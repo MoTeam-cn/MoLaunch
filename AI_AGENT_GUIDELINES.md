@@ -319,20 +319,20 @@ const handleSelect = (id: string) => {
 
 ## 八、修改完成后的检查清单
 
-每次修改代码后，**必须按顺序执行以下命令**：
+每次修改代码后，**必须按顺序执行以下命令**，全部通过后才能提交：
 
 ```bash
-# 1. 前端代码检查
-npm run lint
+# 1. Rust 代码格式化 (必须第一个执行)
+cd src-tauri && cargo fmt
 
-# 2. TypeScript 类型检查
-npm run typecheck
-
-# 3. Rust 代码检查
+# 2. Rust 代码检查 (必须通过，0 warnings)
 cd src-tauri && cargo clippy -- -D warnings
 
-# 4. Rust 代码格式化
-cd src-tauri && cargo fmt
+# 3. 前端代码检查 (必须通过，0 errors)
+npm run lint
+
+# 4. TypeScript 类型检查
+npm run typecheck
 
 # 5. 提交
 git add -A
@@ -340,7 +340,11 @@ git commit -m "type(scope): description"
 git push origin main
 ```
 
-**绝对不要跳过代码检查！** CI 会检查代码格式，格式不对会失败。
+**重要提醒：**
+- **绝对不要跳过本地检查直接提交！** CI 会检查代码，本地不过 CI 也不会过。
+- `npm run lint` 必须 0 errors 才能提交（warnings 可以接受）
+- `cargo clippy` 必须 0 warnings 才能提交（使用 `-D warnings` 将警告视为错误）
+- `cargo fmt` 必须在 `cargo clippy` 之前执行
 
 ---
 
