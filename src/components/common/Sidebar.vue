@@ -4,12 +4,14 @@
  * 支持二级、三级菜单
  */
 
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
+import { ChevronRightIcon } from '@heroicons/vue/24/outline'
+import type { Component } from 'vue'
 
 export interface SidebarItem {
   id: string
   label: string
-  icon?: string
+  icon?: Component
   description?: string
   children?: SidebarItem[]
   badge?: string | number
@@ -33,7 +35,6 @@ const emit = defineEmits<{
   select: [id: string]
 }>()
 
-// 展开的项目
 const expandedItems = ref<Set<string>>(new Set())
 
 function toggleExpand(id: string) {
@@ -84,10 +85,7 @@ function hasChildren(item: SidebarItem): boolean {
           @click="!item.disabled && (hasChildren(item) ? toggleExpand(item.id) : handleSelect(item.id))"
         >
           <div class="flex items-center min-w-0">
-            <!-- 图标 -->
-            <span v-if="item.icon" class="mr-2 text-lg">{{ item.icon }}</span>
-            
-            <!-- 标签和描述 -->
+            <component :is="item.icon" v-if="item.icon" class="w-5 h-5 mr-2 flex-shrink-0" />
             <div class="min-w-0">
               <div class="flex items-center">
                 <span class="text-sm font-medium truncate">{{ item.label }}</span>
@@ -104,17 +102,11 @@ function hasChildren(item: SidebarItem): boolean {
             </div>
           </div>
 
-          <!-- 展开箭头 -->
-          <svg
+          <ChevronRightIcon
             v-if="hasChildren(item)"
-            class="w-4 h-4 transition-transform"
+            class="w-4 h-4 transition-transform flex-shrink-0"
             :class="{ 'rotate-90': isExpanded(item.id) }"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-          </svg>
+          />
         </div>
 
         <!-- 二级菜单 -->
@@ -128,7 +120,6 @@ function hasChildren(item: SidebarItem): boolean {
         >
           <div v-if="hasChildren(item) && isExpanded(item.id)" class="ml-4 mt-1">
             <div v-for="child in item.children" :key="child.id" class="px-2">
-              <!-- 二级菜单项 -->
               <div
                 class="flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
                 :class="[
@@ -140,7 +131,7 @@ function hasChildren(item: SidebarItem): boolean {
                 @click="!child.disabled && (hasChildren(child) ? toggleExpand(child.id) : handleSelect(child.id))"
               >
                 <div class="flex items-center min-w-0">
-                  <span v-if="child.icon" class="mr-2 text-sm">{{ child.icon }}</span>
+                  <component :is="child.icon" v-if="child.icon" class="w-4 h-4 mr-2 flex-shrink-0" />
                   <div class="min-w-0">
                     <span class="text-sm truncate">{{ child.label }}</span>
                     <p v-if="child.description" class="text-xs text-gray-500 dark:text-gray-400 truncate">
@@ -156,16 +147,11 @@ function hasChildren(item: SidebarItem): boolean {
                   >
                     {{ child.badge }}
                   </span>
-                  <svg
+                  <ChevronRightIcon
                     v-if="hasChildren(child)"
-                    class="w-3.5 h-3.5 ml-1 transition-transform"
+                    class="w-3.5 h-3.5 ml-1 transition-transform flex-shrink-0"
                     :class="{ 'rotate-90': isExpanded(child.id) }"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                  </svg>
+                  />
                 </div>
               </div>
 
@@ -192,7 +178,7 @@ function hasChildren(item: SidebarItem): boolean {
                     @click="!grandchild.disabled && handleSelect(grandchild.id)"
                   >
                     <div class="flex items-center">
-                      <span v-if="grandchild.icon" class="mr-2 text-xs">{{ grandchild.icon }}</span>
+                      <component :is="grandchild.icon" v-if="grandchild.icon" class="w-3.5 h-3.5 mr-2 flex-shrink-0" />
                       <span class="text-xs truncate">{{ grandchild.label }}</span>
                     </div>
                   </div>

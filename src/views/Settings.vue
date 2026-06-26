@@ -43,7 +43,8 @@ function handleReset() {
 </script>
 
 <template>
-  <div class="max-w-2xl mx-auto">
+  <div class="h-full overflow-y-auto">
+    <div class="max-w-2xl mx-auto py-6 px-4">
     <!-- 标题 -->
     <div class="mb-6">
       <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
@@ -334,6 +335,7 @@ function handleReset() {
       <button class="btn-primary" @click="handleSave">
         保存设置
       </button>
+    </div>
     </div>
   </div>
 </template>
