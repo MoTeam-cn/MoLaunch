@@ -1,0 +1,279 @@
+<script setup lang="ts">
+/**
+ * 设置页面
+ */
+
+import { ref, onMounted } from 'vue'
+import { useSdkStore } from '@/stores/sdk'
+
+const sdkStore = useSdkStore()
+
+const gameDir = ref('.minecraft')
+const maxThreads = ref(8)
+const minMemory = ref(512)
+const maxMemory = ref(2048)
+const theme = ref<'light' | 'dark' | 'system'>('system')
+const language = ref<'zh-CN' | 'en-US'>('zh-CN')
+const logLevel = ref(3)
+
+const showSaveSuccess = ref(false)
+
+onMounted(() => {
+  // TODO: 从存储加载设置
+})
+
+function handleSave() {
+  // TODO: 保存设置
+  showSaveSuccess.value = true
+  setTimeout(() => {
+    showSaveSuccess.value = false
+  }, 3000)
+}
+
+function handleReset() {
+  gameDir.value = '.minecraft'
+  maxThreads.value = 8
+  minMemory.value = 512
+  maxMemory.value = 2048
+  theme.value = 'system'
+  language.value = 'zh-CN'
+  logLevel.value = 3
+}
+</script>
+
+<template>
+  <div class="max-w-2xl mx-auto">
+    <!-- 标题 -->
+    <div class="mb-6">
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+        设置
+      </h1>
+      <p class="text-gray-600 dark:text-gray-400 mt-1">
+        配置启动器参数
+      </p>
+    </div>
+
+    <!-- 保存成功提示 -->
+    <transition
+      enter-active-class="transition ease-out duration-300"
+      enter-from-class="transform opacity-0 -translate-y-2"
+      enter-to-class="transform opacity-100 translate-y-0"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="transform opacity-100 translate-y-0"
+      leave-to-class="transform opacity-0 -translate-y-2"
+    >
+      <div
+        v-if="showSaveSuccess"
+        class="mb-4 p-4 rounded-lg bg-green-50 dark:bg-green-900/50 border border-green-200 dark:border-green-800"
+      >
+        <div class="flex items-center">
+          <svg class="w-5 h-5 text-green-600 dark:text-green-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span class="text-green-800 dark:text-green-200">设置已保存</span>
+        </div>
+      </div>
+    </transition>
+
+    <!-- 游戏设置 -->
+    <div class="card mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        游戏设置
+      </h2>
+      <div class="space-y-4">
+        <!-- 游戏目录 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            游戏目录
+          </label>
+          <input
+            v-model="gameDir"
+            type="text"
+            class="input"
+            placeholder=".minecraft"
+          />
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Minecraft 游戏数据存放目录
+          </p>
+        </div>
+
+        <!-- 内存分配 -->
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              最小内存 (MB)
+            </label>
+            <input
+              v-model.number="minMemory"
+              type="number"
+              class="input"
+              min="256"
+              max="16384"
+              step="256"
+            />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              最大内存 (MB)
+            </label>
+            <input
+              v-model.number="maxMemory"
+              type="number"
+              class="input"
+              min="256"
+              max="16384"
+              step="256"
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 下载设置 -->
+    <div class="card mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        下载设置
+      </h2>
+      <div class="space-y-4">
+        <!-- 下载线程数 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            下载线程数
+          </label>
+          <input
+            v-model.number="maxThreads"
+            type="range"
+            class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-700"
+            min="1"
+            max="16"
+            step="1"
+          />
+          <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <span>1</span>
+            <span>{{ maxThreads }}</span>
+            <span>16</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 界面设置 -->
+    <div class="card mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        界面设置
+      </h2>
+      <div class="space-y-4">
+        <!-- 主题 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            主题
+          </label>
+          <div class="flex gap-4">
+            <label class="flex items-center">
+              <input
+                v-model="theme"
+                type="radio"
+                value="light"
+                class="mr-2"
+              />
+              <span class="text-gray-700 dark:text-gray-300">浅色</span>
+            </label>
+            <label class="flex items-center">
+              <input
+                v-model="theme"
+                type="radio"
+                value="dark"
+                class="mr-2"
+              />
+              <span class="text-gray-700 dark:text-gray-300">深色</span>
+            </label>
+            <label class="flex items-center">
+              <input
+                v-model="theme"
+                type="radio"
+                value="system"
+                class="mr-2"
+              />
+              <span class="text-gray-700 dark:text-gray-300">跟随系统</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 语言 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            语言
+          </label>
+          <select v-model="language" class="input">
+            <option value="zh-CN">简体中文</option>
+            <option value="en-US">English</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- 高级设置 -->
+    <div class="card mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        高级设置
+      </h2>
+      <div class="space-y-4">
+        <!-- 日志级别 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            日志级别
+          </label>
+          <select v-model.number="logLevel" class="input">
+            <option :value="0">关闭</option>
+            <option :value="1">错误</option>
+            <option :value="2">警告</option>
+            <option :value="3">信息</option>
+            <option :value="4">调试</option>
+            <option :value="5">跟踪</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- SDK 信息 -->
+    <div class="card mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        SDK 信息
+      </h2>
+      <div class="space-y-2 text-sm">
+        <div class="flex justify-between">
+          <span class="text-gray-600 dark:text-gray-400">平台</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ sdkStore.status?.platform || '未知' }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600 dark:text-gray-400">版本</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ sdkStore.version || '未加载' }}</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600 dark:text-gray-400">状态</span>
+          <span
+            :class="sdkStore.isReady ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'"
+          >
+            {{ sdkStore.isReady ? '就绪' : '加载中' }}
+          </span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600 dark:text-gray-400">库路径</span>
+          <span class="text-gray-900 dark:text-gray-100 text-xs truncate ml-2 max-w-xs">
+            {{ sdkStore.status?.library_path || '未知' }}
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 操作按钮 -->
+    <div class="flex justify-end gap-4">
+      <button @click="handleReset" class="btn-secondary">
+        重置默认
+      </button>
+      <button @click="handleSave" class="btn-primary">
+        保存设置
+      </button>
+    </div>
+  </div>
+</template>

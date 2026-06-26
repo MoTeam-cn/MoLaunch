@@ -1,0 +1,37 @@
+[package]
+name = "mo-launch"
+version = "0.1.0"
+description = "Modern Minecraft Launcher"
+authors = ["MoTeam"]
+license = "MIT"
+repository = "https://github.com/MoTeam-cn/MoLaunch"
+edition = "2021"
+
+[lib]
+name = "mo_launch_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = [ "shell-execute", "shell-sidecar", "shell-open", "dialog-all", "notification-all", "fs-all", "path-all", "window-all"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.35", features = ["full"] }
+log = "0.4"
+env_logger = "0.10"
+thiserror = "1.0"
+dirs = "5.0"
+uuid = { version = "1.7", features = ["v4"] }
+libloading = "0.8"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
