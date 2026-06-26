@@ -91,9 +91,9 @@ function handleKeyPress(e: KeyboardEvent) {
           </div>
 
           <button
-            @click="handleLogin"
             class="btn-primary w-full"
             :disabled="loading || !username.trim()"
+            @click="handleLogin"
           >
             <span v-if="loading" class="flex items-center justify-center">
               <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">

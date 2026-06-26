@@ -96,32 +96,32 @@ function getVersionTypeBadge(versionType: string) {
         <!-- 过滤按钮 -->
         <div class="flex gap-2">
           <button
-            @click="filterType = 'all'"
             class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             :class="filterType === 'all'
               ? 'bg-primary-600 text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
             "
+            @click="filterType = 'all'"
           >
             全部
           </button>
           <button
-            @click="filterType = 'release'"
             class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             :class="filterType === 'release'
               ? 'bg-green-600 text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
             "
+            @click="filterType = 'release'"
           >
             正式版
           </button>
           <button
-            @click="filterType = 'snapshot'"
             class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
             :class="filterType === 'snapshot'
               ? 'bg-yellow-600 text-white'
               : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600'
             "
+            @click="filterType = 'snapshot'"
           >
             快照版
           </button>

@@ -8,9 +8,9 @@ use mo_launch_lib::state::AppState;
 fn main() {
     // 初始化日志
     env_logger::init();
-    
+
     log::info!("Starting MoLaunch v{}", env!("CARGO_PKG_VERSION"));
-    
+
     tauri::Builder::default()
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![

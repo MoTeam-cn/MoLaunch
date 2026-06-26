@@ -49,11 +49,11 @@ pub fn get_sdk_resource_dir() -> PathBuf {
     // 在开发模式下，sdk_data 在项目根目录
     // 在发布模式下，sdk_data 被打包到 resources 目录
     let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../sdk_data");
-    
+
     if dev_path.exists() {
         return dev_path;
     }
-    
+
     // 发布模式下，尝试从 Tauri 资源目录获取
     if let Ok(resource_dir) = std::env::current_exe() {
         if let Some(exe_dir) = resource_dir.parent() {
@@ -63,7 +63,7 @@ pub fn get_sdk_resource_dir() -> PathBuf {
             }
         }
     }
-    
+
     // 兜底返回开发路径
     dev_path
 }
@@ -182,15 +182,14 @@ impl SdkInstance {
     /// 加载 SDK 库
     pub fn load() -> Result<Self, SdkError> {
         let lib_path = check_sdk_library()?;
-        
+
         log::info!("Loading SDK from: {}", lib_path.display());
-        
+
         let lib = unsafe {
-            libloading::Library::new(&lib_path).map_err(|e| {
-                SdkError::LoadFailed(format!("Failed to load library: {}", e))
-            })?
+            libloading::Library::new(&lib_path)
+                .map_err(|e| SdkError::LoadFailed(format!("Failed to load library: {}", e)))?
         };
-        
+
         let functions = unsafe {
             SdkFunctions {
                 init: *lib.get(b"mc_sdk_init").map_err(|e| {
@@ -225,19 +224,24 @@ impl SdkInstance {
                 })?,
             }
         };
-        
+
         Ok(Self {
             handle: std::ptr::null_mut(),
             functions,
             _lib: lib,
         })
     }
-    
+
     /// 初始化 SDK
-    pub fn init(&mut self, game_dir: &str, max_threads: u32, log_level: u32) -> Result<(), SdkError> {
+    pub fn init(
+        &mut self,
+        game_dir: &str,
+        max_threads: u32,
+        log_level: u32,
+    ) -> Result<(), SdkError> {
         let game_dir_cstr = std::ffi::CString::new(game_dir)
             .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
-        
+
         let config = MCConfig {
             game_dir: game_dir_cstr.as_ptr(),
             max_download_threads: max_threads,
@@ -245,9 +249,9 @@ impl SdkInstance {
             log_level,
             curseforge_api_key: std::ptr::null(),
         };
-        
+
         let handle = unsafe { (self.functions.init)(&config) };
-        
+
         if handle.is_null() {
             let error = unsafe { (self.functions.last_error)() };
             if !error.is_null() {
@@ -261,12 +265,12 @@ impl SdkInstance {
             }
             return Err(SdkError::NullPointer);
         }
-        
+
         self.handle = handle;
         log::info!("SDK initialized successfully");
         Ok(())
     }
-    
+
     /// 获取 SDK 版本
     pub fn version(&self) -> String {
         let version_ptr = unsafe { (self.functions.version)() };
@@ -277,33 +281,33 @@ impl SdkInstance {
             .to_string_lossy()
             .to_string()
     }
-    
+
     /// 获取设备 ID
     pub fn get_device_id(&self) -> Result<String, SdkError> {
         let device_id_ptr = unsafe { (self.functions.get_device_id)() };
         if device_id_ptr.is_null() {
             return Err(SdkError::NullPointer);
         }
-        
+
         let device_id = unsafe { std::ffi::CStr::from_ptr(device_id_ptr) }
             .to_string_lossy()
             .to_string();
-        
+
         // 释放 SDK 分配的内存
         unsafe { (self.functions.free_string)(device_id_ptr) };
-        
+
         Ok(device_id)
     }
-    
+
     /// 离线登录
     pub fn auth_offline(&self, username: &str) -> Result<AuthResult, SdkError> {
         if self.handle.is_null() {
             return Err(SdkError::NotInitialized);
         }
-        
+
         let username_cstr = std::ffi::CString::new(username)
             .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
-        
+
         let mut result = FFIAuthResult {
             auth_type: 0,
             access_token: std::ptr::null_mut(),
@@ -314,27 +318,27 @@ impl SdkInstance {
             error_code: 0,
             error_message: std::ptr::null_mut(),
         };
-        
+
         let code = unsafe { (self.functions.auth_offline)(username_cstr.as_ptr(), &mut result) };
-        
+
         if code != 0 {
             return Err(SdkError::FfiFailed(code));
         }
-        
+
         let auth_result = AuthResult::from_ffi(&result);
-        
+
         // 释放 FFI 内存
         unsafe { (self.functions.auth_free_result)(&mut result) };
-        
+
         Ok(auth_result)
     }
-    
+
     /// 获取版本列表
     pub fn list_versions(&self) -> Result<VersionList, SdkError> {
         if self.handle.is_null() {
             return Err(SdkError::NotInitialized);
         }
-        
+
         let mut version_list = FFIVersionList {
             versions: std::ptr::null_mut(),
             count: 0,
@@ -343,18 +347,18 @@ impl SdkInstance {
             error_code: 0,
             error_message: std::ptr::null_mut(),
         };
-        
+
         let code = unsafe { (self.functions.list_versions)(&mut version_list) };
-        
+
         if code != 0 {
             return Err(SdkError::FfiFailed(code));
         }
-        
+
         let result = VersionList::from_ffi(&version_list);
-        
+
         // 释放 FFI 内存
         unsafe { (self.functions.free_version_list)(&mut version_list) };
-        
+
         Ok(result)
     }
 }
@@ -448,7 +452,7 @@ pub struct VersionList {
 impl VersionList {
     fn from_ffi(ffi: &FFIVersionList) -> Self {
         let mut versions = Vec::new();
-        
+
         if !ffi.versions.is_null() && ffi.count > 0 {
             for i in 0..ffi.count {
                 let entry = unsafe { &*ffi.versions.add(i as usize) };
@@ -475,7 +479,7 @@ impl VersionList {
                 });
             }
         }
-        
+
         Self {
             versions,
             latest_release: unsafe {

@@ -44,8 +44,8 @@ function handleLogout() {
       <!-- 用户菜单 -->
       <div v-if="authStore.isLoggedIn" class="relative">
         <button
-          @click="toggleUserMenu"
           class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          @click="toggleUserMenu"
         >
           <div class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
             <span class="text-primary-600 dark:text-primary-400 font-semibold text-sm">
@@ -79,8 +79,8 @@ function handleLogout() {
               </p>
             </div>
             <button
-              @click="handleLogout"
               class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/50"
+              @click="handleLogout"
             >
               登出
             </button>

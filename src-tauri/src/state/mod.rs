@@ -1,9 +1,9 @@
 //! 应用状态管理
 
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use crate::sdk::SdkInstance;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// 应用全局状态
 pub struct AppState {
@@ -39,19 +39,10 @@ impl Default for AppConfig {
 }
 
 /// 认证状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AuthState {
     pub current_user: Option<crate::sdk::AuthResult>,
     pub is_logged_in: bool,
-}
-
-impl Default for AuthState {
-    fn default() -> Self {
-        Self {
-            current_user: None,
-            is_logged_in: false,
-        }
-    }
 }
 
 /// 获取默认游戏目录
@@ -61,6 +52,12 @@ fn get_default_game_dir() -> String {
         minecraft_dir.to_string_lossy().to_string()
     } else {
         ".minecraft".to_string()
+    }
+}
+
+impl Default for AppState {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

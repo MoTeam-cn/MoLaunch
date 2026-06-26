@@ -89,12 +89,12 @@ function handleReset() {
           </label>
           <div class="grid grid-cols-2 gap-4">
             <button
-              @click="settingsStore.setLayoutMode('sidebar')"
               class="relative p-4 rounded-lg border-2 transition-all"
               :class="settingsStore.layoutMode === 'sidebar'
                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/50'
                 : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               "
+              @click="settingsStore.setLayoutMode('sidebar')"
             >
               <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded bg-gray-200 dark:bg-gray-600 flex">
@@ -117,12 +117,12 @@ function handleReset() {
             </button>
             
             <button
-              @click="settingsStore.setLayoutMode('topnav')"
               class="relative p-4 rounded-lg border-2 transition-all"
               :class="settingsStore.layoutMode === 'topnav'
                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/50'
                 : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
               "
+              @click="settingsStore.setLayoutMode('topnav')"
             >
               <div class="flex items-center space-x-3">
                 <div class="w-10 h-10 rounded bg-gray-200 dark:bg-gray-600 flex flex-col">
@@ -156,8 +156,8 @@ function handleReset() {
               <input
                 type="radio"
                 :checked="settingsStore.theme === 'light'"
-                @change="settingsStore.setTheme('light')"
                 class="mr-2"
+                @change="settingsStore.setTheme('light')"
               />
               <span class="text-gray-700 dark:text-gray-300">浅色</span>
             </label>
@@ -165,8 +165,8 @@ function handleReset() {
               <input
                 type="radio"
                 :checked="settingsStore.theme === 'dark'"
-                @change="settingsStore.setTheme('dark')"
                 class="mr-2"
+                @change="settingsStore.setTheme('dark')"
               />
               <span class="text-gray-700 dark:text-gray-300">深色</span>
             </label>
@@ -174,8 +174,8 @@ function handleReset() {
               <input
                 type="radio"
                 :checked="settingsStore.theme === 'system'"
-                @change="settingsStore.setTheme('system')"
                 class="mr-2"
+                @change="settingsStore.setTheme('system')"
               />
               <span class="text-gray-700 dark:text-gray-300">跟随系统</span>
             </label>
@@ -328,10 +328,10 @@ function handleReset() {
 
     <!-- 操作按钮 -->
     <div class="flex justify-end gap-4">
-      <button @click="handleReset" class="btn-secondary">
+      <button class="btn-secondary" @click="handleReset">
         重置默认
       </button>
-      <button @click="handleSave" class="btn-primary">
+      <button class="btn-primary" @click="handleSave">
         保存设置
       </button>
     </div>

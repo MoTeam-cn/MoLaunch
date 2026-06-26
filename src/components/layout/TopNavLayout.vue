@@ -87,8 +87,8 @@ function handleLogout() {
           <!-- 用户菜单 -->
           <div v-if="authStore.isLoggedIn" class="relative">
             <button
-              @click="toggleUserMenu"
               class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              @click="toggleUserMenu"
             >
               <div class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
                 <span class="text-primary-600 dark:text-primary-400 font-semibold text-sm">
@@ -125,8 +125,8 @@ function handleLogout() {
                   </p>
                 </div>
                 <button
-                  @click="handleLogout"
                   class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/50"
+                  @click="handleLogout"
                 >
                   登出
                 </button>
@@ -144,8 +144,8 @@ function handleLogout() {
           
           <!-- 移动端菜单按钮 -->
           <button
-            @click="showMobileMenu = !showMobileMenu"
             class="md:hidden p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
+            @click="showMobileMenu = !showMobileMenu"
           >
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
@@ -184,13 +184,13 @@ function handleLogout() {
             <button
               v-for="item in navItems"
               :key="item.path"
-              @click="navigateTo(item.path)"
               class="w-full text-left px-4 py-3 rounded-lg text-sm font-medium transition-colors"
               :class="[
                 isActive(item.path)
                   ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
                   : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
               ]"
+              @click="navigateTo(item.path)"
             >
               {{ item.name }}
             </button>
