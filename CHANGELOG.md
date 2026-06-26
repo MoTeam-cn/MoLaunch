@@ -7,18 +7,6 @@
 
 ## [未发布]
 
-### 新增
-- 完整的项目结构和配置文件
-- 多平台 SDK 自动选择机制 (Windows/macOS/Linux)
-- Rust FFI 绑定层，支持动态加载 SDK
-- Vue 3 前端框架，集成 Tailwind CSS
-- 侧边栏、顶部栏布局组件
-- 首页、登录页、版本管理页、设置页
-- 认证状态管理 (Pinia)
-- 版本状态管理 (Pinia)
-- SDK 状态管理 (Pinia)
-- Tauri IPC 命令封装
-
 ### 待实现
 - 微软 OAuth 2.0 设备码登录流程
 - 版本下载功能
@@ -37,6 +25,35 @@
 - Rust 后端框架搭建
 - Vue 前端框架搭建
 - Headless UI + Tailwind CSS 集成
+- 完整的项目结构和配置文件
+
+#### SDK 集成
+- 多平台 SDK 自动选择机制 (Windows/macOS/Linux)
+- Rust FFI 绑定层，支持动态加载 SDK
+- Tauri IPC 命令封装
+- 设备 ID 获取功能
+
+#### UI 框架
+- 侧边栏布局组件
+- 顶部导航栏布局组件
+- 首页、登录页、版本管理页、设置页
+- 布局切换功能 (侧边栏/顶部栏)
+- 主题切换功能 (浅色/深色/跟随系统)
+
+#### 状态管理
+- 认证状态管理 (Pinia)
+- 版本状态管理 (Pinia)
+- SDK 状态管理 (Pinia)
+- 设置状态管理 (Pinia)
+
+#### 功能
+- 离线模式登录
+- 版本列表获取
+- 设备 ID 显示
+
+#### CI/CD
+- GitHub Actions CI workflow
+- GitHub Actions Release workflow
 
 #### 核心模块
 - McSDK FFI 绑定层 (`src-tauri/src/sdk/`)
