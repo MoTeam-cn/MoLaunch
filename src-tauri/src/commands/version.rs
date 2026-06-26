@@ -7,24 +7,10 @@ use tauri::{Manager, State};
 /// 下载进度事件
 #[derive(Clone, serde::Serialize)]
 pub struct DownloadProgress {
-    pub stage: u32,
-    pub stage_name: String,
-    pub current: u32,
-    pub total: u32,
+    pub stage: String,
+    pub current: usize,
+    pub total: usize,
     pub percentage: f64,
-}
-
-/// 获取阶段名称
-fn get_stage_name(stage: u32) -> &'static str {
-    match stage {
-        0 => "版本清单",
-        1 => "版本 JSON",
-        2 => "客户端 JAR",
-        3 => "库文件",
-        4 => "资源文件",
-        5 => "解压 Natives",
-        _ => "未知",
-    }
 }
 
 /// 获取版本列表
@@ -68,7 +54,6 @@ pub async fn download_version(
 
         let progress = DownloadProgress {
             stage,
-            stage_name: get_stage_name(stage).to_string(),
             current,
             total,
             percentage,
@@ -78,8 +63,7 @@ pub async fn download_version(
         let _ = app_handle.emit_all("download-progress", &progress);
 
         log::debug!(
-            "Download progress [{}]: {}/{} ({:.1}%)",
-            get_stage_name(stage),
+            "Download progress: {}/{} ({:.1}%)",
             current,
             total,
             percentage

@@ -8,8 +8,7 @@ import type { VersionInfo, VersionList } from '@/types/version'
 import * as tauri from '@/utils/tauri'
 
 export interface DownloadProgress {
-  stage: number
-  stage_name: string
+  stage: string
   current: number
   total: number
   percentage: number

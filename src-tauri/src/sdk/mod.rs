@@ -164,7 +164,8 @@ pub struct FFIJavaList {
 }
 
 /// 下载进度回调函数类型
-pub type DownloadCallback = unsafe extern "C" fn(u32, u32, u32, *mut std::ffi::c_void);
+pub type DownloadCallback =
+    unsafe extern "C" fn(*const std::ffi::c_char, usize, usize, *mut std::ffi::c_void);
 
 // FFI 函数类型定义
 type McSdkInit = unsafe extern "C" fn(*const MCConfig) -> *mut std::ffi::c_void;
@@ -434,7 +435,7 @@ impl SdkInstance {
         callback: F,
     ) -> Result<(), SdkError>
     where
-        F: Fn(u32, u32, u32) + Send + 'static,
+        F: Fn(String, usize, usize) + Send + 'static,
     {
         if self.handle.is_null() {
             return Err(SdkError::NotInitialized);
@@ -449,14 +450,17 @@ impl SdkInstance {
 
         // 定义 C 回调函数
         unsafe extern "C" fn c_callback(
-            stage: u32,
-            current: u32,
-            total: u32,
+            stage: *const std::ffi::c_char,
+            current: usize,
+            total: usize,
             user_data: *mut std::ffi::c_void,
         ) {
-            if !user_data.is_null() {
-                let callback = &*(user_data as *const Box<dyn Fn(u32, u32, u32) + Send>);
-                callback(stage, current, total);
+            if !user_data.is_null() && !stage.is_null() {
+                let stage_str = std::ffi::CStr::from_ptr(stage)
+                    .to_string_lossy()
+                    .to_string();
+                let callback = &*(user_data as *const Box<dyn Fn(String, usize, usize) + Send>);
+                callback(stage_str, current, total);
             }
         }
 
@@ -471,7 +475,7 @@ impl SdkInstance {
 
         // 释放回调内存
         unsafe {
-            let _ = Box::from_raw(callback_ptr as *mut Box<dyn Fn(u32, u32, u32) + Send>);
+            let _ = Box::from_raw(callback_ptr as *mut Box<dyn Fn(String, usize, usize) + Send>);
         }
 
         if code != 0 {

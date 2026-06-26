@@ -9,6 +9,21 @@ import { useVersionStore } from '@/stores/version'
 import type { DownloadProgress } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 
+// 导入 Blocks 图片
+import grassIcon from '@/assets/blocks/Grass.png'
+import anvilIcon from '@/assets/blocks/Anvil.png'
+import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
+import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
+import eggIcon from '@/assets/blocks/Egg.png'
+import fabricIcon from '@/assets/blocks/Fabric.png'
+import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
+import grassPathIcon from '@/assets/blocks/GrassPath.png'
+import neoForgeIcon from '@/assets/blocks/NeoForge.png'
+import optiFabricIcon from '@/assets/blocks/OptiFabric.png'
+import redstoneBlockIcon from '@/assets/blocks/RedstoneBlock.png'
+import redstoneLampOffIcon from '@/assets/blocks/RedstoneLampOff.png'
+import redstoneLampOnIcon from '@/assets/blocks/RedstoneLampOn.png'
+
 const versionStore = useVersionStore()
 
 const searchQuery = ref('')
@@ -16,6 +31,23 @@ const filterType = ref<'all' | 'release' | 'snapshot'>('all')
 const loading = ref(false)
 const installedVersions = ref<string[]>([])
 const activeTab = ref<'available' | 'installed'>('available')
+
+// 版本类型对应的图标
+const versionIcons = [
+  grassIcon,
+  anvilIcon,
+  cobblestoneIcon,
+  commandBlockIcon,
+  eggIcon,
+  fabricIcon,
+  goldBlockIcon,
+  grassPathIcon,
+  neoForgeIcon,
+  optiFabricIcon,
+  redstoneBlockIcon,
+  redstoneLampOffIcon,
+  redstoneLampOnIcon,
+]
 
 // 监听下载进度事件
 let unlistenProgress: (() => void) | null = null
@@ -83,6 +115,16 @@ function formatDate(timestamp: number): string {
   })
 }
 
+function getVersionIcon(versionId: string): string {
+  // 根据版本ID生成一个稳定的索引
+  let hash = 0
+  for (let i = 0; i < versionId.length; i++) {
+    hash = ((hash << 5) - hash) + versionId.charCodeAt(i)
+    hash = hash & hash
+  }
+  return versionIcons[Math.abs(hash) % versionIcons.length]
+}
+
 function getVersionTypeBadge(versionType: string) {
   switch (versionType) {
     case 'release':
@@ -119,7 +161,8 @@ async function handleDownload(versionId: string) {
   <div class="max-w-4xl mx-auto">
     <!-- 标题 -->
     <div class="mb-6">
-      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 flex items-center">
+        <img :src="grassIcon" alt="Grass" class="w-8 h-8 mr-2" />
         版本管理
       </h1>
       <p class="text-gray-600 dark:text-gray-400 mt-1">
@@ -143,7 +186,7 @@ async function handleDownload(versionId: string) {
               正在下载 {{ versionStore.downloadingVersion }}
             </span>
             <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
-              {{ versionStore.downloadProgress.stage_name }}
+              {{ versionStore.downloadProgress.stage }}
             </span>
           </div>
           <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
@@ -161,7 +204,6 @@ async function handleDownload(versionId: string) {
         
         <div class="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
           <span>{{ versionStore.downloadProgress.current }} / {{ versionStore.downloadProgress.total }}</span>
-          <span>阶段 {{ versionStore.downloadProgress.stage + 1 }} / 6</span>
         </div>
       </div>
     </transition>
@@ -250,33 +292,41 @@ async function handleDownload(versionId: string) {
           :key="version.id"
           class="card flex items-center justify-between hover:shadow-md transition-shadow"
         >
-          <div>
-            <div class="flex items-center">
-              <span class="font-semibold text-gray-900 dark:text-gray-100">
-                {{ version.id }}
-              </span>
-              <span
-                class="ml-2 text-xs px-2 py-0.5 rounded-full"
-                :class="getVersionTypeBadge(version.version_type).class"
-              >
-                {{ getVersionTypeBadge(version.version_type).text }}
-              </span>
-              <span
-                v-if="version.id === versionStore.latestRelease"
-                class="ml-2 text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200"
-              >
-                最新
-              </span>
-              <span
-                v-if="isInstalled(version.id)"
-                class="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-              >
-                已安装
-              </span>
+          <div class="flex items-center">
+            <!-- 版本图标 -->
+            <img
+              :src="getVersionIcon(version.id)"
+              :alt="version.id"
+              class="w-10 h-10 rounded mr-3"
+            />
+            <div>
+              <div class="flex items-center">
+                <span class="font-semibold text-gray-900 dark:text-gray-100">
+                  {{ version.id }}
+                </span>
+                <span
+                  class="ml-2 text-xs px-2 py-0.5 rounded-full"
+                  :class="getVersionTypeBadge(version.version_type).class"
+                >
+                  {{ getVersionTypeBadge(version.version_type).text }}
+                </span>
+                <span
+                  v-if="version.id === versionStore.latestRelease"
+                  class="ml-2 text-xs px-2 py-0.5 rounded-full bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200"
+                >
+                  最新
+                </span>
+                <span
+                  v-if="isInstalled(version.id)"
+                  class="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                >
+                  已安装
+                </span>
+              </div>
+              <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                发布于 {{ formatDate(version.release_time) }}
+              </p>
             </div>
-            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              发布于 {{ formatDate(version.release_time) }}
-            </p>
           </div>
           <button
             class="btn-primary text-sm"
@@ -318,13 +368,20 @@ async function handleDownload(versionId: string) {
           :key="versionId"
           class="card flex items-center justify-between"
         >
-          <div>
-            <span class="font-semibold text-gray-900 dark:text-gray-100">
-              {{ versionId }}
-            </span>
-            <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-              已安装
-            </span>
+          <div class="flex items-center">
+            <img
+              :src="getVersionIcon(versionId)"
+              :alt="versionId"
+              class="w-10 h-10 rounded mr-3"
+            />
+            <div>
+              <span class="font-semibold text-gray-900 dark:text-gray-100">
+                {{ versionId }}
+              </span>
+              <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                已安装
+              </span>
+            </div>
           </div>
           <button class="btn-primary text-sm">
             <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">

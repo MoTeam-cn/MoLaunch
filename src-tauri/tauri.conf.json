@@ -45,7 +45,7 @@
       "targets": "all",
       "identifier": "com.moteam.molaunch",
       "icon": [
-        "icons/icon.png"
+        "Images/icon.ico"
       ],
       "resources": [
         "../sdk_data/*"
