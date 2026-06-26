@@ -10,6 +10,7 @@ import { listen } from '@tauri-apps/api/event'
 import { useVersionStore } from '@/stores/version'
 import type { DownloadProgress } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
+import { showError, showConfirm } from '@/utils/modal'
 import {
   CubeIcon,
   WrenchIcon,
@@ -38,19 +39,19 @@ const loading = ref(false)
 const installedVersions = ref<string[]>([])
 const activeCategory = ref('vanilla')
 
-// 当前展开的分类（只展开一个）
-const expandedSection = ref<string | null>('latest')
+// 展开的分类（支持多个同时展开）
+const expandedSections = ref<Set<string>>(new Set(['latest']))
 
 function toggleSection(sectionId: string) {
-  if (expandedSection.value === sectionId) {
-    expandedSection.value = null
+  if (expandedSections.value.has(sectionId)) {
+    expandedSections.value.delete(sectionId)
   } else {
-    expandedSection.value = sectionId
+    expandedSections.value.add(sectionId)
   }
 }
 
 function isSectionExpanded(sectionId: string): boolean {
-  return expandedSection.value === sectionId
+  return expandedSections.value.has(sectionId)
 }
 
 // 版本类型图标
@@ -182,22 +183,25 @@ async function handleDownload(versionId: string) {
     await tauri.downloadVersion(versionId)
   } catch (e) {
     console.error('Failed to download version:', e)
-    alert(`下载失败: ${e}`)
+    showError('下载失败', `无法下载版本 ${versionId}`, String(e))
     versionStore.finishDownload()
   }
 }
 
 async function handleUninstall(versionId: string) {
-  if (!confirm(`确定要卸载版本 ${versionId} 吗？`)) {
-    return
-  }
-  try {
-    await tauri.uninstallVersion(versionId)
-    installedVersions.value = installedVersions.value.filter(v => v !== versionId)
-  } catch (e) {
-    console.error('Failed to uninstall version:', e)
-    alert(`卸载失败: ${e}`)
-  }
+  showConfirm(
+    '卸载版本',
+    `确定要卸载版本 ${versionId} 吗？此操作不可撤销。`,
+    async () => {
+      try {
+        await tauri.uninstallVersion(versionId)
+        installedVersions.value = installedVersions.value.filter(v => v !== versionId)
+      } catch (e) {
+        console.error('Failed to uninstall version:', e)
+        showError('卸载失败', `无法卸载版本 ${versionId}`, String(e))
+      }
+    }
+  )
 }
 
 async function handleOpenGameDir() {

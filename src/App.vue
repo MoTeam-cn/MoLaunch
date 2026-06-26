@@ -3,16 +3,27 @@
  * MoLaunch 根组件
  */
 
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import TopNavLayout from '@/components/layout/TopNavLayout.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
+import Modal from '@/components/common/Modal.vue'
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
+import { setModalRef } from '@/utils/modal'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
+const modalRef = ref<InstanceType<typeof Modal> | null>(null)
 
-onMounted(async () => {
+onMounted(() => {
+  // 设置弹窗引用
+  setModalRef(modalRef.value)
+  
+  // 初始化
+  initApp()
+})
+
+async function initApp() {
   // 获取平台信息
   await sdkStore.fetchPlatformInfo()
   
@@ -30,7 +41,7 @@ onMounted(async () => {
   
   // 恢复登录状态
   await authStore.restoreSession()
-})
+}
 </script>
 
 <template>
@@ -42,6 +53,7 @@ onMounted(async () => {
     </router-view>
   </TopNavLayout>
   <BackToTop />
+  <Modal ref="modalRef" />
 </template>
 
 <style>
