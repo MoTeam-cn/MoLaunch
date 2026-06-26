@@ -23,6 +23,7 @@ import {
   ChevronRightIcon,
   PlayIcon,
   TrashIcon,
+  SparklesIcon,
 } from '@heroicons/vue/24/outline'
 
 // 导入 Blocks 图片
@@ -37,19 +38,19 @@ const loading = ref(false)
 const installedVersions = ref<string[]>([])
 const activeCategory = ref('vanilla')
 
-// 展开的分类
-const expandedSections = ref<Set<string>>(new Set(['release', 'snapshot', 'old']))
+// 当前展开的分类（只展开一个）
+const expandedSection = ref<string | null>('latest')
 
 function toggleSection(sectionId: string) {
-  if (expandedSections.value.has(sectionId)) {
-    expandedSections.value.delete(sectionId)
+  if (expandedSection.value === sectionId) {
+    expandedSection.value = null
   } else {
-    expandedSections.value.add(sectionId)
+    expandedSection.value = sectionId
   }
 }
 
 function isSectionExpanded(sectionId: string): boolean {
-  return expandedSections.value.has(sectionId)
+  return expandedSection.value === sectionId
 }
 
 // 版本类型图标
@@ -81,8 +82,29 @@ const categories = [
   { id: 'installed', label: '已安装', icon: CheckCircleIcon },
 ]
 
+// 最新版本
+const latestVersions = computed(() => {
+  const versions = []
+  if (versionStore.latestRelease) {
+    const v = versionStore.getVersionById(versionStore.latestRelease)
+    if (v) versions.push({ ...v, tag: '正式版' })
+  }
+  if (versionStore.latestSnapshot) {
+    const v = versionStore.getVersionById(versionStore.latestSnapshot)
+    if (v) versions.push({ ...v, tag: '快照版' })
+  }
+  return versions
+})
+
 // 版本分类
 const sections = computed(() => [
+  {
+    id: 'latest',
+    label: '最新版本',
+    icon: SparklesIcon,
+    count: latestVersions.value.length,
+    versions: latestVersions.value,
+  },
   {
     id: 'release',
     label: '正式版',
@@ -324,16 +346,13 @@ async function handleOpenGameDir() {
                         <div class="flex items-center">
                           <span class="text-sm text-gray-900 dark:text-gray-100">{{ version.id }}</span>
                           <span
-                            v-if="version.id === versionStore.latestRelease && section.id === 'release'"
-                            class="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                            v-if="(version as any).tag"
+                            class="ml-2 text-xs px-1.5 py-0.5 rounded-full"
+                            :class="(version as any).tag === '正式版' 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'"
                           >
-                            最新
-                          </span>
-                          <span
-                            v-if="version.id === versionStore.latestSnapshot && section.id === 'snapshot'"
-                            class="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
-                          >
-                            最新
+                            {{ (version as any).tag }}
                           </span>
                         </div>
                         <span class="text-xs text-gray-500">{{ formatDate(version.release_time) }}</span>

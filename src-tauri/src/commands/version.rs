@@ -113,10 +113,14 @@ pub async fn uninstall_version(
     let game_dir = config.game_dir.clone();
     drop(config);
 
+    log::info!("Game directory: {}", game_dir);
+
     // 构建版本目录路径
     let version_dir = std::path::Path::new(&game_dir)
         .join("versions")
         .join(&version_id);
+
+    log::info!("Version directory: {}", version_dir.display());
 
     if version_dir.exists() {
         std::fs::remove_dir_all(&version_dir).map_err(|e| {
@@ -124,10 +128,12 @@ pub async fn uninstall_version(
             format!("Failed to remove version: {}", e)
         })?;
         log::info!("Version {} uninstalled successfully", version_id);
+        Ok(())
     } else {
         log::warn!("Version directory not found: {}", version_dir.display());
-        return Err("Version not found".to_string());
+        Err(format!(
+            "Version directory not found: {}",
+            version_dir.display()
+        ))
     }
-
-    Ok(())
 }
