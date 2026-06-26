@@ -78,6 +78,13 @@ export async function listInstalledVersions(): Promise<string[]> {
 }
 
 /**
+ * 卸载版本
+ */
+export async function uninstallVersion(versionId: string): Promise<void> {
+  return await invoke<void>('uninstall_version', { versionId })
+}
+
+/**
  * 获取设备 ID
  */
 export async function getDeviceId(): Promise<string> {

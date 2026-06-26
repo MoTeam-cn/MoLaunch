@@ -100,3 +100,34 @@ pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<S
     log::info!("Found {} installed versions", versions.len());
     Ok(versions)
 }
+
+/// 卸载版本
+#[tauri::command]
+pub async fn uninstall_version(
+    state: State<'_, AppState>,
+    version_id: String,
+) -> Result<(), String> {
+    log::info!("Uninstalling version: {}", version_id);
+
+    let config = state.config.lock().await;
+    let game_dir = config.game_dir.clone();
+    drop(config);
+
+    // 构建版本目录路径
+    let version_dir = std::path::Path::new(&game_dir)
+        .join("versions")
+        .join(&version_id);
+
+    if version_dir.exists() {
+        std::fs::remove_dir_all(&version_dir).map_err(|e| {
+            log::error!("Failed to remove version directory: {}", e);
+            format!("Failed to remove version: {}", e)
+        })?;
+        log::info!("Version {} uninstalled successfully", version_id);
+    } else {
+        log::warn!("Version directory not found: {}", version_dir.display());
+        return Err("Version not found".to_string());
+    }
+
+    Ok(())
+}

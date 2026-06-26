@@ -28,6 +28,7 @@ fn main() {
             commands::version::list_versions,
             commands::version::download_version,
             commands::version::list_installed_versions,
+            commands::version::uninstall_version,
             // Java 命令
             commands::java::detect_java,
             commands::java::list_java,
