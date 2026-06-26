@@ -93,15 +93,18 @@ pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<S
     let game_dir = config.game_dir.clone();
     drop(config);
 
+    log::info!("Game directory: {}", game_dir);
+
     let versions_dir = std::path::Path::new(&game_dir).join("versions");
-    
+    log::info!("Versions directory: {}", versions_dir.display());
+
     if !versions_dir.exists() {
-        log::info!("Versions directory not found: {}", versions_dir.display());
+        log::warn!("Versions directory does not exist");
         return Ok(Vec::new());
     }
 
+    // 读取版本目录
     let mut versions = Vec::new();
-    
     match std::fs::read_dir(&versions_dir) {
         Ok(entries) => {
             for entry in entries.flatten() {
@@ -109,22 +112,18 @@ pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<S
                 if path.is_dir() {
                     if let Some(name) = path.file_name() {
                         let name_str = name.to_string_lossy().to_string();
-                        // 检查是否有对应的jar文件（表示已安装）
-                        let jar_path = path.join(format!("{}.jar", name_str));
-                        if jar_path.exists() {
-                            versions.push(name_str);
-                        }
+                        versions.push(name_str);
                     }
                 }
             }
         }
         Err(e) => {
             log::error!("Failed to read versions directory: {}", e);
-            return Err(format!("Failed to read versions directory: {}", e));
+            return Err(format!("Failed to read: {}", e));
         }
     }
 
-    log::info!("Found {} installed versions", versions.len());
+    log::info!("Found {} version directories: {:?}", versions.len(), versions);
     Ok(versions)
 }
 
@@ -134,7 +133,8 @@ pub async fn uninstall_version(
     state: State<'_, AppState>,
     version_id: String,
 ) -> Result<(), String> {
-    log::info!("Uninstalling version: {}", version_id);
+    log::info!("Uninstalling version: '{}'", version_id);
+    log::info!("Version ID length: {}, bytes: {:?}", version_id.len(), version_id.as_bytes());
 
     let config = state.config.lock().await;
     let game_dir = config.game_dir.clone();
@@ -148,6 +148,20 @@ pub async fn uninstall_version(
         .join(&version_id);
 
     log::info!("Version directory: {}", version_dir.display());
+    log::info!("Version directory exists: {}", version_dir.exists());
+
+    // 列出versions目录下的所有子目录
+    let versions_dir = std::path::Path::new(&game_dir).join("versions");
+    if versions_dir.exists() {
+        log::info!("Listing versions directory:");
+        if let Ok(entries) = std::fs::read_dir(&versions_dir) {
+            for entry in entries.flatten() {
+                if entry.path().is_dir() {
+                    log::info!("  - {}", entry.file_name().to_string_lossy());
+                }
+            }
+        }
+    }
 
     if version_dir.exists() {
         std::fs::remove_dir_all(&version_dir).map_err(|e| {

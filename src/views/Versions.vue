@@ -204,6 +204,17 @@ async function handleUninstall(versionId: string) {
   )
 }
 
+// 调试：显示版本目录信息
+async function debugVersions() {
+  try {
+    const gameDir = await tauri.getGameDir()
+    console.log('Game directory:', gameDir)
+    console.log('Installed versions:', installedVersions.value)
+  } catch (e) {
+    console.error('Debug error:', e)
+  }
+}
+
 async function handleOpenGameDir() {
   try {
     await tauri.openGameDir()
