@@ -26,6 +26,11 @@ fn main() {
             commands::auth::logout,
             // 版本命令
             commands::version::list_versions,
+            commands::version::download_version,
+            commands::version::list_installed_versions,
+            // Java 命令
+            commands::java::detect_java,
+            commands::java::list_java,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MoLaunch");

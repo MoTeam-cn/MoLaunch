@@ -5,32 +5,43 @@
 
 import { ref, computed, onMounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
+import * as tauri from '@/utils/tauri'
 
 const versionStore = useVersionStore()
 
 const searchQuery = ref('')
 const filterType = ref<'all' | 'release' | 'snapshot'>('all')
 const loading = ref(false)
+const downloading = ref<string | null>(null)
+const installedVersions = ref<string[]>([])
+const activeTab = ref<'available' | 'installed'>('available')
 
 onMounted(async () => {
-  if (versionStore.versions.length === 0) {
-    loading.value = true
-    await versionStore.fetchVersions()
-    loading.value = false
-  }
+  loading.value = true
+  await Promise.all([
+    versionStore.fetchVersions(),
+    loadInstalledVersions(),
+  ])
+  loading.value = false
 })
+
+async function loadInstalledVersions() {
+  try {
+    installedVersions.value = await tauri.listInstalledVersions()
+  } catch (e) {
+    console.error('Failed to load installed versions:', e)
+  }
+}
 
 const filteredVersions = computed(() => {
   let versions = versionStore.versions
 
-  // 按类型过滤
   if (filterType.value === 'release') {
     versions = versions.filter(v => v.version_type === 'release')
   } else if (filterType.value === 'snapshot') {
     versions = versions.filter(v => v.version_type === 'snapshot')
   }
 
-  // 按搜索词过滤
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
     versions = versions.filter(v => v.id.toLowerCase().includes(query))
@@ -38,6 +49,10 @@ const filteredVersions = computed(() => {
 
   return versions
 })
+
+function isInstalled(versionId: string): boolean {
+  return installedVersions.value.includes(versionId)
+}
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleDateString('zh-CN', {
@@ -66,6 +81,19 @@ function getVersionTypeBadge(versionType: string) {
       }
   }
 }
+
+async function handleDownload(versionId: string) {
+  downloading.value = versionId
+  try {
+    await tauri.downloadVersion(versionId)
+    installedVersions.value.push(versionId)
+  } catch (e) {
+    console.error('Failed to download version:', e)
+    alert(`下载失败: ${e}`)
+  } finally {
+    downloading.value = null
+  }
+}
 </script>
 
 <template>
@@ -76,14 +104,37 @@ function getVersionTypeBadge(versionType: string) {
         版本管理
       </h1>
       <p class="text-gray-600 dark:text-gray-400 mt-1">
-        浏览和下载 Minecraft 版本
+        浏览、下载和管理 Minecraft 版本
       </p>
     </div>
 
-    <!-- 搜索和过滤 -->
-    <div class="card mb-6">
+    <!-- 标签页 -->
+    <div class="flex space-x-1 mb-6 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
+      <button
+        class="flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
+        :class="activeTab === 'available'
+          ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow'
+          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+        "
+        @click="activeTab = 'available'"
+      >
+        可用版本
+      </button>
+      <button
+        class="flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors"
+        :class="activeTab === 'installed'
+          ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow'
+          : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+        "
+        @click="activeTab = 'installed'"
+      >
+        已安装 ({{ installedVersions.length }})
+      </button>
+    </div>
+
+    <!-- 搜索和过滤 (仅可用版本) -->
+    <div v-if="activeTab === 'available'" class="card mb-6">
       <div class="flex flex-col md:flex-row gap-4">
-        <!-- 搜索框 -->
         <div class="flex-1">
           <input
             v-model="searchQuery"
@@ -92,8 +143,6 @@ function getVersionTypeBadge(versionType: string) {
             class="input"
           />
         </div>
-
-        <!-- 过滤按钮 -->
         <div class="flex gap-2">
           <button
             class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -135,14 +184,14 @@ function getVersionTypeBadge(versionType: string) {
       <p class="text-gray-600 dark:text-gray-400 mt-4">加载版本列表...</p>
     </div>
 
-    <!-- 版本列表 -->
-    <div v-else-if="filteredVersions.length > 0" class="space-y-2">
-      <div
-        v-for="version in filteredVersions"
-        :key="version.id"
-        class="card flex items-center justify-between hover:shadow-md transition-shadow"
-      >
-        <div class="flex items-center">
+    <!-- 可用版本列表 -->
+    <div v-else-if="activeTab === 'available'">
+      <div v-if="filteredVersions.length > 0" class="space-y-2">
+        <div
+          v-for="version in filteredVersions"
+          :key="version.id"
+          class="card flex items-center justify-between hover:shadow-md transition-shadow"
+        >
           <div>
             <div class="flex items-center">
               <span class="font-semibold text-gray-900 dark:text-gray-100">
@@ -160,29 +209,88 @@ function getVersionTypeBadge(versionType: string) {
               >
                 最新
               </span>
+              <span
+                v-if="isInstalled(version.id)"
+                class="ml-2 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+              >
+                已安装
+              </span>
             </div>
             <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
               发布于 {{ formatDate(version.release_time) }}
             </p>
           </div>
+          <button
+            class="btn-primary text-sm"
+            :disabled="downloading === version.id || isInstalled(version.id)"
+            @click="handleDownload(version.id)"
+          >
+            <span v-if="downloading === version.id" class="flex items-center">
+              <svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+              下载中...
+            </span>
+            <span v-else-if="isInstalled(version.id)">已安装</span>
+            <span v-else class="flex items-center">
+              <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              下载
+            </span>
+          </button>
         </div>
-        <button class="btn-primary text-sm">
-          <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          下载
-        </button>
+      </div>
+      <div v-else class="card text-center py-12">
+        <svg class="w-16 h-16 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p class="text-gray-600 dark:text-gray-400 mt-4">
+          {{ searchQuery ? '未找到匹配的版本' : '暂无版本数据' }}
+        </p>
       </div>
     </div>
 
-    <!-- 空状态 -->
-    <div v-else class="card text-center py-12">
-      <svg class="w-16 h-16 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-      <p class="text-gray-600 dark:text-gray-400 mt-4">
-        {{ searchQuery ? '未找到匹配的版本' : '暂无版本数据' }}
-      </p>
+    <!-- 已安装版本列表 -->
+    <div v-else-if="activeTab === 'installed'">
+      <div v-if="installedVersions.length > 0" class="space-y-2">
+        <div
+          v-for="versionId in installedVersions"
+          :key="versionId"
+          class="card flex items-center justify-between"
+        >
+          <div>
+            <span class="font-semibold text-gray-900 dark:text-gray-100">
+              {{ versionId }}
+            </span>
+            <span class="ml-2 text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              已安装
+            </span>
+          </div>
+          <button class="btn-primary text-sm">
+            <svg class="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            启动
+          </button>
+        </div>
+      </div>
+      <div v-else class="card text-center py-12">
+        <svg class="w-16 h-16 text-gray-400 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+        </svg>
+        <p class="text-gray-600 dark:text-gray-400 mt-4">
+          暂未安装任何版本
+        </p>
+        <button
+          class="btn-primary mt-4"
+          @click="activeTab = 'available'"
+        >
+          浏览可用版本
+        </button>
+      </div>
     </div>
   </div>
 </template>

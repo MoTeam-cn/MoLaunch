@@ -142,6 +142,30 @@ pub struct ErrorInfo {
     pub message: *const std::ffi::c_char,
 }
 
+/// Java 运行时结构体
+#[repr(C)]
+#[derive(Debug)]
+pub struct FFIJavaRuntime {
+    pub executable: *mut std::ffi::c_char,
+    pub version: *mut std::ffi::c_char,
+    pub major_version: u32,
+    pub arch: *mut std::ffi::c_char,
+    pub home: *mut std::ffi::c_char,
+}
+
+/// Java 列表结构体
+#[repr(C)]
+#[derive(Debug)]
+pub struct FFIJavaList {
+    pub runtimes: *mut FFIJavaRuntime,
+    pub count: u32,
+    pub error_code: i32,
+    pub error_message: *mut std::ffi::c_char,
+}
+
+/// 下载进度回调函数类型
+pub type DownloadCallback = unsafe extern "C" fn(u32, u32, u32, *mut std::ffi::c_void);
+
 // FFI 函数类型定义
 type McSdkInit = unsafe extern "C" fn(*const MCConfig) -> *mut std::ffi::c_void;
 type McSdkFree = unsafe extern "C" fn(*mut std::ffi::c_void);
@@ -153,6 +177,19 @@ type McAuthOffline = unsafe extern "C" fn(*const std::ffi::c_char, *mut FFIAuthR
 type McAuthFreeResult = unsafe extern "C" fn(*mut FFIAuthResult);
 type McListVersions = unsafe extern "C" fn(*mut FFIVersionList) -> i32;
 type McFreeVersionList = unsafe extern "C" fn(*mut FFIVersionList);
+type McDownloadVersion = unsafe extern "C" fn(
+    *const std::ffi::c_void,
+    *const std::ffi::c_char,
+    DownloadCallback,
+    *mut std::ffi::c_void,
+) -> i32;
+type McDetectJava = unsafe extern "C" fn(*mut FFIJavaRuntime) -> i32;
+type McListJava = unsafe extern "C" fn(*mut FFIJavaList) -> i32;
+type McFreeJavaRuntime = unsafe extern "C" fn(*mut FFIJavaRuntime);
+type McFreeJavaList = unsafe extern "C" fn(*mut FFIJavaList);
+type McListInstalledVersions =
+    unsafe extern "C" fn(*const std::ffi::c_void, *mut *mut *mut std::ffi::c_char, *mut u32) -> i32;
+type McFreeStringArray = unsafe extern "C" fn(*mut *mut std::ffi::c_char, u32);
 
 /// SDK 函数集合
 pub struct SdkFunctions {
@@ -166,6 +203,13 @@ pub struct SdkFunctions {
     pub auth_free_result: McAuthFreeResult,
     pub list_versions: McListVersions,
     pub free_version_list: McFreeVersionList,
+    pub download_version: McDownloadVersion,
+    pub detect_java: McDetectJava,
+    pub list_java: McListJava,
+    pub free_java_runtime: McFreeJavaRuntime,
+    pub free_java_list: McFreeJavaList,
+    pub list_installed_versions: McListInstalledVersions,
+    pub free_string_array: McFreeStringArray,
 }
 
 /// SDK 实例
@@ -221,6 +265,27 @@ impl SdkInstance {
                 })?,
                 free_version_list: *lib.get(b"mc_free_version_list").map_err(|e| {
                     SdkError::LoadFailed(format!("Failed to get mc_free_version_list: {}", e))
+                })?,
+                download_version: *lib.get(b"mc_download_version").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_download_version: {}", e))
+                })?,
+                detect_java: *lib.get(b"mc_detect_java").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_detect_java: {}", e))
+                })?,
+                list_java: *lib.get(b"mc_list_java").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_list_java: {}", e))
+                })?,
+                free_java_runtime: *lib.get(b"mc_free_java_runtime").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_free_java_runtime: {}", e))
+                })?,
+                free_java_list: *lib.get(b"mc_free_java_list").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_free_java_list: {}", e))
+                })?,
+                list_installed_versions: *lib.get(b"mc_list_installed_versions").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_list_installed_versions: {}", e))
+                })?,
+                free_string_array: *lib.get(b"mc_free_string_array").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_free_string_array: {}", e))
                 })?,
             }
         };
@@ -361,6 +426,120 @@ impl SdkInstance {
 
         Ok(result)
     }
+
+    /// 下载版本
+    pub fn download_version(&self, version_id: &str) -> Result<(), SdkError> {
+        if self.handle.is_null() {
+            return Err(SdkError::NotInitialized);
+        }
+
+        let version_cstr = std::ffi::CString::new(version_id)
+            .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+
+        // 空回调，不报告进度
+        unsafe extern "C" fn empty_callback(_: u32, _: u32, _: u32, _: *mut std::ffi::c_void) {}
+
+        let code = unsafe {
+            (self.functions.download_version)(
+                self.handle,
+                version_cstr.as_ptr(),
+                empty_callback,
+                std::ptr::null_mut(),
+            )
+        };
+
+        if code != 0 {
+            return Err(SdkError::FfiFailed(code));
+        }
+
+        log::info!("Version {} downloaded successfully", version_id);
+        Ok(())
+    }
+
+    /// 检测 Java
+    pub fn detect_java(&self) -> Result<JavaRuntime, SdkError> {
+        let mut java = FFIJavaRuntime {
+            executable: std::ptr::null_mut(),
+            version: std::ptr::null_mut(),
+            major_version: 0,
+            arch: std::ptr::null_mut(),
+            home: std::ptr::null_mut(),
+        };
+
+        let code = unsafe { (self.functions.detect_java)(&mut java) };
+
+        if code != 0 {
+            return Err(SdkError::FfiFailed(code));
+        }
+
+        let result = JavaRuntime::from_ffi(&java);
+        unsafe { (self.functions.free_java_runtime)(&mut java) };
+
+        Ok(result)
+    }
+
+    /// 列出所有 Java
+    pub fn list_java(&self) -> Result<Vec<JavaRuntime>, SdkError> {
+        let mut java_list = FFIJavaList {
+            runtimes: std::ptr::null_mut(),
+            count: 0,
+            error_code: 0,
+            error_message: std::ptr::null_mut(),
+        };
+
+        let code = unsafe { (self.functions.list_java)(&mut java_list) };
+
+        if code != 0 {
+            return Err(SdkError::FfiFailed(code));
+        }
+
+        let mut result = Vec::new();
+        if !java_list.runtimes.is_null() && java_list.count > 0 {
+            for i in 0..java_list.count {
+                let entry = unsafe { &*java_list.runtimes.add(i as usize) };
+                result.push(JavaRuntime::from_ffi(entry));
+            }
+        }
+
+        unsafe { (self.functions.free_java_list)(&mut java_list) };
+
+        Ok(result)
+    }
+
+    /// 获取已安装版本列表
+    pub fn list_installed_versions(&self) -> Result<Vec<String>, SdkError> {
+        if self.handle.is_null() {
+            return Err(SdkError::NotInitialized);
+        }
+
+        let mut versions: *mut *mut std::ffi::c_char = std::ptr::null_mut();
+        let mut count: u32 = 0;
+
+        let code = unsafe {
+            (self.functions.list_installed_versions)(self.handle, &mut versions, &mut count)
+        };
+
+        if code != 0 {
+            return Err(SdkError::FfiFailed(code));
+        }
+
+        let mut result = Vec::new();
+        if !versions.is_null() && count > 0 {
+            for i in 0..count {
+                let ptr = unsafe { *versions.add(i as usize) };
+                if !ptr.is_null() {
+                    let s = unsafe { std::ffi::CStr::from_ptr(ptr) }
+                        .to_string_lossy()
+                        .to_string();
+                    result.push(s);
+                }
+            }
+        }
+
+        unsafe { (self.functions.free_string_array)(versions, count) };
+
+        Ok(result)
+    }
 }
 
 impl Drop for SdkInstance {
@@ -447,6 +626,60 @@ pub struct VersionList {
     pub versions: Vec<VersionInfo>,
     pub latest_release: String,
     pub latest_snapshot: String,
+}
+
+/// Java 运行时信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct JavaRuntime {
+    pub executable: String,
+    pub version: String,
+    pub major_version: u32,
+    pub arch: String,
+    pub home: String,
+}
+
+impl JavaRuntime {
+    fn from_ffi(ffi: &FFIJavaRuntime) -> Self {
+        Self {
+            executable: unsafe {
+                if ffi.executable.is_null() {
+                    String::new()
+                } else {
+                    std::ffi::CStr::from_ptr(ffi.executable)
+                        .to_string_lossy()
+                        .to_string()
+                }
+            },
+            version: unsafe {
+                if ffi.version.is_null() {
+                    String::new()
+                } else {
+                    std::ffi::CStr::from_ptr(ffi.version)
+                        .to_string_lossy()
+                        .to_string()
+                }
+            },
+            major_version: ffi.major_version,
+            arch: unsafe {
+                if ffi.arch.is_null() {
+                    String::new()
+                } else {
+                    std::ffi::CStr::from_ptr(ffi.arch)
+                        .to_string_lossy()
+                        .to_string()
+                }
+            },
+            home: unsafe {
+                if ffi.home.is_null() {
+                    String::new()
+                } else {
+                    std::ffi::CStr::from_ptr(ffi.home)
+                        .to_string_lossy()
+                        .to_string()
+                }
+            },
+        }
+    }
 }
 
 impl VersionList {

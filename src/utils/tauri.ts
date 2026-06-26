@@ -5,6 +5,7 @@
 import { invoke } from '@tauri-apps/api/tauri'
 import type { AuthResult, SdkStatus } from '@/types/auth'
 import type { VersionList } from '@/types/version'
+import type { JavaRuntime } from '@/types/java'
 
 /**
  * 获取平台信息
@@ -63,8 +64,36 @@ export async function listVersions(): Promise<VersionList> {
 }
 
 /**
+ * 下载版本
+ */
+export async function downloadVersion(versionId: string): Promise<void> {
+  return await invoke<void>('download_version', { versionId })
+}
+
+/**
+ * 获取已安装版本列表
+ */
+export async function listInstalledVersions(): Promise<string[]> {
+  return await invoke<string[]>('list_installed_versions')
+}
+
+/**
  * 获取设备 ID
  */
 export async function getDeviceId(): Promise<string> {
   return await invoke<string>('get_device_id')
+}
+
+/**
+ * 检测 Java
+ */
+export async function detectJava(): Promise<JavaRuntime> {
+  return await invoke<JavaRuntime>('detect_java')
+}
+
+/**
+ * 列出所有 Java
+ */
+export async function listJava(): Promise<JavaRuntime[]> {
+  return await invoke<JavaRuntime[]>('list_java')
 }
