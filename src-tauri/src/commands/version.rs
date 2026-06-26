@@ -89,13 +89,40 @@ pub async fn download_version(
 pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     log::info!("Fetching installed versions");
 
-    let sdk_guard = state.sdk.lock().await;
-    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    let config = state.config.lock().await;
+    let game_dir = config.game_dir.clone();
+    drop(config);
 
-    let versions = sdk.list_installed_versions().map_err(|e| {
-        log::error!("Failed to list installed versions: {}", e);
-        e.to_string()
-    })?;
+    let versions_dir = std::path::Path::new(&game_dir).join("versions");
+    
+    if !versions_dir.exists() {
+        log::info!("Versions directory not found: {}", versions_dir.display());
+        return Ok(Vec::new());
+    }
+
+    let mut versions = Vec::new();
+    
+    match std::fs::read_dir(&versions_dir) {
+        Ok(entries) => {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    if let Some(name) = path.file_name() {
+                        let name_str = name.to_string_lossy().to_string();
+                        // 检查是否有对应的jar文件（表示已安装）
+                        let jar_path = path.join(format!("{}.jar", name_str));
+                        if jar_path.exists() {
+                            versions.push(name_str);
+                        }
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            log::error!("Failed to read versions directory: {}", e);
+            return Err(format!("Failed to read versions directory: {}", e));
+        }
+    }
 
     log::info!("Found {} installed versions", versions.len());
     Ok(versions)
