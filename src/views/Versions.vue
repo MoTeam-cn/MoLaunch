@@ -11,18 +11,9 @@ import * as tauri from '@/utils/tauri'
 
 // 导入 Blocks 图片
 import grassIcon from '@/assets/blocks/Grass.png'
-import anvilIcon from '@/assets/blocks/Anvil.png'
 import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
 import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
-import eggIcon from '@/assets/blocks/Egg.png'
-import fabricIcon from '@/assets/blocks/Fabric.png'
 import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
-import grassPathIcon from '@/assets/blocks/GrassPath.png'
-import neoForgeIcon from '@/assets/blocks/NeoForge.png'
-import optiFabricIcon from '@/assets/blocks/OptiFabric.png'
-import redstoneBlockIcon from '@/assets/blocks/RedstoneBlock.png'
-import redstoneLampOffIcon from '@/assets/blocks/RedstoneLampOff.png'
-import redstoneLampOnIcon from '@/assets/blocks/RedstoneLampOn.png'
 
 const versionStore = useVersionStore()
 
@@ -33,21 +24,21 @@ const installedVersions = ref<string[]>([])
 const activeTab = ref<'available' | 'installed'>('available')
 
 // 版本类型对应的图标
-const versionIcons = [
-  grassIcon,
-  anvilIcon,
-  cobblestoneIcon,
-  commandBlockIcon,
-  eggIcon,
-  fabricIcon,
-  goldBlockIcon,
-  grassPathIcon,
-  neoForgeIcon,
-  optiFabricIcon,
-  redstoneBlockIcon,
-  redstoneLampOffIcon,
-  redstoneLampOnIcon,
-]
+const versionTypeIcons: Record<string, string> = {
+  release: grassIcon,      // 正式版 - Grass
+  snapshot: commandBlockIcon, // 快照版 - CommandBlock
+  old_beta: cobblestoneIcon, // 远古版 - CobbleStone
+  old_alpha: cobblestoneIcon, // 远古版 - CobbleStone
+}
+
+// 特殊版本图标
+const specialIcons: Record<string, string> = {
+  '23w13a_or_b': goldBlockIcon, // 愚人节版
+  '20w14infinite': goldBlockIcon,
+  '22w13oneblockatatime': goldBlockIcon,
+  '24w14potato': goldBlockIcon,
+  '25w14craftmine': goldBlockIcon,
+}
 
 // 监听下载进度事件
 let unlistenProgress: (() => void) | null = null
@@ -115,14 +106,13 @@ function formatDate(timestamp: number): string {
   })
 }
 
-function getVersionIcon(versionId: string): string {
-  // 根据版本ID生成一个稳定的索引
-  let hash = 0
-  for (let i = 0; i < versionId.length; i++) {
-    hash = ((hash << 5) - hash) + versionId.charCodeAt(i)
-    hash = hash & hash
+function getVersionIcon(versionId: string, versionType: string): string {
+  // 检查是否是特殊版本（愚人节等）
+  if (specialIcons[versionId]) {
+    return specialIcons[versionId]
   }
-  return versionIcons[Math.abs(hash) % versionIcons.length]
+  // 根据版本类型返回对应图标
+  return versionTypeIcons[versionType] || grassIcon
 }
 
 function getVersionTypeBadge(versionType: string) {
@@ -295,7 +285,7 @@ async function handleDownload(versionId: string) {
           <div class="flex items-center">
             <!-- 版本图标 -->
             <img
-              :src="getVersionIcon(version.id)"
+              :src="getVersionIcon(version.id, version.version_type)"
               :alt="version.id"
               class="w-10 h-10 rounded mr-3"
             />
@@ -370,7 +360,7 @@ async function handleDownload(versionId: string) {
         >
           <div class="flex items-center">
             <img
-              :src="getVersionIcon(versionId)"
+              :src="getVersionIcon(versionId, 'release')"
               :alt="versionId"
               class="w-10 h-10 rounded mr-3"
             />
