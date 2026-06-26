@@ -61,3 +61,10 @@ export async function logout(): Promise<void> {
 export async function listVersions(): Promise<VersionList> {
   return await invoke<VersionList>('list_versions')
 }
+
+/**
+ * 获取设备 ID
+ */
+export async function getDeviceId(): Promise<string> {
+  return await invoke<string>('get_device_id')
+}

@@ -12,6 +12,7 @@ export const useSdkStore = defineStore('sdk', () => {
   const status = ref<SdkStatus | null>(null)
   const initialized = ref(false)
   const version = ref<string | null>(null)
+  const deviceId = ref<string | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
 
@@ -34,6 +35,9 @@ export const useSdkStore = defineStore('sdk', () => {
     try {
       version.value = await tauri.initializeSdk(gameDir)
       initialized.value = true
+      
+      // 初始化成功后获取设备 ID
+      await fetchDeviceId()
     } catch (e) {
       error.value = String(e)
       initialized.value = false
@@ -48,9 +52,19 @@ export const useSdkStore = defineStore('sdk', () => {
       initialized.value = await tauri.isSdkInitialized()
       if (initialized.value) {
         version.value = await tauri.getSdkVersion()
+        await fetchDeviceId()
       }
     } catch (e) {
       console.error('Failed to check SDK status:', e)
+    }
+  }
+
+  async function fetchDeviceId() {
+    try {
+      deviceId.value = await tauri.getDeviceId()
+    } catch (e) {
+      console.error('Failed to get device ID:', e)
+      deviceId.value = null
     }
   }
 
@@ -58,11 +72,13 @@ export const useSdkStore = defineStore('sdk', () => {
     status,
     initialized,
     version,
+    deviceId,
     loading,
     error,
     isReady,
     fetchPlatformInfo,
     initialize,
     checkStatus,
+    fetchDeviceId,
   }
 })

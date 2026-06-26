@@ -148,6 +148,7 @@ type McSdkFree = unsafe extern "C" fn(*mut std::ffi::c_void);
 type McSdkVersion = unsafe extern "C" fn() -> *const std::ffi::c_char;
 type McSdkLastError = unsafe extern "C" fn() -> *const ErrorInfo;
 type McSdkFreeString = unsafe extern "C" fn(*mut std::ffi::c_char);
+type McGetDeviceId = unsafe extern "C" fn() -> *mut std::ffi::c_char;
 type McAuthOffline = unsafe extern "C" fn(*const std::ffi::c_char, *mut FFIAuthResult) -> i32;
 type McAuthFreeResult = unsafe extern "C" fn(*mut FFIAuthResult);
 type McListVersions = unsafe extern "C" fn(*mut FFIVersionList) -> i32;
@@ -160,6 +161,7 @@ pub struct SdkFunctions {
     pub version: McSdkVersion,
     pub last_error: McSdkLastError,
     pub free_string: McSdkFreeString,
+    pub get_device_id: McGetDeviceId,
     pub auth_offline: McAuthOffline,
     pub auth_free_result: McAuthFreeResult,
     pub list_versions: McListVersions,
@@ -205,6 +207,9 @@ impl SdkInstance {
                 })?,
                 free_string: *lib.get(b"mc_sdk_free_string").map_err(|e| {
                     SdkError::LoadFailed(format!("Failed to get mc_sdk_free_string: {}", e))
+                })?,
+                get_device_id: *lib.get(b"mc_get_device_id").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_get_device_id: {}", e))
                 })?,
                 auth_offline: *lib.get(b"mc_auth_offline").map_err(|e| {
                     SdkError::LoadFailed(format!("Failed to get mc_auth_offline: {}", e))
@@ -271,6 +276,23 @@ impl SdkInstance {
         unsafe { std::ffi::CStr::from_ptr(version_ptr) }
             .to_string_lossy()
             .to_string()
+    }
+    
+    /// 获取设备 ID
+    pub fn get_device_id(&self) -> Result<String, SdkError> {
+        let device_id_ptr = unsafe { (self.functions.get_device_id)() };
+        if device_id_ptr.is_null() {
+            return Err(SdkError::NullPointer);
+        }
+        
+        let device_id = unsafe { std::ffi::CStr::from_ptr(device_id_ptr) }
+            .to_string_lossy()
+            .to_string();
+        
+        // 释放 SDK 分配的内存
+        unsafe { (self.functions.free_string)(device_id_ptr) };
+        
+        Ok(device_id)
     }
     
     /// 离线登录

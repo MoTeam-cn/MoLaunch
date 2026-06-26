@@ -43,3 +43,7 @@ Cargo.lock
 # Test
 coverage/
 *.lcov
+
+# Web Cache
+node_modules
+logo_data

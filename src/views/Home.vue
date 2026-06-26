@@ -141,6 +141,32 @@ function goToVersions() {
       </div>
     </div>
 
+    <!-- 设备信息 -->
+    <div class="card mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        设备信息
+      </h2>
+      <div class="space-y-3">
+        <div class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+          <span class="text-gray-600 dark:text-gray-400">设备 ID</span>
+          <div class="flex items-center">
+            <code v-if="sdkStore.deviceId" class="px-3 py-1 bg-gray-100 dark:bg-gray-700 rounded text-sm font-mono">
+              {{ sdkStore.deviceId }}
+            </code>
+            <span v-else class="text-gray-400 dark:text-gray-500">未获取</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between py-2 border-b border-gray-100 dark:border-gray-700">
+          <span class="text-gray-600 dark:text-gray-400">平台</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ sdkStore.status?.platform || '未知' }}</span>
+        </div>
+        <div class="flex items-center justify-between py-2">
+          <span class="text-gray-600 dark:text-gray-400">SDK 版本</span>
+          <span class="text-gray-900 dark:text-gray-100">{{ sdkStore.version || '未加载' }}</span>
+        </div>
+      </div>
+    </div>
+
     <!-- 快速操作 -->
     <div class="card">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">

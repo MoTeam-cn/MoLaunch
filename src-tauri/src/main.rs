@@ -19,6 +19,7 @@ fn main() {
             commands::sdk::initialize_sdk,
             commands::sdk::get_sdk_version,
             commands::sdk::is_sdk_initialized,
+            commands::sdk::get_device_id,
             // 认证命令
             commands::auth::login_offline,
             commands::auth::get_login_status,

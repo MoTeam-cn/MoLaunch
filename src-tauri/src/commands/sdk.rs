@@ -97,3 +97,18 @@ pub async fn is_sdk_initialized(
     let sdk_guard = state.sdk.lock().await;
     Ok(sdk_guard.is_some())
 }
+
+/// 获取设备 ID
+#[tauri::command]
+pub async fn get_device_id(
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    
+    sdk.get_device_id()
+        .map_err(|e| {
+            log::error!("Failed to get device ID: {}", e);
+            e.to_string()
+        })
+}

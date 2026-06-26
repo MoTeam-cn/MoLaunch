@@ -5,25 +5,26 @@
 
 import { ref, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
+import { useSettingsStore } from '@/stores/settings'
+import type { LayoutMode, Theme } from '@/stores/settings'
 
 const sdkStore = useSdkStore()
+const settingsStore = useSettingsStore()
 
 const gameDir = ref('.minecraft')
 const maxThreads = ref(8)
 const minMemory = ref(512)
 const maxMemory = ref(2048)
-const theme = ref<'light' | 'dark' | 'system'>('system')
-const language = ref<'zh-CN' | 'en-US'>('zh-CN')
 const logLevel = ref(3)
 
 const showSaveSuccess = ref(false)
 
 onMounted(() => {
-  // TODO: 从存储加载设置
+  // TODO: 从存储加载游戏设置
 })
 
 function handleSave() {
-  // TODO: 保存设置
+  // TODO: 保存游戏设置
   showSaveSuccess.value = true
   setTimeout(() => {
     showSaveSuccess.value = false
@@ -35,9 +36,9 @@ function handleReset() {
   maxThreads.value = 8
   minMemory.value = 512
   maxMemory.value = 2048
-  theme.value = 'system'
-  language.value = 'zh-CN'
   logLevel.value = 3
+  settingsStore.setLayoutMode('sidebar')
+  settingsStore.setTheme('system')
 }
 </script>
 
@@ -74,6 +75,114 @@ function handleReset() {
         </div>
       </div>
     </transition>
+
+    <!-- 界面设置 -->
+    <div class="card mb-6">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+        界面设置
+      </h2>
+      <div class="space-y-4">
+        <!-- 布局模式 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            导航布局
+          </label>
+          <div class="grid grid-cols-2 gap-4">
+            <button
+              @click="settingsStore.setLayoutMode('sidebar')"
+              class="relative p-4 rounded-lg border-2 transition-all"
+              :class="settingsStore.layoutMode === 'sidebar'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/50'
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              "
+            >
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded bg-gray-200 dark:bg-gray-600 flex">
+                  <div class="w-3 h-full bg-gray-400 dark:bg-gray-500 rounded-l"></div>
+                  <div class="flex-1"></div>
+                </div>
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">侧边栏</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">左侧导航</p>
+                </div>
+              </div>
+              <div
+                v-if="settingsStore.layoutMode === 'sidebar'"
+                class="absolute top-2 right-2 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center"
+              >
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </button>
+            
+            <button
+              @click="settingsStore.setLayoutMode('topnav')"
+              class="relative p-4 rounded-lg border-2 transition-all"
+              :class="settingsStore.layoutMode === 'topnav'
+                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/50'
+                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+              "
+            >
+              <div class="flex items-center space-x-3">
+                <div class="w-10 h-10 rounded bg-gray-200 dark:bg-gray-600 flex flex-col">
+                  <div class="h-2 bg-gray-400 dark:bg-gray-500 rounded-t"></div>
+                  <div class="flex-1"></div>
+                </div>
+                <div>
+                  <p class="font-medium text-gray-900 dark:text-gray-100">顶部栏</p>
+                  <p class="text-xs text-gray-500 dark:text-gray-400">顶部导航</p>
+                </div>
+              </div>
+              <div
+                v-if="settingsStore.layoutMode === 'topnav'"
+                class="absolute top-2 right-2 w-5 h-5 bg-primary-500 rounded-full flex items-center justify-center"
+              >
+                <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 主题 -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            主题
+          </label>
+          <div class="flex gap-4">
+            <label class="flex items-center">
+              <input
+                type="radio"
+                :checked="settingsStore.theme === 'light'"
+                @change="settingsStore.setTheme('light')"
+                class="mr-2"
+              />
+              <span class="text-gray-700 dark:text-gray-300">浅色</span>
+            </label>
+            <label class="flex items-center">
+              <input
+                type="radio"
+                :checked="settingsStore.theme === 'dark'"
+                @change="settingsStore.setTheme('dark')"
+                class="mr-2"
+              />
+              <span class="text-gray-700 dark:text-gray-300">深色</span>
+            </label>
+            <label class="flex items-center">
+              <input
+                type="radio"
+                :checked="settingsStore.theme === 'system'"
+                @change="settingsStore.setTheme('system')"
+                class="mr-2"
+              />
+              <span class="text-gray-700 dark:text-gray-300">跟随系统</span>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 游戏设置 -->
     <div class="card mb-6">
@@ -157,61 +266,6 @@ function handleReset() {
       </div>
     </div>
 
-    <!-- 界面设置 -->
-    <div class="card mb-6">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
-        界面设置
-      </h2>
-      <div class="space-y-4">
-        <!-- 主题 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            主题
-          </label>
-          <div class="flex gap-4">
-            <label class="flex items-center">
-              <input
-                v-model="theme"
-                type="radio"
-                value="light"
-                class="mr-2"
-              />
-              <span class="text-gray-700 dark:text-gray-300">浅色</span>
-            </label>
-            <label class="flex items-center">
-              <input
-                v-model="theme"
-                type="radio"
-                value="dark"
-                class="mr-2"
-              />
-              <span class="text-gray-700 dark:text-gray-300">深色</span>
-            </label>
-            <label class="flex items-center">
-              <input
-                v-model="theme"
-                type="radio"
-                value="system"
-                class="mr-2"
-              />
-              <span class="text-gray-700 dark:text-gray-300">跟随系统</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- 语言 -->
-        <div>
-          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            语言
-          </label>
-          <select v-model="language" class="input">
-            <option value="zh-CN">简体中文</option>
-            <option value="en-US">English</option>
-          </select>
-        </div>
-      </div>
-    </div>
-
     <!-- 高级设置 -->
     <div class="card mb-6">
       <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
@@ -255,6 +309,12 @@ function handleReset() {
             :class="sdkStore.isReady ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'"
           >
             {{ sdkStore.isReady ? '就绪' : '加载中' }}
+          </span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-gray-600 dark:text-gray-400">设备 ID</span>
+          <span class="text-gray-900 dark:text-gray-100 font-mono text-xs">
+            {{ sdkStore.deviceId || '未获取' }}
           </span>
         </div>
         <div class="flex justify-between">
