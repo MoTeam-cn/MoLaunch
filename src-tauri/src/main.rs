@@ -31,6 +31,9 @@ fn main() {
             // Java 命令
             commands::java::detect_java,
             commands::java::list_java,
+            // 系统命令
+            commands::system::open_game_dir,
+            commands::system::get_game_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MoLaunch");

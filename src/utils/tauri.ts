@@ -97,3 +97,17 @@ export async function detectJava(): Promise<JavaRuntime> {
 export async function listJava(): Promise<JavaRuntime[]> {
   return await invoke<JavaRuntime[]>('list_java')
 }
+
+/**
+ * 打开游戏目录
+ */
+export async function openGameDir(): Promise<void> {
+  return await invoke<void>('open_game_dir')
+}
+
+/**
+ * 获取游戏目录
+ */
+export async function getGameDir(): Promise<string> {
+  return await invoke<string>('get_game_dir')
+}
