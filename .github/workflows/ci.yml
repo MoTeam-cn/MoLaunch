@@ -55,7 +55,7 @@ jobs:
   # Rust Clippy 检查
   rust-clippy:
     name: Rust Clippy
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       
@@ -86,7 +86,7 @@ jobs:
           - platform: macos
             os: macos-latest
           - platform: linux
-            os: ubuntu-latest
+            os: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       
