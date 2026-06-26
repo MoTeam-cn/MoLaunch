@@ -2,7 +2,7 @@
 /**
  * 下载页面
  * 左侧侧边栏：加载类别
- * 右侧主页面：分类列表，点击展开
+ * 右侧主页面：版本列表，最新在前
  */
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
@@ -20,7 +20,6 @@ import {
   StarIcon,
   BeakerIcon,
   ClockIcon,
-  ChevronRightIcon,
   PlayIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -35,21 +34,7 @@ const versionStore = useVersionStore()
 const loading = ref(false)
 const installedVersions = ref<string[]>([])
 const activeCategory = ref('vanilla')
-
-// 展开的分类
-const expandedGroups = ref<Set<string>>(new Set())
-
-function toggleGroup(groupId: string) {
-  if (expandedGroups.value.has(groupId)) {
-    expandedGroups.value.delete(groupId)
-  } else {
-    expandedGroups.value.add(groupId)
-  }
-}
-
-function isGroupExpanded(groupId: string): boolean {
-  return expandedGroups.value.has(groupId)
-}
+const activeSubCategory = ref('release')
 
 // 版本类型图标
 const typeIcons: Record<string, string> = {
@@ -80,86 +65,50 @@ const categories = [
   { id: 'installed', label: '已安装', icon: CheckCircleIcon },
 ]
 
-// 按大版本号分组
-function groupByVersion(versions: { id: string; version_type: string; release_time: number }[]) {
-  const groupMap = new Map<string, typeof versions>()
+// 子分类
+const subCategories = [
+  { id: 'release', label: '正式版', icon: StarIcon },
+  { id: 'snapshot', label: '快照版', icon: BeakerIcon },
+  { id: 'old', label: '远古版', icon: ClockIcon },
+]
 
-  for (const v of versions) {
-    const parts = v.id.split('.')
-    const major = parts.length >= 2 ? `${parts[0]}.${parts[1]}` : v.id
-
-    if (!groupMap.has(major)) {
-      groupMap.set(major, [])
-    }
-    groupMap.get(major)!.push(v)
-  }
-
-  return Array.from(groupMap.entries())
-    .sort((a, b) => b[0].localeCompare(a[0]))
-    .map(([major, versions]) => ({
-      id: major,
-      label: `${major}.x`,
-      versions,
-    }))
-}
-
-// 正式版分组
-const releaseGroups = computed(() => {
-  return groupByVersion(versionStore.getReleaseVersions())
+// 按类型分类的版本（已排序，最新在前）
+const releaseVersions = computed(() => {
+  return versionStore.getReleaseVersions()
 })
 
-// 快照版分组
-const snapshotGroups = computed(() => {
-  return groupByVersion(versionStore.getSnapshotVersions())
+const snapshotVersions = computed(() => {
+  return versionStore.getSnapshotVersions()
 })
 
-// 远古版本
 const oldVersions = computed(() => {
   return versionStore.versions.filter(
     v => v.version_type === 'old_beta' || v.version_type === 'old_alpha'
   )
 })
 
-// 当前显示的内容
-const currentContent = computed(() => {
-  switch (activeCategory.value) {
-    case 'vanilla':
-      return {
-        title: '原版游戏',
-        description: 'Minecraft Java Edition 官方版本',
-        type: 'groups' as const,
-        groups: [
-          { id: 'release', label: '正式版', icon: StarIcon, groups: releaseGroups.value },
-          { id: 'snapshot', label: '快照版', icon: BeakerIcon, groups: snapshotGroups.value },
-          { id: 'old', label: '远古版', icon: ClockIcon, versions: oldVersions.value.slice(0, 50) },
-        ],
-      }
-    case 'modloaders':
-      return {
-        title: '模组加载器',
-        description: '即将开放',
-        type: 'empty' as const,
-      }
-    case 'modpacks':
-      return {
-        title: '整合包',
-        description: '即将开放',
-        type: 'empty' as const,
-      }
-    case 'installed':
-      return {
-        title: '已安装',
-        description: '已下载的版本',
-        type: 'list' as const,
-        versions: installedVersions.value.map(id => ({
-          id,
-          version_type: 'release',
-          release_time: 0,
-        })),
-      }
-    default:
-      return { title: '', description: '', type: 'empty' as const }
+// 当前显示的版本
+const currentVersions = computed(() => {
+  if (activeCategory.value === 'installed') {
+    return installedVersions.value.map(id => ({
+      id,
+      version_type: 'release',
+      release_time: 0,
+    }))
   }
+
+  if (activeCategory.value === 'vanilla') {
+    switch (activeSubCategory.value) {
+      case 'release':
+        return releaseVersions.value
+      case 'snapshot':
+        return snapshotVersions.value
+      case 'old':
+        return oldVersions.value
+    }
+  }
+
+  return []
 })
 
 // 监听下载进度
@@ -267,11 +216,34 @@ async function handleOpenGameDir() {
       <!-- 分类标题 -->
       <div class="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-          {{ currentContent.title }}
+          {{ activeCategory === 'installed' ? '已安装' : '原版游戏' }}
         </h2>
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-          {{ currentContent.description }}
+          {{ activeCategory === 'installed' ? '已下载的版本' : 'Minecraft Java Edition 官方版本' }}
         </p>
+      </div>
+
+      <!-- 子分类标签 (仅原版游戏) -->
+      <div v-if="activeCategory === 'vanilla'" class="px-6 py-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div class="flex space-x-2">
+          <button
+            v-for="sub in subCategories"
+            :key="sub.id"
+            class="flex items-center px-3 py-1.5 rounded-lg text-sm transition-colors"
+            :class="[
+              activeSubCategory === sub.id
+                ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
+                : 'text-gray-600 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700'
+            ]"
+            @click="activeSubCategory = sub.id"
+          >
+            <component :is="sub.icon" class="w-4 h-4 mr-1.5" />
+            {{ sub.label }}
+            <span class="ml-1.5 text-xs opacity-75">
+              {{ sub.id === 'release' ? releaseVersions.length : sub.id === 'snapshot' ? snapshotVersions.length : oldVersions.length }}
+            </span>
+          </button>
+        </div>
       </div>
 
       <!-- 下载进度条 -->
@@ -306,8 +278,8 @@ async function handleOpenGameDir() {
         </div>
       </transition>
 
-      <!-- 内容列表 -->
-      <div class="flex-1 overflow-y-auto p-6">
+      <!-- 版本列表 -->
+      <div class="flex-1 overflow-y-auto">
         <!-- 加载状态 -->
         <div v-if="loading" class="flex items-center justify-center h-full">
           <div class="text-center">
@@ -316,180 +288,67 @@ async function handleOpenGameDir() {
           </div>
         </div>
 
-        <!-- 分组内容 -->
-        <div v-else-if="currentContent.type === 'groups'" class="space-y-4">
-          <div v-for="section in currentContent.groups" :key="section.id" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            <!-- 分组标题 -->
-            <div
-              class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
-              @click="toggleGroup(section.id)"
-            >
-              <div class="flex items-center">
-                <component :is="section.icon" class="w-5 h-5 mr-3 text-gray-500 dark:text-gray-400" />
-                <span class="font-medium text-gray-900 dark:text-gray-100">{{ section.label }}</span>
-                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
-                  {{ section.groups ? section.groups.length + ' 个版本组' : (section.versions?.length || 0) + ' 个版本' }}
-                </span>
-              </div>
-              <ChevronRightIcon
-                class="w-5 h-5 text-gray-400 transition-transform duration-200"
-                :class="{ 'rotate-90': isGroupExpanded(section.id) }"
-              />
-            </div>
-
-            <!-- 展开内容 -->
-            <transition
-              enter-active-class="transition-all duration-300 ease-out"
-              enter-from-class="max-h-0 opacity-0"
-              enter-to-class="max-h-[2000px] opacity-100"
-              leave-active-class="transition-all duration-200 ease-in"
-              leave-from-class="max-h-[2000px] opacity-100"
-              leave-to-class="max-h-0 opacity-0"
-            >
-              <div v-if="isGroupExpanded(section.id)" class="overflow-hidden">
-                <!-- 版本组 -->
-                <div v-if="section.groups" class="border-t border-gray-100 dark:border-gray-700">
-                  <div v-for="group in section.groups" :key="group.id" class="border-b border-gray-100 dark:border-gray-700 last:border-b-0">
-                    <!-- 版本组标题 -->
-                    <div
-                      class="flex items-center justify-between px-4 py-2 pl-12 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-                      @click="toggleGroup(`${section.id}-${group.id}`)"
-                    >
-                      <span class="text-sm text-gray-700 dark:text-gray-300">{{ group.label }}</span>
-                      <div class="flex items-center">
-                        <span class="text-xs text-gray-500 mr-2">{{ group.versions.length }}</span>
-                        <ChevronRightIcon
-                          class="w-4 h-4 text-gray-400 transition-transform duration-200"
-                          :class="{ 'rotate-90': isGroupExpanded(`${section.id}-${group.id}`) }"
-                        />
-                      </div>
-                    </div>
-
-                    <!-- 版本列表 -->
-                    <transition
-                      enter-active-class="transition-all duration-300 ease-out"
-                      enter-from-class="max-h-0 opacity-0"
-                      enter-to-class="max-h-[1000px] opacity-100"
-                      leave-active-class="transition-all duration-200 ease-in"
-                      leave-from-class="max-h-[1000px] opacity-100"
-                      leave-to-class="max-h-0 opacity-0"
-                    >
-                      <div v-if="isGroupExpanded(`${section.id}-${group.id}`)" class="overflow-hidden">
-                        <div class="px-4 py-2 pl-16 space-y-1">
-                          <div
-                            v-for="version in group.versions"
-                            :key="version.id"
-                            class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-                          >
-                            <div class="flex items-center">
-                              <img
-                                :src="getVersionIcon(version.id, version.version_type)"
-                                :alt="version.id"
-                                class="w-6 h-6 rounded mr-2"
-                              />
-                              <span class="text-sm text-gray-900 dark:text-gray-100">{{ version.id }}</span>
-                              <span class="ml-2 text-xs text-gray-500">{{ formatDate(version.release_time) }}</span>
-                            </div>
-                            <div class="flex items-center">
-                              <span
-                                v-if="isInstalled(version.id)"
-                                class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mr-2"
-                              >
-                                已安装
-                              </span>
-                              <button
-                                v-if="isInstalled(version.id)"
-                                class="text-xs px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
-                              >
-                                <PlayIcon class="w-3.5 h-3.5 inline mr-1" />
-                                启动
-                              </button>
-                              <button
-                                v-else
-                                class="text-xs px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors disabled:opacity-50"
-                                :disabled="versionStore.downloading"
-                                @click="handleDownload(version.id)"
-                              >
-                                <ArrowDownTrayIcon v-if="versionStore.downloadingVersion !== version.id" class="w-3.5 h-3.5 inline mr-1" />
-                                {{ versionStore.downloadingVersion === version.id ? '下载中...' : '下载' }}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </transition>
-                  </div>
-                </div>
-
-                <!-- 直接版本列表 -->
-                <div v-else-if="section.versions" class="border-t border-gray-100 dark:border-gray-700 px-4 py-2 pl-12 space-y-1">
-                  <div
-                    v-for="version in section.versions"
-                    :key="version.id"
-                    class="flex items-center justify-between py-2 px-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
-                  >
-                    <div class="flex items-center">
-                      <img
-                        :src="getVersionIcon(version.id, version.version_type)"
-                        :alt="version.id"
-                        class="w-6 h-6 rounded mr-2"
-                      />
-                      <span class="text-sm text-gray-900 dark:text-gray-100">{{ version.id }}</span>
-                      <span class="ml-2 text-xs text-gray-500">{{ formatDate(version.release_time) }}</span>
-                    </div>
-                    <div class="flex items-center">
-                      <span
-                        v-if="isInstalled(version.id)"
-                        class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mr-2"
-                      >
-                        已安装
-                      </span>
-                      <button
-                        v-if="isInstalled(version.id)"
-                        class="text-xs px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors"
-                      >
-                        <PlayIcon class="w-3.5 h-3.5 inline mr-1" />
-                        启动
-                      </button>
-                      <button
-                        v-else
-                        class="text-xs px-3 py-1 bg-primary-600 text-white rounded hover:bg-primary-700 transition-colors disabled:opacity-50"
-                        :disabled="versionStore.downloading"
-                        @click="handleDownload(version.id)"
-                      >
-                        <ArrowDownTrayIcon v-if="versionStore.downloadingVersion !== version.id" class="w-3.5 h-3.5 inline mr-1" />
-                        {{ versionStore.downloadingVersion === version.id ? '下载中...' : '下载' }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </transition>
-          </div>
-        </div>
-
-        <!-- 已安装列表 -->
-        <div v-else-if="currentContent.type === 'list' && currentContent.versions" class="space-y-2">
+        <!-- 版本列表 -->
+        <div v-else-if="currentVersions.length > 0" class="divide-y divide-gray-100 dark:divide-gray-700">
           <div
-            v-for="version in currentContent.versions"
+            v-for="version in currentVersions"
             :key="version.id"
-            class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between"
+            class="flex items-center justify-between px-6 py-3 hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
           >
             <div class="flex items-center">
               <img
                 :src="getVersionIcon(version.id, version.version_type)"
                 :alt="version.id"
-                class="w-10 h-10 rounded mr-3"
+                class="w-8 h-8 rounded mr-3"
               />
               <div>
-                <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ version.id }}</h3>
-                <p class="text-xs text-gray-500">已安装</p>
+                <div class="flex items-center">
+                  <span class="font-medium text-gray-900 dark:text-gray-100 text-sm">
+                    {{ version.id }}
+                  </span>
+                  <span
+                    v-if="version.id === versionStore.latestRelease && activeSubCategory === 'release'"
+                    class="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                  >
+                    最新
+                  </span>
+                  <span
+                    v-if="version.id === versionStore.latestSnapshot && activeSubCategory === 'snapshot'"
+                    class="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200"
+                  >
+                    最新
+                  </span>
+                </div>
+                <span class="text-xs text-gray-500 dark:text-gray-400">
+                  {{ formatDate(version.release_time) }}
+                </span>
               </div>
             </div>
-            <button class="text-sm px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
-              <PlayIcon class="w-4 h-4 inline mr-1" />
-              启动
-            </button>
+
+            <div class="flex items-center">
+              <span
+                v-if="isInstalled(version.id)"
+                class="text-xs px-2 py-1 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mr-3"
+              >
+                已安装
+              </span>
+              <button
+                v-if="isInstalled(version.id)"
+                class="flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors"
+              >
+                <PlayIcon class="w-4 h-4 mr-1" />
+                启动
+              </button>
+              <button
+                v-else
+                class="flex items-center px-3 py-1.5 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors disabled:opacity-50"
+                :disabled="versionStore.downloading"
+                @click="handleDownload(version.id)"
+              >
+                <ArrowDownTrayIcon v-if="versionStore.downloadingVersion !== version.id" class="w-4 h-4 mr-1" />
+                {{ versionStore.downloadingVersion === version.id ? '下载中...' : '下载' }}
+              </button>
+            </div>
           </div>
         </div>
 
@@ -498,7 +357,7 @@ async function handleOpenGameDir() {
           <div class="text-center">
             <CubeIcon class="w-16 h-16 text-gray-400 mx-auto" />
             <p class="text-gray-600 dark:text-gray-400 mt-4">
-              即将开放
+              {{ activeCategory === 'modloaders' || activeCategory === 'modpacks' ? '即将开放' : '暂无版本' }}
             </p>
           </div>
         </div>
