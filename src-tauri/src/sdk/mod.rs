@@ -427,8 +427,15 @@ impl SdkInstance {
         Ok(result)
     }
 
-    /// 下载版本
-    pub fn download_version(&self, version_id: &str) -> Result<(), SdkError> {
+    /// 下载版本（带进度回调）
+    pub fn download_version_with_callback<F>(
+        &self,
+        version_id: &str,
+        callback: F,
+    ) -> Result<(), SdkError>
+    where
+        F: Fn(u32, u32, u32) + Send + 'static,
+    {
         if self.handle.is_null() {
             return Err(SdkError::NotInitialized);
         }
@@ -436,17 +443,36 @@ impl SdkInstance {
         let version_cstr = std::ffi::CString::new(version_id)
             .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
 
-        // 空回调，不报告进度
-        unsafe extern "C" fn empty_callback(_: u32, _: u32, _: u32, _: *mut std::ffi::c_void) {}
+        // 将闭包包装为 Box 以便传递给 C
+        let callback_box = Box::new(callback);
+        let callback_ptr = Box::into_raw(callback_box) as *mut std::ffi::c_void;
+
+        // 定义 C 回调函数
+        unsafe extern "C" fn c_callback(
+            stage: u32,
+            current: u32,
+            total: u32,
+            user_data: *mut std::ffi::c_void,
+        ) {
+            if !user_data.is_null() {
+                let callback = &*(user_data as *const Box<dyn Fn(u32, u32, u32) + Send>);
+                callback(stage, current, total);
+            }
+        }
 
         let code = unsafe {
             (self.functions.download_version)(
                 self.handle,
                 version_cstr.as_ptr(),
-                empty_callback,
-                std::ptr::null_mut(),
+                c_callback,
+                callback_ptr,
             )
         };
+
+        // 释放回调内存
+        unsafe {
+            let _ = Box::from_raw(callback_ptr as *mut Box<dyn Fn(u32, u32, u32) + Send>);
+        }
 
         if code != 0 {
             return Err(SdkError::FfiFailed(code));
@@ -454,6 +480,11 @@ impl SdkInstance {
 
         log::info!("Version {} downloaded successfully", version_id);
         Ok(())
+    }
+
+    /// 下载版本（无进度回调）
+    pub fn download_version(&self, version_id: &str) -> Result<(), SdkError> {
+        self.download_version_with_callback(version_id, |_, _, _| {})
     }
 
     /// 检测 Java

@@ -3,8 +3,10 @@
  * 版本管理页面
  */
 
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { listen } from '@tauri-apps/api/event'
 import { useVersionStore } from '@/stores/version'
+import type { DownloadProgress } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 
 const versionStore = useVersionStore()
@@ -12,9 +14,12 @@ const versionStore = useVersionStore()
 const searchQuery = ref('')
 const filterType = ref<'all' | 'release' | 'snapshot'>('all')
 const loading = ref(false)
-const downloading = ref<string | null>(null)
 const installedVersions = ref<string[]>([])
 const activeTab = ref<'available' | 'installed'>('available')
+
+// 监听下载进度事件
+let unlistenProgress: (() => void) | null = null
+let unlistenComplete: (() => void) | null = null
 
 onMounted(async () => {
   loading.value = true
@@ -23,6 +28,22 @@ onMounted(async () => {
     loadInstalledVersions(),
   ])
   loading.value = false
+
+  // 监听下载进度
+  unlistenProgress = await listen<DownloadProgress>('download-progress', (event) => {
+    versionStore.updateProgress(event.payload)
+  })
+
+  // 监听下载完成
+  unlistenComplete = await listen<{ version_id: string }>('download-complete', (event) => {
+    installedVersions.value.push(event.payload.version_id)
+    versionStore.finishDownload()
+  })
+})
+
+onUnmounted(() => {
+  unlistenProgress?.()
+  unlistenComplete?.()
 })
 
 async function loadInstalledVersions() {
@@ -83,15 +104,13 @@ function getVersionTypeBadge(versionType: string) {
 }
 
 async function handleDownload(versionId: string) {
-  downloading.value = versionId
+  versionStore.startDownload(versionId)
   try {
     await tauri.downloadVersion(versionId)
-    installedVersions.value.push(versionId)
   } catch (e) {
     console.error('Failed to download version:', e)
     alert(`下载失败: ${e}`)
-  } finally {
-    downloading.value = null
+    versionStore.finishDownload()
   }
 }
 </script>
@@ -107,6 +126,45 @@ async function handleDownload(versionId: string) {
         浏览、下载和管理 Minecraft 版本
       </p>
     </div>
+
+    <!-- 下载进度条 -->
+    <transition
+      enter-active-class="transition ease-out duration-200"
+      enter-from-class="opacity-0 -translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition ease-in duration-150"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-2"
+    >
+      <div v-if="versionStore.downloading && versionStore.downloadProgress" class="card mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <span class="font-medium text-gray-900 dark:text-gray-100">
+              正在下载 {{ versionStore.downloadingVersion }}
+            </span>
+            <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
+              {{ versionStore.downloadProgress.stage_name }}
+            </span>
+          </div>
+          <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
+            {{ versionStore.downloadProgress.percentage.toFixed(1) }}%
+          </span>
+        </div>
+        
+        <!-- 进度条 -->
+        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+          <div
+            class="bg-primary-600 h-2.5 rounded-full transition-all duration-300"
+            :style="{ width: `${versionStore.downloadProgress.percentage}%` }"
+          ></div>
+        </div>
+        
+        <div class="flex justify-between mt-2 text-xs text-gray-500 dark:text-gray-400">
+          <span>{{ versionStore.downloadProgress.current }} / {{ versionStore.downloadProgress.total }}</span>
+          <span>阶段 {{ versionStore.downloadProgress.stage + 1 }} / 6</span>
+        </div>
+      </div>
+    </transition>
 
     <!-- 标签页 -->
     <div class="flex space-x-1 mb-6 bg-gray-100 dark:bg-gray-800 p-1 rounded-lg">
@@ -222,10 +280,10 @@ async function handleDownload(versionId: string) {
           </div>
           <button
             class="btn-primary text-sm"
-            :disabled="downloading === version.id || isInstalled(version.id)"
+            :disabled="versionStore.downloading || isInstalled(version.id)"
             @click="handleDownload(version.id)"
           >
-            <span v-if="downloading === version.id" class="flex items-center">
+            <span v-if="versionStore.downloadingVersion === version.id" class="flex items-center">
               <svg class="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>

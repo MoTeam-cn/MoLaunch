@@ -7,6 +7,14 @@ import { ref } from 'vue'
 import type { VersionInfo, VersionList } from '@/types/version'
 import * as tauri from '@/utils/tauri'
 
+export interface DownloadProgress {
+  stage: number
+  stage_name: string
+  current: number
+  total: number
+  percentage: number
+}
+
 export const useVersionStore = defineStore('version', () => {
   // 状态
   const versions = ref<VersionInfo[]>([])
@@ -14,6 +22,11 @@ export const useVersionStore = defineStore('version', () => {
   const latestSnapshot = ref('')
   const loading = ref(false)
   const error = ref<string | null>(null)
+  
+  // 下载状态
+  const downloading = ref(false)
+  const downloadingVersion = ref<string | null>(null)
+  const downloadProgress = ref<DownloadProgress | null>(null)
 
   // 方法
   async function fetchVersions() {
@@ -31,6 +44,22 @@ export const useVersionStore = defineStore('version', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  function startDownload(versionId: string) {
+    downloading.value = true
+    downloadingVersion.value = versionId
+    downloadProgress.value = null
+  }
+
+  function updateProgress(progress: DownloadProgress) {
+    downloadProgress.value = progress
+  }
+
+  function finishDownload() {
+    downloading.value = false
+    downloadingVersion.value = null
+    downloadProgress.value = null
   }
 
   function getVersionById(id: string): VersionInfo | undefined {
@@ -51,7 +80,13 @@ export const useVersionStore = defineStore('version', () => {
     latestSnapshot,
     loading,
     error,
+    downloading,
+    downloadingVersion,
+    downloadProgress,
     fetchVersions,
+    startDownload,
+    updateProgress,
+    finishDownload,
     getVersionById,
     getReleaseVersions,
     getSnapshotVersions,
