@@ -118,3 +118,148 @@ export async function openGameDir(): Promise<void> {
 export async function getGameDir(): Promise<string> {
   return await invoke<string>('get_game_dir')
 }
+
+/**
+ * 选择文件夹（打开系统对话框）
+ */
+export async function selectFolder(): Promise<string | null> {
+  return await invoke<string | null>('select_folder')
+}
+
+/**
+ * 选择文件（打开系统文件选择对话框）
+ */
+export async function selectFile(title?: string, filters?: { name: string; extensions: string[] }[]): Promise<string | null> {
+  return await invoke<string | null>('select_file', { title, filters })
+}
+
+/**
+ * 更新游戏目录
+ */
+export async function setGameDir(gameDir: string): Promise<void> {
+  return await invoke<void>('set_game_dir', { gameDir })
+}
+
+/**
+ * 获取镜像源
+ */
+export async function getMirrorUrl(): Promise<string | null> {
+  return await invoke<string | null>('get_mirror_url')
+}
+
+/**
+ * 设置镜像源
+ */
+export async function setMirrorUrl(mirrorUrl: string | null): Promise<void> {
+  return await invoke<void>('set_mirror_url', { mirrorUrl })
+}
+
+/**
+ * 获取下载源模式
+ */
+export async function getDownloadSource(): Promise<string> {
+  return await invoke<string>('get_download_source')
+}
+
+/**
+ * 设置下载源模式
+ */
+export async function setDownloadSource(source: string): Promise<void> {
+  return await invoke<void>('set_download_source', { source })
+}
+
+/**
+ * 获取最大下载速度
+ */
+export async function getMaxDownloadSpeed(): Promise<number> {
+  return await invoke<number>('get_max_download_speed')
+}
+
+/**
+ * 设置最大下载速度
+ */
+export async function setMaxDownloadSpeed(speed: number): Promise<void> {
+  return await invoke<void>('set_max_download_speed', { speed })
+}
+
+/**
+ * 获取系统内存信息
+ */
+export async function getSystemMemory(): Promise<{ total: number; used: number; available: number; usage_percent: number }> {
+  return await invoke('get_system_memory')
+}
+
+/**
+ * 获取下载进度快照
+ */
+export async function getDownloadProgress(): Promise<{ stage: number; current: number; total: number; bytes_downloaded: number; bytes_total: number; speed: number; files_remaining: number; is_active: boolean; is_complete: boolean; error_code: number }> {
+  return await invoke('get_download_progress')
+}
+
+/**
+ * 检查是否正在下载
+ */
+export async function isDownloading(): Promise<boolean> {
+  return await invoke('is_downloading')
+}
+
+/**
+ * 重置下载进度
+ */
+export async function resetDownloadProgress(): Promise<void> {
+  return await invoke('reset_download_progress')
+}
+
+/**
+ * 查询 Forge 版本列表
+ */
+export async function listForgeVersions(mcVersion: string): Promise<string[]> {
+  const json = await invoke<string>('list_forge_versions', { mcVersion })
+  try { return JSON.parse(json) } catch { return [] }
+}
+
+/**
+ * 查询 NeoForge 版本列表
+ */
+export async function listNeoforgeVersions(mcVersion: string): Promise<{ version: string; recommended: boolean }[]> {
+  const json = await invoke<string>('list_neoforge_versions', { mcVersion })
+  try { return JSON.parse(json) } catch { return [] }
+}
+
+/**
+ * 查询 Fabric 版本列表
+ */
+export async function listFabricVersions(): Promise<{ version: string; stable: boolean }[]> {
+  const json = await invoke<string>('list_fabric_versions')
+  try { return JSON.parse(json) } catch { return [] }
+}
+
+/**
+ * 查询 OptiFine 版本列表
+ */
+export async function listOptifineVersions(): Promise<{ display_name: string; is_preview: boolean }[]> {
+  const json = await invoke<string>('list_optifine_versions')
+  try { return JSON.parse(json) } catch { return [] }
+}
+
+/**
+ * 查询 LiteLoader 版本列表
+ */
+export async function listLiteloaderVersions(mcVersion: string): Promise<string[]> {
+  const json = await invoke<string>('list_liteloader_versions', { mcVersion })
+  try { return JSON.parse(json) } catch { return [] }
+}
+
+/**
+ * 校验加载器兼容性
+ */
+export async function validateLoaders(mcVersion: string, forge?: string, neoforge?: string, fabric?: string, optifine?: string): Promise<boolean> {
+  return await invoke<boolean>('validate_loaders', { mcVersion, forgeVersion: forge, neoforgeVersion: neoforge, fabricVersion: fabric, optifineVersion: optifine })
+}
+
+/**
+ * 合并安装（MC + 加载器）
+ */
+export async function installMerged(mcVersion: string, forge?: string, neoforge?: string, fabric?: string, optifine?: string, liteloader?: string, instanceName?: string): Promise<void> {
+  return await invoke('install_merged', { mcVersion, forgeVersion: forge, neoforgeVersion: neoforge, fabricVersion: fabric, optifineVersion: optifine, liteloaderVersion: liteloader, instanceName })
+}

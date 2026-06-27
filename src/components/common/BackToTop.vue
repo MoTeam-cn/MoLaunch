@@ -1,30 +1,37 @@
 <script setup lang="ts">
 /**
  * 返回顶部按钮组件
+ * 只在内容足够长且滚动超过 1/3 时显示
  */
 
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ArrowUpIcon } from '@heroicons/vue/24/outline'
 
-interface Props {
-  target?: HTMLElement | null
-  threshold?: number
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  target: null,
-  threshold: 300,
-})
-
 const visible = ref(false)
+let activeEl: Element | null = null
 
-function checkScroll() {
-  const el = props.target || document.documentElement
-  visible.value = el.scrollTop > props.threshold
+function onScroll(e: Event) {
+  const el = e.target as Element
+  if (!el || !('scrollTop' in el) || !('scrollHeight' in el)) return
+
+  const scrollHeight = el.scrollHeight
+  const clientHeight = el.clientHeight
+  const scrollTop = el.scrollTop
+
+  // 内容不够长，不显示
+  if (scrollHeight <= clientHeight * 1.5) {
+    visible.value = false
+    return
+  }
+
+  // 滚动超过内容的 1/3 才显示
+  const scrollRatio = scrollTop / (scrollHeight - clientHeight)
+  visible.value = scrollRatio > 0.33
+  activeEl = el
 }
 
 function scrollToTop() {
-  const el = props.target || document.documentElement
+  const el = activeEl || document.documentElement
   el.scrollTo({
     top: 0,
     behavior: 'smooth',
@@ -32,13 +39,11 @@ function scrollToTop() {
 }
 
 onMounted(() => {
-  const el = props.target || window
-  el.addEventListener('scroll', checkScroll, { passive: true })
+  document.addEventListener('scroll', onScroll, { capture: true, passive: true })
 })
 
 onUnmounted(() => {
-  const el = props.target || window
-  el.removeEventListener('scroll', checkScroll)
+  document.removeEventListener('scroll', onScroll, { capture: true })
 })
 </script>
 
@@ -53,11 +58,11 @@ onUnmounted(() => {
   >
     <button
       v-if="visible"
-      class="fixed bottom-6 right-6 z-50 w-10 h-10 bg-white dark:bg-gray-800 rounded-full shadow-lg border border-gray-200 dark:border-gray-700 flex items-center justify-center hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+      class="fixed bottom-6 right-6 z-50 w-10 h-10 bg-white rounded-full shadow-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
       title="返回顶部"
       @click="scrollToTop"
     >
-      <ArrowUpIcon class="w-5 h-5 text-gray-600 dark:text-gray-400" />
+      <ArrowUpIcon class="w-5 h-5 text-gray-600" />
     </button>
   </transition>
 </template>

@@ -47,3 +47,6 @@ coverage/
 # Web Cache
 node_modules
 logo_data
+
+#SDK Cache
+sdk_data

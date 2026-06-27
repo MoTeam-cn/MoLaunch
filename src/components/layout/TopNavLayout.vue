@@ -3,8 +3,10 @@
  * 顶部导航布局组件
  */
 
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSdkStore } from '@/stores/sdk'
+import { appWindow } from '@tauri-apps/api/window'
 import {
   HomeIcon,
   Cog6ToothIcon,
@@ -14,6 +16,14 @@ import {
 const router = useRouter()
 const route = useRoute()
 const sdkStore = useSdkStore()
+const isMaximized = ref(false)
+
+onMounted(async () => {
+  isMaximized.value = await appWindow.isMaximized()
+  await appWindow.onResized(async () => {
+    isMaximized.value = await appWindow.isMaximized()
+  })
+})
 
 const navItems = [
   { name: '首页', path: '/', icon: HomeIcon },
@@ -31,52 +41,87 @@ function navigateTo(path: string) {
 </script>
 
 <template>
-  <div class="flex flex-col h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
-    <!-- 顶部导航栏 - 固定 -->
-    <header class="fixed top-0 left-0 right-0 z-50 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 shadow-sm">
-      <div class="max-w-7xl mx-auto px-6 h-14 flex items-center justify-between">
-        <!-- 左侧：Logo -->
-        <div class="flex items-center w-48">
-          <h1 class="text-lg font-bold text-primary-600 dark:text-primary-400">
-            MoLaunch
-          </h1>
+  <div class="flex flex-col h-screen overflow-hidden">
+    <!-- 顶部栏：蓝色背景 -->
+    <header class="shrink-0 bg-primary-600 select-none">
+      <div class="h-12 flex items-center">
+        <!-- 左侧拖拽区域 -->
+        <div data-tauri-drag-region class="flex items-center pl-4 pr-2 h-full">
+          <span class="text-sm font-bold text-white pointer-events-none">MoLaunch</span>
         </div>
-        
-        <!-- 中间：导航菜单 -->
+
+        <!-- 中间拖拽空隙 -->
+        <div data-tauri-drag-region class="flex-1 h-full" />
+
+        <!-- 导航菜单 -->
         <nav class="flex items-center space-x-1">
           <button
             v-for="item in navItems"
             :key="item.path"
-            class="flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
             :class="[
               isActive(item.path)
-                ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-                : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+                ? 'bg-white/20 text-white'
+                : 'text-white/70 hover:bg-white/10 hover:text-white'
             ]"
             @click="navigateTo(item.path)"
           >
-            <component :is="item.icon" class="w-4 h-4 mr-2" />
+            <component :is="item.icon" class="w-4 h-4 mr-1.5" />
             {{ item.name }}
           </button>
         </nav>
-        
-        <!-- 右侧：SDK 状态 -->
-        <div class="flex items-center w-48 justify-end">
-          <div class="flex items-center text-xs">
-            <div
-              class="w-2 h-2 rounded-full mr-1.5"
-              :class="sdkStore.isReady ? 'bg-green-500' : 'bg-yellow-500'"
-            />
-            <span class="text-gray-500 dark:text-gray-400">
-              {{ sdkStore.isReady ? 'SDK 就绪' : 'SDK 加载中' }}
-            </span>
+
+        <!-- 中间拖拽空隙 -->
+        <div data-tauri-drag-region class="flex-1 h-full" />
+
+        <!-- 右侧：SDK 状态 + 窗口控制 -->
+        <div class="flex items-center h-full">
+          <div data-tauri-drag-region class="flex items-center h-full px-2">
+            <div class="flex items-center text-xs pointer-events-none">
+              <div class="w-1.5 h-1.5 rounded-full mr-1.5" :class="sdkStore.isReady ? 'bg-green-400' : 'bg-yellow-300'" />
+              <span class="text-white/60">{{ sdkStore.isReady ? '就绪' : '加载中' }}</span>
+            </div>
           </div>
+
+          <!-- 最小化 -->
+          <button
+            class="h-full w-11 flex items-center justify-center hover:bg-white/10 transition-colors group"
+            @click="appWindow.minimize()"
+          >
+            <svg class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
+              <rect x="1" y="5.5" width="10" height="1" rx="0.5" fill="currentColor" />
+            </svg>
+          </button>
+
+          <!-- 最大化/还原 -->
+          <button
+            class="h-full w-11 flex items-center justify-center hover:bg-white/10 transition-colors group"
+            @click="appWindow.toggleMaximize()"
+          >
+            <svg v-if="!isMaximized" class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
+              <rect x="1.5" y="1.5" width="9" height="9" rx="1" stroke="currentColor" stroke-width="1" />
+            </svg>
+            <svg v-else class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
+              <rect x="3.5" y="0.5" width="7.5" height="7.5" rx="1" stroke="currentColor" stroke-width="1" />
+              <path d="M1 3.5V10C1 10.5523 1.44772 11 2 11H8.5" stroke="currentColor" stroke-width="1" />
+            </svg>
+          </button>
+
+          <!-- 关闭 -->
+          <button
+            class="h-full w-11 flex items-center justify-center hover:bg-red-500 transition-colors group"
+            @click="appWindow.close()"
+          >
+            <svg class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
+              <path d="M1.5 1.5L10.5 10.5M1.5 10.5L10.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />
+            </svg>
+          </button>
         </div>
       </div>
     </header>
     
-    <!-- 主内容区 -->
-    <main class="flex-1 overflow-hidden pt-14">
+    <!-- 主内容区：淡蓝背景 -->
+    <main class="flex-1 overflow-hidden p-2" style="background-color: #e0ecff">
       <slot />
     </main>
   </div>

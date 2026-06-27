@@ -12,6 +12,10 @@ export interface DownloadProgress {
   current: number
   total: number
   percentage: number
+  speed: number
+  bytesDownloaded: number
+  bytesTotal: number
+  filesRemaining: number
 }
 
 export const useVersionStore = defineStore('version', () => {

@@ -7,19 +7,20 @@ import { onMounted, ref } from 'vue'
 import TopNavLayout from '@/components/layout/TopNavLayout.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
 import Modal from '@/components/common/Modal.vue'
+import Toast from '@/components/common/Toast.vue'
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
 import { setModalRef } from '@/utils/modal'
+import { setToastRef } from '@/utils/toast'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
 const modalRef = ref<InstanceType<typeof Modal> | null>(null)
+const toastRef = ref<InstanceType<typeof Toast> | null>(null)
 
 onMounted(() => {
-  // 设置弹窗引用
   setModalRef(modalRef.value)
-  
-  // 初始化
+  setToastRef(toastRef.value)
   initApp()
 })
 
@@ -41,6 +42,9 @@ async function initApp() {
   
   // 恢复登录状态
   await authStore.restoreSession()
+
+  // 后台加载 Java 信息
+  sdkStore.loadJava()
 }
 </script>
 
@@ -54,6 +58,7 @@ async function initApp() {
   </TopNavLayout>
   <BackToTop />
   <Modal ref="modalRef" />
+  <Toast ref="toastRef" />
 </template>
 
 <style>

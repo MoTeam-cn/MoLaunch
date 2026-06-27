@@ -30,7 +30,7 @@ pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionList, St
     Ok(versions)
 }
 
-/// 下载版本（带进度回调）
+/// 下载版本（同步阻塞，通过轮询获取进度）
 #[tauri::command]
 pub async fn download_version(
     app: tauri::AppHandle,
@@ -42,45 +42,68 @@ pub async fn download_version(
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
 
-    // 克隆 app handle 用于回调
-    let app_handle = app.clone();
+    // 下载前重置进度
+    let _ = sdk.reset_progress();
 
-    sdk.download_version_with_callback(&version_id, move |stage, current, total| {
-        let percentage = if total > 0 {
-            (current as f64 / total as f64) * 100.0
-        } else {
-            0.0
-        };
+    let handle_addr = sdk.handle_ptr() as usize;
+    let download_fn_addr = sdk.download_fn_addr();
+    drop(sdk_guard);
 
-        let progress = DownloadProgress {
-            stage,
-            current,
-            total,
-            percentage,
-        };
+    if handle_addr == 0 {
+        return Err("SDK handle is null".to_string());
+    }
 
-        // 发送进度事件到前端
-        let _ = app_handle.emit_all("download-progress", &progress);
+    let version_id_clone = version_id.clone();
 
-        log::debug!(
-            "Download progress: {}/{} ({:.1}%)",
-            current,
-            total,
-            percentage
-        );
-    })
-    .map_err(|e| {
-        log::error!("Failed to download version: {}", e);
-        e.to_string()
-    })?;
+    let result = std::thread::Builder::new()
+        .name("sdk-download".into())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(move || {
+            let version_cstr = std::ffi::CString::new(version_id_clone.as_str())
+                .map_err(|e| format!("Invalid version id: {}", e))?;
 
-    // 发送完成事件
+            // mc_download_version(handle, version_id, callback, user_data)
+            // 不传回调，SDK 不支持
+            let handle = handle_addr as *const std::ffi::c_void;
+            let download_fn: unsafe extern "C" fn(
+                *const std::ffi::c_void,
+                *const std::ffi::c_char,
+                *const std::ffi::c_void,
+                *mut std::ffi::c_void,
+            ) -> i32 = unsafe { std::mem::transmute(download_fn_addr) };
+
+            eprintln!("[download] 调用 mc_download_version(version={:?})...", version_cstr);
+            log::info!("[download] Calling mc_download_version for {:?}", version_cstr);
+            let code = unsafe {
+                download_fn(handle, version_cstr.as_ptr(), std::ptr::null(), std::ptr::null_mut())
+            };
+            eprintln!("[download] mc_download_version 返回 code={}", code);
+            log::info!("[download] mc_download_version returned code={}", code);
+
+            if code != 0 {
+                Err(format!("SDK download failed with code: {}", code))
+            } else {
+                Ok(())
+            }
+        })
+        .map_err(|e| format!("Failed to spawn download thread: {}", e))?
+        .join()
+        .map_err(|_| "Download thread panicked".to_string())?;
+
+    result?;
+
+    // 下载完成，检查版本目录是否存在
+    let config = crate::state::AppConfig::default();
+    let game_dir = &config.game_dir;
+    let version_dir = std::path::Path::new(game_dir).join("versions").join(&version_id);
+    eprintln!("[download] 版本目录: {:?}, 存在: {}", version_dir, version_dir.exists());
+
     let _ = app.emit_all(
         "download-complete",
         serde_json::json!({ "version_id": version_id }),
     );
 
-    log::info!("Version {} downloaded successfully", version_id);
+    log::info!("Version {} download command completed", version_id);
     Ok(())
 }
 
@@ -177,4 +200,170 @@ pub async fn uninstall_version(
             version_dir.display()
         ))
     }
+}
+
+/// 获取下载进度快照
+#[tauri::command]
+pub async fn get_download_progress(state: State<'_, AppState>) -> Result<crate::sdk::ProgressSnapshot, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    sdk.get_progress().map_err(|e| e.to_string())
+}
+
+/// 检查是否正在下载
+#[tauri::command]
+pub async fn is_downloading(state: State<'_, AppState>) -> Result<bool, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    Ok(sdk.is_downloading())
+}
+
+/// 重置下载进度
+#[tauri::command]
+pub async fn reset_download_progress(state: State<'_, AppState>) -> Result<(), String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    sdk.reset_progress().map_err(|e| e.to_string())
+}
+
+/// 查询 Forge 版本列表
+#[tauri::command]
+pub async fn list_forge_versions(state: State<'_, AppState>, mc_version: String) -> Result<String, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    sdk.list_forge_versions(&mc_version).map_err(|e| e.to_string())
+}
+
+/// 查询 NeoForge 版本列表
+#[tauri::command]
+pub async fn list_neoforge_versions(state: State<'_, AppState>, mc_version: String) -> Result<String, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    sdk.list_neoforge_versions(&mc_version).map_err(|e| e.to_string())
+}
+
+/// 查询 Fabric 版本列表
+#[tauri::command]
+pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    sdk.list_fabric_versions().map_err(|e| e.to_string())
+}
+
+/// 查询 OptiFine 版本列表
+#[tauri::command]
+pub async fn list_optifine_versions(state: State<'_, AppState>) -> Result<String, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    sdk.list_optifine_versions().map_err(|e| e.to_string())
+}
+
+/// 查询 LiteLoader 版本列表
+#[tauri::command]
+pub async fn list_liteloader_versions(state: State<'_, AppState>, mc_version: String) -> Result<String, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    sdk.list_liteloader_versions(&mc_version).map_err(|e| e.to_string())
+}
+
+/// 校验加载器兼容性
+#[tauri::command]
+pub async fn validate_loaders(
+    mc_version: String,
+    forge_version: Option<String>,
+    neoforge_version: Option<String>,
+    fabric_version: Option<String>,
+    optifine_version: Option<String>,
+) -> Result<bool, String> {
+    match crate::sdk::validate_loaders(
+        &mc_version,
+        forge_version.as_deref(),
+        neoforge_version.as_deref(),
+        fabric_version.as_deref(),
+        optifine_version.as_deref(),
+    ) {
+        Ok(()) => Ok(true),
+        Err(crate::sdk::SdkError::FfiFailed(_)) => Ok(false),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+/// 合并安装（MC + 加载器）
+#[tauri::command]
+pub async fn install_merged(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+    mc_version: String,
+    forge_version: Option<String>,
+    neoforge_version: Option<String>,
+    fabric_version: Option<String>,
+    optifine_version: Option<String>,
+    liteloader_version: Option<String>,
+    instance_name: Option<String>,
+) -> Result<(), String> {
+    log::info!("Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
+        mc_version, forge_version, neoforge_version, fabric_version, optifine_version);
+
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    let _ = sdk.reset_progress();
+    let handle_addr = sdk.handle_ptr() as usize;
+    let install_fn_addr = sdk.install_merged_fn_addr();
+    drop(sdk_guard);
+
+    let mc_version_clone = mc_version.clone();
+    let instance = instance_name.clone().unwrap_or_else(|| mc_version.clone());
+    let instance_clone = instance.clone();
+
+    let result = std::thread::Builder::new()
+        .name("sdk-install".into())
+        .stack_size(8 * 1024 * 1024)
+        .spawn(move || {
+            use crate::sdk::FFIMergedInstallRequest;
+
+            let mc_c = std::ffi::CString::new(mc_version_clone.as_str()).unwrap();
+            let forge_c = forge_version.map(|v| std::ffi::CString::new(v).unwrap());
+            let neoforge_c = neoforge_version.map(|v| std::ffi::CString::new(v).unwrap());
+            let fabric_c = fabric_version.map(|v| std::ffi::CString::new(v).unwrap());
+            let optifine_c = optifine_version.map(|v| std::ffi::CString::new(v).unwrap());
+            let liteloader_c = liteloader_version.map(|v| std::ffi::CString::new(v).unwrap());
+            let instance_c = std::ffi::CString::new(instance_clone.as_str()).unwrap();
+
+            let request = FFIMergedInstallRequest {
+                mc_version: mc_c.as_ptr(),
+                forge_version: forge_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+                neoforge_version: neoforge_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+                fabric_version: fabric_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+                optifine_version: optifine_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+                liteloader_version: liteloader_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+                instance_name: instance_c.as_ptr(),
+            };
+
+            let handle = handle_addr as *const std::ffi::c_void;
+            let install_fn: unsafe extern "C" fn(
+                *const std::ffi::c_void,
+                *const FFIMergedInstallRequest,
+                *const std::ffi::c_void,
+                *mut std::ffi::c_void,
+            ) -> i32 = unsafe { std::mem::transmute(install_fn_addr) };
+
+            eprintln!("[install] Calling mc_install_merged...");
+            let code = unsafe { install_fn(handle, &request, std::ptr::null(), std::ptr::null_mut()) };
+            eprintln!("[install] mc_install_merged returned code={}", code);
+
+            if code != 0 {
+                Err(format!("SDK install failed with code: {}", code))
+            } else {
+                Ok(())
+            }
+        })
+        .map_err(|e| format!("Failed to spawn install thread: {}", e))?
+        .join()
+        .map_err(|_| "Install thread panicked".to_string())?;
+
+    result?;
+
+    let _ = app.emit_all("install-complete", serde_json::json!({ "instance_name": instance }));
+    log::info!("Merged install completed");
+    Ok(())
 }

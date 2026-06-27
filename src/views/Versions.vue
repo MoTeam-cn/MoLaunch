@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 下载页面
  * 左侧侧边栏：加载类别
@@ -6,11 +6,11 @@
  */
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { listen } from '@tauri-apps/api/event'
 import { useVersionStore } from '@/stores/version'
-import type { DownloadProgress } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 import { showError, showConfirm } from '@/utils/modal'
+import { showSuccess, showInfo } from '@/utils/toast'
+import LoaderSelect from './LoaderSelect.vue'
 import {
   CubeIcon,
   WrenchIcon,
@@ -27,7 +27,6 @@ import {
   SparklesIcon,
 } from '@heroicons/vue/24/outline'
 
-// 导入 Blocks 图片
 import grassIcon from '@/assets/blocks/Grass.png'
 import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
 import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
@@ -35,11 +34,100 @@ import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
 
 const versionStore = useVersionStore()
 
+let pollTimer: ReturnType<typeof setInterval> | null = null
+let lastPercentage = 0
+
+const stageNames: Record<number, string> = {
+  0: '版本清单', 1: '版本 JSON', 2: '客户端 JAR', 3: '库文件',
+  4: '资源文件', 5: 'Natives', 6: '解压 Natives', 7: '模组', 8: '整合包',
+}
+
+function formatSpeed(bytesPerSec: number): string {
+  if (bytesPerSec <= 0) return ''
+  if (bytesPerSec >= 1024 * 1024) return (bytesPerSec / 1024 / 1024).toFixed(1) + ' MB/s'
+  if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(0) + ' KB/s'
+  return bytesPerSec + ' B/s'
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0'
+  if (bytes >= 1024 * 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB'
+  if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(0) + ' MB'
+  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB'
+  return bytes + ' B'
+}
+
+function startPolling() {
+  if (pollTimer) return
+  lastPercentage = 0
+  pollTimer = setInterval(async () => {
+    try {
+      const snapshot = await tauri.getDownloadProgress()
+      console.log('[poll]', JSON.stringify(snapshot))
+      let percentage = 0
+      if (snapshot.bytes_total > 0) {
+        percentage = (snapshot.bytes_downloaded / snapshot.bytes_total) * 100
+      } else if (snapshot.total > 0) {
+        percentage = (snapshot.current / snapshot.total) * 100
+      }
+      percentage = Math.max(percentage, lastPercentage)
+      percentage = Math.min(percentage, 100)
+      lastPercentage = percentage
+
+      if (snapshot.is_active || percentage > 0) {
+        versionStore.updateProgress({
+          stage: stageNames[snapshot.stage] || `阶段 ${snapshot.stage}`,
+          current: snapshot.current,
+          total: snapshot.total,
+          percentage,
+          speed: snapshot.speed,
+          bytesDownloaded: snapshot.bytes_downloaded,
+          bytesTotal: snapshot.bytes_total,
+          filesRemaining: snapshot.files_remaining,
+        })
+      }
+
+      if (snapshot.is_complete) {
+        stopPolling()
+        await loadInstalledVersions()
+        versionStore.finishDownload()
+        showSuccess(`${versionStore.downloadingVersion} 下载完成`)
+      } else if (snapshot.error_code !== 0) {
+        stopPolling()
+        showError('下载失败', `错误码: ${snapshot.error_code}`, '')
+        versionStore.finishDownload()
+      }
+    } catch (e) {
+      console.error('Failed to poll progress:', e)
+    }
+  }, 300)
+}
+
+function stopPolling() {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+onMounted(async () => {
+  loading.value = true
+  await Promise.all([
+    versionStore.fetchVersions(),
+    loadInstalledVersions(),
+  ])
+  loading.value = false
+})
+
+onUnmounted(() => {
+  stopPolling()
+})
+
 const loading = ref(false)
 const installedVersions = ref<string[]>([])
 const activeCategory = ref('vanilla')
+const selectedVersion = ref<string | null>(null)
 
-// 展开的分类（支持多个同时展开）
 const expandedSections = ref<Set<string>>(new Set(['latest']))
 
 function toggleSection(sectionId: string) {
@@ -54,7 +142,6 @@ function isSectionExpanded(sectionId: string): boolean {
   return expandedSections.value.has(sectionId)
 }
 
-// 版本类型图标
 const typeIcons: Record<string, string> = {
   release: grassIcon,
   snapshot: commandBlockIcon,
@@ -75,7 +162,6 @@ function getVersionIcon(versionId: string, versionType: string): string {
   return typeIcons[versionType] || grassIcon
 }
 
-// 加载类别
 const categories = [
   { id: 'vanilla', label: '原版游戏', icon: CubeIcon },
   { id: 'modloaders', label: '模组加载器', icon: WrenchIcon },
@@ -83,7 +169,6 @@ const categories = [
   { id: 'installed', label: '已安装', icon: CheckCircleIcon },
 ]
 
-// 最新版本
 const latestVersions = computed(() => {
   const versions = []
   if (versionStore.latestRelease) {
@@ -97,7 +182,6 @@ const latestVersions = computed(() => {
   return versions
 })
 
-// 版本分类
 const sections = computed(() => [
   {
     id: 'latest',
@@ -129,33 +213,6 @@ const sections = computed(() => [
   },
 ])
 
-// 监听下载进度
-let unlistenProgress: (() => void) | null = null
-let unlistenComplete: (() => void) | null = null
-
-onMounted(async () => {
-  loading.value = true
-  await Promise.all([
-    versionStore.fetchVersions(),
-    loadInstalledVersions(),
-  ])
-  loading.value = false
-
-  unlistenProgress = await listen<DownloadProgress>('download-progress', (event) => {
-    versionStore.updateProgress(event.payload)
-  })
-
-  unlistenComplete = await listen<{ version_id: string }>('download-complete', (event) => {
-    installedVersions.value.push(event.payload.version_id)
-    versionStore.finishDownload()
-  })
-})
-
-onUnmounted(() => {
-  unlistenProgress?.()
-  unlistenComplete?.()
-})
-
 async function loadInstalledVersions() {
   try {
     installedVersions.value = await tauri.listInstalledVersions()
@@ -178,11 +235,22 @@ function isInstalled(versionId: string): boolean {
 }
 
 async function handleDownload(versionId: string) {
+  console.log('[download] 开始:', versionId)
+  lastPercentage = 0
   versionStore.startDownload(versionId)
+  showInfo(`开始下载 ${versionId}`)
+  startPolling()
   try {
+    console.log('[download] 调用 downloadVersion...')
     await tauri.downloadVersion(versionId)
+    console.log('[download] downloadVersion 返回')
+    stopPolling()
+    await loadInstalledVersions()
+    versionStore.finishDownload()
+    showSuccess(`${versionId} 下载完成`)
   } catch (e) {
-    console.error('Failed to download version:', e)
+    stopPolling()
+    console.error('[download] 失败:', e)
     showError('下载失败', `无法下载版本 ${versionId}`, String(e))
     versionStore.finishDownload()
   }
@@ -196,23 +264,13 @@ async function handleUninstall(versionId: string) {
       try {
         await tauri.uninstallVersion(versionId)
         installedVersions.value = installedVersions.value.filter(v => v !== versionId)
+        showSuccess(`${versionId} 已卸载`)
       } catch (e) {
         console.error('Failed to uninstall version:', e)
         showError('卸载失败', `无法卸载版本 ${versionId}`, String(e))
       }
     }
   )
-}
-
-// 调试：显示版本目录信息
-async function debugVersions() {
-  try {
-    const gameDir = await tauri.getGameDir()
-    console.log('Game directory:', gameDir)
-    console.log('Installed versions:', installedVersions.value)
-  } catch (e) {
-    console.error('Debug error:', e)
-  }
 }
 
 async function handleOpenGameDir() {
@@ -225,9 +283,9 @@ async function handleOpenGameDir() {
 </script>
 
 <template>
-  <div class="flex h-full">
-    <!-- 左侧侧边栏：加载类别 -->
-    <aside class="w-48 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+    <!-- 左侧侧边栏 -->
+    <aside class="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
       <div class="flex-1 overflow-y-auto py-4">
         <button
           v-for="category in categories"
@@ -235,8 +293,8 @@ async function handleOpenGameDir() {
           class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors"
           :class="[
             activeCategory === category.id
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300 border-r-2 border-primary-500'
-              : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+              ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
+              : 'text-gray-700 hover:bg-gray-50'
           ]"
           @click="activeCategory = category.id"
         >
@@ -245,9 +303,9 @@ async function handleOpenGameDir() {
         </button>
       </div>
 
-      <div class="p-3 border-t border-gray-200 dark:border-gray-700">
+      <div class="p-3 border-t border-gray-200">
         <button
-          class="w-full flex items-center justify-center px-3 py-2 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+          class="w-full flex items-center justify-center px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
           @click="handleOpenGameDir"
         >
           <FolderOpenIcon class="w-4 h-4 mr-2" />
@@ -258,12 +316,11 @@ async function handleOpenGameDir() {
 
     <!-- 右侧内容区 -->
     <div class="flex-1 flex flex-col overflow-hidden">
-      <!-- 分类标题 -->
-      <div class="px-6 py-4 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
+      <div class="px-6 py-4 bg-white border-b border-gray-200 shrink-0">
+        <h2 class="text-lg font-semibold text-gray-900">
           {{ activeCategory === 'installed' ? '已安装' : '原版游戏' }}
         </h2>
-        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        <p class="text-xs text-gray-500 mt-1">
           {{ activeCategory === 'installed' ? '已下载的版本，可启动或卸载' : 'Minecraft Java Edition 官方版本' }}
         </p>
       </div>
@@ -277,36 +334,73 @@ async function handleOpenGameDir() {
         leave-from-class="opacity-100 translate-y-0"
         leave-to-class="opacity-0 -translate-y-2"
       >
-        <div v-if="versionStore.downloading && versionStore.downloadProgress" class="mx-6 mt-4 p-4 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
-          <div class="flex items-center justify-between mb-2">
-            <div>
-              <span class="font-medium text-gray-900 dark:text-gray-100">
-                正在下载 {{ versionStore.downloadingVersion }}
+        <div v-if="versionStore.downloading" class="mx-6 mt-4 p-3 bg-white rounded-lg border border-gray-200">
+          <!-- 状态行 -->
+          <div class="flex items-center gap-3">
+            <div class="animate-spin rounded-full h-4 w-4 border-2 border-gray-300 border-t-primary-600"></div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center justify-between">
+                <span class="text-sm font-medium text-gray-900">
+                  正在下载 {{ versionStore.downloadingVersion }}
+                </span>
+                <span class="text-xs text-gray-500">
+                  {{ versionStore.downloadProgress?.stage || '准备中...' }}
+                </span>
+              </div>
+            </div>
+          </div>
+          <!-- 进度条 -->
+          <div class="mt-3">
+            <!-- 有百分比进度时：确定进度条 -->
+            <div v-if="(versionStore.downloadProgress?.percentage || 0) > 0" class="w-full bg-gray-100 rounded-full overflow-hidden" style="height: 6px">
+              <div
+                class="h-full bg-primary-500 rounded-full transition-all duration-300"
+                :style="{ width: `${versionStore.downloadProgress.percentage}%` }"
+              ></div>
+            </div>
+            <!-- 无百分比进度时：动画扫动进度条 -->
+            <div v-else class="w-full bg-gray-100 rounded-full overflow-hidden" style="height: 6px">
+              <div class="h-full bg-primary-400 rounded-full animate-sweep" style="width: 30%"></div>
+            </div>
+            <div class="flex items-center justify-between mt-2 text-xs text-gray-500">
+              <span>
+                <template v-if="versionStore.downloadProgress?.bytesTotal && versionStore.downloadProgress.bytesTotal > 0">
+                  {{ formatBytes(versionStore.downloadProgress.bytesDownloaded) }} / {{ formatBytes(versionStore.downloadProgress.bytesTotal) }}
+                </template>
+                <template v-else-if="versionStore.downloadProgress?.total && versionStore.downloadProgress.total > 0">
+                  {{ versionStore.downloadProgress.current }}/{{ versionStore.downloadProgress.total }} 文件
+                </template>
+                <template v-else>
+                  正在处理...
+                </template>
               </span>
-              <span class="ml-2 text-sm text-gray-500 dark:text-gray-400">
-                {{ versionStore.downloadProgress.stage }}
+              <span v-if="versionStore.downloadProgress?.speed && versionStore.downloadProgress.speed > 0">
+                {{ formatSpeed(versionStore.downloadProgress.speed) }}
               </span>
             </div>
-            <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
-              {{ versionStore.downloadProgress.percentage.toFixed(1) }}%
-            </span>
-          </div>
-          <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-            <div
-              class="bg-primary-600 h-2 rounded-full transition-all duration-300"
-              :style="{ width: `${versionStore.downloadProgress.percentage}%` }"
-            ></div>
           </div>
         </div>
       </transition>
 
       <!-- 内容列表 -->
-      <div class="flex-1 overflow-y-auto p-6">
-        <!-- 加载状态 -->
+      <div class="flex-1 overflow-y-auto">
+        <transition name="slide-right" mode="out-in">
+          <!-- 加载器选择模式 -->
+          <LoaderSelect
+            v-if="selectedVersion"
+            :key="'loader-' + selectedVersion"
+            :mc-version="selectedVersion"
+            @back="selectedVersion = null"
+            @installing="selectedVersion = null"
+          />
+
+          <!-- 版本列表模式 -->
+          <div v-else key="version-list" class="p-6">
+          <!-- 加载状态 -->
         <div v-if="loading" class="flex items-center justify-center h-full">
           <div class="text-center">
             <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-            <p class="text-gray-600 dark:text-gray-400 mt-4">加载中...</p>
+            <p class="text-gray-600 mt-4">加载中...</p>
           </div>
         </div>
 
@@ -315,17 +409,16 @@ async function handleOpenGameDir() {
           <div
             v-for="section in sections"
             :key="section.id"
-            class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden"
+            class="bg-white rounded-lg border border-gray-200 overflow-hidden"
           >
-            <!-- 分类标题 -->
             <div
-              class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors"
+              class="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
               @click="toggleSection(section.id)"
             >
               <div class="flex items-center">
-                <component :is="section.icon" class="w-5 h-5 mr-3 text-gray-500 dark:text-gray-400" />
-                <span class="font-medium text-gray-900 dark:text-gray-100">{{ section.label }}</span>
-                <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">
+                <component :is="section.icon" class="w-5 h-5 mr-3 text-gray-500" />
+                <span class="font-medium text-gray-900">{{ section.label }}</span>
+                <span class="ml-2 text-xs text-gray-500">
                   {{ section.count }} 个版本
                 </span>
               </div>
@@ -335,21 +428,16 @@ async function handleOpenGameDir() {
               />
             </div>
 
-            <!-- 展开内容 -->
-            <transition
-              enter-active-class="transition-all duration-300 ease-out"
-              enter-from-class="max-h-0 opacity-0"
-              enter-to-class="max-h-[5000px] opacity-100"
-              leave-active-class="transition-all duration-200 ease-in"
-              leave-from-class="max-h-[5000px] opacity-100"
-              leave-to-class="max-h-0 opacity-0"
+            <div
+              class="grid transition-all duration-500 ease-in-out"
+              :style="{ gridTemplateRows: isSectionExpanded(section.id) ? '1fr' : '0fr' }"
             >
-              <div v-if="isSectionExpanded(section.id)" class="overflow-hidden">
-                <div class="border-t border-gray-100 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+              <div class="overflow-hidden min-h-0">
+                <div class="border-t border-gray-100 divide-y divide-gray-100">
                   <div
                     v-for="version in section.versions"
                     :key="version.id"
-                    class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                    class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
                   >
                     <div class="flex items-center pl-8">
                       <img
@@ -359,13 +447,13 @@ async function handleOpenGameDir() {
                       />
                       <div>
                         <div class="flex items-center">
-                          <span class="text-sm text-gray-900 dark:text-gray-100">{{ version.id }}</span>
+                          <span class="text-sm text-gray-900">{{ version.id }}</span>
                           <span
                             v-if="(version as any).tag"
                             class="ml-2 text-xs px-1.5 py-0.5 rounded-full"
-                            :class="(version as any).tag === '正式版' 
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'"
+                            :class="(version as any).tag === '正式版'
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-yellow-100 text-yellow-800'"
                           >
                             {{ (version as any).tag }}
                           </span>
@@ -377,7 +465,7 @@ async function handleOpenGameDir() {
                     <div class="flex items-center">
                       <span
                         v-if="isInstalled(version.id)"
-                        class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 mr-2"
+                        class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 mr-2"
                       >
                         已安装
                       </span>
@@ -390,7 +478,7 @@ async function handleOpenGameDir() {
                       </button>
                       <button
                         v-if="isInstalled(version.id)"
-                        class="flex items-center px-2 py-1 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400 text-xs rounded hover:bg-red-200 dark:hover:bg-red-900 transition-colors"
+                        class="flex items-center px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors"
                         @click="handleUninstall(version.id)"
                       >
                         <TrashIcon class="w-3.5 h-3.5" />
@@ -399,16 +487,16 @@ async function handleOpenGameDir() {
                         v-else
                         class="flex items-center px-3 py-1 bg-primary-600 text-white text-xs rounded hover:bg-primary-700 transition-colors disabled:opacity-50"
                         :disabled="versionStore.downloading"
-                        @click="handleDownload(version.id)"
+                        @click="selectedVersion = version.id"
                       >
-                        <ArrowDownTrayIcon v-if="versionStore.downloadingVersion !== version.id" class="w-3.5 h-3.5 mr-1" />
-                        {{ versionStore.downloadingVersion === version.id ? '下载中...' : '下载' }}
+                        <ArrowDownTrayIcon class="w-3.5 h-3.5 mr-1" />
+                        安装
                       </button>
                     </div>
                   </div>
                 </div>
               </div>
-            </transition>
+            </div>
           </div>
         </div>
 
@@ -417,13 +505,13 @@ async function handleOpenGameDir() {
           <div v-if="installedVersions.length === 0" class="flex items-center justify-center h-64">
             <div class="text-center">
               <CubeIcon class="w-16 h-16 text-gray-400 mx-auto" />
-              <p class="text-gray-600 dark:text-gray-400 mt-4">暂未安装任何版本</p>
+              <p class="text-gray-600 mt-4">暂未安装任何版本</p>
             </div>
           </div>
           <div
             v-for="versionId in installedVersions"
             :key="versionId"
-            class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 flex items-center justify-between"
+            class="bg-white rounded-lg border border-gray-200 p-4 flex items-center justify-between"
           >
             <div class="flex items-center">
               <img
@@ -432,7 +520,7 @@ async function handleOpenGameDir() {
                 class="w-10 h-10 rounded mr-3"
               />
               <div>
-                <h3 class="font-semibold text-gray-900 dark:text-gray-100">{{ versionId }}</h3>
+                <h3 class="font-semibold text-gray-900">{{ versionId }}</h3>
                 <p class="text-xs text-gray-500">已安装</p>
               </div>
             </div>
@@ -442,7 +530,7 @@ async function handleOpenGameDir() {
                 启动
               </button>
               <button
-                class="flex items-center px-3 py-2 bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-400 text-sm rounded-lg hover:bg-red-200 dark:hover:bg-red-900 transition-colors"
+                class="flex items-center px-3 py-2 bg-red-100 text-red-700 text-sm rounded-lg hover:bg-red-200 transition-colors"
                 @click="handleUninstall(versionId)"
               >
                 <TrashIcon class="w-4 h-4 mr-1" />
@@ -456,10 +544,29 @@ async function handleOpenGameDir() {
         <div v-else class="flex items-center justify-center h-full">
           <div class="text-center">
             <CubeIcon class="w-16 h-16 text-gray-400 mx-auto" />
-            <p class="text-gray-600 dark:text-gray-400 mt-4">即将开放</p>
+            <p class="text-gray-600 mt-4">即将开放</p>
           </div>
         </div>
+        </div>
+        </transition>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.slide-right-enter-active {
+  transition: transform 0.3s ease-out, opacity 0.2s ease-out;
+}
+.slide-right-leave-active {
+  transition: transform 0.2s ease-in, opacity 0.15s ease-in;
+}
+.slide-right-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+.slide-right-leave-to {
+  transform: translateX(-30%);
+  opacity: 0;
+}
+</style>

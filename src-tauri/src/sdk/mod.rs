@@ -28,19 +28,15 @@ pub enum SdkError {
 pub fn get_sdk_filename() -> &'static str {
     #[cfg(target_os = "windows")]
     {
-        "mc_sdk-windows-x86_64.dll"
+        "mc_sdk.dll"
     }
     #[cfg(target_os = "macos")]
     {
-        if cfg!(target_arch = "aarch64") {
-            "mc_sdk-macos-aarch64.dylib"
-        } else {
-            "mc_sdk-macos-x86_64.dylib"
-        }
+        "mc_sdk.dylib"
     }
     #[cfg(target_os = "linux")]
     {
-        "mc_sdk-linux-x86_64.so"
+        "mc_sdk.so"
     }
 }
 
@@ -97,6 +93,11 @@ pub struct MCConfig {
     pub mirror_url: *const std::ffi::c_char,
     pub log_level: u32,
     pub curseforge_api_key: *const std::ffi::c_char,
+    pub isolation_mode: u32,
+    pub window_title: *const std::ffi::c_char,
+    pub mirror_url_meta: *const std::ffi::c_char,
+    pub mirror_url_download: *const std::ffi::c_char,
+    pub max_download_speed: u64,
 }
 
 /// 认证结果结构体
@@ -163,9 +164,56 @@ pub struct FFIJavaList {
     pub error_message: *mut std::ffi::c_char,
 }
 
-/// 下载进度回调函数类型
-pub type DownloadCallback =
-    unsafe extern "C" fn(*const std::ffi::c_char, usize, usize, *mut std::ffi::c_void);
+/// 系统内存信息结构体
+#[repr(C)]
+#[derive(Debug)]
+pub struct FFISystemMemory {
+    pub total: u64,
+    pub used: u64,
+    pub available: u64,
+    pub usage_percent: f64,
+}
+
+/// 下载进度快照结构体
+#[repr(C)]
+#[derive(Debug)]
+pub struct FFIProgressSnapshot {
+    pub stage: u32,
+    pub current: usize,
+    pub total: usize,
+    pub bytes_downloaded: u64,
+    pub bytes_total: u64,
+    pub speed: u64,
+    pub files_remaining: usize,
+    pub is_active: bool,
+    pub is_complete: bool,
+    pub error_code: i32,
+}
+
+/// 合并安装请求结构体
+#[repr(C)]
+#[derive(Debug)]
+pub struct FFIMergedInstallRequest {
+    pub mc_version: *const std::ffi::c_char,
+    pub forge_version: *const std::ffi::c_char,
+    pub neoforge_version: *const std::ffi::c_char,
+    pub fabric_version: *const std::ffi::c_char,
+    pub optifine_version: *const std::ffi::c_char,
+    pub liteloader_version: *const std::ffi::c_char,
+    pub instance_name: *const std::ffi::c_char,
+}
+
+/// 下载进度回调函数类型 (新签名)
+pub type DownloadCallback = unsafe extern "C" fn(
+    *const std::ffi::c_char,  // stage string
+    usize,                     // current
+    usize,                     // total
+    u64,                       // bytes_downloaded
+    u64,                       // bytes_total
+    u64,                       // speed
+    usize,                     // files_remaining
+    *mut std::ffi::c_void,     // user_data
+);
 
 // FFI 函数类型定义
 type McSdkInit = unsafe extern "C" fn(*const MCConfig) -> *mut std::ffi::c_void;
@@ -176,8 +224,9 @@ type McSdkFreeString = unsafe extern "C" fn(*mut std::ffi::c_char);
 type McGetDeviceId = unsafe extern "C" fn() -> *mut std::ffi::c_char;
 type McAuthOffline = unsafe extern "C" fn(*const std::ffi::c_char, *mut FFIAuthResult) -> i32;
 type McAuthFreeResult = unsafe extern "C" fn(*mut FFIAuthResult);
-type McListVersions = unsafe extern "C" fn(*mut FFIVersionList) -> i32;
+type McListVersions = unsafe extern "C" fn(*const std::ffi::c_void, *mut FFIVersionList) -> i32;
 type McFreeVersionList = unsafe extern "C" fn(*mut FFIVersionList);
+/// mc_download_version(SDKHandle*, const char*, FFICallback, void*) -> i32
 type McDownloadVersion = unsafe extern "C" fn(
     *const std::ffi::c_void,
     *const std::ffi::c_char,
@@ -191,6 +240,33 @@ type McFreeJavaList = unsafe extern "C" fn(*mut FFIJavaList);
 type McListInstalledVersions =
     unsafe extern "C" fn(*const std::ffi::c_void, *mut *mut *mut std::ffi::c_char, *mut u32) -> i32;
 type McFreeStringArray = unsafe extern "C" fn(*mut *mut std::ffi::c_char, u32);
+
+type McGetSystemMemory = unsafe extern "C" fn(*mut FFISystemMemory) -> i32;
+type McGetProgress = unsafe extern "C" fn(*mut FFIProgressSnapshot) -> i32;
+type McResetProgress = unsafe extern "C" fn() -> i32;
+type McIsDownloading = unsafe extern "C" fn() -> i32;
+type McSetWindowTitle = unsafe extern "C" fn(u32, *const std::ffi::c_char) -> i32;
+type McStopWindowTitle = unsafe extern "C" fn() -> i32;
+type McLaunchGameEx = unsafe extern "C" fn(
+    *const std::ffi::c_void,  // handle
+    *const std::ffi::c_char,  // username
+    *const std::ffi::c_char,  // uuid
+    *const std::ffi::c_char,  // access_token
+    *const std::ffi::c_char,  // version_id
+    u32,                       // min_memory
+    u32,                       // max_memory
+    u32,                       // window_width
+    u32,                       // window_height
+    *const std::ffi::c_char,  // server_address
+    u32,                       // server_port
+) -> i32;
+type McListForgeVersions = unsafe extern "C" fn(*const std::ffi::c_void, *const std::ffi::c_char, *mut *mut std::ffi::c_char) -> i32;
+type McListNeoforgeVersions = unsafe extern "C" fn(*const std::ffi::c_void, *const std::ffi::c_char, *mut *mut std::ffi::c_char) -> i32;
+type McListFabricVersions = unsafe extern "C" fn(*const std::ffi::c_void, *mut *mut std::ffi::c_char) -> i32;
+type McListOptifineVersions = unsafe extern "C" fn(*const std::ffi::c_void, *mut *mut std::ffi::c_char) -> i32;
+type McListLiteloaderVersions = unsafe extern "C" fn(*const std::ffi::c_void, *const std::ffi::c_char, *mut *mut std::ffi::c_char) -> i32;
+type McValidateLoaders = unsafe extern "C" fn(*const std::ffi::c_char, *const std::ffi::c_char, *const std::ffi::c_char, *const std::ffi::c_char, *const std::ffi::c_char) -> i32;
+type McInstallMerged = unsafe extern "C" fn(*const std::ffi::c_void, *const FFIMergedInstallRequest, *const std::ffi::c_void, *mut std::ffi::c_void) -> i32;
 
 /// SDK 函数集合
 pub struct SdkFunctions {
@@ -211,6 +287,20 @@ pub struct SdkFunctions {
     pub free_java_list: McFreeJavaList,
     pub list_installed_versions: McListInstalledVersions,
     pub free_string_array: McFreeStringArray,
+    pub get_system_memory: McGetSystemMemory,
+    pub get_progress: McGetProgress,
+    pub reset_progress: McResetProgress,
+    pub is_downloading: McIsDownloading,
+    pub set_window_title: McSetWindowTitle,
+    pub stop_window_title: McStopWindowTitle,
+    pub launch_game_ex: McLaunchGameEx,
+    pub list_forge_versions: McListForgeVersions,
+    pub list_neoforge_versions: McListNeoforgeVersions,
+    pub list_fabric_versions: McListFabricVersions,
+    pub list_optifine_versions: McListOptifineVersions,
+    pub list_liteloader_versions: McListLiteloaderVersions,
+    pub validate_loaders: McValidateLoaders,
+    pub install_merged: McInstallMerged,
 }
 
 /// SDK 实例
@@ -288,6 +378,48 @@ impl SdkInstance {
                 free_string_array: *lib.get(b"mc_free_string_array").map_err(|e| {
                     SdkError::LoadFailed(format!("Failed to get mc_free_string_array: {}", e))
                 })?,
+                get_system_memory: *lib.get(b"mc_get_system_memory").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_get_system_memory: {}", e))
+                })?,
+                get_progress: *lib.get(b"mc_get_progress").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_get_progress: {}", e))
+                })?,
+                reset_progress: *lib.get(b"mc_reset_progress").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_reset_progress: {}", e))
+                })?,
+                is_downloading: *lib.get(b"mc_is_downloading").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_is_downloading: {}", e))
+                })?,
+                set_window_title: *lib.get(b"mc_set_window_title").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_set_window_title: {}", e))
+                })?,
+                stop_window_title: *lib.get(b"mc_stop_window_title").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_stop_window_title: {}", e))
+                })?,
+                launch_game_ex: *lib.get(b"mc_launch_game_ex").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_launch_game_ex: {}", e))
+                })?,
+                list_forge_versions: *lib.get(b"mc_list_forge_versions").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_list_forge_versions: {}", e))
+                })?,
+                list_neoforge_versions: *lib.get(b"mc_list_neoforge_versions").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_list_neoforge_versions: {}", e))
+                })?,
+                list_fabric_versions: *lib.get(b"mc_list_fabric_versions").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_list_fabric_versions: {}", e))
+                })?,
+                list_optifine_versions: *lib.get(b"mc_list_optifine_versions").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_list_optifine_versions: {}", e))
+                })?,
+                list_liteloader_versions: *lib.get(b"mc_list_liteloader_versions").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_list_liteloader_versions: {}", e))
+                })?,
+                validate_loaders: *lib.get(b"mc_validate_loaders").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_validate_loaders: {}", e))
+                })?,
+                install_merged: *lib.get(b"mc_install_merged").map_err(|e| {
+                    SdkError::LoadFailed(format!("Failed to get mc_install_merged: {}", e))
+                })?,
             }
         };
 
@@ -304,16 +436,40 @@ impl SdkInstance {
         game_dir: &str,
         max_threads: u32,
         log_level: u32,
+        mirror_url: Option<&str>,
+        mirror_url_meta: Option<&str>,
+        mirror_url_download: Option<&str>,
+        max_download_speed: u64,
     ) -> Result<(), SdkError> {
         let game_dir_cstr = std::ffi::CString::new(game_dir)
             .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let mirror_cstr = match mirror_url {
+            Some(url) if !url.is_empty() => Some(std::ffi::CString::new(url)
+                .map_err(|e| SdkError::InvalidParameter(e.to_string()))?),
+            _ => None,
+        };
+        let mirror_meta_cstr = match mirror_url_meta {
+            Some(url) if !url.is_empty() => Some(std::ffi::CString::new(url)
+                .map_err(|e| SdkError::InvalidParameter(e.to_string()))?),
+            _ => None,
+        };
+        let mirror_download_cstr = match mirror_url_download {
+            Some(url) if !url.is_empty() => Some(std::ffi::CString::new(url)
+                .map_err(|e| SdkError::InvalidParameter(e.to_string()))?),
+            _ => None,
+        };
 
         let config = MCConfig {
             game_dir: game_dir_cstr.as_ptr(),
             max_download_threads: max_threads,
-            mirror_url: std::ptr::null(),
+            mirror_url: mirror_cstr.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
             log_level,
             curseforge_api_key: std::ptr::null(),
+            isolation_mode: 0,
+            window_title: std::ptr::null(),
+            mirror_url_meta: mirror_meta_cstr.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            mirror_url_download: mirror_download_cstr.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            max_download_speed,
         };
 
         let handle = unsafe { (self.functions.init)(&config) };
@@ -335,6 +491,16 @@ impl SdkInstance {
         self.handle = handle;
         log::info!("SDK initialized successfully");
         Ok(())
+    }
+
+    /// 获取 SDK handle 原始指针（用于跨线程 FFI 调用）
+    pub fn handle_ptr(&self) -> *const std::ffi::c_void {
+        self.handle
+    }
+
+    /// 获取 mc_download_version 函数指针地址（usize，可跨线程传递）
+    pub fn download_fn_addr(&self) -> usize {
+        self.functions.download_version as usize
     }
 
     /// 获取 SDK 版本
@@ -401,10 +567,6 @@ impl SdkInstance {
 
     /// 获取版本列表
     pub fn list_versions(&self) -> Result<VersionList, SdkError> {
-        if self.handle.is_null() {
-            return Err(SdkError::NotInitialized);
-        }
-
         let mut version_list = FFIVersionList {
             versions: std::ptr::null_mut(),
             count: 0,
@@ -414,7 +576,8 @@ impl SdkInstance {
             error_message: std::ptr::null_mut(),
         };
 
-        let code = unsafe { (self.functions.list_versions)(&mut version_list) };
+        // v0.1.8: mc_list_versions 需要传入 handle，传 NULL 走官方源
+        let code = unsafe { (self.functions.list_versions)(self.handle, &mut version_list) };
 
         if code != 0 {
             return Err(SdkError::FfiFailed(code));
@@ -435,7 +598,7 @@ impl SdkInstance {
         callback: F,
     ) -> Result<(), SdkError>
     where
-        F: Fn(String, usize, usize) + Send + 'static,
+        F: Fn(&str, usize, usize, u64, u64, u64, usize) + Send + 'static,
     {
         if self.handle.is_null() {
             return Err(SdkError::NotInitialized);
@@ -448,19 +611,32 @@ impl SdkInstance {
         let callback_box = Box::new(callback);
         let callback_ptr = Box::into_raw(callback_box) as *mut std::ffi::c_void;
 
-        // 定义 C 回调函数
+        // 定义 C 回调函数，签名与 C 端新 FFICallback 一致
         unsafe extern "C" fn c_callback(
             stage: *const std::ffi::c_char,
             current: usize,
             total: usize,
+            bytes_downloaded: u64,
+            bytes_total: u64,
+            speed: u64,
+            files_remaining: usize,
             user_data: *mut std::ffi::c_void,
         ) {
             if !user_data.is_null() && !stage.is_null() {
+                let callback = &*(user_data
+                    as *const Box<dyn Fn(&str, usize, usize, u64, u64, u64, usize) + Send>);
                 let stage_str = std::ffi::CStr::from_ptr(stage)
                     .to_string_lossy()
                     .to_string();
-                let callback = &*(user_data as *const Box<dyn Fn(String, usize, usize) + Send>);
-                callback(stage_str, current, total);
+                callback(
+                    &stage_str,
+                    current,
+                    total,
+                    bytes_downloaded,
+                    bytes_total,
+                    speed,
+                    files_remaining,
+                );
             }
         }
 
@@ -475,7 +651,10 @@ impl SdkInstance {
 
         // 释放回调内存
         unsafe {
-            let _ = Box::from_raw(callback_ptr as *mut Box<dyn Fn(String, usize, usize) + Send>);
+            let _ = Box::from_raw(
+                callback_ptr
+                    as *mut Box<dyn Fn(&str, usize, usize, u64, u64, u64, usize) + Send>,
+            );
         }
 
         if code != 0 {
@@ -488,7 +667,7 @@ impl SdkInstance {
 
     /// 下载版本（无进度回调）
     pub fn download_version(&self, version_id: &str) -> Result<(), SdkError> {
-        self.download_version_with_callback(version_id, |_, _, _| {})
+        self.download_version_with_callback(version_id, |_, _, _, _, _, _, _| {})
     }
 
     /// 检测 Java
@@ -574,6 +753,248 @@ impl SdkInstance {
         unsafe { (self.functions.free_string_array)(versions, count) };
 
         Ok(result)
+    }
+
+    /// 获取系统内存信息
+    pub fn get_system_memory(&self) -> Result<SystemMemory, SdkError> {
+        let mut mem = FFISystemMemory {
+            total: 0,
+            used: 0,
+            available: 0,
+            usage_percent: 0.0,
+        };
+        let code = unsafe { (self.functions.get_system_memory)(&mut mem) };
+        if code != 0 {
+            return Err(SdkError::FfiFailed(code));
+        }
+        Ok(SystemMemory::from_ffi(&mem))
+    }
+
+    /// 获取下载进度快照
+    pub fn get_progress(&self) -> Result<ProgressSnapshot, SdkError> {
+        let mut snapshot = FFIProgressSnapshot {
+            stage: 0,
+            current: 0,
+            total: 0,
+            bytes_downloaded: 0,
+            bytes_total: 0,
+            speed: 0,
+            files_remaining: 0,
+            is_active: false,
+            is_complete: false,
+            error_code: 0,
+        };
+
+        let code = unsafe { (self.functions.get_progress)(&mut snapshot) };
+        if code != 0 {
+            return Err(SdkError::FfiFailed(code));
+        }
+
+        Ok(ProgressSnapshot::from_ffi(&snapshot))
+    }
+
+    /// 重置下载进度
+    pub fn reset_progress(&self) -> Result<(), SdkError> {
+        let code = unsafe { (self.functions.reset_progress)() };
+        if code != 0 {
+            return Err(SdkError::FfiFailed(code));
+        }
+        Ok(())
+    }
+
+    /// 检查是否正在下载
+    pub fn is_downloading(&self) -> bool {
+        unsafe { (self.functions.is_downloading)() == 1 }
+    }
+
+    /// 启动游戏（扩展版本）
+    #[allow(clippy::too_many_arguments)]
+    pub fn launch_game_ex(
+        &self,
+        username: &str,
+        uuid: &str,
+        access_token: &str,
+        version_id: &str,
+        min_memory: u32,
+        max_memory: u32,
+        window_width: u32,
+        window_height: u32,
+        server_address: Option<&str>,
+        server_port: u32,
+    ) -> Result<(), SdkError> {
+        if self.handle.is_null() {
+            return Err(SdkError::NotInitialized);
+        }
+
+        let username_c = std::ffi::CString::new(username)
+            .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let uuid_c =
+            std::ffi::CString::new(uuid).map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let token_c = std::ffi::CString::new(access_token)
+            .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let version_c = std::ffi::CString::new(version_id)
+            .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+
+        let server_c = match server_address {
+            Some(addr) => Some(
+                std::ffi::CString::new(addr)
+                    .map_err(|e| SdkError::InvalidParameter(e.to_string()))?,
+            ),
+            None => None,
+        };
+        let server_ptr = server_c
+            .as_ref()
+            .map(|s| s.as_ptr())
+            .unwrap_or(std::ptr::null());
+
+        let code = unsafe {
+            (self.functions.launch_game_ex)(
+                self.handle,
+                username_c.as_ptr(),
+                uuid_c.as_ptr(),
+                token_c.as_ptr(),
+                version_c.as_ptr(),
+                min_memory,
+                max_memory,
+                window_width,
+                window_height,
+                server_ptr,
+                server_port,
+            )
+        };
+
+        if code != 0 {
+            return Err(SdkError::FfiFailed(code));
+        }
+
+        Ok(())
+    }
+
+    /// 获取 mc_install_merged 函数指针地址
+    pub fn install_merged_fn_addr(&self) -> usize {
+        self.functions.install_merged as usize
+    }
+
+    /// 查询 Forge 版本列表
+    pub fn list_forge_versions(&self, mc_version: &str) -> Result<String, SdkError> {
+        if self.handle.is_null() { return Err(SdkError::NotInitialized); }
+        let mc_cstr = std::ffi::CString::new(mc_version).map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let mut result: *mut std::ffi::c_char = std::ptr::null_mut();
+        let code = unsafe { (self.functions.list_forge_versions)(self.handle, mc_cstr.as_ptr(), &mut result) };
+        if code != 0 { return Err(SdkError::FfiFailed(code)); }
+        let json = if result.is_null() {
+            String::from("[]")
+        } else {
+            let s = unsafe { std::ffi::CStr::from_ptr(result) }.to_string_lossy().to_string();
+            unsafe { (self.functions.free_string)(result) };
+            if s.is_empty() || s == "null" { String::from("[]") } else { s }
+        };
+        log::info!("Forge versions for {}: {} items", mc_version, json.matches('"').count() / 2);
+        Ok(json)
+    }
+
+    /// 查询 NeoForge 版本列表
+    pub fn list_neoforge_versions(&self, mc_version: &str) -> Result<String, SdkError> {
+        if self.handle.is_null() { return Err(SdkError::NotInitialized); }
+        let mc_cstr = std::ffi::CString::new(mc_version).map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let mut result: *mut std::ffi::c_char = std::ptr::null_mut();
+        let code = unsafe { (self.functions.list_neoforge_versions)(self.handle, mc_cstr.as_ptr(), &mut result) };
+        if code != 0 { return Err(SdkError::FfiFailed(code)); }
+        let json = if result.is_null() {
+            String::from("[]")
+        } else {
+            let s = unsafe { std::ffi::CStr::from_ptr(result) }.to_string_lossy().to_string();
+            unsafe { (self.functions.free_string)(result) };
+            if s.is_empty() || s == "null" { String::from("[]") } else { s }
+        };
+        Ok(json)
+    }
+
+    /// 查询 Fabric 版本列表
+    pub fn list_fabric_versions(&self) -> Result<String, SdkError> {
+        if self.handle.is_null() { return Err(SdkError::NotInitialized); }
+        let mut result: *mut std::ffi::c_char = std::ptr::null_mut();
+        let code = unsafe { (self.functions.list_fabric_versions)(self.handle, &mut result) };
+        if code != 0 { return Err(SdkError::FfiFailed(code)); }
+        let json = if result.is_null() {
+            String::from("[]")
+        } else {
+            let s = unsafe { std::ffi::CStr::from_ptr(result) }.to_string_lossy().to_string();
+            unsafe { (self.functions.free_string)(result) };
+            if s.is_empty() || s == "null" { String::from("[]") } else { s }
+        };
+        log::info!("Fabric versions: {}", &json[..json.len().min(100)]);
+        Ok(json)
+    }
+
+    /// 查询 OptiFine 版本列表
+    pub fn list_optifine_versions(&self) -> Result<String, SdkError> {
+        if self.handle.is_null() { return Err(SdkError::NotInitialized); }
+        let mut result: *mut std::ffi::c_char = std::ptr::null_mut();
+        let code = unsafe { (self.functions.list_optifine_versions)(self.handle, &mut result) };
+        if code != 0 { return Err(SdkError::FfiFailed(code)); }
+        let json = if result.is_null() {
+            String::from("[]")
+        } else {
+            let s = unsafe { std::ffi::CStr::from_ptr(result) }.to_string_lossy().to_string();
+            unsafe { (self.functions.free_string)(result) };
+            if s.is_empty() || s == "null" { String::from("[]") } else { s }
+        };
+        Ok(json)
+    }
+
+    /// 查询 LiteLoader 版本列表
+    pub fn list_liteloader_versions(&self, mc_version: &str) -> Result<String, SdkError> {
+        if self.handle.is_null() { return Err(SdkError::NotInitialized); }
+        let mc_cstr = std::ffi::CString::new(mc_version).map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let mut result: *mut std::ffi::c_char = std::ptr::null_mut();
+        let code = unsafe { (self.functions.list_liteloader_versions)(self.handle, mc_cstr.as_ptr(), &mut result) };
+        if code != 0 { return Err(SdkError::FfiFailed(code)); }
+        let json = if result.is_null() {
+            String::from("[]")
+        } else {
+            let s = unsafe { std::ffi::CStr::from_ptr(result) }.to_string_lossy().to_string();
+            unsafe { (self.functions.free_string)(result) };
+            if s.is_empty() || s == "null" { String::from("[]") } else { s }
+        };
+        Ok(json)
+    }
+
+    /// 合并安装
+    #[allow(clippy::too_many_arguments)]
+    pub fn install_merged(
+        &self,
+        mc_version: &str,
+        forge_version: Option<&str>,
+        neoforge_version: Option<&str>,
+        fabric_version: Option<&str>,
+        optifine_version: Option<&str>,
+        liteloader_version: Option<&str>,
+        instance_name: Option<&str>,
+    ) -> Result<(), SdkError> {
+        if self.handle.is_null() { return Err(SdkError::NotInitialized); }
+
+        let mc_c = std::ffi::CString::new(mc_version).map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let forge_c = forge_version.map(|v| std::ffi::CString::new(v).unwrap());
+        let neoforge_c = neoforge_version.map(|v| std::ffi::CString::new(v).unwrap());
+        let fabric_c = fabric_version.map(|v| std::ffi::CString::new(v).unwrap());
+        let optifine_c = optifine_version.map(|v| std::ffi::CString::new(v).unwrap());
+        let liteloader_c = liteloader_version.map(|v| std::ffi::CString::new(v).unwrap());
+        let instance_c = instance_name.map(|v| std::ffi::CString::new(v).unwrap());
+
+        let request = FFIMergedInstallRequest {
+            mc_version: mc_c.as_ptr(),
+            forge_version: forge_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            neoforge_version: neoforge_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            fabric_version: fabric_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            optifine_version: optifine_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            liteloader_version: liteloader_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            instance_name: instance_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+        };
+
+        let code = unsafe { (self.functions.install_merged)(self.handle, &request, std::ptr::null(), std::ptr::null_mut()) };
+        if code != 0 { return Err(SdkError::FfiFailed(code)); }
+        Ok(())
     }
 }
 
@@ -770,4 +1191,126 @@ impl VersionList {
             },
         }
     }
+}
+
+/// 系统内存信息
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SystemMemory {
+    pub total: u64,
+    pub used: u64,
+    pub available: u64,
+    pub usage_percent: f64,
+}
+
+impl SystemMemory {
+    fn from_ffi(ffi: &FFISystemMemory) -> Self {
+        Self {
+            total: ffi.total,
+            used: ffi.used,
+            available: ffi.available,
+            usage_percent: ffi.usage_percent,
+        }
+    }
+}
+
+/// 下载进度快照
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ProgressSnapshot {
+    pub stage: u32,
+    pub current: usize,
+    pub total: usize,
+    pub bytes_downloaded: u64,
+    pub bytes_total: u64,
+    pub speed: u64,
+    pub files_remaining: usize,
+    pub is_active: bool,
+    pub is_complete: bool,
+    pub error_code: i32,
+}
+
+impl ProgressSnapshot {
+    fn from_ffi(ffi: &FFIProgressSnapshot) -> Self {
+        Self {
+            stage: ffi.stage,
+            current: ffi.current,
+            total: ffi.total,
+            bytes_downloaded: ffi.bytes_downloaded,
+            bytes_total: ffi.bytes_total,
+            speed: ffi.speed,
+            files_remaining: ffi.files_remaining,
+            is_active: ffi.is_active,
+            is_complete: ffi.is_complete,
+            error_code: ffi.error_code,
+        }
+    }
+}
+
+/// 获取系统内存信息（独立函数，无需 SDK 句柄）
+pub fn get_system_memory_static() -> Result<SystemMemory, SdkError> {
+    let lib_path = check_sdk_library()?;
+    let lib = unsafe {
+        libloading::Library::new(&lib_path)
+            .map_err(|e| SdkError::LoadFailed(format!("Failed to load library: {}", e)))?
+    };
+
+    let func: McGetSystemMemory = unsafe {
+        *lib.get(b"mc_get_system_memory").map_err(|e| {
+            SdkError::LoadFailed(format!("Failed to get mc_get_system_memory: {}", e))
+        })?
+    };
+
+    let mut memory = FFISystemMemory {
+        total: 0,
+        used: 0,
+        available: 0,
+        usage_percent: 0.0,
+    };
+
+    let code = unsafe { func(&mut memory) };
+    if code != 0 {
+        return Err(SdkError::FfiFailed(code));
+    }
+
+    Ok(SystemMemory::from_ffi(&memory))
+}
+
+/// 校验加载器兼容性（独立函数，无需 SDK 句柄）
+pub fn validate_loaders(
+    mc_version: &str,
+    forge_version: Option<&str>,
+    neoforge_version: Option<&str>,
+    fabric_version: Option<&str>,
+    optifine_version: Option<&str>,
+) -> Result<(), SdkError> {
+    let lib_path = check_sdk_library()?;
+    let lib = unsafe {
+        libloading::Library::new(&lib_path)
+            .map_err(|e| SdkError::LoadFailed(format!("Failed to load library: {}", e)))?
+    };
+    let func: McValidateLoaders = unsafe {
+        *lib.get(b"mc_validate_loaders").map_err(|e| {
+            SdkError::LoadFailed(format!("Failed to get mc_validate_loaders: {}", e))
+        })?
+    };
+
+    let mc_c = std::ffi::CString::new(mc_version).map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+    let forge_c = forge_version.map(|v| std::ffi::CString::new(v).unwrap());
+    let neoforge_c = neoforge_version.map(|v| std::ffi::CString::new(v).unwrap());
+    let fabric_c = fabric_version.map(|v| std::ffi::CString::new(v).unwrap());
+    let optifine_c = optifine_version.map(|v| std::ffi::CString::new(v).unwrap());
+
+    let code = unsafe {
+        func(
+            mc_c.as_ptr(),
+            forge_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            neoforge_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            fabric_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            optifine_c.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+        )
+    };
+
+    if code != 0 {
+        return Err(SdkError::FfiFailed(code));
+    }
+    Ok(())
 }

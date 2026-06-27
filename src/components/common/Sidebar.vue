@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 通用侧边栏组件
  * 支持二级、三级菜单
@@ -59,13 +59,13 @@ function hasChildren(item: SidebarItem): boolean {
 </script>
 
 <template>
-  <div class="w-64 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col h-full">
+  <div class="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
     <!-- 标题区域 -->
-    <div v-if="title || description" class="p-4 border-b border-gray-200 dark:border-gray-700">
-      <h3 v-if="title" class="text-sm font-semibold text-gray-900 dark:text-gray-100">
+    <div v-if="title || description" class="p-4 border-b border-gray-200">
+      <h3 v-if="title" class="text-sm font-semibold text-gray-900">
         {{ title }}
       </h3>
-      <p v-if="description" class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+      <p v-if="description" class="text-xs text-gray-500 mt-1">
         {{ description }}
       </p>
     </div>
@@ -78,8 +78,8 @@ function hasChildren(item: SidebarItem): boolean {
           class="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer transition-colors"
           :class="[
             activeId === item.id
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-              : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700',
+              ? 'bg-primary-50 text-primary-700'
+              : 'text-gray-700 hover:bg-gray-100',
             item.disabled ? 'opacity-50 cursor-not-allowed' : ''
           ]"
           @click="!item.disabled && (hasChildren(item) ? toggleExpand(item.id) : handleSelect(item.id))"
@@ -91,12 +91,12 @@ function hasChildren(item: SidebarItem): boolean {
                 <span class="text-sm font-medium truncate">{{ item.label }}</span>
                 <span
                   v-if="item.badge !== undefined"
-                  class="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300"
+                  class="ml-2 text-xs px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-700"
                 >
                   {{ item.badge }}
                 </span>
               </div>
-              <p v-if="item.description" class="text-xs text-gray-500 dark:text-gray-400 truncate">
+              <p v-if="item.description" class="text-xs text-gray-500 truncate">
                 {{ item.description }}
               </p>
             </div>
@@ -124,8 +124,8 @@ function hasChildren(item: SidebarItem): boolean {
                 class="flex items-center justify-between px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
                 :class="[
                   activeId === child.id
-                    ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-                    : 'text-gray-600 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-gray-700/50',
+                    ? 'bg-primary-50 text-primary-700'
+                    : 'text-gray-600 hover:bg-gray-50',
                   child.disabled ? 'opacity-50 cursor-not-allowed' : ''
                 ]"
                 @click="!child.disabled && (hasChildren(child) ? toggleExpand(child.id) : handleSelect(child.id))"
@@ -134,7 +134,7 @@ function hasChildren(item: SidebarItem): boolean {
                   <component :is="child.icon" v-if="child.icon" class="w-4 h-4 mr-2 flex-shrink-0" />
                   <div class="min-w-0">
                     <span class="text-sm truncate">{{ child.label }}</span>
-                    <p v-if="child.description" class="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    <p v-if="child.description" class="text-xs text-gray-500 truncate">
                       {{ child.description }}
                     </p>
                   </div>
@@ -143,7 +143,7 @@ function hasChildren(item: SidebarItem): boolean {
                 <div class="flex items-center">
                   <span
                     v-if="child.badge !== undefined"
-                    class="text-xs px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300"
+                    class="text-xs px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-700"
                   >
                     {{ child.badge }}
                   </span>
@@ -171,8 +171,8 @@ function hasChildren(item: SidebarItem): boolean {
                     class="px-3 py-1.5 rounded-lg cursor-pointer transition-colors"
                     :class="[
                       activeId === grandchild.id
-                        ? 'bg-primary-50 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300'
-                        : 'text-gray-500 hover:bg-gray-50 dark:text-gray-500 dark:hover:bg-gray-700/50',
+                        ? 'bg-primary-50 text-primary-700'
+                        : 'text-gray-500 hover:bg-gray-50',
                       grandchild.disabled ? 'opacity-50 cursor-not-allowed' : ''
                     ]"
                     @click="!grandchild.disabled && handleSelect(grandchild.id)"

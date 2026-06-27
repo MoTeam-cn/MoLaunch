@@ -4,7 +4,6 @@ export default {
     "./index.html",
     "./src/**/*.{vue,js,ts,jsx,tsx}",
   ],
-  darkMode: 'class',
   theme: {
     extend: {
       colors: {
@@ -21,6 +20,7 @@ export default {
           900: '#1e3a8a',
           950: '#172554',
         },
+        page: '#f0f5ff',
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-out',

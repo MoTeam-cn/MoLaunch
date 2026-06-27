@@ -15,7 +15,8 @@
   }
   
   body {
-    @apply text-gray-900 dark:text-gray-100;
+    @apply text-gray-900;
+    background-color: #e0ecff;
   }
 }
 
@@ -33,28 +34,23 @@
   
   .btn-secondary {
     @apply btn bg-gray-200 text-gray-800 hover:bg-gray-300;
-    @apply dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600;
     @apply focus:ring-gray-500;
   }
   
   .btn-ghost {
     @apply btn bg-transparent text-gray-700 hover:bg-gray-100;
-    @apply dark:text-gray-300 dark:hover:bg-gray-800;
     @apply focus:ring-gray-500;
   }
   
   .input {
     @apply w-full px-4 py-2 rounded-lg border border-gray-300;
     @apply bg-white text-gray-900 placeholder-gray-400;
-    @apply dark:bg-gray-800 dark:border-gray-600 dark:text-gray-100 dark:placeholder-gray-500;
     @apply focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent;
     @apply transition-all duration-200;
   }
   
   .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200;
-    @apply dark:bg-gray-800 dark:border-gray-700;
-    @apply p-6;
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6;
   }
   
   .badge {
@@ -62,15 +58,15 @@
   }
   
   .badge-success {
-    @apply badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+    @apply badge bg-green-100 text-green-800;
   }
   
   .badge-warning {
-    @apply badge bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
+    @apply badge bg-yellow-100 text-yellow-800;
   }
   
   .badge-error {
-    @apply badge bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
+    @apply badge bg-red-100 text-red-800;
   }
 }
 
@@ -81,15 +77,15 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-gray-100 dark:bg-gray-800;
+  @apply bg-gray-100;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+  @apply bg-gray-300 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-gray-400 dark:bg-gray-500;
+  @apply bg-gray-400;
 }
 
 /* 动画 */
@@ -114,4 +110,14 @@
 
 .slide-leave-to {
   transform: translateX(100%);
+}
+
+/* 下载进度条扫动动画 */
+@keyframes sweep {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(233%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-sweep {
+  animation: sweep 1.5s ease-in-out infinite;
 }

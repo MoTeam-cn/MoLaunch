@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
- * 顶部栏组件
- */
+ * 顶部栏组�? */
 
 import { ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
@@ -21,19 +20,18 @@ function handleLogout() {
 </script>
 
 <template>
-  <header class="h-16 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between px-6">
-    <!-- 左侧：标题 -->
+  <header class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6">
+    <!-- 左侧：标�?-->
     <div>
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">
-        Minecraft 启动器
-      </h2>
+      <h2 class="text-lg font-semibold text-gray-900">
+        Minecraft 启动�?      </h2>
     </div>
     
-    <!-- 右侧：操作按钮 -->
+    <!-- 右侧：操作按�?-->
     <div class="flex items-center space-x-4">
       <!-- 主题切换 -->
       <button
-        class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+        class="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
         title="切换主题"
       >
         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -44,11 +42,11 @@ function handleLogout() {
       <!-- 用户菜单 -->
       <div v-if="authStore.isLoggedIn" class="relative">
         <button
-          class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+          class="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-100 transition-colors"
           @click="toggleUserMenu"
         >
-          <div class="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
-            <span class="text-primary-600 dark:text-primary-400 font-semibold text-sm">
+          <div class="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">
+            <span class="text-primary-600 font-semibold text-sm">
               {{ authStore.username.charAt(0).toUpperCase() }}
             </span>
           </div>
@@ -68,18 +66,18 @@ function handleLogout() {
         >
           <div
             v-if="showUserMenu"
-            class="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-50"
+            class="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-50"
           >
-            <div class="px-4 py-2 border-b border-gray-200 dark:border-gray-700">
-              <p class="text-sm font-medium text-gray-900 dark:text-gray-100">
+            <div class="px-4 py-2 border-b border-gray-200">
+              <p class="text-sm font-medium text-gray-900">
                 {{ authStore.username }}
               </p>
-              <p class="text-xs text-gray-500 dark:text-gray-400">
+              <p class="text-xs text-gray-500">
                 离线模式
               </p>
             </div>
             <button
-              class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/50"
+              class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50"
               @click="handleLogout"
             >
               登出

@@ -1,4 +1,4 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /**
  * 应用布局组件
  */
@@ -8,7 +8,7 @@ import Header from './Header.vue'
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-gray-50 dark:bg-gray-900">
+  <div class="flex h-screen overflow-hidden bg-gray-50">
     <!-- 侧边栏 -->
     <Sidebar />
     

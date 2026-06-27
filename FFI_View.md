@@ -12,6 +12,8 @@
 - [SDK 生命周期](#sdk-生命周期)
 - [错误处理](#错误处理)
 - [设备标识](#设备标识)
+- [系统信息](#系统信息)
+- [窗口标题管理](#窗口标题管理)
 - [Token 加密/解密](#token-加密解密)
 - [认证模块](#认证模块)
 - [皮肤管理](#皮肤管理)
@@ -20,6 +22,7 @@
 - [版本管理](#版本管理)
 - [Java 检测](#java-检测)
 - [下载与启动](#下载与启动)
+- [进度查询 (轮询模式)](#进度查询-轮询模式)
 - [资源平台 API](#资源平台-api)
 - [更新系统](#更新系统)
 - [配置管理](#配置管理)
@@ -57,18 +60,53 @@ typedef struct {
     const char* mirror_url;         // 镜像源 URL (可选，NULL 使用官方源)
     uint32_t log_level;             // 日志级别 (0=off, 1=error, 2=warn, 3=info, 4=debug, 5=trace)
     const char* curseforge_api_key; // CurseForge API Key (可选)
+    uint32_t isolation_mode;        // 版本隔离模式 (见 IsolationMode 枚举)
+    const char* window_title;       // 游戏窗口标题 (可选，NULL 使用默认标题)
 } MCConfig;
+```
+
+**IsolationMode 枚举:**
+
+```c
+// 版本隔离模式
+// 0 = 无隔离 - 所有版本共享 mods、config、saves 等目录
+// 1 = 隔离可安装 MOD 的版本 - Forge/Fabric/NeoForge 等模组加载器版本使用独立目录，原版共享
+// 2 = 隔离非正式版 - snapshot/beta/alpha 版本使用独立目录，正式版共享
+// 3 = 隔离可安装 MOD 版本和正式版 - 模组加载器版本和正式版都隔离，只有 snapshot 共享
+// 4 = 隔离所有版本 - 每个版本都有独立的 mods、config、saves 等目录
 ```
 
 **调用示例:**
 
 ```c
+// 示例1: 无隔离 (默认)
 MCConfig config = {
     .game_dir = "C:/Users/Test/.minecraft",
     .max_download_threads = 8,
     .mirror_url = NULL,
     .log_level = 3,
-    .curseforge_api_key = NULL
+    .curseforge_api_key = NULL,
+    .isolation_mode = 0  // 无隔离
+};
+
+// 示例2: 隔离所有版本
+MCConfig config = {
+    .game_dir = "C:/Users/Test/.minecraft",
+    .max_download_threads = 8,
+    .mirror_url = NULL,
+    .log_level = 3,
+    .curseforge_api_key = NULL,
+    .isolation_mode = 4  // 隔离所有版本
+};
+
+// 示例3: 只隔离模组版本
+MCConfig config = {
+    .game_dir = "C:/Users/Test/.minecraft",
+    .max_download_threads = 8,
+    .mirror_url = NULL,
+    .log_level = 3,
+    .curseforge_api_key = NULL,
+    .isolation_mode = 1  // 只隔离模组版本
 };
 
 SDKHandle* handle = mc_sdk_init(&config);
@@ -78,6 +116,27 @@ if (handle == NULL) {
     mc_sdk_free_error(error);
     return;
 }
+```
+
+**版本隔离目录结构:**
+
+```
+.minecraft/
+├── versions/
+│   ├── 1.20.1/                    # 原版 (isolation_mode=1 时不隔离)
+│   │   ├── 1.20.1.json
+│   │   └── 1.20.1.jar
+│   └── 1.20.1-forge-47.2.0/      # 模组版本 (isolation_mode=1 时隔离)
+│       ├── 1.20.1-forge-47.2.0.json
+│       ├── 1.20.1-forge-47.2.0.jar
+│       ├── mods/                  # 版本独立的 mods 目录
+│       ├── config/                # 版本独立的 config 目录
+│       ├── saves/                 # 版本独立的 saves 目录
+│       ├── resourcepacks/         # 版本独立的 resourcepacks 目录
+│       └── shaderpacks/           # 版本独立的 shaderpacks 目录
+├── mods/                          # 共享 mods 目录 (仅隔离模式=0 时使用)
+├── config/                        # 共享 config 目录
+└── saves/                         # 共享 saves 目录
 ```
 
 ---
@@ -290,6 +349,121 @@ if (device_id != NULL) {
     printf("Device ID: %s\n", device_id);  // 输出如: a3f9-c7e2-8b1d-4f6a
     mc_sdk_free_string(device_id);
 }
+```
+
+---
+
+## 系统信息
+
+### mc_get_system_memory
+
+获取系统内存信息。无需 SDK 句柄，可直接调用。
+
+```c
+int32_t mc_get_system_memory(FFISystemMemory* memory_out);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `memory_out` | `FFISystemMemory*` | 输出参数，接收内存信息 |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
+
+**FFISystemMemory 结构体:**
+
+```c
+typedef struct {
+    uint64_t total;           // 总物理内存 (字节)
+    uint64_t used;            // 已使用内存 (字节)
+    uint64_t available;       // 可用内存 (字节)
+    double usage_percent;     // 内存使用率 (0-100)
+} FFISystemMemory;
+```
+
+**调用示例:**
+
+```c
+FFISystemMemory memory;
+if (mc_get_system_memory(&memory) == 0) {
+    printf("总内存: %llu MB\n", memory.total / 1024 / 1024);
+    printf("可用内存: %llu MB\n", memory.available / 1024 / 1024);
+    printf("使用率: %.1f%%\n", memory.usage_percent);
+    
+    // 建议分配给游戏的内存为可用内存的 50-75%
+    uint32_t suggested_memory = (memory.available / 1024 / 1024) * 3 / 4;
+    printf("建议游戏内存: %u MB\n", suggested_memory);
+}
+```
+
+---
+
+## 窗口标题管理
+
+### mc_set_window_title
+
+设置游戏窗口标题。使用 Windows API 查找并修改游戏窗口，对所有 Minecraft 版本有效。
+
+```c
+int32_t mc_set_window_title(uint32_t process_id, const char* title_template);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `process_id` | `uint32_t` | 游戏进程 ID |
+| `title_template` | `const char*` | 标题模板，支持占位符 |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
+
+**支持的占位符:**
+
+| 占位符 | 说明 | 示例 |
+|--------|------|------|
+| `{date}` | 当前日期 | 2026/6/27 |
+| `{time}` | 当前时间 | 14:30:25 |
+
+**实现原理:**
+- 使用 `EnumWindows` 枚举所有窗口
+- 通过窗口类名识别游戏窗口 (`GLFW30`, `LWJGL`, `SunAwtFrame`)
+- 使用 `SetWindowText` 修改窗口标题
+- 每 200ms 更新一次标题（支持动态时间）
+
+**调用示例:**
+
+```c
+// 启动游戏后，设置窗口标题
+uint32_t pid = get_game_pid();  // 获取游戏进程 ID
+mc_set_window_title(pid, "我的启动器 - Minecraft {date} {time}");
+
+// 标题会自动更新为类似：
+// "我的启动器 - Minecraft 2026/6/27 14:30:25"
+```
+
+---
+
+### mc_stop_window_title
+
+停止窗口标题监控。
+
+```c
+int32_t mc_stop_window_title();
+```
+
+**返回值:**
+- `0`: 成功
+
+**调用示例:**
+
+```c
+// 游戏退出时停止监控
+mc_stop_window_title();
 ```
 
 ---
@@ -1158,7 +1332,7 @@ void mc_free_java_runtime(FFIJavaRuntime* java_runtime);
 下载游戏版本文件。
 
 ```c
-int32_t mc_download_version(const SDKHandle* handle, const char* version_id, FFICallback callback, void* user_data);
+int32_t mc_download_version(const SDKHandle* handle, const char* version_id, const void* callback, void* user_data);
 ```
 
 **参数:**
@@ -1167,42 +1341,187 @@ int32_t mc_download_version(const SDKHandle* handle, const char* version_id, FFI
 |------|------|------|
 | `handle` | `const SDKHandle*` | SDK 句柄 |
 | `version_id` | `const char*` | 版本 ID (如 `1.20.1`) |
-| `callback` | `FFICallback` | 进度回调函数 |
+| `callback` | `const void*` | 进度回调函数指针 (可选，传 NULL 表示不需要回调) |
 | `user_data` | `void*` | 用户数据指针 |
 
 **返回值:**
 - `0`: 成功
 - 非 0: 错误码
 
-**FFICallback 类型:**
+**FFICallback 签名:**
 
 ```c
-typedef void (*FFICallback)(uint32_t stage, uint32_t current, uint32_t total, void* user_data);
+typedef void (*FFICallback)(
+    const char* stage,           // 当前阶段名称字符串
+    uintptr_t current,           // 当前已完成文件数量
+    uintptr_t total,             // 总文件数量
+    uint64_t bytes_downloaded,   // 已下载字节数
+    uint64_t bytes_total,        // 总字节数
+    uint64_t speed,              // 下载速度 (bytes/sec)
+    uintptr_t files_remaining,   // 剩余文件数量
+    void* user_data              // 用户数据指针
+);
 ```
 
-**下载阶段 (stage):**
+**下载阶段 (stage 字符串值):**
 
-| 阶段 | 说明 |
-|------|------|
-| 0 | 版本清单 |
-| 1 | 版本 JSON |
-| 2 | 客户端 JAR |
-| 3 | 库文件 |
-| 4 | 资源文件 |
-| 5 | 解压 Natives |
+| 阶段 | 字符串值 | 说明 |
+|------|----------|------|
+| 0 | "Downloading Version Manifest" | 版本清单 |
+| 1 | "Downloading Version JSON" | 版本 JSON |
+| 2 | "Downloading Client JAR" | 客户端 JAR |
+| 3 | "Downloading Libraries" | 库文件 |
+| 4 | "Downloading Assets" | 资源文件 |
+| 5 | "Downloading Natives" | Natives |
+| 6 | "Extracting Natives" | 解压 Natives |
+| 7 | "Downloading Mods" | 模组 |
+| 8 | "Downloading Modpack" | 整合包 |
 
 **调用示例:**
 
 ```c
-void progress_callback(uint32_t stage, uint32_t current, uint32_t total, void* user_data) {
-    printf("Stage %u: %u/%u\n", stage, current, total);
+// 带回调的下载
+void progress_callback(const char* stage, uintptr_t current, uintptr_t total,
+                       uint64_t bytes_downloaded, uint64_t bytes_total,
+                       uint64_t speed, uintptr_t files_remaining, void* user_data) {
+    printf("[%s] %zu/%zu files", stage, current, total);
+    if (bytes_total > 0) {
+        printf(" | %.1f%%", (double)bytes_downloaded / bytes_total * 100.0);
+    }
+    if (speed > 0) {
+        printf(" | %.1f MB/s", (double)speed / 1024 / 1024);
+    }
+    printf("\n");
 }
 
 int32_t code = mc_download_version(handle, "1.20.1", progress_callback, NULL);
 if (code == 0) {
     printf("下载完成!\n");
 }
+
+// 无回调的同步下载
+int32_t code = mc_download_version(handle, "1.20.1", NULL, NULL);
 ```
+
+---
+
+### mc_install_forge
+
+安装 Forge。
+
+```c
+int32_t mc_install_forge(const SDKHandle* handle, const char* mc_version, const char* forge_version, const void* callback, void* user_data);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `handle` | `const SDKHandle*` | SDK 句柄 |
+| `mc_version` | `const char*` | Minecraft 版本号 |
+| `forge_version` | `const char*` | Forge 版本号 |
+| `callback` | `const void*` | 进度回调函数指针 (可选，传 NULL 表示不需要回调) |
+| `user_data` | `void*` | 用户数据指针 |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
+
+---
+
+### mc_install_fabric
+
+安装 Fabric。
+
+```c
+int32_t mc_install_fabric(const SDKHandle* handle, const char* mc_version, const char* loader_version, const void* callback, void* user_data);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `handle` | `const SDKHandle*` | SDK 句柄 |
+| `mc_version` | `const char*` | Minecraft 版本号 |
+| `loader_version` | `const char*` | Fabric Loader 版本号 |
+| `callback` | `const void*` | 进度回调函数指针 (可选) |
+| `user_data` | `void*` | 用户数据指针 |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
+
+---
+
+### mc_install_neoforge
+
+安装 NeoForge。
+
+```c
+int32_t mc_install_neoforge(const SDKHandle* handle, const char* mc_version, const char* neoforge_version, const void* callback, void* user_data);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `handle` | `const SDKHandle*` | SDK 句柄 |
+| `mc_version` | `const char*` | Minecraft 版本号 |
+| `neoforge_version` | `const char*` | NeoForge 版本号 |
+| `callback` | `const void*` | 进度回调函数指针 (可选) |
+| `user_data` | `void*` | 用户数据指针 |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
+
+---
+
+### mc_install_optifine
+
+安装 OptiFine。
+
+```c
+int32_t mc_install_optifine(const SDKHandle* handle, const char* mc_version, const char* optifine_version, const void* callback, void* user_data);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `handle` | `const SDKHandle*` | SDK 句柄 |
+| `mc_version` | `const char*` | Minecraft 版本号 |
+| `optifine_version` | `const char*` | OptiFine 版本号 |
+| `callback` | `const void*` | 进度回调函数指针 (可选) |
+| `user_data` | `void*` | 用户数据指针 |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
+
+---
+
+### mc_install_liteloader
+
+安装 LiteLoader。
+
+```c
+int32_t mc_install_liteloader(const SDKHandle* handle, const char* mc_version, const char* liteloader_version, const void* callback, void* user_data);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `handle` | `const SDKHandle*` | SDK 句柄 |
+| `mc_version` | `const char*` | Minecraft 版本号 |
+| `liteloader_version` | `const char*` | LiteLoader 版本号 |
+| `callback` | `const void*` | 进度回调函数指针 (可选) |
+| `user_data` | `void*` | 用户数据指针 |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
 
 ---
 
@@ -1223,11 +1542,107 @@ int32_t mc_launch_game(const SDKHandle* handle, const char* username, const char
 | `uuid` | `const char*` | 玩家 UUID |
 | `access_token` | `const char*` | 访问令牌 |
 | `version_id` | `const char*` | 版本 ID |
-| `max_memory` | `uint32_t` | 最大内存 (MB，默认 1024) |
+| `max_memory` | `uint32_t` | 最大内存 (MB)，传 0 使用默认值 (1024) |
 
 **返回值:**
 - `0`: 成功
 - 非 0: 错误码
+
+**说明:**
+- min_memory 自动设置为 max_memory / 2
+- 窗口大小使用默认值 854x480
+
+---
+
+### mc_launch_game_ex
+
+启动游戏 (扩展版本，支持更多参数)。
+
+```c
+int32_t mc_launch_game_ex(
+    const SDKHandle* handle,
+    const char* username,
+    const char* uuid,
+    const char* access_token,
+    const char* version_id,
+    uint32_t min_memory,
+    uint32_t max_memory,
+    uint32_t window_width,
+    uint32_t window_height,
+    const char* server_address,
+    uint32_t server_port,
+    const char* java_path
+);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `handle` | `const SDKHandle*` | SDK 句柄 |
+| `username` | `const char*` | 玩家用户名 |
+| `uuid` | `const char*` | 玩家 UUID |
+| `access_token` | `const char*` | 访问令牌 |
+| `version_id` | `const char*` | 版本 ID |
+| `min_memory` | `uint32_t` | 最小内存 (MB)，传 0 使用默认值 (max_memory/2) |
+| `max_memory` | `uint32_t` | 最大内存 (MB)，传 0 使用默认值 (1024) |
+| `window_width` | `uint32_t` | 窗口宽度，传 0 使用默认值 (854) |
+| `window_height` | `uint32_t` | 窗口高度，传 0 使用默认值 (480) |
+| `server_address` | `const char*` | 服务器地址 (可选，传 NULL 不自动加入服务器) |
+| `server_port` | `uint32_t` | 服务器端口 (可选，传 0 使用默认端口 25565) |
+| `java_path` | `const char*` | Java 可执行文件路径 (可选，传 NULL 自动检测) |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
+
+**调用示例:**
+
+```c
+// 列出所有 Java 供用户选择
+FFIJavaList java_list;
+mc_list_java(&java_list);
+printf("找到 %d 个 Java:\n", java_list.count);
+for (uint32_t i = 0; i < java_list.count; i++) {
+    printf("  [%d] %s (Java %u, %s)\n", i,
+           java_list.runtimes[i].executable,
+           java_list.runtimes[i].major_version,
+           java_list.runtimes[i].arch);
+}
+
+// 用户选择了一个 Java
+char* selected_java = java_list.runtimes[0].executable;
+
+// 获取系统内存
+FFISystemMemory mem;
+mc_get_system_memory(&mem);
+uint32_t max_mem = (mem.available / 1024 / 1024) * 3 / 4;
+
+// 启动游戏，使用用户选择的 Java
+mc_launch_game_ex(
+    handle,
+    "TestPlayer",
+    uuid,
+    token,
+    "1.20.1",
+    max_mem / 2,           // min_memory
+    max_mem,               // max_memory
+    1920,                  // window_width
+    1080,                  // window_height
+    "mc.example.com",      // server_address
+    25565,                 // server_port
+    selected_java          // java_path - 用户选择的 Java
+);
+
+// 或者自动检测 Java
+mc_launch_game_ex(
+    handle, "TestPlayer", uuid, token, "1.20.1",
+    max_mem / 2, max_mem, 1920, 1080, NULL, 0,
+    NULL                   // java_path = NULL 自动检测
+);
+
+mc_free_java_list(&java_list);
+```
 
 **调用示例:**
 
@@ -1702,6 +2117,118 @@ if (mirror != NULL) {
         printf("Using official source\n");
     }
     mc_sdk_free_string(mirror);
+}
+```
+
+---
+
+## 进度查询 (轮询模式)
+
+### mc_get_progress
+
+获取当前下载进度快照。可在任意时刻调用，无需 SDK 句柄。
+
+```c
+int32_t mc_get_progress(ProgressSnapshot* snapshot_out);
+```
+
+**参数:**
+
+| 参数 | 类型 | 说明 |
+|------|------|------|
+| `snapshot_out` | `ProgressSnapshot*` | 输出参数，接收进度快照 |
+
+**返回值:**
+- `0`: 成功
+- 非 0: 错误码
+
+**ProgressSnapshot 结构体:**
+
+```c
+typedef struct {
+    uint32_t stage;              // 当前阶段 (0-8)
+    uintptr_t current;           // 当前已完成文件数量
+    uintptr_t total;             // 总文件数量
+    uint64_t bytes_downloaded;   // 已下载字节数
+    uint64_t bytes_total;        // 总字节数
+    uint64_t speed;              // 下载速度 (bytes/sec)
+    uintptr_t files_remaining;   // 剩余文件数量
+    bool is_active;              // 是否正在下载
+    bool is_complete;            // 是否已完成
+    int32_t error_code;          // 错误码 (0 = 无错误)
+} ProgressSnapshot;
+```
+
+**调用示例:**
+
+```c
+ProgressSnapshot snapshot;
+if (mc_get_progress(&snapshot) == 0) {
+    printf("Progress: %zu/%zu files\n", snapshot.current, snapshot.total);
+    printf("Speed: %.2f MB/s\n", (double)snapshot.speed / 1024 / 1024);
+    printf("Remaining: %zu files\n", snapshot.files_remaining);
+}
+```
+
+---
+
+### mc_reset_progress
+
+重置下载进度状态。在开始新的下载任务前调用。
+
+```c
+int32_t mc_reset_progress();
+```
+
+**返回值:**
+- `0`: 成功
+
+---
+
+### mc_is_downloading
+
+检查是否有下载任务正在进行。
+
+```c
+int32_t mc_is_downloading();
+```
+
+**返回值:**
+- `1`: 正在下载
+- `0`: 空闲
+
+---
+
+### 完整轮询示例
+
+```c
+// 启动下载 (不传回调)
+mc_download_version(handle, "1.20.1", NULL, NULL);
+
+// 在另一个线程轮询进度
+while (mc_is_downloading()) {
+    ProgressSnapshot snapshot;
+    if (mc_get_progress(&snapshot) == 0) {
+        printf("[%s] %zu/%zu files", 
+               get_stage_name(snapshot.stage),
+               snapshot.current, snapshot.total);
+        
+        if (snapshot.bytes_total > 0) {
+            printf(" | %.1f%%", 
+                   (double)snapshot.bytes_downloaded / snapshot.bytes_total * 100.0);
+        }
+        if (snapshot.speed > 0) {
+            printf(" | %.1f MB/s", (double)snapshot.speed / 1024 / 1024);
+        }
+        if (snapshot.files_remaining > 0) {
+            printf(" | %zu remaining", snapshot.files_remaining);
+        }
+        printf("\n");
+        
+        if (snapshot.is_complete) break;
+        if (snapshot.error_code != 0) break;
+    }
+    Sleep(100); // 100ms 更新一次
 }
 ```
 

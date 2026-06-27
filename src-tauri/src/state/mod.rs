@@ -22,6 +22,11 @@ pub struct AppConfig {
     pub max_memory: u32,
     pub theme: String,
     pub language: String,
+    pub mirror_url: Option<String>,
+    pub mirror_url_meta: Option<String>,
+    pub mirror_url_download: Option<String>,
+    pub max_download_speed: u64,
+    pub download_source: String,  // "mirror" | "official" | "smart"
 }
 
 impl Default for AppConfig {
@@ -34,6 +39,11 @@ impl Default for AppConfig {
             max_memory: 2048,
             theme: "system".to_string(),
             language: "zh-CN".to_string(),
+            mirror_url: None,
+            mirror_url_meta: None,
+            mirror_url_download: None,
+            max_download_speed: 0,
+            download_source: "mirror".to_string(),
         }
     }
 }
@@ -45,14 +55,21 @@ pub struct AuthState {
     pub is_logged_in: bool,
 }
 
-/// 获取默认游戏目录
+/// 获取默认游戏目录：启动器同级目录下的 .minecraft
 fn get_default_game_dir() -> String {
-    if let Some(home_dir) = dirs::home_dir() {
-        let minecraft_dir = home_dir.join(".minecraft");
-        minecraft_dir.to_string_lossy().to_string()
-    } else {
-        ".minecraft".to_string()
+    // 优先使用可执行文件所在目录
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            let minecraft_dir = exe_dir.join(".minecraft");
+            return minecraft_dir.to_string_lossy().to_string();
+        }
     }
+    // 兜底：当前工作目录
+    if let Ok(cwd) = std::env::current_dir() {
+        let minecraft_dir = cwd.join(".minecraft");
+        return minecraft_dir.to_string_lossy().to_string();
+    }
+    ".minecraft".to_string()
 }
 
 impl Default for AppState {

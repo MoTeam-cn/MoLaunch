@@ -54,7 +54,16 @@ pub async fn initialize_sdk(
     let game_dir = game_dir.unwrap_or_else(|| config.game_dir.clone());
     let max_threads = config.max_download_threads;
     let log_level = config.log_level;
+    let mirror_url = config.mirror_url.clone();
+    let mirror_url_meta = config.mirror_url_meta.clone();
+    let mirror_url_download = config.mirror_url_download.clone();
+    let max_download_speed = config.max_download_speed;
     drop(config);
+
+    log::info!("Game directory: {}", game_dir);
+    log::info!("Mirror URL: {:?}", mirror_url);
+    log::info!("Mirror meta: {:?}, download: {:?}", mirror_url_meta, mirror_url_download);
+    log::info!("Max download speed: {} bytes/sec", max_download_speed);
 
     // 加载 SDK 库
     let mut sdk = SdkInstance::load().map_err(|e| {
@@ -63,7 +72,15 @@ pub async fn initialize_sdk(
     })?;
 
     // 初始化 SDK
-    sdk.init(&game_dir, max_threads, log_level).map_err(|e| {
+    sdk.init(
+        &game_dir,
+        max_threads,
+        log_level,
+        mirror_url.as_deref(),
+        mirror_url_meta.as_deref(),
+        mirror_url_download.as_deref(),
+        max_download_speed,
+    ).map_err(|e| {
         log::error!("Failed to initialize SDK: {}", e);
         e.to_string()
     })?;
