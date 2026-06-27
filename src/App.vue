@@ -6,6 +6,7 @@
 import { onMounted, ref } from 'vue'
 import TopNavLayout from '@/components/layout/TopNavLayout.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
+import DownloadPanel from '@/components/common/DownloadPanel.vue'
 import Modal from '@/components/common/Modal.vue'
 import Toast from '@/components/common/Toast.vue'
 import { useSdkStore } from '@/stores/sdk'
@@ -57,6 +58,7 @@ async function initApp() {
     </router-view>
   </TopNavLayout>
   <BackToTop />
+  <DownloadPanel />
   <Modal ref="modalRef" />
   <Toast ref="toastRef" />
 </template>

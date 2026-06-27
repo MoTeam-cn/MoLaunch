@@ -142,17 +142,20 @@ pub async fn set_download_source(
             config.mirror_url_meta = Some(BMCLAPI.to_string());
             config.mirror_url_download = Some(BMCLAPI.to_string());
             config.mirror_url = Some(BMCLAPI.to_string());
+            config.mirror_mode = 0;
         }
         "official" => {
             config.mirror_url_meta = None;
             config.mirror_url_download = None;
             config.mirror_url = None;
+            config.mirror_mode = 0;
         }
         "smart" => {
-            // 版本信息走官方，资源下载走镜像
+            // 自动探测：SDK 自动检测官方源速度，慢则降级到 BMCLAPI
             config.mirror_url_meta = None;
-            config.mirror_url_download = Some(BMCLAPI.to_string());
+            config.mirror_url_download = None;
             config.mirror_url = None;
+            config.mirror_mode = 1;
         }
         _ => return Err(format!("Invalid source: {}", source)),
     }

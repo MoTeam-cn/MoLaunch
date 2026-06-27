@@ -25,6 +25,7 @@ pub struct AppConfig {
     pub mirror_url: Option<String>,
     pub mirror_url_meta: Option<String>,
     pub mirror_url_download: Option<String>,
+    pub mirror_mode: u32,
     pub max_download_speed: u64,
     pub download_source: String,  // "mirror" | "official" | "smart"
 }
@@ -42,8 +43,9 @@ impl Default for AppConfig {
             mirror_url: None,
             mirror_url_meta: None,
             mirror_url_download: None,
+            mirror_mode: 0,
             max_download_speed: 0,
-            download_source: "mirror".to_string(),
+            download_source: "smart".to_string(),
         }
     }
 }

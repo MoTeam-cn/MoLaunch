@@ -8,6 +8,7 @@ SDK 提供以下下载控制选项：
 |--------|------|--------|------|
 | `mirror_url_meta` | `const char*` | `NULL` | 版本清单/JSON 镜像源 URL |
 | `mirror_url_download` | `const char*` | `NULL` | 资源下载镜像源 URL |
+| `mirror_mode` | `uint32_t` | `0` | 镜像模式 (0=手动, 1=自动探测降级) |
 | `max_download_threads` | `uint32_t` | `8` | 最大并发下载线程数 |
 | `max_download_speed` | `uint64_t` | `0` | 最大下载速度 (bytes/sec)，0=不限制 |
 
@@ -25,11 +26,58 @@ MC_SDK_MCConfig config = {
     // 镜像源（分级控制）
     .mirror_url_meta = "https://bmclapi2.bangbang93.com",     // 版本信息走镜像
     .mirror_url_download = "https://bmclapi2.bangbang93.com", // 资源下载走镜像
+    .mirror_mode = 0,                                         // 手动模式
 
     // 旧字段（向后兼容，新字段为 NULL 时回退到此值）
     .mirror_url = NULL,
 };
 MC_SDK_SDKHandle *handle = mc_sdk_init(&config);
+```
+
+## 镜像模式 (mirror_mode)
+
+| 值 | 模式 | 说明 |
+|---|------|------|
+| `0` | 手动 | 使用配置的 mirror_url_meta/download，不自动切换 |
+| `1` | 自动探测 | 优先官方源，如果慢/不可用自动降级到 BMCLAPI |
+
+### 自动探测逻辑
+
+当 `mirror_mode=1` 且未配置镜像 URL 时：
+
+1. 发送 HEAD 请求到官方版本清单 URL
+2. 如果响应 < 3 秒且状态码 200 → 使用官方源
+3. 如果超时或失败 → 自动切换到 BMCLAPI 镜像
+4. 探测结果缓存 5 分钟，避免重复探测
+
+```
+mirror_mode=1, mirror_url_meta=NULL
+       │
+       ▼
+  探测官方源 (HEAD, 3s 超时)
+       │
+       ├── 快 (< 3s) → 使用官方源
+       │
+       └── 慢/失败 → 自动切 BMCLAPI
+```
+
+### 使用场景
+
+```c
+// 场景 1: 国内用户，手动指定 BMCLAPI
+config.mirror_url_meta = "https://bmclapi2.bangbang93.com";
+config.mirror_url_download = "https://bmclapi2.bangbang93.com";
+config.mirror_mode = 0;
+
+// 场景 2: 不确定网络环境，自动选择最优源
+config.mirror_url_meta = NULL;
+config.mirror_url_download = NULL;
+config.mirror_mode = 1;  // 自动探测
+
+// 场景 3: 国外用户，始终用官方
+config.mirror_url_meta = NULL;
+config.mirror_url_download = NULL;
+config.mirror_mode = 0;
 ```
 
 ## 分级镜像源
@@ -73,6 +121,83 @@ mirror_url_download = NULL ? → 回退到 mirror_url
 ```
 
 旧代码只设置 `mirror_url`，新字段为 NULL 时自动回退，无需修改。
+
+## 自动降级机制
+
+SDK 提供两层自动降级，确保下载稳定：
+
+### 第一层：探测降级 (mirror_mode=1)
+
+在开始下载前，先探测官方源是否可用：
+
+```
+HEAD 请求官方版本清单 (3s 超时)
+  ├── 响应快 (< 3s) → 用官方源下载
+  └── 响应慢/失败 → 自动切 BMCLAPI
+```
+
+- 探测结果缓存 5 分钟
+- 仅在 `mirror_mode=1` 且未配置镜像 URL 时生效
+
+### 第二层：下载失败自动重试镜像 (自动)
+
+每个文件下载时，如果原始 URL 失败（重试 3 次后），自动用镜像 URL 重试：
+
+```
+下载文件 (官方 URL)
+  ├── 成功 → 继续下一个文件
+  └── 失败 (重试 3 次) → 自动用镜像 URL 重试
+       ├── 成功 → 继续
+       └── 失败 → 标记失败
+```
+
+此机制对所有下载生效，无需额外配置。当配置了 `mirror_url_download` 时，SDK 会自动为每个下载任务生成镜像回退 URL。
+
+### URL 自动转换
+
+SDK 自动将官方 URL 转换为镜像 URL：
+
+| 官方域名 | 镜像路径 |
+|----------|----------|
+| `libraries.minecraft.net` | `{mirror}/maven/...` |
+| `resources.download.minecraft.net` | `{mirror}/assets/...` |
+| `launchermeta.mojang.com` | `{mirror}/...` |
+| `maven.minecraftforge.net` | `{mirror}/maven/...` |
+| `maven.neoforged.net` | `{mirror}/maven/...` |
+| `maven.fabricmc.net` | `{mirror}/maven/...` |
+| `meta.fabricmc.net` | `{mirror}/fabric-meta/...` |
+| `dl.liteloader.com` | `{mirror}/...` |
+
+### 完整流程图
+
+```
+                    开始下载
+                       │
+                       ▼
+              mirror_mode=1?
+              ┌────是────┴────否────┐
+              ▼                     ▼
+        探测官方源              使用配置的源
+        ┌──快──┴──慢──┐            │
+        ▼             ▼            │
+     用官方        切 BMCLAPI      │
+        │             │            │
+        └──────┬──────┘            │
+               ▼                   ▼
+          下载文件 (原始 URL)
+               │
+               ├── 成功 → 下一个文件
+               │
+               └── 失败 (重试 3 次)
+                    │
+                    ▼
+              有 mirror_url?
+              ┌──有──┴──无──┐
+              ▼             ▼
+         用镜像重试      标记失败
+         ├── 成功
+         └── 失败 → 标记失败
+```
 
 ## 各函数使用的镜像配置
 
@@ -187,6 +312,23 @@ uint32_t threads = mc_config_get_max_download_threads(handle);
 uint64_t speed = mc_config_get_max_download_speed(handle);  // bytes/sec, 0=不限制
 ```
 
+## User-Agent
+
+SDK 发送的 HTTP 请求使用以下 UA 格式：
+
+```
+McSDK/{version}-client {status}
+```
+
+| 字段 | 说明 | 示例 |
+|------|------|------|
+| `version` | SDK 版本号 | `0.1.8` |
+| `status` | 构建类型 | `release` 或 `dev` |
+
+示例：
+- Release 构建：`McSDK/0.1.8-client release`
+- Debug 构建：`McSDK/0.1.8-client dev`
+
 ## 注意事项
 
 1. **向后兼容**：旧字段 `mirror_url` 仍然可用，新字段为 NULL 时回退
@@ -194,3 +336,5 @@ uint64_t speed = mc_config_get_max_download_speed(handle);  // bytes/sec, 0=不�
 3. **自定义镜像**：按 BMCLAPI 路径格式构建，如果格式不同可能无法工作
 4. **速度限制精度**：滑动窗口每秒检查一次，实际速度可能有短暂波动
 5. **线程数**：建议 4~16，过高可能导致连接不稳定
+6. **自动探测**：仅在 `mirror_mode=1` 且未配置镜像时生效，探测缓存 5 分钟
+7. **下载重试**：每个文件失败后自动用镜像 URL 重试，无需额外配置

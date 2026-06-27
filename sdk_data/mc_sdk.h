@@ -177,7 +177,7 @@ struct MC_SDK_MCConfig {
    */
   uint32_t mMaxDownloadThreads;
   /*
-   镜像源 URL (可选，为空指针表示使用官方源)
+   镜像源 URL (已废弃，保留向后兼容)
    */
   const char *mMirrorUrl;
   /*
@@ -196,6 +196,18 @@ struct MC_SDK_MCConfig {
    游戏窗口标题 (可选，为空指针使用默认标题)
    */
   const char *mWindowTitle;
+  /*
+   镜像源 URL (版本清单/JSON)，为空指针时回退到 mMirrorUrl
+   */
+  const char *mMirrorUrlMeta;
+  /*
+   镜像源 URL (资源下载)，为空指针时回退到 mMirrorUrl
+   */
+  const char *mMirrorUrlDownload;
+  /*
+   最大下载速度 (bytes/sec)，0=不限制
+   */
+  uint64_t mMaxDownloadSpeed;
 };
 
 /*
@@ -1278,6 +1290,45 @@ char *mc_config_get_game_dir(const MC_SDK_SDKHandle *aHandle);
  镜像源 URL 字符串，失败返回 null
  */
 char *mc_config_get_mirror(const MC_SDK_SDKHandle *aHandle);
+
+/*
+ 获取版本清单/JSON 镜像源 URL
+
+ 返回的字符串必须通过 `mc_sdk_free_string` 释放。
+ 如果未设置镜像源，返回空字符串。
+
+ # Arguments
+ * `handle` - SDK 句柄
+
+ # Returns
+ 镜像源 URL 字符串，失败返回 null
+ */
+char *mc_config_get_mirror_meta(const MC_SDK_SDKHandle *aHandle);
+
+/*
+ 获取资源下载镜像源 URL
+
+ 返回的字符串必须通过 `mc_sdk_free_string` 释放。
+ 如果未设置镜像源，返回空字符串。
+
+ # Arguments
+ * `handle` - SDK 句柄
+
+ # Returns
+ 镜像源 URL 字符串，失败返回 null
+ */
+char *mc_config_get_mirror_download(const MC_SDK_SDKHandle *aHandle);
+
+/*
+ 获取最大下载速度
+
+ # Arguments
+ * `handle` - SDK 句柄
+
+ # Returns
+ 最大下载速度 (bytes/sec)，0 表示不限制，失败返回 0
+ */
+uint64_t mc_config_get_max_download_speed(const MC_SDK_SDKHandle *aHandle);
 
 /*
  清除 HTTP 缓存

@@ -6,6 +6,7 @@
 
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ArrowUpIcon } from '@heroicons/vue/24/outline'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 const visible = ref(false)
 let activeEl: Element | null = null
@@ -18,8 +19,8 @@ function onScroll(e: Event) {
   const clientHeight = el.clientHeight
   const scrollTop = el.scrollTop
 
-  // 内容不够长，不显示
-  if (scrollHeight <= clientHeight * 1.5) {
+  // 内容不够长，不显示（至少需要超出容器 50%）
+  if (scrollHeight <= clientHeight * 1.5 || scrollHeight < 600) {
     visible.value = false
     return
   }
@@ -56,13 +57,13 @@ onUnmounted(() => {
     leave-from-class="opacity-100 scale-100"
     leave-to-class="opacity-0 scale-95"
   >
-    <button
-      v-if="visible"
-      class="fixed bottom-6 right-6 z-50 w-10 h-10 bg-white rounded-full shadow-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
-      title="返回顶部"
-      @click="scrollToTop"
-    >
-      <ArrowUpIcon class="w-5 h-5 text-gray-600" />
-    </button>
+    <Tooltip v-if="visible" text="返回顶部" position="left">
+      <button
+        class="fixed bottom-6 right-6 z-50 w-10 h-10 bg-white rounded-full shadow-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
+        @click="scrollToTop"
+      >
+        <ArrowUpIcon class="w-5 h-5 text-gray-600" />
+      </button>
+    </Tooltip>
   </transition>
 </template>

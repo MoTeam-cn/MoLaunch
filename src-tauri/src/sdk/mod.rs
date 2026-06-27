@@ -97,6 +97,7 @@ pub struct MCConfig {
     pub window_title: *const std::ffi::c_char,
     pub mirror_url_meta: *const std::ffi::c_char,
     pub mirror_url_download: *const std::ffi::c_char,
+    pub mirror_mode: u32,
     pub max_download_speed: u64,
 }
 
@@ -439,6 +440,7 @@ impl SdkInstance {
         mirror_url: Option<&str>,
         mirror_url_meta: Option<&str>,
         mirror_url_download: Option<&str>,
+        mirror_mode: u32,
         max_download_speed: u64,
     ) -> Result<(), SdkError> {
         let game_dir_cstr = std::ffi::CString::new(game_dir)
@@ -469,6 +471,7 @@ impl SdkInstance {
             window_title: std::ptr::null(),
             mirror_url_meta: mirror_meta_cstr.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
             mirror_url_download: mirror_download_cstr.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
+            mirror_mode,
             max_download_speed,
         };
 

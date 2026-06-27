@@ -33,6 +33,9 @@ export const useVersionStore = defineStore('version', () => {
 
   // 方法
   async function fetchVersions() {
+    // 已有数据则不重复请求
+    if (versions.value.length > 0) return
+
     loading.value = true
     error.value = null
     
@@ -47,6 +50,11 @@ export const useVersionStore = defineStore('version', () => {
     } finally {
       loading.value = false
     }
+  }
+
+  function refreshVersions() {
+    versions.value = []
+    return fetchVersions()
   }
 
   function startDownload(versionId: string) {
@@ -87,6 +95,7 @@ export const useVersionStore = defineStore('version', () => {
     downloadingVersion,
     downloadProgress,
     fetchVersions,
+    refreshVersions,
     startDownload,
     updateProgress,
     finishDownload,
