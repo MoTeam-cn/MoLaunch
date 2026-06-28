@@ -59,8 +59,10 @@ async function initApp() {
       </transition>
     </router-view>
   </TopNavLayout>
-  <BackToTop />
-  <DownloadPanel />
+  <Teleport to="body">
+    <BackToTop />
+    <DownloadPanel />
+  </Teleport>
   <Modal ref="modalRef" />
   <Toast ref="toastRef" />
 </template>

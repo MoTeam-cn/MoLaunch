@@ -207,8 +207,8 @@ impl SdkInstance {
             window_title: std::ptr::null(),
             mirror_url_meta: mirror_meta_cstr.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
             mirror_url_download: mirror_download_cstr.as_ref().map(|s| s.as_ptr()).unwrap_or(std::ptr::null()),
-            mirror_mode,
-            max_download_speed,
+            max_download_speed,  // ← 修正：先 u64
+            mirror_mode,         // ← 修正：后 u32
         };
 
         let handle = unsafe { (self.functions.init)(&config) };

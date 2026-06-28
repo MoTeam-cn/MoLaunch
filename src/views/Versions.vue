@@ -30,7 +30,11 @@ const { startPolling, stopPolling } = useDownloadPolling()
 const loading = ref(false)
 const installedVersions = ref<string[]>([])
 const activeCategory = ref('vanilla')
-const selectedVersion = ref<string | null>(null)
+// 使用 store 中的 selectedVersion 保持页面切换状态
+const selectedVersion = computed({
+  get: () => versionStore.selectedVersion,
+  set: (val) => { versionStore.selectedVersion = val }
+})
 
 const typeIcons: Record<string, string> = {
   release: grassIcon, snapshot: commandBlockIcon,
@@ -91,7 +95,7 @@ async function handleRefresh() {
 
 function onInstallRequest(options: { mcVersion: string; forge?: string; neoforge?: string; fabric?: string; optifine?: string; liteloader?: string; instanceName: string }) {
   // 立刻返回版本列表
-  selectedVersion.value = null
+  versionStore.selectedVersion = null
   // 设置下载状态，显示 DownloadPanel
   versionStore.startDownload(options.instanceName)
   // 后台执行安装
@@ -140,6 +144,20 @@ function handleUninstall(versionId: string) {
   })
 }
 
+async function handleOpenGameDir() {
+  showInfo('正在打开游戏目录...')
+  try {
+    await tauri.openGameDir()
+    // 随机延迟 1-2 秒，增加真实感
+    const delay = 1000 + Math.random() * 1000
+    setTimeout(() => {
+      showSuccess('已打开游戏目录，请自行浏览哈')
+    }, delay)
+  } catch (e) {
+    showError('打开失败', '无法打开游戏目录', String(e))
+  }
+}
+
 onMounted(async () => {
   // 有缓存就不显示 loading
   if (versionStore.versions.length === 0) {
@@ -171,7 +189,7 @@ onMounted(async () => {
       <div class="p-3 border-t border-gray-200">
         <button
           class="w-full flex items-center justify-center px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-          @click="tauri.openGameDir()"
+          @click="handleOpenGameDir"
         >
           <FolderOpenIcon class="w-4 h-4 mr-2" />
           打开游戏目录
@@ -192,8 +210,10 @@ onMounted(async () => {
         </div>
         <Tooltip text="刷新版本列表" position="bottom">
           <button
-            class="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
-            @click="handleRefresh"
+            class="p-2 rounded-lg transition-colors"
+            :class="selectedVersion ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'"
+            :disabled="!!selectedVersion"
+            @click="!selectedVersion && handleRefresh()"
           >
             <ArrowPathIcon class="w-4 h-4" />
           </button>

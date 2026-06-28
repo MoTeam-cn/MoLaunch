@@ -30,6 +30,18 @@ export const useVersionStore = defineStore('version', () => {
   const downloading = ref(false)
   const downloadingVersion = ref<string | null>(null)
   const downloadProgress = ref<DownloadProgress | null>(null)
+  
+  // 版本选择器状态（用于在页面切换时保持状态）
+  const selectedVersion = ref<string | null>(null)
+  
+  // 加载器版本列表缓存（按 MC 版本号缓存）
+  const loaderVersionsCache = ref<Record<string, {
+    forge: string[]
+    neoforge: { version: string; recommended: boolean }[]
+    fabric: { version: string; stable: boolean }[]
+    optifine: { display_name: string; is_preview: boolean }[]
+    liteloader: string[]
+  }>>({})
 
   // 方法
   async function fetchVersions() {
@@ -84,6 +96,22 @@ export const useVersionStore = defineStore('version', () => {
   function getSnapshotVersions(): VersionInfo[] {
     return versions.value.filter(v => v.version_type === 'snapshot')
   }
+  
+  // 获取加载器缓存
+  function getLoaderCache(mcVersion: string) {
+    return loaderVersionsCache.value[mcVersion] || null
+  }
+  
+  // 设置加载器缓存
+  function setLoaderCache(mcVersion: string, data: {
+    forge: string[]
+    neoforge: { version: string; recommended: boolean }[]
+    fabric: { version: string; stable: boolean }[]
+    optifine: { display_name: string; is_preview: boolean }[]
+    liteloader: string[]
+  }) {
+    loaderVersionsCache.value[mcVersion] = data
+  }
 
   return {
     versions,
@@ -94,6 +122,8 @@ export const useVersionStore = defineStore('version', () => {
     downloading,
     downloadingVersion,
     downloadProgress,
+    selectedVersion,
+    loaderVersionsCache,
     fetchVersions,
     refreshVersions,
     startDownload,
@@ -102,5 +132,7 @@ export const useVersionStore = defineStore('version', () => {
     getVersionById,
     getReleaseVersions,
     getSnapshotVersions,
+    getLoaderCache,
+    setLoaderCache,
   }
 })

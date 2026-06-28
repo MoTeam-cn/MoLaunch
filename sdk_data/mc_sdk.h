@@ -7,28 +7,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+/* 不透明 SDK 句柄 (内部结构不对外暴露) */
+typedef struct MC_SDK_SDKHandle MC_SDK_SDKHandle;
+
 /*
  游戏 ID (Minecraft)
  */
 #define MC_SDK_GAME_ID 432
-
-/*
- 认证类型枚举
- */
-enum MC_SDK_AuthType {
-  /*
-   微软账号
-   */
-  Microsoft = 0,
-  /*
-   离线模式
-   */
-  Offline = 1,
-  /*
-   外置认证 (Authlib-Injector)
-   */
-  External = 2,
-};
 
 /*
  SDK 错误码 (FFI 接口使用)
@@ -165,6 +150,42 @@ enum MC_SDK_ErrorCode {
 };
 
 /*
+ 认证类型枚举
+ */
+enum MC_SDK_AuthType {
+  /*
+   微软账号
+   */
+  Microsoft = 0,
+  /*
+   离线模式
+   */
+  Offline = 1,
+  /*
+   外置认证 (Authlib-Injector)
+   */
+  External = 2,
+};
+
+/*
+ 错误信息结构体 (FFI 使用)
+ */
+struct MC_SDK_ErrorInfo {
+  /*
+   错误码
+   */
+  enum MC_SDK_ErrorCode mCode;
+  /*
+   错误消息 (UTF-8)
+   */
+  char *mMessage;
+  /*
+   详细信息 (可选)
+   */
+  char *mDetails;
+};
+
+/*
  SDK 配置结构体 (FFI 接口使用)
  */
 struct MC_SDK_MCConfig {
@@ -197,17 +218,21 @@ struct MC_SDK_MCConfig {
    */
   const char *mWindowTitle;
   /*
-   镜像源 URL (版本清单/JSON)，为空指针时回退到 mMirrorUrl
+   镜像源 URL (版本清单/JSON)，为空指针时回退到 mirror_url
    */
   const char *mMirrorUrlMeta;
   /*
-   镜像源 URL (资源下载)，为空指针时回退到 mMirrorUrl
+   镜像源 URL (资源下载)，为空指针时回退到 mirror_url
    */
   const char *mMirrorUrlDownload;
   /*
    最大下载速度 (bytes/sec)，0=不限制
    */
   uint64_t mMaxDownloadSpeed;
+  /*
+   镜像模式 (0=手动, 1=自动探测降级)
+   */
+  uint32_t mMirrorMode;
 };
 
 /*
@@ -309,6 +334,40 @@ struct MC_SDK_FFIDeviceCode {
 };
 
 /*
+ 合并安装请求结构体 (FFI 接口使用)
+ */
+struct MC_SDK_FFIMergedInstallRequest {
+  /*
+   Minecraft 版本号 (必须)
+   */
+  const char *mMcVersion;
+  /*
+   Forge 版本号 (NULL = 跳过)
+   */
+  const char *mForgeVersion;
+  /*
+   NeoForge 版本号 (NULL = 跳过)
+   */
+  const char *mNeoforgeVersion;
+  /*
+   Fabric 版本号 (NULL = 跳过)
+   */
+  const char *mFabricVersion;
+  /*
+   OptiFine 版本号 (NULL = 跳过)
+   */
+  const char *mOptifineVersion;
+  /*
+   LiteLoader 版本号 (NULL = 跳过)
+   */
+  const char *mLiteloaderVersion;
+  /*
+   实例名称 (NULL = 默认使用 mc_version)
+   */
+  const char *mInstanceName;
+};
+
+/*
  FFI 版本条目结构体
  */
 struct MC_SDK_FFIVersionEntry {
@@ -356,151 +415,49 @@ struct MC_SDK_FFIVersionList {
   char *mErrorMessage;
 };
 
-/*
- FFI Java 运行时信息结构体
- */
 struct MC_SDK_FFIJavaRuntime {
-  /*
-   Java 可执行文件路径
-   */
   char *mExecutable;
-  /*
-   Java 版本号
-   */
   char *mVersion;
-  /*
-   Java 主版本号 (8, 11, 17, 21 等)
-   */
   uint32_t mMajorVersion;
-  /*
-   Java 架构 (x86_64, aarch64 等)
-   */
   char *mArch;
-  /*
-   Java 主页目录
-   */
   char *mHome;
 };
 
-/*
- FFI Java 列表结构体
- */
 struct MC_SDK_FFIJavaList {
-  /*
-   Java 数组指针
-   */
   struct MC_SDK_FFIJavaRuntime *mRuntimes;
-  /*
-   Java 数量
-   */
   uint32_t mCount;
-  /*
-   错误码 (0 = 成功)
-   */
   int32_t mErrorCode;
-  /*
-   错误消息
-   */
   char *mErrorMessage;
 };
 
-/*
- FFI 更新信息结构体
- */
 struct MC_SDK_FFIUpdateInfo {
-  /*
-   当前版本
-   */
   char *mCurrentVersion;
-  /*
-   最新版本
-   */
   char *mLatestVersion;
-  /*
-   是否需要更新 (1=需要, 0=不需要)
-   */
   int32_t mUpdateAvailable;
-  /*
-   下载 URL
-   */
   char *mDownloadUrl;
-  /*
-   SHA-256 哈希
-   */
   char *mSha256;
-  /*
-   文件大小 (字节)
-   */
   uint64_t mSize;
-  /*
-   更新日志
-   */
   char *mChangelog;
 };
 
-/*
- 进度快照结构体 (FFI 接口)
- */
 struct MC_SDK_FFIProgressSnapshot {
-  /*
-   当前阶段 (枚举值: 0=VersionManifest, 1=VersionJson, ...)
-   */
   uint32_t mStage;
-  /*
-   当前已完成文件数量
-   */
   uintptr_t mCurrent;
-  /*
-   总文件数量
-   */
   uintptr_t mTotal;
-  /*
-   已下载字节数
-   */
   uint64_t mBytesDownloaded;
-  /*
-   总字节数
-   */
   uint64_t mBytesTotal;
-  /*
-   下载速度 (bytes/sec)
-   */
   uint64_t mSpeed;
-  /*
-   剩余文件数量
-   */
   uintptr_t mFilesRemaining;
-  /*
-   是否正在下载
-   */
   bool mIsActive;
-  /*
-   是否已完成
-   */
   bool mIsComplete;
-  /*
-   错误码 (0 = 无错误)
-   */
   int32_t mErrorCode;
 };
 
-/*
- 错误信息结构体 (FFI 使用)
- */
-struct MC_SDK_ErrorInfo {
-  /*
-   错误码
-   */
-  enum MC_SDK_ErrorCode mCode;
-  /*
-   错误消息 (UTF-8)
-   */
-  char *mMessage;
-  /*
-   详细信息 (可选)
-   */
-  char *mDetails;
-};
+const struct MC_SDK_ErrorInfo *mc_sdk_last_error(void);
+
+void mc_sdk_free_error(struct MC_SDK_ErrorInfo *aError);
+
+void mc_sdk_clear_error(void);
 
 /*
  初始化 SDK
@@ -725,7 +682,20 @@ int32_t mc_skin_clear_cape(const char *aAccessToken, char **aProfileOut);
 
  # Callback Signature
  ```c
- typedef void (*FFICallback)(const char* stage, uintptr_t current, uintptr_t total, void* user_data);
+ /**
+ * 下载进度回调函数类型
+ *
+ * # Arguments
+ * * `stage` - 当前阶段名称
+ * * `current` - 当前完成数量
+ * * `total` - 总数量
+ * * `bytes_downloaded` - 已下载字节数
+ * * `bytes_total` - 总字节数
+ * * `speed` - 下载速度 (bytes/sec)
+ * * `files_remaining` - 剩余文件数量
+ * * `user_data` - 用户数据指针
+ */
+typedef void (*FFICallback)(const char* stage, uintptr_t current, uintptr_t total, uint64_t bytes_downloaded, uint64_t bytes_total, uint64_t speed, uintptr_t files_remaining, void* user_data);
  ```
  - stage: 当前阶段名称字符串，如 "Downloading Libraries"
  - current: 当前已完成数量
@@ -816,41 +786,6 @@ int32_t mc_launch_game(const MC_SDK_SDKHandle *aHandle, const char *aUsername, c
 
  # Returns
  0=成功，非0=错误码
-
- # Example
- ```c
- // 获取系统内存，分配 75% 给游戏
- FFISystemMemory mem;
- mc_get_system_memory(&mem);
- uint32_t max_mem = (mem.available / 1024 / 1024) * 3 / 4;
-
- // 列出所有 Java
- FFIJavaList java_list;
- mc_list_java(&java_list);
- for (int i = 0; i < java_list.count; i++) {
-     printf("Java %d: %s (version %s)\n", i,
-            java_list.runtimes[i].executable,
-            java_list.runtimes[i].version);
- }
-
- // 启动游戏，使用指定的 Java
- mc_launch_game_ex(
-     handle, "Player", uuid, token, "1.20.1",
-     max_mem / 2,  // min_memory
-     max_mem,      // max_memory
-     1920,         // window_width
-     1080,         // window_height
-     NULL,         // server_address
-     0,            // server_port
-     "C:/Program Files/Java/jdk-17/bin/java.exe"  // java_path
- );
-
- // 或者自动检测 Java
- mc_launch_game_ex(
-     handle, "Player", uuid, token, "1.20.1",
-     max_mem / 2, max_mem, 1920, 1080, NULL, 0, NULL  // java_path = NULL 自动检测
- );
- ```
  */
 int32_t mc_launch_game_ex(const MC_SDK_SDKHandle *aHandle, const char *aUsername, const char *aUuid, const char *aAccessToken, const char *aVersionId, uint32_t aMinMemory, uint32_t aMaxMemory, uint32_t aWindowWidth, uint32_t aWindowHeight, const char *aServerAddress, uint32_t aServerPort, const char *aJavaPath);
 
@@ -869,7 +804,7 @@ int32_t mc_launch_get_status(void);
 /*
  获取游戏进程退出码
 
- 返回退出码，如果进程还在运行返回 -1
+ 返回退出码，如果进程还在运行或未启动返回 -1
  */
 int32_t mc_launch_get_exit_code(void);
 
@@ -971,14 +906,51 @@ int32_t mc_install_optifine(const MC_SDK_SDKHandle *aHandle, const char *aMcVers
 int32_t mc_install_liteloader(const MC_SDK_SDKHandle *aHandle, const char *aMcVersion, const char *aLiteloaderVersion, const void *aCallback, void *aUserData);
 
 /*
- 获取指定 MC 版本可用的 Forge 版本列表
+ 合并安装: 下载 MC + 选定的加载器，一次调用完成。
 
- 返回 JSON 字符串: ["47.2.0", "47.1.0", ...]
+ 流程: 下载原版 MC → 按顺序安装每个加载器。
+ 进度回调报告各阶段的总体进度。
+
+ # Arguments
+ * `handle` - SDK 句柄
+ * `request` - 合并安装请求
+ * `callback` - 进度回调函数 (可选，传 NULL 表示不需要回调)
+ * `user_data` - 用户数据指针
+
+ # Returns
+ 0=成功，非0=错误码
+ */
+int32_t mc_install_merged(const MC_SDK_SDKHandle *aHandle, const struct MC_SDK_FFIMergedInstallRequest *aRequest, const void *aCallback, void *aUserData);
+
+/*
+ 释放版本列表
+ */
+void mc_free_version_list(struct MC_SDK_FFIVersionList *aVersionList);
+
+/*
+ 获取 Minecraft 版本列表
+
+ 从官方源或镜像源获取所有可用的 Minecraft 版本。
+ 返回的版本列表必须通过 `mc_free_version_list` 释放。
+
+ # Arguments
+ * `handle` - SDK 句柄（可选，传 NULL 使用官方源）
+ * `version_list_out` - 输出参数，接收版本列表
+
+ # Returns
+ 0=成功，非0=错误码
+ */
+int32_t mc_list_versions(const MC_SDK_SDKHandle *aHandle, struct MC_SDK_FFIVersionList *aVersionListOut);
+
+/*
+ 获取可用的 Forge 版本列表
+
+ 返回 JSON 字符串: `["47.2.0", "47.1.0", ...]`
  返回的字符串必须通过 `mc_sdk_free_string` 释放。
 
  # Arguments
  * `handle` - SDK 句柄
- * `mc_version` - Minecraft 版本号 (如 "1.20.1")
+ * `mc_version` - Minecraft 版本号
  * `result_out` - 输出参数，接收 JSON 字符串
 
  # Returns
@@ -987,9 +959,9 @@ int32_t mc_install_liteloader(const MC_SDK_SDKHandle *aHandle, const char *aMcVe
 int32_t mc_list_forge_versions(const MC_SDK_SDKHandle *aHandle, const char *aMcVersion, char **aResultOut);
 
 /*
- 获取指定 MC 版本可用的 NeoForge 版本列表
+ 获取可用的 NeoForge 版本列表
 
- 返回 JSON 字符串: [{"version":"47.2","recommended":false}, ...]
+ 返回 JSON 字符串: `[{"version":"47.2","recommended":false}, ...]`
  返回的字符串必须通过 `mc_sdk_free_string` 释放。
 
  # Arguments
@@ -1005,7 +977,7 @@ int32_t mc_list_neoforge_versions(const MC_SDK_SDKHandle *aHandle, const char *a
 /*
  获取可用的 Fabric Loader 版本列表
 
- 返回 JSON 字符串: [{"version":"0.15.0","stable":true}, ...]
+ 返回 JSON 字符串: `[{"version":"0.15.0","stable":true}, ...]`
  返回的字符串必须通过 `mc_sdk_free_string` 释放。
 
  # Arguments
@@ -1020,7 +992,7 @@ int32_t mc_list_fabric_versions(const MC_SDK_SDKHandle *aHandle, char **aResultO
 /*
  获取可用的 OptiFine 版本列表
 
- 返回 JSON 字符串: [{"display_name":"1.20.1 HD U I7","is_preview":false}, ...]
+ 返回 JSON 字符串: `[{"display_name":"1.20.1 HD U I7","is_preview":false}, ...]`
  返回的字符串必须通过 `mc_sdk_free_string` 释放。
 
  # Arguments
@@ -1033,9 +1005,9 @@ int32_t mc_list_fabric_versions(const MC_SDK_SDKHandle *aHandle, char **aResultO
 int32_t mc_list_optifine_versions(const MC_SDK_SDKHandle *aHandle, char **aResultOut);
 
 /*
- 获取指定 MC 版本可用的 LiteLoader 版本列表
+ 获取可用的 LiteLoader 版本列表
 
- 返回 JSON 字符串: ["1.20.1", ...]
+ 返回 JSON 字符串: `["1.20.1", ...]` (过滤出指定 MC 版本的版本号)
  返回的字符串必须通过 `mc_sdk_free_string` 释放。
 
  # Arguments
@@ -1049,109 +1021,29 @@ int32_t mc_list_optifine_versions(const MC_SDK_SDKHandle *aHandle, char **aResul
 int32_t mc_list_liteloader_versions(const MC_SDK_SDKHandle *aHandle, const char *aMcVersion, char **aResultOut);
 
 /*
- 校验加载器兼容性
+ 验证加载器兼容性
 
- 返回 0=兼容，非0=不兼容（错误码）
- 不兼容时通过 mc_sdk_last_error 获取冲突描述
+ 返回 0 表示兼容，非 0 表示不兼容 (设置 last_error 描述冲突原因)。
 
- 兼容性规则:
-   - Forge + Fabric = 不兼容
-   - Forge + NeoForge = 不兼容
-   - NeoForge + Fabric = 不兼容
-   - NeoForge + OptiFine = 不兼容
-   - Forge 1.13~1.14.3 + OptiFine = 不兼容
-   - Fabric 1.20.5+ + OptiFine = 不兼容
-
- # Arguments
- * `mc_version` - Minecraft 版本号 (必填)
- * `forge_version` - Forge 版本号 (为空指针表示未选择)
- * `neoforge_version` - NeoForge 版本号 (为空指针表示未选择)
- * `fabric_version` - Fabric 版本号 (为空指针表示未选择)
- * `optifine_version` - OptiFine 版本号 (为空指针表示未选择)
-
- # Returns
- 0=兼容，非0=不兼容
- */
-int32_t mc_validate_loaders(const char *aMcVersion,
-                            const char *aForgeVersion,
-                            const char *aNeoforgeVersion,
-                            const char *aFabricVersion,
-                            const char *aOptifineVersion);
-
-/*
- 合并安装：一次调用完成 MC + 所有加载器的安装
-
- 按顺序执行：下载原版 -> 安装各加载器
- 进度回调报告整体进度
+ 规则 (同 PCL2):
+ - Forge + Fabric = 不兼容
+ - Forge + NeoForge = 不兼容
+ - NeoForge + Fabric = 不兼容
+ - NeoForge + OptiFine = 不兼容
+ - Forge 1.13~1.14.3 + OptiFine = 不兼容
+ - Fabric 1.20.5+ + OptiFine = 不兼容
 
  # Arguments
- * `handle` - SDK 句柄
- * `request` - 合并安装请求结构体指针
- * `callback` - 进度回调函数 (可选，传 NULL 表示不需要回调)
- * `user_data` - 用户数据指针
+ * `mc_version` - Minecraft 版本号 (必须)
+ * `forge_version` - Forge 版本号 (NULL 表示未选择)
+ * `neoforge_version` - NeoForge 版本号 (NULL 表示未选择)
+ * `fabric_version` - Fabric 版本号 (NULL 表示未选择)
+ * `optifine_version` - OptiFine 版本号 (NULL 表示未选择)
 
  # Returns
- 0=成功，非0=错误码
+ 0=兼容，非0=不兼容 (ErrorCode::Unsupported)
  */
-int32_t mc_install_merged(const MC_SDK_SDKHandle *aHandle,
-                          const struct MC_SDK_FFIMergedInstallRequest *aRequest,
-                          const void *aCallback,
-                          void *aUserData);
-
-/*
- 合并安装请求结构体 (FFI 接口)
- */
-struct MC_SDK_FFIMergedInstallRequest {
-  /*
-   Minecraft 版本号 (必填)
-   */
-  const char *mMcVersion;
-  /*
-   Forge 版本号 (可选，为空指针表示跳过)
-   */
-  const char *mForgeVersion;
-  /*
-   NeoForge 版本号 (可选，为空指针表示跳过)
-   */
-  const char *mNeoforgeVersion;
-  /*
-   Fabric 版本号 (可选，为空指针表示跳过)
-   */
-  const char *mFabricVersion;
-  /*
-   OptiFine 版本号 (可选，为空指针表示跳过)
-   */
-  const char *mOptifineVersion;
-  /*
-   LiteLoader 版本号 (可选，为空指针表示跳过)
-   */
-  const char *mLiteloaderVersion;
-  /*
-   实例名称 (可选，为空指针使用 mc_version)
-   */
-  const char *mInstanceName;
-};
-
-/*
- 释放版本列表
- */
-void mc_free_version_list(struct MC_SDK_FFIVersionList *aVersionList);
-
-/*
- 获取 Minecraft 版本列表
-
- 从官方源或镜像源获取所有可用的 Minecraft 版本。
- 返回的版本列表必须通过 `mc_free_version_list` 释放。
- 如果传入 handle 且配置了 mirror_url，则使用镜像源。
-
- # Arguments
- * `handle` - SDK 句柄（可选，传 NULL 使用官方源）
- * `version_list_out` - 输出参数，接收版本列表
-
- # Returns
- 0=成功，非0=错误码
- */
-int32_t mc_list_versions(const MC_SDK_SDKHandle *aHandle, struct MC_SDK_FFIVersionList *aVersionListOut);
+int32_t mc_validate_loaders(const char *aMcVersion, const char *aForgeVersion, const char *aNeoforgeVersion, const char *aFabricVersion, const char *aOptifineVersion);
 
 /*
  获取已安装的版本列表
@@ -1178,253 +1070,40 @@ int32_t mc_list_installed_versions(const MC_SDK_SDKHandle *aHandle, char ***aVer
  */
 void mc_free_string_array(char **aArray, uint32_t aCount);
 
-/*
- 释放 Java 列表
- */
 void mc_free_java_list(struct MC_SDK_FFIJavaList *aJavaList);
 
-/*
- 释放 Java 运行时信息
- */
 void mc_free_java_runtime(struct MC_SDK_FFIJavaRuntime *aJavaRuntime);
 
-/*
- 检测最佳 Java 运行时
-
- 自动检测系统中已安装的 Java，并返回最佳版本。
- 要求 Java 8 或更高版本。
-
- # Arguments
- * `java_out` - 输出参数，接收 Java 运行时信息
-
- # Returns
- 0=成功，非0=错误码
- */
 int32_t mc_detect_java(struct MC_SDK_FFIJavaRuntime *aJavaOut);
 
-/*
- 列出所有已安装的 Java 运行时
-
- 返回的列表必须通过 `mc_free_java_list` 释放。
-
- # Arguments
- * `java_list_out` - 输出参数，接收 Java 列表
-
- # Returns
- 0=成功，非0=错误码
- */
 int32_t mc_list_java(struct MC_SDK_FFIJavaList *aJavaListOut);
 
-/*
- 检查 SDK 更新
-
- # Arguments
- * `handle` - SDK 句柄
- * `info_out` - 输出参数，接收更新信息
-
- # Returns
- 0=成功，非0=错误码
- */
 int32_t mc_update_check(const MC_SDK_SDKHandle *aHandle, struct MC_SDK_FFIUpdateInfo *aInfoOut);
 
-/*
- 下载 SDK 更新
-
- # Arguments
- * `handle` - SDK 句柄
- * `download_url` - 下载 URL
- * `sha256` - SHA-256 哈希 (可选，为空指针跳过验证)
- * `output_path` - 输出文件路径
- * `callback` - 进度回调函数 (可选，传 NULL 表示不需要回调)
- * `user_data` - 用户数据指针
-
- # Returns
- 0=成功，非0=错误码
- */
 int32_t mc_update_download(const MC_SDK_SDKHandle *aHandle, const char *aDownloadUrl, const char *aSha256, const char *aOutputPath, const void *aCallback, void *aUserData);
 
-/*
- 安装 SDK 更新
-
- # Arguments
- * `handle` - SDK 句柄
- * `update_path` - 更新包路径
- * `latest_version` - 最新版本号
-
- # Returns
- 0=成功，非0=错误码
- */
 int32_t mc_update_install(const MC_SDK_SDKHandle *aHandle, const char *aUpdatePath, const char *aLatestVersion);
 
-/*
- 释放更新信息
-
- # Arguments
- * `info` - 更新信息指针
- */
 void mc_update_free_info(struct MC_SDK_FFIUpdateInfo *aInfo);
 
-/*
- 获取游戏目录
-
- 返回的字符串必须通过 `mc_sdk_free_string` 释放。
-
- # Arguments
- * `handle` - SDK 句柄
-
- # Returns
- 游戏目录路径字符串，失败返回 null
- */
 char *mc_config_get_game_dir(const MC_SDK_SDKHandle *aHandle);
 
-/*
- 获取镜像源 URL
-
- 返回的字符串必须通过 `mc_sdk_free_string` 释放。
- 如果未设置镜像源，返回空字符串。
-
- # Arguments
- * `handle` - SDK 句柄
-
- # Returns
- 镜像源 URL 字符串，失败返回 null
- */
 char *mc_config_get_mirror(const MC_SDK_SDKHandle *aHandle);
 
-/*
- 获取版本清单/JSON 镜像源 URL
-
- 返回的字符串必须通过 `mc_sdk_free_string` 释放。
- 如果未设置镜像源，返回空字符串。
-
- # Arguments
- * `handle` - SDK 句柄
-
- # Returns
- 镜像源 URL 字符串，失败返回 null
- */
 char *mc_config_get_mirror_meta(const MC_SDK_SDKHandle *aHandle);
 
-/*
- 获取资源下载镜像源 URL
-
- 返回的字符串必须通过 `mc_sdk_free_string` 释放。
- 如果未设置镜像源，返回空字符串。
-
- # Arguments
- * `handle` - SDK 句柄
-
- # Returns
- 镜像源 URL 字符串，失败返回 null
- */
 char *mc_config_get_mirror_download(const MC_SDK_SDKHandle *aHandle);
 
-/*
- 获取最大下载速度
-
- # Arguments
- * `handle` - SDK 句柄
-
- # Returns
- 最大下载速度 (bytes/sec)，0 表示不限制，失败返回 0
- */
 uint64_t mc_config_get_max_download_speed(const MC_SDK_SDKHandle *aHandle);
 
-/*
- 清除 HTTP 缓存
-
- # Arguments
- * `handle` - SDK 句柄
-
- # Returns
- 0=成功，非0=错误码
- */
 int32_t mc_network_clear_cache(const MC_SDK_SDKHandle *aHandle);
 
-/*
- 获取当前下载进度
-
- 轮询模式接口，可以在任意时刻调用获取当前下载进度。
- 无需传入 SDK 句柄，直接查询全局进度状态。
-
- # Arguments
- * `snapshot_out` - 输出参数，接收进度快照
-
- # Returns
- 0=成功，非0=错误码
-
- # Example
- ```c
- // 在另一个线程中轮询进度
- while (true) {
-     FFIProgressSnapshot snapshot;
-     if (mc_get_progress(&snapshot) == 0) {
-         printf("Progress: %zu/%zu files, %.1f MB/s\n",
-                snapshot.current, snapshot.total,
-                (double)snapshot.speed / 1024 / 1024);
-         if (snapshot.is_complete) break;
-         if (snapshot.error_code != 0) break;
-     }
-     Sleep(100);
- }
- ```
- */
 int32_t mc_get_progress(struct MC_SDK_FFIProgressSnapshot *aSnapshotOut);
 
-/*
- 重置下载进度
-
- 在开始新的下载任务前调用，清除之前的进度状态。
-
- # Returns
- 0=成功，非0=错误码
- */
 int32_t mc_reset_progress(void);
 
-/*
- 检查是否有下载任务正在进行
-
- # Returns
- 1=正在下载，0=空闲
- */
 int32_t mc_is_downloading(void);
 
-/*
- 开始设置游戏窗口标题
-
- 使用 Windows API 查找并修改游戏窗口标题。
- 对所有 Minecraft 版本有效，不依赖 --title 参数。
-
- # Arguments
- * `process_id` - 游戏进程 ID
- * `title_template` - 标题模板，支持以下占位符：
-   - `{date}` - 当前日期 (yyyy/MM/dd)
-   - `{time}` - 当前时间 (HH:mm:ss)
-
- # Returns
- 0=成功，非0=错误码
-
- # Example
- ```c
- // 启动游戏后，设置窗口标题
- uint32_t pid = get_game_pid();
- mc_set_window_title(pid, "我的启动器 - Minecraft {date} {time}");
- ```
- */
 int32_t mc_set_window_title(uint32_t aProcessId, const char *aTitleTemplate);
 
-/*
- 停止设置游戏窗口标题
-
- 停止窗口标题监控线程。
-
- # Returns
- 0=成功，非0=错误码
- */
 int32_t mc_stop_window_title(void);
-
-const struct MC_SDK_ErrorInfo *mc_sdk_last_error(void);
-
-void mc_sdk_free_error(struct MC_SDK_ErrorInfo *aError);
-
-void mc_sdk_clear_error(void);

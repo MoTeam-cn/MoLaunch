@@ -72,7 +72,8 @@ function isInstalled(id: string): boolean {
           <div
             v-for="version in versions"
             :key="version.id"
-            class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors"
+            class="flex items-center justify-between px-4 py-2.5 hover:bg-gray-50 transition-colors cursor-pointer"
+            @click="!isInstalled(version.id) && !downloading && emit('download', version.id)"
           >
             <div class="flex items-center pl-8">
               <img
@@ -107,6 +108,7 @@ function isInstalled(id: string): boolean {
               <button
                 v-if="isInstalled(version.id)"
                 class="flex items-center px-3 py-1 bg-primary-600 text-white text-xs rounded hover:bg-primary-700 transition-colors mr-1"
+                @click.stop
               >
                 <PlayIcon class="w-3.5 h-3.5 mr-1" />
                 启动
@@ -114,7 +116,7 @@ function isInstalled(id: string): boolean {
               <button
                 v-if="isInstalled(version.id)"
                 class="flex items-center px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors"
-                @click="emit('uninstall', version.id)"
+                @click.stop="emit('uninstall', version.id)"
               >
                 <TrashIcon class="w-3.5 h-3.5" />
               </button>
@@ -122,7 +124,7 @@ function isInstalled(id: string): boolean {
                 v-else
                 class="flex items-center px-3 py-1 bg-primary-600 text-white text-xs rounded hover:bg-primary-700 transition-colors disabled:opacity-50"
                 :disabled="downloading"
-                @click="emit('download', version.id)"
+                @click.stop="emit('download', version.id)"
               >
                 <ArrowDownTrayIcon class="w-3.5 h-3.5 mr-1" />
                 安装

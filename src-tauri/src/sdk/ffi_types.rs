@@ -13,8 +13,8 @@ pub struct MCConfig {
     pub window_title: *const std::ffi::c_char,
     pub mirror_url_meta: *const std::ffi::c_char,
     pub mirror_url_download: *const std::ffi::c_char,
-    pub mirror_mode: u32,
-    pub max_download_speed: u64,
+    pub max_download_speed: u64,  // ← 修正：先 u64
+    pub mirror_mode: u32,         // ← 修正：后 u32
 }
 
 /// 认证结果结构体

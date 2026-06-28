@@ -4,10 +4,10 @@
  */
 
 import { ref, onMounted, computed } from 'vue'
+import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
-import { ChevronLeftIcon } from '@heroicons/vue/24/outline'
+import { ChevronLeftIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import LoaderCard from '@/components/common/LoaderCard.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
 
 import anvilIcon from '@/assets/blocks/Anvil.png'
 import fabricIcon from '@/assets/blocks/Fabric.png'
@@ -25,6 +25,8 @@ const emit = defineEmits<{
   install: [options: { mcVersion: string; forge?: string; neoforge?: string; fabric?: string; optifine?: string; liteloader?: string; instanceName: string }]
 }>()
 
+const versionStore = useVersionStore()
+
 const forgeVersions = ref<string[]>([])
 const neoforgeVersions = ref<{ version: string; recommended: boolean }[]>([])
 const fabricVersions = ref<{ version: string; stable: boolean }[]>([])
@@ -37,17 +39,31 @@ const selectedFabric = ref<string | null>(null)
 const selectedOptifine = ref<string | null>(null)
 const selectedLiteloader = ref<string | null>(null)
 
-const loading = ref(true)
+// 每个加载器独立的加载状态
+const loadingForge = ref(true)
+const loadingNeoforge = ref(true)
+const loadingFabric = ref(true)
+const loadingOptifine = ref(true)
+const loadingLiteloader = ref(true)
 
 const mcNum = computed(() => {
   const parts = props.mcVersion.split('.')
   return (parseInt(parts[0]) || 0) * 10000 + (parseInt(parts[1]) || 0) * 100 + (parseInt(parts[2]) || 0)
 })
 
-const showForge = computed(() => mcNum.value >= 10501)
-const showNeoforge = computed(() => mcNum.value >= 12001)
-const showFabric = computed(() => mcNum.value > 11300)
-const showLiteloader = computed(() => mcNum.value <= 11202)
+// 判断版本类型 - 从版本列表中获取
+const versionInfo = computed(() => versionStore.getVersionById(props.mcVersion))
+const isSnapshot = computed(() => versionInfo.value?.version_type === 'snapshot')
+const isAncient = computed(() => {
+  const type = versionInfo.value?.version_type
+  return type === 'old_beta' || type === 'old_alpha' || mcNum.value < 10000
+})
+
+const showForge = computed(() => !isSnapshot.value && !isAncient.value && mcNum.value >= 10501)
+const showNeoforge = computed(() => !isSnapshot.value && !isAncient.value && mcNum.value >= 12001)
+const showFabric = computed(() => !isAncient.value && mcNum.value > 11300)
+const showLiteloader = computed(() => !isSnapshot.value && !isAncient.value && mcNum.value <= 11202)
+const showOptifine = computed(() => !isAncient.value)
 
 // 过滤 OptiFine：只显示与当前 MC 版本匹配的
 const filteredOptifine = computed(() => {
@@ -147,23 +163,96 @@ const hasSelection = computed(() =>
 )
 
 onMounted(async () => {
-  loading.value = true
-  const tasks: Promise<void>[] = []
+  // 检查是否有缓存
+  const cached = versionStore.getLoaderCache(props.mcVersion)
+  if (cached) {
+    forgeVersions.value = cached.forge
+    neoforgeVersions.value = cached.neoforge
+    fabricVersions.value = cached.fabric
+    optifineVersions.value = cached.optifine
+    liteloaderVersions.value = cached.liteloader
+    loadingForge.value = false
+    loadingNeoforge.value = false
+    loadingFabric.value = false
+    loadingOptifine.value = false
+    loadingLiteloader.value = false
+    return
+  }
+
+  // 没有缓存，独立请求每个加载器
   if (showForge.value) {
-    tasks.push(tauri.listForgeVersions(props.mcVersion).then(v => { forgeVersions.value = v }).catch(() => {}))
+    tauri.listForgeVersions(props.mcVersion).then(v => {
+      forgeVersions.value = v
+    }).catch(() => {}).finally(() => {
+      loadingForge.value = false
+    })
+  } else {
+    loadingForge.value = false
   }
+
   if (showNeoforge.value) {
-    tasks.push(tauri.listNeoforgeVersions(props.mcVersion).then(v => { neoforgeVersions.value = v }).catch(() => {}))
+    tauri.listNeoforgeVersions(props.mcVersion).then(v => {
+      neoforgeVersions.value = v
+    }).catch(() => {}).finally(() => {
+      loadingNeoforge.value = false
+    })
+  } else {
+    loadingNeoforge.value = false
   }
+
   if (showFabric.value) {
-    tasks.push(tauri.listFabricVersions().then(v => { fabricVersions.value = v }).catch(() => {}))
+    tauri.listFabricVersions().then(v => {
+      fabricVersions.value = v
+    }).catch(() => {}).finally(() => {
+      loadingFabric.value = false
+    })
+  } else {
+    loadingFabric.value = false
   }
+
   if (showLiteloader.value) {
-    tasks.push(tauri.listLiteloaderVersions(props.mcVersion).then(v => { liteloaderVersions.value = v }).catch(() => {}))
+    tauri.listLiteloaderVersions(props.mcVersion).then(v => {
+      liteloaderVersions.value = v
+    }).catch(() => {}).finally(() => {
+      loadingLiteloader.value = false
+    })
+  } else {
+    loadingLiteloader.value = false
   }
-  tasks.push(tauri.listOptifineVersions().then(v => { optifineVersions.value = v }).catch(() => {}))
-  await Promise.all(tasks)
-  loading.value = false
+
+  if (showOptifine.value) {
+    tauri.listOptifineVersions().then(v => {
+      optifineVersions.value = v
+    }).catch(() => {}).finally(() => {
+      loadingOptifine.value = false
+    })
+  } else {
+    loadingOptifine.value = false
+  }
+
+  // 等待所有请求完成后再缓存
+  Promise.all([
+    new Promise(resolve => {
+      const check = () => {
+        if (!loadingForge.value && !loadingNeoforge.value && !loadingFabric.value && 
+            !loadingOptifine.value && !loadingLiteloader.value) {
+          resolve(null)
+        } else {
+          setTimeout(check, 100)
+        }
+      }
+      check()
+    })
+  ]).then(() => {
+    // 保存到缓存
+    versionStore.setLoaderCache(props.mcVersion, {
+      forge: forgeVersions.value,
+      neoforge: neoforgeVersions.value,
+      fabric: fabricVersions.value,
+      optifine: optifineVersions.value,
+      liteloader: liteloaderVersions.value,
+    })
+  })
 })
 
 function handleInstall() {
@@ -192,76 +281,88 @@ function handleInstall() {
       </div>
     </div>
 
-    <!-- 加载中 -->
-    <div v-if="loading" class="flex-1 flex items-center justify-center">
-      <div class="text-center">
-        <div class="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-primary-600 mx-auto"></div>
-        <p class="text-sm text-gray-500 mt-4">不要急哦，正在加急请求各项资源...</p>
-      </div>
-    </div>
-
     <!-- 加载器列表 -->
-    <div v-else class="flex-1 overflow-y-auto p-6 space-y-3">
+    <div class="flex-1 overflow-y-auto p-6 space-y-3">
+      <!-- 远古版提示 -->
+      <div v-if="isAncient" class="flex items-center h-8 rounded-r-lg bg-white shadow-sm overflow-hidden">
+        <div class="w-[3px] h-full bg-amber-500 shrink-0"></div>
+        <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 ml-2.5 shrink-0" />
+        <span class="text-[13px] font-medium text-gray-800 ml-2 mr-3 truncate">版本过老，无任何配套内容，请直接安装原版即可</span>
+      </div>
+
+      <!-- 快照版提示 -->
+      <div v-if="isSnapshot" class="flex items-center h-8 rounded-r-lg bg-white shadow-sm overflow-hidden">
+        <div class="w-[3px] h-full bg-blue-500 shrink-0"></div>
+        <InformationCircleIcon class="w-4 h-4 text-blue-500 ml-2.5 shrink-0" />
+        <span class="text-[13px] font-medium text-gray-800 ml-2 mr-3 truncate">快照版建议选择 Fabric，Forge/NeoForge 一般不会为快照适配</span>
+      </div>
+
+      <!-- Forge -->
       <LoaderCard
-        v-if="showForge && forgeVersions.length > 0"
+        v-if="showForge"
         id="forge"
         name="Forge"
         :icon="anvilIcon"
         color="orange"
         description="经典的 Mod 加载器，拥有最丰富的 Mod 生态，适合大多数 Mod 包。"
-        :versions="forgeItems"
+        :versions="loadingForge ? [] : forgeItems"
         :selected="selectedForge"
-        :disabled="isLoaderDisabled('forge')"
-        :disabled-reason="getLoaderError('forge') || ''"
+        :disabled="isLoaderDisabled('forge') || loadingForge"
+        :disabled-reason="loadingForge ? '获取 Forge 版本中... 先别急哈！' : getLoaderError('forge') || ''"
         @select="v => selectedForge = v"
         @clear="selectedForge = null"
       />
 
+      <!-- NeoForge -->
       <LoaderCard
-        v-if="showNeoforge && neoforgeVersions.length > 0"
+        v-if="showNeoforge"
         id="neoforge"
         name="NeoForge"
         :icon="neoforgeIcon"
         color="purple"
         description="Forge 的社区分支，更新更快，适配新版 Minecraft，是 Forge 的现代替代方案。"
-        :versions="neoforgeItems"
+        :versions="loadingNeoforge ? [] : neoforgeItems"
         :selected="selectedNeoforge"
-        :disabled="isLoaderDisabled('neoforge')"
-        :disabled-reason="getLoaderError('neoforge') || ''"
+        :disabled="isLoaderDisabled('neoforge') || loadingNeoforge"
+        :disabled-reason="loadingNeoforge ? '获取 NeoForge 版本中... 先别急哈！' : getLoaderError('neoforge') || ''"
         @select="v => selectedNeoforge = v"
         @clear="selectedNeoforge = null"
       />
 
+      <!-- Fabric -->
       <LoaderCard
-        v-if="showFabric && fabricVersions.length > 0"
+        v-if="showFabric"
         id="fabric"
         name="Fabric"
         :icon="fabricIcon"
         color="blue"
         description="轻量级现代 Mod 加载器，启动快、更新及时，适合客户端 Mod 和性能优化类 Mod。"
-        :versions="fabricItems"
+        :versions="loadingFabric ? [] : fabricItems"
         :selected="selectedFabric"
-        :disabled="isLoaderDisabled('fabric')"
-        :disabled-reason="getLoaderError('fabric') || ''"
+        :disabled="isLoaderDisabled('fabric') || loadingFabric"
+        :disabled-reason="loadingFabric ? '获取 Fabric 版本中... 先别急哈！' : getLoaderError('fabric') || ''"
         @select="v => selectedFabric = v"
         @clear="selectedFabric = null"
       />
 
+      <!-- OptiFine -->
       <LoaderCard
+        v-if="showOptifine"
         id="optifine"
         name="OptiFine"
         :icon="optifineIcon"
         color="green"
         description="性能优化与光影 Mod，提升帧数、支持 shader，可与 Forge/Fabric 共存。"
-        :versions="optifineItems"
+        :versions="loadingOptifine ? [] : optifineItems"
         :selected="selectedOptifine"
-        :disabled="isLoaderDisabled('optifine')"
-        :disabled-reason="getLoaderError('optifine') || ''"
-        :show-versions="filteredOptifine.length > 0"
+        :disabled="isLoaderDisabled('optifine') || loadingOptifine"
+        :disabled-reason="loadingOptifine ? '获取 OptiFine 版本中... 先别急哈！' : getLoaderError('optifine') || ''"
+        :show-versions="loadingOptifine || filteredOptifine.length > 0"
         @select="v => selectedOptifine = v"
         @clear="selectedOptifine = null"
       />
 
+      <!-- LiteLoader -->
       <LoaderCard
         v-if="showLiteloader"
         id="liteloader"
@@ -269,9 +370,11 @@ function handleInstall() {
         :icon="liteloaderIcon"
         color="teal"
         description="轻量级 Mod 加载器，专注于客户端 Mod，体积小、启动快。已于 1.12.2 停止更新。"
-        :versions="liteloaderItems"
+        :versions="loadingLiteloader ? [] : liteloaderItems"
         :selected="selectedLiteloader"
-        :show-versions="liteloaderVersions.length > 0"
+        :disabled="loadingLiteloader"
+        :disabled-reason="loadingLiteloader ? '获取 LiteLoader 版本中... 先别急哈！' : ''"
+        :show-versions="loadingLiteloader || liteloaderVersions.length > 0"
         @select="v => selectedLiteloader = v"
         @clear="selectedLiteloader = null"
       />
@@ -283,15 +386,7 @@ function handleInstall() {
         <span v-if="hasSelection">版本名: {{ getInstanceName() }}</span>
         <span v-else>不选择加载器 = 安装原版</span>
       </div>
-      <Tooltip v-if="loading" text="当前页面状态未加载完成，请等待加载" position="top">
-        <button
-          class="px-6 py-2 text-sm font-medium text-white bg-gray-400 rounded-lg cursor-not-allowed"
-        >
-          开始安装
-        </button>
-      </Tooltip>
       <button
-        v-else
         class="px-6 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
         @click="handleInstall"
       >
