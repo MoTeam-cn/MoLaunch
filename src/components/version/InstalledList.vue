@@ -5,6 +5,11 @@
 
 import { CubeIcon, PlayIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
+function inferVersionType(id: string): string {
+  if (/^\d{2}w\d{2}[a-z]/.test(id)) return 'snapshot'
+  return 'release'
+}
+
 interface Props {
   versions: string[]
   getVersionIcon: (id: string, type: string) => string
@@ -31,7 +36,7 @@ const emit = defineEmits<{
     >
       <div class="flex items-center">
         <img
-          :src="getVersionIcon(versionId, 'release')"
+          :src="getVersionIcon(versionId, inferVersionType(versionId))"
           :alt="versionId"
           class="w-10 h-10 rounded mr-3"
         />

@@ -4,14 +4,14 @@
 
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
+import type { Theme, Language } from '@/types/settings'
 
 export type LayoutMode = 'sidebar' | 'topnav'
-export type Theme = 'light' | 'system'
 
 export const useSettingsStore = defineStore('settings', () => {
   const layoutMode = ref<LayoutMode>('sidebar')
   const theme = ref<Theme>('system')
-  const language = ref<'zh-CN' | 'en-US'>('zh-CN')
+  const language = ref<Language>('zh-CN')
 
   function loadSettings() {
     try {

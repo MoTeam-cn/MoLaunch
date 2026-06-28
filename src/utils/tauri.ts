@@ -150,8 +150,8 @@ export async function getMirrorUrl(): Promise<string | null> {
 /**
  * 设置镜像源
  */
-export async function setMirrorUrl(mirrorUrl: string | null): Promise<void> {
-  return await invoke<void>('set_mirror_url', { mirrorUrl })
+export async function setMirrorUrl(mirrorUrl: string | null, skipReinit = false): Promise<void> {
+  return await invoke<void>('set_mirror_url', { mirrorUrl, skipReinit })
 }
 
 /**
@@ -164,8 +164,8 @@ export async function getDownloadSource(): Promise<string> {
 /**
  * 设置下载源模式
  */
-export async function setDownloadSource(source: string): Promise<void> {
-  return await invoke<void>('set_download_source', { source })
+export async function setDownloadSource(source: string, skipReinit = false): Promise<void> {
+  return await invoke<void>('set_download_source', { source, skipReinit })
 }
 
 /**
@@ -178,8 +178,8 @@ export async function getMaxDownloadSpeed(): Promise<number> {
 /**
  * 设置最大下载速度
  */
-export async function setMaxDownloadSpeed(speed: number): Promise<void> {
-  return await invoke<void>('set_max_download_speed', { speed })
+export async function setMaxDownloadSpeed(speed: number, skipReinit = false): Promise<void> {
+  return await invoke<void>('set_max_download_speed', { speed, skipReinit })
 }
 
 /**
@@ -187,6 +187,20 @@ export async function setMaxDownloadSpeed(speed: number): Promise<void> {
  */
 export async function getSystemMemory(): Promise<{ total: number; used: number; available: number; usage_percent: number }> {
   return await invoke('get_system_memory')
+}
+
+/**
+ * 获取配置文件路径
+ */
+export async function getConfigPath(): Promise<string> {
+  return await invoke<string>('get_config_path')
+}
+
+/**
+ * 手动保存配置到文件
+ */
+export async function saveConfigToFile(): Promise<void> {
+  return await invoke<void>('save_config_to_file')
 }
 
 /**
@@ -262,4 +276,46 @@ export async function validateLoaders(mcVersion: string, forge?: string, neoforg
  */
 export async function installMerged(mcVersion: string, forge?: string, neoforge?: string, fabric?: string, optifine?: string, liteloader?: string, instanceName?: string): Promise<void> {
   return await invoke('install_merged', { mcVersion, forgeVersion: forge, neoforgeVersion: neoforge, fabricVersion: fabric, optifineVersion: optifine, liteloaderVersion: liteloader, instanceName })
+}
+
+/**
+ * 设置最小内存
+ */
+export async function setMinMemory(memory: number): Promise<void> {
+  return await invoke<void>('set_min_memory', { memory })
+}
+
+/**
+ * 设置最大内存
+ */
+export async function setMaxMemory(memory: number): Promise<void> {
+  return await invoke<void>('set_max_memory', { memory })
+}
+
+/**
+ * 获取内存配置
+ */
+export async function getMemoryConfig(): Promise<[number, number]> {
+  return await invoke<[number, number]>('get_memory_config')
+}
+
+/**
+ * 设置下载线程数
+ */
+export async function setMaxDownloadThreads(threads: number): Promise<void> {
+  return await invoke<void>('set_max_download_threads', { threads })
+}
+
+/**
+ * 获取下载线程数
+ */
+export async function getMaxDownloadThreads(): Promise<number> {
+  return await invoke<number>('get_max_download_threads')
+}
+
+/**
+ * 手动触发 SDK 重新初始化（用于批量设置更新后）
+ */
+export async function reinitializeSdk(): Promise<string> {
+  return await invoke<string>('reinitialize_sdk_command')
 }

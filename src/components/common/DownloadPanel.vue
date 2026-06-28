@@ -7,24 +7,10 @@
 import { ref } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { ArrowDownTrayIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { formatBytes, formatSpeed } from '@/utils/format'
 
 const versionStore = useVersionStore()
 const expanded = ref(false)
-
-function formatSpeed(bps: number): string {
-  if (bps <= 0) return ''
-  if (bps >= 1024 * 1024) return (bps / 1024 / 1024).toFixed(1) + ' MB/s'
-  if (bps >= 1024) return (bps / 1024).toFixed(0) + ' KB/s'
-  return bps + ' B/s'
-}
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '0'
-  if (bytes >= 1024 * 1024 * 1024) return (bytes / 1024 / 1024 / 1024).toFixed(1) + ' GB'
-  if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(0) + ' MB'
-  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB'
-  return bytes + ' B'
-}
 
 function toggle() {
   expanded.value = !expanded.value

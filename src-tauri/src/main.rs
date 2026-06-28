@@ -4,6 +4,7 @@
 
 use mo_launch_lib::commands;
 use mo_launch_lib::state::AppState;
+use tauri::Manager;
 
 fn main() {
     // 初始化日志
@@ -55,7 +56,28 @@ fn main() {
             commands::system::set_max_download_speed,
             commands::system::get_max_download_speed,
             commands::system::get_system_memory,
+            commands::system::get_config_path,
+            commands::system::save_config_to_file,
+            commands::system::set_min_memory,
+            commands::system::set_max_memory,
+            commands::system::get_memory_config,
+            commands::system::set_max_download_threads,
+            commands::system::get_max_download_threads,
+            commands::system::reinitialize_sdk_command,
         ])
+        .on_window_event(|event| {
+            // 窗口关闭时保存配置
+            if let tauri::WindowEvent::CloseRequested { .. } = event.event() {
+                log::info!("Window close requested, saving config...");
+                let state = event.window().state::<AppState>();
+                let config = state.config.blocking_lock();
+                if let Err(e) = mo_launch_lib::config::save_config(&config) {
+                    log::error!("Failed to save config on exit: {}", e);
+                } else {
+                    log::info!("Config saved successfully on exit");
+                }
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running MoLaunch");
 }

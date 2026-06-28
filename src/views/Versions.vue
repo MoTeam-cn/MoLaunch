@@ -3,11 +3,12 @@
  * 下载页面
  */
 
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 import { showError, showConfirm } from '@/utils/modal'
 import { showSuccess, showInfo } from '@/utils/toast'
+import { useDownloadPolling } from '@/composables/useDownloadPolling'
 import Tooltip from '@/components/common/Tooltip.vue'
 import LoaderSelect from './LoaderSelect.vue'
 import VersionSection from '@/components/version/VersionSection.vue'
@@ -24,19 +25,12 @@ import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
 import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
 
 const versionStore = useVersionStore()
+const { startPolling, stopPolling } = useDownloadPolling()
 
 const loading = ref(false)
 const installedVersions = ref<string[]>([])
 const activeCategory = ref('vanilla')
 const selectedVersion = ref<string | null>(null)
-
-let pollTimer: ReturnType<typeof setInterval> | null = null
-let lastPercentage = 0
-
-const stageNames: Record<number, string> = {
-  0: '版本清单', 1: '版本 JSON', 2: '客户端 JAR', 3: '库文件',
-  4: '资源文件', 5: 'Natives', 6: '解压 Natives', 7: '模组', 8: '整合包',
-}
 
 const typeIcons: Record<string, string> = {
   release: grassIcon, snapshot: commandBlockIcon,
@@ -119,34 +113,7 @@ function onInstallRequest(options: { mcVersion: string; forge?: string; neoforge
   })
 }
 
-function startPolling() {
-  if (pollTimer) return
-  lastPercentage = 0
-  pollTimer = setInterval(async () => {
-    try {
-      const s = await tauri.getDownloadProgress()
-      let pct = s.bytes_total > 0 ? (s.bytes_downloaded / s.bytes_total) * 100
-        : s.total > 0 ? (s.current / s.total) * 100 : 0
-      pct = Math.max(pct, lastPercentage)
-      lastPercentage = pct
-      if (s.is_active || pct > 0) {
-        versionStore.updateProgress({
-          stage: stageNames[s.stage] || `阶段 ${s.stage}`,
-          current: s.current, total: s.total, percentage: pct,
-          speed: s.speed, bytesDownloaded: s.bytes_downloaded,
-          bytesTotal: s.bytes_total, filesRemaining: s.files_remaining,
-        })
-      }
-      if (s.is_complete) { stopPolling(); await loadInstalledVersions(); versionStore.finishDownload(); showSuccess(`${versionStore.downloadingVersion} 下载完成`) }
-      else if (s.error_code !== 0) { stopPolling(); showError('下载失败', `错误码: ${s.error_code}`, ''); versionStore.finishDownload() }
-    } catch (e) { console.error(e) }
-  }, 300)
-}
-
-function stopPolling() { if (pollTimer) { clearInterval(pollTimer); pollTimer = null } }
-
 async function handleDownload(versionId: string) {
-  lastPercentage = 0
   versionStore.startDownload(versionId)
   showInfo(`开始下载 ${versionId}`)
   startPolling()
@@ -181,7 +148,6 @@ onMounted(async () => {
   await Promise.all([versionStore.fetchVersions(), loadInstalledVersions()])
   loading.value = false
 })
-onUnmounted(() => stopPolling())
 </script>
 
 <template>

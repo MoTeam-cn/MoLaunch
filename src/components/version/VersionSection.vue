@@ -3,7 +3,7 @@
  * 可展开的版本分类组件
  */
 
-import { ref } from 'vue'
+import { ref, type Component } from 'vue'
 import { ChevronRightIcon, PlayIcon, TrashIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 
 interface VersionItem {
@@ -16,7 +16,7 @@ interface VersionItem {
 interface Props {
   id: string
   label: string
-  icon: object
+  icon: Component
   versions: VersionItem[]
   installedIds: string[]
   downloading: boolean

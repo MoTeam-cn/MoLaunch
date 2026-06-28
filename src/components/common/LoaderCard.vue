@@ -118,8 +118,10 @@ function clear(e: Event) {
             >
               <div class="flex items-center gap-2">
                 <span
-                  class="text-sm"
-                  :class="selected === ver.key ? `text-${color}-800 font-medium` : 'text-gray-700'"
+                  class="text-sm px-2 py-0.5 rounded-full"
+                  :class="selected === ver.key
+                    ? `bg-${color}-100 text-${color}-800 font-medium`
+                    : 'bg-gray-100 text-gray-700'"
                 >
                   {{ ver.label }}
                 </span>

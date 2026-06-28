@@ -21,6 +21,7 @@ const visible = ref(false)
 const triggerRef = ref<HTMLElement | null>(null)
 const tipRef = ref<HTMLElement | null>(null)
 const tipStyle = ref<Record<string, string>>({})
+const arrowStyle = ref<Record<string, string>>({})
 let timer: ReturnType<typeof setTimeout> | null = null
 
 function show() {
@@ -40,23 +41,36 @@ function calcPosition() {
   const r = triggerRef.value.getBoundingClientRect()
   const tipW = tipRef.value.offsetWidth
   const tipH = tipRef.value.offsetHeight
-  const gap = 6
+  const gap = 8
   const vw = window.innerWidth
   let top = 0
   let left = 0
+  const arrow: Record<string, string> = {}
 
   if (props.position === 'top') {
     top = r.top - gap - tipH
     left = r.left + r.width / 2 - tipW / 2
+    arrow.bottom = '-4px'
+    arrow.left = '50%'
+    arrow.transform = 'translateX(-50%) rotate(45deg)'
   } else if (props.position === 'bottom') {
     top = r.bottom + gap
     left = r.left + r.width / 2 - tipW / 2
+    arrow.top = '-4px'
+    arrow.left = '50%'
+    arrow.transform = 'translateX(-50%) rotate(45deg)'
   } else if (props.position === 'left') {
     top = r.top + r.height / 2 - tipH / 2
     left = r.left - gap - tipW
+    arrow.right = '-4px'
+    arrow.top = '50%'
+    arrow.transform = 'translateY(-50%) rotate(45deg)'
   } else {
     top = r.top + r.height / 2 - tipH / 2
     left = r.right + gap
+    arrow.left = '-4px'
+    arrow.top = '50%'
+    arrow.transform = 'translateY(-50%) rotate(45deg)'
   }
 
   // 边界修正
@@ -70,6 +84,7 @@ function calcPosition() {
     left: `${left}px`,
     zIndex: '9999',
   }
+  arrowStyle.value = arrow
 }
 
 onUnmounted(() => { if (timer) clearTimeout(timer) })
@@ -81,6 +96,7 @@ onUnmounted(() => { if (timer) clearTimeout(timer) })
     <teleport to="body">
       <div v-if="visible" ref="tipRef" :style="tipStyle" class="tooltip-body">
         {{ text }}
+        <div class="tooltip-arrow" :style="arrowStyle"></div>
       </div>
     </teleport>
   </div>
@@ -94,6 +110,7 @@ onUnmounted(() => { if (timer) clearTimeout(timer) })
 
 <style>
 .tooltip-body {
+  position: relative;
   padding: 6px 12px;
   background: #1f2937;
   color: #f9fafb;
@@ -104,5 +121,13 @@ onUnmounted(() => { if (timer) clearTimeout(timer) })
   width: max-content;
   max-width: 360px;
   word-break: break-word;
+}
+
+.tooltip-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: #1f2937;
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 </style>

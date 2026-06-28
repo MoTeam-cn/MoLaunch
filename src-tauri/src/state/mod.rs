@@ -82,9 +82,25 @@ impl Default for AppState {
 
 impl AppState {
     pub fn new() -> Self {
+        // 尝试从文件加载配置
+        let config = match crate::config::load_config() {
+            Ok(Some(config)) => {
+                log::info!("Loaded config from file");
+                config
+            }
+            Ok(None) => {
+                log::info!("No config file found, using defaults");
+                AppConfig::default()
+            }
+            Err(e) => {
+                log::warn!("Failed to load config: {}, using defaults", e);
+                AppConfig::default()
+            }
+        };
+
         Self {
             sdk: Arc::new(Mutex::new(None)),
-            config: Arc::new(Mutex::new(AppConfig::default())),
+            config: Arc::new(Mutex::new(config)),
             auth: Arc::new(Mutex::new(AuthState::default())),
         }
     }

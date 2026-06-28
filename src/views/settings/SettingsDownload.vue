@@ -9,40 +9,66 @@ const maxDownloadSpeed = ref(0)
 const speedSlider = ref(0)
 const loaded = ref(false)
 
-watch([mirrorMeta, mirrorDownload], async ([meta, dl]) => {
-  if (!loaded.value) return
-  let source = 'official'
-  if (meta === 'bmclapi' && dl === 'bmclapi') source = 'mirror'
-  else if (meta === 'official' && dl === 'bmclapi') source = 'smart'
-  else if (meta === 'smart' || dl === 'smart') source = 'smart'
-  try {
-    await tauri.setDownloadSource(source)
-  } catch (e) {
-    console.error('Failed to set download source:', e)
-  }
-})
-
-watch(speedSlider, async (val) => {
-  if (!loaded.value) return
-  const speed = val >= 21 ? 0 : (val === 0 ? 1 : val) * 1024 * 1024
-  maxDownloadSpeed.value = speed
-  try {
-    await tauri.setMaxDownloadSpeed(speed)
-  } catch (e) {
-    console.error('Failed to set max download speed:', e)
-  }
-})
-
+// 待保存的设置队列
+const pendingChanges = new Set<string>()
 let saveTimer: ReturnType<typeof setTimeout> | null = null
-function autoSave() {
-  if (!loaded.value) return
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    // TODO: 持久化下载设置到后端
-  }, 500)
+
+function computeSource(): string {
+  const meta = mirrorMeta.value
+  const dl = mirrorDownload.value
+  if (meta === 'bmclapi' && dl === 'bmclapi') return 'mirror'
+  if (meta === 'official' && dl === 'bmclapi') return 'smart'
+  if (meta === 'smart' || dl === 'smart') return 'smart'
+  return 'official'
 }
 
-watch(maxThreads, autoSave)
+function scheduleSave(changeType: string) {
+  if (!loaded.value) return
+  pendingChanges.add(changeType)
+  if (saveTimer) clearTimeout(saveTimer)
+  saveTimer = setTimeout(flushSave, 3000)
+}
+
+async function flushSave() {
+  const changes = [...pendingChanges]
+  pendingChanges.clear()
+  saveTimer = null
+
+  try {
+    // 批量保存所有待更新的设置，跳过单独的 reinit
+    const tasks: Promise<void>[] = []
+    let needsReinit = false
+    
+    if (changes.includes('source')) {
+      tasks.push(tauri.setDownloadSource(computeSource(), true))
+      needsReinit = true
+    }
+    if (changes.includes('speed')) {
+      const speed = speedSlider.value >= 21 ? 0 : (speedSlider.value === 0 ? 1 : speedSlider.value) * 1024 * 1024
+      maxDownloadSpeed.value = speed
+      tasks.push(tauri.setMaxDownloadSpeed(speed, true))
+      needsReinit = true
+    }
+    if (changes.includes('threads')) {
+      // threads 不需要 reinit，直接保存
+      tasks.push(tauri.setMaxDownloadThreads(maxThreads.value))
+    }
+    
+    // 并行保存所有设置
+    await Promise.all(tasks)
+    
+    // 如果有需要 reinit 的设置变更，统一触发一次
+    if (needsReinit) {
+      await tauri.reinitializeSdk()
+    }
+  } catch (e) {
+    console.error('Failed to save download settings:', e)
+  }
+}
+
+watch([mirrorMeta, mirrorDownload], () => scheduleSave('source'))
+watch(speedSlider, () => scheduleSave('speed'))
+watch(maxThreads, () => scheduleSave('threads'))
 
 onMounted(async () => {
   try {
@@ -68,6 +94,11 @@ onMounted(async () => {
     } else {
       speedSlider.value = Math.round(maxDownloadSpeed.value / 1024 / 1024)
     }
+  } catch {
+    // ignore
+  }
+  try {
+    maxThreads.value = await tauri.getMaxDownloadThreads()
   } catch {
     // ignore
   }

@@ -16,11 +16,6 @@ export const useSdkStore = defineStore('sdk', () => {
   const loading = ref(false)
   const error = ref<string | null>(null)
 
-  // Java 状态
-  const javaPath = ref('')
-  const javaList = ref<{ executable: string; version: string; major_version: number }[]>([])
-  const javaLoaded = ref(false)
-
   // 计算属性
   const isReady = computed(() => initialized.value && version.value !== null)
 
@@ -73,29 +68,6 @@ export const useSdkStore = defineStore('sdk', () => {
     }
   }
 
-  async function loadJava() {
-    if (javaLoaded.value) return
-    try {
-      const detected = await tauri.detectJava()
-      if (detected && detected.executable) {
-        javaPath.value = detected.executable
-      }
-      javaList.value = await tauri.listJava()
-      javaLoaded.value = true
-    } catch (e) {
-      console.error('Failed to load Java:', e)
-      javaList.value = []
-      javaLoaded.value = true
-    }
-  }
-
-  async function refreshJava() {
-    javaLoaded.value = false
-    javaPath.value = ''
-    javaList.value = []
-    await loadJava()
-  }
-
   return {
     status,
     initialized,
@@ -104,14 +76,9 @@ export const useSdkStore = defineStore('sdk', () => {
     loading,
     error,
     isReady,
-    javaPath,
-    javaList,
-    javaLoaded,
     fetchPlatformInfo,
     initialize,
     checkStatus,
     fetchDeviceId,
-    loadJava,
-    refreshJava,
   }
 })

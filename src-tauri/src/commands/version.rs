@@ -54,6 +54,9 @@ pub async fn download_version(
     }
 
     let version_id_clone = version_id.clone();
+    let config_guard = state.config.lock().await;
+    let game_dir = config_guard.game_dir.clone();
+    drop(config_guard);
 
     let result = std::thread::Builder::new()
         .name("sdk-download".into())
@@ -93,9 +96,7 @@ pub async fn download_version(
     result?;
 
     // 下载完成，检查版本目录是否存在
-    let config = crate::state::AppConfig::default();
-    let game_dir = &config.game_dir;
-    let version_dir = std::path::Path::new(game_dir).join("versions").join(&version_id);
+    let version_dir = std::path::Path::new(&game_dir).join("versions").join(&version_id);
     eprintln!("[download] 版本目录: {:?}, 存在: {}", version_dir, version_dir.exists());
 
     let _ = app.emit_all(
@@ -215,7 +216,7 @@ pub async fn get_download_progress(state: State<'_, AppState>) -> Result<crate::
 pub async fn is_downloading(state: State<'_, AppState>) -> Result<bool, String> {
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
-    Ok(sdk.is_downloading())
+    sdk.is_downloading().map_err(|e| e.to_string())
 }
 
 /// 重置下载进度
@@ -290,6 +291,7 @@ pub async fn validate_loaders(
 
 /// 合并安装（MC + 加载器）
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn install_merged(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
@@ -321,13 +323,15 @@ pub async fn install_merged(
         .spawn(move || {
             use crate::sdk::FFIMergedInstallRequest;
 
-            let mc_c = std::ffi::CString::new(mc_version_clone.as_str()).unwrap();
-            let forge_c = forge_version.map(|v| std::ffi::CString::new(v).unwrap());
-            let neoforge_c = neoforge_version.map(|v| std::ffi::CString::new(v).unwrap());
-            let fabric_c = fabric_version.map(|v| std::ffi::CString::new(v).unwrap());
-            let optifine_c = optifine_version.map(|v| std::ffi::CString::new(v).unwrap());
-            let liteloader_c = liteloader_version.map(|v| std::ffi::CString::new(v).unwrap());
-            let instance_c = std::ffi::CString::new(instance_clone.as_str()).unwrap();
+            let mc_c = std::ffi::CString::new(mc_version_clone.as_str())
+                .map_err(|e| format!("Invalid mc version: {}", e))?;
+            let forge_c = forge_version.map(|v| std::ffi::CString::new(v).map_err(|e| format!("Invalid forge version: {}", e))).transpose()?;
+            let neoforge_c = neoforge_version.map(|v| std::ffi::CString::new(v).map_err(|e| format!("Invalid neoforge version: {}", e))).transpose()?;
+            let fabric_c = fabric_version.map(|v| std::ffi::CString::new(v).map_err(|e| format!("Invalid fabric version: {}", e))).transpose()?;
+            let optifine_c = optifine_version.map(|v| std::ffi::CString::new(v).map_err(|e| format!("Invalid optifine version: {}", e))).transpose()?;
+            let liteloader_c = liteloader_version.map(|v| std::ffi::CString::new(v).map_err(|e| format!("Invalid liteloader version: {}", e))).transpose()?;
+            let instance_c = std::ffi::CString::new(instance_clone.as_str())
+                .map_err(|e| format!("Invalid instance name: {}", e))?;
 
             let request = FFIMergedInstallRequest {
                 mc_version: mc_c.as_ptr(),

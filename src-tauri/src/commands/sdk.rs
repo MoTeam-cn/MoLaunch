@@ -86,7 +86,7 @@ pub async fn initialize_sdk(
         e.to_string()
     })?;
 
-    let version = sdk.version();
+    let version = sdk.version().map_err(|e| e.to_string())?;
     log::info!("SDK loaded successfully, version: {}", version);
 
     // 保存 SDK 实例
@@ -100,7 +100,10 @@ pub async fn initialize_sdk(
 #[tauri::command]
 pub async fn get_sdk_version(state: State<'_, AppState>) -> Result<Option<String>, String> {
     let sdk_guard = state.sdk.lock().await;
-    Ok(sdk_guard.as_ref().map(|sdk| sdk.version()))
+    match sdk_guard.as_ref() {
+        Some(sdk) => Ok(Some(sdk.version().map_err(|e| e.to_string())?)),
+        None => Ok(None),
+    }
 }
 
 /// 检查 SDK 是否已初始化

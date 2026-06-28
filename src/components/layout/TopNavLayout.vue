@@ -12,6 +12,7 @@ import {
   Cog6ToothIcon,
   CubeIcon,
 } from '@heroicons/vue/24/outline'
+import * as tauri from '@/utils/tauri'
 
 const router = useRouter()
 const route = useRoute()
@@ -37,6 +38,16 @@ function isActive(path: string): boolean {
 
 function navigateTo(path: string) {
   router.push(path)
+}
+
+async function handleClose() {
+  try {
+    // 关闭窗口前先保存配置
+    await tauri.saveConfigToFile()
+  } catch (e) {
+    console.error('Failed to save config before close:', e)
+  }
+  await appWindow.close()
 }
 </script>
 
@@ -110,7 +121,7 @@ function navigateTo(path: string) {
           <!-- 关闭 -->
           <button
             class="h-full w-11 flex items-center justify-center hover:bg-red-500 transition-colors group"
-            @click="appWindow.close()"
+            @click="handleClose"
           >
             <svg class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
               <path d="M1.5 1.5L10.5 10.5M1.5 10.5L10.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" />

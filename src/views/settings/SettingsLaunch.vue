@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
-import { useSdkStore } from '@/stores/sdk'
+import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
 import { FolderOpenIcon, ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
+import { formatBytes } from '@/utils/format'
 
-const sdkStore = useSdkStore()
+const javaStore = useJavaStore()
 
 const gameDir = ref('')
 const minMemory = ref(512)
@@ -37,13 +38,7 @@ function formatMemory(mb: number): string {
   return mb + ' MB'
 }
 
-function formatBytes(bytes: number): string {
-  const mb = bytes / 1024 / 1024
-  if (mb >= 1024) {
-    return (mb / 1024).toFixed(1).replace(/\.0$/, '') + ' GB'
-  }
-  return Math.round(mb) + ' MB'
-}
+
 
 const totalMemoryMB = computed(() => systemMemory.value ? Math.round(systemMemory.value.total / 1024 / 1024) : 0)
 const usedMemoryMB = computed(() => systemMemory.value ? Math.round((systemMemory.value.total - systemMemory.value.available) / 1024 / 1024) : 0)
@@ -67,9 +62,9 @@ watch(memoryMode, (mode) => {
 
 async function handleAutoDetectJava() {
   showInfo('正在尝试搜索系统中存在的 Java...')
-  await sdkStore.refreshJava()
-  if (sdkStore.javaList.length > 0) {
-    showSuccess(`已找到 ${sdkStore.javaList.length} 个可用 Java，请自行展开下拉框选择`)
+  await javaStore.refreshJava()
+  if (javaStore.javaList.length > 0) {
+    showSuccess(`已找到 ${javaStore.javaList.length} 个可用 Java，请自行展开下拉框选择`)
   } else {
     showInfo('未检测到已安装的 Java')
   }
@@ -82,7 +77,7 @@ async function handleManualImportJava() {
       { name: '所有文件', extensions: ['*'] },
     ])
     if (selected) {
-      sdkStore.javaPath = selected
+      javaStore.setJavaPath(selected)
     }
   } catch (e) {
     console.error('Failed to select Java:', e)
@@ -105,12 +100,17 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null
 function autoSave() {
   if (!loaded.value) return
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => {
-    // TODO: 持久化游戏设置到后端
+  saveTimer = setTimeout(async () => {
+    try {
+      await tauri.setMinMemory(minMemory.value)
+      await tauri.setMaxMemory(maxMemory.value)
+    } catch (e) {
+      console.error('Failed to save memory settings:', e)
+    }
   }, 500)
 }
 
-watch([gameDir, minMemory, maxMemory], autoSave)
+watch([minMemory, maxMemory], autoSave)
 
 onMounted(async () => {
   try {
@@ -124,6 +124,13 @@ onMounted(async () => {
     applyAutoMemory()
   } catch (e) {
     console.error('Failed to get system memory:', e)
+  }
+  try {
+    const [min, max] = await tauri.getMemoryConfig()
+    minMemory.value = min
+    maxMemory.value = max
+  } catch (e) {
+    console.error('Failed to get memory config:', e)
   }
   loaded.value = true
 })
@@ -169,10 +176,10 @@ onMounted(async () => {
             >
               <div class="flex items-center min-w-0 mr-2">
                 <span class="text-xs px-1.5 py-0.5 rounded bg-primary-100 text-primary-700 mr-2 shrink-0">
-                  {{ sdkStore.javaPath ? 'Java ' + (sdkStore.javaList.find(j => j.executable === sdkStore.javaPath)?.major_version || '?') : '自动' }}
+                  {{ javaStore.javaPath ? 'Java ' + (javaStore.javaList.find(j => j.executable === javaStore.javaPath)?.major_version || '?') : '自动' }}
                 </span>
                 <span class="text-sm text-gray-900 truncate">
-                  {{ sdkStore.javaPath || '启动时自动查找最佳 Java' }}
+                  {{ javaStore.javaPath || '启动时自动查找最佳 Java' }}
                 </span>
               </div>
               <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform" :class="{ 'rotate-180': showJavaList }" viewBox="0 0 20 20" fill="currentColor">
@@ -195,23 +202,23 @@ onMounted(async () => {
                 <!-- 自动检测 -->
                 <div
                   class="flex items-center justify-between px-3 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors"
-                  :class="{ 'bg-primary-50': !sdkStore.javaPath }"
-                  @click="sdkStore.javaPath = ''; showJavaList = false"
+                  :class="{ 'bg-primary-50': !javaStore.javaPath }"
+                  @click="javaStore.setJavaPath(''); showJavaList = false"
                 >
                   <div class="flex items-center">
                     <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 mr-2">自动</span>
                     <span class="text-sm text-gray-700">启动时自动查找最佳 Java</span>
                   </div>
-                  <span v-if="!sdkStore.javaPath" class="text-primary-600 text-xs font-medium">当前</span>
+                  <span v-if="!javaStore.javaPath" class="text-primary-600 text-xs font-medium">当前</span>
                 </div>
                 <!-- 已安装列表 -->
-                <template v-if="sdkStore.javaList.length > 0">
+                <template v-if="javaStore.javaList.length > 0">
                   <div
-                    v-for="java in sdkStore.javaList"
+                    v-for="java in javaStore.javaList"
                     :key="java.executable"
                     class="flex items-center justify-between px-3 py-2.5 border-t border-gray-100 hover:bg-primary-50 cursor-pointer transition-colors"
-                    :class="{ 'bg-primary-50': sdkStore.javaPath === java.executable }"
-                    @click="sdkStore.javaPath = java.executable; showJavaList = false"
+                    :class="{ 'bg-primary-50': javaStore.javaPath === java.executable }"
+                    @click="javaStore.setJavaPath(java.executable); showJavaList = false"
                   >
                     <div class="flex items-center min-w-0">
                       <span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 mr-2 shrink-0">
@@ -219,7 +226,7 @@ onMounted(async () => {
                       </span>
                       <span class="text-sm text-gray-900 truncate">{{ java.executable }}</span>
                     </div>
-                    <span v-if="sdkStore.javaPath === java.executable" class="text-primary-600 text-xs font-medium ml-2 shrink-0">当前</span>
+                    <span v-if="javaStore.javaPath === java.executable" class="text-primary-600 text-xs font-medium ml-2 shrink-0">当前</span>
                   </div>
                 </template>
                 <div v-else class="px-3 py-2.5 border-t border-gray-100 text-xs text-gray-400">

@@ -11,11 +11,13 @@ import Modal from '@/components/common/Modal.vue'
 import Toast from '@/components/common/Toast.vue'
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
+import { useJavaStore } from '@/stores/java'
 import { setModalRef } from '@/utils/modal'
 import { setToastRef } from '@/utils/toast'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
+const javaStore = useJavaStore()
 const modalRef = ref<InstanceType<typeof Modal> | null>(null)
 const toastRef = ref<InstanceType<typeof Toast> | null>(null)
 
@@ -45,7 +47,7 @@ async function initApp() {
   await authStore.restoreSession()
 
   // 后台加载 Java 信息
-  sdkStore.loadJava()
+  javaStore.detectJava()
 }
 </script>
 

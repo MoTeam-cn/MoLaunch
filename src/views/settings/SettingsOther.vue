@@ -1,10 +1,21 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
 import Select from '@/components/common/Select.vue'
+import * as tauri from '@/utils/tauri'
 
 const sdkStore = useSdkStore()
 const logLevel = ref(3)
+const configPath = ref('')
+
+onMounted(async () => {
+  try {
+    configPath.value = await tauri.getConfigPath()
+  } catch (e) {
+    console.error('Failed to get config path:', e)
+    configPath.value = '获取失败'
+  }
+})
 </script>
 
 <template>
@@ -31,6 +42,17 @@ const logLevel = ref(3)
             style="min-width: 100px"
             @update:model-value="logLevel = Number($event)"
           />
+        </div>
+      </div>
+    </div>
+
+    <!-- 配置信息 -->
+    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">配置信息</h3>
+      <div class="divide-y divide-gray-200">
+        <div class="px-5 py-3">
+          <p class="text-sm text-gray-500 mb-1">配置文件路径</p>
+          <p class="text-xs text-gray-900 font-mono bg-gray-50 px-3 py-2 rounded break-all">{{ configPath || '加载中...' }}</p>
         </div>
       </div>
     </div>
