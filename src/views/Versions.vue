@@ -8,7 +8,6 @@ import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 import { showError, showConfirm } from '@/utils/modal'
 import { showSuccess, showInfo } from '@/utils/toast'
-import { useDownloadPolling } from '@/composables/useDownloadPolling'
 import Tooltip from '@/components/common/Tooltip.vue'
 import LoaderSelect from './LoaderSelect.vue'
 import VersionSection from '@/components/version/VersionSection.vue'
@@ -25,7 +24,6 @@ import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
 import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
 
 const versionStore = useVersionStore()
-const { startPolling, stopPolling } = useDownloadPolling()
 
 const loading = ref(false)
 const installedVersions = ref<string[]>([])
@@ -96,7 +94,7 @@ async function handleRefresh() {
 function onInstallRequest(options: { mcVersion: string; forge?: string; neoforge?: string; fabric?: string; optifine?: string; liteloader?: string; instanceName: string }) {
   // 立刻返回版本列表
   versionStore.selectedVersion = null
-  // 设置下载状态，显示 DownloadPanel
+  // 设置下载状态，显示 DownloadPanel（会自动启动轮询）
   versionStore.startDownload(options.instanceName)
   // 后台执行安装
   tauri.installMerged(
@@ -120,15 +118,12 @@ function onInstallRequest(options: { mcVersion: string; forge?: string; neoforge
 async function handleDownload(versionId: string) {
   versionStore.startDownload(versionId)
   showInfo(`开始下载 ${versionId}`)
-  startPolling()
   try {
     await tauri.downloadVersion(versionId)
-    stopPolling()
     await loadInstalledVersions()
     versionStore.finishDownload()
     showSuccess(`${versionId} 下载完成`)
   } catch (e) {
-    stopPolling()
     showError('下载失败', `无法下载版本 ${versionId}`, String(e))
     versionStore.finishDownload()
   }

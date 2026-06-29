@@ -309,6 +309,7 @@ function handleInstall() {
         :selected="selectedForge"
         :disabled="isLoaderDisabled('forge') || loadingForge"
         :disabled-reason="loadingForge ? '获取 Forge 版本中... 先别急哈！' : getLoaderError('forge') || ''"
+        :loading="loadingForge"
         @select="v => selectedForge = v"
         @clear="selectedForge = null"
       />
@@ -325,6 +326,7 @@ function handleInstall() {
         :selected="selectedNeoforge"
         :disabled="isLoaderDisabled('neoforge') || loadingNeoforge"
         :disabled-reason="loadingNeoforge ? '获取 NeoForge 版本中... 先别急哈！' : getLoaderError('neoforge') || ''"
+        :loading="loadingNeoforge"
         @select="v => selectedNeoforge = v"
         @clear="selectedNeoforge = null"
       />
@@ -341,6 +343,7 @@ function handleInstall() {
         :selected="selectedFabric"
         :disabled="isLoaderDisabled('fabric') || loadingFabric"
         :disabled-reason="loadingFabric ? '获取 Fabric 版本中... 先别急哈！' : getLoaderError('fabric') || ''"
+        :loading="loadingFabric"
         @select="v => selectedFabric = v"
         @clear="selectedFabric = null"
       />
@@ -357,7 +360,7 @@ function handleInstall() {
         :selected="selectedOptifine"
         :disabled="isLoaderDisabled('optifine') || loadingOptifine"
         :disabled-reason="loadingOptifine ? '获取 OptiFine 版本中... 先别急哈！' : getLoaderError('optifine') || ''"
-        :show-versions="loadingOptifine || filteredOptifine.length > 0"
+        :loading="loadingOptifine"
         @select="v => selectedOptifine = v"
         @clear="selectedOptifine = null"
       />
@@ -374,7 +377,7 @@ function handleInstall() {
         :selected="selectedLiteloader"
         :disabled="loadingLiteloader"
         :disabled-reason="loadingLiteloader ? '获取 LiteLoader 版本中... 先别急哈！' : ''"
-        :show-versions="loadingLiteloader || liteloaderVersions.length > 0"
+        :loading="loadingLiteloader"
         @select="v => selectedLiteloader = v"
         @clear="selectedLiteloader = null"
       />

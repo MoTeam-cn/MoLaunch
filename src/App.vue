@@ -14,6 +14,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
 import { setModalRef } from '@/utils/modal'
 import { setToastRef } from '@/utils/toast'
+import { initDownloadPolling } from '@/composables/useDownloadPolling'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
@@ -24,6 +25,7 @@ const toastRef = ref<InstanceType<typeof Toast> | null>(null)
 onMounted(() => {
   setModalRef(modalRef.value)
   setToastRef(toastRef.value)
+  initDownloadPolling()
   initApp()
 })
 

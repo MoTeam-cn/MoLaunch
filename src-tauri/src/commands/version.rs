@@ -208,7 +208,17 @@ pub async fn uninstall_version(
 pub async fn get_download_progress(state: State<'_, AppState>) -> Result<crate::sdk::ProgressSnapshot, String> {
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
-    sdk.get_progress().map_err(|e| e.to_string())
+    let progress = sdk.get_progress().map_err(|e| {
+        log::error!("[Progress] Failed to get progress: {}", e);
+        e.to_string()
+    })?;
+    
+    log::debug!("[Progress] stage={}, current={}, total={}, bytes_downloaded={}, bytes_total={}, speed={}, files_remaining={}, is_active={}, is_complete={}, error_code={}",
+        progress.stage, progress.current, progress.total, 
+        progress.bytes_downloaded, progress.bytes_total, progress.speed,
+        progress.files_remaining, progress.is_active, progress.is_complete, progress.error_code);
+    
+    Ok(progress)
 }
 
 /// 检查是否正在下载
@@ -216,7 +226,14 @@ pub async fn get_download_progress(state: State<'_, AppState>) -> Result<crate::
 pub async fn is_downloading(state: State<'_, AppState>) -> Result<bool, String> {
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
-    sdk.is_downloading().map_err(|e| e.to_string())
+    let downloading = sdk.is_downloading().map_err(|e| {
+        log::error!("[Downloading] Failed to check downloading status: {}", e);
+        e.to_string()
+    })?;
+    
+    log::debug!("[Downloading] is_downloading={}", downloading);
+    
+    Ok(downloading)
 }
 
 /// 重置下载进度
@@ -351,13 +368,19 @@ pub async fn install_merged(
                 *mut std::ffi::c_void,
             ) -> i32 = unsafe { std::mem::transmute(install_fn_addr) };
 
+            log::info!("[Install] Calling mc_install_merged...");
             eprintln!("[install] Calling mc_install_merged...");
+            
             let code = unsafe { install_fn(handle, &request, std::ptr::null(), std::ptr::null_mut()) };
+            
+            log::info!("[Install] mc_install_merged returned code={}", code);
             eprintln!("[install] mc_install_merged returned code={}", code);
 
             if code != 0 {
+                log::error!("[Install] SDK install failed with code: {}", code);
                 Err(format!("SDK install failed with code: {}", code))
             } else {
+                log::info!("[Install] SDK install completed successfully");
                 Ok(())
             }
         })

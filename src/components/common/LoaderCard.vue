@@ -4,7 +4,7 @@
  * 展开/收起动画 + 版本列表 + 说明 + 兼容性禁用
  */
 
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
 
 interface VersionItem {
@@ -24,6 +24,7 @@ interface Props {
   disabled?: boolean
   disabledReason?: string
   showVersions?: boolean
+  loading?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -31,6 +32,7 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   disabledReason: '',
   showVersions: true,
+  loading: false,
 })
 
 const emit = defineEmits<{
@@ -40,12 +42,18 @@ const emit = defineEmits<{
 
 const expanded = ref(false)
 
+// 当加载器被禁用时，自动收起
+watch(() => props.disabled, (newVal) => {
+  if (newVal) expanded.value = false
+})
+
 function toggle() {
   if (props.disabled || !props.showVersions) return
   expanded.value = !expanded.value
 }
 
 function select(key: string) {
+  if (props.disabled) return
   emit('select', props.selected === key ? null : key)
   expanded.value = false
 }
@@ -110,10 +118,13 @@ function clear(e: Event) {
             <div
               v-for="ver in versions"
               :key="ver.key"
-              class="flex items-center justify-between px-3 py-2 rounded-lg border-2 transition-all cursor-pointer"
-              :class="selected === ver.key
-                ? `border-${color}-400 bg-${color}-50 shadow-sm`
-                : `border-gray-200 hover:border-${color}-300 hover:bg-${color}-50/50`"
+              class="flex items-center justify-between px-3 py-2 rounded-lg border-2 transition-all"
+              :class="[
+                disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+                selected === ver.key
+                  ? `border-${color}-400 bg-${color}-50 shadow-sm`
+                  : `border-gray-200 hover:border-${color}-300 hover:bg-${color}-50/50`
+              ]"
               @click="select(ver.key)"
             >
               <div class="flex items-center gap-2">
@@ -152,9 +163,16 @@ function clear(e: Event) {
       </div>
     </div>
 
-    <!-- 无版本时提示 -->
-    <div v-if="versions.length === 0" class="px-4 pb-3 text-xs text-gray-400">
-      暂无适用于此版本的 {{ name }}
+    <!-- 无版本时提示（带展开动画） -->
+    <div
+      class="grid transition-all duration-300 ease-in-out"
+      :style="{ gridTemplateRows: (!loading && versions.length === 0 && showVersions) ? '1fr' : '0fr' }"
+    >
+      <div class="overflow-hidden min-h-0">
+        <div class="px-4 pb-3 text-xs text-gray-400">
+          暂无适用于此版本的 {{ name }}
+        </div>
+      </div>
     </div>
   </div>
 </template>
