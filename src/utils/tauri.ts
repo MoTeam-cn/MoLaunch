@@ -305,3 +305,17 @@ export async function setMaxDownloadThreads(threads: number): Promise<void> {
 export async function getMaxDownloadThreads(): Promise<number> {
   return await invoke<number>('get_max_download_threads')
 }
+
+/**
+ * 获取配置值
+ */
+export async function getConfigValue(section: string, key: string): Promise<string | null> {
+  return await invoke<string | null>('get_config_value', { section, key })
+}
+
+/**
+ * 设置配置值
+ */
+export async function setConfigValue(section: string, key: string, value: string): Promise<void> {
+  return await invoke<void>('set_config_value', { section, key, value })
+}

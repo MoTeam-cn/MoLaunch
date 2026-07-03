@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
 import Select from '@/components/common/Select.vue'
 import * as tauri from '@/utils/tauri'
@@ -8,6 +8,32 @@ const sdkStore = useSdkStore()
 const logLevel = ref(3)
 const configPath = ref('')
 
+// 读取日志级别
+async function loadLogLevel() {
+  try {
+    const level = await tauri.getConfigValue('Log', 'level')
+    if (level) {
+      logLevel.value = parseInt(level, 10)
+    }
+  } catch (e) {
+    console.error('Failed to get log level:', e)
+  }
+}
+
+// 保存日志级别
+async function saveLogLevel(level: number) {
+  try {
+    await tauri.setConfigValue('Log', 'level', String(level))
+  } catch (e) {
+    console.error('Failed to save log level:', e)
+  }
+}
+
+// 监听日志级别变化
+watch(logLevel, (newLevel) => {
+  saveLogLevel(newLevel)
+})
+
 onMounted(async () => {
   try {
     configPath.value = await tauri.getConfigPath()
@@ -15,6 +41,7 @@ onMounted(async () => {
     console.error('Failed to get config path:', e)
     configPath.value = '获取失败'
   }
+  await loadLogLevel()
 })
 </script>
 

@@ -1,60 +1,91 @@
 //! Java检测和管理模块
+//! 参考PCL2的Java搜索和版本检测逻辑
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
 /// Java运行时信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JavaRuntime {
-    /// java.exe完整路径
     pub executable: String,
-    /// 所在文件夹
     pub path_folder: String,
-    /// 是否手动导入
     pub is_user_import: bool,
-    /// 详细版本号（如1.21.0.1）
     pub version: String,
-    /// 大版本号
     pub major_version: u32,
-    /// 是否为JRE
     pub is_jre: bool,
-    /// 是否64位
     pub is_64bit: bool,
 }
 
-/// 检测Java
-pub fn detect_java(java_path: &Path) -> Result<JavaRuntime, Box<dyn std::error::Error>> {
+/// 搜索关键词（参考PCL2，共67个）
+const SEARCH_KEYWORDS: &[&str] = &[
+    "java", "jdk", "jre", "env", "run", "mc", "dragon", "well", "bin", "sdk",
+    "candidate", "current", "software", "cache", "temp", "corretto", "roaming",
+    "users", "craft", "program", "net", "oracle", "game", "file", "data", "jvm",
+    "server", "client", "mojang", "eclipse", "microsoft", "hotspot", "runtime",
+    "x86", "x64", "arm", "forge", "optifine", "hmcl", "mod", "fabric", "download",
+    "launch", "path", "version", "pcl", "zulu", "local", "packages", "jbr",
+    "bellsoft", "liberica", "graal", "adoptium", "temurin", "semerulu", "1.",
+];
+
+/// 检测单个Java
+pub fn detect_java(java_path: &Path) -> Result<JavaRuntime, String> {
     if !java_path.exists() {
         return Err("Java executable not found".into());
     }
-    
+
     let java_str = java_path.to_string_lossy().to_string();
-    
-    // 运行java -version获取输出
-    let output = std::process::Command::new(&java_str)
+
+    // [2] 黑名单检查
+    let path_lower = java_str.to_lowercase();
+    if path_lower.contains("finalshell") || path_lower.contains("paranoia file") {
+        return Err("Incompatible Java variant".into());
+    }
+
+    // [3] JRE/JDK判定
+    let parent_dir = java_path.parent().unwrap_or(Path::new(""));
+    let javac_path = parent_dir.join("javac.exe");
+    let is_jre = !javac_path.exists();
+
+    // [4] 运行 java -version
+    let output = match std::process::Command::new(&java_str)
         .arg("-version")
-        .output()?;
-    
+        .output()
+    {
+        Ok(output) => output,
+        Err(e) => return Err(format!("Failed to execute Java: {}", e)),
+    };
+
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let version_output = format!("{}{}", stderr, stdout);
-    
-    // 提取版本号
-    let version = extract_java_version(&version_output)?;
+    let version_output = format!("{}{}", stderr, stdout).to_lowercase();
+
+    if version_output.is_empty() {
+        return Err("No output from java -version".into());
+    }
+
+    // [5] 输出异常检测
+    if version_output.contains("/lib/ext exists") {
+        return Err("Java has /lib/ext issue".into());
+    }
+    if version_output.contains("a fatal error") {
+        return Err("Java fatal error".into());
+    }
+
+    // [6] 版本号提取与标准化
+    let version = extract_and_normalize_version(&version_output)?;
     let major_version = extract_major_version(&version)?;
-    
-    // 检测是否为64位
+
+    // [8] 架构检测
     let is_64bit = version_output.contains("64-bit");
-    
-    // 检测是否为JRE
-    let is_jre = !version_output.contains("Java(TM) SE Runtime Environment") || 
-                 version_output.contains("Server VM");
-    
-    // 获取所在文件夹
-    let path_folder = java_path.parent()
-        .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_default();
-    
+
+    // [9] 版本合理性验证
+    if major_version < 5 || major_version > 99 {
+        return Err(format!("Invalid major version: {}", major_version));
+    }
+
+    let path_folder = parent_dir.to_string_lossy().to_string();
+
     Ok(JavaRuntime {
         executable: java_str,
         path_folder,
@@ -66,218 +97,316 @@ pub fn detect_java(java_path: &Path) -> Result<JavaRuntime, Box<dyn std::error::
     })
 }
 
-/// 提取Java版本号
-fn extract_java_version(output: &str) -> Result<String, Box<dyn std::error::Error>> {
-    // 尝试匹配 "version " 后的版本号
-    let re = regex::Regex::new(r#"version "([^"]+)""#)?;
-    if let Some(captures) = re.captures(output) {
-        return Ok(captures[1].to_string());
+/// 提取并标准化版本号（参考PCL2第107-121行）
+fn extract_and_normalize_version(output: &str) -> Result<String, String> {
+    // 正则1: version "xxx"
+    let re1 = regex::Regex::new(r#"version "([^"]+)""#).unwrap();
+    // 正则2: openjdk xxx
+    let re2 = regex::Regex::new(r"openjdk (\d+)").unwrap();
+
+    let mut version_str = if let Some(caps) = re1.captures(output) {
+        caps[1].to_string()
+    } else if let Some(caps) = re2.captures(output) {
+        caps[1].to_string()
+    } else {
+        return Err("Failed to extract version".into());
+    };
+
+    // 下划线转点
+    version_str = version_str.replace('_', ".");
+    // 取连字符前
+    if let Some(pos) = version_str.find('-') {
+        version_str = version_str[..pos].to_string();
     }
-    
-    // 尝试匹配其他格式
-    let re = regex::Regex::new(r"version (\d+\.\d+\.\d+[_\d]*)")?;
-    if let Some(captures) = re.captures(output) {
-        return Ok(captures[1].to_string());
+
+    // 防御多余段数
+    let dots = version_str.matches('.').count();
+    if dots > 3 {
+        version_str = version_str.replace(".0.", ".");
     }
-    
-    Err("Failed to extract Java version".into())
+
+    // 补齐到4段
+    while version_str.matches('.').count() < 3 {
+        if version_str.starts_with("1.") {
+            version_str.push_str(".0");
+        } else {
+            version_str = format!("1.{}", version_str);
+        }
+    }
+
+    Ok(version_str)
 }
 
 /// 提取主版本号
-fn extract_major_version(version: &str) -> Result<u32, Box<dyn std::error::Error>> {
-    // 处理新版本格式（如17.0.1）
-    if let Some(first_part) = version.split('.').next() {
-        if let Ok(major) = first_part.parse::<u32>() {
-            if major >= 1 {
+fn extract_major_version(version: &str) -> Result<u32, String> {
+    let parts: Vec<&str> = version.split('.').collect();
+
+    // 新版本格式 (17.0.2.0)
+    if let Some(first) = parts.first() {
+        if let Ok(major) = first.parse::<u32>() {
+            if major >= 5 {
                 return Ok(major);
             }
         }
     }
-    
-    // 处理旧版本格式（如1.8.0_361）
-    let parts: Vec<&str> = version.split('.').collect();
+
+    // 旧版本格式 (1.8.0.321)
     if parts.len() >= 2 {
-        if let Ok(major) = parts[1].parse::<u32>() {
-            return Ok(major);
+        if let Ok(first) = parts[0].parse::<u32>() {
+            if first == 1 {
+                if let Ok(major) = parts[1].parse::<u32>() {
+                    if major >= 5 {
+                        return Ok(major);
+                    }
+                }
+            }
         }
     }
-    
-    Err("Failed to extract major version".into())
+
+    Err(format!("Failed to extract major version from: {}", version))
 }
 
 /// 搜索系统中的Java
 pub fn search_java() -> Vec<JavaRuntime> {
-    let mut java_list = Vec::new();
-    
-    // 检查环境变量
+    crate::log_separator!("Java Search");
+    crate::log_info!("[Java] Starting Java search...");
+
+    let mut java_candidates: Vec<PathBuf> = Vec::new();
+    let mut seen_paths: HashSet<String> = HashSet::new();
+
+    let mut add_candidate = |path: &Path| {
+        let path_str = path.to_string_lossy().to_lowercase().replace("\\", "/");
+        if !seen_paths.contains(&path_str) {
+            seen_paths.insert(path_str);
+            java_candidates.push(path.to_path_buf());
+            crate::log_debug!("[Java] Candidate: {}", path.display());
+        }
+    };
+
+    // Step 1: 环境变量扫描
+    crate::log_info!("[Java] Step 1: Checking environment variables...");
+    let mut env_paths = String::new();
     if let Ok(path) = std::env::var("PATH") {
-        for dir in std::env::split_paths(&path) {
-            let java_path = dir.join("java.exe");
-            if java_path.exists() {
-                if let Ok(java) = detect_java(&java_path) {
-                    java_list.push(java);
-                }
-            }
-        }
+        env_paths.push_str(&path);
     }
-    
-    // 检查JAVA_HOME
     if let Ok(java_home) = std::env::var("JAVA_HOME") {
-        let java_path = Path::new(&java_home).join("bin").join("java.exe");
-        if java_path.exists() {
-            if let Ok(java) = detect_java(&java_path) {
+        crate::log_debug!("[Java] JAVA_HOME: {}", java_home);
+        env_paths.push(';');
+        env_paths.push_str(&java_home);
+        env_paths.push(';');
+        env_paths.push_str(&format!("{}\\bin", java_home));
+    }
+    for dir in std::env::split_paths(&env_paths) {
+        let dir_str = dir.to_string_lossy().to_lowercase().replace("\\", "/");
+        if dir_str.is_empty() {
+            continue;
+        }
+        // 粗略检查 javaw.exe
+        let javaw_path = dir.join("javaw.exe");
+        let java_path = dir.join("java.exe");
+        if javaw_path.exists() {
+            add_candidate(&javaw_path);
+        } else if java_path.exists() {
+            add_candidate(&java_path);
+        }
+    }
+
+    // Step 2: 全磁盘扫描（关键词匹配）
+    crate::log_info!("[Java] Step 2: Searching local drives...");
+    for drive in get_local_drives() {
+        search_folder_recursive(&drive, &mut add_candidate, false);
+    }
+
+    // Step 3: 用户目录深度搜索
+    crate::log_info!("[Java] Step 3: Searching user directories...");
+    if let Some(user_profile) = std::env::var_os("USERPROFILE") {
+        let base = Path::new(&user_profile);
+        search_folder_recursive(base, &mut add_candidate, false);
+        // .jdks 全搜索
+        search_folder_recursive(&base.join(".jdks"), &mut add_candidate, true);
+        // .sdkman 全搜索
+        search_folder_recursive(&base.join(".sdkman/candidates/java"), &mut add_candidate, true);
+    }
+
+    // Step 4: 启动器目录全搜索
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            crate::log_debug!("[Java] Step 4: Searching launcher directory: {}", exe_dir.display());
+            search_folder_recursive(exe_dir, &mut add_candidate, true);
+        }
+    }
+
+    crate::log_info!("[Java] Found {} candidates, verifying...", java_candidates.len());
+
+    // 验证所有候选Java
+    let mut java_list = Vec::new();
+    for path in &java_candidates {
+        match detect_java(path) {
+            Ok(java) => {
+                crate::log_info!("[Java] Valid: {} ({})", java.version, java.path_folder);
                 java_list.push(java);
+            }
+            Err(e) => {
+                crate::log_debug!("[Java] Invalid {}: {}", path.display(), e);
             }
         }
     }
-    
-    // 检查常见安装路径
-    let common_paths = get_common_java_paths();
-    for path in common_paths {
-        if path.exists() {
-            if let Ok(java) = detect_java(&path) {
-                java_list.push(java);
-            }
-        }
-    }
-    
-    // 去重
-    java_list.sort_by(|a, b| a.executable.cmp(&b.executable));
-    java_list.dedup_by(|a, b| a.executable == b.executable);
-    
+
+    // 排序
+    java_list.sort_by(|a, b| {
+        b.major_version.cmp(&a.major_version)
+            .then(b.is_64bit.cmp(&a.is_64bit))
+    });
+
+    crate::log_info!("[Java] Search completed, found {} valid Java installations", java_list.len());
+    crate::log_separator!("Java Search End");
+
     java_list
 }
 
-/// 获取常见的Java安装路径
-fn get_common_java_paths() -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    
-    // Windows常见路径
-    if cfg!(target_os = "windows") {
-        // Program Files
-        if let Some(program_files) = std::env::var_os("ProgramFiles") {
-            let base = Path::new(&program_files);
-            paths.extend(get_java_paths_in_dir(base));
+/// 递归搜索文件夹（参考PCL2的JavaSearchFolder）
+fn search_folder_recursive<F>(
+    dir: &Path,
+    add_candidate: &mut F,
+    is_full_search: bool,
+) where
+    F: FnMut(&Path),
+{
+    if !dir.exists() || !dir.is_dir() {
+        return;
+    }
+
+    // 检查当前目录是否有 javaw.exe 或 java.exe
+    let javaw_path = dir.join("javaw.exe");
+    let java_path = dir.join("java.exe");
+    if javaw_path.exists() {
+        add_candidate(&javaw_path);
+    } else if java_path.exists() {
+        add_candidate(&java_path);
+    }
+
+    // 遍历子目录
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
         }
-        
-        // Program Files (x86)
-        if let Some(program_files_x86) = std::env::var_os("ProgramFiles(x86)") {
-            let base = Path::new(&program_files_x86);
-            paths.extend(get_java_paths_in_dir(base));
+
+        // 跳过符号链接
+        if is_symlink(&path) {
+            continue;
         }
-        
-        // 用户目录
-        if let Some(user_profile) = std::env::var_os("USERPROFILE") {
-            let base = Path::new(&user_profile);
-            paths.extend(get_java_paths_in_dir(&base.join(".jdks")));
-            paths.extend(get_java_paths_in_dir(&base.join(".sdkman")));
+
+        let dir_name = path.file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_lowercase();
+
+        // 判断是否需要递归搜索
+        let should_search = is_full_search ||
+            dir_name == "users" ||
+            dir_name.parse::<f64>().is_ok() ||  // 数字开头
+            dir_name == "bin" ||
+            SEARCH_KEYWORDS.iter().any(|kw| dir_name.contains(kw));
+
+        if should_search {
+            search_folder_recursive(&path, add_candidate, false);
         }
     }
-    
-    paths
 }
 
-/// 获取目录下的Java路径
-fn get_java_paths_in_dir(base: &Path) -> Vec<PathBuf> {
-    let mut paths = Vec::new();
-    
-    if !base.exists() || !base.is_dir() {
-        return paths;
+fn is_symlink(path: &Path) -> bool {
+    match std::fs::symlink_metadata(path) {
+        Ok(metadata) => metadata.file_type().is_symlink(),
+        Err(_) => false,
     }
-    
-    // 查找java.exe
-    let java_path = base.join("bin").join("java.exe");
-    if java_path.exists() {
-        paths.push(java_path);
-    }
-    
-    // 查找子目录中的java.exe
-    if let Ok(entries) = std::fs::read_dir(base) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                let java_path = path.join("bin").join("java.exe");
-                if java_path.exists() {
-                    paths.push(java_path);
-                }
-            }
-        }
-    }
-    
-    paths
 }
 
-/// 选择最佳Java
-pub fn select_best_java(java_list: &[JavaRuntime], min_version: Option<u32>, max_version: Option<u32>) -> Option<&JavaRuntime> {
+fn get_local_drives() -> Vec<PathBuf> {
+    let mut drives = Vec::new();
+    for letter in 'A'..='Z' {
+        let drive = format!("{}:\\", letter);
+        let path = PathBuf::from(&drive);
+        if path.exists() {
+            drives.push(path);
+        }
+    }
+    drives
+}
+
+pub fn select_best_java(
+    java_list: &[JavaRuntime],
+    min_version: Option<u32>,
+    max_version: Option<u32>,
+) -> Option<&JavaRuntime> {
     let mut candidates: Vec<&JavaRuntime> = java_list.iter().collect();
-    
-    // 过滤版本范围
+
     if let Some(min) = min_version {
         candidates.retain(|java| java.major_version >= min);
     }
     if let Some(max) = max_version {
         candidates.retain(|java| java.major_version <= max);
     }
-    
-    // 排序规则：
-    // 1. 64位优先
-    // 2. JRE优先于JDK
-    // 3. 版本号越高越好（但Java 17权重最高）
+
+    // 排序：64位优先，JRE优先，版本权重
     candidates.sort_by(|a, b| {
-        // 64位优先
         if a.is_64bit != b.is_64bit {
             return b.is_64bit.cmp(&a.is_64bit);
         }
-        
-        // JRE优先
         if a.is_jre != b.is_jre {
             return b.is_jre.cmp(&a.is_jre);
         }
-        
-        // 版本权重
         let a_weight = get_java_version_weight(a.major_version);
         let b_weight = get_java_version_weight(b.major_version);
         b_weight.cmp(&a_weight)
     });
-    
+
     candidates.first().map(|&java| java)
 }
 
-/// 获取Java版本权重
+/// Java版本权重（参考PCL2）
 fn get_java_version_weight(major_version: u32) -> u32 {
     match major_version {
-        17 => 31, // Java 17权重最高
-        8 => 30,  // Java 8次之
-        21 => 29, // Java 21
-        16 => 28,
-        11 => 27,
+        7 => 0,
+        8 => 30,   // Java 8 权重最高
+        9 => 4,
+        10 => 5,
+        11 => 14,
+        12 => 6,
+        13 => 7,
+        14 => 8,
+        15 => 9,
+        16 => 12,
+        17 => 31,  // Java 17 权重最高
+        18 => 13,
+        19 => 10,
+        20 => 11,
+        21 => 29,
         _ => major_version,
     }
 }
 
-/// 根据MC版本获取Java版本需求
 pub fn get_java_requirements(mc_version: &str) -> (Option<u32>, Option<u32>) {
     let version_parts: Vec<&str> = mc_version.split('.').collect();
     if version_parts.len() < 2 {
-        return (Some(8), None); // 默认要求Java 8+
+        return (Some(8), None);
     }
-    
+
     let major: u32 = version_parts[0].parse().unwrap_or(1);
     let minor: u32 = version_parts[1].parse().unwrap_or(0);
-    
+
     match (major, minor) {
-        // MC 1.20.5+ 需要 Java 21+
         (1, 20) if minor >= 5 => (Some(21), None),
         (1, minor) if minor > 20 => (Some(21), None),
-        // MC 1.18+ 需要 Java 17+
         (1, 18..=20) => (Some(17), None),
-        // MC 1.17+ 需要 Java 16+
         (1, 17) => (Some(16), None),
-        // MC 1.12+ 需要 Java 8+
         (1, 12..=16) => (Some(8), None),
-        // MC 1.5.2- 最高支持 Java 8
         (1, minor) if minor <= 5 => (None, Some(8)),
-        // 默认
         _ => (Some(8), None),
     }
 }

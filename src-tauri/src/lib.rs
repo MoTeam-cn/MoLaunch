@@ -2,6 +2,7 @@
 
 pub mod commands;
 pub mod config;
+pub mod logger;
 pub mod minecraft;
 pub mod resources;
 pub mod sdk;

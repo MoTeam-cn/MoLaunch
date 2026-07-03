@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
-import { FolderOpenIcon, ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
 import { formatBytes } from '@/utils/format'
 
 const javaStore = useJavaStore()
@@ -56,9 +56,6 @@ function applyAutoMemory() {
   minMemory.value = Math.round(maxMemory.value / 2)
 }
 
-watch(memoryMode, (mode) => {
-  if (mode === 'auto') applyAutoMemory()
-})
 
 async function handleAutoDetectJava() {
   showInfo('正在尝试搜索系统中存在的 Java...')
@@ -72,11 +69,16 @@ async function handleAutoDetectJava() {
 
 async function handleManualImportJava() {
   try {
-    const selected = await tauri.selectFile('选择 Java 可执行文件', [
-      { name: 'Java 可执行文件', extensions: ['exe'] },
-      { name: '所有文件', extensions: ['*'] },
+    const selected = await tauri.selectFile('选择 javaw.exe', [
+      { name: 'Java 可执行文件 (javaw.exe)', extensions: ['exe'] },
     ])
     if (selected) {
+      // 验证必须是 javaw.exe
+      const fileName = selected.split('\\').pop()?.split('/').pop()?.toLowerCase()
+      if (fileName !== 'javaw.exe') {
+        showError('请选择 javaw.exe，而不是 java.exe')
+        return
+      }
       javaStore.setJavaPath(selected)
     }
   } catch (e) {
@@ -84,21 +86,12 @@ async function handleManualImportJava() {
   }
 }
 
-async function handleSelectFolder() {
-  const selected = await tauri.selectFolder()
-  if (selected) {
-    gameDir.value = selected
-    try {
-      await tauri.setGameDir(selected)
-    } catch (e) {
-      console.error('Failed to set game dir:', e)
-    }
-  }
-}
-
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 function autoSave() {
   if (!loaded.value) return
+  // 自动模式下不保存内存配置到文件，启动时动态计算
+  if (memoryMode.value === 'auto') return
+  
   if (saveTimer) clearTimeout(saveTimer)
   saveTimer = setTimeout(async () => {
     try {
@@ -111,6 +104,20 @@ function autoSave() {
 }
 
 watch([minMemory, maxMemory], autoSave)
+
+// 切换到自动模式时，立即应用并清除配置文件中的值
+watch(memoryMode, async (mode) => {
+  if (mode === 'auto') {
+    applyAutoMemory()
+    // 清除配置文件中的内存值（启动时动态计算）
+    try {
+      await tauri.setMinMemory(0)
+      await tauri.setMaxMemory(0)
+    } catch (e) {
+      console.error('Failed to clear memory config:', e)
+    }
+  }
+})
 
 onMounted(async () => {
   try {
@@ -126,13 +133,45 @@ onMounted(async () => {
     console.error('Failed to get system memory:', e)
   }
   try {
-    const [min, max] = await tauri.getMemoryConfig()
-    minMemory.value = min
-    maxMemory.value = max
+    // 从配置文件读取原始值判断是否是自动模式
+    const savedMin = await tauri.getConfigValue('Memory', 'min')
+    const savedMax = await tauri.getConfigValue('Memory', 'max')
+    const minVal = savedMin ? parseInt(savedMin, 10) : 0
+    const maxVal = savedMax ? parseInt(savedMax, 10) : 0
+    
+    if (minVal > 0 && maxVal > 0) {
+      // 自定义模式
+      minMemory.value = minVal
+      maxMemory.value = maxVal
+      memoryMode.value = 'custom'
+    } else {
+      // 自动模式，保持 applyAutoMemory 计算的值
+      memoryMode.value = 'auto'
+    }
   } catch (e) {
     console.error('Failed to get memory config:', e)
   }
   loaded.value = true
+
+  // 1秒自动刷新内存（参考PCL2）
+  memoryTimer = setInterval(async () => {
+    try {
+      systemMemory.value = await tauri.getSystemMemory()
+    } catch (e) {
+      // 静默失败
+    }
+  }, 1000)
+})
+
+// 内存刷新定时器
+let memoryTimer: ReturnType<typeof setInterval> | null = null
+
+// 组件卸载时清除定时器
+onUnmounted(() => {
+  if (memoryTimer) {
+    clearInterval(memoryTimer)
+    memoryTimer = null
+  }
 })
 </script>
 
@@ -213,10 +252,11 @@ onMounted(async () => {
                 </div>
                 <!-- 已安装列表 -->
                 <template v-if="javaStore.javaList.length > 0">
+                  <div class="border-t border-gray-200 mx-3"></div>
                   <div
                     v-for="java in javaStore.javaList"
                     :key="java.executable"
-                    class="flex items-center justify-between px-3 py-2.5 border-t border-gray-100 hover:bg-primary-50 cursor-pointer transition-colors"
+                    class="flex items-center justify-between px-3 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors"
                     :class="{ 'bg-primary-50': javaStore.javaPath === java.executable }"
                     @click="javaStore.setJavaPath(java.executable); showJavaList = false"
                   >
@@ -224,7 +264,10 @@ onMounted(async () => {
                       <span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 mr-2 shrink-0">
                         {{ java.major_version }}
                       </span>
-                      <span class="text-sm text-gray-900 truncate">{{ java.executable }}</span>
+                      <div class="min-w-0">
+                        <div class="text-sm text-gray-900 truncate">{{ java.executable }}</div>
+                        <div class="text-xs text-gray-500">{{ java.version }} · {{ java.is_64bit ? '64位' : '32位' }} · {{ java.is_jre ? 'JRE' : 'JDK' }}</div>
+                      </div>
                     </div>
                     <span v-if="javaStore.javaPath === java.executable" class="text-primary-600 text-xs font-medium ml-2 shrink-0">当前</span>
                   </div>
@@ -359,17 +402,10 @@ onMounted(async () => {
         <div class="px-5 py-4 flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-900">存储路径</p>
-            <p class="text-xs text-gray-500 mt-0.5">Minecraft 游戏数据存放位置</p>
+            <p class="text-xs text-gray-500 mt-0.5">Minecraft 游戏数据存放位置（固定）</p>
           </div>
           <div class="flex items-center gap-2">
             <span class="text-sm text-gray-600 max-w-xs truncate">{{ gameDir }}</span>
-            <button
-              class="px-3 py-1.5 text-sm font-medium bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
-              @click="handleSelectFolder"
-            >
-              <FolderOpenIcon class="w-4 h-4 mr-1" />
-              更改
-            </button>
           </div>
         </div>
       </div>

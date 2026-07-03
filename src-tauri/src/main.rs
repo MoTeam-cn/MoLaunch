@@ -17,6 +17,9 @@ fn main() {
         log::error!("Failed to initialize storage: {}", e);
     }
 
+    // 初始化日志系统
+    mo_launch_lib::logger::init_from_config();
+
     tauri::Builder::default()
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
@@ -55,7 +58,6 @@ fn main() {
             commands::system::get_game_dir,
             commands::system::select_folder,
             commands::system::select_file,
-            commands::system::set_game_dir,
             commands::system::set_mirror_url,
             commands::system::get_mirror_url,
             commands::system::set_download_source,
@@ -70,6 +72,8 @@ fn main() {
             commands::system::get_memory_config,
             commands::system::set_max_download_threads,
             commands::system::get_max_download_threads,
+            commands::system::get_config_value,
+            commands::system::set_config_value,
         ])
         .on_window_event(|event| {
             // 窗口关闭时保存配置

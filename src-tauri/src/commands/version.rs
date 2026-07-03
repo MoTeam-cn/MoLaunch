@@ -82,10 +82,12 @@ pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResu
 fn parse_timestamp(time_str: &str) -> i64 {
     // 尝试解析ISO 8601格式
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(time_str) {
+        #[allow(deprecated)]
         return dt.timestamp();
     }
     // 尝试解析其他格式
     if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(time_str, "%Y-%m-%dT%H:%M:%S") {
+        #[allow(deprecated)]
         return dt.timestamp();
     }
     0

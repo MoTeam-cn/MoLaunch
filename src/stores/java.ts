@@ -11,20 +11,66 @@ export const useJavaStore = defineStore('java', () => {
   const javaList = ref<{ executable: string; version: string; major_version: number }[]>([])
   const javaLoaded = ref(false)
 
+  // 从 storage 读取保存的 Java 路径
+  async function loadSavedJavaPath(): Promise<string | null> {
+    try {
+      return await tauri.getConfigValue('Java', 'path')
+    } catch (e) {
+      return null
+    }
+  }
+
+  // 保存 Java 路径到 storage
+  async function saveJavaPath(path: string) {
+    try {
+      await tauri.setConfigValue('Java', 'path', path)
+    } catch (e) {
+      console.error('Failed to save Java path:', e)
+    }
+  }
+
   async function detectJava() {
     if (javaLoaded.value) return
     try {
-      const detected = await tauri.detectJava()
-      if (detected && detected.executable) {
-        javaPath.value = detected.executable
-      }
       javaList.value = await tauri.listJava()
+      
+      // 读取保存的 Java 路径
+      const savedPath = await loadSavedJavaPath()
+      
+      if (savedPath) {
+        // 用户手动选择的路径
+        const found = javaList.value.find(j => j.executable === savedPath)
+        if (found) {
+          javaPath.value = found.executable
+        } else {
+          // 保存的路径无效，回退到自动选择
+          console.warn('Saved Java path not found, auto selecting...')
+          autoSelectBest()
+        }
+      } else {
+        // 自动选择模式
+        autoSelectBest()
+      }
+      
       javaLoaded.value = true
     } catch (e) {
       console.error('Failed to load Java:', e)
       javaList.value = []
       javaLoaded.value = true
     }
+  }
+
+  // 自动选择最佳 Java
+  function autoSelectBest() {
+    if (javaList.value.length === 0) {
+      javaPath.value = ''
+      return
+    }
+    // 优先选择 64 位、版本最高的
+    const sorted = [...javaList.value].sort((a, b) => {
+      return b.major_version - a.major_version
+    })
+    javaPath.value = sorted[0].executable
   }
 
   async function listJava() {
@@ -38,6 +84,8 @@ export const useJavaStore = defineStore('java', () => {
 
   function setJavaPath(path: string) {
     javaPath.value = path
+    // 保存到 storage
+    saveJavaPath(path)
   }
 
   async function refreshJava() {

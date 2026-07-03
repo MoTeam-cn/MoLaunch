@@ -240,6 +240,7 @@ impl DownloadManager {
 
     /// 根据源模式获取超时时间
     /// Smart 模式下官方源使用较短超时，快速失败后切换到镜像源
+    #[allow(dead_code)]
     fn get_timeout_for_url(&self, url: &str) -> Duration {
         match self.source_mode {
             DownloadSourceMode::Smart => {

@@ -3,6 +3,21 @@
 use crate::state::AppState;
 use tauri::State;
 
+/// 更新配置并保存
+async fn update_config<F>(state: &AppState, updater: F) -> Result<(), String>
+where
+    F: FnOnce(&mut crate::state::AppConfig),
+{
+    let mut config = state.config.lock().await;
+    updater(&mut config);
+    let config_clone = config.clone();
+    drop(config);
+
+    // 立即保存到文件
+    crate::config::save_config(&config_clone)?;
+    Ok(())
+}
+
 /// 打开游戏目录
 #[tauri::command]
 pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
@@ -94,10 +109,10 @@ pub async fn set_game_dir(
     state: State<'_, AppState>,
     game_dir: String,
 ) -> Result<(), String> {
-    let mut config = state.config.lock().await;
-    log::info!("Game directory changed: {} -> {}", config.game_dir, game_dir);
-    config.game_dir = game_dir;
-    Ok(())
+    log::info!("Game directory changed to: {}", game_dir);
+    update_config(&state, |config| {
+        config.game_dir = game_dir;
+    }).await
 }
 
 /// 获取系统内存信息
@@ -113,10 +128,10 @@ pub async fn set_mirror_url(
     mirror_url: Option<String>,
     _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
-    let mut config = state.config.lock().await;
-    log::info!("Mirror URL changed: {:?} -> {:?}", config.mirror_url, mirror_url);
-    config.mirror_url = mirror_url;
-    Ok(())
+    log::info!("Mirror URL changed to: {:?}", mirror_url);
+    update_config(&state, |config| {
+        config.mirror_url = mirror_url;
+    }).await
 }
 
 /// 获取镜像源
@@ -133,34 +148,33 @@ pub async fn set_download_source(
     source: String,
     _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
-    let mut config = state.config.lock().await;
     const BMCLAPI: &str = "https://bmclapi2.bangbang93.com";
-    
-    match source.as_str() {
-        "mirror" => {
-            config.mirror_url_meta = Some(BMCLAPI.to_string());
-            config.mirror_url_download = Some(BMCLAPI.to_string());
-            config.mirror_url = Some(BMCLAPI.to_string());
-            config.mirror_mode = 0;
+
+    log::info!("Download source changed to: {}", source);
+    update_config(&state, |config| {
+        match source.as_str() {
+            "mirror" => {
+                config.mirror_url_meta = Some(BMCLAPI.to_string());
+                config.mirror_url_download = Some(BMCLAPI.to_string());
+                config.mirror_url = Some(BMCLAPI.to_string());
+                config.mirror_mode = 0;
+            }
+            "official" => {
+                config.mirror_url_meta = None;
+                config.mirror_url_download = None;
+                config.mirror_url = None;
+                config.mirror_mode = 0;
+            }
+            "smart" => {
+                config.mirror_url_meta = None;
+                config.mirror_url_download = None;
+                config.mirror_url = None;
+                config.mirror_mode = 1;
+            }
+            _ => {}
         }
-        "official" => {
-            config.mirror_url_meta = None;
-            config.mirror_url_download = None;
-            config.mirror_url = None;
-            config.mirror_mode = 0;
-        }
-        "smart" => {
-            config.mirror_url_meta = None;
-            config.mirror_url_download = None;
-            config.mirror_url = None;
-            config.mirror_mode = 1;
-        }
-        _ => return Err(format!("Invalid source: {}", source)),
-    }
-    
-    config.download_source = source;
-    log::info!("Download source changed to: {}", config.download_source);
-    Ok(())
+        config.download_source = source;
+    }).await
 }
 
 /// 获取下载源模式
@@ -177,10 +191,10 @@ pub async fn set_max_download_speed(
     speed: u64,
     _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
-    let mut config = state.config.lock().await;
-    config.max_download_speed = speed;
     log::info!("Max download speed changed to: {} bytes/sec", speed);
-    Ok(())
+    update_config(&state, |config| {
+        config.max_download_speed = speed;
+    }).await
 }
 
 /// 获取最大下载速度
@@ -212,10 +226,10 @@ pub async fn set_min_memory(
     state: State<'_, AppState>,
     memory: u32,
 ) -> Result<(), String> {
-    let mut config = state.config.lock().await;
-    log::info!("Min memory changed: {} -> {}", config.min_memory, memory);
-    config.min_memory = memory;
-    Ok(())
+    log::info!("Min memory changed to: {} MB", memory);
+    update_config(&state, |config| {
+        config.min_memory = memory;
+    }).await
 }
 
 /// 设置最大内存
@@ -224,10 +238,10 @@ pub async fn set_max_memory(
     state: State<'_, AppState>,
     memory: u32,
 ) -> Result<(), String> {
-    let mut config = state.config.lock().await;
-    log::info!("Max memory changed: {} -> {}", config.max_memory, memory);
-    config.max_memory = memory;
-    Ok(())
+    log::info!("Max memory changed to: {} MB", memory);
+    update_config(&state, |config| {
+        config.max_memory = memory;
+    }).await
 }
 
 /// 获取内存配置
@@ -243,10 +257,10 @@ pub async fn set_max_download_threads(
     state: State<'_, AppState>,
     threads: u32,
 ) -> Result<(), String> {
-    let mut config = state.config.lock().await;
-    log::info!("Max download threads changed: {} -> {}", config.max_download_threads, threads);
-    config.max_download_threads = threads;
-    Ok(())
+    log::info!("Max download threads changed to: {}", threads);
+    update_config(&state, |config| {
+        config.max_download_threads = threads;
+    }).await
 }
 
 /// 获取下载线程数
@@ -254,4 +268,37 @@ pub async fn set_max_download_threads(
 pub async fn get_max_download_threads(state: State<'_, AppState>) -> Result<u32, String> {
     let config = state.config.lock().await;
     Ok(config.max_download_threads)
+}
+
+/// 获取配置值（从 storage 读取）
+#[tauri::command]
+pub async fn get_config_value(section: String, key: String) -> Result<Option<String>, String> {
+    let storage = crate::storage::Storage::instance();
+    Ok(storage.get_config(&section, &key))
+}
+
+/// 设置配置值（写入 storage）
+#[tauri::command]
+pub async fn set_config_value(section: String, key: String, value: String) -> Result<(), String> {
+    let storage = crate::storage::Storage::instance();
+    storage.set_config(&section, &key, &value).map_err(|e| e.to_string())
+}
+
+/// 获取日志级别
+#[tauri::command]
+pub async fn get_log_level(state: State<'_, AppState>) -> Result<u32, String> {
+    let config = state.config.lock().await;
+    Ok(config.log_level)
+}
+
+/// 设置日志级别
+#[tauri::command]
+pub async fn set_log_level(
+    state: State<'_, AppState>,
+    level: u32,
+) -> Result<(), String> {
+    log::info!("Log level changed to: {}", level);
+    update_config(&state, |config| {
+        config.log_level = level;
+    }).await
 }

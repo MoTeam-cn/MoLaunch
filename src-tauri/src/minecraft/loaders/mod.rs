@@ -80,7 +80,9 @@ fn parse_version_number(version: &str) -> Vec<u32> {
 
 /// List NeoForge versions
 pub async fn list_neoforge_versions(mc_version: &str, mirror_url: Option<&str>) -> anyhow::Result<Vec<LoaderVersion>> {
-    // 新版 NeoForge
+    crate::log_separator!("NeoForge List");
+    crate::log_info!("[NeoForge] Listing versions for MC {}", mc_version);
+
     let url = match mirror_url {
         Some(mirror) if !mirror.is_empty() => format!(
             "{}/neoforge/meta/api/maven/details/releases/net/neoforged/neoforge",
@@ -89,26 +91,66 @@ pub async fn list_neoforge_versions(mc_version: &str, mirror_url: Option<&str>) 
         _ => "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge".to_string(),
     };
 
-    let content = download::fetch_url(&url).await?;
-    let json: serde_json::Value = serde_json::from_str(&content)?;
+    crate::log_debug!("[NeoForge] Fetching from: {}", url);
+    let content = match download::fetch_url(&url).await {
+        Ok(c) => {
+            crate::log_debug!("[NeoForge] Response length: {} bytes", c.len());
+            crate::log_debug!("[NeoForge] Response preview: {}", &c[..c.len().min(200)]);
+            c
+        }
+        Err(e) => {
+            crate::log_error!("[NeoForge] Fetch failed: {}", e);
+            return Ok(vec![]);
+        }
+    };
+
+    let json: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(j) => j,
+        Err(e) => {
+            crate::log_error!("[NeoForge] JSON parse failed: {}", e);
+            return Ok(vec![]);
+        }
+    };
+
+    // BMCLAPI 返回的是 files 数组，不是 versions
+    let files_array = json["files"].as_array()
+        .or_else(|| json["versions"].as_array()); // 兼容两种格式
+
+    let total = files_array.map(|a| a.len()).unwrap_or(0);
+    crate::log_info!("[NeoForge] Total versions in API: {}", total);
 
     let mut versions = Vec::new();
-    if let Some(versions_array) = json["versions"].as_array() {
-        for version in versions_array {
-            if let Some(version_str) = version.as_str() {
-                if is_neoforge_compatible(version_str, mc_version) {
-                    let is_beta = version_str.contains("beta") || version_str.contains("alpha");
-                    versions.push(LoaderVersion {
-                        version: version_str.to_string(),
-                        is_recommended: !is_beta,
-                        release_time: None,
-                    });
-                }
+    if let Some(files) = files_array {
+        for file in files {
+            // BMCLAPI 格式: {"name": "26.2.0.0-beta", "type": "DIRECTORY"}
+            // 官方格式: "26.2.0.0-beta"
+            let version_str = if let Some(name) = file["name"].as_str() {
+                name
+            } else if let Some(s) = file.as_str() {
+                s
+            } else {
+                continue;
+            };
+
+            let compatible = is_neoforge_compatible(version_str, mc_version);
+            crate::log_trace!("[NeoForge] Check {} -> {}", version_str, compatible);
+            if compatible {
+                let is_beta = version_str.contains("beta") || version_str.contains("alpha");
+                versions.push(LoaderVersion {
+                    version: version_str.to_string(),
+                    is_recommended: !is_beta,
+                    release_time: None,
+                });
             }
         }
     }
-    
-    // 也检查旧版格式（1.20.1-xxx�?
+
+    crate::log_info!("[NeoForge] Compatible versions: {}", versions.len());
+    for v in &versions {
+        crate::log_debug!("[NeoForge]   - {} (recommended: {})", v.version, v.is_recommended);
+    }
+
+    // 也检查旧版格式
     let legacy_url = match mirror_url {
         Some(mirror) if !mirror.is_empty() => format!(
             "{}/neoforge/meta/api/maven/details/releases/net/neoforged/forge",
@@ -116,20 +158,34 @@ pub async fn list_neoforge_versions(mc_version: &str, mirror_url: Option<&str>) 
         ),
         _ => "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/forge".to_string(),
     };
-    
+
+    crate::log_debug!("[NeoForge] Fetching legacy from: {}", legacy_url);
     if let Ok(legacy_content) = download::fetch_url(&legacy_url).await {
         if let Ok(legacy_json) = serde_json::from_str::<serde_json::Value>(&legacy_content) {
-            if let Some(versions_array) = legacy_json["versions"].as_array() {
-                for version in versions_array {
-                    if let Some(version_str) = version.as_str() {
-                        if version_str.starts_with(&format!("{}-", mc_version)) {
-                            let loader_version = version_str.strip_prefix(&format!("{}-", mc_version)).unwrap_or(version_str);
-                            versions.push(LoaderVersion {
-                                version: loader_version.to_string(),
-                                is_recommended: true,
-                                release_time: None,
-                            });
-                        }
+            // 兼容两种格式
+            let legacy_files = legacy_json["files"].as_array()
+                .or_else(|| legacy_json["versions"].as_array());
+                
+            if let Some(files) = legacy_files {
+                crate::log_debug!("[NeoForge] Legacy versions count: {}", files.len());
+                for file in files {
+                    let version_str = if let Some(name) = file["name"].as_str() {
+                        name
+                    } else if let Some(s) = file.as_str() {
+                        s
+                    } else {
+                        continue;
+                    };
+                    
+                    let prefix = format!("{}-", mc_version);
+                    if version_str.starts_with(&prefix) {
+                        let loader_version = version_str.strip_prefix(&prefix).unwrap_or(version_str);
+                        crate::log_debug!("[NeoForge] Found legacy: {}", loader_version);
+                        versions.push(LoaderVersion {
+                            version: loader_version.to_string(),
+                            is_recommended: true,
+                            release_time: None,
+                        });
                     }
                 }
             }
@@ -143,6 +199,8 @@ pub async fn list_neoforge_versions(mc_version: &str, mirror_url: Option<&str>) 
         v_b.cmp(&v_a)
     });
 
+    crate::log_info!("[NeoForge] Final result: {} versions", versions.len());
+    crate::log_separator!("NeoForge End");
     Ok(versions)
 }
 
@@ -155,14 +213,14 @@ fn is_neoforge_compatible(neoforge_version: &str, mc_version: &str) -> bool {
     let mc_major: u32 = mc_parts[0].parse().unwrap_or(0);
     let mc_minor: u32 = mc_parts[1].parse().unwrap_or(0);
 
+    // 跳过特殊版本（如 0.25w14craftmine.3-beta）
+    if neoforge_version.starts_with("0.") {
+        return false;
+    }
+
     let neoforge_parts: Vec<&str> = neoforge_version.split('.').collect();
     if neoforge_parts.len() < 2 { 
         return false; 
-    }
-
-    // 跳过特殊版本（如 0.25w14craftmine.3-beta�?
-    if neoforge_version.starts_with("0.") {
-        return false;
     }
 
     let neoforge_major: u32 = match neoforge_parts[0].parse() {
@@ -175,15 +233,10 @@ fn is_neoforge_compatible(neoforge_version: &str, mc_version: &str) -> bool {
         Err(_) => return false,
     };
 
-    // PCL2 逻辑�?
-    // - NeoForge 20.4.30 -> MC 1.20.4（major=20, minor=4�?
-    // - NeoForge 24.1.0 -> MC 24.1.0（major=24, minor=1�?
-    // - NeoForge 26.2.0 -> MC 26.2（major=26, minor=2�?
-    
-    // 对于 MC 1.x.y（如 1.26.2）：
-    // NeoForge major = MC minor�?6 = 26�?
-    // 对于 MC x.y（如 26.2）：
-    // NeoForge major = MC major�?6 = 26�?
+    // NeoForge 版本格式：
+    // - 20.4.30 -> MC 1.20.4
+    // - 24.1.0 -> MC 24.1.0  
+    // - 26.2.0.0-beta -> MC 26.2
     
     if mc_major == 1 {
         // MC 1.x.y 格式：NeoForge major = MC minor
@@ -403,7 +456,7 @@ pub async fn install_loader(
     }
 }
 
-async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, mirror_url: Option<&str>) -> anyhow::Result<()> {
+async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _mirror_url: Option<&str>) -> anyhow::Result<()> {
     log::info!("[Forge] Installing {} for MC {}", forge_version, mc_version);
 
     let file_name = format!("forge-{}-{}-installer.jar", mc_version, forge_version);
@@ -533,7 +586,7 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, m
     Ok(())
 }
 
-async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &Path, mirror_url: Option<&str>) -> anyhow::Result<()> {
+async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &Path, _mirror_url: Option<&str>) -> anyhow::Result<()> {
     log::info!("[NeoForge] Installing {} for MC {}", neoforge_version, mc_version);
 
     let installer_url = format!(

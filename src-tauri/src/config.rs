@@ -8,7 +8,7 @@ use crate::storage::Storage;
 /// 从 storage 加载配置
 pub fn load_config() -> Result<Option<AppConfig>, String> {
     let storage = Storage::instance();
-    
+
     // 初始化 storage
     if let Err(e) = storage.init() {
         return Err(format!("Failed to initialize storage: {}", e));
@@ -55,6 +55,23 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.max_memory = max.parse().unwrap_or(app_config.max_memory);
     }
 
+    // 自动模式：内存值为0时，根据系统内存动态计算
+    if app_config.min_memory == 0 || app_config.max_memory == 0 {
+        let sys_mem = crate::minecraft::system::get_system_memory();
+        let available_mb = (sys_mem.available / 1024 / 1024) as u32;
+        let suggested_max = std::cmp::min((available_mb as f64 * 0.75) as u32, 8192);
+        let suggested_max = std::cmp::max(suggested_max, 512);
+        let suggested_min = suggested_max / 2;
+
+        if app_config.max_memory == 0 {
+            app_config.max_memory = suggested_max;
+        }
+        if app_config.min_memory == 0 {
+            app_config.min_memory = suggested_min;
+        }
+        log::info!("Auto memory config: min={}MB, max={}MB", app_config.min_memory, app_config.max_memory);
+    }
+
     // Log
     if let Some(level) = config.get("Log", "level") {
         app_config.log_level = level.parse().unwrap_or(app_config.log_level);
@@ -67,7 +84,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
 /// 保存配置到 storage
 pub fn save_config(config: &AppConfig) -> Result<(), String> {
     let storage = Storage::instance();
-    
+
     let mut ini = storage.read_config().unwrap_or_default();
 
     // General
@@ -106,6 +123,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("Log", "level", &config.log_level.to_string());
 
     storage.write_config(&ini).map_err(|e| e.to_string())?;
-    log::info!("Config saved to storage");
+    log::debug!("Config saved to storage");
     Ok(())
 }

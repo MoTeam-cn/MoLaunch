@@ -5,8 +5,6 @@
 //! - key=value
 //! - # 注释
 
-use std::collections::HashMap;
-
 /// INI 文件
 #[derive(Debug, Clone)]
 pub struct IniFile {

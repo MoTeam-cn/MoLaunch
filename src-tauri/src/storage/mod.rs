@@ -1,15 +1,14 @@
-//! Storage 模块 - 统一管理 .molaunch 文件夹
-//!
-//! 所有对 .molaunch 文件夹的操作都必须通过此模块进行
-//! 使用 INI 格式存储配置
+//! Storage module - manages .Molaunch folder
+//! All operations on .Molaunch folder must go through this module
+//! Uses INI format for configuration
 
 pub mod ini;
 
 use crate::resources;
 use std::path::PathBuf;
-use std::sync::Once;
+use std::sync::OnceLock;
 
-static INIT: Once = Once::new();
+static STORAGE: OnceLock<Storage> = OnceLock::new();
 
 pub struct Storage {
     base_dir: PathBuf,
@@ -17,26 +16,22 @@ pub struct Storage {
 
 impl Storage {
     pub fn instance() -> &'static Storage {
-        static mut INSTANCE: Option<Storage> = None;
-        unsafe {
-            INIT.call_once(|| {
-                let base_dir = Self::resolve_base_dir();
-                INSTANCE = Some(Storage { base_dir });
-            });
-            INSTANCE.as_ref().unwrap()
-        }
+        STORAGE.get_or_init(|| {
+            let base_dir = Self::resolve_base_dir();
+            Storage { base_dir }
+        })
     }
 
     fn resolve_base_dir() -> PathBuf {
         if let Ok(exe_path) = std::env::current_exe() {
             if let Some(exe_dir) = exe_path.parent() {
-                return exe_dir.join(".molaunch");
+                return exe_dir.join(".Molaunch");
             }
         }
         if let Ok(cwd) = std::env::current_dir() {
-            return cwd.join(".molaunch");
+            return cwd.join(".Molaunch");
         }
-        PathBuf::from(".molaunch")
+        PathBuf::from(".Molaunch")
     }
 
     pub fn base_dir(&self) -> &PathBuf {
@@ -53,11 +48,7 @@ impl Storage {
         self.ensure_dir("cache")?;
         self.ensure_dir("temp")?;
 
-        let config_path = self.config_path();
-        if !config_path.exists() {
-            self.write_default_config()?;
-            log::info!("Created default config.ini");
-        }
+        self.sync_config()?;
 
         let instance_path = self.instance_path();
         if !instance_path.exists() {
@@ -96,6 +87,39 @@ impl Storage {
 
     pub fn temp_dir(&self) -> PathBuf {
         self.base_dir.join("temp")
+    }
+
+    fn sync_config(&self) -> anyhow::Result<()> {
+        let config_path = self.config_path();
+
+        if !config_path.exists() {
+            self.write_default_config()?;
+            log::info!("Created default config.ini");
+            return Ok(());
+        }
+
+        let template_content = resources::read_resource("defaults/config.ini")?;
+        let template = ini::IniFile::parse(&template_content);
+        let mut current = self.read_config()?;
+
+        let mut modified = false;
+        for section in template.sections() {
+            let template_pairs = template.get_section(&section);
+            for (key, value) in &template_pairs {
+                if !current.has_key(&section, key) {
+                    log::info!("Config sync: [{}] {} = {}", section, key, value);
+                    current.set(&section, key, value);
+                    modified = true;
+                }
+            }
+        }
+
+        if modified {
+            self.write_config(&current)?;
+            log::info!("Config synced with template");
+        }
+
+        Ok(())
     }
 
     fn write_default_config(&self) -> anyhow::Result<()> {
