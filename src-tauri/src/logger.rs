@@ -146,6 +146,15 @@ pub fn init(level: LogLevel, console_output: bool) {
     logger.init(level, console_output);
 }
 
+/// 设置日志级别（热重载）
+pub fn set_level(level: LogLevel) {
+    if let Ok(mut logger) = LOGGER.lock() {
+        logger.level = level;
+    }
+    // 在锁外记录日志，避免死锁
+    log(LogLevel::Info, "logger", &format!("Log level changed to: {:?}", level));
+}
+
 /// 初始化日志系统（从配置）
 pub fn init_from_config() {
     let storage = Storage::instance();

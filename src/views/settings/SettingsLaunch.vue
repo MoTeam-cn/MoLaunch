@@ -16,6 +16,7 @@ const memoryMode = ref<'auto' | 'custom'>('auto')
 const showJavaList = ref(false)
 const javaSelectorRef = ref<HTMLElement | null>(null)
 const loaded = ref(false)
+const detectingJava = ref(false)
 
 function handleDocumentClick(e: MouseEvent) {
   if (javaSelectorRef.value && !javaSelectorRef.value.contains(e.target as Node)) {
@@ -58,12 +59,18 @@ function applyAutoMemory() {
 
 
 async function handleAutoDetectJava() {
-  showInfo('正在尝试搜索系统中存在的 Java...')
-  await javaStore.refreshJava()
-  if (javaStore.javaList.length > 0) {
-    showSuccess(`已找到 ${javaStore.javaList.length} 个可用 Java，请自行展开下拉框选择`)
-  } else {
-    showInfo('未检测到已安装的 Java')
+  if (detectingJava.value) return
+  detectingJava.value = true
+  try {
+    showInfo('正在尝试搜索系统中存在的 Java...')
+    await javaStore.refreshJava()
+    if (javaStore.javaList.length > 0) {
+      showSuccess(`已找到 ${javaStore.javaList.length} 个可用 Java，请自行展开下拉框选择`)
+    } else {
+      showInfo('未检测到已安装的 Java')
+    }
+  } finally {
+    detectingJava.value = false
   }
 }
 
@@ -190,11 +197,15 @@ onUnmounted(() => {
             </div>
             <div class="flex items-center gap-1.5">
               <button
-                class="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors flex items-center"
+                class="px-2 py-1 text-xs rounded transition-colors flex items-center"
+                :class="detectingJava 
+                  ? 'text-gray-400 bg-gray-50 cursor-not-allowed' 
+                  : 'text-gray-600 bg-gray-100 hover:bg-gray-200'"
+                :disabled="detectingJava"
                 @click="handleAutoDetectJava"
               >
-                <ArrowPathIcon class="w-3.5 h-3.5 mr-1" />
-                自动检测
+                <ArrowPathIcon class="w-3.5 h-3.5 mr-1" :class="{ 'animate-spin': detectingJava }" />
+                {{ detectingJava ? '检测中...' : '自动检测' }}
               </button>
               <button
                 class="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors flex items-center"

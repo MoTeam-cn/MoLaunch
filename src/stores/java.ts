@@ -43,13 +43,13 @@ export const useJavaStore = defineStore('java', () => {
         if (found) {
           javaPath.value = found.executable
         } else {
-          // 保存的路径无效，回退到自动选择
-          console.warn('Saved Java path not found, auto selecting...')
-          autoSelectBest()
+          // 保存的路径无效，清空（自动模式）
+          console.warn('Saved Java path not found, using auto mode')
+          javaPath.value = ''
         }
       } else {
-        // 自动选择模式
-        autoSelectBest()
+        // 自动选择模式，javaPath 为空表示自动
+        javaPath.value = ''
       }
       
       javaLoaded.value = true
@@ -60,17 +60,15 @@ export const useJavaStore = defineStore('java', () => {
     }
   }
 
-  // 自动选择最佳 Java
-  function autoSelectBest() {
-    if (javaList.value.length === 0) {
-      javaPath.value = ''
-      return
+  // 获取实际使用的 Java 路径（自动模式时选择最佳）
+  function getEffectiveJavaPath(): string {
+    if (javaPath.value) {
+      return javaPath.value
     }
-    // 优先选择 64 位、版本最高的
-    const sorted = [...javaList.value].sort((a, b) => {
-      return b.major_version - a.major_version
-    })
-    javaPath.value = sorted[0].executable
+    // 自动选择最佳
+    if (javaList.value.length === 0) return ''
+    const sorted = [...javaList.value].sort((a, b) => b.major_version - a.major_version)
+    return sorted[0].executable
   }
 
   async function listJava() {
@@ -103,5 +101,6 @@ export const useJavaStore = defineStore('java', () => {
     listJava,
     setJavaPath,
     refreshJava,
+    getEffectiveJavaPath,
   }
 })

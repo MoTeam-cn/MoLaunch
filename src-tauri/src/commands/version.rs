@@ -272,8 +272,10 @@ pub async fn list_neoforge_versions(state: State<'_, AppState>, mc_version: Stri
     })?;
 
     let result: Vec<serde_json::Value> = versions.iter().map(|v| {
+        // 移除后缀：26.2.0.7-beta -> 26.2.0.7
+        let display_version = v.version.split('-').next().unwrap_or(&v.version);
         serde_json::json!({
-            "version": v.version,
+            "version": display_version,
             "recommended": v.is_recommended
         })
     }).collect();
