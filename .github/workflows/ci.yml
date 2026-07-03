@@ -21,9 +21,26 @@ env:
   NODE_VERSION: '18'
 
 jobs:
+  # 检查是否跳过 CI
+  check-skip:
+    name: Check Skip
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - id: check
+        run: |
+          if [[ "${{ github.event.head_commit.message }}" == *"!c"* ]]; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
   # 前端检查
   frontend-check:
     name: Frontend Check
+    needs: check-skip
+    if: needs.check-skip.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +60,8 @@ jobs:
   # Rust 格式检查
   rust-fmt:
     name: Rust Format
+    needs: check-skip
+    if: needs.check-skip.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,6 +74,8 @@ jobs:
   # Rust Clippy 检查
   rust-clippy:
     name: Rust Clippy
+    needs: check-skip
+    if: needs.check-skip.outputs.should_skip != 'true'
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +97,8 @@ jobs:
   # Tauri 构建检查
   build:
     name: Build (${{ matrix.platform }})
+    needs: check-skip
+    if: needs.check-skip.outputs.should_skip != 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
