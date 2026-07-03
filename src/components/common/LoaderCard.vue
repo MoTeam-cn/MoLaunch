@@ -10,6 +10,7 @@ import { XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
 interface VersionItem {
   key: string
   label: string
+  description?: string
   tags?: string[]
 }
 
@@ -135,6 +136,12 @@ function clear(e: Event) {
                     : 'bg-gray-100 text-gray-700'"
                 >
                   {{ ver.label }}
+                </span>
+                <span
+                  v-if="ver.description"
+                  class="text-xs text-gray-500"
+                >
+                  {{ ver.description }}
                 </span>
                 <span
                   v-for="tag in ver.tags"

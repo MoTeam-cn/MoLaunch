@@ -9,6 +9,7 @@ import * as tauri from '@/utils/tauri'
 
 export interface DownloadProgress {
   stage: string
+  stageIndex: number
   current: number
   total: number
   percentage: number

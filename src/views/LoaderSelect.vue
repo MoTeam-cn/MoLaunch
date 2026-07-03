@@ -27,7 +27,7 @@ const emit = defineEmits<{
 
 const versionStore = useVersionStore()
 
-const forgeVersions = ref<string[]>([])
+const forgeVersions = ref<{ version: string; is_recommended: boolean; release_time: string }[]>([])
 const neoforgeVersions = ref<{ version: string; recommended: boolean }[]>([])
 const fabricVersions = ref<{ version: string; stable: boolean }[]>([])
 const optifineVersions = ref<{ display_name: string; is_preview: boolean }[]>([])
@@ -77,25 +77,29 @@ const filteredOptifine = computed(() => {
 // 构建版本列表
 const forgeItems = computed(() =>
   forgeVersions.value.map((v, i) => ({
-    key: v,
-    label: v,
-    tags: i === 0 ? ['最新版'] : [],
+    key: v.version,
+    label: v.version,
+    tags: [
+      i === 0 ? '最新版' : null,
+      v.is_recommended ? '推荐' : null,
+      v.release_time ? `发布于 ${v.release_time}` : null,
+    ].filter(Boolean) as string[],
   }))
 )
 
 const neoforgeItems = computed(() =>
   [...neoforgeVersions.value].reverse().map(v => ({
     key: v.version,
-    label: `${props.mcVersion}.${v.version}`,
+    label: v.version,
     tags: v.recommended ? ['推荐'] : [],
   }))
 )
 
 const fabricItems = computed(() =>
-  fabricVersions.value.map(v => ({
+  fabricVersions.value.map((v, i) => ({
     key: v.version,
     label: v.version,
-    tags: [v.stable ? '稳定版' : '测试版'],
+    tags: i === 0 ? ['最新版'] : [v.stable ? '稳定版' : '测试版'],
   }))
 )
 
@@ -103,7 +107,7 @@ const optifineItems = computed(() =>
   filteredOptifine.value.map(v => ({
     key: v.display_name,
     label: v.display_name,
-    tags: v.is_preview ? ['预览版'] : [],
+    tags: [v.is_preview ? '测试版' : '正式版'],
   }))
 )
 
@@ -111,6 +115,7 @@ const liteloaderItems = computed(() =>
   liteloaderVersions.value.map(v => ({
     key: v,
     label: v,
+    tags: ['稳定版'],
   }))
 )
 

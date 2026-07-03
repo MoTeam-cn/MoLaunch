@@ -48,7 +48,8 @@
         "Images/icon.ico"
       ],
       "resources": [
-        "../sdk_data/*"
+        "../sdk_data/*",
+        "resources/*"
       ]
     },
     "security": {

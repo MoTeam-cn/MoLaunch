@@ -7,12 +7,12 @@ export enum AuthType {
 
 /** 认证结果 */
 export interface AuthResult {
-  auth_type: AuthType
-  access_token: string
-  refresh_token?: string
+  name: string
   uuid: string
-  username: string
-  expires_at: number
+  access_token: string
+  client_token: string
+  login_type: string
+  profile_json?: string
 }
 
 /** 登录状态 */

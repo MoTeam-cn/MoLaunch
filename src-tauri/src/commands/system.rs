@@ -3,53 +3,6 @@
 use crate::state::AppState;
 use tauri::State;
 
-/// 重新初始化 SDK 的辅助函数
-async fn reinitialize_sdk(state: &AppState) -> Result<String, String> {
-    let config = state.config.lock().await;
-    let game_dir = config.game_dir.clone();
-    let max_threads = config.max_download_threads;
-    let log_level = config.log_level;
-    let mirror_url = config.mirror_url.clone();
-    let mirror_url_meta = config.mirror_url_meta.clone();
-    let mirror_url_download = config.mirror_url_download.clone();
-    let mirror_mode = config.mirror_mode;
-    let max_download_speed = config.max_download_speed;
-    drop(config);
-
-    let mut sdk_guard = state.sdk.lock().await;
-    if sdk_guard.is_some() {
-        log::info!("Releasing old SDK instance...");
-        *sdk_guard = None;
-    }
-
-    log::info!("Reinitializing SDK...");
-    let mut sdk = crate::sdk::SdkInstance::load().map_err(|e| {
-        log::error!("Failed to load SDK: {}", e);
-        e.to_string()
-    })?;
-
-    sdk.init(
-        &game_dir,
-        max_threads,
-        log_level,
-        mirror_url.as_deref(),
-        mirror_url_meta.as_deref(),
-        mirror_url_download.as_deref(),
-        mirror_mode,
-        max_download_speed,
-    ).map_err(|e| {
-        log::error!("Failed to initialize SDK: {}", e);
-        e.to_string()
-    })?;
-
-    let version = sdk.version().map_err(|e| e.to_string())?;
-    log::info!("SDK reinitialized successfully, version: {}", version);
-
-    *sdk_guard = Some(sdk);
-
-    Ok(version)
-}
-
 /// 打开游戏目录
 #[tauri::command]
 pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
@@ -149,11 +102,8 @@ pub async fn set_game_dir(
 
 /// 获取系统内存信息
 #[tauri::command]
-pub async fn get_system_memory() -> Result<crate::sdk::SystemMemory, String> {
-    crate::sdk::get_system_memory_static().map_err(|e| {
-        log::error!("Failed to get system memory: {}", e);
-        e.to_string()
-    })
+pub async fn get_system_memory() -> Result<crate::minecraft::system::SystemMemory, String> {
+    Ok(crate::minecraft::system::get_system_memory())
 }
 
 /// 设置镜像源
@@ -161,17 +111,11 @@ pub async fn get_system_memory() -> Result<crate::sdk::SystemMemory, String> {
 pub async fn set_mirror_url(
     state: State<'_, AppState>,
     mirror_url: Option<String>,
-    skip_reinit: Option<bool>,
+    _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
     let mut config = state.config.lock().await;
     log::info!("Mirror URL changed: {:?} -> {:?}", config.mirror_url, mirror_url);
     config.mirror_url = mirror_url;
-    drop(config);
-
-    if skip_reinit != Some(true) {
-        reinitialize_sdk(&state).await?;
-    }
-
     Ok(())
 }
 
@@ -187,7 +131,7 @@ pub async fn get_mirror_url(state: State<'_, AppState>) -> Result<Option<String>
 pub async fn set_download_source(
     state: State<'_, AppState>,
     source: String,
-    skip_reinit: Option<bool>,
+    _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
     let mut config = state.config.lock().await;
     const BMCLAPI: &str = "https://bmclapi2.bangbang93.com";
@@ -206,7 +150,6 @@ pub async fn set_download_source(
             config.mirror_mode = 0;
         }
         "smart" => {
-            // 自动探测：SDK 自动检测官方源速度，慢则降级到 BMCLAPI
             config.mirror_url_meta = None;
             config.mirror_url_download = None;
             config.mirror_url = None;
@@ -217,12 +160,6 @@ pub async fn set_download_source(
     
     config.download_source = source;
     log::info!("Download source changed to: {}", config.download_source);
-    drop(config);
-
-    if skip_reinit != Some(true) {
-        reinitialize_sdk(&state).await?;
-    }
-
     Ok(())
 }
 
@@ -238,17 +175,11 @@ pub async fn get_download_source(state: State<'_, AppState>) -> Result<String, S
 pub async fn set_max_download_speed(
     state: State<'_, AppState>,
     speed: u64,
-    skip_reinit: Option<bool>,
+    _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
     let mut config = state.config.lock().await;
     config.max_download_speed = speed;
     log::info!("Max download speed changed to: {} bytes/sec", speed);
-    drop(config);
-
-    if skip_reinit != Some(true) {
-        reinitialize_sdk(&state).await?;
-    }
-
     Ok(())
 }
 
@@ -262,7 +193,8 @@ pub async fn get_max_download_speed(state: State<'_, AppState>) -> Result<u64, S
 /// 获取配置文件路径
 #[tauri::command]
 pub async fn get_config_path() -> Result<String, String> {
-    Ok(crate::config::get_config_file_path().to_string_lossy().to_string())
+    let storage = crate::storage::Storage::instance();
+    Ok(storage.config_path().to_string_lossy().to_string())
 }
 
 /// 手动保存配置到文件
@@ -272,12 +204,6 @@ pub async fn save_config_to_file(state: State<'_, AppState>) -> Result<(), Strin
     crate::config::save_config(&config)?;
     log::info!("Config saved manually");
     Ok(())
-}
-
-/// 手动触发 SDK 重新初始化（用于批量设置更新后）
-#[tauri::command]
-pub async fn reinitialize_sdk_command(state: State<'_, AppState>) -> Result<String, String> {
-    reinitialize_sdk(&state).await
 }
 
 /// 设置最小内存

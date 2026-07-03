@@ -28,9 +28,13 @@ onMounted(async () => {
 
 const navItems = [
   { name: '首页', path: '/', icon: HomeIcon },
-  { name: '下载', path: '/versions', icon: CubeIcon },
+  { name: '下载', path: '/versions', icon: CubeIcon, hasDblClick: true },
   { name: '设置', path: '/settings', icon: Cog6ToothIcon },
 ]
+
+// 双击计时器
+let lastClickTime = 0
+let clickTimer: ReturnType<typeof setTimeout> | null = null
 
 function isActive(path: string): boolean {
   return route.path === path
@@ -38,6 +42,28 @@ function isActive(path: string): boolean {
 
 function navigateTo(path: string) {
   router.push(path)
+}
+
+function handleDownloadClick() {
+  const now = Date.now()
+  const timeDiff = now - lastClickTime
+  
+  if (timeDiff < 300) {
+    // 双击：进入下载管理页面
+    if (clickTimer) {
+      clearTimeout(clickTimer)
+      clickTimer = null
+    }
+    router.push('/downloads')
+  } else {
+    // 单击：延迟执行导航到版本页面
+    clickTimer = setTimeout(() => {
+      router.push('/versions')
+      clickTimer = null
+    }, 300)
+  }
+  
+  lastClickTime = now
 }
 
 async function handleClose() {
@@ -71,11 +97,11 @@ async function handleClose() {
             :key="item.path"
             class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
             :class="[
-              isActive(item.path)
+              isActive(item.path) || (item.hasDblClick && isActive('/downloads'))
                 ? 'bg-white/20 text-white'
                 : 'text-white/70 hover:bg-white/10 hover:text-white'
             ]"
-            @click="navigateTo(item.path)"
+            @click="item.hasDblClick ? handleDownloadClick() : navigateTo(item.path)"
           >
             <component :is="item.icon" class="w-4 h-4 mr-1.5" />
             {{ item.name }}

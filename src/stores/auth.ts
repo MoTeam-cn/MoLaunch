@@ -15,7 +15,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 计算属性
   const isLoggedIn = computed(() => currentUser.value !== null)
-  const username = computed(() => currentUser.value?.username ?? '')
+  const username = computed(() => currentUser.value?.name ?? '')
 
   // 方法
   async function loginOffline(username: string) {

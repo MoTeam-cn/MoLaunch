@@ -15,13 +15,6 @@ export async function getPlatformInfo(): Promise<SdkStatus> {
 }
 
 /**
- * 初始化 SDK
- */
-export async function initializeSdk(gameDir?: string): Promise<string> {
-  return await invoke<string>('initialize_sdk', { gameDir })
-}
-
-/**
  * 获取 SDK 版本
  */
 export async function getSdkVersion(): Promise<string | null> {
@@ -227,7 +220,7 @@ export async function resetDownloadProgress(): Promise<void> {
 /**
  * 查询 Forge 版本列表
  */
-export async function listForgeVersions(mcVersion: string): Promise<string[]> {
+export async function listForgeVersions(mcVersion: string): Promise<{ version: string; is_recommended: boolean; release_time: string }[]> {
   const json = await invoke<string>('list_forge_versions', { mcVersion })
   try { return JSON.parse(json) } catch { return [] }
 }
@@ -311,11 +304,4 @@ export async function setMaxDownloadThreads(threads: number): Promise<void> {
  */
 export async function getMaxDownloadThreads(): Promise<number> {
   return await invoke<number>('get_max_download_threads')
-}
-
-/**
- * 手动触发 SDK 重新初始化（用于批量设置更新后）
- */
-export async function reinitializeSdk(): Promise<string> {
-  return await invoke<string>('reinitialize_sdk_command')
 }

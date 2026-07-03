@@ -35,32 +35,23 @@ async function flushSave() {
   saveTimer = null
 
   try {
-    // 批量保存所有待更新的设置，跳过单独的 reinit
+    // 批量保存所有待更新的设置
     const tasks: Promise<void>[] = []
-    let needsReinit = false
     
     if (changes.includes('source')) {
       tasks.push(tauri.setDownloadSource(computeSource(), true))
-      needsReinit = true
     }
     if (changes.includes('speed')) {
       const speed = speedSlider.value >= 21 ? 0 : (speedSlider.value === 0 ? 1 : speedSlider.value) * 1024 * 1024
       maxDownloadSpeed.value = speed
       tasks.push(tauri.setMaxDownloadSpeed(speed, true))
-      needsReinit = true
     }
     if (changes.includes('threads')) {
-      // threads 不需要 reinit，直接保存
       tasks.push(tauri.setMaxDownloadThreads(maxThreads.value))
     }
     
     // 并行保存所有设置
     await Promise.all(tasks)
-    
-    // 如果有需要 reinit 的设置变更，统一触发一次
-    if (needsReinit) {
-      await tauri.reinitializeSdk()
-    }
   } catch (e) {
     console.error('Failed to save download settings:', e)
   }

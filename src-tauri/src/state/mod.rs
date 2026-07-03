@@ -5,6 +5,23 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+/// 本地认证结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LocalAuthResult {
+    /// 用户名
+    pub name: String,
+    /// UUID
+    pub uuid: String,
+    /// 访问令牌
+    pub access_token: String,
+    /// 客户端令牌
+    pub client_token: String,
+    /// 登录类型
+    pub login_type: String,
+    /// 微软登录时的档案信息
+    pub profile_json: Option<String>,
+}
+
 /// 应用全局状态
 pub struct AppState {
     pub sdk: Arc<Mutex<Option<SdkInstance>>>,
@@ -53,7 +70,7 @@ impl Default for AppConfig {
 /// 认证状态
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct AuthState {
-    pub current_user: Option<crate::sdk::AuthResult>,
+    pub current_user: Option<LocalAuthResult>,
     pub is_logged_in: bool,
 }
 
@@ -98,8 +115,20 @@ impl AppState {
             }
         };
 
+        // 尝试加载 SDK lite
+        let sdk = match crate::sdk::SdkInstance::load() {
+            Ok(sdk) => {
+                log::info!("SDK lite loaded successfully");
+                Some(sdk)
+            }
+            Err(e) => {
+                log::warn!("Failed to load SDK lite: {}", e);
+                None
+            }
+        };
+
         Self {
-            sdk: Arc::new(Mutex::new(None)),
+            sdk: Arc::new(Mutex::new(sdk)),
             config: Arc::new(Mutex::new(config)),
             auth: Arc::new(Mutex::new(AuthState::default())),
         }

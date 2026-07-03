@@ -1,10 +1,9 @@
-//! SDK 管理命令
+//! SDK 管理命令（lite 版本）
 
-use crate::sdk::SdkInstance;
 use crate::state::AppState;
 use tauri::State;
 
-/// 获取 SDK 状态信息
+/// SDK 状态信息
 #[derive(serde::Serialize)]
 pub struct SdkStatus {
     pub loaded: bool,
@@ -42,60 +41,6 @@ pub async fn get_platform_info() -> Result<SdkStatus, String> {
     })
 }
 
-/// 初始化 SDK
-#[tauri::command]
-pub async fn initialize_sdk(
-    state: State<'_, AppState>,
-    game_dir: Option<String>,
-) -> Result<String, String> {
-    log::info!("Initializing SDK...");
-
-    let config = state.config.lock().await;
-    let game_dir = game_dir.unwrap_or_else(|| config.game_dir.clone());
-    let max_threads = config.max_download_threads;
-    let log_level = config.log_level;
-    let mirror_url = config.mirror_url.clone();
-    let mirror_url_meta = config.mirror_url_meta.clone();
-    let mirror_url_download = config.mirror_url_download.clone();
-    let mirror_mode = config.mirror_mode;
-    let max_download_speed = config.max_download_speed;
-    drop(config);
-
-    log::info!("Game directory: {}", game_dir);
-    log::info!("Mirror meta: {:?}, download: {:?}, mode: {}", mirror_url_meta, mirror_url_download, mirror_mode);
-    log::info!("Max download speed: {} bytes/sec", max_download_speed);
-
-    // 加载 SDK 库
-    let mut sdk = SdkInstance::load().map_err(|e| {
-        log::error!("Failed to load SDK: {}", e);
-        e.to_string()
-    })?;
-
-    // 初始化 SDK
-    sdk.init(
-        &game_dir,
-        max_threads,
-        log_level,
-        mirror_url.as_deref(),
-        mirror_url_meta.as_deref(),
-        mirror_url_download.as_deref(),
-        mirror_mode,
-        max_download_speed,
-    ).map_err(|e| {
-        log::error!("Failed to initialize SDK: {}", e);
-        e.to_string()
-    })?;
-
-    let version = sdk.version().map_err(|e| e.to_string())?;
-    log::info!("SDK loaded successfully, version: {}", version);
-
-    // 保存 SDK 实例
-    let mut sdk_guard = state.sdk.lock().await;
-    *sdk_guard = Some(sdk);
-
-    Ok(version)
-}
-
 /// 获取 SDK 版本
 #[tauri::command]
 pub async fn get_sdk_version(state: State<'_, AppState>) -> Result<Option<String>, String> {
@@ -117,10 +62,46 @@ pub async fn is_sdk_initialized(state: State<'_, AppState>) -> Result<bool, Stri
 #[tauri::command]
 pub async fn get_device_id(state: State<'_, AppState>) -> Result<String, String> {
     let sdk_guard = state.sdk.lock().await;
-    let sdk = sdk_guard.as_ref().ok_or("SDK not initialized")?;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
 
     sdk.get_device_id().map_err(|e| {
         log::error!("Failed to get device ID: {}", e);
+        e.to_string()
+    })
+}
+
+/// 加密 Token
+#[tauri::command]
+pub async fn encrypt_token(state: State<'_, AppState>, data: String) -> Result<String, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
+
+    sdk.encrypt_token(&data).map_err(|e| {
+        log::error!("Failed to encrypt token: {}", e);
+        e.to_string()
+    })
+}
+
+/// 解密 Token
+#[tauri::command]
+pub async fn decrypt_token(state: State<'_, AppState>, encrypted: String) -> Result<String, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
+
+    sdk.decrypt_token(&encrypted).map_err(|e| {
+        log::error!("Failed to decrypt token: {}", e);
+        e.to_string()
+    })
+}
+
+/// 检查更新（轻量版）
+#[tauri::command]
+pub async fn check_update_lite(state: State<'_, AppState>) -> Result<crate::sdk::UpdateInfoLite, String> {
+    let sdk_guard = state.sdk.lock().await;
+    let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
+
+    sdk.update_check_lite().map_err(|e| {
+        log::error!("Failed to check update: {}", e);
         e.to_string()
     })
 }

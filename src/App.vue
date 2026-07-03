@@ -33,17 +33,8 @@ async function initApp() {
   // 获取平台信息
   await sdkStore.fetchPlatformInfo()
   
-  // 检查 SDK 状态
-  await sdkStore.checkStatus()
-  
-  // 如果 SDK 未初始化，尝试初始化
-  if (!sdkStore.initialized) {
-    try {
-      await sdkStore.initialize()
-    } catch (e) {
-      console.error('Failed to initialize SDK:', e)
-    }
-  }
+  // 获取设备ID
+  await sdkStore.fetchDeviceId()
   
   // 恢复登录状态
   await authStore.restoreSession()

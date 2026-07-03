@@ -44,16 +44,14 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
       }
 
       if (progress) {
-        // 根据文档，使用 current/total 计算百分比（文件数）
+        // 计算百分比 - 使用字节数计算（SDK已修复bytes_total包含所有文件）
         let percentage = 0
-        if (progress.total > 0) {
-          percentage = Math.round((progress.current / progress.total) * 100)
+        
+        if (progress.bytes_total > 0) {
+          percentage = Math.min(100, Math.round((progress.bytes_downloaded / progress.bytes_total) * 100))
         }
 
-        // 确保百分比在合理范围内
-        percentage = Math.max(0, Math.min(percentage, 100))
-
-        // 如果已完成，设置为 100%
+        // 只有SDK明确报告完成时才设为100%
         if (progress.is_complete) {
           percentage = 100
         }
@@ -64,10 +62,12 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
         }
 
         // 获取阶段名称
-        const stageName = STAGE_NAMES[progress.stage] || `阶段 ${progress.stage}`
+        const stageIndex = progress.stage
+        const stageName = STAGE_NAMES[stageIndex] || `阶段 ${stageIndex}`
 
         versionStore.updateProgress({
           stage: stageName,
+          stageIndex: stageIndex,
           current: progress.current,
           total: progress.total,
           percentage: percentage,

@@ -17,45 +17,16 @@ export const useSdkStore = defineStore('sdk', () => {
   const error = ref<string | null>(null)
 
   // 计算属性
-  const isReady = computed(() => initialized.value && version.value !== null)
+  const isReady = computed(() => initialized.value)
 
   // 方法
   async function fetchPlatformInfo() {
     try {
       status.value = await tauri.getPlatformInfo()
+      version.value = await tauri.getSdkVersion()
+      initialized.value = true
     } catch (e) {
       console.error('Failed to get platform info:', e)
-    }
-  }
-
-  async function initialize(gameDir?: string) {
-    loading.value = true
-    error.value = null
-    
-    try {
-      version.value = await tauri.initializeSdk(gameDir)
-      initialized.value = true
-      
-      // 初始化成功后获取设备 ID
-      await fetchDeviceId()
-    } catch (e) {
-      error.value = String(e)
-      initialized.value = false
-      throw e
-    } finally {
-      loading.value = false
-    }
-  }
-
-  async function checkStatus() {
-    try {
-      initialized.value = await tauri.isSdkInitialized()
-      if (initialized.value) {
-        version.value = await tauri.getSdkVersion()
-        await fetchDeviceId()
-      }
-    } catch (e) {
-      console.error('Failed to check SDK status:', e)
     }
   }
 
@@ -77,8 +48,6 @@ export const useSdkStore = defineStore('sdk', () => {
     error,
     isReady,
     fetchPlatformInfo,
-    initialize,
-    checkStatus,
     fetchDeviceId,
   }
 })

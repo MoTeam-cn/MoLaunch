@@ -158,10 +158,6 @@ function goToVersions() {
             <span class="text-gray-600">平台</span>
             <span class="text-gray-900">{{ sdkStore.status?.platform || '未知' }}</span>
           </div>
-          <div class="flex items-center justify-between py-2">
-            <span class="text-gray-600">SDK 版本</span>
-            <span class="text-gray-900">{{ sdkStore.version || '未加载' }}</span>
-          </div>
         </div>
       </div>
 

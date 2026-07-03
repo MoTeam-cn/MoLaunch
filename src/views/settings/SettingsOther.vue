@@ -66,10 +66,6 @@ onMounted(async () => {
           <span class="text-sm text-gray-900">{{ sdkStore.status?.platform || '未知' }}</span>
         </div>
         <div class="px-5 py-3 flex items-center justify-between">
-          <span class="text-sm text-gray-500">版本</span>
-          <span class="text-sm text-gray-900">{{ sdkStore.version || '未加载' }}</span>
-        </div>
-        <div class="px-5 py-3 flex items-center justify-between">
           <span class="text-sm text-gray-500">状态</span>
           <span class="text-sm" :class="sdkStore.isReady ? 'text-green-600' : 'text-yellow-600'">
             {{ sdkStore.isReady ? '就绪' : '加载中' }}
@@ -78,10 +74,6 @@ onMounted(async () => {
         <div class="px-5 py-3 flex items-center justify-between">
           <span class="text-sm text-gray-500">设备 ID</span>
           <span class="text-sm text-gray-900 font-mono">{{ sdkStore.deviceId || '未获取' }}</span>
-        </div>
-        <div class="px-5 py-3 flex items-center justify-between">
-          <span class="text-sm text-gray-500">库路径</span>
-          <span class="text-sm text-gray-900 truncate ml-4 max-w-xs">{{ sdkStore.status?.library_path || '未知' }}</span>
         </div>
       </div>
     </div>

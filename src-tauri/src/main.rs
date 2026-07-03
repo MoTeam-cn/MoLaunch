@@ -12,15 +12,22 @@ fn main() {
 
     log::info!("Starting MoLaunch v{}", env!("CARGO_PKG_VERSION"));
 
+    // 初始化 storage
+    if let Err(e) = mo_launch_lib::storage::Storage::instance().init() {
+        log::error!("Failed to initialize storage: {}", e);
+    }
+
     tauri::Builder::default()
         .manage(AppState::new())
         .invoke_handler(tauri::generate_handler![
-            // SDK 命令
+            // SDK 命令（lite 版本）
             commands::sdk::get_platform_info,
-            commands::sdk::initialize_sdk,
             commands::sdk::get_sdk_version,
             commands::sdk::is_sdk_initialized,
             commands::sdk::get_device_id,
+            commands::sdk::encrypt_token,
+            commands::sdk::decrypt_token,
+            commands::sdk::check_update_lite,
             // 认证命令
             commands::auth::login_offline,
             commands::auth::get_login_status,
@@ -63,7 +70,6 @@ fn main() {
             commands::system::get_memory_config,
             commands::system::set_max_download_threads,
             commands::system::get_max_download_threads,
-            commands::system::reinitialize_sdk_command,
         ])
         .on_window_event(|event| {
             // 窗口关闭时保存配置

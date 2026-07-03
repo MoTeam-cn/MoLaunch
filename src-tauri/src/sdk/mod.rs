@@ -39,15 +39,15 @@ pub enum SdkError {
 pub fn get_sdk_filename() -> &'static str {
     #[cfg(target_os = "windows")]
     {
-        "mc_sdk.dll"
+        "run_sdk_lib-windows-x86_64.dll"
     }
     #[cfg(target_os = "macos")]
     {
-        "mc_sdk.dylib"
+        "run_sdk_lib-darwin-aarch64.dylib"
     }
     #[cfg(target_os = "linux")]
     {
-        "mc_sdk.so"
+        "run_sdk_lib-linux-x86_64.so"
     }
 }
 
