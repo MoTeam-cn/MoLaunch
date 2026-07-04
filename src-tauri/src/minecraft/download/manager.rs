@@ -1,6 +1,6 @@
 //! 下载管理器 - 多线程下载、进度追踪、文件校验、限速
 
-use crate::{log_warn, log_debug};
+use crate::{log_info, log_warn, log_debug};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -192,7 +192,7 @@ impl DownloadManager {
     }
 
     /// 根据源模式重新排序 URLs
-    /// Smart 模式：官方源和镜像源交替排列，先尝试官方，失败后自动切换
+    /// 根据源模式重新排序 URLs
     fn reorder_urls(&self, urls: &[String]) -> Vec<String> {
         if urls.len() <= 1 {
             return urls.to_vec();
@@ -211,16 +211,15 @@ impl DownloadManager {
 
         match self.source_mode {
             DownloadSourceMode::Official => {
-                official_urls.extend(mirror_urls);
+                // Official：只使用官方源，不切换
                 official_urls
             }
             DownloadSourceMode::Mirror => {
-                mirror_urls.extend(official_urls);
+                // Mirror：只使用镜像源，不切换
                 mirror_urls
             }
             DownloadSourceMode::Smart => {
-                // 智能模式：交替排列，先官方后镜像
-                // 这样下载时会先尝试官方源，失败后再尝试镜像源
+                // Smart：官方源优先，失败后自动切换到镜像源
                 let mut result = Vec::new();
                 let max_len = official_urls.len().max(mirror_urls.len());
                 for i in 0..max_len {
@@ -331,6 +330,7 @@ impl DownloadManager {
                     &urls,
                     Some(limiter),
                     source_mode,
+                    Some(prog.clone()),
                 ).await;
 
                 {
@@ -338,7 +338,13 @@ impl DownloadManager {
                     match &result.status {
                         DownloadStatus::Completed => p.completed_files += 1,
                         DownloadStatus::Failed => p.failed_files += 1,
-                        DownloadStatus::Skipped => p.skipped_files += 1,
+                        DownloadStatus::Skipped => {
+                            p.skipped_files += 1;
+                            // 跳过的文件：只从 total_bytes 中扣除，不增加 downloaded_bytes
+                            // 这样百分比计算不会出错
+                            let skipped_size = result.total;
+                            p.total_bytes = p.total_bytes.saturating_sub(skipped_size);
+                        }
                         _ => {}
                     }
                     p.downloaded_bytes += result.downloaded;
@@ -393,6 +399,7 @@ impl DownloadManager {
         urls: &[String],
         rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
         source_mode: DownloadSourceMode,
+        progress: Option<Arc<Mutex<GlobalProgress>>>,
     ) -> DownloadProgress {
         // 检查文件是否已存在且有效
         let checker = FileChecker::new()
@@ -403,7 +410,7 @@ impl DownloadManager {
             return DownloadProgress {
                 task_id: task.id.clone(),
                 downloaded: 0,
-                total: 0,
+                total: task.expected_size.max(0) as u64,  // 返回任务大小，用于从 total_bytes 中扣除
                 speed: 0,
                 status: DownloadStatus::Skipped,
                 error: None,
@@ -424,7 +431,8 @@ impl DownloadManager {
             }
         }
 
-        // 尝试每个 URL
+        // 尝试每个 URL（每个 URL 最多重试 3 次）
+        const MAX_RETRIES: u32 = 3;
         for url in urls {
             // 根据源模式获取超时时间
             let timeout = match source_mode {
@@ -432,21 +440,38 @@ impl DownloadManager {
                     if url.contains("bmclapi") || url.contains("mirror") {
                         Duration::from_secs(30)
                     } else {
-                        Duration::from_secs(10)  // 官方源增加到10秒
+                        Duration::from_secs(10)
                     }
                 }
                 _ => Duration::from_secs(30),
             };
 
-            log_debug!("[Download] 尝试从 {} 下载 (超时: {}s)", url, timeout.as_secs());
-            match Self::download_from_url(client, url, &task.local_path, rate_limiter.clone(), timeout).await {
-                Ok((downloaded, total, speed)) => {
-                    // 校验
-                    if let Some(err) = checker.check(&task.local_path) {
-                        log_warn!("文件校验失败：{} - {}", task.local_path, err);
-                        let _ = std::fs::remove_file(&task.local_path);
-                        continue;
-                    }
+            for retry in 0..MAX_RETRIES {
+                if retry > 0 {
+                    log_info!("[Download] 重试 {}/{}: {}", retry + 1, MAX_RETRIES, url);
+                    tokio::time::sleep(Duration::from_millis(500 * retry as u64)).await;
+                }
+
+                log_debug!("[Download] 尝试从 {} 下载 (超时: {}s)", url, timeout.as_secs());
+                match Self::download_from_url(client, url, &task.local_path, rate_limiter.clone(), timeout, progress.clone()).await {
+                    Ok((downloaded, total, speed)) => {
+                        // 如果 expected_size 为 0，用实际下载大小更新 checker
+                        let checker = if task.expected_size == 0 && downloaded > 0 {
+                            FileChecker::new()
+                                .with_actual_size(downloaded as i64)
+                                .with_hash(task.expected_hash.clone())
+                        } else {
+                            FileChecker::new()
+                                .with_actual_size(task.expected_size)
+                                .with_hash(task.expected_hash.clone())
+                        };
+                        
+                        // 校验
+                        if let Some(err) = checker.check(&task.local_path) {
+                            log_warn!("文件校验失败：{} - {}", task.local_path, err);
+                            let _ = std::fs::remove_file(&task.local_path);
+                            continue;
+                        }
 
                     return DownloadProgress {
                         task_id: task.id.clone(),
@@ -459,9 +484,10 @@ impl DownloadManager {
                 }
                 Err(e) => {
                     log_debug!("从 {} 下载失败：{}", url, e);
-                    continue;
+                    // 继续重试
                 }
             }
+            } // end retry loop
         }
 
         DownloadProgress {
@@ -481,6 +507,7 @@ impl DownloadManager {
         local_path: &str,
         rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
         timeout: Duration,
+        _progress: Option<Arc<Mutex<GlobalProgress>>>,
     ) -> Result<(u64, u64, u64), Box<dyn std::error::Error + Send + Sync>> {
         let response = client.get(url).timeout(timeout).send().await?;
 

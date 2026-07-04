@@ -2,9 +2,10 @@
 
 pub mod forge_installer;
 
-use crate::log_info;
+use crate::{log_info, log_warn};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+use std::sync::Arc;
 
 use super::download::{self, manager::{DownloadManager, DownloadSourceMode, DownloadTask, DownloadStatus}};
 
@@ -445,22 +446,35 @@ pub async fn install_loader(
     game_dir: &Path,
     mirror_url: Option<&str>,
     _max_threads: usize,
+    progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
+    source_mode: DownloadSourceMode,
 ) -> anyhow::Result<()> {
     match loader_type {
-        LoaderType::Forge => install_forge(mc_version, loader_version, game_dir, mirror_url).await,
-        LoaderType::NeoForge => install_neoforge(mc_version, loader_version, game_dir, mirror_url).await,
-        LoaderType::Fabric => install_fabric(mc_version, loader_version, game_dir, mirror_url).await,
-        LoaderType::OptiFine => install_optifine(mc_version, loader_version).await,
-        LoaderType::LiteLoader => install_liteloader(mc_version, loader_version, game_dir, mirror_url).await,
+        LoaderType::Forge => install_forge(mc_version, loader_version, game_dir, mirror_url, progress_callback, source_mode).await,
+        LoaderType::NeoForge => install_neoforge(mc_version, loader_version, game_dir, mirror_url, progress_callback, source_mode).await,
+        LoaderType::Fabric => install_fabric(mc_version, loader_version, game_dir, mirror_url, progress_callback, source_mode).await,
+        LoaderType::OptiFine => install_optifine(mc_version, loader_version, progress_callback, source_mode).await,
+        LoaderType::LiteLoader => install_liteloader(mc_version, loader_version, game_dir, mirror_url, progress_callback, source_mode).await,
     }
 }
 
-async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _mirror_url: Option<&str>) -> anyhow::Result<()> {
-    log_info!("[Forge] Installing {} for MC {}", forge_version, mc_version);
+async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _mirror_url: Option<&str>, progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>, source_mode: DownloadSourceMode) -> anyhow::Result<()> {
+    if let Some(ref cb) = progress_callback {
+        cb(0.0);
+    }
 
     let file_name = format!("forge-{}-{}-installer.jar", mc_version, forge_version);
     let installer_url = format!("https://maven.minecraftforge.net/net/minecraftforge/forge/{}-{}/{}", mc_version, forge_version, file_name);
-    let installer_path = game_dir.join("forge-installer.jar");
+    let temp_dir = std::env::temp_dir().join("MoLaunch").join("TaskTemp");
+    std::fs::create_dir_all(&temp_dir)?;
+    let installer_path = temp_dir.join(&file_name);
+
+    // 尝试获取文件 hash（从 Maven 的 .sha1 文件）
+    let hash_url = format!("{}.sha1", installer_url);
+    let expected_hash = match crate::http::fetch_url(&hash_url).await {
+        Ok(hash) => Some(hash.trim().to_string()),
+        Err(_) => None,
+    };
 
     // Download installer
     let urls = vec![
@@ -468,23 +482,57 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
         installer_url.clone(),
     ];
 
-    let manager = DownloadManager::new(1, 0, DownloadSourceMode::Smart);
+    let manager = DownloadManager::new(1, 0, source_mode);
     let task = DownloadTask {
         id: "forge_installer".to_string(),
         urls,
         local_path: installer_path.to_string_lossy().to_string(),
-        expected_size: 0,
-        expected_hash: None,
+        expected_size: 0,  // Maven 不提供 size，下载后用实际大小
+        expected_hash,
     };
 
     let results = manager.download_batch(vec![task], None).await;
     if let Some(result) = results.first() {
         if result.status == DownloadStatus::Failed {
+            let _ = std::fs::remove_file(&installer_path);
             return Err(anyhow::anyhow!("Failed to download Forge installer"));
         }
     }
 
+    if let Some(ref cb) = progress_callback {
+        cb(10.0);
+    }
+
+    let result = do_install_forge(mc_version, forge_version, &installer_path, game_dir, progress_callback, source_mode).await;
+    let _ = std::fs::remove_file(&installer_path);
+    result
+}
+
+async fn do_install_forge(mc_version: &str, forge_version: &str, installer_path: &Path, game_dir: &Path, progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>, source_mode: DownloadSourceMode) -> anyhow::Result<()> {
+    log_info!("[Forge] Installing {} for MC {}", forge_version, mc_version);
+
     let version_id = format!("{}-forge-{}", mc_version, forge_version);
+
+    // 确保 launcher_profiles.json 存在（Forge 安装器需要）
+    super::launcher_profiles::ensure_profiles_exist(game_dir)
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+    if let Some(ref cb) = progress_callback {
+        cb(20.0);
+    }
+
+    // 下载 Mojang 映射文件（Forge >= 20 需要）
+    if forge_installer::needs_injector(forge_version, false) {
+        log_info!("[Forge] Downloading Mojang mappings for MC {}", mc_version);
+        if let Err(e) = download_mojang_mappings(mc_version, game_dir, installer_path, source_mode).await {
+            log_warn!("[Forge] Failed to download mappings: {}", e);
+            // 不阻断安装，让安装器自己处理
+        }
+    }
+
+    if let Some(ref cb) = progress_callback {
+        cb(30.0);
+    }
 
     // Check if we need the injector (Forge >= 20)
     if forge_installer::needs_injector(forge_version, false) {
@@ -494,8 +542,16 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
         let cache_dir = game_dir.join(".cache");
         let (injector_path, wrapper_path) = forge_installer::extract_embedded_resources(&cache_dir)?;
 
+        if let Some(ref cb) = progress_callback {
+            cb(40.0);
+        }
+
         // Find Java
         let java_path = find_java_for_install(game_dir)?;
+
+        if let Some(ref cb) = progress_callback {
+            cb(50.0);
+        }
 
         // Run injector
         forge_installer::run_forge_installer(
@@ -507,6 +563,10 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
             false,
             None,
         )?;
+
+        if let Some(ref cb) = progress_callback {
+            cb(80.0);
+        }
 
         // Find and copy the generated version JSON
         let versions_dir = game_dir.join("versions");
@@ -533,11 +593,15 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
                 }
             }
         }
+
+        if let Some(ref cb) = progress_callback {
+            cb(90.0);
+        }
     } else {
         // Old Forge: direct extraction
         log_info!("[Forge] Using direct extraction for old Forge {}", forge_version);
 
-        let file = std::fs::File::open(&installer_path)?;
+        let file = std::fs::File::open(installer_path)?;
         let mut archive = zip::ZipArchive::new(file)?;
 
         // Try to get version.json
@@ -561,7 +625,7 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
         std::fs::write(&json_path, serde_json::to_string_pretty(&merged_json)?)?;
 
         // Extract maven directory
-        let file = std::fs::File::open(&installer_path)?;
+        let file = std::fs::File::open(installer_path)?;
         let mut archive = zip::ZipArchive::new(file)?;
 
         for i in 0..archive.len() {
@@ -578,21 +642,43 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
                 std::io::copy(&mut entry, &mut target_file)?;
             }
         }
+
+        if let Some(ref cb) = progress_callback {
+            cb(90.0);
+        }
     }
 
-    let _ = std::fs::remove_file(&installer_path);
     log_info!("[Forge] Installed: {}", version_id);
+
+    if let Some(ref cb) = progress_callback {
+        cb(100.0);
+    }
+
     Ok(())
 }
 
-async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &Path, _mirror_url: Option<&str>) -> anyhow::Result<()> {
+async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &Path, _mirror_url: Option<&str>, progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>, source_mode: DownloadSourceMode) -> anyhow::Result<()> {
+    if let Some(ref cb) = progress_callback {
+        cb(0.0);
+    }
+
     log_info!("[NeoForge] Installing {} for MC {}", neoforge_version, mc_version);
 
+    let file_name = format!("neoforge-{}-installer.jar", neoforge_version);
     let installer_url = format!(
-        "https://maven.neoforged.net/releases/net/neoforged/neoforge/{}/neoforge-{}-installer.jar",
-        neoforge_version, neoforge_version
+        "https://maven.neoforged.net/releases/net/neoforged/neoforge/{}/{}",
+        neoforge_version, file_name
     );
-    let installer_path = game_dir.join("neoforge-installer.jar");
+    let temp_dir = std::env::temp_dir().join("MoLaunch").join("TaskTemp");
+    std::fs::create_dir_all(&temp_dir)?;
+    let installer_path = temp_dir.join(&file_name);
+
+    // 尝试获取文件 hash
+    let hash_url = format!("{}.sha1", installer_url);
+    let expected_hash = match crate::http::fetch_url(&hash_url).await {
+        Ok(hash) => Some(hash.trim().to_string()),
+        Err(_) => None,
+    };
 
     let urls = vec![
         installer_url.replace("https://maven.neoforged.net/releases", "https://bmclapi2.bangbang93.com/maven"),
@@ -605,7 +691,7 @@ async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &P
         urls,
         local_path: installer_path.to_string_lossy().to_string(),
         expected_size: 0,
-        expected_hash: None,
+        expected_hash,
     };
 
     let results = manager.download_batch(vec![task], None).await;
@@ -615,7 +701,30 @@ async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &P
         }
     }
 
+    if let Some(ref cb) = progress_callback {
+        cb(10.0);
+    }
+
     let version_id = format!("{}-neoforge-{}", mc_version, neoforge_version);
+
+    // 确保 launcher_profiles.json 存在（NeoForge 安装器需要）
+    super::launcher_profiles::ensure_profiles_exist(game_dir)
+        .map_err(|e| anyhow::anyhow!(e))?;
+
+    if let Some(ref cb) = progress_callback {
+        cb(20.0);
+    }
+
+    // 下载 Mojang 映射文件（NeoForge 需要）
+    log_info!("[NeoForge] Downloading Mojang mappings for MC {}", mc_version);
+    if let Err(e) = download_mojang_mappings(mc_version, game_dir, &installer_path, source_mode).await {
+        log_warn!("[NeoForge] Failed to download mappings: {}", e);
+        // 不阻断安装，让安装器自己处理
+    }
+
+    if let Some(ref cb) = progress_callback {
+        cb(30.0);
+    }
 
     // NeoForge always uses injector
     log_info!("[NeoForge] Using injector");
@@ -623,7 +732,15 @@ async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &P
     let cache_dir = game_dir.join(".cache");
     let (injector_path, wrapper_path) = forge_installer::extract_embedded_resources(&cache_dir)?;
 
+    if let Some(ref cb) = progress_callback {
+        cb(40.0);
+    }
+
     let java_path = find_java_for_install(game_dir)?;
+
+    if let Some(ref cb) = progress_callback {
+        cb(50.0);
+    }
 
     forge_installer::run_forge_installer(
         &java_path,
@@ -634,6 +751,10 @@ async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &P
         true,
         None,
     )?;
+
+    if let Some(ref cb) = progress_callback {
+        cb(80.0);
+    }
 
     // Find and copy the generated version JSON
     let versions_dir = game_dir.join("versions");
@@ -661,14 +782,35 @@ async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &P
         }
     }
 
+    if let Some(ref cb) = progress_callback {
+        cb(90.0);
+    }
+
     let _ = std::fs::remove_file(&installer_path);
     log_info!("[NeoForge] Installed: {}", version_id);
+
+    if let Some(ref cb) = progress_callback {
+        cb(100.0);
+    }
+
     Ok(())
 }
 
 /// Find Java for installation (minimum Java 8u60)
+/// 优先使用自动检测的 Java，而不是系统环境变量
 fn find_java_for_install(_game_dir: &Path) -> anyhow::Result<String> {
-    // Try to find Java from PATH
+    // 使用 Java 检测模块搜索 Java
+    let java_list = super::java::search_java();
+
+    if !java_list.is_empty() {
+        // 使用新的 Java 选择算法
+        if let Some(java_path) = super::java_selector::get_java_for_installer(&java_list) {
+            log_info!("[Java] 使用自动检测的 Java: {}", java_path);
+            return Ok(java_path);
+        }
+    }
+
+    // 兜底：尝试从 PATH 查找
     if let Ok(path) = std::env::var("PATH") {
         for dir in std::env::split_paths(&path) {
             let java_path = dir.join("java.exe");
@@ -678,18 +820,14 @@ fn find_java_for_install(_game_dir: &Path) -> anyhow::Result<String> {
         }
     }
 
-    // Try JAVA_HOME
-    if let Ok(java_home) = std::env::var("JAVA_HOME") {
-        let java_path = Path::new(&java_home).join("bin").join("java.exe");
-        if java_path.exists() {
-            return Ok(java_path.to_string_lossy().to_string());
-        }
-    }
-
     Err(anyhow::anyhow!("Java not found. Please install Java 8+ to install Forge/NeoForge."))
 }
 
-async fn install_fabric(mc_version: &str, fabric_version: &str, game_dir: &Path, mirror_url: Option<&str>) -> anyhow::Result<()> {
+async fn install_fabric(mc_version: &str, fabric_version: &str, game_dir: &Path, mirror_url: Option<&str>, progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>, _source_mode: DownloadSourceMode) -> anyhow::Result<()> {
+    if let Some(ref cb) = progress_callback {
+        cb(0.0);
+    }
+
     log_info!("[Fabric] Installing {} for MC {}", fabric_version, mc_version);
 
     let version_id = format!("fabric-{}-{}", fabric_version, mc_version);
@@ -729,15 +867,33 @@ async fn install_fabric(mc_version: &str, fabric_version: &str, game_dir: &Path,
     }
 
     log_info!("[Fabric] Installed: {}", version_id);
+
+    if let Some(ref cb) = progress_callback {
+        cb(100.0);
+    }
+
     Ok(())
 }
 
-async fn install_optifine(mc_version: &str, optifine_version: &str) -> anyhow::Result<()> {
+async fn install_optifine(mc_version: &str, optifine_version: &str, progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>, _source_mode: DownloadSourceMode) -> anyhow::Result<()> {
+    if let Some(ref cb) = progress_callback {
+        cb(0.0);
+    }
+
     log_info!("[OptiFine] {} for MC {} - manual installation required", optifine_version, mc_version);
+
+    if let Some(ref cb) = progress_callback {
+        cb(100.0);
+    }
+
     Ok(())
 }
 
-async fn install_liteloader(mc_version: &str, liteloader_version: &str, game_dir: &Path, mirror_url: Option<&str>) -> anyhow::Result<()> {
+async fn install_liteloader(mc_version: &str, liteloader_version: &str, game_dir: &Path, mirror_url: Option<&str>, progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>, _source_mode: DownloadSourceMode) -> anyhow::Result<()> {
+    if let Some(ref cb) = progress_callback {
+        cb(0.0);
+    }
+
     log_info!("[LiteLoader] Installing {} for MC {}", liteloader_version, mc_version);
 
     let version_id = format!("{}-LiteLoader", mc_version);
@@ -777,5 +933,115 @@ async fn install_liteloader(mc_version: &str, liteloader_version: &str, game_dir
     }
 
     log_info!("[LiteLoader] Installed: {}", version_id);
+
+    if let Some(ref cb) = progress_callback {
+        cb(100.0);
+    }
+
+    Ok(())
+}
+
+/// 下载 Mojang 映射文件（Forge/NeoForge >= 20 需要）
+/// 参考 PCL2 的实现：从 install_profile.json 的 data.MOJMAPS.client 字段获取路径
+async fn download_mojang_mappings(mc_version: &str, game_dir: &Path, installer_path: &Path, source_mode: DownloadSourceMode) -> anyhow::Result<()> {
+    // 从 Forge 安装器中提取 install_profile.json
+    let file = std::fs::File::open(installer_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+    
+    let mut install_profile_content = String::new();
+    {
+        let mut entry = archive.by_name("install_profile.json")?;
+        std::io::Read::read_to_string(&mut entry, &mut install_profile_content)?;
+    }
+    
+    let install_profile: serde_json::Value = serde_json::from_str(&install_profile_content)?;
+    
+    // 检查是否有 MOJMAPS 数据
+    let mojmaps = match install_profile["data"]["MOJMAPS"]["client"].as_str() {
+        Some(s) => s,
+        None => {
+            log_info!("[Mappings] No MOJMAPS data found in install_profile.json");
+            return Ok(());
+        }
+    };
+    
+    // 解析格式：[net.minecraft:client:1.17.1-20210706.113038:mappings@txt]
+    // 去掉 [] 和 @ 后面的部分
+    let original_name = mojmaps
+        .trim_start_matches('[')
+        .trim_end_matches(']')
+        .split('@')
+        .next()
+        .unwrap_or("");
+    
+    // 提取扩展名（@txt -> .txt, @tsrg -> .tsrg）
+    let extension = mojmaps
+        .split('@')
+        .nth(1)
+        .unwrap_or("txt");
+    
+    // 解析 Maven 坐标：net.minecraft:client:1.17.1-20210706.113038
+    let parts: Vec<&str> = original_name.split(':').collect();
+    if parts.len() < 3 {
+        return Err(anyhow::anyhow!("Invalid MOJMAPS format: {}", mojmaps));
+    }
+    
+    let group = parts[0];  // net.minecraft
+    let artifact = parts[1];  // client
+    let version = parts[2];  // 1.17.1-20210706.113038
+    
+    // 构建本地路径：libraries/net/minecraft/client/1.17.1-20210706.113038/client-1.17.1-20210706.113038-mappings.txt
+    let group_path = group.replace('.', std::path::MAIN_SEPARATOR_STR);
+    let local_dir = game_dir.join("libraries").join(group_path).join(artifact).join(version);
+    let filename = format!("{}-{}-mappings.{}", artifact, version, extension);
+    let local_path = local_dir.join(&filename);
+    
+    // 检查是否已存在
+    if local_path.exists() {
+        log_info!("[Mappings] File already exists: {}", local_path.display());
+        return Ok(());
+    }
+    
+    // 从版本 JSON 获取下载信息
+    let version_list = super::download::fetch_version_list(None).await?;
+    let json_url = super::download::get_version_json_url(&version_list.value, mc_version)
+        .ok_or_else(|| anyhow::anyhow!("Version {} not found", mc_version))?;
+    
+    let json_content = super::download::fetch_url(&json_url).await?;
+    let version_json: serde_json::Value = serde_json::from_str(&json_content)?;
+    
+    let mappings = version_json["downloads"]["client_mappings"].as_object()
+        .ok_or_else(|| anyhow::anyhow!("client_mappings not found"))?;
+    
+    let url = mappings["url"].as_str()
+        .ok_or_else(|| anyhow::anyhow!("client_mappings URL not found"))?;
+    let sha1 = mappings["sha1"].as_str().unwrap_or_default();
+    let size = mappings["size"].as_i64().unwrap_or(0);
+    
+    // 下载
+    std::fs::create_dir_all(&local_dir)?;
+    
+    let urls = vec![
+        url.replace("https://piston-data.mojang.com", "https://bmclapi2.bangbang93.com"),
+        url.to_string(),
+    ];
+    
+    let manager = DownloadManager::new(1, 0, source_mode);
+    let task = DownloadTask {
+        id: "mappings".to_string(),
+        urls,
+        local_path: local_path.to_string_lossy().to_string(),
+        expected_size: size,
+        expected_hash: if sha1.is_empty() { None } else { Some(sha1.to_string()) },
+    };
+    
+    let results = manager.download_batch(vec![task], None).await;
+    if let Some(result) = results.first() {
+        if result.status == DownloadStatus::Failed {
+            return Err(anyhow::anyhow!("Failed to download Mojang mappings"));
+        }
+    }
+    
+    log_info!("[Mappings] Downloaded: {}", local_path.display());
     Ok(())
 }

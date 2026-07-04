@@ -40,7 +40,7 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
           weightedProgress += stage.progress * stage.weight
         }
         const percentage = totalWeight > 0
-          ? Math.min(100, Math.round((weightedProgress / totalWeight) * 100))
+          ? Math.min(100, parseFloat(((weightedProgress / totalWeight) * 100).toFixed(1)))
           : 0
 
         versionStore.updateProgress({

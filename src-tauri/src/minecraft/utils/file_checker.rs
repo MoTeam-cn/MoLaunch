@@ -71,11 +71,12 @@ impl FileChecker {
 
         let file_size = metadata.len() as i64;
 
-        if self.actual_size >= 0 && self.actual_size != file_size {
+        // actual_size 为 0 时跳过大小校验（未知大小的文件）
+        if self.actual_size > 0 && self.actual_size != file_size {
             return Some(format!("Size mismatch: expected {} B, got {} B", self.actual_size, file_size));
         }
 
-        if self.min_size >= 0 && self.min_size > file_size {
+        if self.min_size > 0 && self.min_size > file_size {
             return Some(format!("Size too small: expected > {} B, got {} B", self.min_size, file_size));
         }
 

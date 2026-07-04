@@ -1,7 +1,7 @@
 //! Forge Installer 注入器模块
 //! 使用 bangbang93 的 forge_installer.jar 进行 Forge/NeoForge 安装
 
-use crate::{log_info, log_debug};
+use crate::{log_info, log_debug, log_error};
 use crate::resources;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -91,7 +91,7 @@ pub fn run_forge_installer(
         args.push(mc_dir.to_string());
     }
 
-    log_info!("[{}] Starting installer: java {}", loader_name, args.join(" "));
+    log_info!("[{}] Starting installer: {} {}", loader_name, java_path, args.join(" "));
 
     // 启动进程
     let mut child = Command::new(java_path)
@@ -150,7 +150,12 @@ pub fn run_forge_installer(
         log_info!("[{}] Installation successful", loader_name);
         Ok(())
     } else {
-        let last_lines_str: Vec<&str> = last_lines.iter().rev().take(5).map(|s| s.as_str()).collect();
+        // 输出所有日志以便诊断
+        log_error!("[{}] Installation failed. Full output:", loader_name);
+        for (i, line) in last_lines.iter().enumerate() {
+            log_error!("[{}]   {}: {}", loader_name, i, line);
+        }
+        let last_lines_str: Vec<&str> = last_lines.iter().rev().take(10).map(|s| s.as_str()).collect();
         Err(anyhow::anyhow!(
             "{} installer failed, last lines: {:?}",
             loader_name,
