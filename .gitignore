@@ -31,6 +31,7 @@ logs/
 src-tauri/.cargo/
 src-tauri/WixTools/
 src-tauri/NSIS/
+src-tauri/gen/
 
 # Rust
 **/*.rs.bk

@@ -1,5 +1,6 @@
 //! Game launch module
 
+use crate::log_info;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -271,7 +272,7 @@ pub fn launch_game(
     let child = cmd.spawn()?;
     let pid = child.id();
 
-    log::info!("Game launched with PID: {}", pid);
+    log_info!("Game launched with PID: {}", pid);
 
     Ok(pid)
 }

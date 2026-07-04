@@ -1,6 +1,7 @@
 //! SDK lite 版本绑定
 //! 只绑定 11 个基础函数
 
+use crate::log_info;
 use super::ffi_types::*;
 use super::types::*;
 use super::{check_sdk_library, SdkError};
@@ -33,7 +34,7 @@ impl SdkInstance {
     /// 加载 SDK 库
     pub fn load() -> Result<Self, SdkError> {
         let lib_path = check_sdk_library()?;
-        log::info!("Loading SDK lite from: {}", lib_path.display());
+        log_info!("Loading SDK lite from: {}", lib_path.display());
 
         let lib = unsafe {
             libloading::Library::new(&lib_path)
@@ -220,6 +221,6 @@ impl SdkInstance {
 
 impl Drop for SdkInstance {
     fn drop(&mut self) {
-        log::info!("SDK lite instance dropped");
+        log_info!("SDK lite instance dropped");
     }
 }

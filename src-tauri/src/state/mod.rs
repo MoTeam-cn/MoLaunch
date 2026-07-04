@@ -1,5 +1,6 @@
 //! 应用状态管理
 
+use crate::{log_info, log_warn};
 use crate::sdk::SdkInstance;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -102,15 +103,15 @@ impl AppState {
         // 尝试从文件加载配置
         let config = match crate::config::load_config() {
             Ok(Some(config)) => {
-                log::info!("Loaded config from file");
+                log_info!("Loaded config from file");
                 config
             }
             Ok(None) => {
-                log::info!("No config file found, using defaults");
+                log_info!("No config file found, using defaults");
                 AppConfig::default()
             }
             Err(e) => {
-                log::warn!("Failed to load config: {}, using defaults", e);
+                log_warn!("Failed to load config: {}, using defaults", e);
                 AppConfig::default()
             }
         };
@@ -118,11 +119,11 @@ impl AppState {
         // 尝试加载 SDK lite
         let sdk = match crate::sdk::SdkInstance::load() {
             Ok(sdk) => {
-                log::info!("SDK lite loaded successfully");
+                log_info!("SDK lite loaded successfully");
                 Some(sdk)
             }
             Err(e) => {
-                log::warn!("Failed to load SDK lite: {}", e);
+                log_warn!("Failed to load SDK lite: {}", e);
                 None
             }
         };

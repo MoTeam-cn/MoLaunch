@@ -1,6 +1,7 @@
 //! Forge Installer 注入器模块
 //! 使用 bangbang93 的 forge_installer.jar 进行 Forge/NeoForge 安装
 
+use crate::{log_info, log_debug};
 use crate::resources;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -90,7 +91,7 @@ pub fn run_forge_installer(
         args.push(mc_dir.to_string());
     }
 
-    log::info!("[{}] Starting installer: java {}", loader_name, args.join(" "));
+    log_info!("[{}] Starting installer: java {}", loader_name, args.join(" "));
 
     // 启动进程
     let mut child = Command::new(java_path)
@@ -109,7 +110,7 @@ pub fn run_forge_installer(
     let stdout_reader = BufReader::new(stdout);
     for line in stdout_reader.lines() {
         let line = line?;
-        log::debug!("[{}] stdout: {}", loader_name, line);
+        log_debug!("[{}] stdout: {}", loader_name, line);
 
         // 解析进度
         if let Some(ref callback) = progress_callback {
@@ -132,7 +133,7 @@ pub fn run_forge_installer(
     let stderr_reader = BufReader::new(stderr);
     for line in stderr_reader.lines() {
         let line = line?;
-        log::debug!("[{}] stderr: {}", loader_name, line);
+        log_debug!("[{}] stderr: {}", loader_name, line);
         last_lines.push(line);
         if last_lines.len() > 100 {
             last_lines.remove(0);
@@ -146,7 +147,7 @@ pub fn run_forge_installer(
     let success = last_lines.iter().rev().take(5).any(|l| l.trim() == "true");
 
     if success {
-        log::info!("[{}] Installation successful", loader_name);
+        log_info!("[{}] Installation successful", loader_name);
         Ok(())
     } else {
         let last_lines_str: Vec<&str> = last_lines.iter().rev().take(5).map(|s| s.as_str()).collect();

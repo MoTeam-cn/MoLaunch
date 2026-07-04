@@ -1,5 +1,6 @@
 //! 系统命令
 
+use crate::log_info;
 use crate::state::AppState;
 use tauri::State;
 
@@ -24,7 +25,7 @@ pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
     let config = state.config.lock().await;
     let game_dir = &config.game_dir;
 
-    log::info!("Opening game directory: {}", game_dir);
+    log_info!("Opening game directory: {}", game_dir);
 
     #[cfg(target_os = "windows")]
     {
@@ -110,7 +111,7 @@ pub async fn set_game_dir(
     state: State<'_, AppState>,
     game_dir: String,
 ) -> Result<(), String> {
-    log::info!("Game directory changed to: {}", game_dir);
+    log_info!("Game directory changed to: {}", game_dir);
     update_config(&state, |config| {
         config.game_dir = game_dir;
     }).await
@@ -129,7 +130,7 @@ pub async fn set_mirror_url(
     mirror_url: Option<String>,
     _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
-    log::info!("Mirror URL changed to: {:?}", mirror_url);
+    log_info!("Mirror URL changed to: {:?}", mirror_url);
     update_config(&state, |config| {
         config.mirror_url = mirror_url;
     }).await
@@ -151,7 +152,7 @@ pub async fn set_download_source(
 ) -> Result<(), String> {
     const BMCLAPI: &str = "https://bmclapi2.bangbang93.com";
 
-    log::info!("Download source changed to: {}", source);
+    log_info!("Download source changed to: {}", source);
     update_config(&state, |config| {
         match source.as_str() {
             "mirror" => {
@@ -192,7 +193,7 @@ pub async fn set_max_download_speed(
     speed: u64,
     _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
-    log::info!("Max download speed changed to: {} bytes/sec", speed);
+    log_info!("Max download speed changed to: {} bytes/sec", speed);
     update_config(&state, |config| {
         config.max_download_speed = speed;
     }).await
@@ -217,7 +218,7 @@ pub async fn get_config_path() -> Result<String, String> {
 pub async fn save_config_to_file(state: State<'_, AppState>) -> Result<(), String> {
     let config = state.config.lock().await;
     crate::config::save_config(&config)?;
-    log::info!("Config saved manually");
+    log_info!("Config saved manually");
     Ok(())
 }
 
@@ -227,7 +228,7 @@ pub async fn set_min_memory(
     state: State<'_, AppState>,
     memory: u32,
 ) -> Result<(), String> {
-    log::info!("Min memory changed to: {} MB", memory);
+    log_info!("Min memory changed to: {} MB", memory);
     update_config(&state, |config| {
         config.min_memory = memory;
     }).await
@@ -239,7 +240,7 @@ pub async fn set_max_memory(
     state: State<'_, AppState>,
     memory: u32,
 ) -> Result<(), String> {
-    log::info!("Max memory changed to: {} MB", memory);
+    log_info!("Max memory changed to: {} MB", memory);
     update_config(&state, |config| {
         config.max_memory = memory;
     }).await
@@ -258,7 +259,7 @@ pub async fn set_max_download_threads(
     state: State<'_, AppState>,
     threads: u32,
 ) -> Result<(), String> {
-    log::info!("Max download threads changed to: {}", threads);
+    log_info!("Max download threads changed to: {}", threads);
     update_config(&state, |config| {
         config.max_download_threads = threads;
     }).await
@@ -297,7 +298,7 @@ pub async fn set_config_value(section: String, key: String, value: String) -> Re
                 _ => crate::logger::LogLevel::Info,
             };
             crate::logger::set_level(log_level);
-            log::info!("Log level changed to: {}", level);
+            log_info!("Log level changed to: {}", level);
         }
     }
 
@@ -317,7 +318,7 @@ pub async fn set_log_level(
     state: State<'_, AppState>,
     level: u32,
 ) -> Result<(), String> {
-    log::info!("Log level changed to: {}", level);
+    log_info!("Log level changed to: {}", level);
     update_config(&state, |config| {
         config.log_level = level;
     }).await

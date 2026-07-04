@@ -90,15 +90,15 @@ const forgeItems = computed(() =>
 const neoforgeItems = computed(() =>
   [...neoforgeVersions.value].reverse().map(v => ({
     key: v.version,
-    label: v.version,
-    tags: v.recommended ? ['推荐'] : [],
+    label: v.version.split('-')[0], // 显示时去除 -beta 等后缀
+    tags: v.recommended ? ['推荐'] : v.version.includes('beta') ? ['测试版'] : v.version.includes('alpha') ? ['内测版'] : [],
   }))
 )
 
 const fabricItems = computed(() =>
   fabricVersions.value.map((v, i) => ({
     key: v.version,
-    label: v.version,
+    label: v.version.split('+')[0], // 显示时去除 +build.xx 后缀
     tags: i === 0 ? ['最新版'] : [v.stable ? '稳定版' : '测试版'],
   }))
 )

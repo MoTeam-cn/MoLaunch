@@ -1,5 +1,6 @@
 //! JSON inheritance merge module
 
+use crate::log_warn;
 use std::path::Path;
 
 /// Merge version JSON inheritance chain
@@ -18,7 +19,7 @@ pub fn merge_version_json(
 
         let current_id = current.get("id").and_then(|v| v.as_str()).unwrap_or("");
         if inherit_from == current_id {
-            log::warn!("Self-referencing inherit: {}", inherit_from);
+            log_warn!("Self-referencing inherit: {}", inherit_from);
             break;
         }
 
@@ -28,7 +29,7 @@ pub fn merge_version_json(
             .join(format!("{}.json", inherit_from));
 
         if !parent_json_path.exists() {
-            log::warn!("Parent JSON not found: {}", parent_json_path.display());
+            log_warn!("Parent JSON not found: {}", parent_json_path.display());
             break;
         }
 

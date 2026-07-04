@@ -2,6 +2,7 @@
 
 pub mod forge_installer;
 
+use crate::log_info;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -261,10 +262,8 @@ pub async fn list_fabric_versions(mirror_url: Option<&str>) -> anyhow::Result<Ve
     if let Some(versions_array) = json.as_array() {
         for version in versions_array {
             if let Some(version_str) = version["version"].as_str() {
-                // 转换版本号：0.16.14+build.1 -> 0.16.14.1
-                let formatted_version = version_str.replace("+build", "");
                 versions.push(LoaderVersion {
-                    version: formatted_version,
+                    version: version_str.to_string(),  // 保留完整版本号如 0.16.14+build.1
                     is_recommended: version["stable"].as_bool().unwrap_or(false),
                     release_time: None,
                 });
@@ -457,7 +456,7 @@ pub async fn install_loader(
 }
 
 async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _mirror_url: Option<&str>) -> anyhow::Result<()> {
-    log::info!("[Forge] Installing {} for MC {}", forge_version, mc_version);
+    log_info!("[Forge] Installing {} for MC {}", forge_version, mc_version);
 
     let file_name = format!("forge-{}-{}-installer.jar", mc_version, forge_version);
     let installer_url = format!("https://maven.minecraftforge.net/net/minecraftforge/forge/{}-{}/{}", mc_version, forge_version, file_name);
@@ -489,7 +488,7 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
 
     // Check if we need the injector (Forge >= 20)
     if forge_installer::needs_injector(forge_version, false) {
-        log::info!("[Forge] Using injector for Forge {}", forge_version);
+        log_info!("[Forge] Using injector for Forge {}", forge_version);
 
         // Extract embedded resources
         let cache_dir = game_dir.join(".cache");
@@ -527,7 +526,7 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
                             std::fs::create_dir_all(&version_dir)?;
                             let target_json = version_dir.join(format!("{}.json", version_id));
                             std::fs::copy(json_file.path(), &target_json)?;
-                            log::info!("[Forge] Copied version JSON from {}", path.display());
+                            log_info!("[Forge] Copied version JSON from {}", path.display());
                             break;
                         }
                     }
@@ -536,7 +535,7 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
         }
     } else {
         // Old Forge: direct extraction
-        log::info!("[Forge] Using direct extraction for old Forge {}", forge_version);
+        log_info!("[Forge] Using direct extraction for old Forge {}", forge_version);
 
         let file = std::fs::File::open(&installer_path)?;
         let mut archive = zip::ZipArchive::new(file)?;
@@ -582,12 +581,12 @@ async fn install_forge(mc_version: &str, forge_version: &str, game_dir: &Path, _
     }
 
     let _ = std::fs::remove_file(&installer_path);
-    log::info!("[Forge] Installed: {}", version_id);
+    log_info!("[Forge] Installed: {}", version_id);
     Ok(())
 }
 
 async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &Path, _mirror_url: Option<&str>) -> anyhow::Result<()> {
-    log::info!("[NeoForge] Installing {} for MC {}", neoforge_version, mc_version);
+    log_info!("[NeoForge] Installing {} for MC {}", neoforge_version, mc_version);
 
     let installer_url = format!(
         "https://maven.neoforged.net/releases/net/neoforged/neoforge/{}/neoforge-{}-installer.jar",
@@ -619,7 +618,7 @@ async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &P
     let version_id = format!("{}-neoforge-{}", mc_version, neoforge_version);
 
     // NeoForge always uses injector
-    log::info!("[NeoForge] Using injector");
+    log_info!("[NeoForge] Using injector");
 
     let cache_dir = game_dir.join(".cache");
     let (injector_path, wrapper_path) = forge_installer::extract_embedded_resources(&cache_dir)?;
@@ -654,7 +653,7 @@ async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &P
                         std::fs::create_dir_all(&version_dir)?;
                         let target_json = version_dir.join(format!("{}.json", version_id));
                         std::fs::copy(json_file.path(), &target_json)?;
-                        log::info!("[NeoForge] Copied version JSON from {}", path.display());
+                        log_info!("[NeoForge] Copied version JSON from {}", path.display());
                         break;
                     }
                 }
@@ -663,7 +662,7 @@ async fn install_neoforge(mc_version: &str, neoforge_version: &str, game_dir: &P
     }
 
     let _ = std::fs::remove_file(&installer_path);
-    log::info!("[NeoForge] Installed: {}", version_id);
+    log_info!("[NeoForge] Installed: {}", version_id);
     Ok(())
 }
 
@@ -691,7 +690,7 @@ fn find_java_for_install(_game_dir: &Path) -> anyhow::Result<String> {
 }
 
 async fn install_fabric(mc_version: &str, fabric_version: &str, game_dir: &Path, mirror_url: Option<&str>) -> anyhow::Result<()> {
-    log::info!("[Fabric] Installing {} for MC {}", fabric_version, mc_version);
+    log_info!("[Fabric] Installing {} for MC {}", fabric_version, mc_version);
 
     let version_id = format!("fabric-{}-{}", fabric_version, mc_version);
     let version_dir = game_dir.join("versions").join(&version_id);
@@ -729,17 +728,17 @@ async fn install_fabric(mc_version: &str, fabric_version: &str, game_dir: &Path,
         }
     }
 
-    log::info!("[Fabric] Installed: {}", version_id);
+    log_info!("[Fabric] Installed: {}", version_id);
     Ok(())
 }
 
 async fn install_optifine(mc_version: &str, optifine_version: &str) -> anyhow::Result<()> {
-    log::info!("[OptiFine] {} for MC {} - manual installation required", optifine_version, mc_version);
+    log_info!("[OptiFine] {} for MC {} - manual installation required", optifine_version, mc_version);
     Ok(())
 }
 
 async fn install_liteloader(mc_version: &str, liteloader_version: &str, game_dir: &Path, mirror_url: Option<&str>) -> anyhow::Result<()> {
-    log::info!("[LiteLoader] Installing {} for MC {}", liteloader_version, mc_version);
+    log_info!("[LiteLoader] Installing {} for MC {}", liteloader_version, mc_version);
 
     let version_id = format!("{}-LiteLoader", mc_version);
     let version_dir = game_dir.join("versions").join(&version_id);
@@ -777,6 +776,6 @@ async fn install_liteloader(mc_version: &str, liteloader_version: &str, game_dir
         }
     }
 
-    log::info!("[LiteLoader] Installed: {}", version_id);
+    log_info!("[LiteLoader] Installed: {}", version_id);
     Ok(())
 }

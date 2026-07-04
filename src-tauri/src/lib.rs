@@ -16,11 +16,11 @@ pub fn run() {
     // 初始化日志
     env_logger::init();
 
-    log::info!("Starting MoLaunch v{}", env!("CARGO_PKG_VERSION"));
+    log_info!("Starting MoLaunch v{}", env!("CARGO_PKG_VERSION"));
 
     // 初始化 storage
     if let Err(e) = storage::Storage::instance().init() {
-        log::error!("Failed to initialize storage: {}", e);
+        log_error!("Failed to initialize storage: {}", e);
     }
 
     // 初始化日志系统
@@ -88,9 +88,9 @@ pub fn run() {
         .on_window_event(|_window, event| {
             // 窗口关闭时保存配置
             if let tauri::WindowEvent::CloseRequested { .. } = event {
-                log::info!("Window close requested, saving config...");
+                log_info!("Window close requested, saving config...");
                 // 这里需要获取AppState，但由于生命周期限制，我们简化处理
-                log::info!("Config will be saved on exit");
+                log_info!("Config will be saved on exit");
             }
         })
         .run(tauri::generate_context!())

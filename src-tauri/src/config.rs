@@ -2,6 +2,7 @@
 //!
 //! 使用 storage 模块管理配置文件（INI 格式）
 
+use crate::{log_info, log_warn, log_debug};
 use crate::state::AppConfig;
 use crate::storage::Storage;
 
@@ -18,7 +19,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     let config = match storage.read_config() {
         Ok(config) => config,
         Err(e) => {
-            log::warn!("Failed to read config: {}", e);
+            log_warn!("Failed to read config: {}", e);
             return Ok(None);
         }
     };
@@ -69,7 +70,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         if app_config.min_memory == 0 {
             app_config.min_memory = suggested_min;
         }
-        log::info!("Auto memory config: min={}MB, max={}MB", app_config.min_memory, app_config.max_memory);
+        log_info!("Auto memory config: min={}MB, max={}MB", app_config.min_memory, app_config.max_memory);
     }
 
     // Log
@@ -77,7 +78,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.log_level = level.parse().unwrap_or(app_config.log_level);
     }
 
-    log::info!("Config loaded from storage");
+    log_info!("Config loaded from storage");
     Ok(Some(app_config))
 }
 
@@ -123,6 +124,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("Log", "level", &config.log_level.to_string());
 
     storage.write_config(&ini).map_err(|e| e.to_string())?;
-    log::debug!("Config saved to storage");
+    log_debug!("Config saved to storage");
     Ok(())
 }

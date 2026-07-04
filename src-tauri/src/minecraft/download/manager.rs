@@ -1,5 +1,6 @@
 //! 下载管理器 - 多线程下载、进度追踪、文件校验、限速
 
+use crate::{log_warn, log_debug};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -262,8 +263,11 @@ impl DownloadManager {
         tasks: Vec<DownloadTask>,
         progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
     ) -> Vec<DownloadProgress> {
+        let total_bytes: u64 = tasks.iter().map(|t| t.expected_size.max(0) as u64).sum();
+        
         let progress = Arc::new(Mutex::new(GlobalProgress {
             total_files: tasks.len(),
+            total_bytes,
             is_active: true,
             ..Default::default()
         }));
@@ -382,7 +386,7 @@ impl DownloadManager {
                 Ok((downloaded, total, speed)) => {
                     // 校验
                     if let Some(err) = checker.check(&task.local_path) {
-                        log::warn!("文件校验失败：{} - {}", task.local_path, err);
+                        log_warn!("文件校验失败：{} - {}", task.local_path, err);
                         let _ = std::fs::remove_file(&task.local_path);
                         continue;
                     }
@@ -397,7 +401,7 @@ impl DownloadManager {
                     };
                 }
                 Err(e) => {
-                    log::debug!("从 {} 下载失败：{}", url, e);
+                    log_debug!("从 {} 下载失败：{}", url, e);
                     continue;
                 }
             }

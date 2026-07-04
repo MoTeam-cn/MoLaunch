@@ -1,5 +1,6 @@
 //! Java 管理命令
 
+use crate::log_info;
 use crate::minecraft::java;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
@@ -27,7 +28,7 @@ pub struct JavaRuntimeInfo {
 /// 检测 Java
 #[tauri::command]
 pub async fn detect_java(_state: State<'_, AppState>) -> Result<JavaRuntimeInfo, String> {
-    log::info!("Detecting Java...");
+    log_info!("Detecting Java...");
 
     // 从环境变量中查找Java
     let java_list = java::search_java();
@@ -50,14 +51,14 @@ pub async fn detect_java(_state: State<'_, AppState>) -> Result<JavaRuntimeInfo,
         is_64bit: best_java.is_64bit,
     };
 
-    log::info!("Java detected: {} ({})", result.version, result.executable);
+    log_info!("Java detected: {} ({})", result.version, result.executable);
     Ok(result)
 }
 
 /// 列出所有 Java
 #[tauri::command]
 pub async fn list_java(_state: State<'_, AppState>) -> Result<Vec<JavaRuntimeInfo>, String> {
-    log::info!("Listing all Java runtimes...");
+    log_info!("Listing all Java runtimes...");
 
     let java_list = java::search_java();
     
@@ -71,6 +72,6 @@ pub async fn list_java(_state: State<'_, AppState>) -> Result<Vec<JavaRuntimeInf
         is_64bit: j.is_64bit,
     }).collect();
 
-    log::info!("Found {} Java runtimes", result.len());
+    log_info!("Found {} Java runtimes", result.len());
     Ok(result)
 }

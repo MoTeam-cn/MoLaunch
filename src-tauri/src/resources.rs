@@ -3,6 +3,7 @@
 //! 统一管理所有外部资源文件的路径
 //! 所有资源文件都放在 src-tauri/resources/ 目录下
 
+use crate::log_info;
 use std::path::PathBuf;
 
 /// 获取资源根目录路径
@@ -68,7 +69,7 @@ pub fn extract_resource(resource_path: &str, target_path: &PathBuf) -> anyhow::R
 
     if need_write {
         std::fs::write(target_path, &content)?;
-        log::info!("Extracted resource: {} -> {}", resource_path, target_path.display());
+        log_info!("Extracted resource: {} -> {}", resource_path, target_path.display());
     }
 
     Ok(())

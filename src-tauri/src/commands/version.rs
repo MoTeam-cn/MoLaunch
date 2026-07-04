@@ -1,5 +1,6 @@
 //! Version management commands
 
+use crate::{log_info, log_error};
 use crate::minecraft::download::{self, manager as download_manager};
 use crate::minecraft::loaders;
 use crate::minecraft::version::scan as version_scan;
@@ -44,14 +45,14 @@ pub struct DownloadProgressSnapshot {
 /// Get version list
 #[tauri::command]
 pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResult, String> {
-    log::info!("Fetching version list");
+    log_info!("Fetching version list");
 
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
     drop(config);
 
     let result = download::fetch_version_list(mirror_url.as_deref()).await.map_err(|e| {
-        log::error!("Failed to list versions: {}", e);
+        log_error!("Failed to list versions: {}", e);
         e.to_string()
     })?;
 
@@ -69,7 +70,7 @@ pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResu
         }
     }).collect();
 
-    log::info!("Found {} versions", versions.len());
+    log_info!("Found {} versions", versions.len());
     Ok(VersionListResult {
         versions,
         latest_release: latest_release.unwrap_or_default(),
@@ -100,7 +101,7 @@ pub async fn download_version(
     state: State<'_, AppState>,
     version_id: String,
 ) -> Result<(), String> {
-    log::info!("Downloading version: {}", version_id);
+    log_info!("Downloading version: {}", version_id);
 
     let config = state.config.lock().await;
     let game_dir = config.game_dir.clone();
@@ -139,11 +140,11 @@ pub async fn download_version(
         source_mode,
         Some(progress_callback),
     ).await.map_err(|e| {
-        log::error!("Failed to download version: {}", e);
+        log_error!("Failed to download version: {}", e);
         e.to_string()
     })?;
 
-    log::info!(
+    log_info!(
         "Version {} download completed: libs {}/{}, assets {}/{}",
         version_id,
         result.libs_downloaded,
@@ -171,7 +172,7 @@ pub async fn download_version(
 /// Get installed versions
 #[tauri::command]
 pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<String>, String> {
-    log::info!("Fetching installed versions");
+    log_info!("Fetching installed versions");
 
     let config = state.config.lock().await;
     let game_dir = config.game_dir.clone();
@@ -181,7 +182,7 @@ pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<S
     let versions = version_scan::scan_installed_versions(game_path);
     let version_ids: Vec<String> = versions.iter().map(|v| v.id.clone()).collect();
 
-    log::info!("Found {} version directories: {:?}", version_ids.len(), version_ids);
+    log_info!("Found {} version directories: {:?}", version_ids.len(), version_ids);
     Ok(version_ids)
 }
 
@@ -191,7 +192,7 @@ pub async fn uninstall_version(
     state: State<'_, AppState>,
     version_id: String,
 ) -> Result<(), String> {
-    log::info!("Uninstalling version: '{}'", version_id);
+    log_info!("Uninstalling version: '{}'", version_id);
 
     let config = state.config.lock().await;
     let game_dir = config.game_dir.clone();
@@ -199,11 +200,11 @@ pub async fn uninstall_version(
 
     let game_path = std::path::Path::new(&game_dir);
     version_scan::uninstall_version(game_path, &version_id).map_err(|e| {
-        log::error!("Failed to uninstall version: {}", e);
+        log_error!("Failed to uninstall version: {}", e);
         e.to_string()
     })?;
 
-    log::info!("Version {} uninstalled successfully", version_id);
+    log_info!("Version {} uninstalled successfully", version_id);
     Ok(())
 }
 
@@ -244,7 +245,7 @@ pub async fn list_forge_versions(state: State<'_, AppState>, mc_version: String)
     drop(config);
 
     let versions = loaders::list_forge_versions(&mc_version, mirror_url.as_deref()).await.map_err(|e| {
-        log::error!("Failed to list Forge versions: {}", e);
+        log_error!("Failed to list Forge versions: {}", e);
         e.to_string()
     })?;
 
@@ -267,15 +268,13 @@ pub async fn list_neoforge_versions(state: State<'_, AppState>, mc_version: Stri
     drop(config);
 
     let versions = loaders::list_neoforge_versions(&mc_version, mirror_url.as_deref()).await.map_err(|e| {
-        log::error!("Failed to list NeoForge versions: {}", e);
+        log_error!("Failed to list NeoForge versions: {}", e);
         e.to_string()
     })?;
 
     let result: Vec<serde_json::Value> = versions.iter().map(|v| {
-        // 移除后缀：26.2.0.7-beta -> 26.2.0.7
-        let display_version = v.version.split('-').next().unwrap_or(&v.version);
         serde_json::json!({
-            "version": display_version,
+            "version": v.version,
             "recommended": v.is_recommended
         })
     }).collect();
@@ -291,7 +290,7 @@ pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, 
     drop(config);
 
     let versions = loaders::list_fabric_versions(mirror_url.as_deref()).await.map_err(|e| {
-        log::error!("Failed to list Fabric versions: {}", e);
+        log_error!("Failed to list Fabric versions: {}", e);
         e.to_string()
     })?;
 
@@ -306,7 +305,7 @@ pub async fn list_optifine_versions(state: State<'_, AppState>) -> Result<String
     drop(config);
 
     let versions = loaders::list_optifine_versions(mirror_url.as_deref()).await.map_err(|e| {
-        log::error!("Failed to list OptiFine versions: {}", e);
+        log_error!("Failed to list OptiFine versions: {}", e);
         e.to_string()
     })?;
 
@@ -328,7 +327,7 @@ pub async fn list_liteloader_versions(state: State<'_, AppState>, mc_version: St
     drop(config);
 
     let versions = loaders::list_liteloader_versions(&mc_version, mirror_url.as_deref()).await.map_err(|e| {
-        log::error!("Failed to list LiteLoader versions: {}", e);
+        log_error!("Failed to list LiteLoader versions: {}", e);
         e.to_string()
     })?;
 
@@ -363,7 +362,7 @@ pub async fn install_merged(
     liteloader_version: Option<String>,
     instance_name: Option<String>,
 ) -> Result<(), String> {
-    log::info!("Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
+    log_info!("Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
         mc_version, forge_version, neoforge_version, fabric_version, optifine_version);
 
     let config = state.config.lock().await;
@@ -375,12 +374,12 @@ pub async fn install_merged(
     let game_path = std::path::Path::new(&game_dir);
 
     // Download base MC first
-    log::info!("Downloading base MC version: {}", mc_version);
+    log_info!("Downloading base MC version: {}", mc_version);
     download_version(app.clone(), state.clone(), mc_version.clone()).await?;
 
     // Install loaders
     if let Some(forge_ver) = forge_version {
-        log::info!("Installing Forge {}", forge_ver);
+        log_info!("Installing Forge {}", forge_ver);
         loaders::install_loader(
             loaders::LoaderType::Forge,
             &mc_version,
@@ -389,13 +388,13 @@ pub async fn install_merged(
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
-            log::error!("Failed to install Forge: {}", e);
+            log_error!("Failed to install Forge: {}", e);
             e.to_string()
         })?;
     }
 
     if let Some(neoforge_ver) = neoforge_version {
-        log::info!("Installing NeoForge {}", neoforge_ver);
+        log_info!("Installing NeoForge {}", neoforge_ver);
         loaders::install_loader(
             loaders::LoaderType::NeoForge,
             &mc_version,
@@ -404,13 +403,13 @@ pub async fn install_merged(
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
-            log::error!("Failed to install NeoForge: {}", e);
+            log_error!("Failed to install NeoForge: {}", e);
             e.to_string()
         })?;
     }
 
     if let Some(fabric_ver) = fabric_version {
-        log::info!("Installing Fabric {}", fabric_ver);
+        log_info!("Installing Fabric {}", fabric_ver);
         loaders::install_loader(
             loaders::LoaderType::Fabric,
             &mc_version,
@@ -419,13 +418,13 @@ pub async fn install_merged(
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
-            log::error!("Failed to install Fabric: {}", e);
+            log_error!("Failed to install Fabric: {}", e);
             e.to_string()
         })?;
     }
 
     if let Some(optifine_ver) = optifine_version {
-        log::info!("Installing OptiFine {}", optifine_ver);
+        log_info!("Installing OptiFine {}", optifine_ver);
         loaders::install_loader(
             loaders::LoaderType::OptiFine,
             &mc_version,
@@ -434,13 +433,13 @@ pub async fn install_merged(
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
-            log::error!("Failed to install OptiFine: {}", e);
+            log_error!("Failed to install OptiFine: {}", e);
             e.to_string()
         })?;
     }
 
     if let Some(liteloader_ver) = liteloader_version {
-        log::info!("Installing LiteLoader {}", liteloader_ver);
+        log_info!("Installing LiteLoader {}", liteloader_ver);
         loaders::install_loader(
             loaders::LoaderType::LiteLoader,
             &mc_version,
@@ -449,13 +448,13 @@ pub async fn install_merged(
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
-            log::error!("Failed to install LiteLoader: {}", e);
+            log_error!("Failed to install LiteLoader: {}", e);
             e.to_string()
         })?;
     }
 
     let instance = instance_name.unwrap_or_else(|| mc_version.clone());
     let _ = app.emit("install-complete", serde_json::json!({ "instance_name": instance }));
-    log::info!("Merged install completed");
+    log_info!("Merged install completed");
     Ok(())
 }

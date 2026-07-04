@@ -1,5 +1,6 @@
 //! Natives extraction module
 
+use crate::{log_info, log_warn, log_error, log_debug};
 use std::path::{Path, PathBuf};
 
 /// Extract natives files to target directory
@@ -24,7 +25,7 @@ pub fn extract_natives(
 
         let jar_path = Path::new(&entry.local_path);
         if !jar_path.exists() {
-            log::warn!("Natives JAR not found: {}", entry.local_path);
+            log_warn!("Natives JAR not found: {}", entry.local_path);
             continue;
         }
 
@@ -32,7 +33,7 @@ pub fn extract_natives(
         let archive = match zip::ZipArchive::new(file) {
             Ok(a) => a,
             Err(e) => {
-                log::error!("Cannot open natives JAR: {} - {}", entry.local_path, e);
+                log_error!("Cannot open natives JAR: {} - {}", entry.local_path, e);
                 let _ = std::fs::remove_file(jar_path);
                 continue;
             }
@@ -81,18 +82,18 @@ fn extract_dlls_from_zip(
             let entry_size = entry.size();
 
             if existing_size == entry_size {
-                log::debug!("Skipping existing natives: {}", file_name);
+                log_debug!("Skipping existing natives: {}", file_name);
                 continue;
             }
 
-            log::info!("Replacing natives: {}", file_name);
+            log_info!("Replacing natives: {}", file_name);
             std::fs::remove_file(&target_path)?;
         }
 
         let mut target_file = std::fs::File::create(&target_path)?;
         std::io::copy(&mut entry, &mut target_file)?;
 
-        log::info!("Extracted natives: {}", file_name);
+        log_info!("Extracted natives: {}", file_name);
     }
 
     Ok(())
@@ -110,7 +111,7 @@ fn cleanup_natives_dir(target_dir: &Path, extracted_files: &[String]) -> anyhow:
         if path.is_file() {
             let path_str = path.to_string_lossy().to_string();
             if !extracted_files.contains(&path_str) {
-                log::info!("Removing extra natives: {}", path.display());
+                log_info!("Removing extra natives: {}", path.display());
                 let _ = std::fs::remove_file(&path);
             }
         }

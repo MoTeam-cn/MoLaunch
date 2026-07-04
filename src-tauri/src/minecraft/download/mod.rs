@@ -3,6 +3,7 @@
 pub mod assets;
 pub mod manager;
 
+use crate::{log_info, log_warn, log_debug};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
@@ -67,7 +68,7 @@ pub async fn fetch_version_list(mirror_url: Option<&str>) -> anyhow::Result<Vers
             })
         }
         Err(e) => {
-            log::warn!("Primary source failed: {}, trying secondary", e);
+            log_warn!("Primary source failed: {}, trying secondary", e);
             let content = fetch_url(&secondary_url).await?;
             let json: serde_json::Value = serde_json::from_str(&content)?;
             Ok(VersionListResult {
@@ -139,37 +140,37 @@ pub async fn download_version_full(
     std::fs::create_dir_all(&version_dir)?;
 
     // Step 1: Download version JSON
-    log::info!("[Download] Step 1/5: Fetching version JSON URL");
+    log_info!("[Download] Step 1/5: Fetching version JSON URL");
     let version_list = fetch_version_list(mirror_url).await?;
     let json_url = get_version_json_url(&version_list.value, version_id)
         .ok_or_else(|| anyhow::anyhow!("Version {} not found", version_id))?;
 
-    log::info!("[Download] Step 1/5: Downloading version JSON");
+    log_info!("[Download] Step 1/5: Downloading version JSON");
     let json_path = version_dir.join(format!("{}.json", version_id));
     let json_content = fetch_with_retry(&json_url, &json_path, mirror_url).await?;
     let version_json: serde_json::Value = serde_json::from_str(&json_content)?;
 
     // Step 2: Merge JSON inheritance chain
-    log::info!("[Download] Step 2/5: Merging JSON inheritance");
+    log_info!("[Download] Step 2/5: Merging JSON inheritance");
     let merged_json = super::version::json_merge::merge_version_json(&version_json, game_dir)?;
     let merged_json_str = serde_json::to_string_pretty(&merged_json)?;
     std::fs::write(&json_path, &merged_json_str)?;
 
     // Step 3: Download client JAR
-    log::info!("[Download] Step 3/5: Downloading client JAR");
-    download_client_jar(&merged_json, game_dir, version_id, mirror_url, speed_limit, source_mode).await?;
+    log_info!("[Download] Step 3/5: Downloading client JAR");
+    download_client_jar(&merged_json, game_dir, version_id, mirror_url, speed_limit, source_mode, progress_callback.clone()).await?;
 
     // Step 4: Download Libraries
-    log::info!("[Download] Step 4/5: Downloading Libraries");
+    log_info!("[Download] Step 4/5: Downloading Libraries");
     let (libs_total, libs_downloaded, libs_skipped) =
         download_libraries(&merged_json, game_dir, mirror_url, max_threads, speed_limit, source_mode, progress_callback.clone()).await?;
 
     // Step 5: Download Assets
-    log::info!("[Download] Step 5/5: Downloading Assets");
+    log_info!("[Download] Step 5/5: Downloading Assets");
     let (assets_total, assets_downloaded, assets_skipped) =
         download_assets(&merged_json, game_dir, mirror_url, max_threads, speed_limit, source_mode, progress_callback).await?;
 
-    log::info!(
+    log_info!(
         "[Download] Done: Libs {}/{}, Assets {}/{}",
         libs_downloaded, libs_total, assets_downloaded, assets_total
     );
@@ -193,6 +194,7 @@ async fn download_client_jar(
     mirror_url: Option<&str>,
     speed_limit: u64,
     source_mode: DownloadSourceMode,
+    progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
 ) -> anyhow::Result<()> {
     let jar_path = game_dir.join("versions").join(version_id).join(format!("{}.jar", version_id));
 
@@ -202,7 +204,7 @@ async fn download_client_jar(
         .with_hash(json["downloads"]["client"]["sha1"].as_str().map(|s| s.to_string()));
 
     if checker.is_valid(&jar_path.to_string_lossy()) {
-        log::info!("[Download] Client JAR already exists, skipping");
+        log_info!("[Download] Client JAR already exists, skipping");
         return Ok(());
     }
 
@@ -220,7 +222,7 @@ async fn download_client_jar(
     };
 
     let manager = DownloadManager::new(1, speed_limit, source_mode);
-    let results = manager.download_batch(vec![task], None).await;
+    let results = manager.download_batch(vec![task], progress_callback).await;
 
     if let Some(result) = results.first() {
         if result.status != DownloadStatus::Completed && result.status != DownloadStatus::Skipped {
@@ -244,7 +246,7 @@ async fn download_libraries(
     let all_libs = libraries::parse_libraries(json, game_dir);
     let missing_libs = libraries::find_missing_libs(&all_libs, game_dir);
 
-    log::info!("[Libraries] Total: {}, Missing: {}", all_libs.len(), missing_libs.len());
+    log_info!("[Libraries] Total: {}, Missing: {}", all_libs.len(), missing_libs.len());
 
     if missing_libs.is_empty() {
         return Ok((all_libs.len(), 0, all_libs.len()));
@@ -286,7 +288,7 @@ async fn download_assets(
     let index_path = assets::get_asset_index_path(game_dir, &index_meta.id);
 
     if !index_path.exists() {
-        log::info!("[Assets] Downloading asset index: {}", index_meta.id);
+        log_info!("[Assets] Downloading asset index: {}", index_meta.id);
         let index_urls = assets::get_asset_index_urls(&index_meta);
         let task = DownloadTask {
             id: "asset_index".to_string(),
@@ -311,7 +313,7 @@ async fn download_assets(
     let all_assets = assets::parse_asset_index(&index_json, game_dir);
     let missing_assets = assets::find_missing_assets(&all_assets);
 
-    log::info!("[Assets] Total: {}, Missing: {}", all_assets.len(), missing_assets.len());
+    log_info!("[Assets] Total: {}, Missing: {}", all_assets.len(), missing_assets.len());
 
     if missing_assets.is_empty() {
         return Ok((all_assets.len(), 0, all_assets.len()));
@@ -372,7 +374,7 @@ async fn fetch_with_retry(primary_url: &str, local_path: &Path, mirror_url: Opti
         match fetch_url_to_file(url, local_path).await {
             Ok(content) => return Ok(content),
             Err(e) => {
-                log::debug!("Failed to fetch from {}: {}", url, e);
+                log_debug!("Failed to fetch from {}: {}", url, e);
                 continue;
             }
         }

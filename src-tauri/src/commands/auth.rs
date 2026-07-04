@@ -1,5 +1,6 @@
 //! 认证命令
 
+use crate::log_info;
 use crate::minecraft::auth;
 use crate::state::{AppState, LocalAuthResult};
 use tauri::State;
@@ -10,7 +11,7 @@ pub async fn login_offline(
     state: State<'_, AppState>,
     username: String,
 ) -> Result<LocalAuthResult, String> {
-    log::info!("Offline login attempt for user: {}", username);
+    log_info!("Offline login attempt for user: {}", username);
 
     // 验证用户名
     if !auth::validate_username(&username) {
@@ -35,7 +36,7 @@ pub async fn login_offline(
     auth.current_user = Some(auth_result.clone());
     auth.is_logged_in = true;
 
-    log::info!("Offline login successful for user: {}", username);
+    log_info!("Offline login successful for user: {}", username);
     Ok(auth_result)
 }
 
@@ -53,6 +54,6 @@ pub async fn logout(state: State<'_, AppState>) -> Result<(), String> {
     auth.current_user = None;
     auth.is_logged_in = false;
 
-    log::info!("User logged out");
+    log_info!("User logged out");
     Ok(())
 }

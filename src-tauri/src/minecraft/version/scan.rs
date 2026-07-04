@@ -1,5 +1,6 @@
 //! 版本管理模块
 
+use crate::{log_info, log_warn};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -78,7 +79,7 @@ pub fn scan_installed_versions(game_dir: &Path) -> Vec<VersionInfo> {
                     match parse_version_info(&path, &json_path) {
                         Ok(info) => versions.push(info),
                         Err(e) => {
-                            log::warn!("Failed to parse version {}: {}", dir_name, e);
+                            log_warn!("Failed to parse version {}: {}", dir_name, e);
                             // 创建错误状态的版本信息
                             versions.push(VersionInfo {
                                 id: dir_name.to_string(),
@@ -324,7 +325,7 @@ pub fn uninstall_version(game_dir: &Path, version_id: &str) -> Result<(), Box<dy
     let version_dir = game_dir.join("versions").join(version_id);
     if version_dir.exists() {
         std::fs::remove_dir_all(&version_dir)?;
-        log::info!("Uninstalled version: {}", version_id);
+        log_info!("Uninstalled version: {}", version_id);
     }
     Ok(())
 }

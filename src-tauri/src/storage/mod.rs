@@ -4,6 +4,7 @@
 
 pub mod ini;
 
+use crate::log_info;
 use crate::resources;
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -41,7 +42,7 @@ impl Storage {
     pub fn init(&self) -> anyhow::Result<()> {
         if !self.base_dir.exists() {
             std::fs::create_dir_all(&self.base_dir)?;
-            log::info!("Created storage directory: {}", self.base_dir.display());
+            log_info!("Created storage directory: {}", self.base_dir.display());
         }
 
         self.ensure_dir("logs")?;
@@ -53,7 +54,7 @@ impl Storage {
         let instance_path = self.instance_path();
         if !instance_path.exists() {
             self.write_default_instance()?;
-            log::info!("Created default instance.ini");
+            log_info!("Created default instance.ini");
         }
 
         self.update_run_info()?;
@@ -64,7 +65,7 @@ impl Storage {
         let dir = self.base_dir.join(name);
         if !dir.exists() {
             std::fs::create_dir_all(&dir)?;
-            log::info!("Created directory: {}", dir.display());
+            log_info!("Created directory: {}", dir.display());
         }
         Ok(())
     }
@@ -94,7 +95,7 @@ impl Storage {
 
         if !config_path.exists() {
             self.write_default_config()?;
-            log::info!("Created default config.ini");
+            log_info!("Created default config.ini");
             return Ok(());
         }
 
@@ -107,7 +108,7 @@ impl Storage {
             let template_pairs = template.get_section(&section);
             for (key, value) in &template_pairs {
                 if !current.has_key(&section, key) {
-                    log::info!("Config sync: [{}] {} = {}", section, key, value);
+                    log_info!("Config sync: [{}] {} = {}", section, key, value);
                     current.set(&section, key, value);
                     modified = true;
                 }
@@ -116,7 +117,7 @@ impl Storage {
 
         if modified {
             self.write_config(&current)?;
-            log::info!("Config synced with template");
+            log_info!("Config synced with template");
         }
 
         Ok(())

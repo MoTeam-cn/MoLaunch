@@ -1,5 +1,6 @@
 //! SDK 管理命令（lite 版本）
 
+use crate::log_error;
 use crate::state::AppState;
 use tauri::State;
 
@@ -65,7 +66,7 @@ pub async fn get_device_id(state: State<'_, AppState>) -> Result<String, String>
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
 
     sdk.get_device_id().map_err(|e| {
-        log::error!("Failed to get device ID: {}", e);
+        log_error!("Failed to get device ID: {}", e);
         e.to_string()
     })
 }
@@ -77,7 +78,7 @@ pub async fn encrypt_token(state: State<'_, AppState>, data: String) -> Result<S
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
 
     sdk.encrypt_token(&data).map_err(|e| {
-        log::error!("Failed to encrypt token: {}", e);
+        log_error!("Failed to encrypt token: {}", e);
         e.to_string()
     })
 }
@@ -89,7 +90,7 @@ pub async fn decrypt_token(state: State<'_, AppState>, encrypted: String) -> Res
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
 
     sdk.decrypt_token(&encrypted).map_err(|e| {
-        log::error!("Failed to decrypt token: {}", e);
+        log_error!("Failed to decrypt token: {}", e);
         e.to_string()
     })
 }
@@ -101,7 +102,7 @@ pub async fn check_update_lite(state: State<'_, AppState>) -> Result<crate::sdk:
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
 
     sdk.update_check_lite().map_err(|e| {
-        log::error!("Failed to check update: {}", e);
+        log_error!("Failed to check update: {}", e);
         e.to_string()
     })
 }
