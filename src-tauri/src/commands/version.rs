@@ -4,9 +4,11 @@ use crate::{log_info, log_error};
 use crate::minecraft::download::{self, manager as download_manager};
 use crate::minecraft::loaders;
 use crate::minecraft::version::scan as version_scan;
-use crate::state::AppState;
+use crate::state::{AppState, DownloadState, StageStatus};
 use serde::{Deserialize, Serialize};
+use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Instant;
 use tauri::{Emitter, State};
 
 /// Version info
@@ -29,14 +31,25 @@ pub struct VersionListResult {
 
 /// Download progress snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DownloadProgressSnapshot {
-    pub stage: u32,
-    pub current: usize,
-    pub total: usize,
+pub struct DownloadStageSnapshot {
+    pub name: String,
+    pub progress: f64,
+    pub weight: f64,
+    pub status: String,
     pub bytes_downloaded: u64,
     pub bytes_total: u64,
-    pub speed: u64,
-    pub files_remaining: usize,
+    pub files_downloaded: usize,
+    pub files_total: usize,
+}
+
+/// Download progress snapshot
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadProgressSnapshot {
+    pub stages: Vec<DownloadStageSnapshot>,
+    pub current_stage_index: usize,
+    pub global_speed: u64,
+    pub global_bytes_downloaded: u64,
+    pub global_bytes_total: u64,
     pub is_active: bool,
     pub is_complete: bool,
     pub error_code: i32,
@@ -103,31 +116,119 @@ pub async fn download_version(
 ) -> Result<(), String> {
     log_info!("Downloading version: {}", version_id);
 
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.is_active = true;
+        ds.is_complete = false;
+        ds.current_stage_index = 0;
+        ds.global_speed = 0;
+        ds.global_bytes_downloaded = 0;
+        ds.global_bytes_total = 0;
+        ds.error_code = 0;
+        for stage in ds.stages.iter_mut() {
+            stage.progress = 0.0;
+            stage.status = StageStatus::Waiting;
+            stage.bytes_downloaded = 0;
+            stage.bytes_total = 0;
+        }
+    }
+
     let config = state.config.lock().await;
-    let game_dir = config.game_dir.clone();
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     let mirror_url = config.mirror_url.clone();
     let max_threads = config.max_download_threads as usize;
     let speed_limit = config.max_download_speed;
     let source_mode = download_manager::DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
-    let game_path = std::path::Path::new(&game_dir);
+    let game_path = game_dir.as_path();
     let app_clone = app.clone();
     let version_id_clone = version_id.clone();
+    let state_clone = state.download_state.clone();
+
+    // 滑动窗口速度计算
+    let speed_window = Arc::new(std::sync::Mutex::new(VecDeque::<(u64, Instant)>::new()));
+
+    // 跨阶段累计字节跟踪
+    let accumulated_bytes = Arc::new(std::sync::Mutex::new(0u64));
+    let accumulated_total = Arc::new(std::sync::Mutex::new(0u64));
 
     // Create progress callback
+    let state_for_progress = state_clone.clone();
+    let sw = speed_window.clone();
+    let acc_bytes_for_progress = accumulated_bytes.clone();
+    let acc_total_for_progress = accumulated_total.clone();
     let progress_callback = Arc::new(move |progress: download_manager::GlobalProgress| {
-        let _ = app_clone.emit("download-progress", serde_json::json!({
-            "version_id": version_id_clone,
-            "total_files": progress.total_files,
-            "completed_files": progress.completed_files,
-            "failed_files": progress.failed_files,
-            "skipped_files": progress.skipped_files,
-            "total_bytes": progress.total_bytes,
-            "downloaded_bytes": progress.downloaded_bytes,
-            "current_speed": progress.current_speed,
-            "is_active": progress.is_active,
-        }));
+        {
+            let base_bytes = *acc_bytes_for_progress.lock().unwrap();
+            let base_total = *acc_total_for_progress.lock().unwrap();
+            let mut ds = state_for_progress.lock().unwrap();
+            ds.is_active = progress.is_active;
+            ds.global_bytes_downloaded = base_bytes + progress.downloaded_bytes;
+            ds.global_bytes_total = base_total + progress.total_bytes;
+
+            // 更新当前阶段的进度
+            let idx = ds.current_stage_index;
+            if idx < ds.stages.len() {
+                let stage = &mut ds.stages[idx];
+                stage.bytes_downloaded = progress.downloaded_bytes;
+                stage.bytes_total = progress.total_bytes;
+                stage.files_downloaded = progress.completed_files;
+                stage.files_total = progress.total_files;
+                if progress.total_bytes > 0 {
+                    stage.progress = (progress.downloaded_bytes as f64 / progress.total_bytes as f64).min(1.0);
+                }
+                stage.status = StageStatus::Loading;
+            }
+
+            // 滑动窗口速度计算
+            {
+                let mut window = sw.lock().unwrap();
+                window.push_back((ds.global_bytes_downloaded, Instant::now()));
+                if window.len() > 10 { window.pop_front(); }
+                if window.len() >= 2 {
+                    let (first_bytes, first_time) = window.front().unwrap();
+                    let (last_bytes, last_time) = window.back().unwrap();
+                    let bytes_diff = last_bytes.saturating_sub(*first_bytes);
+                    let time_diff = last_time.duration_since(*first_time).as_secs_f64();
+                    if time_diff > 0.0 {
+                        ds.global_speed = (bytes_diff as f64 / time_diff) as u64;
+                    }
+                }
+            }
+        }
+        let ds = state_for_progress.lock().unwrap();
+        let snapshot = build_snapshot(&ds, &version_id_clone);
+        drop(ds);
+        let _ = app_clone.emit("download-progress", snapshot);
+    });
+
+    // Stage callback
+    let state_for_stage = state_clone.clone();
+    let app_for_stage = app.clone();
+    let vid_for_stage = version_id.clone();
+    let acc_bytes_for_stage = accumulated_bytes.clone();
+    let acc_total_for_stage = accumulated_total.clone();
+    let stage_callback = Arc::new(move |stage_index: usize, _stage_name: &str| {
+        let mut ds = state_for_stage.lock().unwrap();
+        // 标记上一个阶段完成，并累加字节
+        if ds.current_stage_index < ds.stages.len() && stage_index > 0 {
+            let prev = ds.current_stage_index;
+            if prev < ds.stages.len() {
+                ds.stages[prev].status = StageStatus::Finished;
+                ds.stages[prev].progress = 1.0;
+                *acc_bytes_for_stage.lock().unwrap() += ds.stages[prev].bytes_downloaded;
+                *acc_total_for_stage.lock().unwrap() += ds.stages[prev].bytes_total;
+            }
+        }
+        ds.current_stage_index = stage_index;
+        if stage_index < ds.stages.len() {
+            ds.stages[stage_index].status = StageStatus::Loading;
+            ds.stages[stage_index].progress = 0.0;
+        }
+        let snapshot = build_snapshot(&ds, &vid_for_stage);
+        drop(ds);
+        let _ = app_for_stage.emit("download-progress", snapshot);
     });
 
     // Full download flow
@@ -139,6 +240,7 @@ pub async fn download_version(
         speed_limit,
         source_mode,
         Some(progress_callback),
+        Some(stage_callback),
     ).await.map_err(|e| {
         log_error!("Failed to download version: {}", e);
         e.to_string()
@@ -152,6 +254,17 @@ pub async fn download_version(
         result.assets_downloaded,
         result.assets_total
     );
+
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.is_active = false;
+        ds.is_complete = true;
+        // 标记所有阶段完成
+        for stage in ds.stages.iter_mut() {
+            stage.status = StageStatus::Finished;
+            stage.progress = 1.0;
+        }
+    }
 
     let _ = app.emit(
         "download-complete",
@@ -169,17 +282,48 @@ pub async fn download_version(
     Ok(())
 }
 
+fn build_snapshot(ds: &DownloadState, version_id: &str) -> serde_json::Value {
+    let stages: Vec<DownloadStageSnapshot> = ds.stages.iter().map(|s| {
+        DownloadStageSnapshot {
+            name: s.name.clone(),
+            progress: s.progress,
+            weight: s.weight,
+            status: match s.status {
+                StageStatus::Waiting => "waiting".to_string(),
+                StageStatus::Loading => "loading".to_string(),
+                StageStatus::Finished => "finished".to_string(),
+                StageStatus::Failed => "failed".to_string(),
+            },
+            bytes_downloaded: s.bytes_downloaded,
+            bytes_total: s.bytes_total,
+            files_downloaded: s.files_downloaded,
+            files_total: s.files_total,
+        }
+    }).collect();
+
+    serde_json::json!({
+        "version_id": version_id,
+        "stages": stages,
+        "current_stage_index": ds.current_stage_index,
+        "global_speed": ds.global_speed,
+        "global_bytes_downloaded": ds.global_bytes_downloaded,
+        "global_bytes_total": ds.global_bytes_total,
+        "is_active": ds.is_active,
+        "is_complete": ds.is_complete,
+        "error_code": ds.error_code,
+    })
+}
+
 /// Get installed versions
 #[tauri::command]
 pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     log_info!("Fetching installed versions");
 
     let config = state.config.lock().await;
-    let game_dir = config.game_dir.clone();
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     drop(config);
 
-    let game_path = std::path::Path::new(&game_dir);
-    let versions = version_scan::scan_installed_versions(game_path);
+    let versions = version_scan::scan_installed_versions(&game_dir);
     let version_ids: Vec<String> = versions.iter().map(|v| v.id.clone()).collect();
 
     log_info!("Found {} version directories: {:?}", version_ids.len(), version_ids);
@@ -195,11 +339,10 @@ pub async fn uninstall_version(
     log_info!("Uninstalling version: '{}'", version_id);
 
     let config = state.config.lock().await;
-    let game_dir = config.game_dir.clone();
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     drop(config);
 
-    let game_path = std::path::Path::new(&game_dir);
-    version_scan::uninstall_version(game_path, &version_id).map_err(|e| {
+    version_scan::uninstall_version(&game_dir, &version_id).map_err(|e| {
         log_error!("Failed to uninstall version: {}", e);
         e.to_string()
     })?;
@@ -210,30 +353,46 @@ pub async fn uninstall_version(
 
 /// Get download progress
 #[tauri::command]
-pub async fn get_download_progress() -> Result<DownloadProgressSnapshot, String> {
+pub async fn get_download_progress(state: State<'_, AppState>) -> Result<DownloadProgressSnapshot, String> {
+    let ds = state.download_state.lock().unwrap();
     Ok(DownloadProgressSnapshot {
-        stage: 0,
-        current: 0,
-        total: 0,
-        bytes_downloaded: 0,
-        bytes_total: 0,
-        speed: 0,
-        files_remaining: 0,
-        is_active: false,
-        is_complete: true,
-        error_code: 0,
+        stages: ds.stages.iter().map(|s| DownloadStageSnapshot {
+            name: s.name.clone(),
+            progress: s.progress,
+            weight: s.weight,
+            status: match s.status {
+                StageStatus::Waiting => "waiting".to_string(),
+                StageStatus::Loading => "loading".to_string(),
+                StageStatus::Finished => "finished".to_string(),
+                StageStatus::Failed => "failed".to_string(),
+            },
+            bytes_downloaded: s.bytes_downloaded,
+            bytes_total: s.bytes_total,
+            files_downloaded: s.files_downloaded,
+            files_total: s.files_total,
+        }).collect(),
+        current_stage_index: ds.current_stage_index,
+        global_speed: ds.global_speed,
+        global_bytes_downloaded: ds.global_bytes_downloaded,
+        global_bytes_total: ds.global_bytes_total,
+        is_active: ds.is_active,
+        is_complete: ds.is_complete,
+        error_code: ds.error_code,
     })
 }
 
 /// Check if downloading
 #[tauri::command]
-pub async fn is_downloading() -> Result<bool, String> {
-    Ok(false)
+pub async fn is_downloading(state: State<'_, AppState>) -> Result<bool, String> {
+    let ds = state.download_state.lock().unwrap();
+    Ok(ds.is_active)
 }
 
 /// Reset download progress
 #[tauri::command]
-pub async fn reset_download_progress() -> Result<(), String> {
+pub async fn reset_download_progress(state: State<'_, AppState>) -> Result<(), String> {
+    let mut ds = state.download_state.lock().unwrap();
+    *ds = DownloadState::default();
     Ok(())
 }
 
@@ -365,17 +524,37 @@ pub async fn install_merged(
     log_info!("Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
         mc_version, forge_version, neoforge_version, fabric_version, optifine_version);
 
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.is_active = true;
+        ds.is_complete = false;
+        ds.current_stage_index = 0;
+        for stage in ds.stages.iter_mut() {
+            stage.progress = 0.0;
+            stage.status = StageStatus::Waiting;
+        }
+    }
+
     let config = state.config.lock().await;
-    let game_dir = config.game_dir.clone();
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     let mirror_url = config.mirror_url.clone();
     let max_threads = config.max_download_threads as usize;
     drop(config);
 
-    let game_path = std::path::Path::new(&game_dir);
-
     // Download base MC first
     log_info!("Downloading base MC version: {}", mc_version);
     download_version(app.clone(), state.clone(), mc_version.clone()).await?;
+
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.is_active = true;
+        ds.is_complete = false;
+        ds.current_stage_index = 0;
+        for stage in ds.stages.iter_mut() {
+            stage.progress = 0.0;
+            stage.status = StageStatus::Waiting;
+        }
+    }
 
     // Install loaders
     if let Some(forge_ver) = forge_version {
@@ -384,7 +563,7 @@ pub async fn install_merged(
             loaders::LoaderType::Forge,
             &mc_version,
             &forge_ver,
-            game_path,
+            &game_dir,
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
@@ -399,7 +578,7 @@ pub async fn install_merged(
             loaders::LoaderType::NeoForge,
             &mc_version,
             &neoforge_ver,
-            game_path,
+            &game_dir,
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
@@ -414,7 +593,7 @@ pub async fn install_merged(
             loaders::LoaderType::Fabric,
             &mc_version,
             &fabric_ver,
-            game_path,
+            &game_dir,
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
@@ -429,7 +608,7 @@ pub async fn install_merged(
             loaders::LoaderType::OptiFine,
             &mc_version,
             &optifine_ver,
-            game_path,
+            &game_dir,
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
@@ -444,7 +623,7 @@ pub async fn install_merged(
             loaders::LoaderType::LiteLoader,
             &mc_version,
             &liteloader_ver,
-            game_path,
+            &game_dir,
             mirror_url.as_deref(),
             max_threads,
         ).await.map_err(|e| {
@@ -454,6 +633,15 @@ pub async fn install_merged(
     }
 
     let instance = instance_name.unwrap_or_else(|| mc_version.clone());
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.is_active = false;
+        ds.is_complete = true;
+        for stage in ds.stages.iter_mut() {
+            stage.status = StageStatus::Finished;
+            stage.progress = 1.0;
+        }
+    }
     let _ = app.emit("install-complete", serde_json::json!({ "instance_name": instance }));
     log_info!("Merged install completed");
     Ok(())

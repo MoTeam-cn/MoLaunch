@@ -7,16 +7,24 @@ import { ref } from 'vue'
 import type { VersionInfo, VersionList } from '@/types/version'
 import * as tauri from '@/utils/tauri'
 
+export interface DownloadStage {
+  name: string
+  progress: number
+  weight: number
+  status: 'waiting' | 'loading' | 'finished' | 'failed'
+  bytes_downloaded: number
+  bytes_total: number
+  files_downloaded: number
+  files_total: number
+}
+
 export interface DownloadProgress {
-  stage: string
-  stageIndex: number
-  current: number
-  total: number
+  stages: DownloadStage[]
+  current_stage_index: number
+  global_speed: number
+  global_bytes_downloaded: number
+  global_bytes_total: number
   percentage: number
-  speed: number
-  bytesDownloaded: number
-  bytesTotal: number
-  filesRemaining: number
 }
 
 export const useVersionStore = defineStore('version', () => {

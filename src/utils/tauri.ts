@@ -199,7 +199,16 @@ export async function saveConfigToFile(): Promise<void> {
 /**
  * 获取下载进度快照
  */
-export async function getDownloadProgress(): Promise<{ stage: number; current: number; total: number; bytes_downloaded: number; bytes_total: number; speed: number; files_remaining: number; is_active: boolean; is_complete: boolean; error_code: number }> {
+export async function getDownloadProgress(): Promise<{
+  stages: { name: string; progress: number; weight: number; status: string; bytes_downloaded: number; bytes_total: number }[]
+  current_stage_index: number
+  global_speed: number
+  global_bytes_downloaded: number
+  global_bytes_total: number
+  is_active: boolean
+  is_complete: boolean
+  error_code: number
+}> {
   return await invoke('get_download_progress')
 }
 

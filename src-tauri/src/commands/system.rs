@@ -58,7 +58,8 @@ pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
 #[tauri::command]
 pub async fn get_game_dir(state: State<'_, AppState>) -> Result<String, String> {
     let config = state.config.lock().await;
-    Ok(config.game_dir.clone())
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
+    Ok(game_dir.to_string_lossy().to_string())
 }
 
 /// 选择文件夹（打开系统文件夹选择对话框）

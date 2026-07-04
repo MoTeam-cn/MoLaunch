@@ -135,11 +135,13 @@ pub async fn download_version_full(
     speed_limit: u64,
     source_mode: DownloadSourceMode,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
+    stage_callback: Option<Arc<dyn Fn(usize, &str) + Send + Sync>>,
 ) -> anyhow::Result<VersionDownloadResult> {
     let version_dir = game_dir.join("versions").join(version_id);
     std::fs::create_dir_all(&version_dir)?;
 
-    // Step 1: Download version JSON
+    // Step 1: 版本清单
+    if let Some(ref cb) = stage_callback { cb(0, "版本清单"); }
     log_info!("[Download] Step 1/5: Fetching version JSON URL");
     let version_list = fetch_version_list(mirror_url).await?;
     let json_url = get_version_json_url(&version_list.value, version_id)
@@ -150,22 +152,26 @@ pub async fn download_version_full(
     let json_content = fetch_with_retry(&json_url, &json_path, mirror_url).await?;
     let version_json: serde_json::Value = serde_json::from_str(&json_content)?;
 
-    // Step 2: Merge JSON inheritance chain
+    // Step 2: 版本信息（合并 JSON 继承链）
+    if let Some(ref cb) = stage_callback { cb(1, "版本信息"); }
     log_info!("[Download] Step 2/5: Merging JSON inheritance");
     let merged_json = super::version::json_merge::merge_version_json(&version_json, game_dir)?;
     let merged_json_str = serde_json::to_string_pretty(&merged_json)?;
     std::fs::write(&json_path, &merged_json_str)?;
 
-    // Step 3: Download client JAR
+    // Step 3: 客户端
+    if let Some(ref cb) = stage_callback { cb(2, "客户端"); }
     log_info!("[Download] Step 3/5: Downloading client JAR");
     download_client_jar(&merged_json, game_dir, version_id, mirror_url, speed_limit, source_mode, progress_callback.clone()).await?;
 
-    // Step 4: Download Libraries
+    // Step 4: 库文件
+    if let Some(ref cb) = stage_callback { cb(3, "库文件"); }
     log_info!("[Download] Step 4/5: Downloading Libraries");
     let (libs_total, libs_downloaded, libs_skipped) =
         download_libraries(&merged_json, game_dir, mirror_url, max_threads, speed_limit, source_mode, progress_callback.clone()).await?;
 
-    // Step 5: Download Assets
+    // Step 5: 资源文件
+    if let Some(ref cb) = stage_callback { cb(4, "资源文件"); }
     log_info!("[Download] Step 5/5: Downloading Assets");
     let (assets_total, assets_downloaded, assets_skipped) =
         download_assets(&merged_json, game_dir, mirror_url, max_threads, speed_limit, source_mode, progress_callback).await?;

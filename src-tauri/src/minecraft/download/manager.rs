@@ -1,6 +1,6 @@
 //! 下载管理器 - 多线程下载、进度追踪、文件校验、限速
 
-use crate::{log_warn, log_debug};
+use crate::{log_info, log_warn, log_debug};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -276,6 +276,43 @@ impl DownloadManager {
         let semaphore = Arc::new(tokio::sync::Semaphore::new(self.max_threads));
         let rate_limiter = Arc::new(Mutex::new(RateLimiter::new(self.speed_limit)));
 
+        // 滑动窗口速度计算
+        let speed_window: Arc<Mutex<std::collections::VecDeque<(u64, Instant)>>> =
+            Arc::new(Mutex::new(std::collections::VecDeque::new()));
+
+        // 启动定期回调任务，每300ms调用一次回调来更新进度
+        let prog_for_timer = progress.clone();
+        let sw_for_timer = speed_window.clone();
+        let callback_for_timer = progress_callback.clone();
+        let timer_handle = tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_millis(300));
+            loop {
+                interval.tick().await;
+                let mut p = prog_for_timer.lock().await;
+                if !p.is_active {
+                    break;
+                }
+                // 计算速度
+                {
+                    let window = sw_for_timer.lock().await;
+                    if window.len() >= 2 {
+                        let (first_bytes, first_time) = window.front().unwrap();
+                        let (last_bytes, last_time) = window.back().unwrap();
+                        let bytes_diff = last_bytes.saturating_sub(*first_bytes);
+                        let time_diff = last_time.duration_since(*first_time).as_secs_f64();
+                        if time_diff > 0.0 {
+                            p.current_speed = (bytes_diff as f64 / time_diff) as u64;
+                        }
+                    }
+                }
+                let p_snapshot = p.clone();
+                drop(p);
+                if let Some(ref cb) = callback_for_timer {
+                    cb(p_snapshot);
+                }
+            }
+        });
+
         let mut handles = Vec::new();
 
         for task in tasks {
@@ -287,6 +324,7 @@ impl DownloadManager {
             let limiter = rate_limiter.clone();
             let urls = self.reorder_urls(&task.urls);
             let source_mode = self.source_mode;
+            let sw = speed_window.clone();
 
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.unwrap();
@@ -308,6 +346,22 @@ impl DownloadManager {
                     }
                     p.downloaded_bytes += result.downloaded;
 
+                    // 滑动窗口速度计算
+                    {
+                        let mut window = sw.lock().await;
+                        window.push_back((p.downloaded_bytes, Instant::now()));
+                        if window.len() > 10 { window.pop_front(); }
+                        if window.len() >= 2 {
+                            let (first_bytes, first_time) = window.front().unwrap();
+                            let (last_bytes, last_time) = window.back().unwrap();
+                            let bytes_diff = last_bytes.saturating_sub(*first_bytes);
+                            let time_diff = last_time.duration_since(*first_time).as_secs_f64();
+                            if time_diff > 0.0 {
+                                p.current_speed = (bytes_diff as f64 / time_diff) as u64;
+                            }
+                        }
+                    }
+
                     if let Some(ref cb) = callback {
                         cb(p.clone());
                     }
@@ -323,8 +377,13 @@ impl DownloadManager {
             let _ = handle.await;
         }
 
-        let mut p = progress.lock().await;
-        p.is_active = false;
+        {
+            let mut p = progress.lock().await;
+            p.is_active = false;
+        }
+
+        // 等待定时器任务结束
+        let _ = timer_handle.await;
 
         let final_results = results.lock().await.clone();
         final_results
@@ -376,12 +435,13 @@ impl DownloadManager {
                     if url.contains("bmclapi") || url.contains("mirror") {
                         Duration::from_secs(30)
                     } else {
-                        Duration::from_secs(3)
+                        Duration::from_secs(10)  // 官方源增加到10秒
                     }
                 }
                 _ => Duration::from_secs(30),
             };
 
+            log_info!("[Download] 尝试从 {} 下载 (超时: {}s)", url, timeout.as_secs());
             match Self::download_from_url(client, url, &task.local_path, rate_limiter.clone(), timeout).await {
                 Ok((downloaded, total, speed)) => {
                     // 校验

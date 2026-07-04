@@ -1,25 +1,7 @@
 import { watch } from 'vue'
 import { useVersionStore } from '@/stores/version'
-import { getDownloadProgress, isDownloading as checkIsDownloading } from '@/utils/tauri'
-
-/**
- * 全局下载轮询服务
- * 当 store 中 downloading 为 true 时自动启动轮询
- * 不依赖组件生命周期
- */
-
-// SDK 阶段映射（根据 poll.md 文档）
-const STAGE_NAMES = [
-  '版本清单',   // 0 - VersionManifest
-  '版本信息',   // 1 - VersionJson
-  '客户端',     // 2 - ClientJar
-  '库文件',     // 3 - Libraries
-  '资源文件',   // 4 - Assets
-  '本地库',     // 5 - Natives
-  '解压',       // 6 - ExtractNatives
-  '模组',       // 7 - Mods
-  '整合包',     // 8 - Modpack
-]
+import { getDownloadProgress } from '@/utils/tauri'
+import type { DownloadStage } from '@/stores/version'
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0
@@ -33,63 +15,50 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
   pollTimer = setInterval(async () => {
     pollCount++
     try {
-      const [progress, downloading] = await Promise.all([
-        getDownloadProgress(),
-        checkIsDownloading()
-      ])
+      const progress = await getDownloadProgress()
 
-      // 每 10 次轮询输出一次详细日志（约 3 秒）
       if (pollCount % 10 === 0) {
-        console.log(`[Polling] #${pollCount} progress=`, progress, `downloading=${downloading}`)
+        console.log(`[Polling] #${pollCount} progress=`, progress)
       }
 
-      if (progress) {
-        // 计算百分比 - 使用字节数计算（SDK已修复bytes_total包含所有文件）
-        let percentage = 0
-        
-        if (progress.bytes_total > 0) {
-          percentage = Math.min(100, Math.round((progress.bytes_downloaded / progress.bytes_total) * 100))
-        }
+      if (progress && progress.stages && progress.stages.length > 0) {
+        const stages: DownloadStage[] = progress.stages.map((s: any) => ({
+          name: s.name,
+          progress: s.progress,
+          weight: s.weight,
+          status: s.status,
+          bytes_downloaded: s.bytes_downloaded,
+          bytes_total: s.bytes_total,
+          files_downloaded: s.files_downloaded || 0,
+          files_total: s.files_total || 0,
+        }))
 
-        // 只有SDK明确报告完成时才设为100%
-        if (progress.is_complete) {
-          percentage = 100
+        let weightedProgress = 0
+        let totalWeight = 0
+        for (const stage of stages) {
+          totalWeight += stage.weight
+          weightedProgress += stage.progress * stage.weight
         }
-
-        // 输出异常百分比警告
-        if (percentage > 100) {
-          console.warn(`[Polling] Abnormal percentage: ${percentage}%, current=${progress.current}, total=${progress.total}`)
-        }
-
-        // 获取阶段名称
-        const stageIndex = progress.stage
-        const stageName = STAGE_NAMES[stageIndex] || `阶段 ${stageIndex}`
+        const percentage = totalWeight > 0
+          ? Math.min(100, Math.round((weightedProgress / totalWeight) * 100))
+          : 0
 
         versionStore.updateProgress({
-          stage: stageName,
-          stageIndex: stageIndex,
-          current: progress.current,
-          total: progress.total,
-          percentage: percentage,
-          speed: progress.speed, // SDK 返回的是 bytes/sec
-          bytesDownloaded: progress.bytes_downloaded,
-          bytesTotal: progress.bytes_total,
-          filesRemaining: progress.files_remaining
+          stages,
+          current_stage_index: progress.current_stage_index ?? 0,
+          global_speed: progress.global_speed ?? 0,
+          global_bytes_downloaded: progress.global_bytes_downloaded ?? 0,
+          global_bytes_total: progress.global_bytes_total ?? 0,
+          percentage,
         })
-      }
 
-      // 判断是否应该停止轮询
-      // 1. is_complete 为 true
-      // 2. is_active 为 false 且 downloading 为 false
-      const shouldStop = progress?.is_complete || (!progress?.is_active && !downloading)
-      
-      if (shouldStop) {
-        console.log(`[Polling] Stopping polling: is_complete=${progress?.is_complete}, is_active=${progress?.is_active}, downloading=${downloading}`)
-        // 延迟停止轮询，确保 UI 有时间更新
-        setTimeout(() => {
-          stopPolling()
-          versionStore.finishDownload()
-        }, 1500)
+        if (progress.is_complete) {
+          console.log('[Polling] Download complete, stopping polling')
+          setTimeout(() => {
+            stopPolling()
+            versionStore.finishDownload()
+          }, 1500)
+        }
       }
     } catch (e) {
       console.error('[Polling] Error:', e)
@@ -105,14 +74,9 @@ function stopPolling() {
   pollCount = 0
 }
 
-/**
- * 初始化全局轮询监听
- * 在 App.vue 中调用一次
- */
 export function initDownloadPolling() {
   const versionStore = useVersionStore()
 
-  // 监听 downloading 状态变化
   watch(
     () => versionStore.downloading,
     (isDownloading) => {

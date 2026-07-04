@@ -3,8 +3,8 @@
 use crate::{log_info, log_warn};
 use crate::sdk::SdkInstance;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
-use tokio::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use tokio::sync::Mutex as TokioMutex;
 
 /// 本地认证结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,9 +25,82 @@ pub struct LocalAuthResult {
 
 /// 应用全局状态
 pub struct AppState {
-    pub sdk: Arc<Mutex<Option<SdkInstance>>>,
-    pub config: Arc<Mutex<AppConfig>>,
-    pub auth: Arc<Mutex<AuthState>>,
+    pub sdk: Arc<TokioMutex<Option<SdkInstance>>>,
+    pub config: Arc<TokioMutex<AppConfig>>,
+    pub auth: Arc<TokioMutex<AuthState>>,
+    pub download_state: Arc<Mutex<DownloadState>>,
+}
+
+/// 阶段状态
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub enum StageStatus {
+    #[default]
+    Waiting,
+    Loading,
+    Finished,
+    Failed,
+}
+
+/// 下载阶段
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadStage {
+    pub name: String,
+    pub progress: f64,
+    pub weight: f64,
+    pub status: StageStatus,
+    pub bytes_downloaded: u64,
+    pub bytes_total: u64,
+    pub files_downloaded: usize,
+    pub files_total: usize,
+}
+
+impl DownloadStage {
+    pub fn new(name: impl Into<String>, weight: f64) -> Self {
+        Self {
+            name: name.into(),
+            progress: 0.0,
+            weight,
+            status: StageStatus::Waiting,
+            bytes_downloaded: 0,
+            bytes_total: 0,
+            files_downloaded: 0,
+            files_total: 0,
+        }
+    }
+}
+
+/// 下载状态
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DownloadState {
+    pub is_active: bool,
+    pub is_complete: bool,
+    pub stages: Vec<DownloadStage>,
+    pub current_stage_index: usize,
+    pub global_speed: u64,
+    pub global_bytes_downloaded: u64,
+    pub global_bytes_total: u64,
+    pub error_code: i32,
+}
+
+impl Default for DownloadState {
+    fn default() -> Self {
+        Self {
+            is_active: false,
+            is_complete: false,
+            stages: vec![
+                DownloadStage::new("版本清单", 2.0),
+                DownloadStage::new("版本信息", 3.0),
+                DownloadStage::new("客户端", 5.0),
+                DownloadStage::new("库文件", 15.0),
+                DownloadStage::new("资源文件", 20.0),
+            ],
+            current_stage_index: 0,
+            global_speed: 0,
+            global_bytes_downloaded: 0,
+            global_bytes_total: 0,
+            error_code: 0,
+        }
+    }
 }
 
 /// 应用配置
@@ -92,6 +165,22 @@ fn get_default_game_dir() -> String {
     ".minecraft".to_string()
 }
 
+/// 解析游戏目录：如果是相对路径，则相对于可执行文件目录
+pub fn resolve_game_dir(game_dir: &str) -> std::path::PathBuf {
+    let path = std::path::Path::new(game_dir);
+    if path.is_absolute() {
+        return path.to_path_buf();
+    }
+    // 相对路径：优先相对于可执行文件目录
+    if let Ok(exe_path) = std::env::current_exe() {
+        if let Some(exe_dir) = exe_path.parent() {
+            return exe_dir.join(game_dir);
+        }
+    }
+    // 兜底：当前工作目录
+    std::env::current_dir().unwrap_or_default().join(game_dir)
+}
+
 impl Default for AppState {
     fn default() -> Self {
         Self::new()
@@ -129,9 +218,10 @@ impl AppState {
         };
 
         Self {
-            sdk: Arc::new(Mutex::new(sdk)),
-            config: Arc::new(Mutex::new(config)),
-            auth: Arc::new(Mutex::new(AuthState::default())),
+            sdk: Arc::new(TokioMutex::new(sdk)),
+            config: Arc::new(TokioMutex::new(config)),
+            auth: Arc::new(TokioMutex::new(AuthState::default())),
+            download_state: Arc::new(Mutex::new(DownloadState::default())),
         }
     }
 }
