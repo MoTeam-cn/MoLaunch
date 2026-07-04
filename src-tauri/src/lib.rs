@@ -2,6 +2,7 @@
 
 pub mod commands;
 pub mod config;
+pub mod http;
 pub mod logger;
 pub mod minecraft;
 pub mod resources;
@@ -26,12 +27,20 @@ pub fn run() {
     // 初始化日志系统
     logger::init_from_config();
 
+    // 初始化 HTTP 客户端（根据代理配置）
+    let app_state = AppState::new();
+    {
+        let config = app_state.config.blocking_lock();
+        http::init_client(&config.proxy_mode, &config.proxy_type, &config.proxy_url);
+        log_info!("HTTP client initialized (proxy: {})", config.proxy_mode);
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
-        .manage(AppState::new())
+        .manage(app_state)
         .invoke_handler(tauri::generate_handler![
             // SDK 命令（lite 版本）
             commands::sdk::get_platform_info,
@@ -84,6 +93,12 @@ pub fn run() {
             commands::system::get_max_download_threads,
             commands::system::get_config_value,
             commands::system::set_config_value,
+            commands::system::get_proxy_mode,
+            commands::system::set_proxy_mode,
+            commands::system::get_proxy_type,
+            commands::system::set_proxy_type,
+            commands::system::get_proxy_url,
+            commands::system::set_proxy_url,
         ])
         .on_window_event(|_window, event| {
             // 窗口关闭时保存配置

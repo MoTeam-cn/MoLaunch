@@ -166,9 +166,9 @@ function goToVersions() {
             <!-- 分割线 -->
             <div class="h-px bg-gradient-to-r from-gray-100 to-gray-200"></div>
 
-            <!-- 已下载 / 总大小 -->
+            <!-- 已下载 / 总大小（累计） -->
             <div>
-              <div class="text-xs text-gray-500 mb-1">已下载 / 总大小</div>
+              <div class="text-xs text-gray-500 mb-1">已下载 / 总大小（累计）</div>
               <div class="text-sm font-medium text-gray-900">
                 {{ formatBytes(bytesDownloaded) }}
               </div>
@@ -180,9 +180,9 @@ function goToVersions() {
             <!-- 分割线 -->
             <div class="h-px bg-gradient-to-r from-gray-100 to-gray-200"></div>
 
-            <!-- 剩余阶段 -->
+            <!-- 剩余文件（当前阶段） -->
             <div>
-              <div class="text-xs text-gray-500 mb-1">剩余阶段</div>
+              <div class="text-xs text-gray-500 mb-1">剩余文件（当前阶段）</div>
               <div class="text-lg font-semibold text-gray-900">{{ filesRemaining }}</div>
             </div>
           </div>

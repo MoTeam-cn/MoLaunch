@@ -3,12 +3,14 @@ import { ref } from 'vue'
 import SettingsLaunch from './settings/SettingsLaunch.vue'
 import SettingsDownload from './settings/SettingsDownload.vue'
 import SettingsPersonal from './settings/SettingsPersonal.vue'
+import SettingsAdvanced from './settings/SettingsAdvanced.vue'
 import SettingsOther from './settings/SettingsOther.vue'
 import {
   RocketLaunchIcon,
   PaintBrushIcon,
   EllipsisHorizontalIcon,
   ArrowDownTrayIcon,
+  CogIcon,
 } from '@heroicons/vue/24/outline'
 
 const activeCategory = ref('launch')
@@ -17,6 +19,7 @@ const categories = [
   { id: 'launch', label: '游戏启动', icon: RocketLaunchIcon, desc: 'Java、内存、游戏目录等启动参数' },
   { id: 'download', label: '下载配置', icon: ArrowDownTrayIcon, desc: '下载源、限速、并发等下载配置' },
   { id: 'personal', label: '个性化', icon: PaintBrushIcon, desc: '主题、布局、语言等外观设置' },
+  { id: 'advanced', label: '高阶配置', icon: CogIcon, desc: '代理、高级参数等' },
   { id: 'other', label: '其他', icon: EllipsisHorizontalIcon, desc: '日志、SDK 信息' },
 ]
 
@@ -58,6 +61,7 @@ const activeDesc = () => categories.find(c => c.id === activeCategory.value)?.de
         <SettingsLaunch v-if="activeCategory === 'launch'" />
         <SettingsDownload v-else-if="activeCategory === 'download'" />
         <SettingsPersonal v-else-if="activeCategory === 'personal'" />
+        <SettingsAdvanced v-else-if="activeCategory === 'advanced'" />
         <SettingsOther v-else-if="activeCategory === 'other'" />
       </div>
     </div>

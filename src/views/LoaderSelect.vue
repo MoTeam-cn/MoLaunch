@@ -14,6 +14,7 @@ import fabricIcon from '@/assets/blocks/Fabric.png'
 import neoforgeIcon from '@/assets/blocks/NeoForge.png'
 import optifineIcon from '@/assets/blocks/RedstoneLampOn.png'
 import liteloaderIcon from '@/assets/blocks/Egg.png'
+import Alert from '@/components/common/Alert.vue'
 
 interface Props {
   mcVersion: string
@@ -289,18 +290,10 @@ function handleInstall() {
     <!-- 加载器列表 -->
     <div class="flex-1 overflow-y-auto p-6 space-y-3">
       <!-- 远古版提示 -->
-      <div v-if="isAncient" class="flex items-center h-8 rounded-r-lg bg-white shadow-sm overflow-hidden">
-        <div class="w-[3px] h-full bg-amber-500 shrink-0"></div>
-        <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 ml-2.5 shrink-0" />
-        <span class="text-[13px] font-medium text-gray-800 ml-2 mr-3 truncate">版本过老，无任何配套内容，请直接安装原版即可</span>
-      </div>
+      <Alert v-if="isAncient" type="warning" message="版本过老，无任何配套内容，请直接安装原版即可" />
 
       <!-- 快照版提示 -->
-      <div v-if="isSnapshot" class="flex items-center h-8 rounded-r-lg bg-white shadow-sm overflow-hidden">
-        <div class="w-[3px] h-full bg-blue-500 shrink-0"></div>
-        <InformationCircleIcon class="w-4 h-4 text-blue-500 ml-2.5 shrink-0" />
-        <span class="text-[13px] font-medium text-gray-800 ml-2 mr-3 truncate">快照版建议选择 Fabric，Forge/NeoForge 一般不会为快照适配</span>
-      </div>
+      <Alert v-if="isSnapshot" type="info" message="快照版建议选择 Fabric，Forge/NeoForge 一般不会为快照适配" />
 
       <!-- Forge -->
       <LoaderCard

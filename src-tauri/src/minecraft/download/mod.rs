@@ -4,6 +4,7 @@ pub mod assets;
 pub mod manager;
 
 use crate::{log_info, log_warn, log_debug};
+use crate::http;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
@@ -227,7 +228,7 @@ async fn download_client_jar(
         expected_hash: json["downloads"]["client"]["sha1"].as_str().map(|s| s.to_string()),
     };
 
-    let manager = DownloadManager::new(1, speed_limit, source_mode);
+        let manager = DownloadManager::new(1, speed_limit, source_mode);
     let results = manager.download_batch(vec![task], progress_callback).await;
 
     if let Some(result) = results.first() {
@@ -304,7 +305,7 @@ async fn download_assets(
             expected_hash: if index_meta.sha1.is_empty() { None } else { Some(index_meta.sha1.clone()) },
         };
 
-        let manager = DownloadManager::new(1, speed_limit, source_mode);
+    let manager = DownloadManager::new(1, speed_limit, source_mode);
         let results = manager.download_batch(vec![task], None).await;
 
         if let Some(result) = results.first() {
@@ -391,33 +392,12 @@ async fn fetch_with_retry(primary_url: &str, local_path: &Path, mirror_url: Opti
 
 /// 下载 URL 内容到文件
 async fn fetch_url_to_file(url: &str, local_path: &Path) -> anyhow::Result<String> {
-    let client = reqwest::Client::new();
-    let response = client.get(url).timeout(std::time::Duration::from_secs(30)).send().await?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("HTTP error: {}", response.status()));
-    }
-
-    let content = response.text().await?;
-
-    if let Some(parent) = local_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    std::fs::write(local_path, &content)?;
-    Ok(content)
+    http::fetch_url_to_file(url, local_path).await
 }
 
 /// 获取 URL 内容
 pub async fn fetch_url(url: &str) -> anyhow::Result<String> {
-    let client = reqwest::Client::new();
-    let response = client.get(url).timeout(std::time::Duration::from_secs(30)).send().await?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("HTTP error: {}", response.status()));
-    }
-
-    Ok(response.text().await?)
+    http::fetch_url(url).await
 }
 
 /// 补全版本文件

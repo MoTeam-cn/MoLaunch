@@ -119,6 +119,9 @@ pub struct AppConfig {
     pub mirror_mode: u32,
     pub max_download_speed: u64,
     pub download_source: String,  // "mirror" | "official" | "smart"
+    pub proxy_mode: String,       // "none" | "system" | "custom"
+    pub proxy_type: String,       // "http" | "https" | "socks5"
+    pub proxy_url: String,        // 自定义代理地址，如 "127.0.0.1:7890"
 }
 
 impl Default for AppConfig {
@@ -137,6 +140,9 @@ impl Default for AppConfig {
             mirror_mode: 0,
             max_download_speed: 0,
             download_source: "smart".to_string(),
+            proxy_mode: "none".to_string(),
+            proxy_type: "http".to_string(),
+            proxy_url: String::new(),
         }
     }
 }

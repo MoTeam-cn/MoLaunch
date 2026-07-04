@@ -7,7 +7,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 import { showError, showConfirm } from '@/utils/modal'
-import { showSuccess, showInfo } from '@/utils/toast'
+import { showSuccess, showInfo, showWarning } from '@/utils/toast'
 import Tooltip from '@/components/common/Tooltip.vue'
 import LoaderSelect from './LoaderSelect.vue'
 import VersionSection from '@/components/version/VersionSection.vue'
@@ -86,9 +86,17 @@ async function loadInstalledVersions() {
 
 async function handleRefresh() {
   showInfo('正在刷新版本列表...')
-  await versionStore.refreshVersions()
-  await loadInstalledVersions()
-  showSuccess('版本列表已刷新')
+  try {
+    await versionStore.refreshVersions()
+    await loadInstalledVersions()
+    if (versionStore.versions.length === 0) {
+      showWarning('未获取到版本列表，请检查网络连接')
+    } else {
+      showSuccess('版本列表已刷新')
+    }
+  } catch (e) {
+    showError('获取版本列表失败', String(e))
+  }
 }
 
 function onInstallRequest(options: { mcVersion: string; forge?: string; neoforge?: string; fabric?: string; optifine?: string; liteloader?: string; instanceName: string }) {
@@ -156,7 +164,11 @@ onMounted(async () => {
   if (versionStore.versions.length === 0) {
     loading.value = true
   }
-  await Promise.all([versionStore.fetchVersions(), loadInstalledVersions()])
+  try {
+    await Promise.all([versionStore.fetchVersions(), loadInstalledVersions()])
+  } catch (e) {
+    showError('获取版本列表失败', String(e))
+  }
   loading.value = false
 })
 </script>
@@ -173,7 +185,7 @@ onMounted(async () => {
           :class="activeCategory === cat.id
             ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
             : 'text-gray-700 hover:bg-gray-50'"
-          @click="activeCategory = cat.id"
+          @click="activeCategory = cat.id; selectedVersion = null"
         >
           <component :is="cat.icon" class="w-5 h-5 mr-3" />
           {{ cat.label }}
@@ -204,9 +216,9 @@ onMounted(async () => {
         <Tooltip text="刷新版本列表" position="bottom">
           <button
             class="p-2 rounded-lg transition-colors"
-            :class="selectedVersion ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'"
-            :disabled="!!selectedVersion"
-            @click="!selectedVersion && handleRefresh()"
+            :class="(selectedVersion || activeCategory !== 'vanilla') ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'"
+            :disabled="!!selectedVersion || activeCategory !== 'vanilla'"
+            @click="!selectedVersion && activeCategory === 'vanilla' && handleRefresh()"
           >
             <ArrowPathIcon class="w-4 h-4" />
           </button>

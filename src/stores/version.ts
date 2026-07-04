@@ -68,6 +68,7 @@ export const useVersionStore = defineStore('version', () => {
     } catch (e) {
       error.value = String(e)
       console.error('Failed to fetch versions:', e)
+      throw e // 重新抛出错误，让调用者处理
     } finally {
       loading.value = false
     }

@@ -78,6 +78,11 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.log_level = level.parse().unwrap_or(app_config.log_level);
     }
 
+    // Proxy
+    app_config.proxy_mode = config.get_or("Proxy", "mode", &app_config.proxy_mode);
+    app_config.proxy_type = config.get_or("Proxy", "type", &app_config.proxy_type);
+    app_config.proxy_url = config.get_or("Proxy", "url", &app_config.proxy_url);
+
     log_info!("Config loaded from storage");
     Ok(Some(app_config))
 }
@@ -122,6 +127,11 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
 
     // Log
     ini.set("Log", "level", &config.log_level.to_string());
+
+    // Proxy
+    ini.set("Proxy", "mode", &config.proxy_mode);
+    ini.set("Proxy", "type", &config.proxy_type);
+    ini.set("Proxy", "url", &config.proxy_url);
 
     storage.write_config(&ini).map_err(|e| e.to_string())?;
     log_debug!("Config saved to storage");

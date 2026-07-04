@@ -1,6 +1,6 @@
 //! 下载管理器 - 多线程下载、进度追踪、文件校验、限速
 
-use crate::{log_info, log_warn, log_debug};
+use crate::{log_warn, log_debug};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
@@ -180,10 +180,7 @@ impl DownloadManager {
         speed_limit: u64,
         source_mode: DownloadSourceMode,
     ) -> Self {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .expect("Failed to create HTTP client");
+        let client = crate::http::get_client();
 
         Self {
             client,
@@ -441,7 +438,7 @@ impl DownloadManager {
                 _ => Duration::from_secs(30),
             };
 
-            log_info!("[Download] 尝试从 {} 下载 (超时: {}s)", url, timeout.as_secs());
+            log_debug!("[Download] 尝试从 {} 下载 (超时: {}s)", url, timeout.as_secs());
             match Self::download_from_url(client, url, &task.local_path, rate_limiter.clone(), timeout).await {
                 Ok((downloaded, total, speed)) => {
                     // 校验

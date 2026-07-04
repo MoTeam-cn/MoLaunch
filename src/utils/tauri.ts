@@ -328,3 +328,45 @@ export async function getConfigValue(section: string, key: string): Promise<stri
 export async function setConfigValue(section: string, key: string, value: string): Promise<void> {
   return await invoke<void>('set_config_value', { section, key, value })
 }
+
+/**
+ * 获取代理模式
+ */
+export async function getProxyMode(): Promise<string> {
+  return await invoke<string>('get_proxy_mode')
+}
+
+/**
+ * 设置代理模式
+ */
+export async function setProxyMode(mode: string): Promise<void> {
+  return await invoke<void>('set_proxy_mode', { mode })
+}
+
+/**
+ * 获取代理类型
+ */
+export async function getProxyType(): Promise<string> {
+  return await invoke<string>('get_proxy_type')
+}
+
+/**
+ * 设置代理类型
+ */
+export async function setProxyType(proxyType: string): Promise<void> {
+  return await invoke<void>('set_proxy_type', { proxyType })
+}
+
+/**
+ * 获取代理地址
+ */
+export async function getProxyUrl(): Promise<string> {
+  return await invoke<string>('get_proxy_url')
+}
+
+/**
+ * 设置代理地址
+ */
+export async function setProxyUrl(url: string): Promise<void> {
+  return await invoke<void>('set_proxy_url', { url })
+}
