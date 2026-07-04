@@ -98,9 +98,16 @@ pub fn parse_version_list(version_list: &serde_json::Value) -> Vec<VersionEntry>
                 version["releaseTime"].as_str(),
                 version["url"].as_str(),
             ) {
+                // 检测愚人节版本，修正 type
+                let actual_type = if super::fools::detect_fool(id, version_type, release_time).is_some() {
+                    "fool"
+                } else {
+                    version_type
+                };
+
                 entries.push(VersionEntry {
                     id: id.to_string(),
-                    version_type: version_type.to_string(),
+                    version_type: actual_type.to_string(),
                     time: time.to_string(),
                     release_time: release_time.to_string(),
                     url: url.to_string(),

@@ -11,6 +11,7 @@ interface VersionItem {
   version_type: string
   release_time: number
   tag?: string
+  description?: string
 }
 
 interface Props {
@@ -83,7 +84,7 @@ function isInstalled(id: string): boolean {
               />
               <div>
                 <div class="flex items-center">
-                  <span class="text-sm text-gray-900">{{ version.id }}</span>
+                  <span class="text-sm text-gray-900">{{ version.description || version.id }}</span>
                   <span
                     v-if="version.tag"
                     class="ml-2 text-xs px-1.5 py-0.5 rounded-full"

@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod download;
+pub mod fools;
 pub mod java;
 pub mod java_selector;
 pub mod launch;

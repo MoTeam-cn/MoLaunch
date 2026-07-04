@@ -15,7 +15,7 @@ import InstalledList from '@/components/version/InstalledList.vue'
 import {
   CubeIcon, WrenchIcon, ArchiveBoxIcon, CheckCircleIcon,
   FolderOpenIcon, StarIcon, BeakerIcon, ClockIcon, SparklesIcon,
-  ArrowPathIcon,
+  ArrowPathIcon, FaceSmileIcon,
 } from '@heroicons/vue/24/outline'
 
 import grassIcon from '@/assets/blocks/Grass.png'
@@ -38,15 +38,11 @@ const selectedVersion = computed({
 const typeIcons: Record<string, string> = {
   release: grassIcon, snapshot: commandBlockIcon,
   old_beta: cobblestoneIcon, old_alpha: cobblestoneIcon,
-}
-const specialIcons: Record<string, string> = {
-  '23w13a_or_b': goldBlockIcon, '20w14infinite': goldBlockIcon,
-  '22w13oneblockatatime': goldBlockIcon, '24w14potato': goldBlockIcon,
-  '25w14craftmine': goldBlockIcon,
+  fool: goldBlockIcon,
 }
 
 function getVersionIcon(id: string, type: string): string {
-  return specialIcons[id] || typeIcons[type] || grassIcon
+  return typeIcons[type] || grassIcon
 }
 
 function formatDate(ts: number): string {
@@ -78,6 +74,7 @@ const sections = computed(() => [
   { id: 'latest', label: '最新版本', icon: SparklesIcon, versions: latestVersions.value },
   { id: 'release', label: '正式版', icon: StarIcon, versions: versionStore.getReleaseVersions() },
   { id: 'snapshot', label: '快照版', icon: BeakerIcon, versions: versionStore.getSnapshotVersions() },
+  { id: 'fool', label: '愚人节版', icon: FaceSmileIcon, versions: versionStore.versions.filter(v => v.version_type === 'fool') },
   { id: 'old', label: '远古版', icon: ClockIcon, versions: versionStore.versions.filter(v => v.version_type === 'old_beta' || v.version_type === 'old_alpha') },
 ])
 

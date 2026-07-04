@@ -55,16 +55,17 @@ const mcNum = computed(() => {
 // 判断版本类型 - 从版本列表中获取
 const versionInfo = computed(() => versionStore.getVersionById(props.mcVersion))
 const isSnapshot = computed(() => versionInfo.value?.version_type === 'snapshot')
+const isFool = computed(() => versionInfo.value?.version_type === 'fool')
 const isAncient = computed(() => {
   const type = versionInfo.value?.version_type
   return type === 'old_beta' || type === 'old_alpha' || mcNum.value < 10000
 })
 
-const showForge = computed(() => !isSnapshot.value && !isAncient.value && mcNum.value >= 10501)
-const showNeoforge = computed(() => !isSnapshot.value && !isAncient.value && mcNum.value >= 12001)
-const showFabric = computed(() => !isAncient.value && mcNum.value > 11300)
-const showLiteloader = computed(() => !isSnapshot.value && !isAncient.value && mcNum.value <= 11202)
-const showOptifine = computed(() => !isAncient.value)
+const showForge = computed(() => !isSnapshot.value && !isAncient.value && !isFool.value && mcNum.value >= 10501)
+const showNeoforge = computed(() => !isSnapshot.value && !isAncient.value && !isFool.value && mcNum.value >= 12001)
+const showFabric = computed(() => !isAncient.value && !isFool.value && mcNum.value > 11300)
+const showLiteloader = computed(() => !isSnapshot.value && !isAncient.value && !isFool.value && mcNum.value <= 11202)
+const showOptifine = computed(() => !isAncient.value && !isFool.value)
 
 // 过滤 OptiFine：只显示与当前 MC 版本匹配的
 const filteredOptifine = computed(() => {
@@ -294,6 +295,9 @@ function handleInstall() {
 
       <!-- 快照版提示 -->
       <Alert v-if="isSnapshot" type="info" message="快照版建议选择 Fabric，Forge/NeoForge 一般不会为快照适配" />
+
+      <!-- 愚人节版提示 -->
+      <Alert v-if="isFool" type="info" message="愚人节版本不支持 Mod 加载器，请直接安装原版体验" />
 
       <!-- Forge -->
       <LoaderCard
