@@ -93,6 +93,8 @@ pub fn run() {
             commands::system::get_memory_config,
             commands::system::set_max_download_threads,
             commands::system::get_max_download_threads,
+            commands::system::set_chunk_count,
+            commands::system::get_chunk_count,
             commands::system::get_config_value,
             commands::system::set_config_value,
             commands::system::get_proxy_mode,

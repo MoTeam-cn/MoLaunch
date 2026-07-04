@@ -3,9 +3,49 @@ use crate::minecraft::download::{self, manager as download_manager};
 use crate::minecraft::loaders;
 use crate::state::{AppState, StageStatus};
 use std::collections::VecDeque;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, State};
+
+/// 启动进度模拟器：缓慢上涨进度条，直到 stop 信号为 true
+/// - 从 `start` 开始，每 500ms 增长一小段，上限 `cap`
+/// - 返回 stop 信号，设为 true 即停止模拟
+fn start_progress_ticker(
+    state: Arc<std::sync::Mutex<crate::state::DownloadState>>,
+    start: f64,
+    cap: f64,
+) -> Arc<AtomicBool> {
+    let stop = Arc::new(AtomicBool::new(false));
+    let stop_clone = stop.clone();
+
+    tokio::spawn(async move {
+        let mut current = start;
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+        interval.tick().await; // 跳过第一次立即触发
+
+        while !stop_clone.load(Ordering::Relaxed) {
+            interval.tick().await;
+            if stop_clone.load(Ordering::Relaxed) {
+                break;
+            }
+            // 每次增长 1%~3%，越接近 cap 越慢
+            let remaining = cap - current;
+            if remaining <= 0.0 {
+                break;
+            }
+            let step = (remaining * 0.05).clamp(0.5, 3.0);
+            current = (current + step).min(cap);
+
+            let mut ds = state.lock().unwrap();
+            if ds.stages.len() > 5 {
+                ds.stages[5].progress = current / 100.0;
+            }
+        }
+    });
+
+    stop
+}
 
 /// Merged install (MC + loader)
 #[tauri::command]
@@ -47,8 +87,9 @@ pub async fn install_merged(
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     let mirror_url = config.mirror_url.clone();
     let max_threads = config.max_download_threads as usize;
+    let chunk_count = config.chunk_count as usize;
     let speed_limit = config.max_download_speed;
-    let source_mode = download_manager::DownloadSourceMode::from_str(&config.download_source);
+    let source_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
     let game_path = game_dir.as_path();
@@ -137,6 +178,7 @@ pub async fn install_merged(
         game_path,
         mirror_url.as_deref(),
         max_threads,
+        chunk_count,
         speed_limit,
         source_mode,
         Some(progress_callback),
@@ -163,12 +205,15 @@ pub async fn install_merged(
     }
 
     let mut loader_errors = Vec::new();
+    let has_any_loader = forge_version.is_some() || neoforge_version.is_some() || 
+                         fabric_version.is_some() || optifine_version.is_some() || 
+                         liteloader_version.is_some();
 
     if let Some(forge_ver) = forge_version {
         // 更新阶段：Forge 安装
         {
             let mut ds = state.download_state.lock().unwrap();
-            ds.current_stage_index = 5; // 使用第6个阶段显示加载器安装
+            ds.current_stage_index = 5;
             if ds.stages.len() > 5 {
                 ds.stages[5].name = format!("安装 Forge {}", forge_ver);
                 ds.stages[5].status = StageStatus::Loading;
@@ -186,6 +231,9 @@ pub async fn install_merged(
             }
         });
         
+        // 启动进度模拟器，防止进度卡住
+        let ticker_stop = start_progress_ticker(state.download_state.clone(), 5.0, 95.0);
+        
         match loaders::install_loader(
             loaders::LoaderType::Forge,
             &mc_version,
@@ -197,8 +245,8 @@ pub async fn install_merged(
             source_mode,
         ).await {
             Ok(_) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_info!("[Merged] Forge {} installed successfully", forge_ver);
-                // 标记 Forge 安装完成
                 let mut ds = state.download_state.lock().unwrap();
                 if ds.stages.len() > 5 {
                     ds.stages[5].status = StageStatus::Finished;
@@ -206,9 +254,9 @@ pub async fn install_merged(
                 }
             }
             Err(e) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_error!("[Merged] Failed to install Forge: {}", e);
                 loader_errors.push(format!("Forge: {}", e));
-                // 标记 Forge 安装失败
                 let mut ds = state.download_state.lock().unwrap();
                 if ds.stages.len() > 5 {
                     ds.stages[5].status = StageStatus::Failed;
@@ -218,7 +266,6 @@ pub async fn install_merged(
     }
 
     if let Some(neoforge_ver) = neoforge_version {
-        // 更新阶段：NeoForge 安装
         {
             let mut ds = state.download_state.lock().unwrap();
             ds.current_stage_index = 5;
@@ -229,6 +276,7 @@ pub async fn install_merged(
             }
         }
         log_info!("[Merged] Installing NeoForge {}", neoforge_ver);
+        let ticker_stop = start_progress_ticker(state.download_state.clone(), 5.0, 95.0);
         match loaders::install_loader(
             loaders::LoaderType::NeoForge,
             &mc_version,
@@ -240,6 +288,7 @@ pub async fn install_merged(
             source_mode,
         ).await {
             Ok(_) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_info!("[Merged] NeoForge {} installed successfully", neoforge_ver);
                 let mut ds = state.download_state.lock().unwrap();
                 if ds.stages.len() > 5 {
@@ -248,6 +297,7 @@ pub async fn install_merged(
                 }
             }
             Err(e) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_error!("[Merged] Failed to install NeoForge: {}", e);
                 loader_errors.push(format!("NeoForge: {}", e));
                 let mut ds = state.download_state.lock().unwrap();
@@ -269,6 +319,7 @@ pub async fn install_merged(
             }
         }
         log_info!("[Merged] Installing Fabric {}", fabric_ver);
+        let ticker_stop = start_progress_ticker(state.download_state.clone(), 5.0, 95.0);
         match loaders::install_loader(
             loaders::LoaderType::Fabric,
             &mc_version,
@@ -280,6 +331,7 @@ pub async fn install_merged(
             source_mode,
         ).await {
             Ok(_) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_info!("[Merged] Fabric {} installed successfully", fabric_ver);
                 let mut ds = state.download_state.lock().unwrap();
                 if ds.stages.len() > 5 {
@@ -288,6 +340,7 @@ pub async fn install_merged(
                 }
             }
             Err(e) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_error!("[Merged] Failed to install Fabric: {}", e);
                 loader_errors.push(format!("Fabric: {}", e));
                 let mut ds = state.download_state.lock().unwrap();
@@ -309,6 +362,7 @@ pub async fn install_merged(
             }
         }
         log_info!("[Merged] Installing OptiFine {}", optifine_ver);
+        let ticker_stop = start_progress_ticker(state.download_state.clone(), 5.0, 95.0);
         match loaders::install_loader(
             loaders::LoaderType::OptiFine,
             &mc_version,
@@ -320,6 +374,7 @@ pub async fn install_merged(
             source_mode,
         ).await {
             Ok(_) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_info!("[Merged] OptiFine {} installed successfully", optifine_ver);
                 let mut ds = state.download_state.lock().unwrap();
                 if ds.stages.len() > 5 {
@@ -328,6 +383,7 @@ pub async fn install_merged(
                 }
             }
             Err(e) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_error!("[Merged] Failed to install OptiFine: {}", e);
                 loader_errors.push(format!("OptiFine: {}", e));
                 let mut ds = state.download_state.lock().unwrap();
@@ -349,6 +405,7 @@ pub async fn install_merged(
             }
         }
         log_info!("[Merged] Installing LiteLoader {}", liteloader_ver);
+        let ticker_stop = start_progress_ticker(state.download_state.clone(), 5.0, 95.0);
         match loaders::install_loader(
             loaders::LoaderType::LiteLoader,
             &mc_version,
@@ -360,6 +417,7 @@ pub async fn install_merged(
             source_mode,
         ).await {
             Ok(_) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_info!("[Merged] LiteLoader {} installed successfully", liteloader_ver);
                 let mut ds = state.download_state.lock().unwrap();
                 if ds.stages.len() > 5 {
@@ -368,6 +426,7 @@ pub async fn install_merged(
                 }
             }
             Err(e) => {
+                ticker_stop.store(true, Ordering::Relaxed);
                 log_error!("[Merged] Failed to install LiteLoader: {}", e);
                 loader_errors.push(format!("LiteLoader: {}", e));
                 let mut ds = state.download_state.lock().unwrap();
@@ -392,6 +451,16 @@ pub async fn install_merged(
     let _ = app.emit("install-complete", serde_json::json!({ "instance_name": instance }));
 
     if loader_errors.is_empty() {
+        // 安装成功后，如果有加载器，删除原版文件夹（参考 PCL2：只保留加载器版本文件夹）
+        if has_any_loader {
+            let mc_version_dir = game_dir.join("versions").join(&mc_version);
+            if mc_version_dir.exists() {
+                match std::fs::remove_dir_all(&mc_version_dir) {
+                    Ok(_) => log_info!("[Merged] 已删除原版目录: {}", mc_version_dir.display()),
+                    Err(e) => log_warn!("[Merged] 删除原版目录失败: {}", e),
+                }
+            }
+        }
         log_info!("[Merged] Install completed successfully");
         Ok(())
     } else {

@@ -26,6 +26,7 @@ import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
 const versionStore = useVersionStore()
 
 const loading = ref(false)
+const installedLoaded = ref(false)
 const installedVersions = ref<string[]>([])
 const activeCategory = ref('vanilla')
 // 使用 store 中的 selectedVersion 保持页面切换状态
@@ -50,7 +51,7 @@ function getVersionIcon(id: string, type: string): string {
 
 function formatDate(ts: number): string {
   if (!ts) return '未知'
-  return new Date(ts * 1000).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' })
+  return new Date(ts * 1000).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 const categories = [
@@ -82,6 +83,7 @@ const sections = computed(() => [
 
 async function loadInstalledVersions() {
   try { installedVersions.value = await tauri.listInstalledVersions() } catch (e) { console.error(e) }
+  installedLoaded.value = true
 }
 
 async function handleRefresh() {
@@ -236,13 +238,15 @@ onMounted(async () => {
           />
 
           <div v-else key="version-list" class="p-6 h-full">
-            <div v-if="loading" class="flex items-center justify-center h-full">
+            <!-- 原版游戏 - 加载中 -->
+            <div v-if="activeCategory === 'vanilla' && loading" class="flex items-center justify-center h-full">
               <div class="text-center">
                 <div class="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-primary-600 mx-auto"></div>
                 <p class="text-sm text-gray-500 mt-3">加载中...</p>
               </div>
             </div>
 
+            <!-- 原版游戏 - 列表 -->
             <div v-else-if="activeCategory === 'vanilla'" class="space-y-4">
               <VersionSection
                 v-for="(section, idx) in sections"
@@ -261,6 +265,15 @@ onMounted(async () => {
               />
             </div>
 
+            <!-- 已安装 - 加载中 -->
+            <div v-else-if="activeCategory === 'installed' && !installedLoaded" class="flex items-center justify-center h-full">
+              <div class="text-center">
+                <div class="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-primary-600 mx-auto"></div>
+                <p class="text-sm text-gray-500 mt-3">加载中...</p>
+              </div>
+            </div>
+
+            <!-- 已安装 - 列表 -->
             <InstalledList
               v-else-if="activeCategory === 'installed'"
               :versions="installedVersions"

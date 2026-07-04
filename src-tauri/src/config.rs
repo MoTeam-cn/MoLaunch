@@ -35,6 +35,9 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(threads) = config.get("Download", "max_threads") {
         app_config.max_download_threads = threads.parse().unwrap_or(app_config.max_download_threads);
     }
+    if let Some(chunks) = config.get("Download", "chunk_count") {
+        app_config.chunk_count = chunks.parse().unwrap_or(app_config.chunk_count);
+    }
     if let Some(speed) = config.get("Download", "max_speed") {
         app_config.max_download_speed = speed.parse().unwrap_or(app_config.max_download_speed);
     }
@@ -100,6 +103,7 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
 
     // Download
     ini.set("Download", "max_threads", &config.max_download_threads.to_string());
+    ini.set("Download", "chunk_count", &config.chunk_count.to_string());
     ini.set("Download", "max_speed", &config.max_download_speed.to_string());
     ini.set("Download", "source", &config.download_source);
     ini.set("Download", "mirror_mode", &config.mirror_mode.to_string());

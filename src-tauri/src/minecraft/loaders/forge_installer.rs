@@ -14,9 +14,15 @@ pub struct ForgeInstallProgress {
     pub progress: f64,
 }
 
+/// 获取缓存目录（参考 PCL2：使用临时目录）
+fn get_cache_dir() -> std::path::PathBuf {
+    std::env::temp_dir().join("MoLaunch").join("Cache")
+}
+
 /// 释放嵌入的资源文件到缓存目录
-pub fn extract_embedded_resources(cache_dir: &Path) -> anyhow::Result<(String, String)> {
-    std::fs::create_dir_all(cache_dir)?;
+pub fn extract_embedded_resources() -> anyhow::Result<(String, String)> {
+    let cache_dir = get_cache_dir();
+    std::fs::create_dir_all(&cache_dir)?;
 
     let installer_path = cache_dir.join("forge-installer.jar");
     let wrapper_path = cache_dir.join("java-wrapper.jar");
@@ -140,8 +146,16 @@ pub fn run_forge_installer(
         }
     }
 
-    // 等待进程结束
+    // 参考 PCL2：等待进程完全退出
+    // PCL2: Do Until process.HasExited + Thread.Sleep(10)
+    // Rust: child.wait() 会阻塞直到进程退出
     let _status = child.wait()?;
+
+    // 参考 PCL2：等待 I/O 流完全关闭
+    // PCL2: outputWaitHandle.WaitOne(10000) + errorWaitHandle.WaitOne(10000)
+    // 我们已经通过读取 stdout/stderr 循环等待流关闭了
+    // 但 Java 运行时可能还有文件句柄未释放，等待一下
+    std::thread::sleep(std::time::Duration::from_secs(1));
 
     // 检查是否成功（最后 5 行中是否有 "true"）
     let success = last_lines.iter().rev().take(5).any(|l| l.trim() == "true");

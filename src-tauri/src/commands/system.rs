@@ -151,15 +151,15 @@ pub async fn set_download_source(
     source: String,
     _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
-    const BMCLAPI: &str = "https://bmclapi2.bangbang93.com";
+    let bmclapi = crate::minecraft::sources::BMCLAPI_BASE;
 
     log_info!("Download source changed to: {}", source);
     update_config(&state, |config| {
         match source.as_str() {
             "mirror" => {
-                config.mirror_url_meta = Some(BMCLAPI.to_string());
-                config.mirror_url_download = Some(BMCLAPI.to_string());
-                config.mirror_url = Some(BMCLAPI.to_string());
+                config.mirror_url_meta = Some(bmclapi.to_string());
+                config.mirror_url_download = Some(bmclapi.to_string());
+                config.mirror_url = Some(bmclapi.to_string());
                 config.mirror_mode = 0;
             }
             "official" => {
@@ -271,6 +271,25 @@ pub async fn set_max_download_threads(
 pub async fn get_max_download_threads(state: State<'_, AppState>) -> Result<u32, String> {
     let config = state.config.lock().await;
     Ok(config.max_download_threads)
+}
+
+/// 设置分片数量
+#[tauri::command]
+pub async fn set_chunk_count(
+    state: State<'_, AppState>,
+    count: u32,
+) -> Result<(), String> {
+    log_info!("Chunk count changed to: {}", count);
+    update_config(&state, |config| {
+        config.chunk_count = count;
+    }).await
+}
+
+/// 获取分片数量
+#[tauri::command]
+pub async fn get_chunk_count(state: State<'_, AppState>) -> Result<u32, String> {
+    let config = state.config.lock().await;
+    Ok(config.chunk_count)
 }
 
 /// 获取配置值（从 storage 读取）

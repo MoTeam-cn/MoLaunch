@@ -1,15 +1,17 @@
 //! 下载管理器 - 多线程下载、进度追踪、文件校验、限速
 
-use crate::{log_info, log_warn, log_debug};
+use crate::{log_warn, log_debug, log_info};
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 use super::super::utils::file_checker::FileChecker;
+use super::super::sources::DownloadSourceMode;
 
 /// 下载任务
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -73,7 +75,7 @@ impl Default for GlobalProgress {
 }
 
 /// 令牌桶限速器
-struct RateLimiter {
+pub struct RateLimiter {
     /// 每秒允许的字节数
     bytes_per_second: u64,
     /// 当前可用令牌（字节）
@@ -85,7 +87,7 @@ struct RateLimiter {
 }
 
 impl RateLimiter {
-    fn new(bytes_per_second: u64) -> Self {
+    pub fn new(bytes_per_second: u64) -> Self {
         let max_tokens = if bytes_per_second > 0 {
             bytes_per_second as f64 * 0.5 // 允许0.5秒的突发
         } else {
@@ -101,7 +103,7 @@ impl RateLimiter {
     }
 
     /// 尝试获取令牌（字节数），返回实际可用的字节数
-    fn acquire(&mut self, requested: u64) -> u64 {
+    pub fn acquire(&mut self, requested: u64) -> u64 {
         if self.bytes_per_second == 0 {
             return requested; // 不限速
         }
@@ -129,7 +131,7 @@ impl RateLimiter {
     }
 
     /// 获取需要等待的时间（毫秒）
-    fn wait_time_ms(&self, requested: u64) -> u64 {
+    pub fn wait_time_ms(&self, requested: u64) -> u64 {
         if self.bytes_per_second == 0 {
             return 0;
         }
@@ -143,40 +145,20 @@ impl RateLimiter {
     }
 }
 
-/// 下载源模式
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum DownloadSourceMode {
-    /// 官方源优先
-    Official,
-    /// 镜像源优先
-    Mirror,
-    /// 智能模式（自动检测）
-    Smart,
-}
-
-impl DownloadSourceMode {
-    pub fn from_str(s: &str) -> Self {
-        match s {
-            "official" => Self::Official,
-            "mirror" => Self::Mirror,
-            "smart" => Self::Smart,
-            _ => Self::Smart,
-        }
-    }
-}
-
 /// 下载管理器
 pub struct DownloadManager {
     client: reqwest::Client,
     max_threads: usize,
+    chunk_count: usize,
     speed_limit: u64, // bytes/sec, 0 = 不限速
     source_mode: DownloadSourceMode,
-    progress: Arc<Mutex<GlobalProgress>>,
+    progress: Arc<StdMutex<GlobalProgress>>,
 }
 
 impl DownloadManager {
     pub fn new(
         max_threads: usize,
+        chunk_count: usize,
         speed_limit: u64,
         source_mode: DownloadSourceMode,
     ) -> Self {
@@ -185,9 +167,10 @@ impl DownloadManager {
         Self {
             client,
             max_threads,
+            chunk_count,
             speed_limit,
             source_mode,
-            progress: Arc::new(Mutex::new(GlobalProgress::default())),
+            progress: Arc::new(StdMutex::new(GlobalProgress::default())),
         }
     }
 
@@ -211,15 +194,17 @@ impl DownloadManager {
 
         match self.source_mode {
             DownloadSourceMode::Official => {
-                // Official：只使用官方源，不切换
+                // Official：只使用官方源
                 official_urls
             }
             DownloadSourceMode::Mirror => {
-                // Mirror：只使用镜像源，不切换
+                // Mirror：只使用镜像源
                 mirror_urls
             }
             DownloadSourceMode::Smart => {
-                // Smart：官方源优先，失败后自动切换到镜像源
+                // Smart：参考 PCL2，官方源优先，超时后切换到镜像源
+                // 交替排列：官方1, 镜像1, 官方2, 镜像2, ...
+                // 这样先尝试官方源，失败后立即尝试镜像源
                 let mut result = Vec::new();
                 let max_len = official_urls.len().max(mirror_urls.len());
                 for i in 0..max_len {
@@ -235,24 +220,6 @@ impl DownloadManager {
         }
     }
 
-    /// 根据源模式获取超时时间
-    /// Smart 模式下官方源使用较短超时，快速失败后切换到镜像源
-    #[allow(dead_code)]
-    fn get_timeout_for_url(&self, url: &str) -> Duration {
-        match self.source_mode {
-            DownloadSourceMode::Smart => {
-                if url.contains("bmclapi") || url.contains("mirror") {
-                    // 镜像源：较长超时
-                    Duration::from_secs(30)
-                } else {
-                    // 官方源：较短超时（3秒），快速失败后切换
-                    Duration::from_secs(3)
-                }
-            }
-            _ => Duration::from_secs(30),
-        }
-    }
-
     /// 批量下载文件
     pub async fn download_batch(
         &self,
@@ -261,7 +228,7 @@ impl DownloadManager {
     ) -> Vec<DownloadProgress> {
         let total_bytes: u64 = tasks.iter().map(|t| t.expected_size.max(0) as u64).sum();
         
-        let progress = Arc::new(Mutex::new(GlobalProgress {
+        let progress = Arc::new(StdMutex::new(GlobalProgress {
             total_files: tasks.len(),
             total_bytes,
             is_active: true,
@@ -271,6 +238,10 @@ impl DownloadManager {
         let results = Arc::new(Mutex::new(Vec::new()));
         let semaphore = Arc::new(tokio::sync::Semaphore::new(self.max_threads));
         let rate_limiter = Arc::new(Mutex::new(RateLimiter::new(self.speed_limit)));
+
+        // 跟踪已使用分片下载的任务，防止字节重复统计
+        let chunked_task_ids: Arc<StdMutex<std::collections::HashSet<String>>> =
+            Arc::new(StdMutex::new(std::collections::HashSet::new()));
 
         // 滑动窗口速度计算
         let speed_window: Arc<Mutex<std::collections::VecDeque<(u64, Instant)>>> =
@@ -284,12 +255,15 @@ impl DownloadManager {
             let mut interval = tokio::time::interval(Duration::from_millis(300));
             loop {
                 interval.tick().await;
-                let mut p = prog_for_timer.lock().await;
-                if !p.is_active {
-                    break;
+                // 检查是否活跃
+                {
+                    let p = prog_for_timer.lock().unwrap();
+                    if !p.is_active {
+                        break;
+                    }
                 }
                 // 计算速度
-                {
+                let speed = {
                     let window = sw_for_timer.lock().await;
                     if window.len() >= 2 {
                         let (first_bytes, first_time) = window.front().unwrap();
@@ -297,12 +271,20 @@ impl DownloadManager {
                         let bytes_diff = last_bytes.saturating_sub(*first_bytes);
                         let time_diff = last_time.duration_since(*first_time).as_secs_f64();
                         if time_diff > 0.0 {
-                            p.current_speed = (bytes_diff as f64 / time_diff) as u64;
+                            (bytes_diff as f64 / time_diff) as u64
+                        } else {
+                            0
                         }
+                    } else {
+                        0
                     }
-                }
-                let p_snapshot = p.clone();
-                drop(p);
+                };
+                // 更新进度并回调
+                let p_snapshot = {
+                    let mut p = prog_for_timer.lock().unwrap();
+                    p.current_speed = speed;
+                    p.clone()
+                };
                 if let Some(ref cb) = callback_for_timer {
                     cb(p_snapshot);
                 }
@@ -321,6 +303,10 @@ impl DownloadManager {
             let urls = self.reorder_urls(&task.urls);
             let source_mode = self.source_mode;
             let sw = speed_window.clone();
+            let self_chunk_count = self.chunk_count;
+            let chunked_ids = chunked_task_ids.clone();
+
+            let chunked_ids_for_single = chunked_ids.clone();
 
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.unwrap();
@@ -328,43 +314,49 @@ impl DownloadManager {
                     &client,
                     &task,
                     &urls,
+                    self_chunk_count,
                     Some(limiter),
                     source_mode,
                     Some(prog.clone()),
+                    Some(chunked_ids_for_single),
                 ).await;
 
                 {
-                    let mut p = prog.lock().await;
+                    let mut p = prog.lock().unwrap();
                     match &result.status {
-                        DownloadStatus::Completed => p.completed_files += 1,
+                        DownloadStatus::Completed => {
+                            p.completed_files += 1;
+                            // 分片下载的字节已由 chunks 实时更新，不重复累加
+                            let is_chunked = chunked_ids.lock().unwrap().contains(&task.id);
+                            if !is_chunked {
+                                p.downloaded_bytes += result.downloaded;
+                            }
+                        }
                         DownloadStatus::Failed => p.failed_files += 1,
                         DownloadStatus::Skipped => {
                             p.skipped_files += 1;
-                            // 跳过的文件：只从 total_bytes 中扣除，不增加 downloaded_bytes
-                            // 这样百分比计算不会出错
                             let skipped_size = result.total;
                             p.total_bytes = p.total_bytes.saturating_sub(skipped_size);
                         }
                         _ => {}
                     }
-                    p.downloaded_bytes += result.downloaded;
+                }
 
-                    // 滑动窗口速度计算
-                    {
-                        let mut window = sw.lock().await;
-                        window.push_back((p.downloaded_bytes, Instant::now()));
-                        if window.len() > 10 { window.pop_front(); }
-                        if window.len() >= 2 {
-                            let (first_bytes, first_time) = window.front().unwrap();
-                            let (last_bytes, last_time) = window.back().unwrap();
-                            let bytes_diff = last_bytes.saturating_sub(*first_bytes);
-                            let time_diff = last_time.duration_since(*first_time).as_secs_f64();
-                            if time_diff > 0.0 {
-                                p.current_speed = (bytes_diff as f64 / time_diff) as u64;
-                            }
+                // 滑动窗口速度计算
+                {
+                    let mut window = sw.lock().await;
+                    let mut p = prog.lock().unwrap();
+                    window.push_back((p.downloaded_bytes, Instant::now()));
+                    if window.len() > 10 { window.pop_front(); }
+                    if window.len() >= 2 {
+                        let (first_bytes, first_time) = window.front().unwrap();
+                        let (last_bytes, last_time) = window.back().unwrap();
+                        let bytes_diff = last_bytes.saturating_sub(*first_bytes);
+                        let time_diff = last_time.duration_since(*first_time).as_secs_f64();
+                        if time_diff > 0.0 {
+                            p.current_speed = (bytes_diff as f64 / time_diff) as u64;
                         }
                     }
-
                     if let Some(ref cb) = callback {
                         cb(p.clone());
                     }
@@ -381,7 +373,7 @@ impl DownloadManager {
         }
 
         {
-            let mut p = progress.lock().await;
+            let mut p = progress.lock().unwrap();
             p.is_active = false;
         }
 
@@ -392,14 +384,16 @@ impl DownloadManager {
         final_results
     }
 
-    /// 下载单个文件
+    /// 下载单个文件（统一逻辑：顺序尝试 URL，超时自动切换，大文件分片下载）
     async fn download_single(
         client: &reqwest::Client,
         task: &DownloadTask,
         urls: &[String],
+        chunk_count: usize,
         rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
         source_mode: DownloadSourceMode,
-        progress: Option<Arc<Mutex<GlobalProgress>>>,
+        progress: Option<Arc<StdMutex<GlobalProgress>>>,
+        chunked_task_ids: Option<Arc<StdMutex<std::collections::HashSet<String>>>>,
     ) -> DownloadProgress {
         // 检查文件是否已存在且有效
         let checker = FileChecker::new()
@@ -410,7 +404,7 @@ impl DownloadManager {
             return DownloadProgress {
                 task_id: task.id.clone(),
                 downloaded: 0,
-                total: task.expected_size.max(0) as u64,  // 返回任务大小，用于从 total_bytes 中扣除
+                total: task.expected_size.max(0) as u64,
                 speed: 0,
                 status: DownloadStatus::Skipped,
                 error: None,
@@ -431,31 +425,75 @@ impl DownloadManager {
             }
         }
 
-        // 尝试每个 URL（每个 URL 最多重试 3 次）
-        const MAX_RETRIES: u32 = 3;
-        for url in urls {
-            // 根据源模式获取超时时间
+        // 分片下载阈值：file_size / chunk_count > 1MB
+        let chunk_threshold: u64 = 1_048_576;
+        let file_size = task.expected_size.max(0) as u64;
+        let can_chunk = chunk_count > 1 && file_size > 0 && (file_size / chunk_count as u64) > chunk_threshold;
+
+        // 顺序尝试每个 URL，超时自动重试，总共最多 3 次
+        let max_retries: usize = 3;
+        let mut attempt = 0;
+
+        'url_loop: for url in urls {
+            // 确定超时时间
             let timeout = match source_mode {
                 DownloadSourceMode::Smart => {
                     if url.contains("bmclapi") || url.contains("mirror") {
-                        Duration::from_secs(30)
-                    } else {
                         Duration::from_secs(10)
+                    } else {
+                        Duration::from_secs(5)
                     }
                 }
                 _ => Duration::from_secs(30),
             };
 
-            for retry in 0..MAX_RETRIES {
-                if retry > 0 {
-                    log_info!("[Download] 重试 {}/{}: {}", retry + 1, MAX_RETRIES, url);
-                    tokio::time::sleep(Duration::from_millis(500 * retry as u64)).await;
+            while attempt < max_retries {
+                attempt += 1;
+
+                // 尝试分片下载（大文件 + 服务器支持 Range）
+                if can_chunk {
+                    if attempt == 1 {
+                        log_debug!("[Download] 检测分片支持: {}", url);
+                    }
+                    if super::chunk::supports_range(client, url).await {
+                        log_info!("[Download] 使用分片下载: {} ({} chunks, 尝试 {}/{})", url, chunk_count, attempt, max_retries);
+                        let limiter = rate_limiter.clone().unwrap_or_else(|| {
+                            Arc::new(Mutex::new(RateLimiter::new(0)))
+                        });
+                        let chunk_result = super::chunk::download_chunked(
+                            client, url, &task.local_path,
+                            file_size, chunk_count, limiter, progress.clone(),
+                        ).await;
+
+                        if chunk_result.status == DownloadStatus::Completed {
+                            let checker = FileChecker::new()
+                                .with_actual_size(task.expected_size)
+                                .with_hash(task.expected_hash.clone());
+                            if let Some(err) = checker.check(&task.local_path) {
+                                log_warn!("[Chunk] 文件校验失败：{} - {}", task.local_path, err);
+                                let _ = std::fs::remove_file(&task.local_path);
+                            } else {
+                                if let Some(ref ids) = chunked_task_ids {
+                                    ids.lock().unwrap().insert(task.id.clone());
+                                }
+                                return DownloadProgress {
+                                    task_id: task.id.clone(),
+                                    downloaded: chunk_result.downloaded,
+                                    total: chunk_result.total,
+                                    speed: chunk_result.speed,
+                                    status: DownloadStatus::Completed,
+                                    error: None,
+                                };
+                            }
+                        }
+                        log_debug!("[Chunk] 分片下载失败: {:?}, 回退单流", chunk_result.error);
+                    }
                 }
 
-                log_debug!("[Download] 尝试从 {} 下载 (超时: {}s)", url, timeout.as_secs());
+                // 单流下载
+                log_debug!("[Download] 从 {} 单流下载 (超时: {}s, 尝试 {}/{})", url, timeout.as_secs(), attempt, max_retries);
                 match Self::download_from_url(client, url, &task.local_path, rate_limiter.clone(), timeout, progress.clone()).await {
                     Ok((downloaded, total, speed)) => {
-                        // 如果 expected_size 为 0，用实际下载大小更新 checker
                         let checker = if task.expected_size == 0 && downloaded > 0 {
                             FileChecker::new()
                                 .with_actual_size(downloaded as i64)
@@ -465,29 +503,30 @@ impl DownloadManager {
                                 .with_actual_size(task.expected_size)
                                 .with_hash(task.expected_hash.clone())
                         };
-                        
-                        // 校验
+
                         if let Some(err) = checker.check(&task.local_path) {
                             log_warn!("文件校验失败：{} - {}", task.local_path, err);
                             let _ = std::fs::remove_file(&task.local_path);
-                            continue;
+                            continue 'url_loop;
                         }
 
-                    return DownloadProgress {
-                        task_id: task.id.clone(),
-                        downloaded,
-                        total,
-                        speed,
-                        status: DownloadStatus::Completed,
-                        error: None,
-                    };
-                }
-                Err(e) => {
-                    log_debug!("从 {} 下载失败：{}", url, e);
-                    // 继续重试
+                        return DownloadProgress {
+                            task_id: task.id.clone(),
+                            downloaded,
+                            total,
+                            speed,
+                            status: DownloadStatus::Completed,
+                            error: None,
+                        };
+                    }
+                    Err(e) => {
+                        log_debug!("从 {} 下载失败 (尝试 {}/{}): {}", url, attempt, max_retries, e);
+                        if attempt < max_retries {
+                            tokio::time::sleep(Duration::from_millis(500)).await;
+                        }
+                    }
                 }
             }
-            } // end retry loop
         }
 
         DownloadProgress {
@@ -507,7 +546,7 @@ impl DownloadManager {
         local_path: &str,
         rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
         timeout: Duration,
-        _progress: Option<Arc<Mutex<GlobalProgress>>>,
+        _progress: Option<Arc<StdMutex<GlobalProgress>>>,
     ) -> Result<(u64, u64, u64), Box<dyn std::error::Error + Send + Sync>> {
         let response = client.get(url).timeout(timeout).send().await?;
 
@@ -535,7 +574,6 @@ impl DownloadManager {
                 while remaining > 0 {
                     let granted = limiter.acquire(remaining);
                     if granted == 0 {
-                        // 需要等待
                         let wait_ms = limiter.wait_time_ms(remaining);
                         drop(limiter);
                         tokio::time::sleep(Duration::from_millis(wait_ms.max(10))).await;
@@ -567,6 +605,6 @@ impl DownloadManager {
 
     /// 获取当前进度
     pub async fn get_progress(&self) -> GlobalProgress {
-        self.progress.lock().await.clone()
+        self.progress.lock().unwrap().clone()
     }
 }

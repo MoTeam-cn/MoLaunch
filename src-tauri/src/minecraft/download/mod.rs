@@ -1,9 +1,10 @@
 //! 下载管理模块 - 完整版本下载流程
 
 pub mod assets;
+pub mod chunk;
 pub mod manager;
 
-use crate::{log_info, log_warn, log_debug};
+use crate::{log_info, log_debug};
 use crate::http;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -11,7 +12,8 @@ use std::sync::Arc;
 
 use super::utils::file_checker::FileChecker;
 use super::version::libraries;
-use manager::{DownloadManager, DownloadSourceMode, DownloadTask, DownloadStatus, GlobalProgress};
+use manager::{DownloadManager, DownloadTask, DownloadStatus, GlobalProgress};
+use super::sources::{self, DownloadSourceMode};
 
 /// 版本列表结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -44,41 +46,30 @@ pub struct VersionDownloadResult {
 }
 
 /// 获取版本列表
-pub async fn fetch_version_list(mirror_url: Option<&str>) -> anyhow::Result<VersionListResult> {
-    let official_url = "https://launchermeta.mojang.com/mc/game/version_manifest.json";
-    let bmclapi_url = "https://bmclapi2.bangbang93.com/mc/game/version_manifest.json";
+pub async fn fetch_version_list(mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<VersionListResult> {
+    let urls = sources::build_urls(
+        mirror_url,
+        &format!("{}/mc/game/version_manifest.json", sources::MOJANG_LAUNCHERMETA),
+        sources::BMCLAPI_VERSION_MANIFEST,
+        source_mode,
+    );
 
-    let (primary_url, secondary_url, source_name) = if let Some(mirror) = mirror_url {
-        if !mirror.is_empty() {
-            let mirror_manifest = format!("{}/mc/game/version_manifest.json", mirror.trim_end_matches('/'));
-            (mirror_manifest, official_url.to_string(), "Mirror")
-        } else {
-            (official_url.to_string(), bmclapi_url.to_string(), "Mojang")
-        }
+    let content = sources::fetch_with_fallback(&urls).await?;
+    let json: serde_json::Value = serde_json::from_str(&content)?;
+
+    let source_name = if urls.first().map_or(false, |u: &String| u.contains("bmclapi")) {
+        "BMCLAPI"
+    } else if mirror_url.is_some() && urls.first().map_or(false, |u: &String| u.starts_with(mirror_url.unwrap_or(""))) {
+        "Mirror"
     } else {
-        (official_url.to_string(), bmclapi_url.to_string(), "Mojang")
+        "Mojang"
     };
 
-    match fetch_url(&primary_url).await {
-        Ok(content) => {
-            let json: serde_json::Value = serde_json::from_str(&content)?;
-            Ok(VersionListResult {
-                source_name: source_name.to_string(),
-                is_official: source_name == "Mojang",
-                value: json,
-            })
-        }
-        Err(e) => {
-            log_warn!("Primary source failed: {}, trying secondary", e);
-            let content = fetch_url(&secondary_url).await?;
-            let json: serde_json::Value = serde_json::from_str(&content)?;
-            Ok(VersionListResult {
-                source_name: if source_name == "Mojang" { "BMCLAPI" } else { "Mojang" }.to_string(),
-                is_official: source_name != "Mojang",
-                value: json,
-            })
-        }
-    }
+    Ok(VersionListResult {
+        source_name: source_name.to_string(),
+        is_official: source_name == "Mojang",
+        value: json,
+    })
 }
 
 /// 获取版本 JSON URL
@@ -128,11 +119,13 @@ pub fn get_latest_versions(version_list: &serde_json::Value) -> (Option<String>,
 }
 
 /// 完整版本下载
+#[allow(clippy::too_many_arguments, clippy::type_complexity)]
 pub async fn download_version_full(
     version_id: &str,
     game_dir: &Path,
     mirror_url: Option<&str>,
     max_threads: usize,
+    chunk_count: usize,
     speed_limit: u64,
     source_mode: DownloadSourceMode,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
@@ -144,13 +137,13 @@ pub async fn download_version_full(
     // Step 1: 版本清单
     if let Some(ref cb) = stage_callback { cb(0, "版本清单"); }
     log_info!("[Download] Step 1/5: Fetching version JSON URL");
-    let version_list = fetch_version_list(mirror_url).await?;
+    let version_list = fetch_version_list(mirror_url, source_mode).await?;
     let json_url = get_version_json_url(&version_list.value, version_id)
         .ok_or_else(|| anyhow::anyhow!("Version {} not found", version_id))?;
 
     log_info!("[Download] Step 1/5: Downloading version JSON");
     let json_path = version_dir.join(format!("{}.json", version_id));
-    let json_content = fetch_with_retry(&json_url, &json_path, mirror_url).await?;
+    let json_content = fetch_with_retry(&json_url, &json_path, mirror_url, source_mode).await?;
     let version_json: serde_json::Value = serde_json::from_str(&json_content)?;
 
     // Step 2: 版本信息（合并 JSON 继承链）
@@ -163,19 +156,19 @@ pub async fn download_version_full(
     // Step 3: 客户端
     if let Some(ref cb) = stage_callback { cb(2, "客户端"); }
     log_info!("[Download] Step 3/5: Downloading client JAR");
-    download_client_jar(&merged_json, game_dir, version_id, mirror_url, speed_limit, source_mode, progress_callback.clone()).await?;
+    download_client_jar(&merged_json, game_dir, version_id, mirror_url, chunk_count, speed_limit, source_mode, progress_callback.clone()).await?;
 
     // Step 4: 库文件
     if let Some(ref cb) = stage_callback { cb(3, "库文件"); }
     log_info!("[Download] Step 4/5: Downloading Libraries");
     let (libs_total, libs_downloaded, libs_skipped) =
-        download_libraries(&merged_json, game_dir, mirror_url, max_threads, speed_limit, source_mode, progress_callback.clone()).await?;
+        download_libraries(&merged_json, game_dir, mirror_url, max_threads, chunk_count, speed_limit, source_mode, progress_callback.clone()).await?;
 
     // Step 5: 资源文件
     if let Some(ref cb) = stage_callback { cb(4, "资源文件"); }
     log_info!("[Download] Step 5/5: Downloading Assets");
     let (assets_total, assets_downloaded, assets_skipped) =
-        download_assets(&merged_json, game_dir, mirror_url, max_threads, speed_limit, source_mode, progress_callback).await?;
+        download_assets(&merged_json, game_dir, mirror_url, max_threads, chunk_count, speed_limit, source_mode, progress_callback).await?;
 
     log_info!(
         "[Download] Done: Libs {}/{}, Assets {}/{}",
@@ -194,11 +187,13 @@ pub async fn download_version_full(
 }
 
 /// 下载客户端 JAR
+#[allow(clippy::too_many_arguments)]
 async fn download_client_jar(
     json: &serde_json::Value,
     game_dir: &Path,
     version_id: &str,
     mirror_url: Option<&str>,
+    chunk_count: usize,
     speed_limit: u64,
     source_mode: DownloadSourceMode,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
@@ -219,7 +214,7 @@ async fn download_client_jar(
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("Client JAR URL not found"))?;
 
-    let urls = build_launcher_meta_urls(url, mirror_url);
+    let urls = build_launcher_meta_urls(url, mirror_url, source_mode);
     let task = DownloadTask {
         id: "client_jar".to_string(),
         urls,
@@ -228,7 +223,7 @@ async fn download_client_jar(
         expected_hash: json["downloads"]["client"]["sha1"].as_str().map(|s| s.to_string()),
     };
 
-        let manager = DownloadManager::new(1, speed_limit, source_mode);
+        let manager = DownloadManager::new(1, chunk_count, speed_limit, source_mode);
     let results = manager.download_batch(vec![task], progress_callback).await;
 
     if let Some(result) = results.first() {
@@ -241,11 +236,13 @@ async fn download_client_jar(
 }
 
 /// 下载 Libraries
+#[allow(clippy::too_many_arguments)]
 async fn download_libraries(
     json: &serde_json::Value,
     game_dir: &Path,
     mirror_url: Option<&str>,
     max_threads: usize,
+    chunk_count: usize,
     speed_limit: u64,
     source_mode: DownloadSourceMode,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
@@ -270,7 +267,7 @@ async fn download_libraries(
         }
     }).collect();
 
-    let manager = DownloadManager::new(max_threads, speed_limit, source_mode);
+    let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
     let results = manager.download_batch(tasks, progress_callback).await;
 
     let downloaded = results.iter().filter(|r| r.status == DownloadStatus::Completed).count();
@@ -280,11 +277,13 @@ async fn download_libraries(
 }
 
 /// 下载 Assets
+#[allow(clippy::too_many_arguments)]
 async fn download_assets(
     json: &serde_json::Value,
     game_dir: &Path,
     mirror_url: Option<&str>,
     max_threads: usize,
+    chunk_count: usize,
     speed_limit: u64,
     source_mode: DownloadSourceMode,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
@@ -296,7 +295,7 @@ async fn download_assets(
 
     if !index_path.exists() {
         log_info!("[Assets] Downloading asset index: {}", index_meta.id);
-        let index_urls = assets::get_asset_index_urls(&index_meta);
+        let index_urls = assets::get_asset_index_urls(&index_meta, source_mode);
         let task = DownloadTask {
             id: "asset_index".to_string(),
             urls: index_urls,
@@ -305,7 +304,7 @@ async fn download_assets(
             expected_hash: if index_meta.sha1.is_empty() { None } else { Some(index_meta.sha1.clone()) },
         };
 
-    let manager = DownloadManager::new(1, speed_limit, source_mode);
+    let manager = DownloadManager::new(1, chunk_count, speed_limit, source_mode);
         let results = manager.download_batch(vec![task], None).await;
 
         if let Some(result) = results.first() {
@@ -327,7 +326,7 @@ async fn download_assets(
     }
 
     let tasks: Vec<DownloadTask> = missing_assets.iter().enumerate().map(|(i, asset)| {
-        let urls = assets::build_asset_download_urls(asset, mirror_url);
+        let urls = assets::build_asset_download_urls(asset, mirror_url, source_mode);
         DownloadTask {
             id: format!("asset_{}", i),
             urls,
@@ -337,7 +336,7 @@ async fn download_assets(
         }
     }).collect();
 
-    let manager = DownloadManager::new(max_threads, speed_limit, source_mode);
+    let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
     let results = manager.download_batch(tasks, progress_callback).await;
 
     let downloaded = results.iter().filter(|r| r.status == DownloadStatus::Completed).count();
@@ -347,35 +346,13 @@ async fn download_assets(
 }
 
 /// 构建 launcher/meta URL 列表
-fn build_launcher_meta_urls(original: &str, mirror_url: Option<&str>) -> Vec<String> {
-    let mut urls = vec![original.to_string()];
-
-    let bmclapi = original
-        .replace("https://piston-data.mojang.com", "https://bmclapi2.bangbang93.com")
-        .replace("https://piston-meta.mojang.com", "https://bmclapi2.bangbang93.com")
-        .replace("https://launcher.mojang.com", "https://bmclapi2.bangbang93.com")
-        .replace("https://launchermeta.mojang.com", "https://bmclapi2.bangbang93.com");
-
-    if bmclapi != original {
-        urls.push(bmclapi);
-    }
-
-    if let Some(mirror) = mirror_url {
-        let mirror_base = mirror.trim_end_matches('/');
-        if let Some(path) = original.splitn(4, '/').last() {
-            let url = format!("{}/{}", mirror_base, path);
-            if !urls.contains(&url) {
-                urls.insert(0, url);
-            }
-        }
-    }
-
-    urls
+fn build_launcher_meta_urls(original: &str, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> Vec<String> {
+    sources::build_replace_urls(original, mirror_url, sources::MOJANG_REPLACEMENTS, source_mode)
 }
 
 /// 带重试的下载
-async fn fetch_with_retry(primary_url: &str, local_path: &Path, mirror_url: Option<&str>) -> anyhow::Result<String> {
-    let urls = build_launcher_meta_urls(primary_url, mirror_url);
+async fn fetch_with_retry(primary_url: &str, local_path: &Path, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<String> {
+    let urls = build_launcher_meta_urls(primary_url, mirror_url, source_mode);
 
     for url in &urls {
         match fetch_url_to_file(url, local_path).await {
@@ -406,6 +383,7 @@ pub async fn fix_version_files(
     game_dir: &Path,
     mirror_url: Option<&str>,
     max_threads: usize,
+    chunk_count: usize,
     speed_limit: u64,
     source_mode: DownloadSourceMode,
 ) -> anyhow::Result<()> {
@@ -419,8 +397,8 @@ pub async fn fix_version_files(
     let json: serde_json::Value = serde_json::from_str(&json_content)?;
     let merged_json = super::version::json_merge::merge_version_json(&json, game_dir)?;
 
-    let _ = download_libraries(&merged_json, game_dir, mirror_url, max_threads, speed_limit, source_mode, None).await?;
-    let _ = download_assets(&merged_json, game_dir, mirror_url, max_threads, speed_limit, source_mode, None).await?;
+    let _ = download_libraries(&merged_json, game_dir, mirror_url, max_threads, chunk_count, speed_limit, source_mode, None).await?;
+    let _ = download_assets(&merged_json, game_dir, mirror_url, max_threads, chunk_count, speed_limit, source_mode, None).await?;
 
     Ok(())
 }

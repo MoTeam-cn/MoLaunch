@@ -1,5 +1,6 @@
 use crate::{log_error, log_info};
 use crate::minecraft::download;
+use crate::minecraft::sources::DownloadSourceMode;
 use crate::state::AppState;
 use tauri::State;
 
@@ -12,9 +13,10 @@ pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResu
 
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
+    let source_mode = DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
-    let result = download::fetch_version_list(mirror_url.as_deref()).await.map_err(|e| {
+    let result = download::fetch_version_list(mirror_url.as_deref(), source_mode).await.map_err(|e| {
         log_error!("Failed to list versions: {}", e);
         e.to_string()
     })?;

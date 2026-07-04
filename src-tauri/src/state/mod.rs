@@ -109,6 +109,7 @@ impl Default for DownloadState {
 pub struct AppConfig {
     pub game_dir: String,
     pub max_download_threads: u32,
+    pub chunk_count: u32,
     pub log_level: u32,
     pub min_memory: u32,
     pub max_memory: u32,
@@ -130,6 +131,7 @@ impl Default for AppConfig {
         Self {
             game_dir: get_default_game_dir(),
             max_download_threads: 8,
+            chunk_count: 4,
             log_level: 3,
             min_memory: 512,
             max_memory: 2048,

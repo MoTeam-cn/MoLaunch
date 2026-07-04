@@ -7,6 +7,7 @@ pub mod java_selector;
 pub mod launch;
 pub mod launcher_profiles;
 pub mod loaders;
+pub mod sources;
 pub mod system;
 pub mod utils;
 pub mod version;

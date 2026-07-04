@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::path::Path;
 
 use super::super::utils::file_checker::FileChecker;
+use super::super::sources;
 
 /// Library entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -285,21 +286,14 @@ pub fn build_download_urls(lib: &LibEntry, mirror_url: Option<&str>) -> Vec<Stri
     if let Some(ref url) = lib.url {
         urls.push(url.clone());
 
-        let bmclapi_url = url
-            .replace("https://piston-data.mojang.com", "https://bmclapi2.bangbang93.com/maven")
-            .replace("https://piston-meta.mojang.com", "https://bmclapi2.bangbang93.com/maven")
-            .replace("https://libraries.minecraft.net", "https://bmclapi2.bangbang93.com/maven")
-            .replace("https://maven.minecraftforge.net", "https://bmclapi2.bangbang93.com/maven")
-            .replace("https://maven.neoforged.net/releases", "https://bmclapi2.bangbang93.com/maven")
-            .replace("https://maven.fabricmc.net", "https://bmclapi2.bangbang93.com/maven");
+        // BMCLAPI/maven 替换
+        let bmclapi_url = sources::apply_replacements(url, sources::MAVEN_REPLACEMENTS);
 
         if bmclapi_url != *url {
             urls.push(bmclapi_url.clone());
 
-            let bmclapi_lib_url = url
-                .replace("https://piston-data.mojang.com", "https://bmclapi2.bangbang93.com/libraries")
-                .replace("https://piston-meta.mojang.com", "https://bmclapi2.bangbang93.com/libraries")
-                .replace("https://libraries.minecraft.net", "https://bmclapi2.bangbang93.com/libraries");
+            // BMCLAPI/libraries 替换
+            let bmclapi_lib_url = sources::apply_replacements(url, sources::LIBRARY_REPLACEMENTS);
 
             if bmclapi_lib_url != *url && bmclapi_lib_url != bmclapi_url {
                 urls.push(bmclapi_lib_url);
@@ -316,8 +310,8 @@ pub fn build_download_urls(lib: &LibEntry, mirror_url: Option<&str>) -> Vec<Stri
             .to_string();
 
         if !relative.is_empty() {
-            urls.push(format!("https://libraries.minecraft.net/{}", relative));
-            urls.push(format!("https://bmclapi2.bangbang93.com/maven/{}", relative));
+            urls.push(format!("{}/{}", sources::MOJANG_LIBRARIES, relative));
+            urls.push(format!("{}/maven/{}", sources::BMCLAPI_BASE, relative));
         }
     }
 

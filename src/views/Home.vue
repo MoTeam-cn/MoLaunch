@@ -239,7 +239,7 @@ function goToVersions() {
               </span>
             </div>
             <span class="text-sm text-gray-500">
-              {{ new Date(version.release_time * 1000).toLocaleDateString('zh-CN') }}
+              {{ new Date(version.release_time * 1000).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) }}
             </span>
           </div>
         </div>

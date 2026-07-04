@@ -115,20 +115,24 @@ impl LauncherProfiles {
         }
     }
 
-    /// 从文件加载，如果不存在则创建
+    /// 从文件加载，如果不存在或解析失败则创建
     pub fn load_or_create(mc_folder: &Path) -> Result<Self, String> {
         let path = mc_folder.join("launcher_profiles.json");
         if path.exists() {
             let content = std::fs::read_to_string(&path)
                 .map_err(|e| format!("读取 launcher_profiles.json 失败: {}", e))?;
-            serde_json::from_str(&content)
-                .map_err(|e| format!("解析 launcher_profiles.json 失败: {}", e))
-        } else {
-            let profiles = Self::create_default();
-            profiles.save(mc_folder)?;
-            log_info!("[Profiles] Created launcher_profiles.json in {}", mc_folder.display());
-            Ok(profiles)
+            match serde_json::from_str::<Self>(&content) {
+                Ok(profiles) => return Ok(profiles),
+                Err(e) => {
+                    log_warn!("[Profiles] 解析失败，重新创建: {}", e);
+                    let _ = std::fs::remove_file(&path);
+                }
+            }
         }
+        let profiles = Self::create_default();
+        profiles.save(mc_folder)?;
+        log_info!("[Profiles] Created launcher_profiles.json in {}", mc_folder.display());
+        Ok(profiles)
     }
 
     /// 保存到文件

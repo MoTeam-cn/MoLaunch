@@ -5,6 +5,8 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 use super::super::utils::file_checker::FileChecker;
+use super::super::sources;
+use super::super::sources::DownloadSourceMode;
 
 /// 资源条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -54,7 +56,8 @@ pub fn get_asset_index_meta(json: &serde_json::Value) -> Option<AssetIndexMeta> 
             sha1: String::new(),
             size: 0,
             url: format!(
-                "https://piston-meta.mojang.com/mc/game/assets/{}/{}",
+                "{}/mc/game/assets/{}/{}",
+                sources::MOJANG_PISTON_META,
                 "2ec0cc96c44e5a76b9c8b7c39df7210883d12871", // 常见的索引版本
                 assets
             ),
@@ -114,21 +117,8 @@ pub fn get_asset_index_path(game_dir: &Path, index_id: &str) -> PathBuf {
 }
 
 /// 下载资源索引的 URL 列表
-pub fn get_asset_index_urls(meta: &AssetIndexMeta) -> Vec<String> {
-    let mut urls = vec![meta.url.clone()];
-
-    // BMCLAPI 镜像
-    let bmclapi_url = meta.url
-        .replace("https://piston-data.mojang.com", "https://bmclapi2.bangbang93.com")
-        .replace("https://piston-meta.mojang.com", "https://bmclapi2.bangbang93.com")
-        .replace("https://launchermeta.mojang.com", "https://bmclapi2.bangbang93.com")
-        .replace("https://launcher.mojang.com", "https://bmclapi2.bangbang93.com");
-
-    if bmclapi_url != meta.url {
-        urls.push(bmclapi_url);
-    }
-
-    urls
+pub fn get_asset_index_urls(meta: &AssetIndexMeta, source_mode: DownloadSourceMode) -> Vec<String> {
+    sources::build_replace_urls(&meta.url, None, sources::MOJANG_REPLACEMENTS, source_mode)
 }
 
 /// 检测缺失的资源文件
@@ -151,29 +141,27 @@ pub fn find_missing_assets(
 }
 
 /// 构建资源文件的下载 URL 列表
-pub fn build_asset_download_urls(entry: &AssetEntry, mirror_url: Option<&str>) -> Vec<String> {
+pub fn build_asset_download_urls(entry: &AssetEntry, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> Vec<String> {
     let hash = &entry.hash;
     let prefix = &hash[..2.min(hash.len())];
 
-    let mut urls = Vec::new();
+    let official_url = format!("{}/{}/{}", sources::MOJANG_RESOURCES, prefix, hash);
+    let bmclapi_url = format!("{}/assets/{}/{}", sources::BMCLAPI_BASE, prefix, hash);
 
-    // 官方源
-    urls.push(format!(
-        "https://resources.download.minecraft.net/{}/{}",
-        prefix, hash
-    ));
-
-    // BMCLAPI 镜像
-    urls.push(format!(
-        "https://bmclapi2.bangbang93.com/assets/{}/{}",
-        prefix, hash
-    ));
-
-    // 自定义镜像源
-    if let Some(mirror) = mirror_url {
-        let mirror_base = mirror.trim_end_matches('/');
-        urls.push(format!("{}/assets/{}/{}", mirror_base, prefix, hash));
+    match source_mode {
+        DownloadSourceMode::Mirror => {
+            let mut urls = Vec::new();
+            if let Some(mirror) = mirror_url {
+                urls.push(format!("{}/assets/{}/{}", mirror.trim_end_matches('/'), prefix, hash));
+            }
+            urls.push(bmclapi_url);
+            urls
+        }
+        DownloadSourceMode::Official => {
+            vec![official_url]
+        }
+        DownloadSourceMode::Smart => {
+            vec![official_url, bmclapi_url]
+        }
     }
-
-    urls
 }

@@ -3,6 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
 
 const maxThreads = ref(8)
+const chunkCount = ref(4)
 const mirrorMeta = ref<'official' | 'bmclapi' | 'smart'>('bmclapi')
 const mirrorDownload = ref<'official' | 'bmclapi' | 'smart'>('bmclapi')
 const maxDownloadSpeed = ref(0)
@@ -49,6 +50,9 @@ async function flushSave() {
     if (changes.includes('threads')) {
       tasks.push(tauri.setMaxDownloadThreads(maxThreads.value))
     }
+    if (changes.includes('chunks')) {
+      tasks.push(tauri.setChunkCount(chunkCount.value))
+    }
     
     // 并行保存所有设置
     await Promise.all(tasks)
@@ -60,6 +64,7 @@ async function flushSave() {
 watch([mirrorMeta, mirrorDownload], () => scheduleSave('source'))
 watch(speedSlider, () => scheduleSave('speed'))
 watch(maxThreads, () => scheduleSave('threads'))
+watch(chunkCount, () => scheduleSave('chunks'))
 
 onMounted(async () => {
   try {
@@ -90,6 +95,11 @@ onMounted(async () => {
   }
   try {
     maxThreads.value = await tauri.getMaxDownloadThreads()
+  } catch {
+    // ignore
+  }
+  try {
+    chunkCount.value = await tauri.getChunkCount()
   } catch {
     // ignore
   }
@@ -196,11 +206,11 @@ onMounted(async () => {
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">下载控制</h3>
       <div class="divide-y divide-gray-200">
-        <!-- 下载线程数 -->
+        <!-- 并行下载数 -->
         <div class="px-5 py-4 flex items-center justify-between">
           <div>
-            <p class="text-sm font-medium text-gray-900">下载线程数</p>
-            <p class="text-xs text-gray-500 mt-0.5">并发下载线程，数值越大下载越快</p>
+            <p class="text-sm font-medium text-gray-900">并行下载数</p>
+            <p class="text-xs text-gray-500 mt-0.5">控制同时下载文件的数量，一般情况下推荐设置为 8</p>
           </div>
           <div class="flex items-center gap-3">
             <input
@@ -214,12 +224,30 @@ onMounted(async () => {
             <span class="text-sm font-medium text-primary-600 w-6 text-right">{{ maxThreads }}</span>
           </div>
         </div>
+        <!-- 分片数量 -->
+        <div class="px-5 py-4 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-900">下载线程数</p>
+            <p class="text-xs text-gray-500 mt-0.5">跟 IDM等多线程下载器一样，将文件分片下载，提升单文件下载速度，推荐设置为 4</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <input
+              v-model.number="chunkCount"
+              type="range"
+              class="w-32 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              min="1"
+              max="8"
+              step="1"
+            />
+            <span class="text-sm font-medium text-primary-600 w-6 text-right">{{ chunkCount }}</span>
+          </div>
+        </div>
         <!-- 下载限速 -->
         <div class="px-5 py-4">
           <div class="flex items-center justify-between mb-2">
             <div>
               <p class="text-sm font-medium text-gray-900">下载限速</p>
-              <p class="text-xs text-gray-500 mt-0.5">拖到最右边为不限制</p>
+              <p class="text-xs text-gray-500 mt-0.5">现在下载资源时候的速度，对于电脑性能不好的，可以防止其他程序突然卡死</p>
             </div>
             <span class="text-sm font-medium text-primary-600">
               {{ speedSlider >= 21 ? '不限制' : speedSlider + ' MB/s' }}

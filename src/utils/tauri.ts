@@ -316,6 +316,20 @@ export async function getMaxDownloadThreads(): Promise<number> {
 }
 
 /**
+ * 设置分片数量
+ */
+export async function setChunkCount(count: number): Promise<void> {
+  return await invoke<void>('set_chunk_count', { count })
+}
+
+/**
+ * 获取分片数量
+ */
+export async function getChunkCount(): Promise<number> {
+  return await invoke<number>('get_chunk_count')
+}
+
+/**
  * 获取配置值
  */
 export async function getConfigValue(section: string, key: string): Promise<string | null> {
