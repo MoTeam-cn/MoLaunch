@@ -6,7 +6,7 @@ use crate::minecraft::version::scan as version_scan;
 use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tauri::{Manager, State};
+use tauri::{Emitter, State};
 
 /// Version info
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -116,7 +116,7 @@ pub async fn download_version(
 
     // Create progress callback
     let progress_callback = Arc::new(move |progress: download_manager::GlobalProgress| {
-        let _ = app_clone.emit_all("download-progress", serde_json::json!({
+        let _ = app_clone.emit("download-progress", serde_json::json!({
             "version_id": version_id_clone,
             "total_files": progress.total_files,
             "completed_files": progress.completed_files,
@@ -152,7 +152,7 @@ pub async fn download_version(
         result.assets_total
     );
 
-    let _ = app.emit_all(
+    let _ = app.emit(
         "download-complete",
         serde_json::json!({
             "version_id": version_id,
@@ -455,7 +455,7 @@ pub async fn install_merged(
     }
 
     let instance = instance_name.unwrap_or_else(|| mc_version.clone());
-    let _ = app.emit_all("install-complete", serde_json::json!({ "instance_name": instance }));
+    let _ = app.emit("install-complete", serde_json::json!({ "instance_name": instance }));
     log::info!("Merged install completed");
     Ok(())
 }

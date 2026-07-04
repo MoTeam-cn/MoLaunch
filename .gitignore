@@ -47,6 +47,7 @@ coverage/
 # Web Cache
 node_modules
 logo_data
+package-lock.json
 
 #SDK Cache
 sdk_data

@@ -62,27 +62,28 @@ pub async fn get_game_dir(state: State<'_, AppState>) -> Result<String, String> 
 
 /// 选择文件夹（打开系统文件夹选择对话框）
 #[tauri::command]
-pub async fn select_folder(current: Option<String>) -> Result<Option<String>, String> {
-    use tauri::api::dialog::blocking::FileDialogBuilder;
+pub async fn select_folder(app: tauri::AppHandle, current: Option<String>) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
 
-    let mut dialog = FileDialogBuilder::new();
+    let mut dialog = app.dialog().file();
     if let Some(ref dir) = current {
         dialog = dialog.set_directory(dir);
     }
 
-    let result = dialog.pick_folder();
-    Ok(result.map(|p| p.to_string_lossy().to_string()))
+    let result = dialog.blocking_pick_folder();
+    Ok(result.map(|p| p.to_string()))
 }
 
 /// 选择文件（打开系统文件选择对话框）
 #[tauri::command]
 pub async fn select_file(
+    app: tauri::AppHandle,
     title: Option<String>,
     filters: Option<Vec<FileFilter>>,
 ) -> Result<Option<String>, String> {
-    use tauri::api::dialog::blocking::FileDialogBuilder;
+    use tauri_plugin_dialog::DialogExt;
 
-    let mut dialog = FileDialogBuilder::new();
+    let mut dialog = app.dialog().file();
     if let Some(t) = title {
         dialog = dialog.set_title(&t);
     }
@@ -93,8 +94,8 @@ pub async fn select_file(
         }
     }
 
-    let result = dialog.pick_file();
-    Ok(result.map(|p| p.to_string_lossy().to_string()))
+    let result = dialog.blocking_pick_file();
+    Ok(result.map(|p| p.to_string()))
 }
 
 #[derive(serde::Deserialize)]

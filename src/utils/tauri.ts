@@ -2,7 +2,7 @@
  * Tauri API 封装工具
  */
 
-import { invoke } from '@tauri-apps/api/tauri'
+import { invoke } from '@tauri-apps/api/core'
 import type { AuthResult, SdkStatus } from '@/types/auth'
 import type { VersionList } from '@/types/version'
 import type { JavaRuntime } from '@/types/java'

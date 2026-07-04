@@ -6,13 +6,14 @@
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSdkStore } from '@/stores/sdk'
-import { appWindow } from '@tauri-apps/api/window'
+import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import {
   HomeIcon,
   Cog6ToothIcon,
   CubeIcon,
 } from '@heroicons/vue/24/outline'
 import * as tauri from '@/utils/tauri'
+const appWindow = getCurrentWebviewWindow()
 
 const router = useRouter()
 const route = useRoute()

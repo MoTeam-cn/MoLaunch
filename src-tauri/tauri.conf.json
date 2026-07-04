@@ -2,59 +2,26 @@
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist"
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
   },
-  "package": {
-    "productName": "MoLaunch",
-    "version": "0.1.0"
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "resources": [
+      "../sdk_data/*",
+      "resources/*"
+    ],
+    "icon": [
+      "Images/icon.ico"
+    ]
   },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "shell": {
-        "all": false,
-        "execute": true,
-        "sidecar": true,
-        "open": true
-      },
-      "fs": {
-        "all": true,
-        "readFile": true,
-        "writeFile": true,
-        "readDir": true,
-        "createDir": true,
-        "removeFile": true,
-        "renameFile": true
-      },
-      "path": {
-        "all": true
-      },
-      "window": {
-        "all": true
-      },
-      "dialog": {
-        "all": true
-      },
-      "notification": {
-        "all": true
-      }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.moteam.molaunch",
-      "icon": [
-        "Images/icon.ico"
-      ],
-      "resources": [
-        "../sdk_data/*",
-        "resources/*"
-      ]
-    },
-    "security": {
-      "csp": null
-    },
+  "productName": "MoLaunch",
+  "mainBinaryName": "MoLaunch",
+  "version": "0.1.0",
+  "identifier": "com.moteam.molaunch",
+  "plugins": {},
+  "app": {
     "windows": [
       {
         "fullscreen": false,
@@ -65,8 +32,12 @@
         "height": 800,
         "minWidth": 900,
         "minHeight": 600,
-        "center": true
+        "center": true,
+        "useHttpsScheme": true
       }
-    ]
+    ],
+    "security": {
+      "csp": null
+    }
   }
 }

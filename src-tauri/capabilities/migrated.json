@@ -1,0 +1,28 @@
+{
+  "identifier": "migrated",
+  "description": "permissions that were migrated from v1",
+  "local": true,
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-set-resizable",
+    "core:window:allow-set-size",
+    "core:window:allow-set-min-size",
+    "core:window:allow-set-position",
+    "core:window:allow-center",
+    "core:window:allow-request-user-attention",
+    "core:window:allow-set-focus",
+    "core:window:allow-start-dragging",
+    "shell:default",
+    "dialog:default",
+    "fs:default",
+    "notification:default"
+  ]
+}
