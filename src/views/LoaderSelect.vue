@@ -40,13 +40,6 @@ const selectedFabric = ref<string | null>(null)
 const selectedOptifine = ref<string | null>(null)
 const selectedLiteloader = ref<string | null>(null)
 
-// 自定义版本名称
-const customInstanceName = ref('')
-const showNameInput = ref(false)
-
-// 已安装版本列表
-const installedVersions = ref<string[]>([])
-
 // 每个加载器独立的加载状态
 const loadingForge = ref(true)
 const loadingNeoforge = ref(true)
@@ -173,44 +166,11 @@ function getDefaultInstanceName(): string {
   return name
 }
 
-// 获取当前显示的版本名（自定义或默认）
-const instanceName = computed(() => {
-  return customInstanceName.value || getDefaultInstanceName()
-})
-
-// 重置自定义名称（当加载器选择变化时）
-function resetCustomName() {
-  customInstanceName.value = ''
-  isEditingName.value = false
-}
-
-// 检查版本名是否已存在，并生成唯一的名称
-function getUniqueInstanceName(name: string): string {
-  if (!installedVersions.value.includes(name)) {
-    return name
-  }
-  // 版本名已存在，追加 (1), (2) 等后缀
-  let counter = 1
-  let uniqueName = `${name}(${counter})`
-  while (installedVersions.value.includes(uniqueName)) {
-    counter++
-    uniqueName = `${name}(${counter})`
-  }
-  return uniqueName
-}
-
 const hasSelection = computed(() =>
   selectedForge.value || selectedNeoforge.value || selectedFabric.value || selectedOptifine.value || selectedLiteloader.value
 )
 
 onMounted(async () => {
-  // 加载已安装版本列表
-  try {
-    installedVersions.value = await tauri.listInstalledVersions()
-  } catch (e) {
-    console.error('Failed to load installed versions:', e)
-  }
-
   // 检查是否有缓存
   const cached = versionStore.getLoaderCache(props.mcVersion)
   if (cached) {
@@ -304,10 +264,6 @@ onMounted(async () => {
 })
 
 function handleInstall() {
-  const name = instanceName.value
-  // 如果版本名已存在，自动追加后缀
-  const finalName = getUniqueInstanceName(name)
-  
   emit('install', {
     mcVersion: props.mcVersion,
     forge: selectedForge.value || undefined,
@@ -315,7 +271,7 @@ function handleInstall() {
     fabric: selectedFabric.value || undefined,
     optifine: selectedOptifine.value || undefined,
     liteloader: selectedLiteloader.value || undefined,
-    instanceName: finalName,
+    instanceName: getDefaultInstanceName(),
   })
 }
 </script>
@@ -432,34 +388,11 @@ function handleInstall() {
 
     <!-- 底部 -->
     <div class="px-6 py-4 bg-white border-t border-gray-300 shrink-0">
-      <!-- 版本名称行 -->
-      <div class="flex items-center gap-3 mb-3">
-        <span class="text-xs text-gray-500 shrink-0">版本名:</span>
-        
-        <!-- 名称显示/输入 -->
-        <div class="flex-1 min-w-0">
-          <input
-            v-if="showNameInput"
-            v-model="customInstanceName"
-            :placeholder="getDefaultInstanceName()"
-            class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-primary-500"
-          />
-          <span v-else class="text-sm font-medium text-gray-900">{{ instanceName }}</span>
-        </div>
-        
-        <!-- 切换按钮 -->
-        <button
-          class="text-xs text-primary-600 hover:text-primary-700 shrink-0"
-          @click="showNameInput = !showNameInput"
-        >
-          {{ showNameInput ? '使用默认' : '自定义' }}
-        </button>
-      </div>
-      
-      <!-- 安装按钮行 -->
       <div class="flex items-center justify-between">
-        <p v-if="!hasSelection" class="text-xs text-gray-400">不选择加载器 = 安装原版</p>
-        <p v-else class="text-xs text-gray-400">&nbsp;</p>
+        <div>
+          <span v-if="hasSelection" class="text-sm text-gray-500">版本名: {{ getDefaultInstanceName() }}</span>
+          <span v-else class="text-xs text-gray-400">不选择加载器 = 安装原版</span>
+        </div>
         
         <button
           class="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
