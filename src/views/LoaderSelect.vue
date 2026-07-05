@@ -6,7 +6,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
-import { ChevronLeftIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { ChevronLeftIcon, InformationCircleIcon, ExclamationTriangleIcon, PencilIcon } from '@heroicons/vue/24/outline'
 import LoaderCard from '@/components/common/LoaderCard.vue'
 
 import anvilIcon from '@/assets/blocks/Anvil.png'
@@ -39,6 +39,13 @@ const selectedNeoforge = ref<string | null>(null)
 const selectedFabric = ref<string | null>(null)
 const selectedOptifine = ref<string | null>(null)
 const selectedLiteloader = ref<string | null>(null)
+
+// 自定义版本名称
+const customInstanceName = ref('')
+const isEditingName = ref(false)
+
+// 已安装版本列表
+const installedVersions = ref<string[]>([])
 
 // 每个加载器独立的加载状态
 const loadingForge = ref(true)
@@ -155,7 +162,8 @@ function isLoaderSelected(loader: string): boolean {
   return false
 }
 
-function getInstanceName(): string {
+// 获取默认版本名
+function getDefaultInstanceName(): string {
   let name = props.mcVersion
   if (selectedFabric.value) name += `-Fabric${selectedFabric.value}`
   if (selectedForge.value) name += `-Forge_${selectedForge.value}`
@@ -165,11 +173,44 @@ function getInstanceName(): string {
   return name
 }
 
+// 获取当前显示的版本名（自定义或默认）
+const instanceName = computed(() => {
+  return customInstanceName.value || getDefaultInstanceName()
+})
+
+// 重置自定义名称（当加载器选择变化时）
+function resetCustomName() {
+  customInstanceName.value = ''
+  isEditingName.value = false
+}
+
+// 检查版本名是否已存在，并生成唯一的名称
+function getUniqueInstanceName(name: string): string {
+  if (!installedVersions.value.includes(name)) {
+    return name
+  }
+  // 版本名已存在，追加 (1), (2) 等后缀
+  let counter = 1
+  let uniqueName = `${name}(${counter})`
+  while (installedVersions.value.includes(uniqueName)) {
+    counter++
+    uniqueName = `${name}(${counter})`
+  }
+  return uniqueName
+}
+
 const hasSelection = computed(() =>
   selectedForge.value || selectedNeoforge.value || selectedFabric.value || selectedOptifine.value || selectedLiteloader.value
 )
 
 onMounted(async () => {
+  // 加载已安装版本列表
+  try {
+    installedVersions.value = await tauri.listInstalledVersions()
+  } catch (e) {
+    console.error('Failed to load installed versions:', e)
+  }
+
   // 检查是否有缓存
   const cached = versionStore.getLoaderCache(props.mcVersion)
   if (cached) {
@@ -263,6 +304,10 @@ onMounted(async () => {
 })
 
 function handleInstall() {
+  const name = instanceName.value
+  // 如果版本名已存在，自动追加后缀
+  const finalName = getUniqueInstanceName(name)
+  
   emit('install', {
     mcVersion: props.mcVersion,
     forge: selectedForge.value || undefined,
@@ -270,7 +315,7 @@ function handleInstall() {
     fabric: selectedFabric.value || undefined,
     optifine: selectedOptifine.value || undefined,
     liteloader: selectedLiteloader.value || undefined,
-    instanceName: getInstanceName(),
+    instanceName: finalName,
   })
 }
 </script>
@@ -386,17 +431,54 @@ function handleInstall() {
     </div>
 
     <!-- 底部 -->
-    <div class="px-6 py-4 bg-white border-t border-gray-300 flex items-center justify-between shrink-0">
-      <div class="text-sm text-gray-500">
-        <span v-if="hasSelection">版本名: {{ getInstanceName() }}</span>
-        <span v-else>不选择加载器 = 安装原版</span>
+    <div class="px-6 py-4 bg-white border-t border-gray-300 shrink-0">
+      <!-- 版本名称编辑 -->
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-sm text-gray-500 shrink-0">版本名:</span>
+        <div class="flex-1 flex items-center gap-2">
+          <input
+            v-if="isEditingName"
+            v-model="customInstanceName"
+            :placeholder="getDefaultInstanceName()"
+            class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
+            @blur="isEditingName = false"
+            @keyup.enter="isEditingName = false"
+          />
+          <span v-else class="flex-1 text-sm font-medium text-gray-900 truncate">
+            {{ instanceName }}
+          </span>
+          <button
+            v-if="!isEditingName"
+            class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            @click="isEditingName = true"
+          >
+            <PencilIcon class="w-4 h-4 text-gray-400" />
+          </button>
+          <button
+            v-if="customInstanceName"
+            class="text-xs text-gray-400 hover:text-gray-600"
+            @click="resetCustomName"
+          >
+            重置
+          </button>
+        </div>
       </div>
-      <button
-        class="px-6 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
-        @click="handleInstall"
-      >
-        开始安装
-      </button>
+      
+      <!-- 安装按钮 -->
+      <div class="flex items-center justify-between">
+        <div class="text-xs text-gray-400">
+          <span v-if="hasSelection && getUniqueInstanceName(instanceName) !== instanceName" class="text-orange-500">
+            版本名已存在，将自动命名为: {{ getUniqueInstanceName(instanceName) }}
+          </span>
+          <span v-else-if="!hasSelection">不选择加载器 = 安装原版</span>
+        </div>
+        <button
+          class="px-6 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+          @click="handleInstall"
+        >
+          开始安装
+        </button>
+      </div>
     </div>
   </div>
 </template>
