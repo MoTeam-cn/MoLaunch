@@ -63,6 +63,13 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.max_memory = max.parse().unwrap_or(app_config.max_memory);
     }
 
+    // 兼容旧配置：如果没有 mode 字段但有具体的内存值，则为自定义模式
+    if config.get("Memory", "mode").is_none() && app_config.min_memory > 0 && app_config.max_memory > 0 {
+        app_config.memory_mode = "custom".to_string();
+        log_info!("Legacy config detected: memory mode set to custom (min={}MB, max={}MB)", 
+            app_config.min_memory, app_config.max_memory);
+    }
+
     // 自动模式：如果 memory_mode 为 "auto"，计算自动值用于运行时
     if app_config.memory_mode == "auto" {
         let sys_mem = crate::minecraft::system::get_system_memory();
