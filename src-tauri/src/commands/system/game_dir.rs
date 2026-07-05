@@ -14,14 +14,14 @@ pub struct FileFilter {
 #[tauri::command]
 pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
     let config = state.config.lock().await;
-    let game_dir = &config.game_dir;
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
 
-    log_info!("Opening game directory: {}", game_dir);
+    log_info!("Opening game directory: {}", game_dir.display());
 
     #[cfg(target_os = "windows")]
     {
         std::process::Command::new("explorer")
-            .arg(game_dir)
+            .arg(game_dir.to_string_lossy().to_string())
             .spawn()
             .map_err(|e| format!("Failed to open directory: {}", e))?;
     }
@@ -29,7 +29,7 @@ pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     {
         std::process::Command::new("open")
-            .arg(game_dir)
+            .arg(game_dir.to_string_lossy().to_string())
             .spawn()
             .map_err(|e| format!("Failed to open directory: {}", e))?;
     }
@@ -37,7 +37,7 @@ pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
         std::process::Command::new("xdg-open")
-            .arg(game_dir)
+            .arg(game_dir.to_string_lossy().to_string())
             .spawn()
             .map_err(|e| format!("Failed to open directory: {}", e))?;
     }

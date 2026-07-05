@@ -138,6 +138,33 @@ pub async fn install_merged(
     log_info!("Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
         mc_version, forge_version, neoforge_version, fabric_version, optifine_version);
 
+    // 处理版本名称：如果已存在则追加后缀 (1), (2) 等
+    let config = state.config.lock().await;
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
+    drop(config);
+
+    let base_name = instance_name.unwrap_or_else(|| mc_version.clone());
+    let instance = {
+        let versions_dir = game_dir.join("versions");
+        if !versions_dir.join(&base_name).exists() {
+            base_name.clone()
+        } else {
+            // 版本名已存在，追加后缀
+            let mut counter = 1;
+            loop {
+                let candidate = format!("{}({})", base_name, counter);
+                if !versions_dir.join(&candidate).exists() {
+                    break candidate;
+                }
+                counter += 1;
+            }
+        }
+    };
+
+    if instance != base_name {
+        log_info!("[Merged] Version name '{}' already exists, using '{}'", base_name, instance);
+    }
+
     // 预添加加载器安装阶段（状态为 Waiting，让用户从一开始就看到）
     let has_any_loader = forge_version.is_some() || neoforge_version.is_some() || 
                          fabric_version.is_some() || optifine_version.is_some() || 
@@ -167,7 +194,6 @@ pub async fn install_merged(
     }
 
     let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     let mirror_url = config.mirror_url.clone();
     let max_threads = config.max_download_threads as usize;
     let chunk_count = config.chunk_count as usize;
@@ -336,7 +362,6 @@ pub async fn install_merged(
     }
 
     // 完成：设置最终状态
-    let instance = instance_name.unwrap_or_else(|| mc_version.clone());
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.is_active = false;

@@ -6,7 +6,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
-import { ChevronLeftIcon, InformationCircleIcon, ExclamationTriangleIcon, PencilIcon } from '@heroicons/vue/24/outline'
+import { ChevronLeftIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 import LoaderCard from '@/components/common/LoaderCard.vue'
 
 import anvilIcon from '@/assets/blocks/Anvil.png'
@@ -42,7 +42,7 @@ const selectedLiteloader = ref<string | null>(null)
 
 // 自定义版本名称
 const customInstanceName = ref('')
-const isEditingName = ref(false)
+const showNameInput = ref(false)
 
 // 已安装版本列表
 const installedVersions = ref<string[]>([])
@@ -432,53 +432,39 @@ function handleInstall() {
 
     <!-- 底部 -->
     <div class="px-6 py-4 bg-white border-t border-gray-300 shrink-0">
-      <!-- 版本名称编辑 -->
-      <div class="flex items-center gap-2 mb-3">
-        <span class="text-sm text-gray-500 shrink-0">版本名:</span>
-        <div class="flex-1 flex items-center gap-2">
-          <input
-            v-if="isEditingName"
-            v-model="customInstanceName"
-            :placeholder="getDefaultInstanceName()"
-            class="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500"
-            @blur="isEditingName = false"
-            @keyup.enter="isEditingName = false"
-          />
-          <span v-else class="flex-1 text-sm font-medium text-gray-900 truncate">
-            {{ instanceName }}
-          </span>
+      <!-- 版本名称 -->
+      <div class="mb-3">
+        <div class="flex items-center justify-between mb-1.5">
+          <span class="text-xs text-gray-500">版本名称</span>
           <button
-            v-if="!isEditingName"
-            class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
-            @click="isEditingName = true"
+            class="text-xs text-primary-600 hover:text-primary-700"
+            @click="showNameInput = !showNameInput"
           >
-            <PencilIcon class="w-4 h-4 text-gray-400" />
+            {{ showNameInput ? '使用默认名称' : '自定义名称' }}
           </button>
-          <button
-            v-if="customInstanceName"
-            class="text-xs text-gray-400 hover:text-gray-600"
-            @click="resetCustomName"
-          >
-            重置
-          </button>
+        </div>
+        
+        <!-- 自定义名称输入框 -->
+        <input
+          v-if="showNameInput"
+          v-model="customInstanceName"
+          :placeholder="getDefaultInstanceName()"
+          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 mb-1"
+        />
+        
+        <!-- 显示当前名称 -->
+        <div v-else class="text-sm font-medium text-gray-900 truncate">
+          {{ instanceName }}
         </div>
       </div>
       
       <!-- 安装按钮 -->
-      <div class="flex items-center justify-between">
-        <div class="text-xs text-gray-400">
-          <span v-if="hasSelection && getUniqueInstanceName(instanceName) !== instanceName" class="text-orange-500">
-            版本名已存在，将自动命名为: {{ getUniqueInstanceName(instanceName) }}
-          </span>
-          <span v-else-if="!hasSelection">不选择加载器 = 安装原版</span>
-        </div>
-        <button
-          class="px-6 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
-          @click="handleInstall"
-        >
-          开始安装
-        </button>
-      </div>
+      <button
+        class="w-full py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+        @click="handleInstall"
+      >
+        开始安装
+      </button>
     </div>
   </div>
 </template>
