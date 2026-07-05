@@ -432,39 +432,37 @@ function handleInstall() {
 
     <!-- 底部 -->
     <div class="px-6 py-4 bg-white border-t border-gray-300 shrink-0">
-      <div class="flex items-center justify-between">
-        <!-- 左侧：版本名称 -->
-        <div class="flex-1 min-w-0 mr-4">
-          <div class="flex items-center gap-2 mb-1">
-            <span class="text-xs text-gray-500 shrink-0">版本名:</span>
-            <button
-              class="text-xs text-primary-600 hover:text-primary-700 shrink-0"
-              @click="showNameInput = !showNameInput"
-            >
-              {{ showNameInput ? '使用默认' : '自定义' }}
-            </button>
-          </div>
-          
-          <!-- 自定义名称输入框 -->
+      <!-- 版本名称行 -->
+      <div class="flex items-center gap-3 mb-3">
+        <span class="text-xs text-gray-500 shrink-0">版本名:</span>
+        
+        <!-- 名称显示/输入 -->
+        <div class="flex-1 min-w-0">
           <input
             v-if="showNameInput"
             v-model="customInstanceName"
             :placeholder="getDefaultInstanceName()"
             class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-primary-500"
           />
-          
-          <!-- 显示当前名称 -->
-          <div v-else class="text-sm font-medium text-gray-900 truncate">
-            {{ instanceName }}
-          </div>
-          
-          <!-- 提示信息 -->
-          <p v-if="!hasSelection" class="text-xs text-gray-400 mt-1">不选择加载器 = 安装原版</p>
+          <span v-else class="text-sm font-medium text-gray-900">{{ instanceName }}</span>
         </div>
         
-        <!-- 右侧：安装按钮 -->
+        <!-- 切换按钮 -->
         <button
-          class="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shrink-0"
+          class="text-xs text-primary-600 hover:text-primary-700 shrink-0"
+          @click="showNameInput = !showNameInput"
+        >
+          {{ showNameInput ? '使用默认' : '自定义' }}
+        </button>
+      </div>
+      
+      <!-- 安装按钮行 -->
+      <div class="flex items-center justify-between">
+        <p v-if="!hasSelection" class="text-xs text-gray-400">不选择加载器 = 安装原版</p>
+        <p v-else class="text-xs text-gray-400">&nbsp;</p>
+        
+        <button
+          class="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
           @click="handleInstall"
         >
           <ArrowDownTrayIcon class="w-4 h-4 mr-1.5" />
