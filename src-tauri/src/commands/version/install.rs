@@ -71,7 +71,7 @@ async fn install_single_loader(
 }
 
 /// 启动进度模拟器：缓慢上涨进度条，直到 stop 信号为 true
-/// 从 start 增长到 cap，每秒增长约 1%，整体约 90秒完成
+/// 从 start 增长到 cap，约 45-60秒完成
 fn start_progress_ticker(
     state: Arc<std::sync::Mutex<crate::state::DownloadState>>,
     start: f64,
@@ -82,8 +82,8 @@ fn start_progress_ticker(
 
     tokio::spawn(async move {
         let mut current = start;
-        // 每 1 秒更新一次
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(1000));
+        // 每 500ms 更新一次，更平滑
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
         interval.tick().await;
 
         while !stop_clone.load(Ordering::Relaxed) {
@@ -91,9 +91,8 @@ fn start_progress_ticker(
             if stop_clone.load(Ordering::Relaxed) { break; }
             let remaining = cap - current;
             if remaining <= 0.0 { break; }
-            // 每次增长剩余量的 2%，最少 0.2%，最多 1%
-            // 这样从 5% 到 95% 大约需要 90秒
-            let step = (remaining * 0.02).clamp(0.2, 1.0);
+            // 每次增长约 1%，从5%到95% 约 45秒完成
+            let step = 1.0;
             current = (current + step).min(cap);
 
             let mut ds = state.lock().unwrap();
