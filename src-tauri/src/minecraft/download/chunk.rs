@@ -10,7 +10,8 @@ use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-use super::manager::{DownloadStatus, GlobalProgress, RateLimiter};
+use super::types::{DownloadStatus, GlobalProgress};
+use super::rate_limiter::RateLimiter;
 
 /// 分片下载结果
 pub struct ChunkDownloadResult {

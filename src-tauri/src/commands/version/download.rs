@@ -1,5 +1,5 @@
 use crate::{log_error, log_info};
-use crate::minecraft::download::{self, manager as download_manager};
+use crate::minecraft::download::{self, types as download_types};
 use crate::state::{AppState, DownloadState, StageStatus};
 use std::collections::VecDeque;
 use std::sync::Arc;
@@ -60,7 +60,7 @@ pub async fn download_version(
     let sw = speed_window.clone();
     let acc_bytes_for_progress = accumulated_bytes.clone();
     let acc_total_for_progress = accumulated_total.clone();
-    let progress_callback = Arc::new(move |progress: download_manager::GlobalProgress| {
+    let progress_callback = Arc::new(move |progress: download_types::GlobalProgress| {
         {
             let base_bytes = *acc_bytes_for_progress.lock().unwrap();
             let base_total = *acc_total_for_progress.lock().unwrap();

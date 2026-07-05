@@ -2,7 +2,10 @@
 
 pub mod assets;
 pub mod chunk;
+pub mod downloader;
 pub mod manager;
+pub mod rate_limiter;
+pub mod types;
 
 use crate::{log_info, log_debug};
 use crate::http;
@@ -12,7 +15,8 @@ use std::sync::Arc;
 
 use super::utils::file_checker::FileChecker;
 use super::version::libraries;
-use manager::{DownloadManager, DownloadTask, DownloadStatus, GlobalProgress};
+use manager::DownloadManager;
+use types::{DownloadTask, DownloadStatus, GlobalProgress};
 use super::sources::{self, DownloadSourceMode};
 
 /// 版本列表结果

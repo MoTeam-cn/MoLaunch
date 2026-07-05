@@ -93,7 +93,6 @@ impl Default for DownloadState {
                 DownloadStage::new("客户端", 5.0),
                 DownloadStage::new("库文件", 15.0),
                 DownloadStage::new("资源文件", 20.0),
-                DownloadStage::new("加载器安装", 30.0),
             ],
             current_stage_index: 0,
             global_speed: 0,
