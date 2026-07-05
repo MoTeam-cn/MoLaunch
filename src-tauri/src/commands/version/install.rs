@@ -22,19 +22,13 @@ async fn install_single_loader(
     max_threads: usize,
     source_mode: crate::minecraft::sources::DownloadSourceMode,
 ) -> Result<(), String> {
-    // 添加加载器安装阶段（动态添加，因为默认阶段不包含此项）
+    // 更新阶段状态（阶段已在之前预添加）
     {
         let mut ds = state.download_state.lock().unwrap();
-        let loader_stage = crate::state::DownloadStage::new(
-            format!("安装 {} {}", loader_name, loader_version),
-            30.0,
-        );
-        // 如果已有加载器阶段（index 5），更新它；否则添加新的
-        if ds.stages.len() > 5 {
-            ds.stages[5] = loader_stage;
-            ds.stages[5].status = StageStatus::Loading;
-        } else {
-            ds.stages.push(loader_stage);
+        if let Some(last) = ds.stages.last_mut() {
+            last.name = format!("安装 {} {}", loader_name, loader_version);
+            last.status = StageStatus::Loading;
+            last.progress = 0.0;
         }
         ds.current_stage_index = ds.stages.len() - 1;
     }
@@ -58,23 +52,26 @@ async fn install_single_loader(
             ticker_stop.store(true, Ordering::Relaxed);
             log_info!("[Merged] {} {} installed successfully", loader_name, loader_version);
             let mut ds = state.download_state.lock().unwrap();
-            let idx = ds.stages.len() - 1;
-            ds.stages[idx].status = StageStatus::Finished;
-            ds.stages[idx].progress = 1.0;
+            if let Some(last) = ds.stages.last_mut() {
+                last.status = StageStatus::Finished;
+                last.progress = 1.0;
+            }
             Ok(())
         }
         Err(e) => {
             ticker_stop.store(true, Ordering::Relaxed);
             log_error!("[Merged] Failed to install {}: {}", loader_name, e);
             let mut ds = state.download_state.lock().unwrap();
-            let idx = ds.stages.len() - 1;
-            ds.stages[idx].status = StageStatus::Failed;
+            if let Some(last) = ds.stages.last_mut() {
+                last.status = StageStatus::Failed;
+            }
             Err(format!("{}: {}", loader_name, e))
         }
     }
 }
 
 /// 启动进度模拟器：缓慢上涨进度条，直到 stop 信号为 true
+/// 从 start 增长到 cap，每秒增长约 1%，整体约 90秒完成
 fn start_progress_ticker(
     state: Arc<std::sync::Mutex<crate::state::DownloadState>>,
     start: f64,
@@ -85,7 +82,8 @@ fn start_progress_ticker(
 
     tokio::spawn(async move {
         let mut current = start;
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
+        // 每 1 秒更新一次
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(1000));
         interval.tick().await;
 
         while !stop_clone.load(Ordering::Relaxed) {
@@ -93,7 +91,9 @@ fn start_progress_ticker(
             if stop_clone.load(Ordering::Relaxed) { break; }
             let remaining = cap - current;
             if remaining <= 0.0 { break; }
-            let step = (remaining * 0.05).clamp(0.5, 3.0);
+            // 每次增长剩余量的 2%，最少 0.2%，最多 1%
+            // 这样从 5% 到 95% 大约需要 90秒
+            let step = (remaining * 0.02).clamp(0.2, 1.0);
             current = (current + step).min(cap);
 
             let mut ds = state.lock().unwrap();
@@ -124,6 +124,11 @@ pub async fn install_merged(
     log_info!("Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
         mc_version, forge_version, neoforge_version, fabric_version, optifine_version);
 
+    // 预添加加载器安装阶段（状态为 Waiting，让用户从一开始就看到）
+    let has_any_loader = forge_version.is_some() || neoforge_version.is_some() || 
+                         fabric_version.is_some() || optifine_version.is_some() || 
+                         liteloader_version.is_some();
+
     // 设置下载状态
     {
         let mut ds = state.download_state.lock().unwrap();
@@ -140,6 +145,10 @@ pub async fn install_merged(
             stage.status = StageStatus::Waiting;
             stage.bytes_downloaded = 0;
             stage.bytes_total = 0;
+        }
+        // 如果需要安装加载器，预添加阶段
+        if has_any_loader {
+            ds.stages.push(crate::state::DownloadStage::new("加载器安装", 30.0));
         }
     }
 
@@ -252,8 +261,11 @@ pub async fn install_merged(
         result.libs_downloaded, result.libs_total,
         result.assets_downloaded, result.assets_total);
 
-    // Step 2: 安装加载器（更新阶段状态）
-    {
+    // 预添加加载器安装阶段（状态为 Waiting，让用户知道还有这个步骤）
+    let has_any_loader = forge_version.is_some() || neoforge_version.is_some() || 
+                         fabric_version.is_some() || optifine_version.is_some() || 
+                         liteloader_version.is_some();
+    if has_any_loader {
         let mut ds = state.download_state.lock().unwrap();
         // 标记前面的阶段完成
         for stage in ds.stages.iter_mut() {
@@ -262,12 +274,11 @@ pub async fn install_merged(
                 stage.progress = 1.0;
             }
         }
+        // 添加加载器安装阶段（Waiting 状态）
+        ds.stages.push(crate::state::DownloadStage::new("加载器安装", 30.0));
     }
 
     let mut loader_errors = Vec::new();
-    let has_any_loader = forge_version.is_some() || neoforge_version.is_some() || 
-                         fabric_version.is_some() || optifine_version.is_some() || 
-                         liteloader_version.is_some();
 
     // 安装各加载器（使用辅助函数消除重复代码）
     if let Some(forge_ver) = forge_version {
