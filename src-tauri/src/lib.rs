@@ -92,6 +92,8 @@ pub fn run() {
             commands::system::set_min_memory,
             commands::system::set_max_memory,
             commands::system::get_memory_config,
+            commands::system::get_memory_mode,
+            commands::system::set_memory_mode,
             commands::system::set_max_download_threads,
             commands::system::get_max_download_threads,
             commands::system::set_chunk_count,

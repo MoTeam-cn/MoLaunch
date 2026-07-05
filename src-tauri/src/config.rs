@@ -55,6 +55,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.mirror_url_download = config.get("Mirror", "url_download");
 
     // Memory
+    app_config.memory_mode = config.get_or("Memory", "mode", &app_config.memory_mode);
     if let Some(min) = config.get("Memory", "min") {
         app_config.min_memory = min.parse().unwrap_or(app_config.min_memory);
     }
@@ -62,20 +63,15 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.max_memory = max.parse().unwrap_or(app_config.max_memory);
     }
 
-    // 自动模式：内存值为0时，根据系统内存动态计算
-    if app_config.min_memory == 0 || app_config.max_memory == 0 {
+    // 自动模式：如果 memory_mode 为 "auto"，计算自动值用于运行时
+    if app_config.memory_mode == "auto" {
         let sys_mem = crate::minecraft::system::get_system_memory();
         let available_mb = (sys_mem.available / 1024 / 1024) as u32;
         let suggested_max = std::cmp::min((available_mb as f64 * 0.75) as u32, 8192);
         let suggested_max = std::cmp::max(suggested_max, 512);
         let suggested_min = suggested_max / 2;
-
-        if app_config.max_memory == 0 {
-            app_config.max_memory = suggested_max;
-        }
-        if app_config.min_memory == 0 {
-            app_config.min_memory = suggested_min;
-        }
+        app_config.min_memory = suggested_min;
+        app_config.max_memory = suggested_max;
         log_info!("Auto memory config: min={}MB, max={}MB", app_config.min_memory, app_config.max_memory);
     }
 
@@ -130,8 +126,15 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     }
 
     // Memory
-    ini.set("Memory", "min", &config.min_memory.to_string());
-    ini.set("Memory", "max", &config.max_memory.to_string());
+    ini.set("Memory", "mode", &config.memory_mode);
+    if config.memory_mode == "custom" {
+        ini.set("Memory", "min", &config.min_memory.to_string());
+        ini.set("Memory", "max", &config.max_memory.to_string());
+    } else {
+        // 自动模式下不保存具体值，只保存 mode
+        ini.remove("Memory", "min");
+        ini.remove("Memory", "max");
+    }
 
     // Log
     ini.set("Log", "level", &config.log_level.to_string());

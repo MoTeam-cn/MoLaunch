@@ -35,6 +35,30 @@ pub async fn get_memory_config(state: State<'_, AppState>) -> Result<(u32, u32),
     Ok((config.min_memory, config.max_memory))
 }
 
+/// 获取内存模式
+#[tauri::command]
+pub async fn get_memory_mode(state: State<'_, AppState>) -> Result<String, String> {
+    let config = state.config.lock().await;
+    Ok(config.memory_mode.clone())
+}
+
+/// 设置内存模式
+#[tauri::command]
+pub async fn set_memory_mode(
+    state: State<'_, AppState>,
+    mode: String,
+) -> Result<(), String> {
+    log_info!("Memory mode changed to: {}", mode);
+    super::update_config(&state, |config| {
+        config.memory_mode = mode.clone();
+        if mode == "auto" {
+            // 切换到自动模式时，将内存值设为 0
+            config.min_memory = 0;
+            config.max_memory = 0;
+        }
+    }).await
+}
+
 /// 设置版本隔离模式
 #[tauri::command]
 pub async fn set_isolation_mode(

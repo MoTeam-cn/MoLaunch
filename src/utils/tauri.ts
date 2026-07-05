@@ -302,6 +302,20 @@ export async function getMemoryConfig(): Promise<[number, number]> {
 }
 
 /**
+ * 获取内存模式
+ */
+export async function getMemoryMode(): Promise<string> {
+  return await invoke<string>('get_memory_mode')
+}
+
+/**
+ * 设置内存模式
+ */
+export async function setMemoryMode(mode: string): Promise<void> {
+  return await invoke<void>('set_memory_mode', { mode })
+}
+
+/**
  * 设置下载线程数
  */
 export async function setMaxDownloadThreads(threads: number): Promise<void> {

@@ -132,17 +132,15 @@ watch(isolationMode, async (mode) => {
   }
 })
 
-// 切换到自动模式时，立即应用并清除配置文件中的值
+// 切换内存模式时，同步到后端
 watch(memoryMode, async (mode) => {
   if (mode === 'auto') {
     applyAutoMemory()
-    // 清除配置文件中的内存值（启动时动态计算）
-    try {
-      await tauri.setMinMemory(0)
-      await tauri.setMaxMemory(0)
-    } catch (e) {
-      console.error('Failed to clear memory config:', e)
-    }
+  }
+  try {
+    await tauri.setMemoryMode(mode)
+  } catch (e) {
+    console.error('Failed to set memory mode:', e)
   }
 })
 
@@ -160,20 +158,17 @@ onMounted(async () => {
     console.error('Failed to get system memory:', e)
   }
   try {
-    // 从配置文件读取原始值判断是否是自动模式
-    const savedMin = await tauri.getConfigValue('Memory', 'min')
-    const savedMax = await tauri.getConfigValue('Memory', 'max')
-    const minVal = savedMin ? parseInt(savedMin, 10) : 0
-    const maxVal = savedMax ? parseInt(savedMax, 10) : 0
+    // 从后端读取内存模式
+    const mode = await tauri.getMemoryMode()
+    memoryMode.value = mode === 'custom' ? 'custom' : 'auto'
     
-    if (minVal > 0 && maxVal > 0) {
-      // 自定义模式
-      minMemory.value = minVal
-      maxMemory.value = maxVal
-      memoryMode.value = 'custom'
+    if (memoryMode.value === 'custom') {
+      // 自定义模式：读取保存的内存值
+      const [min, max] = await tauri.getMemoryConfig()
+      minMemory.value = min
+      maxMemory.value = max
     } else {
-      // 自动模式，保持 applyAutoMemory 计算的值
-      memoryMode.value = 'auto'
+      // 自动模式：使用 applyAutoMemory 计算的值
     }
   } catch (e) {
     console.error('Failed to get memory config:', e)
