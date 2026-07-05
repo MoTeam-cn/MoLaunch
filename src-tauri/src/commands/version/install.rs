@@ -11,6 +11,7 @@ use std::time::Instant;
 use tauri::{Emitter, State};
 
 /// 安装单个加载器的通用辅助函数
+/// 如果阶段已存在（最后一个阶段是加载器安装），则更新它；否则添加新阶段
 async fn install_single_loader(
     state: &AppState,
     loader_type: loaders::LoaderType,
@@ -22,8 +23,14 @@ async fn install_single_loader(
     max_threads: usize,
     source_mode: crate::minecraft::sources::DownloadSourceMode,
 ) -> Result<(), String> {
-    // 更新阶段状态（阶段已在之前预添加）
-    {
+    // 检查是否已有加载器安装阶段（通过名称判断）
+    let has_loader_stage = {
+        let ds = state.download_state.lock().unwrap();
+        ds.stages.last().map_or(false, |s| s.name.contains("安装") || s.name.contains("加载器"))
+    };
+
+    if has_loader_stage {
+        // 更新现有阶段
         let mut ds = state.download_state.lock().unwrap();
         if let Some(last) = ds.stages.last_mut() {
             last.name = format!("安装 {} {}", loader_name, loader_version);
@@ -31,7 +38,15 @@ async fn install_single_loader(
             last.progress = 0.0;
         }
         ds.current_stage_index = ds.stages.len() - 1;
+    } else {
+        // 添加新阶段
+        let mut ds = state.download_state.lock().unwrap();
+        let mut stage = crate::state::DownloadStage::new(format!("安装 {} {}", loader_name, loader_version), 30.0);
+        stage.status = StageStatus::Loading;
+        ds.stages.push(stage);
+        ds.current_stage_index = ds.stages.len() - 1;
     }
+
     log_info!("[Merged] Installing {} {}", loader_name, loader_version);
 
     // 启动进度模拟器
@@ -260,26 +275,21 @@ pub async fn install_merged(
         result.libs_downloaded, result.libs_total,
         result.assets_downloaded, result.assets_total);
 
-    // 预添加加载器安装阶段（状态为 Waiting，让用户知道还有这个步骤）
-    let has_any_loader = forge_version.is_some() || neoforge_version.is_some() || 
-                         fabric_version.is_some() || optifine_version.is_some() || 
-                         liteloader_version.is_some();
-    if has_any_loader {
+    // 标记前面的阶段完成
+    {
         let mut ds = state.download_state.lock().unwrap();
-        // 标记前面的阶段完成
         for stage in ds.stages.iter_mut() {
             if stage.status == StageStatus::Loading {
                 stage.status = StageStatus::Finished;
                 stage.progress = 1.0;
             }
         }
-        // 添加加载器安装阶段（Waiting 状态）
-        ds.stages.push(crate::state::DownloadStage::new("加载器安装", 30.0));
     }
 
     let mut loader_errors = Vec::new();
 
     // 安装各加载器（使用辅助函数消除重复代码）
+    // 注意：第一个加载器会添加阶段，后续加载器只更新阶段
     if let Some(forge_ver) = forge_version {
         if let Err(e) = install_single_loader(
             &state, loaders::LoaderType::Forge, "Forge", &forge_ver,
