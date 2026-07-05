@@ -411,7 +411,7 @@ function handleInstall() {
         </div>
         <button
           class="text-xs text-primary-600 hover:text-primary-700 shrink-0"
-          @click="showNameInput = !showNameInput; if (!showNameInput) customInstanceName = ''"
+          @click="showNameInput = !showNameInput; if (showNameInput) customInstanceName = getDefaultInstanceName(); else customInstanceName = ''"
         >
           {{ showNameInput ? '使用默认' : '自定义' }}
         </button>
