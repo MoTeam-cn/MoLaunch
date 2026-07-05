@@ -408,19 +408,64 @@ pub async fn install_merged(
             mc_version.clone()
         };
 
-        let version_dir = game_dir.join("versions").join(&final_version_id);
+        // 如果用户自定义了名称，需要重命名版本目录和修改 JSON
+        let actual_version_id = if instance != final_version_id {
+            log_info!("[Merged] 重命名版本: {} -> {}", final_version_id, instance);
+            let old_dir = game_dir.join("versions").join(&final_version_id);
+            let new_dir = game_dir.join("versions").join(&instance);
+            
+            // 重命名目录
+            if let Err(e) = std::fs::rename(&old_dir, &new_dir) {
+                log_warn!("[Merged] 重命名目录失败: {}", e);
+                final_version_id.clone()
+            } else {
+                // 重命名 JSON 文件
+                let old_json = new_dir.join(format!("{}.json", final_version_id));
+                let new_json = new_dir.join(format!("{}.json", instance));
+                if old_json.exists() {
+                    if let Err(e) = std::fs::rename(&old_json, &new_json) {
+                        log_warn!("[Merged] 重命名 JSON 失败: {}", e);
+                    }
+                }
+                
+                // 修改 JSON 中的 id 字段
+                if new_json.exists() {
+                    if let Ok(content) = std::fs::read_to_string(&new_json) {
+                        if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&content) {
+                            json["id"] = serde_json::Value::String(instance.clone());
+                            if let Ok(new_content) = serde_json::to_string_pretty(&json) {
+                                let _ = std::fs::write(&new_json, new_content);
+                            }
+                        }
+                    }
+                }
+                
+                // 重命名 JAR 文件
+                let old_jar = new_dir.join(format!("{}.jar", final_version_id));
+                let new_jar = new_dir.join(format!("{}.jar", instance));
+                if old_jar.exists() {
+                    let _ = std::fs::rename(&old_jar, &new_jar);
+                }
+                
+                instance.clone()
+            }
+        } else {
+            final_version_id.clone()
+        };
+
+        let version_dir = game_dir.join("versions").join(&actual_version_id);
 
         // 保存 setup.ini（参考 PCL2：记录版本元数据）
         // 注意：前面的加载器安装代码已经 move 了这些变量，这里通过版本目录名推断
-        let version_type = if final_version_id.contains("-forge-") {
+        let version_type = if actual_version_id.contains("-forge-") {
             VersionType::Forge
-        } else if final_version_id.contains("-neoforge-") {
+        } else if actual_version_id.contains("-neoforge-") {
             VersionType::NeoForge
-        } else if final_version_id.starts_with("fabric-") {
+        } else if actual_version_id.starts_with("fabric-") {
             VersionType::Fabric
-        } else if final_version_id.contains("-OptiFine") {
+        } else if actual_version_id.contains("-OptiFine") {
             VersionType::OptiFine
-        } else if final_version_id.contains("-LiteLoader") {
+        } else if actual_version_id.contains("-LiteLoader") {
             VersionType::LiteLoader
         } else {
             VersionType::Release
@@ -446,7 +491,7 @@ pub async fn install_merged(
         let isolation_mode = state.config.lock().await.isolation_mode;
         let mode = IsolationMode::from_u32(isolation_mode);
         if isolation::should_isolate(mode, version_type) {
-            log_info!("[Merged] 创建隔离目录: {} (模式: {}, 类型: {:?})", final_version_id, isolation_mode, version_type);
+            log_info!("[Merged] 创建隔离目录: {} (模式: {}, 类型: {:?})", actual_version_id, isolation_mode, version_type);
             // 根据版本类型创建不同的目录结构
             let result = if version_type.is_modded() {
                 isolation::ensure_modded_dirs(&version_dir)

@@ -40,6 +40,10 @@ const selectedFabric = ref<string | null>(null)
 const selectedOptifine = ref<string | null>(null)
 const selectedLiteloader = ref<string | null>(null)
 
+// 自定义版本名称
+const customInstanceName = ref('')
+const showNameInput = ref(false)
+
 // 每个加载器独立的加载状态
 const loadingForge = ref(true)
 const loadingNeoforge = ref(true)
@@ -166,6 +170,11 @@ function getDefaultInstanceName(): string {
   return name
 }
 
+// 获取当前显示的版本名（自定义或默认）
+const instanceName = computed(() => {
+  return customInstanceName.value || getDefaultInstanceName()
+})
+
 const hasSelection = computed(() =>
   selectedForge.value || selectedNeoforge.value || selectedFabric.value || selectedOptifine.value || selectedLiteloader.value
 )
@@ -271,7 +280,7 @@ function handleInstall() {
     fabric: selectedFabric.value || undefined,
     optifine: selectedOptifine.value || undefined,
     liteloader: selectedLiteloader.value || undefined,
-    instanceName: getDefaultInstanceName(),
+    instanceName: instanceName.value,
   })
 }
 </script>
@@ -388,11 +397,30 @@ function handleInstall() {
 
     <!-- 底部 -->
     <div class="px-6 py-4 bg-white border-t border-gray-300 shrink-0">
-      <div class="flex items-center justify-between">
-        <div>
-          <span v-if="hasSelection" class="text-sm text-gray-500">版本名: {{ getDefaultInstanceName() }}</span>
-          <span v-else class="text-xs text-gray-400">不选择加载器 = 安装原版</span>
+      <!-- 版本名称 -->
+      <div class="flex items-center gap-2 mb-3">
+        <span class="text-xs text-gray-500 shrink-0">版本名:</span>
+        <div class="flex-1 min-w-0">
+          <input
+            v-if="showNameInput"
+            v-model="customInstanceName"
+            :placeholder="getDefaultInstanceName()"
+            class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-primary-500"
+          />
+          <span v-else class="text-sm font-medium text-gray-900">{{ instanceName }}</span>
         </div>
+        <button
+          class="text-xs text-primary-600 hover:text-primary-700 shrink-0"
+          @click="showNameInput = !showNameInput; if (!showNameInput) customInstanceName = ''"
+        >
+          {{ showNameInput ? '使用默认' : '自定义' }}
+        </button>
+      </div>
+      
+      <!-- 安装按钮 -->
+      <div class="flex items-center justify-between">
+        <span v-if="!hasSelection" class="text-xs text-gray-400">不选择加载器 = 安装原版</span>
+        <span v-else class="text-xs text-gray-400">&nbsp;</span>
         
         <button
           class="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
