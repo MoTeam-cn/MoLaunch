@@ -1,10 +1,31 @@
 //! Game launch module
+//!
+//! This module provides Minecraft launch functionality:
+//! - Build launch arguments (JVM args, game args, classpath)
+//! - Launch game process
+//! - Version isolation support
+//! - Complete launch pipeline (inspired by PCL2)
+//! - Game process monitoring and crash detection
+//!
+//! Architecture:
+//! - pipeline.rs: 完整的启动流水线，支持并行执行和进度追踪
+//! - watcher.rs: 游戏进程监控和崩溃检测
+//! - mod.rs: 基础启动参数构建和进程启动
 
 use crate::log_info;
 use crate::minecraft::isolation::{self, IsolationMode};
 use crate::minecraft::version::{setup::VersionSetup, state::VersionType};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
+
+pub mod pipeline;
+pub mod watcher;
+
+// Re-export pipeline types
+pub use pipeline::{LaunchConfig, LaunchPipeline, LaunchProgress, LaunchStage, LaunchResult as PipelineLaunchResult};
+
+// Re-export watcher types
+pub use watcher::{GameWatcher, GameState, CrashInfo, CrashCategory, LoadProgress, ExitInfo};
 
 /// Launch arguments
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -111,6 +132,15 @@ pub fn build_launch_arguments(
         auth_info, window_width, window_height, server_address, server_port,
     )?;
 
+    // 在 launch 前设置游戏语言为中文（写入有效目录，适配隔离模式）
+    if let Err(e) = crate::minecraft::language::set_game_language(
+        &effective_game_dir,
+        version_id,
+        version_id, // 用 version_id 作为 MC 版本号（后续可从 setup.ini 读 OriginalVersion）
+    ) {
+        log_info!("[Language] Failed to set game language: {}", e);
+    }
+
     Ok(LaunchArguments {
         jvm_args,
         game_args,
@@ -127,11 +157,16 @@ pub fn build_launch_arguments(
 /// Build classpath
 fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyhow::Result<String> {
     let mut entries = Vec::new();
-    let version_id = json["id"].as_str().unwrap_or_default();
 
-    let version_jar = game_dir.join("versions").join(version_id).join(format!("{}.jar", version_id));
+    // 参考 PCL2 的 McLibListGet 函数
+    // 递归查找最深层的继承版本来获取原版jar
+    let jar_version = find_original_version(game_dir, json);
+    let version_jar = game_dir.join("versions").join(&jar_version).join(format!("{}.jar", jar_version));
+    
     if version_jar.exists() {
         entries.push(version_jar.to_string_lossy().to_string());
+    } else {
+        log_info!("[Classpath] Warning: Main jar not found: {}", version_jar.display());
     }
 
     if let Some(libraries) = json["libraries"].as_array() {
@@ -154,6 +189,35 @@ fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyhow::Result<
     }
 
     Ok(entries.join(if cfg!(target_os = "windows") { ";" } else { ":" }))
+}
+
+/// 递归查找最深层的继承版本（参考 PCL2 的 McLibListGet）
+fn find_original_version(game_dir: &Path, json: &serde_json::Value) -> String {
+    // 检查是否有 jar 字段指定
+    if let Some(jar) = json.get("jar").and_then(|v| v.as_str()) {
+        return jar.to_string();
+    }
+    
+    // 检查 inheritsFrom
+    if let Some(inherits_from) = json.get("inheritsFrom").and_then(|v| v.as_str()) {
+        if !inherits_from.is_empty() {
+            // 加载父版本JSON
+            let parent_json_path = game_dir.join("versions").join(inherits_from).join(format!("{}.json", inherits_from));
+            if parent_json_path.exists() {
+                if let Ok(content) = std::fs::read_to_string(&parent_json_path) {
+                    if let Ok(parent_json) = serde_json::from_str::<serde_json::Value>(&content) {
+                        // 递归查找
+                        return find_original_version(game_dir, &parent_json);
+                    }
+                }
+            }
+            // 如果父版本不存在，返回inheritsFrom作为版本名
+            return inherits_from.to_string();
+        }
+    }
+    
+    // 没有继承，使用当前版本
+    json.get("id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string()
 }
 
 /// Convert Maven name to path

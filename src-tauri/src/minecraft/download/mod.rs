@@ -406,6 +406,8 @@ pub async fn fix_version_files(
 
     let json_content = std::fs::read_to_string(&json_path)?;
     let json: serde_json::Value = serde_json::from_str(&json_content)?;
+
+    // merge_version_json 会处理父版本不存在的情况（参考PCL2的容错机制）
     let merged_json = super::version::json_merge::merge_version_json(&json, game_dir)?;
 
     let _ = download_libraries(&merged_json, game_dir, mirror_url, max_threads, chunk_count, speed_limit, source_mode, None).await?;

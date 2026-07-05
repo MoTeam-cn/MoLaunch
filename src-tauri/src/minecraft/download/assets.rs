@@ -65,7 +65,30 @@ pub fn get_asset_index_meta(json: &serde_json::Value) -> Option<AssetIndexMeta> 
         });
     }
 
-    None
+    // 最终回退：参考 PCL2 的 McAssetsGetIndex 函数
+    // 当无法获取 assetIndex 时，使用硬编码的 legacy fallback
+    let inherits_from = json.get("inheritsFrom").and_then(|v| v.as_str()).unwrap_or("");
+    
+    if !inherits_from.is_empty() {
+        crate::log_warn!("[Assets] No assetIndex found in JSON for version with inheritsFrom={}", inherits_from);
+        crate::log_warn!("[Assets] Using legacy asset index as fallback");
+    } else {
+        crate::log_warn!("[Assets] No assetIndex found in JSON, using legacy fallback");
+    }
+    
+    // 参考 PCL2 的硬编码 legacy fallback
+    // https://launchermeta.mojang.com/mc-staging/assets/legacy/c0fd82e8ce9fbc93119e40d96d5a4e62cfa3f729/legacy.json
+    Some(AssetIndexMeta {
+        id: "legacy".to_string(),
+        sha1: "c0fd82e8ce9fbc93119e40d96d5a4e62cfa3f729".to_string(),
+        size: 134284,
+        url: format!(
+            "{}/mc-staging/assets/legacy/{}/legacy.json",
+            sources::MOJANG_LAUNCHERMETA,
+            "c0fd82e8ce9fbc93119e40d96d5a4e62cfa3f729"
+        ),
+        total_size: Some(111220701),
+    })
 }
 
 /// 解析资源索引 JSON，获取所有资源条目

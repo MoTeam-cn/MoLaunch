@@ -23,12 +23,30 @@ pub struct LocalAuthResult {
     pub profile_json: Option<String>,
 }
 
+/// 启动历史记录
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LaunchHistory {
+    /// 版本ID
+    pub version_id: String,
+    /// 用户名
+    pub username: String,
+    /// 启动时间
+    pub launch_time: String,
+    /// 进程ID
+    pub pid: u32,
+    /// 退出码（如果有）
+    pub exit_code: Option<i32>,
+}
+
 /// 应用全局状态
 pub struct AppState {
     pub sdk: Arc<TokioMutex<Option<SdkInstance>>>,
     pub config: Arc<TokioMutex<AppConfig>>,
     pub auth: Arc<TokioMutex<AuthState>>,
     pub download_state: Arc<Mutex<DownloadState>>,
+    pub launch_history: Arc<TokioMutex<Vec<LaunchHistory>>>,
+    pub current_pid: Arc<TokioMutex<Option<u32>>>,
+    pub launch_pipeline: Arc<TokioMutex<Option<Arc<crate::minecraft::launch::LaunchPipeline>>>>,
 }
 
 /// 阶段状态
@@ -234,6 +252,9 @@ impl AppState {
             config: Arc::new(TokioMutex::new(config)),
             auth: Arc::new(TokioMutex::new(AuthState::default())),
             download_state: Arc::new(Mutex::new(DownloadState::default())),
+            launch_history: Arc::new(TokioMutex::new(Vec::new())),
+            current_pid: Arc::new(TokioMutex::new(None)),
+            launch_pipeline: Arc::new(TokioMutex::new(None)),
         }
     }
 }

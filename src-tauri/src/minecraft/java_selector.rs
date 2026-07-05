@@ -8,6 +8,7 @@ use super::java::JavaRuntime;
 /// # 规则（参考 PCL2）
 /// | MC 版本      | 最低 Java | 推荐 Java |
 /// |-------------|----------|----------|
+/// | 26+ (新格式) | Java 21  | Java 21  |
 /// | 1.20.5+     | Java 21  | Java 21  |
 /// | 1.18-1.20.4 | Java 17  | Java 17  |
 /// | 1.17        | Java 16  | Java 17  |
@@ -19,28 +20,34 @@ pub fn get_required_java_version(mc_version: &str) -> u32 {
         return 8;
     }
 
-    let _major: u32 = parts[0].parse().unwrap_or(1);
+    let major: u32 = parts[0].parse().unwrap_or(1);
     let minor: u32 = parts[1].parse().unwrap_or(0);
     let patch: u32 = parts.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
 
+    // 新版本格式 (26+) 需要 Java 21
+    // MC 从 1.21 之后改为使用主版本号格式 (如 26.2, 27.1)
+    if major >= 26 {
+        return 21;
+    }
+
     // 1.20.5+ 需要 Java 21
-    if minor == 20 && patch >= 5 {
+    if major == 1 && minor == 20 && patch >= 5 {
         return 21;
     }
     // 1.21+ 需要 Java 21
-    if minor > 20 {
+    if major == 1 && minor > 20 {
         return 21;
     }
     // 1.18-1.20.4 需要 Java 17
-    if minor >= 18 {
+    if major == 1 && minor >= 18 {
         return 17;
     }
     // 1.17 需要 Java 16
-    if minor == 17 {
+    if major == 1 && minor == 17 {
         return 16;
     }
     // 1.12-1.16 需要 Java 8
-    if minor >= 12 {
+    if major == 1 && minor >= 12 {
         return 8;
     }
     // 1.5 以下默认 Java 8

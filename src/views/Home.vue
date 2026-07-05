@@ -3,11 +3,13 @@
  * 首页
  */
 
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useSdkStore } from '@/stores/sdk'
 import { useVersionStore } from '@/stores/version'
+import { showWarning, showError, showSuccess } from '@/utils/modal'
+import * as tauri from '@/utils/tauri'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -17,6 +19,7 @@ const versionStore = useVersionStore()
 onMounted(async () => {
   if (sdkStore.isReady) {
     await versionStore.fetchVersions()
+    await versionStore.checkRunningGame()
   }
 })
 
@@ -26,6 +29,68 @@ function goToLogin() {
 
 function goToVersions() {
   router.push('/versions')
+}
+
+// 启动按钮状态
+const launchStatus = computed(() => {
+  if (!authStore.isLoggedIn) return { icon: 'login', text: '登录后可启动', color: 'text-gray-400' }
+  if (versionStore.launching) return { icon: 'loading', text: '取消启动', color: 'text-yellow-600' }
+  if (versionStore.runningPid) return { icon: 'stop', text: '停止游戏', color: 'text-red-600' }
+  return { icon: 'play', text: '启动游戏', color: 'text-green-600' }
+})
+
+async function handleLaunchGame() {
+  // 未登录 - toast提示
+  if (!authStore.isLoggedIn) {
+    showWarning('提示', '请先登录后再启动游戏')
+    return
+  }
+
+  // 游戏运行中 - 停止
+  if (versionStore.runningPid) {
+    try {
+      await versionStore.stopGame()
+      showSuccess('已停止', '游戏进程已终止')
+    } catch (e) {
+      showError('停止失败', String(e))
+    }
+    return
+  }
+
+  // 启动中 - 取消
+  if (versionStore.launching) {
+    try {
+      await versionStore.cancelLaunch()
+      showSuccess('已取消', '启动已取消')
+    } catch (e) {
+      showError('取消失败', String(e))
+    }
+    return
+  }
+
+  // 获取已安装版本列表
+  try {
+    const installed = await tauri.listInstalledVersions()
+    if (!installed || installed.length === 0) {
+      showWarning('提示', '没有已安装的版本，请先下载一个版本')
+      return
+    }
+
+    // 使用第一个已安装版本
+    const versionId = installed[0]
+
+    // 启动游戏
+    const pid = await versionStore.launchGame({
+      versionId,
+      username: authStore.currentUser?.name || 'Player',
+      uuid: authStore.currentUser?.uuid || '',
+      accessToken: authStore.currentUser?.access_token || '',
+    })
+
+    showSuccess('启动成功', `游戏已启动 (PID: ${pid})`)
+  } catch (e) {
+    showError('启动失败', String(e))
+  }
 }
 </script>
 
@@ -176,14 +241,35 @@ function goToVersions() {
           </button>
 
           <button
-            class="flex flex-col items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
-            :disabled="!authStore.isLoggedIn"
+            class="flex flex-col items-center p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors relative"
+            @click="handleLaunchGame"
           >
-            <svg class="w-8 h-8 text-green-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <!-- 图标 -->
+            <svg v-if="launchStatus.icon === 'loading'" class="w-8 h-8 text-yellow-600 mb-2 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            <svg v-else-if="launchStatus.icon === 'stop'" class="w-8 h-8 text-red-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+            </svg>
+            <svg v-else-if="launchStatus.icon === 'login'" class="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
+            </svg>
+            <svg v-else class="w-8 h-8 text-green-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <span class="text-sm font-medium text-gray-700">启动游戏</span>
+            <!-- 文字 -->
+            <span class="text-sm font-medium" :class="launchStatus.color">
+              {{ launchStatus.text }}
+            </span>
+            <!-- 启动进度 -->
+            <div v-if="versionStore.launching && versionStore.launchProgress" class="absolute -bottom-10 left-0 right-0 text-center">
+              <div class="text-xs text-gray-500">{{ versionStore.launchStageName }}</div>
+              <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1">
+                <div class="bg-primary-600 h-1.5 rounded-full transition-all" :style="{ width: `${versionStore.launchProgress.overall_progress * 100}%` }"></div>
+              </div>
+            </div>
           </button>
 
           <button

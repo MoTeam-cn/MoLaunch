@@ -28,6 +28,7 @@ const versionStore = useVersionStore()
 const loading = ref(false)
 const installedLoaded = ref(false)
 const installedVersions = ref<string[]>([])
+const installedVersionTypes = ref<Record<string, string>>({}) // 版本ID -> 版本类型
 const activeCategory = ref('vanilla')
 // 使用 store 中的 selectedVersion 保持页面切换状态
 const selectedVersion = computed({
@@ -42,7 +43,9 @@ const typeIcons: Record<string, string> = {
 }
 
 function getVersionIcon(id: string, type: string): string {
-  return typeIcons[type] || grassIcon
+  // 对于已安装版本，优先使用 installedVersionTypes
+  const actualType = installedVersionTypes.value[id] || type
+  return typeIcons[actualType] || grassIcon
 }
 
 function formatDate(ts: number): string {
@@ -79,7 +82,18 @@ const sections = computed(() => [
 ])
 
 async function loadInstalledVersions() {
-  try { installedVersions.value = await tauri.listInstalledVersions() } catch (e) { console.error(e) }
+  try {
+    const versionsWithType = await tauri.listInstalledVersionsWithType()
+    installedVersions.value = versionsWithType.map(v => v.id)
+    // 存储版本类型信息
+    const typeMap: Record<string, string> = {}
+    versionsWithType.forEach(v => { typeMap[v.id] = v.version_type })
+    installedVersionTypes.value = typeMap
+  } catch (e) {
+    console.error(e)
+    // 降级到旧API
+    try { installedVersions.value = await tauri.listInstalledVersions() } catch (e2) { console.error(e2) }
+  }
   installedLoaded.value = true
 }
 
@@ -274,6 +288,7 @@ onMounted(async () => {
             <InstalledList
               v-else-if="activeCategory === 'installed'"
               :versions="installedVersions"
+              :version-types="installedVersionTypes"
               :get-version-icon="getVersionIcon"
               @uninstall="handleUninstall"
             />

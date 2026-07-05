@@ -58,6 +58,7 @@ pub fn run() {
             commands::version::list::list_versions,
             commands::version::download::download_version,
             commands::version::manage::list_installed_versions,
+            commands::version::manage::list_installed_versions_with_type,
             commands::version::manage::uninstall_version,
             commands::version::progress::get_download_progress,
             commands::version::progress::is_downloading,
@@ -70,6 +71,10 @@ pub fn run() {
             commands::version::loaders::validate_loaders,
             commands::version::install::install_merged,
             commands::version::launch::launch_game,
+            commands::version::launch::get_launch_progress,
+            commands::version::launch::cancel_launch,
+            commands::version::launch::stop_game,
+            commands::version::launch::get_running_game,
             // Java 命令
             commands::java::detect_java,
             commands::java::list_java,

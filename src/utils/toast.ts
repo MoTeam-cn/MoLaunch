@@ -11,22 +11,26 @@ interface ToastRef {
 
 let toastRef: ToastRef | null = null
 
+function getRef(): ToastRef | null {
+  return toastRef || (window as any).__toastRef || null
+}
+
 export function setToastRef(ref: ToastRef) {
   toastRef = ref
 }
 
 export function showInfo(text: string) {
-  toastRef?.info(text)
+  getRef()?.info(text)
 }
 
 export function showSuccess(text: string) {
-  toastRef?.success(text)
+  getRef()?.success(text)
 }
 
 export function showError(text: string) {
-  toastRef?.error(text)
+  getRef()?.error(text)
 }
 
 export function showWarning(text: string) {
-  toastRef?.warning(text)
+  getRef()?.warning(text)
 }

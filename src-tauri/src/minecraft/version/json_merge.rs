@@ -1,9 +1,11 @@
 //! JSON inheritance merge module
+//! 参考 PCL2 的 JsonObject 属性实现
 
 use crate::log_warn;
 use std::path::Path;
 
 /// Merge version JSON inheritance chain
+/// 参考 PCL2 的处理方式：如果父版本不存在，仅记录警告，返回当前JSON
 pub fn merge_version_json(
     json: &serde_json::Value,
     game_dir: &Path,
@@ -19,7 +21,7 @@ pub fn merge_version_json(
 
         let current_id = current.get("id").and_then(|v| v.as_str()).unwrap_or("");
         if inherit_from == current_id {
-            log_warn!("Self-referencing inherit: {}", inherit_from);
+            log_warn!("[JsonMerge] Self-referencing inherit: {}", inherit_from);
             break;
         }
 
@@ -28,8 +30,11 @@ pub fn merge_version_json(
             .join(inherit_from)
             .join(format!("{}.json", inherit_from));
 
+        // 参考 PCL2：父版本不存在时仅警告，不报错
         if !parent_json_path.exists() {
-            log_warn!("Parent JSON not found: {}", parent_json_path.display());
+            log_warn!("[JsonMerge] Parent JSON not found: {} (inheritsFrom: {})", parent_json_path.display(), inherit_from);
+            log_warn!("[JsonMerge] Continuing without parent merge, some features may not work");
+            // 注意：不移除 inheritsFrom，让 get_asset_index_meta 的fallback能工作
             break;
         }
 
@@ -39,7 +44,7 @@ pub fn merge_version_json(
         // Recursively merge parent's inheritance
         parent_json = merge_version_json(&parent_json, game_dir)?;
 
-        // Merge Libraries: child first, parent after
+        // Merge Libraries: child first, parent after (参考 PCL2 第576-584行)
         let mut merged_libs = serde_json::Value::Array(Vec::new());
 
         if let Some(child_libs) = current.get("libraries").and_then(|l| l.as_array()) {
@@ -58,7 +63,7 @@ pub fn merge_version_json(
             }
         }
 
-        // Merge other fields: child overrides parent
+        // Merge other fields: child overrides parent (参考 PCL2 第582-583行)
         let mut merged = parent_json.clone();
         merge_json_values(&mut merged, &current);
         merged["libraries"] = merged_libs;

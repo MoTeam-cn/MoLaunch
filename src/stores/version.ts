@@ -3,9 +3,19 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { VersionInfo, VersionList } from '@/types/version'
+import { ref, computed } from 'vue'
+import { showSuccess, showWarning } from '@/utils/toast'
+import type { VersionInfo } from '@/types/version'
 import * as tauri from '@/utils/tauri'
+import { listen } from '@tauri-apps/api/event'
+
+// 游戏退出事件类型
+interface GameExitEvent {
+  pid: number
+  version_id: string
+  exit_code: number
+  is_normal: boolean
+}
 
 export interface DownloadStage {
   name: string
@@ -40,8 +50,67 @@ export const useVersionStore = defineStore('version', () => {
   const downloadingVersion = ref<string | null>(null)
   const downloadProgress = ref<DownloadProgress | null>(null)
   
+  // 启动状态
+  const launching = ref(false)
+  const launchingVersionId = ref<string | null>(null) // 当前正在启动的版本ID
+  const runningPid = ref<number | null>(null)
+  const runningVersionId = ref<string | null>(null) // 当前正在运行的版本ID
+  const launchProgress = ref<tauri.LaunchProgress | null>(null)
+  let launchProgressTimer: number | null = null
+  
   // 版本选择器状态（用于在页面切换时保持状态）
   const selectedVersion = ref<string | null>(null)
+  
+  // 监听游戏退出事件
+  let unlistenFn: (() => void) | null = null
+  
+  let exitPollTimer: number | null = null
+
+  // 开始轮询游戏退出
+  function startExitPolling() {
+    stopExitPolling()
+    exitPollTimer = window.setInterval(async () => {
+      try {
+        const pid = await tauri.getRunningGame()
+        if (pid === null && runningVersionId.value) {
+          runningPid.value = null
+          runningVersionId.value = null
+          showSuccess('游戏已退出')
+          stopExitPolling()
+        }
+      } catch {
+        // ignore
+      }
+    }, 1000)
+  }
+
+  function stopExitPolling() {
+    if (exitPollTimer !== null) {
+      clearInterval(exitPollTimer)
+      exitPollTimer = null
+    }
+  }
+
+  async function setupGameExitListener() {
+    try {
+      unlistenFn = await listen<GameExitEvent>('game-exited', (event) => {
+        console.log('Game exited:', event.payload)
+      })
+    } catch (e) {
+      console.error('Failed to setup game exit listener:', e)
+    }
+  }
+  
+  // 清理监听器
+  function cleanupGameExitListener() {
+    if (unlistenFn) {
+      unlistenFn()
+      unlistenFn = null
+    }
+  }
+  
+  // 初始化时设置监听器
+  setupGameExitListener()
   
   // 加载器版本列表缓存（按 MC 版本号缓存）
   const loaderVersionsCache = ref<Record<string, {
@@ -123,6 +192,125 @@ export const useVersionStore = defineStore('version', () => {
     loaderVersionsCache.value[mcVersion] = data
   }
 
+  // 启动游戏
+  async function launchGame(params: {
+    versionId: string
+    javaPath?: string
+    username: string
+    uuid: string
+    accessToken: string
+    windowWidth?: number
+    windowHeight?: number
+    serverAddress?: string
+    serverPort?: number
+  }): Promise<number> {
+    launching.value = true
+    launchingVersionId.value = params.versionId
+    launchProgress.value = null
+    
+    // 启动进度轮询
+    startProgressPolling()
+    
+    try {
+      const pid = await tauri.launchGame(params)
+      runningPid.value = pid
+      runningVersionId.value = params.versionId
+      // 开始轮询检测游戏退出
+      startExitPolling()
+      return pid
+    } catch (e) {
+      console.error('Failed to launch game:', e)
+      throw e
+    } finally {
+      // 启动完成后停止轮询
+      stopProgressPolling()
+      launching.value = false
+      launchingVersionId.value = null
+    }
+  }
+
+  // 停止游戏
+  async function stopGame(): Promise<void> {
+    try {
+      await tauri.stopGame()
+      runningPid.value = null
+      runningVersionId.value = null
+      stopExitPolling()
+      showWarning('游戏已停止')
+    } catch (e) {
+      console.error('Failed to stop game:', e)
+      throw e
+    }
+  }
+
+  // 取消启动
+  async function cancelLaunch(): Promise<void> {
+    try {
+      await tauri.cancelLaunch()
+      launching.value = false
+      launchingVersionId.value = null
+      launchProgress.value = null
+    } catch (e) {
+      console.error('Failed to cancel launch:', e)
+      throw e
+    }
+  }
+
+  // 检查运行状态
+  async function checkRunningGame(): Promise<void> {
+    try {
+      const pid = await tauri.getRunningGame()
+      runningPid.value = pid
+    } catch (e) {
+      console.error('Failed to check running game:', e)
+    }
+  }
+
+  // 开始进度轮询
+  function startProgressPolling() {
+    stopProgressPolling()
+    launchProgressTimer = window.setInterval(async () => {
+      try {
+        const progress = await tauri.getLaunchProgress()
+        if (progress) {
+          launchProgress.value = progress
+          // 如果完成或失败，停止轮询
+          if (progress.stage === 'Finished' || progress.stage === 'Failed') {
+            stopProgressPolling()
+          }
+        }
+      } catch (e) {
+        console.error('Failed to get launch progress:', e)
+      }
+    }, 200)
+  }
+
+  // 停止进度轮询
+  function stopProgressPolling() {
+    if (launchProgressTimer) {
+      clearInterval(launchProgressTimer)
+      launchProgressTimer = null
+    }
+  }
+
+  // 计算属性：启动阶段名称
+  const launchStageName = computed(() => {
+    if (!launchProgress.value) return ''
+    const stageNames: Record<string, string> = {
+      'Init': '初始化',
+      'GetJava': '获取Java',
+      'Login': '登录验证',
+      'ValidateFiles': '文件检查',
+      'BuildArgs': '构建参数',
+      'ExtractNatives': '解压原生库',
+      'LaunchProcess': '启动进程',
+      'WaitWindow': '等待窗口',
+      'Finished': '完成',
+      'Failed': '失败',
+    }
+    return stageNames[launchProgress.value.stage] || launchProgress.value.stage
+  })
+
   return {
     versions,
     latestRelease,
@@ -132,6 +320,12 @@ export const useVersionStore = defineStore('version', () => {
     downloading,
     downloadingVersion,
     downloadProgress,
+    launching,
+    launchingVersionId,
+    runningPid,
+    runningVersionId,
+    launchProgress,
+    launchStageName,
     selectedVersion,
     loaderVersionsCache,
     fetchVersions,
@@ -144,5 +338,10 @@ export const useVersionStore = defineStore('version', () => {
     getSnapshotVersions,
     getLoaderCache,
     setLoaderCache,
+    launchGame,
+    stopGame,
+    cancelLaunch,
+    checkRunningGame,
+    cleanupGameExitListener,
   }
 })

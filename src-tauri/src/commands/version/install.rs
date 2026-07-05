@@ -375,7 +375,42 @@ pub async fn install_merged(
 
     if loader_errors.is_empty() {
         // 安装成功后，如果有加载器，删除原版文件夹（参考 PCL2：只保留加载器版本文件夹）
+        // 但需要先确保加载器版本的JSON已合并原版信息
         if has_any_loader {
+            // 找到加载器版本目录（如 forge-26.2-65.0.3）
+            let versions_dir = game_dir.join("versions");
+            if let Ok(entries) = std::fs::read_dir(&versions_dir) {
+                for entry in entries.flatten() {
+                    let dir_name = entry.file_name().to_string_lossy().to_string();
+                    if dir_name.starts_with(&format!("{}-forge-", mc_version))
+                        || dir_name.starts_with(&format!("{}-neoforge-", mc_version))
+                        || (dir_name.starts_with("fabric-") && dir_name.ends_with(&format!("-{}", mc_version)))
+                        || dir_name.starts_with(&format!("{}-OptiFine", mc_version))
+                        || dir_name.starts_with(&format!("{}-LiteLoader", mc_version))
+                    {
+                        // 合并加载器版本的JSON（删除inheritsFrom）
+                        let loader_json_path = versions_dir.join(&dir_name).join(format!("{}.json", dir_name));
+                        if loader_json_path.exists() {
+                            if let Ok(content) = std::fs::read_to_string(&loader_json_path) {
+                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                                    if json.get("inheritsFrom").is_some() {
+                                        // 合并原版JSON
+                                        if let Ok(merged) = crate::minecraft::version::json_merge::merge_version_json(&json, &game_dir) {
+                                            if let Ok(new_content) = serde_json::to_string_pretty(&merged) {
+                                                let _ = std::fs::write(&loader_json_path, new_content);
+                                                log_info!("[Merged] 已合并JSON并删除inheritsFrom: {}", dir_name);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        break;
+                    }
+                }
+            }
+            
+            // 删除原版目录
             let mc_version_dir = game_dir.join("versions").join(&mc_version);
             if mc_version_dir.exists() {
                 match std::fs::remove_dir_all(&mc_version_dir) {
