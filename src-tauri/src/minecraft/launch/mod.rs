@@ -1,6 +1,8 @@
 //! Game launch module
 
 use crate::log_info;
+use crate::minecraft::isolation::{self, IsolationMode};
+use crate::minecraft::version::{setup::VersionSetup, state::VersionType};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -28,7 +30,7 @@ pub struct AuthInfo {
     pub login_type: String,
 }
 
-/// Build launch arguments
+/// Build launch arguments with isolation support
 pub fn build_launch_arguments(
     game_dir: &Path,
     version_id: &str,
@@ -40,6 +42,7 @@ pub fn build_launch_arguments(
     window_height: Option<u32>,
     server_address: Option<&str>,
     server_port: Option<u32>,
+    isolation_mode: u32,
 ) -> anyhow::Result<LaunchArguments> {
     let version_dir = game_dir.join("versions").join(version_id);
     let json_path = version_dir.join(format!("{}.json", version_id));
@@ -64,9 +67,41 @@ pub fn build_launch_arguments(
         .unwrap_or("legacy")
         .to_string();
 
+    // 获取版本类型：优先从 setup.ini 读取，否则从 JSON 检测
+    let version_type = match VersionSetup::load(&version_dir) {
+        Ok(Some(setup)) => {
+            log_info!("Loaded version type from setup.ini: {:?}", setup.version_type);
+            setup.version_type
+        }
+        _ => {
+            let detected = VersionType::detect_from_json(version_id, &json);
+            log_info!("Detected version type from JSON: {:?}", detected);
+            detected
+        }
+    };
+
+    // 计算隔离后的有效游戏目录
+    let mode = IsolationMode::from_u32(isolation_mode);
+    let effective_game_dir = isolation::get_effective_game_dir(game_dir, version_id, mode, version_type);
+
+    // 确保隔离目录存在
+    if effective_game_dir != game_dir {
+        if let Err(e) = isolation::ensure_isolated_dirs(&effective_game_dir) {
+            log_info!("Warning: Failed to create isolated dirs: {}", e);
+        }
+    }
+
+    log_info!(
+        "Game dir: {} -> effective: {} (isolation mode: {}, version type: {:?})",
+        game_dir.display(),
+        effective_game_dir.display(),
+        isolation_mode,
+        version_type
+    );
+
     let jvm_args = build_jvm_args(game_dir, version_id, &classpath, min_memory, max_memory, java_path)?;
     let game_args = build_game_args(
-        &json, game_dir, version_id, &assets_dir, &asset_index,
+        &json, &effective_game_dir, version_id, &assets_dir, &asset_index,
         auth_info, window_width, window_height, server_address, server_port,
     )?;
 
@@ -76,7 +111,7 @@ pub fn build_launch_arguments(
         main_class,
         classpath,
         version_id: version_id.to_string(),
-        game_dir: game_dir.to_string_lossy().to_string(),
+        game_dir: effective_game_dir.to_string_lossy().to_string(),
         assets_dir,
         asset_index,
         auth_info: auth_info.clone(),

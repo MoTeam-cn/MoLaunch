@@ -5,6 +5,7 @@ import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
 import { formatBytes } from '@/utils/format'
+import Select from '@/components/common/Select.vue'
 
 const javaStore = useJavaStore()
 
@@ -17,6 +18,15 @@ const showJavaList = ref(false)
 const javaSelectorRef = ref<HTMLElement | null>(null)
 const loaded = ref(false)
 const detectingJava = ref(false)
+const isolationMode = ref(4)
+
+const isolationOptions = [
+  { label: '关闭', value: 0 },
+  { label: '隔离 Mod 版本', value: 1 },
+  { label: '隔离非正式版', value: 2 },
+  { label: '隔离非正式版 + Mod 版本', value: 3 },
+  { label: '隔离所有版本（推荐）', value: 4 },
+]
 
 function handleDocumentClick(e: MouseEvent) {
   if (javaSelectorRef.value && !javaSelectorRef.value.contains(e.target as Node)) {
@@ -112,6 +122,16 @@ function autoSave() {
 
 watch([minMemory, maxMemory], autoSave)
 
+// 版本隔离模式保存
+watch(isolationMode, async (mode) => {
+  if (!loaded.value) return
+  try {
+    await tauri.setIsolationMode(mode)
+  } catch (e) {
+    console.error('Failed to save isolation mode:', e)
+  }
+})
+
 // 切换到自动模式时，立即应用并清除配置文件中的值
 watch(memoryMode, async (mode) => {
   if (mode === 'auto') {
@@ -157,6 +177,11 @@ onMounted(async () => {
     }
   } catch (e) {
     console.error('Failed to get memory config:', e)
+  }
+  try {
+    isolationMode.value = await tauri.getIsolationMode()
+  } catch (e) {
+    console.error('Failed to get isolation mode:', e)
   }
   loaded.value = true
 
@@ -402,6 +427,25 @@ onUnmounted(() => {
               <span>{{ formatMemory(maxMemory) }}</span>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 版本隔离 -->
+    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">版本隔离</h3>
+      <div class="divide-y divide-gray-200">
+        <div class="px-5 py-4 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-900">隔离模式</p>
+            <p class="text-xs text-gray-500 mt-0.5">控制不同版本是否共享存档、Mod、资源包等</p>
+          </div>
+          <Select
+            :model-value="isolationMode"
+            :options="isolationOptions"
+            class="w-56"
+            @update:model-value="isolationMode = $event as number"
+          />
         </div>
       </div>
     </div>

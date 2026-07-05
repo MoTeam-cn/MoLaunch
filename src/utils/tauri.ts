@@ -330,6 +330,20 @@ export async function getChunkCount(): Promise<number> {
 }
 
 /**
+ * 设置版本隔离模式
+ */
+export async function setIsolationMode(mode: number): Promise<void> {
+  return await invoke<void>('set_isolation_mode', { mode })
+}
+
+/**
+ * 获取版本隔离模式
+ */
+export async function getIsolationMode(): Promise<number> {
+  return await invoke<number>('get_isolation_mode')
+}
+
+/**
  * 获取配置值
  */
 export async function getConfigValue(section: string, key: string): Promise<string | null> {
@@ -383,4 +397,31 @@ export async function getProxyUrl(): Promise<string> {
  */
 export async function setProxyUrl(url: string): Promise<void> {
   return await invoke<void>('set_proxy_url', { url })
+}
+
+/**
+ * 启动游戏
+ */
+export async function launchGame(params: {
+  versionId: string
+  javaPath: string
+  username: string
+  uuid: string
+  accessToken: string
+  windowWidth?: number
+  windowHeight?: number
+  serverAddress?: string
+  serverPort?: number
+}): Promise<number> {
+  return await invoke<number>('launch_game', {
+    versionId: params.versionId,
+    javaPath: params.javaPath,
+    username: params.username,
+    uuid: params.uuid,
+    accessToken: params.accessToken,
+    windowWidth: params.windowWidth ?? null,
+    windowHeight: params.windowHeight ?? null,
+    serverAddress: params.serverAddress ?? null,
+    serverPort: params.serverPort ?? null,
+  })
 }

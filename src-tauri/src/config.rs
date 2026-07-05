@@ -38,6 +38,9 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(chunks) = config.get("Download", "chunk_count") {
         app_config.chunk_count = chunks.parse().unwrap_or(app_config.chunk_count);
     }
+    if let Some(mode) = config.get("General", "isolation_mode") {
+        app_config.isolation_mode = mode.parse().unwrap_or(app_config.isolation_mode);
+    }
     if let Some(speed) = config.get("Download", "max_speed") {
         app_config.max_download_speed = speed.parse().unwrap_or(app_config.max_download_speed);
     }
@@ -100,6 +103,7 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("General", "game_dir", &config.game_dir);
     ini.set("General", "theme", &config.theme);
     ini.set("General", "language", &config.language);
+    ini.set("General", "isolation_mode", &config.isolation_mode.to_string());
 
     // Download
     ini.set("Download", "max_threads", &config.max_download_threads.to_string());

@@ -69,6 +69,7 @@ pub fn run() {
             commands::version::loaders::list_liteloader_versions,
             commands::version::loaders::validate_loaders,
             commands::version::install::install_merged,
+            commands::version::launch::launch_game,
             // Java 命令
             commands::java::detect_java,
             commands::java::list_java,
@@ -95,6 +96,8 @@ pub fn run() {
             commands::system::get_max_download_threads,
             commands::system::set_chunk_count,
             commands::system::get_chunk_count,
+            commands::system::set_isolation_mode,
+            commands::system::get_isolation_mode,
             commands::system::get_config_value,
             commands::system::set_config_value,
             commands::system::get_proxy_mode,

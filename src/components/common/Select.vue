@@ -18,8 +18,10 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{ 'update:modelValue': [value: string | number] }>()
 
 const open = ref(false)
+const closing = ref(false)
 const triggerRef = ref<HTMLElement | null>(null)
 const dropdownStyle = ref({})
+const openUpward = ref(false)
 
 const selectedLabel = computed(() => props.options.find(o => o.value === props.modelValue)?.label || props.placeholder)
 
@@ -31,20 +33,54 @@ function select(value: string | number) {
 function updateDropdownPosition() {
   if (!triggerRef.value) return
   const rect = triggerRef.value.getBoundingClientRect()
-  dropdownStyle.value = {
-    position: 'fixed',
-    top: `${rect.bottom + 4}px`,
-    left: `${rect.left}px`,
-    width: `${rect.width}px`,
-    zIndex: 9999,
+  const viewportH = window.innerHeight
+  const dropdownMaxH = 240
+  const gap = 4
+
+  const spaceBelow = viewportH - rect.bottom - gap
+  const spaceAbove = rect.top - gap
+
+  if (spaceBelow >= dropdownMaxH || spaceBelow >= spaceAbove) {
+    openUpward.value = false
+    dropdownStyle.value = {
+      position: 'fixed',
+      top: `${rect.bottom + gap}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      zIndex: 9999,
+    }
+  } else {
+    openUpward.value = true
+    dropdownStyle.value = {
+      position: 'fixed',
+      bottom: `${viewportH - rect.top + gap}px`,
+      left: `${rect.left}px`,
+      width: `${rect.width}px`,
+      zIndex: 9999,
+    }
   }
 }
 
 function toggle() {
   if (!open.value) {
     updateDropdownPosition()
+    window.addEventListener('scroll', onScroll, true)
+  } else {
+    window.removeEventListener('scroll', onScroll, true)
   }
   open.value = !open.value
+}
+
+function onScroll() {
+  if (open.value && !closing.value) {
+    closing.value = true
+    window.removeEventListener('scroll', onScroll, true)
+    requestAnimationFrame(() => {
+      open.value = false
+      // 等过渡动画结束再重置标记（动画时长 100ms）
+      setTimeout(() => { closing.value = false }, 150)
+    })
+  }
 }
 
 function handleClickOutside(e: MouseEvent) {
@@ -54,7 +90,10 @@ function handleClickOutside(e: MouseEvent) {
 }
 
 onMounted(() => document.addEventListener('click', handleClickOutside))
-onUnmounted(() => document.removeEventListener('click', handleClickOutside))
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
+  window.removeEventListener('scroll', onScroll, true)
+})
 </script>
 
 <template>
@@ -76,15 +115,23 @@ onUnmounted(() => document.removeEventListener('click', handleClickOutside))
       </svg>
     </div>
 
-    <!-- 下拉面板：teleport 到 body，不受父容器 overflow 影响 -->
+    <!-- 下拉面板 -->
     <teleport to="body">
       <transition
-        enter-active-class="transition ease-out duration-150"
-        enter-from-class="opacity-0 scale-y-95"
-        enter-to-class="opacity-100 scale-y-100"
-        leave-active-class="transition ease-in duration-100"
-        leave-from-class="opacity-100 scale-y-100"
-        leave-to-class="opacity-0 scale-y-95"
+        :enter-active-class="openUpward
+          ? 'transition ease-out duration-150'
+          : 'transition ease-out duration-150'"
+        :enter-from-class="openUpward
+          ? 'opacity-0 translate-y-2'
+          : 'opacity-0 -translate-y-2'"
+        :enter-to-class="openUpward
+          ? 'opacity-100 translate-y-0'
+          : 'opacity-100 translate-y-0'"
+        :leave-active-class="'transition ease-in duration-100'"
+        :leave-from-class="'opacity-100 translate-y-0'"
+        :leave-to-class="openUpward
+          ? 'opacity-0 translate-y-2'
+          : 'opacity-0 -translate-y-2'"
       >
         <div v-if="open" class="select-dropdown" :style="dropdownStyle">
           <div

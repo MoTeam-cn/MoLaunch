@@ -7,6 +7,7 @@ pub mod manage;
 pub mod loaders;
 pub mod progress;
 pub mod install;
+pub mod launch;
 
 // Re-export types
 pub use types::{VersionInfo, VersionListResult, DownloadStageSnapshot, DownloadProgressSnapshot};

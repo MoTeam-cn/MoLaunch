@@ -1,6 +1,8 @@
 use crate::{log_error, log_info, log_warn};
 use crate::minecraft::download::{self, manager as download_manager};
+use crate::minecraft::isolation::{self, IsolationMode};
 use crate::minecraft::loaders;
+use crate::minecraft::version::{setup::VersionSetup, state::VersionType};
 use crate::state::{AppState, StageStatus};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -461,6 +463,74 @@ pub async fn install_merged(
                 }
             }
         }
+
+        // 确定最终的版本目录名
+        let final_version_id = if has_any_loader {
+            let versions_dir = game_dir.join("versions");
+            let mut found_id = None;
+            if let Ok(entries) = std::fs::read_dir(&versions_dir) {
+                for entry in entries.flatten() {
+                    let dir_name = entry.file_name().to_string_lossy().to_string();
+                    if dir_name.starts_with(&format!("{}-forge-", mc_version))
+                        || dir_name.starts_with(&format!("{}-neoforge-", mc_version))
+                        || (dir_name.starts_with("fabric-") && dir_name.ends_with(&format!("-{}", mc_version)))
+                        || dir_name.starts_with(&format!("{}-OptiFine", mc_version))
+                        || dir_name.starts_with(&format!("{}-LiteLoader", mc_version))
+                    {
+                        found_id = Some(dir_name);
+                        break;
+                    }
+                }
+            }
+            found_id.unwrap_or_else(|| mc_version.clone())
+        } else {
+            mc_version.clone()
+        };
+
+        let version_dir = game_dir.join("versions").join(&final_version_id);
+
+        // 保存 setup.ini（参考 PCL2：记录版本元数据）
+        // 注意：前面的加载器安装代码已经 move 了这些变量，这里通过版本目录名推断
+        let version_type = if final_version_id.contains("-forge-") {
+            VersionType::Forge
+        } else if final_version_id.contains("-neoforge-") {
+            VersionType::NeoForge
+        } else if final_version_id.starts_with("fabric-") {
+            VersionType::Fabric
+        } else if final_version_id.contains("-OptiFine") {
+            VersionType::OptiFine
+        } else if final_version_id.contains("-LiteLoader") {
+            VersionType::LiteLoader
+        } else {
+            VersionType::Release
+        };
+
+        let setup = VersionSetup::new(
+            &mc_version,
+            version_type,
+            None, // Forge 版本号从目录名或 JSON 中提取
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
+        if let Err(e) = setup.save(&version_dir) {
+            log_warn!("[Merged] 保存 setup.ini 失败: {}", e);
+        } else {
+            log_info!("[Merged] 已保存 setup.ini: {}", version_dir.display());
+        }
+
+        // 根据版本隔离设置创建隔离目录（参考 PCL2：安装时即创建）
+        let isolation_mode = state.config.lock().await.isolation_mode;
+        let mode = IsolationMode::from_u32(isolation_mode);
+        if isolation::should_isolate(mode, version_type) {
+            log_info!("[Merged] 创建隔离目录: {} (模式: {})", final_version_id, isolation_mode);
+            if let Err(e) = isolation::ensure_isolated_dirs(&version_dir) {
+                log_warn!("[Merged] 创建隔离目录失败: {}", e);
+            }
+        }
+
         log_info!("[Merged] Install completed successfully");
         Ok(())
     } else {

@@ -292,6 +292,25 @@ pub async fn get_chunk_count(state: State<'_, AppState>) -> Result<u32, String> 
     Ok(config.chunk_count)
 }
 
+/// 设置版本隔离模式
+#[tauri::command]
+pub async fn set_isolation_mode(
+    state: State<'_, AppState>,
+    mode: u32,
+) -> Result<(), String> {
+    log_info!("Isolation mode changed to: {}", mode);
+    update_config(&state, |config| {
+        config.isolation_mode = mode;
+    }).await
+}
+
+/// 获取版本隔离模式
+#[tauri::command]
+pub async fn get_isolation_mode(state: State<'_, AppState>) -> Result<u32, String> {
+    let config = state.config.lock().await;
+    Ok(config.isolation_mode)
+}
+
 /// 获取配置值（从 storage 读取）
 #[tauri::command]
 pub async fn get_config_value(section: String, key: String) -> Result<Option<String>, String> {
