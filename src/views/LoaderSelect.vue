@@ -6,7 +6,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
-import { ChevronLeftIcon, InformationCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { ChevronLeftIcon, InformationCircleIcon, ExclamationTriangleIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import LoaderCard from '@/components/common/LoaderCard.vue'
 
 import anvilIcon from '@/assets/blocks/Anvil.png'
@@ -432,39 +432,45 @@ function handleInstall() {
 
     <!-- 底部 -->
     <div class="px-6 py-4 bg-white border-t border-gray-300 shrink-0">
-      <!-- 版本名称 -->
-      <div class="mb-3">
-        <div class="flex items-center justify-between mb-1.5">
-          <span class="text-xs text-gray-500">版本名称</span>
-          <button
-            class="text-xs text-primary-600 hover:text-primary-700"
-            @click="showNameInput = !showNameInput"
-          >
-            {{ showNameInput ? '使用默认名称' : '自定义名称' }}
-          </button>
+      <div class="flex items-center justify-between">
+        <!-- 左侧：版本名称 -->
+        <div class="flex-1 min-w-0 mr-4">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-xs text-gray-500 shrink-0">版本名:</span>
+            <button
+              class="text-xs text-primary-600 hover:text-primary-700 shrink-0"
+              @click="showNameInput = !showNameInput"
+            >
+              {{ showNameInput ? '使用默认' : '自定义' }}
+            </button>
+          </div>
+          
+          <!-- 自定义名称输入框 -->
+          <input
+            v-if="showNameInput"
+            v-model="customInstanceName"
+            :placeholder="getDefaultInstanceName()"
+            class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-primary-500"
+          />
+          
+          <!-- 显示当前名称 -->
+          <div v-else class="text-sm font-medium text-gray-900 truncate">
+            {{ instanceName }}
+          </div>
+          
+          <!-- 提示信息 -->
+          <p v-if="!hasSelection" class="text-xs text-gray-400 mt-1">不选择加载器 = 安装原版</p>
         </div>
         
-        <!-- 自定义名称输入框 -->
-        <input
-          v-if="showNameInput"
-          v-model="customInstanceName"
-          :placeholder="getDefaultInstanceName()"
-          class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:border-primary-500 mb-1"
-        />
-        
-        <!-- 显示当前名称 -->
-        <div v-else class="text-sm font-medium text-gray-900 truncate">
-          {{ instanceName }}
-        </div>
+        <!-- 右侧：安装按钮 -->
+        <button
+          class="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors shrink-0"
+          @click="handleInstall"
+        >
+          <ArrowDownTrayIcon class="w-4 h-4 mr-1.5" />
+          开始安装
+        </button>
       </div>
-      
-      <!-- 安装按钮 -->
-      <button
-        class="w-full py-2.5 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
-        @click="handleInstall"
-      >
-        开始安装
-      </button>
     </div>
   </div>
 </template>
