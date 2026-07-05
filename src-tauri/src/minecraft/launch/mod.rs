@@ -86,7 +86,13 @@ pub fn build_launch_arguments(
 
     // 确保隔离目录存在
     if effective_game_dir != game_dir {
-        if let Err(e) = isolation::ensure_isolated_dirs(&effective_game_dir) {
+        // 根据版本类型创建不同的目录结构
+        let result = if version_type.is_modded() {
+            isolation::ensure_modded_dirs(&effective_game_dir)
+        } else {
+            isolation::ensure_isolated_dirs(&effective_game_dir)
+        };
+        if let Err(e) = result {
             log_info!("Warning: Failed to create isolated dirs: {}", e);
         }
     }

@@ -446,8 +446,14 @@ pub async fn install_merged(
         let isolation_mode = state.config.lock().await.isolation_mode;
         let mode = IsolationMode::from_u32(isolation_mode);
         if isolation::should_isolate(mode, version_type) {
-            log_info!("[Merged] 创建隔离目录: {} (模式: {})", final_version_id, isolation_mode);
-            if let Err(e) = isolation::ensure_isolated_dirs(&version_dir) {
+            log_info!("[Merged] 创建隔离目录: {} (模式: {}, 类型: {:?})", final_version_id, isolation_mode, version_type);
+            // 根据版本类型创建不同的目录结构
+            let result = if version_type.is_modded() {
+                isolation::ensure_modded_dirs(&version_dir)
+            } else {
+                isolation::ensure_isolated_dirs(&version_dir)
+            };
+            if let Err(e) = result {
                 log_warn!("[Merged] 创建隔离目录失败: {}", e);
             }
         }

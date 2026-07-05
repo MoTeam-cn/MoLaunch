@@ -77,9 +77,20 @@ pub fn get_effective_game_dir(
     }
 }
 
-/// 创建隔离版本所需的目录结构
+/// 创建隔离版本所需的基本目录结构（原版）
 pub fn ensure_isolated_dirs(version_dir: &Path) -> std::io::Result<()> {
-    for dir in &["mods", "config", "saves", "resourcepacks", "shaderpacks", "crash-reports", "logs"] {
+    for dir in &["saves", "config", "crash-reports", "logs"] {
+        std::fs::create_dir_all(version_dir.join(dir))?;
+    }
+    Ok(())
+}
+
+/// 创建隔离版本所需的完整目录结构（Mod 版本）
+pub fn ensure_modded_dirs(version_dir: &Path) -> std::io::Result<()> {
+    // 先创建基本目录
+    ensure_isolated_dirs(version_dir)?;
+    // 再创建 Mod 相关目录
+    for dir in &["mods", "resourcepacks", "shaderpacks"] {
         std::fs::create_dir_all(version_dir.join(dir))?;
     }
     Ok(())
