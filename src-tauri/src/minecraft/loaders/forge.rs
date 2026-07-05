@@ -227,6 +227,17 @@ async fn install_legacy(
             }
         }
         log_info!("[Forge] 解压 maven/ 到 libraries/: {} 个文件", extracted_count);
+
+        // 复制原版 JAR 到 Forge 版本目录（Legacy 方式 1 需要）
+        let mc_jar = game_dir.join("versions").join(mc_version).join(format!("{}.jar", mc_version));
+        let forge_jar = version_dir.join(format!("{}.jar", version_id));
+        if mc_jar.exists() && !forge_jar.exists() {
+            if let Err(e) = std::fs::copy(&mc_jar, &forge_jar) {
+                log_warn!("[Forge] Failed to copy MC JAR: {}", e);
+            } else {
+                log_info!("[Forge] Copied MC JAR: {} -> {}", mc_jar.display(), forge_jar.display());
+            }
+        }
     }
 
     if let Some(ref cb) = progress_callback {
