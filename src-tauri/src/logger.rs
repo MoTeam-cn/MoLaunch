@@ -77,11 +77,7 @@ impl Logger {
         let filename = format!("molaunch_{}.log", now.format("%Y-%m-%d"));
         let log_path = logs_dir.join(filename);
 
-        match OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&log_path)
-        {
+        match OpenOptions::new().create(true).append(true).open(&log_path) {
             Ok(file) => {
                 self.file = Some(file);
                 // 写入启动标记
@@ -119,11 +115,11 @@ impl Logger {
             let time_colored = format!("\x1b[90m[{}]\x1b[0m", timestamp);
             // 级别：不同颜色
             let level_colored = match level {
-                LogLevel::Error => format!("\x1b[1;31m[{}]\x1b[0m", level_str),  // 红色加粗
-                LogLevel::Warn => format!("\x1b[1;33m[{}]\x1b[0m", level_str),   // 黄色加粗
-                LogLevel::Info => format!("\x1b[1;36m[{}]\x1b[0m", level_str),    // 青色加粗
-                LogLevel::Debug => format!("\x1b[1;35m[{}]\x1b[0m", level_str),   // 紫色加粗
-                LogLevel::Trace => format!("\x1b[1;90m[{}]\x1b[0m", level_str),   // 灰色加粗
+                LogLevel::Error => format!("\x1b[1;31m[{}]\x1b[0m", level_str), // 红色加粗
+                LogLevel::Warn => format!("\x1b[1;33m[{}]\x1b[0m", level_str),  // 黄色加粗
+                LogLevel::Info => format!("\x1b[1;36m[{}]\x1b[0m", level_str),  // 青色加粗
+                LogLevel::Debug => format!("\x1b[1;35m[{}]\x1b[0m", level_str), // 紫色加粗
+                LogLevel::Trace => format!("\x1b[1;90m[{}]\x1b[0m", level_str), // 灰色加粗
             };
             // 内容：默认颜色
             let content = message;
@@ -142,7 +138,8 @@ impl Logger {
 
 /// 初始化日志系统
 pub fn init(level: LogLevel, console_output: bool) {
-    let mut logger = LOGGER.lock().unwrap();
+    // 即使锁被 poison（持有者 panic），仍取回内部数据继续工作，避免日志系统拖垮启动
+    let mut logger = LOGGER.lock().unwrap_or_else(|e| e.into_inner());
     logger.init(level, console_output);
 }
 
@@ -152,13 +149,19 @@ pub fn set_level(level: LogLevel) {
         logger.level = level;
     }
     // 在锁外记录日志，避免死锁
-    log(LogLevel::Info, "logger", &format!("Log level changed to: {:?}", level));
+    log(
+        LogLevel::Info,
+        "logger",
+        &format!("Log level changed to: {:?}", level),
+    );
 }
 
 /// 初始化日志系统（从配置）
 pub fn init_from_config() {
     let storage = Storage::instance();
-    let level_str = storage.get_config("Log", "level").unwrap_or_else(|| "3".to_string());
+    let level_str = storage
+        .get_config("Log", "level")
+        .unwrap_or_else(|| "3".to_string());
 
     let level = match level_str.parse::<u32>().unwrap_or(3) {
         0 => LogLevel::Error,

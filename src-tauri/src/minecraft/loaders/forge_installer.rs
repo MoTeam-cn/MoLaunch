@@ -1,8 +1,8 @@
 //! Forge Installer 注入器模块
 //! 使用 bangbang93 的 forge_installer.jar 进行 Forge/NeoForge 安装
 
-use crate::{log_info, log_debug, log_error};
 use crate::resources;
+use crate::{log_debug, log_error, log_info, log_warn};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -37,7 +37,7 @@ pub fn extract_embedded_resources() -> anyhow::Result<(String, String)> {
 }
 
 /// 运行 Forge 安装器
-/// 
+///
 /// # Arguments
 /// * `java_path` - Java 可执行文件路径
 /// * `installer_path` - 官方 Forge installer.jar 路径
@@ -97,7 +97,12 @@ pub fn run_forge_installer(
         args.push(mc_dir.to_string());
     }
 
-    log_info!("[{}] Starting installer: {} {}", loader_name, java_path, args.join(" "));
+    log_info!(
+        "[{}] Starting installer: {} {}",
+        loader_name,
+        java_path,
+        args.join(" ")
+    );
 
     // 启动进程
     let mut child = Command::new(java_path)
@@ -112,7 +117,31 @@ pub fn run_forge_installer(
 
     let mut last_lines: Vec<String> = Vec::new();
 
-    // 读取 stdout
+    // 在独立线程读取 stderr，避免 stdout/stderr 顺序读取时管道缓冲区填满死锁
+    // （Java 安装器可能向 stderr 大量输出，同时 stdout 也在产生数据）
+    let stderr_loader_name = loader_name.to_string();
+    let stderr_handle = std::thread::spawn(move || {
+        let stderr_reader = BufReader::new(stderr);
+        let mut lines: Vec<String> = Vec::new();
+        for line in stderr_reader.lines() {
+            match line {
+                Ok(l) => {
+                    log_debug!("[{}] stderr: {}", stderr_loader_name, l);
+                    lines.push(l);
+                    if lines.len() > 100 {
+                        lines.remove(0);
+                    }
+                }
+                Err(e) => {
+                    log_warn!("[{}] stderr 读取异常: {}", stderr_loader_name, e);
+                    break;
+                }
+            }
+        }
+        lines
+    });
+
+    // 主线程读 stdout
     let stdout_reader = BufReader::new(stdout);
     for line in stdout_reader.lines() {
         let line = line?;
@@ -135,16 +164,11 @@ pub fn run_forge_installer(
         }
     }
 
-    // 读取 stderr
-    let stderr_reader = BufReader::new(stderr);
-    for line in stderr_reader.lines() {
-        let line = line?;
-        log_debug!("[{}] stderr: {}", loader_name, line);
-        last_lines.push(line);
-        if last_lines.len() > 100 {
-            last_lines.remove(0);
-        }
-    }
+    // 等待 stderr 线程结束，合并行
+    let stderr_lines = stderr_handle
+        .join()
+        .map_err(|e| anyhow::anyhow!("stderr 读取线程崩溃: {:?}", e))?;
+    last_lines.extend(stderr_lines);
 
     // 参考 PCL2：等待进程完全退出
     // PCL2: Do Until process.HasExited + Thread.Sleep(10)
@@ -169,7 +193,12 @@ pub fn run_forge_installer(
         for (i, line) in last_lines.iter().enumerate() {
             log_error!("[{}]   {}: {}", loader_name, i, line);
         }
-        let last_lines_str: Vec<&str> = last_lines.iter().rev().take(10).map(|s| s.as_str()).collect();
+        let last_lines_str: Vec<&str> = last_lines
+            .iter()
+            .rev()
+            .take(10)
+            .map(|s| s.as_str())
+            .collect();
         Err(anyhow::anyhow!(
             "{} installer failed, last lines: {:?}",
             loader_name,
@@ -202,13 +231,13 @@ fn parse_progress_line(line: &str) -> Option<f64> {
 
 /// 获取 Java 主版本号
 fn get_java_major_version(java_path: &str) -> Option<u32> {
-    let output = Command::new(java_path)
-        .arg("-version")
-        .output()
-        .ok()?;
+    let output = Command::new(java_path).arg("-version").output().ok()?;
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let re = regex::Regex::new(r#"version "(\d+)\."#).ok()?;
+    static RE: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
+    let re = RE
+        .get_or_init(|| regex::Regex::new(r#"version "(\d+)\."#).ok())
+        .as_ref()?;
     let captures = re.captures(&stderr)?;
     captures[1].parse().ok()
 }

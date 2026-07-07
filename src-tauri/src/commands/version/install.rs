@@ -1,16 +1,16 @@
-use crate::{log_error, log_info, log_warn};
 use crate::minecraft::download::{self, types as download_types};
 use crate::minecraft::isolation::{self, IsolationMode};
 use crate::minecraft::loaders;
 use crate::minecraft::version::{setup::VersionSetup, state::VersionType};
 use crate::state::{AppState, StageStatus};
+use crate::{log_error, log_info, log_warn};
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, State};
 
-use super::{sanitize_version_id, sanitize_mc_version};
+use super::{sanitize_mc_version, sanitize_version_id};
 
 /// 安装单个加载器的通用辅助函数
 /// 如果阶段已存在（最后一个阶段是加载器安装），则更新它；否则添加新阶段
@@ -28,7 +28,9 @@ async fn install_single_loader(
     // 检查是否已有加载器安装阶段（通过名称判断）
     let has_loader_stage = {
         let ds = state.download_state.lock().unwrap();
-        ds.stages.last().map_or(false, |s| s.name.contains("安装") || s.name.contains("加载器"))
+        ds.stages.last().map_or(false, |s| {
+            s.name.contains("安装") || s.name.contains("加载器")
+        })
     };
 
     if has_loader_stage {
@@ -43,7 +45,10 @@ async fn install_single_loader(
     } else {
         // 添加新阶段
         let mut ds = state.download_state.lock().unwrap();
-        let mut stage = crate::state::DownloadStage::new(format!("安装 {} {}", loader_name, loader_version), 30.0);
+        let mut stage = crate::state::DownloadStage::new(
+            format!("安装 {} {}", loader_name, loader_version),
+            30.0,
+        );
         stage.status = StageStatus::Loading;
         ds.stages.push(stage);
         ds.current_stage_index = ds.stages.len() - 1;
@@ -64,10 +69,16 @@ async fn install_single_loader(
         max_threads,
         None,
         source_mode,
-    ).await {
+    )
+    .await
+    {
         Ok(_) => {
             ticker_stop.store(true, Ordering::Relaxed);
-            log_info!("[Merged] {} {} installed successfully", loader_name, loader_version);
+            log_info!(
+                "[Merged] {} {} installed successfully",
+                loader_name,
+                loader_version
+            );
             let mut ds = state.download_state.lock().unwrap();
             if let Some(last) = ds.stages.last_mut() {
                 last.status = StageStatus::Finished;
@@ -105,9 +116,13 @@ fn start_progress_ticker(
 
         while !stop_clone.load(Ordering::Relaxed) {
             interval.tick().await;
-            if stop_clone.load(Ordering::Relaxed) { break; }
+            if stop_clone.load(Ordering::Relaxed) {
+                break;
+            }
             let remaining = cap - current;
-            if remaining <= 0.0 { break; }
+            if remaining <= 0.0 {
+                break;
+            }
             // 每次增长约 1%，从5%到95% 约 45秒完成
             let step = 1.0;
             current = (current + step).min(cap);
@@ -141,8 +156,14 @@ pub async fn install_merged(
     if let Some(ref name) = instance_name {
         sanitize_version_id(name)?;
     }
-    log_info!("Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
-        mc_version, forge_version, neoforge_version, fabric_version, optifine_version);
+    log_info!(
+        "Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
+        mc_version,
+        forge_version,
+        neoforge_version,
+        fabric_version,
+        optifine_version
+    );
 
     // 处理版本名称：如果已存在则追加后缀 (1), (2) 等
     let config = state.config.lock().await;
@@ -168,13 +189,19 @@ pub async fn install_merged(
     };
 
     if instance != base_name {
-        log_info!("[Merged] Version name '{}' already exists, using '{}'", base_name, instance);
+        log_info!(
+            "[Merged] Version name '{}' already exists, using '{}'",
+            base_name,
+            instance
+        );
     }
 
     // 预添加加载器安装阶段（状态为 Waiting，让用户从一开始就看到）
-    let has_any_loader = forge_version.is_some() || neoforge_version.is_some() || 
-                         fabric_version.is_some() || optifine_version.is_some() || 
-                         liteloader_version.is_some();
+    let has_any_loader = forge_version.is_some()
+        || neoforge_version.is_some()
+        || fabric_version.is_some()
+        || optifine_version.is_some()
+        || liteloader_version.is_some();
 
     // 设置下载状态
     {
@@ -195,7 +222,8 @@ pub async fn install_merged(
         }
         // 如果需要安装加载器，预添加阶段
         if has_any_loader {
-            ds.stages.push(crate::state::DownloadStage::new("加载器安装", 30.0));
+            ds.stages
+                .push(crate::state::DownloadStage::new("加载器安装", 30.0));
         }
     }
 
@@ -204,7 +232,8 @@ pub async fn install_merged(
     let max_threads = config.max_download_threads as usize;
     let chunk_count = config.chunk_count as usize;
     let speed_limit = config.max_download_speed;
-    let source_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.download_source);
+    let source_mode =
+        crate::minecraft::sources::DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
     let game_path = game_dir.as_path();
@@ -228,7 +257,8 @@ pub async fn install_merged(
                 stage.files_downloaded = progress.completed_files;
                 stage.files_total = progress.total_files;
                 if progress.total_bytes > 0 {
-                    stage.progress = (progress.downloaded_bytes as f64 / progress.total_bytes as f64).min(1.0);
+                    stage.progress =
+                        (progress.downloaded_bytes as f64 / progress.total_bytes as f64).min(1.0);
                 } else {
                     // 如果 total_bytes 为 0（全部跳过），设为完成
                     stage.progress = 1.0;
@@ -252,7 +282,9 @@ pub async fn install_merged(
             {
                 let mut window = sw.lock().unwrap();
                 window.push_back((ds.global_bytes_downloaded, Instant::now()));
-                if window.len() > 10 { window.pop_front(); }
+                if window.len() > 10 {
+                    window.pop_front();
+                }
                 if window.len() >= 2 {
                     let (first_bytes, first_time) = window.front().unwrap();
                     let (last_bytes, last_time) = window.back().unwrap();
@@ -298,14 +330,20 @@ pub async fn install_merged(
         source_mode,
         Some(progress_callback),
         Some(stage_callback),
-    ).await.map_err(|e| {
+    )
+    .await
+    .map_err(|e| {
         log_error!("Failed to download MC version: {}", e);
         e.to_string()
     })?;
 
-    log_info!("[Merged] MC download completed: libs {}/{}, assets {}/{}",
-        result.libs_downloaded, result.libs_total,
-        result.assets_downloaded, result.assets_total);
+    log_info!(
+        "[Merged] MC download completed: libs {}/{}, assets {}/{}",
+        result.libs_downloaded,
+        result.libs_total,
+        result.assets_downloaded,
+        result.assets_total
+    );
 
     // 标记前面的阶段完成
     {
@@ -324,45 +362,90 @@ pub async fn install_merged(
     // 注意：第一个加载器会添加阶段，后续加载器只更新阶段
     if let Some(forge_ver) = forge_version {
         if let Err(e) = install_single_loader(
-            &state, loaders::LoaderType::Forge, "Forge", &forge_ver,
-            &mc_version, &game_dir, mirror_url.as_deref(), max_threads, source_mode,
-        ).await {
+            &state,
+            loaders::LoaderType::Forge,
+            "Forge",
+            &forge_ver,
+            &mc_version,
+            &game_dir,
+            mirror_url.as_deref(),
+            max_threads,
+            source_mode,
+        )
+        .await
+        {
             loader_errors.push(e);
         }
     }
 
     if let Some(neoforge_ver) = neoforge_version {
         if let Err(e) = install_single_loader(
-            &state, loaders::LoaderType::NeoForge, "NeoForge", &neoforge_ver,
-            &mc_version, &game_dir, mirror_url.as_deref(), max_threads, source_mode,
-        ).await {
+            &state,
+            loaders::LoaderType::NeoForge,
+            "NeoForge",
+            &neoforge_ver,
+            &mc_version,
+            &game_dir,
+            mirror_url.as_deref(),
+            max_threads,
+            source_mode,
+        )
+        .await
+        {
             loader_errors.push(e);
         }
     }
 
-    if let Some(fabric_ver) = fabric_version {
+    if let Some(ref fabric_ver) = fabric_version {
         if let Err(e) = install_single_loader(
-            &state, loaders::LoaderType::Fabric, "Fabric", &fabric_ver,
-            &mc_version, &game_dir, mirror_url.as_deref(), max_threads, source_mode,
-        ).await {
+            &state,
+            loaders::LoaderType::Fabric,
+            "Fabric",
+            fabric_ver,
+            &mc_version,
+            &game_dir,
+            mirror_url.as_deref(),
+            max_threads,
+            source_mode,
+        )
+        .await
+        {
             loader_errors.push(e);
         }
     }
 
     if let Some(optifine_ver) = optifine_version {
         if let Err(e) = install_single_loader(
-            &state, loaders::LoaderType::OptiFine, "OptiFine", &optifine_ver,
-            &mc_version, &game_dir, mirror_url.as_deref(), max_threads, source_mode,
-        ).await {
+            &state,
+            loaders::LoaderType::OptiFine,
+            "OptiFine",
+            &optifine_ver,
+            &mc_version,
+            &game_dir,
+            mirror_url.as_deref(),
+            max_threads,
+            source_mode,
+        )
+        .await
+        {
             loader_errors.push(e);
         }
     }
 
     if let Some(liteloader_ver) = liteloader_version {
         if let Err(e) = install_single_loader(
-            &state, loaders::LoaderType::LiteLoader, "LiteLoader", &liteloader_ver,
-            &mc_version, &game_dir, mirror_url.as_deref(), max_threads, source_mode,
-        ).await {
+            &state,
+            loaders::LoaderType::LiteLoader,
+            "LiteLoader",
+            &liteloader_ver,
+            &mc_version,
+            &game_dir,
+            mirror_url.as_deref(),
+            max_threads,
+            source_mode,
+        )
+        .await
+        {
             loader_errors.push(e);
         }
     }
@@ -377,7 +460,10 @@ pub async fn install_merged(
             stage.progress = 1.0;
         }
     }
-    let _ = app.emit("install-complete", serde_json::json!({ "instance_name": instance }));
+    let _ = app.emit(
+        "install-complete",
+        serde_json::json!({ "instance_name": instance }),
+    );
 
     if loader_errors.is_empty() {
         // 安装成功后，如果有加载器，删除原版文件夹（参考 PCL2：只保留加载器版本文件夹）
@@ -390,15 +476,20 @@ pub async fn install_merged(
                     let dir_name = entry.file_name().to_string_lossy().to_string();
                     if dir_name.starts_with(&format!("{}-forge-", mc_version))
                         || dir_name.starts_with(&format!("{}-neoforge-", mc_version))
-                        || (dir_name.starts_with("fabric-") && dir_name.ends_with(&format!("-{}", mc_version)))
+                        || (dir_name.starts_with("fabric-")
+                            && dir_name.ends_with(&format!("-{}", mc_version)))
                         || dir_name.starts_with(&format!("{}-OptiFine", mc_version))
                         || dir_name.starts_with(&format!("{}-LiteLoader", mc_version))
                     {
                         // 合并加载器版本的JSON（删除inheritsFrom）
-                        let loader_json_path = versions_dir.join(&dir_name).join(format!("{}.json", dir_name));
+                        let loader_json_path = versions_dir
+                            .join(&dir_name)
+                            .join(format!("{}.json", dir_name));
                         if loader_json_path.exists() {
                             if let Ok(content) = std::fs::read_to_string(&loader_json_path) {
-                                if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                                if let Ok(json) =
+                                    serde_json::from_str::<serde_json::Value>(&content)
+                                {
                                     if json.get("inheritsFrom").is_some() {
                                         // 合并原版JSON
                                         if let Ok(merged) = crate::minecraft::version::json_merge::merge_version_json(&json, &game_dir) {
@@ -415,7 +506,7 @@ pub async fn install_merged(
                     }
                 }
             }
-            
+
             // 删除原版目录
             let mc_version_dir = game_dir.join("versions").join(&mc_version);
             if mc_version_dir.exists() {
@@ -435,7 +526,8 @@ pub async fn install_merged(
                     let dir_name = entry.file_name().to_string_lossy().to_string();
                     if dir_name.starts_with(&format!("{}-forge-", mc_version))
                         || dir_name.starts_with(&format!("{}-neoforge-", mc_version))
-                        || (dir_name.starts_with("fabric-") && dir_name.ends_with(&format!("-{}", mc_version)))
+                        || (dir_name.starts_with("fabric-")
+                            && dir_name.ends_with(&format!("-{}", mc_version)))
                         || dir_name.starts_with(&format!("{}-OptiFine", mc_version))
                         || dir_name.starts_with(&format!("{}-LiteLoader", mc_version))
                     {
@@ -454,7 +546,7 @@ pub async fn install_merged(
             log_info!("[Merged] 重命名版本: {} -> {}", final_version_id, instance);
             let old_dir = game_dir.join("versions").join(&final_version_id);
             let new_dir = game_dir.join("versions").join(&instance);
-            
+
             // 重命名目录
             if let Err(e) = std::fs::rename(&old_dir, &new_dir) {
                 log_warn!("[Merged] 重命名目录失败: {}", e);
@@ -468,7 +560,7 @@ pub async fn install_merged(
                         log_warn!("[Merged] 重命名 JSON 失败: {}", e);
                     }
                 }
-                
+
                 // 修改 JSON 中的 id 字段
                 if new_json.exists() {
                     if let Ok(content) = std::fs::read_to_string(&new_json) {
@@ -480,14 +572,14 @@ pub async fn install_merged(
                         }
                     }
                 }
-                
+
                 // 重命名 JAR 文件
                 let old_jar = new_dir.join(format!("{}.jar", final_version_id));
                 let new_jar = new_dir.join(format!("{}.jar", instance));
                 if old_jar.exists() {
                     let _ = std::fs::rename(&old_jar, &new_jar);
                 }
-                
+
                 instance.clone()
             }
         } else {
@@ -532,7 +624,12 @@ pub async fn install_merged(
         let isolation_mode = state.config.lock().await.isolation_mode;
         let mode = IsolationMode::from_u32(isolation_mode);
         if isolation::should_isolate(mode, version_type) {
-            log_info!("[Merged] 创建隔离目录: {} (模式: {}, 类型: {:?})", actual_version_id, isolation_mode, version_type);
+            log_info!(
+                "[Merged] 创建隔离目录: {} (模式: {}, 类型: {:?})",
+                actual_version_id,
+                isolation_mode,
+                version_type
+            );
             // 根据版本类型创建不同的目录结构
             let result = if version_type.is_modded() {
                 isolation::ensure_modded_dirs(&version_dir)
@@ -550,9 +647,9 @@ pub async fn install_merged(
         // 加载器安装失败，清理已下载的版本目录
         let error_msg = format!("部分加载器安装失败: {}", loader_errors.join(", "));
         log_warn!("[Merged] {}", error_msg);
-        
+
         let versions_dir = game_dir.join("versions");
-        
+
         // 删除原版目录
         let mc_version_dir = versions_dir.join(&mc_version);
         if mc_version_dir.exists() {
@@ -561,22 +658,29 @@ pub async fn install_merged(
                 Err(e) => log_error!("[Merged] 清理原版目录失败: {}", e),
             }
         }
-        
+
         // 删除加载器创建的目录（如 1.20.1-forge-47.4.20）
-        let loader_patterns = vec![
+        // 注意：fabric 目录命名为 `fabric-{fabric_version}-{mc_version}`，
+        // 之前用 `fabric-` 前缀过宽（会误删任意含 "fabric-" 的目录），
+        // 改为仅在知道 fabric_version 时构造精确匹配。
+        let mut loader_patterns = vec![
             format!("{}-forge-", mc_version),
             format!("{}-neoforge-", mc_version),
-            format!("fabric-"),
             format!("{}-LiteLoader", mc_version),
         ];
-        
+        if let Some(fv) = fabric_version.as_ref() {
+            loader_patterns.push(format!("fabric-{}-{}", fv, mc_version));
+        }
+
         if let Ok(entries) = std::fs::read_dir(&versions_dir) {
             for entry in entries.flatten() {
                 let dir_name = entry.file_name().to_string_lossy().to_string();
                 for pattern in &loader_patterns {
                     if dir_name.contains(pattern) {
                         match std::fs::remove_dir_all(entry.path()) {
-                            Ok(_) => log_info!("[Merged] 已清理加载器目录: {}", entry.path().display()),
+                            Ok(_) => {
+                                log_info!("[Merged] 已清理加载器目录: {}", entry.path().display())
+                            }
                             Err(e) => log_error!("[Merged] 清理加载器目录失败: {}", e),
                         }
                         break;
@@ -584,7 +688,7 @@ pub async fn install_merged(
                 }
             }
         }
-        
+
         Err(error_msg)
     }
 }

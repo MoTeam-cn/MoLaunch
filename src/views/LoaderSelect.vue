@@ -6,6 +6,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
+import { showError } from '@/utils/modal'
 import { ChevronLeftIcon, InformationCircleIcon, ExclamationTriangleIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import LoaderCard from '@/components/common/LoaderCard.vue'
 
@@ -200,7 +201,10 @@ onMounted(async () => {
   if (showForge.value) {
     tauri.listForgeVersions(props.mcVersion).then(v => {
       forgeVersions.value = v
-    }).catch(() => {}).finally(() => {
+    }).catch((e) => {
+      console.error('Failed to load Forge versions:', e)
+      showError('加载失败', `无法获取 Forge 版本列表：${e}`)
+    }).finally(() => {
       loadingForge.value = false
     })
   } else {
@@ -210,7 +214,10 @@ onMounted(async () => {
   if (showNeoforge.value) {
     tauri.listNeoforgeVersions(props.mcVersion).then(v => {
       neoforgeVersions.value = v
-    }).catch(() => {}).finally(() => {
+    }).catch((e) => {
+      console.error('Failed to load NeoForge versions:', e)
+      showError('加载失败', `无法获取 NeoForge 版本列表：${e}`)
+    }).finally(() => {
       loadingNeoforge.value = false
     })
   } else {
@@ -220,7 +227,10 @@ onMounted(async () => {
   if (showFabric.value) {
     tauri.listFabricVersions().then(v => {
       fabricVersions.value = v
-    }).catch(() => {}).finally(() => {
+    }).catch((e) => {
+      console.error('Failed to load Fabric versions:', e)
+      showError('加载失败', `无法获取 Fabric 版本列表：${e}`)
+    }).finally(() => {
       loadingFabric.value = false
     })
   } else {
@@ -230,7 +240,10 @@ onMounted(async () => {
   if (showLiteloader.value) {
     tauri.listLiteloaderVersions(props.mcVersion).then(v => {
       liteloaderVersions.value = v
-    }).catch(() => {}).finally(() => {
+    }).catch((e) => {
+      console.error('Failed to load LiteLoader versions:', e)
+      showError('加载失败', `无法获取 LiteLoader 版本列表：${e}`)
+    }).finally(() => {
       loadingLiteloader.value = false
     })
   } else {
@@ -240,7 +253,10 @@ onMounted(async () => {
   if (showOptifine.value) {
     tauri.listOptifineVersions().then(v => {
       optifineVersions.value = v
-    }).catch(() => {}).finally(() => {
+    }).catch((e) => {
+      console.error('Failed to load OptiFine versions:', e)
+      showError('加载失败', `无法获取 OptiFine 版本列表：${e}`)
+    }).finally(() => {
       loadingOptifine.value = false
     })
   } else {

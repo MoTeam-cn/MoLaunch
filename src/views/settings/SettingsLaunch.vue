@@ -105,20 +105,27 @@ async function handleManualImportJava() {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+
+async function flushSave() {
+  if (saveTimer) {
+    clearTimeout(saveTimer)
+    saveTimer = null
+  }
+  try {
+    await tauri.setMinMemory(minMemory.value)
+    await tauri.setMaxMemory(maxMemory.value)
+  } catch (e) {
+    console.error('Failed to save memory settings:', e)
+  }
+}
+
 function autoSave() {
   if (!loaded.value) return
   // 自动模式下不保存内存配置到文件，启动时动态计算
   if (memoryMode.value === 'auto') return
-  
+
   if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(async () => {
-    try {
-      await tauri.setMinMemory(minMemory.value)
-      await tauri.setMaxMemory(maxMemory.value)
-    } catch (e) {
-      console.error('Failed to save memory settings:', e)
-    }
-  }, 500)
+  saveTimer = setTimeout(flushSave, 500)
 }
 
 watch([minMemory, maxMemory], autoSave)
@@ -194,11 +201,15 @@ onMounted(async () => {
 // 内存刷新定时器
 let memoryTimer: ReturnType<typeof setInterval> | null = null
 
-// 组件卸载时清除定时器
+// 组件卸载时清除定时器并 flush 待保存的内存配置
 onUnmounted(() => {
   if (memoryTimer) {
     clearInterval(memoryTimer)
     memoryTimer = null
+  }
+  // 若有未 flush 的保存任务，立即执行（不等待，避免丢失用户最后一次调整）
+  if (saveTimer) {
+    void flushSave()
   }
 })
 </script>

@@ -215,31 +215,41 @@ impl GameWatcher {
                 let reader = BufReader::new(stdout);
                 let mut lines = reader.lines();
 
-                while let Ok(Some(line)) = lines.next_line().await {
-                    let entry = Self::parse_log_line(&line, "stdout");
+                loop {
+                    match lines.next_line().await {
+                        Ok(Some(line)) => {
+                            let entry = Self::parse_log_line(&line, "stdout");
 
-                    // 检测加载进度
-                    let new_progress = Self::detect_load_progress(&line);
-                    {
-                        let mut current = load_progress.write().await;
-                        if new_progress > *current {
-                            *current = new_progress;
+                            // 检测加载进度
+                            let new_progress = Self::detect_load_progress(&line);
+                            {
+                                let mut current = load_progress.write().await;
+                                if new_progress > *current {
+                                    *current = new_progress;
+                                }
+                            }
+
+                            // 检测是否开始加载
+                            {
+                                let mut state_guard = state.write().await;
+                                if *state_guard == GameState::Starting {
+                                    *state_guard = GameState::Loading;
+                                }
+                            }
+
+                            // 添加到缓冲区
+                            let mut buffer = log_buffer.lock().await;
+                            buffer.push_back(entry);
+                            if buffer.len() > max_lines {
+                                buffer.pop_front();
+                            }
                         }
-                    }
-
-                    // 检测是否开始加载
-                    {
-                        let mut state_guard = state.write().await;
-                        if *state_guard == GameState::Starting {
-                            *state_guard = GameState::Loading;
+                        Ok(None) => break, // 流正常关闭
+                        Err(e) => {
+                            // 非 UTF-8 行或读取错误：记录后退出，避免静默吞错
+                            crate::log_warn!("[Watcher] stdout 读取异常: {}", e);
+                            break;
                         }
-                    }
-
-                    // 添加到缓冲区
-                    let mut buffer = log_buffer.lock().await;
-                    buffer.push_back(entry);
-                    if buffer.len() > max_lines {
-                        buffer.pop_front();
                     }
                 }
             });
@@ -254,12 +264,21 @@ impl GameWatcher {
                 let reader = BufReader::new(stderr);
                 let mut lines = reader.lines();
 
-                while let Ok(Some(line)) = lines.next_line().await {
-                    let entry = Self::parse_log_line(&line, "stderr");
-                    let mut buffer = log_buffer.lock().await;
-                    buffer.push_back(entry);
-                    if buffer.len() > max_lines {
-                        buffer.pop_front();
+                loop {
+                    match lines.next_line().await {
+                        Ok(Some(line)) => {
+                            let entry = Self::parse_log_line(&line, "stderr");
+                            let mut buffer = log_buffer.lock().await;
+                            buffer.push_back(entry);
+                            if buffer.len() > max_lines {
+                                buffer.pop_front();
+                            }
+                        }
+                        Ok(None) => break, // 流正常关闭
+                        Err(e) => {
+                            crate::log_warn!("[Watcher] stderr 读取异常: {}", e);
+                            break;
+                        }
                     }
                 }
             });
@@ -312,9 +331,13 @@ impl GameWatcher {
 
             // 发送退出通知
             let _ = exit_tx.send(Some(exit_info));
-            
-            log_info!("[Watcher] Game process exited (PID: {}, code: {}, version: {})", 
-                _pid, exit_code, version_id);
+
+            log_info!(
+                "[Watcher] Game process exited (PID: {}, code: {}, version: {})",
+                _pid,
+                exit_code,
+                version_id
+            );
         });
 
         child_handle
@@ -420,7 +443,9 @@ impl GameWatcher {
             }
 
             // OpenGL 错误
-            if line_lower.contains("opengl") && (line_lower.contains("error") || line_lower.contains("not supported")) {
+            if line_lower.contains("opengl")
+                && (line_lower.contains("error") || line_lower.contains("not supported"))
+            {
                 return Some(CrashInfo {
                     reason: "OpenGL错误".to_string(),
                     category: CrashCategory::Graphics,
@@ -507,10 +532,20 @@ impl GameWatcher {
     fn analyze_stack_for_mod(error_lines: &[String]) -> Option<String> {
         // 常见的非Mod包名
         let excluded_packages = [
-            "java.", "javax.", "sun.", "com.sun.", "jdk.",
-            "net.minecraft", "com.mojang", "net.minecraftforge",
-            "net.fabricmc", "net.neoforged", "cpw.mods",
-            "org.spongepowered", "org.apache", "com.google",
+            "java.",
+            "javax.",
+            "sun.",
+            "com.sun.",
+            "jdk.",
+            "net.minecraft",
+            "com.mojang",
+            "net.minecraftforge",
+            "net.fabricmc",
+            "net.neoforged",
+            "cpw.mods",
+            "org.spongepowered",
+            "org.apache",
+            "com.google",
         ];
 
         for line in error_lines {
@@ -523,7 +558,8 @@ impl GameWatcher {
                         let class_path = &rest[..paren_pos];
 
                         // 检查是否是Mod包
-                        let is_excluded = excluded_packages.iter().any(|p| class_path.starts_with(p));
+                        let is_excluded =
+                            excluded_packages.iter().any(|p| class_path.starts_with(p));
                         if !is_excluded && class_path.contains('.') {
                             // 可能是Mod包，尝试提取Mod ID
                             let parts: Vec<&str> = class_path.split('.').collect();
@@ -531,7 +567,9 @@ impl GameWatcher {
                                 // 通常格式: com.modid.xxx
                                 let potential_mod_id = parts[1];
                                 // 过滤掉常见的非Mod标识
-                                if !["common", "core", "api", "util", "lib", "internal"].contains(&potential_mod_id) {
+                                if !["common", "core", "api", "util", "lib", "internal"]
+                                    .contains(&potential_mod_id)
+                                {
                                     return Some(potential_mod_id.to_string());
                                 }
                             }

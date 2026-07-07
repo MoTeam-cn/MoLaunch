@@ -1,10 +1,10 @@
 //! SDK lite 版本绑定
 //! 只绑定 11 个基础函数
 
-use crate::log_info;
 use super::ffi_types::*;
 use super::types::*;
 use super::{check_sdk_library, SdkError};
+use crate::log_info;
 
 /// SDK lite 函数集合
 pub struct SdkFunctions {
@@ -27,6 +27,10 @@ pub struct SdkInstance {
     _lib: libloading::Library,
 }
 
+// SAFETY: `libloading::Library` 本身是 Send+Sync；`SdkFunctions` 仅持有从库导出的
+// 函数指针（Plain Old Data），调用时通过 FFI 传入/传出参数，无内部可变状态、
+// 无线程本地存储依赖。SDK 库本身在 C层面保证 mc_* 函数线程安全（仅读设备ID、
+// 内存信息等无状态查询）。因此 SdkInstance 可安全跨线程共享。
 unsafe impl Send for SdkInstance {}
 unsafe impl Sync for SdkInstance {}
 
@@ -130,8 +134,8 @@ impl SdkInstance {
 
     /// 加密 Token
     pub fn encrypt_token(&self, data: &str) -> Result<String, SdkError> {
-        let data_cstr = std::ffi::CString::new(data)
-            .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let data_cstr =
+            std::ffi::CString::new(data).map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
 
         let result = unsafe { (self.functions.encrypt_token)(data_cstr.as_ptr()) };
         if result.is_null() {

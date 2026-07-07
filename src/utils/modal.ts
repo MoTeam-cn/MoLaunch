@@ -18,9 +18,19 @@ interface ModalOptions {
   onCancel?: () => void
 }
 
-const modalRef = ref<any>(null)
+/** Modal 组件实例对外暴露的接口（与 Modal.vue defineExpose 对应） */
+export interface ModalInstance {
+  show: (opts: ModalOptions) => void
+  error: (title: string, message: string, details?: string) => void
+  warning: (title: string, message: string, details?: string) => void
+  info: (title: string, message: string, details?: string) => void
+  success: (title: string, message: string, details?: string) => void
+  confirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) => void
+}
 
-export function setModalRef(ref: any) {
+const modalRef = ref<ModalInstance | null>(null)
+
+export function setModalRef(ref: ModalInstance | null) {
   modalRef.value = ref
 }
 

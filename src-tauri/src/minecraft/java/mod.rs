@@ -19,13 +19,63 @@ pub struct JavaRuntime {
 
 /// 搜索关键词（参考PCL2，共67个）
 const SEARCH_KEYWORDS: &[&str] = &[
-    "java", "jdk", "jre", "env", "run", "mc", "dragon", "well", "bin", "sdk",
-    "candidate", "current", "software", "cache", "temp", "corretto", "roaming",
-    "users", "craft", "program", "net", "oracle", "game", "file", "data", "jvm",
-    "server", "client", "mojang", "eclipse", "microsoft", "hotspot", "runtime",
-    "x86", "x64", "arm", "forge", "optifine", "hmcl", "mod", "fabric", "download",
-    "launch", "path", "version", "pcl", "zulu", "local", "packages", "jbr",
-    "bellsoft", "liberica", "graal", "adoptium", "temurin", "semerulu", "1.",
+    "java",
+    "jdk",
+    "jre",
+    "env",
+    "run",
+    "mc",
+    "dragon",
+    "well",
+    "bin",
+    "sdk",
+    "candidate",
+    "current",
+    "software",
+    "cache",
+    "temp",
+    "corretto",
+    "roaming",
+    "users",
+    "craft",
+    "program",
+    "net",
+    "oracle",
+    "game",
+    "file",
+    "data",
+    "jvm",
+    "server",
+    "client",
+    "mojang",
+    "eclipse",
+    "microsoft",
+    "hotspot",
+    "runtime",
+    "x86",
+    "x64",
+    "arm",
+    "forge",
+    "optifine",
+    "hmcl",
+    "mod",
+    "fabric",
+    "download",
+    "launch",
+    "path",
+    "version",
+    "pcl",
+    "zulu",
+    "local",
+    "packages",
+    "jbr",
+    "bellsoft",
+    "liberica",
+    "graal",
+    "adoptium",
+    "temurin",
+    "semerulu",
+    "1.",
 ];
 
 /// 检测单个Java
@@ -100,9 +150,11 @@ pub fn detect_java(java_path: &Path) -> Result<JavaRuntime, String> {
 /// 提取并标准化版本号（参考PCL2第107-121行）
 fn extract_and_normalize_version(output: &str) -> Result<String, String> {
     // 正则1: version "xxx"
-    let re1 = regex::Regex::new(r#"version "([^"]+)""#).unwrap();
+    static RE1: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re1 = RE1.get_or_init(|| regex::Regex::new(r#"version "([^"]+)""#).unwrap());
     // 正则2: openjdk xxx
-    let re2 = regex::Regex::new(r"openjdk (\d+)").unwrap();
+    static RE2: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re2 = RE2.get_or_init(|| regex::Regex::new(r"openjdk (\d+)").unwrap());
 
     let mut version_str = if let Some(caps) = re1.captures(output) {
         caps[1].to_string()
@@ -225,18 +277,28 @@ pub fn search_java() -> Vec<JavaRuntime> {
         // .jdks 全搜索
         search_folder_recursive(&base.join(".jdks"), &mut add_candidate, true);
         // .sdkman 全搜索
-        search_folder_recursive(&base.join(".sdkman/candidates/java"), &mut add_candidate, true);
+        search_folder_recursive(
+            &base.join(".sdkman/candidates/java"),
+            &mut add_candidate,
+            true,
+        );
     }
 
     // Step 4: 启动器目录全搜索
     if let Ok(exe_path) = std::env::current_exe() {
         if let Some(exe_dir) = exe_path.parent() {
-            crate::log_debug!("[Java] Step 4: Searching launcher directory: {}", exe_dir.display());
+            crate::log_debug!(
+                "[Java] Step 4: Searching launcher directory: {}",
+                exe_dir.display()
+            );
             search_folder_recursive(exe_dir, &mut add_candidate, true);
         }
     }
 
-    crate::log_info!("[Java] Found {} candidates, verifying...", java_candidates.len());
+    crate::log_info!(
+        "[Java] Found {} candidates, verifying...",
+        java_candidates.len()
+    );
 
     // 验证所有候选Java
     let mut java_list = Vec::new();
@@ -254,22 +316,23 @@ pub fn search_java() -> Vec<JavaRuntime> {
 
     // 排序
     java_list.sort_by(|a, b| {
-        b.major_version.cmp(&a.major_version)
+        b.major_version
+            .cmp(&a.major_version)
             .then(b.is_64bit.cmp(&a.is_64bit))
     });
 
-    crate::log_info!("[Java] Search completed, found {} valid Java installations", java_list.len());
+    crate::log_info!(
+        "[Java] Search completed, found {} valid Java installations",
+        java_list.len()
+    );
     crate::log_separator!("Java Search End");
 
     java_list
 }
 
 /// 递归搜索文件夹（参考PCL2的JavaSearchFolder）
-fn search_folder_recursive<F>(
-    dir: &Path,
-    add_candidate: &mut F,
-    is_full_search: bool,
-) where
+fn search_folder_recursive<F>(dir: &Path, add_candidate: &mut F, is_full_search: bool)
+where
     F: FnMut(&Path),
 {
     if !dir.exists() || !dir.is_dir() {
@@ -302,7 +365,8 @@ fn search_folder_recursive<F>(
             continue;
         }
 
-        let dir_name = path.file_name()
+        let dir_name = path
+            .file_name()
             .unwrap_or_default()
             .to_string_lossy()
             .to_lowercase();
@@ -373,7 +437,7 @@ pub fn select_best_java(
 fn get_java_version_weight(major_version: u32) -> u32 {
     match major_version {
         7 => 0,
-        8 => 30,   // Java 8 权重最高
+        8 => 30, // Java 8 权重最高
         9 => 4,
         10 => 5,
         11 => 14,
@@ -382,7 +446,7 @@ fn get_java_version_weight(major_version: u32) -> u32 {
         14 => 8,
         15 => 9,
         16 => 12,
-        17 => 31,  // Java 17 权重最高
+        17 => 31, // Java 17 权重最高
         18 => 13,
         19 => 10,
         20 => 11,

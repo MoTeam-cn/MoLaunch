@@ -94,7 +94,10 @@ export const useVersionStore = defineStore('version', () => {
   async function setupGameExitListener() {
     try {
       unlistenFn = await listen<GameExitEvent>('game-exited', (event) => {
-        console.log('Game exited:', event.payload)
+        // 游戏退出：清理运行状态（不再 console.log，避免生产环境噪音）
+        if (import.meta.env.DEV) {
+          console.debug('[GameExit]', event.payload)
+        }
         runningPid.value = null
         runningVersionId.value = null
         stopExitPolling()

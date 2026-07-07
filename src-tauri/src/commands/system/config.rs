@@ -29,11 +29,19 @@ pub async fn get_config_value(section: String, key: String) -> Result<Option<Str
 
 /// 设置配置值（写入 storage）
 #[tauri::command]
-pub async fn set_config_value(section: String, key: String, value: String) -> Result<(), String> {
+pub async fn set_config_value(
+    state: State<'_, AppState>,
+    section: String,
+    key: String,
+    value: String,
+) -> Result<(), String> {
     let storage = crate::storage::Storage::instance();
-    storage.set_config(&section, &key, &value).map_err(|e| e.to_string())?;
+    storage
+        .set_config(&section, &key, &value)
+        .map_err(|e| e.to_string())?;
 
-    // 日志级别热重载
+    // 日志级别热重载：同时更新 logger 运行时级别 + state.config 内存
+    // 否则后续 save_config(&state.config) 会用内存中的旧 log_level 覆盖 storage 的新值
     if section == "Log" && key == "level" {
         if let Ok(level) = value.parse::<u32>() {
             let log_level = match level {
@@ -46,6 +54,9 @@ pub async fn set_config_value(section: String, key: String, value: String) -> Re
                 _ => crate::logger::LogLevel::Info,
             };
             crate::logger::set_level(log_level);
+            // 同步刷新内存中的 AppConfig.log_level，避免 save_config 覆盖
+            let mut config = state.config.lock().await;
+            config.log_level = level;
             log_info!("Log level changed to: {}", level);
         }
     }

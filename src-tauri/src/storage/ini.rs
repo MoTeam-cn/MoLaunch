@@ -29,6 +29,9 @@ impl IniFile {
 
     /// 解析 INI 格式字符串
     pub fn parse(content: &str) -> Self {
+        // 剥离 UTF-8 BOM（部分编辑器会写入），否则首行 [Section] 会被识别失败
+        let content = content.strip_prefix('\u{FEFF}').unwrap_or(content);
+
         let mut sections = Vec::new();
         let mut current_section = Section {
             name: String::new(),
@@ -37,7 +40,7 @@ impl IniFile {
 
         for line in content.lines() {
             let line = line.trim();
-            
+
             // 跳过空行和注释
             if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
                 continue;
@@ -50,7 +53,7 @@ impl IniFile {
                     sections.push(current_section);
                 }
                 current_section = Section {
-                    name: line[1..line.len()-1].trim().to_string(),
+                    name: line[1..line.len() - 1].trim().to_string(),
                     keys: Vec::new(),
                 };
                 continue;
@@ -59,8 +62,13 @@ impl IniFile {
             // 解析键值对
             if let Some(pos) = line.find('=') {
                 let key = line[..pos].trim().to_string();
-                let value = line[pos+1..].trim().to_string();
-                current_section.keys.push((key, value));
+                let value = line[pos + 1..].trim().to_string();
+                // 同段落内同名 key 保留最后一个（去重，避免后续 set 时定位到旧值）
+                if let Some(existing) = current_section.keys.iter_mut().find(|(k, _)| *k == key) {
+                    existing.1 = value;
+                } else {
+                    current_section.keys.push((key, value));
+                }
             }
         }
 
@@ -75,7 +83,7 @@ impl IniFile {
     /// 转换为字符串
     pub fn to_string(&self) -> String {
         let mut result = String::new();
-        
+
         for section in &self.sections {
             if !section.name.is_empty() {
                 result.push_str(&format!("[{}]\n", section.name));
@@ -85,7 +93,7 @@ impl IniFile {
             }
             result.push('\n');
         }
-        
+
         result
     }
 
@@ -105,7 +113,8 @@ impl IniFile {
 
     /// 获取配置值，带默认值
     pub fn get_or(&self, section: &str, key: &str, default: &str) -> String {
-        self.get(section, key).unwrap_or_else(|| default.to_string())
+        self.get(section, key)
+            .unwrap_or_else(|| default.to_string())
     }
 
     /// 设置配置值
@@ -193,7 +202,10 @@ theme=system
 max_threads=8
 "#;
         let ini = IniFile::parse(input);
-        assert_eq!(ini.get("General", "game_dir"), Some(".minecraft".to_string()));
+        assert_eq!(
+            ini.get("General", "game_dir"),
+            Some(".minecraft".to_string())
+        );
         assert_eq!(ini.get("General", "theme"), Some("system".to_string()));
         assert_eq!(ini.get("Download", "max_threads"), Some("8".to_string()));
     }

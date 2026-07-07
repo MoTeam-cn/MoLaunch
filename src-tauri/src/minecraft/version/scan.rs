@@ -66,12 +66,13 @@ pub fn scan_installed_versions(game_dir: &Path) -> Vec<VersionInfo> {
 
 /// 解析版本信息
 fn parse_version_info(version_dir: &Path, json_path: &Path) -> Result<VersionInfo, String> {
-    let content = std::fs::read_to_string(json_path)
-        .map_err(|e| format!("Failed to read JSON: {}", e))?;
-    let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let content =
+        std::fs::read_to_string(json_path).map_err(|e| format!("Failed to read JSON: {}", e))?;
+    let json: serde_json::Value =
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
-    let id = version_dir.file_name()
+    let id = version_dir
+        .file_name()
         .unwrap_or_default()
         .to_string_lossy()
         .to_string();
@@ -80,8 +81,15 @@ fn parse_version_info(version_dir: &Path, json_path: &Path) -> Result<VersionInf
     let release_time = json["releaseTime"].as_str().unwrap_or("").to_string();
 
     // 检测加载器
-    let (state, original_version, forge_version, neoforge_version, fabric_version, optifine_version, liteloader_version) =
-        detect_loaders(&json, &content);
+    let (
+        state,
+        original_version,
+        forge_version,
+        neoforge_version,
+        fabric_version,
+        optifine_version,
+        liteloader_version,
+    ) = detect_loaders(&json, &content);
 
     Ok(VersionInfo {
         id,
@@ -103,7 +111,15 @@ fn parse_version_info(version_dir: &Path, json_path: &Path) -> Result<VersionInf
 fn detect_loaders(
     json: &serde_json::Value,
     json_content: &str,
-) -> (VersionType, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>) {
+) -> (
+    VersionType,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+) {
     let mut state = VersionType::Release;
     let mut forge_version = None;
     let mut neoforge_version = None;
@@ -127,7 +143,9 @@ fn detect_loaders(
     }
 
     // 检测 Fabric
-    if json_content.contains("net.fabricmc:fabric-loader") || json_content.contains("org.quiltmc:quilt-loader") {
+    if json_content.contains("net.fabricmc:fabric-loader")
+        || json_content.contains("org.quiltmc:quilt-loader")
+    {
         state = VersionType::Fabric;
         if let Some(libraries) = json["libraries"].as_array() {
             for lib in libraries {
@@ -196,7 +214,15 @@ fn detect_loaders(
         }
     }
 
-    (state, original_version, forge_version, neoforge_version, fabric_version, optifine_version, liteloader_version)
+    (
+        state,
+        original_version,
+        forge_version,
+        neoforge_version,
+        fabric_version,
+        optifine_version,
+        liteloader_version,
+    )
 }
 
 /// 提取原版版本号
@@ -227,7 +253,9 @@ fn extract_original_version(json: &serde_json::Value, _json_content: &str) -> Op
     if let Some(downloads) = json["downloads"].as_object() {
         if let Some(client) = downloads.get("client") {
             if let Some(url) = client["url"].as_str() {
-                let re = regex::Regex::new(r"(\d+\.\d+(\.\d+)?(-\w+)?)").unwrap();
+                static RE_URL: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+                let re =
+                    RE_URL.get_or_init(|| regex::Regex::new(r"(\d+\.\d+(\.\d+)?(-\w+)?)").unwrap());
                 if let Some(captures) = re.captures(url) {
                     return Some(captures[1].to_string());
                 }
@@ -242,7 +270,8 @@ fn extract_original_version(json: &serde_json::Value, _json_content: &str) -> Op
 
     // 策略5: 从 id 字段正则匹配
     if let Some(id) = json["id"].as_str() {
-        let re = regex::Regex::new(r"^(\d+\.\d+(\.\d+)?)").unwrap();
+        static RE_ID: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+        let re = RE_ID.get_or_init(|| regex::Regex::new(r"^(\d+\.\d+(\.\d+)?)").unwrap());
         if let Some(captures) = re.captures(id) {
             return Some(captures[1].to_string());
         }
@@ -257,25 +286,26 @@ pub fn get_version_chain(game_dir: &Path, version_id: &str) -> Vec<String> {
     let mut current = version_id.to_string();
 
     loop {
-        let json_path = game_dir.join("versions").join(&current).join(format!("{}.json", current));
+        let json_path = game_dir
+            .join("versions")
+            .join(&current)
+            .join(format!("{}.json", current));
         if !json_path.exists() {
             break;
         }
 
         match std::fs::read_to_string(&json_path) {
-            Ok(content) => {
-                match serde_json::from_str::<serde_json::Value>(&content) {
-                    Ok(json) => {
-                        if let Some(inherits) = json["inheritsFrom"].as_str() {
-                            chain.push(inherits.to_string());
-                            current = inherits.to_string();
-                        } else {
-                            break;
-                        }
+            Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
+                Ok(json) => {
+                    if let Some(inherits) = json["inheritsFrom"].as_str() {
+                        chain.push(inherits.to_string());
+                        current = inherits.to_string();
+                    } else {
+                        break;
                     }
-                    Err(_) => break,
                 }
-            }
+                Err(_) => break,
+            },
             Err(_) => break,
         }
     }

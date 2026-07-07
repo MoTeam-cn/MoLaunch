@@ -3,8 +3,8 @@
 //! 定义版本类型（正式版/快照/愚人节/远古版/Mod加载器），
 //! 提供检测函数和序列化支持。
 
-use serde::{Deserialize, Serialize};
 use crate::minecraft::fools;
+use serde::{Deserialize, Serialize};
 
 /// 版本类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -70,12 +70,29 @@ impl VersionType {
 
     /// 是否为正式版（非快照/愚人节/远古）
     pub fn is_release(&self) -> bool {
-        matches!(self, Self::Release | Self::Forge | Self::NeoForge | Self::Fabric | Self::Quilt | Self::OptiFine | Self::LiteLoader)
+        matches!(
+            self,
+            Self::Release
+                | Self::Forge
+                | Self::NeoForge
+                | Self::Fabric
+                | Self::Quilt
+                | Self::OptiFine
+                | Self::LiteLoader
+        )
     }
 
     /// 是否为 Mod 加载器版本
     pub fn is_modded(&self) -> bool {
-        matches!(self, Self::Forge | Self::NeoForge | Self::Fabric | Self::Quilt | Self::LiteLoader | Self::OptiFine)
+        matches!(
+            self,
+            Self::Forge
+                | Self::NeoForge
+                | Self::Fabric
+                | Self::Quilt
+                | Self::LiteLoader
+                | Self::OptiFine
+        )
     }
 
     /// 从版本 JSON 检测版本类型（实例方法，方便调用）
@@ -92,10 +109,7 @@ impl VersionType {
 /// 3. 快照版（type=snapshot 或 YYwWWa 格式）
 /// 4. Mod 加载器（libraries 中的 Maven 坐标）
 /// 5. 默认为正式版
-pub fn detect_version_type(
-    version_id: &str,
-    version_json: &serde_json::Value,
-) -> VersionType {
+pub fn detect_version_type(version_id: &str, version_json: &serde_json::Value) -> VersionType {
     let json_type = version_json["type"].as_str().unwrap_or("");
     let release_time = version_json["releaseTime"].as_str().unwrap_or("");
 
@@ -133,12 +147,24 @@ pub fn infer_from_loader(
     optifine: Option<&str>,
     liteloader: Option<&str>,
 ) -> VersionType {
-    if forge.is_some() { return VersionType::Forge; }
-    if neoforge.is_some() { return VersionType::NeoForge; }
-    if fabric.is_some() { return VersionType::Fabric; }
-    if quilt.is_some() { return VersionType::Quilt; }
-    if optifine.is_some() { return VersionType::OptiFine; }
-    if liteloader.is_some() { return VersionType::LiteLoader; }
+    if forge.is_some() {
+        return VersionType::Forge;
+    }
+    if neoforge.is_some() {
+        return VersionType::NeoForge;
+    }
+    if fabric.is_some() {
+        return VersionType::Fabric;
+    }
+    if quilt.is_some() {
+        return VersionType::Quilt;
+    }
+    if optifine.is_some() {
+        return VersionType::OptiFine;
+    }
+    if liteloader.is_some() {
+        return VersionType::LiteLoader;
+    }
     VersionType::Release
 }
 
@@ -191,10 +217,13 @@ fn is_snapshot(version_id: &str, json_type: &str) -> bool {
     }
     let id_lower = version_id.to_lowercase();
     // 匹配 YYwWWa 格式（如 24w14a、23w13a）
-    let re_weekly = regex::Regex::new(r"^\d{2}w\d{2}[a-z]").unwrap();
+    static RE_WEEKLY: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re_weekly = RE_WEEKLY.get_or_init(|| regex::Regex::new(r"^\d{2}w\d{2}[a-z]").unwrap());
     // 匹配 -pre\d+ 或 -rc\d+ 格式（如 1.20.1-pre1、1.20.1-rc1）
-    let re_pre = regex::Regex::new(r"-pre\d+").unwrap();
-    let re_rc = regex::Regex::new(r"-rc\d+").unwrap();
+    static RE_PRE: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re_pre = RE_PRE.get_or_init(|| regex::Regex::new(r"-pre\d+").unwrap());
+    static RE_RC: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();
+    let re_rc = RE_RC.get_or_init(|| regex::Regex::new(r"-rc\d+").unwrap());
     re_weekly.is_match(&id_lower)
         || re_pre.is_match(&id_lower)
         || re_rc.is_match(&id_lower)
@@ -245,10 +274,25 @@ mod tests {
 
     #[test]
     fn test_infer_from_loader() {
-        assert_eq!(infer_from_loader(Some("47.2.0"), None, None, None, None, None), VersionType::Forge);
-        assert_eq!(infer_from_loader(None, Some("20.4.0"), None, None, None, None), VersionType::NeoForge);
-        assert_eq!(infer_from_loader(None, None, Some("0.16.0"), None, None, None), VersionType::Fabric);
-        assert_eq!(infer_from_loader(None, None, None, None, Some("HD_U_I7"), None), VersionType::OptiFine);
-        assert_eq!(infer_from_loader(None, None, None, None, None, None), VersionType::Release);
+        assert_eq!(
+            infer_from_loader(Some("47.2.0"), None, None, None, None, None),
+            VersionType::Forge
+        );
+        assert_eq!(
+            infer_from_loader(None, Some("20.4.0"), None, None, None, None),
+            VersionType::NeoForge
+        );
+        assert_eq!(
+            infer_from_loader(None, None, Some("0.16.0"), None, None, None),
+            VersionType::Fabric
+        );
+        assert_eq!(
+            infer_from_loader(None, None, None, None, Some("HD_U_I7"), None),
+            VersionType::OptiFine
+        );
+        assert_eq!(
+            infer_from_loader(None, None, None, None, None, None),
+            VersionType::Release
+        );
     }
 }

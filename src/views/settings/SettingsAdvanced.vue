@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import * as tauri from '@/utils/tauri'
 import Alert from '@/components/common/Alert.vue'
 
@@ -57,6 +57,13 @@ onMounted(async () => {
     proxyUrl.value = await tauri.getProxyUrl()
   } catch { /* ignore */ }
   loaded.value = true
+})
+
+// 组件卸载时若有未 flush 的代理设置变更，立即保存，避免丢失最后一次调整
+onUnmounted(() => {
+  if (saveTimer) {
+    void flushSave()
+  }
 })
 </script>
 

@@ -150,13 +150,19 @@ impl Storage {
 
         ini.set("Instance", "last_run", &now);
 
-        if ini.get("Instance", "first_run").unwrap_or_default().is_empty() {
+        if ini
+            .get("Instance", "first_run")
+            .unwrap_or_default()
+            .is_empty()
+        {
             ini.set("Instance", "first_run", &now);
         }
 
-        let count = ini.get("Instance", "run_count")
+        let count = ini
+            .get("Instance", "run_count")
             .and_then(|s| s.parse::<u64>().ok())
-            .unwrap_or(0) + 1;
+            .unwrap_or(0)
+            + 1;
         ini.set("Instance", "run_count", &count.to_string());
 
         self.write_instance(&ini)?;
@@ -196,16 +202,21 @@ impl Storage {
     }
 
     pub fn write_config(&self, config: &ini::IniFile) -> anyhow::Result<()> {
-        std::fs::write(self.config_path(), config.to_string())?;
+        // 原子写入：先写 .tmp 再 rename，避免崩溃导致配置文件半写状态
+        let target = self.config_path();
+        let tmp = target.with_extension("ini.tmp");
+        std::fs::write(&tmp, config.to_string())?;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            if let Ok(metadata) = std::fs::metadata(self.config_path()) {
+            if let Ok(metadata) = std::fs::metadata(&tmp) {
                 let mut perms = metadata.permissions();
                 perms.set_mode(0o600);
-                let _ = std::fs::set_permissions(self.config_path(), perms);
+                let _ = std::fs::set_permissions(&tmp, perms);
             }
         }
+        // rename 在同分区是原子的（POSIX/Windows 均保证）
+        std::fs::rename(&tmp, &target)?;
         Ok(())
     }
 

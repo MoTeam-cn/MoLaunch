@@ -12,7 +12,7 @@ interface ToastRef {
 let toastRef: ToastRef | null = null
 
 function getRef(): ToastRef | null {
-  return toastRef || (window as any).__toastRef || null
+  return toastRef
 }
 
 export function setToastRef(ref: ToastRef) {

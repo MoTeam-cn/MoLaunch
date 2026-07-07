@@ -25,8 +25,6 @@ const toastRef = ref<InstanceType<typeof Toast> | null>(null)
 onMounted(() => {
   setModalRef(modalRef.value)
   setToastRef(toastRef.value)
-  // 全局暴露，供 Pinia store 等非组件代码使用
-  ;(window as any).__toastRef = toastRef.value
   initDownloadPolling()
   initApp()
 })

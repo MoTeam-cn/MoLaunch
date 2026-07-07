@@ -22,10 +22,12 @@ pub mod pipeline;
 pub mod watcher;
 
 // Re-export pipeline types
-pub use pipeline::{LaunchConfig, LaunchPipeline, LaunchProgress, LaunchStage, LaunchResult as PipelineLaunchResult};
+pub use pipeline::{
+    LaunchConfig, LaunchPipeline, LaunchProgress, LaunchResult as PipelineLaunchResult, LaunchStage,
+};
 
 // Re-export watcher types
-pub use watcher::{GameWatcher, GameState, CrashInfo, CrashCategory, LoadProgress, ExitInfo};
+pub use watcher::{CrashCategory, CrashInfo, ExitInfo, GameState, GameWatcher, LoadProgress};
 
 /// Launch arguments
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,7 +93,10 @@ pub fn build_launch_arguments(
     // 获取版本类型：优先从 setup.ini 读取，否则从 JSON 检测
     let version_type = match VersionSetup::load(&version_dir) {
         Ok(Some(setup)) => {
-            log_info!("Loaded version type from setup.ini: {:?}", setup.version_type);
+            log_info!(
+                "Loaded version type from setup.ini: {:?}",
+                setup.version_type
+            );
             setup.version_type
         }
         _ => {
@@ -103,7 +108,8 @@ pub fn build_launch_arguments(
 
     // 计算隔离后的有效游戏目录
     let mode = IsolationMode::from_u32(isolation_mode);
-    let effective_game_dir = isolation::get_effective_game_dir(game_dir, version_id, mode, version_type);
+    let effective_game_dir =
+        isolation::get_effective_game_dir(game_dir, version_id, mode, version_type);
 
     // 确保隔离目录存在
     if effective_game_dir != game_dir {
@@ -126,10 +132,20 @@ pub fn build_launch_arguments(
         version_type
     );
 
-    let jvm_args = build_jvm_args(game_dir, version_id, &classpath, min_memory, max_memory, java_path)?;
+    let jvm_args = build_jvm_args(
+        game_dir, version_id, &classpath, min_memory, max_memory, java_path,
+    )?;
     let game_args = build_game_args(
-        &json, &effective_game_dir, version_id, &assets_dir, &asset_index,
-        auth_info, window_width, window_height, server_address, server_port,
+        &json,
+        &effective_game_dir,
+        version_id,
+        &assets_dir,
+        &asset_index,
+        auth_info,
+        window_width,
+        window_height,
+        server_address,
+        server_port,
     )?;
 
     // 在 launch 前设置游戏语言为中文（写入有效目录，适配隔离模式）
@@ -161,12 +177,18 @@ fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyhow::Result<
     // 参考 PCL2 的 McLibListGet 函数
     // 递归查找最深层的继承版本来获取原版jar
     let jar_version = find_original_version(game_dir, json);
-    let version_jar = game_dir.join("versions").join(&jar_version).join(format!("{}.jar", jar_version));
-    
+    let version_jar = game_dir
+        .join("versions")
+        .join(&jar_version)
+        .join(format!("{}.jar", jar_version));
+
     if version_jar.exists() {
         entries.push(version_jar.to_string_lossy().to_string());
     } else {
-        log_info!("[Classpath] Warning: Main jar not found: {}", version_jar.display());
+        log_info!(
+            "[Classpath] Warning: Main jar not found: {}",
+            version_jar.display()
+        );
     }
 
     if let Some(libraries) = json["libraries"].as_array() {
@@ -188,7 +210,11 @@ fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyhow::Result<
         }
     }
 
-    Ok(entries.join(if cfg!(target_os = "windows") { ";" } else { ":" }))
+    Ok(entries.join(if cfg!(target_os = "windows") {
+        ";"
+    } else {
+        ":"
+    }))
 }
 
 /// 递归查找最深层的继承版本（参考 PCL2 的 McLibListGet）
@@ -197,12 +223,15 @@ fn find_original_version(game_dir: &Path, json: &serde_json::Value) -> String {
     if let Some(jar) = json.get("jar").and_then(|v| v.as_str()) {
         return jar.to_string();
     }
-    
+
     // 检查 inheritsFrom
     if let Some(inherits_from) = json.get("inheritsFrom").and_then(|v| v.as_str()) {
         if !inherits_from.is_empty() {
             // 加载父版本JSON
-            let parent_json_path = game_dir.join("versions").join(inherits_from).join(format!("{}.json", inherits_from));
+            let parent_json_path = game_dir
+                .join("versions")
+                .join(inherits_from)
+                .join(format!("{}.json", inherits_from));
             if parent_json_path.exists() {
                 if let Ok(content) = std::fs::read_to_string(&parent_json_path) {
                     if let Ok(parent_json) = serde_json::from_str::<serde_json::Value>(&content) {
@@ -215,9 +244,12 @@ fn find_original_version(game_dir: &Path, json: &serde_json::Value) -> String {
             return inherits_from.to_string();
         }
     }
-    
+
     // 没有继承，使用当前版本
-    json.get("id").and_then(|v| v.as_str()).unwrap_or("unknown").to_string()
+    json.get("id")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown")
+        .to_string()
 }
 
 /// Convert Maven name to path
@@ -233,9 +265,15 @@ fn maven_name_to_path(name: &str) -> String {
     let classifier = if parts.len() > 3 { parts[3] } else { "" };
 
     if classifier.is_empty() {
-        format!("{}/{}/{}/{}-{}.jar", group, artifact, version, artifact, version)
+        format!(
+            "{}/{}/{}/{}-{}.jar",
+            group, artifact, version, artifact, version
+        )
     } else {
-        format!("{}/{}/{}/{}-{}-{}.jar", group, artifact, version, artifact, version, classifier)
+        format!(
+            "{}/{}/{}/{}-{}-{}.jar",
+            group, artifact, version, artifact, version, classifier
+        )
     }
 }
 
@@ -272,7 +310,10 @@ fn build_jvm_args(
         .join("versions")
         .join(version_id)
         .join(format!("{}-natives", version_id));
-    args.push(format!("-Djava.library.path={}", natives_dir.to_string_lossy()));
+    args.push(format!(
+        "-Djava.library.path={}",
+        natives_dir.to_string_lossy()
+    ));
 
     Ok(args)
 }
@@ -285,7 +326,10 @@ fn get_java_version(java_path: &Path) -> Option<u32> {
         .ok()?;
 
     let stderr = String::from_utf8_lossy(&output.stderr);
-    let re = regex::Regex::new(r#"version "(\d+)\."#).ok()?;
+    static RE: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
+    let re = RE
+        .get_or_init(|| regex::Regex::new(r#"version "(\d+)\."#).ok())
+        .as_ref()?;
     let captures = re.captures(&stderr)?;
     captures[1].parse().ok()
 }

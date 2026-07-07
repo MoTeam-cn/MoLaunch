@@ -3,6 +3,18 @@ import { useVersionStore } from '@/stores/version'
 import { getDownloadProgress } from '@/utils/tauri'
 import type { DownloadStage } from '@/stores/version'
 
+/** 后端返回的阶段原始结构（部分字段可能缺失，需做 fallback） */
+interface RawDownloadStage {
+  name: string
+  progress: number
+  weight: number
+  status: DownloadStage['status']
+  bytes_downloaded: number
+  bytes_total: number
+  files_downloaded?: number
+  files_total?: number
+}
+
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0
 
@@ -10,27 +22,31 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
   if (pollTimer) return
 
   pollCount = 0
-  console.log('[Polling] Starting download polling...')
+  if (import.meta.env.DEV) {
+    console.debug('[Polling] Starting download polling...')
+  }
 
   pollTimer = setInterval(async () => {
     pollCount++
     try {
       const progress = await getDownloadProgress()
 
-      if (pollCount % 10 === 0) {
-        console.log(`[Polling] #${pollCount} progress=`, progress)
+      if (import.meta.env.DEV && pollCount % 10 === 0) {
+        console.debug(`[Polling] #${pollCount} progress=`, progress)
       }
 
       if (progress && progress.stages && progress.stages.length > 0) {
         // 先检查错误码，避免在失败状态下继续轮询
         if (progress.error_code && progress.error_code !== 0) {
-          console.log('[Polling] Download failed with error_code=', progress.error_code, ', stopping polling')
+          if (import.meta.env.DEV) {
+            console.debug('[Polling] Download failed with error_code=', progress.error_code)
+          }
           stopPolling()
           versionStore.finishDownload()
           return
         }
 
-        const stages: DownloadStage[] = progress.stages.map((s: any) => ({
+        const stages: DownloadStage[] = progress.stages.map((s: RawDownloadStage) => ({
           name: s.name,
           progress: s.progress,
           weight: s.weight,
@@ -61,7 +77,9 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
         })
 
         if (progress.is_complete) {
-          console.log('[Polling] Download complete, stopping polling')
+          if (import.meta.env.DEV) {
+            console.debug('[Polling] Download complete, stopping polling')
+          }
           stopPolling()
           versionStore.finishDownload()
           return
