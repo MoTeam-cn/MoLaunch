@@ -126,6 +126,15 @@ impl Storage {
     fn write_default_config(&self) -> anyhow::Result<()> {
         let content = resources::read_resource("defaults/config.ini")?;
         std::fs::write(self.config_path(), content)?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(metadata) = std::fs::metadata(self.config_path()) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o600);
+                let _ = std::fs::set_permissions(self.config_path(), perms);
+            }
+        }
         Ok(())
     }
 
@@ -165,6 +174,15 @@ impl Storage {
 
     pub fn write_instance(&self, ini: &ini::IniFile) -> anyhow::Result<()> {
         std::fs::write(self.instance_path(), ini.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(metadata) = std::fs::metadata(self.instance_path()) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o600);
+                let _ = std::fs::set_permissions(self.instance_path(), perms);
+            }
+        }
         Ok(())
     }
 
@@ -179,6 +197,15 @@ impl Storage {
 
     pub fn write_config(&self, config: &ini::IniFile) -> anyhow::Result<()> {
         std::fs::write(self.config_path(), config.to_string())?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(metadata) = std::fs::metadata(self.config_path()) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o600);
+                let _ = std::fs::set_permissions(self.config_path(), perms);
+            }
+        }
         Ok(())
     }
 

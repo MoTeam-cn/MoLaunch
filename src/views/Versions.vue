@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * 下载页面
  */
@@ -131,6 +131,7 @@ function onInstallRequest(options: { mcVersion: string; forge?: string; neoforge
     await loadInstalledVersions()
   }).catch((e) => {
     showError('安装失败', String(e))
+    versionStore.finishDownload()
   })
   // 不在这里调用 finishDownload，由轮询统一管理生命周期
 }
@@ -144,6 +145,7 @@ async function handleDownload(versionId: string) {
     showSuccess(`${versionId} 下载完成`)
   } catch (e) {
     showError('下载失败', `无法下载版本 ${versionId}`, String(e))
+    versionStore.finishDownload()
   }
   // 不在这里调用 finishDownload，由轮询统一管理生命周期
 }

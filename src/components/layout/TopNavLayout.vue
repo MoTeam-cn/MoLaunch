@@ -3,7 +3,7 @@
  * 顶部导航布局组件
  */
 
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useSdkStore } from '@/stores/sdk'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
@@ -19,12 +19,20 @@ const router = useRouter()
 const route = useRoute()
 const sdkStore = useSdkStore()
 const isMaximized = ref(false)
+const unlistenResized = ref<(() => void) | null>(null)
 
 onMounted(async () => {
   isMaximized.value = await appWindow.isMaximized()
-  await appWindow.onResized(async () => {
+  unlistenResized.value = await appWindow.onResized(async () => {
     isMaximized.value = await appWindow.isMaximized()
   })
+})
+
+onUnmounted(() => {
+  if (unlistenResized.value) {
+    unlistenResized.value()
+    unlistenResized.value = null
+  }
 })
 
 const navItems = [

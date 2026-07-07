@@ -22,6 +22,14 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
       }
 
       if (progress && progress.stages && progress.stages.length > 0) {
+        // 先检查错误码，避免在失败状态下继续轮询
+        if (progress.error_code && progress.error_code !== 0) {
+          console.log('[Polling] Download failed with error_code=', progress.error_code, ', stopping polling')
+          stopPolling()
+          versionStore.finishDownload()
+          return
+        }
+
         const stages: DownloadStage[] = progress.stages.map((s: any) => ({
           name: s.name,
           progress: s.progress,
@@ -54,10 +62,9 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
 
         if (progress.is_complete) {
           console.log('[Polling] Download complete, stopping polling')
-          setTimeout(() => {
-            stopPolling()
-            versionStore.finishDownload()
-          }, 1500)
+          stopPolling()
+          versionStore.finishDownload()
+          return
         }
       }
     } catch (e) {

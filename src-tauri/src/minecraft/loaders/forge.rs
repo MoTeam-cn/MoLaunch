@@ -213,6 +213,14 @@ async fn install_legacy(
             if relative_path.is_empty() { continue; }
             let dest_path = maven_dest.join(relative_path);
 
+            // Zip Slip 防护：校验最终路径仍在 maven_dest 内
+            let canonical_base = maven_dest.canonicalize().unwrap_or_else(|_| maven_dest.to_path_buf());
+            let canonical_dest = dest_path.canonicalize().unwrap_or_else(|_| dest_path.clone());
+            if !canonical_dest.starts_with(&canonical_base) {
+                crate::log_warn!("[Forge] Skip path traversal entry: {}", entry_name);
+                continue;
+            }
+
             let mut entry = zip.by_name(entry_name)?;
             if entry.is_dir() {
                 std::fs::create_dir_all(&dest_path)?;

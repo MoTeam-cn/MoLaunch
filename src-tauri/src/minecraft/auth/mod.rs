@@ -49,57 +49,27 @@ pub fn login_offline(username: &str) -> LoginResult {
 }
 
 /// 生成离线UUID
-/// 参考PCL2的实现，使用用户名的哈希值生成符合UUID v3格式的标识符
+/// 使用标准 Minecraft 离线 UUID 算法（UUID v3），即对 `"OfflinePlayer:" + username` 取 MD5，
+/// 然后按 RFC 4122 v3 格式化（设置 version 位为 3，variant 位为 0b10xx）。
+/// 这样与官方启动器、PCL2 等保持一致，避免离线账号 UUID 因启动器不同而漂移。
 pub fn generate_offline_uuid(username: &str) -> String {
-    // 计算用户名的稳定哈希值
-    let hash = get_stable_hash_code(username);
-    
-    // 转换为16进制字符串
-    let hash_hex = format!("{:016X}", hash);
-    let length_hex = format!("{:016X}", username.len() as u64);
-    
-    // 组合
-    let combined = format!("{}{}", length_hex, hash_hex);
-    
-    // 确保长度为32个字符
-    let combined = if combined.len() < 32 {
-        format!("{:0<32}", combined)
-    } else {
-        combined[..32].to_string()
-    };
-    
-    // 格式化为UUID格式，设置版本为3
-    let mut uuid_chars: Vec<char> = combined.chars().collect();
-    uuid_chars[12] = '3'; // 版本号
-    uuid_chars[16] = '9'; // 变体
-    
-    let uuid_str: String = uuid_chars.into_iter().collect();
-    
-    // 格式化为标准UUID格式
-    format!(
-        "{}-{}-{}-{}-{}",
-        &uuid_str[0..8],
-        &uuid_str[8..12],
-        &uuid_str[12..16],
-        &uuid_str[16..20],
-        &uuid_str[20..32]
-    )
-}
+    let digest = md5::compute(format!("OfflinePlayer:{}", username));
+    let mut bytes = digest.0;
 
-/// 获取字符串的稳定哈希值
-/// 参考Java的String.hashCode()实现
-fn get_stable_hash_code(s: &str) -> u64 {
-    let mut hash: i64 = 0;
-    let mut multiplier: i64 = 1;
-    
-    for ch in s.chars().rev() {
-        let char_value = ch as i64;
-        hash = hash.wrapping_add(char_value.wrapping_mul(multiplier));
-        multiplier = multiplier.wrapping_mul(31);
-    }
-    
-    // 转换为无符号64位整数
-    hash as u64
+    // 设置 version 位为 3（UUID v3）：清零 byte[6] 高 4 位后置为 0011
+    bytes[6] = (bytes[6] & 0x0F) | 0x30;
+    // 设置 variant 位为 0b10xx：清零 byte[8] 高 2 位后置为 10
+    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+
+    // 格式化为标准 UUID 字符串（8-4-4-4-12，小写十六进制）
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        bytes[0], bytes[1], bytes[2], bytes[3],
+        bytes[4], bytes[5],
+        bytes[6], bytes[7],
+        bytes[8], bytes[9],
+        bytes[10], bytes[11], bytes[12], bytes[13], bytes[14], bytes[15]
+    )
 }
 
 /// 验证用户名是否有效

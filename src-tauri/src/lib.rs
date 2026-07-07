@@ -47,8 +47,6 @@ pub fn run() {
             commands::sdk::get_sdk_version,
             commands::sdk::is_sdk_initialized,
             commands::sdk::get_device_id,
-            commands::sdk::encrypt_token,
-            commands::sdk::decrypt_token,
             commands::sdk::check_update_lite,
             // 认证命令
             commands::auth::login_offline,

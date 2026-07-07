@@ -285,6 +285,9 @@ pub fn get_version_chain(game_dir: &Path, version_id: &str) -> Vec<String> {
 
 /// 卸载版本
 pub fn uninstall_version(game_dir: &Path, version_id: &str) -> Result<(), String> {
+    // 防御性校验：防止路径遍历（虽然调用方 manage.rs 已校验，这里再加一道）
+    crate::commands::version::sanitize_version_id(version_id)?;
+
     let version_dir = game_dir.join("versions").join(version_id);
     if !version_dir.exists() {
         return Err(format!("Version {} not found", version_id));

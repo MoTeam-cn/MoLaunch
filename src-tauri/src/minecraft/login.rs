@@ -111,7 +111,7 @@ pub fn login_offline(username: &str) -> Result<LoginResult, LoginError> {
     }
 
     // 生成UUID
-    let uuid = generate_offline_uuid(username);
+    let uuid = crate::minecraft::auth::generate_offline_uuid(username);
     let access_token = uuid.clone();
     let client_token = uuid.clone();
 
@@ -123,48 +123,6 @@ pub fn login_offline(username: &str) -> Result<LoginResult, LoginError> {
         login_type: LoginType::Offline,
         profile_json: None,
     })
-}
-
-/// 生成离线UUID (参考PCL2)
-pub fn generate_offline_uuid(username: &str) -> String {
-    use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
-
-    // 计算用户名的稳定哈希值
-    let mut hasher = DefaultHasher::new();
-    username.hash(&mut hasher);
-    let hash = hasher.finish();
-
-    // 转换为16进制字符串
-    let hash_hex = format!("{:016x}", hash);
-    let length_hex = format!("{:016x}", username.len() as u64);
-
-    // 组合
-    let combined = format!("{}{}", length_hex, hash_hex);
-
-    // 确保长度为32个字符
-    let combined = if combined.len() < 32 {
-        format!("{:0<32}", combined)
-    } else {
-        combined[..32].to_string()
-    };
-
-    // 格式化为UUID格式，设置版本为3
-    let mut uuid_chars: Vec<char> = combined.chars().collect();
-    uuid_chars[12] = '3'; // 版本号
-    uuid_chars[16] = '9'; // 变体
-
-    let uuid_str: String = uuid_chars.into_iter().collect();
-
-    // 格式化为标准UUID格式
-    format!(
-        "{}-{}-{}-{}-{}",
-        &uuid_str[..8],
-        &uuid_str[8..12],
-        &uuid_str[12..16],
-        &uuid_str[16..20],
-        &uuid_str[20..]
-    )
 }
 
 /// 微软登录 (预留接口)
@@ -303,9 +261,9 @@ mod tests {
 
     #[test]
     fn test_uuid_generation() {
-        let uuid1 = generate_offline_uuid("Player1");
-        let uuid2 = generate_offline_uuid("Player2");
-        let uuid3 = generate_offline_uuid("Player1");
+        let uuid1 = crate::minecraft::auth::generate_offline_uuid("Player1");
+        let uuid2 = crate::minecraft::auth::generate_offline_uuid("Player2");
+        let uuid3 = crate::minecraft::auth::generate_offline_uuid("Player1");
 
         // 不同用户名应该生成不同的UUID
         assert_ne!(uuid1, uuid2);
@@ -313,8 +271,10 @@ mod tests {
         // 相同用户名应该生成相同的UUID
         assert_eq!(uuid1, uuid3);
 
-        // 检查UUID格式
+        // 检查UUID格式（标准 UUID v3 字符串：36 字符，4 个连字符）
         assert_eq!(uuid1.len(), 36);
         assert_eq!(uuid1.chars().filter(|c| *c == '-').count(), 4);
+        // UUID v3 的版本位（第 14 个字符，即第 3 段首位）应为 '3'
+        assert_eq!(uuid1.chars().nth(14), Some('3'));
     }
 }

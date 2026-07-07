@@ -7,6 +7,7 @@ use std::time::Instant;
 use tauri::{Emitter, State};
 
 use super::types::DownloadStageSnapshot;
+use super::sanitize_version_id;
 
 /// Download version
 #[tauri::command]
@@ -15,6 +16,7 @@ pub async fn download_version(
     state: State<'_, AppState>,
     version_id: String,
 ) -> Result<(), String> {
+    sanitize_version_id(&version_id)?;
     log_info!("Downloading version: {}", version_id);
 
     {

@@ -10,6 +10,8 @@ use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, State};
 
+use super::{sanitize_version_id, sanitize_mc_version};
+
 /// 安装单个加载器的通用辅助函数
 /// 如果阶段已存在（最后一个阶段是加载器安装），则更新它；否则添加新阶段
 async fn install_single_loader(
@@ -135,6 +137,10 @@ pub async fn install_merged(
     liteloader_version: Option<String>,
     instance_name: Option<String>,
 ) -> Result<(), String> {
+    sanitize_mc_version(&mc_version)?;
+    if let Some(ref name) = instance_name {
+        sanitize_version_id(name)?;
+    }
     log_info!("Merged install: mc={}, forge={:?}, neoforge={:?}, fabric={:?}, optifine={:?}",
         mc_version, forge_version, neoforge_version, fabric_version, optifine_version);
 

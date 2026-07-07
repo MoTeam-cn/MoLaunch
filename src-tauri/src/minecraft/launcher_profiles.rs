@@ -124,8 +124,9 @@ impl LauncherProfiles {
             match serde_json::from_str::<Self>(&content) {
                 Ok(profiles) => return Ok(profiles),
                 Err(e) => {
-                    log_warn!("[Profiles] 解析失败，重新创建: {}", e);
-                    let _ = std::fs::remove_file(&path);
+                    log_warn!("[Profiles] 解析失败，备份原文件: {}", e);
+                    let bak_path = path.with_extension("json.bak");
+                    let _ = std::fs::rename(&path, &bak_path);
                 }
             }
         }
@@ -142,6 +143,15 @@ impl LauncherProfiles {
             .map_err(|e| format!("序列化 launcher_profiles.json 失败: {}", e))?;
         std::fs::write(&path, content)
             .map_err(|e| format!("写入 launcher_profiles.json 失败: {}", e))?;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(metadata) = std::fs::metadata(&path) {
+                let mut perms = metadata.permissions();
+                perms.set_mode(0o600);
+                let _ = std::fs::set_permissions(&path, perms);
+            }
+        }
         Ok(())
     }
 
@@ -190,9 +200,10 @@ impl LauncherProfiles {
         match self.save(mc_folder) {
             Ok(()) => Ok(()),
             Err(e) => {
-                log_warn!("[Profiles] 保存失败，删除后重试: {}", e);
+                log_warn!("[Profiles] 保存失败，备份后重试: {}", e);
                 let path = mc_folder.join("launcher_profiles.json");
-                let _ = std::fs::remove_file(&path);
+                let bak_path = path.with_extension("json.bak");
+                let _ = std::fs::rename(&path, &bak_path);
                 *self = Self::create_default();
                 self.save(mc_folder)?;
                 // 重新写入认证数据

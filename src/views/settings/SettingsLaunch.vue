@@ -3,6 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
+import { showError } from '@/utils/modal'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
 import { formatBytes } from '@/utils/format'
 import Select from '@/components/common/Select.vue'
@@ -93,7 +94,7 @@ async function handleManualImportJava() {
       // 验证必须是 javaw.exe
       const fileName = selected.split('\\').pop()?.split('/').pop()?.toLowerCase()
       if (fileName !== 'javaw.exe') {
-        showError('请选择 javaw.exe，而不是 java.exe')
+        showError('提示', '请选择 javaw.exe，而不是 java.exe')
         return
       }
       javaStore.setJavaPath(selected)

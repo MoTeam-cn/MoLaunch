@@ -62,9 +62,11 @@ pub async fn download_single(
 
     // 顺序尝试每个 URL，超时自动重试，总共最多 3 次
     let max_retries: usize = 3;
-    let mut attempt = 0;
 
     'url_loop: for url in urls {
+        // 每个 URL 独立计数，确保 URL 回退时重试次数正确重置
+        let mut attempt = 0;
+
         // 确定超时时间
         let timeout = match source_mode {
             DownloadSourceMode::Smart => {

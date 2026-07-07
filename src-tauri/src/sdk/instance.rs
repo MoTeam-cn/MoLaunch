@@ -180,6 +180,8 @@ impl SdkInstance {
 
         let code = unsafe { (self.functions.update_check_lite)(&mut info) };
         if code != 0 {
+            // 错误分支也需释放可能已分配的 FFI 内存
+            unsafe { (self.functions.update_free_info_lite)(&mut info) };
             return Err(SdkError::FfiFailed(code));
         }
 

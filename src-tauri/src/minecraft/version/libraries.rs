@@ -159,6 +159,10 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
                 if let Some(cls) = library["downloads"]["classifiers"].get(&classifier) {
                     let url = cls["url"].as_str().or(root_url.as_deref()).map(|s| s.to_string());
                     let path = if let Some(p) = cls["path"].as_str() {
+                        if p.contains("..") {
+                            crate::log_warn!("[Libraries] Skip path traversal in artifact path: {}", p);
+                            continue;
+                        }
                         game_dir.join("libraries").join(p.replace('/', std::path::MAIN_SEPARATOR_STR)).to_string_lossy().to_string()
                     } else {
                         maven_to_path(name, game_dir).replace(".jar", &format!("-natives-{}.jar", arch))
@@ -190,6 +194,10 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
             let (url, local_path, size, sha1) = if let Some(artifact) = library.get("downloads").and_then(|d| d.get("artifact")) {
                 let url = artifact["url"].as_str().or(root_url.as_deref()).map(|s| s.to_string());
                 let path = if let Some(p) = artifact["path"].as_str() {
+                    if p.contains("..") {
+                        crate::log_warn!("[Libraries] Skip path traversal in artifact path: {}", p);
+                        continue;
+                    }
                     game_dir.join("libraries").join(p.replace('/', std::path::MAIN_SEPARATOR_STR)).to_string_lossy().to_string()
                 } else {
                     maven_to_path(name, game_dir)

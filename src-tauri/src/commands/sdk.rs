@@ -71,30 +71,6 @@ pub async fn get_device_id(state: State<'_, AppState>) -> Result<String, String>
     })
 }
 
-/// 加密 Token
-#[tauri::command]
-pub async fn encrypt_token(state: State<'_, AppState>, data: String) -> Result<String, String> {
-    let sdk_guard = state.sdk.lock().await;
-    let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
-
-    sdk.encrypt_token(&data).map_err(|e| {
-        log_error!("Failed to encrypt token: {}", e);
-        e.to_string()
-    })
-}
-
-/// 解密 Token
-#[tauri::command]
-pub async fn decrypt_token(state: State<'_, AppState>, encrypted: String) -> Result<String, String> {
-    let sdk_guard = state.sdk.lock().await;
-    let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
-
-    sdk.decrypt_token(&encrypted).map_err(|e| {
-        log_error!("Failed to decrypt token: {}", e);
-        e.to_string()
-    })
-}
-
 /// 检查更新（轻量版）
 #[tauri::command]
 pub async fn check_update_lite(state: State<'_, AppState>) -> Result<crate::sdk::UpdateInfoLite, String> {

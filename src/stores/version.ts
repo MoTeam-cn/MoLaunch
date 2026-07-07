@@ -95,6 +95,9 @@ export const useVersionStore = defineStore('version', () => {
     try {
       unlistenFn = await listen<GameExitEvent>('game-exited', (event) => {
         console.log('Game exited:', event.payload)
+        runningPid.value = null
+        runningVersionId.value = null
+        stopExitPolling()
       })
     } catch (e) {
       console.error('Failed to setup game exit listener:', e)

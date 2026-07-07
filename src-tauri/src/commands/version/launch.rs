@@ -6,6 +6,8 @@ use crate::state::{AppState, resolve_game_dir};
 use std::sync::Arc;
 use tauri::{State, Emitter};
 
+use super::sanitize_version_id;
+
 /// 游戏退出事件数据
 #[derive(Clone, serde::Serialize)]
 pub struct GameExitEvent {
@@ -30,6 +32,7 @@ pub async fn launch_game(
     server_address: Option<String>,
     server_port: Option<u32>,
 ) -> Result<u32, String> {
+    sanitize_version_id(&version_id)?;
     log_info!("Launching game version: {}", version_id);
 
     let config = state.config.lock().await;
@@ -65,14 +68,11 @@ pub async fn launch_game(
     drop(config);
 
     // 使用启动流水线
-    let pipeline = LaunchPipeline::new(launch_config);
-    
-    // 存储pipeline以便后续取消
-    *state.launch_pipeline.lock().await = Some(Arc::new(pipeline));
-    
-    // 获取pipeline引用（注意：pipeline_guard 持有锁，必须在 spawn 之前释放）
-    let pipeline_guard = state.launch_pipeline.lock().await;
-    let pipeline = pipeline_guard.as_ref().ok_or("启动流水线未初始化")?;
+    let pipeline = Arc::new(LaunchPipeline::new(launch_config));
+
+    // 存储pipeline以便后续取消，立即释放锁，后续通过 Arc 访问
+    // 避免阻塞 cancel_launch/stop_game/get_launch_progress
+    *state.launch_pipeline.lock().await = Some(pipeline.clone());
 
     // 执行启动
     let result = pipeline.execute().await
@@ -96,9 +96,8 @@ pub async fn launch_game(
     // 更新当前运行状态
     *state.current_pid.lock().await = Some(result.pid);
 
-    // 先获取退出接收器，再释放 pipeline_guard，避免监控任务死锁
+    // 获取退出接收器（pipeline 现在是 Arc<LaunchPipeline>，无需持有锁）
     let exit_rx = pipeline.exit_receiver().await;
-    drop(pipeline_guard);
 
     let version_id_clone = version_id.clone();
     let app_handle_clone = app_handle.clone();
@@ -173,12 +172,16 @@ pub async fn stop_game(state: State<'_, AppState>) -> Result<(), String> {
     if let Some(pid) = *current_pid {
         log_info!("Stopping game with PID: {}", pid);
 
-        // 在 Windows 上终止进程
+        // 立即清理并释放 current_pid 锁，避免阻塞监控任务且防止 PID 复用误判
+        *current_pid = None;
+        drop(current_pid);
+
+        // 在 Windows 上终止进程树（/T 杀子进程，/F 强制结束）
         #[cfg(target_os = "windows")]
         {
             use std::process::Command;
             Command::new("taskkill")
-                .args(&["/PID", &pid.to_string(), "/F"])
+                .args(&["/PID", &pid.to_string(), "/T", "/F"])
                 .output()
                 .map_err(|e| format!("Failed to stop game: {}", e))?;
         }
@@ -193,11 +196,9 @@ pub async fn stop_game(state: State<'_, AppState>) -> Result<(), String> {
                 .map_err(|e| format!("Failed to stop game: {}", e))?;
         }
 
-        *current_pid = None;
-        
         // 清理pipeline
         *state.launch_pipeline.lock().await = None;
-        
+
         log_info!("Game stopped successfully");
         Ok(())
     } else {

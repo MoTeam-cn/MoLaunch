@@ -75,6 +75,16 @@ pub async fn download_chunked(
     }
 
     let chunk_size = file_size / chunk_count as u64;
+    if chunk_size == 0 {
+        // file_size < chunk_count，无法分片，避免整数下溢
+        return ChunkDownloadResult {
+            downloaded: 0,
+            total: file_size,
+            speed: 0,
+            status: DownloadStatus::Failed,
+            error: Some("file size too small to chunk".into()),
+        };
+    }
     let mut ranges: Vec<(u64, u64)> = Vec::with_capacity(chunk_count);
 
     for i in 0..chunk_count {

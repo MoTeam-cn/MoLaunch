@@ -5,6 +5,8 @@ use crate::state::AppState;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use super::sanitize_version_id;
+
 /// Installed version info
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InstalledVersionInfo {
@@ -129,6 +131,7 @@ pub async fn uninstall_version(
     state: State<'_, AppState>,
     version_id: String,
 ) -> Result<(), String> {
+    sanitize_version_id(&version_id)?;
     log_info!("Uninstalling version: '{}'", version_id);
 
     let config = state.config.lock().await;

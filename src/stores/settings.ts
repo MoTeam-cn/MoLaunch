@@ -19,6 +19,7 @@ export const useSettingsStore = defineStore('settings', () => {
       if (saved) {
         const parsed = JSON.parse(saved)
         if (parsed.layoutMode) layoutMode.value = parsed.layoutMode
+        if (parsed.theme) theme.value = parsed.theme
         if (parsed.language) language.value = parsed.language
       }
     } catch (e) {
@@ -30,6 +31,7 @@ export const useSettingsStore = defineStore('settings', () => {
     try {
       localStorage.setItem('molaunch-settings', JSON.stringify({
         layoutMode: layoutMode.value,
+        theme: theme.value,
         language: language.value,
       }))
     } catch (e) {
@@ -47,6 +49,11 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSettings()
   }
 
+  function setLanguage(newLanguage: string) {
+    language.value = newLanguage as Language
+    saveSettings()
+  }
+
   loadSettings()
 
   return {
@@ -55,6 +62,7 @@ export const useSettingsStore = defineStore('settings', () => {
     language,
     setLayoutMode,
     setTheme,
+    setLanguage,
     loadSettings,
     saveSettings,
   }

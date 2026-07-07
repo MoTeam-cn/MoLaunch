@@ -111,6 +111,12 @@ pub fn parse_asset_index(
         let hash = object["hash"].as_str().unwrap_or_default();
         let size = object["size"].as_i64().unwrap_or(0);
 
+        // 路径遍历防护：拒绝含 ".." 的 source_path
+        if source_path.contains("..") {
+            crate::log_warn!("[Assets] Skip path traversal in source_path: {}", source_path);
+            continue;
+        }
+
         let local_path = if is_map_to_resources {
             // 极老版本：resources 模式
             game_dir.join("resources").join(source_path).to_string_lossy().to_string()
