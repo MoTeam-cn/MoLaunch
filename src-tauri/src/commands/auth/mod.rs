@@ -10,7 +10,10 @@ pub mod microsoft;
 pub mod offline;
 
 // 重导出所有 Tauri 命令
-pub use account::{get_login_status, get_ms_accounts, logout, remove_ms_account, switch_ms_account};
+pub use account::{
+    get_login_status, get_ms_accounts, get_offline_accounts, logout, remove_ms_account,
+    remove_offline_account, set_offline_skin, switch_ms_account, switch_offline_account,
+};
 pub use microsoft::{
     ms_login_get_config, ms_login_poll, ms_login_refresh, ms_login_request_device_code,
     ms_login_web_exchange, ms_login_web_start,

@@ -52,6 +52,9 @@ const KEY_MS_CURRENT_PROFILE: &str = "MsCurrentProfile";
 /// 所有微软账号列表 JSON（加密）
 const KEY_MS_ACCOUNTS: &str = "MsAccounts";
 
+/// 所有离线账号列表 JSON（加密）
+const KEY_OFFLINE_ACCOUNTS: &str = "OfflineAccounts";
+
 /// 所有注册表键名（用于清理）
 #[cfg(windows)]
 const ALL_KEYS: &[&str] = &[
@@ -65,6 +68,7 @@ const ALL_KEYS: &[&str] = &[
     KEY_MS_CURRENT_EXPIRES,
     KEY_MS_CURRENT_PROFILE,
     KEY_MS_ACCOUNTS,
+    KEY_OFFLINE_ACCOUNTS,
 ];
 
 // ============================================================
@@ -95,6 +99,16 @@ impl From<&MicrosoftLoginResult> for StoredMsAccount {
     }
 }
 
+/// 持久化的离线账号信息
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredOfflineAccount {
+    pub username: String,
+    pub uuid: String,
+    /// 用户选择的本地皮肤名称（None 表示使用默认 hash 皮肤）
+    #[serde(default)]
+    pub skin: Option<String>,
+}
+
 /// 持久化的认证状态
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct PersistedAuthState {
@@ -102,6 +116,9 @@ pub struct PersistedAuthState {
     pub current_user: Option<CurrentUser>,
     /// 已保存的微软账号列表（多账号）
     pub ms_accounts: Vec<StoredMsAccount>,
+    /// 已保存的离线账号列表（多账号）
+    #[serde(default)]
+    pub offline_accounts: Vec<StoredOfflineAccount>,
 }
 
 /// 当前登录用户（持久化用）
@@ -186,7 +203,9 @@ impl AuthStorage {
     async fn encrypt(&self, data: &str) -> Result<String, String> {
         let sdk = self.sdk.lock().await;
         match sdk.as_ref() {
-            Some(sdk) => sdk.encrypt_token(data).map_err(|e| format!("加密失败: {}", e)),
+            Some(sdk) => sdk
+                .encrypt_token(data)
+                .map_err(|e| format!("加密失败: {}", e)),
             None => Err("SDK 未加载，无法加密认证数据".to_string()),
         }
     }
@@ -195,19 +214,16 @@ impl AuthStorage {
     async fn decrypt(&self, data: &str) -> Result<String, String> {
         let sdk = self.sdk.lock().await;
         match sdk.as_ref() {
-            Some(sdk) => sdk.decrypt_token(data).map_err(|e| format!("解密失败: {}", e)),
+            Some(sdk) => sdk
+                .decrypt_token(data)
+                .map_err(|e| format!("解密失败: {}", e)),
             None => Err("SDK 未加载，无法解密认证数据".to_string()),
         }
     }
 
     /// 加密并写入注册表
     #[cfg(windows)]
-    async fn reg_set_encrypted(
-        &self,
-        key: &RegKey,
-        name: &str,
-        value: &str,
-    ) -> Result<(), String> {
+    async fn reg_set_encrypted(&self, key: &RegKey, name: &str, value: &str) -> Result<(), String> {
         let encrypted = self.encrypt(value).await?;
         Self::reg_set(key, name, &encrypted)
     }
@@ -286,9 +302,7 @@ impl AuthStorage {
                         .await
                         .and_then(|s| s.parse::<u64>().ok())
                         .unwrap_or(0);
-                    let profile = self
-                        .reg_get_decrypted(&key, KEY_MS_CURRENT_PROFILE)
-                        .await;
+                    let profile = self.reg_get_decrypted(&key, KEY_MS_CURRENT_PROFILE).await;
 
                     state.current_user = Some(CurrentUser {
                         name,
@@ -306,19 +320,26 @@ impl AuthStorage {
             // 读取多账号列表
             if let Some(accounts_json) = self.reg_get_decrypted(&key, KEY_MS_ACCOUNTS).await {
                 if !accounts_json.is_empty() {
-                    state.ms_accounts =
-                        serde_json::from_str(&accounts_json).unwrap_or_default();
+                    state.ms_accounts = serde_json::from_str(&accounts_json).unwrap_or_default();
+                }
+            }
+
+            // 读取离线账号列表
+            if let Some(offline_json) = self.reg_get_decrypted(&key, KEY_OFFLINE_ACCOUNTS).await {
+                if !offline_json.is_empty() {
+                    state.offline_accounts = serde_json::from_str(&offline_json).unwrap_or_default();
                 }
             }
 
             log_info!(
-                "Loaded persisted auth state: current_user={}, ms_accounts={}",
+                "Loaded persisted auth state: current_user={}, ms_accounts={}, offline_accounts={}",
                 state
                     .current_user
                     .as_ref()
                     .map(|u| u.name.as_str())
                     .unwrap_or("none"),
-                state.ms_accounts.len()
+                state.ms_accounts.len(),
+                state.offline_accounts.len()
             );
 
             Ok(state)
@@ -392,6 +413,13 @@ impl AuthStorage {
                 self.reg_set_encrypted(&key, KEY_MS_ACCOUNTS, &json).await?;
             }
 
+            // 写入离线账号列表
+            if !state.offline_accounts.is_empty() {
+                let json = serde_json::to_string(&state.offline_accounts)
+                    .map_err(|e| format!("序列化离线账号列表失败: {}", e))?;
+                self.reg_set_encrypted(&key, KEY_OFFLINE_ACCOUNTS, &json).await?;
+            }
+
             Ok(())
         }
     }
@@ -428,8 +456,30 @@ impl AuthStorage {
     }
 
     /// 保存离线登录并设为当前用户
+    ///
+    /// 同时把账号添加到离线账号列表（UUID 去重），保留已有的 skin 选择。
     pub async fn save_offline_login(&self, username: &str, uuid: &str) -> Result<(), String> {
         let mut state = self.load().await.unwrap_or_default();
+
+        // 添加到离线账号列表（UUID 去重，保留已有的 skin 选择）
+        let account = StoredOfflineAccount {
+            username: username.to_string(),
+            uuid: uuid.to_string(),
+            skin: state
+                .offline_accounts
+                .iter()
+                .find(|a| a.uuid == uuid)
+                .and_then(|a| a.skin.clone()),
+        };
+        if let Some(existing) = state
+            .offline_accounts
+            .iter_mut()
+            .find(|a| a.uuid == account.uuid)
+        {
+            *existing = account.clone();
+        } else {
+            state.offline_accounts.push(account);
+        }
 
         state.current_user = Some(CurrentUser {
             name: username.to_string(),
@@ -443,6 +493,41 @@ impl AuthStorage {
         });
 
         self.save(&state).await
+    }
+
+    /// 设置离线账号的皮肤选择
+    pub async fn set_offline_skin(&self, uuid: &str, skin: Option<&str>) -> Result<(), String> {
+        let mut state = self.load().await.unwrap_or_default();
+        if let Some(account) = state.offline_accounts.iter_mut().find(|a| a.uuid == uuid) {
+            account.skin = skin.map(|s| s.to_string());
+            self.save(&state).await
+        } else {
+            Err("离线账号不存在".to_string())
+        }
+    }
+
+    /// 删除指定离线账号
+    pub async fn remove_offline_account(&self, uuid: &str) -> Result<(), String> {
+        let mut state = self.load().await.unwrap_or_default();
+        state.offline_accounts.retain(|a| a.uuid != uuid);
+
+        // 如果删除的是当前用户，也清除当前用户
+        if let Some(ref current) = state.current_user {
+            if current.uuid == uuid {
+                state.current_user = None;
+            }
+        }
+
+        self.save(&state).await
+    }
+
+    /// 获取指定离线账号
+    pub async fn get_offline_account(&self, uuid: &str) -> Result<Option<StoredOfflineAccount>, String> {
+        let state = self.load().await?;
+        Ok(state
+            .offline_accounts
+            .into_iter()
+            .find(|a| a.uuid == uuid))
     }
 
     /// 清除当前用户（登出）

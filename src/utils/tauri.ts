@@ -3,7 +3,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
-import type { AuthResult, SdkStatus, MsAccountInfo, DeviceCodeInfo, PollResult, LoginConfig } from '@/types/auth'
+import type { AuthResult, SdkStatus, MsAccountInfo, OfflineAccountInfo, DeviceCodeInfo, PollResult, LoginConfig } from '@/types/auth'
 import type { VersionList } from '@/types/version'
 import type { JavaRuntime } from '@/types/java'
 
@@ -104,6 +104,34 @@ export async function removeMsAccount(uuid: string): Promise<void> {
  */
 export async function switchMsAccount(uuid: string): Promise<AuthResult> {
   return await invoke<AuthResult>('switch_ms_account', { uuid })
+}
+
+/**
+ * 获取已存储的离线账号列表
+ */
+export async function getOfflineAccounts(): Promise<OfflineAccountInfo[]> {
+  return await invoke<OfflineAccountInfo[]>('get_offline_accounts')
+}
+
+/**
+ * 删除已存储的离线账号
+ */
+export async function removeOfflineAccount(uuid: string): Promise<void> {
+  return await invoke<void>('remove_offline_account', { uuid })
+}
+
+/**
+ * 切换到已存储的离线账号
+ */
+export async function switchOfflineAccount(uuid: string): Promise<AuthResult> {
+  return await invoke<AuthResult>('switch_offline_account', { uuid })
+}
+
+/**
+ * 设置离线账号的皮肤选择
+ */
+export async function setOfflineSkin(uuid: string, skin: string | null): Promise<void> {
+  return await invoke<void>('set_offline_skin', { uuid, skin })
 }
 
 /**
@@ -544,4 +572,84 @@ export async function stopGame(): Promise<void> {
  */
 export async function getRunningGame(): Promise<number | null> {
   return await invoke<number | null>('get_running_game')
+}
+
+// ============================================================
+// 皮肤与披风管理
+// ============================================================
+
+export interface SkinInfo {
+  id: string
+  state: string
+  url: string
+  variant: string
+  alias: string | null
+}
+
+export interface CapeInfo {
+  id: string
+  state: string
+  alias: string
+  display_name: string
+  url: string | null
+}
+
+export interface SkinCapeInfo {
+  skins: SkinInfo[]
+  capes: CapeInfo[]
+}
+
+/**
+ * 获取当前账号的皮肤/披风信息
+ */
+export async function getSkinCapeInfo(): Promise<SkinCapeInfo> {
+  return await invoke<SkinCapeInfo>('get_skin_cape_info')
+}
+
+/**
+ * 获取皮肤 PNG 下载 URL
+ */
+export async function getSkinUrl(): Promise<string | null> {
+  return await invoke<string | null>('get_skin_url')
+}
+
+/**
+ * 下载皮肤 PNG，返回 data:image/png;base64,... 格式
+ *
+ * 前端收到后用 canvas 裁剪 (8,8,8,8) 区域作为头像（PCL2 的方式）
+ */
+export async function downloadSkinPng(uuid?: string): Promise<string> {
+  return await invoke<string>('download_skin_png', { uuid: uuid ?? null })
+}
+
+/**
+ * 下载当前已装备披风的 PNG，返回 data:image/png;base64,... 格式
+ *
+ * 无披风时返回 null
+ */
+export async function downloadCapePng(): Promise<string | null> {
+  return await invoke<string | null>('download_cape_png')
+}
+
+/**
+ * 上传/修改皮肤
+ * @param filePath PNG 文件本地路径
+ * @param variant 'classic' (Steve) 或 'slim' (Alex)
+ */
+export async function uploadSkin(filePath: string, variant: 'classic' | 'slim'): Promise<void> {
+  return await invoke<void>('upload_skin', { filePath, variant })
+}
+
+/**
+ * 装备披风
+ */
+export async function equipCape(capeId: string): Promise<void> {
+  return await invoke<void>('equip_cape', { capeId })
+}
+
+/**
+ * 取消披风
+ */
+export async function unequipCape(): Promise<void> {
+  return await invoke<void>('unequip_cape')
 }

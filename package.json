@@ -17,6 +17,7 @@
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "pinia": "^2.1.7",
+    "skinview3d": "^3.4.2",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5"
   },

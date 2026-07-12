@@ -4,9 +4,11 @@
  * 支持离线登录和微软登录（Web Authorization Code Flow）
  */
 
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { open } from '@tauri-apps/plugin-shell'
+import Alert from '@/components/common/Alert.vue'
 import DeviceCodeModal from '@/components/common/DeviceCodeModal.vue'
 
 const router = useRouter()
@@ -63,21 +65,15 @@ function onMsModalClose() {
   showMsModal.value = false
 }
 
-// 切换到已存储的微软账号
-async function handleSwitchAccount(uuid: string) {
-  error.value = null
-  try {
-    await authStore.switchMsAccount(uuid)
-    router.push('/')
-  } catch (e) {
-    error.value = String(e)
-  }
+// 打开购买页面
+function openBuyPage() {
+  open('https://www.xbox.com/zh-cn/games/store/minecraft-java-bedrock-edition-for-pc/9nxp44l49shj').catch(() => {})
 }
 
-// 加载已存储的微软账号
-onMounted(() => {
-  authStore.loadMsAccounts()
-})
+// 打开 Minecraft 官网
+function openOfficialSite() {
+  open('https://www.minecraft.net/').catch(() => {})
+}
 </script>
 
 <template>
@@ -91,36 +87,6 @@ onMounted(() => {
 
       <!-- 登录卡片 -->
       <div class="rounded-2xl bg-white p-6 shadow-lg">
-        <!-- 已存储的微软账号 -->
-        <div v-if="authStore.msAccounts.length > 0" class="mb-4">
-          <p class="mb-2 text-xs font-medium text-gray-400">已保存的微软账号</p>
-          <div class="space-y-2">
-            <button
-              v-for="account in authStore.msAccounts"
-              :key="account.uuid"
-              class="flex w-full items-center gap-3 rounded-lg border border-gray-200 p-3 transition hover:border-primary-300 hover:bg-primary-50"
-              @click="handleSwitchAccount(account.uuid)"
-            >
-              <!-- 头像占位 -->
-              <div class="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100 text-xs font-bold text-primary-600">
-                {{ account.username.charAt(0).toUpperCase() }}
-              </div>
-              <div class="flex-1 text-left">
-                <p class="text-sm font-medium text-gray-900">{{ account.username }}</p>
-                <p class="text-xs text-gray-400">{{ account.is_expired ? 'Token 已过期（将自动刷新）' : 'Token 有效' }}</p>
-              </div>
-              <svg class="h-4 w-4 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
-          <div class="my-4 flex items-center gap-3">
-            <div class="h-px flex-1 bg-gray-100"></div>
-            <span class="text-xs text-gray-400">或</span>
-            <div class="h-px flex-1 bg-gray-100"></div>
-          </div>
-        </div>
-
         <!-- 离线登录 -->
         <div class="space-y-3">
           <div>
@@ -180,13 +146,27 @@ onMounted(() => {
           </svg>
           微软账号登录
         </button>
+
+        <!-- 购买正版 + 前往官网 -->
+        <div class="mt-3 flex gap-2">
+          <button
+            class="flex-1 rounded-lg border border-gray-200 bg-gray-50 py-2 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+            @click="openBuyPage"
+          >
+            购买正版
+          </button>
+          <button
+            class="flex-1 rounded-lg border border-gray-200 bg-gray-50 py-2 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
+            @click="openOfficialSite"
+          >
+            前往官网
+          </button>
+        </div>
       </div>
 
       <!-- 信息提示 -->
-      <div class="mt-4 rounded-xl bg-blue-50 p-4">
-        <p class="text-xs text-blue-600">
-          离线模式仅能进入支持离线登录的服务器。微软账号登录可进入正版服务器并使用皮肤。
-        </p>
+      <div class="mt-4">
+        <Alert type="info" :truncate="false" message="离线模式仅能进入支持离线登录的服务器。微软账号登录可进入正版服务器并使用皮肤。" />
       </div>
     </div>
 

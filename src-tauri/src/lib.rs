@@ -62,6 +62,18 @@ pub fn run() {
             commands::auth::account::get_ms_accounts,
             commands::auth::account::remove_ms_account,
             commands::auth::account::switch_ms_account,
+            commands::auth::account::get_offline_accounts,
+            commands::auth::account::remove_offline_account,
+            commands::auth::account::switch_offline_account,
+            commands::auth::account::set_offline_skin,
+            // 皮肤管理命令
+            commands::skin::get_skin_cape_info,
+            commands::skin::get_skin_url,
+            commands::skin::download_skin_png,
+            commands::skin::download_cape_png,
+            commands::skin::upload_skin,
+            commands::skin::equip_cape,
+            commands::skin::unequip_cape,
             // 版本命令
             commands::version::list::list_versions,
             commands::version::download::download_version,

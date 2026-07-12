@@ -34,6 +34,13 @@ export interface MsAccountInfo {
   is_expired: boolean
 }
 
+/** 已存储的离线账号 */
+export interface OfflineAccountInfo {
+  username: string
+  uuid: string
+  skin: string | null
+}
+
 /** 设备码信息（后端返回给前端显示） */
 export interface DeviceCodeInfo {
   user_code: string

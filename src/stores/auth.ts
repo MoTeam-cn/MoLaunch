@@ -6,8 +6,9 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { AuthResult, LoginStatus, MsAccountInfo, DeviceCodeInfo, PollResult } from '@/types/auth'
+import type { AuthResult, LoginStatus, MsAccountInfo, OfflineAccountInfo, DeviceCodeInfo, PollResult } from '@/types/auth'
 import * as tauri from '@/utils/tauri'
+import { syncOfflineSkins } from '@/utils/default-skin'
 
 const STEP_LABELS: Record<string, string> = {
   exchanging: '授权成功，开始交换 Token...',
@@ -26,6 +27,7 @@ export const useAuthStore = defineStore('auth', () => {
   const msFlow = ref<'web' | 'device_code' | ''>('')
   const deviceCodeInfo = ref<DeviceCodeInfo | null>(null)
   const msAccounts = ref<MsAccountInfo[]>([])
+  const offlineAccounts = ref<OfflineAccountInfo[]>([])
   const msLoginStep = ref('')
   const msLoginStepLabel = computed(() => STEP_LABELS[msLoginStep.value] ?? '')
 
@@ -127,6 +129,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       currentUser.value = await tauri.loginOffline(name)
       loginStatus.value = 'success'
+      await loadOfflineAccounts()
     } catch (e) {
       error.value = String(e); loginStatus.value = 'error'; throw e
     }
@@ -144,6 +147,15 @@ export const useAuthStore = defineStore('auth', () => {
     catch (e) { console.error('Failed to load MS accounts:', e) }
   }
 
+  async function loadOfflineAccounts() {
+    try {
+      offlineAccounts.value = await tauri.getOfflineAccounts()
+      // 同步离线账号皮肤选择到内存缓存
+      syncOfflineSkins(offlineAccounts.value)
+    }
+    catch (e) { console.error('Failed to load offline accounts:', e) }
+  }
+
   async function removeMsAccount(uuid: string) {
     try { await tauri.removeMsAccount(uuid); await loadMsAccounts() }
     catch (e) { error.value = String(e); throw e }
@@ -157,11 +169,24 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) { error.value = String(e); loginStatus.value = 'error'; throw e }
   }
 
+  async function removeOfflineAccount(uuid: string) {
+    try { await tauri.removeOfflineAccount(uuid); await loadOfflineAccounts() }
+    catch (e) { error.value = String(e); throw e }
+  }
+
+  async function switchOfflineAccount(uuid: string) {
+    loginStatus.value = 'loading'; error.value = null
+    try {
+      currentUser.value = await tauri.switchOfflineAccount(uuid)
+      loginStatus.value = 'success'
+    } catch (e) { error.value = String(e); loginStatus.value = 'error'; throw e }
+  }
+
   async function restoreSession() {
     try {
       const result = await tauri.getLoginStatus()
       if (result) { currentUser.value = result; loginStatus.value = 'success' }
-      await loadMsAccounts()
+      await Promise.all([loadMsAccounts(), loadOfflineAccounts()])
     } catch (e) { console.error('Failed to restore session:', e) }
   }
 
@@ -173,10 +198,11 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     currentUser, loginStatus, error, msLoginStatus, msFlow, deviceCodeInfo,
-    msAccounts, msLoginStep, msLoginStepLabel,
+    msAccounts, offlineAccounts, msLoginStep, msLoginStepLabel,
     isLoggedIn, username, isMicrosoftLogin, isMsLoggingIn,
     loginOffline, startMsLogin, cancelMsLogin, refreshMsToken,
-    loadMsAccounts, removeMsAccount, switchMsAccount,
+    loadMsAccounts, loadOfflineAccounts, removeMsAccount, switchMsAccount,
+    removeOfflineAccount, switchOfflineAccount,
     restoreSession, logout: logoutUser,
   }
 })

@@ -76,14 +76,20 @@ pub fn generate_offline_uuid(username: &str) -> String {
 }
 
 /// 验证用户名是否有效
+///
+/// 参考 PCL2：允许 1-16 字符，支持中文、字母、数字、下划线、连字符
+/// （离线模式仅本地使用，不与 Mojang 服务器交互，宽松限制即可）
 pub fn validate_username(username: &str) -> bool {
-    // 用户名长度检查
-    if username.len() < 3 || username.len() > 16 {
+    let chars: Vec<char> = username.chars().collect();
+    let len = chars.len();
+
+    // 长度检查：1-16 字符（按 Unicode 字符数计算，非字节数）
+    if len < 1 || len > 16 {
         return false;
     }
 
-    // 用户名字符检查（只允许字母、数字、下划线）
-    username
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    // 字符检查：允许中文、字母、数字、下划线、连字符
+    chars
+        .iter()
+        .all(|c| c.is_alphanumeric() || *c == '_' || *c == '-')
 }

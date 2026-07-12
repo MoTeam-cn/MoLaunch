@@ -9,10 +9,13 @@ import { ExclamationTriangleIcon, InformationCircleIcon, CheckCircleIcon } from 
 interface Props {
   type?: 'warning' | 'info' | 'success'
   message: string
+  /** 是否单行截断（默认 true）；传 false 允许换行完整显示 */
+  truncate?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   type: 'info',
+  truncate: true,
 })
 
 const typeConfig = {
@@ -37,9 +40,19 @@ const config = typeConfig[props.type]
 </script>
 
 <template>
-  <div class="flex items-center h-8 rounded-r-lg bg-white shadow-sm overflow-hidden">
-    <div class="w-[3px] h-full shrink-0" :class="config.color"></div>
-    <component :is="config.icon" class="w-4 h-4 ml-2.5 shrink-0" :class="config.iconColor" />
-    <span class="text-[13px] font-medium text-gray-800 ml-2 mr-3 truncate">{{ message }}</span>
+  <div
+    class="flex rounded-r-lg bg-white shadow-sm overflow-hidden"
+    :class="truncate ? 'items-center h-8' : 'items-start min-h-8'"
+  >
+    <div class="w-[3px] self-stretch shrink-0" :class="config.color"></div>
+    <component
+      :is="config.icon"
+      class="w-4 h-4 ml-2.5 shrink-0"
+      :class="[config.iconColor, truncate ? '' : 'mt-2']"
+    />
+    <span
+      class="text-[13px] font-medium text-gray-800 ml-2 mr-3"
+      :class="truncate ? 'truncate' : 'py-2'"
+    >{{ message }}</span>
   </div>
 </template>

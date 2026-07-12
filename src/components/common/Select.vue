@@ -1,13 +1,20 @@
 <script setup lang="ts">
 /**
  * 自定义下拉选择框组件
+ * 支持通过 slot 自定义触发器、选项渲染和底部额外内容
  */
 
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 
+interface SelectOption {
+  label: string
+  value: string | number
+  [key: string]: any
+}
+
 interface Props {
   modelValue: string | number
-  options: { label: string; value: string | number }[]
+  options: SelectOption[]
   placeholder?: string
 }
 
@@ -20,7 +27,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: string | number] }>()
 const open = ref(false)
 const closing = ref(false)
 const triggerRef = ref<HTMLElement | null>(null)
-const dropdownStyle = ref({})
+const dropdownStyle = ref<Record<string, string>>({})
 const openUpward = ref(false)
 
 const selectedLabel = computed(() => props.options.find(o => o.value === props.modelValue)?.label || props.placeholder)
@@ -47,7 +54,7 @@ function updateDropdownPosition() {
       top: `${rect.bottom + gap}px`,
       left: `${rect.left}px`,
       width: `${rect.width}px`,
-      zIndex: 9999,
+      zIndex: '9999',
     }
   } else {
     openUpward.value = true
@@ -56,7 +63,7 @@ function updateDropdownPosition() {
       bottom: `${viewportH - rect.top + gap}px`,
       left: `${rect.left}px`,
       width: `${rect.width}px`,
-      zIndex: 9999,
+      zIndex: '9999',
     }
   }
 }
@@ -77,7 +84,6 @@ function onScroll() {
     window.removeEventListener('scroll', onScroll, true)
     requestAnimationFrame(() => {
       open.value = false
-      // 等过渡动画结束再重置标记（动画时长 100ms）
       setTimeout(() => { closing.value = false }, 150)
     })
   }
@@ -98,22 +104,24 @@ onUnmounted(() => {
 
 <template>
   <div ref="triggerRef" class="custom-select">
-    <!-- 触发器 -->
-    <div
-      class="select-trigger"
-      :class="{ active: open }"
-      @click="toggle"
-    >
-      <span class="select-value">{{ selectedLabel }}</span>
-      <svg
-        class="select-arrow"
-        :class="{ rotated: open }"
-        viewBox="0 0 20 20"
-        fill="currentColor"
+    <!-- 触发器：可通过 #trigger 自定义 -->
+    <slot name="trigger" :label="selectedLabel" :open="open" :toggle="toggle">
+      <div
+        class="select-trigger"
+        :class="{ active: open }"
+        @click="toggle"
       >
-        <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-      </svg>
-    </div>
+        <span class="select-value">{{ selectedLabel }}</span>
+        <svg
+          class="select-arrow"
+          :class="{ rotated: open }"
+          viewBox="0 0 20 20"
+          fill="currentColor"
+        >
+          <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
+        </svg>
+      </div>
+    </slot>
 
     <!-- 下拉面板 -->
     <teleport to="body">
@@ -134,18 +142,28 @@ onUnmounted(() => {
           : 'opacity-0 -translate-y-2'"
       >
         <div v-if="open" class="select-dropdown" :style="dropdownStyle">
-          <div
-            v-for="opt in options"
-            :key="opt.value"
-            class="select-option"
-            :class="{ selected: opt.value === modelValue }"
-            @click="select(opt.value)"
-          >
-            <span>{{ opt.label }}</span>
-            <svg v-if="opt.value === modelValue" class="w-4 h-4 text-primary-500" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
-            </svg>
+          <!-- 选项列表（可滚动） -->
+          <div class="select-options-wrapper">
+            <div
+              v-for="opt in options"
+              :key="opt.value"
+              class="select-option"
+              :class="{ selected: opt.value === modelValue }"
+              @click="select(opt.value)"
+            >
+              <slot name="option" :option="opt" :selected="opt.value === modelValue">
+                <span>{{ opt.label }}</span>
+                <svg v-if="opt.value === modelValue" class="w-4 h-4 text-primary-500" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" />
+                </svg>
+              </slot>
+            </div>
+            <div v-if="options.length === 0" class="px-3 py-4 text-center text-sm text-gray-400">
+              <slot name="empty">无选项</slot>
+            </div>
           </div>
+          <!-- 底部额外内容（如"下载新版本"按钮） -->
+          <slot name="footer" />
         </div>
       </transition>
     </teleport>
@@ -206,28 +224,25 @@ onUnmounted(() => {
   border: 1px solid #d1d5db;
   border-radius: 8px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform-origin: top;
+}
+
+.select-options-wrapper {
   max-height: 240px;
   overflow-y: auto;
-  transform-origin: top;
+  border-radius: 8px;
 }
 
 .select-option {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 8px 12px;
   font-size: 13px;
   color: #374151;
   cursor: pointer;
   transition: background 0.1s ease;
-}
-
-.select-option:first-child {
-  border-radius: 8px 8px 0 0;
-}
-
-.select-option:last-child {
-  border-radius: 0 0 8px 8px;
 }
 
 .select-option:hover {

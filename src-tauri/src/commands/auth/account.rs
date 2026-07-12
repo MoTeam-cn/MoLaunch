@@ -3,6 +3,7 @@
 use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::auth::microsoft;
+use crate::minecraft::auth::storage::StoredOfflineAccount;
 use crate::state::{AppState, LocalAuthResult};
 use serde::Serialize;
 use tauri::State;
@@ -14,6 +15,14 @@ pub struct MsAccountInfo {
     pub uuid: String,
     pub expires_at: u64,
     pub is_expired: bool,
+}
+
+/// 已存储的离线账号信息
+#[derive(Debug, Clone, Serialize)]
+pub struct OfflineAccountInfo {
+    pub username: String,
+    pub uuid: String,
+    pub skin: Option<String>,
 }
 
 /// 获取已存储的微软账号列表
@@ -73,7 +82,11 @@ pub async fn switch_ms_account(
             }
             (r.access_token, r.refresh_token, r.expires_at)
         } else {
-            (account.access_token.clone(), account.refresh_token, account.expires_at)
+            (
+                account.access_token.clone(),
+                account.refresh_token,
+                account.expires_at,
+            )
         };
 
     let auth_result = LocalAuthResult {
@@ -115,9 +128,108 @@ pub async fn switch_ms_account(
     Ok(auth_result)
 }
 
+/// 获取已存储的离线账号列表
+#[tauri::command]
+pub async fn get_offline_accounts(
+    state: State<'_, AppState>,
+) -> Result<Vec<OfflineAccountInfo>, String> {
+    let persisted = state.auth_storage.load().await.map_err(|e| e.to_string())?;
+    Ok(persisted
+        .offline_accounts
+        .iter()
+        .map(|a| OfflineAccountInfo {
+            username: a.username.clone(),
+            uuid: a.uuid.clone(),
+            skin: a.skin.clone(),
+        })
+        .collect())
+}
+
+/// 设置离线账号的皮肤选择
+#[tauri::command]
+pub async fn set_offline_skin(
+    state: State<'_, AppState>,
+    uuid: String,
+    skin: Option<String>,
+) -> Result<(), String> {
+    log_info!("Setting offline skin: uuid={}, skin={:?}", uuid, skin);
+    state
+        .auth_storage
+        .set_offline_skin(&uuid, skin.as_deref())
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 删除已存储的离线账号
+#[tauri::command]
+pub async fn remove_offline_account(state: State<'_, AppState>, uuid: String) -> Result<(), String> {
+    log_info!("Removing offline account: {}", uuid);
+    state
+        .auth_storage
+        .remove_offline_account(&uuid)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+/// 切换到已存储的离线账号
+#[tauri::command]
+pub async fn switch_offline_account(
+    state: State<'_, AppState>,
+    uuid: String,
+) -> Result<LocalAuthResult, String> {
+    log_info!("Switching to offline account: {}", uuid);
+
+    let account: StoredOfflineAccount = state
+        .auth_storage
+        .get_offline_account(&uuid)
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "离线账号不存在".to_string())?;
+
+    let auth_result = LocalAuthResult {
+        name: account.username.clone(),
+        uuid: account.uuid.clone(),
+        access_token: account.uuid.clone(),
+        client_token: account.uuid.clone(),
+        login_type: "Legacy".to_string(),
+        profile_json: None,
+    };
+
+    // 更新当前用户（持久化）
+    {
+        let mut persisted = state.auth_storage.load().await.map_err(|e| e.to_string())?;
+        persisted.current_user = Some(crate::minecraft::auth::storage::CurrentUser {
+            name: account.username.clone(),
+            uuid: account.uuid.clone(),
+            access_token: account.uuid.clone(),
+            client_token: account.uuid.clone(),
+            login_type: "Legacy".to_string(),
+            profile_json: None,
+            refresh_token: None,
+            expires_at: None,
+        });
+        state
+            .auth_storage
+            .save(&persisted)
+            .await
+            .map_err(|e| e.to_string())?;
+    }
+
+    {
+        let mut auth = state.auth.lock().await;
+        auth.current_user = Some(auth_result.clone());
+        auth.is_logged_in = true;
+    }
+
+    log_info!("Switched to offline account: {}", account.username);
+    Ok(auth_result)
+}
+
 /// 获取当前登录状态（优先内存，其次磁盘恢复）
 #[tauri::command]
-pub async fn get_login_status(state: State<'_, AppState>) -> Result<Option<LocalAuthResult>, String> {
+pub async fn get_login_status(
+    state: State<'_, AppState>,
+) -> Result<Option<LocalAuthResult>, String> {
     {
         let auth = state.auth.lock().await;
         if auth.current_user.is_some() {
@@ -129,14 +241,20 @@ pub async fn get_login_status(state: State<'_, AppState>) -> Result<Option<Local
 
     if let Some(user) = persisted.current_user {
         if user.login_type == "Microsoft" {
-            if let (Some(expires_at), Some(refresh_token)) = (user.expires_at, &user.refresh_token) {
+            if let (Some(expires_at), Some(refresh_token)) = (user.expires_at, &user.refresh_token)
+            {
                 if microsoft::is_token_expired(expires_at) {
                     log_info!("Token expired on restore, attempting silent refresh...");
                     match microsoft::login_with_refresh_token(refresh_token, |_| {}).await {
                         Ok(r) => {
                             if let Err(e) = state
                                 .auth_storage
-                                .update_ms_token(&user.uuid, &r.access_token, &r.refresh_token, r.expires_at)
+                                .update_ms_token(
+                                    &user.uuid,
+                                    &r.access_token,
+                                    &r.refresh_token,
+                                    r.expires_at,
+                                )
                                 .await
                             {
                                 log_warn!("Failed to update persisted token: {}", e);
