@@ -5,18 +5,27 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::shared;
+use super::{utils, LoaderVersion};
 use crate::minecraft::download::manager::DownloadManager;
-use crate::minecraft::download::types::{DownloadTask, DownloadStatus};
+use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::launcher_profiles;
 use crate::minecraft::sources::{self, DownloadSourceMode};
-use super::{LoaderVersion, utils};
 
 /// List NeoForge versions
-pub async fn list_versions(mc_version: &str, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
+pub async fn list_versions(
+    mc_version: &str,
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
     crate::log_separator!("NeoForge List");
     crate::log_info!("[NeoForge] Listing versions for MC {}", mc_version);
 
-    let urls = sources::build_urls(mirror_url, sources::NEOFORGE_API, sources::BMCLAPI_NEOFORGE, source_mode);
+    let urls = sources::build_urls(
+        mirror_url,
+        sources::NEOFORGE_API,
+        sources::BMCLAPI_NEOFORGE,
+        source_mode,
+    );
     crate::log_debug!("[NeoForge] 尝试源: {:?}", urls);
 
     let content = match sources::fetch_with_fallback(&urls).await {
@@ -38,7 +47,8 @@ pub async fn list_versions(mc_version: &str, mirror_url: Option<&str>, source_mo
         }
     };
 
-    let files_array = json["files"].as_array()
+    let files_array = json["files"]
+        .as_array()
         .or_else(|| json["versions"].as_array());
 
     let total = files_array.map(|a| a.len()).unwrap_or(0);
@@ -67,10 +77,16 @@ pub async fn list_versions(mc_version: &str, mirror_url: Option<&str>, source_mo
     }
 
     // 检查旧版格式
-    let legacy_urls = sources::build_urls(mirror_url, sources::NEOFORGE_API_LEGACY, sources::BMCLAPI_NEOFORGE_LEGACY, source_mode);
+    let legacy_urls = sources::build_urls(
+        mirror_url,
+        sources::NEOFORGE_API_LEGACY,
+        sources::BMCLAPI_NEOFORGE_LEGACY,
+        source_mode,
+    );
     if let Ok(legacy_content) = sources::fetch_with_fallback(&legacy_urls).await {
         if let Ok(legacy_json) = serde_json::from_str::<serde_json::Value>(&legacy_content) {
-            let legacy_files = legacy_json["files"].as_array()
+            let legacy_files = legacy_json["files"]
+                .as_array()
                 .or_else(|| legacy_json["versions"].as_array());
             if let Some(files) = legacy_files {
                 for file in files {
@@ -83,7 +99,8 @@ pub async fn list_versions(mc_version: &str, mirror_url: Option<&str>, source_mo
                     };
                     let prefix = format!("{}-", mc_version);
                     if version_str.starts_with(&prefix) {
-                        let loader_version = version_str.strip_prefix(&prefix).unwrap_or(version_str);
+                        let loader_version =
+                            version_str.strip_prefix(&prefix).unwrap_or(version_str);
                         versions.push(LoaderVersion {
                             version: loader_version.to_string(),
                             is_recommended: true,
@@ -109,18 +126,30 @@ pub async fn list_versions(mc_version: &str, mirror_url: Option<&str>, source_mo
 /// Check NeoForge version compatibility
 fn is_compatible(neoforge_version: &str, mc_version: &str) -> bool {
     let mc_parts: Vec<&str> = mc_version.split('.').collect();
-    if mc_parts.len() < 2 { return false; }
+    if mc_parts.len() < 2 {
+        return false;
+    }
 
     let mc_major: u32 = mc_parts[0].parse().unwrap_or(0);
     let mc_minor: u32 = mc_parts[1].parse().unwrap_or(0);
 
-    if neoforge_version.starts_with("0.") { return false; }
+    if neoforge_version.starts_with("0.") {
+        return false;
+    }
 
     let neoforge_parts: Vec<&str> = neoforge_version.split('.').collect();
-    if neoforge_parts.len() < 2 { return false; }
+    if neoforge_parts.len() < 2 {
+        return false;
+    }
 
-    let neoforge_major: u32 = match neoforge_parts[0].parse() { Ok(v) => v, Err(_) => return false };
-    let neoforge_minor: u32 = match neoforge_parts[1].parse() { Ok(v) => v, Err(_) => return false };
+    let neoforge_major: u32 = match neoforge_parts[0].parse() {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    let neoforge_minor: u32 = match neoforge_parts[1].parse() {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
 
     if mc_major == 1 {
         neoforge_major == mc_minor
@@ -138,9 +167,15 @@ pub async fn install(
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
     source_mode: DownloadSourceMode,
 ) -> anyhow::Result<()> {
-    if let Some(ref cb) = progress_callback { cb(0.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(0.0);
+    }
 
-    log_info!("[NeoForge] Installing {} for MC {}", neoforge_version, mc_version);
+    log_info!(
+        "[NeoForge] Installing {} for MC {}",
+        neoforge_version,
+        mc_version
+    );
 
     let file_name = format!("neoforge-{}-installer.jar", neoforge_version);
     let installer_url = sources::neoforge_installer_url(neoforge_version);
@@ -154,7 +189,12 @@ pub async fn install(
         Err(_) => None,
     };
 
-    let urls = sources::build_replace_urls(&installer_url, mirror_url, sources::MAVEN_REPLACEMENTS, source_mode);
+    let urls = sources::build_replace_urls(
+        &installer_url,
+        mirror_url,
+        sources::MAVEN_REPLACEMENTS,
+        source_mode,
+    );
 
     let manager = DownloadManager::new(1, 0, 0, source_mode);
     let task = DownloadTask {
@@ -172,29 +212,40 @@ pub async fn install(
         }
     }
 
-    if let Some(ref cb) = progress_callback { cb(10.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(10.0);
+    }
 
     let version_id = format!("{}-neoforge-{}", mc_version, neoforge_version);
 
-    launcher_profiles::ensure_profiles_exist(game_dir)
-        .map_err(|e: String| anyhow::anyhow!(e))?;
+    launcher_profiles::ensure_profiles_exist(game_dir).map_err(|e: String| anyhow::anyhow!(e))?;
 
-    if let Some(ref cb) = progress_callback { cb(20.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(20.0);
+    }
 
-    if let Err(e) = shared::download_mojang_mappings(mc_version, game_dir, &installer_path, source_mode).await {
+    if let Err(e) =
+        shared::download_mojang_mappings(mc_version, game_dir, &installer_path, source_mode).await
+    {
         log_warn!("[NeoForge] Failed to download mappings: {}", e);
     }
 
-    if let Some(ref cb) = progress_callback { cb(30.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(30.0);
+    }
 
     log_info!("[NeoForge] Using injector");
     let (injector_path, wrapper_path) = super::forge_installer::extract_embedded_resources()?;
 
-    if let Some(ref cb) = progress_callback { cb(40.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(40.0);
+    }
 
     let java_path = shared::find_java_for_install(game_dir)?;
 
-    if let Some(ref cb) = progress_callback { cb(50.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(50.0);
+    }
 
     super::forge_installer::run_forge_installer(
         &java_path,
@@ -206,15 +257,21 @@ pub async fn install(
         None,
     )?;
 
-    if let Some(ref cb) = progress_callback { cb(80.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(80.0);
+    }
 
     shared::copy_generated_version_json(game_dir, mc_version, &version_id, "neoforge");
 
-    if let Some(ref cb) = progress_callback { cb(90.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(90.0);
+    }
 
     log_info!("[NeoForge] Installed: {}", version_id);
 
-    if let Some(ref cb) = progress_callback { cb(100.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(100.0);
+    }
 
     Ok(())
 }

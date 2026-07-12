@@ -2,11 +2,14 @@
 
 use std::sync::Arc;
 
-use crate::minecraft::sources::{self, DownloadSourceMode};
 use super::LoaderVersion;
+use crate::minecraft::sources::{self, DownloadSourceMode};
 
 /// List OptiFine versions
-pub async fn list_versions(mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
+pub async fn list_versions(
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
     let urls = sources::build_urls(
         mirror_url,
         &format!("{}{}", sources::BMCLAPI_BASE, sources::BMCLAPI_OPTIFINE),
@@ -17,31 +20,35 @@ pub async fn list_versions(mirror_url: Option<&str>, source_mode: DownloadSource
     let content = sources::fetch_with_fallback(&urls).await?;
 
     if let Ok(json_array) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
-        let mut versions: Vec<LoaderVersion> = json_array.iter().filter_map(|v| {
-            let mc_ver = v["mcversion"].as_str()?;
-            let type_str = v["type"].as_str().unwrap_or("");
-            let patch = v["patch"].as_str().unwrap_or("");
+        let mut versions: Vec<LoaderVersion> = json_array
+            .iter()
+            .filter_map(|v| {
+                let mc_ver = v["mcversion"].as_str()?;
+                let type_str = v["type"].as_str().unwrap_or("");
+                let patch = v["patch"].as_str().unwrap_or("");
 
-            let type_display = type_str
-                .replace("HD_U", "")
-                .replace("_", " ")
-                .trim()
-                .to_string();
+                let type_display = type_str
+                    .replace("HD_U", "")
+                    .replace("_", " ")
+                    .trim()
+                    .to_string();
 
-            let display_name = if type_display.is_empty() {
-                format!("{} {}", mc_ver, patch)
-            } else {
-                format!("{} {} {}", mc_ver, type_display, patch)
-            };
+                let display_name = if type_display.is_empty() {
+                    format!("{} {}", mc_ver, patch)
+                } else {
+                    format!("{} {} {}", mc_ver, type_display, patch)
+                };
 
-            let is_preview = patch.contains("pre") || patch.contains("alpha") || patch.contains("beta");
+                let is_preview =
+                    patch.contains("pre") || patch.contains("alpha") || patch.contains("beta");
 
-            Some(LoaderVersion {
-                version: display_name.trim().to_string(),
-                is_recommended: !is_preview,
-                release_time: None,
+                Some(LoaderVersion {
+                    version: display_name.trim().to_string(),
+                    is_recommended: !is_preview,
+                    release_time: None,
+                })
             })
-        }).collect();
+            .collect();
 
         versions.sort_by(|a, b| {
             if a.is_recommended != b.is_recommended {
@@ -68,11 +75,15 @@ fn compare_version(a: &str, b: &str) -> std::cmp::Ordering {
         match (a_num, b_num) {
             (Some(a_n), Some(b_n)) => {
                 let cmp = a_n.cmp(&b_n);
-                if cmp != std::cmp::Ordering::Equal { return cmp; }
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
+                }
             }
             _ => {
                 let cmp = a_part.cmp(b_part);
-                if cmp != std::cmp::Ordering::Equal { return cmp; }
+                if cmp != std::cmp::Ordering::Equal {
+                    return cmp;
+                }
             }
         }
     }
@@ -123,11 +134,19 @@ pub async fn install(
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
     _source_mode: DownloadSourceMode,
 ) -> anyhow::Result<()> {
-    if let Some(ref cb) = progress_callback { cb(0.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(0.0);
+    }
 
-    crate::log_info!("[OptiFine] {} for MC {} - manual installation required", optifine_version, mc_version);
+    crate::log_info!(
+        "[OptiFine] {} for MC {} - manual installation required",
+        optifine_version,
+        mc_version
+    );
 
-    if let Some(ref cb) = progress_callback { cb(100.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(100.0);
+    }
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 //! Single file download logic
 
-use crate::{log_warn, log_debug, log_info};
+use crate::{log_debug, log_info, log_warn};
 use futures_util::StreamExt;
 use std::io::Write;
 use std::path::Path;
@@ -9,10 +9,10 @@ use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-use super::types::{DownloadTask, DownloadProgress, DownloadStatus, GlobalProgress};
-use super::rate_limiter::RateLimiter;
-use super::super::utils::file_checker::FileChecker;
 use super::super::sources::DownloadSourceMode;
+use super::super::utils::file_checker::FileChecker;
+use super::rate_limiter::RateLimiter;
+use super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
 
 /// 下载单个文件（统一逻辑：顺序尝试 URL，超时自动切换，大文件分片下载）
 pub async fn download_single(
@@ -58,7 +58,8 @@ pub async fn download_single(
     // 分片下载阈值：file_size / chunk_count > 1MB
     let chunk_threshold: u64 = 1_048_576;
     let file_size = task.expected_size.max(0) as u64;
-    let can_chunk = chunk_count > 1 && file_size > 0 && (file_size / chunk_count as u64) > chunk_threshold;
+    let can_chunk =
+        chunk_count > 1 && file_size > 0 && (file_size / chunk_count as u64) > chunk_threshold;
 
     // 顺序尝试每个 URL，超时自动重试，总共最多 3 次
     let max_retries: usize = 3;
@@ -88,14 +89,26 @@ pub async fn download_single(
                     log_debug!("[Download] 检测分片支持: {}", url);
                 }
                 if super::chunk::supports_range(client, url).await {
-                    log_info!("[Download] 使用分片下载: {} ({} chunks, 尝试 {}/{})", url, chunk_count, attempt, max_retries);
-                    let limiter = rate_limiter.clone().unwrap_or_else(|| {
-                        Arc::new(Mutex::new(RateLimiter::new(0)))
-                    });
+                    log_info!(
+                        "[Download] 使用分片下载: {} ({} chunks, 尝试 {}/{})",
+                        url,
+                        chunk_count,
+                        attempt,
+                        max_retries
+                    );
+                    let limiter = rate_limiter
+                        .clone()
+                        .unwrap_or_else(|| Arc::new(Mutex::new(RateLimiter::new(0))));
                     let chunk_result = super::chunk::download_chunked(
-                        client, url, &task.local_path,
-                        file_size, chunk_count, limiter, progress.clone(),
-                    ).await;
+                        client,
+                        url,
+                        &task.local_path,
+                        file_size,
+                        chunk_count,
+                        limiter,
+                        progress.clone(),
+                    )
+                    .await;
 
                     if chunk_result.status == DownloadStatus::Completed {
                         let checker = FileChecker::new()
@@ -123,8 +136,23 @@ pub async fn download_single(
             }
 
             // 单流下载
-            log_debug!("[Download] 从 {} 单流下载 (超时: {}s, 尝试 {}/{})", url, timeout.as_secs(), attempt, max_retries);
-            match download_from_url(client, url, &task.local_path, rate_limiter.clone(), timeout, progress.clone()).await {
+            log_debug!(
+                "[Download] 从 {} 单流下载 (超时: {}s, 尝试 {}/{})",
+                url,
+                timeout.as_secs(),
+                attempt,
+                max_retries
+            );
+            match download_from_url(
+                client,
+                url,
+                &task.local_path,
+                rate_limiter.clone(),
+                timeout,
+                progress.clone(),
+            )
+            .await
+            {
                 Ok((downloaded, total, speed)) => {
                     let checker = if task.expected_size == 0 && downloaded > 0 {
                         FileChecker::new()
@@ -152,7 +180,13 @@ pub async fn download_single(
                     };
                 }
                 Err(e) => {
-                    log_debug!("从 {} 下载失败 (尝试 {}/{}): {}", url, attempt, max_retries, e);
+                    log_debug!(
+                        "从 {} 下载失败 (尝试 {}/{}): {}",
+                        url,
+                        attempt,
+                        max_retries,
+                        e
+                    );
                     if attempt < max_retries {
                         tokio::time::sleep(Duration::from_millis(500)).await;
                     }

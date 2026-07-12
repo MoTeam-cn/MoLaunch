@@ -4,9 +4,7 @@
 ///
 /// 例如 "1.20.1" -> [1, 20, 1]
 pub fn parse_version_number(version: &str) -> Vec<u32> {
-    version.split('.')
-        .filter_map(|s| s.parse().ok())
-        .collect()
+    version.split('.').filter_map(|s| s.parse().ok()).collect()
 }
 
 /// 将 UTC 时间字符串转换为本地时间格式
@@ -16,7 +14,7 @@ pub fn parse_version_number(version: &str) -> Vec<u32> {
 /// - Naive datetime (视为 UTC): "2023-09-08 12:00:00"
 /// - Date only (视为 UTC 00:00): "2023-09-08"
 pub fn parse_utc_to_local(s: &str) -> Option<String> {
-    use chrono::{TimeZone, Local};
+    use chrono::{Local, TimeZone};
 
     // 尝试 RFC3339（带时区）
     if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(s) {

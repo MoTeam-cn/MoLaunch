@@ -1,10 +1,10 @@
 //! 版本启动命令
 
-use crate::{log_info, log_error};
 use crate::minecraft::launch::{self, AuthInfo, LaunchConfig, LaunchPipeline};
-use crate::state::{AppState, resolve_game_dir};
+use crate::state::{resolve_game_dir, AppState};
+use crate::{log_error, log_info};
 use std::sync::Arc;
-use tauri::{State, Emitter};
+use tauri::{Emitter, State};
 
 use super::sanitize_version_id;
 
@@ -27,6 +27,7 @@ pub async fn launch_game(
     username: String,
     uuid: String,
     access_token: String,
+    login_type: Option<String>,
     window_width: Option<u32>,
     window_height: Option<u32>,
     server_address: Option<String>,
@@ -38,13 +39,13 @@ pub async fn launch_game(
     let config = state.config.lock().await;
     let game_dir = resolve_game_dir(&config.game_dir);
 
-    // 构建认证信息
+    // 构建认证信息（login_type 从前端传入，默认 Legacy）
     let auth_info = AuthInfo {
         username,
         uuid,
         access_token: access_token.clone(),
         client_token: access_token,
-        login_type: "Legacy".to_string(),
+        login_type: login_type.unwrap_or_else(|| "Legacy".to_string()),
     };
 
     // 创建启动配置
@@ -75,11 +76,10 @@ pub async fn launch_game(
     *state.launch_pipeline.lock().await = Some(pipeline.clone());
 
     // 执行启动
-    let result = pipeline.execute().await
-        .map_err(|e| {
-            log_error!("Launch failed: {}", e);
-            e.to_string()
-        })?;
+    let result = pipeline.execute().await.map_err(|e| {
+        log_error!("Launch failed: {}", e);
+        e.to_string()
+    })?;
 
     log_info!("Game launched with PID: {}", result.pid);
 
@@ -109,15 +109,14 @@ pub async fn launch_game(
         if let Some(mut rx) = exit_rx {
             // 等待退出通知（wait_for 返回 Ref，需立即 clone 出来避免持有非 Send 的 Ref 跨 await）
             let rx_fut = rx.wait_for(|val| val.is_some());
-            let exit_info_opt = match tokio::time::timeout(
-                std::time::Duration::from_secs(3600), rx_fut
-            ).await {
-                Ok(Ok(ref_val)) => {
-                    let val = (*ref_val).clone();
-                    val
-                }
-                _ => None,
-            };
+            let exit_info_opt =
+                match tokio::time::timeout(std::time::Duration::from_secs(3600), rx_fut).await {
+                    Ok(Ok(ref_val)) => {
+                        let val = (*ref_val).clone();
+                        val
+                    }
+                    _ => None,
+                };
 
             // 检查是否被 stop_game 手动清理了
             if current_pid_arc.lock().await.is_some() {
@@ -129,12 +128,15 @@ pub async fn launch_game(
                 *current_pid_arc.lock().await = None;
                 *launch_pipeline_arc.lock().await = None;
 
-                let _ = app_handle_clone.emit("game-exited", GameExitEvent {
-                    pid: launched_pid,
-                    version_id: version_id_clone,
-                    exit_code,
-                    is_normal,
-                });
+                let _ = app_handle_clone.emit(
+                    "game-exited",
+                    GameExitEvent {
+                        pid: launched_pid,
+                        version_id: version_id_clone,
+                        exit_code,
+                        is_normal,
+                    },
+                );
             }
         }
     });
@@ -144,7 +146,9 @@ pub async fn launch_game(
 
 /// 获取启动进度
 #[tauri::command]
-pub async fn get_launch_progress(state: State<'_, AppState>) -> Result<Option<launch::LaunchProgress>, String> {
+pub async fn get_launch_progress(
+    state: State<'_, AppState>,
+) -> Result<Option<launch::LaunchProgress>, String> {
     let pipeline = state.launch_pipeline.lock().await;
     if let Some(ref pipeline) = *pipeline {
         Ok(Some(pipeline.progress().await))

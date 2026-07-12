@@ -3,14 +3,22 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::minecraft::download::manager::DownloadManager;
-use crate::minecraft::download::types::{DownloadTask, DownloadStatus};
-use crate::minecraft::sources::{self, DownloadSourceMode};
 use super::LoaderVersion;
+use crate::minecraft::download::manager::DownloadManager;
+use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
+use crate::minecraft::sources::{self, DownloadSourceMode};
 
 /// List Fabric versions
-pub async fn list_versions(mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
-    let urls = sources::build_urls(mirror_url, sources::FABRIC_META, sources::BMCLAPI_FABRIC_META, source_mode);
+pub async fn list_versions(
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
+    let urls = sources::build_urls(
+        mirror_url,
+        sources::FABRIC_META,
+        sources::BMCLAPI_FABRIC_META,
+        source_mode,
+    );
     let content = sources::fetch_with_fallback(&urls).await?;
     let json: serde_json::Value = serde_json::from_str(&content)?;
 
@@ -39,9 +47,15 @@ pub async fn install(
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
     source_mode: DownloadSourceMode,
 ) -> anyhow::Result<()> {
-    if let Some(ref cb) = progress_callback { cb(0.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(0.0);
+    }
 
-    crate::log_info!("[Fabric] Installing {} for MC {}", fabric_version, mc_version);
+    crate::log_info!(
+        "[Fabric] Installing {} for MC {}",
+        fabric_version,
+        mc_version
+    );
 
     let version_id = format!("fabric-{}-{}", fabric_version, mc_version);
     let version_dir = game_dir.join("versions").join(&version_id);
@@ -51,12 +65,27 @@ pub async fn install(
 
     let urls = match mirror_url {
         Some(mirror) if !mirror.is_empty() => vec![
-            format!("{}/fabric-meta/v2/versions/loader/{}/{}/profile/json", mirror.trim_end_matches('/'), mc_version, fabric_version),
-            format!("{}/fabric-meta/v2/versions/loader/{}/{}/profile/json", sources::BMCLAPI_BASE, mc_version, fabric_version),
+            format!(
+                "{}/fabric-meta/v2/versions/loader/{}/{}/profile/json",
+                mirror.trim_end_matches('/'),
+                mc_version,
+                fabric_version
+            ),
+            format!(
+                "{}/fabric-meta/v2/versions/loader/{}/{}/profile/json",
+                sources::BMCLAPI_BASE,
+                mc_version,
+                fabric_version
+            ),
             url,
         ],
         _ => vec![
-            format!("{}/fabric-meta/v2/versions/loader/{}/{}/profile/json", sources::BMCLAPI_BASE, mc_version, fabric_version),
+            format!(
+                "{}/fabric-meta/v2/versions/loader/{}/{}/profile/json",
+                sources::BMCLAPI_BASE,
+                mc_version,
+                fabric_version
+            ),
             url,
         ],
     };
@@ -65,7 +94,10 @@ pub async fn install(
     let task = DownloadTask {
         id: "fabric_profile".to_string(),
         urls,
-        local_path: version_dir.join(format!("{}.json", version_id)).to_string_lossy().to_string(),
+        local_path: version_dir
+            .join(format!("{}.json", version_id))
+            .to_string_lossy()
+            .to_string(),
         expected_size: 0,
         expected_hash: None,
     };
@@ -79,7 +111,9 @@ pub async fn install(
 
     crate::log_info!("[Fabric] Installed: {}", version_id);
 
-    if let Some(ref cb) = progress_callback { cb(100.0); }
+    if let Some(ref cb) = progress_callback {
+        cb(100.0);
+    }
 
     Ok(())
 }

@@ -192,10 +192,8 @@ pub fn get_java_for_installer(java_list: &[JavaRuntime]) -> Option<String> {
     };
 
     // 优先使用 Java 8（Forge 安装器兼容性最好）
-    let java8_candidates: Vec<&JavaRuntime> = java_list
-        .iter()
-        .filter(|j| j.major_version == 8)
-        .collect();
+    let java8_candidates: Vec<&JavaRuntime> =
+        java_list.iter().filter(|j| j.major_version == 8).collect();
 
     if let Some(best) = select_best_from_candidates(&java8_candidates) {
         let java_path = to_java_exe(&best.executable);
@@ -225,10 +223,8 @@ pub fn get_java_for_installer(java_list: &[JavaRuntime]) -> Option<String> {
     }
 
     // 最后使用任何可用的 Java 8+
-    let any_candidates: Vec<&JavaRuntime> = java_list
-        .iter()
-        .filter(|j| j.major_version >= 8)
-        .collect();
+    let any_candidates: Vec<&JavaRuntime> =
+        java_list.iter().filter(|j| j.major_version >= 8).collect();
 
     if let Some(best) = select_best_from_candidates(&any_candidates) {
         let java_path = to_java_exe(&best.executable);
@@ -274,7 +270,7 @@ fn select_best_from_candidates<'a>(candidates: &[&'a JavaRuntime]) -> Option<&'a
 fn get_java_version_weight(major_version: u32) -> u32 {
     match major_version {
         7 => 0,
-        8 => 30,   // Java 8 权重最高（兼容性最好）
+        8 => 30, // Java 8 权重最高（兼容性最好）
         9 => 4,
         10 => 5,
         11 => 14,
@@ -283,11 +279,11 @@ fn get_java_version_weight(major_version: u32) -> u32 {
         14 => 8,
         15 => 9,
         16 => 12,
-        17 => 31,  // Java 17 权重最高（新版本推荐）
+        17 => 31, // Java 17 权重最高（新版本推荐）
         18 => 13,
         19 => 10,
         20 => 11,
-        21 => 29,  // Java 21 权重高（最新 LTS）
+        21 => 29, // Java 21 权重高（最新 LTS）
         _ => major_version,
     }
 }

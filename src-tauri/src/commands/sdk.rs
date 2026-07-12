@@ -73,7 +73,9 @@ pub async fn get_device_id(state: State<'_, AppState>) -> Result<String, String>
 
 /// 检查更新（轻量版）
 #[tauri::command]
-pub async fn check_update_lite(state: State<'_, AppState>) -> Result<crate::sdk::UpdateInfoLite, String> {
+pub async fn check_update_lite(
+    state: State<'_, AppState>,
+) -> Result<crate::sdk::UpdateInfoLite, String> {
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
 

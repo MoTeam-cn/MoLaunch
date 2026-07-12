@@ -205,6 +205,7 @@ export const useVersionStore = defineStore('version', () => {
     username: string
     uuid: string
     accessToken: string
+    loginType?: string
     windowWidth?: number
     windowHeight?: number
     serverAddress?: string

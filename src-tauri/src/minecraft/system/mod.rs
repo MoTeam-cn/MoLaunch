@@ -20,7 +20,7 @@ pub struct SystemMemory {
 pub fn get_system_memory() -> SystemMemory {
     let mut sys = System::new_all();
     sys.refresh_memory();
-    
+
     let total = sys.total_memory();
     let used = sys.used_memory();
     let available = total - used;
@@ -29,7 +29,7 @@ pub fn get_system_memory() -> SystemMemory {
     } else {
         0.0
     };
-    
+
     SystemMemory {
         total,
         used,

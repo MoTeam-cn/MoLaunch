@@ -3,7 +3,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
-import type { AuthResult, SdkStatus } from '@/types/auth'
+import type { AuthResult, SdkStatus, DeviceCodeInfo, PollResult, MsAccountInfo } from '@/types/auth'
 import type { VersionList } from '@/types/version'
 import type { JavaRuntime } from '@/types/java'
 
@@ -47,6 +47,52 @@ export async function getLoginStatus(): Promise<AuthResult | null> {
  */
 export async function logout(): Promise<void> {
   return await invoke<void>('logout')
+}
+
+// ============================================================
+// 微软登录相关
+// ============================================================
+
+/**
+ * 微软登录步骤 1：申请设备码
+ */
+export async function msLoginStart(): Promise<DeviceCodeInfo> {
+  return await invoke<DeviceCodeInfo>('ms_login_start')
+}
+
+/**
+ * 微软登录步骤 2：轮询设备码授权结果
+ */
+export async function msLoginPoll(deviceCode: string): Promise<PollResult> {
+  return await invoke<PollResult>('ms_login_poll', { deviceCode })
+}
+
+/**
+ * 微软登录：使用 Refresh Token 静默刷新
+ */
+export async function msLoginRefresh(): Promise<AuthResult> {
+  return await invoke<AuthResult>('ms_login_refresh')
+}
+
+/**
+ * 获取已存储的微软账号列表
+ */
+export async function getMsAccounts(): Promise<MsAccountInfo[]> {
+  return await invoke<MsAccountInfo[]>('get_ms_accounts')
+}
+
+/**
+ * 删除已存储的微软账号
+ */
+export async function removeMsAccount(uuid: string): Promise<void> {
+  return await invoke<void>('remove_ms_account', { uuid })
+}
+
+/**
+ * 切换到已存储的微软账号
+ */
+export async function switchMsAccount(uuid: string): Promise<AuthResult> {
+  return await invoke<AuthResult>('switch_ms_account', { uuid })
 }
 
 /**
@@ -434,6 +480,7 @@ export async function launchGame(params: {
   username: string
   uuid: string
   accessToken: string
+  loginType?: string
   windowWidth?: number
   windowHeight?: number
   serverAddress?: string
@@ -449,6 +496,7 @@ export async function launchGame(params: {
     windowHeight: params.windowHeight ?? null,
     serverAddress: params.serverAddress ?? null,
     serverPort: params.serverPort ?? null,
+    loginType: params.loginType ?? null,
   })
 }
 

@@ -73,11 +73,17 @@ impl FileChecker {
 
         // actual_size 为 0 时跳过大小校验（未知大小的文件）
         if self.actual_size > 0 && self.actual_size != file_size {
-            return Some(format!("Size mismatch: expected {} B, got {} B", self.actual_size, file_size));
+            return Some(format!(
+                "Size mismatch: expected {} B, got {} B",
+                self.actual_size, file_size
+            ));
         }
 
         if self.min_size > 0 && self.min_size > file_size {
-            return Some(format!("Size too small: expected > {} B, got {} B", self.min_size, file_size));
+            return Some(format!(
+                "Size too small: expected > {} B, got {} B",
+                self.min_size, file_size
+            ));
         }
 
         if let Some(ref hash) = self.hash {
@@ -93,7 +99,10 @@ impl FileChecker {
                 match computed_hash {
                     Ok(actual_hash) => {
                         if hash.to_lowercase() != actual_hash.to_lowercase() {
-                            return Some(format!("Hash mismatch: expected {}, got {}", hash, actual_hash));
+                            return Some(format!(
+                                "Hash mismatch: expected {}, got {}",
+                                hash, actual_hash
+                            ));
                         }
                     }
                     Err(e) => return Some(format!("Hash computation failed: {}", e)),

@@ -1,13 +1,13 @@
-use crate::{log_error, log_info};
 use crate::minecraft::download::{self, types as download_types};
 use crate::state::{AppState, DownloadState, StageStatus};
+use crate::{log_error, log_info};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Instant;
 use tauri::{Emitter, State};
 
-use super::types::DownloadStageSnapshot;
 use super::sanitize_version_id;
+use super::types::DownloadStageSnapshot;
 
 /// Download version
 #[tauri::command]
@@ -42,7 +42,8 @@ pub async fn download_version(
     let max_threads = config.max_download_threads as usize;
     let chunk_count = config.chunk_count as usize;
     let speed_limit = config.max_download_speed;
-    let source_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.download_source);
+    let source_mode =
+        crate::minecraft::sources::DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
     let game_path = game_dir.as_path();
@@ -80,7 +81,8 @@ pub async fn download_version(
                 stage.files_downloaded = progress.completed_files;
                 stage.files_total = progress.total_files;
                 if progress.total_bytes > 0 {
-                    stage.progress = (progress.downloaded_bytes as f64 / progress.total_bytes as f64).min(1.0);
+                    stage.progress =
+                        (progress.downloaded_bytes as f64 / progress.total_bytes as f64).min(1.0);
                 }
                 stage.status = StageStatus::Loading;
             }
@@ -89,7 +91,9 @@ pub async fn download_version(
             {
                 let mut window = sw.lock().unwrap();
                 window.push_back((ds.global_bytes_downloaded, Instant::now()));
-                if window.len() > 10 { window.pop_front(); }
+                if window.len() > 10 {
+                    window.pop_front();
+                }
                 if window.len() >= 2 {
                     let (first_bytes, first_time) = window.front().unwrap();
                     let (last_bytes, last_time) = window.back().unwrap();
@@ -146,7 +150,9 @@ pub async fn download_version(
         source_mode,
         Some(progress_callback),
         Some(stage_callback),
-    ).await.map_err(|e| {
+    )
+    .await
+    .map_err(|e| {
         log_error!("Failed to download version: {}", e);
         e.to_string()
     })?;
@@ -188,8 +194,10 @@ pub async fn download_version(
 }
 
 pub fn build_snapshot(ds: &DownloadState, version_id: &str) -> serde_json::Value {
-    let stages: Vec<DownloadStageSnapshot> = ds.stages.iter().map(|s| {
-        DownloadStageSnapshot {
+    let stages: Vec<DownloadStageSnapshot> = ds
+        .stages
+        .iter()
+        .map(|s| DownloadStageSnapshot {
             name: s.name.clone(),
             progress: s.progress,
             weight: s.weight,
@@ -203,8 +211,8 @@ pub fn build_snapshot(ds: &DownloadState, version_id: &str) -> serde_json::Value
             bytes_total: s.bytes_total,
             files_downloaded: s.files_downloaded,
             files_total: s.files_total,
-        }
-    }).collect();
+        })
+        .collect();
 
     serde_json::json!({
         "version_id": version_id,

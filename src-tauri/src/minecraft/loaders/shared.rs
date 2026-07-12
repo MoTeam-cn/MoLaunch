@@ -1,10 +1,10 @@
 //! Shared utilities for loader installation
 
-use crate::{log_info, log_warn, log_error};
+use crate::{log_error, log_info, log_warn};
 use std::path::{Path, PathBuf};
 
 use crate::minecraft::download::manager::DownloadManager;
-use crate::minecraft::download::types::{DownloadTask, DownloadStatus};
+use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::sources::{self, DownloadSourceMode};
 
 /// Find Java for installation (minimum Java 8u60)
@@ -28,7 +28,9 @@ pub fn find_java_for_install(_game_dir: &Path) -> anyhow::Result<String> {
         }
     }
 
-    Err(anyhow::anyhow!("Java not found. Please install Java 8+ to install Forge/NeoForge."))
+    Err(anyhow::anyhow!(
+        "Java not found. Please install Java 8+ to install Forge/NeoForge."
+    ))
 }
 
 /// Convert Maven coordinate to local file path
@@ -83,7 +85,11 @@ pub async fn download_mojang_mappings(
 
     let mojmaps_clean = mojmaps.trim_start_matches('[').trim_end_matches(']');
     let original_name = mojmaps_clean.split('@').next().unwrap_or("");
-    let extension = mojmaps_clean.split('@').nth(1).unwrap_or("txt").trim_end_matches(']');
+    let extension = mojmaps_clean
+        .split('@')
+        .nth(1)
+        .unwrap_or("txt")
+        .trim_end_matches(']');
 
     let parts: Vec<&str> = original_name.split(':').collect();
     if parts.len() < 3 {
@@ -95,7 +101,11 @@ pub async fn download_mojang_mappings(
     let version = parts[2];
 
     let group_path = group.replace('.', std::path::MAIN_SEPARATOR_STR);
-    let local_dir = game_dir.join("libraries").join(group_path).join(artifact).join(version);
+    let local_dir = game_dir
+        .join("libraries")
+        .join(group_path)
+        .join(artifact)
+        .join(version);
     let filename = format!("{}-{}-mappings.{}", artifact, version, extension);
     let local_path = local_dir.join(&filename);
 
@@ -111,10 +121,12 @@ pub async fn download_mojang_mappings(
     let json_content = super::super::download::fetch_url(&json_url).await?;
     let version_json: serde_json::Value = serde_json::from_str(&json_content)?;
 
-    let mappings = version_json["downloads"]["client_mappings"].as_object()
+    let mappings = version_json["downloads"]["client_mappings"]
+        .as_object()
         .ok_or_else(|| anyhow::anyhow!("client_mappings not found"))?;
 
-    let url = mappings["url"].as_str()
+    let url = mappings["url"]
+        .as_str()
         .ok_or_else(|| anyhow::anyhow!("client_mappings URL not found"))?;
     let sha1 = mappings["sha1"].as_str().unwrap_or_default();
     let size = mappings["size"].as_i64().unwrap_or(0);
@@ -129,7 +141,11 @@ pub async fn download_mojang_mappings(
         urls,
         local_path: local_path.to_string_lossy().to_string(),
         expected_size: size,
-        expected_hash: if sha1.is_empty() { None } else { Some(sha1.to_string()) },
+        expected_hash: if sha1.is_empty() {
+            None
+        } else {
+            Some(sha1.to_string())
+        },
     };
 
     let results = manager.download_batch(vec![task], None).await;
@@ -144,7 +160,12 @@ pub async fn download_mojang_mappings(
 }
 
 /// Copy generated version JSON from installer output
-pub fn copy_generated_version_json(game_dir: &Path, mc_version: &str, version_id: &str, loader_keyword: &str) {
+pub fn copy_generated_version_json(
+    game_dir: &Path,
+    mc_version: &str,
+    version_id: &str,
+    loader_keyword: &str,
+) {
     let versions_dir = game_dir.join("versions");
     if let Ok(entries) = std::fs::read_dir(&versions_dir) {
         for entry in entries.flatten() {
@@ -154,9 +175,16 @@ pub fn copy_generated_version_json(game_dir: &Path, mc_version: &str, version_id
                 if dir_name.contains(loader_keyword) && dir_name.contains(mc_version) {
                     let json_files: Vec<_> = std::fs::read_dir(&path)
                         .ok()
-                        .map(|e| e.filter_map(|e| e.ok())
-                            .filter(|e| e.path().extension().map(|ext| ext == "json").unwrap_or(false))
-                            .collect())
+                        .map(|e| {
+                            e.filter_map(|e| e.ok())
+                                .filter(|e| {
+                                    e.path()
+                                        .extension()
+                                        .map(|ext| ext == "json")
+                                        .unwrap_or(false)
+                                })
+                                .collect()
+                        })
                         .unwrap_or_default();
 
                     if let Some(json_file) = json_files.first() {
@@ -168,15 +196,28 @@ pub fn copy_generated_version_json(game_dir: &Path, mc_version: &str, version_id
                         for retry in 0..3 {
                             match std::fs::copy(json_file.path(), &target_json) {
                                 Ok(_) => {
-                                    log_info!("[{}] Copied version JSON from {}", loader_keyword, path.display());
+                                    log_info!(
+                                        "[{}] Copied version JSON from {}",
+                                        loader_keyword,
+                                        path.display()
+                                    );
                                     return;
                                 }
                                 Err(e) => {
                                     if retry < 2 {
-                                        log_warn!("[{}] Copy failed (retry {}): {}", loader_keyword, retry + 1, e);
+                                        log_warn!(
+                                            "[{}] Copy failed (retry {}): {}",
+                                            loader_keyword,
+                                            retry + 1,
+                                            e
+                                        );
                                         std::thread::sleep(std::time::Duration::from_millis(500));
                                     } else {
-                                        log_error!("[{}] Copy failed after retries: {}", loader_keyword, e);
+                                        log_error!(
+                                            "[{}] Copy failed after retries: {}",
+                                            loader_keyword,
+                                            e
+                                        );
                                     }
                                 }
                             }
@@ -190,8 +231,14 @@ pub fn copy_generated_version_json(game_dir: &Path, mc_version: &str, version_id
 
 /// Copy MC JAR to loader version folder
 pub fn copy_mc_jar(game_dir: &Path, mc_version: &str, version_id: &str) {
-    let mc_jar = game_dir.join("versions").join(mc_version).join(format!("{}.jar", mc_version));
-    let target_jar = game_dir.join("versions").join(version_id).join(format!("{}.jar", version_id));
+    let mc_jar = game_dir
+        .join("versions")
+        .join(mc_version)
+        .join(format!("{}.jar", mc_version));
+    let target_jar = game_dir
+        .join("versions")
+        .join(version_id)
+        .join(format!("{}.jar", version_id));
 
     if mc_jar.exists() && !target_jar.exists() {
         if let Err(e) = std::fs::copy(&mc_jar, &target_jar) {

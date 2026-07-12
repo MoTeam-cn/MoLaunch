@@ -4,9 +4,9 @@
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-use super::super::utils::file_checker::FileChecker;
 use super::super::sources;
 use super::super::sources::DownloadSourceMode;
+use super::super::utils::file_checker::FileChecker;
 
 /// 资源条目
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -67,15 +67,21 @@ pub fn get_asset_index_meta(json: &serde_json::Value) -> Option<AssetIndexMeta> 
 
     // 最终回退：参考 PCL2 的 McAssetsGetIndex 函数
     // 当无法获取 assetIndex 时，使用硬编码的 legacy fallback
-    let inherits_from = json.get("inheritsFrom").and_then(|v| v.as_str()).unwrap_or("");
-    
+    let inherits_from = json
+        .get("inheritsFrom")
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
+
     if !inherits_from.is_empty() {
-        crate::log_warn!("[Assets] No assetIndex found in JSON for version with inheritsFrom={}", inherits_from);
+        crate::log_warn!(
+            "[Assets] No assetIndex found in JSON for version with inheritsFrom={}",
+            inherits_from
+        );
         crate::log_warn!("[Assets] Using legacy asset index as fallback");
     } else {
         crate::log_warn!("[Assets] No assetIndex found in JSON, using legacy fallback");
     }
-    
+
     // 参考 PCL2 的硬编码 legacy fallback
     // https://launchermeta.mojang.com/mc-staging/assets/legacy/c0fd82e8ce9fbc93119e40d96d5a4e62cfa3f729/legacy.json
     Some(AssetIndexMeta {
@@ -92,10 +98,7 @@ pub fn get_asset_index_meta(json: &serde_json::Value) -> Option<AssetIndexMeta> 
 }
 
 /// 解析资源索引 JSON，获取所有资源条目
-pub fn parse_asset_index(
-    index_json: &serde_json::Value,
-    game_dir: &Path,
-) -> Vec<AssetEntry> {
+pub fn parse_asset_index(index_json: &serde_json::Value, game_dir: &Path) -> Vec<AssetEntry> {
     let mut entries = Vec::new();
 
     let objects = match index_json.get("objects").and_then(|o| o.as_object()) {
@@ -104,8 +107,14 @@ pub fn parse_asset_index(
     };
 
     // 检查是否为 legacy 模式
-    let is_legacy = index_json.get("virtual").and_then(|v| v.as_bool()).unwrap_or(false);
-    let is_map_to_resources = index_json.get("map_to_resources").and_then(|v| v.as_bool()).unwrap_or(false);
+    let is_legacy = index_json
+        .get("virtual")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let is_map_to_resources = index_json
+        .get("map_to_resources")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
 
     for (source_path, object) in objects {
         let hash = object["hash"].as_str().unwrap_or_default();
@@ -113,20 +122,39 @@ pub fn parse_asset_index(
 
         // 路径遍历防护：拒绝含 ".." 的 source_path
         if source_path.contains("..") {
-            crate::log_warn!("[Assets] Skip path traversal in source_path: {}", source_path);
+            crate::log_warn!(
+                "[Assets] Skip path traversal in source_path: {}",
+                source_path
+            );
             continue;
         }
 
         let local_path = if is_map_to_resources {
             // 极老版本：resources 模式
-            game_dir.join("resources").join(source_path).to_string_lossy().to_string()
+            game_dir
+                .join("resources")
+                .join(source_path)
+                .to_string_lossy()
+                .to_string()
         } else if is_legacy {
             // 旧版本：virtual 模式
-            game_dir.join("assets").join("virtual").join("legacy").join(source_path).to_string_lossy().to_string()
+            game_dir
+                .join("assets")
+                .join("virtual")
+                .join("legacy")
+                .join(source_path)
+                .to_string_lossy()
+                .to_string()
         } else {
             // 正常模式：objects 目录
             let prefix = &hash[..2.min(hash.len())];
-            game_dir.join("assets").join("objects").join(prefix).join(hash).to_string_lossy().to_string()
+            game_dir
+                .join("assets")
+                .join("objects")
+                .join(prefix)
+                .join(hash)
+                .to_string_lossy()
+                .to_string()
         };
 
         entries.push(AssetEntry {
@@ -142,7 +170,10 @@ pub fn parse_asset_index(
 
 /// 获取资源索引的本地路径
 pub fn get_asset_index_path(game_dir: &Path, index_id: &str) -> PathBuf {
-    game_dir.join("assets").join("indexes").join(format!("{}.json", index_id))
+    game_dir
+        .join("assets")
+        .join("indexes")
+        .join(format!("{}.json", index_id))
 }
 
 /// 下载资源索引的 URL 列表
@@ -151,15 +182,17 @@ pub fn get_asset_index_urls(meta: &AssetIndexMeta, source_mode: DownloadSourceMo
 }
 
 /// 检测缺失的资源文件
-pub fn find_missing_assets(
-    entries: &[AssetEntry],
-) -> Vec<AssetEntry> {
+pub fn find_missing_assets(entries: &[AssetEntry]) -> Vec<AssetEntry> {
     let mut missing = Vec::new();
 
     for entry in entries {
         let checker = FileChecker::new()
             .with_actual_size(if entry.size == 0 { -1 } else { entry.size })
-            .with_hash(if entry.hash.is_empty() { None } else { Some(entry.hash.clone()) });
+            .with_hash(if entry.hash.is_empty() {
+                None
+            } else {
+                Some(entry.hash.clone())
+            });
 
         if !checker.is_valid(&entry.local_path) {
             missing.push(entry.clone());
@@ -170,7 +203,11 @@ pub fn find_missing_assets(
 }
 
 /// 构建资源文件的下载 URL 列表
-pub fn build_asset_download_urls(entry: &AssetEntry, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> Vec<String> {
+pub fn build_asset_download_urls(
+    entry: &AssetEntry,
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> Vec<String> {
     let hash = &entry.hash;
     let prefix = &hash[..2.min(hash.len())];
 
@@ -181,7 +218,12 @@ pub fn build_asset_download_urls(entry: &AssetEntry, mirror_url: Option<&str>, s
         DownloadSourceMode::Mirror => {
             let mut urls = Vec::new();
             if let Some(mirror) = mirror_url {
-                urls.push(format!("{}/assets/{}/{}", mirror.trim_end_matches('/'), prefix, hash));
+                urls.push(format!(
+                    "{}/assets/{}/{}",
+                    mirror.trim_end_matches('/'),
+                    prefix,
+                    hash
+                ));
             }
             urls.push(bmclapi_url);
             urls

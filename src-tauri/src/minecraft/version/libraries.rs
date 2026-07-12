@@ -4,8 +4,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-use super::super::utils::file_checker::FileChecker;
 use super::super::sources;
+use super::super::utils::file_checker::FileChecker;
 
 /// Library entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -140,7 +140,10 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
     };
 
     for library in libraries {
-        let rules = library.get("rules").and_then(|r| r.as_array()).map(|arr| arr.clone());
+        let rules = library
+            .get("rules")
+            .and_then(|r| r.as_array())
+            .map(|arr| arr.clone());
         if !check_rules(&rules) {
             continue;
         }
@@ -153,19 +156,34 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
 
         if let Some(natives) = library.get("natives") {
             if let Some(windows_name) = natives["windows"].as_str() {
-                let arch = if std::mem::size_of::<usize>() == 8 { "64" } else { "32" };
+                let arch = if std::mem::size_of::<usize>() == 8 {
+                    "64"
+                } else {
+                    "32"
+                };
                 let classifier = windows_name.replace("${arch}", arch);
 
                 if let Some(cls) = library["downloads"]["classifiers"].get(&classifier) {
-                    let url = cls["url"].as_str().or(root_url.as_deref()).map(|s| s.to_string());
+                    let url = cls["url"]
+                        .as_str()
+                        .or(root_url.as_deref())
+                        .map(|s| s.to_string());
                     let path = if let Some(p) = cls["path"].as_str() {
                         if p.contains("..") {
-                            crate::log_warn!("[Libraries] Skip path traversal in artifact path: {}", p);
+                            crate::log_warn!(
+                                "[Libraries] Skip path traversal in artifact path: {}",
+                                p
+                            );
                             continue;
                         }
-                        game_dir.join("libraries").join(p.replace('/', std::path::MAIN_SEPARATOR_STR)).to_string_lossy().to_string()
+                        game_dir
+                            .join("libraries")
+                            .join(p.replace('/', std::path::MAIN_SEPARATOR_STR))
+                            .to_string_lossy()
+                            .to_string()
                     } else {
-                        maven_to_path(name, game_dir).replace(".jar", &format!("-natives-{}.jar", arch))
+                        maven_to_path(name, game_dir)
+                            .replace(".jar", &format!("-natives-{}.jar", arch))
                     };
                     let size = cls["size"].as_i64().unwrap_or(0);
                     let sha1 = cls["sha1"].as_str().map(|s| s.to_string());
@@ -179,7 +197,8 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
                         url,
                     });
                 } else {
-                    let path = maven_to_path(name, game_dir).replace(".jar", &format!("-natives-{}.jar", arch));
+                    let path = maven_to_path(name, game_dir)
+                        .replace(".jar", &format!("-natives-{}.jar", arch));
                     result.push(LibEntry {
                         original_name: Some(name.to_string()),
                         local_path: path,
@@ -191,14 +210,23 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
                 }
             }
         } else {
-            let (url, local_path, size, sha1) = if let Some(artifact) = library.get("downloads").and_then(|d| d.get("artifact")) {
-                let url = artifact["url"].as_str().or(root_url.as_deref()).map(|s| s.to_string());
+            let (url, local_path, size, sha1) = if let Some(artifact) =
+                library.get("downloads").and_then(|d| d.get("artifact"))
+            {
+                let url = artifact["url"]
+                    .as_str()
+                    .or(root_url.as_deref())
+                    .map(|s| s.to_string());
                 let path = if let Some(p) = artifact["path"].as_str() {
                     if p.contains("..") {
                         crate::log_warn!("[Libraries] Skip path traversal in artifact path: {}", p);
                         continue;
                     }
-                    game_dir.join("libraries").join(p.replace('/', std::path::MAIN_SEPARATOR_STR)).to_string_lossy().to_string()
+                    game_dir
+                        .join("libraries")
+                        .join(p.replace('/', std::path::MAIN_SEPARATOR_STR))
+                        .to_string_lossy()
+                        .to_string()
                 } else {
                     maven_to_path(name, game_dir)
                 };
@@ -231,7 +259,8 @@ fn deduplicate_libs(libs: Vec<LibEntry>) -> Vec<LibEntry> {
         let key = format!("{}:{}", lib.name(), lib.is_natives);
 
         if let Some(existing) = map.get(&key) {
-            let existing_version = get_version_from_name(existing.original_name.as_deref().unwrap_or(""));
+            let existing_version =
+                get_version_from_name(existing.original_name.as_deref().unwrap_or(""));
             let new_version = get_version_from_name(lib.original_name.as_deref().unwrap_or(""));
             if compare_versions_ge(&new_version, &existing_version) {
                 map.insert(key, lib);
@@ -310,7 +339,8 @@ pub fn build_download_urls(lib: &LibEntry, mirror_url: Option<&str>) -> Vec<Stri
     }
 
     if urls.is_empty() {
-        let relative = lib.local_path
+        let relative = lib
+            .local_path
             .replace("\\", "/")
             .split("/libraries/")
             .last()
@@ -329,7 +359,8 @@ pub fn build_download_urls(lib: &LibEntry, mirror_url: Option<&str>) -> Vec<Stri
             let mirror_url = format!(
                 "{}/{}",
                 mirror_base,
-                url.split("/maven/").last()
+                url.split("/maven/")
+                    .last()
                     .or_else(|| url.split("/libraries/").last())
                     .unwrap_or("")
             );

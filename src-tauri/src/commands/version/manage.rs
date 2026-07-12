@@ -1,7 +1,7 @@
-use crate::{log_error, log_info};
 use crate::minecraft::version::scan as version_scan;
 use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
+use crate::{log_error, log_info};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -26,13 +26,19 @@ pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<S
     let versions = version_scan::scan_installed_versions(&game_dir);
     let version_ids: Vec<String> = versions.iter().map(|v| v.id.clone()).collect();
 
-    log_info!("Found {} version directories: {:?}", version_ids.len(), version_ids);
+    log_info!(
+        "Found {} version directories: {:?}",
+        version_ids.len(),
+        version_ids
+    );
     Ok(version_ids)
 }
 
 /// Get installed versions with type info
 #[tauri::command]
-pub async fn list_installed_versions_with_type(state: State<'_, AppState>) -> Result<Vec<InstalledVersionInfo>, String> {
+pub async fn list_installed_versions_with_type(
+    state: State<'_, AppState>,
+) -> Result<Vec<InstalledVersionInfo>, String> {
     log_info!("Fetching installed versions with type info");
 
     let config = state.config.lock().await;
@@ -57,7 +63,7 @@ pub async fn list_installed_versions_with_type(state: State<'_, AppState>) -> Re
 /// Detect version type from directory
 fn detect_version_type_from_dir(game_dir: &std::path::Path, version_id: &str) -> VersionType {
     let version_dir = game_dir.join("versions").join(version_id);
-    
+
     // 1. 优先从 JSON 检测（检查libraries中的加载器）
     let json_path = version_dir.join(format!("{}.json", version_id));
     if json_path.exists() {
@@ -71,7 +77,7 @@ fn detect_version_type_from_dir(game_dir: &std::path::Path, version_id: &str) ->
             }
         }
     }
-    
+
     // 2. 从 setup.ini 读取（仅当JSON检测为Release时）
     let setup_path = version_dir.join("setup.ini");
     if setup_path.exists() {
@@ -97,14 +103,22 @@ fn detect_version_type_from_dir(game_dir: &std::path::Path, version_id: &str) ->
             }
         }
     }
-    
+
     // 3. 从版本ID推断
     let id_lower = version_id.to_lowercase();
-    if id_lower.contains("forge") { return VersionType::Forge; }
-    if id_lower.contains("neoforge") { return VersionType::NeoForge; }
-    if id_lower.contains("fabric") { return VersionType::Fabric; }
-    if id_lower.contains("optifine") { return VersionType::OptiFine; }
-    
+    if id_lower.contains("forge") {
+        return VersionType::Forge;
+    }
+    if id_lower.contains("neoforge") {
+        return VersionType::NeoForge;
+    }
+    if id_lower.contains("fabric") {
+        return VersionType::Fabric;
+    }
+    if id_lower.contains("optifine") {
+        return VersionType::OptiFine;
+    }
+
     VersionType::Release
 }
 

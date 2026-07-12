@@ -13,14 +13,12 @@ pub async fn get_proxy_mode(state: State<'_, AppState>) -> Result<String, String
 
 /// 设置代理模式
 #[tauri::command]
-pub async fn set_proxy_mode(
-    state: State<'_, AppState>,
-    mode: String,
-) -> Result<(), String> {
+pub async fn set_proxy_mode(state: State<'_, AppState>, mode: String) -> Result<(), String> {
     log_info!("Proxy mode changed to: {}", mode);
     super::update_config(&state, |config| {
         config.proxy_mode = mode;
-    }).await
+    })
+    .await
 }
 
 /// 获取代理类型
@@ -32,14 +30,12 @@ pub async fn get_proxy_type(state: State<'_, AppState>) -> Result<String, String
 
 /// 设置代理类型
 #[tauri::command]
-pub async fn set_proxy_type(
-    state: State<'_, AppState>,
-    proxy_type: String,
-) -> Result<(), String> {
+pub async fn set_proxy_type(state: State<'_, AppState>, proxy_type: String) -> Result<(), String> {
     log_info!("Proxy type changed to: {}", proxy_type);
     super::update_config(&state, |config| {
         config.proxy_type = proxy_type;
-    }).await
+    })
+    .await
 }
 
 /// 获取代理地址
@@ -51,12 +47,10 @@ pub async fn get_proxy_url(state: State<'_, AppState>) -> Result<String, String>
 
 /// 设置代理地址
 #[tauri::command]
-pub async fn set_proxy_url(
-    state: State<'_, AppState>,
-    url: String,
-) -> Result<(), String> {
+pub async fn set_proxy_url(state: State<'_, AppState>, url: String) -> Result<(), String> {
     log_info!("Proxy URL changed to: {}", url);
     super::update_config(&state, |config| {
         config.proxy_url = url;
-    }).await
+    })
+    .await
 }

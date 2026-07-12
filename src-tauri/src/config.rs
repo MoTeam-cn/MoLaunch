@@ -2,9 +2,9 @@
 //!
 //! 使用 storage 模块管理配置文件（INI 格式）
 
-use crate::{log_info, log_warn, log_debug};
 use crate::state::AppConfig;
 use crate::storage::Storage;
+use crate::{log_debug, log_info, log_warn};
 
 /// 从 storage 加载配置
 pub fn load_config() -> Result<Option<AppConfig>, String> {
@@ -33,7 +33,8 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
 
     // Download
     if let Some(threads) = config.get("Download", "max_threads") {
-        app_config.max_download_threads = threads.parse().unwrap_or(app_config.max_download_threads);
+        app_config.max_download_threads =
+            threads.parse().unwrap_or(app_config.max_download_threads);
     }
     if let Some(chunks) = config.get("Download", "chunk_count") {
         app_config.chunk_count = chunks.parse().unwrap_or(app_config.chunk_count);
@@ -64,10 +65,16 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     }
 
     // 兼容旧配置：如果没有 mode 字段但有具体的内存值，则为自定义模式
-    if config.get("Memory", "mode").is_none() && app_config.min_memory > 0 && app_config.max_memory > 0 {
+    if config.get("Memory", "mode").is_none()
+        && app_config.min_memory > 0
+        && app_config.max_memory > 0
+    {
         app_config.memory_mode = "custom".to_string();
-        log_info!("Legacy config detected: memory mode set to custom (min={}MB, max={}MB)", 
-            app_config.min_memory, app_config.max_memory);
+        log_info!(
+            "Legacy config detected: memory mode set to custom (min={}MB, max={}MB)",
+            app_config.min_memory,
+            app_config.max_memory
+        );
     }
 
     // 自动模式：如果 memory_mode 为 "auto"，计算自动值用于运行时
@@ -79,7 +86,11 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         let suggested_min = suggested_max / 2;
         app_config.min_memory = suggested_min;
         app_config.max_memory = suggested_max;
-        log_info!("Auto memory config: min={}MB, max={}MB", app_config.min_memory, app_config.max_memory);
+        log_info!(
+            "Auto memory config: min={}MB, max={}MB",
+            app_config.min_memory,
+            app_config.max_memory
+        );
     }
 
     // Log
@@ -106,12 +117,24 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("General", "game_dir", &config.game_dir);
     ini.set("General", "theme", &config.theme);
     ini.set("General", "language", &config.language);
-    ini.set("General", "isolation_mode", &config.isolation_mode.to_string());
+    ini.set(
+        "General",
+        "isolation_mode",
+        &config.isolation_mode.to_string(),
+    );
 
     // Download
-    ini.set("Download", "max_threads", &config.max_download_threads.to_string());
+    ini.set(
+        "Download",
+        "max_threads",
+        &config.max_download_threads.to_string(),
+    );
     ini.set("Download", "chunk_count", &config.chunk_count.to_string());
-    ini.set("Download", "max_speed", &config.max_download_speed.to_string());
+    ini.set(
+        "Download",
+        "max_speed",
+        &config.max_download_speed.to_string(),
+    );
     ini.set("Download", "source", &config.download_source);
     ini.set("Download", "mirror_mode", &config.mirror_mode.to_string());
 

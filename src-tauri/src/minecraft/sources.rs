@@ -33,8 +33,10 @@ pub const MAVEN_FABRIC: &str = "https://maven.fabricmc.net";
 
 // ── Mod Loader 官方 ──
 pub const FORGE_VERSIONS_URL: &str = "https://files.minecraftforge.net/net/minecraftforge/forge";
-pub const NEOFORGE_API: &str = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
-pub const NEOFORGE_API_LEGACY: &str = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/forge";
+pub const NEOFORGE_API: &str =
+    "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge";
+pub const NEOFORGE_API_LEGACY: &str =
+    "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/forge";
 pub const FABRIC_META: &str = "https://meta.fabricmc.net/v2/versions/loader";
 pub const LITELOADER_VERSIONS: &str = "https://dl.liteloader.com/versions/versions.json";
 
@@ -42,8 +44,10 @@ pub const LITELOADER_VERSIONS: &str = "https://dl.liteloader.com/versions/versio
 pub const BMCLAPI_VERSION_MANIFEST: &str = "/mc/game/version_manifest.json";
 pub const BMCLAPI_OPTIFINE: &str = "/optifine/versionList";
 pub const BMCLAPI_FABRIC_META: &str = "/fabric-meta/v2/versions/loader";
-pub const BMCLAPI_NEOFORGE: &str = "/neoforge/meta/api/maven/details/releases/net/neoforged/neoforge";
-pub const BMCLAPI_NEOFORGE_LEGACY: &str = "/neoforge/meta/api/maven/details/releases/net/neoforged/forge";
+pub const BMCLAPI_NEOFORGE: &str =
+    "/neoforge/meta/api/maven/details/releases/net/neoforged/neoforge";
+pub const BMCLAPI_NEOFORGE_LEGACY: &str =
+    "/neoforge/meta/api/maven/details/releases/net/neoforged/forge";
 pub const BMCLAPI_LITELOADER: &str = "/maven/com/mumfrey/liteloader/versions.json";
 
 // ═══════════════════════════════════════════════════════════
@@ -66,9 +70,10 @@ pub const MAVEN_REPLACEMENTS: &[(&str, &str)] = &[
 ];
 
 /// Minecraft 库 -> BMCLAPI/libraries
-pub const LIBRARY_REPLACEMENTS: &[(&str, &str)] = &[
-    (MOJANG_LIBRARIES, "https://bmclapi2.bangbang93.com/libraries"),
-];
+pub const LIBRARY_REPLACEMENTS: &[(&str, &str)] = &[(
+    MOJANG_LIBRARIES,
+    "https://bmclapi2.bangbang93.com/libraries",
+)];
 
 // ═══════════════════════════════════════════════════════════
 // 动态路径构建
@@ -102,7 +107,10 @@ pub fn neoforge_installer_url(neoforge_version: &str) -> String {
 
 /// Fabric profile JSON 官方 URL
 pub fn fabric_profile_url(major_version: &str, loader_version: &str) -> String {
-    format!("{}/{}/{}/profile/json", FABRIC_META, major_version, loader_version)
+    format!(
+        "{}/{}/{}/profile/json",
+        FABRIC_META, major_version, loader_version
+    )
 }
 
 /// LiteLoader 版本 JSON 官方 URL
@@ -258,12 +266,22 @@ pub async fn fetch_with_fallback(urls: &[String]) -> anyhow::Result<String> {
                             return Ok(text);
                         }
                         Err(e) => {
-                            log_debug!("[Sources] 读取响应失败 {}: {} ({})", url, e, fmt_elapsed(start));
+                            log_debug!(
+                                "[Sources] 读取响应失败 {}: {} ({})",
+                                url,
+                                e,
+                                fmt_elapsed(start)
+                            );
                             last_err = format!("{}: 读取失败 - {}", url, e);
                         }
                     }
                 } else if should_skip_status(status) {
-                    log_warn!("[Sources] {} 返回 {}，跳过不重试 ({})", url, status, fmt_elapsed(start));
+                    log_warn!(
+                        "[Sources] {} 返回 {}，跳过不重试 ({})",
+                        url,
+                        status,
+                        fmt_elapsed(start)
+                    );
                     last_err = format!("{}: HTTP {}", url, status);
                     continue;
                 } else {

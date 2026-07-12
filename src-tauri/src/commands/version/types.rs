@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct VersionInfo {
     pub id: String,
     pub version_type: String,
-    pub release_time: i64,  // Unix时间戳
+    pub release_time: i64, // Unix时间戳
     pub url: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,

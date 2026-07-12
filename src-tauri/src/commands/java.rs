@@ -44,15 +44,15 @@ pub async fn detect_java(_state: State<'_, AppState>) -> Result<JavaRuntimeInfo,
 
     // 从环境变量中查找Java
     let java_list = java::search_java();
-    
+
     if java_list.is_empty() {
         return Err("No Java found".to_string());
     }
-    
+
     // 选择最佳Java
-    let best_java = java::select_best_java(&java_list, None, None)
-        .ok_or("No suitable Java found")?;
-    
+    let best_java =
+        java::select_best_java(&java_list, None, None).ok_or("No suitable Java found")?;
+
     let result = JavaRuntimeInfo {
         executable: best_java.executable.clone(),
         path_folder: best_java.path_folder.clone(),
@@ -73,16 +73,19 @@ pub async fn list_java(_state: State<'_, AppState>) -> Result<Vec<JavaRuntimeInf
     log_info!("Listing all Java runtimes...");
 
     let java_list = java::search_java();
-    
-    let result: Vec<JavaRuntimeInfo> = java_list.iter().map(|j| JavaRuntimeInfo {
-        executable: j.executable.clone(),
-        path_folder: j.path_folder.clone(),
-        is_user_import: j.is_user_import,
-        version: j.version.clone(),
-        major_version: j.major_version,
-        is_jre: j.is_jre,
-        is_64bit: j.is_64bit,
-    }).collect();
+
+    let result: Vec<JavaRuntimeInfo> = java_list
+        .iter()
+        .map(|j| JavaRuntimeInfo {
+            executable: j.executable.clone(),
+            path_folder: j.path_folder.clone(),
+            is_user_import: j.is_user_import,
+            version: j.version.clone(),
+            major_version: j.major_version,
+            is_jre: j.is_jre,
+            is_64bit: j.is_64bit,
+        })
+        .collect();
 
     log_info!("Found {} Java runtimes", result.len());
     Ok(result)
@@ -103,17 +106,19 @@ pub async fn select_java_for_mc(
         return Err("No Java found".to_string());
     }
 
-    let best_java = java_selector::select_best_java(
-        &mc_version,
-        &java_list,
-        user_java_path.as_deref(),
-    )
-    .ok_or_else(|| {
-        let required = java_selector::get_required_java_version(&mc_version);
-        format!("No suitable Java found for MC {} (requires Java {}+)", mc_version, required)
-    })?;
+    let best_java =
+        java_selector::select_best_java(&mc_version, &java_list, user_java_path.as_deref())
+            .ok_or_else(|| {
+                let required = java_selector::get_required_java_version(&mc_version);
+                format!(
+                    "No suitable Java found for MC {} (requires Java {}+)",
+                    mc_version, required
+                )
+            })?;
 
-    let java = java_list.iter().find(|j| j.executable == best_java)
+    let java = java_list
+        .iter()
+        .find(|j| j.executable == best_java)
         .ok_or("Selected Java not found in list")?;
 
     let result = JavaRuntimeInfo {
@@ -126,7 +131,12 @@ pub async fn select_java_for_mc(
         is_64bit: java.is_64bit,
     };
 
-    log_info!("Selected Java for MC {}: {} ({})", mc_version, result.version, result.executable);
+    log_info!(
+        "Selected Java for MC {}: {} ({})",
+        mc_version,
+        result.version,
+        result.executable
+    );
     Ok(result)
 }
 

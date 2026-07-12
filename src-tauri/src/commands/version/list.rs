@@ -1,8 +1,8 @@
-use crate::{log_error, log_info};
 use crate::minecraft::download;
 use crate::minecraft::fools;
 use crate::minecraft::sources::DownloadSourceMode;
 use crate::state::AppState;
+use crate::{log_error, log_info};
 use tauri::State;
 
 use super::types::{VersionInfo, VersionListResult};
@@ -17,29 +17,34 @@ pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResu
     let source_mode = DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
-    let result = download::fetch_version_list(mirror_url.as_deref(), source_mode).await.map_err(|e| {
-        log_error!("Failed to list versions: {}", e);
-        e.to_string()
-    })?;
+    let result = download::fetch_version_list(mirror_url.as_deref(), source_mode)
+        .await
+        .map_err(|e| {
+            log_error!("Failed to list versions: {}", e);
+            e.to_string()
+        })?;
 
     let (latest_release, latest_snapshot) = download::get_latest_versions(&result.value);
     let entries = download::parse_version_list(&result.value);
 
-    let versions: Vec<VersionInfo> = entries.iter().map(|e| {
-        let release_time = parse_timestamp(&e.release_time);
-        let description = if e.version_type == "fool" {
-            fools::get_fool_description(&e.id)
-        } else {
-            None
-        };
-        VersionInfo {
-            id: e.id.clone(),
-            version_type: e.version_type.clone(),
-            release_time,
-            url: e.url.clone(),
-            description,
-        }
-    }).collect();
+    let versions: Vec<VersionInfo> = entries
+        .iter()
+        .map(|e| {
+            let release_time = parse_timestamp(&e.release_time);
+            let description = if e.version_type == "fool" {
+                fools::get_fool_description(&e.id)
+            } else {
+                None
+            };
+            VersionInfo {
+                id: e.id.clone(),
+                version_type: e.version_type.clone(),
+                release_time,
+                url: e.url.clone(),
+                description,
+            }
+        })
+        .collect();
 
     log_info!("Found {} versions", versions.len());
     Ok(VersionListResult {

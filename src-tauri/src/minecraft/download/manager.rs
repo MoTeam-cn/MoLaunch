@@ -5,10 +5,10 @@ use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-use super::types::{DownloadTask, DownloadProgress, DownloadStatus, GlobalProgress};
-use super::rate_limiter::RateLimiter;
-use super::downloader;
 use super::super::sources::DownloadSourceMode;
+use super::downloader;
+use super::rate_limiter::RateLimiter;
+use super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
 
 /// 下载管理器
 pub struct DownloadManager {
@@ -110,7 +110,9 @@ impl DownloadManager {
                 interval.tick().await;
                 {
                     let p = prog_for_timer.lock().unwrap();
-                    if !p.is_active { break; }
+                    if !p.is_active {
+                        break;
+                    }
                 }
                 let speed = {
                     let window = sw_for_timer.lock().await;
@@ -119,8 +121,14 @@ impl DownloadManager {
                         let (last_bytes, last_time) = window.back().unwrap();
                         let bytes_diff = last_bytes.saturating_sub(*first_bytes);
                         let time_diff = last_time.duration_since(*first_time).as_secs_f64();
-                        if time_diff > 0.0 { (bytes_diff as f64 / time_diff) as u64 } else { 0 }
-                    } else { 0 }
+                        if time_diff > 0.0 {
+                            (bytes_diff as f64 / time_diff) as u64
+                        } else {
+                            0
+                        }
+                    } else {
+                        0
+                    }
                 };
                 let p_snapshot = {
                     let mut p = prog_for_timer.lock().unwrap();
@@ -159,7 +167,8 @@ impl DownloadManager {
                     source_mode,
                     Some(prog.clone()),
                     Some(chunked_ids.clone()),
-                ).await;
+                )
+                .await;
 
                 {
                     let mut p = prog.lock().unwrap();
@@ -185,7 +194,9 @@ impl DownloadManager {
                     let mut window = sw.lock().await;
                     let mut p = prog.lock().unwrap();
                     window.push_back((p.downloaded_bytes, Instant::now()));
-                    if window.len() > 10 { window.pop_front(); }
+                    if window.len() > 10 {
+                        window.pop_front();
+                    }
                     if window.len() >= 2 {
                         let (first_bytes, first_time) = window.front().unwrap();
                         let (last_bytes, last_time) = window.back().unwrap();

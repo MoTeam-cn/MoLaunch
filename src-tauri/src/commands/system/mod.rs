@@ -1,16 +1,16 @@
 //! 系统命令模块
 
-mod game_dir;
+mod config;
 mod download;
 mod game;
+mod game_dir;
 mod proxy;
-mod config;
 
-pub use game_dir::*;
+pub use config::*;
 pub use download::*;
 pub use game::*;
+pub use game_dir::*;
 pub use proxy::*;
-pub use config::*;
 
 use crate::state::AppState;
 

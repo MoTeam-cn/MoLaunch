@@ -10,8 +10,8 @@ use std::sync::{Arc, Mutex as StdMutex};
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
-use super::types::{DownloadStatus, GlobalProgress};
 use super::rate_limiter::RateLimiter;
+use super::types::{DownloadStatus, GlobalProgress};
 
 /// 分片下载结果
 pub struct ChunkDownloadResult {
@@ -24,7 +24,12 @@ pub struct ChunkDownloadResult {
 
 /// 检测服务器是否支持 Range 请求
 pub async fn supports_range(client: &reqwest::Client, url: &str) -> bool {
-    match client.head(url).timeout(Duration::from_secs(10)).send().await {
+    match client
+        .head(url)
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+    {
         Ok(resp) => {
             if let Some(accept_ranges) = resp.headers().get("accept-ranges") {
                 accept_ranges.to_str().is_ok_and(|v| v.contains("bytes"))
@@ -106,9 +111,8 @@ pub async fn download_chunked(
     );
 
     // 分片进度追踪：每个 chunk 已下载字节数
-    let chunk_progress: Arc<Vec<StdMutex<u64>>> = Arc::new(
-        (0..chunk_count).map(|_| StdMutex::new(0u64)).collect(),
-    );
+    let chunk_progress: Arc<Vec<StdMutex<u64>>> =
+        Arc::new((0..chunk_count).map(|_| StdMutex::new(0u64)).collect());
 
     let start_time = Instant::now();
     let mut handles = Vec::with_capacity(chunk_count);
@@ -123,15 +127,7 @@ pub async fn download_chunked(
 
         let handle = tokio::spawn(async move {
             let result = download_chunk(
-                &client,
-                &url,
-                &part_path,
-                start,
-                end,
-                limiter,
-                prog,
-                i,
-                file_prog,
+                &client, &url, &part_path, start, end, limiter, prog, i, file_prog,
             )
             .await;
             (i, result)
@@ -287,10 +283,7 @@ async fn download_chunk(
 
         // 更新文件级进度（聚合所有 chunk）供速度计算使用
         if let Some(ref fp) = file_progress {
-            let total_chunk_bytes: u64 = chunk_progress
-                .iter()
-                .map(|c| *c.lock().unwrap())
-                .sum();
+            let total_chunk_bytes: u64 = chunk_progress.iter().map(|c| *c.lock().unwrap()).sum();
             let mut p = fp.lock().unwrap();
             p.downloaded_bytes = total_chunk_bytes;
         }

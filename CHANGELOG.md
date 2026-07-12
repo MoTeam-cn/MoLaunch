@@ -7,8 +7,21 @@
 
 ## [未发布]
 
+### 新增
+
+#### 微软登录
+- 微软 OAuth 2.0 设备码登录流程（Device Code Flow）
+- 6 步 Token 交换链：设备码 → OAuth Token → XBL Token → XSTS Token → MC Token → 玩家档案
+- Token 持久化存储（DES 加密，支持多账号管理）
+- 会话恢复（应用重启后自动恢复登录状态）
+- 静默刷新（Token 过期时使用 Refresh Token 自动刷新）
+- 已存储微软账号列表展示与快速切换
+- 设备码弹窗组件（自动打开浏览器 + 复制验证码 + 轮询授权）
+- Xbox 错误码处理（封禁/未注册/地区限制/年龄不足）
+- 游戏所有权验证（entitlements 检查）
+- `launch_game` 命令支持动态 `login_type` 参数（Legacy/Microsoft）
+
 ### 待实现
-- 微软 OAuth 2.0 设备码登录流程
 - Mod 管理功能
 - 皮肤管理功能
 - 服务器列表功能

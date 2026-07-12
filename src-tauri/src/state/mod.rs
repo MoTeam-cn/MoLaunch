@@ -1,7 +1,7 @@
 //! 应用状态管理
 
-use crate::{log_info, log_warn};
 use crate::sdk::SdkInstance;
+use crate::{log_info, log_warn};
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use tokio::sync::Mutex as TokioMutex;
@@ -43,6 +43,7 @@ pub struct AppState {
     pub sdk: Arc<TokioMutex<Option<SdkInstance>>>,
     pub config: Arc<TokioMutex<AppConfig>>,
     pub auth: Arc<TokioMutex<AuthState>>,
+    pub auth_storage: Arc<crate::minecraft::auth::storage::AuthStorage>,
     pub download_state: Arc<Mutex<DownloadState>>,
     pub launch_history: Arc<TokioMutex<Vec<LaunchHistory>>>,
     pub current_pid: Arc<TokioMutex<Option<u32>>>,
@@ -131,7 +132,7 @@ pub struct AppConfig {
     pub log_level: u32,
     pub min_memory: u32,
     pub max_memory: u32,
-    pub memory_mode: String,  // "auto" | "custom"
+    pub memory_mode: String, // "auto" | "custom"
     pub theme: String,
     pub language: String,
     pub mirror_url: Option<String>,
@@ -139,10 +140,10 @@ pub struct AppConfig {
     pub mirror_url_download: Option<String>,
     pub mirror_mode: u32,
     pub max_download_speed: u64,
-    pub download_source: String,  // "mirror" | "official" | "smart"
-    pub proxy_mode: String,       // "none" | "system" | "custom"
-    pub proxy_type: String,       // "http" | "https" | "socks5"
-    pub proxy_url: String,        // 自定义代理地址，如 "127.0.0.1:7890"
+    pub download_source: String, // "mirror" | "official" | "smart"
+    pub proxy_mode: String,      // "none" | "system" | "custom"
+    pub proxy_type: String,      // "http" | "https" | "socks5"
+    pub proxy_url: String,       // 自定义代理地址，如 "127.0.0.1:7890"
 }
 
 impl Default for AppConfig {
@@ -247,10 +248,14 @@ impl AppState {
             }
         };
 
+        // 创建 SDK Arc（需先创建以便共享给 auth_storage）
+        let sdk_arc = Arc::new(TokioMutex::new(sdk));
+
         Self {
-            sdk: Arc::new(TokioMutex::new(sdk)),
+            sdk: sdk_arc.clone(),
             config: Arc::new(TokioMutex::new(config)),
             auth: Arc::new(TokioMutex::new(AuthState::default())),
+            auth_storage: Arc::new(crate::minecraft::auth::storage::AuthStorage::new(sdk_arc)),
             download_state: Arc::new(Mutex::new(DownloadState::default())),
             launch_history: Arc::new(TokioMutex::new(Vec::new())),
             current_pid: Arc::new(TokioMutex::new(None)),

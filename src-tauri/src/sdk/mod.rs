@@ -3,18 +3,18 @@
 //! 提供跨平台 SDK 动态库加载和 FFI 函数绑定
 
 mod ffi_types;
+mod helpers;
 mod instance;
 mod types;
-mod helpers;
 
 use std::path::PathBuf;
 use thiserror::Error;
 
 // Re-export public types
 pub use ffi_types::*;
-pub use instance::{SdkInstance, SdkFunctions};
-pub use types::*;
 pub use helpers::*;
+pub use instance::{SdkFunctions, SdkInstance};
+pub use types::*;
 
 /// SDK 错误类型
 #[derive(Error, Debug)]

@@ -4,11 +4,11 @@ pub mod forge_html;
 pub mod forge_installer;
 pub mod utils;
 
-mod forge;
-mod neoforge;
 mod fabric;
-mod optifine;
+mod forge;
 mod liteloader;
+mod neoforge;
+mod optifine;
 mod shared;
 
 use serde::{Deserialize, Serialize};
@@ -36,27 +36,45 @@ pub struct LoaderVersion {
 }
 
 /// List Forge versions
-pub async fn list_forge_versions(mc_version: &str, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
+pub async fn list_forge_versions(
+    mc_version: &str,
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
     forge::list_versions(mc_version, mirror_url, source_mode).await
 }
 
 /// List NeoForge versions
-pub async fn list_neoforge_versions(mc_version: &str, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
+pub async fn list_neoforge_versions(
+    mc_version: &str,
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
     neoforge::list_versions(mc_version, mirror_url, source_mode).await
 }
 
 /// List Fabric versions
-pub async fn list_fabric_versions(mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
+pub async fn list_fabric_versions(
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
     fabric::list_versions(mirror_url, source_mode).await
 }
 
 /// List OptiFine versions
-pub async fn list_optifine_versions(mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
+pub async fn list_optifine_versions(
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
     optifine::list_versions(mirror_url, source_mode).await
 }
 
 /// List LiteLoader versions
-pub async fn list_liteloader_versions(mc_version: &str, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
+pub async fn list_liteloader_versions(
+    mc_version: &str,
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
     liteloader::list_versions(mc_version, mirror_url, source_mode).await
 }
 
@@ -72,10 +90,52 @@ pub async fn install_loader(
     source_mode: DownloadSourceMode,
 ) -> anyhow::Result<()> {
     match loader_type {
-        LoaderType::Forge => forge::install(mc_version, loader_version, game_dir, mirror_url, progress_callback, source_mode).await,
-        LoaderType::NeoForge => neoforge::install(mc_version, loader_version, game_dir, mirror_url, progress_callback, source_mode).await,
-        LoaderType::Fabric => fabric::install(mc_version, loader_version, game_dir, mirror_url, progress_callback, source_mode).await,
-        LoaderType::OptiFine => optifine::install(mc_version, loader_version, progress_callback, source_mode).await,
-        LoaderType::LiteLoader => liteloader::install(mc_version, loader_version, game_dir, mirror_url, progress_callback, source_mode).await,
+        LoaderType::Forge => {
+            forge::install(
+                mc_version,
+                loader_version,
+                game_dir,
+                mirror_url,
+                progress_callback,
+                source_mode,
+            )
+            .await
+        }
+        LoaderType::NeoForge => {
+            neoforge::install(
+                mc_version,
+                loader_version,
+                game_dir,
+                mirror_url,
+                progress_callback,
+                source_mode,
+            )
+            .await
+        }
+        LoaderType::Fabric => {
+            fabric::install(
+                mc_version,
+                loader_version,
+                game_dir,
+                mirror_url,
+                progress_callback,
+                source_mode,
+            )
+            .await
+        }
+        LoaderType::OptiFine => {
+            optifine::install(mc_version, loader_version, progress_callback, source_mode).await
+        }
+        LoaderType::LiteLoader => {
+            liteloader::install(
+                mc_version,
+                loader_version,
+                game_dir,
+                mirror_url,
+                progress_callback,
+                source_mode,
+            )
+            .await
+        }
     }
 }

@@ -1,5 +1,8 @@
 //! 认证模块
 
+pub mod microsoft;
+pub mod storage;
+
 use serde::{Deserialize, Serialize};
 
 /// 登录类型
@@ -37,7 +40,7 @@ pub fn login_offline(username: &str) -> LoginResult {
     let uuid = generate_offline_uuid(username);
     let access_token = uuid.clone();
     let client_token = uuid.clone();
-    
+
     LoginResult {
         name: username.to_string(),
         uuid,
@@ -78,7 +81,9 @@ pub fn validate_username(username: &str) -> bool {
     if username.len() < 3 || username.len() > 16 {
         return false;
     }
-    
+
     // 用户名字符检查（只允许字母、数字、下划线）
-    username.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    username
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_')
 }

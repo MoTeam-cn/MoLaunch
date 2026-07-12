@@ -3,8 +3,8 @@
 //! 管理每个版本的 setup.ini 文件，记录版本元数据（加载器类型、版本号等）。
 //! 参考 PCL2 的 setup.ini 机制。
 
-use std::path::{Path, PathBuf};
 use super::state::VersionType;
+use std::path::{Path, PathBuf};
 
 /// 版本 Setup 信息
 #[derive(Debug, Clone)]
@@ -101,11 +101,13 @@ impl VersionSetup {
         let content = std::fs::read_to_string(&path)?;
         let ini = parse_ini(&content);
 
-        let original_version = ini.get("OriginalVersion")
+        let original_version = ini
+            .get("OriginalVersion")
             .cloned()
             .unwrap_or_else(|| "unknown".to_string());
 
-        let version_type = ini.get("Type")
+        let version_type = ini
+            .get("Type")
             .map(|s| VersionType::from_str(s))
             .unwrap_or(VersionType::Unknown);
 
@@ -132,7 +134,8 @@ impl VersionSetup {
         let json: serde_json::Value = serde_json::from_str(&content).ok()?;
 
         let version_type = super::state::detect_version_type(version_id, &json);
-        let original_version = json["inheritsFrom"].as_str()
+        let original_version = json["inheritsFrom"]
+            .as_str()
             .or_else(|| json["id"].as_str())
             .unwrap_or(version_id)
             .to_string();
@@ -150,15 +153,21 @@ impl VersionSetup {
                 if let Some(name) = lib["name"].as_str() {
                     if let Some(ver) = extract_maven_version(name, "net.minecraftforge:forge:") {
                         forge_version = Some(ver);
-                    } else if let Some(ver) = extract_maven_version(name, "net.neoforged:neoforge:") {
+                    } else if let Some(ver) = extract_maven_version(name, "net.neoforged:neoforge:")
+                    {
                         neoforge_version = Some(ver);
-                    } else if let Some(ver) = extract_maven_version(name, "net.fabricmc:fabric-loader:") {
+                    } else if let Some(ver) =
+                        extract_maven_version(name, "net.fabricmc:fabric-loader:")
+                    {
                         fabric_version = Some(ver);
-                    } else if let Some(ver) = extract_maven_version(name, "org.quiltmc:quilt-loader:") {
+                    } else if let Some(ver) =
+                        extract_maven_version(name, "org.quiltmc:quilt-loader:")
+                    {
                         quilt_version = Some(ver);
                     } else if let Some(ver) = extract_maven_version(name, "optifine:OptiFine:") {
                         optifine_version = Some(ver);
-                    } else if let Some(ver) = extract_maven_version(name, "com.mumfrey:liteloader:") {
+                    } else if let Some(ver) = extract_maven_version(name, "com.mumfrey:liteloader:")
+                    {
                         liteloader_version = Some(ver);
                     }
                 }
@@ -192,7 +201,11 @@ fn parse_ini(content: &str) -> std::collections::HashMap<String, String> {
     let mut map = std::collections::HashMap::new();
     for line in content.lines() {
         let line = line.trim();
-        if line.is_empty() || line.starts_with('[') || line.starts_with('#') || line.starts_with(';') {
+        if line.is_empty()
+            || line.starts_with('[')
+            || line.starts_with('#')
+            || line.starts_with(';')
+        {
             continue;
         }
         if let Some((key, value)) = line.split_once('=') {
@@ -219,11 +232,17 @@ mod tests {
     #[test]
     fn test_extract_maven_version() {
         assert_eq!(
-            extract_maven_version("net.minecraftforge:forge:1.20.1-47.2.0", "net.minecraftforge:forge:"),
+            extract_maven_version(
+                "net.minecraftforge:forge:1.20.1-47.2.0",
+                "net.minecraftforge:forge:"
+            ),
             Some("1.20.1-47.2.0".to_string())
         );
         assert_eq!(
-            extract_maven_version("net.fabricmc:fabric-loader:0.16.0", "net.fabricmc:fabric-loader:"),
+            extract_maven_version(
+                "net.fabricmc:fabric-loader:0.16.0",
+                "net.fabricmc:fabric-loader:"
+            ),
             Some("0.16.0".to_string())
         );
         assert_eq!(

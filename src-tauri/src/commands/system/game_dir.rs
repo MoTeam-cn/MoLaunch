@@ -55,7 +55,10 @@ pub async fn get_game_dir(state: State<'_, AppState>) -> Result<String, String> 
 
 /// 选择文件夹
 #[tauri::command]
-pub async fn select_folder(app: tauri::AppHandle, current: Option<String>) -> Result<Option<String>, String> {
+pub async fn select_folder(
+    app: tauri::AppHandle,
+    current: Option<String>,
+) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
     let mut dialog = app.dialog().file();
@@ -93,14 +96,12 @@ pub async fn select_file(
 
 /// 更新游戏目录
 #[tauri::command]
-pub async fn set_game_dir(
-    state: State<'_, AppState>,
-    game_dir: String,
-) -> Result<(), String> {
+pub async fn set_game_dir(state: State<'_, AppState>, game_dir: String) -> Result<(), String> {
     log_info!("Game directory changed to: {}", game_dir);
     super::update_config(&state, |config| {
         config.game_dir = game_dir;
-    }).await
+    })
+    .await
 }
 
 /// 获取系统内存信息

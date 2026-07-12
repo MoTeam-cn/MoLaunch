@@ -1,5 +1,5 @@
 //! Launcher Profiles 管理模块
-//! 
+//!
 //! 管理 Minecraft 的 launcher_profiles.json 文件
 //! 参考 PCL2 的实现逻辑
 
@@ -40,7 +40,10 @@ pub struct LauncherProfiles {
     pub selected_profile: String,
     #[serde(rename = "clientToken")]
     pub client_token: String,
-    #[serde(rename = "authenticationDatabase", skip_serializing_if = "Option::is_none")]
+    #[serde(
+        rename = "authenticationDatabase",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub authentication_database: Option<HashMap<String, AuthAccount>>,
     #[serde(rename = "selectedUser", skip_serializing_if = "Option::is_none")]
     pub selected_user: Option<SelectedUser>,
@@ -93,18 +96,23 @@ pub struct SelectedUser {
 impl LauncherProfiles {
     /// 创建默认的 launcher_profiles.json
     pub fn create_default() -> Self {
-        let now = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%S.0000Z").to_string();
+        let now = chrono::Utc::now()
+            .format("%Y-%m-%dT%H:%M:%S.0000Z")
+            .to_string();
         let mut profiles = HashMap::new();
-        profiles.insert("MoLaunch".to_string(), Profile {
-            icon: "Grass".to_string(),
-            name: "MoLaunch".to_string(),
-            last_version_id: "latest-release".to_string(),
-            profile_type: "latest-release".to_string(),
-            last_used: now,
-            game_dir: None,
-            java_args: None,
-            java_dir: None,
-        });
+        profiles.insert(
+            "MoLaunch".to_string(),
+            Profile {
+                icon: "Grass".to_string(),
+                name: "MoLaunch".to_string(),
+                last_version_id: "latest-release".to_string(),
+                profile_type: "latest-release".to_string(),
+                last_used: now,
+                game_dir: None,
+                java_args: None,
+                java_dir: None,
+            },
+        );
 
         LauncherProfiles {
             profiles,
@@ -132,7 +140,10 @@ impl LauncherProfiles {
         }
         let profiles = Self::create_default();
         profiles.save(mc_folder)?;
-        log_info!("[Profiles] Created launcher_profiles.json in {}", mc_folder.display());
+        log_info!(
+            "[Profiles] Created launcher_profiles.json in {}",
+            mc_folder.display()
+        );
         Ok(profiles)
     }
 
@@ -167,7 +178,10 @@ impl LauncherProfiles {
             return Ok(());
         }
 
-        log_info!("[Profiles] Updating for Microsoft account: {}", login_result.name);
+        log_info!(
+            "[Profiles] Updating for Microsoft account: {}",
+            login_result.name
+        );
 
         // 构建认证数据库
         let mut auth_profiles = HashMap::new();

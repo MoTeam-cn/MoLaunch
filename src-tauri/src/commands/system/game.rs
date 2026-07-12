@@ -6,26 +6,22 @@ use tauri::State;
 
 /// 设置最小内存
 #[tauri::command]
-pub async fn set_min_memory(
-    state: State<'_, AppState>,
-    memory: u32,
-) -> Result<(), String> {
+pub async fn set_min_memory(state: State<'_, AppState>, memory: u32) -> Result<(), String> {
     log_info!("Min memory changed to: {} MB", memory);
     super::update_config(&state, |config| {
         config.min_memory = memory;
-    }).await
+    })
+    .await
 }
 
 /// 设置最大内存
 #[tauri::command]
-pub async fn set_max_memory(
-    state: State<'_, AppState>,
-    memory: u32,
-) -> Result<(), String> {
+pub async fn set_max_memory(state: State<'_, AppState>, memory: u32) -> Result<(), String> {
     log_info!("Max memory changed to: {} MB", memory);
     super::update_config(&state, |config| {
         config.max_memory = memory;
-    }).await
+    })
+    .await
 }
 
 /// 获取内存配置
@@ -44,10 +40,7 @@ pub async fn get_memory_mode(state: State<'_, AppState>) -> Result<String, Strin
 
 /// 设置内存模式
 #[tauri::command]
-pub async fn set_memory_mode(
-    state: State<'_, AppState>,
-    mode: String,
-) -> Result<(), String> {
+pub async fn set_memory_mode(state: State<'_, AppState>, mode: String) -> Result<(), String> {
     log_info!("Memory mode changed to: {}", mode);
     super::update_config(&state, |config| {
         config.memory_mode = mode.clone();
@@ -56,19 +49,18 @@ pub async fn set_memory_mode(
             config.min_memory = 0;
             config.max_memory = 0;
         }
-    }).await
+    })
+    .await
 }
 
 /// 设置版本隔离模式
 #[tauri::command]
-pub async fn set_isolation_mode(
-    state: State<'_, AppState>,
-    mode: u32,
-) -> Result<(), String> {
+pub async fn set_isolation_mode(state: State<'_, AppState>, mode: u32) -> Result<(), String> {
     log_info!("Isolation mode changed to: {}", mode);
     super::update_config(&state, |config| {
         config.isolation_mode = mode;
-    }).await
+    })
+    .await
 }
 
 /// 获取版本隔离模式
@@ -87,12 +79,10 @@ pub async fn get_log_level(state: State<'_, AppState>) -> Result<u32, String> {
 
 /// 设置日志级别
 #[tauri::command]
-pub async fn set_log_level(
-    state: State<'_, AppState>,
-    level: u32,
-) -> Result<(), String> {
+pub async fn set_log_level(state: State<'_, AppState>, level: u32) -> Result<(), String> {
     log_info!("Log level changed to: {}", level);
     super::update_config(&state, |config| {
         config.log_level = level;
-    }).await
+    })
+    .await
 }

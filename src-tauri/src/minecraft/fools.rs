@@ -61,14 +61,16 @@ pub fn detect_fool(id: &str, version_type: &str, release_time: &str) -> Option<F
 
 /// 解析时间为 UTC+2，返回 NaiveDateTime（仅当日期为 4月1日）
 fn parse_april_fools_date(time_str: &str) -> Option<chrono::NaiveDateTime> {
-    use chrono::{TimeZone, Datelike};
+    use chrono::{Datelike, TimeZone};
 
     let utc_plus_2 = chrono::FixedOffset::east_opt(2 * 3600)?;
 
     let local = if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(time_str) {
         dt.with_timezone(&utc_plus_2)
     } else if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(time_str, "%Y-%m-%dT%H:%M:%S") {
-        chrono::Utc.from_utc_datetime(&naive).with_timezone(&utc_plus_2)
+        chrono::Utc
+            .from_utc_datetime(&naive)
+            .with_timezone(&utc_plus_2)
     } else {
         return None;
     };

@@ -14,7 +14,8 @@ pub async fn set_mirror_url(
     log_info!("Mirror URL changed to: {:?}", mirror_url);
     super::update_config(&state, |config| {
         config.mirror_url = mirror_url;
-    }).await
+    })
+    .await
 }
 
 /// 获取镜像源
@@ -57,7 +58,8 @@ pub async fn set_download_source(
             _ => {}
         }
         config.download_source = source;
-    }).await
+    })
+    .await
 }
 
 /// 获取下载源模式
@@ -77,7 +79,8 @@ pub async fn set_max_download_speed(
     log_info!("Max download speed changed to: {} bytes/sec", speed);
     super::update_config(&state, |config| {
         config.max_download_speed = speed;
-    }).await
+    })
+    .await
 }
 
 /// 获取最大下载速度
@@ -96,7 +99,8 @@ pub async fn set_max_download_threads(
     log_info!("Max download threads changed to: {}", threads);
     super::update_config(&state, |config| {
         config.max_download_threads = threads;
-    }).await
+    })
+    .await
 }
 
 /// 获取下载线程数
@@ -108,14 +112,12 @@ pub async fn get_max_download_threads(state: State<'_, AppState>) -> Result<u32,
 
 /// 设置分片数量
 #[tauri::command]
-pub async fn set_chunk_count(
-    state: State<'_, AppState>,
-    count: u32,
-) -> Result<(), String> {
+pub async fn set_chunk_count(state: State<'_, AppState>, count: u32) -> Result<(), String> {
     log_info!("Chunk count changed to: {}", count);
     super::update_config(&state, |config| {
         config.chunk_count = count;
-    }).await
+    })
+    .await
 }
 
 /// 获取分片数量

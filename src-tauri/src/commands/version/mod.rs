@@ -1,16 +1,16 @@
 //! Version management commands
 
-pub mod types;
-pub mod list;
 pub mod download;
-pub mod manage;
-pub mod loaders;
-pub mod progress;
 pub mod install;
 pub mod launch;
+pub mod list;
+pub mod loaders;
+pub mod manage;
+pub mod progress;
+pub mod types;
 
 // Re-export types
-pub use types::{VersionInfo, VersionListResult, DownloadStageSnapshot, DownloadProgressSnapshot};
+pub use types::{DownloadProgressSnapshot, DownloadStageSnapshot, VersionInfo, VersionListResult};
 
 /// 校验版本 ID / 实例名，防止路径遍历
 pub fn sanitize_version_id(id: &str) -> Result<(), String> {

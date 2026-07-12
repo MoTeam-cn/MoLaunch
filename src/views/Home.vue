@@ -85,6 +85,7 @@ async function handleLaunchGame() {
       username: authStore.currentUser?.name || 'Player',
       uuid: authStore.currentUser?.uuid || '',
       accessToken: authStore.currentUser?.access_token || '',
+      loginType: authStore.currentUser?.login_type || 'Legacy',
     })
 
     showSuccess('启动成功', `游戏已启动 (PID: ${pid})`)

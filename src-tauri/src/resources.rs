@@ -54,11 +54,11 @@ pub fn list_dir(relative_path: &str) -> Vec<String> {
 /// 释放资源文件到目标路径
 pub fn extract_resource(resource_path: &str, target_path: &PathBuf) -> anyhow::Result<()> {
     let content = read_resource_bytes(resource_path)?;
-    
+
     if let Some(parent) = target_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    
+
     // 只在文件不存在或大小不同时写入
     let need_write = if target_path.exists() {
         let existing_size = std::fs::metadata(target_path)?.len();
@@ -69,7 +69,11 @@ pub fn extract_resource(resource_path: &str, target_path: &PathBuf) -> anyhow::R
 
     if need_write {
         std::fs::write(target_path, &content)?;
-        log_info!("Extracted resource: {} -> {}", resource_path, target_path.display());
+        log_info!(
+            "Extracted resource: {} -> {}",
+            resource_path,
+            target_path.display()
+        );
     }
 
     Ok(())

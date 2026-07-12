@@ -13,7 +13,10 @@ pub fn merge_version_json(
     let mut current = json.clone();
 
     loop {
-        let inherit_from = current.get("inheritsFrom").and_then(|v| v.as_str()).unwrap_or("");
+        let inherit_from = current
+            .get("inheritsFrom")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
 
         if inherit_from.is_empty() {
             break;
@@ -32,7 +35,11 @@ pub fn merge_version_json(
 
         // 参考 PCL2：父版本不存在时仅警告，不报错
         if !parent_json_path.exists() {
-            log_warn!("[JsonMerge] Parent JSON not found: {} (inheritsFrom: {})", parent_json_path.display(), inherit_from);
+            log_warn!(
+                "[JsonMerge] Parent JSON not found: {} (inheritsFrom: {})",
+                parent_json_path.display(),
+                inherit_from
+            );
             log_warn!("[JsonMerge] Continuing without parent merge, some features may not work");
             // 注意：不移除 inheritsFrom，让 get_asset_index_meta 的fallback能工作
             break;
@@ -80,7 +87,9 @@ pub fn merge_version_json(
 
 /// Merge two JSON values (source overrides target)
 fn merge_json_values(target: &mut serde_json::Value, source: &serde_json::Value) {
-    if let (serde_json::Value::Object(target_map), serde_json::Value::Object(source_map)) = (target, source) {
+    if let (serde_json::Value::Object(target_map), serde_json::Value::Object(source_map)) =
+        (target, source)
+    {
         for (key, value) in source_map {
             if key == "libraries" {
                 continue;
@@ -114,7 +123,9 @@ pub fn merge_multiple_jsons(
 
         if let (Some(base_args), Some(other_args)) = (
             result.get("minecraftArguments").and_then(|a| a.as_str()),
-            other_clean.get("minecraftArguments").and_then(|a| a.as_str()),
+            other_clean
+                .get("minecraftArguments")
+                .and_then(|a| a.as_str()),
         ) {
             let merged_args = merge_minecraft_arguments(base_args, other_args);
             result["minecraftArguments"] = serde_json::Value::String(merged_args);

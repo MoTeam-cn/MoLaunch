@@ -11,7 +11,9 @@ static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 /// 应在应用启动时调用一次
 pub fn init_client(proxy_mode: &str, proxy_type: &str, proxy_url: &str) {
     let client = build_client(proxy_mode, proxy_type, proxy_url, Duration::from_secs(30));
-    HTTP_CLIENT.set(client).expect("HTTP client already initialized");
+    HTTP_CLIENT
+        .set(client)
+        .expect("HTTP client already initialized");
 }
 
 /// 获取全局 HTTP 客户端

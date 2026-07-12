@@ -5,14 +5,18 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::shared;
+use super::{utils, LoaderVersion};
 use crate::minecraft::download::manager::DownloadManager;
-use crate::minecraft::download::types::{DownloadTask, DownloadStatus};
+use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::launcher_profiles;
 use crate::minecraft::sources::{self, DownloadSourceMode};
-use super::{LoaderVersion, utils};
 
 /// List Forge versions
-pub async fn list_versions(mc_version: &str, mirror_url: Option<&str>, source_mode: DownloadSourceMode) -> anyhow::Result<Vec<LoaderVersion>> {
+pub async fn list_versions(
+    mc_version: &str,
+    mirror_url: Option<&str>,
+    source_mode: DownloadSourceMode,
+) -> anyhow::Result<Vec<LoaderVersion>> {
     let urls = sources::build_urls(
         mirror_url,
         &sources::forge_versions_url(mc_version),
@@ -24,16 +28,19 @@ pub async fn list_versions(mc_version: &str, mirror_url: Option<&str>, source_mo
 
     // 尝试 BMCLAPI JSON 格式
     if let Ok(json_array) = serde_json::from_str::<Vec<serde_json::Value>>(&content) {
-        let mut versions: Vec<LoaderVersion> = json_array.iter().filter_map(|v| {
-            let version = v["version"].as_str()?;
-            let modified = v["modified"].as_str();
-            let release_time = modified.and_then(|s| utils::parse_utc_to_local(s));
-            Some(LoaderVersion {
-                version: version.to_string(),
-                is_recommended: v["category"].as_str() == Some("recommended"),
-                release_time,
+        let mut versions: Vec<LoaderVersion> = json_array
+            .iter()
+            .filter_map(|v| {
+                let version = v["version"].as_str()?;
+                let modified = v["modified"].as_str();
+                let release_time = modified.and_then(|s| utils::parse_utc_to_local(s));
+                Some(LoaderVersion {
+                    version: version.to_string(),
+                    is_recommended: v["category"].as_str() == Some("recommended"),
+                    release_time,
+                })
             })
-        }).collect();
+            .collect();
 
         versions.sort_by(|a, b| {
             let v_a = utils::parse_version_number(&a.version);
@@ -75,7 +82,12 @@ pub async fn install(
     };
 
     // Download installer
-    let urls = sources::build_replace_urls(&installer_url, mirror_url, sources::MAVEN_REPLACEMENTS, source_mode);
+    let urls = sources::build_replace_urls(
+        &installer_url,
+        mirror_url,
+        sources::MAVEN_REPLACEMENTS,
+        source_mode,
+    );
 
     let manager = DownloadManager::new(1, 0, 0, source_mode);
     let task = DownloadTask {
@@ -100,9 +112,24 @@ pub async fn install(
 
     // 根据 Forge 版本选择安装方式
     if super::forge_installer::needs_injector(forge_version, false) {
-        install_modern(mc_version, forge_version, &installer_path, game_dir, progress_callback, source_mode).await
+        install_modern(
+            mc_version,
+            forge_version,
+            &installer_path,
+            game_dir,
+            progress_callback,
+            source_mode,
+        )
+        .await
     } else {
-        install_legacy(mc_version, forge_version, &installer_path, game_dir, progress_callback).await
+        install_legacy(
+            mc_version,
+            forge_version,
+            &installer_path,
+            game_dir,
+            progress_callback,
+        )
+        .await
     }
 }
 
@@ -116,7 +143,11 @@ async fn install_legacy(
 ) -> anyhow::Result<()> {
     use std::io::Read;
 
-    log_info!("[Forge] Legacy 安装 {} for MC {}", forge_version, mc_version);
+    log_info!(
+        "[Forge] Legacy 安装 {} for MC {}",
+        forge_version,
+        mc_version
+    );
 
     let version_id = format!("{}-forge-{}", mc_version, forge_version);
     let version_dir = game_dir.join("versions").join(&version_id);
@@ -141,9 +172,11 @@ async fn install_legacy(
         log_info!("[Forge] Legacy 方式 2: {}", forge_version);
         let install = &profile_json["install"];
 
-        let file_path = install["filePath"].as_str()
+        let file_path = install["filePath"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("install.filePath not found"))?;
-        let lib_path = install["path"].as_str()
+        let lib_path = install["path"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("install.path not found"))?;
 
         let jar_dest = shared::maven_path_to_local(lib_path, game_dir);
@@ -163,7 +196,8 @@ async fn install_legacy(
             cb(60.0);
         }
 
-        let version_info = profile_json.get("versionInfo")
+        let version_info = profile_json
+            .get("versionInfo")
             .ok_or_else(|| anyhow::anyhow!("versionInfo not found"))?;
         let mut version_json = version_info.clone();
 
@@ -179,7 +213,8 @@ async fn install_legacy(
         // Legacy 方式 1（1.8 ~ 1.12.2）
         log_info!("[Forge] Legacy 方式 1: {}", forge_version);
 
-        let json_entry_name = profile_json["json"].as_str()
+        let json_entry_name = profile_json["json"]
+            .as_str()
             .ok_or_else(|| anyhow::anyhow!("install_profile.json 中缺少 json 字段"))?
             .trim_start_matches('/');
 
@@ -202,7 +237,8 @@ async fn install_legacy(
 
         // 解压 maven/ 文件夹到 libraries/
         let maven_dest = game_dir.join("libraries");
-        let maven_entries: Vec<String> = zip.file_names()
+        let maven_entries: Vec<String> = zip
+            .file_names()
             .filter(|name| name.starts_with("maven/"))
             .map(|s| s.to_string())
             .collect();
@@ -210,12 +246,18 @@ async fn install_legacy(
         let mut extracted_count = 0;
         for entry_name in &maven_entries {
             let relative_path = entry_name.strip_prefix("maven/").unwrap_or(entry_name);
-            if relative_path.is_empty() { continue; }
+            if relative_path.is_empty() {
+                continue;
+            }
             let dest_path = maven_dest.join(relative_path);
 
             // Zip Slip 防护：校验最终路径仍在 maven_dest 内
-            let canonical_base = maven_dest.canonicalize().unwrap_or_else(|_| maven_dest.to_path_buf());
-            let canonical_dest = dest_path.canonicalize().unwrap_or_else(|_| dest_path.clone());
+            let canonical_base = maven_dest
+                .canonicalize()
+                .unwrap_or_else(|_| maven_dest.to_path_buf());
+            let canonical_dest = dest_path
+                .canonicalize()
+                .unwrap_or_else(|_| dest_path.clone());
             if !canonical_dest.starts_with(&canonical_base) {
                 crate::log_warn!("[Forge] Skip path traversal entry: {}", entry_name);
                 continue;
@@ -234,16 +276,26 @@ async fn install_legacy(
                 extracted_count += 1;
             }
         }
-        log_info!("[Forge] 解压 maven/ 到 libraries/: {} 个文件", extracted_count);
+        log_info!(
+            "[Forge] 解压 maven/ 到 libraries/: {} 个文件",
+            extracted_count
+        );
 
         // 复制原版 JAR 到 Forge 版本目录（Legacy 方式 1 需要）
-        let mc_jar = game_dir.join("versions").join(mc_version).join(format!("{}.jar", mc_version));
+        let mc_jar = game_dir
+            .join("versions")
+            .join(mc_version)
+            .join(format!("{}.jar", mc_version));
         let forge_jar = version_dir.join(format!("{}.jar", version_id));
         if mc_jar.exists() && !forge_jar.exists() {
             if let Err(e) = std::fs::copy(&mc_jar, &forge_jar) {
                 log_warn!("[Forge] Failed to copy MC JAR: {}", e);
             } else {
-                log_info!("[Forge] Copied MC JAR: {} -> {}", mc_jar.display(), forge_jar.display());
+                log_info!(
+                    "[Forge] Copied MC JAR: {} -> {}",
+                    mc_jar.display(),
+                    forge_jar.display()
+                );
             }
         }
     }
@@ -269,15 +321,16 @@ async fn install_modern(
 
     let version_id = format!("{}-forge-{}", mc_version, forge_version);
 
-    launcher_profiles::ensure_profiles_exist(game_dir)
-        .map_err(|e: String| anyhow::anyhow!(e))?;
+    launcher_profiles::ensure_profiles_exist(game_dir).map_err(|e: String| anyhow::anyhow!(e))?;
 
     if let Some(ref cb) = progress_callback {
         cb(20.0);
     }
 
     // 下载 Mojang 映射文件
-    if let Err(e) = shared::download_mojang_mappings(mc_version, game_dir, installer_path, source_mode).await {
+    if let Err(e) =
+        shared::download_mojang_mappings(mc_version, game_dir, installer_path, source_mode).await
+    {
         log_warn!("[Forge] Failed to download mappings: {}", e);
     }
 

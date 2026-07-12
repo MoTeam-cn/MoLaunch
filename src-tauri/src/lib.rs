@@ -52,6 +52,13 @@ pub fn run() {
             commands::auth::login_offline,
             commands::auth::get_login_status,
             commands::auth::logout,
+            // 微软登录命令
+            commands::auth::ms_login_start,
+            commands::auth::ms_login_poll,
+            commands::auth::ms_login_refresh,
+            commands::auth::get_ms_accounts,
+            commands::auth::remove_ms_account,
+            commands::auth::switch_ms_account,
             // 版本命令
             commands::version::list::list_versions,
             commands::version::download::download_version,

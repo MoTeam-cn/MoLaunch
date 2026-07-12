@@ -126,7 +126,7 @@ pub fn login_offline(username: &str) -> Result<LoginResult, LoginError> {
 }
 
 /// 微软登录 (预留接口)
-/// 
+///
 /// # 流程说明
 /// 1. 获取设备码 (Device Code)
 /// 2. 用户在浏览器中授权
@@ -135,10 +135,12 @@ pub fn login_offline(username: &str) -> Result<LoginResult, LoginError> {
 /// 5. 获取XSTS令牌
 /// 6. 获取Minecraft访问令牌
 /// 7. 获取玩家信息
-pub async fn login_microsoft(_device_code_callback: impl Fn(&str, &str)) -> Result<LoginResult, LoginError> {
+pub async fn login_microsoft(
+    _device_code_callback: impl Fn(&str, &str),
+) -> Result<LoginResult, LoginError> {
     // TODO: 实现微软登录
     // 这里预留接口，后续实现
-    
+
     Err(LoginError {
         message: "微软登录功能暂未实现".to_string(),
         error_type: LoginErrorType::Unknown,

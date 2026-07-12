@@ -2,8 +2,8 @@
 //!
 //! 解析 Forge 官方网站的 HTML 版本列表页面。
 
-use super::LoaderVersion;
 use super::utils;
+use super::LoaderVersion;
 
 /// 解析 Forge 官方 HTML 页面，提取版本列表
 ///
@@ -70,7 +70,11 @@ fn extract_version_number(td_content: &str) -> Option<String> {
         }
     }
 
-    if version.is_empty() { None } else { Some(version) }
+    if version.is_empty() {
+        None
+    } else {
+        Some(version)
+    }
 }
 
 /// 从表格行中提取发布时间

@@ -6,47 +6,63 @@ use tauri::State;
 
 /// List Forge versions
 #[tauri::command]
-pub async fn list_forge_versions(state: State<'_, AppState>, mc_version: String) -> Result<String, String> {
+pub async fn list_forge_versions(
+    state: State<'_, AppState>,
+    mc_version: String,
+) -> Result<String, String> {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
     let source_mode = DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
-    let versions = loaders::list_forge_versions(&mc_version, mirror_url.as_deref(), source_mode).await.map_err(|e| {
-        log_error!("Failed to list Forge versions: {}", e);
-        e.to_string()
-    })?;
+    let versions = loaders::list_forge_versions(&mc_version, mirror_url.as_deref(), source_mode)
+        .await
+        .map_err(|e| {
+            log_error!("Failed to list Forge versions: {}", e);
+            e.to_string()
+        })?;
 
-    let result: Vec<serde_json::Value> = versions.iter().map(|v| {
-        serde_json::json!({
-            "version": v.version,
-            "is_recommended": v.is_recommended,
-            "release_time": v.release_time.as_deref().unwrap_or("")
+    let result: Vec<serde_json::Value> = versions
+        .iter()
+        .map(|v| {
+            serde_json::json!({
+                "version": v.version,
+                "is_recommended": v.is_recommended,
+                "release_time": v.release_time.as_deref().unwrap_or("")
+            })
         })
-    }).collect();
+        .collect();
     serde_json::to_string(&result).map_err(|e| e.to_string())
 }
 
 /// List NeoForge versions
 #[tauri::command]
-pub async fn list_neoforge_versions(state: State<'_, AppState>, mc_version: String) -> Result<String, String> {
+pub async fn list_neoforge_versions(
+    state: State<'_, AppState>,
+    mc_version: String,
+) -> Result<String, String> {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
     let source_mode = DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
-    let versions = loaders::list_neoforge_versions(&mc_version, mirror_url.as_deref(), source_mode).await.map_err(|e| {
-        log_error!("Failed to list NeoForge versions: {}", e);
-        e.to_string()
-    })?;
+    let versions = loaders::list_neoforge_versions(&mc_version, mirror_url.as_deref(), source_mode)
+        .await
+        .map_err(|e| {
+            log_error!("Failed to list NeoForge versions: {}", e);
+            e.to_string()
+        })?;
 
-    let result: Vec<serde_json::Value> = versions.iter().map(|v| {
-        serde_json::json!({
-            "version": v.version,
-            "recommended": v.is_recommended
+    let result: Vec<serde_json::Value> = versions
+        .iter()
+        .map(|v| {
+            serde_json::json!({
+                "version": v.version,
+                "recommended": v.is_recommended
+            })
         })
-    }).collect();
-    
+        .collect();
+
     serde_json::to_string(&result).map_err(|e| e.to_string())
 }
 
@@ -58,10 +74,12 @@ pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, 
     let source_mode = DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
-    let versions = loaders::list_fabric_versions(mirror_url.as_deref(), source_mode).await.map_err(|e| {
-        log_error!("Failed to list Fabric versions: {}", e);
-        e.to_string()
-    })?;
+    let versions = loaders::list_fabric_versions(mirror_url.as_deref(), source_mode)
+        .await
+        .map_err(|e| {
+            log_error!("Failed to list Fabric versions: {}", e);
+            e.to_string()
+        })?;
 
     serde_json::to_string(&versions).map_err(|e| e.to_string())
 }
@@ -74,32 +92,43 @@ pub async fn list_optifine_versions(state: State<'_, AppState>) -> Result<String
     let source_mode = DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
-    let versions = loaders::list_optifine_versions(mirror_url.as_deref(), source_mode).await.map_err(|e| {
-        log_error!("Failed to list OptiFine versions: {}", e);
-        e.to_string()
-    })?;
+    let versions = loaders::list_optifine_versions(mirror_url.as_deref(), source_mode)
+        .await
+        .map_err(|e| {
+            log_error!("Failed to list OptiFine versions: {}", e);
+            e.to_string()
+        })?;
 
-    let result: Vec<serde_json::Value> = versions.iter().map(|v| {
-        serde_json::json!({
-            "display_name": v.version,
-            "is_preview": !v.is_recommended
+    let result: Vec<serde_json::Value> = versions
+        .iter()
+        .map(|v| {
+            serde_json::json!({
+                "display_name": v.version,
+                "is_preview": !v.is_recommended
+            })
         })
-    }).collect();
+        .collect();
     serde_json::to_string(&result).map_err(|e| e.to_string())
 }
 
 /// List LiteLoader versions
 #[tauri::command]
-pub async fn list_liteloader_versions(state: State<'_, AppState>, mc_version: String) -> Result<String, String> {
+pub async fn list_liteloader_versions(
+    state: State<'_, AppState>,
+    mc_version: String,
+) -> Result<String, String> {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
     let source_mode = DownloadSourceMode::from_str(&config.download_source);
     drop(config);
 
-    let versions = loaders::list_liteloader_versions(&mc_version, mirror_url.as_deref(), source_mode).await.map_err(|e| {
-        log_error!("Failed to list LiteLoader versions: {}", e);
-        e.to_string()
-    })?;
+    let versions =
+        loaders::list_liteloader_versions(&mc_version, mirror_url.as_deref(), source_mode)
+            .await
+            .map_err(|e| {
+                log_error!("Failed to list LiteLoader versions: {}", e);
+                e.to_string()
+            })?;
 
     let version_strings: Vec<String> = versions.iter().map(|v| v.version.clone()).collect();
     serde_json::to_string(&version_strings).map_err(|e| e.to_string())
