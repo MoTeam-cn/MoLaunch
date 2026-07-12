@@ -9,7 +9,6 @@
 //! 存储文件：.Molaunch/auth.json（加密后的 JSON）
 
 use crate::log_info;
-use crate::log_warn;
 use crate::sdk::SdkInstance;
 use crate::storage::Storage;
 use serde::{Deserialize, Serialize};
@@ -83,32 +82,25 @@ impl AuthStorage {
         Storage::instance().base_dir().join("auth.json")
     }
 
-    /// 加密数据
+    /// 加密数据（使用 SDK 内置的 DES 加密）
     async fn encrypt(&self, data: &str) -> Result<String, String> {
         let sdk = self.sdk.lock().await;
-        if let Some(ref sdk) = *sdk {
-            sdk.encrypt_token(data)
-                .map_err(|e| format!("加密失败: {}", e))
-        } else {
-            // SDK 不可用时，使用 Base64 作为兜底（不安全但保证功能可用）
-            log_warn!("SDK not available, using base64 fallback for auth storage");
-            Ok(format!("b64:{}", base64_encode(data)))
+        match sdk.as_ref() {
+            Some(sdk) => sdk
+                .encrypt_token(data)
+                .map_err(|e| format!("加密失败: {}", e)),
+            None => Err("SDK 未加载，无法加密认证数据".to_string()),
         }
     }
 
-    /// 解密数据
+    /// 解密数据（使用 SDK 内置的 DES 解密）
     async fn decrypt(&self, data: &str) -> Result<String, String> {
-        // 检查是否是 base64 兜底格式
-        if let Some(b64_data) = data.strip_prefix("b64:") {
-            return base64_decode(b64_data).ok_or_else(|| "Base64 解码失败".to_string());
-        }
-
         let sdk = self.sdk.lock().await;
-        if let Some(ref sdk) = *sdk {
-            sdk.decrypt_token(data)
-                .map_err(|e| format!("解密失败: {}", e))
-        } else {
-            Err("SDK 不可用且数据非 Base64 格式".to_string())
+        match sdk.as_ref() {
+            Some(sdk) => sdk
+                .decrypt_token(data)
+                .map_err(|e| format!("解密失败: {}", e)),
+            None => Err("SDK 未加载，无法解密认证数据".to_string()),
         }
     }
 
@@ -286,62 +278,4 @@ impl AuthStorage {
 
         self.save(&state).await
     }
-}
-
-// ============================================================
-// Base64 编解码（SDK 不可用时的兜底）
-// ============================================================
-
-fn base64_encode(input: &str) -> String {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let bytes = input.as_bytes();
-    let mut result = String::with_capacity((bytes.len() + 2) / 3 * 4);
-
-    for chunk in bytes.chunks(3) {
-        let b0 = chunk[0] as u32;
-        let b1 = if chunk.len() > 1 { chunk[1] as u32 } else { 0 };
-        let b2 = if chunk.len() > 2 { chunk[2] as u32 } else { 0 };
-
-        let triple = (b0 << 16) | (b1 << 8) | b2;
-
-        result.push(CHARS[((triple >> 18) & 0x3F) as usize] as char);
-        result.push(CHARS[((triple >> 12) & 0x3F) as usize] as char);
-
-        if chunk.len() > 1 {
-            result.push(CHARS[((triple >> 6) & 0x3F) as usize] as char);
-        } else {
-            result.push('=');
-        }
-
-        if chunk.len() > 2 {
-            result.push(CHARS[(triple & 0x3F) as usize] as char);
-        } else {
-            result.push('=');
-        }
-    }
-
-    result
-}
-
-fn base64_decode(input: &str) -> Option<String> {
-    const CHARS: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let input = input.trim_end_matches('=');
-    let mut bytes = Vec::with_capacity(input.len() * 3 / 4);
-
-    let mut buffer = 0u32;
-    let mut bits = 0u32;
-
-    for c in input.chars() {
-        let pos = CHARS.iter().position(|&b| b as char == c)?;
-        buffer = (buffer << 6) | (pos as u32);
-        bits += 6;
-
-        if bits >= 8 {
-            bits -= 8;
-            bytes.push((buffer >> bits) as u8);
-            buffer &= (1 << bits) - 1;
-        }
-    }
-
-    String::from_utf8(bytes).ok()
 }
