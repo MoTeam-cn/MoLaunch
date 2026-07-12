@@ -1,21 +1,75 @@
 //! 认证持久化模块
 //!
-//! 负责将微软登录的 Token 安全存储到磁盘，支持：
-//! - 多账号管理（以用户名为键）
-//! - Token 加密（使用 SDK DES 加密，密钥为 mcsdk-{设备码}）
-//! - 会话恢复（应用重启后自动加载已存储的登录状态）
-//! - 自动静默刷新（Token 过期时使用 Refresh Token 刷新）
+//! 参考 PCL2 的存储方式，将认证信息存储到 Windows 注册表：
+//! - 每个字段单独存储为注册表键值（而非单个 JSON 文件）
+//! - 敏感字段（Token、用户名、UUID 等）使用 SDK DES 加密
+//! - 非敏感字段（登录类型）明文存储
+//! - 多账号列表用一个加密的 JSON 字符串存储
 //!
-//! 存储文件：.Molaunch/auth.json（加密后的 JSON）
+//! 注册表路径：`HKEY_CURRENT_USER\Software\MoLaunch`
 
 use crate::log_info;
 use crate::sdk::SdkInstance;
-use crate::storage::Storage;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
 
+#[cfg(windows)]
+use winreg::enums::*;
+#[cfg(windows)]
+use winreg::RegKey;
+
 use super::microsoft::MicrosoftLoginResult;
+
+// ============================================================
+// 注册表键名定义（参考 PCL2 的命名风格）
+// ============================================================
+
+/// 注册表子键路径
+const REG_SUBKEY: &str = "Software\\MoLaunch";
+
+/// 登录类型（明文）："Legacy" 或 "Microsoft"
+const KEY_LOGIN_TYPE: &str = "LoginType";
+
+/// 离线登录用户名（加密）
+const KEY_LEGACY_NAME: &str = "LoginLegacyName";
+/// 离线登录 UUID（加密）
+const KEY_LEGACY_UUID: &str = "LoginLegacyUuid";
+
+/// 当前微软账号用户名（加密）
+const KEY_MS_CURRENT_NAME: &str = "MsCurrentName";
+/// 当前微软账号 UUID（加密）
+const KEY_MS_CURRENT_UUID: &str = "MsCurrentUuid";
+/// 当前微软账号 access_token（加密）
+const KEY_MS_CURRENT_ACCESS: &str = "MsCurrentAccess";
+/// 当前微软账号 refresh_token（加密）
+const KEY_MS_CURRENT_REFRESH: &str = "MsCurrentRefresh";
+/// 当前微软账号过期时间戳（加密，字符串形式的 u64）
+const KEY_MS_CURRENT_EXPIRES: &str = "MsCurrentExpires";
+/// 当前微软账号档案 JSON（加密）
+const KEY_MS_CURRENT_PROFILE: &str = "MsCurrentProfile";
+
+/// 所有微软账号列表 JSON（加密）
+const KEY_MS_ACCOUNTS: &str = "MsAccounts";
+
+/// 所有注册表键名（用于清理）
+#[cfg(windows)]
+const ALL_KEYS: &[&str] = &[
+    KEY_LOGIN_TYPE,
+    KEY_LEGACY_NAME,
+    KEY_LEGACY_UUID,
+    KEY_MS_CURRENT_NAME,
+    KEY_MS_CURRENT_UUID,
+    KEY_MS_CURRENT_ACCESS,
+    KEY_MS_CURRENT_REFRESH,
+    KEY_MS_CURRENT_EXPIRES,
+    KEY_MS_CURRENT_PROFILE,
+    KEY_MS_ACCOUNTS,
+];
+
+// ============================================================
+// 数据结构（保持向后兼容，对外 API 不变）
+// ============================================================
 
 /// 持久化的微软账号信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -66,7 +120,14 @@ pub struct CurrentUser {
     pub expires_at: Option<u64>,
 }
 
+// ============================================================
+// 认证存储管理器
+// ============================================================
+
 /// 认证存储管理器
+///
+/// 使用 Windows 注册表存储认证信息，每个字段单独存储。
+/// 敏感字段使用 SDK DES 加密，非敏感字段明文存储。
 pub struct AuthStorage {
     /// SDK 实例引用（用于 DES 加解密）
     sdk: Arc<TokioMutex<Option<SdkInstance>>>,
@@ -77,18 +138,55 @@ impl AuthStorage {
         Self { sdk }
     }
 
-    /// 认证文件路径
-    fn auth_file_path() -> std::path::PathBuf {
-        Storage::instance().base_dir().join("auth.json")
+    // --------------------------------------------------------
+    // 注册表操作工具
+    // --------------------------------------------------------
+
+    /// 打开或创建注册表子键
+    #[cfg(windows)]
+    fn reg_key() -> Result<RegKey, String> {
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        hkcu.open_subkey_with_flags(REG_SUBKEY, KEY_SET_VALUE | KEY_READ)
+            .or_else(|_| {
+                hkcu.create_subkey(REG_SUBKEY)
+                    .map(|(k, _)| k)
+                    .map_err(|e| e.to_string())
+            })
+            .map_err(|e| format!("打开注册表失败: {}", e))
     }
+
+    /// 读取注册表字符串值
+    #[cfg(windows)]
+    fn reg_get(key: &RegKey, name: &str) -> Option<String> {
+        key.get_value::<String, _>(name).ok()
+    }
+
+    /// 写入注册表字符串值
+    #[cfg(windows)]
+    fn reg_set(key: &RegKey, name: &str, value: &str) -> Result<(), String> {
+        key.set_value(name, &value)
+            .map_err(|e| format!("写入注册表失败: {}", e))
+    }
+
+    /// 删除注册表值（不存在不算错误）
+    #[cfg(windows)]
+    fn reg_delete(key: &RegKey, name: &str) -> Result<(), String> {
+        match key.delete_value(name) {
+            Ok(()) => Ok(()),
+            Err(ref e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(format!("删除注册表失败: {}", e)),
+        }
+    }
+
+    // --------------------------------------------------------
+    // 加解密工具
+    // --------------------------------------------------------
 
     /// 加密数据（使用 SDK 内置的 DES 加密）
     async fn encrypt(&self, data: &str) -> Result<String, String> {
         let sdk = self.sdk.lock().await;
         match sdk.as_ref() {
-            Some(sdk) => sdk
-                .encrypt_token(data)
-                .map_err(|e| format!("加密失败: {}", e)),
+            Some(sdk) => sdk.encrypt_token(data).map_err(|e| format!("加密失败: {}", e)),
             None => Err("SDK 未加载，无法加密认证数据".to_string()),
         }
     }
@@ -97,68 +195,205 @@ impl AuthStorage {
     async fn decrypt(&self, data: &str) -> Result<String, String> {
         let sdk = self.sdk.lock().await;
         match sdk.as_ref() {
-            Some(sdk) => sdk
-                .decrypt_token(data)
-                .map_err(|e| format!("解密失败: {}", e)),
+            Some(sdk) => sdk.decrypt_token(data).map_err(|e| format!("解密失败: {}", e)),
             None => Err("SDK 未加载，无法解密认证数据".to_string()),
         }
     }
 
-    /// 加载持久化的认证状态
-    pub async fn load(&self) -> Result<PersistedAuthState, String> {
-        let path = Self::auth_file_path();
-        if !path.exists() {
-            return Ok(PersistedAuthState::default());
-        }
-
-        let encrypted =
-            std::fs::read_to_string(&path).map_err(|e| format!("读取认证文件失败: {}", e))?;
-        if encrypted.is_empty() {
-            return Ok(PersistedAuthState::default());
-        }
-
-        let decrypted = self.decrypt(&encrypted).await?;
-        let state: PersistedAuthState =
-            serde_json::from_str(&decrypted).map_err(|e| format!("解析认证状态失败: {}", e))?;
-
-        log_info!(
-            "Loaded persisted auth state: current_user={}, ms_accounts={}",
-            state
-                .current_user
-                .as_ref()
-                .map(|u| u.name.as_str())
-                .unwrap_or("none"),
-            state.ms_accounts.len()
-        );
-
-        Ok(state)
+    /// 加密并写入注册表
+    #[cfg(windows)]
+    async fn reg_set_encrypted(
+        &self,
+        key: &RegKey,
+        name: &str,
+        value: &str,
+    ) -> Result<(), String> {
+        let encrypted = self.encrypt(value).await?;
+        Self::reg_set(key, name, &encrypted)
     }
 
-    /// 保存认证状态到磁盘
-    pub async fn save(&self, state: &PersistedAuthState) -> Result<(), String> {
-        let json = serde_json::to_string_pretty(state)
-            .map_err(|e| format!("序列化认证状态失败: {}", e))?;
-        let encrypted = self.encrypt(&json).await?;
+    /// 读取并解密注册表
+    #[cfg(windows)]
+    async fn reg_get_decrypted(&self, key: &RegKey, name: &str) -> Option<String> {
+        let encrypted = Self::reg_get(key, name)?;
+        self.decrypt(&encrypted).await.ok()
+    }
 
-        let path = Self::auth_file_path();
+    // --------------------------------------------------------
+    // 公开 API
+    // --------------------------------------------------------
 
-        // 原子写入：先写 .tmp 再 rename
-        let tmp = path.with_extension("json.tmp");
-        std::fs::write(&tmp, &encrypted).map_err(|e| format!("写入认证文件失败: {}", e))?;
-
-        #[cfg(unix)]
+    /// 加载持久化的认证状态
+    ///
+    /// 从注册表读取所有字段，组装成 `PersistedAuthState`。
+    pub async fn load(&self) -> Result<PersistedAuthState, String> {
+        #[cfg(not(windows))]
         {
-            use std::os::unix::fs::PermissionsExt;
-            if let Ok(metadata) = std::fs::metadata(&tmp) {
-                let mut perms = metadata.permissions();
-                perms.set_mode(0o600);
-                let _ = std::fs::set_permissions(&tmp, perms);
-            }
+            return Ok(PersistedAuthState::default());
         }
 
-        std::fs::rename(&tmp, &path).map_err(|e| format!("重命名认证文件失败: {}", e))?;
+        #[cfg(windows)]
+        {
+            let key = Self::reg_key()?;
+            let mut state = PersistedAuthState::default();
 
-        Ok(())
+            // 读取登录类型
+            let login_type = Self::reg_get(&key, KEY_LOGIN_TYPE).unwrap_or_default();
+
+            if login_type == "Legacy" {
+                // 离线登录
+                let name = self
+                    .reg_get_decrypted(&key, KEY_LEGACY_NAME)
+                    .await
+                    .unwrap_or_default();
+                let uuid = self
+                    .reg_get_decrypted(&key, KEY_LEGACY_UUID)
+                    .await
+                    .unwrap_or_default();
+                if !name.is_empty() {
+                    state.current_user = Some(CurrentUser {
+                        name,
+                        uuid: uuid.clone(),
+                        access_token: uuid.clone(),
+                        client_token: uuid,
+                        login_type: "Legacy".to_string(),
+                        profile_json: None,
+                        refresh_token: None,
+                        expires_at: None,
+                    });
+                }
+            } else if login_type == "Microsoft" {
+                // 微软登录
+                let name = self
+                    .reg_get_decrypted(&key, KEY_MS_CURRENT_NAME)
+                    .await
+                    .unwrap_or_default();
+                let uuid = self
+                    .reg_get_decrypted(&key, KEY_MS_CURRENT_UUID)
+                    .await
+                    .unwrap_or_default();
+                if !name.is_empty() {
+                    let access = self
+                        .reg_get_decrypted(&key, KEY_MS_CURRENT_ACCESS)
+                        .await
+                        .unwrap_or_default();
+                    let refresh = self
+                        .reg_get_decrypted(&key, KEY_MS_CURRENT_REFRESH)
+                        .await
+                        .unwrap_or_default();
+                    let expires = self
+                        .reg_get_decrypted(&key, KEY_MS_CURRENT_EXPIRES)
+                        .await
+                        .and_then(|s| s.parse::<u64>().ok())
+                        .unwrap_or(0);
+                    let profile = self
+                        .reg_get_decrypted(&key, KEY_MS_CURRENT_PROFILE)
+                        .await;
+
+                    state.current_user = Some(CurrentUser {
+                        name,
+                        uuid,
+                        access_token: access,
+                        client_token: String::new(),
+                        login_type: "Microsoft".to_string(),
+                        profile_json: profile,
+                        refresh_token: Some(refresh),
+                        expires_at: Some(expires),
+                    });
+                }
+            }
+
+            // 读取多账号列表
+            if let Some(accounts_json) = self.reg_get_decrypted(&key, KEY_MS_ACCOUNTS).await {
+                if !accounts_json.is_empty() {
+                    state.ms_accounts =
+                        serde_json::from_str(&accounts_json).unwrap_or_default();
+                }
+            }
+
+            log_info!(
+                "Loaded persisted auth state: current_user={}, ms_accounts={}",
+                state
+                    .current_user
+                    .as_ref()
+                    .map(|u| u.name.as_str())
+                    .unwrap_or("none"),
+                state.ms_accounts.len()
+            );
+
+            Ok(state)
+        }
+    }
+
+    /// 保存认证状态到注册表
+    ///
+    /// 将 `PersistedAuthState` 的所有字段写入注册表。
+    /// 先清除所有旧值，再写入新值，确保数据一致。
+    pub async fn save(&self, state: &PersistedAuthState) -> Result<(), String> {
+        #[cfg(not(windows))]
+        {
+            let _ = state;
+            return Ok(());
+        }
+
+        #[cfg(windows)]
+        {
+            let key = Self::reg_key()?;
+
+            // 清除所有旧值
+            for name in ALL_KEYS {
+                let _ = Self::reg_delete(&key, name);
+            }
+
+            // 写入当前用户
+            if let Some(ref user) = state.current_user {
+                // 登录类型（明文）
+                Self::reg_set(&key, KEY_LOGIN_TYPE, &user.login_type)?;
+
+                match user.login_type.as_str() {
+                    "Legacy" => {
+                        self.reg_set_encrypted(&key, KEY_LEGACY_NAME, &user.name)
+                            .await?;
+                        self.reg_set_encrypted(&key, KEY_LEGACY_UUID, &user.uuid)
+                            .await?;
+                    }
+                    "Microsoft" => {
+                        self.reg_set_encrypted(&key, KEY_MS_CURRENT_NAME, &user.name)
+                            .await?;
+                        self.reg_set_encrypted(&key, KEY_MS_CURRENT_UUID, &user.uuid)
+                            .await?;
+                        self.reg_set_encrypted(&key, KEY_MS_CURRENT_ACCESS, &user.access_token)
+                            .await?;
+                        if let Some(ref refresh) = user.refresh_token {
+                            self.reg_set_encrypted(&key, KEY_MS_CURRENT_REFRESH, refresh)
+                                .await?;
+                        }
+                        if let Some(expires) = user.expires_at {
+                            self.reg_set_encrypted(
+                                &key,
+                                KEY_MS_CURRENT_EXPIRES,
+                                &expires.to_string(),
+                            )
+                            .await?;
+                        }
+                        if let Some(ref profile) = user.profile_json {
+                            self.reg_set_encrypted(&key, KEY_MS_CURRENT_PROFILE, profile)
+                                .await?;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            // 写入多账号列表
+            if !state.ms_accounts.is_empty() {
+                let json = serde_json::to_string(&state.ms_accounts)
+                    .map_err(|e| format!("序列化账号列表失败: {}", e))?;
+                self.reg_set_encrypted(&key, KEY_MS_ACCOUNTS, &json).await?;
+            }
+
+            Ok(())
+        }
     }
 
     /// 保存微软登录结果并设为当前用户
@@ -182,7 +417,7 @@ impl AuthStorage {
             name: result.username.clone(),
             uuid: result.uuid.clone(),
             access_token: result.access_token.clone(),
-            client_token: String::new(), // 微软登录无 client_token
+            client_token: String::new(),
             login_type: "Microsoft".to_string(),
             profile_json: Some(result.profile_json.clone()),
             refresh_token: Some(result.refresh_token.clone()),

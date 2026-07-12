@@ -10,16 +10,27 @@
 ### 新增
 
 #### 微软登录
-- 微软 OAuth 2.0 设备码登录流程（Device Code Flow）
-- 6 步 Token 交换链：设备码 → OAuth Token → XBL Token → XSTS Token → MC Token → 玩家档案
+- 微软 OAuth 2.0 Web 授权码登录流程（Authorization Code Flow，使用 login.live.com 旧版端点 + 公共 Client ID `00000000402b5328`，与 PCL2/HMCL 一致）
+- 6 步 Token 交换链：授权码 → OAuth Token → XBL Token → XSTS Token → MC Token → 玩家档案
 - Token 持久化存储（DES 加密，支持多账号管理）
 - 会话恢复（应用重启后自动恢复登录状态）
 - 静默刷新（Token 过期时使用 Refresh Token 自动刷新）
 - 已存储微软账号列表展示与快速切换
-- 设备码弹窗组件（自动打开浏览器 + 复制验证码 + 轮询授权）
+- Webview 登录窗口组件（内嵌浏览器 + `on_navigation` 拦截回调 + 自动交换 Token）
 - Xbox 错误码处理（封禁/未注册/地区限制/年龄不足）
 - 游戏所有权验证（entitlements 检查）
 - `launch_game` 命令支持动态 `login_type` 参数（Legacy/Microsoft）
+- 事件驱动登录状态通信（`ms-login-success` / `ms-login-error` / `ms-login-cancelled` / `ms-login-progress`）
+
+### 变更
+- 微软登录采用 Device Code Flow（设备码流程，与 PCL2 一致），使用 v2.0 consumers 端点 + MoLaunch 独立 Azure 应用 Client ID
+- 认证存储从单一 `auth.json` 文件改为 Windows 注册表分字段存储（参考 PCL2，路径 `HKCU\Software\MoLaunch`）
+- 敏感字段（Token、用户名、UUID 等）单独 SDK DES 加密，非敏感字段（登录类型）明文存储
+- Token 刷新使用 login.live.com 旧版端点（与 PCL2 一致）
+
+### 修复
+- 修复微软登录申请设备码时返回 `AADSTS700016` 错误（旧版 Minecraft 启动器 Client ID 与 `login.microsoftonline.com` v2.0 端点不兼容，改用 `login.live.com` 旧版端点）
+- 修复 `DeviceCodeModal.vue` 中 `openUrl` 导入错误（Tauri 2 shell 插件 API 变更为 `open`）
 
 ### 待实现
 - Mod 管理功能

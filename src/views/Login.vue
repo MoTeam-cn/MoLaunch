@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 登录页面
- * 支持离线登录和微软登录（Device Code Flow）
+ * 支持离线登录和微软登录（Web Authorization Code Flow）
  */
 
 import { ref, onMounted } from 'vue'
@@ -190,7 +190,7 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 微软登录设备码弹窗 -->
+    <!-- 微软登录弹窗 -->
     <DeviceCodeModal
       :visible="showMsModal"
       @close="onMsModalClose"

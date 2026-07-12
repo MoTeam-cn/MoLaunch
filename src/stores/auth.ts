@@ -1,235 +1,182 @@
 /**
  * 认证状态管理
- * 支持离线登录和微软登录（Device Code Flow）
+ * 支持离线登录和微软登录（Web Auth Code Flow / Device Code Flow）
  */
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { AuthResult, LoginStatus, DeviceCodeInfo, MsAccountInfo } from '@/types/auth'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import type { AuthResult, LoginStatus, MsAccountInfo, DeviceCodeInfo, PollResult } from '@/types/auth'
 import * as tauri from '@/utils/tauri'
 
+const STEP_LABELS: Record<string, string> = {
+  exchanging: '授权成功，开始交换 Token...',
+  xbl: '正在获取 XBL Token...',
+  xsts: '正在获取 XSTS Token...',
+  mc_token: '正在获取 Minecraft Token...',
+  entitlements: '正在验证游戏所有权...',
+  profile: '正在获取玩家档案...',
+}
+
 export const useAuthStore = defineStore('auth', () => {
-  // 状态
   const currentUser = ref<AuthResult | null>(null)
   const loginStatus = ref<LoginStatus>('idle')
   const error = ref<string | null>(null)
-
-  // 微软登录状态
-  const msLoginStatus = ref<'idle' | 'device_code' | 'polling' | 'exchanging' | 'success' | 'error'>('idle')
+  const msLoginStatus = ref<'idle' | 'requesting' | 'waiting' | 'exchanging' | 'success' | 'error'>('idle')
+  const msFlow = ref<'web' | 'device_code' | ''>('')
   const deviceCodeInfo = ref<DeviceCodeInfo | null>(null)
   const msAccounts = ref<MsAccountInfo[]>([])
+  const msLoginStep = ref('')
+  const msLoginStepLabel = computed(() => STEP_LABELS[msLoginStep.value] ?? '')
 
-  // 计算属性
+  let pollTimer: ReturnType<typeof setTimeout> | null = null
+  let progressUnlisten: UnlistenFn | null = null
+  let codeUnlisten: UnlistenFn | null = null
+
   const isLoggedIn = computed(() => currentUser.value !== null)
   const username = computed(() => currentUser.value?.name ?? '')
   const isMicrosoftLogin = computed(() => currentUser.value?.login_type === 'Microsoft')
-  const isMsLoggingIn = computed(() =>
-    msLoginStatus.value === 'device_code' ||
-    msLoginStatus.value === 'polling' ||
-    msLoginStatus.value === 'exchanging'
-  )
+  const isMsLoggingIn = computed(() => ['requesting', 'waiting', 'exchanging'].includes(msLoginStatus.value))
 
-  // ============================================================
-  // 离线登录
-  // ============================================================
+  function cleanup() {
+    if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
+    if (progressUnlisten) { progressUnlisten(); progressUnlisten = null }
+    if (codeUnlisten) { codeUnlisten(); codeUnlisten = null }
+    msLoginStep.value = ''
+  }
 
-  async function loginOffline(username: string) {
-    loginStatus.value = 'loading'
-    error.value = null
+  async function startProgressListener() {
+    progressUnlisten = await listen<string>('ms-login-progress', (e) => {
+      msLoginStep.value = e.payload
+      if (msLoginStatus.value === 'waiting') msLoginStatus.value = 'exchanging'
+    })
+  }
 
-    try {
-      const result = await tauri.loginOffline(username)
-      currentUser.value = result
-      loginStatus.value = 'success'
-    } catch (e) {
-      error.value = String(e)
-      loginStatus.value = 'error'
-      throw e
+  function handleResult(result: PollResult): boolean {
+    switch (result.status) {
+      case 'Pending': return false
+      case 'Success':
+        cleanup()
+        msLoginStatus.value = 'success'; loginStatus.value = 'success'
+        currentUser.value = result.auth; deviceCodeInfo.value = null
+        loadMsAccounts()
+        return true
+      case 'Declined':
+        cleanup(); error.value = '授权被拒绝'; msLoginStatus.value = 'error'; return true
+      case 'Expired':
+        cleanup(); error.value = '设备码已过期，请重新登录'; msLoginStatus.value = 'error'; return true
+      case 'Error':
+        cleanup(); error.value = result.message; msLoginStatus.value = 'error'; return true
     }
   }
 
-  // ============================================================
-  // 微软登录 - Device Code Flow
-  // ============================================================
-
-  /** 开始微软登录流程：申请设备码 */
   async function startMsLogin() {
-    msLoginStatus.value = 'device_code'
-    error.value = null
-    deviceCodeInfo.value = null
-
+    msLoginStatus.value = 'requesting'
+    error.value = null; deviceCodeInfo.value = null; msLoginStep.value = ''
+    cleanup()
     try {
-      const info = await tauri.msLoginStart()
-      deviceCodeInfo.value = info
-      msLoginStatus.value = 'polling'
-      return info
+      const config = await tauri.msLoginGetConfig()
+      msFlow.value = config.flow as 'web' | 'device_code'
+      await startProgressListener()
+      if (config.flow === 'web') await startWebFlow()
+      else await startDeviceCodeFlow()
     } catch (e) {
-      error.value = String(e)
-      msLoginStatus.value = 'error'
-      throw e
+      error.value = String(e); msLoginStatus.value = 'error'; cleanup(); throw e
     }
   }
 
-  /** 轮询微软登录授权结果 */
-  async function pollMsLogin(): Promise<boolean> {
-    if (!deviceCodeInfo.value) {
-      error.value = '设备码信息缺失'
-      msLoginStatus.value = 'error'
-      return false
-    }
-
-    try {
-      const result = await tauri.msLoginPoll(deviceCodeInfo.value.device_code)
-
-      if (result.status === 'Pending') {
-        return false // 继续轮询
+  async function startWebFlow() {
+    codeUnlisten = await listen<string>('ms-auth-code', async (event) => {
+      if (codeUnlisten) { codeUnlisten(); codeUnlisten = null }
+      try {
+        const result = await tauri.msLoginWebExchange(event.payload)
+        handleResult(result)
+      } catch (e) {
+        cleanup(); error.value = String(e); msLoginStatus.value = 'error'
       }
-
-      // Success
-      msLoginStatus.value = 'exchanging'
-      currentUser.value = {
-        name: result.name,
-        uuid: result.uuid,
-        access_token: result.access_token,
-        client_token: result.client_token,
-        login_type: result.login_type,
-        profile_json: result.profile_json ?? undefined,
-      }
-      loginStatus.value = 'success'
-      msLoginStatus.value = 'success'
-      deviceCodeInfo.value = null
-
-      // 刷新账号列表
-      await loadMsAccounts()
-
-      return true
-    } catch (e) {
-      error.value = String(e)
-      msLoginStatus.value = 'error'
-      throw e
-    }
+    })
+    await tauri.msLoginWebStart()
+    msLoginStatus.value = 'waiting'
   }
 
-  /** 取消微软登录 */
+  async function startDeviceCodeFlow() {
+    const info = await tauri.msLoginRequestDeviceCode()
+    deviceCodeInfo.value = info
+    msLoginStatus.value = 'waiting'
+    startPolling(info.device_code, info.interval * 1000)
+  }
+
+  function startPolling(deviceCode: string, intervalMs: number) {
+    async function pollOnce() {
+      try {
+        const result = await tauri.msLoginPoll(deviceCode)
+        if (!handleResult(result)) pollTimer = setTimeout(pollOnce, intervalMs)
+      } catch (e) {
+        cleanup(); error.value = String(e); msLoginStatus.value = 'error'
+      }
+    }
+    pollTimer = setTimeout(pollOnce, 2000)
+  }
+
   function cancelMsLogin() {
-    msLoginStatus.value = 'idle'
-    deviceCodeInfo.value = null
-    error.value = null
+    cleanup(); msLoginStatus.value = 'idle'; error.value = null; deviceCodeInfo.value = null
   }
 
-  /** 静默刷新微软 Token */
+  async function loginOffline(name: string) {
+    loginStatus.value = 'loading'; error.value = null
+    try {
+      currentUser.value = await tauri.loginOffline(name)
+      loginStatus.value = 'success'
+    } catch (e) {
+      error.value = String(e); loginStatus.value = 'error'; throw e
+    }
+  }
+
   async function refreshMsToken() {
     try {
-      const result = await tauri.msLoginRefresh()
-      currentUser.value = result
+      currentUser.value = await tauri.msLoginRefresh()
       loginStatus.value = 'success'
-    } catch (e) {
-      error.value = String(e)
-      // 刷新失败，可能需要重新登录
-      throw e
-    }
+    } catch (e) { error.value = String(e); throw e }
   }
 
-  // ============================================================
-  // 微软账号管理
-  // ============================================================
-
-  /** 加载已存储的微软账号列表 */
   async function loadMsAccounts() {
-    try {
-      msAccounts.value = await tauri.getMsAccounts()
-    } catch (e) {
-      console.error('Failed to load MS accounts:', e)
-    }
+    try { msAccounts.value = await tauri.getMsAccounts() }
+    catch (e) { console.error('Failed to load MS accounts:', e) }
   }
 
-  /** 删除已存储的微软账号 */
   async function removeMsAccount(uuid: string) {
-    try {
-      await tauri.removeMsAccount(uuid)
-      await loadMsAccounts()
-    } catch (e) {
-      error.value = String(e)
-      throw e
-    }
+    try { await tauri.removeMsAccount(uuid); await loadMsAccounts() }
+    catch (e) { error.value = String(e); throw e }
   }
 
-  /** 切换到已存储的微软账号 */
   async function switchMsAccount(uuid: string) {
-    loginStatus.value = 'loading'
-    error.value = null
-
+    loginStatus.value = 'loading'; error.value = null
     try {
-      const result = await tauri.switchMsAccount(uuid)
-      currentUser.value = result
+      currentUser.value = await tauri.switchMsAccount(uuid)
       loginStatus.value = 'success'
-    } catch (e) {
-      error.value = String(e)
-      loginStatus.value = 'error'
-      throw e
-    }
+    } catch (e) { error.value = String(e); loginStatus.value = 'error'; throw e }
   }
 
-  // ============================================================
-  // 通用方法
-  // ============================================================
-
-  /** 恢复会话 */
   async function restoreSession() {
     try {
       const result = await tauri.getLoginStatus()
-      if (result) {
-        currentUser.value = result
-        loginStatus.value = 'success'
-      }
-      // 加载微软账号列表
+      if (result) { currentUser.value = result; loginStatus.value = 'success' }
       await loadMsAccounts()
-    } catch (e) {
-      console.error('Failed to restore session:', e)
-    }
+    } catch (e) { console.error('Failed to restore session:', e) }
   }
 
-  /** 登出 */
   async function logoutUser() {
-    try {
-      await tauri.logout()
-    } catch (e) {
-      console.error('Failed to logout:', e)
-    }
-
-    currentUser.value = null
-    loginStatus.value = 'idle'
-    error.value = null
-    msLoginStatus.value = 'idle'
-    deviceCodeInfo.value = null
+    try { await tauri.logout() } catch (e) { console.error('Failed to logout:', e) }
+    cleanup(); currentUser.value = null; loginStatus.value = 'idle'
+    error.value = null; msLoginStatus.value = 'idle'; deviceCodeInfo.value = null
   }
 
   return {
-    // 状态
-    currentUser,
-    loginStatus,
-    error,
-    msLoginStatus,
-    deviceCodeInfo,
-    msAccounts,
-    // 计算属性
-    isLoggedIn,
-    username,
-    isMicrosoftLogin,
-    isMsLoggingIn,
-    // 离线登录
-    loginOffline,
-    // 微软登录
-    startMsLogin,
-    pollMsLogin,
-    cancelMsLogin,
-    refreshMsToken,
-    // 账号管理
-    loadMsAccounts,
-    removeMsAccount,
-    switchMsAccount,
-    // 通用
-    restoreSession,
-    logout: logoutUser,
+    currentUser, loginStatus, error, msLoginStatus, msFlow, deviceCodeInfo,
+    msAccounts, msLoginStep, msLoginStepLabel,
+    isLoggedIn, username, isMicrosoftLogin, isMsLoggingIn,
+    loginOffline, startMsLogin, cancelMsLogin, refreshMsToken,
+    loadMsAccounts, removeMsAccount, switchMsAccount,
+    restoreSession, logout: logoutUser,
   }
 })

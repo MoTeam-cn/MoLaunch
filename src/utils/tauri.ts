@@ -3,7 +3,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
-import type { AuthResult, SdkStatus, DeviceCodeInfo, PollResult, MsAccountInfo } from '@/types/auth'
+import type { AuthResult, SdkStatus, MsAccountInfo, DeviceCodeInfo, PollResult, LoginConfig } from '@/types/auth'
 import type { VersionList } from '@/types/version'
 import type { JavaRuntime } from '@/types/java'
 
@@ -50,19 +50,30 @@ export async function logout(): Promise<void> {
 }
 
 // ============================================================
-// 微软登录相关
+// 微软登录相关（支持 Web Auth Code Flow 和 Device Code Flow）
 // ============================================================
 
-/**
- * 微软登录步骤 1：申请设备码
- */
-export async function msLoginStart(): Promise<DeviceCodeInfo> {
-  return await invoke<DeviceCodeInfo>('ms_login_start')
+/** 获取登录流程配置 */
+export async function msLoginGetConfig(): Promise<LoginConfig> {
+  return await invoke<LoginConfig>('ms_login_get_config')
 }
 
-/**
- * 微软登录步骤 2：轮询设备码授权结果
- */
+/** Web Auth Code Flow：打开 Webview 窗口 */
+export async function msLoginWebStart(): Promise<void> {
+  return await invoke<void>('ms_login_web_start')
+}
+
+/** Web Auth Code Flow：用授权码完成登录 */
+export async function msLoginWebExchange(code: string): Promise<PollResult> {
+  return await invoke<PollResult>('ms_login_web_exchange', { code })
+}
+
+/** Device Code Flow：请求设备码 */
+export async function msLoginRequestDeviceCode(): Promise<DeviceCodeInfo> {
+  return await invoke<DeviceCodeInfo>('ms_login_request_device_code')
+}
+
+/** Device Code Flow：轮询授权状态 */
 export async function msLoginPoll(deviceCode: string): Promise<PollResult> {
   return await invoke<PollResult>('ms_login_poll', { deviceCode })
 }
