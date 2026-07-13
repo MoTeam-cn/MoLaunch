@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
- * 启动面板（左侧栏，参考 PCL2）
+ * 启动面板（左侧栏，参考 PCL2 PageLaunchLeft）
  * - 顶部：账号类型胶囊指示器
  * - 中部：账号卡片（头像+用户名+hover工具栏）
- * - 底部：版本选择器 + 启动按钮
+ * - 底部：版本选择 + 版本设置 + 启动按钮
  */
 
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
 import { showWarning } from '@/utils/toast'
@@ -15,6 +16,7 @@ import VersionSelector from './VersionSelector.vue'
 
 const authStore = useAuthStore()
 const versionStore = useVersionStore()
+const router = useRouter()
 
 // 账号类型标签
 const accountTypeLabel = computed(() => {
@@ -22,13 +24,14 @@ const accountTypeLabel = computed(() => {
   return authStore.currentUser?.login_type === 'Microsoft' ? '正版账号' : '离线账号'
 })
 
-// 启动按钮状态
+// 启动按钮状态（参考 PCL2 MyButton：白底 + 主题色细边框 + 主题色文字，文字色=边框色）
 const launchState = computed(() => {
-  if (!authStore.isLoggedIn) return { text: '登录后可启动', color: 'bg-gray-100 text-gray-400 cursor-not-allowed', spin: false }
-  if (versionStore.launching) return { text: '取消启动', color: 'bg-yellow-500 text-white hover:bg-yellow-600', spin: true }
-  if (versionStore.runningPid) return { text: '停止游戏', color: 'bg-red-500 text-white hover:bg-red-600', spin: false }
-  if (!versionStore.selectedVersion) return { text: '选择版本', color: 'bg-gray-100 text-gray-400 cursor-not-allowed', spin: false }
-  return { text: '启动游戏', color: 'bg-primary-600 text-white hover:bg-primary-700 shadow-sm', spin: false }
+  if (!authStore.isLoggedIn) return { text: '登录后可启动', color: 'border border-gray-300 bg-white/80 text-gray-400 cursor-not-allowed', spin: false }
+  if (versionStore.launching) return { text: '取消启动', color: 'border border-yellow-500 bg-white/80 text-yellow-600 hover:bg-yellow-50 hover:border-yellow-600', spin: true }
+  if (versionStore.runningPid) return { text: '停止游戏', color: 'border border-red-500 bg-white/80 text-red-600 hover:bg-red-50 hover:border-red-600', spin: false }
+  if (!versionStore.selectedVersion) return { text: '选择版本', color: 'border border-gray-300 bg-white/80 text-gray-400 cursor-not-allowed', spin: false }
+  // Highlight：主题色边框 + 白底 + 主题色文字，hover 时边框变亮蓝 + 极淡蓝底（参考 PCL2 ColorBrush3 + ColorBrush7）
+  return { text: '启动游戏', color: 'border border-primary-600 bg-white/80 text-primary-600 hover:bg-primary-50 hover:border-blue-500 hover:text-blue-500', spin: false }
 })
 
 const progressPercent = computed(() => {
@@ -95,31 +98,45 @@ async function handleLaunch() {
       <span class="ml-auto truncate text-xs text-green-600">{{ versionStore.runningVersionId }}</span>
     </div>
 
-    <!-- 版本选择器 -->
-    <div class="border-t border-gray-100 px-4 py-3">
-      <div class="mb-1.5 px-1 text-xs font-medium text-gray-400">游戏版本</div>
-      <VersionSelector />
-    </div>
+    <!-- 底部：版本选择 + 版本设置 + 启动按钮（参考 PCL2 PageLaunchLeft） -->
+    <div class="flex-none px-5 pb-5 pt-2">
+      <!-- Row 3：版本选择 + 版本设置（左右分栏，参考 PCL2 BtnVersion + BtnMore，高 35px、圆角 3px） -->
+      <div class="mb-2.5 flex gap-2">
+        <VersionSelector />
+        <button
+          class="flex h-[35px] w-[80px] flex-none items-center justify-center rounded-[3px] border border-gray-300 bg-white/80 text-[13px] text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50"
+          @click="router.push('/version-settings')"
+        >
+          版本设置
+        </button>
+      </div>
 
-    <!-- 启动按钮（底部） -->
-    <div class="px-4 pb-4">
+      <!-- Row 2：启动按钮 + 版本名（LabVersion 叠在按钮内部底部，参考 PCL2 BtnLaunch + LabVersion，高 54px、圆角 3px） -->
       <button
-        class="flex w-full items-center justify-center gap-2 rounded-xl py-3.5 text-sm font-semibold transition-all"
+        class="relative flex h-[54px] w-full flex-col items-center justify-center overflow-hidden rounded-[3px] text-[13px] font-normal transition-colors"
         :class="launchState.color"
         :disabled="!authStore.isLoggedIn && !versionStore.selectedVersion"
         @click="handleLaunch"
       >
-        <svg v-if="launchState.spin" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-          <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
-          <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-        </svg>
-        <svg v-else-if="versionStore.runningPid" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-          <rect x="6" y="6" width="12" height="12" rx="2" />
-        </svg>
-        <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7z" />
-        </svg>
-        {{ launchState.text }}
+        <!-- 主文字区（向上偏移以给底部 LabVersion 留出 13px 间距） -->
+        <span class="flex items-center gap-2" style="margin-top: -18px;">
+          <svg v-if="launchState.spin" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          </svg>
+          <svg v-else-if="versionStore.runningPid" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="6" width="12" height="12" rx="2" />
+          </svg>
+          <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+          <span>{{ launchState.text }}</span>
+        </span>
+        <!-- 当前版本名（按钮内部底部，参考 PCL2 LabVersion：11px、灰色、底部 10px） -->
+        <span
+          v-if="versionStore.selectedVersion"
+          class="pointer-events-none absolute bottom-2 left-1/2 max-w-[calc(100%-40px)] -translate-x-1/2 truncate text-center text-[11px] text-gray-400"
+        >{{ versionStore.selectedVersion }}</span>
       </button>
     </div>
   </div>

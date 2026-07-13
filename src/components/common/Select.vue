@@ -78,15 +78,21 @@ function toggle() {
   open.value = !open.value
 }
 
-function onScroll() {
-  if (open.value && !closing.value) {
-    closing.value = true
-    window.removeEventListener('scroll', onScroll, true)
-    requestAnimationFrame(() => {
-      open.value = false
-      setTimeout(() => { closing.value = false }, 150)
-    })
-  }
+function onScroll(e: Event) {
+  if (!open.value || closing.value) return
+  // 忽略下拉面板内部的滚动（仅响应页面/外部滚动才关闭）
+  const target = e.target as Node
+  const dropdown = document.querySelector('.select-dropdown')
+  if (dropdown && dropdown.contains(target)) return
+  // 触发器内部滚动也忽略
+  if (triggerRef.value && triggerRef.value.contains(target)) return
+
+  closing.value = true
+  window.removeEventListener('scroll', onScroll, true)
+  requestAnimationFrame(() => {
+    open.value = false
+    setTimeout(() => { closing.value = false }, 150)
+  })
 }
 
 function handleClickOutside(e: MouseEvent) {

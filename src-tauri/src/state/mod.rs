@@ -126,6 +126,8 @@ impl Default for DownloadState {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
     pub game_dir: String,
+    /// Minecraft 文件夹列表（含默认和用户添加的）
+    pub mc_folders: Vec<McFolder>,
     pub max_download_threads: u32,
     pub chunk_count: u32,
     pub isolation_mode: u32,
@@ -144,12 +146,28 @@ pub struct AppConfig {
     pub proxy_mode: String,      // "none" | "system" | "custom"
     pub proxy_type: String,      // "http" | "https" | "socks5"
     pub proxy_url: String,       // 自定义代理地址，如 "127.0.0.1:7890"
+    /// 上次选中的游戏版本（持久化，启动器重启后恢复）
+    pub selected_version: Option<String>,
+}
+
+/// Minecraft 文件夹项
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McFolder {
+    /// 显示名称
+    pub name: String,
+    /// 文件夹路径（相对或绝对）
+    pub path: String,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
+        let default_game_dir = get_default_game_dir();
         Self {
-            game_dir: get_default_game_dir(),
+            game_dir: default_game_dir.clone(),
+            mc_folders: vec![McFolder {
+                name: "默认".to_string(),
+                path: default_game_dir,
+            }],
             max_download_threads: 8,
             chunk_count: 4,
             isolation_mode: 4,
@@ -168,6 +186,7 @@ impl Default for AppConfig {
             proxy_mode: "none".to_string(),
             proxy_type: "http".to_string(),
             proxy_url: String::new(),
+            selected_version: None,
         }
     }
 }

@@ -3,7 +3,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { showSuccess, showWarning } from '@/utils/toast'
 import type { VersionInfo } from '@/types/version'
 import * as tauri from '@/utils/tauri'
@@ -60,7 +60,33 @@ export const useVersionStore = defineStore('version', () => {
   
   // 版本选择器状态（用于在页面切换时保持状态）
   const selectedVersion = ref<string | null>(null)
-  
+
+  // 持久化 selectedVersion：变化时自动保存到 config.ini
+  watch(selectedVersion, (val) => {
+    tauri.setSelectedVersion(val).catch((e) => {
+      console.error('Failed to persist selectedVersion:', e)
+    })
+  })
+
+  /** 从 config.ini 恢复上次选中的版本（启动器启动时调用） */
+  async function restoreSelectedVersion() {
+    try {
+      const saved = await tauri.getSelectedVersion()
+      if (saved) {
+        // 验证版本是否仍然存在
+        const installed = await tauri.listInstalledVersionsWithType()
+        if (installed.some((v) => v.id === saved)) {
+          selectedVersion.value = saved
+        } else {
+          // 版本已不存在，清空持久化
+          await tauri.setSelectedVersion(null)
+        }
+      }
+    } catch (e) {
+      console.error('Failed to restore selectedVersion:', e)
+    }
+  }
+
   // 监听游戏退出事件
   let unlistenFn: (() => void) | null = null
   
@@ -334,6 +360,7 @@ export const useVersionStore = defineStore('version', () => {
     launchProgress,
     launchStageName,
     selectedVersion,
+    restoreSelectedVersion,
     loaderVersionsCache,
     fetchVersions,
     refreshVersions,

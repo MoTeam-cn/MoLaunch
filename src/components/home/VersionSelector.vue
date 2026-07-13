@@ -1,13 +1,14 @@
 <script setup lang="ts">
 /**
- * 版本选择器组件
- * 基于通用 Select 组件，显示已安装版本列表
+ * 版本选择入口（参考 PCL2 PageLaunchLeft 的 BtnVersion）
+ *
+ * 显示当前选中的版本（方块图标 + 版本名 + 类型），点击跳转到版本选择页。
+ * 不再使用下拉框，版本选择在独立的 /select 页面完成。
  */
 
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
-import * as tauri from '@/utils/tauri'
-import Select from '@/components/common/Select.vue'
 import grassIcon from '@/assets/blocks/Grass.png'
 import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
 import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
@@ -18,39 +19,12 @@ import neoforgeIcon from '@/assets/blocks/NeoForge.png'
 import optifineIcon from '@/assets/blocks/RedstoneLampOn.png'
 import liteloaderIcon from '@/assets/blocks/Egg.png'
 
+const router = useRouter()
 const versionStore = useVersionStore()
 
-interface InstalledVersion {
-  id: string
-  version_type: string
-}
-
-const installed = ref<InstalledVersion[]>([])
-const loading = ref(false)
-
-/** 当前选中的版本 ID（从 store 同步） */
-const selectedId = computed({
-  get: () => versionStore.selectedVersion,
-  set: (val) => { versionStore.selectedVersion = val }
-})
-
-/** 当前选中的版本对象 */
-const selectedVersion = computed(() =>
-  installed.value.find((v) => v.id === selectedId.value)
-)
-
-/** 当前选中版本的类型元数据（缓存，避免模板重复调用） */
-const selectedTypeMeta = computed<TypeMeta>(() => {
-  if (!selectedVersion.value) return defaultMeta
-  return typeMeta(inferVersionType(selectedVersion.value.id, selectedVersion.value.version_type))
-})
-
-/**
- * 推断版本类型
- * modloader 字符串匹配优先（后端 version_type 对 forge 版本通常只返回 release），
- * 与 InstalledList.vue#inferVersionType 保持一致
- */
-function inferVersionType(id: string, backendType: string): string {
+/** 推断版本类型（仅根据 ID 字符串匹配） */
+function inferVersionType(id: string): string {
+  if (!id) return 'release'
   const lower = id.toLowerCase()
   if (lower.includes('neoforge')) return 'neoforge'
   if (lower.includes('forge')) return 'forge'
@@ -58,117 +32,56 @@ function inferVersionType(id: string, backendType: string): string {
   if (lower.includes('optifine')) return 'optifine'
   if (lower.includes('liteloader')) return 'liteloader'
   if (/^\d{2}w\d{2}[a-z]/.test(id)) return 'snapshot'
-  if (backendType) return backendType
   return 'release'
 }
 
-/** Select 组件的 options（type 为推断后的类型） */
-const options = computed(() =>
-  installed.value.map(v => ({
-    label: v.id,
-    value: v.id,
-    type: inferVersionType(v.id, v.version_type),
-  }))
-)
-
-/** 版本类型 → 方块图标 + 标签（与下载页/加载器选择页一致） */
 interface TypeMeta {
   icon: string
   label: string
 }
 const typeMetaMap: Record<string, TypeMeta> = {
-  release: { icon: grassIcon, label: '正式版' },
-  snapshot: { icon: commandBlockIcon, label: '快照' },
-  old_beta: { icon: cobblestoneIcon, label: '旧版' },
-  old_alpha: { icon: cobblestoneIcon, label: '旧版' },
-  fool: { icon: goldBlockIcon, label: '愚人节版' },
-  forge: { icon: anvilIcon, label: 'Forge' },
-  fabric: { icon: fabricIcon, label: 'Fabric' },
-  neoforge: { icon: neoforgeIcon, label: 'NeoForge' },
-  optifine: { icon: optifineIcon, label: 'OptiFine' },
-  liteloader: { icon: liteloaderIcon, label: 'LiteLoader' },
+  release:    { icon: grassIcon,        label: '正式版' },
+  snapshot:   { icon: commandBlockIcon, label: '快照' },
+  forge:      { icon: anvilIcon,        label: 'Forge' },
+  neoforge:   { icon: neoforgeIcon,     label: 'NeoForge' },
+  fabric:     { icon: fabricIcon,       label: 'Fabric' },
+  optifine:   { icon: optifineIcon,     label: 'OptiFine' },
+  liteloader: { icon: liteloaderIcon,   label: 'LiteLoader' },
+  old:        { icon: cobblestoneIcon,  label: '旧版' },
+  fool:       { icon: goldBlockIcon,    label: '愚人节版' },
 }
 const defaultMeta: TypeMeta = { icon: grassIcon, label: '其他' }
 
-function typeMeta(type: string): TypeMeta {
-  return typeMetaMap[type] ?? defaultMeta
-}
-
-async function loadInstalled() {
-  loading.value = true
-  try {
-    installed.value = await tauri.listInstalledVersionsWithType()
-    if (installed.value.length > 0) {
-      const exists = installed.value.some((v) => v.id === selectedId.value)
-      if (!exists) selectedId.value = installed.value[0].id
-    }
-  } catch (e) {
-    console.error('Failed to load installed versions:', e)
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(() => {
-  loadInstalled()
+const selectedId = computed(() => versionStore.selectedVersion)
+const currentMeta = computed<TypeMeta>(() => {
+  if (!selectedId.value) return defaultMeta
+  return typeMetaMap[inferVersionType(selectedId.value)] ?? defaultMeta
 })
 
-// 监听下载完成时刷新列表
-watch(() => versionStore.downloading, (val) => {
-  if (!val) setTimeout(loadInstalled, 500)
-})
-
-defineExpose({ refresh: loadInstalled })
+function goToSelect() {
+  router.push('/select')
+}
 </script>
 
 <template>
-  <Select
-    class="w-full"
-    :model-value="selectedId"
-    :options="options"
-    @update:model-value="selectedId = String($event)"
+  <button
+    class="flex h-[35px] min-w-0 flex-1 items-center justify-between overflow-hidden rounded-[3px] border border-gray-300 bg-white/80 px-3 text-[13px] text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50"
+    @click="goToSelect"
   >
-    <!-- 自定义触发器 -->
-    <template #trigger="{ open, toggle }">
-      <button
-        class="flex w-full items-center justify-between rounded-lg border bg-white px-3 py-2.5 transition-colors disabled:cursor-not-allowed"
-        :class="open ? 'border-primary-400 bg-primary-50/30' : 'border-gray-200 hover:border-primary-300 hover:bg-primary-50/30'"
-        :disabled="loading"
-        @click="toggle"
-      >
-        <div class="flex items-center gap-2 overflow-hidden">
-          <span v-if="loading" class="text-sm text-gray-400">加载中...</span>
-          <template v-else-if="selectedVersion">
-            <!-- 版本类型方块图标（与下载页一致） -->
-            <img
-              :src="selectedTypeMeta.icon"
-              :title="selectedTypeMeta.label"
-              class="h-5 w-5 flex-none rounded"
-              alt=""
-            >
-            <span class="truncate text-sm font-medium text-gray-900">{{ selectedVersion.id }}</span>
-          </template>
-          <span v-else class="text-sm text-gray-400">无可用版本</span>
-        </div>
-        <svg class="h-4 w-4 flex-none text-gray-400 transition-transform" :class="{ 'rotate-180': open }" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M5.3 7.3a1 1 0 011.4 0L10 10.6l3.3-3.3a1 1 0 111.4 1.4l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 010-1.4z" clip-rule="evenodd" />
-        </svg>
-      </button>
-    </template>
-
-    <!-- 自定义选项渲染 -->
-    <template #option="{ option }">
-      <!-- 版本类型方块图标（与下载页一致） -->
+    <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       <img
-        :src="typeMeta(option.type).icon"
-        :title="typeMeta(option.type).label"
-        class="h-5 w-5 flex-none rounded"
+        :src="currentMeta.icon"
+        class="h-4 w-4 flex-none rounded-sm"
         alt=""
       >
-      <span class="flex-1 truncate text-sm text-gray-900">{{ option.label }}</span>
-    </template>
-
-    <!-- 空状态 -->
-    <template #empty>暂无已安装版本</template>
-  </Select>
+      <span v-if="selectedId" class="min-w-0 flex-1 truncate">{{ selectedId }}</span>
+      <span v-else class="text-gray-400">无可用版本</span>
+    </div>
+    <div class="flex flex-none items-center gap-1.5">
+      <span v-if="selectedId" class="text-xs text-gray-400">{{ currentMeta.label }}</span>
+      <svg class="h-3.5 w-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M7.3 14.7a1 1 0 010-1.4L11.6 9 7.3 4.7a1 1 0 011.4-1.4l5 5a1 1 0 010 1.4l-5 5a1 1 0 01-1.4 0z" clip-rule="evenodd" />
+      </svg>
+    </div>
+  </button>
 </template>

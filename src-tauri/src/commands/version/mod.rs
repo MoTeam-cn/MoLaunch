@@ -1,6 +1,7 @@
 //! Version management commands
 
 pub mod download;
+pub mod folder;
 pub mod install;
 pub mod launch;
 pub mod list;

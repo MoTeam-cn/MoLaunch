@@ -77,7 +77,18 @@ function openOfficialSite() {
 </script>
 
 <template>
-  <div class="flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
+  <div class="relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
+    <!-- 返回主页按钮 -->
+    <button
+      class="absolute left-4 top-4 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+      @click="router.push('/')"
+    >
+      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+        <path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.4 10l4.3 4.3a1 1 0 01-1.4 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.4 0z" clip-rule="evenodd" />
+      </svg>
+      返回主页
+    </button>
+
     <div class="w-full max-w-md">
       <!-- 标题 -->
       <div class="mb-6 text-center">

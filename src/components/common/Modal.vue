@@ -1,9 +1,12 @@
 <script setup lang="ts">
 /**
  * 弹窗组件
+ * 支持四种类型：error / warning / info / success
+ * 支持确认对话框（showCancel）
+ * 支持输入框模式（showInput，替代 window.prompt）
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import {
   ExclamationTriangleIcon,
   XCircleIcon,
@@ -23,6 +26,11 @@ interface ModalOptions {
   cancelText?: string
   onConfirm?: () => void
   onCancel?: () => void
+  /** 输入框模式：显示输入框，确认时回调接收输入值 */
+  showInput?: boolean
+  inputValue?: string
+  inputPlaceholder?: string
+  onConfirmInput?: (value: string) => void
 }
 
 const visible = ref(false)
@@ -31,6 +39,8 @@ const options = ref<ModalOptions>({
   title: '',
   message: '',
 })
+const inputValue = ref('')
+const inputRef = ref<HTMLInputElement | null>(null)
 
 const icon = computed(() => {
   switch (options.value.type) {
@@ -55,12 +65,24 @@ const showDetails = ref(false)
 function show(opts: ModalOptions) {
   options.value = opts
   showDetails.value = false
+  inputValue.value = opts.inputValue ?? ''
   visible.value = true
+  // 输入框模式下自动聚焦
+  if (opts.showInput) {
+    nextTick(() => {
+      inputRef.value?.focus()
+      inputRef.value?.select()
+    })
+  }
 }
 
 function handleConfirm() {
   visible.value = false
-  options.value.onConfirm?.()
+  if (options.value.showInput) {
+    options.value.onConfirmInput?.(inputValue.value)
+  } else {
+    options.value.onConfirm?.()
+  }
 }
 
 function handleCancel() {
@@ -98,6 +120,24 @@ defineExpose({
       onCancel,
     })
   },
+  prompt: (
+    title: string,
+    message: string,
+    onConfirm: (value: string) => void,
+    opts?: { defaultValue?: string; placeholder?: string; onCancel?: () => void },
+  ) => {
+    show({
+      type: 'info',
+      title,
+      message,
+      showInput: true,
+      showCancel: true,
+      inputValue: opts?.defaultValue ?? '',
+      inputPlaceholder: opts?.placeholder,
+      onConfirmInput: onConfirm,
+      onCancel: opts?.onCancel,
+    })
+  },
 })
 </script>
 
@@ -128,6 +168,18 @@ defineExpose({
             </div>
             <!-- 消息 -->
             <p class="mt-2 ml-8 text-sm text-gray-600 leading-relaxed">{{ options.message }}</p>
+
+            <!-- 输入框 -->
+            <div v-if="options.showInput" class="mt-3 ml-8">
+              <input
+                ref="inputRef"
+                v-model="inputValue"
+                type="text"
+                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                :placeholder="options.inputPlaceholder"
+                @keyup.enter="handleConfirm"
+              >
+            </div>
 
             <!-- 详情 -->
             <div v-if="options.details" class="mt-3 ml-8">

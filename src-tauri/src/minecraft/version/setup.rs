@@ -25,6 +25,14 @@ pub struct VersionSetup {
     pub optifine_version: Option<String>,
     /// LiteLoader 版本号（如有）
     pub liteloader_version: Option<String>,
+    /// 自定义图标文件名（空字符串=自动判断，PCL\Logo.png 等相对路径）
+    pub logo: Option<String>,
+    /// 自定义描述（空字符串=使用默认描述）
+    pub custom_info: Option<String>,
+    /// 强制版本分类（0=自动，1=隐藏，2=可安装Mod，3=原版类似，4=垃圾，5=愚人节，6=错误）
+    pub display_type: Option<i32>,
+    /// 是否收藏
+    pub is_star: Option<bool>,
 }
 
 impl VersionSetup {
@@ -48,6 +56,10 @@ impl VersionSetup {
             quilt_version: quilt.map(|s| s.to_string()),
             optifine_version: optifine.map(|s| s.to_string()),
             liteloader_version: liteloader.map(|s| s.to_string()),
+            logo: None,
+            custom_info: None,
+            display_type: None,
+            is_star: None,
         }
     }
 
@@ -61,34 +73,182 @@ impl VersionSetup {
         Self::file_path(version_dir).exists()
     }
 
-    /// 保存到 setup.ini
+    /// 保存到 setup.ini（保留已有个性化字段，仅更新基础信息）
     pub fn save(&self, version_dir: &Path) -> std::io::Result<()> {
+        Self::save_with_options(version_dir, self, true)
+    }
+
+    /// 完整保存（覆盖所有字段，包括个性化字段）
+    pub fn save_full(&self, version_dir: &Path) -> std::io::Result<()> {
+        Self::save_with_options(version_dir, self, false)
+    }
+
+    /// 保存实现：若 preserve_personalization=true，保留已存在的个性化字段
+    fn save_with_options(
+        version_dir: &Path,
+        setup: &VersionSetup,
+        preserve_personalization: bool,
+    ) -> std::io::Result<()> {
         let path = Self::file_path(version_dir);
+
+        // 若保留个性化字段，先读取旧 setup.ini 中的个性化值
+        let (old_logo, old_info, old_dtype, old_star) = if preserve_personalization {
+            match std::fs::read_to_string(&path) {
+                Ok(content) => {
+                    let ini = parse_ini(&content);
+                    (
+                        ini.get("Logo").cloned(),
+                        ini.get("CustomInfo").cloned(),
+                        ini.get("DisplayType").and_then(|s| s.parse::<i32>().ok()),
+                        ini.get("IsStar").map(|s| s.eq_ignore_ascii_case("true")),
+                    )
+                }
+                Err(_) => (None, None, None, None),
+            }
+        } else {
+            (None, None, None, None)
+        };
+
+        let logo = if preserve_personalization {
+            old_logo.or_else(|| setup.logo.clone())
+        } else {
+            setup.logo.clone()
+        };
+        let custom_info = if preserve_personalization {
+            old_info.or_else(|| setup.custom_info.clone())
+        } else {
+            setup.custom_info.clone()
+        };
+        let display_type = if preserve_personalization {
+            old_dtype.or(setup.display_type)
+        } else {
+            setup.display_type
+        };
+        let is_star = if preserve_personalization {
+            old_star.or(setup.is_star)
+        } else {
+            setup.is_star
+        };
+
         let mut content = String::new();
         content.push_str("[info]\n");
-        content.push_str(&format!("OriginalVersion={}\n", self.original_version));
-        content.push_str(&format!("Type={}\n", self.version_type.as_str()));
+        content.push_str(&format!("OriginalVersion={}\n", setup.original_version));
+        content.push_str(&format!("Type={}\n", setup.version_type.as_str()));
 
-        if let Some(ref v) = self.forge_version {
+        if let Some(ref v) = setup.forge_version {
             content.push_str(&format!("ForgeVersion={}\n", v));
         }
-        if let Some(ref v) = self.neoforge_version {
+        if let Some(ref v) = setup.neoforge_version {
             content.push_str(&format!("NeoForgeVersion={}\n", v));
         }
-        if let Some(ref v) = self.fabric_version {
+        if let Some(ref v) = setup.fabric_version {
             content.push_str(&format!("FabricVersion={}\n", v));
         }
-        if let Some(ref v) = self.quilt_version {
+        if let Some(ref v) = setup.quilt_version {
             content.push_str(&format!("QuiltVersion={}\n", v));
         }
-        if let Some(ref v) = self.optifine_version {
+        if let Some(ref v) = setup.optifine_version {
             content.push_str(&format!("OptiFineVersion={}\n", v));
         }
-        if let Some(ref v) = self.liteloader_version {
+        if let Some(ref v) = setup.liteloader_version {
             content.push_str(&format!("LiteLoaderVersion={}\n", v));
         }
 
+        // 个性化字段（空值也写入，保持一致）
+        content.push_str(&format!("Logo={}\n", logo.unwrap_or_default()));
+        content.push_str(&format!("CustomInfo={}\n", custom_info.unwrap_or_default()));
+        if let Some(dt) = display_type {
+            content.push_str(&format!("DisplayType={}\n", dt));
+        } else {
+            content.push_str("DisplayType=0\n");
+        }
+        content.push_str(&format!(
+            "IsStar={}\n",
+            is_star.unwrap_or(false)
+        ));
+
         std::fs::write(&path, content)
+    }
+
+    /// 加载或从 JSON 推断（若 setup.ini 不存在则从版本 JSON 推断并保存）
+    pub fn load_or_create(version_dir: &Path, version_id: &str) -> Self {
+        if let Ok(Some(setup)) = Self::load(version_dir) {
+            return setup;
+        }
+        let setup = Self::from_version_json(version_dir, version_id)
+            .unwrap_or_else(|| Self {
+                original_version: version_id.to_string(),
+                version_type: VersionType::Unknown,
+                forge_version: None,
+                neoforge_version: None,
+                fabric_version: None,
+                quilt_version: None,
+                optifine_version: None,
+                liteloader_version: None,
+                logo: None,
+                custom_info: None,
+                display_type: None,
+                is_star: None,
+            });
+        let _ = setup.save(version_dir);
+        setup
+    }
+
+    /// 更新单个个性化字段（不修改其他字段）
+    pub fn update_personalization(
+        version_dir: &Path,
+        logo: Option<&str>,
+        custom_info: Option<&str>,
+        display_type: Option<i32>,
+        is_star: Option<bool>,
+    ) -> std::io::Result<()> {
+        let path = Self::file_path(version_dir);
+        let mut setup = if path.exists() {
+            Self::load(version_dir)?.unwrap_or_else(|| Self {
+                original_version: String::new(),
+                version_type: VersionType::Unknown,
+                forge_version: None,
+                neoforge_version: None,
+                fabric_version: None,
+                quilt_version: None,
+                optifine_version: None,
+                liteloader_version: None,
+                logo: None,
+                custom_info: None,
+                display_type: None,
+                is_star: None,
+            })
+        } else {
+            Self {
+                original_version: String::new(),
+                version_type: VersionType::Unknown,
+                forge_version: None,
+                neoforge_version: None,
+                fabric_version: None,
+                quilt_version: None,
+                optifine_version: None,
+                liteloader_version: None,
+                logo: None,
+                custom_info: None,
+                display_type: None,
+                is_star: None,
+            }
+        };
+
+        if let Some(v) = logo {
+            setup.logo = Some(v.to_string());
+        }
+        if let Some(v) = custom_info {
+            setup.custom_info = Some(v.to_string());
+        }
+        if let Some(v) = display_type {
+            setup.display_type = Some(v);
+        }
+        if let Some(v) = is_star {
+            setup.is_star = Some(v);
+        }
+
+        setup.save_full(version_dir)
     }
 
     /// 从 setup.ini 加载
@@ -120,6 +280,10 @@ impl VersionSetup {
             quilt_version: ini.get("QuiltVersion").cloned(),
             optifine_version: ini.get("OptiFineVersion").cloned(),
             liteloader_version: ini.get("LiteLoaderVersion").cloned(),
+            logo: ini.get("Logo").cloned(),
+            custom_info: ini.get("CustomInfo").cloned(),
+            display_type: ini.get("DisplayType").and_then(|s| s.parse::<i32>().ok()),
+            is_star: ini.get("IsStar").map(|s| s.eq_ignore_ascii_case("true")),
         }))
     }
 
@@ -183,6 +347,10 @@ impl VersionSetup {
             quilt_version,
             optifine_version,
             liteloader_version,
+            logo: None,
+            custom_info: None,
+            display_type: None,
+            is_star: None,
         })
     }
 }

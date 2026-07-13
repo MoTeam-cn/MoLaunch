@@ -168,10 +168,142 @@ export async function listInstalledVersionsWithType(): Promise<InstalledVersionI
 }
 
 /**
+ * Minecraft 文件夹项
+ */
+export interface McFolder {
+  name: string
+  path: string
+}
+
+/** 列出所有 Minecraft 文件夹 */
+export async function listMcFolders(): Promise<McFolder[]> {
+  return await invoke<McFolder[]>('list_mc_folders')
+}
+
+/** 添加 Minecraft 文件夹（自动去重） */
+export async function addMcFolder(name: string, path: string): Promise<McFolder[]> {
+  return await invoke<McFolder[]>('add_mc_folder', { name, path })
+}
+
+/** 移除 Minecraft 文件夹 */
+export async function removeMcFolder(path: string): Promise<McFolder[]> {
+  return await invoke<McFolder[]>('remove_mc_folder', { path })
+}
+
+/** 切换当前 Minecraft 文件夹 */
+export async function switchMcFolder(path: string): Promise<string> {
+  return await invoke<string>('switch_mc_folder', { path })
+}
+
+/** 重命名 Minecraft 文件夹 */
+export async function renameMcFolder(path: string, newName: string): Promise<McFolder[]> {
+  return await invoke<McFolder[]>('rename_mc_folder', { path, newName })
+}
+
+/**
  * 卸载版本
  */
 export async function uninstallVersion(versionId: string): Promise<void> {
   return await invoke<void>('uninstall_version', { versionId })
+}
+
+/**
+ * 获取版本的有效游戏目录（考虑版本隔离）
+ * 隔离时返回 `{game_dir}/versions/{version_id}/`，非隔离时返回 `{game_dir}/`
+ */
+export async function getVersionEffectiveDir(versionId: string): Promise<string> {
+  return await invoke<string>('get_version_effective_dir', { versionId })
+}
+
+/** 版本个性化信息 */
+export interface VersionPersonalization {
+  logo: string
+  custom_info: string
+  display_type: number
+  is_star: boolean
+  version_type: string
+  original_version: string
+}
+
+/**
+ * 获取版本个性化设置
+ */
+export async function getVersionPersonalization(versionId: string): Promise<VersionPersonalization> {
+  return await invoke<VersionPersonalization>('get_version_personalization', { versionId })
+}
+
+/**
+ * 更新版本个性化字段（传 undefined 表示不修改该字段）
+ */
+export async function updateVersionPersonalization(
+  versionId: string,
+  options: {
+    logo?: string
+    customInfo?: string
+    displayType?: number
+    isStar?: boolean
+  },
+): Promise<void> {
+  return await invoke<void>('update_version_personalization', {
+    versionId,
+    logo: options.logo,
+    customInfo: options.customInfo,
+    displayType: options.displayType,
+    isStar: options.isStar,
+  })
+}
+
+/**
+ * 导出启动脚本（.bat，使用绝对路径 Java + 版权信息）
+ *
+ * @param javaPath 用户指定的 Java 路径（可选，为空时后端按 MC 版本自动检测）
+ */
+export async function exportLaunchScript(
+  versionId: string,
+  username: string,
+  uuid: string,
+  accessToken: string,
+  loginType: string,
+  javaPath: string | null,
+  savePath: string,
+): Promise<void> {
+  return await invoke<void>('export_launch_script', {
+    versionId,
+    username,
+    uuid,
+    accessToken,
+    loginType,
+    javaPath,
+    savePath,
+  })
+}
+
+/**
+ * 补全版本文件（校验并下载缺失的 libraries/assets）
+ */
+export async function fixVersionFiles(versionId: string): Promise<void> {
+  return await invoke<void>('fix_version_files', { versionId })
+}
+
+/**
+ * 重命名版本
+ */
+export async function renameVersion(versionId: string, newName: string): Promise<void> {
+  return await invoke<void>('rename_version', { versionId, newName })
+}
+
+/**
+ * 获取上次选中的版本（持久化）
+ */
+export async function getSelectedVersion(): Promise<string | null> {
+  return await invoke<string | null>('get_selected_version')
+}
+
+/**
+ * 保存当前选中的版本（持久化到 config.ini）
+ */
+export async function setSelectedVersion(versionId: string | null): Promise<void> {
+  return await invoke<void>('set_selected_version', { versionId })
 }
 
 /**
@@ -203,6 +335,13 @@ export async function openGameDir(): Promise<void> {
 }
 
 /**
+ * 打开任意路径（文件夹或文件）
+ */
+export async function openPath(path: string): Promise<void> {
+  return await invoke<void>('open_path', { path })
+}
+
+/**
  * 获取游戏目录
  */
 export async function getGameDir(): Promise<string> {
@@ -221,6 +360,17 @@ export async function selectFolder(): Promise<string | null> {
  */
 export async function selectFile(title?: string, filters?: { name: string; extensions: string[] }[]): Promise<string | null> {
   return await invoke<string | null>('select_file', { title, filters })
+}
+
+/**
+ * 保存文件对话框（让用户选择保存位置）
+ */
+export async function saveFile(
+  title?: string,
+  defaultName?: string,
+  filters?: { name: string; extensions: string[] }[],
+): Promise<string | null> {
+  return await invoke<string | null>('save_file', { title, defaultName, filters })
 }
 
 /**

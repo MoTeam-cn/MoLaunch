@@ -31,6 +31,27 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.theme = config.get_or("General", "theme", &app_config.theme);
     app_config.language = config.get_or("General", "language", &app_config.language);
 
+    // Folders（Minecraft 文件夹列表）
+    if let Some(list_json) = config.get("Folders", "list") {
+        match serde_json::from_str::<Vec<crate::state::McFolder>>(&list_json) {
+            Ok(folders) => {
+                if !folders.is_empty() {
+                    app_config.mc_folders = folders;
+                }
+            }
+            Err(e) => {
+                log_warn!("Failed to parse mc_folders list: {}", e);
+            }
+        }
+    }
+    // 兼容：如果 mc_folders 为空但 game_dir 存在，用 game_dir 作为默认文件夹
+    if app_config.mc_folders.is_empty() {
+        app_config.mc_folders = vec![crate::state::McFolder {
+            name: "默认".to_string(),
+            path: app_config.game_dir.clone(),
+        }];
+    }
+
     // Download
     if let Some(threads) = config.get("Download", "max_threads") {
         app_config.max_download_threads =
@@ -103,6 +124,12 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.proxy_type = config.get_or("Proxy", "type", &app_config.proxy_type);
     app_config.proxy_url = config.get_or("Proxy", "url", &app_config.proxy_url);
 
+    // Version
+    app_config.selected_version = config
+        .get("Version", "selected")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.clone());
+
     log_info!("Config loaded from storage");
     Ok(Some(app_config))
 }
@@ -121,6 +148,13 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "General",
         "isolation_mode",
         &config.isolation_mode.to_string(),
+    );
+
+    // Folders（Minecraft 文件夹列表，JSON 序列化存储）
+    ini.set(
+        "Folders",
+        "list",
+        &serde_json::to_string(&config.mc_folders).unwrap_or_else(|_| "[]".to_string()),
     );
 
     // Download
@@ -173,6 +207,9 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("Proxy", "mode", &config.proxy_mode);
     ini.set("Proxy", "type", &config.proxy_type);
     ini.set("Proxy", "url", &config.proxy_url);
+
+    // Version
+    ini.set("Version", "selected", config.selected_version.as_deref().unwrap_or(""));
 
     storage.write_config(&ini).map_err(|e| e.to_string())?;
     log_debug!("Config saved to storage");

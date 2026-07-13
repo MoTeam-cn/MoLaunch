@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useSdkStore } from '@/stores/sdk'
 import { useVersionStore } from '@/stores/version'
 import { useJavaStore } from '@/stores/java'
+import * as tauri from '@/utils/tauri'
 import LaunchPanel from '@/components/home/LaunchPanel.vue'
 import LaunchLog from '@/components/home/LaunchLog.vue'
 
@@ -29,6 +30,21 @@ onMounted(async () => {
   if (sdkStore.isReady) {
     await versionStore.fetchVersions()
     await versionStore.checkRunningGame()
+  }
+
+  // 先尝试恢复上次选中的版本（会校验版本是否仍然存在）
+  await versionStore.restoreSelectedVersion()
+
+  // 如果仍未选中，自动选中第一个已安装版本
+  if (!versionStore.selectedVersion) {
+    try {
+      const installed = await tauri.listInstalledVersionsWithType()
+      if (installed.length > 0) {
+        versionStore.selectedVersion = installed[0].id
+      }
+    } catch {
+      // 忽略：用户可去版本选择页手动选
+    }
   }
 })
 </script>

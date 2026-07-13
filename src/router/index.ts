@@ -23,6 +23,16 @@ const router = createRouter({
       component: () => import('@/views/Versions.vue'),
     },
     {
+      path: '/select',
+      name: 'select',
+      component: () => import('@/views/VersionSelect.vue'),
+    },
+    {
+      path: '/version-settings',
+      name: 'version-settings',
+      component: () => import('@/views/VersionSettings.vue'),
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('@/views/Settings.vue'),
