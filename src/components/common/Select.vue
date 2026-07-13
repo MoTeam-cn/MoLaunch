@@ -41,6 +41,7 @@ function updateDropdownPosition() {
   if (!triggerRef.value) return
   const rect = triggerRef.value.getBoundingClientRect()
   const viewportH = window.innerHeight
+  const viewportW = window.innerWidth
   const dropdownMaxH = 240
   const gap = 4
 
@@ -53,7 +54,9 @@ function updateDropdownPosition() {
       position: 'fixed',
       top: `${rect.bottom + gap}px`,
       left: `${rect.left}px`,
-      width: `${rect.width}px`,
+      minWidth: `${rect.width}px`,
+      width: 'max-content',
+      maxWidth: `${viewportW - rect.left - 8}px`,
       zIndex: '9999',
     }
   } else {
@@ -62,7 +65,9 @@ function updateDropdownPosition() {
       position: 'fixed',
       bottom: `${viewportH - rect.top + gap}px`,
       left: `${rect.left}px`,
-      width: `${rect.width}px`,
+      minWidth: `${rect.width}px`,
+      width: 'max-content',
+      maxWidth: `${viewportW - rect.left - 8}px`,
       zIndex: '9999',
     }
   }

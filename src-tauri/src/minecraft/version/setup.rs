@@ -4,7 +4,32 @@
 //! 参考 PCL2 的 setup.ini 机制。
 
 use super::state::VersionType;
+use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
+
+/// 版本个性化字段更新（所有字段可选，None 表示不修改）
+/// 注意：前端传 camelCase（如 javaPath），需 rename_all 匹配
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PersonalizationUpdate {
+    pub logo: Option<String>,
+    pub custom_info: Option<String>,
+    pub display_type: Option<i32>,
+    pub is_star: Option<bool>,
+    pub indie_type: Option<i32>,
+    pub window_title: Option<String>,
+    pub server_enter: Option<String>,
+    pub advance_jvm_args: Option<String>,
+    pub advance_game_args: Option<String>,
+    pub advance_run_cmd: Option<String>,
+    pub java_path: Option<String>,
+    /// 内存模式：None=跟随全局, Some("auto")=自动, Some("custom")=自定义
+    pub memory_mode: Option<String>,
+    /// 版本独立最小内存（MB，仅 custom 模式生效）
+    pub min_memory: Option<u32>,
+    /// 版本独立最大内存（MB，仅 custom 模式生效）
+    pub max_memory: Option<u32>,
+}
 
 /// 版本 Setup 信息
 #[derive(Debug, Clone)]
@@ -33,6 +58,26 @@ pub struct VersionSetup {
     pub display_type: Option<i32>,
     /// 是否收藏
     pub is_star: Option<bool>,
+    /// 版本独立隔离设置（0=跟随全局，1=开启隔离，2=关闭隔离）
+    pub indie_type: Option<i32>,
+    /// 游戏窗口标题（空=跟随全局）
+    pub window_title: Option<String>,
+    /// 自动进入服务器（"IP:Port" 格式，空=不自动进入）
+    pub server_enter: Option<String>,
+    /// 额外 JVM 参数（空=跟随全局）
+    pub advance_jvm_args: Option<String>,
+    /// 额外游戏参数（空=跟随全局）
+    pub advance_game_args: Option<String>,
+    /// 启动前执行命令（空=跟随全局）
+    pub advance_run_cmd: Option<String>,
+    /// 版本独立 Java 路径（空=自动选择）
+    pub java_path: Option<String>,
+    /// 内存模式：None/空=跟随全局, "auto"=自动, "custom"=自定义
+    pub memory_mode: Option<String>,
+    /// 版本独立最小内存（MB，仅 custom 模式生效）
+    pub min_memory: Option<u32>,
+    /// 版本独立最大内存（MB，仅 custom 模式生效）
+    pub max_memory: Option<u32>,
 }
 
 impl VersionSetup {
@@ -60,12 +105,50 @@ impl VersionSetup {
             custom_info: None,
             display_type: None,
             is_star: None,
+            indie_type: None,
+            window_title: None,
+            server_enter: None,
+            advance_jvm_args: None,
+            advance_game_args: None,
+            advance_run_cmd: None,
+            java_path: None,
+            memory_mode: None,
+            min_memory: None,
+            max_memory: None,
         }
     }
 
     /// 获取 setup.ini 文件路径
     pub fn file_path(version_dir: &Path) -> PathBuf {
         version_dir.join("setup.ini")
+    }
+
+    /// 全空默认 Setup（用于 setup.ini 不存在时的兜底）
+    pub fn empty() -> Self {
+        Self {
+            original_version: String::new(),
+            version_type: VersionType::Unknown,
+            forge_version: None,
+            neoforge_version: None,
+            fabric_version: None,
+            quilt_version: None,
+            optifine_version: None,
+            liteloader_version: None,
+            logo: None,
+            custom_info: None,
+            display_type: None,
+            is_star: None,
+            indie_type: None,
+            window_title: None,
+            server_enter: None,
+            advance_jvm_args: None,
+            advance_game_args: None,
+            advance_run_cmd: None,
+            java_path: None,
+            memory_mode: None,
+            min_memory: None,
+            max_memory: None,
+        }
     }
 
     /// 检查 setup.ini 是否存在
@@ -91,44 +174,73 @@ impl VersionSetup {
     ) -> std::io::Result<()> {
         let path = Self::file_path(version_dir);
 
-        // 若保留个性化字段，先读取旧 setup.ini 中的个性化值
-        let (old_logo, old_info, old_dtype, old_star) = if preserve_personalization {
-            match std::fs::read_to_string(&path) {
-                Ok(content) => {
-                    let ini = parse_ini(&content);
-                    (
-                        ini.get("Logo").cloned(),
-                        ini.get("CustomInfo").cloned(),
-                        ini.get("DisplayType").and_then(|s| s.parse::<i32>().ok()),
-                        ini.get("IsStar").map(|s| s.eq_ignore_ascii_case("true")),
-                    )
-                }
-                Err(_) => (None, None, None, None),
-            }
+        // 读取旧 setup.ini（用于保留个性化字段）
+        let old_ini: std::collections::HashMap<String, String> = if preserve_personalization {
+            std::fs::read_to_string(&path)
+                .map(|c| parse_ini(&c))
+                .unwrap_or_default()
         } else {
-            (None, None, None, None)
+            Default::default()
         };
 
-        let logo = if preserve_personalization {
-            old_logo.or_else(|| setup.logo.clone())
-        } else {
-            setup.logo.clone()
+        // 保留策略：preserve 时 old.or(new)，否则直接用 new
+        let pick_str = |key: &str, new: &Option<String>| -> String {
+            if preserve_personalization {
+                old_ini
+                    .get(key)
+                    .cloned()
+                    .filter(|s| !s.is_empty())
+                    .or_else(|| new.clone())
+                    .unwrap_or_default()
+            } else {
+                new.clone().unwrap_or_default()
+            }
         };
-        let custom_info = if preserve_personalization {
-            old_info.or_else(|| setup.custom_info.clone())
-        } else {
-            setup.custom_info.clone()
+        let pick_i32 = |key: &str, new: Option<i32>| -> Option<i32> {
+            if preserve_personalization {
+                old_ini
+                    .get(key)
+                    .and_then(|s| s.parse::<i32>().ok())
+                    .or(new)
+            } else {
+                new
+            }
         };
-        let display_type = if preserve_personalization {
-            old_dtype.or(setup.display_type)
-        } else {
-            setup.display_type
+        let pick_bool = |key: &str, new: Option<bool>| -> Option<bool> {
+            if preserve_personalization {
+                old_ini
+                    .get(key)
+                    .map(|s| s.eq_ignore_ascii_case("true"))
+                    .or(new)
+            } else {
+                new
+            }
         };
-        let is_star = if preserve_personalization {
-            old_star.or(setup.is_star)
-        } else {
-            setup.is_star
+        let pick_u32 = |key: &str, new: Option<u32>| -> Option<u32> {
+            if preserve_personalization {
+                old_ini
+                    .get(key)
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .or(new)
+            } else {
+                new
+            }
         };
+
+        let logo = pick_str("Logo", &setup.logo);
+        let custom_info = pick_str("CustomInfo", &setup.custom_info);
+        let display_type = pick_i32("DisplayType", setup.display_type);
+        let is_star = pick_bool("IsStar", setup.is_star);
+        let indie_type = pick_i32("IndieType", setup.indie_type);
+        let window_title = pick_str("WindowTitle", &setup.window_title);
+        let server_enter = pick_str("ServerEnter", &setup.server_enter);
+        let advance_jvm_args = pick_str("AdvanceJvmArgs", &setup.advance_jvm_args);
+        let advance_game_args = pick_str("AdvanceGameArgs", &setup.advance_game_args);
+        let advance_run_cmd = pick_str("AdvanceRunCmd", &setup.advance_run_cmd);
+        let java_path = pick_str("JavaPath", &setup.java_path);
+        let memory_mode = pick_str("MemoryMode", &setup.memory_mode);
+        let min_memory = pick_u32("MinMemory", setup.min_memory);
+        let max_memory = pick_u32("MaxMemory", setup.max_memory);
 
         let mut content = String::new();
         content.push_str("[info]\n");
@@ -154,25 +266,83 @@ impl VersionSetup {
             content.push_str(&format!("LiteLoaderVersion={}\n", v));
         }
 
-        // 个性化字段（空值也写入，保持一致）
-        content.push_str(&format!("Logo={}\n", logo.unwrap_or_default()));
-        content.push_str(&format!("CustomInfo={}\n", custom_info.unwrap_or_default()));
-        if let Some(dt) = display_type {
-            content.push_str(&format!("DisplayType={}\n", dt));
-        } else {
-            content.push_str("DisplayType=0\n");
+        // 个性化字段
+        content.push_str(&format!("Logo={}\n", logo));
+        content.push_str(&format!("CustomInfo={}\n", custom_info));
+        content.push_str(&format!("DisplayType={}\n", display_type.unwrap_or(0)));
+        content.push_str(&format!("IsStar={}\n", is_star.unwrap_or(false)));
+        if let Some(it) = indie_type {
+            content.push_str(&format!("IndieType={}\n", it));
         }
-        content.push_str(&format!(
-            "IsStar={}\n",
-            is_star.unwrap_or(false)
-        ));
+        // 版本功能设置（空值也写入，便于人工编辑）
+        content.push_str(&format!("WindowTitle={}\n", window_title));
+        content.push_str(&format!("ServerEnter={}\n", server_enter));
+        content.push_str(&format!("AdvanceJvmArgs={}\n", advance_jvm_args));
+        content.push_str(&format!("AdvanceGameArgs={}\n", advance_game_args));
+        content.push_str(&format!("AdvanceRunCmd={}\n", advance_run_cmd));
+        content.push_str(&format!("JavaPath={}\n", java_path));
+
+        // 内存设置独立段
+        content.push_str("\n[Memory]\n");
+        content.push_str(&format!("MemoryMode={}\n", memory_mode));
+        if let Some(mm) = min_memory {
+            content.push_str(&format!("MinMemory={}\n", mm));
+        }
+        if let Some(mm) = max_memory {
+            content.push_str(&format!("MaxMemory={}\n", mm));
+        }
 
         std::fs::write(&path, content)
     }
 
+    /// 按模板（resources/defaults/setup.ini）比对补全缺失字段
+    /// 返回 true 表示有补全修改，false 表示无需修改
+    /// 段感知：[info] 和 [Memory] 段分别比对，只补缺失的 key，不覆盖已有值
+    pub fn ensure_complete(version_dir: &Path) -> std::io::Result<bool> {
+        let path = Self::file_path(version_dir);
+        if !path.exists() {
+            return Ok(false);
+        }
+
+        // 读取模板
+        let template_content = crate::resources::read_resource("defaults/setup.ini")
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+        let template = crate::storage::ini::IniFile::parse(&template_content);
+
+        // 读取当前 setup.ini
+        let current_content = std::fs::read_to_string(&path)?;
+        let mut current = crate::storage::ini::IniFile::parse(&current_content);
+
+        // 逐段比对，补全缺失的 key
+        let mut modified = false;
+        for section in template.sections() {
+            let template_pairs = template.get_section(&section);
+            for (key, value) in &template_pairs {
+                if !current.has_key(&section, key) {
+                    current.set(&section, key, value);
+                    modified = true;
+                }
+            }
+        }
+
+        if modified {
+            std::fs::write(&path, current.to_string())?;
+        }
+
+        Ok(modified)
+    }
+
     /// 加载或从 JSON 推断（若 setup.ini 不存在则从版本 JSON 推断并保存）
+    /// 若 setup.ini 是旧格式（缺失字段），自动按模板补全所有字段
     pub fn load_or_create(version_dir: &Path, version_id: &str) -> Self {
         if let Ok(Some(setup)) = Self::load(version_dir) {
+            // 自动补全：按模板比对，缺失字段自动补上
+            if Self::ensure_complete(version_dir).unwrap_or(false) {
+                // 补全后重新加载，返回完整数据
+                if let Ok(Some(refreshed)) = Self::load(version_dir) {
+                    return refreshed;
+                }
+            }
             return setup;
         }
         let setup = Self::from_version_json(version_dir, version_id)
@@ -189,63 +359,74 @@ impl VersionSetup {
                 custom_info: None,
                 display_type: None,
                 is_star: None,
+                indie_type: None,
+                window_title: None,
+                server_enter: None,
+                advance_jvm_args: None,
+                advance_game_args: None,
+                advance_run_cmd: None,
+                java_path: None,
+            memory_mode: None,
+            min_memory: None,
+            max_memory: None,
             });
         let _ = setup.save(version_dir);
         setup
     }
 
-    /// 更新单个个性化字段（不修改其他字段）
+    /// 更新个性化字段（仅更新非 None 的字段，其他保持不变）
     pub fn update_personalization(
         version_dir: &Path,
-        logo: Option<&str>,
-        custom_info: Option<&str>,
-        display_type: Option<i32>,
-        is_star: Option<bool>,
+        update: &PersonalizationUpdate,
     ) -> std::io::Result<()> {
         let path = Self::file_path(version_dir);
         let mut setup = if path.exists() {
-            Self::load(version_dir)?.unwrap_or_else(|| Self {
-                original_version: String::new(),
-                version_type: VersionType::Unknown,
-                forge_version: None,
-                neoforge_version: None,
-                fabric_version: None,
-                quilt_version: None,
-                optifine_version: None,
-                liteloader_version: None,
-                logo: None,
-                custom_info: None,
-                display_type: None,
-                is_star: None,
-            })
+            Self::load(version_dir)?.unwrap_or_else(|| Self::empty())
         } else {
-            Self {
-                original_version: String::new(),
-                version_type: VersionType::Unknown,
-                forge_version: None,
-                neoforge_version: None,
-                fabric_version: None,
-                quilt_version: None,
-                optifine_version: None,
-                liteloader_version: None,
-                logo: None,
-                custom_info: None,
-                display_type: None,
-                is_star: None,
-            }
+            Self::empty()
         };
 
-        if let Some(v) = logo {
-            setup.logo = Some(v.to_string());
+        if let Some(ref v) = update.logo {
+            setup.logo = Some(v.clone());
         }
-        if let Some(v) = custom_info {
-            setup.custom_info = Some(v.to_string());
+        if let Some(ref v) = update.custom_info {
+            setup.custom_info = Some(v.clone());
         }
-        if let Some(v) = display_type {
+        if let Some(v) = update.display_type {
             setup.display_type = Some(v);
         }
-        if let Some(v) = is_star {
+        if let Some(v) = update.is_star {
             setup.is_star = Some(v);
+        }
+        if let Some(v) = update.indie_type {
+            setup.indie_type = Some(v);
+        }
+        if let Some(ref v) = update.window_title {
+            setup.window_title = Some(v.clone());
+        }
+        if let Some(ref v) = update.server_enter {
+            setup.server_enter = Some(v.clone());
+        }
+        if let Some(ref v) = update.advance_jvm_args {
+            setup.advance_jvm_args = Some(v.clone());
+        }
+        if let Some(ref v) = update.advance_game_args {
+            setup.advance_game_args = Some(v.clone());
+        }
+        if let Some(ref v) = update.advance_run_cmd {
+            setup.advance_run_cmd = Some(v.clone());
+        }
+        if let Some(ref v) = update.java_path {
+            setup.java_path = Some(v.clone());
+        }
+        if let Some(ref v) = update.memory_mode {
+            setup.memory_mode = Some(v.clone());
+        }
+        if let Some(v) = update.min_memory {
+            setup.min_memory = Some(v);
+        }
+        if let Some(v) = update.max_memory {
+            setup.max_memory = Some(v);
         }
 
         setup.save_full(version_dir)
@@ -284,6 +465,16 @@ impl VersionSetup {
             custom_info: ini.get("CustomInfo").cloned(),
             display_type: ini.get("DisplayType").and_then(|s| s.parse::<i32>().ok()),
             is_star: ini.get("IsStar").map(|s| s.eq_ignore_ascii_case("true")),
+            indie_type: ini.get("IndieType").and_then(|s| s.parse::<i32>().ok()),
+            window_title: ini.get("WindowTitle").cloned(),
+            server_enter: ini.get("ServerEnter").cloned(),
+            advance_jvm_args: ini.get("AdvanceJvmArgs").cloned(),
+            advance_game_args: ini.get("AdvanceGameArgs").cloned(),
+            advance_run_cmd: ini.get("AdvanceRunCmd").cloned(),
+            java_path: ini.get("JavaPath").cloned(),
+            memory_mode: ini.get("MemoryMode").cloned(),
+            min_memory: ini.get("MinMemory").and_then(|s| s.parse::<u32>().ok()),
+            max_memory: ini.get("MaxMemory").and_then(|s| s.parse::<u32>().ok()),
         }))
     }
 
@@ -351,6 +542,16 @@ impl VersionSetup {
             custom_info: None,
             display_type: None,
             is_star: None,
+            indie_type: None,
+            window_title: None,
+            server_enter: None,
+            advance_jvm_args: None,
+            advance_game_args: None,
+            advance_run_cmd: None,
+            java_path: None,
+            memory_mode: None,
+            min_memory: None,
+            max_memory: None,
         })
     }
 }

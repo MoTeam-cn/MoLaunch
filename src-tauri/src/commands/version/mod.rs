@@ -7,6 +7,7 @@ pub mod launch;
 pub mod list;
 pub mod loaders;
 pub mod manage;
+pub mod mods;
 pub mod progress;
 pub mod types;
 

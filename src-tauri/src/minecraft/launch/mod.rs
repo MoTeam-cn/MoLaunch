@@ -66,6 +66,8 @@ pub fn build_launch_arguments(
     server_address: Option<&str>,
     server_port: Option<u32>,
     isolation_mode: u32,
+    extra_jvm_args: &[String],
+    extra_game_args: &[String],
 ) -> anyhow::Result<LaunchArguments> {
     let version_dir = game_dir.join("versions").join(version_id);
     let json_path = version_dir.join(format!("{}.json", version_id));
@@ -133,7 +135,7 @@ pub fn build_launch_arguments(
     );
 
     let jvm_args = build_jvm_args(
-        game_dir, version_id, &classpath, min_memory, max_memory, java_path,
+        game_dir, version_id, &classpath, min_memory, max_memory, java_path, extra_jvm_args,
     )?;
     let game_args = build_game_args(
         &json,
@@ -146,6 +148,7 @@ pub fn build_launch_arguments(
         window_height,
         server_address,
         server_port,
+        extra_game_args,
     )?;
 
     // 在 launch 前设置游戏语言为中文（写入有效目录，适配隔离模式）
@@ -285,6 +288,7 @@ fn build_jvm_args(
     min_memory: u32,
     max_memory: u32,
     java_path: &Path,
+    extra_jvm_args: &[String],
 ) -> anyhow::Result<Vec<String>> {
     let mut args = Vec::new();
 
@@ -302,6 +306,9 @@ fn build_jvm_args(
             args.push("-XX:+UseG1GC".to_string());
         }
     }
+
+    // 用户额外 JVM 参数（版本独立 > 全局，参考 PCL2 的 AdvanceJvm）
+    args.extend(extra_jvm_args.iter().cloned());
 
     args.push("-cp".to_string());
     args.push(classpath.to_string());
@@ -346,6 +353,7 @@ fn build_game_args(
     window_height: Option<u32>,
     server_address: Option<&str>,
     server_port: Option<u32>,
+    extra_game_args: &[String],
 ) -> anyhow::Result<Vec<String>> {
     let mut args = Vec::new();
 
@@ -394,6 +402,9 @@ fn build_game_args(
             final_args.push(port.to_string());
         }
     }
+
+    // 用户额外游戏参数（参考 PCL2 的 AdvanceGame）
+    final_args.extend(extra_game_args.iter().cloned());
 
     Ok(final_args)
 }

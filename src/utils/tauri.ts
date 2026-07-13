@@ -221,8 +221,42 @@ export interface VersionPersonalization {
   custom_info: string
   display_type: number
   is_star: boolean
+  indie_type: number
   version_type: string
   original_version: string
+  window_title: string
+  server_enter: string
+  advance_jvm_args: string
+  advance_game_args: string
+  advance_run_cmd: string
+  java_path: string
+  /** 内存模式（空=跟随全局, "auto"=自动, "custom"=自定义） */
+  memory_mode: string
+  /** 版本独立最小内存（MB，仅 custom 模式生效，0 表示未设置） */
+  min_memory: number
+  /** 版本独立最大内存（MB，仅 custom 模式生效，0 表示未设置） */
+  max_memory: number
+}
+
+/** 版本个性化字段更新（undefined 的字段不会被修改） */
+export interface PersonalizationUpdate {
+  logo?: string
+  customInfo?: string
+  displayType?: number
+  isStar?: boolean
+  indieType?: number
+  windowTitle?: string
+  serverEnter?: string
+  advanceJvmArgs?: string
+  advanceGameArgs?: string
+  advanceRunCmd?: string
+  javaPath?: string
+  /** 内存模式：传空字符串=跟随全局, "auto"=自动, "custom"=自定义 */
+  memoryMode?: string
+  /** 版本独立最小内存（MB） */
+  minMemory?: number
+  /** 版本独立最大内存（MB） */
+  maxMemory?: number
 }
 
 /**
@@ -237,20 +271,9 @@ export async function getVersionPersonalization(versionId: string): Promise<Vers
  */
 export async function updateVersionPersonalization(
   versionId: string,
-  options: {
-    logo?: string
-    customInfo?: string
-    displayType?: number
-    isStar?: boolean
-  },
+  update: PersonalizationUpdate,
 ): Promise<void> {
-  return await invoke<void>('update_version_personalization', {
-    versionId,
-    logo: options.logo,
-    customInfo: options.customInfo,
-    displayType: options.displayType,
-    isStar: options.isStar,
-  })
+  return await invoke<void>('update_version_personalization', { versionId, update })
 }
 
 /**
@@ -283,6 +306,70 @@ export async function exportLaunchScript(
  */
 export async function fixVersionFiles(versionId: string): Promise<void> {
   return await invoke<void>('fix_version_files', { versionId })
+}
+
+// ==================== Mod 管理 ====================
+
+/**
+ * 单个 Mod 信息
+ */
+export interface ModInfo {
+  /** 文件名（含扩展名） */
+  file_name: string
+  /** 启用时的文件名（去除 .disabled / .old 后缀） */
+  enabled_name: string
+  /** 是否启用 */
+  is_enabled: boolean
+  /** 文件大小（字节） */
+  size: number
+  /** 加载器类型（forge/fabric/neoforge/liteloader/unknown） */
+  loader_type: string
+}
+
+/**
+ * 判断版本是否可安装 Mod（含 Forge/Fabric/NeoForge/LiteLoader 或个性化分类为"可安装Mod"）
+ */
+export async function isVersionModable(versionId: string): Promise<boolean> {
+  return await invoke<boolean>('is_version_modable', { versionId })
+}
+
+/**
+ * 列出版本的 Mod
+ */
+export async function listMods(versionId: string): Promise<ModInfo[]> {
+  return await invoke<ModInfo[]>('list_mods', { versionId })
+}
+
+/**
+ * 启用/禁用 Mod
+ */
+export async function toggleMod(
+  versionId: string,
+  fileName: string,
+  enable: boolean,
+): Promise<void> {
+  return await invoke<void>('toggle_mod', { versionId, fileName, enable })
+}
+
+/**
+ * 删除 Mod
+ */
+export async function deleteMod(versionId: string, fileName: string): Promise<void> {
+  return await invoke<void>('delete_mod', { versionId, fileName })
+}
+
+/**
+ * 从外部文件安装 Mod（复制到 mods 目录）
+ */
+export async function installMod(versionId: string, sourcePath: string): Promise<void> {
+  return await invoke<void>('install_mod', { versionId, sourcePath })
+}
+
+/**
+ * 打开版本的 mods 目录（自动创建）
+ */
+export async function openModsDir(versionId: string): Promise<void> {
+  return await invoke<void>('open_mods_dir', { versionId })
 }
 
 /**

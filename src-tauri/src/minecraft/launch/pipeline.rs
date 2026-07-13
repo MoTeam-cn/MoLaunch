@@ -23,6 +23,8 @@ pub enum LaunchStage {
     ValidateFiles,
     /// 构建参数
     BuildArgs,
+    /// 启动前命令
+    PreLaunch,
     /// 解压Natives
     ExtractNatives,
     /// 启动进程
@@ -43,6 +45,7 @@ impl LaunchStage {
             LaunchStage::Login => 15.0,
             LaunchStage::ValidateFiles => 15.0,
             LaunchStage::BuildArgs => 2.0,
+            LaunchStage::PreLaunch => 1.0,
             LaunchStage::ExtractNatives => 2.0,
             LaunchStage::LaunchProcess => 2.0,
             LaunchStage::WaitWindow => 1.0,
@@ -58,6 +61,7 @@ impl LaunchStage {
             LaunchStage::Login => "登录验证",
             LaunchStage::ValidateFiles => "文件检查",
             LaunchStage::BuildArgs => "构建参数",
+            LaunchStage::PreLaunch => "启动前命令",
             LaunchStage::ExtractNatives => "解压原生库",
             LaunchStage::LaunchProcess => "启动进程",
             LaunchStage::WaitWindow => "等待窗口",
@@ -109,6 +113,8 @@ pub struct LaunchConfig {
     pub extra_jvm_args: Vec<String>,
     /// 额外游戏参数
     pub extra_game_args: Vec<String>,
+    /// 启动前执行命令（None=不执行）
+    pub pre_launch_cmd: Option<String>,
 }
 
 /// 启动结果
@@ -239,30 +245,21 @@ impl LaunchPipeline {
         message: impl Into<String>,
     ) {
         let mut progress = self.progress.write().await;
-        let total_weight: f64 = vec![
+        let stages = vec![
             LaunchStage::GetJava,
             LaunchStage::Login,
             LaunchStage::ValidateFiles,
             LaunchStage::BuildArgs,
+            LaunchStage::PreLaunch,
             LaunchStage::ExtractNatives,
             LaunchStage::LaunchProcess,
             LaunchStage::WaitWindow,
-        ]
-        .iter()
-        .map(|s| s.weight())
-        .sum();
+        ];
+        let total_weight: f64 = stages.iter().map(|s| s.weight()).sum();
 
         let mut completed_weight = 0.0;
-        for s in vec![
-            LaunchStage::GetJava,
-            LaunchStage::Login,
-            LaunchStage::ValidateFiles,
-            LaunchStage::BuildArgs,
-            LaunchStage::ExtractNatives,
-            LaunchStage::LaunchProcess,
-            LaunchStage::WaitWindow,
-        ] {
-            if s == stage {
+        for s in &stages {
+            if *s == stage {
                 completed_weight += s.weight() * stage_progress;
                 break;
             } else {
@@ -331,14 +328,32 @@ impl LaunchPipeline {
         self.update_progress(LaunchStage::BuildArgs, 1.0, "参数构建完成")
             .await;
 
-        // 阶段4: 解压Natives
+        // 检查取消
+        if *self.cancel_flag.lock().await {
+            return Err(LaunchError {
+                stage: LaunchStage::BuildArgs,
+                message: "启动已取消".to_string(),
+                is_user_facing: true,
+            });
+        }
+
+        // 阶段4: 启动前命令（advance_run_cmd，参考 PCL2 的 PreLaunch）
+        if self.config.pre_launch_cmd.is_some() {
+            self.update_progress(LaunchStage::PreLaunch, 0.0, "正在执行启动前命令...")
+                .await;
+            self.run_pre_launch().await?;
+            self.update_progress(LaunchStage::PreLaunch, 1.0, "启动前命令执行完成")
+                .await;
+        }
+
+        // 阶段5: 解压Natives
         self.update_progress(LaunchStage::ExtractNatives, 0.0, "正在解压原生库...")
             .await;
         self.extract_natives().await?;
         self.update_progress(LaunchStage::ExtractNatives, 1.0, "原生库解压完成")
             .await;
 
-        // 阶段5: 启动进程
+        // 阶段6: 启动进程
         self.update_progress(LaunchStage::LaunchProcess, 0.0, "正在启动游戏...")
             .await;
         let result = self.launch_process(&java_path, &launch_args).await?;
@@ -349,7 +364,7 @@ impl LaunchPipeline {
         )
         .await;
 
-        // 阶段6: 等待窗口 (监控进程)
+        // 阶段7: 等待窗口 (监控进程)
         self.update_progress(LaunchStage::WaitWindow, 0.0, "等待游戏加载...")
             .await;
         // 监控已在launch_process中启动
@@ -359,6 +374,54 @@ impl LaunchPipeline {
             .await;
 
         Ok(result)
+    }
+
+    /// 执行启动前命令（语法同 Windows cmd，不等待退出，失败仅记录日志）
+    async fn run_pre_launch(&self) -> Result<(), LaunchError> {
+        let cmd_str = match self.config.pre_launch_cmd.as_ref() {
+            Some(s) if !s.is_empty() => s.clone(),
+            _ => return Ok(()),
+        };
+        log_info!("[PreLaunch] Executing: {}", cmd_str);
+
+        #[cfg(target_os = "windows")]
+        let (program, args) = ("cmd", vec!["/C".to_string(), cmd_str.clone()]);
+        #[cfg(not(target_os = "windows"))]
+        let (program, args) = ("sh", vec!["-c".to_string(), cmd_str.clone()]);
+
+        let game_dir = self.config.game_dir.clone();
+        let result = tokio::task::spawn_blocking(move || {
+            let mut cmd = std::process::Command::new(program);
+            cmd.args(&args).current_dir(&game_dir);
+            #[cfg(target_os = "windows")]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+            }
+            cmd.output()
+        })
+        .await;
+
+        match result {
+            Ok(Ok(output)) => {
+                if !output.status.success() {
+                    log_info!(
+                        "[PreLaunch] Command exited with status: {}",
+                        output.status
+                    );
+                }
+                Ok(())
+            }
+            Ok(Err(e)) => {
+                log_info!("[PreLaunch] Failed to execute command: {}", e);
+                // 启动前命令失败不中断启动流程（与 PCL2 行为一致）
+                Ok(())
+            }
+            Err(e) => {
+                log_info!("[PreLaunch] Task spawn failed: {}", e);
+                Ok(())
+            }
+        }
     }
 
     /// 检测Java
@@ -547,6 +610,8 @@ impl LaunchPipeline {
             self.config.server_address.as_deref(),
             self.config.server_port,
             self.config.isolation_mode,
+            &self.config.extra_jvm_args,
+            &self.config.extra_game_args,
         )
         .map_err(|e| LaunchError {
             stage: LaunchStage::BuildArgs,

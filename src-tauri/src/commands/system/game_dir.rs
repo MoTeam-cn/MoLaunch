@@ -28,7 +28,7 @@ pub async fn open_path(path: String) -> Result<(), String> {
 }
 
 /// 跨平台打开路径的内部实现（文件夹不存在时自动创建，避免 explorer 回退打开文档库）
-fn open_path_impl(path: &str) -> Result<(), String> {
+pub fn open_path_impl(path: &str) -> Result<(), String> {
     let p = std::path::Path::new(path);
     if !p.exists() {
         // 路径不存在时自动创建文件夹（游戏子目录如 saves/mods 等可能尚未生成）

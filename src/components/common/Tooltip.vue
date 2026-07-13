@@ -121,6 +121,7 @@ onUnmounted(() => { if (timer) clearTimeout(timer) })
   width: max-content;
   max-width: 360px;
   word-break: break-word;
+  white-space: pre-line;
 }
 
 .tooltip-arrow {

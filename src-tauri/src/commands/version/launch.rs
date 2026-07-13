@@ -1,6 +1,7 @@
 //! 版本启动命令
 
 use crate::minecraft::launch::{self, AuthInfo, LaunchConfig, LaunchPipeline};
+use crate::minecraft::version::setup::VersionSetup;
 use crate::state::{resolve_game_dir, AppState};
 use crate::{log_error, log_info};
 use std::sync::Arc;
@@ -15,6 +16,20 @@ pub struct GameExitEvent {
     pub version_id: String,
     pub exit_code: i32,
     pub is_normal: bool,
+}
+
+/// 解析 "IP:Port" 字符串为 (address, port)，无端口时 port=None
+fn parse_server_enter(s: &str) -> (Option<String>, Option<u32>) {
+    let s = s.trim();
+    if s.is_empty() {
+        return (None, None);
+    }
+    if let Some((ip, port_str)) = s.rsplit_once(':') {
+        if let Ok(port) = port_str.parse::<u32>() {
+            return (Some(ip.to_string()), Some(port));
+        }
+    }
+    (Some(s.to_string()), None)
 }
 
 /// 启动游戏
@@ -39,6 +54,64 @@ pub async fn launch_game(
     let config = state.config.lock().await;
     let game_dir = resolve_game_dir(&config.game_dir);
 
+    // 读取版本独立设置（setup.ini）
+    let version_dir = game_dir.join("versions").join(&version_id);
+    let setup = VersionSetup::load_or_create(&version_dir, &version_id);
+
+    // Java 路径：前端传入 > 版本独立 > 自动检测
+    let resolved_java = java_path
+        .or_else(|| setup.java_path.clone().filter(|s| !s.is_empty()));
+
+    // 服务器：前端未传则用版本独立的 server_enter（"IP:Port" 格式需解析）
+    let (resolved_server_addr, resolved_server_port) =
+        if server_address.is_some() || server_port.is_some() {
+            (server_address, server_port)
+        } else if let Some(ref enter) = setup.server_enter {
+            if !enter.is_empty() {
+                parse_server_enter(enter)
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
+    // 额外参数：按空白拆分
+    let split_args = |s: &Option<String>| -> Vec<String> {
+        s.as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.split_whitespace().map(String::from).collect())
+            .unwrap_or_default()
+    };
+    let extra_jvm_args = split_args(&setup.advance_jvm_args);
+    let extra_game_args = split_args(&setup.advance_game_args);
+    let pre_launch_cmd = setup.advance_run_cmd.clone().filter(|s| !s.is_empty());
+
+    // 内存：版本独立设置 > 全局
+    // - setup.memory_mode = Some("auto") → 根据系统内存动态计算（版本独立自动）
+    // - setup.memory_mode = Some("custom") → 使用 setup.min_memory/max_memory
+    // - None / 空 / 其他 → 回退到全局 config.min_memory/max_memory
+    let (resolved_min_mem, resolved_max_mem) = match setup
+        .memory_mode
+        .as_deref()
+        .filter(|s| !s.is_empty())
+    {
+        Some("auto") => {
+            let sys_mem = crate::minecraft::system::get_system_memory();
+            let available_mb = (sys_mem.available / 1024 / 1024) as u32;
+            let suggested_max = std::cmp::min((available_mb as f64 * 0.75) as u32, 8192);
+            let suggested_max = std::cmp::max(suggested_max, 512);
+            let suggested_min = suggested_max / 2;
+            (suggested_min, suggested_max)
+        }
+        Some("custom") => {
+            let max = setup.max_memory.unwrap_or(config.max_memory);
+            let min = setup.min_memory.unwrap_or_else(|| max / 2);
+            (min, max)
+        }
+        _ => (config.min_memory, config.max_memory),
+    };
+
     // 构建认证信息（login_type 从前端传入，默认 Legacy）
     let auth_info = AuthInfo {
         username,
@@ -50,19 +123,25 @@ pub async fn launch_game(
 
     // 创建启动配置
     let launch_config = LaunchConfig {
-        game_dir,
+        game_dir: game_dir.clone(),
         version_id: version_id.clone(),
         auth_info: auth_info.clone(),
-        min_memory: config.min_memory,
-        max_memory: config.max_memory,
+        min_memory: resolved_min_mem,
+        max_memory: resolved_max_mem,
         window_width,
         window_height,
-        server_address,
-        server_port,
-        isolation_mode: config.isolation_mode,
-        java_path,
-        extra_jvm_args: Vec::new(),
-        extra_game_args: Vec::new(),
+        server_address: resolved_server_addr,
+        server_port: resolved_server_port,
+        // 版本独立隔离设置覆盖全局
+        isolation_mode: super::manage::resolve_isolation_mode(
+            &game_dir,
+            &version_id,
+            config.isolation_mode,
+        ),
+        java_path: resolved_java,
+        extra_jvm_args,
+        extra_game_args,
+        pre_launch_cmd,
     };
 
     // 释放锁，避免阻塞其他操作

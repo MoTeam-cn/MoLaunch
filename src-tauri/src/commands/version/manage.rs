@@ -1,6 +1,6 @@
 use crate::minecraft::isolation::{self, IsolationMode};
 use crate::minecraft::version::scan as version_scan;
-use crate::minecraft::version::setup::VersionSetup;
+use crate::minecraft::version::setup::{PersonalizationUpdate, VersionSetup};
 use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
 use crate::{log_error, log_info, log_warn};
@@ -62,8 +62,27 @@ pub async fn list_installed_versions_with_type(
     Ok(result)
 }
 
+/// 根据版本独立隔离设置和全局设置，解析最终使用的 isolation_mode
+///
+/// - indie_type=0 或 None：跟随全局（返回 global_mode）
+/// - indie_type=1：强制开启隔离（返回 4=IsolationAll）
+/// - indie_type=2：强制关闭隔离（返回 0=IsolationNone）
+pub fn resolve_isolation_mode(
+    game_dir: &std::path::Path,
+    version_id: &str,
+    global_mode: u32,
+) -> u32 {
+    let version_dir = game_dir.join("versions").join(version_id);
+    let setup = VersionSetup::load_or_create(&version_dir, version_id);
+    match setup.indie_type.unwrap_or(0) {
+        1 => 4, // 强制隔离 → IsolationAll
+        2 => 0, // 强制不隔离 → IsolationNone
+        _ => global_mode, // 跟随全局
+    }
+}
+
 /// Detect version type from directory
-fn detect_version_type_from_dir(game_dir: &std::path::Path, version_id: &str) -> VersionType {
+pub fn detect_version_type_from_dir(game_dir: &std::path::Path, version_id: &str) -> VersionType {
     let version_dir = game_dir.join("versions").join(version_id);
 
     // 1. 优先从 JSON 检测（检查libraries中的加载器）
@@ -176,9 +195,11 @@ pub async fn get_version_effective_dir(
 
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    let isolation_mode = config.isolation_mode;
+    let global_isolation_mode = config.isolation_mode;
     drop(config);
 
+    // 版本独立隔离设置覆盖全局
+    let isolation_mode = resolve_isolation_mode(&game_dir, &version_id, global_isolation_mode);
     let version_type = detect_version_type_from_dir(&game_dir, &version_id);
     let mode = IsolationMode::from_u32(isolation_mode);
     let effective_dir = isolation::get_effective_game_dir(
@@ -198,8 +219,27 @@ pub struct VersionPersonalization {
     pub custom_info: String,
     pub display_type: i32,
     pub is_star: bool,
+    pub indie_type: i32,
     pub version_type: String,
     pub original_version: String,
+    /// 游戏窗口标题（空=跟随全局）
+    pub window_title: String,
+    /// 自动进入服务器（"IP:Port"，空=不自动进入）
+    pub server_enter: String,
+    /// 额外 JVM 参数（空=跟随全局）
+    pub advance_jvm_args: String,
+    /// 额外游戏参数（空=跟随全局）
+    pub advance_game_args: String,
+    /// 启动前执行命令（空=跟随全局）
+    pub advance_run_cmd: String,
+    /// 版本独立 Java 路径（空=自动选择）
+    pub java_path: String,
+    /// 内存模式（空=跟随全局, "auto"=自动, "custom"=自定义）
+    pub memory_mode: String,
+    /// 版本独立最小内存（MB，仅 custom 模式生效）
+    pub min_memory: u32,
+    /// 版本独立最大内存（MB，仅 custom 模式生效）
+    pub max_memory: u32,
 }
 
 /// 获取版本个性化设置
@@ -222,20 +262,27 @@ pub async fn get_version_personalization(
         custom_info: setup.custom_info.unwrap_or_default(),
         display_type: setup.display_type.unwrap_or(0),
         is_star: setup.is_star.unwrap_or(false),
+        indie_type: setup.indie_type.unwrap_or(0),
         version_type: version_type_to_string(&setup.version_type),
         original_version: setup.original_version,
+        window_title: setup.window_title.unwrap_or_default(),
+        server_enter: setup.server_enter.unwrap_or_default(),
+        advance_jvm_args: setup.advance_jvm_args.unwrap_or_default(),
+        advance_game_args: setup.advance_game_args.unwrap_or_default(),
+        advance_run_cmd: setup.advance_run_cmd.unwrap_or_default(),
+        java_path: setup.java_path.unwrap_or_default(),
+        memory_mode: setup.memory_mode.unwrap_or_default(),
+        min_memory: setup.min_memory.unwrap_or(0),
+        max_memory: setup.max_memory.unwrap_or(0),
     })
 }
 
-/// 更新版本个性化字段
+/// 更新版本个性化字段（传 null/undefined 的字段不会被修改）
 #[tauri::command]
 pub async fn update_version_personalization(
     state: State<'_, AppState>,
     version_id: String,
-    logo: Option<String>,
-    custom_info: Option<String>,
-    display_type: Option<i32>,
-    is_star: Option<bool>,
+    update: PersonalizationUpdate,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
     log_info!("Updating personalization for version: {}", version_id);
@@ -245,14 +292,7 @@ pub async fn update_version_personalization(
     drop(config);
 
     let version_dir = game_dir.join("versions").join(&version_id);
-    VersionSetup::update_personalization(
-        &version_dir,
-        logo.as_deref(),
-        custom_info.as_deref(),
-        display_type,
-        is_star,
-    )
-    .map_err(|e| {
+    VersionSetup::update_personalization(&version_dir, &update).map_err(|e| {
         log_error!("Failed to update personalization: {}", e);
         e.to_string()
     })?;
@@ -278,13 +318,44 @@ pub async fn export_launch_script(
 
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    let isolation_mode = config.isolation_mode;
-    let min_memory = config.min_memory;
-    let max_memory = config.max_memory;
+    let global_isolation_mode = config.isolation_mode;
+
+    // 读取版本独立设置（setup.ini）
+    let version_dir = game_dir.join("versions").join(&version_id);
+    let setup = VersionSetup::load_or_create(&version_dir, &version_id);
+
+    // 内存：版本独立设置 > 全局
+    let min_memory;
+    let max_memory;
+    match setup.memory_mode.as_deref().filter(|s| !s.is_empty()) {
+        Some("auto") => {
+            let sys_mem = crate::minecraft::system::get_system_memory();
+            let available_mb = (sys_mem.available / 1024 / 1024) as u32;
+            let suggested_max = std::cmp::min((available_mb as f64 * 0.75) as u32, 8192);
+            let suggested_max = std::cmp::max(suggested_max, 512);
+            min_memory = suggested_max / 2;
+            max_memory = suggested_max;
+        }
+        Some("custom") => {
+            max_memory = setup.max_memory.unwrap_or(config.max_memory);
+            min_memory = setup.min_memory.unwrap_or_else(|| max_memory / 2);
+        }
+        _ => {
+            min_memory = config.min_memory;
+            max_memory = config.max_memory;
+        }
+    }
     drop(config);
 
+    // 版本独立隔离设置覆盖全局
+    let isolation_mode = resolve_isolation_mode(&game_dir, &version_id, global_isolation_mode);
+
+    // Java 路径：前端传入 > 版本独立 > 自动检测
+    let resolved_java = java_path
+        .or_else(|| setup.java_path.clone().filter(|s| !s.is_empty()));
+
     // 解析 Java 路径：优先用户指定 → 否则按 MC 版本自动检测 → 都失败则报错
-    let java_path_buf = resolve_java_path(&game_dir, &version_id, java_path.as_deref())
+    let java_path_buf = resolve_java_path(&game_dir, &version_id, resolved_java.as_deref())
         .await
         .map_err(|e| {
             log_error!("Failed to resolve Java path for script: {}", e);
@@ -292,6 +363,31 @@ pub async fn export_launch_script(
         })?;
     let java_str = java_path_buf.to_string_lossy().replace('/', "\\");
     log_info!("Script will use Java: {}", java_str);
+
+    // 服务器：从版本独立 server_enter 解析
+    let (server_addr, server_port) = setup
+        .server_enter
+        .as_deref()
+        .filter(|s| !s.is_empty())
+        .map(|s| {
+            if let Some((ip, port_str)) = s.rsplit_once(':') {
+                if let Ok(port) = port_str.parse::<u32>() {
+                    return (Some(ip.to_string()), Some(port));
+                }
+            }
+            (Some(s.to_string()), None)
+        })
+        .unwrap_or((None, None));
+
+    // 额外参数：按空白拆分
+    let split_args = |s: &Option<String>| -> Vec<String> {
+        s.as_deref()
+            .filter(|s| !s.is_empty())
+            .map(|s| s.split_whitespace().map(String::from).collect())
+            .unwrap_or_default()
+    };
+    let extra_jvm_args = split_args(&setup.advance_jvm_args);
+    let extra_game_args = split_args(&setup.advance_game_args);
 
     // 构建认证信息（导出脚本时使用占位符，避免泄露真实 token）
     let auth_info = crate::minecraft::launch::AuthInfo {
@@ -312,9 +408,11 @@ pub async fn export_launch_script(
         max_memory,
         None,
         None,
-        None,
-        None,
+        server_addr.as_deref(),
+        server_port,
         isolation_mode,
+        &extra_jvm_args,
+        &extra_game_args,
     )
     .map_err(|e| {
         log_error!("Failed to build launch arguments: {}", e);
@@ -353,6 +451,14 @@ pub async fn export_launch_script(
     // 切换到游戏目录
     script.push_str(&format!("cd /D \"{}\"\n", game_dir_display));
     script.push('\n');
+    // 启动前命令（advance_run_cmd，语法与 cmd 一致）
+    if let Some(ref cmd) = setup.advance_run_cmd {
+        if !cmd.is_empty() {
+            script.push_str("REM 启动前命令\n");
+            script.push_str(cmd);
+            script.push_str("\n\n");
+        }
+    }
     // Java 启动命令（使用绝对路径，不依赖系统 PATH）
     script.push_str(&format!(
         "\"{}\" {} {} {}\n",
