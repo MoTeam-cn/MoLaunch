@@ -445,6 +445,20 @@ impl VersionSetup {
             setup.advance_game_args = Some(v.clone());
         }
         if let Some(ref v) = update.advance_run_cmd {
+            // 安全检测：记录危险字符警告（CWE-78，不阻止保存）
+            // 这些字符可能被用于命令注入，恶意整合包可借此实现 RCE
+            if v.contains('&')
+                || v.contains('|')
+                || v.contains('>')
+                || v.contains('<')
+                || v.contains('`')
+                || v.contains("$(")
+            {
+                crate::log_warn!(
+                    "[Setup] advance_run_cmd contains potentially dangerous characters: {:?}",
+                    v
+                );
+            }
             setup.advance_run_cmd = Some(v.clone());
         }
         if let Some(ref v) = update.java_path {

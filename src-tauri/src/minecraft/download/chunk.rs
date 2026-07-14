@@ -247,6 +247,11 @@ async fn download_chunk(
     let mut file = std::fs::File::create(part_path)?;
     let mut downloaded: u64 = 0;
 
+    // 单分片字节数上限：期望为 end-start+1，允许 2 倍冗余，
+    // 防止被劫持镜像源在 Range 请求中返回超量数据导致磁盘耗尽
+    let expected_chunk_bytes = end.saturating_sub(start).saturating_add(1);
+    let chunk_byte_limit = expected_chunk_bytes.saturating_mul(2);
+
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { e.into() })?;
         let chunk_len = chunk.len() as u64;
@@ -286,6 +291,15 @@ async fn download_chunk(
             let total_chunk_bytes: u64 = chunk_progress.iter().map(|c| *c.lock().unwrap()).sum();
             let mut p = fp.lock().unwrap();
             p.downloaded_bytes = total_chunk_bytes;
+        }
+
+        // max_bytes 上限校验，防止被劫持镜像源返回超量数据导致磁盘耗尽
+        if downloaded > chunk_byte_limit {
+            return Err(format!(
+                "Chunk {} download size exceeded limit: {} > {}",
+                chunk_index, downloaded, chunk_byte_limit
+            )
+            .into());
         }
     }
 

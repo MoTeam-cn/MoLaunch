@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter};
 
-use crate::log_info;
+use crate::{log_info, log_warn};
 use crate::minecraft::sources::{build_replace_urls, DownloadSourceMode};
 
 /// Mojang Java Runtime 索引 URL（官方）
@@ -252,23 +252,71 @@ pub async fn download_java_runtime(
         let download_info = &file.downloads.as_ref().unwrap().raw;
         let local_path = runtime_dir.join(path_str);
 
+        // 校验路径穿越：manifest 来自远程，必须确保最终路径仍在 runtime_dir 内
+        // 1. 拒绝显式包含 ".." 的路径
+        if path_str.contains("..") {
+            return Err(format!(
+                "Path traversal detected in manifest path: {}",
+                path_str
+            ));
+        }
+        // 2. canonicalize 校验最终路径父目录仍位于 runtime_dir 内
+        let canonical_base = runtime_dir
+            .canonicalize()
+            .unwrap_or_else(|_| runtime_dir.to_path_buf());
+        if let Some(parent) = local_path.parent() {
+            if let Ok(canonical_parent) = parent.canonicalize() {
+                if !canonical_parent.starts_with(&canonical_base) {
+                    return Err(format!(
+                        "Path traversal detected: {} is outside runtime dir",
+                        path_str
+                    ));
+                }
+            }
+        }
+
         // 跳过已存在且校验通过的文件（断点续传）
         if local_path.exists() {
             if let Ok(meta) = std::fs::metadata(&local_path) {
                 if meta.len() == download_info.size {
-                    // 尺寸匹配，跳过（简化校验，不做 sha1 全量校验）
-                    completed += 1;
-                    downloaded_bytes += download_info.size;
-                    emit_progress(
-                        app,
-                        "downloading",
-                        completed,
-                        total_files,
-                        downloaded_bytes,
-                        total_bytes,
-                        &format!("已跳过: {}", path_str),
-                    );
-                    continue;
+                    // 尺寸匹配后再做 SHA1 校验，避免攻击者预先放置任意内容绕过
+                    let sha1_ok = if download_info.sha1.is_empty() {
+                        true
+                    } else {
+                        match std::fs::read(&local_path) {
+                            Ok(existing_bytes) => {
+                                verify_bytes_sha1(
+                                    &existing_bytes,
+                                    &download_info.sha1,
+                                    path_str,
+                                )
+                                .is_ok()
+                            }
+                            Err(e) => {
+                                log_warn!(
+                                    "[JavaDownload] 读取已存在文件失败，重新下载: {}: {}",
+                                    path_str,
+                                    e
+                                );
+                                false
+                            }
+                        }
+                    };
+                    if sha1_ok {
+                        completed += 1;
+                        downloaded_bytes += download_info.size;
+                        emit_progress(
+                            app,
+                            "downloading",
+                            completed,
+                            total_files,
+                            downloaded_bytes,
+                            total_bytes,
+                            &format!("已跳过: {}", path_str),
+                        );
+                        continue;
+                    }
+                    // SHA1 不匹配，继续下载覆盖
                 }
             }
         }
@@ -297,6 +345,12 @@ pub async fn download_java_runtime(
                         match resp.bytes().await {
                             Ok(bytes) => {
                                 if bytes.len() as u64 == download_info.size {
+                                    // 写入前校验 SHA1，防止镜像源返回篡改内容
+                                    verify_bytes_sha1(
+                                        &bytes,
+                                        &download_info.sha1,
+                                        path_str,
+                                    )?;
                                     std::fs::write(&local_path, &bytes).map_err(|e| {
                                         format!("写入文件失败: {}: {}", local_path.display(), e)
                                     })?;
@@ -473,4 +527,35 @@ fn emit_progress(
             },
         );
     }
+}
+
+/// 计算字节的 SHA1，返回小写十六进制字符串
+fn compute_sha1_hex(bytes: &[u8]) -> String {
+    use sha1::Digest;
+    let mut hasher = sha1::Sha1::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
+/// 校验字节的 SHA1，`expected_sha1` 为空则跳过（返回 Ok）
+fn verify_bytes_sha1(
+    bytes: &[u8],
+    expected_sha1: &str,
+    path_str: &str,
+) -> Result<(), String> {
+    if expected_sha1.is_empty() {
+        return Ok(());
+    }
+    let computed = compute_sha1_hex(bytes);
+    if computed.to_lowercase() != expected_sha1.to_lowercase() {
+        log_warn!(
+            "[JavaDownload] SHA1 mismatch for {}: expected {}, got {}",
+            path_str,
+            expected_sha1,
+            computed
+        );
+        return Err(format!("SHA1 verification failed for {}", path_str));
+    }
+    log_info!("[JavaDownload] SHA1 verified for {}", path_str);
+    Ok(())
 }

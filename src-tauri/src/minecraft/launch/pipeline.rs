@@ -394,7 +394,17 @@ impl LaunchPipeline {
             Some(s) if !s.is_empty() => s.clone(),
             _ => return Ok(()),
         };
-        log_info!("[PreLaunch] Executing: {}", cmd_str);
+
+        // 安全检测：检查命令字符串中的危险字符/关键词（仅警告，不阻止执行）
+        // 保留底层执行方式（cmd /C 或 sh -c）以维持向后兼容
+        match validate_pre_launch_cmd(&cmd_str) {
+            Err(reason) => log_warn!(
+                "PreLaunch executing command: {} (warning: contains potentially dangerous characters: {})",
+                cmd_str,
+                reason
+            ),
+            Ok(()) => log_warn!("PreLaunch executing command: {}", cmd_str),
+        }
 
         #[cfg(target_os = "windows")]
         let (program, args) = ("cmd", vec!["/C".to_string(), cmd_str.clone()]);
@@ -910,7 +920,14 @@ impl LaunchPipeline {
                             if let Some(path) = artifact["path"].as_str() {
                                 let jar_path = self.config.game_dir.join("libraries").join(path);
                                 if jar_path.exists() {
-                                    self.extract_native_jar(&jar_path, &natives_dir).await?;
+                                    let jar_sha1 = artifact["sha1"].as_str();
+                                    log_info!(
+                                        "[Natives] Processing native JAR: {} (expected sha1: {:?})",
+                                        jar_path.display(),
+                                        jar_sha1
+                                    );
+                                    self.extract_native_jar(&jar_path, &natives_dir, jar_sha1)
+                                        .await?;
                                 }
                             }
                         }
@@ -946,7 +963,14 @@ impl LaunchPipeline {
                             if let Some(path) = lib["downloads"]["artifact"]["path"].as_str() {
                                 let jar_path = self.config.game_dir.join("libraries").join(path);
                                 if jar_path.exists() {
-                                    self.extract_native_jar(&jar_path, &natives_dir).await?;
+                                    let jar_sha1 = lib["downloads"]["artifact"]["sha1"].as_str();
+                                    log_info!(
+                                        "[Natives] Processing native JAR: {} (expected sha1: {:?})",
+                                        jar_path.display(),
+                                        jar_sha1
+                                    );
+                                    self.extract_native_jar(&jar_path, &natives_dir, jar_sha1)
+                                        .await?;
                                 }
                             }
                         }
@@ -966,17 +990,61 @@ impl LaunchPipeline {
     }
 
     /// 解压单个native jar
+    ///
+    /// `expected_sha1` 为版本 JSON 中记录的 JAR 文件 SHA1（可选）。
+    /// - 若提供：先校验 JAR 文件 SHA1，匹配才解压；不匹配则跳过提取并记录警告。
+    /// - 若为 None：记录警告（无法校验），仍按原逻辑解压。
+    /// 每个提取出的 DLL/SO/DYLIB 会计算并记录其 SHA1，便于审计。
     async fn extract_native_jar(
         &self,
         jar_path: &PathBuf,
         natives_dir: &PathBuf,
+        expected_sha1: Option<&str>,
     ) -> Result<(), LaunchError> {
         let jar_path = jar_path.clone();
         let natives_dir = natives_dir.clone();
+        let expected_sha1 = expected_sha1.map(|s| s.to_string());
 
         tokio::task::spawn_blocking(move || {
+            use sha1::Digest;
             use std::fs::File;
             use std::io::Read;
+
+            // SHA1 校验：如果提供了预期 SHA1，先校验 JAR 文件完整性（CWE-494/CWE-345）
+            if let Some(ref expected) = expected_sha1 {
+                let jar_bytes = match std::fs::read(&jar_path) {
+                    Ok(b) => b,
+                    Err(e) => return Err(format!("读取jar文件失败: {}", e)),
+                };
+                let mut hasher = sha1::Sha1::new();
+                hasher.update(&jar_bytes);
+                let actual = hex::encode(hasher.finalize());
+                if actual.eq_ignore_ascii_case(expected) {
+                    log_info!(
+                        "[Natives] JAR SHA1 verified: {} (sha1={})",
+                        jar_path.display(),
+                        actual
+                    );
+                } else {
+                    log_warn!(
+                        "[Natives] JAR SHA1 mismatch for {}: expected={}, actual={} — skipping extraction",
+                        jar_path.display(),
+                        expected,
+                        actual
+                    );
+                    return Ok(());
+                }
+            } else {
+                log_warn!(
+                    "[Natives] No expected SHA1 for JAR {}, skipping verification",
+                    jar_path.display()
+                );
+            }
+
+            log_info!(
+                "[Natives] Extracting native JAR: {}",
+                jar_path.display()
+            );
 
             let file = File::open(&jar_path).map_err(|e| format!("打开jar失败: {}", e))?;
             let mut archive =
@@ -1002,8 +1070,20 @@ impl LaunchPipeline {
                         .read_to_end(&mut buffer)
                         .map_err(|e| format!("读取文件失败: {}", e))?;
 
-                    std::fs::write(&out_path, buffer)
+                    // 计算提取文件的 SHA1 用于审计日志
+                    let mut hasher = sha1::Sha1::new();
+                    hasher.update(&buffer);
+                    let file_sha1 = hex::encode(hasher.finalize());
+
+                    std::fs::write(&out_path, &buffer)
                         .map_err(|e| format!("写入文件失败: {}", e))?;
+
+                    log_info!(
+                        "[Natives] Extracted: {} (size={}, sha1={})",
+                        out_path.display(),
+                        buffer.len(),
+                        file_sha1
+                    );
                 }
             }
 
@@ -1239,6 +1319,32 @@ impl LaunchPipeline {
                 .collect(),
         })
     }
+}
+
+/// 检测 PreLaunch 命令字符串中的危险字符/关键词。
+/// 返回 `Err(reason)` 表示检测到危险模式（reason 为具体原因），`Ok(())` 表示未检测到。
+/// 注意：仅用于日志警告，不阻止命令执行（保持向后兼容，用户可能确实需要这些命令）。
+fn validate_pre_launch_cmd(cmd: &str) -> Result<(), String> {
+    // 命令分隔符：&、&&、|
+    if cmd.contains('&') || cmd.contains('|') {
+        return Err("command separator (& or |)".to_string());
+    }
+    // 重定向：>、<
+    if cmd.contains('>') || cmd.contains('<') {
+        return Err("redirection (> or <)".to_string());
+    }
+    // 命令替换：反引号、$(
+    if cmd.contains('`') || cmd.contains("$(") {
+        return Err("command substitution (` or $()".to_string());
+    }
+    // 常见攻击载荷关键词（不区分大小写）
+    let lower = cmd.to_lowercase();
+    for keyword in ["powershell", "curl", "wget", "iex", "invoke-"] {
+        if lower.contains(keyword) {
+            return Err(format!("suspicious keyword: {}", keyword));
+        }
+    }
+    Ok(())
 }
 
 /// 快捷启动函数

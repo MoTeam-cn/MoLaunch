@@ -257,6 +257,12 @@ pub async fn install_mod(
     source_path: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
+
+    // 安全校验：源路径不能包含 ..
+    if source_path.contains("..") {
+        return Err("源路径不能包含 ..".to_string());
+    }
+
     log_info!("Installing mod to version {}", version_id);
 
     let mods_dir = get_mods_dir(&state, &version_id).await?;
@@ -270,6 +276,9 @@ pub async fn install_mod(
     }
 
     let src = std::path::Path::new(&source_path);
+    if !src.is_absolute() {
+        return Err("源路径必须是绝对路径".to_string());
+    }
     if !src.exists() {
         return Err(format!("源文件不存在: {}", source_path));
     }
@@ -297,6 +306,8 @@ pub async fn install_mod(
     if dst.exists() {
         return Err(format!("Mods 目录已存在同名文件: {}", clean_name));
     }
+
+    log_info!("Installing mod from {} to {}", source_path, dst.display());
 
     std::fs::copy(src, &dst).map_err(|e| {
         log_error!("Failed to copy mod: {}", e);

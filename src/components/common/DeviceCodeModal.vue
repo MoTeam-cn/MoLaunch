@@ -4,7 +4,7 @@
  * 支持 Web Auth Code Flow（官方 ID）和 Device Code Flow（自定义 ID）
  */
 
-import { computed, watch, onUnmounted } from 'vue'
+import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { open } from '@tauri-apps/plugin-shell'
 import { useAuthStore } from '@/stores/auth'
@@ -31,12 +31,41 @@ const stepIndex = computed(() => {
 
 const isWebFlow = computed(() => authStore.msFlow === 'web')
 
+// verification_uri 白名单，防止钓鱼替换
+const ALLOWED_URIS = [
+  'https://microsoft.com/link',
+  'https://login.microsoftonline.com',
+  'https://login.live.com',
+  'https://www.microsoft.com/link',
+]
+// 打开登录页失败/被拦截时的提示信息
+const uriError = ref('')
+
 async function copyToClipboard(text: string) {
   try { await navigator.clipboard.writeText(text) } catch { /* ignore */ }
 }
 
 async function openBrowser(url: string) {
   try { await open(url) } catch { /* ignore */ }
+}
+
+/** 用户主动点击：打开 Microsoft 登录页（带白名单校验） */
+function openLoginUrl() {
+  if (!authStore.deviceCodeInfo) return
+  const uri = authStore.deviceCodeInfo.verification_uri
+  const isAllowed = ALLOWED_URIS.some(allowed => uri === allowed || uri.startsWith(allowed + '/'))
+  if (!isAllowed) {
+    uriError.value = '登录地址不在受信任白名单内，已拦截以防止钓鱼跳转'
+    return
+  }
+  uriError.value = ''
+  openBrowser(uri)
+}
+
+/** 用户主动点击：复制设备码到剪贴板 */
+function copyCode() {
+  if (!authStore.deviceCodeInfo) return
+  copyToClipboard(authStore.deviceCodeInfo.user_code)
 }
 
 function handleCancel() { authStore.cancelMsLogin(); emit('close') }
@@ -47,7 +76,9 @@ watch(() => props.visible, async (val) => {
 })
 
 watch(() => authStore.deviceCodeInfo, (info) => {
-  if (info) { copyToClipboard(info.user_code); openBrowser(info.verification_uri) }
+  // 不再自动复制 user_code 或自动打开 verification_uri
+  // 改为用户主动点击按钮触发，避免剪贴板嗅探与钓鱼跳转
+  if (info) { uriError.value = '' }
 })
 
 watch(() => authStore.msLoginStatus, (status) => {
@@ -92,16 +123,17 @@ onUnmounted(() => authStore.cancelMsLogin())
             <!-- Device Code Flow: 显示设备码 -->
             <div v-else-if="authStore.deviceCodeInfo" class="space-y-3">
               <div class="text-center">
-                <p class="mb-2 text-sm text-gray-600">请在打开的网页中输入以下代码：</p>
+                <p class="mb-2 text-sm text-gray-600">点击下方按钮打开 Microsoft 登录页，并输入以下代码：</p>
                 <div class="my-3 select-all rounded-lg bg-gray-100 py-3 text-2xl font-bold tracking-widest text-gray-900">
                   {{ authStore.deviceCodeInfo.user_code }}
                 </div>
-                <p class="text-xs text-gray-400">代码已自动复制到剪贴板</p>
+                <p class="text-xs text-gray-400">请手动点击按钮复制代码并打开网页</p>
               </div>
               <div class="flex gap-2">
-                <button class="btn-primary flex-1 rounded-lg px-4 py-2 text-sm font-medium" @click="openBrowser(authStore.deviceCodeInfo!.verification_uri)">重新打开网页</button>
-                <button class="btn-secondary rounded-lg px-4 py-2 text-sm font-medium" @click="copyToClipboard(authStore.deviceCodeInfo!.user_code)">复制代码</button>
+                <button class="btn-primary flex-1 rounded-lg px-4 py-2 text-sm font-medium" @click="openLoginUrl">点击打开 Microsoft 登录页</button>
+                <button class="btn-secondary rounded-lg px-4 py-2 text-sm font-medium" @click="copyCode">复制设备码</button>
               </div>
+              <p v-if="uriError" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ uriError }}</p>
               <div class="flex items-center justify-center gap-2 text-sm text-gray-500">
                 <div class="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-500" />
                 <span>等待授权中...</span>

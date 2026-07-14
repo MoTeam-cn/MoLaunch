@@ -129,7 +129,7 @@ async function handleExportScript() {
     if (!savePath) return
     await tauri.exportLaunchScript(selectedId.value, user.name, user.uuid, user.access_token, user.login_type, javaStore.javaPath || null, savePath)
     showSuccess('启动脚本已导出')
-    await tauri.openPath(savePath.replace(/[\\/][^\\/]+$/, ''))
+    showWarning('⚠️ 该脚本包含您的访问令牌，请妥善保管，请勿分享')
   } catch (e) { showError('导出失败：' + String(e)) }
 }
 

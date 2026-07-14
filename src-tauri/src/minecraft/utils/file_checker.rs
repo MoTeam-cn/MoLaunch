@@ -1,5 +1,6 @@
 //! File verification module - SHA1/MD5/SHA256/file size checking
 
+use crate::log_warn;
 use serde::{Deserialize, Serialize};
 use std::io::Read;
 use std::path::Path;
@@ -70,6 +71,22 @@ impl FileChecker {
         };
 
         let file_size = metadata.len() as i64;
+
+        // 无元数据不可跳过：当 actual_size 为 0（未知大小）且无哈希时，
+        // 仅凭"文件存在"不足以通过校验，避免攻击者预先放置任意内容绕过。
+        // 返回 Some(error) 表示校验失败，调用方需重新下载。
+        if self.actual_size == 0
+            && (self.hash.is_none() || self.hash.as_ref().map(|h| h.is_empty()).unwrap_or(true))
+        {
+            log_warn!(
+                "File check failed due to missing metadata, cannot verify: {}",
+                local_path
+            );
+            return Some(format!(
+                "Cannot verify file due to missing metadata (size and hash unknown): {}",
+                local_path
+            ));
+        }
 
         // actual_size 为 0 时跳过大小校验（未知大小的文件）
         if self.actual_size > 0 && self.actual_size != file_size {

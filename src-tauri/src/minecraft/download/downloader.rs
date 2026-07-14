@@ -14,6 +14,9 @@ use super::super::utils::file_checker::FileChecker;
 use super::rate_limiter::RateLimiter;
 use super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
 
+/// 未校验下载流的最大字节数上限，防止被劫持镜像源返回无限流导致磁盘耗尽
+const MAX_UNVERIFIED_BYTES: u64 = 2 * 1024 * 1024 * 1024; // 2 GiB
+
 /// 下载单个文件（统一逻辑：顺序尝试 URL，超时自动切换，大文件分片下载）
 pub async fn download_single(
     client: &reqwest::Client,
@@ -147,6 +150,7 @@ pub async fn download_single(
                 client,
                 url,
                 &task.local_path,
+                file_size,
                 rate_limiter.clone(),
                 timeout,
                 progress.clone(),
@@ -210,6 +214,7 @@ async fn download_from_url(
     client: &reqwest::Client,
     url: &str,
     local_path: &str,
+    expected_size: u64,
     rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
     timeout: Duration,
     _progress: Option<Arc<StdMutex<GlobalProgress>>>,
@@ -223,6 +228,13 @@ async fn download_from_url(
     let total_size = response.content_length().unwrap_or(0);
     let mut downloaded: u64 = 0;
     let start_time = Instant::now();
+
+    // 下载流字节数上限：已知期望大小时允许 2 倍冗余，否则使用绝对上限
+    let byte_limit = if expected_size > 0 {
+        expected_size.saturating_mul(2)
+    } else {
+        MAX_UNVERIFIED_BYTES
+    };
 
     let mut stream = response.bytes_stream();
     let mut file = std::fs::File::create(local_path)?;
@@ -256,6 +268,15 @@ async fn download_from_url(
         } else {
             file.write_all(&chunk)?;
             downloaded += chunk_size;
+        }
+
+        // max_bytes 上限校验，防止被劫持镜像源返回无限流导致磁盘耗尽
+        if downloaded > byte_limit {
+            return Err(format!(
+                "Download size exceeded limit: {} > {}",
+                downloaded, byte_limit
+            )
+            .into());
         }
     }
 

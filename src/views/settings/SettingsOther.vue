@@ -100,7 +100,7 @@ onMounted(async () => {
         </div>
         <div class="px-5 py-3 flex items-center justify-between">
           <span class="text-sm text-gray-500">设备 ID</span>
-          <span class="text-sm text-gray-900 font-mono">{{ sdkStore.deviceId || '未获取' }}</span>
+          <span class="text-sm text-gray-900 font-mono">{{ sdkStore.deviceId ? sdkStore.deviceId.substring(0, 4) + '****' : '未获取' }}</span>
         </div>
       </div>
     </div>

@@ -57,7 +57,7 @@ const activeCape = computed(() => info.value?.capes.find(c => c.state === 'ACTIV
 const activeSkin = computed(() => info.value?.skins.find(s => s.state === 'ACTIVE') ?? info.value?.skins[0] ?? null)
 
 async function loadInfo() {
-  console.log('[SkinManager] loadInfo started, isMicrosoft:', isMicrosoft.value)
+  if (import.meta.env.DEV) console.log('[SkinManager] loadInfo started, isMicrosoft:', isMicrosoft.value)
   loading.value = true
   skinDataUrl.value = null
   capeDataUrl.value = null
@@ -71,7 +71,7 @@ async function loadInfo() {
     selectedLocalSkin.value = getLocalSkinName(uuid.value) || entry.name
     info.value = null
     loading.value = false
-    console.log('[SkinManager] offline account, using local skin:', entry.name)
+    if (import.meta.env.DEV) console.log('[SkinManager] offline account, using local skin:', entry.name)
     return
   }
 
@@ -82,7 +82,7 @@ async function loadInfo() {
   // 1. 获取皮肤/披风信息
   try {
     info.value = await getSkinCapeInfo()
-    console.log('[SkinManager] getSkinCapeInfo ok:', info.value)
+    if (import.meta.env.DEV) console.log('[SkinManager] getSkinCapeInfo ok:', info.value)
   } catch (e) {
     console.error('[SkinManager] getSkinCapeInfo failed:', e)
     showError(`获取皮肤信息失败: ${e}`)
@@ -91,7 +91,7 @@ async function loadInfo() {
   // 2. 下载皮肤 PNG 全图用于 3D 预览
   try {
     skinDataUrl.value = await downloadSkinPng()
-    console.log('[SkinManager] downloadSkinPng ok, length:', skinDataUrl.value?.length)
+    if (import.meta.env.DEV) console.log('[SkinManager] downloadSkinPng ok, length:', skinDataUrl.value?.length)
   } catch (e) {
     console.error('[SkinManager] downloadSkinPng failed:', e)
   }
@@ -99,7 +99,7 @@ async function loadInfo() {
   // 3. 下载披风 PNG（可能为 null）
   try {
     capeDataUrl.value = await downloadCapePng()
-    console.log('[SkinManager] downloadCapePng ok:', capeDataUrl.value ? 'has cape' : 'no cape')
+    if (import.meta.env.DEV) console.log('[SkinManager] downloadCapePng ok:', capeDataUrl.value ? 'has cape' : 'no cape')
   } catch (e) {
     console.warn('[SkinManager] downloadCapePng failed:', e)
     capeDataUrl.value = null
@@ -113,7 +113,7 @@ async function loadInfo() {
   }
 
   loading.value = false
-  console.log('[SkinManager] loadInfo done, skinDataUrl:', skinDataUrl.value ? 'has data' : 'null')
+  if (import.meta.env.DEV) console.log('[SkinManager] loadInfo done, skinDataUrl:', skinDataUrl.value ? 'has data' : 'null')
 }
 
 async function pickAndUpload() {

@@ -27,14 +27,20 @@ pub async fn open_path(path: String) -> Result<(), String> {
     open_path_impl(&path)
 }
 
-/// 跨平台打开路径的内部实现（文件夹不存在时自动创建，避免 explorer 回退打开文档库）
+/// 跨平台打开路径的内部实现（路径必须已存在，不自动创建）
 pub fn open_path_impl(path: &str) -> Result<(), String> {
+    // 安全校验：拒绝路径遍历
+    if path.contains("..") {
+        return Err("路径不能包含 ..".to_string());
+    }
+    // 安全校验：拒绝 UNC 路径（防止 SMB 认证泄露）
+    if path.starts_with("\\\\") || path.starts_with("//") {
+        return Err("不支持 UNC 路径".to_string());
+    }
+
     let p = std::path::Path::new(path);
     if !p.exists() {
-        // 路径不存在时自动创建文件夹（游戏子目录如 saves/mods 等可能尚未生成）
-        std::fs::create_dir_all(p)
-            .map_err(|e| format!("无法创建文件夹 {}：{}", path, e))?;
-        log_info!("Created directory: {}", path);
+        return Err(format!("路径不存在: {}", path));
     }
 
     #[cfg(target_os = "windows")]

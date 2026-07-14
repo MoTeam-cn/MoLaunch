@@ -4,6 +4,55 @@ use crate::log_info;
 use crate::state::AppState;
 use tauri::State;
 
+/// 校验镜像 URL，防止 SSRF（不引入 url crate，用字符串匹配）
+fn validate_mirror_url(url: &str) -> Result<(), String> {
+    // 必须是 https:// 或 http:// 开头
+    if !url.starts_with("https://") && !url.starts_with("http://") {
+        return Err("镜像 URL 必须以 http:// 或 https:// 开头".to_string());
+    }
+    // 去掉 scheme，提取主机部分
+    let after_scheme = if let Some(rest) = url.strip_prefix("https://") {
+        rest
+    } else {
+        url.strip_prefix("http://").unwrap_or(url)
+    };
+    // 处理 userinfo@host 情况，取最后一个 @ 之后的部分
+    let host_part = after_scheme.split('@').last().unwrap_or(after_scheme);
+    // 主机到第一个 / : ? # 之前结束
+    let host_end = host_part
+        .find(|c| c == '/' || c == ':' || c == '?' || c == '#')
+        .unwrap_or(host_part.len());
+    let host = &host_part[..host_end];
+    // 去掉 IPv6 方括号
+    let host = host.trim_start_matches('[').trim_end_matches(']');
+
+    if host.is_empty() {
+        return Err("镜像 URL 主机不能为空".to_string());
+    }
+    // 拒绝环回地址
+    if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+        return Err("镜像 URL 不能指向环回地址".to_string());
+    }
+    // 拒绝链路本地地址
+    if host.starts_with("169.254.") {
+        return Err("镜像 URL 不能指向链路本地地址".to_string());
+    }
+    // 拒绝私有网段（基本检查）
+    if host.starts_with("10.") || host.starts_with("192.168.") {
+        return Err("镜像 URL 不能指向私有网络地址".to_string());
+    }
+    if host.starts_with("172.") {
+        if let Some(second) = host.split('.').nth(1) {
+            if let Ok(n) = second.parse::<u32>() {
+                if n >= 16 && n <= 31 {
+                    return Err("镜像 URL 不能指向私有网络地址".to_string());
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// 设置镜像源
 #[tauri::command]
 pub async fn set_mirror_url(
@@ -11,6 +60,10 @@ pub async fn set_mirror_url(
     mirror_url: Option<String>,
     _skip_reinit: Option<bool>,
 ) -> Result<(), String> {
+    // SSRF 防护：校验镜像 URL
+    if let Some(ref url) = mirror_url {
+        validate_mirror_url(url)?;
+    }
     log_info!("Mirror URL changed to: {:?}", mirror_url);
     super::update_config(&state, |config| {
         config.mirror_url = mirror_url;
