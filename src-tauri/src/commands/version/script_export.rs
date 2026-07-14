@@ -130,7 +130,10 @@ pub async fn export_launch_script(
 
     let mut script = String::new();
     script.push_str("@echo off\n");
-    script.push_str("@REM ⚠️ 警告：此文件包含 Minecraft 访问令牌，请勿分享或上传到公共平台\n");
+    // 切换控制台代码页到 GBK（936），与本文件编码一致，避免中文乱码
+    // 较新的中文 Windows 11 可能默认 codepage 为 65001（UTF-8），会导致 GBK 编码的中文显示乱码
+    script.push_str("chcp 936 >nul\n");
+    script.push_str("@REM [!] 警告：此文件包含 Minecraft 访问令牌，请勿分享或上传到公共平台\n");
     script.push_str(&format!("title MoLaunch - {}\n", version_id));
     script.push('\n');
     // 版权信息头

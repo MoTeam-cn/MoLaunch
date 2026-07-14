@@ -70,6 +70,59 @@ pub fn open_path_impl(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 在资源管理器中打开并选中指定文件
+/// Windows: explorer /select,<file>
+/// macOS: open -R <file>
+/// Linux: 不支持选中，回退到打开父目录
+#[tauri::command]
+pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
+    log_info!("Reveal in explorer: {}", path);
+    // 安全校验：拒绝路径遍历
+    if path.contains("..") {
+        return Err("路径不能包含 ..".to_string());
+    }
+    // 安全校验：拒绝 UNC 路径
+    if path.starts_with("\\\\") || path.starts_with("//") {
+        return Err("不支持 UNC 路径".to_string());
+    }
+
+    let p = std::path::Path::new(&path);
+    if !p.exists() {
+        return Err(format!("路径不存在: {}", path));
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        // explorer /select,<file> 会在资源管理器中打开父目录并选中文件
+        // 路径需要用逗号分隔（不能用 /select <file> 空格形式，因路径可能含空格）
+        std::process::Command::new("explorer")
+            .arg(format!("/select,{}", path))
+            .spawn()
+            .map_err(|e| format!("Failed to reveal in explorer: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS: open -R <file> 在 Finder 中显示文件
+        std::process::Command::new("open")
+            .args(["-R", &path])
+            .spawn()
+            .map_err(|e| format!("Failed to reveal in finder: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        // Linux 文件管理器没有统一的"选中文件"接口，回退到打开父目录
+        let parent = p.parent().unwrap_or(std::path::Path::new("."));
+        std::process::Command::new("xdg-open")
+            .arg(parent)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {}", e))?;
+    }
+
+    Ok(())
+}
+
 /// 获取游戏目录
 #[tauri::command]
 pub async fn get_game_dir(state: State<'_, AppState>) -> Result<String, String> {

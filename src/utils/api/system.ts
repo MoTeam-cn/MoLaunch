@@ -21,6 +21,13 @@ export async function openPath(path: string): Promise<void> {
 }
 
 /**
+ * 在资源管理器中打开并选中指定文件（Windows: explorer /select, macOS: open -R）
+ */
+export async function revealInExplorer(path: string): Promise<void> {
+  return await invoke<void>('reveal_in_explorer', { path })
+}
+
+/**
  * 获取游戏目录
  */
 export async function getGameDir(): Promise<string> {

@@ -125,6 +125,7 @@ pub fn run() {
             // 系统命令
             commands::system::open_game_dir,
             commands::system::open_path,
+            commands::system::reveal_in_explorer,
             commands::system::get_game_dir,
             commands::system::select_folder,
             commands::system::select_file,
