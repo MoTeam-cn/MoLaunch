@@ -19,10 +19,7 @@ import {
   ArrowPathIcon, FaceSmileIcon,
 } from '@heroicons/vue/24/outline'
 
-import grassIcon from '@/assets/blocks/Grass.png'
-import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
-import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
-import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
+import { resolveVersionIcon as resolveIconByType } from '@/composables/useVersionMeta'
 
 const versionStore = useVersionStore()
 const { resolveVersionIcon } = useVersionSettings()
@@ -33,25 +30,19 @@ const installedVersions = ref<string[]>([])
 const installedVersionTypes = ref<Record<string, string>>({}) // 版本ID -> 版本类型
 const installedVersionLogos = ref<Record<string, string>>({}) // 版本ID -> 自定义 logo
 const activeCategory = ref('vanilla')
-// 使用 store 中的 selectedVersion 保持页面切换状态
-const selectedVersion = computed({
-  get: () => versionStore.selectedVersion,
-  set: (val) => { versionStore.selectedVersion = val }
-})
-
-const typeIcons: Record<string, string> = {
-  release: grassIcon, snapshot: commandBlockIcon,
-  old_beta: cobblestoneIcon, old_alpha: cobblestoneIcon,
-  fool: goldBlockIcon,
-}
+// 本地状态：用户在此页面点击某版本卡片后选中的 MC 版本（用于展开 LoaderSelect）
+// 注意：这与首页 versionStore.selectedVersion（启动用版本）是两个概念，不可共享，
+// 否则首页选中版本后进入下载页会直接渲染 LoaderSelect，且切菜单/安装会反向清空首页选中版本。
+const selectedVersion = ref<string | null>(null)
 
 function getVersionIcon(id: string, type: string): string {
   // 优先使用版本设置中的自定义 logo
   const logo = installedVersionLogos.value[id]
   if (logo) return resolveVersionIcon(logo, id)
-  // 否则按类型映射（已安装版本优先用真实类型）
+  // 否则按类型映射（已安装版本优先用真实类型，old_beta/old_alpha 归一化为 old）
   const actualType = installedVersionTypes.value[id] || type
-  return typeIcons[actualType] || grassIcon
+  const normalized = (actualType === 'old_beta' || actualType === 'old_alpha') ? 'old' : actualType
+  return resolveIconByType(normalized)
 }
 
 function formatDate(ts: number): string {
@@ -124,8 +115,8 @@ async function handleRefresh() {
 }
 
 function onInstallRequest(options: { mcVersion: string; forge?: string; neoforge?: string; fabric?: string; optifine?: string; liteloader?: string; instanceName: string }) {
-  // 立刻返回版本列表
-  versionStore.selectedVersion = null
+  // 立刻返回版本列表（仅清空本页面的 LoaderSelect 展开，不影响首页启动用选中版本）
+  selectedVersion.value = null
   // 设置下载状态，显示 DownloadPanel（会自动启动轮询）
   versionStore.startDownload(options.instanceName)
   // 后台执行安装
