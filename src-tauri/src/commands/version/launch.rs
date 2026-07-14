@@ -58,9 +58,24 @@ pub async fn launch_game(
     let version_dir = game_dir.join("versions").join(&version_id);
     let setup = VersionSetup::load_or_create(&version_dir, &version_id);
 
-    // Java 路径：前端传入 > 版本独立 > 自动检测
-    let resolved_java = java_path
-        .or_else(|| setup.java_path.clone().filter(|s| !s.is_empty()));
+    // Java 路径解析（根据 setup.java_mode 决定策略）：
+    // - 前端传入的 java_path 优先级最高（兼容旧调用方）
+    // - 否则按版本独立设置的 JavaMode 处理：
+    //   - auto/空 → 自动选择（resolved_java = None，pipeline 按规则表选）
+    //   - auto_version → 自动选择指定版本范围（pipeline 用 java_version_min/max 约束）
+    //   - folder → 使用版本文件夹下的 Java（pipeline 查找 version_dir/runtime/）
+    //   - custom → 使用 setup.java_path
+    let resolved_java = java_path.or_else(|| {
+        let mode = setup.java_mode.as_deref().unwrap_or("").trim();
+        if mode.eq_ignore_ascii_case("custom") {
+            setup.java_path.clone().filter(|s| !s.is_empty())
+        } else {
+            None
+        }
+    });
+    let resolved_java_mode = setup.java_mode.clone();
+    let resolved_java_version_min = setup.java_version_min.unwrap_or(0);
+    let resolved_java_version_max = setup.java_version_max.unwrap_or(0);
 
     // 服务器：前端未传则用版本独立的 server_enter（"IP:Port" 格式需解析）
     let (resolved_server_addr, resolved_server_port) =
@@ -139,9 +154,15 @@ pub async fn launch_game(
             config.isolation_mode,
         ),
         java_path: resolved_java,
+        java_mode: resolved_java_mode,
+        java_version_min: resolved_java_version_min,
+        java_version_max: resolved_java_version_max,
+        download_source: config.download_source.clone(),
+        mirror_url: config.mirror_url.clone(),
         extra_jvm_args,
         extra_game_args,
         pre_launch_cmd,
+        app_handle: Some(app_handle.clone()),
     };
 
     // 释放锁，避免阻塞其他操作

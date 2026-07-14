@@ -182,12 +182,24 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) { error.value = String(e); loginStatus.value = 'error'; throw e }
   }
 
+  // 防重入：App.vue 和 Home.vue 都会在 onMounted 调用 restoreSession，
+  // 用 Promise 缓存避免并发触发多次 silent refresh（否则会冲击 Mojang API 触发 429 风控）
+  let restoringPromise: Promise<void> | null = null
+
   async function restoreSession() {
+    if (restoringPromise) return restoringPromise
+    restoringPromise = (async () => {
+      try {
+        const result = await tauri.getLoginStatus()
+        if (result) { currentUser.value = result; loginStatus.value = 'success' }
+        await Promise.all([loadMsAccounts(), loadOfflineAccounts()])
+      } catch (e) { console.error('Failed to restore session:', e) }
+    })()
     try {
-      const result = await tauri.getLoginStatus()
-      if (result) { currentUser.value = result; loginStatus.value = 'success' }
-      await Promise.all([loadMsAccounts(), loadOfflineAccounts()])
-    } catch (e) { console.error('Failed to restore session:', e) }
+      await restoringPromise
+    } finally {
+      restoringPromise = null
+    }
   }
 
   async function logoutUser() {

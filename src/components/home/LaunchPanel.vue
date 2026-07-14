@@ -10,7 +10,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
-import { showWarning } from '@/utils/toast'
+import { showError, showWarning } from '@/utils/toast'
 import AccountSelector from './AccountSelector.vue'
 import VersionSelector from './VersionSelector.vue'
 
@@ -34,11 +34,6 @@ const launchState = computed(() => {
   return { text: '启动游戏', color: 'border border-primary-600 bg-white/80 text-primary-600 hover:bg-primary-50 hover:border-blue-500 hover:text-blue-500', spin: false }
 })
 
-const progressPercent = computed(() => {
-  if (!versionStore.launchProgress) return 0
-  return Math.round(versionStore.launchProgress.overall_progress)
-})
-
 async function handleLaunch() {
   if (versionStore.launching) { versionStore.cancelLaunch(); return }
   if (versionStore.runningPid) { versionStore.stopGame(); return }
@@ -46,13 +41,17 @@ async function handleLaunch() {
   if (!versionStore.selectedVersion) { showWarning('请选择版本'); return }
 
   const user = authStore.currentUser!
-  await versionStore.launchGame({
-    versionId: versionStore.selectedVersion,
-    username: user.name,
-    uuid: user.uuid,
-    accessToken: user.access_token,
-    loginType: user.login_type,
-  })
+  try {
+    await versionStore.launchGame({
+      versionId: versionStore.selectedVersion,
+      username: user.name,
+      uuid: user.uuid,
+      accessToken: user.access_token,
+      loginType: user.login_type,
+    })
+  } catch (e) {
+    showError('启动失败', String(e))
+  }
 }
 </script>
 
@@ -80,19 +79,8 @@ async function handleLaunch() {
       <AccountSelector />
     </div>
 
-    <!-- 启动进度（仅启动中显示，浮在版本选择上方） -->
-    <div v-if="versionStore.launching && versionStore.launchProgress" class="px-4 pb-2">
-      <div class="h-1.5 overflow-hidden rounded-full bg-gray-100">
-        <div class="h-full rounded-full bg-primary-500 transition-all duration-300" :style="{ width: progressPercent + '%' }" />
-      </div>
-      <div class="mt-1 flex items-center justify-between text-xs">
-        <span class="text-gray-500">{{ versionStore.launchStageName }}</span>
-        <span class="font-medium text-primary-600">{{ progressPercent }}%</span>
-      </div>
-    </div>
-
     <!-- 运行中提示 -->
-    <div v-else-if="versionStore.runningPid" class="mx-4 mb-2 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
+    <div v-if="versionStore.runningPid" class="mx-4 mb-2 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
       <div class="h-2 w-2 animate-pulse rounded-full bg-green-500" />
       <span class="text-xs font-medium text-green-700">游戏运行中</span>
       <span class="ml-auto truncate text-xs text-green-600">{{ versionStore.runningVersionId }}</span>

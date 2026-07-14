@@ -13,6 +13,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { invoke } from '@tauri-apps/api/core'
 import { useVersionStore } from '@/stores/version'
+import { useVersionSettings } from '@/composables/useVersionSettings'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showWarning, showError } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
@@ -28,11 +29,13 @@ import liteloaderIcon from '@/assets/blocks/Egg.png'
 
 const router = useRouter()
 const versionStore = useVersionStore()
+const { resolveVersionIcon } = useVersionSettings()
 
 interface InstalledVersion {
   id: string
   version_type: string
   inferredType: string
+  logo: string
 }
 
 interface McFolder {
@@ -116,6 +119,7 @@ async function loadInstalled() {
       id: v.id,
       version_type: v.version_type,
       inferredType: inferVersionType(v.id, v.version_type),
+      logo: v.logo || '',
     }))
     if (installed.value.length > 0) {
       const exists = installed.value.some(v => v.id === selectedId.value)
@@ -387,7 +391,7 @@ onMounted(async () => {
                   :class="{ 'bg-primary-50': ver.id === selectedId }"
                   @click="selectVersion(ver.id)"
                 >
-                  <img :src="typeMeta(ver.inferredType).icon" class="h-8 w-8 flex-none rounded" alt="">
+                  <img :src="resolveVersionIcon(ver.logo, ver.id)" class="h-8 w-8 flex-none rounded" alt="">
                   <div class="min-w-0 flex-1">
                     <div class="truncate text-sm font-medium text-gray-900">{{ ver.id }}</div>
                     <div class="mt-0.5 text-xs text-gray-400">{{ typeMeta(ver.inferredType).label }}</div>

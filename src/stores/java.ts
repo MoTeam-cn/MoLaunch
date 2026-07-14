@@ -60,16 +60,8 @@ export const useJavaStore = defineStore('java', () => {
     }
   }
 
-  // 获取实际使用的 Java 路径（自动模式时选择最佳）
-  function getEffectiveJavaPath(): string {
-    if (javaPath.value) {
-      return javaPath.value
-    }
-    // 自动选择最佳
-    if (javaList.value.length === 0) return ''
-    const sorted = [...javaList.value].sort((a, b) => b.major_version - a.major_version)
-    return sorted[0].executable
-  }
+  // 获取实际使用的 Java 路径：自动模式由后端启动流水线统一处理（select_best_java_with_loader）
+  // 前端不再独立计算，避免与后端规则不一致
 
   async function listJava() {
     try {
@@ -101,6 +93,5 @@ export const useJavaStore = defineStore('java', () => {
     listJava,
     setJavaPath,
     refreshJava,
-    getEffectiveJavaPath,
   }
 })

@@ -5,6 +5,7 @@
 
 import { ref, computed, onMounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
+import { useVersionSettings } from '@/composables/useVersionSettings'
 import * as tauri from '@/utils/tauri'
 import { showError, showConfirm } from '@/utils/modal'
 import { showSuccess, showInfo, showWarning } from '@/utils/toast'
@@ -24,11 +25,13 @@ import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
 import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
 
 const versionStore = useVersionStore()
+const { resolveVersionIcon } = useVersionSettings()
 
 const loading = ref(false)
 const installedLoaded = ref(false)
 const installedVersions = ref<string[]>([])
 const installedVersionTypes = ref<Record<string, string>>({}) // 版本ID -> 版本类型
+const installedVersionLogos = ref<Record<string, string>>({}) // 版本ID -> 自定义 logo
 const activeCategory = ref('vanilla')
 // 使用 store 中的 selectedVersion 保持页面切换状态
 const selectedVersion = computed({
@@ -43,7 +46,10 @@ const typeIcons: Record<string, string> = {
 }
 
 function getVersionIcon(id: string, type: string): string {
-  // 对于已安装版本，优先使用 installedVersionTypes
+  // 优先使用版本设置中的自定义 logo
+  const logo = installedVersionLogos.value[id]
+  if (logo) return resolveVersionIcon(logo, id)
+  // 否则按类型映射（已安装版本优先用真实类型）
   const actualType = installedVersionTypes.value[id] || type
   return typeIcons[actualType] || grassIcon
 }
@@ -85,10 +91,15 @@ async function loadInstalledVersions() {
   try {
     const versionsWithType = await tauri.listInstalledVersionsWithType()
     installedVersions.value = versionsWithType.map(v => v.id)
-    // 存储版本类型信息
+    // 存储版本类型 + logo 信息
     const typeMap: Record<string, string> = {}
-    versionsWithType.forEach(v => { typeMap[v.id] = v.version_type })
+    const logoMap: Record<string, string> = {}
+    versionsWithType.forEach(v => {
+      typeMap[v.id] = v.version_type
+      logoMap[v.id] = v.logo || ''
+    })
     installedVersionTypes.value = typeMap
+    installedVersionLogos.value = logoMap
   } catch (e) {
     console.error(e)
     // 降级到旧API

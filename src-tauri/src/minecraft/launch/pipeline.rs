@@ -1,13 +1,13 @@
 //! Launch pipeline - 完整的Minecraft启动流程
 //! 复刻PCL2的启动架构，支持并行执行和进度追踪
 
-use crate::log_info;
+use crate::{log_info, log_warn};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
-use super::watcher::{GameState, GameWatcher, LoadProgress, LogEntry};
+use super::watcher::{ExitInfo, GameState, GameWatcher, LoadProgress, LogEntry};
 use super::AuthInfo;
 
 /// 启动阶段枚举
@@ -109,12 +109,25 @@ pub struct LaunchConfig {
     pub isolation_mode: u32,
     /// 用户指定的Java路径(空=自动)
     pub java_path: Option<String>,
+    /// Java 选择模式：None/空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java
+    pub java_mode: Option<String>,
+    /// 自动选择时的最小 Java 主版本（仅 auto_version 模式生效，0=不限）
+    pub java_version_min: u32,
+    /// 自动选择时的最大 Java 主版本（仅 auto_version 模式生效，0=不限）
+    pub java_version_max: u32,
+    /// 下载源模式（"official"/"mirror"/"smart"），用于 Java 自动下载
+    pub download_source: String,
+    /// 自定义镜像源 URL（None 或空则用 BMCLAPI）
+    pub mirror_url: Option<String>,
     /// 额外JVM参数
     pub extra_jvm_args: Vec<String>,
     /// 额外游戏参数
     pub extra_game_args: Vec<String>,
     /// 启动前执行命令（None=不执行）
     pub pre_launch_cmd: Option<String>,
+    /// Tauri AppHandle（用于 Java 自动下载时推送进度事件）
+    #[serde(skip)]
+    pub app_handle: Option<tauri::AppHandle>,
 }
 
 /// 启动结果
@@ -247,7 +260,6 @@ impl LaunchPipeline {
         let mut progress = self.progress.write().await;
         let stages = vec![
             LaunchStage::GetJava,
-            LaunchStage::Login,
             LaunchStage::ValidateFiles,
             LaunchStage::BuildArgs,
             LaunchStage::PreLaunch,
@@ -426,66 +438,113 @@ impl LaunchPipeline {
 
     /// 检测Java
     async fn detect_java(&self) -> Result<PathBuf, LaunchError> {
-        // 如果用户指定了Java，直接使用
-        if let Some(ref path) = self.config.java_path {
-            if !path.is_empty() {
-                let java_path = PathBuf::from(path);
-                if java_path.exists() {
-                    return Ok(java_path);
-                }
-            }
-        }
-
-        // 否则自动检测
-        // 获取真实的MC版本号（从setup.ini或JSON的inheritsFrom）
+        // 获取版本目录
         let version_dir = self
             .config
             .game_dir
             .join("versions")
             .join(&self.config.version_id);
 
-        let mc_version = {
-            // 优先从setup.ini读取OriginalVersion
-            let setup_path = version_dir.join("setup.ini");
-            let mut found_version = None;
+        // 读取 MC 版本号和加载器类型（从 setup.ini 或 JSON）
+        let (mc_version, loader) = self.read_mc_version_and_loader(&version_dir);
 
-            if setup_path.exists() {
-                if let Ok(content) = std::fs::read_to_string(&setup_path) {
-                    for line in content.lines() {
-                        if let Some(value) = line.strip_prefix("OriginalVersion=") {
-                            let version = value.trim().to_string();
-                            if !version.is_empty() {
-                                log_info!(
-                                    "[DetectJava] Using OriginalVersion from setup.ini: {}",
-                                    version
-                                );
-                                found_version = Some(version);
-                                break;
-                            }
-                        }
-                    }
-                }
+        // 读取版本 JSON 中的 Mojang 官方 Java 要求
+        let mojang_req = self.read_mojang_java_requirement(&version_dir);
+
+        // 计算 Java 版本约束区间 [min, max]
+        let (mut min_req, mut max_req) =
+            crate::minecraft::java_selector::get_java_version_range(&mc_version, loader.as_deref());
+
+        // Mojang 官方要求覆盖规则表的下限（取更严格者）
+        if let Some(mojang_min) = mojang_req {
+            min_req = Some(min_req.map_or(mojang_min, |m| m.max(mojang_min)));
+        }
+
+        // Java 选择模式（来自 setup.ini 的 JavaMode 字段）
+        let java_mode = self.config.java_mode.as_deref().unwrap_or("").trim();
+        // auto_version 模式：用用户指定的版本范围覆盖规则表的约束
+        if java_mode.eq_ignore_ascii_case("auto_version") {
+            if self.config.java_version_min > 0 {
+                min_req = Some(self.config.java_version_min);
             }
-
-            // 如果setup.ini没有找到，从JSON读取
-            found_version.unwrap_or_else(|| self.read_mc_version_from_json(&version_dir))
-        };
-
-        let required_version =
-            crate::minecraft::java_selector::get_required_java_version(&mc_version);
+            // max=0 表示不限上限（清除规则表的上限约束）
+            if self.config.java_version_max > 0 {
+                max_req = Some(self.config.java_version_max);
+            } else {
+                max_req = None;
+            }
+        }
 
         log_info!(
-            "[DetectJava] MC {} requires Java {}+",
+            "[DetectJava] MC {} (loader: {:?}) requires Java {}-{} (mojang: {:?}, mode: {:?})",
             mc_version,
-            required_version
+            loader,
+            min_req.unwrap_or(0),
+            max_req.map(|m| m.to_string()).unwrap_or("∞".to_string()),
+            mojang_req,
+            java_mode
         );
+
+        // folder 模式：优先使用版本文件夹下的 Java（runtime/jre 子目录）
+        if java_mode.eq_ignore_ascii_case("folder") {
+            if let Some(folder_java) = self.find_version_folder_java(&version_dir) {
+                log_info!("[DetectJava] Using Java from version folder: {}", folder_java.display());
+                return Ok(folder_java);
+            }
+            log_warn!("[DetectJava] folder 模式未在版本文件夹下找到 Java，回退到自动选择");
+        }
+
+        // custom 模式：使用用户指定的 Java
+        if java_mode.eq_ignore_ascii_case("custom") {
+            if let Some(ref path) = self.config.java_path {
+                if !path.is_empty() {
+                    let java_path = PathBuf::from(path);
+                    if java_path.exists() {
+                        // 校验版本兼容性（参考 PCL2：不兼容时阻断启动并提示）
+                        if let Some(java_ver) =
+                            crate::minecraft::java::detect_java_version(path)
+                        {
+                            if let Err((_cur, cur_min, cur_max)) =
+                                crate::minecraft::java_selector::check_java_compatible(
+                                    java_ver,
+                                    &mc_version,
+                                    loader.as_deref(),
+                                )
+                            {
+                                let req_desc = match (cur_min, cur_max) {
+                                    (Some(mn), Some(mx)) if mn == mx => format!("需要 Java {}", mn),
+                                    (Some(mn), Some(mx)) => format!("需要 Java {}~{}", mn, mx),
+                                    (Some(mn), None) => format!("至少需要 Java {}", mn),
+                                    (None, Some(mx)) => format!("最高兼容到 Java {}", mx),
+                                    _ => String::new(),
+                                };
+                                return Err(LaunchError {
+                                    stage: LaunchStage::GetJava,
+                                    message: format!(
+                                        "Java 版本不兼容：当前版本{}，{}。\n请前往 版本设置 → 游戏 Java 重新选择，或切换为「自动选择」",
+                                        java_ver, req_desc
+                                    ),
+                                    is_user_facing: true,
+                                });
+                            }
+                        }
+                        return Ok(java_path);
+                    }
+                    log_warn!("[DetectJava] User-specified Java not found: {}", path);
+                }
+            }
+        }
 
         self.update_progress(LaunchStage::GetJava, 0.3, "正在搜索系统Java...")
             .await;
 
         // 搜索Java (使用同步函数在spawn_blocking中运行)
         let mc_version_clone = mc_version.clone();
-        let java_list = tokio::task::spawn_blocking(move || crate::minecraft::java::search_java())
+        let loader_clone = loader.clone();
+        let game_dir_clone = self.config.game_dir.clone();
+        let java_list = tokio::task::spawn_blocking(move || {
+            crate::minecraft::java::search_java_with_paths(&[game_dir_clone])
+        })
             .await
             .map_err(|e| LaunchError {
                 stage: LaunchStage::GetJava,
@@ -496,17 +555,166 @@ impl LaunchPipeline {
         self.update_progress(LaunchStage::GetJava, 0.6, "正在选择最佳Java...")
             .await;
 
-        // 选择最佳Java
-        let selected_path =
-            crate::minecraft::java_selector::select_best_java(&mc_version_clone, &java_list, None)
-                .ok_or_else(|| LaunchError {
+        // 选择最佳Java（支持加载器约束）
+        let selected_path = match crate::minecraft::java_selector::select_best_java_with_loader(
+            &mc_version_clone,
+            loader_clone.as_deref(),
+            &java_list,
+            None,
+        ) {
+            Some(path) => path,
+            None => {
+                // 自动下载补全：用约束区间的下限作为下载目标
+                // 优先用 min_req（已被 mojang JSON 覆盖的值），其次用规则表推荐版本
+                let target_major = min_req.unwrap_or_else(|| {
+                    crate::minecraft::java_selector::get_recommended_java_version(&mc_version_clone)
+                });
+                // 校验推荐版本落在需求区间内
+                let in_range = min_req.map_or(true, |m| target_major >= m)
+                    && max_req.map_or(true, |m| target_major <= m);
+                if !in_range {
+                    return Err(LaunchError {
+                        stage: LaunchStage::GetJava,
+                        message: format!(
+                            "未找到满足要求的Java (需要Java {}-{})，且无法自动下载匹配版本。\n请在 版本设置 → 游戏 Java 中手动选择或下载。",
+                            min_req.unwrap_or(0),
+                            max_req.map(|m| m.to_string()).unwrap_or("∞".to_string())
+                        ),
+                        is_user_facing: true,
+                    });
+                }
+
+                self.update_progress(
+                    LaunchStage::GetJava,
+                    0.7,
+                    &format!("未找到兼容 Java，正在自动下载 Java {}...", target_major),
+                )
+                .await;
+
+                let app_handle = self.config.app_handle.clone();
+                let dl_mode =
+                    crate::minecraft::sources::DownloadSourceMode::from_str(
+                        &self.config.download_source,
+                    );
+                let mirror_url = self.config.mirror_url.clone();
+                let downloaded = crate::minecraft::java::download::download_java_runtime(
+                    target_major,
+                    dl_mode,
+                    mirror_url.as_deref(),
+                    app_handle.as_ref(),
+                )
+                .await
+                .map_err(|e| LaunchError {
                     stage: LaunchStage::GetJava,
-                    message: format!("未找到满足要求的Java (需要Java {}+)", required_version),
+                    message: format!(
+                        "自动下载 Java {} 失败：{}\n请在 版本设置 → 游戏 Java 中手动下载或选择。",
+                        target_major, e
+                    ),
                     is_user_facing: true,
                 })?;
 
+                log_info!("[DetectJava] Auto-downloaded Java: {}", downloaded.display());
+                downloaded.to_string_lossy().to_string()
+            }
+        };
+
         log_info!("Selected Java: {}", selected_path);
         Ok(PathBuf::from(&selected_path))
+    }
+
+    /// 在版本文件夹下查找 Java 可执行文件（folder 模式）
+    /// 查找路径：{version_dir}/runtime/{任意子目录}/bin/javaw.exe（Windows）或 bin/java（Unix）
+    /// 也兼容 {version_dir}/jre/ 等常见命名
+    fn find_version_folder_java(&self, version_dir: &std::path::Path) -> Option<PathBuf> {
+        let exe_name = if cfg!(windows) { "javaw.exe" } else { "java" };
+        // 候选根目录：runtime/、jre/、java/
+        let candidates = ["runtime", "jre", "java"];
+        for dir in candidates {
+            let root = version_dir.join(dir);
+            if !root.exists() {
+                continue;
+            }
+            // 遍历 root 下的所有子目录（包括 root 本身），查找 bin/{exe_name}
+            if let Some(found) = Self::search_java_in_dir(&root, exe_name) {
+                return Some(found);
+            }
+        }
+        None
+    }
+
+    /// 递归查找目录下的 bin/{exe_name}（最多 4 层深度，避免遍历过大）
+    fn search_java_in_dir(dir: &std::path::Path, exe_name: &str) -> Option<PathBuf> {
+        // 直接检查 dir/bin/{exe_name}
+        let direct = dir.join("bin").join(exe_name);
+        if direct.exists() {
+            return Some(direct);
+        }
+        // 限制深度为 4 层
+        fn walk(dir: &std::path::Path, exe_name: &str, depth: u32) -> Option<PathBuf> {
+            if depth > 4 {
+                return None;
+            }
+            let entries = match std::fs::read_dir(dir) {
+                Ok(e) => e,
+                Err(_) => return None,
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.is_dir() {
+                    continue;
+                }
+                // 优先检查 path/bin/{exe_name}
+                let candidate = path.join("bin").join(exe_name);
+                if candidate.exists() {
+                    return Some(candidate);
+                }
+                if let Some(found) = walk(&path, exe_name, depth + 1) {
+                    return Some(found);
+                }
+            }
+            None
+        }
+        walk(dir, exe_name, 0)
+    }
+
+    /// 读取 MC 版本号和加载器类型（从 setup.ini 或 JSON）
+    fn read_mc_version_and_loader(&self, version_dir: &std::path::Path) -> (String, Option<String>) {
+        // 优先从 setup.ini 读取 OriginalVersion 和 Type
+        let setup_path = version_dir.join("setup.ini");
+        let mut mc_version = None;
+        let mut loader = None;
+
+        if setup_path.exists() {
+            if let Ok(content) = std::fs::read_to_string(&setup_path) {
+                for line in content.lines() {
+                    if let Some(value) = line.strip_prefix("OriginalVersion=") {
+                        let v = value.trim().to_string();
+                        if !v.is_empty() {
+                            mc_version = Some(v);
+                        }
+                    } else if let Some(value) = line.strip_prefix("Type=") {
+                        let t = value.trim().to_lowercase();
+                        if !t.is_empty() && t != "release" && t != "snapshot" {
+                            loader = Some(t);
+                        }
+                    }
+                }
+            }
+        }
+
+        let mc_version = mc_version.unwrap_or_else(|| self.read_mc_version_from_json(version_dir));
+        (mc_version, loader)
+    }
+
+    /// 从版本 JSON 读取 Mojang 官方 Java 版本要求
+    fn read_mojang_java_requirement(&self, version_dir: &std::path::Path) -> Option<u32> {
+        let json_path = version_dir.join(format!("{}.json", self.config.version_id));
+        if !json_path.exists() {
+            return None;
+        }
+        let content = std::fs::read_to_string(&json_path).ok()?;
+        let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+        crate::minecraft::java_selector::get_mojang_java_requirement(&json)
     }
 
     /// 从JSON读取MC版本号（从inheritsFrom或id）
@@ -660,26 +868,86 @@ impl LaunchPipeline {
         if let Some(libraries) = json["libraries"].as_array() {
             let total = libraries.len();
             for (i, lib) in libraries.iter().enumerate() {
-                // 检查是否是native库
-                if lib.get("natives").is_none() {
+                // 应用 rules 过滤（平台适配）
+                let rules: Option<Vec<serde_json::Value>> = lib
+                    .get("rules")
+                    .and_then(|v| v.as_array())
+                    .map(|a| a.clone());
+                if !crate::minecraft::version::libraries::check_rules(&rules) {
                     continue;
                 }
 
-                // 获取平台对应的classifier
-                let classifier_key = if cfg!(target_os = "windows") {
-                    "natives-windows"
-                } else if cfg!(target_os = "macos") {
-                    "natives-macos"
-                } else {
-                    "natives-linux"
-                };
+                // 模式 A（旧版）：library 有 "natives" 字段 + "downloads.classifiers"
+                if let Some(natives_field) = lib.get("natives").and_then(|v| v.as_object()) {
+                    let platform_key = if cfg!(target_os = "windows") {
+                        "windows"
+                    } else if cfg!(target_os = "macos") {
+                        "osx"
+                    } else {
+                        "linux"
+                    };
 
-                if let Some(classifiers) = lib["downloads"]["classifiers"].as_object() {
-                    if let Some(artifact) = classifiers.get(classifier_key) {
-                        if let Some(path) = artifact["path"].as_str() {
-                            let jar_path = self.config.game_dir.join("libraries").join(path);
-                            if jar_path.exists() {
-                                self.extract_native_jar(&jar_path, &natives_dir).await?;
+                    let classifier_key = match natives_field.get(platform_key).and_then(|v| v.as_str()) {
+                        Some(c) => c.to_string(),
+                        None => continue,
+                    };
+
+                    if let Some(classifiers) = lib["downloads"]["classifiers"].as_object() {
+                        let artifact = classifiers.get(&classifier_key).or_else(|| {
+                            let base = classifier_key
+                                .split('-')
+                                .take(2)
+                                .collect::<Vec<_>>()
+                                .join("-");
+                            if base != classifier_key {
+                                classifiers.get(&base)
+                            } else {
+                                None
+                            }
+                        });
+
+                        if let Some(artifact) = artifact {
+                            if let Some(path) = artifact["path"].as_str() {
+                                let jar_path = self.config.game_dir.join("libraries").join(path);
+                                if jar_path.exists() {
+                                    self.extract_native_jar(&jar_path, &natives_dir).await?;
+                                }
+                            }
+                        }
+                    }
+                    self.update_progress(
+                        LaunchStage::ExtractNatives,
+                        (i + 1) as f64 / total as f64,
+                        "正在解压原生库...",
+                    )
+                    .await;
+                    continue;
+                }
+
+                // 模式 B（Forge 26.2+ 新格式）：library 无 "natives" 字段，但 name 含 classifier（如 "natives-windows-x86"）
+                // 这类直接用 downloads.artifact.path 解压
+                if let Some(name) = lib["name"].as_str() {
+                    let parts: Vec<&str> = name.split(':').collect();
+                    if parts.len() > 3 {
+                        let classifier = parts[3];
+                        if classifier.starts_with("natives-") {
+                            // 架构过滤：避免解压错误架构的 native
+                            if !crate::minecraft::version::libraries::is_native_matching_arch(
+                                classifier,
+                            ) {
+                                self.update_progress(
+                                    LaunchStage::ExtractNatives,
+                                    (i + 1) as f64 / total as f64,
+                                    "正在解压原生库...",
+                                )
+                                .await;
+                                continue;
+                            }
+                            if let Some(path) = lib["downloads"]["artifact"]["path"].as_str() {
+                                let jar_path = self.config.game_dir.join("libraries").join(path);
+                                if jar_path.exists() {
+                                    self.extract_native_jar(&jar_path, &natives_dir).await?;
+                                }
                             }
                         }
                     }
@@ -819,28 +1087,24 @@ impl LaunchPipeline {
         *self.child_process.lock().await = Some(child_handle.clone());
 
         // 等待一段时间检查进程是否立即崩溃
-        // Java异常通常在启动后1-2秒内发生
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // 检查进程是否仍在运行（使用 try_lock 避免阻塞）
-        {
-            if let Ok(_guard) = child_handle.try_lock() {
-                // 检查进程是否已退出（非阻塞）
-                // 注意：这里不能调用 wait()，否则会阻塞
-            }
-        }
-
-        // 检查日志中是否有Java异常
-        let logs = {
+        // Forge 启动较慢，等待 5 秒覆盖早期崩溃
+        let exit_rx = {
             let watcher_guard = self.watcher.lock().await;
             if let Some(ref w) = *watcher_guard {
-                w.recent_logs(50).await
+                w.exit_receiver()
             } else {
-                Vec::new()
+                return Err(LaunchError {
+                    stage: LaunchStage::LaunchProcess,
+                    message: "Watcher not available".to_string(),
+                    is_user_facing: false,
+                });
             }
         };
 
-        // 检查是否有Java异常（这些通常出现在stderr）
+        // 早期崩溃检测：轮询最多 2 秒，每 200ms 检查一次
+        // - 进程退出且非 0 → 报告崩溃
+        // - 日志出现 Java 异常 → 报告崩溃
+        // - 日志出现正常启动标志（LWJGL/GL info/Setting user 等）→ 立即返回
         let fatal_errors = [
             "A Java Exception has occurred",
             "Error: A JNI error has occurred",
@@ -850,16 +1114,115 @@ impl LaunchPipeline {
             "java.lang.ClassNotFoundException",
             "java.lang.UnsupportedClassVersionError",
         ];
+        // 正常启动标志：出现这些说明游戏已开始正常加载，不再需要等待
+        let healthy_signs = [
+            "LWJGL",
+            "Setting user",
+            "GL info",
+            "OpenAL",
+            "lwjgl",
+            "ModLauncher",
+            "EARLYDISPLAY",
+            "Launching target",
+        ];
 
-        for log in &logs {
-            for error in &fatal_errors {
-                if log.message.contains(error) {
-                    return Err(LaunchError {
-                        stage: LaunchStage::LaunchProcess,
-                        message: format!("Java启动失败: {}", log.message),
-                        is_user_facing: true,
-                    });
+        let mut exit_info_caught: Option<ExitInfo> = None;
+        let mut error_logs: Option<Vec<String>> = None;
+
+        let poll_deadline = tokio::time::Instant::now() + tokio::time::Duration::from_secs(2);
+        loop {
+            if tokio::time::Instant::now() >= poll_deadline {
+                break;
+            }
+
+            // 先检查进程是否退出（非阻塞：借用 watch 的已接收值）
+            // exit_rx 每轮 clone 一次用于 changed 超时探测
+            {
+                let mut rx = exit_rx.clone();
+                match tokio::time::timeout(
+                    tokio::time::Duration::from_millis(200),
+                    rx.changed(),
+                )
+                .await
+                {
+                    Ok(Ok(())) => {
+                        if let Some(ref info) = *rx.borrow() {
+                            exit_info_caught = Some(info.clone());
+                            break; // 进程已退出，跳出处理
+                        }
+                    }
+                    _ => {}
                 }
+            }
+
+            // 检查日志
+            let logs = {
+                let watcher_guard = self.watcher.lock().await;
+                if let Some(ref w) = *watcher_guard {
+                    w.recent_logs(80).await
+                } else {
+                    Vec::new()
+                }
+            };
+
+            let logs_chronological: Vec<&LogEntry> = logs.iter().rev().collect();
+
+            // 先检查是否有 Java 异常
+            for (idx, log) in logs_chronological.iter().enumerate() {
+                for error in &fatal_errors {
+                    if log.message.contains(error) {
+                        let tail: Vec<String> = logs_chronological
+                            .iter()
+                            .skip(idx)
+                            .take(30)
+                            .map(|l| l.message.clone())
+                            .collect();
+                        error_logs = Some(tail);
+                        break;
+                    }
+                }
+                if error_logs.is_some() {
+                    break;
+                }
+            }
+            if let Some(tail) = error_logs.take() {
+                return Err(LaunchError {
+                    stage: LaunchStage::LaunchProcess,
+                    message: format!("Java启动失败:\n{}", tail.join("\n")),
+                    is_user_facing: true,
+                });
+            }
+
+            // 检查是否有正常启动标志 → 立即返回
+            let has_healthy = logs_chronological
+                .iter()
+                .any(|l| healthy_signs.iter().any(|s| l.message.contains(s)));
+            if has_healthy {
+                break;
+            }
+        }
+
+        // 处理轮询期间捕获的进程退出
+        if let Some(exit_info) = exit_info_caught {
+            if exit_info.code != 0 {
+                let logs = {
+                    let watcher_guard = self.watcher.lock().await;
+                    if let Some(ref w) = *watcher_guard {
+                        w.recent_logs(40).await
+                    } else {
+                        Vec::new()
+                    }
+                };
+                let tail: Vec<String> = logs.iter().take(40).map(|l| l.message.clone()).collect();
+                return Err(LaunchError {
+                    stage: LaunchStage::LaunchProcess,
+                    message: format!(
+                        "游戏进程退出（代码: {}）\n最近日志:\n{}",
+                        exit_info.code,
+                        tail.join("\n")
+                    ),
+                    is_user_facing: true,
+                });
             }
         }
 

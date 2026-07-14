@@ -4,7 +4,7 @@
 
 import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
-import { showSuccess, showWarning } from '@/utils/toast'
+import { showError, showSuccess, showWarning } from '@/utils/toast'
 import type { VersionInfo } from '@/types/version'
 import * as tauri from '@/utils/tauri'
 import { listen } from '@tauri-apps/api/event'
@@ -57,7 +57,26 @@ export const useVersionStore = defineStore('version', () => {
   const runningVersionId = ref<string | null>(null) // 当前正在运行的版本ID
   const launchProgress = ref<tauri.LaunchProgress | null>(null)
   let launchProgressTimer: number | null = null
-  
+
+  // Java 自动下载进度（启动时自动下载 Java 用，与版本设置页的独立下载共享事件）
+  const javaDownloadProgress = ref<tauri.JavaDownloadProgress | null>(null)
+  let javaDownloadUnlisten: (() => void) | null = null
+
+  async function startJavaDownloadListener() {
+    if (javaDownloadUnlisten) return
+    javaDownloadUnlisten = await listen<tauri.JavaDownloadProgress>(
+      tauri.JAVA_DOWNLOAD_PROGRESS_EVENT,
+      (e) => { javaDownloadProgress.value = e.payload },
+    )
+  }
+  function stopJavaDownloadListener() {
+    if (javaDownloadUnlisten) {
+      javaDownloadUnlisten()
+      javaDownloadUnlisten = null
+    }
+    javaDownloadProgress.value = null
+  }
+
   // 版本选择器状态（用于在页面切换时保持状态）
   const selectedVersion = ref<string | null>(null)
 
@@ -89,33 +108,6 @@ export const useVersionStore = defineStore('version', () => {
 
   // 监听游戏退出事件
   let unlistenFn: (() => void) | null = null
-  
-  let exitPollTimer: number | null = null
-
-  // 开始轮询游戏退出
-  function startExitPolling() {
-    stopExitPolling()
-    exitPollTimer = window.setInterval(async () => {
-      try {
-        const pid = await tauri.getRunningGame()
-        if (pid === null && runningVersionId.value) {
-          runningPid.value = null
-          runningVersionId.value = null
-          showSuccess('游戏已退出')
-          stopExitPolling()
-        }
-      } catch {
-        // ignore
-      }
-    }, 1000)
-  }
-
-  function stopExitPolling() {
-    if (exitPollTimer !== null) {
-      clearInterval(exitPollTimer)
-      exitPollTimer = null
-    }
-  }
 
   async function setupGameExitListener() {
     try {
@@ -124,9 +116,14 @@ export const useVersionStore = defineStore('version', () => {
         if (import.meta.env.DEV) {
           console.debug('[GameExit]', event.payload)
         }
+        const { is_normal, exit_code } = event.payload
         runningPid.value = null
         runningVersionId.value = null
-        stopExitPolling()
+        if (is_normal) {
+          showSuccess('游戏已退出')
+        } else {
+          showError(`游戏已退出（代码: ${exit_code}）`)
+        }
       })
     } catch (e) {
       console.error('Failed to setup game exit listener:', e)
@@ -240,23 +237,26 @@ export const useVersionStore = defineStore('version', () => {
     launching.value = true
     launchingVersionId.value = params.versionId
     launchProgress.value = null
-    
+
     // 启动进度轮询
     startProgressPolling()
-    
+    // 启动 Java 下载进度监听（启动流程可能触发 Java 自动下载）
+    await startJavaDownloadListener()
+
     try {
       const pid = await tauri.launchGame(params)
       runningPid.value = pid
       runningVersionId.value = params.versionId
-      // 开始轮询检测游戏退出
-      startExitPolling()
+      showSuccess(`游戏已启动（PID: ${pid}）`)
       return pid
     } catch (e) {
       console.error('Failed to launch game:', e)
+      showError(e instanceof Error ? e.message : String(e))
       throw e
     } finally {
       // 启动完成后停止轮询
       stopProgressPolling()
+      stopJavaDownloadListener()
       launching.value = false
       launchingVersionId.value = null
     }
@@ -268,7 +268,6 @@ export const useVersionStore = defineStore('version', () => {
       await tauri.stopGame()
       runningPid.value = null
       runningVersionId.value = null
-      stopExitPolling()
       showWarning('游戏已停止')
     } catch (e) {
       console.error('Failed to stop game:', e)
@@ -359,6 +358,7 @@ export const useVersionStore = defineStore('version', () => {
     runningVersionId,
     launchProgress,
     launchStageName,
+    javaDownloadProgress,
     selectedVersion,
     restoreSelectedVersion,
     loaderVersionsCache,

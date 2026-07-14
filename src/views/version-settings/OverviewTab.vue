@@ -114,7 +114,8 @@ async function handleChangeLogo(newLogo: string) {
   if (!selectedId.value || !personalization.value) return
   try {
     await tauri.updateVersionPersonalization(selectedId.value, { logo: newLogo })
-    personalization.value.logo = newLogo
+    // 替换整个 personalization 对象，确保所有依赖该 ref 的组件（如首页 VersionSelector）都能响应式更新
+    personalization.value = { ...personalization.value, logo: newLogo }
     showSuccess('图标已更新')
   } catch (e) { showError('更新失败：' + String(e)) }
 }

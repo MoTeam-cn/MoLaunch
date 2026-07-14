@@ -185,6 +185,7 @@ onUnmounted(() => {
 .custom-select {
   position: relative;
   min-width: 120px;
+  max-width: 100%;
 }
 
 .select-trigger {
@@ -199,6 +200,8 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.15s ease;
   user-select: none;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .select-trigger:hover {
@@ -216,6 +219,8 @@ onUnmounted(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
 }
 
 .select-arrow {

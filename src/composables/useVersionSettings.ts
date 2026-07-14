@@ -103,6 +103,20 @@ const currentLogoIcon = computed(() => {
   return opt?.icon || currentMeta.value.icon
 })
 
+/**
+ * 根据自定义 logo + 版本 ID 解析图标（供版本列表/选择页使用）
+ * - logo 非空时优先使用 iconOptions 中匹配的图标
+ * - 否则按 versionId 推断类型，返回类型对应图标
+ */
+function resolveVersionIcon(logo: string, versionId: string): string {
+  if (logo) {
+    const opt = iconOptions.find(o => o.value === logo)
+    if (opt?.icon) return opt.icon
+  }
+  const inferred = inferVersionType(versionId)
+  return typeMetaMap[inferred]?.icon ?? grassIcon
+}
+
 /** 是否支持 Mod */
 const isModable = computed(() => {
   if (!selectedId.value) return false
@@ -162,6 +176,7 @@ export function useVersionSettings() {
     currentLogoIcon,
     isModable,
     inferVersionType,
+    resolveVersionIcon,
     loadPersonalization,
     initContext,
     refreshEffectiveDir,

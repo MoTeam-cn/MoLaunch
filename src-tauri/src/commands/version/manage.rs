@@ -14,6 +14,8 @@ use super::sanitize_version_id;
 pub struct InstalledVersionInfo {
     pub id: String,
     pub version_type: String,
+    /// 自定义图标文件名（空=自动判断，来自 setup.ini 的 Logo 字段）
+    pub logo: String,
 }
 
 /// Get installed versions
@@ -52,9 +54,15 @@ pub async fn list_installed_versions_with_type(
 
     for version in versions {
         let version_type = detect_version_type_from_dir(&game_dir, &version.id);
+        // 读取版本独立 setup.ini 的 Logo 字段（空=自动判断）
+        let version_dir = game_dir.join("versions").join(&version.id);
+        let logo = VersionSetup::load_or_create(&version_dir, &version.id)
+            .logo
+            .unwrap_or_default();
         result.push(InstalledVersionInfo {
             id: version.id,
             version_type: version_type_to_string(&version_type),
+            logo,
         });
     }
 
@@ -232,8 +240,14 @@ pub struct VersionPersonalization {
     pub advance_game_args: String,
     /// 启动前执行命令（空=跟随全局）
     pub advance_run_cmd: String,
-    /// 版本独立 Java 路径（空=自动选择）
+    /// 版本独立 Java 路径（仅 JavaMode="custom" 时生效）
     pub java_path: String,
+    /// Java 选择模式：空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java
+    pub java_mode: String,
+    /// 自动选择时的最小 Java 主版本（仅 auto_version 模式生效，0=不限）
+    pub java_version_min: u32,
+    /// 自动选择时的最大 Java 主版本（仅 auto_version 模式生效，0=不限）
+    pub java_version_max: u32,
     /// 内存模式（空=跟随全局, "auto"=自动, "custom"=自定义）
     pub memory_mode: String,
     /// 版本独立最小内存（MB，仅 custom 模式生效）
@@ -271,6 +285,9 @@ pub async fn get_version_personalization(
         advance_game_args: setup.advance_game_args.unwrap_or_default(),
         advance_run_cmd: setup.advance_run_cmd.unwrap_or_default(),
         java_path: setup.java_path.unwrap_or_default(),
+        java_mode: setup.java_mode.unwrap_or_default(),
+        java_version_min: setup.java_version_min.unwrap_or(0),
+        java_version_max: setup.java_version_max.unwrap_or(0),
         memory_mode: setup.memory_mode.unwrap_or_default(),
         min_memory: setup.min_memory.unwrap_or(0),
         max_memory: setup.max_memory.unwrap_or(0),
@@ -350,9 +367,16 @@ pub async fn export_launch_script(
     // 版本独立隔离设置覆盖全局
     let isolation_mode = resolve_isolation_mode(&game_dir, &version_id, global_isolation_mode);
 
-    // Java 路径：前端传入 > 版本独立 > 自动检测
-    let resolved_java = java_path
-        .or_else(|| setup.java_path.clone().filter(|s| !s.is_empty()));
+    // Java 路径：前端传入 > custom 模式下的版本独立 > 自动检测
+    // 注意：脚本导出仅支持 custom 模式的显式路径，auto_version/folder 模式按自动选择处理
+    let resolved_java = java_path.or_else(|| {
+        let mode = setup.java_mode.as_deref().unwrap_or("").trim();
+        if mode.eq_ignore_ascii_case("custom") {
+            setup.java_path.clone().filter(|s| !s.is_empty())
+        } else {
+            None
+        }
+    });
 
     // 解析 Java 路径：优先用户指定 → 否则按 MC 版本自动检测 → 都失败则报错
     let java_path_buf = resolve_java_path(&game_dir, &version_id, resolved_java.as_deref())
@@ -495,32 +519,56 @@ pub async fn export_launch_script(
 }
 
 /// 解析脚本使用的 Java 路径（优先用户指定 → 否则按 MC 版本自动检测）
+/// 用户指定路径会校验版本兼容性，不兼容时返回错误
 async fn resolve_java_path(
     game_dir: &std::path::Path,
     version_id: &str,
     user_java_path: Option<&str>,
 ) -> Result<std::path::PathBuf, String> {
-    // 1. 优先使用用户指定的 Java 路径
+    // 获取版本目录和 MC 版本号 + 加载器
+    let version_dir = game_dir.join("versions").join(version_id);
+    let (mc_version, loader) = read_mc_version_and_loader_for_java(&version_dir, version_id);
+
+    // 1. 优先使用用户指定的 Java 路径（校验版本兼容性）
     if let Some(path) = user_java_path {
         if !path.is_empty() {
             let p = std::path::PathBuf::from(path);
             if p.exists() {
+                // 校验版本兼容性
+                if let Some(java_ver) = crate::minecraft::java::detect_java_version(path) {
+                    if let Err((_cur, cur_min, cur_max)) =
+                        crate::minecraft::java_selector::check_java_compatible(
+                            java_ver,
+                            &mc_version,
+                            loader.as_deref(),
+                        )
+                    {
+                        let req_desc = match (cur_min, cur_max) {
+                            (Some(mn), Some(mx)) if mn == mx => format!("需要 Java {}", mn),
+                            (Some(mn), Some(mx)) => format!("需要 Java {}~{}", mn, mx),
+                            (Some(mn), None) => format!("至少需要 Java {}", mn),
+                            (None, Some(mx)) => format!("最高兼容到 Java {}", mx),
+                            _ => String::new(),
+                        };
+                        return Err(format!(
+                            "Java 版本不兼容：当前版本{}，{}。\n请前往 版本设置 → 游戏 Java 重新选择，或切换为「自动选择」",
+                            java_ver, req_desc
+                        ));
+                    }
+                }
                 return Ok(p);
             }
             log_error!("User-specified Java not found: {}", path);
         }
     }
 
-    // 2. 自动检测：先获取 MC 版本号
-    let version_dir = game_dir.join("versions").join(version_id);
-    let mc_version = read_mc_version_for_java(&version_dir, version_id);
-
     log_info!(
-        "[ExportScript] Auto-detecting Java for MC {}...",
-        mc_version
+        "[ExportScript] Auto-detecting Java for MC {} (loader: {:?})...",
+        mc_version,
+        loader
     );
 
-    // 3. 搜索系统 Java
+    // 2. 搜索系统 Java
     let java_list = tokio::task::spawn_blocking(crate::minecraft::java::search_java)
         .await
         .map_err(|e| format!("Java 搜索失败: {}", e))?;
@@ -529,18 +577,59 @@ async fn resolve_java_path(
         return Err("未找到任何已安装的 Java，请先安装 Java 或在设置中指定 Java 路径".to_string());
     }
 
-    // 4. 按版本号选择最佳 Java
-    let selected = crate::minecraft::java_selector::select_best_java(&mc_version, &java_list, None)
-        .ok_or_else(|| {
-            let required =
-                crate::minecraft::java_selector::get_required_java_version(&mc_version);
-            format!(
-                "未找到满足 MC {} 要求的 Java (需要 Java {}+)",
-                mc_version, required
-            )
-        })?;
+    // 3. 按版本号选择最佳 Java（支持加载器约束）
+    let selected = crate::minecraft::java_selector::select_best_java_with_loader(
+        &mc_version,
+        loader.as_deref(),
+        &java_list,
+        None,
+    )
+    .ok_or_else(|| {
+        let (min_req, max_req) = crate::minecraft::java_selector::get_java_version_range(
+            &mc_version,
+            loader.as_deref(),
+        );
+        format!(
+            "未找到满足 MC {} 要求的 Java (需要 Java {}-{})",
+            mc_version,
+            min_req.unwrap_or(0),
+            max_req.map(|m| m.to_string()).unwrap_or("∞".to_string())
+        )
+    })?;
 
     Ok(std::path::PathBuf::from(&selected))
+}
+
+/// 从 setup.ini 或 version.json 读取 MC 版本号和加载器类型
+fn read_mc_version_and_loader_for_java(
+    version_dir: &std::path::Path,
+    version_id: &str,
+) -> (String, Option<String>) {
+    let mut mc_version = None;
+    let mut loader = None;
+
+    // 1. 从 setup.ini 读取 OriginalVersion 和 Type
+    let setup_path = version_dir.join("setup.ini");
+    if setup_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&setup_path) {
+            for line in content.lines() {
+                if let Some(value) = line.strip_prefix("OriginalVersion=") {
+                    let v = value.trim().to_string();
+                    if !v.is_empty() {
+                        mc_version = Some(v);
+                    }
+                } else if let Some(value) = line.strip_prefix("Type=") {
+                    let t = value.trim().to_lowercase();
+                    if !t.is_empty() && t != "release" && t != "snapshot" {
+                        loader = Some(t);
+                    }
+                }
+            }
+        }
+    }
+
+    let mc_version = mc_version.unwrap_or_else(|| read_mc_version_for_java(version_dir, version_id));
+    (mc_version, loader)
 }
 
 /// 从 setup.ini 或 version.json 读取 MC 版本号（用于 Java 选择）

@@ -1,6 +1,8 @@
 //! Java检测和管理模块
 //! 参考PCL2的Java搜索和版本检测逻辑
 
+pub mod download;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -147,6 +149,29 @@ pub fn detect_java(java_path: &Path) -> Result<JavaRuntime, String> {
     })
 }
 
+/// 轻量级版本检测：仅返回 Java 大版本号（用于兼容性检查）
+/// 路径可以是 java.exe 的完整路径，也可以是文件夹
+pub fn detect_java_version(java_path_or_dir: &str) -> Option<u32> {
+    let path = std::path::Path::new(java_path_or_dir);
+    // 如果是目录，尝试找 java.exe
+    let java_exe = if path.is_dir() {
+        let candidates = ["java.exe", "bin\\java.exe", "bin/java.exe"];
+        let mut found = None;
+        for c in &candidates {
+            let p = path.join(c);
+            if p.exists() {
+                found = Some(p);
+                break;
+            }
+        }
+        found?
+    } else {
+        path.to_path_buf()
+    };
+
+    detect_java(&java_exe).ok().map(|j| j.major_version)
+}
+
 /// 提取并标准化版本号（参考PCL2第107-121行）
 fn extract_and_normalize_version(output: &str) -> Result<String, String> {
     // 正则1: version "xxx"
@@ -220,6 +245,14 @@ fn extract_major_version(version: &str) -> Result<u32, String> {
 
 /// 搜索系统中的Java
 pub fn search_java() -> Vec<JavaRuntime> {
+    search_java_with_paths(&[])
+}
+
+/// 带额外搜索路径的 Java 搜索
+///
+/// `extra_paths` 用于追加搜索根目录（如游戏目录、APPDATA 等），会全遍历搜索。
+/// 参考 PCL2 `JavaSearchFolder(..., IsFullSearch:=True)`。
+pub fn search_java_with_paths(extra_paths: &[PathBuf]) -> Vec<JavaRuntime> {
     crate::log_separator!("Java Search");
     crate::log_info!("[Java] Starting Java search...");
 
@@ -292,6 +325,32 @@ pub fn search_java() -> Vec<JavaRuntime> {
                 exe_dir.display()
             );
             search_folder_recursive(exe_dir, &mut add_candidate, true);
+        }
+    }
+
+    // Step 5: APPDATA\.minecraft\runtime\（PCL2/官启自动下载的 Java 存放处）
+    // 与 PCL2 一致，runtime 下的 Java 跨游戏目录共享，必须搜索
+    crate::log_info!("[Java] Step 5: Searching APPDATA .minecraft runtime...");
+    if let Ok(appdata) = std::env::var("APPDATA") {
+        let runtime_dir = Path::new(&appdata).join(".minecraft").join("runtime");
+        if runtime_dir.exists() {
+            crate::log_debug!(
+                "[Java] Step 5: Searching runtime directory: {}",
+                runtime_dir.display()
+            );
+            search_folder_recursive(&runtime_dir, &mut add_candidate, true);
+        }
+    }
+
+    // Step 6: 调用方追加的额外搜索路径（如游戏目录）
+    for (i, extra) in extra_paths.iter().enumerate() {
+        if extra.exists() && extra.is_dir() {
+            crate::log_debug!(
+                "[Java] Step 6.{}: Searching extra path: {}",
+                i,
+                extra.display()
+            );
+            search_folder_recursive(extra, &mut add_candidate, true);
         }
     }
 
@@ -452,25 +511,5 @@ fn get_java_version_weight(major_version: u32) -> u32 {
         20 => 11,
         21 => 29,
         _ => major_version,
-    }
-}
-
-pub fn get_java_requirements(mc_version: &str) -> (Option<u32>, Option<u32>) {
-    let version_parts: Vec<&str> = mc_version.split('.').collect();
-    if version_parts.len() < 2 {
-        return (Some(8), None);
-    }
-
-    let major: u32 = version_parts[0].parse().unwrap_or(1);
-    let minor: u32 = version_parts[1].parse().unwrap_or(0);
-
-    match (major, minor) {
-        (1, 20) if minor >= 5 => (Some(21), None),
-        (1, minor) if minor > 20 => (Some(21), None),
-        (1, 18..=20) => (Some(17), None),
-        (1, 17) => (Some(16), None),
-        (1, 12..=16) => (Some(8), None),
-        (1, minor) if minor <= 5 => (None, Some(8)),
-        _ => (Some(8), None),
     }
 }

@@ -3,60 +3,24 @@
  * 版本选择入口（参考 PCL2 PageLaunchLeft 的 BtnVersion）
  *
  * 显示当前选中的版本（方块图标 + 版本名 + 类型），点击跳转到版本选择页。
- * 不再使用下拉框，版本选择在独立的 /select 页面完成。
+ * 图标优先使用版本设置中自定义的 logo，fallback 到根据 ID 推断的类型图标。
  */
 
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
-import grassIcon from '@/assets/blocks/Grass.png'
-import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
-import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
-import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
-import anvilIcon from '@/assets/blocks/Anvil.png'
-import fabricIcon from '@/assets/blocks/Fabric.png'
-import neoforgeIcon from '@/assets/blocks/NeoForge.png'
-import optifineIcon from '@/assets/blocks/RedstoneLampOn.png'
-import liteloaderIcon from '@/assets/blocks/Egg.png'
+import { useVersionSettings } from '@/composables/useVersionSettings'
 
 const router = useRouter()
 const versionStore = useVersionStore()
-
-/** 推断版本类型（仅根据 ID 字符串匹配） */
-function inferVersionType(id: string): string {
-  if (!id) return 'release'
-  const lower = id.toLowerCase()
-  if (lower.includes('neoforge')) return 'neoforge'
-  if (lower.includes('forge')) return 'forge'
-  if (lower.includes('fabric')) return 'fabric'
-  if (lower.includes('optifine')) return 'optifine'
-  if (lower.includes('liteloader')) return 'liteloader'
-  if (/^\d{2}w\d{2}[a-z]/.test(id)) return 'snapshot'
-  return 'release'
-}
-
-interface TypeMeta {
-  icon: string
-  label: string
-}
-const typeMetaMap: Record<string, TypeMeta> = {
-  release:    { icon: grassIcon,        label: '正式版' },
-  snapshot:   { icon: commandBlockIcon, label: '快照' },
-  forge:      { icon: anvilIcon,        label: 'Forge' },
-  neoforge:   { icon: neoforgeIcon,     label: 'NeoForge' },
-  fabric:     { icon: fabricIcon,       label: 'Fabric' },
-  optifine:   { icon: optifineIcon,     label: 'OptiFine' },
-  liteloader: { icon: liteloaderIcon,   label: 'LiteLoader' },
-  old:        { icon: cobblestoneIcon,  label: '旧版' },
-  fool:       { icon: goldBlockIcon,    label: '愚人节版' },
-}
-const defaultMeta: TypeMeta = { icon: grassIcon, label: '其他' }
+const { currentLogoIcon, currentMeta, loadPersonalization } = useVersionSettings()
 
 const selectedId = computed(() => versionStore.selectedVersion)
-const currentMeta = computed<TypeMeta>(() => {
-  if (!selectedId.value) return defaultMeta
-  return typeMetaMap[inferVersionType(selectedId.value)] ?? defaultMeta
-})
+
+// 选中版本变化时加载个性化设置（用于显示自定义 logo）
+watch(selectedId, async (id) => {
+  if (id) await loadPersonalization()
+}, { immediate: true })
 
 function goToSelect() {
   router.push('/select')
@@ -70,7 +34,7 @@ function goToSelect() {
   >
     <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       <img
-        :src="currentMeta.icon"
+        :src="currentLogoIcon || currentMeta.icon"
         class="h-4 w-4 flex-none rounded-sm"
         alt=""
       >

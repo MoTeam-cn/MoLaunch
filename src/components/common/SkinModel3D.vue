@@ -11,7 +11,17 @@
  */
 
 import { ref, watch, onMounted, onUnmounted, shallowRef } from 'vue'
-import { SkinViewer, WalkingAnimation, IdleAnimation } from 'skinview3d'
+import {
+  SkinViewer,
+  IdleAnimation,
+  WalkingAnimation,
+  RunningAnimation,
+  FlyingAnimation,
+  WaveAnimation,
+  CrouchAnimation,
+  HitAnimation,
+  SwimAnimation,
+} from 'skinview3d'
 
 const props = withDefaults(defineProps<{
   /** 皮肤 PNG dataURL（data:image/png;base64,...） */
@@ -22,8 +32,8 @@ const props = withDefaults(defineProps<{
   variant?: 'classic' | 'slim'
   /** 画布高度（px） */
   height?: number
-  /** 动画类型：'idle' 站立 | 'walk' 行走 | 'none' 无 */
-  animation?: 'idle' | 'walk' | 'none'
+  /** 动画类型 */
+  animation?: AnimationType
 }>(), {
   skinUrl: null,
   capeUrl: null,
@@ -31,6 +41,18 @@ const props = withDefaults(defineProps<{
   height: 320,
   animation: 'idle',
 })
+
+/** skinview3d 支持的全部动画类型 */
+export type AnimationType =
+  | 'idle'    // 站立呼吸
+  | 'walk'    // 行走
+  | 'run'     // 跑步
+  | 'fly'     // 飞行（展示披风/鞘翅动效）
+  | 'wave'    // 挥手
+  | 'crouch'  // 蹲下
+  | 'hit'     // 受击
+  | 'swim'    // 游泳
+  | 'none'    // 静止
 
 const container = ref<HTMLDivElement | null>(null)
 // 用 shallowRef 避免 skinview3d 对象被 Vue 深度代理
@@ -92,15 +114,15 @@ function initViewer() {
 /** 应用动画 */
 function applyAnimation(skinViewer: SkinViewer) {
   switch (props.animation) {
-    case 'walk':
-      skinViewer.animation = new WalkingAnimation()
-      break
-    case 'idle':
-      skinViewer.animation = new IdleAnimation()
-      break
-    case 'none':
-      skinViewer.animation = null
-      break
+    case 'idle':    skinViewer.animation = new IdleAnimation(); break
+    case 'walk':    skinViewer.animation = new WalkingAnimation(); break
+    case 'run':     skinViewer.animation = new RunningAnimation(); break
+    case 'fly':     skinViewer.animation = new FlyingAnimation(); break
+    case 'wave':    skinViewer.animation = new WaveAnimation(); break
+    case 'crouch':  skinViewer.animation = new CrouchAnimation(); break
+    case 'hit':     skinViewer.animation = new HitAnimation(); break
+    case 'swim':    skinViewer.animation = new SwimAnimation(); break
+    case 'none':    skinViewer.animation = null; break
   }
 }
 

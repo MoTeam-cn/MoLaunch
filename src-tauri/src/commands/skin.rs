@@ -211,3 +211,26 @@ pub async fn unequip_cape(state: State<'_, AppState>) -> Result<(), String> {
 
     Ok(())
 }
+
+/// 将 data URL（如 data:image/png;base64,xxxx）保存到本地文件
+///
+/// 用于"下载当前皮肤到本地"功能：前端已通过 download_skin_png 拿到 dataURL，
+/// 用户选择保存位置后调用此命令写入文件。
+#[tauri::command]
+pub async fn save_data_url_to_file(data_url: String, path: String) -> Result<(), String> {
+    // 解析 data URL：data:image/png;base64,<base64 数据>
+    let base64_data = data_url
+        .find(",")
+        .map(|i| &data_url[i + 1..])
+        .ok_or_else(|| "Invalid data URL: missing comma".to_string())?;
+
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_data.trim())
+        .map_err(|e| format!("Base64 解码失败: {}", e))?;
+
+    std::fs::write(&path, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+
+    crate::log_info!("[Skin] Saved data URL to: {} ({} bytes)", path, bytes.len());
+    Ok(())
+}

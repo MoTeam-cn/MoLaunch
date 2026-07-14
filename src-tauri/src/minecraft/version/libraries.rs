@@ -79,6 +79,34 @@ pub fn maven_to_relative_path(name: &str) -> String {
     format!("{}/{}/{}/{}", group, artifact, version, filename)
 }
 
+/// Check if a native classifier matches the current platform architecture.
+///
+/// Mojang's version JSON for lwjgl 3.4.x has `natives-windows`, `natives-windows-x86`,
+/// and `natives-windows-arm64` entries that all have identical rules (`os.name=windows`
+/// with no `arch` field). Without this filter, all three pass `check_rules` and then
+/// collide in `deduplicate_libs` (same key `group:artifact:true`), causing only the
+/// last one in JSON order to survive — typically the wrong architecture.
+pub fn is_native_matching_arch(classifier: &str) -> bool {
+    if cfg!(target_os = "windows") {
+        let is_64bit = std::mem::size_of::<usize>() == 8;
+        match classifier {
+            "natives-windows" => is_64bit, // 64-bit x86
+            "natives-windows-x86" => !is_64bit, // 32-bit x86
+            "natives-windows-arm64" => false, // ARM64 not detected via usize; skip for now
+            _ => true,                     // Unknown windows native, allow
+        }
+    } else if cfg!(target_os = "macos") {
+        let is_arm64 = cfg!(target_arch = "aarch64");
+        match classifier {
+            "natives-macos" => !is_arm64,
+            "natives-macos-arm64" => is_arm64,
+            _ => true,
+        }
+    } else {
+        true // Linux and others: no arch-specific natives to filter
+    }
+}
+
 /// Check if rules match current platform
 pub fn check_rules(rules: &Option<Vec<serde_json::Value>>) -> bool {
     let rules = match rules {
@@ -209,6 +237,54 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
                     });
                 }
             }
+        } else if name.split(':').count() > 3
+            && name.split(':').nth(3).unwrap_or("").starts_with("natives-")
+        {
+            // 新格式（Forge 26.2+）：无 "natives" 字段，但 name 含 natives-xxx classifier
+            // 直接用 downloads.artifact 的路径和 URL
+            let classifier = name.split(':').nth(3).unwrap_or("");
+
+            // 架构过滤：Mojang 的 rules 只检查 os.name 不检查 arch
+            // 三个 windows native 变体都会通过 check_rules，需要在这里过滤
+            if !is_native_matching_arch(classifier) {
+                continue;
+            }
+
+            let (url, local_path, size, sha1) = if let Some(artifact) =
+                library.get("downloads").and_then(|d| d.get("artifact"))
+            {
+                let url = artifact["url"]
+                    .as_str()
+                    .or(root_url.as_deref())
+                    .map(|s| s.to_string());
+                let path = if let Some(p) = artifact["path"].as_str() {
+                    if p.contains("..") {
+                        crate::log_warn!("[Libraries] Skip path traversal in artifact path: {}", p);
+                        continue;
+                    }
+                    game_dir
+                        .join("libraries")
+                        .join(p.replace('/', std::path::MAIN_SEPARATOR_STR))
+                        .to_string_lossy()
+                        .to_string()
+                } else {
+                    maven_to_path(name, game_dir)
+                };
+                let size = artifact["size"].as_i64().unwrap_or(0);
+                let sha1 = artifact["sha1"].as_str().map(|s| s.to_string());
+                (url, path, size, sha1)
+            } else {
+                (root_url, maven_to_path(name, game_dir), 0, None)
+            };
+
+            result.push(LibEntry {
+                original_name: Some(name.to_string()),
+                local_path,
+                size,
+                is_natives: true,
+                sha1,
+                url,
+            });
         } else {
             let (url, local_path, size, sha1) = if let Some(artifact) =
                 library.get("downloads").and_then(|d| d.get("artifact"))

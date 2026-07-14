@@ -23,6 +23,12 @@ pub struct PersonalizationUpdate {
     pub advance_game_args: Option<String>,
     pub advance_run_cmd: Option<String>,
     pub java_path: Option<String>,
+    /// Java 选择模式：None/空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java
+    pub java_mode: Option<String>,
+    /// 自动选择时的最小 Java 主版本（仅 auto_version 模式生效，0=不限）
+    pub java_version_min: Option<u32>,
+    /// 自动选择时的最大 Java 主版本（仅 auto_version 模式生效，0=不限）
+    pub java_version_max: Option<u32>,
     /// 内存模式：None=跟随全局, Some("auto")=自动, Some("custom")=自定义
     pub memory_mode: Option<String>,
     /// 版本独立最小内存（MB，仅 custom 模式生效）
@@ -70,8 +76,14 @@ pub struct VersionSetup {
     pub advance_game_args: Option<String>,
     /// 启动前执行命令（空=跟随全局）
     pub advance_run_cmd: Option<String>,
-    /// 版本独立 Java 路径（空=自动选择）
+    /// 版本独立 Java 路径（仅 JavaMode="custom" 时生效）
     pub java_path: Option<String>,
+    /// Java 选择模式：None/空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java
+    pub java_mode: Option<String>,
+    /// 自动选择时的最小 Java 主版本（仅 JavaMode="auto_version" 时生效，0=不限）
+    pub java_version_min: Option<u32>,
+    /// 自动选择时的最大 Java 主版本（仅 JavaMode="auto_version" 时生效，0=不限）
+    pub java_version_max: Option<u32>,
     /// 内存模式：None/空=跟随全局, "auto"=自动, "custom"=自定义
     pub memory_mode: Option<String>,
     /// 版本独立最小内存（MB，仅 custom 模式生效）
@@ -112,6 +124,9 @@ impl VersionSetup {
             advance_game_args: None,
             advance_run_cmd: None,
             java_path: None,
+            java_mode: None,
+            java_version_min: None,
+            java_version_max: None,
             memory_mode: None,
             min_memory: None,
             max_memory: None,
@@ -145,6 +160,9 @@ impl VersionSetup {
             advance_game_args: None,
             advance_run_cmd: None,
             java_path: None,
+            java_mode: None,
+            java_version_min: None,
+            java_version_max: None,
             memory_mode: None,
             min_memory: None,
             max_memory: None,
@@ -238,6 +256,9 @@ impl VersionSetup {
         let advance_game_args = pick_str("AdvanceGameArgs", &setup.advance_game_args);
         let advance_run_cmd = pick_str("AdvanceRunCmd", &setup.advance_run_cmd);
         let java_path = pick_str("JavaPath", &setup.java_path);
+        let java_mode = pick_str("JavaMode", &setup.java_mode);
+        let java_version_min = pick_u32("JavaVersionMin", setup.java_version_min);
+        let java_version_max = pick_u32("JavaVersionMax", setup.java_version_max);
         let memory_mode = pick_str("MemoryMode", &setup.memory_mode);
         let min_memory = pick_u32("MinMemory", setup.min_memory);
         let max_memory = pick_u32("MaxMemory", setup.max_memory);
@@ -281,6 +302,13 @@ impl VersionSetup {
         content.push_str(&format!("AdvanceGameArgs={}\n", advance_game_args));
         content.push_str(&format!("AdvanceRunCmd={}\n", advance_run_cmd));
         content.push_str(&format!("JavaPath={}\n", java_path));
+        content.push_str(&format!("JavaMode={}\n", java_mode));
+        if let Some(v) = java_version_min {
+            content.push_str(&format!("JavaVersionMin={}\n", v));
+        }
+        if let Some(v) = java_version_max {
+            content.push_str(&format!("JavaVersionMax={}\n", v));
+        }
 
         // 内存设置独立段
         content.push_str("\n[Memory]\n");
@@ -366,9 +394,12 @@ impl VersionSetup {
                 advance_game_args: None,
                 advance_run_cmd: None,
                 java_path: None,
-            memory_mode: None,
-            min_memory: None,
-            max_memory: None,
+                java_mode: None,
+                java_version_min: None,
+                java_version_max: None,
+                memory_mode: None,
+                min_memory: None,
+                max_memory: None,
             });
         let _ = setup.save(version_dir);
         setup
@@ -418,6 +449,15 @@ impl VersionSetup {
         }
         if let Some(ref v) = update.java_path {
             setup.java_path = Some(v.clone());
+        }
+        if let Some(ref v) = update.java_mode {
+            setup.java_mode = Some(v.clone());
+        }
+        if let Some(v) = update.java_version_min {
+            setup.java_version_min = Some(v);
+        }
+        if let Some(v) = update.java_version_max {
+            setup.java_version_max = Some(v);
         }
         if let Some(ref v) = update.memory_mode {
             setup.memory_mode = Some(v.clone());
@@ -472,6 +512,9 @@ impl VersionSetup {
             advance_game_args: ini.get("AdvanceGameArgs").cloned(),
             advance_run_cmd: ini.get("AdvanceRunCmd").cloned(),
             java_path: ini.get("JavaPath").cloned(),
+            java_mode: ini.get("JavaMode").cloned(),
+            java_version_min: ini.get("JavaVersionMin").and_then(|s| s.parse::<u32>().ok()),
+            java_version_max: ini.get("JavaVersionMax").and_then(|s| s.parse::<u32>().ok()),
             memory_mode: ini.get("MemoryMode").cloned(),
             min_memory: ini.get("MinMemory").and_then(|s| s.parse::<u32>().ok()),
             max_memory: ini.get("MaxMemory").and_then(|s| s.parse::<u32>().ok()),
@@ -549,6 +592,9 @@ impl VersionSetup {
             advance_game_args: None,
             advance_run_cmd: None,
             java_path: None,
+            java_mode: None,
+            java_version_min: None,
+            java_version_max: None,
             memory_mode: None,
             min_memory: None,
             max_memory: None,

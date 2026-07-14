@@ -74,6 +74,7 @@ pub fn run() {
             commands::skin::upload_skin,
             commands::skin::equip_cape,
             commands::skin::unequip_cape,
+            commands::skin::save_data_url_to_file,
             // 版本命令
             commands::version::list::list_versions,
             commands::version::download::download_version,
@@ -119,6 +120,8 @@ pub fn run() {
             commands::java::list_java,
             commands::java::select_java_for_mc,
             commands::java::get_java_requirements,
+            commands::java::check_java_compatible,
+            commands::java::download_java,
             // 系统命令
             commands::system::open_game_dir,
             commands::system::open_path,

@@ -11,11 +11,12 @@ import { open } from '@tauri-apps/plugin-shell'
 import { useAuthStore } from '@/stores/auth'
 import {
   getSkinCapeInfo, downloadSkinPng, downloadCapePng, uploadSkin, equipCape, unequipCape,
-  selectFile, type SkinCapeInfo,
+  selectFile, saveFile, saveDataUrlToFile, type SkinCapeInfo,
 } from '@/utils/tauri'
 import { showSuccess, showError } from '@/utils/toast'
 import SkinAvatar from './SkinAvatar.vue'
 import SkinModel3D from './SkinModel3D.vue'
+import Tooltip from './Tooltip.vue'
 import { defaultSkins, getDefaultSkinEntry, getLocalSkinName, setLocalSkinName, bumpSkinVersion } from '@/utils/default-skin'
 
 const props = defineProps<{ visible: boolean }>()
@@ -30,6 +31,21 @@ const capeDataUrl = ref<string | null>(null)
 const variant = ref<'classic' | 'slim'>('classic')
 /** 离线账号当前选中的本地皮肤名称 */
 const selectedLocalSkin = ref<string | null>(null)
+/** 3D 预览动画类型 */
+type AnimationType = 'idle' | 'walk' | 'run' | 'fly' | 'wave' | 'crouch' | 'hit' | 'swim' | 'none'
+const animation = ref<AnimationType>('idle')
+/** 动画选项：图标用 SVG path 数组（24x24 viewBox，stroke 风格） */
+const animationOptions: { value: AnimationType; label: string; paths: string[] }[] = [
+  { value: 'idle', label: '站立', paths: ['M12 2a2 2 0 100 4 2 2 0 000-4z', 'M12 6v10', 'M9 9l3-3 3 3', 'M9 20l3-4 3 4'] },
+  { value: 'walk', label: '行走', paths: ['M13 4a2 2 0 100 4 2 2 0 000-4z', 'M13 8v6', 'M13 11l-3 2', 'M13 11l3 2', 'M13 14l-2 5', 'M13 14l2 5'] },
+  { value: 'run', label: '跑步', paths: ['M14 3a2 2 0 100 4 2 2 0 000-4z', 'M14 7v6', 'M14 9l-4 1', 'M14 9l4 1', 'M14 13l-3 6', 'M14 13l3 6', 'M5 20h4'] },
+  { value: 'fly', label: '飞行', paths: ['M12 2a2 2 0 100 4 2 2 0 000-4z', 'M12 6v8', 'M4 10l8-2 8 2', 'M9 20l3-6 3 6'] },
+  { value: 'wave', label: '挥手', paths: ['M12 5a2 2 0 100 4 2 2 0 000-4z', 'M12 9v8', 'M12 11l-4-2', 'M12 12l4-2', 'M9 19l3-2 3 2'] },
+  { value: 'crouch', label: '蹲下', paths: ['M12 4a2 2 0 100 4 2 2 0 000-4z', 'M12 8v5', 'M9 13h6', 'M8 13v5', 'M16 13v5'] },
+  { value: 'hit', label: '受击', paths: ['M12 3a2 2 0 100 4 2 2 0 000-4z', 'M12 7v8', 'M9 10l-3-1', 'M15 10l3-1', 'M9 20l3-5 3 5'] },
+  { value: 'swim', label: '游泳', paths: ['M5 8a2 2 0 100 4 2 2 0 000-4z', 'M3 14h4l4-2 4 2 4-1 2 1', 'M3 18h4l4-1 4 1 4-1 2 1'] },
+  { value: 'none', label: '静止', paths: ['M12 3a2 2 0 100 4 2 2 0 000-4z', 'M12 7v10', 'M12 7l-3 3', 'M12 7l3 3', 'M9 21h6'] },
+]
 
 const uuid = computed(() => authStore.currentUser?.uuid ?? '')
 const username = computed(() => authStore.currentUser?.name ?? '')
@@ -164,6 +180,24 @@ async function onSelectLocalSkin(skinName: string) {
   showSuccess(`已切换为 ${skinName} 皮肤`)
 }
 
+/** 下载当前皮肤 PNG 到本地（弹出保存对话框） */
+async function saveSkinToLocal() {
+  if (!skinDataUrl.value) {
+    showError('当前无皮肤数据')
+    return
+  }
+  // 皮肤文件名：用户名_皮肤模型.png
+  const defaultName = `${username.value || 'skin'}_${variant.value === 'slim' ? 'alex' : 'steve'}.png`
+  const savePath = await saveFile('保存皮肤', defaultName, [{ name: 'PNG 图片', extensions: ['png'] }])
+  if (!savePath) return
+  try {
+    await saveDataUrlToFile(skinDataUrl.value, savePath)
+    showSuccess(`皮肤已保存到：${savePath}`)
+  } catch (e) {
+    showError('保存失败：' + String(e))
+  }
+}
+
 function openChangePassword() {
   open('https://account.live.com/password/Change').catch(() => showError('打开网页失败'))
 }
@@ -236,6 +270,7 @@ watch(() => props.visible, (v) => {
                     :cape-url="capeDataUrl"
                     :variant="variant"
                     :height="280"
+                    :animation="animation"
                   />
                 </div>
                 <div class="mt-3 flex items-center gap-3">
@@ -246,6 +281,19 @@ watch(() => props.visible, (v) => {
                     <div v-if="isMicrosoft">当前披风：{{ activeCape?.display_name ?? '未装备' }}</div>
                     <div v-else>当前皮肤：{{ selectedLocalSkin ?? '默认' }}</div>
                   </div>
+                  <!-- 下载当前皮肤按钮 -->
+                  <Tooltip text="下载当前皮肤 PNG 到本地" position="top" :delay="0">
+                    <button
+                      class="flex-none flex h-7 w-7 items-center justify-center rounded border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
+                      :disabled="!skinDataUrl"
+                      @click="saveSkinToLocal"
+                    >
+                      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 3a1 1 0 011 1v6.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 10.586V4a1 1 0 011-1z" />
+                        <path d="M3 14a1 1 0 011 1v1h12v-1a1 1 0 112 0v2a1 1 0 01-1 1H3a1 1 0 01-1-1v-2a1 1 0 011-1z" />
+                      </svg>
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
 
@@ -327,6 +375,32 @@ watch(() => props.visible, (v) => {
                       <span>修改用户名（每30天一次）</span>
                       <svg class="h-3.5 w-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor"><path d="M11 3a1 1 0 100 2h2.586l-6.293 6.293a1 1 0 101.414 1.414L15 6.414V9a1 1 0 102 0V4a1 1 0 00-1-1h-5z" /><path d="M5 5a2 2 0 00-2 2v8a2 2 0 002 2h8a2 2 0 002-2v-3a1 1 0 10-2 0v3H5V7h3a1 1 0 000-2H5z" /></svg>
                     </button>
+                  </div>
+                </div>
+
+                <!-- 动画状态（所有账号类型共用） -->
+                <div class="rounded-lg border border-gray-100 p-4">
+                  <div class="mb-3 text-sm font-medium text-gray-700">动画状态</div>
+                  <div class="flex flex-wrap gap-1.5">
+                    <Tooltip
+                      v-for="opt in animationOptions"
+                      :key="opt.value"
+                      :text="opt.label"
+                      position="top"
+                      :delay="0"
+                    >
+                      <button
+                        class="flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
+                        :class="animation === opt.value
+                          ? 'border-primary-500 bg-primary-50 text-primary-700'
+                          : 'border-gray-200 text-gray-500 hover:bg-gray-50'"
+                        @click="animation = opt.value"
+                      >
+                        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                          <path v-for="(d, i) in opt.paths" :key="i" :d="d" />
+                        </svg>
+                      </button>
+                    </Tooltip>
                   </div>
                 </div>
               </div>

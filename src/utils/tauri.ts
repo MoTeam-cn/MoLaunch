@@ -5,7 +5,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import type { AuthResult, SdkStatus, MsAccountInfo, OfflineAccountInfo, DeviceCodeInfo, PollResult, LoginConfig } from '@/types/auth'
 import type { VersionList } from '@/types/version'
-import type { JavaRuntime } from '@/types/java'
+import type { JavaRuntime, JavaRequirements, JavaCompatResult } from '@/types/java'
 
 /**
  * 获取平台信息
@@ -158,6 +158,8 @@ export async function listInstalledVersions(): Promise<string[]> {
 export interface InstalledVersionInfo {
   id: string
   version_type: string
+  /** 自定义图标文件名（空=自动判断） */
+  logo: string
 }
 
 /**
@@ -230,6 +232,12 @@ export interface VersionPersonalization {
   advance_game_args: string
   advance_run_cmd: string
   java_path: string
+  /** Java 选择模式：空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java */
+  java_mode: string
+  /** 自动选择时的最小 Java 主版本（仅 auto_version 模式生效，0=不限） */
+  java_version_min: number
+  /** 自动选择时的最大 Java 主版本（仅 auto_version 模式生效，0=不限） */
+  java_version_max: number
   /** 内存模式（空=跟随全局, "auto"=自动, "custom"=自定义） */
   memory_mode: string
   /** 版本独立最小内存（MB，仅 custom 模式生效，0 表示未设置） */
@@ -251,6 +259,12 @@ export interface PersonalizationUpdate {
   advanceGameArgs?: string
   advanceRunCmd?: string
   javaPath?: string
+  /** Java 选择模式：空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java */
+  javaMode?: string
+  /** 自动选择时的最小 Java 主版本（仅 auto_version 模式生效，0=不限） */
+  javaVersionMin?: number
+  /** 自动选择时的最大 Java 主版本（仅 auto_version 模式生效，0=不限） */
+  javaVersionMax?: number
   /** 内存模式：传空字符串=跟随全局, "auto"=自动, "custom"=自定义 */
   memoryMode?: string
   /** 版本独立最小内存（MB） */
@@ -412,6 +426,54 @@ export async function detectJava(): Promise<JavaRuntime> {
  */
 export async function listJava(): Promise<JavaRuntime[]> {
   return await invoke<JavaRuntime[]>('list_java')
+}
+
+/**
+ * 获取 MC 版本的 Java 需求（支持加载器约束）
+ */
+export async function getJavaRequirements(
+  mcVersion: string,
+  loader?: string | null,
+): Promise<JavaRequirements> {
+  return await invoke<JavaRequirements>('get_java_requirements', {
+    mcVersion,
+    loader: loader ?? null,
+  })
+}
+
+/**
+ * 检查指定 Java 是否兼容 MC 版本需求
+ */
+export async function checkJavaCompatible(
+  javaPath: string,
+  mcVersion: string,
+  loader?: string | null,
+): Promise<JavaCompatResult> {
+  return await invoke<JavaCompatResult>('check_java_compatible', {
+    javaPath,
+    mcVersion,
+    loader: loader ?? null,
+  })
+}
+
+/**
+ * Java 下载进度事件名
+ */
+export const JAVA_DOWNLOAD_PROGRESS_EVENT = 'java-download-progress'
+
+// 重新导出 Java 下载进度类型（便于 store/组件通过 tauri 命名空间访问）
+export type { JavaDownloadProgress } from '@/types/java'
+
+/**
+ * 下载 Java Runtime（从 Mojang 官方 Java Runtime 索引）
+ *
+ * @param targetMajor 目标 Java 大版本号（如 21、17、8）
+ * @returns 下载的 java.exe 完整路径
+ *
+ * 进度通过 `java-download-progress` 事件推送，监听 `JavaDownloadProgress` payload
+ */
+export async function downloadJava(targetMajor: number): Promise<string> {
+  return await invoke<string>('download_java', { targetMajor })
 }
 
 /**
@@ -866,6 +928,15 @@ export async function downloadSkinPng(uuid?: string): Promise<string> {
  */
 export async function downloadCapePng(): Promise<string | null> {
   return await invoke<string | null>('download_cape_png')
+}
+
+/**
+ * 将 data URL（如 data:image/png;base64,xxxx）保存到本地文件
+ *
+ * 用于"下载当前皮肤到本地"：前端已有 dataURL，用户选择保存位置后调用此命令写入
+ */
+export async function saveDataUrlToFile(dataUrl: string, path: string): Promise<void> {
+  return await invoke<void>('save_data_url_to_file', { dataUrl, path })
 }
 
 /**

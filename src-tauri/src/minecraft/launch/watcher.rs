@@ -212,12 +212,24 @@ impl GameWatcher {
             let max_lines = self.max_log_lines;
 
             tokio::spawn(async move {
-                let reader = BufReader::new(stdout);
-                let mut lines = reader.lines();
+                let mut reader = BufReader::new(stdout);
+                let mut buf: Vec<u8> = Vec::with_capacity(1024);
 
                 loop {
-                    match lines.next_line().await {
-                        Ok(Some(line)) => {
+                    buf.clear();
+                    match reader.read_until(b'\n', &mut buf).await {
+                        Ok(0) => break, // 流正常关闭
+                        Ok(_) => {
+                            // 去掉末尾换行符
+                            if buf.last() == Some(&b'\n') {
+                                buf.pop();
+                                if buf.last() == Some(&b'\r') {
+                                    buf.pop();
+                                }
+                            }
+                            // Java 在 Windows 上默认按 GBK 输出，可能不是合法 UTF-8
+                            // 用 lossy 转换避免读取中断
+                            let line = String::from_utf8_lossy(&buf).to_string();
                             let entry = Self::parse_log_line(&line, "stdout");
 
                             // 检测加载进度
@@ -244,9 +256,7 @@ impl GameWatcher {
                                 buffer.pop_front();
                             }
                         }
-                        Ok(None) => break, // 流正常关闭
                         Err(e) => {
-                            // 非 UTF-8 行或读取错误：记录后退出，避免静默吞错
                             crate::log_warn!("[Watcher] stdout 读取异常: {}", e);
                             break;
                         }
@@ -261,12 +271,21 @@ impl GameWatcher {
             let max_lines = self.max_log_lines;
 
             tokio::spawn(async move {
-                let reader = BufReader::new(stderr);
-                let mut lines = reader.lines();
+                let mut reader = BufReader::new(stderr);
+                let mut buf: Vec<u8> = Vec::with_capacity(1024);
 
                 loop {
-                    match lines.next_line().await {
-                        Ok(Some(line)) => {
+                    buf.clear();
+                    match reader.read_until(b'\n', &mut buf).await {
+                        Ok(0) => break, // 流正常关闭
+                        Ok(_) => {
+                            if buf.last() == Some(&b'\n') {
+                                buf.pop();
+                                if buf.last() == Some(&b'\r') {
+                                    buf.pop();
+                                }
+                            }
+                            let line = String::from_utf8_lossy(&buf).to_string();
                             let entry = Self::parse_log_line(&line, "stderr");
                             let mut buffer = log_buffer.lock().await;
                             buffer.push_back(entry);
@@ -274,7 +293,6 @@ impl GameWatcher {
                                 buffer.pop_front();
                             }
                         }
-                        Ok(None) => break, // 流正常关闭
                         Err(e) => {
                             crate::log_warn!("[Watcher] stderr 读取异常: {}", e);
                             break;

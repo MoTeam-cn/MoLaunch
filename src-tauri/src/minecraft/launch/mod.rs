@@ -135,7 +135,8 @@ pub fn build_launch_arguments(
     );
 
     let jvm_args = build_jvm_args(
-        game_dir, version_id, &classpath, min_memory, max_memory, java_path, extra_jvm_args,
+        game_dir, version_id, &classpath, min_memory, max_memory, java_path,
+        extra_jvm_args, &json,
     )?;
     let game_args = build_game_args(
         &json,
@@ -196,14 +197,39 @@ fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyhow::Result<
 
     if let Some(libraries) = json["libraries"].as_array() {
         for lib in libraries {
+            // 应用 rules 过滤（平台适配）
+            let rules: Option<Vec<serde_json::Value>> = lib
+                .get("rules")
+                .and_then(|v| v.as_array())
+                .map(|a| a.clone());
+            if !crate::minecraft::version::libraries::check_rules(&rules) {
+                continue;
+            }
+
+            // 解析 maven name 判断是否有 classifier（如 "natives-windows"）
+            // 有 classifier 的是 native 包，应通过 extract_natives 处理，不放入 classpath
+            // 但对于"无 natives 字段但有 classifier"的新格式，需要特殊处理（见 extract_natives）
+            let has_classifier = lib["name"]
+                .as_str()
+                .map(|n| n.split(':').count() > 3)
+                .unwrap_or(false);
+
+            // 优先用 downloads.artifact.path（更准确）
             if let Some(artifact) = lib.get("downloads").and_then(|d| d.get("artifact")) {
                 if let Some(path) = artifact["path"].as_str() {
+                    // 跳过 native 包（有 classifier 且 classifier 含 "natives"）
+                    let is_native = has_classifier
+                        && path.contains("natives-");
+                    if is_native {
+                        continue;
+                    }
                     let lib_path = game_dir.join("libraries").join(path);
                     if lib_path.exists() {
                         entries.push(lib_path.to_string_lossy().to_string());
                     }
                 }
             } else if let Some(name) = lib["name"].as_str() {
+                // 没有 downloads.artifact，用 maven name 解析路径
                 let path = maven_name_to_path(name);
                 let lib_path = game_dir.join("libraries").join(&path);
                 if lib_path.exists() {
@@ -289,6 +315,7 @@ fn build_jvm_args(
     max_memory: u32,
     java_path: &Path,
     extra_jvm_args: &[String],
+    json: &serde_json::Value,
 ) -> anyhow::Result<Vec<String>> {
     let mut args = Vec::new();
 
@@ -304,6 +331,45 @@ fn build_jvm_args(
             args.push("-XX:+UseZGC".to_string());
         } else {
             args.push("-XX:+UseG1GC".to_string());
+        }
+    }
+
+    // 版本 JSON 的 arguments.jvm（必需 JVM 参数，如 -Djava.net.preferIPv6Addresses=system）
+    // 参考 PCL2：解析 arguments.jvm，应用 rules 过滤，跳过已处理的 -cp 和 -Djava.library.path
+    if let Some(jvm_args_json) = json["arguments"]["jvm"].as_array() {
+        for arg in jvm_args_json {
+            let (value, rules) = if let Some(s) = arg.as_str() {
+                (s.to_string(), None)
+            } else if let Some(obj) = arg.as_object() {
+                let value = obj.get("value").and_then(|v| {
+                    if let Some(s) = v.as_str() {
+                        Some(s.to_string())
+                    } else if let Some(arr) = v.as_array() {
+                        Some(arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>().join(" "))
+                    } else {
+                        None
+                    }
+                });
+                let rules = obj.get("rules").and_then(|r| r.as_array()).map(|a| a.clone());
+                match value {
+                    Some(v) => (v, rules),
+                    None => continue,
+                }
+            } else {
+                continue;
+            };
+
+            // 应用 rules 过滤
+            if !crate::minecraft::version::libraries::check_rules(&rules) {
+                continue;
+            }
+
+            // 跳过已处理的参数
+            if value.contains("${classpath}") || value.contains("${natives_directory}") {
+                continue;
+            }
+
+            args.push(value);
         }
     }
 
@@ -359,14 +425,64 @@ fn build_game_args(
 
     if let Some(game_args) = json["arguments"]["game"].as_array() {
         for arg in game_args {
-            if let Some(arg_str) = arg.as_str() {
-                args.push(arg_str.to_string());
+            let (value, rules) = if let Some(s) = arg.as_str() {
+                (s.to_string(), None)
+            } else if let Some(obj) = arg.as_object() {
+                let value = obj.get("value").and_then(|v| {
+                    if let Some(s) = v.as_str() {
+                        Some(s.to_string())
+                    } else if let Some(arr) = v.as_array() {
+                        Some(arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>().join(" "))
+                    } else {
+                        None
+                    }
+                });
+                let rules = obj.get("rules").and_then(|r| r.as_array()).map(|a| a.clone());
+                match value {
+                    Some(v) => (v, rules),
+                    None => continue,
+                }
+            } else {
+                continue;
+            };
+
+            if !crate::minecraft::version::libraries::check_rules(&rules) {
+                continue;
             }
+
+            args.push(value);
         }
     } else if let Some(mc_args) = json["minecraftArguments"].as_str() {
         for arg in mc_args.split(' ') {
             args.push(arg.to_string());
         }
+    }
+
+    // 如果 arguments.game 未提供标准 Minecraft 客户端参数（如 Forge 26.2 自包含 JSON），
+    // 自动补充必需参数（参考 Mojang 原版 JSON 的 arguments.game 模板）
+    if !args.iter().any(|a| a == "--accessToken") {
+        let mut std_args = vec![
+            "--username".to_string(),
+            "${auth_player_name}".to_string(),
+            "--version".to_string(),
+            "${version_name}".to_string(),
+            "--gameDir".to_string(),
+            "${game_directory}".to_string(),
+            "--assetsDir".to_string(),
+            "${assets_root}".to_string(),
+            "--assetIndex".to_string(),
+            "${assets_index_name}".to_string(),
+            "--uuid".to_string(),
+            "${auth_uuid}".to_string(),
+            "--accessToken".to_string(),
+            "${auth_access_token}".to_string(),
+            "--userType".to_string(),
+            "${user_type}".to_string(),
+            "--versionType".to_string(),
+            "${version_type}".to_string(),
+        ];
+        std_args.extend(args);
+        args = std_args;
     }
 
     let mut final_args = Vec::new();
@@ -383,7 +499,8 @@ fn build_game_args(
             .replace("${game_assets}", assets_dir)
             .replace("${assets_root}", assets_dir)
             .replace("${assets_index_name}", asset_index)
-            .replace("${user_properties}", "{}");
+            .replace("${user_properties}", "{}")
+            .replace("${version_type}", "MoLaunch");
         final_args.push(replaced);
     }
 
