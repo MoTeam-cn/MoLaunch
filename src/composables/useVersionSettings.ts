@@ -8,6 +8,7 @@
 import { ref, computed } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
+import { inferVersionType, typeMetaMap } from '@/composables/useVersionMeta'
 import grassIcon from '@/assets/blocks/Grass.png'
 import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
 import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
@@ -66,31 +67,6 @@ const displayTypeOptions = [
   { value: 5, label: '愚人节' },
   { value: 1, label: '隐藏' },
 ]
-
-/** 推断版本类型 */
-function inferVersionType(id: string): string {
-  if (!id) return 'release'
-  const lower = id.toLowerCase()
-  if (lower.includes('neoforge')) return 'neoforge'
-  if (lower.includes('forge')) return 'forge'
-  if (lower.includes('fabric')) return 'fabric'
-  if (lower.includes('optifine')) return 'optifine'
-  if (lower.includes('liteloader')) return 'liteloader'
-  if (/^\d{2}w\d{2}[a-z]/.test(id)) return 'snapshot'
-  return 'release'
-}
-
-const typeMetaMap: Record<string, { icon: string; label: string }> = {
-  release: { icon: grassIcon, label: '正式版' },
-  snapshot: { icon: commandBlockIcon, label: '快照' },
-  forge: { icon: anvilIcon, label: 'Forge' },
-  neoforge: { icon: neoforgeIcon, label: 'NeoForge' },
-  fabric: { icon: fabricIcon, label: 'Fabric' },
-  optifine: { icon: optifinIcon, label: 'OptiFine' },
-  liteloader: { icon: liteloaderIcon, label: 'LiteLoader' },
-  old: { icon: cobblestoneIcon, label: '旧版' },
-  fool: { icon: goldBlockIcon, label: '愚人节版' },
-}
 
 const currentMeta = computed(() => {
   if (!selectedId.value) return { icon: grassIcon, label: '其他' }

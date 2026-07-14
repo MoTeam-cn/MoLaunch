@@ -103,19 +103,7 @@ impl Storage {
         let template = ini::IniFile::parse(&template_content);
         let mut current = self.read_config()?;
 
-        let mut modified = false;
-        for section in template.sections() {
-            let template_pairs = template.get_section(&section);
-            for (key, value) in &template_pairs {
-                if !current.has_key(&section, key) {
-                    log_info!("Config sync: [{}] {} = {}", section, key, value);
-                    current.set(&section, key, value);
-                    modified = true;
-                }
-            }
-        }
-
-        if modified {
+        if current.merge_missing_from(&template) {
             self.write_config(&current)?;
             log_info!("Config synced with template");
         }

@@ -63,7 +63,7 @@ fn is_valid_config_key(section: &str, key: &str) -> bool {
     }
 }
 
-/// 设置配置值（写入 storage）
+/// 设置配置值（写入 storage + 同步内存 AppConfig）
 #[tauri::command]
 pub async fn set_config_value(
     state: State<'_, AppState>,
@@ -81,25 +81,60 @@ pub async fn set_config_value(
         .set_config(&section, &key, &value)
         .map_err(|e| e.to_string())?;
 
-    // 日志级别热重载：同时更新 logger 运行时级别 + state.config 内存
-    // 否则后续 save_config(&state.config) 会用内存中的旧 log_level 覆盖 storage 的新值
-    if section == "Log" && key == "level" {
-        if let Ok(level) = value.parse::<u32>() {
-            let log_level = match level {
-                0 => crate::logger::LogLevel::Error,
-                1 => crate::logger::LogLevel::Error,
-                2 => crate::logger::LogLevel::Warn,
-                3 => crate::logger::LogLevel::Info,
-                4 => crate::logger::LogLevel::Debug,
-                5 => crate::logger::LogLevel::Trace,
-                _ => crate::logger::LogLevel::Info,
-            };
-            crate::logger::set_level(log_level);
-            // 同步刷新内存中的 AppConfig.log_level，避免 save_config 覆盖
-            let mut config = state.config.lock().await;
-            config.log_level = level;
-            log_info!("Log level changed to: {}", level);
+    // 同步刷新内存中的 AppConfig，避免后续 save_config 用内存旧值覆盖 INI 新值
+    // （此前仅 Log/level 做了特例补丁，其余字段存在数据覆盖风险）
+    let mut config = state.config.lock().await;
+    match (section.as_str(), key.as_str()) {
+        ("General", "game_dir") => config.game_dir = value.clone(),
+        ("General", "theme") => config.theme = value.clone(),
+        ("General", "language") => config.language = value.clone(),
+        ("General", "isolation_mode") => {
+            config.isolation_mode = value.parse().unwrap_or(0);
         }
+        ("Java", "path") => {} // Java path 不在 AppConfig 中，走 INI [Java] 独立存储
+        ("Download", "max_threads") => {
+            config.max_download_threads = value.parse().unwrap_or(0);
+        }
+        ("Download", "max_speed") => {
+            config.max_download_speed = value.parse().unwrap_or(0);
+        }
+        ("Download", "source") => config.download_source = value.clone(),
+        ("Download", "mirror_mode") => {
+            config.mirror_mode = value.parse().unwrap_or(0);
+        }
+        ("Download", "chunk_count") => {
+            config.chunk_count = value.parse().unwrap_or(0);
+        }
+        ("Mirror", "url") => config.mirror_url = if value.is_empty() { None } else { Some(value.clone()) },
+        ("Mirror", "url_meta") => config.mirror_url_meta = if value.is_empty() { None } else { Some(value.clone()) },
+        ("Mirror", "url_download") => config.mirror_url_download = if value.is_empty() { None } else { Some(value.clone()) },
+        ("Memory", "mode") => config.memory_mode = value.clone(),
+        ("Memory", "min") => {
+            config.min_memory = value.parse().unwrap_or(0);
+        }
+        ("Memory", "max") => {
+            config.max_memory = value.parse().unwrap_or(0);
+        }
+        ("Log", "level") => {
+            if let Ok(level) = value.parse::<u32>() {
+                let log_level = match level {
+                    0 => crate::logger::LogLevel::Error,
+                    1 => crate::logger::LogLevel::Error,
+                    2 => crate::logger::LogLevel::Warn,
+                    3 => crate::logger::LogLevel::Info,
+                    4 => crate::logger::LogLevel::Debug,
+                    5 => crate::logger::LogLevel::Trace,
+                    _ => crate::logger::LogLevel::Info,
+                };
+                crate::logger::set_level(log_level);
+                config.log_level = level;
+                log_info!("Log level changed to: {}", level);
+            }
+        }
+        ("Proxy", "mode") => config.proxy_mode = value.clone(),
+        ("Proxy", "type") => config.proxy_type = value.clone(),
+        ("Proxy", "url") => config.proxy_url = value.clone(),
+        _ => {}
     }
 
     Ok(())

@@ -100,11 +100,8 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
 
     // 自动模式：如果 memory_mode 为 "auto"，计算自动值用于运行时
     if app_config.memory_mode == "auto" {
-        let sys_mem = crate::minecraft::system::get_system_memory();
-        let available_mb = (sys_mem.available / 1024 / 1024) as u32;
-        let suggested_max = std::cmp::min((available_mb as f64 * 0.75) as u32, 8192);
-        let suggested_max = std::cmp::max(suggested_max, 512);
-        let suggested_min = suggested_max / 2;
+        let (suggested_min, suggested_max) =
+            crate::minecraft::system::suggest_memory();
         app_config.min_memory = suggested_min;
         app_config.max_memory = suggested_max;
         log_info!(

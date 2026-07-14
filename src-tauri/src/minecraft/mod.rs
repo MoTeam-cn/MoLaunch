@@ -10,7 +10,6 @@ pub mod language;
 pub mod launch;
 pub mod launcher_profiles;
 pub mod loaders;
-pub mod login;
 pub mod skin;
 pub mod sources;
 pub mod system;

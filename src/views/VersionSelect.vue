@@ -18,14 +18,7 @@ import * as tauri from '@/utils/tauri'
 import { showSuccess, showWarning, showError } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
 import grassIcon from '@/assets/blocks/Grass.png'
-import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
-import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
-import goldBlockIcon from '@/assets/blocks/GoldBlock.png'
-import anvilIcon from '@/assets/blocks/Anvil.png'
-import fabricIcon from '@/assets/blocks/Fabric.png'
-import neoforgeIcon from '@/assets/blocks/NeoForge.png'
-import optifineIcon from '@/assets/blocks/RedstoneLampOn.png'
-import liteloaderIcon from '@/assets/blocks/Egg.png'
+import { inferVersionType, typeMetaMap, type VersionTypeMeta } from '@/composables/useVersionMeta'
 
 const router = useRouter()
 const versionStore = useVersionStore()
@@ -49,40 +42,9 @@ const currentPath = ref<string>('')
 const loading = ref(false)
 const switchingFolder = ref(false)
 
-/** 推断版本类型 */
-function inferVersionType(id: string, backendType: string): string {
-  const lower = id.toLowerCase()
-  if (lower.includes('neoforge')) return 'neoforge'
-  if (lower.includes('forge')) return 'forge'
-  if (lower.includes('fabric')) return 'fabric'
-  if (lower.includes('optifine')) return 'optifine'
-  if (lower.includes('liteloader')) return 'liteloader'
-  if (/^\d{2}w\d{2}[a-z]/.test(id)) return 'snapshot'
-  if (backendType === 'old_beta' || backendType === 'old_alpha') return 'old'
-  if (backendType === 'fool') return 'fool'
-  return backendType || 'release'
-}
+const defaultMeta: VersionTypeMeta = { icon: grassIcon, label: '其他', groupTitle: '其他版本', order: 99 }
 
-interface TypeMeta {
-  icon: string
-  label: string
-  groupTitle: string
-  order: number
-}
-const typeMetaMap: Record<string, TypeMeta> = {
-  forge:      { icon: anvilIcon,        label: 'Forge',      groupTitle: 'Forge 版本',      order: 1 },
-  neoforge:   { icon: neoforgeIcon,     label: 'NeoForge',   groupTitle: 'NeoForge 版本',   order: 2 },
-  fabric:     { icon: fabricIcon,       label: 'Fabric',     groupTitle: 'Fabric 版本',     order: 3 },
-  optifine:   { icon: optifineIcon,     label: 'OptiFine',   groupTitle: 'OptiFine 版本',   order: 4 },
-  liteloader: { icon: liteloaderIcon,   label: 'LiteLoader', groupTitle: 'LiteLoader 版本', order: 5 },
-  release:    { icon: grassIcon,        label: '正式版',     groupTitle: '原版游戏',         order: 6 },
-  snapshot:   { icon: commandBlockIcon, label: '快照',       groupTitle: '快照版本',         order: 7 },
-  old:        { icon: cobblestoneIcon,  label: '旧版',       groupTitle: '不常用版本',       order: 8 },
-  fool:       { icon: goldBlockIcon,    label: '愚人节版',   groupTitle: '愚人节版本',       order: 9 },
-}
-const defaultMeta: TypeMeta = { icon: grassIcon, label: '其他', groupTitle: '其他版本', order: 99 }
-
-function typeMeta(type: string): TypeMeta {
+function typeMeta(type: string): VersionTypeMeta {
   return typeMetaMap[type] ?? defaultMeta
 }
 
@@ -118,7 +80,7 @@ async function loadInstalled() {
     installed.value = list.map(v => ({
       id: v.id,
       version_type: v.version_type,
-      inferredType: inferVersionType(v.id, v.version_type),
+      inferredType: inferVersionType(v.id, undefined, v.version_type),
       logo: v.logo || '',
     }))
     if (installed.value.length > 0) {

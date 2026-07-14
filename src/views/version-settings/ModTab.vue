@@ -10,6 +10,7 @@ import * as tauri from '@/utils/tauri'
 import { showSuccess, showError } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { useVersionSettings } from '@/composables/useVersionSettings'
+import { formatBytes } from '@/utils/format'
 
 const router = useRouter()
 const { selectedId, isModable } = useVersionSettings()
@@ -59,12 +60,6 @@ const filteredMods = computed(() => {
   }
   return list
 })
-
-function formatSize(bytes: number): string {
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(2)} MB`
-}
 
 async function handleToggleMod(mod: tauri.ModInfo) {
   if (!selectedId.value) return
@@ -249,7 +244,7 @@ onMounted(async () => {
           <div class="min-w-0 flex-1">
             <div class="truncate text-sm font-medium text-gray-800">{{ mod.enabled_name }}</div>
             <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-400">
-              <span>{{ formatSize(mod.size) }}</span>
+              <span>{{ formatBytes(mod.size) }}</span>
               <span v-if="mod.loader_type !== 'unknown'">·</span>
               <span v-if="mod.loader_type !== 'unknown'">{{ mod.loader_type }}</span>
               <span>·</span>

@@ -5,7 +5,8 @@ import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
 import { showError } from '@/utils/modal'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatMemoryMB } from '@/utils/format'
+import { useDebouncedSave } from '@/composables/useDebouncedSave'
 import Select from '@/components/common/Select.vue'
 
 const javaStore = useJavaStore()
@@ -42,13 +43,6 @@ watch(showJavaList, (open) => {
     document.removeEventListener('click', handleDocumentClick)
   }
 })
-
-function formatMemory(mb: number): string {
-  if (mb >= 1024) {
-    return (mb / 1024).toFixed(1).replace(/\.0$/, '') + ' GB'
-  }
-  return mb + ' MB'
-}
 
 
 
@@ -104,13 +98,7 @@ async function handleManualImportJava() {
   }
 }
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-
 async function flushSave() {
-  if (saveTimer) {
-    clearTimeout(saveTimer)
-    saveTimer = null
-  }
   try {
     await tauri.setMinMemory(minMemory.value)
     await tauri.setMaxMemory(maxMemory.value)
@@ -119,13 +107,14 @@ async function flushSave() {
   }
 }
 
+const { scheduleSave } = useDebouncedSave(flushSave, 500)
+
 function autoSave() {
   if (!loaded.value) return
   // 自动模式下不保存内存配置到文件，启动时动态计算
   if (memoryMode.value === 'auto') return
 
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(flushSave, 500)
+  scheduleSave()
 }
 
 watch([minMemory, maxMemory], autoSave)
@@ -207,10 +196,7 @@ onUnmounted(() => {
     clearInterval(memoryTimer)
     memoryTimer = null
   }
-  // 若有未 flush 的保存任务，立即执行（不等待，避免丢失用户最后一次调整）
-  if (saveTimer) {
-    void flushSave()
-  }
+  // 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush
 })
 </script>
 
@@ -339,22 +325,22 @@ onUnmounted(() => {
           <div
             class="h-full bg-orange-400 transition-all duration-500"
             :style="{ width: usedPercent + '%' }"
-            :title="'系统已用: ' + formatMemory(usedMemoryMB)"
+            :title="'系统已用: ' + formatMemoryMB(usedMemoryMB)"
           />
           <div
             class="h-full bg-primary-500 transition-all duration-500"
             :style="{ width: gamePercent + '%' }"
-            :title="'游戏分配: ' + formatMemory(gameMemoryMB)"
+            :title="'游戏分配: ' + formatMemoryMB(gameMemoryMB)"
           />
           <div
             class="h-full bg-green-400 transition-all duration-500 flex-1"
-            :title="'剩余: ' + formatMemory(otherMemoryMB)"
+            :title="'剩余: ' + formatMemoryMB(otherMemoryMB)"
           />
         </div>
         <div class="flex items-center gap-4 mt-2 text-xs">
-          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span> 系统占用 {{ formatMemory(usedMemoryMB) }}</span>
-          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-primary-500"></span> 游戏分配 {{ formatMemory(gameMemoryMB) }}</span>
-          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-green-400"></span> 剩余 {{ formatMemory(otherMemoryMB) }}</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span> 系统占用 {{ formatMemoryMB(usedMemoryMB) }}</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-primary-500"></span> 游戏分配 {{ formatMemoryMB(gameMemoryMB) }}</span>
+          <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-green-400"></span> 剩余 {{ formatMemoryMB(otherMemoryMB) }}</span>
         </div>
       </div>
 
@@ -393,7 +379,7 @@ onUnmounted(() => {
               <p class="text-sm font-medium text-gray-900">游戏最大内存</p>
               <p class="text-xs text-gray-500 mt-0.5">根据可用内存自动分配 75%，上限 8 GB</p>
             </div>
-            <span class="text-lg font-bold text-primary-600">{{ formatMemory(maxMemory) }}</span>
+            <span class="text-lg font-bold text-primary-600">{{ formatMemoryMB(maxMemory) }}</span>
           </div>
         </div>
         <!-- 自定义模式：滑动条 -->
@@ -401,7 +387,7 @@ onUnmounted(() => {
           <div>
             <div class="flex items-center justify-between mb-2">
               <p class="text-sm font-medium text-gray-900">最大内存</p>
-              <span class="text-sm font-bold text-primary-600">{{ formatMemory(maxMemory) }}</span>
+              <span class="text-sm font-bold text-primary-600">{{ formatMemoryMB(maxMemory) }}</span>
             </div>
             <input
               v-model.number="maxMemory"
@@ -413,13 +399,13 @@ onUnmounted(() => {
             />
             <div class="flex justify-between text-xs text-gray-400 mt-1">
               <span>512 MB</span>
-              <span>{{ formatMemory(totalMemoryMB > 0 ? Math.min(totalMemoryMB, 16384) : 8192) }}</span>
+              <span>{{ formatMemoryMB(totalMemoryMB > 0 ? Math.min(totalMemoryMB, 16384) : 8192) }}</span>
             </div>
           </div>
           <div>
             <div class="flex items-center justify-between mb-2">
               <p class="text-sm font-medium text-gray-900">最小内存</p>
-              <span class="text-sm font-bold text-gray-600">{{ formatMemory(minMemory) }}</span>
+              <span class="text-sm font-bold text-gray-600">{{ formatMemoryMB(minMemory) }}</span>
             </div>
             <input
               v-model.number="minMemory"
@@ -431,7 +417,7 @@ onUnmounted(() => {
             />
             <div class="flex justify-between text-xs text-gray-400 mt-1">
               <span>256 MB</span>
-              <span>{{ formatMemory(maxMemory) }}</span>
+              <span>{{ formatMemoryMB(maxMemory) }}</span>
             </div>
           </div>
         </div>

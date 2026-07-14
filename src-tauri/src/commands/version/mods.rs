@@ -346,13 +346,13 @@ async fn get_mods_dir(
     drop(config);
 
     // 版本独立隔离设置覆盖全局
-    let isolation_mode = crate::commands::version::manage::resolve_isolation_mode(
+    let isolation_mode = crate::commands::version::list::resolve_isolation_mode(
         &game_dir,
         version_id,
         global_isolation_mode,
     );
     let version_type =
-        crate::commands::version::manage::detect_version_type_from_dir(&game_dir, version_id);
+        crate::commands::version::list::detect_version_type_from_dir(&game_dir, version_id);
     let mode = crate::minecraft::isolation::IsolationMode::from_u32(isolation_mode);
     let effective_dir = crate::minecraft::isolation::get_effective_game_dir(
         &game_dir,

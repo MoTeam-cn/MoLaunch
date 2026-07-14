@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
+import { useDebouncedSave } from '@/composables/useDebouncedSave'
 import Alert from '@/components/common/Alert.vue'
 
 const proxyMode = ref<'none' | 'system' | 'custom'>('none')
@@ -8,20 +9,11 @@ const proxyType = ref<'http' | 'https' | 'socks5'>('http')
 const proxyUrl = ref('')
 const loaded = ref(false)
 
-let saveTimer: ReturnType<typeof setTimeout> | null = null
 const pendingChanges = new Set<string>()
-
-function scheduleSave(changeType: string) {
-  if (!loaded.value) return
-  pendingChanges.add(changeType)
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(flushSave, 1500)
-}
 
 async function flushSave() {
   const changes = [...pendingChanges]
   pendingChanges.clear()
-  saveTimer = null
 
   try {
     const tasks: Promise<void>[] = []
@@ -42,6 +34,14 @@ async function flushSave() {
   }
 }
 
+const { scheduleSave: scheduleDebouncedSave } = useDebouncedSave(flushSave, 1500)
+
+function scheduleSave(changeType: string) {
+  if (!loaded.value) return
+  pendingChanges.add(changeType)
+  scheduleDebouncedSave()
+}
+
 watch(proxyMode, () => scheduleSave('mode'))
 watch(proxyType, () => scheduleSave('type'))
 watch(proxyUrl, () => scheduleSave('url'))
@@ -57,13 +57,6 @@ onMounted(async () => {
     proxyUrl.value = await tauri.getProxyUrl()
   } catch { /* ignore */ }
   loaded.value = true
-})
-
-// 组件卸载时若有未 flush 的代理设置变更，立即保存，避免丢失最后一次调整
-onUnmounted(() => {
-  if (saveTimer) {
-    void flushSave()
-  }
 })
 </script>
 

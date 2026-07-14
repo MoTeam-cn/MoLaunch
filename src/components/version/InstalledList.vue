@@ -10,47 +10,10 @@ import { useVersionStore } from '@/stores/version'
 import { useAuthStore } from '@/stores/auth'
 import { showWarning, showError } from '@/utils/modal'
 import { showSuccess } from '@/utils/toast'
+import { inferVersionType, getVersionTypeLabel, getVersionTypeBadgeClass } from '@/composables/useVersionMeta'
 
 const versionStore = useVersionStore()
 const authStore = useAuthStore()
-
-function inferVersionType(id: string): string {
-  // 优先使用后端提供的版本类型
-  if (props.versionTypes[id]) {
-    return props.versionTypes[id]
-  }
-  // 降级到字符串匹配
-  if (/^\d{2}w\d{2}[a-z]/.test(id)) return 'snapshot'
-  if (id.toLowerCase().includes('forge')) return 'forge'
-  if (id.toLowerCase().includes('fabric')) return 'fabric'
-  if (id.toLowerCase().includes('neoforge')) return 'neoforge'
-  if (id.toLowerCase().includes('optifine')) return 'optifine'
-  return 'release'
-}
-
-function getVersionTypeLabel(type: string): string {
-  const labels: Record<string, string> = {
-    release: 'Release',
-    snapshot: 'Snapshot',
-    forge: 'Forge',
-    fabric: 'Fabric',
-    neoforge: 'NeoForge',
-    optifine: 'OptiFine',
-  }
-  return labels[type] || type
-}
-
-function getVersionTypeBadgeClass(type: string): string {
-  switch (type) {
-    case 'release': return 'bg-green-500'
-    case 'snapshot': return 'bg-yellow-500'
-    case 'forge': return 'bg-purple-500'
-    case 'fabric': return 'bg-cyan-500'
-    case 'neoforge': return 'bg-orange-500'
-    case 'optifine': return 'bg-blue-500'
-    default: return 'bg-gray-500'
-  }
-}
 
 interface Props {
   versions: string[]
@@ -65,6 +28,11 @@ const emit = defineEmits<{
   uninstall: [versionId: string]
   refresh: []
 }>()
+
+/** 推断版本类型：传入后端类型作为 backendType（old_beta/old_alpha 归一化为 old） */
+function inferType(id: string): string {
+  return inferVersionType(id, undefined, props.versionTypes[id])
+}
 
 async function handleLaunch(versionId: string) {
   // 防呆检查 - 使用toast提示
@@ -169,8 +137,8 @@ function isLaunching(versionId: string) {
           <div class="relative flex-shrink-0">
             <div class="w-12 h-12 rounded-lg overflow-hidden bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center">
               <img
-                v-if="getVersionIcon(versionId, inferVersionType(versionId))"
-                :src="getVersionIcon(versionId, inferVersionType(versionId))"
+                v-if="getVersionIcon(versionId, inferType(versionId))"
+                :src="getVersionIcon(versionId, inferType(versionId))"
                 :alt="versionId"
                 class="w-full h-full object-cover"
               />
@@ -179,10 +147,10 @@ function isLaunching(versionId: string) {
             <!-- 类型标记 -->
             <div
               class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center"
-              :class="getVersionTypeBadgeClass(inferVersionType(versionId))"
+              :class="getVersionTypeBadgeClass(inferType(versionId))"
             >
               <span class="text-[8px] font-bold text-white">
-                {{ getVersionTypeLabel(inferVersionType(versionId)).charAt(0) }}
+                {{ getVersionTypeLabel(inferType(versionId)).charAt(0) }}
               </span>
             </div>
           </div>
@@ -191,7 +159,7 @@ function isLaunching(versionId: string) {
           <div class="flex-1 min-w-0">
             <h3 class="text-sm font-semibold text-gray-900 truncate">{{ versionId }}</h3>
             <p class="text-xs text-gray-500 mt-0.5">
-              {{ getVersionTypeLabel(inferVersionType(versionId)) }}
+              {{ getVersionTypeLabel(inferType(versionId)) }}
             </p>
           </div>
 

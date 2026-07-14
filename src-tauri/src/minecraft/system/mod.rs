@@ -52,3 +52,19 @@ pub fn get_os_type() -> String {
 pub fn is_64bit_system() -> bool {
     std::mem::size_of::<usize>() == 8
 }
+
+/// 根据系统可用内存推算 Minecraft 推荐内存配置（auto 模式统一算法）。
+/// 返回 `(min_mb, max_mb)`：max = min(可用*0.75, 8192) 且 >= 512，min = max/2。
+pub fn suggest_memory() -> (u32, u32) {
+    let sys_mem = get_system_memory();
+    let available_mb = (sys_mem.available / 1024 / 1024) as u32;
+    suggest_memory_from_available(available_mb)
+}
+
+/// 根据可用内存（MB）推算推荐内存配置。
+pub fn suggest_memory_from_available(available_mb: u32) -> (u32, u32) {
+    let suggested_max = std::cmp::min((available_mb as f64 * 0.75) as u32, 8192);
+    let suggested_max = std::cmp::max(suggested_max, 512);
+    let suggested_min = suggested_max / 2;
+    (suggested_min, suggested_max)
+}

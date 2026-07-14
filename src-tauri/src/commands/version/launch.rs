@@ -19,7 +19,7 @@ pub struct GameExitEvent {
 }
 
 /// 解析 "IP:Port" 字符串为 (address, port)，无端口时 port=None
-fn parse_server_enter(s: &str) -> (Option<String>, Option<u32>) {
+pub fn parse_server_enter(s: &str) -> (Option<String>, Option<u32>) {
     let s = s.trim();
     if s.is_empty() {
         return (None, None);
@@ -111,14 +111,7 @@ pub async fn launch_game(
         .as_deref()
         .filter(|s| !s.is_empty())
     {
-        Some("auto") => {
-            let sys_mem = crate::minecraft::system::get_system_memory();
-            let available_mb = (sys_mem.available / 1024 / 1024) as u32;
-            let suggested_max = std::cmp::min((available_mb as f64 * 0.75) as u32, 8192);
-            let suggested_max = std::cmp::max(suggested_max, 512);
-            let suggested_min = suggested_max / 2;
-            (suggested_min, suggested_max)
-        }
+        Some("auto") => crate::minecraft::system::suggest_memory(),
         Some("custom") => {
             let max = setup.max_memory.unwrap_or(config.max_memory);
             let min = setup.min_memory.unwrap_or_else(|| max / 2);
@@ -148,7 +141,7 @@ pub async fn launch_game(
         server_address: resolved_server_addr,
         server_port: resolved_server_port,
         // 版本独立隔离设置覆盖全局
-        isolation_mode: super::manage::resolve_isolation_mode(
+        isolation_mode: super::list::resolve_isolation_mode(
             &game_dir,
             &version_id,
             config.isolation_mode,

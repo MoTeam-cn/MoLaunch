@@ -157,6 +157,18 @@ pub fn get_recommended_java_version(mc_version: &str) -> u32 {
     }
 }
 
+/// 将 Java 版本需求区间 `(min, max)` 描述为人类可读的中文文案。
+/// 用于 Java 兼容性校验失败的提示信息（统一文案，避免多处复制粘贴）。
+pub fn describe_java_requirement(min: Option<u32>, max: Option<u32>) -> String {
+    match (min, max) {
+        (Some(mn), Some(mx)) if mn == mx => format!("需要 Java {}", mn),
+        (Some(mn), Some(mx)) => format!("需要 Java {}~{}", mn, mx),
+        (Some(mn), None) => format!("至少需要 Java {}", mn),
+        (None, Some(mx)) => format!("最高兼容到 Java {}", mx),
+        _ => String::new(),
+    }
+}
+
 /// 检查指定 Java 是否兼容 MC 版本需求
 ///
 /// # 参数

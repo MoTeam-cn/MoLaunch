@@ -525,31 +525,3 @@ fn build_game_args(
 
     Ok(final_args)
 }
-
-/// Launch game process
-pub fn launch_game(
-    java_path: &Path,
-    arguments: &LaunchArguments,
-    game_dir: &Path,
-) -> anyhow::Result<u32> {
-    let mut cmd = std::process::Command::new(java_path);
-
-    for arg in &arguments.jvm_args {
-        cmd.arg(arg);
-    }
-
-    cmd.arg(&arguments.main_class);
-
-    for arg in &arguments.game_args {
-        cmd.arg(arg);
-    }
-
-    cmd.current_dir(game_dir);
-
-    let child = cmd.spawn()?;
-    let pid = child.id();
-
-    log_info!("Game launched with PID: {}", pid);
-
-    Ok(pid)
-}

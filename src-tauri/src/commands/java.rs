@@ -222,13 +222,7 @@ pub async fn check_java_compatible(
     let warning = match &check {
         Ok(()) => String::new(),
         Err((cur, min_req, max_req)) => {
-            let req_desc = match (min_req, max_req) {
-                (Some(mn), Some(mx)) if mn == mx => format!("需要 Java {}", mn),
-                (Some(mn), Some(mx)) => format!("需要 Java {}~{}", mn, mx),
-                (Some(mn), None) => format!("至少需要 Java {}", mn),
-                (None, Some(mx)) => format!("最高兼容到 Java {}", mx),
-                _ => String::new(),
-            };
+            let req_desc = crate::minecraft::java_selector::describe_java_requirement(*min_req, *max_req);
             format!(
                 "当前版本{}，{}，可能导致游戏崩溃",
                 cur, req_desc

@@ -180,6 +180,22 @@ impl IniFile {
     pub fn sections(&self) -> Vec<String> {
         self.sections.iter().map(|s| s.name.clone()).collect()
     }
+
+    /// 用模板补全当前 INI 缺失的键（逐段逐键比对，仅补缺失项，不覆盖已有值）。
+    /// 返回 `true` 表示有补全修改，`false` 表示无需修改。
+    /// 用于 config.ini / setup.ini 的旧配置字段自动补全（消除 sync_config / ensure_complete 重复实现）。
+    pub fn merge_missing_from(&mut self, template: &IniFile) -> bool {
+        let mut modified = false;
+        for section in template.sections() {
+            for (key, value) in template.get_section(&section) {
+                if !self.has_key(&section, &key) {
+                    self.set(&section, &key, &value);
+                    modified = true;
+                }
+            }
+        }
+        modified
+    }
 }
 
 impl Default for IniFile {

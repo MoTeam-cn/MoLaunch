@@ -20,3 +20,18 @@ export function formatBytes(bytes: number, decimals = 2): string {
 export function formatSpeed(bytesPerSecond: number): string {
   return formatBytes(bytesPerSecond) + '/s'
 }
+
+/**
+ * 格式化以 MB 为单位的内存数值为可读字符串
+ *
+ * - >= 1024 MB 显示为 GB（1 位小数，去掉无意义的 .0 后缀）
+ * - 否则显示为 MB
+ *
+ * 供启动设置/版本设置内存分配可视化条复用。
+ */
+export function formatMemoryMB(mb: number): string {
+  if (mb >= 1024) {
+    return (mb / 1024).toFixed(1).replace(/\.0$/, '') + ' GB'
+  }
+  return mb + ' MB'
+}

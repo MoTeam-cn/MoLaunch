@@ -1,10 +1,18 @@
+//! 版本列表、类型检测、隔离解析
+
 use crate::minecraft::download;
 use crate::minecraft::fools;
+use crate::minecraft::isolation::{self, IsolationMode};
 use crate::minecraft::sources::DownloadSourceMode;
+use crate::minecraft::version::scan as version_scan;
+use crate::minecraft::version::setup::VersionSetup;
+use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
 use crate::{log_error, log_info};
+use serde::{Deserialize, Serialize};
 use tauri::State;
 
+use super::sanitize_version_id;
 use super::types::{VersionInfo, VersionListResult};
 
 /// Get version list
@@ -68,4 +76,215 @@ fn parse_timestamp(time_str: &str) -> i64 {
         return dt.timestamp();
     }
     0
+}
+
+/// Installed version info
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstalledVersionInfo {
+    pub id: String,
+    pub version_type: String,
+    /// 自定义图标文件名（空=自动判断，来自 setup.ini 的 Logo 字段）
+    pub logo: String,
+}
+
+/// Get installed versions
+#[tauri::command]
+pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+    log_info!("Fetching installed versions");
+
+    let config = state.config.lock().await;
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
+    drop(config);
+
+    let versions = version_scan::scan_installed_versions(&game_dir);
+    let version_ids: Vec<String> = versions.iter().map(|v| v.id.clone()).collect();
+
+    log_info!(
+        "Found {} version directories: {:?}",
+        version_ids.len(),
+        version_ids
+    );
+    Ok(version_ids)
+}
+
+/// Get installed versions with type info
+#[tauri::command]
+pub async fn list_installed_versions_with_type(
+    state: State<'_, AppState>,
+) -> Result<Vec<InstalledVersionInfo>, String> {
+    log_info!("Fetching installed versions with type info");
+
+    let config = state.config.lock().await;
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
+    drop(config);
+
+    let versions = version_scan::scan_installed_versions(&game_dir);
+    let mut result = Vec::new();
+
+    for version in versions {
+        let version_type = detect_version_type_from_dir(&game_dir, &version.id);
+        // 读取版本独立 setup.ini 的 Logo 字段（空=自动判断）
+        let version_dir = game_dir.join("versions").join(&version.id);
+        let logo = VersionSetup::load_or_create(&version_dir, &version.id)
+            .logo
+            .unwrap_or_default();
+        result.push(InstalledVersionInfo {
+            id: version.id,
+            version_type: version_type_to_string(&version_type),
+            logo,
+        });
+    }
+
+    log_info!("Found {} versions with type info", result.len());
+    Ok(result)
+}
+
+/// 根据版本独立隔离设置和全局设置，解析最终使用的 isolation_mode
+///
+/// - indie_type=0 或 None：跟随全局（返回 global_mode）
+/// - indie_type=1：强制开启隔离（返回 4=IsolationAll）
+/// - indie_type=2：强制关闭隔离（返回 0=IsolationNone）
+pub fn resolve_isolation_mode(
+    game_dir: &std::path::Path,
+    version_id: &str,
+    global_mode: u32,
+) -> u32 {
+    let version_dir = game_dir.join("versions").join(version_id);
+    let setup = VersionSetup::load_or_create(&version_dir, version_id);
+    match setup.indie_type.unwrap_or(0) {
+        1 => 4, // 强制隔离 → IsolationAll
+        2 => 0, // 强制不隔离 → IsolationNone
+        _ => global_mode, // 跟随全局
+    }
+}
+
+/// Detect version type from directory
+pub fn detect_version_type_from_dir(game_dir: &std::path::Path, version_id: &str) -> VersionType {
+    let version_dir = game_dir.join("versions").join(version_id);
+
+    // 1. 优先从 JSON 检测（检查libraries中的加载器）
+    let json_path = version_dir.join(format!("{}.json", version_id));
+    if json_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&json_path) {
+            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
+                let detected = VersionType::detect_from_json(version_id, &json);
+                // 如果检测到加载器类型，直接返回
+                if detected != VersionType::Release {
+                    return detected;
+                }
+            }
+        }
+    }
+
+    // 2. 从 setup.ini 读取（仅当JSON检测为Release时）
+    let setup_path = version_dir.join("setup.ini");
+    if setup_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&setup_path) {
+            for line in content.lines() {
+                if let Some(value) = line.strip_prefix("Type=") {
+                    let type_str = value.trim().to_lowercase();
+                    // 忽略 "release"，继续检测
+                    if type_str != "release" {
+                        return match type_str.as_str() {
+                            "forge" => VersionType::Forge,
+                            "neoforge" => VersionType::NeoForge,
+                            "fabric" => VersionType::Fabric,
+                            "quilt" => VersionType::Quilt,
+                            "optifine" => VersionType::OptiFine,
+                            "liteloader" => VersionType::LiteLoader,
+                            "snapshot" => VersionType::Snapshot,
+                            "old" | "old_alpha" | "old_beta" => VersionType::Old,
+                            _ => VersionType::Release,
+                        };
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. 从版本ID推断
+    let id_lower = version_id.to_lowercase();
+    if id_lower.contains("forge") {
+        return VersionType::Forge;
+    }
+    if id_lower.contains("neoforge") {
+        return VersionType::NeoForge;
+    }
+    if id_lower.contains("fabric") {
+        return VersionType::Fabric;
+    }
+    if id_lower.contains("optifine") {
+        return VersionType::OptiFine;
+    }
+
+    VersionType::Release
+}
+
+/// Convert VersionType to string
+pub(super) fn version_type_to_string(version_type: &VersionType) -> String {
+    match version_type {
+        VersionType::Release => "release".to_string(),
+        VersionType::Snapshot => "snapshot".to_string(),
+        VersionType::Old => "old".to_string(),
+        VersionType::Fool => "fool".to_string(),
+        VersionType::Forge => "forge".to_string(),
+        VersionType::NeoForge => "neoforge".to_string(),
+        VersionType::Fabric => "fabric".to_string(),
+        VersionType::Quilt => "quilt".to_string(),
+        VersionType::OptiFine => "optifine".to_string(),
+        VersionType::LiteLoader => "liteloader".to_string(),
+        VersionType::Unknown => "unknown".to_string(),
+    }
+}
+
+/// Uninstall version
+#[tauri::command]
+pub async fn uninstall_version(
+    state: State<'_, AppState>,
+    version_id: String,
+) -> Result<(), String> {
+    sanitize_version_id(&version_id)?;
+    log_info!("Uninstalling version: '{}'", version_id);
+
+    let config = state.config.lock().await;
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
+    drop(config);
+
+    version_scan::uninstall_version(&game_dir, &version_id).map_err(|e| {
+        log_error!("Failed to uninstall version: {}", e);
+        e.to_string()
+    })?;
+
+    log_info!("Version {} uninstalled successfully", version_id);
+    Ok(())
+}
+
+/// 获取版本的有效游戏目录（考虑版本隔离）
+///
+/// 隔离时返回 `{game_dir}/versions/{version_id}/`
+/// 非隔离时返回 `{game_dir}/`
+#[tauri::command]
+pub async fn get_version_effective_dir(
+    state: State<'_, AppState>,
+    version_id: String,
+) -> Result<String, String> {
+    sanitize_version_id(&version_id)?;
+
+    let config = state.config.lock().await;
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
+    let global_isolation_mode = config.isolation_mode;
+    drop(config);
+
+    // 版本独立隔离设置覆盖全局
+    let isolation_mode = resolve_isolation_mode(&game_dir, &version_id, global_isolation_mode);
+    let version_type = detect_version_type_from_dir(&game_dir, &version_id);
+    let mode = IsolationMode::from_u32(isolation_mode);
+    let effective_dir = isolation::get_effective_game_dir(
+        &game_dir,
+        &version_id,
+        mode,
+        version_type,
+    );
+
+    Ok(effective_dir.to_string_lossy().to_string())
 }

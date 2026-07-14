@@ -7,7 +7,8 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showError, showWarning } from '@/utils/toast'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatMemoryMB } from '@/utils/format'
+import { useDebouncedSave } from '@/composables/useDebouncedSave'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 
 const { selectedId, personalization } = useVersionSettings()
@@ -27,11 +28,6 @@ const globalMax = ref(0)
 const systemMemory = ref<{ total: number; available: number; usage_percent: number } | null>(null)
 let memoryTimer: ReturnType<typeof setInterval> | null = null
 
-function formatMemory(mb: number): string {
-  if (mb >= 1024) return (mb / 1024).toFixed(1).replace(/\.0$/, '') + ' GB'
-  return mb + ' MB'
-}
-
 const totalMemoryMB = computed(() => systemMemory.value ? Math.round(systemMemory.value.total / 1024 / 1024) : 0)
 const usedMemoryMB = computed(() => systemMemory.value ? Math.round((systemMemory.value.total - systemMemory.value.available) / 1024 / 1024) : 0)
 const gameMemoryMB = computed(() => maxMemory.value)
@@ -40,8 +36,8 @@ const usedPercent = computed(() => totalMemoryMB.value > 0 ? (usedMemoryMB.value
 const gamePercent = computed(() => totalMemoryMB.value > 0 ? (gameMemoryMB.value / totalMemoryMB.value) * 100 : 0)
 
 const globalMemoryDesc = computed(() => {
-  if (globalMode.value === 'auto') return `自动配置（约 ${formatMemory(globalMax.value) || '动态计算'}）`
-  return `自定义 ${formatMemory(globalMin.value)} / ${formatMemory(globalMax.value)}`
+  if (globalMode.value === 'auto') return `自动配置（约 ${formatMemoryMB(globalMax.value) || '动态计算'}）`
+  return `自定义 ${formatMemoryMB(globalMin.value)} / ${formatMemoryMB(globalMax.value)}`
 })
 
 function applyAutoMemory() {
@@ -79,10 +75,7 @@ async function handleSaveMemoryMode(mode: 'inherit' | 'auto' | 'custom') {
 }
 
 // 自定义模式下防抖保存
-let saveTimer: ReturnType<typeof setTimeout> | null = null
-
 async function flushSaveMemory() {
-  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
   if (!selectedId.value || memoryMode.value !== 'custom') return
   try {
     await tauri.updateVersionPersonalization(selectedId.value, {
@@ -96,10 +89,11 @@ async function flushSaveMemory() {
   } catch (e) { console.error('Failed to save memory:', e) }
 }
 
+const { scheduleSave: scheduleSaveMemory } = useDebouncedSave(flushSaveMemory, 500)
+
 function autoSaveMemory() {
   if (!loaded.value || memoryMode.value !== 'custom') return
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(flushSaveMemory, 500)
+  scheduleSaveMemory()
 }
 
 watch([minMemory, maxMemory], () => {
@@ -142,7 +136,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (memoryTimer) { clearInterval(memoryTimer); memoryTimer = null }
-  if (saveTimer) void flushSaveMemory()
+  // 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush
 })
 
 const modeButtons: { value: 'inherit' | 'auto' | 'custom'; label: string }[] = [
@@ -163,14 +157,14 @@ const modeButtons: { value: 'inherit' | 'auto' | 'custom'; label: string }[] = [
         <span>{{ systemMemory.usage_percent.toFixed(0) }}% 已占用</span>
       </div>
       <div class="h-6 rounded-full overflow-hidden flex bg-gray-100">
-        <div class="h-full bg-orange-400 transition-all duration-500" :style="{ width: usedPercent + '%' }" :title="'系统已用: ' + formatMemory(usedMemoryMB)" />
-        <div class="h-full bg-primary-500 transition-all duration-500" :style="{ width: gamePercent + '%' }" :title="'游戏分配: ' + formatMemory(gameMemoryMB)" />
-        <div class="h-full bg-green-400 transition-all duration-500 flex-1" :title="'剩余: ' + formatMemory(otherMemoryMB)" />
+        <div class="h-full bg-orange-400 transition-all duration-500" :style="{ width: usedPercent + '%' }" :title="'系统已用: ' + formatMemoryMB(usedMemoryMB)" />
+        <div class="h-full bg-primary-500 transition-all duration-500" :style="{ width: gamePercent + '%' }" :title="'游戏分配: ' + formatMemoryMB(gameMemoryMB)" />
+        <div class="h-full bg-green-400 transition-all duration-500 flex-1" :title="'剩余: ' + formatMemoryMB(otherMemoryMB)" />
       </div>
       <div class="flex items-center gap-4 mt-2 text-xs">
-        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-orange-400" /> 系统占用 {{ formatMemory(usedMemoryMB) }}</span>
-        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-primary-500" /> 游戏分配 {{ formatMemory(gameMemoryMB) }}</span>
-        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-green-400" /> 剩余 {{ formatMemory(otherMemoryMB) }}</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-orange-400" /> 系统占用 {{ formatMemoryMB(usedMemoryMB) }}</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-primary-500" /> 游戏分配 {{ formatMemoryMB(gameMemoryMB) }}</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-green-400" /> 剩余 {{ formatMemoryMB(otherMemoryMB) }}</span>
       </div>
     </div>
 
@@ -201,7 +195,7 @@ const modeButtons: { value: 'inherit' | 'auto' | 'custom'; label: string }[] = [
         <p class="text-sm font-medium text-gray-900">游戏最大内存</p>
         <p class="text-xs text-gray-500 mt-0.5">根据可用内存自动分配 75%，上限 8 GB</p>
       </div>
-      <span class="text-lg font-bold text-primary-600">{{ formatMemory(maxMemory) }}</span>
+      <span class="text-lg font-bold text-primary-600">{{ formatMemoryMB(maxMemory) }}</span>
     </div>
 
     <!-- 自定义：滑块 -->
@@ -209,23 +203,23 @@ const modeButtons: { value: 'inherit' | 'auto' | 'custom'; label: string }[] = [
       <div>
         <div class="flex items-center justify-between mb-2">
           <p class="text-sm font-medium text-gray-900">最大内存</p>
-          <span class="text-sm font-bold text-primary-600">{{ formatMemory(maxMemory) }}</span>
+          <span class="text-sm font-bold text-primary-600">{{ formatMemoryMB(maxMemory) }}</span>
         </div>
         <input v-model.number="maxMemory" type="range" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" min="512" :max="totalMemoryMB > 0 ? Math.min(totalMemoryMB, 16384) : 8192" step="256" />
         <div class="flex justify-between text-xs text-gray-400 mt-1">
           <span>512 MB</span>
-          <span>{{ formatMemory(totalMemoryMB > 0 ? Math.min(totalMemoryMB, 16384) : 8192) }}</span>
+          <span>{{ formatMemoryMB(totalMemoryMB > 0 ? Math.min(totalMemoryMB, 16384) : 8192) }}</span>
         </div>
       </div>
       <div>
         <div class="flex items-center justify-between mb-2">
           <p class="text-sm font-medium text-gray-900">最小内存</p>
-          <span class="text-sm font-bold text-gray-600">{{ formatMemory(minMemory) }}</span>
+          <span class="text-sm font-bold text-gray-600">{{ formatMemoryMB(minMemory) }}</span>
         </div>
         <input v-model.number="minMemory" type="range" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer" min="256" :max="maxMemory" step="256" />
         <div class="flex justify-between text-xs text-gray-400 mt-1">
           <span>256 MB</span>
-          <span>{{ formatMemory(maxMemory) }}</span>
+          <span>{{ formatMemoryMB(maxMemory) }}</span>
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
+import { useDebouncedSave } from '@/composables/useDebouncedSave'
 
 const maxThreads = ref(8)
 const chunkCount = ref(4)
@@ -12,7 +13,6 @@ const loaded = ref(false)
 
 // 待保存的设置队列
 const pendingChanges = new Set<string>()
-let saveTimer: ReturnType<typeof setTimeout> | null = null
 
 function computeSource(): string {
   const meta = mirrorMeta.value
@@ -23,22 +23,14 @@ function computeSource(): string {
   return 'official'
 }
 
-function scheduleSave(changeType: string) {
-  if (!loaded.value) return
-  pendingChanges.add(changeType)
-  if (saveTimer) clearTimeout(saveTimer)
-  saveTimer = setTimeout(flushSave, 3000)
-}
-
 async function flushSave() {
   const changes = [...pendingChanges]
   pendingChanges.clear()
-  saveTimer = null
 
   try {
     // 批量保存所有待更新的设置
     const tasks: Promise<void>[] = []
-    
+
     if (changes.includes('source')) {
       tasks.push(tauri.setDownloadSource(computeSource(), true))
     }
@@ -53,12 +45,20 @@ async function flushSave() {
     if (changes.includes('chunks')) {
       tasks.push(tauri.setChunkCount(chunkCount.value))
     }
-    
+
     // 并行保存所有设置
     await Promise.all(tasks)
   } catch (e) {
     console.error('Failed to save download settings:', e)
   }
+}
+
+const { scheduleSave: scheduleDebouncedSave } = useDebouncedSave(flushSave, 3000)
+
+function scheduleSave(changeType: string) {
+  if (!loaded.value) return
+  pendingChanges.add(changeType)
+  scheduleDebouncedSave()
 }
 
 watch([mirrorMeta, mirrorDownload], () => scheduleSave('source'))
@@ -104,13 +104,6 @@ onMounted(async () => {
     // ignore
   }
   loaded.value = true
-})
-
-// 组件卸载时若有未 flush 的下载设置变更，立即保存，避免丢失最后一次调整
-onUnmounted(() => {
-  if (saveTimer) {
-    void flushSave()
-  }
 })
 </script>
 
