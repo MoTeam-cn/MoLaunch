@@ -12,7 +12,7 @@ pub async fn list_forge_versions(
 ) -> Result<String, String> {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.download_source);
+    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
     drop(config);
 
     let versions = loaders::list_forge_versions(&mc_version, mirror_url.as_deref(), source_mode)
@@ -43,7 +43,7 @@ pub async fn list_neoforge_versions(
 ) -> Result<String, String> {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.download_source);
+    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
     drop(config);
 
     let versions = loaders::list_neoforge_versions(&mc_version, mirror_url.as_deref(), source_mode)
@@ -71,7 +71,7 @@ pub async fn list_neoforge_versions(
 pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, String> {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.download_source);
+    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
     drop(config);
 
     let versions = loaders::list_fabric_versions(mirror_url.as_deref(), source_mode)
@@ -89,7 +89,7 @@ pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, 
 pub async fn list_optifine_versions(state: State<'_, AppState>) -> Result<String, String> {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.download_source);
+    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
     drop(config);
 
     let versions = loaders::list_optifine_versions(mirror_url.as_deref(), source_mode)
@@ -119,7 +119,7 @@ pub async fn list_liteloader_versions(
 ) -> Result<String, String> {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.download_source);
+    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
     drop(config);
 
     let versions =

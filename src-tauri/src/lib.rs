@@ -138,6 +138,8 @@ pub fn run() {
             commands::system::get_mirror_url,
             commands::system::set_download_source,
             commands::system::get_download_source,
+            commands::system::set_meta_source,
+            commands::system::get_meta_source,
             commands::system::set_max_download_speed,
             commands::system::get_max_download_speed,
             commands::system::get_system_memory,

@@ -67,6 +67,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.max_download_speed = speed.parse().unwrap_or(app_config.max_download_speed);
     }
     app_config.download_source = config.get_or("Download", "source", &app_config.download_source);
+    app_config.meta_source = config.get_or("Download", "meta_source", &app_config.meta_source);
     if let Some(mode) = config.get("Download", "mirror_mode") {
         app_config.mirror_mode = mode.parse().unwrap_or(app_config.mirror_mode);
     }
@@ -167,6 +168,7 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         &config.max_download_speed.to_string(),
     );
     ini.set("Download", "source", &config.download_source);
+    ini.set("Download", "meta_source", &config.meta_source);
     ini.set("Download", "mirror_mode", &config.mirror_mode.to_string());
 
     // Mirror

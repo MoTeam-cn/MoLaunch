@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
 
 const maxThreads = ref(8)
 const chunkCount = ref(4)
-const mirrorMeta = ref<'official' | 'bmclapi' | 'smart'>('bmclapi')
-const mirrorDownload = ref<'official' | 'bmclapi' | 'smart'>('bmclapi')
+const mirrorMeta = ref<'official' | 'bmclapi' | 'smart'>('smart')
+const mirrorDownload = ref<'official' | 'bmclapi' | 'smart'>('smart')
 const maxDownloadSpeed = ref(0)
 const speedSlider = ref(0)
 const loaded = ref(false)
@@ -14,13 +14,16 @@ const loaded = ref(false)
 // 待保存的设置队列
 const pendingChanges = new Set<string>()
 
-function computeSource(): string {
-  const meta = mirrorMeta.value
-  const dl = mirrorDownload.value
-  if (meta === 'bmclapi' && dl === 'bmclapi') return 'mirror'
-  if (meta === 'official' && dl === 'bmclapi') return 'smart'
-  if (meta === 'smart' || dl === 'smart') return 'smart'
-  return 'official'
+/** 前端选项 → 后端 source 值 */
+function toSource(v: 'official' | 'bmclapi' | 'smart'): string {
+  return v === 'bmclapi' ? 'mirror' : v
+}
+
+/** 后端 source 值 → 前端选项 */
+function fromSource(s: string): 'official' | 'bmclapi' | 'smart' {
+  if (s === 'mirror') return 'bmclapi'
+  if (s === 'official') return 'official'
+  return 'smart'
 }
 
 async function flushSave() {
@@ -28,11 +31,13 @@ async function flushSave() {
   pendingChanges.clear()
 
   try {
-    // 批量保存所有待更新的设置
     const tasks: Promise<void>[] = []
 
-    if (changes.includes('source')) {
-      tasks.push(tauri.setDownloadSource(computeSource(), true))
+    if (changes.includes('meta')) {
+      tasks.push(tauri.setMetaSource(toSource(mirrorMeta.value), true))
+    }
+    if (changes.includes('download')) {
+      tasks.push(tauri.setDownloadSource(toSource(mirrorDownload.value), true))
     }
     if (changes.includes('speed')) {
       const speed = speedSlider.value >= 21 ? 0 : (speedSlider.value === 0 ? 1 : speedSlider.value) * 1024 * 1024
@@ -46,14 +51,13 @@ async function flushSave() {
       tasks.push(tauri.setChunkCount(chunkCount.value))
     }
 
-    // 并行保存所有设置
     await Promise.all(tasks)
   } catch (e) {
     console.error('Failed to save download settings:', e)
   }
 }
 
-const { scheduleSave: scheduleDebouncedSave } = useDebouncedSave(flushSave, 3000)
+const { scheduleSave: scheduleDebouncedSave } = useDebouncedSave(flushSave, 1500)
 
 function scheduleSave(changeType: string) {
   if (!loaded.value) return
@@ -61,26 +65,21 @@ function scheduleSave(changeType: string) {
   scheduleDebouncedSave()
 }
 
-watch([mirrorMeta, mirrorDownload], () => scheduleSave('source'))
+watch(mirrorMeta, () => scheduleSave('meta'))
+watch(mirrorDownload, () => scheduleSave('download'))
 watch(speedSlider, () => scheduleSave('speed'))
 watch(maxThreads, () => scheduleSave('threads'))
 watch(chunkCount, () => scheduleSave('chunks'))
 
 onMounted(async () => {
   try {
-    const source = await tauri.getDownloadSource()
-    if (source === 'mirror') {
-      mirrorMeta.value = 'bmclapi'
-      mirrorDownload.value = 'bmclapi'
-    } else if (source === 'official') {
-      mirrorMeta.value = 'official'
-      mirrorDownload.value = 'official'
-    } else {
-      mirrorMeta.value = 'smart'
-      mirrorDownload.value = 'smart'
-    }
+    mirrorMeta.value = fromSource(await tauri.getMetaSource())
   } catch {
     mirrorMeta.value = 'smart'
+  }
+  try {
+    mirrorDownload.value = fromSource(await tauri.getDownloadSource())
+  } catch {
     mirrorDownload.value = 'smart'
   }
   try {
@@ -103,12 +102,31 @@ onMounted(async () => {
   } catch {
     // ignore
   }
+  // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
+  await nextTick()
   loaded.value = true
 })
 </script>
 
 <template>
   <div class="space-y-6">
+    <!-- 加载占位（避免初始值与实际值不一致导致的闪烁） -->
+    <div v-if="!loaded" class="space-y-6">
+      <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+        <div class="px-5 py-5">
+          <div class="h-4 w-24 bg-gray-200 rounded animate-pulse mb-4" />
+          <div class="h-10 bg-gray-100 rounded animate-pulse" />
+        </div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+        <div class="px-5 py-5">
+          <div class="h-4 w-24 bg-gray-200 rounded animate-pulse mb-4" />
+          <div class="h-10 bg-gray-100 rounded animate-pulse" />
+        </div>
+      </div>
+    </div>
+
+    <template v-else>
     <!-- 下载源 -->
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">下载源</h3>
@@ -268,5 +286,6 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>

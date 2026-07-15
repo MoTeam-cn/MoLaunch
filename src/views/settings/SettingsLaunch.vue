@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
@@ -175,6 +175,8 @@ onMounted(async () => {
   } catch (e) {
     console.error('Failed to get isolation mode:', e)
   }
+  // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
+  await nextTick()
   loaded.value = true
 
   // 1秒自动刷新内存（参考PCL2）

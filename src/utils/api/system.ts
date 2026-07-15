@@ -118,6 +118,20 @@ export async function setDownloadSource(source: string, skipReinit = false): Pro
 }
 
 /**
+ * 获取版本列表源模式
+ */
+export async function getMetaSource(): Promise<string> {
+  return await invoke<string>('get_meta_source')
+}
+
+/**
+ * 设置版本列表源模式
+ */
+export async function setMetaSource(source: string, skipReinit = false): Promise<void> {
+  return await invoke<void>('set_meta_source', { source, skipReinit })
+}
+
+/**
  * 获取最大下载速度
  */
 export async function getMaxDownloadSpeed(): Promise<number> {

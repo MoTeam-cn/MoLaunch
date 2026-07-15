@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, nextTick } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
 import { getCurseForgeConfig, setCurseForgeConfig } from '@/utils/api/community'
@@ -98,12 +98,31 @@ onMounted(async () => {
   } catch (e: any) {
     console.error('Failed to load CurseForge config:', e)
   }
+  // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
+  await nextTick()
   loaded.value = true
 })
 </script>
 
 <template>
   <div class="space-y-6">
+    <!-- 加载占位（避免初始值与实际值不一致导致的闪烁） -->
+    <div v-if="!loaded" class="space-y-6">
+      <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+        <div class="px-5 py-5">
+          <div class="h-4 w-24 bg-gray-200 rounded animate-pulse mb-4" />
+          <div class="h-10 bg-gray-100 rounded animate-pulse" />
+        </div>
+      </div>
+      <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+        <div class="px-5 py-5">
+          <div class="h-4 w-40 bg-gray-200 rounded animate-pulse mb-4" />
+          <div class="h-10 bg-gray-100 rounded animate-pulse" />
+        </div>
+      </div>
+    </div>
+
+    <template v-else>
     <!-- 代理配置 -->
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">代理配置</h3>
@@ -268,7 +287,7 @@ onMounted(async () => {
           <div class="flex items-center justify-between mb-2">
             <div>
               <p class="text-sm font-medium text-gray-900">API Key</p>
-              <p class="text-xs text-gray-500 mt-0.5">从 CurseForge Console 申请，使用 SDK DES 加密后存储到注册表</p>
+              <p class="text-xs text-gray-500 mt-0.5">从 CurseForge Console 申请，使用 SDK DES 加密后存入 INI</p>
             </div>
             <a
               href="https://console.curseforge.com/?#/api-keys"
@@ -310,5 +329,6 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>

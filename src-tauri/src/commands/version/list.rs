@@ -22,7 +22,7 @@ pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResu
 
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.download_source);
+    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
     drop(config);
 
     let result = download::fetch_version_list(mirror_url.as_deref(), source_mode)

@@ -99,6 +99,7 @@ pub async fn set_config_value(
             config.max_download_speed = value.parse().unwrap_or(0);
         }
         ("Download", "source") => config.download_source = value.clone(),
+        ("Download", "meta_source") => config.meta_source = value.clone(),
         ("Download", "mirror_mode") => {
             config.mirror_mode = value.parse().unwrap_or(0);
         }

@@ -78,7 +78,7 @@ pub async fn get_mirror_url(state: State<'_, AppState>) -> Result<Option<String>
     Ok(config.mirror_url.clone())
 }
 
-/// 设置下载源模式
+/// 设置文件下载源模式（只影响文件下载，不影响版本列表）
 #[tauri::command]
 pub async fn set_download_source(
     state: State<'_, AppState>,
@@ -91,19 +91,16 @@ pub async fn set_download_source(
     super::update_config(&state, |config| {
         match source.as_str() {
             "mirror" => {
-                config.mirror_url_meta = Some(bmclapi.to_string());
                 config.mirror_url_download = Some(bmclapi.to_string());
                 config.mirror_url = Some(bmclapi.to_string());
                 config.mirror_mode = 0;
             }
             "official" => {
-                config.mirror_url_meta = None;
                 config.mirror_url_download = None;
                 config.mirror_url = None;
                 config.mirror_mode = 0;
             }
             "smart" => {
-                config.mirror_url_meta = None;
                 config.mirror_url_download = None;
                 config.mirror_url = None;
                 config.mirror_mode = 1;
@@ -115,11 +112,43 @@ pub async fn set_download_source(
     .await
 }
 
-/// 获取下载源模式
+/// 获取文件下载源模式
 #[tauri::command]
 pub async fn get_download_source(state: State<'_, AppState>) -> Result<String, String> {
     let config = state.config.lock().await;
     Ok(config.download_source.clone())
+}
+
+/// 设置版本列表源模式（只影响版本清单/加载器列表，不影响文件下载）
+#[tauri::command]
+pub async fn set_meta_source(
+    state: State<'_, AppState>,
+    source: String,
+    _skip_reinit: Option<bool>,
+) -> Result<(), String> {
+    let bmclapi = crate::minecraft::sources::BMCLAPI_BASE;
+
+    log_info!("Meta source changed to: {}", source);
+    super::update_config(&state, |config| {
+        match source.as_str() {
+            "mirror" => {
+                config.mirror_url_meta = Some(bmclapi.to_string());
+            }
+            "official" | "smart" => {
+                config.mirror_url_meta = None;
+            }
+            _ => {}
+        }
+        config.meta_source = source;
+    })
+    .await
+}
+
+/// 获取版本列表源模式
+#[tauri::command]
+pub async fn get_meta_source(state: State<'_, AppState>) -> Result<String, String> {
+    let config = state.config.lock().await;
+    Ok(config.meta_source.clone())
 }
 
 /// 设置最大下载速度
