@@ -148,11 +148,17 @@ pub struct CurrentUser {
 pub struct AuthStorage {
     /// SDK 实例引用（用于 DES 加解密）
     sdk: Arc<TokioMutex<Option<SdkInstance>>>,
+    /// 内存缓存（避免每次命令都重新读注册表+解密+打日志）
+    /// save 系列方法会自动刷新此缓存
+    cache: TokioMutex<Option<PersistedAuthState>>,
 }
 
 impl AuthStorage {
     pub fn new(sdk: Arc<TokioMutex<Option<SdkInstance>>>) -> Self {
-        Self { sdk }
+        Self {
+            sdk,
+            cache: TokioMutex::new(None),
+        }
     }
 
     // --------------------------------------------------------
@@ -241,11 +247,19 @@ impl AuthStorage {
 
     /// 加载持久化的认证状态
     ///
-    /// 从注册表读取所有字段，组装成 `PersistedAuthState`。
+    /// 优先返回内存缓存，避免每次命令都重新读注册表+解密+打日志。
+    /// save 系列方法会自动刷新缓存；如需强制从注册表读取，调用 `invalidate` 后再 load。
     pub async fn load(&self) -> Result<PersistedAuthState, String> {
+        // 优先返回缓存
+        if let Some(cached) = self.cache.lock().await.clone() {
+            return Ok(cached);
+        }
+
         #[cfg(not(windows))]
         {
-            return Ok(PersistedAuthState::default());
+            let state = PersistedAuthState::default();
+            *self.cache.lock().await = Some(state.clone());
+            return Ok(state);
         }
 
         #[cfg(windows)]
@@ -342,8 +356,16 @@ impl AuthStorage {
                 state.offline_accounts.len()
             );
 
+            // 写入缓存，后续 load 直接返回
+            *self.cache.lock().await = Some(state.clone());
+
             Ok(state)
         }
+    }
+
+    /// 清除内存缓存，强制下次 load 从注册表重新读取
+    pub async fn invalidate(&self) {
+        *self.cache.lock().await = None;
     }
 
     /// 保存认证状态到注册表
@@ -419,6 +441,9 @@ impl AuthStorage {
                     .map_err(|e| format!("序列化离线账号列表失败: {}", e))?;
                 self.reg_set_encrypted(&key, KEY_OFFLINE_ACCOUNTS, &json).await?;
             }
+
+            // 更新内存缓存
+            *self.cache.lock().await = Some(state.clone());
 
             Ok(())
         }
