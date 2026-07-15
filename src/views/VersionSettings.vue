@@ -34,7 +34,7 @@ const categories = [
 const currentCategory = () => categories.find(c => c.id === activeCategory.value)
 
 function goBack() {
-  router.push('/')
+  router.push('/apps')
 }
 
 onMounted(initContext)
@@ -69,7 +69,7 @@ onMounted(initContext)
         <p class="text-sm">请先在主页选择一个版本</p>
         <button
           class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-          @click="router.push('/select')"
+          @click="router.push('/apps/versions/select')"
         >
           去选择版本
         </button>

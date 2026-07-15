@@ -10,13 +10,13 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { formatBytes, formatSpeed } from '@/utils/format'
-import { 
-  ArrowPathIcon, 
-  CheckCircleIcon, 
-  ClockIcon, 
+import {
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ClockIcon,
   ArrowDownTrayIcon,
   CubeIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
@@ -54,7 +54,7 @@ const currentStageName = computed(() => {
 })
 
 function goToVersions() {
-  router.push('/versions')
+  router.push('/app/versions')
 }
 </script>
 

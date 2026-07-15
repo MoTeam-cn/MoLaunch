@@ -93,7 +93,7 @@ async function handleLaunch() {
         <VersionSelector />
         <button
           class="flex h-[35px] w-[80px] flex-none items-center justify-center rounded-[3px] border border-gray-300 bg-white/80 text-[13px] text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50"
-          @click="router.push('/version-settings')"
+          @click="router.push('/apps/versions/setup')"
         >
           版本设置
         </button>

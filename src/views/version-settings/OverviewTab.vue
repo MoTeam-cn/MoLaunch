@@ -153,7 +153,7 @@ function handleDelete() {
     try {
       await tauri.uninstallVersion(selectedId.value!)
       showSuccess('版本已删除')
-      router.push('/')
+      router.push('/apps')
     } catch (e) { showError(String(e)) }
   })
 }

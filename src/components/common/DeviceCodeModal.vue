@@ -82,7 +82,7 @@ watch(() => authStore.deviceCodeInfo, (info) => {
 })
 
 watch(() => authStore.msLoginStatus, (status) => {
-  if (status === 'success') { emit('success'); router.push('/') }
+  if (status === 'success') { emit('success'); router.push('/apps') }
 })
 
 onUnmounted(() => authStore.cancelMsLogin())

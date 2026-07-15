@@ -184,15 +184,15 @@ async function removeFolder(folder: McFolder, event: Event) {
 /** 选中版本并返回主页 */
 function selectVersion(id: string) {
   selectedId.value = id
-  router.push('/')
+  router.push('/apps')
 }
 
 function goToDownloads() {
-  router.push('/downloads')
+  router.push('/apps/downloads')
 }
 
 function goBack() {
-  router.push('/')
+  router.push('/apps')
 }
 
 onMounted(async () => {

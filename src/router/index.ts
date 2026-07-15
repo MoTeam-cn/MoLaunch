@@ -1,5 +1,14 @@
 /**
  * 路由配置
+ *
+ * 路径结构：
+ * - /login          登录页（无需认证）
+ * - /app            首页
+ * - /app/versions   版本列表（含社区资源搜索侧栏）
+ * - /app/versions/select   选择下载版本
+ * - /app/versions/setup    版本设置
+ * - /app/settings   全局设置
+ * - /app/downloads  下载管理
  */
 
 import { createRouter, createWebHistory } from 'vue-router'
@@ -10,8 +19,7 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      name: 'home',
-      component: () => import('@/views/Home.vue'),
+      redirect: '/apps',
     },
     {
       path: '/login',
@@ -19,31 +27,37 @@ const router = createRouter({
       component: () => import('@/views/Login.vue'),
     },
     {
-      path: '/versions',
+      path: '/apps',
+      name: 'home',
+      component: () => import('@/views/Home.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/apps/versions',
       name: 'versions',
       component: () => import('@/views/Versions.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/select',
+      path: '/apps/versions/select',
       name: 'select',
       component: () => import('@/views/VersionSelect.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/version-settings',
+      path: '/apps/versions/setup',
       name: 'version-settings',
       component: () => import('@/views/VersionSettings.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/settings',
+      path: '/apps/settings',
       name: 'settings',
       component: () => import('@/views/Settings.vue'),
       meta: { requiresAuth: true },
     },
     {
-      path: '/downloads',
+      path: '/app/downloads',
       name: 'downloads',
       component: () => import('@/views/Downloads.vue'),
       meta: { requiresAuth: true },

@@ -1,6 +1,7 @@
 //! Minecraft modules
 
 pub mod auth;
+pub mod community;
 pub mod download;
 pub mod fools;
 pub mod isolation;

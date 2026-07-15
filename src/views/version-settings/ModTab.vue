@@ -133,13 +133,13 @@ onMounted(async () => {
         <div class="flex justify-center gap-3">
           <button
             class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            @click="router.push('/downloads')"
+            @click="router.push('/apps/downloads')"
           >
             转到下载页面
           </button>
           <button
             class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            @click="router.push('/select')"
+            @click="router.push('/apps/versions/select')"
           >
             版本选择
           </button>

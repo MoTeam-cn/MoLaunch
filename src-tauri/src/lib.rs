@@ -35,6 +35,10 @@ pub fn run() {
         log_info!("HTTP client initialized (proxy: {})", config.proxy_mode);
     }
 
+    // 初始化 CurseForge 配置（同步读 enabled，api_key 懒加载，避免启动时 DES 解密触发杀软）
+    minecraft::community::secure_storage::init_enabled();
+    minecraft::community::secure_storage::set_sdk(app_state.sdk.clone());
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
@@ -158,6 +162,17 @@ pub fn run() {
             commands::system::set_proxy_type,
             commands::system::get_proxy_url,
             commands::system::set_proxy_url,
+            // 社区资源命令
+            commands::community::search::search_resources,
+            commands::community::search::get_category_tags,
+            commands::community::detail::get_project_detail,
+            commands::community::detail::get_project_versions,
+            commands::community::install::download_resource,
+            commands::community::install::download_resource_to_path,
+            commands::community::install::install_resource,
+            commands::community::install::get_resource_install_path,
+            commands::community::secure_config::get_curseforge_config,
+            commands::community::secure_config::set_curseforge_config,
         ])
         .on_window_event(|_window, event| {
             // 窗口关闭时保存配置

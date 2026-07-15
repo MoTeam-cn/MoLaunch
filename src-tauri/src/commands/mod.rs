@@ -1,6 +1,7 @@
 //! Tauri 命令层
 
 pub mod auth;
+pub mod community;
 pub mod java;
 pub mod sdk;
 pub mod skin;

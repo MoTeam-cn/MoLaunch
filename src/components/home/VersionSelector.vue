@@ -23,7 +23,7 @@ watch(selectedId, async (id) => {
 }, { immediate: true })
 
 function goToSelect() {
-  router.push('/select')
+  router.push('/apps/versions/select')
 }
 </script>
 

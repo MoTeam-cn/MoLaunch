@@ -36,9 +36,9 @@ onUnmounted(() => {
 })
 
 const navItems = [
-  { name: '首页', path: '/', icon: HomeIcon },
-  { name: '下载', path: '/versions', icon: CubeIcon, hasDblClick: true },
-  { name: '设置', path: '/settings', icon: Cog6ToothIcon },
+  { name: '首页', path: '/apps', icon: HomeIcon },
+  { name: '下载', path: '/apps/versions', icon: CubeIcon, hasDblClick: true },
+  { name: '设置', path: '/apps/settings', icon: Cog6ToothIcon },
 ]
 
 // 双击计时器
@@ -56,22 +56,22 @@ function navigateTo(path: string) {
 function handleDownloadClick() {
   const now = Date.now()
   const timeDiff = now - lastClickTime
-  
+
   if (timeDiff < 300) {
     // 双击：进入下载管理页面
     if (clickTimer) {
       clearTimeout(clickTimer)
       clickTimer = null
     }
-    router.push('/downloads')
+    router.push('/apps/downloads')
   } else {
     // 单击：延迟执行导航到版本页面
     clickTimer = setTimeout(() => {
-      router.push('/versions')
+      router.push('/apps/versions')
       clickTimer = null
     }, 300)
   }
-  
+
   lastClickTime = now
 }
 
@@ -106,7 +106,7 @@ async function handleClose() {
             :key="item.path"
             class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
             :class="[
-              isActive(item.path) || (item.hasDblClick && isActive('/downloads'))
+              isActive(item.path) || (item.hasDblClick && isActive('/apps/downloads'))
                 ? 'bg-white/20 text-white'
                 : 'text-white/70 hover:bg-white/10 hover:text-white'
             ]"

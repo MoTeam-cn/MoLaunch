@@ -1,8 +1,5 @@
 <script setup lang="ts">
-/**
- * 下载页面
- */
-
+/** 下载页面 */
 import { ref, computed, onMounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
@@ -12,34 +9,57 @@ import { showSuccess, showInfo, showWarning } from '@/utils/toast'
 import Tooltip from '@/components/common/Tooltip.vue'
 import LoaderSelect from './LoaderSelect.vue'
 import VersionSection from '@/components/version/VersionSection.vue'
-import InstalledList from '@/components/version/InstalledList.vue'
+import Community from './Community.vue'
 import {
-  CubeIcon, WrenchIcon, ArchiveBoxIcon, CheckCircleIcon,
+  CubeIcon, WrenchIcon, ArchiveBoxIcon,
   FolderOpenIcon, StarIcon, BeakerIcon, ClockIcon, SparklesIcon,
   ArrowPathIcon, FaceSmileIcon,
+  PuzzlePieceIcon, SwatchIcon, BoltIcon, CircleStackIcon,
 } from '@heroicons/vue/24/outline'
-
 import { resolveVersionIcon as resolveIconByType } from '@/composables/useVersionMeta'
+import type { ResourceType } from '@/types/community'
 
 const versionStore = useVersionStore()
 const { resolveVersionIcon } = useVersionSettings()
 
 const loading = ref(false)
-const installedLoaded = ref(false)
 const installedVersions = ref<string[]>([])
-const installedVersionTypes = ref<Record<string, string>>({}) // 版本ID -> 版本类型
-const installedVersionLogos = ref<Record<string, string>>({}) // 版本ID -> 自定义 logo
+const installedVersionTypes = ref<Record<string, string>>({})
+const installedVersionLogos = ref<Record<string, string>>({})
 const activeCategory = ref('vanilla')
-// 本地状态：用户在此页面点击某版本卡片后选中的 MC 版本（用于展开 LoaderSelect）
-// 注意：这与首页 versionStore.selectedVersion（启动用版本）是两个概念，不可共享，
-// 否则首页选中版本后进入下载页会直接渲染 LoaderSelect，且切菜单/安装会反向清空首页选中版本。
 const selectedVersion = ref<string | null>(null)
 
+const topCategories = [
+  { id: 'vanilla', label: '原版游戏', icon: CubeIcon },
+  { id: 'modloaders', label: '模组加载器', icon: WrenchIcon },
+  { id: 'modpacks', label: '整合包', icon: ArchiveBoxIcon },
+]
+
+const communityCategories: { id: string; type: ResourceType; label: string; icon: any }[] = [
+  { id: 'community:Mod', type: 'Mod', label: 'Mod', icon: PuzzlePieceIcon },
+  { id: 'community:ModPack', type: 'ModPack', label: '整合包', icon: ArchiveBoxIcon },
+  { id: 'community:ResourcePack', type: 'ResourcePack', label: '资源包', icon: SwatchIcon },
+  { id: 'community:Shader', type: 'Shader', label: '光影', icon: BoltIcon },
+  { id: 'community:DataPack', type: 'DataPack', label: '数据包', icon: CircleStackIcon },
+]
+
+const communityResourceType = computed<ResourceType | null>(() =>
+  activeCategory.value.startsWith('community:')
+    ? activeCategory.value.slice('community:'.length) as ResourceType : null
+)
+
+const headerTitle = computed(() =>
+  communityResourceType.value
+    ? communityCategories.find(c => c.id === activeCategory.value)?.label || '社区资源'
+    : '原版游戏'
+)
+const headerSubtitle = computed(() =>
+  communityResourceType.value ? '从 CurseForge 和 Modrinth 搜索并安装' : 'Minecraft Java Edition 官方版本'
+)
+
 function getVersionIcon(id: string, type: string): string {
-  // 优先使用版本设置中的自定义 logo
   const logo = installedVersionLogos.value[id]
   if (logo) return resolveVersionIcon(logo, id)
-  // 否则按类型映射（已安装版本优先用真实类型，old_beta/old_alpha 归一化为 old）
   const actualType = installedVersionTypes.value[id] || type
   const normalized = (actualType === 'old_beta' || actualType === 'old_alpha') ? 'old' : actualType
   return resolveIconByType(normalized)
@@ -49,13 +69,6 @@ function formatDate(ts: number): string {
   if (!ts) return '未知'
   return new Date(ts * 1000).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
-
-const categories = [
-  { id: 'vanilla', label: '原版游戏', icon: CubeIcon },
-  { id: 'modloaders', label: '模组加载器', icon: WrenchIcon },
-  { id: 'modpacks', label: '整合包', icon: ArchiveBoxIcon },
-  { id: 'installed', label: '已安装', icon: CheckCircleIcon },
-]
 
 const latestVersions = computed(() => {
   const list = []
@@ -80,23 +93,17 @@ const sections = computed(() => [
 
 async function loadInstalledVersions() {
   try {
-    const versionsWithType = await tauri.listInstalledVersionsWithType()
-    installedVersions.value = versionsWithType.map(v => v.id)
-    // 存储版本类型 + logo 信息
+    const vwt = await tauri.listInstalledVersionsWithType()
+    installedVersions.value = vwt.map(v => v.id)
     const typeMap: Record<string, string> = {}
     const logoMap: Record<string, string> = {}
-    versionsWithType.forEach(v => {
-      typeMap[v.id] = v.version_type
-      logoMap[v.id] = v.logo || ''
-    })
+    vwt.forEach(v => { typeMap[v.id] = v.version_type; logoMap[v.id] = v.logo || '' })
     installedVersionTypes.value = typeMap
     installedVersionLogos.value = logoMap
   } catch (e) {
     console.error(e)
-    // 降级到旧API
     try { installedVersions.value = await tauri.listInstalledVersions() } catch (e2) { console.error(e2) }
   }
-  installedLoaded.value = true
 }
 
 async function handleRefresh() {
@@ -195,8 +202,9 @@ onMounted(async () => {
     <!-- 左侧菜单 -->
     <aside class="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
       <div class="flex-1 overflow-y-auto py-4">
+        <!-- 官方下载 -->
         <button
-          v-for="cat in categories"
+          v-for="cat in topCategories"
           :key="cat.id"
           class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors"
           :class="activeCategory === cat.id
@@ -205,6 +213,26 @@ onMounted(async () => {
           @click="activeCategory = cat.id; selectedVersion = null"
         >
           <component :is="cat.icon" class="w-5 h-5 mr-3" />
+          {{ cat.label }}
+        </button>
+
+        <!-- 分隔线 -->
+        <div class="my-2 mx-4 border-t border-gray-200"></div>
+
+        <!-- 社区资源分组标题 -->
+        <div class="px-4 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">社区资源</div>
+
+        <!-- 社区子分类 -->
+        <button
+          v-for="cat in communityCategories"
+          :key="cat.id"
+          class="w-full flex items-center pl-8 pr-4 py-2 text-sm transition-colors"
+          :class="activeCategory === cat.id
+            ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
+            : 'text-gray-600 hover:bg-gray-50'"
+          @click="activeCategory = cat.id; selectedVersion = null"
+        >
+          <component :is="cat.icon" class="w-4 h-4 mr-2.5" />
           {{ cat.label }}
         </button>
       </div>
@@ -223,12 +251,8 @@ onMounted(async () => {
     <div class="flex-1 flex flex-col overflow-hidden">
       <div class="px-6 py-4 bg-white border-b border-gray-200 flex items-center justify-between shrink-0">
         <div>
-          <h2 class="text-lg font-semibold text-gray-900">
-            {{ activeCategory === 'installed' ? '已安装' : '原版游戏' }}
-          </h2>
-          <p class="text-xs text-gray-500 mt-1">
-            {{ activeCategory === 'installed' ? '已下载的版本，可启动或卸载' : 'Minecraft Java Edition 官方版本' }}
-          </p>
+          <h2 class="text-lg font-semibold text-gray-900">{{ headerTitle }}</h2>
+          <p class="text-xs text-gray-500 mt-1">{{ headerSubtitle }}</p>
         </div>
         <Tooltip text="刷新版本列表" position="bottom">
           <button
@@ -242,7 +266,7 @@ onMounted(async () => {
         </Tooltip>
       </div>
 
-      <div class="flex-1 overflow-y-auto">
+      <div class="flex-1 overflow-hidden">
         <transition name="slide-right" mode="out-in">
           <LoaderSelect
             v-if="selectedVersion"
@@ -252,7 +276,14 @@ onMounted(async () => {
             @install="onInstallRequest"
           />
 
-          <div v-else key="version-list" class="p-6 h-full">
+          <!-- 社区资源：全高度，无 padding -->
+          <Community
+            v-else-if="communityResourceType"
+            :key="activeCategory"
+            :resource-type="communityResourceType"
+          />
+
+          <div v-else key="version-list" class="p-6 h-full overflow-y-auto">
             <!-- 原版游戏 - 加载中 -->
             <div v-if="activeCategory === 'vanilla' && loading" class="flex items-center justify-center h-full">
               <div class="text-center">
@@ -264,39 +295,16 @@ onMounted(async () => {
             <!-- 原版游戏 - 列表 -->
             <div v-else-if="activeCategory === 'vanilla'" class="space-y-4">
               <VersionSection
-                v-for="(section, idx) in sections"
-                :id="section.id"
-                :key="section.id"
-                :label="section.label"
-                :icon="section.icon"
-                :versions="section.versions"
-                :installed-ids="installedVersions"
-                :downloading="versionStore.downloading"
-                :default-expanded="idx === 0"
-                :format-date="formatDate"
+                v-for="(section, idx) in sections" :id="section.id" :key="section.id"
+                :label="section.label" :icon="section.icon" :versions="section.versions"
+                :installed-ids="installedVersions" :downloading="versionStore.downloading"
+                :default-expanded="idx === 0" :format-date="formatDate"
                 :get-version-icon="getVersionIcon"
-                @download="selectedVersion = $event"
-                @uninstall="handleUninstall"
+                @download="selectedVersion = $event" @uninstall="handleUninstall"
               />
             </div>
 
-            <!-- 已安装 - 加载中 -->
-            <div v-else-if="activeCategory === 'installed' && !installedLoaded" class="flex items-center justify-center h-full">
-              <div class="text-center">
-                <div class="animate-spin rounded-full h-10 w-10 border-2 border-gray-200 border-t-primary-600 mx-auto"></div>
-                <p class="text-sm text-gray-500 mt-3">加载中...</p>
-              </div>
-            </div>
-
-            <!-- 已安装 - 列表 -->
-            <InstalledList
-              v-else-if="activeCategory === 'installed'"
-              :versions="installedVersions"
-              :version-types="installedVersionTypes"
-              :get-version-icon="getVersionIcon"
-              @uninstall="handleUninstall"
-            />
-
+            <!-- 模组加载器/整合包 - 待实现 -->
             <div v-else class="flex items-center justify-center h-full">
               <div class="text-center">
                 <CubeIcon class="w-16 h-16 text-gray-400 mx-auto" />

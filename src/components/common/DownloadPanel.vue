@@ -13,7 +13,7 @@ const router = useRouter()
 const versionStore = useVersionStore()
 
 function goToDownloads() {
-  router.push('/downloads')
+  router.push('/apps/downloads')
 }
 </script>
 
