@@ -125,6 +125,8 @@ export interface ModInfo {
   size: number
   /** 加载器类型（forge/fabric/neoforge/liteloader/unknown） */
   loader_type: string
+  /** 中文译名（来自 mcmod 数据库，可能为空） */
+  translated_name: string
 }
 
 /**

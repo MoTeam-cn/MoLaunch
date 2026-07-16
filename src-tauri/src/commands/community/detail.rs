@@ -34,3 +34,14 @@ pub async fn get_project_versions(
         Platform::Modrinth => modrinth::get_versions(&project_id).await,
     }
 }
+
+/// 获取资源的 MC 百科详情页 URL（直链，非搜索页）
+///
+/// 参考 PCL2 PageDownloadCompDetail.BtnIntroWiki_Click：
+/// 通过 moddata.txt 的 slug → 行号（= class id）查表，拼接 `https://www.mcmod.cn/class/<id>.html`
+/// 查不到返回 None，前端可回退到搜索 URL
+#[tauri::command]
+pub async fn get_mcmod_url(platform: Platform, slug: String) -> Result<Option<String>, String> {
+    Ok(crate::minecraft::community::mcmod::lookup_class_id(platform, &slug)
+        .map(|id| format!("https://www.mcmod.cn/class/{}.html", id)))
+}

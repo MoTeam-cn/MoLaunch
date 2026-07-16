@@ -2,9 +2,9 @@
 import { ref, watch, onMounted, nextTick } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
-import { getCurseForgeConfig, setCurseForgeConfig } from '@/utils/api/community'
 import { showError } from '@/utils/toast'
 import Alert from '@/components/common/Alert.vue'
+import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
 import {
   ExclamationTriangleIcon,
   EyeIcon,
@@ -21,82 +21,34 @@ const loaded = ref(false)
 const cfEnabled = ref(false)
 const cfApiKey = ref('')
 const cfShowKey = ref(false)
-const cfSaving = ref(false)
 
-const pendingChanges = new Set<string>()
-
-async function flushSave() {
-  const changes = [...pendingChanges]
-  pendingChanges.clear()
-
+const { markDirty } = useDebouncedSave('patch', async (patch) => {
   try {
-    const tasks: Promise<void>[] = []
-
-    if (changes.includes('mode')) {
-      tasks.push(tauri.setProxyMode(proxyMode.value))
-    }
-    if (changes.includes('type')) {
-      tasks.push(tauri.setProxyType(proxyType.value))
-    }
-    if (changes.includes('url')) {
-      tasks.push(tauri.setProxyUrl(proxyUrl.value))
-    }
-    // CurseForge 配置走加密存储命令，单独处理（不与代理合并批量调用）
-    if (changes.includes('cf_enabled') || changes.includes('cf_api_key')) {
-      tasks.push(saveCurseForgeConfig())
-    }
-
-    await Promise.all(tasks)
+    await tauri.applyConfig(patch)
   } catch (e) {
     console.error('Failed to save settings:', e)
   }
-}
-
-const { scheduleSave: scheduleDebouncedSave } = useDebouncedSave(flushSave, 1500)
-
-function scheduleSave(changeType: string) {
-  if (!loaded.value) return
-  pendingChanges.add(changeType)
-  scheduleDebouncedSave()
-}
+}, 1500)
 
 // 代理：普通 INI 存储
-watch(proxyMode, () => scheduleSave('mode'))
-watch(proxyType, () => scheduleSave('type'))
-watch(proxyUrl, () => scheduleSave('url'))
+watch(proxyMode, (v) => markDirty('proxyMode', v))
+watch(proxyType, (v) => markDirty('proxyType', v))
+watch(proxyUrl, (v) => markDirty('proxyUrl', v))
 
-// CurseForge：走加密存储命令
-watch(cfEnabled, () => scheduleSave('cf_enabled'))
-watch(cfApiKey, () => scheduleSave('cf_api_key'))
-
-/** 调用后端 set_curseforge_config 命令保存（API Key 在后端用 SDK DES 加密后写 INI） */
-async function saveCurseForgeConfig() {
-  cfSaving.value = true
-  try {
-    await setCurseForgeConfig(cfEnabled.value, cfApiKey.value)
-  } catch (e: any) {
-    showError('保存 CurseForge 配置失败: ' + (e?.message || String(e)))
-  } finally {
-    cfSaving.value = false
-  }
-}
+// CurseForge：走加密存储（applyConfig 内部分流到 secure_storage）
+watch(cfEnabled, (v) => markDirty('curseforgeEnabled', v))
+watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
 
 onMounted(async () => {
   try {
-    proxyMode.value = (await tauri.getProxyMode()) as typeof proxyMode.value
-  } catch { /* ignore */ }
-  try {
-    proxyType.value = (await tauri.getProxyType()) as typeof proxyType.value
-  } catch { /* ignore */ }
-  try {
-    proxyUrl.value = await tauri.getProxyUrl()
-  } catch { /* ignore */ }
-  try {
-    const cf = await getCurseForgeConfig()
-    cfEnabled.value = cf.enabled
-    cfApiKey.value = cf.apiKey ?? ''
+    const cfg = await tauri.getConfigMap()
+    proxyMode.value = cfg.proxyMode as typeof proxyMode.value
+    proxyType.value = cfg.proxyType as typeof proxyType.value
+    proxyUrl.value = cfg.proxyUrl
+    cfEnabled.value = cfg.curseforgeEnabled
+    cfApiKey.value = cfg.curseforgeApiKey
   } catch (e: any) {
-    console.error('Failed to load CurseForge config:', e)
+    console.error('Failed to load settings:', e)
   }
   // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
   await nextTick()
@@ -254,7 +206,6 @@ onMounted(async () => {
               <p class="text-sm font-medium text-gray-900">启用 API Key</p>
               <p class="text-xs text-gray-500 mt-0.5">启用后使用官方 API，未配置 Key 时仍回退到镜像</p>
             </div>
-            <span v-if="cfSaving" class="text-[11px] text-gray-400">保存中...</span>
           </div>
           <div class="flex gap-2">
             <button
@@ -329,6 +280,9 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- 社区资源配置卡片（参考 PCL2 PageSetupSystem "社区资源" 卡片） -->
+    <CommunityConfigCard />
     </template>
   </div>
 </template>

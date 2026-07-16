@@ -3,9 +3,12 @@
  * 参考 PCL2 PageDownloadCompDetail.GetGroupedVersionName / UpdateFilterResult
  *
  * 将版本按游戏版本号分组，支持折叠/展开、版本筛选
+ *
+ * 性能优化：expanded 状态独立于 groups computed，toggleGroup 只触发 expanded 变化，
+ * 不重新计算 groups，避免 v-for 全部重渲染导致展开/收起动画卡顿。
  */
 
-import { computed, ref } from 'vue'
+import { computed, nextTick, reactive, ref, shallowRef, watch } from 'vue'
 import type { ResourceVersion } from '@/types/community'
 import { ModLoaderFlags } from '@/types/community'
 
@@ -15,29 +18,49 @@ export interface VersionGroup {
   title: string
   /** 组内版本列表（按发布时间降序） */
   versions: ResourceVersion[]
-  /** 是否展开 */
-  expanded: boolean
 }
 
 /**
- * 判断是否为标准版本号格式（参考 PCL2 IsFormatFit）
- * 匹配 1.x 或 2x.x 新格式
- */
-function isFormatFit(name: string): boolean {
-  return /^1\.\d/.test(name) || (/^[2-9]\d\.\d+/.test(name) && parseInt(name) >= 26)
-}
-
-/**
- * 将游戏版本号转为分组名（参考 PCL2 GetGroupedVersionName）
- * - 含 "w" 或无法识别 → "快照版"
+ * 顶部筛选滑块用的版本号（截断到二级）
+ * - 1.12.2 → "1.12"，1.20.1 → "1.20"，26.1.3 → "26.1"
+ * - 低于 1.12 的版本统一归"远古版"（顶部筛选项不显示 1.8/1.9/1.10/1.11 各项，避免过多）
+ * - 含 "w" → "快照版"
  * - 非标准格式 → "远古版"
- * - 标准 → 原样返回
+ * - 空 → "其他"
+ */
+function getFilterVersionName(name: string): string {
+  if (!name) return '其他'
+  if (name.includes('w')) return '快照版'
+  const m = /^1\.(\d+)/.exec(name)
+  if (m) {
+    const minor = parseInt(m[1])
+    if (minor < 12) return '远古版' // 低于 1.12 合并成单个远古版标签
+    return `1.${minor}`
+  }
+  if (/^[2-9]\d\.\d+/.test(name) && parseInt(name) >= 26) {
+    return name.split('.').slice(0, 2).join('.')
+  }
+  return '远古版'
+}
+
+/**
+ * 下面版本分组卡片用的版本号（所有标准版本保留完整版本号）
+ * - 1.12.2 → "1.12.2"，1.10.1 → "1.10.1"，1.8.9 → "1.8.9"，26.1.3 → "26.1.3"
+ * - 含 "w" → "快照版"
+ * - 非标准格式（无法识别的版本号）→ "远古版"
+ * - 空 → "其他"
+ *
+ * 注：顶部筛选滑块用 getFilterVersionName 截断到二级，下面分组卡片用本函数保留完整版本号
  */
 function getGroupedVersionName(name: string): string {
   if (!name) return '其他'
   if (name.includes('w')) return '快照版'
-  if (!isFormatFit(name)) return '远古版'
-  return name
+  // 标准 1.x 格式：保留完整版本号（1.10.1 → "1.10.1"，1.12.2 → "1.12.2"）
+  if (/^1\.\d+/.test(name)) return name
+  // 新格式（26.x）：保留完整版本号
+  if (/^[2-9]\d\.\d+/.test(name) && parseInt(name) >= 26) return name
+  // 非标准格式归远古版
+  return '远古版'
 }
 
 /** 提取加载器名称 */
@@ -72,15 +95,69 @@ function specialWeight(title: string): number {
   return 0
 }
 
+/** 计算分组（不依赖 expanded 状态） */
+function computeGroups(versions: ResourceVersion[], versionFilter: string): VersionGroup[] {
+  if (versions.length === 0) return []
+
+  const dict = new Map<string, ResourceVersion[]>()
+
+  for (const ver of versions) {
+    const loaders = loaderNames(ver.mod_loaders)
+    const gvs = ver.game_versions.length > 0 ? ver.game_versions : ['其他']
+    for (const gv of gvs) {
+      // 筛选用截断到二级的版本号匹配（1.12 匹配 1.12/1.12.1/1.12.2）
+      const filterName = getFilterVersionName(gv)
+      if (versionFilter && versionFilter !== '全部' && filterName !== versionFilter) continue
+      // 分组用完整版本号（1.12.2 保持 1.12.2）
+      const verName = getGroupedVersionName(gv)
+      // 如果有多个加载器，每个加载器独立分组（如 "Fabric 1.20.1"）
+      const prefixes = loaders.length > 0 ? loaders : ['']
+      for (const prefix of prefixes) {
+        const title = prefix ? `${prefix} ${verName}` : verName
+        if (!dict.has(title)) dict.set(title, [])
+        // 避免同一版本被重复加入同一组
+        const existing = dict.get(title)!
+        if (!existing.some(v => v.id === ver.id)) {
+          existing.push(ver)
+        }
+      }
+    }
+  }
+
+  // 转为数组并排序
+  const result: VersionGroup[] = []
+  for (const [title, vers] of dict) {
+    // 组内按发布时间降序
+    vers.sort((a, b) => b.release_date.localeCompare(a.release_date))
+    result.push({ title, versions: vers })
+  }
+
+  // 排序：标准版本号降序，特殊类排后
+  result.sort((a, b) => {
+    const wa = specialWeight(a.title)
+    const wb = specialWeight(b.title)
+    if (wa !== wb) return wa - wb
+    // 都是标准版本号或同类特殊
+    // 提取版本号部分（去掉加载器前缀）
+    const va = a.title.replace(/^(Fabric|Forge|NeoForge|Quilt)\s+/, '')
+    const vb = b.title.replace(/^(Fabric|Forge|NeoForge|Quilt)\s+/, '')
+    return compareVersion(vb, va) // 降序，新版本在前
+  })
+
+  return result
+}
+
 /**
  * 对版本列表进行分组（带版本筛选）
+ *
+ * expanded 状态独立存储，toggleGroup 只修改 expandedMap，
+ * 不触发 groups 重新计算，避免 v-for 全部重渲染导致展开/收起动画卡顿。
  */
 export function useVersionGroups(versions: () => ResourceVersion[]) {
-  const expandedSet = ref<Set<string>>(new Set())
   /** 当前选中的筛选版本（空字符串=全部） */
   const versionFilter = ref('')
 
-  /** 可用筛选项（从所有版本提取去重） */
+  /** 可用筛选项（从所有版本提取去重，截断到二级版本号） */
   const filterOptions = computed<string[]>(() => {
     const vlist = versions()
     if (vlist.length === 0) return []
@@ -88,7 +165,7 @@ export function useVersionGroups(versions: () => ResourceVersion[]) {
     for (const ver of vlist) {
       const gvs = ver.game_versions.length > 0 ? ver.game_versions : ['其他']
       for (const gv of gvs) {
-        set.add(getGroupedVersionName(gv))
+        set.add(getFilterVersionName(gv))
       }
     }
     // 排序：标准版本号降序，特殊类排后
@@ -100,78 +177,57 @@ export function useVersionGroups(versions: () => ResourceVersion[]) {
     })
   })
 
-  const groups = computed<VersionGroup[]>(() => {
-    const vlist = versions()
-    if (vlist.length === 0) return []
+  /** 展开状态：独立 reactive 对象，toggleGroup 只改这里，不触发 groups 重算 */
+  const expandedMap = reactive<Record<string, boolean>>({})
 
-    const dict = new Map<string, ResourceVersion[]>()
+  /** 内容懒挂载标记：首次展开后才渲染版本条目 DOM，折叠卡片不产生内容 DOM，避免大量兄弟节点拖慢 reflow */
+  const mountedMap = reactive<Record<string, boolean>>({})
 
-    for (const ver of vlist) {
-      const loaders = loaderNames(ver.mod_loaders)
-      const gvs = ver.game_versions.length > 0 ? ver.game_versions : ['其他']
-      for (const gv of gvs) {
-        const verName = getGroupedVersionName(gv)
-        // 版本筛选：如果选中了筛选，且当前分组名不匹配，跳过
-        if (versionFilter.value && versionFilter.value !== '全部' && verName !== versionFilter.value) continue
-        // 如果有多个加载器，每个加载器独立分组（如 "Fabric 1.20.1"）
-        const prefixes = loaders.length > 0 ? loaders : ['']
-        for (const prefix of prefixes) {
-          const title = prefix ? `${prefix} ${verName}` : verName
-          if (!dict.has(title)) dict.set(title, [])
-          // 避免同一版本被重复加入同一组
-          const existing = dict.get(title)!
-          if (!existing.some(v => v.id === ver.id)) {
-            existing.push(ver)
-          }
-        }
+  // groups 用 shallowRef + watch 重建，只在 versions/filter 变化时重新计算
+  // 不依赖 expanded 状态，避免 toggleGroup 触发 groups 重算
+  // 注意：expandedMap/mountedMap 必须在 watch 之前声明，因为 immediate+sync 会在声明时同步执行回调
+  const groups = shallowRef<VersionGroup[]>([])
+  watch(
+    [() => versions(), versionFilter],
+    ([vlist, vf]) => {
+      groups.value = computeGroups(vlist, vf)
+      // 数据/筛选变化时清空挂载与展开状态
+      for (const k of Object.keys(expandedMap)) delete expandedMap[k]
+      for (const k of Object.keys(mountedMap)) delete mountedMap[k]
+      // 如果只有一组，自动展开（需先挂载再展开，保证动画）
+      if (groups.value.length === 1) {
+        const title = groups.value[0].title
+        mountedMap[title] = true
+        nextTick(() => { expandedMap[title] = true })
       }
+    },
+    { immediate: true, flush: 'sync' },
+  )
+
+  /** 可响应的 expanded 读取（模板用 expandedOf(g.title)） */
+  function expandedOf(title: string): boolean {
+    return expandedMap[title] === true
+  }
+
+  /** 内容是否已挂载（模板用 mountedOf(g.title) 控制 v-if） */
+  function mountedOf(title: string): boolean {
+    return mountedMap[title] === true
+  }
+
+  /** 展开/收起：首次展开时先挂载内容（保持 0fr 折叠态），下一 tick 再展开触发 0fr→1fr 动画 */
+  async function toggleGroup(title: string) {
+    const willExpand = !expandedMap[title]
+    if (willExpand && !mountedMap[title]) {
+      mountedMap[title] = true
+      await nextTick()
     }
-
-    // 转为数组并排序
-    const result: VersionGroup[] = []
-    for (const [title, vers] of dict) {
-      // 组内按发布时间降序
-      vers.sort((a, b) => b.release_date.localeCompare(a.release_date))
-      result.push({
-        title,
-        versions: vers,
-        expanded: expandedSet.value.has(title),
-      })
-    }
-
-    // 排序：标准版本号降序，特殊类排后
-    result.sort((a, b) => {
-      const wa = specialWeight(a.title)
-      const wb = specialWeight(b.title)
-      if (wa !== wb) return wa - wb
-      // 都是标准版本号或同类特殊
-      // 提取版本号部分（去掉加载器前缀）
-      const va = a.title.replace(/^(Fabric|Forge|NeoForge|Quilt)\s+/, '')
-      const vb = b.title.replace(/^(Fabric|Forge|NeoForge|Quilt)\s+/, '')
-      return compareVersion(vb, va) // 降序，新版本在前
-    })
-
-    // 如果只有一组，自动展开
-    if (result.length === 1) {
-      result[0].expanded = true
-      expandedSet.value.add(result[0].title)
-    }
-
-    return result
-  })
-
-  function toggleGroup(title: string) {
-    if (expandedSet.value.has(title)) {
-      expandedSet.value.delete(title)
-    } else {
-      expandedSet.value.add(title)
-    }
+    expandedMap[title] = willExpand
   }
 
   function setFilter(f: string) {
     versionFilter.value = f
-    expandedSet.value.clear()
+    // watch 会清空 mounted/expanded，无需重复处理
   }
 
-  return { groups, filterOptions, versionFilter, toggleGroup, setFilter }
+  return { groups, filterOptions, versionFilter, toggleGroup, setFilter, expandedOf, mountedOf }
 }

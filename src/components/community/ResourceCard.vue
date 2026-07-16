@@ -75,7 +75,6 @@ const platformLabel = computed(() => props.project.platform)
         :src="project.logo_url"
         :alt="project.raw_name"
         class="w-full h-full object-cover"
-        loading="lazy"
         @error="($event.target as HTMLImageElement).style.display = 'none'"
       >
       <span v-else class="text-lg text-gray-400">📦</span>

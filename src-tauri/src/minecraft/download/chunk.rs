@@ -43,7 +43,7 @@ pub async fn supports_range(client: &reqwest::Client, url: &str) -> bool {
 
 /// 分片下载单个文件
 ///
-/// - `file_size` 必须是已知的精确大小（来自 Content-Length 或版本 JSON）
+/// - `file_size` 为 0 时会自动探测（GET + Range:bytes=0-0，通过 Content-Range 拿总大小）
 /// - `chunk_count` 分片数量
 /// - 所有 chunk 共享同一个 RateLimiter
 /// - 进度通过 `file_progress` 实时更新，供速度计算使用
@@ -51,11 +51,32 @@ pub async fn download_chunked(
     client: &reqwest::Client,
     url: &str,
     local_path: &str,
-    file_size: u64,
+    mut file_size: u64,
     chunk_count: usize,
     rate_limiter: Arc<Mutex<RateLimiter>>,
     file_progress: Option<Arc<StdMutex<GlobalProgress>>>,
 ) -> ChunkDownloadResult {
+    // file_size=0 时自动探测（GET + Range:bytes=0-0，通过 Content-Range 拿总大小）
+    // 不用 HEAD 是因为 Modrinth CDN 307 重定向后 HEAD 不返回 Content-Length
+    if file_size == 0 {
+        file_size = probe_file_size(client, url).await;
+        if file_size == 0 {
+            return ChunkDownloadResult {
+                downloaded: 0,
+                total: 0,
+                speed: 0,
+                status: DownloadStatus::Failed,
+                error: Some("无法探测文件大小".into()),
+            };
+        }
+        // 探测到的真实大小回写到全局 total_bytes（download_batch 初始化时按 expected_size=0 求和，
+        // total_bytes 为 0，前端会一直显示「计算中...」）
+        if let Some(ref fp) = file_progress {
+            let mut p = fp.lock().unwrap();
+            p.total_bytes = p.total_bytes.saturating_add(file_size);
+        }
+    }
+
     if file_size == 0 || chunk_count <= 1 {
         return ChunkDownloadResult {
             downloaded: 0,
@@ -103,11 +124,11 @@ pub async fn download_chunked(
     }
 
     log_info!(
-        "[Chunk] 开始分片下载: {} ({} bytes, {} chunks, 每块约 {} bytes)",
+        "[Chunk] 开始分片下载: {} ({}, {} chunks, 每块约 {})",
         local_path,
-        file_size,
+        format_bytes(file_size),
         chunk_count,
-        chunk_size
+        format_bytes(chunk_size)
     );
 
     // 分片进度追踪：每个 chunk 已下载字节数
@@ -145,7 +166,7 @@ pub async fn download_chunked(
         match handle.await {
             Ok((idx, Ok(bytes))) => {
                 total_downloaded += bytes;
-                log_debug!("[Chunk] chunk {} 完成: {} bytes", idx, bytes);
+                log_debug!("[Chunk] chunk {} 完成: {}", idx, format_bytes(bytes));
             }
             Ok((idx, Err(e))) => {
                 all_ok = false;
@@ -164,6 +185,12 @@ pub async fn download_chunked(
         // 清理临时文件
         for i in 0..chunk_count {
             let _ = std::fs::remove_file(format!("{}.part{}", local_path, i));
+        }
+        // 回滚 file_progress：本次分片下载增量加的部分无效（文件将被重新下载），
+        // 避免重试时 downloaded_bytes 持续累加导致进度偏高/超过 total
+        if let Some(ref fp) = file_progress {
+            let mut p = fp.lock().unwrap();
+            p.downloaded_bytes = p.downloaded_bytes.saturating_sub(total_downloaded);
         }
         return ChunkDownloadResult {
             downloaded: total_downloaded,
@@ -201,9 +228,9 @@ pub async fn download_chunked(
     };
 
     log_info!(
-        "[Chunk] 分片下载完成: {} ({} bytes, {:.1}s, {}/s)",
+        "[Chunk] 分片下载完成: {} ({}, {:.1}s, {})",
         local_path,
-        total_downloaded,
+        format_bytes(total_downloaded),
         elapsed,
         format_speed(speed)
     );
@@ -281,16 +308,19 @@ async fn download_chunk(
         }
 
         // 更新本 chunk 的进度
-        {
+        let prev_chunk_bytes = {
             let mut cp = chunk_progress[chunk_index].lock().unwrap();
+            let prev = *cp;
             *cp = downloaded;
-        }
+            prev
+        };
 
-        // 更新文件级进度（聚合所有 chunk）供速度计算使用
+        // 更新文件级进度（增量累加，避免多文件并发时覆盖）
         if let Some(ref fp) = file_progress {
-            let total_chunk_bytes: u64 = chunk_progress.iter().map(|c| *c.lock().unwrap()).sum();
+            let delta = downloaded.saturating_sub(prev_chunk_bytes);
             let mut p = fp.lock().unwrap();
-            p.downloaded_bytes = total_chunk_bytes;
+            // 增量累加，避免覆盖其他并发文件的进度
+            p.downloaded_bytes = p.downloaded_bytes.saturating_add(delta);
         }
 
         // max_bytes 上限校验，防止被劫持镜像源返回超量数据导致磁盘耗尽
@@ -332,4 +362,40 @@ fn format_speed(bytes_per_sec: u64) -> String {
     } else {
         format!("{} B/s", bytes_per_sec)
     }
+}
+
+/// 格式化字节数为人类可读大小（如 29.6 MB）
+fn format_bytes(bytes: u64) -> String {
+    if bytes >= 1_048_576 {
+        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
+    } else if bytes >= 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+/// 探测远程文件大小（GET + Range:bytes=0-0，通过 Content-Range 拿总大小）
+async fn probe_file_size(client: &reqwest::Client, url: &str) -> u64 {
+    if let Ok(resp) = client
+        .get(url)
+        .header("Range", "bytes=0-0")
+        .timeout(Duration::from_secs(15))
+        .send()
+        .await
+    {
+        if resp.status().is_success() {
+            if let Some(cr) = resp.headers().get("content-range") {
+                if let Ok(s) = cr.to_str() {
+                    if let Some(total) = s.rsplit('/').next() {
+                        if let Ok(n) = total.parse::<u64>() {
+                            log_info!("[Chunk] 探测文件大小: {} ({})", format_bytes(n), url);
+                            return n;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    0
 }

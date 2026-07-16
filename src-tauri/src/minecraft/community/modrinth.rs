@@ -9,8 +9,27 @@ use super::types::{
     ModLoaders, Platform, ReleaseType, ResourceProject, ResourceVersion, ResourceType,
 };
 
-/// Modrinth API 基地址（使用 MCIM 镜像源）
+/// Modrinth 官方 API 基地址
+const MR_OFFICIAL_BASE: &str = "https://api.modrinth.com/v2";
+
+/// Modrinth 镜像 API 基地址（MCIM 镜像源）
 const MR_MIRROR_BASE: &str = "https://mod.mcimirror.top/modrinth/v2";
+
+/// 根据 source 策略选择 Modrinth 基地址
+///
+/// source 策略（参考 PCL2 ToolDownloadMod）：
+/// - 0=尽量镜像：强制走镜像
+/// - 1=缓慢时换镜像：优先官方，失败后由调用方回退镜像
+/// - 2=尽量官方：强制走官方
+fn pick_base() -> (&'static str, u8) {
+    let source = super::get_source_pref();
+    match source {
+        0 => (MR_MIRROR_BASE, source),
+        2 => (MR_OFFICIAL_BASE, source),
+        // 1=缓慢时换镜像：优先官方
+        _ => (MR_OFFICIAL_BASE, source),
+    }
+}
 
 /// Modrinth 搜索响应
 #[derive(Debug, Deserialize)]
@@ -305,6 +324,8 @@ fn convert_version(v: &MrVersion) -> ResourceVersion {
 
 /// 构建 Modrinth facets 参数
 /// 格式: [["project_type:mod"],["categories:'forge'"],["versions:'1.20.1'"]]
+///
+/// ignore_quilt=true 时过滤 Quilt 加载器（参考 PCL2 ToolDownloadIgnoreQuilt）
 fn build_facets(
     rtype: ResourceType,
     game_version: Option<&str>,
@@ -324,11 +345,13 @@ fn build_facets(
     }
 
     // mod_loader (OR 组合)
+    // 读取 ignore_quilt 配置，true 时从查询条件中移除 Quilt
+    let ignore_quilt = super::get_ignore_quilt();
     let mut loaders = Vec::new();
     if mod_loader & ModLoaders::FORGE != 0 { loaders.push("categories:'forge'".to_string()); }
     if mod_loader & ModLoaders::NEOFORGE != 0 { loaders.push("categories:'neoforge'".to_string()); }
     if mod_loader & ModLoaders::FABRIC != 0 { loaders.push("categories:'fabric'".to_string()); }
-    if mod_loader & ModLoaders::QUILT != 0 { loaders.push("categories:'quilt'".to_string()); }
+    if !ignore_quilt && mod_loader & ModLoaders::QUILT != 0 { loaders.push("categories:'quilt'".to_string()); }
     if mod_loader & ModLoaders::LITELOADER != 0 { loaders.push("categories:'liteloader'".to_string()); }
     if !loaders.is_empty() {
         facets.push(loaders);
@@ -344,9 +367,110 @@ fn build_facets(
     serde_json::to_string(&facets).unwrap_or_else(|_| "[]".to_string())
 }
 
-/// 构建请求 URL，使用镜像源
-fn build_url(path: &str) -> String {
-    format!("{}{}", MR_MIRROR_BASE, path)
+/// 发送 GET 请求
+///
+/// source=1（缓慢时换镜像）时，若官方请求失败/超时，自动回退到镜像源重试
+/// source=2 时官方请求不设超时（让其自然完成），失败直接报错
+/// source=0 时直接走镜像
+async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String> {
+    let (base, source) = pick_base();
+    let url = format!("{}{}", base, path);
+
+    // 官方请求超时（参考 PCL2 DlModRequest：Modrinth 官方默认 20s）
+    const MR_OFFICIAL_TIMEOUT_SECS: u64 = 20;
+
+    let is_official = base == MR_OFFICIAL_BASE;
+    let start = std::time::Instant::now();
+
+    let result = if is_official {
+        // source=1 时官方请求加超时，超时触发回退；source=2 时不加超时
+        if source == 1 {
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(MR_OFFICIAL_TIMEOUT_SECS),
+                crate::http::get_client().get(&url).send(),
+            )
+            .await
+            {
+                Ok(Ok(resp)) => resp.json::<T>().await.map_err(|e| {
+                    crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
+                    format!("Modrinth 响应解析失败: {}", e)
+                }),
+                Ok(Err(e)) => {
+                    crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
+                    Err(format!("Modrinth 请求失败: {}", e))
+                }
+                Err(_) => {
+                    crate::log_warn!(
+                        "[Community] MR 官方请求超时（{}s），回退镜像",
+                        MR_OFFICIAL_TIMEOUT_SECS
+                    );
+                    Err(format!("Modrinth 官方请求超时（{}s）", MR_OFFICIAL_TIMEOUT_SECS))
+                }
+            }
+        } else {
+            // source=2：官方请求不加超时
+            crate::http::get_client()
+                .get(&url)
+                .send()
+                .await
+                .map_err(|e| {
+                    crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
+                    format!("Modrinth 请求失败: {}", e)
+                })?
+                .json::<T>()
+                .await
+                .map_err(|e| {
+                    crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
+                    format!("Modrinth 响应解析失败: {}", e)
+                })
+        }
+    } else {
+        // 镜像请求不加超时
+        crate::http::get_client()
+            .get(&url)
+            .send()
+            .await
+            .map_err(|e| {
+                crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
+                format!("Modrinth 请求失败: {}", e)
+            })?
+            .json::<T>()
+            .await
+            .map_err(|e| {
+                crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
+                format!("Modrinth 响应解析失败: {}", e)
+            })
+    };
+
+    match result {
+        Ok(value) => {
+            crate::log_info!("[Community] MR 请求成功: {} ({})", url, fmt_elapsed(start));
+            Ok(value)
+        }
+        Err(e) => {
+            // 策略 1（缓慢时换镜像）：官方失败时回退镜像
+            if source == 1 && is_official {
+                crate::log_warn!("[Community] MR 官方请求失败，回退镜像: {}", e);
+                let mirror_url = format!("{}{}", MR_MIRROR_BASE, path);
+                let resp = crate::http::get_client()
+                    .get(&mirror_url)
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        crate::log_warn!("[Community] MR 镜像请求失败: {} ({:?})", mirror_url, e);
+                        format!("Modrinth 镜像请求失败: {}", e)
+                    })?;
+                let value: T = resp.json().await
+                    .map_err(|e| {
+                        crate::log_warn!("[Community] MR 镜像响应解析失败: {} ({})", mirror_url, e);
+                        format!("Modrinth 镜像响应解析失败: {}", e)
+                    })?;
+                crate::log_info!("[Community] MR 镜像请求成功: {} ({})", mirror_url, fmt_elapsed(start));
+                return Ok(value);
+            }
+            Err(e)
+        }
+    }
 }
 
 /// Modrinth 搜索
@@ -372,22 +496,9 @@ pub async fn search(
         params.push(("query", query.to_string()));
     }
 
-    let url = format!("{}/search?{}", build_url(""), urlencode_params(&params));
+    let path = format!("/search?{}", urlencode_params(&params));
+    let resp: MrSearchResponse = mr_get(&path).await?;
 
-    let start = std::time::Instant::now();
-    let resp: MrSearchResponse = crate::http::get_client()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| {
-            crate::log_info!("[Community] MR 请求失败: {} ({:?})", url, e);
-            format!("Modrinth 搜索失败: {}", e)
-        })?
-        .json()
-        .await
-        .map_err(|e| format!("Modrinth 响应解析失败: {}", e))?;
-
-    crate::log_info!("[Community] MR 请求成功: {} ({})", url, fmt_elapsed(start));
     let total = resp.total_hits;
     let projects = resp.hits.iter().map(|h| convert_hit(h, rtype)).collect();
 
@@ -402,19 +513,8 @@ pub async fn get_project(project_id: &str, rtype: ResourceType) -> Result<Resour
         return Ok(cached);
     }
 
-    let url = build_url(&format!("/project/{}", project_id));
-
-    let start = std::time::Instant::now();
-    let resp: MrProject = crate::http::get_client()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Modrinth 获取工程失败: {}", e))?
-        .json()
-        .await
-        .map_err(|e| format!("Modrinth 工程解析失败: {}", e))?;
-
-    crate::log_info!("[Community] MR 请求成功: {} ({})", url, fmt_elapsed(start));
+    let path = format!("/project/{}", project_id);
+    let resp: MrProject = mr_get(&path).await?;
     let project = convert_project(&resp, rtype);
     super::cache::set_project("MR", project_id, &project);
     Ok(project)
@@ -428,19 +528,8 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
         return Ok(cached);
     }
 
-    let url = build_url(&format!("/project/{}/version", project_id));
-
-    let start = std::time::Instant::now();
-    let resp: Vec<MrVersion> = crate::http::get_client()
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("Modrinth 获取版本列表失败: {}", e))?
-        .json()
-        .await
-        .map_err(|e| format!("Modrinth 版本列表解析失败: {}", e))?;
-
-    crate::log_info!("[Community] MR 请求成功: {} ({})", url, fmt_elapsed(start));
+    let path = format!("/project/{}/version", project_id);
+    let resp: Vec<MrVersion> = mr_get(&path).await?;
     let versions: Vec<ResourceVersion> = resp.iter().map(convert_version).collect();
     super::cache::set_versions("MR", project_id, &versions);
     Ok(versions)

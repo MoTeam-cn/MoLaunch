@@ -11,9 +11,6 @@ const maxDownloadSpeed = ref(0)
 const speedSlider = ref(0)
 const loaded = ref(false)
 
-// 待保存的设置队列
-const pendingChanges = new Set<string>()
-
 /** 前端选项 → 后端 source 值 */
 function toSource(v: 'official' | 'bmclapi' | 'smart'): string {
   return v === 'bmclapi' ? 'mirror' : v
@@ -26,81 +23,39 @@ function fromSource(s: string): 'official' | 'bmclapi' | 'smart' {
   return 'smart'
 }
 
-async function flushSave() {
-  const changes = [...pendingChanges]
-  pendingChanges.clear()
-
+const { markDirty } = useDebouncedSave('patch', async (patch) => {
   try {
-    const tasks: Promise<void>[] = []
-
-    if (changes.includes('meta')) {
-      tasks.push(tauri.setMetaSource(toSource(mirrorMeta.value), true))
-    }
-    if (changes.includes('download')) {
-      tasks.push(tauri.setDownloadSource(toSource(mirrorDownload.value), true))
-    }
-    if (changes.includes('speed')) {
-      const speed = speedSlider.value >= 21 ? 0 : (speedSlider.value === 0 ? 1 : speedSlider.value) * 1024 * 1024
-      maxDownloadSpeed.value = speed
-      tasks.push(tauri.setMaxDownloadSpeed(speed, true))
-    }
-    if (changes.includes('threads')) {
-      tasks.push(tauri.setMaxDownloadThreads(maxThreads.value))
-    }
-    if (changes.includes('chunks')) {
-      tasks.push(tauri.setChunkCount(chunkCount.value))
-    }
-
-    await Promise.all(tasks)
+    await tauri.applyConfig(patch)
   } catch (e) {
     console.error('Failed to save download settings:', e)
   }
-}
+}, 1500)
 
-const { scheduleSave: scheduleDebouncedSave } = useDebouncedSave(flushSave, 1500)
-
-function scheduleSave(changeType: string) {
-  if (!loaded.value) return
-  pendingChanges.add(changeType)
-  scheduleDebouncedSave()
-}
-
-watch(mirrorMeta, () => scheduleSave('meta'))
-watch(mirrorDownload, () => scheduleSave('download'))
-watch(speedSlider, () => scheduleSave('speed'))
-watch(maxThreads, () => scheduleSave('threads'))
-watch(chunkCount, () => scheduleSave('chunks'))
+watch(mirrorMeta, (v) => markDirty('metaSource', toSource(v)))
+watch(mirrorDownload, (v) => markDirty('downloadSource', toSource(v)))
+watch(speedSlider, (v) => {
+  const speed = v >= 21 ? 0 : (v === 0 ? 1 : v) * 1024 * 1024
+  maxDownloadSpeed.value = speed
+  markDirty('maxDownloadSpeed', speed)
+})
+watch(maxThreads, (v) => markDirty('maxDownloadThreads', v))
+watch(chunkCount, (v) => markDirty('chunkCount', v))
 
 onMounted(async () => {
   try {
-    mirrorMeta.value = fromSource(await tauri.getMetaSource())
-  } catch {
-    mirrorMeta.value = 'smart'
-  }
-  try {
-    mirrorDownload.value = fromSource(await tauri.getDownloadSource())
-  } catch {
-    mirrorDownload.value = 'smart'
-  }
-  try {
-    maxDownloadSpeed.value = await tauri.getMaxDownloadSpeed()
+    const cfg = await tauri.getConfigMap()
+    mirrorMeta.value = fromSource(cfg.metaSource)
+    mirrorDownload.value = fromSource(cfg.downloadSource)
+    maxDownloadSpeed.value = cfg.maxDownloadSpeed
     if (maxDownloadSpeed.value === 0) {
       speedSlider.value = 21
     } else {
       speedSlider.value = Math.round(maxDownloadSpeed.value / 1024 / 1024)
     }
-  } catch {
-    // ignore
-  }
-  try {
-    maxThreads.value = await tauri.getMaxDownloadThreads()
-  } catch {
-    // ignore
-  }
-  try {
-    chunkCount.value = await tauri.getChunkCount()
-  } catch {
-    // ignore
+    maxThreads.value = cfg.maxDownloadThreads
+    chunkCount.value = cfg.chunkCount
+  } catch (e) {
+    console.error('Failed to load download settings:', e)
   }
   // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
   await nextTick()

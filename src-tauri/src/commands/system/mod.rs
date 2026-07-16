@@ -1,16 +1,18 @@
 //! 系统命令模块
 
+mod apply_config;
 mod config;
 mod download;
 mod game;
 mod game_dir;
 mod proxy;
 
+pub use apply_config::*;
 pub use config::*;
-pub use download::*;
-pub use game::*;
 pub use game_dir::*;
-pub use proxy::*;
+
+// download/game/proxy 模块保留为占位（后续如需专属命令可扩展），
+// 所有 get/set 由 `get_config` / `apply_config` 统一处理。
 
 use crate::state::AppState;
 

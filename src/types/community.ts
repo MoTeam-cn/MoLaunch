@@ -89,12 +89,35 @@ export interface DownloadRequest {
   resourceType: ResourceType
   versionId?: string
   hash?: string
+  /** 译名（可选，来自 mcmod 数据库，用于按 filenameFormat 拼接新文件名） */
+  translatedName?: string
 }
 
 /** 下载安装结果 */
 export interface DownloadResult {
   path: string
   size: number
+}
+
+/** 整合包安装请求 */
+export interface InstallModpackRequest {
+  platform: Platform
+  downloadUrl: string
+  fileName: string
+  instanceName: string
+}
+
+/** 整合包格式 */
+export type ModpackFormat = 'curseforge' | 'modrinth'
+
+/** 整合包安装结果 */
+export interface InstallModpackResult {
+  format: ModpackFormat
+  gameVersion: string
+  loader: string
+  loaderVersion: string
+  archivePath: string
+  instanceDir: string
 }
 
 /** 详情请求 */

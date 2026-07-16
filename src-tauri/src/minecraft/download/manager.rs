@@ -114,6 +114,19 @@ impl DownloadManager {
                         break;
                     }
                 }
+                // 在 timer 中 push 速度窗口，让下载过程中也能计算速度
+                // 注意：StdMutex 的 MutexGuard 不是 Send，必须在 await 前释放
+                let downloaded_snapshot = {
+                    let p = prog_for_timer.lock().unwrap();
+                    p.downloaded_bytes
+                };
+                {
+                    let mut window = sw_for_timer.lock().await;
+                    window.push_back((downloaded_snapshot, Instant::now()));
+                    if window.len() > 10 {
+                        window.pop_front();
+                    }
+                }
                 let speed = {
                     let window = sw_for_timer.lock().await;
                     if window.len() >= 2 {
@@ -152,7 +165,6 @@ impl DownloadManager {
             let limiter = rate_limiter.clone();
             let urls = self.reorder_urls(&task.urls);
             let source_mode = self.source_mode;
-            let sw = speed_window.clone();
             let self_chunk_count = self.chunk_count;
             let chunked_ids = chunked_task_ids.clone();
 
@@ -175,10 +187,8 @@ impl DownloadManager {
                     match &result.status {
                         DownloadStatus::Completed => {
                             p.completed_files += 1;
-                            let is_chunked = chunked_ids.lock().unwrap().contains(&task.id);
-                            if !is_chunked {
-                                p.downloaded_bytes += result.downloaded;
-                            }
+                            // 分片下载和单流下载过程中都已增量更新 downloaded_bytes，
+                            // 这里不再重复加（避免进度偏高/超过 total）
                         }
                         DownloadStatus::Failed => p.failed_files += 1,
                         DownloadStatus::Skipped => {
@@ -191,21 +201,7 @@ impl DownloadManager {
                 }
 
                 {
-                    let mut window = sw.lock().await;
-                    let mut p = prog.lock().unwrap();
-                    window.push_back((p.downloaded_bytes, Instant::now()));
-                    if window.len() > 10 {
-                        window.pop_front();
-                    }
-                    if window.len() >= 2 {
-                        let (first_bytes, first_time) = window.front().unwrap();
-                        let (last_bytes, last_time) = window.back().unwrap();
-                        let bytes_diff = last_bytes.saturating_sub(*first_bytes);
-                        let time_diff = last_time.duration_since(*first_time).as_secs_f64();
-                        if time_diff > 0.0 {
-                            p.current_speed = (bytes_diff as f64 / time_diff) as u64;
-                        }
-                    }
+                    let p = prog.lock().unwrap();
                     if let Some(ref cb) = callback {
                         cb(p.clone());
                     }

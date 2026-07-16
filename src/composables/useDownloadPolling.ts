@@ -13,6 +13,7 @@ interface RawDownloadStage {
   bytes_total: number
   files_downloaded?: number
   files_total?: number
+  group?: string | null
 }
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -55,6 +56,7 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
           bytes_total: s.bytes_total,
           files_downloaded: s.files_downloaded || 0,
           files_total: s.files_total || 0,
+          group: s.group ?? null,
         }))
 
         let weightedProgress = 0

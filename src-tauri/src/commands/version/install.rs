@@ -204,26 +204,39 @@ pub async fn install_merged(
         || liteloader_version.is_some();
 
     // 设置下载状态
+    // 重要：install_merged 启动时**追加**新阶段，不清空已有 stages
+    //  - 整合包安装流程的 4 个阶段保留显示（前端按 group 分组折叠展开）
+    //  - download_version_full 的 stage_callback(0..4) 是相对偏移，实际索引 = stage_offset + stage_index
+    //  - stage_offset = 追加前 stages 长度
+    let stage_offset;
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.is_active = true;
         ds.is_complete = false;
-        ds.current_stage_index = 0;
         ds.global_speed = 0;
         ds.global_bytes_downloaded = 0;
         ds.global_bytes_total = 0;
         ds.error_code = 0;
-        // 重置所有阶段
-        for stage in ds.stages.iter_mut() {
-            stage.progress = 0.0;
-            stage.status = StageStatus::Waiting;
-            stage.bytes_downloaded = 0;
-            stage.bytes_total = 0;
-        }
-        // 如果需要安装加载器，预添加阶段
+
+        stage_offset = ds.stages.len();
+        ds.current_stage_index = stage_offset;
+
+        // 追加标准 MC 下载 5 阶段（与 download_version_full 的 stage_callback 索引对应）
+        // 全部归入"MC本体安装"分组，加载器阶段也归入此分组
+        ds.stages.extend([
+            crate::state::DownloadStage::new_grouped("版本清单", 2.0, "MC本体安装"),
+            crate::state::DownloadStage::new_grouped("版本信息", 3.0, "MC本体安装"),
+            crate::state::DownloadStage::new_grouped("客户端", 5.0, "MC本体安装"),
+            crate::state::DownloadStage::new_grouped("库文件", 15.0, "MC本体安装"),
+            crate::state::DownloadStage::new_grouped("资源文件", 20.0, "MC本体安装"),
+        ]);
+        // 如果需要安装加载器，追加阶段（索引 = stage_offset + 5）
         if has_any_loader {
-            ds.stages
-                .push(crate::state::DownloadStage::new("加载器安装", 30.0));
+            ds.stages.push(crate::state::DownloadStage::new_grouped(
+                "加载器安装",
+                30.0,
+                "MC本体安装",
+            ));
         }
     }
 
@@ -299,22 +312,26 @@ pub async fn install_merged(
     });
 
     // Stage callback (更新阶段状态)
+    // download_version_full 传 0..4 相对索引，加上 stage_offset 得到实际索引
+    // 注意：第一次 stage_callback(0) 时 actual_index = stage_offset（即 MC 本体第一个阶段），
+    // 此时 current_stage_index 已经是 stage_offset，不能把 stage_offset 自己标记为 Finished
     let state_for_stage = state.download_state.clone();
     let stage_callback = Arc::new(move |stage_index: usize, _stage_name: &str| {
+        let actual_index = stage_offset + stage_index;
         let mut ds = state_for_stage.lock().unwrap();
-        if ds.current_stage_index < ds.stages.len() && stage_index > 0 {
-            let prev = ds.current_stage_index;
-            if prev < ds.stages.len() {
-                ds.stages[prev].status = StageStatus::Finished;
-                ds.stages[prev].progress = 1.0;
-            }
+        let prev = ds.current_stage_index;
+        // 只有切换到新阶段（actual_index > prev）才把前一阶段标记为 Finished
+        // 避免 stage_callback(0) 时误把 stage_offset（MC本体第一个）标记为 Finished
+        if actual_index > prev && prev < ds.stages.len() {
+            ds.stages[prev].status = StageStatus::Finished;
+            ds.stages[prev].progress = 1.0;
         }
-        ds.current_stage_index = stage_index;
-        if stage_index < ds.stages.len() {
-            ds.stages[stage_index].status = StageStatus::Loading;
-            ds.stages[stage_index].progress = 0.0;
-            ds.stages[stage_index].bytes_downloaded = 0;
-            ds.stages[stage_index].bytes_total = 0;
+        ds.current_stage_index = actual_index;
+        if actual_index < ds.stages.len() {
+            ds.stages[actual_index].status = StageStatus::Loading;
+            ds.stages[actual_index].progress = 0.0;
+            ds.stages[actual_index].bytes_downloaded = 0;
+            ds.stages[actual_index].bytes_total = 0;
         }
     });
 

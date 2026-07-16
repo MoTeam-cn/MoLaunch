@@ -21,6 +21,8 @@ const modFilter = ref<'all' | 'enabled' | 'disabled'>('all')
 const modSearch = ref('')
 const isModableVersion = ref(false)
 const checkingModable = ref(false)
+// Mod 管理样式：0=标题显示译名，详情显示文件名；1=标题显示文件名，详情显示译名
+const modLocalNameStyle = ref(0)
 
 async function checkModable() {
   if (!selectedId.value) {
@@ -56,10 +58,31 @@ const filteredMods = computed(() => {
   else if (modFilter.value === 'disabled') list = list.filter(m => !m.is_enabled)
   if (modSearch.value.trim()) {
     const q = modSearch.value.toLowerCase()
-    list = list.filter(m => m.enabled_name.toLowerCase().includes(q))
+    list = list.filter(m =>
+      m.enabled_name.toLowerCase().includes(q) ||
+      m.translated_name.toLowerCase().includes(q),
+    )
   }
   return list
 })
+
+/** 根据 modLocalNameStyle 返回 Mod 标题（主显示名） */
+function modTitle(mod: tauri.ModInfo): string {
+  // 0 = 标题显示译名，1 = 标题显示文件名
+  if (modLocalNameStyle.value === 0) {
+    return mod.translated_name || mod.enabled_name
+  }
+  return mod.enabled_name
+}
+
+/** 根据 modLocalNameStyle 返回 Mod 副标题（详情名） */
+function modSubtitle(mod: tauri.ModInfo): string {
+  // 0 = 详情显示文件名，1 = 详情显示译名
+  if (modLocalNameStyle.value === 0) {
+    return mod.enabled_name
+  }
+  return mod.translated_name
+}
 
 async function handleToggleMod(mod: tauri.ModInfo) {
   if (!selectedId.value) return
@@ -76,7 +99,7 @@ function handleDeleteMod(mod: tauri.ModInfo) {
   if (!selectedId.value) return
   showConfirm(
     '删除 Mod',
-    `确定要删除 "${mod.enabled_name}" 吗？此操作不可恢复。`,
+    `确定要删除 "${modTitle(mod)}" 吗？此操作不可恢复。`,
     async () => {
       try {
         await tauri.deleteMod(selectedId.value!, mod.file_name)
@@ -114,6 +137,11 @@ async function handleOpenModsDir() {
 }
 
 onMounted(async () => {
+  // 读取 Mod 管理样式配置
+  try {
+    const cfg = await tauri.getConfigMap()
+    modLocalNameStyle.value = cfg.communityModLocalNameStyle
+  } catch { /* 默认 0 */ }
   await checkModable()
   if (isModableVersion.value) await loadMods()
 })
@@ -242,8 +270,10 @@ onMounted(async () => {
             {{ mod.loader_type === 'unknown' ? 'M' : mod.loader_type.charAt(0).toUpperCase() }}
           </div>
           <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-medium text-gray-800">{{ mod.enabled_name }}</div>
+            <div class="truncate text-sm font-medium text-gray-800">{{ modTitle(mod) }}</div>
             <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-400">
+              <span v-if="modSubtitle(mod) && modSubtitle(mod) !== modTitle(mod)" class="truncate">{{ modSubtitle(mod) }}</span>
+              <span v-if="modSubtitle(mod) && modSubtitle(mod) !== modTitle(mod)">·</span>
               <span>{{ formatBytes(mod.size) }}</span>
               <span v-if="mod.loader_type !== 'unknown'">·</span>
               <span v-if="mod.loader_type !== 'unknown'">{{ mod.loader_type }}</span>

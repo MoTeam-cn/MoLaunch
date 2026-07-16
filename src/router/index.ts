@@ -8,7 +8,7 @@
  * - /app/versions/select   选择下载版本
  * - /app/versions/setup    版本设置
  * - /app/settings   全局设置
- * - /app/downloads  下载管理
+ * - /apps/downloads  下载管理
  */
 
 import { createRouter, createWebHistory } from 'vue-router'
@@ -57,7 +57,7 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
-      path: '/app/downloads',
+      path: '/apps/downloads',
       name: 'downloads',
       component: () => import('@/views/Downloads.vue'),
       meta: { requiresAuth: true },

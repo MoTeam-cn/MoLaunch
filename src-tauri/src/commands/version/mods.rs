@@ -12,6 +12,7 @@ use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
 use crate::{log_error, log_info};
 use serde::{Deserialize, Serialize};
+use std::io::Read;
 use tauri::State;
 
 use super::sanitize_version_id;
@@ -30,6 +31,11 @@ pub struct ModInfo {
     /// Mod 加载器类型（forge/fabric/neoforge/liteloader/unknown）
     /// 通过文件名和扩展名推断，简化处理
     pub loader_type: String,
+    /// 中文译名（来自 mcmod 数据库，可能为空）
+    /// 由 community_mod_local_name_style 控制在 UI 中的显示方式：
+    ///   0 = 标题显示译名，详情显示文件名
+    ///   1 = 标题显示文件名，详情显示译名
+    pub translated_name: String,
 }
 
 /// 判断版本是否可以安装 Mod（参考 PCL2 McInstance.Modable）
@@ -137,12 +143,16 @@ pub async fn list_mods(
 
         let loader_type = infer_loader_type(&file_name);
 
+        // 从 jar 内读取 mod slug，查询 mcmod 中文译名（参考 PCL2 Mod.LocalName）
+        let translated_name = read_mod_translated_name(&path, &loader_type);
+
         mods.push(ModInfo {
             file_name,
             enabled_name,
             is_enabled,
             size,
             loader_type,
+            translated_name,
         });
     }
 
@@ -395,4 +405,99 @@ fn sanitize_file_name(name: &str) -> Result<(), String> {
         return Err(format!("Invalid file name: {}", name));
     }
     Ok(())
+}
+
+/// 从 jar 文件内读取 mod slug，查询 mcmod 中文译名
+///
+/// 读取顺序（参考 PCL2 LocalMod.Read):
+/// 1. fabric.mod.json → id 字段（Fabric/Quilt）
+/// 2. META-INF/mods.toml → modId（Forge 1.13+/NeoForge）
+/// 3. mcmod.info → modid（Forge 1.12-）
+///
+/// 查到 slug 后用 mcmod 数据库查询译名，查不到返回空字符串
+fn read_mod_translated_name(path: &std::path::Path, _loader_type: &str) -> String {
+    let file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return String::new(),
+    };
+    let mut archive = match zip::ZipArchive::new(file) {
+        Ok(a) => a,
+        Err(_) => return String::new(),
+    };
+
+    // 尝试 fabric.mod.json
+    if let Some(slug) = read_fabric_mod_json(&mut archive) {
+        if let Some(name) = lookup_translated(&slug) {
+            return name;
+        }
+    }
+    // 尝试 META-INF/mods.toml（Forge 1.13+/NeoForge）
+    if let Some(slug) = read_forge_mods_toml(&mut archive) {
+        if let Some(name) = lookup_translated(&slug) {
+            return name;
+        }
+    }
+    // 尝试 mcmod.info（Forge 1.12-）
+    if let Some(slug) = read_mcmod_info(&mut archive) {
+        if let Some(name) = lookup_translated(&slug) {
+            return name;
+        }
+    }
+
+    String::new()
+}
+
+/// 读取 fabric.mod.json 的 id 字段
+fn read_fabric_mod_json(archive: &mut zip::ZipArchive<std::fs::File>) -> Option<String> {
+    let mut file = archive.by_name("fabric.mod.json").ok()?;
+    let mut content = String::new();
+    file.read_to_string(&mut content).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let id = json.get("id")?.as_str()?.to_string();
+    Some(id.trim().to_lowercase())
+}
+
+/// 读取 META-INF/mods.toml 的 modId（Forge 1.13+/NeoForge）
+fn read_forge_mods_toml(archive: &mut zip::ZipArchive<std::fs::File>) -> Option<String> {
+    let mut file = archive.by_name("META-INF/mods.toml").ok()?;
+    let mut content = String::new();
+    file.read_to_string(&mut content).ok()?;
+    // 简化解析：找 modId="xxx" 或 modId = "xxx"
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if let Some(rest) = trimmed.strip_prefix("modId") {
+            let rest = rest.trim_start();
+            if let Some(rest) = rest.strip_prefix('=') {
+                let rest = rest.trim().trim_matches('"').trim_matches('\'');
+                if !rest.is_empty() {
+                    return Some(rest.to_lowercase());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// 读取 mcmod.info 的 modid（Forge 1.12-）
+fn read_mcmod_info(archive: &mut zip::ZipArchive<std::fs::File>) -> Option<String> {
+    let mut file = archive.by_name("mcmod.info").ok()?;
+    let mut content = String::new();
+    file.read_to_string(&mut content).ok()?;
+    let json: serde_json::Value = serde_json::from_str(&content).ok()?;
+    let arr = json.as_array().or_else(|| json.get("modList")?.as_array())?;
+    let first = arr.first()?;
+    let id = first.get("modid")?.as_str()?.to_string();
+    Some(id.trim().to_lowercase())
+}
+
+/// 查询 mcmod 译名（先查 CurseForge slug，再查 Modrinth slug）
+fn lookup_translated(slug: &str) -> Option<String> {
+    let slug = slug.trim().to_lowercase();
+    if let Some(name) = crate::minecraft::community::mcmod::lookup_cf(&slug) {
+        return Some(name.to_string());
+    }
+    if let Some(name) = crate::minecraft::community::mcmod::lookup_mr(&slug) {
+        return Some(name.to_string());
+    }
+    None
 }

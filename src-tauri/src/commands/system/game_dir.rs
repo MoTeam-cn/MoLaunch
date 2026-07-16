@@ -17,6 +17,12 @@ pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
 
     log_info!("Opening game directory: {}", game_dir.display());
+
+    // 如果游戏目录不存在，先尝试创建（防御性：启动时创建可能因权限失败，这里兜底）
+    if !game_dir.exists() {
+        std::fs::create_dir_all(&game_dir).map_err(|e| format!("创建游戏目录失败: {}", e))?;
+    }
+
     open_path_impl(&game_dir.to_string_lossy())
 }
 
@@ -200,7 +206,11 @@ pub async fn save_file(
     Ok(result.map(|p| p.to_string()))
 }
 
-/// 更新游戏目录
+/// 更新游戏目录（保留独立命令，因为调用方 version/manage.rs 在切换版本时直接调用）
+///
+/// 重构说明：此命令保留，未合并到 `apply_config`，因为它在版本切换流程中被
+/// 内部逻辑调用，不是用户设置页触发的。用户在设置页改 game_dir 时走
+/// `apply_config({ gameDir: ... })`。
 #[tauri::command]
 pub async fn set_game_dir(state: State<'_, AppState>, game_dir: String) -> Result<(), String> {
     log_info!("Game directory changed to: {}", game_dir);

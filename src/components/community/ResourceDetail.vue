@@ -10,13 +10,16 @@
 import { ref, watch, onUnmounted } from 'vue'
 import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { ModLoaderFlags } from '@/types/community'
-import { getProjectVersions, downloadResourceToPath } from '@/utils/api/community'
+import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, getMcmodUrl, installModpack } from '@/utils/api/community'
+import { installMerged } from '@/utils/api/loader'
+import { useVersionStore } from '@/stores/version'
 import { saveFile } from '@/utils/api/system'
 import { showSuccess, showError } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
 import { useVersionGroups } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import { useCommunityDownload } from '@/composables/useCommunityDownload'
+import { open as openUrl } from '@tauri-apps/plugin-shell'
 import HorizontalFilter from '@/components/common/HorizontalFilter.vue'
 import {
   XMarkIcon,
@@ -24,7 +27,12 @@ import {
   ArrowTopRightOnSquareIcon,
   ChevronDownIcon,
   CubeIcon,
+  ClipboardDocumentIcon,
+  BookOpenIcon,
+  RocketLaunchIcon,
 } from '@heroicons/vue/24/outline'
+
+const versionStore = useVersionStore()
 
 interface Props {
   visible: boolean
@@ -39,7 +47,7 @@ const versions = ref<ResourceVersion[]>([])
 const loading = ref(false)
 const downloading = ref<string | null>(null)
 
-const { groups, filterOptions, versionFilter, toggleGroup, setFilter } = useVersionGroups(() => versions.value)
+const { groups, filterOptions, versionFilter, toggleGroup, setFilter, expandedOf, mountedOf } = useVersionGroups(() => versions.value)
 const { percent, slowMerging, stageText, start, finish, fail } = useSearchProgress()
 const { downloading: communityDownloading, progress: downloadProgress, startDownload, startListener, stopListener } = useCommunityDownload()
 
@@ -89,22 +97,74 @@ function formatDownloads(n: number): string {
 
 async function handleDownload(v: ResourceVersion) {
   if (!props.project) return
-  // 1. 弹出系统文件管理器让用户选择保存位置
+  // 1. 根据用户设置的下载文件名格式生成默认文件名（译名+原名拼接）
+  const finalFileName = await formatDownloadFilename(v.file_name, props.project.translated_name)
+  // 2. 弹出系统文件管理器让用户选择保存位置
   const savePath = await saveFile(
     '选择保存位置',
-    v.file_name,
+    finalFileName,
     [{ name: '所有文件', extensions: ['*'] }],
   )
   if (!savePath) return // 用户取消
 
-  // 2. 启动下载（流式 + 进度推送）
+  // 3. 启动下载（流式 + 进度推送）
   downloading.value = v.id
   startDownload()
   try {
-    await downloadResourceToPath(v.download_url, v.file_name, savePath)
-    showSuccess(`已下载: ${v.file_name}`)
+    await downloadResourceToPath(v.download_url, finalFileName, savePath)
+    showSuccess(`已下载: ${finalFileName}`)
   } catch (e: any) {
     showError('下载失败: ' + (e?.message || String(e)))
+  } finally {
+    downloading.value = null
+  }
+}
+
+/**
+ * 安装整合包（参考 PCL2 PageDownloadCompDetail.Install_Click）
+ *
+ * 流程：
+ * 1. versionStore.startDownload 触发 DownloadPanel 显示
+ * 2. installModpack：下载原始包 + 解析 + 下载依赖 mods + 复制 overrides（进度走 download_state）
+ * 3. installMerged：安装游戏本体 + 加载器（进度走 download_state，复用同一 DownloadPanel）
+ */
+async function handleInstallModpack(v: ResourceVersion) {
+  if (!props.project) return
+  const { platform, resource_type, translated_name, raw_name } = props.project
+  if (resource_type !== 'ModPack') return
+
+  const instanceName = translated_name || raw_name || v.file_name.replace(/\.(zip|mrpack)$/i, '')
+  downloading.value = v.id
+
+  // 触发 DownloadPanel（右下角进度环 + 下载管理页面）
+  versionStore.startDownload(instanceName)
+
+  try {
+    // 1. 安装整合包专属部分（下载原始包 + 依赖 mods + overrides）
+    const result = await installModpack({
+      platform,
+      downloadUrl: v.download_url,
+      fileName: v.file_name,
+      instanceName,
+    })
+
+    // 2. 安装游戏本体 + 加载器（使用 manifest 中的 game_version + loader_version）
+    const loader = result.loader
+    const lv = result.loaderVersion
+    await installMerged(
+      result.gameVersion,
+      loader === 'forge' ? lv : undefined,
+      loader === 'neoforge' ? lv : undefined,
+      loader === 'fabric' || loader === 'quilt' ? lv : undefined, // quilt 暂复用 fabric 通道
+      undefined, // optifine
+      undefined, // liteloader
+      instanceName,
+    )
+
+    showSuccess(`整合包 ${instanceName} 安装完成`)
+  } catch (e: any) {
+    showError('整合包安装失败: ' + (e?.message || String(e)))
+    versionStore.finishDownload()
   } finally {
     downloading.value = null
   }
@@ -115,6 +175,36 @@ function formatSpeed(bytesPerSec: number): string {
   if (bytesPerSec >= 1_048_576) return (bytesPerSec / 1_048_576).toFixed(1) + ' MB/s'
   if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(0) + ' KB/s'
   return bytesPerSec + ' B/s'
+}
+
+/** 点击"转到 MC百科"：先查 class id 直链，查不到回退搜索 URL，toast 提示后跳转 */
+async function openMcmod() {
+  if (!props.project) return
+  const { platform, slug, translated_name, raw_name } = props.project
+  // 优先用 slug 查 moddata.txt 的 class id 直链
+  let url = await getMcmodUrl(platform, slug)
+  if (!url) {
+    // 回退到搜索 URL
+    const name = translated_name || raw_name
+    url = `https://search.mcmod.cn/s?key=${encodeURIComponent(name)}`
+    showSuccess('未找到 MC 百科直链，已跳转到搜索页')
+  } else {
+    showSuccess('正在打开 MC 百科详情页')
+  }
+  // 用 Tauri shell opener 打开系统默认浏览器（webview 内 window.open 会被拦截）
+  await openUrl(url)
+}
+
+/** 复制资源名称到剪贴板 */
+async function copyName() {
+  const name = props.project?.translated_name || props.project?.raw_name || ''
+  if (!name) return
+  try {
+    await navigator.clipboard.writeText(name)
+    showSuccess('已复制: ' + name)
+  } catch {
+    showError('复制失败')
+  }
 }
 
 /** 下载进度百分比 */
@@ -172,15 +262,29 @@ onUnmounted(() => stopListener())
 
           <!-- 操作按钮行 -->
           <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-100">
-            <a
+            <button
               v-if="project.website"
-              :href="project.website"
-              target="_blank"
               class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors flex items-center gap-1"
+              @click="openUrl(project.website)"
             >
               <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
               转到 {{ project.platform }}
-            </a>
+            </button>
+            <button
+              v-if="project.resource_type === 'Mod'"
+              class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1"
+              @click="openMcmod"
+            >
+              <BookOpenIcon class="w-3.5 h-3.5" />
+              转到 MC百科
+            </button>
+            <button
+              class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1"
+              @click="copyName"
+            >
+              <ClipboardDocumentIcon class="w-3.5 h-3.5" />
+              复制名称
+            </button>
           </div>
 
           <!-- 版本筛选（横向滚动，参考 PCL2 CardFilter） -->
@@ -225,32 +329,32 @@ onUnmounted(() => stopListener())
                 v-for="g in groups"
                 :key="g.title"
                 class="border border-gray-200 rounded-md overflow-hidden transition-colors duration-200"
-                :class="g.expanded ? 'border-primary-200 bg-primary-50/30' : 'bg-white hover:border-gray-300'"
+                :class="expandedOf(g.title) ? 'border-primary-200 bg-primary-50/30' : 'bg-white hover:border-gray-300'"
               >
                 <!-- 卡片标题栏（点击折叠/展开） -->
                 <button
                   class="w-full flex items-center justify-between px-3 py-2.5 transition-colors duration-200"
-                  :class="g.expanded ? 'bg-primary-50/50 hover:bg-primary-100/50' : 'bg-gray-50 hover:bg-gray-100'"
+                  :class="expandedOf(g.title) ? 'bg-primary-50/50 hover:bg-primary-100/50' : 'bg-gray-50 hover:bg-gray-100'"
                   @click="toggleGroup(g.title)"
                 >
                   <div class="flex items-center gap-1.5">
                     <CubeIcon
                       class="w-3.5 h-3.5 transition-colors duration-300"
-                      :class="g.expanded ? 'text-primary-500' : 'text-gray-400'"
+                      :class="expandedOf(g.title) ? 'text-primary-500' : 'text-gray-400'"
                     />
                     <span
                       class="text-sm font-medium transition-colors duration-200"
-                      :class="g.expanded ? 'text-primary-700' : 'text-gray-700'"
+                      :class="expandedOf(g.title) ? 'text-primary-700' : 'text-gray-700'"
                     >{{ g.title }}</span>
                   </div>
                   <div class="flex items-center gap-2">
                     <span
                       class="text-xs transition-colors duration-200"
-                      :class="g.expanded ? 'text-primary-400' : 'text-gray-400'"
+                      :class="expandedOf(g.title) ? 'text-primary-400' : 'text-gray-400'"
                     >{{ g.versions.length }} 个版本</span>
                     <span
                       class="inline-flex items-center justify-center w-5 h-5 rounded-full transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
-                      :class="g.expanded
+                      :class="expandedOf(g.title)
                         ? 'bg-primary-100 text-primary-600 rotate-180'
                         : 'bg-gray-100 text-gray-500 rotate-0'"
                     >
@@ -259,15 +363,16 @@ onUnmounted(() => stopListener())
                   </div>
                 </button>
 
-                <!-- 卡片内容（grid-template-rows 0fr→1fr + 内容 opacity/translate 过渡，更自然的展开/收起动画） -->
+                <!-- 卡片内容（懒挂载：首次展开才渲染版本条目，折叠卡片无内容 DOM；grid-template-rows 0fr→1fr 过渡） -->
                 <div
+                  v-if="mountedOf(g.title)"
                   class="grid transition-[grid-template-rows] duration-[400ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
-                  :class="g.expanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+                  :class="expandedOf(g.title) ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
                 >
                   <div class="overflow-hidden">
                     <div
                       class="p-1.5 space-y-0.5 transition-all duration-[350ms] ease-[cubic-bezier(0.4,0,0.2,1)]"
-                      :class="g.expanded
+                      :class="expandedOf(g.title)
                         ? 'opacity-100 translate-y-0 transition-delay-[50ms]'
                         : 'opacity-0 -translate-y-2 transition-delay-0'"
                     >
@@ -291,10 +396,16 @@ onUnmounted(() => stopListener())
                         <button
                           class="shrink-0 px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center gap-1"
                           :disabled="downloading === v.id"
-                          @click="handleDownload(v)"
+                          @click="project.resource_type === 'ModPack' ? handleInstallModpack(v) : handleDownload(v)"
                         >
-                          <ArrowDownTrayIcon class="w-3.5 h-3.5" />
-                          {{ downloading === v.id ? '下载中...' : '安装' }}
+                          <RocketLaunchIcon v-if="project.resource_type === 'ModPack'" class="w-3.5 h-3.5" />
+                          <ArrowDownTrayIcon v-else class="w-3.5 h-3.5" />
+                          <template v-if="downloading === v.id">
+                            {{ project.resource_type === 'ModPack' ? '安装中...' : '下载中...' }}
+                          </template>
+                          <template v-else>
+                            {{ project.resource_type === 'ModPack' ? '安装' : '下载' }}
+                          </template>
                         </button>
                       </div>
                     </div>

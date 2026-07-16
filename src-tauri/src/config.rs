@@ -122,6 +122,20 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.proxy_type = config.get_or("Proxy", "type", &app_config.proxy_type);
     app_config.proxy_url = config.get_or("Proxy", "url", &app_config.proxy_url);
 
+    // Community（社区资源配置，参考 PCL2 PageSetupSystem "社区资源" 卡片）
+    if let Some(v) = config.get("Community", "source") {
+        app_config.community_source = v.parse().unwrap_or(app_config.community_source);
+    }
+    if let Some(v) = config.get("Community", "filename_format") {
+        app_config.community_filename_format = v.parse().unwrap_or(app_config.community_filename_format);
+    }
+    if let Some(v) = config.get("Community", "mod_local_name_style") {
+        app_config.community_mod_local_name_style = v.parse().unwrap_or(app_config.community_mod_local_name_style);
+    }
+    if let Some(v) = config.get("Community", "ignore_quilt") {
+        app_config.community_ignore_quilt = v == "true" || v == "1";
+    }
+
     // Version
     app_config.selected_version = config
         .get("Version", "selected")
@@ -206,6 +220,12 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("Proxy", "mode", &config.proxy_mode);
     ini.set("Proxy", "type", &config.proxy_type);
     ini.set("Proxy", "url", &config.proxy_url);
+
+    // Community
+    ini.set("Community", "source", &config.community_source.to_string());
+    ini.set("Community", "filename_format", &config.community_filename_format.to_string());
+    ini.set("Community", "mod_local_name_style", &config.community_mod_local_name_style.to_string());
+    ini.set("Community", "ignore_quilt", if config.community_ignore_quilt { "true" } else { "false" });
 
     // Version
     ini.set("Version", "selected", config.selected_version.as_deref().unwrap_or(""));

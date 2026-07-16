@@ -15,6 +15,10 @@ function onScroll(e: Event) {
   const el = e.target as Element
   if (!el || !('scrollTop' in el) || !('scrollHeight' in el)) return
 
+  // 排除非页面级滚动容器：下拉框、弹窗、详情面板等
+  // 这些容器通常是 fixed/absolute 定位，或位于 Teleport 的弹层内
+  if (isNonMainScroller(el)) return
+
   const scrollHeight = el.scrollHeight
   const clientHeight = el.clientHeight
   const scrollTop = el.scrollTop
@@ -29,6 +33,26 @@ function onScroll(e: Event) {
   const scrollRatio = scrollTop / (scrollHeight - clientHeight)
   visible.value = scrollRatio > 0.33
   activeEl = el
+}
+
+/**
+ * 判断是否为非页面级滚动容器（应被忽略）
+ * - 弹窗（Teleport 到 body 的 fixed 容器内的子元素）
+ * - 下拉框（绝对/固定定位的弹出层）
+ * - 详情面板等浮层
+ *
+ * 判断依据：向上查找祖先，如果遇到 fixed 定位的元素，说明在弹层内
+ */
+function isNonMainScroller(el: Element): boolean {
+  let node: Element | null = el
+  while (node && node !== document.body) {
+    const style = window.getComputedStyle(node)
+    if (style.position === 'fixed' || style.position === 'absolute') {
+      return true
+    }
+    node = node.parentElement
+  }
+  return false
 }
 
 function scrollToTop() {

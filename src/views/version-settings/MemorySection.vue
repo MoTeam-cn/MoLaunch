@@ -107,10 +107,10 @@ watch([minMemory, maxMemory], () => {
 onMounted(async () => {
   try {
     systemMemory.value = await tauri.getSystemMemory()
-    const [gMode, gMem] = await Promise.all([tauri.getMemoryMode(), tauri.getMemoryConfig()])
-    globalMode.value = gMode
-    globalMin.value = gMem[0]
-    globalMax.value = gMem[1]
+    const cfg = await tauri.getConfigMap()
+    globalMode.value = cfg.memoryMode
+    globalMin.value = cfg.minMemory
+    globalMax.value = cfg.maxMemory
   } catch (e) { console.error('Failed to load system/global memory:', e) }
 
   // 从 personalization 读取版本独立内存

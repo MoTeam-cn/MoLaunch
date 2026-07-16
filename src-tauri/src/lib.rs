@@ -33,6 +33,18 @@ pub fn run() {
         let config = app_state.config.blocking_lock();
         http::init_client(&config.proxy_mode, &config.proxy_type, &config.proxy_url);
         log_info!("HTTP client initialized (proxy: {})", config.proxy_mode);
+
+        // 确保默认游戏目录存在（参考 PCL2 McFolderListLoadSub:124-128）
+        // PCL2 启动时主动创建 .minecraft/versions/，避免用户首次点"打开游戏目录"时报路径不存在
+        let game_dir = state::resolve_game_dir(&config.game_dir);
+        let versions_dir = game_dir.join("versions");
+        if !versions_dir.exists() {
+            if let Err(e) = std::fs::create_dir_all(&versions_dir) {
+                log_error!("Failed to create game directory: {}", e);
+            } else {
+                log_info!("Created game directory: {}", game_dir.display());
+            }
+        }
     }
 
     // 初始化 CurseForge 配置（同步读 enabled，api_key 懒加载，避免启动时 DES 解密触发杀软）
@@ -134,47 +146,26 @@ pub fn run() {
             commands::system::select_folder,
             commands::system::select_file,
             commands::system::save_file,
-            commands::system::set_mirror_url,
-            commands::system::get_mirror_url,
-            commands::system::set_download_source,
-            commands::system::get_download_source,
-            commands::system::set_meta_source,
-            commands::system::get_meta_source,
-            commands::system::set_max_download_speed,
-            commands::system::get_max_download_speed,
-            commands::system::get_system_memory,
+            // 统一配置读写命令（取代此前 33 个分散的 get_*/set_* 命令）
+            commands::system::get_config,
+            commands::system::apply_config,
             commands::system::get_config_path,
             commands::system::save_config_to_file,
-            commands::system::set_min_memory,
-            commands::system::set_max_memory,
-            commands::system::get_memory_config,
-            commands::system::get_memory_mode,
-            commands::system::set_memory_mode,
-            commands::system::set_max_download_threads,
-            commands::system::get_max_download_threads,
-            commands::system::set_chunk_count,
-            commands::system::get_chunk_count,
-            commands::system::set_isolation_mode,
-            commands::system::get_isolation_mode,
+            commands::system::get_system_memory,
             commands::system::get_config_value,
             commands::system::set_config_value,
-            commands::system::get_proxy_mode,
-            commands::system::set_proxy_mode,
-            commands::system::get_proxy_type,
-            commands::system::set_proxy_type,
-            commands::system::get_proxy_url,
-            commands::system::set_proxy_url,
             // 社区资源命令
             commands::community::search::search_resources,
             commands::community::search::get_category_tags,
             commands::community::detail::get_project_detail,
             commands::community::detail::get_project_versions,
+            commands::community::detail::get_mcmod_url,
             commands::community::install::download_resource,
             commands::community::install::download_resource_to_path,
+            commands::community::install::format_download_filename,
             commands::community::install::install_resource,
+            commands::community::install::install_modpack,
             commands::community::install::get_resource_install_path,
-            commands::community::secure_config::get_curseforge_config,
-            commands::community::secure_config::set_curseforge_config,
         ])
         .on_window_event(|_window, event| {
             // 窗口关闭时保存配置

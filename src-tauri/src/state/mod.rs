@@ -71,6 +71,10 @@ pub struct DownloadStage {
     pub bytes_total: u64,
     pub files_downloaded: usize,
     pub files_total: usize,
+    /// 所属任务分组（用于前端按"整合包安装"/"MC本体安装"等分组折叠展开）
+    /// None 表示独立阶段（不分组），Some 表示归属于某分组
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 impl DownloadStage {
@@ -84,7 +88,15 @@ impl DownloadStage {
             bytes_total: 0,
             files_downloaded: 0,
             files_total: 0,
+            group: None,
         }
+    }
+
+    /// 创建带分组的 stage
+    pub fn new_grouped(name: impl Into<String>, weight: f64, group: impl Into<String>) -> Self {
+        let mut s = Self::new(name, weight);
+        s.group = Some(group.into());
+        s
     }
 }
 
@@ -149,6 +161,15 @@ pub struct AppConfig {
     pub proxy_url: String,       // 自定义代理地址，如 "127.0.0.1:7890"
     /// 上次选中的游戏版本（持久化，启动器重启后恢复）
     pub selected_version: Option<String>,
+    // ===== 社区资源配置（参考 PCL2 PageSetupSystem "社区资源" 卡片）=====
+    /// 社区资源来源策略：0=尽量镜像 / 1=缓慢时换镜像 / 2=尽量官方（默认 2）
+    pub community_source: u8,
+    /// 下载文件名格式：0=【译名】原名 / 1=[译名] 原名 / 2=译名-原名 / 3=原名-译名 / 4=仅原名（默认 1）
+    pub community_filename_format: u8,
+    /// Mod 管理页显示样式：0=标题译名/详情文件名 / 1=标题文件名/详情译名（默认 0）
+    pub community_mod_local_name_style: u8,
+    /// 在显示 Mod 加载器时忽略 Quilt（默认 true）
+    pub community_ignore_quilt: bool,
 }
 
 /// Minecraft 文件夹项
@@ -189,6 +210,10 @@ impl Default for AppConfig {
             proxy_type: "http".to_string(),
             proxy_url: String::new(),
             selected_version: None,
+            community_source: 2,
+            community_filename_format: 1,
+            community_mod_local_name_style: 0,
+            community_ignore_quilt: true,
         }
     }
 }

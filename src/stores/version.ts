@@ -26,6 +26,8 @@ export interface DownloadStage {
   bytes_total: number
   files_downloaded: number
   files_total: number
+  /** 所属任务分组（用于前端按"整合包安装"/"MC本体安装"等分组折叠展开），null 表示独立阶段 */
+  group: string | null
 }
 
 export interface DownloadProgress {

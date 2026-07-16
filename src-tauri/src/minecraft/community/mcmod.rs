@@ -1,8 +1,11 @@
 //! MC 百科（mcmod.cn）数据库
 //!
 //! 参考 PCL2 WikiEntry.vb
-//! 加载内置 moddata.txt，通过工程 Slug 查找中文译名
+//! 加载内置 moddata.txt，通过工程 Slug 查找中文译名和 MC 百科 class id
 //! 仅对 Mod / 数据包类型生效
+//!
+//! 关键设计（与 PCL2 对齐）：moddata.txt 第 N 行 → mcmod.cn class id = N
+//! 空行也占用行号（PCL2 WikiEntry.vb: i += 1 在 Continue For 之前）
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -10,25 +13,37 @@ use std::collections::HashMap;
 /// 全局数据库
 static DATABASE: Lazy<Database> = Lazy::new(Database::load);
 
+/// 单条查询结果：中文名 + MC 百科 class id
+#[derive(Clone)]
+struct Entry {
+    chinese_name: String,
+    class_id: u32,
+}
+
 struct Database {
-    /// CurseForge Slug → 中文译名
-    cf_map: HashMap<String, String>,
-    /// Modrinth Slug → 中文译名
-    mr_map: HashMap<String, String>,
+    /// CurseForge Slug → 条目
+    cf_map: HashMap<String, Entry>,
+    /// Modrinth Slug → 条目
+    mr_map: HashMap<String, Entry>,
 }
 
 impl Database {
     fn load() -> Self {
-        let data = include_str!("../../../resources/moddata.txt");
-        let mut cf_map: HashMap<String, String> = HashMap::new();
-        let mut mr_map: HashMap<String, String> = HashMap::new();
+        // 统一走 resources 模块（编译时 include_str! 嵌入二进制，运行时零 IO）
+        let data = crate::resources::read_resource("moddata.txt")
+            .expect("嵌入资源 moddata.txt 缺失，请检查 resources.rs 注册");
+        let mut cf_map: HashMap<String, Entry> = HashMap::new();
+        let mut mr_map: HashMap<String, Entry> = HashMap::new();
 
         // 最后一行是 Popularity 排行数据，跳过
-        let data_str: &str = data;
+        let data_str: &str = &data;
         let lines: Vec<&str> = data_str.lines().collect();
         let entry_lines = if lines.len() > 1 { &lines[..lines.len() - 1] } else { &lines[..] };
 
-        for line in entry_lines {
+        // 行号即 class id（参考 PCL2 WikiEntry.vb:39-82）
+        // 关键：空行也计数（i += 1 在 Continue For 之前），否则行号会错位
+        for (idx, line) in entry_lines.iter().enumerate() {
+            let class_id = (idx + 1) as u32; // 行号从 1 开始
             let line: &str = line;
             if line.is_empty() {
                 continue;
@@ -53,12 +68,16 @@ impl Database {
 
                 // 解析 Slug 部分（参考 PCL2 WikiEntry.vb:55-67）
                 let (cf_slug, mr_slug) = parse_slug_part(slug_part);
+                let entry = Entry {
+                    chinese_name: chinese_name.clone(),
+                    class_id,
+                };
 
                 if let Some(cf) = cf_slug {
-                    cf_map.insert(cf, chinese_name.clone());
+                    cf_map.insert(cf, entry.clone());
                 }
                 if let Some(mr) = mr_slug {
-                    mr_map.insert(mr, chinese_name);
+                    mr_map.insert(mr, entry);
                 }
             }
         }
@@ -72,14 +91,14 @@ impl Database {
         Database { cf_map, mr_map }
     }
 
-    /// 通过 CurseForge Slug 查找中文译名
-    fn lookup_cf(&self, slug: &str) -> Option<&str> {
-        self.cf_map.get(slug).map(|s| s.as_str())
+    /// 通过 CurseForge Slug 查找条目
+    fn lookup_cf(&self, slug: &str) -> Option<&Entry> {
+        self.cf_map.get(slug)
     }
 
-    /// 通过 Modrinth Slug 查找中文译名
-    fn lookup_mr(&self, slug: &str) -> Option<&str> {
-        self.mr_map.get(slug).map(|s| s.as_str())
+    /// 通过 Modrinth Slug 查找条目
+    fn lookup_mr(&self, slug: &str) -> Option<&Entry> {
+        self.mr_map.get(slug)
     }
 }
 
@@ -159,12 +178,12 @@ fn capitalize(s: String) -> String {
 
 /// 通过 CurseForge Slug 查找中文译名
 pub fn lookup_cf(slug: &str) -> Option<&str> {
-    DATABASE.lookup_cf(slug)
+    DATABASE.lookup_cf(slug).map(|e| e.chinese_name.as_str())
 }
 
 /// 通过 Modrinth Slug 查找中文译名
 pub fn lookup_mr(slug: &str) -> Option<&str> {
-    DATABASE.lookup_mr(slug)
+    DATABASE.lookup_mr(slug).map(|e| e.chinese_name.as_str())
 }
 
 /// 通过平台和 Slug 查找中文译名
@@ -173,5 +192,14 @@ pub fn translate(platform: super::types::Platform, slug: &str) -> Option<&str> {
     match platform {
         Platform::CurseForge => lookup_cf(slug),
         Platform::Modrinth => lookup_mr(slug),
+    }
+}
+
+/// 通过平台和 Slug 查找 MC 百科 class id（用于拼接详情页 URL）
+pub fn lookup_class_id(platform: super::types::Platform, slug: &str) -> Option<u32> {
+    use super::types::Platform;
+    match platform {
+        Platform::CurseForge => DATABASE.lookup_cf(slug).map(|e| e.class_id),
+        Platform::Modrinth => DATABASE.lookup_mr(slug).map(|e| e.class_id),
     }
 }

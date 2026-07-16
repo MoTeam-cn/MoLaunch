@@ -336,6 +336,10 @@ fn build_jvm_args(
 
     // 版本 JSON 的 arguments.jvm（必需 JVM 参数，如 -Djava.net.preferIPv6Addresses=system）
     // 参考 PCL2：解析 arguments.jvm，应用 rules 过滤，跳过已处理的 -cp 和 -Djava.library.path
+    // 注意：Forge 1.20.1 的 arguments.jvm 包含 ${library_directory}、${classpath_separator}、${version_name} 等占位符
+    // 必须替换为实际值，否则 JVM 会把字面量 ${library_directory} 当作路径，导致 module path 失效
+    let libraries_dir = game_dir.join("libraries");
+    let libraries_dir_str = libraries_dir.to_string_lossy().replace('/', "\\");
     if let Some(jvm_args_json) = json["arguments"]["jvm"].as_array() {
         for arg in jvm_args_json {
             let (value, rules) = if let Some(s) = arg.as_str() {
@@ -368,6 +372,12 @@ fn build_jvm_args(
             if value.contains("${classpath}") || value.contains("${natives_directory}") {
                 continue;
             }
+
+            // 替换 Mojang 占位符（参考 PCL2 Replace Variables）
+            let value = value
+                .replace("${library_directory}", &libraries_dir_str)
+                .replace("${classpath_separator}", ";") // Windows 用分号
+                .replace("${version_name}", version_id);
 
             args.push(value);
         }

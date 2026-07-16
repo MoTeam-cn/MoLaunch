@@ -98,54 +98,51 @@ async function handleManualImportJava() {
   }
 }
 
-async function flushSave() {
+const { markDirty } = useDebouncedSave('patch', async (patch) => {
   try {
-    await tauri.setMinMemory(minMemory.value)
-    await tauri.setMaxMemory(maxMemory.value)
+    await tauri.applyConfig(patch)
   } catch (e) {
-    console.error('Failed to save memory settings:', e)
+    console.error('Failed to save settings:', e)
   }
-}
+}, 500)
 
-const { scheduleSave } = useDebouncedSave(flushSave, 500)
-
-function autoSave() {
+// 自定义内存模式下：拖动滑块防抖保存
+watch([minMemory, maxMemory], () => {
   if (!loaded.value) return
   // 自动模式下不保存内存配置到文件，启动时动态计算
   if (memoryMode.value === 'auto') return
-
-  scheduleSave()
-}
-
-watch([minMemory, maxMemory], autoSave)
+  markDirty('minMemory', minMemory.value)
+  markDirty('maxMemory', maxMemory.value)
+})
 
 // 版本隔离模式保存
-watch(isolationMode, async (mode) => {
+watch(isolationMode, (mode) => {
   if (!loaded.value) return
-  try {
-    await tauri.setIsolationMode(mode)
-  } catch (e) {
-    console.error('Failed to save isolation mode:', e)
-  }
+  markDirty('isolationMode', mode)
 })
 
 // 切换内存模式时，同步到后端
-watch(memoryMode, async (mode) => {
+watch(memoryMode, (mode) => {
   if (mode === 'auto') {
     applyAutoMemory()
   }
-  try {
-    await tauri.setMemoryMode(mode)
-  } catch (e) {
-    console.error('Failed to set memory mode:', e)
-  }
+  if (!loaded.value) return
+  markDirty('memoryMode', mode)
 })
 
 onMounted(async () => {
   try {
-    gameDir.value = await tauri.getGameDir()
+    const cfg = await tauri.getConfigMap()
+    gameDir.value = cfg.gameDir || '.minecraft'
+    memoryMode.value = cfg.memoryMode === 'custom' ? 'custom' : 'auto'
+    if (memoryMode.value === 'custom') {
+      // 自定义模式：读取保存的内存值
+      minMemory.value = cfg.minMemory
+      maxMemory.value = cfg.maxMemory
+    }
+    isolationMode.value = cfg.isolationMode
   } catch (e) {
-    console.error('Failed to get game dir:', e)
+    console.error('Failed to load config:', e)
     gameDir.value = '.minecraft'
   }
   try {
@@ -153,27 +150,6 @@ onMounted(async () => {
     applyAutoMemory()
   } catch (e) {
     console.error('Failed to get system memory:', e)
-  }
-  try {
-    // 从后端读取内存模式
-    const mode = await tauri.getMemoryMode()
-    memoryMode.value = mode === 'custom' ? 'custom' : 'auto'
-    
-    if (memoryMode.value === 'custom') {
-      // 自定义模式：读取保存的内存值
-      const [min, max] = await tauri.getMemoryConfig()
-      minMemory.value = min
-      maxMemory.value = max
-    } else {
-      // 自动模式：使用 applyAutoMemory 计算的值
-    }
-  } catch (e) {
-    console.error('Failed to get memory config:', e)
-  }
-  try {
-    isolationMode.value = await tauri.getIsolationMode()
-  } catch (e) {
-    console.error('Failed to get isolation mode:', e)
   }
   // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
   await nextTick()

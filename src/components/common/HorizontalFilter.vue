@@ -3,9 +3,12 @@
  * 横向滚动筛选组件
  * 单行展示筛选项，可横向滚动，选中项高亮
  * 参考 PCL2 PageDownloadCompDetail CardFilter 横向 RadioButton
+ *
+ * 左右箭头：常驻显示（有空间可滑时），点击平滑滚动
+ * 滚动条：默认隐藏，hover 容器时显示
  */
 
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onMounted, onBeforeUnmount } from 'vue'
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/vue/24/outline'
 
 interface Option {
@@ -34,6 +37,8 @@ const emit = defineEmits<{
 const scrollRef = ref<HTMLDivElement | null>(null)
 const showLeftArrow = ref(false)
 const showRightArrow = ref(false)
+
+let resizeObserver: ResizeObserver | null = null
 
 function select(v: string) {
   emit('update:modelValue', v)
@@ -69,6 +74,27 @@ async function scrollToSelected() {
 
 watch(() => props.modelValue, scrollToSelected)
 watch(() => props.options, () => nextTick(checkArrows), { deep: true })
+
+onMounted(() => {
+  // 用 ResizeObserver 监听容器和内容尺寸变化，确保箭头状态准确
+  const el = scrollRef.value
+  if (el) {
+    resizeObserver = new ResizeObserver(() => checkArrows())
+    resizeObserver.observe(el)
+    // 也观察内容变化（子元素增减导致宽度变化）
+    nextTick(() => {
+      if (el.firstElementChild) {
+        resizeObserver?.observe(el.firstElementChild)
+      }
+    })
+  }
+  checkArrows()
+})
+
+onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
+  resizeObserver = null
+})
 
 defineExpose({ checkArrows })
 </script>
@@ -132,11 +158,34 @@ defineExpose({ checkArrows })
 </template>
 
 <style scoped>
+/*
+ * 滚动条平滑淡入方案：
+ * - 滚动条高度始终 6px（不变，避免 height 0→6 瞬变）
+ * - thumb 默认 background-color: transparent
+ * - hover 时只改变 thumb 颜色（transition: background-color 平滑过渡）
+ *
+ * 注意：不能用 scrollbar-width: none，Edge/Chromium 会识别该属性并隐藏整个滚动条，
+ * 导致 ::-webkit-scrollbar 规则失效。这里用 transparent thumb 实现"默认隐藏"效果。
+ */
 .scroll-area {
-  scrollbar-width: none;
   -ms-overflow-style: none;
 }
+/* webkit：高度固定，thumb 颜色透明 → hover 时淡入 */
 .scroll-area::-webkit-scrollbar {
-  display: none;
+  height: 6px;
+}
+.scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scroll-area::-webkit-scrollbar-thumb {
+  background-color: transparent;
+  border-radius: 3px;
+  transition: background-color 0.25s ease;
+}
+.scroll-area:hover::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+}
+.scroll-area:hover::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(107, 114, 128, 0.7);
 }
 </style>

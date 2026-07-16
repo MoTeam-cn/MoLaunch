@@ -61,8 +61,15 @@ pub async fn download_single(
     // 分片下载阈值：file_size / chunk_count > 1MB
     let chunk_threshold: u64 = 1_048_576;
     let file_size = task.expected_size.max(0) as u64;
-    let can_chunk =
-        chunk_count > 1 && file_size > 0 && (file_size / chunk_count as u64) > chunk_threshold;
+
+    // file_size 已知时按大小判断是否分片；file_size=0（未知大小）时直接尝试分片，
+    // 由 chunk::download_chunked 内部探测真实大小并分片。
+    // 这样整合包原始包（expected_size=0）能自动走分片，无需在调用方手动探测。
+    let can_chunk = if file_size == 0 {
+        chunk_count > 1
+    } else {
+        chunk_count > 1 && (file_size / chunk_count as u64) > chunk_threshold
+    };
 
     // 顺序尝试每个 URL，超时自动重试，总共最多 3 次
     let max_retries: usize = 3;
@@ -114,8 +121,9 @@ pub async fn download_single(
                     .await;
 
                     if chunk_result.status == DownloadStatus::Completed {
+                        // 用 chunk_result.total（探测后的真实大小）校验
                         let checker = FileChecker::new()
-                            .with_actual_size(task.expected_size)
+                            .with_actual_size(chunk_result.total as i64)
                             .with_hash(task.expected_hash.clone());
                         if let Some(err) = checker.check(&task.local_path) {
                             log_warn!("[Chunk] 文件校验失败：{} - {}", task.local_path, err);
@@ -158,15 +166,11 @@ pub async fn download_single(
             .await
             {
                 Ok((downloaded, total, speed)) => {
-                    let checker = if task.expected_size == 0 && downloaded > 0 {
-                        FileChecker::new()
-                            .with_actual_size(downloaded as i64)
-                            .with_hash(task.expected_hash.clone())
-                    } else {
-                        FileChecker::new()
-                            .with_actual_size(task.expected_size)
-                            .with_hash(task.expected_hash.clone())
-                    };
+                    // file_size=0（未探测，走单流回退）时用 downloaded 校验；
+                    // file_size>0（已知大小）时用 file_size 校验
+                    let checker = FileChecker::new()
+                        .with_actual_size(if file_size > 0 { file_size as i64 } else { downloaded as i64 })
+                        .with_hash(task.expected_hash.clone());
 
                     if let Some(err) = checker.check(&task.local_path) {
                         log_warn!("文件校验失败：{} - {}", task.local_path, err);
@@ -209,7 +213,7 @@ pub async fn download_single(
     }
 }
 
-/// 从单个 URL 下载（支持限速和动态超时）
+/// 从单个 URL 下载（支持限速和动态超时，实时更新进度）
 async fn download_from_url(
     client: &reqwest::Client,
     url: &str,
@@ -217,7 +221,7 @@ async fn download_from_url(
     expected_size: u64,
     rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
     timeout: Duration,
-    _progress: Option<Arc<StdMutex<GlobalProgress>>>,
+    progress: Option<Arc<StdMutex<GlobalProgress>>>,
 ) -> Result<(u64, u64, u64), Box<dyn std::error::Error + Send + Sync>> {
     let response = client.get(url).timeout(timeout).send().await?;
 
@@ -239,8 +243,24 @@ async fn download_from_url(
     let mut stream = response.bytes_stream();
     let mut file = std::fs::File::create(local_path)?;
 
+    // 回滚已增量加到 progress 的字节数（downloaded>0 时才需要）
+    let rollback_progress = |downloaded: u64, progress: &Option<Arc<StdMutex<GlobalProgress>>>| {
+        if downloaded > 0 {
+            if let Some(ref p) = progress {
+                let mut p = p.lock().unwrap();
+                p.downloaded_bytes = p.downloaded_bytes.saturating_sub(downloaded);
+            }
+        }
+    };
+
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| -> Box<dyn std::error::Error + Send + Sync> { e.into() })?;
+        let chunk = match chunk {
+            Ok(c) => c,
+            Err(e) => {
+                rollback_progress(downloaded, &progress);
+                return Err(Box::from(e) as Box<dyn std::error::Error + Send + Sync>);
+            }
+        };
         let chunk_size = chunk.len() as u64;
 
         // 限速处理
@@ -260,18 +280,31 @@ async fn download_from_url(
                 }
 
                 let end = (offset + granted as usize).min(chunk.len());
-                file.write_all(&chunk[offset..end])?;
+                if let Err(e) = file.write_all(&chunk[offset..end]) {
+                    rollback_progress(downloaded, &progress);
+                    return Err(e.into());
+                }
                 offset = end;
                 remaining -= granted;
                 downloaded += granted;
             }
         } else {
-            file.write_all(&chunk)?;
+            if let Err(e) = file.write_all(&chunk) {
+                rollback_progress(downloaded, &progress);
+                return Err(e.into());
+            }
             downloaded += chunk_size;
+        }
+
+        // 增量更新全局进度（与分片下载保持一致，让前端实时看到下载进度）
+        if let Some(ref p) = progress {
+            let mut p = p.lock().unwrap();
+            p.downloaded_bytes = p.downloaded_bytes.saturating_add(chunk_size);
         }
 
         // max_bytes 上限校验，防止被劫持镜像源返回无限流导致磁盘耗尽
         if downloaded > byte_limit {
+            rollback_progress(downloaded, &progress);
             return Err(format!(
                 "Download size exceeded limit: {} > {}",
                 downloaded, byte_limit
