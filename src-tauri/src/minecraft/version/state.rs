@@ -169,27 +169,70 @@ pub fn infer_from_loader(
 }
 
 /// 从版本 JSON 的 libraries 检测加载器类型
+///
+/// 参考 PCL2 ModMinecraft.vb Load() 的字符串包含判断：
+/// - 优先级：OptiFine > LiteLoader > Fabric > NeoForge > Forge（与 PCL2 一致）
+/// - 用 JSON 原始字符串包含判断，而不是解析 libraries 数组的 name.starts_with
+///   因为新版 Forge（1.20.1+）library 拆分为 fmlloader/jarjar 等多个独立模块，
+///   没有 `net.minecraftforge:forge:` 这个 library，但 JSON 内容里仍含 "minecraftforge"
+/// - Forge 排除 NeoForge：`minecraftforge` 关键字 NeoForge 的 JSON 也会命中（net.neoforge
+///   的 loader 安装时复用了 minecraftforge 命名空间），所以必须先排除
 fn detect_loader_from_json(version_json: &serde_json::Value) -> Option<VersionType> {
-    let libraries = version_json["libraries"].as_array()?;
-    for lib in libraries {
-        let name = lib["name"].as_str()?;
-        if name.starts_with("net.minecraftforge:forge:") {
-            return Some(VersionType::Forge);
-        }
-        if name.starts_with("net.neoforged:neoforge:") {
-            return Some(VersionType::NeoForge);
-        }
-        if name.starts_with("net.fabricmc:fabric-loader:") {
-            return Some(VersionType::Fabric);
-        }
-        if name.starts_with("org.quiltmc:quilt-loader:") {
-            return Some(VersionType::Quilt);
-        }
-        if name.starts_with("com.mumfrey:liteloader:") {
-            return Some(VersionType::LiteLoader);
-        }
-        if name.starts_with("optifine:OptiFine:") {
-            return Some(VersionType::OptiFine);
+    // 用原始 JSON 文本做关键字搜索（与 PCL2 一致），避免漏掉新版加载器
+    let json_text = version_json.to_string();
+    let json_lower = json_text.to_lowercase();
+
+    // 检测 OptiFine
+    if json_lower.contains("optifine") {
+        return Some(VersionType::OptiFine);
+    }
+    // 检测 LiteLoader
+    if json_lower.contains("liteloader") {
+        return Some(VersionType::LiteLoader);
+    }
+    // 检测 Fabric / Quilt（先于 Forge 判断，避免误判）
+    if json_lower.contains("net.fabricmc:fabric-loader") {
+        return Some(VersionType::Fabric);
+    }
+    if json_lower.contains("org.quiltmc:quilt-loader") {
+        return Some(VersionType::Quilt);
+    }
+    // 检测 NeoForge（必须在 Forge 之前判断，因为 NeoForge 的 JSON 也含 minecraftforge）
+    // PCL2 用 "net.neoforge" 关键字，1.20.2+ 的 NeoForge JSON 会有 net.neoforged 命名空间
+    if json_lower.contains("net.neoforge") || json_lower.contains("net.neoforged") {
+        return Some(VersionType::NeoForge);
+    }
+    // 检测 Forge
+    // PCL2 关键字："minecraftforge" 且不含 "net.neoforge"
+    // 新版 Forge (1.20.1+) 的 library 拆分为 net.minecraftforge:fmlloader / JarJar* 等，
+    // 没有 net.minecraftforge:forge: 这个 library，但 JSON 里仍有 "minecraftforge" 字样
+    if json_lower.contains("minecraftforge") {
+        return Some(VersionType::Forge);
+    }
+
+    // 兜底：解析 libraries 数组，防止极端情况下关键字未命中
+    if let Some(libraries) = version_json["libraries"].as_array() {
+        for lib in libraries {
+            let name = lib["name"].as_str().unwrap_or("");
+            // 老版 Forge：net.minecraftforge:forge:1.16.5-36.2.0
+            if name.starts_with("net.minecraftforge:forge:") {
+                return Some(VersionType::Forge);
+            }
+            if name.starts_with("net.neoforged:neoforge:") {
+                return Some(VersionType::NeoForge);
+            }
+            if name.starts_with("net.fabricmc:fabric-loader:") {
+                return Some(VersionType::Fabric);
+            }
+            if name.starts_with("org.quiltmc:quilt-loader:") {
+                return Some(VersionType::Quilt);
+            }
+            if name.starts_with("com.mumfrey:liteloader:") {
+                return Some(VersionType::LiteLoader);
+            }
+            if name.starts_with("optifine:OptiFine:") {
+                return Some(VersionType::OptiFine);
+            }
         }
     }
     None

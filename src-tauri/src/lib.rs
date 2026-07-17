@@ -111,6 +111,7 @@ pub fn run() {
             commands::version::mods::delete_mod,
             commands::version::mods::install_mod,
             commands::version::mods::open_mods_dir,
+            commands::version::mods::reveal_mod_file,
             commands::version::folder::list_mc_folders,
             commands::version::folder::add_mc_folder,
             commands::version::folder::remove_mc_folder,

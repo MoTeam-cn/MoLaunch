@@ -28,6 +28,11 @@ const personalization = ref<tauri.VersionPersonalization | null>(null)
 /** 当前选中的版本 ID */
 const selectedId = computed(() => versionStore.selectedVersion)
 
+/** 已安装版本类型映射（后端精确分析 JSON 的结果，供 inferVersionType 用作 backendType）
+ *  形如 { "1.20.1-forge-47.4.10": "forge", "Zombie Invade 100 Days": "forge" }
+ *  仅靠版本 ID 关键字匹配无法识别整合包版本（ID 不含 "forge" 字样），必须依赖后端类型 */
+const installedVersionTypes = ref<Record<string, string>>({})
+
 /** 路径分隔符 */
 const sep = computed(() => (gameDir.value.includes('\\') ? '\\' : '/'))
 
@@ -70,7 +75,8 @@ const displayTypeOptions = [
 
 const currentMeta = computed(() => {
   if (!selectedId.value) return { icon: grassIcon, label: '其他' }
-  return typeMetaMap[inferVersionType(selectedId.value)] ?? { icon: grassIcon, label: '其他' }
+  const backendType = installedVersionTypes.value[selectedId.value]
+  return typeMetaMap[inferVersionType(selectedId.value, undefined, backendType)] ?? { icon: grassIcon, label: '其他' }
 })
 
 const currentLogo = computed(() => personalization.value?.logo ?? '')
@@ -83,20 +89,24 @@ const currentLogoIcon = computed(() => {
  * 根据自定义 logo + 版本 ID 解析图标（供版本列表/选择页使用）
  * - logo 非空时优先使用 iconOptions 中匹配的图标
  * - 否则按 versionId 推断类型，返回类型对应图标
+ *   优先用显式传入的 explicitType（调用方已知后端类型时直接传，避免依赖 installedVersionTypes 的加载时机）
+ *   其次用 installedVersionTypes（模块级缓存）
  */
-function resolveVersionIcon(logo: string, versionId: string): string {
+function resolveVersionIcon(logo: string, versionId: string, explicitType?: string): string {
   if (logo) {
     const opt = iconOptions.find(o => o.value === logo)
     if (opt?.icon) return opt.icon
   }
-  const inferred = inferVersionType(versionId)
+  const backendType = explicitType ?? installedVersionTypes.value[versionId]
+  const inferred = inferVersionType(versionId, undefined, backendType)
   return typeMetaMap[inferred]?.icon ?? grassIcon
 }
 
 /** 是否支持 Mod */
 const isModable = computed(() => {
   if (!selectedId.value) return false
-  return ['forge', 'neoforge', 'fabric', 'optifine', 'liteloader'].includes(inferVersionType(selectedId.value))
+  const backendType = installedVersionTypes.value[selectedId.value]
+  return ['forge', 'neoforge', 'fabric', 'optifine', 'liteloader'].includes(inferVersionType(selectedId.value, undefined, backendType))
 })
 
 /** 加载个性化数据 */
@@ -116,6 +126,15 @@ async function loadPersonalization() {
 async function initContext() {
   try {
     gameDir.value = await tauri.getGameDir()
+    // 加载已安装版本类型映射（用于 inferVersionType 的 backendType，正确识别整合包版本类型）
+    try {
+      const vwt = await tauri.listInstalledVersionsWithType()
+      const typeMap: Record<string, string> = {}
+      vwt.forEach(v => { typeMap[v.id] = v.version_type })
+      installedVersionTypes.value = typeMap
+    } catch (e) {
+      console.error('Failed to load installed version types:', e)
+    }
     if (selectedId.value) {
       effectiveDir.value = await tauri.getVersionEffectiveDir(selectedId.value)
       await loadPersonalization()
@@ -134,12 +153,25 @@ async function refreshEffectiveDir() {
   }
 }
 
+/** 刷新已安装版本类型映射（版本列表更新、安装/卸载后调用） */
+async function refreshInstalledVersionTypes() {
+  try {
+    const vwt = await tauri.listInstalledVersionsWithType()
+    const typeMap: Record<string, string> = {}
+    vwt.forEach(v => { typeMap[v.id] = v.version_type })
+    installedVersionTypes.value = typeMap
+  } catch (e) {
+    console.error('Failed to refresh installed version types:', e)
+  }
+}
+
 export function useVersionSettings() {
   return {
     selectedId,
     gameDir,
     effectiveDir,
     personalization,
+    installedVersionTypes,
     versionFolder,
     savesFolder,
     modsFolder,
@@ -156,5 +188,6 @@ export function useVersionSettings() {
     loadPersonalization,
     initContext,
     refreshEffectiveDir,
+    refreshInstalledVersionTypes,
   }
 }

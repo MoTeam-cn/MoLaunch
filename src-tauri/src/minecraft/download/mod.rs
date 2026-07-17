@@ -163,6 +163,10 @@ pub async fn download_version_full(
     let version_dir = game_dir.join("versions").join(version_id);
     std::fs::create_dir_all(&version_dir)?;
 
+    // 复用单个 DownloadManager 实例（避免每个阶段 new 一个独立 manager + 独立 timer）
+    // client_jar / asset_index 只传 1 个 task（自然单线程），libraries / assets 传多 task
+    let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
+
     // Step 1: 版本清单
     if let Some(ref cb) = stage_callback {
         cb(0, "版本清单");
@@ -196,9 +200,7 @@ pub async fn download_version_full(
         game_dir,
         version_id,
         mirror_url,
-        chunk_count,
-        speed_limit,
-        source_mode,
+        &manager,
         progress_callback.clone(),
     )
     .await?;
@@ -212,10 +214,7 @@ pub async fn download_version_full(
         &merged_json,
         game_dir,
         mirror_url,
-        max_threads,
-        chunk_count,
-        speed_limit,
-        source_mode,
+        &manager,
         progress_callback.clone(),
     )
     .await?;
@@ -229,10 +228,7 @@ pub async fn download_version_full(
         &merged_json,
         game_dir,
         mirror_url,
-        max_threads,
-        chunk_count,
-        speed_limit,
-        source_mode,
+        &manager,
         progress_callback,
     )
     .await?;
@@ -257,15 +253,12 @@ pub async fn download_version_full(
 }
 
 /// 下载客户端 JAR
-#[allow(clippy::too_many_arguments)]
 async fn download_client_jar(
     json: &serde_json::Value,
     game_dir: &Path,
     version_id: &str,
     mirror_url: Option<&str>,
-    chunk_count: usize,
-    speed_limit: u64,
-    source_mode: DownloadSourceMode,
+    manager: &DownloadManager,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
 ) -> anyhow::Result<()> {
     let jar_path = game_dir
@@ -291,7 +284,7 @@ async fn download_client_jar(
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("Client JAR URL not found"))?;
 
-    let urls = build_launcher_meta_urls(url, mirror_url, source_mode);
+    let urls = build_launcher_meta_urls(url, mirror_url, source_mode_of(manager));
     let task = DownloadTask {
         id: "client_jar".to_string(),
         urls,
@@ -302,7 +295,6 @@ async fn download_client_jar(
             .map(|s| s.to_string()),
     };
 
-    let manager = DownloadManager::new(1, chunk_count, speed_limit, source_mode);
     let results = manager.download_batch(vec![task], progress_callback).await;
 
     if let Some(result) = results.first() {
@@ -318,15 +310,11 @@ async fn download_client_jar(
 }
 
 /// 下载 Libraries
-#[allow(clippy::too_many_arguments)]
 async fn download_libraries(
     json: &serde_json::Value,
     game_dir: &Path,
     mirror_url: Option<&str>,
-    max_threads: usize,
-    chunk_count: usize,
-    speed_limit: u64,
-    source_mode: DownloadSourceMode,
+    manager: &DownloadManager,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
 ) -> anyhow::Result<(usize, usize, usize)> {
     let all_libs = libraries::parse_libraries(json, game_dir);
@@ -357,7 +345,6 @@ async fn download_libraries(
         })
         .collect();
 
-    let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
     let results = manager.download_batch(tasks, progress_callback).await;
 
     let downloaded = results
@@ -373,15 +360,11 @@ async fn download_libraries(
 }
 
 /// 下载 Assets
-#[allow(clippy::too_many_arguments)]
 async fn download_assets(
     json: &serde_json::Value,
     game_dir: &Path,
     mirror_url: Option<&str>,
-    max_threads: usize,
-    chunk_count: usize,
-    speed_limit: u64,
-    source_mode: DownloadSourceMode,
+    manager: &DownloadManager,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
 ) -> anyhow::Result<(usize, usize, usize)> {
     let index_meta = assets::get_asset_index_meta(json)
@@ -391,7 +374,7 @@ async fn download_assets(
 
     if !index_path.exists() {
         log_info!("[Assets] Downloading asset index: {}", index_meta.id);
-        let index_urls = assets::get_asset_index_urls(&index_meta, source_mode);
+        let index_urls = assets::get_asset_index_urls(&index_meta, source_mode_of(manager));
         let task = DownloadTask {
             id: "asset_index".to_string(),
             urls: index_urls,
@@ -404,7 +387,6 @@ async fn download_assets(
             },
         };
 
-        let manager = DownloadManager::new(1, chunk_count, speed_limit, source_mode);
         let results = manager.download_batch(vec![task], None).await;
 
         if let Some(result) = results.first() {
@@ -435,7 +417,7 @@ async fn download_assets(
         .iter()
         .enumerate()
         .map(|(i, asset)| {
-            let urls = assets::build_asset_download_urls(asset, mirror_url, source_mode);
+            let urls = assets::build_asset_download_urls(asset, mirror_url, source_mode_of(manager));
             DownloadTask {
                 id: format!("asset_{}", i),
                 urls,
@@ -446,7 +428,6 @@ async fn download_assets(
         })
         .collect();
 
-    let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
     let results = manager.download_batch(tasks, progress_callback).await;
 
     let downloaded = results
@@ -459,6 +440,11 @@ async fn download_assets(
         .count();
 
     Ok((all_assets.len(), downloaded, skipped))
+}
+
+/// 从 DownloadManager 获取 source_mode（用于构造 URL）
+fn source_mode_of(manager: &DownloadManager) -> DownloadSourceMode {
+    manager.source_mode()
 }
 
 /// 构建 launcher/meta URL 列表
@@ -532,14 +518,14 @@ pub async fn fix_version_files(
     // merge_version_json 会处理父版本不存在的情况（参考PCL2的容错机制）
     let merged_json = super::version::json_merge::merge_version_json(&json, game_dir)?;
 
+    // 复用单个 DownloadManager 实例（与 download_version_full 一致）
+    let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
+
     let _ = download_libraries(
         &merged_json,
         game_dir,
         mirror_url,
-        max_threads,
-        chunk_count,
-        speed_limit,
-        source_mode,
+        &manager,
         None,
     )
     .await?;
@@ -547,10 +533,7 @@ pub async fn fix_version_files(
         &merged_json,
         game_dir,
         mirror_url,
-        max_threads,
-        chunk_count,
-        speed_limit,
-        source_mode,
+        &manager,
         None,
     )
     .await?;

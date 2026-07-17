@@ -127,6 +127,12 @@ export interface ModInfo {
   loader_type: string
   /** 中文译名（来自 mcmod 数据库，可能为空） */
   translated_name: string
+  /** Mod 描述（来自 jar 内 metadata，可能为空） */
+  description?: string
+  /** Mod 版本号（来自 jar 内 metadata，可能为空） */
+  version?: string
+  /** Mod 图标（base64 data URL，从 jar 内 logo 文件提取，可能为空） */
+  logo_data?: string
 }
 
 /**
@@ -173,6 +179,13 @@ export async function installMod(versionId: string, sourcePath: string): Promise
  */
 export async function openModsDir(versionId: string): Promise<void> {
   return await invoke<void>('open_mods_dir', { versionId })
+}
+
+/**
+ * 在资源管理器中打开并选中指定 Mod 文件（参考 PCL2 Open_Click）
+ */
+export async function revealModFile(versionId: string, fileName: string): Promise<void> {
+  return await invoke<void>('reveal_mod_file', { versionId, fileName })
 }
 
 /**

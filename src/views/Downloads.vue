@@ -32,14 +32,12 @@ const bytesDownloaded = computed(() => progress.value?.global_bytes_downloaded |
 const bytesTotal = computed(() => progress.value?.global_bytes_total || 0)
 const filesRemaining = computed(() => {
   if (!progress.value?.stages) return 0
-  // 计算所有阶段中剩余的文件数
+  // 统计所有未完成阶段（loading + waiting）的剩余文件数
   let remaining = 0
   for (const s of progress.value.stages) {
     if (s.status === 'loading') {
-      // 进行中的阶段：总文件数 - 已下载文件数
       remaining += Math.max(0, (s.files_total || 0) - (s.files_downloaded || 0))
     } else if (s.status === 'waiting') {
-      // 等待中的阶段：使用总文件数
       remaining += s.files_total || 0
     }
   }
@@ -60,7 +58,9 @@ interface TaskGroup {
   title: string // 显示名
   stages: typeof stages.value
   status: 'loading' | 'finished' | 'waiting' | 'failed'
-  progress: number // 分组总进度（0-1）
+  progress: number // 分组加权进度（0-1，按 stage.weight 加权平均）
+  bytesDownloaded: number // 分组已下载字节（Finished + Loading 阶段累加）
+  bytesTotal: number // 分组总字节
   isIndependent: boolean // 是否独立阶段（无 group）
 }
 
@@ -78,6 +78,8 @@ const taskGroups = computed<TaskGroup[]>(() => {
         stages: [],
         status: 'waiting',
         progress: 0,
+        bytesDownloaded: 0,
+        bytesTotal: 0,
         isIndependent: !s.group,
       }
       groupMap.set(groupKey, g)
@@ -86,7 +88,7 @@ const taskGroups = computed<TaskGroup[]>(() => {
     g.stages.push(s)
   }
 
-  // 计算每个分组的聚合状态和进度
+  // 计算每个分组的聚合状态、加权进度和字节
   for (const g of groups) {
     const statuses = g.stages.map(s => s.status)
     if (statuses.includes('failed')) {
@@ -98,8 +100,21 @@ const taskGroups = computed<TaskGroup[]>(() => {
     } else {
       g.status = 'waiting'
     }
-    // 进度 = 子阶段平均
-    g.progress = g.stages.reduce((sum, s) => sum + s.progress, 0) / g.stages.length
+    // 加权进度（与整体 percentage 算法一致：按 stage.weight 加权平均）
+    let weightedProgress = 0
+    let totalWeight = 0
+    for (const s of g.stages) {
+      totalWeight += s.weight
+      weightedProgress += s.progress * s.weight
+    }
+    g.progress = totalWeight > 0 ? weightedProgress / totalWeight : 0
+    // 字节累加（仅 Finished + Loading 阶段，与后端 global_bytes 算法一致）
+    for (const s of g.stages) {
+      if (s.status === 'finished' || s.status === 'loading') {
+        g.bytesDownloaded += s.bytes_downloaded
+        g.bytesTotal += s.bytes_total
+      }
+    }
   }
 
   return groups
@@ -247,9 +262,9 @@ function goToVersions() {
             <!-- 分割线 -->
             <div class="h-px bg-gradient-to-r from-gray-100 to-gray-200"></div>
 
-            <!-- 剩余文件（当前阶段） -->
+            <!-- 剩余文件 -->
             <div>
-              <div class="text-xs text-gray-500 mb-1">剩余文件（当前阶段）</div>
+              <div class="text-xs text-gray-500 mb-1">剩余文件</div>
               <div class="text-lg font-semibold text-gray-900">{{ filesRemaining }}</div>
             </div>
           </div>
@@ -301,9 +316,15 @@ function goToVersions() {
                     >
                       {{ g.title }}
                     </span>
-                    <!-- 子阶段计数 -->
+                    <!-- 子阶段计数 + 分组字节 -->
                     <span v-if="!g.isIndependent" class="text-[10px] text-gray-400">
                       {{ g.stages.length }} 项
+                    </span>
+                    <span
+                      v-if="g.bytesTotal > 0 && (g.status === 'loading' || g.status === 'finished')"
+                      class="text-[10px] text-gray-400"
+                    >
+                      {{ formatBytes(g.bytesDownloaded) }} / {{ formatBytes(g.bytesTotal) }}
                     </span>
                     <!-- 进度 -->
                     <span
@@ -346,6 +367,13 @@ function goToVersions() {
                         }"
                       >
                         {{ s.name }}
+                      </span>
+                      <!-- 字节/文件进度 -->
+                      <span v-if="s.status === 'loading' && s.bytes_total > 0" class="text-[10px] text-gray-400">
+                        {{ formatBytes(s.bytes_downloaded) }} / {{ formatBytes(s.bytes_total) }}
+                      </span>
+                      <span v-else-if="s.status === 'loading' && s.files_total > 0" class="text-[10px] text-gray-400">
+                        {{ s.files_downloaded }} / {{ s.files_total }} 文件
                       </span>
                       <span v-if="s.status === 'loading'" class="text-[11px] text-primary-600 font-medium">
                         {{ Math.round(s.progress * 100) }}%

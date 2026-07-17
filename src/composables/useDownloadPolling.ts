@@ -18,11 +18,16 @@ interface RawDownloadStage {
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0
+// 上一次轮询的字节数，用于检测进度回退（突然归零）的 bug
+let lastGlobalDownloaded = 0
+let lastGlobalTotal = 0
 
 function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
   if (pollTimer) return
 
   pollCount = 0
+  lastGlobalDownloaded = 0
+  lastGlobalTotal = 0
   if (import.meta.env.DEV) {
     console.debug('[Polling] Starting download polling...')
   }
@@ -46,6 +51,27 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
           versionStore.finishDownload()
           return
         }
+
+        // 检测进度回退：downloaded 或 total 突然变小（非初始化阶段）
+        // 这是定位「timeout 后进度归零」bug 的关键日志
+        const newDownloaded = progress.global_bytes_downloaded ?? 0
+        const newTotal = progress.global_bytes_total ?? 0
+        if (import.meta.env.DEV && pollCount > 2) {
+          if (newDownloaded < lastGlobalDownloaded) {
+            console.debug(
+              `[Polling] ⚠️ downloaded 回退! ${lastGlobalDownloaded} -> ${newDownloaded} (差值 ${lastGlobalDownloaded - newDownloaded}, poll #${pollCount})`,
+              JSON.parse(JSON.stringify(progress))
+            )
+          }
+          if (newTotal < lastGlobalTotal && newTotal > 0) {
+            console.debug(
+              `[Polling] ⚠️ total 回退! ${lastGlobalTotal} -> ${newTotal} (差值 ${lastGlobalTotal - newTotal}, poll #${pollCount})`,
+              JSON.parse(JSON.stringify(progress))
+            )
+          }
+        }
+        if (newDownloaded > 0) lastGlobalDownloaded = newDownloaded
+        if (newTotal > 0) lastGlobalTotal = newTotal
 
         const stages: DownloadStage[] = progress.stages.map((s: RawDownloadStage) => ({
           name: s.name,
@@ -99,6 +125,8 @@ function stopPolling() {
     pollTimer = null
   }
   pollCount = 0
+  lastGlobalDownloaded = 0
+  lastGlobalTotal = 0
 }
 
 export function initDownloadPolling() {

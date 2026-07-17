@@ -487,14 +487,25 @@ pub async fn install_modpack(
     std::fs::create_dir_all(&instance_dir)
         .map_err(|e| format!("创建整合包目录失败: {}", e))?;
 
-    // 2. 重置 download_state，设置整合包专用 stages
-    reset_modpack_state(&state);
+    // 2. 重置 download_state，设置整合包专用 stages（统一方法）
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.reset_stages(vec![
+            DownloadStage::new_grouped("下载整合包", 10.0, "整合包安装"),
+            DownloadStage::new_grouped("解析整合包", 1.0, "整合包安装"),
+            DownloadStage::new_grouped("下载 MOD", 40.0, "整合包安装"),
+            DownloadStage::new_grouped("复制配置文件", 5.0, "整合包安装"),
+        ]);
+    }
 
     // 3. 下载原始整合包（Stage 0）— 直接交给 DownloadManager
     // DownloadManager 内部会自动探测文件大小（expected_size=0 时用 GET + Range: bytes=0-0）
     // 并据此判断是否走分片下载，无需在这里手动探测
     let archive_path = instance_dir.join(&req.file_name);
-    set_stage(&state, 0, StageStatus::Loading, 0.0);
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_status(0, StageStatus::Loading, 0.0);
+    }
 
     log_info!("[Community] 下载整合包到: {}", archive_path.display());
 
@@ -510,25 +521,19 @@ pub async fn install_modpack(
         expected_hash: None,
     };
 
-    // stage 0 的进度回调：把 DownloadManager 的 GlobalProgress 同步到 download_state
+    // stage 0 的进度回调：统一用 sync_stage_from_progress 同步 GlobalProgress 到 download_state
     let stage0_state = state.download_state.clone();
     let stage0_callback: Arc<dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync> =
         Arc::new(move |p| {
             let mut ds = stage0_state.lock().unwrap();
-            if 0 < ds.stages.len() {
-                ds.stages[0].bytes_downloaded = p.downloaded_bytes;
-                ds.stages[0].bytes_total = p.total_bytes;
-                ds.stages[0].files_downloaded = p.completed_files;
-                ds.stages[0].files_total = p.total_files;
-                if p.total_bytes > 0 {
-                    ds.stages[0].progress =
-                        (p.downloaded_bytes as f64 / p.total_bytes as f64).min(1.0);
-                }
-                ds.stages[0].status = StageStatus::Loading;
-            }
-            ds.global_bytes_downloaded = p.downloaded_bytes;
-            ds.global_bytes_total = p.total_bytes;
-            ds.global_speed = p.current_speed;
+            ds.sync_stage_from_progress(
+                0,
+                p.downloaded_bytes,
+                p.total_bytes,
+                p.completed_files,
+                p.total_files,
+                p.current_speed,
+            );
         });
 
     let config = state.config.lock().await;
@@ -551,8 +556,12 @@ pub async fn install_modpack(
 
     if let Some(err) = archive_err {
         let msg = format!("下载整合包失败: {}", err);
-        set_stage(&state, 0, StageStatus::Failed, 0.0);
-        mark_failed(&state, &msg);
+        {
+            let mut ds = state.download_state.lock().unwrap();
+            ds.set_stage_status(0, StageStatus::Failed, 0.0);
+            ds.mark_failed(1);
+        }
+        log_info!("[Community] 整合包安装失败: {}", msg);
         return Err(msg);
     }
 
@@ -560,7 +569,10 @@ pub async fn install_modpack(
         .map(|m| m.len())
         .unwrap_or(0);
 
-    set_stage(&state, 0, StageStatus::Finished, 1.0);
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_status(0, StageStatus::Finished, 1.0);
+    }
     log_info!(
         "[Community] 整合包下载完成: {} ({})",
         req.file_name,
@@ -568,7 +580,10 @@ pub async fn install_modpack(
     );
 
     // 4. 打开 zip，检测格式（Stage 1）
-    set_stage(&state, 1, StageStatus::Loading, 0.0);
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_status(1, StageStatus::Loading, 0.0);
+    }
     let file = std::fs::File::open(&archive_path)
         .map_err(|e| format!("打开整合包失败: {}", e))?;
     let mut archive = zip::ZipArchive::new(file)
@@ -611,7 +626,10 @@ pub async fn install_modpack(
         }
     };
 
-    set_stage(&state, 1, StageStatus::Finished, 1.0);
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_status(1, StageStatus::Finished, 1.0);
+    }
     log_info!(
         "[Community] 整合包格式={:?} game={} loader={}{} mods={}",
         format,
@@ -622,7 +640,10 @@ pub async fn install_modpack(
     );
 
     // 5. 下载依赖文件（Stage 2）
-    set_stage(&state, 2, StageStatus::Loading, 0.0);
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_status(2, StageStatus::Loading, 0.0);
+    }
     let mods_dir = instance_dir.join("mods");
     std::fs::create_dir_all(&mods_dir)
         .map_err(|e| format!("创建 mods 目录失败: {}", e))?;
@@ -650,18 +671,22 @@ pub async fn install_modpack(
             .await?;
         }
     }
-    set_stage(&state, 2, StageStatus::Finished, 1.0);
-
-    // 6. 复制 overrides（Stage 3）
-    set_stage(&state, 3, StageStatus::Loading, 0.0);
-    extract_overrides(&mut archive, &instance_dir, &state)?;
-    set_stage(&state, 3, StageStatus::Finished, 1.0);
-
-    // 完成
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.is_active = false;
-        ds.is_complete = true;
+        ds.set_stage_status(2, StageStatus::Finished, 1.0);
+    }
+
+    // 6. 复制 overrides（Stage 3）
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_status(3, StageStatus::Loading, 0.0);
+    }
+    extract_overrides(&mut archive, &instance_dir, &state)?;
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_status(3, StageStatus::Finished, 1.0);
+        // 不调用 mark_complete()：前端会紧接着调用 install_merged 安装 MC 本体，
+        // 轮询必须继续。mark_complete 由 install_merged 在全部完成后调用。
     }
 
     log_info!("[Community] 整合包安装完成: {}", req.instance_name);
@@ -677,57 +702,10 @@ pub async fn install_modpack(
 }
 
 // ============================================================================
-// download_state 辅助函数
+// download_state 操作已统一到 state::DownloadState 的方法中：
+//   reset_stages / set_stage_status / set_stage_bytes / sync_stage_from_progress / mark_complete / mark_failed
+// 不再在此文件维护私有辅助函数，与 install_merged 共用同一套逻辑
 // ============================================================================
-
-/// 重置 download_state 为整合包专用 stages
-fn reset_modpack_state(state: &AppState) {
-    let mut ds = state.download_state.lock().unwrap();
-    ds.is_active = true;
-    ds.is_complete = false;
-    ds.current_stage_index = 0;
-    ds.global_speed = 0;
-    ds.global_bytes_downloaded = 0;
-    ds.global_bytes_total = 0;
-    ds.error_code = 0;
-    ds.stages = vec![
-        DownloadStage::new_grouped("下载整合包", 10.0, "整合包安装"),
-        DownloadStage::new_grouped("解析整合包", 1.0, "整合包安装"),
-        DownloadStage::new_grouped("下载 MOD", 40.0, "整合包安装"),
-        DownloadStage::new_grouped("复制配置文件", 5.0, "整合包安装"),
-    ];
-}
-
-/// 设置某个 stage 的状态和进度
-fn set_stage(state: &AppState, index: usize, status: StageStatus, progress: f64) {
-    let mut ds = state.download_state.lock().unwrap();
-    ds.current_stage_index = index;
-    if index < ds.stages.len() {
-        ds.stages[index].status = status;
-        ds.stages[index].progress = progress;
-    }
-}
-
-/// 更新某个 stage 的下载进度
-fn update_stage_bytes(state: &AppState, index: usize, downloaded: u64, total: u64) {
-    let mut ds = state.download_state.lock().unwrap();
-    if index < ds.stages.len() {
-        ds.stages[index].bytes_downloaded = downloaded;
-        ds.stages[index].bytes_total = total;
-        if total > 0 {
-            ds.stages[index].progress = (downloaded as f64 / total as f64).min(1.0);
-        }
-    }
-}
-
-/// 标记整体失败
-fn mark_failed(state: &AppState, error_msg: &str) {
-    let mut ds = state.download_state.lock().unwrap();
-    ds.is_active = false;
-    ds.is_complete = false;
-    ds.error_code = 1;
-    log_info!("[Community] 整合包安装失败: {}", error_msg);
-}
 
 // ============================================================================
 // 下载辅助
@@ -735,26 +713,23 @@ fn mark_failed(state: &AppState, error_msg: &str) {
 
 /// 并发下载多个文件，进度汇总到 download_state 的指定 stage
 ///
-/// 改进：
-/// - 复用 `DownloadManager`：自动按文件大小走分片下载（>1MB/chunk 走 chunk::download_chunked）
-///   或普通下载（小文件直连），与 MC 本体/库/assets 走同一套下载基础设施
-/// - 每个 file 支持 fallback URL 数组（DownloadTask.urls 按顺序尝试）
-/// - 预计算 total bytes 一次性设置
-/// - 300ms 定时器刷新 state（bytes/速度）
-/// - 失败立即 log_info 完整 URL+错误，避免静默吞错
+/// 统一走 DownloadManager：自动按文件大小走分片下载（>1MB/chunk 走 chunk::download_chunked）
+/// 或普通下载（小文件直连），与 MC 本体/库/assets 走同一套下载基础设施。
+/// 进度通过 `sync_stage_from_progress` 统一同步到 download_state（速度/字节累加由统一方法处理）。
 async fn download_files_concurrent(
     state: &AppState,
     stage_index: usize,
     files: &[(Vec<String>, String, u64)], // (urls, target_path, file_size)
     max_threads: usize,
-    precomputed_total: u64,
+    _precomputed_total: u64,
 ) -> Result<(), String> {
     use crate::minecraft::download::manager::DownloadManager;
     use crate::minecraft::download::types::DownloadTask;
     use crate::minecraft::sources::DownloadSourceMode;
 
     if files.is_empty() {
-        update_stage_bytes(state, stage_index, 1, 1);
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_bytes(stage_index, 1, 1);
         return Ok(());
     }
 
@@ -772,60 +747,23 @@ async fn download_files_concurrent(
         .collect();
 
     let total_count = files.len() as u64;
-    let completed = Arc::new(std::sync::atomic::AtomicU64::new(0));
-    let bytes_done = Arc::new(std::sync::atomic::AtomicU64::new(0));
-    let bytes_total = Arc::new(std::sync::atomic::AtomicU64::new(precomputed_total));
-    let last_speed_check = Arc::new(std::sync::Mutex::new((std::time::Instant::now(), 0u64)));
-    let is_active = Arc::new(std::sync::atomic::AtomicBool::new(true));
 
-    // 进度回调：DownloadManager 每 300ms 调用一次
-    // 累加所有任务的 downloaded/total/speed 到我们的原子计数器
-    let progress_completed = completed.clone();
-    let progress_bytes_done = bytes_done.clone();
-    let progress_bytes_total = bytes_total.clone();
-    let progress_speed_check = last_speed_check.clone();
+    // 进度回调：DownloadManager 已内置 300ms timer + 滑动窗口速度计算
+    // 直接用 sync_stage_from_progress 统一同步，无需额外 timer / 原子计数器 / 速度计算
     let progress_state = state.download_state.clone();
     let progress_stage_index = stage_index;
-    let progress_total_count = total_count;
     let progress_callback: Arc<dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync> =
         Arc::new(move |p| {
-            progress_bytes_done.store(p.downloaded_bytes, std::sync::atomic::Ordering::Relaxed);
-            progress_bytes_total.store(p.total_bytes, std::sync::atomic::Ordering::Relaxed);
-            // completed_files 是已完成文件数
-            progress_completed.store(p.completed_files as u64, std::sync::atomic::Ordering::Relaxed);
-            update_modpack_progress(
-                &progress_state,
+            let mut ds = progress_state.lock().unwrap();
+            ds.sync_stage_from_progress(
                 progress_stage_index,
-                p.completed_files as u64,
-                progress_total_count,
-                &progress_bytes_done,
-                &progress_bytes_total,
-                &progress_speed_check,
+                p.downloaded_bytes,
+                p.total_bytes,
+                p.completed_files,
+                p.total_files,
+                p.current_speed,
             );
         });
-
-    // 启动 300ms 定时器：补充刷新 state（防止 callback 间隔过长导致 UI 卡顿）
-    let timer_state = state.download_state.clone();
-    let timer_bytes_done = bytes_done.clone();
-    let timer_bytes_total = bytes_total.clone();
-    let timer_speed = last_speed_check.clone();
-    let timer_active = is_active.clone();
-    let timer_completed = completed.clone();
-    let timer_stage_index = stage_index;
-    let timer_handle = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(300));
-        loop {
-            interval.tick().await;
-            if !timer_active.load(std::sync::atomic::Ordering::Relaxed) {
-                break;
-            }
-            let done = timer_completed.load(std::sync::atomic::Ordering::Relaxed);
-            update_modpack_progress(
-                &timer_state, timer_stage_index, done, total_count,
-                &timer_bytes_done, &timer_bytes_total, &timer_speed,
-            );
-        }
-    });
 
     // 用 DownloadManager 下载（自动分片 + 多线程 + 重试 + URL fallback）
     let config = state.config.lock().await;
@@ -833,10 +771,6 @@ async fn download_files_concurrent(
     drop(config);
     let manager = DownloadManager::new(max_threads, chunk_count, 0, DownloadSourceMode::Smart);
     let results = manager.download_batch(tasks, Some(progress_callback)).await;
-
-    // 停止定时器
-    is_active.store(false, std::sync::atomic::Ordering::Relaxed);
-    let _ = timer_handle.await;
 
     // 收集失败
     let mut errors: Vec<String> = Vec::new();
@@ -866,48 +800,6 @@ async fn download_files_concurrent(
     }
 
     Ok(())
-}
-
-/// 更新整合包下载进度到 download_state（一次锁更新所有字段）
-fn update_modpack_progress(
-    state_clone: &Arc<std::sync::Mutex<crate::state::DownloadState>>,
-    stage_index: usize,
-    done: u64,
-    total_count: u64,
-    bytes_done: &std::sync::atomic::AtomicU64,
-    bytes_total: &std::sync::atomic::AtomicU64,
-    last_speed_check: &std::sync::Mutex<(std::time::Instant, u64)>,
-) {
-    let bd = bytes_done.load(std::sync::atomic::Ordering::Relaxed);
-    let bt = bytes_total.load(std::sync::atomic::Ordering::Relaxed);
-    let mut ds = state_clone.lock().unwrap();
-
-    if stage_index < ds.stages.len() {
-        ds.stages[stage_index].files_downloaded = done as usize;
-        ds.stages[stage_index].files_total = total_count as usize;
-        ds.stages[stage_index].bytes_downloaded = bd;
-        ds.stages[stage_index].bytes_total = bt;
-        if total_count > 0 {
-            ds.stages[stage_index].progress = (done as f64 / total_count as f64).min(1.0);
-        }
-        ds.stages[stage_index].status = StageStatus::Loading;
-    }
-
-    ds.global_bytes_downloaded = bd;
-    ds.global_bytes_total = bt;
-
-    // 300ms 滑动窗口速度
-    let mut sc = last_speed_check.lock().unwrap();
-    let now = std::time::Instant::now();
-    let elapsed = now.duration_since(sc.0).as_secs_f64();
-    if elapsed >= 0.3 {
-        if elapsed > 0.0 {
-            let diff = bd.saturating_sub(sc.1);
-            ds.global_speed = (diff as f64 / elapsed) as u64;
-        }
-        sc.0 = now;
-        sc.1 = bd;
-    }
 }
 
 // ============================================================================
@@ -1170,11 +1062,15 @@ fn extract_overrides(
 
         // 每 10 个文件更新一次进度
         if count % 10 == 0 {
-            update_stage_bytes(state, 3, count as u64, total as u64);
+            let mut ds = state.download_state.lock().unwrap();
+            ds.set_stage_bytes(3, count as u64, total as u64);
         }
     }
 
-    update_stage_bytes(state, 3, count as u64, total as u64);
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.set_stage_bytes(3, count as u64, total as u64);
+    }
     log_info!("[Community] overrides 解压完成 ({} 个文件)", count);
     Ok(())
 }

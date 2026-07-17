@@ -4,10 +4,8 @@ use crate::minecraft::loaders;
 use crate::minecraft::version::{setup::VersionSetup, state::VersionType};
 use crate::state::{AppState, StageStatus};
 use crate::{log_error, log_info, log_warn};
-use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use std::time::Instant;
 use tauri::{Emitter, State};
 
 use super::{sanitize_mc_version, sanitize_version_id};
@@ -173,17 +171,46 @@ pub async fn install_merged(
     let base_name = instance_name.unwrap_or_else(|| mc_version.clone());
     let instance = {
         let versions_dir = game_dir.join("versions");
-        if !versions_dir.join(&base_name).exists() {
+        let target_dir = versions_dir.join(&base_name);
+        if !target_dir.exists() {
+            // 目录不存在：直接使用
+            log_info!(
+                "[Merged] 版本目录不存在，直接使用: {}",
+                target_dir.display()
+            );
             base_name.clone()
         } else {
-            // 版本名已存在，追加后缀
-            let mut counter = 1;
-            loop {
-                let candidate = format!("{}({})", base_name, counter);
-                if !versions_dir.join(&candidate).exists() {
-                    break candidate;
+            // 目录已存在：检查是否为「完整版本」（有 <base_name>.json 或 <base_name>.jar）
+            // 整合包安装后会创建同名目录，但里面只有 mods/overrides/configs，
+            // 没有版本 JSON/JAR，这种情况下应直接复用目录，不要追加后缀
+            let has_version_json = target_dir.join(format!("{}.json", base_name)).exists();
+            let has_version_jar = target_dir.join(format!("{}.jar", base_name)).exists();
+            let has_mods = target_dir.join("mods").exists();
+            log_info!(
+                "[Merged] 版本目录已存在: {} (json={}, jar={}, mods={})",
+                target_dir.display(),
+                has_version_json,
+                has_version_jar,
+                has_mods
+            );
+            if !has_version_json && !has_version_jar {
+                // 整合包半成品目录（只有 mods/overrides，没有 MC 本体）→ 直接复用
+                log_info!(
+                    "[Merged] 检测到整合包半成品目录，直接复用: {}",
+                    target_dir.display()
+                );
+                base_name.clone()
+            } else {
+                // 完整版本已存在：追加后缀 (1), (2) 等
+                log_info!("[Merged] 版本已存在，追加后缀: {}", base_name);
+                let mut counter = 1;
+                loop {
+                    let candidate = format!("{}({})", base_name, counter);
+                    if !versions_dir.join(&candidate).exists() {
+                        break candidate;
+                    }
+                    counter += 1;
                 }
-                counter += 1;
             }
         }
     };
@@ -203,41 +230,27 @@ pub async fn install_merged(
         || optifine_version.is_some()
         || liteloader_version.is_some();
 
-    // 设置下载状态
-    // 重要：install_merged 启动时**追加**新阶段，不清空已有 stages
+    // 设置下载状态（统一方法：append_stages 追加，保留整合包 stages）
     //  - 整合包安装流程的 4 个阶段保留显示（前端按 group 分组折叠展开）
     //  - download_version_full 的 stage_callback(0..4) 是相对偏移，实际索引 = stage_offset + stage_index
-    //  - stage_offset = 追加前 stages 长度
     let stage_offset;
+    let mut new_stages = vec![
+        crate::state::DownloadStage::new_grouped("版本清单", 2.0, "MC本体安装"),
+        crate::state::DownloadStage::new_grouped("版本信息", 3.0, "MC本体安装"),
+        crate::state::DownloadStage::new_grouped("客户端", 5.0, "MC本体安装"),
+        crate::state::DownloadStage::new_grouped("库文件", 15.0, "MC本体安装"),
+        crate::state::DownloadStage::new_grouped("资源文件", 20.0, "MC本体安装"),
+    ];
+    if has_any_loader {
+        new_stages.push(crate::state::DownloadStage::new_grouped(
+            "加载器安装",
+            30.0,
+            "MC本体安装",
+        ));
+    }
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.is_active = true;
-        ds.is_complete = false;
-        ds.global_speed = 0;
-        ds.global_bytes_downloaded = 0;
-        ds.global_bytes_total = 0;
-        ds.error_code = 0;
-
-        stage_offset = ds.stages.len();
-        ds.current_stage_index = stage_offset;
-
-        // 追加标准 MC 下载 5 阶段（与 download_version_full 的 stage_callback 索引对应）
-        // 全部归入"MC本体安装"分组，加载器阶段也归入此分组
-        ds.stages.extend([
-            crate::state::DownloadStage::new_grouped("版本清单", 2.0, "MC本体安装"),
-            crate::state::DownloadStage::new_grouped("版本信息", 3.0, "MC本体安装"),
-            crate::state::DownloadStage::new_grouped("客户端", 5.0, "MC本体安装"),
-            crate::state::DownloadStage::new_grouped("库文件", 15.0, "MC本体安装"),
-            crate::state::DownloadStage::new_grouped("资源文件", 20.0, "MC本体安装"),
-        ]);
-        // 如果需要安装加载器，追加阶段（索引 = stage_offset + 5）
-        if has_any_loader {
-            ds.stages.push(crate::state::DownloadStage::new_grouped(
-                "加载器安装",
-                30.0,
-                "MC本体安装",
-            ));
-        }
+        stage_offset = ds.append_stages(new_stages);
     }
 
     let config = state.config.lock().await;
@@ -252,87 +265,28 @@ pub async fn install_merged(
     let game_path = game_dir.as_path();
     let state_clone = state.download_state.clone();
 
-    // 滑动窗口速度计算
-    let speed_window = Arc::new(std::sync::Mutex::new(VecDeque::<(u64, Instant)>::new()));
-
-    // Create progress callback (不发射事件，只更新状态)
-    let sw = speed_window.clone();
+    // progress callback：统一用 sync_stage_from_progress 同步 GlobalProgress 到 download_state
+    // 速度/字节累加由统一方法处理，不再在此维护 speed_window
     let progress_callback = Arc::new(move |progress: download_types::GlobalProgress| {
-        {
-            let mut ds = state_clone.lock().unwrap();
-            ds.is_active = progress.is_active;
-
-            let idx = ds.current_stage_index;
-            if idx < ds.stages.len() {
-                let stage = &mut ds.stages[idx];
-                stage.bytes_downloaded = progress.downloaded_bytes;
-                stage.bytes_total = progress.total_bytes;
-                stage.files_downloaded = progress.completed_files;
-                stage.files_total = progress.total_files;
-                if progress.total_bytes > 0 {
-                    stage.progress =
-                        (progress.downloaded_bytes as f64 / progress.total_bytes as f64).min(1.0);
-                } else {
-                    // 如果 total_bytes 为 0（全部跳过），设为完成
-                    stage.progress = 1.0;
-                }
-                stage.status = StageStatus::Loading;
-            }
-
-            // 从所有阶段计算全局进度
-            let mut total_downloaded = 0u64;
-            let mut total_size = 0u64;
-            for stage in &ds.stages {
-                // 只累加未完成或进行中的阶段，跳过等待中的阶段
-                if stage.status == StageStatus::Finished || stage.status == StageStatus::Loading {
-                    total_downloaded += stage.bytes_downloaded;
-                    total_size += stage.bytes_total;
-                }
-            }
-            ds.global_bytes_downloaded = total_downloaded;
-            ds.global_bytes_total = total_size;
-
-            {
-                let mut window = sw.lock().unwrap();
-                window.push_back((ds.global_bytes_downloaded, Instant::now()));
-                if window.len() > 10 {
-                    window.pop_front();
-                }
-                if window.len() >= 2 {
-                    let (first_bytes, first_time) = window.front().unwrap();
-                    let (last_bytes, last_time) = window.back().unwrap();
-                    let bytes_diff = last_bytes.saturating_sub(*first_bytes);
-                    let time_diff = last_time.duration_since(*first_time).as_secs_f64();
-                    if time_diff > 0.0 {
-                        ds.global_speed = (bytes_diff as f64 / time_diff) as u64;
-                    }
-                }
-            }
-        }
+        let mut ds = state_clone.lock().unwrap();
+        ds.is_active = progress.is_active;
+        let idx = ds.current_stage_index;
+        ds.sync_stage_from_progress(
+            idx,
+            progress.downloaded_bytes,
+            progress.total_bytes,
+            progress.completed_files,
+            progress.total_files,
+            progress.current_speed,
+        );
     });
 
-    // Stage callback (更新阶段状态)
-    // download_version_full 传 0..4 相对索引，加上 stage_offset 得到实际索引
-    // 注意：第一次 stage_callback(0) 时 actual_index = stage_offset（即 MC 本体第一个阶段），
-    // 此时 current_stage_index 已经是 stage_offset，不能把 stage_offset 自己标记为 Finished
+    // Stage callback：统一用 set_current_stage 切换阶段（自动把前一阶段标记 Finished）
     let state_for_stage = state.download_state.clone();
     let stage_callback = Arc::new(move |stage_index: usize, _stage_name: &str| {
         let actual_index = stage_offset + stage_index;
         let mut ds = state_for_stage.lock().unwrap();
-        let prev = ds.current_stage_index;
-        // 只有切换到新阶段（actual_index > prev）才把前一阶段标记为 Finished
-        // 避免 stage_callback(0) 时误把 stage_offset（MC本体第一个）标记为 Finished
-        if actual_index > prev && prev < ds.stages.len() {
-            ds.stages[prev].status = StageStatus::Finished;
-            ds.stages[prev].progress = 1.0;
-        }
-        ds.current_stage_index = actual_index;
-        if actual_index < ds.stages.len() {
-            ds.stages[actual_index].status = StageStatus::Loading;
-            ds.stages[actual_index].progress = 0.0;
-            ds.stages[actual_index].bytes_downloaded = 0;
-            ds.stages[actual_index].bytes_total = 0;
-        }
+        ds.set_current_stage(actual_index);
     });
 
     // Step 1: 下载原版 MC（直接调用内部函数，不触发事件）
@@ -467,15 +421,10 @@ pub async fn install_merged(
         }
     }
 
-    // 完成：设置最终状态
+    // 完成：设置最终状态（统一方法）
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.is_active = false;
-        ds.is_complete = true;
-        for stage in ds.stages.iter_mut() {
-            stage.status = StageStatus::Finished;
-            stage.progress = 1.0;
-        }
+        ds.mark_complete();
     }
     let _ = app.emit(
         "install-complete",
@@ -564,9 +513,43 @@ pub async fn install_merged(
             let old_dir = game_dir.join("versions").join(&final_version_id);
             let new_dir = game_dir.join("versions").join(&instance);
 
-            // 重命名目录
-            if let Err(e) = std::fs::rename(&old_dir, &new_dir) {
-                log_warn!("[Merged] 重命名目录失败: {}", e);
+            // 重命名目录：如果目标已存在（整合包半成品目录），改为合并文件
+            let rename_ok = if new_dir.exists() {
+                // 整合包半成品目录：移动 MC 本体相关文件（jar/json/natives 等）到目标目录
+                log_info!(
+                    "[Merged] 目标目录已存在（整合包半成品），改为合并文件: {} -> {}",
+                    old_dir.display(),
+                    new_dir.display()
+                );
+                let mut merged_ok = true;
+                if let Ok(entries) = std::fs::read_dir(&old_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        let file_name = entry.file_name();
+                        let target = new_dir.join(&file_name);
+                        // 如果目标已存在同名文件（如 config 目录），跳过避免覆盖整合包配置
+                        if target.exists() {
+                            log_info!(
+                                "[Merged] 跳过已存在的文件: {}",
+                                target.display()
+                            );
+                            continue;
+                        }
+                        if let Err(e) = std::fs::rename(&path, &target) {
+                            log_warn!("[Merged] 移动文件失败: {} -> {} : {}", path.display(), target.display(), e);
+                            merged_ok = false;
+                        }
+                    }
+                }
+                // 删除空的 old_dir
+                let _ = std::fs::remove_dir(&old_dir);
+                merged_ok
+            } else {
+                std::fs::rename(&old_dir, &new_dir).is_ok()
+            };
+
+            if !rename_ok {
+                log_warn!("[Merged] 重命名/合并目录失败");
                 final_version_id.clone()
             } else {
                 // 重命名 JSON 文件

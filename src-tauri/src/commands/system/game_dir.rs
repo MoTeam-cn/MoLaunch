@@ -49,10 +49,19 @@ pub fn open_path_impl(path: &str) -> Result<(), String> {
         return Err(format!("路径不存在: {}", path));
     }
 
+    log_info!("Opening path: {}", path);
+
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("explorer")
-            .arg(path)
+        // 不能用 `explorer <path>`：Rust 会给含空格的路径自动加引号，
+        // explorer.exe 对带引号的裸路径解析失败会回退到打开"文档"库。
+        // 改用 `cmd /c start "" "<path>"`：start 命令正确处理带引号路径。
+        // 第一个 "" 是 start 的窗口标题占位（start 语法要求），CREATE_NO_WINDOW 隐藏 cmd 黑框。
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", path])
+            .creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .map_err(|e| format!("Failed to open path: {}", e))?;
     }
@@ -80,9 +89,7 @@ pub fn open_path_impl(path: &str) -> Result<(), String> {
 /// Windows: explorer /select,<file>
 /// macOS: open -R <file>
 /// Linux: 不支持选中，回退到打开父目录
-#[tauri::command]
-pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
-    log_info!("Reveal in explorer: {}", path);
+pub fn reveal_in_explorer_impl(path: &str) -> Result<(), String> {
     // 安全校验：拒绝路径遍历
     if path.contains("..") {
         return Err("路径不能包含 ..".to_string());
@@ -92,15 +99,19 @@ pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
         return Err("不支持 UNC 路径".to_string());
     }
 
-    let p = std::path::Path::new(&path);
+    let p = std::path::Path::new(path);
     if !p.exists() {
         return Err(format!("路径不存在: {}", path));
     }
 
+    log_info!("Reveal in explorer: {}", path);
+
     #[cfg(target_os = "windows")]
     {
         // explorer /select,<file> 会在资源管理器中打开父目录并选中文件
-        // 路径需要用逗号分隔（不能用 /select <file> 空格形式，因路径可能含空格）
+        // /select, 形式带引号时 explorer 能正确解析（与裸路径不同）：
+        //   explorer "/select,C:\path with spaces\file.jar"  ← 可行
+        //   explorer "C:\path with spaces\mods"              ← 不可行（回退到文档库）
         std::process::Command::new("explorer")
             .arg(format!("/select,{}", path))
             .spawn()
@@ -111,7 +122,7 @@ pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
     {
         // macOS: open -R <file> 在 Finder 中显示文件
         std::process::Command::new("open")
-            .args(["-R", &path])
+            .args(["-R", path])
             .spawn()
             .map_err(|e| format!("Failed to reveal in finder: {}", e))?;
     }
@@ -127,6 +138,13 @@ pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// Tauri 命令包装：在资源管理器中打开并选中指定文件
+#[tauri::command]
+pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
+    log_info!("Reveal in explorer: {}", path);
+    reveal_in_explorer_impl(&path)
 }
 
 /// 获取游戏目录

@@ -25,8 +25,15 @@ export interface VersionTypeMeta {
 /**
  * 推断版本类型
  *
- * 采用最全实现：modloader 字符串匹配优先 neoforge 再 forge；
- * 显式传入的 loader 提示优先；backendType 用于 old/fool 等后端类型归一化。
+ * 优先级（与 PCL2 / 后端 detect_loader_from_json 对齐）：
+ *   1. 显式 loader 提示（已知加载器场景，如安装加载器页面）
+ *   2. 后端 backendType：后端已经精确分析版本 JSON 的 libraries/字符串内容，
+ *      如果返回的是明确的加载器类型（forge/neoforge/fabric/quilt/optifine/liteloader），
+ *      必须优先于 ID 关键字匹配——因为整合包版本 ID 可能不含加载器关键字
+ *      （例如 "Zombie Invade 100 Days" 不含 forge，但后端 JSON 分析已识别为 Forge）
+ *   3. ID 关键字匹配（本地无 backendType 时的兜底）
+ *   4. old/fool 等归一化
+ *   5. 默认 release
  */
 export function inferVersionType(
   versionId: string,
@@ -34,7 +41,7 @@ export function inferVersionType(
   backendType?: string,
 ): string {
   if (!versionId) return 'release'
-  // 显式 loader 提示优先（用于已知加载器的场景）
+  // 1. 显式 loader 提示优先（用于已知加载器的场景）
   if (loader) {
     const l = loader.toLowerCase()
     if (l.includes('neoforge')) return 'neoforge'
@@ -43,6 +50,23 @@ export function inferVersionType(
     if (l.includes('optifine')) return 'optifine'
     if (l.includes('liteloader')) return 'liteloader'
   }
+  // 2. 后端 backendType 优先于 ID 关键字匹配
+  //    后端已精确分析 JSON，前端不应再用 ID 字符串猜测覆盖（如整合包 ID 不含 forge 字样）
+  if (backendType) {
+    const b = backendType.toLowerCase()
+    if (b === 'forge' || b === 'neoforge' || b === 'fabric'
+        || b === 'quilt' || b === 'optifine' || b === 'liteloader') {
+      return b
+    }
+    if (b === 'old_beta' || b === 'old_alpha') return 'old'
+    if (b === 'fool') return 'fool'
+    if (b === 'snapshot') return 'snapshot'
+    if (b === 'release') {
+      // backendType=release 时仍走 ID 关键字兜底，避免后端漏判（如 ID 明显含 forge 但 JSON 未识别）
+      // 落到下面的 ID 匹配
+    }
+  }
+  // 3. ID 关键字匹配（本地兜底）
   const lower = versionId.toLowerCase()
   if (lower.includes('neoforge')) return 'neoforge'
   if (lower.includes('forge')) return 'forge'
@@ -50,8 +74,8 @@ export function inferVersionType(
   if (lower.includes('optifine')) return 'optifine'
   if (lower.includes('liteloader')) return 'liteloader'
   if (/^\d{2}w\d{2}[a-z]/.test(versionId)) return 'snapshot'
-  if (backendType === 'old_beta' || backendType === 'old_alpha') return 'old'
-  if (backendType === 'fool') return 'fool'
+  // 4. old/fool 归一化（backendType 已在上面处理，这里是纯 ID 兜底）
+  // 5. 默认
   return backendType || 'release'
 }
 

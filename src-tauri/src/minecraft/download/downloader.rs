@@ -60,7 +60,9 @@ pub async fn download_single(
 
     // 分片下载阈值：file_size / chunk_count > 1MB
     let chunk_threshold: u64 = 1_048_576;
-    let file_size = task.expected_size.max(0) as u64;
+    // file_size 可变：第一次分片探测到真实大小后记住，避免重试时重复探测
+    // （重复探测会导致 progress.total_bytes 被 saturating_add 多次，前端显示总大小翻倍）
+    let mut file_size = task.expected_size.max(0) as u64;
 
     // file_size 已知时按大小判断是否分片；file_size=0（未知大小）时直接尝试分片，
     // 由 chunk::download_chunked 内部探测真实大小并分片。
@@ -119,6 +121,12 @@ pub async fn download_single(
                         progress.clone(),
                     )
                     .await;
+
+                    // 第一次分片探测到真实大小后记住，避免重试时重复探测
+                    // （重复探测会重复 saturating_add 到 progress.total_bytes，导致前端显示总大小翻倍）
+                    if file_size == 0 && chunk_result.total > 0 {
+                        file_size = chunk_result.total;
+                    }
 
                     if chunk_result.status == DownloadStatus::Completed {
                         // 用 chunk_result.total（探测后的真实大小）校验

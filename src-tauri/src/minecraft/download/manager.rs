@@ -39,6 +39,11 @@ impl DownloadManager {
         }
     }
 
+    /// 获取当前源模式（用于构造 URL）
+    pub fn source_mode(&self) -> DownloadSourceMode {
+        self.source_mode
+    }
+
     /// 根据源模式重新排序 URLs
     fn reorder_urls(&self, urls: &[String]) -> Vec<String> {
         if urls.len() <= 1 {

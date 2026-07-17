@@ -166,8 +166,8 @@ defineExpose({
               <component :is="icon" class="w-5 h-5 shrink-0" :class="iconColor" />
               <h3 class="text-sm font-semibold text-gray-900">{{ options.title }}</h3>
             </div>
-            <!-- 消息 -->
-            <p class="mt-2 ml-8 text-sm text-gray-600 leading-relaxed">{{ options.message }}</p>
+            <!-- 消息（支持 \n 换行） -->
+            <p class="mt-2 ml-8 text-sm text-gray-600 leading-relaxed whitespace-pre-line">{{ options.message }}</p>
 
             <!-- 输入框 -->
             <div v-if="options.showInput" class="mt-3 ml-8">

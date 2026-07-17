@@ -134,6 +134,128 @@ impl Default for DownloadState {
     }
 }
 
+impl DownloadState {
+    /// 重置为指定 stages（清空原有，用于独立安装流程）
+    pub fn reset_stages(&mut self, stages: Vec<DownloadStage>) {
+        self.stages = stages;
+        self.current_stage_index = 0;
+        self.is_active = true;
+        self.is_complete = false;
+        self.global_speed = 0;
+        self.global_bytes_downloaded = 0;
+        self.global_bytes_total = 0;
+        self.error_code = 0;
+    }
+
+    /// 追加 stages（保留原有，用于连续安装流程：整合包 → MC 本体）
+    /// 返回追加前的 stages 长度，作为后续 stage_callback 的偏移量
+    pub fn append_stages(&mut self, stages: Vec<DownloadStage>) -> usize {
+        let offset = self.stages.len();
+        self.stages.extend(stages);
+        self.is_active = true;
+        self.is_complete = false;
+        offset
+    }
+
+    /// 设置当前阶段索引（stage_callback 调用）
+    /// 自动把前一阶段标记为 Finished（仅当 idx > prev 时）
+    pub fn set_current_stage(&mut self, idx: usize) {
+        if idx > self.current_stage_index && self.current_stage_index < self.stages.len() {
+            self.stages[self.current_stage_index].status = StageStatus::Finished;
+            self.stages[self.current_stage_index].progress = 1.0;
+        }
+        self.current_stage_index = idx;
+        if idx < self.stages.len() {
+            self.stages[idx].status = StageStatus::Loading;
+            self.stages[idx].progress = 0.0;
+            self.stages[idx].bytes_downloaded = 0;
+            self.stages[idx].bytes_total = 0;
+        }
+    }
+
+    /// 设置指定阶段的状态和进度（本地操作用：解析 zip、复制 overrides 等）
+    pub fn set_stage_status(&mut self, idx: usize, status: StageStatus, progress: f64) {
+        self.current_stage_index = idx;
+        if idx < self.stages.len() {
+            self.stages[idx].status = status;
+            self.stages[idx].progress = progress;
+        }
+    }
+
+    /// 设置指定阶段的字节进度（本地操作如解压 overrides）
+    pub fn set_stage_bytes(&mut self, idx: usize, downloaded: u64, total: u64) {
+        if idx < self.stages.len() {
+            self.stages[idx].bytes_downloaded = downloaded;
+            self.stages[idx].bytes_total = total;
+            if total > 0 {
+                self.stages[idx].progress = (downloaded as f64 / total as f64).min(1.0);
+            }
+        }
+    }
+
+    /// 同步 DownloadManager 的 GlobalProgress 到指定阶段 + 更新全局指标
+    /// 这是核心统一方法：整合包/MC 本体/自定义下载都用这个
+    /// 统一规则：
+    ///   - stage 进度按 bytes 计算（total_bytes>0 时），否则按 files 计算
+    ///   - global_bytes 累加所有 Finished + Loading 阶段（支持连续安装流程的进度连贯）
+    ///   - global_speed 直接信任 DownloadManager 的 current_speed（它已有 300ms 滑动窗口）
+    pub fn sync_stage_from_progress(
+        &mut self,
+        idx: usize,
+        downloaded_bytes: u64,
+        total_bytes: u64,
+        completed_files: usize,
+        total_files: usize,
+        current_speed: u64,
+    ) {
+        if idx < self.stages.len() {
+            let stage = &mut self.stages[idx];
+            stage.bytes_downloaded = downloaded_bytes;
+            stage.bytes_total = total_bytes;
+            stage.files_downloaded = completed_files;
+            stage.files_total = total_files;
+            stage.status = StageStatus::Loading;
+            if total_bytes > 0 {
+                stage.progress = (downloaded_bytes as f64 / total_bytes as f64).min(1.0);
+            } else if total_files > 0 && completed_files >= total_files {
+                stage.progress = 1.0;
+            }
+        }
+
+        // 统一 global_bytes 算法：累加所有 Finished + Loading 阶段
+        let mut g_downloaded = 0u64;
+        let mut g_total = 0u64;
+        for stage in &self.stages {
+            if stage.status == StageStatus::Finished || stage.status == StageStatus::Loading {
+                g_downloaded += stage.bytes_downloaded;
+                g_total += stage.bytes_total;
+            }
+        }
+        self.global_bytes_downloaded = g_downloaded;
+        self.global_bytes_total = g_total;
+        self.global_speed = current_speed;
+    }
+
+    /// 标记整体完成（所有 Loading 阶段标记为 Finished）
+    pub fn mark_complete(&mut self) {
+        self.is_active = false;
+        self.is_complete = true;
+        for stage in &mut self.stages {
+            if stage.status == StageStatus::Loading {
+                stage.status = StageStatus::Finished;
+                stage.progress = 1.0;
+            }
+        }
+    }
+
+    /// 标记整体失败
+    pub fn mark_failed(&mut self, error_code: i32) {
+        self.is_active = false;
+        self.is_complete = false;
+        self.error_code = error_code;
+    }
+}
+
 /// 应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {

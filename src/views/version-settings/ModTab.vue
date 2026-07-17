@@ -1,16 +1,34 @@
 <script setup lang="ts">
 /**
  * 版本设置 - Mod 管理子页
- * 列表、筛选、启用/禁用、安装、删除
- * 原版不支持 Mod 时显示提示
+ *
+ * 设计参考 PCL2 PageInstanceMod + MyLocalModItem：
+ * - 左侧 4px 状态色条（启用=primary/禁用=gray）
+ * - 34×34 圆角真实 Logo 图标（从 jar 内提取，无 logo fallback 到加载器首字母色块）
+ * - 标题 14px + 副标题 12px 灰色（译名/文件名按 modLocalNameStyle 切换）
+ * - 详情行：文件大小 · 加载器类型 · 文件名（hover Tooltip 显示完整路径）
+ * - 四个操作按钮（参考 PCL2 MyLocalModItem）：详情、打开文件位置、启用/禁用、删除
+ * - 按钮默认 opacity-0 隐藏，hover 列表项时才显示（与 PCL2 ButtonStack 行为一致）
  */
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showError } from '@/utils/toast'
-import { showConfirm } from '@/utils/modal'
+import { showInfo, showConfirm } from '@/utils/modal'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { formatBytes } from '@/utils/format'
+import Tooltip from '@/components/common/Tooltip.vue'
+import {
+  ArrowDownTrayIcon,
+  FolderOpenIcon,
+  ArrowPathIcon,
+  PlayIcon,
+  PauseIcon,
+  TrashIcon,
+  MagnifyingGlassIcon,
+  PuzzlePieceIcon,
+  InformationCircleIcon,
+} from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const { selectedId, isModable } = useVersionSettings()
@@ -21,7 +39,6 @@ const modFilter = ref<'all' | 'enabled' | 'disabled'>('all')
 const modSearch = ref('')
 const isModableVersion = ref(false)
 const checkingModable = ref(false)
-// Mod 管理样式：0=标题显示译名，详情显示文件名；1=标题显示文件名，详情显示译名
 const modLocalNameStyle = ref(0)
 
 async function checkModable() {
@@ -45,7 +62,7 @@ async function loadMods() {
   try {
     mods.value = await tauri.listMods(selectedId.value)
   } catch (e) {
-    showError('加载 Mod 列表失败：' + String(e))
+    showError('加载 Mod 列表失败', String(e))
     mods.value = []
   } finally {
     modsLoading.value = false
@@ -66,9 +83,11 @@ const filteredMods = computed(() => {
   return list
 })
 
+const enabledCount = computed(() => mods.value.filter(m => m.is_enabled).length)
+const disabledCount = computed(() => mods.value.filter(m => !m.is_enabled).length)
+
 /** 根据 modLocalNameStyle 返回 Mod 标题（主显示名） */
 function modTitle(mod: tauri.ModInfo): string {
-  // 0 = 标题显示译名，1 = 标题显示文件名
   if (modLocalNameStyle.value === 0) {
     return mod.translated_name || mod.enabled_name
   }
@@ -77,21 +96,31 @@ function modTitle(mod: tauri.ModInfo): string {
 
 /** 根据 modLocalNameStyle 返回 Mod 副标题（详情名） */
 function modSubtitle(mod: tauri.ModInfo): string {
-  // 0 = 详情显示文件名，1 = 详情显示译名
   if (modLocalNameStyle.value === 0) {
     return mod.enabled_name
   }
   return mod.translated_name
 }
 
+/** 加载器类型对应的图标背景色与首字母（无 logo 时 fallback） */
+function loaderVisual(type: string): { bg: string; text: string; label: string; letter: string } {
+  const t = type.toLowerCase()
+  if (t === 'forge') return { bg: 'bg-orange-100', text: 'text-orange-600', label: 'Forge', letter: 'F' }
+  if (t === 'neoforge') return { bg: 'bg-amber-100', text: 'text-amber-600', label: 'NeoForge', letter: 'N' }
+  if (t === 'fabric') return { bg: 'bg-cyan-100', text: 'text-cyan-600', label: 'Fabric', letter: 'F' }
+  if (t === 'quilt') return { bg: 'bg-pink-100', text: 'text-pink-600', label: 'Quilt', letter: 'Q' }
+  if (t === 'liteloader') return { bg: 'bg-rose-100', text: 'text-rose-600', label: 'LiteLoader', letter: 'L' }
+  return { bg: 'bg-gray-100', text: 'text-gray-500', label: '未知', letter: 'M' }
+}
+
 async function handleToggleMod(mod: tauri.ModInfo) {
   if (!selectedId.value) return
   try {
     await tauri.toggleMod(selectedId.value, mod.file_name, !mod.is_enabled)
-    showSuccess(mod.is_enabled ? '已禁用' : '已启用')
+    showSuccess(mod.is_enabled ? '已禁用' : '已启用', mod.enabled_name)
     await loadMods()
   } catch (e) {
-    showError('操作失败：' + String(e))
+    showError('操作失败', String(e))
   }
 }
 
@@ -103,10 +132,10 @@ function handleDeleteMod(mod: tauri.ModInfo) {
     async () => {
       try {
         await tauri.deleteMod(selectedId.value!, mod.file_name)
-        showSuccess('Mod 已删除')
+        showSuccess('Mod 已删除', mod.enabled_name)
         await loadMods()
       } catch (e) {
-        showError('删除失败：' + String(e))
+        showError('删除失败', String(e))
       }
     },
   )
@@ -123,7 +152,7 @@ async function handleInstallMod() {
     showSuccess('Mod 安装成功')
     await loadMods()
   } catch (e) {
-    showError('安装失败：' + String(e))
+    showError('安装失败', String(e))
   }
 }
 
@@ -132,12 +161,41 @@ async function handleOpenModsDir() {
   try {
     await tauri.openModsDir(selectedId.value)
   } catch (e) {
-    showError('打开文件夹失败：' + String(e))
+    showError('打开文件夹失败', String(e))
   }
 }
 
+/** 打开单个 Mod 的文件位置（参考 PCL2 Open_Click） */
+async function handleOpenFile(mod: tauri.ModInfo) {
+  if (!selectedId.value) return
+  try {
+    await tauri.revealModFile(selectedId.value, mod.file_name)
+  } catch (e) {
+    showError('打开文件位置失败', String(e))
+  }
+}
+
+/** 详情按钮：显示 Mod 完整信息（参考 PCL2 Info_Click） */
+function handleShowInfo(mod: tauri.ModInfo) {
+  const lines: string[] = []
+  if (mod.description) {
+    lines.push(mod.description)
+    lines.push('')
+  }
+  lines.push(`文件：${mod.file_name}（${formatBytes(mod.size)}）`)
+  if (mod.version) lines.push(`版本：${mod.version}`)
+  if (mod.translated_name) lines.push(`译名：${mod.translated_name}`)
+  if (mod.loader_type !== 'unknown') lines.push(`加载器：${loaderVisual(mod.loader_type).label}`)
+  showInfo(modTitle(mod), lines.join('\n'))
+}
+
+const filterOptions = [
+  { v: 'all' as const, l: '全部', count: () => mods.value.length },
+  { v: 'enabled' as const, l: '已启用', count: () => enabledCount.value },
+  { v: 'disabled' as const, l: '已禁用', count: () => disabledCount.value },
+]
+
 onMounted(async () => {
-  // 读取 Mod 管理样式配置
   try {
     const cfg = await tauri.getConfigMap()
     modLocalNameStyle.value = cfg.communityModLocalNameStyle
@@ -148,7 +206,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="flex flex-col">
     <!-- 不可安装 Mod 的提示 -->
     <div v-if="!isModableVersion && !checkingModable" class="flex items-center justify-center py-12">
       <div class="rounded-xl border border-gray-200 bg-white p-8 text-center shadow-sm">
@@ -175,55 +233,68 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- Mod 管理主体 -->
-    <div v-else>
-      <!-- 顶部工具栏 -->
-      <section class="rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
+    <!-- Mod 管理主体：顶部工具栏 sticky 固定，列表可滚动 -->
+    <div v-else class="flex flex-col">
+      <!-- 顶部工具栏（sticky 固定） -->
+      <section class="sticky top-0 z-10 rounded-xl border border-gray-200 bg-white p-3 shadow-sm">
         <div class="flex flex-wrap items-center gap-2">
-          <button
-            class="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs text-white transition-colors hover:bg-primary-700"
-            @click="handleInstallMod"
-          >
-            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" /></svg>
-            从文件安装
-          </button>
-          <button
-            class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-50"
-            @click="handleOpenModsDir"
-          >
-            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
-            打开文件夹
-          </button>
-          <button
-            class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-700 transition-colors hover:bg-gray-50"
-            @click="loadMods"
-          >
-            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg>
-            刷新
-          </button>
-
-          <div class="ml-auto flex items-center gap-1">
+          <Tooltip text="从本地 jar 文件安装 Mod" position="bottom">
             <button
-              v-for="opt in [
-                { v: 'all', l: '全部' },
-                { v: 'enabled', l: '已启用' },
-                { v: 'disabled', l: '已禁用' },
-              ]"
+              class="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700"
+              @click="handleInstallMod"
+            >
+              <ArrowDownTrayIcon class="h-3.5 w-3.5" />
+              从文件安装
+            </button>
+          </Tooltip>
+          <Tooltip text="在系统资源管理器中打开 mods 目录" position="bottom">
+            <button
+              class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              @click="handleOpenModsDir"
+            >
+              <FolderOpenIcon class="h-3.5 w-3.5" />
+              打开文件夹
+            </button>
+          </Tooltip>
+          <Tooltip text="重新扫描 mods 目录" position="bottom">
+            <button
+              class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              @click="loadMods"
+            >
+              <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': modsLoading }" />
+              刷新
+            </button>
+          </Tooltip>
+
+          <div class="ml-auto flex items-center gap-1 rounded-lg bg-gray-100 p-0.5">
+            <button
+              v-for="opt in filterOptions"
               :key="opt.v"
-              class="rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
-              :class="modFilter === opt.v ? 'bg-primary-100 text-primary-700' : 'text-gray-500 hover:bg-gray-100'"
-              @click="modFilter = opt.v as 'all' | 'enabled' | 'disabled'"
+              class="flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
+              :class="modFilter === opt.v
+                ? 'bg-white text-primary-700 shadow-sm'
+                : 'text-gray-500 hover:text-gray-700'"
+              @click="modFilter = opt.v"
             >
               {{ opt.l }}
+              <span
+                class="rounded-full px-1.5 py-0.5 text-[10px] leading-none"
+                :class="modFilter === opt.v
+                  ? 'bg-primary-100 text-primary-700'
+                  : 'bg-gray-200 text-gray-500'"
+              >{{ opt.count() }}</span>
             </button>
           </div>
 
-          <input
-            v-model="modSearch"
-            type="text"
-            placeholder="搜索 Mod 名称"
-            class="w-48 rounded-md border border-gray-300 px-3 py-1 text-xs focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-          >
+          <div class="relative">
+            <MagnifyingGlassIcon class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+            <input
+              v-model="modSearch"
+              type="text"
+              placeholder="搜索 Mod 名称"
+              class="w-56 rounded-lg border border-gray-300 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-700 transition-colors placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            >
+          </div>
         </div>
       </section>
 
@@ -239,6 +310,7 @@ onMounted(async () => {
       <!-- 空列表 -->
       <div v-else-if="filteredMods.length === 0" class="flex items-center justify-center py-12">
         <div class="text-center">
+          <PuzzlePieceIcon class="mx-auto mb-3 h-10 w-10 text-gray-300" />
           <div class="mb-2 text-base font-medium text-gray-500">
             {{ mods.length === 0 ? '尚未安装 Mod' : '没有符合条件的 Mod' }}
           </div>
@@ -255,52 +327,121 @@ onMounted(async () => {
         </div>
       </div>
 
-      <!-- Mod 列表 -->
-      <div v-else class="space-y-2">
-        <div
-          v-for="mod in filteredMods"
-          :key="mod.file_name"
-          class="flex items-center gap-3 rounded-lg border border-gray-200 bg-white p-3 shadow-sm transition-colors hover:border-gray-300"
-          :class="{ 'opacity-60': !mod.is_enabled }"
-        >
-          <div
-            class="flex h-10 w-10 flex-none items-center justify-center rounded-md text-xs font-medium"
-            :class="mod.is_enabled ? 'bg-primary-50 text-primary-600' : 'bg-gray-100 text-gray-400'"
+      <!-- Mod 列表（与顶部工具栏无间距，紧贴下方） -->
+      <div v-else class="mt-0 overflow-hidden rounded-xl border border-t-0 border-gray-200 bg-white shadow-sm">
+        <ul class="divide-y divide-gray-100">
+          <li
+            v-for="mod in filteredMods"
+            :key="mod.file_name"
+            class="group relative flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-gray-50"
+            :class="{ 'bg-gray-50/40': !mod.is_enabled }"
           >
-            {{ mod.loader_type === 'unknown' ? 'M' : mod.loader_type.charAt(0).toUpperCase() }}
-          </div>
-          <div class="min-w-0 flex-1">
-            <div class="truncate text-sm font-medium text-gray-800">{{ modTitle(mod) }}</div>
-            <div class="mt-0.5 flex items-center gap-2 text-xs text-gray-400">
-              <span v-if="modSubtitle(mod) && modSubtitle(mod) !== modTitle(mod)" class="truncate">{{ modSubtitle(mod) }}</span>
-              <span v-if="modSubtitle(mod) && modSubtitle(mod) !== modTitle(mod)">·</span>
-              <span>{{ formatBytes(mod.size) }}</span>
-              <span v-if="mod.loader_type !== 'unknown'">·</span>
-              <span v-if="mod.loader_type !== 'unknown'">{{ mod.loader_type }}</span>
-              <span>·</span>
-              <span :class="mod.is_enabled ? 'text-green-600' : 'text-gray-400'">
-                {{ mod.is_enabled ? '已启用' : '已禁用' }}
-              </span>
+            <!-- 左侧状态色条 -->
+            <div
+              class="absolute left-0 top-0 h-full w-1 transition-colors"
+              :class="mod.is_enabled ? 'bg-primary-500' : 'bg-gray-300'"
+            ></div>
+
+            <!-- 图标：有 logo 用真实 logo，否则 fallback 到加载器色块 -->
+            <div class="relative flex-none">
+              <img
+                v-if="mod.logo_data"
+                :src="mod.logo_data"
+                class="h-9 w-9 rounded-lg object-cover"
+                :class="{ 'opacity-50 grayscale': !mod.is_enabled }"
+                alt=""
+                @error="(e) => (e.target as HTMLImageElement).style.display = 'none'"
+              >
+              <div
+                v-else
+                class="flex h-9 w-9 items-center justify-center rounded-lg text-sm font-semibold"
+                :class="mod.is_enabled
+                  ? loaderVisual(mod.loader_type).bg + ' ' + loaderVisual(mod.loader_type).text
+                  : 'bg-gray-100 text-gray-400'"
+              >
+                {{ loaderVisual(mod.loader_type).letter }}
+              </div>
+              <!-- 禁用角标 -->
+              <div
+                v-if="!mod.is_enabled"
+                class="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-gray-400 text-white shadow"
+              >
+                <PauseIcon class="h-2.5 w-2.5" />
+              </div>
             </div>
-          </div>
-          <div class="flex flex-none items-center gap-1">
-            <button
-              class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-              :title="mod.is_enabled ? '禁用' : '启用'"
-              @click="handleToggleMod(mod)"
-            >
-              <svg v-if="mod.is_enabled" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M5 4a2 2 0 012-2h6a2 2 0 012 2v14l-5-2.5L5 18V4z" /></svg>
-              <svg v-else class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-            </button>
-            <button
-              class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-              title="删除"
-              @click="handleDeleteMod(mod)"
-            >
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-            </button>
-          </div>
-        </div>
+
+            <!-- 信息区 -->
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span
+                  class="truncate text-sm font-medium"
+                  :class="mod.is_enabled ? 'text-gray-800' : 'text-gray-500 line-through decoration-gray-300'"
+                >
+                  {{ modTitle(mod) }}
+                </span>
+                <span
+                  v-if="mod.version"
+                  class="flex-none rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500"
+                >{{ mod.version }}</span>
+                <span
+                  v-if="modSubtitle(mod) && modSubtitle(mod) !== modTitle(mod)"
+                  class="truncate text-xs text-gray-400"
+                >{{ modSubtitle(mod) }}</span>
+              </div>
+              <div class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
+                <span>{{ formatBytes(mod.size) }}</span>
+                <span v-if="mod.loader_type !== 'unknown'">·</span>
+                <span v-if="mod.loader_type !== 'unknown'">{{ loaderVisual(mod.loader_type).label }}</span>
+                <span>·</span>
+                <Tooltip :text="mod.file_name" position="top" :delay="200">
+                  <span class="cursor-help underline decoration-dotted underline-offset-2 hover:text-gray-600">
+                    {{ mod.file_name.length > 28 ? mod.file_name.slice(0, 25) + '...' : mod.file_name }}
+                  </span>
+                </Tooltip>
+              </div>
+            </div>
+
+            <!-- 操作区：四个按钮，默认隐藏，hover 时显示（参考 PCL2 ButtonStack opacity 动画） -->
+            <div class="flex flex-none items-center gap-1 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+              <Tooltip text="查看详情" position="top">
+                <button
+                  class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+                  @click="handleShowInfo(mod)"
+                >
+                  <InformationCircleIcon class="h-4 w-4" />
+                </button>
+              </Tooltip>
+              <Tooltip text="打开文件位置" position="top">
+                <button
+                  class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
+                  @click="handleOpenFile(mod)"
+                >
+                  <FolderOpenIcon class="h-4 w-4" />
+                </button>
+              </Tooltip>
+              <Tooltip :text="mod.is_enabled ? '禁用' : '启用'" position="top">
+                <button
+                  class="rounded-md p-1.5 transition-colors"
+                  :class="mod.is_enabled
+                    ? 'text-gray-400 hover:bg-amber-50 hover:text-amber-600'
+                    : 'text-gray-400 hover:bg-green-50 hover:text-green-600'"
+                  @click="handleToggleMod(mod)"
+                >
+                  <PauseIcon v-if="mod.is_enabled" class="h-4 w-4" />
+                  <PlayIcon v-else class="h-4 w-4" />
+                </button>
+              </Tooltip>
+              <Tooltip text="删除" position="top">
+                <button
+                  class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  @click="handleDeleteMod(mod)"
+                >
+                  <TrashIcon class="h-4 w-4" />
+                </button>
+              </Tooltip>
+            </div>
+          </li>
+        </ul>
       </div>
     </div>
   </div>

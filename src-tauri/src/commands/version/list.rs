@@ -123,6 +123,11 @@ pub async fn list_installed_versions_with_type(
 
     for version in versions {
         let version_type = detect_version_type_from_dir(&game_dir, &version.id);
+        log_info!(
+            "[VersionList] detect type: id={} type={:?}",
+            version.id,
+            version_type
+        );
         // 读取版本独立 setup.ini 的 Logo 字段（空=自动判断）
         let version_dir = game_dir.join("versions").join(&version.id);
         let logo = VersionSetup::load_or_create(&version_dir, &version.id)

@@ -75,6 +75,24 @@
 
 ### 重构
 
+#### 下载引擎统一：整合包安装 + MC 本体安装合并为同一套系统
+- 背景：原 `install_modpack`（社区整合包安装）和 `install_merged`（MC 本体安装）各自维护独立的进度同步逻辑——整合包侧有 5 个私有辅助函数 + 300ms timer + 原子计数器 + 速度计算；MC 本体侧有内联 `speed_window`（VecDeque）+ 全局字节累加。两套逻辑重复且不一致
+- 新增 `DownloadState` 统一方法（backend: src-tauri/src/state/mod.rs），8 个方法覆盖全部进度操作：
+  - `reset_stages`：清空重置（独立安装流程用）
+  - `append_stages`：追加保留（连续安装流程：整合包 → MC 本体，返回 offset 作索引偏移）
+  - `set_current_stage`：切换当前阶段（自动把前一阶段标记 Finished）
+  - `set_stage_status` / `set_stage_bytes`：本地操作（解析 zip、复制 overrides 等）
+  - `sync_stage_from_progress`：核心统一方法——同步 `DownloadManager` 的 `GlobalProgress` 到指定阶段 + 累加所有 Finished/Loading 阶段的 bytes 到 global + 信任 DownloadManager 的 `current_speed`（它已有 300ms 滑动窗口，不再在前端重复维护 speed_window）
+  - `mark_complete` / `mark_failed`：终态标记
+- `install_modpack` 改造（backend: src-tauri/src/commands/community/install.rs）：删除 `reset_modpack_state` / `set_stage` / `update_stage_bytes` / `mark_failed` / `update_modpack_progress` 5 个私有辅助函数；`download_files_concurrent` 删除 300ms timer / `AtomicU64` 计数器 / `last_speed_check` / `is_active` 标志，改用 `sync_stage_from_progress`
+- `install_merged` 改造（backend: src-tauri/src/commands/version/install.rs）：删除 `use std::collections::VecDeque` 和 `use std::time::Instant`（不再使用内联 speed_window）；progress_callback 和 stage_callback 改用统一方法 `sync_stage_from_progress` / `set_current_stage`；最终完成标记改用 `mark_complete()`
+- `download_version_full` 改造（backend: src-tauri/src/minecraft/download/mod.rs）：复用单个 `DownloadManager` 实例（此前每阶段 new 一个独立 manager + 独立 timer）；`download_client_jar` / `download_libraries` / `download_assets` 签名简化为接收 `&DownloadManager`；`fix_version_files` 也改为复用单实例；`DownloadManager` 新增 `source_mode()` getter
+- 修复整合包 → MC 本体连续安装时轮询提前停止：原 `install_modpack` 末尾调用 `mark_complete()` 设置 `is_complete=true`，前端轮询检测到后停止轮询并 `finishDownload()`，导致后续 `install_merged` 的进度完全无法显示。改为不调用 `mark_complete()`（仅标记最后一个 stage 为 Finished），由 `install_merged` 在全部完成后统一调用
+- 修复前端 Downloads.vue 分组进度展示（加权平均 + 字节汇总 + 子阶段字节/文件进度），修正「剩余文件」标签
+- 修复分片下载重试时 `progress.total_bytes` 重复累加导致前端显示总大小翻倍（28.6 MB → 57.2 MB）：根因是 `download_single` 的重试循环中 `file_size` 始终为 `task.expected_size`（=0），每次重试都重新调用 `download_chunked`，每次都探测文件大小并 `saturating_add` 到 `total_bytes`。修复：`file_size` 改为 `mut`，第一次探测到真实大小后记住（`file_size = chunk_result.total`），后续重试传入已知大小，不再触发探测和重复累加（backend: src-tauri/src/minecraft/download/downloader.rs）
+- 修复分片下载失败 chunk 的增量进度未回滚导致 `downloaded_bytes` 偏高：原 `download_chunk` 在 stream 错误/写文件错误/超过 byte_limit 时直接返回 Err，但已增量加到 `file_progress.downloaded_bytes` 的字节数没回滚。`download_chunked` 只回滚成功 chunk 的 bytes（`total_downloaded`），失败 chunk 的增量残留。修复：`download_chunk` 新增 `rollback` 闭包，在所有 Err 返回路径前回滚本次增量加的字节数（与 `download_from_url` 的回滚逻辑一致）（backend: src-tauri/src/minecraft/download/chunk.rs）
+- 优化 FileChecker 日志：整合包原始包等 `expected_size=0 + 无 hash` 的文件预检查时，原 `log_warn!("File check failed due to missing metadata")` 会让用户误以为是真正的校验失败。实际这是预期行为（无元数据无法校验 → 强制重下）。改为 `log_debug!`，仅诊断时可见（backend: src-tauri/src/minecraft/utils/file_checker.rs）
+
 #### 配置更新接口统一
 - 新增 `apply_config` 单一 IPC 命令取代此前分散在 6 个文件的 19 个 `set_*` setter 命令（backend: src-tauri/src/commands/system/apply_config.rs）
 - 新增 `ConfigPatch` 结构体（所有字段 `Option<T>`，仅传需要改的字段），前端通过 `applyConfig(patch)` 一次性更新多字段，避免多次 IPC 往返和多次落盘
