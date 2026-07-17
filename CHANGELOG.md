@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 代码重构阶段 4.2：拆分 minecraft/auth/storage.rs 为 4 个子模块
+- 现象：`minecraft/auth/storage.rs` 626 行，单一文件混合「数据结构」「注册表常量+低层操作」「AuthStorage 结构体+加解密+load/save」「11 个高层操作方法」4 块关注点
+- 修复：将 `storage.rs` 升级为 `storage/` 目录，拆为 4 个子模块：
+  - `storage/types.rs`（~67 行）：`StoredMsAccount` + impl From<&MicrosoftLoginResult> + `StoredOfflineAccount` + `PersistedAuthState` + `CurrentUser`
+  - `storage/registry.rs`（~85 行）：11 个注册表键名常量 + `ALL_KEYS` 数组 + 4 个自由函数 `reg_key`/`reg_get`/`reg_set`/`reg_delete`（原 AuthStorage 静态方法）
+  - `storage/operations.rs`（~185 行）：`impl AuthStorage` 独立 impl 块，封装 11 个高层操作：`save_ms_login`/`save_offline_login`/`set_offline_skin`/`remove_offline_account`/`get_offline_account`/`clear_current_user`/`remove_ms_account`/`get_ms_account`/`get_current_refresh_token`/`update_ms_token`（仅依赖 `self.load()`/`self.save()`，与注册表细节解耦）
+  - `storage/mod.rs`（~280 行）：`AuthStorage` 结构体 + `new()` + `encrypt`/`decrypt` + `reg_set_encrypted`/`reg_get_decrypted` + `load`/`invalidate`/`save` 核心方法
+- `pub use types::*` 保持 `crate::minecraft::auth::storage::X` 路径完全向后兼容，外部 5 处调用无需修改
+- 利用 Rust 多 impl 块特性，将 11 个高层操作分散到独立文件，主文件聚焦核心 load/save
+- 验证：`cargo check` 通过
+
 #### 代码重构阶段 4.1：拆分 state/mod.rs 为 5 个子模块
 - 现象：`state/mod.rs` 433 行，混合「AppState 聚合」「认证结构」「下载阶段/状态」「AppConfig + McFolder + 路径解析」「LaunchHistory」5 块关注点
 - 修复：按关注点拆分到 `state/` 下的 5 个子模块：
