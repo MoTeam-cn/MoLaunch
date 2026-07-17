@@ -9,6 +9,12 @@
 
 ### 修复
 
+#### 代码重构阶段 1.1：修复 useVersionGroups 遗漏 LiteLoader 检查
+- 现象：含 LiteLoader 的资源版本不会被分到 "LiteLoader 1.12.2" 等独立分组
+- 根因：`loaderNames(flags)` 函数只检查 Forge/NeoForge/Fabric/Quilt，遗漏 `ModLoaderFlags.LiteLoader`
+- 修复 1：`loaderNames` 末尾增加 `if (flags & ModLoaderFlags.LiteLoader) list.push('LiteLoader')`，顺序与 `typeMetaMap.order` 对齐（Forge→NeoForge→Fabric→Quilt→LiteLoader）（frontend: src/composables/useVersionGroups.ts）
+- 修复 2：版本号排序时去掉加载器前缀的正则同步补充 LiteLoader：`/^(Fabric|Forge|NeoForge|Quilt|LiteLoader)\s+/`
+
 #### Mod 详情按钮等待 3 秒才弹窗（预加载已完成但不知道）
 - 现象：用户点击某个 mod 详情按钮，没有任何网络请求，等了 3 秒才弹本地信息弹窗
 - 根因：该 mod 的 jar 内没有 metadata（没有 fabric.mod.json/mods.toml/mcmod.info），所以 slug 一直为空。`handleShowInfo` 在 slug 为空时固定等待 3 秒（30次 × 100ms 轮询），但缓存命中时预加载在 14ms 内就全部完成了，slug 不会再变化，3 秒等待完全浪费

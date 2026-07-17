@@ -70,13 +70,14 @@ function getGroupedVersionName(name: string): string {
   return '远古版'
 }
 
-/** 提取加载器名称 */
+/** 提取加载器名称（顺序与 useVersionMeta.ts 的 typeMetaMap.order 对齐：Forge→NeoForge→Fabric→Quilt→LiteLoader） */
 function loaderNames(flags: number): string[] {
   const list: string[] = []
   if (flags & ModLoaderFlags.Forge) list.push('Forge')
   if (flags & ModLoaderFlags.NeoForge) list.push('NeoForge')
   if (flags & ModLoaderFlags.Fabric) list.push('Fabric')
   if (flags & ModLoaderFlags.Quilt) list.push('Quilt')
+  if (flags & ModLoaderFlags.LiteLoader) list.push('LiteLoader')
   return list
 }
 
@@ -146,8 +147,8 @@ function computeGroups(versions: ResourceVersion[], versionFilter: string): Vers
     if (wa !== wb) return wa - wb
     // 都是标准版本号或同类特殊
     // 提取版本号部分（去掉加载器前缀）
-    const va = a.title.replace(/^(Fabric|Forge|NeoForge|Quilt)\s+/, '')
-    const vb = b.title.replace(/^(Fabric|Forge|NeoForge|Quilt)\s+/, '')
+    const va = a.title.replace(/^(Fabric|Forge|NeoForge|Quilt|LiteLoader)\s+/, '')
+    const vb = b.title.replace(/^(Fabric|Forge|NeoForge|Quilt|LiteLoader)\s+/, '')
     return compareVersion(vb, va) // 降序，新版本在前
   })
 
