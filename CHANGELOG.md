@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 3.9：拆分 ResourceDetail.vue 为 3 个子组件
+- 现象：`ResourceDetail.vue` 481 行，模板独占 232 行，混合「头部+操作按钮」「版本分组卡片」「下载进度浮层」3 块独立 UI + 各自的 helper 函数
+- 修复：抽出 3 个子组件到 `components/community/resource-detail/`：
+  - `ResourceDetailHeader.vue`（~108 行）：Logo + 标题 + 平台标签 + 操作按钮行（转到平台/MC百科/复制名称），`openMcmod`/`copyName` 内部处理
+  - `VersionGroupCard.vue`（~115 行）：版本分组卡片，props 接收 title/versions/expanded/mounted/downloading/isModpack，emit `toggle`/`download`/`install`；`releaseColor`/`loaderNames` 移入内部
+  - `DownloadProgressOverlay.vue`（~40 行）：下载进度浮层，props 接收 progress，`formatSpeed`/`downloadPercent` 移入内部
+- 父组件保留：版本加载 watch、handleDownload、handleInstallModpack、composable 编排
+- `ResourceDetail.vue` 缩减至 221 行
+
 #### 代码重构阶段 3.8：提取 useLoaderData composable 消除 5 处重复 fetch 模式
 - 现象：`LoaderSelect.vue` 468 行，其中 `onMounted` 独占 107 行，5 种加载器（Forge/NeoForge/Fabric/OptiFine/LiteLoader）的 `fetch → 赋值 → catch → finally` 模式逐字重复
 - 修复：新建 `composables/useLoaderData.ts`（~180 行）：
