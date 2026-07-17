@@ -9,6 +9,20 @@
 
 ### 修复
 
+#### 代码重构阶段 3.12：拆分 stores/version.ts 为 useLaunchState composable
+- 现象：`stores/version.ts` 335 行，单一 store 混合「版本列表」「下载状态」「启动流程」「Java 下载进度」「游戏退出监听」「进度轮询」6 块关注点，其中启动相关逻辑独占约 175 行
+- 修复：抽出 `composables/useLaunchState.ts`（200 行）：
+  - 封装：launching/launchingVersionId/runningPid/runningVersionId/launchProgress/javaDownloadProgress 状态
+  - 封装：launchGame/stopGame/cancelLaunch/checkRunningGame 函数
+  - 封装：startProgressPolling/stopProgressPolling（每 200ms 轮询后端启动进度）
+  - 封装：startJavaDownloadListener/stopJavaDownloadListener（监听 Java 自动下载进度事件）
+  - 封装：setupGameExitListener/cleanupGameExitListener（游戏退出事件监听 + 提示）
+  - 封装：launchStageName computed（10 个阶段枚举 → 中文显示）
+  - 与版本列表本身解耦：launchGame 直接接收完整 params，不依赖 versions 数组
+- 父 store 保留：版本列表状态 + fetchVersions/refreshVersions、下载状态 + startDownload/updateProgress/finishDownload、selectedVersion 持久化、loaderVersionsCache + getLoaderCache/setLoaderCache、getVersionById/getReleaseVersions/getSnapshotVersions
+- 父 store 通过 `const { ... } = useLaunchState()` 委托启动状态，并 re-export 给调用方（保持 store API 完全向后兼容，其他文件 import useVersionStore 无需修改）
+- `stores/version.ts` 缩减至 160 行
+
 #### 代码重构阶段 3.11：拆分 ModTab.vue 为 3 子组件 + 1 composable + 1 util
 - 现象：`ModTab.vue` 710 行，混合「不可安装提示」「工具栏」「列表项」「3 种空状态」5 块 UI + 详情按钮 3 级 fallback 逻辑（70 行）+ 显示辅助函数
 - 修复：抽出 3 子组件 + 1 composable + 1 util：

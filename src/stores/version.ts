@@ -1,65 +1,39 @@
 /**
  * 版本状态管理
+ *
+ * 启动相关逻辑（launchGame/stopGame/cancelLaunch/进度轮询/Java 下载进度/游戏退出监听）
+ * 已拆分到 `composables/useLaunchState.ts`，本 store 通过 composable 委托调用。
  */
 
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
-import { showError, showSuccess, showWarning } from '@/utils/toast'
+import { ref, watch } from 'vue'
 import type { VersionInfo } from '@/types/version'
 import type { DownloadProgress } from '@/types/download'
 import * as tauri from '@/utils/tauri'
-import { listen } from '@tauri-apps/api/event'
-
-// 游戏退出事件类型
-interface GameExitEvent {
-  pid: number
-  version_id: string
-  exit_code: number
-  is_normal: boolean
-}
+import { useLaunchState } from '@/composables/useLaunchState'
 
 // 重新导出 DownloadStage/DownloadProgress，保持向后兼容（其他文件可能从 '@/stores/version' import）
 export type { DownloadStage, DownloadProgress } from '@/types/download'
 
 export const useVersionStore = defineStore('version', () => {
-  // 状态
+  // 版本列表状态
   const versions = ref<VersionInfo[]>([])
   const latestRelease = ref('')
   const latestSnapshot = ref('')
   const loading = ref(false)
   const error = ref<string | null>(null)
-  
+
   // 下载状态
   const downloading = ref(false)
   const downloadingVersion = ref<string | null>(null)
   const downloadProgress = ref<DownloadProgress | null>(null)
-  
-  // 启动状态
-  const launching = ref(false)
-  const launchingVersionId = ref<string | null>(null) // 当前正在启动的版本ID
-  const runningPid = ref<number | null>(null)
-  const runningVersionId = ref<string | null>(null) // 当前正在运行的版本ID
-  const launchProgress = ref<tauri.LaunchProgress | null>(null)
-  let launchProgressTimer: number | null = null
 
-  // Java 自动下载进度（启动时自动下载 Java 用，与版本设置页的独立下载共享事件）
-  const javaDownloadProgress = ref<tauri.JavaDownloadProgress | null>(null)
-  let javaDownloadUnlisten: (() => void) | null = null
-
-  async function startJavaDownloadListener() {
-    if (javaDownloadUnlisten) return
-    javaDownloadUnlisten = await listen<tauri.JavaDownloadProgress>(
-      tauri.JAVA_DOWNLOAD_PROGRESS_EVENT,
-      (e) => { javaDownloadProgress.value = e.payload },
-    )
-  }
-  function stopJavaDownloadListener() {
-    if (javaDownloadUnlisten) {
-      javaDownloadUnlisten()
-      javaDownloadUnlisten = null
-    }
-    javaDownloadProgress.value = null
-  }
+  // 启动状态（委托给 useLaunchState composable）
+  const {
+    launching, launchingVersionId, runningPid, runningVersionId,
+    launchProgress, launchStageName, javaDownloadProgress,
+    launchGame, stopGame, cancelLaunch, checkRunningGame, cleanupGameExitListener,
+  } = useLaunchState()
 
   // 版本选择器状态（用于在页面切换时保持状态）
   const selectedVersion = ref<string | null>(null)
@@ -90,41 +64,6 @@ export const useVersionStore = defineStore('version', () => {
     }
   }
 
-  // 监听游戏退出事件
-  let unlistenFn: (() => void) | null = null
-
-  async function setupGameExitListener() {
-    try {
-      unlistenFn = await listen<GameExitEvent>('game-exited', (event) => {
-        // 游戏退出：清理运行状态（不再 console.log，避免生产环境噪音）
-        if (import.meta.env.DEV) {
-          console.debug('[GameExit]', event.payload)
-        }
-        const { is_normal, exit_code } = event.payload
-        runningPid.value = null
-        runningVersionId.value = null
-        if (is_normal) {
-          showSuccess('游戏已退出')
-        } else {
-          showError(`游戏已退出（代码: ${exit_code}）`)
-        }
-      })
-    } catch (e) {
-      console.error('Failed to setup game exit listener:', e)
-    }
-  }
-  
-  // 清理监听器
-  function cleanupGameExitListener() {
-    if (unlistenFn) {
-      unlistenFn()
-      unlistenFn = null
-    }
-  }
-  
-  // 初始化时设置监听器
-  setupGameExitListener()
-  
   // 加载器版本列表缓存（按 MC 版本号缓存）
   const loaderVersionsCache = ref<Record<string, {
     forge: string[]
@@ -134,14 +73,13 @@ export const useVersionStore = defineStore('version', () => {
     liteloader: string[]
   }>>({})
 
-  // 方法
+  /** 拉取版本清单（已有数据则跳过） */
   async function fetchVersions() {
-    // 已有数据则不重复请求
     if (versions.value.length > 0) return
 
     loading.value = true
     error.value = null
-    
+
     try {
       const result = await tauri.listVersions()
       versions.value = result.versions
@@ -150,12 +88,13 @@ export const useVersionStore = defineStore('version', () => {
     } catch (e) {
       error.value = String(e)
       console.error('Failed to fetch versions:', e)
-      throw e // 重新抛出错误，让调用者处理
+      throw e
     } finally {
       loading.value = false
     }
   }
 
+  /** 强制重新拉取版本清单 */
   function refreshVersions() {
     versions.value = []
     return fetchVersions()
@@ -188,13 +127,13 @@ export const useVersionStore = defineStore('version', () => {
   function getSnapshotVersions(): VersionInfo[] {
     return versions.value.filter(v => v.version_type === 'snapshot')
   }
-  
-  // 获取加载器缓存
+
+  /** 获取加载器缓存 */
   function getLoaderCache(mcVersion: string) {
     return loaderVersionsCache.value[mcVersion] || null
   }
-  
-  // 设置加载器缓存
+
+  /** 设置加载器缓存 */
   function setLoaderCache(mcVersion: string, data: {
     forge: string[]
     neoforge: { version: string; recommended: boolean }[]
@@ -204,128 +143,6 @@ export const useVersionStore = defineStore('version', () => {
   }) {
     loaderVersionsCache.value[mcVersion] = data
   }
-
-  // 启动游戏
-  async function launchGame(params: {
-    versionId: string
-    javaPath?: string
-    username: string
-    uuid: string
-    accessToken: string
-    loginType?: string
-    windowWidth?: number
-    windowHeight?: number
-    serverAddress?: string
-    serverPort?: number
-  }): Promise<number> {
-    launching.value = true
-    launchingVersionId.value = params.versionId
-    launchProgress.value = null
-
-    // 启动进度轮询
-    startProgressPolling()
-    // 启动 Java 下载进度监听（启动流程可能触发 Java 自动下载）
-    await startJavaDownloadListener()
-
-    try {
-      const pid = await tauri.launchGame(params)
-      runningPid.value = pid
-      runningVersionId.value = params.versionId
-      showSuccess(`游戏已启动（PID: ${pid}）`)
-      return pid
-    } catch (e) {
-      console.error('Failed to launch game:', e)
-      showError(e instanceof Error ? e.message : String(e))
-      throw e
-    } finally {
-      // 启动完成后停止轮询
-      stopProgressPolling()
-      stopJavaDownloadListener()
-      launching.value = false
-      launchingVersionId.value = null
-    }
-  }
-
-  // 停止游戏
-  async function stopGame(): Promise<void> {
-    try {
-      await tauri.stopGame()
-      runningPid.value = null
-      runningVersionId.value = null
-      showWarning('游戏已停止')
-    } catch (e) {
-      console.error('Failed to stop game:', e)
-      throw e
-    }
-  }
-
-  // 取消启动
-  async function cancelLaunch(): Promise<void> {
-    try {
-      await tauri.cancelLaunch()
-      launching.value = false
-      launchingVersionId.value = null
-      launchProgress.value = null
-    } catch (e) {
-      console.error('Failed to cancel launch:', e)
-      throw e
-    }
-  }
-
-  // 检查运行状态
-  async function checkRunningGame(): Promise<void> {
-    try {
-      const pid = await tauri.getRunningGame()
-      runningPid.value = pid
-    } catch (e) {
-      console.error('Failed to check running game:', e)
-    }
-  }
-
-  // 开始进度轮询
-  function startProgressPolling() {
-    stopProgressPolling()
-    launchProgressTimer = window.setInterval(async () => {
-      try {
-        const progress = await tauri.getLaunchProgress()
-        if (progress) {
-          launchProgress.value = progress
-          // 如果完成或失败，停止轮询
-          if (progress.stage === 'Finished' || progress.stage === 'Failed') {
-            stopProgressPolling()
-          }
-        }
-      } catch (e) {
-        console.error('Failed to get launch progress:', e)
-      }
-    }, 200)
-  }
-
-  // 停止进度轮询
-  function stopProgressPolling() {
-    if (launchProgressTimer) {
-      clearInterval(launchProgressTimer)
-      launchProgressTimer = null
-    }
-  }
-
-  // 计算属性：启动阶段名称
-  const launchStageName = computed(() => {
-    if (!launchProgress.value) return ''
-    const stageNames: Record<string, string> = {
-      'Init': '初始化',
-      'GetJava': '获取Java',
-      'Login': '登录验证',
-      'ValidateFiles': '文件检查',
-      'BuildArgs': '构建参数',
-      'ExtractNatives': '解压原生库',
-      'LaunchProcess': '启动进程',
-      'WaitWindow': '等待窗口',
-      'Finished': '完成',
-      'Failed': '失败',
-    }
-    return stageNames[launchProgress.value.stage] || launchProgress.value.stage
-  })
 
   return {
     versions,
