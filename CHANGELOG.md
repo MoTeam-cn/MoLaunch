@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 代码重构阶段 3.11：拆分 ModTab.vue 为 3 子组件 + 1 composable + 1 util
+- 现象：`ModTab.vue` 710 行，混合「不可安装提示」「工具栏」「列表项」「3 种空状态」5 块 UI + 详情按钮 3 级 fallback 逻辑（70 行）+ 显示辅助函数
+- 修复：抽出 3 子组件 + 1 composable + 1 util：
+  - `views/version-settings/mod-tab/ModListItem.vue`（164 行）：单个 Mod 行 UI，props 接收 mod/detailLoadingFor/modLocalNameStyle，emit toggle/delete/show-info/open-wiki/open-file；包含 5 个操作按钮 + 状态色条 + 图标 + 信息区
+  - `views/version-settings/mod-tab/ModToolbar.vue`（94 行）：工具栏（从文件安装/打开文件夹/刷新按钮 + 过滤按钮组 + 搜索输入），使用 `defineModel` 双向绑定 modFilter/modSearch
+  - `views/version-settings/mod-tab/ModEmptyState.vue`（82 行）：4 种空状态统一组件（not-modable/loading/empty/no-match），props 接收 variant + modsCount，emit go-download/go-select/install
+  - `composables/useModDetailQuery.ts`（162 行）：详情按钮 3 级 fallback 逻辑（零延迟预加载就绪 → 等待预加载 → 并发请求 CF+MR → 本地信息弹窗）；封装 detailVisible/detailProject/detailLoadingFor 状态 + handleShowInfo + handleOpenWiki
+  - `utils/mod-display.ts`（60 行）：纯函数 modTitle/modSubtitle/loaderVisual/stripModVersion，消除父子组件间的逻辑重复
+- 父组件保留：mods 列表加载/过滤、handleToggleMod（原地更新避免列表闪烁）、handleDeleteMod/handleInstallMod/handleOpenModsDir/handleOpenFile、onMounted 编排
+- `ModTab.vue` 缩减至 297 行
+
 #### 代码重构阶段 3.10：拆分 SetupTab.vue 为 JavaModeSelector + JavaCustomMode 子组件
 - 现象：`SetupTab.vue` 534 行，其中 Java 选择模式（4 模式：auto/auto_version/folder/custom）独占约 330 行，包含状态、5 个 computed、6 个函数、4 套模式 UI
 - 修复：抽出 2 个子组件到 `views/version-settings/setup-tab/`：
