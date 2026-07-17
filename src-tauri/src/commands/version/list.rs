@@ -293,3 +293,37 @@ pub async fn get_version_effective_dir(
 
     Ok(effective_dir.to_string_lossy().to_string())
 }
+
+/// 获取版本对应的 Minecraft 游戏版本号（如 "1.20.1"）
+///
+/// 用于从 ModTab 打开资源详情弹窗时，自动选中整合包对应的版本筛选 tag。
+/// 解析顺序参考 `version::scan::extract_original_version`：
+/// 1. JSON 的 `inheritsFrom` 字段
+/// 2. arguments.game 中的 `--fml.mcVersion`
+/// 3. downloads.client.url 正则匹配
+/// 4. JSON 的 `jar` 字段
+/// 5. JSON 的 `id` 字段正则匹配
+#[tauri::command]
+pub async fn get_version_game_version(
+    state: State<'_, AppState>,
+    version_id: String,
+) -> Result<Option<String>, String> {
+    sanitize_version_id(&version_id)?;
+
+    let config = state.config.lock().await;
+    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
+    drop(config);
+
+    let version_dir = game_dir.join("versions").join(&version_id);
+    let json_path = version_dir.join(format!("{}.json", version_id));
+    if !json_path.exists() {
+        return Ok(None);
+    }
+
+    let content = std::fs::read_to_string(&json_path)
+        .map_err(|e| format!("Failed to read version JSON: {}", e))?;
+    let json: serde_json::Value = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse version JSON: {}", e))?;
+
+    Ok(version_scan::extract_original_version(&json, &content))
+}

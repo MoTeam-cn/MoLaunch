@@ -25,10 +25,14 @@ export interface VersionGroup {
  * - 1.12.2 → "1.12"，1.20.1 → "1.20"，26.1.3 → "26.1"
  * - 低于 1.12 的版本统一归"远古版"（顶部筛选项不显示 1.8/1.9/1.10/1.11 各项，避免过多）
  * - 含 "w" → "快照版"
+ * - 新格式快照版：26.2-snapshot-2 / 26.2-snapshot-3 → "26.2"（与正式版 26.2 归为同一 tag）
  * - 非标准格式 → "远古版"
  * - 空 → "其他"
+ *
+ * 导出供外部调用：例如从 ModTab 打开资源详情弹窗时，根据整合包的 MC 版本号
+ * 自动选中顶部筛选 tag，需要用本函数把 "1.20.1" 转成 "1.20"。
  */
-function getFilterVersionName(name: string): string {
+export function getFilterVersionName(name: string): string {
   if (!name) return '其他'
   if (name.includes('w')) return '快照版'
   const m = /^1\.(\d+)/.exec(name)
@@ -37,8 +41,11 @@ function getFilterVersionName(name: string): string {
     if (minor < 12) return '远古版' // 低于 1.12 合并成单个远古版标签
     return `1.${minor}`
   }
+  // 新格式（26.x）：截断到二级版本号
+  // 先去掉 -snapshot-数字 等后缀（26.2-snapshot-2 → 26.2），再截断到二级（26.2.1 → 26.2）
   if (/^[2-9]\d\.\d+/.test(name) && parseInt(name) >= 26) {
-    return name.split('.').slice(0, 2).join('.')
+    const base = name.split('-')[0]
+    return base.split('.').slice(0, 2).join('.')
   }
   return '远古版'
 }

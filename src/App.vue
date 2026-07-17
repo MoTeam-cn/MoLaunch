@@ -4,6 +4,7 @@
  */
 
 import { onMounted, ref } from 'vue'
+import router from '@/router'
 import TopNavLayout from '@/components/layout/TopNavLayout.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
 import DownloadPanel from '@/components/common/DownloadPanel.vue'
@@ -46,6 +47,17 @@ async function initApp() {
 
   // 登录态已恢复，关闭加载遮罩
   isRestoring.value = false
+
+  // 会话恢复后修正路由：
+  // - 已登录但停在 /login → 跳首页
+  // - 未登录但停在 requiresAuth 页面 → 跳登录页
+  // （恢复期间守卫放行，可能导致用户停在错误页面，这里主动修正）
+  const currentRoute = router.currentRoute.value
+  if (authStore.isLoggedIn && currentRoute.path === '/login') {
+    router.replace('/apps')
+  } else if (!authStore.isLoggedIn && currentRoute.meta.requiresAuth) {
+    router.replace('/login')
+  }
 }
 </script>
 

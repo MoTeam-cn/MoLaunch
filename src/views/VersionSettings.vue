@@ -106,7 +106,12 @@ onMounted(initContext)
           <p class="mt-1 text-xs text-gray-500">{{ currentCategory()?.desc }}</p>
         </div>
 
-        <div class="flex-1 overflow-y-auto p-6">
+        <!-- Mod 管理页由 ModTab 自己管理布局（工具栏固定 + 列表独立滚动），
+             其他 tab 共用外层滚动容器 -->
+        <div
+          class="flex-1 overflow-hidden"
+          :class="activeCategory === 'mod' ? 'flex flex-col' : 'overflow-y-auto p-6'"
+        >
           <OverviewTab v-if="activeCategory === 'overview'" />
           <SetupTab v-else-if="activeCategory === 'setup'" />
           <ModTab v-else-if="activeCategory === 'mod'" />

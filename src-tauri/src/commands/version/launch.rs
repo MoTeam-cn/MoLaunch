@@ -273,25 +273,8 @@ pub async fn stop_game(state: State<'_, AppState>) -> Result<(), String> {
         *current_pid = None;
         drop(current_pid);
 
-        // 在 Windows 上终止进程树（/T 杀子进程，/F 强制结束）
-        #[cfg(target_os = "windows")]
-        {
-            use std::process::Command;
-            Command::new("taskkill")
-                .args(&["/PID", &pid.to_string(), "/T", "/F"])
-                .output()
-                .map_err(|e| format!("Failed to stop game: {}", e))?;
-        }
-
-        // 在 Unix 上终止进程
-        #[cfg(not(target_os = "windows"))]
-        {
-            use std::process::Command;
-            Command::new("kill")
-                .args(&["-9", &pid.to_string()])
-                .output()
-                .map_err(|e| format!("Failed to stop game: {}", e))?;
-        }
+        // 终止进程树（Windows: taskkill /T /F，Unix: kill -9），统一走 shell 模块
+        crate::minecraft::system::shell::kill_process_tree(pid)?;
 
         // 清理pipeline
         *state.launch_pipeline.lock().await = None;

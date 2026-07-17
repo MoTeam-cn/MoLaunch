@@ -1,4 +1,7 @@
 //! 游戏目录相关命令
+//!
+//! Shell 命令（打开文件夹、选中文件等）已统一封装到
+//! `crate::minecraft::system::shell`，本模块仅保留 Tauri 命令包装层。
 
 use crate::log_info;
 use crate::state::AppState;
@@ -23,128 +26,19 @@ pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
         std::fs::create_dir_all(&game_dir).map_err(|e| format!("创建游戏目录失败: {}", e))?;
     }
 
-    open_path_impl(&game_dir.to_string_lossy())
+    crate::minecraft::system::shell::open_path(&game_dir.to_string_lossy())
 }
 
 /// 打开任意路径（文件夹或文件）
 #[tauri::command]
 pub async fn open_path(path: String) -> Result<(), String> {
-    log_info!("Opening path: {}", path);
-    open_path_impl(&path)
-}
-
-/// 跨平台打开路径的内部实现（路径必须已存在，不自动创建）
-pub fn open_path_impl(path: &str) -> Result<(), String> {
-    // 安全校验：拒绝路径遍历
-    if path.contains("..") {
-        return Err("路径不能包含 ..".to_string());
-    }
-    // 安全校验：拒绝 UNC 路径（防止 SMB 认证泄露）
-    if path.starts_with("\\\\") || path.starts_with("//") {
-        return Err("不支持 UNC 路径".to_string());
-    }
-
-    let p = std::path::Path::new(path);
-    if !p.exists() {
-        return Err(format!("路径不存在: {}", path));
-    }
-
-    log_info!("Opening path: {}", path);
-
-    #[cfg(target_os = "windows")]
-    {
-        // 不能用 `explorer <path>`：Rust 会给含空格的路径自动加引号，
-        // explorer.exe 对带引号的裸路径解析失败会回退到打开"文档"库。
-        // 改用 `cmd /c start "" "<path>"`：start 命令正确处理带引号路径。
-        // 第一个 "" 是 start 的窗口标题占位（start 语法要求），CREATE_NO_WINDOW 隐藏 cmd 黑框。
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        std::process::Command::new("cmd")
-            .args(["/c", "start", "", path])
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| format!("Failed to open path: {}", e))?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        std::process::Command::new("open")
-            .arg(path)
-            .spawn()
-            .map_err(|e| format!("Failed to open path: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        std::process::Command::new("xdg-open")
-            .arg(path)
-            .spawn()
-            .map_err(|e| format!("Failed to open path: {}", e))?;
-    }
-
-    Ok(())
-}
-
-/// 在资源管理器中打开并选中指定文件
-/// Windows: explorer /select,<file>
-/// macOS: open -R <file>
-/// Linux: 不支持选中，回退到打开父目录
-pub fn reveal_in_explorer_impl(path: &str) -> Result<(), String> {
-    // 安全校验：拒绝路径遍历
-    if path.contains("..") {
-        return Err("路径不能包含 ..".to_string());
-    }
-    // 安全校验：拒绝 UNC 路径
-    if path.starts_with("\\\\") || path.starts_with("//") {
-        return Err("不支持 UNC 路径".to_string());
-    }
-
-    let p = std::path::Path::new(path);
-    if !p.exists() {
-        return Err(format!("路径不存在: {}", path));
-    }
-
-    log_info!("Reveal in explorer: {}", path);
-
-    #[cfg(target_os = "windows")]
-    {
-        // explorer /select,<file> 会在资源管理器中打开父目录并选中文件
-        // /select, 形式带引号时 explorer 能正确解析（与裸路径不同）：
-        //   explorer "/select,C:\path with spaces\file.jar"  ← 可行
-        //   explorer "C:\path with spaces\mods"              ← 不可行（回退到文档库）
-        std::process::Command::new("explorer")
-            .arg(format!("/select,{}", path))
-            .spawn()
-            .map_err(|e| format!("Failed to reveal in explorer: {}", e))?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        // macOS: open -R <file> 在 Finder 中显示文件
-        std::process::Command::new("open")
-            .args(["-R", path])
-            .spawn()
-            .map_err(|e| format!("Failed to reveal in finder: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        // Linux 文件管理器没有统一的"选中文件"接口，回退到打开父目录
-        let parent = p.parent().unwrap_or(std::path::Path::new("."));
-        std::process::Command::new("xdg-open")
-            .arg(parent)
-            .spawn()
-            .map_err(|e| format!("Failed to open folder: {}", e))?;
-    }
-
-    Ok(())
+    crate::minecraft::system::shell::open_path(&path)
 }
 
 /// Tauri 命令包装：在资源管理器中打开并选中指定文件
 #[tauri::command]
 pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
-    log_info!("Reveal in explorer: {}", path);
-    reveal_in_explorer_impl(&path)
+    crate::minecraft::system::shell::reveal_in_file_manager(&path)
 }
 
 /// 获取游戏目录
@@ -203,12 +97,20 @@ pub async fn save_file(
     title: Option<String>,
     default_name: Option<String>,
     filters: Option<Vec<FileFilter>>,
+    default_directory: Option<String>,
 ) -> Result<Option<String>, String> {
     use tauri_plugin_dialog::DialogExt;
 
     let mut dialog = app.dialog().file();
     if let Some(t) = title {
         dialog = dialog.set_title(&t);
+    }
+    if let Some(d) = default_directory {
+        // 设置对话框默认打开的目录（例如从 ModTab 打开时默认到整合包的 mods 文件夹）
+        let path = std::path::PathBuf::from(&d);
+        if path.exists() {
+            dialog = dialog.set_directory(&path);
+        }
     }
     if let Some(n) = default_name {
         dialog = dialog.set_file_name(&n);

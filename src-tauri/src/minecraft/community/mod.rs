@@ -15,6 +15,7 @@ pub mod cache;
 pub mod curseforge;
 pub mod mcmod;
 pub mod modrinth;
+pub mod preload;
 pub mod searcher;
 pub mod secure_storage;
 pub mod tags;

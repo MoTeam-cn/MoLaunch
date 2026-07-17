@@ -44,8 +44,9 @@ export async function saveFile(
   title?: string,
   defaultName?: string,
   filters?: { name: string; extensions: string[] }[],
+  defaultDirectory?: string,
 ): Promise<string | null> {
-  return await invoke<string | null>('save_file', { title, defaultName, filters })
+  return await invoke<string | null>('save_file', { title, defaultName, filters, defaultDirectory })
 }
 
 /**

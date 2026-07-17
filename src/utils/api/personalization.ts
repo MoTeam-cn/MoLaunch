@@ -3,6 +3,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import type { ResourceProject } from '@/types/community'
 
 /** 版本个性化信息 */
 export interface VersionPersonalization {
@@ -133,6 +134,17 @@ export interface ModInfo {
   version?: string
   /** Mod 图标（base64 data URL，从 jar 内 logo 文件提取，可能为空） */
   logo_data?: string
+  /** Mod slug（来自 jar 内 metadata，用于关联 CF/MR 平台工程和查 mcmod.cn 直链） */
+  slug: string
+  /**
+   * 预加载到的平台工程详情（由 `preload_mods_detail_cmd` 后台批量查询填充）。
+   *
+   * 参考 PCL2 `LocalResourceFile.Project`：
+   * - `list_mods` 返回时为空（同步阶段不联网）
+   * - 后台预加载完成后通过 `mods-preload-update` 事件推送，前端按 file_name 匹配更新此字段
+   * - 详情按钮点击时判断此字段是否就绪，就绪直接弹 ResourceDetail（零延迟）
+   */
+  project?: ResourceProject
 }
 
 /**
@@ -151,13 +163,15 @@ export async function listMods(versionId: string): Promise<ModInfo[]> {
 
 /**
  * 启用/禁用 Mod
+ *
+ * 返回重命名后的新文件名（前端据此原地更新 mod 字段，避免重新加载列表丢失预加载的 project 等信息）。
  */
 export async function toggleMod(
   versionId: string,
   fileName: string,
   enable: boolean,
-): Promise<void> {
-  return await invoke<void>('toggle_mod', { versionId, fileName, enable })
+): Promise<string> {
+  return await invoke<string>('toggle_mod', { versionId, fileName, enable })
 }
 
 /**
@@ -186,6 +200,40 @@ export async function openModsDir(versionId: string): Promise<void> {
  */
 export async function revealModFile(versionId: string, fileName: string): Promise<void> {
   return await invoke<void>('reveal_mod_file', { versionId, fileName })
+}
+
+/**
+ * 获取版本的 mods 目录路径（自动创建，不打开）
+ *
+ * 用于资源详情弹窗点击"下载"按钮时默认保存到 mods 文件夹。
+ */
+export async function getVersionModsDir(versionId: string): Promise<string> {
+  return await invoke<string>('get_version_mods_dir', { versionId })
+}
+
+/**
+ * 获取版本对应的 Minecraft 游戏版本号（如 "1.20.1"）
+ *
+ * 用于从 ModTab 打开资源详情弹窗时，自动选中整合包对应的版本筛选 tag。
+ * 返回 null 表示无法识别（JSON 缺失或所有策略都未命中）。
+ */
+export async function getVersionGameVersion(versionId: string): Promise<string | null> {
+  return await invoke<string | null>('get_version_game_version', { versionId })
+}
+
+/**
+ * 触发 mod 详情预加载（后台异步，立即返回）
+ *
+ * 参考 PCL2 `LocalResourceOnlineLoader`：在 `list_mods` 返回后立即调用本函数，
+ * 后台并发批量查询每个 mod 的 CF/MR 工程详情：
+ * - 命中持久化缓存（6h TTL）→ 直接 emit `mods-preload-update` 事件，不联网
+ * - 未命中 → 计算文件 hash → CF `/fingerprints` + MR `/version_files` 批量查询 → emit 事件
+ *
+ * 前端监听 `mods-preload-update` 事件，按 `file_name` 匹配更新对应 mod 的 `project` 字段。
+ * 详情按钮点击时判断 `mod.project` 是否就绪，就绪直接弹 ResourceDetail（零延迟）。
+ */
+export async function preloadModsDetail(versionId: string): Promise<void> {
+  return await invoke<void>('preload_mods_detail_cmd', { versionId })
 }
 
 /**

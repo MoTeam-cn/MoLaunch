@@ -1,5 +1,7 @@
 //! 系统信息获取模块
 
+pub mod shell;
+
 use serde::{Deserialize, Serialize};
 use sysinfo::{System, SystemExt};
 

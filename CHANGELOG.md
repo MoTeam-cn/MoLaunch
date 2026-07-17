@@ -7,7 +7,192 @@
 
 ## [未发布]
 
+### 修复
+
+#### Mod 详情按钮等待 3 秒才弹窗（预加载已完成但不知道）
+- 现象：用户点击某个 mod 详情按钮，没有任何网络请求，等了 3 秒才弹本地信息弹窗
+- 根因：该 mod 的 jar 内没有 metadata（没有 fabric.mod.json/mods.toml/mcmod.info），所以 slug 一直为空。`handleShowInfo` 在 slug 为空时固定等待 3 秒（30次 × 100ms 轮询），但缓存命中时预加载在 14ms 内就全部完成了，slug 不会再变化，3 秒等待完全浪费
+- 修复 1：后端预加载完成时 emit `mods-preload-done` 事件（缓存命中和正常完成两个路径都 emit）（backend: src-tauri/src/minecraft/community/preload.rs）
+- 修复 2：前端 `useModsPreload` 新增 `isPreloadDone` 状态，监听 `mods-preload-done` 事件（frontend: src/composables/useModsPreload.ts）
+- 修复 3：`handleShowInfo` 在 slug 为空时先判断 `isPreloadDone`：若已完成则立即走本地信息弹窗，不等待；若未完成才进入等待循环，且循环中每次也检查 `isPreloadDone`，一旦完成立即跳出（frontend: src/views/version-settings/ModTab.vue）
+
+#### 启动时错误跳转到登录页
+- 现象：已登录用户每次启动应用都进入登录页，不应该是首页
+- 根因：`restoreSession()` 是异步的（在 App.vue onMounted 中调用），但路由守卫 `beforeEach` 在应用启动时就同步执行，此时 `currentUser` 还是 null，`isLoggedIn = false`，导致 `requiresAuth` 路由被重定向到 `/login`
+- 修复 1：auth store 新增 `isRestoring` 标志（初始 true，restoreSession 完成后置 false）（frontend: src/stores/auth.ts）
+- 修复 2：路由守卫在 `isRestoring = true` 期间放行所有路由，不拦截 requiresAuth 路由。App.vue 有 isRestoring 加载遮罩覆盖整个恢复期，用户看不到路由变化（frontend: src/router/index.ts）
+- 修复 3：App.vue 在 `restoreSession` 完成后主动修正路由：已登录但停在 /login → 跳首页；未登录但停在 requiresAuth 页面 → 跳登录页（frontend: src/App.vue）
+- 修复 4：已登录用户访问 /login 时路由守卫自动重定向到首页（避免登录后又手动回到登录页）
+
+#### 版本筛选 tag 对新格式快照版适配
+- 现象：Minecraft 新版本号格式（如 `26.2-snapshot-2` / `26.2-snapshot-3`）被识别为两个独立的筛选 tag，应该归为同一个 `26.2`
+- 根因：`getFilterVersionName` 中 `name.split('.').slice(0, 2).join('.')` 对 `26.2-snapshot-2` 的 split 结果是 `["26", "2-snapshot-2"]`，slice(0,2).join('.') 后仍然是 `"26.2-snapshot-2"`，没有截断
+- 修复：在截断到二级版本号之前，先用 `name.split('-')[0]` 去掉 `-snapshot-数字` 等后缀，这样 `26.2-snapshot-2` 和 `26.2-snapshot-3` 都会归到 `26.2` tag（frontend: src/composables/useVersionGroups.ts）
+
+#### Mod 默认 logo 改为图片
+- 无 jar logo 的 mod 项不再显示加载器首字母色块，改为显示 `assets/Mods/default-min.png` 默认图片（frontend: src/views/version-settings/ModTab.vue）
+
+#### Mod 列表两阶段加载（完整对齐 PCL2，秒加载 + 排序修复）
+- 现象：用户反馈每次进入 Mod 列表都要等好几秒（143 个 mod 要等 jar 元数据全部读完），PCL2 进入基本秒加载；且禁用的 mod 总是被排到列表末尾
+- 根因分析（参考 PCL2 `LocalResourceLoaders.vb`）：
+  - PCL2 同步阶段**只做文件枚举**（`DirectoryUtils.GetFiles`），完全不读 JAR 内容，所以瞬间返回
+  - PCL2 排序规则只按 `File.Name`（含扩展名）字母序升序，**禁用状态不参与排序**（第 88 行 `ModList.OrderBy(Function(m) m.File.Name)`）
+  - MoLaunch 原 `list_mods` 对每个 jar 同步调用 `read_mod_metadata`（打开 jar + 读 fabric.mod.json/mods.toml/mcmod.info + 提取 logo base64 + 查 mcmod 译名），143 个 mod = 143 次磁盘 IO，这是慢的根本原因
+  - MoLaunch 原排序规则「启用的排前面 + 文件名升序」导致禁用的 mod 被挤到末尾
+- 修复 1：`list_mods` 极致轻量化（backend: src-tauri/src/commands/version/mods.rs）
+  - 去掉 `read_mod_metadata` 调用，元数据字段（translated_name/description/version/logo_data/slug）全部返回空
+  - 只做文件枚举 + 获取文件大小 + 推断加载器类型（从文件名），保证瞬间返回
+  - 排序改为只按 `file_name`（含扩展名）字母序升序，禁用状态不参与排序（与 PCL2 一致）
+- 修复 2：把 JAR 元数据读取合并到 preload 阶段（backend: src-tauri/src/minecraft/community/preload.rs）
+  - `read_mod_metadata` 从 private 改为 `pub(crate)`，返回类型从元组改为 `ModMetadata` 结构体
+  - 新增 `finalize_metadata` 辅助函数统一处理 logo 提取 + 译名查询
+  - `preload_mods_detail` 重构为两阶段：先用 `tokio::task::spawn_blocking` + `Semaphore(8)` 并发读所有 jar 元数据 + 算 hash，每读完一个就 emit 元数据事件（前端立即看到译名、logo、版本）；再批量查 CF/MR project，每查到一个 emit project 事件
+  - `PreloadUpdate` 结构扩展：新增 slug/description/version/logo_data/translated_name 字段（原只有 project）
+  - 缓存结构扩展：`CachedMod` 存储完整元数据 + project，第二次进入直接从缓存恢复所有信息（真正秒加载）
+  - 缓存版本号从 1 升到 2（旧缓存自动失效）
+- 修复 3：前端 `useModsPreload` 扩展（frontend: src/composables/useModsPreload.ts）
+  - 事件 payload 新增 slug/description/version/logo_data/translated_name 字段
+  - 监听器按字段是否 undefined 决定是否更新（支持分次 emit：元数据先到、project 后到）
+- 修复 4：`handleShowInfo` 等待逻辑（frontend: src/views/version-settings/ModTab.vue）
+  - 用户点详情按钮时如果 slug 还为空（预加载还没读到 jar 元数据），先等待最多 3 秒（每 100ms 检查一次），等待期间显示 spinner
+  - 等待后仍无 slug 才走本地信息弹窗；等待期间 project 就绪则直接弹窗
+
+#### Mod 启用/禁用原地更新（不刷新列表、不重排位置）
+- 现象：用户反馈禁用 Mod 后整个列表重新加载（视觉闪烁），且禁用的 Mod 自动窜到列表最后（被后端排序规则「启用的排前面」挤到禁用区末尾），设计不合理
+- 根因：`handleToggleMod` 调用 `await loadMods()` 重新加载整个列表，触发后端排序 + 丢失预加载的 `project` 字段（list_mods 返回时 project 为空，需要重新等预加载）
+- 后端 `toggle_mod` 命令返回类型从 `Result<(), String>` 改为 `Result<String, String>`，返回重命名后的新文件名（backend: src-tauri/src/commands/version/mods.rs）
+- 前端 `toggleMod` 封装同步改为 `Promise<string>`（frontend: src/utils/api/personalization.ts）
+- 前端 `handleToggleMod` 改为原地更新：按 `file_name` 找到对应 mod，用整对象替换更新 `file_name` + `is_enabled` 字段（保留 `enabled_name`、`project` 等其他字段不动）。mod 在列表中的位置完全不动，预加载的 project 字段也保留。工具栏统计 `enabledCount` / `disabledCount` 是 computed，会自动同步更新（frontend: src/views/version-settings/ModTab.vue）
+
+#### 版本设置 - Mod 管理工具栏固定（列表独立滚动）
+- 原布局：Mod 管理页与 OverviewTab/SetupTab 共用 VersionSettings.vue 的 `flex-1 overflow-y-auto p-6` 滚动容器，工具栏用 `sticky top-0` 尝试固定。因父容器 padding 存在，列表滚动时会从工具栏上方和两侧 padding 间隙穿过，视觉上列表滑过了操作栏
+- 修改 VersionSettings.vue 内容区容器：按 `activeCategory` 切换 class，mod tab 用 `flex-1 flex flex-col overflow-hidden`（不滚动），其他 tab 保持原 `overflow-y-auto p-6`（frontend: src/views/VersionSettings.vue）
+- 修改 ModTab.vue 为独立 flex 布局：根容器 `flex flex-1 flex-col overflow-hidden`，工具栏 `flex-none border-b`（永远固定不滚动），列表区单独包进 `flex-1 overflow-y-auto p-6`（只有列表滚动）。移除原 sticky/负 margin 方案（frontend: src/views/version-settings/ModTab.vue）
+
+#### Mod 列表加载状态统一 + 打开文件位置修复
+- Mod 列表加载状态改为项目统一样式（与 VersionSelect.vue 一致）：大尺寸（h-8 w-8）svg spinner 居中垂直排列 + 文字，替代原内联小尺寸（h-4 w-4）水平排列（frontend: src/views/version-settings/ModTab.vue）
+- 修复 Mod「打开文件位置」按钮打开的是「文档」库而非实际位置（backend: src-tauri/src/commands/system/game_dir.rs）：根因是 `reveal_in_explorer_impl` 用 `Command::new("explorer").arg(format!("/select,{}", path))`，Rust Command::arg 会给含空格的整个参数加引号，导致 explorer 收到 `"/select,C:\path with spaces\file.jar"` 后不识别 `/select` 开关，把整个字符串当路径找不到，回退到文档库。原记忆「explorer /select,<path> 形式带引号能正确解析」结论有误，实际与裸路径行为一致都会回退。修复：改用 `cmd /c` 构造完整命令 `explorer /select,"<path>"`，手动给路径加引号，explorer 正确解析 /select 开关和带引号的路径（与 open_path_impl 修复方式一致）
+
+### 重构
+
+#### Shell 命令统一封装到 minecraft::system::shell 模块
+- 新增 `src-tauri/src/minecraft/system/shell.rs` 统一 shell 命令封装模块，整合所有系统级外部命令调用：
+  - 文件管理器交互：`open_path`（打开文件夹）、`reveal_in_file_manager`（选中文件）—— 原 `game_dir.rs` 的 `open_path_impl`/`reveal_in_explorer_impl`
+  - 进程管理：`kill_process_tree`（杀进程树）—— 原 `launch.rs` 的 taskkill/kill
+  - 文件权限：`restrict_file_permissions`（限制权限为当前用户）—— 原 `script_export.rs` 的 icacls/chmod
+- 所有 shell 命令统一：跨平台差异处理（Windows/macOS/Linux）、安全校验（拒绝路径遍历 `..` 和 UNC 路径 `\\`）、统一日志（`[Shell]` 前缀 + 调用前后都记录）、错误转换为 String
+- 重构调用方：
+  - `game_dir.rs`：删除 `open_path_impl`/`reveal_in_explorer_impl` 实现（约 90 行），Tauri 命令 `open_path`/`reveal_in_explorer`/`open_game_dir` 改为转发调用 shell 模块（backend: src-tauri/src/commands/system/game_dir.rs）
+  - `launch.rs`：删除 taskkill/kill 平台分支代码，`stop_game` 改为调用 `shell::kill_process_tree(pid)`（backend: src-tauri/src/commands/version/launch.rs）
+  - `script_export.rs`：删除 `restrict_script_permissions` 函数（约 30 行），改为直接调用 `shell::restrict_file_permissions`（backend: src-tauri/src/commands/version/script_export.rs）
+  - `mods.rs`：`open_mods_dir`/`reveal_mod_file` 调用方从 `crate::commands::system::open_path_impl`/`reveal_in_explorer_impl` 改为 `crate::minecraft::system::shell::open_path`/`reveal_in_file_manager`（backend: src-tauri/src/commands/version/mods.rs）
+
+#### reveal_in_file_manager 改用 ShellExecuteW（彻底修复打开位置错误）
+- 现象：用户反馈 Mod「打开文件位置」按钮打开的是「此电脑」而非实际位置。日志显示 `cmd /c explorer /select,"<path>"` 命令确实执行了，但 explorer 回退到默认位置
+- 根因：Rust `Command` 在 Windows 上对含空格和引号的 arg 会加引号并转义内部引号（`"` → `\"`），但 cmd.exe **不识别 `\"` 转义**。故障链：
+  1. Rust 构造 arg `explorer /select,"C:\path with spaces\file.jar"`（含空格和引号）
+  2. Rust 转义后传给 cmd.exe：`cmd /c "explorer /select,\"C:\path with spaces\file.jar\""`
+  3. cmd.exe 去掉首尾引号（规则：首尾是 `"` 且内部有引号时去掉），不处理 `\"` → `explorer /select,\"C:\path with spaces\file.jar\"`（字面反斜杠引号）
+  4. explorer 收到 `/select,\"...\"` 参数，解析失败，回退到默认位置「此电脑」
+- 修复：Windows 平台 `reveal_in_file_manager` 改用 Win32 API `ShellExecuteW` 直接调用 explorer.exe（backend: src-tauri/src/minecraft/system/shell.rs）。ShellExecuteW 接收 UTF-16 字符串作为参数，绕过 Rust `Command` 的参数转义和 cmd.exe 的引号解析，explorer.exe 直接收到原始参数 `/select,"<path>"`，用 `CommandLineToArgvW` 正确解析引号并合并路径
+- 前两次修复方案均无效的原因：
+  - 第一次 `Command::new("explorer").arg(format!("/select,{}", path))`：Rust 给含空格的整个 arg 加引号，explorer 不识别 `/select,"..."`
+  - 第二次 `cmd /c explorer /select,"<path>"`：cmd.exe 不识别 Rust 的 `\"` 转义，explorer 收到字面反斜杠引号
+- ShellExecuteW 是 Windows 95+ API，完全兼容所有 Windows 版本，是 Windows 上启动程序最可靠的方式
+
+#### 整合包安装应用 community_filename_format 命名规范
+- 现象：用户反馈整合包安装下载的 mod 没有按设置里的 `community_filename_format` 命名（如设置了 `[译名] 原名`，整合包安装后 jar 文件名仍是原始名）
+- 根因：`install_cf_mods` 和 `install_mr_files` 直接用原始 `file_name` / `path` 作为目标文件名，没有调用 `apply_filename_format`，也没有查询 mcmod 译名
+- 修复 CF 整合包（backend: src-tauri/src/commands/community/install.rs `install_cf_mods`）：
+  - 用 manifest 中的 `project_id` 列表，调 CF 批量接口 `GET /v1/mods?modIds=...` 查询 mod info 拿 slug
+  - 通过 manifest 关联 `file_id ↔ project_id`，构造 `file_id → 译名` 映射（slug → `mcmod::lookup_cf` 查译名）
+  - 对每个下载文件调用 `apply_filename_format(orig_name, translated, config.community_filename_format)` 重命名
+- 修复 MR 整合包（backend: src-tauri/src/commands/community/install.rs `install_mr_files`）：
+  - 新增 `extract_mr_project_id` 从 `downloads` URL 提取 project_id（URL 格式 `https://cdn.modrinth.com/data/<id>/versions/...`）
+  - 用提取的 project_id 列表，调 MR 批量接口 `GET /projects?ids=[...]` 查询 project info 拿 slug
+  - 构造 `file_index → 译名` 映射（slug → `mcmod::lookup_mr` 查译名）
+  - 仅对 `mods/` 路径下的文件应用 `apply_filename_format`（resourcepacks/shaderpacks 保留原名，mcmod 数据库只覆盖 mod）
+- 新增 CF 批量查询 mod info 接口（backend: src-tauri/src/minecraft/community/curseforge.rs `batch_get_mod_slugs`）：调 `GET /v1/mods?modIds=...` 返回 `modId → slug` 映射，失败时返回空 map 不阻断下载
+- 新增 MR 批量查询 projects 接口（backend: src-tauri/src/minecraft/community/modrinth.rs `batch_get_project_slugs`）：调 `GET /projects?ids=[...]` 返回 `project_id → slug` 映射，失败时返回空 map 不阻断下载
+- 失败容错：所有译名查询失败时返回空 map，下载流程继续，仅文件名不应用格式（与 PCL2 行为一致，不让网络问题阻断整合包安装）
+
+#### Mod 管理「详情」按钮关联社区资源 + 新增「前往百科」按钮
+- 现象：用户参考 PCL2，希望 Mod 管理列表的「详情」按钮能直接打开社区资源详情弹窗（即搜索 mod 时弹出的 ResourceDetail），而不是只显示本地信息；无法关联的 mod 才回退到本地信息弹窗；另外希望加个「前往百科」按钮直接打开 mcmod.cn
+- 后端 `ModInfo` 新增 `slug: String` 字段，`read_mod_metadata` 返回元组扩展为 `(translated, description, version, logo, slug)`，把从 jar 内 metadata 读到的 slug（fabric.mod.json 的 id / mods.toml 的 modId / mcmod.info 的 modid）带回前端用于关联 CF/MR 平台工程（backend: src-tauri/src/commands/version/mods.rs）
+- 前端 `ModInfo` interface 同步新增 `slug: string` 字段（frontend: src/utils/api/personal.ts）
+- ModTab.vue「详情」按钮逻辑改造（参考 PCL2 MyLocalModItem.Info_Click）：
+  - 有 slug：先调 `getProjectDetail('CurseForge', slug, 'Mod')`（CF API 支持用 slug 查询 mod），失败再调 `getProjectDetail('Modrinth', slug, 'Mod')`（MR API 同样支持 slug 查询）。成功则弹出复用的 `ResourceDetail` 组件展示完整 mod 详情（版本、下载、描述等），与社区资源搜索的详情弹窗完全一致
+  - 失败或无 slug：回退到 `showLocalModInfo` 显示本地信息弹窗（描述、文件、版本、译名、加载器），与原行为一致
+  - 「详情」按钮加载期间 disabled 防止重复点击（frontend: src/views/version-settings/ModTab.vue）
+- 新增「前往百科」按钮（在「详情」按钮右侧，hover 列表项时显示，参考 PCL2 PageDownloadCompDetail.BtnIntroWiki_Click）：
+  - 有 slug：先调 `getMcmodUrl('CurseForge', slug)` 查 mcmod.cn 直链，无则调 `getMcmodUrl('Modrinth', slug)`（CF 收录更全，优先 CF）。查到直链则用 `@tauri-apps/plugin-shell` 的 `open` 打开 `https://www.mcmod.cn/class/<id>.html`
+  - 查不到直链或无 slug：打开 mcmod.cn 搜索页 `https://www.mcmod.cn/search?key=<keyword>`，关键字优先用 `translated_name`，其次用文件名去 `.jar` / `.disabled` / `.old` 后缀
+- 操作按钮从 4 个变为 5 个（详情 / 前往百科 / 打开文件位置 / 启用禁用 / 删除），按钮 hover 配色：详情=蓝、前往百科=翠绿、打开文件位置=灰、启用=绿/禁用=橙、删除=红
+
+#### Mod 详情按钮体验优化（并发请求 + 防呆 spinner + 预取上下文）
+- 现象：用户反馈点击「详情」按钮后才发请求有明显卡顿感；串行 CF → MR 查询若 CF 失败还要等 MR；用户不知道是否点到了按钮会重复点击
+- 并发请求：`handleShowInfo` 改用 `Promise.any` 并发请求 CF + MR，谁先成功用谁（响应时间从 `CF + MR` 缩短为 `max(CF, MR)`），全部失败才回退本地信息弹窗（frontend: src/views/version-settings/ModTab.vue）
+- 防呆 spinner：把 `detailLoading` 单一布尔改为 `detailLoadingFor: string | null`（记录当前加载中的 mod file_name），按钮显示旋转 spinner + Tooltip 文字变为「正在加载详情...」+ 禁用同 mod 重复点击。加载中时按钮容器强制 `opacity-100`，避免鼠标离开列表项后 spinner 隐藏让用户以为没点到（frontend: src/views/version-settings/ModTab.vue）
+- 预取上下文：onMounted 时调用 `prefetchVersionContext` 异步获取整合包的 MC 版本号和 mods 目录路径，避免用户点击详情按钮后再请求造成卡顿（frontend: src/views/version-settings/ModTab.vue）
+
+#### Mod 详情弹窗自动选中整合包版本 + 下载默认到 mods 文件夹
+- 现象：用户希望从 ModTab 打开资源详情弹窗后，自动选中顶部筛选 tag 为整合包对应的版本；点击下载按钮时，saveFile 对话框默认定位到整合包的 mods 文件夹
+- 后端新增 `get_version_game_version` Tauri 命令（backend: src-tauri/src/commands/version/list.rs）：从版本 JSON 提取 MC 版本号（如 "1.20.1"），复用 `version::scan::extract_original_version` 的解析策略（inheritsFrom → --fml.mcVersion → downloads URL 正则 → jar → id 正则）。把 `extract_original_version` 改为 `pub(crate)` 供 commands 层复用（backend: src-tauri/src/minecraft/version/scan.rs）
+- 后端新增 `get_version_mods_dir` Tauri 命令（backend: src-tauri/src/commands/version/mods.rs）：返回版本 mods 目录绝对路径（自动创建），用于前端下载 mod 时指定默认保存位置
+- 前端封装（frontend: src/utils/api/personal.ts）：新增 `getVersionGameVersion` / `getVersionModsDir` 调用上述两个命令
+- ResourceDetail 新增 `gameVersion` 和 `modsDir` 两个可选 prop（frontend: src/components/community/ResourceDetail.vue）：
+  - `gameVersion`：版本列表加载完成后，调 `getFilterVersionName` 把 "1.20.1" 截断成 "1.20"，匹配 filterOptions 后 `setFilter` 自动选中顶部筛选 tag
+  - `modsDir`：`handleDownload` 调 `saveFile` 时作为 `defaultDirectory` 传入，对话框默认打开到 mods 文件夹
+- 导出 `getFilterVersionName` 函数（frontend: src/composables/useVersionGroups.ts）供 ResourceDetail 调用
+- ModTab 把预取的 `versionGameVersion` / `versionModsDir` 通过 prop 传给 ResourceDetail（frontend: src/views/version-settings/ModTab.vue）
+
+#### 百科搜索 URL 修正 + 关键字去版本号
+- 现象：用户反馈百科搜索 URL 应该是 `https://search.mcmod.cn/s?key=` 而不是 `https://www.mcmod.cn/search?key=`；搜索关键字不应包含版本号（如 "AI-Improvements-1.20-0.5.2" 应截断为 "AI-Improvements"），否则百科搜索匹配不到结果
+- URL 修正（frontend: src/views/version-settings/ModTab.vue `handleOpenWiki`）：`https://www.mcmod.cn/search?key=` → `https://search.mcmod.cn/s?key=`
+- 关键字截断：新增 `stripModVersion` 函数，用正则 `^([^-\s+_]+(?:[-\s+_][^-\s+_]+)*?)[-+_]\d+\.\d+` 在第一个版本号位置截断。例：`AI-Improvements-1.20-0.5.2.jar` → `AI-Improvements`，`FabricAPI-0.92.2+1.20.4` → `FabricAPI`，`create-1.20.1-6.0.4.jar` → `create`
+
+#### save_file 命令支持默认目录 + MR 404 优雅处理
+- 后端 `save_file` Tauri 命令新增 `default_directory: Option<String>` 参数（backend: src-tauri/src/commands/system/game_dir.rs）：调用 `dialog.set_directory(path)` 设置对话框默认打开目录，路径不存在时静默忽略。用于从 ModTab 打开资源详情下载 mod 时默认定位到 mods 文件夹
+- 前端 `saveFile` 封装同步新增 `defaultDirectory` 可选参数（frontend: src/utils/api/system.ts）
+- MR API 404 优雅处理（backend: src-tauri/src/minecraft/community/modrinth.rs `mr_get`）：
+  - 现象：用户日志显示 `[WARN] MR 响应解析失败: https://api.modrinth.com/v2/project/oworld2create (error decoding response body: EOF while parsing a value at line 1 column 0)`。根因是 MR 对不存在的 slug 返回 404 + 空 body，`resp.json()` 解析空 body 报 "EOF while parsing"，警告日志让用户以为出错了
+  - 修复：抽出 `parse_resp` 辅助函数，先检查 HTTP 状态码，404 时返回 "Modrinth 资源不存在" 错误并记 INFO（不报警告），非 2xx 记警告，2xx 才调 `resp.json()`。镜像回退路径也复用 `parse_resp`
+  - 404 时跳过镜像回退：source=1 时官方失败原本会回退镜像，但 404 表示资源真不存在（镜像也是 404），重试无意义，通过 `is_not_found` 判断跳过
+
+#### CF slug 查询修复（missing field `data` 警告消除）
+- 现象：用户日志显示 `[WARN] CF 响应解析失败: https://mod.mcimirror.top/curseforge/v1/mods/oworld2create (error decoding response body: missing field 'data' at line 1 column 110)`。根因是 CF API `/v1/mods/<id>` 只接受数字 modId，对非数字 slug 镜像返回不含 `data` 字段的不同响应结构
+- 修复（backend: src-tauri/src/minecraft/community/curseforge.rs `get_project`）：判断 `project_id` 是否全数字，数字走原 `/mods/<id>` 路径，非数字走 `/mods/search?gameId=432&slug=<slug>` 搜索接口取首个结果。两种响应结构分别用不同 struct 反序列化，避免 "missing field" 错误
+
+
+
+
+
+
 ### 新增
+
+#### Mod 详情预加载架构（完整对齐 PCL2 LocalResourceOnlineLoader）
+- 设计目标：参考 PCL2 `MyLocalModItem.Info_Click`（PageInstanceMod.xaml.vb 第 751-792 行）的核心设计——**详情按钮本身不发任何网络请求**，只判断 `Entry.Project` 是否已被预加载填充，实现零延迟跳转。预加载由 `LocalResourceOnlineLoader` 在 `list_mods` 返回后立即后台执行（哈希批量查询 + 工程详情拉取）
+- 后端新增预加载核心模块（backend: src-tauri/src/minecraft/community/preload.rs）：
+  - MurmurHash2 算法实现（CF 指纹算法）：读取文件字节后**跳过空白字节**（0x09/0x0A/0x0D/0x20），再用 seed=1、m=0x5bd1e995、r=24 计算（与 PCL2 `LocalResourceFile.vb` 第 417-490 行实现一致）
+  - SHA1 hash 计算（MR 文件识别算法，标准 SHA1）
+  - `preload_mods_detail` 主入口流程：1) 读持久化缓存 → 2) 计算每个 mod 的 CF MurmurHash2 + MR SHA1 → 3) `tokio::join!` 并发批量查询 CF/MR → 4) 合并结果（CF 优先，MR 兜底）→ 5) 每查到一个 project 就 `app.emit("mods-preload-update", ...)` → 6) 写入持久化缓存
+  - 持久化文件缓存：`.Molaunch/cache/preload_mods/{version_id}.json`，6 小时 TTL + 版本号 gating（版本号变化强制刷新，参考 PCL2 `Cache/LocalMod.json` 的 key=`ModrinthHash + VanillaVersion + ModLoaders`）
+  - Tauri 事件推送：`PreloadUpdate { version_id, file_name, project }`，每个 mod 查到后单独 emit，前端逐个响应式更新
+- 后端新增 CF 批量指纹查询（backend: src-tauri/src/minecraft/community/curseforge.rs）：
+  - `build_cf_post_request` + `cf_post<T>` 辅助函数（POST 请求携带 API Key + JSON body，支持 source 策略 + 镜像回退）
+  - `fingerprint_search` 4 步批量查询：1) POST `/v1/fingerprints/432` 带 fingerprints 数组 → exactMatches → 2) 收集 modIds 构造 fingerprint→modId 映射 → 3) POST `/v1/mods` 带 modIds 数组批量查工程详情 → 4) 映射 fingerprint→ResourceProject 并缓存
+- 后端新增 MR 批量 SHA1 查询（backend: src-tauri/src/minecraft/community/modrinth.rs）：
+  - `mr_post<T>` 辅助函数（POST 请求 + source 策略 + 404 跳过镜像回退 + 镜像回退，与 `mr_get` 行为一致）
+  - `version_files_search` 4 步批量查询：1) POST `/v2/version_files` 带 SHA1 hashes → 返回 version+project_id 映射 → 2) **校验 file.hashes.sha1 与查询 sha1 匹配**（防 MR 返回错位）→ 3) GET `/v2/projects?ids=[...]` 批量查工程详情 → 4) 映射 sha1→ResourceProject 并缓存
+- 后端新增 `preload_mods_detail_cmd` Tauri 命令（backend: src-tauri/src/commands/version/preload.rs）：扫描版本 mods 目录构造 `PreloadModInput` 列表（file_name + 文件字节），`tokio::spawn` 异步任务不阻塞命令返回；注册到 `lib.rs` invoke_handler
+- 后端 `get_mods_dir` 从 private 改为 `pub(crate)`（backend: src-tauri/src/commands/version/mods.rs）供 preload 命令复用
+- 前端新增 `useModsPreload` composable（frontend: src/composables/useModsPreload.ts）：`listen<PreloadUpdatePayload>('mods-preload-update', cb)` 监听事件，按 `file_name` 匹配 mods 数组对应项，用 `mods.value[i] = { ...mods.value[i], project }` 确保 Vue 响应式触发（直接赋值属性不会触发）
+- 前端 `ModInfo` 新增 `project?: ResourceProject` 字段（frontend: src/utils/api/personal.ts）并封装 `preloadModsDetail(versionId)` 调用上述命令
+- 前端 ModTab.vue `handleShowInfo` 改造为三级 fallback（参考 PCL2 `MyLocalModItem.Info_Click`）：
+  1. **零延迟路径**：`mod.project` 已被 `preload_mods_detail_cmd` 后台预加载填充 → 直接弹 ResourceDetail（与 PCL2 `Entry.Project IsNot Nothing` 分支一致）
+  2. **并发 fallback**：预加载未就绪（用户点太快）或预加载失败 → `Promise.any` 并发请求 CF + MR，谁先成功用谁
+  3. **本地信息**：无 slug 或两个平台都查不到 → 弹本地信息弹窗 + 百科搜索按钮（与 PCL2 `Else` 分支一致）
+- onMounted 启动预加载事件监听（必须在 `loadMods` 之前，避免错过早期事件）→ `loadMods` → `prefetchVersionContext` → `preloadModsDetail`（后台异步，不阻塞 UI）；onUnmounted 停止监听
 
 #### 整合包安装：完整流程（后端 + 前端）
 - 新增 `install_modpack` Tauri 命令（backend: src-tauri/src/commands/community/install.rs），参考 PCL2 ModModpack.vb ModpackInstall 实现

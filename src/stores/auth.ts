@@ -30,6 +30,9 @@ export const useAuthStore = defineStore('auth', () => {
   const offlineAccounts = ref<OfflineAccountInfo[]>([])
   const msLoginStep = ref('')
   const msLoginStepLabel = computed(() => STEP_LABELS[msLoginStep.value] ?? '')
+  /** 会话恢复中标志：应用启动时为 true，restoreSession 完成后置为 false。
+   *  路由守卫在此期间不拦截 requiresAuth 路由，避免会话还没恢复就把已登录用户踢到 /login */
+  const isRestoring = ref(true)
 
   let pollTimer: ReturnType<typeof setTimeout> | null = null
   let progressUnlisten: UnlistenFn | null = null
@@ -199,6 +202,7 @@ export const useAuthStore = defineStore('auth', () => {
       await restoringPromise
     } finally {
       restoringPromise = null
+      isRestoring.value = false
     }
   }
 
@@ -211,7 +215,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     currentUser, loginStatus, error, msLoginStatus, msFlow, deviceCodeInfo,
     msAccounts, offlineAccounts, msLoginStep, msLoginStepLabel,
-    isLoggedIn, username, isMicrosoftLogin, isMsLoggingIn,
+    isLoggedIn, username, isMicrosoftLogin, isMsLoggingIn, isRestoring,
     loginOffline, startMsLogin, cancelMsLogin, refreshMsToken,
     loadMsAccounts, loadOfflineAccounts, removeMsAccount, switchMsAccount,
     removeOfflineAccount, switchOfflineAccount,

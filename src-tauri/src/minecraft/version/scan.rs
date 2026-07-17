@@ -225,8 +225,8 @@ fn detect_loaders(
     )
 }
 
-/// 提取原版版本号
-fn extract_original_version(json: &serde_json::Value, _json_content: &str) -> Option<String> {
+/// 提取原版版本号（pub(crate) 供 commands 层复用）
+pub(crate) fn extract_original_version(json: &serde_json::Value, _json_content: &str) -> Option<String> {
     // 策略1: 从 inheritsFrom 获取
     if let Some(inherits) = json["inheritsFrom"].as_str() {
         return Some(inherits.to_string());

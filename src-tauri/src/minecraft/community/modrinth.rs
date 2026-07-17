@@ -382,6 +382,28 @@ async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String>
     let is_official = base == MR_OFFICIAL_BASE;
     let start = std::time::Instant::now();
 
+    /// 解析响应：404 单独处理（避免空 body 触发 "EOF while parsing" 警告混淆）
+    async fn parse_resp<T: serde::de::DeserializeOwned>(
+        resp: reqwest::Response,
+        url: &str,
+    ) -> Result<T, String> {
+        let status = resp.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            // 404 视为正常 "未找到"，记 INFO 不报警告（用户查不到 mod 不算异常）
+            crate::log_info!("[Community] MR 资源不存在 (404): {}", url);
+            return Err(format!("Modrinth 资源不存在: {}", url));
+        }
+        if !status.is_success() {
+            let code = status.as_u16();
+            crate::log_warn!("[Community] MR 响应非 2xx: {} ({})", url, code);
+            return Err(format!("Modrinth 响应异常: HTTP {}", code));
+        }
+        resp.json::<T>().await.map_err(|e| {
+            crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
+            format!("Modrinth 响应解析失败: {}", e)
+        })
+    }
+
     let result = if is_official {
         // source=1 时官方请求加超时，超时触发回退；source=2 时不加超时
         if source == 1 {
@@ -391,10 +413,7 @@ async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String>
             )
             .await
             {
-                Ok(Ok(resp)) => resp.json::<T>().await.map_err(|e| {
-                    crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
-                    format!("Modrinth 响应解析失败: {}", e)
-                }),
+                Ok(Ok(resp)) => parse_resp::<T>(resp, &url).await,
                 Ok(Err(e)) => {
                     crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
                     Err(format!("Modrinth 请求失败: {}", e))
@@ -409,37 +428,27 @@ async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String>
             }
         } else {
             // source=2：官方请求不加超时
-            crate::http::get_client()
+            let resp = crate::http::get_client()
                 .get(&url)
                 .send()
                 .await
                 .map_err(|e| {
                     crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
                     format!("Modrinth 请求失败: {}", e)
-                })?
-                .json::<T>()
-                .await
-                .map_err(|e| {
-                    crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
-                    format!("Modrinth 响应解析失败: {}", e)
-                })
+                })?;
+            parse_resp::<T>(resp, &url).await
         }
     } else {
         // 镜像请求不加超时
-        crate::http::get_client()
+        let resp = crate::http::get_client()
             .get(&url)
             .send()
             .await
             .map_err(|e| {
                 crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
                 format!("Modrinth 请求失败: {}", e)
-            })?
-            .json::<T>()
-            .await
-            .map_err(|e| {
-                crate::log_warn!("[Community] MR 响应解析失败: {} ({})", url, e);
-                format!("Modrinth 响应解析失败: {}", e)
-            })
+            })?;
+        parse_resp::<T>(resp, &url).await
     };
 
     match result {
@@ -449,7 +458,9 @@ async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String>
         }
         Err(e) => {
             // 策略 1（缓慢时换镜像）：官方失败时回退镜像
-            if source == 1 && is_official {
+            // 但 404 表示资源真的不存在，重试镜像也无意义（镜像也是 404）
+            let is_not_found = e.starts_with("Modrinth 资源不存在");
+            if source == 1 && is_official && !is_not_found {
                 crate::log_warn!("[Community] MR 官方请求失败，回退镜像: {}", e);
                 let mirror_url = format!("{}{}", MR_MIRROR_BASE, path);
                 let resp = crate::http::get_client()
@@ -460,17 +471,244 @@ async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, String>
                         crate::log_warn!("[Community] MR 镜像请求失败: {} ({:?})", mirror_url, e);
                         format!("Modrinth 镜像请求失败: {}", e)
                     })?;
-                let value: T = resp.json().await
-                    .map_err(|e| {
-                        crate::log_warn!("[Community] MR 镜像响应解析失败: {} ({})", mirror_url, e);
-                        format!("Modrinth 镜像响应解析失败: {}", e)
-                    })?;
+                let value: T = parse_resp::<T>(resp, &mirror_url).await?;
                 crate::log_info!("[Community] MR 镜像请求成功: {} ({})", mirror_url, fmt_elapsed(start));
                 return Ok(value);
             }
             Err(e)
         }
     }
+}
+
+/// 发送 POST 请求（参考 PCL2 `DlModRequest` 对 MR POST 接口的处理）
+///
+/// 与 `mr_get` 一致的 source 策略和 404 处理。
+/// 用于 `/v2/version_files` 批量按 hash 查询本地 mod 对应的工程。
+async fn mr_post<T: serde::de::DeserializeOwned>(
+    path: &str,
+    body: String,
+) -> Result<T, String> {
+    let (base, source) = pick_base();
+    let url = format!("{}{}", base, path);
+
+    const MR_OFFICIAL_TIMEOUT_SECS: u64 = 20;
+    let is_official = base == MR_OFFICIAL_BASE;
+    let start = std::time::Instant::now();
+
+    /// 解析 POST 响应（复用 mr_get 的 404 优雅处理逻辑）
+    async fn parse_post_resp<T: serde::de::DeserializeOwned>(
+        resp: reqwest::Response,
+        url: &str,
+    ) -> Result<T, String> {
+        let status = resp.status();
+        if status == reqwest::StatusCode::NOT_FOUND {
+            crate::log_info!("[Community] MR POST 资源不存在 (404): {}", url);
+            return Err(format!("Modrinth 资源不存在: {}", url));
+        }
+        if !status.is_success() {
+            let code = status.as_u16();
+            crate::log_warn!("[Community] MR POST 响应非 2xx: {} ({})", url, code);
+            return Err(format!("Modrinth 响应异常: HTTP {}", code));
+        }
+        resp.json::<T>().await.map_err(|e| {
+            crate::log_warn!("[Community] MR POST 响应解析失败: {} ({})", url, e);
+            format!("Modrinth 响应解析失败: {}", e)
+        })
+    }
+
+    let result = if is_official && source == 1 {
+        // source=1：官方请求加超时
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(MR_OFFICIAL_TIMEOUT_SECS),
+            crate::http::get_client()
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .body(body.clone())
+                .send(),
+        )
+        .await
+        {
+            Ok(Ok(resp)) => parse_post_resp::<T>(resp, &url).await,
+            Ok(Err(e)) => {
+                crate::log_warn!("[Community] MR POST 请求失败: {} ({:?})", url, e);
+                Err(format!("Modrinth 请求失败: {}", e))
+            }
+            Err(_) => {
+                crate::log_warn!(
+                    "[Community] MR POST 官方请求超时（{}s），回退镜像",
+                    MR_OFFICIAL_TIMEOUT_SECS
+                );
+                Err(format!(
+                    "Modrinth 官方请求超时（{}s）",
+                    MR_OFFICIAL_TIMEOUT_SECS
+                ))
+            }
+        }
+    } else {
+        // source=2 官方不加超时 / source=0 直接镜像
+        let resp = crate::http::get_client()
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .body(body.clone())
+            .send()
+            .await
+            .map_err(|e| {
+                crate::log_warn!("[Community] MR POST 请求失败: {} ({:?})", url, e);
+                format!("Modrinth 请求失败: {}", e)
+            })?;
+        parse_post_resp::<T>(resp, &url).await
+    };
+
+    match result {
+        Ok(value) => {
+            crate::log_info!("[Community] MR POST 请求成功: {} ({})", url, fmt_elapsed(start));
+            Ok(value)
+        }
+        Err(e) => {
+            let is_not_found = e.starts_with("Modrinth 资源不存在");
+            if source == 1 && is_official && !is_not_found {
+                crate::log_warn!("[Community] MR POST 官方请求失败，回退镜像: {}", e);
+                let mirror_url = format!("{}{}", MR_MIRROR_BASE, path);
+                let resp = crate::http::get_client()
+                    .post(&mirror_url)
+                    .header("Content-Type", "application/json")
+                    .body(body)
+                    .send()
+                    .await
+                    .map_err(|e| {
+                        crate::log_warn!(
+                            "[Community] MR POST 镜像请求失败: {} ({:?})",
+                            mirror_url,
+                            e
+                        );
+                        format!("Modrinth 镜像请求失败: {}", e)
+                    })?;
+                let value: T = parse_post_resp::<T>(resp, &mirror_url).await?;
+                crate::log_info!(
+                    "[Community] MR POST 镜像请求成功: {} ({})",
+                    mirror_url,
+                    fmt_elapsed(start)
+                );
+                return Ok(value);
+            }
+            Err(e)
+        }
+    }
+}
+
+/// 按 SHA1 批量查询 Modrinth 工程详情
+///
+/// 参考 PCL2 `LocalResourceOnlineLoad` 步骤 1-3：
+/// 1. POST `/v2/version_files` 用 SHA1 查 version 和 project_id
+/// 2. 收集所有 project_id
+/// 3. GET `/v2/projects?ids=[...]` 批量查询工程详情
+///
+/// 返回 `sha1 → ResourceProject` 映射（未查到的不在 map 中）
+pub async fn version_files_search(
+    sha1s: Vec<String>,
+    rtype: ResourceType,
+) -> Result<std::collections::HashMap<String, ResourceProject>, String> {
+    if sha1s.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let _ = rtype;
+
+    // 步骤 1：POST /version_files 批量查询
+    let body = serde_json::json!({
+        "hashes": sha1s,
+        "algorithm": "sha1"
+    })
+    .to_string();
+
+    // 响应结构：{ "<sha1>": { "id": version_id, "project_id": "...", "files": [{ "hashes": { "sha1": "..." }}], ... } }
+    type VersionFilesResp = std::collections::HashMap<String, MrVersionFileEntry>;
+
+    #[derive(Deserialize)]
+    struct MrVersionFileEntry {
+        #[serde(default)]
+        project_id: String,
+        #[serde(default)]
+        files: Vec<MrFile>,
+    }
+
+    let resp: VersionFilesResp = mr_post("/version_files", body).await?;
+    crate::log_info!(
+        "[Community] MR version_files 查询命中 {} / {} 个",
+        resp.len(),
+        sha1s.len()
+    );
+
+    if resp.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // 步骤 2：构建 sha1 → project_id 映射，收集所有 project_id
+    let mut sha1_to_project_id: std::collections::HashMap<String, String> =
+        std::collections::HashMap::new();
+    let mut project_ids: Vec<String> = Vec::new();
+    for (sha1, entry) in &resp {
+        if entry.project_id.is_empty() {
+            continue;
+        }
+        // 校验 file.hashes.sha1 与查询的 sha1 一致（防 MR 返回错位，参考 PCL2 第 148 行）
+        let sha1_match = entry.files.iter().any(|f| {
+            f.hashes
+                .as_ref()
+                .and_then(|h| h.sha1.as_deref())
+                .map(|s| s == sha1)
+                .unwrap_or(false)
+        });
+        if !sha1_match {
+            continue;
+        }
+        sha1_to_project_id.insert(sha1.clone(), entry.project_id.clone());
+        if !project_ids.contains(&entry.project_id) {
+            project_ids.push(entry.project_id.clone());
+        }
+    }
+
+    if project_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // 步骤 3：GET /projects?ids=[...] 批量查询工程详情
+    let ids_json = serde_json::to_string(&project_ids).unwrap_or_else(|_| "[]".to_string());
+    let encoded = urlencoding::encode(&ids_json).to_string();
+    let path = format!("/projects?ids={}", encoded);
+
+    let projects: Vec<MrProject> = match mr_get::<Vec<MrProject>>(&path).await {
+        Ok(p) => p,
+        Err(e) => {
+            crate::log_warn!("[Community] MR 批量查询 projects 失败: {}", e);
+            return Ok(std::collections::HashMap::new());
+        }
+    };
+
+    // 构建 project_id → ResourceProject 映射
+    let mut pid_to_project: std::collections::HashMap<String, ResourceProject> =
+        std::collections::HashMap::new();
+    for p in &projects {
+        let project = convert_project(p, ResourceType::Mod);
+        super::cache::set_project("MR", &p.id, &project);
+        pid_to_project.insert(p.id.clone(), project);
+    }
+
+    // 步骤 4：构建 sha1 → ResourceProject 映射返回
+    let mut result: std::collections::HashMap<String, ResourceProject> =
+        std::collections::HashMap::new();
+    for (sha1, pid) in &sha1_to_project_id {
+        if let Some(project) = pid_to_project.get(pid) {
+            result.insert(sha1.clone(), project.clone());
+        }
+    }
+
+    crate::log_info!(
+        "[Community] MR version_files 批量查询完成：{} 个工程 → {} 个本地文件",
+        pid_to_project.len(),
+        result.len()
+    );
+
+    Ok(result)
 }
 
 /// Modrinth 搜索
@@ -533,6 +771,41 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
     let versions: Vec<ResourceVersion> = resp.iter().map(convert_version).collect();
     super::cache::set_versions("MR", project_id, &versions);
     Ok(versions)
+}
+
+/// 批量查询 project 信息，返回 `project_id → slug` 映射
+///
+/// 用于整合包安装时按 `community_filename_format` 重命名 mod 文件：
+/// 从 MR 整合包 files[].downloads URL 提取 project_id →
+/// 调 `GET /projects?ids=[...]` 批量查询 → 拿 slug → 查 mcmod 译名 → 应用文件名格式。
+///
+/// 失败时返回空 map（不阻断下载，只是文件名不应用格式）。
+pub async fn batch_get_project_slugs(
+    project_ids: &[String],
+) -> std::collections::HashMap<String, String> {
+    if project_ids.is_empty() {
+        return std::collections::HashMap::new();
+    }
+
+    // Modrinth API: GET /projects?ids=["id1","id2"]
+    let ids_json = serde_json::to_string(project_ids).unwrap_or_else(|_| "[]".to_string());
+    let encoded = urlencoding::encode(&ids_json).to_string();
+    let path = format!("/projects?ids={}", encoded);
+
+    match mr_get::<Vec<MrProject>>(&path).await {
+        Ok(projects) => {
+            let map: std::collections::HashMap<String, String> = projects
+                .into_iter()
+                .filter_map(|p| p.slug.map(|s| (p.id, s)))
+                .collect();
+            crate::log_info!("[Community] MR 批量查询 projects 成功: {} 条", map.len());
+            map
+        }
+        Err(e) => {
+            crate::log_warn!("[Community] MR 批量查询 projects 失败: {}", e);
+            std::collections::HashMap::new()
+        }
+    }
 }
 
 /// 简单 URL 编码参数列表

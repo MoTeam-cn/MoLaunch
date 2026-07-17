@@ -200,42 +200,10 @@ pub async fn export_launch_script(
     })?;
 
     // 尝试限制文件权限为当前用户（防止 access_token 被其他用户读取）
-    restrict_script_permissions(std::path::Path::new(&save_path));
+    crate::minecraft::system::shell::restrict_file_permissions(std::path::Path::new(&save_path));
 
     log_info!("Launch script exported to: {}", save_path);
     Ok(())
-}
-
-/// 尽力限制导出脚本文件权限为当前用户（防止 access_token 被其他用户读取）
-fn restrict_script_permissions(path: &std::path::Path) {
-    #[cfg(target_os = "windows")]
-    {
-        // Windows: 使用 icacls 移除继承权限并仅保留当前用户完全控制
-        let username = std::env::var("USERNAME").unwrap_or_default();
-        if !username.is_empty() {
-            let grant = format!("{}:F", username);
-            let result = std::process::Command::new("icacls")
-                .arg(path)
-                .arg("/inheritance:r")
-                .arg("/grant:r")
-                .arg(&grant)
-                .output();
-            if let Err(e) = result {
-                log_warn!("[ExportScript] Failed to restrict file permissions: {}", e);
-            }
-        }
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
-            log_warn!("[ExportScript] Failed to restrict file permissions: {}", e);
-        }
-    }
-    #[cfg(not(any(target_os = "windows", unix)))]
-    {
-        let _ = path;
-    }
 }
 
 /// 解析脚本使用的 Java 路径（优先用户指定 → 否则按 MC 版本自动检测）

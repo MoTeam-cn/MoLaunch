@@ -9,6 +9,7 @@ pub mod loaders;
 pub mod manage;
 pub mod mods;
 pub mod personalization;
+pub mod preload;
 pub mod progress;
 pub mod script_export;
 pub mod types;

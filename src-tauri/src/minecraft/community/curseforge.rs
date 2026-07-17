@@ -116,6 +116,12 @@ struct CfCategory {
 #[serde(rename_all = "camelCase")]
 struct CfFile {
     id: i64,
+    /// 文件的 MurmurHash2 指纹（与请求 /fingerprints/432 时传入的指纹一致）
+    ///
+    /// 参考 PCL2 `Project("file")("fileFingerprint")`：用于反查 exactMatches[i] 对应哪个本地指纹。
+    /// 注意：CF 的 fileFingerprint 是 uint32 number，不是字符串。
+    #[serde(default)]
+    file_fingerprint: u32,
     #[serde(default)]
     display_name: String,
     #[serde(default)]
@@ -372,6 +378,248 @@ fn build_cf_request(url: &str, api_key: Option<&str>) -> reqwest::RequestBuilder
     req
 }
 
+/// 构造 CF POST 请求（附加 API Key header + JSON body）
+fn build_cf_post_request(
+    url: &str,
+    api_key: Option<&str>,
+    body: String,
+) -> reqwest::RequestBuilder {
+    let mut req = crate::http::get_client()
+        .post(url)
+        .header("Content-Type", "application/json")
+        .body(body);
+    if let Some(key) = api_key {
+        req = req.header("x-api-key", key);
+        req = req.header("Accept", "application/json");
+    }
+    req
+}
+
+/// 发送 POST 请求（参考 PCL2 DlModRequest 对 CF POST 接口的处理）
+///
+/// 与 `cf_get` 一致的 source 策略：
+/// - source=1 时官方失败回退镜像
+/// - source=0 强制镜像
+/// - source=2 强制官方
+async fn cf_post<T: serde::de::DeserializeOwned>(
+    path: &str,
+    body: String,
+) -> Result<T, String> {
+    let (base, api_key, source) = get_cf_config().await;
+    let url = format!("{}{}", base, path);
+
+    const CF_OFFICIAL_TIMEOUT_SECS: u64 = 15;
+    let is_official = base == CF_OFFICIAL_BASE;
+    let start = Instant::now();
+
+    let result = if is_official {
+        let req = build_cf_post_request(&url, api_key.as_deref(), body.clone());
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(CF_OFFICIAL_TIMEOUT_SECS),
+            req.send(),
+        )
+        .await
+        {
+            Ok(Ok(resp)) => resp.json::<T>().await.map_err(|e| {
+                crate::log_warn!("[Community] CF POST 响应解析失败: {} ({})", url, e);
+                format!("CurseForge 响应解析失败: {}", e)
+            }),
+            Ok(Err(e)) => {
+                crate::log_warn!("[Community] CF POST 请求失败: {} ({:?})", url, e);
+                Err(format!("CurseForge 请求失败: {}", e))
+            }
+            Err(_) => {
+                crate::log_warn!(
+                    "[Community] CF POST 官方请求超时（{}s），{}",
+                    CF_OFFICIAL_TIMEOUT_SECS,
+                    if source == 1 { "回退镜像" } else { "报错" }
+                );
+                Err(format!(
+                    "CurseForge 官方请求超时（{}s）",
+                    CF_OFFICIAL_TIMEOUT_SECS
+                ))
+            }
+        }
+    } else {
+        let req = build_cf_post_request(&url, api_key.as_deref(), body.clone());
+        req.send()
+            .await
+            .map_err(|e| {
+                crate::log_warn!("[Community] CF POST 请求失败: {} ({:?})", url, e);
+                format!("CurseForge 请求失败: {}", e)
+            })?
+            .json::<T>()
+            .await
+            .map_err(|e| {
+                crate::log_warn!("[Community] CF POST 响应解析失败: {} ({})", url, e);
+                format!("CurseForge 响应解析失败: {}", e)
+            })
+    };
+
+    match result {
+        Ok(value) => {
+            crate::log_info!("[Community] CF POST 请求成功: {} ({})", url, fmt_elapsed(start));
+            Ok(value)
+        }
+        Err(e) => {
+            // 策略 1：官方失败时回退镜像
+            if source == 1 && is_official {
+                crate::log_warn!("[Community] CF POST 官方请求失败，回退镜像: {}", e);
+                let mirror_url = format!("{}{}", CF_MIRROR_BASE, path);
+                let req = build_cf_post_request(&mirror_url, None, body);
+                let resp = req.send().await.map_err(|e| {
+                    crate::log_warn!(
+                        "[Community] CF POST 镜像请求失败: {} ({:?})",
+                        mirror_url,
+                        e
+                    );
+                    format!("CurseForge 镜像请求失败: {}", e)
+                })?;
+                let value: T = resp.json().await.map_err(|e| {
+                    crate::log_warn!(
+                        "[Community] CF POST 镜像响应解析失败: {} ({})",
+                        mirror_url,
+                        e
+                    );
+                    format!("CurseForge 镜像响应解析失败: {}", e)
+                })?;
+                crate::log_info!(
+                    "[Community] CF POST 镜像请求成功: {} ({})",
+                    mirror_url,
+                    fmt_elapsed(start)
+                );
+                return Ok(value);
+            }
+            Err(e)
+        }
+    }
+}
+
+/// 按 MurmurHash2 指纹批量查询 CurseForge 工程详情
+///
+/// 参考 PCL2 `LocalResourceOnlineLoad` 步骤 1-3：
+/// 1. POST `/v1/fingerprints/432` 用指纹查 modId 和文件信息
+/// 2. 从响应提取所有 modId
+/// 3. POST `/v1/mods` 批量查询工程详情
+///
+/// 返回 `fingerprint → ResourceProject` 映射（未查到的指纹不在 map 中）
+pub async fn fingerprint_search(
+    fingerprints: Vec<u32>,
+    rtype: ResourceType,
+) -> Result<std::collections::HashMap<u32, ResourceProject>, String> {
+    if fingerprints.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    let _ = rtype; // 预留：未来可能按 rtype 过滤
+
+    // 步骤 1：POST /fingerprints/432 批量查询指纹
+    let body = serde_json::json!({
+        "fingerprints": fingerprints
+    })
+    .to_string();
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct FingerprintResp {
+        #[serde(default)]
+        data: FingerprintData,
+    }
+
+    #[derive(Deserialize, Default)]
+    #[serde(rename_all = "camelCase")]
+    struct FingerprintData {
+        #[serde(default)]
+        exact_matches: Vec<ExactMatch>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ExactMatch {
+        /// 匹配到的 modId（CF API 中 exactMatches[i].id 就是 modId）
+        ///
+        /// 参考 PCL2 `Project("id").ToString` 直接作为 ProjectId 用于 `POST /v1/mods` 查询。
+        #[serde(default)]
+        id: Option<i64>,
+        /// 匹配到的文件详情（含 fileFingerprint 反查指纹）
+        #[serde(default)]
+        file: Option<CfFile>,
+    }
+
+    let resp: FingerprintResp = cf_post("/fingerprints/432", body).await?;
+    crate::log_info!(
+        "[Community] CF fingerprint 查询命中 {} / {} 个",
+        resp.data.exact_matches.len(),
+        fingerprints.len()
+    );
+
+    if resp.data.exact_matches.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // 步骤 2：收集所有 modId，构建 fingerprint → modId 映射
+    //
+    // 参考 PCL2 `LocalResourceLoaders.vb` 第 223-234 行：
+    //   Dim ProjectId = Project("id").ToString                         ' modId
+    //   Dim Hash As UInteger = Project("file")("fileFingerprint")     ' 指纹
+    //
+    // CF 返回的 exactMatches 中，每条的 `id` 是 modId，`file.fileFingerprint` 是
+    // 本地文件的 MurmurHash2 指纹（与请求时传入的指纹一致），用它反查本地文件。
+    let mut fp_to_modid: std::collections::HashMap<u32, i64> = std::collections::HashMap::new();
+    let mut mod_ids: Vec<i64> = Vec::new();
+    for m in &resp.data.exact_matches {
+        if let (Some(id), Some(file)) = (m.id, m.file.as_ref()) {
+            let fp = file.file_fingerprint;
+            fp_to_modid.insert(fp, id);
+            if !mod_ids.contains(&id) {
+                mod_ids.push(id);
+            }
+        }
+    }
+
+    if mod_ids.is_empty() {
+        crate::log_warn!(
+            "[Community] CF fingerprint 响应中无法提取任何 modId（exactMatches={} 但 id/file 字段缺失）",
+            resp.data.exact_matches.len()
+        );
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // 步骤 3：POST /mods 批量查询工程详情
+    let body2 = serde_json::json!({ "modIds": mod_ids }).to_string();
+    #[derive(Deserialize)]
+    struct ModsResp {
+        #[serde(default)]
+        data: Vec<CfModEntry>,
+    }
+    let mods_resp: ModsResp = cf_post("/mods", body2).await?;
+
+    // 构建 modId → ResourceProject 映射
+    let mut modid_to_project: std::collections::HashMap<i64, ResourceProject> =
+        std::collections::HashMap::new();
+    for entry in &mods_resp.data {
+        let project = convert_project(entry, ResourceType::Mod);
+        super::cache::set_project("CF", &entry.id.to_string(), &project);
+        modid_to_project.insert(entry.id, project);
+    }
+
+    // 步骤 4：构建 fingerprint → ResourceProject 映射返回
+    let mut result: std::collections::HashMap<u32, ResourceProject> = std::collections::HashMap::new();
+    for (fp, mod_id) in &fp_to_modid {
+        if let Some(project) = modid_to_project.get(mod_id) {
+            result.insert(*fp, project.clone());
+        }
+    }
+
+    crate::log_info!(
+        "[Community] CF fingerprint 批量查询完成：{} 个工程 → {} 个本地文件",
+        modid_to_project.len(),
+        result.len()
+    );
+
+    Ok(result)
+}
+
 /// CurseForge 搜索
 pub async fn search(
     query: &str,
@@ -430,15 +678,23 @@ pub async fn get_project(project_id: &str, rtype: ResourceType) -> Result<Resour
         return Ok(cached);
     }
 
-    let path = format!("/mods/{}", project_id);
+    // CF API /mods/<id> 只接受数字 modId。
+    // 非数字（slug）走 search 接口：GET /mods/search?gameId=432&slug=<slug>
+    let entry: CfModEntry = if project_id.chars().all(|c| c.is_ascii_digit()) {
+        let path = format!("/mods/{}", project_id);
+        #[derive(Deserialize)]
+        struct Resp { data: CfModEntry }
+        cf_get::<Resp>(&path).await?.data
+    } else {
+        let slug_encoded = urlencoding::encode(project_id);
+        let path = format!("/mods/search?gameId=432&slug={}", slug_encoded);
+        let resp: CfSearchResponse = cf_get(&path).await?;
+        resp.data.into_iter().next().ok_or_else(|| {
+            format!("CurseForge 未找到 slug={} 的 mod", project_id)
+        })?
+    };
 
-    #[derive(Deserialize)]
-    struct Resp {
-        data: CfModEntry,
-    }
-
-    let resp: Resp = cf_get(&path).await?;
-    let project = convert_project(&resp.data, rtype);
+    let project = convert_project(&entry, rtype);
     super::cache::set_project("CF", project_id, &project);
     Ok(project)
 }
@@ -457,6 +713,47 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
     let versions: Vec<ResourceVersion> = resp.data.iter().map(convert_version).collect();
     super::cache::set_versions("CF", project_id, &versions);
     Ok(versions)
+}
+
+/// 批量查询 mod 工程信息，返回 `modId → slug` 映射
+///
+/// 用于整合包安装时按 `community_filename_format` 重命名 mod 文件：
+/// manifest 提供 project_id 列表 → 调 `GET /v1/mods?modIds=...` 批量查询 →
+/// 拿到每个 mod 的 slug → 查 mcmod 译名 → 应用文件名格式。
+///
+/// 失败时返回空 map（不阻断下载，只是文件名不应用格式）。
+pub async fn batch_get_mod_slugs(mod_ids: &[i64]) -> std::collections::HashMap<i64, String> {
+    if mod_ids.is_empty() {
+        return std::collections::HashMap::new();
+    }
+
+    let ids_query = mod_ids
+        .iter()
+        .map(|id| id.to_string())
+        .collect::<Vec<_>>()
+        .join(",");
+    let path = format!("/mods?modIds={}", ids_query);
+
+    #[derive(Deserialize)]
+    struct Resp {
+        data: Vec<CfModEntry>,
+    }
+
+    match cf_get::<Resp>(&path).await {
+        Ok(resp) => {
+            let map: std::collections::HashMap<i64, String> = resp
+                .data
+                .into_iter()
+                .filter_map(|e| e.slug.map(|s| (e.id, s)))
+                .collect();
+            crate::log_info!("[Community] CF 批量查询 mod info 成功: {} 条", map.len());
+            map
+        }
+        Err(e) => {
+            crate::log_warn!("[Community] CF 批量查询 mod info 失败: {}", e);
+            std::collections::HashMap::new()
+        }
+    }
 }
 
 /// CurseForge modLoaderType 参数值

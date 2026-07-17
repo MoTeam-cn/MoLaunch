@@ -862,6 +862,7 @@ struct CfFileEntry {
 /// 安装 CF 整合包依赖 mods
 ///
 /// POST /v1/mods/files 批量查询所有 file_id 的下载信息，然后并发下载到 mods 目录。
+/// 文件名按用户设置的 `community_filename_format` 重命名（查询 mod slug → mcmod 译名 → 应用格式）。
 async fn install_cf_mods(
     state: &AppState,
     manifest_files: &[CfManifestFile],
@@ -903,7 +904,23 @@ async fn install_cf_mods(
 
     log_info!("[Community] CF 批量查询返回 {} 个文件", batch.data.len());
 
-    // 2. 构造下载列表（CF 通常只有一个 download_url，包装为单元素数组）
+    // 2. 批量查询 mod info 拿 slug（用于查 mcmod 译名 + 应用 community_filename_format）
+    //    manifest 提供 project_id 列表，调用 CF /mods?modIds=... 批量查询
+    let project_ids: Vec<i64> = manifest_files.iter().map(|f| f.project_id).collect();
+    let mod_slug_map = crate::minecraft::community::curseforge::batch_get_mod_slugs(&project_ids).await;
+
+    // 3. 构造 file_id → 译名 映射（通过 manifest 关联 file_id 与 project_id）
+    let mut file_translated: std::collections::HashMap<i64, Option<String>> = std::collections::HashMap::new();
+    for mf in manifest_files {
+        let slug = mod_slug_map.get(&mf.project_id);
+        let translated = slug.and_then(|s| crate::minecraft::community::mcmod::lookup_cf(s).map(|n| n.to_string()));
+        file_translated.insert(mf.file_id, translated);
+    }
+
+    // 4. 读取用户设置的文件名格式
+    let filename_format = state.config.lock().await.community_filename_format;
+
+    // 5. 构造下载列表（CF 通常只有一个 download_url，包装为单元素数组）
     let mut download_list: Vec<(Vec<String>, String, u64)> = Vec::with_capacity(batch.data.len());
     let mut total_bytes: u64 = 0;
     for entry in &batch.data {
@@ -912,7 +929,17 @@ async fn install_cf_mods(
             .clone()
             .filter(|u| !u.is_empty())
             .unwrap_or_else(|| construct_cf_edge_url(entry.file_id, &entry.file_name));
-        let target = mods_dir.join(&entry.file_name);
+        // 应用 community_filename_format（无译名时 apply_filename_format 返回原名）
+        let translated = file_translated.get(&entry.file_id).cloned().flatten();
+        let final_name = apply_filename_format(&entry.file_name, translated.as_deref(), filename_format);
+        if final_name != entry.file_name {
+            log_info!(
+                "[Community] CF mod 文件名重命名: {} → {}",
+                entry.file_name,
+                final_name
+            );
+        }
+        let target = mods_dir.join(&final_name);
         download_list.push((vec![primary_url], target.to_string_lossy().to_string(), entry.file_length));
         total_bytes += entry.file_length;
     }
@@ -923,7 +950,7 @@ async fn install_cf_mods(
         format_bytes(total_bytes)
     );
 
-    // 3. 并发下载
+    // 6. 并发下载
     download_files_concurrent(state, 2, &download_list, max_threads, total_bytes).await?;
 
     log_info!("[Community] CF mods 下载完成 ({} 个)", download_list.len());
@@ -964,9 +991,31 @@ struct MrFile {
     file_size: u64,
 }
 
+/// 从 Modrinth 下载 URL 提取 project_id
+///
+/// URL 格式：`https://cdn.modrinth.com/data/<project_id>/versions/<version_id>/<filename>`
+/// 或镜像源 `https://mod.mcimirror.top/.../data/<project_id>/...` 等。
+/// 提取失败返回 None（不影响下载，只是无法应用文件名格式）。
+fn extract_mr_project_id(url: &str) -> Option<String> {
+    // 匹配 /data/<id>/ 片段，id 为字母数字短串（Modrinth 项目 ID 格式）
+    if let Some(start) = url.find("/data/") {
+        let rest = &url[start + "/data/".len()..];
+        if let Some(end) = rest.find('/') {
+            let id = &rest[..end];
+            if !id.is_empty() && id.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+                return Some(id.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// 安装 MR 整合包依赖文件
 ///
 /// 遍历 files[] 直接下载（path 相对于 instance 目录，如 mods/xxx.jar）。
+/// mods/ 目录下的 jar 文件按用户设置的 `community_filename_format` 重命名
+/// （从 downloads URL 提取 project_id → 批量查询拿 slug → 查 mcmod 译名 → 应用格式）。
+/// 非 mods/ 文件（resourcepacks/shaderpacks 等）保留原名（mcmod 数据库只覆盖 mod）。
 async fn install_mr_files(
     state: &AppState,
     mr_files: &[MrFile],
@@ -978,9 +1027,38 @@ async fn install_mr_files(
         return Ok(());
     }
 
+    // 1. 从所有文件的 downloads URL 提取 project_id（仅对 mods/ 路径下的文件）
+    let mut file_project_ids: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
+    let mut all_project_ids: Vec<String> = Vec::new();
+    for (i, f) in mr_files.iter().enumerate() {
+        // 仅对 mods/ 目录下的文件应用命名规范（resourcepacks/shaders 等保留原名）
+        if !f.path.starts_with("mods/") {
+            continue;
+        }
+        if let Some(first_url) = f.downloads.first() {
+            if let Some(pid) = extract_mr_project_id(first_url) {
+                file_project_ids.insert(i, pid.clone());
+                all_project_ids.push(pid);
+            }
+        }
+    }
+
+    // 2. 批量查询 project info 拿 slug，再查 mcmod 译名
+    let slug_map = crate::minecraft::community::modrinth::batch_get_project_slugs(&all_project_ids).await;
+    let mut file_translated: std::collections::HashMap<usize, Option<String>> = std::collections::HashMap::new();
+    for (i, pid) in &file_project_ids {
+        let slug = slug_map.get(pid);
+        let translated = slug.and_then(|s| crate::minecraft::community::mcmod::lookup_mr(s).map(|n| n.to_string()));
+        file_translated.insert(*i, translated);
+    }
+
+    // 3. 读取用户设置的文件名格式
+    let filename_format = state.config.lock().await.community_filename_format;
+
+    // 4. 构造下载列表
     let mut download_list: Vec<(Vec<String>, String, u64)> = Vec::with_capacity(mr_files.len());
     let mut total_bytes: u64 = 0;
-    for f in mr_files {
+    for (i, f) in mr_files.iter().enumerate() {
         if f.downloads.is_empty() {
             log_info!("[Community] MR 文件无下载 URL，跳过: {}", f.path);
             continue;
@@ -991,8 +1069,36 @@ async fn install_mr_files(
             log_info!("[Community] MR 文件所有 URL 为空，跳过: {}", f.path);
             continue;
         }
-        let target = instance_dir.join(&f.path);
-        download_list.push((urls, target.to_string_lossy().to_string(), f.file_size));
+
+        // 对 mods/ 路径下的文件应用 community_filename_format
+        let target_path_str = if f.path.starts_with("mods/") {
+            if let Some(parent) = std::path::Path::new(&f.path).parent() {
+                let orig_name = std::path::Path::new(&f.path)
+                    .file_name()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| f.path.clone());
+                let translated = file_translated.get(&i).cloned().flatten();
+                let final_name = apply_filename_format(&orig_name, translated.as_deref(), filename_format);
+                if final_name != orig_name {
+                    log_info!(
+                        "[Community] MR mod 文件名重命名: {} → {}",
+                        orig_name,
+                        final_name
+                    );
+                }
+                instance_dir
+                    .join(parent)
+                    .join(&final_name)
+                    .to_string_lossy()
+                    .to_string()
+            } else {
+                instance_dir.join(&f.path).to_string_lossy().to_string()
+            }
+        } else {
+            instance_dir.join(&f.path).to_string_lossy().to_string()
+        };
+
+        download_list.push((urls, target_path_str, f.file_size));
         total_bytes += f.file_size;
     }
 

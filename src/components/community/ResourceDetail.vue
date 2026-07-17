@@ -7,7 +7,7 @@
  * - 加载进度条
  */
 
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted, nextTick } from 'vue'
 import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { ModLoaderFlags } from '@/types/community'
 import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, getMcmodUrl, installModpack } from '@/utils/api/community'
@@ -16,7 +16,7 @@ import { useVersionStore } from '@/stores/version'
 import { saveFile } from '@/utils/api/system'
 import { showSuccess, showError } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
-import { useVersionGroups } from '@/composables/useVersionGroups'
+import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import { useCommunityDownload } from '@/composables/useCommunityDownload'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
@@ -38,6 +38,22 @@ interface Props {
   visible: boolean
   project: ResourceProject | null
   versionId?: string
+  /**
+   * 整合包对应的 MC 版本号（如 "1.20.1"）。
+   *
+   * 设置后，弹窗加载版本列表完成时会自动选中顶部筛选 tag
+   * （把 "1.20.1" 截断成 "1.20" 后匹配 filterOptions）。
+   * 用于从 ModTab 打开资源详情时自动定位到整合包对应版本。
+   */
+  gameVersion?: string
+  /**
+   * 整合包的 mods 目录绝对路径。
+   *
+   * 设置后，资源类型为 Mod 时，下载按钮默认保存到该目录
+   * （saveFile 对话框的默认路径会拼接 modsDir + 文件名）。
+   * 用于从 ModTab 打开资源详情时，下载 mod 直接放到整合包的 mods 文件夹。
+   */
+  modsDir?: string
 }
 
 const props = defineProps<Props>()
@@ -65,6 +81,15 @@ watch(
     try {
       versions.value = await getProjectVersions(props.project.platform, props.project.id)
       finish()
+      // 版本列表加载完成后，若传入了 gameVersion（来自 ModTab 的整合包版本），
+      // 自动选中顶部筛选 tag（截断到二级：1.20.1 → "1.20"）
+      if (props.gameVersion) {
+        const target = getFilterVersionName(props.gameVersion)
+        if (target && filterOptions.value.includes(target)) {
+          // 下一 tick 再设置，确保 useVersionGroups 的 watch（flush:sync）已重建 groups
+          nextTick(() => setFilter(target))
+        }
+      }
     } catch (e: any) {
       showError('加载版本列表失败: ' + (e?.message || String(e)))
       fail()
@@ -100,10 +125,12 @@ async function handleDownload(v: ResourceVersion) {
   // 1. 根据用户设置的下载文件名格式生成默认文件名（译名+原名拼接）
   const finalFileName = await formatDownloadFilename(v.file_name, props.project.translated_name)
   // 2. 弹出系统文件管理器让用户选择保存位置
+  //    若传入了 modsDir（从 ModTab 打开），默认定位到整合包的 mods 文件夹
   const savePath = await saveFile(
     '选择保存位置',
     finalFileName,
     [{ name: '所有文件', extensions: ['*'] }],
+    props.modsDir,
   )
   if (!savePath) return // 用户取消
 

@@ -67,8 +67,18 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   const authStore = useAuthStore()
+  // 会话恢复期间不拦截：restoreSession 是异步的，在 App.vue onMounted 中调用。
+  // 若不跳过守卫，应用启动时 currentUser 还是 null，会把已登录用户错误地重定向到 /login。
+  // App.vue 有 isRestoring 加载遮罩覆盖整个恢复期，用户看不到路由变化。
+  if (authStore.isRestoring) {
+    next()
+    return
+  }
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next('/login')
+  } else if (to.path === '/login' && authStore.isLoggedIn) {
+    // 已登录用户访问登录页，重定向到首页
+    next('/apps')
   } else {
     next()
   }

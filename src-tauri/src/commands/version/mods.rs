@@ -48,6 +48,10 @@ pub struct ModInfo {
     /// 前端可直接用作 <img src> 加载
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub logo_data: Option<String>,
+    /// Mod slug（来自 jar 内 metadata：fabric.mod.json 的 id / mods.toml 的 modId / mcmod.info 的 modid）
+    /// 用于「详情」按钮关联 CF/MR 平台工程和「前往百科」按钮查 mcmod.cn 直链
+    #[serde(default)]
+    pub slug: String,
 }
 
 /// 判断版本是否可以安装 Mod（参考 PCL2 McInstance.Modable）
@@ -103,6 +107,12 @@ pub async fn is_version_modable(
 }
 
 /// 列出版本的 Mod（参考 PCL2 LocalResourceLoader 扫描 mods 目录）
+///
+/// **两阶段加载设计**（参考 PCL2 `LocalResourceLoaders.vb` 第 5-102 行）：
+/// - 本函数是同步阶段，**只做文件枚举**，不读 JAR 内容，保证瞬间返回
+/// - 元数据（译名、描述、版本、logo、slug）全部返回空，由 `preload_mods_detail_cmd` 后台异步补全
+/// - 排序规则与 PCL2 一致：只按 `file_name`（含扩展名）字母序升序，**禁用状态不参与排序**
+///   （参考 PCL2 `ModList.OrderBy(Function(m) m.File.Name)`）
 #[tauri::command]
 pub async fn list_mods(
     state: State<'_, AppState>,
@@ -155,41 +165,39 @@ pub async fn list_mods(
 
         let loader_type = infer_loader_type(&file_name);
 
-        // 从 jar 内读取 mod slug + 描述 + 版本 + logo（参考 PCL2 LocalMod.Read)
-        let (translated_name, description, version, logo_data) = read_mod_metadata(&path);
-
+        // 同步阶段不读 JAR 内容！元数据字段全部返回空，由 preload 阶段异步补全
         mods.push(ModInfo {
             file_name,
             enabled_name,
             is_enabled,
             size,
             loader_type,
-            translated_name,
-            description,
-            version,
-            logo_data,
+            translated_name: String::new(),
+            description: String::new(),
+            version: String::new(),
+            logo_data: None,
+            slug: String::new(),
         });
     }
 
-    // 启用的排前面，同状态按文件名排序
-    mods.sort_by(|a, b| {
-        b.is_enabled
-            .cmp(&a.is_enabled)
-            .then_with(|| a.enabled_name.to_lowercase().cmp(&b.enabled_name.to_lowercase()))
-    });
+    // 只按 file_name（含扩展名）字母序升序，禁用状态不参与排序
+    // （参考 PCL2 LocalResourceLoaders.vb 第 88 行：ModList.OrderBy(Function(m) m.File.Name)）
+    mods.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
 
     log_info!("Found {} mods for version {}", mods.len(), version_id);
     Ok(mods)
 }
 
 /// 启用/禁用 Mod（参考 PCL2 EDMods，重命名文件扩展名）
+///
+/// 返回重命名后的新文件名（前端据此原地更新 mod 字段，避免重新加载列表丢失预加载的 project 等信息）。
 #[tauri::command]
 pub async fn toggle_mod(
     state: State<'_, AppState>,
     version_id: String,
     file_name: String,
     enable: bool,
-) -> Result<(), String> {
+) -> Result<String, String> {
     sanitize_version_id(&version_id)?;
     sanitize_file_name(&file_name)?;
     log_info!(
@@ -211,7 +219,7 @@ pub async fn toggle_mod(
 
     // 状态已一致，无需操作
     if is_currently_enabled == enable {
-        return Ok(());
+        return Ok(file_name);
     }
 
     // 计算目标文件名
@@ -244,7 +252,7 @@ pub async fn toggle_mod(
     })?;
 
     log_info!("Mod renamed: {} -> {}", file_name, new_name);
-    Ok(())
+    Ok(new_name)
 }
 
 /// 删除 Mod 文件
@@ -358,7 +366,21 @@ pub async fn open_mods_dir(
 
     let path_str = mods_dir.to_string_lossy().to_string();
     log_info!("Opening mods dir: {}", path_str);
-    crate::commands::system::open_path_impl(&path_str)
+    crate::minecraft::system::shell::open_path(&path_str)
+}
+
+/// 获取版本的 mods 目录路径（不打开，用于前端下载 mod 时指定保存位置）
+#[tauri::command]
+pub async fn get_version_mods_dir(
+    state: State<'_, AppState>,
+    version_id: String,
+) -> Result<String, String> {
+    sanitize_version_id(&version_id)?;
+    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    if !mods_dir.exists() {
+        std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+    }
+    Ok(mods_dir.to_string_lossy().to_string())
 }
 
 /// 在资源管理器中打开并选中指定 Mod 文件（参考 PCL2 Open_Click）
@@ -377,11 +399,11 @@ pub async fn reveal_mod_file(
     }
     let path_str = mod_path.to_string_lossy().to_string();
     log_info!("Revealing mod file: {}", path_str);
-    crate::commands::system::reveal_in_explorer_impl(&path_str)
+    crate::minecraft::system::shell::reveal_in_file_manager(&path_str)
 }
 
-/// 获取版本的 mods 目录路径（内部辅助函数）
-async fn get_mods_dir(
+/// 获取版本的 mods 目录路径（内部辅助函数，pub(crate) 供 preload 命令复用）
+pub(crate) async fn get_mods_dir(
     state: &State<'_, AppState>,
     version_id: &str,
 ) -> Result<std::path::PathBuf, String> {
@@ -442,7 +464,7 @@ fn sanitize_file_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 从 jar 文件内读取 mod 元数据：译名、描述、版本号、logo data URL
+/// 从 jar 文件内读取 mod 元数据：译名、描述、版本号、logo data URL、slug
 ///
 /// 读取顺序（参考 PCL2 LocalMod.Read):
 /// 1. fabric.mod.json → id / description / version / iconPath（Fabric/Quilt）
@@ -451,59 +473,66 @@ fn sanitize_file_name(name: &str) -> Result<(), String> {
 ///
 /// 查到 slug 后用 mcmod 数据库查询译名，查不到返回空字符串
 /// logo 从 jar 内提取并编码为 base64 data URL，未找到则返回 None
-fn read_mod_metadata(
-    path: &std::path::Path,
-) -> (String, String, String, Option<String>) {
+/// slug 也一并返回，用于前端关联 CF/MR 平台工程和查 mcmod.cn 直链
+pub(crate) fn read_mod_metadata(path: &std::path::Path) -> ModMetadata {
     let file = match std::fs::File::open(path) {
         Ok(f) => f,
-        Err(_) => return (String::new(), String::new(), String::new(), None),
+        Err(_) => return ModMetadata::default(),
     };
     let mut archive = match zip::ZipArchive::new(file) {
         Ok(a) => a,
-        Err(_) => return (String::new(), String::new(), String::new(), None),
+        Err(_) => return ModMetadata::default(),
     };
 
     // 尝试 fabric.mod.json
     if let Some(meta) = read_fabric_mod_meta(&mut archive) {
-        let translated = meta
-            .slug
-            .as_deref()
-            .and_then(|s| lookup_translated(s))
-            .unwrap_or_default();
-        let logo = meta
-            .icon_path
-            .as_deref()
-            .and_then(|p| extract_logo_data_url(&mut archive, p));
-        return (translated, meta.description, meta.version, logo);
+        return finalize_metadata(meta, &mut archive);
     }
     // 尝试 META-INF/mods.toml（Forge 1.13+/NeoForge）
     if let Some(meta) = read_forge_mods_toml_meta(&mut archive) {
-        let translated = meta
-            .slug
-            .as_deref()
-            .and_then(|s| lookup_translated(s))
-            .unwrap_or_default();
-        let logo = meta
-            .logo_file
-            .as_deref()
-            .and_then(|p| extract_logo_data_url(&mut archive, p));
-        return (translated, meta.description, meta.version, logo);
+        return finalize_metadata(meta, &mut archive);
     }
     // 尝试 mcmod.info（Forge 1.12-）
     if let Some(meta) = read_mcmod_info_meta(&mut archive) {
-        let translated = meta
-            .slug
-            .as_deref()
-            .and_then(|s| lookup_translated(s))
-            .unwrap_or_default();
-        let logo = meta
-            .logo_file
-            .as_deref()
-            .and_then(|p| extract_logo_data_url(&mut archive, p));
-        return (translated, meta.description, meta.version, logo);
+        return finalize_metadata(meta, &mut archive);
     }
 
-    (String::new(), String::new(), String::new(), None)
+    ModMetadata::default()
+}
+
+/// 把中间结构 ModMeta 转换为最终 ModMetadata（提取 logo + 查译名）
+fn finalize_metadata<R: std::io::Read + std::io::Seek>(
+    meta: ModMeta,
+    archive: &mut zip::ZipArchive<R>,
+) -> ModMetadata {
+    let slug = meta.slug.clone().unwrap_or_default();
+    let translated = meta
+        .slug
+        .as_deref()
+        .and_then(lookup_translated)
+        .unwrap_or_default();
+    // fabric 用 icon_path，forge/mcmod 用 logo_file
+    let logo_path = meta.icon_path.or(meta.logo_file);
+    let logo = logo_path
+        .as_deref()
+        .and_then(|p| extract_logo_data_url(archive, p));
+    ModMetadata {
+        slug,
+        description: meta.description,
+        version: meta.version,
+        logo_data: logo,
+        translated_name: translated,
+    }
+}
+
+/// jar 内 mod metadata 最终结果（供 preload 模块使用）
+#[derive(Debug, Clone, Default, serde::Serialize)]
+pub(crate) struct ModMetadata {
+    pub slug: String,
+    pub description: String,
+    pub version: String,
+    pub logo_data: Option<String>,
+    pub translated_name: String,
 }
 
 /// jar 内 mod metadata 中间结构
