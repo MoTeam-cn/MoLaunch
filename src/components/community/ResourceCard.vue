@@ -13,16 +13,10 @@ import {
   GlobeAltIcon,
   TagIcon,
 } from '@heroicons/vue/24/outline'
+import { formatDownloads } from '@/utils/format'
 
 const props = defineProps<{ project: ResourceProject }>()
 const emit = defineEmits<{ click: [project: ResourceProject] }>()
-
-/** 格式化下载量（参考 PCL2） */
-function formatDownloads(n: number): string {
-  if (n >= 100_000_000) return (n / 100_000_000).toFixed(2) + ' 亿'
-  if (n >= 10_000) return (n / 10_000).toFixed(1).replace(/\.0$/, '') + ' 万'
-  return String(n)
-}
 
 /** 相对时间（参考 PCL2 LabTime） */
 function formatRelativeTime(dateStr: string): string {

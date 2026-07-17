@@ -35,3 +35,16 @@ export function formatMemoryMB(mb: number): string {
   }
   return mb + ' MB'
 }
+
+/**
+ * 格式化下载量（参考 PCL2，中文万/亿单位）
+ *
+ * - >= 1 亿：显示 "X.XX 亿"
+ * - >= 1 万：显示 "X.X 万"（去掉无意义的 .0 后缀）
+ * - 否则：显示原始数字
+ */
+export function formatDownloads(n: number): string {
+  if (n >= 100_000_000) return (n / 100_000_000).toFixed(2) + ' 亿'
+  if (n >= 10_000) return (n / 10_000).toFixed(1).replace(/\.0$/, '') + ' 万'
+  return String(n)
+}

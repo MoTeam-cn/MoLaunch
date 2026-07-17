@@ -9,6 +9,11 @@
 
 ### 修复
 
+#### 代码重构阶段 2.1：整合 formatDownloads 到 utils/format.ts
+- 现象：`formatDownloads` 函数在 `ResourceCard.vue` 和 `ResourceDetail.vue` 中各有一份**完全相同**的实现（中文万/亿单位格式化），违反 DRY 原则
+- 修复：将 `formatDownloads` 提取到已有的 `src/utils/format.ts`，两个组件改为 `import { formatDownloads } from '@/utils/format'`
+- 说明：`ResourceDetail.vue` 的本地 `formatSpeed` 保留（精度与 utils 版本不同：MB/s 用 1 位小数、KB/s 用 0 位小数，属于显示偏好差异，非重复代码）
+
 #### 代码重构阶段 1.11：setup.rs 改用原子写入
 - 现象：`src-tauri/src/minecraft/version/setup.rs` 的 `save_with_options` 和 `ensure_complete` 两个写入点都直接使用 `std::fs::write(&path, content)`，若写入过程中进程崩溃/断电/磁盘满，setup.ini 会处于半写状态，导致版本元数据损坏
 - 修复：改为原子写入模式（与 `storage::Storage::write_config` 一致）：

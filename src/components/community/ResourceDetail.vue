@@ -15,7 +15,7 @@ import { installMerged } from '@/utils/api/loader'
 import { useVersionStore } from '@/stores/version'
 import { saveFile } from '@/utils/api/system'
 import { showSuccess, showError } from '@/utils/toast'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatDownloads } from '@/utils/format'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import { useCommunityDownload } from '@/composables/useCommunityDownload'
@@ -112,12 +112,6 @@ function releaseColor(rt: string): string {
   if (rt === 'Release') return 'bg-green-100 text-green-700'
   if (rt === 'Beta') return 'bg-yellow-100 text-yellow-700'
   return 'bg-gray-100 text-gray-600'
-}
-
-function formatDownloads(n: number): string {
-  if (n >= 100_000_000) return (n / 100_000_000).toFixed(2) + ' 亿'
-  if (n >= 10_000) return (n / 10_000).toFixed(1).replace(/\.0$/, '') + ' 万'
-  return String(n)
 }
 
 async function handleDownload(v: ResourceVersion) {
