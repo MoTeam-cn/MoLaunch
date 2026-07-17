@@ -9,6 +9,16 @@
 
 ### 修复
 
+#### 代码重构阶段 3.10：拆分 SetupTab.vue 为 JavaModeSelector + JavaCustomMode 子组件
+- 现象：`SetupTab.vue` 534 行，其中 Java 选择模式（4 模式：auto/auto_version/folder/custom）独占约 330 行，包含状态、5 个 computed、6 个函数、4 套模式 UI
+- 修复：抽出 2 个子组件到 `views/version-settings/setup-tab/`：
+  - `JavaModeSelector.vue`（219 行）：4 模式下拉框 + auto/auto_version/folder 三种模式 UI；保留状态（javaMode/javaVersionMin/Max/customJavaPath/refreshingJava/javaReqs）、javaReqDesc/javaVersionRangeTip/hasCompatibleJava/pickDefaultJavaPath、handleSaveJavaMode/handleSaveJavaVersionRange、watch(personalization)
+  - `JavaCustomMode.vue`（148 行）：custom 模式 UI（Java 列表 Select + 刷新按钮 + 空状态 + 不兼容警告）；props 接收 customJavaPath/refreshingJava（v-model）+ javaReqs；内部管理 javaOptionsForCustom/customJavaWarning/handleSelectJavaFromList/handleImportJava/handleRefreshJavaList
+- 额外修复：将 `isJavaCompatible` 抽取为 `utils/api/java.ts` 中的纯函数（参数为 majorVersion + reqs），消除父子组件间的逻辑重复
+- 父子组件通过 `useVersionSettings()` 共享状态（模块级单例），无需 props 透传 selectedId/personalization
+- 父组件 `SetupTab.vue` 保留：启动选项（版本隔离/窗口标题/自定义信息）、内存分配（MemorySection 子组件）、服务器、高级选项
+- `SetupTab.vue` 缩减至 187 行
+
 #### 代码重构阶段 3.9：拆分 ResourceDetail.vue 为 3 个子组件
 - 现象：`ResourceDetail.vue` 481 行，模板独占 232 行，混合「头部+操作按钮」「版本分组卡片」「下载进度浮层」3 块独立 UI + 各自的 helper 函数
 - 修复：抽出 3 个子组件到 `components/community/resource-detail/`：

@@ -55,6 +55,20 @@ export async function checkJavaCompatible(
 }
 
 /**
+ * 纯函数：判断某 Java 主版本号是否落在 JavaRequirements 允许的范围内
+ *
+ * @param majorVersion Java 大版本号（如 8、17、21）
+ * @param reqs         后端返回的 Java 需求；为 null 时视为无约束
+ */
+export function isJavaCompatible(majorVersion: number, reqs: JavaRequirements | null): boolean {
+  if (!reqs) return true
+  const { min_java_version: min, max_java_version: max } = reqs
+  if (min && majorVersion < min) return false
+  if (max && majorVersion > max) return false
+  return true
+}
+
+/**
  * Java 下载进度事件名
  */
 export const JAVA_DOWNLOAD_PROGRESS_EVENT = 'java-download-progress'
