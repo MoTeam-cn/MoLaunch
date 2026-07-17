@@ -3,7 +3,6 @@
 //! 提供跨平台 SDK 动态库加载和 FFI 函数绑定
 
 mod ffi_types;
-mod helpers;
 mod instance;
 mod types;
 
@@ -12,7 +11,6 @@ use thiserror::Error;
 
 // Re-export public types
 pub use ffi_types::*;
-pub use helpers::*;
 pub use instance::{SdkFunctions, SdkInstance};
 pub use types::*;
 

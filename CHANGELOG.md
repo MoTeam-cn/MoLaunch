@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 1.10：删除 sdk/helpers.rs 死代码
+- 现象：`src-tauri/src/sdk/helpers.rs` 的 `get_system_memory_static()` 函数存在两个问题：
+  - 每次调用都通过 `libloading::Library::new` 重新加载 DLL，性能开销大（应复用 `SdkInstance` 的共享句柄）
+  - 该函数在整个代码库中**无任何调用方**，属于死代码
+- 实际内存查询路径：`commands::system::get_system_memory` → `minecraft::system::get_system_memory()`（使用 `sysinfo` crate，不经过 SDK）
+- SDK 侧已有 `SdkInstance::get_system_memory()` 方法（使用共享库句柄，实现正确），但同样未被调用
+- 修复：直接删除 `sdk/helpers.rs` 文件，并从 `sdk/mod.rs` 移除 `mod helpers;` 和 `pub use helpers::*;`
+- 决策依据：与阶段 1.6 一致，遵循"删除无引用 dead code"原则；保留 `SdkInstance::get_system_memory()` 方法作为 SDK 公共 API 表面（未来可能启用）
+
 #### 代码重构阶段 1.8：skin.rs 添加 [Skin] 日志前缀规范
 - 现象：`src-tauri/src/minecraft/skin.rs` 的所有 `log_info!`/`log_warn!` 调用使用无前缀的英文消息（如 `"Downloading skin from: {}"`），不符合项目日志规范（其他模块均使用 `[Sources]`/`[Community] CF`/`[Shell]`/`[Chunk]`/`[Natives]` 前缀）
 - 修复：为全部 18 处日志调用添加 `[Skin]` 前缀，并将消息文本统一为中文，与项目其他模块风格一致
