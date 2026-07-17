@@ -18,10 +18,3 @@ export async function getPlatformInfo(): Promise<SdkStatus> {
 export async function getSdkVersion(): Promise<string | null> {
   return await invoke<string | null>('get_sdk_version')
 }
-
-/**
- * 检查 SDK 是否已初始化
- */
-export async function isSdkInitialized(): Promise<boolean> {
-  return await invoke<boolean>('is_sdk_initialized')
-}

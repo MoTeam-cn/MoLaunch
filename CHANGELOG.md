@@ -9,6 +9,16 @@
 
 ### 修复
 
+#### 代码重构阶段 1.6：清理 Dead Code（6 处未引用的 interface/function）
+- 现象：6 处类型/函数定义从未被任何调用方引用，纯死代码：
+  - `src/types/settings.ts` 的 `AppSettings` interface（实际配置走 `ConfigSnapshot`，已被取代）
+  - `src/types/version.ts` 的 `InstalledVersion` interface（`VersionSelect.vue` 自定义了同名本地 interface，未引用此处的）
+  - `src/types/community.ts` 的 `DetailRequest` interface（`getProjectDetail` 直接用内联对象参数）
+  - `src/utils/api/community.ts` 的 `CurseForgeConfig` 和 `CommunityConfig` interfaces（仅作文档说明，无类型引用；对应字段已在 `ConfigSnapshot`/`ConfigPatch` 中）
+  - `src/utils/api/sdk.ts` 的 `isSdkInitialized()` 函数（无任何前端调用方，但后端命令 `is_sdk_initialized` 保留）
+- 修复：删除上述 6 处 dead code；`community.ts` 中两段配置说明改为注释引用 `ConfigSnapshot`/`ConfigPatch` 字段
+- `Theme` 和 `Language` 类型保留（被 `stores/settings.ts` 引用）
+
 #### 代码重构阶段 1.5：统一 DownloadStage 类型定义到 types/download.ts
 - 现象：`DownloadStage` 类型在 3 处重复定义：
   - `stores/version.ts` 定义 `DownloadStage` + `DownloadProgress`

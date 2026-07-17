@@ -110,29 +110,21 @@ export async function getMcmodUrl(platform: Platform, slug: string): Promise<str
 }
 
 // ==================== CurseForge 配置（读写走 getConfig/applyConfig）====================
-
-/** CurseForge 加密配置（API Key 走 SDK DES 加密 + INI 存储） */
-export interface CurseForgeConfig {
-  enabled: boolean
-  apiKey: string
-}
-
+//
+// 类型已内嵌于 `ConfigSnapshot`/`ConfigPatch`（参见 src/utils/api/system.ts）：
+//   - curseforgeEnabled: boolean
+//   - curseforgeApiKey: string   // 后端 SDK DES 加密后存 INI
+//
 // 读取：getConfig() 返回的 curseforgeEnabled / curseforgeApiKey
 // 保存：applyConfig({ curseforgeEnabled, curseforgeApiKey })
 
 // ==================== 社区资源配置（读写走 getConfig/applyConfig）====================
-
-/** 社区资源配置（参考 PCL2 PageSetupSystem "社区资源" 卡片） */
-export interface CommunityConfig {
-  /** 来源策略：0=尽量镜像 / 1=缓慢时换镜像 / 2=尽量官方 */
-  source: number
-  /** 文件名格式：0=【译名】原名 / 1=[译名] 原名 / 2=译名-原名 / 3=原名-译名 / 4=仅原名 */
-  filenameFormat: number
-  /** Mod 管理页显示样式：0=标题译名/详情文件名 / 1=标题文件名/详情译名 */
-  modLocalNameStyle: number
-  /** 在显示 Mod 加载器时忽略 Quilt */
-  ignoreQuilt: boolean
-}
-
+//
+// 类型已内嵌于 `ConfigSnapshot`/`ConfigPatch`（参见 src/utils/api/system.ts）：
+//   - communitySource: number           // 0=尽量镜像 / 1=缓慢时换镜像 / 2=尽量官方
+//   - communityFilenameFormat: number  // 0=【译名】原名 / 1=[译名] 原名 / 2=译名-原名 / 3=原名-译名 / 4=仅原名
+//   - communityModLocalNameStyle: number // 0=标题译名/详情文件名 / 1=标题文件名/详情译名
+//   - communityIgnoreQuilt: boolean
+//
 // 读取：getConfig() 返回的 communitySource / communityFilenameFormat / communityModLocalNameStyle / communityIgnoreQuilt
 // 保存：applyConfig({ communitySource, communityFilenameFormat, communityModLocalNameStyle, communityIgnoreQuilt })

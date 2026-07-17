@@ -120,13 +120,6 @@ export interface InstallModpackResult {
   instanceDir: string
 }
 
-/** 详情请求 */
-export interface DetailRequest {
-  platform: Platform
-  projectId: string
-  resourceType: ResourceType
-}
-
 /** 来源选项 */
 export const SOURCE_OPTIONS = [
   { label: '全部', value: 0 },
