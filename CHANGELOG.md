@@ -9,6 +9,14 @@
 
 ### 修复
 
+#### 代码重构阶段 3.3：拆分 VersionSelect.vue 为 FolderSidebar 子组件
+- 现象：`VersionSelect.vue` 345 行，混合「左侧文件夹管理」和「右侧版本列表」两块相互独立的逻辑
+- 修复：抽出左侧文件夹列表为 `views/version-select/FolderSidebar.vue`（179 行，含切换/添加/移除文件夹逻辑）
+- 父子通信：
+  - 子组件 `defineExpose({ loadFolders })` 暴露刷新接口
+  - 子组件 `emit('switched', path)` 通知父组件重新加载版本列表（父组件直接绑定 `@switched="loadInstalled"`）
+- `VersionSelect.vue` 缩减至 208 行，并移除不再需要的 `invoke`/`showConfirm`/`showPrompt`/`showSuccess`/`showWarning`/`showError` 导入和 `McFolder` 接口
+
 #### 代码重构阶段 2.5：新增 SegmentedButtons.vue 组件
 - 现象：3 按钮选择组（`<div class="flex gap-2"><button :class="active ? ... : ..."/></div>`）在 5 处重复，类名字符串 `border-primary-500 bg-primary-50 text-primary-700` 在 6 个组件中重复
 - 修复：新建 `components/common/SegmentedButtons.vue`，支持 `v-model`（直接赋值）和 `@select`（自定义回调）两种模式
