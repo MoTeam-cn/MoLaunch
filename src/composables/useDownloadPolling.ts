@@ -1,20 +1,7 @@
 import { watch } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { getDownloadProgress } from '@/utils/tauri'
-import type { DownloadStage } from '@/stores/version'
-
-/** 后端返回的阶段原始结构（部分字段可能缺失，需做 fallback） */
-interface RawDownloadStage {
-  name: string
-  progress: number
-  weight: number
-  status: DownloadStage['status']
-  bytes_downloaded: number
-  bytes_total: number
-  files_downloaded?: number
-  files_total?: number
-  group?: string | null
-}
+import type { DownloadStage, RawDownloadStage } from '@/types/download'
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0

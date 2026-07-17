@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 代码重构阶段 1.5：统一 DownloadStage 类型定义到 types/download.ts
+- 现象：`DownloadStage` 类型在 3 处重复定义：
+  - `stores/version.ts` 定义 `DownloadStage` + `DownloadProgress`
+  - `composables/useDownloadPolling.ts` 重复定义 `RawDownloadStage`（与 DownloadStage 字段对应）
+  - `utils/api/system.ts` 内联定义 `getDownloadProgress` 返回类型（又写一遍字段）
+- 修复：新建 `src/types/download.ts` 统一定义 4 个类型：`StageStatus`、`DownloadStage`、`DownloadProgress`、`RawDownloadStage`、`RawDownloadProgress`
+- 重构：
+  - `stores/version.ts` 删除原 `DownloadStage`/`DownloadProgress` 定义，改为 `import type` + `export type` re-export（保持向后兼容）
+  - `composables/useDownloadPolling.ts` 删除 `RawDownloadStage` 定义，改为 `import type` 自 `@/types/download`
+  - `utils/api/system.ts` 的 `getDownloadProgress` 返回类型改用 `RawDownloadProgress`，消除内联定义
+
 #### 代码重构阶段 1.3：消除 resolveVersionIcon 同名不同签名冲突
 - 现象：`useVersionMeta.ts` 导出 `resolveVersionIcon(type: string)`（按 type 查表），`useVersionSettings.ts` 也导出 `resolveVersionIcon(logo, versionId, explicitType?)`（含 logo 优先策略），同名不同签名，调用方极易混淆
 - 修复：将 `useVersionSettings.ts` 的 `resolveVersionIcon` 重命名为 `resolveVersionIconWithLogo`，并补充 JSDoc 说明两者区别

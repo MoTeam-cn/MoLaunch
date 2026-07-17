@@ -6,6 +6,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import type { RawDownloadProgress } from '@/types/download'
 
 // ==================== 系统操作 ====================
 
@@ -305,17 +306,8 @@ export async function setConfigValue(section: string, key: string, value: string
 
 // ==================== 下载进度查询 ====================
 
-/** 获取下载进度快照 */
-export async function getDownloadProgress(): Promise<{
-  stages: { name: string; progress: number; weight: number; status: string; bytes_downloaded: number; bytes_total: number }[]
-  current_stage_index: number
-  global_speed: number
-  global_bytes_downloaded: number
-  global_bytes_total: number
-  is_active: boolean
-  is_complete: boolean
-  error_code: number
-}> {
+/** 获取下载进度快照（返回后端原始结构 RawDownloadProgress，由调用方做 fallback） */
+export async function getDownloadProgress(): Promise<RawDownloadProgress> {
   return await invoke('get_download_progress')
 }
 

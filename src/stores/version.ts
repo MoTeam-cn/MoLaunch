@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { showError, showSuccess, showWarning } from '@/utils/toast'
 import type { VersionInfo } from '@/types/version'
+import type { DownloadProgress } from '@/types/download'
 import * as tauri from '@/utils/tauri'
 import { listen } from '@tauri-apps/api/event'
 
@@ -17,27 +18,8 @@ interface GameExitEvent {
   is_normal: boolean
 }
 
-export interface DownloadStage {
-  name: string
-  progress: number
-  weight: number
-  status: 'waiting' | 'loading' | 'finished' | 'failed'
-  bytes_downloaded: number
-  bytes_total: number
-  files_downloaded: number
-  files_total: number
-  /** 所属任务分组（用于前端按"整合包安装"/"MC本体安装"等分组折叠展开），null 表示独立阶段 */
-  group: string | null
-}
-
-export interface DownloadProgress {
-  stages: DownloadStage[]
-  current_stage_index: number
-  global_speed: number
-  global_bytes_downloaded: number
-  global_bytes_total: number
-  percentage: number
-}
+// 重新导出 DownloadStage/DownloadProgress，保持向后兼容（其他文件可能从 '@/stores/version' import）
+export type { DownloadStage, DownloadProgress } from '@/types/download'
 
 export const useVersionStore = defineStore('version', () => {
   // 状态
