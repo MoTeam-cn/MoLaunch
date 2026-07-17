@@ -3,6 +3,7 @@
 //! Uses INI format for configuration
 
 pub mod ini;
+pub mod registry;
 
 use crate::log_info;
 use crate::resources;

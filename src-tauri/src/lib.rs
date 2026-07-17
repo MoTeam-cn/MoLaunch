@@ -157,6 +157,17 @@ pub fn run() {
             commands::system::get_system_memory,
             commands::system::get_config_value,
             commands::system::set_config_value,
+            // 开发者模式命令
+            commands::system::is_developer_unlocked,
+            commands::system::unlock_developer_mode,
+            commands::system::is_developer_mode,
+            commands::system::set_developer_mode,
+            commands::system::get_storage_dirs,
+            commands::system::get_system_info,
+            // 日志查看命令（开发者模式）
+            logger::get_log_path,
+            logger::list_log_files,
+            logger::read_log_file,
             // 社区资源命令
             commands::community::search::search_resources,
             commands::community::search::get_category_tags,

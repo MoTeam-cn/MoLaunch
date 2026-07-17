@@ -255,7 +255,7 @@ pub fn separator(title: &str) {
 }
 
 /// 获取日志文件路径
-pub fn get_log_path() -> PathBuf {
+pub fn get_log_path_inner() -> PathBuf {
     let storage = Storage::instance();
     let logs_dir = storage.logs_dir();
     let now = chrono::Local::now();
@@ -264,7 +264,7 @@ pub fn get_log_path() -> PathBuf {
 }
 
 /// 获取所有日志文件
-pub fn list_log_files() -> Vec<String> {
+pub fn list_log_files_inner() -> Vec<String> {
     let storage = Storage::instance();
     let logs_dir = storage.logs_dir();
 
@@ -283,8 +283,44 @@ pub fn list_log_files() -> Vec<String> {
 }
 
 /// 读取日志文件内容
-pub fn read_log_file(filename: &str) -> anyhow::Result<String> {
+pub fn read_log_file_inner(filename: &str) -> anyhow::Result<String> {
     let storage = Storage::instance();
     let path = storage.logs_dir().join(filename);
     Ok(std::fs::read_to_string(&path)?)
+}
+
+// ============================================================
+// Tauri 命令包装（供开发者模式「日志查看」调用）
+// ============================================================
+//
+// 原函数返回 PathBuf / Vec<String> / anyhow::Result<String>，
+// 不能直接作为 #[tauri::command]（PathBuf 需要序列化、&str 参数需要 owned）。
+// 这里提供薄包装层转换为 Tauri 友好的返回类型。
+
+/// 获取今日日志文件完整路径（字符串形式）
+#[tauri::command]
+pub fn get_log_path() -> String {
+    get_log_path_inner().to_string_lossy().to_string()
+}
+
+/// 获取所有日志文件名列表（最新的在前）
+#[tauri::command]
+pub fn list_log_files() -> Vec<String> {
+    list_log_files_inner()
+}
+
+/// 读取指定日志文件内容
+///
+/// `filename` 仅允许 `.log` 后缀，且不得包含路径分隔符（防止路径遍历）。
+#[tauri::command]
+pub fn read_log_file(filename: String) -> Result<String, String> {
+    if filename.is_empty()
+        || filename.contains('/')
+        || filename.contains('\\')
+        || filename.contains("..")
+        || !filename.ends_with(".log")
+    {
+        return Err(format!("非法日志文件名: {}", filename));
+    }
+    read_log_file_inner(&filename).map_err(|e| format!("读取日志文件失败: {}", e))
 }

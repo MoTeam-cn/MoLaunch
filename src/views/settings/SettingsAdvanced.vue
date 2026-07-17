@@ -2,9 +2,9 @@
 import { ref, watch, onMounted, nextTick } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
-import { showError } from '@/utils/toast'
 import Alert from '@/components/common/Alert.vue'
 import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
+import DevModeToggle from '@/components/settings/DevModeToggle.vue'
 import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
 import {
   ExclamationTriangleIcon,
@@ -76,6 +76,9 @@ onMounted(async () => {
     </div>
 
     <template v-else>
+    <!-- 开发者模式（仅在「其他」页连续点击版本号 5 次解锁后显示） -->
+    <DevModeToggle />
+
     <!-- 代理配置 -->
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">代理配置</h3>

@@ -7,6 +7,107 @@
 
 ## [未发布]
 
+### 新增
+
+#### 开发者模式功能
+- 触发方式（两者结合）：
+  1. 在「其他」页的应用版本号上连续点击 5 次（1.5 秒内）解锁开发者模式
+  2. 解锁后「高阶配置」顶部显示「开发者模式」开关卡片（关闭/开启 2 按钮样式）
+  3. 开关开启后「设置」侧边菜单末尾追加「开发者」菜单项
+- 存储位置：Windows 注册表 `HKCU\Software\MoLaunch` 下的两个布尔值
+  - `DeveloperUnlocked`：是否已解锁（决定开关卡片是否显示）
+  - `DeveloperMode`：开关是否开启（决定侧边菜单 developer 项是否显示）
+- 开发者页（SettingsDeveloper.vue）4 个卡片：
+  - 日志：日志文件下拉选择 + 黑底等宽字体内容预览（最高 384px 滚动）+ 刷新按钮 + 打开日志目录按钮
+  - 缓存：缓存目录/临时目录路径展示 + 各带「打开」按钮
+  - 存储信息：数据根目录/配置文件/日志目录路径展示 + 各带「打开」按钮
+  - 系统信息：应用版本/操作系统/架构/位数/总内存/已用内存/可用内存/内存使用率
+
+#### 后端：抽象注册表模块到 storage 子目录
+- 现象：注册表操作（reg_key/reg_get/reg_set/reg_delete）原本位于 `minecraft/auth/storage/registry.rs` 内为 `pub(super)`，仅 AuthStorage 可用，新开发者模式无法复用
+- 修复：创建 `src-tauri/src/storage/registry.rs` 子模块，包含 `pub(crate)` 可见性的 `reg_key/reg_get/reg_set/reg_delete` + 新增高层便捷 API `reg_get_bool/reg_set_bool`（布尔值存取）；`minecraft/auth/storage/registry.rs` 仅保留认证专用键名常量；`minecraft/auth/storage/mod.rs` 改用 `crate::storage::registry::{reg_key, reg_get, reg_set, reg_delete}`；`storage/mod.rs` 新增 `pub mod registry;` 声明
+- 非 Windows 平台桩实现保留（保证跨平台编译通过）
+
+#### 后端：新增 commands/system/developer.rs
+- 6 个 Tauri 命令：
+  - `is_developer_unlocked` - 查询开发者模式是否已解锁
+  - `unlock_developer_mode` - 解锁开发者模式（连续点击版本号 5 次后调用）
+  - `is_developer_mode` - 查询开发者模式是否开启
+  - `set_developer_mode` - 设置开关（仅在已解锁时可生效）
+  - `get_storage_dirs` - 返回 `{ base, config, logs, cache, temp }` 路径
+  - `get_system_info` - 返回应用版本/OS/架构/内存等系统信息
+
+#### 后端：暴露日志命令（logger.rs）
+- 原函数 `get_log_path` / `list_log_files` / `read_log_file` 已存在但未加 `#[tauri::command]`，前端无法调用
+- 修复：原函数重命名为 `_inner` 后缀，新增 3 个 `#[tauri::command]` 包装：
+  - `get_log_path` - 返回今日日志文件完整路径（String）
+  - `list_log_files` - 返回日志文件名列表（最新的在前）
+  - `read_log_file` - 读取指定日志文件内容（带路径遍历防护：禁止 `/` `\` `..`，仅允许 `.log` 后缀）
+
+#### 前端：新增 src/utils/api/developer.ts
+- 封装 9 个 invoke 调用 + `StorageDirs` / `SystemInfo` TypeScript 类型
+- 通过 `src/utils/tauri.ts` re-export，复用现有 `import * as tauri from '@/utils/tauri'` 入口
+
+#### 前端：版本号注入与开发者模式触发
+- `vite.config.ts` 新增 `define: { __APP_VERSION__: JSON.stringify(pkg.version) }`，从 package.json 读取版本号注入
+- `src/vite-env.d.ts` 新增 `declare const __APP_VERSION__: string` 类型声明
+- `SettingsOther.vue` 在「配置信息」卡片末尾新增「应用版本」行（可点击），连续点击 5 次解锁开发者模式，Toast 提示剩余次数
+- 版本号行使用项目自定义 Tooltip 组件（position=right, delay=200ms）显示「连续点击 5 次解锁开发者模式」提示，替代原生 title 属性
+
+#### 前端：SettingsAdvanced.vue 开发者模式开关卡片
+- 仅在 `devUnlocked === true` 时显示（`v-if="devUnlocked"`），位于「高阶配置」顶部
+- 「已开启/已关闭」2 按钮样式（与 CurseForge API Key 启用开关一致）
+- 切换时调用 `setDeveloperMode`，成功后派发 `window.dispatchEvent(new CustomEvent('developer-mode-changed', { detail: v }))` 通知父组件
+
+#### 前端：Settings.vue 侧边菜单条件渲染
+- `baseCategories` 数组（5 项基础菜单）+ `developerCategory`（开发者菜单项）
+- `categories` computed：`devModeEnabled` 为 true 时追加 developer 项到末尾
+- `onMounted` 时读取 `isDeveloperMode()` 初始化状态 + 监听 `developer-mode-changed` 事件实时更新
+- 关闭开发者模式时若当前停留在 developer 分类，自动切回「其他」避免空白页
+- `onUnmounted` 清理事件监听
+
+#### 前端：新建 SettingsDeveloper.vue
+- 4 个卡片（重构后日志卡片已抽到 LogViewer.vue，详见下方「前端重构」条目）：
+  - 日志：日志文件 Select 下拉（复用项目自定义组件）+ 黑底等宽字体 pre 内容预览 + 刷新按钮 + 打开日志目录按钮
+  - 缓存：缓存目录/临时目录路径展示 + 各带「打开」按钮
+  - 存储信息：数据根目录/配置文件/日志目录路径展示 + 各带「打开」按钮
+  - 系统信息：应用版本/操作系统/架构/位数/总内存/已用内存/可用内存/内存使用率 8 项
+- 字节数格式化（KB/MB/GB）+ 操作系统/架构友好显示名（windows→Windows / x86_64→x64 (64-bit) 等）
+
+### 重构
+
+#### 前端重构：拆分 SettingsDeveloper.vue / SettingsAdvanced.vue（300 行规范）
+- 现象：开发者模式功能落地后两个 Vue 文件超过项目 300 行规范——
+  - `SettingsDeveloper.vue` 385 行（含 formatBytes 重复实现 / osDisplay / archDisplay / LogLine 接口 / parseLogLines / logLineClass 等可复用函数内联在组件中）
+  - `SettingsAdvanced.vue` 303 行（含开发者模式开关卡片的模板与脚本逻辑与代理/CurseForge 配置混杂）
+- 修复一：抽取可复用纯函数到 TS 工具文件（参考现有 `utils/format.ts` / `utils/mod-display.ts` 模式）
+  - 新建 `src/utils/system-display.ts`（23 行）：`osDisplay` / `archDisplay`，将后端原始 os/arch 字符串映射为本地化显示名
+  - 新建 `src/utils/log-display.ts`（50 行）：`LogLine` 接口 + `parseLogLines`（按 `[LEVEL]` 正则解析为带行号与级别的行数组）+ `logLineClass`（按业界惯例返回级别文字颜色 class，ERROR→红/WARN→黄/INFO→绿/DEBUG→青/TRACE→暗灰）
+  - `formatBytes` 已在 `src/utils/format.ts` 存在（LaunchLog.vue 已在用），原 SettingsDeveloper.vue 内的重复实现删除，改为 `import { formatBytes } from '@/utils/format'`
+- 修复二：抽取日志查看卡片为自包含子组件
+  - 新建 `src/components/settings/LogViewer.vue`（197 行）：包含日志文件 Select 下拉 + RecycleScroller 虚拟滚动渲染 + 黑底深灰滚动条样式，接收 `logsDir` prop 用于「打开目录」按钮
+  - SettingsDeveloper.vue 删除日志查看相关状态（logFiles / selectedLogFile / logContent / logLoading / loadLogFiles / loadLogContent / onLogSelect / refreshLogs / logFileOptions / logLines）与 RecycleScroller / parseLogLines / logLineClass 等 import，改为 `<LogViewer :logs-dir="storageDirs?.logs" />`
+- 修复三：抽取开发者模式开关卡片为自包含子组件
+  - 新建 `src/components/settings/DevModeToggle.vue`（85 行）：包含 devUnlocked / devMode 状态 + toggleDevMode 函数 + onMounted 自行加载注册表状态 + 派发 `developer-mode-changed` window 事件，内部 `v-if="devUnlocked"` 自行控制显隐
+  - SettingsAdvanced.vue 删除 devUnlocked / devMode ref + toggleDevMode 函数 + onMounted 中读取开发者模式状态的代码 + 模板中开发者模式卡片整段（~49 行模板），改为 `<DevModeToggle />`
+- 修复四：SettingsDeveloper.vue 模板去重
+  - 缓存/存储信息/系统信息三张卡片原本各包含手写重复的目录行/信息行模板（每行 ~10 行 × 13 条 = 130 行模板），改为 `cacheEntries` / `storageEntries` / `systemEntries` 三个 computed 数组 + `v-for` 渲染，每张卡片只需 1 个通用行模板
+- 结果：
+  - `SettingsDeveloper.vue`：385 → 153 行（减少 232 行，主要为模板去重 + 抽取日志查看器）
+  - `SettingsAdvanced.vue`：303 → 252 行（减少 51 行，主要为抽取开发者模式开关卡片）
+  - `LogViewer.vue`：197 行（新文件）
+  - `DevModeToggle.vue`：85 行（新文件）
+  - `system-display.ts`：23 行（新文件）
+  - `log-display.ts`：50 行（新文件）
+- 验证：`npm run build` 通过
+
+#### 前端：日志查看器会话分隔标记着色 + 跳过开头空行
+- 现象：后端每次会话开始时打印 `\n=== MoLaunch Started ===`，前端渲染时该行显示为默认白色（与其他原始输出无法区分），且开头多出一个空行
+- 修复（仅改 `src/utils/log-display.ts`）：
+  - 新增 `session` 级别：`=== ... ===` 模式的行匹配为 `session`，对应颜色 `text-indigo-400`（靛蓝，醒目区分启动边界，区别于 INFO 的绿色 / DEBUG 的青色）
+  - `parseLogLines` 跳过开头连续空行（后端 `\n===` 前缀导致的开头空行），中间空行保留（作为日志段落分隔）；行号保留原始文件行号，便于与实际文件对照
+- 验证：`npm run build` 通过
+
 ### 修复
 
 #### 代码重构阶段 4.9：拆分 commands/community/install.rs 为 7 个子模块

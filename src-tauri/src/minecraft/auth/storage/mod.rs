@@ -25,8 +25,9 @@ use crate::sdk::SdkInstance;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
 
+use crate::storage::registry::{reg_delete, reg_get, reg_key, reg_set};
 use registry::{
-    reg_delete, reg_get, reg_key, reg_set, ALL_KEYS, KEY_LEGACY_NAME, KEY_LEGACY_UUID,
+    ALL_KEYS, KEY_LEGACY_NAME, KEY_LEGACY_UUID,
     KEY_LOGIN_TYPE, KEY_MS_ACCOUNTS, KEY_MS_CURRENT_ACCESS, KEY_MS_CURRENT_EXPIRES,
     KEY_MS_CURRENT_NAME, KEY_MS_CURRENT_PROFILE, KEY_MS_CURRENT_REFRESH, KEY_MS_CURRENT_UUID,
     KEY_OFFLINE_ACCOUNTS,

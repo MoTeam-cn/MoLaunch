@@ -19,7 +19,8 @@
     "pinia": "^2.1.7",
     "skinview3d": "^3.4.2",
     "vue": "^3.4.15",
-    "vue-router": "^4.2.5"
+    "vue-router": "^4.2.5",
+    "vue-virtual-scroller": "^3.0.4"
   },
   "devDependencies": {
     "@rushstack/eslint-patch": "^1.6.0",

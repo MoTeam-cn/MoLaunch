@@ -2,12 +2,22 @@
 import { ref, watch, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
 import Select from '@/components/common/Select.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import * as tauri from '@/utils/tauri'
 import { getConfigMap, applyConfig } from '@/utils/api/config'
+import { showInfo, showSuccess } from '@/utils/toast'
 
 const sdkStore = useSdkStore()
 const logLevel = ref(3)
 const configPath = ref('')
+
+// 应用版本（从 package.json 注入，由 vite define 提供；点击 5 次解锁开发者模式）
+const appVersion = __APP_VERSION__
+
+// 开发者模式解锁状态
+const devUnlocked = ref(false)
+const versionClickCount = ref(0)
+let versionClickTimer: ReturnType<typeof setTimeout> | null = null
 
 // 读取日志级别（统一走 getConfigMap，避免使用调试用 getConfigValue）
 async function loadLogLevel() {
@@ -35,6 +45,38 @@ watch(logLevel, (newLevel) => {
   saveLogLevel(newLevel)
 })
 
+// 版本号点击：连续 5 次解锁开发者模式
+async function onVersionClick() {
+  if (devUnlocked.value) return
+
+  versionClickCount.value++
+  const remaining = 5 - versionClickCount.value
+
+  if (versionClickCount.value >= 5) {
+    // 解锁
+    try {
+      await tauri.unlockDeveloperMode()
+      devUnlocked.value = true
+      versionClickCount.value = 0
+      showSuccess('已解锁开发者模式，可在「高阶配置」中开启')
+    } catch (e) {
+      console.error('Failed to unlock developer mode:', e)
+      showError('解锁失败：' + e)
+    }
+    return
+  }
+
+  // 提示还需点击几次
+  showInfo(`再点击 ${remaining} 次解锁开发者模式`)
+
+  // 1.5 秒内未完成 5 次点击则重置计数器
+  if (versionClickTimer) clearTimeout(versionClickTimer)
+  versionClickTimer = setTimeout(() => {
+    versionClickCount.value = 0
+    versionClickTimer = null
+  }, 1500)
+}
+
 onMounted(async () => {
   try {
     configPath.value = await tauri.getConfigPath()
@@ -43,6 +85,11 @@ onMounted(async () => {
     configPath.value = '获取失败'
   }
   await loadLogLevel()
+  try {
+    devUnlocked.value = await tauri.isDeveloperUnlocked()
+  } catch (e) {
+    console.error('Failed to check developer unlocked:', e)
+  }
 })
 </script>
 
@@ -81,6 +128,19 @@ onMounted(async () => {
         <div class="px-5 py-3">
           <p class="text-sm text-gray-500 mb-1">配置文件路径</p>
           <p class="text-xs text-gray-900 font-mono bg-gray-50 px-3 py-2 rounded break-all">{{ configPath || '加载中...' }}</p>
+        </div>
+        <div
+          class="px-5 py-3 flex items-center justify-between cursor-pointer select-none hover:bg-gray-50"
+          @click="onVersionClick"
+        >
+          <span class="text-sm text-gray-500">应用版本</span>
+          <Tooltip
+            :text="devUnlocked ? '开发者模式已解锁' : '连续点击 5 次解锁开发者模式'"
+            position="top"
+            :delay="200"
+          >
+            <span class="text-sm text-gray-900 font-mono">v{{ appVersion }}</span>
+          </Tooltip>
         </div>
       </div>
     </div>

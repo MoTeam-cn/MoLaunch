@@ -2,6 +2,7 @@
 
 mod apply_config;
 mod config;
+mod developer;
 mod download;
 mod game;
 mod game_dir;
@@ -9,6 +10,7 @@ mod proxy;
 
 pub use apply_config::*;
 pub use config::*;
+pub use developer::*;
 pub use game_dir::*;
 
 // download/game/proxy 模块保留为占位（后续如需专属命令可扩展），
