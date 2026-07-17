@@ -9,6 +9,14 @@
 
 ### 修复
 
+#### 代码重构阶段 3.4：拆分 Downloads.vue 为空状态 + 统计面板子组件
+- 现象：`Downloads.vue` 367 行，混合「空状态」「统计面板」「任务列表」三块独立 UI
+- 修复：抽出两个子组件到 `views/downloads/`：
+  - `DownloadEmptyState.vue`（~95 行）：无下载任务时的空状态卡片，含「浏览版本」按钮（内部用 router 跳转）
+  - `DownloadStatsPanel.vue`（~75 行）：左侧统计面板，接收 6 个 props（currentStageName/percentage/speed/bytesDownloaded/bytesTotal/filesRemaining）
+- 父组件保留：进度计算（taskGroups computed）、任务列表模板、折叠/展开状态
+- `Downloads.vue` 缩减至 286 行；同时移除父组件不再需要的 `useRouter`、`useRouter`-related `goToVersions`、`formatSpeed` 等导入
+
 #### 代码重构阶段 3.3：拆分 VersionSelect.vue 为 FolderSidebar 子组件
 - 现象：`VersionSelect.vue` 345 行，混合「左侧文件夹管理」和「右侧版本列表」两块相互独立的逻辑
 - 修复：抽出左侧文件夹列表为 `views/version-select/FolderSidebar.vue`（179 行，含切换/添加/移除文件夹逻辑）
