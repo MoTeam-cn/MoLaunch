@@ -9,6 +9,14 @@
 
 ### 修复
 
+#### 代码重构阶段 1.8：skin.rs 添加 [Skin] 日志前缀规范
+- 现象：`src-tauri/src/minecraft/skin.rs` 的所有 `log_info!`/`log_warn!` 调用使用无前缀的英文消息（如 `"Downloading skin from: {}"`），不符合项目日志规范（其他模块均使用 `[Sources]`/`[Community] CF`/`[Shell]`/`[Chunk]`/`[Natives]` 前缀）
+- 修复：为全部 18 处日志调用添加 `[Skin]` 前缀，并将消息文本统一为中文，与项目其他模块风格一致
+- 说明：本模块直接使用 `http::get_client()` 而非 `sources::fetch_with_fallback`，因为：
+  - 皮肤/披风 PNG 为二进制下载，`fetch_with_fallback` 仅返回 String 文本
+  - 目标域名 `textures.minecraft.net` 和 `api.minecraftservices.com` 没有 BMCLAPI 镜像，无回退需求
+  - 已在源码顶部添加注释说明此决策
+
 #### 代码重构阶段 1.6：清理 Dead Code（6 处未引用的 interface/function）
 - 现象：6 处类型/函数定义从未被任何调用方引用，纯死代码：
   - `src/types/settings.ts` 的 `AppSettings` interface（实际配置走 `ConfigSnapshot`，已被取代）

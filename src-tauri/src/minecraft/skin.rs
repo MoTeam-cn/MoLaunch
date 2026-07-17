@@ -11,6 +11,16 @@ use crate::log_info;
 use crate::log_warn;
 use serde::{Deserialize, Serialize};
 
+// ─────────────────────────────────────────────────────────────
+// 关于不使用 sources::fetch_with_fallback 的说明
+// ─────────────────────────────────────────────────────────────
+// 本模块的所有 HTTP 请求目标为 Mojang 官方 API：
+//   - textures.minecraft.net（皮肤/披风 PNG 二进制）
+//   - api.minecraftservices.com（profile / skins / capes）
+// 这些端点没有 BMCLAPI 镜像，且 PNG 下载为二进制流，
+// 而 sources::fetch_with_fallback 仅返回 String 文本。
+// 因此本模块直接使用 http::get_client()，不经过 sources 模块。
+
 /// 皮肤上传端点
 const SKIN_UPLOAD_URL: &str = "https://api.minecraftservices.com/minecraft/profile/skins";
 
@@ -175,7 +185,7 @@ pub fn get_skin_url(profile_json: &str) -> Option<String> {
 ///
 /// 直接从 textures.minecraft.net 下载，返回 PNG 字节流
 pub async fn download_skin_png(skin_url: &str) -> Result<Vec<u8>, String> {
-    log_info!("Downloading skin from: {}", skin_url);
+    log_info!("[Skin] 下载皮肤: {}", skin_url);
 
     let client = http::get_client();
     let response = client
@@ -187,7 +197,7 @@ pub async fn download_skin_png(skin_url: &str) -> Result<Vec<u8>, String> {
     let status = response.status();
     if !status.is_success() {
         let body = response.text().await.unwrap_or_default();
-        log_warn!("Skin download failed: {} - {}", status, body);
+        log_warn!("[Skin] 皮肤下载失败: {} - {}", status, body);
         return Err(format!("download skin HTTP {}: {}", status, body));
     }
 
@@ -196,7 +206,7 @@ pub async fn download_skin_png(skin_url: &str) -> Result<Vec<u8>, String> {
         .await
         .map_err(|e| format!("read skin bytes error: {}", e))?;
 
-    log_info!("Skin downloaded: {} bytes", bytes.len());
+    log_info!("[Skin] 皮肤已下载: {} 字节", bytes.len());
     Ok(bytes.to_vec())
 }
 
@@ -211,7 +221,7 @@ pub fn get_cape_url(profile_json: &str) -> Option<String> {
 
 /// 下载披风 PNG 二进制数据
 pub async fn download_cape_png(cape_url: &str) -> Result<Vec<u8>, String> {
-    log_info!("Downloading cape from: {}", cape_url);
+    log_info!("[Skin] 下载披风: {}", cape_url);
 
     let client = http::get_client();
     let response = client
@@ -223,7 +233,7 @@ pub async fn download_cape_png(cape_url: &str) -> Result<Vec<u8>, String> {
     let status = response.status();
     if !status.is_success() {
         let body = response.text().await.unwrap_or_default();
-        log_warn!("Cape download failed: {} - {}", status, body);
+        log_warn!("[Skin] 披风下载失败: {} - {}", status, body);
         return Err(format!("download cape HTTP {}: {}", status, body));
     }
 
@@ -232,7 +242,7 @@ pub async fn download_cape_png(cape_url: &str) -> Result<Vec<u8>, String> {
         .await
         .map_err(|e| format!("read cape bytes error: {}", e))?;
 
-    log_info!("Cape downloaded: {} bytes", bytes.len());
+    log_info!("[Skin] 披风已下载: {} 字节", bytes.len());
     Ok(bytes.to_vec())
 }
 
@@ -246,7 +256,7 @@ pub async fn upload_skin(
     variant: &str,
 ) -> Result<(), String> {
     log_info!(
-        "Uploading skin, variant={}, size={} bytes",
+        "[Skin] 上传皮肤: model={}, size={} 字节",
         variant,
         png_data.len()
     );
@@ -277,17 +287,17 @@ pub async fn upload_skin(
     let body = response.text().await.unwrap_or_default();
 
     if !status.is_success() {
-        log_warn!("Skin upload failed: {} - {}", status, body);
+        log_warn!("[Skin] 皮肤上传失败: {} - {}", status, body);
         return Err(format!("upload HTTP {}: {}", status, body));
     }
 
-    log_info!("Skin uploaded successfully");
+    log_info!("[Skin] 皮肤上传成功");
     Ok(())
 }
 
 /// 装备披风
 pub async fn equip_cape(access_token: &str, cape_id: &str) -> Result<(), String> {
-    log_info!("Equipping cape: {}", cape_id);
+    log_info!("[Skin] 装备披风: {}", cape_id);
 
     let client = http::get_client();
     let body = serde_json::json!({ "capeId": cape_id });
@@ -305,17 +315,17 @@ pub async fn equip_cape(access_token: &str, cape_id: &str) -> Result<(), String>
     let body_text = response.text().await.unwrap_or_default();
 
     if !status.is_success() {
-        log_warn!("Equip cape failed: {} - {}", status, body_text);
+        log_warn!("[Skin] 装备披风失败: {} - {}", status, body_text);
         return Err(format!("equip cape HTTP {}: {}", status, body_text));
     }
 
-    log_info!("Cape equipped successfully");
+    log_info!("[Skin] 披风装备成功");
     Ok(())
 }
 
 /// 取消披风
 pub async fn unequip_cape(access_token: &str) -> Result<(), String> {
-    log_info!("Unequipping cape");
+    log_info!("[Skin] 取消披风装备");
 
     let client = http::get_client();
 
@@ -330,11 +340,11 @@ pub async fn unequip_cape(access_token: &str) -> Result<(), String> {
     let body_text = response.text().await.unwrap_or_default();
 
     if !status.is_success() {
-        log_warn!("Unequip cape failed: {} - {}", status, body_text);
+        log_warn!("[Skin] 取消披风失败: {} - {}", status, body_text);
         return Err(format!("unequip cape HTTP {}: {}", status, body_text));
     }
 
-    log_info!("Cape unequipped successfully");
+    log_info!("[Skin] 披风已取消装备");
     Ok(())
 }
 
@@ -342,7 +352,7 @@ pub async fn unequip_cape(access_token: &str) -> Result<(), String> {
 ///
 /// 返回最新的 profile JSON 字符串，调用方应将其写入 state.auth.current_user.profile_json
 pub async fn fetch_profile(access_token: &str) -> Result<String, String> {
-    log_info!("Refreshing Minecraft profile from API");
+    log_info!("[Skin] 刷新 Minecraft profile");
 
     let client = http::get_client();
     let response = client
@@ -356,10 +366,10 @@ pub async fn fetch_profile(access_token: &str) -> Result<String, String> {
     let body_text = response.text().await.unwrap_or_default();
 
     if !status.is_success() {
-        log_warn!("Profile refresh failed: {} - {}", status, body_text);
+        log_warn!("[Skin] profile 刷新失败: {} - {}", status, body_text);
         return Err(format!("profile HTTP {}: {}", status, body_text));
     }
 
-    log_info!("Profile refreshed successfully");
+    log_info!("[Skin] profile 刷新成功");
     Ok(body_text)
 }
