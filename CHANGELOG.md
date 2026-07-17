@@ -9,6 +9,11 @@
 
 ### 修复
 
+#### 代码重构阶段 1.2：SettingsOther.vue 改用统一配置入口
+- 现象：`SettingsOther.vue` 的 `logLevel` 使用调试用 `getConfigValue('Log', 'level')` / `setConfigValue('Log', 'level', String(level))` 读写，违反"统一走 `applyConfig`/`getConfigMap`"约定
+- 修复：`loadLogLevel` 改用 `getConfigMap()` 取 `cfg.logLevel`；`saveLogLevel` 改用 `applyConfig({ logLevel: level })`（后端 `apply_config` 会同步调用 `logger::set_level` 立即生效）
+- 范围说明：`stores/java.ts` 的 `getConfigValue('Java', 'path')` 不在本次修复范围——后端 `commands/system/config.rs:94` 明确注释"Java path 不在 AppConfig 中，走 INI [Java] 独立存储"，是有意设计，不属于违规（frontend: src/views/settings/SettingsOther.vue）
+
 #### 代码重构阶段 1.1：修复 useVersionGroups 遗漏 LiteLoader 检查
 - 现象：含 LiteLoader 的资源版本不会被分到 "LiteLoader 1.12.2" 等独立分组
 - 根因：`loaderNames(flags)` 函数只检查 Forge/NeoForge/Fabric/Quilt，遗漏 `ModLoaderFlags.LiteLoader`

@@ -3,27 +3,28 @@ import { ref, watch, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
 import Select from '@/components/common/Select.vue'
 import * as tauri from '@/utils/tauri'
+import { getConfigMap, applyConfig } from '@/utils/api/system'
 
 const sdkStore = useSdkStore()
 const logLevel = ref(3)
 const configPath = ref('')
 
-// 读取日志级别
+// 读取日志级别（统一走 getConfigMap，避免使用调试用 getConfigValue）
 async function loadLogLevel() {
   try {
-    const level = await tauri.getConfigValue('Log', 'level')
-    if (level) {
-      logLevel.value = parseInt(level, 10)
+    const cfg = await getConfigMap()
+    if (typeof cfg.logLevel === 'number') {
+      logLevel.value = cfg.logLevel
     }
   } catch (e) {
     console.error('Failed to get log level:', e)
   }
 }
 
-// 保存日志级别
+// 保存日志级别（统一走 applyConfig，后端会同步调用 logger::set_level 立即生效）
 async function saveLogLevel(level: number) {
   try {
-    await tauri.setConfigValue('Log', 'level', String(level))
+    await applyConfig({ logLevel: level })
   } catch (e) {
     console.error('Failed to save log level:', e)
   }
