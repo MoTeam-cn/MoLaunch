@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
@@ -7,6 +7,7 @@ import { showError } from '@/utils/modal'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
+import { usePolling } from '@/composables/usePolling'
 import Select from '@/components/common/Select.vue'
 
 const javaStore = useJavaStore()
@@ -21,6 +22,11 @@ const javaSelectorRef = ref<HTMLElement | null>(null)
 const loaded = ref(false)
 const detectingJava = ref(false)
 const isolationMode = ref(4)
+
+// 1秒自动刷新内存（参考PCL2）；onUnmounted 自动清理
+const { start: startMemoryPolling } = usePolling(async () => {
+  systemMemory.value = await tauri.getSystemMemory()
+}, 1000)
 
 const isolationOptions = [
   { label: '关闭', value: 0 },
@@ -155,27 +161,12 @@ onMounted(async () => {
   await nextTick()
   loaded.value = true
 
-  // 1秒自动刷新内存（参考PCL2）
-  memoryTimer = setInterval(async () => {
-    try {
-      systemMemory.value = await tauri.getSystemMemory()
-    } catch (e) {
-      // 静默失败
-    }
-  }, 1000)
+  // 1秒自动刷新内存（参考PCL2）；onUnmounted 自动清理
+  startMemoryPolling()
 })
 
-// 内存刷新定时器
-let memoryTimer: ReturnType<typeof setInterval> | null = null
-
-// 组件卸载时清除定时器并 flush 待保存的内存配置
-onUnmounted(() => {
-  if (memoryTimer) {
-    clearInterval(memoryTimer)
-    memoryTimer = null
-  }
-  // 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush
-})
+// 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush；
+// 轮询由 usePolling 在 onUnmounted 自动 stop。
 </script>
 
 <template>

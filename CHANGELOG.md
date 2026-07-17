@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 2.2-2.3：新增 useTauriEvent + usePolling composable
+- 现象：`listen`/`unlisten` + `setInterval`/`clearInterval` 样板代码在 5+ 处重复，且容易遗忘 onUnmounted 清理
+- 修复：
+  - 新建 `composables/useTauriEvent.ts`：封装 `listen` + 自动 `onUnmounted` 清理 unlisten 句柄
+  - 新建 `composables/usePolling.ts`：封装 `setInterval` + 自动 `onUnmounted` 清理 timer + 防重复启动
+- 应用：将 `MemorySection.vue` 和 `SettingsLaunch.vue` 的 1 秒内存轮询（逻辑完全相同）迁移到 `usePolling`，消除样板代码
+- 后续可逐步迁移 `useCommunityDownload.ts`、`JavaDownloadBar.vue`、`stores/auth.ts`、`stores/version.ts` 的事件监听
+- 说明：未强制全量迁移，避免一次性改动过大；新代码默认使用新 composable
+
 #### 代码重构阶段 2.8：提取 Maven 坐标转路径到 utils/maven.rs
 - 现象：Maven 坐标转路径的核心逻辑（`split(':')` → `replace('.', '/')` → 拼接路径）在 4 处重复实现：
   - `minecraft/launch/mod.rs` 私有 `maven_name_to_path` → 相对路径 String

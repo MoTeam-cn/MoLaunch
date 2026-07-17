@@ -4,11 +4,12 @@
  * 抄全局设置 SettingsLaunch.vue 的可视化 UI，新增「跟随全局」模式。
  * 通过 updateVersionPersonalization 保存到 setup.ini。
  */
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showError, showWarning } from '@/utils/toast'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
+import { usePolling } from '@/composables/usePolling'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 
 const { selectedId, personalization } = useVersionSettings()
@@ -26,7 +27,9 @@ const globalMax = ref(0)
 
 // 系统内存
 const systemMemory = ref<{ total: number; available: number; usage_percent: number } | null>(null)
-let memoryTimer: ReturnType<typeof setInterval> | null = null
+const { start: startMemoryPolling } = usePolling(async () => {
+  systemMemory.value = await tauri.getSystemMemory()
+}, 1000)
 
 const totalMemoryMB = computed(() => systemMemory.value ? Math.round(systemMemory.value.total / 1024 / 1024) : 0)
 const usedMemoryMB = computed(() => systemMemory.value ? Math.round((systemMemory.value.total - systemMemory.value.available) / 1024 / 1024) : 0)
@@ -129,15 +132,11 @@ onMounted(async () => {
   }
   loaded.value = true
 
-  memoryTimer = setInterval(async () => {
-    try { systemMemory.value = await tauri.getSystemMemory() } catch { /* ignore */ }
-  }, 1000)
+  startMemoryPolling()
 })
 
-onUnmounted(() => {
-  if (memoryTimer) { clearInterval(memoryTimer); memoryTimer = null }
-  // 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush
-})
+// 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush；
+// 轮询由 usePolling 在 onUnmounted 自动 stop。
 
 const modeButtons: { value: 'inherit' | 'auto' | 'custom'; label: string }[] = [
   { value: 'inherit', label: '跟随全局' },
