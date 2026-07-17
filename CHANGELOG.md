@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 代码重构阶段 4.3：拆分 minecraft/launch/watcher.rs 为 4 个子模块
+- 现象：`minecraft/launch/watcher.rs` 690 行，单一文件混合「8 个数据结构」「日志行解析+加载进度检测」「崩溃分析（运行时日志+崩溃报告文件）」「GameWatcher 结构体+start_monitoring 流程」4 块关注点
+- 修复：将 `watcher.rs` 升级为 `watcher/` 目录，拆为 4 个子模块：
+  - `watcher/types.rs`（~115 行）：`GameState` / `ExitInfo` / `CrashInfo` / `CrashCategory` / `LogLevel` / `LogEntry` / `LoadProgress` + impl `name()`
+  - `watcher/log_parser.rs`（~70 行）：`parse_log_line` / `extract_log_level`（私有）/ `detect_load_progress` 纯函数（原 GameWatcher 静态方法）
+  - `watcher/analyzer.rs`（~260 行）：`analyze_crash` / `analyze_stack_for_mod`（私有）/ `analyze_crash_report`（pub，外部调用）/ `parse_crash_report`（私有）
+  - `watcher/mod.rs`（~250 行）：`GameWatcher` 结构体 + new/state/load_progress/recent_logs/exit_receiver/start_monitoring/stop
+- `pub use` 保持 `crate::minecraft::launch::watcher::X` 路径完全向后兼容，`launch/mod.rs` 已有的 `pub use watcher::{CrashCategory, CrashInfo, ExitInfo, GameState, GameWatcher, LoadProgress}` re-export 无需修改
+- 原 `Self::parse_log_line`/`Self::detect_load_progress`/`Self::analyze_crash` 调用改为 `parse_log_line`/`detect_load_progress`/`analyzer::analyze_crash` 自由函数调用
+- 验证：`cargo check` 通过
+
 #### 代码重构阶段 4.2：拆分 minecraft/auth/storage.rs 为 4 个子模块
 - 现象：`minecraft/auth/storage.rs` 626 行，单一文件混合「数据结构」「注册表常量+低层操作」「AuthStorage 结构体+加解密+load/save」「11 个高层操作方法」4 块关注点
 - 修复：将 `storage.rs` 升级为 `storage/` 目录，拆为 4 个子模块：
