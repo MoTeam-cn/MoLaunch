@@ -9,6 +9,18 @@
 
 ### 修复
 
+#### 代码重构阶段 4.1：拆分 state/mod.rs 为 5 个子模块
+- 现象：`state/mod.rs` 433 行，混合「AppState 聚合」「认证结构」「下载阶段/状态」「AppConfig + McFolder + 路径解析」「LaunchHistory」5 块关注点
+- 修复：按关注点拆分到 `state/` 下的 5 个子模块：
+  - `state/auth.rs`（28 行）：`LocalAuthResult` + `AuthState`
+  - `state/launch.rs`（18 行）：`LaunchHistory`
+  - `state/download.rs`（209 行）：`StageStatus` 枚举 + `DownloadStage` + impl (new/new_grouped) + `DownloadState` + impl Default + 8 个进度同步方法（reset_stages/append_stages/set_current_stage/set_stage_status/set_stage_bytes/sync_stage_from_progress/mark_complete/mark_failed）
+  - `state/config.rs`（120 行）：`AppConfig` + impl Default + `McFolder` + `get_default_game_dir` + `resolve_game_dir`
+  - `state/app.rs`（82 行）：`AppState` 聚合结构体 + impl Default + impl new()（加载配置 + 加载 SDK + 创建 auth_storage 共享 Arc）
+- `state/mod.rs` 缩减至 22 行：仅声明 5 个子模块 + `pub use` 统一 re-export 所有公开类型/函数
+- 通过 `pub use` 保持 `crate::state::X` 路径完全向后兼容，外部 65 处调用无需修改
+- 验证：`cargo check` 通过
+
 #### 代码重构阶段 3.13：拆分 utils/api/system.ts 为 config 模块
 - 现象：`utils/api/system.ts` 322 行，混合「系统操作」「目录选择」「下载进度查询」「全局配置读写（getConfig/applyConfig/refreshConfig + ConfigSnapshot/ConfigPatch/ConfigEntry 类型 + configCache 缓存）」4 块关注点，其中配置相关逻辑独占约 230 行
 - 修复：抽出 `utils/api/config.ts`（239 行）：
