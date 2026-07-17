@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 代码重构阶段 4.6：拆分 minecraft/community/curseforge.rs 为 4 个子模块
+- 现象：`minecraft/community/curseforge.rs` 786 行，单一文件混合「9 个 CF API 响应数据结构（CfModEntry / CfFile / CfSearchResponse 等）」「响应到统一资源模型的转换（convert_project / convert_version / parse_cf_download_url）」「HTTP 请求层（get_cf_config + cf_get / cf_post + source 策略回退镜像）」「公共 API（fingerprint_search / search / get_project / get_versions / batch_get_mod_slugs + 私有 curseforge_loader_type）」4 块关注点
+- 修复：将 `curseforge.rs` 升级为 `curseforge/` 目录，拆为 4 个子模块：
+  - `curseforge/types.rs`（111 行）：`CfSearchResponse` / `CfPagination` / `CfModEntry` / `CfLogo` / `CfLinks` / `CfCategory` / `CfFile` / `CfHash` / `CfFilesResponse` 共 9 个 CF API 响应数据结构（`pub(crate)` 可见性，仅模块内部使用）
+  - `curseforge/convert.rs`（140 行）：`convert_project`（CF 工程条目 → ResourceProject，含 tags 翻译 + mcmod 中文译名 + 加载器标志位聚合）+ `convert_version`（CF 文件 → ResourceVersion）+ `parse_cf_download_url`（参考 PCL2 ParseCurseForgeDownloadUrls，构造 edge.forgecdn.net 回退 URL）
+  - `curseforge/http.rs`（259 行）：`CF_OFFICIAL_BASE` / `CF_MIRROR_BASE` 常量 + `get_cf_config`（source 策略：0=强制镜像 / 1=缓慢时换镜像 / 2=尽量官方）+ `build_cf_request` / `build_cf_post_request`（附加 x-api-key header）+ `cf_get` / `cf_post`（source=1 时官方失败自动回退镜像重试，官方请求 10s/15s 超时）
+  - `curseforge/mod.rs`（305 行）：`fingerprint_search`（参考 PCL2 LocalResourceOnlineLoad 步骤 1-3：fingerprints/432 → modId → /mods 批量查询）+ `search` + `get_project`（数字 modId 走 /mods/{id}，slug 走 /mods/search）+ `get_versions` + `batch_get_mod_slugs`（整合包文件名格式化用）+ 私有 `curseforge_loader_type`
+- 同步修复：发现 `urlencode_params` 函数在 `curseforge.rs` 与 `modrinth.rs` 中重复定义，已抽取到 `community/common.rs` 作为 `pub fn urlencode_params`（与已有 `fmt_elapsed` 共置），`curseforge/mod.rs` 改用 `super::common::urlencode_params`。`modrinth.rs` 中的私有 `urlencode_params` 待 Phase 4.7 拆分时一并清理
+- `curseforge::{search, get_project, get_versions, fingerprint_search, batch_get_mod_slugs}` 公共 API 路径保持完全向后兼容，`community/mod.rs` 已有的 `pub mod curseforge;` 声明 + 5 处外部调用（preload / searcher / detail / community/install）均无需修改
+- 验证：`cargo check` 通过
+
 #### 代码重构阶段 4.5：拆分 commands/version/install.rs 为 4 个子模块
 - 现象：`commands/version/install.rs` 694 行，单一文件混合「install_merged 主入口（参数校验 + 版本名唯一化 + MC 本体下载 + 多加载器顺序安装 + 进度 ticker + 失败清理）」「加载器单次安装逻辑（install_single_loader + 进度 ticker）」「版本目录命名冲突解决（resolve_unique_instance_name + find_loader_version_dir）」「失败清理（cleanup_failed_install）」4 块关注点
 - 修复：将 `install.rs` 升级为 `install/` 目录，拆为 4 个子模块：

@@ -16,3 +16,14 @@ pub fn fmt_elapsed(start: Instant) -> String {
         format!("{}ms", ms)
     }
 }
+
+/// 简单 URL 编码参数列表
+///
+/// 统一替代此前分散在 curseforge.rs / modrinth.rs 中的同名私有实现。
+pub fn urlencode_params(params: &[(&str, String)]) -> String {
+    params
+        .iter()
+        .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
+        .collect::<Vec<_>>()
+        .join("&")
+}
