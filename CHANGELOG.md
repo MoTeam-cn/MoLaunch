@@ -9,6 +9,16 @@
 
 ### 修复
 
+#### 代码重构阶段 4.5：拆分 commands/version/install.rs 为 4 个子模块
+- 现象：`commands/version/install.rs` 694 行，单一文件混合「install_merged 主入口（参数校验 + 版本名唯一化 + MC 本体下载 + 多加载器顺序安装 + 进度 ticker + 失败清理）」「加载器单次安装逻辑（install_single_loader + 进度 ticker）」「版本目录命名冲突解决（resolve_unique_instance_name + find_loader_version_dir）」「失败清理（cleanup_failed_install）」4 块关注点
+- 修复：将 `install.rs` 升级为 `install/` 目录，拆为 4 个子模块：
+  - `install/loader_helpers.rs`（136 行）：`install_single_loader`（pub(crate)）+ `start_progress_ticker`（pub(crate)），加载器单次安装与进度推送逻辑
+  - `install/version_naming.rs`（83 行）：`resolve_unique_instance_name`（pub(crate)，处理 `(1)`/`(2)` 后缀冲突 + 复用 modpack 半成品目录）+ `find_loader_version_dir`（pub(crate)，按 Forge/NeoForge/Fabric/OptiFine/LiteLoader 前缀匹配版本目录）
+  - `install/cleanup.rs`（54 行）：`cleanup_failed_install`（pub(crate)），删除原 MC 目录 + 加载器创建目录（fabric 用精确 `fabric-{fabric_version}-{mc_version}` 模式避免误删）
+  - `install/mod.rs`（471 行）：`install_merged` 主入口 #[tauri::command]（参数校验 + 唯一实例名解析 + MC 本体下载 + 多加载器顺序安装委托 + 进度 ticker + 失败清理委托）
+- `commands::version::install::install_merged` 路径保持完全向后兼容，`commands/version/mod.rs` 已有的 `pub mod install;` 声明 + `lib.rs` 的 invoke_handler 注册均无需修改
+- 验证：`cargo check` 通过
+
 #### 代码重构阶段 4.4：拆分 minecraft/version/setup.rs 为 3 个子模块
 - 现象：`minecraft/version/setup.rs` 692 行，单一文件混合「PersonalizationUpdate + VersionSetup 结构体定义」「INI/Maven 解析辅助 + 版本号检测自由函数」「impl VersionSetup（构造 + save/load + ensure_complete + load_or_create + update_personalization + from_version_json）+ tests」3 块关注点
 - 修复：将 `setup.rs` 升级为 `setup/` 目录，拆为 3 个子模块：
