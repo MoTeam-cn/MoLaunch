@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 3.8：提取 useLoaderData composable 消除 5 处重复 fetch 模式
+- 现象：`LoaderSelect.vue` 468 行，其中 `onMounted` 独占 107 行，5 种加载器（Forge/NeoForge/Fabric/OptiFine/LiteLoader）的 `fetch → 赋值 → catch → finally` 模式逐字重复
+- 修复：新建 `composables/useLoaderData.ts`（~180 行）：
+  - 提取通用 `fetchLoader<T>` 泛型函数消除 5 处重复的 promise 链
+  - 包含：原始版本数据 refs、加载状态 refs、5 个 computed 版本项列表（forgeItems/neoforgeItems/fabricItems/optifineItems/liteloaderItems）、`fetchAll()` 函数（缓存检查 + 独立请求 + 完成后缓存）
+  - 导出 `LoaderItem`/`ForgeVersion`/`NeoforgeVersion`/`FabricVersion`/`OptifineVersion` 类型供外部复用
+- 父组件保留：MC 版本类型判断、选中状态管理、兼容性检查、实例名生成、模板
+- `LoaderSelect.vue` 缩减至 291 行
+
 #### 代码重构阶段 3.7：拆分 SkinManager.vue 为 4 个子组件 + 提取 runWithRefresh 消除重复
 - 现象：`SkinManager.vue` 443 行，混合「3D 预览」「上传皮肤」「离线皮肤选择」「披风列表」「动画选择」「账号管理」6 块 UI
 - 修复：抽出 4 个子组件到 `components/common/skin-manager/`：
