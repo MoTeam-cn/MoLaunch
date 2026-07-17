@@ -9,6 +9,13 @@
 
 ### 修复
 
+#### 代码重构阶段 1.11：setup.rs 改用原子写入
+- 现象：`src-tauri/src/minecraft/version/setup.rs` 的 `save_with_options` 和 `ensure_complete` 两个写入点都直接使用 `std::fs::write(&path, content)`，若写入过程中进程崩溃/断电/磁盘满，setup.ini 会处于半写状态，导致版本元数据损坏
+- 修复：改为原子写入模式（与 `storage::Storage::write_config` 一致）：
+  - 先写入 `setup.ini.tmp` 临时文件
+  - 再 `std::fs::rename` 到 `setup.ini`（同分区 rename 在 POSIX 和 Windows 上均保证原子性）
+- 影响函数：`VersionSetup::save_with_options`、`VersionSetup::ensure_complete`
+
 #### 代码重构阶段 1.10：删除 sdk/helpers.rs 死代码
 - 现象：`src-tauri/src/sdk/helpers.rs` 的 `get_system_memory_static()` 函数存在两个问题：
   - 每次调用都通过 `libloading::Library::new` 重新加载 DLL，性能开销大（应复用 `SdkInstance` 的共享句柄）

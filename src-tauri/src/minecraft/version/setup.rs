@@ -320,7 +320,11 @@ impl VersionSetup {
             content.push_str(&format!("MaxMemory={}\n", mm));
         }
 
-        std::fs::write(&path, content)
+        // 原子写入：先写 .tmp 再 rename，避免崩溃导致 setup.ini 半写状态
+        let tmp = path.with_extension("ini.tmp");
+        std::fs::write(&tmp, content)?;
+        std::fs::rename(&tmp, &path)?;
+        Ok(())
     }
 
     /// 按模板（resources/defaults/setup.ini）比对补全缺失字段
@@ -345,7 +349,10 @@ impl VersionSetup {
         let modified = current.merge_missing_from(&template);
 
         if modified {
-            std::fs::write(&path, current.to_string())?;
+            // 原子写入：先写 .tmp 再 rename
+            let tmp = path.with_extension("ini.tmp");
+            std::fs::write(&tmp, current.to_string())?;
+            std::fs::rename(&tmp, &path)?;
         }
 
         Ok(modified)
