@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 2.7：提取 fmt_elapsed 到 community/common.rs
+- 现象：`fmt_elapsed` 函数在 4 个文件中各有一份**完全相同**的实现（格式化耗时为 ms/s），违反 DRY：
+  - `minecraft/sources.rs`（私有 `fn fmt_elapsed`）
+  - `minecraft/community/curseforge.rs`（私有 `fn fmt_elapsed`）
+  - `minecraft/community/modrinth.rs`（私有 `fn fmt_elapsed`，参数用全限定 `std::time::Instant`）
+  - `minecraft/community/preload.rs`（私有 `fn fmt_elapsed_from`，函数名带 `_from` 后缀但实现一致）
+- 修复：新建 `minecraft/community/common.rs`，提供 `pub fn fmt_elapsed(start: Instant) -> String`；4 个文件删除本地实现，改为 import
+- `preload.rs` 的 2 处 `fmt_elapsed_from(start)` 调用同步改名为 `fmt_elapsed(start)`
+
 #### 代码重构阶段 2.1：整合 formatDownloads 到 utils/format.ts
 - 现象：`formatDownloads` 函数在 `ResourceCard.vue` 和 `ResourceDetail.vue` 中各有一份**完全相同**的实现（中文万/亿单位格式化），违反 DRY 原则
 - 修复：将 `formatDownloads` 提取到已有的 `src/utils/format.ts`，两个组件改为 `import { formatDownloads } from '@/utils/format'`

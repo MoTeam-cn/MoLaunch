@@ -5,6 +5,7 @@
 
 use serde::Deserialize;
 
+use super::common::fmt_elapsed;
 use super::types::{
     ModLoaders, Platform, ReleaseType, ResourceProject, ResourceVersion, ResourceType,
 };
@@ -815,14 +816,4 @@ fn urlencode_params(params: &[(&str, String)]) -> String {
         .map(|(k, v)| format!("{}={}", k, urlencoding::encode(v)))
         .collect::<Vec<_>>()
         .join("&")
-}
-
-/// 格式化耗时
-fn fmt_elapsed(start: std::time::Instant) -> String {
-    let ms = start.elapsed().as_millis();
-    if ms >= 1000 {
-        format!("{:.1}s", ms as f64 / 1000.0)
-    } else {
-        format!("{}ms", ms)
-    }
 }

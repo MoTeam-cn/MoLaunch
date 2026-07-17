@@ -9,6 +9,7 @@
 //! 所有远程 URL 必须在此文件定义常量，禁止在其他文件硬编码。
 
 use crate::{log_debug, log_info, log_warn};
+use crate::minecraft::community::common::fmt_elapsed;
 use std::time::Instant;
 
 // ═══════════════════════════════════════════════════════════
@@ -297,14 +298,4 @@ pub async fn fetch_with_fallback(urls: &[String]) -> anyhow::Result<String> {
     }
 
     Err(anyhow::anyhow!("所有源均失败: {}", last_err))
-}
-
-/// 格式化耗时：< 1000ms 显示 ms，>= 1000ms 显示 s
-fn fmt_elapsed(start: Instant) -> String {
-    let ms = start.elapsed().as_millis();
-    if ms >= 1000 {
-        format!("{:.1}s", ms as f64 / 1000.0)
-    } else {
-        format!("{}ms", ms)
-    }
 }

@@ -12,6 +12,7 @@
 //! - mcmod.rs: mcmod.cn 中文译名数据库
 
 pub mod cache;
+pub mod common;
 pub mod curseforge;
 pub mod mcmod;
 pub mod modrinth;

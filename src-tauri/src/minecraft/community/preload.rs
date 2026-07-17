@@ -21,6 +21,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter};
 
+use super::common::fmt_elapsed;
 use super::types::{ResourceProject, ResourceType};
 
 /// 预加载缓存版本号（结构变更时递增，使旧缓存失效）
@@ -323,7 +324,7 @@ pub async fn preload_mods_detail(
         "[Preload] JAR 元数据读取完成：{} / {} 个（耗时 {}）",
         hashed_mods.len(),
         total,
-        fmt_elapsed_from(start)
+        fmt_elapsed(start)
     );
 
     if hashed_mods.is_empty() {
@@ -435,7 +436,7 @@ pub async fn preload_mods_detail(
         mr_count,
         cache_map.values().filter(|c| c.project.is_some()).count(),
         hashed_mods.len(),
-        fmt_elapsed_from(start)
+        fmt_elapsed(start)
     );
 
     // 通知前端预加载已全部完成（前端据此跳过 handleShowInfo 的等待循环）
@@ -447,14 +448,4 @@ pub async fn preload_mods_detail(
 pub struct PreloadModInput {
     pub file_name: String,
     pub path: String,
-}
-
-/// 格式化耗时
-fn fmt_elapsed_from(start: Instant) -> String {
-    let ms = start.elapsed().as_millis();
-    if ms >= 1000 {
-        format!("{:.1}s", ms as f64 / 1000.0)
-    } else {
-        format!("{}ms", ms)
-    }
 }
