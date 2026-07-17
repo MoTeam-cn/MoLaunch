@@ -9,6 +9,18 @@
 
 ### 修复
 
+#### 代码重构阶段 3.13：拆分 utils/api/system.ts 为 config 模块
+- 现象：`utils/api/system.ts` 322 行，混合「系统操作」「目录选择」「下载进度查询」「全局配置读写（getConfig/applyConfig/refreshConfig + ConfigSnapshot/ConfigPatch/ConfigEntry 类型 + configCache 缓存）」4 块关注点，其中配置相关逻辑独占约 230 行
+- 修复：抽出 `utils/api/config.ts`（239 行）：
+  - 类型：`ConfigSnapshot`（全量快照）/`ConfigPatch`（部分更新）/`ConfigEntry`（扁平 key-value）
+  - 缓存：`configCache`/`configPromise` 模块级状态（首次请求后缓存，切换侧栏直接读缓存）
+  - 读写：`getConfig(keys?, force?)`（扁平数组格式 + 缓存 + 并发请求合并）/`getConfigMap(force?)`（对象格式 + 缓存）/`applyConfig(patch)`（统一更新入口 + 乐观缓存同步）/`refreshConfig()`（清空缓存）
+  - 直写 INI：`getConfigValue(section, key)`/`setConfigValue(section, key, value)`（保留用于调试/迁移）
+- 父文件 `system.ts` 保留：系统操作（openGameDir/openPath/revealInExplorer/getGameDir/selectFolder/selectFile/saveFile/setGameDir/getSystemMemory/getConfigPath/saveConfigToFile）+ 下载进度查询（getDownloadProgress/isDownloading/resetDownloadProgress）
+- `tauri.ts` 增加 `export * from './api/config'` 保持 `import * as tauri` 用法向后兼容
+- 修复 2 处直接 import：`composables/useDebouncedSave.ts`（ConfigPatch 类型）和 `views/settings/SettingsOther.vue`（getConfigMap/applyConfig）改为从 `@/utils/api/config` 导入
+- `system.ts` 缩减至 92 行
+
 #### 代码重构阶段 3.12：拆分 stores/version.ts 为 useLaunchState composable
 - 现象：`stores/version.ts` 335 行，单一 store 混合「版本列表」「下载状态」「启动流程」「Java 下载进度」「游戏退出监听」「进度轮询」6 块关注点，其中启动相关逻辑独占约 175 行
 - 修复：抽出 `composables/useLaunchState.ts`（200 行）：

@@ -9,7 +9,8 @@
  * - java.ts         Java 检测/校验/下载
  * - loader.ts       加载器版本查询与合并安装
  * - launch.ts       启动游戏
- * - system.ts       系统操作 + 全局配置（下载/内存/线程/隔离/代理/进度）
+ * - system.ts       系统操作 + 下载进度查询
+ * - config.ts       全局配置读写（getConfig/applyConfig/refreshConfig + 缓存）
  * - skin.ts         皮肤与披风管理
  *
  * 此文件仅为兼容现有 `import * as tauri from '@/utils/tauri'` 用法，
@@ -24,4 +25,5 @@ export * from './api/java'
 export * from './api/loader'
 export * from './api/launch'
 export * from './api/system'
+export * from './api/config'
 export * from './api/skin'

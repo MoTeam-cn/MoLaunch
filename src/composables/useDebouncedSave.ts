@@ -14,7 +14,7 @@
  * 只要两个侧栏共用同一个 patchSaver（或累积到同一份 patch），flush 时只会传 X 和 Y。
  */
 import { onScopeDispose } from 'vue'
-import type { ConfigPatch } from '@/utils/api/system'
+import type { ConfigPatch } from '@/utils/api/config'
 
 /** 简单模式：只做时间防抖 */
 export function useDebouncedSave(

@@ -3,7 +3,7 @@ import { ref, watch, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
 import Select from '@/components/common/Select.vue'
 import * as tauri from '@/utils/tauri'
-import { getConfigMap, applyConfig } from '@/utils/api/system'
+import { getConfigMap, applyConfig } from '@/utils/api/config'
 
 const sdkStore = useSdkStore()
 const logLevel = ref(3)
