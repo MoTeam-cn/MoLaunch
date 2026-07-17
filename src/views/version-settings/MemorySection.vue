@@ -10,6 +10,7 @@ import { showSuccess, showError, showWarning } from '@/utils/toast'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
 import { usePolling } from '@/composables/usePolling'
+import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 
 const { selectedId, personalization } = useVersionSettings()
@@ -170,17 +171,11 @@ const modeButtons: { value: 'inherit' | 'auto' | 'custom'; label: string }[] = [
     <!-- 分配模式 -->
     <div class="flex items-center gap-3 mb-4">
       <label class="w-28 flex-none text-xs text-gray-500">分配模式</label>
-      <div class="flex gap-2">
-        <button
-          v-for="m in modeButtons"
-          :key="m.value"
-          class="px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors"
-          :class="memoryMode === m.value
-            ? 'border-primary-500 bg-primary-50 text-primary-700'
-            : 'border-gray-300 text-gray-600 hover:border-gray-400'"
-          @click="handleSaveMemoryMode(m.value)"
-        >{{ m.label }}</button>
-      </div>
+      <SegmentedButtons
+        :model-value="memoryMode"
+        :options="modeButtons"
+        @select="handleSaveMemoryMode"
+      />
     </div>
 
     <!-- 跟随全局：显示全局当前设置 -->

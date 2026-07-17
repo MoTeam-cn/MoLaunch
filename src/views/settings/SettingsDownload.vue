@@ -2,6 +2,7 @@
 import { ref, watch, onMounted, nextTick } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
+import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 
 const maxThreads = ref(8)
 const chunkCount = ref(4)
@@ -94,35 +95,15 @@ onMounted(async () => {
               <p class="text-xs text-gray-500 mt-0.5">版本清单、Forge/Fabric 等加载器列表的获取源</p>
             </div>
           </div>
-          <div class="flex gap-2">
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="mirrorMeta === 'official'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="mirrorMeta = 'official'"
-            >
-              官方源
-            </button>
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="mirrorMeta === 'bmclapi'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="mirrorMeta = 'bmclapi'"
-            >
-              BMCLAPI
-            </button>
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="mirrorMeta === 'smart'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="mirrorMeta = 'smart'"
-            >
-              优先官方
-            </button>
-          </div>
+          <SegmentedButtons
+            v-model="mirrorMeta"
+            button-class="flex-1 px-3 py-2"
+            :options="[
+              { label: '官方源', value: 'official' },
+              { label: 'BMCLAPI', value: 'bmclapi' },
+              { label: '优先官方', value: 'smart' },
+            ]"
+          />
           <p class="text-xs text-gray-400 mt-2">
             <template v-if="mirrorMeta === 'official'">Mojang 官方源，海外快国内可能较慢</template>
             <template v-else-if="mirrorMeta === 'bmclapi'">BMCLAPI 国内镜像，速度快</template>
@@ -137,35 +118,15 @@ onMounted(async () => {
               <p class="text-xs text-gray-500 mt-0.5">客户端 JAR、库文件、资源文件、加载器安装包</p>
             </div>
           </div>
-          <div class="flex gap-2">
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="mirrorDownload === 'official'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="mirrorDownload = 'official'"
-            >
-              官方源
-            </button>
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="mirrorDownload === 'bmclapi'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="mirrorDownload = 'bmclapi'"
-            >
-              BMCLAPI
-            </button>
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="mirrorDownload === 'smart'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="mirrorDownload = 'smart'"
-            >
-              优先官方
-            </button>
-          </div>
+          <SegmentedButtons
+            v-model="mirrorDownload"
+            button-class="flex-1 px-3 py-2"
+            :options="[
+              { label: '官方源', value: 'official' },
+              { label: 'BMCLAPI', value: 'bmclapi' },
+              { label: '优先官方', value: 'smart' },
+            ]"
+          />
           <p class="text-xs text-gray-400 mt-2">
             <template v-if="mirrorDownload === 'official'">Mojang 官方源，海外快国内可能较慢</template>
             <template v-else-if="mirrorDownload === 'bmclapi'">BMCLAPI 国内镜像，速度快</template>

@@ -4,6 +4,7 @@ import * as tauri from '@/utils/tauri'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
 import { showError } from '@/utils/toast'
 import Alert from '@/components/common/Alert.vue'
+import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
 import {
   ExclamationTriangleIcon,
@@ -93,35 +94,15 @@ onMounted(async () => {
               <p class="text-xs text-gray-500 mt-0.5">选择启动器的网络代理方式</p>
             </div>
           </div>
-          <div class="flex gap-2">
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="proxyMode === 'none'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="proxyMode = 'none'"
-            >
-              不使用代理
-            </button>
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="proxyMode === 'system'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="proxyMode = 'system'"
-            >
-              系统代理
-            </button>
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="proxyMode === 'custom'
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="proxyMode = 'custom'"
-            >
-              自定义代理
-            </button>
-          </div>
+          <SegmentedButtons
+            v-model="proxyMode"
+            button-class="flex-1 px-3 py-2"
+            :options="[
+              { label: '不使用代理', value: 'none' },
+              { label: '系统代理', value: 'system' },
+              { label: '自定义代理', value: 'custom' },
+            ]"
+          />
           <p class="text-xs text-gray-400 mt-2">
             <template v-if="proxyMode === 'none'">不使用任何代理，直接连接</template>
             <template v-else-if="proxyMode === 'system'">使用操作系统中配置的代理设置</template>
@@ -134,35 +115,15 @@ onMounted(async () => {
           <!-- 代理类型 -->
           <div>
             <p class="text-sm font-medium text-gray-900 mb-2">代理类型</p>
-            <div class="flex gap-2">
-              <button
-                class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-                :class="proxyType === 'http'
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-                @click="proxyType = 'http'"
-              >
-                HTTP
-              </button>
-              <button
-                class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-                :class="proxyType === 'https'
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-                @click="proxyType = 'https'"
-              >
-                HTTPS
-              </button>
-              <button
-                class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-                :class="proxyType === 'socks5'
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-                @click="proxyType = 'socks5'"
-              >
-                SOCKS5
-              </button>
-            </div>
+            <SegmentedButtons
+              v-model="proxyType"
+              button-class="flex-1 px-3 py-2"
+              :options="[
+                { label: 'HTTP', value: 'http' },
+                { label: 'HTTPS', value: 'https' },
+                { label: 'SOCKS5', value: 'socks5' },
+              ]"
+            />
           </div>
 
           <!-- 代理地址 -->

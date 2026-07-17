@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 2.5：新增 SegmentedButtons.vue 组件
+- 现象：3 按钮选择组（`<div class="flex gap-2"><button :class="active ? ... : ..."/></div>`）在 5 处重复，类名字符串 `border-primary-500 bg-primary-50 text-primary-700` 在 6 个组件中重复
+- 修复：新建 `components/common/SegmentedButtons.vue`，支持 `v-model`（直接赋值）和 `@select`（自定义回调）两种模式
+- 应用迁移：
+  - `SettingsAdvanced.vue` 的代理模式 + 代理类型（2 处 3 按钮组）改用 `SegmentedButtons`
+  - `SettingsDownload.vue` 的版本列表源 + 文件下载源（2 处 3 按钮组）改用 `SegmentedButtons`
+  - `MemorySection.vue` 的分配模式（1 处 3 按钮组）改用 `SegmentedButtons`（@select 模式，保留 handleSaveMemoryMode 回调）
+- 减少约 100 行模板样板代码
+
 #### 代码重构阶段 2.2-2.3：新增 useTauriEvent + usePolling composable
 - 现象：`listen`/`unlisten` + `setInterval`/`clearInterval` 样板代码在 5+ 处重复，且容易遗忘 onUnmounted 清理
 - 修复：
