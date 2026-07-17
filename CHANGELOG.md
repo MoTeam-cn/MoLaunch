@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 4.4：拆分 minecraft/version/setup.rs 为 3 个子模块
+- 现象：`minecraft/version/setup.rs` 692 行，单一文件混合「PersonalizationUpdate + VersionSetup 结构体定义」「INI/Maven 解析辅助 + 版本号检测自由函数」「impl VersionSetup（构造 + save/load + ensure_complete + load_or_create + update_personalization + from_version_json）+ tests」3 块关注点
+- 修复：将 `setup.rs` 升级为 `setup/` 目录，拆为 3 个子模块：
+  - `setup/types.rs`（~110 行）：`PersonalizationUpdate` + `VersionSetup` 结构体定义
+  - `setup/helpers.rs`（~85 行）：`parse_ini` / `extract_maven_version`（私有）/ `read_setup_version_and_loader` / `read_mc_version_from_json` / `detect_version_and_loader` 自由函数
+  - `setup/mod.rs`（~540 行）：`impl VersionSetup` 全部方法（new/file_path/empty/exists/save/save_full/save_with_options/ensure_complete/load_or_create/update_personalization/load/from_version_json）+ tests
+- `pub use` 保持 `crate::minecraft::version::setup::{VersionSetup, PersonalizationUpdate, detect_version_and_loader, read_setup_version_and_loader, read_mc_version_from_json}` 路径完全向后兼容，外部 8 处调用无需修改
+- 验证：`cargo check` 通过 + `cargo test --lib setup` 2 个单元测试通过
+
 #### 代码重构阶段 4.3：拆分 minecraft/launch/watcher.rs 为 4 个子模块
 - 现象：`minecraft/launch/watcher.rs` 690 行，单一文件混合「8 个数据结构」「日志行解析+加载进度检测」「崩溃分析（运行时日志+崩溃报告文件）」「GameWatcher 结构体+start_monitoring 流程」4 块关注点
 - 修复：将 `watcher.rs` 升级为 `watcher/` 目录，拆为 4 个子模块：

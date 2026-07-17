@@ -2,95 +2,22 @@
 //!
 //! 管理每个版本的 setup.ini 文件，记录版本元数据（加载器类型、版本号等）。
 //! 参考 PCL2 的 setup.ini 机制。
+//!
+//! 按关注点拆分为 3 个子模块：
+//! - `types`     PersonalizationUpdate + VersionSetup 结构体定义
+//! - `helpers`   parse_ini / extract_maven_version / read_setup_version_and_loader / read_mc_version_from_json / detect_version_and_loader
+//! - `mod.rs`    impl VersionSetup（构造 + save/load + ensure_complete + load_or_create + update_personalization + from_version_json）+ tests
+
+mod helpers;
+mod types;
+
+pub use helpers::{detect_version_and_loader, read_mc_version_from_json, read_setup_version_and_loader};
+pub use types::{PersonalizationUpdate, VersionSetup};
 
 use super::state::VersionType;
-use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
-/// 版本个性化字段更新（所有字段可选，None 表示不修改）
-/// 注意：前端传 camelCase（如 javaPath），需 rename_all 匹配
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PersonalizationUpdate {
-    pub logo: Option<String>,
-    pub custom_info: Option<String>,
-    pub display_type: Option<i32>,
-    pub is_star: Option<bool>,
-    pub indie_type: Option<i32>,
-    pub window_title: Option<String>,
-    pub server_enter: Option<String>,
-    pub advance_jvm_args: Option<String>,
-    pub advance_game_args: Option<String>,
-    pub advance_run_cmd: Option<String>,
-    pub java_path: Option<String>,
-    /// Java 选择模式：None/空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java
-    pub java_mode: Option<String>,
-    /// 自动选择时的最小 Java 主版本（仅 auto_version 模式生效，0=不限）
-    pub java_version_min: Option<u32>,
-    /// 自动选择时的最大 Java 主版本（仅 auto_version 模式生效，0=不限）
-    pub java_version_max: Option<u32>,
-    /// 内存模式：None=跟随全局, Some("auto")=自动, Some("custom")=自定义
-    pub memory_mode: Option<String>,
-    /// 版本独立最小内存（MB，仅 custom 模式生效）
-    pub min_memory: Option<u32>,
-    /// 版本独立最大内存（MB，仅 custom 模式生效）
-    pub max_memory: Option<u32>,
-}
-
-/// 版本 Setup 信息
-#[derive(Debug, Clone)]
-pub struct VersionSetup {
-    /// 原始 MC 版本号（如 1.20.1）
-    pub original_version: String,
-    /// 版本类型
-    pub version_type: VersionType,
-    /// Forge 版本号（如有）
-    pub forge_version: Option<String>,
-    /// NeoForge 版本号（如有）
-    pub neoforge_version: Option<String>,
-    /// Fabric Loader 版本号（如有）
-    pub fabric_version: Option<String>,
-    /// Quilt Loader 版本号（如有）
-    pub quilt_version: Option<String>,
-    /// OptiFine 版本号（如有）
-    pub optifine_version: Option<String>,
-    /// LiteLoader 版本号（如有）
-    pub liteloader_version: Option<String>,
-    /// 自定义图标文件名（空字符串=自动判断，PCL\Logo.png 等相对路径）
-    pub logo: Option<String>,
-    /// 自定义描述（空字符串=使用默认描述）
-    pub custom_info: Option<String>,
-    /// 强制版本分类（0=自动，1=隐藏，2=可安装Mod，3=原版类似，4=垃圾，5=愚人节，6=错误）
-    pub display_type: Option<i32>,
-    /// 是否收藏
-    pub is_star: Option<bool>,
-    /// 版本独立隔离设置（0=跟随全局，1=开启隔离，2=关闭隔离）
-    pub indie_type: Option<i32>,
-    /// 游戏窗口标题（空=跟随全局）
-    pub window_title: Option<String>,
-    /// 自动进入服务器（"IP:Port" 格式，空=不自动进入）
-    pub server_enter: Option<String>,
-    /// 额外 JVM 参数（空=跟随全局）
-    pub advance_jvm_args: Option<String>,
-    /// 额外游戏参数（空=跟随全局）
-    pub advance_game_args: Option<String>,
-    /// 启动前执行命令（空=跟随全局）
-    pub advance_run_cmd: Option<String>,
-    /// 版本独立 Java 路径（仅 JavaMode="custom" 时生效）
-    pub java_path: Option<String>,
-    /// Java 选择模式：None/空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java
-    pub java_mode: Option<String>,
-    /// 自动选择时的最小 Java 主版本（仅 JavaMode="auto_version" 时生效，0=不限）
-    pub java_version_min: Option<u32>,
-    /// 自动选择时的最大 Java 主版本（仅 JavaMode="auto_version" 时生效，0=不限）
-    pub java_version_max: Option<u32>,
-    /// 内存模式：None/空=跟随全局, "auto"=自动, "custom"=自定义
-    pub memory_mode: Option<String>,
-    /// 版本独立最小内存（MB，仅 custom 模式生效）
-    pub min_memory: Option<u32>,
-    /// 版本独立最大内存（MB，仅 custom 模式生效）
-    pub max_memory: Option<u32>,
-}
+use helpers::{extract_maven_version, parse_ini};
 
 impl VersionSetup {
     /// 创建新的 Setup（安装时调用）
@@ -614,93 +541,9 @@ impl VersionSetup {
     }
 }
 
-/// 从 Maven 坐标提取版本号
-fn extract_maven_version(name: &str, prefix: &str) -> Option<String> {
-    if name.starts_with(prefix) {
-        Some(name[prefix.len()..].to_string())
-    } else {
-        None
-    }
-}
-
-/// 从 setup.ini 读取 `(OriginalVersion, loader-Type)`。
-/// loader 仅当 Type 非 release/snapshot 时返回（视为 modloader 类型）。
-/// setup.ini 不存在或读取失败时返回 `(None, None)`。
-pub fn read_setup_version_and_loader(version_dir: &Path) -> (Option<String>, Option<String>) {
-    let setup_path = version_dir.join("setup.ini");
-    if !setup_path.exists() {
-        return (None, None);
-    }
-    let Ok(content) = std::fs::read_to_string(&setup_path) else {
-        return (None, None);
-    };
-    let mut mc_version = None;
-    let mut loader = None;
-    for line in content.lines() {
-        if let Some(value) = line.strip_prefix("OriginalVersion=") {
-            let v = value.trim().to_string();
-            if !v.is_empty() {
-                mc_version = Some(v);
-            }
-        } else if let Some(value) = line.strip_prefix("Type=") {
-            let t = value.trim().to_lowercase();
-            if !t.is_empty() && t != "release" && t != "snapshot" {
-                loader = Some(t);
-            }
-        }
-    }
-    (mc_version, loader)
-}
-
-/// 从 version.json 读取 Mojang 版本号（优先 inheritsFrom，否则 id，否则回退 version_id）。
-pub fn read_mc_version_from_json(version_dir: &Path, version_id: &str) -> String {
-    let json_path = version_dir.join(format!("{}.json", version_id));
-    if json_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&json_path) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                if let Some(inherits_from) = json.get("inheritsFrom").and_then(|v| v.as_str()) {
-                    if !inherits_from.is_empty() {
-                        return inherits_from.to_string();
-                    }
-                }
-                if let Some(id) = json.get("id").and_then(|v| v.as_str()) {
-                    return id.to_string();
-                }
-            }
-        }
-    }
-    version_id.to_string()
-}
-
-/// 从 setup.ini 或 version.json 读取 MC 版本号和加载器类型（统一入口，消除重复实现）。
-/// 优先 setup.ini 的 OriginalVersion/Type，缺失则从 version.json 读取版本号。
-pub fn detect_version_and_loader(version_dir: &Path, version_id: &str) -> (String, Option<String>) {
-    let (mc_version, loader) = read_setup_version_and_loader(version_dir);
-    let mc_version =
-        mc_version.unwrap_or_else(|| read_mc_version_from_json(version_dir, version_id));
-    (mc_version, loader)
-}
-
-/// 简单的 INI 解析器（flat：忽略 section，按 key 聚合到 HashMap）
-///
-/// 注意：setup.ini 的字段在 [info] 和 [Memory] 两个 section 中且字段名全局唯一，
-/// 因此 flat 解析与段感知解析行为一致。底层委托 `storage::ini::IniFile`，
-/// 避免重复实现 BOM 剥离、注释跳过、键值解析等逻辑。
-fn parse_ini(content: &str) -> std::collections::HashMap<String, String> {
-    let ini = crate::storage::ini::IniFile::parse(content);
-    let mut map = std::collections::HashMap::new();
-    for section in ini.sections() {
-        for (k, v) in ini.get_section(&section) {
-            map.insert(k, v);
-        }
-    }
-    map
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_parse_ini() {
