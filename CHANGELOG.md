@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 2.9：统一 Java 版本检测到 java::detect_java_version
+- 现象：Java 版本检测逻辑在 3 处重复实现：
+  - `minecraft/launch/mod.rs` 私有 `get_java_version(&Path)`（启动参数构建时用）
+  - `minecraft/loaders/forge_installer.rs` 私有 `get_java_major_version(&str)`（Forge 安装器用）
+  - `minecraft/java/mod.rs` 公开 `detect_java_version(&str)`（更完善：支持目录路径、黑名单检查、JRE/JDK 判定）
+- 前两处实现逐字节相同（`Command::new(java).arg("-version")` + 正则 `version "(\d+)\."`），是 `detect_java_version` 的子集
+- 修复：删除 `launch/mod.rs` 和 `forge_installer.rs` 的私有实现，改为调用 `crate::minecraft::java::detect_java_version`
+- 额外修复：`get_java_version_weight`（PCL2 权重表）在 `java_selector.rs` 和 `java/mod.rs` 各有一份相同实现；将 `java_selector.rs` 的版本改为 `pub`，`java/mod.rs` 删除本地实现改为调用前者
+
 #### 代码重构阶段 2.7：提取 fmt_elapsed 到 community/common.rs
 - 现象：`fmt_elapsed` 函数在 4 个文件中各有一份**完全相同**的实现（格式化耗时为 ms/s），违反 DRY：
   - `minecraft/sources.rs`（私有 `fn fmt_elapsed`）

@@ -322,7 +322,7 @@ fn build_jvm_args(
     args.push(format!("-Xms{}M", min_memory));
     args.push(format!("-Xmx{}M", max_memory));
 
-    let java_version = get_java_version(java_path);
+    let java_version = crate::minecraft::java::detect_java_version(&java_path.to_string_lossy());
     if let Some(version) = java_version {
         if version >= 21 {
             args.push("-XX:+UseZGC".to_string());
@@ -399,22 +399,6 @@ fn build_jvm_args(
     ));
 
     Ok(args)
-}
-
-/// Get Java version
-fn get_java_version(java_path: &Path) -> Option<u32> {
-    let output = std::process::Command::new(java_path)
-        .arg("-version")
-        .output()
-        .ok()?;
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    static RE: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
-    let re = RE
-        .get_or_init(|| regex::Regex::new(r#"version "(\d+)\."#).ok())
-        .as_ref()?;
-    let captures = re.captures(&stderr)?;
-    captures[1].parse().ok()
 }
 
 /// Build game arguments

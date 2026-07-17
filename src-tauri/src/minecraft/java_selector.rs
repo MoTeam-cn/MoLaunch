@@ -424,7 +424,7 @@ fn select_best_from_candidates<'a>(candidates: &[&'a JavaRuntime]) -> Option<&'a
 }
 
 /// Java 版本权重（参考 PCL2）
-fn get_java_version_weight(major_version: u32) -> u32 {
+pub fn get_java_version_weight(major_version: u32) -> u32 {
     match major_version {
         7 => 0,
         8 => 30, // Java 8 权重最高（兼容性最好）

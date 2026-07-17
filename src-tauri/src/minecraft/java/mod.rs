@@ -484,32 +484,10 @@ pub fn select_best_java(
         if a.is_jre != b.is_jre {
             return b.is_jre.cmp(&a.is_jre);
         }
-        let a_weight = get_java_version_weight(a.major_version);
-        let b_weight = get_java_version_weight(b.major_version);
+        let a_weight = crate::minecraft::java_selector::get_java_version_weight(a.major_version);
+        let b_weight = crate::minecraft::java_selector::get_java_version_weight(b.major_version);
         b_weight.cmp(&a_weight)
     });
 
     candidates.first().map(|&java| java)
-}
-
-/// Java版本权重（参考PCL2）
-fn get_java_version_weight(major_version: u32) -> u32 {
-    match major_version {
-        7 => 0,
-        8 => 30, // Java 8 权重最高
-        9 => 4,
-        10 => 5,
-        11 => 14,
-        12 => 6,
-        13 => 7,
-        14 => 8,
-        15 => 9,
-        16 => 12,
-        17 => 31, // Java 17 权重最高
-        18 => 13,
-        19 => 10,
-        20 => 11,
-        21 => 29,
-        _ => major_version,
-    }
 }

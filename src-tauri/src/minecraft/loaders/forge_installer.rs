@@ -58,7 +58,7 @@ pub fn run_forge_installer(
     let loader_name = if is_neoforge { "NeoForge" } else { "Forge" };
 
     // 检测 Java 版本
-    let java_major = get_java_major_version(java_path).unwrap_or(8);
+    let java_major = crate::minecraft::java::detect_java_version(java_path).unwrap_or(8);
 
     // 构建 classpath
     let classpath = format!("{};{}", injector_path, installer_path);
@@ -227,19 +227,6 @@ fn parse_progress_line(line: &str) -> Option<f64> {
         "Injecting profile" => Some(0.91),
         _ => None,
     }
-}
-
-/// 获取 Java 主版本号
-fn get_java_major_version(java_path: &str) -> Option<u32> {
-    let output = Command::new(java_path).arg("-version").output().ok()?;
-
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    static RE: std::sync::OnceLock<Option<regex::Regex>> = std::sync::OnceLock::new();
-    let re = RE
-        .get_or_init(|| regex::Regex::new(r#"version "(\d+)\."#).ok())
-        .as_ref()?;
-    let captures = re.captures(&stderr)?;
-    captures[1].parse().ok()
 }
 
 /// 检测是否需要使用注入器（新版 Forge >= 20 或 NeoForge）
