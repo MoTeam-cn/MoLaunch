@@ -22,7 +22,7 @@ import { inferVersionType, typeMetaMap, type VersionTypeMeta } from '@/composabl
 
 const router = useRouter()
 const versionStore = useVersionStore()
-const { resolveVersionIcon } = useVersionSettings()
+const { resolveVersionIconWithLogo } = useVersionSettings()
 
 interface InstalledVersion {
   id: string
@@ -353,7 +353,7 @@ onMounted(async () => {
                   :class="{ 'bg-primary-50': ver.id === selectedId }"
                   @click="selectVersion(ver.id)"
                 >
-                  <img :src="resolveVersionIcon(ver.logo, ver.id, ver.version_type)" class="h-8 w-8 flex-none rounded" alt="">
+                  <img :src="resolveVersionIconWithLogo(ver.logo, ver.id, ver.version_type)" class="h-8 w-8 flex-none rounded" alt="">
                   <div class="min-w-0 flex-1">
                     <div class="truncate text-sm font-medium text-gray-900">{{ ver.id }}</div>
                     <div class="mt-0.5 text-xs text-gray-400">{{ typeMeta(ver.inferredType).label }}</div>

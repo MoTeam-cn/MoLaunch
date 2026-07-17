@@ -87,12 +87,16 @@ const currentLogoIcon = computed(() => {
 
 /**
  * 根据自定义 logo + 版本 ID 解析图标（供版本列表/选择页使用）
- * - logo 非空时优先使用 iconOptions 中匹配的图标
- * - 否则按 versionId 推断类型，返回类型对应图标
- *   优先用显式传入的 explicitType（调用方已知后端类型时直接传，避免依赖 installedVersionTypes 的加载时机）
- *   其次用 installedVersionTypes（模块级缓存）
+ *
+ * 与 useVersionMeta.ts 的 resolveVersionIcon(type) 区别：
+ *   - useVersionMeta.resolveVersionIcon(type)：仅按版本类型查表取图标（type→icon）
+ *   - 本函数 resolveVersionIconWithLogo(logo, versionId, explicitType?)：含 logo 优先策略，
+ *     logo 非空时优先使用 iconOptions 中匹配的图标，否则按 versionId 推断类型后查表
+ *
+ * 优先用显式传入的 explicitType（调用方已知后端类型时直接传，避免依赖 installedVersionTypes 的加载时机）
+ * 其次用 installedVersionTypes（模块级缓存）
  */
-function resolveVersionIcon(logo: string, versionId: string, explicitType?: string): string {
+function resolveVersionIconWithLogo(logo: string, versionId: string, explicitType?: string): string {
   if (logo) {
     const opt = iconOptions.find(o => o.value === logo)
     if (opt?.icon) return opt.icon
@@ -184,7 +188,7 @@ export function useVersionSettings() {
     currentLogoIcon,
     isModable,
     inferVersionType,
-    resolveVersionIcon,
+    resolveVersionIconWithLogo,
     loadPersonalization,
     initContext,
     refreshEffectiveDir,

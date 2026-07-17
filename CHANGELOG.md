@@ -9,6 +9,12 @@
 
 ### 修复
 
+#### 代码重构阶段 1.3：消除 resolveVersionIcon 同名不同签名冲突
+- 现象：`useVersionMeta.ts` 导出 `resolveVersionIcon(type: string)`（按 type 查表），`useVersionSettings.ts` 也导出 `resolveVersionIcon(logo, versionId, explicitType?)`（含 logo 优先策略），同名不同签名，调用方极易混淆
+- 修复：将 `useVersionSettings.ts` 的 `resolveVersionIcon` 重命名为 `resolveVersionIconWithLogo`，并补充 JSDoc 说明两者区别
+- 同步更新调用方：`VersionSelect.vue` 解构 + 模板调用；`Versions.vue` 解构（保留旧名 alias，避免影响 `getVersionIcon` 内部调用）
+- `useVersionMeta.ts` 的 `resolveVersionIcon(type)` 保留原名不变（语义清晰，且已被 `Versions.vue` 以 `resolveIconByType` alias 引用）
+
 #### 代码重构阶段 1.2：SettingsOther.vue 改用统一配置入口
 - 现象：`SettingsOther.vue` 的 `logLevel` 使用调试用 `getConfigValue('Log', 'level')` / `setConfigValue('Log', 'level', String(level))` 读写，违反"统一走 `applyConfig`/`getConfigMap`"约定
 - 修复：`loadLogLevel` 改用 `getConfigMap()` 取 `cfg.logLevel`；`saveLogLevel` 改用 `applyConfig({ logLevel: level })`（后端 `apply_config` 会同步调用 `logger::set_level` 立即生效）

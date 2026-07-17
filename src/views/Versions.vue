@@ -20,7 +20,7 @@ import { resolveVersionIcon as resolveIconByType } from '@/composables/useVersio
 import type { ResourceType } from '@/types/community'
 
 const versionStore = useVersionStore()
-const { resolveVersionIcon } = useVersionSettings()
+const { resolveVersionIconWithLogo: resolveVersionIcon } = useVersionSettings()
 
 const loading = ref(false)
 const installedVersions = ref<string[]>([])
