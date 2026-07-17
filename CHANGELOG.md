@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 代码重构阶段 3.7：拆分 SkinManager.vue 为 4 个子组件 + 提取 runWithRefresh 消除重复
+- 现象：`SkinManager.vue` 443 行，混合「3D 预览」「上传皮肤」「离线皮肤选择」「披风列表」「动画选择」「账号管理」6 块 UI
+- 修复：抽出 4 个子组件到 `components/common/skin-manager/`：
+  - `SkinAnimationSelector.vue`（~55 行）：动画状态选择器，`v-model` 双向绑定，`AnimationType` 类型从此处 `export`
+  - `SkinCapeList.vue`（~55 行）：披风列表，props 接收 capes/activeCape/uploading，emit `equip`/`unequip`
+  - `SkinUploadPanel.vue`（~80 行）：微软账号上传皮肤 + 账号管理快捷入口（修改密码/用户名，内部 `open` 外部链接）
+  - `SkinLocalSelector.vue`（~40 行）：离线账号本地皮肤选择网格，emit `select`
+- 额外修复：提取 `runWithRefresh` 工具函数消除 `pickAndUpload`/`onEquipCape`/`onUnequipCape` 三处重复的 `uploading=true → 执行 → showSuccess → loadInfo → bumpSkinVersion → uploading=false` 模式
+- 父组件保留：3D 预览区（SkinModel3D + SkinAvatar + 下载按钮）、状态管理、loadInfo、saveSkinToLocal、onSelectLocalSkin
+- `SkinManager.vue` 缩减至 265 行
+
 #### 代码重构阶段 3.6：拆分 SettingsLaunch.vue 为 JavaPathSelector 子组件
 - 现象：`SettingsLaunch.vue` 431 行，混合「Java 路径选择」「内存分配」「版本隔离」「游戏目录」4 块逻辑，其中 Java 选择器独占约 155 行（按钮 + 下拉列表 + 点击外部收起 + 自动检测/手动导入）
 - 修复：抽出 Java 选择器为 `views/settings/settings-launch/JavaPathSelector.vue`（约 175 行）：
