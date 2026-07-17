@@ -182,3 +182,14 @@ pub fn compute_file_hash(file_path: &str, method: HashMethod) -> anyhow::Result<
 
     Ok(hex::encode(hash_bytes))
 }
+
+/// 计算字节的 SHA1，返回小写十六进制字符串
+///
+/// 统一替代此前分散在 `java/download.rs`、`community/preload.rs`、
+/// `launch/pipeline/natives.rs` 中的内联 SHA1 实现。
+pub fn compute_sha1_hex(bytes: &[u8]) -> String {
+    use sha1::Digest;
+    let mut hasher = sha1::Sha1::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}

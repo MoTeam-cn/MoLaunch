@@ -9,6 +9,18 @@
 
 ### 修复
 
+#### 代码重构阶段 2.10：统一 SHA1 计算到 file_checker::compute_sha1_hex
+- 现象：字节级 SHA1 计算代码在 4 处重复（均为 `sha1::Sha1::new()` + `update` + `hex::encode(finalize)` 模式）：
+  - `minecraft/java/download.rs` 私有 `compute_sha1_hex(bytes)`（Java 运行时下载校验）
+  - `minecraft/community/preload.rs` `compute_modrinth_sha1(path)`（Modrinth 指纹计算）
+  - `minecraft/launch/pipeline/natives.rs` 内联（JAR 文件 SHA1 校验，CWE-494 防护）
+  - `minecraft/launch/pipeline/natives.rs` 内联（提取文件 SHA1 审计日志）
+- 已有 `minecraft/utils/file_checker.rs::compute_file_hash` 支持文件级哈希，但缺少字节级工具
+- 修复：在 `file_checker.rs` 新增 `pub fn compute_sha1_hex(bytes: &[u8]) -> String`；4 处调用点改为 import 或直接调用
+- `java/download.rs` 删除本地 `compute_sha1_hex`（`verify_bytes_sha1` 保留，含日志逻辑）
+- `preload.rs` 的 `compute_modrinth_sha1` 改为委托 `compute_sha1_hex`
+- `natives.rs` 2 处内联代码替换为函数调用
+
 #### 代码重构阶段 2.9：统一 Java 版本检测到 java::detect_java_version
 - 现象：Java 版本检测逻辑在 3 处重复实现：
   - `minecraft/launch/mod.rs` 私有 `get_java_version(&Path)`（启动参数构建时用）

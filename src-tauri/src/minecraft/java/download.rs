@@ -10,6 +10,7 @@ use tauri::{AppHandle, Emitter};
 
 use crate::{log_info, log_warn};
 use crate::minecraft::sources::{build_replace_urls, DownloadSourceMode};
+use crate::minecraft::utils::file_checker::compute_sha1_hex;
 
 /// Mojang Java Runtime 索引 URL（官方）
 const JAVA_RUNTIME_INDEX_OFFICIAL: &str =
@@ -527,14 +528,6 @@ fn emit_progress(
             },
         );
     }
-}
-
-/// 计算字节的 SHA1，返回小写十六进制字符串
-fn compute_sha1_hex(bytes: &[u8]) -> String {
-    use sha1::Digest;
-    let mut hasher = sha1::Sha1::new();
-    hasher.update(bytes);
-    hex::encode(hasher.finalize())
 }
 
 /// 校验字节的 SHA1，`expected_sha1` 为空则跳过（返回 Ok）

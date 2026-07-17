@@ -157,11 +157,8 @@ pub fn compute_curseforge_fingerprint(path: &Path) -> Result<u32, String> {
 
 /// Modrinth 用的 SHA1 哈希（hex 字符串）
 pub fn compute_modrinth_sha1(path: &Path) -> Result<String, String> {
-    use sha1::{Digest, Sha1};
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    let mut hasher = Sha1::new();
-    hasher.update(&bytes);
-    Ok(hex::encode(hasher.finalize()))
+    Ok(crate::minecraft::utils::file_checker::compute_sha1_hex(&bytes))
 }
 
 /// MurmurHash2 算法（参考 PCL2 `LocalResourceFile.CurseForgeHash` 第 434-459 行）

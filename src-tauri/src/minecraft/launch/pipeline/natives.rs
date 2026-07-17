@@ -175,7 +175,6 @@ impl LaunchPipeline {
         let expected_sha1 = expected_sha1.map(|s| s.to_string());
 
         tokio::task::spawn_blocking(move || {
-            use sha1::Digest;
             use std::fs::File;
             use std::io::Read;
 
@@ -185,9 +184,7 @@ impl LaunchPipeline {
                     Ok(b) => b,
                     Err(e) => return Err(format!("读取jar文件失败: {}", e)),
                 };
-                let mut hasher = sha1::Sha1::new();
-                hasher.update(&jar_bytes);
-                let actual = hex::encode(hasher.finalize());
+                let actual = crate::minecraft::utils::file_checker::compute_sha1_hex(&jar_bytes);
                 if actual.eq_ignore_ascii_case(expected) {
                     log_info!(
                         "[Natives] JAR SHA1 verified: {} (sha1={})",
@@ -240,9 +237,7 @@ impl LaunchPipeline {
                         .map_err(|e| format!("读取文件失败: {}", e))?;
 
                     // 计算提取文件的 SHA1 用于审计日志
-                    let mut hasher = sha1::Sha1::new();
-                    hasher.update(&buffer);
-                    let file_sha1 = hex::encode(hasher.finalize());
+                    let file_sha1 = crate::minecraft::utils::file_checker::compute_sha1_hex(&buffer);
 
                     std::fs::write(&out_path, &buffer)
                         .map_err(|e| format!("写入文件失败: {}", e))?;
