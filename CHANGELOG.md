@@ -9,6 +9,14 @@
 
 ### 修复
 
+#### 代码重构阶段 3.6：拆分 SettingsLaunch.vue 为 JavaPathSelector 子组件
+- 现象：`SettingsLaunch.vue` 431 行，混合「Java 路径选择」「内存分配」「版本隔离」「游戏目录」4 块逻辑，其中 Java 选择器独占约 155 行（按钮 + 下拉列表 + 点击外部收起 + 自动检测/手动导入）
+- 修复：抽出 Java 选择器为 `views/settings/settings-launch/JavaPathSelector.vue`（约 175 行）：
+  - 自包含：管理 `showJavaList`/`detectingJava`/`javaSelectorRef` 状态、`handleDocumentClick` 外部点击监听、`handleAutoDetectJava`/`handleManualImportJava` 函数
+  - 模板含：版本徽章、下拉输入框、自动选项 + 已安装 Java 列表
+- 父组件保留：内存配置（自动/自定义 + 可视化条 + 滑动条）、版本隔离（Select 下拉）、游戏目录只读展示
+- `SettingsLaunch.vue` 缩减至 279 行，并移除不再需要的 `useJavaStore`、`ArrowPathIcon`/`DocumentPlusIcon`、`showInfo`/`showSuccess`/`showError` 等导入和 click-outside watcher
+
 #### 代码重构阶段 3.5：拆分 AccountSelector.vue 为 4 个子模块
 - 现象：`AccountSelector.vue` 440 行，混合「未登录提示」「指示器」「卡片轮播」「拖动/滚轮导航」4 块独立逻辑
 - 修复：抽出 4 个子模块到 `components/home/account-selector/` 和 `composables/`：
