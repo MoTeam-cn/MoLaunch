@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 代码重构阶段 3.5：拆分 AccountSelector.vue 为 4 个子模块
+- 现象：`AccountSelector.vue` 440 行，混合「未登录提示」「指示器」「卡片轮播」「拖动/滚轮导航」4 块独立逻辑
+- 修复：抽出 4 个子模块到 `components/home/account-selector/` 和 `composables/`：
+  - `LoginPrompt.vue`（~25 行）：未登录时的图标 + 登录按钮（内部 router 跳转）
+  - `AccountIndicator.vue`（~50 行）：圆点指示器 + 计数，emit `switch` 切换
+  - `AccountCard.vue`（~80 行）：单个账号卡片（头像/用户名/操作按钮），emit `skin`/`logout`
+  - `useSwipeNavigation.ts`（~85 行）：拖动/滚轮导航 composable，参数为 `totalCards`/`currentIndex`/`onSwitch` 回调
+- `AccountCardData` 接口在 `AccountCard.vue` 中 `export`，`AccountIndicator.vue` 和父组件通过 `import type` 复用，避免重复定义
+- 父组件保留：cards computed、switchTo/prev/next、switchAccount/removeAccount、watch currentIndex 同步逻辑
+- `AccountSelector.vue` 缩减至 289 行
+
 #### 代码重构阶段 3.4：拆分 Downloads.vue 为空状态 + 统计面板子组件
 - 现象：`Downloads.vue` 367 行，混合「空状态」「统计面板」「任务列表」三块独立 UI
 - 修复：抽出两个子组件到 `views/downloads/`：

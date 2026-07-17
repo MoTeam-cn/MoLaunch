@@ -6,15 +6,23 @@
  * - 左右箭头 / 拖动 / 滚轮 切换账号，带平滑滑动动画
  * - 末尾有"添加账号"卡片
  * - 离线账号显示默认皮肤（Steve/Alex）
+ *
+ * 子组件：
+ *   - LoginPrompt         未登录时的登录引导
+ *   - AccountIndicator    圆点指示器 + 计数
+ *   - AccountCard         单个账号卡片（头像/用户名/操作按钮）
+ *   - useSwipeNavigation  拖动/滚轮导航 composable
  */
 
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { showWarning } from '@/utils/toast'
-import SkinAvatar from '@/components/common/SkinAvatar.vue'
 import SkinManager from '@/components/common/SkinManager.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+import AccountCard, { type AccountCardData } from './account-selector/AccountCard.vue'
+import AccountIndicator from './account-selector/AccountIndicator.vue'
+import LoginPrompt from './account-selector/LoginPrompt.vue'
+import { useSwipeNavigation } from '@/composables/useSwipeNavigation'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -24,22 +32,14 @@ const showSkinManager = ref(false)
 /** 当前显示的卡片索引 */
 const currentIndex = ref(0)
 
-interface AccountCard {
-  uuid: string
-  username: string
-  loginType: string  // 'Microsoft' | 'Offline'
-  isExpired?: boolean
-  isActive?: boolean
-}
-
 /**
  * 账号卡片列表（微软账号 + 离线账号，顺序稳定）
  *
  * 关键：cards 的顺序不随 currentUser 变化而重排，
  * 当前账号通过 isActive=true 标记，这样切换账号时 currentIndex 指向稳定不变。
  */
-const cards = computed<AccountCard[]>(() => {
-  const list: AccountCard[] = []
+const cards = computed<AccountCardData[]>(() => {
+  const list: AccountCardData[] = []
   const currentUuid = authStore.currentUser?.uuid
 
   // 微软账号
@@ -108,7 +108,7 @@ watch(cards, (newCards) => {
 const switching = ref(false)
 
 /** 点击卡片上的"皮肤"按钮：非当前账号先切换再打开 */
-async function onCardSkin(card: AccountCard) {
+async function onCardSkin(card: AccountCardData) {
   if (!card.isActive) {
     await switchAccount(card.uuid, card.loginType)
   }
@@ -116,7 +116,7 @@ async function onCardSkin(card: AccountCard) {
 }
 
 /** 点击卡片上的"登出/删除"按钮 */
-async function onCardLogout(card: AccountCard, event: Event) {
+async function onCardLogout(card: AccountCardData, event: Event) {
   if (card.isActive) {
     await logout()
   } else {
@@ -175,70 +175,13 @@ async function removeAccount(targetUuid: string, loginType: string, event: Event
 }
 
 function addAccount() { router.push('/login') }
-function login() { router.push('/login') }
 async function logout() { await authStore.logoutUser() }
 
-/** ---- 拖动切换支持 ---- **/
-const isDragging = ref(false)
-const dragOffset = ref(0)
-let dragStartX = 0
-let dragMoved = false
-
-function onPointerDown(e: PointerEvent) {
-  isDragging.value = true
-  dragMoved = false
-  dragStartX = e.clientX
-  dragOffset.value = 0
-}
-function onPointerMove(e: PointerEvent) {
-  if (!isDragging.value) return
-  const dx = e.clientX - dragStartX
-  if (Math.abs(dx) > 4) dragMoved = true
-  dragOffset.value = dx
-}
-function onPointerUp() {
-  if (!isDragging.value) return
-  isDragging.value = false
-  const threshold = 60
-  if (dragOffset.value < -threshold && currentIndex.value < totalCards.value - 1) {
-    next()
-  } else if (dragOffset.value > threshold && currentIndex.value > 0) {
-    prev()
-  }
-  dragOffset.value = 0
-}
-/** 鼠标滚轮左右切换（带节流，防止快速滑动并发请求） */
-let lastWheelTime = 0
-const WHEEL_THROTTLE_MS = 300  // 节流间隔，与切换动画时长匹配
-function onWheel(e: WheelEvent) {
-  // 只在非拖动、非切换中时响应滚轮
-  if (isDragging.value || switching.value) return
-  // 节流：间隔内忽略
-  const now = Date.now()
-  if (now - lastWheelTime < WHEEL_THROTTLE_MS) return
-
-  let direction = 0
-  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-    direction = e.deltaY > 0 ? 1 : -1
-  } else if (e.deltaX !== 0) {
-    direction = e.deltaX > 0 ? 1 : -1
-  }
-  if (direction === 0) return
-  e.preventDefault()
-
-  const newIndex = currentIndex.value + direction
-  if (newIndex < 0 || newIndex >= totalCards.value) return
-  lastWheelTime = now
-  switchTo(newIndex)
-}
-
-/** 卡片滑动 transform */
-const cardTransform = computed(() => {
-  if (isDragging.value && dragMoved) {
-    return `translateX(calc(-${currentIndex.value * 100}% + ${dragOffset.value}px))`
-  }
-  return `translateX(-${currentIndex.value * 100}%)`
-})
+// 拖动/滚轮导航（onSwitch 回调即 switchTo，switchTo 内部自带 switching 检查）
+const {
+  isDragging, dragMoved, cardTransform,
+  onPointerDown, onPointerMove, onPointerUp, onWheel,
+} = useSwipeNavigation(totalCards, currentIndex, switchTo)
 
 onMounted(() => {
   authStore.loadMsAccounts()
@@ -249,56 +192,18 @@ onMounted(() => {
 <template>
   <div class="account-card-container flex h-full w-full min-w-0 flex-col overflow-hidden">
     <!-- 未登录状态 -->
-    <div v-if="!isLoggedIn" class="flex flex-col items-center py-8">
-      <svg class="mb-5 h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-5 0-9 3-9 7v1h18v-1c0-4-4-7-9-7z" />
-      </svg>
-      <button
-        class="rounded-lg bg-primary-600 px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        @click="login"
-      >
-        立即登录
-      </button>
-      <div class="mt-4 flex gap-4 text-xs text-gray-300">
-        <a class="cursor-pointer transition-colors hover:text-primary-500" @click="login">登录账号</a>
-      </div>
-    </div>
+    <LoginPrompt v-if="!isLoggedIn" />
 
     <!-- 已登录状态：单卡片 + 左右切换 -->
     <template v-else>
       <!-- 卡片栏标题 + 指示器 -->
-      <div class="mb-2 flex items-center justify-between px-1">
-        <div class="text-xs font-medium text-gray-400">账号切换</div>
-        <div class="flex items-center gap-1.5">
-          <!-- 指示点（可点击切换） -->
-          <Tooltip
-            v-for="(card, i) in cards"
-            :key="card.uuid"
-            :text="card.username"
-            position="bottom"
-            :delay="200"
-          >
-            <button
-              class="h-1.5 rounded-full transition-all hover:opacity-70"
-              :class="i === currentIndex ? 'w-4 bg-primary-500' : 'w-1.5 bg-gray-300'"
-              @click="switchTo(i)"
-            />
-          </Tooltip>
-          <Tooltip
-            v-if="hasAddCard"
-            text="添加账号"
-            position="bottom"
-            :delay="200"
-          >
-            <button
-              class="h-1.5 rounded-full transition-all hover:opacity-70"
-              :class="currentIndex === cards.length ? 'w-4 bg-primary-500' : 'w-1.5 bg-gray-300'"
-              @click="switchTo(cards.length)"
-            />
-          </Tooltip>
-          <span class="ml-1 text-[10px] text-gray-300">{{ currentIndex + 1 }}/{{ totalCards }}</span>
-        </div>
-      </div>
+      <AccountIndicator
+        :cards="cards"
+        :current-index="currentIndex"
+        :has-add-card="hasAddCard"
+        :total-cards="totalCards"
+        @switch="switchTo"
+      />
 
       <!-- 卡片容器（带左右切换按钮） -->
       <div class="flex items-center gap-1">
@@ -328,69 +233,13 @@ onMounted(() => {
             :style="{ transform: cardTransform }"
           >
             <!-- 账号卡片 -->
-            <div
+            <AccountCard
               v-for="card in cards"
               :key="card.uuid"
-              class="flex-none"
-              style="width: 100%;"
-            >
-              <div
-                class="group relative rounded-xl border-2 p-4 transition-all"
-                :class="card.isActive
-                  ? 'border-primary-500 bg-primary-50'
-                  : 'border-gray-200 bg-white hover:border-primary-300'"
-              >
-                <!-- 头像（PCL2 双层立体头像，离线账号显示默认皮肤） -->
-                <div class="mb-3 flex justify-center">
-                  <SkinAvatar
-                    :uuid="card.uuid"
-                    :username="card.username"
-                    :size="96"
-                    :overlay="true"
-                    :rounded="false"
-                    :login-type="card.loginType === '正版' ? 'Microsoft' : 'Offline'"
-                  />
-                </div>
-
-                <!-- 用户名 -->
-                <div class="truncate text-center text-base font-medium" :class="card.isActive ? 'text-primary-700' : 'text-gray-800'">
-                  {{ card.username }}
-                </div>
-
-                <!-- 账号类型 + 状态 -->
-                <div class="mt-1 flex items-center justify-center gap-1.5 text-xs">
-                  <span :class="card.isActive ? 'text-primary-500' : 'text-gray-400'">{{ card.loginType }}</span>
-                  <span v-if="card.isActive" class="rounded-full bg-primary-100 px-2 py-0.5 text-primary-600">当前</span>
-                  <span v-else-if="card.isExpired" class="rounded-full bg-yellow-100 px-2 py-0.5 text-yellow-600">过期</span>
-                  <span v-else class="text-gray-300">点击切换</span>
-                </div>
-
-                <!-- 常驻操作按钮组（所有账号卡片） -->
-                <div class="mt-3 flex flex-wrap justify-center gap-1.5">
-                  <button
-                    class="flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600"
-                    :title="card.loginType === '正版' ? '皮肤与披风管理' : '本地皮肤选择'"
-                    @click.stop="onCardSkin(card)"
-                  >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 2a6 6 0 110 12 6 6 0 010-12z" />
-                    </svg>
-                    皮肤
-                  </button>
-                  <button
-                    class="flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs text-red-500 transition-colors hover:border-red-300 hover:bg-red-50"
-                    :title="card.isActive ? '退出登录' : '删除此账号'"
-                    @click.stop="onCardLogout(card, $event)"
-                  >
-                    <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-                      <path v-if="card.isActive" fill-rule="evenodd" d="M3 4a1 1 0 011-1h7a1 1 0 110 2H5v10h6a1 1 0 110 2H4a1 1 0 01-1-1V4zm11.3 3.3a1 1 0 011.4 0l3 3a1 1 0 010 1.4l-3 3a1 1 0 01-1.4-1.4l1.3-1.3H9a1 1 0 110-2h6.6l-1.3-1.3a1 1 0 010-1.4z" clip-rule="evenodd" />
-                      <path v-else fill-rule="evenodd" d="M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 01-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 01-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z" clip-rule="evenodd" />
-                    </svg>
-                    {{ card.isActive ? '登出' : '删除' }}
-                  </button>
-                </div>
-              </div>
-            </div>
+              :card="card"
+              @skin="onCardSkin"
+              @logout="onCardLogout"
+            />
 
             <!-- 添加账号卡片 -->
             <div v-if="hasAddCard" class="flex-none" style="width: 100%;">
