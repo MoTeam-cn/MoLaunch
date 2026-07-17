@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 代码重构阶段 2.8：提取 Maven 坐标转路径到 utils/maven.rs
+- 现象：Maven 坐标转路径的核心逻辑（`split(':')` → `replace('.', '/')` → 拼接路径）在 4 处重复实现：
+  - `minecraft/launch/mod.rs` 私有 `maven_name_to_path` → 相对路径 String
+  - `minecraft/version/libraries.rs` pub `maven_to_relative_path` → 相对路径 String（与上者逻辑完全相同）
+  - `minecraft/version/libraries.rs` pub `maven_to_path` → 绝对路径 String
+  - `minecraft/loaders/shared.rs` pub `maven_path_to_local` → 绝对路径 PathBuf
+- 修复：新建 `minecraft/utils/maven.rs`，提供 `pub fn maven_to_relative_path(name) -> String` 和 `pub fn maven_to_local_path(name, game_dir) -> PathBuf`
+- 原 4 个函数中：`launch/mod.rs` 删除私有实现改为直接调用；`libraries.rs` 和 `shared.rs` 的 pub 函数保留为薄包装委托（维持 API 兼容）
+
 #### 代码重构阶段 2.10：统一 SHA1 计算到 file_checker::compute_sha1_hex
 - 现象：字节级 SHA1 计算代码在 4 处重复（均为 `sha1::Sha1::new()` + `update` + `hex::encode(finalize)` 模式）：
   - `minecraft/java/download.rs` 私有 `compute_sha1_hex(bytes)`（Java 运行时下载校验）

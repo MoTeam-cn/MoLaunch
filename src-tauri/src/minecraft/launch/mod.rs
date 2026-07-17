@@ -230,7 +230,7 @@ fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyhow::Result<
                 }
             } else if let Some(name) = lib["name"].as_str() {
                 // 没有 downloads.artifact，用 maven name 解析路径
-                let path = maven_name_to_path(name);
+                let path = crate::minecraft::utils::maven::maven_to_relative_path(name);
                 let lib_path = game_dir.join("libraries").join(&path);
                 if lib_path.exists() {
                     entries.push(lib_path.to_string_lossy().to_string());
@@ -279,31 +279,6 @@ fn find_original_version(game_dir: &Path, json: &serde_json::Value) -> String {
         .and_then(|v| v.as_str())
         .unwrap_or("unknown")
         .to_string()
-}
-
-/// Convert Maven name to path
-fn maven_name_to_path(name: &str) -> String {
-    let parts: Vec<&str> = name.split(':').collect();
-    if parts.len() < 3 {
-        return name.to_string();
-    }
-
-    let group = parts[0].replace('.', "/");
-    let artifact = parts[1];
-    let version = parts[2];
-    let classifier = if parts.len() > 3 { parts[3] } else { "" };
-
-    if classifier.is_empty() {
-        format!(
-            "{}/{}/{}/{}-{}.jar",
-            group, artifact, version, artifact, version
-        )
-    } else {
-        format!(
-            "{}/{}/{}/{}-{}-{}.jar",
-            group, artifact, version, artifact, version, classifier
-        )
-    }
 }
 
 /// Build JVM arguments

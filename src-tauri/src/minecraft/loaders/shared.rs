@@ -35,26 +35,7 @@ pub fn find_java_for_install(_game_dir: &Path) -> anyhow::Result<String> {
 
 /// Convert Maven coordinate to local file path
 pub fn maven_path_to_local(maven_path: &str, game_dir: &Path) -> PathBuf {
-    let parts: Vec<&str> = maven_path.split(':').collect();
-    let libs_dir = game_dir.join("libraries");
-
-    if parts.len() >= 3 {
-        let group = parts[0].replace('.', "/");
-        let artifact = parts[1];
-        let version = parts[2];
-        let classifier = if parts.len() >= 4 { parts[3] } else { "" };
-
-        let dir_path = libs_dir.join(&group).join(artifact).join(version);
-        let file_name = if classifier.is_empty() {
-            format!("{}-{}.jar", artifact, version)
-        } else {
-            format!("{}-{}-{}.jar", artifact, version, classifier)
-        };
-
-        dir_path.join(file_name)
-    } else {
-        libs_dir.join(maven_path.replace(':', "/"))
-    }
+    crate::minecraft::utils::maven::maven_to_local_path(maven_path, game_dir)
 }
 
 /// Download Mojang mappings (required for Forge/NeoForge >= 20)

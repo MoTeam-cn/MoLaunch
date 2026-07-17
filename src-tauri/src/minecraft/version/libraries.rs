@@ -34,49 +34,9 @@ impl LibEntry {
 
 /// Maven coordinate to local path
 pub fn maven_to_path(name: &str, game_dir: &Path) -> String {
-    let parts: Vec<&str> = name.split(':').collect();
-    if parts.len() < 3 {
-        return String::new();
-    }
-
-    let group = parts[0].replace('.', "/");
-    let artifact = parts[1];
-    let version = parts[2];
-
-    let filename = if parts.len() > 3 {
-        format!("{}-{}-{}.jar", artifact, version, parts[3])
-    } else {
-        format!("{}-{}.jar", artifact, version)
-    };
-
-    game_dir
-        .join("libraries")
-        .join(&group)
-        .join(artifact)
-        .join(version)
-        .join(&filename)
+    crate::minecraft::utils::maven::maven_to_local_path(name, game_dir)
         .to_string_lossy()
         .to_string()
-}
-
-/// Maven coordinate to relative path
-pub fn maven_to_relative_path(name: &str) -> String {
-    let parts: Vec<&str> = name.split(':').collect();
-    if parts.len() < 3 {
-        return String::new();
-    }
-
-    let group = parts[0].replace('.', "/");
-    let artifact = parts[1];
-    let version = parts[2];
-
-    let filename = if parts.len() > 3 {
-        format!("{}-{}-{}.jar", artifact, version, parts[3])
-    } else {
-        format!("{}-{}.jar", artifact, version)
-    };
-
-    format!("{}/{}/{}/{}", group, artifact, version, filename)
 }
 
 /// Check if a native classifier matches the current platform architecture.
@@ -178,7 +138,7 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
 
         let name = library["name"].as_str().unwrap_or_default();
         let root_url = library["url"].as_str().map(|u| {
-            let path = maven_to_relative_path(name);
+            let path = crate::minecraft::utils::maven::maven_to_relative_path(name);
             format!("{}{}", u.trim_end_matches('/'), path)
         });
 
