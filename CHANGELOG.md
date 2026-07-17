@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 代码重构阶段 4.7：拆分 minecraft/community/modrinth.rs 为 4 个子模块
+- 现象：`minecraft/community/modrinth.rs` 819 行，单一文件混合「7 个 MR API 响应数据结构（MrHit / MrProject / MrVersion 等）+ 基地址常量」「响应到统一资源模型的转换（convert_hit / convert_project / convert_version + build_facets 查询参数构造）」「HTTP 请求层（pick_base + mr_get / mr_post + source 策略回退镜像 + 404 优雅处理）」「公共 API（version_files_search / search / get_project / get_versions / batch_get_project_slugs）」4 块关注点
+- 修复：将 `modrinth.rs` 升级为 `modrinth/` 目录，拆为 4 个子模块：
+  - `modrinth/types.rs`（110 行）：`MR_OFFICIAL_BASE` / `MR_MIRROR_BASE` 常量 + `MrSearchResponse` / `MrHit` / `MrProject` / `MrVersion` / `MrFile` / `MrHashes` / `MrDependency` 共 7 个 MR API 响应数据结构（`pub(crate)` 可见性，仅模块内部使用）
+  - `modrinth/convert.rs`（248 行）：`convert_hit`（搜索命中 → ResourceProject）+ `convert_project`（工程详情 → ResourceProject，含 mcmod 中文译名 + 加载器标志位聚合）+ `convert_version`（版本 → ResourceVersion，取 primary 文件 + 提取 required 依赖）+ `build_facets`（构造 MR facets 查询参数 `[["project_type:mod"],["categories:'forge'"]]`，ignore_quilt 过滤）
+  - `modrinth/http.rs`（257 行）：`pick_base`（source 策略：0=强制镜像 / 1=缓慢时换镜像 / 2=尽量官方）+ `mr_get` / `mr_post`（source=1 时官方失败自动回退镜像，但 404 不重试因镜像也是 404，官方 20s 超时，含嵌套 `parse_resp` / `parse_post_resp` 处理 404/非 2xx/响应解析）
+  - `modrinth/mod.rs`（234 行）：`version_files_search`（参考 PCL2 LocalResourceOnlineLoad 步骤 1-3：version_files 用 SHA1 查 → project_id → /projects 批量查询 + sha1 一致性校验防错位）+ `search` + `get_project` + `get_versions` + `batch_get_project_slugs`（整合包文件名格式化用）
+- 同步清理：移除 `modrinth.rs` 中的私有 `urlencode_params` 函数（与 `curseforge.rs` 重复），改用 Phase 4.6 抽取的 `super::common::urlencode_params`。至此 `urlencode_params` 重复定义问题完全解决
+- `modrinth::{search, get_project, get_versions, version_files_search, batch_get_project_slugs}` 公共 API 路径保持完全向后兼容，`community/mod.rs` 已有的 `pub mod modrinth;` 声明 + 5 处外部调用（preload / searcher / detail / community/install）均无需修改
+- 验证：`cargo check` 通过
+
 #### 代码重构阶段 4.6：拆分 minecraft/community/curseforge.rs 为 4 个子模块
 - 现象：`minecraft/community/curseforge.rs` 786 行，单一文件混合「9 个 CF API 响应数据结构（CfModEntry / CfFile / CfSearchResponse 等）」「响应到统一资源模型的转换（convert_project / convert_version / parse_cf_download_url）」「HTTP 请求层（get_cf_config + cf_get / cf_post + source 策略回退镜像）」「公共 API（fingerprint_search / search / get_project / get_versions / batch_get_mod_slugs + 私有 curseforge_loader_type）」4 块关注点
 - 修复：将 `curseforge.rs` 升级为 `curseforge/` 目录，拆为 4 个子模块：
