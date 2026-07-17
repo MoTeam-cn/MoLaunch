@@ -29,8 +29,13 @@ jobs:
       should_skip: ${{ steps.check.outputs.skip }}
     steps:
       - id: check
+        # 通过 env 传递 commit message，避免直接插值到 bash 表达式
+        # 原写法 "${{ github.event.head_commit.message }}" 在 message 含双引号 / $ / 反引号时
+        # 会被 shell 二次解析（如 cmd /c start "" "<path>" 中的 > 被当作重定向）
+        env:
+          COMMIT_MSG: ${{ github.event.head_commit.message }}
         run: |
-          if [[ "${{ github.event.head_commit.message }}" == *"!c"* ]]; then
+          if [[ "$COMMIT_MSG" == *"!c"* ]]; then
             echo "skip=true" >> $GITHUB_OUTPUT
           else
             echo "skip=false" >> $GITHUB_OUTPUT
