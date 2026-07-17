@@ -9,6 +9,23 @@
 
 ### 修复
 
+#### 代码重构阶段 4.8：拆分 commands/version/mods.rs 为 4 个子模块
+- 现象：`commands/version/mods.rs` 813 行，单一文件混合「3 个数据结构（ModInfo / ModMetadata / ModMeta）」「2 个共享辅助函数（get_mods_dir + sanitize_file_name）」「jar 内 mod 元数据读取流水线（read_mod_metadata + 8 个内部辅助：finalize_metadata / extract_logo_data_url / guess_mime / read_fabric_mod_meta / read_forge_mods_toml_meta / read_manifest_version / read_mcmod_info_meta / parse_toml_kv / lookup_translated）」「8 个 #[tauri::command] 命令（is_version_modable / list_mods / toggle_mod / delete_mod / install_mod / open_mods_dir / get_version_mods_dir / reveal_mod_file）+ infer_loader_type」4 块关注点
+- 修复：将 `mods.rs` 升级为 `mods/` 目录，拆为 4 个子模块：
+  - `mods/types.rs`（78 行）：`ModInfo`（pub，前端 invoke 返回类型）+ `ModMetadata`（pub(crate)，jar 元数据最终结构）+ `ModMeta`（pub(super)，jar 元数据中间结构）
+  - `mods/helpers.rs`（37 行）：`get_mods_dir`（pub(crate)，按隔离模式解析 effective_dir/mods）+ `sanitize_file_name`（pub(super)，路径遍历防护）
+  - `mods/metadata.rs`（~280 行）：`read_mod_metadata`（pub(crate)，jar 元数据读取流水线入口）+ 8 个内部辅助函数（finalize_metadata / extract_logo_data_url / guess_mime / read_fabric_mod_meta / read_forge_mods_toml_meta / read_manifest_version / read_mcmod_info_meta / parse_toml_kv / lookup_translated）
+  - `mods/mod.rs`（402 行）：8 个 `#[tauri::command]` 命令（is_version_modable / list_mods / toggle_mod / delete_mod / install_mod / open_mods_dir / get_version_mods_dir / reveal_mod_file）+ 私有 `infer_loader_type`
+- 关键约束：`#[tauri::command]` 宏在函数定义处生成 `__cmd__` / `__tauri_command_name_` 辅助符号，`lib.rs` 的 `invoke_handler` 通过 `commands::version::mods::__cmd__X` 路径查找。**命令函数不能移到子模块后用 `pub use` 重导出**（否则 `__cmd__` 符号留在子模块，路径查找失败）。故 8 个命令必须留在 `mod.rs`，仅类型 / 辅助函数 / 元数据读取流水线可拆分
+- 重导出策略：
+  - `pub use types::ModInfo;`（ModInfo 为 pub，前端可见）
+  - `pub(crate) use types::ModMetadata;`（ModMetadata 为 pub(crate)，crate 内可见，preload 复用）
+  - `pub(crate) use helpers::get_mods_dir;`（commands/version/preload.rs 的 `use super::mods::get_mods_dir` 依赖此重导出）
+  - `pub(crate) use metadata::read_mod_metadata;`（minecraft/community/preload.rs 的 `crate::commands::version::mods::read_mod_metadata` 依赖此重导出）
+  - 注意：ModMetadata 在 metadata.rs 中是私有 `use super::types::ModMetadata` 引入的，不能通过 `pub(crate) use metadata::{read_mod_metadata, ModMetadata}` 重导出（编译器报 E0603 private），必须从 `types` 直接重导出
+- `commands::version::mods::{is_version_modable, list_mods, toggle_mod, delete_mod, install_mod, open_mods_dir, reveal_mod_file, get_version_mods_dir, ModInfo, ModMetadata, read_mod_metadata, get_mods_dir}` 路径保持完全向后兼容，`lib.rs` 的 invoke_handler 注册 + `commands/version/preload.rs` + `minecraft/community/preload.rs` 共 3 处外部引用均无需修改
+- 验证：`cargo check` 通过
+
 #### 代码重构阶段 4.7：拆分 minecraft/community/modrinth.rs 为 4 个子模块
 - 现象：`minecraft/community/modrinth.rs` 819 行，单一文件混合「7 个 MR API 响应数据结构（MrHit / MrProject / MrVersion 等）+ 基地址常量」「响应到统一资源模型的转换（convert_hit / convert_project / convert_version + build_facets 查询参数构造）」「HTTP 请求层（pick_base + mr_get / mr_post + source 策略回退镜像 + 404 优雅处理）」「公共 API（version_files_search / search / get_project / get_versions / batch_get_project_slugs）」4 块关注点
 - 修复：将 `modrinth.rs` 升级为 `modrinth/` 目录，拆为 4 个子模块：
