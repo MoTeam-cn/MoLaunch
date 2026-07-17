@@ -9,6 +9,21 @@
 
 ### 修复
 
+#### 代码重构阶段 4.9：拆分 commands/community/install.rs 为 7 个子模块
+- 现象：`commands/community/install.rs` 1117 行，单一文件混合「6 个对外数据结构（DownloadRequest / DownloadResult / CommunityDownloadProgress / InstallModpackRequest / ModpackFormat / InstallModpackResult）」「7 个纯工具函数（format_bytes / apply_filename_format / resolve_install_dir / parse_cf_loader_id / parse_mr_loader / extract_mr_project_id / construct_cf_edge_url）」「3 个 zip/下载操作（download_files_concurrent / extract_overrides / detect_modpack_format）」「CF 整合包处理（6 个 manifest 数据结构 + install_cf_mods）」「MR 整合包处理（2 个 index 数据结构 + install_mr_files）」「6 个 #[tauri::command] 命令（download_resource / format_download_filename / download_resource_to_path / install_resource / get_resource_install_path / install_modpack）」6 块关注点，其中 install_modpack 单函数达 252 行
+- 修复：将 `install.rs` 升级为 `install/` 目录，拆为 7 个子模块：
+  - `install/types.rs`（106 行）：DownloadRequest / DownloadResult / CommunityDownloadProgress / InstallModpackRequest / ModpackFormat / InstallModpackResult（均 pub）+ ModpackInfo（pub(super)，install_modpack Stage 1 解析中间结构，跨 CF/MR 格式统一）
+  - `install/helpers.rs`（129 行）：format_bytes / apply_filename_format / resolve_install_dir / parse_cf_loader_id / parse_mr_loader / extract_mr_project_id / construct_cf_edge_url 共 7 个纯函数（均 pub(super)）
+  - `install/concurrent.rs`（183 行）：download_files_concurrent（多文件并发下载，进度汇总到 download_state 指定 stage）+ extract_overrides（解压 overrides / client-overrides 到 instance 目录）+ detect_modpack_format（检测 manifest.json / modrinth.index.json）
+  - `install/curseforge.rs`（141 行）：CfManifest / CfMinecraft / CfModLoader / CfManifestFile / CfFilesBatchResponse / CfFileEntry 共 6 个 CF manifest 数据结构 + install_cf_mods（POST /v1/mods/files 批量查询 → 批量查 slug → 应用 filename_format → 并发下载）
+  - `install/modrinth.rs`（121 行）：MrIndex / MrFile 共 2 个 MR index 数据结构 + install_mr_files（遍历 files[] 直接下载，mods/ 路径下文件应用 filename_format）
+  - `install/modpack_stages.rs`（156 行）：download_modpack_archive（Stage 0，下载原始整合包）+ parse_modpack_info（Stage 1，解析 manifest/index 得到 ModpackInfo）—— 从 install_modpack 中抽取的两个独立阶段，降低 install_modpack 自身行数
+  - `install/mod.rs`（379 行）：6 个 `#[tauri::command]` 命令（download_resource / format_download_filename / download_resource_to_path / install_resource / get_resource_install_path / install_modpack）
+- 关键设计：install_modpack 原 252 行通过抽取 download_modpack_archive + parse_modpack_info 两个阶段辅助函数降至 ~150 行，mod.rs 总行数控制在 379 行（6 个命令 + 1 个 install_modpack 主体）
+- 关键约束（继承 Phase 4.8）：`#[tauri::command]` 宏在定义处生成 `__cmd__` 符号，命令函数不能移到子模块后用 pub use 重导出，故 6 个命令必须留在 mod.rs
+- 重导出策略：`pub use types::{DownloadRequest, DownloadResult, CommunityDownloadProgress, InstallModpackRequest, ModpackFormat, InstallModpackResult};` 保持 `commands::community::install::X` 路径完全向后兼容，`community/mod.rs` 的 `pub mod install;` + `pub use install::{download_resource, ...}` 共 2 处声明 + `lib.rs` invoke_handler 注册均无需修改
+- 验证：`cargo check` 通过
+
 #### 代码重构阶段 4.8：拆分 commands/version/mods.rs 为 4 个子模块
 - 现象：`commands/version/mods.rs` 813 行，单一文件混合「3 个数据结构（ModInfo / ModMetadata / ModMeta）」「2 个共享辅助函数（get_mods_dir + sanitize_file_name）」「jar 内 mod 元数据读取流水线（read_mod_metadata + 8 个内部辅助：finalize_metadata / extract_logo_data_url / guess_mime / read_fabric_mod_meta / read_forge_mods_toml_meta / read_manifest_version / read_mcmod_info_meta / parse_toml_kv / lookup_translated）」「8 个 #[tauri::command] 命令（is_version_modable / list_mods / toggle_mod / delete_mod / install_mod / open_mods_dir / get_version_mods_dir / reveal_mod_file）+ infer_loader_type」4 块关注点
 - 修复：将 `mods.rs` 升级为 `mods/` 目录，拆为 4 个子模块：
