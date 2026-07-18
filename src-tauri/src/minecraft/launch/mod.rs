@@ -283,25 +283,52 @@ fn find_original_version(game_dir: &Path, json: &serde_json::Value) -> String {
         .to_string()
 }
 
-/// 解析 LWJGL Unsafe Agent jar 路径
+/// 解析嵌入资源 jar 的缓存路径
 ///
-/// 从缓存目录释放 lwjgl-unsafe-agent.jar，返回路径。
-/// 参考 PCL2 ModLaunch.vb 中 ExtractPatch 逻辑。
-fn resolve_lwjgl_agent() -> Option<std::path::PathBuf> {
+/// 从缓存目录释放指定 jar，返回路径。
+/// 参考 PCL2 ModDownloadLib.vb 中 ExtractPatch 逻辑（首次使用从嵌入资源释放）。
+fn resolve_embedded_jar(resource_name: &str, cache_rel: &str) -> Option<std::path::PathBuf> {
     use crate::storage::cache::Cache;
-    let rel = "launch/lwjgl-unsafe-agent.jar";
     let cache = Cache::instance();
-    if !cache.exists(rel) {
-        // 首次使用：从嵌入资源释放到缓存
-        if let Err(e) = crate::resources::extract_resource("lwjgl-unsafe-agent.jar", &cache.path(rel)) {
-            crate::log_warn!("[Launch] 释放 lwjgl-unsafe-agent.jar 失败: {}", e);
+    if !cache.exists(cache_rel) {
+        if let Err(e) = crate::resources::extract_resource(resource_name, &cache.path(cache_rel)) {
+            crate::log_warn!("[Launch] 释放 {} 失败: {}", resource_name, e);
             return None;
         }
     }
-    Some(cache.path(rel))
+    Some(cache.path(cache_rel))
+}
+
+/// 检查版本 JSON 的 libraries 中是否包含指定库名（如 "org.lwjgl:lwjgl:3.4.1"）
+/// 参考 PCL2 ModLaunch.vb 中 McLibListGet(...).Any(Function(e) e.OriginalName = "org.lwjgl:lwjgl:3.4.1")
+fn has_library(json: &serde_json::Value, lib_name: &str) -> bool {
+    if let Some(libraries) = json["libraries"].as_array() {
+        for lib in libraries {
+            if let Some(name) = lib["name"].as_str() {
+                if name == lib_name {
+                    // 还需通过 rules 校验（平台适配）
+                    let rules: Option<Vec<serde_json::Value>> = lib
+                        .get("rules")
+                        .and_then(|v| v.as_array())
+                        .map(|a| a.clone());
+                    if crate::minecraft::version::libraries::check_rules(&rules) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+    false
 }
 
 /// Build JVM arguments
+///
+/// 严格参考 PCL2 ModLaunch.vb McLaunchArgumentsJVM 逻辑：
+/// - LUA：仅当版本库列表包含 org.lwjgl:lwjgl:3.4.1 时注入 -javaagent
+/// - JLW：仅当非 GBK 编码、路径非纯 ASCII、且无自定义 -javaagent 时启用
+///   - Java 9+ 添加 --add-exports cpw.mods.bootstraplauncher
+///   - 添加 -Doolloo.jlw.tmpdir={pure_directory}
+///   - 末尾添加 -jar java-wrapper.jar（覆盖 mainClass 作为入口）
 fn build_jvm_args(
     game_dir: &Path,
     version_id: &str,
@@ -316,22 +343,25 @@ fn build_jvm_args(
 ) -> anyhow::Result<Vec<String>> {
     let mut args = Vec::new();
 
-    // LWJGL Unsafe Agent（LUA）：修复 LWJGL 3.4.1 性能问题
-    // 通过 -javaagent 参数注入 lwjgl-unsafe-agent.jar
-    // 参考 PCL2 ModLaunch.vb LaunchAdvanceDisableLUA 逻辑
-    if !disable_lua {
-        if let Some(agent_path) = resolve_lwjgl_agent() {
+    // 检测 Java 主版本号（用于决定 GC 策略和 JLW 的 --add-exports）
+    let java_major = crate::minecraft::java::detect_java_version(&java_path.to_string_lossy());
+
+    // ===== LUA（LWJGL Unsafe Agent）=====
+    // 参考 PCL2：仅当库列表包含 org.lwjgl:lwjgl:3.4.1 且未禁用时注入
+    let use_lua = !disable_lua && has_library(json, "org.lwjgl:lwjgl:3.4.1");
+    if use_lua {
+        if let Some(agent_path) = resolve_embedded_jar("lwjgl-unsafe-agent.jar", "launch/lwjgl-unsafe-agent.jar") {
             args.push(format!("-javaagent:{}", agent_path.to_string_lossy()));
         } else {
-            crate::log_warn!("[Launch] lwjgl-unsafe-agent.jar 未找到，跳过 LUA");
+            crate::log_warn!("[Launch] lwjgl-unsafe-agent.jar 释放失败，跳过 LUA");
         }
     }
+    crate::log_info!("[Launch] 使用 LUA：{}", use_lua);
 
     args.push(format!("-Xms{}M", min_memory));
     args.push(format!("-Xmx{}M", max_memory));
 
-    let java_version = crate::minecraft::java::detect_java_version(&java_path.to_string_lossy());
-    if let Some(version) = java_version {
+    if let Some(version) = java_major {
         if version >= 21 {
             args.push("-XX:+UseZGC".to_string());
             args.push("-XX:+ZGenerational".to_string());
@@ -342,10 +372,7 @@ fn build_jvm_args(
         }
     }
 
-    // 版本 JSON 的 arguments.jvm（必需 JVM 参数，如 -Djava.net.preferIPv6Addresses=system）
-    // 参考 PCL2：解析 arguments.jvm，应用 rules 过滤，跳过已处理的 -cp 和 -Djava.library.path
-    // 注意：Forge 1.20.1 的 arguments.jvm 包含 ${library_directory}、${classpath_separator}、${version_name} 等占位符
-    // 必须替换为实际值，否则 JVM 会把字面量 ${library_directory} 当作路径，导致 module path 失效
+    // 版本 JSON 的 arguments.jvm（必需 JVM 参数）
     let libraries_dir = game_dir.join("libraries");
     let libraries_dir_str = libraries_dir.to_string_lossy().replace('/', "\\");
     if let Some(jvm_args_json) = json["arguments"]["jvm"].as_array() {
@@ -371,20 +398,17 @@ fn build_jvm_args(
                 continue;
             };
 
-            // 应用 rules 过滤
             if !crate::minecraft::version::libraries::check_rules(&rules) {
                 continue;
             }
 
-            // 跳过已处理的参数
             if value.contains("${classpath}") || value.contains("${natives_directory}") {
                 continue;
             }
 
-            // 替换 Mojang 占位符（参考 PCL2 Replace Variables）
             let value = value
                 .replace("${library_directory}", &libraries_dir_str)
-                .replace("${classpath_separator}", ";") // Windows 用分号
+                .replace("${classpath_separator}", ";")
                 .replace("${version_name}", version_id);
 
             args.push(value);
@@ -406,7 +430,69 @@ fn build_jvm_args(
         natives_dir.to_string_lossy()
     ));
 
+    // ===== JLW（Java Launch Wrapper）=====
+    // 参考 PCL2 ModLaunch.vb 第 1443-1458 行：
+    // - 仅当未禁用、非 GBK 编码、路径非纯 ASCII 时触发（仅在该环境下才会触发 JDK-8272352 Bug）
+    // - 若用户自定义参数含 -javaagent 则禁用 JLW（冲突会导致崩溃）
+    // - Java 9+ 添加 --add-exports cpw.mods.bootstraplauncher
+    // - 添加 -Doolloo.jlw.tmpdir={pure_directory}（不以 \ 结尾）
+    // - 末尾添加 -jar java-wrapper.jar（作为 JVM 入口，接收原 mainClass 作为参数）
+    let is_gbk = is_gbk_encoding();
+    let game_dir_str = game_dir.to_string_lossy();
+    let is_ascii_only = game_dir_str.chars().all(|c| c.is_ascii());
+    let has_custom_javaagent = extra_jvm_args.iter().any(|a| a.contains("-javaagent"));
+
+    let use_jlw = !disable_jlw
+        && !is_gbk
+        && !is_ascii_only
+        && !has_custom_javaagent;
+
+    if use_jlw {
+        if let Some(major) = java_major {
+            if major >= 9 {
+                args.push("--add-exports".to_string());
+                args.push("cpw.mods.bootstraplauncher/cpw.mods.bootstraplauncher=ALL-UNNAMED".to_string());
+            }
+        }
+        // pure_directory：游戏目录路径（不以 \ 结尾）
+        let pure_dir = game_dir_str.trim_end_matches('\\').trim_end_matches('/');
+        args.push(format!("-Doolloo.jlw.tmpdir={}", pure_dir));
+        // -jar java-wrapper.jar 必须放在 JVM args 末尾，作为入口接管 mainClass
+        if let Some(wrapper_path) = resolve_embedded_jar("java-wrapper.jar", "launch/java-wrapper.jar") {
+            args.push("-jar".to_string());
+            args.push(wrapper_path.to_string_lossy().to_string());
+        } else {
+            crate::log_warn!("[Launch] java-wrapper.jar 释放失败，JLW 降级为直接启动");
+        }
+    } else if has_custom_javaagent && !disable_jlw {
+        crate::log_warn!("[Launch] 检测到自定义 -javaagent，已禁用 JLW 以避免冲突");
+    }
+    crate::log_info!("[Launch] 使用 JLW：{}", use_jlw);
+
     Ok(args)
+}
+
+/// 检测系统是否使用 GBK 编码（Windows ANSI 代码页 936）
+/// 参考 PCL2 ModLaunch.vb 中 IsGBKEncoding 判断
+#[cfg(target_os = "windows")]
+fn is_gbk_encoding() -> bool {
+    // 通过注册表读取系统 ANSI 代码页：HKLM\SYSTEM\CurrentControlSet\Control\Nls\CodePage::ACP
+    // 936 = GBK，返回 true；其他值返回 false
+    use winreg::enums::*;
+    use winreg::RegKey;
+    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
+    if let Ok(key) = hklm.open_subkey("SYSTEM\\CurrentControlSet\\Control\\Nls\\CodePage") {
+        if let Ok(acp) = key.get_value::<String, _>("ACP") {
+            return acp == "936";
+        }
+    }
+    // 读取失败时默认非 GBK（避免误触发 JLW）
+    false
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_gbk_encoding() -> bool {
+    false
 }
 
 /// Build game arguments

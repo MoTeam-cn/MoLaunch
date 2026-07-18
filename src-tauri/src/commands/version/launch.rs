@@ -162,6 +162,8 @@ pub async fn launch_game(
         ignore_java_warning: setup.advance_ignore_java_warning.unwrap_or(false),
         // 关闭文件校验（仅版本独立设置，跳过 libraries/assets/主 jar 文件校验和补全）
         disable_assets_verify: setup.advance_disable_assets_verify.unwrap_or(false),
+        // 使用高性能显卡（仅全局设置，启动前写注册表 GpuPreference=2）
+        use_dedicated_gpu: config.launch_use_dedicated_gpu,
         app_handle: Some(app_handle.clone()),
     };
 

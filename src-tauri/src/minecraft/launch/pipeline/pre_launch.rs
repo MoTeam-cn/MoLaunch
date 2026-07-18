@@ -1,4 +1,4 @@
-//! 启动前命令执行（PreLaunch）
+//! 启动前命令执行（PreLaunch）与高性能显卡设置
 
 use crate::{log_info, log_warn};
 
@@ -61,6 +61,77 @@ impl LaunchPipeline {
                 Ok(())
             }
         }
+    }
+
+    /// 将 Java 和 PCL 自身设置为使用高性能显卡启动
+    ///
+    /// 严格参考 PCL2 ModMain.vb SetGPUPreference 逻辑：
+    /// - 注册表项：HKCU\Software\Microsoft\DirectX\UserGpuPreferences
+    /// - 值名：exe 完整路径
+    /// - 值数据：`GpuPreference=2;`
+    /// - 若已有相同设置则跳过（不重复写入）
+    pub(super) async fn set_gpu_preference(
+        &self,
+        java_path: &std::path::Path,
+    ) -> Result<(), LaunchError> {
+        let java_exe = java_path.to_string_lossy().to_string();
+        // PCL 自身路径（MoLaunch.exe）
+        let self_exe = std::env::current_exe()
+            .map(|p| p.to_string_lossy().to_string())
+            .unwrap_or_default();
+
+        let java_exe_clone = java_exe.clone();
+        let self_exe_clone = self_exe.clone();
+        tokio::task::spawn_blocking(move || {
+            #[cfg(target_os = "windows")]
+            {
+                use winreg::enums::*;
+                use winreg::RegKey;
+                const REG_PATH: &str = "Software\\Microsoft\\DirectX\\UserGpuPreferences";
+                const REG_VALUE: &str = "GpuPreference=2;";
+                let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+
+                for exe in [&java_exe_clone, &self_exe_clone] {
+                    if exe.is_empty() {
+                        continue;
+                    }
+                    // 读取现有设置
+                    let current = hkcu
+                        .open_subkey(REG_PATH)
+                        .ok()
+                        .and_then(|key| key.get_value::<String, _>(exe).ok());
+                    if current.as_deref() == Some(REG_VALUE) {
+                        log_info!("[GPU] 无需调整显卡设置：{}", exe);
+                        continue;
+                    }
+                    // 写入新设置（若父级键不存在会自动创建）
+                    match hkcu.create_subkey(REG_PATH) {
+                        Ok((key, _)) => {
+                            if let Err(e) = key.set_value(exe, &REG_VALUE) {
+                                log_warn!("[GPU] 写入 {} 失败: {}", exe, e);
+                            } else {
+                                log_info!("[GPU] 已调整显卡设置：{}", exe);
+                            }
+                        }
+                        Err(e) => {
+                            log_warn!("[GPU] 创建注册表项失败: {}", e);
+                        }
+                    }
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = (&java_exe_clone, &self_exe_clone);
+                log_info!("[GPU] 非 Windows 平台，跳过高性能显卡设置");
+            }
+        })
+        .await
+        .map_err(|e| LaunchError {
+            stage: super::LaunchStage::PreLaunch,
+            message: format!("高性能显卡设置任务失败: {}", e),
+            is_user_facing: false,
+        })?;
+        Ok(())
     }
 }
 

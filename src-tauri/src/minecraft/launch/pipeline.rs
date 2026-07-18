@@ -8,7 +8,7 @@
 //! - pipeline/pre_launch.rs: 启动前命令执行
 //! - pipeline/process_spawn.rs: 游戏进程启动与早期崩溃检测
 
-use crate::log_info;
+use crate::{log_info, log_warn};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -145,6 +145,9 @@ pub struct LaunchConfig {
     pub ignore_java_warning: bool,
     /// 关闭文件校验（跳过 libraries/assets/主 jar 文件的校验和补全）
     pub disable_assets_verify: bool,
+    /// 使用高性能显卡（启动前将 Java 和 PCL exe 写入 Windows 注册表 GpuPreference=2）
+    /// 参考 PCL2 ModLaunch.vb McLaunchPrerun 中 SetGPUPreference
+    pub use_dedicated_gpu: bool,
     /// Tauri AppHandle（用于 Java 自动下载时推送进度事件）
     #[serde(skip)]
     pub app_handle: Option<tauri::AppHandle>,
@@ -370,6 +373,14 @@ impl LaunchPipeline {
         }
 
         // 阶段4: 启动前命令（advance_run_cmd，参考 PCL2 的 PreLaunch）
+        // 高性能显卡设置也在这一阶段执行（参考 PCL2 McLaunchPrerun）
+        if self.config.use_dedicated_gpu {
+            self.update_progress(LaunchStage::PreLaunch, 0.0, "正在设置高性能显卡...")
+                .await;
+            if let Err(e) = self.set_gpu_preference(&java_path).await {
+                log_warn!("[Launch] 设置高性能显卡失败: {}", e);
+            }
+        }
         if self.config.pre_launch_cmd.is_some() {
             self.update_progress(LaunchStage::PreLaunch, 0.0, "正在执行启动前命令...")
                 .await;
