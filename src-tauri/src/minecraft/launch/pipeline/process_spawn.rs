@@ -31,11 +31,12 @@ impl LaunchPipeline {
             cmd.arg(arg);
         }
 
-        // 设置工作目录
-        cmd.current_dir(&self.config.game_dir);
+        // 设置工作目录（使用 effective_game_dir，即隔离目录，参考 PCL2 的隔离模式）
+        // args.game_dir 是 build_launch_arguments 内部通过 isolation::get_effective_game_dir 计算的有效目录
+        cmd.current_dir(&args.game_dir);
 
-        // 设置环境变量
-        cmd.env("appdata", &self.config.game_dir);
+        // 设置环境变量（APPDATA 也指向隔离目录，某些 Mod 会读取）
+        cmd.env("appdata", &args.game_dir);
 
         // 重定向stdout和stderr以便监控
         cmd.stdout(std::process::Stdio::piped());
@@ -47,7 +48,14 @@ impl LaunchPipeline {
             cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
         }
 
-        log_info!("Launching: {} {:?}", java_path.display(), args.jvm_args);
+        // 打印完整的启动命令（JVM args + main class + game args），方便调试
+        log_info!(
+            "Launching: {} {:?} {} {:?}",
+            java_path.display(),
+            args.jvm_args,
+            args.main_class,
+            args.game_args
+        );
 
         let child = cmd.spawn().map_err(|e| LaunchError {
             stage: LaunchStage::LaunchProcess,
@@ -58,10 +66,10 @@ impl LaunchPipeline {
         let pid = child.id().unwrap_or(0);
         log_info!("Game process started with PID: {}", pid);
 
-        // 创建监控器
+        // 创建监控器（game_dir 使用隔离目录，确保崩溃分析在正确目录查找日志）
         let watcher = GameWatcher::new(
             pid,
-            self.config.game_dir.clone(),
+            std::path::PathBuf::from(&args.game_dir),
             self.config.version_id.clone(),
         );
 
