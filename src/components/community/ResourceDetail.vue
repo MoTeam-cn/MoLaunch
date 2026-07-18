@@ -10,6 +10,7 @@
  */
 
 import { ref, watch, onUnmounted, nextTick } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
 import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, installModpack } from '@/utils/api/community'
 import { installMerged } from '@/utils/api/loader'
@@ -34,6 +35,8 @@ interface Props {
   gameVersion?: string
   /** 整合包的 mods 目录路径，设置后下载 Mod 默认保存到该目录 */
   modsDir?: string
+  /** 是否禁止更新 Mod（版本独立设置 advance_disable_mod_update），开启后下载已存在文件时拦截 */
+  disableModUpdate?: boolean
 }
 
 const props = defineProps<Props>()
@@ -79,6 +82,21 @@ watch(
 async function handleDownload(v: ResourceVersion) {
   if (!props.project) return
   const finalFileName = await formatDownloadFilename(v.file_name, props.project.translated_name)
+
+  // 禁止更新 Mod 拦截：如果目标文件在 mods 目录已存在（即"更新"场景），阻止下载
+  if (props.disableModUpdate && props.modsDir) {
+    const targetPath = `${props.modsDir}/${finalFileName}`.replace(/\\/g, '/')
+    try {
+      const exists = await invoke<boolean>('plugin:fs|exists', { path: targetPath })
+      if (exists) {
+        showError(`此版本已禁止更新 Mod：${finalFileName} 已存在。\n如需更新，请前往 版本设置 → 高级选项 关闭「禁止更新 Mod」`)
+        return
+      }
+    } catch (e) {
+      console.debug('[ResourceDetail] 检查文件存在性失败:', e)
+    }
+  }
+
   const savePath = await saveFile('选择保存位置', finalFileName, [{ name: '所有文件', extensions: ['*'] }], props.modsDir)
   if (!savePath) return
 

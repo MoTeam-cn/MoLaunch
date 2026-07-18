@@ -72,26 +72,31 @@ impl LaunchPipeline {
                     let java_path = PathBuf::from(path);
                     if java_path.exists() {
                         // 校验版本兼容性（参考 PCL2：不兼容时阻断启动并提示）
-                        if let Some(java_ver) =
-                            crate::minecraft::java::detect_java_version(path)
-                        {
-                            if let Err((_cur, cur_min, cur_max)) =
-                                crate::minecraft::java_selector::check_java_compatible(
-                                    java_ver,
-                                    &mc_version,
-                                    loader.as_deref(),
-                                )
+                        // 版本独立设置 advance_ignore_java_warning 可跳过此校验，强制使用用户指定的 Java
+                        if !self.config.ignore_java_warning {
+                            if let Some(java_ver) =
+                                crate::minecraft::java::detect_java_version(path)
                             {
-                                let req_desc = crate::minecraft::java_selector::describe_java_requirement(cur_min, cur_max);
-                                return Err(LaunchError {
-                                    stage: LaunchStage::GetJava,
-                                    message: format!(
-                                        "Java 版本不兼容：当前版本{}，{}。\n请前往 版本设置 → 游戏 Java 重新选择，或切换为「自动选择」",
-                                        java_ver, req_desc
-                                    ),
-                                    is_user_facing: true,
-                                });
+                                if let Err((_cur, cur_min, cur_max)) =
+                                    crate::minecraft::java_selector::check_java_compatible(
+                                        java_ver,
+                                        &mc_version,
+                                        loader.as_deref(),
+                                    )
+                                {
+                                    let req_desc = crate::minecraft::java_selector::describe_java_requirement(cur_min, cur_max);
+                                    return Err(LaunchError {
+                                        stage: LaunchStage::GetJava,
+                                        message: format!(
+                                            "Java 版本不兼容：当前版本{}，{}。\n请前往 版本设置 → 游戏 Java 重新选择，或切换为「自动选择」\n（或在版本设置-高级选项中开启「忽略 Java 兼容性警告」强制使用）",
+                                            java_ver, req_desc
+                                        ),
+                                        is_user_facing: true,
+                                    });
+                                }
                             }
+                        } else {
+                            log_info!("[DetectJava] ignore_java_warning=true，跳过 Java 兼容性校验，强制使用用户指定的 Java: {}", path);
                         }
                         return Ok(java_path);
                     }

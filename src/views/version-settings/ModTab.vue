@@ -27,6 +27,8 @@ const modSearch = ref('')
 const isModableVersion = ref(false)
 const checkingModable = ref(false)
 const modLocalNameStyle = ref(0)
+/** 此版本是否禁止更新 Mod（advance_disable_mod_update），开启后 ResourceDetail 下载已存在文件时拦截 */
+const disableModUpdate = ref(false)
 
 /**
  * 预加载事件监听：后端 `preload_mods_detail_cmd` 批量查询 CF/MR 后，
@@ -85,6 +87,14 @@ async function prefetchVersionContext() {
   } catch (e) {
     console.debug('[ModTab] 获取 mods 目录失败:', e)
     versionModsDir.value = null
+  }
+  // 读取版本独立设置：是否禁止更新 Mod
+  try {
+    const p = await tauri.getVersionPersonalization(selectedId.value)
+    disableModUpdate.value = p.advance_disable_mod_update
+  } catch (e) {
+    console.debug('[ModTab] 获取禁止更新 Mod 配置失败:', e)
+    disableModUpdate.value = false
   }
 }
 
@@ -291,6 +301,7 @@ onUnmounted(() => {
       :version-id="selectedId || undefined"
       :game-version="versionGameVersion || undefined"
       :mods-dir="versionModsDir || undefined"
+      :disable-mod-update="disableModUpdate"
       @close="detailVisible = false"
     />
   </div>

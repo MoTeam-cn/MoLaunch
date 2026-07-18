@@ -141,6 +141,10 @@ pub struct LaunchConfig {
     pub disable_jlw: bool,
     /// 禁用 LWJGL Unsafe Agent（修复 LWJGL 3.4.1 性能问题）
     pub disable_lua: bool,
+    /// 忽略 Java 兼容性警告（custom 模式下跳过版本兼容性校验，强制使用用户指定的 Java）
+    pub ignore_java_warning: bool,
+    /// 关闭文件校验（跳过 libraries/assets/主 jar 文件的校验和补全）
+    pub disable_assets_verify: bool,
     /// Tauri AppHandle（用于 Java 自动下载时推送进度事件）
     #[serde(skip)]
     pub app_handle: Option<tauri::AppHandle>,
@@ -420,6 +424,15 @@ impl LaunchPipeline {
                 message: format!("版本 {} 不存在", self.config.version_id),
                 is_user_facing: true,
             });
+        }
+
+        // 版本独立设置 advance_disable_assets_verify：跳过文件校验和补全
+        // 参考 PCL2 VersionAdvanceAssetsV2：完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件
+        if self.config.disable_assets_verify {
+            log_info!("[ValidateFiles] disable_assets_verify=true，跳过文件校验和补全");
+            self.update_progress(LaunchStage::ValidateFiles, 1.0, "已跳过文件校验")
+                .await;
+            return Ok(());
         }
 
         self.update_progress(LaunchStage::ValidateFiles, 0.2, "正在读取版本信息...")

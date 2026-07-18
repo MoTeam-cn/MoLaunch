@@ -158,6 +158,10 @@ pub async fn launch_game(
         // 启动高级选项：版本独立覆盖全局（两者都未禁用才启用，参考 PCL2 ModLaunch.vb）
         disable_jlw: config.launch_disable_jlw || setup.advance_disable_jlw.unwrap_or(false),
         disable_lua: config.launch_disable_lua || setup.advance_disable_lua.unwrap_or(false),
+        // 忽略 Java 兼容性警告（仅版本独立设置，custom 模式下跳过兼容性校验）
+        ignore_java_warning: setup.advance_ignore_java_warning.unwrap_or(false),
+        // 关闭文件校验（仅版本独立设置，跳过 libraries/assets/主 jar 文件校验和补全）
+        disable_assets_verify: setup.advance_disable_assets_verify.unwrap_or(false),
         app_handle: Some(app_handle.clone()),
     };
 
