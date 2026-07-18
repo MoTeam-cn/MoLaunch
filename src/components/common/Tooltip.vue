@@ -10,11 +10,14 @@ interface Props {
   text: string
   position?: 'top' | 'bottom' | 'left' | 'right'
   delay?: number
+  /** 是否以块级元素渲染（宽度撑满父容器），默认 false（inline-flex，宽度收缩到内容） */
+  block?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   position: 'top',
   delay: 300,
+  block: false,
 })
 
 const visible = ref(false)
@@ -91,7 +94,7 @@ onUnmounted(() => { if (timer) clearTimeout(timer) })
 </script>
 
 <template>
-  <div ref="triggerRef" class="tooltip-trigger" @mouseenter="show" @mouseleave="hide" @focus="show" @blur="hide">
+  <div ref="triggerRef" class="tooltip-trigger" :class="{ 'tooltip-trigger--block': block }" @mouseenter="show" @mouseleave="hide" @focus="show" @blur="hide">
     <slot />
     <teleport to="body">
       <div v-if="visible" ref="tipRef" :style="tipStyle" class="tooltip-body">
@@ -105,6 +108,10 @@ onUnmounted(() => { if (timer) clearTimeout(timer) })
 <style scoped>
 .tooltip-trigger {
   display: inline-flex;
+}
+.tooltip-trigger--block {
+  display: flex;
+  width: 100%;
 }
 </style>
 

@@ -208,25 +208,25 @@ onMounted(loadSetup)
       <h3 class="mb-4 text-sm font-semibold text-gray-700">高级选项</h3>
       <div class="space-y-4">
         <div v-for="f in advanceFields" :key="f.field">
-          <Tooltip :text="f.tip" position="top" :delay="0" class="mb-1.5 inline-flex">
-            <label class="cursor-help text-xs text-gray-500">{{ f.label }}</label>
+          <label class="block mb-1.5 text-xs text-gray-500">{{ f.label }}</label>
+          <Tooltip :text="f.tip" position="top" :delay="0" block>
+            <textarea
+              v-if="f.area"
+              v-model="f.value"
+              rows="3"
+              placeholder="跟随全局设置"
+              class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              @blur="savePersonalField(f.field, f.value, f.name)"
+            />
+            <input
+              v-else
+              v-model="f.value"
+              type="text"
+              placeholder="跟随全局设置"
+              class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+              @blur="savePersonalField(f.field, f.value, f.name)"
+            >
           </Tooltip>
-          <textarea
-            v-if="f.area"
-            v-model="f.value"
-            rows="3"
-            placeholder="跟随全局设置"
-            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            @blur="savePersonalField(f.field, f.value, f.name)"
-          />
-          <input
-            v-else
-            v-model="f.value"
-            type="text"
-            placeholder="跟随全局设置"
-            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            @blur="savePersonalField(f.field, f.value, f.name)"
-          >
         </div>
         <!-- 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）-->
         <div class="space-y-2 pt-2">
@@ -234,7 +234,7 @@ onMounted(loadSetup)
           <!-- 禁止更新 Mod -->
           <Tooltip
             text="禁止为此版本更新 Mod，以防止整合包玩家误操作。"
-            position="top" :delay="0"
+            position="top" :delay="0" block
           >
             <div class="flex items-center justify-between py-1.5">
               <span class="text-sm text-gray-700">禁止更新 Mod</span>
@@ -253,7 +253,7 @@ onMounted(loadSetup)
           <!-- 忽略 Java 兼容性警告 -->
           <Tooltip
             text="如果手动选择了与当前版本不兼容的 Java，则自动跳过兼容性警告弹窗，强制使用手动选择的 Java。"
-            position="top" :delay="0"
+            position="top" :delay="0" block
           >
             <div class="flex items-center justify-between py-1.5">
               <span class="text-sm text-gray-700">忽略 Java 兼容性警告</span>
@@ -272,7 +272,7 @@ onMounted(loadSetup)
           <!-- 关闭文件校验 -->
           <Tooltip
             text="完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件是否被修改。&#10;如果你没有修改相关文件，请勿勾选此项。"
-            position="top" :delay="0"
+            position="top" :delay="0" block
           >
             <div class="flex items-center justify-between py-1.5">
               <span class="text-sm text-gray-700">关闭文件校验</span>
@@ -291,7 +291,7 @@ onMounted(loadSetup)
           <!-- 禁用 Java Launch Wrapper -->
           <Tooltip
             text="是否使用 Java Launch Wrapper 修复 Java 18- 在中文路径下可能无法正常启动的问题。&#10;详见：https://github.com/00ll00/java_launch_wrapper"
-            position="top" :delay="0"
+            position="top" :delay="0" block
           >
             <div class="flex items-center justify-between py-1.5">
               <span class="text-sm text-gray-700">禁用 Java Launch Wrapper</span>
@@ -310,7 +310,7 @@ onMounted(loadSetup)
           <!-- 禁用 LWJGL Unsafe Agent -->
           <Tooltip
             text="是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。&#10;详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent"
-            position="top" :delay="0"
+            position="top" :delay="0" block
           >
             <div class="flex items-center justify-between py-1.5">
               <span class="text-sm text-gray-700">禁用 LWJGL Unsafe Agent</span>
