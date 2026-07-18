@@ -78,8 +78,7 @@ export interface FabricApiVersion {
  * 返回的列表已按发布日期降序排序（最新版在前）
  */
 export async function listFabricApiVersions(mcVersion: string): Promise<FabricApiVersion[]> {
-  const json = await invoke<string>('list_fabric_api_versions', { mcVersion })
-  try { return JSON.parse(json) } catch { return [] }
+  return await invoke<FabricApiVersion[]>('list_fabric_api_versions', { mcVersion })
 }
 
 /**

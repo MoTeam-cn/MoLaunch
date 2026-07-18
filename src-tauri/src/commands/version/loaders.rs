@@ -150,8 +150,13 @@ pub async fn validate_loaders(
 ///
 /// 参考 PCL2 PageDownloadInstall.xaml.vb FabricApi_Loaded：
 /// 从 Modrinth 查询 fabric-api 版本列表并按 MC 版本筛选
+///
+/// 直接返回 Vec<FabricApiVersion>，Tauri 自动序列化为 JSON 数组，
+/// 前端无需 JSON.parse
 #[tauri::command]
-pub async fn list_fabric_api_versions(mc_version: String) -> Result<String, String> {
+pub async fn list_fabric_api_versions(
+    mc_version: String,
+) -> Result<Vec<loaders::fabric_api::FabricApiVersion>, String> {
     let versions = loaders::fabric_api::list_versions(&mc_version)
         .await
         .map_err(|e| {
@@ -159,7 +164,7 @@ pub async fn list_fabric_api_versions(mc_version: String) -> Result<String, Stri
             e
         })?;
 
-    serde_json::to_string(&versions).map_err(|e| e.to_string())
+    Ok(versions)
 }
 
 /// Install Fabric API for a specific version
