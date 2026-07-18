@@ -14,7 +14,7 @@ use crate::minecraft::download::{self, types as download_types};
 use crate::minecraft::isolation::{self, IsolationMode};
 use crate::minecraft::loaders;
 use crate::minecraft::version::{setup::VersionSetup, state::VersionType};
-use crate::state::{AppState, StageStatus};
+use crate::state::{AppState, DownloadStage, StageStatus};
 use crate::{log_error, log_info, log_warn};
 use std::sync::Arc;
 use tauri::{Emitter, State};
@@ -54,6 +54,14 @@ pub async fn install_merged(
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     drop(config);
+
+    // 重置取消/暂停信号（确保每次安装都是干净状态）
+    state
+        .download_cancel_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+    state
+        .download_pause_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
 
     let base_name = instance_name.unwrap_or_else(|| mc_version.clone());
     let instance = resolve_unique_instance_name(&game_dir, &base_name);
@@ -144,6 +152,8 @@ pub async fn install_merged(
         source_mode,
         Some(progress_callback),
         Some(stage_callback),
+        Some(state.download_cancel_flag.clone()),
+        Some(state.download_pause_flag.clone()),
     )
     .await
     .map_err(|e| {
@@ -159,6 +169,17 @@ pub async fn install_merged(
         result.assets_total
     );
 
+    // 检查取消信号：MC 下载阶段被取消则直接返回
+    if state
+        .download_cancel_flag
+        .load(std::sync::atomic::Ordering::Relaxed)
+    {
+        log_warn!("[Merged] 下载已被用户取消");
+        let mut ds = state.download_state.lock().unwrap();
+        ds.mark_failed(1);
+        return Err("下载已取消".to_string());
+    }
+
     // 标记前面的阶段完成
     {
         let mut ds = state.download_state.lock().unwrap();
@@ -172,8 +193,14 @@ pub async fn install_merged(
 
     let mut loader_errors = Vec::new();
 
+    // 检查取消信号：加载器安装前
+    let cancelled = state
+        .download_cancel_flag
+        .load(std::sync::atomic::Ordering::Relaxed);
+
     // 安装各加载器（使用辅助函数消除重复代码）
     // 注意：第一个加载器会添加阶段，后续加载器只更新阶段
+    if !cancelled {
     if let Some(forge_ver) = forge_version {
         if let Err(e) = install_single_loader(
             &state,
@@ -263,16 +290,18 @@ pub async fn install_merged(
             loader_errors.push(e);
         }
     }
+    } // if !cancelled
 
-    // 完成：设置最终状态（统一方法）
-    {
+    // 如果被取消，直接返回
+    if cancelled {
+        log_warn!("[Merged] 用户取消安装，跳过加载器安装");
         let mut ds = state.download_state.lock().unwrap();
-        ds.mark_complete();
+        ds.mark_failed(1);
+        return Err("下载已取消".to_string());
     }
-    let _ = app.emit(
-        "install-complete",
-        serde_json::json!({ "instance_name": instance }),
-    );
+
+    // 阶段完成标记延迟到所有任务（含 Fabric API）完成后
+    // install-complete 事件也延迟到 mark_complete() 之后，避免前端提前关闭进度面板
 
     if loader_errors.is_empty() {
         // 安装成功后，如果有加载器，删除原版文件夹（参考 PCL2：只保留加载器版本文件夹）
@@ -461,7 +490,26 @@ pub async fn install_merged(
         // 参考 PCL2 PageDownloadInstall.xaml.vb FabricApi_Loaded + ModDownloadLib.vb McInstallLoader：
         // 安装 Fabric Loader 后自动下载最新兼容的 Fabric API 到 mods 目录
         if fabric_version.is_some() {
-            log_info!("[Merged] 检测到 Fabric，开始自动补充 Fabric API");
+            // 检查取消信号：用户在加载器安装阶段取消
+            if state
+                .download_cancel_flag
+                .load(std::sync::atomic::Ordering::Relaxed)
+            {
+                log_warn!("[Merged] 用户取消安装，跳过 Fabric API");
+            } else {
+                log_info!("[Merged] 检测到 Fabric，开始自动补充 Fabric API");
+
+            // 添加 Fabric API 安装阶段（参考 PCL2 的阶段管理）
+            {
+                let mut ds = state.download_state.lock().unwrap();
+                ds.append_stages(vec![DownloadStage::new_grouped(
+                    "安装 Fabric API",
+                    10.0,
+                    "MC本体安装",
+                )]);
+                let new_idx = ds.stages.len() - 1;
+                ds.set_current_stage(new_idx);
+            }
 
             // 获取 mods 目录（考虑版本隔离）
             let isolation_mode_val = state.config.lock().await.isolation_mode;
@@ -486,6 +534,13 @@ pub async fn install_merged(
                         latest.file_name
                     );
 
+                    // 更新阶段名称为具体版本
+                    {
+                        let mut ds = state.download_state.lock().unwrap();
+                        let idx = ds.stages.len() - 1;
+                        ds.stages[idx].name = format!("Fabric API {}", latest.version_number);
+                    }
+
                     // 下载安装
                     let source_mode_val = {
                         let config = state.config.lock().await;
@@ -503,18 +558,45 @@ pub async fn install_merged(
                     .await
                     {
                         log_warn!("[Merged] Fabric API 安装失败（不阻断主流程）: {}", e);
+                        // 标记阶段为失败但继续
+                        let mut ds = state.download_state.lock().unwrap();
+                        let idx = ds.stages.len() - 1;
+                        ds.set_stage_status(idx, StageStatus::Failed, 0.0);
                     } else {
                         log_info!("[Merged] Fabric API 安装完成: {}", latest.file_name);
+                        // 标记阶段完成
+                        let mut ds = state.download_state.lock().unwrap();
+                        let idx = ds.stages.len() - 1;
+                        ds.set_stage_status(idx, StageStatus::Finished, 1.0);
                     }
                 }
                 Ok(_) => {
                     log_warn!("[Merged] 未找到兼容 MC {} 的 Fabric API 版本", mc_version);
+                    let mut ds = state.download_state.lock().unwrap();
+                    let idx = ds.stages.len() - 1;
+                    ds.set_stage_status(idx, StageStatus::Finished, 1.0);
                 }
                 Err(e) => {
                     log_warn!("[Merged] 查询 Fabric API 版本失败（不阻断主流程）: {}", e);
+                    let mut ds = state.download_state.lock().unwrap();
+                    let idx = ds.stages.len() - 1;
+                    ds.set_stage_status(idx, StageStatus::Finished, 1.0);
                 }
             }
+            } // else (未取消)
         }
+
+        // 所有任务完成（含 Fabric API），现在才标记整体完成
+        {
+            let mut ds = state.download_state.lock().unwrap();
+            ds.mark_complete();
+        }
+
+        // 安装完成事件：在 mark_complete() 之后发出，确保前端看到 is_complete=true 时进度面板已展示完毕
+        let _ = app.emit(
+            "install-complete",
+            serde_json::json!({ "instance_name": instance }),
+        );
 
         log_info!("[Merged] Install completed successfully");
         Ok(())

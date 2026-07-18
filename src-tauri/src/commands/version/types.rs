@@ -31,6 +31,12 @@ pub struct DownloadStageSnapshot {
     pub bytes_total: u64,
     pub files_downloaded: usize,
     pub files_total: usize,
+    /// 所属分组（用于前端按 "MC本体安装" 等分组折叠展开）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
+    /// 是否已暂停（由前端 pause 按钮控制，用于显示暂停状态）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_paused: Option<bool>,
 }
 
 /// Download progress snapshot

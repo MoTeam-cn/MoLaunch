@@ -36,6 +36,8 @@ export interface DownloadProgress {
   global_bytes_downloaded: number
   global_bytes_total: number
   percentage: number
+  /** 是否已暂停（由前端 pause 按钮控制） */
+  isPaused?: boolean
 }
 
 /**
@@ -54,6 +56,7 @@ export interface RawDownloadStage {
   files_downloaded?: number
   files_total?: number
   group?: string | null
+  is_paused?: boolean | null
 }
 
 /**

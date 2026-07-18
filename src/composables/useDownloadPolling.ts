@@ -72,6 +72,9 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
           group: s.group ?? null,
         }))
 
+        // 检测暂停状态：任意 stage 携带 is_paused=true 即表示全局暂停
+        const isPaused = progress.stages.some((s: RawDownloadStage) => s.is_paused === true)
+
         let weightedProgress = 0
         let totalWeight = 0
         for (const stage of stages) {
@@ -89,6 +92,7 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
           global_bytes_downloaded: progress.global_bytes_downloaded ?? 0,
           global_bytes_total: progress.global_bytes_total ?? 0,
           percentage,
+          isPaused,
         })
 
         if (progress.is_complete) {

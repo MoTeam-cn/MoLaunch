@@ -1,5 +1,6 @@
 //! Download manager - batch download with progress tracking
 
+use crate::log_info;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant};
@@ -18,6 +19,10 @@ pub struct DownloadManager {
     speed_limit: u64,
     source_mode: DownloadSourceMode,
     progress: Arc<StdMutex<GlobalProgress>>,
+    /// 取消信号（可选，由外部传入）
+    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+    /// 暂停信号（可选，由外部传入）
+    pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 }
 
 impl DownloadManager {
@@ -36,7 +41,37 @@ impl DownloadManager {
             speed_limit,
             source_mode,
             progress: Arc::new(StdMutex::new(GlobalProgress::default())),
+            cancel_flag: None,
+            pause_flag: None,
         }
+    }
+
+    /// 设置取消信号（用于支持前端取消下载）
+    pub fn with_cancel_flag(mut self, flag: Arc<std::sync::atomic::AtomicBool>) -> Self {
+        self.cancel_flag = Some(flag);
+        self
+    }
+
+    /// 设置暂停信号（用于支持前端暂停/恢复下载）
+    pub fn with_pause_flag(mut self, flag: Arc<std::sync::atomic::AtomicBool>) -> Self {
+        self.pause_flag = Some(flag);
+        self
+    }
+
+    /// 检查是否已取消
+    fn is_cancelled(&self) -> bool {
+        self.cancel_flag
+            .as_ref()
+            .map(|f| f.load(std::sync::atomic::Ordering::Relaxed))
+            .unwrap_or(false)
+    }
+
+    /// 检查是否已暂停
+    fn is_paused(&self) -> bool {
+        self.pause_flag
+            .as_ref()
+            .map(|f| f.load(std::sync::atomic::Ordering::Relaxed))
+            .unwrap_or(false)
     }
 
     /// 获取当前源模式（用于构造 URL）
@@ -160,8 +195,30 @@ impl DownloadManager {
         });
 
         let mut handles = Vec::new();
+        let total_task_count = tasks.len();
+        let mut task_index = 0;
 
         for task in tasks {
+            // 检查取消信号
+            if self.is_cancelled() {
+                let remaining = total_task_count - task_index;
+                log_info!("[Download] 检测到取消信号，跳过剩余 {} 个任务", remaining);
+                break;
+            }
+
+            // 检查暂停信号：暂停时等待恢复或取消
+            while self.is_paused() && !self.is_cancelled() {
+                log_info!("[Download] 下载已暂停，等待恢复...");
+                tokio::time::sleep(Duration::from_millis(500)).await;
+            }
+            if self.is_cancelled() {
+                let remaining = total_task_count - task_index;
+                log_info!("[Download] 暂停期间检测到取消信号，跳过剩余 {} 个任务", remaining);
+                break;
+            }
+
+            task_index += 1;
+
             let sem = semaphore.clone();
             let prog = progress.clone();
             let results = results.clone();
@@ -172,9 +229,27 @@ impl DownloadManager {
             let source_mode = self.source_mode;
             let self_chunk_count = self.chunk_count;
             let chunked_ids = chunked_task_ids.clone();
+            let cancel_flag = self.cancel_flag.clone();
 
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.unwrap();
+
+                // 获取许可后再次检查取消信号
+                if let Some(ref flag) = cancel_flag {
+                    if flag.load(std::sync::atomic::Ordering::Relaxed) {
+                        let result = DownloadProgress {
+                            task_id: task.id.clone(),
+                            status: DownloadStatus::Failed,
+                            downloaded: 0,
+                            total: task.expected_size as u64,
+                            speed: 0,
+                            error: Some("下载已取消".to_string()),
+                        };
+                        results.lock().await.push(result);
+                        return;
+                    }
+                }
+
                 let result = downloader::download_single(
                     &client,
                     &task,

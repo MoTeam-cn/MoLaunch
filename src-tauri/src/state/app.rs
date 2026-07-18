@@ -20,6 +20,12 @@ pub struct AppState {
     pub launch_history: Arc<TokioMutex<Vec<LaunchHistory>>>,
     pub current_pid: Arc<TokioMutex<Option<u32>>>,
     pub launch_pipeline: Arc<TokioMutex<Option<Arc<crate::minecraft::launch::LaunchPipeline>>>>,
+    /// 下载取消信号（设置为 true 时，正在进行的下载任务会尽快中止）
+    /// 参考 PCL2 中 LoaderTask 的 IsAborted 机制
+    pub download_cancel_flag: Arc<std::sync::atomic::AtomicBool>,
+    /// 下载暂停信号（设置为 true 时，新任务不再开始，已进行的任务完成当前文件后等待）
+    /// 参考 PCL2 中下载暂停按钮的行为
+    pub download_pause_flag: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl Default for AppState {
@@ -70,6 +76,8 @@ impl AppState {
             launch_history: Arc::new(TokioMutex::new(Vec::new())),
             current_pid: Arc::new(TokioMutex::new(None)),
             launch_pipeline: Arc::new(TokioMutex::new(None)),
+            download_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            download_pause_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 }

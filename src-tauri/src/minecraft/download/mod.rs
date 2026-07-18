@@ -159,13 +159,21 @@ pub async fn download_version_full(
     source_mode: DownloadSourceMode,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
     stage_callback: Option<Arc<dyn Fn(usize, &str) + Send + Sync>>,
+    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+    pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> anyhow::Result<VersionDownloadResult> {
     let version_dir = game_dir.join("versions").join(version_id);
     std::fs::create_dir_all(&version_dir)?;
 
     // 复用单个 DownloadManager 实例（避免每个阶段 new 一个独立 manager + 独立 timer）
     // client_jar / asset_index 只传 1 个 task（自然单线程），libraries / assets 传多 task
-    let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
+    let mut manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
+    if let Some(flag) = cancel_flag {
+        manager = manager.with_cancel_flag(flag);
+    }
+    if let Some(flag) = pause_flag {
+        manager = manager.with_pause_flag(flag);
+    }
 
     // Step 1: 版本清单
     if let Some(ref cb) = stage_callback {

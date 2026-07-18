@@ -90,3 +90,18 @@ export async function isDownloading(): Promise<boolean> {
 export async function resetDownloadProgress(): Promise<void> {
   return await invoke('reset_download_progress')
 }
+
+/** 取消下载（设置 cancel_flag，正在进行的下载会尽快中止） */
+export async function cancelDownload(): Promise<void> {
+  return await invoke('cancel_download')
+}
+
+/** 暂停下载（设置 pause_flag，新任务不再开始，已进行的任务完成当前文件后等待） */
+export async function pauseDownload(): Promise<void> {
+  return await invoke('pause_download')
+}
+
+/** 恢复下载（清除 pause_flag） */
+export async function resumeDownload(): Promise<void> {
+  return await invoke('resume_download')
+}

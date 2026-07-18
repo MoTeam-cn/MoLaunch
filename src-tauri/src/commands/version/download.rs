@@ -150,6 +150,8 @@ pub async fn download_version(
         source_mode,
         Some(progress_callback),
         Some(stage_callback),
+        Some(state.download_cancel_flag.clone()),
+        Some(state.download_pause_flag.clone()),
     )
     .await
     .map_err(|e| {
@@ -211,6 +213,8 @@ pub fn build_snapshot(ds: &DownloadState, version_id: &str) -> serde_json::Value
             bytes_total: s.bytes_total,
             files_downloaded: s.files_downloaded,
             files_total: s.files_total,
+            group: s.group.clone(),
+            is_paused: None,
         })
         .collect();
 

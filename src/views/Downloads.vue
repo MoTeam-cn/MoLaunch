@@ -10,11 +10,16 @@
 import { computed, ref } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { formatBytes } from '@/utils/format'
+import { showConfirm } from '@/utils/modal'
+import { pauseDownload, resumeDownload, cancelDownload } from '@/utils/tauri'
 import {
   ArrowPathIcon,
   CheckCircleIcon,
   ClockIcon,
   ChevronDownIcon,
+  PauseCircleIcon,
+  PlayCircleIcon,
+  XCircleIcon,
 } from '@heroicons/vue/24/outline'
 import DownloadEmptyState from './downloads/DownloadEmptyState.vue'
 import DownloadStatsPanel from './downloads/DownloadStatsPanel.vue'
@@ -23,6 +28,7 @@ const versionStore = useVersionStore()
 
 const hasActiveDownload = computed(() => versionStore.downloading)
 const progress = computed(() => versionStore.downloadProgress)
+const isPaused = computed(() => progress.value?.isPaused ?? false)
 
 const percentage = computed(() => progress.value?.percentage || 0)
 const speed = computed(() => progress.value?.global_speed || 0)
@@ -121,6 +127,44 @@ const taskGroups = computed<TaskGroup[]>(() => {
 // 展开状态：默认全展开，用户点击可折叠
 const collapsedGroups = ref<Set<string>>(new Set())
 
+// 按钮状态
+const togglingPause = ref(false)
+const cancelling = ref(false)
+
+async function handleTogglePause() {
+  if (togglingPause.value) return
+  togglingPause.value = true
+  try {
+    if (isPaused.value) {
+      await resumeDownload()
+    } else {
+      await pauseDownload()
+    }
+  } catch (e) {
+    console.error('Failed to toggle pause:', e)
+  } finally {
+    togglingPause.value = false
+  }
+}
+
+function handleCancel() {
+  showConfirm(
+    '取消下载',
+    '确定要取消当前下载任务吗？已下载的文件将保留，但未完成的下载将被中止。',
+    async () => {
+      if (cancelling.value) return
+      cancelling.value = true
+      try {
+        await cancelDownload()
+      } catch (e) {
+        console.error('Failed to cancel download:', e)
+      } finally {
+        cancelling.value = false
+      }
+    },
+  )
+}
+
 function toggleGroup(key: string) {
   if (collapsedGroups.value.has(key)) {
     collapsedGroups.value.delete(key)
@@ -167,14 +211,45 @@ function isExpanded(key: string): boolean {
               <!-- 卡片头部 -->
               <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                  <ArrowPathIcon class="w-4 h-4 text-primary-500 animate-spin" />
+                  <ArrowPathIcon v-if="!isPaused" class="w-4 h-4 text-primary-500 animate-spin" />
+                  <PauseCircleIcon v-else class="w-4 h-4 text-amber-500" />
                   <span class="text-sm font-medium text-gray-900">
                     {{ versionStore.downloadingVersion }}
                   </span>
+                  <span v-if="isPaused" class="text-xs text-amber-600 font-medium">已暂停</span>
                 </div>
-                <span class="text-xs text-gray-500">
-                  {{ percentage.toFixed(1) }}%
-                </span>
+                <div class="flex items-center gap-3">
+                  <span class="text-xs text-gray-500">
+                    {{ percentage.toFixed(1) }}%
+                  </span>
+                  <!-- 暂停/恢复按钮 -->
+                  <button
+                    class="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors"
+                    :class="isPaused
+                      ? 'text-green-600 hover:bg-green-50'
+                      : 'text-amber-600 hover:bg-amber-50'"
+                    :disabled="togglingPause"
+                    :title="isPaused ? '恢复下载' : '暂停下载'"
+                    @click="handleTogglePause"
+                  >
+                    <component
+                      :is="isPaused ? PlayCircleIcon : PauseCircleIcon"
+                      class="w-4 h-4"
+                      :class="{ 'animate-pulse': togglingPause }"
+                    />
+                    {{ isPaused ? '恢复' : '暂停' }}
+                  </button>
+                  <!-- 取消按钮 -->
+                  <button
+                    class="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                    :disabled="cancelling"
+                    title="取消下载"
+                    @click="handleCancel"
+                  >
+                    <XCircleIcon class="w-4 h-4" :class="{ 'animate-pulse': cancelling }" />
+                    取消
+                  </button>
+                </div>
               </div>
 
               <!-- 任务分组列表（按 group 分组，可折叠展开看子阶段） -->
@@ -189,7 +264,8 @@ function isExpanded(key: string): boolean {
                     <!-- 状态图标 -->
                     <div class="w-5 h-5 flex items-center justify-center shrink-0">
                       <CheckCircleIcon v-if="g.status === 'finished'" class="w-5 h-5 text-green-500" />
-                      <div v-else-if="g.status === 'loading'" class="w-5 h-5 rounded-full border-2 border-gray-200 border-t-primary-500 animate-spin" />
+                      <div v-else-if="g.status === 'loading' && !isPaused" class="w-5 h-5 rounded-full border-2 border-gray-200 border-t-primary-500 animate-spin" />
+                      <PauseCircleIcon v-else-if="g.status === 'loading' && isPaused" class="w-5 h-5 text-amber-500" />
                       <div v-else-if="g.status === 'failed'" class="w-5 h-5 rounded-full bg-red-500" />
                       <ClockIcon v-else class="w-5 h-5 text-gray-300" />
                     </div>
@@ -244,7 +320,8 @@ function isExpanded(key: string): boolean {
                       <!-- 子状态图标 -->
                       <div class="w-4 h-4 flex items-center justify-center shrink-0">
                         <CheckCircleIcon v-if="s.status === 'finished'" class="w-4 h-4 text-green-400" />
-                        <div v-else-if="s.status === 'loading'" class="w-4 h-4 rounded-full border border-gray-200 border-t-primary-400 animate-spin" />
+                        <div v-else-if="s.status === 'loading' && !isPaused" class="w-4 h-4 rounded-full border border-gray-200 border-t-primary-400 animate-spin" />
+                        <PauseCircleIcon v-else-if="s.status === 'loading' && isPaused" class="w-4 h-4 text-amber-400" />
                         <ClockIcon v-else class="w-4 h-4 text-gray-300" />
                       </div>
                       <span
@@ -276,7 +353,7 @@ function isExpanded(key: string): boolean {
 
             <!-- 提示信息 -->
             <div class="mt-4 text-center text-xs text-gray-400">
-              下载完成后将自动返回
+              {{ isPaused ? '下载已暂停，点击恢复按钮继续' : '下载完成后将自动返回' }}
             </div>
           </div>
         </div>

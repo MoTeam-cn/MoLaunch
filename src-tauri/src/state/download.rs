@@ -70,13 +70,9 @@ impl Default for DownloadState {
         Self {
             is_active: false,
             is_complete: false,
-            stages: vec![
-                DownloadStage::new("版本清单", 2.0),
-                DownloadStage::new("版本信息", 3.0),
-                DownloadStage::new("客户端", 5.0),
-                DownloadStage::new("库文件", 15.0),
-                DownloadStage::new("资源文件", 20.0),
-            ],
+            // 空列表：stages 由安装流程通过 reset_stages / append_stages 动态添加
+            // 修复：之前默认填充 5 个阶段，导致 install_merged 的 append_stages 追加后出现重复阶段
+            stages: vec![],
             current_stage_index: 0,
             global_speed: 0,
             global_bytes_downloaded: 0,
@@ -166,11 +162,21 @@ impl DownloadState {
             stage.bytes_total = total_bytes;
             stage.files_downloaded = completed_files;
             stage.files_total = total_files;
-            stage.status = StageStatus::Loading;
-            if total_bytes > 0 {
-                stage.progress = (downloaded_bytes as f64 / total_bytes as f64).min(1.0);
-            } else if total_files > 0 && completed_files >= total_files {
-                stage.progress = 1.0;
+            // 计算进度
+            let progress = if total_bytes > 0 {
+                (downloaded_bytes as f64 / total_bytes as f64).min(1.0)
+            } else if total_files > 0 {
+                (completed_files as f64 / total_files as f64).min(1.0)
+            } else {
+                0.0
+            };
+            stage.progress = progress;
+            // 仅当未完成时标记为 Loading，避免完成后图标不更新
+            // 修复：之前无条件设为 Loading，导致 progress=1.0 时前端仍显示加载中图标
+            if progress >= 1.0 {
+                stage.status = StageStatus::Finished;
+            } else if stage.status != StageStatus::Finished {
+                stage.status = StageStatus::Loading;
             }
         }
 

@@ -9,6 +9,37 @@
 
 ### 新增
 
+#### 下载暂停/取消功能
+- 新增下载进度页面的暂停和取消按钮，用户可在安装过程中随时暂停或终止下载任务
+- 后端改动：
+  - `state/app.rs`：`AppState` 新增 `download_pause_flag: Arc<AtomicBool>` 字段
+  - `minecraft/download/manager.rs`：`DownloadManager` 新增 `pause_flag` 字段和 `with_pause_flag()` 方法，`download_batch` 循环中检查暂停信号并等待
+  - `minecraft/download/mod.rs`：`download_version_full` 新增 `pause_flag` 参数
+  - `commands/version/progress.rs`：新增 `cancel_download` / `pause_download` / `resume_download` 三个 Tauri 命令
+  - `commands/version/install/mod.rs`：`install_merged` 在开始时重置取消/暂停标志，在 MC 下载后、加载器安装前、Fabric API 安装前检查取消信号
+  - `commands/version/download.rs`：`download_version` 传入 cancel/pause 标志
+  - `commands/version/types.rs`：`DownloadStageSnapshot` 新增 `group` 和 `is_paused` 字段
+- 前端改动：
+  - `utils/api/system.ts`：新增 `cancelDownload` / `pauseDownload` / `resumeDownload` API 封装
+  - `types/download.ts`：`RawDownloadStage` 新增 `is_paused` 字段，`DownloadProgress` 新增 `isPaused` 字段
+  - `composables/useDownloadPolling.ts`：从 stage 的 `is_paused` 推导全局暂停状态
+  - `views/Downloads.vue`：卡片头部新增暂停/恢复和取消按钮，暂停时进度图标切换为暂停状态
+
+### 修复
+
+#### 下载阶段重复显示
+- `state/download.rs`：`DownloadState::default()` 不再预填充 5 个阶段，改为空列表
+- 原因：`install_merged` 的 `append_stages` 会在默认阶段之上追加，导致出现两组重复的阶段（第一组永远停留在 waiting 状态，图标不更新）
+
+#### 阶段快照缺少 group 字段
+- `commands/version/types.rs`：`DownloadStageSnapshot` 新增 `group: Option<String>` 字段
+- `commands/version/progress.rs` 和 `download.rs`：快照映射时填充 `group` 字段
+- 原因：前端 `useDownloadPolling.ts` 读取 `s.group` 但后端未返回，导致所有阶段显示为独立项而非按分组折叠
+
+#### Fabric API 安装导致前端提前退出
+- `commands/version/install/mod.rs`：将 `install-complete` 事件从加载器安装后移至 `mark_complete()` 之后
+- 原因：原代码在 Fabric API 安装前就发出 `install-complete` 事件并调用 `mark_complete()`，导致前端轮询检测到 `is_complete=true` 后关闭进度面板
+
 #### 启动高级选项（参考 PCL2 PageSetupLaunch）
 - 新增 3 个启动高级选项，位于"启动设置"页面底部：
   - **禁用 Java Launch Wrapper**：JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题
