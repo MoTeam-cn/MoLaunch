@@ -33,6 +33,17 @@ pub struct PersonalizationUpdate {
     pub min_memory: Option<u32>,
     /// 版本独立最大内存（MB，仅 custom 模式生效）
     pub max_memory: Option<u32>,
+    // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
+    /// 禁止更新 Mod（None=跟随全局默认 false）
+    pub advance_disable_mod_update: Option<bool>,
+    /// 忽略 Java 兼容性警告（None=跟随全局默认 false）
+    pub advance_ignore_java_warning: Option<bool>,
+    /// 关闭文件校验（None=跟随全局默认 false）
+    pub advance_disable_assets_verify: Option<bool>,
+    /// 禁用 Java Launch Wrapper（None=跟随全局默认 false）
+    pub advance_disable_jlw: Option<bool>,
+    /// 禁用 LWJGL Unsafe Agent（None=跟随全局默认 false）
+    pub advance_disable_lua: Option<bool>,
 }
 
 /// 版本 Setup 信息
@@ -88,4 +99,15 @@ pub struct VersionSetup {
     pub min_memory: Option<u32>,
     /// 版本独立最大内存（MB，仅 custom 模式生效）
     pub max_memory: Option<u32>,
+    // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
+    /// 禁止更新 Mod
+    pub advance_disable_mod_update: Option<bool>,
+    /// 忽略 Java 兼容性警告
+    pub advance_ignore_java_warning: Option<bool>,
+    /// 关闭文件校验
+    pub advance_disable_assets_verify: Option<bool>,
+    /// 禁用 Java Launch Wrapper
+    pub advance_disable_jlw: Option<bool>,
+    /// 禁用 LWJGL Unsafe Agent
+    pub advance_disable_lua: Option<bool>,
 }

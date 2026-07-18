@@ -57,6 +57,11 @@ impl VersionSetup {
             memory_mode: None,
             min_memory: None,
             max_memory: None,
+            advance_disable_mod_update: None,
+            advance_ignore_java_warning: None,
+            advance_disable_assets_verify: None,
+            advance_disable_jlw: None,
+            advance_disable_lua: None,
         }
     }
 
@@ -93,6 +98,11 @@ impl VersionSetup {
             memory_mode: None,
             min_memory: None,
             max_memory: None,
+            advance_disable_mod_update: None,
+            advance_ignore_java_warning: None,
+            advance_disable_assets_verify: None,
+            advance_disable_jlw: None,
+            advance_disable_lua: None,
         }
     }
 
@@ -189,6 +199,11 @@ impl VersionSetup {
         let memory_mode = pick_str("MemoryMode", &setup.memory_mode);
         let min_memory = pick_u32("MinMemory", setup.min_memory);
         let max_memory = pick_u32("MaxMemory", setup.max_memory);
+        let advance_disable_mod_update = pick_bool("AdvanceDisableModUpdate", setup.advance_disable_mod_update);
+        let advance_ignore_java_warning = pick_bool("AdvanceIgnoreJavaWarning", setup.advance_ignore_java_warning);
+        let advance_disable_assets_verify = pick_bool("AdvanceDisableAssetsVerify", setup.advance_disable_assets_verify);
+        let advance_disable_jlw = pick_bool("AdvanceDisableJLW", setup.advance_disable_jlw);
+        let advance_disable_lua = pick_bool("AdvanceDisableLUA", setup.advance_disable_lua);
 
         let mut content = String::new();
         content.push_str("[info]\n");
@@ -228,6 +243,11 @@ impl VersionSetup {
         content.push_str(&format!("AdvanceJvmArgs={}\n", advance_jvm_args));
         content.push_str(&format!("AdvanceGameArgs={}\n", advance_game_args));
         content.push_str(&format!("AdvanceRunCmd={}\n", advance_run_cmd));
+        content.push_str(&format!("AdvanceDisableModUpdate={}\n", advance_disable_mod_update.unwrap_or(false)));
+        content.push_str(&format!("AdvanceIgnoreJavaWarning={}\n", advance_ignore_java_warning.unwrap_or(false)));
+        content.push_str(&format!("AdvanceDisableAssetsVerify={}\n", advance_disable_assets_verify.unwrap_or(false)));
+        content.push_str(&format!("AdvanceDisableJLW={}\n", advance_disable_jlw.unwrap_or(false)));
+        content.push_str(&format!("AdvanceDisableLUA={}\n", advance_disable_lua.unwrap_or(false)));
         content.push_str(&format!("JavaPath={}\n", java_path));
         content.push_str(&format!("JavaMode={}\n", java_mode));
         if let Some(v) = java_version_min {
@@ -325,6 +345,11 @@ impl VersionSetup {
                 memory_mode: None,
                 min_memory: None,
                 max_memory: None,
+                advance_disable_mod_update: None,
+                advance_ignore_java_warning: None,
+                advance_disable_assets_verify: None,
+                advance_disable_jlw: None,
+                advance_disable_lua: None,
             });
         let _ = setup.save(version_dir);
         setup
@@ -407,6 +432,21 @@ impl VersionSetup {
         if let Some(v) = update.max_memory {
             setup.max_memory = Some(v);
         }
+        if let Some(v) = update.advance_disable_mod_update {
+            setup.advance_disable_mod_update = Some(v);
+        }
+        if let Some(v) = update.advance_ignore_java_warning {
+            setup.advance_ignore_java_warning = Some(v);
+        }
+        if let Some(v) = update.advance_disable_assets_verify {
+            setup.advance_disable_assets_verify = Some(v);
+        }
+        if let Some(v) = update.advance_disable_jlw {
+            setup.advance_disable_jlw = Some(v);
+        }
+        if let Some(v) = update.advance_disable_lua {
+            setup.advance_disable_lua = Some(v);
+        }
 
         setup.save_full(version_dir)
     }
@@ -457,6 +497,11 @@ impl VersionSetup {
             memory_mode: ini.get("MemoryMode").cloned(),
             min_memory: ini.get("MinMemory").and_then(|s| s.parse::<u32>().ok()),
             max_memory: ini.get("MaxMemory").and_then(|s| s.parse::<u32>().ok()),
+            advance_disable_mod_update: ini.get("AdvanceDisableModUpdate").map(|s| s.eq_ignore_ascii_case("true")),
+            advance_ignore_java_warning: ini.get("AdvanceIgnoreJavaWarning").map(|s| s.eq_ignore_ascii_case("true")),
+            advance_disable_assets_verify: ini.get("AdvanceDisableAssetsVerify").map(|s| s.eq_ignore_ascii_case("true")),
+            advance_disable_jlw: ini.get("AdvanceDisableJLW").map(|s| s.eq_ignore_ascii_case("true")),
+            advance_disable_lua: ini.get("AdvanceDisableLUA").map(|s| s.eq_ignore_ascii_case("true")),
         }))
     }
 
@@ -537,6 +582,11 @@ impl VersionSetup {
             memory_mode: None,
             min_memory: None,
             max_memory: None,
+            advance_disable_mod_update: None,
+            advance_ignore_java_warning: None,
+            advance_disable_assets_verify: None,
+            advance_disable_jlw: None,
+            advance_disable_lua: None,
         })
     }
 }

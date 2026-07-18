@@ -22,6 +22,13 @@ const windowTitle = ref('')
 const customInfo = ref('')
 const serverEnter = ref('')
 
+// 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）
+const advanceDisableModUpdate = ref(false)
+const advanceIgnoreJavaWarning = ref(false)
+const advanceDisableAssetsVerify = ref(false)
+const advanceDisableJlw = ref(false)
+const advanceDisableLua = ref(false)
+
 const advanceFields = reactive([
   { label: 'Java 虚拟机参数', field: 'advanceJvmArgs', name: 'JVM 参数', value: '', area: true,
     tip: '启动 Minecraft 时使用的额外 JVM 参数，在没有确定把握的情况下请不要尝试修改。\n若留空，则跟随全局设置的值。' },
@@ -36,6 +43,11 @@ const snakeMap: Record<string, string> = {
   windowTitle: 'window_title', customInfo: 'custom_info', serverEnter: 'server_enter',
   advanceJvmArgs: 'advance_jvm_args', advanceGameArgs: 'advance_game_args',
   advanceRunCmd: 'advance_run_cmd', javaPath: 'java_path',
+  advanceDisableModUpdate: 'advance_disable_mod_update',
+  advanceIgnoreJavaWarning: 'advance_ignore_java_warning',
+  advanceDisableAssetsVerify: 'advance_disable_assets_verify',
+  advanceDisableJlw: 'advance_disable_jlw',
+  advanceDisableLua: 'advance_disable_lua',
 }
 
 async function loadSetup() {
@@ -49,6 +61,11 @@ async function loadSetup() {
       advanceFields[0].value = p.advance_jvm_args
       advanceFields[1].value = p.advance_game_args
       advanceFields[2].value = p.advance_run_cmd
+      advanceDisableModUpdate.value = p.advance_disable_mod_update
+      advanceIgnoreJavaWarning.value = p.advance_ignore_java_warning
+      advanceDisableAssetsVerify.value = p.advance_disable_assets_verify
+      advanceDisableJlw.value = p.advance_disable_jlw
+      advanceDisableLua.value = p.advance_disable_lua
     }
   } catch (e) {
     console.error('Failed to load setup:', e)
@@ -75,6 +92,20 @@ async function handleSaveIndie(val: number) {
     await tauri.updateVersionPersonalization(selectedId.value, { indieType: val })
     if (personalization.value) personalization.value.indie_type = val
     showSuccess(val === 0 ? '已跟随全局设置' : val === 1 ? '已开启版本隔离' : '已关闭版本隔离')
+  } catch (e) { showError('保存失败：' + String(e)) }
+}
+
+/** 保存高级选项开关 */
+async function saveAdvanceSwitch(field: string, value: boolean, name: string) {
+  if (!selectedId.value) return
+  try {
+    const update = { [field]: value } as tauri.PersonalizationUpdate
+    await tauri.updateVersionPersonalization(selectedId.value, update)
+    if (personalization.value) {
+      const sk = snakeMap[field]
+      if (sk) (personalization.value as any)[sk] = value
+    }
+    showSuccess(`${name}已保存`)
   } catch (e) { showError('保存失败：' + String(e)) }
 }
 
@@ -196,6 +227,105 @@ onMounted(loadSetup)
             class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             @blur="savePersonalField(f.field, f.value, f.name)"
           >
+        </div>
+        <!-- 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）-->
+        <div class="space-y-2 pt-2">
+          <label class="block text-xs font-medium text-gray-500 mb-1">进阶开关</label>
+          <!-- 禁止更新 Mod -->
+          <Tooltip
+            text="禁止为此版本更新 Mod，以防止整合包玩家误操作。"
+            position="top" :delay="0"
+          >
+            <div class="flex items-center justify-between py-1.5">
+              <span class="text-sm text-gray-700">禁止更新 Mod</span>
+              <button
+                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
+                :class="advanceDisableModUpdate ? 'bg-primary-500' : 'bg-gray-300'"
+                @click="advanceDisableModUpdate = !advanceDisableModUpdate; saveAdvanceSwitch('advanceDisableModUpdate', advanceDisableModUpdate, '禁止更新 Mod')"
+              >
+                <span
+                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  :class="advanceDisableModUpdate ? 'translate-x-5' : 'translate-x-1'"
+                />
+              </button>
+            </div>
+          </Tooltip>
+          <!-- 忽略 Java 兼容性警告 -->
+          <Tooltip
+            text="如果手动选择了与当前版本不兼容的 Java，则自动跳过兼容性警告弹窗，强制使用手动选择的 Java。"
+            position="top" :delay="0"
+          >
+            <div class="flex items-center justify-between py-1.5">
+              <span class="text-sm text-gray-700">忽略 Java 兼容性警告</span>
+              <button
+                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
+                :class="advanceIgnoreJavaWarning ? 'bg-primary-500' : 'bg-gray-300'"
+                @click="advanceIgnoreJavaWarning = !advanceIgnoreJavaWarning; saveAdvanceSwitch('advanceIgnoreJavaWarning', advanceIgnoreJavaWarning, '忽略 Java 警告')"
+              >
+                <span
+                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  :class="advanceIgnoreJavaWarning ? 'translate-x-5' : 'translate-x-1'"
+                />
+              </button>
+            </div>
+          </Tooltip>
+          <!-- 关闭文件校验 -->
+          <Tooltip
+            text="完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件是否被修改。&#10;如果你没有修改相关文件，请勿勾选此项。"
+            position="top" :delay="0"
+          >
+            <div class="flex items-center justify-between py-1.5">
+              <span class="text-sm text-gray-700">关闭文件校验</span>
+              <button
+                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
+                :class="advanceDisableAssetsVerify ? 'bg-primary-500' : 'bg-gray-300'"
+                @click="advanceDisableAssetsVerify = !advanceDisableAssetsVerify; saveAdvanceSwitch('advanceDisableAssetsVerify', advanceDisableAssetsVerify, '文件校验')"
+              >
+                <span
+                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  :class="advanceDisableAssetsVerify ? 'translate-x-5' : 'translate-x-1'"
+                />
+              </button>
+            </div>
+          </Tooltip>
+          <!-- 禁用 Java Launch Wrapper -->
+          <Tooltip
+            text="是否使用 Java Launch Wrapper 修复 Java 18- 在中文路径下可能无法正常启动的问题。&#10;详见：https://github.com/00ll00/java_launch_wrapper"
+            position="top" :delay="0"
+          >
+            <div class="flex items-center justify-between py-1.5">
+              <span class="text-sm text-gray-700">禁用 Java Launch Wrapper</span>
+              <button
+                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
+                :class="advanceDisableJlw ? 'bg-primary-500' : 'bg-gray-300'"
+                @click="advanceDisableJlw = !advanceDisableJlw; saveAdvanceSwitch('advanceDisableJlw', advanceDisableJlw, 'JLW')"
+              >
+                <span
+                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  :class="advanceDisableJlw ? 'translate-x-5' : 'translate-x-1'"
+                />
+              </button>
+            </div>
+          </Tooltip>
+          <!-- 禁用 LWJGL Unsafe Agent -->
+          <Tooltip
+            text="是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。&#10;详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent"
+            position="top" :delay="0"
+          >
+            <div class="flex items-center justify-between py-1.5">
+              <span class="text-sm text-gray-700">禁用 LWJGL Unsafe Agent</span>
+              <button
+                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
+                :class="advanceDisableLua ? 'bg-primary-500' : 'bg-gray-300'"
+                @click="advanceDisableLua = !advanceDisableLua; saveAdvanceSwitch('advanceDisableLua', advanceDisableLua, 'LUA')"
+              >
+                <span
+                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
+                  :class="advanceDisableLua ? 'translate-x-5' : 'translate-x-1'"
+                />
+              </button>
+            </div>
+          </Tooltip>
         </div>
       </div>
     </section>

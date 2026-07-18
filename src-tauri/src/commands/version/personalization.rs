@@ -43,6 +43,17 @@ pub struct VersionPersonalization {
     pub min_memory: u32,
     /// 版本独立最大内存（MB，仅 custom 模式生效）
     pub max_memory: u32,
+    // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
+    /// 禁止更新 Mod
+    pub advance_disable_mod_update: bool,
+    /// 忽略 Java 兼容性警告
+    pub advance_ignore_java_warning: bool,
+    /// 关闭文件校验
+    pub advance_disable_assets_verify: bool,
+    /// 禁用 Java Launch Wrapper
+    pub advance_disable_jlw: bool,
+    /// 禁用 LWJGL Unsafe Agent
+    pub advance_disable_lua: bool,
 }
 
 /// 获取版本个性化设置
@@ -80,6 +91,11 @@ pub async fn get_version_personalization(
         memory_mode: setup.memory_mode.unwrap_or_default(),
         min_memory: setup.min_memory.unwrap_or(0),
         max_memory: setup.max_memory.unwrap_or(0),
+        advance_disable_mod_update: setup.advance_disable_mod_update.unwrap_or(false),
+        advance_ignore_java_warning: setup.advance_ignore_java_warning.unwrap_or(false),
+        advance_disable_assets_verify: setup.advance_disable_assets_verify.unwrap_or(false),
+        advance_disable_jlw: setup.advance_disable_jlw.unwrap_or(false),
+        advance_disable_lua: setup.advance_disable_lua.unwrap_or(false),
     })
 }
 

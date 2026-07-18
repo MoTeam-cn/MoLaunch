@@ -32,6 +32,12 @@ export interface VersionPersonalization {
   min_memory: number
   /** 版本独立最大内存（MB，仅 custom 模式生效，0 表示未设置） */
   max_memory: number
+  // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
+  advance_disable_mod_update: boolean
+  advance_ignore_java_warning: boolean
+  advance_disable_assets_verify: boolean
+  advance_disable_jlw: boolean
+  advance_disable_lua: boolean
 }
 
 /** 版本个性化字段更新（undefined 的字段不会被修改） */
@@ -59,6 +65,12 @@ export interface PersonalizationUpdate {
   minMemory?: number
   /** 版本独立最大内存（MB） */
   maxMemory?: number
+  // ===== 高级选项开关 =====
+  advanceDisableModUpdate?: boolean
+  advanceIgnoreJavaWarning?: boolean
+  advanceDisableAssetsVerify?: boolean
+  advanceDisableJlw?: boolean
+  advanceDisableLua?: boolean
 }
 
 /**

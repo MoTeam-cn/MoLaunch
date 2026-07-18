@@ -155,9 +155,9 @@ pub async fn launch_game(
         extra_jvm_args,
         extra_game_args,
         pre_launch_cmd,
-        // 启动高级选项（从全局配置读取）
-        disable_jlw: config.launch_disable_jlw,
-        disable_lua: config.launch_disable_lua,
+        // 启动高级选项：版本独立覆盖全局（两者都未禁用才启用，参考 PCL2 ModLaunch.vb）
+        disable_jlw: config.launch_disable_jlw || setup.advance_disable_jlw.unwrap_or(false),
+        disable_lua: config.launch_disable_lua || setup.advance_disable_lua.unwrap_or(false),
         app_handle: Some(app_handle.clone()),
     };
 
