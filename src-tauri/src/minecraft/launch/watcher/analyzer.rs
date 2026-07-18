@@ -138,7 +138,7 @@ fn analyze_crit1(
     crash_report_path: Option<PathBuf>,
 ) -> Option<CrashInfo> {
     let log_mc_l = log_mc.to_lowercase();
-    let log_crash_l = log_crash.to_lowercase();
+    let _log_crash_l = log_crash.to_lowercase();
     let log_hs_l = log_hs.to_lowercase();
 
     // --- 崩溃报告分析（高优先级）---
@@ -471,7 +471,7 @@ fn analyze_mod_name(keywords: &[String]) -> Option<Vec<String>> {
     }
     let unique: Vec<String> = {
         let mut seen = std::collections::HashSet::new();
-        keywords.iter().filter(|k| seen.insert(k.clone())).cloned().collect()
+        keywords.iter().filter(|k| seen.insert((*k).clone())).cloned().collect()
     };
     if unique.is_empty() {
         None

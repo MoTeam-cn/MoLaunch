@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::minecraft::community::modrinth;
-use crate::minecraft::community::types::{ResourceType, ResourceVersion};
+use crate::minecraft::community::types::ResourceVersion;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::sources::DownloadSourceMode;
