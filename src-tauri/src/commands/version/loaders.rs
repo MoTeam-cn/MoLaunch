@@ -145,3 +145,63 @@ pub async fn validate_loaders(
 ) -> Result<bool, String> {
     Ok(true)
 }
+
+/// List Fabric API versions compatible with the given MC version
+///
+/// 参考 PCL2 PageDownloadInstall.xaml.vb FabricApi_Loaded：
+/// 从 Modrinth 查询 fabric-api 版本列表并按 MC 版本筛选
+#[tauri::command]
+pub async fn list_fabric_api_versions(mc_version: String) -> Result<String, String> {
+    let versions = loaders::fabric_api::list_versions(&mc_version)
+        .await
+        .map_err(|e| {
+            crate::log_error!("Failed to list Fabric API versions: {}", e);
+            e
+        })?;
+
+    serde_json::to_string(&versions).map_err(|e| e.to_string())
+}
+
+/// Install Fabric API for a specific version
+///
+/// 参考 PCL2 ModDownloadLib.vb McInstallLoader 中下载 Fabric API 的逻辑：
+/// 下载到版本对应的 mods 目录（考虑版本隔离）
+#[tauri::command]
+pub async fn install_fabric_api_for_version(
+    state: State<'_, AppState>,
+    version_id: String,
+    download_url: String,
+    file_name: String,
+    hash: Option<String>,
+) -> Result<(), String> {
+    use crate::commands::version::mods::helpers::get_mods_dir;
+    use crate::minecraft::sources::DownloadSourceMode;
+
+    let config = state.config.lock().await;
+    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
+    drop(config);
+
+    let mods_dir: std::path::PathBuf = get_mods_dir(&state, &version_id).await?;
+
+    crate::log_info!(
+        "[FabricAPI] 为版本 {} 安装 Fabric API: {}",
+        version_id,
+        file_name
+    );
+
+    loaders::fabric_api::install(
+        &download_url,
+        &file_name,
+        &mods_dir,
+        hash.as_deref(),
+        source_mode,
+        None,
+    )
+    .await
+    .map_err(|e| {
+        crate::log_error!("Failed to install Fabric API: {}", e);
+        e.to_string()
+    })?;
+
+    Ok(())
+}

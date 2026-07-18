@@ -131,6 +131,8 @@ pub fn run() {
             commands::version::loaders::list_optifine_versions,
             commands::version::loaders::list_liteloader_versions,
             commands::version::loaders::validate_loaders,
+            commands::version::loaders::list_fabric_api_versions,
+            commands::version::loaders::install_fabric_api_for_version,
             commands::version::install::install_merged,
             commands::version::launch::launch_game,
             commands::version::launch::get_launch_progress,

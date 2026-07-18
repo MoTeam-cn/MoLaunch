@@ -11,12 +11,13 @@
  *   - 实例名生成 + 安装按钮
  */
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useVersionStore } from '@/stores/version'
-import { ChevronLeftIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
+import { ChevronLeftIcon, ArrowDownTrayIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import LoaderCard from '@/components/common/LoaderCard.vue'
 import Alert from '@/components/common/Alert.vue'
 import { useLoaderData } from '@/composables/useLoaderData'
+import { listFabricApiVersions, type FabricApiVersion } from '@/utils/api/loader'
 
 import anvilIcon from '@/assets/blocks/Anvil.png'
 import fabricIcon from '@/assets/blocks/Fabric.png'
@@ -79,6 +80,64 @@ const {
   optifine: showOptifine,
   liteloader: showLiteloader,
 })
+
+// —— Fabric API 信息 ——
+// 后端在 install_merged 时已自动安装最新版 Fabric API，
+// 此处仅做信息展示：告知用户将自动安装哪个版本，便于了解。
+type FabricApiState = 'idle' | 'loading' | 'success' | 'empty' | 'error'
+const fabricApiState = ref<FabricApiState>('idle')
+const fabricApiLatest = ref<FabricApiVersion | null>(null)
+const fabricApiError = ref<string>('')
+
+async function fetchFabricApi() {
+  // 正在查询中，跳过
+  if (fabricApiState.value === 'loading') return
+  // 已成功查询过（有数据或确认无兼容版本），不重复查询；出错则允许重试
+  if (fabricApiState.value === 'success' || fabricApiState.value === 'empty') return
+
+  fabricApiState.value = 'loading'
+  try {
+    const versions = await listFabricApiVersions(props.mcVersion)
+    if (versions.length > 0) {
+      // 列表已按发布日期降序排序，取第一个即最新版
+      fabricApiLatest.value = versions[0]
+      fabricApiState.value = 'success'
+    } else {
+      fabricApiLatest.value = null
+      fabricApiState.value = 'empty'
+    }
+    fabricApiError.value = ''
+  } catch (e: any) {
+    console.error('Failed to load Fabric API versions:', e)
+    fabricApiError.value = typeof e === 'string' ? e : (e?.message || String(e))
+    fabricApiLatest.value = null
+    fabricApiState.value = 'error'
+  }
+}
+
+// 选择 Fabric Loader 后触发查询 Fabric API 版本信息
+watch(() => selectedFabric.value, (newVal) => {
+  if (newVal) fetchFabricApi()
+})
+
+// —— 格式化辅助 ——
+function formatFileSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB']
+  let i = 0
+  let size = bytes
+  while (size >= 1024 && i < units.length - 1) {
+    size /= 1024
+    i++
+  }
+  return `${size.toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+}
+
+function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  // ISO 格式取日期部分；其他格式原样返回
+  return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
+}
 
 // —— 兼容性检查 ——
 function getLoaderError(loader: string): string | null {
@@ -208,6 +267,77 @@ onMounted(() => {
         @select="v => selectedFabric = v"
         @clear="selectedFabric = null"
       />
+
+      <!-- Fabric API 信息卡片（选择 Fabric 后显示，仅信息展示，后端自动安装最新版） -->
+      <div
+        v-if="selectedFabric"
+        class="bg-white rounded-lg border border-blue-200 overflow-hidden ml-4"
+      >
+        <!-- 标题栏 -->
+        <div class="flex items-center justify-between px-4 py-2.5 bg-blue-50/40">
+          <div class="flex items-center gap-2 min-w-0">
+            <img :src="fabricIcon" class="w-4 h-4 rounded shrink-0 opacity-80" />
+            <span class="text-sm font-medium text-gray-900 shrink-0">Fabric API</span>
+            <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
+              将自动安装
+            </span>
+          </div>
+          <button
+            v-if="fabricApiState === 'error'"
+            class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 shrink-0 transition-colors"
+            @click="fabricApiState = 'idle'; fetchFabricApi()"
+          >
+            <ArrowPathIcon class="w-3.5 h-3.5" />
+            重试
+          </button>
+        </div>
+
+        <!-- 内容区 -->
+        <div class="px-4 py-3 border-t border-blue-100">
+          <!-- Loading -->
+          <div v-if="fabricApiState === 'loading'" class="flex items-center gap-2 text-xs text-gray-500">
+            <svg class="animate-spin w-4 h-4 text-blue-500 shrink-0" viewBox="0 0 24 24" fill="none">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            正在获取 Fabric API 版本信息...
+          </div>
+
+          <!-- Error -->
+          <Alert
+            v-else-if="fabricApiState === 'error'"
+            type="warning"
+            :message="`获取 Fabric API 版本信息失败：${fabricApiError}`"
+            :truncate="false"
+          />
+
+          <!-- Empty -->
+          <div v-else-if="fabricApiState === 'empty'" class="text-xs text-gray-500">
+            未找到适用于 Minecraft {{ mcVersion }} 的 Fabric API 版本
+          </div>
+
+          <!-- Success: 展示最新版本信息 -->
+          <div v-else-if="fabricApiState === 'success' && fabricApiLatest" class="space-y-1.5">
+            <div class="flex items-center gap-2">
+              <span class="text-xs text-gray-500 shrink-0 w-14">版本号</span>
+              <span class="text-sm font-medium text-gray-900">{{ fabricApiLatest.version_number }}</span>
+            </div>
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-xs text-gray-500 shrink-0 w-14">文件名</span>
+              <span class="text-xs text-gray-700 truncate" :title="fabricApiLatest.file_name">{{ fabricApiLatest.file_name }}</span>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-gray-500">
+              <span class="shrink-0 w-14">发布日期</span>
+              <span>{{ formatDate(fabricApiLatest.release_date) }}</span>
+              <span class="text-gray-300">·</span>
+              <span>{{ formatFileSize(fabricApiLatest.size) }}</span>
+            </div>
+            <p class="text-xs text-blue-600 pt-1 leading-relaxed">
+              安装时将自动下载此版本，安装完成后可在 Mod 管理页面手动更换版本
+            </p>
+          </div>
+        </div>
+      </div>
 
       <!-- OptiFine -->
       <LoaderCard

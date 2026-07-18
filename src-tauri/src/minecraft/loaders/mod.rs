@@ -1,5 +1,6 @@
 //! Loader management module
 
+pub mod fabric_api;
 pub mod forge_html;
 pub mod forge_installer;
 pub mod utils;

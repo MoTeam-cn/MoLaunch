@@ -14,7 +14,7 @@
 //! - mod.rs: 所有 #[tauri::command] 命令（tauri::command 宏在定义处生成 __cmd__ 符号，
 //!   不能移到子模块后用 pub use 重导出，故命令函数必须留在 mod.rs）
 
-mod helpers;
+pub(crate) mod helpers;
 mod metadata;
 mod types;
 

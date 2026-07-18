@@ -457,6 +457,65 @@ pub async fn install_merged(
             }
         }
 
+        // ===== Fabric API 自动补充 =====
+        // 参考 PCL2 PageDownloadInstall.xaml.vb FabricApi_Loaded + ModDownloadLib.vb McInstallLoader：
+        // 安装 Fabric Loader 后自动下载最新兼容的 Fabric API 到 mods 目录
+        if fabric_version.is_some() {
+            log_info!("[Merged] 检测到 Fabric，开始自动补充 Fabric API");
+
+            // 获取 mods 目录（考虑版本隔离）
+            let isolation_mode_val = state.config.lock().await.isolation_mode;
+            let mode_val = IsolationMode::from_u32(isolation_mode_val);
+            let effective_dir = isolation::get_effective_game_dir(
+                &game_dir,
+                &actual_version_id,
+                mode_val,
+                version_type,
+            );
+            let mods_dir = effective_dir.join("mods");
+            std::fs::create_dir_all(&mods_dir).ok();
+
+            // 查询兼容的 Fabric API 版本
+            match loaders::fabric_api::list_versions(&mc_version).await {
+                Ok(versions) if !versions.is_empty() => {
+                    // 自动选择最新版本（列表已按发布日期降序排序）
+                    let latest = &versions[0];
+                    log_info!(
+                        "[Merged] 自动选择 Fabric API: {} ({})",
+                        latest.version_number,
+                        latest.file_name
+                    );
+
+                    // 下载安装
+                    let source_mode_val = {
+                        let config = state.config.lock().await;
+                        crate::minecraft::sources::DownloadSourceMode::from_str(&config.meta_source)
+                    };
+
+                    if let Err(e) = loaders::fabric_api::install(
+                        &latest.download_url,
+                        &latest.file_name,
+                        &mods_dir,
+                        latest.hash.as_deref(),
+                        source_mode_val,
+                        None,
+                    )
+                    .await
+                    {
+                        log_warn!("[Merged] Fabric API 安装失败（不阻断主流程）: {}", e);
+                    } else {
+                        log_info!("[Merged] Fabric API 安装完成: {}", latest.file_name);
+                    }
+                }
+                Ok(_) => {
+                    log_warn!("[Merged] 未找到兼容 MC {} 的 Fabric API 版本", mc_version);
+                }
+                Err(e) => {
+                    log_warn!("[Merged] 查询 Fabric API 版本失败（不阻断主流程）: {}", e);
+                }
+            }
+        }
+
         log_info!("[Merged] Install completed successfully");
         Ok(())
     } else {

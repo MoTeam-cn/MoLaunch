@@ -57,3 +57,35 @@ export async function validateLoaders(mcVersion: string, forge?: string, neoforg
 export async function installMerged(mcVersion: string, forge?: string, neoforge?: string, fabric?: string, optifine?: string, liteloader?: string, instanceName?: string): Promise<void> {
   return await invoke('install_merged', { mcVersion, forgeVersion: forge, neoforgeVersion: neoforge, fabricVersion: fabric, optifineVersion: optifine, liteloaderVersion: liteloader, instanceName })
 }
+
+/**
+ * Fabric API 版本信息（来自 Modrinth）
+ */
+export interface FabricApiVersion {
+  version_id: string       // Modrinth version ID
+  version_number: string   // 版本号（如 0.92.2+1.20.4）
+  display_name: string     // 显示名
+  game_versions: string[]  // 支持的 MC 版本
+  release_date: string     // 发布日期
+  download_url: string     // 下载 URL
+  file_name: string        // 文件名
+  size: number             // 文件大小（字节）
+  hash: string | null      // SHA1
+}
+
+/**
+ * 查询指定 MC 版本可用的 Fabric API 版本列表
+ * 返回的列表已按发布日期降序排序（最新版在前）
+ */
+export async function listFabricApiVersions(mcVersion: string): Promise<FabricApiVersion[]> {
+  const json = await invoke<string>('list_fabric_api_versions', { mcVersion })
+  try { return JSON.parse(json) } catch { return [] }
+}
+
+/**
+ * 为已安装的版本手动安装指定 Fabric API
+ * （install_merged 已自动安装最新版，此命令用于手动更换版本）
+ */
+export async function installFabricApiForVersion(versionId: string, downloadUrl: string, fileName: string, hash?: string | null): Promise<void> {
+  return await invoke('install_fabric_api_for_version', { versionId, downloadUrl, fileName, hash: hash ?? null })
+}
