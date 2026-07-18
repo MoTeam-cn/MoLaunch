@@ -15,9 +15,10 @@
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import {
-  getSkinCapeInfo, downloadSkinPng, downloadCapePng, uploadSkin, equipCape, unequipCape,
-  selectFile, saveFile, saveDataUrlToFile, type SkinCapeInfo,
+  getSkinCapeInfo, getSkinUrl, getCapeUrl, uploadSkin, equipCape, unequipCape,
+  selectFile, saveFile, downloadUrlToFile, type SkinCapeInfo,
 } from '@/utils/tauri'
+import { onImageCached } from '@/composables/useImageCache'
 import { showSuccess, showError } from '@/utils/toast'
 import SkinAvatar from './SkinAvatar.vue'
 import SkinModel3D from './SkinModel3D.vue'
@@ -35,8 +36,8 @@ const authStore = useAuthStore()
 const info = ref<SkinCapeInfo | null>(null)
 const loading = ref(false)
 const uploading = ref(false)
-const skinDataUrl = ref<string | null>(null)
-const capeDataUrl = ref<string | null>(null)
+const skinUrl = ref<string | null>(null)
+const capeUrl = ref<string | null>(null)
 const variant = ref<'classic' | 'slim'>('classic')
 /** 离线账号当前选中的本地皮肤名称 */
 const selectedLocalSkin = ref<string | null>(null)
@@ -51,17 +52,27 @@ const activeCape = computed(() => info.value?.capes.find(c => c.state === 'ACTIV
 /** 当前已装备的皮肤 */
 const activeSkin = computed(() => info.value?.skins.find(s => s.state === 'ACTIVE') ?? info.value?.skins[0] ?? null)
 
+/** 监听 image-cached 事件，当后端下载完成后自动刷新远程 URL 为本地缓存 URL */
+onImageCached((remoteUrl, localUrl) => {
+  if (skinUrl.value === remoteUrl) {
+    skinUrl.value = localUrl
+  }
+  if (capeUrl.value === remoteUrl) {
+    capeUrl.value = localUrl
+  }
+})
+
 async function loadInfo() {
   const dev = import.meta.env.DEV
   dev && console.log('[SkinManager] loadInfo started, isMicrosoft:', isMicrosoft.value)
   loading.value = true
-  skinDataUrl.value = null
-  capeDataUrl.value = null
+  skinUrl.value = null
+  capeUrl.value = null
 
   if (!isMicrosoft.value) {
     // 离线账号：使用本地默认皮肤（从注册表同步的内存缓存）
     const entry = getDefaultSkinEntry(uuid.value || username.value)
-    skinDataUrl.value = entry.url
+    skinUrl.value = entry.url
     variant.value = entry.variant
     selectedLocalSkin.value = getLocalSkinName(uuid.value) || entry.name
     info.value = null
@@ -79,22 +90,24 @@ async function loadInfo() {
     showError(`获取皮肤信息失败: ${e}`)
   }
   try {
-    skinDataUrl.value = await downloadSkinPng()
-    dev && console.log('[SkinManager] downloadSkinPng ok, length:', skinDataUrl.value?.length)
+    const result = await getSkinUrl()
+    skinUrl.value = result?.url ?? null
+    dev && console.log('[SkinManager] getSkinUrl ok:', result?.cached ? 'cached' : 'remote')
   } catch (e) {
-    console.error('[SkinManager] downloadSkinPng failed:', e)
+    console.error('[SkinManager] getSkinUrl failed:', e)
   }
   try {
-    capeDataUrl.value = await downloadCapePng()
-    dev && console.log('[SkinManager] downloadCapePng ok:', capeDataUrl.value ? 'has cape' : 'no cape')
+    const result = await getCapeUrl()
+    capeUrl.value = result?.url ?? null
+    dev && console.log('[SkinManager] getCapeUrl ok:', result ? (result.cached ? 'cached' : 'remote') : 'no cape')
   } catch (e) {
-    console.warn('[SkinManager] downloadCapePng failed:', e)
-    capeDataUrl.value = null
+    console.warn('[SkinManager] getCapeUrl failed:', e)
+    capeUrl.value = null
   }
   variant.value = activeSkin.value?.variant === 'slim' ? 'slim' : 'classic'
 
   loading.value = false
-  dev && console.log('[SkinManager] loadInfo done, skinDataUrl:', skinDataUrl.value ? 'has data' : 'null')
+  dev && console.log('[SkinManager] loadInfo done, skinUrl:', skinUrl.value ? 'has url' : 'null')
 }
 
 async function pickAndUpload() {
@@ -136,7 +149,7 @@ async function onSelectLocalSkin(skinName: string) {
   selectedLocalSkin.value = skinName
   const entry = defaultSkins.find(s => s.name === skinName)
   if (entry) {
-    skinDataUrl.value = entry.url
+    skinUrl.value = entry.url
     variant.value = entry.variant
   }
   bumpSkinVersion()
@@ -145,7 +158,7 @@ async function onSelectLocalSkin(skinName: string) {
 
 /** 下载当前皮肤 PNG 到本地（弹出保存对话框） */
 async function saveSkinToLocal() {
-  if (!skinDataUrl.value) {
+  if (!skinUrl.value) {
     showError('当前无皮肤数据')
     return
   }
@@ -153,7 +166,7 @@ async function saveSkinToLocal() {
   const savePath = await saveFile('保存皮肤', defaultName, [{ name: 'PNG 图片', extensions: ['png'] }])
   if (!savePath) return
   try {
-    await saveDataUrlToFile(skinDataUrl.value, savePath)
+    await downloadUrlToFile(skinUrl.value, savePath)
     showSuccess(`皮肤已保存到：${savePath}`)
   } catch (e) {
     showError('保存失败：' + String(e))
@@ -220,15 +233,15 @@ watch(() => props.visible, (v) => {
                 <!-- 3D 人物模型（skinview3d 渲染，皮肤 + 披风） -->
                 <div class="flex justify-center rounded-md bg-white p-2 shadow-sm">
                   <SkinModel3D
-                    :skin-url="skinDataUrl"
-                    :cape-url="capeDataUrl"
+                    :skin-url="skinUrl"
+                    :cape-url="capeUrl"
                     :variant="variant"
                     :height="280"
                     :animation="animation"
                   />
                 </div>
                 <div class="mt-3 flex items-center gap-3">
-                  <SkinAvatar :skin-url="skinDataUrl" :uuid="uuid" :username="username" :size="40" :overlay="true" :login-type="isMicrosoft ? 'Microsoft' : 'Offline'" />
+                  <SkinAvatar :skin-url="skinUrl" :uuid="uuid" :username="username" :size="40" :overlay="true" :login-type="isMicrosoft ? 'Microsoft' : 'Offline'" />
                   <div class="flex-1 space-y-1 text-xs text-gray-500">
                     <div>用户名：{{ username }}</div>
                     <div>皮肤模型：{{ variant === 'slim' ? 'Alex（纤细）' : 'Steve（经典）' }}</div>
@@ -239,7 +252,7 @@ watch(() => props.visible, (v) => {
                   <Tooltip text="下载当前皮肤 PNG 到本地" position="top" :delay="0">
                     <button
                       class="flex-none flex h-7 w-7 items-center justify-center rounded border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
-                      :disabled="!skinDataUrl"
+                      :disabled="!skinUrl"
                       @click="saveSkinToLocal"
                     >
                       <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">

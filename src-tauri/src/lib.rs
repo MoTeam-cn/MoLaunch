@@ -85,12 +85,15 @@ pub fn run() {
             // 皮肤管理命令
             commands::skin::get_skin_cape_info,
             commands::skin::get_skin_url,
-            commands::skin::download_skin_png,
-            commands::skin::download_cape_png,
+            commands::skin::get_cape_url,
             commands::skin::upload_skin,
             commands::skin::equip_cape,
             commands::skin::unequip_cape,
-            commands::skin::save_data_url_to_file,
+            commands::skin::download_url_to_file,
+            // 通用图片缓存命令
+            commands::image_cache::get_cached_image_url,
+            commands::image_cache::invalidate_cached_image,
+            commands::image_cache::clear_image_cache,
             // 版本命令
             commands::version::list::list_versions,
             commands::version::download::download_version,
@@ -189,6 +192,60 @@ pub fn run() {
                 log_info!("Config will be saved on exit");
             }
         })
+        .register_uri_scheme_protocol(
+            minecraft::image_cache::CACHE_IMAGE_SCHEME,
+            |_app, request| {
+                // 从请求 URI 中提取 hash
+                let uri = request.uri().to_string();
+
+                // 解析 hash
+                let hash = match minecraft::image_cache::parse_hash_from_request(&uri) {
+                    Some(h) => h,
+                    None => {
+                        log_warn!("[ImageCache] 无效的缓存图片请求: {}", uri);
+                        return tauri::http::Response::builder()
+                            .status(403)
+                            .header("Access-Control-Allow-Origin", "*")
+                            .body::<Vec<u8>>(Vec::new())
+                            .unwrap();
+                    }
+                };
+
+                // 根据 hash 查找缓存文件
+                match minecraft::image_cache::find_cache_by_hash(&hash) {
+                    Some(path) => {
+                        // 读取文件内容
+                        match std::fs::read(&path) {
+                            Ok(bytes) => {
+                                tauri::http::Response::builder()
+                                    .status(200)
+                                    .header("Content-Type", "image/png")
+                                    .header("Cache-Control", "public, max-age=86400")
+                                    .header("Access-Control-Allow-Origin", "*")
+                                    .body::<Vec<u8>>(bytes)
+                                    .unwrap()
+                            }
+                            Err(e) => {
+                                log_warn!("[ImageCache] 读取缓存文件失败: {}", e);
+                                tauri::http::Response::builder()
+                                    .status(500)
+                                    .header("Access-Control-Allow-Origin", "*")
+                                    .body::<Vec<u8>>(Vec::new())
+                                    .unwrap()
+                            }
+                        }
+                    }
+                    None => {
+                        log_warn!("[ImageCache] 缓存文件不存在: {}", hash);
+                        tauri::http::Response::builder()
+                            .status(404)
+                            .header("Access-Control-Allow-Origin", "*")
+                            .body::<Vec<u8>>(Vec::new())
+                            .unwrap()
+                    }
+                }
+            },
+        )
         .run(tauri::generate_context!())
         .expect("error while running MoLaunch");
 }

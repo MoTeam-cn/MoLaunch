@@ -16,8 +16,10 @@
  */
 
 import { ref, watch, computed, onMounted } from 'vue'
-import { downloadSkinPng } from '@/utils/tauri'
+import { getSkinUrl } from '@/utils/tauri'
+import { onImageCached } from '@/composables/useImageCache'
 import { getDefaultSkin, skinVersion } from '@/utils/default-skin'
+import { loadImage, clipImageRegion } from '@/utils/image-crop'
 
 const props = withDefaults(defineProps<{
   /** 玩家 UUID（用于触发重新加载） */
@@ -50,6 +52,8 @@ const faceDataUrl = ref<string | null>(null)
 const hairDataUrl = ref<string | null>(null)
 const loadFailed = ref(false)
 const loading = ref(false)
+/** 当前加载的远程 URL（用于 image-cached 事件匹配后重新加载） */
+const currentRemoteUrl = ref<string | null>(null)
 
 const avatarLetter = computed(() => {
   const name = props.username || ''
@@ -95,35 +99,41 @@ async function loadAvatar() {
     faceDataUrl.value = null
     hairDataUrl.value = null
     loadFailed.value = true
+    currentRemoteUrl.value = null
     return
   }
   loading.value = true
   loadFailed.value = false
   try {
-    // 优先级：直接传入的 skinUrl > 离线账号默认皮肤 > 微软账号后端下载
-    let pngDataUrl: string
+    // 优先级：直接传入的 skinUrl > 离线账号默认皮肤 > 微软账号后端获取 URL
+    let pngUrl: string
     if (props.skinUrl) {
-      pngDataUrl = props.skinUrl
+      pngUrl = props.skinUrl
+      currentRemoteUrl.value = null  // 直接传入的 URL 不参与缓存刷新
     } else if (props.loginType === 'Offline') {
       // 离线账号：使用用户选择的皮肤（从注册表同步到内存）或 uuid hash 默认
-      pngDataUrl = getDefaultSkin(props.uuid || props.username)
+      pngUrl = getDefaultSkin(props.uuid || props.username)
+      currentRemoteUrl.value = null
     } else {
-      // 微软账号：下载对应 uuid 的皮肤 PNG，失败时静默回退到默认皮肤
+      // 微软账号：获取皮肤 URL（CachedImage），失败时静默回退到默认皮肤
       try {
-        pngDataUrl = await downloadSkinPng(props.uuid)
+        const result = await getSkinUrl(props.uuid)
+        if (result) {
+          pngUrl = result.url
+          // 仅当返回的是远程 URL（未命中缓存）时才记录，用于事件匹配
+          currentRemoteUrl.value = result.cached ? null : result.url
+        } else {
+          pngUrl = getDefaultSkin(props.uuid || props.username)
+          currentRemoteUrl.value = null
+        }
       } catch {
-        pngDataUrl = getDefaultSkin(props.uuid || props.username)
+        pngUrl = getDefaultSkin(props.uuid || props.username)
+        currentRemoteUrl.value = null
       }
     }
 
     // 加载为 Image 对象
-    const img = new Image()
-    img.crossOrigin = 'anonymous'
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve()
-      img.onerror = () => reject(new Error('load image failed'))
-      img.src = pngDataUrl
-    })
+    const img = await loadImage(pngUrl)
 
     // 计算缩放比例（PCL2 的 Scale）
     const w = img.naturalWidth
@@ -135,7 +145,7 @@ async function loadAvatar() {
     const cellSize = Math.max(1, Math.round(scale * 8))
 
     // 裁剪脸层：从 (Scale*8, Scale*8) 取 8x8 区域
-    faceDataUrl.value = clipRegion(img, scale * 8, scale * 8, cellSize, cellSize)
+    faceDataUrl.value = clipImageRegion(img, scale * 8, scale * 8, cellSize, cellSize, undefined, undefined, true)
 
     // 裁剪头发层（附加层）：从 (Scale*40, Scale*8) 取 8x8 区域
     // 仅当图片有透明像素时才叠加（参考 PCL2 MySkin.Load 的透明度检查）
@@ -168,13 +178,14 @@ async function loadAvatar() {
           }
         }
         // 还需检查头发层区域本身是否有非透明内容
+        const hairDataUrlTmp = clipImageRegion(img, scale * 40, scale * 8, cellSize, cellSize, undefined, undefined, true)
         const hairCanvas = document.createElement('canvas')
         hairCanvas.width = cellSize
         hairCanvas.height = cellSize
         const hairCtx = hairCanvas.getContext('2d', { willReadFrequently: true })
         if (hairCtx) {
-          hairCtx.imageSmoothingEnabled = false
-          hairCtx.drawImage(img, scale * 40, scale * 8, cellSize, cellSize, 0, 0, cellSize, cellSize)
+          const hairImg = await loadImage(hairDataUrlTmp)
+          hairCtx.drawImage(hairImg, 0, 0)
           const hairData = hairCtx.getImageData(0, 0, cellSize, cellSize).data
           let hairHasContent = false
           for (let i = 3; i < hairData.length; i += 4) {
@@ -182,7 +193,7 @@ async function loadAvatar() {
           }
           // PCL2 条件：图片有透明像素 或 颜色差异，且头发层有内容
           if ((hasTransparency || colorDifferent) && hairHasContent) {
-            hairDataUrl.value = hairCanvas.toDataURL('image/png')
+            hairDataUrl.value = hairDataUrlTmp
           }
         }
       }
@@ -194,16 +205,13 @@ async function loadAvatar() {
   }
 }
 
-/** 从图片裁剪指定区域为 dataURL */
-function clipRegion(img: HTMLImageElement, sx: number, sy: number, sw: number, sh: number): string {
-  const canvas = document.createElement('canvas')
-  canvas.width = sw
-  canvas.height = sh
-  const ctx = canvas.getContext('2d', { willReadFrequently: true })!
-  ctx.imageSmoothingEnabled = false
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh)
-  return canvas.toDataURL('image/png')
-}
+/** 监听 image-cached 事件，当后端下载完成后重新加载头像（从本地缓存读取） */
+onImageCached((remoteUrl) => {
+  if (currentRemoteUrl.value === remoteUrl) {
+    currentRemoteUrl.value = null  // 清除标记避免重复加载
+    loadAvatar()
+  }
+})
 
 onMounted(loadAvatar)
 watch(() => [props.uuid, props.loginType, props.skinUrl, skinVersion.value], loadAvatar)

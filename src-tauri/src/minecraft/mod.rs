@@ -4,6 +4,7 @@ pub mod auth;
 pub mod community;
 pub mod download;
 pub mod fools;
+pub mod image_cache;
 pub mod isolation;
 pub mod java;
 pub mod java_selector;

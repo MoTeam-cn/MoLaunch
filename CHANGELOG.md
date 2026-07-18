@@ -9,6 +9,100 @@
 
 ### 新增
 
+#### 通用图片缓存组件（方案 C：混合缓存 + 自定义 URI scheme）
+- 背景：前端直接用 `<img :src="remoteUrl">` 加载远程图片，Tauri webview 的 HTTP 缓存仅会话内有效，重启应用后需重新下载
+- **安全设计**：不使用 Tauri 的 asset protocol（会暴露完整本地文件路径，存在恶意读取风险），改用自定义 URI scheme `cache-image://{hash}.png`，前端只能通过 hash 请求，后端验证 hash 合法性后返回文件内容
+- 新增 `src-tauri/src/minecraft/image_cache.rs` 通用图片缓存组件：
+  - 首次加载：返回远程 URL，前端立即渲染；后端 `tokio::spawn` 异步下载到本地缓存
+  - 二次加载：返回自定义 URI scheme URL（`cache-image://{hash}.png`），零网络请求
+  - 缓存 key：URL 的 SHA1 hash，URL 变化时自动失效
+  - 下载完成：emit `image-cached` 事件通知前端刷新
+  - 并发去重：`IN_FLIGHT` Mutex<HashSet> 避免同一 URL 重复下载
+  - `parse_hash_from_request()`：从 URI 解析 hash 并验证格式（40 位十六进制）
+  - `find_cache_by_hash()`：根据 hash 查找缓存文件路径
+  - 提供 `get_image_url()` / `invalidate()` / `clear_all()` 三个公开方法
+- `lib.rs` 注册 `register_uri_scheme_protocol("cache-image", ...)` 处理器：
+  - 从请求 URI 提取 hash，验证格式（防止路径遍历）
+  - 查找缓存文件，返回 `image/png` 内容
+  - 无效请求返回 403，文件不存在返回 404
+  - 响应头设置 `Cache-Control: public, max-age=86400` 减少重复请求
+- `storage/cache.rs` 新增 `read_bytes()` / `write_bytes()` 二进制读写方法
+- `minecraft/mod.rs` 注册 `pub mod image_cache`
+- Tauri 配置更新：
+  - `tauri.conf.json` CSP 放行 `cache-image:` scheme（不含 asset: 和 asset.localhost）
+  - 不启用 `assetProtocol`（避免暴露本地文件路径）
+  - 不添加 `protocol-asset` feature（无需 asset protocol）
+- 前端新增 `src/composables/useImageCache.ts`：
+  - `useImageCache(targetRef, expectedRemoteUrlRef)`：自动监听事件并刷新指定 ref
+  - `onImageCached(callback)`：回调式监听，适合自定义刷新逻辑
+  - 组件卸载时自动 unlisten
+- 皮肤/披风管理接入图片缓存：
+  - `commands/skin.rs`：`get_skin_url` / `get_cape_url` 返回 `CachedImage` 结构体（含 url 和 cached 字段），上传皮肤/装备取消披风后显式失效旧缓存
+  - `skin.ts`：`getSkinUrl` / `getCapeUrl` 返回 `CachedImage | null`
+  - `SkinManager.vue`：监听 `image-cached` 事件刷新 skinUrl/capeUrl
+  - `SkinAvatar.vue`：记录 `currentRemoteUrl`，事件匹配后重新加载头像
+  - `SkinCapeList.vue`：直接使用 `cape.cached_url` 加载图片（由 `getSkinCapeInfo` 返回时填充），无需额外调用 `getCachedImageUrl`，减少一轮 IPC 调用
+- 通用图片缓存命令（独立组件，可复用于任意远程图片场景）：
+  - 新增 `src-tauri/src/commands/image_cache.rs`：
+    - `get_cached_image_url(url)`：接受任意远程 URL，返回 `CachedImage`
+    - `invalidate_cached_image(url)`：失效指定 URL 缓存
+    - `clear_image_cache()`：清空所有图片缓存
+  - 新增 `src/utils/api/image-cache.ts`：前端 API 封装（`getCachedImageUrl` / `invalidateCachedImage` / `clearImageCache`）
+  - `tauri.ts` 导出 `image-cache` 模块
+  - 披风列表 `SkinCapeList.vue` 改用 `getCachedImageUrl` 获取缓存 URL 再裁剪图标，二次加载零网络
+
+### 重构
+
+#### 新增 storage/cache.rs 缓存组件，统一缓存路径管理
+- 背景：缓存文件散落在各处，`forge_installer.rs` 使用 `std::env::temp_dir().join("MoLaunch").join("Cache")`，`preload.rs` 手动拼接 `"cache/preload_mods/"` 前缀调用 `Storage.read_file/write_file`，路径管理不统一
+- 新增 `src-tauri/src/storage/cache.rs`：
+  - `Cache` 结构体（全局单例 + OnceLock 懒加载），缓存根目录由 `Storage::cache_dir()` 提供
+  - 提供 `dir()` / `path()` / `ensure_dir()` / `exists()` / `read()` / `write()` / `remove()` / `list()` / `clear_dir()` 共 9 个方法
+  - 所有方法接受相对于缓存根目录的路径，自动拼接，调用方无需手动构造 `"cache/"` 前缀
+- `storage/mod.rs` 注册 `pub mod cache;`
+- 迁移调用方：
+  - `forge_installer.rs`：删除 `get_cache_dir()` 函数，改用 `Cache::instance().ensure_dir("forge_installer")`，资源文件从系统临时目录迁移到 `.Molaunch/cache/forge_installer/`
+  - `preload.rs`：`load_file_cache` / `save_file_cache` 从 `Storage::instance().read_file("cache/preload_mods/...")` 改为 `Cache::instance().read("preload_mods/...")`，去掉手动 `cache/` 前缀
+  - `developer.rs`：`get_storage_dirs` 命令的 `cache` 字段从 `storage.cache_dir()` 改为 `Cache::instance().dir()`
+
+### 优化
+
+#### 皮肤/披风管理：后端改为返回 URL，前端直接加载图片
+- 背景：原实现中后端 `download_skin_png` 和 `download_cape_png` 命令会下载 PNG 二进制数据并 base64 编码后返回前端，存在不必要的 base64 编解码开销和 IPC 传输浪费
+- 后端改动（`src-tauri/src/commands/skin.rs`）：
+  - `get_skin_url` 新增可选 `uuid` 参数，支持查询非当前登录用户的皮肤 URL（原 `download_skin_png` 的 uuid 查找逻辑合并至此）
+  - 新增 `get_cape_url` 命令，返回当前已装备披风的下载 URL（替代原 `download_cape_png`）
+  - 删除 `download_skin_png` 和 `download_cape_png` 命令（不再需要后端下载+base64）
+  - `save_data_url_to_file` 改为 `download_url_to_file(url, path)`，后端直接从 URL 下载并写入文件，避免 base64 中转
+- 后端注册表更新（`src-tauri/src/lib.rs`）：移除 `download_skin_png`/`download_cape_png`/`save_data_url_to_file`，注册 `get_cape_url`/`download_url_to_file`
+- 前端 API 层（`src/utils/api/skin.ts`）：
+  - `getSkinUrl` 新增可选 `uuid` 参数
+  - 新增 `getCapeUrl` 函数
+  - 删除 `downloadSkinPng`、`downloadCapePng`、`saveDataUrlToFile`
+  - 新增 `downloadUrlToFile(url, path)` 函数
+- 前端组件改动：
+  - `SkinManager.vue`：`skinDataUrl`/`capeDataUrl` 重命名为 `skinUrl`/`capeUrl`，调用改为 `getSkinUrl()`/`getCapeUrl()`，保存皮肤改用 `downloadUrlToFile`
+  - `SkinAvatar.vue`：微软账号皮肤加载改用 `getSkinUrl(uuid)` 获取 URL，直接传给 `Image` 加载（离线账号默认皮肤仍使用 Vite 本地 URL，无 CORS 问题）
+  - `SkinCapeList.vue`：披风列表从 SVG 占位图标改为显示真实披风 PNG 图片（详见下方「披风列表显示真实图片」条目）
+
+#### 披风列表显示真实披风图标
+- 背景：原 `SkinCapeList.vue` 对所有披风使用统一的 SVG 占位图标（对勾/方块），无法直观区分不同披风；MC 服务器返回的披风 PNG 是完整正背面纹理图，直接显示会过大且包含无关内容
+- 新增工具函数（`src/utils/cape-icon.ts`）：
+  - `getCapeIcon(capeUrl)`：根据 skinview3d 的 CapeObject UV 映射，裁剪披风外侧可见图案（front 面，纹理坐标 (1,1) 起 10x16 区域）作为图标
+  - 参考 skinview3d 源码（`node_modules/skinview3d/libs/model.js` 的 `setCapeUVs` 函数）确认正确的纹理坐标
+  - 输出 canvas 尺寸 10x16（原始尺寸，由 CSS 控制显示大小）
+  - 支持高清披风纹理（根据图片宽度自动计算 scale，标准 64x32 scale=1，高清 128x64 scale=2）
+  - 使用 `imageSmoothingEnabled = false` 保持像素风格
+- 改动（`src/components/common/skin-manager/SkinCapeList.vue`）：
+  - 引入 `getCapeIcon`，为每个披风加载图标 dataURL 存入 `iconMap`
+  - `watch` 监听 `capes` 变化自动重新加载图标（`immediate: true, deep: true`）
+  - 加载失败的披风 id 记入 `failedIds`，回退到灰色占位 SVG
+  - 布局从横排改为纵排卡片（图标在上、名称在下），网格 3-6 列
+  - 图标使用 `image-rendering: pixelated` 保持 Minecraft 像素风格
+  - 已装备披风保留对勾角标 + 主题色高亮边框
+
+### 新增
+
 #### 开发者模式功能
 - 触发方式（两者结合）：
   1. 在「其他」页的应用版本号上连续点击 5 次（1.5 秒内）解锁开发者模式

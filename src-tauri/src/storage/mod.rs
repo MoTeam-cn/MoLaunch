@@ -2,6 +2,7 @@
 //! All operations on .Molaunch folder must go through this module
 //! Uses INI format for configuration
 
+pub mod cache;
 pub mod ini;
 pub mod registry;
 

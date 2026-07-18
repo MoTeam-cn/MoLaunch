@@ -87,8 +87,8 @@ struct CachedMod {
 /// - `cached_map`：file_name → CachedMod
 /// - `is_fresh`：缓存是否存在且未过期（false 表示需重新联网）
 fn load_file_cache(version_id: &str) -> (HashMap<String, CachedMod>, bool) {
-    let rel = format!("cache/preload_mods/{}.json", sanitize_cache_key(version_id));
-    let json = match crate::storage::Storage::instance().read_file(&rel) {
+    let rel = format!("preload_mods/{}.json", sanitize_cache_key(version_id));
+    let json = match crate::storage::cache::Cache::instance().read(&rel) {
         Ok(s) => s,
         Err(_) => return (HashMap::new(), false),
     };
@@ -126,8 +126,8 @@ fn save_file_cache(version_id: &str, mods: &HashMap<String, CachedMod>) {
             return;
         }
     };
-    let rel = format!("cache/preload_mods/{}.json", sanitize_cache_key(version_id));
-    if let Err(e) = crate::storage::Storage::instance().write_file(&rel, &json) {
+    let rel = format!("preload_mods/{}.json", sanitize_cache_key(version_id));
+    if let Err(e) = crate::storage::cache::Cache::instance().write(&rel, &json) {
         crate::log_warn!("[Preload] 缓存写入失败: {}", e);
     }
 }

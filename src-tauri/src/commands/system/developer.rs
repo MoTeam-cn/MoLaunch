@@ -11,6 +11,7 @@
 
 use crate::log_info;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
+use crate::storage::cache::Cache;
 use crate::storage::registry::{reg_get_bool, reg_set_bool};
 use crate::storage::Storage;
 use serde::Serialize;
@@ -92,7 +93,7 @@ pub fn get_storage_dirs() -> StorageDirs {
         base: storage.base_dir().to_string_lossy().to_string(),
         config: storage.config_path().to_string_lossy().to_string(),
         logs: storage.logs_dir().to_string_lossy().to_string(),
-        cache: storage.cache_dir().to_string_lossy().to_string(),
+        cache: Cache::instance().dir().to_string_lossy().to_string(),
         temp: storage.temp_dir().to_string_lossy().to_string(),
     }
 }

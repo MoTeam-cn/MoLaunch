@@ -42,6 +42,13 @@ pub struct SkinInfo {
     pub url: String,
     pub variant: String,
     pub alias: Option<String>,
+    /// 缓存 URL（命中缓存时为 cache-image:// 本地 URL，未命中时为远程 URL）
+    /// 由 get_skin_cape_info 命令填充，parse 时不设置
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_url: Option<String>,
+    /// 是否命中缓存
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached: Option<bool>,
 }
 
 /// 披风信息
@@ -54,6 +61,13 @@ pub struct CapeInfo {
     pub display_name: String,
     /// 披风 PNG 下载地址（来自 profile_json 的 capes[].url）
     pub url: Option<String>,
+    /// 缓存 URL（命中缓存时为 cache-image:// 本地 URL，未命中时为远程 URL）
+    /// 由 get_skin_cape_info 命令填充，parse 时不设置
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached_url: Option<String>,
+    /// 是否命中缓存
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cached: Option<bool>,
 }
 
 /// 皮肤/披风完整信息
@@ -132,6 +146,8 @@ pub fn parse_skin_cape_info(profile_json: &str) -> Result<SkinCapeInfo, String> 
                             .unwrap_or("")
                             .to_string(),
                         alias: s.get("alias").and_then(|v| v.as_str()).map(String::from),
+                        cached_url: None,
+                        cached: None,
                     })
                 })
                 .collect()
@@ -151,6 +167,8 @@ pub fn parse_skin_cape_info(profile_json: &str) -> Result<SkinCapeInfo, String> 
                         alias: alias.clone(),
                         display_name: cape_display_name(&alias),
                         url: c.get("url").and_then(|v| v.as_str()).map(String::from),
+                        cached_url: None,
+                        cached: None,
                     })
                 })
                 .collect()

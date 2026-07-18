@@ -10,6 +10,10 @@ export interface SkinInfo {
   url: string
   variant: string
   alias: string | null
+  /** 缓存 URL（命中缓存时为 cache-image:// 本地 URL，未命中时为远程 URL） */
+  cached_url?: string
+  /** 是否命中缓存 */
+  cached?: boolean
 }
 
 export interface CapeInfo {
@@ -18,11 +22,25 @@ export interface CapeInfo {
   alias: string
   display_name: string
   url: string | null
+  /** 缓存 URL（命中缓存时为 cache-image:// 本地 URL，未命中时为远程 URL） */
+  cached_url?: string
+  /** 是否命中缓存 */
+  cached?: boolean
 }
 
 export interface SkinCapeInfo {
   skins: SkinInfo[]
   capes: CapeInfo[]
+}
+
+/**
+ * 缓存图片结果
+ * - url: 立即用于渲染的 URL（本地缓存或远程）
+ * - cached: true 表示本地缓存命中，无需网络
+ */
+export interface CachedImage {
+  url: string
+  cached: boolean
 }
 
 /**
@@ -33,37 +51,36 @@ export async function getSkinCapeInfo(): Promise<SkinCapeInfo> {
 }
 
 /**
- * 获取皮肤 PNG 下载 URL
+ * 获取皮肤 PNG URL（带本地缓存）
+ *
+ * 可传入 uuid 指定账号（用于预加载非当前账号的皮肤）；
+ * 不传则使用当前登录用户。
+ *
+ * 返回 CachedImage：
+ * - cached: true 表示本地缓存命中，URL 为 asset protocol
+ * - cached: false 表示远程 URL，后端会异步下载，完成后 emit 'image-cached' 事件
  */
-export async function getSkinUrl(): Promise<string | null> {
-  return await invoke<string | null>('get_skin_url')
+export async function getSkinUrl(uuid?: string): Promise<CachedImage | null> {
+  return await invoke<CachedImage | null>('get_skin_url', { uuid: uuid ?? null })
 }
 
 /**
- * 下载皮肤 PNG，返回 data:image/png;base64,... 格式
+ * 获取当前已装备披风的下载 URL（带本地缓存）
  *
- * 前端收到后用 canvas 裁剪 (8,8,8,8) 区域作为头像（PCL2 的方式）
+ * 返回 CachedImage，同 getSkinUrl
  */
-export async function downloadSkinPng(uuid?: string): Promise<string> {
-  return await invoke<string>('download_skin_png', { uuid: uuid ?? null })
+export async function getCapeUrl(): Promise<CachedImage | null> {
+  return await invoke<CachedImage | null>('get_cape_url')
 }
 
 /**
- * 下载当前已装备披风的 PNG，返回 data:image/png;base64,... 格式
+ * 下载指定 URL 的图片到本地文件
  *
- * 无披风时返回 null
+ * 用于"下载当前皮肤到本地"功能：前端已有皮肤 URL（来自 getSkinUrl），
+ * 用户选择保存位置后，后端直接从 URL 下载并写入文件。
  */
-export async function downloadCapePng(): Promise<string | null> {
-  return await invoke<string | null>('download_cape_png')
-}
-
-/**
- * 将 data URL（如 data:image/png;base64,xxxx）保存到本地文件
- *
- * 用于"下载当前皮肤到本地"：前端已有 dataURL，用户选择保存位置后调用此命令写入
- */
-export async function saveDataUrlToFile(dataUrl: string, path: string): Promise<void> {
-  return await invoke<void>('save_data_url_to_file', { dataUrl, path })
+export async function downloadUrlToFile(url: string, path: string): Promise<void> {
+  return await invoke<void>('download_url_to_file', { url, path })
 }
 
 /**

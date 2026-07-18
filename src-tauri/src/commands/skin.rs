@@ -2,115 +2,135 @@
 //!
 //! 提供 Tauri 命令接口，供前端调用：
 //! - 获取皮肤/披风信息
-//! - 下载皮肤 PNG（前端裁剪为 2D 头像）
+//! - 获取皮肤/披风 PNG 下载 URL（带本地缓存，方案 C）
 //! - 上传皮肤
 //! - 装备/取消披风
+//! - 下载 URL 图片到本地文件
 
+use crate::minecraft::image_cache::{self, CachedImage};
 use crate::minecraft::skin;
 use crate::state::AppState;
+use crate::log_info;
 use crate::log_warn;
-use tauri::State;
+use tauri::{AppHandle, State};
 
 /// 获取当前账号的皮肤/披风信息（从 profile_json 解析）
+///
+/// 返回前会对每个 skin/cape 的 url 做缓存处理，填充 cached_url 和 cached 字段：
+/// - 缓存命中：cached_url 为 cache-image:// 本地 URL，cached: true
+/// - 缓存未命中：cached_url 为远程 URL，cached: false，后端异步下载完成后 emit image-cached 事件
 #[tauri::command]
-pub async fn get_skin_cape_info(state: State<'_, AppState>) -> Result<skin::SkinCapeInfo, String> {
+pub async fn get_skin_cape_info(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<skin::SkinCapeInfo, String> {
     let auth = state.auth.lock().await;
     let profile_json = auth
         .current_user
         .as_ref()
         .and_then(|u| u.profile_json.as_ref())
         .ok_or("No profile data, please login with Microsoft account first")?;
-    skin::parse_skin_cape_info(profile_json)
+    let mut info = skin::parse_skin_cape_info(profile_json)?;
+    drop(auth);
+
+    // 对每个 skin 填充缓存 URL
+    for skin in info.skins.iter_mut() {
+        let cached = image_cache::get_image_url(&skin.url, Some(app.clone())).await;
+        skin.cached_url = Some(cached.url);
+        skin.cached = Some(cached.cached);
+    }
+
+    // 对每个 cape 填充缓存 URL
+    for cape in info.capes.iter_mut() {
+        if let Some(ref url) = cape.url {
+            let cached = image_cache::get_image_url(url, Some(app.clone())).await;
+            cape.cached_url = Some(cached.url);
+            cape.cached = Some(cached.cached);
+        }
+    }
+
+    Ok(info)
 }
 
-/// 获取皮肤 PNG 下载 URL（从 profile 解析，参考 PCL2）
+/// 获取皮肤 PNG URL（带本地缓存）
+///
+/// 可传入 uuid 指定账号（用于预加载非当前账号的皮肤）；
+/// 不传或传 null 则使用当前登录用户。
+///
+/// 返回 `CachedImage`：
+/// - `cached: true` 表示返回的是本地缓存 URL（无需网络）
+/// - `cached: false` 表示返回的是远程 URL，后端会异步下载到缓存，完成后 emit `image-cached` 事件
 #[tauri::command]
-pub async fn get_skin_url(state: State<'_, AppState>) -> Result<Option<String>, String> {
+pub async fn get_skin_url(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    uuid: Option<String>,
+) -> Result<Option<CachedImage>, String> {
+    let auth = state.auth.lock().await;
+    // 优先用 uuid 从 current_user 或 ms_accounts 查找 profile_json
+    let profile_json: String = if let Some(ref uuid) = uuid {
+        // 先看 current_user
+        if auth
+            .current_user
+            .as_ref()
+            .map(|u| &u.uuid == uuid)
+            .unwrap_or(false)
+        {
+            auth.current_user
+                .as_ref()
+                .and_then(|u| u.profile_json.as_ref())
+                .ok_or("No profile data")?
+                .clone()
+        } else {
+            // 从 ms_accounts 查找
+            let persisted = state.auth_storage.load().await.map_err(|e| e.to_string())?;
+            persisted
+                .ms_accounts
+                .iter()
+                .find(|a| &a.uuid == uuid)
+                .and_then(|a| Some(a.profile_json.as_str()))
+                .ok_or("No profile data")?
+                .to_string()
+        }
+    } else {
+        auth.current_user
+            .as_ref()
+            .and_then(|u| u.profile_json.as_ref())
+            .ok_or("No profile data")?
+            .clone()
+    };
+    drop(auth);
+
+    let remote_url = skin::get_skin_url(&profile_json);
+    match remote_url {
+        Some(url) => Ok(Some(image_cache::get_image_url(&url, Some(app)).await)),
+        None => Ok(None),
+    }
+}
+
+/// 获取当前已装备披风的下载 URL（带本地缓存）
+///
+/// 返回 `CachedImage`：
+/// - `cached: true` 表示返回的是本地缓存 URL（无需网络）
+/// - `cached: false` 表示返回的是远程 URL，后端会异步下载到缓存，完成后 emit `image-cached` 事件
+#[tauri::command]
+pub async fn get_cape_url(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Option<CachedImage>, String> {
     let auth = state.auth.lock().await;
     let profile_json = auth
         .current_user
         .as_ref()
         .and_then(|u| u.profile_json.as_ref())
         .ok_or("No profile data")?;
-    Ok(skin::get_skin_url(profile_json))
-}
+    let remote_url = skin::get_cape_url(profile_json);
+    drop(auth);
 
-/// 下载皮肤 PNG，返回 base64 编码的 PNG 数据
-///
-/// 可传入 uuid 指定账号（用于预加载非当前账号的皮肤）；
-/// 不传或传 null 则使用当前登录用户。
-/// 前端收到 base64 后用 canvas 裁剪 (8,8,8,8) 区域作为头像（PCL2 的方式）
-#[tauri::command]
-pub async fn download_skin_png(
-    state: State<'_, AppState>,
-    uuid: Option<String>,
-) -> Result<String, String> {
-    use base64::Engine;
-    let skin_url = {
-        let auth = state.auth.lock().await;
-        // 优先用 uuid 从 current_user 或 ms_accounts 查找 profile_json
-        let profile_json: String = if let Some(ref uuid) = uuid {
-            // 先看 current_user
-            if auth
-                .current_user
-                .as_ref()
-                .map(|u| &u.uuid == uuid)
-                .unwrap_or(false)
-            {
-                auth.current_user
-                    .as_ref()
-                    .and_then(|u| u.profile_json.as_ref())
-                    .ok_or("No profile data")?
-                    .clone()
-            } else {
-                // 从 ms_accounts 查找
-                let persisted = state.auth_storage.load().await.map_err(|e| e.to_string())?;
-                persisted
-                    .ms_accounts
-                    .iter()
-                    .find(|a| &a.uuid == uuid)
-                    .and_then(|a| Some(a.profile_json.as_str()))
-                    .ok_or("No profile data")?
-                    .to_string()
-            }
-        } else {
-            auth.current_user
-                .as_ref()
-                .and_then(|u| u.profile_json.as_ref())
-                .ok_or("No profile data")?
-                .clone()
-        };
-        skin::get_skin_url(&profile_json).ok_or("No active skin found in profile")?
-    };
-
-    let png_data = skin::download_skin_png(&skin_url).await?;
-    let base64_data = base64::engine::general_purpose::STANDARD.encode(&png_data);
-    Ok(format!("data:image/png;base64,{}", base64_data))
-}
-
-/// 下载当前已装备披风的 PNG，返回 base64 编码数据
-///
-/// 前端用于在 2D 人物预览中合成披风显示
-#[tauri::command]
-pub async fn download_cape_png(state: State<'_, AppState>) -> Result<Option<String>, String> {
-    use base64::Engine;
-    let cape_url = {
-        let auth = state.auth.lock().await;
-        let profile_json = auth
-            .current_user
-            .as_ref()
-            .and_then(|u| u.profile_json.as_ref())
-            .ok_or("No profile data")?;
-        skin::get_cape_url(profile_json)
-    };
-
-    let Some(cape_url) = cape_url else {
-        return Ok(None);
-    };
-
-    let png_data = skin::download_cape_png(&cape_url).await?;
-    let base64_data = base64::engine::general_purpose::STANDARD.encode(&png_data);
-    Ok(Some(format!("data:image/png;base64,{}", base64_data)))
+    match remote_url {
+        Some(url) => Ok(Some(image_cache::get_image_url(&url, Some(app)).await)),
+        None => Ok(None),
+    }
 }
 
 /// 上传/修改皮肤
@@ -145,6 +165,13 @@ pub async fn upload_skin(
     skin::upload_skin(&access_token, png_data, &variant).await?;
 
     // 上传成功后刷新本地 profile 缓存，确保前端能读到最新皮肤
+    let old_profile_json = {
+        let auth = state.auth.lock().await;
+        auth.current_user
+            .as_ref()
+            .and_then(|u| u.profile_json.clone())
+    };
+
     match skin::fetch_profile(&access_token).await {
         Ok(new_profile) => {
             let mut auth = state.auth.lock().await;
@@ -154,6 +181,9 @@ pub async fn upload_skin(
         }
         Err(e) => log_warn!("Failed to refresh profile after skin upload: {}", e),
     }
+
+    // 失效旧皮肤缓存（URL 变化会自动失效，但显式清理更稳妥）
+    invalidate_skin_cache(&old_profile_json);
 
     Ok(())
 }
@@ -172,6 +202,13 @@ pub async fn equip_cape(state: State<'_, AppState>, cape_id: String) -> Result<(
     skin::equip_cape(&access_token, &cape_id).await?;
 
     // 装备成功后刷新本地 profile 缓存，确保前端能读到最新披风
+    let old_profile_json = {
+        let auth = state.auth.lock().await;
+        auth.current_user
+            .as_ref()
+            .and_then(|u| u.profile_json.clone())
+    };
+
     match skin::fetch_profile(&access_token).await {
         Ok(new_profile) => {
             let mut auth = state.auth.lock().await;
@@ -181,6 +218,9 @@ pub async fn equip_cape(state: State<'_, AppState>, cape_id: String) -> Result<(
         }
         Err(e) => log_warn!("Failed to refresh profile after cape equip: {}", e),
     }
+
+    // 失效旧披风缓存
+    invalidate_cape_cache(&old_profile_json);
 
     Ok(())
 }
@@ -199,6 +239,13 @@ pub async fn unequip_cape(state: State<'_, AppState>) -> Result<(), String> {
     skin::unequip_cape(&access_token).await?;
 
     // 取消成功后刷新本地 profile 缓存
+    let old_profile_json = {
+        let auth = state.auth.lock().await;
+        auth.current_user
+            .as_ref()
+            .and_then(|u| u.profile_json.clone())
+    };
+
     match skin::fetch_profile(&access_token).await {
         Ok(new_profile) => {
             let mut auth = state.auth.lock().await;
@@ -209,28 +256,63 @@ pub async fn unequip_cape(state: State<'_, AppState>) -> Result<(), String> {
         Err(e) => log_warn!("Failed to refresh profile after cape unequip: {}", e),
     }
 
+    // 失效旧披风缓存
+    invalidate_cape_cache(&old_profile_json);
+
     Ok(())
 }
 
-/// 将 data URL（如 data:image/png;base64,xxxx）保存到本地文件
+/// 下载指定 URL 的图片到本地文件
 ///
-/// 用于"下载当前皮肤到本地"功能：前端已通过 download_skin_png 拿到 dataURL，
-/// 用户选择保存位置后调用此命令写入文件。
+/// 用于"下载当前皮肤到本地"功能：前端已有皮肤 URL（来自 get_skin_url），
+/// 用户选择保存位置后，后端直接从 URL 下载并写入文件，避免 base64 中转开销。
 #[tauri::command]
-pub async fn save_data_url_to_file(data_url: String, path: String) -> Result<(), String> {
-    // 解析 data URL：data:image/png;base64,<base64 数据>
-    let base64_data = data_url
-        .find(",")
-        .map(|i| &data_url[i + 1..])
-        .ok_or_else(|| "Invalid data URL: missing comma".to_string())?;
+pub async fn download_url_to_file(url: String, path: String) -> Result<(), String> {
+    log_info!("[Skin] 下载 URL 到文件: {} -> {}", url, path);
 
-    use base64::Engine;
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(base64_data.trim())
-        .map_err(|e| format!("Base64 解码失败: {}", e))?;
+    let client = crate::http::get_client();
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("download request error: {}", e))?;
+
+    let status = response.status();
+    if !status.is_success() {
+        let body = response.text().await.unwrap_or_default();
+        log_warn!("[Skin] 下载失败: {} - {}", status, body);
+        return Err(format!("download HTTP {}: {}", status, body));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("read bytes error: {}", e))?;
 
     std::fs::write(&path, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
 
-    crate::log_info!("[Skin] Saved data URL to: {} ({} bytes)", path, bytes.len());
+    log_info!("[Skin] 已保存到: {} ({} 字节)", path, bytes.len());
     Ok(())
+}
+
+/// 失效旧皮肤缓存（上传新皮肤后调用）
+fn invalidate_skin_cache(old_profile_json: &Option<String>) {
+    if let Some(json) = old_profile_json {
+        if let Some(old_url) = skin::get_skin_url(json) {
+            if let Err(e) = image_cache::invalidate(&old_url) {
+                log_warn!("[Skin] 失效旧皮肤缓存失败: {}", e);
+            }
+        }
+    }
+}
+
+/// 失效旧披风缓存（装备/取消披风后调用）
+fn invalidate_cape_cache(old_profile_json: &Option<String>) {
+    if let Some(json) = old_profile_json {
+        if let Some(old_url) = skin::get_cape_url(json) {
+            if let Err(e) = image_cache::invalidate(&old_url) {
+                log_warn!("[Skin] 失效旧披风缓存失败: {}", e);
+            }
+        }
+    }
 }
