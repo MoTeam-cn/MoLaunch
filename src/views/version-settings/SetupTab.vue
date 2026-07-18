@@ -228,106 +228,124 @@ onMounted(loadSetup)
             >
           </Tooltip>
         </div>
-        <!-- 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）-->
-        <div class="space-y-2 pt-2">
-          <label class="block text-xs font-medium text-gray-500 mb-1">进阶开关</label>
-          <!-- 禁止更新 Mod -->
-          <Tooltip
-            text="禁止为此版本更新 Mod，以防止整合包玩家误操作。"
-            position="top" :delay="0" block
-          >
-            <div class="flex items-center justify-between py-1.5">
-              <span class="text-sm text-gray-700">禁止更新 Mod</span>
-              <button
-                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
-                :class="advanceDisableModUpdate ? 'bg-primary-500' : 'bg-gray-300'"
-                @click="advanceDisableModUpdate = !advanceDisableModUpdate; saveAdvanceSwitch('advanceDisableModUpdate', advanceDisableModUpdate, '禁止更新 Mod')"
-              >
-                <span
-                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
-                  :class="advanceDisableModUpdate ? 'translate-x-5' : 'translate-x-1'"
-                />
-              </button>
-            </div>
-          </Tooltip>
-          <!-- 忽略 Java 兼容性警告 -->
-          <Tooltip
-            text="如果手动选择了与当前版本不兼容的 Java，则自动跳过兼容性警告弹窗，强制使用手动选择的 Java。"
-            position="top" :delay="0" block
-          >
-            <div class="flex items-center justify-between py-1.5">
-              <span class="text-sm text-gray-700">忽略 Java 兼容性警告</span>
-              <button
-                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
-                :class="advanceIgnoreJavaWarning ? 'bg-primary-500' : 'bg-gray-300'"
-                @click="advanceIgnoreJavaWarning = !advanceIgnoreJavaWarning; saveAdvanceSwitch('advanceIgnoreJavaWarning', advanceIgnoreJavaWarning, '忽略 Java 警告')"
-              >
-                <span
-                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
-                  :class="advanceIgnoreJavaWarning ? 'translate-x-5' : 'translate-x-1'"
-                />
-              </button>
-            </div>
-          </Tooltip>
-          <!-- 关闭文件校验 -->
-          <Tooltip
-            text="完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件是否被修改。&#10;如果你没有修改相关文件，请勿勾选此项。"
-            position="top" :delay="0" block
-          >
-            <div class="flex items-center justify-between py-1.5">
-              <span class="text-sm text-gray-700">关闭文件校验</span>
-              <button
-                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
-                :class="advanceDisableAssetsVerify ? 'bg-primary-500' : 'bg-gray-300'"
-                @click="advanceDisableAssetsVerify = !advanceDisableAssetsVerify; saveAdvanceSwitch('advanceDisableAssetsVerify', advanceDisableAssetsVerify, '文件校验')"
-              >
-                <span
-                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
-                  :class="advanceDisableAssetsVerify ? 'translate-x-5' : 'translate-x-1'"
-                />
-              </button>
-            </div>
-          </Tooltip>
-          <!-- 禁用 Java Launch Wrapper -->
-          <Tooltip
-            text="是否使用 Java Launch Wrapper 修复 Java 18- 在中文路径下可能无法正常启动的问题。&#10;详见：https://github.com/00ll00/java_launch_wrapper"
-            position="top" :delay="0" block
-          >
-            <div class="flex items-center justify-between py-1.5">
-              <span class="text-sm text-gray-700">禁用 Java Launch Wrapper</span>
-              <button
-                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
-                :class="advanceDisableJlw ? 'bg-primary-500' : 'bg-gray-300'"
-                @click="advanceDisableJlw = !advanceDisableJlw; saveAdvanceSwitch('advanceDisableJlw', advanceDisableJlw, 'JLW')"
-              >
-                <span
-                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
-                  :class="advanceDisableJlw ? 'translate-x-5' : 'translate-x-1'"
-                />
-              </button>
-            </div>
-          </Tooltip>
-          <!-- 禁用 LWJGL Unsafe Agent -->
-          <Tooltip
-            text="是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。&#10;详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent"
-            position="top" :delay="0" block
-          >
-            <div class="flex items-center justify-between py-1.5">
-              <span class="text-sm text-gray-700">禁用 LWJGL Unsafe Agent</span>
-              <button
-                class="relative inline-flex h-5 w-9 flex-none items-center rounded-full transition-colors"
-                :class="advanceDisableLua ? 'bg-primary-500' : 'bg-gray-300'"
-                @click="advanceDisableLua = !advanceDisableLua; saveAdvanceSwitch('advanceDisableLua', advanceDisableLua, 'LUA')"
-              >
-                <span
-                  class="inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform"
-                  :class="advanceDisableLua ? 'translate-x-5' : 'translate-x-1'"
-                />
-              </button>
-            </div>
-          </Tooltip>
-        </div>
       </div>
     </section>
+
+    <!-- 进阶开关（参考 PCL2 PageInstanceSetup 高级选项，样式对齐全局设置）-->
+    <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">进阶开关</h3>
+      <div class="divide-y divide-gray-100">
+        <!-- 禁止更新 Mod -->
+        <Tooltip
+          text="禁止为此版本更新 Mod，以防止整合包玩家误操作。"
+          position="top" :delay="0" block
+        >
+          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+            <div class="min-w-0 mr-4">
+              <p class="text-sm font-medium text-gray-900">禁止更新 Mod</p>
+              <p class="text-xs text-gray-500 mt-0.5">禁止为此版本更新 Mod，防止整合包玩家误操作</p>
+            </div>
+            <button
+              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
+              :class="advanceDisableModUpdate ? 'bg-primary-500' : 'bg-gray-300'"
+              @click="advanceDisableModUpdate = !advanceDisableModUpdate; saveAdvanceSwitch('advanceDisableModUpdate', advanceDisableModUpdate, '禁止更新 Mod')"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                :class="advanceDisableModUpdate ? 'translate-x-6' : 'translate-x-1'"
+              />
+            </button>
+          </div>
+        </Tooltip>
+        <!-- 忽略 Java 兼容性警告 -->
+        <Tooltip
+          text="如果手动选择了与当前版本不兼容的 Java，则自动跳过兼容性警告弹窗，强制使用手动选择的 Java。"
+          position="top" :delay="0" block
+        >
+          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+            <div class="min-w-0 mr-4">
+              <p class="text-sm font-medium text-gray-900">忽略 Java 兼容性警告</p>
+              <p class="text-xs text-gray-500 mt-0.5">跳过兼容性警告弹窗，强制使用手动选择的 Java</p>
+            </div>
+            <button
+              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
+              :class="advanceIgnoreJavaWarning ? 'bg-primary-500' : 'bg-gray-300'"
+              @click="advanceIgnoreJavaWarning = !advanceIgnoreJavaWarning; saveAdvanceSwitch('advanceIgnoreJavaWarning', advanceIgnoreJavaWarning, '忽略 Java 警告')"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                :class="advanceIgnoreJavaWarning ? 'translate-x-6' : 'translate-x-1'"
+              />
+            </button>
+          </div>
+        </Tooltip>
+        <!-- 关闭文件校验 -->
+        <Tooltip
+          text="完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件是否被修改。&#10;如果你没有修改相关文件，请勿勾选此项。"
+          position="top" :delay="0" block
+        >
+          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+            <div class="min-w-0 mr-4">
+              <p class="text-sm font-medium text-gray-900">关闭文件校验</p>
+              <p class="text-xs text-gray-500 mt-0.5">不校验 libraries、assets、主 jar 文件是否被修改</p>
+            </div>
+            <button
+              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
+              :class="advanceDisableAssetsVerify ? 'bg-primary-500' : 'bg-gray-300'"
+              @click="advanceDisableAssetsVerify = !advanceDisableAssetsVerify; saveAdvanceSwitch('advanceDisableAssetsVerify', advanceDisableAssetsVerify, '文件校验')"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                :class="advanceDisableAssetsVerify ? 'translate-x-6' : 'translate-x-1'"
+              />
+            </button>
+          </div>
+        </Tooltip>
+        <!-- 禁用 Java Launch Wrapper -->
+        <Tooltip
+          text="是否使用 Java Launch Wrapper 修复 Java 18- 在中文路径下可能无法正常启动的问题。&#10;详见：https://github.com/00ll00/java_launch_wrapper"
+          position="top" :delay="0" block
+        >
+          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+            <div class="min-w-0 mr-4">
+              <p class="text-sm font-medium text-gray-900">禁用 Java Launch Wrapper</p>
+              <p class="text-xs text-gray-500 mt-0.5">JLW 修复 Java 18- 中文路径启动问题，异常时可关闭</p>
+            </div>
+            <button
+              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
+              :class="advanceDisableJlw ? 'bg-primary-500' : 'bg-gray-300'"
+              @click="advanceDisableJlw = !advanceDisableJlw; saveAdvanceSwitch('advanceDisableJlw', advanceDisableJlw, 'JLW')"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                :class="advanceDisableJlw ? 'translate-x-6' : 'translate-x-1'"
+              />
+            </button>
+          </div>
+        </Tooltip>
+        <!-- 禁用 LWJGL Unsafe Agent -->
+        <Tooltip
+          text="是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。&#10;详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent"
+          position="top" :delay="0" block
+        >
+          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+            <div class="min-w-0 mr-4">
+              <p class="text-sm font-medium text-gray-900">禁用 LWJGL Unsafe Agent</p>
+              <p class="text-xs text-gray-500 mt-0.5">LUA 修复 LWJGL 3.4.1 性能问题，卡顿时可关闭</p>
+            </div>
+            <button
+              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
+              :class="advanceDisableLua ? 'bg-primary-500' : 'bg-gray-300'"
+              @click="advanceDisableLua = !advanceDisableLua; saveAdvanceSwitch('advanceDisableLua', advanceDisableLua, 'LUA')"
+            >
+              <span
+                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                :class="advanceDisableLua ? 'translate-x-6' : 'translate-x-1'"
+              />
+            </button>
+          </div>
+        </Tooltip>
+      </div>
+    </div>
   </div>
 </template>
