@@ -34,19 +34,23 @@ onMounted(async () => {
     await versionStore.checkRunningGame()
   }
 
-  // 先尝试恢复上次选中的版本（会校验版本是否仍然存在）
-  await versionStore.restoreSelectedVersion()
-
-  // 加载已安装版本列表并刷新类型映射缓存（主页 VersionSelector 依赖此缓存显示版本类型图标）
+  // 一次性获取已安装版本列表，复用给后续三个逻辑（避免重复 IPC 调用）
+  let installed: Awaited<ReturnType<typeof tauri.listInstalledVersionsWithType>> = []
   try {
-    const installed = await tauri.listInstalledVersionsWithType()
-    await refreshInstalledVersionTypes()
-    // 如果仍未选中，自动选中第一个已安装版本
-    if (!versionStore.selectedVersion && installed.length > 0) {
-      versionStore.selectedVersion = installed[0].id
-    }
+    installed = await tauri.listInstalledVersionsWithType()
   } catch {
     // 忽略：用户可去版本选择页手动选
+  }
+
+  // 1. 刷新已安装版本类型映射缓存（主页 VersionSelector 依赖此缓存显示版本类型图标）
+  await refreshInstalledVersionTypes(installed)
+
+  // 2. 恢复上次选中的版本（复用已获取的列表校验版本是否仍然存在）
+  await versionStore.restoreSelectedVersion(installed)
+
+  // 3. 如果仍未选中，自动选中第一个已安装版本
+  if (!versionStore.selectedVersion && installed.length > 0) {
+    versionStore.selectedVersion = installed[0].id
   }
 })
 </script>

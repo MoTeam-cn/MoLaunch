@@ -157,10 +157,13 @@ async function refreshEffectiveDir() {
   }
 }
 
-/** 刷新已安装版本类型映射（版本列表更新、安装/卸载后调用） */
-async function refreshInstalledVersionTypes() {
+/** 刷新已安装版本类型映射（版本列表更新、安装/卸载后调用）
+ *
+ * @param vwtList 可选，已获取的已安装版本列表，避免重复调用 IPC
+ */
+async function refreshInstalledVersionTypes(vwtList?: { id: string; version_type: string }[]) {
   try {
-    const vwt = await tauri.listInstalledVersionsWithType()
+    const vwt = vwtList ?? await tauri.listInstalledVersionsWithType()
     const typeMap: Record<string, string> = {}
     vwt.forEach(v => { typeMap[v.id] = v.version_type })
     installedVersionTypes.value = typeMap

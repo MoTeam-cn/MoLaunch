@@ -45,13 +45,16 @@ export const useVersionStore = defineStore('version', () => {
     })
   })
 
-  /** 从 config.ini 恢复上次选中的版本（启动器启动时调用） */
-  async function restoreSelectedVersion() {
+  /** 从 config.ini 恢复上次选中的版本（启动器启动时调用）
+   *
+   * @param installedList 可选，已获取的已安装版本列表，避免重复调用 IPC
+   */
+  async function restoreSelectedVersion(installedList?: { id: string }[]) {
     try {
       const saved = await tauri.getSelectedVersion()
       if (saved) {
-        // 验证版本是否仍然存在
-        const installed = await tauri.listInstalledVersionsWithType()
+        // 验证版本是否仍然存在（复用传入的列表或重新获取）
+        const installed = installedList ?? await tauri.listInstalledVersionsWithType()
         if (installed.some((v) => v.id === saved)) {
           selectedVersion.value = saved
         } else {
