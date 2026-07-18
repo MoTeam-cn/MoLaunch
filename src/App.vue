@@ -9,11 +9,13 @@ import TopNavLayout from '@/components/layout/TopNavLayout.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
 import DownloadPanel from '@/components/common/DownloadPanel.vue'
 import Modal from '@/components/common/Modal.vue'
+import CrashDialog from '@/components/common/CrashDialog.vue'
 import Toast from '@/components/common/Toast.vue'
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
 import { setModalRef } from '@/utils/modal'
+import { setCrashDialogRef } from '@/utils/crashDialog'
 import { setToastRef } from '@/utils/toast'
 import { initDownloadPolling } from '@/composables/useDownloadPolling'
 
@@ -21,12 +23,14 @@ const sdkStore = useSdkStore()
 const authStore = useAuthStore()
 const javaStore = useJavaStore()
 const modalRef = ref<InstanceType<typeof Modal> | null>(null)
+const crashDialogRef = ref<InstanceType<typeof CrashDialog> | null>(null)
 const toastRef = ref<InstanceType<typeof Toast> | null>(null)
 // 会话恢复期间的加载遮罩，避免未恢复登录态就触发其他页面 invoke
 const isRestoring = ref(true)
 
 onMounted(() => {
   setModalRef(modalRef.value)
+  setCrashDialogRef(crashDialogRef.value)
   setToastRef(toastRef.value)
   initDownloadPolling()
   initApp()
@@ -74,6 +78,7 @@ async function initApp() {
     <DownloadPanel />
   </Teleport>
   <Modal ref="modalRef" />
+  <CrashDialog ref="crashDialogRef" />
   <Toast ref="toastRef" />
   <!-- 会话恢复期间的加载遮罩 -->
   <Teleport to="body">

@@ -22,21 +22,30 @@ pub enum GameState {
 pub struct ExitInfo {
     pub code: i32,
     pub is_normal: bool,
+    /// 崩溃详情（仅 is_normal=false 时可能有值）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crash_info: Option<CrashInfo>,
 }
 
 /// 崩溃信息
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CrashInfo {
-    /// 崩溃原因
+    /// 崩溃原因摘要
     pub reason: String,
     /// 崩溃类别
     pub category: CrashCategory,
-    /// 相关日志行
+    /// 相关日志行（错误/致命级别）
     pub log_lines: Vec<String>,
     /// 建议的解决方案
     pub suggestion: String,
     /// 可能导致崩溃的Mod
     pub problematic_mod: Option<String>,
+    /// 崩溃报告文件路径（供用户查看，如 crash-reports/crash-xxx.txt）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crash_report_path: Option<String>,
+    /// 游戏日志尾部（最近 N 行，供弹窗展示）
+    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    pub log_tail: Vec<String>,
 }
 
 /// 崩溃类别

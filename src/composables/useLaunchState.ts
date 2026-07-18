@@ -14,6 +14,21 @@ import { ref, computed } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showError, showWarning } from '@/utils/toast'
+import { showCrashDialog } from '@/utils/crashDialog'
+
+/** 崩溃类别（与后端 CrashCategory 枚举对应） */
+type CrashCategory = 'Java' | 'Memory' | 'Graphics' | 'Mod' | 'Forge' | 'Fabric' | 'OptiFine' | 'Unknown'
+
+/** 崩溃详情（与后端 CrashInfo 结构对应） */
+interface CrashInfo {
+  reason: string
+  category: CrashCategory
+  log_lines: string[]
+  suggestion: string
+  problematic_mod: string | null
+  crash_report_path?: string
+  log_tail: string[]
+}
 
 /** 游戏退出事件 payload */
 interface GameExitEvent {
@@ -21,6 +36,7 @@ interface GameExitEvent {
   version_id: string
   exit_code: number
   is_normal: boolean
+  crash_info?: CrashInfo
 }
 
 /** 启动进度阶段名映射（后端枚举 → 中文显示） */
@@ -74,11 +90,14 @@ export function useLaunchState() {
         if (import.meta.env.DEV) {
           console.debug('[GameExit]', event.payload)
         }
-        const { is_normal, exit_code } = event.payload
+        const { is_normal, exit_code, crash_info } = event.payload
         runningPid.value = null
         runningVersionId.value = null
         if (is_normal) {
           showSuccess('游戏已退出')
+        } else if (crash_info) {
+          // 参考 PCL2 ModCrash.vb Output：弹出崩溃分析对话框
+          showCrashDialog(crash_info)
         } else {
           showError(`游戏已退出（代码: ${exit_code}）`)
         }

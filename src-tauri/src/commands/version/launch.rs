@@ -16,6 +16,9 @@ pub struct GameExitEvent {
     pub version_id: String,
     pub exit_code: i32,
     pub is_normal: bool,
+    /// 崩溃详情（仅异常退出时可能有值）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub crash_info: Option<crate::minecraft::launch::watcher::CrashInfo>,
 }
 
 /// 解析 "IP:Port" 字符串为 (address, port)，无端口时 port=None
@@ -222,9 +225,9 @@ pub async fn launch_game(
 
             // 检查是否被 stop_game 手动清理了
             if current_pid_arc.lock().await.is_some() {
-                let (exit_code, is_normal) = match &exit_info_opt {
-                    Some(info) => (info.code, info.is_normal),
-                    None => (0, true),
+                let (exit_code, is_normal, crash_info) = match &exit_info_opt {
+                    Some(info) => (info.code, info.is_normal, info.crash_info.clone()),
+                    None => (0, true, None),
                 };
 
                 *current_pid_arc.lock().await = None;
@@ -237,6 +240,7 @@ pub async fn launch_game(
                         version_id: version_id_clone,
                         exit_code,
                         is_normal,
+                        crash_info,
                     },
                 );
             }

@@ -12,7 +12,6 @@ mod analyzer;
 mod log_parser;
 mod types;
 
-pub use analyzer::analyze_crash_report;
 pub use types::{
     CrashCategory, CrashInfo, ExitInfo, GameState, LoadProgress, LogEntry, LogLevel,
 };
@@ -210,6 +209,7 @@ impl GameWatcher {
         let _pid = self.pid;
         let exit_tx = self.exit_tx.clone();
         let version_id = self.version_id.clone();
+        let game_dir = self.game_dir.clone();
 
         tokio::spawn(async move {
             // 等待进程结束
@@ -229,19 +229,32 @@ impl GameWatcher {
             };
 
             // 分析是否崩溃
-            let crash_info = analyzer::analyze_crash(exit_code, &logs);
+            // 参考 PCL2 ModWatcher.vb Crashed()：延迟 2 秒让文件系统刷新崩溃报告
+            let crash_info = if exit_code != 0 {
+                log_info!(
+                    "[Watcher] 游戏异常退出（code={}），2 秒后开始崩溃分析...",
+                    exit_code
+                );
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                analyzer::analyze_crash(exit_code, &logs, &game_dir).await
+            } else {
+                None
+            };
 
             let exit_info = if let Some(info) = crash_info {
+                log_info!("[Watcher] 崩溃分析完成: {}（类别: {:?}）", info.reason, info.category);
                 let mut state_guard = state.write().await;
                 *state_guard = GameState::Crashed(info.clone());
                 ExitInfo {
                     code: exit_code,
                     is_normal: false,
+                    crash_info: Some(info),
                 }
             } else {
                 let exit_info = ExitInfo {
                     code: exit_code,
                     is_normal: exit_code == 0,
+                    crash_info: None,
                 };
                 let mut state_guard = state.write().await;
                 *state_guard = GameState::Exited(exit_info.clone());
