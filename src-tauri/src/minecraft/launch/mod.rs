@@ -68,6 +68,8 @@ pub fn build_launch_arguments(
     isolation_mode: u32,
     extra_jvm_args: &[String],
     extra_game_args: &[String],
+    disable_jlw: bool,
+    disable_lua: bool,
 ) -> anyhow::Result<LaunchArguments> {
     let version_dir = game_dir.join("versions").join(version_id);
     let json_path = version_dir.join(format!("{}.json", version_id));
@@ -136,7 +138,7 @@ pub fn build_launch_arguments(
 
     let jvm_args = build_jvm_args(
         game_dir, version_id, &classpath, min_memory, max_memory, java_path,
-        extra_jvm_args, &json,
+        extra_jvm_args, &json, disable_jlw, disable_lua,
     )?;
     let game_args = build_game_args(
         &json,
@@ -281,6 +283,24 @@ fn find_original_version(game_dir: &Path, json: &serde_json::Value) -> String {
         .to_string()
 }
 
+/// 解析 LWJGL Unsafe Agent jar 路径
+///
+/// 从缓存目录释放 lwjgl-unsafe-agent.jar，返回路径。
+/// 参考 PCL2 ModLaunch.vb 中 ExtractPatch 逻辑。
+fn resolve_lwjgl_agent() -> Option<std::path::PathBuf> {
+    use crate::storage::cache::Cache;
+    let rel = "launch/lwjgl-unsafe-agent.jar";
+    let cache = Cache::instance();
+    if !cache.exists(rel) {
+        // 首次使用：从嵌入资源释放到缓存
+        if let Err(e) = crate::resources::extract_resource("lwjgl-unsafe-agent.jar", &cache.path(rel)) {
+            crate::log_warn!("[Launch] 释放 lwjgl-unsafe-agent.jar 失败: {}", e);
+            return None;
+        }
+    }
+    Some(cache.path(rel))
+}
+
 /// Build JVM arguments
 fn build_jvm_args(
     game_dir: &Path,
@@ -291,8 +311,21 @@ fn build_jvm_args(
     java_path: &Path,
     extra_jvm_args: &[String],
     json: &serde_json::Value,
+    disable_jlw: bool,
+    disable_lua: bool,
 ) -> anyhow::Result<Vec<String>> {
     let mut args = Vec::new();
+
+    // LWJGL Unsafe Agent（LUA）：修复 LWJGL 3.4.1 性能问题
+    // 通过 -javaagent 参数注入 lwjgl-unsafe-agent.jar
+    // 参考 PCL2 ModLaunch.vb LaunchAdvanceDisableLUA 逻辑
+    if !disable_lua {
+        if let Some(agent_path) = resolve_lwjgl_agent() {
+            args.push(format!("-javaagent:{}", agent_path.to_string_lossy()));
+        } else {
+            crate::log_warn!("[Launch] lwjgl-unsafe-agent.jar 未找到，跳过 LUA");
+        }
+    }
 
     args.push(format!("-Xms{}M", min_memory));
     args.push(format!("-Xmx{}M", max_memory));

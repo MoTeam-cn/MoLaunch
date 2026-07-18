@@ -46,6 +46,10 @@ export interface ConfigSnapshot {
   // CurseForge（已解密）
   curseforgeEnabled: boolean
   curseforgeApiKey: string
+  // 启动高级选项（参考 PCL2 PageSetupLaunch 高级选项）
+  launchDisableJlw: boolean
+  launchDisableLua: boolean
+  launchUseDedicatedGpu: boolean
 }
 
 /**
@@ -83,6 +87,10 @@ export interface ConfigPatch {
   // CurseForge（加密存储，后端内部分流到 secure_storage）
   curseforgeEnabled?: boolean
   curseforgeApiKey?: string
+  // 启动高级选项
+  launchDisableJlw?: boolean
+  launchDisableLua?: boolean
+  launchUseDedicatedGpu?: boolean
 }
 
 // ==================== 配置缓存与读写（带全局缓存）====================

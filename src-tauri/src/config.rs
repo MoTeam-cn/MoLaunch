@@ -136,6 +136,17 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.community_ignore_quilt = v == "true" || v == "1";
     }
 
+    // Launch（启动高级选项，参考 PCL2 PageSetupLaunch 高级选项）
+    if let Some(v) = config.get("Launch", "disable_jlw") {
+        app_config.launch_disable_jlw = v == "true" || v == "1";
+    }
+    if let Some(v) = config.get("Launch", "disable_lua") {
+        app_config.launch_disable_lua = v == "true" || v == "1";
+    }
+    if let Some(v) = config.get("Launch", "use_dedicated_gpu") {
+        app_config.launch_use_dedicated_gpu = v == "true" || v == "1";
+    }
+
     // Version
     app_config.selected_version = config
         .get("Version", "selected")
@@ -226,6 +237,11 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("Community", "filename_format", &config.community_filename_format.to_string());
     ini.set("Community", "mod_local_name_style", &config.community_mod_local_name_style.to_string());
     ini.set("Community", "ignore_quilt", if config.community_ignore_quilt { "true" } else { "false" });
+
+    // Launch（启动高级选项）
+    ini.set("Launch", "disable_jlw", if config.launch_disable_jlw { "true" } else { "false" });
+    ini.set("Launch", "disable_lua", if config.launch_disable_lua { "true" } else { "false" });
+    ini.set("Launch", "use_dedicated_gpu", if config.launch_use_dedicated_gpu { "true" } else { "false" });
 
     // Version
     ini.set("Version", "selected", config.selected_version.as_deref().unwrap_or(""));

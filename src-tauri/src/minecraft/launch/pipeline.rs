@@ -137,6 +137,10 @@ pub struct LaunchConfig {
     pub extra_game_args: Vec<String>,
     /// 启动前执行命令（None=不执行）
     pub pre_launch_cmd: Option<String>,
+    /// 禁用 Java Launch Wrapper（修复 Java 18- 中文路径启动问题）
+    pub disable_jlw: bool,
+    /// 禁用 LWJGL Unsafe Agent（修复 LWJGL 3.4.1 性能问题）
+    pub disable_lua: bool,
     /// Tauri AppHandle（用于 Java 自动下载时推送进度事件）
     #[serde(skip)]
     pub app_handle: Option<tauri::AppHandle>,
@@ -481,6 +485,8 @@ impl LaunchPipeline {
             self.config.isolation_mode,
             &self.config.extra_jvm_args,
             &self.config.extra_game_args,
+            self.config.disable_jlw,
+            self.config.disable_lua,
         )
         .map_err(|e| LaunchError {
             stage: LaunchStage::BuildArgs,

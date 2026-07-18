@@ -9,6 +9,26 @@
 
 ### 新增
 
+#### 启动高级选项（参考 PCL2 PageSetupLaunch）
+- 新增 3 个启动高级选项，位于"启动设置"页面底部：
+  - **禁用 Java Launch Wrapper**：JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题
+  - **禁用 LWJGL Unsafe Agent**：LUA 用于修复 LWJGL 3.4.1 的性能问题，通过 `-javaagent` 参数注入 `lwjgl-unsafe-agent.jar`
+  - **使用高性能显卡**：自动在 Windows 设置中将 Java 改为使用独立显卡
+- 从 PCL2 资源文件夹复制 `lwjgl-unsafe-agent.jar` 到 `src-tauri/resources/`，注册为嵌入资源
+- 后端改动：
+  - `state/config.rs`：`AppConfig` 新增 `launch_disable_jlw` / `launch_disable_lua` / `launch_use_dedicated_gpu` 三个字段
+  - `commands/system/apply_config.rs`：`ConfigPatch` 和 `ConfigSnapshot` 同步新增三个字段
+  - `config.rs`：INI 加载/保存支持 `[Launch]` 段的三个字段
+  - `resources/defaults/config.ini`：新增 `[Launch]` 段默认值
+  - `minecraft/launch/mod.rs`：
+    - 新增 `resolve_lwjgl_agent()` 函数，从缓存目录释放 `lwjgl-unsafe-agent.jar`
+    - `build_jvm_args()` 接入 `disable_lua` 参数，未禁用时添加 `-javaagent` 参数
+  - `minecraft/launch/pipeline.rs`：`LaunchConfig` 新增 `disable_jlw` / `disable_lua` 字段
+  - `commands/version/launch.rs`：从全局配置读取 `disable_jlw` / `disable_lua` 传入 `LaunchConfig`
+- 前端改动：
+  - `utils/api/config.ts`：`ConfigSnapshot` 和 `ConfigPatch` 新增三个字段（camelCase）
+  - `views/settings/SettingsLaunch.vue`：新增"高级选项"卡片，3 个开关切换器，watch 自动保存
+
 #### 通用图片缓存组件（方案 C：混合缓存 + 自定义 URI scheme）
 - 背景：前端直接用 `<img :src="remoteUrl">` 加载远程图片，Tauri webview 的 HTTP 缓存仅会话内有效，重启应用后需重新下载
 - **安全设计**：不使用 Tauri 的 asset protocol（会暴露完整本地文件路径，存在恶意读取风险），改用自定义 URI scheme `cache-image://{hash}.png`，前端只能通过 hash 请求，后端验证 hash 合法性后返回文件内容

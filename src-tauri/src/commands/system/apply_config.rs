@@ -57,6 +57,11 @@ pub struct ConfigPatch {
     // ===== CurseForge（加密存储，不进 AppConfig，内部分流到 secure_storage）=====
     pub curseforge_enabled: Option<bool>,
     pub curseforge_api_key: Option<String>,
+
+    // ===== 启动高级选项 =====
+    pub launch_disable_jlw: Option<bool>,
+    pub launch_disable_lua: Option<bool>,
+    pub launch_use_dedicated_gpu: Option<bool>,
 }
 
 /// 配置快照：返回所有配置字段的当前值
@@ -95,6 +100,10 @@ pub struct ConfigSnapshot {
     // CurseForge（从 secure_storage 缓存读，已解密）
     pub curseforge_enabled: bool,
     pub curseforge_api_key: String,
+    // 启动高级选项
+    pub launch_disable_jlw: bool,
+    pub launch_disable_lua: bool,
+    pub launch_use_dedicated_gpu: bool,
 }
 
 /// 配置项：扁平化 key-value 对
@@ -151,6 +160,9 @@ pub async fn get_config(
             community_ignore_quilt: config.community_ignore_quilt,
             curseforge_enabled: cf_enabled,
             curseforge_api_key: cf_api_key.unwrap_or_default(),
+            launch_disable_jlw: config.launch_disable_jlw,
+            launch_disable_lua: config.launch_disable_lua,
+            launch_use_dedicated_gpu: config.launch_use_dedicated_gpu,
         }
     };
 
@@ -408,6 +420,20 @@ async fn apply_config_inner(state: State<'_, AppState>, patch: ConfigPatch) -> R
         if let Some(ignore) = patch.community_ignore_quilt {
             log_info!("[Config] community_ignore_quilt = {}", ignore);
             config.community_ignore_quilt = ignore;
+        }
+
+        // 启动高级选项
+        if let Some(v) = patch.launch_disable_jlw {
+            log_info!("[Config] launch_disable_jlw = {}", v);
+            config.launch_disable_jlw = v;
+        }
+        if let Some(v) = patch.launch_disable_lua {
+            log_info!("[Config] launch_disable_lua = {}", v);
+            config.launch_disable_lua = v;
+        }
+        if let Some(v) = patch.launch_use_dedicated_gpu {
+            log_info!("[Config] launch_use_dedicated_gpu = {}", v);
+            config.launch_use_dedicated_gpu = v;
         }
     })
     .await?;

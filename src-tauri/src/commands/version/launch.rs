@@ -155,6 +155,9 @@ pub async fn launch_game(
         extra_jvm_args,
         extra_game_args,
         pre_launch_cmd,
+        // 启动高级选项（从全局配置读取）
+        disable_jlw: config.launch_disable_jlw,
+        disable_lua: config.launch_disable_lua,
         app_handle: Some(app_handle.clone()),
     };
 

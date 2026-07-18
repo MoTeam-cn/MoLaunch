@@ -38,6 +38,16 @@ pub struct AppConfig {
     pub community_mod_local_name_style: u8,
     /// 在显示 Mod 加载器时忽略 Quilt（默认 true）
     pub community_ignore_quilt: bool,
+    // ===== 启动高级选项（参考 PCL2 PageSetupLaunch 高级选项）=====
+    /// 禁用 Java Launch Wrapper（默认 false）
+    /// JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题
+    pub launch_disable_jlw: bool,
+    /// 禁用 LWJGL Unsafe Agent（默认 false）
+    /// LUA 用于修复 LWJGL 3.4.1 的一个性能问题
+    pub launch_disable_lua: bool,
+    /// 使用高性能显卡（默认 false）
+    /// 自动在 Windows 设置中将 PCL 和 Java 改为使用高性能显卡
+    pub launch_use_dedicated_gpu: bool,
 }
 
 /// Minecraft 文件夹项
@@ -82,6 +92,9 @@ impl Default for AppConfig {
             community_filename_format: 1,
             community_mod_local_name_style: 0,
             community_ignore_quilt: true,
+            launch_disable_jlw: false,
+            launch_disable_lua: false,
+            launch_use_dedicated_gpu: false,
         }
     }
 }

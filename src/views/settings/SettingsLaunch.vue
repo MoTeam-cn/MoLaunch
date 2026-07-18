@@ -21,6 +21,10 @@ const systemMemory = ref<{ total: number; available: number; usage_percent: numb
 const memoryMode = ref<'auto' | 'custom'>('auto')
 const loaded = ref(false)
 const isolationMode = ref(4)
+// 启动高级选项（参考 PCL2 PageSetupLaunch 高级选项）
+const launchDisableJlw = ref(false)
+const launchDisableLua = ref(false)
+const launchUseDedicatedGpu = ref(false)
 
 // 1秒自动刷新内存（参考PCL2）；onUnmounted 自动清理
 const { start: startMemoryPolling } = usePolling(async () => {
@@ -74,6 +78,20 @@ watch(isolationMode, (mode) => {
   markDirty('isolationMode', mode)
 })
 
+// 启动高级选项保存
+watch(launchDisableJlw, (v) => {
+  if (!loaded.value) return
+  tauri.applyConfig({ launchDisableJlw: v })
+})
+watch(launchDisableLua, (v) => {
+  if (!loaded.value) return
+  tauri.applyConfig({ launchDisableLua: v })
+})
+watch(launchUseDedicatedGpu, (v) => {
+  if (!loaded.value) return
+  tauri.applyConfig({ launchUseDedicatedGpu: v })
+})
+
 // 切换内存模式时，同步到后端
 watch(memoryMode, (mode) => {
   if (mode === 'auto') {
@@ -94,6 +112,9 @@ onMounted(async () => {
       maxMemory.value = cfg.maxMemory
     }
     isolationMode.value = cfg.isolationMode
+    launchDisableJlw.value = cfg.launchDisableJlw
+    launchDisableLua.value = cfg.launchDisableLua
+    launchUseDedicatedGpu.value = cfg.launchUseDedicatedGpu
   } catch (e) {
     console.error('Failed to load config:', e)
     gameDir.value = '.minecraft'
@@ -255,6 +276,64 @@ onMounted(async () => {
             class="w-56"
             @update:model-value="isolationMode = $event as number"
           />
+        </div>
+      </div>
+    </div>
+
+    <!-- 高级选项（参考 PCL2 PageSetupLaunch 高级选项）-->
+    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">高级选项</h3>
+      <div class="divide-y divide-gray-200">
+        <!-- 禁用 Java Launch Wrapper -->
+        <div class="px-5 py-4 flex items-center justify-between">
+          <div class="min-w-0 mr-4">
+            <p class="text-sm font-medium text-gray-900">禁用 Java Launch Wrapper</p>
+            <p class="text-xs text-gray-500 mt-0.5">JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题，若启动异常可尝试关闭</p>
+          </div>
+          <button
+            class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
+            :class="launchDisableJlw ? 'bg-primary-500' : 'bg-gray-300'"
+            @click="launchDisableJlw = !launchDisableJlw"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+              :class="launchDisableJlw ? 'translate-x-6' : 'translate-x-1'"
+            />
+          </button>
+        </div>
+        <!-- 禁用 LWJGL Unsafe Agent -->
+        <div class="px-5 py-4 flex items-center justify-between">
+          <div class="min-w-0 mr-4">
+            <p class="text-sm font-medium text-gray-900">禁用 LWJGL Unsafe Agent</p>
+            <p class="text-xs text-gray-500 mt-0.5">LUA 用于修复 LWJGL 3.4.1 的性能问题，若游戏卡顿可尝试关闭</p>
+          </div>
+          <button
+            class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
+            :class="launchDisableLua ? 'bg-primary-500' : 'bg-gray-300'"
+            @click="launchDisableLua = !launchDisableLua"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+              :class="launchDisableLua ? 'translate-x-6' : 'translate-x-1'"
+            />
+          </button>
+        </div>
+        <!-- 使用高性能显卡 -->
+        <div class="px-5 py-4 flex items-center justify-between">
+          <div class="min-w-0 mr-4">
+            <p class="text-sm font-medium text-gray-900">使用高性能显卡</p>
+            <p class="text-xs text-gray-500 mt-0.5">自动在 Windows 设置中将 Java 改为使用独立显卡，提升游戏帧率</p>
+          </div>
+          <button
+            class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
+            :class="launchUseDedicatedGpu ? 'bg-primary-500' : 'bg-gray-300'"
+            @click="launchUseDedicatedGpu = !launchUseDedicatedGpu"
+          >
+            <span
+              class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+              :class="launchUseDedicatedGpu ? 'translate-x-6' : 'translate-x-1'"
+            />
+          </button>
         </div>
       </div>
     </div>

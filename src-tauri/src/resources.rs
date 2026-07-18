@@ -34,6 +34,7 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
     match path {
         "forge-installer.jar" => Some(include_bytes!("../resources/forge-installer.jar")),
         "java-wrapper.jar" => Some(include_bytes!("../resources/java-wrapper.jar")),
+        "lwjgl-unsafe-agent.jar" => Some(include_bytes!("../resources/lwjgl-unsafe-agent.jar")),
         _ => None,
     }
 }
