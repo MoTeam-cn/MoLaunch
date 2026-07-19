@@ -11,7 +11,6 @@
  */
 import { formatBytes } from '@/utils/format'
 import {
-  ArrowPathIcon,
   CheckCircleIcon,
   ClockIcon,
   ChevronDownIcon,
@@ -52,8 +51,7 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
     <!-- 卡片头部 -->
     <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
       <div class="flex items-center gap-2">
-        <ArrowPathIcon v-if="!isPaused" class="w-4 h-4 text-primary-500 animate-spin" />
-        <PauseCircleIcon v-else class="w-4 h-4 text-amber-500" />
+        <PauseCircleIcon v-if="isPaused" class="w-4 h-4 text-amber-500" />
         <span class="text-sm font-medium text-gray-900">
           {{ versionName }}
         </span>
@@ -105,7 +103,7 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
           <!-- 状态图标 -->
           <div class="w-5 h-5 flex items-center justify-center shrink-0">
             <CheckCircleIcon v-if="g.status === 'finished'" class="w-5 h-5 text-green-500" />
-            <div v-else-if="g.status === 'loading' && !isPaused" class="w-5 h-5 rounded-full border-2 border-gray-200 border-t-primary-500 animate-spin" />
+            <div v-else-if="g.status === 'loading' && !isPaused" class="w-3.5 h-3.5 rounded-full border border-gray-200 border-t-primary-500 animate-spin" />
             <PauseCircleIcon v-else-if="g.status === 'loading' && isPaused" class="w-5 h-5 text-amber-500" />
             <div v-else-if="g.status === 'failed'" class="w-5 h-5 rounded-full bg-red-500" />
             <ClockIcon v-else class="w-5 h-5 text-gray-300" />
@@ -161,12 +159,12 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
             <!-- 子状态图标 -->
             <div class="w-4 h-4 flex items-center justify-center shrink-0">
               <CheckCircleIcon v-if="s.status === 'finished'" class="w-4 h-4 text-green-400" />
-              <div v-else-if="s.status === 'loading' && !isPaused" class="w-4 h-4 rounded-full border border-gray-200 border-t-primary-400 animate-spin" />
+              <div v-else-if="s.status === 'loading' && !isPaused" class="w-3 h-3 rounded-full border border-gray-200 border-t-primary-400 animate-spin" />
               <PauseCircleIcon v-else-if="s.status === 'loading' && isPaused" class="w-4 h-4 text-amber-400" />
               <ClockIcon v-else class="w-4 h-4 text-gray-300" />
             </div>
             <span
-              class="text-xs flex-1"
+              class="text-sm flex-1"
               :class="{
                 'text-gray-900 font-medium': s.status === 'loading',
                 'text-gray-600': s.status === 'finished',
@@ -176,16 +174,16 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
               {{ s.name }}
             </span>
             <!-- 字节/文件进度 -->
-            <span v-if="s.status === 'loading' && s.bytes_total > 0" class="text-[10px] text-gray-400">
+            <span v-if="s.status === 'loading' && s.bytes_total > 0" class="text-xs text-gray-400">
               {{ formatBytes(s.bytes_downloaded) }} / {{ formatBytes(s.bytes_total) }}
             </span>
-            <span v-else-if="s.status === 'loading' && s.files_total > 0" class="text-[10px] text-gray-400">
+            <span v-else-if="s.status === 'loading' && s.files_total > 0" class="text-xs text-gray-400">
               {{ s.files_downloaded }} / {{ s.files_total }} 文件
             </span>
-            <span v-if="s.status === 'loading'" class="text-[11px] text-primary-600 font-medium">
+            <span v-if="s.status === 'loading'" class="text-xs text-primary-600 font-medium">
               {{ Math.round(s.progress * 100) }}%
             </span>
-            <span v-else-if="s.status === 'finished'" class="text-[11px] text-green-600">100%</span>
+            <span v-else-if="s.status === 'finished'" class="text-xs text-green-600">100%</span>
           </div>
         </div>
       </div>

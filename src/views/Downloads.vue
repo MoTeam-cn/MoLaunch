@@ -7,15 +7,63 @@
  * - 无任务时：空状态（DownloadEmptyState 子组件）
  */
 
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { showConfirm } from '@/utils/modal'
-import { pauseDownload, resumeDownload, cancelDownload } from '@/utils/tauri'
+import { pauseDownload, resumeDownload, cancelDownload, getDownloadProgress, isDownloading } from '@/utils/tauri'
+import type { RawDownloadProgress } from '@/types/download'
 import DownloadEmptyState from './downloads/DownloadEmptyState.vue'
 import DownloadStatsPanel from './downloads/DownloadStatsPanel.vue'
 import TaskGroupCard from '@/components/downloads/TaskGroupCard.vue'
+import { initDownloadPolling } from '@/composables/useDownloadPolling'
 
 const versionStore = useVersionStore()
+
+// 进入页面时恢复下载状态
+onMounted(async () => {
+  initDownloadPolling()
+  try {
+    const active = await isDownloading()
+    if (active) {
+      versionStore.startDownload('')
+      const raw = await getDownloadProgress()
+      if (raw && raw.stages && raw.stages.length > 0) {
+        // 计算加权百分比
+        let weightedProgress = 0
+        let totalWeight = 0
+        for (const s of raw.stages) {
+          totalWeight += s.weight
+          weightedProgress += s.progress * s.weight
+        }
+        const percentage = totalWeight > 0
+          ? Math.min(100, parseFloat(((weightedProgress / totalWeight) * 100).toFixed(1)))
+          : 0
+        const isPaused = raw.stages.some((s) => s.is_paused === true)
+        versionStore.updateProgress({
+          stages: raw.stages.map((s) => ({
+            name: s.name,
+            progress: s.progress,
+            weight: s.weight,
+            status: s.status,
+            bytes_downloaded: s.bytes_downloaded,
+            bytes_total: s.bytes_total,
+            files_downloaded: s.files_downloaded || 0,
+            files_total: s.files_total || 0,
+            group: s.group ?? null,
+          })),
+          current_stage_index: raw.current_stage_index ?? 0,
+          global_speed: raw.global_speed ?? 0,
+          global_bytes_downloaded: raw.global_bytes_downloaded ?? 0,
+          global_bytes_total: raw.global_bytes_total ?? 0,
+          percentage,
+          isPaused,
+        })
+      }
+    }
+  } catch (e) {
+    console.error('Failed to restore download state:', e)
+  }
+})
 
 const hasActiveDownload = computed(() => versionStore.downloading)
 const progress = computed(() => versionStore.downloadProgress)
