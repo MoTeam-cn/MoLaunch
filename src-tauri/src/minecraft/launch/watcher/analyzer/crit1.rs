@@ -191,6 +191,40 @@ fn analyze_game_log(
             error_lines, crash_report_path,
         ));
     }
+    // ClassNotFoundException: 主类或关键类找不到（通常是 Fabric/Forge 加载器库缺失）
+    if log_mc_l.contains("classnotfoundexception") {
+        // 尝试提取缺失的类名
+        let missing_class = extract_class_name(log_mc, "classnotfoundexception");
+        let class_hint = missing_class.as_deref().unwrap_or("未知类");
+        // 根据类名判断具体原因
+        let (reason, suggestion) = if class_hint.contains("fabric") || class_hint.contains("knot") {
+            (
+                "Fabric 加载器库缺失",
+                "Fabric Loader 的 jar 文件未正确加入 classpath。\n这通常是版本安装不完整导致的。\n请尝试重新安装该版本的 Fabric 加载器，或重新创建版本。".to_string(),
+            )
+        } else if class_hint.contains("forge") || class_hint.contains("fml") || class_hint.contains("modlauncher") {
+            (
+                "Forge 加载器库缺失",
+                "Forge 的核心库未正确加入 classpath。\n这通常是版本安装不完整导致的。\n请尝试重新安装该版本的 Forge 加载器，或重新创建版本。".to_string(),
+            )
+        } else if class_hint.contains("neoforge") {
+            (
+                "NeoForge 加载器库缺失",
+                "NeoForge 的核心库未正确加入 classpath。\n这通常是版本安装不完整导致的。\n请尝试重新安装该版本的 NeoForge 加载器，或重新创建版本。".to_string(),
+            )
+        } else {
+            (
+                "Java 类缺失",
+                format!("Java 找不到类 {}，可能是版本安装不完整或 classpath 配置有误。\n请尝试重新安装该版本。", class_hint),
+            )
+        };
+        return Some(make_crash_info(
+            reason,
+            CrashCategory::Unknown,
+            &suggestion,
+            error_lines, crash_report_path,
+        ));
+    }
     // 确定的 Mod 导致崩溃
     if let Some(mod_name) = extract_mod_from_keyword(log_mc, "caught exception from ") {
         return Some(CrashInfo {
@@ -204,6 +238,30 @@ fn analyze_game_log(
         });
     }
 
+    None
+}
+
+/// 从日志中提取 ClassNotFoundException 中的类名
+///
+/// 匹配模式：`ClassNotFoundException: net.fabricmc.loader.impl.launch.knot.KnotClient`
+/// 或 `java.lang.ClassNotFoundException: xxx`
+fn extract_class_name(log: &str, keyword: &str) -> Option<String> {
+    let log_l = log.to_lowercase();
+    let keyword_l = keyword.to_lowercase();
+    if let Some(pos) = log_l.find(&keyword_l) {
+        // 从关键字后找类名（可能跨行）
+        let rest = &log[pos + keyword_l.len()..];
+        // 跳过冒号和空格
+        let rest = rest.trim_start_matches(':').trim_start();
+        // 类名格式：xxx.xxx.xxx（只含字母、数字、点、$、_）
+        let class_end = rest
+            .find(|c: char| !(c.is_alphanumeric() || c == '.' || c == '$' || c == '_'))
+            .unwrap_or(rest.len().min(200));
+        let class_name = &rest[..class_end];
+        if !class_name.is_empty() {
+            return Some(class_name.to_string());
+        }
+    }
     None
 }
 

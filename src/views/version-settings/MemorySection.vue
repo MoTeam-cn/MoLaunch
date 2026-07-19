@@ -28,6 +28,7 @@ const globalMax = ref(0)
 
 // 系统内存可视化（复用 useMemoryVisualizer composable）
 const {
+  systemMemory,
   totalMemoryMB,
   usedMemoryMB,
   gameMemoryMB,
@@ -101,12 +102,11 @@ watch([minMemory, maxMemory], () => {
 
 onMounted(async () => {
   try {
-    systemMemory.value = await tauri.getSystemMemory()
     const cfg = await tauri.getConfigMap()
     globalMode.value = cfg.memoryMode
     globalMin.value = cfg.minMemory
     globalMax.value = cfg.maxMemory
-  } catch (e) { console.error('Failed to load system/global memory:', e) }
+  } catch (e) { console.error('Failed to load global memory:', e) }
 
   // 从 personalization 读取版本独立内存
   const p = personalization.value

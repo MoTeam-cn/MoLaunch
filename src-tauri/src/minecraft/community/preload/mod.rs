@@ -34,6 +34,7 @@ use super::common::fmt_elapsed;
 use cache::{load_file_cache, save_file_cache};
 use jar_metadata::read_jar_metadata_and_hash;
 use online_query::query_and_merge;
+use crate::minecraft::image_cache;
 
 pub use hash::{compute_curseforge_fingerprint, compute_modrinth_sha1};
 // pub use 同时把项带入当前作用域供本文件内使用，无需重复 use（参考 mods/mod.rs 模式）
@@ -72,6 +73,18 @@ pub async fn preload_mods_detail(
             cached.len()
         );
         for (file_name, cm) in &cached {
+            // 从 project.logo_url 重新计算 cached_logo_url
+            // （image_cache 状态可能已变化：首次未命中缓存的图片现在可能已下载完成）
+            let cached_logo_url = match &cm.project {
+                Some(project) => match &project.logo_url {
+                    Some(url) if !url.is_empty() => {
+                        let img = image_cache::get_image_url(url, Some(app.clone())).await;
+                        Some(img.url)
+                    }
+                    _ => None,
+                },
+                None => None,
+            };
             let _ = app.emit(
                 "mods-preload-update",
                 PreloadUpdate {
@@ -79,7 +92,7 @@ pub async fn preload_mods_detail(
                     slug: Some(cm.slug.clone()),
                     description: Some(cm.description.clone()),
                     version: Some(cm.version.clone()),
-                    logo_data: cm.logo_data.clone(),
+                    cached_logo_url,
                     translated_name: Some(cm.translated_name.clone()),
                     project: cm.project.clone(),
                 },

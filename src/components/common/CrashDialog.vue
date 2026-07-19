@@ -1,82 +1,55 @@
 <template>
-  <Transition name="modal">
-    <div v-if="visible" class="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <!-- 遮罩 -->
-      <div class="absolute inset-0 bg-black/50" @click="handleClose" />
+  <Transition name="crash-modal">
+    <div v-if="visible" class="fixed inset-0 z-[9999] flex items-center justify-center p-6">
+      <!-- 遮罩（PCL2 PanMsg: rgba(0,0,0,0.353)，崩溃弹窗是普通蓝色主题不是警告） -->
+      <div class="absolute inset-0 bg-black/35" @click="handleClose" />
 
-      <!-- 弹窗主体 -->
-      <div class="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-        <!-- 标题栏 -->
-        <div class="flex items-center gap-3 px-6 py-4 border-b border-gray-200">
-          <div class="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 flex-none">
-            <svg class="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-          </div>
-          <div class="min-w-0 flex-1">
-            <h2 class="text-lg font-semibold text-gray-900">Minecraft 出现错误</h2>
-            <p class="text-xs text-gray-500 mt-0.5">游戏已异常退出，以下是崩溃分析结果</p>
-          </div>
-          <button
-            class="text-gray-400 hover:text-gray-600 transition-colors flex-none"
-            @click="handleClose"
-          >
-            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
+      <!-- 弹窗主体（参考 PCL2 MyMsgText.xaml） -->
+      <div class="crash-dialog relative bg-pclmsg-bg rounded-lg shadow-[0_4px_20px_rgba(52,61,74,0.5)] w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+        <!-- 标题区 + 分割线（PCL2 MyMsgText: LabTitle FontSize=23, Foreground=ColorBrush2 #0b5bcb） -->
+        <div class="px-7 pt-6 pb-3">
+          <h2 class="text-[23px] font-normal text-pcl-2 leading-tight">Minecraft 出现错误</h2>
+          <!-- 分割线（PCL2 ShapeLine: Height=2, Fill=绑定标题前景色 #0b5bcb） -->
+          <div class="mt-3 h-0.5 bg-pcl-2 rounded-full"></div>
         </div>
 
-        <!-- 内容区域（可滚动）-->
-        <div class="flex-1 overflow-y-auto px-6 py-4 space-y-4">
-          <!-- 崩溃原因 -->
-          <div>
-            <div class="flex items-center gap-2 mb-2">
-              <span class="text-xs font-semibold uppercase tracking-wide text-gray-500">崩溃原因</span>
-              <span
-                class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium"
-                :class="categoryColor"
-              >
-                {{ categoryLabel }}
-              </span>
-            </div>
-            <p class="text-sm text-gray-900 font-medium">{{ crashInfo.reason }}</p>
-            <p v-if="crashInfo.problematic_mod" class="text-xs text-gray-500 mt-1">
-              相关 Mod：{{ crashInfo.problematic_mod }}
-            </p>
-          </div>
+        <!-- 内容区（PCL2 PanCaption: FontSize=15, LineHeight=18, Foreground=#5C5C5C） -->
+        <div class="flex-1 overflow-y-auto px-7 py-4">
+          <!-- 崩溃原因段落 -->
+          <p class="text-[15px] leading-[18px] text-pclmsg-caption mb-4">
+            游戏已异常退出，以下是崩溃分析结果：
+          </p>
 
-          <!-- 建议 -->
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div class="flex items-start gap-2">
-              <svg class="h-5 w-5 text-blue-500 flex-none mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <div class="min-w-0 flex-1">
-                <p class="text-xs font-semibold text-blue-900 mb-1">建议</p>
-                <p class="text-sm text-blue-800 whitespace-pre-line">{{ crashInfo.suggestion }}</p>
-              </div>
-            </div>
-          </div>
+          <!-- 原因详情（加粗，深色文字） -->
+          <p class="text-[15px] leading-[18px] text-pcl-1 font-medium mb-2">
+            {{ crashInfo?.reason || '未知原因' }}
+          </p>
 
-          <!-- 崩溃报告路径 -->
-          <div v-if="crashInfo.crash_report_path" class="bg-gray-50 rounded-lg p-3">
-            <p class="text-xs text-gray-500 mb-1">崩溃报告文件</p>
-            <div class="flex items-center gap-2">
-              <code class="flex-1 text-xs text-gray-700 break-all">{{ crashInfo.crash_report_path }}</code>
-              <button
-                class="flex-none px-2 py-1 text-xs text-primary-600 hover:bg-primary-50 rounded transition-colors"
-                @click="openCrashReport"
-              >
-                打开
-              </button>
-            </div>
-          </div>
+          <!-- 相关 Mod（如果有） -->
+          <p v-if="crashInfo?.problematic_mod" class="text-[15px] leading-[18px] text-pclmsg-caption mb-4">
+            相关 Mod：{{ crashInfo.problematic_mod }}
+          </p>
 
-          <!-- 日志详情（可折叠）-->
-          <div v-if="crashInfo.log_lines.length > 0 || crashInfo.log_tail.length > 0">
+          <!-- 建议（PCL2 GetAnalyzeResult 输出风格，纯文本段落） -->
+          <p class="text-[15px] leading-[18px] text-pclmsg-caption whitespace-pre-line mb-4">
+            {{ crashInfo?.suggestion || '' }}
+          </p>
+
+          <!-- 崩溃报告文件路径（如果有，可点击打开） -->
+          <div v-if="crashInfo?.crash_report_path" class="mb-4">
+            <p class="text-[15px] leading-[18px] text-pclmsg-caption mb-1">崩溃报告文件：</p>
             <button
-              class="flex items-center gap-1 text-xs font-semibold text-gray-500 hover:text-gray-700 transition-colors"
+              class="text-[15px] text-pcl-2 hover:text-pcl-3 hover:underline text-left break-all transition-colors"
+              @click="openCrashReport"
+            >
+              {{ crashInfo.crash_report_path }}
+            </button>
+          </div>
+
+          <!-- 日志详情（可折叠） -->
+          <div v-if="hasLogDetails" class="border-t border-gray-200 pt-3 mt-4">
+            <button
+              class="flex items-center gap-1 text-[14px] text-pclmsg-caption hover:text-pcl-1 transition-colors"
               @click="showDetails = !showDetails"
             >
               <svg
@@ -86,46 +59,50 @@
               >
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
               </svg>
-              日志详情
+              查看日志详情
             </button>
 
-            <div v-if="showDetails" class="mt-2 space-y-2">
-              <!-- 错误日志行 -->
-              <div v-if="crashInfo.log_lines.length > 0">
-                <p class="text-xs text-gray-500 mb-1">错误日志（{{ crashInfo.log_lines.length }} 行）</p>
-                <div class="bg-gray-900 rounded-lg p-3 max-h-48 overflow-y-auto">
-                  <pre class="text-xs text-red-300 whitespace-pre-wrap break-all font-mono">{{ crashInfo.log_lines.join('\n') }}</pre>
+            <div v-if="showDetails" class="mt-3 space-y-3">
+              <!-- 错误日志 -->
+              <div v-if="errorLines.length > 0">
+                <p class="text-[13px] text-pclmsg-caption mb-1">错误日志（{{ errorLines.length }} 行）</p>
+                <div class="bg-gray-900 rounded-md p-3 max-h-48 overflow-y-auto">
+                  <pre class="text-xs text-red-300 whitespace-pre-wrap break-all font-mono">{{ errorLines.join('\n') }}</pre>
                 </div>
               </div>
 
               <!-- 游戏日志尾部 -->
-              <div v-if="crashInfo.log_tail.length > 0">
-                <p class="text-xs text-gray-500 mb-1">游戏日志尾部（{{ crashInfo.log_tail.length }} 行）</p>
-                <div class="bg-gray-900 rounded-lg p-3 max-h-48 overflow-y-auto">
-                  <pre class="text-xs text-gray-300 whitespace-pre-wrap break-all font-mono">{{ crashInfo.log_tail.join('\n') }}</pre>
+              <div v-if="logTail.length > 0">
+                <p class="text-[13px] text-pclmsg-caption mb-1">游戏日志尾部（{{ logTail.length }} 行）</p>
+                <div class="bg-gray-900 rounded-md p-3 max-h-48 overflow-y-auto">
+                  <pre class="text-xs text-gray-300 whitespace-pre-wrap break-all font-mono">{{ logTail.join('\n') }}</pre>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 按钮栏 -->
-        <div class="flex items-center justify-end gap-2 px-6 py-4 border-t border-gray-200 bg-gray-50">
+        <!-- 按钮栏（PCL2 PanBtn: 右对齐，3 个按钮） -->
+        <!-- 按钮配色参考 PCL2 MyButton: Highlight=#0b5bcb, Normal=#343d4a, hover=#1370f3+bg#e0eafd -->
+        <div class="flex items-center justify-end gap-3 px-7 py-4 border-t border-gray-200 bg-gray-50">
+          <!-- 查看输出按钮（Normal 态：深灰蓝边框，hover 亮蓝） -->
           <button
-            v-if="crashInfo.crash_report_path"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            v-if="crashInfo?.crash_report_path"
+            class="px-4 py-1.5 text-sm text-pcl-1 border border-pcl-1 bg-white/30 rounded hover:text-pcl-3 hover:border-pcl-3 hover:bg-pcl-7 transition-colors duration-100"
             @click="openCrashReport"
           >
             查看输出
           </button>
+          <!-- 导出错误报告按钮（Normal 态） -->
           <button
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            class="px-4 py-1.5 text-sm text-pcl-1 border border-pcl-1 bg-white/30 rounded hover:text-pcl-3 hover:border-pcl-3 hover:bg-pcl-7 transition-colors duration-100"
             @click="exportReport"
           >
             导出错误报告
           </button>
+          <!-- 确定按钮（Highlight 态：主蓝边框 #0b5bcb，hover 亮蓝） -->
           <button
-            class="px-4 py-2 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 transition-colors"
+            class="px-5 py-1.5 text-sm font-medium text-pcl-2 border border-pcl-2 bg-white/30 rounded hover:text-pcl-3 hover:border-pcl-3 hover:bg-pcl-7 transition-colors duration-100"
             @click="handleClose"
           >
             确定
@@ -148,33 +125,10 @@ const visible = ref(false)
 const showDetails = ref(false)
 const crashInfo = ref<CrashInfo | null>(null)
 
-const categoryColor = computed(() => {
-  const map: Record<string, string> = {
-    Java: 'bg-orange-100 text-orange-700',
-    Memory: 'bg-yellow-100 text-yellow-700',
-    Graphics: 'bg-purple-100 text-purple-700',
-    Mod: 'bg-blue-100 text-blue-700',
-    Forge: 'bg-red-100 text-red-700',
-    Fabric: 'bg-green-100 text-green-700',
-    OptiFine: 'bg-indigo-100 text-indigo-700',
-    Unknown: 'bg-gray-100 text-gray-700',
-  }
-  return map[crashInfo.value?.category ?? 'Unknown'] ?? 'bg-gray-100 text-gray-700'
-})
-
-const categoryLabel = computed(() => {
-  const map: Record<string, string> = {
-    Java: 'Java',
-    Memory: '内存',
-    Graphics: '显卡',
-    Mod: 'Mod',
-    Forge: 'Forge',
-    Fabric: 'Fabric',
-    OptiFine: 'OptiFine',
-    Unknown: '未知',
-  }
-  return map[crashInfo.value?.category ?? 'Unknown'] ?? '未知'
-})
+// 防御性处理：crashInfo 可能为 null 或字段 undefined
+const errorLines = computed<string[]>(() => crashInfo.value?.log_lines ?? [])
+const logTail = computed<string[]>(() => crashInfo.value?.log_tail ?? [])
+const hasLogDetails = computed(() => errorLines.value.length > 0 || logTail.value.length > 0)
 
 function show(info: CrashInfo) {
   crashInfo.value = info
@@ -198,28 +152,27 @@ async function openCrashReport() {
 async function exportReport() {
   if (!crashInfo.value) return
   try {
-    // 将崩溃信息写入临时文件并打开保存对话框
+    const info = crashInfo.value
     const lines: string[] = [
       '===== MoLaunch 崩溃报告 =====',
       `时间: ${new Date().toLocaleString()}`,
-      `崩溃原因: ${crashInfo.value.reason}`,
-      `类别: ${crashInfo.value.category}`,
+      `崩溃原因: ${info.reason}`,
+      `类别: ${info.category}`,
       '',
       '--- 建议 ---',
-      crashInfo.value.suggestion,
+      info.suggestion,
       '',
     ]
-    if (crashInfo.value.problematic_mod) {
-      lines.push(`--- 相关 Mod ---`, crashInfo.value.problematic_mod, '')
+    if (info.problematic_mod) {
+      lines.push(`--- 相关 Mod ---`, info.problematic_mod, '')
     }
-    if (crashInfo.value.log_lines.length > 0) {
-      lines.push('--- 错误日志 ---', ...crashInfo.value.log_lines, '')
+    if (info.log_lines && info.log_lines.length > 0) {
+      lines.push('--- 错误日志 ---', ...info.log_lines, '')
     }
-    if (crashInfo.value.log_tail.length > 0) {
-      lines.push('--- 游戏日志尾部 ---', ...crashInfo.value.log_tail, '')
+    if (info.log_tail && info.log_tail.length > 0) {
+      lines.push('--- 游戏日志尾部 ---', ...info.log_tail, '')
     }
 
-    // 使用 Tauri 的保存文件对话框
     const filePath = await saveFile(
       '选择保存位置',
       `crash-report-${Date.now()}.txt`,
@@ -239,3 +192,34 @@ async function exportReport() {
 
 defineExpose({ show })
 </script>
+
+<style scoped>
+/* 参考 PCL2 MyMsgText 进入动画（MyMsgText.xaml.vb 第 32-52 行）：
+   - 背景遮罩：透明 → rgba(0,0,0,0.353)
+   - 弹窗：透明度 0→1（120ms），Y 偏移 40→0（300ms，回弹缓动 OutBack） */
+.crash-modal-enter-active {
+  transition: opacity 0.2s ease;
+}
+.crash-modal-enter-active .crash-dialog {
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease;
+}
+.crash-modal-enter-from {
+  opacity: 0;
+}
+.crash-modal-enter-from .crash-dialog {
+  transform: translateY(40px);
+  opacity: 0;
+}
+/* 关闭动画（MyMsgText.xaml.vb 第 53-70 行）：
+   - 下沉 20px + 旋转 6° + 淡出 */
+.crash-modal-leave-active {
+  transition: opacity 0.15s ease;
+}
+.crash-modal-leave-to {
+  opacity: 0;
+}
+.crash-modal-leave-to .crash-dialog {
+  transform: translateY(20px);
+  opacity: 0;
+}
+</style>

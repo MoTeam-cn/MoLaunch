@@ -34,6 +34,7 @@ pub async fn download_single(
         .with_hash(task.expected_hash.clone());
 
     if checker.is_valid(&task.local_path) {
+        log_debug!("[Download] 跳过已存在文件: {} (size={})", task.local_path, task.expected_size);
         return DownloadProgress {
             task_id: task.id.clone(),
             downloaded: 0,
@@ -43,6 +44,13 @@ pub async fn download_single(
             error: None,
         };
     }
+
+    log_debug!(
+        "[Download] 开始下载: {} (size={}, urls={:?})",
+        task.local_path,
+        task.expected_size,
+        urls
+    );
 
     // 确保目录存在
     if let Some(parent) = Path::new(&task.local_path).parent() {
@@ -211,6 +219,11 @@ pub async fn download_single(
         }
     }
 
+    log_warn!(
+        "[Download] 下载失败: {} (尝试了 {} 个 URL)",
+        task.local_path,
+        urls.len()
+    );
     DownloadProgress {
         task_id: task.id.clone(),
         downloaded: 0,

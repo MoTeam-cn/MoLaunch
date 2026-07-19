@@ -34,7 +34,7 @@ pub(crate) struct CachedMod {
     pub description: String,
     pub version: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub logo_data: Option<String>,
+    pub cached_logo_url: Option<String>,
     pub translated_name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<ResourceProject>,

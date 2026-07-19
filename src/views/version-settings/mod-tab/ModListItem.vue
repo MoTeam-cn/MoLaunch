@@ -1,12 +1,24 @@
 <script setup lang="ts">
 /**
  * 单个 Mod 列表项（参考 PCL2 MyLocalModItem）
- * - 左侧 4px 状态色条（启用=primary/禁用=gray）
- * - 34×34 圆角真实 Logo 图标（从 jar 内提取，无 logo fallback 到默认图）
+ * - 34×34 圆角真实 Logo 图标（来自平台工程 logo_url，经 image_cache 缓存；无 logo fallback 到默认图）
  * - 标题 14px + 副标题 12px 灰色（译名/文件名按 modLocalNameStyle 切换）
  * - 详情行：文件大小 · 加载器类型 · 文件名（hover Tooltip 显示完整路径）
- * - 五个操作按钮：详情、百科、打开文件位置、启用/禁用、删除
+ * - 六个操作按钮：详情、百科、打开文件位置、启用/禁用、更新、删除
  * - 按钮默认 opacity-0 隐藏，hover 列表项时才显示（与 PCL2 ButtonStack 行为一致）
+ *
+ * 选中状态指示（参考 PCL2 MyLocalModItem.RectCheck，.vb 第 280-286 行）：
+ * - 不使用复选框图标（太突兀），也不覆盖原有状态色条
+ * - 在列表项左边缘外侧挂一条 5px 宽的彩色竖条（通过负 margin -3px 向左探出）
+ * - 未选中：高度 0、透明（完全不可见，不影响原有状态色条）
+ * - 选中：高度撑满（上下留 6px）、显示主题色，带弹性动画（对应 PCL2 AniEaseOutBack）
+ * - 选中时标题颜色变为主题强调色（对应 PCL2 ColorBrush2）
+ * - 原有的启用/禁用状态色条保持不变，两者互不干扰
+ *
+ * 多选交互（参考 PCL2 PageInstanceMod + MyLocalModItem）：
+ * - 点击列表项（非按钮区域）切换选中状态（PCL2 也是点击触发，非长按）
+ * - Shift+点击 范围选择（由 useMultiSelect composable 处理）
+ * - 按钮使用 @click.stop 避免触发选中
  */
 import Tooltip from '@/components/common/Tooltip.vue'
 import { formatBytes } from '@/utils/format'
@@ -20,39 +32,62 @@ import {
   InformationCircleIcon,
   BookOpenIcon,
   FolderOpenIcon,
+  ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import type { ModInfo } from '@/utils/tauri'
 
-defineProps<{
+const props = defineProps<{
   mod: ModInfo
   detailLoadingFor: string | null
   modLocalNameStyle: number
+  /** 当前项是否被选中 */
+  selected?: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   toggle: [mod: ModInfo]
   delete: [mod: ModInfo]
   'show-info': [mod: ModInfo]
   'open-wiki': [mod: ModInfo]
   'open-file': [mod: ModInfo]
+  /** 打开更新/更改版本对话框（仅关联了平台工程的 mod 显示此按钮） */
+  'update': [mod: ModInfo]
+  /** 点击列表项（非按钮区域），切换选中状态（带 shiftKey 用于范围选择） */
+  'select': [mod: ModInfo, shiftKey: boolean]
 }>()
+
+/**
+ * 点击列表项：切换选中状态（参考 PCL2 MyLocalModItem.Checked 的 Set 逻辑）
+ *
+ * 按钮使用 @click.stop 阻止冒泡，不会触发此 handler。
+ */
+function handleClick(e: MouseEvent) {
+  emit('select', props.mod, e.shiftKey)
+}
 </script>
 
 <template>
   <li
-    class="group relative flex items-center gap-3 px-3 py-2.5 transition-colors hover:bg-gray-50"
-    :class="{ 'bg-gray-50/40': !mod.is_enabled }"
+    class="group relative flex items-center gap-3 px-3 py-2.5 transition-colors cursor-default hover:bg-gray-50"
+    :class="{ 'bg-gray-50/40': !mod.is_enabled && !selected }"
+    @click="handleClick"
   >
-    <!-- 左侧状态色条 -->
+    <!-- 原有启用/禁用状态色条（保持不变） -->
     <div
       class="absolute left-0 top-0 h-full w-1 transition-colors"
       :class="mod.is_enabled ? 'bg-primary-500' : 'bg-gray-300'"
     ></div>
+    <!-- 选中指示条（参考 PCL2 RectCheck，.vb 第 280-286 行）：
+         独立于状态色条，挂在左边缘外侧（-left-1 探出 4px），选中时显示，带弹性动画 -->
+    <div
+      v-if="selected"
+      class="absolute -left-1 top-1.5 bottom-1.5 w-[5px] rounded-full bg-blue-500 animate-check-pop z-10"
+    ></div>
 
-    <!-- 图标：有 logo 用真实 logo，否则用默认图片（不再用字母色块） -->
+    <!-- 图标：使用平台工程 logo_url 经 image_cache 缓存后的 URL，无 logo 用默认图（不再用字母色块） -->
     <div class="relative flex-none">
       <img
-        :src="mod.logo_data || defaultModLogo"
+        :src="mod.cached_logo_url || defaultModLogo"
         class="h-9 w-9 rounded-lg object-cover"
         :class="{ 'opacity-50 grayscale': !mod.is_enabled }"
         alt=""
@@ -71,8 +106,10 @@ defineEmits<{
     <div class="min-w-0 flex-1">
       <div class="flex items-center gap-2">
         <span
-          class="truncate text-sm font-medium"
-          :class="mod.is_enabled ? 'text-gray-800' : 'text-gray-500 line-through decoration-gray-300'"
+          class="truncate text-sm font-medium transition-colors"
+          :class="selected
+            ? 'text-blue-600'
+            : (mod.is_enabled ? 'text-gray-800' : 'text-gray-500 line-through decoration-gray-300')"
         >
           {{ modTitle(mod, modLocalNameStyle) }}
         </span>
@@ -98,8 +135,8 @@ defineEmits<{
       </div>
     </div>
 
-    <!-- 操作区：五个按钮，默认隐藏，hover 时显示（参考 PCL2 ButtonStack opacity 动画） -->
-    <!-- 加载中时强制显示，避免鼠标离开后 spinner 消失让用户以为没点到（防呆） -->
+    <!-- 操作区：六个按钮，默认隐藏，hover 时显示（参考 PCL2 ButtonStack opacity 动画） -->
+    <!-- 选中时也显示按钮，按钮的 @click.stop 会阻止触发选中 -->
     <div
       class="flex flex-none items-center gap-1 transition-opacity duration-200"
       :class="detailLoadingFor === mod.file_name
@@ -113,7 +150,7 @@ defineEmits<{
             ? 'text-blue-500 bg-blue-50 cursor-wait'
             : 'text-gray-400 hover:bg-blue-50 hover:text-blue-600'"
           :disabled="detailLoadingFor === mod.file_name"
-          @click="$emit('show-info', mod)"
+          @click.stop="$emit('show-info', mod)"
         >
           <!-- 加载中：旋转 spinner，让用户明确感知按钮已响应（防呆） -->
           <svg v-if="detailLoadingFor === mod.file_name" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
@@ -126,7 +163,7 @@ defineEmits<{
       <Tooltip text="前往百科" position="top">
         <button
           class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-emerald-50 hover:text-emerald-600"
-          @click="$emit('open-wiki', mod)"
+          @click.stop="$emit('open-wiki', mod)"
         >
           <BookOpenIcon class="h-4 w-4" />
         </button>
@@ -134,27 +171,35 @@ defineEmits<{
       <Tooltip text="打开文件位置" position="top">
         <button
           class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-700"
-          @click="$emit('open-file', mod)"
+          @click.stop="$emit('open-file', mod)"
         >
           <FolderOpenIcon class="h-4 w-4" />
         </button>
       </Tooltip>
-      <Tooltip :text="mod.is_enabled ? '禁用' : '启用'" position="top">
+      <Tooltip text="启用/禁用" position="top">
         <button
           class="rounded-md p-1.5 transition-colors"
           :class="mod.is_enabled
             ? 'text-gray-400 hover:bg-amber-50 hover:text-amber-600'
             : 'text-gray-400 hover:bg-green-50 hover:text-green-600'"
-          @click="$emit('toggle', mod)"
+          @click.stop="$emit('toggle', mod)"
         >
           <PauseIcon v-if="mod.is_enabled" class="h-4 w-4" />
           <PlayIcon v-else class="h-4 w-4" />
         </button>
       </Tooltip>
+      <Tooltip v-if="mod.project" text="更新 / 更改版本" position="top">
+        <button
+          class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
+          @click.stop="$emit('update', mod)"
+        >
+          <ArrowPathIcon class="h-4 w-4" />
+        </button>
+      </Tooltip>
       <Tooltip text="删除" position="top">
         <button
           class="rounded-md p-1.5 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-          @click="$emit('delete', mod)"
+          @click.stop="$emit('delete', mod)"
         >
           <TrashIcon class="h-4 w-4" />
         </button>
@@ -162,3 +207,27 @@ defineEmits<{
     </div>
   </li>
 </template>
+
+<style scoped>
+/* 选中指示条弹性动画（参考 PCL2 AniEaseOutBack：先冲过头再回弹）
+   使用 transform scaleY 而非 height，避免 height auto 无法动画的问题 */
+.animate-check-pop {
+  animation: checkPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform-origin: center;
+}
+
+@keyframes checkPop {
+  0% {
+    transform: scaleY(0);
+    opacity: 0;
+  }
+  60% {
+    transform: scaleY(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+</style>

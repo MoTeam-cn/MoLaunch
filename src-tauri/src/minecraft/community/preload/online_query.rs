@@ -15,6 +15,7 @@ use super::types::{HashedMod, PreloadUpdate};
 use crate::minecraft::community::curseforge::fingerprint_search;
 use crate::minecraft::community::modrinth::version_files_search;
 use crate::minecraft::community::types::ResourceType;
+use crate::minecraft::image_cache;
 
 /// 在线批量查询的统计结果（供 mod.rs 写最终日志）
 pub(crate) struct QueryStats {
@@ -59,7 +60,7 @@ pub(crate) async fn query_and_merge(
                 slug: m.metadata.slug.clone(),
                 description: m.metadata.description.clone(),
                 version: m.metadata.version.clone(),
-                logo_data: m.metadata.logo_data.clone(),
+                cached_logo_url: None,
                 translated_name: m.metadata.translated_name.clone(),
                 project: None,
             },
@@ -75,6 +76,14 @@ pub(crate) async fn query_and_merge(
                         cm.project = Some(project.clone());
                     }
                     cf_count += 1;
+                    // 预填充 logo 缓存 URL（参考皮肤/披风 cached_url 机制）
+                    let cached_logo_url = match &project.logo_url {
+                        Some(url) if !url.is_empty() => {
+                            let img = image_cache::get_image_url(url, Some(app.clone())).await;
+                            Some(img.url)
+                        }
+                        _ => None,
+                    };
                     let _ = app.emit(
                         "mods-preload-update",
                         PreloadUpdate {
@@ -82,7 +91,7 @@ pub(crate) async fn query_and_merge(
                             slug: None,
                             description: None,
                             version: None,
-                            logo_data: None,
+                            cached_logo_url,
                             translated_name: None,
                             project: Some(project.clone()),
                         },
@@ -108,6 +117,14 @@ pub(crate) async fn query_and_merge(
                         cm.project = Some(project.clone());
                     }
                     mr_count += 1;
+                    // 预填充 logo 缓存 URL（参考皮肤/披风 cached_url 机制）
+                    let cached_logo_url = match &project.logo_url {
+                        Some(url) if !url.is_empty() => {
+                            let img = image_cache::get_image_url(url, Some(app.clone())).await;
+                            Some(img.url)
+                        }
+                        _ => None,
+                    };
                     let _ = app.emit(
                         "mods-preload-update",
                         PreloadUpdate {
@@ -115,7 +132,7 @@ pub(crate) async fn query_and_merge(
                             slug: None,
                             description: None,
                             version: None,
-                            logo_data: None,
+                            cached_logo_url,
                             translated_name: None,
                             project: Some(project.clone()),
                         },

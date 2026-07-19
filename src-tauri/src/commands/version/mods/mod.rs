@@ -11,12 +11,18 @@
 //! - types.rs: ModInfo / ModMetadata / ModMeta 数据类型
 //! - helpers.rs: get_mods_dir + sanitize_file_name 共享辅助函数
 //! - metadata.rs: jar 内 mod 元数据读取流水线（read_mod_metadata + 8 个内部辅助）
+//! - watcher.rs: mods 目录文件监听（notify crate + 防抖 + emit mods-dir-changed 事件）
 //! - mod.rs: 所有 #[tauri::command] 命令（tauri::command 宏在定义处生成 __cmd__ 符号，
 //!   不能移到子模块后用 pub use 重导出，故命令函数必须留在 mod.rs）
+//!
+//! 注意：watcher.rs 中的 `watch_mods_dir` / `unwatch_mods_dir` 命令是例外，
+//! 它们通过完整路径 `commands::version::mods::watcher::xxx` 注册到 invoke_handler，
+//! 不经过 `pub use` 重导出，符合 Tauri 命令注册要求。
 
 pub(crate) mod helpers;
 mod metadata;
 mod types;
+pub mod watcher;
 
 use crate::minecraft::version::setup::VersionSetup;
 use crate::minecraft::version::state::VersionType;
@@ -157,7 +163,6 @@ pub async fn list_mods(
             translated_name: String::new(),
             description: String::new(),
             version: String::new(),
-            logo_data: None,
             slug: String::new(),
         });
     }

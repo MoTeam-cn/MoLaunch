@@ -104,6 +104,7 @@ pub async fn download_version_full(
         mirror_url,
         &manager,
         progress_callback.clone(),
+        false, // 完整校验模式（下载时严格校验哈希）
     )
     .await?;
 
@@ -118,6 +119,7 @@ pub async fn download_version_full(
         mirror_url,
         &manager,
         progress_callback,
+        false, // 完整校验模式（下载时严格校验哈希）
     )
     .await?;
 

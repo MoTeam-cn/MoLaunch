@@ -21,10 +21,14 @@ pub async fn download_client_jar(
     manager: &DownloadManager,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
 ) -> anyhow::Result<()> {
+    // 用 find_original_version 确定主 jar 的正确位置
+    // 有 inheritsFrom 时主 jar 在父版本目录下（如 Fabric 版本的主 jar 在原版目录）
+    // 无 inheritsFrom 时主 jar 在当前版本目录下
+    let jar_version = crate::minecraft::launch::classpath::find_original_version(game_dir, json);
     let jar_path = game_dir
         .join("versions")
-        .join(version_id)
-        .join(format!("{}.jar", version_id));
+        .join(&jar_version)
+        .join(format!("{}.jar", jar_version));
 
     let checker = FileChecker::new()
         .with_min_size(1024)
@@ -36,13 +40,15 @@ pub async fn download_client_jar(
         );
 
     if checker.is_valid(&jar_path.to_string_lossy()) {
-        log_info!("[Download] Client JAR already exists, skipping");
+        log_info!("[Download] Client JAR already exists at {}, skipping", jar_path.display());
         return Ok(());
     }
 
     let url = json["downloads"]["client"]["url"]
         .as_str()
-        .ok_or_else(|| anyhow::anyhow!("Client JAR URL not found"))?;
+        .ok_or_else(|| anyhow::anyhow!("Client JAR URL not found in version {} (merged json may be missing downloads.client)", version_id))?;
+
+    log_info!("[Download] Downloading client JAR to {}", jar_path.display());
 
     let urls = build_launcher_meta_urls(url, mirror_url, source_mode_of(manager));
     let task = DownloadTask {
@@ -76,14 +82,16 @@ pub async fn download_libraries(
     mirror_url: Option<&str>,
     manager: &DownloadManager,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
+    quick_check: bool,
 ) -> anyhow::Result<(usize, usize, usize)> {
     let all_libs = libraries::parse_libraries(json, game_dir);
-    let missing_libs = libraries::find_missing_libs(&all_libs, game_dir);
+    let missing_libs = libraries::find_missing_libs(&all_libs, game_dir, quick_check);
 
     log_info!(
-        "[Libraries] Total: {}, Missing: {}",
+        "[Libraries] Total: {}, Missing: {} (mode: {})",
         all_libs.len(),
-        missing_libs.len()
+        missing_libs.len(),
+        if quick_check { "quick" } else { "full" }
     );
 
     if missing_libs.is_empty() {
@@ -126,6 +134,7 @@ pub async fn download_assets(
     mirror_url: Option<&str>,
     manager: &DownloadManager,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
+    quick_check: bool,
 ) -> anyhow::Result<(usize, usize, usize)> {
     let index_meta = assets::get_asset_index_meta(json)
         .ok_or_else(|| anyhow::anyhow!("Asset index metadata not found"))?;
@@ -161,12 +170,13 @@ pub async fn download_assets(
     let index_content = std::fs::read_to_string(&index_path)?;
     let index_json: serde_json::Value = serde_json::from_str(&index_content)?;
     let all_assets = assets::parse_asset_index(&index_json, game_dir);
-    let missing_assets = assets::find_missing_assets(&all_assets);
+    let missing_assets = assets::find_missing_assets(&all_assets, quick_check);
 
     log_info!(
-        "[Assets] Total: {}, Missing: {}",
+        "[Assets] Total: {}, Missing: {} (mode: {})",
         all_assets.len(),
-        missing_assets.len()
+        missing_assets.len(),
+        if quick_check { "quick" } else { "full" }
     );
 
     if missing_assets.is_empty() {

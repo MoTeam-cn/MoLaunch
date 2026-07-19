@@ -53,15 +53,17 @@ const { downloading: communityDownloading, progress: downloadProgress, startDown
 startListener()
 
 watch(
-  () => props.visible,
-  async (v) => {
-    if (!v || !props.project) return
+  [() => props.visible, () => props.project],
+  async ([v, p], [oldV, oldP]) => {
+    // 仅在 visible 变为 true 或 project 变化时触发（避免 visible/gameVersion 单独变化重复加载）
+    if (!v || !p) return
+    if (v === oldV && p === oldP) return
     loading.value = true
     versions.value = []
     setFilter('')
-    start(props.project.platform === 'CurseForge' ? 1 : props.project.platform === 'Modrinth' ? 2 : 0)
+    start(p.platform === 'CurseForge' ? 1 : p.platform === 'Modrinth' ? 2 : 0)
     try {
-      versions.value = await getProjectVersions(props.project.platform, props.project.id)
+      versions.value = await getProjectVersions(p.platform, p.id)
       finish()
       // 整合包来自 ModTab 时自动选中对应版本筛选
       if (props.gameVersion) {

@@ -26,9 +26,15 @@ pub struct PreloadUpdate {
     /// JAR 内读到的版本号
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
-    /// JAR 内提取的 logo（base64 data URL）
+    /// 平台工程的 logo_url 经过 image_cache::get_image_url 处理后的缓存 URL
+    ///
+    /// 设计参考 PCL2 ResourceProject.ApplyLogoToMyImage + 本项目皮肤/披风 cached_url：
+    /// - 命中缓存：返回 `cache-image://{hash}.png`，零网络请求
+    /// - 未命中：返回原始远程 URL，后端异步下载到缓存，完成后 emit `image-cached` 事件
+    ///
+    /// 仅在 online_query 阶段 project 被填充时一起填充。
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub logo_data: Option<String>,
+    pub cached_logo_url: Option<String>,
     /// mcmod 数据库查到的中文译名
     #[serde(skip_serializing_if = "Option::is_none")]
     pub translated_name: Option<String>,

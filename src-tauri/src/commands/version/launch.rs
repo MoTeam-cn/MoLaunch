@@ -1,9 +1,9 @@
 //! 版本启动命令
 
-use crate::minecraft::launch::{self, AuthInfo, LaunchConfig, LaunchPipeline};
+use crate::minecraft::launch::{self, AuthInfo, CrashCategory, CrashInfo, LaunchConfig, LaunchPipeline, LaunchStage};
 use crate::minecraft::version::setup::VersionSetup;
 use crate::state::{resolve_game_dir, AppState};
-use crate::{log_error, log_info};
+use crate::{log_debug, log_error, log_info};
 use std::sync::Arc;
 use tauri::{Emitter, State};
 
@@ -181,10 +181,92 @@ pub async fn launch_game(
     *state.launch_pipeline.lock().await = Some(pipeline.clone());
 
     // 执行启动
-    let result = pipeline.execute().await.map_err(|e| {
-        log_error!("Launch failed: {}", e);
-        e.to_string()
-    })?;
+    let result = pipeline.execute().await;
+
+    // 启动失败时的处理：如果是 LaunchProcess 阶段失败（如 ClassNotFoundException），
+    // 仍然等待 watcher 完成崩溃分析，并通过 game-exited 事件通知前端展示崩溃对话框
+    // 参考 PCL2 ModWatcher.vb Crashed()：无论进程是否成功启动，只要异常退出都做崩溃分析
+    let result = match result {
+        Ok(r) => r,
+        Err(launch_err) => {
+            log_error!("Launch failed: {}", launch_err);
+
+            // 只对 LaunchProcess 阶段的失败做崩溃分析（其他阶段如 GetJava/Login 失败不需要）
+            if launch_err.stage != LaunchStage::LaunchProcess {
+                return Err(launch_err.to_string());
+            }
+
+            log_debug!("[Launch] LaunchProcess 阶段失败，等待 watcher 崩溃分析...");
+            // 等待 watcher 完成崩溃分析（watcher 在进程退出后延迟 2 秒开始分析）
+            // 这里最多等 15 秒，避免无限等待
+            let exit_rx = pipeline.exit_receiver().await;
+            let mut crash_info: Option<CrashInfo> = None;
+            let exit_code: i32;
+            if let Some(mut rx) = exit_rx {
+                log_debug!("[Launch] 已获取 exit_rx，等待退出信号...");
+                let rx_fut = rx.wait_for(|val| val.is_some());
+                match tokio::time::timeout(std::time::Duration::from_secs(15), rx_fut).await {
+                    Ok(Ok(ref_val)) => {
+                        log_debug!("[Launch] 收到退出信号");
+                        if let Some(info) = (*ref_val).clone() {
+                            exit_code = info.code;
+                            crash_info = info.crash_info.clone();
+                        } else {
+                            exit_code = 1;
+                        }
+                    }
+                    Ok(Err(_)) => {
+                        log_debug!("[Launch] wait_for 返回错误");
+                        exit_code = 1;
+                    }
+                    Err(_) => {
+                        log_debug!("[Launch] 等待退出信号超时（15秒）");
+                        exit_code = 1;
+                    }
+                }
+            } else {
+                log_debug!("[Launch] 无法获取 exit_rx（watcher 未初始化）");
+                exit_code = 1;
+            }
+
+            // 如果崩溃分析没结果，构造一个基本的 CrashInfo（用 launch_err.message 作为 reason）
+            let crash_info = crash_info.unwrap_or_else(|| {
+                log_debug!("[Launch] 崩溃分析无结果，构造基本 CrashInfo");
+                CrashInfo {
+                    reason: "游戏启动失败".to_string(),
+                    category: CrashCategory::Unknown,
+                    log_lines: vec![launch_err.message.clone()],
+                    suggestion: "游戏进程启动后立即退出，可能是 Java 环境或版本文件问题。\n请查看日志详情了解具体原因。".to_string(),
+                    problematic_mod: None,
+                    crash_report_path: None,
+                    log_tail: Vec::new(),
+                }
+            });
+
+            log_info!("[Watcher] 崩溃分析完成（启动失败路径）: {}（类别: {:?}）", crash_info.reason, crash_info.category);
+
+            // 清理启动状态
+            *state.current_pid.lock().await = None;
+            *state.launch_pipeline.lock().await = None;
+
+            // 发送 game-exited 事件，让前端展示崩溃对话框
+            match app_handle.emit(
+                "game-exited",
+                GameExitEvent {
+                    pid: 0,
+                    version_id: version_id.clone(),
+                    exit_code,
+                    is_normal: false,
+                    crash_info: Some(crash_info),
+                },
+            ) {
+                Ok(_) => log_debug!("[Launch] game-exited 事件发送成功"),
+                Err(e) => log_error!("[Launch] game-exited 事件发送失败: {}", e),
+            }
+
+            return Err(launch_err.to_string());
+        }
+    };
 
     log_info!("Game launched with PID: {}", result.pid);
 

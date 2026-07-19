@@ -87,9 +87,6 @@ export function useLaunchState() {
   async function setupGameExitListener() {
     try {
       unlistenFn = await listen<GameExitEvent>('game-exited', (event) => {
-        if (import.meta.env.DEV) {
-          console.debug('[GameExit]', event.payload)
-        }
         const { is_normal, exit_code, crash_info } = event.payload
         runningPid.value = null
         runningVersionId.value = null

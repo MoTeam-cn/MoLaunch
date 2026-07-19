@@ -35,6 +35,7 @@ pub struct CrashInfo {
     /// 崩溃类别
     pub category: CrashCategory,
     /// 相关日志行（错误/致命级别）
+    #[serde(default)]
     pub log_lines: Vec<String>,
     /// 建议的解决方案
     pub suggestion: String,
@@ -44,7 +45,7 @@ pub struct CrashInfo {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub crash_report_path: Option<String>,
     /// 游戏日志尾部（最近 N 行，供弹窗展示）
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
+    #[serde(default)]
     pub log_tail: Vec<String>,
 }
 

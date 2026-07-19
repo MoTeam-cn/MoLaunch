@@ -21,6 +21,7 @@ pub mod searcher;
 pub mod secure_storage;
 pub mod tags;
 pub mod types;
+pub mod version_extract;
 
 pub use searcher::search;
 pub use types::{Platform, ResourceProject, ResourceVersion, ResourceType, SearchParams, SearchResult};

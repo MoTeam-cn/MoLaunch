@@ -54,7 +54,7 @@ pub(crate) async fn read_jar_metadata_and_hash(
                     slug: Some(metadata.slug.clone()),
                     description: Some(metadata.description.clone()),
                     version: Some(metadata.version.clone()),
-                    logo_data: metadata.logo_data.clone(),
+                    cached_logo_url: None,
                     translated_name: Some(metadata.translated_name.clone()),
                     project: None,
                 },

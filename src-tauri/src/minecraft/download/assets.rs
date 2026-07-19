@@ -182,24 +182,93 @@ pub fn get_asset_index_urls(meta: &AssetIndexMeta, source_mode: DownloadSourceMo
 }
 
 /// 检测缺失的资源文件
-pub fn find_missing_assets(entries: &[AssetEntry]) -> Vec<AssetEntry> {
-    let mut missing = Vec::new();
+/// Find missing assets
+///
+/// ## 性能优化（与 `find_missing_libs` 一致）
+///
+/// - **并行检查**：使用 `std::thread::scope` 并行检查多个资源文件
+/// - **快速检查模式**（`quick_check = true`）：只检查文件存在 + 大小匹配，不计算 SHA1
+///   - 用于启动时的文件校验（assets 数量通常几百上千，串行哈希校验会非常慢）
+///   - 参考 PCL2 启动流程：启动时不做哈希校验
+/// - **完整校验模式**（`quick_check = false`）：计算 SHA1 哈希，确保文件完整性
+///   - 用于版本安装/修复时的严格校验
+pub fn find_missing_assets(entries: &[AssetEntry], quick_check: bool) -> Vec<AssetEntry> {
+    use std::sync::Mutex;
 
-    for entry in entries {
-        let checker = FileChecker::new()
-            .with_actual_size(if entry.size == 0 { -1 } else { entry.size })
-            .with_hash(if entry.hash.is_empty() {
-                None
-            } else {
-                Some(entry.hash.clone())
+    let missing: Mutex<Vec<AssetEntry>> = Mutex::new(Vec::new());
+    let num_threads = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4)
+        .min(entries.len())
+        .max(1);
+
+    // 按索引取模分配到各线程
+    let chunks: Vec<Vec<&AssetEntry>> = if num_threads > 1 {
+        (0..num_threads)
+            .map(|tid| {
+                entries
+                    .iter()
+                    .enumerate()
+                    .filter(|(i, _)| i % num_threads == tid)
+                    .map(|(_, e)| e)
+                    .collect()
+            })
+            .collect()
+    } else {
+        vec![entries.iter().collect()]
+    };
+
+    std::thread::scope(|s| {
+        for chunk in chunks {
+            let missing = &missing;
+            s.spawn(move || {
+                for entry in chunk {
+                    let is_ok = if quick_check {
+                        // 快速检查：只检查文件存在 + 大小匹配
+                        quick_check_asset(entry)
+                    } else {
+                        // 完整校验：文件存在 + 大小 + SHA1
+                        let checker = FileChecker::new()
+                            .with_actual_size(if entry.size == 0 { -1 } else { entry.size })
+                            .with_hash(if entry.hash.is_empty() {
+                                None
+                            } else {
+                                Some(entry.hash.clone())
+                            });
+                        checker.is_valid(&entry.local_path)
+                    };
+                    if !is_ok {
+                        missing.lock().unwrap().push(entry.clone());
+                    }
+                }
             });
-
-        if !checker.is_valid(&entry.local_path) {
-            missing.push(entry.clone());
         }
-    }
+    });
 
-    missing
+    // 保持原有顺序
+    let mut result = missing.into_inner().unwrap();
+    result.sort_by_key(|e| {
+        entries
+            .iter()
+            .position(|x| x.local_path == e.local_path)
+            .unwrap_or(usize::MAX)
+    });
+    result
+}
+
+/// 快速检查资源文件：只检查文件存在 + 大小匹配，不计算哈希
+fn quick_check_asset(entry: &AssetEntry) -> bool {
+    let path = Path::new(&entry.local_path);
+    if !path.exists() {
+        return false;
+    }
+    if entry.size > 0 {
+        if let Ok(meta) = std::fs::metadata(path) {
+            return meta.len() as i64 == entry.size;
+        }
+        return false;
+    }
+    true
 }
 
 /// 构建资源文件的下载 URL 列表

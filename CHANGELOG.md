@@ -165,6 +165,339 @@
   - `composables/useDownloadPolling.ts`：从 stage 的 `is_paused` 推导全局暂停状态
   - `views/Downloads.vue`：卡片头部新增暂停/恢复和取消按钮，暂停时进度图标切换为暂停状态
 
+#### Mod 多选与版本更新功能（参考 PCL2 PageInstanceMod）
+- 版本设置 Mod 管理页新增多选模式与版本更新/更改功能
+- 多选交互（复刻 PCL2 PageInstanceMod + MyLocalModItem）：
+  - **点击列表项即切换选中**（PCL2 也是点击触发，非长按）
+  - Shift+点击 范围选择，ESC 清空选中
+  - 批量操作：启用、禁用、更新、删除、全选、反选
+  - **批量操作完成后自动清空选中**（参考 PCL2 第 465、678 行 `ChangeAllSelected(False)`）：启用/禁用、删除操作成功后无条件调用 `clearSelection()`，退出多选状态
+- 按钮智能禁用（复刻 PCL2 PageInstanceMod.xaml.vb 第 202-216 行）：
+  - 选中项中没有已启用的 mod 时，"禁用"按钮禁用（`hasEnabledSelected`）
+  - 选中项中没有已禁用的 mod 时，"启用"按钮禁用（`hasDisabledSelected`）
+  - 选中项中没有可更新的 mod 时，"更新"按钮禁用（`hasUpdatableSelected`）
+  - "删除"按钮始终可用（只要有选中项）
+  - `batchActions` 改为 `computed`，根据选中状态响应式更新 `disabled` 属性
+- 选中状态指示（复刻 PCL2 MyLocalModItem.RectCheck，.vb 第 280-286 行）：
+  - **不使用复选框图标**（太突兀），也**不覆盖原有启用/禁用状态色条**
+  - 在列表项左边缘外侧挂一条 5px 宽的蓝色圆角竖条（`-left-1` 向左探出 4px），与 PCL2 `Margin=(-3,6,0,6)` 一致
+  - 未选中：竖条不渲染，完全不影响原有状态色条
+  - 选中：竖条上下留 6px（`top-1.5 bottom-1.5`），用 `transform: scaleY` 弹性动画（`cubic-bezier(0.34, 1.56, 0.64, 1)` 先冲到 1.15 再回弹到 1，对应 PCL2 AniEaseOutBack）
+  - 选中时标题颜色变为主题强调色（`text-blue-600`，对应 PCL2 ColorBrush2）
+  - 原有的启用/禁用状态色条保持不变，两者位置独立、互不干扰
+- 多选操作栏布局（复刻 PCL2 CardSelect，第 59-77 行）：
+  - **浮动在视口底部中央**（fixed bottom-6 left-1/2），不占据列表布局空间
+  - 卡片分上下两部分：上方居中"已选择 X 项"文字，下方水平排列操作按钮
+  - 入场动画：从下方滑入 + 淡入（对应 PCL2 的 TranslateTransform Y="-10" + Opacity）
+  - 通过 `teleport to="body"` 确保浮在最上层，z-40 不遮挡弹窗（z-9999）
+- 版本更新/更改功能：
+  - 单个 Mod 列表项新增"更新"按钮（仅关联了平台工程的 Mod 显示）
+  - 弹出版本选择对话框，查询 CurseForge/Modrinth 平台版本列表
+  - 按游戏版本和加载器过滤，自动选中当前版本对应的筛选条件
+  - 选择版本后下载安装到 mods 目录，自动删除旧版本文件（文件名不同时）
+- 通用化设计（可复用于其他列表场景）：
+  - 新建 `composables/useMultiSelect.ts`：泛型多选 composable，管理选中集合/Shift 范围选择/全选反选/ESC 清空，不涉及业务逻辑
+  - 新建 `components/common/MultiSelectBar.vue`：通用批量操作栏组件，通过 `actions` prop 配置按钮（key/label/icon/variant），emit `action` 事件由调用方分发
+- 新增文件：
+  - `composables/useMultiSelect.ts`：通用多选 composable
+  - `components/common/MultiSelectBar.vue`：通用批量操作栏组件
+  - `views/version-settings/mod-tab/ModUpdateDialog.vue`：版本更新对话框（teleport + transition 自承载弹窗）
+- 修改文件：
+  - `views/version-settings/mod-tab/ModListItem.vue`：新增 `hasSelection`/`selected` props、`select` emit，点击切换选中，新增更新按钮
+  - `views/version-settings/ModTab.vue`：集成通用 MultiSelectBar 和 ModUpdateDialog，定义 actions 配置 + action 事件分发
+  - `composables/useModOperations.ts`：内部使用 useMultiSelect composable 管理选中状态，新增批量业务 handler（batchToggle/batchDelete/batchUpdate/openUpdateDialog）
+
+#### Mod 详情版本 tag 自动切换修复
+- 修复从 Mod 列表点击"详情"打开 ResourceDetail 时，不会自动切换到 mod 所在整合包的游戏版本 tag 的问题
+- 根因：后端命令 `get_version_game_version` 已在 `commands/version/list.rs` 定义并标注 `#[tauri::command]`，但**未在 `lib.rs` 的 `invoke_handler` 中注册**，导致前端调用时报 `Command get_version_game_version not found`，`versionGameVersion` 始终为 `null`，传给 ResourceDetail 的 `gameVersion` 为 `undefined`，watch 中 `if (props.gameVersion)` 判断为 false，不执行 tag 自动切换
+- 修复：在 `src-tauri/src/lib.rs` 的 `invoke_handler` 列表中添加 `commands::version::list::get_version_game_version` 注册
+
+#### Mod 图标机制重构 + Mods 目录文件监听（参考 PCL2）
+- **放弃 jar 解包提取 logo**，改用平台工程 `logo_url` + `image_cache` 缓存机制（与皮肤/披风一致），实现「几秒后图标自动加载出来」的体验
+- 图标缓存机制（复用皮肤/披风 `image_cache::get_image_url`）：
+  - 预加载查到 CF/MR 工程后，调用 `image_cache::get_image_url(project.logo_url, app)` 处理 logo URL
+  - 命中缓存：返回 `cache-image://{hash}.png`，零网络请求，前端立即渲染
+  - 未命中：返回远程 URL，后端异步下载，完成后 emit `image-cached` 事件通知前端刷新
+  - 前端 `useModOperations` 监听 `image-cached` 事件，按 `cached_logo_url === remote_url` 匹配 mod 并原地替换为本地缓存 URL
+  - 持久化缓存命中时从 `project.logo_url` 重新计算 `cached_logo_url`（image_cache 状态可能已变化）
+- Mods 目录文件监听（参考 PCL2 PageInstanceMod FileSystemWatcher）：
+  - 新增 `notify = "8"` crate 依赖
+  - 新建 `commands/version/mods/watcher.rs`：`watch_mods_dir` / `unwatch_mods_dir` 命令
+  - 使用 `notify::RecommendedWatcher` 监听 mods 目录文件创建/修改/删除
+  - 500ms 静默期防抖：收到事件后等待无新事件才 emit，避免文件还在写入时过早刷新
+  - 全局 `Mutex<Option<RecommendedWatcher>>` 持有当前 watcher，同一时间只有一个监听
+  - watcher drop 时 channel 关闭，防抖线程自动退出
+  - 通过 `mods-dir-changed` 事件通知前端
+- 前端改动：
+  - `composables/useModOperations.ts`：
+    - 新增 `image-cached` 事件监听，异步下载完成后自动刷新 mod 图标 URL
+    - 新增 `mods-dir-changed` 事件监听，文件变化时静默重载 mod 列表（`loadMods(true)` 不显示 spinner）+ 重新触发预加载
+    - `loadMods(silent)` 重构：按 `enabled_name` 保存当前预加载数据（project / cached_logo_url / translated_name 等），重载后合并回去，避免文件变化触发重载时丢失已加载的工程信息
+    - `init()` 中调用 `watchModsDir(selectedId)` 启动文件监听
+    - `onUnmounted` 调用 `unwatchModsDir()` 停止监听，避免资源泄漏
+  - `utils/api/personalization.ts`：新增 `watchModsDir` / `unwatchModsDir` API 封装
+  - `views/version-settings/mod-tab/ModListItem.vue`：图标 `src` 从 `mod.logo_data` 改为 `mod.cached_logo_url || defaultModLogo`
+  - `views/version-settings/mod-tab/ModUpdateDialog.vue`：同上，并新增 `@error` fallback 到默认图
+- 后端改动：
+  - `commands/version/mods/types.rs`：`ModInfo` / `ModMetadata` / `ModMeta` 移除 `logo_data` / `icon_path` / `logo_file` 字段
+  - `commands/version/mods/metadata.rs`：删除 `extract_logo_data_url` / `guess_mime` 函数，移除 jar 内 logo 提取逻辑
+  - `minecraft/community/preload/types.rs`：`PreloadUpdate` 的 `logo_data` 字段改为 `cached_logo_url`
+  - `minecraft/community/preload/online_query.rs`：CF/MR 结果 emit 时填充 `cached_logo_url`（通过 `image_cache::get_image_url`）
+  - `minecraft/community/preload/cache.rs`：`CachedMod` 的 `logo_data` 字段改为 `cached_logo_url`
+  - `minecraft/community/preload/mod.rs`：缓存命中时从 `project.logo_url` 重新计算 `cached_logo_url`
+  - `minecraft/community/preload/jar_metadata.rs`：JAR 元数据 emit 时 `cached_logo_url` 为 None（logo 仅来自平台工程）
+  - `commands/version/mods/mod.rs`：新增 `pub mod watcher;` 模块声明
+  - `lib.rs`：注册 `watch_mods_dir` / `unwatch_mods_dir` 命令
+
+#### Mod 更新对话框底部状态栏优化
+- 修复"发现新版本："标签无内容价值的问题（原逻辑仅做字符串相等比较，且只重复显示表格中已有的版本号）
+- 新建 `utils/version.ts`：抽出 `compareVersion` 和 `versionChangeType` 工具函数（从 `useVersionGroups.ts` 抽出共享，消除重复代码）
+- `useVersionGroups.ts`：移除内联 `compareVersion`，改为从 `@/utils/version` 导入
+- `ModUpdateDialog.vue` 底部状态栏改为显示有价值的版本变化信息：
+  - **升级**（绿色 ↑）：`1.2.0 → 1.3.0`，选中版本高于当前版本
+  - **降级**（琥珀色 ↓）：`1.3.0 → 1.2.0`，选中版本低于当前版本（用户主动降级）
+  - **当前版本**（灰色 ✓）：选中版本与当前版本相同
+  - **已选择**（灰色）：当前 mod 版本未知时回退显示
+  - 附加下载量信息（`formatDownloads`，如 `· 12.3 万次下载`），表格中未显示的有用信息
+- 使用语义化版本比较（`compareVersion` 按 `.` 分段数字比较）替代字符串相等，正确识别 `1.2.0` 与 `1.2` 为同版本
+- 后端版本号 fallback 链：JAR 元数据 → MANIFEST.MF → 文件名提取
+  - `commands/version/mods/metadata.rs`：`finalize_metadata` 接收 `path` 参数，当 JAR 元数据 version 为空时调用 `extract_version_from_filename` 从文件名提取版本号
+  - 新增 `extract_version_from_filename` 函数：去掉扩展名后，按 `+` 分隔符或最后匹配策略提取版本号
+    - 有 `+` 时取 `+` 前面的第一个版本号（如 `alltheleaks-1.1.1+1.20.1-forge.jar` → `1.1.1`）
+    - 无 `+` 时取最后一个版本号（如 `create-1.20.1-6.0.4.jar` → `6.0.4`）
+  - 解决 Forge mod 的 `mods.toml` 中 `${file.jarVersion}` 占位符无法解析且 MANIFEST.MF 缺失时 version 为空的问题
+- 前端 `ModUpdateDialog.vue`：当 `mod.version` 仍为空时显示"当前版本未知 → 选中版本"，明确告知用户无法判断升降级的原因
+
+#### Mod 版本号识别链完整复刻 PCL2
+- **根因**：之前只按顺序短路返回第一个找到的来源，且缺少 `fml_cache_annotation.json` 来源，导致部分 Forge mod 无法获取版本号
+- **完整复刻 PCL2 `LocalResourceFile.LoadMetadataFromJar`**（`code-libs/PCL-main/.../LocalResourceFile.vb`）的 4 来源累积合并策略：
+  1. `mcmod.info`（Forge 1.12-）
+  2. `fabric.mod.json`（Fabric/Quilt，必须包含 `schemaVersion` 才视为有效）
+  3. `META-INF/mods.toml`（Forge 1.13+/NeoForge）
+  4. **`META-INF/fml_cache_annotation.json`（Forge 1.7-1.12 注解缓存，新增）**——查找 `@Mod` 注解，从 `values.version.value` 获取版本号
+- **累积合并不覆盖策略**（参考 PCL2 的 Display/Description/Version setter）：
+  - `MetaBuilder` 封装"已有有效值不覆盖"逻辑
+  - `slug`：第一个非空值优先
+  - `description`：第一个长度>2的值优先
+  - `version`：第一个有效版本号（只含数字、点、减号）优先，占位符（包含 "version" 字样，如 `${file.jarVersion}`）标记为 `"version"`
+- **`${file.jarVersion}` 占位符统一处理**：标记为 `"version"` 后，最后从 `META-INF/MANIFEST.MF` 的 `Implementation-Version` 解析（参考 PCL2 Finished: 标签第 314-329 行）
+- **版本号有效性校验**：版本号必须包含 `.` 或 `-`，否则视为无效（参考 PCL2 第 330 行）
+- 拆分为目录结构（文件超过 500 行按项目约定拆分）：
+  - `metadata/mod.rs`：主入口 + `MetaBuilder` 合并器 + `finalize_metadata` + `extract_version_from_filename`
+  - `metadata/sources.rs`：4 个来源的 `merge_*` 函数 + `read_manifest_version`
+
+#### CurseForge 版本列表版本号修复
+- **根因**：`curseforge/convert.rs` 的 `convert_version` 直接写 `version: String::new()`，注释"CurseForge 无版本号字段"，导致 CF 版本列表的 `ResourceVersion.version` 全为空字符串，前端 `versionChange` 计算永远走 `unknown` 分支
+- **参考 PCL2**：阅读 `MyLocalModItem.xaml.vb` 第 298 行 `If(Entry.ProjectVersion.Version, Entry.ProjectVersion.Display)`，PCL2 对 CF 也是 `Version = Nothing`，但用 `Display`（即 `displayName`）作为 fallback
+- **修复**：新建 `minecraft/community/version_extract.rs` 共享工具，从 `display_name` 提取版本号
+  - CurseForge 的 `displayName` 通常类似 `jei-1.20.1-15.2.0.27.jar`，提取出 `15.2.0.27`
+  - 有 `+` 分隔符时取 `+` 前面的版本号（如 `alltheleaks-1.1.1+1.20.1-forge.jar` → `1.1.1`）
+  - 无 `+` 时取最后一个版本号（mod 版本号通常在 MC 版本号后面）
+- `curseforge/convert.rs`：`convert_version` 调用 `version_extract::extract_version_from_name(&file.display_name)` 填充 `version` 字段
+- `mods/metadata/mod.rs`：移除内联 `extract_version_from_filename`，改用共享的 `version_extract::extract_version_from_name`（消除重复代码）
+- Modrinth 的 `version` 来自 API 的 `version_number` 字段，不需要 fallback
+
+#### 版本变化提示视觉重做
+- **问题**：底部状态栏的小徽章（text-xs）视觉上不够突出，和操作按钮挤在一起
+- **改进设计**：参考 npm / VS Code 扩展更新的版本对比设计，从底部小徽章提升为独立的"双卡片+大箭头"对比区域
+- 新建 `VersionChangeBadge.vue` 组件（100 行）：
+  - 左侧：当前版本卡片（白底灰边，`当前` 标签 + 等宽字体版本号）
+  - 中间：大箭头图标（w-5 h-5）+ 状态标签（升级↑/降级↓/同版本✓/切换→）
+  - 右侧：选中版本卡片（彩色底+彩色边，颜色随状态变化：升级绿/降级琥珀/同版本灰/未知蓝）
+  - 右侧：下载量（如有）
+- 位置从底部状态栏移到 mod 信息卡片下方、过滤器上方，成为视觉焦点
+- 底部状态栏简化为只保留取消/安装按钮（`justify-end`），更简洁
+- `ModUpdateDialog.vue` 从 442 行降至 391 行（版本变化逻辑抽到独立组件）
+- 移除不再使用的 `hasUnknownVersion` 计算属性和 `formatDownloads`/`ArrowUpIcon`/`ArrowDownIcon`/`CheckCircleIcon` 导入
+
+#### 版本列表简化 + 回退版本变化 UI
+- **版本列表表格简化**：隐藏"版本号"列，改为只显示"文件名"列（文件全称）
+  - 之前同时显示 `ver.version`（版本号）和 `ver.file_name`（文件名），信息冗余
+  - 现在只显示 `ver.file_name`，超长时 truncate 并保留原生 `title` tooltip
+- **回退 VersionChangeBadge 双卡片设计**：用户反馈"还不如原来左下角那个"
+  - 删除 `VersionChangeBadge.vue` 组件
+  - 恢复左下角小徽章版本变化提示（彩色徽章 + 图标 + `当前版本 → 选中版本` + 下载量）
+  - 简化未知版本的文案逻辑：`mod.version` 有值显示"已选择"，无值显示"当前版本未知"
+
+#### 版本列表自定义 Tooltip 恢复 + 徽章视觉优化
+- **恢复自定义 Tooltip**：版本列表文件名回退为原生 `title` 的问题修复
+  - 重新导入 `Tooltip` 组件
+  - 文件名长度超过 28 字符时才用 Tooltip（短文件名不需要，避免过度触发）
+  - 添加 `cursor-help` 样式提示可悬停
+- **左下角徽章视觉优化**：从矩形 `rounded-md` 改为胶囊式 `rounded-full`，更精致
+  - 统一为单个胶囊容器，通过 `:class` 动态切换背景色和边框色（升级绿/降级琥珀/同版本灰/未知蓝）
+  - 旧版本号用删除线 + 灰色（表示将被替换），新版本号用彩色加粗高亮
+  - 同版本时不显示旧版本和箭头，只显示 `✓ + 版本号`
+  - 未知状态用小圆点替代图标，视觉更轻量
+
+#### 移除版本更新弹窗的筛选器
+- **问题**：更新/更换 mod 版本时，游戏版本和模组加载器由当前整合包决定，用户不可能切换，筛选框是多余的
+- **移除**：删除模板中的游戏版本 Select、加载器 Select、"全部"复选框
+- **保留自动筛选逻辑**：`filteredVersions` 仍按当前整合包的 MC 版本（`props.mcVersion`）和加载器（`modLoaderType`）自动筛选
+- 移除不再使用的 `Select` 组件导入、`gameVersionOptions`、`loaderOptions`、`showAllVersions`
+- 简化 `loadVersions` 中的自动选中逻辑：直接用 `props.mcVersion` 和 `modLoaderType`，不再检查 `gameVersionOptions.includes`
+
+#### Fabric/Forge 启动 ClassNotFoundException 修复
+- **根因**：`build_classpath` 只读取当前版本 JSON 的 `libraries`，不递归合并父版本的 libraries
+  - Fabric 版本 JSON 有 `inheritsFrom`，其 `libraries` 只包含 Fabric Loader 相关库
+  - 原版库（lwjgl、netty 等）来自父版本 JSON
+  - 不递归合并导致 classpath 缺失 Fabric Loader 库，启动时报 `ClassNotFoundException: net.fabricmc.loader.impl.launch.knot.KnotClient`
+- **修复**：参考 PCL2 `McLibListGet`，新增 `collect_libraries_recursive` 递归合并父版本 libraries
+  - 遍历 `inheritsFrom` 链，把所有层级的 libraries 合并到一起
+  - 子版本 libraries 排在前面（优先级更高）
+  - 循环继承检测（防止 `inheritsFrom` 成环导致死循环）
+  - 使用 `HashSet` 去重，避免同一 jar 被重复加入 classpath
+- **崩溃分析器增强**：`crit1.rs` 新增 `ClassNotFoundException` 规则
+  - 提取缺失的类名（支持跨行匹配）
+  - 根据类名智能判断具体原因：
+    - 类名含 `fabric`/`knot` → "Fabric 加载器库缺失"
+    - 类名含 `forge`/`fml`/`modlauncher` → "Forge 加载器库缺失"
+    - 类名含 `neoforge` → "NeoForge 加载器库缺失"
+    - 其他 → "Java 类缺失" + 具体类名
+  - 给出"重新安装该版本的加载器"的建议
+
+#### 启动时文件检查速度优化（60 秒 → 0.5 秒）
+- **根因**：`find_missing_libs` 对每个 lib **串行**调用 `FileChecker.is_valid`，其中哈希校验会读取整个文件并计算 SHA1。73 个 lib（约 200MB）串行计算哈希非常慢，导致每次启动卡 1 分钟
+- **参考 PCL2**：阅读 `ModLaunch.vb` 第 1705 行，PCL2 启动时构建 classpath 只调用 `McLibListGet` 获取路径列表，**不做任何文件校验和哈希检查**。文件校验和下载在安装阶段做，启动时不重复校验
+- **优化方案**：新增 `quick_check` 参数区分两种场景：
+  - **快速检查模式**（`quick_check = true`，启动时）：只检查文件存在 + 大小匹配，不计算 SHA1
+    - 用于 `fix_version_files` 经 `validate_and_fix_files` 调用
+    - 文件下载时已经做过完整校验，正常情况下不会损坏
+  - **完整校验模式**（`quick_check = false`，下载时）：计算 SHA1 哈希，确保文件完整性
+    - 用于 `download_version_full` 的版本安装/修复
+- **并行化**：使用 `std::thread::scope` 并行检查多个库文件
+  - 按 CPU 核心数分线程（`available_parallelism`），按索引取模分配库文件
+  - 使用 `Mutex<Vec<LibEntry>>` 收集结果，最后按原顺序排序
+- `find_missing_libs` 新增 `quick_check` 参数
+- `download_libraries` 新增 `quick_check` 参数透传
+- `fix.rs`（启动时）传 `true`，`full_download.rs`（下载时）传 `false`
+- 日志增加模式标识：`[Libraries] Total: 73, Missing: 7 (mode: quick)`
+- **预期效果**：73 个库的检查时间从约 60 秒降至约 0.5 秒（120 倍提速）
+
+#### Assets 文件检查速度优化（启动卡顿的真正元凶）
+- **根因**：上一次优化只修了 `find_missing_libs`，但 `find_missing_assets` 仍然是**串行 + 完整哈希校验**。Assets 通常有几百上千个文件（音效、纹理等），串行计算 SHA1 是启动卡 44 秒的真正元凶
+- **优化**：对 `find_missing_assets` 应用与 `find_missing_libs` 相同的优化方案
+  - 新增 `quick_check` 参数，快速检查模式只检查文件存在 + 大小匹配
+  - 使用 `std::thread::scope` 并行检查，按 CPU 核心数分线程
+  - 新增 `quick_check_asset` 辅助函数
+- `download_assets` 新增 `quick_check` 参数透传
+- `fix.rs`（启动时）传 `true`，`full_download.rs`（下载时）传 `false`
+- 日志增加模式标识：`[Assets] Total: 580, Missing: 12 (mode: quick)`
+- **预期效果**：assets 检查时间从约 40 秒降至约 1 秒（40 倍提速）
+
+#### Fabric 启动 ClassNotFoundException 真正根因修复：主 jar 未下载
+- **根因**：`fix_version_files`（启动时文件补全）只调用了 `download_libraries` 和 `download_assets`，**缺少 `download_client_jar`**！导致主 jar 文件（如 `26.2-Fabric0.19.3.jar`）不存在，启动时 classpath 缺失主 jar
+- **日志证据**：`[Classpath] Warning: Main jar not found: ...26.2-Fabric0.19.3.jar`
+- **修复**：在 `fix.rs` 中添加 `download_client_jar` 调用，作为文件补全的第 1 步
+  - 用 `merged_json` 获取 `downloads.client` 字段（支持 inheritsFrom，父版本的 client jar 信息会合并进来）
+  - 主 jar 下载失败不中断流程（某些特殊版本可能没有 client jar，用 `log_info` 记录后继续）
+- **`download_client_jar` 修复**：用 `find_original_version` 确定主 jar 的正确路径
+  - 之前直接用传入的 `version_id` 构造路径，对于有 `inheritsFrom` 的版本会下载到错误位置
+  - 有 `inheritsFrom` 时主 jar 应在父版本目录下（如 Fabric 版本的主 jar 在原版目录 `versions\26.2\26.2.jar`）
+  - 无 `inheritsFrom` 时主 jar 在当前版本目录下
+  - `find_original_version` 改为 `pub(crate)`，`classpath` 模块改为 `pub(crate) mod`
+- **关于"卡 41 秒"的澄清**：这不是检查慢，而是下载 7 个缺失库的网络耗时
+  - 检查本身是秒过的（quick 模式生效，日志 `mode: quick`）
+  - `[Libraries] Total: 73, Missing: 7` 打印后，到 `[Assets]` 之间的 36 秒是在下载那 7 个缺失的库
+  - 下载耗时取决于网络速度和文件大小，属正常现象
+
+#### 崩溃分析结果前端无提示修复 + PCL2 风格崩溃弹窗
+- **根因**：`launch` 命令在 `pipeline.execute().await` 返回 `Err` 时（如 `ClassNotFoundException` 致命错误），通过 `?` 直接返回 Err，**后面的 `tokio::spawn` 监听 `exit_rx` 退出事件的任务永远不会被创建**。所以 `game-exited` 事件永远不会发送，前端收不到崩溃信息
+- **后端修复**：`launch.rs` 捕获 `LaunchProcess` 阶段的失败，等待 watcher 完成崩溃分析后手动发送 `game-exited` 事件
+  - 只对 `LaunchProcess` 阶段的失败做崩溃分析（`GetJava`/`Login` 等阶段失败不需要）
+  - 等待 `exit_rx` 最多 15 秒，避免无限等待
+  - 如果崩溃分析无结果，构造基本的 `CrashInfo`（用 `launch_err.message` 作为 reason）
+  - 清理启动状态后发送 `game-exited` 事件，让前端展示崩溃对话框
+- **前端优化**：`CrashDialog.vue` 参考 PCL2 `MyMsgText` 风格优化
+  - 参考 PCL2 `MyMsgText.xaml`：
+    - 浅灰白底 `#FBFBFB`（PCL2 的 `Background="#FBFBFB"`）
+    - 圆角 `rounded-lg`（PCL2 的 `CornerRadius="7"`）
+    - 标题下方加 2px 分割线（PCL2 的 `ShapeLine`，与标题同色）
+    - 遮罩半透明黑色 `bg-black/40`（PCL2 的 `RGBA(90,0,0,0)`）
+  - 参考 PCL2 `MyMsgText.xaml.vb` 进入动画：
+    - 透明度 0→1（120ms）
+    - Y 偏移 40→0（300ms，回弹缓动 `cubic-bezier(0.34, 1.56, 0.64, 1)`）
+    - 关闭时下沉 20px + 淡出
+  - Transition 名从 `modal` 改为 `crash-modal`，添加 scoped 样式
+
+#### Fabric 库下载失败根因修复 + CrashDialog 报错修复 + PCL2 风格重做
+- **Fabric 库 size/sha1 读取修复**（`libraries.rs` `parse_libraries`）
+  - **根因**：Fabric 版本 JSON 的库格式与 Mojang 不同：
+    ```json
+    { "name": "org.ow2.asm:asm:9.10.1", "sha1": "...", "size": 126151, "url": "https://maven.fabricmc.net/" }
+    ```
+    size 和 sha1 在**根级别**，不在 `downloads.artifact` 里
+  - 之前没有 `downloads.artifact` 时，else 分支直接设 `size=0, sha1=None`，导致：
+    - `find_missing_libs` 快速检查时 `size=0` 只检查文件存在，文件不存在就标记为缺失
+    - 下载时 `expected_size=0` 无法校验
+    - 每次启动都缺失 7 个 Fabric 库（fabric-loader、asm、sponge-mixin 等）
+  - **修复**：else 分支从根级别读取 `size` 和 `sha1`
+- **下载日志可见性修复**（`downloader.rs`）
+  - 之前关键日志用 `log_debug`，默认不输出，导致看不到下载过程
+  - 改为 `log_info`：开始下载时输出 `local_path`、`size`、`urls`
+  - 跳过已存在文件时输出日志
+  - 下载失败时输出尝试的 URL 数量
+- **CrashDialog `log_tail` undefined 报错修复**（`types.rs`）
+  - **根因**：`CrashInfo.log_tail` 有 `#[serde(skip_serializing_if = "Vec::is_empty")]`，空时序列化跳过该字段，前端收到 `undefined`
+  - **修复**：移除 `skip_serializing_if`，只保留 `default`，确保字段始终序列化
+  - `log_lines` 也加 `default` 防御
+  - 前端 `CrashDialog.vue` 加防御性处理：`crashInfo.value?.log_lines ?? []`
+- **CrashDialog 重做为 PCL2 风格**（严格参考 `MyMsgText.xaml`）
+  - 标题字号 23px（PCL2 `LabTitle FontSize=23`）
+  - 标题下方 2px 分割线（PCL2 `ShapeLine`，与标题同色 `bg-gray-700/80`）
+  - 内容字号 15px（PCL2 `LabCaption FontSize=15`）
+  - 文字颜色 `#5C5C5C`（PCL2 `LabCaption Foreground="#FF5C5C5C"`）
+  - 去掉"崩溃原因""建议"等小标题卡片，改为 PCL2 风格的纯文本段落（参考 `GetAnalyzeResult` 输出）
+  - 浅灰白底 `#FBFBFB`，圆角 `rounded-lg`（PCL2 `CornerRadius="7"`）
+  - 按钮 3 个右对齐：查看输出 / 导出错误报告 / 确定（PCL2 `PanBtn`）
+  - 进入动画：透明度 0→1（120ms）+ Y 偏移 40→0（300ms 回弹缓动）
+
+#### Fabric 库 URL 拼接修复 + CrashDialog 严格复刻 PCL2 配色
+- **URL 拼接缺斜杠修复**（`libraries.rs` `root_url` 构造）
+  - **根因**：`format!("{}{}", u.trim_end_matches('/'), path)` 把 URL 结尾的 `/` 去掉后直接拼接，导致 `https://maven.fabricmc.net/` + `org/ow2/asm/...` 变成 `https://maven.fabricmc.netorg/ow2/asm/...`（缺少斜杠）
+  - **修复**：改为 `format!("{}/{}", u.trim_end_matches('/'), path)`，用 `/` 连接
+- **parse_libraries 读取 Fabric 格式 size/sha1**（之前修改未保存，重新修复）
+  - Fabric 版本 JSON 的库格式：`{ "name": "...", "sha1": "...", "size": 126151, "url": "..." }`
+  - size 和 sha1 在根级别，不在 `downloads.artifact` 里
+  - else 分支从根级别读取 `library["size"]` 和 `library["sha1"]`
+- **CrashDialog 严格复刻 PCL2 配色**（参考 `MyMsgText.xaml` + `Application.xaml`）
+  - 在 `tailwind.config.js` 添加 PCL2 颜色系：
+    - `pcl-1`=`#343d4a`（深灰蓝，正文/默认文字/阴影）
+    - `pcl-2`=`#0b5bcb`（主蓝，标题/Highlight 按钮）
+    - `pcl-3`=`#1370f3`（亮蓝，悬停态边框）
+    - `pcl-7`=`#e0eafd`（按钮悬停背景）
+    - `pclmsg-bg`=`#FBFBFB`（弹窗背景）
+    - `pclmsg-caption`=`#5C5C5C`（正文文字，写死不随主题变）
+  - 弹窗配色严格对应 PCL2：
+    - 标题 `text-pcl-2`（`#0b5bcb`），字号 23px
+    - 分割线 `bg-pcl-2`（与标题同色，高 2px）
+    - 正文 `text-pclmsg-caption`（`#5C5C5C`），字号 15px，行高 18px
+    - 背景 `bg-pclmsg-bg`（`#FBFBFB`）
+    - 阴影 `shadow-[0_4px_20px_rgba(52,61,74,0.5)]`（PCL2 DropShadowEffect）
+    - 遮罩 `bg-black/35`（PCL2 `rgba(0,0,0,0.353)`）
+  - 按钮配色参考 PCL2 MyButton 三态：
+    - 确定按钮（Highlight 态）：边框 `border-pcl-2`，文字 `text-pcl-2`，hover 变 `pcl-3` + 背景 `pcl-7`
+    - 查看输出/导出按钮（Normal 态）：边框 `border-pcl-1`，文字 `text-pcl-1`，hover 同上
+    - 按钮背景 `bg-white/30`（PCL2 `ColorBrushHalfWhite #55ffffff`）
+    - 圆角 `rounded`（PCL2 `CornerRadius=3`）
+    - 过渡 `duration-100`（PCL2 颜色过渡 100ms）
+
+#### Mod 更新对话框 UI 重做
+- **版本变化徽章视觉突出**：底部状态栏从纯文字改为彩色徽章卡片样式（参考 `Alert` 组件的色块结构）
+  - 升级：绿色徽章（`bg-green-50 border-green-200`）+ ↑ 图标 + `1.2.0 → 1.3.0` 等宽字体
+  - 降级：琥珀色徽章（`bg-amber-50 border-amber-200`）+ ↓ 图标 + 版本号
+  - 同版本：灰色徽章 + ✓ 图标 + 版本号
+  - 未知/已选择：蓝色徽章 + `→` 箭头 + 选中版本号
+  - 版本号使用 `font-mono` 等宽字体，对齐数字和 `.` 便于阅读
+- **按钮样式重做**（对齐项目 `Modal` / `DownloadPanel` 组件的配色约定）：
+  - 取消按钮：`text-gray-600 hover:bg-gray-200`（移除 border，与 Modal 次按钮一致）
+  - 安装按钮：`bg-primary-600 hover:bg-primary-700`（从 `bg-blue-500` 改为项目主色 `primary-600`）
+  - 禁用状态添加 `disabled:hover:bg-primary-600` 防止 hover 覆盖禁用样式
+- **自定义 Tooltip 替换原生 title**：
+  - 版本列表中文件名的 `:title="ver.file_name"` 改为 `<Tooltip>` 组件
+  - 添加 `cursor-help` 样式提示可悬停
+  - 使用 200ms 延迟避免快速划过时频繁触发
+
 ### 修复
 
 #### 下载阶段重复显示

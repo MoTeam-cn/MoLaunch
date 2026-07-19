@@ -23,7 +23,7 @@ pub mod pipeline;
 pub mod watcher;
 
 mod arguments;
-mod classpath;
+pub(crate) mod classpath;
 mod embedded;
 mod game_args;
 mod jvm_args;

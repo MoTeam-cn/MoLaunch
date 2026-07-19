@@ -82,6 +82,11 @@ pub(crate) fn convert_project(entry: &CfModEntry, rtype: ResourceType) -> Resour
 }
 
 /// 将 CurseForge 文件转换为统一 ResourceVersion
+///
+/// 版本号 fallback（参考 PCL2 `MyLocalModItem.GetUpdateCompareDescription` 第 298 行）：
+/// CurseForge API 不直接提供 mod 版本号字段（PCL2 中 `Version = Nothing`），
+/// PCL2 用 `Display`（即 `displayName`）作为 fallback 进行版本对比。
+/// 这里从 `display_name` 提取版本号，提取失败则用 `display_name` 本身。
 pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
     let mod_loaders = file
         .game_versions
@@ -105,10 +110,14 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
 
     let download_url = parse_cf_download_url(&file.download_url, &file.file_name, file.id);
 
+    // 版本号 fallback：从 display_name 提取（参考 PCL2 第 298 行）
+    // CurseForge 的 displayName 通常类似 "jei-1.20.1-15.2.0.27.jar"
+    let version = crate::minecraft::community::version_extract::extract_version_from_name(&file.display_name);
+
     ResourceVersion {
         id: file.id.to_string(),
         display: file.display_name.clone(),
-        version: String::new(), // CurseForge 无版本号字段
+        version,
         release_date: file.file_date.clone(),
         download_count: file.download_count,
         mod_loaders,

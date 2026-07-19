@@ -34,10 +34,6 @@ pub struct ModInfo {
     /// fabric.mod.json 的 version / mods.toml 的 version / mcmod.info 的 version
     #[serde(default)]
     pub version: String,
-    /// Mod 图标（base64 data URL，从 jar 内 logo 文件提取，可能为 None）
-    /// 前端可直接用作 <img src> 加载
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub logo_data: Option<String>,
     /// Mod slug（来自 jar 内 metadata：fabric.mod.json 的 id / mods.toml 的 modId / mcmod.info 的 modid）
     /// 用于「详情」按钮关联 CF/MR 平台工程和「前往百科」按钮查 mcmod.cn 直链
     #[serde(default)]
@@ -50,7 +46,6 @@ pub(crate) struct ModMetadata {
     pub slug: String,
     pub description: String,
     pub version: String,
-    pub logo_data: Option<String>,
     pub translated_name: String,
 }
 
@@ -59,6 +54,4 @@ pub(super) struct ModMeta {
     pub slug: Option<String>,
     pub description: String,
     pub version: String,
-    pub icon_path: Option<String>,
-    pub logo_file: Option<String>,
 }

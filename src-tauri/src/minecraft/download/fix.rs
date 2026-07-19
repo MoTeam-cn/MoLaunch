@@ -1,11 +1,12 @@
-//! 补全版本文件（libraries + assets）
+//! 补全版本文件（主 jar + libraries + assets）
 
 use std::path::Path;
 
+use crate::log_info;
 use super::super::sources::DownloadSourceMode;
 use super::super::version::json_merge;
 use super::manager::DownloadManager;
-use super::stages::{download_assets, download_libraries};
+use super::stages::{download_assets, download_client_jar, download_libraries};
 
 /// 补全版本文件
 pub async fn fix_version_files(
@@ -35,20 +36,46 @@ pub async fn fix_version_files(
     // 复用单个 DownloadManager 实例（与 download_version_full 一致）
     let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
 
+    // 1. 下载主 jar（client.jar）
+    // 修复：之前 fix_version_files 漏了主 jar 下载，导致启动时报
+    // "Main jar not found" + ClassNotFoundException
+    // download_client_jar 内部用 find_original_version 确定正确的 jar 路径
+    // （有 inheritsFrom 时下载到父版本目录，无 inheritsFrom 时下载到当前版本目录）
+    if let Err(e) = download_client_jar(
+        &merged_json,
+        game_dir,
+        version_id,
+        mirror_url,
+        &manager,
+        None,
+    )
+    .await
+    {
+        log_info!("[Fix] download_client_jar failed (may be expected for some versions): {}", e);
+    }
+
+    // 2. 下载 Libraries（启动时用快速检查模式）
+    // 启动时的文件补全：使用快速检查模式（只检查文件存在 + 大小，不计算 SHA1）
+    // 参考 PCL2 启动流程：启动时只构建 classpath，不做哈希校验，避免每次启动卡顿
+    // 文件下载时已经做过完整校验，正常情况下不会损坏
     let _ = download_libraries(
         &merged_json,
         game_dir,
         mirror_url,
         &manager,
         None,
+        true, // quick_check
     )
     .await?;
+
+    // 3. 下载 Assets（启动时用快速检查模式）
     let _ = download_assets(
         &merged_json,
         game_dir,
         mirror_url,
         &manager,
         None,
+        true, // quick_check
     )
     .await?;
 

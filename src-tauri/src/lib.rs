@@ -102,6 +102,7 @@ pub fn run() {
             commands::version::list::list_installed_versions_with_type,
             commands::version::list::uninstall_version,
             commands::version::list::get_version_effective_dir,
+            commands::version::list::get_version_game_version,
             // - folder: 游戏目录管理
             commands::version::folder::list_mc_folders,
             commands::version::folder::add_mc_folder,
@@ -138,6 +139,8 @@ pub fn run() {
             commands::version::mods::open_mods_dir,
             commands::version::mods::reveal_mod_file,
             commands::version::mods::get_version_mods_dir,
+            commands::version::mods::watcher::watch_mods_dir,
+            commands::version::mods::watcher::unwatch_mods_dir,
             // - preload: Mod 详情预加载
             commands::version::preload::preload_mods_detail_cmd,
             // - progress: 下载进度与控制

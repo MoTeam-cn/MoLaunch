@@ -144,9 +144,17 @@ export interface ModInfo {
   description?: string
   /** Mod 版本号（来自 jar 内 metadata，可能为空） */
   version?: string
-  /** Mod 图标（base64 data URL，从 jar 内 logo 文件提取，可能为空） */
-  logo_data?: string
-  /** Mod slug（来自 jar 内 metadata，用于关联 CF/MR 平台工程和查 mcmod.cn 直链） */
+  /**
+   * Mod 图标缓存 URL（由预加载阶段填充）
+   *
+   * 设计参考 PCL2 ResourceProject.ApplyLogoToMyImage + 本项目皮肤/披风 cached_url：
+   * - 后端预加载查到平台工程后，调用 `image_cache::get_image_url` 处理 `project.logo_url`
+   * - 命中缓存：返回 `cache-image://{hash}.png`，零网络请求
+   * - 未命中：返回原始远程 URL，后端异步下载，完成后 emit `image-cached` 事件通知前端刷新
+   * - 列表初始加载时为空，显示默认图标；预加载完成后自动更新为真实 logo
+   */
+  cached_logo_url?: string
+  /** Mod slug（来自 jar 内 metadata：fabric.mod.json 的 id / mods.toml 的 modId / mcmod.info 的 modid） */
   slug: string
   /**
    * 预加载到的平台工程详情（由 `preload_mods_detail_cmd` 后台批量查询填充）。
@@ -221,6 +229,28 @@ export async function revealModFile(versionId: string, fileName: string): Promis
  */
 export async function getVersionModsDir(versionId: string): Promise<string> {
   return await invoke<string>('get_version_mods_dir', { versionId })
+}
+
+/**
+ * 开始监听版本 mods 目录的文件变化（参考 PCL2 PageInstanceMod FileSystemWatcher）
+ *
+ * 后台启动 `notify` 文件监听，当 mods 目录中的文件被创建/修改/删除时，
+ * 通过 `mods-dir-changed` 事件通知前端。前端应监听此事件并调用 `listMods` 刷新列表。
+ *
+ * 如果已有监听中的 watcher，会自动停止旧的再启动新的（同一时间只有一个监听）。
+ * 文件变化事件经过 500ms 防抖处理，避免文件还在写入时触发过早刷新。
+ *
+ * 应在 ModTab 组件 `onMounted` 时调用，配合 `unwatchModsDir` 在 `onUnmounted` 时清理。
+ */
+export async function watchModsDir(versionId: string): Promise<void> {
+  return await invoke<void>('watch_mods_dir', { versionId })
+}
+
+/**
+ * 停止监听 mods 目录（ModTab 组件卸载时调用）
+ */
+export async function unwatchModsDir(): Promise<void> {
+  return await invoke<void>('unwatch_mods_dir')
 }
 
 /**

@@ -11,8 +11,8 @@
  * `handleShowInfo` 在 slug 为空时判断此标志：若预加载已完成则立即走本地信息弹窗，不等待。
  *
  * 事件可能分两次 emit：
- * - 元数据先到（slug/description/version/logo_data/translated_name 字段非 null）
- * - project 后到（project 字段非 null）
+ * - 元数据先到（slug/description/version/translated_name 字段非 null）
+ * - project 后到（project 字段非 null，同时 cached_logo_url 一起到）
  * 也可能一次性 emit（缓存命中时所有字段一起到）。
  *
  * 使用方式：
@@ -37,8 +37,8 @@ interface PreloadUpdatePayload {
   description?: string
   /** JAR 内读到的版本号（undefined 表示不更新） */
   version?: string
-  /** JAR 内提取的 logo（base64 data URL，undefined 表示不更新） */
-  logo_data?: string
+  /** 平台工程 logo_url 经 image_cache 处理后的缓存 URL（undefined 表示不更新） */
+  cached_logo_url?: string
   /** mcmod 数据库查到的中文译名（undefined 表示不更新） */
   translated_name?: string
   /** CF/MR 查到的平台工程（undefined 表示尚未查询或未查到） */
@@ -78,7 +78,7 @@ export function useModsPreload(mods: Ref<ModInfo[]>) {
               ...(payload.slug !== undefined ? { slug: payload.slug } : {}),
               ...(payload.description !== undefined ? { description: payload.description } : {}),
               ...(payload.version !== undefined ? { version: payload.version } : {}),
-              ...(payload.logo_data !== undefined ? { logo_data: payload.logo_data } : {}),
+              ...(payload.cached_logo_url !== undefined ? { cached_logo_url: payload.cached_logo_url } : {}),
               ...(payload.translated_name !== undefined ? { translated_name: payload.translated_name } : {}),
               // project 仅在原值为空或新值非 null 时更新（避免覆盖已加载的更优结果）
               ...(payload.project && !old.project ? { project: payload.project } : {}),

@@ -11,6 +11,7 @@
 import { computed, nextTick, reactive, ref, shallowRef, watch } from 'vue'
 import type { ResourceVersion } from '@/types/community'
 import { ModLoaderFlags } from '@/types/community'
+import { compareVersion } from '@/utils/version'
 
 /** 版本分组卡片 */
 export interface VersionGroup {
@@ -79,20 +80,6 @@ function loaderNames(flags: number): string[] {
   if (flags & ModLoaderFlags.Quilt) list.push('Quilt')
   if (flags & ModLoaderFlags.LiteLoader) list.push('LiteLoader')
   return list
-}
-
-/** 比较版本号大小（参考 PCL2 CompareVersion） */
-function compareVersion(a: string, b: string): number {
-  const parseVer = (s: string) => s.split('.').map(n => parseInt(n) || 0)
-  const pa = parseVer(a)
-  const pb = parseVer(b)
-  const len = Math.max(pa.length, pb.length)
-  for (let i = 0; i < len; i++) {
-    const va = pa[i] || 0
-    const vb = pb[i] || 0
-    if (va !== vb) return va - vb
-  }
-  return 0
 }
 
 /** 特殊分组排序权重（特殊类排后） */

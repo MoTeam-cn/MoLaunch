@@ -6,20 +6,23 @@
  * 右侧根据当前分类渲染对应子组件
  * 共享状态通过 useVersionSettings composable 单例管理
  */
-import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted, watch } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import {
   Squares2X2Icon,
   Cog6ToothIcon,
   PuzzlePieceIcon,
   ArrowUpTrayIcon,
 } from '@heroicons/vue/24/outline'
+import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import OverviewTab from './version-settings/OverviewTab.vue'
 import SetupTab from './version-settings/SetupTab.vue'
 import ModTab from './version-settings/ModTab.vue'
 
 const router = useRouter()
+const route = useRoute()
+const versionStore = useVersionStore()
 const { selectedId, initContext } = useVersionSettings()
 
 const activeCategory = ref('overview')
@@ -37,7 +40,35 @@ function goBack() {
   router.push('/apps')
 }
 
-onMounted(initContext)
+// 路由 query 中的版本 ID 与 store 双向同步：
+// - 进入页面时：优先用 query.id，其次用 store.selectedVersion，最后从 config.ini 恢复
+// - store 变化时：同步到 query（刷新页面后 URL 仍带 id，可直接恢复）
+watch(selectedId, (val) => {
+  const currentQueryId = route.query.id as string | undefined
+  if (val && val !== currentQueryId) {
+    router.replace({ query: { ...route.query, id: val } })
+  } else if (!val && currentQueryId) {
+    // selectedVersion 被清空时移除 query.id
+    const { id: _id, ...rest } = route.query
+    router.replace({ query: rest })
+  }
+}, { immediate: true })
+
+onMounted(async () => {
+  // 1. 优先从 URL query 读取版本 ID（支持刷新页面、分享链接）
+  const queryId = route.query.id as string | undefined
+  if (queryId && queryId !== versionStore.selectedVersion) {
+    versionStore.selectedVersion = queryId
+  }
+
+  // 2. 若仍无选中版本，尝试从 config.ini 恢复（刷新 /apps/versions/setup 时不会经过 Home.vue）
+  if (!versionStore.selectedVersion) {
+    await versionStore.restoreSelectedVersion()
+  }
+
+  // 3. 初始化版本上下文（gameDir / effectiveDir / personalization 等）
+  await initContext()
+})
 </script>
 
 <template>
