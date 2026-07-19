@@ -17,10 +17,10 @@ use crate::storage::Storage;
 use serde::Serialize;
 
 /// 注册表键名：开发者模式是否已解锁
-const KEY_DEV_UNLOCKED: &str = "DeveloperUnlocked";
+pub const KEY_DEV_UNLOCKED: &str = "DeveloperUnlocked";
 
 /// 注册表键名：开发者模式是否开启
-const KEY_DEV_MODE: &str = "DeveloperMode";
+pub const KEY_DEV_MODE: &str = "DeveloperMode";
 
 // ============================================================
 // 解锁与开关
@@ -29,6 +29,7 @@ const KEY_DEV_MODE: &str = "DeveloperMode";
 /// 查询开发者模式是否已解锁（用户连续点击版本号 5 次后解锁）
 ///
 /// 未解锁时返回 false，「高阶配置」页不显示开发者模式开关卡片。
+/// 开关的开启状态由 `get_config` / `apply_config` 统一管理（developerMode 字段）。
 #[tauri::command]
 pub fn is_developer_unlocked() -> bool {
     reg_get_bool(KEY_DEV_UNLOCKED)
@@ -42,27 +43,6 @@ pub fn is_developer_unlocked() -> bool {
 pub fn unlock_developer_mode() -> Result<(), String> {
     log_info!("[Developer] 开发者模式已解锁");
     reg_set_bool(KEY_DEV_UNLOCKED, true)
-}
-
-/// 查询开发者模式是否开启
-///
-/// 开启后「设置」侧边菜单将出现「开发者」项。
-/// 未解锁时也返回 false（开关未显示自然不会开启）。
-#[tauri::command]
-pub fn is_developer_mode() -> bool {
-    is_developer_unlocked() && reg_get_bool(KEY_DEV_MODE)
-}
-
-/// 设置开发者模式开关
-///
-/// 仅在已解锁时可生效。未解锁时调用返回错误。
-#[tauri::command]
-pub fn set_developer_mode(enabled: bool) -> Result<(), String> {
-    if !is_developer_unlocked() {
-        return Err("开发者模式尚未解锁".to_string());
-    }
-    log_info!("[Developer] 开发者模式开关: {}", enabled);
-    reg_set_bool(KEY_DEV_MODE, enabled)
 }
 
 // ============================================================

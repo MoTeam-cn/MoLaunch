@@ -6,20 +6,14 @@
  * - 进度条（渐变色）
  * - 已下载/总大小 + 百分比
  *
- * 内部 helper：formatSpeed、downloadPercent（仅本组件使用）
+ * 内部 helper：downloadPercent（仅本组件使用）
  */
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatSpeedCompact } from '@/utils/format'
 import type { CommunityDownloadProgress } from '@/composables/useCommunityDownload'
 
 const props = defineProps<{
   progress: CommunityDownloadProgress
 }>()
-
-function formatSpeed(bytesPerSec: number): string {
-  if (bytesPerSec >= 1_048_576) return (bytesPerSec / 1_048_576).toFixed(1) + ' MB/s'
-  if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(0) + ' KB/s'
-  return bytesPerSec + ' B/s'
-}
 
 function downloadPercent(): number {
   if (!props.progress || props.progress.total === 0) return 0
@@ -34,7 +28,7 @@ function downloadPercent(): number {
         {{ progress.fileName }}
       </span>
       <span class="text-xs text-gray-500 ml-2">
-        {{ formatSpeed(progress.speed) }}
+        {{ formatSpeedCompact(progress.speed) }}
       </span>
     </div>
     <div class="h-1.5 overflow-hidden rounded-full bg-gray-100">

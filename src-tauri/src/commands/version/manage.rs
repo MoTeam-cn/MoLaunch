@@ -92,9 +92,7 @@ pub async fn rename_version(
 
     log_info!("Renaming version: {} -> {}", version_id, new_name);
 
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
 
     let versions_dir = game_dir.join("versions");
     let old_dir = versions_dir.join(&version_id);

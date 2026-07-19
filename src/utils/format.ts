@@ -22,6 +22,19 @@ export function formatSpeed(bytesPerSecond: number): string {
 }
 
 /**
+ * 紧凑速度格式（用于下载进度条等空间受限场景）
+ *
+ * - >= 1 MB/s：显示 "X.X MB/s"
+ * - >= 1 KB/s：显示 "X KB/s"
+ * - 否则：显示 "X B/s"
+ */
+export function formatSpeedCompact(bytesPerSec: number): string {
+  if (bytesPerSec >= 1_048_576) return (bytesPerSec / 1_048_576).toFixed(1) + ' MB/s'
+  if (bytesPerSec >= 1024) return (bytesPerSec / 1024).toFixed(0) + ' KB/s'
+  return bytesPerSec + ' B/s'
+}
+
+/**
  * 格式化以 MB 为单位的内存数值为可读字符串
  *
  * - >= 1024 MB 显示为 GB（1 位小数，去掉无意义的 .0 后缀）
@@ -47,4 +60,14 @@ export function formatDownloads(n: number): string {
   if (n >= 100_000_000) return (n / 100_000_000).toFixed(2) + ' 亿'
   if (n >= 10_000) return (n / 10_000).toFixed(1).replace(/\.0$/, '') + ' 万'
   return String(n)
+}
+
+/**
+ * 格式化 ISO 日期字符串为 YYYY-MM-DD
+ *
+ * 用于展示文件发布日期等场景。非 ISO 格式原样返回。
+ */
+export function formatDate(dateStr: string): string {
+  if (!dateStr) return ''
+  return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
 }

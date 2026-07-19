@@ -6,7 +6,7 @@ import SettingsPersonal from './settings/SettingsPersonal.vue'
 import SettingsAdvanced from './settings/SettingsAdvanced.vue'
 import SettingsOther from './settings/SettingsOther.vue'
 import SettingsDeveloper from './settings/SettingsDeveloper.vue'
-import * as tauri from '@/utils/tauri'
+import { getConfigMap } from '@/utils/api/config'
 import {
   RocketLaunchIcon,
   PaintBrushIcon,
@@ -49,7 +49,7 @@ const categories = computed(() => {
 const activeDesc = () => categories.value.find(c => c.id === activeCategory.value)?.desc ?? ''
 
 // 监听「高阶配置」页开发者模式开关变化，实时更新侧边菜单
-// （SettingsAdvanced.vue 切换开关时派发 'developer-mode-changed' 自定义事件）
+// （DevModeToggle.vue 切换开关时派发 'developer-mode-changed' 自定义事件）
 function onDevModeChanged(e: Event) {
   const detail = (e as CustomEvent).detail as boolean
   devModeEnabled.value = detail
@@ -61,7 +61,9 @@ function onDevModeChanged(e: Event) {
 
 onMounted(async () => {
   try {
-    devModeEnabled.value = await tauri.isDeveloperMode()
+    // 通过统一配置接口读取 developerMode（注册表存储，走 get_config 分流）
+    const config = await getConfigMap()
+    devModeEnabled.value = config.developerMode
   } catch (e) {
     console.error('Failed to check developer mode:', e)
   }

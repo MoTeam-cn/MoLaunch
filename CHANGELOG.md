@@ -7,6 +7,146 @@
 
 ## [未发布]
 
+### 重构
+
+#### 阶段 1：重复代码整合（参考 docs/CODE_QUALITY_REPORT.md）
+
+##### 1.1 useConfigPage composable（消除 4 处 Settings 页样板）
+- 新建 `src/composables/useConfigPage.ts`：抽象 onMounted 加载配置 + useDebouncedSave('patch', applyConfig) + watch+markDirty+loaded 守卫三件套
+- 重构 `SettingsDownload.vue`、`SettingsAdvanced.vue`、`CommunityConfigCard.vue`、`SettingsLaunch.vue` 使用 useConfigPage，每处减少 15-25 行样板代码
+
+##### 1.2 useMemoryVisualizer composable（消除内存可视化重复）
+- 新建 `src/composables/useMemoryVisualizer.ts`：封装系统内存轮询 + 6 个 computed（totalMemoryMB/usedMemoryMB/gameMemoryMB/otherMemoryMB/usedPercent/gamePercent）+ applyAutoMemory
+- 重构 `SettingsLaunch.vue` 和 `MemorySection.vue` 使用 useMemoryVisualizer，消除两文件间逐字相同的内存可视化逻辑
+
+##### 1.6 + 1.7 后端 state helper（消除 12 处 lock/clone/drop 套件）
+- 在 `state/mod.rs` 新增 `resolve_mirror_and_source(state)` 和 `resolve_game_dir_from_state(state)` 两个 async helper
+- 重构 `loaders.rs`（5 处 mirror_and_source）、`personalization.rs`（2 处 game_dir）、`manage.rs`（1 处 game_dir）、`list.rs`（4 处 game_dir）使用新 helper
+
+##### 1.9 VersionPersonalization serde rename 修复（消除 snakeMap workaround）
+- 后端 `commands/version/personalization.rs`：给 `VersionPersonalization` 加 `#[serde(rename_all = "camelCase")]`，与 `PersonalizationUpdate` 保持一致
+- 前端 `utils/api/personalization.ts`：`VersionPersonalization` 接口所有字段从 snake_case 改为 camelCase
+- 前端 `SetupTab.vue`：删除 `snakeMap` 转换表（11 行），`savePersonalField`/`saveAdvanceSwitch` 直接用字段名同步共享状态
+- 前端 `OverviewTab.vue`、`ModTab.vue`、`MemorySection.vue`、`setup-tab/JavaModeSelector.vue`：所有 `p.xxx_yyy` 访问改为 `p.xxxYyy`
+
+##### 2.1 LoaderSelect.vue 拆分（422 → 283 行，低于 300 行限制）
+- 新建 `src/composables/useFabricApi.ts`：封装 Fabric API 版本查询状态管理（state/latest/error refs + fetchFabricApi + retry + watch selected 触发）
+- 新建 `src/components/install/FabricApiInfoCard.vue`：纯展示组件，接收 state/latest/error props + emit retry，内部使用 formatBytes/formatDate
+- `src/utils/format.ts`：新增 `formatDate`（ISO 日期 → YYYY-MM-DD）
+- 重构 `src/views/LoaderSelect.vue`：使用 useFabricApi composable + FabricApiInfoCard 子组件，移除内联 Fabric API 状态/格式化代码（约 130 行）
+
+##### 3.1 install/mod.rs 拆分（612 → 253 行 + 4 个子模块）
+- 新建 `stages.rs`（115 行）：`install_all_loaders` 批量加载器安装
+- 新建 `post_install.rs`（156 行）：`merge_and_rename_version` JSON 合并 + 目录重命名
+- 新建 `setup_persist.rs`（53 行）：`save_setup_and_create_isolation` setup.ini 保存 + 隔离目录创建
+- 新建 `fabric_api.rs`（117 行）：`auto_install_fabric_api` Fabric API 自动安装
+- 重构 `mod.rs`（253 行）：保留 MC 下载编排 + 阶段管理 + 取消/错误处理，调用 4 个子模块函数
+
+##### 1.3-1.5 + 1.8 工具函数整合
+- `utils/format.ts`：新增 `formatSpeedCompact`（紧凑速度格式，用于下载进度条）
+- `utils/toast.ts`：新增 `toastSuccess`/`toastError`/`toastWarning`/`toastInfo` 推荐函数名，保留 `showSuccess` 等为兼容别名，消除与 `modal.ts` 的命名冲突
+- 新建 `utils/async.ts`：`safeCall`/`safeCallSync` 高阶函数，统一 try/catch + console.error 样板
+- 新建后端 `error_util.rs`：`log_err`/`log_err_with` 辅助函数，统一 `.map_err(|e| { log_error!(...); e.to_string() })` 样板
+- `DownloadProgressOverlay.vue`：移除本地 `formatSpeed`，改用 `formatSpeedCompact`
+- `Versions.vue`：toast 引入改用 `toastSuccess`/`toastInfo`/`toastWarning` 前缀
+
+#### 阶段 2：前端超长文件拆分
+
+##### 2.2 Downloads.vue 拆分（364 → 139 行）
+- 新建 `composables/useDownloadTaskGroups.ts`：下载任务分组逻辑
+- 新建 `components/downloads/TaskGroupCard.vue`：任务卡片子组件
+
+##### 2.3 + 2.4 SettingsLaunch + SetupTab 共建 ToggleRow
+- 新建 `components/settings/ToggleRow.vue`：公共开关行组件（Tooltip + Toggle）
+- 新建 `views/settings/settings-launch/MemoryAllocation.vue`：内存分配子组件
+- 新建 `components/version-settings/AdvanceFieldsPanel.vue`：高级选项面板
+- `SettingsLaunch.vue` 334 → 135 行，`SetupTab.vue` 340 → 232 行
+
+##### 2.5 Versions.vue 拆分（327 → 211 行）
+- 新建 `composables/useVersionInstallActions.ts`：安装/卸载/下载 handler 下沉
+- 新建 `views/downloads/DownloadSidebar.vue`：侧边栏子组件
+
+##### 2.6 ModTab.vue 拆分（309 → 104 行）
+- 新建 `composables/useModOperations.ts`：8 个 handler + filteredMods 下沉
+
+##### 2.7 SkinManager.vue 拆分（304 → 144 行）
+- 新建 `composables/useSkinOperations.ts`：7 个异步操作 + image-cache 监听下沉
+- 新建 `components/common/skin-manager/SkinPreviewPanel.vue`：预览面板子组件
+
+##### 2.8 OverviewTab.vue 拆分（303 → 177 行）
+- 新建 `composables/useVersionOverviewActions.ts`：8 个 handler 下沉
+
+#### 阶段 3：后端超长文件拆分
+
+##### 3.2 java/download.rs 拆分（554 → 121 行 mod.rs + 7 子模块）
+- 拆为 `download/{mod,constants,types,match,fetch,files,verify,progress}.rs`
+
+##### 3.3 community/preload.rs 拆分（404 → 125 行 mod.rs + 5 子模块）
+- 拆为 `preload/{mod,types,cache,hash,jar_metadata,online_query}.rs`
+
+##### 3.4 launch/watcher/analyzer.rs 拆分（728 → 88 行 mod.rs + 5 子模块）
+- 拆为 `analyzer/{mod,crit1,stack,crit3,collect,util}.rs`
+- `analyze_crit1` 函数（221行）拆为 4 个子函数
+
+##### 3.5 version/setup/mod.rs 拆分（585 → 21 行 mod.rs + 5 子模块）
+- 拆为 `setup/{mod,types,save,load,update,helpers,tests}.rs`
+- 新增 4 个分组子 struct（LoaderInfo/DisplayConfig/JavaConfig/AdvancedConfig）
+
+##### 3.6 apply_config.rs 拆分（454 → 87 行 mod.rs + 4 子模块）
+- 拆为 `apply_config/{mod,types,validate,apply,secure}.rs`
+- `apply_config_inner` 按域拆为 6 个子函数
+
+##### 3.7 launch/mod.rs 拆分（615 → 64 行 mod.rs + 5 子模块）
+- 拆为 `launch/{mod,arguments,classpath,jvm_args,game_args,embedded}.rs`
+- `build_jvm_args` 函数（146行）拆为 5 个子函数
+
+##### 3.8 java_selector.rs 拆分（511 → 26 行 mod.rs + 6 子模块）
+- 拆为 `java_selector/{mod,rules,compat,weight,select,installer,tests}.rs`
+
+##### 3.9 java/mod.rs 拆分（493 → 28 行 mod.rs + 3 子模块）
+- 拆为 `java/{mod,detect,search,select}.rs`
+- `search_java_with_paths`（138行）拆为 4 个函数 + CandidateCollector 结构体
+
+##### 3.10 download/mod.rs 拆分（549 → 30 行 mod.rs + 5 子模块）
+- 拆为 `download/{mod,version_list,full_download,stages,fix,util}.rs`
+
+##### 3.11 launch/pipeline.rs 拆分（521 → 103 行 mod.rs + 3 子模块）
+- 拆为 `pipeline/{mod,types,execute,validate}.rs`
+
+##### 3.12 download/chunk.rs 拆分（440 → 243 行 mod.rs + 4 子模块）
+- 拆为 `chunk/{mod,probe,download,merge,util}.rs`
+
+#### 阶段 4：lib.rs 优化
+
+##### 4.1 图片缓存协议抽离
+- `minecraft/image_cache.rs` 新增 `register_uri_scheme(builder)` 函数
+- `lib.rs` 中 54 行内联协议注册闭包抽离为一行调用
+- 消除 3 处重复的空响应构造
+
+##### 4.2 版本域命令分组重组
+- 47 个 version 命令按子域分组并添加注释头（list/folder/download/install/loaders/manage/personalization/mods/preload/progress/launch/script_export）
+
+#### 修复：cleanup_failed_install dead_code 警告
+- `cleanup_failed_install` 函数在 Phase 3 重构（任务 3.1）拆分 `install/mod.rs` 时丢失了调用点
+- 在 `install/mod.rs` 的两个失败路径恢复清理调用：
+  - MC 本体下载失败时（`download_version_full` 返回 Err）
+  - 加载器安装失败时（`loader_errors` 非空）
+- 用户取消安装的路径不触发清理（保留部分下载以便后续恢复）
+
+### 优化
+
+#### 开发者模式配置统一到 get_config/apply_config
+- 将开发者模式开关的获取/修改从独立 IPC（`is_developer_mode`/`set_developer_mode`）统一到 `get_config`/`apply_config`，与项目约定一致
+- 后端改动：
+  - `commands/system/apply_config.rs`：`ConfigSnapshot` 新增 `developerMode`/`developerUnlocked` 字段，`ConfigPatch` 新增 `developerMode` 字段；`get_config` 从注册表读取填充，`apply_config` 分流写入注册表（含解锁校验）
+  - `commands/system/developer.rs`：移除 `is_developer_mode`/`set_developer_mode` 命令，`KEY_DEV_UNLOCKED`/`KEY_DEV_MODE` 常量改为 `pub` 供 apply_config 引用
+  - `lib.rs`：注销 `is_developer_mode`/`set_developer_mode` 命令
+- 前端改动：
+  - `utils/api/config.ts`：`ConfigSnapshot` 新增 `developerMode`/`developerUnlocked`，`ConfigPatch` 新增 `developerMode`
+  - `utils/api/developer.ts`：移除 `isDeveloperMode`/`setDeveloperMode` 函数
+  - `components/settings/DevModeToggle.vue`：改用 `getConfigMap`/`applyConfig` 读写开发者模式
+  - `views/Settings.vue`：改用 `getConfigMap` 读取 `developerMode` 决定侧边菜单显隐
+
 ### 新增
 
 #### 下载暂停/取消功能

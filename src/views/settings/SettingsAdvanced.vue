@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
-import * as tauri from '@/utils/tauri'
-import { useDebouncedSave } from '@/composables/useDebouncedSave'
+import { ref, watch } from 'vue'
+import { useConfigPage } from '@/composables/useConfigPage'
 import Alert from '@/components/common/Alert.vue'
 import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 import DevModeToggle from '@/components/settings/DevModeToggle.vue'
@@ -16,20 +15,23 @@ import {
 const proxyMode = ref<'none' | 'system' | 'custom'>('none')
 const proxyType = ref<'http' | 'https' | 'socks5'>('http')
 const proxyUrl = ref('')
-const loaded = ref(false)
 
 // CurseForge API Key 配置（加密存储到 INI）
 const cfEnabled = ref(false)
 const cfApiKey = ref('')
 const cfShowKey = ref(false)
 
-const { markDirty } = useDebouncedSave('patch', async (patch) => {
-  try {
-    await tauri.applyConfig(patch)
-  } catch (e) {
-    console.error('Failed to save settings:', e)
-  }
-}, 1500)
+const { loaded, markDirty } = useConfigPage({
+  delay: 1000,
+  errorLabel: 'save advanced settings',
+  onLoad: (cfg) => {
+    proxyMode.value = cfg.proxyMode as typeof proxyMode.value
+    proxyType.value = cfg.proxyType as typeof proxyType.value
+    proxyUrl.value = cfg.proxyUrl
+    cfEnabled.value = cfg.curseforgeEnabled
+    cfApiKey.value = cfg.curseforgeApiKey
+  },
+})
 
 // 代理：普通 INI 存储
 watch(proxyMode, (v) => markDirty('proxyMode', v))
@@ -39,22 +41,6 @@ watch(proxyUrl, (v) => markDirty('proxyUrl', v))
 // CurseForge：走加密存储（applyConfig 内部分流到 secure_storage）
 watch(cfEnabled, (v) => markDirty('curseforgeEnabled', v))
 watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
-
-onMounted(async () => {
-  try {
-    const cfg = await tauri.getConfigMap()
-    proxyMode.value = cfg.proxyMode as typeof proxyMode.value
-    proxyType.value = cfg.proxyType as typeof proxyType.value
-    proxyUrl.value = cfg.proxyUrl
-    cfEnabled.value = cfg.curseforgeEnabled
-    cfApiKey.value = cfg.curseforgeApiKey
-  } catch (e: any) {
-    console.error('Failed to load settings:', e)
-  }
-  // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
-  await nextTick()
-  loaded.value = true
-})
 </script>
 
 <template>

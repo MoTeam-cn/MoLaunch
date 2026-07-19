@@ -2,6 +2,7 @@
 
 pub mod commands;
 pub mod config;
+pub mod error_util;
 pub mod http;
 pub mod logger;
 pub mod minecraft;
@@ -51,7 +52,7 @@ pub fn run() {
     minecraft::community::secure_storage::init_enabled();
     minecraft::community::secure_storage::set_sdk(app_state.sdk.clone());
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
@@ -94,40 +95,24 @@ pub fn run() {
             commands::image_cache::get_cached_image_url,
             commands::image_cache::invalidate_cached_image,
             commands::image_cache::clear_image_cache,
-            // 版本命令
+            // 版本命令（按子域分组；generate_handler! 不支持通配符，须逐个显式注册）
+            // - list: 版本列表与卸载
             commands::version::list::list_versions,
-            commands::version::download::download_version,
             commands::version::list::list_installed_versions,
             commands::version::list::list_installed_versions_with_type,
             commands::version::list::uninstall_version,
             commands::version::list::get_version_effective_dir,
-            commands::version::personalization::get_version_personalization,
-            commands::version::personalization::update_version_personalization,
-            commands::version::script_export::export_launch_script,
-            commands::version::manage::fix_version_files,
-            commands::version::manage::rename_version,
-            commands::version::manage::get_selected_version,
-            commands::version::manage::set_selected_version,
-            commands::version::mods::is_version_modable,
-            commands::version::mods::list_mods,
-            commands::version::mods::toggle_mod,
-            commands::version::mods::delete_mod,
-            commands::version::mods::install_mod,
-            commands::version::mods::open_mods_dir,
-            commands::version::mods::reveal_mod_file,
-            commands::version::mods::get_version_mods_dir,
-            commands::version::preload::preload_mods_detail_cmd,
+            // - folder: 游戏目录管理
             commands::version::folder::list_mc_folders,
             commands::version::folder::add_mc_folder,
             commands::version::folder::remove_mc_folder,
             commands::version::folder::switch_mc_folder,
             commands::version::folder::rename_mc_folder,
-            commands::version::progress::get_download_progress,
-            commands::version::progress::is_downloading,
-            commands::version::progress::reset_download_progress,
-            commands::version::progress::cancel_download,
-            commands::version::progress::pause_download,
-            commands::version::progress::resume_download,
+            // - download: 版本下载
+            commands::version::download::download_version,
+            // - install: 合并安装
+            commands::version::install::install_merged,
+            // - loaders: 加载器版本查询与安装
             commands::version::loaders::list_forge_versions,
             commands::version::loaders::list_neoforge_versions,
             commands::version::loaders::list_fabric_versions,
@@ -136,12 +121,40 @@ pub fn run() {
             commands::version::loaders::validate_loaders,
             commands::version::loaders::list_fabric_api_versions,
             commands::version::loaders::install_fabric_api_for_version,
-            commands::version::install::install_merged,
+            // - manage: 版本管理（修复/重命名/选中）
+            commands::version::manage::fix_version_files,
+            commands::version::manage::rename_version,
+            commands::version::manage::get_selected_version,
+            commands::version::manage::set_selected_version,
+            // - personalization: 版本个性化设置
+            commands::version::personalization::get_version_personalization,
+            commands::version::personalization::update_version_personalization,
+            // - mods: Mod 管理
+            commands::version::mods::is_version_modable,
+            commands::version::mods::list_mods,
+            commands::version::mods::toggle_mod,
+            commands::version::mods::delete_mod,
+            commands::version::mods::install_mod,
+            commands::version::mods::open_mods_dir,
+            commands::version::mods::reveal_mod_file,
+            commands::version::mods::get_version_mods_dir,
+            // - preload: Mod 详情预加载
+            commands::version::preload::preload_mods_detail_cmd,
+            // - progress: 下载进度与控制
+            commands::version::progress::get_download_progress,
+            commands::version::progress::is_downloading,
+            commands::version::progress::reset_download_progress,
+            commands::version::progress::cancel_download,
+            commands::version::progress::pause_download,
+            commands::version::progress::resume_download,
+            // - launch: 启动游戏
             commands::version::launch::launch_game,
             commands::version::launch::get_launch_progress,
             commands::version::launch::cancel_launch,
             commands::version::launch::stop_game,
             commands::version::launch::get_running_game,
+            // - script_export: 启动脚本导出
+            commands::version::script_export::export_launch_script,
             // Java 命令
             commands::java::detect_java,
             commands::java::list_java,
@@ -165,11 +178,9 @@ pub fn run() {
             commands::system::get_system_memory,
             commands::system::get_config_value,
             commands::system::set_config_value,
-            // 开发者模式命令
+            // 开发者模式命令（开关状态由 get_config/apply_config 统一管理）
             commands::system::is_developer_unlocked,
             commands::system::unlock_developer_mode,
-            commands::system::is_developer_mode,
-            commands::system::set_developer_mode,
             commands::system::get_storage_dirs,
             commands::system::get_system_info,
             // 日志查看命令（开发者模式）
@@ -196,61 +207,12 @@ pub fn run() {
                 // 这里需要获取AppState，但由于生命周期限制，我们简化处理
                 log_info!("Config will be saved on exit");
             }
-        })
-        .register_uri_scheme_protocol(
-            minecraft::image_cache::CACHE_IMAGE_SCHEME,
-            |_app, request| {
-                // 从请求 URI 中提取 hash
-                let uri = request.uri().to_string();
+        });
 
-                // 解析 hash
-                let hash = match minecraft::image_cache::parse_hash_from_request(&uri) {
-                    Some(h) => h,
-                    None => {
-                        log_warn!("[ImageCache] 无效的缓存图片请求: {}", uri);
-                        return tauri::http::Response::builder()
-                            .status(403)
-                            .header("Access-Control-Allow-Origin", "*")
-                            .body::<Vec<u8>>(Vec::new())
-                            .unwrap();
-                    }
-                };
+    // 注册 cache-image 自定义 URI scheme（图片缓存协议，抽离至 minecraft::image_cache）
+    let builder = minecraft::image_cache::register_uri_scheme(builder);
 
-                // 根据 hash 查找缓存文件
-                match minecraft::image_cache::find_cache_by_hash(&hash) {
-                    Some(path) => {
-                        // 读取文件内容
-                        match std::fs::read(&path) {
-                            Ok(bytes) => {
-                                tauri::http::Response::builder()
-                                    .status(200)
-                                    .header("Content-Type", "image/png")
-                                    .header("Cache-Control", "public, max-age=86400")
-                                    .header("Access-Control-Allow-Origin", "*")
-                                    .body::<Vec<u8>>(bytes)
-                                    .unwrap()
-                            }
-                            Err(e) => {
-                                log_warn!("[ImageCache] 读取缓存文件失败: {}", e);
-                                tauri::http::Response::builder()
-                                    .status(500)
-                                    .header("Access-Control-Allow-Origin", "*")
-                                    .body::<Vec<u8>>(Vec::new())
-                                    .unwrap()
-                            }
-                        }
-                    }
-                    None => {
-                        log_warn!("[ImageCache] 缓存文件不存在: {}", hash);
-                        tauri::http::Response::builder()
-                            .status(404)
-                            .header("Access-Control-Allow-Origin", "*")
-                            .body::<Vec<u8>>(Vec::new())
-                            .unwrap()
-                    }
-                }
-            },
-        )
+    builder
         .run(tauri::generate_context!())
         .expect("error while running MoLaunch");
 }

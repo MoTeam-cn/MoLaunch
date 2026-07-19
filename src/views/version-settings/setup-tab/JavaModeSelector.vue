@@ -108,10 +108,10 @@ async function handleSaveJavaMode(mode: string) {
     }
     await tauri.updateVersionPersonalization(selectedId.value, update)
     if (personalization.value) {
-      personalization.value.java_mode = mode
-      personalization.value.java_path = update.javaPath ?? ''
-      personalization.value.java_version_min = javaVersionMin.value
-      personalization.value.java_version_max = javaVersionMax.value
+      personalization.value.javaMode = mode
+      personalization.value.javaPath = update.javaPath ?? ''
+      personalization.value.javaVersionMin = javaVersionMin.value
+      personalization.value.javaVersionMax = javaVersionMax.value
     }
     javaMode.value = mode
     const labelMap: Record<string, string> = {
@@ -138,8 +138,8 @@ async function handleSaveJavaVersionRange() {
     }
     await tauri.updateVersionPersonalization(selectedId.value, update)
     if (personalization.value) {
-      personalization.value.java_version_min = javaVersionMin.value
-      personalization.value.java_version_max = javaVersionMax.value
+      personalization.value.javaVersionMin = javaVersionMin.value
+      personalization.value.javaVersionMax = javaVersionMax.value
     }
     showSuccess('Java 版本范围已保存')
   } catch (e) { showError('保存失败：' + String(e)) }
@@ -148,16 +148,16 @@ async function handleSaveJavaVersionRange() {
 /** 监听 personalization 加载完成，初始化 Java 相关字段 + 加载 Java 需求 */
 watch(personalization, async (p) => {
   if (!p) return
-  const mode = p.java_mode || ''
+  const mode = p.javaMode || ''
   javaMode.value = ['auto', 'auto_version', 'folder', 'custom'].includes(mode) ? mode : 'auto'
-  javaVersionMin.value = p.java_version_min || 0
-  javaVersionMax.value = p.java_version_max || 0
-  customJavaPath.value = p.java_path || ''
+  javaVersionMin.value = p.javaVersionMin || 0
+  javaVersionMax.value = p.javaVersionMax || 0
+  customJavaPath.value = p.javaPath || ''
 
-  // 加载 Java 需求（用 original_version 和 version_type 判断）
-  const loader = ['forge', 'neoforge', 'fabric', 'quilt', 'optifine', 'liteloader'].includes(p.version_type) ? p.version_type : null
+  // 加载 Java 需求（用 originalVersion 和 versionType 判断）
+  const loader = ['forge', 'neoforge', 'fabric', 'quilt', 'optifine', 'liteloader'].includes(p.versionType) ? p.versionType : null
   try {
-    javaReqs.value = await tauri.getJavaRequirements(p.original_version || p.version_type || '', loader)
+    javaReqs.value = await tauri.getJavaRequirements(p.originalVersion || p.versionType || '', loader)
   } catch (e) {
     console.error('Failed to load Java requirements:', e)
   }

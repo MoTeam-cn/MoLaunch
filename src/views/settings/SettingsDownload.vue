@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
-import * as tauri from '@/utils/tauri'
-import { useDebouncedSave } from '@/composables/useDebouncedSave'
+import { ref, watch } from 'vue'
+import { useConfigPage } from '@/composables/useConfigPage'
 import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 
 const maxThreads = ref(8)
@@ -10,7 +9,6 @@ const mirrorMeta = ref<'official' | 'bmclapi' | 'smart'>('smart')
 const mirrorDownload = ref<'official' | 'bmclapi' | 'smart'>('smart')
 const maxDownloadSpeed = ref(0)
 const speedSlider = ref(0)
-const loaded = ref(false)
 
 /** 前端选项 → 后端 source 值 */
 function toSource(v: 'official' | 'bmclapi' | 'smart'): string {
@@ -24,27 +22,10 @@ function fromSource(s: string): 'official' | 'bmclapi' | 'smart' {
   return 'smart'
 }
 
-const { markDirty } = useDebouncedSave('patch', async (patch) => {
-  try {
-    await tauri.applyConfig(patch)
-  } catch (e) {
-    console.error('Failed to save download settings:', e)
-  }
-}, 1500)
-
-watch(mirrorMeta, (v) => markDirty('metaSource', toSource(v)))
-watch(mirrorDownload, (v) => markDirty('downloadSource', toSource(v)))
-watch(speedSlider, (v) => {
-  const speed = v >= 21 ? 0 : (v === 0 ? 1 : v) * 1024 * 1024
-  maxDownloadSpeed.value = speed
-  markDirty('maxDownloadSpeed', speed)
-})
-watch(maxThreads, (v) => markDirty('maxDownloadThreads', v))
-watch(chunkCount, (v) => markDirty('chunkCount', v))
-
-onMounted(async () => {
-  try {
-    const cfg = await tauri.getConfigMap()
+const { loaded, markDirty } = useConfigPage({
+  delay: 1500,
+  errorLabel: 'save download settings',
+  onLoad: (cfg) => {
     mirrorMeta.value = fromSource(cfg.metaSource)
     mirrorDownload.value = fromSource(cfg.downloadSource)
     maxDownloadSpeed.value = cfg.maxDownloadSpeed
@@ -55,13 +36,18 @@ onMounted(async () => {
     }
     maxThreads.value = cfg.maxDownloadThreads
     chunkCount.value = cfg.chunkCount
-  } catch (e) {
-    console.error('Failed to load download settings:', e)
-  }
-  // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
-  await nextTick()
-  loaded.value = true
+  },
 })
+
+watch(mirrorMeta, (v) => markDirty('metaSource', toSource(v)))
+watch(mirrorDownload, (v) => markDirty('downloadSource', toSource(v)))
+watch(speedSlider, (v) => {
+  const speed = v >= 21 ? 0 : (v === 0 ? 1 : v) * 1024 * 1024
+  maxDownloadSpeed.value = speed
+  markDirty('maxDownloadSpeed', speed)
+})
+watch(maxThreads, (v) => markDirty('maxDownloadThreads', v))
+watch(chunkCount, (v) => markDirty('chunkCount', v))
 </script>
 
 <template>

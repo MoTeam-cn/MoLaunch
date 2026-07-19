@@ -1,6 +1,5 @@
 use crate::log_error;
 use crate::minecraft::loaders;
-use crate::minecraft::sources::DownloadSourceMode;
 use crate::state::AppState;
 use tauri::State;
 
@@ -10,10 +9,7 @@ pub async fn list_forge_versions(
     state: State<'_, AppState>,
     mc_version: String,
 ) -> Result<String, String> {
-    let config = state.config.lock().await;
-    let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
-    drop(config);
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions = loaders::list_forge_versions(&mc_version, mirror_url.as_deref(), source_mode)
         .await
@@ -41,10 +37,7 @@ pub async fn list_neoforge_versions(
     state: State<'_, AppState>,
     mc_version: String,
 ) -> Result<String, String> {
-    let config = state.config.lock().await;
-    let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
-    drop(config);
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions = loaders::list_neoforge_versions(&mc_version, mirror_url.as_deref(), source_mode)
         .await
@@ -69,10 +62,7 @@ pub async fn list_neoforge_versions(
 /// List Fabric versions
 #[tauri::command]
 pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, String> {
-    let config = state.config.lock().await;
-    let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
-    drop(config);
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions = loaders::list_fabric_versions(mirror_url.as_deref(), source_mode)
         .await
@@ -87,10 +77,7 @@ pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, 
 /// List OptiFine versions
 #[tauri::command]
 pub async fn list_optifine_versions(state: State<'_, AppState>) -> Result<String, String> {
-    let config = state.config.lock().await;
-    let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
-    drop(config);
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions = loaders::list_optifine_versions(mirror_url.as_deref(), source_mode)
         .await
@@ -117,10 +104,7 @@ pub async fn list_liteloader_versions(
     state: State<'_, AppState>,
     mc_version: String,
 ) -> Result<String, String> {
-    let config = state.config.lock().await;
-    let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
-    drop(config);
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions =
         loaders::list_liteloader_versions(&mc_version, mirror_url.as_deref(), source_mode)

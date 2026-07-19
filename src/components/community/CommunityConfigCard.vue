@@ -8,44 +8,30 @@
  * - Mod 管理样式：标题/详情显示译名或文件名
  * - 忽略 Quilt：在显示 Mod 加载器时是否过滤 Quilt
  */
-import { ref, watch, onMounted, nextTick } from 'vue'
-import * as tauri from '@/utils/tauri'
-import { useDebouncedSave } from '@/composables/useDebouncedSave'
+import { ref, watch } from 'vue'
+import { useConfigPage } from '@/composables/useConfigPage'
 import Select from '@/components/common/Select.vue'
 
-const loaded = ref(false)
 const source = ref<number>(2)
 const filenameFormat = ref<number>(1)
 const modLocalNameStyle = ref<number>(0)
 const ignoreQuilt = ref<boolean>(true)
 
-const { markDirty } = useDebouncedSave('patch', async (patch) => {
-  try {
-    await tauri.applyConfig(patch)
-  } catch (e) {
-    console.error('Failed to save community config:', e)
-  }
-}, 800)
+const { loaded, markDirty } = useConfigPage({
+  delay: 800,
+  errorLabel: 'save community config',
+  onLoad: (cfg) => {
+    source.value = cfg.communitySource
+    filenameFormat.value = cfg.communityFilenameFormat
+    modLocalNameStyle.value = cfg.communityModLocalNameStyle
+    ignoreQuilt.value = cfg.communityIgnoreQuilt
+  },
+})
 
 watch(source, (v) => markDirty('communitySource', v))
 watch(filenameFormat, (v) => markDirty('communityFilenameFormat', v))
 watch(modLocalNameStyle, (v) => markDirty('communityModLocalNameStyle', v))
 watch(ignoreQuilt, (v) => markDirty('communityIgnoreQuilt', v))
-
-onMounted(async () => {
-  try {
-    const cfg = await tauri.getConfigMap()
-    source.value = cfg.communitySource
-    filenameFormat.value = cfg.communityFilenameFormat
-    modLocalNameStyle.value = cfg.communityModLocalNameStyle
-    ignoreQuilt.value = cfg.communityIgnoreQuilt
-  } catch (e) {
-    console.error('Failed to load community config:', e)
-  }
-  // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
-  await nextTick()
-  loaded.value = true
-})
 
 const sourceOptions = [
   { value: 0, label: '尽量镜像', desc: '使用镜像源，可能缺少刚刚更新的版本' },

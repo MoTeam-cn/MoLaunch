@@ -1,31 +1,34 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 /** 下载页面 */
 import { ref, computed, onMounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
-import * as tauri from '@/utils/tauri'
-import { showError, showConfirm } from '@/utils/modal'
-import { showSuccess, showInfo, showWarning } from '@/utils/toast'
+import { showError } from '@/utils/modal'
 import Tooltip from '@/components/common/Tooltip.vue'
 import LoaderSelect from './LoaderSelect.vue'
 import VersionSection from '@/components/version/VersionSection.vue'
 import Community from './Community.vue'
+import DownloadSidebar from './downloads/DownloadSidebar.vue'
 import {
   CubeIcon, WrenchIcon, ArchiveBoxIcon,
-  FolderOpenIcon, StarIcon, BeakerIcon, ClockIcon, SparklesIcon,
+  StarIcon, BeakerIcon, ClockIcon, SparklesIcon,
   ArrowPathIcon, FaceSmileIcon,
   PuzzlePieceIcon, SwatchIcon, BoltIcon, CircleStackIcon,
 } from '@heroicons/vue/24/outline'
 import { resolveVersionIcon as resolveIconByType } from '@/composables/useVersionMeta'
+import { useVersionInstallActions, type InstallOptions } from '@/composables/useVersionInstallActions'
 import type { ResourceType } from '@/types/community'
 
 const versionStore = useVersionStore()
 const { resolveVersionIconWithLogo: resolveVersionIcon } = useVersionSettings()
 
+const {
+  installedVersions, installedVersionTypes, installedVersionLogos,
+  loadInstalledVersions, handleRefresh, onInstallRequest,
+  handleUninstall, handleOpenGameDir,
+} = useVersionInstallActions()
+
 const loading = ref(false)
-const installedVersions = ref<string[]>([])
-const installedVersionTypes = ref<Record<string, string>>({})
-const installedVersionLogos = ref<Record<string, string>>({})
 const activeCategory = ref('vanilla')
 const selectedVersion = ref<string | null>(null)
 
@@ -91,96 +94,17 @@ const sections = computed(() => [
   { id: 'old', label: '远古版', icon: ClockIcon, versions: versionStore.versions.filter(v => v.version_type === 'old_beta' || v.version_type === 'old_alpha') },
 ])
 
-async function loadInstalledVersions() {
-  try {
-    const vwt = await tauri.listInstalledVersionsWithType()
-    installedVersions.value = vwt.map(v => v.id)
-    const typeMap: Record<string, string> = {}
-    const logoMap: Record<string, string> = {}
-    vwt.forEach(v => { typeMap[v.id] = v.version_type; logoMap[v.id] = v.logo || '' })
-    installedVersionTypes.value = typeMap
-    installedVersionLogos.value = logoMap
-  } catch (e) {
-    console.error(e)
-    try { installedVersions.value = await tauri.listInstalledVersions() } catch (e2) { console.error(e2) }
-  }
-}
-
-async function handleRefresh() {
-  showInfo('正在刷新版本列表...')
-  try {
-    await versionStore.refreshVersions()
-    await loadInstalledVersions()
-    if (versionStore.versions.length === 0) {
-      showWarning('未获取到版本列表，请检查网络连接')
-    } else {
-      showSuccess('版本列表已刷新')
-    }
-  } catch (e) {
-    showError('获取版本列表失败', String(e))
-  }
-}
-
-function onInstallRequest(options: { mcVersion: string; forge?: string; neoforge?: string; fabric?: string; optifine?: string; liteloader?: string; instanceName: string }) {
+/** 安装请求：清空 LoaderSelect 展开后委托 composable 执行后台安装流程 */
+function handleInstallRequest(options: InstallOptions) {
   // 立刻返回版本列表（仅清空本页面的 LoaderSelect 展开，不影响首页启动用选中版本）
   selectedVersion.value = null
-  // 设置下载状态，显示 DownloadPanel（会自动启动轮询）
-  versionStore.startDownload(options.instanceName)
-  // 后台执行安装
-  tauri.installMerged(
-    options.mcVersion,
-    options.forge,
-    options.neoforge,
-    options.fabric,
-    options.optifine,
-    options.liteloader,
-    options.instanceName,
-  ).then(async () => {
-    showSuccess(`${options.instanceName} 安装完成`)
-    await loadInstalledVersions()
-  }).catch((e) => {
-    showError('安装失败', String(e))
-    versionStore.finishDownload()
-  })
-  // 不在这里调用 finishDownload，由轮询统一管理生命周期
+  onInstallRequest(options)
 }
 
-async function handleDownload(versionId: string) {
-  versionStore.startDownload(versionId)
-  showInfo(`开始下载 ${versionId}`)
-  try {
-    await tauri.downloadVersion(versionId)
-    await loadInstalledVersions()
-    showSuccess(`${versionId} 下载完成`)
-  } catch (e) {
-    showError('下载失败', `无法下载版本 ${versionId}`, String(e))
-    versionStore.finishDownload()
-  }
-  // 不在这里调用 finishDownload，由轮询统一管理生命周期
-}
-
-function handleUninstall(versionId: string) {
-  showConfirm('卸载版本', `确定要卸载版本 ${versionId} 吗？此操作不可撤销。`, async () => {
-    try {
-      await tauri.uninstallVersion(versionId)
-      installedVersions.value = installedVersions.value.filter(v => v !== versionId)
-      showSuccess(`${versionId} 已卸载`)
-    } catch (e) { showError('卸载失败', `无法卸载版本 ${versionId}`, String(e)) }
-  })
-}
-
-async function handleOpenGameDir() {
-  showInfo('正在打开游戏目录...')
-  try {
-    await tauri.openGameDir()
-    // 随机延迟 1-2 秒，增加真实感
-    const delay = 1000 + Math.random() * 1000
-    setTimeout(() => {
-      showSuccess('已打开游戏目录，请自行浏览哈')
-    }, delay)
-  } catch (e) {
-    showError('打开失败', '无法打开游戏目录', String(e))
-  }
+/** 选择分类：切换分类并清空 LoaderSelect 展开 */
+function handleSelectCategory(category: string) {
+  activeCategory.value = category
+  selectedVersion.value = null
 }
 
 onMounted(async () => {
@@ -200,52 +124,13 @@ onMounted(async () => {
 <template>
   <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
     <!-- 左侧菜单 -->
-    <aside class="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
-      <div class="flex-1 overflow-y-auto py-4">
-        <!-- 官方下载 -->
-        <button
-          v-for="cat in topCategories"
-          :key="cat.id"
-          class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors"
-          :class="activeCategory === cat.id
-            ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
-            : 'text-gray-700 hover:bg-gray-50'"
-          @click="activeCategory = cat.id; selectedVersion = null"
-        >
-          <component :is="cat.icon" class="w-5 h-5 mr-3" />
-          {{ cat.label }}
-        </button>
-
-        <!-- 分隔线 -->
-        <div class="my-2 mx-4 border-t border-gray-200"></div>
-
-        <!-- 社区资源分组标题 -->
-        <div class="px-4 py-1 text-[11px] font-semibold text-gray-400 uppercase tracking-wide">社区资源</div>
-
-        <!-- 社区子分类 -->
-        <button
-          v-for="cat in communityCategories"
-          :key="cat.id"
-          class="w-full flex items-center pl-8 pr-4 py-2 text-sm transition-colors"
-          :class="activeCategory === cat.id
-            ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
-            : 'text-gray-600 hover:bg-gray-50'"
-          @click="activeCategory = cat.id; selectedVersion = null"
-        >
-          <component :is="cat.icon" class="w-4 h-4 mr-2.5" />
-          {{ cat.label }}
-        </button>
-      </div>
-      <div class="p-3 border-t border-gray-200">
-        <button
-          class="w-full flex items-center justify-center px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
-          @click="handleOpenGameDir"
-        >
-          <FolderOpenIcon class="w-4 h-4 mr-2" />
-          打开游戏目录
-        </button>
-      </div>
-    </aside>
+    <DownloadSidebar
+      :top-categories="topCategories"
+      :community-categories="communityCategories"
+      :active-category="activeCategory"
+      @select="handleSelectCategory"
+      @open-game-dir="handleOpenGameDir"
+    />
 
     <!-- 右侧内容 -->
     <div class="flex-1 flex flex-col overflow-hidden">
@@ -273,7 +158,7 @@ onMounted(async () => {
             :key="'loader-' + selectedVersion"
             :mc-version="selectedVersion"
             @back="selectedVersion = null"
-            @install="onInstallRequest"
+            @install="handleInstallRequest"
           />
 
           <!-- 社区资源：全高度，无 padding -->

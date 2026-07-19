@@ -9,9 +9,9 @@ import * as tauri from '@/utils/tauri'
 import { showSuccess, showError, showWarning } from '@/utils/toast'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
-import { usePolling } from '@/composables/usePolling'
 import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
+import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
 
 const { selectedId, personalization } = useVersionSettings()
 
@@ -26,31 +26,22 @@ const globalMode = ref('auto')
 const globalMin = ref(0)
 const globalMax = ref(0)
 
-// 系统内存
-const systemMemory = ref<{ total: number; available: number; usage_percent: number } | null>(null)
-const { start: startMemoryPolling } = usePolling(async () => {
-  systemMemory.value = await tauri.getSystemMemory()
-}, 1000)
-
-const totalMemoryMB = computed(() => systemMemory.value ? Math.round(systemMemory.value.total / 1024 / 1024) : 0)
-const usedMemoryMB = computed(() => systemMemory.value ? Math.round((systemMemory.value.total - systemMemory.value.available) / 1024 / 1024) : 0)
-const gameMemoryMB = computed(() => maxMemory.value)
-const otherMemoryMB = computed(() => Math.max(0, totalMemoryMB.value - usedMemoryMB.value - gameMemoryMB.value))
-const usedPercent = computed(() => totalMemoryMB.value > 0 ? (usedMemoryMB.value / totalMemoryMB.value) * 100 : 0)
-const gamePercent = computed(() => totalMemoryMB.value > 0 ? (gameMemoryMB.value / totalMemoryMB.value) * 100 : 0)
+// 系统内存可视化（复用 useMemoryVisualizer composable）
+const {
+  totalMemoryMB,
+  usedMemoryMB,
+  gameMemoryMB,
+  otherMemoryMB,
+  usedPercent,
+  gamePercent,
+  applyAutoMemory,
+  startMemoryPolling,
+} = useMemoryVisualizer(maxMemory, minMemory)
 
 const globalMemoryDesc = computed(() => {
   if (globalMode.value === 'auto') return `自动配置（约 ${formatMemoryMB(globalMax.value) || '动态计算'}）`
   return `自定义 ${formatMemoryMB(globalMin.value)} / ${formatMemoryMB(globalMax.value)}`
 })
-
-function applyAutoMemory() {
-  if (!systemMemory.value) return
-  const availableMB = systemMemory.value.available / 1024 / 1024
-  const suggested = Math.min(Math.round(availableMB * 0.75), 8192)
-  maxMemory.value = Math.max(suggested, 512)
-  minMemory.value = Math.round(maxMemory.value / 2)
-}
 
 /** 切换内存模式 */
 async function handleSaveMemoryMode(mode: 'inherit' | 'auto' | 'custom') {
@@ -66,10 +57,10 @@ async function handleSaveMemoryMode(mode: 'inherit' | 'auto' | 'custom') {
     }
     await tauri.updateVersionPersonalization(selectedId.value, update)
     if (personalization.value) {
-      personalization.value.memory_mode = backendMode
+      personalization.value.memoryMode = backendMode
       if (mode === 'custom') {
-        personalization.value.max_memory = maxMemory.value
-        personalization.value.min_memory = minMemory.value
+        personalization.value.maxMemory = maxMemory.value
+        personalization.value.minMemory = minMemory.value
       }
     }
     memoryMode.value = mode
@@ -87,8 +78,8 @@ async function flushSaveMemory() {
       minMemory: minMemory.value,
     })
     if (personalization.value) {
-      personalization.value.max_memory = maxMemory.value
-      personalization.value.min_memory = minMemory.value
+      personalization.value.maxMemory = maxMemory.value
+      personalization.value.minMemory = minMemory.value
     }
   } catch (e) { console.error('Failed to save memory:', e) }
 }
@@ -120,11 +111,11 @@ onMounted(async () => {
   // 从 personalization 读取版本独立内存
   const p = personalization.value
   if (p) {
-    const m = p.memory_mode
+    const m = p.memoryMode
     memoryMode.value = m === 'auto' || m === 'custom' ? m : 'inherit'
     if (memoryMode.value === 'custom') {
-      maxMemory.value = p.max_memory || globalMax.value
-      minMemory.value = p.min_memory || Math.floor(maxMemory.value / 2)
+      maxMemory.value = p.maxMemory || globalMax.value
+      minMemory.value = p.minMemory || Math.floor(maxMemory.value / 2)
     } else if (memoryMode.value === 'auto') {
       applyAutoMemory()
     }

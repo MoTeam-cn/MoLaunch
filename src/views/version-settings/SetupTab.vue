@@ -5,12 +5,16 @@
  * 版本独立设置存 setup.ini（通过 updateVersionPersonalization）
  *
  * Java 选择（4 模式）拆分到 JavaModeSelector 子组件
+ * 高级选项字段拆分到 AdvanceFieldsPanel 子组件
+ * 进阶开关复用 ToggleRow 公共组件
  */
-import { ref, reactive, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showError } from '@/utils/toast'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import ToggleRow from '@/components/settings/ToggleRow.vue'
+import AdvanceFieldsPanel from '@/components/version-settings/AdvanceFieldsPanel.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import MemorySection from './MemorySection.vue'
 import JavaModeSelector from './setup-tab/JavaModeSelector.vue'
@@ -29,43 +33,22 @@ const advanceDisableAssetsVerify = ref(false)
 const advanceDisableJlw = ref(false)
 const advanceDisableLua = ref(false)
 
-const advanceFields = reactive([
-  { label: 'Java 虚拟机参数', field: 'advanceJvmArgs', name: 'JVM 参数', value: '', area: true,
-    tip: '启动 Minecraft 时使用的额外 JVM 参数，在没有确定把握的情况下请不要尝试修改。\n若留空，则跟随全局设置的值。' },
-  { label: '游戏参数', field: 'advanceGameArgs', name: '游戏参数', value: '', area: false,
-    tip: '文本框中的内容将会被直接拼合在启动参数的末尾。\n例如，输入 --demo 则会以试玩模式启动游戏。\n若留空，则跟随全局设置的值。' },
-  { label: '启动前执行命令', field: 'advanceRunCmd', name: '启动前命令', value: '', area: false,
-    tip: '在 MC 启动前执行特定命令或程序，语法与 Windows 的命令提示符一致。\n涉及路径的操作最好都打上双引号，以避免路径中的空格导致运行失败。\n\n⚠️ 安全警告：此命令将通过系统 shell 执行，请勿输入来源不明的命令。共享整合包时请检查此字段。\n\n该项不会覆盖全局设置：启动时会先执行全局设置的命令，再执行版本设置的命令。' },
-])
-
-// personalization 字段名映射：camelCase → snake_case（用于同步共享状态）
-const snakeMap: Record<string, string> = {
-  windowTitle: 'window_title', customInfo: 'custom_info', serverEnter: 'server_enter',
-  advanceJvmArgs: 'advance_jvm_args', advanceGameArgs: 'advance_game_args',
-  advanceRunCmd: 'advance_run_cmd', javaPath: 'java_path',
-  advanceDisableModUpdate: 'advance_disable_mod_update',
-  advanceIgnoreJavaWarning: 'advance_ignore_java_warning',
-  advanceDisableAssetsVerify: 'advance_disable_assets_verify',
-  advanceDisableJlw: 'advance_disable_jlw',
-  advanceDisableLua: 'advance_disable_lua',
-}
+// personalization 字段名与 camelCase 一致（后端已加 #[serde(rename_all = "camelCase")]），
+// 无需 snakeMap 转换，直接用字段名同步共享状态即可
 
 async function loadSetup() {
   try {
     if (!personalization.value && selectedId.value) await loadPersonalization()
     const p = personalization.value
     if (p) {
-      windowTitle.value = p.window_title
-      customInfo.value = p.custom_info
-      serverEnter.value = p.server_enter
-      advanceFields[0].value = p.advance_jvm_args
-      advanceFields[1].value = p.advance_game_args
-      advanceFields[2].value = p.advance_run_cmd
-      advanceDisableModUpdate.value = p.advance_disable_mod_update
-      advanceIgnoreJavaWarning.value = p.advance_ignore_java_warning
-      advanceDisableAssetsVerify.value = p.advance_disable_assets_verify
-      advanceDisableJlw.value = p.advance_disable_jlw
-      advanceDisableLua.value = p.advance_disable_lua
+      windowTitle.value = p.windowTitle
+      customInfo.value = p.customInfo
+      serverEnter.value = p.serverEnter
+      advanceDisableModUpdate.value = p.advanceDisableModUpdate
+      advanceIgnoreJavaWarning.value = p.advanceIgnoreJavaWarning
+      advanceDisableAssetsVerify.value = p.advanceDisableAssetsVerify
+      advanceDisableJlw.value = p.advanceDisableJlw
+      advanceDisableLua.value = p.advanceDisableLua
     }
   } catch (e) {
     console.error('Failed to load setup:', e)
@@ -79,8 +62,7 @@ async function savePersonalField(field: string, value: string, name: string) {
     const update = { [field]: value } as tauri.PersonalizationUpdate
     await tauri.updateVersionPersonalization(selectedId.value, update)
     if (personalization.value) {
-      const sk = snakeMap[field]
-      if (sk) (personalization.value as any)[sk] = value
+      (personalization.value as any)[field] = value
     }
     showSuccess(`${name}已保存`)
   } catch (e) { showError('保存失败：' + String(e)) }
@@ -90,7 +72,7 @@ async function handleSaveIndie(val: number) {
   if (!selectedId.value) return
   try {
     await tauri.updateVersionPersonalization(selectedId.value, { indieType: val })
-    if (personalization.value) personalization.value.indie_type = val
+    if (personalization.value) personalization.value.indieType = val
     showSuccess(val === 0 ? '已跟随全局设置' : val === 1 ? '已开启版本隔离' : '已关闭版本隔离')
   } catch (e) { showError('保存失败：' + String(e)) }
 }
@@ -102,8 +84,7 @@ async function saveAdvanceSwitch(field: string, value: boolean, name: string) {
     const update = { [field]: value } as tauri.PersonalizationUpdate
     await tauri.updateVersionPersonalization(selectedId.value, update)
     if (personalization.value) {
-      const sk = snakeMap[field]
-      if (sk) (personalization.value as any)[sk] = value
+      (personalization.value as any)[field] = value
     }
     showSuccess(`${name}已保存`)
   } catch (e) { showError('保存失败：' + String(e)) }
@@ -121,7 +102,7 @@ onMounted(loadSetup)
         <div class="flex items-center gap-3">
           <label class="w-28 flex-none text-xs text-gray-500">版本隔离</label>
           <Select
-            :model-value="String(personalization?.indie_type ?? 0)"
+            :model-value="String(personalization?.indieType ?? 0)"
             :options="[
               { value: '0', label: '跟随全局' },
               { value: '1', label: '开启' },
@@ -130,7 +111,7 @@ onMounted(loadSetup)
             @update:model-value="(v: string) => handleSaveIndie(Number(v))"
           />
           <Tooltip
-            v-if="personalization?.indie_type === 1"
+            v-if="personalization?.indieType === 1"
             text="与其他版本的存档、Mod 等文件相互独立，互不干涉。
 这会使你无法跨版本共享存档，但可以规避 Mod 冲突问题。"
             position="top"
@@ -138,7 +119,7 @@ onMounted(loadSetup)
             <span class="cursor-help text-xs text-gray-400">仅对此版本生效</span>
           </Tooltip>
           <Tooltip
-            v-else-if="personalization?.indie_type === 2"
+            v-else-if="personalization?.indieType === 2"
             text="与其余关闭隔离的版本共享存档、Mod 等文件。
 若存在多个安装了 Mod 的版本，可能会由于 Mod 冲突而导致崩溃。"
             position="top"
@@ -203,148 +184,48 @@ onMounted(loadSetup)
       </div>
     </section>
 
-    <!-- 高级选项 -->
-    <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
-      <h3 class="mb-4 text-sm font-semibold text-gray-700">高级选项</h3>
-      <div class="space-y-4">
-        <div v-for="f in advanceFields" :key="f.field">
-          <label class="block mb-1.5 text-xs text-gray-500">{{ f.label }}</label>
-          <Tooltip :text="f.tip" position="top" :delay="0" block>
-            <textarea
-              v-if="f.area"
-              v-model="f.value"
-              rows="3"
-              placeholder="跟随全局设置"
-              class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              @blur="savePersonalField(f.field, f.value, f.name)"
-            />
-            <input
-              v-else
-              v-model="f.value"
-              type="text"
-              placeholder="跟随全局设置"
-              class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              @blur="savePersonalField(f.field, f.value, f.name)"
-            >
-          </Tooltip>
-        </div>
-      </div>
-    </section>
+    <!-- 高级选项（子组件：3 个文本字段） -->
+    <AdvanceFieldsPanel />
 
-    <!-- 进阶开关（参考 PCL2 PageInstanceSetup 高级选项，样式对齐全局设置）-->
+    <!-- 进阶开关（参考 PCL2 PageInstanceSetup 高级选项，复用 ToggleRow 公共组件）-->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">进阶开关</h3>
       <div class="divide-y divide-gray-100">
-        <!-- 禁止更新 Mod -->
-        <Tooltip
-          text="禁止为此版本更新 Mod，以防止整合包玩家误操作。"
-          position="top" :delay="0" block
-        >
-          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-            <div class="min-w-0 mr-4">
-              <p class="text-sm font-medium text-gray-900">禁止更新 Mod</p>
-              <p class="text-xs text-gray-500 mt-0.5">禁止为此版本更新 Mod，防止整合包玩家误操作</p>
-            </div>
-            <button
-              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
-              :class="advanceDisableModUpdate ? 'bg-primary-500' : 'bg-gray-300'"
-              @click="advanceDisableModUpdate = !advanceDisableModUpdate; saveAdvanceSwitch('advanceDisableModUpdate', advanceDisableModUpdate, '禁止更新 Mod')"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                :class="advanceDisableModUpdate ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
-          </div>
-        </Tooltip>
-        <!-- 忽略 Java 兼容性警告 -->
-        <Tooltip
-          text="如果手动选择了与当前版本不兼容的 Java，则自动跳过兼容性警告弹窗，强制使用手动选择的 Java。"
-          position="top" :delay="0" block
-        >
-          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-            <div class="min-w-0 mr-4">
-              <p class="text-sm font-medium text-gray-900">忽略 Java 兼容性警告</p>
-              <p class="text-xs text-gray-500 mt-0.5">跳过兼容性警告弹窗，强制使用手动选择的 Java</p>
-            </div>
-            <button
-              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
-              :class="advanceIgnoreJavaWarning ? 'bg-primary-500' : 'bg-gray-300'"
-              @click="advanceIgnoreJavaWarning = !advanceIgnoreJavaWarning; saveAdvanceSwitch('advanceIgnoreJavaWarning', advanceIgnoreJavaWarning, '忽略 Java 警告')"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                :class="advanceIgnoreJavaWarning ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
-          </div>
-        </Tooltip>
-        <!-- 关闭文件校验 -->
-        <Tooltip
-          text="完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件是否被修改。&#10;如果你没有修改相关文件，请勿勾选此项。"
-          position="top" :delay="0" block
-        >
-          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-            <div class="min-w-0 mr-4">
-              <p class="text-sm font-medium text-gray-900">关闭文件校验</p>
-              <p class="text-xs text-gray-500 mt-0.5">不校验 libraries、assets、主 jar 文件是否被修改</p>
-            </div>
-            <button
-              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
-              :class="advanceDisableAssetsVerify ? 'bg-primary-500' : 'bg-gray-300'"
-              @click="advanceDisableAssetsVerify = !advanceDisableAssetsVerify; saveAdvanceSwitch('advanceDisableAssetsVerify', advanceDisableAssetsVerify, '文件校验')"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                :class="advanceDisableAssetsVerify ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
-          </div>
-        </Tooltip>
-        <!-- 禁用 Java Launch Wrapper -->
-        <Tooltip
-          text="是否使用 Java Launch Wrapper 修复 Java 18- 在中文路径下可能无法正常启动的问题。&#10;详见：https://github.com/00ll00/java_launch_wrapper"
-          position="top" :delay="0" block
-        >
-          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-            <div class="min-w-0 mr-4">
-              <p class="text-sm font-medium text-gray-900">禁用 Java Launch Wrapper</p>
-              <p class="text-xs text-gray-500 mt-0.5">JLW 修复 Java 18- 中文路径启动问题，异常时可关闭</p>
-            </div>
-            <button
-              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
-              :class="advanceDisableJlw ? 'bg-primary-500' : 'bg-gray-300'"
-              @click="advanceDisableJlw = !advanceDisableJlw; saveAdvanceSwitch('advanceDisableJlw', advanceDisableJlw, 'JLW')"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                :class="advanceDisableJlw ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
-          </div>
-        </Tooltip>
-        <!-- 禁用 LWJGL Unsafe Agent -->
-        <Tooltip
-          text="是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。&#10;详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent"
-          position="top" :delay="0" block
-        >
-          <div class="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-            <div class="min-w-0 mr-4">
-              <p class="text-sm font-medium text-gray-900">禁用 LWJGL Unsafe Agent</p>
-              <p class="text-xs text-gray-500 mt-0.5">LUA 修复 LWJGL 3.4.1 性能问题，卡顿时可关闭</p>
-            </div>
-            <button
-              class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"
-              :class="advanceDisableLua ? 'bg-primary-500' : 'bg-gray-300'"
-              @click="advanceDisableLua = !advanceDisableLua; saveAdvanceSwitch('advanceDisableLua', advanceDisableLua, 'LUA')"
-            >
-              <span
-                class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
-                :class="advanceDisableLua ? 'translate-x-6' : 'translate-x-1'"
-              />
-            </button>
-          </div>
-        </Tooltip>
+        <ToggleRow
+          v-model="advanceDisableModUpdate"
+          label="禁止更新 Mod"
+          description="禁止为此版本更新 Mod，防止整合包玩家误操作"
+          tooltip-text="禁止为此版本更新 Mod，以防止整合包玩家误操作。"
+          @update:model-value="(v) => saveAdvanceSwitch('advanceDisableModUpdate', v, '禁止更新 Mod')"
+        />
+        <ToggleRow
+          v-model="advanceIgnoreJavaWarning"
+          label="忽略 Java 兼容性警告"
+          description="跳过兼容性警告弹窗，强制使用手动选择的 Java"
+          tooltip-text="如果手动选择了与当前版本不兼容的 Java，则自动跳过兼容性警告弹窗，强制使用手动选择的 Java。"
+          @update:model-value="(v) => saveAdvanceSwitch('advanceIgnoreJavaWarning', v, '忽略 Java 警告')"
+        />
+        <ToggleRow
+          v-model="advanceDisableAssetsVerify"
+          label="关闭文件校验"
+          description="不校验 libraries、assets、主 jar 文件是否被修改"
+          tooltip-text="完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件是否被修改。&#10;如果你没有修改相关文件，请勿勾选此项。"
+          @update:model-value="(v) => saveAdvanceSwitch('advanceDisableAssetsVerify', v, '文件校验')"
+        />
+        <ToggleRow
+          v-model="advanceDisableJlw"
+          label="禁用 Java Launch Wrapper"
+          description="JLW 修复 Java 18- 中文路径启动问题，异常时可关闭"
+          tooltip-text="是否使用 Java Launch Wrapper 修复 Java 18- 在中文路径下可能无法正常启动的问题。&#10;详见：https://github.com/00ll00/java_launch_wrapper"
+          @update:model-value="(v) => saveAdvanceSwitch('advanceDisableJlw', v, 'JLW')"
+        />
+        <ToggleRow
+          v-model="advanceDisableLua"
+          label="禁用 LWJGL Unsafe Agent"
+          description="LUA 修复 LWJGL 3.4.1 性能问题，卡顿时可关闭"
+          tooltip-text="是否使用 LWJGL Unsafe Agent 修复 LWJGL 3.4.1 的一个性能问题。&#10;详见：https://github.com/HMCL-dev/lwjgl-unsafe-agent"
+          @update:model-value="(v) => saveAdvanceSwitch('advanceDisableLua', v, 'LUA')"
+        />
       </div>
     </div>
   </div>

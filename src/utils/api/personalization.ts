@@ -8,36 +8,36 @@ import type { ResourceProject } from '@/types/community'
 /** 版本个性化信息 */
 export interface VersionPersonalization {
   logo: string
-  custom_info: string
-  display_type: number
-  is_star: boolean
-  indie_type: number
-  version_type: string
-  original_version: string
-  window_title: string
-  server_enter: string
-  advance_jvm_args: string
-  advance_game_args: string
-  advance_run_cmd: string
-  java_path: string
+  customInfo: string
+  displayType: number
+  isStar: boolean
+  indieType: number
+  versionType: string
+  originalVersion: string
+  windowTitle: string
+  serverEnter: string
+  advanceJvmArgs: string
+  advanceGameArgs: string
+  advanceRunCmd: string
+  javaPath: string
   /** Java 选择模式：空/auto=自动选择, "auto_version"=自动选择指定版本范围, "folder"=使用版本文件夹中的 Java, "custom"=使用指定的 Java */
-  java_mode: string
+  javaMode: string
   /** 自动选择时的最小 Java 主版本（仅 auto_version 模式生效，0=不限） */
-  java_version_min: number
+  javaVersionMin: number
   /** 自动选择时的最大 Java 主版本（仅 auto_version 模式生效，0=不限） */
-  java_version_max: number
+  javaVersionMax: number
   /** 内存模式（空=跟随全局, "auto"=自动, "custom"=自定义） */
-  memory_mode: string
+  memoryMode: string
   /** 版本独立最小内存（MB，仅 custom 模式生效，0 表示未设置） */
-  min_memory: number
+  minMemory: number
   /** 版本独立最大内存（MB，仅 custom 模式生效，0 表示未设置） */
-  max_memory: number
+  maxMemory: number
   // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
-  advance_disable_mod_update: boolean
-  advance_ignore_java_warning: boolean
-  advance_disable_assets_verify: boolean
-  advance_disable_jlw: boolean
-  advance_disable_lua: boolean
+  advanceDisableModUpdate: boolean
+  advanceIgnoreJavaWarning: boolean
+  advanceDisableAssetsVerify: boolean
+  advanceDisableJlw: boolean
+  advanceDisableLua: boolean
 }
 
 /** 版本个性化字段更新（undefined 的字段不会被修改） */

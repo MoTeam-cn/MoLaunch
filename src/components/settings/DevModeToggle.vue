@@ -6,9 +6,12 @@
  * `developer-mode-changed` 通知父级（Settings.vue）更新侧边菜单显隐。
  *
  * 解锁触发点在 SettingsOther.vue（连续点击版本号 5 次）。
+ *
+ * 数据来源：get_config / apply_config（developerMode 字段），
+ * 解锁状态通过 developerUnlocked 只读字段获取。
  */
 import { ref, onMounted } from 'vue'
-import * as tauri from '@/utils/tauri'
+import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { showError } from '@/utils/toast'
 import Alert from '@/components/common/Alert.vue'
 
@@ -17,7 +20,7 @@ const devMode = ref(false)
 
 async function toggleDevMode(v: boolean) {
   try {
-    await tauri.setDeveloperMode(v)
+    await applyConfig({ developerMode: v })
     devMode.value = v
     // 通知 Settings.vue 父组件更新侧边菜单（dev 菜单项的显隐）
     window.dispatchEvent(new CustomEvent('developer-mode-changed', { detail: v }))
@@ -30,10 +33,9 @@ async function toggleDevMode(v: boolean) {
 
 onMounted(async () => {
   try {
-    devUnlocked.value = await tauri.isDeveloperUnlocked()
-    if (devUnlocked.value) {
-      devMode.value = await tauri.isDeveloperMode()
-    }
+    const config = await getConfigMap()
+    devUnlocked.value = config.developerUnlocked
+    devMode.value = config.developerMode
   } catch (e) {
     console.error('Failed to load developer mode state:', e)
   }

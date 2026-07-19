@@ -50,6 +50,9 @@ export interface ConfigSnapshot {
   launchDisableJlw: boolean
   launchDisableLua: boolean
   launchUseDedicatedGpu: boolean
+  // 开发者模式（从注册表读，developerUnlocked 为只读）
+  developerUnlocked: boolean
+  developerMode: boolean
 }
 
 /**
@@ -91,6 +94,8 @@ export interface ConfigPatch {
   launchDisableJlw?: boolean
   launchDisableLua?: boolean
   launchUseDedicatedGpu?: boolean
+  // 开发者模式（注册表存储，后端内部分流到 registry，仅已解锁时可生效）
+  developerMode?: boolean
 }
 
 // ==================== 配置缓存与读写（带全局缓存）====================

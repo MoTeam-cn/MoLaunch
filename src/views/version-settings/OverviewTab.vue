@@ -1,162 +1,36 @@
 <script setup lang="ts">
 /**
- * 版本设置 - 概览子页
- * 版本展示、个性化、快捷方式、高级管理
+ * 版本设置 - 概览子页：版本展示、个性化、快捷方式、高级管理
+ * 业务逻辑已抽取到 `@/composables/useVersionOverviewActions`，本文件仅负责模板组装。
  */
-import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
-import * as tauri from '@/utils/tauri'
-import { showSuccess, showError, showWarning, showInfo } from '@/utils/toast'
-import { showConfirm, showPrompt } from '@/utils/modal'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
+import { useVersionOverviewActions } from '@/composables/useVersionOverviewActions'
 
 const router = useRouter()
 const authStore = useAuthStore()
 const javaStore = useJavaStore()
 const {
-  selectedId,
-  personalization,
-  versionFolder,
-  savesFolder,
-  modsFolder,
-  resourcepacksFolder,
-  shaderpacksFolder,
-  currentLogoIcon,
-  currentLogo,
-  currentMeta,
-  iconOptions,
-  displayTypeOptions,
-  isModable,
-  loadPersonalization,
-  refreshEffectiveDir,
+  selectedId, personalization,
+  versionFolder, savesFolder, modsFolder, resourcepacksFolder, shaderpacksFolder,
+  currentLogoIcon, currentLogo, currentMeta,
+  iconOptions, displayTypeOptions,
+  isModable, loadPersonalization, refreshEffectiveDir,
 } = useVersionSettings()
 
-const fixing = ref(false)
-
-async function openFolder(path: string) {
-  try {
-    await tauri.openPath(path)
-  } catch (e) {
-    showError('打开失败：' + String(e))
-  }
-}
-
-function handleEditDesc() {
-  if (!selectedId.value) return
-  const oldDesc = personalization.value?.custom_info ?? ''
-  showPrompt(
-    '修改版本描述',
-    '修改版本的描述文本，留空则使用默认描述。',
-    async (newDesc: string) => {
-      if (!selectedId.value) return
-      try {
-        await tauri.updateVersionPersonalization(selectedId.value, { customInfo: newDesc })
-        if (personalization.value) personalization.value.custom_info = newDesc
-        showSuccess('描述已更新')
-      } catch (e) {
-        showError('更新失败：' + String(e))
-      }
-    },
-    { defaultValue: oldDesc, placeholder: '请输入版本描述' },
-  )
-}
-
-function handleRename() {
-  if (!selectedId.value) return
-  showPrompt(
-    '重命名版本',
-    '修改版本文件夹名称（不影响游戏内版本号）',
-    async (newName: string) => {
-      if (!selectedId.value || !newName.trim()) return
-      if (newName === selectedId.value) return
-      try {
-        const oldName = selectedId.value
-        await tauri.renameVersion(oldName, newName.trim())
-        // 等待 selectedId computed 更新
-        await nextTick()
-        await loadPersonalization()
-        await refreshEffectiveDir()
-        showSuccess('重命名成功')
-      } catch (e) {
-        showError('重命名失败：' + String(e))
-      }
-    },
-    { defaultValue: selectedId.value, placeholder: '请输入新版本名' },
-  )
-}
-
-async function handleToggleStar() {
-  if (!selectedId.value || !personalization.value) return
-  const newVal = !personalization.value.is_star
-  try {
-    await tauri.updateVersionPersonalization(selectedId.value, { isStar: newVal })
-    personalization.value.is_star = newVal
-    showSuccess(newVal ? '已加入收藏' : '已取消收藏')
-  } catch (e) {
-    showError('操作失败：' + String(e))
-  }
-}
-
-async function handleChangeDisplayType(newType: number) {
-  if (!selectedId.value || !personalization.value) return
-  try {
-    await tauri.updateVersionPersonalization(selectedId.value, { displayType: newType })
-    personalization.value.display_type = newType
-    showSuccess('分类已更新')
-  } catch (e) { showError('更新失败：' + String(e)) }
-}
-
-async function handleChangeLogo(newLogo: string) {
-  if (!selectedId.value || !personalization.value) return
-  try {
-    await tauri.updateVersionPersonalization(selectedId.value, { logo: newLogo })
-    // 替换整个 personalization 对象，确保所有依赖该 ref 的组件（如首页 VersionSelector）都能响应式更新
-    personalization.value = { ...personalization.value, logo: newLogo }
-    showSuccess('图标已更新')
-  } catch (e) { showError('更新失败：' + String(e)) }
-}
-
-async function handleExportScript() {
-  if (!selectedId.value) return
-  if (!authStore.isLoggedIn) return showWarning('请先登录账号')
-  const user = authStore.currentUser!
-  try {
-    const savePath = await tauri.saveFile('选择脚本保存位置', `Run_${selectedId.value}.bat`, [{ name: '批处理文件', extensions: ['bat'] }])
-    if (!savePath) return
-    await tauri.exportLaunchScript(selectedId.value, user.name, user.uuid, user.access_token, user.login_type, javaStore.javaPath || null, savePath)
-    showSuccess('启动脚本已导出')
-    // 导出后自动打开所在文件夹并选中导出的文件
-    await tauri.revealInExplorer(savePath)
-  } catch (e) { showError('导出失败：' + String(e)) }
-}
-
-async function handleFixFiles() {
-  if (!selectedId.value || fixing.value) return
-  showConfirm('补全文件', `将检查并下载版本"${selectedId.value}"缺失的 libraries 和 assets 文件，可能耗时较长。`, async () => {
-    fixing.value = true
-    showInfo('开始补全文件...')
-    try {
-      await tauri.fixVersionFiles(selectedId.value!)
-      showSuccess('文件补全完成')
-    } catch (e) { showError('补全失败：' + String(e)) }
-    finally { fixing.value = false }
-  })
-}
-
-function handleDelete() {
-  if (!selectedId.value) return
-  showConfirm('删除版本', `确定要删除版本"${selectedId.value}"吗？此操作不可恢复。`, async () => {
-    try {
-      await tauri.uninstallVersion(selectedId.value!)
-      showSuccess('版本已删除')
-      router.push('/apps')
-    } catch (e) { showError(String(e)) }
-  })
-}
+const {
+  fixing, openFolder,
+  handleEditDesc, handleRename, handleToggleStar,
+  handleChangeDisplayType, handleChangeLogo,
+  handleExportScript, handleFixFiles, handleDelete,
+} = useVersionOverviewActions({
+  selectedId, personalization, loadPersonalization, refreshEffectiveDir,
+  router, authStore, javaStore,
+})
 </script>
 
 <template>
@@ -171,25 +45,25 @@ function handleDelete() {
             <span class="inline-block rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-600">
               {{ currentMeta.label }}
             </span>
-            <span v-if="personalization?.original_version" class="text-xs text-gray-400">
-              原版 {{ personalization.original_version }}
+            <span v-if="personalization?.originalVersion" class="text-xs text-gray-400">
+              原版 {{ personalization.originalVersion }}
             </span>
           </div>
-          <p v-if="personalization?.custom_info" class="mt-1.5 text-xs text-gray-500">
-            {{ personalization.custom_info }}
+          <p v-if="personalization?.customInfo" class="mt-1.5 text-xs text-gray-500">
+            {{ personalization.customInfo }}
           </p>
         </div>
         <button
           class="flex flex-none items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs transition-colors"
-          :class="personalization?.is_star
+          :class="personalization?.isStar
             ? 'border-yellow-400 bg-yellow-50 text-yellow-600'
             : 'border-gray-300 bg-white text-gray-500 hover:border-yellow-400 hover:text-yellow-600'"
           @click="handleToggleStar"
         >
-          <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" :fill="personalization?.is_star ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
+          <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" :fill="personalization?.isStar ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.5">
             <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
           </svg>
-          {{ personalization?.is_star ? '已收藏' : '收藏' }}
+          {{ personalization?.isStar ? '已收藏' : '收藏' }}
         </button>
       </div>
     </section>
@@ -208,8 +82,8 @@ function handleDelete() {
         </div>
         <div class="flex items-center gap-3">
           <span class="w-20 flex-none text-xs text-gray-500">描述</span>
-          <span class="flex-1 truncate text-sm" :class="personalization?.custom_info ? 'text-gray-800' : 'text-gray-400'">
-            {{ personalization?.custom_info || '默认描述' }}
+          <span class="flex-1 truncate text-sm" :class="personalization?.customInfo ? 'text-gray-800' : 'text-gray-400'">
+            {{ personalization?.customInfo || '默认描述' }}
           </span>
           <button class="flex flex-none items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50" @click="handleEditDesc">
             <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.379-8.379-2.828-2.828z" /></svg>
@@ -245,7 +119,7 @@ function handleDelete() {
         <div class="flex items-center gap-3">
           <span class="w-20 flex-none text-xs text-gray-500">分类</span>
           <Select
-            :model-value="personalization?.display_type ?? 0"
+            :model-value="personalization?.displayType ?? 0"
             :options="displayTypeOptions"
             class="flex-1"
             @update:model-value="handleChangeDisplayType($event as number)"

@@ -10,7 +10,11 @@ use super::sanitize_version_id;
 use super::list::version_type_to_string;
 
 /// 版本个性化信息（返回给前端）
+///
+/// 注意：与 `PersonalizationUpdate` 保持一致，使用 camelCase 序列化，
+/// 前端无需 snakeMap 转换即可直接访问（如 `p.windowTitle`）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VersionPersonalization {
     pub logo: String,
     pub custom_info: String,
@@ -64,9 +68,7 @@ pub async fn get_version_personalization(
 ) -> Result<VersionPersonalization, String> {
     sanitize_version_id(&version_id)?;
 
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
 
     let version_dir = game_dir.join("versions").join(&version_id);
     let setup = VersionSetup::load_or_create(&version_dir, &version_id);
@@ -109,9 +111,7 @@ pub async fn update_version_personalization(
     sanitize_version_id(&version_id)?;
     log_info!("Updating personalization for version: {}", version_id);
 
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
 
     let version_dir = game_dir.join("versions").join(&version_id);
     VersionSetup::update_personalization(&version_dir, &update).map_err(|e| {

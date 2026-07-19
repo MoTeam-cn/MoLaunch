@@ -92,9 +92,7 @@ pub struct InstalledVersionInfo {
 pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     log_info!("Fetching installed versions");
 
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
 
     let versions = version_scan::scan_installed_versions(&game_dir);
     let version_ids: Vec<String> = versions.iter().map(|v| v.id.clone()).collect();
@@ -114,9 +112,7 @@ pub async fn list_installed_versions_with_type(
 ) -> Result<Vec<InstalledVersionInfo>, String> {
     log_info!("Fetching installed versions with type info");
 
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
 
     let versions = version_scan::scan_installed_versions(&game_dir);
     let mut result = Vec::new();
@@ -251,9 +247,7 @@ pub async fn uninstall_version(
     sanitize_version_id(&version_id)?;
     log_info!("Uninstalling version: '{}'", version_id);
 
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
 
     version_scan::uninstall_version(&game_dir, &version_id).map_err(|e| {
         log_error!("Failed to uninstall version: {}", e);
@@ -310,9 +304,7 @@ pub async fn get_version_game_version(
 ) -> Result<Option<String>, String> {
     sanitize_version_id(&version_id)?;
 
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
 
     let version_dir = game_dir.join("versions").join(&version_id);
     let json_path = version_dir.join(format!("{}.json", version_id));

@@ -2,8 +2,12 @@
 //!
 //! 原 setup.rs 模块级自由函数：parse_ini / extract_maven_version /
 //! read_setup_version_and_loader / read_mc_version_from_json / detect_version_and_loader
+//!
+//! 另含 VersionSetup 的路径相关关联函数：file_path / exists
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
+
+use super::types::VersionSetup;
 
 /// 简单的 INI 解析器（flat：忽略 section，按 key 聚合到 HashMap）
 ///
@@ -86,4 +90,16 @@ pub fn detect_version_and_loader(version_dir: &Path, version_id: &str) -> (Strin
     let mc_version =
         mc_version.unwrap_or_else(|| read_mc_version_from_json(version_dir, version_id));
     (mc_version, loader)
+}
+
+impl VersionSetup {
+    /// 获取 setup.ini 文件路径
+    pub fn file_path(version_dir: &Path) -> PathBuf {
+        version_dir.join("setup.ini")
+    }
+
+    /// 检查 setup.ini 是否存在
+    pub fn exists(version_dir: &Path) -> bool {
+        Self::file_path(version_dir).exists()
+    }
 }
