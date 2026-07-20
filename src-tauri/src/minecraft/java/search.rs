@@ -53,7 +53,6 @@ const SEARCH_KEYWORDS: &[&str] = &[
     "launch",
     "path",
     "version",
-    "pcl",
     "zulu",
     "local",
     "packages",
