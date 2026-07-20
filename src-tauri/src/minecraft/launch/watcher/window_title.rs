@@ -218,15 +218,17 @@ mod macos_impl {
     use std::process::Command;
 
     /// 检查指定 PID 的进程是否有可见窗口
-    /// macOS 上用 osascript 检查进程是否存在窗口
+    /// macOS 上用 osascript 通过 System Events 检查进程是否有窗口
     pub async fn is_window_visible(pid: u32) -> bool {
-        // 用 System Events 检查该 PID 进程是否有窗口
         let script = format!(
             r#"tell application "System Events" to count (windows of (first process whose unix id is {}))"#,
             pid
         );
         match Command::new("osascript").arg("-e").arg(&script).output() {
             Ok(output) => {
+                if !output.status.success() {
+                    return false;
+                }
                 let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
                 stdout.parse::<u32>().unwrap_or(0) > 0
             }
@@ -236,6 +238,10 @@ mod macos_impl {
 
     /// 改写指定 PID 的窗口标题
     /// 通过 AppleScript 的 System Events 修改进程窗口标题
+    ///
+    /// 注意：Java 应用的窗口由 JVM 管理，System Events 可能无法直接修改其标题。
+    /// 这种情况下会输出警告日志，但不影响游戏运行。
+    /// macOS 需要用户在"系统设置 > 隐私与安全性 > 辅助功能"中授权启动器。
     pub async fn set_window_title(pid: u32, title: &str) {
         // 转义标题中的双引号和反斜杠
         let escaped_title = title.replace('\\', "\\\\").replace('"', "\\\"");
@@ -247,9 +253,24 @@ mod macos_impl {
             Ok(output) => {
                 if !output.status.success() {
                     let stderr = String::from_utf8_lossy(&output.stderr);
-                    // 静默处理错误（窗口可能已关闭或权限不足）
                     if !stderr.is_empty() {
-                        crate::log_warn!("[Watcher] macOS 改写窗口标题失败: {}", stderr.trim());
+                        // 常见错误：
+                        // - "Not authorized to send Apple events" → 需要辅助功能权限
+                        // - "Can't set name of window" → Java 应用不支持修改窗口标题
+                        let err = stderr.trim();
+                        if err.contains("Not authorized") || err.contains("Apple events") {
+                            crate::log_warn!("[Watcher] macOS 修改窗口标题需要辅助功能权限，请在系统设置 > 隐私与安全性 > 辅助功能中授权");
+                        } else if err.contains("Can't set name") || err.contains("can't be set") {
+                            // Java 应用可能不支持，静默处理避免刷屏
+                            // 只在第一次输出警告
+                            static WARNED: std::sync::atomic::AtomicBool =
+                                std::sync::atomic::AtomicBool::new(false);
+                            if !WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+                                crate::log_warn!("[Watcher] macOS Java 应用不支持修改窗口标题（System Events 无法设置 name 属性）");
+                            }
+                        } else {
+                            crate::log_warn!("[Watcher] macOS 改写窗口标题失败: {}", err);
+                        }
                     }
                 }
             }
@@ -269,31 +290,50 @@ mod linux_impl {
     use std::process::Command;
 
     /// 检查指定 PID 的进程是否有可见窗口
-    /// 优先用 wmctrl，其次 xdotool
+    /// 优先用 xdotool（支持按 PID 查找），fallback 到 wmctrl + 进程检查
     pub async fn is_window_visible(pid: u32) -> bool {
-        // 尝试用 xdotool 按 PID 搜索窗口
-        match Command::new("xdotool")
+        // 方案 1：xdotool search --pid
+        if let Ok(output) = Command::new("xdotool")
             .args(["search", "--pid", &pid.to_string(), "--onlyvisible"])
             .output()
         {
-            Ok(output) => {
-                let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                !stdout.is_empty()
-            }
-            Err(_) => {
-                // xdotool 不存在，尝试 wmctrl（只能列出所有窗口，无法按 PID 过滤）
-                // 退而求其次：检查进程是否在运行
-                Command::new("ps")
-                    .args(["-p", &pid.to_string()])
-                    .output()
-                    .map(|o| o.status.success())
-                    .unwrap_or(false)
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !stdout.is_empty() {
+                return true;
             }
         }
+
+        // 方案 2：wmctrl -l 列出所有窗口，检查是否有窗口标题包含 "Minecraft"
+        if let Ok(output) = Command::new("wmctrl").args(["-l", "-p"]).output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                // wmctrl -l -p 输出格式：窗口ID 主机名 PID 标题
+                let parts: Vec<&str> = line.splitn(4, char::is_whitespace).collect();
+                if parts.len() >= 3 {
+                    if let Ok(window_pid) = parts[2].parse::<u32>() {
+                        if window_pid == pid {
+                            return true;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 方案 3：检查进程是否在运行（最后的 fallback）
+        Command::new("ps")
+            .args(["-p", &pid.to_string()])
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false)
     }
 
     /// 改写指定 PID 的窗口标题
-    /// 优先用 xdotool（支持按 PID 查找窗口），其次 wmctrl
+    /// 优先用 xdotool（支持按 PID 查找窗口），其次 wmctrl（按标题匹配）
+    ///
+    /// 注意：
+    /// - X11 下 xdotool/wmctrl 可正常工作
+    /// - Wayland 下大多数合成器出于安全限制不允许程序修改其他窗口标题
+    ///   这是 Wayland 的设计限制，非代码问题
     pub async fn set_window_title(pid: u32, title: &str) {
         // 方案 1：xdotool search --pid <pid> 然后 set_window --name
         if let Ok(output) = Command::new("xdotool")
@@ -302,18 +342,49 @@ mod linux_impl {
         {
             let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
             if let Some(window_id) = stdout.lines().next() {
-                let _ = Command::new("xdotool")
+                let result = Command::new("xdotool")
                     .args(["set_window", "--name", title, window_id])
                     .output();
-                return;
+                match result {
+                    Ok(o) if o.status.success() => return,
+                    Ok(o) => {
+                        let stderr = String::from_utf8_lossy(&o.stderr);
+                        if !stderr.is_empty() {
+                            crate::log_warn!("[Watcher] xdotool set_window 失败: {}", stderr.trim());
+                        }
+                    }
+                    Err(_) => {}
+                }
             }
         }
 
-        // 方案 2：wmctrl -r "旧标题" -T "新标题"（需要知道旧标题，不太可靠）
-        // wmctrl 无法按 PID 查找窗口，这里用窗口类名 "Minecraft" 作为 fallback
-        let _ = Command::new("wmctrl")
-            .args(["-r", "Minecraft", "-T", title])
-            .output();
+        // 方案 2：wmctrl -r "旧标题" -T "新标题"
+        // wmctrl 无法按 PID 查找窗口，需要知道旧标题
+        // 先用 wmctrl -l 找到该 PID 的窗口标题，再改
+        if let Ok(output) = Command::new("wmctrl").args(["-l", "-p"]).output() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            for line in stdout.lines() {
+                let parts: Vec<&str> = line.splitn(4, char::is_whitespace).collect();
+                if parts.len() >= 4 {
+                    if let Ok(window_pid) = parts[2].parse::<u32>() {
+                        if window_pid == pid {
+                            let old_title = parts[3];
+                            let _ = Command::new("wmctrl")
+                                .args(["-r", old_title, "-T", title])
+                                .output();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 两个工具都不可用（可能是 Wayland 环境）
+        static WARNED: std::sync::atomic::AtomicBool =
+            std::sync::atomic::AtomicBool::new(false);
+        if !WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
+            crate::log_warn!("[Watcher] Linux 无法修改窗口标题（可能缺少 xdotool/wmctrl，或运行在 Wayland 环境下）");
+        }
     }
 }
 
