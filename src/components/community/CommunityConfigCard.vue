@@ -73,12 +73,6 @@ const filenameOptions = [
               </div>
               <div class="w-72">
                 <Select v-model="source" :options="sourceOptions" custom-option>
-                  <template #selected>
-                    <div class="flex flex-col min-w-0 flex-1 leading-tight">
-                      <span class="text-sm font-medium text-gray-900 truncate">{{ sourceOptions.find(o => o.value === source)?.label }}</span>
-                      <span class="text-xs text-gray-400 truncate">{{ sourceOptions.find(o => o.value === source)?.desc }}</span>
-                    </div>
-                  </template>
                   <template #option="{ option }">
                     <div class="flex flex-col min-w-0 flex-1">
                       <span class="text-sm font-medium text-gray-900">{{ option.label }}</span>
@@ -86,7 +80,7 @@ const filenameOptions = [
                     </div>
                     <svg
                       v-if="option.value === source"
-                      class="select-check-icon shrink-0 mt-0.5"
+                      class="w-3 h-3 text-blue-600 shrink-0 mt-0.5"
                       viewBox="0 0 1024 1024"
                       fill="currentColor"
                     >
