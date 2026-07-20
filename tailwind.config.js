@@ -48,8 +48,8 @@ export default {
           950: '#172554',
         },
         page: '#f0f5ff',
-        // PCL2 配色（参考 Application.xaml 主题色）
-        pcl: {
+        // 主题配色
+        brand: {
           1: '#343d4a',  // 深灰蓝 - 正文/默认文字/阴影
           2: '#0b5bcb',  // 主蓝 - 标题/Highlight 按钮
           3: '#1370f3',  // 亮蓝 - 悬停态边框
@@ -59,7 +59,7 @@ export default {
           7: '#e0eafd',  // 按钮悬停背景
           8: '#eaf2fe',
         },
-        pclmsg: {
+        dialog: {
           bg: '#FBFBFB',           // 弹窗背景
           caption: '#5C5C5C',      // 正文文字（写死，不随主题变）
         },

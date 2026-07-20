@@ -5,41 +5,41 @@
       <div class="absolute inset-0 bg-black/35" @click="handleClose" />
 
       <!-- 弹窗主体 -->
-      <div class="crash-dialog relative bg-pclmsg-bg rounded-lg shadow-[0_4px_20px_rgba(52,61,74,0.5)] w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+      <div class="crash-dialog relative bg-dialog-bg rounded-lg shadow-[0_4px_20px_rgba(52,61,74,0.5)] w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
         <!-- 标题区 + 分割线 -->
         <div class="px-7 pt-6 pb-3">
-          <h2 class="text-[23px] font-normal text-pcl-2 leading-tight">Minecraft 出现错误</h2>
+          <h2 class="text-[23px] font-normal text-brand-2 leading-tight">Minecraft 出现错误</h2>
           <!-- 分割线 -->
-          <div class="mt-3 h-0.5 bg-pcl-2 rounded-full"></div>
+          <div class="mt-3 h-0.5 bg-brand-2 rounded-full"></div>
         </div>
 
         <!-- 内容区 -->
         <div class="flex-1 overflow-y-auto px-7 py-4">
           <!-- 崩溃原因段落 -->
-          <p class="text-[15px] leading-[18px] text-pclmsg-caption mb-4">
+          <p class="text-[15px] leading-[18px] text-dialog-caption mb-4">
             游戏已异常退出，以下是崩溃分析结果：
           </p>
 
           <!-- 原因详情（加粗，深色文字） -->
-          <p class="text-[15px] leading-[18px] text-pcl-1 font-medium mb-2">
+          <p class="text-[15px] leading-[18px] text-brand-1 font-medium mb-2">
             {{ crashInfo?.reason || '未知原因' }}
           </p>
 
           <!-- 相关 Mod（如果有） -->
-          <p v-if="crashInfo?.problematic_mod" class="text-[15px] leading-[18px] text-pclmsg-caption mb-4">
+          <p v-if="crashInfo?.problematic_mod" class="text-[15px] leading-[18px] text-dialog-caption mb-4">
             相关 Mod：{{ crashInfo.problematic_mod }}
           </p>
 
           <!-- 建议（纯文本段落） -->
-          <p class="text-[15px] leading-[18px] text-pclmsg-caption whitespace-pre-line mb-4">
+          <p class="text-[15px] leading-[18px] text-dialog-caption whitespace-pre-line mb-4">
             {{ crashInfo?.suggestion || '' }}
           </p>
 
           <!-- 崩溃报告文件路径（如果有，可点击打开） -->
           <div v-if="crashInfo?.crash_report_path" class="mb-4">
-            <p class="text-[15px] leading-[18px] text-pclmsg-caption mb-1">崩溃报告文件：</p>
+            <p class="text-[15px] leading-[18px] text-dialog-caption mb-1">崩溃报告文件：</p>
             <button
-              class="text-[15px] text-pcl-2 hover:text-pcl-3 hover:underline text-left break-all transition-colors"
+              class="text-[15px] text-brand-2 hover:text-brand-3 hover:underline text-left break-all transition-colors"
               @click="openCrashReport"
             >
               {{ crashInfo.crash_report_path }}
@@ -68,7 +68,7 @@
             <div v-if="showDetails" class="mt-3 space-y-3">
               <!-- 错误日志 -->
               <div v-if="errorLines.length > 0">
-                <p class="text-[13px] text-pclmsg-caption mb-1">错误日志（{{ errorLines.length }} 行）</p>
+                <p class="text-[13px] text-dialog-caption mb-1">错误日志（{{ errorLines.length }} 行）</p>
                 <div class="bg-gray-900 rounded-md p-3 max-h-48 overflow-y-auto">
                   <pre class="text-xs text-red-300 whitespace-pre-wrap break-all font-mono">{{ errorLines.join('\n') }}</pre>
                 </div>
@@ -76,7 +76,7 @@
 
               <!-- 游戏日志尾部 -->
               <div v-if="logTail.length > 0">
-                <p class="text-[13px] text-pclmsg-caption mb-1">游戏日志尾部（{{ logTail.length }} 行）</p>
+                <p class="text-[13px] text-dialog-caption mb-1">游戏日志尾部（{{ logTail.length }} 行）</p>
                 <div class="bg-gray-900 rounded-md p-3 max-h-48 overflow-y-auto">
                   <pre class="text-xs text-gray-300 whitespace-pre-wrap break-all font-mono">{{ logTail.join('\n') }}</pre>
                 </div>

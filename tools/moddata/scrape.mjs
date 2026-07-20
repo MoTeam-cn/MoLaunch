@@ -103,10 +103,14 @@ function fmtTime(ms) {
 }
 
 const tty = process.stdout.isTTY;
+const SCR_H = 5; // 固定行数
 function scr(rows) {
   if (!tty) { rows.forEach(r => console.log(r)); return; }
   readline.cursorTo(process.stdout, 0, 0);
-  process.stdout.write(rows.join('\n') + '\x1b[J');
+  // 补齐到固定行数，避免残留
+  const buf = [];
+  for (let i = 0; i < SCR_H; i++) buf.push(rows[i] || '');
+  process.stdout.write(buf.join('\n') + '\x1b[J');
 }
 
 // ── Phase 1 ──────────────────────────────────────────────
@@ -127,6 +131,7 @@ async function discoverAllIds() {
   scr(['▶ Phase 1: 扫描列表页  (0.0%)',
        `[${'░'.repeat(30)}] 0/${total}`,
        `已发现: 0 ID  `,
+       '并发: 初始化...',
        '用时: 0s']);
 
   const results = await pool(
@@ -152,7 +157,8 @@ async function discoverAllIds() {
        scr([`▶ Phase 1: 扫描列表页  (${(pct*100).toFixed(1)}%)`,
            `[${bar}] ${done}/${total}`,
            `已发现: ${idCount.toLocaleString()} 个 ID`,
-           `用时: ${fmtTime(el)}  剩余: ${fmtTime(eta)}  速率: ${(done/(el/1000)).toFixed(1)} pg/s`]);
+           `并发: 6 线程  速率: ${(done/(el/1000)).toFixed(1)} pg/s`,
+           `用时: ${fmtTime(el)}  剩余: ${fmtTime(eta)}`]);
        // 每 100 页写一次日志
        if (done % 100 === 0) logRaw(`discover ${done}/${total} pages, ${idCount} IDs`);
     }
@@ -164,7 +170,7 @@ async function discoverAllIds() {
 
   scr([`✓ Phase 1 完成`,
        `发现 ${arr.length.toLocaleString()} 个 ID (${arr[0]} ~ ${arr[arr.length-1]})`,
-       `总用时 ${fmtTime(Date.now() - t0)}`]);
+       `总用时 ${fmtTime(Date.now() - t0)}`, '', '']);
   logRaw(`Phase1 done: ${arr.length} IDs`);
   return arr;
 }
@@ -227,20 +233,49 @@ async function scrapeOne(id) {
 }
 
 // ── 文件输出 ─────────────────────────────────────────────
-function writeOut(ids, map, pathOut) {
-  const max = ids.length ? ids[ids.length - 1] : 0;
+function readExistingLines() {
+  if (!fs.existsSync(OUT)) return [];
+  const text = fs.readFileSync(OUT, 'utf-8');
+  return text.split('\n');
+}
+
+function writeOut(scrapedIds, map, pathOut) {
+  const oldLines = readExistingLines();
+  // 去除尾部空行（文件末尾 \n 导致的 split 多余元素）
+  while (oldLines.length && oldLines[oldLines.length - 1] === '') oldLines.pop();
+  const oldData = oldLines.length > 0 ? oldLines.slice(0, -1) : [];
+  const oldPop = oldLines.length > 0 ? oldLines[oldLines.length - 1] : '';
+
+  const maxId = Math.max(scrapedIds.length ? scrapedIds[scrapedIds.length - 1] : 0, oldData.length);
   const lines = [];
-  for (let id = 1; id <= max; id++) {
+  const popVals = [];
+
+  for (let id = 1; id <= maxId; id++) {
     const m = map.get(id);
-    lines.push(m ? encode(m.cn, m.en, m.cf, m.mr) : '');
+    if (m) {
+      lines.push(encode(m.cn, m.en, m.cf, m.mr));
+    } else if (id <= oldData.length && oldData[id - 1].trim()) {
+      lines.push(oldData[id - 1]);
+    } else {
+      lines.push('');
+    }
+    // 解析旧 popularity 值
+    if (id <= oldData.length && oldPop) {
+      const parts = oldPop.split('|');
+      popVals.push(parts[id] || '0');
+    } else {
+      popVals.push('0');
+    }
   }
-  lines.push('|' + Array(max).fill(0).join('|'));
+  lines.push('|' + popVals.join('|'));
   fs.writeFileSync(pathOut, lines.join('\n'), 'utf-8');
 }
 
 function existingIds() {
   if (!fs.existsSync(OUT)) return new Set();
-  const lines = fs.readFileSync(OUT, 'utf-8').split('\n').slice(0, -1);
+  let lines = fs.readFileSync(OUT, 'utf-8').split('\n');
+  while (lines.length && lines[lines.length - 1] === '') lines.pop();
+  lines.pop(); // 去掉 popularity 行
   const set = new Set();
   lines.forEach((l, i) => { if (l.trim()) set.add(i + 1); });
   return set;
@@ -287,6 +322,7 @@ async function main() {
     scr(['▶ Phase 2: 抓取详情  (0.0%)',
          `[${'░'.repeat(30)}] 0/${total.toLocaleString()}`,
          '成功: 0  失败: 0',
+         '当前: 初始化中...',
          '用时: 0s']);
 
     const results = await pool(
@@ -304,10 +340,12 @@ async function main() {
           else { ok++; cur = results[i].cn + (results[i].en ? ' ('+results[i].en+')' : ''); }
         }
 
-        scr([`▶ Phase 2: 抓取详情  (${(pct*100).toFixed(1)}%)`,
-             `[${bar}] ${done.toLocaleString()}/${total.toLocaleString()}`,
-             `成功: ${ok}  失败: ${fail}  速率: ${(done/(el/1000/60)).toFixed(0)}/min`,
-             `用时: ${fmtTime(el)}  剩余: ${fmtTime(eta)}`]);
+       const curTrunc = cur.length > 50 ? cur.substring(0, 47) + '...' : cur;
+       scr([`▶ Phase 2: 抓取详情  (${(pct*100).toFixed(1)}%)`,
+           `[${bar}] ${done.toLocaleString()}/${total.toLocaleString()}`,
+           `成功: ${ok}  失败: ${fail}  速率: ${(done/(el/1000/60)).toFixed(0)}/min`,
+           `当前: class/${ids[done-1]}.html  ${curTrunc}`,
+           `用时: ${fmtTime(el)}  剩余: ${fmtTime(eta)}`]);
 
         // 每 100 条写日志
         if (done - lastLogDone >= 100) {
@@ -316,7 +354,7 @@ async function main() {
         }
         if (done % 300 === 0) {
           for (let i = 0; i < done; i++) if (results[i] && results[i] !== null) map.set(ids[i], results[i]);
-          writeOut(ids, map, OUT + '.partial');
+          writeOut(ids, map, OUT);
         }
       }
     );
@@ -326,12 +364,13 @@ async function main() {
       if (results[i] && results[i] !== null) { map.set(ids[i], results[i]); ok++; }
       else fail++;
     }
-    writeOut(ids, map, OUT + '.partial');
+    writeOut(ids, map, OUT);
 
     scr([`✓ Phase 2 完成`,
          `成功: ${ok}  失败: ${fail}  总计: ${total}`,
          `总用时 ${fmtTime(Date.now() - t0)}`,
-         `已保存到 ${OUT}.partial`]);
+         `已更新 moddata.txt`,
+         '']);
     logRaw(`Phase2 done: ok=${ok} fail=${fail}`);
   }
 
