@@ -7,17 +7,18 @@
  * - 无任务时：空状态（DownloadEmptyState 子组件）
  */
 
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { showConfirm } from '@/utils/modal'
 import { pauseDownload, resumeDownload, cancelDownload, getDownloadProgress, isDownloading } from '@/utils/tauri'
 import type { RawDownloadProgress } from '@/types/download'
-import DownloadEmptyState from './downloads/DownloadEmptyState.vue'
 import DownloadStatsPanel from './downloads/DownloadStatsPanel.vue'
 import TaskGroupCard from '@/components/downloads/TaskGroupCard.vue'
 import { initDownloadPolling } from '@/composables/useDownloadPolling'
 
 const versionStore = useVersionStore()
+const router = useRouter()
 
 // 进入页面时恢复下载状态
 onMounted(async () => {
@@ -60,13 +61,27 @@ onMounted(async () => {
           isPaused,
         })
       }
+    } else {
+      // 无下载任务：自动返回上一页（用户需求：没有任务自动回到之前点击下载按钮的地方）
+      router.back()
+      return
     }
   } catch (e) {
     console.error('Failed to restore download state:', e)
+    // 出错也返回上一页，避免停留在空白下载页
+    router.back()
+    return
   }
 })
 
 const hasActiveDownload = computed(() => versionStore.downloading)
+
+// 下载完成/取消后自动返回上一页（hasActiveDownload 从 true 变为 false 时触发）
+watch(hasActiveDownload, (active, wasActive) => {
+  if (!active && wasActive) {
+    router.back()
+  }
+})
 const progress = computed(() => versionStore.downloadProgress)
 const isPaused = computed(() => progress.value?.isPaused ?? false)
 
@@ -130,6 +145,8 @@ function handleCancel() {
         console.error('Failed to cancel download:', e)
       } finally {
         cancelling.value = false
+        // 确保取消后立即触发返回（避免轮询已停止时卡在空白页）
+        versionStore.finishDownload()
       }
     },
   )
@@ -146,11 +163,8 @@ function handleCancel() {
 
     <!-- 内容区域 -->
     <div class="flex-1 overflow-hidden flex">
-      <!-- 无下载任务时的空状态 -->
-      <DownloadEmptyState v-if="!hasActiveDownload" />
-
       <!-- 有下载任务时 -->
-      <template v-else>
+      <template v-if="hasActiveDownload">
         <!-- 左侧：统计面板 -->
         <DownloadStatsPanel
           :current-stage-name="currentStageName"

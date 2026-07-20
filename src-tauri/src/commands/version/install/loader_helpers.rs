@@ -53,8 +53,21 @@ pub(crate) async fn install_single_loader(
 
     log_info!("[Merged] Installing {} {}", loader_name, loader_version);
 
-    // 启动进度模拟器
+    // 启动进度模拟器（为安装过程提供伪进度底色）
     let ticker_stop = start_progress_ticker(state.download_state.clone(), 5.0, 95.0);
+
+    // 构造 progress_callback：将加载器内部进度（0.0-1.0）更新到当前 stage
+    // 修复：之前传 None，导致 Fabric 等快速安装的加载器没有可见的进度变化
+    let ds_for_cb = state.download_state.clone();
+    let progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>> = Some(Arc::new(move |p: f64| {
+        let mut ds = ds_for_cb.lock().unwrap();
+        if let Some(last) = ds.stages.last_mut() {
+            // p 是 0.0-1.0，直接设为 stage progress
+            // 与 ticker 的伪进度取较大值，避免回调进度低于 ticker 进度时倒退
+            let ticker_progress = last.progress;
+            last.progress = ticker_progress.max(p);
+        }
+    }));
 
     // 安装加载器
     match loaders::install_loader(
@@ -64,7 +77,7 @@ pub(crate) async fn install_single_loader(
         game_dir,
         mirror_url,
         max_threads,
-        None,
+        progress_callback,
         source_mode,
     )
     .await
