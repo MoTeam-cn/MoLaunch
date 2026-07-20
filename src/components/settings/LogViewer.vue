@@ -148,15 +148,15 @@ onMounted(async () => {
             :item-size="20"
             key-field="no"
             v-slot="{ item }"
-            style="height: 360px; overflow: auto;"
+            style="height: 360px;"
           >
             <div
-              class="flex hover:bg-gray-800/50 px-1"
-              style="min-height: 20px"
+              class="flex hover:bg-gray-800/50 log-row"
+              style="height: 20px"
             >
-              <span class="text-gray-600 select-none w-10 shrink-0 text-right pr-3 tabular-nums text-xs leading-5">{{ item.no }}</span>
+              <span class="text-gray-600 select-none w-10 shrink-0 text-right pr-3 tabular-nums text-xs leading-5 log-line-no">{{ item.no }}</span>
               <span
-                class="pl-3 border-l border-gray-800 whitespace-pre text-xs leading-5 font-mono"
+                class="pl-3 border-l border-gray-800 whitespace-pre text-xs leading-5 font-mono log-line-text"
                 :class="logLineClass(item.level)"
               >{{ item.text || ' ' }}</span>
             </div>
@@ -171,17 +171,24 @@ onMounted(async () => {
 <style scoped>
 /* 日志查看器：黑色背景 + 黑色滚动条 */
 
+/* RecycleScroller 容器：纵向滚动 + 横向滚动 */
 .log-viewer :deep(.vue-recycle-scroller) {
   background: #111827; /* gray-900 */
+  /* 纵向滚动由 RecycleScroller 内部处理，横向滚动由外层 overflow-y: auto + item-view width: max-content 触发 */
+  overflow-x: auto !important;
 }
 
-/* RecycleScroller 的 item-view 是 absolute 定位，默认 width:100% 会导致
-   whitespace-pre 的长行内容溢出但容器不出现横向滚动条。
-   修复：让 item-view 宽度适应内容（max-content），最小 100% */
+/* 关键修复：item-view 默认 width: 100%，导致长行内容被截断无法横向滚动
+   改为 width: max-content 让每行宽度适应内容，min-width: 100% 保证短行填满 */
 .log-viewer :deep(.vue-recycle-scroller__item-view) {
   background: #111827;
   width: max-content !important;
   min-width: 100% !important;
+}
+
+/* 行容器：确保不换行，宽度适应内容 */
+.log-viewer :deep(.log-row) {
+  white-space: nowrap;
 }
 
 /* 自定义滚动条：黑色背景上的深灰色滚动条（纵向 + 横向） */
