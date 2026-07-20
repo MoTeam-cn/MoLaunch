@@ -206,9 +206,11 @@ impl DownloadManager {
                 break;
             }
 
-            // 检查暂停信号：暂停时等待恢复或取消
-            while self.is_paused() && !self.is_cancelled() {
+            // 检查暂停信号：暂停时等待恢复或取消（只打印一次暂停日志）
+            if self.is_paused() && !self.is_cancelled() {
                 log_info!("[Download] 下载已暂停，等待恢复...");
+            }
+            while self.is_paused() && !self.is_cancelled() {
                 tokio::time::sleep(Duration::from_millis(500)).await;
             }
             if self.is_cancelled() {

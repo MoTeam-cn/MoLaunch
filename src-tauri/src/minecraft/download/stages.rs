@@ -65,6 +65,11 @@ pub async fn download_client_jar(
 
     if let Some(result) = results.first() {
         if result.status != DownloadStatus::Completed && result.status != DownloadStatus::Skipped {
+            // 取消导致的失败返回更友好的错误信息
+            let err_msg = result.error.as_deref().unwrap_or("unknown error");
+            if err_msg.contains("取消") || err_msg.contains("cancel") {
+                return Err(anyhow::anyhow!("下载已取消"));
+            }
             return Err(anyhow::anyhow!(
                 "Failed to download client JAR: {:?}",
                 result.error

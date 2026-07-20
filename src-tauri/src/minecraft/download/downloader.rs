@@ -262,6 +262,10 @@ async fn download_from_url(
     };
 
     let mut stream = response.bytes_stream();
+    // 确保父目录存在（取消/清理可能导致目录被删除）
+    if let Some(parent) = Path::new(local_path).parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
     let mut file = std::fs::File::create(local_path)?;
 
     // 回滚已增量加到 progress 的字节数（downloaded>0 时才需要）

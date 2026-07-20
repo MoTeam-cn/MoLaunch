@@ -19,8 +19,11 @@ pub async fn download_version(
     sanitize_version_id(&version_id)?;
     log_info!("Downloading version: {}", version_id);
 
+    // 清空上一次下载的 stages（避免累积）
+    // 修复：之前只重置已有 stages 的状态，不清空数组，多次下载后 stages 越来越长
     {
         let mut ds = state.download_state.lock().unwrap();
+        ds.stages.clear();
         ds.is_active = true;
         ds.is_complete = false;
         ds.current_stage_index = 0;
@@ -28,12 +31,6 @@ pub async fn download_version(
         ds.global_bytes_downloaded = 0;
         ds.global_bytes_total = 0;
         ds.error_code = 0;
-        for stage in ds.stages.iter_mut() {
-            stage.progress = 0.0;
-            stage.status = StageStatus::Waiting;
-            stage.bytes_downloaded = 0;
-            stage.bytes_total = 0;
-        }
     }
 
     let config = state.config.lock().await;

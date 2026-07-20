@@ -71,6 +71,20 @@ pub async fn install_merged(
         .download_pause_flag
         .store(false, std::sync::atomic::Ordering::Relaxed);
 
+    // 清空上一次下载的 stages（避免累积导致前端显示历史阶段）
+    // 修复：之前 append_stages 会保留旧 stages，多次安装后 stages 数组越来越长
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.stages.clear();
+        ds.current_stage_index = 0;
+        ds.is_active = false;
+        ds.is_complete = false;
+        ds.global_speed = 0;
+        ds.global_bytes_downloaded = 0;
+        ds.global_bytes_total = 0;
+        ds.error_code = 0;
+    }
+
     let base_name = instance_name.unwrap_or_else(|| mc_version.clone());
     let instance = resolve_unique_instance_name(&game_dir, &base_name);
     if instance != base_name {
