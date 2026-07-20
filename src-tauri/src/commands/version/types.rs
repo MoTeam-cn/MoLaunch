@@ -50,4 +50,7 @@ pub struct DownloadProgressSnapshot {
     pub is_active: bool,
     pub is_complete: bool,
     pub error_code: i32,
+    /// 当前下载的版本名（用于前端显示，刷新页面后恢复）
+    #[serde(default)]
+    pub version_name: String,
 }

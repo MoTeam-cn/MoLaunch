@@ -73,4 +73,6 @@ export interface RawDownloadProgress {
   is_active: boolean
   is_complete: boolean
   error_code: number
+  /** 当前下载的版本名（用于前端显示，刷新页面后恢复） */
+  version_name?: string
 }

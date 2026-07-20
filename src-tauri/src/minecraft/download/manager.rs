@@ -232,6 +232,7 @@ impl DownloadManager {
             let self_chunk_count = self.chunk_count;
             let chunked_ids = chunked_task_ids.clone();
             let cancel_flag = self.cancel_flag.clone();
+            let pause_flag = self.pause_flag.clone();
 
             let handle = tokio::spawn(async move {
                 let _permit = sem.acquire().await.unwrap();
@@ -261,6 +262,8 @@ impl DownloadManager {
                     source_mode,
                     Some(prog.clone()),
                     Some(chunked_ids.clone()),
+                    pause_flag.clone(),
+                    cancel_flag.clone(),
                 )
                 .await;
 

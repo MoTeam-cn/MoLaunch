@@ -27,6 +27,8 @@ pub async fn download_single(
     source_mode: DownloadSourceMode,
     progress: Option<Arc<StdMutex<GlobalProgress>>>,
     chunked_task_ids: Option<Arc<StdMutex<std::collections::HashSet<String>>>>,
+    pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> DownloadProgress {
     // 检查文件是否已存在且有效
     let checker = FileChecker::new()
@@ -127,6 +129,8 @@ pub async fn download_single(
                         chunk_count,
                         limiter,
                         progress.clone(),
+                        pause_flag.clone(),
+                        cancel_flag.clone(),
                     )
                     .await;
 
@@ -178,6 +182,8 @@ pub async fn download_single(
                 rate_limiter.clone(),
                 timeout,
                 progress.clone(),
+                pause_flag.clone(),
+                cancel_flag.clone(),
             )
             .await
             {
@@ -243,6 +249,8 @@ async fn download_from_url(
     rate_limiter: Option<Arc<Mutex<RateLimiter>>>,
     timeout: Duration,
     progress: Option<Arc<StdMutex<GlobalProgress>>>,
+    pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> Result<(u64, u64, u64), Box<dyn std::error::Error + Send + Sync>> {
     let response = client.get(url).timeout(timeout).send().await?;
 
@@ -279,6 +287,25 @@ async fn download_from_url(
     };
 
     while let Some(chunk) = stream.next().await {
+        // 检查取消信号
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(std::sync::atomic::Ordering::Relaxed) {
+                rollback_progress(downloaded, &progress);
+                return Err("下载已取消".into());
+            }
+        }
+        // 检查暂停信号
+        if let Some(ref flag) = pause_flag {
+            while flag.load(std::sync::atomic::Ordering::Relaxed) {
+                if let Some(ref cf) = cancel_flag {
+                    if cf.load(std::sync::atomic::Ordering::Relaxed) {
+                        rollback_progress(downloaded, &progress);
+                        return Err("下载已取消".into());
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(200)).await;
+            }
+        }
         let chunk = match chunk {
             Ok(c) => c,
             Err(e) => {

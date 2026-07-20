@@ -10,6 +10,7 @@
 
 use std::path::Path;
 use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::atomic::AtomicBool;
 use std::time::Instant;
 use tokio::sync::Mutex;
 
@@ -53,6 +54,8 @@ pub async fn download_chunked(
     chunk_count: usize,
     rate_limiter: Arc<Mutex<RateLimiter>>,
     file_progress: Option<Arc<StdMutex<GlobalProgress>>>,
+    pause_flag: Option<Arc<AtomicBool>>,
+    cancel_flag: Option<Arc<AtomicBool>>,
 ) -> ChunkDownloadResult {
     // file_size=0 时自动探测（GET + Range:bytes=0-0，通过 Content-Range 拿总大小）
     // 不用 HEAD 是因为 Modrinth CDN 307 重定向后 HEAD 不返回 Content-Length
@@ -143,10 +146,13 @@ pub async fn download_chunked(
         let limiter = rate_limiter.clone();
         let prog = chunk_progress.clone();
         let file_prog = file_progress.clone();
+        let pause = pause_flag.clone();
+        let cancel = cancel_flag.clone();
 
         let handle = tokio::spawn(async move {
             let result = download_chunk(
                 &client, &url, &part_path, start, end, limiter, prog, i, file_prog,
+                pause, cancel,
             )
             .await;
             (i, result)

@@ -83,6 +83,7 @@ pub async fn install_merged(
         ds.global_bytes_downloaded = 0;
         ds.global_bytes_total = 0;
         ds.error_code = 0;
+        ds.version_name = instance_name.clone().unwrap_or_else(|| mc_version.clone());
     }
 
     let base_name = instance_name.unwrap_or_else(|| mc_version.clone());

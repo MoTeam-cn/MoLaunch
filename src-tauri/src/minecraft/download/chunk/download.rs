@@ -2,6 +2,7 @@
 
 use std::io::Write;
 use std::sync::{Arc, Mutex as StdMutex};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -12,6 +13,10 @@ use super::super::types::GlobalProgress;
 use super::util::format_bytes;
 
 /// 下载单个分片
+///
+/// 新增 `pause_flag` / `cancel_flag` 参数：分片数据流 loop 里检查暂停/取消信号，
+/// 暂停时 sleep 等待恢复，取消时立即返回错误。
+/// 修复：之前分片下载完全不受暂停/取消控制，一旦开始就停不下来。
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn download_chunk(
     client: &reqwest::Client,
@@ -23,6 +28,8 @@ pub(super) async fn download_chunk(
     chunk_progress: Arc<Vec<StdMutex<u64>>>,
     chunk_index: usize,
     file_progress: Option<Arc<StdMutex<GlobalProgress>>>,
+    pause_flag: Option<Arc<AtomicBool>>,
+    cancel_flag: Option<Arc<AtomicBool>>,
 ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
     let range_header = format!("bytes={}-{}", start, end);
 
@@ -64,6 +71,28 @@ pub(super) async fn download_chunk(
     // 真正卡死（15s 内没收到任何字节）才报错。
     // 这样慢速网络不会被误判 timeout，只有真断流才会失败。
     loop {
+        // 检查取消信号：立即返回错误
+        if let Some(ref flag) = cancel_flag {
+            if flag.load(Ordering::Relaxed) {
+                rollback(downloaded, &file_progress);
+                return Err("下载已取消".into());
+            }
+        }
+
+        // 检查暂停信号：暂停时 sleep 等待恢复或取消
+        if let Some(ref flag) = pause_flag {
+            while flag.load(Ordering::Relaxed) {
+                // 暂停期间也检查取消信号
+                if let Some(ref cf) = cancel_flag {
+                    if cf.load(Ordering::Relaxed) {
+                        rollback(downloaded, &file_progress);
+                        return Err("下载已取消".into());
+                    }
+                }
+                tokio::time::sleep(Duration::from_millis(200)).await;
+            }
+        }
+
         let next_chunk = tokio::time::timeout(Duration::from_secs(15), stream.next()).await;
         let chunk = match next_chunk {
             Err(_elapsed) => {

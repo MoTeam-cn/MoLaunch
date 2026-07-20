@@ -25,9 +25,10 @@ onMounted(async () => {
   try {
     const active = await isDownloading()
     if (active) {
-      versionStore.startDownload('')
+      // 从后端 snapshot 恢复版本名（避免刷新后版本名显示为空）
       const raw = await getDownloadProgress()
       if (raw && raw.stages && raw.stages.length > 0) {
+        versionStore.startDownload(raw.version_name || '')
         // 计算加权百分比
         let weightedProgress = 0
         let totalWeight = 0

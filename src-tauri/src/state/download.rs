@@ -63,6 +63,9 @@ pub struct DownloadState {
     pub global_bytes_downloaded: u64,
     pub global_bytes_total: u64,
     pub error_code: i32,
+    /// 当前下载的版本名（用于前端显示，刷新页面后恢复）
+    #[serde(default)]
+    pub version_name: String,
 }
 
 impl Default for DownloadState {
@@ -78,6 +81,7 @@ impl Default for DownloadState {
             global_bytes_downloaded: 0,
             global_bytes_total: 0,
             error_code: 0,
+            version_name: String::new(),
         }
     }
 }

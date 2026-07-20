@@ -41,6 +41,7 @@ pub async fn get_download_progress(
         is_active: ds.is_active,
         is_complete: ds.is_complete,
         error_code: ds.error_code,
+        version_name: ds.version_name.clone(),
     })
 }
 

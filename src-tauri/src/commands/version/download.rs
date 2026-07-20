@@ -31,6 +31,7 @@ pub async fn download_version(
         ds.global_bytes_downloaded = 0;
         ds.global_bytes_total = 0;
         ds.error_code = 0;
+        ds.version_name = version_id.clone();
     }
 
     let config = state.config.lock().await;
