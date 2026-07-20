@@ -1,11 +1,10 @@
 //! JSON inheritance merge module
-//! 参考 PCL2 的 JsonObject 属性实现
 
 use crate::log_warn;
 use std::path::Path;
 
 /// Merge version JSON inheritance chain
-/// 参考 PCL2 的处理方式：如果父版本不存在，仅记录警告，返回当前JSON
+/// 如果父版本不存在，仅记录警告，返回当前JSON
 pub fn merge_version_json(
     json: &serde_json::Value,
     game_dir: &Path,
@@ -33,7 +32,7 @@ pub fn merge_version_json(
             .join(inherit_from)
             .join(format!("{}.json", inherit_from));
 
-        // 参考 PCL2：父版本不存在时仅警告，不报错
+        // 父版本不存在时仅警告，不报错
         if !parent_json_path.exists() {
             log_warn!(
                 "[JsonMerge] Parent JSON not found: {} (inheritsFrom: {})",
@@ -51,7 +50,7 @@ pub fn merge_version_json(
         // Recursively merge parent's inheritance
         parent_json = merge_version_json(&parent_json, game_dir)?;
 
-        // Merge Libraries: child first, parent after (参考 PCL2 第576-584行)
+        // Merge Libraries: child first, parent after
         let mut merged_libs = serde_json::Value::Array(Vec::new());
 
         if let Some(child_libs) = current.get("libraries").and_then(|l| l.as_array()) {
@@ -70,7 +69,7 @@ pub fn merge_version_json(
             }
         }
 
-        // Merge other fields: child overrides parent (参考 PCL2 第582-583行)
+        // Merge other fields: child overrides parent
         let mut merged = parent_json.clone();
         merge_json_values(&mut merged, &current);
         merged["libraries"] = merged_libs;

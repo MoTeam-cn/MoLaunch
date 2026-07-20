@@ -1,7 +1,6 @@
 <script setup lang="ts">
 /**
  * 下载管理页左侧统计面板
- * 参考 PCL2 PageDownloads 左侧统计
  * 所有统计数据通过 props 接收（父组件已 computed）
  */
 import { formatBytes, formatSpeed } from '@/utils/format'

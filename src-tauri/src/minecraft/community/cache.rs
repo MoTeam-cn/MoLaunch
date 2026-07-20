@@ -1,6 +1,5 @@
 //! 社区资源内存缓存
 //!
-//! 参考 PCL2 ResourceProject.Cache / ResourceVersion.ProjectFilesCache
 //! 缓存工程详情和版本列表，避免重复请求
 
 use std::collections::HashMap;

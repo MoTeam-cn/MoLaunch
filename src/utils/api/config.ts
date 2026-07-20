@@ -46,7 +46,7 @@ export interface ConfigSnapshot {
   // CurseForge（已解密）
   curseforgeEnabled: boolean
   curseforgeApiKey: string
-  // 启动高级选项（参考 PCL2 PageSetupLaunch 高级选项）
+  // 启动高级选项
   launchDisableJlw: boolean
   launchDisableLua: boolean
   launchUseDedicatedGpu: boolean

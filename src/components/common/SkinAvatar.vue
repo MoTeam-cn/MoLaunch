@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /**
- * 玩家皮肤头像组件（严格参考 PCL2 的 MySkin 实现）
+ * 玩家皮肤头像组件
  *
- * PCL2 的实现（MySkin.xaml + MySkin.xaml.vb）：
+ * 实现规格：
  * - 控件容器：64x64
- * - ImgBack（脸层）：48x48，居中显示，从皮肤 (Scale*8, Scale*8) 裁剪 8x8
- * - ImgFore（头发层）：56x56，居中显示（比脸层大 1/6，向外扩展形成立体感），
+ * - 脸层（ImgBack）：48x48，居中显示，从皮肤 (Scale*8, Scale*8) 裁剪 8x8
+ * - 头发层（ImgFore）：56x56，居中显示（比脸层大 1/6，向外扩展形成立体感），
  *   从皮肤 (Scale*40, Scale*8) 裁剪 8x8
  * - 头发层仅在图片存在透明像素（或颜色差异）时才叠加，避免纯色白底覆盖
  *
- * 本组件用两层 div + img 模拟 PCL2 的双 Image 重叠效果：
+ * 本组件用两层 div + img 模拟双 Image 重叠效果：
  * - 外层容器：size x size
  * - 脸层：size * (48/64) 居中
  * - 头发层：size * (56/64) 居中，仅当有头发内容时显示
@@ -26,7 +26,7 @@ const props = withDefaults(defineProps<{
   uuid?: string
   /** 头像尺寸（px，容器尺寸） */
   size?: number
-  /** 是否叠加头发层（PCL2 的 ImgFore） */
+  /** 是否叠加头发层（ImgFore） */
   overlay?: boolean
   /** 用户名（用于回退显示） */
   username?: string
@@ -74,21 +74,21 @@ const avatarGradient = computed(() => {
   return gradients[Math.abs(hash) % gradients.length]
 })
 
-/** 脸层显示尺寸（PCL2：48/64 of 容器） */
+/** 脸层显示尺寸（48/64 of 容器） */
 const faceSize = computed(() => Math.round(props.size * 48 / 64))
-/** 头发层显示尺寸（PCL2：56/64 of 容器） */
+/** 头发层显示尺寸（56/64 of 容器） */
 const hairSize = computed(() => Math.round(props.size * 56 / 64))
 
 /**
  * 从皮肤 PNG 裁剪头像
  *
- * PCL2 的裁剪逻辑（参考 MySkin.Load）：
+ * 裁剪逻辑：
  * - Scale = 图片宽度 / 64（支持高清皮肤，如 128x64）
  * - 脸层：Clip(Scale*8, Scale*8, Scale*8, Scale*8)
  * - 头发层（附加层）：Clip(Scale*40, Scale*8, Scale*8, Scale*8)
  *   仅当图片有透明像素时才叠加（避免纯色白底覆盖）
  *
- * PCL2 透明像素检查（MySkin.xaml.vb 第 100-114 行）：
+ * 透明像素检查：
  *   - 检查 (1,1)、(W-1,H-1)、(W-2,H/2-2) 三点是否有透明像素
  *   - 或检查这三点与 (Scale*41, Scale*9) 颜色是否不同
  *   - 满足任一条件才叠加头发层
@@ -135,7 +135,7 @@ async function loadAvatar() {
     // 加载为 Image 对象
     const img = await loadImage(pngUrl)
 
-    // 计算缩放比例（PCL2 的 Scale）
+    // 计算缩放比例（Scale）
     const w = img.naturalWidth
     const h = img.naturalHeight
     if (w < 32 || h < 32) {
@@ -148,10 +148,10 @@ async function loadAvatar() {
     faceDataUrl.value = clipImageRegion(img, scale * 8, scale * 8, cellSize, cellSize, undefined, undefined, true)
 
     // 裁剪头发层（附加层）：从 (Scale*40, Scale*8) 取 8x8 区域
-    // 仅当图片有透明像素时才叠加（参考 PCL2 MySkin.Load 的透明度检查）
+    // 仅当图片有透明像素时才叠加
     hairDataUrl.value = null
     if (props.overlay && w >= 64 && h >= 32) {
-      // PCL2 的透明检查：(1,1)、(W-1,H-1)、(W-2,H/2-2) 是否有透明像素
+      // 透明检查：(1,1)、(W-1,H-1)、(W-2,H/2-2) 是否有透明像素
       // 或这三点与 (Scale*41, Scale*9) 颜色是否不同
       const tmp = document.createElement('canvas')
       tmp.width = w
@@ -191,7 +191,7 @@ async function loadAvatar() {
           for (let i = 3; i < hairData.length; i += 4) {
             if (hairData[i] > 0) { hairHasContent = true; break }
           }
-          // PCL2 条件：图片有透明像素 或 颜色差异，且头发层有内容
+          // 叠加条件：图片有透明像素 或 颜色差异，且头发层有内容
           if ((hasTransparency || colorDifferent) && hairHasContent) {
             hairDataUrl.value = hairDataUrlTmp
           }
@@ -223,7 +223,7 @@ watch(() => [props.uuid, props.loginType, props.skinUrl, skinVersion.value], loa
     :class="rounded ? 'rounded-full' : 'rounded-md'"
     :style="{ height: `${size}px`, width: `${size}px` }"
   >
-    <!-- 皮肤裁剪头像：双层叠加（PCL2 风格） -->
+    <!-- 皮肤裁剪头像：双层叠加 -->
     <template v-if="faceDataUrl && !loadFailed">
       <!-- 脸层（ImgBack）：48/64 居中 -->
       <img

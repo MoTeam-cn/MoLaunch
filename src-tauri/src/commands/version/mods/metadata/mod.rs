@@ -1,6 +1,6 @@
 //! Jar 内 Mod 元数据读取流水线
 //!
-//! 完整复刻 PCL2 `LocalResourceFile.LoadMetadataFromJar` 的版本号识别链：
+//! 版本号识别链：
 //! 1. mcmod.info（Forge 1.12-）
 //! 2. fabric.mod.json（Fabric/Quilt）
 //! 3. META-INF/mods.toml（Forge 1.13+/NeoForge）
@@ -22,7 +22,6 @@ use sources::{merge_fabric_mod_json, merge_fml_cache_annotation, merge_mcmod_inf
 
 /// 从 jar 文件内读取 mod 元数据：译名、描述、版本号、slug
 ///
-/// 完整复刻 PCL2 `LocalResourceFile.LoadMetadataFromJar`：
 /// 按顺序尝试 4 个来源，累积合并，已有有效值不覆盖。
 pub(crate) fn read_mod_metadata(path: &std::path::Path) -> ModMetadata {
     let file = match std::fs::File::open(path) {
@@ -34,7 +33,7 @@ pub(crate) fn read_mod_metadata(path: &std::path::Path) -> ModMetadata {
         Err(_) => return ModMetadata::default(),
     };
 
-    // 累积合并模式（参考 PCL2）：按顺序尝试 4 个来源，已有有效值不覆盖
+    // 累积合并模式：按顺序尝试 4 个来源，已有有效值不覆盖
     let mut builder = MetaBuilder::new();
     merge_mcmod_info(&mut archive, &mut builder);
     merge_fabric_mod_json(&mut archive, &mut builder);
@@ -43,7 +42,7 @@ pub(crate) fn read_mod_metadata(path: &std::path::Path) -> ModMetadata {
 
     let mut meta = builder.build();
 
-    // 将 Version 代号转换为 META-INF 中的版本（参考 PCL2 Finished: 标签第 314-329 行）
+    // 将 Version 代号转换为 META-INF 中的版本
     if meta.version == "version" {
         if let Some(manifest_ver) = read_manifest_version(&mut archive) {
             meta.version = manifest_ver;
@@ -52,7 +51,7 @@ pub(crate) fn read_mod_metadata(path: &std::path::Path) -> ModMetadata {
         }
     }
 
-    // 版本号有效性校验（参考 PCL2 第 330 行）：
+    // 版本号有效性校验：
     // 版本号必须包含 "." 或 "-"，否则视为无效
     if !meta.version.is_empty() && !meta.version.contains('.') && !meta.version.contains('-') {
         meta.version = String::new();
@@ -61,9 +60,9 @@ pub(crate) fn read_mod_metadata(path: &std::path::Path) -> ModMetadata {
     finalize_metadata(meta, path)
 }
 
-/// 中间结构，封装 PCL2 的"不覆盖"合并逻辑
+/// 中间结构，封装"不覆盖"合并逻辑
 ///
-/// 参考 PCL2 `LocalResourceFile` 的 Display/Description/Version setter：
+/// 字段设置规则：
 /// - Display: 第一个非空、非占位符的值优先（后续不覆盖）
 /// - Description: 第一个长度>2的值优先（后续不覆盖）
 /// - Version: 第一个有效版本号优先（后续不覆盖），占位符标记为 "version"
@@ -96,7 +95,7 @@ impl MetaBuilder {
         }
     }
 
-    /// 设置 description（只在未设置且长度>2时赋值，参考 PCL2 Description setter 第 80-86 行）
+    /// 设置 description（只在未设置且长度>2时赋值）
     fn set_description(&mut self, value: String) {
         if self.description.is_some() {
             return;
@@ -107,7 +106,7 @@ impl MetaBuilder {
         }
     }
 
-    /// 设置 version（已有有效版本不覆盖，占位符标记为 "version"，参考 PCL2 Version setter 第 99-103 行）
+    /// 设置 version（已有有效版本不覆盖，占位符标记为 "version"）
     fn set_version(&mut self, value: String) {
         if let Some(ref v) = self.version {
             if is_valid_version(v) {
@@ -131,7 +130,7 @@ impl MetaBuilder {
     }
 }
 
-/// 判断是否为有效版本号（只含数字、点、减号，参考 PCL2 `_Version.RegexCheck("[0-9.\-]+")`）
+/// 判断是否为有效版本号（只含数字、点、减号，对应正则 `[0-9.\-]+`）
 fn is_valid_version(v: &str) -> bool {
     !v.is_empty() && v.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '-')
 }

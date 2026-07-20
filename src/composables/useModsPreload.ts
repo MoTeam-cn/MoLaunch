@@ -1,7 +1,7 @@
 /**
  * Mod 详情预加载事件监听
  *
- * 参考 PCL2 `LocalResourceOnlineLoader` 后台加载完成后通过事件刷新 UI 的模式：
+ * 后台加载完成后通过事件刷新 UI 的模式：
  * 后端 `preload_mods_detail_cmd` 命令在后台并发：
  *   1. 读 JAR 元数据（slug / 描述 / 版本 / logo / 译名）
  *   2. 批量查询 CF/MR 工程详情

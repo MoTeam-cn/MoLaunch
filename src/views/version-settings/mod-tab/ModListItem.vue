@@ -1,29 +1,29 @@
 <script setup lang="ts">
 /**
- * 单个 Mod 列表项（参考 PCL2 MyLocalModItem）
+ * 单个 Mod 列表项
  * - 34×34 圆角真实 Logo 图标（来自平台工程 logo_url，经 image_cache 缓存；无 logo fallback 到默认图）
  * - 标题 14px + 副标题 12px 灰色（译名/文件名按 modLocalNameStyle 切换）
  * - 详情行：文件大小 · 加载器类型 · 文件名（hover Tooltip 显示完整路径）
  * - 六个操作按钮：详情、百科、打开文件位置、启用/禁用、更新、删除
- * - 按钮默认 opacity-0 隐藏，hover 列表项时才显示（与 PCL2 ButtonStack 行为一致）
+ * - 按钮默认 opacity-0 隐藏，hover 列表项时才显示
  *
- * 选中状态指示（参考 PCL2 MyLocalModItem.RectCheck，.vb 第 280-286 行）：
+ * 选中状态指示：
  * - 不使用复选框图标（太突兀），也不覆盖原有状态色条
  * - 在列表项左边缘外侧挂一条 5px 宽的彩色竖条（通过负 margin -3px 向左探出）
  * - 未选中：高度 0、透明（完全不可见，不影响原有状态色条）
- * - 选中：高度撑满（上下留 6px）、显示主题色，带弹性动画（对应 PCL2 AniEaseOutBack）
- * - 选中时标题颜色变为主题强调色（对应 PCL2 ColorBrush2）
+ * - 选中：高度撑满（上下留 6px）、显示主题色，带弹性动画
+ * - 选中时标题颜色变为主题强调色
  * - 原有的启用/禁用状态色条保持不变，两者互不干扰
  *
- * 多选交互（参考 PCL2 PageInstanceMod + MyLocalModItem）：
- * - 点击列表项（非按钮区域）切换选中状态（PCL2 也是点击触发，非长按）
+ * 多选交互：
+ * - 点击列表项（非按钮区域）切换选中状态（非长按）
  * - Shift+点击 范围选择（由 useMultiSelect composable 处理）
  * - 按钮使用 @click.stop 避免触发选中
  */
 import Tooltip from '@/components/common/Tooltip.vue'
 import { formatBytes } from '@/utils/format'
 import { modTitle, modSubtitle, loaderVisual } from '@/utils/mod-display'
-// Mod 默认 logo（无 jar 内 logo 时使用，参考 PCL2 Icons/NoIcon.png）
+// Mod 默认 logo（无 jar 内 logo 时使用）
 import defaultModLogo from '@/assets/Mods/default-min.png'
 import {
   PauseIcon,
@@ -57,7 +57,7 @@ const emit = defineEmits<{
 }>()
 
 /**
- * 点击列表项：切换选中状态（参考 PCL2 MyLocalModItem.Checked 的 Set 逻辑）
+ * 点击列表项：切换选中状态
  *
  * 按钮使用 @click.stop 阻止冒泡，不会触发此 handler。
  */
@@ -77,7 +77,7 @@ function handleClick(e: MouseEvent) {
       class="absolute left-0 top-0 h-full w-1 transition-colors"
       :class="mod.is_enabled ? 'bg-primary-500' : 'bg-gray-300'"
     ></div>
-    <!-- 选中指示条（参考 PCL2 RectCheck，.vb 第 280-286 行）：
+    <!-- 选中指示条：
          独立于状态色条，挂在左边缘外侧（-left-1 探出 4px），选中时显示，带弹性动画 -->
     <div
       v-if="selected"
@@ -135,7 +135,7 @@ function handleClick(e: MouseEvent) {
       </div>
     </div>
 
-    <!-- 操作区：六个按钮，默认隐藏，hover 时显示（参考 PCL2 ButtonStack opacity 动画） -->
+    <!-- 操作区：六个按钮，默认隐藏，hover 时显示 -->
     <!-- 选中时也显示按钮，按钮的 @click.stop 会阻止触发选中 -->
     <div
       class="flex flex-none items-center gap-1 transition-opacity duration-200"
@@ -209,7 +209,7 @@ function handleClick(e: MouseEvent) {
 </template>
 
 <style scoped>
-/* 选中指示条弹性动画（参考 PCL2 AniEaseOutBack：先冲过头再回弹）
+/* 选中指示条弹性动画：先冲过头再回弹
    使用 transform scaleY 而非 height，避免 height auto 无法动画的问题 */
 .animate-check-pop {
   animation: checkPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);

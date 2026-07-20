@@ -1,6 +1,5 @@
 //! 社区资源命令模块
 //!
-//! 参考 PCL2 PageDownload/Resource 侧栏功能
 //! 提供搜索、详情、安装三大类 Tauri 命令
 
 pub mod community_config;

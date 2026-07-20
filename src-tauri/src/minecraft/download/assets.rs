@@ -65,7 +65,7 @@ pub fn get_asset_index_meta(json: &serde_json::Value) -> Option<AssetIndexMeta> 
         });
     }
 
-    // 最终回退：参考 PCL2 的 McAssetsGetIndex 函数
+    // 最终回退：McAssetsGetIndex 函数
     // 当无法获取 assetIndex 时，使用硬编码的 legacy fallback
     let inherits_from = json
         .get("inheritsFrom")
@@ -82,7 +82,7 @@ pub fn get_asset_index_meta(json: &serde_json::Value) -> Option<AssetIndexMeta> 
         crate::log_warn!("[Assets] No assetIndex found in JSON, using legacy fallback");
     }
 
-    // 参考 PCL2 的硬编码 legacy fallback
+    // 硬编码 legacy fallback
     // https://launchermeta.mojang.com/mc-staging/assets/legacy/c0fd82e8ce9fbc93119e40d96d5a4e62cfa3f729/legacy.json
     Some(AssetIndexMeta {
         id: "legacy".to_string(),
@@ -189,7 +189,7 @@ pub fn get_asset_index_urls(meta: &AssetIndexMeta, source_mode: DownloadSourceMo
 /// - **并行检查**：使用 `std::thread::scope` 并行检查多个资源文件
 /// - **快速检查模式**（`quick_check = true`）：只检查文件存在 + 大小匹配，不计算 SHA1
 ///   - 用于启动时的文件校验（assets 数量通常几百上千，串行哈希校验会非常慢）
-///   - 参考 PCL2 启动流程：启动时不做哈希校验
+///   - 启动时不做哈希校验
 /// - **完整校验模式**（`quick_check = false`）：计算 SHA1 哈希，确保文件完整性
 ///   - 用于版本安装/修复时的严格校验
 pub fn find_missing_assets(entries: &[AssetEntry], quick_check: bool) -> Vec<AssetEntry> {

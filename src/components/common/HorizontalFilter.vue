@@ -2,7 +2,6 @@
 /**
  * 横向滚动筛选组件
  * 单行展示筛选项，可横向滚动，选中项高亮
- * 参考 PCL2 PageDownloadCompDetail CardFilter 横向 RadioButton
  *
  * 左右箭头：常驻显示（有空间可滑时），点击平滑滚动
  * 滚动条：默认隐藏，hover 容器时显示

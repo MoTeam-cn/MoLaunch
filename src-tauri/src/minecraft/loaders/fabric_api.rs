@@ -1,8 +1,8 @@
 //! Fabric API 自动补充模块
 //!
-//! 严格参考 PCL2 PageDownloadInstall.xaml.vb 的 FabricApi_Loaded 逻辑：
+//! Fabric API 加载逻辑：
 //! - 从 Modrinth 官方源获取 fabric-api 版本列表（project_id = P7dR8mSH）
-//! - 按 MC 版本筛选兼容版本（使用 game_versions 字段精确匹配，比 PCL2 的字符串匹配更可靠）
+//! - 按 MC 版本筛选兼容版本（使用 game_versions 字段精确匹配）
 //! - 按发布日期降序排序（最新在前）
 //! - 自动选择最新版本并下载到 mods 目录（考虑版本隔离）
 
@@ -16,7 +16,6 @@ use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::sources::DownloadSourceMode;
 
 /// Fabric API 在 Modrinth 上的 project_id（slug = fabric-api）
-/// 参考 PCL2 ModDownload.vb DlFabricApiLoader: ResourceVersion.FromProjectId("fabric-api", ...)
 const FABRIC_API_PROJECT_ID: &str = "P7dR8mSH";
 
 /// Fabric API 版本信息（精简版，用于前端展示和后端安装）
@@ -44,13 +43,10 @@ pub struct FabricApiVersion {
 
 /// 列出与指定 MC 版本兼容的 Fabric API 版本
 ///
-/// 参考 PCL2 PageDownloadInstall.xaml.vb FabricApi_Loaded：
+/// 流程：
 /// 1. 从 Modrinth 获取 fabric-api 全部版本列表
-/// 2. 用 IsFabricApiCompatible 筛选兼容版本
+/// 2. 用 is_compatible 筛选兼容版本
 /// 3. 按 ReleaseDate 降序排序（最新在前）
-///
-/// MoLaunch 改进：使用 Modrinth API 返回的 game_versions 字段精确匹配，
-/// 比 PCL2 基于显示名字符串匹配更可靠。
 pub async fn list_versions(mc_version: &str) -> Result<Vec<FabricApiVersion>, String> {
     crate::log_info!("[FabricAPI] 查询兼容 MC {} 的 Fabric API 版本", mc_version);
 
@@ -86,13 +82,13 @@ pub async fn list_versions(mc_version: &str) -> Result<Vec<FabricApiVersion>, St
 
 /// 检查 Fabric API 版本是否与指定 MC 版本兼容
 ///
-/// 参考 PCL2 IsFabricApiCompatible，但使用 Modrinth API 的 game_versions 字段精确匹配
+/// 使用 Modrinth API 的 game_versions 字段精确匹配
 fn is_compatible(version: &ResourceVersion, mc_version: &str) -> bool {
     // 精确匹配 game_versions 列表
     if version.game_versions.iter().any(|gv| gv == mc_version) {
         return true;
     }
-    // 兼容 PCL2 的字符串匹配逻辑（作为 fallback）
+    // 字符串匹配逻辑（作为 fallback）
     // 某些 Fabric API 版本可能用 "1.20.4/1.20.5" 这样的格式
     let display_l = version.display.to_lowercase();
     let mc_l = mc_version.to_lowercase();
@@ -115,7 +111,6 @@ fn is_compatible(version: &ResourceVersion, mc_version: &str) -> bool {
 
 /// 安装 Fabric API 到指定 mods 目录
 ///
-/// 参考 PCL2 ModDownloadLib.vb McInstallLoader 中下载 Fabric API 的逻辑：
 /// - 作为 DownloadReason.Dependency 类型下载
 /// - 下载到 mods 目录（考虑版本隔离路径）
 pub async fn install(
@@ -140,7 +135,6 @@ pub async fn install(
     std::fs::create_dir_all(mods_dir)?;
 
     // 构建下载 URL 列表（官方源 + MCIM 镜像）
-    // 参考 PCL2 ModDownload.vb DlSourceModGet：
     //   cdn.modrinth.com → mod.mcimirror.top
     //   api.modrinth.com → mod.mcimirror.top/modrinth
     const MCIM_CDN_MIRROR: &str = "https://mod.mcimirror.top";

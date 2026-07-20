@@ -4,7 +4,7 @@
  * 将下载阶段按 `group` 字段聚合：有 group 的聚合成一个任务分组卡片，
  * 无 group 的独立成卡片。计算每个分组的聚合状态、加权进度和字节累加。
  *
- * 抽取自 Downloads.vue，参考 PCL2 PageDownloads 任务分组显示。
+ * 抽取自 Downloads.vue，任务分组显示。
  */
 import { computed, ref } from 'vue'
 import type { DownloadStage, StageStatus } from '@/types/download'

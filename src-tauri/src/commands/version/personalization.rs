@@ -47,7 +47,7 @@ pub struct VersionPersonalization {
     pub min_memory: u32,
     /// 版本独立最大内存（MB，仅 custom 模式生效）
     pub max_memory: u32,
-    // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
+    // ===== 高级选项开关 =====
     /// 禁止更新 Mod
     pub advance_disable_mod_update: bool,
     /// 忽略 Java 兼容性警告

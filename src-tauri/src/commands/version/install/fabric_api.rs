@@ -1,6 +1,5 @@
 //! Fabric API 自动安装
 //!
-//! 参考 PCL2 PageDownloadInstall.xaml.vb FabricApi_Loaded + ModDownloadLib.vb McInstallLoader：
 //! 安装 Fabric Loader 后自动下载最新兼容的 Fabric API 到 mods 目录。
 //! 失败不阻断主流程，仅标记阶段为失败。
 

@@ -106,8 +106,8 @@ impl LaunchPipeline {
             });
         }
 
-        // 阶段4: 启动前命令（advance_run_cmd，参考 PCL2 的 PreLaunch）
-        // 高性能显卡设置也在这一阶段执行（参考 PCL2 McLaunchPrerun）
+        // 阶段4: 启动前命令（advance_run_cmd）
+        // 高性能显卡设置也在这一阶段执行
         if self.config.use_dedicated_gpu {
             self.update_progress(LaunchStage::PreLaunch, 0.0, "正在设置高性能显卡...")
                 .await;

@@ -18,7 +18,7 @@ pub(crate) const CF_MIRROR_BASE: &str = "https://mod.mcimirror.top/curseforge/v1
 
 /// 读取 CurseForge 配置，返回 (base_url, api_key, source_pref)
 ///
-/// source 策略（参考 PCL2 ToolDownloadMod）：
+/// source 策略：
 /// - 0=尽量镜像：强制走镜像（即使配置了 API Key 也不用）
 /// - 1=缓慢时换镜像：优先官方（若有 API Key），失败后由 cf_get 回退镜像
 /// - 2=尽量官方：优先官方（若有 API Key），否则镜像
@@ -54,7 +54,7 @@ pub(crate) async fn cf_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
     let (base, api_key, source) = get_cf_config().await;
     let url = format!("{}{}", base, path);
 
-    // 官方请求超时（参考 PCL2 DlModRequest：CF 官方默认 10s）
+    // 官方请求超时（CF 官方默认 10s）
     const CF_OFFICIAL_TIMEOUT_SECS: u64 = 10;
 
     let is_official = base == CF_OFFICIAL_BASE;
@@ -158,7 +158,7 @@ fn build_cf_post_request(
     req
 }
 
-/// 发送 POST 请求（参考 PCL2 DlModRequest 对 CF POST 接口的处理）
+/// 发送 POST 请求
 ///
 /// 与 `cf_get` 一致的 source 策略：
 /// - source=1 时官方失败回退镜像

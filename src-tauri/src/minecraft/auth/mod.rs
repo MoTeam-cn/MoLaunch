@@ -54,7 +54,7 @@ pub fn login_offline(username: &str) -> LoginResult {
 /// 生成离线UUID
 /// 使用标准 Minecraft 离线 UUID 算法（UUID v3），即对 `"OfflinePlayer:" + username` 取 MD5，
 /// 然后按 RFC 4122 v3 格式化（设置 version 位为 3，variant 位为 0b10xx）。
-/// 这样与官方启动器、PCL2 等保持一致，避免离线账号 UUID 因启动器不同而漂移。
+/// 这样与官方启动器等保持一致，避免离线账号 UUID 因启动器不同而漂移。
 pub fn generate_offline_uuid(username: &str) -> String {
     let digest = md5::compute(format!("OfflinePlayer:{}", username));
     let mut bytes = digest.0;
@@ -77,7 +77,7 @@ pub fn generate_offline_uuid(username: &str) -> String {
 
 /// 验证用户名是否有效
 ///
-/// 参考 PCL2：允许 1-16 字符，支持中文、字母、数字、下划线、连字符
+/// 允许 1-16 字符，支持中文、字母、数字、下划线、连字符
 /// （离线模式仅本地使用，不与 Mojang 服务器交互，宽松限制即可）
 pub fn validate_username(username: &str) -> bool {
     let chars: Vec<char> = username.chars().collect();

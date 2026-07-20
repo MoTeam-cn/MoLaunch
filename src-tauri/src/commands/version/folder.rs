@@ -1,6 +1,6 @@
 //! Minecraft 文件夹管理命令
 //!
-//! 支持多文件夹管理（参考 PCL2 PageSelectLeft）：
+//! 支持多文件夹管理：
 //! - list_mc_folders：列出所有文件夹
 //! - add_mc_folder：添加文件夹（自动去重）
 //! - remove_mc_folder：移除文件夹

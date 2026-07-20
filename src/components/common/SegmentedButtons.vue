@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 分段按钮组（参考 PCL2 的三按钮选择组）
+ * 分段按钮组
  *
  * 整合 SettingsAdvanced.vue / SettingsDownload.vue / MemorySection.vue 等中重复的
  * `<div class="flex gap-2"><button :class="active ? ... : ..."/></div>` 模式。

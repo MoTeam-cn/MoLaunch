@@ -1,8 +1,16 @@
+<!--
+  MoLaunch - Minecraft Launcher
+  Copyright (C) 2026 MoTeam
+
+  This file is derived from Arco Design Vue (https://arco.design/).
+  Original code licensed under the MIT License.
+
+  MIT License full text will be added here
+-->
 <script setup lang="ts">
 /**
- * 自定义下拉选择框组件（复刻 Arco Design 样式）
+ * 自定义下拉选择框组件
  *
- * 样式来源：arco-design-vue Select + Dropdown 组件
  * - 触发器：32px 高，14px 字号，#f2f3f5 背景，2px 圆角，focus 时边框变蓝
  * - 下拉面板：#fff 背景，1px #e5e6eb 边框，4px 圆角，0 4px 10px 阴影
  * - 选项：36px 行高，hover #f2f3f5 背景，选中 font-weight 500
@@ -55,7 +63,7 @@ function updateDropdownPosition() {
   const rect = triggerRef.value.getBoundingClientRect()
   const viewportH = window.innerHeight
   const viewportW = window.innerWidth
-  // Arco 的下拉面板 max-height 是 200px
+  // 下拉面板 max-height 是 200px
   const dropdownMaxH = 200
   const gap = 4
 
@@ -202,7 +210,7 @@ onUnmounted(() => {
 
 <style scoped>
 /* ============================================================
- * 触发器（复刻 Arco Design Select 触发器）
+ * 触发器
  * height: 32px, font-size: 14px, bg: #f2f3f5, border-radius: 2px
  * ============================================================ */
 .custom-select {
@@ -216,43 +224,43 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  /* Arco: padding 0 12px, height 32px → 垂直 padding ≈ 4px (32 - 2*border - line-height*font-size) / 2 */
+  /* padding 0 12px, height 32px → 垂直 padding ≈ 4px (32 - 2*border - line-height*font-size) / 2 */
   height: 32px;
   padding: 0 12px;
   box-sizing: border-box;
-  /* Arco: color-text-1 = #1d2129, font-size-body-3 = 14px */
+  /* 文字色 #1d2129, 字号 14px */
   color: #1d2129;
   font-size: 14px;
-  /* Arco: color-fill-2 = #f2f3f5, border transparent */
+  /* 背景 #f2f3f5, 边框透明 */
   background-color: #f2f3f5;
   border: 1px solid transparent;
-  /* Arco: radius-small = 2px */
+  /* 圆角 2px */
   border-radius: 2px;
   cursor: pointer;
   user-select: none;
   max-width: 100%;
   overflow: hidden;
-  /* Arco: transition 0.1s linear */
+  /* 过渡 0.1s */
   transition: color 0.1s cubic-bezier(0, 0, 1, 1),
     border-color 0.1s cubic-bezier(0, 0, 1, 1),
     background-color 0.1s cubic-bezier(0, 0, 1, 1);
 }
 
-/* Arco hover: background color-fill-3 = #e5e6eb */
+/* hover：背景 #e5e6eb */
 .select-trigger:hover {
   background-color: #e5e6eb;
   border-color: transparent;
 }
 
-/* Arco focus (展开): background #fff, border primary-6 = #165dff */
+/* 展开时：背景 #fff, 边框 #165dff */
 .select-trigger.active {
   background-color: #fff;
   border-color: #165dff;
-  /* Arco: box-shadow 0 0 0 0 (无外扩，仅边框变色) */
+  /* 无外扩阴影，仅边框变色 */
   box-shadow: none;
 }
 
-/* Arco disabled: color color-text-4 = #c9cdd4, bg color-fill-2 = #f2f3f5 */
+/* 禁用态：文字 #c9cdd4, 背景 #f2f3f5 */
 .select-trigger.disabled {
   color: #c9cdd4;
   background-color: #f2f3f5;
@@ -270,13 +278,13 @@ onUnmounted(() => {
 }
 
 .select-value.placeholder {
-  color: #86909c; /* Arco color-text-3 */
+  color: #86909c;
 }
 
 .select-arrow {
-  width: 12px; /* Arco select-size-icon = 12px */
+  width: 12px;
   height: 12px;
-  color: #86909c; /* Arco color-text-3 */
+  color: #86909c;
   transition: transform 0.2s ease;
   flex-shrink: 0;
 }
@@ -286,26 +294,26 @@ onUnmounted(() => {
 }
 
 /* ============================================================
- * 下拉面板（复刻 Arco Design Dropdown）
+ * 下拉面板
  * bg: #fff, border 1px #e5e6eb, radius 4px, shadow 0 4px 10px
  * padding: 4px 0, max-height 200px
  * ============================================================ */
 .select-dropdown {
   background-color: #fff;
-  border: 1px solid #e5e6eb; /* Arco color-fill-3 */
-  border-radius: 4px; /* Arco radius-medium */
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1); /* Arco shadow2-down */
-  padding: 4px 0; /* Arco dropdown-padding-vertical = spacing-2 */
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  padding: 4px 0;
   box-sizing: border-box;
 }
 
 .select-options-wrapper {
-  max-height: 200px; /* Arco dropdown-max-height = size-50 = 200px */
+  max-height: 200px;
   overflow-y: auto;
 }
 
 /* ============================================================
- * 选项（复刻 Arco Design Dropdown Option）
+ * 选项
  * line-height: 36px, padding 0 12px, font-size 14px
  * hover bg: #f2f3f5, selected font-weight 500
  * ============================================================ */
@@ -316,27 +324,27 @@ onUnmounted(() => {
   gap: 8px;
   width: 100%;
   box-sizing: border-box;
-  padding: 0 12px; /* Arco option-padding-horizontal = spacing-6 */
-  /* Arco: line-height size-9 = 36px */
+  padding: 0 12px;
+  /* line-height 36px */
   line-height: 36px;
   height: 36px;
-  font-size: 14px; /* Arco font-size-body-3 */
-  color: #1d2129; /* Arco color-text-1 */
+  font-size: 14px;
+  color: #1d2129;
   text-align: left;
-  background-color: transparent; /* Arco default transparent */
+  background-color: transparent;
   cursor: pointer;
   transition: all 0.1s cubic-bezier(0, 0, 1, 1);
 }
 
 .select-option:hover {
   color: #1d2129;
-  background-color: #f2f3f5; /* Arco color-fill-2 */
+  background-color: #f2f3f5;
 }
 
-/* Arco selected: font-weight 500, bg transparent, color 不变 */
+/* 选中态：font-weight 500, 背景透明, 颜色不变 */
 .select-option.selected {
   color: #1d2129;
-  font-weight: 500; /* Arco font-weight-500 */
+  font-weight: 500;
   background-color: transparent;
 }
 
@@ -360,7 +368,7 @@ onUnmounted(() => {
 .select-check-icon {
   width: 12px;
   height: 12px;
-  color: #165dff; /* Arco primary-6 */
+  color: #165dff;
   flex-shrink: 0;
 }
 
@@ -368,11 +376,11 @@ onUnmounted(() => {
   padding: 8px 12px;
   text-align: center;
   font-size: 14px;
-  color: #86909c; /* Arco color-text-3 */
+  color: #86909c;
 }
 
 /* ============================================================
- * 动画（复刻 Arco slide-dynamic-origin）
+ * 动画
  * transform: scaleY 0.9→1, opacity 0→1
  * 0.2s cubic-bezier(0.34, 0.69, 0.1, 1)
  * ============================================================ */

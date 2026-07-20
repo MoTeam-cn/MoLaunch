@@ -93,7 +93,7 @@ export function useLaunchState() {
         if (is_normal) {
           showSuccess('游戏已退出')
         } else if (crash_info) {
-          // 参考 PCL2 ModCrash.vb Output：弹出崩溃分析对话框
+          // 弹出崩溃分析对话框
           showCrashDialog(crash_info)
         } else {
           showError(`游戏已退出（代码: ${exit_code}）`)

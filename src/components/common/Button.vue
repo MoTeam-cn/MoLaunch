@@ -1,6 +1,15 @@
+<!--
+  MoLaunch - Minecraft Launcher
+  Copyright (C) 2026 MoTeam
+
+  This file is derived from Arco Design Vue (https://arco.design/).
+  Original code licensed under the MIT License.
+
+  MIT License full text will be added here
+-->
 <script setup lang="ts">
 /**
- * 按钮组件（复刻 Arco Design Button 样式）
+ * 按钮组件
  *
  * 类型：
  * - primary：蓝底白字（默认）

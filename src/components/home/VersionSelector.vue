@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 版本选择入口（参考 PCL2 PageLaunchLeft 的 BtnVersion）
+ * 版本选择入口
  *
  * 显示当前选中的版本（方块图标 + 版本名 + 类型），点击跳转到版本选择页。
  * 图标优先使用版本设置中自定义的 logo，fallback 到根据 ID 推断的类型图标。

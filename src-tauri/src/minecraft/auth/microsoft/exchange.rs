@@ -190,7 +190,7 @@ pub fn is_token_expired(expires_at: u64) -> bool {
     unix_now() >= expires_at
 }
 
-/// 获取轮询间隔（参考 PCL2）
+/// 获取轮询间隔
 pub fn get_poll_interval(server_interval: u64) -> Duration {
     if server_interval > 1 { Duration::from_secs(server_interval - 1) }
     else { Duration::from_secs(2) }

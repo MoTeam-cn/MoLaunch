@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 社区资源内容区（参考 PCL2 PageResource）
+ * 社区资源内容区
  * 搜索栏 + 单列结果列表 + 分页 + 详情弹窗
  */
 

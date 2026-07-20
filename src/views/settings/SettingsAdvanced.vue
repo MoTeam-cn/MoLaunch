@@ -228,7 +228,7 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
       </div>
     </div>
 
-    <!-- 社区资源配置卡片（参考 PCL2 PageSetupSystem "社区资源" 卡片） -->
+    <!-- 社区资源配置卡片 -->
     <CommunityConfigCard />
     </template>
   </div>

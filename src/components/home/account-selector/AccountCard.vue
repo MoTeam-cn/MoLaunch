@@ -31,7 +31,7 @@ const emit = defineEmits<{
         ? 'border-primary-500 bg-primary-50'
         : 'border-gray-200 bg-white hover:border-primary-300'"
     >
-      <!-- 头像（PCL2 双层立体头像，离线账号显示默认皮肤） -->
+      <!-- 头像（双层立体头像，离线账号显示默认皮肤） -->
       <div class="mb-3 flex justify-center">
         <SkinAvatar
           :uuid="card.uuid"

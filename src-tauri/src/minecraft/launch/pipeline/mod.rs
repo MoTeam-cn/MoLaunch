@@ -1,5 +1,5 @@
 //! Launch pipeline - 完整的Minecraft启动流程
-//! 复刻PCL2的启动架构，支持并行执行和进度追踪
+//! 支持并行执行和进度追踪
 //!
 //! 结构：
 //! - pipeline/mod.rs: 结构体定义 + 公共 API + 模块编排

@@ -1,6 +1,5 @@
 //! 双平台搜索调度器
 //!
-//! 参考 PCL2 ResourceSearcher.Search
 //! 并行调用 CurseForge 和 Modrinth，合并结果、去重、排序
 
 use super::types::{ResourceProject, SearchParams, SearchResult};
@@ -106,7 +105,7 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
         });
     }
 
-    // 去重（参考 PCL2 ResourceProject.IsLike）
+    // 去重
     let projects = dedup(projects);
 
     // 排序
@@ -127,7 +126,7 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
     })
 }
 
-/// 跨平台去重（参考 PCL2 ResourceProject.IsLike）
+/// 跨平台去重
 fn dedup(projects: Vec<ResourceProject>) -> Vec<ResourceProject> {
     let mut result: Vec<ResourceProject> = Vec::new();
     for p in projects {
@@ -174,7 +173,7 @@ fn alnum_only(s: &str) -> String {
         .to_lowercase()
 }
 
-/// 排序（参考 PCL2 ResourceSearcher 排序逻辑）
+/// 排序
 fn sort_projects(
     mut projects: Vec<ResourceProject>,
     has_query: bool,
@@ -204,7 +203,7 @@ fn score(p: &ResourceProject, has_query: bool, rtype: super::types::ResourceType
     }
 }
 
-/// 平台下载量权重（参考 PCL2 GetDownloadCountMult）
+/// 平台下载量权重
 fn get_download_count_mult(
     platform: super::types::Platform,
     rtype: super::types::ResourceType,

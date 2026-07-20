@@ -1,9 +1,8 @@
 //! Java 版本规则模块
-//! 参考 PCL2 的 Java 版本选择逻辑（ModLaunch.vb:1184-1280）
 
 /// 根据 MC 版本获取所需的最低 Java 版本
 ///
-/// # 规则（参考 PCL2）
+/// # 规则
 /// | MC 版本      | 最低 Java | 推荐 Java |
 /// |-------------|----------|----------|
 /// | 26+ (新格式) | Java 21  | Java 21  |
@@ -17,7 +16,7 @@ pub fn get_required_java_version(mc_version: &str) -> u32 {
     min.unwrap_or(8)
 }
 
-/// 根据 MC 版本和加载器获取 Java 版本约束区间（MinVer/MaxVer 双向约束，参考 PCL2）
+/// 根据 MC 版本和加载器获取 Java 版本约束区间（MinVer/MaxVer 双向约束）
 ///
 /// # 参数
 /// - `mc_version`: MC 版本号（如 "1.20.1"、"26.2"）
@@ -73,7 +72,7 @@ pub fn get_java_version_range(mc_version: &str, loader: Option<&str>) -> (Option
         tighten_min(&mut min, 8);
     }
 
-    // 加载器覆盖规则（参考 PCL2 ModLaunch.vb:1198-1280）
+    // 加载器覆盖规则
     if let Some(loader) = loader {
         let loader_lower = loader.to_lowercase();
         match loader_lower.as_str() {
@@ -133,7 +132,7 @@ pub fn get_java_version_range(mc_version: &str, loader: Option<&str>) -> (Option
 /// 从版本 JSON 读取 Mojang 官方 Java 版本要求（覆盖规则表）
 ///
 /// 返回 Some(major_version) 若 JSON 中有 javaVersion.majorVersion 字段且 >= 22
-/// （PCL2 阈值，参考 ModLaunch.vb:1184-1196）
+/// （阈值参考：低于 22 视为旧版本号，不覆盖规则表）
 pub fn get_mojang_java_requirement(version_json: &serde_json::Value) -> Option<u32> {
     let major = version_json
         .get("javaVersion")?

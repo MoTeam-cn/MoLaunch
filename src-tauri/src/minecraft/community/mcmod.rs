@@ -1,11 +1,10 @@
 //! MC 百科（mcmod.cn）数据库
 //!
-//! 参考 PCL2 WikiEntry.vb
 //! 加载内置 moddata.txt，通过工程 Slug 查找中文译名和 MC 百科 class id
 //! 仅对 Mod / 数据包类型生效
 //!
-//! 关键设计（与 PCL2 对齐）：moddata.txt 第 N 行 → mcmod.cn class id = N
-//! 空行也占用行号（PCL2 WikiEntry.vb: i += 1 在 Continue For 之前）
+//! 关键设计：moddata.txt 第 N 行 → mcmod.cn class id = N
+//! 空行也占用行号（i += 1 在 Continue For 之前）
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -40,7 +39,7 @@ impl Database {
         let lines: Vec<&str> = data_str.lines().collect();
         let entry_lines = if lines.len() > 1 { &lines[..lines.len() - 1] } else { &lines[..] };
 
-        // 行号即 class id（参考 PCL2 WikiEntry.vb:39-82）
+        // 行号即 class id
         // 关键：空行也计数（i += 1 在 Continue For 之前），否则行号会错位
         for (idx, line) in entry_lines.iter().enumerate() {
             let class_id = (idx + 1) as u32; // 行号从 1 开始
@@ -66,7 +65,7 @@ impl Database {
                     continue;
                 }
 
-                // 解析 Slug 部分（参考 PCL2 WikiEntry.vb:55-67）
+                // 解析 Slug 部分
                 let (cf_slug, mr_slug) = parse_slug_part(slug_part);
                 let entry = Entry {
                     chinese_name: chinese_name.clone(),
@@ -102,7 +101,7 @@ impl Database {
     }
 }
 
-/// 解析 Slug 部分（参考 PCL2 WikiEntry.vb:55-67）
+/// 解析 Slug 部分
 /// 四种语法：
 /// - `@slug` → CF=None, MR=slug
 /// - `slug@` → CF=slug, MR=slug（相同）
@@ -144,7 +143,7 @@ fn parse_slug_part(s: &str) -> (Option<String>, Option<String>) {
     }
 }
 
-/// 处理中文名中的 * 通配符（参考 PCL2 WikiEntry.vb:72-75）
+/// 处理中文名中的 * 通配符
 /// * 替换为 " (Slug 去横线并首字母大写)"
 fn process_wildcard(name: &str, slug_part: &str) -> String {
     if !name.contains('*') {

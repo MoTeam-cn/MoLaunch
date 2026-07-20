@@ -31,7 +31,7 @@ pub(crate) fn convert_hit(hit: &MrHit, rtype: ResourceType) -> ResourceProject {
         hit.project_type, hit.slug
     );
 
-    // 分类标签中文化（参考 PCL2 ResourceProject.vb:310-378）
+    // 分类标签中文化
     let tags: Vec<String> = hit
         .categories
         .iter()
@@ -65,7 +65,7 @@ pub(crate) fn convert_hit(hit: &MrHit, rtype: ResourceType) -> ResourceProject {
         } else {
             hit.title.clone()
         },
-        // mcmod.cn 中文译名（参考 PCL2 ResourceProject.TranslatedName）
+        // mcmod.cn 中文译名
         translated_name: super::super::mcmod::lookup_mr(&hit.slug)
             .unwrap_or_default()
             .to_string(),
@@ -106,12 +106,12 @@ pub(crate) fn convert_project(p: &MrProject, rtype: ResourceType) -> ResourcePro
         p.project_type, slug
     );
 
-    // mcmod.cn 中文译名（参考 PCL2 ResourceProject.TranslatedName）
+    // mcmod.cn 中文译名
     let translated_name = super::super::mcmod::lookup_mr(&slug)
         .unwrap_or_default()
         .to_string();
 
-    // 分类标签中文化（参考 PCL2 ResourceProject.vb:310-378）
+    // 分类标签中文化
     let tags: Vec<String> = p
         .categories
         .iter()
@@ -205,7 +205,7 @@ pub(crate) fn convert_version(v: &MrVersion) -> ResourceVersion {
 /// 构建 Modrinth facets 参数
 /// 格式: [["project_type:mod"],["categories:'forge'"],["versions:'1.20.1'"]]
 ///
-/// ignore_quilt=true 时过滤 Quilt 加载器（参考 PCL2 ToolDownloadIgnoreQuilt）
+/// ignore_quilt=true 时过滤 Quilt 加载器
 pub(crate) fn build_facets(
     rtype: ResourceType,
     game_version: Option<&str>,

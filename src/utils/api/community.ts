@@ -101,7 +101,6 @@ export async function installModpack(req: InstallModpackRequest): Promise<Instal
 /**
  * 获取资源的 MC 百科详情页直链 URL
  *
- * 参考 PCL2 PageDownloadCompDetail.BtnIntroWiki_Click：
  * 通过 moddata.txt 的 slug → 行号（= class id）查表，拼接 `https://www.mcmod.cn/class/<id>.html`
  * 查不到返回 null，前端可回退到搜索 URL
  */

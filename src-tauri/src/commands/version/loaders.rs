@@ -132,7 +132,6 @@ pub async fn validate_loaders(
 
 /// List Fabric API versions compatible with the given MC version
 ///
-/// 参考 PCL2 PageDownloadInstall.xaml.vb FabricApi_Loaded：
 /// 从 Modrinth 查询 fabric-api 版本列表并按 MC 版本筛选
 ///
 /// 直接返回 Vec<FabricApiVersion>，Tauri 自动序列化为 JSON 数组，
@@ -153,7 +152,6 @@ pub async fn list_fabric_api_versions(
 
 /// Install Fabric API for a specific version
 ///
-/// 参考 PCL2 ModDownloadLib.vb McInstallLoader 中下载 Fabric API 的逻辑：
 /// 下载到版本对应的 mods 目录（考虑版本隔离）
 #[tauri::command]
 pub async fn install_fabric_api_for_version(

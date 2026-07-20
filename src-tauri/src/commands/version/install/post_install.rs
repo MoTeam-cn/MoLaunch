@@ -1,6 +1,6 @@
 //! 安装后处理：JSON 合并、原版目录删除、版本重命名
 //!
-//! 参考 PCL2：安装加载器后合并加载器 JSON（删除 inheritsFrom）、
+//! 安装加载器后合并加载器 JSON（删除 inheritsFrom）、
 //! 删除原版目录、按用户自定义名称重命名版本目录/JAR/JSON。
 
 use crate::{log_info, log_warn};

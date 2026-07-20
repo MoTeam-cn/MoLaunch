@@ -2,7 +2,7 @@
 /**
  * Java 选择模式组件（版本独立设置）
  *
- * 4 种模式（参考 PCL2）：
+ * 4 种模式：
  *   - auto         自动选择（按 MC 版本兼容性规则）
  *   - auto_version 自动选择指定版本范围的 Java
  *   - folder       使用版本文件夹中的 Java（{version_dir}/runtime/、jre/、java/）

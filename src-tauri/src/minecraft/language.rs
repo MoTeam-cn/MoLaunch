@@ -6,7 +6,6 @@ use crate::log_info;
 use std::path::Path;
 
 /// 设置游戏语言为中文
-/// 参考 PCL2 的 ToolHelpChinese 机制
 pub fn set_game_language(
     game_dir: &Path,
     version_id: &str,
@@ -72,7 +71,6 @@ pub fn set_game_language(
 }
 
 /// 根据 MC 版本确定语言代码
-/// 参考 PCL2 的版本兼容性处理
 fn determine_lang_code(mc_version: &str) -> String {
     // 解析版本号
     let parts: Vec<&str> = mc_version.split('.').collect();

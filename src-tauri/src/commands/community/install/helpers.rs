@@ -19,7 +19,7 @@ pub(super) fn format_bytes(bytes: u64) -> String {
 
 /// 根据 `community_filename_format` 拼接文件名
 ///
-/// 格式（参考 PCL2 PageSetupSystem FilenameFormat）：
+/// 格式：
 /// - 0: 【译名】原名
 /// - 1: [译名] 原名（默认）
 /// - 2: 译名-原名

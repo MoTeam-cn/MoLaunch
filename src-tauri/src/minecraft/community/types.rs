@@ -1,11 +1,10 @@
 //! 社区资源数据类型定义
 //!
-//! 参考 PCL2 ResourceProject / ResourceVersion，
 //! 统一 CurseForge 和 Modrinth 两个平台的数据结构
 
 use serde::{Deserialize, Serialize};
 
-/// 资源类型（参考 PCL2 ResourceTypes）
+/// 资源类型
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ResourceType {
     Mod,
@@ -66,7 +65,7 @@ impl Platform {
     }
 }
 
-/// 加载器类型（Flags 枚举，参考 PCL2 ModLoaders）
+/// 加载器类型（Flags 枚举）
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct ModLoaders(pub u32);
 
@@ -133,7 +132,7 @@ impl ReleaseType {
     }
 }
 
-/// 资源工程（参考 PCL2 ResourceProject）
+/// 资源工程
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceProject {
     pub platform: Platform,
@@ -154,7 +153,7 @@ pub struct ResourceProject {
     pub game_versions: Vec<String>,
 }
 
-/// 资源版本/文件（参考 PCL2 ResourceVersion）
+/// 资源版本/文件
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceVersion {
     pub id: String,

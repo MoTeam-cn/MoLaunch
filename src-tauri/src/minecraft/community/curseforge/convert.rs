@@ -3,7 +3,7 @@
 //! 包含：
 //! - convert_project：CF 工程条目 → ResourceProject
 //! - convert_version：CF 文件 → ResourceVersion
-//! - parse_cf_download_url：构造 CF 下载 URL（参考 PCL2 ParseCurseForgeDownloadUrls）
+//! - parse_cf_download_url：构造 CF 下载 URL
 
 use super::super::mcmod::lookup_cf;
 use super::super::tags::translate_curseforge_tag;
@@ -46,7 +46,7 @@ pub(crate) fn convert_project(entry: &CfModEntry, rtype: ResourceType) -> Resour
         .categories
         .iter()
         .filter_map(|c| {
-            // 优先用 ID 翻译；翻译不了就保留原 name（参考 PCL2 ResourceProject.vb:199-274）
+            // 优先用 ID 翻译；翻译不了就保留原 name
             if let Some(id) = c.id {
                 if let Some(label) = translate_curseforge_tag(id) {
                     return Some(label.to_string());
@@ -63,7 +63,7 @@ pub(crate) fn convert_project(entry: &CfModEntry, rtype: ResourceType) -> Resour
         id: entry.id.to_string(),
         slug: entry.slug.clone().unwrap_or_default(),
         raw_name: entry.name.clone(),
-        // mcmod.cn 中文译名（参考 PCL2 ResourceProject.TranslatedName）
+        // mcmod.cn 中文译名
         translated_name: entry
             .slug
             .as_ref()
@@ -83,9 +83,9 @@ pub(crate) fn convert_project(entry: &CfModEntry, rtype: ResourceType) -> Resour
 
 /// 将 CurseForge 文件转换为统一 ResourceVersion
 ///
-/// 版本号 fallback（参考 PCL2 `MyLocalModItem.GetUpdateCompareDescription` 第 298 行）：
-/// CurseForge API 不直接提供 mod 版本号字段（PCL2 中 `Version = Nothing`），
-/// PCL2 用 `Display`（即 `displayName`）作为 fallback 进行版本对比。
+/// 版本号 fallback：
+/// CurseForge API 不直接提供 mod 版本号字段（`Version = Nothing`），
+/// 用 `Display`（即 `displayName`）作为 fallback 进行版本对比。
 /// 这里从 `display_name` 提取版本号，提取失败则用 `display_name` 本身。
 pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
     let mod_loaders = file
@@ -110,7 +110,7 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
 
     let download_url = parse_cf_download_url(&file.download_url, &file.file_name, file.id);
 
-    // 版本号 fallback：从 display_name 提取（参考 PCL2 第 298 行）
+    // 版本号 fallback：从 display_name 提取
     // CurseForge 的 displayName 通常类似 "jei-1.20.1-15.2.0.27.jar"
     let version = crate::minecraft::community::version_extract::extract_version_from_name(&file.display_name);
 
@@ -131,7 +131,7 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
     }
 }
 
-/// 构造 CurseForge 下载 URL（参考 PCL2 ParseCurseForgeDownloadUrls）
+/// 构造 CurseForge 下载 URL
 pub(crate) fn parse_cf_download_url(url: &Option<String>, file_name: &str, file_id: i64) -> String {
     if let Some(ref u) = url {
         if !u.is_empty() {

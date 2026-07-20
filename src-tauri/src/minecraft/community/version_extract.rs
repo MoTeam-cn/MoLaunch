@@ -2,8 +2,7 @@
 //!
 //! 从文件名或显示名中提取版本号，用于 CurseForge 等不直接提供版本号的平台。
 //!
-//! 参考 PCL2 `MyLocalModItem.GetUpdateCompareDescription`（第 298 行）：
-//! CurseForge 的 `Version` 字段为 `Nothing`，PCL2 用 `Display`（即 `displayName`）
+//! CurseForge 的 `Version` 字段为 `Nothing`，用 `Display`（即 `displayName`）
 //! 作为 fallback 进行版本对比。
 //!
 //! CurseForge 的 `displayName` 通常类似：

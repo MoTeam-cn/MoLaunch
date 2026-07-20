@@ -30,7 +30,7 @@ pub async fn fix_version_files(
     let json_content = std::fs::read_to_string(&json_path)?;
     let json: serde_json::Value = serde_json::from_str(&json_content)?;
 
-    // merge_version_json 会处理父版本不存在的情况（参考PCL2的容错机制）
+    // merge_version_json 会处理父版本不存在的情况（容错机制）
     let merged_json = json_merge::merge_version_json(&json, game_dir)?;
 
     // 复用单个 DownloadManager 实例（与 download_version_full 一致）
@@ -56,7 +56,7 @@ pub async fn fix_version_files(
 
     // 2. 下载 Libraries（启动时用快速检查模式）
     // 启动时的文件补全：使用快速检查模式（只检查文件存在 + 大小，不计算 SHA1）
-    // 参考 PCL2 启动流程：启动时只构建 classpath，不做哈希校验，避免每次启动卡顿
+    // 启动时只构建 classpath，不做哈希校验，避免每次启动卡顿
     // 文件下载时已经做过完整校验，正常情况下不会损坏
     let _ = download_libraries(
         &merged_json,

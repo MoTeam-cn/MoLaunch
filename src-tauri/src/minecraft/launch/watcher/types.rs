@@ -94,7 +94,7 @@ pub struct LogEntry {
     pub message: String,
 }
 
-/// 加载进度级别 (参考PCL2)
+/// 加载进度级别
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum LoadProgress {
     /// 无输出

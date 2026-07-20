@@ -71,7 +71,7 @@ impl LaunchPipeline {
                 if !path.is_empty() {
                     let java_path = PathBuf::from(path);
                     if java_path.exists() {
-                        // 校验版本兼容性（参考 PCL2：不兼容时阻断启动并提示）
+                        // 校验版本兼容性：不兼容时阻断启动并提示
                         // 版本独立设置 advance_ignore_java_warning 可跳过此校验，强制使用用户指定的 Java
                         if !self.config.ignore_java_warning {
                             if let Some(java_ver) =

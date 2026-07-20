@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 版本选择页（参考 PCL2 PageSelectLeft + PageSelectRight）
+ * 版本选择页（左右分栏布局）
  *
  * 左侧：Minecraft 文件夹列表（FolderSidebar 子组件，可添加/删除/切换）
  * 右侧：当前文件夹下的版本列表（按类型分组卡片）
@@ -103,7 +103,7 @@ onMounted(() => loadInstalled())
 
 <template>
   <div class="flex h-full">
-    <!-- 左侧：文件夹列表（FolderSidebar 子组件，参考 PCL2 PageSelectLeft） -->
+    <!-- 左侧：文件夹列表（FolderSidebar 子组件） -->
     <FolderSidebar @switched="loadInstalled" />
 
     <!-- 右侧：版本列表 -->

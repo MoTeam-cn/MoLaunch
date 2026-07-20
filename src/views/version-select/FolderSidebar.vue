@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 版本选择页左侧文件夹列表（参考 PCL2 PageSelectLeft）
+ * 版本选择页左侧文件夹列表
  *
  * 管理 Minecraft 文件夹的列表展示、切换、添加、移除。
  * 父组件在文件夹切换后需要重新加载版本列表（通过 @switched 事件）。
@@ -129,7 +129,7 @@ defineExpose({ loadFolders })
             :disabled="switchingFolder"
             @click="switchFolder(folder)"
           >
-            <!-- 选中时左侧高亮条（参考 PCL2 MyListItem RadioBox 样式） -->
+            <!-- 选中时左侧高亮条 -->
             <span
               v-if="folder.path === currentPath"
               class="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary-500"

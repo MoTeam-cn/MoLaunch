@@ -16,7 +16,7 @@ import MemoryAllocation from './settings-launch/MemoryAllocation.vue'
 
 const gameDir = ref('')
 const isolationMode = ref(4)
-// 启动高级选项（参考 PCL2 PageSetupLaunch 高级选项）
+// 启动高级选项
 const launchDisableJlw = ref(false)
 const launchDisableLua = ref(false)
 const launchUseDedicatedGpu = ref(false)
@@ -88,7 +88,7 @@ function saveLaunchSwitch(key: 'launchDisableJlw' | 'launchDisableLua' | 'launch
       </div>
     </div>
 
-    <!-- 高级选项（参考 PCL2 PageSetupLaunch 高级选项，复用 ToggleRow 公共组件）-->
+    <!-- 高级选项（复用 ToggleRow 公共组件）-->
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">高级选项</h3>
       <div class="divide-y divide-gray-200">

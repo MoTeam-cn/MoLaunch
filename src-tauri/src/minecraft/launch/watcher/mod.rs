@@ -1,6 +1,6 @@
 //! 游戏进程监控器
 //!
-//! 参考PCL2的ModWatcher实现，监控游戏状态和崩溃检测。
+//! 监控游戏状态和崩溃检测。
 //!
 //! 按关注点拆分为 3 个子模块：
 //! - `types`       GameState / ExitInfo / CrashInfo / CrashCategory / LogLevel / LogEntry / LoadProgress
@@ -48,7 +48,6 @@ pub struct GameWatcher {
     /// 退出接收通道（供外部监听）
     exit_rx: tokio::sync::watch::Receiver<Option<ExitInfo>>,
     /// 自定义窗口标题（非空时启动后改写游戏窗口标题）
-    /// 参考 PCL2 ModWatcher.vb：启动后轮询找到窗口句柄，用 SetWindowText 改标题
     window_title: Option<String>,
     /// 手动停止标志（stop_game 调用时设为 true，watcher 检测到后跳过崩溃分析）
     /// 修复：之前 kill_process_tree 后游戏以非 0 退出码退出，watcher 误判为崩溃并触发分析
@@ -59,7 +58,6 @@ impl GameWatcher {
     /// 创建新的监控器
     ///
     /// `window_title`：自定义窗口标题，非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题
-    /// 参考 PCL2 ModWatcher.vb 第 62-101 行
     pub fn new(pid: u32, game_dir: PathBuf, version_id: String, window_title: Option<String>) -> Self {
         let (exit_tx, exit_rx) = tokio::sync::watch::channel(None);
         Self {
@@ -220,7 +218,7 @@ impl GameWatcher {
             });
         }
 
-        // 启动窗口标题修改（参考 PCL2 ModWatcher.vb 第 99-101 行）
+        // 启动窗口标题修改
         // 如果设置了自定义窗口标题，启动后轮询找到 MC 窗口，改写标题
         // 支持 {date} 和 {time} 实时替换
         // 跨平台：Windows 用 Win32 API，macOS 用 osascript，Linux 用 wmctrl/xdotool
@@ -260,7 +258,7 @@ impl GameWatcher {
             };
 
             // 分析是否崩溃
-            // 参考 PCL2 ModWatcher.vb Crashed()：延迟 2 秒让文件系统刷新崩溃报告
+            // 延迟 2 秒让文件系统刷新崩溃报告
             // 修复：手动停止（stop_game）时跳过崩溃分析，直接按正常退出处理
             let is_manual_stop = manual_stop.load(std::sync::atomic::Ordering::Relaxed);
             let crash_info = if exit_code != 0 && !is_manual_stop {

@@ -1,10 +1,10 @@
 /**
  * 通用多选 composable
  *
- * 参考 PCL2 PageInstanceMod + MyLocalModItem 的多选交互：
- * - 点击列表项切换选中状态（非长按，PCL2 也是点击触发）
+ * 多选交互：
+ * - 点击列表项切换选中状态（非长按）
  * - Shift+点击 范围选择
- * - 滑动拖拽选择可后续扩展（PCL2 的 Swipe 机制）
+ * - 滑动拖拽选择可后续扩展
  * - ESC 清空选中
  * - 当 selectedCount > 0 时，外部组件显示 MultiSelectBar
  *
@@ -51,7 +51,7 @@ export function useMultiSelect<T>(options: UseMultiSelectOptions<T>) {
    * @param item 要切换的项
    * @param shiftKey 是否按住 Shift（范围选择）
    *
-   * 参考 PCL2 MyLocalModItem.Checked 的 Set 逻辑 + Swipe 范围选择
+   * Checked 的 Set 逻辑 + Swipe 范围选择
    */
   function toggle(item: T, shiftKey = false) {
     const id = getId(item)
@@ -119,7 +119,7 @@ export function useMultiSelect<T>(options: UseMultiSelectOptions<T>) {
     return list.filter(item => selectedIds.value.has(getId(item)))
   }
 
-  /** ESC 清空选中（参考 PCL2 的 ESC 行为） */
+  /** ESC 清空选中 */
   function handleKeydown(e: KeyboardEvent) {
     if (e.key === 'Escape' && selectedIds.value.size > 0) {
       clearSelection()

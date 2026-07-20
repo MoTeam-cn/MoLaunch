@@ -1,8 +1,8 @@
 //! Java 自动下载模块 - 编排入口
 //!
-//! 从 Mojang 官方 Java Runtime 索引下载 Java（参考 PCL2 ModJava.vb:691-754）
+//! 从 Mojang 官方 Java Runtime 索引下载 Java
 //! 下载源：piston-meta.mojang.com（官方）/ bmclapi2.bangbang93.com（镜像）
-//! 下载到 {APPDATA}\.minecraft\runtime\{component}\（与 PCL2 一致，跨游戏目录共享）
+//! 下载到 {APPDATA}\.minecraft\runtime\{component}\（跨游戏目录共享）
 //!
 //! 5 阶段流水线：
 //! 1. fetching    - 拉取 all.json 索引

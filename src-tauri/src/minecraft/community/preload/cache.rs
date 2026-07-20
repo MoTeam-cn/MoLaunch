@@ -1,6 +1,6 @@
 //! 预加载持久化缓存
 //!
-//! 参考 PCL2 `Cache/LocalMod.json`：结果写入
+//! 结果写入
 //! `.Molaunch/cache/preload_mods/{version_id}.json`，6h TTL。
 //! 结构变更时递增 `PRELOAD_CACHE_VERSION` 使旧缓存失效。
 
@@ -13,7 +13,7 @@ use crate::minecraft::community::types::ResourceProject;
 
 /// 预加载缓存版本号（结构变更时递增，使旧缓存失效）
 pub(crate) const PRELOAD_CACHE_VERSION: u32 = 2;
-/// 缓存有效期（6 小时，参考 PCL2）
+/// 缓存有效期（6 小时）
 pub(crate) const PRELOAD_CACHE_TTL: Duration = Duration::from_secs(6 * 60 * 60);
 
 /// 持久化缓存条目
@@ -40,7 +40,7 @@ pub(crate) struct CachedMod {
     pub project: Option<ResourceProject>,
 }
 
-/// 读取持久化缓存（参考 PCL2 `Cache/LocalMod.json`）
+/// 读取持久化缓存
 ///
 /// 返回 `(cached_map, is_fresh)`：
 /// - `cached_map`：file_name → CachedMod

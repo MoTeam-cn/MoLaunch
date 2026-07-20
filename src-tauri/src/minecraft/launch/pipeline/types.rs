@@ -130,14 +130,13 @@ pub struct LaunchConfig {
     pub ignore_java_warning: bool,
     /// 关闭文件校验（跳过 libraries/assets/主 jar 文件的校验和补全）
     pub disable_assets_verify: bool,
-    /// 使用高性能显卡（启动前将 Java 和 PCL exe 写入 Windows 注册表 GpuPreference=2）
-    /// 参考 PCL2 ModLaunch.vb McLaunchPrerun 中 SetGPUPreference
+    /// 使用高性能显卡（启动前将 Java 和启动器 exe 写入 Windows 注册表 GpuPreference=2）
     pub use_dedicated_gpu: bool,
-    /// 自定义信息（对应 PCL2 VersionArgumentInfo，替换 ${version_type}）
+    /// 自定义信息（替换 ${version_type}）
     /// 非空时显示在游戏主界面左下角和 F3 左上角，空则删除 --versionType 参数
     #[serde(default)]
     pub custom_info: Option<String>,
-    /// 自定义窗口标题（对应 PCL2 VersionArgumentTitle）
+    /// 自定义窗口标题
     /// 启动后通过 Win32 SetWindowText 强制改写游戏窗口标题，空则不改
     #[serde(default)]
     pub window_title: Option<String>,

@@ -1,5 +1,4 @@
 //! Java检测和管理模块
-//! 参考PCL2的Java搜索和版本检测逻辑
 //!
 //! 子模块组织：
 //! - `download`: Java 自动下载（Mojang Runtime 索引）

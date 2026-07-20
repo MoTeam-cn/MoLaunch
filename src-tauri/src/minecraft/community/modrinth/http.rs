@@ -13,7 +13,7 @@ use super::types::{MR_MIRROR_BASE, MR_OFFICIAL_BASE};
 
 /// 根据 source 策略选择 Modrinth 基地址
 ///
-/// source 策略（参考 PCL2 ToolDownloadMod）：
+/// source 策略：
 /// - 0=尽量镜像：强制走镜像
 /// - 1=缓慢时换镜像：优先官方，失败后由调用方回退镜像
 /// - 2=尽量官方：强制走官方
@@ -36,7 +36,7 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
     let (base, source) = pick_base();
     let url = format!("{}{}", base, path);
 
-    // 官方请求超时（参考 PCL2 DlModRequest：Modrinth 官方默认 20s）
+    // 官方请求超时（Modrinth 官方默认 20s）
     const MR_OFFICIAL_TIMEOUT_SECS: u64 = 20;
 
     let is_official = base == MR_OFFICIAL_BASE;
@@ -140,7 +140,7 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
     }
 }
 
-/// 发送 POST 请求（参考 PCL2 `DlModRequest` 对 MR POST 接口的处理）
+/// 发送 POST 请求
 ///
 /// 与 `mr_get` 一致的 source 策略和 404 处理。
 /// 用于 `/v2/version_files` 批量按 hash 查询本地 mod 对应的工程。

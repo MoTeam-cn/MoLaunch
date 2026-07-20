@@ -1,8 +1,8 @@
 //! 皮肤与披风管理模块
 //!
-//! 参考 PCL2 的实现：
+//! 实现说明：
 //! - 皮肤 URL 直接从 profile_json 的 skins[].url 获取（textures.minecraft.net）
-//! - 头像通过下载皮肤 PNG 后由前端 canvas 裁剪 (8,8,8,8) 区域（PCL2 的方式）
+//! - 头像通过下载皮肤 PNG 后由前端 canvas 裁剪 (8,8,8,8) 区域
 //! - 上传/修改皮肤（multipart/form-data）
 //! - 装备/取消披风
 
@@ -78,7 +78,7 @@ pub struct SkinCapeInfo {
 }
 
 // ============================================================
-// 披风别名中文映射（与 PCL2 一致）
+// 披风别名中文映射
 // ============================================================
 
 fn cape_display_name(alias: &str) -> String {
@@ -178,9 +178,9 @@ pub fn parse_skin_cape_info(profile_json: &str) -> Result<SkinCapeInfo, String> 
     Ok(SkinCapeInfo { skins, capes })
 }
 
-/// 获取皮肤 PNG 下载 URL（从 profile 解析，参考 PCL2）
+/// 获取皮肤 PNG 下载 URL（从 profile 解析）
 ///
-/// PCL2 的逻辑：
+/// 逻辑：
 /// 1. 优先从 profile_json 的 skins[].url 取
 /// 2. 将 http:// 替换为 https://（minecraft.net 域名才替换）
 pub fn get_skin_url(profile_json: &str) -> Option<String> {
@@ -190,7 +190,7 @@ pub fn get_skin_url(profile_json: &str) -> Option<String> {
         .find(|s| s.state == "ACTIVE")
         .or_else(|| info.skins.first())
         .map(|s| {
-            // PCL2: If SkinUrl.Contains("minecraft.net/") Then SkinUrl.Replace("http://", "https://")
+            // 如果 URL 包含 minecraft.net/，将 http:// 替换为 https://
             if s.url.contains("minecraft.net/") {
                 s.url.replace("http://", "https://")
             } else {
@@ -281,7 +281,7 @@ pub async fn upload_skin(
 
     let client = http::get_client();
 
-    // 使用 multipart/form-data（与 PCL2 一致）
+    // 使用 multipart/form-data
     let form = reqwest::multipart::Form::new()
         .text("variant", variant.to_string())
         .part(

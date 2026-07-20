@@ -1,6 +1,5 @@
 //! CurseForge API 客户端
 //!
-//! 参考 PCL2 ResourceSearcher.GetCurseForgeAddress
 //! API 文档: https://docs.curseforge.com/
 //!
 //! 支持两种模式：
@@ -27,7 +26,7 @@ use types::{CfFile, CfModEntry, CfSearchResponse, CfFilesResponse};
 
 /// 按 MurmurHash2 指纹批量查询 CurseForge 工程详情
 ///
-/// 参考 PCL2 `LocalResourceOnlineLoad` 步骤 1-3：
+/// 步骤 1-3：
 /// 1. POST `/v1/fingerprints/432` 用指纹查 modId 和文件信息
 /// 2. 从响应提取所有 modId
 /// 3. POST `/v1/mods` 批量查询工程详情
@@ -68,7 +67,7 @@ pub async fn fingerprint_search(
     struct ExactMatch {
         /// 匹配到的 modId（CF API 中 exactMatches[i].id 就是 modId）
         ///
-        /// 参考 PCL2 `Project("id").ToString` 直接作为 ProjectId 用于 `POST /v1/mods` 查询。
+        /// 直接作为 ProjectId 用于 `POST /v1/mods` 查询。
         #[serde(default)]
         id: Option<i64>,
         /// 匹配到的文件详情（含 fileFingerprint 反查指纹）
@@ -89,7 +88,6 @@ pub async fn fingerprint_search(
 
     // 步骤 2：收集所有 modId，构建 fingerprint → modId 映射
     //
-    // 参考 PCL2 `LocalResourceLoaders.vb` 第 223-234 行：
     //   Dim ProjectId = Project("id").ToString                         ' modId
     //   Dim Hash As UInteger = Project("file")("fileFingerprint")     ' 指纹
     //

@@ -39,17 +39,17 @@ export function useModDetailQuery() {
   }
 
   /**
-   * 详情按钮（参考 PCL2 `MyLocalModItem.Info_Click` 第 751-792 行）：
+   * 详情按钮：
    *
    * 核心设计：**详情按钮本身不发任何网络请求**，只判断 `mod.project` 是否已被预加载填充。
    *
    * 三级 fallback：
    * 1. **零延迟路径（最优）**：`mod.project` 已被 `preload_mods_detail_cmd` 后台预加载填充
-   *    → 直接弹 ResourceDetail（与 PCL2 `Entry.Project IsNot Nothing` 分支一致）
+   *    → 直接弹 ResourceDetail（工程已就绪分支）
    * 2. **并发 fallback**：预加载尚未完成（用户点太快）或预加载失败
    *    → 并发请求 CF + MR（`Promise.any`），谁先成功用谁
    * 3. **本地信息**：无 slug 或两个平台都查不到
-   *    → 弹本地信息弹窗 + "百科搜索"按钮（与 PCL2 `Else` 分支一致）
+   *    → 弹本地信息弹窗 + "百科搜索"按钮（本地兜底分支）
    *
    * 防呆：detailLoadingFor 记录当前加载中的 mod file_name，
    * 按钮显示 spinner 并禁用同 mod 的重复点击。
@@ -61,7 +61,7 @@ export function useModDetailQuery() {
     // 防呆：同一 mod 正在加载中，忽略重复点击
     if (detailLoadingFor.value === mod.file_name) return
 
-    // 1. 零延迟路径：预加载已就绪，直接弹窗（参考 PCL2 Entry.Project IsNot Nothing）
+    // 1. 零延迟路径：预加载已就绪，直接弹窗
     if (mod.project) {
       detailProject.value = mod.project
       detailVisible.value = true
@@ -130,7 +130,7 @@ export function useModDetailQuery() {
   }
 
   /**
-   * 前往百科按钮（参考 PCL2 PageDownloadCompDetail.BtnIntroWiki_Click）：
+   * 前往百科按钮：
    * - 优先通过 slug 查 mcmod.cn 直链（先 CF 后 MR，因为 mcmod 数据库中 CF 收录更全）
    * - 查不到直链时打开 mcmod.cn 搜索页，关键字优先用译名，其次用文件名去扩展名+版本号
    *

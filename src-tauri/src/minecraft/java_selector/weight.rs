@@ -1,6 +1,6 @@
-//! Java 版本权重模块（参考 PCL2）
+//! Java 版本权重模块
 
-/// Java 版本权重（参考 PCL2）
+/// Java 版本权重
 pub fn get_java_version_weight(major_version: u32) -> u32 {
     match major_version {
         7 => 0,

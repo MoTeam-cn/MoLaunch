@@ -1,5 +1,4 @@
 //! Java 搜索模块
-//! 参考PCL2的Java搜索逻辑
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
@@ -7,7 +6,7 @@ use std::path::{Path, PathBuf};
 use super::detect::detect_java;
 use super::JavaRuntime;
 
-/// 搜索关键词（参考PCL2，共67个）
+/// 搜索关键词（共67个）
 const SEARCH_KEYWORDS: &[&str] = &[
     "java",
     "jdk",
@@ -76,7 +75,6 @@ pub fn search_java() -> Vec<JavaRuntime> {
 /// 带额外搜索路径的 Java 搜索
 ///
 /// `extra_paths` 用于追加搜索根目录（如游戏目录、APPDATA 等），会全遍历搜索。
-/// 参考 PCL2 `JavaSearchFolder(..., IsFullSearch:=True)`。
 pub fn search_java_with_paths(extra_paths: &[PathBuf]) -> Vec<JavaRuntime> {
     crate::log_separator!("Java Search");
     crate::log_info!("[Java] Starting Java search...");
@@ -176,8 +174,8 @@ fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
         }
     }
 
-    // Step 5: APPDATA\.minecraft\runtime\（PCL2/官启自动下载的 Java 存放处）
-    // 与 PCL2 一致，runtime 下的 Java 跨游戏目录共享，必须搜索
+    // Step 5: APPDATA\.minecraft\runtime\（官启自动下载的 Java 存放处）
+    // runtime 下的 Java 跨游戏目录共享，必须搜索
     crate::log_info!("[Java] Step 5: Searching APPDATA .minecraft runtime...");
     if let Ok(appdata) = std::env::var("APPDATA") {
         let runtime_dir = Path::new(&appdata).join(".minecraft").join("runtime");
@@ -251,7 +249,7 @@ fn verify_java_candidates(candidates: &[PathBuf]) -> Vec<JavaRuntime> {
     java_list
 }
 
-/// 递归搜索文件夹（参考PCL2的JavaSearchFolder）
+/// 递归搜索文件夹
 fn search_folder_recursive(dir: &Path, collector: &mut CandidateCollector, is_full_search: bool) {
     if !dir.exists() || !dir.is_dir() {
         return;

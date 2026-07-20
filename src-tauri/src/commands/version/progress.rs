@@ -61,7 +61,6 @@ pub async fn reset_download_progress(state: State<'_, AppState>) -> Result<(), S
 }
 
 /// 取消下载（设置 cancel_flag，正在进行的下载会尽快中止）
-/// 参考 PCL2 的 LoaderTask.Abort()
 #[tauri::command]
 pub async fn cancel_download(state: State<'_, AppState>) -> Result<(), String> {
     state

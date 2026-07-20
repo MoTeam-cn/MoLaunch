@@ -34,8 +34,8 @@ pub fn run() {
         http::init_client(&config.proxy_mode, &config.proxy_type, &config.proxy_url);
         log_info!("HTTP client initialized (proxy: {})", config.proxy_mode);
 
-        // 确保默认游戏目录存在（参考 PCL2 McFolderListLoadSub:124-128）
-        // PCL2 启动时主动创建 .minecraft/versions/，避免用户首次点"打开游戏目录"时报路径不存在
+        // 确保默认游戏目录存在
+        // 启动时主动创建 .minecraft/versions/，避免用户首次点"打开游戏目录"时报路径不存在
         let game_dir = state::resolve_game_dir(&config.game_dir);
         let versions_dir = game_dir.join("versions");
         if !versions_dir.exists() {

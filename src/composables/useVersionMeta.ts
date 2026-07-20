@@ -25,7 +25,7 @@ export interface VersionTypeMeta {
 /**
  * 推断版本类型
  *
- * 优先级（与 PCL2 / 后端 detect_loader_from_json 对齐）：
+ * 优先级（与后端 detect_loader_from_json 对齐）：
  *   1. 显式 loader 提示（已知加载器场景，如安装加载器页面）
  *   2. 后端 backendType：后端已经精确分析版本 JSON 的 libraries/字符串内容，
  *      如果返回的是明确的加载器类型（forge/neoforge/fabric/quilt/optifine/liteloader），

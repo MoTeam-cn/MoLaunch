@@ -1,6 +1,6 @@
 //! CurseForge MurmurHash2 + Modrinth SHA1 指纹计算
 //!
-//! 参考 PCL2 `LocalResourceFile.CurseForgeHash`：
+//! 算法步骤：
 //! 1. 读取文件所有字节
 //! 2. **跳过空白字符**（0x09 制表符 / 0x0A 换行 / 0x0D 回车 / 0x20 空格）
 //! 3. 对处理后的字节流做 MurmurHash2（seed=1，与 CF 官方一致）
@@ -24,7 +24,7 @@ pub fn compute_modrinth_sha1(path: &Path) -> Result<String, String> {
     Ok(crate::minecraft::utils::file_checker::compute_sha1_hex(&bytes))
 }
 
-/// MurmurHash2 算法（参考 PCL2 `LocalResourceFile.CurseForgeHash` 第 434-459 行）
+/// MurmurHash2 算法
 fn murmur_hash2(data: &[u8], seed: u32) -> u32 {
     let m: u32 = 0x5bd1_e995;
     let r: u32 = 24;

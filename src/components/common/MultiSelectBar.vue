@@ -2,11 +2,10 @@
 /**
  * 通用多选操作栏（浮动卡片）
  *
- * 参考 PCL2 PageInstanceMod.xaml 的 CardSelect（第 59-77 行）：
- * - 浮动在视口底部中央（HorizontalAlignment="Center" VerticalAlignment="Bottom"）
+ * - 浮动在视口底部中央
  * - 不占据列表布局空间，通过 fixed 定位悬浮于内容之上
  * - 卡片分两部分：上方居中"已选择 X 项"文字，下方水平排列操作按钮
- * - 入场动画：从下方 10px 滑入 + 淡入（对应 PCL2 的 TranslateTransform Y="-10" + Opacity）
+ * - 入场动画：从下方 10px 滑入 + 淡入
  *
  * 通用化设计：
  * - actions prop 接收操作按钮配置数组，每个按钮包含 key/label/icon/variant
@@ -80,7 +79,7 @@ const emit = defineEmits<{
 
 const isAllSelected = computed(() => props.selectedCount === props.totalCount && props.totalCount > 0)
 
-/** 操作按钮颜色变体（参考 PCL2 MyIconTextButton 的配色） */
+/** 操作按钮颜色变体配色 */
 const variantClasses: Record<ActionVariant, string> = {
   enable: 'text-green-600 hover:bg-green-50',
   disable: 'text-yellow-600 hover:bg-yellow-50',
@@ -100,18 +99,18 @@ const variantClasses: Record<ActionVariant, string> = {
       leave-from-class="opacity-100 translate-y-0"
       leave-to-class="opacity-0 translate-y-3"
     >
-      <!-- 浮动卡片：视口底部中央（参考 PCL2 CardSelect：HorizontalAlignment="Center" VerticalAlignment="Bottom"） -->
+      <!-- 浮动卡片：视口底部中央 -->
       <div
         v-if="selectedCount > 0"
         class="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 min-w-[320px]"
       >
         <div class="bg-white rounded-xl shadow-xl border border-gray-200 px-3 py-2">
-          <!-- 上方：居中显示选中计数（参考 PCL2 LabSelect） -->
+          <!-- 上方：居中显示选中计数 -->
           <div class="flex items-center justify-center gap-1.5 text-xs text-gray-500 mb-1.5">
             <CheckCircleIcon class="w-3.5 h-3.5 text-blue-500" />
             <span class="font-medium">已选择 {{ selectedCount }} 项</span>
           </div>
-          <!-- 下方：操作按钮行（参考 PCL2 StackPanel Orientation="Horizontal"） -->
+          <!-- 下方：操作按钮行 -->
           <div class="flex items-center gap-0.5">
             <!-- 批量操作按钮（由调用方通过 actions prop 配置） -->
             <button
@@ -147,7 +146,7 @@ const variantClasses: Record<ActionVariant, string> = {
             </button>
             <!-- 分隔线 -->
             <div class="w-px h-5 bg-gray-200 mx-1" />
-            <!-- 退出多选（参考 PCL2 BtnSelectCancel） -->
+            <!-- 退出多选 -->
             <button
               class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
               title="退出多选（ESC）"

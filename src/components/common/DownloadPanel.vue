@@ -2,7 +2,6 @@
 /**
  * 浮动下载按钮
  * 右下角圆形按钮 + 进度环，点击进入下载管理页面
- * 参考 PCL2 的 BtnExtraDownload 设计
  */
 
 import { useRouter } from 'vue-router'

@@ -1,7 +1,6 @@
 //! 信息收集 — 读取 crash-reports、hs_err、latest.log 等文件
 //!
-//! 参考 PCL2 ModCrash.vb Collect 方法，在崩溃发生后 3 分钟窗口内
-//! 搜索最新的崩溃报告文件。
+//! 在崩溃发生后 3 分钟窗口内搜索最新的崩溃报告文件。
 
 use super::super::types::{LogEntry, LogLevel};
 use super::util::truncate_head_tail;
@@ -24,7 +23,7 @@ pub(super) struct CollectedSources {
     pub(super) latest_log_tail: Vec<String>,
 }
 
-/// 收集各源文本（参考 PCL2 ModCrash.vb Collect 方法）
+/// 收集各源文本
 pub(super) fn collect_sources(logs: &[LogEntry], game_dir: &Path) -> CollectedSources {
     let runtime_log: String = logs
         .iter()
@@ -72,7 +71,6 @@ pub(super) fn collect_sources(logs: &[LogEntry], game_dir: &Path) -> CollectedSo
 }
 
 /// 读取 crash-reports 目录中最新的崩溃报告（3分钟内修改过）
-/// 参考 PCL2 ModCrash.vb Collect 方法
 fn read_latest_crash_report(game_dir: &Path) -> Option<(PathBuf, String)> {
     let crash_dir = game_dir.join("crash-reports");
     if !crash_dir.exists() {
@@ -92,7 +90,7 @@ fn read_latest_crash_report(game_dir: &Path) -> Option<(PathBuf, String)> {
             }
             if let Ok(meta) = entry.metadata() {
                 if let Ok(modified) = meta.modified() {
-                    // 只看 3 分钟内修改过的文件（参考 PCL2）
+                    // 只看 3 分钟内修改过的文件
                     if let Ok(age) = now.duration_since(modified) {
                         if age.as_secs() < 180 {
                             if latest.as_ref().map_or(true, |(_, t)| modified > *t) {
@@ -114,7 +112,6 @@ fn read_latest_crash_report(game_dir: &Path) -> Option<(PathBuf, String)> {
 }
 
 /// 读取最新的 hs_err_pid*.log 文件（3分钟内）
-/// 参考 PCL2 ModCrash.vb Collect 中收集 .minecraft 根目录下 .log 文件的逻辑
 fn read_latest_hs_err(game_dir: &Path) -> String {
     let now = SystemTime::now();
     let mut latest: Option<(PathBuf, SystemTime)> = None;
@@ -150,7 +147,7 @@ fn read_latest_hs_err(game_dir: &Path) -> String {
 
     if let Some((path, _)) = latest {
         if let Ok(content) = std::fs::read_to_string(&path) {
-            // 截取头 200 行 + 尾 100 行（参考 PCL2 GetHeadTailLines）
+            // 截取头 200 行 + 尾 100 行
             return truncate_head_tail(&content, 200, 100);
         }
     }

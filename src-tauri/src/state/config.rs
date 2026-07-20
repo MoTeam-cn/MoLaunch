@@ -29,7 +29,7 @@ pub struct AppConfig {
     pub proxy_url: String,       // 自定义代理地址，如 "127.0.0.1:7890"
     /// 上次选中的游戏版本（持久化，启动器重启后恢复）
     pub selected_version: Option<String>,
-    // ===== 社区资源配置（参考 PCL2 PageSetupSystem "社区资源" 卡片）=====
+    // ===== 社区资源配置 =====
     /// 社区资源来源策略：0=尽量镜像 / 1=缓慢时换镜像 / 2=尽量官方（默认 2）
     pub community_source: u8,
     /// 下载文件名格式：0=【译名】原名 / 1=[译名] 原名 / 2=译名-原名 / 3=原名-译名 / 4=仅原名（默认 1）
@@ -38,7 +38,7 @@ pub struct AppConfig {
     pub community_mod_local_name_style: u8,
     /// 在显示 Mod 加载器时忽略 Quilt（默认 true）
     pub community_ignore_quilt: bool,
-    // ===== 启动高级选项（参考 PCL2 PageSetupLaunch 高级选项）=====
+    // ===== 启动高级选项 =====
     /// 禁用 Java Launch Wrapper（默认 false）
     /// JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题
     pub launch_disable_jlw: bool,
@@ -46,7 +46,7 @@ pub struct AppConfig {
     /// LUA 用于修复 LWJGL 3.4.1 的一个性能问题
     pub launch_disable_lua: bool,
     /// 使用高性能显卡（默认 false）
-    /// 自动在 Windows 设置中将 PCL 和 Java 改为使用高性能显卡
+    /// 自动在 Windows 设置中将启动器和 Java 改为使用高性能显卡
     pub launch_use_dedicated_gpu: bool,
 }
 

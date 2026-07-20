@@ -11,8 +11,6 @@
  *
  * 采用 teleport + transition 自承载弹窗（与 ResourceDetail 一致），
  * 不使用 singleton Modal（Modal 仅适合简单确认/提示，不支持自定义宽度和表格内容）。
- *
- * 参考 PCL2 PageDownloadInstall 的版本选择逻辑
  */
 import { ref, computed, watch } from 'vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -31,7 +29,7 @@ import {
   ArrowUpIcon,
   ArrowDownIcon,
 } from '@heroicons/vue/24/outline'
-// Mod 默认 logo（无平台工程 logo 时使用，参考 PCL2 Icons/NoIcon.png）
+// Mod 默认 logo（无平台工程 logo 时使用）
 import defaultModLogo from '@/assets/Mods/default-min.png'
 
 interface Props {

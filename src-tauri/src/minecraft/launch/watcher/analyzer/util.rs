@@ -19,7 +19,7 @@ pub(super) fn extract_mod_from_keyword(text: &str, prefix: &str) -> Option<Strin
     None
 }
 
-/// 截取头 N 行 + 尾 M 行（参考 PCL2 GetHeadTailLines）
+/// 截取头 N 行 + 尾 M 行
 pub(super) fn truncate_head_tail(content: &str, head: usize, tail: usize) -> String {
     let lines: Vec<&str> = content.lines().collect();
     if lines.len() <= head + tail {

@@ -38,7 +38,7 @@ pub struct PersonalizationUpdate {
     pub min_memory: Option<u32>,
     /// 版本独立最大内存（MB，仅 custom 模式生效）
     pub max_memory: Option<u32>,
-    // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
+    // ===== 高级选项开关 =====
     /// 禁止更新 Mod（None=跟随全局默认 false）
     pub advance_disable_mod_update: Option<bool>,
     /// 忽略 Java 兼容性警告（None=跟随全局默认 false）
@@ -129,7 +129,7 @@ pub struct VersionSetup {
     /// LiteLoader 版本号（如有）
     pub liteloader_version: Option<String>,
     // ===== DisplayConfig 分组 =====
-    /// 自定义图标文件名（空字符串=自动判断，PCL\Logo.png 等相对路径）
+    /// 自定义图标文件名（空字符串=自动判断，logo.png 等相对路径）
     pub logo: Option<String>,
     /// 自定义描述（空字符串=使用默认描述）
     pub custom_info: Option<String>,
@@ -165,7 +165,7 @@ pub struct VersionSetup {
     pub min_memory: Option<u32>,
     /// 版本独立最大内存（MB，仅 custom 模式生效）
     pub max_memory: Option<u32>,
-    // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
+    // ===== 高级选项开关 =====
     /// 禁止更新 Mod
     pub advance_disable_mod_update: Option<bool>,
     /// 忽略 Java 兼容性警告

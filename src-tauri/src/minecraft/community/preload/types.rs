@@ -28,7 +28,7 @@ pub struct PreloadUpdate {
     pub version: Option<String>,
     /// 平台工程的 logo_url 经过 image_cache::get_image_url 处理后的缓存 URL
     ///
-    /// 设计参考 PCL2 ResourceProject.ApplyLogoToMyImage + 本项目皮肤/披风 cached_url：
+    /// 设计思路：
     /// - 命中缓存：返回 `cache-image://{hash}.png`，零网络请求
     /// - 未命中：返回原始远程 URL，后端异步下载到缓存，完成后 emit `image-cached` 事件
     ///

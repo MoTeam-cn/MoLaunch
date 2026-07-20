@@ -1,3 +1,13 @@
+/*
+  MoLaunch - Minecraft Launcher
+  Copyright (C) 2026 MoTeam
+
+  This file is derived from Arco Design Vue (https://arco.design/).
+  Original code licensed under the MIT License.
+
+  MIT License full text will be added here
+*/
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -22,7 +32,7 @@
 
 @layer components {
   /* ============================================================
-   * 按钮基础样式（复刻 Arco Design Button）
+   * 按钮基础样式
    * height: 32px, padding 0 15px, font-size 14px, border-radius 2px
    * transition: all 0.1s cubic-bezier(0,0,1,1)
    * ============================================================ */
@@ -141,7 +151,7 @@
   }
 
   /* ============================================================
-   * 输入框样式（复刻 Arco Design Input）
+   * 输入框样式
    * height: 32px, padding 0 12px, font-size 14px, border-radius 2px
    * default bg #f2f3f5 border transparent
    * hover bg #e5e6eb
@@ -184,7 +194,7 @@
   }
 
   /* ============================================================
-   * 搜索框样式（复刻 Arco Design Input Search）
+   * 搜索框样式
    * 结构：.search-input > input.input + button.btn-primary
    * 按钮去掉左侧圆角贴合输入框
    * ============================================================ */

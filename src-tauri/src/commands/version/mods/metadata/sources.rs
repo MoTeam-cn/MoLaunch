@@ -1,6 +1,6 @@
 //! Mod 元数据的 4 个来源读取函数
 //!
-//! 参考 PCL2 `LocalResourceFile.LoadMetadataFromJar` 的 4 个 #Region：
+//! 对应 `LocalResourceFile.LoadMetadataFromJar` 的 4 个来源：
 //! 1. mcmod.info（Forge 1.12-）
 //! 2. fabric.mod.json（Fabric/Quilt）
 //! 3. META-INF/mods.toml（Forge 1.13+/NeoForge）
@@ -13,7 +13,7 @@ use super::MetaBuilder;
 
 /// 合并 mcmod.info（Forge 1.12-）
 ///
-/// 参考 PCL2 第 136-161 行：读取 mcmod.info，从第一个 mod 对象获取 modid/description/version
+/// 读取 mcmod.info，从第一个 mod 对象获取 modid/description/version
 pub(super) fn merge_mcmod_info<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
     builder: &mut MetaBuilder,
@@ -54,7 +54,7 @@ pub(super) fn merge_mcmod_info<R: Read + std::io::Seek>(
 
 /// 合并 fabric.mod.json（Fabric/Quilt）
 ///
-/// 参考 PCL2 第 162-183 行：必须包含 "schemaVersion" 才视为有效 fabric.mod.json
+/// 必须包含 "schemaVersion" 才视为有效 fabric.mod.json
 pub(super) fn merge_fabric_mod_json<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
     builder: &mut MetaBuilder,
@@ -70,7 +70,7 @@ pub(super) fn merge_fabric_mod_json<R: Read + std::io::Seek>(
         }
         s
     };
-    // PCL2 检查：必须包含 "schemaVersion" 才是有效的 fabric.mod.json
+    // 检查：必须包含 "schemaVersion" 才是有效的 fabric.mod.json
     if !content.contains("schemaVersion") {
         return;
     }
@@ -92,7 +92,7 @@ pub(super) fn merge_fabric_mod_json<R: Read + std::io::Seek>(
 
 /// 合并 META-INF/mods.toml（Forge 1.13+/NeoForge）
 ///
-/// 参考 PCL2 第 184-272 行：完整 TOML 解析，从 [[mods]] 块获取 modId/description/version
+/// 完整 TOML 解析，从 [[mods]] 块获取 modId/description/version
 pub(super) fn merge_mods_toml<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
     builder: &mut MetaBuilder,
@@ -109,7 +109,7 @@ pub(super) fn merge_mods_toml<R: Read + std::io::Seek>(
         s
     };
 
-    // 文件标准化：去除注释、头尾空格、空行（参考 PCL2 第 194-204 行）
+    // 文件标准化：去除注释、头尾空格、空行
     let lines: Vec<String> = content
         .lines()
         .filter_map(|line| {
@@ -129,7 +129,7 @@ pub(super) fn merge_mods_toml<R: Read + std::io::Seek>(
         })
         .collect();
 
-    // 按段落分组（参考 PCL2 第 206-254 行）
+    // 按段落分组
     let mut current_section = String::new();
     let mut current_fields: HashMap<String, String> = HashMap::new();
     let mut sections: Vec<(String, HashMap<String, String>)> = Vec::new();
@@ -154,7 +154,7 @@ pub(super) fn merge_mods_toml<R: Read + std::io::Seek>(
         sections.push((current_section, current_fields));
     }
 
-    // 从 [[mods]] 块获取信息（参考 PCL2 第 256-267 行）
+    // 从 [[mods]] 块获取信息
     let mod_entry = sections
         .iter()
         .find(|(header, _)| header == "mods")
@@ -175,7 +175,7 @@ pub(super) fn merge_mods_toml<R: Read + std::io::Seek>(
 
 /// 合并 META-INF/fml_cache_annotation.json（Forge 1.7-1.12 注解缓存）
 ///
-/// 参考 PCL2 第 273-308 行：查找 @Mod 注解，从 values 中获取 version
+/// 查找 @Mod 注解，从 values 中获取 version
 pub(super) fn merge_fml_cache_annotation<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
     builder: &mut MetaBuilder,
@@ -203,7 +203,7 @@ pub(super) fn merge_fml_cache_annotation<R: Read + std::io::Seek>(
         None => return,
     };
 
-    // 遍历所有文件条目，查找 @Mod 注解（参考 PCL2 第 286-298 行）
+    // 遍历所有文件条目，查找 @Mod 注解
     for (_, file_value) in obj {
         let annotations = match file_value.get("annotations").and_then(|v| v.as_array()) {
             Some(a) => a,
@@ -228,7 +228,7 @@ pub(super) fn merge_fml_cache_annotation<R: Read + std::io::Seek>(
 }
 
 /// 从 META-INF/MANIFEST.MF 读取 Implementation-Version
-/// 用于替换 mods.toml 中的 ${file.jarVersion} 占位符（参考 PCL2 第 314-329 行）
+/// 用于替换 mods.toml 中的 ${file.jarVersion} 占位符
 pub(super) fn read_manifest_version<R: Read + std::io::Seek>(
     archive: &mut zip::ZipArchive<R>,
 ) -> Option<String> {

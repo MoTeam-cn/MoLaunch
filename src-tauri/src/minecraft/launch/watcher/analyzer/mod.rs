@@ -1,6 +1,6 @@
 //! 崩溃分析（运行时日志 + 崩溃报告文件 + hs_err + latest.log）
 //!
-//! 严格参考 PCL2 ModCrash.vb 的 CrashAnalyzer 四步流程：
+//! CrashAnalyzer 四步流程：
 //! 1. Collect  — 收集 crash-reports/*.txt、hs_err_pid*.log、logs/latest.log、运行时日志
 //! 2. Prepare  — 提取各源文本（头N行 + 尾M行）
 //! 3. Analyze  — 三级关键字匹配（高优先级精准 → 堆栈分析 → 低优先级）
@@ -17,7 +17,6 @@ use std::path::Path;
 
 /// 分析崩溃（主入口）
 ///
-/// 参考 PCL2 ModCrash.vb CrashAnalyzer.Analyze
 /// 综合 exit_code、运行时日志、crash-reports 文件、hs_err 文件、latest.log 判断崩溃原因
 pub(crate) async fn analyze_crash(
     exit_code: i32,
@@ -34,7 +33,7 @@ pub(crate) async fn analyze_crash(
     // ===== 步骤1: Collect — 收集各源文本 =====
     let sources = collect::collect_sources(logs, game_dir);
 
-    // ===== 步骤2: Analyze — 三级关键字匹配（参考 PCL2 AnalyzeCrit1/2/3）=====
+    // ===== 步骤2: Analyze — 三级关键字匹配 =====
 
     // 第一级：高优先级精准匹配
     if let Some(info) = crit1::analyze_crit1(

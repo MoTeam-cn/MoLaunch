@@ -1,5 +1,5 @@
 /**
- * 版本号比较工具（参考 PCL2 CompareVersion）
+ * 版本号比较工具
  *
  * 从 `useVersionGroups.ts` 抽出的共享工具，供 ModUpdateDialog 等其他场景复用。
  */

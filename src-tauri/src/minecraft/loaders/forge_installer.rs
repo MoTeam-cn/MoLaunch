@@ -166,13 +166,11 @@ pub fn run_forge_installer(
         .map_err(|e| anyhow::anyhow!("stderr 读取线程崩溃: {:?}", e))?;
     last_lines.extend(stderr_lines);
 
-    // 参考 PCL2：等待进程完全退出
-    // PCL2: Do Until process.HasExited + Thread.Sleep(10)
+    // 等待进程完全退出
     // Rust: child.wait() 会阻塞直到进程退出
     let _status = child.wait()?;
 
-    // 参考 PCL2：等待 I/O 流完全关闭
-    // PCL2: outputWaitHandle.WaitOne(10000) + errorWaitHandle.WaitOne(10000)
+    // 等待 I/O 流完全关闭
     // 我们已经通过读取 stdout/stderr 循环等待流关闭了
     // 但 Java 运行时可能还有文件句柄未释放，等待一下
     std::thread::sleep(std::time::Duration::from_secs(1));

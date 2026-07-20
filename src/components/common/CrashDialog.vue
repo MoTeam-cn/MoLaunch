@@ -1,19 +1,19 @@
 <template>
   <Transition name="crash-modal">
     <div v-if="visible" class="fixed inset-0 z-[9999] flex items-center justify-center p-6">
-      <!-- 遮罩（PCL2 PanMsg: rgba(0,0,0,0.353)，崩溃弹窗是普通蓝色主题不是警告） -->
+      <!-- 遮罩（崩溃弹窗是普通蓝色主题不是警告） -->
       <div class="absolute inset-0 bg-black/35" @click="handleClose" />
 
-      <!-- 弹窗主体（参考 PCL2 MyMsgText.xaml） -->
+      <!-- 弹窗主体 -->
       <div class="crash-dialog relative bg-pclmsg-bg rounded-lg shadow-[0_4px_20px_rgba(52,61,74,0.5)] w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-        <!-- 标题区 + 分割线（PCL2 MyMsgText: LabTitle FontSize=23, Foreground=ColorBrush2 #0b5bcb） -->
+        <!-- 标题区 + 分割线 -->
         <div class="px-7 pt-6 pb-3">
           <h2 class="text-[23px] font-normal text-pcl-2 leading-tight">Minecraft 出现错误</h2>
-          <!-- 分割线（PCL2 ShapeLine: Height=2, Fill=绑定标题前景色 #0b5bcb） -->
+          <!-- 分割线 -->
           <div class="mt-3 h-0.5 bg-pcl-2 rounded-full"></div>
         </div>
 
-        <!-- 内容区（PCL2 PanCaption: FontSize=15, LineHeight=18, Foreground=#5C5C5C） -->
+        <!-- 内容区 -->
         <div class="flex-1 overflow-y-auto px-7 py-4">
           <!-- 崩溃原因段落 -->
           <p class="text-[15px] leading-[18px] text-pclmsg-caption mb-4">
@@ -30,7 +30,7 @@
             相关 Mod：{{ crashInfo.problematic_mod }}
           </p>
 
-          <!-- 建议（PCL2 GetAnalyzeResult 输出风格，纯文本段落） -->
+          <!-- 建议（纯文本段落） -->
           <p class="text-[15px] leading-[18px] text-pclmsg-caption whitespace-pre-line mb-4">
             {{ crashInfo?.suggestion || '' }}
           </p>
@@ -85,8 +85,8 @@
           </div>
         </div>
 
-        <!-- 按钮栏（PCL2 PanBtn: 右对齐，3 个按钮） -->
-        <!-- 按钮配色参考 PCL2 MyButton: Highlight=#0b5bcb, Normal=#343d4a, hover=#1370f3+bg#e0eafd -->
+        <!-- 按钮栏（右对齐，3 个按钮） -->
+        <!-- 按钮配色：Highlight=#0b5bcb, Normal=#343d4a, hover=#1370f3+bg#e0eafd -->
         <div class="flex items-center justify-end gap-3 px-7 py-4 border-t border-gray-200 bg-gray-50">
           <!-- 查看输出按钮（Normal 态：深灰蓝边框，hover 亮蓝） -->
           <Button
@@ -201,7 +201,7 @@ defineExpose({ show })
 </script>
 
 <style scoped>
-/* 参考 PCL2 MyMsgText 进入动画（MyMsgText.xaml.vb 第 32-52 行）：
+/* 进入动画：
    - 背景遮罩：透明 → rgba(0,0,0,0.353)
    - 弹窗：透明度 0→1（120ms），Y 偏移 40→0（300ms，回弹缓动 OutBack） */
 .crash-modal-enter-active {

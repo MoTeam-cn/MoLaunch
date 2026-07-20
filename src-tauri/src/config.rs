@@ -122,7 +122,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.proxy_type = config.get_or("Proxy", "type", &app_config.proxy_type);
     app_config.proxy_url = config.get_or("Proxy", "url", &app_config.proxy_url);
 
-    // Community（社区资源配置，参考 PCL2 PageSetupSystem "社区资源" 卡片）
+    // Community（社区资源配置）
     if let Some(v) = config.get("Community", "source") {
         app_config.community_source = v.parse().unwrap_or(app_config.community_source);
     }
@@ -136,7 +136,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.community_ignore_quilt = v == "true" || v == "1";
     }
 
-    // Launch（启动高级选项，参考 PCL2 PageSetupLaunch 高级选项）
+    // Launch（启动高级选项）
     if let Some(v) = config.get("Launch", "disable_jlw") {
         app_config.launch_disable_jlw = v == "true" || v == "1";
     }

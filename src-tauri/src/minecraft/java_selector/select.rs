@@ -1,5 +1,4 @@
 //! Java 选择算法模块
-//! 参考 PCL2 的 Java 选择逻辑
 
 use crate::minecraft::java::JavaRuntime;
 
@@ -27,7 +26,7 @@ pub fn select_best_java(
 /// 从 Java 列表中选择最佳 Java（支持加载器约束）
 ///
 /// 选择流程：
-/// 1. 若用户指定了 Java 路径，优先尝试使用（仅校验最低要求，不阻断，与 PCL2 一致）
+/// 1. 若用户指定了 Java 路径，优先尝试使用（仅校验最低要求，不阻断）
 /// 2. 否则自动筛选满足 MinVer/MaxVer 双向约束的候选，按推荐版本/64位/JRE/权重排序
 pub fn select_best_java_with_loader(
     mc_version: &str,
@@ -37,7 +36,7 @@ pub fn select_best_java_with_loader(
 ) -> Option<String> {
     let (min_req, max_req) = get_java_version_range(mc_version, loader);
 
-    // 1. 用户手动指定的 Java 优先（仅校验最低要求，不阻断，与 PCL2 一致：警告但允许强制使用）
+    // 1. 用户手动指定的 Java 优先（仅校验最低要求，不阻断：警告但允许强制使用）
     if let Some(path) = try_user_specified_java(
         user_java_path,
         java_list,
@@ -71,7 +70,7 @@ pub fn select_best_java_with_loader(
         return None;
     }
 
-    // 按优先级排序（参考 PCL2 权重系统）
+    // 按优先级排序
     sort_candidates_by_priority(&mut candidates, recommended);
 
     let best = candidates[0];
@@ -137,7 +136,7 @@ fn try_user_specified_java(
     }
 }
 
-/// 按优先级对候选 Java 排序（参考 PCL2 权重系统）
+/// 按优先级对候选 Java 排序
 ///
 /// 排序优先级（高的排前）：
 /// 1. 推荐版本优先

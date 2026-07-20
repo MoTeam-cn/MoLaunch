@@ -1,7 +1,6 @@
 //! 版本 Setup 模块
 //!
 //! 管理每个版本的 setup.ini 文件，记录版本元数据（加载器类型、版本号等）。
-//! 参考 PCL2 的 setup.ini 机制。
 //!
 //! 按关注点拆分为子模块：
 //! - `types`     PersonalizationUpdate + VersionSetup（含 4 个分组子 struct）+ new/empty 构造

@@ -53,7 +53,7 @@ impl LaunchPipeline {
             }
             Ok(Err(e)) => {
                 log_info!("[PreLaunch] Failed to execute command: {}", e);
-                // 启动前命令失败不中断启动流程（与 PCL2 行为一致）
+                // 启动前命令失败不中断启动流程
                 Ok(())
             }
             Err(e) => {
@@ -63,9 +63,9 @@ impl LaunchPipeline {
         }
     }
 
-    /// 将 Java 和 PCL 自身设置为使用高性能显卡启动
+    /// 将 Java 和启动器自身设置为使用高性能显卡启动
     ///
-    /// 严格参考 PCL2 ModMain.vb SetGPUPreference 逻辑：
+    /// 实现逻辑：
     /// - 注册表项：HKCU\Software\Microsoft\DirectX\UserGpuPreferences
     /// - 值名：exe 完整路径
     /// - 值数据：`GpuPreference=2;`
@@ -75,7 +75,7 @@ impl LaunchPipeline {
         java_path: &std::path::Path,
     ) -> Result<(), LaunchError> {
         let java_exe = java_path.to_string_lossy().to_string();
-        // PCL 自身路径（MoLaunch.exe）
+        // 启动器自身路径（MoLaunch.exe）
         let self_exe = std::env::current_exe()
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_default();

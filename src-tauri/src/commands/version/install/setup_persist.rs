@@ -1,6 +1,6 @@
 //! 版本安装后的 setup.ini 持久化 + 隔离目录创建
 //!
-//! 参考 PCL2：安装完成后记录版本元数据到 setup.ini，
+//! 安装完成后记录版本元数据到 setup.ini，
 //! 并根据全局隔离设置创建 mods/saves/resourcepacks 等目录。
 
 use crate::minecraft::isolation::{self, IsolationMode};

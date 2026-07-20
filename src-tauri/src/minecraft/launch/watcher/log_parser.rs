@@ -36,7 +36,7 @@ fn extract_log_level(line: &str) -> (LogLevel, &str) {
     }
 }
 
-/// 检测加载进度 (参考PCL2)
+/// 检测加载进度
 pub(crate) fn detect_load_progress(line: &str) -> LoadProgress {
     let line_lower = line.to_lowercase();
 

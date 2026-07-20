@@ -1,7 +1,6 @@
 /**
  * 崩溃弹窗服务
  *
- * 参考 PCL2 ModCrash.vb Output 方法：
  * - 弹窗标题："Minecraft 出现错误"
  * - 展示崩溃原因、建议
  * - 按钮：确定 / 查看输出 / 导出错误报告
@@ -36,7 +35,7 @@ export function setCrashDialogRef(ref: CrashDialogInstance | null) {
 
 /**
  * 显示崩溃弹窗
- * 参考 PCL2 ModCrash.vb Output：自动触发崩溃分析后弹出
+ * 自动触发崩溃分析后弹出
  */
 export function showCrashDialog(info: CrashInfo) {
   crashDialogRef.value?.show(info)

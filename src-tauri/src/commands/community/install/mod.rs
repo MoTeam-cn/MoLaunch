@@ -1,6 +1,5 @@
 //! 社区资源下载安装命令
 //!
-//! 参考 PCL2 PageDownloadCompDetail Save_Click / Install_Click
 //! 下载资源文件到指定版本目录
 //!
 //! 模块结构：
@@ -41,7 +40,6 @@ pub use types::{
 
 /// 下载资源文件到游戏目录（保留原逻辑，用于"快速安装"）
 ///
-/// 参考 PCL2 Save_Click：
 /// - Mod → versions/{vid}/mods/
 /// - ResourcePack → versions/{vid}/resourcepacks/
 /// - Shader → versions/{vid}/shaderpacks/
@@ -59,7 +57,7 @@ pub async fn download_resource(
 
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    // 根据 community_filename_format 拼接文件名（参考 PCL2 Save_Click）
+    // 根据 community_filename_format 拼接文件名
     let final_file_name = apply_filename_format(
         &req.file_name,
         req.translated_name.as_deref(),
@@ -274,7 +272,7 @@ pub async fn get_resource_install_path(
 
 /// 安装整合包
 ///
-/// 完整流程（参考 PCL2 ModpackInstall + PageDownloadCompDetail.Install_Click）：
+/// 完整流程：
 /// 1. CF 平台前置检查 API Key（未启用或为空立即报错）
 /// 2. 下载原始整合包到 versions/{instance}/（委托 modpack_stages::download_modpack_archive）
 /// 3. 检测格式 + 解析 manifest/modrinth.index.json（委托 modpack_stages::parse_modpack_info）

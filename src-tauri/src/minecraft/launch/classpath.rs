@@ -1,6 +1,6 @@
 //! Classpath 构建
 //!
-//! 参考 PCL2 的 McLibListGet，递归处理继承版本与 libraries，拼装 Java classpath。
+//! 递归处理继承版本与 libraries，拼装 Java classpath。
 
 use crate::log_info;
 use crate::minecraft::utils::maven::maven_to_relative_path;
@@ -8,7 +8,7 @@ use std::path::Path;
 
 /// Build classpath
 ///
-/// 参考 PCL2 的 McLibListGet 函数：递归合并当前版本与所有继承版本的 libraries，
+/// 递归合并当前版本与所有继承版本的 libraries，
 /// 然后按 rules 过滤、跳过 native 包，拼装 Java classpath。
 ///
 /// **关键修复**：之前只读取当前版本 JSON 的 `libraries`，不读取父版本的 libraries。
@@ -24,7 +24,6 @@ pub(super) fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyh
     let mut all_libraries = Vec::new();
     collect_libraries_recursive(game_dir, json, &mut all_libraries, &mut std::collections::HashSet::new());
 
-    // 参考 PCL2 的 McLibListGet 函数
     // 递归查找最深层的继承版本来获取原版jar
     let jar_version = find_original_version(game_dir, json);
     let version_jar = game_dir
@@ -93,7 +92,7 @@ pub(super) fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyh
     }))
 }
 
-/// 递归收集当前版本及所有继承版本的 libraries（参考 PCL2 McLibListGet）
+/// 递归收集当前版本及所有继承版本的 libraries
 ///
 /// 遍历顺序：当前版本 → 父版本 → 祖父版本...
 /// 子版本的 libraries 排在前面（优先级更高，虽然 classpath 顺序通常不影响）
@@ -139,7 +138,7 @@ fn collect_libraries_recursive(
     }
 }
 
-/// 递归查找最深层的继承版本（参考 PCL2 的 McLibListGet）
+/// 递归查找最深层的继承版本
 ///
 /// 用于确定主 jar 文件的位置：有 `inheritsFrom` 时主 jar 在父版本目录下，
 /// 无 `inheritsFrom` 时主 jar 在当前版本目录下。

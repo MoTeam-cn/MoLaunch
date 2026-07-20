@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 右侧内容区（参考 PCL2 PageLaunchRight + PanLaunching）
+ * 右侧内容区
  * - 启动中：居中显示全局进度条 + 当前阶段名 + Java 下载进度
  * - 默认：空内容占位（后续可由用户/插件自定义内容）
  */
@@ -104,7 +104,7 @@ const javaDlStageText = computed(() => {
 
 <template>
   <div class="flex h-full flex-col">
-    <!-- 启动中：居中显示全局进度（参考 PCL2 PanLaunching） -->
+    <!-- 启动中：居中显示全局进度 -->
     <Transition name="fade">
       <div
         v-if="showLaunching"
@@ -160,7 +160,7 @@ const javaDlStageText = computed(() => {
       </div>
     </Transition>
 
-    <!-- 默认：空内容占位（参考 PCL2 PanCustom 空栈） -->
+    <!-- 默认：空内容占位 -->
     <div v-if="!showLaunching" class="flex flex-1 items-center justify-center p-8">
       <div class="text-center text-gray-300">
         <svg class="mx-auto mb-3 h-16 w-16 opacity-40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">

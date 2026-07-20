@@ -9,10 +9,9 @@ use super::AuthInfo;
 
 /// Build game arguments
 ///
-/// `custom_info`：版本独立自定义信息（对应 PCL2 VersionArgumentInfo）
+/// `custom_info`：版本独立自定义信息
 /// - 非空：替换 `${version_type}` 为 custom_info 值（显示在游戏主界面左下角和 F3 左上角）
 /// - 空/None：从参数列表删除 `--versionType` 及其值，避免 MC 显示空字符串或占位符
-/// 参考 PCL2 ModLaunch.vb McLaunchArgumentsReplace 第 1664-1677 行
 pub(super) fn build_game_args(
     json: &serde_json::Value,
     game_dir: &Path,
@@ -91,7 +90,7 @@ pub(super) fn build_game_args(
         args = std_args;
     }
 
-    // 自定义信息替换（参考 PCL2 ModLaunch.vb 第 1664-1677 行）
+    // 自定义信息替换
     // - custom_info 非空：替换 ${version_type} 为用户自定义值
     // - custom_info 空/None：替换 ${version_type} 为空字符串，并从参数列表删除 --versionType 及其值
     let custom_info_str = custom_info.unwrap_or("").trim();
@@ -121,7 +120,6 @@ pub(super) fn build_game_args(
     }
 
     // custom_info 为空时，从参数列表删除 --versionType 及其值
-    // 参考 PCL2 ModLaunch.vb 第 1668-1673 行：
     //   If Arguments.Contains("--versionType") Then
     //       Dim Index As Integer = Arguments.IndexOf("--versionType")
     //       Arguments.RemoveAt(Index)
@@ -143,7 +141,7 @@ pub(super) fn build_game_args(
         final_args.push(height.to_string());
     }
 
-    // 服务器参数（参考 PCL2 ModLaunch.vb 第 1616-1635 行）
+    // 服务器参数
     // 1.20+（releaseTime >= 2023-04-04）用 --quickPlayMultiplayer
     // 老版本用 --server + --port（无冒号则默认 25565）
     if let Some(server) = server_address {
@@ -169,7 +167,7 @@ pub(super) fn build_game_args(
         }
     }
 
-    // 用户额外游戏参数（参考 PCL2 的 AdvanceGame）
+    // 用户额外游戏参数
     final_args.extend(extra_game_args.iter().cloned());
 
     Ok(final_args)

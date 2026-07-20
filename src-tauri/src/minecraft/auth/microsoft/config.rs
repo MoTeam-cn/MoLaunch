@@ -1,6 +1,6 @@
 //! 微软登录配置
 //!
-//! Client ID 通过编译时环境变量 `MOLAUNCH_MS_CLIENT_ID` 传入（参考 PCL2 的做法）。
+//! Client ID 通过编译时环境变量 `MOLAUNCH_MS_CLIENT_ID` 传入。
 //! 未设置时默认使用 Minecraft 官方启动器 ID，该 ID 已拥有 Minecraft API 权限，
 //! 但不支持 v2.0 Device Code Flow，只能使用旧版 login.live.com 端点 + Web Auth Code Flow。
 //!

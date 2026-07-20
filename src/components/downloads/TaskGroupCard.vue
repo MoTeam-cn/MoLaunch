@@ -6,7 +6,7 @@
  * - 卡片头部：版本名、总进度百分比、暂停/恢复/取消按钮
  * - 卡片主体：按 group 聚合的任务分组列表，可折叠展开查看子阶段
  *
- * 抽取自 Downloads.vue，参考 PCL2 PageDownloads 任务列表卡片。
+ * 抽取自 Downloads.vue，任务列表卡片。
  * 分组聚合与折叠状态由 useDownloadTaskGroups composable 管理。
  */
 import { formatBytes } from '@/utils/format'

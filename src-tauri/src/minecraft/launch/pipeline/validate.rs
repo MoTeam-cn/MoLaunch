@@ -30,7 +30,7 @@ impl LaunchPipeline {
         }
 
         // 版本独立设置 advance_disable_assets_verify：跳过文件校验和补全
-        // 参考 PCL2 VersionAdvanceAssetsV2：完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件
+        // 完全不更改 assets；不校验 libraries、第三方登录库与版本主 jar 文件
         if self.config.disable_assets_verify {
             log_info!("[ValidateFiles] disable_assets_verify=true，跳过文件校验和补全");
             self.update_progress(LaunchStage::ValidateFiles, 1.0, "已跳过文件校验")

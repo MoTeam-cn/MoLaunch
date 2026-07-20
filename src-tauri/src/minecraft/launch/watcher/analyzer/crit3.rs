@@ -1,4 +1,4 @@
-//! 第三级低优先级匹配（参考 PCL2 AnalyzeCrit3）
+//! 第三级低优先级匹配
 //!
 //! 在前两级未命中时，使用更宽松的关键字匹配。
 
@@ -6,7 +6,7 @@ use super::super::types::{CrashCategory, CrashInfo};
 use super::util::make_crash_info;
 use std::path::Path;
 
-/// 第三级低优先级匹配（参考 PCL2 AnalyzeCrit3）
+/// 第三级低优先级匹配
 pub(super) fn analyze_crit3(
     log_mc: &str,
     log_crash: &str,

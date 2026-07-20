@@ -1,6 +1,5 @@
 //! 游戏窗口标题修改（跨平台）
 //!
-//! 参考 PCL2 ModWatcher.vb 第 62-101 行：
 //! 启动后轮询找到属于 MC 进程的窗口，改写标题。
 //! 支持 `{date}` 和 `{time}` 实时替换。
 //!
@@ -13,7 +12,6 @@ use std::time::Duration;
 
 /// 轮询找到 MC 进程的窗口并改写标题
 ///
-/// 参考 PCL2 ModWatcher.vb：
 /// - 等待窗口出现（最多 60 秒，每秒检查一次）
 /// - 窗口出现后，每秒改写一次（支持 {date}/{time} 实时替换）
 /// - 持续 5 分钟后停止（避免无限循环）
@@ -34,7 +32,7 @@ pub async fn apply_window_title(pid: u32, title_template: String) {
     }
 
     // 阶段 2：持续改写标题（每秒一次，持续 5 分钟）
-    // 参考 PCL2 ModWatcher.vb：每次轮询都改写，支持 {date}/{time} 实时替换
+    // 每次轮询都改写，支持 {date}/{time} 实时替换
     let mut elapsed_secs = 0u32;
     loop {
         let title = render_title(&title_template);
@@ -156,7 +154,6 @@ mod windows_impl {
     }
 
     /// EnumWindows 回调函数
-    /// 参考 PCL2 ModWatcher.vb TryGetMinecraftWindow 第 304-338 行：
     /// 1. 检查类名：GLFW30 / LWJGL / SunAwtFrame
     /// 2. 检查标题：排除 PopupMessageWindow 和以 GLFW 开头的辅助窗口
     /// 3. 检查进程启动时间：窗口进程的启动时间 >= Java 进程启动时间
@@ -175,7 +172,7 @@ mod windows_impl {
 
             // ② 检查窗口标题（排除辅助窗口）
             let window_text = get_window_text(hwnd);
-            // PCL2 逻辑：允许 FML 开头，排除 PopupMessageWindow 和 GLFW 开头
+            // 允许 FML 开头，排除 PopupMessageWindow 和 GLFW 开头
             if !window_text.starts_with("FML")
                 && (window_text == "PopupMessageWindow" || window_text.starts_with("GLFW"))
             {
@@ -191,7 +188,7 @@ mod windows_impl {
             let mut window_pid: u32 = 0;
             GetWindowThreadProcessId(hwnd, Some(&mut window_pid));
 
-            // ⑤ 比较进程启动时间（兼容子进程，参考 PCL2 ModWatcher.vb 第 329 行）
+            // ⑤ 比较进程启动时间（兼容子进程）
             // 窗口进程的启动时间必须 >= Java 进程的启动时间
             if let Some(java_start) = data.java_start_time {
                 if let Some(window_start) = get_process_creation_time(window_pid) {

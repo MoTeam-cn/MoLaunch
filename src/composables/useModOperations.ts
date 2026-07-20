@@ -91,7 +91,7 @@ export function useModOperations(options: UseModOperationsOptions) {
    *
    * 本监听器在 mods 数组中查找 `cached_logo_url === remote_url` 的 mod，
    * 原地替换为 `local_url`（`cache-image://{hash}.png`），触发 Vue 响应式更新，
-   * 实现「几秒后图标自动加载出来」的体验（与 PCL2 行为一致）。
+   * 实现「几秒后图标自动加载出来」的体验。
    *
    * 注意：`onImageCached` 内部使用 `useTauriEvent`，必须在 setup 同步上下文中调用，
    * 因此放在 composable 顶层（非 init 异步函数内），onUnmounted 自动清理。
@@ -105,13 +105,13 @@ export function useModOperations(options: UseModOperationsOptions) {
   })
 
   /**
-   * Mods 目录文件变化监听（参考 PCL2 PageInstanceMod FileSystemWatcher）
+   * Mods 目录文件变化监听
    *
    * 后端 `watch_mods_dir` 在 mods 目录文件变化时 emit `mods-dir-changed` 事件（500ms 防抖），
    * 本监听器收到事件后重新加载 mod 列表（loadMods 内部会合并保留预加载数据），
    * 并重新触发后台预加载（为新加入的 mod 查询 CF/MR 工程详情）。
    *
-   * 实现「拖入新 mod → 几秒后自动出现在列表中并加载图标」的体验（与 PCL2 一致）。
+   * 实现「拖入新 mod → 几秒后自动出现在列表中并加载图标」的体验。
    *
    * 注意：`useTauriEvent` 必须在 setup 同步上下文中调用，onUnmounted 自动清理。
    */
@@ -144,7 +144,7 @@ export function useModOperations(options: UseModOperationsOptions) {
   /**
    * 加载 Mod 列表（合并预加载数据）
    *
-   * **合并设计**（参考 PCL2 ModList 刷新时保留已加载的工程信息）：
+   * **合并设计**（刷新时保留已加载的工程信息）：
    * `list_mods` 返回的 mod 元数据字段（project / cached_logo_url / translated_name 等）全为空，
    * 由 `preload_mods_detail` 后台异步补全。当 mods 目录文件变化触发重新加载时，
    * 如果直接覆盖会丢失已加载的预加载数据，导致用户点详情按钮又要等预加载。
@@ -232,7 +232,7 @@ export function useModOperations(options: UseModOperationsOptions) {
     { v: 'disabled' as const, l: '已禁用', count: disabledCount.value },
   ])
 
-  // ===== 通用多选（使用 useMultiSelect composable，参考 PCL2 PageInstanceMod） =====
+  // ===== 通用多选（使用 useMultiSelect composable） =====
   const {
     selectedIds, batchProcessing,
     hasSelection, selectedCount,
@@ -244,7 +244,7 @@ export function useModOperations(options: UseModOperationsOptions) {
     getId: (mod) => mod.file_name,
   })
 
-  // ===== 按钮可用性判断（参考 PCL2 PageInstanceMod.xaml.vb 第 202-216 行） =====
+  // ===== 按钮可用性判断 =====
   // 选中项中是否有已启用的 mod（控制"禁用"按钮）
   const hasEnabledSelected = computed(() =>
     getSelectedItems().some(m => m.is_enabled),
@@ -259,7 +259,7 @@ export function useModOperations(options: UseModOperationsOptions) {
   )
 
   /**
-   * 启用/禁用 Mod（参考 PCL2 MyLocalModItem.Enable_Click）
+   * 启用/禁用 Mod
    *
    * 核心设计：**原地更新 mod 字段，不重新加载列表**。
    *
@@ -337,7 +337,7 @@ export function useModOperations(options: UseModOperationsOptions) {
     }
   }
 
-  /** 打开单个 Mod 的文件位置（参考 PCL2 Open_Click） */
+  /** 打开单个 Mod 的文件位置 */
   async function handleOpenFile(mod: ModInfo) {
     if (!selectedId.value) return
     try {
@@ -388,7 +388,7 @@ export function useModOperations(options: UseModOperationsOptions) {
       } else {
         toastError(`${enable ? '启用' : '禁用'}完成，成功 ${success} 个，失败 ${failed} 个`)
       }
-      // 操作完成后自动清空选中（参考 PCL2 PageInstanceMod.xaml.vb 第 465 行 ChangeAllSelected(False)）
+      // 操作完成后自动清空选中
       clearSelection()
     } finally {
       batchProcessing.value = false
@@ -423,7 +423,7 @@ export function useModOperations(options: UseModOperationsOptions) {
           } else {
             toastError(`删除完成，成功 ${success} 个，失败 ${failed} 个`)
           }
-          // 操作完成后自动清空选中（参考 PCL2 PageInstanceMod.xaml.vb 第 678 行 ChangeAllSelected(False)）
+          // 操作完成后自动清空选中
           clearSelection()
         } finally {
           batchProcessing.value = false
@@ -487,7 +487,7 @@ export function useModOperations(options: UseModOperationsOptions) {
     await checkModable()
     if (isModableVersion.value) {
       await loadMods()
-      // 启动 mods 目录文件监听（参考 PCL2 PageInstanceMod FileSystemWatcher）
+      // 启动 mods 目录文件监听
       // 拖入新 mod / 删除 mod 时自动刷新列表，无需手动按刷新按钮
       if (selectedId.value) {
         tauri.watchModsDir(selectedId.value).catch(e => {
@@ -535,7 +535,7 @@ export function useModOperations(options: UseModOperationsOptions) {
     batchProcessing,
     hasSelection,
     selectedCount,
-    // 按钮可用性判断（参考 PCL2 第 202-216 行）
+    // 按钮可用性判断
     hasEnabledSelected,
     hasDisabledSelected,
     hasUpdatableSelected,

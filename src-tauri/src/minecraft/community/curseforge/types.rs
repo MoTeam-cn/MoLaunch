@@ -71,7 +71,7 @@ pub(crate) struct CfFile {
     pub id: i64,
     /// 文件的 MurmurHash2 指纹（与请求 /fingerprints/432 时传入的指纹一致）
     ///
-    /// 参考 PCL2 `Project("file")("fileFingerprint")`：用于反查 exactMatches[i] 对应哪个本地指纹。
+    /// 用于反查 exactMatches[i] 对应哪个本地指纹。
     /// 注意：CF 的 fileFingerprint 是 uint32 number，不是字符串。
     #[serde(default)]
     pub file_fingerprint: u32,

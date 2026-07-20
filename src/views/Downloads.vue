@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 下载管理页面
- * 参考 PCL2 设计：左右分栏布局
+ * 左右分栏布局
  * - 左侧：统计面板（DownloadStatsPanel 子组件）
  * - 右侧：任务卡片（TaskGroupCard 子组件，含分组列表与暂停/取消按钮）
  * - 无任务时：空状态（DownloadEmptyState 子组件）

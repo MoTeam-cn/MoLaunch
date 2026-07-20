@@ -1,6 +1,5 @@
 //! 社区资源模块
 //!
-//! 参考 PCL2 PageDownload/Resource + Modules/Resource
 //! 对接 CurseForge 和 Modrinth 两大平台 API
 //!
 //! 模块结构：
@@ -26,7 +25,7 @@ pub mod version_extract;
 pub use searcher::search;
 pub use types::{Platform, ResourceProject, ResourceVersion, ResourceType, SearchParams, SearchResult};
 
-/// 读取社区资源来源策略（参考 PCL2 ToolDownloadMod）
+/// 读取社区资源来源策略
 ///
 /// 0=尽量镜像 / 1=缓慢时换镜像 / 2=尽量官方（默认）
 ///
@@ -40,9 +39,9 @@ pub fn get_source_pref() -> u8 {
         .unwrap_or(2)
 }
 
-/// 读取是否忽略 Quilt 加载器（参考 PCL2 ToolDownloadIgnoreQuilt）
+/// 读取是否忽略 Quilt 加载器
 ///
-/// 默认 true（与 PCL2 默认一致）
+/// 默认 true
 pub fn get_ignore_quilt() -> bool {
     crate::storage::Storage::instance()
         .get_config("Community", "ignore_quilt")

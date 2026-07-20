@@ -32,7 +32,7 @@ export interface VersionPersonalization {
   minMemory: number
   /** 版本独立最大内存（MB，仅 custom 模式生效，0 表示未设置） */
   maxMemory: number
-  // ===== 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）=====
+  // ===== 高级选项开关 =====
   advanceDisableModUpdate: boolean
   advanceIgnoreJavaWarning: boolean
   advanceDisableAssetsVerify: boolean
@@ -147,7 +147,7 @@ export interface ModInfo {
   /**
    * Mod 图标缓存 URL（由预加载阶段填充）
    *
-   * 设计参考 PCL2 ResourceProject.ApplyLogoToMyImage + 本项目皮肤/披风 cached_url：
+   * 设计：本项目皮肤/披风 cached_url：
    * - 后端预加载查到平台工程后，调用 `image_cache::get_image_url` 处理 `project.logo_url`
    * - 命中缓存：返回 `cache-image://{hash}.png`，零网络请求
    * - 未命中：返回原始远程 URL，后端异步下载，完成后 emit `image-cached` 事件通知前端刷新
@@ -159,7 +159,6 @@ export interface ModInfo {
   /**
    * 预加载到的平台工程详情（由 `preload_mods_detail_cmd` 后台批量查询填充）。
    *
-   * 参考 PCL2 `LocalResourceFile.Project`：
    * - `list_mods` 返回时为空（同步阶段不联网）
    * - 后台预加载完成后通过 `mods-preload-update` 事件推送，前端按 file_name 匹配更新此字段
    * - 详情按钮点击时判断此字段是否就绪，就绪直接弹 ResourceDetail（零延迟）
@@ -216,7 +215,7 @@ export async function openModsDir(versionId: string): Promise<void> {
 }
 
 /**
- * 在资源管理器中打开并选中指定 Mod 文件（参考 PCL2 Open_Click）
+ * 在资源管理器中打开并选中指定 Mod 文件
  */
 export async function revealModFile(versionId: string, fileName: string): Promise<void> {
   return await invoke<void>('reveal_mod_file', { versionId, fileName })
@@ -232,7 +231,7 @@ export async function getVersionModsDir(versionId: string): Promise<string> {
 }
 
 /**
- * 开始监听版本 mods 目录的文件变化（参考 PCL2 PageInstanceMod FileSystemWatcher）
+ * 开始监听版本 mods 目录的文件变化
  *
  * 后台启动 `notify` 文件监听，当 mods 目录中的文件被创建/修改/删除时，
  * 通过 `mods-dir-changed` 事件通知前端。前端应监听此事件并调用 `listMods` 刷新列表。
@@ -266,7 +265,7 @@ export async function getVersionGameVersion(versionId: string): Promise<string |
 /**
  * 触发 mod 详情预加载（后台异步，立即返回）
  *
- * 参考 PCL2 `LocalResourceOnlineLoader`：在 `list_mods` 返回后立即调用本函数，
+ * 调用时机：在 `list_mods` 返回后立即调用本函数，
  * 后台并发批量查询每个 mod 的 CF/MR 工程详情：
  * - 命中持久化缓存（6h TTL）→ 直接 emit `mods-preload-update` 事件，不联网
  * - 未命中 → 计算文件 hash → CF `/fingerprints` + MR `/version_files` 批量查询 → emit 事件

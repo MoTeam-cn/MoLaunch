@@ -358,7 +358,7 @@ fn compare_versions_ge(a: &str, b: &str) -> bool {
 /// - **并行检查**：使用 `std::thread::scope` 并行检查多个库文件，充分利用多核 CPU
 /// - **快速检查模式**（`quick_check = true`）：只检查文件存在 + 大小匹配，不计算 SHA1
 ///   - 用于启动时的文件校验（`fix_version_files` 经 `validate_and_fix_files` 调用）
-///   - 参考 PCL2 启动流程：启动时只构建 classpath，不做哈希校验，避免每次启动卡顿
+///   - 启动时只构建 classpath，不做哈希校验，避免每次启动卡顿
 ///   - 文件下载时已经做过完整校验，正常情况下不会损坏
 /// - **完整校验模式**（`quick_check = false`）：计算 SHA1 哈希，确保文件完整性
 ///   - 用于版本安装/修复时的严格校验

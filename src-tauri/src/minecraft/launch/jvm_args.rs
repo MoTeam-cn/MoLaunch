@@ -1,6 +1,6 @@
 //! JVM 参数构建
 //!
-//! 严格参考 PCL2 ModLaunch.vb McLaunchArgumentsJVM 逻辑：
+//! 构建逻辑：
 //! - LUA：仅当版本库列表包含 org.lwjgl:lwjgl:3.4.1 时注入 -javaagent
 //! - JLW：仅当非 GBK 编码、路径非纯 ASCII、且无自定义 -javaagent 时启用
 //!   - Java 9+ 添加 --add-exports cpw.mods.bootstraplauncher
@@ -47,7 +47,7 @@ pub(super) fn build_jvm_args(
     // ===== 版本 JSON 的 arguments.jvm（必需 JVM 参数）=====
     add_json_jvm_args(&mut args, json, game_dir, version_id);
 
-    // 用户额外 JVM 参数（版本独立 > 全局，参考 PCL2 的 AdvanceJvm）
+    // 用户额外 JVM 参数（版本独立 > 全局）
     args.extend(extra_jvm_args.iter().cloned());
 
     args.push("-cp".to_string());
@@ -69,7 +69,7 @@ pub(super) fn build_jvm_args(
 }
 
 /// LUA（LWJGL Unsafe Agent）
-/// 参考 PCL2：仅当库列表包含 org.lwjgl:lwjgl:3.4.1 且未禁用时注入
+/// 仅当库列表包含 org.lwjgl:lwjgl:3.4.1 且未禁用时注入
 fn add_lua_args(args: &mut Vec<String>, json: &serde_json::Value, disable_lua: bool) {
     let use_lua = !disable_lua && has_library(json, "org.lwjgl:lwjgl:3.4.1");
     if use_lua {
@@ -155,7 +155,6 @@ fn add_json_jvm_args(
 }
 
 /// JLW（Java Launch Wrapper）
-/// 参考 PCL2 ModLaunch.vb 第 1443-1458 行：
 /// - 仅当未禁用、非 GBK 编码、路径非纯 ASCII 时触发（仅在该环境下才会触发 JDK-8272352 Bug）
 /// - 若用户自定义参数含 -javaagent 则禁用 JLW（冲突会导致崩溃）
 /// - Java 9+ 添加 --add-exports cpw.mods.bootstraplauncher
@@ -202,7 +201,6 @@ fn add_jlw_args(
 }
 
 /// 检测系统是否使用 GBK 编码（Windows ANSI 代码页 936）
-/// 参考 PCL2 ModLaunch.vb 中 IsGBKEncoding 判断
 #[cfg(target_os = "windows")]
 fn is_gbk_encoding() -> bool {
     // 通过注册表读取系统 ANSI 代码页：HKLM\SYSTEM\CurrentControlSet\Control\Nls\CodePage::ACP

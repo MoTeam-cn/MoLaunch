@@ -193,7 +193,7 @@ pub async fn launch_game(
         extra_jvm_args,
         extra_game_args,
         pre_launch_cmd,
-        // 启动高级选项：版本独立覆盖全局（两者都未禁用才启用，参考 PCL2 ModLaunch.vb）
+        // 启动高级选项：版本独立覆盖全局（两者都未禁用才启用）
         disable_jlw: config.launch_disable_jlw || setup.advance_disable_jlw.unwrap_or(false),
         disable_lua: config.launch_disable_lua || setup.advance_disable_lua.unwrap_or(false),
         // 忽略 Java 兼容性警告（仅版本独立设置，custom 模式下跳过兼容性校验）
@@ -202,9 +202,9 @@ pub async fn launch_game(
         disable_assets_verify: setup.advance_disable_assets_verify.unwrap_or(false),
         // 使用高性能显卡（仅全局设置，启动前写注册表 GpuPreference=2）
         use_dedicated_gpu: config.launch_use_dedicated_gpu,
-        // 自定义信息（复刻 PCL2 VersionArgumentInfo → ${version_type} 替换）
+        // 自定义信息（→ ${version_type} 替换）
         custom_info: setup.custom_info.clone(),
-        // 自定义窗口标题（复刻 PCL2 VersionArgumentTitle → Win32 SetWindowText）
+        // 自定义窗口标题（→ Win32 SetWindowText）
         window_title: setup.window_title.clone(),
         app_handle: Some(app_handle.clone()),
     };
@@ -224,7 +224,7 @@ pub async fn launch_game(
 
     // 启动失败时的处理：如果是 LaunchProcess 阶段失败（如 ClassNotFoundException），
     // 仍然等待 watcher 完成崩溃分析，并通过 game-exited 事件通知前端展示崩溃对话框
-    // 参考 PCL2 ModWatcher.vb Crashed()：无论进程是否成功启动，只要异常退出都做崩溃分析
+    // 无论进程是否成功启动，只要异常退出都做崩溃分析
     let result = match result {
         Ok(r) => r,
         Err(launch_err) => {

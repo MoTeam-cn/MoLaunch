@@ -1,4 +1,4 @@
-//! Mods 目录文件监听（参考 PCL2 PageInstanceMod 中的 FileSystemWatcher）
+//! Mods 目录文件监听
 //!
 //! 使用 `notify` crate 监听 mods 目录的文件变化，通过 `mods-dir-changed` 事件
 //! 通知前端自动刷新 mod 列表。实现「拖入新 mod 几秒后自动出现在列表中」的体验。

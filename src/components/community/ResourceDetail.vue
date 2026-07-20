@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 资源详情弹窗（参考 PCL2 PageDownloadCompDetail）
+ * 资源详情弹窗
  *
  * - 顶部资源预览 + 操作按钮（ResourceDetailHeader 子组件）
  * - 版本筛选 RadioButton（HorizontalFilter）

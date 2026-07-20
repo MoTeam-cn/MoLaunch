@@ -4,7 +4,7 @@
 //! - Build launch arguments (JVM args, game args, classpath)
 //! - Launch game process
 //! - Version isolation support
-//! - Complete launch pipeline (inspired by PCL2)
+//! - Complete launch pipeline
 //! - Game process monitoring and crash detection
 //!
 //! Architecture:

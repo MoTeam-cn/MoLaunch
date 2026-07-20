@@ -6,7 +6,7 @@ use tauri::{Emitter, State};
 
 use super::sanitize_version_id;
 
-/// 补全版本文件（参考 PCL2 BtnManageCheck，校验并下载缺失的 libraries/assets）
+/// 补全版本文件（校验并下载缺失的 libraries/assets）
 #[tauri::command]
 pub async fn fix_version_files(
     state: State<'_, AppState>,
@@ -76,7 +76,7 @@ pub async fn fix_version_files(
     }
 }
 
-/// 重命名版本（参考 PCL2 BtnDisplayRename_Click）
+/// 重命名版本
 #[tauri::command]
 pub async fn rename_version(
     state: State<'_, AppState>,

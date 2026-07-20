@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 搜索筛选栏（参考 PCL2 PageResource 搜索区）
+ * 搜索筛选栏
  * 两行布局：名称+来源 / 版本+加载器+类型
  * 使用项目自定义 Select 组件
  */

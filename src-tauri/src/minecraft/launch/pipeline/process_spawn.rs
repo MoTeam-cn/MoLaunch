@@ -31,7 +31,7 @@ impl LaunchPipeline {
             cmd.arg(arg);
         }
 
-        // 设置工作目录（使用 effective_game_dir，即隔离目录，参考 PCL2 的隔离模式）
+        // 设置工作目录（使用 effective_game_dir，即隔离目录）
         // args.game_dir 是 build_launch_arguments 内部通过 isolation::get_effective_game_dir 计算的有效目录
         cmd.current_dir(&args.game_dir);
 

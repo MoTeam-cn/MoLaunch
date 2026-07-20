@@ -1,6 +1,15 @@
+<!--
+  MoLaunch - Minecraft Launcher
+  Copyright (C) 2026 MoTeam
+
+  This file is derived from Arco Design Vue (https://arco.design/).
+  Original code licensed under the MIT License.
+
+  MIT License full text will be added here
+-->
 <script setup lang="ts">
 /**
- * 输入框组件（复刻 Arco Design Input 样式）
+ * 输入框组件
  *
  * 特性：
  * - 灰底无边框（default #f2f3f5），focus 时白底蓝边框
@@ -26,7 +35,7 @@ interface Props {
   clearable?: boolean
   maxlength?: number
   size?: 'mini' | 'small' | 'default' | 'large'
-  /** 是否渲染为 textarea（文本域，复刻 Arco Textarea 样式） */
+  /** 是否渲染为 textarea（文本域） */
   textarea?: boolean
   /** textarea 的行数（仅 textarea 模式生效） */
   rows?: number
@@ -87,7 +96,7 @@ const sizeClass = computed(() => `input-size-${props.size}`)
 </script>
 
 <template>
-  <!-- textarea 模式（复刻 Arco Textarea） -->
+  <!-- textarea 模式 -->
   <div
     v-if="textarea"
     class="input-wrapper textarea-wrapper"
@@ -110,7 +119,7 @@ const sizeClass = computed(() => `input-size-${props.size}`)
     />
   </div>
 
-  <!-- input 模式（复刻 Arco Input） -->
+  <!-- input 模式 -->
   <div
     v-else
     class="input-wrapper"
@@ -167,7 +176,7 @@ const sizeClass = computed(() => `input-size-${props.size}`)
 </template>
 
 <style scoped>
-/* 输入框 wrapper：复刻 Arco .arco-input-wrapper */
+/* 输入框 wrapper */
 .input-wrapper {
   display: inline-flex;
   align-items: center;
@@ -301,7 +310,7 @@ const sizeClass = computed(() => `input-size-${props.size}`)
 }
 
 /* ============================================================
- * Textarea 模式（复刻 Arco Design Textarea）
+ * Textarea 模式
  * wrapper padding 0，textarea 自身 padding 4px 12px
  * min-height 32px, font-size 14px, line-height 1.5715
  * ============================================================ */

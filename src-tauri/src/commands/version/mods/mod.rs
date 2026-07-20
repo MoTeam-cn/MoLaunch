@@ -1,6 +1,5 @@
 //! 版本 Mod 管理命令
 //!
-//! 参考 PCL2 PageInstanceMod：
 //! - list_mods：扫描版本 mods 目录，返回 Mod 列表（含启用/禁用状态）
 //! - toggle_mod：启用/禁用 Mod（重命名 .jar ↔ .jar.disabled）
 //! - delete_mod：删除 Mod 文件
@@ -42,7 +41,7 @@ pub(crate) use types::ModMetadata;
 pub(crate) use helpers::get_mods_dir;
 pub(crate) use metadata::read_mod_metadata;
 
-/// 判断版本是否可以安装 Mod（参考 PCL2 McInstance.Modable）
+/// 判断版本是否可以安装 Mod
 ///
 /// 规则：版本含 Forge/Fabric/NeoForge/LiteLoader，或个性化分类被强制为 "可安装Mod"（display_type=2）
 #[tauri::command]
@@ -94,13 +93,13 @@ pub async fn is_version_modable(
     Ok(false)
 }
 
-/// 列出版本的 Mod（参考 PCL2 LocalResourceLoader 扫描 mods 目录）
+/// 列出版本的 Mod（扫描 mods 目录）
 ///
-/// **两阶段加载设计**（参考 PCL2 `LocalResourceLoaders.vb` 第 5-102 行）：
+/// **两阶段加载设计**：
 /// - 本函数是同步阶段，**只做文件枚举**，不读 JAR 内容，保证瞬间返回
 /// - 元数据（译名、描述、版本、logo、slug）全部返回空，由 `preload_mods_detail_cmd` 后台异步补全
-/// - 排序规则与 PCL2 一致：只按 `file_name`（含扩展名）字母序升序，**禁用状态不参与排序**
-///   （参考 PCL2 `ModList.OrderBy(Function(m) m.File.Name)`）
+/// - 排序规则：只按 `file_name`（含扩展名）字母序升序，**禁用状态不参与排序**
+///   （按 `ModList.OrderBy(Function(m) m.File.Name)` 的方式）
 #[tauri::command]
 pub async fn list_mods(
     state: State<'_, AppState>,
@@ -168,14 +167,14 @@ pub async fn list_mods(
     }
 
     // 只按 file_name（含扩展名）字母序升序，禁用状态不参与排序
-    // （参考 PCL2 LocalResourceLoaders.vb 第 88 行：ModList.OrderBy(Function(m) m.File.Name)）
+    // （ModList.OrderBy(Function(m) m.File.Name)）
     mods.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
 
     log_info!("Found {} mods for version {}", mods.len(), version_id);
     Ok(mods)
 }
 
-/// 启用/禁用 Mod（参考 PCL2 EDMods，重命名文件扩展名）
+/// 启用/禁用 Mod（重命名文件扩展名）
 ///
 /// 返回重命名后的新文件名（前端据此原地更新 mod 字段，避免重新加载列表丢失预加载的 project 等信息）。
 #[tauri::command]
@@ -370,7 +369,7 @@ pub async fn get_version_mods_dir(
     Ok(mods_dir.to_string_lossy().to_string())
 }
 
-/// 在资源管理器中打开并选中指定 Mod 文件（参考 PCL2 Open_Click）
+/// 在资源管理器中打开并选中指定 Mod 文件
 #[tauri::command]
 pub async fn reveal_mod_file(
     state: State<'_, AppState>,

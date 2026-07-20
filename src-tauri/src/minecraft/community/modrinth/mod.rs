@@ -1,6 +1,5 @@
 //! Modrinth API 客户端
 //!
-//! 参考 PCL2 ResourceSearcher.GetModrinthAddress
 //! API 文档: https://docs.modrinth.com/
 //!
 //! 模块结构：
@@ -23,7 +22,7 @@ use types::{MrFile, MrProject, MrSearchResponse, MrVersion};
 
 /// 按 SHA1 批量查询 Modrinth 工程详情
 ///
-/// 参考 PCL2 `LocalResourceOnlineLoad` 步骤 1-3：
+/// 步骤 1-3：
 /// 1. POST `/v2/version_files` 用 SHA1 查 version 和 project_id
 /// 2. 收集所有 project_id
 /// 3. GET `/v2/projects?ids=[...]` 批量查询工程详情
@@ -75,7 +74,7 @@ pub async fn version_files_search(
         if entry.project_id.is_empty() {
             continue;
         }
-        // 校验 file.hashes.sha1 与查询的 sha1 一致（防 MR 返回错位，参考 PCL2 第 148 行）
+        // 校验 file.hashes.sha1 与查询的 sha1 一致（防 MR 返回错位）
         let sha1_match = entry.files.iter().any(|f| {
             f.hashes
                 .as_ref()

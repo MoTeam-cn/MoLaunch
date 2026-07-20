@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 资源卡片（单列行式，参考 PCL2 MyResourceItem）
+ * 资源卡片（单列行式）
  * 固定高度，横向布局：Logo + 标题/描述 + 版本/下载量/时间/来源
  */
 
@@ -18,7 +18,7 @@ import { formatDownloads } from '@/utils/format'
 const props = defineProps<{ project: ResourceProject }>()
 const emit = defineEmits<{ click: [project: ResourceProject] }>()
 
-/** 相对时间（参考 PCL2 LabTime） */
+/** 相对时间 */
 function formatRelativeTime(dateStr: string): string {
   if (!dateStr) return '未知'
   const date = new Date(dateStr)

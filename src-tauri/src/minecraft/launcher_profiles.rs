@@ -1,14 +1,13 @@
 //! Launcher Profiles 管理模块
 //!
 //! 管理 Minecraft 的 launcher_profiles.json 文件
-//! 参考 PCL2 的实现逻辑
 
 use crate::{log_info, log_warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-/// 固定的占位 ID（与 PCL2 保持一致）
+/// 固定的占位 ID
 const AUTH_ACCOUNT_ID: &str = "00000111112222233333444445555566";
 const AUTH_PROFILE_ID: &str = "66666555554444433333222221111100";
 const DEFAULT_CLIENT_TOKEN: &str = "23323323323323323323323323323333";
@@ -173,7 +172,7 @@ impl LauncherProfiles {
         mc_folder: &Path,
         login_result: &LoginResult,
     ) -> Result<(), String> {
-        // PCL2 的核心判断：非 Microsoft 账号不更新
+        // 核心判断：非 Microsoft 账号不更新
         if login_result.login_type != LoginType::Microsoft {
             return Ok(());
         }

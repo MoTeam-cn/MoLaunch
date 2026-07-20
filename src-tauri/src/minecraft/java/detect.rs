@@ -1,5 +1,4 @@
 //! Java 检测模块
-//! 参考PCL2的Java版本检测逻辑
 
 use std::path::Path;
 
@@ -97,7 +96,7 @@ pub fn detect_java_version(java_path_or_dir: &str) -> Option<u32> {
     detect_java(&java_exe).ok().map(|j| j.major_version)
 }
 
-/// 提取并标准化版本号（参考PCL2第107-121行）
+/// 提取并标准化版本号
 fn extract_and_normalize_version(output: &str) -> Result<String, String> {
     // 正则1: version "xxx"
     static RE1: std::sync::OnceLock<regex::Regex> = std::sync::OnceLock::new();

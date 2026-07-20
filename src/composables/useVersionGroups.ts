@@ -1,6 +1,5 @@
 /**
  * 资源版本分组逻辑
- * 参考 PCL2 PageDownloadCompDetail.GetGroupedVersionName / UpdateFilterResult
  *
  * 将版本按游戏版本号分组，支持折叠/展开、版本筛选
  *

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /**
  * 版本设置 - 设置子页
- * 参考 PCL2 PageInstanceSetup：启动选项、内存分配、服务器、高级选项
+ * 启动选项、内存分配、服务器、高级选项
  * 版本独立设置存 setup.ini（通过 updateVersionPersonalization）
  *
  * Java 选择（4 模式）拆分到 JavaModeSelector 子组件
@@ -27,7 +27,7 @@ const windowTitle = ref('')
 const customInfo = ref('')
 const serverEnter = ref('')
 
-// 高级选项开关（参考 PCL2 PageInstanceSetup 高级选项）
+// 高级选项开关
 const advanceDisableModUpdate = ref(false)
 const advanceIgnoreJavaWarning = ref(false)
 const advanceDisableAssetsVerify = ref(false)
@@ -186,7 +186,7 @@ onMounted(loadSetup)
     <!-- 高级选项（子组件：3 个文本字段） -->
     <AdvanceFieldsPanel />
 
-    <!-- 进阶开关（参考 PCL2 PageInstanceSetup 高级选项，复用 ToggleRow 公共组件）-->
+    <!-- 进阶开关（复用 ToggleRow 公共组件）-->
     <div class="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">进阶开关</h3>
       <div class="divide-y divide-gray-100">

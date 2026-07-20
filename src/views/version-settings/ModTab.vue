@@ -8,8 +8,8 @@
  * 业务逻辑（列表加载、过滤、启用/禁用、删除、安装、打开目录、详情查询、预加载监听、
  * 批量操作、版本更新）抽取到 `@/composables/useModOperations`。
  *
- * 多选交互（参考 PCL2 PageInstanceMod + MyLocalModItem）：
- * - 点击列表项切换选中状态（PCL2 也是点击触发，非长按）
+ * 多选交互：
+ * - 点击列表项切换选中状态（非长按）
  * - Shift+点击 范围选择
  * - 有选中项时顶部显示 MultiSelectBar，所有项显示复选框列
  * - ESC 清空选中
@@ -43,7 +43,7 @@ const {
   detailVisible, detailProject, detailLoadingFor,
   // 多选状态（来自 useMultiSelect）
   selectedIds, batchProcessing, hasSelection, selectedCount,
-  // 按钮可用性判断（参考 PCL2 第 202-216 行）
+  // 按钮可用性判断
   hasEnabledSelected, hasDisabledSelected, hasUpdatableSelected,
   // Mod 更新对话框
   updateDialogVisible, updateTargetMod,
@@ -64,7 +64,6 @@ const {
 /**
  * 批量操作按钮配置（响应式，根据选中状态智能禁用）
  *
- * 参考 PCL2 PageInstanceMod.xaml.vb 第 202-216 行：
  * - "禁用"按钮：选中中有已启用的才可用（HasEnabled）
  * - "启用"按钮：选中中有已禁用的才可用（HasDisabled）
  * - "更新"按钮：选中中有可更新的才可用（HasUpdate）
@@ -118,7 +117,7 @@ onUnmounted(() => {
         @refresh="loadMods"
       />
 
-      <!-- 多选操作栏：浮动在视口底部中央（参考 PCL2 CardSelect），由组件自身 teleport + fixed 定位，不占列表空间 -->
+      <!-- 多选操作栏：浮动在视口底部中央，由组件自身 teleport + fixed 定位，不占列表空间 -->
       <MultiSelectBar
         :selected-count="selectedCount"
         :total-count="filteredMods.length"

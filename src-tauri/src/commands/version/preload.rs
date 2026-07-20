@@ -3,7 +3,7 @@
 //! 对接 `minecraft::community::preload` 模块，前端在 `list_mods` 完成后调用本命令，
 //! 后台异步并发从 CF/MR 批量查询每个 mod 的 ResourceProject，通过 Tauri event 推送。
 //!
-//! 参考 PCL2 `LocalResourceOnlineLoader`：列表加载完成后立即启动后台联网补全。
+//! 列表加载完成后立即启动后台联网补全。
 
 use tauri::{AppHandle, State};
 

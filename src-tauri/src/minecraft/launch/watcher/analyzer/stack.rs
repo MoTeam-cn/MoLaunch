@@ -1,4 +1,4 @@
-//! 第二级堆栈分析（参考 PCL2 AnalyzeStackKeyword）
+//! 第二级堆栈分析
 //!
 //! 从崩溃报告、运行时日志、hs_err 的堆栈信息中提取关键字，
 //! 过滤后推断可能的 Mod 名称。
@@ -6,7 +6,7 @@
 use super::super::types::{CrashCategory, CrashInfo};
 use std::path::Path;
 
-/// 第二级堆栈分析（参考 PCL2 AnalyzeStackKeyword）
+/// 第二级堆栈分析
 pub(super) fn analyze_stack(
     log_mc: &str,
     log_crash: &str,
@@ -63,7 +63,7 @@ pub(super) fn analyze_stack(
     None
 }
 
-/// 从堆栈文本提取关键字（参考 PCL2 AnalyzeStackKeyword）
+/// 从堆栈文本提取关键字
 fn extract_stack_keywords(text: &str) -> Vec<String> {
     let mut results = Vec::new();
     let excluded_packages = [
@@ -116,7 +116,7 @@ fn extract_stack_keywords(text: &str) -> Vec<String> {
     results
 }
 
-/// 从关键字列表分析 Mod 名称（参考 PCL2 AnalyzeModName）
+/// 从关键字列表分析 Mod 名称
 fn analyze_mod_name(keywords: &[String]) -> Option<Vec<String>> {
     if keywords.is_empty() {
         return None;
