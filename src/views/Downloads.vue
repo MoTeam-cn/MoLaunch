@@ -20,6 +20,9 @@ import { initDownloadPolling } from '@/composables/useDownloadPolling'
 const versionStore = useVersionStore()
 const router = useRouter()
 
+// 检查中状态：3 秒重试期间为 true，避免页面空白
+const checking = ref(true)
+
 // 进入页面时恢复下载状态
 // 首次进入时延迟重试检查（给后端异步启动下载任务的时间，避免双击下载按钮进入页面就被赶回去）
 onMounted(async () => {
@@ -63,6 +66,7 @@ onMounted(async () => {
             isPaused,
           })
         }
+        checking.value = false
         return // 成功恢复，不需要返回
       }
     } catch (e) {
@@ -73,7 +77,9 @@ onMounted(async () => {
       await new Promise(resolve => setTimeout(resolve, 500))
     }
   }
-  // 重试完毕仍无任务，返回上一页
+  // 重试完毕仍无任务，显示暂无任务极简画面，1.5 秒后返回上一页
+  checking.value = false
+  await new Promise(resolve => setTimeout(resolve, 1500))
   router.back()
 })
 
@@ -200,6 +206,30 @@ function handleCancel() {
           </div>
         </div>
       </template>
+
+      <!-- 无任务时：极简占位画面（检查中 / 暂无任务） -->
+      <div
+        v-else
+        class="flex-1 flex flex-col items-center justify-center bg-gray-50"
+      >
+        <!-- 检查中：旋转加载圈 -->
+        <div v-if="checking" class="flex flex-col items-center gap-3">
+          <svg class="h-7 w-7 animate-spin text-primary-400" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
+            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          </svg>
+          <p class="text-sm text-gray-500">正在检查下载任务...</p>
+        </div>
+
+        <!-- 暂无任务：极简空状态 -->
+        <div v-else class="flex flex-col items-center gap-2">
+          <svg class="h-10 w-10 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m-6-8h6M6 4h12a1 1 0 011 1v14a1 1 0 01-1 1H6a1 1 0 01-1-1V5a1 1 0 011-1z" />
+          </svg>
+          <p class="text-sm text-gray-400">暂无下载任务</p>
+          <p class="text-xs text-gray-300">即将返回上一页...</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>

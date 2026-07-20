@@ -154,36 +154,36 @@ defineExpose({
     >
       <div
         v-if="visible"
-        class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
         @click.self="handleCancel"
       >
         <div class="absolute inset-0 bg-black/40" />
 
-        <div class="relative w-full max-w-sm bg-white rounded-lg shadow-xl">
+        <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl">
           <!-- 内容 -->
-          <div class="p-5">
+          <div class="p-6">
             <!-- 标题行 -->
             <div class="flex items-center gap-3">
-              <component :is="icon" class="w-5 h-5 shrink-0" :class="iconColor" />
-              <h3 class="text-sm font-semibold text-gray-900">{{ options.title }}</h3>
+              <component :is="icon" class="w-6 h-6 shrink-0" :class="iconColor" />
+              <h3 class="text-base font-semibold text-gray-900">{{ options.title }}</h3>
             </div>
             <!-- 消息（支持 \n 换行） -->
-            <p class="mt-2 ml-8 text-sm text-gray-600 leading-relaxed whitespace-pre-line">{{ options.message }}</p>
+            <p class="mt-2 ml-9 text-sm text-gray-600 leading-relaxed whitespace-pre-line">{{ options.message }}</p>
 
             <!-- 输入框 -->
-            <div v-if="options.showInput" class="mt-3 ml-8">
+            <div v-if="options.showInput" class="mt-4 ml-9">
               <input
                 ref="inputRef"
                 v-model="inputValue"
                 type="text"
-                class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
+                class="w-full rounded-lg border border-gray-300 px-3.5 py-2.5 text-sm text-gray-900 outline-none transition-colors focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
                 :placeholder="options.inputPlaceholder"
                 @keyup.enter="handleConfirm"
               >
             </div>
 
             <!-- 详情 -->
-            <div v-if="options.details" class="mt-3 ml-8">
+            <div v-if="options.details" class="mt-4 ml-9">
               <Button
                 type="text"
                 size="mini"
@@ -206,7 +206,7 @@ defineExpose({
           </div>
 
           <!-- 按钮栏 -->
-          <div class="flex justify-end gap-2 px-5 py-3 bg-gray-50 rounded-b-lg">
+          <div class="flex justify-end gap-2 px-6 py-3.5 bg-gray-50 rounded-b-lg">
             <Button
               v-if="options.showCancel"
               type="ghost"

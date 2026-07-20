@@ -34,7 +34,7 @@ const advanceFields = reactive<AdvanceField[]>([
   { label: '游戏参数', field: 'advanceGameArgs', name: '游戏参数', value: '', area: false,
     tip: '文本框中的内容将会被直接拼合在启动参数的末尾。\n例如，输入 --demo 则会以试玩模式启动游戏。\n若留空，则跟随全局设置的值。' },
   { label: '启动前执行命令', field: 'advanceRunCmd', name: '启动前命令', value: '', area: false,
-    tip: '在 MC 启动前执行特定命令或程序，语法与 Windows 的命令提示符一致。\n涉及路径的操作最好都打上双引号，以避免路径中的空格导致运行失败。\n\n⚠️ 安全警告：此命令将通过系统 shell 执行，请勿输入来源不明的命令。共享整合包时请检查此字段。\n\n该项不会覆盖全局设置：启动时会先执行全局设置的命令，再执行版本设置的命令。' },
+    tip: '在 MC 启动前执行特定命令或程序，语法与 Windows 的命令提示符一致。\n涉及路径的操作最好都打上双引号，以避免路径中的空格导致运行失败。\n\n【安全警告】此命令将通过系统 shell 执行，请勿输入来源不明的命令。共享整合包时请检查此字段。\n\n该项不会覆盖全局设置：启动时会先执行全局设置的命令，再执行版本设置的命令。' },
 ])
 
 async function loadSetup() {

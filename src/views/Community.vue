@@ -138,8 +138,10 @@ watch(() => props.resourceType, () => {
       </div>
 
       <!-- 空结果 -->
-      <div v-else-if="projects.length === 0" class="flex flex-col items-center justify-center py-20 text-gray-400">
-        <span class="text-4xl mb-3">🔍</span>
+      <div v-else-if="projects.length === 0" class="h-full flex flex-col items-center justify-center text-gray-400">
+        <svg class="w-12 h-12 mb-3 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+        </svg>
         <span class="text-sm">未找到匹配的资源</span>
       </div>
 

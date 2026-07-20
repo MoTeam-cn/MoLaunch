@@ -17,6 +17,7 @@ import { installMerged } from '@/utils/api/loader'
 import { useVersionStore } from '@/stores/version'
 import { saveFile } from '@/utils/api/system'
 import { showSuccess, showError } from '@/utils/toast'
+import { showPrompt } from '@/utils/modal'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import { useCommunityDownload } from '@/composables/useCommunityDownload'
@@ -117,13 +118,20 @@ async function handleDownload(v: ResourceVersion) {
 /**
  * 安装整合包：下载原始包 + 解析 + 下载依赖 mods + 复制 overrides → 安装游戏本体 + 加载器
  * 进度走 download_state，复用 DownloadPanel
+ *
+ * 点击下载后先弹窗询问安装名称，用户可自定义；取消则中止安装。
  */
 async function handleInstallModpack(v: ResourceVersion) {
   if (!props.project) return
   const { platform, resource_type, translated_name, raw_name } = props.project
   if (resource_type !== 'ModPack') return
 
-  const instanceName = translated_name || raw_name || v.file_name.replace(/\.(zip|mrpack)$/i, '')
+  const defaultName = translated_name || raw_name || v.file_name.replace(/\.(zip|mrpack)$/i, '')
+
+  // 弹窗询问安装名称，允许用户自定义（取消则中止）
+  const instanceName = await promptForInstanceName(defaultName)
+  if (!instanceName) return
+
   downloading.value = v.id
   versionStore.startDownload(instanceName)
 
@@ -145,6 +153,30 @@ async function handleInstallModpack(v: ResourceVersion) {
   } finally {
     downloading.value = null
   }
+}
+
+/**
+ * 弹窗询问整合包安装名称
+ *
+ * 将 callback 风格的 showPrompt 包装为 Promise，便于在 async 流程中 await。
+ * 用户确认返回 trim 后的名称（空则回退默认名）；取消返回 null。
+ */
+function promptForInstanceName(defaultName: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    showPrompt(
+      '安装整合包',
+      '请输入整合包的安装名称：',
+      (value: string) => {
+        const trimmed = value.trim()
+        resolve(trimmed || defaultName)
+      },
+      {
+        defaultValue: defaultName,
+        placeholder: '请输入安装名称',
+        onCancel: () => resolve(null),
+      },
+    )
+  })
 }
 
 onUnmounted(() => stopListener())

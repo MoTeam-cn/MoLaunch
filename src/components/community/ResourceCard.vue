@@ -12,6 +12,7 @@ import {
   ClockIcon,
   GlobeAltIcon,
   TagIcon,
+  CubeIcon,
 } from '@heroicons/vue/24/outline'
 import { formatDownloads } from '@/utils/format'
 
@@ -71,7 +72,7 @@ const platformLabel = computed(() => props.project.platform)
         class="w-full h-full object-cover"
         @error="($event.target as HTMLImageElement).style.display = 'none'"
       >
-      <span v-else class="text-lg text-gray-400">📦</span>
+      <CubeIcon v-else class="w-5 h-5 text-gray-400" />
     </div>
 
     <!-- 中间信息 -->

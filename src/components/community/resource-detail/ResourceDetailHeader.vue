@@ -8,6 +8,7 @@
  *
  * openMcmod 和 copyName 内部处理（只依赖 project prop）
  */
+import { ref, watch } from 'vue'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
 import type { ResourceProject } from '@/types/community'
 import { getMcmodUrl } from '@/utils/api/community'
@@ -25,18 +26,29 @@ import Button from '@/components/common/Button.vue'
 const props = defineProps<{ project: ResourceProject }>()
 const emit = defineEmits<{ close: [] }>()
 
-/** 点击"转到 MC百科"：先查 class id 直链，查不到回退搜索 URL */
+/** MC 百科详情页直链（查不到则为 null，按钮不显示） */
+const mcmodUrl = ref<string | null>(null)
+
+// project 变化时异步查询 MC 百科直链，查不到则按钮不显示
+watch(
+  () => props.project,
+  async (p) => {
+    mcmodUrl.value = null
+    if (!p || p.resource_type !== 'Mod') return
+    try {
+      mcmodUrl.value = await getMcmodUrl(p.platform, p.slug)
+    } catch (e) {
+      console.debug('[ResourceDetailHeader] 查询 MC 百科直链失败:', e)
+    }
+  },
+  { immediate: true },
+)
+
+/** 点击"转到 MC百科"：直接打开已查到的直链 */
 async function openMcmod() {
-  const { platform, slug, translated_name, raw_name } = props.project
-  let url = await getMcmodUrl(platform, slug)
-  if (!url) {
-    const name = translated_name || raw_name
-    url = `https://search.mcmod.cn/s?key=${encodeURIComponent(name)}`
-    showSuccess('未找到 MC 百科直链，已跳转到搜索页')
-  } else {
-    showSuccess('正在打开 MC 百科详情页')
-  }
-  await openUrl(url)
+  if (!mcmodUrl.value) return
+  showSuccess('正在打开 MC 百科详情页')
+  await openUrl(mcmodUrl.value)
 }
 
 /** 复制资源名称到剪贴板 */
@@ -92,7 +104,7 @@ async function copyName() {
       转到 {{ project.platform }}
     </Button>
     <Button
-      v-if="project.resource_type === 'Mod'"
+      v-if="mcmodUrl"
       type="secondary"
       size="small"
       @click="openMcmod"

@@ -46,13 +46,13 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
         if (import.meta.env.DEV && pollCount > 2) {
           if (newDownloaded < lastGlobalDownloaded) {
             console.debug(
-              `[Polling] ⚠️ downloaded 回退! ${lastGlobalDownloaded} -> ${newDownloaded} (差值 ${lastGlobalDownloaded - newDownloaded}, poll #${pollCount})`,
+              `[Polling] [WARN] downloaded 回退! ${lastGlobalDownloaded} -> ${newDownloaded} (差值 ${lastGlobalDownloaded - newDownloaded}, poll #${pollCount})`,
               JSON.parse(JSON.stringify(progress))
             )
           }
           if (newTotal < lastGlobalTotal && newTotal > 0) {
             console.debug(
-              `[Polling] ⚠️ total 回退! ${lastGlobalTotal} -> ${newTotal} (差值 ${lastGlobalTotal - newTotal}, poll #${pollCount})`,
+              `[Polling] [WARN] total 回退! ${lastGlobalTotal} -> ${newTotal} (差值 ${lastGlobalTotal - newTotal}, poll #${pollCount})`,
               JSON.parse(JSON.stringify(progress))
             )
           }

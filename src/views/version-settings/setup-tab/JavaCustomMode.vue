@@ -46,7 +46,7 @@ const javaOptionsForCustom = computed(() => {
     const compat = isJavaCompatible(j.major_version, props.javaReqs)
     return {
       value: j.executable,
-      label: `Java ${j.version}（${j.major_version}${compat ? ' ✓' : ' ✗'}）`,
+      label: `Java ${j.version}（${j.major_version}${compat ? ' 兼容' : ' 不兼容'}）`,
     }
   })
   opts.push({ value: IMPORT_JAVA_VALUE, label: '导入 Java' })

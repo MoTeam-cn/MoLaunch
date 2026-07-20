@@ -73,12 +73,18 @@ function onInput() {
     emit('search')
   }, 500)
 }
+
+/** Select 选项变化时同步更新并立即触发搜索 */
+function selectAndUpdate(field: 'source' | 'modLoader' | 'category', value: number | string) {
+  emit(`update:${field}` as any, value)
+  emit('search')
+}
 </script>
 
 <template>
   <div class="space-y-2.5">
-    <!-- 第一行：名称 + 来源 -->
-    <div class="grid grid-cols-[1fr_auto_auto] gap-3 items-center">
+    <!-- 第一行：名称 + 来源 + 搜索按钮 -->
+    <div class="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center">
       <Input
         v-model="localQuery"
         placeholder="搜索资源名称..."
@@ -94,9 +100,15 @@ function onInput() {
         <Select
           :model-value="source"
           :options="sourceOptions"
-          @update:model-value="emit('update:source', $event as number)"
+          @update:model-value="selectAndUpdate('source', $event as number)"
         />
       </div>
+      <Button type="primary" size="small" @click="emit('search')">
+        <template #icon>
+          <MagnifyingGlassIcon class="w-4 h-4" />
+        </template>
+        搜索
+      </Button>
       <Button type="outline" size="small" @click="emit('reset')">
         <template #icon>
           <ArrowPathIcon class="w-4 h-4" />
@@ -114,6 +126,7 @@ function onInput() {
         list="common-versions"
         @update:model-value="emit('update:gameVersion', $event)"
         @input="emit('update:gameVersion', $event)"
+        @keydown.enter="emit('search')"
       />
       <datalist id="common-versions">
         <option v-for="v in commonVersions" :key="v" :value="v" />
@@ -123,14 +136,14 @@ function onInput() {
       <Select
         :model-value="modLoader"
         :options="loaderOptions"
-        @update:model-value="emit('update:modLoader', $event as number)"
+        @update:model-value="selectAndUpdate('modLoader', $event as number)"
       />
 
       <!-- 分类 -->
       <Select
         :model-value="category"
         :options="categoryOptions"
-        @update:model-value="emit('update:category', $event as string)"
+        @update:model-value="selectAndUpdate('category', $event as string)"
       />
     </div>
   </div>

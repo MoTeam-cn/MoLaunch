@@ -113,7 +113,7 @@ defineExpose({
   flex-direction: column;
   gap: 6px;
   pointer-events: none;
-  z-index: 9998;
+  z-index: 10001;
 }
 
 .toast-item {

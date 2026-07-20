@@ -7,6 +7,40 @@
 
 ## [未发布]
 
+### 新增
+
+#### 整合包安装支持自定义安装名称
+- `src/components/community/ResourceDetail.vue`：点击整合包下载后，弹窗询问安装名称（默认填入整合包译名/原名/文件名），用户可自定义；取消则中止安装
+- 新增 `promptForInstanceName` 辅助函数：将 callback 风格的 `showPrompt` 包装为 Promise，便于在 async 流程中 await
+
+#### Modal 全局弹窗层级与尺寸优化
+- `src/components/common/Modal.vue`：z-index 从 9999 提升至 10000，确保覆盖所有业务弹窗（ResourceDetail/ModUpdateDialog 等 9999 层级），修复整合包安装名称询问框被版本详情弹窗遮挡的问题
+- 弹窗宽度从 max-w-sm 放大到 max-w-md，内边距 p-5→p-6，标题字号 text-sm→text-base，图标 w-5→w-6，输入框 py-2→py-2.5，按钮栏 py-3→py-3.5，整体视觉更协调
+
+#### Toast 全局提示置顶
+- `src/components/common/Toast.vue`：z-index 从 9998 提升至 10001，确保 Toast 始终显示在所有弹窗之上（Modal 10000 / 业务弹窗 9999），修复弹窗遮挡 Toast 提示的问题
+
+#### 资源详情 MC 百科按钮按需显示
+- `src/components/community/resource-detail/ResourceDetailHeader.vue`：「转到 MC百科」按钮改为异步查询 mcmod 数据库直链，查到才显示按钮，查不到直接不显示（原逻辑是查不到回退到搜索页）
+- 新增 `mcmodUrl` ref + watch：project 变化时异步查询，`openMcmod` 简化为直接打开已查到的直链
+
+#### 全局替换 Emoji 为图标组件
+- `src/views/Community.vue`：搜索页空结果 🔍 Emoji 替换为放大镜 SVG 图标，空状态改为 `h-full` 撑满容器实现上下左右居中
+- `src/components/community/ResourceCard.vue`：资源卡片无 Logo 时 📦 Emoji 替换为 CubeIcon 图标
+- `src/components/common/DeviceCodeModal.vue`：登录步骤完成标记 ✓ Emoji 替换为 CheckIcon 图标
+- `src/views/version-settings/setup-tab/JavaCustomMode.vue`：Java 兼容性标记 ✓/✗ 替换为「兼容/不兼容」文字
+- `src/components/version-settings/AdvanceFieldsPanel.vue`：安全警告 ⚠️ Emoji 替换为【安全警告】文字标记
+- `src/composables/useDownloadPolling.ts`：调试日志 ⚠️ Emoji 替换为 [WARN] 文字标记
+
+#### 搜索栏新增独立搜索按钮 + Select 变化触发搜索
+- `src/components/community/SearchBar.vue`：第一行新增「搜索」主按钮（带放大镜图标），与「重置」按钮并列
+- 三个 Select（来源/加载器/分类）选项变化时通过 `selectAndUpdate` 辅助函数同步更新 v-model 并立即触发 search 事件，无需手动在搜索框输入才生效
+- 游戏版本输入框新增 `@keydown.enter` 回车触发搜索
+
+#### 下载管理页无任务时显示极简占位画面
+- `src/views/Downloads.vue`：3 秒重试检查期间显示"正在检查下载任务..."加载动画，避免页面空白
+- 检查完毕仍无任务时显示"暂无下载任务，即将返回上一页..."极简空状态，停留 1.5 秒后自动返回，避免突兀跳转
+
 ### 重构
 
 #### 阶段 1：重复代码整合（参考 docs/CODE_QUALITY_REPORT.md）

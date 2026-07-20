@@ -9,6 +9,7 @@ import { useRouter } from 'vue-router'
 import { open } from '@tauri-apps/plugin-shell'
 import { useAuthStore } from '@/stores/auth'
 import Button from '@/components/common/Button.vue'
+import { CheckIcon } from '@heroicons/vue/24/solid'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'success'): void }>()
@@ -151,7 +152,7 @@ onUnmounted(() => authStore.cancelMsLogin())
             </div>
             <div class="space-y-1.5">
               <div v-for="(s, idx) in STEPS" :key="s.key" class="flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors" :class="{ 'bg-primary-50 text-primary-700': idx === stepIndex, 'text-gray-400': idx > stepIndex, 'text-green-600': idx >= 0 && idx < stepIndex }">
-                <span v-if="idx >= 0 && idx < stepIndex" class="text-green-500">✓</span>
+                <CheckIcon v-if="idx >= 0 && idx < stepIndex" class="w-4 h-4 text-green-500" />
                 <span v-else-if="idx === stepIndex" class="h-2 w-2 animate-pulse rounded-full bg-primary-500" />
                 <span v-else class="h-2 w-2 rounded-full bg-gray-300" />
                 <span>{{ s.label }}</span>
