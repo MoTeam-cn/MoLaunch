@@ -6,6 +6,8 @@
  * - 搜索框
  */
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
+import Input from '@/components/common/Input.vue'
 import {
   ArrowDownTrayIcon,
   FolderOpenIcon,
@@ -33,31 +35,35 @@ defineEmits<{
   <section class="flex-none border-b border-gray-200 bg-white px-6 py-3">
     <div class="flex flex-wrap items-center gap-2">
       <Tooltip text="从本地 jar 文件安装 Mod" position="bottom">
-        <button
-          class="flex items-center gap-1.5 rounded-lg bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700"
+        <Button
+          type="primary"
+          size="small"
           @click="$emit('install')"
         >
-          <ArrowDownTrayIcon class="h-3.5 w-3.5" />
+          <template #icon><ArrowDownTrayIcon class="h-3.5 w-3.5" /></template>
           从文件安装
-        </button>
+        </Button>
       </Tooltip>
       <Tooltip text="在系统资源管理器中打开 mods 目录" position="bottom">
-        <button
-          class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        <Button
+          type="outline"
+          size="small"
           @click="$emit('open-dir')"
         >
-          <FolderOpenIcon class="h-3.5 w-3.5" />
+          <template #icon><FolderOpenIcon class="h-3.5 w-3.5" /></template>
           打开文件夹
-        </button>
+        </Button>
       </Tooltip>
       <Tooltip text="重新扫描 mods 目录" position="bottom">
-        <button
-          class="flex items-center gap-1.5 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        <Button
+          type="outline"
+          size="small"
+          :loading="modsLoading"
           @click="$emit('refresh')"
         >
-          <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': modsLoading }" />
+          <template #icon><ArrowPathIcon class="h-3.5 w-3.5" /></template>
           刷新
-        </button>
+        </Button>
       </Tooltip>
 
       <div class="ml-auto flex items-center gap-1 rounded-lg bg-gray-100 p-0.5">
@@ -80,15 +86,14 @@ defineEmits<{
         </button>
       </div>
 
-      <div class="relative">
-        <MagnifyingGlassIcon class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
-        <input
-          v-model="modSearch"
-          type="text"
-          placeholder="搜索 Mod 名称"
-          class="w-56 rounded-lg border border-gray-300 bg-white py-1.5 pl-8 pr-3 text-xs text-gray-700 transition-colors placeholder:text-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        >
-      </div>
+      <Input
+        v-model="modSearch"
+        placeholder="搜索 Mod 名称"
+        size="small"
+        class="w-56"
+      >
+        <template #prefix><MagnifyingGlassIcon class="h-3.5 w-3.5" /></template>
+      </Input>
     </div>
   </section>
 </template>

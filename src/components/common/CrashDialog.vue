@@ -48,19 +48,22 @@
 
           <!-- 日志详情（可折叠） -->
           <div v-if="hasLogDetails" class="border-t border-gray-200 pt-3 mt-4">
-            <button
-              class="flex items-center gap-1 text-[14px] text-pclmsg-caption hover:text-pcl-1 transition-colors"
+            <Button
+              type="text"
+              size="small"
               @click="showDetails = !showDetails"
             >
-              <svg
-                class="h-4 w-4 transition-transform"
-                :class="{ 'rotate-90': showDetails }"
-                fill="none" viewBox="0 0 24 24" stroke="currentColor"
-              >
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
+              <template #icon>
+                <svg
+                  class="h-4 w-4 transition-transform"
+                  :class="{ 'rotate-90': showDetails }"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                </svg>
+              </template>
               查看日志详情
-            </button>
+            </Button>
 
             <div v-if="showDetails" class="mt-3 space-y-3">
               <!-- 错误日志 -->
@@ -86,27 +89,30 @@
         <!-- 按钮配色参考 PCL2 MyButton: Highlight=#0b5bcb, Normal=#343d4a, hover=#1370f3+bg#e0eafd -->
         <div class="flex items-center justify-end gap-3 px-7 py-4 border-t border-gray-200 bg-gray-50">
           <!-- 查看输出按钮（Normal 态：深灰蓝边框，hover 亮蓝） -->
-          <button
+          <Button
             v-if="crashInfo?.crash_report_path"
-            class="px-4 py-1.5 text-sm text-pcl-1 border border-pcl-1 bg-white/30 rounded hover:text-pcl-3 hover:border-pcl-3 hover:bg-pcl-7 transition-colors duration-100"
+            type="outline"
+            size="small"
             @click="openCrashReport"
           >
             查看输出
-          </button>
+          </Button>
           <!-- 导出错误报告按钮（Normal 态） -->
-          <button
-            class="px-4 py-1.5 text-sm text-pcl-1 border border-pcl-1 bg-white/30 rounded hover:text-pcl-3 hover:border-pcl-3 hover:bg-pcl-7 transition-colors duration-100"
+          <Button
+            type="outline"
+            size="small"
             @click="exportReport"
           >
             导出错误报告
-          </button>
+          </Button>
           <!-- 确定按钮（Highlight 态：主蓝边框 #0b5bcb，hover 亮蓝） -->
-          <button
-            class="px-5 py-1.5 text-sm font-medium text-pcl-2 border border-pcl-2 bg-white/30 rounded hover:text-pcl-3 hover:border-pcl-3 hover:bg-pcl-7 transition-colors duration-100"
+          <Button
+            type="primary"
+            size="small"
             @click="handleClose"
           >
             确定
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -120,6 +126,7 @@ import { open } from '@tauri-apps/plugin-shell'
 import { showSuccess, showError } from '@/utils/toast'
 import { saveFile } from '@/utils/api/system'
 import type { CrashInfo } from '@/utils/crashDialog'
+import Button from '@/components/common/Button.vue'
 
 const visible = ref(false)
 const showDetails = ref(false)

@@ -9,6 +9,8 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { open } from '@tauri-apps/plugin-shell'
 import Alert from '@/components/common/Alert.vue'
+import Button from '@/components/common/Button.vue'
+import Input from '@/components/common/Input.vue'
 import DeviceCodeModal from '@/components/common/DeviceCodeModal.vue'
 
 const router = useRouter()
@@ -79,15 +81,19 @@ function openOfficialSite() {
 <template>
   <div class="relative flex min-h-[calc(100vh-3.5rem)] items-center justify-center p-4">
     <!-- 返回主页按钮 -->
-    <button
-      class="absolute left-4 top-4 flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+    <Button
+      type="ghost"
+      size="small"
+      class="absolute left-4 top-4"
       @click="router.push('/apps')"
     >
-      <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-        <path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.4 10l4.3 4.3a1 1 0 01-1.4 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.4 0z" clip-rule="evenodd" />
-      </svg>
+      <template #icon>
+        <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+          <path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.4 10l4.3 4.3a1 1 0 01-1.4 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.4 0z" clip-rule="evenodd" />
+        </svg>
+      </template>
       返回主页
-    </button>
+    </Button>
 
     <div class="w-full max-w-md">
       <!-- 标题 -->
@@ -102,14 +108,14 @@ function openOfficialSite() {
         <div class="space-y-3">
           <div>
             <label class="mb-1 block text-sm font-medium text-gray-700">用户名</label>
-            <input
+            <Input
               v-model="username"
               type="text"
-              maxlength="16"
-              class="input w-full"
+              :maxlength="16"
+              class="w-full"
               placeholder="输入游戏用户名"
               :disabled="loading"
-              @keypress="handleKeyPress"
+              @keydown="handleKeyPress"
             />
             <p class="mt-1 text-xs text-gray-400">最多 16 个字符，仅支持字母、数字和下划线</p>
           </div>
@@ -119,20 +125,15 @@ function openOfficialSite() {
             <p class="text-sm text-red-600">{{ error || authStore.error }}</p>
           </div>
 
-          <button
-            class="btn-primary w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-50"
-            :disabled="loading || !username.trim()"
+          <Button
+            type="primary"
+            long
+            :loading="loading"
+            :disabled="!username.trim()"
             @click="handleLogin"
           >
-            <span v-if="loading" class="flex items-center justify-center gap-2">
-              <svg class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
-                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-              </svg>
-              登录中...
-            </span>
-            <span v-else>离线登录</span>
-          </button>
+            {{ loading ? '登录中...' : '离线登录' }}
+          </Button>
         </div>
 
         <!-- 分隔线 -->
@@ -143,35 +144,32 @@ function openOfficialSite() {
         </div>
 
         <!-- 微软登录按钮 -->
-        <button
-          class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 py-2.5 text-sm font-medium text-gray-700 transition hover:bg-gray-50"
+        <Button
+          type="outline"
+          long
           :disabled="authStore.isMsLoggingIn"
           @click="handleMsLogin"
         >
-          <!-- 微软四色方块 -->
-          <svg viewBox="0 0 23 23" class="h-4 w-4">
-            <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-            <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
-            <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
-            <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
-          </svg>
+          <template #icon>
+            <!-- 微软四色方块 -->
+            <svg viewBox="0 0 23 23" class="h-4 w-4">
+              <rect x="1" y="1" width="10" height="10" fill="#F25022" />
+              <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
+              <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
+              <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
+            </svg>
+          </template>
           微软账号登录
-        </button>
+        </Button>
 
         <!-- 购买正版 + 前往官网 -->
         <div class="mt-3 flex gap-2">
-          <button
-            class="flex-1 rounded-lg border border-gray-200 bg-gray-50 py-2 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-            @click="openBuyPage"
-          >
+          <Button type="secondary" size="small" class="flex-1" @click="openBuyPage">
             购买正版
-          </button>
-          <button
-            class="flex-1 rounded-lg border border-gray-200 bg-gray-50 py-2 text-xs font-medium text-gray-500 transition hover:bg-gray-100 hover:text-gray-700"
-            @click="openOfficialSite"
-          >
+          </Button>
+          <Button type="secondary" size="small" class="flex-1" @click="openOfficialSite">
             前往官网
-          </button>
+          </Button>
         </div>
       </div>
 

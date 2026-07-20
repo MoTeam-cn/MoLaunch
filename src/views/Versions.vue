@@ -5,6 +5,7 @@ import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { showError } from '@/utils/modal'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 import LoaderSelect from './LoaderSelect.vue'
 import VersionSection from '@/components/version/VersionSection.vue'
 import Community from './Community.vue'
@@ -139,14 +140,14 @@ onMounted(async () => {
           <p class="text-xs text-gray-500 mt-1">{{ headerSubtitle }}</p>
         </div>
         <Tooltip text="刷新版本列表" position="bottom">
-          <button
-            class="p-2 rounded-lg transition-colors"
-            :class="(selectedVersion || activeCategory !== 'vanilla') ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'"
+          <Button
+            type="ghost"
+            size="small"
             :disabled="!!selectedVersion || activeCategory !== 'vanilla'"
             @click="!selectedVersion && activeCategory === 'vanilla' && handleRefresh()"
           >
-            <ArrowPathIcon class="w-4 h-4" />
-          </button>
+            <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
+          </Button>
         </Tooltip>
       </div>
 

@@ -16,6 +16,8 @@ import { useVersionStore } from '@/stores/version'
 import { ChevronLeftIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import LoaderCard from '@/components/common/LoaderCard.vue'
 import Alert from '@/components/common/Alert.vue'
+import Button from '@/components/common/Button.vue'
+import Input from '@/components/common/Input.vue'
 import FabricApiInfoCard from '@/components/install/FabricApiInfoCard.vue'
 import { useLoaderData } from '@/composables/useLoaderData'
 import { useFabricApi } from '@/composables/useFabricApi'
@@ -165,9 +167,9 @@ onMounted(() => {
   <div class="flex flex-col h-full animate-slide-in">
     <!-- 顶栏 -->
     <div class="px-6 py-4 bg-white border-b border-gray-300 flex items-center gap-3 shrink-0">
-      <button class="p-1.5 hover:bg-gray-100 rounded-lg transition-colors" @click="emit('back')">
-        <ChevronLeftIcon class="w-5 h-5 text-gray-600" />
-      </button>
+      <Button type="ghost" size="small" @click="emit('back')">
+        <template #icon><ChevronLeftIcon class="w-5 h-5 text-gray-600" /></template>
+      </Button>
       <div>
         <h2 class="text-lg font-semibold text-gray-900">选择加载器</h2>
         <p class="text-xs text-gray-500">Minecraft {{ mcVersion }} — 可选安装 Mod 加载器</p>
@@ -266,31 +268,32 @@ onMounted(() => {
       <div class="flex items-center gap-2 mb-3">
         <span class="text-xs text-gray-500 shrink-0">版本名:</span>
         <div class="flex-1 min-w-0">
-          <input
+          <Input
             v-if="showNameInput"
             v-model="customInstanceName"
             :placeholder="getDefaultInstanceName()"
-            class="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:border-primary-500"
+            size="small"
           />
           <span v-else class="text-sm font-medium text-gray-900">{{ instanceName }}</span>
         </div>
-        <button
-          class="text-xs text-primary-600 hover:text-primary-700 shrink-0"
+        <Button
+          type="text"
+          size="mini"
           @click="showNameInput = !showNameInput; if (showNameInput) customInstanceName = getDefaultInstanceName(); else customInstanceName = ''"
         >
           {{ showNameInput ? '使用默认' : '自定义' }}
-        </button>
+        </Button>
       </div>
       <div class="flex items-center justify-between">
         <span v-if="!hasSelection" class="text-xs text-gray-400">不选择加载器 = 安装原版</span>
         <span v-else class="text-xs text-gray-400">&nbsp;</span>
-        <button
-          class="flex items-center px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors"
+        <Button
+          type="primary"
           @click="handleInstall"
         >
-          <ArrowDownTrayIcon class="w-4 h-4 mr-1.5" />
+          <template #icon><ArrowDownTrayIcon class="w-4 h-4" /></template>
           开始安装
-        </button>
+        </Button>
       </div>
     </div>
   </div>

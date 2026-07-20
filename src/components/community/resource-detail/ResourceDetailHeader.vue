@@ -20,6 +20,7 @@ import {
   BookOpenIcon,
   CubeIcon,
 } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
 
 const props = defineProps<{ project: ResourceProject }>()
 const emit = defineEmits<{ close: [] }>()
@@ -74,35 +75,38 @@ async function copyName() {
         <span class="text-[11px] text-gray-400">{{ formatDownloads(project.download_count) }} 下载</span>
       </div>
     </div>
-    <button class="p-1 rounded text-gray-400 hover:bg-gray-100" @click="emit('close')">
-      <XMarkIcon class="w-5 h-5" />
-    </button>
+    <Button type="ghost" size="mini" @click="emit('close')">
+      <template #icon><XMarkIcon class="w-5 h-5" /></template>
+    </Button>
   </div>
 
   <!-- 操作按钮行 -->
   <div class="flex items-center gap-2 px-4 py-2 border-b border-gray-100">
-    <button
+    <Button
       v-if="project.website"
-      class="px-3 py-1.5 rounded-md text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors flex items-center gap-1"
+      type="primary"
+      size="small"
       @click="openUrl(project.website)"
     >
-      <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
+      <template #icon><ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" /></template>
       转到 {{ project.platform }}
-    </button>
-    <button
+    </Button>
+    <Button
       v-if="project.resource_type === 'Mod'"
-      class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1"
+      type="secondary"
+      size="small"
       @click="openMcmod"
     >
-      <BookOpenIcon class="w-3.5 h-3.5" />
+      <template #icon><BookOpenIcon class="w-3.5 h-3.5" /></template>
       转到 MC百科
-    </button>
-    <button
-      class="px-3 py-1.5 rounded-md text-xs font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 transition-colors flex items-center gap-1"
+    </Button>
+    <Button
+      type="secondary"
+      size="small"
       @click="copyName"
     >
-      <ClipboardDocumentIcon class="w-3.5 h-3.5" />
+      <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
       复制名称
-    </button>
+    </Button>
   </div>
 </template>

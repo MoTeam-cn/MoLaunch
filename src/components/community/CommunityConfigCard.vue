@@ -11,6 +11,7 @@
 import { ref, watch } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
 import Select from '@/components/common/Select.vue'
+import Button from '@/components/common/Button.vue'
 
 const source = ref<number>(2)
 const filenameFormat = ref<number>(1)
@@ -114,24 +115,22 @@ const filenameOptions = [
               </div>
             </div>
             <div class="flex gap-2">
-              <button
-                class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-                :class="modLocalNameStyle === 0
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'"
+              <Button
+                :type="modLocalNameStyle === 0 ? 'primary' : 'outline'"
+                size="small"
+                class="flex-1"
                 @click="modLocalNameStyle = 0"
               >
                 标题显示译名，详情显示文件名
-              </button>
-              <button
-                class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-                :class="modLocalNameStyle === 1
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'"
+              </Button>
+              <Button
+                :type="modLocalNameStyle === 1 ? 'primary' : 'outline'"
+                size="small"
+                class="flex-1"
                 @click="modLocalNameStyle = 1"
               >
                 标题显示文件名，详情显示译名
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -144,24 +143,22 @@ const filenameOptions = [
               </div>
             </div>
             <div class="flex gap-2">
-              <button
-                class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-                :class="ignoreQuilt
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'"
+              <Button
+                :type="ignoreQuilt ? 'primary' : 'outline'"
+                size="small"
+                class="flex-1"
                 @click="ignoreQuilt = true"
               >
                 已启用
-              </button>
-              <button
-                class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-                :class="!ignoreQuilt
-                  ? 'border-primary-500 bg-primary-50 text-primary-700'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300'"
+              </Button>
+              <Button
+                :type="!ignoreQuilt ? 'primary' : 'outline'"
+                size="small"
+                class="flex-1"
                 @click="ignoreQuilt = false"
               >
                 未启用
-              </button>
+              </Button>
             </div>
             <p class="text-xs text-gray-400 mt-2">
               <template v-if="ignoreQuilt">已启用：搜索和显示 Mod 加载器时将过滤 Quilt</template>

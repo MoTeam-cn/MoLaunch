@@ -15,6 +15,7 @@ import { useVersionSettings } from '@/composables/useVersionSettings'
 import * as tauri from '@/utils/tauri'
 import grassIcon from '@/assets/blocks/Grass.png'
 import { inferVersionType, typeMetaMap, type VersionTypeMeta } from '@/composables/useVersionMeta'
+import Button from '@/components/common/Button.vue'
 import FolderSidebar from './version-select/FolderSidebar.vue'
 
 const router = useRouter()
@@ -110,27 +111,33 @@ onMounted(() => loadInstalled())
       <!-- 顶部栏 -->
       <header class="flex flex-none items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
         <div class="flex items-center gap-3">
-          <button
-            class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+          <Button
+            type="ghost"
+            size="small"
             @click="goBack"
           >
-            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.4 10l4.3 4.3a1 1 0 01-1.4 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.4 0z" clip-rule="evenodd" />
-            </svg>
+            <template #icon>
+              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.4 10l4.3 4.3a1 1 0 01-1.4 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.4 0z" clip-rule="evenodd" />
+              </svg>
+            </template>
             返回
-          </button>
+          </Button>
           <h1 class="text-base font-semibold text-gray-800">选择版本</h1>
         </div>
-        <button
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-primary-600"
+        <Button
+          type="ghost"
+          size="small"
           :disabled="loading"
           @click="loadInstalled"
         >
-          <svg class="h-4 w-4" :class="{ 'animate-spin': loading }" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.1a7 7 0 0111.6 2.5 1 1 0 11-1.88.7A5 5 0 005.9 6.4H8a1 1 0 010 2H3a1 1 0 01-1-1V3a1 1 0 011-1zm5.3 14.3a1 1 0 011.4 0l5-5a1 1 0 00-1.4-1.4L10 14.6l-2.3-2.3a1 1 0 00-1.4 1.4l3 3z" clip-rule="evenodd" />
-          </svg>
+          <template #icon>
+            <svg class="h-4 w-4" :class="{ 'animate-spin': loading }" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.1a7 7 0 0111.6 2.5 1 1 0 11-1.88.7A5 5 0 005.9 6.4H8a1 1 0 010 2H3a1 1 0 01-1-1V3a1 1 0 011-1zm5.3 14.3a1 1 0 011.4 0l5-5a1 1 0 00-1.4-1.4L10 14.6l-2.3-2.3a1 1 0 00-1.4 1.4l3 3z" clip-rule="evenodd" />
+            </svg>
+          </template>
           刷新
-        </button>
+        </Button>
       </header>
 
       <!-- 主体 -->
@@ -156,16 +163,18 @@ onMounted(() => loadInstalled())
               <p class="text-base font-medium text-gray-700">无可用版本</p>
               <p class="mt-1 text-sm text-gray-400">当前文件夹下未找到任何已安装的版本</p>
             </div>
-            <button
-              class="flex items-center gap-1.5 rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            <Button
+              type="primary"
               @click="goToDownloads"
             >
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 3a1 1 0 011 1v6.6l2.3-2.3a1 1 0 111.4 1.4l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L9 10.6V4a1 1 0 011-1z" />
-                <path d="M4 14a1 1 0 011 1v1h10v-1a1 1 0 112 0v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2a1 1 0 011-1z" />
-              </svg>
+              <template #icon>
+                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                  <path d="M10 3a1 1 0 011 1v6.6l2.3-2.3a1 1 0 111.4 1.4l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L9 10.6V4a1 1 0 011-1z" />
+                  <path d="M4 14a1 1 0 011 1v1h10v-1a1 1 0 112 0v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2a1 1 0 011-1z" />
+                </svg>
+              </template>
               下载游戏
-            </button>
+            </Button>
           </div>
         </div>
 

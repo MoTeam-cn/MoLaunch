@@ -5,6 +5,7 @@ import { showError } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
 import { osDisplay, archDisplay } from '@/utils/system-display'
 import LogViewer from '@/components/settings/LogViewer.vue'
+import Button from '@/components/common/Button.vue'
 import {
   FolderOpenIcon,
   DocumentTextIcon,
@@ -100,13 +101,15 @@ onMounted(async () => {
             <p class="text-sm text-gray-500">{{ entry.label }}</p>
             <p class="text-xs text-gray-900 font-mono mt-1 break-all">{{ entry.path }}</p>
           </div>
-          <button
-            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors shrink-0 ml-4"
+          <Button
+            type="outline"
+            size="small"
+            class="shrink-0 ml-4"
             @click="openDir(entry.path)"
           >
-            <FolderOpenIcon class="w-3.5 h-3.5" />
+            <template #icon><FolderOpenIcon class="w-3.5 h-3.5" /></template>
             打开
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -124,13 +127,15 @@ onMounted(async () => {
             <p class="text-sm text-gray-500">{{ entry.label }}</p>
             <p class="text-xs text-gray-900 font-mono mt-1 break-all">{{ entry.path }}</p>
           </div>
-          <button
-            class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors shrink-0 ml-4"
+          <Button
+            type="outline"
+            size="small"
+            class="shrink-0 ml-4"
             @click="openDir(entry.path)"
           >
-            <component :is="entry.locate ? DocumentTextIcon : FolderOpenIcon" class="w-3.5 h-3.5" />
+            <template #icon><component :is="entry.locate ? DocumentTextIcon : FolderOpenIcon" class="w-3.5 h-3.5" /></template>
             {{ entry.locate ? '定位' : '打开' }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

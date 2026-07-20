@@ -9,6 +9,7 @@
  */
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
 import Alert from '@/components/common/Alert.vue'
+import Button from '@/components/common/Button.vue'
 import { formatBytes, formatDate } from '@/utils/format'
 import type { FabricApiVersion } from '@/utils/api/loader'
 import type { FabricApiState } from '@/composables/useFabricApi'
@@ -36,14 +37,16 @@ defineEmits<{ retry: [] }>()
           将自动安装
         </span>
       </div>
-      <button
+      <Button
         v-if="state === 'error'"
-        class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 shrink-0 transition-colors"
+        type="text"
+        size="mini"
+        class="shrink-0"
         @click="$emit('retry')"
       >
-        <ArrowPathIcon class="w-3.5 h-3.5" />
+        <template #icon><ArrowPathIcon class="w-3.5 h-3.5" /></template>
         重试
-      </button>
+      </Button>
     </div>
 
     <!-- 内容区 -->

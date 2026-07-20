@@ -16,6 +16,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
+import Button from '@/components/common/Button.vue'
 import OverviewTab from './version-settings/OverviewTab.vue'
 import SetupTab from './version-settings/SetupTab.vue'
 import ModTab from './version-settings/ModTab.vue'
@@ -76,15 +77,18 @@ onMounted(async () => {
     <!-- 顶部栏 -->
     <header class="flex flex-none items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
       <div class="flex items-center gap-3">
-        <button
-          class="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
+        <Button
+          type="ghost"
+          size="small"
           @click="goBack"
         >
-          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.4 10l4.3 4.3a1 1 0 01-1.4 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.4 0z" clip-rule="evenodd" />
-          </svg>
+          <template #icon>
+            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+              <path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.4 10l4.3 4.3a1 1 0 01-1.4 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.4 0z" clip-rule="evenodd" />
+            </svg>
+          </template>
           返回
-        </button>
+        </Button>
         <h1 class="text-base font-semibold text-gray-800">
           版本设置<span v-if="selectedId" class="text-gray-400"> - {{ selectedId }}</span>
         </h1>
@@ -98,12 +102,12 @@ onMounted(async () => {
           <path d="M4 4a2 2 0 012-2h12a2 2 0 012 2v16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v4h12V4H6zm0 6v4h12v-4H6zm0 6v4h12v-4H6z" />
         </svg>
         <p class="text-sm">请先在主页选择一个版本</p>
-        <button
-          class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+        <Button
+          type="primary"
           @click="router.push('/apps/versions/select')"
         >
           去选择版本
-        </button>
+        </Button>
       </div>
     </div>
 

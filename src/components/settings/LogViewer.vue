@@ -10,6 +10,7 @@ import * as tauri from '@/utils/tauri'
 import { showError, showSuccess } from '@/utils/toast'
 import { parseLogLines, logLineClass, type LogLine } from '@/utils/log-display'
 import Select from '@/components/common/Select.vue'
+import Button from '@/components/common/Button.vue'
 import {
   FolderOpenIcon,
   ArrowPathIcon,
@@ -96,22 +97,24 @@ onMounted(async () => {
     <div class="px-5 pt-5 pb-3 flex items-center justify-between">
       <h3 class="text-sm font-semibold text-gray-900">日志</h3>
       <div class="flex items-center gap-2">
-        <button
-          class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+        <Button
+          type="outline"
+          size="small"
           :disabled="logLoading"
           @click="refreshLogs"
         >
-          <ArrowPathIcon class="w-3.5 h-3.5" :class="logLoading ? 'animate-spin' : ''" />
+          <template #icon><ArrowPathIcon class="w-3.5 h-3.5" :class="logLoading ? 'animate-spin' : ''" /></template>
           刷新
-        </button>
-        <button
+        </Button>
+        <Button
           v-if="logsDir"
-          class="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors"
+          type="outline"
+          size="small"
           @click="openLogsDir"
         >
-          <FolderOpenIcon class="w-3.5 h-3.5" />
+          <template #icon><FolderOpenIcon class="w-3.5 h-3.5" /></template>
           打开目录
-        </button>
+        </Button>
       </div>
     </div>
 

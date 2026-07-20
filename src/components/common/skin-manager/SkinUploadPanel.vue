@@ -8,6 +8,7 @@
  */
 import { open } from '@tauri-apps/plugin-shell'
 import { showError } from '@/utils/toast'
+import Button from '@/components/common/Button.vue'
 
 const props = defineProps<{
   variant: 'classic' | 'slim'
@@ -38,25 +39,28 @@ function openChangeUsername() {
     <div class="mb-3">
       <label class="mb-1 block text-xs text-gray-500">皮肤模型</label>
       <div class="flex gap-2">
-        <button
-          class="flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors"
-          :class="props.variant === 'classic' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
+        <Button
+          :type="props.variant === 'classic' ? 'primary' : 'outline'"
+          size="small"
+          class="flex-1"
           @click="emit('update:variant', 'classic')"
-        >Steve（经典）</button>
-        <button
-          class="flex-1 rounded-md border px-3 py-1.5 text-xs transition-colors"
-          :class="props.variant === 'slim' ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'"
+        >Steve（经典）</Button>
+        <Button
+          :type="props.variant === 'slim' ? 'primary' : 'outline'"
+          size="small"
+          class="flex-1"
           @click="emit('update:variant', 'slim')"
-        >Alex（纤细）</button>
+        >Alex（纤细）</Button>
       </div>
     </div>
-    <button
-      class="w-full rounded-md bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-50"
-      :disabled="uploading"
+    <Button
+      type="primary"
+      long
+      :loading="uploading"
       @click="emit('upload')"
     >
       {{ uploading ? '处理中...' : '选择文件并上传' }}
-    </button>
+    </Button>
   </div>
 
   <!-- 账号管理快捷入口 -->

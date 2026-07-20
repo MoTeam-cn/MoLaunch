@@ -8,6 +8,7 @@
  * - 底部"打开游戏目录"按钮
  */
 import { FolderOpenIcon } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
 import type { ResourceType } from '@/types/community'
 
 interface Category {
@@ -75,13 +76,14 @@ defineEmits<{
       </button>
     </div>
     <div class="p-3 border-t border-gray-200">
-      <button
-        class="w-full flex items-center justify-center px-3 py-2 text-xs text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
+      <Button
+        type="ghost"
+        long
         @click="$emit('openGameDir')"
       >
-        <FolderOpenIcon class="w-4 h-4 mr-2" />
+        <template #icon><FolderOpenIcon class="w-4 h-4" /></template>
         打开游戏目录
-      </button>
+      </Button>
     </div>
   </aside>
 </template>

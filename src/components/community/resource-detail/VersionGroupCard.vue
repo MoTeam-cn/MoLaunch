@@ -18,6 +18,7 @@ import {
   ArrowDownTrayIcon,
   RocketLaunchIcon,
 } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
 
 defineProps<{
   title: string
@@ -117,20 +118,24 @@ function releaseColor(rt: string): string {
                 <span>{{ formatDownloads(v.download_count) }} 下载</span>
               </div>
             </div>
-            <button
-              class="shrink-0 px-2.5 py-1.5 rounded-md text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-50 transition-colors flex items-center gap-1"
-              :disabled="downloading === v.id"
+            <Button
+              type="primary"
+              size="mini"
+              class="shrink-0"
+              :loading="downloading === v.id"
               @click="isModpack ? emit('install', v) : emit('download', v)"
             >
-              <RocketLaunchIcon v-if="isModpack" class="w-3.5 h-3.5" />
-              <ArrowDownTrayIcon v-else class="w-3.5 h-3.5" />
+              <template #icon>
+                <RocketLaunchIcon v-if="isModpack" class="w-3.5 h-3.5" />
+                <ArrowDownTrayIcon v-else class="w-3.5 h-3.5" />
+              </template>
               <template v-if="downloading === v.id">
                 {{ isModpack ? '安装中...' : '下载中...' }}
               </template>
               <template v-else>
                 {{ isModpack ? '安装' : '下载' }}
               </template>
-            </button>
+            </Button>
           </div>
         </div>
       </div>

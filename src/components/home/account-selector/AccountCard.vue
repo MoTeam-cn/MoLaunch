@@ -5,6 +5,7 @@
  * - 纯展示组件，所有操作通过 emit 上抛由父组件处理
  */
 import SkinAvatar from '@/components/common/SkinAvatar.vue'
+import Button from '@/components/common/Button.vue'
 
 export interface AccountCardData {
   uuid: string
@@ -57,16 +58,19 @@ const emit = defineEmits<{
 
       <!-- 常驻操作按钮组（所有账号卡片） -->
       <div class="mt-3 flex flex-wrap justify-center gap-1.5">
-        <button
-          class="flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-primary-300 hover:bg-primary-50 hover:text-primary-600"
+        <Button
+          type="outline"
+          size="mini"
           :title="card.loginType === '正版' ? '皮肤与披风管理' : '本地皮肤选择'"
           @click.stop="emit('skin', card)"
         >
-          <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-            <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 2a6 6 0 110 12 6 6 0 010-12z" />
-          </svg>
+          <template #icon>
+            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 2a6 6 0 110 12 6 6 0 010-12z" />
+            </svg>
+          </template>
           皮肤
-        </button>
+        </Button>
         <button
           class="flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs text-red-500 transition-colors hover:border-red-300 hover:bg-red-50"
           :title="card.isActive ? '退出登录' : '删除此账号'"

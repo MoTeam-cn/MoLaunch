@@ -12,6 +12,7 @@ import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
 import { showError } from '@/utils/modal'
+import Button from '@/components/common/Button.vue'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
 
 const javaStore = useJavaStore()
@@ -78,24 +79,23 @@ async function handleManualImportJava() {
         <p class="text-xs text-gray-500 mt-0.5">选择用于启动游戏的 Java 运行时</p>
       </div>
       <div class="flex items-center gap-1.5">
-        <button
-          class="px-2 py-1 text-xs rounded transition-colors flex items-center"
-          :class="detectingJava
-            ? 'text-gray-400 bg-gray-50 cursor-not-allowed'
-            : 'text-gray-600 bg-gray-100 hover:bg-gray-200'"
+        <Button
+          type="secondary"
+          size="mini"
           :disabled="detectingJava"
           @click="handleAutoDetectJava"
         >
-          <ArrowPathIcon class="w-3.5 h-3.5 mr-1" :class="{ 'animate-spin': detectingJava }" />
+          <template #icon><ArrowPathIcon class="w-3.5 h-3.5" :class="{ 'animate-spin': detectingJava }" /></template>
           {{ detectingJava ? '检测中...' : '自动检测' }}
-        </button>
-        <button
-          class="px-2 py-1 text-xs text-gray-600 bg-gray-100 hover:bg-gray-200 rounded transition-colors flex items-center"
+        </Button>
+        <Button
+          type="secondary"
+          size="mini"
           @click="handleManualImportJava"
         >
-          <DocumentPlusIcon class="w-3.5 h-3.5 mr-1" />
+          <template #icon><DocumentPlusIcon class="w-3.5 h-3.5" /></template>
           手动导入
-        </button>
+        </Button>
       </div>
     </div>
     <!-- 选择器整体容器 -->

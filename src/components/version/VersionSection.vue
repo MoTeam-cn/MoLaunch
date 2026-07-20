@@ -5,6 +5,7 @@
 
 import { ref, type Component } from 'vue'
 import { ChevronRightIcon, TrashIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
 
 interface VersionItem {
   id: string
@@ -106,14 +107,15 @@ function isInstalled(id: string): boolean {
               >
                 已安装
               </span>
-              <button
-                class="flex items-center px-3 py-1 bg-primary-600 text-white text-xs rounded hover:bg-primary-700 transition-colors disabled:opacity-50"
+              <Button
+                type="primary"
+                size="small"
                 :disabled="downloading"
                 @click.stop="emit('download', version.id)"
               >
-                <ArrowDownTrayIcon class="w-3.5 h-3.5 mr-1" />
+                <template #icon><ArrowDownTrayIcon class="w-3.5 h-3.5" /></template>
                 安装
-              </button>
+              </Button>
               <button
                 v-if="isInstalled(version.id)"
                 class="flex items-center px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors ml-1"

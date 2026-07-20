@@ -14,6 +14,7 @@ import { reactive, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showError } from '@/utils/toast'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Input from '@/components/common/Input.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 
 const { selectedId, personalization, loadPersonalization } = useVersionSettings()
@@ -81,14 +82,12 @@ onMounted(loadSetup)
             class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             @blur="savePersonalField(f.field, f.value, f.name)"
           />
-          <input
+          <Input
             v-else
             v-model="f.value"
-            type="text"
             placeholder="跟随全局设置"
-            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             @blur="savePersonalField(f.field, f.value, f.name)"
-          >
+          />
         </Tooltip>
       </div>
     </div>

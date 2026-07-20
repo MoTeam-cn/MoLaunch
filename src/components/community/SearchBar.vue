@@ -9,6 +9,8 @@ import { ref, watch, computed } from 'vue'
 import type { ResourceType, CategoryTagInfo } from '@/types/community'
 import { SOURCE_OPTIONS, LOADER_OPTIONS } from '@/types/community'
 import Select from '@/components/common/Select.vue'
+import Button from '@/components/common/Button.vue'
+import Input from '@/components/common/Input.vue'
 import { MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { getCategoryTags } from '@/utils/api/community'
 
@@ -77,17 +79,17 @@ function onInput() {
   <div class="space-y-2.5">
     <!-- 第一行：名称 + 来源 -->
     <div class="grid grid-cols-[1fr_auto_auto] gap-3 items-center">
-      <div class="relative">
-        <MagnifyingGlassIcon class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          v-model="localQuery"
-          type="text"
-          placeholder="搜索资源名称..."
-          class="w-full pl-9 pr-3 py-2 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500"
-          @input="onInput"
-          @keyup.enter="emit('search')"
-        >
-      </div>
+      <Input
+        v-model="localQuery"
+        placeholder="搜索资源名称..."
+        class="w-full"
+        @input="onInput"
+        @keydown.enter="emit('search')"
+      >
+        <template #prefix>
+          <MagnifyingGlassIcon class="w-4 h-4 text-gray-400" />
+        </template>
+      </Input>
       <div class="w-36">
         <Select
           :model-value="source"
@@ -95,13 +97,12 @@ function onInput() {
           @update:model-value="emit('update:source', $event as number)"
         />
       </div>
-      <button
-        class="px-3 py-2 rounded-lg text-sm text-gray-500 border border-gray-300 hover:bg-gray-50 transition-colors flex items-center gap-1"
-        @click="emit('reset')"
-      >
-        <ArrowPathIcon class="w-4 h-4" />
+      <Button type="outline" size="small" @click="emit('reset')">
+        <template #icon>
+          <ArrowPathIcon class="w-4 h-4" />
+        </template>
         重置
-      </button>
+      </Button>
     </div>
 
     <!-- 第二行：版本 + 加载器 + 类型 -->

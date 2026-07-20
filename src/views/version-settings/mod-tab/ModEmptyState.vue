@@ -9,6 +9,7 @@
  * - no-match：有 Mod 但筛选/搜索后无匹配（仅提示文案）
  */
 import { PuzzlePieceIcon } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
 
 defineProps<{
   variant: 'not-modable' | 'loading' | 'empty' | 'no-match'
@@ -33,18 +34,18 @@ defineEmits<{
         如果你已经安装过 Mod 加载器，可能是版本选择有误，请切换版本。
       </p>
       <div class="flex justify-center gap-3">
-        <button
-          class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+        <Button
+          type="primary"
           @click="$emit('go-download')"
         >
           转到下载页面
-        </button>
-        <button
-          class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        </Button>
+        <Button
+          type="outline"
           @click="$emit('go-select')"
         >
           版本选择
-        </button>
+        </Button>
       </div>
     </div>
   </div>
@@ -70,13 +71,13 @@ defineEmits<{
       <p v-if="modsCount === 0" class="mb-4 text-xs text-gray-400">
         你可以从文件安装 Mod，或下载新 Mod
       </p>
-      <button
+      <Button
         v-if="modsCount === 0"
-        class="rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+        type="primary"
         @click="$emit('install')"
       >
         从文件安装 Mod
-      </button>
+      </Button>
     </div>
   </div>
 </template>

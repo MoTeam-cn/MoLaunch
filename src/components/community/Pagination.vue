@@ -10,6 +10,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
 
 interface Props {
   page: number
@@ -31,36 +32,36 @@ function hasNext() { return (props.page + 1) * props.pageSize < props.total }
     class="flex items-center justify-center gap-2 py-4"
   >
     <!-- 首页 -->
-    <button
-      class="p-1.5 rounded-md transition-colors"
-      :class="hasPrev() ? 'text-gray-500 hover:bg-gray-100' : 'text-gray-300 cursor-not-allowed'"
+    <Button
+      type="ghost"
+      size="mini"
       :disabled="!hasPrev()"
       @click="hasPrev() && emit('change', 0)"
     >
-      <ChevronDoubleLeftIcon class="w-4 h-4" />
-    </button>
+      <template #icon><ChevronDoubleLeftIcon class="w-4 h-4" /></template>
+    </Button>
 
     <!-- 上一页 -->
-    <button
-      class="p-1.5 rounded-md transition-colors"
-      :class="hasPrev() ? 'text-gray-500 hover:bg-gray-100' : 'text-gray-300 cursor-not-allowed'"
+    <Button
+      type="ghost"
+      size="mini"
       :disabled="!hasPrev()"
       @click="hasPrev() && emit('change', page - 1)"
     >
-      <ChevronLeftIcon class="w-4 h-4" />
-    </button>
+      <template #icon><ChevronLeftIcon class="w-4 h-4" /></template>
+    </Button>
 
     <!-- 页码 -->
     <span class="px-3 text-sm text-gray-600 font-medium">{{ page + 1 }}</span>
 
     <!-- 下一页 -->
-    <button
-      class="p-1.5 rounded-md transition-colors"
-      :class="hasNext() ? 'text-gray-500 hover:bg-gray-100' : 'text-gray-300 cursor-not-allowed'"
+    <Button
+      type="ghost"
+      size="mini"
       :disabled="!hasNext()"
       @click="hasNext() && emit('change', page + 1)"
     >
-      <ChevronRightIcon class="w-4 h-4" />
-    </button>
+      <template #icon><ChevronRightIcon class="w-4 h-4" /></template>
+    </Button>
   </div>
 </template>

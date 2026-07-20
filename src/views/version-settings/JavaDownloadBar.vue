@@ -8,6 +8,7 @@ import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showError } from '@/utils/toast'
+import Button from '@/components/common/Button.vue'
 import type { JavaRequirements, JavaDownloadProgress } from '@/types/java'
 
 const props = defineProps<{ javaReqs: JavaRequirements | null }>()
@@ -63,18 +64,20 @@ onUnmounted(() => {
 <template>
   <div v-if="javaReqs && targetMajor" class="space-y-1.5">
     <!-- 下载按钮（不在下载中时显示） -->
-    <button
+    <Button
       v-if="!downloading"
-      type="button"
-      class="inline-flex items-center gap-1.5 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-50"
+      type="primary"
+      size="small"
       @click="handleDownload"
     >
-      <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M10 3a1 1 0 011 1v6.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 10.586V4a1 1 0 011-1z" />
-        <path d="M3 14a1 1 0 011 1v1h12v-1a1 1 0 112 0v2a1 1 0 01-1 1H3a1 1 0 01-1-1v-2a1 1 0 011-1z" />
-      </svg>
+      <template #icon>
+        <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+          <path d="M10 3a1 1 0 011 1v6.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 10.586V4a1 1 0 011-1z" />
+          <path d="M3 14a1 1 0 011 1v1h12v-1a1 1 0 112 0v2a1 1 0 01-1 1H3a1 1 0 01-1-1v-2a1 1 0 011-1z" />
+        </svg>
+      </template>
       下载 Java {{ targetMajor }}
-    </button>
+    </Button>
 
     <!-- 下载进度条 -->
     <div v-if="downloading && progress" class="rounded-md bg-blue-50 px-3 py-2 text-xs text-blue-700">

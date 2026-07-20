@@ -13,6 +13,7 @@ import * as tauri from '@/utils/tauri'
 import { showSuccess, showError } from '@/utils/toast'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Input from '@/components/common/Input.vue'
 import ToggleRow from '@/components/settings/ToggleRow.vue'
 import AdvanceFieldsPanel from '@/components/version-settings/AdvanceFieldsPanel.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
@@ -132,7 +133,7 @@ onMounted(loadSetup)
         <div class="flex items-center gap-3">
           <label class="w-28 flex-none text-xs text-gray-500">游戏窗口标题</label>
           <Tooltip text="自定义游戏窗口的标题，若留空则跟随全局设置的值。" position="top" :delay="0" class="flex-1">
-            <input v-model="windowTitle" type="text" placeholder="跟随全局设置" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500" @blur="savePersonalField('windowTitle', windowTitle, '窗口标题')">
+            <Input v-model="windowTitle" placeholder="跟随全局设置" @blur="savePersonalField('windowTitle', windowTitle, '窗口标题')" />
           </Tooltip>
         </div>
 
@@ -147,7 +148,7 @@ onMounted(loadSetup)
             :delay="0"
             class="flex-1"
           >
-            <input v-model="customInfo" type="text" placeholder="跟随全局设置" class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500" @blur="savePersonalField('customInfo', customInfo, '自定义信息')">
+            <Input v-model="customInfo" placeholder="跟随全局设置" @blur="savePersonalField('customInfo', customInfo, '自定义信息')" />
           </Tooltip>
         </div>
 
@@ -173,13 +174,11 @@ onMounted(loadSetup)
           :delay="0"
           class="flex-1"
         >
-          <input
+          <Input
             v-model="serverEnter"
-            type="text"
             placeholder="例如：233.233.233.233:12345"
-            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             @blur="savePersonalField('serverEnter', serverEnter, '服务器')"
-          >
+          />
         </Tooltip>
       </div>
     </section>

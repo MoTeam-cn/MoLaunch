@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core'
 import * as tauri from '@/utils/tauri'
 import { showSuccess, showWarning, showError } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
+import Button from '@/components/common/Button.vue'
 
 interface McFolder {
   name: string
@@ -163,15 +164,18 @@ defineExpose({ loadFolders })
       <div class="mb-1 mt-5 px-2 text-xs font-medium text-gray-400">添加或导入</div>
       <ul class="space-y-0.5">
         <li>
-          <button
-            class="flex w-full items-center rounded-md px-3 py-2 text-left text-sm text-gray-600 transition-colors hover:bg-gray-50 hover:text-primary-600"
+          <Button
+            type="ghost"
+            long
             @click="addFolder"
           >
-            <svg class="mr-2.5 h-4 w-4 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
-            </svg>
+            <template #icon>
+              <svg class="h-4 w-4 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
+              </svg>
+            </template>
             添加已有文件夹
-          </button>
+          </Button>
         </li>
       </ul>
     </div>

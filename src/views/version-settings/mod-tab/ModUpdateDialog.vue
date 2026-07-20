@@ -16,6 +16,7 @@
  */
 import { ref, computed, watch } from 'vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 import { getProjectVersions, downloadResourceToPath } from '@/utils/api/community'
 import { getVersionModsDir, deleteMod, type ModInfo } from '@/utils/api/personalization'
 import { formatBytes, formatDate, formatDownloads } from '@/utils/format'
@@ -241,12 +242,13 @@ function releaseTypeClass(type: string): string {
               <ArrowPathIcon class="w-4 h-4 text-blue-500" />
               更新 / 更改 Mod 版本
             </h3>
-            <button
-              class="text-gray-400 hover:text-gray-600 transition-colors"
+            <Button
+              type="ghost"
+              size="small"
               @click="$emit('update:visible', false)"
             >
-              <XMarkIcon class="w-5 h-5" />
-            </button>
+              <template #icon><XMarkIcon class="w-5 h-5" /></template>
+            </Button>
           </div>
 
           <!-- 内容区 -->
@@ -396,23 +398,20 @@ function releaseTypeClass(type: string): string {
             <div v-else class="flex-1"></div>
             <!-- 右侧：操作按钮 -->
             <div class="flex gap-2 shrink-0">
-              <button
-                class="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded transition-colors"
+              <Button
+                type="ghost"
                 @click="$emit('update:visible', false)"
               >
                 取消
-              </button>
-              <button
-                class="flex items-center gap-1.5 px-4 py-1.5 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-primary-600"
+              </Button>
+              <Button
+                type="primary"
+                :loading="installing"
                 :disabled="!selectedVersion || installing"
                 @click="installSelected"
               >
-                <svg v-if="installing" class="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                  <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                  <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                </svg>
                 {{ installing ? '安装中...' : '安装' }}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

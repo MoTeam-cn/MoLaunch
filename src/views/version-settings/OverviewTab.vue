@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useVersionOverviewActions } from '@/composables/useVersionOverviewActions'
 
@@ -75,20 +76,20 @@ const {
         <div class="flex items-center gap-3">
           <span class="w-20 flex-none text-xs text-gray-500">版本名</span>
           <span class="flex-1 truncate text-sm text-gray-800">{{ selectedId }}</span>
-          <button class="flex flex-none items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50" @click="handleRename">
-            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.379-8.379-2.828-2.828z" /></svg>
+          <Button type="outline" size="small" @click="handleRename">
+            <template #icon><svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.379-8.379-2.828-2.828z" /></svg></template>
             重命名
-          </button>
+          </Button>
         </div>
         <div class="flex items-center gap-3">
           <span class="w-20 flex-none text-xs text-gray-500">描述</span>
           <span class="flex-1 truncate text-sm" :class="personalization?.customInfo ? 'text-gray-800' : 'text-gray-400'">
             {{ personalization?.customInfo || '默认描述' }}
           </span>
-          <button class="flex flex-none items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50" @click="handleEditDesc">
-            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.379-8.379-2.828-2.828z" /></svg>
+          <Button type="outline" size="small" @click="handleEditDesc">
+            <template #icon><svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.379-8.379-2.828-2.828z" /></svg></template>
             修改
-          </button>
+          </Button>
         </div>
         <div class="flex items-center gap-3">
           <span class="w-20 flex-none text-xs text-gray-500">图标</span>
@@ -132,7 +133,7 @@ const {
     <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 class="mb-3 text-sm font-semibold text-gray-700">快捷方式</h3>
       <div class="flex flex-wrap gap-3">
-        <button
+        <Button
           v-for="f in [
             { label: '版本文件夹', path: versionFolder, show: true },
             { label: '存档文件夹', path: savesFolder, show: true },
@@ -142,12 +143,12 @@ const {
           ]"
           v-show="f.show"
           :key="f.label"
-          class="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50"
+          type="outline"
           @click="openFolder(f.path)"
         >
-          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
+          <template #icon><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg></template>
           {{ f.label }}
-        </button>
+        </Button>
       </div>
     </section>
 
@@ -155,21 +156,19 @@ const {
     <section class="rounded-xl border border-gray-200 bg-white p-5 shadow-sm">
       <h3 class="mb-3 text-sm font-semibold text-gray-700">高级管理</h3>
       <div class="flex flex-wrap gap-3">
-        <button class="flex items-center gap-2 rounded-lg border border-blue-300 bg-white px-4 py-2 text-sm text-blue-600 transition-colors hover:bg-blue-50 hover:border-blue-500" :disabled="fixing" :class="{ 'opacity-50 cursor-not-allowed': fixing }" @click="handleExportScript">
-          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg>
+        <Button type="outline" :disabled="fixing" @click="handleExportScript">
+          <template #icon><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" /></svg></template>
           导出启动脚本
-        </button>
+        </Button>
         <Tooltip text="校验并下载该版本缺失的文件（库文件、资源文件等）。当游戏无法启动或缺少文件时使用。" position="top">
-          <button class="flex items-center gap-2 rounded-lg border border-green-300 bg-white px-4 py-2 text-sm text-green-600 transition-colors hover:bg-green-50 hover:border-green-500" :disabled="fixing" :class="{ 'opacity-50 cursor-not-allowed': fixing }" @click="handleFixFiles">
-            <svg v-if="fixing" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" /><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" /></svg>
-            <svg v-else class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" /></svg>
+          <Button type="outline" :loading="fixing" :disabled="fixing" @click="handleFixFiles">
             {{ fixing ? '补全中...' : '补全文件' }}
-          </button>
+          </Button>
         </Tooltip>
-        <button class="flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 hover:border-red-500" @click="handleDelete">
-          <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+        <Button type="outline" @click="handleDelete">
+          <template #icon><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg></template>
           删除版本
-        </button>
+        </Button>
       </div>
     </section>
   </div>

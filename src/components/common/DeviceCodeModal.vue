@@ -8,6 +8,7 @@ import { computed, ref, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { open } from '@tauri-apps/plugin-shell'
 import { useAuthStore } from '@/stores/auth'
+import Button from '@/components/common/Button.vue'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'success'): void }>()
@@ -130,8 +131,8 @@ onUnmounted(() => authStore.cancelMsLogin())
                 <p class="text-xs text-gray-400">请手动点击按钮复制代码并打开网页</p>
               </div>
               <div class="flex gap-2">
-                <button class="btn-primary flex-1 rounded-lg px-4 py-2 text-sm font-medium" @click="openLoginUrl">点击打开 Microsoft 登录页</button>
-                <button class="btn-secondary rounded-lg px-4 py-2 text-sm font-medium" @click="copyCode">复制设备码</button>
+                <Button type="primary" class="flex-1" @click="openLoginUrl">点击打开 Microsoft 登录页</Button>
+                <Button type="secondary" @click="copyCode">复制设备码</Button>
               </div>
               <p v-if="uriError" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ uriError }}</p>
               <div class="flex items-center justify-center gap-2 text-sm text-gray-500">
@@ -139,7 +140,7 @@ onUnmounted(() => authStore.cancelMsLogin())
                 <span>等待授权中...</span>
               </div>
             </div>
-            <button class="w-full rounded-lg px-4 py-2 text-sm font-medium text-gray-400 hover:text-gray-600" @click="handleCancel">取消登录</button>
+            <Button type="text" long @click="handleCancel">取消登录</Button>
           </div>
 
           <!-- Token 交换中 -->
@@ -162,8 +163,8 @@ onUnmounted(() => authStore.cancelMsLogin())
           <div v-else-if="authStore.msLoginStatus === 'error'" class="space-y-4">
             <div class="rounded-lg bg-red-50 p-4"><p class="text-sm text-red-700">{{ authStore.error }}</p></div>
             <div class="flex gap-3">
-              <button class="btn-primary flex-1 rounded-lg px-4 py-2 text-sm font-medium" @click="handleRetry">重新登录</button>
-              <button class="btn-secondary rounded-lg px-4 py-2 text-sm font-medium" @click="handleCancel">取消</button>
+              <Button type="primary" class="flex-1" @click="handleRetry">重新登录</Button>
+              <Button type="secondary" @click="handleCancel">取消</Button>
             </div>
           </div>
 

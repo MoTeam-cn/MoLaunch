@@ -2,6 +2,7 @@
 import { ref, watch } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
 import Alert from '@/components/common/Alert.vue'
+import Input from '@/components/common/Input.vue'
 import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 import DevModeToggle from '@/components/settings/DevModeToggle.vue'
 import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
@@ -118,12 +119,7 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
           <!-- 代理地址 -->
           <div>
             <p class="text-sm font-medium text-gray-900 mb-2">代理地址</p>
-            <input
-              v-model="proxyUrl"
-              type="text"
-              placeholder="127.0.0.1:7890"
-              class="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
+            <Input v-model="proxyUrl" placeholder="127.0.0.1:7890" />
             <p class="text-xs text-gray-400 mt-1">格式：IP地址:端口号，例如 127.0.0.1:7890</p>
           </div>
         </div>
@@ -199,23 +195,24 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
               <ArrowTopRightOnSquareIcon class="w-3 h-3" />
             </a>
           </div>
-          <div class="relative">
-            <input
-              v-model="cfApiKey"
-              :type="cfShowKey ? 'text' : 'password'"
-              placeholder="粘贴你的 CurseForge API Key"
-              class="w-full px-3 py-2 pr-10 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono"
-            />
-            <button
-              type="button"
-              class="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600"
-              :title="cfShowKey ? '隐藏' : '显示'"
-              @click="cfShowKey = !cfShowKey"
-            >
-              <EyeSlashIcon v-if="cfShowKey" class="w-4 h-4" />
-              <EyeIcon v-else class="w-4 h-4" />
-            </button>
-          </div>
+          <Input
+            v-model="cfApiKey"
+            :type="cfShowKey ? 'text' : 'password'"
+            placeholder="粘贴你的 CurseForge API Key"
+            class="font-mono"
+          >
+            <template #suffix>
+              <button
+                type="button"
+                class="p-1 text-gray-400 hover:text-gray-600"
+                :title="cfShowKey ? '隐藏' : '显示'"
+                @click="cfShowKey = !cfShowKey"
+              >
+                <EyeSlashIcon v-if="cfShowKey" class="w-4 h-4" />
+                <EyeIcon v-else class="w-4 h-4" />
+              </button>
+            </template>
+          </Input>
           <!-- 状态提示 -->
           <div v-if="cfEnabled && !cfApiKey" class="mt-2 flex items-center gap-1.5 text-xs text-amber-600">
             <ExclamationTriangleIcon class="w-3.5 h-3.5" />

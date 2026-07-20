@@ -13,6 +13,7 @@ import {
   InformationCircleIcon,
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
 
 export type ModalType = 'error' | 'warning' | 'info' | 'success'
 
@@ -183,39 +184,44 @@ defineExpose({
 
             <!-- 详情 -->
             <div v-if="options.details" class="mt-3 ml-8">
-              <button
-                class="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              <Button
+                type="text"
+                size="mini"
                 @click="showDetails = !showDetails"
               >
                 {{ showDetails ? '收起' : '查看详情' }}
-              </button>
+              </Button>
               <div v-if="showDetails" class="mt-2 p-2.5 bg-gray-50 rounded text-xs text-gray-600 font-mono break-all max-h-32 overflow-y-auto">
                 {{ options.details }}
-                <button
-                  class="mt-1.5 text-xs text-primary-600 hover:text-primary-700 transition-colors"
+                <Button
+                  type="text"
+                  size="mini"
+                  class="mt-1.5"
                   @click="copyDetails"
                 >
                   复制
-                </button>
+                </Button>
               </div>
             </div>
           </div>
 
           <!-- 按钮栏 -->
           <div class="flex justify-end gap-2 px-5 py-3 bg-gray-50 rounded-b-lg">
-            <button
+            <Button
               v-if="options.showCancel"
-              class="px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-200 rounded transition-colors"
+              type="ghost"
+              size="small"
               @click="handleCancel"
             >
               {{ options.cancelText || '取消' }}
-            </button>
-            <button
-              class="px-4 py-1.5 text-sm text-white bg-primary-600 hover:bg-primary-700 rounded transition-colors"
+            </Button>
+            <Button
+              type="primary"
+              size="small"
               @click="handleConfirm"
             >
               {{ options.confirmText || '确定' }}
-            </button>
+            </Button>
           </div>
         </div>
       </div>
