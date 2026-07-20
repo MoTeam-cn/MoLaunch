@@ -67,10 +67,12 @@ impl LaunchPipeline {
         log_info!("Game process started with PID: {}", pid);
 
         // 创建监控器（game_dir 使用隔离目录，确保崩溃分析在正确目录查找日志）
+        // 传入 window_title：非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题
         let watcher = GameWatcher::new(
             pid,
             std::path::PathBuf::from(&args.game_dir),
             self.config.version_id.clone(),
+            self.config.window_title.clone(),
         );
 
         // 启动监控

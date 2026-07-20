@@ -30,6 +30,7 @@ pub fn build_launch_arguments(
     extra_game_args: &[String],
     disable_jlw: bool,
     disable_lua: bool,
+    custom_info: Option<&str>,
 ) -> anyhow::Result<LaunchArguments> {
     let version_dir = game_dir.join("versions").join(version_id);
     let json_path = version_dir.join(format!("{}.json", version_id));
@@ -113,6 +114,7 @@ pub fn build_launch_arguments(
         server_address,
         server_port,
         extra_game_args,
+        custom_info,
     )?;
 
     // 在 launch 前设置游戏语言为中文（写入有效目录，适配隔离模式）

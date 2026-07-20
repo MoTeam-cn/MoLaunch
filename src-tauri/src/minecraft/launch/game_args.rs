@@ -8,6 +8,11 @@ use std::path::Path;
 use super::AuthInfo;
 
 /// Build game arguments
+///
+/// `custom_info`：版本独立自定义信息（对应 PCL2 VersionArgumentInfo）
+/// - 非空：替换 `${version_type}` 为 custom_info 值（显示在游戏主界面左下角和 F3 左上角）
+/// - 空/None：从参数列表删除 `--versionType` 及其值，避免 MC 显示空字符串或占位符
+/// 参考 PCL2 ModLaunch.vb McLaunchArgumentsReplace 第 1664-1677 行
 pub(super) fn build_game_args(
     json: &serde_json::Value,
     game_dir: &Path,
@@ -20,6 +25,7 @@ pub(super) fn build_game_args(
     server_address: Option<&str>,
     server_port: Option<u32>,
     extra_game_args: &[String],
+    custom_info: Option<&str>,
 ) -> anyhow::Result<Vec<String>> {
     let mut args = Vec::new();
 
@@ -85,6 +91,16 @@ pub(super) fn build_game_args(
         args = std_args;
     }
 
+    // 自定义信息替换（参考 PCL2 ModLaunch.vb 第 1664-1677 行）
+    // - custom_info 非空：替换 ${version_type} 为用户自定义值
+    // - custom_info 空/None：替换 ${version_type} 为空字符串，并从参数列表删除 --versionType 及其值
+    let custom_info_str = custom_info.unwrap_or("").trim();
+    let version_type_replacement = if custom_info_str.is_empty() {
+        String::new()
+    } else {
+        custom_info_str.to_string()
+    };
+
     let mut final_args = Vec::new();
     for arg in args {
         let replaced = arg
@@ -100,8 +116,24 @@ pub(super) fn build_game_args(
             .replace("${assets_root}", assets_dir)
             .replace("${assets_index_name}", asset_index)
             .replace("${user_properties}", "{}")
-            .replace("${version_type}", "MoLaunch");
+            .replace("${version_type}", &version_type_replacement);
         final_args.push(replaced);
+    }
+
+    // custom_info 为空时，从参数列表删除 --versionType 及其值
+    // 参考 PCL2 ModLaunch.vb 第 1668-1673 行：
+    //   If Arguments.Contains("--versionType") Then
+    //       Dim Index As Integer = Arguments.IndexOf("--versionType")
+    //       Arguments.RemoveAt(Index)
+    //       If Index < Arguments.Count Then Arguments.RemoveAt(Index)
+    //   End If
+    if custom_info_str.is_empty() {
+        if let Some(pos) = final_args.iter().position(|a| a == "--versionType") {
+            final_args.remove(pos); // 删除 --versionType
+            if pos < final_args.len() {
+                final_args.remove(pos); // 删除它的值（空字符串）
+            }
+        }
     }
 
     if let (Some(width), Some(height)) = (window_width, window_height) {
@@ -111,12 +143,29 @@ pub(super) fn build_game_args(
         final_args.push(height.to_string());
     }
 
+    // 服务器参数（参考 PCL2 ModLaunch.vb 第 1616-1635 行）
+    // 1.20+（releaseTime >= 2023-04-04）用 --quickPlayMultiplayer
+    // 老版本用 --server + --port（无冒号则默认 25565）
     if let Some(server) = server_address {
-        final_args.push("--server".to_string());
-        final_args.push(server.to_string());
-        if let Some(port) = server_port {
+        let release_time = json["releaseTime"]
+            .as_str()
+            .unwrap_or("2000-01-01T00:00:00+0000");
+        let is_quickplay = release_time >= "2023-04-04";
+
+        if is_quickplay {
+            // 1.20+：--quickPlayMultiplayer <ip:port> 或 <ip>
+            final_args.push("--quickPlayMultiplayer".to_string());
+            if let Some(port) = server_port {
+                final_args.push(format!("{}:{}", server, port));
+            } else {
+                final_args.push(server.to_string());
+            }
+        } else {
+            // 老版本：--server <ip> --port <port>
+            final_args.push("--server".to_string());
+            final_args.push(server.to_string());
             final_args.push("--port".to_string());
-            final_args.push(port.to_string());
+            final_args.push(server_port.unwrap_or(25565).to_string());
         }
     }
 

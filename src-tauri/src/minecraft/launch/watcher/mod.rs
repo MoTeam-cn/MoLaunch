@@ -11,6 +11,8 @@
 mod analyzer;
 mod log_parser;
 mod types;
+#[cfg(windows)]
+mod window_title;
 
 pub use types::{
     CrashCategory, CrashInfo, ExitInfo, GameState, LoadProgress, LogEntry, LogLevel,
@@ -46,11 +48,17 @@ pub struct GameWatcher {
     exit_tx: tokio::sync::watch::Sender<Option<ExitInfo>>,
     /// 退出接收通道（供外部监听）
     exit_rx: tokio::sync::watch::Receiver<Option<ExitInfo>>,
+    /// 自定义窗口标题（非空时启动后改写游戏窗口标题）
+    /// 参考 PCL2 ModWatcher.vb：启动后轮询找到窗口句柄，用 SetWindowText 改标题
+    window_title: Option<String>,
 }
 
 impl GameWatcher {
     /// 创建新的监控器
-    pub fn new(pid: u32, game_dir: PathBuf, version_id: String) -> Self {
+    ///
+    /// `window_title`：自定义窗口标题，非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题
+    /// 参考 PCL2 ModWatcher.vb 第 62-101 行
+    pub fn new(pid: u32, game_dir: PathBuf, version_id: String, window_title: Option<String>) -> Self {
         let (exit_tx, exit_rx) = tokio::sync::watch::channel(None);
         Self {
             pid,
@@ -62,6 +70,7 @@ impl GameWatcher {
             max_log_lines: 10000,
             game_dir,
             version_id,
+            window_title,
         }
     }
 
@@ -198,6 +207,24 @@ impl GameWatcher {
                             break;
                         }
                     }
+                }
+            });
+        }
+
+        // 启动窗口标题修改（参考 PCL2 ModWatcher.vb 第 99-101 行）
+        // 如果设置了自定义窗口标题，启动后轮询找到 MC 窗口句柄，用 SetWindowText 改标题
+        // 支持 {date} 和 {time} 实时替换
+        if let Some(ref title) = self.window_title {
+            let title = title.clone();
+            let pid = self.pid;
+            tokio::spawn(async move {
+                #[cfg(windows)]
+                {
+                    window_title::apply_window_title(pid, title).await;
+                }
+                #[cfg(not(windows))]
+                {
+                    let _ = (pid, title);
                 }
             });
         }
