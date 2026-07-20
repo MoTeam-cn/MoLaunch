@@ -11,7 +11,6 @@
 mod analyzer;
 mod log_parser;
 mod types;
-#[cfg(windows)]
 mod window_title;
 
 pub use types::{
@@ -212,20 +211,14 @@ impl GameWatcher {
         }
 
         // 启动窗口标题修改（参考 PCL2 ModWatcher.vb 第 99-101 行）
-        // 如果设置了自定义窗口标题，启动后轮询找到 MC 窗口句柄，用 SetWindowText 改标题
+        // 如果设置了自定义窗口标题，启动后轮询找到 MC 窗口，改写标题
         // 支持 {date} 和 {time} 实时替换
+        // 跨平台：Windows 用 Win32 API，macOS 用 osascript，Linux 用 wmctrl/xdotool
         if let Some(ref title) = self.window_title {
             let title = title.clone();
             let pid = self.pid;
             tokio::spawn(async move {
-                #[cfg(windows)]
-                {
-                    window_title::apply_window_title(pid, title).await;
-                }
-                #[cfg(not(windows))]
-                {
-                    let _ = (pid, title);
-                }
+                window_title::apply_window_title(pid, title).await;
             });
         }
 
