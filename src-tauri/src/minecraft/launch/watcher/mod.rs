@@ -50,6 +50,9 @@ pub struct GameWatcher {
     /// 自定义窗口标题（非空时启动后改写游戏窗口标题）
     /// 参考 PCL2 ModWatcher.vb：启动后轮询找到窗口句柄，用 SetWindowText 改标题
     window_title: Option<String>,
+    /// 手动停止标志（stop_game 调用时设为 true，watcher 检测到后跳过崩溃分析）
+    /// 修复：之前 kill_process_tree 后游戏以非 0 退出码退出，watcher 误判为崩溃并触发分析
+    manual_stop: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl GameWatcher {
@@ -70,7 +73,14 @@ impl GameWatcher {
             game_dir,
             version_id,
             window_title,
+            manual_stop: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
+    }
+
+    /// 标记为手动停止（stop_game 调用）
+    /// watcher 检测到此标志后，跳过崩溃分析，直接按正常退出处理
+    pub fn mark_manual_stop(&self) {
+        self.manual_stop.store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// 获取当前状态
@@ -230,6 +240,7 @@ impl GameWatcher {
         let exit_tx = self.exit_tx.clone();
         let version_id = self.version_id.clone();
         let game_dir = self.game_dir.clone();
+        let manual_stop = self.manual_stop.clone();
 
         tokio::spawn(async move {
             // 等待进程结束
@@ -250,13 +261,21 @@ impl GameWatcher {
 
             // 分析是否崩溃
             // 参考 PCL2 ModWatcher.vb Crashed()：延迟 2 秒让文件系统刷新崩溃报告
-            let crash_info = if exit_code != 0 {
+            // 修复：手动停止（stop_game）时跳过崩溃分析，直接按正常退出处理
+            let is_manual_stop = manual_stop.load(std::sync::atomic::Ordering::Relaxed);
+            let crash_info = if exit_code != 0 && !is_manual_stop {
                 log_info!(
                     "[Watcher] 游戏异常退出（code={}），2 秒后开始崩溃分析...",
                     exit_code
                 );
                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
                 analyzer::analyze_crash(exit_code, &logs, &game_dir).await
+            } else if is_manual_stop {
+                log_info!(
+                    "[Watcher] 游戏被手动停止（code={}），跳过崩溃分析",
+                    exit_code
+                );
+                None
             } else {
                 None
             };
@@ -273,7 +292,8 @@ impl GameWatcher {
             } else {
                 let exit_info = ExitInfo {
                     code: exit_code,
-                    is_normal: exit_code == 0,
+                    // 手动停止或退出码为 0 都算正常退出
+                    is_normal: exit_code == 0 || is_manual_stop,
                     crash_info: None,
                 };
                 let mut state_guard = state.write().await;

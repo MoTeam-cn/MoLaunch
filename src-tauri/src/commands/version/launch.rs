@@ -372,6 +372,15 @@ pub async fn stop_game(state: State<'_, AppState>) -> Result<(), String> {
         *current_pid = None;
         drop(current_pid);
 
+        // 先标记 watcher 为手动停止，避免 kill 后 watcher 误判为崩溃并触发崩溃分析
+        // 修复：之前 kill_process_tree 后游戏以非 0 退出码退出，watcher 误判为崩溃
+        {
+            let pipeline = state.launch_pipeline.lock().await;
+            if let Some(ref p) = *pipeline {
+                p.mark_manual_stop().await;
+            }
+        }
+
         // 终止进程树（Windows: taskkill /T /F，Unix: kill -9），统一走 shell 模块
         crate::minecraft::system::shell::kill_process_tree(pid)?;
 

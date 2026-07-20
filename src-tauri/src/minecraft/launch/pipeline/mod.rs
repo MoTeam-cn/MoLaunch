@@ -93,8 +93,23 @@ impl LaunchPipeline {
         watcher_guard.as_ref().map(|w| w.exit_receiver())
     }
 
+    /// 标记 watcher 为手动停止（跳过崩溃分析）
+    pub async fn mark_manual_stop(&self) {
+        let watcher = self.watcher.lock().await;
+        if let Some(ref w) = *watcher {
+            w.mark_manual_stop();
+        }
+    }
+
     /// 停止游戏
     pub async fn stop_game(&self) {
+        // 先标记手动停止，让 watcher 跳过崩溃分析
+        {
+            let watcher = self.watcher.lock().await;
+            if let Some(ref w) = *watcher {
+                w.mark_manual_stop();
+            }
+        }
         let child = self.child_process.lock().await;
         if let Some(ref child) = *child {
             let watcher = self.watcher.lock().await;
