@@ -53,23 +53,11 @@ pub(crate) async fn install_single_loader(
 
     log_info!("[Merged] Installing {} {}", loader_name, loader_version);
 
-    // 启动进度模拟器（为安装过程提供伪进度底色）
+    // 启动进度模拟器（对数曲线，前期快后期慢）
+    // 统一由 ticker 管理伪进度，加载器 install 内部不需要手写 progress_callback
     let ticker_stop = start_progress_ticker(state.download_state.clone(), 5.0, 95.0);
 
-    // 构造 progress_callback：将加载器内部进度（0.0-1.0）更新到当前 stage
-    // 修复：之前传 None，导致 Fabric 等快速安装的加载器没有可见的进度变化
-    let ds_for_cb = state.download_state.clone();
-    let progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>> = Some(Arc::new(move |p: f64| {
-        let mut ds = ds_for_cb.lock().unwrap();
-        if let Some(last) = ds.stages.last_mut() {
-            // p 是 0.0-1.0，直接设为 stage progress
-            // 与 ticker 的伪进度取较大值，避免回调进度低于 ticker 进度时倒退
-            let ticker_progress = last.progress;
-            last.progress = ticker_progress.max(p);
-        }
-    }));
-
-    // 安装加载器
+    // 安装加载器（progress_callback 传 None，进度由 ticker 统一管理）
     match loaders::install_loader(
         loader_type,
         mc_version,
@@ -77,7 +65,7 @@ pub(crate) async fn install_single_loader(
         game_dir,
         mirror_url,
         max_threads,
-        progress_callback,
+        None,
         source_mode,
     )
     .await
@@ -108,8 +96,13 @@ pub(crate) async fn install_single_loader(
     }
 }
 
-/// 启动进度模拟器：缓慢上涨进度条，直到 stop 信号为 true
-/// 从 start 增长到 cap，约 45-60秒完成
+/// 启动进度模拟器：对数曲线上涨（前期快后期慢），直到 stop 信号为 true
+///
+/// 使用 `current = start + (cap - start) * (1 - exp(-elapsed / tau))` 曲线：
+/// - 1 秒后约 30%（快速安装也能看到明显进度）
+/// - 3 秒后约 60%
+/// - 10 秒后约 92%
+/// - 30 秒后约 95%（卡在上限，等安装完成跳 100%）
 pub(crate) fn start_progress_ticker(
     state: Arc<std::sync::Mutex<crate::state::DownloadState>>,
     start: f64,
@@ -119,26 +112,24 @@ pub(crate) fn start_progress_ticker(
     let stop_clone = stop.clone();
 
     tokio::spawn(async move {
-        let mut current = start;
-        // 每 500ms 更新一次，更平滑
-        let mut interval = tokio::time::interval(std::time::Duration::from_millis(500));
-        interval.tick().await;
+        let tau = 3.0; // 时间常数：控制曲线上升速度
+        let mut elapsed_ms: u64 = 0;
+        let step_ms: u64 = 200;
+        let mut interval = tokio::time::interval(std::time::Duration::from_millis(step_ms));
+        interval.tick().await; // 跳过第一次立即触发
 
         while !stop_clone.load(Ordering::Relaxed) {
             interval.tick().await;
             if stop_clone.load(Ordering::Relaxed) {
                 break;
             }
-            let remaining = cap - current;
-            if remaining <= 0.0 {
-                break;
-            }
-            // 每次增长约 1%，从5%到95% 约 45秒完成
-            let step = 1.0;
-            current = (current + step).min(cap);
+            elapsed_ms += step_ms;
+            let elapsed_secs = elapsed_ms as f64 / 1000.0;
+            // 对数曲线：1 - exp(-t/tau)
+            let factor = 1.0 - (-elapsed_secs / tau).exp();
+            let current = start + (cap - start) * factor;
 
             let mut ds = state.lock().unwrap();
-            // 更新最后一个阶段的进度（即当前加载器安装阶段）
             if let Some(last) = ds.stages.last_mut() {
                 last.progress = current / 100.0;
             }

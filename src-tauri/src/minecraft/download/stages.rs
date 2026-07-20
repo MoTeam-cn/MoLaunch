@@ -13,18 +13,24 @@ use super::types::{DownloadStatus, DownloadTask, GlobalProgress};
 use super::util::{build_launcher_meta_urls, source_mode_of};
 
 /// 下载客户端 JAR
+///
+/// `original_json`：原始版本 JSON（含 inheritsFrom，用于判断 jar 路径）
+/// `merged_json`：合并后的 JSON（含 downloads.client.url，用于获取下载 URL）
+/// 修复：之前只传 merged_json，但 merge_version_json 会移除 inheritsFrom，
+/// 导致 find_original_version 找不到父版本，jar 路径错误，启动时重复下载
 pub async fn download_client_jar(
-    json: &serde_json::Value,
+    original_json: &serde_json::Value,
+    merged_json: &serde_json::Value,
     game_dir: &Path,
     version_id: &str,
     mirror_url: Option<&str>,
     manager: &DownloadManager,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
 ) -> anyhow::Result<()> {
-    // 用 find_original_version 确定主 jar 的正确位置
+    // 用原始 json 的 inheritsFrom 确定主 jar 的正确位置
     // 有 inheritsFrom 时主 jar 在父版本目录下（如 Fabric 版本的主 jar 在原版目录）
     // 无 inheritsFrom 时主 jar 在当前版本目录下
-    let jar_version = crate::minecraft::launch::classpath::find_original_version(game_dir, json);
+    let jar_version = crate::minecraft::launch::classpath::find_original_version(game_dir, original_json);
     let jar_path = game_dir
         .join("versions")
         .join(&jar_version)
@@ -32,9 +38,9 @@ pub async fn download_client_jar(
 
     let checker = FileChecker::new()
         .with_min_size(1024)
-        .with_actual_size(json["downloads"]["client"]["size"].as_i64().unwrap_or(-1))
+        .with_actual_size(merged_json["downloads"]["client"]["size"].as_i64().unwrap_or(-1))
         .with_hash(
-            json["downloads"]["client"]["sha1"]
+            merged_json["downloads"]["client"]["sha1"]
                 .as_str()
                 .map(|s| s.to_string()),
         );
@@ -44,7 +50,7 @@ pub async fn download_client_jar(
         return Ok(());
     }
 
-    let url = json["downloads"]["client"]["url"]
+    let url = merged_json["downloads"]["client"]["url"]
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("Client JAR URL not found in version {} (merged json may be missing downloads.client)", version_id))?;
 
@@ -55,8 +61,8 @@ pub async fn download_client_jar(
         id: "client_jar".to_string(),
         urls,
         local_path: jar_path.to_string_lossy().to_string(),
-        expected_size: json["downloads"]["client"]["size"].as_i64().unwrap_or(0),
-        expected_hash: json["downloads"]["client"]["sha1"]
+        expected_size: merged_json["downloads"]["client"]["size"].as_i64().unwrap_or(0),
+        expected_hash: merged_json["downloads"]["client"]["sha1"]
             .as_str()
             .map(|s| s.to_string()),
     };

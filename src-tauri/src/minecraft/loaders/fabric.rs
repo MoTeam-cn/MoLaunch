@@ -40,24 +40,16 @@ pub async fn list_versions(
 
 /// Install Fabric
 ///
-/// 通过 progress_callback 报告子步骤进度，让前端"安装 Fabric"阶段有可见的进度变化：
-/// - 0%：开始安装
-/// - 20%：准备下载 profile JSON
-/// - 60%：profile JSON 下载完成
-/// - 80%：验证安装
-/// - 100%：完成
+/// 进度由 `loader_helpers::start_progress_ticker` 统一管理（对数曲线伪进度），
+/// 此函数内部不需要手写 progress_callback 回调。
 pub async fn install(
     mc_version: &str,
     fabric_version: &str,
     game_dir: &Path,
     mirror_url: Option<&str>,
-    progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
+    _progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
     source_mode: DownloadSourceMode,
 ) -> anyhow::Result<()> {
-    if let Some(ref cb) = progress_callback {
-        cb(0.0);
-    }
-
     crate::log_info!(
         "[Fabric] Installing {} for MC {}",
         fabric_version,
@@ -67,10 +59,6 @@ pub async fn install(
     let version_id = format!("fabric-{}-{}", fabric_version, mc_version);
     let version_dir = game_dir.join("versions").join(&version_id);
     std::fs::create_dir_all(&version_dir)?;
-
-    if let Some(ref cb) = progress_callback {
-        cb(0.2);
-    }
 
     let url = sources::fabric_profile_url(mc_version, fabric_version);
 
@@ -120,25 +108,13 @@ pub async fn install(
         }
     }
 
-    if let Some(ref cb) = progress_callback {
-        cb(0.6);
-    }
-
     // 验证 profile JSON 已写入
     let profile_path = version_dir.join(format!("{}.json", version_id));
     if !profile_path.exists() {
         return Err(anyhow::anyhow!("Fabric profile JSON not found after download"));
     }
 
-    if let Some(ref cb) = progress_callback {
-        cb(0.8);
-    }
-
     crate::log_info!("[Fabric] Installed: {}", version_id);
-
-    if let Some(ref cb) = progress_callback {
-        cb(1.0);
-    }
 
     Ok(())
 }

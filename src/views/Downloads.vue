@@ -21,57 +21,60 @@ const versionStore = useVersionStore()
 const router = useRouter()
 
 // 进入页面时恢复下载状态
+// 首次进入时延迟重试检查（给后端异步启动下载任务的时间，避免双击下载按钮进入页面就被赶回去）
 onMounted(async () => {
   initDownloadPolling()
-  try {
-    const active = await isDownloading()
-    if (active) {
-      // 从后端 snapshot 恢复版本名（避免刷新后版本名显示为空）
-      const raw = await getDownloadProgress()
-      if (raw && raw.stages && raw.stages.length > 0) {
-        versionStore.startDownload(raw.version_name || '')
-        // 计算加权百分比
-        let weightedProgress = 0
-        let totalWeight = 0
-        for (const s of raw.stages) {
-          totalWeight += s.weight
-          weightedProgress += s.progress * s.weight
+  const maxRetries = 6 // 最多重试 6 次，每次 500ms，共 3 秒
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const active = await isDownloading()
+      if (active) {
+        // 有下载任务，恢复状态
+        const raw = await getDownloadProgress()
+        if (raw && raw.stages && raw.stages.length > 0) {
+          versionStore.startDownload(raw.version_name || '')
+          let weightedProgress = 0
+          let totalWeight = 0
+          for (const s of raw.stages) {
+            totalWeight += s.weight
+            weightedProgress += s.progress * s.weight
+          }
+          const percentage = totalWeight > 0
+            ? Math.min(100, parseFloat(((weightedProgress / totalWeight) * 100).toFixed(1)))
+            : 0
+          const isPaused = raw.stages.some((s) => s.is_paused === true)
+          versionStore.updateProgress({
+            stages: raw.stages.map((s) => ({
+              name: s.name,
+              progress: s.progress,
+              weight: s.weight,
+              status: s.status,
+              bytes_downloaded: s.bytes_downloaded,
+              bytes_total: s.bytes_total,
+              files_downloaded: s.files_downloaded || 0,
+              files_total: s.files_total || 0,
+              group: s.group ?? null,
+            })),
+            current_stage_index: raw.current_stage_index ?? 0,
+            global_speed: raw.global_speed ?? 0,
+            global_bytes_downloaded: raw.global_bytes_downloaded ?? 0,
+            global_bytes_total: raw.global_bytes_total ?? 0,
+            percentage,
+            isPaused,
+          })
         }
-        const percentage = totalWeight > 0
-          ? Math.min(100, parseFloat(((weightedProgress / totalWeight) * 100).toFixed(1)))
-          : 0
-        const isPaused = raw.stages.some((s) => s.is_paused === true)
-        versionStore.updateProgress({
-          stages: raw.stages.map((s) => ({
-            name: s.name,
-            progress: s.progress,
-            weight: s.weight,
-            status: s.status,
-            bytes_downloaded: s.bytes_downloaded,
-            bytes_total: s.bytes_total,
-            files_downloaded: s.files_downloaded || 0,
-            files_total: s.files_total || 0,
-            group: s.group ?? null,
-          })),
-          current_stage_index: raw.current_stage_index ?? 0,
-          global_speed: raw.global_speed ?? 0,
-          global_bytes_downloaded: raw.global_bytes_downloaded ?? 0,
-          global_bytes_total: raw.global_bytes_total ?? 0,
-          percentage,
-          isPaused,
-        })
+        return // 成功恢复，不需要返回
       }
-    } else {
-      // 无下载任务：自动返回上一页（用户需求：没有任务自动回到之前点击下载按钮的地方）
-      router.back()
-      return
+    } catch (e) {
+      console.error('Failed to check download state:', e)
     }
-  } catch (e) {
-    console.error('Failed to restore download state:', e)
-    // 出错也返回上一页，避免停留在空白下载页
-    router.back()
-    return
+    // 等待 500ms 后重试
+    if (attempt < maxRetries - 1) {
+      await new Promise(resolve => setTimeout(resolve, 500))
+    }
   }
+  // 重试完毕仍无任务，返回上一页
+  router.back()
 })
 
 const hasActiveDownload = computed(() => versionStore.downloading)

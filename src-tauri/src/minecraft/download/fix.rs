@@ -37,11 +37,11 @@ pub async fn fix_version_files(
     let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
 
     // 1. 下载主 jar（client.jar）
-    // 修复：之前 fix_version_files 漏了主 jar 下载，导致启动时报
-    // "Main jar not found" + ClassNotFoundException
-    // download_client_jar 内部用 find_original_version 确定正确的 jar 路径
-    // （有 inheritsFrom 时下载到父版本目录，无 inheritsFrom 时下载到当前版本目录）
+    // 修复：传原始 json 给 download_client_jar（含 inheritsFrom，用于判断 jar 路径）
+    // 之前只传 merged_json，但 merge_version_json 会移除 inheritsFrom，
+    // 导致 find_original_version 找不到父版本，jar 路径错误，启动时重复下载
     if let Err(e) = download_client_jar(
+        &json,
         &merged_json,
         game_dir,
         version_id,

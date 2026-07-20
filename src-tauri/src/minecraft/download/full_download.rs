@@ -84,6 +84,7 @@ pub async fn download_version_full(
     }
     log_info!("[Download] Step 3/5: Downloading client JAR");
     download_client_jar(
+        &version_json,
         &merged_json,
         game_dir,
         version_id,
