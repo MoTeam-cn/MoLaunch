@@ -6,13 +6,15 @@ import { invoke } from '@tauri-apps/api/core'
 
 /**
  * 启动游戏
+ *
+ * 安全修复：移除 accessToken 参数，后端根据 uuid 自行从 auth_storage 获取 token
+ * 前端只传 username 和 uuid，避免 token 在 IPC 请求体中明文传输
  */
 export async function launchGame(params: {
   versionId: string
   javaPath?: string
   username: string
   uuid: string
-  accessToken: string
   loginType?: string
   windowWidth?: number
   windowHeight?: number
@@ -24,7 +26,6 @@ export async function launchGame(params: {
     javaPath: params.javaPath ?? null,
     username: params.username,
     uuid: params.uuid,
-    accessToken: params.accessToken,
     windowWidth: params.windowWidth ?? null,
     windowHeight: params.windowHeight ?? null,
     serverAddress: params.serverAddress ?? null,

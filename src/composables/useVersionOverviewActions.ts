@@ -154,7 +154,7 @@ export function useVersionOverviewActions(options: UseVersionOverviewActionsOpti
     try {
       const savePath = await tauri.saveFile('选择脚本保存位置', `Run_${selectedId.value}.bat`, [{ name: '批处理文件', extensions: ['bat'] }])
       if (!savePath) return
-      await tauri.exportLaunchScript(selectedId.value, user.name, user.uuid, user.access_token, user.login_type, javaStore.javaPath || null, savePath)
+      await tauri.exportLaunchScript(selectedId.value, user.name, user.uuid, user.login_type, javaStore.javaPath || null, savePath)
       toastSuccess('启动脚本已导出')
       // 导出后自动打开所在文件夹并选中导出的文件
       await tauri.revealInExplorer(savePath)

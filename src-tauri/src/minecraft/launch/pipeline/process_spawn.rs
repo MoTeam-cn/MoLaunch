@@ -48,13 +48,14 @@ impl LaunchPipeline {
             cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
         }
 
-        // 打印完整的启动命令（JVM args + main class + game args），方便调试
+        // 打印启动命令（脱敏处理，避免 access_token 等敏感信息写入日志文件）
+        // 修复：之前 {:?} 打印完整 game_args，其中含 --accessToken <真实token>，会被持久化到日志文件
         log_info!(
-            "Launching: {} {:?} {} {:?}",
+            "Launching: {} {} {} {}",
             java_path.display(),
-            args.jvm_args,
+            super::super::sanitize_args_for_log(&args.jvm_args).join(" "),
             args.main_class,
-            args.game_args
+            super::super::sanitize_args_for_log(&args.game_args).join(" ")
         );
 
         let child = cmd.spawn().map_err(|e| LaunchError {

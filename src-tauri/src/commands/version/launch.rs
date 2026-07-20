@@ -3,7 +3,7 @@
 use crate::minecraft::launch::{self, AuthInfo, CrashCategory, CrashInfo, LaunchConfig, LaunchPipeline, LaunchStage};
 use crate::minecraft::version::setup::VersionSetup;
 use crate::state::{resolve_game_dir, AppState};
-use crate::{log_debug, log_error, log_info};
+use crate::{log_debug, log_error, log_info, log_warn};
 use std::sync::Arc;
 use tauri::{Emitter, State};
 
@@ -36,6 +36,9 @@ pub fn parse_server_enter(s: &str) -> (Option<String>, Option<u32>) {
 }
 
 /// 启动游戏
+///
+/// 安全修复：移除 access_token 参数，改为后端从 auth_storage 自行获取 token
+/// 前端只传 username 和 uuid，避免 token 在 IPC 请求体中明文传输
 #[tauri::command]
 pub async fn launch_game(
     state: State<'_, AppState>,
@@ -44,7 +47,6 @@ pub async fn launch_game(
     java_path: Option<String>,
     username: String,
     uuid: String,
-    access_token: String,
     login_type: Option<String>,
     window_width: Option<u32>,
     window_height: Option<u32>,
@@ -123,13 +125,46 @@ pub async fn launch_game(
         _ => (config.min_memory, config.max_memory),
     };
 
-    // 构建认证信息（login_type 从前端传入，默认 Legacy）
+    // 构建认证信息
+    // 安全修复：从后端 auth_storage 获取 access_token，避免前端 IPC 明文传输 token
+    // 前端只传 username 和 uuid，后端根据 uuid 从注册表加载对应账号的 token
+    let login_type_str = login_type.unwrap_or_else(|| "Legacy".to_string());
+    let (access_token, client_token) = {
+        match state.auth_storage.load().await {
+            Ok(auth_state) => {
+                if let Some(ref current) = auth_state.current_user {
+                    // 验证 current_user 的 uuid 与前端传入的 uuid 一致（防止越权）
+                    if current.uuid == uuid {
+                        (
+                            current.access_token.clone(),
+                            current.client_token.clone(),
+                        )
+                    } else {
+                        log_warn!(
+                            "当前登录账号 UUID ({}) 与请求的 UUID ({}) 不一致，使用空 token",
+                            current.uuid,
+                            uuid
+                        );
+                        (String::new(), String::new())
+                    }
+                } else {
+                    // 未登录或离线模式，token 为空
+                    (String::new(), String::new())
+                }
+            }
+            Err(e) => {
+                log_warn!("从 auth_storage 加载 token 失败: {}，使用空 token", e);
+                (String::new(), String::new())
+            }
+        }
+    };
+
     let auth_info = AuthInfo {
         username,
         uuid,
-        access_token: access_token.clone(),
-        client_token: access_token,
-        login_type: login_type.unwrap_or_else(|| "Legacy".to_string()),
+        access_token,
+        client_token,
+        login_type: login_type_str,
     };
 
     // 创建启动配置

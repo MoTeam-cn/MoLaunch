@@ -120,7 +120,6 @@ export function useLaunchState() {
     javaPath?: string
     username: string
     uuid: string
-    accessToken: string
     loginType?: string
     windowWidth?: number
     windowHeight?: number

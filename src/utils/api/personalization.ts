@@ -93,13 +93,14 @@ export async function updateVersionPersonalization(
 /**
  * 导出启动脚本（.bat，使用绝对路径 Java + 版权信息）
  *
+ * 安全修复：移除 accessToken 参数，后端根据 uuid 自行从 auth_storage 获取 token
+ *
  * @param javaPath 用户指定的 Java 路径（可选，为空时后端按 MC 版本自动检测）
  */
 export async function exportLaunchScript(
   versionId: string,
   username: string,
   uuid: string,
-  accessToken: string,
   loginType: string,
   javaPath: string | null,
   savePath: string,
@@ -108,7 +109,6 @@ export async function exportLaunchScript(
     versionId,
     username,
     uuid,
-    accessToken,
     loginType,
     javaPath,
     savePath,

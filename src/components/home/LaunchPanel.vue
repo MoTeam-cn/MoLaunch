@@ -46,7 +46,6 @@ async function handleLaunch() {
       versionId: versionStore.selectedVersion,
       username: user.name,
       uuid: user.uuid,
-      accessToken: user.access_token,
       loginType: user.login_type,
     })
   } catch (e) {

@@ -15,9 +15,8 @@ use state::AppState;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    // 初始化日志
-    env_logger::init();
-
+    // 初始化日志系统（统一使用自定义 logger，不使用 env_logger）
+    // 移除 env_logger::init()，避免双重日志系统导致第三方库日志绕过脱敏过滤
     log_info!("Starting MoLaunch v{}", env!("CARGO_PKG_VERSION"));
 
     // 初始化 storage
@@ -25,7 +24,7 @@ pub fn run() {
         log_error!("Failed to initialize storage: {}", e);
     }
 
-    // 初始化日志系统
+    // 初始化日志系统（从配置文件加载日志级别和输出选项）
     logger::init_from_config();
 
     // 初始化 HTTP 客户端（根据代理配置）

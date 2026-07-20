@@ -9,20 +9,22 @@ use super::sanitize_version_id;
 use super::list::resolve_isolation_mode;
 
 /// 导出启动脚本（.bat 批处理文件，使用绝对路径 Java + 版权信息）
+///
+/// 安全修复：移除 access_token 参数，改为后端从 auth_storage 获取 token
+/// 前端只传 username 和 uuid，避免 token 在 IPC 请求体中明文传输
 #[tauri::command]
 pub async fn export_launch_script(
     state: State<'_, AppState>,
     version_id: String,
     username: String,
     uuid: String,
-    access_token: String,
     login_type: Option<String>,
     java_path: Option<String>,
     save_path: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
     log_info!("Exporting launch script for version: {}", version_id);
-    log_warn!("Exporting launch script with access token to: {}", save_path);
+    log_warn!("Exporting launch script to: {}", save_path);
 
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
@@ -94,12 +96,30 @@ pub async fn export_launch_script(
     let extra_jvm_args = split_args(&setup.advance_jvm_args);
     let extra_game_args = split_args(&setup.advance_game_args);
 
-    // 构建认证信息（导出脚本时使用占位符，避免泄露真实 token）
+    // 构建认证信息
+    // 安全修复：导出脚本时不使用真实 token（game_args 已脱敏为 ***）
+    // 后端从 auth_storage 获取 token 仅用于构建参数结构，实际 token 不会写入脚本
+    let (real_access_token, real_client_token) = {
+        match state.auth_storage.load().await {
+            Ok(auth_state) => {
+                if let Some(ref current) = auth_state.current_user {
+                    if current.uuid == uuid {
+                        (current.access_token.clone(), current.client_token.clone())
+                    } else {
+                        (String::new(), String::new())
+                    }
+                } else {
+                    (String::new(), String::new())
+                }
+            }
+            Err(_) => (String::new(), String::new()),
+        }
+    };
     let auth_info = crate::minecraft::launch::AuthInfo {
         username: username.clone(),
         uuid,
-        access_token: access_token.clone(),
-        client_token: access_token,
+        access_token: real_access_token,
+        client_token: real_client_token,
         login_type: login_type.unwrap_or_else(|| "Legacy".to_string()),
     };
 
@@ -172,12 +192,20 @@ pub async fn export_launch_script(
         }
     }
     // Java 启动命令（使用绝对路径，不依赖系统 PATH）
+    // 安全修复：对 game_args 中的敏感参数值脱敏，避免 access_token 明文写入 .bat 文件
+    // 用户需手动填入 token，或在脚本中使用环境变量
+    let sanitized_game_args = crate::minecraft::launch::sanitize_args_for_log(&launch_args.game_args);
+    let has_redacted = sanitized_game_args.iter().any(|a| a == "***");
+    if has_redacted {
+        script.push_str("REM [!] 警告：以下参数中的 accessToken / uuid 等敏感信息已脱敏为 ***\n");
+        script.push_str("REM [!] 请手动替换 *** 为你的实际 token，或通过环境变量传入\n");
+    }
     script.push_str(&format!(
         "\"{}\" {} {} {}\n",
         java_str,
         launch_args.jvm_args.join(" "),
         launch_args.main_class,
-        launch_args.game_args.join(" ")
+        sanitized_game_args.join(" ")
     ));
     script.push('\n');
     // 退出提示

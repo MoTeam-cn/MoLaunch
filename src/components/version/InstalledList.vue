@@ -70,7 +70,6 @@ async function handleLaunch(versionId: string) {
       versionId,
       username: authStore.currentUser?.name || 'Player',
       uuid: authStore.currentUser?.uuid || '',
-      accessToken: authStore.currentUser?.access_token || '',
     })
     showSuccess(`游戏已启动 (PID: ${pid})`)
   } catch (e) {
