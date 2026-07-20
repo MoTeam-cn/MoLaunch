@@ -175,9 +175,13 @@ onMounted(async () => {
   background: #111827; /* gray-900 */
 }
 
-/* RecycleScroller 的 item-view 是 absolute 定位，需显式继承深色背景 */
+/* RecycleScroller 的 item-view 是 absolute 定位，默认 width:100% 会导致
+   whitespace-pre 的长行内容溢出但容器不出现横向滚动条。
+   修复：让 item-view 宽度适应内容（max-content），最小 100% */
 .log-viewer :deep(.vue-recycle-scroller__item-view) {
   background: #111827;
+  width: max-content !important;
+  min-width: 100% !important;
 }
 
 /* 自定义滚动条：黑色背景上的深灰色滚动条（纵向 + 横向） */
