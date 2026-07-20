@@ -1,442 +1,165 @@
-# AI Agent 开发规范
+# AI Agent 协作规范
 
-> **适用对象**: AI Agent (Cursor/Copilot/OpenCode 等)
-> **版本**: v1.0.0
-> **更新日期**: 2026-06-26
-
----
-
-## 核心原则
-
-**每次修改代码，必须同步更新相关文档和日志。**
+> **适用对象**：AI Agent（Cursor / Copilot / Trae 等）
+> **最后更新**：2026-07-20
 
 ---
 
-## 一、修改代码前的检查清单
+## 一、核心原则
 
-在进行任何代码修改之前，必须确认：
+【必须】每次修改代码，必须同步更新 `CHANGELOG.md`。这是 AI Agent 协作的第一约束，违反即视为任务未完成。
 
-```
-□ 当前版本号是多少？
-□ 这次修改属于什么类型？(feat/fix/refactor/docs/ci/chore)
-□ 这次修改涉及哪些模块？
-□ 是否需要更新 CHANGELOG.md？
-□ 是否需要更新版本号？
-```
+完整的开发规范（代码风格、UI 组件、分支管理等）见 `DEVELOPMENT_GUIDELINES.md`，本文件仅聚焦 AI 协作过程中必须遵守的行为约束。
 
 ---
 
 ## 二、CHANGELOG 更新规则
 
-### 何时必须更新 CHANGELOG
+### 2.1 何时必须更新
 
-| 修改类型 | 是否更新 | 示例 |
-|---------|---------|------|
-| 新增功能 | ✅ 必须 | 添加新的页面组件 |
-| 修复 Bug | ✅ 必须 | 修复登录失败问题 |
-| 重构代码 | ⚠️ 视情况 | 重构状态管理 |
-| 性能优化 | ⚠️ 视情况 | 优化渲染性能 |
-| 文档更新 | ❌ 不需要 | 修改注释 |
-| CI/CD 配置 | ❌ 不需要 | 修改 workflow |
-| 依赖更新 | ❌ 不需要 | 更新 package.json |
+| 修改类型 | 是否更新 CHANGELOG |
+|---------|-------------------|
+| 新增功能 | 必须 |
+| 修复 Bug | 必须 |
+| 重构代码 | 视情况（影响外部行为则更新） |
+| 性能优化 | 视情况 |
+| 文档 / 注释 | 不需要 |
+| CI / CD 配置 | 不需要 |
+| 依赖更新 | 不需要 |
 
-### CHANGELOG 格式规范
+### 2.2 格式规范
+
+遵循项目现有 `CHANGELOG.md` 风格（基于 Keep a Changelog）：
 
 ```markdown
-## [版本号] - YYYY-MM-DD
+## [版本号或 未发布]
 
 ### 新增
-- 功能描述 (模块: 文件)
+
+#### 功能标题
+- `文件路径`：变更说明
+- `文件路径`：变更说明
 
 ### 修复
-- 问题描述 (模块: 文件)
 
+#### 修复标题
+- `文件路径`：变更说明
+
+### 重构
 ### 变更
-- 变更描述 (模块: 文件)
-
 ### 移除
-- 移除描述
 ```
 
-### 示例
-
-```markdown
-## [0.2.0] - 2026-06-26
-
-### 新增
-- 添加版本管理页面 (frontend: src/views/VersionManager.vue)
-- 实现 Mod 搜索功能 (frontend: src/components/ModSearch.vue)
-- 添加 Tauri 命令: 获取版本列表 (backend: src-tauri/src/commands/version.rs)
-
-### 修复
-- 修复登录状态丢失问题 (frontend: src/stores/auth.ts)
-- 修复下载进度显示错误 (frontend: src/components/DownloadProgress.vue)
-
-### 变更
-- 重构认证状态管理 (frontend: src/stores/auth.ts)
-- 优化侧边栏导航样式 (frontend: src/components/Sidebar.vue)
-```
+要点：
+- 分类标题统一使用：新增 / 修复 / 重构 / 变更 / 移除
+- 每个功能点用 `####` 四级标题概括
+- 每条变更必须标注涉及的文件路径（用反引号包裹）
+- 新增的未发布内容写入 `## [未发布]` 段下
 
 ---
 
-## 三、版本号管理规则
+## 三、Git 提交规范
 
-### 版本号格式
-
-遵循 Semantic Versioning: `MAJOR.MINOR.PATCH`
-
-| 变更类型 | 版本变化 | 示例 |
-|---------|---------|------|
-| 不兼容的 API 变更 | MAJOR +1 | 0.1.0 → 1.0.0 |
-| 新增功能 | MINOR +1 | 0.1.0 → 0.2.0 |
-| Bug 修复 | PATCH +1 | 0.1.0 → 0.1.1 |
-
-### 何时更新版本号
+### 3.1 提交信息格式
 
 ```
-□ 新增了页面/组件 → MINOR
-□ 新增了 Tauri 命令 → MINOR
-□ 新增了功能模块 → MINOR
-□ 修复了严重 Bug → PATCH
-□ 重构了内部实现 → PATCH
-□ 不兼容的 API 变更 → MAJOR
+<type>(<scope>): <subject> !c
 ```
 
-### 版本号同步位置
+### 3.2 常见 type
 
-更新版本号时，必须同步以下位置：
+| type | 说明 |
+|------|------|
+| feat | 新功能 |
+| fix | 修复 Bug |
+| refactor | 重构（不改变外部行为） |
+| perf | 性能优化 |
+| docs | 文档更新 |
+| test | 测试相关 |
+| ci | CI / CD 配置 |
+| chore | 构建 / 工具 / 依赖 |
+| style | 代码格式 |
+
+scope 与完整示例见 `DEVELOPMENT_GUIDELINES.md` 第二节。
+
+### 3.3 【必须】提交信息末尾携带 `!c`
+
+提交信息末尾必须包含 `!c` 标记。项目的 CI 流水线会检查 commit message 是否包含 `!c` 子串，包含则跳过本次推送触发的 CI，避免重复占用构建资源。
+
+示例：
 
 ```
-□ package.json → "version": "X.Y.Z"
-□ src-tauri/Cargo.toml → version = "X.Y.Z"
-□ src-tauri/tauri.conf.json → "version": "X.Y.Z"
-□ CHANGELOG.md → ## [X.Y.Z] - YYYY-MM-DD
+feat(version): 实现版本下载功能 !c
 ```
+
+### 3.4 【必须】提交信息使用常规泛化描述
+
+提交信息必须使用常规、泛化的技术描述，严禁出现敏感引用或第三方项目代号（如 PCL2、pcl 等）。描述应遮掩实际意图，使用通用术语。
+
+- 允许：`refactor(state): 提取状态访问 helper 消除重复套件`
+- 允许：`feat(auth): 实现登录流程`
+- 禁止：包含第三方项目名、内部代号、特定实现来源引用
+- 禁止：`refactor(state): 参考 PCL2 实现 FileSystemWatcher`
 
 ---
 
-## 四、Git 提交规范
+## 四、修改前检查清单
 
-### 提交信息格式
+开始任何代码修改前，必须确认：
 
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-### Type 类型
-
-| Type | 说明 | 示例 |
-|------|------|------|
-| `feat` | 新功能 | `feat(auth): 添加微软 OAuth 登录` |
-| `fix` | 修复 Bug | `fix(download): 修复断点续传失败` |
-| `refactor` | 重构 | `refactor(state): 重构状态管理` |
-| `perf` | 性能优化 | `perf(render): 优化列表渲染` |
-| `docs` | 文档 | `docs: 更新 CHANGELOG` |
-| `test` | 测试 | `test(auth): 添加认证测试` |
-| `ci` | CI/CD | `ci: 添加 GitHub Actions` |
-| `chore` | 构建/工具 | `chore: 更新依赖版本` |
-| `style` | 样式 | `style: 优化按钮样式` |
-
-### Scope 范围
-
-```
-frontend, backend, auth, version, mod, skin, java, settings, ui, state, commands
-```
-
-### 提交前检查
-
-```
-□ npm run lint (前端代码检查)
-□ npm run typecheck (TypeScript 类型检查)
-□ cargo clippy (Rust 代码检查)
-□ cargo fmt (Rust 代码格式化)
-□ 更新 CHANGELOG.md (如果需要)
-□ 提交信息格式正确
-```
+- 当前版本号是多少？（`package.json` / `Cargo.toml` / `tauri.conf.json` 三处应一致）
+- 本次修改属于什么类型？（feat / fix / refactor / perf / docs / chore ...）
+- 本次修改涉及哪些模块？（frontend / backend / auth / version / mod / skin / java / settings / ui / state / commands ...）
+- 是否需要更新 `CHANGELOG.md`？
+- 是否需要更新版本号？（新增功能 MINOR，Bug 修复 PATCH，不兼容变更 MAJOR）
 
 ---
 
-## 五、日志记录规范
+## 五、修改后检查清单
 
-### 何时添加日志
+修改完成后，【必须】按以下顺序执行，全部通过才能提交：
 
-| 场景 | 日志级别 | 示例 |
-|------|---------|------|
-| 初始化/启动 | INFO | `log::info!("Initializing MoLaunch v{}", version)` |
-| 重要操作完成 | INFO | `log::info!("Version downloaded: {}", version_id)` |
-| 警告情况 | WARN | `log::warn!("File already exists, skipping: {}", path)` |
-| 可恢复错误 | ERROR | `log::error!("Failed to download: {}", e)` |
-| 调试信息 | DEBUG | `log::debug!("Parsed version: {}", version)` |
-| 详细跟踪 | TRACE | `log::trace!("Processing file: {}", path)` |
+1. `cargo fmt`（Rust 格式化，在 `src-tauri` 目录执行）
+2. `cargo clippy -- -D warnings`（Rust 检查，必须 0 warnings）
+3. `npm run lint`（前端检查，必须 0 errors）
+4. `npm run typecheck`（TypeScript 类型检查，必须通过）
+5. 更新 `CHANGELOG.md`（如本次修改属于"必须更新"类型）
+6. 提交（commit message 遵循第三节规范，末尾带 `!c`）
 
-### 日志格式规范
-
-```rust
-// ✅ 正确: 包含上下文信息
-log::info!("Download completed: {} ({} bytes)", url, size);
-log::error!("Failed to parse version manifest: {}", e);
-
-// ❌ 错误: 过于简单
-log::info!("Done");
-log::error!("Error");
-```
-
-### Tauri 命令日志
-
-```rust
-#[tauri::command]
-pub async fn get_versions(handle: State<'_, AppState>) -> Result<Vec<VersionInfo>, String> {
-    log::info!("Getting version list");
-    
-    let versions = handle.sdk.list_versions()
-        .map_err(|e| {
-            log::error!("Failed to get versions: {}", e);
-            e.to_string()
-        })?;
-    
-    log::info!("Found {} versions", versions.len());
-    Ok(versions)
-}
-```
-
----
-
-## 六、Tauri 命令开发规范
-
-### 新增 Tauri 命令的完整流程
-
-```
-1. 在 src-tauri/src/commands/ 中添加函数
-2. 添加 #[tauri::command] 属性
-3. 实现完整的错误处理
-4. 添加文档注释 (///)
-5. 在 main.rs 中注册命令
-6. 在前端创建对应的 TypeScript 类型
-7. 更新 CHANGELOG.md
-8. 提交并推送
-```
-
-### Tauri 命令模板
-
-```rust
-/// 函数功能描述
-///
-/// # Arguments
-/// * `handle` - 应用状态
-/// * `param` - 参数说明
-///
-/// # Returns
-/// 成功返回数据，失败返回错误信息
-#[tauri::command]
-pub async fn example_command(
-    handle: State<'_, AppState>,
-    param: String,
-) -> Result<ExampleData, String> {
-    log::info!("Executing example command with param: {}", param);
-    
-    // 1. 参数验证
-    if param.is_empty() {
-        log::warn!("Empty parameter received");
-        return Err("Parameter cannot be empty".to_string());
-    }
-    
-    // 2. 业务逻辑
-    let result = handle.sdk.some_function(&param)
-        .map_err(|e| {
-            log::error!("Command failed: {}", e);
-            e.to_string()
-        })?;
-    
-    // 3. 返回结果
-    log::info!("Command executed successfully");
-    Ok(result)
-}
-```
-
----
-
-## 七、Vue 组件开发规范
-
-### 组件命名规范
-
-- 文件名: `PascalCase.vue` (如 `VersionList.vue`)
-- 组件名: `PascalCase` (如 `VersionList`)
-- 组合式函数: `useXxx` (如 `useAuth`)
-
-### 组件模板
-
-```vue
-<script setup lang="ts">
-/**
- * 组件功能描述
- */
-
-// Props 定义
-interface Props {
-  title: string
-  count?: number
-}
-
-const props = withDefaults(defineProps<Props>(), {
-  count: 0,
-})
-
-// Emits 定义
-const emit = defineEmits<{
-  select: [id: string]
-  delete: [id: string]
-}>()
-
-// 组合式函数
-const { data, loading, error } = useExample()
-
-// 方法
-const handleSelect = (id: string) => {
-  emit('select', id)
-}
-</script>
-
-<template>
-  <div class="example-component">
-    <h2>{{ title }}</h2>
-    <p>Count: {{ count }}</p>
-    <button @click="handleSelect('test')">Select</button>
-  </div>
-</template>
-
-<style scoped>
-.example-component {
-  /* 样式 */
-}
-</style>
-```
-
----
-
-## 八、修改完成后的检查清单
-
-每次修改代码后，**必须按顺序执行以下命令**，全部通过后才能提交：
+命令速查：
 
 ```bash
-# 1. Rust 代码格式化 (必须第一个执行)
 cd src-tauri && cargo fmt
-
-# 2. Rust 代码检查 (必须通过，0 warnings)
 cd src-tauri && cargo clippy -- -D warnings
-
-# 3. 前端代码检查 (必须通过，0 errors)
 npm run lint
-
-# 4. TypeScript 类型检查
 npm run typecheck
-
-# 5. 提交
-git add -A
-git commit -m "type(scope): description"
-git push origin main
-```
-
-**重要提醒：**
-- **绝对不要跳过本地检查直接提交！** CI 会检查代码，本地不过 CI 也不会过。
-- `npm run lint` 必须 0 errors 才能提交（warnings 可以接受）
-- `cargo clippy` 必须 0 warnings 才能提交（使用 `-D warnings` 将警告视为错误）
-- `cargo fmt` 必须在 `cargo clippy` 之前执行
-
----
-
-## 九、禁止事项
-
-### 绝对不要
-
-```
-❌ 提交包含 TODO 的代码 (除非明确标注为"未来功能")
-❌ 提交不完整的 Tauri 命令 (直接返回 Ok)
-❌ 修改代码后不更新 CHANGELOG
-❌ 使用 unwrap() 或 expect() 在 Rust 生产代码中
-❌ 在 Tauri 命令中 panic
-❌ 遗漏错误处理
-❌ 提交未通过 lint 检查的代码
-```
-
-### 必须要做
-
-```
-✅ 所有 Tauri 命令使用 Result 返回
-✅ 所有错误转换为字符串返回
-✅ 重要操作记录日志
-✅ 修改后更新 CHANGELOG
-✅ 新功能更新版本号
-✅ 运行测试确认通过
-✅ 前端组件添加 TypeScript 类型
 ```
 
 ---
 
-## 十、快速参考
+## 六、禁止事项
 
-### 添加新功能的完整流程
-
-```bash
-# 1. 编写代码
-# 2. 前端检查
-npm run lint && npm run typecheck
-
-# 3. 后端检查
-cd src-tauri && cargo fmt && cargo clippy -- -D warnings
-
-# 4. 更新 CHANGELOG.md
-# 5. 更新版本号 (如果需要)
-# 6. 提交
-git add -A
-git commit -m "feat(module): 描述"
-git push origin main
-```
-
-### 修复 Bug 的完整流程
-
-```bash
-# 1. 修复代码
-# 2. 前端检查
-npm run lint && npm run typecheck
-
-# 3. 后端检查
-cd src-tauri && cargo fmt && cargo clippy -- -D warnings
-
-# 4. 更新 CHANGELOG.md
-# 5. 提交
-git add -A
-git commit -m "fix(module): 描述"
-git push origin main
-```
+【禁止】在 Rust 生产代码中使用 `unwrap()` / `expect()` / `panic!()`
+【禁止】在 TypeScript 中使用 `any` 类型（如确需，使用 `unknown` 配合类型守卫）
+【禁止】提交包含 `TODO` 的代码（除非明确标注为"未来功能"并说明计划）
+【禁止】提交不完整的功能（如 Tauri 命令直接返回 `Ok(())` 占位、空实现）
+【禁止】修改代码后不更新 `CHANGELOG.md`
+【禁止】跳过 lint / clippy / typecheck 检查直接提交
+【禁止】在 commit message 中出现敏感引用或第三方项目代号
+【禁止】遗漏错误处理（所有可能失败的操作必须返回 `Result`）
 
 ---
 
-## 十一、技术栈参考
+## 七、必须事项
 
-### 前端
-- **框架**: Vue 3 + TypeScript
-- **构建工具**: Vite
-- **状态管理**: Pinia
-- **路由**: Vue Router
-- **UI 组件**: Headless UI + Tailwind CSS
-- **动画**: Framer Motion
-
-### 后端
-- **框架**: Tauri
-- **语言**: Rust
-- **SDK**: McSDK (C FFI)
-- **异步**: Tokio
-
-### 开发工具
-- **包管理**: npm
-- **代码检查**: ESLint (前端) + Clippy (后端)
-- **格式化**: Prettier (前端) + rustfmt (后端)
-- **类型检查**: TypeScript
+【必须】所有 Tauri 命令使用 `Result<T, String>` 返回，错误转换为字符串
+【必须】所有 Tauri 命令通过 `State<'_, AppState>` 注入状态，`lock()` 后及时 `drop()` 释放锁
+【必须】重要操作记录日志（使用项目自定义宏 `log_info!` / `log_warn!` / `log_error!`，非 `log::` crate）
+【必须】前端组件使用 `<script setup lang="ts">` + Composition API
+【必须】UI 交互组件使用项目自定义组件（Button / Input / Select / Modal / Toast 等），不引入第三方 UI 库
+【必须】修改后更新 `CHANGELOG.md`
+【必须】前端代码为所有变量、参数、返回值标注 TypeScript 类型
 
 ---
 
-*本文档最后更新于 2026-06-26*
+*本文档最后更新于 2026-07-20*

@@ -7,6 +7,14 @@
 
 ## [未发布]
 
+### 重构
+
+#### 项目文档全面重构
+- `README.md`：基于项目真实技术栈重写，修正前端为 Tailwind CSS + @heroicons/vue + skinview3d + vue-virtual-scroller，后端为纯 Rust minecraft 模块（非 McSDK C FFI），项目结构按实际目录重写，删除过时路线图，更新致谢与文档链接
+- `AI_AGENT_GUIDELINES.md`：精简为 AI 协作行为约束，聚焦 CHANGELOG 规则、Git 提交规范（`!c` 后缀 + 常规泛化描述约束）、修改前/后检查清单、禁止/必须事项
+- `DEVELOPMENT_GUIDELINES.md`：完整开发规范，修正日志宏为项目自定义宏（log_info!/log_warn! 等），Tauri 命令模板使用 State + lock/drop 模式，Vue 模板使用 script setup + Composition API + 自定义组件，新增 Arco Design 风格 UI 规范
+- `DEVELOPMENT_BLUEPRINT.md`：基于真实架构重写，覆盖后端 commands/minecraft/state/storage 分层、前端 components/composables/stores 结构、IPC 数据流、下载状态轮询、启动流水线、安全规范、z-index 层级（9999/10000/10001）
+
 ### 新增
 
 #### 整合包安装支持自定义安装名称
