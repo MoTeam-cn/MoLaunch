@@ -47,10 +47,11 @@ notify = "8"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
-# Win32 API（用于游戏窗口标题修改，参考 PCL2 ModWatcher.vb SetWindowText）
+# Win32 API（用于游戏窗口标题修改，参考 PCL2 ModWatcher.vb）
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Threading",
 ] }
 
 [features]
