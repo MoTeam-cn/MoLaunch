@@ -10,7 +10,7 @@ import VersionSection from '@/components/version/VersionSection.vue'
 import Community from './Community.vue'
 import DownloadSidebar from './downloads/DownloadSidebar.vue'
 import {
-  CubeIcon, WrenchIcon, ArchiveBoxIcon,
+  CubeIcon, ArchiveBoxIcon,
   StarIcon, BeakerIcon, ClockIcon, SparklesIcon,
   ArrowPathIcon, FaceSmileIcon,
   PuzzlePieceIcon, SwatchIcon, BoltIcon, CircleStackIcon,
@@ -32,10 +32,9 @@ const loading = ref(false)
 const activeCategory = ref('vanilla')
 const selectedVersion = ref<string | null>(null)
 
+// 官方下载分类（仅保留原版游戏；模组加载器/整合包已由社区资源替代）
 const topCategories = [
   { id: 'vanilla', label: '原版游戏', icon: CubeIcon },
-  { id: 'modloaders', label: '模组加载器', icon: WrenchIcon },
-  { id: 'modpacks', label: '整合包', icon: ArchiveBoxIcon },
 ]
 
 const communityCategories: { id: string; type: ResourceType; label: string; icon: any }[] = [
@@ -187,14 +186,6 @@ onMounted(async () => {
                 :get-version-icon="getVersionIcon"
                 @download="selectedVersion = $event" @uninstall="handleUninstall"
               />
-            </div>
-
-            <!-- 模组加载器/整合包 - 待实现 -->
-            <div v-else class="flex items-center justify-center h-full">
-              <div class="text-center">
-                <CubeIcon class="w-16 h-16 text-gray-400 mx-auto" />
-                <p class="text-gray-600 mt-4">即将开放</p>
-              </div>
             </div>
           </div>
         </transition>
