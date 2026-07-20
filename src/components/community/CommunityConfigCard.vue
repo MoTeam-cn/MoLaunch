@@ -72,12 +72,26 @@ const filenameOptions = [
                 <p class="text-xs text-gray-500 mt-0.5">CurseForge 与 Modrinth 资源请求的源策略</p>
               </div>
               <div class="w-72">
-                <Select v-model="source" :options="sourceOptions">
+                <Select v-model="source" :options="sourceOptions" custom-option>
+                  <template #selected>
+                    <div class="flex flex-col min-w-0 flex-1 leading-tight">
+                      <span class="text-sm font-medium text-gray-900 truncate">{{ sourceOptions.find(o => o.value === source)?.label }}</span>
+                      <span class="text-xs text-gray-400 truncate">{{ sourceOptions.find(o => o.value === source)?.desc }}</span>
+                    </div>
+                  </template>
                   <template #option="{ option }">
-                    <div class="flex flex-col py-0.5">
+                    <div class="flex flex-col min-w-0 flex-1">
                       <span class="text-sm font-medium text-gray-900">{{ option.label }}</span>
                       <span class="text-xs text-gray-400">{{ option.desc }}</span>
                     </div>
+                    <svg
+                      v-if="option.value === source"
+                      class="select-check-icon shrink-0 mt-0.5"
+                      viewBox="0 0 1024 1024"
+                      fill="currentColor"
+                    >
+                      <path d="M912 192c-12.8 0-25.6 4.266667-34.133333 12.8L384 699.2 234.666667 548.266667c-17.066667-17.066667-46.933333-17.066667-64 0-17.066667 17.066667-17.066667 46.933333 0 64l179.2 179.2c8.533333 8.533333 21.333333 12.8 34.133333 12.8s25.6-4.266667 34.133333-12.8l520.533334-520.533334c17.066667-17.066667 17.066667-46.933333 0-64-8.533333-8.533333-21.333333-12.8-34.133334-12.8z" />
+                    </svg>
                   </template>
                 </Select>
               </div>

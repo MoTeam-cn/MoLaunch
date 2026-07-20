@@ -23,11 +23,14 @@ interface Props {
   placeholder?: string
   /** 是否禁用 */
   disabled?: boolean
+  /** 是否使用自定义选项渲染（启用后选项高度自适应，不再固定 36px） */
+  customOption?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   placeholder: '请选择',
   disabled: false,
+  customOption: false,
 })
 
 const emit = defineEmits<{ 'update:modelValue': [value: string | number] }>()
@@ -129,14 +132,17 @@ onUnmounted(() => {
 
 <template>
   <div ref="triggerRef" class="custom-select">
-    <!-- 触发器：可通过 #trigger 自定义 -->
+    <!-- 触发器：可通过 #trigger 完全自定义，或通过 #selected 自定义触发器内容 -->
     <slot name="trigger" :label="selectedLabel" :open="open" :toggle="toggle">
       <div
         class="select-trigger"
         :class="{ active: open, disabled: disabled }"
         @click="toggle"
       >
-        <span class="select-value" :class="{ placeholder: !options.find(o => o.value === modelValue) }">
+        <span v-if="$slots.selected" class="select-value">
+          <slot name="selected" :label="selectedLabel" />
+        </span>
+        <span v-else class="select-value" :class="{ placeholder: !options.find(o => o.value === modelValue) }">
           {{ selectedLabel }}
         </span>
         <svg
@@ -167,7 +173,7 @@ onUnmounted(() => {
               v-for="opt in options"
               :key="opt.value"
               class="select-option"
-              :class="{ selected: opt.value === modelValue }"
+              :class="{ selected: opt.value === modelValue, 'select-option-custom': customOption }"
               @click="select(opt.value)"
             >
               <slot name="option" :option="opt" :selected="opt.value === modelValue">
@@ -332,6 +338,15 @@ onUnmounted(() => {
   color: #1d2129;
   font-weight: 500; /* Arco font-weight-500 */
   background-color: transparent;
+}
+
+/* 自定义选项模式：高度自适应，支持多行内容（主标题+描述等） */
+.select-option-custom {
+  height: auto;
+  min-height: 36px;
+  line-height: 1.5715;
+  padding: 6px 12px; /* 垂直 padding 让多行内容有呼吸空间 */
+  align-items: flex-start; /* 多行内容顶部对齐 */
 }
 
 .select-option-content {
