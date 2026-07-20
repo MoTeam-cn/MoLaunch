@@ -26,6 +26,14 @@ interface Props {
   clearable?: boolean
   maxlength?: number
   size?: 'mini' | 'small' | 'default' | 'large'
+  /** 是否渲染为 textarea（文本域，复刻 Arco Textarea 样式） */
+  textarea?: boolean
+  /** textarea 的行数（仅 textarea 模式生效） */
+  rows?: number
+  /** textarea 是否允许用户调整大小（仅 textarea 模式生效） */
+  resize?: 'none' | 'vertical' | 'horizontal' | 'both'
+  /** datalist 的 id（用于输入框自动补全，透传到内部 input 的 list 属性） */
+  list?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -35,6 +43,10 @@ const props = withDefaults(defineProps<Props>(), {
   readonly: false,
   clearable: false,
   size: 'default',
+  textarea: false,
+  rows: 3,
+  resize: 'vertical',
+  list: undefined,
 })
 
 const emit = defineEmits<{
@@ -75,7 +87,32 @@ const sizeClass = computed(() => `input-size-${props.size}`)
 </script>
 
 <template>
+  <!-- textarea 模式（复刻 Arco Textarea） -->
   <div
+    v-if="textarea"
+    class="input-wrapper textarea-wrapper"
+    :class="{ 'input-disabled': disabled, 'input-readonly': readonly }"
+  >
+    <textarea
+      v-model="inputValue"
+      :rows="rows"
+      :placeholder="placeholder"
+      :disabled="disabled"
+      :readonly="readonly"
+      :maxlength="maxlength"
+      class="textarea-inner"
+      :style="{ resize }"
+      @input="onInput"
+      @change="onChange"
+      @focus="$emit('focus', $event)"
+      @blur="$emit('blur', $event)"
+      @keydown="$emit('keydown', $event)"
+    />
+  </div>
+
+  <!-- input 模式（复刻 Arco Input） -->
+  <div
+    v-else
     class="input-wrapper"
     :class="[sizeClass, { 'input-disabled': disabled, 'input-readonly': readonly }]"
   >
@@ -97,6 +134,7 @@ const sizeClass = computed(() => `input-size-${props.size}`)
       :disabled="disabled"
       :readonly="readonly"
       :maxlength="maxlength"
+      :list="list"
       class="input-inner"
       @input="onInput"
       @change="onChange"
@@ -260,5 +298,43 @@ const sizeClass = computed(() => `input-size-${props.size}`)
 }
 .input-size-large {
   height: 36px;
+}
+
+/* ============================================================
+ * Textarea 模式（复刻 Arco Design Textarea）
+ * wrapper padding 0，textarea 自身 padding 4px 12px
+ * min-height 32px, font-size 14px, line-height 1.5715
+ * ============================================================ */
+.textarea-wrapper {
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  height: auto;
+  min-height: 32px;
+}
+
+.textarea-inner {
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  min-height: 32px;
+  padding: 4px 12px;
+  font-size: 14px;
+  line-height: 1.5715;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 0;
+  outline: none;
+  -webkit-appearance: none;
+  vertical-align: top;
+}
+.textarea-inner::placeholder {
+  color: #86909c;
+}
+.textarea-inner:disabled {
+  -webkit-text-fill-color: #c9cdd4;
+  cursor: not-allowed;
 }
 </style>

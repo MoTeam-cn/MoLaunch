@@ -74,17 +74,10 @@ onMounted(loadSetup)
       <div v-for="f in advanceFields" :key="f.field">
         <label class="block mb-1.5 text-xs text-gray-500">{{ f.label }}</label>
         <Tooltip :text="f.tip" position="top" :delay="0" block>
-          <textarea
-            v-if="f.area"
-            v-model="f.value"
-            rows="3"
-            placeholder="跟随全局设置"
-            class="w-full rounded-md border border-gray-300 px-3 py-1.5 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            @blur="savePersonalField(f.field, f.value, f.name)"
-          />
           <Input
-            v-else
             v-model="f.value"
+            :textarea="f.area"
+            :rows="3"
             placeholder="跟随全局设置"
             @blur="savePersonalField(f.field, f.value, f.name)"
           />

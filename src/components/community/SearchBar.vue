@@ -108,19 +108,16 @@ function onInput() {
     <!-- 第二行：版本 + 加载器 + 类型 -->
     <div class="grid grid-cols-3 gap-3">
       <!-- 游戏版本 -->
-      <div class="relative">
-        <input
-          :value="gameVersion"
-          @input="emit('update:gameVersion', ($event.target as HTMLInputElement).value)"
-          type="text"
-          list="common-versions"
-          placeholder="游戏版本"
-          class="w-full px-3 py-2 text-sm bg-white border border-gray-300 rounded-lg outline-none focus:border-primary-500"
-        >
-        <datalist id="common-versions">
-          <option v-for="v in commonVersions" :key="v" :value="v" />
-        </datalist>
-      </div>
+      <Input
+        :model-value="gameVersion"
+        placeholder="游戏版本"
+        list="common-versions"
+        @update:model-value="emit('update:gameVersion', $event)"
+        @input="emit('update:gameVersion', $event)"
+      />
+      <datalist id="common-versions">
+        <option v-for="v in commonVersions" :key="v" :value="v" />
+      </datalist>
 
       <!-- 加载器 -->
       <Select
