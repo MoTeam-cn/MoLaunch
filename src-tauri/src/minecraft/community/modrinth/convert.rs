@@ -26,10 +26,7 @@ pub(crate) fn convert_hit(hit: &MrHit, rtype: ResourceType) -> ResourceProject {
         .cloned()
         .collect();
 
-    let website = format!(
-        "https://modrinth.com/{}/{}",
-        hit.project_type, hit.slug
-    );
+    let website = format!("https://modrinth.com/{}/{}", hit.project_type, hit.slug);
 
     // 分类标签中文化
     let tags: Vec<String> = hit
@@ -41,7 +38,10 @@ pub(crate) fn convert_hit(hit: &MrHit, rtype: ResourceType) -> ResourceProject {
                 Some(label) => Some(label.to_string()),
                 None => {
                     // 加载器标签不放入 tags
-                    if matches!(c.as_str(), "fabric" | "forge" | "neoforge" | "quilt" | "liteloader") {
+                    if matches!(
+                        c.as_str(),
+                        "fabric" | "forge" | "neoforge" | "quilt" | "liteloader"
+                    ) {
                         None
                     } else {
                         Some(c.clone())
@@ -101,10 +101,7 @@ pub(crate) fn convert_project(p: &MrProject, rtype: ResourceType) -> ResourcePro
         .collect();
 
     let slug = p.slug.clone().unwrap_or_default();
-    let website = format!(
-        "https://modrinth.com/{}/{}",
-        p.project_type, slug
-    );
+    let website = format!("https://modrinth.com/{}/{}", p.project_type, slug);
 
     // mcmod.cn 中文译名
     let translated_name = super::super::mcmod::lookup_mr(&slug)
@@ -118,7 +115,10 @@ pub(crate) fn convert_project(p: &MrProject, rtype: ResourceType) -> ResourcePro
         .filter_map(|c| match super::super::tags::translate_modrinth_tag(c) {
             Some(label) => Some(label.to_string()),
             None => {
-                if matches!(c.as_str(), "fabric" | "forge" | "neoforge" | "quilt" | "liteloader") {
+                if matches!(
+                    c.as_str(),
+                    "fabric" | "forge" | "neoforge" | "quilt" | "liteloader"
+                ) {
                     None
                 } else {
                     Some(c.clone())
@@ -215,7 +215,10 @@ pub(crate) fn build_facets(
     let mut facets: Vec<Vec<String>> = Vec::new();
 
     // project_type
-    facets.push(vec![format!("project_type:{}", rtype.modrinth_project_type())]);
+    facets.push(vec![format!(
+        "project_type:{}",
+        rtype.modrinth_project_type()
+    )]);
 
     // category
     if let Some(c) = category {
@@ -228,11 +231,21 @@ pub(crate) fn build_facets(
     // 读取 ignore_quilt 配置，true 时从查询条件中移除 Quilt
     let ignore_quilt = super::super::get_ignore_quilt();
     let mut loaders = Vec::new();
-    if mod_loader & ModLoaders::FORGE != 0 { loaders.push("categories:'forge'".to_string()); }
-    if mod_loader & ModLoaders::NEOFORGE != 0 { loaders.push("categories:'neoforge'".to_string()); }
-    if mod_loader & ModLoaders::FABRIC != 0 { loaders.push("categories:'fabric'".to_string()); }
-    if !ignore_quilt && mod_loader & ModLoaders::QUILT != 0 { loaders.push("categories:'quilt'".to_string()); }
-    if mod_loader & ModLoaders::LITELOADER != 0 { loaders.push("categories:'liteloader'".to_string()); }
+    if mod_loader & ModLoaders::FORGE != 0 {
+        loaders.push("categories:'forge'".to_string());
+    }
+    if mod_loader & ModLoaders::NEOFORGE != 0 {
+        loaders.push("categories:'neoforge'".to_string());
+    }
+    if mod_loader & ModLoaders::FABRIC != 0 {
+        loaders.push("categories:'fabric'".to_string());
+    }
+    if !ignore_quilt && mod_loader & ModLoaders::QUILT != 0 {
+        loaders.push("categories:'quilt'".to_string());
+    }
+    if mod_loader & ModLoaders::LITELOADER != 0 {
+        loaders.push("categories:'liteloader'".to_string());
+    }
     if !loaders.is_empty() {
         facets.push(loaders);
     }

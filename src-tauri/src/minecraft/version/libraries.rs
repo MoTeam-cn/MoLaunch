@@ -50,10 +50,10 @@ pub fn is_native_matching_arch(classifier: &str) -> bool {
     if cfg!(target_os = "windows") {
         let is_64bit = std::mem::size_of::<usize>() == 8;
         match classifier {
-            "natives-windows" => is_64bit, // 64-bit x86
+            "natives-windows" => is_64bit,      // 64-bit x86
             "natives-windows-x86" => !is_64bit, // 32-bit x86
-            "natives-windows-arm64" => false, // ARM64 not detected via usize; skip for now
-            _ => true,                     // Unknown windows native, allow
+            "natives-windows-arm64" => false,   // ARM64 not detected via usize; skip for now
+            _ => true,                          // Unknown windows native, allow
         }
     } else if cfg!(target_os = "macos") {
         let is_arm64 = cfg!(target_arch = "aarch64");
@@ -419,7 +419,9 @@ pub fn find_missing_libs(libs: &[LibEntry], _game_dir: &Path, quick_check: bool)
     // 保持原有顺序（按 libs 中的顺序）
     let mut result = missing.into_inner().unwrap();
     result.sort_by_key(|l| {
-        libs.iter().position(|x| x.local_path == l.local_path).unwrap_or(usize::MAX)
+        libs.iter()
+            .position(|x| x.local_path == l.local_path)
+            .unwrap_or(usize::MAX)
     });
     result
 }

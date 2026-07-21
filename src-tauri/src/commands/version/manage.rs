@@ -148,7 +148,11 @@ pub async fn rename_version(
         let _ = std::fs::rename(&old_natives, &new_natives);
     }
 
-    log_info!("Version renamed successfully: {} -> {}", version_id, new_name);
+    log_info!(
+        "Version renamed successfully: {} -> {}",
+        version_id,
+        new_name
+    );
     Ok(())
 }
 

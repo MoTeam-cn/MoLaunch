@@ -37,7 +37,11 @@ impl Database {
         // 最后一行是 Popularity 排行数据，跳过
         let data_str: &str = &data;
         let lines: Vec<&str> = data_str.lines().collect();
-        let entry_lines = if lines.len() > 1 { &lines[..lines.len() - 1] } else { &lines[..] };
+        let entry_lines = if lines.len() > 1 {
+            &lines[..lines.len() - 1]
+        } else {
+            &lines[..]
+        };
 
         // 行号即 class id
         // 关键：空行也计数（i += 1 在 Continue For 之前），否则行号会错位
@@ -134,8 +138,10 @@ fn parse_slug_part(s: &str) -> (Option<String>, Option<String>) {
         if cf.is_empty() && mr.is_empty() {
             (None, None)
         } else {
-            (if cf.is_empty() { None } else { Some(cf) },
-             if mr.is_empty() { None } else { Some(mr) })
+            (
+                if cf.is_empty() { None } else { Some(cf) },
+                if mr.is_empty() { None } else { Some(mr) },
+            )
         }
     } else {
         // 无 @ → 仅 CurseForge
@@ -153,7 +159,11 @@ fn process_wildcard(name: &str, slug_part: &str) -> String {
     let slug = if let Some(idx) = slug_part.find('@') {
         let cf = &slug_part[..idx];
         let mr = &slug_part[idx + 1..];
-        if !cf.is_empty() { cf } else { mr }
+        if !cf.is_empty() {
+            cf
+        } else {
+            mr
+        }
     } else if slug_part.starts_with('@') {
         &slug_part[1..]
     } else if slug_part.ends_with('@') {

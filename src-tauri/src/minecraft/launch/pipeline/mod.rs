@@ -34,7 +34,8 @@ pub struct LaunchPipeline {
     pub(super) current_stage: Arc<Mutex<LaunchStage>>,
     pub(super) cancel_flag: Arc<Mutex<bool>>,
     pub(super) watcher: Arc<Mutex<Option<GameWatcher>>>,
-    pub(super) child_process: Arc<Mutex<Option<Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>>>>,
+    pub(super) child_process:
+        Arc<Mutex<Option<Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>>>>,
 }
 
 impl LaunchPipeline {

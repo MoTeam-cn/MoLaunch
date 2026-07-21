@@ -29,7 +29,7 @@
         "title": "MoLaunch",
         "width": 1200,
         "height": 800,
-        "minWidth": 1090,
+        "minWidth": 1092,
         "minHeight": 592,
         "center": true,
         "useHttpsScheme": true

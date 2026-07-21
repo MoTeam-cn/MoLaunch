@@ -30,10 +30,7 @@ pub(crate) struct QueryStats {
 /// 并发批量查询 CF + MR，合并结果并 emit project 事件
 ///
 /// CF 优先（CF 收录更全），CF 没有再用 MR。返回写入缓存用的 `cache_map`。
-pub(crate) async fn query_and_merge(
-    app: &AppHandle,
-    hashed_mods: &[HashedMod],
-) -> QueryStats {
+pub(crate) async fn query_and_merge(app: &AppHandle, hashed_mods: &[HashedMod]) -> QueryStats {
     let cf_fingerprints: Vec<u32> = hashed_mods
         .iter()
         .filter_map(|m| m.cf_fingerprint)

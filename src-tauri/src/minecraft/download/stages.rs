@@ -30,7 +30,8 @@ pub async fn download_client_jar(
     // 用原始 json 的 inheritsFrom 确定主 jar 的正确位置
     // 有 inheritsFrom 时主 jar 在父版本目录下（如 Fabric 版本的主 jar 在原版目录）
     // 无 inheritsFrom 时主 jar 在当前版本目录下
-    let jar_version = crate::minecraft::launch::classpath::find_original_version(game_dir, original_json);
+    let jar_version =
+        crate::minecraft::launch::classpath::find_original_version(game_dir, original_json);
     let jar_path = game_dir
         .join("versions")
         .join(&jar_version)
@@ -38,7 +39,11 @@ pub async fn download_client_jar(
 
     let checker = FileChecker::new()
         .with_min_size(1024)
-        .with_actual_size(merged_json["downloads"]["client"]["size"].as_i64().unwrap_or(-1))
+        .with_actual_size(
+            merged_json["downloads"]["client"]["size"]
+                .as_i64()
+                .unwrap_or(-1),
+        )
         .with_hash(
             merged_json["downloads"]["client"]["sha1"]
                 .as_str()
@@ -46,7 +51,10 @@ pub async fn download_client_jar(
         );
 
     if checker.is_valid(&jar_path.to_string_lossy()) {
-        log_info!("[Download] Client JAR already exists at {}, skipping", jar_path.display());
+        log_info!(
+            "[Download] Client JAR already exists at {}, skipping",
+            jar_path.display()
+        );
         return Ok(());
     }
 
@@ -54,14 +62,19 @@ pub async fn download_client_jar(
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("Client JAR URL not found in version {} (merged json may be missing downloads.client)", version_id))?;
 
-    log_info!("[Download] Downloading client JAR to {}", jar_path.display());
+    log_info!(
+        "[Download] Downloading client JAR to {}",
+        jar_path.display()
+    );
 
     let urls = build_launcher_meta_urls(url, mirror_url, source_mode_of(manager));
     let task = DownloadTask {
         id: "client_jar".to_string(),
         urls,
         local_path: jar_path.to_string_lossy().to_string(),
-        expected_size: merged_json["downloads"]["client"]["size"].as_i64().unwrap_or(0),
+        expected_size: merged_json["downloads"]["client"]["size"]
+            .as_i64()
+            .unwrap_or(0),
         expected_hash: merged_json["downloads"]["client"]["sha1"]
             .as_str()
             .map(|s| s.to_string()),
@@ -198,7 +211,8 @@ pub async fn download_assets(
         .iter()
         .enumerate()
         .map(|(i, asset)| {
-            let urls = assets::build_asset_download_urls(asset, mirror_url, source_mode_of(manager));
+            let urls =
+                assets::build_asset_download_urls(asset, mirror_url, source_mode_of(manager));
             DownloadTask {
                 id: format!("asset_{}", i),
                 urls,

@@ -2,18 +2,14 @@
 
 use std::path::Path;
 
-use crate::{log_info, log_warn};
 use crate::minecraft::utils::file_checker::compute_sha1_hex;
+use crate::{log_info, log_warn};
 
 /// 校验字节的 SHA1，`expected_sha1` 为空则跳过（返回 Ok）
 ///
 /// 用于下载前校验镜像源返回内容、以及断点续传时校验已存在文件，
 /// 防止攻击者预先放置任意内容绕过尺寸检查。
-pub fn verify_bytes_sha1(
-    bytes: &[u8],
-    expected_sha1: &str,
-    path_str: &str,
-) -> Result<(), String> {
+pub fn verify_bytes_sha1(bytes: &[u8], expected_sha1: &str, path_str: &str) -> Result<(), String> {
     if expected_sha1.is_empty() {
         return Ok(());
     }

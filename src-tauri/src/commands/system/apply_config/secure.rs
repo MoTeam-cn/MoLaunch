@@ -4,10 +4,10 @@
 //! 开发者模式走注册表（DeveloperUnlocked / DeveloperMode），不进 AppConfig。
 //! 这两块在 `apply_config_inner` 中先于普通字段更新执行。
 
-use crate::log_info;
-use crate::state::AppState;
 use super::super::developer::{KEY_DEV_MODE, KEY_DEV_UNLOCKED};
 use super::types::ConfigPatch;
+use crate::log_info;
+use crate::state::AppState;
 
 /// 读取 CurseForge 配置（异步触发 SDK DES 解密并缓存）
 pub async fn read_curseforge() -> (bool, Option<String>) {

@@ -22,7 +22,7 @@ use super::common::urlencode_params;
 use super::types::{ResourceProject, ResourceType, ResourceVersion};
 use convert::{convert_project, convert_version};
 use http::{cf_get, cf_post};
-use types::{CfFile, CfModEntry, CfSearchResponse, CfFilesResponse};
+use types::{CfFile, CfFilesResponse, CfModEntry, CfSearchResponse};
 
 /// 按 MurmurHash2 指纹批量查询 CurseForge 工程详情
 ///
@@ -132,7 +132,8 @@ pub async fn fingerprint_search(
     }
 
     // 步骤 4：构建 fingerprint → ResourceProject 映射返回
-    let mut result: std::collections::HashMap<u32, ResourceProject> = std::collections::HashMap::new();
+    let mut result: std::collections::HashMap<u32, ResourceProject> =
+        std::collections::HashMap::new();
     for (fp, mod_id) in &fp_to_modid {
         if let Some(project) = modid_to_project.get(mod_id) {
             result.insert(*fp, project.clone());
@@ -193,7 +194,11 @@ pub async fn search(
     let resp: CfSearchResponse = cf_get(&path).await?;
 
     let total = resp.pagination.total_count;
-    let projects = resp.data.iter().map(|e| convert_project(e, rtype)).collect();
+    let projects = resp
+        .data
+        .iter()
+        .map(|e| convert_project(e, rtype))
+        .collect();
 
     Ok((projects, total))
 }
@@ -211,15 +216,18 @@ pub async fn get_project(project_id: &str, rtype: ResourceType) -> Result<Resour
     let entry: CfModEntry = if project_id.chars().all(|c| c.is_ascii_digit()) {
         let path = format!("/mods/{}", project_id);
         #[derive(Deserialize)]
-        struct Resp { data: CfModEntry }
+        struct Resp {
+            data: CfModEntry,
+        }
         cf_get::<Resp>(&path).await?.data
     } else {
         let slug_encoded = urlencoding::encode(project_id);
         let path = format!("/mods/search?gameId=432&slug={}", slug_encoded);
         let resp: CfSearchResponse = cf_get(&path).await?;
-        resp.data.into_iter().next().ok_or_else(|| {
-            format!("CurseForge 未找到 slug={} 的 mod", project_id)
-        })?
+        resp.data
+            .into_iter()
+            .next()
+            .ok_or_else(|| format!("CurseForge 未找到 slug={} 的 mod", project_id))?
     };
 
     let project = convert_project(&entry, rtype);

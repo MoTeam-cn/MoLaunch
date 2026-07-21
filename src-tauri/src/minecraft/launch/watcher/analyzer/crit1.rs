@@ -42,7 +42,9 @@ fn analyze_crash_report(
         return None;
     }
 
-    if log_crash.contains("Unable to make protected final java.lang.Class java.lang.ClassLoader.defineClass") {
+    if log_crash.contains(
+        "Unable to make protected final java.lang.Class java.lang.ClassLoader.defineClass",
+    ) {
         return Some(make_crash_info(
             "Java 版本过高",
             CrashCategory::Java,
@@ -55,7 +57,8 @@ fn analyze_crash_report(
             "Mod 过多导致超出 ID 限制",
             CrashCategory::Mod,
             "安装的 Mod 过多，超出了游戏的 ID 限制。\n请尝试移除部分不常用的 Mod。",
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
     if log_crash.contains("Pixel format not accelerated") {
@@ -71,7 +74,8 @@ fn analyze_crash_report(
             "玩家手动触发调试崩溃",
             CrashCategory::Unknown,
             "事实上，你的游戏没有任何问题，这是你自己触发的崩溃（F3+C）。",
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
 
@@ -103,7 +107,8 @@ fn analyze_game_log(
             "无法创建 Java 虚拟机",
             CrashCategory::Java,
             "Java 虚拟机创建失败。\n请检查 JVM 参数是否正确，或尝试更换 Java 版本。",
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
     if log_mc_l.contains("the driver does not appear to support opengl") {
@@ -130,7 +135,8 @@ fn analyze_game_log(
             "使用了不兼容的 OpenJ9 Java",
             CrashCategory::Java,
             "游戏不兼容 OpenJ9 虚拟机。\n请更换为 HotSpot 版本的 Java。",
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
     if log_mc_l.contains("java.lang.outofmemoryerror")
@@ -149,14 +155,16 @@ fn analyze_game_log(
                 "使用 32 位 Java 导致 JVM 无法分配足够内存",
                 CrashCategory::Java,
                 "32 位 Java 无法分配足够的内存。\n请更换为 64 位 Java。",
-                error_lines, crash_report_path,
+                error_lines,
+                crash_report_path,
             ));
         }
         return Some(make_crash_info(
             "内存不足",
             CrashCategory::Memory,
             "JVM 无法保留足够的内存空间。\n请尝试减少游戏内存分配，或关闭其他占用内存的程序。",
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
     if log_mc_l.contains("1282: invalid operation") {
@@ -164,7 +172,8 @@ fn analyze_game_log(
             "光影或资源包导致 OpenGL 1282 错误",
             CrashCategory::Graphics,
             "光影或资源包导致了 OpenGL 错误。\n请尝试移除最近安装的光影或资源包。",
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
     if log_mc_l.contains("duplicate mod") || log_mc_l.contains("duplicate mods found") {
@@ -172,7 +181,8 @@ fn analyze_game_log(
             "Mod 重复安装",
             CrashCategory::Mod,
             "检测到重复安装的 Mod。\n请检查 mods 文件夹，移除重复的 Mod 文件。",
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
     if log_mc_l.contains("missing or unsupported mandatory dependencies") {
@@ -188,7 +198,8 @@ fn analyze_game_log(
             "使用了 JDK 而非 JRE",
             CrashCategory::Java,
             "游戏似乎因为使用了 JDK 而非 JRE 而崩溃。\n请更换为 JRE 版本的 Java。",
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
     // ClassNotFoundException: 主类或关键类找不到（通常是 Fabric/Forge 加载器库缺失）
@@ -202,7 +213,10 @@ fn analyze_game_log(
                 "Fabric 加载器库缺失",
                 "Fabric Loader 的 jar 文件未正确加入 classpath。\n这通常是版本安装不完整导致的。\n请尝试重新安装该版本的 Fabric 加载器，或重新创建版本。".to_string(),
             )
-        } else if class_hint.contains("forge") || class_hint.contains("fml") || class_hint.contains("modlauncher") {
+        } else if class_hint.contains("forge")
+            || class_hint.contains("fml")
+            || class_hint.contains("modlauncher")
+        {
             (
                 "Forge 加载器库缺失",
                 "Forge 的核心库未正确加入 classpath。\n这通常是版本安装不完整导致的。\n请尝试重新安装该版本的 Forge 加载器，或重新创建版本。".to_string(),
@@ -222,7 +236,8 @@ fn analyze_game_log(
             reason,
             CrashCategory::Unknown,
             &suggestion,
-            error_lines, crash_report_path,
+            error_lines,
+            crash_report_path,
         ));
     }
     // 确定的 Mod 导致崩溃
@@ -231,7 +246,10 @@ fn analyze_game_log(
             reason: format!("Mod '{}' 导致游戏崩溃", mod_name),
             category: CrashCategory::Mod,
             log_lines: error_lines.to_vec(),
-            suggestion: format!("名为 {} 的 Mod 导致了游戏出错。\n你可以尝试禁用此 Mod，然后观察游戏是否还会崩溃。", mod_name),
+            suggestion: format!(
+                "名为 {} 的 Mod 导致了游戏出错。\n你可以尝试禁用此 Mod，然后观察游戏是否还会崩溃。",
+                mod_name
+            ),
             problematic_mod: Some(mod_name),
             crash_report_path: crash_report_path.map(|p| p.to_string_lossy().to_string()),
             log_tail: Vec::new(),

@@ -9,19 +9,19 @@
 //! - `util`: 格式化工具
 
 use std::path::Path;
-use std::sync::{Arc, Mutex as StdMutex};
 use std::sync::atomic::AtomicBool;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Instant;
 use tokio::sync::Mutex;
 
 use crate::{log_debug, log_info, log_warn};
 
-use super::rate_limiter::RateLimiter;
-use super::types::{DownloadStatus, GlobalProgress};
 use self::download::download_chunk;
 use self::merge::merge_chunks;
 use self::probe::probe_file_size;
 use self::util::{format_bytes, format_speed};
+use super::rate_limiter::RateLimiter;
+use super::types::{DownloadStatus, GlobalProgress};
 
 pub mod download;
 pub mod merge;
@@ -151,8 +151,7 @@ pub async fn download_chunked(
 
         let handle = tokio::spawn(async move {
             let result = download_chunk(
-                &client, &url, &part_path, start, end, limiter, prog, i, file_prog,
-                pause, cancel,
+                &client, &url, &part_path, start, end, limiter, prog, i, file_prog, pause, cancel,
             )
             .await;
             (i, result)

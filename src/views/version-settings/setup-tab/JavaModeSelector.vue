@@ -228,8 +228,8 @@ watch(personalization, async (p) => {
     <!-- custom 模式：子组件接管（列表选择 + 导入 + 刷新 + 警告） -->
     <JavaCustomMode
       v-else-if="javaMode === 'custom'"
-      v-model:customJavaPath="customJavaPath"
-      v-model:refreshingJava="refreshingJava"
+      v-model:custom-java-path="customJavaPath"
+      v-model:refreshing-java="refreshingJava"
       :java-reqs="javaReqs"
     />
   </div>

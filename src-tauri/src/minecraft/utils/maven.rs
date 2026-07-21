@@ -33,5 +33,7 @@ pub fn maven_to_relative_path(name: &str) -> String {
 ///
 /// 基于 `maven_to_relative_path` 拼接 `game_dir/libraries/` 前缀。
 pub fn maven_to_local_path(name: &str, game_dir: &Path) -> PathBuf {
-    game_dir.join("libraries").join(maven_to_relative_path(name))
+    game_dir
+        .join("libraries")
+        .join(maven_to_relative_path(name))
 }

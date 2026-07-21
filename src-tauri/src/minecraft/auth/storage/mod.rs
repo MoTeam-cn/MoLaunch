@@ -27,10 +27,9 @@ use tokio::sync::Mutex as TokioMutex;
 
 use crate::storage::registry::{reg_delete, reg_get, reg_key, reg_set};
 use registry::{
-    ALL_KEYS, KEY_LEGACY_NAME, KEY_LEGACY_UUID,
-    KEY_LOGIN_TYPE, KEY_MS_ACCOUNTS, KEY_MS_CURRENT_ACCESS, KEY_MS_CURRENT_EXPIRES,
-    KEY_MS_CURRENT_NAME, KEY_MS_CURRENT_PROFILE, KEY_MS_CURRENT_REFRESH, KEY_MS_CURRENT_UUID,
-    KEY_OFFLINE_ACCOUNTS,
+    ALL_KEYS, KEY_LEGACY_NAME, KEY_LEGACY_UUID, KEY_LOGIN_TYPE, KEY_MS_ACCOUNTS,
+    KEY_MS_CURRENT_ACCESS, KEY_MS_CURRENT_EXPIRES, KEY_MS_CURRENT_NAME, KEY_MS_CURRENT_PROFILE,
+    KEY_MS_CURRENT_REFRESH, KEY_MS_CURRENT_UUID, KEY_OFFLINE_ACCOUNTS,
 };
 
 // ============================================================
@@ -85,7 +84,12 @@ impl AuthStorage {
 
     /// 加密并写入注册表
     #[cfg(windows)]
-    async fn reg_set_encrypted(&self, key: &winreg::RegKey, name: &str, value: &str) -> Result<(), String> {
+    async fn reg_set_encrypted(
+        &self,
+        key: &winreg::RegKey,
+        name: &str,
+        value: &str,
+    ) -> Result<(), String> {
         let encrypted = self.encrypt(value).await?;
         reg_set(key, name, &encrypted)
     }
@@ -197,7 +201,8 @@ impl AuthStorage {
             // 读取离线账号列表
             if let Some(offline_json) = self.reg_get_decrypted(&key, KEY_OFFLINE_ACCOUNTS).await {
                 if !offline_json.is_empty() {
-                    state.offline_accounts = serde_json::from_str(&offline_json).unwrap_or_default();
+                    state.offline_accounts =
+                        serde_json::from_str(&offline_json).unwrap_or_default();
                 }
             }
 
@@ -295,7 +300,8 @@ impl AuthStorage {
             if !state.offline_accounts.is_empty() {
                 let json = serde_json::to_string(&state.offline_accounts)
                     .map_err(|e| format!("序列化离线账号列表失败: {}", e))?;
-                self.reg_set_encrypted(&key, KEY_OFFLINE_ACCOUNTS, &json).await?;
+                self.reg_set_encrypted(&key, KEY_OFFLINE_ACCOUNTS, &json)
+                    .await?;
             }
 
             // 更新内存缓存

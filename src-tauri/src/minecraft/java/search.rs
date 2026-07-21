@@ -155,11 +155,7 @@ fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
         // .jdks 全搜索
         search_folder_recursive(&base.join(".jdks"), &mut collector, true);
         // .sdkman 全搜索
-        search_folder_recursive(
-            &base.join(".sdkman/candidates/java"),
-            &mut collector,
-            true,
-        );
+        search_folder_recursive(&base.join(".sdkman/candidates/java"), &mut collector, true);
     }
 
     // Step 4: 启动器目录全搜索

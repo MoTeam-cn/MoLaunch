@@ -49,7 +49,9 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
                 Some(f) => match tokio::time::timeout(
                     std::time::Duration::from_secs(PLATFORM_TIMEOUT_SECS),
                     f,
-                ).await {
+                )
+                .await
+                {
                     Ok(Ok(r)) => Some(r),
                     Ok(Err(e)) => {
                         crate::log_warn!("[Community] CF 搜索失败: {}", e);
@@ -68,7 +70,9 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
                 Some(f) => match tokio::time::timeout(
                     std::time::Duration::from_secs(PLATFORM_TIMEOUT_SECS),
                     f,
-                ).await {
+                )
+                .await
+                {
                     Ok(Ok(r)) => Some(r),
                     Ok(Err(e)) => {
                         crate::log_warn!("[Community] MR 搜索失败: {}", e);
@@ -113,10 +117,7 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
     let projects = sort_projects(projects, has_query, rtype);
 
     // 限制单页数量
-    let projects: Vec<ResourceProject> = projects
-        .into_iter()
-        .take(PAGE_SIZE as usize)
-        .collect();
+    let projects: Vec<ResourceProject> = projects.into_iter().take(PAGE_SIZE as usize).collect();
 
     Ok(SearchResult {
         projects,

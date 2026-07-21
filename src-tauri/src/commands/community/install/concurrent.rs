@@ -50,18 +50,19 @@ pub(super) async fn download_files_concurrent(
     // 直接用 sync_stage_from_progress 统一同步，无需额外 timer / 原子计数器 / 速度计算
     let progress_state = state.download_state.clone();
     let progress_stage_index = stage_index;
-    let progress_callback: Arc<dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync> =
-        Arc::new(move |p| {
-            let mut ds = progress_state.lock().unwrap();
-            ds.sync_stage_from_progress(
-                progress_stage_index,
-                p.downloaded_bytes,
-                p.total_bytes,
-                p.completed_files,
-                p.total_files,
-                p.current_speed,
-            );
-        });
+    let progress_callback: Arc<
+        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
+    > = Arc::new(move |p| {
+        let mut ds = progress_state.lock().unwrap();
+        ds.sync_stage_from_progress(
+            progress_stage_index,
+            p.downloaded_bytes,
+            p.total_bytes,
+            p.completed_files,
+            p.total_files,
+            p.current_speed,
+        );
+    });
 
     // 用 DownloadManager 下载（自动分片 + 多线程 + 重试 + URL fallback）
     let config = state.config.lock().await;
@@ -135,8 +136,7 @@ pub(super) fn extract_overrides(
         let target = instance_dir.join(relative);
         if let Some(parent) = target.parent() {
             if !parent.exists() {
-                std::fs::create_dir_all(parent)
-                    .map_err(|e| format!("创建目录失败: {}", e))?;
+                std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
             }
         }
 
@@ -145,8 +145,7 @@ pub(super) fn extract_overrides(
             entry
                 .read_to_end(&mut buf)
                 .map_err(|e| format!("读取文件失败: {}", e))?;
-            std::fs::write(&target, &buf)
-                .map_err(|e| format!("写入文件失败: {}", e))?;
+            std::fs::write(&target, &buf).map_err(|e| format!("写入文件失败: {}", e))?;
             count += 1;
         }
 
@@ -169,8 +168,8 @@ pub(super) fn extract_overrides(
 pub(super) fn detect_modpack_format(
     archive: &mut zip::ZipArchive<std::fs::File>,
 ) -> Result<(super::types::ModpackFormat, Option<String>, Option<String>), String> {
-    use std::io::Read;
     use super::types::ModpackFormat;
+    use std::io::Read;
     let mut cf_content: Option<String> = None;
     let mut mr_content: Option<String> = None;
 
@@ -200,7 +199,9 @@ pub(super) fn detect_modpack_format(
         (Some(_), _) => ModpackFormat::Curseforge,
         (_, Some(_)) => ModpackFormat::Modrinth,
         (None, None) => {
-            return Err("无法识别的整合包格式：未找到 manifest.json 或 modrinth.index.json".to_string());
+            return Err(
+                "无法识别的整合包格式：未找到 manifest.json 或 modrinth.index.json".to_string(),
+            );
         }
     };
 

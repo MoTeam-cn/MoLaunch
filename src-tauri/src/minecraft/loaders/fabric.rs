@@ -111,7 +111,9 @@ pub async fn install(
     // 验证 profile JSON 已写入
     let profile_path = version_dir.join(format!("{}.json", version_id));
     if !profile_path.exists() {
-        return Err(anyhow::anyhow!("Fabric profile JSON not found after download"));
+        return Err(anyhow::anyhow!(
+            "Fabric profile JSON not found after download"
+        ));
     }
 
     crate::log_info!("[Fabric] Installed: {}", version_id);

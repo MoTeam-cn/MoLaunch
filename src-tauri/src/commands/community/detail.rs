@@ -2,7 +2,9 @@
 
 use crate::minecraft::community::curseforge;
 use crate::minecraft::community::modrinth;
-use crate::minecraft::community::types::{Platform, ResourceProject, ResourceVersion, ResourceType};
+use crate::minecraft::community::types::{
+    Platform, ResourceProject, ResourceType, ResourceVersion,
+};
 use serde::Deserialize;
 
 /// 工程详情请求
@@ -41,6 +43,8 @@ pub async fn get_project_versions(
 /// 查不到返回 None，前端可回退到搜索 URL
 #[tauri::command]
 pub async fn get_mcmod_url(platform: Platform, slug: String) -> Result<Option<String>, String> {
-    Ok(crate::minecraft::community::mcmod::lookup_class_id(platform, &slug)
-        .map(|id| format!("https://www.mcmod.cn/class/{}.html", id)))
+    Ok(
+        crate::minecraft::community::mcmod::lookup_class_id(platform, &slug)
+            .map(|id| format!("https://www.mcmod.cn/class/{}.html", id)),
+    )
 }

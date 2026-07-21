@@ -23,8 +23,9 @@ static PROJECT_CACHE: once_cell::sync::Lazy<Mutex<HashMap<String, CacheEntry<Res
     once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
 
 /// 版本列表缓存: key = "platform:id"
-static VERSIONS_CACHE: once_cell::sync::Lazy<Mutex<HashMap<String, CacheEntry<Vec<ResourceVersion>>>>> =
-    once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
+static VERSIONS_CACHE: once_cell::sync::Lazy<
+    Mutex<HashMap<String, CacheEntry<Vec<ResourceVersion>>>>,
+> = once_cell::sync::Lazy::new(|| Mutex::new(HashMap::new()));
 
 fn project_key(platform: &str, id: &str) -> String {
     format!("{}:{}", platform, id)

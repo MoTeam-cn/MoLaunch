@@ -10,7 +10,9 @@ pub(super) fn extract_mod_from_keyword(text: &str, prefix: &str) -> Option<Strin
     if let Some(pos) = text_l.find(&prefix_l) {
         let rest = &text[pos + prefix_l.len()..];
         // 取到行尾或下一个空格
-        let end = rest.find(|c: char| c == '\n' || c == '\r').unwrap_or(rest.len());
+        let end = rest
+            .find(|c: char| c == '\n' || c == '\r')
+            .unwrap_or(rest.len());
         let mod_name = rest[..end].trim();
         if !mod_name.is_empty() {
             return Some(mod_name.to_string());

@@ -132,11 +132,8 @@ impl LaunchPipeline {
             // 先检查进程是否退出（非阻塞：借用 watch 的已接收值）
             {
                 let mut rx = exit_rx.clone();
-                match tokio::time::timeout(
-                    tokio::time::Duration::from_millis(200),
-                    rx.changed(),
-                )
-                .await
+                match tokio::time::timeout(tokio::time::Duration::from_millis(200), rx.changed())
+                    .await
                 {
                     Ok(Ok(())) => {
                         if let Some(ref info) = *rx.borrow() {

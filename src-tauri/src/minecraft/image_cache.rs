@@ -105,8 +105,7 @@ fn cache_image_url(url: &str) -> String {
 /// 这些 URL 只在 WebView 内部有效，后端 reqwest 等 HTTP 客户端无法访问，
 /// 需要通过 `read_cache_by_url` 直接读取本地缓存文件。
 pub fn is_cache_url(url: &str) -> bool {
-    url.starts_with("https://cache-image.localhost/")
-        || url.starts_with("cache-image://localhost/")
+    url.starts_with("https://cache-image.localhost/") || url.starts_with("cache-image://localhost/")
 }
 
 /// 从 cache-image 虚拟 URL 读取本地缓存文件内容
@@ -144,7 +143,9 @@ pub fn parse_hash_from_request(uri: &str) -> Option<String> {
     // 取路径最后一部分
     let filename = path.rsplit('/').next()?;
     // 去掉 .png 后缀
-    let hash = filename.strip_suffix(".png").or_else(|| filename.strip_suffix(".PNG"))?;
+    let hash = filename
+        .strip_suffix(".png")
+        .or_else(|| filename.strip_suffix(".PNG"))?;
 
     // 验证 hash 格式（SHA1 是 40 位十六进制）
     if hash.len() == 40 && hash.chars().all(|c| c.is_ascii_hexdigit()) {
@@ -274,11 +275,7 @@ async fn download_image(remote_url: &str) -> anyhow::Result<()> {
     let rel = cache_rel_path(remote_url);
     Cache::instance().write_bytes(&rel, &bytes)?;
 
-    crate::log_info!(
-        "[ImageCache] 已缓存: {} ({} 字节)",
-        remote_url,
-        bytes.len()
-    );
+    crate::log_info!("[ImageCache] 已缓存: {} ({} 字节)", remote_url, bytes.len());
 
     Ok(())
 }

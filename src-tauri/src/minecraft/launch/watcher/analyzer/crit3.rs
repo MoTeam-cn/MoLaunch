@@ -38,15 +38,19 @@ pub(super) fn analyze_crit3(
                 "Mod 初始化失败",
                 CrashCategory::Mod,
                 "某个 Mod 在初始化时失败。\n请检查 Mod 的前置要求，或尝试移除最近安装的 Mod。",
-                error_lines, crash_report_path,
+                error_lines,
+                crash_report_path,
             ));
         }
-        if log_mc_l.contains("an exception was thrown, the game will display an error screen and halt") {
+        if log_mc_l
+            .contains("an exception was thrown, the game will display an error screen and halt")
+        {
             return Some(make_crash_info(
                 "Forge 报错",
                 CrashCategory::Forge,
                 "Forge 抛出了异常并停止了游戏。\n请查看日志了解具体错误，或尝试重新安装 Forge。",
-                error_lines, crash_report_path,
+                error_lines,
+                crash_report_path,
             ));
         }
         if log_mc_l.contains("a potential solution has been determined") {
@@ -54,7 +58,8 @@ pub(super) fn analyze_crit3(
                 "Fabric 报错并给出解决方案",
                 CrashCategory::Fabric,
                 "Fabric 报告了错误并给出了可能的解决方案。\n请查看日志中 Fabric 提供的建议。",
-                error_lines, crash_report_path,
+                error_lines,
+                crash_report_path,
             ));
         }
     }
@@ -73,7 +78,8 @@ pub(super) fn analyze_crit3(
                 "特定实体导致崩溃",
                 CrashCategory::Mod,
                 "游戏在处理某个实体时崩溃。\n请尝试移除可能引起问题的实体。",
-                error_lines, crash_report_path,
+                error_lines,
+                crash_report_path,
             ));
         }
     }

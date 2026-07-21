@@ -340,8 +340,8 @@ pub fn read_log_file(filename: String) -> Result<String, String> {
 ///
 /// 保留短字符串和普通日志内容，只替换明显的 token 特征。
 pub fn sanitize_sensitive_info(s: &str) -> String {
-    use std::sync::OnceLock;
     use regex::Regex;
+    use std::sync::OnceLock;
 
     static JWT_RE: OnceLock<Regex> = OnceLock::new();
     static JSON_TOKEN_RE: OnceLock<Regex> = OnceLock::new();

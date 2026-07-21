@@ -71,8 +71,7 @@ pub(crate) fn find_loader_version_dir(versions_dir: &Path, mc_version: &str) -> 
         let dir_name = entry.file_name().to_string_lossy().to_string();
         if dir_name.starts_with(&format!("{}-forge-", mc_version))
             || dir_name.starts_with(&format!("{}-neoforge-", mc_version))
-            || (dir_name.starts_with("fabric-")
-                && dir_name.ends_with(&format!("-{}", mc_version)))
+            || (dir_name.starts_with("fabric-") && dir_name.ends_with(&format!("-{}", mc_version)))
             || dir_name.starts_with(&format!("{}-OptiFine", mc_version))
             || dir_name.starts_with(&format!("{}-LiteLoader", mc_version))
         {

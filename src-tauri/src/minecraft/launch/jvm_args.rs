@@ -127,7 +127,10 @@ fn add_json_jvm_args(
                         None
                     }
                 });
-                let rules = obj.get("rules").and_then(|r| r.as_array()).map(|a| a.clone());
+                let rules = obj
+                    .get("rules")
+                    .and_then(|r| r.as_array())
+                    .map(|a| a.clone());
                 match value {
                     Some(v) => (v, rules),
                     None => continue,
@@ -179,8 +182,7 @@ fn add_jlw_args(
             if major >= 9 {
                 args.push("--add-exports".to_string());
                 args.push(
-                    "cpw.mods.bootstraplauncher/cpw.mods.bootstraplauncher=ALL-UNNAMED"
-                        .to_string(),
+                    "cpw.mods.bootstraplauncher/cpw.mods.bootstraplauncher=ALL-UNNAMED".to_string(),
                 );
             }
         }
@@ -188,7 +190,9 @@ fn add_jlw_args(
         let pure_dir = game_dir_str.trim_end_matches('\\').trim_end_matches('/');
         args.push(format!("-Doolloo.jlw.tmpdir={}", pure_dir));
         // -jar java-wrapper.jar 必须放在 JVM args 末尾，作为入口接管 mainClass
-        if let Some(wrapper_path) = resolve_embedded_jar("java-wrapper.jar", "launch/java-wrapper.jar") {
+        if let Some(wrapper_path) =
+            resolve_embedded_jar("java-wrapper.jar", "launch/java-wrapper.jar")
+        {
             args.push("-jar".to_string());
             args.push(wrapper_path.to_string_lossy().to_string());
         } else {

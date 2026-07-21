@@ -153,8 +153,8 @@ pub fn resolve_isolation_mode(
     let version_dir = game_dir.join("versions").join(version_id);
     let setup = VersionSetup::load_or_create(&version_dir, version_id);
     match setup.indie_type.unwrap_or(0) {
-        1 => 4, // 强制隔离 → IsolationAll
-        2 => 0, // 强制不隔离 → IsolationNone
+        1 => 4,           // 强制隔离 → IsolationAll
+        2 => 0,           // 强制不隔离 → IsolationNone
         _ => global_mode, // 跟随全局
     }
 }
@@ -278,12 +278,8 @@ pub async fn get_version_effective_dir(
     let isolation_mode = resolve_isolation_mode(&game_dir, &version_id, global_isolation_mode);
     let version_type = detect_version_type_from_dir(&game_dir, &version_id);
     let mode = IsolationMode::from_u32(isolation_mode);
-    let effective_dir = isolation::get_effective_game_dir(
-        &game_dir,
-        &version_id,
-        mode,
-        version_type,
-    );
+    let effective_dir =
+        isolation::get_effective_game_dir(&game_dir, &version_id, mode, version_type);
 
     Ok(effective_dir.to_string_lossy().to_string())
 }

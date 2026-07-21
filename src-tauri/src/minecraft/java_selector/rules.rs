@@ -24,7 +24,10 @@ pub fn get_required_java_version(mc_version: &str) -> u32 {
 ///
 /// # 返回
 /// `(min, max)`，None 表示该方向无约束。多条件叠加取最严格区间（收紧取交）
-pub fn get_java_version_range(mc_version: &str, loader: Option<&str>) -> (Option<u32>, Option<u32>) {
+pub fn get_java_version_range(
+    mc_version: &str,
+    loader: Option<&str>,
+) -> (Option<u32>, Option<u32>) {
     let parts: Vec<&str> = mc_version.split('.').collect();
     let major: u32 = parts.first().and_then(|s| s.parse().ok()).unwrap_or(1);
     let minor: u32 = parts.get(1).and_then(|s| s.parse().ok()).unwrap_or(0);

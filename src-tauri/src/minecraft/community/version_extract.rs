@@ -37,7 +37,10 @@ pub fn extract_version_from_name(name: &str) -> String {
             while end < chars.len() {
                 if chars[end].is_ascii_digit() {
                     end += 1;
-                } else if chars[end] == '.' && end + 1 < chars.len() && chars[end + 1].is_ascii_digit() {
+                } else if chars[end] == '.'
+                    && end + 1 < chars.len()
+                    && chars[end + 1].is_ascii_digit()
+                {
                     end += 2;
                 } else {
                     break;

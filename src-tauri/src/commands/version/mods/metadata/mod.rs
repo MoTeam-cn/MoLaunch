@@ -18,7 +18,10 @@
 mod sources;
 
 use super::types::{ModMeta, ModMetadata};
-use sources::{merge_fabric_mod_json, merge_fml_cache_annotation, merge_mcmod_info, merge_mods_toml, read_manifest_version};
+use sources::{
+    merge_fabric_mod_json, merge_fml_cache_annotation, merge_mcmod_info, merge_mods_toml,
+    read_manifest_version,
+};
 
 /// 从 jar 文件内读取 mod 元数据：译名、描述、版本号、slug
 ///
@@ -132,7 +135,9 @@ impl MetaBuilder {
 
 /// 判断是否为有效版本号（只含数字、点、减号，对应正则 `[0-9.\-]+`）
 fn is_valid_version(v: &str) -> bool {
-    !v.is_empty() && v.chars().all(|c| c.is_ascii_digit() || c == '.' || c == '-')
+    !v.is_empty()
+        && v.chars()
+            .all(|c| c.is_ascii_digit() || c == '.' || c == '-')
 }
 
 /// 把中间结构 ModMeta 转换为最终 ModMetadata（查译名 + 版本号 fallback）
@@ -147,7 +152,9 @@ fn finalize_metadata(meta: ModMeta, path: &std::path::Path) -> ModMetadata {
     let version = if meta.version.is_empty() {
         path.file_name()
             .and_then(|n| n.to_str())
-            .map(|name| crate::minecraft::community::version_extract::extract_version_from_name(name))
+            .map(|name| {
+                crate::minecraft::community::version_extract::extract_version_from_name(name)
+            })
             .unwrap_or_default()
     } else {
         meta.version

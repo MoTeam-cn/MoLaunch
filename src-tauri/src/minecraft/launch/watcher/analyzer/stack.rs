@@ -32,7 +32,8 @@ pub(super) fn analyze_stack(
     // 从 hs_err 的 THREAD 段提取
     if !log_hs.is_empty() {
         if let Some(thread_start) = log_hs.find("T H R E A D") {
-            let thread_section = if let Some(reg_start) = log_hs[thread_start..].find("Registers:") {
+            let thread_section = if let Some(reg_start) = log_hs[thread_start..].find("Registers:")
+            {
                 &log_hs[thread_start..thread_start + reg_start]
             } else {
                 &log_hs[thread_start..]
@@ -67,11 +68,25 @@ pub(super) fn analyze_stack(
 fn extract_stack_keywords(text: &str) -> Vec<String> {
     let mut results = Vec::new();
     let excluded_packages = [
-        "java.", "javax.", "sun.", "com.sun.", "jdk.", "oolloo.",
-        "org.lwjgl", "net.minecraftforge", "paulscode.sound", "com.mojang",
-        "net.minecraft", "cpw.mods", "com.google", "org.apache",
-        "org.spongepowered", "net.fabricmc", "com.mumfrey",
-        "com.electronwill.nightconfig", "it.unimi.dsi",
+        "java.",
+        "javax.",
+        "sun.",
+        "com.sun.",
+        "jdk.",
+        "oolloo.",
+        "org.lwjgl",
+        "net.minecraftforge",
+        "paulscode.sound",
+        "com.mojang",
+        "net.minecraft",
+        "cpw.mods",
+        "com.google",
+        "org.apache",
+        "org.spongepowered",
+        "net.fabricmc",
+        "com.mumfrey",
+        "com.electronwill.nightconfig",
+        "it.unimi.dsi",
         "MojangTricksIntelDriversForPerformance",
     ];
 
@@ -96,14 +111,44 @@ fn extract_stack_keywords(text: &str) -> Vec<String> {
                     }
                     let word_l = word.to_lowercase();
                     // 排除通用词
-                    if matches!(word_l.as_str(),
-                        "com" | "org" | "net" | "asm" | "fml" | "mod" | "forge" |
-                        "fabric" | "minecraft" | "optifine" | "internal" | "common" |
-                        "core" | "api" | "util" | "lib" | "client" | "server" |
-                        "event" | "config" | "block" | "item" | "entity" | "render" |
-                        "world" | "game" | "player" | "tile" | "gui" | "screen" |
-                        "packet" | "network" | "registry" | "loader" | "mixin" |
-                        "concurrent"
+                    if matches!(
+                        word_l.as_str(),
+                        "com"
+                            | "org"
+                            | "net"
+                            | "asm"
+                            | "fml"
+                            | "mod"
+                            | "forge"
+                            | "fabric"
+                            | "minecraft"
+                            | "optifine"
+                            | "internal"
+                            | "common"
+                            | "core"
+                            | "api"
+                            | "util"
+                            | "lib"
+                            | "client"
+                            | "server"
+                            | "event"
+                            | "config"
+                            | "block"
+                            | "item"
+                            | "entity"
+                            | "render"
+                            | "world"
+                            | "game"
+                            | "player"
+                            | "tile"
+                            | "gui"
+                            | "screen"
+                            | "packet"
+                            | "network"
+                            | "registry"
+                            | "loader"
+                            | "mixin"
+                            | "concurrent"
                     ) {
                         continue;
                     }
@@ -127,7 +172,11 @@ fn analyze_mod_name(keywords: &[String]) -> Option<Vec<String>> {
     }
     let unique: Vec<String> = {
         let mut seen = std::collections::HashSet::new();
-        keywords.iter().filter(|k| seen.insert((*k).clone())).cloned().collect()
+        keywords
+            .iter()
+            .filter(|k| seen.insert((*k).clone()))
+            .cloned()
+            .collect()
     };
     if unique.is_empty() {
         None

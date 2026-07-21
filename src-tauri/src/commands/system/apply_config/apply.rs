@@ -8,11 +8,11 @@
 //! 6 个域子函数：代理 / 下载 / 内存 / 启动器 / 社区 / 启动高级。
 //! CurseForge 与开发者模式不在闭包内（分别走 secure_storage 与注册表）。
 
-use crate::log_info;
-use crate::state::AppState;
 use super::secure;
 use super::types::ConfigPatch;
 use super::validate;
+use crate::log_info;
+use crate::state::AppState;
 use tauri::State;
 
 /// 配置更新核心逻辑（从扁平参数构建 `ConfigPatch` 后调用）

@@ -94,6 +94,12 @@ pub(crate) fn save_file_cache(version_id: &str, mods: &HashMap<String, CachedMod
 /// 净化缓存文件名（防止 version_id 含特殊字符）
 fn sanitize_cache_key(s: &str) -> String {
     s.chars()
-        .map(|c| if c.is_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }

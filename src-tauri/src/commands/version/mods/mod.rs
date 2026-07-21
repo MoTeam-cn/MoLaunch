@@ -36,10 +36,10 @@ use helpers::sanitize_file_name;
 // （pub use 同时也会把项带入当前作用域供本文件内使用，无需重复 use）
 // 注意：ModMetadata 在 metadata.rs 中是私有 use 引入的（use super::types::ModMetadata），
 // 故必须从 types 直接重导出，不能走 metadata 中转
-pub use types::ModInfo;
-pub(crate) use types::ModMetadata;
 pub(crate) use helpers::get_mods_dir;
 pub(crate) use metadata::read_mod_metadata;
+pub use types::ModInfo;
+pub(crate) use types::ModMetadata;
 
 /// 判断版本是否可以安装 Mod
 ///
@@ -339,10 +339,7 @@ pub async fn install_mod(
 
 /// 打开版本的 mods 目录（自动创建）
 #[tauri::command]
-pub async fn open_mods_dir(
-    state: State<'_, AppState>,
-    version_id: String,
-) -> Result<(), String> {
+pub async fn open_mods_dir(state: State<'_, AppState>, version_id: String) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
     let mods_dir = get_mods_dir(&state, &version_id).await?;
 

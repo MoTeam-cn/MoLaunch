@@ -66,10 +66,11 @@ impl LaunchPipeline {
                         "linux"
                     };
 
-                    let classifier_key = match natives_field.get(platform_key).and_then(|v| v.as_str()) {
-                        Some(c) => c.to_string(),
-                        None => continue,
-                    };
+                    let classifier_key =
+                        match natives_field.get(platform_key).and_then(|v| v.as_str()) {
+                            Some(c) => c.to_string(),
+                            None => continue,
+                        };
 
                     if let Some(classifiers) = lib["downloads"]["classifiers"].as_object() {
                         let artifact = classifiers.get(&classifier_key).or_else(|| {

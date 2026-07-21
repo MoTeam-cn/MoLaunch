@@ -22,7 +22,12 @@ pub(super) fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyh
 
     // 递归收集当前版本及所有继承版本的 libraries（子版本优先）
     let mut all_libraries = Vec::new();
-    collect_libraries_recursive(game_dir, json, &mut all_libraries, &mut std::collections::HashSet::new());
+    collect_libraries_recursive(
+        game_dir,
+        json,
+        &mut all_libraries,
+        &mut std::collections::HashSet::new(),
+    );
 
     // 递归查找最深层的继承版本来获取原版jar
     let jar_version = find_original_version(game_dir, json);

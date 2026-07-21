@@ -36,8 +36,7 @@ pub fn total_bytes(files_to_download: &[(String, RuntimeFile)]) -> u64 {
 ///
 /// 存到官启默认 .minecraft 目录下，跨游戏目录共享，不随 game_dir 删除而丢失。
 pub fn get_runtime_dir(component: &str) -> Result<PathBuf, String> {
-    let appdata = std::env::var("APPDATA")
-        .map_err(|_| "无法获取 APPDATA 环境变量".to_string())?;
+    let appdata = std::env::var("APPDATA").map_err(|_| "无法获取 APPDATA 环境变量".to_string())?;
     Ok(PathBuf::from(appdata)
         .join(".minecraft")
         .join("runtime")
@@ -118,11 +117,7 @@ fn validate_path_traversal(
 ///
 /// 尺寸匹配后再做 SHA1 校验，避免攻击者预先放置任意内容绕过。
 /// 返回 true 表示可跳过下载。
-fn should_skip_existing(
-    local_path: &Path,
-    download_info: &DownloadInfo,
-    path_str: &str,
-) -> bool {
+fn should_skip_existing(local_path: &Path, download_info: &DownloadInfo, path_str: &str) -> bool {
     if !local_path.exists() {
         return false;
     }
@@ -242,10 +237,7 @@ pub async fn download_all_files(
         if !success {
             // 清理整个 runtime 目录
             let _ = std::fs::remove_dir_all(runtime_dir);
-            return Err(format!(
-                "下载文件失败: {} - {}",
-                path_str, download_err
-            ));
+            return Err(format!("下载文件失败: {} - {}", path_str, download_err));
         }
 
         // 设置可执行权限（Unix）
@@ -253,10 +245,8 @@ pub async fn download_all_files(
             #[cfg(unix)]
             {
                 use std::os::unix::fs::PermissionsExt;
-                let _ = std::fs::set_permissions(
-                    &local_path,
-                    std::fs::Permissions::from_mode(0o755),
-                );
+                let _ =
+                    std::fs::set_permissions(&local_path, std::fs::Permissions::from_mode(0o755));
             }
         }
 

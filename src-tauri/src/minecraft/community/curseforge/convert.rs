@@ -17,7 +17,12 @@ pub(crate) fn convert_project(entry: &CfModEntry, rtype: ResourceType) -> Resour
     let mod_loaders = entry
         .latest_files
         .iter()
-        .map(|f| f.game_versions.iter().map(|v| ModLoaders::from_str(v)).fold(0u32, |a, b| a | b))
+        .map(|f| {
+            f.game_versions
+                .iter()
+                .map(|v| ModLoaders::from_str(v))
+                .fold(0u32, |a, b| a | b)
+        })
         .fold(0u32, |a, b| a | b);
 
     let game_versions = entry
@@ -112,7 +117,8 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
 
     // 版本号 fallback：从 display_name 提取
     // CurseForge 的 displayName 通常类似 "jei-1.20.1-15.2.0.27.jar"
-    let version = crate::minecraft::community::version_extract::extract_version_from_name(&file.display_name);
+    let version =
+        crate::minecraft::community::version_extract::extract_version_from_name(&file.display_name);
 
     ResourceVersion {
         id: file.id.to_string(),

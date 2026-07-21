@@ -23,7 +23,9 @@ pub mod types;
 pub mod version_extract;
 
 pub use searcher::search;
-pub use types::{Platform, ResourceProject, ResourceVersion, ResourceType, SearchParams, SearchResult};
+pub use types::{
+    Platform, ResourceProject, ResourceType, ResourceVersion, SearchParams, SearchResult,
+};
 
 /// 读取社区资源来源策略
 ///

@@ -46,8 +46,7 @@ pub async fn get_config(
     };
 
     // 序列化为 JSON 对象，再转为扁平数组
-    let value = serde_json::to_value(&snapshot)
-        .map_err(|e| format!("序列化配置失败: {}", e))?;
+    let value = serde_json::to_value(&snapshot).map_err(|e| format!("序列化配置失败: {}", e))?;
     let map = value
         .as_object()
         .cloned()

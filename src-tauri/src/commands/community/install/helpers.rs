@@ -27,7 +27,11 @@ pub(super) fn format_bytes(bytes: u64) -> String {
 /// - 4: 仅原名
 ///
 /// 无译名时统一返回原名。扩展名（含 .jar.disabled 等多段后缀）原样保留。
-pub(super) fn apply_filename_format(original: &str, translated: Option<&str>, format: u8) -> String {
+pub(super) fn apply_filename_format(
+    original: &str,
+    translated: Option<&str>,
+    format: u8,
+) -> String {
     let translated = match translated {
         Some(t) if !t.is_empty() => t,
         _ => return original.to_string(),
@@ -120,7 +124,11 @@ pub(super) fn extract_mr_project_id(url: &str) -> Option<String> {
         let rest = &url[start + "/data/".len()..];
         if let Some(end) = rest.find('/') {
             let id = &rest[..end];
-            if !id.is_empty() && id.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+            if !id.is_empty()
+                && id
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+            {
                 return Some(id.to_string());
             }
         }

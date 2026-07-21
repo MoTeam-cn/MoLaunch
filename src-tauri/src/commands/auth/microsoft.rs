@@ -105,18 +105,30 @@ pub async fn ms_login_web_exchange(
 
     let oauth_token = match microsoft::exchange_auth_code(&code).await {
         Ok(t) => t,
-        Err(e) => return Ok(PollResult::Error { message: e.to_string() }),
+        Err(e) => {
+            return Ok(PollResult::Error {
+                message: e.to_string(),
+            })
+        }
     };
 
     let refresh_token = oauth_token.refresh_token.clone().unwrap_or_default();
-    complete_login(&app_handle, &state, &oauth_token.access_token, &refresh_token).await
+    complete_login(
+        &app_handle,
+        &state,
+        &oauth_token.access_token,
+        &refresh_token,
+    )
+    .await
 }
 
 /// Device Code Flow：申请设备码
 #[tauri::command]
 pub async fn ms_login_request_device_code() -> Result<DeviceCodeInfo, String> {
     log_info!("Requesting Microsoft device code");
-    let r = microsoft::request_device_code().await.map_err(|e| e.to_string())?;
+    let r = microsoft::request_device_code()
+        .await
+        .map_err(|e| e.to_string())?;
     Ok(DeviceCodeInfo {
         user_code: r.user_code,
         verification_uri: r.verification_uri,
@@ -139,7 +151,11 @@ pub async fn ms_login_poll(
         Err(e) => match e.error_code.as_deref() {
             Some("authorization_declined") => return Ok(PollResult::Declined),
             Some("expired_token") => return Ok(PollResult::Expired),
-            _ => return Ok(PollResult::Error { message: e.to_string() }),
+            _ => {
+                return Ok(PollResult::Error {
+                    message: e.to_string(),
+                })
+            }
         },
     };
 
@@ -157,20 +173,36 @@ pub async fn ms_login_poll(
 #[tauri::command]
 pub async fn ms_login_refresh(state: State<'_, AppState>) -> Result<LocalAuthResult, String> {
     log_info!("Attempting silent Microsoft token refresh");
-    let refresh_token = state.auth_storage.get_current_refresh_token().await
+    let refresh_token = state
+        .auth_storage
+        .get_current_refresh_token()
+        .await
         .map_err(|e| e.to_string())?
         .ok_or_else(|| "No refresh token available".to_string())?;
 
     let result = microsoft::login_with_refresh_token(&refresh_token, |_| {})
-        .await.map_err(|e| e.to_string())?;
+        .await
+        .map_err(|e| e.to_string())?;
 
-    if let Err(e) = state.auth_storage.update_ms_token(
-        &result.uuid, &result.access_token, &result.refresh_token, result.expires_at
-    ).await { log_warn!("Failed to update persisted token: {}", e); }
+    if let Err(e) = state
+        .auth_storage
+        .update_ms_token(
+            &result.uuid,
+            &result.access_token,
+            &result.refresh_token,
+            result.expires_at,
+        )
+        .await
+    {
+        log_warn!("Failed to update persisted token: {}", e);
+    }
 
     let auth_result = to_local_auth(&result);
-    { let mut auth = state.auth.lock().await;
-      auth.current_user = Some(auth_result.clone()); auth.is_logged_in = true; }
+    {
+        let mut auth = state.auth.lock().await;
+        auth.current_user = Some(auth_result.clone());
+        auth.is_logged_in = true;
+    }
     log_info!("Microsoft token refreshed successfully");
     Ok(auth_result)
 }
@@ -178,32 +210,46 @@ pub async fn ms_login_refresh(state: State<'_, AppState>) -> Result<LocalAuthRes
 /// 转换为 LocalAuthResult
 fn to_local_auth(r: &microsoft::MicrosoftLoginResult) -> LocalAuthResult {
     LocalAuthResult {
-        name: r.username.clone(), uuid: r.uuid.clone(),
-        access_token: r.access_token.clone(), client_token: String::new(),
-        login_type: "Microsoft".to_string(), profile_json: Some(r.profile_json.clone()),
+        name: r.username.clone(),
+        uuid: r.uuid.clone(),
+        access_token: r.access_token.clone(),
+        client_token: String::new(),
+        login_type: "Microsoft".to_string(),
+        profile_json: Some(r.profile_json.clone()),
     }
 }
 
 /// 完成 Token 交换链并持久化（Web Flow 和 Device Code Flow 共用）
 async fn complete_login(
-    app: &AppHandle, state: &State<'_, AppState>,
-    access_token: &str, refresh_token: &str,
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+    access_token: &str,
+    refresh_token: &str,
 ) -> Result<PollResult, String> {
     let app_handle = app.clone();
     match microsoft::complete_login_chain(access_token, refresh_token, |step| {
         let _ = app_handle.emit("ms-login-progress", step);
-    }).await {
+    })
+    .await
+    {
         Ok(login_result) => {
             if let Err(e) = state.auth_storage.save_ms_login(&login_result).await {
                 log_warn!("Failed to persist Microsoft login: {}", e);
             }
             let auth_result = to_local_auth(&login_result);
-            { let mut auth = state.auth.lock().await;
-              auth.current_user = Some(auth_result.clone()); auth.is_logged_in = true; }
+            {
+                let mut auth = state.auth.lock().await;
+                auth.current_user = Some(auth_result.clone());
+                auth.is_logged_in = true;
+            }
             log_info!("Microsoft login successful: user={}", login_result.username);
             Ok(PollResult::Success { auth: auth_result })
         }
-        Err(e) => { log_warn!("Login chain failed: {}", e);
-            Ok(PollResult::Error { message: e.to_string() }) }
+        Err(e) => {
+            log_warn!("Login chain failed: {}", e);
+            Ok(PollResult::Error {
+                message: e.to_string(),
+            })
+        }
     }
 }

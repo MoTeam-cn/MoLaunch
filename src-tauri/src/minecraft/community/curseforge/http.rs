@@ -38,7 +38,10 @@ pub(crate) async fn get_cf_config() -> (String, Option<String>, u8) {
     if enabled {
         if let Some(ref key) = api_key {
             if !key.is_empty() {
-                crate::log_debug!("[Community] CF 走官方 API（source={}, API Key 已配置）", source);
+                crate::log_debug!(
+                    "[Community] CF 走官方 API（source={}, API Key 已配置）",
+                    source
+                );
                 return (CF_OFFICIAL_BASE.to_string(), api_key, source);
             }
         }
@@ -81,15 +84,23 @@ pub(crate) async fn cf_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                 crate::log_warn!(
                     "[Community] CF 官方请求超时（{}s），{}",
                     CF_OFFICIAL_TIMEOUT_SECS,
-                    if source == 1 { "回退镜像" } else { "报错" }
+                    if source == 1 {
+                        "回退镜像"
+                    } else {
+                        "报错"
+                    }
                 );
-                Err(format!("CurseForge 官方请求超时（{}s）", CF_OFFICIAL_TIMEOUT_SECS))
+                Err(format!(
+                    "CurseForge 官方请求超时（{}s）",
+                    CF_OFFICIAL_TIMEOUT_SECS
+                ))
             }
         }
     } else {
         // 镜像请求不加超时（镜像本身可能较慢，让其自然完成）
         let req = build_cf_request(&url, api_key.as_deref());
-        req.send().await
+        req.send()
+            .await
             .map_err(|e| {
                 crate::log_warn!("[Community] CF 请求失败: {} ({:?})", url, e);
                 format!("CurseForge 请求失败: {}", e)
@@ -113,17 +124,19 @@ pub(crate) async fn cf_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                 crate::log_warn!("[Community] CF 官方请求失败，回退镜像: {}", e);
                 let mirror_url = format!("{}{}", CF_MIRROR_BASE, path);
                 let req = build_cf_request(&mirror_url, None);
-                let resp = req.send().await
-                    .map_err(|e| {
-                        crate::log_warn!("[Community] CF 镜像请求失败: {} ({:?})", mirror_url, e);
-                        format!("CurseForge 镜像请求失败: {}", e)
-                    })?;
-                let value: T = resp.json().await
-                    .map_err(|e| {
-                        crate::log_warn!("[Community] CF 镜像响应解析失败: {} ({})", mirror_url, e);
-                        format!("CurseForge 镜像响应解析失败: {}", e)
-                    })?;
-                crate::log_info!("[Community] CF 镜像请求成功: {} ({})", mirror_url, fmt_elapsed(start));
+                let resp = req.send().await.map_err(|e| {
+                    crate::log_warn!("[Community] CF 镜像请求失败: {} ({:?})", mirror_url, e);
+                    format!("CurseForge 镜像请求失败: {}", e)
+                })?;
+                let value: T = resp.json().await.map_err(|e| {
+                    crate::log_warn!("[Community] CF 镜像响应解析失败: {} ({})", mirror_url, e);
+                    format!("CurseForge 镜像响应解析失败: {}", e)
+                })?;
+                crate::log_info!(
+                    "[Community] CF 镜像请求成功: {} ({})",
+                    mirror_url,
+                    fmt_elapsed(start)
+                );
                 return Ok(value);
             }
             Err(e)
@@ -195,7 +208,11 @@ pub(crate) async fn cf_post<T: serde::de::DeserializeOwned>(
                 crate::log_warn!(
                     "[Community] CF POST 官方请求超时（{}s），{}",
                     CF_OFFICIAL_TIMEOUT_SECS,
-                    if source == 1 { "回退镜像" } else { "报错" }
+                    if source == 1 {
+                        "回退镜像"
+                    } else {
+                        "报错"
+                    }
                 );
                 Err(format!(
                     "CurseForge 官方请求超时（{}s）",
@@ -221,7 +238,11 @@ pub(crate) async fn cf_post<T: serde::de::DeserializeOwned>(
 
     match result {
         Ok(value) => {
-            crate::log_info!("[Community] CF POST 请求成功: {} ({})", url, fmt_elapsed(start));
+            crate::log_info!(
+                "[Community] CF POST 请求成功: {} ({})",
+                url,
+                fmt_elapsed(start)
+            );
             Ok(value)
         }
         Err(e) => {
@@ -231,11 +252,7 @@ pub(crate) async fn cf_post<T: serde::de::DeserializeOwned>(
                 let mirror_url = format!("{}{}", CF_MIRROR_BASE, path);
                 let req = build_cf_post_request(&mirror_url, None, body);
                 let resp = req.send().await.map_err(|e| {
-                    crate::log_warn!(
-                        "[Community] CF POST 镜像请求失败: {} ({:?})",
-                        mirror_url,
-                        e
-                    );
+                    crate::log_warn!("[Community] CF POST 镜像请求失败: {} ({:?})", mirror_url, e);
                     format!("CurseForge 镜像请求失败: {}", e)
                 })?;
                 let value: T = resp.json().await.map_err(|e| {

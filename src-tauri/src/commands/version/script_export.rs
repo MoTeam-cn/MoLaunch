@@ -5,8 +5,8 @@ use crate::state::AppState;
 use crate::{log_error, log_info, log_warn};
 use tauri::State;
 
-use super::sanitize_version_id;
 use super::list::resolve_isolation_mode;
+use super::sanitize_version_id;
 
 /// 导出启动脚本（.bat 批处理文件，使用绝对路径 Java + 版权信息）
 ///
@@ -139,8 +139,10 @@ pub async fn export_launch_script(
                             skin_name.as_str(),
                             "Alex" | "Ari" | "Efe" | "Makena" | "Noor" | "Sunny" | "Zuri"
                         );
-                        let adjusted_uuid =
-                            crate::minecraft::auth::adjust_uuid_for_skin_variant(&auth_info.uuid, slim);
+                        let adjusted_uuid = crate::minecraft::auth::adjust_uuid_for_skin_variant(
+                            &auth_info.uuid,
+                            slim,
+                        );
                         crate::minecraft::launch::AuthInfo {
                             uuid: adjusted_uuid,
                             ..auth_info
@@ -229,7 +231,8 @@ pub async fn export_launch_script(
     // Java 启动命令（使用绝对路径，不依赖系统 PATH）
     // 安全修复：对 game_args 中的敏感参数值脱敏，避免 access_token 明文写入 .bat 文件
     // 用户需手动填入 token，或在脚本中使用环境变量
-    let sanitized_game_args = crate::minecraft::launch::sanitize_args_for_log(&launch_args.game_args);
+    let sanitized_game_args =
+        crate::minecraft::launch::sanitize_args_for_log(&launch_args.game_args);
     let has_redacted = sanitized_game_args.iter().any(|a| a == "***");
     if has_redacted {
         script.push_str("REM [!] 警告：以下参数中的 accessToken / uuid 等敏感信息已脱敏为 ***\n");
@@ -281,10 +284,8 @@ async fn resolve_java_path(
 ) -> Result<std::path::PathBuf, String> {
     // 获取版本目录和 MC 版本号 + 加载器
     let version_dir = game_dir.join("versions").join(version_id);
-    let (mc_version, loader) = crate::minecraft::version::setup::detect_version_and_loader(
-        &version_dir,
-        version_id,
-    );
+    let (mc_version, loader) =
+        crate::minecraft::version::setup::detect_version_and_loader(&version_dir, version_id);
 
     // 1. 优先使用用户指定的 Java 路径（校验版本兼容性）
     if let Some(path) = user_java_path {
@@ -300,7 +301,9 @@ async fn resolve_java_path(
                             loader.as_deref(),
                         )
                     {
-                        let req_desc = crate::minecraft::java_selector::describe_java_requirement(cur_min, cur_max);
+                        let req_desc = crate::minecraft::java_selector::describe_java_requirement(
+                            cur_min, cur_max,
+                        );
                         return Err(format!(
                             "Java 版本不兼容：当前版本{}，{}。\n请前往 版本设置 → 游戏 Java 重新选择，或切换为「自动选择」",
                             java_ver, req_desc
@@ -336,10 +339,8 @@ async fn resolve_java_path(
         None,
     )
     .ok_or_else(|| {
-        let (min_req, max_req) = crate::minecraft::java_selector::get_java_version_range(
-            &mc_version,
-            loader.as_deref(),
-        );
+        let (min_req, max_req) =
+            crate::minecraft::java_selector::get_java_version_range(&mc_version, loader.as_deref());
         format!(
             "未找到满足 MC {} 要求的 Java (需要 Java {}-{})",
             mc_version,

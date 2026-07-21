@@ -3,9 +3,9 @@
 //! 这些方法仅依赖 `self.load()` 和 `self.save()`，与注册表读写细节解耦。
 //! Rust 允许同一结构体在多个文件中分散 impl 块。
 
+use super::super::microsoft::MicrosoftLoginResult;
 use super::types::{CurrentUser, StoredMsAccount, StoredOfflineAccount};
 use super::AuthStorage;
-use super::super::microsoft::MicrosoftLoginResult;
 
 impl AuthStorage {
     /// 保存微软登录结果并设为当前用户

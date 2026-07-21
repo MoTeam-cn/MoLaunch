@@ -44,10 +44,7 @@ impl LaunchPipeline {
         match result {
             Ok(Ok(output)) => {
                 if !output.status.success() {
-                    log_info!(
-                        "[PreLaunch] Command exited with status: {}",
-                        output.status
-                    );
+                    log_info!("[PreLaunch] Command exited with status: {}", output.status);
                 }
                 Ok(())
             }

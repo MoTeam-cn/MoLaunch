@@ -126,7 +126,7 @@ const variantClasses: Record<ActionVariant, string> = {
                 :disabled="batchProcessing || selectedCount === 0 || action.disabled"
                 @click="emit('action', action.key)"
               >
-                <component v-if="action.icon" :is="action.icon" class="w-3.5 h-3.5" />
+                <component :is="action.icon" v-if="action.icon" class="w-3.5 h-3.5" />
                 {{ action.label }}
               </button>
             </Tooltip>

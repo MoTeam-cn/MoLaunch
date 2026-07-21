@@ -192,7 +192,12 @@ fn enable_resourcepack_in_options(game_dir: &Path, mc_version: &str) {
                 // 判断数组是否为空
                 let array_content = &trimmed[trimmed.find('[').unwrap_or(0) + 1..close];
                 if array_content.trim().is_empty() {
-                    *line = format!("{}[{}]{}", &line[..line.find('[').unwrap_or(0)], desired_entry, after);
+                    *line = format!(
+                        "{}[{}]{}",
+                        &line[..line.find('[').unwrap_or(0)],
+                        desired_entry,
+                        after
+                    );
                 } else {
                     *line = format!("{},{}{}", before, desired_entry, after);
                 }
@@ -260,9 +265,8 @@ pub fn apply_skin_resourcepack(
         Some(name) if name.starts_with("custom:") => {
             // 自定义皮肤：从本地文件读取 PNG
             let custom_path = &name["custom:".len()..];
-            let skin_png = std::fs::read(custom_path).map_err(|e| {
-                anyhow::anyhow!("读取自定义皮肤文件失败 {}: {}", custom_path, e)
-            })?;
+            let skin_png = std::fs::read(custom_path)
+                .map_err(|e| anyhow::anyhow!("读取自定义皮肤文件失败 {}: {}", custom_path, e))?;
 
             // 验证 PNG 文件头
             if skin_png.len() < 8 || skin_png[0..5] != [0x89, 0x50, 0x4E, 0x47, 0x0D] {

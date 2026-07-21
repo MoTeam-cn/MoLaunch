@@ -125,11 +125,7 @@ pub async fn install(
         cb(0.0);
     }
 
-    crate::log_info!(
-        "[FabricAPI] 安装 {} -> {}",
-        file_name,
-        mods_dir.display()
-    );
+    crate::log_info!("[FabricAPI] 安装 {} -> {}", file_name, mods_dir.display());
 
     // 确保 mods 目录存在
     std::fs::create_dir_all(mods_dir)?;

@@ -49,7 +49,7 @@ export function loaderVisual(type: string): { label: string } {
  */
 export function stripModVersion(name: string): string {
   // 1. 去扩展名
-  let s = name.replace(/\.jar(\.disabled|\.old)?$/i, '').replace(/\.(litemod)(\.disabled|\.old)?$/i, '')
+  const s = name.replace(/\.jar(\.disabled|\.old)?$/i, '').replace(/\.(litemod)(\.disabled|\.old)?$/i, '')
   // 2. 在版本号处截断（版本号特征：-<数字>.<数字> 或 +<数字>.<数字> 或 _<数字>.<数字>）
   //    匹配如 -1.20 / -0.92.2 / -6.0.4 / +1.20.4 等
   const m = s.match(/^([^-\s+_]+(?:[-\s+_][^-\s+_]+)*?)[-+_]\d+\.\d+/)

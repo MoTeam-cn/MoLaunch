@@ -6,8 +6,14 @@ pub const JAVA_RUNTIME_INDEX_OFFICIAL: &str =
 
 /// 文件下载域名替换：Mojang 官方域名 → BMCLAPI
 pub const DOWNLOAD_DOMAIN_REPLACEMENTS: &[(&str, &str)] = &[
-    ("https://piston-data.mojang.com", "https://bmclapi2.bangbang93.com"),
-    ("https://piston-meta.mojang.com", "https://bmclapi2.bangbang93.com"),
+    (
+        "https://piston-data.mojang.com",
+        "https://bmclapi2.bangbang93.com",
+    ),
+    (
+        "https://piston-meta.mojang.com",
+        "https://bmclapi2.bangbang93.com",
+    ),
 ];
 
 /// Java 下载进度事件名

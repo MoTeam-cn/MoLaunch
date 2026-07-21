@@ -59,7 +59,10 @@ impl LaunchPipeline {
         // folder 模式：优先使用版本文件夹下的 Java（runtime/jre 子目录）
         if java_mode.eq_ignore_ascii_case("folder") {
             if let Some(folder_java) = self.find_version_folder_java(&version_dir) {
-                log_info!("[DetectJava] Using Java from version folder: {}", folder_java.display());
+                log_info!(
+                    "[DetectJava] Using Java from version folder: {}",
+                    folder_java.display()
+                );
                 return Ok(folder_java);
             }
             log_warn!("[DetectJava] folder 模式未在版本文件夹下找到 Java，回退到自动选择");
@@ -84,7 +87,10 @@ impl LaunchPipeline {
                                         loader.as_deref(),
                                     )
                                 {
-                                    let req_desc = crate::minecraft::java_selector::describe_java_requirement(cur_min, cur_max);
+                                    let req_desc =
+                                        crate::minecraft::java_selector::describe_java_requirement(
+                                            cur_min, cur_max,
+                                        );
                                     return Err(LaunchError {
                                         stage: LaunchStage::GetJava,
                                         message: format!(
@@ -161,10 +167,9 @@ impl LaunchPipeline {
                 .await;
 
                 let app_handle = self.config.app_handle.clone();
-                let dl_mode =
-                    crate::minecraft::sources::DownloadSourceMode::from_str(
-                        &self.config.download_source,
-                    );
+                let dl_mode = crate::minecraft::sources::DownloadSourceMode::from_str(
+                    &self.config.download_source,
+                );
                 let mirror_url = self.config.mirror_url.clone();
                 let downloaded = crate::minecraft::java::download::download_java_runtime(
                     target_major,
@@ -182,7 +187,10 @@ impl LaunchPipeline {
                     is_user_facing: true,
                 })?;
 
-                log_info!("[DetectJava] Auto-downloaded Java: {}", downloaded.display());
+                log_info!(
+                    "[DetectJava] Auto-downloaded Java: {}",
+                    downloaded.display()
+                );
                 downloaded.to_string_lossy().to_string()
             }
         };
@@ -245,7 +253,10 @@ impl LaunchPipeline {
     }
 
     /// 读取 MC 版本号和加载器类型（从 setup.ini 或 JSON）
-    fn read_mc_version_and_loader(&self, version_dir: &std::path::Path) -> (String, Option<String>) {
+    fn read_mc_version_and_loader(
+        &self,
+        version_dir: &std::path::Path,
+    ) -> (String, Option<String>) {
         crate::minecraft::version::setup::detect_version_and_loader(
             version_dir,
             &self.config.version_id,

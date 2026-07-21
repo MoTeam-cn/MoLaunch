@@ -26,8 +26,7 @@ pub(crate) fn merge_and_rename_version(
     // 确定最终的版本目录名
     let final_version_id = if has_any_loader {
         let versions_dir = game_dir.join("versions");
-        find_loader_version_dir(&versions_dir, mc_version)
-            .unwrap_or_else(|| mc_version.to_string())
+        find_loader_version_dir(&versions_dir, mc_version).unwrap_or_else(|| mc_version.to_string())
     } else {
         mc_version.to_string()
     };

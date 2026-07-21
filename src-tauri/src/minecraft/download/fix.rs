@@ -2,11 +2,11 @@
 
 use std::path::Path;
 
-use crate::log_info;
 use super::super::sources::DownloadSourceMode;
 use super::super::version::json_merge;
 use super::manager::DownloadManager;
 use super::stages::{download_assets, download_client_jar, download_libraries};
+use crate::log_info;
 
 /// 补全版本文件
 pub async fn fix_version_files(
@@ -51,7 +51,10 @@ pub async fn fix_version_files(
     )
     .await
     {
-        log_info!("[Fix] download_client_jar failed (may be expected for some versions): {}", e);
+        log_info!(
+            "[Fix] download_client_jar failed (may be expected for some versions): {}",
+            e
+        );
     }
 
     // 2. 下载 Libraries（启动时用快速检查模式）

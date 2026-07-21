@@ -11,10 +11,7 @@ use super::types::JavaRuntimeEntry;
 /// 根据 Java 大版本号匹配 Mojang component
 ///
 /// 返回 `(component_key, JavaRuntimeEntry)`；未匹配返回 `None`。
-pub fn match_component(
-    all_json: &Value,
-    target_major: u32,
-) -> Option<(String, JavaRuntimeEntry)> {
+pub fn match_component(all_json: &Value, target_major: u32) -> Option<(String, JavaRuntimeEntry)> {
     let platform = if cfg!(target_arch = "aarch64") {
         "windows-arm64"
     } else {

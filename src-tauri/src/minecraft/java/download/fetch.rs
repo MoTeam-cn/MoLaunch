@@ -18,12 +18,10 @@ pub async fn fetch_text_with_fallback(
     let mut last_err = String::new();
     for url in urls {
         match client.get(url).send().await {
-            Ok(resp) if resp.status().is_success() => {
-                match resp.text().await {
-                    Ok(text) => return Ok(text),
-                    Err(e) => last_err = format!("读取失败: {}", e),
-                }
-            }
+            Ok(resp) if resp.status().is_success() => match resp.text().await {
+                Ok(text) => return Ok(text),
+                Err(e) => last_err = format!("读取失败: {}", e),
+            },
             Ok(resp) => last_err = format!("HTTP {}", resp.status()),
             Err(e) => last_err = format!("请求失败: {}", e),
         }
@@ -54,12 +52,7 @@ pub async fn fetch_manifest(
     mirror_url: Option<&str>,
     mode: DownloadSourceMode,
 ) -> Result<RuntimeManifest, String> {
-    let urls = build_replace_urls(
-        manifest_url,
-        mirror_url,
-        DOWNLOAD_DOMAIN_REPLACEMENTS,
-        mode,
-    );
+    let urls = build_replace_urls(manifest_url, mirror_url, DOWNLOAD_DOMAIN_REPLACEMENTS, mode);
     let text = fetch_text_with_fallback(client, &urls).await?;
     serde_json::from_str(&text).map_err(|e| format!("解析文件清单失败: {}", e))
 }

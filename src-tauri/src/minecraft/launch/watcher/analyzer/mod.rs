@@ -83,7 +83,12 @@ pub(crate) async fn analyze_crash(
     let log_tail: Vec<String> = if !sources.latest_log_tail.is_empty() {
         sources.latest_log_tail
     } else {
-        logs.iter().rev().take(30).rev().map(|e| e.message.clone()).collect()
+        logs.iter()
+            .rev()
+            .take(30)
+            .rev()
+            .map(|e| e.message.clone())
+            .collect()
     };
 
     Some(CrashInfo {

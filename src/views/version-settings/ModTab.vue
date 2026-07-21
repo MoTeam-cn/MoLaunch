@@ -108,8 +108,8 @@ onUnmounted(() => {
 
     <div v-else class="flex h-full flex-col">
       <ModToolbar
-        v-model:modFilter="modFilter"
-        v-model:modSearch="modSearch"
+        v-model:mod-filter="modFilter"
+        v-model:mod-search="modSearch"
         :mods-loading="modsLoading"
         :filter-options="filterOptions"
         @install="handleInstallMod"

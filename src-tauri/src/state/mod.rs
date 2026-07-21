@@ -61,11 +61,13 @@ pub async fn resolve_game_dir_from_state(state: &AppState) -> PathBuf {
 /// ```
 pub async fn resolve_mirror_and_source(
     state: &AppState,
-) -> (Option<String>, crate::minecraft::sources::DownloadSourceMode) {
+) -> (
+    Option<String>,
+    crate::minecraft::sources::DownloadSourceMode,
+) {
     let config = state.config.lock().await;
     let mirror_url = config.mirror_url.clone();
     let source_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.meta_source);
     drop(config);
     (mirror_url, source_mode)
 }
-

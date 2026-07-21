@@ -83,7 +83,10 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                         "[Community] MR 官方请求超时（{}s），回退镜像",
                         MR_OFFICIAL_TIMEOUT_SECS
                     );
-                    Err(format!("Modrinth 官方请求超时（{}s）", MR_OFFICIAL_TIMEOUT_SECS))
+                    Err(format!(
+                        "Modrinth 官方请求超时（{}s）",
+                        MR_OFFICIAL_TIMEOUT_SECS
+                    ))
                 }
             }
         } else {
@@ -132,7 +135,11 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                         format!("Modrinth 镜像请求失败: {}", e)
                     })?;
                 let value: T = parse_resp::<T>(resp, &mirror_url).await?;
-                crate::log_info!("[Community] MR 镜像请求成功: {} ({})", mirror_url, fmt_elapsed(start));
+                crate::log_info!(
+                    "[Community] MR 镜像请求成功: {} ({})",
+                    mirror_url,
+                    fmt_elapsed(start)
+                );
                 return Ok(value);
             }
             Err(e)
@@ -221,7 +228,11 @@ pub(crate) async fn mr_post<T: serde::de::DeserializeOwned>(
 
     match result {
         Ok(value) => {
-            crate::log_info!("[Community] MR POST 请求成功: {} ({})", url, fmt_elapsed(start));
+            crate::log_info!(
+                "[Community] MR POST 请求成功: {} ({})",
+                url,
+                fmt_elapsed(start)
+            );
             Ok(value)
         }
         Err(e) => {

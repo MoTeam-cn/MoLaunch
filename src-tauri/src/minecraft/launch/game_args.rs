@@ -37,12 +37,20 @@ pub(super) fn build_game_args(
                     if let Some(s) = v.as_str() {
                         Some(s.to_string())
                     } else if let Some(arr) = v.as_array() {
-                        Some(arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect::<Vec<_>>().join(" "))
+                        Some(
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                                .collect::<Vec<_>>()
+                                .join(" "),
+                        )
                     } else {
                         None
                     }
                 });
-                let rules = obj.get("rules").and_then(|r| r.as_array()).map(|a| a.clone());
+                let rules = obj
+                    .get("rules")
+                    .and_then(|r| r.as_array())
+                    .map(|a| a.clone());
                 match value {
                     Some(v) => (v, rules),
                     None => continue,

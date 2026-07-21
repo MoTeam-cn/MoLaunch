@@ -101,8 +101,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
 
     // 自动模式：如果 memory_mode 为 "auto"，计算自动值用于运行时
     if app_config.memory_mode == "auto" {
-        let (suggested_min, suggested_max) =
-            crate::minecraft::system::suggest_memory();
+        let (suggested_min, suggested_max) = crate::minecraft::system::suggest_memory();
         app_config.min_memory = suggested_min;
         app_config.max_memory = suggested_max;
         log_info!(
@@ -127,10 +126,13 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.community_source = v.parse().unwrap_or(app_config.community_source);
     }
     if let Some(v) = config.get("Community", "filename_format") {
-        app_config.community_filename_format = v.parse().unwrap_or(app_config.community_filename_format);
+        app_config.community_filename_format =
+            v.parse().unwrap_or(app_config.community_filename_format);
     }
     if let Some(v) = config.get("Community", "mod_local_name_style") {
-        app_config.community_mod_local_name_style = v.parse().unwrap_or(app_config.community_mod_local_name_style);
+        app_config.community_mod_local_name_style = v
+            .parse()
+            .unwrap_or(app_config.community_mod_local_name_style);
     }
     if let Some(v) = config.get("Community", "ignore_quilt") {
         app_config.community_ignore_quilt = v == "true" || v == "1";
@@ -234,17 +236,61 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
 
     // Community
     ini.set("Community", "source", &config.community_source.to_string());
-    ini.set("Community", "filename_format", &config.community_filename_format.to_string());
-    ini.set("Community", "mod_local_name_style", &config.community_mod_local_name_style.to_string());
-    ini.set("Community", "ignore_quilt", if config.community_ignore_quilt { "true" } else { "false" });
+    ini.set(
+        "Community",
+        "filename_format",
+        &config.community_filename_format.to_string(),
+    );
+    ini.set(
+        "Community",
+        "mod_local_name_style",
+        &config.community_mod_local_name_style.to_string(),
+    );
+    ini.set(
+        "Community",
+        "ignore_quilt",
+        if config.community_ignore_quilt {
+            "true"
+        } else {
+            "false"
+        },
+    );
 
     // Launch（启动高级选项）
-    ini.set("Launch", "disable_jlw", if config.launch_disable_jlw { "true" } else { "false" });
-    ini.set("Launch", "disable_lua", if config.launch_disable_lua { "true" } else { "false" });
-    ini.set("Launch", "use_dedicated_gpu", if config.launch_use_dedicated_gpu { "true" } else { "false" });
+    ini.set(
+        "Launch",
+        "disable_jlw",
+        if config.launch_disable_jlw {
+            "true"
+        } else {
+            "false"
+        },
+    );
+    ini.set(
+        "Launch",
+        "disable_lua",
+        if config.launch_disable_lua {
+            "true"
+        } else {
+            "false"
+        },
+    );
+    ini.set(
+        "Launch",
+        "use_dedicated_gpu",
+        if config.launch_use_dedicated_gpu {
+            "true"
+        } else {
+            "false"
+        },
+    );
 
     // Version
-    ini.set("Version", "selected", config.selected_version.as_deref().unwrap_or(""));
+    ini.set(
+        "Version",
+        "selected",
+        config.selected_version.as_deref().unwrap_or(""),
+    );
 
     storage.write_config(&ini).map_err(|e| e.to_string())?;
     log_debug!("Config saved to storage");

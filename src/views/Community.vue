@@ -98,11 +98,11 @@ watch(() => props.resourceType, () => {
     <div class="px-4 py-3 bg-white border-b border-gray-100 shrink-0">
       <SearchBar
         v-model:query="query"
-        :resource-type="resourceType"
         v-model:game-version="gameVersion"
         v-model:mod-loader="modLoader"
         v-model:source="source"
         v-model:category="category"
+        :resource-type="resourceType"
         @search="page = 0; doSearch()"
         @reset="onReset"
       />

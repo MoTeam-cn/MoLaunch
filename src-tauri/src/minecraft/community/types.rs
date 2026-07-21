@@ -95,11 +95,21 @@ impl ModLoaders {
     /// 返回包含的加载器名称列表
     pub fn to_names(&self) -> Vec<String> {
         let mut names = Vec::new();
-        if self.contains(Self::FORGE) { names.push("Forge".into()); }
-        if self.contains(Self::NEOFORGE) { names.push("NeoForge".into()); }
-        if self.contains(Self::FABRIC) { names.push("Fabric".into()); }
-        if self.contains(Self::QUILT) { names.push("Quilt".into()); }
-        if self.contains(Self::LITELOADER) { names.push("LiteLoader".into()); }
+        if self.contains(Self::FORGE) {
+            names.push("Forge".into());
+        }
+        if self.contains(Self::NEOFORGE) {
+            names.push("NeoForge".into());
+        }
+        if self.contains(Self::FABRIC) {
+            names.push("Fabric".into());
+        }
+        if self.contains(Self::QUILT) {
+            names.push("Quilt".into());
+        }
+        if self.contains(Self::LITELOADER) {
+            names.push("LiteLoader".into());
+        }
         names
     }
 }

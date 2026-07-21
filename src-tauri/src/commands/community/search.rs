@@ -1,7 +1,7 @@
 //! 社区资源搜索命令
 
-use crate::minecraft::community::{search, SearchParams, SearchResult, ResourceType};
 use crate::minecraft::community::tags::get_categories as fetch_category_tags;
+use crate::minecraft::community::{search, ResourceType, SearchParams, SearchResult};
 use serde::{Deserialize, Serialize};
 
 /// 前端搜索请求参数
@@ -65,7 +65,9 @@ pub async fn search_resources(req: SearchRequest) -> Result<SearchResult, String
 
 /// 获取指定资源类型的分类标签列表
 #[tauri::command]
-pub async fn get_category_tags(resource_type: ResourceType) -> Result<Vec<CategoryTagInfo>, String> {
+pub async fn get_category_tags(
+    resource_type: ResourceType,
+) -> Result<Vec<CategoryTagInfo>, String> {
     let tags = fetch_category_tags(resource_type);
     Ok(tags
         .into_iter()

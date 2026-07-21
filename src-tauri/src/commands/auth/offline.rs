@@ -15,7 +15,9 @@ pub async fn login_offline(
     log_info!("Offline login attempt for user: {}", username);
 
     if !auth::validate_username(&username) {
-        return Err("用户名长度需为 1-16 个字符，仅支持中文、字母、数字、下划线和连字符".to_string());
+        return Err(
+            "用户名长度需为 1-16 个字符，仅支持中文、字母、数字、下划线和连字符".to_string(),
+        );
     }
 
     let result = auth::login_offline(&username);

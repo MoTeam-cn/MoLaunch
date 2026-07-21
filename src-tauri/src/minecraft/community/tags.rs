@@ -19,10 +19,7 @@ impl CategoryTag {
     /// 从 "CFId/MrSlug" 格式字符串解析
     pub fn from_combined(combined: &'static str, label: &'static str) -> Self {
         let parts: Vec<&'static str> = combined.split('/').collect();
-        let cf_id = parts
-            .first()
-            .and_then(|s| s.parse().ok())
-            .unwrap_or(0);
+        let cf_id = parts.first().and_then(|s| s.parse().ok()).unwrap_or(0);
         let mr_slug = parts.get(1).copied().unwrap_or("");
         Self {
             curseforge_id: cf_id,
@@ -64,7 +61,10 @@ pub fn translate_modrinth_tag(slug: &str) -> Option<&'static str> {
         return Some(t.label);
     }
     // 再在整合包分类里找
-    if let Some(t) = modpack_categories().iter().find(|t| t.modrinth_slug == slug) {
+    if let Some(t) = modpack_categories()
+        .iter()
+        .find(|t| t.modrinth_slug == slug)
+    {
         return Some(t.label);
     }
     // 特殊处理：加载器标签不翻译

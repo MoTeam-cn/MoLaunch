@@ -21,7 +21,9 @@ pub fn compute_curseforge_fingerprint(path: &Path) -> Result<u32, String> {
 /// Modrinth 用的 SHA1 哈希（hex 字符串）
 pub fn compute_modrinth_sha1(path: &Path) -> Result<String, String> {
     let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    Ok(crate::minecraft::utils::file_checker::compute_sha1_hex(&bytes))
+    Ok(crate::minecraft::utils::file_checker::compute_sha1_hex(
+        &bytes,
+    ))
 }
 
 /// MurmurHash2 算法

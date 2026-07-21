@@ -98,13 +98,16 @@ pub(super) async fn install_cf_mods(
     // 2. 批量查询 mod info 拿 slug（用于查 mcmod 译名 + 应用 community_filename_format）
     //    manifest 提供 project_id 列表，调用 CF /mods?modIds=... 批量查询
     let project_ids: Vec<i64> = manifest_files.iter().map(|f| f.project_id).collect();
-    let mod_slug_map = crate::minecraft::community::curseforge::batch_get_mod_slugs(&project_ids).await;
+    let mod_slug_map =
+        crate::minecraft::community::curseforge::batch_get_mod_slugs(&project_ids).await;
 
     // 3. 构造 file_id → 译名 映射（通过 manifest 关联 file_id 与 project_id）
-    let mut file_translated: std::collections::HashMap<i64, Option<String>> = std::collections::HashMap::new();
+    let mut file_translated: std::collections::HashMap<i64, Option<String>> =
+        std::collections::HashMap::new();
     for mf in manifest_files {
         let slug = mod_slug_map.get(&mf.project_id);
-        let translated = slug.and_then(|s| crate::minecraft::community::mcmod::lookup_cf(s).map(|n| n.to_string()));
+        let translated = slug
+            .and_then(|s| crate::minecraft::community::mcmod::lookup_cf(s).map(|n| n.to_string()));
         file_translated.insert(mf.file_id, translated);
     }
 
@@ -119,12 +122,18 @@ pub(super) async fn install_cf_mods(
             .download_url
             .clone()
             .filter(|u| !u.is_empty())
-            .unwrap_or_else(|| super::helpers::construct_cf_edge_url(entry.file_id, &entry.file_name));
+            .unwrap_or_else(|| {
+                super::helpers::construct_cf_edge_url(entry.file_id, &entry.file_name)
+            });
         // 构造官方 + 镜像双 URL 列表，交给 DownloadManager 自动 fallback
         let urls = crate::minecraft::sources::cdn_urls(&primary_url);
         // 应用 community_filename_format（无译名时 apply_filename_format 返回原名）
         let translated = file_translated.get(&entry.file_id).cloned().flatten();
-        let final_name = super::helpers::apply_filename_format(&entry.file_name, translated.as_deref(), filename_format);
+        let final_name = super::helpers::apply_filename_format(
+            &entry.file_name,
+            translated.as_deref(),
+            filename_format,
+        );
         if final_name != entry.file_name {
             log_info!(
                 "[Community] CF mod 文件名重命名: {} → {}",
@@ -133,7 +142,11 @@ pub(super) async fn install_cf_mods(
             );
         }
         let target = mods_dir.join(&final_name);
-        download_list.push((urls, target.to_string_lossy().to_string(), entry.file_length));
+        download_list.push((
+            urls,
+            target.to_string_lossy().to_string(),
+            entry.file_length,
+        ));
         total_bytes += entry.file_length;
     }
 
@@ -144,7 +157,14 @@ pub(super) async fn install_cf_mods(
     );
 
     // 6. 并发下载
-    super::concurrent::download_files_concurrent(state, 2, &download_list, max_threads, total_bytes).await?;
+    super::concurrent::download_files_concurrent(
+        state,
+        2,
+        &download_list,
+        max_threads,
+        total_bytes,
+    )
+    .await?;
 
     log_info!("[Community] CF mods 下载完成 ({} 个)", download_list.len());
     Ok(())

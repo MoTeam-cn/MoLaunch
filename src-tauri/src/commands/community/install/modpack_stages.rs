@@ -5,11 +5,11 @@
 //! - `parse_modpack_info`：Stage 1，解析 manifest.json / modrinth.index.json 得到整合包信息
 
 use crate::log_info;
-use crate::state::{AppState, StageStatus};
-use crate::minecraft::download::types::DownloadStatus;
 use crate::minecraft::download::manager::DownloadManager;
+use crate::minecraft::download::types::DownloadStatus;
 use crate::minecraft::download::types::DownloadTask;
 use crate::minecraft::sources::DownloadSourceMode;
+use crate::state::{AppState, StageStatus};
 use std::sync::Arc;
 
 use super::curseforge::CfManifest;
@@ -46,18 +46,19 @@ pub(super) async fn download_modpack_archive(
 
     // stage 0 的进度回调：统一用 sync_stage_from_progress 同步 GlobalProgress 到 download_state
     let stage0_state = state.download_state.clone();
-    let stage0_callback: Arc<dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync> =
-        Arc::new(move |p| {
-            let mut ds = stage0_state.lock().unwrap();
-            ds.sync_stage_from_progress(
-                0,
-                p.downloaded_bytes,
-                p.total_bytes,
-                p.completed_files,
-                p.total_files,
-                p.current_speed,
-            );
-        });
+    let stage0_callback: Arc<
+        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
+    > = Arc::new(move |p| {
+        let mut ds = stage0_state.lock().unwrap();
+        ds.sync_stage_from_progress(
+            0,
+            p.downloaded_bytes,
+            p.total_bytes,
+            p.completed_files,
+            p.total_files,
+            p.current_speed,
+        );
+    });
 
     let config = state.config.lock().await;
     let chunk_count = config.chunk_count.max(1) as usize;
@@ -69,15 +70,13 @@ pub(super) async fn download_modpack_archive(
         .download_batch(vec![archive_task], Some(stage0_callback))
         .await;
 
-    let archive_err = archive_results
-        .first()
-        .and_then(|r| {
-            if r.status != DownloadStatus::Completed && r.status != DownloadStatus::Skipped {
-                r.error.clone()
-            } else {
-                None
-            }
-        });
+    let archive_err = archive_results.first().and_then(|r| {
+        if r.status != DownloadStatus::Completed && r.status != DownloadStatus::Skipped {
+            r.error.clone()
+        } else {
+            None
+        }
+    });
 
     if let Some(err) = archive_err {
         let msg = format!("下载整合包失败: {}", err);
@@ -146,7 +145,11 @@ pub(super) fn parse_modpack_info(
         ModpackFormat::Modrinth => {
             let index: MrIndex = serde_json::from_str(index_content.unwrap())
                 .map_err(|e| format!("解析 modrinth.index.json 失败: {}", e))?;
-            let gv = index.dependencies.get("minecraft").cloned().unwrap_or_default();
+            let gv = index
+                .dependencies
+                .get("minecraft")
+                .cloned()
+                .unwrap_or_default();
             let (loader, ver) = ["fabric-loader", "quilt-loader", "forge", "neoforge"]
                 .iter()
                 .find_map(|key| {

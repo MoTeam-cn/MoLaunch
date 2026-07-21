@@ -217,16 +217,15 @@ pub async fn check_java_compatible(
 
     let (min, max) = java_selector::get_java_version_range(&mc_version, loader.as_deref());
 
-    let check = java_selector::check_java_compatible(current_version, &mc_version, loader.as_deref());
+    let check =
+        java_selector::check_java_compatible(current_version, &mc_version, loader.as_deref());
 
     let warning = match &check {
         Ok(()) => String::new(),
         Err((cur, min_req, max_req)) => {
-            let req_desc = crate::minecraft::java_selector::describe_java_requirement(*min_req, *max_req);
-            format!(
-                "当前版本{}，{}，可能导致游戏崩溃",
-                cur, req_desc
-            )
+            let req_desc =
+                crate::minecraft::java_selector::describe_java_requirement(*min_req, *max_req);
+            format!("当前版本{}，{}，可能导致游戏崩溃", cur, req_desc)
         }
     };
 

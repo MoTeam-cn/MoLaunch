@@ -1,6 +1,8 @@
 //! 版本启动命令
 
-use crate::minecraft::launch::{self, AuthInfo, CrashCategory, CrashInfo, LaunchConfig, LaunchPipeline, LaunchStage};
+use crate::minecraft::launch::{
+    self, AuthInfo, CrashCategory, CrashInfo, LaunchConfig, LaunchPipeline, LaunchStage,
+};
 use crate::minecraft::version::setup::VersionSetup;
 use crate::state::{resolve_game_dir, AppState};
 use crate::{log_debug, log_error, log_info, log_warn};
@@ -111,19 +113,16 @@ pub async fn launch_game(
     // - setup.memory_mode = Some("auto") → 根据系统内存动态计算（版本独立自动）
     // - setup.memory_mode = Some("custom") → 使用 setup.min_memory/max_memory
     // - None / 空 / 其他 → 回退到全局 config.min_memory/max_memory
-    let (resolved_min_mem, resolved_max_mem) = match setup
-        .memory_mode
-        .as_deref()
-        .filter(|s| !s.is_empty())
-    {
-        Some("auto") => crate::minecraft::system::suggest_memory(),
-        Some("custom") => {
-            let max = setup.max_memory.unwrap_or(config.max_memory);
-            let min = setup.min_memory.unwrap_or_else(|| max / 2);
-            (min, max)
-        }
-        _ => (config.min_memory, config.max_memory),
-    };
+    let (resolved_min_mem, resolved_max_mem) =
+        match setup.memory_mode.as_deref().filter(|s| !s.is_empty()) {
+            Some("auto") => crate::minecraft::system::suggest_memory(),
+            Some("custom") => {
+                let max = setup.max_memory.unwrap_or(config.max_memory);
+                let min = setup.min_memory.unwrap_or_else(|| max / 2);
+                (min, max)
+            }
+            _ => (config.min_memory, config.max_memory),
+        };
 
     // 构建认证信息
     // 安全修复：从后端 auth_storage 获取 access_token，避免前端 IPC 明文传输 token
@@ -136,10 +135,7 @@ pub async fn launch_game(
                 if let Some(ref current) = auth_state.current_user {
                     // 验证 current_user 的 uuid 与前端传入的 uuid 一致（防止越权）
                     if current.uuid == uuid {
-                        (
-                            current.access_token.clone(),
-                            current.client_token.clone(),
-                        )
+                        (current.access_token.clone(), current.client_token.clone())
                     } else {
                         log_warn!(
                             "当前登录账号 UUID ({}) 与请求的 UUID ({}) 不一致，使用空 token",
@@ -189,8 +185,10 @@ pub async fn launch_game(
                                 "Alex" | "Ari" | "Efe" | "Makena" | "Noor" | "Sunny" | "Zuri"
                             )
                         };
-                        let adjusted_uuid =
-                            crate::minecraft::auth::adjust_uuid_for_skin_variant(&auth_info.uuid, slim);
+                        let adjusted_uuid = crate::minecraft::auth::adjust_uuid_for_skin_variant(
+                            &auth_info.uuid,
+                            slim,
+                        );
                         if adjusted_uuid != auth_info.uuid {
                             log_info!(
                                 "离线皮肤 UUID 调整: {} -> {} (skin={}, slim={})",
@@ -223,17 +221,12 @@ pub async fn launch_game(
     // 方案 B：离线账号皮肤资源包替换
     // 生成资源包 zip 替换原版玩家纹理，确保 1.19.3+ 也精确显示选定角色
     if is_legacy {
-        let skin_to_apply = state
-            .auth_storage
-            .load()
-            .await
-            .ok()
-            .and_then(|s| {
-                s.offline_accounts
-                    .iter()
-                    .find(|a| a.uuid == auth_info.uuid)
-                    .and_then(|a| a.skin.clone())
-            });
+        let skin_to_apply = state.auth_storage.load().await.ok().and_then(|s| {
+            s.offline_accounts
+                .iter()
+                .find(|a| a.uuid == auth_info.uuid)
+                .and_then(|a| a.skin.clone())
+        });
 
         match crate::minecraft::launch::skin_resourcepack::apply_skin_resourcepack(
             &game_dir,
@@ -363,7 +356,11 @@ pub async fn launch_game(
                 }
             });
 
-            log_info!("[Watcher] 崩溃分析完成（启动失败路径）: {}（类别: {:?}）", crash_info.reason, crash_info.category);
+            log_info!(
+                "[Watcher] 崩溃分析完成（启动失败路径）: {}（类别: {:?}）",
+                crash_info.reason,
+                crash_info.category
+            );
 
             // 清理启动状态
             *state.current_pid.lock().await = None;

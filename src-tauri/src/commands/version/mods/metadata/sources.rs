@@ -6,8 +6,8 @@
 //! 3. META-INF/mods.toml（Forge 1.13+/NeoForge）
 //! 4. META-INF/fml_cache_annotation.json（Forge 1.7-1.12 注解缓存）
 
-use std::io::Read;
 use std::collections::HashMap;
+use std::io::Read;
 
 use super::MetaBuilder;
 
@@ -41,7 +41,10 @@ pub(super) fn merge_mcmod_info<R: Read + std::io::Seek>(
         None => return,
     };
 
-    let modid = first.get("modid").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let modid = first
+        .get("modid")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     builder.set_slug(modid);
 
     if let Some(desc) = first.get("description").and_then(|v| v.as_str()) {
@@ -79,7 +82,10 @@ pub(super) fn merge_fabric_mod_json<R: Read + std::io::Seek>(
         Err(_) => return,
     };
 
-    let id = json.get("id").and_then(|v| v.as_str()).map(|s| s.to_string());
+    let id = json
+        .get("id")
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string());
     builder.set_slug(id);
 
     if let Some(desc) = json.get("description").and_then(|v| v.as_str()) {

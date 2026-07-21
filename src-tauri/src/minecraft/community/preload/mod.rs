@@ -30,10 +30,10 @@ use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
 use super::common::fmt_elapsed;
+use crate::minecraft::image_cache;
 use cache::{load_file_cache, save_file_cache};
 use jar_metadata::read_jar_metadata_and_hash;
 use online_query::query_and_merge;
-use crate::minecraft::image_cache;
 
 pub use hash::{compute_curseforge_fingerprint, compute_modrinth_sha1};
 // pub use 同时把项带入当前作用域供本文件内使用，无需重复 use（参考 mods/mod.rs 模式）
@@ -47,11 +47,7 @@ pub use types::{PreloadModInput, PreloadUpdate};
 /// 3. 并发调 CF `/fingerprints` + MR `/version_files` 批量查询工程详情
 /// 4. 每查到一个 project 就 emit
 /// 5. 全部完成后写持久化缓存
-pub async fn preload_mods_detail(
-    app: AppHandle,
-    version_id: String,
-    mods: Vec<PreloadModInput>,
-) {
+pub async fn preload_mods_detail(app: AppHandle, version_id: String, mods: Vec<PreloadModInput>) {
     if mods.is_empty() {
         return;
     }
@@ -67,10 +63,7 @@ pub async fn preload_mods_detail(
     // 1. 读取持久化缓存，命中则直接推送（不联网、不读 jar）
     let (cached, is_fresh) = load_file_cache(&version_id);
     if is_fresh && !cached.is_empty() {
-        crate::log_info!(
-            "[Preload] 缓存命中 {} 条，直接推送（不联网）",
-            cached.len()
-        );
+        crate::log_info!("[Preload] 缓存命中 {} 条，直接推送（不联网）", cached.len());
         for (file_name, cm) in &cached {
             // 从 project.logo_url 重新计算 cached_logo_url
             // （image_cache 状态可能已变化：首次未命中缓存的图片现在可能已下载完成）
@@ -127,7 +120,11 @@ pub async fn preload_mods_detail(
         "[Preload] 预加载完成：CF 命中 {}，MR 命中 {}，共 {} / {} 个 mod 有 project（总耗时 {}）",
         stats.cf_count,
         stats.mr_count,
-        stats.cache_map.values().filter(|c| c.project.is_some()).count(),
+        stats
+            .cache_map
+            .values()
+            .filter(|c| c.project.is_some())
+            .count(),
         hashed_mods.len(),
         fmt_elapsed(start)
     );

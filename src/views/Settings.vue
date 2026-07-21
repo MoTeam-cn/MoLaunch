@@ -6,6 +6,7 @@ import SettingsPersonal from './settings/SettingsPersonal.vue'
 import SettingsAdvanced from './settings/SettingsAdvanced.vue'
 import SettingsOther from './settings/SettingsOther.vue'
 import SettingsDeveloper from './settings/SettingsDeveloper.vue'
+import SettingsMore from './settings/SettingsMore.vue'
 import { getConfigMap } from '@/utils/api/config'
 import {
   RocketLaunchIcon,
@@ -14,6 +15,7 @@ import {
   ArrowDownTrayIcon,
   CogIcon,
   CommandLineIcon,
+  InformationCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const activeCategory = ref('launch')
@@ -25,6 +27,7 @@ const baseCategories = [
   { id: 'personal', label: '个性化', icon: PaintBrushIcon, desc: '主题、布局、语言等外观设置' },
   { id: 'advanced', label: '高阶配置', icon: CogIcon, desc: '代理、高级参数等' },
   { id: 'other', label: '其他', icon: EllipsisHorizontalIcon, desc: '日志、SDK 信息' },
+  { id: 'about', label: '更多', icon: InformationCircleIcon, desc: '关于 MoLaunch、鸣谢、教程、法律信息' },
 ]
 
 // 开发者菜单项（仅在开发者模式开启时追加到末尾）
@@ -106,12 +109,16 @@ onUnmounted(() => {
         <p class="text-xs text-gray-500 mt-1">{{ activeDesc() }}</p>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-6">
+      <div
+        class="flex-1 overflow-y-auto"
+        :class="activeCategory === 'about' ? '' : 'p-6'"
+      >
         <SettingsLaunch v-if="activeCategory === 'launch'" />
         <SettingsDownload v-else-if="activeCategory === 'download'" />
         <SettingsPersonal v-else-if="activeCategory === 'personal'" />
         <SettingsAdvanced v-else-if="activeCategory === 'advanced'" />
         <SettingsOther v-else-if="activeCategory === 'other'" />
+        <SettingsMore v-else-if="activeCategory === 'about'" />
         <SettingsDeveloper v-else-if="activeCategory === 'developer'" />
       </div>
     </div>

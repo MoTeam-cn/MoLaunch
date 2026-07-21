@@ -25,6 +25,6 @@ pub use fix::fix_version_files;
 pub use full_download::{download_version_full, VersionDownloadResult};
 pub use util::fetch_url;
 pub use version_list::{
-    fetch_version_list, get_latest_versions, get_version_json_url, parse_version_list, VersionEntry,
-    VersionListResult,
+    fetch_version_list, get_latest_versions, get_version_json_url, parse_version_list,
+    VersionEntry, VersionListResult,
 };

@@ -80,7 +80,8 @@ async function copyName() {
       </p>
       <p class="text-xs text-gray-500 mt-0.5 line-clamp-2">{{ project.description }}</p>
       <div class="flex items-center gap-2 mt-1.5">
-        <span class="px-1.5 py-0.5 rounded text-[10px] font-medium"
+        <span
+class="px-1.5 py-0.5 rounded text-[10px] font-medium"
           :class="project.platform === 'CurseForge' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'">
           {{ project.platform }}
         </span>

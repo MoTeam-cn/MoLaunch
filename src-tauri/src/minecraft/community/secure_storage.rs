@@ -101,15 +101,21 @@ async fn ensure_api_key_decrypted() {
 
     crate::log_info!(
         "[Community] CF api_key 解密完成: {}",
-        if api_key.is_some() { "已配置" } else { "未配置" }
+        if api_key.is_some() {
+            "已配置"
+        } else {
+            "未配置"
+        }
     );
 
     // 写入结果（double-check 防止竞态）
-    let state = STATE.get_or_init(|| RwLock::new(State {
-        enabled: false,
-        api_key: None,
-        decrypted: false,
-    }));
+    let state = STATE.get_or_init(|| {
+        RwLock::new(State {
+            enabled: false,
+            api_key: None,
+            decrypted: false,
+        })
+    });
     let mut guard = state.write().unwrap();
     if !guard.decrypted {
         guard.api_key = api_key;
@@ -174,11 +180,13 @@ pub async fn save(
         .map_err(|e| e.to_string())?;
 
     // 更新内存缓存
-    let state = STATE.get_or_init(|| RwLock::new(State {
-        enabled: false,
-        api_key: None,
-        decrypted: false,
-    }));
+    let state = STATE.get_or_init(|| {
+        RwLock::new(State {
+            enabled: false,
+            api_key: None,
+            decrypted: false,
+        })
+    });
     {
         let mut g = state.write().unwrap();
         g.enabled = enabled;
@@ -193,7 +201,11 @@ pub async fn save(
     crate::log_info!(
         "[Community] CF 配置已保存: enabled={}, api_key={}",
         enabled,
-        if api_key.is_empty() { "已清空" } else { "已更新" }
+        if api_key.is_empty() {
+            "已清空"
+        } else {
+            "已更新"
+        }
     );
 
     Ok(())

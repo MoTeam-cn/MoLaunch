@@ -51,13 +51,19 @@ pub(super) fn collect_sources(logs: &[LogEntry], game_dir: &Path) -> CollectedSo
     // 读取 hs_err_pid*.log（JVM 崩溃报告，3分钟内）
     let hs_err_text = read_latest_hs_err(game_dir);
     if !hs_err_text.is_empty() {
-        crate::log_info!("[CrashAnalyzer] 找到 hs_err_pid 日志（{}字符）", hs_err_text.len());
+        crate::log_info!(
+            "[CrashAnalyzer] 找到 hs_err_pid 日志（{}字符）",
+            hs_err_text.len()
+        );
     }
 
     // 读取 logs/latest.log 尾部（500行）
     let latest_log_tail = read_latest_log_tail(game_dir, 500);
     if !latest_log_tail.is_empty() {
-        crate::log_info!("[CrashAnalyzer] 读取 latest.log 尾部（{}行）", latest_log_tail.len());
+        crate::log_info!(
+            "[CrashAnalyzer] 读取 latest.log 尾部（{}行）",
+            latest_log_tail.len()
+        );
     }
 
     CollectedSources {

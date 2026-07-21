@@ -6,8 +6,8 @@
 
 use std::path::Path;
 
-use super::helpers::{extract_maven_version, parse_ini};
 use super::super::state::VersionType;
+use super::helpers::{extract_maven_version, parse_ini};
 use super::types::VersionSetup;
 
 impl VersionSetup {
@@ -52,16 +52,30 @@ impl VersionSetup {
             advance_run_cmd: ini.get("AdvanceRunCmd").cloned(),
             java_path: ini.get("JavaPath").cloned(),
             java_mode: ini.get("JavaMode").cloned(),
-            java_version_min: ini.get("JavaVersionMin").and_then(|s| s.parse::<u32>().ok()),
-            java_version_max: ini.get("JavaVersionMax").and_then(|s| s.parse::<u32>().ok()),
+            java_version_min: ini
+                .get("JavaVersionMin")
+                .and_then(|s| s.parse::<u32>().ok()),
+            java_version_max: ini
+                .get("JavaVersionMax")
+                .and_then(|s| s.parse::<u32>().ok()),
             memory_mode: ini.get("MemoryMode").cloned(),
             min_memory: ini.get("MinMemory").and_then(|s| s.parse::<u32>().ok()),
             max_memory: ini.get("MaxMemory").and_then(|s| s.parse::<u32>().ok()),
-            advance_disable_mod_update: ini.get("AdvanceDisableModUpdate").map(|s| s.eq_ignore_ascii_case("true")),
-            advance_ignore_java_warning: ini.get("AdvanceIgnoreJavaWarning").map(|s| s.eq_ignore_ascii_case("true")),
-            advance_disable_assets_verify: ini.get("AdvanceDisableAssetsVerify").map(|s| s.eq_ignore_ascii_case("true")),
-            advance_disable_jlw: ini.get("AdvanceDisableJLW").map(|s| s.eq_ignore_ascii_case("true")),
-            advance_disable_lua: ini.get("AdvanceDisableLUA").map(|s| s.eq_ignore_ascii_case("true")),
+            advance_disable_mod_update: ini
+                .get("AdvanceDisableModUpdate")
+                .map(|s| s.eq_ignore_ascii_case("true")),
+            advance_ignore_java_warning: ini
+                .get("AdvanceIgnoreJavaWarning")
+                .map(|s| s.eq_ignore_ascii_case("true")),
+            advance_disable_assets_verify: ini
+                .get("AdvanceDisableAssetsVerify")
+                .map(|s| s.eq_ignore_ascii_case("true")),
+            advance_disable_jlw: ini
+                .get("AdvanceDisableJLW")
+                .map(|s| s.eq_ignore_ascii_case("true")),
+            advance_disable_lua: ini
+                .get("AdvanceDisableLUA")
+                .map(|s| s.eq_ignore_ascii_case("true")),
         }))
     }
 
@@ -78,39 +92,38 @@ impl VersionSetup {
             }
             return setup;
         }
-        let setup = Self::from_version_json(version_dir, version_id)
-            .unwrap_or_else(|| Self {
-                original_version: version_id.to_string(),
-                version_type: VersionType::Unknown,
-                forge_version: None,
-                neoforge_version: None,
-                fabric_version: None,
-                quilt_version: None,
-                optifine_version: None,
-                liteloader_version: None,
-                logo: None,
-                custom_info: None,
-                display_type: None,
-                is_star: None,
-                indie_type: None,
-                window_title: None,
-                server_enter: None,
-                advance_jvm_args: None,
-                advance_game_args: None,
-                advance_run_cmd: None,
-                java_path: None,
-                java_mode: None,
-                java_version_min: None,
-                java_version_max: None,
-                memory_mode: None,
-                min_memory: None,
-                max_memory: None,
-                advance_disable_mod_update: None,
-                advance_ignore_java_warning: None,
-                advance_disable_assets_verify: None,
-                advance_disable_jlw: None,
-                advance_disable_lua: None,
-            });
+        let setup = Self::from_version_json(version_dir, version_id).unwrap_or_else(|| Self {
+            original_version: version_id.to_string(),
+            version_type: VersionType::Unknown,
+            forge_version: None,
+            neoforge_version: None,
+            fabric_version: None,
+            quilt_version: None,
+            optifine_version: None,
+            liteloader_version: None,
+            logo: None,
+            custom_info: None,
+            display_type: None,
+            is_star: None,
+            indie_type: None,
+            window_title: None,
+            server_enter: None,
+            advance_jvm_args: None,
+            advance_game_args: None,
+            advance_run_cmd: None,
+            java_path: None,
+            java_mode: None,
+            java_version_min: None,
+            java_version_max: None,
+            memory_mode: None,
+            min_memory: None,
+            max_memory: None,
+            advance_disable_mod_update: None,
+            advance_ignore_java_warning: None,
+            advance_disable_assets_verify: None,
+            advance_disable_jlw: None,
+            advance_disable_lua: None,
+        });
         let _ = setup.save(version_dir);
         setup
     }

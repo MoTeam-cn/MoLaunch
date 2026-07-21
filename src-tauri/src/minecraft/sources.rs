@@ -8,8 +8,8 @@
 //! ## URL 管理规范
 //! 所有远程 URL 必须在此文件定义常量，禁止在其他文件硬编码。
 
-use crate::{log_debug, log_info, log_warn};
 use crate::minecraft::community::common::fmt_elapsed;
+use crate::{log_debug, log_info, log_warn};
 use std::time::Instant;
 
 // ═══════════════════════════════════════════════════════════
@@ -81,10 +81,7 @@ pub const LIBRARY_REPLACEMENTS: &[(&str, &str)] = &[(
 pub const CDN_MIRROR: &str = "https://mod.mcimirror.top";
 
 /// CurseForge CDN 官方域名列表
-pub const CF_CDN_DOMAINS: &[&str] = &[
-    "https://edge.forgecdn.net",
-    "https://media.forgecdn.net",
-];
+pub const CF_CDN_DOMAINS: &[&str] = &["https://edge.forgecdn.net", "https://media.forgecdn.net"];
 
 /// Modrinth CDN 官方域名列表
 pub const MR_CDN_DOMAINS: &[&str] = &["https://cdn.modrinth.com"];

@@ -36,7 +36,11 @@ pub async fn download_single(
         .with_hash(task.expected_hash.clone());
 
     if checker.is_valid(&task.local_path) {
-        log_debug!("[Download] 跳过已存在文件: {} (size={})", task.local_path, task.expected_size);
+        log_debug!(
+            "[Download] 跳过已存在文件: {} (size={})",
+            task.local_path,
+            task.expected_size
+        );
         return DownloadProgress {
             task_id: task.id.clone(),
             downloaded: 0,
@@ -191,7 +195,11 @@ pub async fn download_single(
                     // file_size=0（未探测，走单流回退）时用 downloaded 校验；
                     // file_size>0（已知大小）时用 file_size 校验
                     let checker = FileChecker::new()
-                        .with_actual_size(if file_size > 0 { file_size as i64 } else { downloaded as i64 })
+                        .with_actual_size(if file_size > 0 {
+                            file_size as i64
+                        } else {
+                            downloaded as i64
+                        })
                         .with_hash(task.expected_hash.clone());
 
                     if let Some(err) = checker.check(&task.local_path) {

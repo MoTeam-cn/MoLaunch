@@ -13,9 +13,7 @@ mod log_parser;
 mod types;
 mod window_title;
 
-pub use types::{
-    CrashCategory, CrashInfo, ExitInfo, GameState, LoadProgress, LogEntry, LogLevel,
-};
+pub use types::{CrashCategory, CrashInfo, ExitInfo, GameState, LoadProgress, LogEntry, LogLevel};
 
 use crate::log_info;
 use log_parser::{detect_load_progress, parse_log_line};
@@ -58,7 +56,12 @@ impl GameWatcher {
     /// 创建新的监控器
     ///
     /// `window_title`：自定义窗口标题，非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题
-    pub fn new(pid: u32, game_dir: PathBuf, version_id: String, window_title: Option<String>) -> Self {
+    pub fn new(
+        pid: u32,
+        game_dir: PathBuf,
+        version_id: String,
+        window_title: Option<String>,
+    ) -> Self {
         let (exit_tx, exit_rx) = tokio::sync::watch::channel(None);
         Self {
             pid,
@@ -78,7 +81,8 @@ impl GameWatcher {
     /// 标记为手动停止（stop_game 调用）
     /// watcher 检测到此标志后，跳过崩溃分析，直接按正常退出处理
     pub fn mark_manual_stop(&self) {
-        self.manual_stop.store(true, std::sync::atomic::Ordering::Relaxed);
+        self.manual_stop
+            .store(true, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// 获取当前状态
@@ -279,7 +283,11 @@ impl GameWatcher {
             };
 
             let exit_info = if let Some(info) = crash_info {
-                log_info!("[Watcher] 崩溃分析完成: {}（类别: {:?}）", info.reason, info.category);
+                log_info!(
+                    "[Watcher] 崩溃分析完成: {}（类别: {:?}）",
+                    info.reason,
+                    info.category
+                );
                 let mut state_guard = state.write().await;
                 *state_guard = GameState::Crashed(info.clone());
                 ExitInfo {

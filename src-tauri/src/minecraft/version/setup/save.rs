@@ -53,10 +53,7 @@ impl VersionSetup {
         };
         let pick_i32 = |key: &str, new: Option<i32>| -> Option<i32> {
             if preserve_personalization {
-                old_ini
-                    .get(key)
-                    .and_then(|s| s.parse::<i32>().ok())
-                    .or(new)
+                old_ini.get(key).and_then(|s| s.parse::<i32>().ok()).or(new)
             } else {
                 new
             }
@@ -73,10 +70,7 @@ impl VersionSetup {
         };
         let pick_u32 = |key: &str, new: Option<u32>| -> Option<u32> {
             if preserve_personalization {
-                old_ini
-                    .get(key)
-                    .and_then(|s| s.parse::<u32>().ok())
-                    .or(new)
+                old_ini.get(key).and_then(|s| s.parse::<u32>().ok()).or(new)
             } else {
                 new
             }
@@ -99,9 +93,16 @@ impl VersionSetup {
         let memory_mode = pick_str("MemoryMode", &setup.memory_mode);
         let min_memory = pick_u32("MinMemory", setup.min_memory);
         let max_memory = pick_u32("MaxMemory", setup.max_memory);
-        let advance_disable_mod_update = pick_bool("AdvanceDisableModUpdate", setup.advance_disable_mod_update);
-        let advance_ignore_java_warning = pick_bool("AdvanceIgnoreJavaWarning", setup.advance_ignore_java_warning);
-        let advance_disable_assets_verify = pick_bool("AdvanceDisableAssetsVerify", setup.advance_disable_assets_verify);
+        let advance_disable_mod_update =
+            pick_bool("AdvanceDisableModUpdate", setup.advance_disable_mod_update);
+        let advance_ignore_java_warning = pick_bool(
+            "AdvanceIgnoreJavaWarning",
+            setup.advance_ignore_java_warning,
+        );
+        let advance_disable_assets_verify = pick_bool(
+            "AdvanceDisableAssetsVerify",
+            setup.advance_disable_assets_verify,
+        );
         let advance_disable_jlw = pick_bool("AdvanceDisableJLW", setup.advance_disable_jlw);
         let advance_disable_lua = pick_bool("AdvanceDisableLUA", setup.advance_disable_lua);
 
@@ -143,11 +144,26 @@ impl VersionSetup {
         content.push_str(&format!("AdvanceJvmArgs={}\n", advance_jvm_args));
         content.push_str(&format!("AdvanceGameArgs={}\n", advance_game_args));
         content.push_str(&format!("AdvanceRunCmd={}\n", advance_run_cmd));
-        content.push_str(&format!("AdvanceDisableModUpdate={}\n", advance_disable_mod_update.unwrap_or(false)));
-        content.push_str(&format!("AdvanceIgnoreJavaWarning={}\n", advance_ignore_java_warning.unwrap_or(false)));
-        content.push_str(&format!("AdvanceDisableAssetsVerify={}\n", advance_disable_assets_verify.unwrap_or(false)));
-        content.push_str(&format!("AdvanceDisableJLW={}\n", advance_disable_jlw.unwrap_or(false)));
-        content.push_str(&format!("AdvanceDisableLUA={}\n", advance_disable_lua.unwrap_or(false)));
+        content.push_str(&format!(
+            "AdvanceDisableModUpdate={}\n",
+            advance_disable_mod_update.unwrap_or(false)
+        ));
+        content.push_str(&format!(
+            "AdvanceIgnoreJavaWarning={}\n",
+            advance_ignore_java_warning.unwrap_or(false)
+        ));
+        content.push_str(&format!(
+            "AdvanceDisableAssetsVerify={}\n",
+            advance_disable_assets_verify.unwrap_or(false)
+        ));
+        content.push_str(&format!(
+            "AdvanceDisableJLW={}\n",
+            advance_disable_jlw.unwrap_or(false)
+        ));
+        content.push_str(&format!(
+            "AdvanceDisableLUA={}\n",
+            advance_disable_lua.unwrap_or(false)
+        ));
         content.push_str(&format!("JavaPath={}\n", java_path));
         content.push_str(&format!("JavaMode={}\n", java_mode));
         if let Some(v) = java_version_min {

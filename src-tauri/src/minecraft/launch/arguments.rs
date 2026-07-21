@@ -99,8 +99,16 @@ pub fn build_launch_arguments(
     );
 
     let jvm_args = build_jvm_args(
-        game_dir, version_id, &classpath, min_memory, max_memory, java_path,
-        extra_jvm_args, &json, disable_jlw, disable_lua,
+        game_dir,
+        version_id,
+        &classpath,
+        min_memory,
+        max_memory,
+        java_path,
+        extra_jvm_args,
+        &json,
+        disable_jlw,
+        disable_lua,
     )?;
     let game_args = build_game_args(
         &json,

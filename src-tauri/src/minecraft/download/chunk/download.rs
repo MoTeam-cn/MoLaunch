@@ -1,8 +1,8 @@
 //! 单个分片的下载实现
 
 use std::io::Write;
-use std::sync::{Arc, Mutex as StdMutex};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use futures_util::StreamExt;
@@ -57,8 +57,7 @@ pub(super) async fn download_chunk(
     // 回滚闭包：失败时回滚本次增量加到 file_progress 的字节数
     // （失败 chunk 的 .part 文件会被 download_chunked 删除，已加的进度必须回滚，
     // 否则重试时 downloaded_bytes 会偏高甚至超过 total）
-    let rollback = |downloaded: u64,
-                    file_progress: &Option<Arc<StdMutex<GlobalProgress>>>| {
+    let rollback = |downloaded: u64, file_progress: &Option<Arc<StdMutex<GlobalProgress>>>| {
         if downloaded > 0 {
             if let Some(ref p) = file_progress {
                 let mut p = p.lock().unwrap();

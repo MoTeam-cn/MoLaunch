@@ -6,8 +6,8 @@ use crate::{log_error, log_info};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use super::sanitize_version_id;
 use super::list::version_type_to_string;
+use super::sanitize_version_id;
 
 /// 版本个性化信息（返回给前端）
 ///

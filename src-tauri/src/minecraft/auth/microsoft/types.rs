@@ -100,7 +100,11 @@ impl std::error::Error for MicrosoftLoginError {}
 
 impl MicrosoftLoginError {
     pub fn new(message: impl Into<String>) -> Self {
-        Self { message: message.into(), error_code: None, step: None }
+        Self {
+            message: message.into(),
+            error_code: None,
+            step: None,
+        }
     }
 
     pub fn with_step(mut self, step: impl Into<String>) -> Self {

@@ -215,7 +215,10 @@ impl DownloadManager {
             }
             if self.is_cancelled() {
                 let remaining = total_task_count - task_index;
-                log_info!("[Download] 暂停期间检测到取消信号，跳过剩余 {} 个任务", remaining);
+                log_info!(
+                    "[Download] 暂停期间检测到取消信号，跳过剩余 {} 个任务",
+                    remaining
+                );
                 break;
             }
 

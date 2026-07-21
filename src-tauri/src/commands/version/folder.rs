@@ -107,9 +107,9 @@ pub async fn remove_mc_folder(
     // 查找并移除
     let target_path = crate::state::resolve_game_dir(&path);
     let initial_len = config.mc_folders.len();
-    config.mc_folders.retain(|f| {
-        crate::state::resolve_game_dir(&f.path) != target_path
-    });
+    config
+        .mc_folders
+        .retain(|f| crate::state::resolve_game_dir(&f.path) != target_path);
 
     if config.mc_folders.len() == initial_len {
         return Err("未找到要移除的文件夹".to_string());
@@ -135,10 +135,7 @@ pub async fn remove_mc_folder(
 
 /// 切换当前 Minecraft 文件夹
 #[tauri::command]
-pub async fn switch_mc_folder(
-    state: State<'_, AppState>,
-    path: String,
-) -> Result<String, String> {
+pub async fn switch_mc_folder(state: State<'_, AppState>, path: String) -> Result<String, String> {
     log_info!("Switching MC folder to: {}", path);
 
     let mut config = state.config.lock().await;

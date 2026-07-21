@@ -47,12 +47,8 @@ pub(crate) async fn auto_install_fabric_api(
     // 获取 mods 目录（考虑版本隔离）
     let isolation_mode_val = state.config.lock().await.isolation_mode;
     let mode_val = IsolationMode::from_u32(isolation_mode_val);
-    let effective_dir = isolation::get_effective_game_dir(
-        game_dir,
-        actual_version_id,
-        mode_val,
-        version_type,
-    );
+    let effective_dir =
+        isolation::get_effective_game_dir(game_dir, actual_version_id, mode_val, version_type);
     let mods_dir = effective_dir.join("mods");
     std::fs::create_dir_all(&mods_dir).ok();
 
@@ -104,19 +100,13 @@ pub(crate) async fn auto_install_fabric_api(
             }
         }
         Ok(_) => {
-            log_warn!(
-                "[Merged] 未找到兼容 MC {} 的 Fabric API 版本",
-                mc_version
-            );
+            log_warn!("[Merged] 未找到兼容 MC {} 的 Fabric API 版本", mc_version);
             let mut ds = state.download_state.lock().unwrap();
             let idx = ds.stages.len() - 1;
             ds.set_stage_status(idx, StageStatus::Finished, 1.0);
         }
         Err(e) => {
-            log_warn!(
-                "[Merged] 查询 Fabric API 版本失败（不阻断主流程）: {}",
-                e
-            );
+            log_warn!("[Merged] 查询 Fabric API 版本失败（不阻断主流程）: {}", e);
             let mut ds = state.download_state.lock().unwrap();
             let idx = ds.stages.len() - 1;
             ds.set_stage_status(idx, StageStatus::Finished, 1.0);

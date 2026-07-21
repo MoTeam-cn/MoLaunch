@@ -106,9 +106,27 @@ pub async fn set_config_value(
         ("Download", "chunk_count") => {
             config.chunk_count = value.parse().unwrap_or(0);
         }
-        ("Mirror", "url") => config.mirror_url = if value.is_empty() { None } else { Some(value.clone()) },
-        ("Mirror", "url_meta") => config.mirror_url_meta = if value.is_empty() { None } else { Some(value.clone()) },
-        ("Mirror", "url_download") => config.mirror_url_download = if value.is_empty() { None } else { Some(value.clone()) },
+        ("Mirror", "url") => {
+            config.mirror_url = if value.is_empty() {
+                None
+            } else {
+                Some(value.clone())
+            }
+        }
+        ("Mirror", "url_meta") => {
+            config.mirror_url_meta = if value.is_empty() {
+                None
+            } else {
+                Some(value.clone())
+            }
+        }
+        ("Mirror", "url_download") => {
+            config.mirror_url_download = if value.is_empty() {
+                None
+            } else {
+                Some(value.clone())
+            }
+        }
         ("Memory", "mode") => config.memory_mode = value.clone(),
         ("Memory", "min") => {
             config.min_memory = value.parse().unwrap_or(0);

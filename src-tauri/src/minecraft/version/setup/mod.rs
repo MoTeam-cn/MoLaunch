@@ -19,5 +19,7 @@ mod save;
 mod types;
 mod update;
 
-pub use helpers::{detect_version_and_loader, read_mc_version_from_json, read_setup_version_and_loader};
+pub use helpers::{
+    detect_version_and_loader, read_mc_version_from_json, read_setup_version_and_loader,
+};
 pub use types::{PersonalizationUpdate, VersionSetup};
