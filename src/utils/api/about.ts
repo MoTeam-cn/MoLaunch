@@ -1,0 +1,73 @@
+/**
+ * 关于页面数据 API
+ *
+ * 从后端 `get_about_data` 命令获取关于页面所需的全部数据
+ * （特别鸣谢、技术栈、许可声明），数据源为 `src-tauri/resources/about/` 下的
+ * markdown 表格格式 txt 文件，由后端 `utils::markdown_table` 模块解析。
+ */
+
+import { invoke } from '@tauri-apps/api/core'
+
+/** 特别鸣谢项 */
+export interface AcknowledgementItem {
+  /** 项目名称 */
+  name: string
+  /** 官网地址 */
+  home: string
+  /** 简介 */
+  desc: string
+  /** logo 资源文件名（位于 src/assets/AboutIcon/） */
+  logo: string
+  /** 作者列表（可能为空数组） */
+  authors: string[]
+}
+
+/** 技术栈依赖项（前端运行时 / 前端开发工具链 / 后端依赖 共用） */
+export interface DependencyItem {
+  /** 依赖名称 */
+  name: string
+  /** 版本号 */
+  version: string
+  /** 官网/仓库地址 */
+  url: string
+  /** 简介 */
+  desc: string
+}
+
+/** 许可与版权声明项 */
+export interface LicenseItem {
+  /** 依赖名称 */
+  name: string
+  /** 版权声明 */
+  copyright: string
+  /** 许可类型 */
+  license: string
+  /** 来源网站 */
+  sourceUrl: string
+  /** 许可文档地址 */
+  licenseUrl: string
+}
+
+/** 关于页面完整数据 */
+export interface AboutData {
+  /** 特别鸣谢列表 */
+  acknowledgements: AcknowledgementItem[]
+  /** 前端运行时依赖 */
+  frontendDeps: DependencyItem[]
+  /** 前端开发工具链 */
+  frontendDevDeps: DependencyItem[]
+  /** 后端依赖 */
+  backendDeps: DependencyItem[]
+  /** 许可与版权声明列表 */
+  licenses: LicenseItem[]
+}
+
+/**
+ * 拉取关于页面所需的全部数据
+ *
+ * 数据由后端从 `resources/about/` 下嵌入的 markdown 表格 txt 文件解析得到，
+ * 一次 IPC 调用返回所有内容，避免多次往返。
+ */
+export async function getAboutData(): Promise<AboutData> {
+  return invoke<AboutData>('get_about_data')
+}

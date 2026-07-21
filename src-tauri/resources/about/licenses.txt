@@ -1,0 +1,41 @@
+# 许可与版权声明
+#
+# 字段说明:
+#   name        依赖名称
+#   copyright   版权声明
+#   license     许可类型
+#   sourceUrl   来源网站
+#   licenseUrl  许可文档地址
+#
+# 注意: 文件通过 include_str! 嵌入二进制，修改后需重新编译 Rust 后端生效
+# 注意: 字段值中的 | 字符需用 \| 转义，避免与表格分隔符冲突
+
+| name | copyright | license | sourceUrl | licenseUrl |
+| --- | --- | --- | --- | --- |
+| Vue 3 | Copyright (c) 2014-present Yuxi (Evan) You | MIT License | https://vuejs.org | https://opensource.org/licenses/MIT |
+| Vue Router | Copyright (c) 2014-present Evan You | MIT License | https://router.vuejs.org | https://opensource.org/licenses/MIT |
+| Pinia | Copyright (c) 2019 Eduardo San Martin Morote | MIT License | https://pinia.vuejs.org | https://opensource.org/licenses/MIT |
+| Tauri 2 | Copyright (c) 2019-2024 Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://v2.tauri.app | https://github.com/tauri-apps/tauri/blob/dev/LICENSE |
+| Heroicons | Copyright (c) 2020 Refactoring UI Inc. | MIT License | https://heroicons.com | https://github.com/tailwindlabs/heroicons/blob/master/LICENSE |
+| Tailwind CSS | Copyright (c) Adam Wathan | MIT License | https://tailwindcss.com | https://github.com/tailwindlabs/tailwindcss/blob/master/LICENSE |
+| skinview3d | Copyright (c) 2021 bs-community | MIT License | https://github.com/bs-community/skinview3d | https://github.com/bs-community/skinview3d/blob/master/LICENSE |
+| Vue Virtual Scroller | Copyright (c) 2018 Guillaume Chau | MIT License | https://github.com/Akryum/vue-virtual-scroller | https://github.com/Akryum/vue-virtual-scroller/blob/master/LICENSE |
+| Vite | Copyright (c) 2019-present Evan You & Vite Contributors | MIT License | https://vitejs.dev | https://github.com/vitejs/vite/blob/main/LICENSE |
+| TypeScript | Copyright (c) Microsoft Corporation | Apache License 2.0 | https://www.typescriptlang.org | https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt |
+| Vue Language Tools (vue-tsc) | Copyright (c) 2021-present Johnson Chu | MIT License | https://github.com/vuejs/language-tools | https://github.com/vuejs/language-tools/blob/master/LICENSE |
+| @vue/test-utils | Copyright (c) 2021-present Eduardo San Martin Morote | MIT License | https://test-utils.vuejs.org | https://github.com/vuejs/test-utils/blob/main/LICENSE |
+| Vitest | Copyright (c) 2021-Present Anthony Fu | MIT License | https://vitest.dev | https://github.com/vitest-dev/vitest/blob/main/LICENSE |
+| ESLint | Copyright (c) OpenJS Foundation and other contributors | MIT License | https://eslint.org | https://github.com/eslint/eslint/blob/main/LICENSE |
+| Prettier | Copyright (c) James Long and contributors | MIT License | https://prettier.io | https://github.com/prettier/prettier/blob/main/LICENSE |
+| PostCSS | Copyright (c) Andrey Sitnik and contributors | MIT License | https://postcss.org | https://github.com/postcss/postcss/blob/main/LICENSE |
+| Autoprefixer | Copyright (c) Andrey Sitnik and contributors | MIT License | https://github.com/postcss/autoprefixer | https://github.com/postcss/autoprefixer/blob/main/LICENSE |
+| Arco Design Vue | Copyright (c) 2019 Arco Design | MIT License | https://arco.design | https://github.com/arco-design/arco-design-vue/blob/main/LICENSE |
+| Element Plus Icons | Copyright (c) 2021-present Element Plus Team | MIT License | https://github.com/element-plus/element-plus-icons | https://github.com/element-plus/element-plus-icons/blob/main/LICENSE |
+| Tokio | Copyright (c) 2024 Tokio Contributors | MIT License | https://tokio.rs | https://github.com/tokio-rs/tokio/blob/master/LICENSE |
+| Reqwest | Copyright (c) 2016-present Sean McArthur | MIT / Apache-2.0 | https://docs.rs/reqwest | https://github.com/seanmonstar/reqwest/blob/master/LICENSE-MIT |
+| Serde | Copyright (c) 2014-2024 The Serde Developers | MIT / Apache-2.0 | https://serde.rs | https://github.com/serde-rs/serde/blob/master/LICENSE-MIT |
+| libloading | Copyright (c) 2015 Simonas Kazlauskas | ISC License | https://docs.rs/libloading | https://github.com/nickel-org/libloading/blob/master/LICENSE-ISC |
+| zip (Rust) | Copyright (c) 2014 Mathijs van de Nes | MIT License | https://docs.rs/zip | https://github.com/zip-rs/zip2/blob/master/LICENSE |
+| notify | Copyright (c) notify-rs developers | CC0-1.0 / Artistic-2.0 | https://docs.rs/notify | https://github.com/notify-rs/notify/blob/main/LICENSE-CC0 |
+| sysinfo | Copyright (c) 2015 Guillaume Gomez | MIT License | https://docs.rs/sysinfo | https://github.com/GuillaumeGomez/sysinfo/blob/master/LICENSE |
+| Plain Craft Launcher 2 (PCL2) | Copyright © 成都瓜皮龙科技有限公司（龙腾猫跃）2016. All Rights Reserved. | PCL 分发有限许可（自定义许可） | https://github.com/Meloong-Git/PCL | https://github.com/Meloong-Git/PCL/blob/main/LICENCE |

@@ -22,6 +22,16 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         "defaults/instance.ini" => Some(include_str!("../resources/defaults/instance.ini")),
         "defaults/setup.ini" => Some(include_str!("../resources/defaults/setup.ini")),
         "moddata.txt" => Some(include_str!("../resources/moddata.txt")),
+        // 关于页面数据（markdown 表格格式，由 commands/system/about.rs 解析）
+        "about/acknowledgements.txt" => {
+            Some(include_str!("../resources/about/acknowledgements.txt"))
+        }
+        "about/frontend-deps.txt" => Some(include_str!("../resources/about/frontend-deps.txt")),
+        "about/frontend-dev-deps.txt" => {
+            Some(include_str!("../resources/about/frontend-dev-deps.txt"))
+        }
+        "about/backend-deps.txt" => Some(include_str!("../resources/about/backend-deps.txt")),
+        "about/licenses.txt" => Some(include_str!("../resources/about/licenses.txt")),
         _ => None,
     }
 }
@@ -49,17 +59,17 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "skins/Sunny.png" => Some(include_bytes!("../resources/skins/Sunny.png")),
         "skins/Zuri.png" => Some(include_bytes!("../resources/skins/Zuri.png")),
         #[cfg(target_os = "windows")]
-        "sdk/run_sdk_lib-windows-x86_64.dll" => {
-            Some(include_bytes!("../resources/sdk/run_sdk_lib-windows-x86_64.dll"))
-        }
+        "sdk/run_sdk_lib-windows-x86_64.dll" => Some(include_bytes!(
+            "../resources/sdk/run_sdk_lib-windows-x86_64.dll"
+        )),
         #[cfg(target_os = "macos")]
-        "sdk/run_sdk_lib-darwin-aarch64.dylib" => {
-            Some(include_bytes!("../resources/sdk/run_sdk_lib-darwin-aarch64.dylib"))
-        }
+        "sdk/run_sdk_lib-darwin-aarch64.dylib" => Some(include_bytes!(
+            "../resources/sdk/run_sdk_lib-darwin-aarch64.dylib"
+        )),
         #[cfg(target_os = "linux")]
-        "sdk/run_sdk_lib-linux-x86_64.so" => {
-            Some(include_bytes!("../resources/sdk/run_sdk_lib-linux-x86_64.so"))
-        }
+        "sdk/run_sdk_lib-linux-x86_64.so" => Some(include_bytes!(
+            "../resources/sdk/run_sdk_lib-linux-x86_64.so"
+        )),
         _ => None,
     }
 }

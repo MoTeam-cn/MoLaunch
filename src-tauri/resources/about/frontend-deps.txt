@@ -1,0 +1,21 @@
+# 前端运行时依赖
+#
+# 字段说明:
+#   name    依赖名称
+#   version 版本号
+#   url     官网/仓库地址
+#   desc    简介
+#
+# 注意: 文件通过 include_str! 嵌入二进制，修改后需重新编译 Rust 后端生效
+
+| name | version | url | desc |
+| --- | --- | --- | --- |
+| Vue 3 | ^3.4.15 | https://vuejs.org | 渐进式 JavaScript 框架 |
+| Vue Router | ^4.2.5 | https://router.vuejs.org | Vue.js 官方路由 |
+| Pinia | ^2.1.7 | https://pinia.vuejs.org | Vue 状态管理库 |
+| Tauri API | ^2.11.1 | https://v2.tauri.app | Tauri 前端 API（IPC 调用） |
+| Tauri Plugin Shell | ^2.3.5 | https://v2.tauri.app/plugin/shell/ | Tauri Shell 插件 |
+| Heroicons Vue | ^2.2.0 | https://heroicons.com | Tailwind CSS 图标库 |
+| Tailwind CSS | ^3.4.1 | https://tailwindcss.com | 原子化 CSS 框架 |
+| skinview3d | ^3.4.2 | https://github.com/bs-community/skinview3d | 3D 皮肤预览引擎 |
+| Vue Virtual Scroller | ^3.0.4 | https://github.com/Akryum/vue-virtual-scroller | 虚拟滚动列表 |

@@ -1,0 +1,24 @@
+# 后端依赖 (Rust)
+#
+# 字段说明:
+#   name    依赖名称
+#   version 版本号
+#   url     官网/仓库地址
+#   desc    简介
+#
+# 注意: 文件通过 include_str! 嵌入二进制，修改后需重新编译 Rust 后端生效
+
+| name | version | url | desc |
+| --- | --- | --- | --- |
+| Tauri 2 | 2 | https://v2.tauri.app | 跨平台桌面应用框架 |
+| Tokio | 1.35 | https://tokio.rs | Rust 异步运行时 |
+| Reqwest | 0.11 | https://docs.rs/reqwest | HTTP 客户端 |
+| Serde | 1.0 | https://serde.rs | 序列化/反序列化框架 |
+| libloading | 0.8 | https://docs.rs/libloading | 动态库加载（SDK FFI） |
+| zip | 2 | https://docs.rs/zip | ZIP 压缩/解压（jar 读取） |
+| notify | 8 | https://docs.rs/notify | 文件系统监听（mods 目录刷新） |
+| sysinfo | 0.29 | https://docs.rs/sysinfo | 系统信息收集 |
+| sha1 / sha2 / md5 | — | https://docs.rs/sha2 | 哈希校验 |
+| regex | 1 | https://docs.rs/regex | 正则表达式 |
+| chrono | 0.4 | https://docs.rs/chrono | 日期时间处理 |
+| windows | 0.58 | https://docs.rs/windows | Windows API 绑定（窗口标题修改） |

@@ -1,5 +1,6 @@
 //! 系统命令模块
 
+mod about;
 mod apply_config;
 mod config;
 mod developer;
@@ -8,6 +9,7 @@ mod game;
 mod game_dir;
 mod proxy;
 
+pub use about::*;
 pub use apply_config::*;
 pub use config::*;
 pub use developer::*;

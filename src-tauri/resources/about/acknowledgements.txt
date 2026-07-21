@@ -1,0 +1,16 @@
+# 特别鸣谢
+#
+# 字段说明:
+#   name    项目名称
+#   home    官网地址
+#   desc    简介
+#   logo    资源文件名（位于 src/assets/AboutIcon/）
+#   authors 作者列表（多个用英文逗号分隔，可为空）
+#
+# 注意: 文件通过 include_str! 嵌入二进制，修改后需重新编译 Rust 后端生效
+
+| name | home | desc | logo | authors |
+| --- | --- | --- | --- | --- |
+| BMCLAPI | https://bmclapi2.bangbang93.com | Minecraft Java 版的国内下载源加速服务，由 bangbang93 提供，用于加速游戏本体、资源文件、库文件等下载 | bangbang93.png |  |
+| MC 百科 (mcmod.cn) | https://www.mcmod.cn | Minecraft 中文 Mod 译名数据库，提供 Mod 中文名称、简介、分类等信息，用于社区资源中文译名展示 | mcmod.png |  |
+| MCIM API (mod.mcimirror.top) | https://mcimirror.top | CurseForge 和 Modrinth 国内镜像服务，用于加速社区 Mod 搜索、元数据查询和文件下载 | mcimirror.webp |  |

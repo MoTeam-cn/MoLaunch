@@ -7,6 +7,26 @@
 
 ## [未发布]
 
+### 新增
+
+#### 关于页面数据迁移至后端（markdown 表格 txt + IPC 命令）
+- `src-tauri/resources/about/`：新建目录，存放 5 个 markdown 表格格式的 txt 数据文件：`acknowledgements.txt`（特别鸣谢，含 authors 字段）、`frontend-deps.txt`（前端运行时依赖）、`frontend-dev-deps.txt`（前端开发工具链）、`backend-deps.txt`（后端依赖）、`licenses.txt`（许可与版权声明）。修改数据只需更新 txt 文件并重新编译后端，无需改动业务代码
+- `src-tauri/src/utils/markdown_table.rs`：新建通用 markdown 表格解析工具模块，支持注释行（`#`）、转义竖线（`\|`）、对齐分隔行（`:---:`）、缺失列填充、多余列忽略；含 7 个单元测试覆盖各种边界场景
+- `src-tauri/src/utils/mod.rs`：新建顶级 utils 模块并注册 `markdown_table` 子模块
+- `src-tauri/src/commands/system/about.rs`：新建 about 命令模块，定义 `AcknowledgementItem`/`DependencyItem`/`LicenseItem`/`AboutData` 数据结构，提供 `get_about_data` IPC 命令一次性返回关于页面所需的全部数据
+- `src-tauri/src/commands/system/mod.rs`：注册 about 子模块并 pub use
+- `src-tauri/src/resources.rs`：在 `embedded_text` 中注册 5 个 about txt 资源（include_str! 嵌入二进制）
+- `src-tauri/src/lib.rs`：注册顶级 utils 模块；在 invoke_handler 中注册 `get_about_data` 命令
+- `src/utils/api/about.ts`：新建前端 API 封装，定义 `AboutData`/`AcknowledgementItem`/`DependencyItem`/`LicenseItem` 类型与 `getAboutData()` 调用函数
+- `src/views/settings/SettingsMore.vue`：移除全部硬编码的 `acknowledgements`/`frontendDeps`/`frontendDevDeps`/`backendDeps`/`licenses` 数组（约 250 行数据），改为 `onMounted` 异步调用 `getAboutData()` 加载；技术栈和许可列表区域增加加载中/加载失败状态；logo 改用 `import.meta.glob` 预加载 AboutIcon 目录构建 文件名→URL 映射表，根据后端返回的 logo 文件名动态解析；官网按钮文案从 `molaunch.moiu.cn` 改为 `点我前往`；特别鸣谢每项增加"作者"展开按钮（ChevronDownIcon 旋转 180°），展开后显示作者标签列表，作者为空时显示"暂未提供作者信息"，展开/收起附带 200ms 平滑过渡动画
+
+#### 关于页面技术栈补全前端开发工具链
+- `src/views/settings/SettingsMore.vue`：新增 `frontendDevDeps` 数组并拆出"前端开发工具"独立子组（与"前端"/"后端 (Rust)"并列展示），将原混入 `frontendDeps` 的 Vite / TypeScript 移至新组，并补充 9 个直接 devDependencies：vue-tsc、@vitejs/plugin-vue、Vitest、@vue/test-utils、ESLint、Prettier、PostCSS、Autoprefixer、@tauri-apps/cli；同步在"许可与版权声明"列表中追加 7 个新条目（Vue Language Tools、@vue/test-utils、Vitest、ESLint、Prettier、PostCSS、Autoprefixer），@vitejs/plugin-vue 与 @tauri-apps/cli 因分别跟随 Vite / Tauri 2 已有条目不再重复
+
+#### 关于页面补充 Element Plus Icons 借用声明
+- `src/views/settings/SettingsMore.vue`：在"鸣谢 → 法律信息 → 特别说明"中追加"关于 Element Plus Icons"段落，说明 Heroicons Vue 图标集不足时从 Element Plus Icons 提取 SVG path 写入 `src/utils/element-icons.ts` 复用、未引入运行时依赖、版权声明已添加；同时在"许可与版权声明"列表中追加 Element Plus Icons 条目（MIT License，含来源网站与许可文档链接）
+- `src/utils/element-icons.ts`：补全顶部 MIT 许可证完整文本（替换原占位注释"MIT License full text will be added here"），明确标注 Copyright (c) 2021-present Element Plus Team 及完整权限与免责条款
+
 ### 修复
 
 #### 整合包下载面板不显示名字

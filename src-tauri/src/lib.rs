@@ -10,6 +10,7 @@ pub mod resources;
 pub mod sdk;
 pub mod state;
 pub mod storage;
+pub mod utils;
 
 use state::AppState;
 
@@ -186,6 +187,8 @@ pub fn run() {
             commands::system::unlock_developer_mode,
             commands::system::get_storage_dirs,
             commands::system::get_system_info,
+            // 关于页面数据命令（从 resources/about/ 加载 markdown 表格数据）
+            commands::system::get_about_data,
             // 日志查看命令（开发者模式）
             logger::get_log_path,
             logger::list_log_files,
