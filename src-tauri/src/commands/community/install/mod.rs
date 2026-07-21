@@ -53,11 +53,7 @@ pub async fn download_resource(
     state: State<'_, AppState>,
     req: DownloadRequest,
 ) -> Result<DownloadResult, String> {
-    log_info!(
-        "[Community] Downloading {} from {}",
-        req.file_name,
-        req.url
-    );
+    log_info!("[Community] Downloading {} from {}", req.file_name, req.url);
 
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
@@ -73,8 +69,7 @@ pub async fn download_resource(
 
     // 确保目录存在
     if !target_dir.exists() {
-        std::fs::create_dir_all(&target_dir)
-            .map_err(|e| format!("创建目录失败: {}", e))?;
+        std::fs::create_dir_all(&target_dir).map_err(|e| format!("创建目录失败: {}", e))?;
     }
 
     let target_path = target_dir.join(&final_file_name);
@@ -130,13 +125,18 @@ pub async fn download_resource(
     .with_cancel_flag(state.download_cancel_flag.clone())
     .with_pause_flag(state.download_pause_flag.clone());
 
-    let results = manager.download_batch(vec![task], Some(progress_callback)).await;
+    let results = manager
+        .download_batch(vec![task], Some(progress_callback))
+        .await;
 
     let result = results.first().ok_or("下载结果为空")?;
 
     use crate::minecraft::download::types::DownloadStatus;
     if result.status != DownloadStatus::Completed && result.status != DownloadStatus::Skipped {
-        let err = result.error.clone().unwrap_or_else(|| "未知错误".to_string());
+        let err = result
+            .error
+            .clone()
+            .unwrap_or_else(|| "未知错误".to_string());
         {
             let mut ds = state.download_state.lock().unwrap();
             ds.mark_failed(1);
@@ -203,8 +203,7 @@ pub async fn download_resource_to_path(
     // 确保父目录存在
     if let Some(parent) = save_path.parent() {
         if !parent.exists() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("创建目录失败: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
         }
     }
 
@@ -263,15 +262,18 @@ pub async fn download_resource_to_path(
     .with_cancel_flag(state.download_cancel_flag.clone())
     .with_pause_flag(state.download_pause_flag.clone());
 
-    let results = manager.download_batch(vec![task], Some(progress_callback)).await;
+    let results = manager
+        .download_batch(vec![task], Some(progress_callback))
+        .await;
 
-    let result = results
-        .first()
-        .ok_or("下载结果为空")?;
+    let result = results.first().ok_or("下载结果为空")?;
 
     use crate::minecraft::download::types::DownloadStatus;
     if result.status != DownloadStatus::Completed && result.status != DownloadStatus::Skipped {
-        let err = result.error.clone().unwrap_or_else(|| "未知错误".to_string());
+        let err = result
+            .error
+            .clone()
+            .unwrap_or_else(|| "未知错误".to_string());
         {
             let mut ds = state.download_state.lock().unwrap();
             ds.mark_failed(1);
@@ -279,9 +281,7 @@ pub async fn download_resource_to_path(
         return Err(err);
     }
 
-    let size = std::fs::metadata(&save_path)
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let size = std::fs::metadata(&save_path).map(|m| m.len()).unwrap_or(0);
 
     {
         let mut ds = state.download_state.lock().unwrap();
@@ -369,8 +369,7 @@ pub async fn install_modpack(
     drop(config);
 
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
-    std::fs::create_dir_all(&instance_dir)
-        .map_err(|e| format!("创建整合包目录失败: {}", e))?;
+    std::fs::create_dir_all(&instance_dir).map_err(|e| format!("创建整合包目录失败: {}", e))?;
 
     // 2. 重置 download_state，设置整合包专用 stages（统一方法）
     // 同时重置暂停/取消标志，防止上次残留导致新下载卡住
@@ -400,13 +399,17 @@ pub async fn install_modpack(
         let mut ds = state.download_state.lock().unwrap();
         ds.set_stage_status(1, StageStatus::Loading, 0.0);
     }
-    let file = std::fs::File::open(&archive_path)
-        .map_err(|e| format!("打开整合包失败: {}", e))?;
+    let file = std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| format!("解析 zip 失败: {}（可能不是有效的整合包）", e))?;
 
-    let (format, manifest_content, index_content) = concurrent::detect_modpack_format(&mut archive)?;
-    let info = parse_modpack_info(format, manifest_content.as_deref(), index_content.as_deref())?;
+    let (format, manifest_content, index_content) =
+        concurrent::detect_modpack_format(&mut archive)?;
+    let info = parse_modpack_info(
+        format,
+        manifest_content.as_deref(),
+        index_content.as_deref(),
+    )?;
 
     {
         let mut ds = state.download_state.lock().unwrap();
@@ -417,7 +420,11 @@ pub async fn install_modpack(
         info.format,
         info.game_version,
         info.loader,
-        if info.loader_version.is_empty() { String::new() } else { format!("@{}", info.loader_version) },
+        if info.loader_version.is_empty() {
+            String::new()
+        } else {
+            format!("@{}", info.loader_version)
+        },
         info.mod_files_count
     );
 
@@ -427,8 +434,7 @@ pub async fn install_modpack(
         ds.set_stage_status(2, StageStatus::Loading, 0.0);
     }
     let mods_dir = instance_dir.join("mods");
-    std::fs::create_dir_all(&mods_dir)
-        .map_err(|e| format!("创建 mods 目录失败: {}", e))?;
+    std::fs::create_dir_all(&mods_dir).map_err(|e| format!("创建 mods 目录失败: {}", e))?;
 
     match info.format {
         ModpackFormat::Curseforge => {
@@ -444,13 +450,7 @@ pub async fn install_modpack(
         }
         ModpackFormat::Modrinth => {
             let index = info.mr_index.expect("MR index 应已解析");
-            modrinth::install_mr_files(
-                &state,
-                &index.files,
-                &instance_dir,
-                max_threads,
-            )
-            .await?;
+            modrinth::install_mr_files(&state, &index.files, &instance_dir, max_threads).await?;
         }
     }
     {
