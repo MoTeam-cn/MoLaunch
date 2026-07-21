@@ -7,6 +7,23 @@ use std::time::Duration;
 /// 全局 HTTP 客户端（懒初始化）
 static HTTP_CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
 
+/// 编译时生成的 User-Agent 字符串
+/// 格式：`MoLaunch/<os> <version>`（如 `MoLaunch/windows 0.1.0`）
+/// - `<os>` 来自 `std::env::consts::OS`（编译期不可用，运行时取值）
+/// - `<version>` 来自 Cargo.toml 的 `version` 字段（编译期通过 `env!` 注入）
+static USER_AGENT: OnceLock<String> = OnceLock::new();
+
+/// 获取 User-Agent 字符串（运行时拼接 OS + 编译时版本号）
+fn user_agent() -> &'static str {
+    USER_AGENT.get_or_init(|| {
+        format!(
+            "MoLaunch/{} {}",
+            std::env::consts::OS,
+            env!("CARGO_PKG_VERSION")
+        )
+    })
+}
+
 /// 初始化全局 HTTP 客户端
 /// 应在应用启动时调用一次
 pub fn init_client(proxy_mode: &str, proxy_type: &str, proxy_url: &str) {
@@ -22,6 +39,7 @@ pub fn get_client() -> reqwest::Client {
     HTTP_CLIENT.get().cloned().unwrap_or_else(|| {
         reqwest::Client::builder()
             .timeout(Duration::from_secs(30))
+            .user_agent(user_agent())
             .no_proxy()
             .build()
             .expect("Failed to build default HTTP client")
@@ -35,7 +53,9 @@ pub fn build_client(
     proxy_url: &str,
     timeout: Duration,
 ) -> reqwest::Client {
-    let mut builder = reqwest::Client::builder().timeout(timeout);
+    let mut builder = reqwest::Client::builder()
+        .timeout(timeout)
+        .user_agent(user_agent());
 
     match proxy_mode {
         "system" => {

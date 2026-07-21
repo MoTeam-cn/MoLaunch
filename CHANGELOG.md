@@ -9,6 +9,9 @@
 
 ### 新增
 
+#### 统一 User-Agent 标识
+- `src-tauri/src/http.rs`：所有外部 HTTP 请求统一附加 UA 头，格式 `MoLaunch/<os> <version>`（如 `MoLaunch/windows 0.1.0`），覆盖皮肤/披风下载、头像缓存、BMCLAPI 镜像源、MC 文件下载、Java 下载、微软账号 OAuth 登录、社区资源下载等所有走 `http::get_client()` / `http::build_client()` 的请求；`<os>` 运行时取 `std::env::consts::OS`（windows/macos/linux），`<version>` 编译时通过 `env!("CARGO_PKG_VERSION")` 从 Cargo.toml 注入；替换原 reqwest 默认 UA `reqwest/<version>`，避免被部分 WAF/CDN 识别为爬虫返回 403
+
 #### 浏览器环境拦截提示
 - `src/main.ts`：在最早入口处检测 `window.__TAURI_INTERNALS__`（Tauri 2 在 WebView 中注入的全局对象），若不存在则判定为浏览器环境，直接渲染友好提示页（SVG 警告图标 + "小朋友，此页面默认给 Tauri 客户端使用，请勿使用浏览器直接打开呦？！"），并阻止 Vue app 挂载，避免 `@tauri-apps/api` 的 `getCurrentWindow()` 在浏览器中抛 "Cannot read properties of undefined (reading 'metadata')" 导致 TopNavLayout setup 崩溃刷屏；Tauri WebView 中正常走原挂载流程
 
