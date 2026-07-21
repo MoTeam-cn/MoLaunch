@@ -10,6 +10,7 @@
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
 import Alert from '@/components/common/Alert.vue'
 import Button from '@/components/common/Button.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import { formatBytes, formatDate } from '@/utils/format'
 import type { FabricApiVersion } from '@/utils/api/loader'
 import type { FabricApiState } from '@/composables/useFabricApi'
@@ -81,7 +82,11 @@ defineEmits<{ retry: [] }>()
         </div>
         <div class="flex items-center gap-2 min-w-0">
           <span class="text-xs text-gray-500 shrink-0 w-14">文件名</span>
-          <span class="text-xs text-gray-700 truncate" :title="latest.file_name">{{ latest.file_name }}</span>
+          <div class="min-w-0">
+            <Tooltip :text="latest.file_name" position="top" block>
+              <span class="text-xs text-gray-700 truncate min-w-0 w-full">{{ latest.file_name }}</span>
+            </Tooltip>
+          </div>
         </div>
         <div class="flex items-center gap-2 text-xs text-gray-500">
           <span class="shrink-0 w-14">发布日期</span>

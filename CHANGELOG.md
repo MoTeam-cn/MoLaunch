@@ -9,6 +9,20 @@
 
 ### 优化
 
+#### 账号卡片拖拽体验优化
+- `src/composables/useSwipeNavigation.ts`：重写拖拽逻辑，新增边界阻尼（首尾卡片拖拽阻力减半）、`isAnimating` 状态标记、左键/触摸判断；切换阈值从 60px 降为 40px 更灵敏
+- `src/composables/useSwipeNavigation.ts`：`onPointerDown` 调用 `setPointerCapture` 捕获指针，`onPointerUp` 调用 `releasePointerCapture` 释放，修复指针移出容器外部后丢失拖拽状态的问题
+- `src/components/home/AccountSelector.vue`：`switchTo` 视觉索引立即更新不再被 switching 锁阻塞，账号切换异步进行；卡片容器增加 `cursor-grab/grabbing` 光标反馈、`will-change-transform` GPU 加速、`select-none` 防止拖动选中文字
+
+#### 离线账号皮肤接入启动流程（PCL2 方案 A + 方案 B）
+- `src-tauri/src/minecraft/auth/mod.rs`：新增 `adjust_uuid_for_skin_variant()` 函数，通过递增 UUID 末位让 MC 离线模式哈希到目标皮肤模型（Steve=classic / Alex=slim），算法参考 PCL2 的 `McSkinSex` 函数
+- `src-tauri/src/minecraft/launch/skin_resourcepack.rs`：新增独立模块实现方案 B（资源包替换），包含 pack_format 版本映射、1.19.3+ 9 角色路径处理、zip 生成、options.txt resourcePacks 字段修改；含 4 个单元测试
+- `src-tauri/src/minecraft/launch/mod.rs`：添加 `pub mod skin_resourcepack` 模块声明
+- `src-tauri/src/resources.rs`：注册 9 个离线皮肤 PNG 文件（从 `src/assets/Skins/` 复制到 `src-tauri/resources/skins/`），新增 `get_embedded_resource()` 公共接口供 `skin_resourcepack` 模块直接读取嵌入资源
+- `src-tauri/src/commands/version/launch.rs`：方案 A（UUID 调整）+ 方案 B（资源包生成）协同工作；非离线账号启动时自动清理残留资源包
+- `src-tauri/src/commands/version/script_export.rs`：导出启动脚本时同步应用 UUID 调整
+- `src/components/common/SkinManager.vue`：更新离线皮肤弹窗提示文案为"通过 UUID 调整 + 资源包替换实现，游戏内将显示选定角色。1.19.3+ 也会精确显示，但仅本地可见。"
+
 #### SDK 加载逻辑与日志优化
 - `src-tauri/src/sdk/mod.rs`：重写 `get_sdk_resource_dir()`，优先从发布模式资源目录（`<exe_dir>/resources/sdk_data/`）查找 SDK 库，开发模式路径用词法规范化去掉 `../`，macOS 额外查找 `.app/Contents/Resources/sdk_data/`
 - 新增 `normalize_path()` 函数：词法规范化路径组件，避免日志显示 `src-tauri/../sdk_data` 这类不美观路径
@@ -19,6 +33,18 @@
 - `src-tauri/src/sdk/mod.rs`：删除 `get_sdk_resource_dir()` 和 `normalize_path()`，`check_sdk_library()` 改为调用 `resources::extract_sdk()` 确保释放后返回临时目录路径，`get_sdk_library_path()` 改为返回临时目录路径
 - `src-tauri/tauri.conf.json`：移除 `../sdk_data/*` 资源打包配置（SDK 不再从外部文件加载）
 - 释放策略复用 `extract_resource` 的 sha256 校验机制：SDK 热更新（手动替换临时目录文件）不会触发覆盖，主程序更新后嵌入版本变化自动覆盖旧版，临时目录被清理后自动重新释放
+
+#### 全局替换原生 tooltip 为 Tooltip 组件 + 账号卡片按钮统一
+- `src/components/home/account-selector/AccountCard.vue`：皮肤按钮和退出按钮统一为 `Button type="outline" size="mini"`，退出按钮用 `!text-red-500` 等类保留红色危险操作样式，两个按钮均用 `Tooltip` 组件替换原生 `title` 属性
+- 9 个文件原生 `title` 属性替换为 `Tooltip` 组件：`InstalledList.vue`、`BackToTop.vue`、`TaskGroupCard.vue`（2处）、`MultiSelectBar.vue`（4处）、`MemorySection.vue`（3处）、`SettingsAdvanced.vue`、`MemoryAllocation.vue`（3处）、`FabricApiInfoCard.vue`、`SkinCapeList.vue`
+
+#### 离线皮肤弹窗提示版本不支持
+- `src/utils/element-icons.ts`：新增 Element Plus Icons SVG path 数据文件，包含 info/warning/error/success/debug 5 种图标，带 MIT 版权注释
+- `src/components/common/Alert.vue`：扩展提示框组件，新增 error（红色）和 debug（青色）类型，原有 info/warning/success 保留，共支持 5 种类型（v1 Arco 风格：白底左色条）
+- `src/components/common/AlertV2.vue`：新增第二版提示框组件（v2 灰底简洁风格），图标改用 Element Plus Icons（从 `element-icons.ts` 引入），`leading-relaxed` 确保文字与图标对齐
+- `src/components/common/SkinManager.vue`：离线账号皮肤弹窗顶部用 AlertV2（type=info）替换 Alert，内容区 max-h 从 70vh 调为 80vh 避免加提示后触发滚动条
+- `src/components/common/skin-manager/SkinLocalSelector.vue`：移除内联提示，改由 SkinManager 弹窗顶部的 AlertV2 组件统一显示
+- `src/assets/styles/main.css`：html/body 新增 `overflow: hidden; height: 100%; margin: 0`，修复 App 容器外部出现滚动条的问题
 
 ### 重构
 

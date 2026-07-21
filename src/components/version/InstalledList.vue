@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import { showWarning, showError } from '@/utils/modal'
 import { showSuccess } from '@/utils/toast'
 import { inferVersionType, getVersionTypeLabel, getVersionTypeBadgeClass } from '@/composables/useVersionMeta'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 const versionStore = useVersionStore()
 const authStore = useAuthStore()
@@ -195,13 +196,14 @@ function isLaunching(versionId: string) {
             </template>
 
             <!-- 卸载按钮 -->
-            <button
-              class="delete-btn"
-              title="卸载"
-              @click.stop="handleUninstall(versionId)"
-            >
-              <TrashIcon class="w-4 h-4" />
-            </button>
+            <Tooltip text="卸载" position="top">
+              <button
+                class="delete-btn"
+                @click.stop="handleUninstall(versionId)"
+              >
+                <TrashIcon class="w-4 h-4" />
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

@@ -13,6 +13,7 @@ import { ref, watch } from 'vue'
 import type { SkinCapeInfo } from '@/utils/tauri'
 import { getCapeIcon } from '@/utils/cape-icon'
 import { onImageCached } from '@/composables/useImageCache'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 const props = defineProps<{
   capes: SkinCapeInfo['capes']
@@ -128,11 +129,12 @@ watch(() => props.capes, loadIcons, { immediate: true, deep: true })
         </div>
         <!-- 名称 -->
         <div class="flex min-w-0 flex-1 items-center gap-1">
-          <span
-            class="text-xs"
-            :class="cape.state === 'ACTIVE' ? 'text-primary-700 font-medium' : 'text-gray-600'"
-            :title="cape.display_name"
-          >{{ cape.display_name }}</span>
+          <Tooltip :text="cape.display_name" position="top">
+            <span
+              class="text-xs"
+              :class="cape.state === 'ACTIVE' ? 'text-primary-700 font-medium' : 'text-gray-600'"
+            >{{ cape.display_name }}</span>
+          </Tooltip>
         </div>
       </button>
     </div>

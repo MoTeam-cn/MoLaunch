@@ -6,6 +6,7 @@ import Input from '@/components/common/Input.vue'
 import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 import DevModeToggle from '@/components/settings/DevModeToggle.vue'
 import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import {
   ExclamationTriangleIcon,
   EyeIcon,
@@ -202,15 +203,16 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
             class="font-mono"
           >
             <template #suffix>
-              <button
-                type="button"
-                class="p-1 text-gray-400 hover:text-gray-600"
-                :title="cfShowKey ? '隐藏' : '显示'"
-                @click="cfShowKey = !cfShowKey"
-              >
-                <EyeSlashIcon v-if="cfShowKey" class="w-4 h-4" />
-                <EyeIcon v-else class="w-4 h-4" />
-              </button>
+              <Tooltip :text="cfShowKey ? '隐藏' : '显示'" position="top">
+                <button
+                  type="button"
+                  class="p-1 text-gray-400 hover:text-gray-600"
+                  @click="cfShowKey = !cfShowKey"
+                >
+                  <EyeSlashIcon v-if="cfShowKey" class="w-4 h-4" />
+                  <EyeIcon v-else class="w-4 h-4" />
+                </button>
+              </Tooltip>
             </template>
           </Input>
           <!-- 状态提示 -->

@@ -20,8 +20,11 @@
     --color-error: 239 68 68;
   }
   
-  html {
+  html, body {
     @apply antialiased;
+    overflow: hidden;
+    height: 100%;
+    margin: 0;
   }
   
   body {

@@ -27,6 +27,7 @@ pub(crate) mod classpath;
 mod embedded;
 mod game_args;
 mod jvm_args;
+pub mod skin_resourcepack;
 
 // Re-export pipeline types
 pub use pipeline::{

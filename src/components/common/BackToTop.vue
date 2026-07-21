@@ -6,6 +6,7 @@
 
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ArrowUpIcon } from '@heroicons/vue/24/solid'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 const visible = ref(false)
 const isHover = ref(false)
@@ -73,25 +74,26 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <Transition name="back-to-top">
-    <button
-      v-if="visible"
-      class="back-to-top-btn"
-      title="返回顶部"
-      @click="scrollToTop"
-      @mouseenter="isHover = true"
-      @mouseleave="isHover = false"
-    >
-      <!-- 涟漪背景 -->
-      <span class="ripple-bg" :class="{ 'ripple-active': isHover }"></span>
-      
-      <!-- 图标 -->
-      <ArrowUpIcon class="w-5 h-5 text-white relative z-10 transition-transform duration-300" :class="{ '-translate-y-0.5': isHover }" />
-      
-      <!-- 外圈光晕 -->
-      <span class="glow-ring" :class="{ 'glow-active': isHover }"></span>
-    </button>
-  </Transition>
+  <Tooltip text="返回顶部" position="left">
+    <Transition name="back-to-top">
+      <button
+        v-if="visible"
+        class="back-to-top-btn"
+        @click="scrollToTop"
+        @mouseenter="isHover = true"
+        @mouseleave="isHover = false"
+      >
+        <!-- 涟漪背景 -->
+        <span class="ripple-bg" :class="{ 'ripple-active': isHover }"></span>
+
+        <!-- 图标 -->
+        <ArrowUpIcon class="w-5 h-5 text-white relative z-10 transition-transform duration-300" :class="{ '-translate-y-0.5': isHover }" />
+
+        <!-- 外圈光晕 -->
+        <span class="glow-ring" :class="{ 'glow-active': isHover }"></span>
+      </button>
+    </Transition>
+  </Tooltip>
 </template>
 
 <style scoped>

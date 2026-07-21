@@ -21,6 +21,7 @@ import SkinCapeList from './skin-manager/SkinCapeList.vue'
 import SkinUploadPanel from './skin-manager/SkinUploadPanel.vue'
 import SkinLocalSelector from './skin-manager/SkinLocalSelector.vue'
 import SkinPreviewPanel from './skin-manager/SkinPreviewPanel.vue'
+import AlertV2 from './AlertV2.vue'
 import { useSkinOperations } from '@/composables/useSkinOperations'
 
 const props = defineProps<{ visible: boolean }>()
@@ -81,7 +82,15 @@ watch(() => props.visible, (v) => {
           </div>
 
           <!-- 内容 -->
-          <div class="max-h-[70vh] overflow-y-auto p-5">
+          <div class="max-h-[80vh] overflow-y-auto p-5">
+            <!-- 离线账号：顶部提示皮肤生效范围 -->
+            <AlertV2
+              v-if="!isMicrosoft"
+              type="info"
+              message="离线皮肤通过 UUID 调整 + 资源包替换实现，游戏内将显示选定角色。1.19.3+ 也会精确显示，但仅本地可见。"
+              class="mb-4"
+            />
+
             <div v-if="loading" class="py-12 text-center text-sm text-gray-400">
               <svg class="mx-auto mb-2 h-6 w-6 animate-spin text-primary-500" viewBox="0 0 24 24" fill="none">
                 <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />

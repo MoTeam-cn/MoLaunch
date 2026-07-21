@@ -115,12 +115,47 @@ pub async fn export_launch_script(
             Err(_) => (String::new(), String::new()),
         }
     };
+    let login_type_str = login_type.clone().unwrap_or_else(|| "Legacy".to_string());
+    let is_legacy = login_type_str == "Legacy";
     let auth_info = crate::minecraft::launch::AuthInfo {
         username: username.clone(),
         uuid,
         access_token: real_access_token,
         client_token: real_client_token,
-        login_type: login_type.unwrap_or_else(|| "Legacy".to_string()),
+        login_type: login_type_str,
+    };
+
+    // 离线账号皮肤：与 launch.rs 一致，调整 UUID 匹配皮肤变体
+    let auth_info = if is_legacy {
+        match state.auth_storage.load().await {
+            Ok(auth_state) => {
+                if let Some(acc) = auth_state
+                    .offline_accounts
+                    .iter()
+                    .find(|a| a.uuid == auth_info.uuid)
+                {
+                    if let Some(ref skin_name) = acc.skin {
+                        let slim = matches!(
+                            skin_name.as_str(),
+                            "Alex" | "Ari" | "Efe" | "Makena" | "Noor" | "Sunny" | "Zuri"
+                        );
+                        let adjusted_uuid =
+                            crate::minecraft::auth::adjust_uuid_for_skin_variant(&auth_info.uuid, slim);
+                        crate::minecraft::launch::AuthInfo {
+                            uuid: adjusted_uuid,
+                            ..auth_info
+                        }
+                    } else {
+                        auth_info
+                    }
+                } else {
+                    auth_info
+                }
+            }
+            Err(_) => auth_info,
+        }
+    } else {
+        auth_info
     };
 
     // 构建启动参数（注意：build_launch_arguments 会触发 set_game_language 副作用，此处可接受）

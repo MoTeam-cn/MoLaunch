@@ -14,6 +14,7 @@ import * as tauri from '@/utils/tauri'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useConfigPage } from '@/composables/useConfigPage'
 import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 const minMemory = ref(512)
 const maxMemory = ref(2048)
@@ -87,20 +88,21 @@ watch(memoryMode, (mode) => {
         <span>{{ systemMemory.usage_percent.toFixed(0) }}% 已占用</span>
       </div>
       <div class="h-6 rounded-full overflow-hidden flex bg-gray-100">
-        <div
-          class="h-full bg-orange-400 transition-all duration-500"
-          :style="{ width: usedPercent + '%' }"
-          :title="'系统已用: ' + formatMemoryMB(usedMemoryMB)"
-        />
-        <div
-          class="h-full bg-primary-500 transition-all duration-500"
-          :style="{ width: gamePercent + '%' }"
-          :title="'游戏分配: ' + formatMemoryMB(gameMemoryMB)"
-        />
-        <div
-          class="h-full bg-green-400 transition-all duration-500 flex-1"
-          :title="'剩余: ' + formatMemoryMB(otherMemoryMB)"
-        />
+        <div class="h-full flex" :style="{ width: usedPercent + '%' }">
+          <Tooltip :text="'系统已用: ' + formatMemoryMB(usedMemoryMB)" position="top" block>
+            <div class="h-full w-full bg-orange-400 transition-all duration-500" />
+          </Tooltip>
+        </div>
+        <div class="h-full flex" :style="{ width: gamePercent + '%' }">
+          <Tooltip :text="'游戏分配: ' + formatMemoryMB(gameMemoryMB)" position="top" block>
+            <div class="h-full w-full bg-primary-500 transition-all duration-500" />
+          </Tooltip>
+        </div>
+        <div class="h-full flex flex-1">
+          <Tooltip :text="'剩余: ' + formatMemoryMB(otherMemoryMB)" position="top" block>
+            <div class="h-full w-full bg-green-400 transition-all duration-500" />
+          </Tooltip>
+        </div>
       </div>
       <div class="flex items-center gap-4 mt-2 text-xs">
         <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-orange-400"></span> 系统占用 {{ formatMemoryMB(usedMemoryMB) }}</span>

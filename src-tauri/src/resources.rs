@@ -38,6 +38,16 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "forge-installer.jar" => Some(include_bytes!("../resources/forge-installer.jar")),
         "java-wrapper.jar" => Some(include_bytes!("../resources/java-wrapper.jar")),
         "lwjgl-unsafe-agent.jar" => Some(include_bytes!("../resources/lwjgl-unsafe-agent.jar")),
+        // 离线皮肤 PNG（9 个默认角色）
+        "skins/Steve.png" => Some(include_bytes!("../resources/skins/Steve.png")),
+        "skins/Alex.png" => Some(include_bytes!("../resources/skins/Alex.png")),
+        "skins/Ari.png" => Some(include_bytes!("../resources/skins/Ari.png")),
+        "skins/Efe.png" => Some(include_bytes!("../resources/skins/Efe.png")),
+        "skins/Kai.png" => Some(include_bytes!("../resources/skins/Kai.png")),
+        "skins/Makena.png" => Some(include_bytes!("../resources/skins/Makena.png")),
+        "skins/Noor.png" => Some(include_bytes!("../resources/skins/Noor.png")),
+        "skins/Sunny.png" => Some(include_bytes!("../resources/skins/Sunny.png")),
+        "skins/Zuri.png" => Some(include_bytes!("../resources/skins/Zuri.png")),
         #[cfg(target_os = "windows")]
         "sdk/run_sdk_lib-windows-x86_64.dll" => {
             Some(include_bytes!("../resources/sdk/run_sdk_lib-windows-x86_64.dll"))
@@ -52,6 +62,14 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         }
         _ => None,
     }
+}
+
+/// 获取嵌入的二进制资源内容（公共接口）
+///
+/// 供其他模块（如 `skin_resourcepack`）直接读取嵌入的 PNG 等二进制资源，
+/// 无需通过 `extract_resource` 释放到磁盘。
+pub fn get_embedded_resource(path: &str) -> Option<&'static [u8]> {
+    embedded_bytes(path)
 }
 
 /// 读取文本资源内容

@@ -33,6 +33,7 @@ import {
   Squares2X2Icon,
   ArrowTopRightOnSquareIcon,
 } from '@heroicons/vue/24/outline'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 /** 操作按钮变体样式 */
 type ActionVariant = 'enable' | 'disable' | 'update' | 'delete' | 'default'
@@ -113,48 +114,55 @@ const variantClasses: Record<ActionVariant, string> = {
           <!-- 下方：操作按钮行 -->
           <div class="flex items-center gap-0.5">
             <!-- 批量操作按钮（由调用方通过 actions prop 配置） -->
-            <button
+            <Tooltip
               v-for="action in actions"
               :key="action.key"
-              class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              :class="variantClasses[action.variant || 'default']"
-              :disabled="batchProcessing || selectedCount === 0 || action.disabled"
-              :title="action.label"
-              @click="emit('action', action.key)"
+              :text="action.label"
+              position="top"
             >
-              <component v-if="action.icon" :is="action.icon" class="w-3.5 h-3.5" />
-              {{ action.label }}
-            </button>
+              <button
+                class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                :class="variantClasses[action.variant || 'default']"
+                :disabled="batchProcessing || selectedCount === 0 || action.disabled"
+                @click="emit('action', action.key)"
+              >
+                <component v-if="action.icon" :is="action.icon" class="w-3.5 h-3.5" />
+                {{ action.label }}
+              </button>
+            </Tooltip>
             <!-- 分隔线 -->
             <div class="w-px h-5 bg-gray-200 mx-1" />
             <!-- 全选/反选 -->
-            <button
-              class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
-              :title="isAllSelected ? '取消全选' : '全选'"
-              @click="emit('selectAll')"
-            >
-              <Squares2X2Icon class="w-3.5 h-3.5" />
-              {{ isAllSelected ? '取消全选' : '全选' }}
-            </button>
-            <button
-              class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
-              title="反选"
-              @click="emit('invertSelection')"
-            >
-              <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
-              反选
-            </button>
+            <Tooltip :text="isAllSelected ? '取消全选' : '全选'" position="top">
+              <button
+                class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+                @click="emit('selectAll')"
+              >
+                <Squares2X2Icon class="w-3.5 h-3.5" />
+                {{ isAllSelected ? '取消全选' : '全选' }}
+              </button>
+            </Tooltip>
+            <Tooltip text="反选" position="top">
+              <button
+                class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+                @click="emit('invertSelection')"
+              >
+                <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
+                反选
+              </button>
+            </Tooltip>
             <!-- 分隔线 -->
             <div class="w-px h-5 bg-gray-200 mx-1" />
             <!-- 退出多选 -->
-            <button
-              class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
-              title="退出多选（ESC）"
-              @click="emit('exit')"
-            >
-              <XMarkIcon class="w-3.5 h-3.5" />
-              取消选择
-            </button>
+            <Tooltip text="退出多选（ESC）" position="top">
+              <button
+                class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+                @click="emit('exit')"
+              >
+                <XMarkIcon class="w-3.5 h-3.5" />
+                取消选择
+              </button>
+            </Tooltip>
           </div>
         </div>
       </div>

@@ -10,6 +10,7 @@
  * 分组聚合与折叠状态由 useDownloadTaskGroups composable 管理。
  */
 import { formatBytes } from '@/utils/format'
+import Tooltip from '@/components/common/Tooltip.vue'
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -62,32 +63,34 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
           {{ percentage.toFixed(1) }}%
         </span>
         <!-- 暂停/恢复按钮 -->
-        <button
-          class="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors"
-          :class="isPaused
-            ? 'text-green-600 hover:bg-green-50'
-            : 'text-amber-600 hover:bg-amber-50'"
-          :disabled="togglingPause"
-          :title="isPaused ? '恢复下载' : '暂停下载'"
-          @click="emit('togglePause')"
-        >
-          <component
-            :is="isPaused ? PlayCircleIcon : PauseCircleIcon"
-            class="w-4 h-4"
-            :class="{ 'animate-pulse': togglingPause }"
-          />
-          {{ isPaused ? '恢复' : '暂停' }}
-        </button>
+        <Tooltip :text="isPaused ? '恢复下载' : '暂停下载'" position="top">
+          <button
+            class="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors"
+            :class="isPaused
+              ? 'text-green-600 hover:bg-green-50'
+              : 'text-amber-600 hover:bg-amber-50'"
+            :disabled="togglingPause"
+            @click="emit('togglePause')"
+          >
+            <component
+              :is="isPaused ? PlayCircleIcon : PauseCircleIcon"
+              class="w-4 h-4"
+              :class="{ 'animate-pulse': togglingPause }"
+            />
+            {{ isPaused ? '恢复' : '暂停' }}
+          </button>
+        </Tooltip>
         <!-- 取消按钮 -->
-        <button
-          class="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors"
-          :disabled="cancelling"
-          title="取消下载"
-          @click="emit('cancel')"
-        >
-          <XCircleIcon class="w-4 h-4" :class="{ 'animate-pulse': cancelling }" />
-          取消
-        </button>
+        <Tooltip text="取消下载" position="top">
+          <button
+            class="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors"
+            :disabled="cancelling"
+            @click="emit('cancel')"
+          >
+            <XCircleIcon class="w-4 h-4" :class="{ 'animate-pulse': cancelling }" />
+            取消
+          </button>
+        </Tooltip>
       </div>
     </div>
 

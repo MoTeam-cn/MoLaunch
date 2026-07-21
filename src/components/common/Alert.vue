@@ -1,13 +1,17 @@
 <script setup lang="ts">
 /**
  * 提示框组件
- * 用于显示各种类型的提示信息
+ * 用于显示各种类型的提示信息（info / warning / error / debug）
+ *
+ * 用法：<Alert type="warning" message="提示文字" />
+ * 截断模式（默认）：单行显示，超出截断
+ * 换行模式：传 :truncate="false" 允许换行完整显示
  */
 
-import { ExclamationTriangleIcon, InformationCircleIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { ExclamationTriangleIcon, InformationCircleIcon, CheckCircleIcon, ExclamationCircleIcon, BugAntIcon } from '@heroicons/vue/24/outline'
 
 interface Props {
-  type?: 'warning' | 'info' | 'success'
+  type?: 'info' | 'warning' | 'error' | 'success' | 'debug'
   message: string
   /** 是否单行截断（默认 true）；传 false 允许换行完整显示 */
   truncate?: boolean
@@ -19,20 +23,30 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const typeConfig = {
-  warning: {
-    color: 'bg-amber-500',
-    icon: ExclamationTriangleIcon,
-    iconColor: 'text-amber-500',
-  },
   info: {
     color: 'bg-blue-500',
     icon: InformationCircleIcon,
     iconColor: 'text-blue-500',
   },
+  warning: {
+    color: 'bg-amber-500',
+    icon: ExclamationTriangleIcon,
+    iconColor: 'text-amber-500',
+  },
+  error: {
+    color: 'bg-red-500',
+    icon: ExclamationCircleIcon,
+    iconColor: 'text-red-500',
+  },
   success: {
     color: 'bg-green-500',
     icon: CheckCircleIcon,
     iconColor: 'text-green-500',
+  },
+  debug: {
+    color: 'bg-cyan-500',
+    icon: BugAntIcon,
+    iconColor: 'text-cyan-500',
   },
 }
 

@@ -21,9 +21,6 @@ const emit = defineEmits<{
 <template>
   <div class="rounded-lg border border-gray-100 p-4">
     <div class="mb-3 text-sm font-medium text-gray-700">选择默认皮肤</div>
-    <div class="mb-3 text-xs text-gray-500">
-      离线账号仅支持本地显示，选择后启动器和头像将显示该皮肤。
-    </div>
     <div class="grid grid-cols-3 gap-2">
       <button
         v-for="skin in defaultSkins"

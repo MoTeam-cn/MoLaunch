@@ -128,7 +128,8 @@ pub async fn launch_game(
     // 构建认证信息
     // 安全修复：从后端 auth_storage 获取 access_token，避免前端 IPC 明文传输 token
     // 前端只传 username 和 uuid，后端根据 uuid 从注册表加载对应账号的 token
-    let login_type_str = login_type.unwrap_or_else(|| "Legacy".to_string());
+    let login_type_str = login_type.clone().unwrap_or_else(|| "Legacy".to_string());
+    let is_legacy = login_type_str == "Legacy";
     let (access_token, client_token) = {
         match state.auth_storage.load().await {
             Ok(auth_state) => {
@@ -166,6 +167,81 @@ pub async fn launch_game(
         client_token,
         login_type: login_type_str,
     };
+
+    // 离线账号皮肤：根据用户选择的皮肤变体调整 UUID
+    // PCL2 方案 A：通过递增 UUID 末位让 MC 离线模式哈希到目标皮肤模型（Steve/Alex）
+    let auth_info = if is_legacy {
+        match state.auth_storage.load().await {
+            Ok(auth_state) => {
+                if let Some(acc) = auth_state
+                    .offline_accounts
+                    .iter()
+                    .find(|a| a.uuid == auth_info.uuid)
+                {
+                    if let Some(ref skin_name) = acc.skin {
+                        // 判断目标皮肤变体：slim → true（Alex 模型），classic → false（Steve 模型）
+                        let slim = matches!(
+                            skin_name.as_str(),
+                            "Alex" | "Ari" | "Efe" | "Makena" | "Noor" | "Sunny" | "Zuri"
+                        );
+                        let adjusted_uuid =
+                            crate::minecraft::auth::adjust_uuid_for_skin_variant(&auth_info.uuid, slim);
+                        if adjusted_uuid != auth_info.uuid {
+                            log_info!(
+                                "离线皮肤 UUID 调整: {} -> {} (skin={}, slim={})",
+                                auth_info.uuid,
+                                adjusted_uuid,
+                                skin_name,
+                                slim
+                            );
+                        }
+                        AuthInfo {
+                            uuid: adjusted_uuid,
+                            ..auth_info
+                        }
+                    } else {
+                        auth_info
+                    }
+                } else {
+                    auth_info
+                }
+            }
+            Err(e) => {
+                log_warn!("加载离线账号皮肤失败: {}, 使用原始 UUID", e);
+                auth_info
+            }
+        }
+    } else {
+        auth_info
+    };
+
+    // 方案 B：离线账号皮肤资源包替换
+    // 生成资源包 zip 替换原版玩家纹理，确保 1.19.3+ 也精确显示选定角色
+    if is_legacy {
+        let skin_to_apply = state
+            .auth_storage
+            .load()
+            .await
+            .ok()
+            .and_then(|s| {
+                s.offline_accounts
+                    .iter()
+                    .find(|a| a.uuid == auth_info.uuid)
+                    .and_then(|a| a.skin.clone())
+            });
+
+        match crate::minecraft::launch::skin_resourcepack::apply_skin_resourcepack(
+            &game_dir,
+            &version_id,
+            skin_to_apply.as_deref(),
+        ) {
+            Ok(_) => {}
+            Err(e) => log_warn!("离线皮肤资源包生成失败: {}", e),
+        }
+    } else {
+        // 非离线账号：清理可能存在的离线皮肤资源包
+        crate::minecraft::launch::skin_resourcepack::remove_skin_resourcepack(&game_dir);
+    }
 
     // 创建启动配置
     let launch_config = LaunchConfig {

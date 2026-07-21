@@ -6,6 +6,7 @@
  */
 import SkinAvatar from '@/components/common/SkinAvatar.vue'
 import Button from '@/components/common/Button.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 export interface AccountCardData {
   uuid: string
@@ -58,30 +59,36 @@ const emit = defineEmits<{
 
       <!-- 常驻操作按钮组（所有账号卡片） -->
       <div class="mt-3 flex flex-wrap justify-center gap-1.5">
-        <Button
-          type="outline"
-          size="mini"
-          :title="card.loginType === '正版' ? '皮肤与披风管理' : '本地皮肤选择'"
-          @click.stop="emit('skin', card)"
-        >
-          <template #icon>
-            <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-              <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 2a6 6 0 110 12 6 6 0 010-12z" />
-            </svg>
-          </template>
-          皮肤
-        </Button>
-        <button
-          class="flex items-center gap-1 rounded-md border border-gray-200 px-2.5 py-1 text-xs text-red-500 transition-colors hover:border-red-300 hover:bg-red-50"
-          :title="card.isActive ? '退出登录' : '删除此账号'"
-          @click.stop="emit('logout', card, $event)"
-        >
-          <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
-            <path v-if="card.isActive" fill-rule="evenodd" d="M3 4a1 1 0 011-1h7a1 1 0 110 2H5v10h6a1 1 0 110 2H4a1 1 0 01-1-1V4zm11.3 3.3a1 1 0 011.4 0l3 3a1 1 0 010 1.4l-3 3a1 1 0 01-1.4-1.4l1.3-1.3H9a1 1 0 110-2h6.6l-1.3-1.3a1 1 0 010-1.4z" clip-rule="evenodd" />
-            <path v-else fill-rule="evenodd" d="M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 01-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 01-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z" clip-rule="evenodd" />
-          </svg>
-          {{ card.isActive ? '登出' : '删除' }}
-        </button>
+        <Tooltip :text="card.loginType === '正版' ? '皮肤与披风管理' : '本地皮肤选择'" position="top">
+          <Button
+            type="outline"
+            size="mini"
+            @click.stop="emit('skin', card)"
+          >
+            <template #icon>
+              <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 2a6 6 0 110 12 6 6 0 010-12z" />
+              </svg>
+            </template>
+            皮肤
+          </Button>
+        </Tooltip>
+        <Tooltip :text="card.isActive ? '退出登录' : '删除此账号'" position="top">
+          <Button
+            type="outline"
+            size="mini"
+            class="!text-red-500 hover:!border-red-300 hover:!bg-red-50"
+            @click.stop="emit('logout', card, $event)"
+          >
+            <template #icon>
+              <svg class="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+                <path v-if="card.isActive" fill-rule="evenodd" d="M3 4a1 1 0 011-1h7a1 1 0 110 2H5v10h6a1 1 0 110 2H4a1 1 0 01-1-1V4zm11.3 3.3a1 1 0 011.4 0l3 3a1 1 0 010 1.4l-3 3a1 1 0 01-1.4-1.4l1.3-1.3H9a1 1 0 110-2h6.6l-1.3-1.3a1 1 0 010-1.4z" clip-rule="evenodd" />
+                <path v-else fill-rule="evenodd" d="M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 01-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 01-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z" clip-rule="evenodd" />
+              </svg>
+              {{ card.isActive ? '登出' : '删除' }}
+            </template>
+          </Button>
+        </Tooltip>
       </div>
     </div>
   </div>

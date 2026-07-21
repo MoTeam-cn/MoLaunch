@@ -124,14 +124,24 @@ async function onCardLogout(card: AccountCardData, event: Event) {
   }
 }
 
-/** 切换到指定索引（带边界检查 + 切换锁） */
+/** 切换到指定索引（带边界检查）
+ *
+ * 视觉索引立即更新（保证拖动/滚轮流畅），账号切换异步进行不受 switching 锁阻塞。
+ * switching 锁仅在 switchAccount 内部防止并发请求。
+ */
 function switchTo(index: number) {
   if (index < 0 || index >= totalCards.value) return
-  if (switching.value) return  // 正在切换中，忽略
-  currentIndex.value = index
-  // 如果切换到了一个非当前账号卡片，触发账号切换
+  // 添加账号卡片（末尾），无需切换账号
+  if (index === cards.value.length) {
+    currentIndex.value = index
+    return
+  }
   const card = cards.value[index]
-  if (card && !card.isActive) {
+  if (!card) return
+  // 先更新视觉索引
+  currentIndex.value = index
+  // 异步切换账号（switchAccount 内部有 switching 锁防并发）
+  if (!card.isActive) {
     switchAccount(card.uuid, card.loginType)
   }
 }
@@ -179,7 +189,7 @@ async function logout() { await authStore.logoutUser() }
 
 // 拖动/滚轮导航（onSwitch 回调即 switchTo，switchTo 内部自带 switching 检查）
 const {
-  isDragging, dragMoved, cardTransform,
+  isDragging, dragMoved, isAnimating, cardTransform,
   onPointerDown, onPointerMove, onPointerUp, onWheel,
 } = useSwipeNavigation(totalCards, currentIndex, switchTo)
 
@@ -221,6 +231,7 @@ onMounted(() => {
         <!-- 卡片滑动区 -->
         <div
           class="relative min-w-0 flex-1 overflow-hidden rounded-xl"
+          :class="{ 'cursor-grab': !isDragging, 'cursor-grabbing': isDragging }"
           @pointerdown="onPointerDown"
           @pointermove="onPointerMove"
           @pointerup="onPointerUp"
@@ -228,8 +239,11 @@ onMounted(() => {
           @wheel="onWheel"
         >
           <div
-            class="flex transition-transform duration-300 ease-out"
-            :class="{ 'transition-none': isDragging && dragMoved }"
+            class="flex will-change-transform"
+            :class="[
+              (isDragging && dragMoved) ? 'transition-none' : 'transition-transform duration-300 ease-out',
+              isDragging && dragMoved ? 'select-none' : '',
+            ]"
             :style="{ transform: cardTransform }"
           >
             <!-- 账号卡片 -->
