@@ -7,6 +7,19 @@
 
 ## [未发布]
 
+### 优化
+
+#### SDK 加载逻辑与日志优化
+- `src-tauri/src/sdk/mod.rs`：重写 `get_sdk_resource_dir()`，优先从发布模式资源目录（`<exe_dir>/resources/sdk_data/`）查找 SDK 库，开发模式路径用词法规范化去掉 `../`，macOS 额外查找 `.app/Contents/Resources/sdk_data/`
+- 新增 `normalize_path()` 函数：词法规范化路径组件，避免日志显示 `src-tauri/../sdk_data` 这类不美观路径
+- `src-tauri/src/state/app.rs`：去掉重复的 `Loaded config from file` 日志（`config.rs` 中已有 `Config loaded from storage`）
+
+#### SDK 动态库改为嵌入二进制释放到临时目录
+- `src-tauri/src/resources.rs`：`embedded_bytes` 中按平台条件编译注册 SDK 动态库（`cfg(target_os = "windows/macos/linux")`），新增 `extract_sdk()` 函数释放 SDK 到 `<temp>/MoLaunch/sdk/` 目录
+- `src-tauri/src/sdk/mod.rs`：删除 `get_sdk_resource_dir()` 和 `normalize_path()`，`check_sdk_library()` 改为调用 `resources::extract_sdk()` 确保释放后返回临时目录路径，`get_sdk_library_path()` 改为返回临时目录路径
+- `src-tauri/tauri.conf.json`：移除 `../sdk_data/*` 资源打包配置（SDK 不再从外部文件加载）
+- 释放策略复用 `extract_resource` 的 sha256 校验机制：SDK 热更新（手动替换临时目录文件）不会触发覆盖，主程序更新后嵌入版本变化自动覆盖旧版，临时目录被清理后自动重新释放
+
 ### 重构
 
 #### 项目文档全面重构

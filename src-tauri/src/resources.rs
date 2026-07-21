@@ -30,11 +30,26 @@ fn embedded_text(path: &str) -> Option<&'static str> {
 ///
 /// 编译时通过 include_bytes! 把 resources/ 下的二进制文件直接打进二进制。
 /// 新增二进制资源时，在此 match 中追加一条分支即可。
+///
+/// SDK 动态库按平台条件编译，只注册当前平台的文件，避免跨平台编译时
+/// 因文件不存在而导致 include_bytes! 编译失败。
 fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
     match path {
         "forge-installer.jar" => Some(include_bytes!("../resources/forge-installer.jar")),
         "java-wrapper.jar" => Some(include_bytes!("../resources/java-wrapper.jar")),
         "lwjgl-unsafe-agent.jar" => Some(include_bytes!("../resources/lwjgl-unsafe-agent.jar")),
+        #[cfg(target_os = "windows")]
+        "sdk/run_sdk_lib-windows-x86_64.dll" => {
+            Some(include_bytes!("../resources/sdk/run_sdk_lib-windows-x86_64.dll"))
+        }
+        #[cfg(target_os = "macos")]
+        "sdk/run_sdk_lib-darwin-aarch64.dylib" => {
+            Some(include_bytes!("../resources/sdk/run_sdk_lib-darwin-aarch64.dylib"))
+        }
+        #[cfg(target_os = "linux")]
+        "sdk/run_sdk_lib-linux-x86_64.so" => {
+            Some(include_bytes!("../resources/sdk/run_sdk_lib-linux-x86_64.so"))
+        }
         _ => None,
     }
 }
@@ -126,4 +141,25 @@ pub fn extract_resource(resource_path: &str, target_path: &Path) -> anyhow::Resu
         &expected_hash[..12]
     );
     Ok(())
+}
+
+/// 释放 SDK 动态库到临时目录，返回释放后的文件路径
+///
+/// SDK 在编译时通过 `include_bytes!` 嵌入二进制，运行时释放到
+/// `<temp>/MoLaunch/sdk/` 目录供 `libloading` 加载。
+///
+/// 释放策略（复用 `extract_resource` 的 sha256 校验机制）：
+/// - **SDK 热更新**（手动替换临时目录文件）：hash 文件不变仍匹配 → 跳过释放，加载热更新后的文件
+/// - **主程序更新后启动**：嵌入 SDK 的 sha256 变了，与 hash 文件不匹配 → 自动释放覆盖旧版
+/// - **临时目录被清理**：文件不存在 → 重新释放
+pub fn extract_sdk() -> anyhow::Result<std::path::PathBuf> {
+    let sdk_filename = crate::sdk::get_sdk_filename();
+    let resource_path = format!("sdk/{}", sdk_filename);
+
+    let temp_dir = std::env::temp_dir().join("MoLaunch").join("sdk");
+    let target_path = temp_dir.join(sdk_filename);
+
+    extract_resource(&resource_path, &target_path)?;
+
+    Ok(target_path)
 }

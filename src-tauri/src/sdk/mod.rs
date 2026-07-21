@@ -49,46 +49,28 @@ pub fn get_sdk_filename() -> &'static str {
     }
 }
 
-/// 获取 SDK 资源目录路径
-pub fn get_sdk_resource_dir() -> PathBuf {
-    // 在开发模式下，sdk_data 在项目根目录
-    // 在发布模式下，sdk_data 被打包到 resources 目录
-    let dev_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../sdk_data");
-
-    if dev_path.exists() {
-        return dev_path;
-    }
-
-    // 发布模式下，尝试从 Tauri 资源目录获取
-    if let Ok(resource_dir) = std::env::current_exe() {
-        if let Some(exe_dir) = resource_dir.parent() {
-            let resource_path = exe_dir.join("resources").join("sdk_data");
-            if resource_path.exists() {
-                return resource_path;
-            }
-        }
-    }
-
-    // 兜底返回开发路径
-    dev_path
-}
-
-/// 获取 SDK 动态库的完整路径
+/// 获取 SDK 动态库的释放路径（临时目录）
+///
+/// SDK 在编译时嵌入二进制，运行时由 `resources::extract_sdk()` 释放到
+/// `<temp>/MoLaunch/sdk/<filename>`。此函数仅返回路径，不触发释放。
 pub fn get_sdk_library_path() -> PathBuf {
-    let resource_dir = get_sdk_resource_dir();
-    let filename = get_sdk_filename();
-    resource_dir.join(filename)
+    let sdk_filename = get_sdk_filename();
+    std::env::temp_dir()
+        .join("MoLaunch")
+        .join("sdk")
+        .join(sdk_filename)
 }
 
-/// 检查 SDK 库是否存在
+/// 确保 SDK 已释放到临时目录，返回动态库路径
+///
+/// 调用 `resources::extract_sdk()` 释放嵌入的 SDK 到临时目录。
+/// sha256 校验机制保证：只在版本不匹配时重新释放，避免每次启动重复写盘。
 pub fn check_sdk_library() -> Result<PathBuf, SdkError> {
-    let path = get_sdk_library_path();
-    if path.exists() {
-        Ok(path)
-    } else {
-        Err(SdkError::LoadFailed(format!(
-            "SDK library not found at: {}",
-            path.display()
-        )))
+    match crate::resources::extract_sdk() {
+        Ok(path) => Ok(path),
+        Err(e) => Err(SdkError::LoadFailed(format!(
+            "Failed to extract SDK to temp dir: {}",
+            e
+        ))),
     }
 }

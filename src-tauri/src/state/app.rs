@@ -36,10 +36,7 @@ impl AppState {
     pub fn new() -> Self {
         // 尝试从文件加载配置
         let config = match crate::config::load_config() {
-            Ok(Some(config)) => {
-                log_info!("Loaded config from file");
-                config
-            }
+            Ok(Some(config)) => config,
             Ok(None) => {
                 log_info!("No config file found, using defaults");
                 AppConfig::default()

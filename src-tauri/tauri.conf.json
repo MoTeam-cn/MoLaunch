@@ -9,7 +9,6 @@
     "active": true,
     "targets": "all",
     "resources": [
-      "../sdk_data/*",
       "resources/*"
     ],
     "icon": [
