@@ -105,15 +105,15 @@ onUnmounted(() => {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 
-    0 4px 14px rgba(37, 99, 235, 0.4),
-    0 2px 6px rgba(37, 99, 235, 0.2);
+  box-shadow:
+    0 4px 14px rgb(var(--color-primary-rgb-600) / 0.4),
+    0 2px 6px rgb(var(--color-primary-rgb-600) / 0.2);
   transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
   overflow: hidden;
 }

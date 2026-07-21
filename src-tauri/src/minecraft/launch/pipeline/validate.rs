@@ -104,6 +104,7 @@ impl LaunchPipeline {
             self.config.disable_jlw,
             self.config.disable_lua,
             self.config.custom_info.as_deref(),
+            self.config.game_language.as_deref(),
         )
         .map_err(|e| LaunchError {
             stage: LaunchStage::BuildArgs,

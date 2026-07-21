@@ -30,6 +30,8 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.game_dir = config.get_or("General", "game_dir", &app_config.game_dir);
     app_config.theme = config.get_or("General", "theme", &app_config.theme);
     app_config.language = config.get_or("General", "language", &app_config.language);
+    app_config.game_language = config.get_or("General", "game_language", &app_config.game_language);
+    app_config.primary_color = config.get_or("General", "primary_color", &app_config.primary_color);
 
     // Folders（Minecraft 文件夹列表）
     if let Some(list_json) = config.get("Folders", "list") {
@@ -169,6 +171,8 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("General", "game_dir", &config.game_dir);
     ini.set("General", "theme", &config.theme);
     ini.set("General", "language", &config.language);
+    ini.set("General", "game_language", &config.game_language);
+    ini.set("General", "primary_color", &config.primary_color);
     ini.set(
         "General",
         "isolation_mode",

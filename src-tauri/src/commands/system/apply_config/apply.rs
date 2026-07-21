@@ -154,7 +154,7 @@ fn apply_memory(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     }
 }
 
-/// 启动器域：game_dir / isolation_mode / log_level（收集待应用值）/ selected_version
+/// 启动器域：game_dir / isolation_mode / log_level（收集待应用值）/ selected_version / game_language / primary_color
 fn apply_launcher(
     config: &mut crate::state::AppConfig,
     patch: &ConfigPatch,
@@ -176,6 +176,14 @@ fn apply_launcher(
     if let Some(ref version) = patch.selected_version {
         log_info!("[Config] selected_version = {:?}", version);
         config.selected_version = version.clone();
+    }
+    if let Some(ref lang) = patch.game_language {
+        log_info!("[Config] game_language = {}", lang);
+        config.game_language = lang.clone();
+    }
+    if let Some(ref color) = patch.primary_color {
+        log_info!("[Config] primary_color = {}", color);
+        config.primary_color = color.clone();
     }
 }
 

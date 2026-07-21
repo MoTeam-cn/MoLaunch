@@ -203,11 +203,11 @@ const sizeClass = computed(() => `input-size-${props.size}`)
   background-color: #e5e6eb;
 }
 
-/* focus-within：内部 input 聚焦时整个 wrapper 变白底蓝边 */
+/* focus-within：内部 input 聚焦时整个 wrapper 变白底主色边 */
 .input-wrapper:focus-within {
   z-index: 1;
   background-color: #ffffff;
-  border-color: #165dff;
+  border-color: var(--color-primary-500);
 }
 
 .input-disabled {

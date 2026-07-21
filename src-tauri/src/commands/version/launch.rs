@@ -37,6 +37,30 @@ pub fn parse_server_enter(s: &str) -> (Option<String>, Option<u32>) {
     (Some(s.to_string()), None)
 }
 
+/// 解析游戏默认语言配置为实际写入 options.txt 的语言代码
+///
+/// - `game_language="none"` 或空 → None（不设置，保留玩家游戏内选择）
+/// - `game_language="zh_cn"` / `"en_us"` 等 → 直接返回该值
+/// - `game_language="auto"` → 旧配置兼容：跟随启动器 UI 语言（zh-CN → zh_cn，en-US → en_us）
+///   新版本前端已移除 auto 选项，默认改为 "zh_cn"，此处保留仅为兼容旧配置文件
+fn resolve_game_language(game_language: &str, launcher_language: &str) -> Option<String> {
+    let gl = game_language.trim();
+    if gl.is_empty() || gl == "none" {
+        return None;
+    }
+    if gl == "auto" {
+        // 旧配置兼容：跟随启动器 UI 语言（BCP 47 → MC 小写代码）
+        let mc_lang = match launcher_language {
+            "zh-CN" => "zh_cn",
+            "en-US" => "en_us",
+            _ => "zh_cn", // 默认中文
+        };
+        return Some(mc_lang.to_string());
+    }
+    // 直接使用用户指定的语言代码
+    Some(gl.to_string())
+}
+
 /// 启动游戏
 ///
 /// 安全修复：移除 access_token 参数，改为后端从 auth_storage 自行获取 token
@@ -280,6 +304,8 @@ pub async fn launch_game(
         custom_info: setup.custom_info.clone(),
         // 自定义窗口标题（→ Win32 SetWindowText）
         window_title: setup.window_title.clone(),
+        // 游戏默认语言：none 模式不设置，auto 旧配置兼容跟随启动器语言
+        game_language: resolve_game_language(&config.game_language, &config.language),
         app_handle: Some(app_handle.clone()),
     };
 

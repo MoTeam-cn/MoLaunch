@@ -30,8 +30,8 @@ const launchState = computed(() => {
   if (versionStore.launching) return { text: '取消启动', color: 'border border-yellow-500 bg-white/80 text-yellow-600 hover:bg-yellow-50 hover:border-yellow-600', spin: true }
   if (versionStore.runningPid) return { text: '停止游戏', color: 'border border-red-500 bg-white/80 text-red-600 hover:bg-red-50 hover:border-red-600', spin: false }
   if (!versionStore.selectedVersion) return { text: '选择版本', color: 'border border-gray-300 bg-white/80 text-gray-400 cursor-not-allowed', spin: false }
-  // Highlight：主题色边框 + 白底 + 主题色文字，hover 时边框变亮蓝 + 极淡蓝底
-  return { text: '启动游戏', color: 'border border-primary-600 bg-white/80 text-primary-600 hover:bg-primary-50 hover:border-blue-500 hover:text-blue-500', spin: false }
+  // Highlight：主题色边框 + 白底 + 主题色文字，hover 时变亮档（primary-500）+ 极淡底
+  return { text: '启动游戏', color: 'border border-primary-600 bg-white/80 text-primary-600 hover:bg-primary-50 hover:border-primary-500 hover:text-primary-500', spin: false }
 })
 
 async function handleLaunch() {

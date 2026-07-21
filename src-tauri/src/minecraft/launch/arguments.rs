@@ -31,6 +31,7 @@ pub fn build_launch_arguments(
     disable_jlw: bool,
     disable_lua: bool,
     custom_info: Option<&str>,
+    game_language: Option<&str>,
 ) -> anyhow::Result<LaunchArguments> {
     let version_dir = game_dir.join("versions").join(version_id);
     let json_path = version_dir.join(format!("{}.json", version_id));
@@ -125,13 +126,38 @@ pub fn build_launch_arguments(
         custom_info,
     )?;
 
-    // 在 launch 前设置游戏语言为中文（写入有效目录，适配隔离模式）
-    if let Err(e) = crate::minecraft::language::set_game_language(
-        &effective_game_dir,
-        version_id,
-        version_id, // 用 version_id 作为 MC 版本号（后续可从 setup.ini 读 OriginalVersion）
-    ) {
-        log_info!("[Language] Failed to set game language: {}", e);
+    // 在 launch 前设置游戏语言（写入有效目录，适配隔离模式）
+    // 仅当 game_language 配置非空且非 "none" 时才设置
+    if let Some(lang) = game_language {
+        if !lang.is_empty() && lang != "none" {
+            // 获取真实 MC 版本号（用于决定语言代码大小写）
+            // 优先从 setup.ini 读取 OriginalVersion，回退到 version.json 的 inheritsFrom/id
+            let mc_version = crate::minecraft::version::setup::detect_version_and_loader(
+                &version_dir, version_id,
+            )
+            .0;
+            log_info!(
+                "[Language] Resolved MC version for language case: {} (from version_id={})",
+                mc_version,
+                version_id
+            );
+
+            if let Err(e) = crate::minecraft::language::set_game_language(
+                &effective_game_dir,
+                version_id,
+                &mc_version,
+                lang,
+            ) {
+                log_info!("[Language] Failed to set game language: {}", e);
+            }
+        } else {
+            log_info!(
+                "[Language] Skipped (game_language={:?}, respecting user in-game choice)",
+                lang
+            );
+        }
+    } else {
+        log_info!("[Language] Skipped (game_language=None)");
     }
 
     Ok(LaunchArguments {

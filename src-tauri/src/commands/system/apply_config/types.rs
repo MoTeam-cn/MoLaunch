@@ -38,6 +38,13 @@ pub struct ConfigPatch {
     pub isolation_mode: Option<u32>,
     pub log_level: Option<u32>,
     pub selected_version: Option<Option<String>>,
+    /// 游戏默认界面语言：写入 options.txt 的 lang 字段
+    /// - "auto"：跟随启动器语言（旧配置兼容）
+    /// - "zh_cn" / "en_us" / "ja_jp" / "ko_kr" 等 MC 标准语言代码
+    /// - "none"：不设置
+    pub game_language: Option<String>,
+    /// 主题主色 HEX（如 "#165dff"），前端注入 CSS 变量驱动 primary-* 色阶
+    pub primary_color: Option<String>,
 
     // ===== 社区资源（INI 明文，进 AppConfig）=====
     pub community_source: Option<u8>,
@@ -88,6 +95,10 @@ pub struct ConfigSnapshot {
     pub isolation_mode: u32,
     pub log_level: u32,
     pub selected_version: Option<String>,
+    /// 游戏默认界面语言
+    pub game_language: String,
+    /// 主题主色 HEX（如 "#165dff"）
+    pub primary_color: String,
     // 社区资源（INI 明文）
     pub community_source: u8,
     pub community_filename_format: u8,
@@ -144,6 +155,8 @@ pub fn build_snapshot(
         isolation_mode: config.isolation_mode,
         log_level: config.log_level,
         selected_version: config.selected_version.clone(),
+        game_language: config.game_language.clone(),
+        primary_color: config.primary_color.clone(),
         community_source: config.community_source,
         community_filename_format: config.community_filename_format,
         community_mod_local_name_style: config.community_mod_local_name_style,

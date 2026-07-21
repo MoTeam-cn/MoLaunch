@@ -252,10 +252,10 @@ onUnmounted(() => {
   border-color: transparent;
 }
 
-/* 展开时：背景 #fff, 边框 #165dff */
+/* 展开时：背景 #fff, 边框主色 */
 .select-trigger.active {
   background-color: #fff;
-  border-color: #165dff;
+  border-color: var(--color-primary-500);
   /* 无外扩阴影，仅边框变色 */
   box-shadow: none;
 }
@@ -368,7 +368,7 @@ onUnmounted(() => {
 .select-check-icon {
   width: 12px;
   height: 12px;
-  color: #165dff;
+  color: var(--color-primary-500);
   flex-shrink: 0;
 }
 

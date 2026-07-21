@@ -178,6 +178,7 @@ pub async fn export_launch_script(
         false, // 导出脚本时不启用 JLW
         false, // 导出脚本时不启用 LUA
         None,  // 导出脚本时不传 custom_info
+        None,  // 导出脚本时不设置游戏语言
     )
     .map_err(|e| {
         log_error!("Failed to build launch arguments: {}", e);

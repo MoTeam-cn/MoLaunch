@@ -140,6 +140,12 @@ pub struct LaunchConfig {
     /// 启动后通过 Win32 SetWindowText 强制改写游戏窗口标题，空则不改
     #[serde(default)]
     pub window_title: Option<String>,
+    /// 游戏默认界面语言（写入 options.txt 的 lang 字段）
+    /// - "zh_cn" / "en_us" / "ja_jp" / "ko_kr" 等 MC 标准语言代码（默认 "zh_cn"）
+    /// - "none"：不设置，保留玩家游戏内手动选择
+    /// - "auto"：旧配置兼容值，resolve_game_language 会按启动器语言映射处理
+    #[serde(default)]
+    pub game_language: Option<String>,
     /// Tauri AppHandle（用于 Java 自动下载时推送进度事件）
     #[serde(skip)]
     pub app_handle: Option<tauri::AppHandle>,

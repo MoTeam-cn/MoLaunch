@@ -14,6 +14,7 @@ import Toast from '@/components/common/Toast.vue'
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
+import { useSettingsStore } from '@/stores/settings'
 import { setModalRef } from '@/utils/modal'
 import { setCrashDialogRef } from '@/utils/crashDialog'
 import { setToastRef } from '@/utils/toast'
@@ -22,6 +23,7 @@ import { initDownloadPolling } from '@/composables/useDownloadPolling'
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
 const javaStore = useJavaStore()
+const settingsStore = useSettingsStore()
 const modalRef = ref<InstanceType<typeof Modal> | null>(null)
 const crashDialogRef = ref<InstanceType<typeof CrashDialog> | null>(null)
 const toastRef = ref<InstanceType<typeof Toast> | null>(null)
@@ -42,6 +44,10 @@ async function initApp() {
   // Java 搜索不依赖 SDK/认证，提前并行启动（后端 list_java 是耗时操作）
   const javaPromise = javaStore.detectJava()
   console.log('[Startup][Frontend] javaStore.detectJava fired (background)')
+
+  // 异步从后端 INI 同步主题色（不阻塞主流程，完成后覆盖前端 localStorage）
+  settingsStore.syncPrimaryColorFromBackend()
+  console.log('[Startup][Frontend] syncPrimaryColorFromBackend fired (background)')
 
   // 平台信息和设备 ID 互不依赖，并行获取
   console.log('[Startup][Frontend] awaiting fetchPlatformInfo + fetchDeviceId...')

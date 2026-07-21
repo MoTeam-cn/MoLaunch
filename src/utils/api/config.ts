@@ -38,6 +38,10 @@ export interface ConfigSnapshot {
   isolationMode: number
   logLevel: number
   selectedVersion: string | null
+  /** 游戏默认界面语言（写入 options.txt 的 lang 字段，默认 "zh_cn"） */
+  gameLanguage: string
+  /** 主题主色 HEX（如 "#165dff"），驱动 primary-* 色阶 */
+  primaryColor: string
   // 社区资源
   communitySource: number
   communityFilenameFormat: number
@@ -82,6 +86,10 @@ export interface ConfigPatch {
   isolationMode?: number
   logLevel?: number
   selectedVersion?: string | null                          // null 表示清空选中
+  /** 游戏默认界面语言："zh_cn" 等 MC 代码 / "none"（不设置）/ "auto"（旧配置兼容） */
+  gameLanguage?: string
+  /** 主题主色 HEX（如 "#165dff"） */
+  primaryColor?: string
   // 社区资源（INI 明文）
   communitySource?: number                                 // 0/1/2
   communityFilenameFormat?: number                         // 0-4

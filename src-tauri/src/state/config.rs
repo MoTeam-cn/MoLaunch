@@ -17,6 +17,14 @@ pub struct AppConfig {
     pub memory_mode: String, // "auto" | "custom"
     pub theme: String,
     pub language: String,
+    /// 游戏默认界面语言（写入 options.txt 的 lang 字段）
+    /// - "zh_cn" / "en_us" / "ja_jp" / "ko_kr" 等 MC 标准语言代码（默认 "zh_cn"）
+    /// - "none"：不设置，保留玩家游戏内手动选择
+    /// - "auto"：旧配置兼容值，后端 resolve_game_language 会按启动器语言映射处理
+    pub game_language: String,
+    /// 主题主色 HEX（如 "#165dff"），前端读取后通过 applyPrimaryColor() 注入 CSS 变量
+    /// 驱动 Tailwind primary-* 色阶与 main.css 中所有 var(--color-primary-*)
+    pub primary_color: String,
     pub mirror_url: Option<String>,
     pub mirror_url_meta: Option<String>,
     pub mirror_url_download: Option<String>,
@@ -77,6 +85,8 @@ impl Default for AppConfig {
             memory_mode: "auto".to_string(),
             theme: "system".to_string(),
             language: "zh-CN".to_string(),
+            game_language: "zh_cn".to_string(),
+            primary_color: "#165dff".to_string(),
             mirror_url: None,
             mirror_url_meta: None,
             mirror_url_download: None,

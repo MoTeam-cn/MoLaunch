@@ -14,22 +14,54 @@
 
 @layer base {
   :root {
-    --color-primary: 59 130 246;
+    /* 默认主色：Arco 蓝 #165dff
+     * 运行时由 settingsStore.primaryColor 通过 applyPrimaryColor() 覆盖
+     * - --color-primary-{n}：HEX 值，供 var(--color-primary-500) 等直接使用
+     * - --color-primary-rgb-{n}：空格分隔 RGB，供 Tailwind rgb(var(...) / <alpha>) 使用
+     */
+    --color-primary-50:  #eff2ff;
+    --color-primary-100: #dde5ff;
+    --color-primary-200: #bcd0ff;
+    --color-primary-300: #8cb0ff;
+    --color-primary-400: #5688ff;
+    --color-primary-500: #165dff;
+    --color-primary-600: #0e42d2;
+    --color-primary-700: #0a3aae;
+    --color-primary-800: #0a3290;
+    --color-primary-900: #0b2b75;
+    --color-primary-950: #071a4d;
+
+    --color-primary-rgb-50:  239 242 255;
+    --color-primary-rgb-100: 221 229 255;
+    --color-primary-rgb-200: 188 208 255;
+    --color-primary-rgb-300: 140 176 255;
+    --color-primary-rgb-400: 86 136 255;
+    --color-primary-rgb-500: 22 93 255;
+    --color-primary-rgb-600: 14 66 210;
+    --color-primary-rgb-700: 10 58 174;
+    --color-primary-rgb-800: 10 50 144;
+    --color-primary-rgb-900: 11 43 117;
+    --color-primary-rgb-950: 7 26 77;
+
+    /* 兼容旧变量：空格分隔 RGB */
+    --color-primary: var(--color-primary-rgb-500);
     --color-success: 16 185 129;
     --color-warning: 245 158 11;
     --color-error: 239 68 68;
   }
-  
+
   html, body {
     @apply antialiased;
     overflow: hidden;
     height: 100%;
     margin: 0;
   }
-  
+
   body {
     @apply text-gray-900;
-    background-color: #e0ecff;
+    /* 主内容区背景：主题色 100 档 25% 透明度叠加白底，呈现淡色调
+     * 跟随主题色变化（原硬编码 #e0ecff） */
+    background-color: rgb(var(--color-primary-rgb-100) / 0.25);
   }
 }
 
@@ -65,21 +97,21 @@
   }
 
   /* Primary：蓝底白字
-     default #165dff / hover #4080ff / active #0e42d2 / disabled #94bfff */
+     default primary-500 / hover primary-400 / active primary-600 / disabled primary-300 */
   .btn-primary {
     @apply btn;
     color: #ffffff;
-    background-color: #165dff;
+    background-color: var(--color-primary-500);
     border-color: transparent;
   }
   .btn-primary:hover:not(:disabled) {
-    background-color: #4080ff;
+    background-color: var(--color-primary-400);
   }
   .btn-primary:active:not(:disabled) {
-    background-color: #0e42d2;
+    background-color: var(--color-primary-600);
   }
   .btn-primary:disabled {
-    background-color: #94bfff;
+    background-color: var(--color-primary-300);
   }
 
   /* Secondary：灰底深字
@@ -103,24 +135,24 @@
   }
 
   /* Outline：透明底蓝边框
-     default #165dff / hover #4080ff / active #0e42d2 / disabled #94bfff */
+     default primary-500 / hover primary-400 / active primary-600 / disabled primary-300 */
   .btn-outline {
     @apply btn;
-    color: #165dff;
+    color: var(--color-primary-500);
     background-color: transparent;
-    border-color: #165dff;
+    border-color: var(--color-primary-500);
   }
   .btn-outline:hover:not(:disabled) {
-    color: #4080ff;
-    border-color: #4080ff;
+    color: var(--color-primary-400);
+    border-color: var(--color-primary-400);
   }
   .btn-outline:active:not(:disabled) {
-    color: #0e42d2;
-    border-color: #0e42d2;
+    color: var(--color-primary-600);
+    border-color: var(--color-primary-600);
   }
   .btn-outline:disabled {
-    color: #94bfff;
-    border-color: #94bfff;
+    color: var(--color-primary-300);
+    border-color: var(--color-primary-300);
   }
 
   /* Ghost：透明底，hover 浅灰 */
@@ -131,7 +163,7 @@
     border-color: transparent;
   }
   .btn-ghost:hover:not(:disabled) {
-    color: #165dff;
+    color: var(--color-primary-500);
     background-color: #f2f3f5;
   }
 
@@ -139,7 +171,7 @@
   .btn-text {
     @apply btn;
     padding: 0 8px;
-    color: #165dff;
+    color: var(--color-primary-500);
     background-color: transparent;
     border-color: transparent;
   }
@@ -150,7 +182,7 @@
     background-color: #e5e6eb;
   }
   .btn-text:disabled {
-    color: #94bfff;
+    color: var(--color-primary-300);
   }
 
   /* ============================================================
@@ -188,7 +220,7 @@
   .input:focus {
     z-index: 1;
     background-color: #ffffff;
-    border-color: #165dff;
+    border-color: var(--color-primary-500);
   }
   .input:disabled {
     color: #c9cdd4;

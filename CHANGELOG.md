@@ -9,6 +9,56 @@
 
 ### 新增
 
+#### 浏览器环境拦截提示
+- `src/main.ts`：在最早入口处检测 `window.__TAURI_INTERNALS__`（Tauri 2 在 WebView 中注入的全局对象），若不存在则判定为浏览器环境，直接渲染友好提示页（SVG 警告图标 + "小朋友，此页面默认给 Tauri 客户端使用，请勿使用浏览器直接打开呦？！"），并阻止 Vue app 挂载，避免 `@tauri-apps/api` 的 `getCurrentWindow()` 在浏览器中抛 "Cannot read properties of undefined (reading 'metadata')" 导致 TopNavLayout setup 崩溃刷屏；Tauri WebView 中正常走原挂载流程
+
+#### 主题色自定义（Arco Design 风格颜色选择器 + 后端持久化）
+- `src/utils/color.ts`：新建颜色工具模块，提供 HEX ↔ RGB ↔ HSL 互转、`generateColorScale` 由主色生成 50~950 共 11 档色阶（基于 HSL 调整 L 值，极亮/极暗档微调饱和度防发灰）、`applyPrimaryColor` 把色阶写入 `:root` 的 CSS 变量（同时输出 HEX 形式 `--color-primary-{n}` 与 RGB 空格分隔形式 `--color-primary-rgb-{n}`，供 Tailwind `rgb(var(...) / <alpha>)` 使用，并打印诊断日志便于排查）、`PRESET_COLORS` 12 个预设色板
+- `src/components/common/ColorPicker.vue`：新建自研颜色选择器组件，参考 Arco Design Vue `<color-picker>` 视觉风格（文件头部按项目规范添加 Arco Design Vue 版权声明）；触发器 32px 高（色块 + HEX 文本 + 下拉箭头），与项目自研 Select 风格一致；下拉面板含预设色板（6 列 × 2 行 = 12 色，参考 Arco 默认色板）+ 自定义 HEX 输入框（实时校验，3 位缩写自动扩展为 6 位，无效输入显示红框 + 错误提示并回退原值）；弹层定位逻辑复用 Select.vue 实现（视口空间不足自动向上展开 + scroll 事件关闭）并补充横向边界夹紧（右侧/左侧空间不足时左移到 `viewportW - margin - dropdownW`，避免下拉面板被窗口边框截断）；"自定义颜色"标题与上方色板通过 `:not(:first-child) { margin-top: 16px }` 拉开距离；scaleY + opacity 弹出动画；select 函数添加诊断日志
+- `src/stores/settings.ts`：新增 `primaryColor` 字段（默认 `"#165dff"` Arco 蓝）与 `setPrimaryColor()` 方法；`loadSettings()` 末尾立即调用 `applyPrimaryColor()` 注入 CSS 变量；存储双轨制——前端 localStorage（首屏前同步读取避免闪烁）+ 后端 INI（跨设备同步）；新增 `syncPrimaryColorFromBackend()` 启动后从后端拉取覆盖前端，后端无值时把前端默认值同步到后端；`setPrimaryColor()` 同时做四件事：立即注入 CSS 变量 + 写 localStorage + 异步 `applyConfig({ primaryColor })` 写后端 INI + toastSuccess 提示用户操作已生效
+- `src/main.ts`：在 `app.mount()` 之前先调用 `useSettingsStore(pinia)` 触发 `loadSettings()`，确保 CSS 变量在 Vue 渲染前就注入到 `:root`，避免首屏蓝色 → 用户自定义色的闪烁
+- `src/App.vue`：`initApp()` 中异步触发 `settingsStore.syncPrimaryColorFromBackend()`，不阻塞主流程
+- `tailwind.config.js`：`primary` 调色板 11 档从硬编码 HEX 改为 `rgb(var(--color-primary-rgb-{n}) / <alpha-value>)` 形式，让所有 `text-primary-*` / `bg-primary-*` / `border-primary-*` 工具类自动跟随 CSS 变量
+- `src/assets/styles/main.css`：在 `:root` 定义完整 11 档色阶默认值（Arco 蓝 `#165dff` 系列），含 HEX 与 RGB 双形式；`--color-primary` 兼容旧变量指向 500 档 RGB；所有 `.btn-primary` / `.btn-outline` / `.btn-text` / `.btn-ghost:hover` / `.input:focus` 中的硬编码 `#165dff` / `#4080ff` / `#0e42d2` / `#94bfff` 改为 `var(--color-primary-{n})`；`body` 背景色从硬编码 `#e0ecff` 改为 `rgb(var(--color-primary-rgb-100) / 0.25)` 跟随主题色
+- `src/components/layout/TopNavLayout.vue`：主内容区背景从内联 `style="background-color: #e0ecff"` 改为 `bg-primary-100/30` Tailwind 类，跟随主题色
+- `src/components/common/Input.vue`：`.input-wrapper:focus-within` 边框色从 `#165dff` 改为 `var(--color-primary-500)`
+- `src/components/common/Select.vue`：`.select-trigger.active` 边框色 + `.select-check-icon` 颜色从 `#165dff` 改为 `var(--color-primary-500)`
+- `src/components/common/BackToTop.vue`：渐变背景从 `linear-gradient(135deg, #3b82f6, #2563eb)` 改为 `linear-gradient(135deg, var(--color-primary-500), var(--color-primary-600))`；阴影 rgba 改为 `rgb(var(--color-primary-rgb-600) / 0.4)`
+- `src/components/home/LaunchPanel.vue`：启动按钮 hover 态从混用 `border-blue-500 text-blue-500` 改为统一 `border-primary-500 text-primary-500`
+- `src/views/settings/SettingsPersonal.vue`：移除原"主题"Select（浅色/深色/跟随系统，本就未生效）；新增"主题色"ColorPicker，绑定 `settingsStore.primaryColor`，描述"控制菜单栏、按钮、选中态等所有主色区域"
+- 后端配置链路（双轨制持久化）：
+  - `src-tauri/src/state/config.rs`：`AppConfig` 新增 `primary_color: String` 字段，默认 `"#165dff"`
+  - `src-tauri/src/config.rs`：INI 加载/保存新增 `primary_color` 键（`[General]` 段下）
+  - `src-tauri/src/commands/system/apply_config/types.rs`：`ConfigPatch` 新增 `primary_color: Option<String>`；`ConfigSnapshot` 新增 `primary_color: String`；`build_snapshot` 补充字段映射
+  - `src-tauri/src/commands/system/apply_config/apply.rs`：`apply_launcher` 函数新增 `primary_color` 字段处理
+- `src/utils/api/config.ts`：`ConfigSnapshot` 新增 `primaryColor: string`；`ConfigPatch` 新增 `primaryColor?: string`
+- 受影响区域（全部跟随主题色变化）：顶栏背景 `bg-primary-600`、主内容区背景 `bg-primary-100/30` + body `rgb(var(--color-primary-rgb-100) / 0.25)`、设置/版本设置/下载/文件夹选择侧栏选中态 `bg-primary-50 text-primary-700 border-primary-500`、SubTabBar / SegmentedButtons 选中态、所有 `.btn-primary` / `.btn-outline` / `.btn-text` 按钮、所有 Input / Select 聚焦边框、BackToTop 渐变按钮、LaunchPanel 启动按钮、社区资源/版本选择/账号卡片等约 100 处 `primary-*` 使用点
+- 不受影响区域：47 处 `text-blue-*` / `bg-blue-*` 硬编码（Alert info 提示框、Toast info、Java 下载进度条等"信息提示"语义场景）保留原色，符合 Arco Design 中 info 蓝与 primary 蓝分离的设计规范
+- 用户操作反馈：选择颜色后立即注入 CSS 变量生效 + toastSuccess 提示"主题色已更新为 #XXXXXX" + 后端 INI 持久化（跨设备同步）
+
+#### 设置页个性化补充：游戏默认界面语言 + 启动器语言固定简体中文
+- `src-tauri/src/state/config.rs`：`AppConfig` 新增 `game_language: String` 字段，默认值 `"zh_cn"`（启动器语言固定简体中文，无需"跟随启动器"选项），支持 `"none"`（不设置）与 MC 标准语言代码（`zh_cn` / `en_us` / `ja_jp` / `ko_kr` / `fr_fr` / `de_de` / `ru_ru` 等）；`"auto"` 作为旧配置兼容值保留处理
+- `src-tauri/src/config.rs`：INI 加载/保存新增 `game_language` 字段（`[General]` 段下 `game_language` 键），持久化到本地配置文件
+- `src-tauri/src/commands/system/apply_config/types.rs`：`ConfigPatch` 新增 `game_language: Option<String>`（可选更新）；`ConfigSnapshot` 新增 `game_language: String`（快照返回）；`build_snapshot` 补充字段映射
+- `src-tauri/src/commands/system/apply_config/apply.rs`：`apply_launcher` 函数新增 `game_language` 字段处理，写入 AppConfig 并通过 `apply_config` IPC 命令统一更新
+- `src-tauri/src/minecraft/language.rs`：完全重写 `set_game_language` 函数，签名从 `(game_dir, version_id, mc_version)` 改为 `(game_dir, version_id, mc_version, target_lang)`，从硬编码中文改为接受任意目标语言；新增 `adjust_lang_case` 函数根据 MC 版本自动调整大小写（1.0~1.10 用 `zh_CN` 大写后缀，1.11+ 用 `zh_cn` 小写，26+ 用小写）；新增 `to_upper_suffix` 辅助函数；每个分支补充 `[Language]` 前缀日志；保留老用户保护机制（saves/ 存在时不覆盖已有语言）
+- `src-tauri/src/minecraft/launch/arguments.rs`：`build_launch_arguments` 新增 `game_language: Option<&str>` 参数；仅当 game_language 非空且非 `"none"` 时才调用 `set_game_language`；修复原代码 bug——`set_game_language` 的 `mc_version` 参数原本误传 `version_id`（如 `"1.20.1-forge"`），改为调用 `detect_version_and_loader` 获取真实 MC 版本号（如 `"1.20.1"`），避免 `adjust_lang_case` 解析版本号失败；同时修复 `helpers` 私有模块访问错误，改用 `crate::minecraft::version::setup::detect_version_and_loader` 公共再导出路径
+- `src-tauri/src/minecraft/launch/pipeline/types.rs`：`LaunchConfig` 新增 `#[serde(default)] pub game_language: Option<String>` 字段，支持从前端启动请求透传
+- `src-tauri/src/minecraft/launch/pipeline/validate.rs`：`build_arguments` 方法透传 `self.config.game_language.as_deref()` 到 `build_launch_arguments`
+- `src-tauri/src/commands/version/launch.rs`：新增 `resolve_game_language` 辅助函数（`none` → `None`；`auto` 旧配置兼容 → 跟随启动器语言映射 `zh-CN` → `zh_cn`、`en-US` → `en_us`；其他 → 直接返回）；`LaunchConfig` 构造时填充 `game_language` 字段
+- `src-tauri/src/commands/version/script_export.rs`：`build_launch_arguments` 调用新增 `None` 参数（导出脚本时不设置游戏语言，避免副作用）
+- `src/utils/api/config.ts`：`ConfigSnapshot` 新增 `gameLanguage: string`；`ConfigPatch` 新增 `gameLanguage?: string`
+- `src/views/settings/SettingsPersonal.vue`：完全重写——启动器语言固定仅简体中文（移除 English 选项，Select 仅含 `简体中文` 一项）；新增「游戏」分组含「默认界面语言」Select（8 个选项：简体中文 / English / 日本語 / 한국어 / Français / Deutsch / Русский / 不设置，默认简体中文）；通过 `getConfigMap` / `applyConfig` IPC 读写后端配置，`watch` 自动保存；`loadGameLanguage` 兼容旧配置读到 `auto` 时回退为 `zh_cn`
+
+#### options.txt 语言设置逻辑优化（5 分支处理）
+- `src-tauri/src/minecraft/language.rs`：`set_game_language` 优化为 5 分支处理逻辑：
+  1. **options.txt 不存在**：创建文件并写入 `lang:<target>`，不写入其他字段
+  2. **文件存在，lang 字段不存在**：补充 lang 字段到文件末尾（不创建新文件）
+  3. **文件存在，lang 已是目标语言**：跳过，不写入（避免无意义 IO）
+  4. **文件存在，lang 是其他语言且 saves/ 不存在**：覆盖为目标语言（先写 `-` 触发缓存清空，再写目标值，PCL2 风格）
+  5. **文件存在，lang 是其他语言且 saves/ 已存在**：跳过，尊重老用户手动选择的语言
+- 补充 `#[cfg(test)]` 单元测试覆盖 `adjust_lang_case` 与 `to_upper_suffix`：MC 1.0~1.10 大写后缀、1.11+ 小写、26+ 小写、无下划线代码原样返回
+
 #### 关于页新增 MoLaunch 实现原理介绍
 - `src/components/about/MoLaunchIntro.vue`：新增组件，默认折叠，点击标题栏展开 200 字实现说明，内容涵盖技术栈选型（Tauri 2 + Vue 3 + Rust）、启动器核心实现（版本管理、Java 检测、游戏启动）、联机模块（FRP 隧道 SDK 动态库嵌入与释放）、UI 设计理念（参考 PCL2 / Arco Design）、数据存储与安全（设备 ID 派生密钥加密）
 - `src/views/settings/SettingsMore.vue`：在「关于」子页签的 MoLaunch 介绍卡片与技术栈卡片之间插入 `<MoLaunchIntro />` 组件
