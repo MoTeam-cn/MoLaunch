@@ -9,8 +9,8 @@ import * as tauri from '@/utils/tauri'
 import { showSuccess, showError, showWarning } from '@/utils/toast'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
-import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
 
@@ -130,12 +130,6 @@ onMounted(async () => {
 
 // 内存配置的防抖保存由 useDebouncedSave 在组件卸载时自动 flush；
 // 轮询由 usePolling 在 onUnmounted 自动 stop。
-
-const modeButtons: { value: 'inherit' | 'auto' | 'custom'; label: string }[] = [
-  { value: 'inherit', label: '跟随全局' },
-  { value: 'auto', label: '自动配置' },
-  { value: 'custom', label: '自定义' },
-]
 </script>
 
 <template>
@@ -173,13 +167,36 @@ const modeButtons: { value: 'inherit' | 'auto' | 'custom'; label: string }[] = [
     </div>
 
     <!-- 分配模式 -->
-    <div class="flex items-center gap-3 mb-4">
-      <label class="w-28 flex-none text-xs text-gray-500">分配模式</label>
-      <SegmentedButtons
-        :model-value="memoryMode"
-        :options="modeButtons"
-        @select="handleSaveMemoryMode"
-      />
+    <div class="mb-4">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-sm font-medium text-gray-900">分配模式</p>
+      </div>
+      <div class="flex gap-2">
+        <Button
+          :type="memoryMode === 'inherit' ? 'primary' : 'outline'"
+          size="small"
+          class="flex-1"
+          @click="handleSaveMemoryMode('inherit')"
+        >
+          跟随全局
+        </Button>
+        <Button
+          :type="memoryMode === 'auto' ? 'primary' : 'outline'"
+          size="small"
+          class="flex-1"
+          @click="handleSaveMemoryMode('auto')"
+        >
+          自动配置
+        </Button>
+        <Button
+          :type="memoryMode === 'custom' ? 'primary' : 'outline'"
+          size="small"
+          class="flex-1"
+          @click="handleSaveMemoryMode('custom')"
+        >
+          自定义
+        </Button>
+      </div>
     </div>
 
     <!-- 跟随全局：显示全局当前设置 -->

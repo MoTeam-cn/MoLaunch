@@ -14,6 +14,7 @@ import { ref, onMounted } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { showError } from '@/utils/toast'
 import Alert from '@/components/common/Alert.vue'
+import Select from '@/components/common/Select.vue'
 
 const devUnlocked = ref(false)
 const devMode = ref(false)
@@ -59,31 +60,21 @@ onMounted(async () => {
     <div class="divide-y divide-gray-200">
       <!-- 开关 -->
       <div class="px-5 py-4">
-        <div class="flex items-center justify-between mb-2">
-          <div>
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
             <p class="text-sm font-medium text-gray-900">开启开发者模式</p>
             <p class="text-xs text-gray-500 mt-0.5">控制「开发者」菜单项的显示</p>
           </div>
-        </div>
-        <div class="flex gap-2">
-          <button
-            class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-            :class="devMode
-              ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-            @click="toggleDevMode(true)"
-          >
-            已开启
-          </button>
-          <button
-            class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-            :class="!devMode
-              ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-            @click="toggleDevMode(false)"
-          >
-            已关闭
-          </button>
+          <div class="flex-none w-40">
+            <Select
+              :model-value="devMode ? 'true' : 'false'"
+              :options="[
+                { label: '已开启', value: 'true' },
+                { label: '已关闭', value: 'false' },
+              ]"
+              @update:model-value="toggleDevMode($event === 'true')"
+            />
+          </div>
         </div>
         <p class="text-xs text-gray-400 mt-2">
           <template v-if="devMode">已开启：侧边菜单显示「开发者」项</template>

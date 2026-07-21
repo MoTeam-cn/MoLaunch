@@ -25,8 +25,18 @@ pub struct AcknowledgementItem {
     pub desc: String,
     /// logo 资源文件名（位于 src/assets/AboutIcon/）
     pub logo: String,
-    /// 作者列表（多个用英文逗号分隔，可能为空）
-    pub authors: Vec<String>,
+    /// 作者列表（可能为空数组）
+    pub authors: Vec<Author>,
+}
+
+/// 作者信息
+#[derive(Debug, Serialize, Clone)]
+pub struct Author {
+    /// 作者姓名
+    pub name: String,
+    /// 作者头像文件名（位于 src/assets/AboutIcon/），None 表示无头像
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub avatar: Option<String>,
 }
 
 /// 技术栈依赖项（前端运行时依赖 / 前端开发工具链 / 后端依赖 共用此结构）
@@ -86,11 +96,31 @@ fn get_field(row: &std::collections::HashMap<String, String>, key: &str) -> Stri
     row.get(key).cloned().unwrap_or_default()
 }
 
-/// 将 authors 字段（英文逗号分隔）解析为 Vec<String>，去除两端空白，跳过空项
-fn parse_authors(raw: &str) -> Vec<String> {
+/// 解析 authors 字段为结构化作者列表
+///
+/// 格式：`姓名1:头像1.png,姓名2:头像2.png,姓名3`
+/// - 多个作者用英文逗号分隔
+/// - 每位作者用冒号分隔姓名与头像文件名，冒号可省略（表示无头像）
+/// - 空字符串返回空 Vec
+fn parse_authors(raw: &str) -> Vec<Author> {
     raw.split(',')
-        .map(|s| s.trim().to_string())
+        .map(|s| s.trim())
         .filter(|s| !s.is_empty())
+        .map(|s| {
+            if let Some((name, avatar)) = s.split_once(':') {
+                let name = name.trim().to_string();
+                let avatar = avatar.trim().to_string();
+                Author {
+                    name,
+                    avatar: if avatar.is_empty() { None } else { Some(avatar) },
+                }
+            } else {
+                Author {
+                    name: s.to_string(),
+                    avatar: None,
+                }
+            }
+        })
         .collect()
 }
 

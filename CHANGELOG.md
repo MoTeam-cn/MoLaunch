@@ -9,6 +9,38 @@
 
 ### 新增
 
+#### 开发者模式开关与设备 ID 显示优化
+- `src/components/settings/DevModeToggle.vue`：开启/关闭双按钮组改为 Select 平行布局（与设置页其他选择器风格一致）
+- `src/views/settings/SettingsOther.vue`：设备 ID 默认打码显示（前 4 位 + `****` + 后 4 位），双击切换全额显示；打码状态下点击图标 Tooltip 提示"双击切换全额显示 / 打码"；全额显示时下方常驻 Alert 警告"设备 ID 已全额显示，本 ID 用于本地数据加密存储，请勿截图外传或泄露给他人"；切到其他设置页时随组件卸载自动隐藏提示
+
+#### 设置页选择器统一改为自定义 Select 组件
+- `src/views/settings/SettingsDownload.vue`：版本列表源、文件下载源两处 SegmentedButtons 改为 Select 组件，布局调整为标题左/Select 右的平行布局（`flex items-center justify-between`，Select 固定宽 `w-40`）
+- `src/views/settings/SettingsPersonal.vue`：外观的主题（浅色/深色/跟随系统，补充深色选项）、语言（简体中文/English）两处按钮组改为 Select 平行布局
+- `src/views/settings/SettingsAdvanced.vue`：代理模式（不使用代理/系统代理/自定义代理）、代理类型（HTTP/HTTPS/SOCKS5）、CurseForge API Key 启用开关（已启用/未启用）三处 SegmentedButtons 改为 Select 平行布局；移除 SegmentedButtons 组件导入
+- 整体规范：所有设置页选择器统一使用 32px 高的 Arco Design 风格 Select 组件，与左侧标题/描述平行展示，描述文案下移至同行下方
+
+#### 游戏启动 Java 路径改用 Select 组件
+- `src/views/settings/settings-launch/JavaPathSelector.vue`：移除原 watch + `handleDocumentClick` + `showJavaList` + `javaSelectorRef` 自定义下拉逻辑，改为复用项目自研 Select 组件（`customOption` prop + `#selected`/`#option`/`#empty` slot）；触发器展示版本徽章（自动/Java 17 等）+ 路径，下拉项展示主版本徽章 + 完整路径 + 完整版本号两行布局，未检测到 Java 时显示空状态提示；保留自动检测/手动导入按钮不变
+- 修复原代码 bug：原实现使用了 `javaList` 中不存在的 `is_64bit` / `is_jre` 字段（实际类型为 `{ executable, version, major_version }`），新代码只展示真实存在的字段
+
+#### 内存分配模式改用 Button 组件 + Tooltip 与 Select 下拉框协调优化
+- `src/views/settings/settings-launch/MemoryAllocation.vue`：「分配模式」原两个原生 `<button>`（自动配置 / 自定义）改为复用项目自研 Button 组件（`type="primary"` 选中 / `type="outline"` 未选中，`size="small"` + `flex-1` 等宽），与「高阶配置 → 社区资源 → Mod 管理样式」按钮组风格统一
+- `src/views/version-settings/MemorySection.vue`：「分配模式」原 `SegmentedButtons` 组件（跟随全局 / 自动配置 / 自定义）改为三个 Button 组件（同上风格），移除 `SegmentedButtons` 导入与 `modeButtons` 数组
+- `src/components/common/Tooltip.vue`：新增与 Select 下拉框的方向协调——显示时若拟放置位置与任何 `.select-dropdown` 矩形重叠，且当前方向为 `top`/`bottom`，自动切换到反方向重算位置（反方向仍重叠则保留原方向）；新增 `MutationObserver` 监听 body 子节点变化（select-dropdown 通过 teleport 加入/移除 body），下拉框打开/关闭时实时重新计算 Tooltip 位置，避免下拉框向上展开时与 Tooltip 重叠导致无法框选选项；新增 `overlapsSelectDropdown` 矩形相交检测函数与 `calcByDirection` 方向化位置计算函数，原 `calcPosition` 重构为先按 `props.position` 计算、再视情况避让、最后边界修正的三阶段流程
+
+#### 下载配置页下载源改用 Select 组件
+- `src/views/settings/SettingsDownload.vue`：将"版本列表源"与"文件下载源"两处 SegmentedButtons 替换为项目自定义 Select 组件（32px 高、Arco Design 风格、下拉面板 4px 圆角 + 阴影），符合项目"复用自定义组件而非浏览器原生组件"的规范
+
+#### 特别鸣谢 logo 圆形展示优化与重生头像修复
+- `src-tauri/resources/about/acknowledgements.txt`：MC 百科作者重生补充头像文件名 `chongsheng.jpg`
+- `src/views/settings/SettingsMore.vue`：项目 logo 容器从 12x12 放大到 14x14；背景从 `bg-gray-50` 改为 `bg-white` 与方形 logo 白边融合；图片样式从 `object-contain` 改为 `object-cover` 填满圆形容器，方形 logo 四角白边被圆形裁剪不再突兀
+
+#### 特别鸣谢作者信息与头像展示
+- `src-tauri/resources/about/acknowledgements.txt`：补充三位作者信息——BMCLAPI(bangbang93)、MC 百科(重生)、MCIM API(z0z0r4)；BMCLAPI 项目 logo 从 `bangbang93.png` 改为 `bmclapi-qun.png`；authors 字段格式升级为 `姓名:头像文件名`，支持作者头像展示
+- `src-tauri/src/commands/system/about.rs`：新增 `Author` 结构体（`name` + `avatar: Option<String>`），`AcknowledgementItem.authors` 类型从 `Vec<String>` 改为 `Vec<Author>`；`parse_authors` 函数支持 `name:avatar` 格式解析，冒号可省略表示无头像
+- `src/utils/api/about.ts`：新增 `Author` 接口，`AcknowledgementItem.authors` 类型从 `string[]` 改为 `Author[]`
+- `src/views/settings/SettingsMore.vue`：特别鸣谢项目 logo 容器从方框（`rounded-lg`）改为圆形（`rounded-full`）+ 灰色环边；作者标签改为圆形头像 + 姓名 组合，有头像时显示图片，无头像时显示姓名首字圆形占位（primary 主题色背景）
+
 #### 关于页面数据迁移至后端（markdown 表格 txt + IPC 命令）
 - `src-tauri/resources/about/`：新建目录，存放 5 个 markdown 表格格式的 txt 数据文件：`acknowledgements.txt`（特别鸣谢，含 authors 字段）、`frontend-deps.txt`（前端运行时依赖）、`frontend-dev-deps.txt`（前端开发工具链）、`backend-deps.txt`（后端依赖）、`licenses.txt`（许可与版权声明）。修改数据只需更新 txt 文件并重新编译后端，无需改动业务代码
 - `src-tauri/src/utils/markdown_table.rs`：新建通用 markdown 表格解析工具模块，支持注释行（`#`）、转义竖线（`\|`）、对齐分隔行（`:---:`）、缺失列填充、多余列忽略；含 7 个单元测试覆盖各种边界场景

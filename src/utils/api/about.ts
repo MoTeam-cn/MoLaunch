@@ -8,6 +8,14 @@
 
 import { invoke } from '@tauri-apps/api/core'
 
+/** 作者信息 */
+export interface Author {
+  /** 作者姓名 */
+  name: string
+  /** 作者头像文件名（位于 src/assets/AboutIcon/），undefined 表示无头像 */
+  avatar?: string
+}
+
 /** 特别鸣谢项 */
 export interface AcknowledgementItem {
   /** 项目名称 */
@@ -19,7 +27,7 @@ export interface AcknowledgementItem {
   /** logo 资源文件名（位于 src/assets/AboutIcon/） */
   logo: string
   /** 作者列表（可能为空数组） */
-  authors: string[]
+  authors: Author[]
 }
 
 /** 技术栈依赖项（前端运行时 / 前端开发工具链 / 后端依赖 共用） */

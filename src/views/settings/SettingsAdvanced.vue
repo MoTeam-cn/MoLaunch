@@ -3,7 +3,7 @@ import { ref, watch } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
 import Alert from '@/components/common/Alert.vue'
 import Input from '@/components/common/Input.vue'
-import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
+import Select from '@/components/common/Select.vue'
 import DevModeToggle from '@/components/settings/DevModeToggle.vue'
 import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -79,21 +79,22 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
       <div class="divide-y divide-gray-200">
         <!-- 代理模式 -->
         <div class="px-5 py-4">
-          <div class="flex items-center justify-between mb-2">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm font-medium text-gray-900">代理模式</p>
               <p class="text-xs text-gray-500 mt-0.5">选择启动器的网络代理方式</p>
             </div>
+            <div class="flex-none w-40">
+              <Select
+                v-model="proxyMode"
+                :options="[
+                  { label: '不使用代理', value: 'none' },
+                  { label: '系统代理', value: 'system' },
+                  { label: '自定义代理', value: 'custom' },
+                ]"
+              />
+            </div>
           </div>
-          <SegmentedButtons
-            v-model="proxyMode"
-            button-class="flex-1 px-3 py-2"
-            :options="[
-              { label: '不使用代理', value: 'none' },
-              { label: '系统代理', value: 'system' },
-              { label: '自定义代理', value: 'custom' },
-            ]"
-          />
           <p class="text-xs text-gray-400 mt-2">
             <template v-if="proxyMode === 'none'">不使用任何代理，直接连接</template>
             <template v-else-if="proxyMode === 'system'">使用操作系统中配置的代理设置</template>
@@ -104,17 +105,21 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
         <!-- 自定义代理配置 -->
         <div v-if="proxyMode === 'custom'" class="px-5 py-4 space-y-4">
           <!-- 代理类型 -->
-          <div>
-            <p class="text-sm font-medium text-gray-900 mb-2">代理类型</p>
-            <SegmentedButtons
-              v-model="proxyType"
-              button-class="flex-1 px-3 py-2"
-              :options="[
-                { label: 'HTTP', value: 'http' },
-                { label: 'HTTPS', value: 'https' },
-                { label: 'SOCKS5', value: 'socks5' },
-              ]"
-            />
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900">代理类型</p>
+              <p class="text-xs text-gray-500 mt-0.5">选择代理协议</p>
+            </div>
+            <div class="flex-none w-40">
+              <Select
+                v-model="proxyType"
+                :options="[
+                  { label: 'HTTP', value: 'http' },
+                  { label: 'HTTPS', value: 'https' },
+                  { label: 'SOCKS5', value: 'socks5' },
+                ]"
+              />
+            </div>
           </div>
 
           <!-- 代理地址 -->
@@ -148,31 +153,21 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
       <div class="divide-y divide-gray-200">
         <!-- 启用开关 -->
         <div class="px-5 py-4">
-          <div class="flex items-center justify-between mb-2">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm font-medium text-gray-900">启用 API Key</p>
               <p class="text-xs text-gray-500 mt-0.5">启用后使用官方 API，未配置 Key 时仍回退到镜像</p>
             </div>
-          </div>
-          <div class="flex gap-2">
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="cfEnabled
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="cfEnabled = true"
-            >
-              已启用
-            </button>
-            <button
-              class="flex-1 px-3 py-2 text-xs font-medium rounded-lg border-2 transition-colors"
-              :class="!cfEnabled
-                ? 'border-primary-500 bg-primary-50 text-primary-700'
-                : 'border-gray-200 text-gray-600 hover:border-gray-300'"
-              @click="cfEnabled = false"
-            >
-              未启用
-            </button>
+            <div class="flex-none w-40">
+              <Select
+                :model-value="cfEnabled ? 'true' : 'false'"
+                :options="[
+                  { label: '已启用', value: 'true' },
+                  { label: '未启用', value: 'false' },
+                ]"
+                @update:model-value="cfEnabled = $event === 'true'"
+              />
+            </div>
           </div>
           <p class="text-xs text-gray-400 mt-2">
             <template v-if="cfEnabled">已启用：CurseForge 请求走官方 API（api.curseforge.com）</template>

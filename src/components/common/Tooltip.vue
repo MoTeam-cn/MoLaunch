@@ -2,6 +2,11 @@
 /**
  * 自定义 Tooltip 组件
  * Teleport 到 body，fixed 定位，自动边界检测
+ *
+ * 与 Select 下拉框的协调：Tooltip 显示期间通过 MutationObserver 监听
+ * body 子节点变化（select-dropdown 通过 teleported 加入/移除 body），
+ * 一旦检测到下拉框与拟放置位置重叠，自动切换 top/bottom 方向，
+ * 避免遮挡下拉框选项导致无法框选。
  */
 
 import { ref, nextTick, onUnmounted } from 'vue'
@@ -26,43 +31,60 @@ const tipRef = ref<HTMLElement | null>(null)
 const tipStyle = ref<Record<string, string>>({})
 const arrowStyle = ref<Record<string, string>>({})
 let timer: ReturnType<typeof setTimeout> | null = null
+let observer: MutationObserver | null = null
 
 function show() {
   timer = setTimeout(() => {
     visible.value = true
-    nextTick(calcPosition)
+    nextTick(() => {
+      calcPosition()
+      startObserver()
+    })
   }, props.delay)
 }
 
 function hide() {
   if (timer) { clearTimeout(timer); timer = null }
   visible.value = false
+  stopObserver()
 }
 
-function calcPosition() {
-  if (!triggerRef.value || !tipRef.value) return
-  const r = triggerRef.value.getBoundingClientRect()
-  const tipW = tipRef.value.offsetWidth
-  const tipH = tipRef.value.offsetHeight
+/** 检测拟放置矩形是否与任何 select-dropdown 重叠（用于避让 Select 下拉框） */
+function overlapsSelectDropdown(top: number, left: number, tipW: number, tipH: number): boolean {
+  const dropdowns = document.querySelectorAll('.select-dropdown')
+  for (const dd of dropdowns) {
+    const r = dd.getBoundingClientRect()
+    // 矩形相交判定
+    if (!(top + tipH < r.top || top > r.bottom || left + tipW < r.left || left > r.right)) {
+      return true
+    }
+  }
+  return false
+}
+
+/** 按指定方向计算位置（不含边界修正），返回 {top,left,arrow} */
+function calcByDirection(pos: 'top' | 'bottom' | 'left' | 'right') {
+  const r = triggerRef.value!.getBoundingClientRect()
+  const tipW = tipRef.value!.offsetWidth
+  const tipH = tipRef.value!.offsetHeight
   const gap = 8
-  const vw = window.innerWidth
+  const arrow: Record<string, string> = {}
   let top = 0
   let left = 0
-  const arrow: Record<string, string> = {}
 
-  if (props.position === 'top') {
+  if (pos === 'top') {
     top = r.top - gap - tipH
     left = r.left + r.width / 2 - tipW / 2
     arrow.bottom = '-4px'
     arrow.left = '50%'
     arrow.transform = 'translateX(-50%) rotate(45deg)'
-  } else if (props.position === 'bottom') {
+  } else if (pos === 'bottom') {
     top = r.bottom + gap
     left = r.left + r.width / 2 - tipW / 2
     arrow.top = '-4px'
     arrow.left = '50%'
     arrow.transform = 'translateX(-50%) rotate(45deg)'
-  } else if (props.position === 'left') {
+  } else if (pos === 'left') {
     top = r.top + r.height / 2 - tipH / 2
     left = r.left - gap - tipW
     arrow.right = '-4px'
@@ -75,11 +97,39 @@ function calcPosition() {
     arrow.top = '50%'
     arrow.transform = 'translateY(-50%) rotate(45deg)'
   }
+  return { top, left, arrow }
+}
+
+function calcPosition() {
+  if (!triggerRef.value || !tipRef.value) return
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  const tipW = tipRef.value.offsetWidth
+  const tipH = tipRef.value.offsetHeight
+
+  let { top, left, arrow } = calcByDirection(props.position)
+
+  // 与 select-dropdown 重叠时，top/bottom 方向自动切换避让
+  if (overlapsSelectDropdown(top, left, tipW, tipH)) {
+    if (props.position === 'top') {
+      const alt = calcByDirection('bottom')
+      if (!overlapsSelectDropdown(alt.top, alt.left, tipW, tipH)) {
+        top = alt.top; left = alt.left; arrow = alt.arrow
+      }
+    } else if (props.position === 'bottom') {
+      const alt = calcByDirection('top')
+      if (!overlapsSelectDropdown(alt.top, alt.left, tipW, tipH)) {
+        top = alt.top; left = alt.left; arrow = alt.arrow
+      }
+    }
+    // left/right 暂不处理（与 select-dropdown 竖向重叠少见）
+  }
 
   // 边界修正
   if (left < 8) left = 8
   if (left + tipW > vw - 8) left = vw - tipW - 8
   if (top < 8) top = 8
+  if (top + tipH > vh - 8) top = vh - tipH - 8
 
   tipStyle.value = {
     position: 'fixed',
@@ -90,7 +140,26 @@ function calcPosition() {
   arrowStyle.value = arrow
 }
 
-onUnmounted(() => { if (timer) clearTimeout(timer) })
+/** Tooltip 显示期间监听 body 子节点变化（select-dropdown 的出现/消失），自动重新计算位置 */
+function startObserver() {
+  if (observer) return
+  observer = new MutationObserver(() => {
+    if (visible.value) calcPosition()
+  })
+  observer.observe(document.body, { childList: true })
+}
+
+function stopObserver() {
+  if (observer) {
+    observer.disconnect()
+    observer = null
+  }
+}
+
+onUnmounted(() => {
+  if (timer) clearTimeout(timer)
+  stopObserver()
+})
 </script>
 
 <template>

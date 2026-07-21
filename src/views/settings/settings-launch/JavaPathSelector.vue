@@ -2,38 +2,43 @@
 /**
  * Java 路径选择器
  *
+ * - 基于项目自研 Select 组件实现（customOption + 自定义 #option slot）
  * - 显示当前 Java 路径（含版本号徽章）
  * - 自动检测已安装 Java / 手动导入 javaw.exe
- * - 下拉列表展示已检测到的 Java（带版本/位数/JRE-JDK 信息）
- * - 点击外部自动收起下拉
+ * - 下拉列表展示已检测到的 Java（带版本信息）
  */
-import { ref, watch } from 'vue'
+import { ref, computed } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { showInfo, showSuccess } from '@/utils/toast'
 import { showError } from '@/utils/modal'
 import Button from '@/components/common/Button.vue'
+import Select from '@/components/common/Select.vue'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
 
 const javaStore = useJavaStore()
-
-const showJavaList = ref(false)
-const javaSelectorRef = ref<HTMLElement | null>(null)
 const detectingJava = ref(false)
 
-function handleDocumentClick(e: MouseEvent) {
-  if (javaSelectorRef.value && !javaSelectorRef.value.contains(e.target as Node)) {
-    showJavaList.value = false
-  }
-}
-
-watch(showJavaList, (open) => {
-  if (open) {
-    setTimeout(() => document.addEventListener('click', handleDocumentClick), 0)
-  } else {
-    document.removeEventListener('click', handleDocumentClick)
-  }
+// 当前选中项的版本号（用于触发器徽章显示，空路径显示"自动"）
+const currentMajorVersion = computed(() => {
+  if (!javaStore.javaPath) return null
+  return javaStore.javaList.find(j => j.executable === javaStore.javaPath)?.major_version ?? null
 })
+
+// Select 选项：自动 + 已检测的 Java 列表
+const selectOptions = computed(() => [
+  { label: '启动时自动查找最佳 Java', value: '' },
+  ...javaStore.javaList.map(j => ({
+    label: j.executable,
+    value: j.executable,
+    majorVersion: j.major_version,
+    version: j.version,
+  })),
+])
+
+function onSelectChange(value: string | number) {
+  javaStore.setJavaPath(String(value))
+}
 
 async function handleAutoDetectJava() {
   if (detectingJava.value) return
@@ -98,78 +103,56 @@ async function handleManualImportJava() {
         </Button>
       </div>
     </div>
-    <!-- 选择器整体容器 -->
-    <div ref="javaSelectorRef" class="relative">
-      <!-- 输入框 -->
-      <div
-        class="flex items-center justify-between px-3 py-2 bg-white border rounded-lg cursor-pointer transition-colors"
-        :class="showJavaList ? 'border-primary-500 ring-2 ring-primary-100' : 'border-gray-300 hover:border-gray-400'"
-        @click="showJavaList = !showJavaList"
-      >
-        <div class="flex items-center min-w-0 mr-2">
-          <span class="text-xs px-1.5 py-0.5 rounded bg-primary-100 text-primary-700 mr-2 shrink-0">
-            {{ javaStore.javaPath ? 'Java ' + (javaStore.javaList.find(j => j.executable === javaStore.javaPath)?.major_version || '?') : '自动' }}
+
+    <!-- Java 路径下拉选择器 -->
+    <Select
+      :model-value="javaStore.javaPath"
+      :options="selectOptions"
+      custom-option
+      placeholder="启动时自动查找最佳 Java"
+      @update:model-value="onSelectChange"
+    >
+
+      <!-- 触发器：版本徽章 + 路径 -->
+      <template #selected>
+        <div class="flex items-center min-w-0 gap-2">
+          <span
+            class="text-xs px-1.5 py-0.5 rounded shrink-0"
+            :class="javaStore.javaPath
+              ? 'bg-primary-100 text-primary-700'
+              : 'bg-gray-100 text-gray-600'"
+          >
+            {{ javaStore.javaPath ? `Java ${currentMajorVersion ?? '?'}` : '自动' }}
           </span>
           <span class="text-sm text-gray-900 truncate">
             {{ javaStore.javaPath || '启动时自动查找最佳 Java' }}
           </span>
         </div>
-        <svg class="w-4 h-4 text-gray-400 shrink-0 transition-transform" :class="{ 'rotate-180': showJavaList }" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 11.168l3.71-3.938a.75.75 0 111.08 1.04l-4.25 4.5a.75.75 0 01-1.08 0l-4.25-4.5a.75.75 0 01.02-1.06z" clip-rule="evenodd" />
-        </svg>
-      </div>
-      <!-- 下拉列表 -->
-      <transition
-        enter-active-class="transition ease-out duration-150"
-        enter-from-class="opacity-0 scale-y-95"
-        enter-to-class="opacity-100 scale-y-100"
-        leave-active-class="transition ease-in duration-100"
-        leave-from-class="opacity-100 scale-y-100"
-        leave-to-class="opacity-0 scale-y-95"
-      >
-        <div
-          v-if="showJavaList"
-          class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg overflow-hidden origin-top"
-        >
-          <!-- 自动检测 -->
-          <div
-            class="flex items-center justify-between px-3 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors"
-            :class="{ 'bg-primary-50': !javaStore.javaPath }"
-            @click="javaStore.setJavaPath(''); showJavaList = false"
-          >
-            <div class="flex items-center">
-              <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 mr-2">自动</span>
-              <span class="text-sm text-gray-700">启动时自动查找最佳 Java</span>
-            </div>
-            <span v-if="!javaStore.javaPath" class="text-primary-600 text-xs font-medium">当前</span>
-          </div>
-          <!-- 已安装列表 -->
-          <template v-if="javaStore.javaList.length > 0">
-            <div class="border-t border-gray-200 mx-3"></div>
-            <div
-              v-for="java in javaStore.javaList"
-              :key="java.executable"
-              class="flex items-center justify-between px-3 py-2.5 hover:bg-primary-50 cursor-pointer transition-colors"
-              :class="{ 'bg-primary-50': javaStore.javaPath === java.executable }"
-              @click="javaStore.setJavaPath(java.executable); showJavaList = false"
-            >
-              <div class="flex items-center min-w-0">
-                <span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 mr-2 shrink-0">
-                  {{ java.major_version }}
-                </span>
-                <div class="min-w-0">
-                  <div class="text-sm text-gray-900 truncate">{{ java.executable }}</div>
-                  <div class="text-xs text-gray-500">{{ java.version }} · {{ java.is_64bit ? '64位' : '32位' }} · {{ java.is_jre ? 'JRE' : 'JDK' }}</div>
-                </div>
-              </div>
-              <span v-if="javaStore.javaPath === java.executable" class="text-primary-600 text-xs font-medium ml-2 shrink-0">当前</span>
-            </div>
-          </template>
-          <div v-else class="px-3 py-2.5 border-t border-gray-100 text-xs text-gray-400">
-            未检测到已安装的 Java，请点击「手动导入」
+      </template>
+
+      <!-- 选项：自动项 + 已检测 Java 项 -->
+      <template #option="{ option, selected }">
+        <div v-if="option.value === ''" class="flex items-center min-w-0">
+          <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 mr-2 shrink-0">自动</span>
+          <span class="text-sm text-gray-700 truncate">启动时自动查找最佳 Java</span>
+        </div>
+        <div v-else class="flex items-center min-w-0 w-full">
+          <span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 mr-2 shrink-0">
+            {{ option.majorVersion }}
+          </span>
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-gray-900 truncate">{{ option.value }}</div>
+            <div class="text-xs text-gray-500 truncate">{{ option.version }}</div>
           </div>
         </div>
-      </transition>
-    </div>
+      </template>
+
+      <!-- 空状态 -->
+      <template #empty>
+        <div class="px-3 py-2.5 text-xs text-gray-400">
+          未检测到已安装的 Java，请点击「手动导入」
+        </div>
+      </template>
+    </Select>
   </div>
 </template>

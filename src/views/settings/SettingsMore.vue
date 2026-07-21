@@ -262,9 +262,9 @@ function openLink(url: string) {
               class="rounded-lg border border-gray-100 transition-colors hover:border-gray-200 hover:bg-gray-50"
             >
               <div class="flex items-start gap-4 p-4">
-                <!-- Logo -->
-                <div class="flex h-12 w-12 flex-none items-center justify-center rounded-lg bg-gray-50 overflow-hidden">
-                  <img v-if="resolveLogo(item.logo)" :src="resolveLogo(item.logo)" :alt="item.name" class="max-h-10 max-w-10 object-contain" />
+                <!-- Logo（圆形，放大到 14x14 让方形 logo 白边不突兀） -->
+                <div class="flex h-14 w-14 flex-none items-center justify-center rounded-full bg-white overflow-hidden ring-1 ring-gray-100">
+                  <img v-if="resolveLogo(item.logo)" :src="resolveLogo(item.logo)" :alt="item.name" class="h-full w-full object-cover" />
                 </div>
 
                 <div class="min-w-0 flex-1">
@@ -304,14 +304,28 @@ function openLink(url: string) {
                   <div v-if="item.authors.length === 0" class="mt-1.5 text-[12px] text-gray-400">
                     暂未提供作者信息
                   </div>
-                  <div v-else class="mt-1.5 flex flex-wrap gap-1.5">
-                    <span
+                  <div v-else class="mt-2 flex flex-wrap gap-2">
+                    <div
                       v-for="author in item.authors"
-                      :key="author"
-                      class="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-medium text-gray-700 ring-1 ring-gray-200"
+                      :key="author.name"
+                      class="flex items-center gap-2 rounded-full bg-white px-2 py-1 ring-1 ring-gray-200"
                     >
-                      {{ author }}
-                    </span>
+                      <!-- 作者头像（圆形） -->
+                      <img
+                        v-if="author.avatar && resolveLogo(author.avatar)"
+                        :src="resolveLogo(author.avatar)"
+                        :alt="author.name"
+                        class="h-5 w-5 rounded-full object-cover"
+                      />
+                      <!-- 无头像时显示姓名首字占位 -->
+                      <span
+                        v-else
+                        class="flex h-5 w-5 items-center justify-center rounded-full bg-primary-100 text-[10px] font-medium text-primary-700"
+                      >
+                        {{ author.name.charAt(0) }}
+                      </span>
+                      <span class="pr-1 text-[11px] font-medium text-gray-700">{{ author.name }}</span>
+                    </div>
                   </div>
                 </div>
               </transition>

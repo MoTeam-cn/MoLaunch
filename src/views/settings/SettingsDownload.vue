@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
-import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
+import Select from '@/components/common/Select.vue'
 
 const maxThreads = ref(8)
 const chunkCount = ref(4)
@@ -75,21 +75,22 @@ watch(chunkCount, (v) => markDirty('chunkCount', v))
       <div class="divide-y divide-gray-200">
         <!-- 版本列表源 -->
         <div class="px-5 py-4">
-          <div class="flex items-center justify-between mb-2">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm font-medium text-gray-900">版本列表源</p>
               <p class="text-xs text-gray-500 mt-0.5">版本清单、Forge/Fabric 等加载器列表的获取源</p>
             </div>
+            <div class="flex-none w-40">
+              <Select
+                v-model="mirrorMeta"
+                :options="[
+                  { label: '官方源', value: 'official' },
+                  { label: 'BMCLAPI', value: 'bmclapi' },
+                  { label: '优先官方', value: 'smart' },
+                ]"
+              />
+            </div>
           </div>
-          <SegmentedButtons
-            v-model="mirrorMeta"
-            button-class="flex-1 px-3 py-2"
-            :options="[
-              { label: '官方源', value: 'official' },
-              { label: 'BMCLAPI', value: 'bmclapi' },
-              { label: '优先官方', value: 'smart' },
-            ]"
-          />
           <p class="text-xs text-gray-400 mt-2">
             <template v-if="mirrorMeta === 'official'">Mojang 官方源，海外快国内可能较慢</template>
             <template v-else-if="mirrorMeta === 'bmclapi'">BMCLAPI 国内镜像，速度快</template>
@@ -98,21 +99,22 @@ watch(chunkCount, (v) => markDirty('chunkCount', v))
         </div>
         <!-- 文件下载源 -->
         <div class="px-5 py-4">
-          <div class="flex items-center justify-between mb-2">
-            <div>
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
               <p class="text-sm font-medium text-gray-900">文件下载源</p>
               <p class="text-xs text-gray-500 mt-0.5">客户端 JAR、库文件、资源文件、加载器安装包</p>
             </div>
+            <div class="flex-none w-40">
+              <Select
+                v-model="mirrorDownload"
+                :options="[
+                  { label: '官方源', value: 'official' },
+                  { label: 'BMCLAPI', value: 'bmclapi' },
+                  { label: '优先官方', value: 'smart' },
+                ]"
+              />
+            </div>
           </div>
-          <SegmentedButtons
-            v-model="mirrorDownload"
-            button-class="flex-1 px-3 py-2"
-            :options="[
-              { label: '官方源', value: 'official' },
-              { label: 'BMCLAPI', value: 'bmclapi' },
-              { label: '优先官方', value: 'smart' },
-            ]"
-          />
           <p class="text-xs text-gray-400 mt-2">
             <template v-if="mirrorDownload === 'official'">Mojang 官方源，海外快国内可能较慢</template>
             <template v-else-if="mirrorDownload === 'bmclapi'">BMCLAPI 国内镜像，速度快</template>

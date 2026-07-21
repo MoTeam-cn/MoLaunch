@@ -15,6 +15,7 @@ import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useConfigPage } from '@/composables/useConfigPage'
 import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 
 const minMemory = ref(512)
 const maxMemory = ref(2048)
@@ -113,30 +114,30 @@ watch(memoryMode, (mode) => {
 
     <div class="divide-y divide-gray-200">
       <!-- 分配模式 -->
-      <div class="px-5 py-4 flex items-center justify-between">
-        <div>
-          <p class="text-sm font-medium text-gray-900">分配模式</p>
-          <p class="text-xs text-gray-500 mt-0.5">自动模式根据系统内存智能分配</p>
+      <div class="px-5 py-4">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <p class="text-sm font-medium text-gray-900">分配模式</p>
+            <p class="text-xs text-gray-500 mt-0.5">自动模式根据系统内存智能分配</p>
+          </div>
         </div>
         <div class="flex gap-2">
-          <button
-            class="px-4 py-1.5 text-sm font-medium rounded-lg border transition-colors"
-            :class="memoryMode === 'auto'
-              ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-gray-300 text-gray-600 hover:border-gray-400'"
+          <Button
+            :type="memoryMode === 'auto' ? 'primary' : 'outline'"
+            size="small"
+            class="flex-1"
             @click="memoryMode = 'auto'"
           >
             自动配置
-          </button>
-          <button
-            class="px-4 py-1.5 text-sm font-medium rounded-lg border transition-colors"
-            :class="memoryMode === 'custom'
-              ? 'border-primary-500 bg-primary-50 text-primary-700'
-              : 'border-gray-300 text-gray-600 hover:border-gray-400'"
+          </Button>
+          <Button
+            :type="memoryMode === 'custom' ? 'primary' : 'outline'"
+            size="small"
+            class="flex-1"
             @click="memoryMode = 'custom'"
           >
             自定义
-          </button>
+          </Button>
         </div>
       </div>
       <!-- 自动模式说明 -->
