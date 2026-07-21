@@ -16,6 +16,7 @@
 
 import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
+import { useVersionStore } from '@/stores/version'
 import SkinAnimationSelector, { type AnimationType } from './skin-manager/SkinAnimationSelector.vue'
 import SkinCapeList from './skin-manager/SkinCapeList.vue'
 import SkinUploadPanel from './skin-manager/SkinUploadPanel.vue'
@@ -28,17 +29,19 @@ const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ 'update:visible': [boolean] }>()
 
 const authStore = useAuthStore()
+const versionStore = useVersionStore()
 const animation = ref<AnimationType>('idle')
 
 const uuid = computed(() => authStore.currentUser?.uuid ?? '')
 const username = computed(() => authStore.currentUser?.name ?? '')
 const isMicrosoft = computed(() => authStore.currentUser?.login_type === 'Microsoft')
+const mcVersion = computed(() => versionStore.selectedVersion || '1.20.1')
 
 const {
   info, loading, uploading, skinUrl, capeUrl, variant, selectedLocalSkin,
   activeCape,
   loadInfo, pickAndUpload, onEquipCape, onUnequipCape,
-  onSelectLocalSkin, saveSkinToLocal,
+  onSelectLocalSkin, onUploadCustomSkin, saveSkinToLocal,
 } = useSkinOperations({ uuid, username, isMicrosoft })
 
 function close() {
@@ -87,7 +90,7 @@ watch(() => props.visible, (v) => {
             <AlertV2
               v-if="!isMicrosoft"
               type="info"
-              message="离线皮肤通过 UUID 调整 + 资源包替换实现，游戏内将显示选定角色。1.19.3+ 也会精确显示，但仅本地可见。"
+              message="离线皮肤通过 UUID 调整 + 资源包替换实现，游戏内将显示选定皮肤。1.19.3+ 也会精确显示，但仅本地可见。"
               class="mb-4"
             />
 
@@ -124,11 +127,13 @@ watch(() => props.visible, (v) => {
                   @upload="pickAndUpload"
                 />
 
-                <!-- 离线账号：本地皮肤选择网格 -->
+                <!-- 离线账号：本地皮肤选择网格 + 自定义上传 -->
                 <SkinLocalSelector
                   v-else
                   :selected-local-skin="selectedLocalSkin"
+                  :mc-version="mcVersion"
                   @select="onSelectLocalSkin"
+                  @upload="onUploadCustomSkin"
                 />
 
                 <!-- 动画状态（所有账号类型共用） -->

@@ -180,10 +180,15 @@ pub async fn launch_game(
                 {
                     if let Some(ref skin_name) = acc.skin {
                         // 判断目标皮肤变体：slim → true（Alex 模型），classic → false（Steve 模型）
-                        let slim = matches!(
-                            skin_name.as_str(),
-                            "Alex" | "Ari" | "Efe" | "Makena" | "Noor" | "Sunny" | "Zuri"
-                        );
+                        // 自定义皮肤格式 custom:/path|slim 或 custom:/path|classic
+                        let slim = if skin_name.starts_with("custom:") {
+                            skin_name.contains("|slim")
+                        } else {
+                            matches!(
+                                skin_name.as_str(),
+                                "Alex" | "Ari" | "Efe" | "Makena" | "Noor" | "Sunny" | "Zuri"
+                            )
+                        };
                         let adjusted_uuid =
                             crate::minecraft::auth::adjust_uuid_for_skin_variant(&auth_info.uuid, slim);
                         if adjusted_uuid != auth_info.uuid {

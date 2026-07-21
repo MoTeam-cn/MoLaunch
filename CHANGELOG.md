@@ -7,6 +7,63 @@
 
 ## [未发布]
 
+### 修复
+
+#### 整合包下载面板不显示名字
+- `src-tauri/src/commands/community/install/mod.rs`：`install_modpack` 中 `reset_stages` 后补充 `ds.version_name = req.instance_name.clone()`，修复前端从后端恢复下载状态时拿到空字符串覆盖正确名字的问题（普通版本下载无此问题）
+
+#### 整合包下载暂停按钮无效
+- `src-tauri/src/commands/community/install/modpack_stages.rs`：整合包原始包下载的 `DownloadManager` 补充 `.with_cancel_flag()` 和 `.with_pause_flag()`
+- `src-tauri/src/commands/community/install/concurrent.rs`：整合包 mods 下载的 `DownloadManager` 补充 `.with_cancel_flag()` 和 `.with_pause_flag()`
+- `src-tauri/src/commands/community/install/mod.rs`：`install_modpack` 开头重置 `download_cancel_flag` 和 `download_pause_flag`，防止上次残留导致新下载卡住
+
+#### 社区资源下载走 DownloadManager + 下载管理页面展示
+- `src-tauri/src/commands/community/install/mod.rs`：`download_resource` 和 `download_resource_to_path` 两个命令全部从单流 reqwest 直连改为走 `DownloadManager`（支持多 URL fallback + 分片 + 暂停/取消），进度通过 `download_state` 统一通道写入，前端在下载管理页面展示
+- `src/components/community/ResourceDetail.vue`：移除 `useCommunityDownload` 和 `DownloadProgressOverlay`，改用 `versionStore.startDownload` 接入统一下载状态；下载开始时 `toastInfo` 提示
+- `src/views/version-settings/mod-tab/ModUpdateDialog.vue`：Mod 更新下载也接入 `versionStore.startDownload`，下载开始时 `toastInfo` 提示
+- `src/composables/useDownloadPolling.ts`：下载完成时 `toastSuccess` 提示，下载失败时 `toastError` 提示
+- 所有社区资源下载完成后右下角 `DownloadPanel` 浮动按钮自动显示进度环，点击可进入下载管理页面查看详情
+
+#### CurseForge + Modrinth CDN 下载镜像替换（统一由来源策略控制）
+- `src-tauri/src/minecraft/sources.rs`：重写 CDN 替换为统一函数，同时支持 CurseForge（`edge.forgecdn.net` 等）和 Modrinth（`cdn.modrinth.com`）域名替换为 `mod.mcimirror.top`；由现有 `community_source` 配置控制：source=0 直接用镜像、source=1 官方+镜像双 URL fallback、source=2 用官方
+- `src-tauri/src/minecraft/community/curseforge/convert.rs`：撤销源头 CDN 替换，改为在使用时替换
+- `src-tauri/src/commands/community/install/helpers.rs`：`construct_cf_edge_url` fallback 构造根据 source 策略选择域名
+- `src-tauri/src/commands/community/install/modpack_stages.rs`：整合包下载使用统一 `cdn_urls()` 构造 URL 列表
+- `src-tauri/src/commands/community/install/curseforge.rs`：CF mods 下载使用统一 `cdn_urls()`
+- `src-tauri/src/commands/community/install/modrinth.rs`：MR mods 下载对每个 URL 应用 `cdn_urls()` 扩展镜像 fallback
+- `src-tauri/src/commands/community/install/mod.rs`：`download_resource` 和 `download_resource_to_path` 使用统一 `replace_cdn()`
+- `src-tauri/src/minecraft/loaders/fabric_api.rs`：移除硬编码的 MCIM 镜像替换，复用统一 `cdn_urls()` 函数
+- 移除上一版新增的 `community_cf_cdn_mirror` 独立配置项（不再需要，统一由来源策略控制）
+
+#### CurseForge 批量查询绕过 source 策略
+- `src-tauri/src/minecraft/community/curseforge/mod.rs`：`http` 模块改为 `pub(crate)` 暴露 `cf_post`
+- `src-tauri/src/commands/community/install/curseforge.rs`：`install_cf_mods` 中的 `/mods/files` 批量查询从硬编码官方 API 改为 `cf_post`，走 source 策略（source=0 强制镜像，source=1 回退，source=2 官方）
+
+### 优化
+
+#### 窗口最小尺寸调整
+- `src-tauri/tauri.conf.json`：窗口最小尺寸从 900×600 调整为 1090×592，避免界面元素拥挤
+
+#### Mod 管理界面优化
+- `src/views/version-settings/mod-tab/ModToolbar.vue`：搜索框宽度减半（`w-56` → `w-28`），筛选按钮组增加内边距和按钮间距（`p-0.5` → `p-1`、`px-2.5` → `px-3`、`gap-1` → `gap-1.5`），搜索框与操作栏保持在同一行不换行
+- `src/views/version-settings/mod-tab/ModEmptyState.vue`：空状态改为上下左右居中显示（`flex h-full min-h-[400px] items-center justify-center`），图标增加圆角灰色背景容器，字体和信息层级优化（标题 15px font-semibold、副标题 13px），无匹配时增加"试试调整筛选条件或搜索关键词"提示
+- `src/views/version-settings/mod-tab/ModListItem.vue`：列表项字体优化（标题 `text-[13px] font-semibold`、详情行 `text-[11px] font-medium`），分隔符改为 `|`，文件名截断长度从 28 字符增至 32 字符
+
+#### 启动初始化并行化（减少 Java 搜索等待时间）
+- `src/App.vue`：`initApp()` 中 `detectJava()` 提前并行启动（不再等待 SDK 和认证恢复完成）；`fetchPlatformInfo()` 和 `fetchDeviceId()` 改为 `Promise.all` 并行获取；路由修正后再 `await javaPromise` 确保完成
+
+### 修复
+
+#### 下载缓存图片时 cache-image.localhost 连接失败
+- `src-tauri/src/minecraft/image_cache.rs`：新增三个公共函数：`is_cache_url()` 判断 URL 是否为 Tauri WebView 内部虚拟 URL、`read_cache_by_url()` 从虚拟 URL 直接读取本地缓存文件内容、`cache_path_by_url()` 返回缓存文件路径；`get_image_url()` 入口增加防御性检查，误传 cache-image 虚拟 URL 时直接返回避免 reqwest 请求虚拟 URL
+- `src-tauri/src/commands/skin.rs`：`download_url_to_file` 命令改用公共函数 `read_cache_by_url` 识别虚拟 URL 并从本地缓存读取，不再用 reqwest 发起无法连接的 HTTP 请求
+- 已排查确认启动流程（`launch.rs` / `script_export.rs` / `minecraft/launch/`）不存在同样问题，启动 IPC 参数不包含 URL 字段，后端 reqwest 调用全部使用后端硬编码 URL 或 profile_json 远程 URL
+- 已排查确认前端其他 URL→后端调用点（`download_resource_to_path` / `install_modpack`）接收的是 CurseForge/Modrinth 平台 jar 文件远程 URL，不经过 image-cache 系统，确定安全；`<img>` src 等 WebView 内部场景均不会回传给后端 invoke
+
+#### Button 组件除 primary 外所有类型按钮无边框/背景丢失
+- `src/components/common/Button.vue`：将类名从动态模板字符串 `` `btn-${type}` `` / `` `btn-size-${size}` `` 改为静态 switch 映射（`typeClass`/`sizeClass`）。原因：Tailwind purge 扫描器只能静态识别源码中出现的完整类名字符串，无法推断模板字符串展开结果，导致 `main.css` 的 `@layer components` 中 `btn-outline`/`btn-secondary`/`btn-ghost`/`btn-text` 等自定义类被判定为"未使用"而整体 purge，这些类型按钮丢失 border/background/color 只剩文字。改用静态映射后 Tailwind 可在源码中识别到完整类名，保留对应样式
+- `src/composables/useSwipeNavigation.ts`：`onPointerDown` 在 `pointerdown` 起源于交互元素（button/a/input 等）时提前返回，跳过 `setPointerCapture` 指针捕获，避免拖拽逻辑劫持点击事件导致皮肤/登出按钮的 `click` 无法派发、弹窗不弹出的问题
+
 ### 优化
 
 #### 账号卡片拖拽体验优化
@@ -16,12 +73,18 @@
 
 #### 离线账号皮肤接入启动流程（PCL2 方案 A + 方案 B）
 - `src-tauri/src/minecraft/auth/mod.rs`：新增 `adjust_uuid_for_skin_variant()` 函数，通过递增 UUID 末位让 MC 离线模式哈希到目标皮肤模型（Steve=classic / Alex=slim），算法参考 PCL2 的 `McSkinSex` 函数
-- `src-tauri/src/minecraft/launch/skin_resourcepack.rs`：新增独立模块实现方案 B（资源包替换），包含 pack_format 版本映射、1.19.3+ 9 角色路径处理、zip 生成、options.txt resourcePacks 字段修改；含 4 个单元测试
+- `src-tauri/src/minecraft/launch/skin_resourcepack.rs`：新增独立模块实现方案 B（资源包替换），包含 pack_format 版本映射、1.19.3+ 9 角色路径处理、zip 生成、options.txt resourcePacks 字段修改；支持默认皮肤和自定义皮肤（`custom:` 前缀）；含 4 个单元测试
 - `src-tauri/src/minecraft/launch/mod.rs`：添加 `pub mod skin_resourcepack` 模块声明
 - `src-tauri/src/resources.rs`：注册 9 个离线皮肤 PNG 文件（从 `src/assets/Skins/` 复制到 `src-tauri/resources/skins/`），新增 `get_embedded_resource()` 公共接口供 `skin_resourcepack` 模块直接读取嵌入资源
 - `src-tauri/src/commands/version/launch.rs`：方案 A（UUID 调整）+ 方案 B（资源包生成）协同工作；非离线账号启动时自动清理残留资源包
 - `src-tauri/src/commands/version/script_export.rs`：导出启动脚本时同步应用 UUID 调整
-- `src/components/common/SkinManager.vue`：更新离线皮肤弹窗提示文案为"通过 UUID 调整 + 资源包替换实现，游戏内将显示选定角色。1.19.3+ 也会精确显示，但仅本地可见。"
+- `src-tauri/src/commands/auth/account.rs`：新增 `save_custom_skin` IPC 命令，将用户选择的 PNG 文件复制到 `<app_data>/custom_skins/<uuid>.png`，验证 PNG 文件头和大小（<1MB），写入 `custom:<path>|<variant>` 格式的 skin 字段
+- `src-tauri/src/lib.rs`：注册 `save_custom_skin` 命令
+- `src/utils/api/auth.ts`：新增 `saveCustomSkin` API 封装
+- `src/utils/default-skin.ts`：新增 `isVersion1193Plus`、`getDefaultSkinsForVersion`、`parseSkinUrl`、`isCustomSkin`、`parseSkinVariant` 工具函数；`getDefaultSkin` 和 `getDefaultSkinEntry` 支持自定义皮肤 URL 解析（通过 `convertFileSrc`）
+- `src/components/common/skin-manager/SkinLocalSelector.vue`：根据 MC 版本过滤可选皮肤（1.19.3+ 显示 9 个，旧版只显示 Steve/Alex）；新增自定义皮肤上传按钮区
+- `src/composables/useSkinOperations.ts`：`loadInfo` 和 `onSelectLocalSkin` 支持自定义皮肤 URL 解析；新增 `onUploadCustomSkin` handler
+- `src/components/common/SkinManager.vue`：引入 `useVersionStore` 获取当前 MC 版本传给 `SkinLocalSelector`；传递 `onUploadCustomSkin` handler
 
 #### SDK 加载逻辑与日志优化
 - `src-tauri/src/sdk/mod.rs`：重写 `get_sdk_resource_dir()`，优先从发布模式资源目录（`<exe_dir>/resources/sdk_data/`）查找 SDK 库，开发模式路径用词法规范化去掉 `../`，macOS 额外查找 `.app/Contents/Resources/sdk_data/`
@@ -1771,4 +1834,4 @@
 
 ---
 
-*本文档最后更新于 2026-06-26*
+*本文档最后更新于 2026-07-21*

@@ -76,6 +76,60 @@ pub const LIBRARY_REPLACEMENTS: &[(&str, &str)] = &[(
     "https://bmclapi2.bangbang93.com/libraries",
 )];
 
+// ── 社区资源 CDN 镜像（CurseForge + Modrinth 统一由 source 策略控制）──
+/// MCIMirror CDN 镜像基础 URL
+pub const CDN_MIRROR: &str = "https://mod.mcimirror.top";
+
+/// CurseForge CDN 官方域名列表
+pub const CF_CDN_DOMAINS: &[&str] = &[
+    "https://edge.forgecdn.net",
+    "https://media.forgecdn.net",
+];
+
+/// Modrinth CDN 官方域名列表
+pub const MR_CDN_DOMAINS: &[&str] = &["https://cdn.modrinth.com"];
+
+/// 将 CDN URL 替换为镜像 URL（内部函数，不判断 source 策略）
+fn apply_cdn_mirror(url: &str) -> String {
+    for domain in CF_CDN_DOMAINS.iter().chain(MR_CDN_DOMAINS.iter()) {
+        if url.starts_with(domain) {
+            return url.replacen(domain, CDN_MIRROR, 1);
+        }
+    }
+    url.to_string()
+}
+
+/// 根据 source 策略替换 CDN URL（单 URL，用于直连下载场景）
+///
+/// - source=0（尽量镜像）：返回镜像 URL
+/// - source=1（缓慢时换镜像）：返回官方 URL（fallback 由 `cdn_urls` 处理）
+/// - source=2（尽量官方）：返回官方 URL
+pub fn replace_cdn(url: &str) -> String {
+    let source = crate::minecraft::community::get_source_pref();
+    if source == 0 {
+        apply_cdn_mirror(url)
+    } else {
+        url.to_string()
+    }
+}
+
+/// 根据 source 策略构造 CDN URL 列表（多 URL，用于 DownloadManager fallback）
+///
+/// - source=0（尽量镜像）：`[镜像URL]`
+/// - source=1（缓慢时换镜像）：`[官方URL, 镜像URL]`（官方优先，失败自动 fallback）
+/// - source=2（尽量官方）：`[官方URL]`
+pub fn cdn_urls(url: &str) -> Vec<String> {
+    let source = crate::minecraft::community::get_source_pref();
+    let mirrored = apply_cdn_mirror(url);
+    let is_cdn = mirrored != url;
+
+    match source {
+        0 if is_cdn => vec![mirrored],
+        1 if is_cdn => vec![url.to_string(), mirrored],
+        _ => vec![url.to_string()],
+    }
+}
+
 // ═══════════════════════════════════════════════════════════
 // 动态路径构建
 // ═══════════════════════════════════════════════════════════

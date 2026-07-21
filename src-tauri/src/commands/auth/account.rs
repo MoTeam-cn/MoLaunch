@@ -160,6 +160,62 @@ pub async fn set_offline_skin(
         .map_err(|e| e.to_string())
 }
 
+/// 保存自定义皮肤文件并设置到离线账号
+///
+/// 将用户选择的 PNG 文件复制到 `<app_data>/custom_skins/<uuid>.png`，
+/// 然后把 `custom:<path>|<variant>` 写入离线账号的 skin 字段。
+#[tauri::command]
+pub async fn save_custom_skin(
+    state: State<'_, AppState>,
+    uuid: String,
+    file_path: String,
+    variant: Option<String>,
+) -> Result<String, String> {
+    let variant = variant.unwrap_or_else(|| "classic".to_string());
+
+    // 读取源文件
+    let png_data = std::fs::read(&file_path)
+        .map_err(|e| format!("读取皮肤文件失败: {}", e))?;
+
+    // 验证 PNG 文件头
+    if png_data.len() < 8 || png_data[0..5] != [0x89, 0x50, 0x4E, 0x47, 0x0D] {
+        return Err("文件不是有效的 PNG 格式".to_string());
+    }
+
+    // 验证文件大小（< 1MB，比 Mojang 的 24KB 宽松，因为是本地使用）
+    if png_data.len() > 1024 * 1024 {
+        return Err("皮肤文件过大（超过 1MB）".to_string());
+    }
+
+    // 保存到 app data 目录
+    let skin_dir = crate::storage::Storage::instance().base_dir().join("custom_skins");
+    std::fs::create_dir_all(&skin_dir)
+        .map_err(|e| format!("创建皮肤目录失败: {}", e))?;
+
+    let dest_path = skin_dir.join(format!("{}.png", uuid));
+    std::fs::write(&dest_path, &png_data)
+        .map_err(|e| format!("保存皮肤文件失败: {}", e))?;
+
+    // 构建 skin 字段：custom:/path|slim 或 custom:/path|classic
+    let skin_value = format!("custom:{}|{}", dest_path.display(), variant);
+
+    // 写入注册表
+    state
+        .auth_storage
+        .set_offline_skin(&uuid, Some(&skin_value))
+        .await
+        .map_err(|e| e.to_string())?;
+
+    log_info!(
+        "Saved custom skin: uuid={}, file={}, variant={}",
+        uuid,
+        dest_path.display(),
+        variant
+    );
+
+    Ok(skin_value)
+}
+
 /// 删除已存储的离线账号
 #[tauri::command]
 pub async fn remove_offline_account(state: State<'_, AppState>, uuid: String) -> Result<(), String> {

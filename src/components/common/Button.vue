@@ -53,14 +53,42 @@ const props = withDefaults(defineProps<Props>(), {
 
 defineEmits<{ click: [e: MouseEvent] }>()
 
-const sizeClass = computed(() => `btn-size-${props.size}`)
+/**
+ * 类名使用静态映射而非动态拼接（`btn-${type}` / `btn-size-${size}`）。
+ *
+ * 关键：Tailwind 的 purge 扫描器只能静态识别源码中出现的完整类名字符串，
+ * 无法推断模板字符串 `btn-${type}` 会展开为哪些具体类名。若使用动态拼接，
+ * main.css 中 @layer components 定义的自定义类（btn-outline / btn-secondary
+ * / btn-ghost / btn-text）会因"未被检测到使用"而被整体 purge，
+ * 导致这些类型按钮丢失 border/background/color，只剩 scoped 尺寸样式。
+ */
+const typeClass = computed(() => {
+  switch (props.type) {
+    case 'primary': return 'btn-primary'
+    case 'secondary': return 'btn-secondary'
+    case 'outline': return 'btn-outline'
+    case 'ghost': return 'btn-ghost'
+    case 'text': return 'btn-text'
+    default: return 'btn-primary'
+  }
+})
+
+const sizeClass = computed(() => {
+  switch (props.size) {
+    case 'mini': return 'btn-size-mini'
+    case 'small': return 'btn-size-small'
+    case 'default': return 'btn-size-default'
+    case 'large': return 'btn-size-large'
+    default: return 'btn-size-default'
+  }
+})
 </script>
 
 <template>
   <button
     :class="[
       'btn',
-      `btn-${type}`,
+      typeClass,
       sizeClass,
       { 'btn-long': long, 'btn-loading': loading },
     ]"

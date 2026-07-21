@@ -97,6 +97,40 @@ fn cache_image_url(url: &str) -> String {
 /// 从自定义 URI scheme 请求路径中提取 hash
 ///
 /// 支持两种 URL 格式：
+/// 判断 URL 是否为 Tauri WebView 内部虚拟 URL（cache-image scheme）
+///
+/// Windows/Android 格式：`https://cache-image.localhost/{hash}.png`
+/// macOS/Linux 格式：`cache-image://localhost/{hash}.png`
+///
+/// 这些 URL 只在 WebView 内部有效，后端 reqwest 等 HTTP 客户端无法访问，
+/// 需要通过 `read_cache_by_url` 直接读取本地缓存文件。
+pub fn is_cache_url(url: &str) -> bool {
+    url.starts_with("https://cache-image.localhost/")
+        || url.starts_with("cache-image://localhost/")
+}
+
+/// 从 cache-image 虚拟 URL 读取本地缓存文件内容
+///
+/// 如果 URL 不是 cache-image 虚拟格式或缓存文件不存在，返回 None。
+/// 调用方应先判断返回值，None 时可回退到普通 HTTP 下载。
+pub fn read_cache_by_url(url: &str) -> Option<Vec<u8>> {
+    if !is_cache_url(url) {
+        return None;
+    }
+    let hash = parse_hash_from_request(url)?;
+    let cache_path = find_cache_by_hash(&hash)?;
+    std::fs::read(&cache_path).ok()
+}
+
+/// 返回缓存文件的路径（如果 URL 是 cache-image 虚拟格式且缓存文件存在）
+pub fn cache_path_by_url(url: &str) -> Option<PathBuf> {
+    if !is_cache_url(url) {
+        return None;
+    }
+    let hash = parse_hash_from_request(url)?;
+    find_cache_by_hash(&hash)
+}
+
 /// - Windows/Android: `https://cache-image.localhost/{hash}.png`
 /// - macOS/Linux: `cache-image://localhost/{hash}.png`
 ///
@@ -139,9 +173,21 @@ pub fn find_cache_by_hash(hash: &str) -> Option<PathBuf> {
 /// - 如果本地缓存不存在，返回远程 URL（`cached: false`），并 spawn 异步任务下载
 ///
 /// # 参数
-/// - `remote_url`: 远程图片 URL
+/// - `remote_url`: 远程图片 URL（不可是 cache-image 虚拟 URL）
 /// - `app`: Tauri AppHandle，用于下载完成后 emit 事件
+///
+/// # 防御性检查
+/// 如果传入的 URL 已经是 cache-image 虚拟 URL（误用），
+/// 直接返回它本身标记为 cached，避免用 reqwest 去下载虚拟 URL 导致连接失败。
 pub async fn get_image_url(remote_url: &str, app: Option<AppHandle>) -> CachedImage {
+    // 防御：如果误传 cache-image 虚拟 URL，直接返回，不发起 reqwest 下载
+    if is_cache_url(remote_url) {
+        return CachedImage {
+            url: remote_url.to_string(),
+            cached: true,
+        };
+    }
+
     let rel = cache_rel_path(remote_url);
 
     // 缓存命中：返回自定义 URI scheme URL

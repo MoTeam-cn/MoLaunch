@@ -106,7 +106,7 @@ function handleClick(e: MouseEvent) {
     <div class="min-w-0 flex-1">
       <div class="flex items-center gap-2">
         <span
-          class="truncate text-sm font-medium transition-colors"
+          class="truncate text-[13px] font-semibold transition-colors"
           :class="selected
             ? 'text-blue-600'
             : (mod.is_enabled ? 'text-gray-800' : 'text-gray-500 line-through decoration-gray-300')"
@@ -122,14 +122,14 @@ function handleClick(e: MouseEvent) {
           class="truncate text-xs text-gray-400"
         >{{ modSubtitle(mod, modLocalNameStyle) }}</span>
       </div>
-      <div class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
-        <span>{{ formatBytes(mod.size) }}</span>
-        <span v-if="mod.loader_type !== 'unknown'">·</span>
-        <span v-if="mod.loader_type !== 'unknown'">{{ loaderVisual(mod.loader_type).label }}</span>
-        <span>·</span>
+      <div class="mt-1 flex items-center gap-2 text-[11px] text-gray-400">
+        <span class="font-medium">{{ formatBytes(mod.size) }}</span>
+        <span v-if="mod.loader_type !== 'unknown'" class="text-gray-300">|</span>
+        <span v-if="mod.loader_type !== 'unknown'" class="font-medium">{{ loaderVisual(mod.loader_type).label }}</span>
+        <span class="text-gray-300">|</span>
         <Tooltip :text="mod.file_name" position="top" :delay="200">
           <span class="cursor-help underline decoration-dotted underline-offset-2 hover:text-gray-600">
-            {{ mod.file_name.length > 28 ? mod.file_name.slice(0, 25) + '...' : mod.file_name }}
+            {{ mod.file_name.length > 32 ? mod.file_name.slice(0, 29) + '...' : mod.file_name }}
           </span>
         </Tooltip>
       </div>

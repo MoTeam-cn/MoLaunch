@@ -13,7 +13,7 @@
 //! - mod.rs: 公共 API（search / get_project / get_versions / fingerprint_search / batch_get_mod_slugs）
 
 mod convert;
-mod http;
+pub(crate) mod http;
 mod types;
 
 use serde::Deserialize;

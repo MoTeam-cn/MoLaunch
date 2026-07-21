@@ -19,8 +19,9 @@ import { getProjectVersions, downloadResourceToPath } from '@/utils/api/communit
 import { getVersionModsDir, deleteMod, type ModInfo } from '@/utils/api/personalization'
 import { formatBytes, formatDate, formatDownloads } from '@/utils/format'
 import { versionChangeType, type VersionChangeType } from '@/utils/version'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
+import { useVersionStore } from '@/stores/version'
 import type { ResourceVersion, Platform } from '@/types/community'
 import {
   XMarkIcon,
@@ -50,6 +51,7 @@ const emit = defineEmits<{
 }>()
 
 // 版本列表状态
+const versionStore = useVersionStore()
 const loading = ref(false)
 const versions = ref<ResourceVersion[]>([])
 const error = ref('')
@@ -167,7 +169,9 @@ function installSelected() {
         // 获取 mods 目录
         const modsDir = await getVersionModsDir(props.versionId)
 
-        // 下载新版本到 mods 目录
+        // 下载新版本到 mods 目录（走 DownloadManager，进度在下载管理页面展示）
+        versionStore.startDownload(version.file_name)
+        toastInfo(`开始下载: ${version.file_name}`)
         await downloadResourceToPath(version.download_url, version.file_name, modsDir)
 
         // 删除旧版本文件（如果文件名不同）
@@ -185,6 +189,7 @@ function installSelected() {
       } catch (e: any) {
         const msg = typeof e === 'string' ? e : (e?.message || String(e))
         toastError(`安装失败：${msg}`)
+        versionStore.finishDownload()
       } finally {
         installing.value = false
       }

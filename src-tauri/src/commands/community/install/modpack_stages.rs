@@ -38,7 +38,7 @@ pub(super) async fn download_modpack_archive(
 
     let archive_task = DownloadTask {
         id: "modpack_archive".to_string(),
-        urls: vec![download_url.to_string()],
+        urls: crate::minecraft::sources::cdn_urls(download_url),
         local_path: archive_path.to_string_lossy().to_string(),
         expected_size: 0, // 由 DownloadManager 自动探测
         expected_hash: None,
@@ -62,7 +62,9 @@ pub(super) async fn download_modpack_archive(
     let config = state.config.lock().await;
     let chunk_count = config.chunk_count.max(1) as usize;
     drop(config);
-    let archive_manager = DownloadManager::new(4, chunk_count, 0, DownloadSourceMode::Smart);
+    let archive_manager = DownloadManager::new(4, chunk_count, 0, DownloadSourceMode::Smart)
+        .with_cancel_flag(state.download_cancel_flag.clone())
+        .with_pause_flag(state.download_pause_flag.clone());
     let archive_results = archive_manager
         .download_batch(vec![archive_task], Some(stage0_callback))
         .await;

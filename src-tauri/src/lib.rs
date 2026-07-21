@@ -82,6 +82,7 @@ pub fn run() {
             commands::auth::account::remove_offline_account,
             commands::auth::account::switch_offline_account,
             commands::auth::account::set_offline_skin,
+            commands::auth::account::save_custom_skin,
             // 皮肤管理命令
             commands::skin::get_skin_cape_info,
             commands::skin::get_skin_url,

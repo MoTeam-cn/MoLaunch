@@ -82,8 +82,18 @@ pub(super) async fn install_mr_files(
             log_info!("[Community] MR 文件无下载 URL，跳过: {}", f.path);
             continue;
         }
-        // Modrinth 的 downloads 是数组，包含多个镜像源，全部传入供 fallback
-        let urls: Vec<String> = f.downloads.iter().filter(|u| !u.is_empty()).cloned().collect();
+        // Modrinth 的 downloads 是数组，对每个 URL 根据 source 策略扩展镜像 fallback
+        let mut urls: Vec<String> = Vec::new();
+        for u in &f.downloads {
+            if u.is_empty() {
+                continue;
+            }
+            for candidate in crate::minecraft::sources::cdn_urls(u) {
+                if !urls.contains(&candidate) {
+                    urls.push(candidate);
+                }
+            }
+        }
         if urls.is_empty() {
             log_info!("[Community] MR 文件所有 URL 为空，跳过: {}", f.path);
             continue;

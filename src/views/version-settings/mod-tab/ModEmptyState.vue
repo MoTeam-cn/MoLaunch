@@ -62,14 +62,19 @@ defineEmits<{
   </div>
 
   <!-- 空列表 / 无匹配 -->
-  <div v-else class="flex items-center justify-center py-12">
-    <div class="text-center">
-      <PuzzlePieceIcon class="mx-auto mb-3 h-10 w-10 text-gray-300" />
-      <div class="mb-2 text-base font-medium text-gray-500">
+  <div v-else class="flex h-full min-h-[400px] items-center justify-center">
+    <div class="flex flex-col items-center text-center">
+      <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
+        <PuzzlePieceIcon class="h-8 w-8 text-gray-300" />
+      </div>
+      <div class="mb-2 text-[15px] font-semibold text-gray-600">
         {{ modsCount === 0 ? '尚未安装 Mod' : '没有符合条件的 Mod' }}
       </div>
-      <p v-if="modsCount === 0" class="mb-4 text-xs text-gray-400">
+      <p v-if="modsCount === 0" class="mb-5 text-[13px] text-gray-400">
         你可以从文件安装 Mod，或下载新 Mod
+      </p>
+      <p v-else class="mb-5 text-[13px] text-gray-400">
+        试试调整筛选条件或搜索关键词
       </p>
       <Button
         v-if="modsCount === 0"

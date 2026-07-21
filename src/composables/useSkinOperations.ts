@@ -35,8 +35,10 @@ import {
 } from '@/utils/tauri'
 import { onImageCached } from '@/composables/useImageCache'
 import { toastSuccess, toastError } from '@/utils/toast'
+import { saveCustomSkin } from '@/utils/api/auth'
 import {
   defaultSkins, getDefaultSkinEntry, getLocalSkinName, setLocalSkinName, bumpSkinVersion,
+  parseSkinUrl, parseSkinVariant,
 } from '@/utils/default-skin'
 
 interface UseSkinOperationsOptions {
@@ -88,14 +90,24 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
     capeUrl.value = null
 
     if (!isMicrosoft.value) {
-      // 离线账号：使用本地默认皮肤（从注册表同步的内存缓存）
-      const entry = getDefaultSkinEntry(uuid.value || username.value)
-      skinUrl.value = entry.url
-      variant.value = entry.variant
-      selectedLocalSkin.value = getLocalSkinName(uuid.value) || entry.name
+      // 离线账号：使用本地默认皮肤或自定义皮肤（从注册表同步的内存缓存）
+      const stored = getLocalSkinName(uuid.value)
+      selectedLocalSkin.value = stored
+      if (stored) {
+        // 解析 skin 字段获取 URL 和变体（支持默认皮肤和自定义皮肤）
+        const url = parseSkinUrl(stored)
+        if (url) skinUrl.value = url
+        variant.value = parseSkinVariant(stored)
+      } else {
+        // 未选择皮肤时使用 UUID 哈希默认
+        const entry = getDefaultSkinEntry(uuid.value || username.value)
+        skinUrl.value = entry.url
+        variant.value = entry.variant
+        selectedLocalSkin.value = entry.name
+      }
       info.value = null
       loading.value = false
-      dev && console.log('[SkinManager] offline account, using local skin:', entry.name)
+      dev && console.log('[SkinManager] offline account, using skin:', selectedLocalSkin.value)
       return
     }
 
@@ -165,13 +177,35 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
   async function onSelectLocalSkin(skinName: string) {
     await setLocalSkinName(uuid.value, skinName)
     selectedLocalSkin.value = skinName
-    const entry = defaultSkins.find(s => s.name === skinName)
-    if (entry) {
-      skinUrl.value = entry.url
-      variant.value = entry.variant
-    }
+    const url = parseSkinUrl(skinName)
+    if (url) skinUrl.value = url
+    variant.value = parseSkinVariant(skinName)
     bumpSkinVersion()
     toastSuccess(`已切换为 ${skinName} 皮肤`)
+  }
+
+  /** 离线账号：上传自定义皮肤 PNG 文件 */
+  async function onUploadCustomSkin() {
+    try {
+      const filePath = await selectFile('选择皮肤 PNG 文件', [{ name: 'PNG 图片', extensions: ['png'] }])
+      if (!filePath) return
+
+      uploading.value = true
+      // 保存到 app data 并获取 skin 字段值
+      const skinValue = await saveCustomSkin(uuid.value, filePath, variant.value)
+
+      // 更新内存缓存和 UI
+      selectedLocalSkin.value = skinValue
+      const url = parseSkinUrl(skinValue)
+      if (url) skinUrl.value = url
+      variant.value = parseSkinVariant(skinValue)
+      bumpSkinVersion()
+      toastSuccess('自定义皮肤已应用')
+    } catch (e) {
+      toastError(String(e))
+    } finally {
+      uploading.value = false
+    }
   }
 
   /** 下载当前皮肤 PNG 到本地（弹出保存对话框） */
@@ -209,6 +243,7 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
     onEquipCape,
     onUnequipCape,
     onSelectLocalSkin,
+    onUploadCustomSkin,
     saveSkinToLocal,
   }
 }

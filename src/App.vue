@@ -37,17 +37,17 @@ onMounted(() => {
 })
 
 async function initApp() {
-  // 获取平台信息
-  await sdkStore.fetchPlatformInfo()
+  // Java 搜索不依赖 SDK/认证，提前并行启动（后端 list_java 是耗时操作）
+  const javaPromise = javaStore.detectJava()
 
-  // 获取设备ID
-  await sdkStore.fetchDeviceId()
+  // 平台信息和设备 ID 互不依赖，并行获取
+  await Promise.all([
+    sdkStore.fetchPlatformInfo(),
+    sdkStore.fetchDeviceId(),
+  ])
 
   // 恢复登录状态
   await authStore.restoreSession()
-
-  // 后台加载 Java 信息
-  javaStore.detectJava()
 
   // 登录态已恢复，关闭加载遮罩
   isRestoring.value = false
@@ -62,6 +62,9 @@ async function initApp() {
   } else if (!authStore.isLoggedIn && currentRoute.meta.requiresAuth) {
     router.replace('/login')
   }
+
+  // 等待 Java 搜索完成（不阻塞 UI 和路由修正）
+  await javaPromise
 }
 </script>
 

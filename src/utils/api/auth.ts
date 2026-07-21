@@ -110,3 +110,16 @@ export async function switchOfflineAccount(uuid: string): Promise<AuthResult> {
 export async function setOfflineSkin(uuid: string, skin: string | null): Promise<void> {
   return await invoke<void>('set_offline_skin', { uuid, skin })
 }
+
+/**
+ * 保存自定义皮肤文件并设置到离线账号
+ *
+ * 将用户选择的 PNG 文件复制到 app data 目录，返回 skin 字段值（custom:path|variant）
+ */
+export async function saveCustomSkin(
+  uuid: string,
+  filePath: string,
+  variant?: 'classic' | 'slim',
+): Promise<string> {
+  return await invoke<string>('save_custom_skin', { uuid, filePath, variant })
+}

@@ -9,22 +9,20 @@
  * - 下载进度浮层（DownloadProgressOverlay 子组件）
  */
 
-import { ref, watch, onUnmounted, nextTick } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, installModpack } from '@/utils/api/community'
 import { installMerged } from '@/utils/api/loader'
 import { useVersionStore } from '@/stores/version'
 import { saveFile } from '@/utils/api/system'
-import { showSuccess, showError } from '@/utils/toast'
+import { showSuccess, showError, toastInfo } from '@/utils/toast'
 import { showPrompt } from '@/utils/modal'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
-import { useCommunityDownload } from '@/composables/useCommunityDownload'
 import HorizontalFilter from '@/components/common/HorizontalFilter.vue'
 import ResourceDetailHeader from './resource-detail/ResourceDetailHeader.vue'
 import VersionGroupCard from './resource-detail/VersionGroupCard.vue'
-import DownloadProgressOverlay from './resource-detail/DownloadProgressOverlay.vue'
 
 const versionStore = useVersionStore()
 
@@ -49,9 +47,6 @@ const downloading = ref<string | null>(null)
 
 const { groups, filterOptions, versionFilter, toggleGroup, setFilter, expandedOf, mountedOf } = useVersionGroups(() => versions.value)
 const { percent, slowMerging, stageText, start, finish, fail } = useSearchProgress()
-const { downloading: communityDownloading, progress: downloadProgress, startDownload, startListener, stopListener } = useCommunityDownload()
-
-startListener()
 
 watch(
   [() => props.visible, () => props.project],
@@ -104,12 +99,14 @@ async function handleDownload(v: ResourceVersion) {
   if (!savePath) return
 
   downloading.value = v.id
-  startDownload()
+  versionStore.startDownload(finalFileName)
+  toastInfo(`开始下载: ${finalFileName}`)
   try {
     await downloadResourceToPath(v.download_url, finalFileName, savePath)
-    showSuccess(`已下载: ${finalFileName}`)
+    // 不调用 finishDownload，由轮询检测 is_complete 自动完成
   } catch (e: any) {
     showError('下载失败: ' + (e?.message || String(e)))
+    versionStore.finishDownload()
   } finally {
     downloading.value = null
   }
@@ -178,8 +175,6 @@ function promptForInstanceName(defaultName: string): Promise<string | null> {
     )
   })
 }
-
-onUnmounted(() => stopListener())
 </script>
 
 <template>
@@ -260,11 +255,6 @@ onUnmounted(() => stopListener())
               暂无版本数据
             </div>
 
-            <!-- 下载进度浮层 -->
-            <DownloadProgressOverlay
-              v-if="communityDownloading && downloadProgress"
-              :progress="downloadProgress"
-            />
           </div>
         </div>
       </div>

@@ -129,12 +129,20 @@ pub(super) fn extract_mr_project_id(url: &str) -> Option<String> {
 }
 
 /// 构造 CF edge 下载 URL（当 download_url 为空时的 fallback）
+///
+/// 根据 source 策略选择域名：source=0 用镜像，其余用官方
 pub(super) fn construct_cf_edge_url(file_id: i64, file_name: &str) -> String {
+    let source = crate::minecraft::community::get_source_pref();
+    let base = if source == 0 {
+        crate::minecraft::sources::CDN_MIRROR
+    } else {
+        "https://edge.forgecdn.net"
+    };
     let id_str = file_id.to_string();
     if id_str.len() >= 6 {
         let (p1, p2) = id_str.split_at(id_str.len() - 4);
-        format!("https://edge.forgecdn.net/files/{}/{}", p1, p2)
+        format!("{}/files/{}/{}", base, p1, p2)
     } else {
-        format!("https://edge.forgecdn.net/files/0/{}", file_name)
+        format!("{}/files/0/{}", base, file_name)
     }
 }

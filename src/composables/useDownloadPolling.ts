@@ -1,6 +1,7 @@
 import { watch } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { getDownloadProgress } from '@/utils/tauri'
+import { toastSuccess, toastError } from '@/utils/toast'
 import type { DownloadStage, RawDownloadStage } from '@/types/download'
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -35,7 +36,9 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
             console.debug('[Polling] Download failed with error_code=', progress.error_code)
           }
           stopPolling()
+          const failedName = versionStore.downloadingVersion || '下载任务'
           versionStore.finishDownload()
+          toastError(`${failedName} 下载失败`)
           return
         }
 
@@ -100,7 +103,9 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
             console.debug('[Polling] Download complete, stopping polling')
           }
           stopPolling()
+          const completedName = versionStore.downloadingVersion || '下载任务'
           versionStore.finishDownload()
+          toastSuccess(`${completedName} 下载完成`)
           return
         }
       }

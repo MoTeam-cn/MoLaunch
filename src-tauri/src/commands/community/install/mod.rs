@@ -26,6 +26,7 @@ use crate::minecraft::community::secure_storage;
 use crate::minecraft::community::types::{Platform, ResourceType};
 use crate::state::{AppState, DownloadStage, StageStatus};
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::{AppHandle, Emitter, State};
 
 use helpers::{apply_filename_format, resolve_install_dir};
@@ -38,7 +39,10 @@ pub use types::{
     InstallModpackResult, ModpackFormat,
 };
 
-/// 下载资源文件到游戏目录（保留原逻辑，用于"快速安装"）
+/// 下载资源文件到游戏目录（用于"快速安装"）
+///
+/// 走 DownloadManager（支持多 URL fallback + 分片 + 暂停/取消），
+/// 进度通过 `download_state` 统一通道，前端在下载管理页面展示。
 ///
 /// - Mod → versions/{vid}/mods/
 /// - ResourcePack → versions/{vid}/resourcepacks/
@@ -57,12 +61,12 @@ pub async fn download_resource(
 
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    // 根据 community_filename_format 拼接文件名
     let final_file_name = apply_filename_format(
         &req.file_name,
         req.translated_name.as_deref(),
         config.community_filename_format,
     );
+    let chunk_count = config.chunk_count.max(1) as usize;
     drop(config);
 
     let target_dir = resolve_install_dir(&game_dir, req.resource_type, req.version_id.as_deref());
@@ -75,28 +79,79 @@ pub async fn download_resource(
 
     let target_path = target_dir.join(&final_file_name);
 
-    // 下载文件
-    let client = crate::http::get_client();
-    let resp = client
-        .get(&req.url)
-        .send()
-        .await
-        .map_err(|e| format!("下载请求失败: {}", e))?;
+    // 重置 download_state，注册单阶段任务（分组"社区资源"）
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.reset_stages(vec![DownloadStage::new_grouped(
+            &final_file_name,
+            1.0,
+            "社区资源",
+        )]);
+        ds.version_name = final_file_name.clone();
+    }
+    state
+        .download_cancel_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+    state
+        .download_pause_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
 
-    if !resp.status().is_success() {
-        return Err(format!("下载失败: HTTP {}", resp.status()));
+    // 构造下载任务（cdn_urls 根据 source 策略生成多 URL fallback）
+    let task = crate::minecraft::download::types::DownloadTask {
+        id: format!("community_resource_{}", final_file_name),
+        urls: crate::minecraft::sources::cdn_urls(&req.url),
+        local_path: target_path.to_string_lossy().to_string(),
+        expected_size: 0,
+        expected_hash: None,
+    };
+
+    // 进度回调：sync_stage_from_progress 统一同步到 download_state
+    let cb_state = state.download_state.clone();
+    let progress_callback: Arc<
+        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
+    > = Arc::new(move |p| {
+        let mut ds = cb_state.lock().unwrap();
+        ds.sync_stage_from_progress(
+            0,
+            p.downloaded_bytes,
+            p.total_bytes,
+            p.completed_files,
+            p.total_files,
+            p.current_speed,
+        );
+    });
+
+    let manager = crate::minecraft::download::manager::DownloadManager::new(
+        4,
+        chunk_count,
+        0,
+        crate::minecraft::sources::DownloadSourceMode::Smart,
+    )
+    .with_cancel_flag(state.download_cancel_flag.clone())
+    .with_pause_flag(state.download_pause_flag.clone());
+
+    let results = manager.download_batch(vec![task], Some(progress_callback)).await;
+
+    let result = results.first().ok_or("下载结果为空")?;
+
+    use crate::minecraft::download::types::DownloadStatus;
+    if result.status != DownloadStatus::Completed && result.status != DownloadStatus::Skipped {
+        let err = result.error.clone().unwrap_or_else(|| "未知错误".to_string());
+        {
+            let mut ds = state.download_state.lock().unwrap();
+            ds.mark_failed(1);
+        }
+        return Err(err);
     }
 
-    let bytes = resp
-        .bytes()
-        .await
-        .map_err(|e| format!("读取响应数据失败: {}", e))?;
+    let size = std::fs::metadata(&target_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
 
-    let size = bytes.len() as u64;
-
-    // 写入文件
-    std::fs::write(&target_path, &bytes)
-        .map_err(|e| format!("写入文件失败: {}", e))?;
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.mark_complete();
+    }
 
     log_info!(
         "[Community] Downloaded {} ({} bytes) to {}",
@@ -130,15 +185,18 @@ pub async fn format_download_filename(
 }
 
 /// 下载资源文件到自定义路径（用户通过文件管理器选择）
-/// 流式下载 + 实时进度推送（参考 DownloadManager 的进度回调）
+///
+/// 走 DownloadManager（支持多 URL fallback + 分片 + 暂停/取消），
+/// 进度通过 `download_state` 统一通道，前端在下载管理页面展示。
 #[tauri::command]
 pub async fn download_resource_to_path(
-    app: AppHandle,
+    state: State<'_, AppState>,
+    _app: AppHandle,
     url: String,
     file_name: String,
     save_path: String,
 ) -> Result<DownloadResult, String> {
-    log_info!("[Community] 流式下载 {} 到 {}", file_name, save_path);
+    log_info!("[Community] 下载 {} 到 {}", file_name, save_path);
 
     let save_path = PathBuf::from(&save_path);
 
@@ -150,95 +208,87 @@ pub async fn download_resource_to_path(
         }
     }
 
-    let client = crate::http::get_client();
-    let resp = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| {
-            let _ = app.emit("community-download-progress", CommunityDownloadProgress {
-                file_name: file_name.clone(),
-                downloaded: 0,
-                total: 0,
-                speed: 0,
-                completed: false,
-                error: Some(format!("下载请求失败: {}", e)),
-            });
-            format!("下载请求失败: {}", e)
-        })?;
+    // 重置 download_state，注册单阶段任务（分组"社区资源"）
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.reset_stages(vec![DownloadStage::new_grouped(
+            &file_name,
+            1.0,
+            "社区资源",
+        )]);
+        ds.version_name = file_name.clone();
+    }
+    state
+        .download_cancel_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+    state
+        .download_pause_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
 
-    if !resp.status().is_success() {
-        let err = format!("下载失败: HTTP {}", resp.status());
-        let _ = app.emit("community-download-progress", CommunityDownloadProgress {
-            file_name: file_name.clone(),
-            downloaded: 0,
-            total: 0,
-            speed: 0,
-            completed: false,
-            error: Some(err.clone()),
-        });
+    // 构造下载任务（cdn_urls 根据 source 策略生成多 URL fallback）
+    let task = crate::minecraft::download::types::DownloadTask {
+        id: format!("community_{}", file_name),
+        urls: crate::minecraft::sources::cdn_urls(&url),
+        local_path: save_path.to_string_lossy().to_string(),
+        expected_size: 0,
+        expected_hash: None,
+    };
+
+    // 进度回调：sync_stage_from_progress 统一同步到 download_state
+    let cb_state = state.download_state.clone();
+    let progress_callback: Arc<
+        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
+    > = Arc::new(move |p| {
+        let mut ds = cb_state.lock().unwrap();
+        ds.sync_stage_from_progress(
+            0,
+            p.downloaded_bytes,
+            p.total_bytes,
+            p.completed_files,
+            p.total_files,
+            p.current_speed,
+        );
+    });
+
+    let config = state.config.lock().await;
+    let chunk_count = config.chunk_count.max(1) as usize;
+    drop(config);
+
+    let manager = crate::minecraft::download::manager::DownloadManager::new(
+        4,
+        chunk_count,
+        0,
+        crate::minecraft::sources::DownloadSourceMode::Smart,
+    )
+    .with_cancel_flag(state.download_cancel_flag.clone())
+    .with_pause_flag(state.download_pause_flag.clone());
+
+    let results = manager.download_batch(vec![task], Some(progress_callback)).await;
+
+    let result = results
+        .first()
+        .ok_or("下载结果为空")?;
+
+    use crate::minecraft::download::types::DownloadStatus;
+    if result.status != DownloadStatus::Completed && result.status != DownloadStatus::Skipped {
+        let err = result.error.clone().unwrap_or_else(|| "未知错误".to_string());
+        {
+            let mut ds = state.download_state.lock().unwrap();
+            ds.mark_failed(1);
+        }
         return Err(err);
     }
 
-    let total_size = resp.content_length().unwrap_or(0);
-    let mut file = std::fs::File::create(&save_path)
-        .map_err(|e| format!("创建文件失败: {}", e))?;
+    let size = std::fs::metadata(&save_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
 
-    use std::io::Write;
-
-    use futures_util::StreamExt;
-    let mut stream = resp.bytes_stream();
-    let mut downloaded: u64 = 0;
-    let mut last_emit = std::time::Instant::now();
-    let mut last_bytes: u64 = 0;
-    let start_time = std::time::Instant::now();
-
-    while let Some(chunk_result) = stream.next().await {
-        let chunk = chunk_result.map_err(|e| format!("读取数据块失败: {}", e))?;
-        file.write_all(&chunk).map_err(|e| format!("写入文件失败: {}", e))?;
-        downloaded += chunk.len() as u64;
-
-        // 每 300ms 推送一次进度（参考 DownloadManager 的 300ms 回调）
-        let now = std::time::Instant::now();
-        if now.duration_since(last_emit).as_millis() >= 300 {
-            let elapsed = now.duration_since(last_emit).as_secs_f64().max(0.001);
-            let speed = ((downloaded - last_bytes) as f64 / elapsed) as u64;
-            let _ = app.emit("community-download-progress", CommunityDownloadProgress {
-                file_name: file_name.clone(),
-                downloaded,
-                total: total_size,
-                speed,
-                completed: false,
-                error: None,
-            });
-            last_emit = now;
-            last_bytes = downloaded;
-        }
+    {
+        let mut ds = state.download_state.lock().unwrap();
+        ds.mark_complete();
     }
 
-    file.flush().map_err(|e| format!("刷新文件失败: {}", e))?;
-    drop(file);
-
-    let size = downloaded;
-    let elapsed = start_time.elapsed().as_secs_f64().max(0.001);
-    let avg_speed = (size as f64 / elapsed) as u64;
-
-    // 推送完成事件
-    let _ = app.emit("community-download-progress", CommunityDownloadProgress {
-        file_name: file_name.clone(),
-        downloaded: size,
-        total: total_size,
-        speed: avg_speed,
-        completed: true,
-        error: None,
-    });
-
-    log_info!(
-        "[Community] 下载完成: {} ({} bytes, {:.1}s)",
-        file_name,
-        size,
-        elapsed
-    );
+    log_info!("[Community] 下载完成: {} ({} bytes)", file_name, size);
 
     Ok(DownloadResult {
         path: save_path.to_string_lossy().to_string(),
@@ -323,6 +373,7 @@ pub async fn install_modpack(
         .map_err(|e| format!("创建整合包目录失败: {}", e))?;
 
     // 2. 重置 download_state，设置整合包专用 stages（统一方法）
+    // 同时重置暂停/取消标志，防止上次残留导致新下载卡住
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.reset_stages(vec![
@@ -331,7 +382,14 @@ pub async fn install_modpack(
             DownloadStage::new_grouped("下载 MOD", 40.0, "整合包安装"),
             DownloadStage::new_grouped("复制配置文件", 5.0, "整合包安装"),
         ]);
+        ds.version_name = req.instance_name.clone();
     }
+    state
+        .download_cancel_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+    state
+        .download_pause_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
 
     // 3. Stage 0：下载原始整合包（委托 modpack_stages）
     let archive_path = instance_dir.join(&req.file_name);

@@ -43,6 +43,8 @@ interface Props {
   resize?: 'none' | 'vertical' | 'horizontal' | 'both'
   /** datalist 的 id（用于输入框自动补全，透传到内部 input 的 list 属性） */
   list?: string
+  /** 自定义宽度 CSS 值（如 '200px'、'50%'），传入后会覆盖默认 100% 宽度 */
+  width?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -56,6 +58,7 @@ const props = withDefaults(defineProps<Props>(), {
   rows: 3,
   resize: 'vertical',
   list: undefined,
+  width: undefined,
 })
 
 const emit = defineEmits<{
@@ -124,6 +127,7 @@ const sizeClass = computed(() => `input-size-${props.size}`)
     v-else
     class="input-wrapper"
     :class="[sizeClass, { 'input-disabled': disabled, 'input-readonly': readonly }]"
+    :style="width ? { width } : undefined"
   >
     <!-- 前置标签 -->
     <div v-if="$slots.prepend" class="input-prepend">

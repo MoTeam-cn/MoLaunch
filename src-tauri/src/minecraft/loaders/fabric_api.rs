@@ -134,16 +134,8 @@ pub async fn install(
     // 确保 mods 目录存在
     std::fs::create_dir_all(mods_dir)?;
 
-    // 构建下载 URL 列表（官方源 + MCIM 镜像）
-    //   cdn.modrinth.com → mod.mcimirror.top
-    //   api.modrinth.com → mod.mcimirror.top/modrinth
-    const MCIM_CDN_MIRROR: &str = "https://mod.mcimirror.top";
-    let urls = vec![
-        download_url.to_string(),
-        download_url
-            .replace("https://cdn.modrinth.com", MCIM_CDN_MIRROR)
-            .replace("https://api.modrinth.com", &format!("{}/modrinth", MCIM_CDN_MIRROR)),
-    ];
+    // 构建下载 URL 列表（根据 source 策略：0=镜像，1=官方+镜像fallback，2=官方）
+    let urls = crate::minecraft::sources::cdn_urls(download_url);
 
     let local_path = mods_dir.join(file_name);
     let manager = DownloadManager::new(1, 0, 0, source_mode);

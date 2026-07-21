@@ -83,28 +83,15 @@ pub(super) async fn install_cf_mods(
     let file_ids: Vec<i64> = manifest_files.iter().map(|f| f.file_id).collect();
     log_info!("[Community] CF 批量查询 {} 个文件", file_ids.len());
 
-    let (_enabled, api_key) = secure_storage::get_config_async().await;
-    let key = api_key.ok_or("CF API Key 丢失")?;
-
-    let client = crate::http::get_client();
-    let resp = client
-        .post("https://api.curseforge.com/v1/mods/files")
-        .header("x-api-key", &key)
-        .header("Accept", "application/json")
-        .header("Content-Type", "application/json")
-        .json(&serde_json::json!({ "fileIds": file_ids }))
-        .send()
-        .await
-        .map_err(|e| format!("CF 批量查询失败: {}", e))?;
-
-    if !resp.status().is_success() {
-        return Err(format!("CF 批量查询失败: HTTP {}", resp.status()));
-    }
-
-    let batch: CfFilesBatchResponse = resp
-        .json()
-        .await
-        .map_err(|e| format!("CF 批量查询响应解析失败: {}", e))?;
+    let (_enabled, _api_key) = secure_storage::get_config_async().await;
+    // 通过 cf_post 走 source 策略（source=0 强制镜像，source=1 回退，source=2 官方）
+    // cf_post 内部自动获取 API Key 并处理 HTTP 错误
+    let batch: CfFilesBatchResponse = crate::minecraft::community::curseforge::http::cf_post(
+        "/mods/files",
+        serde_json::json!({ "fileIds": file_ids }).to_string(),
+    )
+    .await
+    .map_err(|e| format!("CF 批量查询失败: {}", e))?;
 
     log_info!("[Community] CF 批量查询返回 {} 个文件", batch.data.len());
 
@@ -133,6 +120,8 @@ pub(super) async fn install_cf_mods(
             .clone()
             .filter(|u| !u.is_empty())
             .unwrap_or_else(|| super::helpers::construct_cf_edge_url(entry.file_id, &entry.file_name));
+        // 构造官方 + 镜像双 URL 列表，交给 DownloadManager 自动 fallback
+        let urls = crate::minecraft::sources::cdn_urls(&primary_url);
         // 应用 community_filename_format（无译名时 apply_filename_format 返回原名）
         let translated = file_translated.get(&entry.file_id).cloned().flatten();
         let final_name = super::helpers::apply_filename_format(&entry.file_name, translated.as_deref(), filename_format);
@@ -144,7 +133,7 @@ pub(super) async fn install_cf_mods(
             );
         }
         let target = mods_dir.join(&final_name);
-        download_list.push((vec![primary_url], target.to_string_lossy().to_string(), entry.file_length));
+        download_list.push((urls, target.to_string_lossy().to_string(), entry.file_length));
         total_bytes += entry.file_length;
     }
 

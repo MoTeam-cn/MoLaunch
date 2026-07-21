@@ -67,7 +67,9 @@ pub(super) async fn download_files_concurrent(
     let config = state.config.lock().await;
     let chunk_count = config.chunk_count.max(1) as usize;
     drop(config);
-    let manager = DownloadManager::new(max_threads, chunk_count, 0, DownloadSourceMode::Smart);
+    let manager = DownloadManager::new(max_threads, chunk_count, 0, DownloadSourceMode::Smart)
+        .with_cancel_flag(state.download_cancel_flag.clone())
+        .with_pause_flag(state.download_pause_flag.clone());
     let results = manager.download_batch(tasks, Some(progress_callback)).await;
 
     // 收集失败
