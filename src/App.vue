@@ -29,6 +29,7 @@ const toastRef = ref<InstanceType<typeof Toast> | null>(null)
 const isRestoring = ref(true)
 
 onMounted(() => {
+  console.log('[Startup][Frontend] App.vue onMounted @', new Date().toISOString())
   setModalRef(modalRef.value)
   setCrashDialogRef(crashDialogRef.value)
   setToastRef(toastRef.value)
@@ -37,17 +38,23 @@ onMounted(() => {
 })
 
 async function initApp() {
+  console.log('[Startup][Frontend] initApp start @', new Date().toISOString())
   // Java 搜索不依赖 SDK/认证，提前并行启动（后端 list_java 是耗时操作）
   const javaPromise = javaStore.detectJava()
+  console.log('[Startup][Frontend] javaStore.detectJava fired (background)')
 
   // 平台信息和设备 ID 互不依赖，并行获取
+  console.log('[Startup][Frontend] awaiting fetchPlatformInfo + fetchDeviceId...')
   await Promise.all([
     sdkStore.fetchPlatformInfo(),
     sdkStore.fetchDeviceId(),
   ])
+  console.log('[Startup][Frontend] fetchPlatformInfo + fetchDeviceId done @', new Date().toISOString())
 
   // 恢复登录状态
+  console.log('[Startup][Frontend] awaiting authStore.restoreSession...')
   await authStore.restoreSession()
+  console.log('[Startup][Frontend] restoreSession done @', new Date().toISOString())
 
   // 登录态已恢复，关闭加载遮罩
   isRestoring.value = false
@@ -65,6 +72,7 @@ async function initApp() {
 
   // 等待 Java 搜索完成（不阻塞 UI 和路由修正）
   await javaPromise
+  console.log('[Startup][Frontend] initApp fully done @', new Date().toISOString())
 }
 </script>
 

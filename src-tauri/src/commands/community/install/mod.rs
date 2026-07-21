@@ -27,7 +27,7 @@ use crate::minecraft::community::types::{Platform, ResourceType};
 use crate::state::{AppState, DownloadStage, StageStatus};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, State};
 
 use helpers::{apply_filename_format, resolve_install_dir};
 use modpack_stages::{download_modpack_archive, parse_modpack_info};

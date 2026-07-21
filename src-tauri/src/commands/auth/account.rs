@@ -28,6 +28,7 @@ pub struct OfflineAccountInfo {
 /// 获取已存储的微软账号列表
 #[tauri::command]
 pub async fn get_ms_accounts(state: State<'_, AppState>) -> Result<Vec<MsAccountInfo>, String> {
+    log_info!("[Startup][IPC] get_ms_accounts called");
     let persisted = state.auth_storage.load().await.map_err(|e| e.to_string())?;
     Ok(persisted
         .ms_accounts
@@ -133,6 +134,7 @@ pub async fn switch_ms_account(
 pub async fn get_offline_accounts(
     state: State<'_, AppState>,
 ) -> Result<Vec<OfflineAccountInfo>, String> {
+    log_info!("[Startup][IPC] get_offline_accounts called");
     let persisted = state.auth_storage.load().await.map_err(|e| e.to_string())?;
     Ok(persisted
         .offline_accounts
@@ -288,9 +290,11 @@ pub async fn switch_offline_account(
 pub async fn get_login_status(
     state: State<'_, AppState>,
 ) -> Result<Option<LocalAuthResult>, String> {
+    log_info!("[Startup][IPC] get_login_status called");
     {
         let auth = state.auth.lock().await;
         if auth.current_user.is_some() {
+            log_info!("[Startup][IPC] get_login_status: returning in-memory user");
             return Ok(auth.current_user.clone());
         }
     }

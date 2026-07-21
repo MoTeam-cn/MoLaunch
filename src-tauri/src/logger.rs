@@ -92,7 +92,7 @@ impl Logger {
         }
     }
 
-    fn log(&mut self, level: LogLevel, _target: &str, message: &str) {
+    fn log(&mut self, level: LogLevel, file: &str, line: u32, message: &str) {
         if level > self.level {
             return;
         }
@@ -101,10 +101,17 @@ impl Logger {
         let timestamp = now.format("%H:%M:%S%.3f");
         let level_str = level.as_str();
 
+        // 将绝对路径裁剪为项目相对路径（src-tauri/src/xxx.rs）
+        // file!() 在 Rust 中返回相对路径如 "src/logger.rs" 或 "src/commands/sdk.rs"
+        let rel_path = strip_to_src_relative(file);
+
         // 安全脱敏：过滤 message 中的敏感信息，避免 token 明文写入日志文件
         // 识别 JWT 格式（eyJ 开头）、Minecraft token（含 "eyJ" 子串）、长 hex/base64 token
         let sanitized = sanitize_sensitive_info(message);
-        let log_line = format!("[{}] [{}] {}\n", timestamp, level_str, sanitized);
+        let log_line = format!(
+            "[{}] [{}] [{}:{}] {}\n",
+            timestamp, level_str, rel_path, line, sanitized
+        );
 
         // 写入文件
         if let Some(ref mut file) = self.file {
@@ -124,10 +131,12 @@ impl Logger {
                 LogLevel::Debug => format!("\x1b[1;35m[{}]\x1b[0m", level_str), // 紫色加粗
                 LogLevel::Trace => format!("\x1b[1;90m[{}]\x1b[0m", level_str), // 灰色加粗
             };
+            // 路径：灰色
+            let path_colored = format!("\x1b[90m[{}:{}]\x1b[0m", rel_path, line);
             // 内容：默认颜色（使用脱敏后的内容）
             let content = &sanitized;
 
-            eprintln!("{} {} {}", time_colored, level_colored, content);
+            eprintln!("{} {} {} {}", time_colored, level_colored, path_colored, content);
         }
     }
 
@@ -154,7 +163,8 @@ pub fn set_level(level: LogLevel) {
     // 在锁外记录日志，避免死锁
     log(
         LogLevel::Info,
-        "logger",
+        "logger.rs",
+        line!(),
         &format!("Log level changed to: {:?}", level),
     );
 }
@@ -187,7 +197,8 @@ macro_rules! log_error {
     ($($arg:tt)*) => {
         $crate::logger::log(
             $crate::logger::LogLevel::Error,
-            module_path!(),
+            file!(),
+            line!(),
             &format!($($arg)*)
         )
     };
@@ -198,7 +209,8 @@ macro_rules! log_warn {
     ($($arg:tt)*) => {
         $crate::logger::log(
             $crate::logger::LogLevel::Warn,
-            module_path!(),
+            file!(),
+            line!(),
             &format!($($arg)*)
         )
     };
@@ -209,7 +221,8 @@ macro_rules! log_info {
     ($($arg:tt)*) => {
         $crate::logger::log(
             $crate::logger::LogLevel::Info,
-            module_path!(),
+            file!(),
+            line!(),
             &format!($($arg)*)
         )
     };
@@ -220,7 +233,8 @@ macro_rules! log_debug {
     ($($arg:tt)*) => {
         $crate::logger::log(
             $crate::logger::LogLevel::Debug,
-            module_path!(),
+            file!(),
+            line!(),
             &format!($($arg)*)
         )
     };
@@ -231,7 +245,8 @@ macro_rules! log_trace {
     ($($arg:tt)*) => {
         $crate::logger::log(
             $crate::logger::LogLevel::Trace,
-            module_path!(),
+            file!(),
+            line!(),
             &format!($($arg)*)
         )
     };
@@ -245,16 +260,32 @@ macro_rules! log_separator {
 }
 
 /// 记录日志（供外部调用）
-pub fn log(level: LogLevel, target: &str, message: &str) {
+pub fn log(level: LogLevel, file: &str, line: u32, message: &str) {
     if let Ok(mut logger) = LOGGER.lock() {
-        logger.log(level, target, message);
+        logger.log(level, file, line, message);
     }
 }
 
 /// 记录分割线
 pub fn separator(title: &str) {
     let line = format!("========== {} ==========", title);
-    log(LogLevel::Info, "", &line);
+    // 分割线没有调用方信息，用空字符串占位
+    log(LogLevel::Info, "logger.rs", 0, &line);
+}
+
+/// 将 `file!()` 返回的路径裁剪为项目内相对路径（以 src/ 开头）
+///
+/// `file!()` 在 cargo 编译时返回相对于 crate root 的路径，通常已经是
+/// `src/logger.rs` / `src/commands/sdk.rs` 形式。但有时会带 `src-tauri/` 前缀，
+/// 此函数统一裁剪到 `src/...` 形式，便于日志阅读。
+fn strip_to_src_relative(file: &str) -> String {
+    // 优先裁剪到 `src/` 之后
+    if let Some(pos) = file.find("src/") {
+        file[pos..].to_string()
+    } else {
+        // 兜底：直接使用原路径
+        file.to_string()
+    }
 }
 
 /// 获取日志文件路径

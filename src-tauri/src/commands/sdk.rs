@@ -1,6 +1,7 @@
 //! SDK 管理命令（lite 版本）
 
 use crate::log_error;
+use crate::log_info;
 use crate::state::AppState;
 use tauri::State;
 
@@ -16,6 +17,7 @@ pub struct SdkStatus {
 /// 获取当前平台信息
 #[tauri::command]
 pub async fn get_platform_info() -> Result<SdkStatus, String> {
+    log_info!("[Startup][IPC] get_platform_info called");
     let platform = if cfg!(target_os = "windows") {
         "windows-x86_64"
     } else if cfg!(target_os = "macos") {
@@ -45,6 +47,7 @@ pub async fn get_platform_info() -> Result<SdkStatus, String> {
 /// 获取 SDK 版本
 #[tauri::command]
 pub async fn get_sdk_version(state: State<'_, AppState>) -> Result<Option<String>, String> {
+    log_info!("[Startup][IPC] get_sdk_version called");
     let sdk_guard = state.sdk.lock().await;
     match sdk_guard.as_ref() {
         Some(sdk) => Ok(Some(sdk.version().map_err(|e| e.to_string())?)),
@@ -62,6 +65,7 @@ pub async fn is_sdk_initialized(state: State<'_, AppState>) -> Result<bool, Stri
 /// 获取设备 ID
 #[tauri::command]
 pub async fn get_device_id(state: State<'_, AppState>) -> Result<String, String> {
+    log_info!("[Startup][IPC] get_device_id called");
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
 

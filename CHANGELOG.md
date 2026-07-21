@@ -9,6 +9,14 @@
 
 ### 新增
 
+#### 关于页新增 MoLaunch 实现原理介绍
+- `src/components/about/MoLaunchIntro.vue`：新增组件，默认折叠，点击标题栏展开 200 字实现说明，内容涵盖技术栈选型（Tauri 2 + Vue 3 + Rust）、启动器核心实现（版本管理、Java 检测、游戏启动）、联机模块（FRP 隧道 SDK 动态库嵌入与释放）、UI 设计理念（参考 PCL2 / Arco Design）、数据存储与安全（设备 ID 派生密钥加密）
+- `src/views/settings/SettingsMore.vue`：在「关于」子页签的 MoLaunch 介绍卡片与技术栈卡片之间插入 `<MoLaunchIntro />` 组件
+
+#### 窗口尺寸固定不可缩放
+- `src-tauri/tauri.conf.json`：`resizable` 改为 `false`，移除 `minWidth`/`minHeight`，窗口固定为 1096×592 不可拖拽缩放
+- `src-tauri/src/lib.rs`：移除 `setup` 钩子中的 `set_min_size` 调用，移除 `on_window_event` 中 `Resized` 事件的夹紧逻辑（不再需要）
+
 #### 开发者模式开关与设备 ID 显示优化
 - `src/components/settings/DevModeToggle.vue`：开启/关闭双按钮组改为 Select 平行布局（与设置页其他选择器风格一致）
 - `src/views/settings/SettingsOther.vue`：设备 ID 默认打码显示（前 4 位 + `****` + 后 4 位），双击切换全额显示；打码状态下点击图标 Tooltip 提示"双击切换全额显示 / 打码"；全额显示时下方常驻 Alert 警告"设备 ID 已全额显示，本 ID 用于本地数据加密存储，请勿截图外传或泄露给他人"；切到其他设置页时随组件卸载自动隐藏提示
@@ -59,7 +67,22 @@
 - `src/views/settings/SettingsMore.vue`：在"鸣谢 → 法律信息 → 特别说明"中追加"关于 Element Plus Icons"段落，说明 Heroicons Vue 图标集不足时从 Element Plus Icons 提取 SVG path 写入 `src/utils/element-icons.ts` 复用、未引入运行时依赖、版权声明已添加；同时在"许可与版权声明"列表中追加 Element Plus Icons 条目（MIT License，含来源网站与许可文档链接）
 - `src/utils/element-icons.ts`：补全顶部 MIT 许可证完整文本（替换原占位注释"MIT License full text will be added here"），明确标注 Copyright (c) 2021-present Element Plus Team 及完整权限与免责条款
 
+#### 启动流程日志增强（定位启动后 16 秒空白期）
+- `src-tauri/src/lib.rs`：在 Tauri Builder 构建前、`register_uri_scheme` 前后、`builder.run()` 前、`setup()` 钩子入口各补一条 `[Startup]` 日志，便于定位从 `CF enabled` 到首个 IPC 之间的耗时区间（涵盖 plugin 注册、URI scheme 注册、context 构建、webview/窗口创建、setup 钩子）
+- `src-tauri/src/commands/sdk.rs`：`get_platform_info` / `get_sdk_version` / `get_device_id` 入口补 `[Startup][IPC]` 日志，定位前端首波 SDK 查询到达后端的时间点
+- `src-tauri/src/commands/auth/account.rs`：`get_login_status` / `get_ms_accounts` / `get_offline_accounts` 入口补 `[Startup][IPC]` 日志，定位 `authStore.restoreSession()` 三次 IPC 到达时间点
+- `src/App.vue`：`onMounted` 与 `initApp` 各阶段（detectJava 触发、fetchPlatformInfo+fetchDeviceId 完成、restoreSession 完成、initApp 完成）补 `[Startup][Frontend]` console.log 与 ISO 时间戳，配合后端日志可定位 16 秒空白期究竟花在 Tauri 框架启动、WebView 初始化还是前端 JS 加载
+- 说明：日志显示 `[20:04:21.518] CF enabled=false` 到 `[20:04:37.211] Listing all Java runtimes` 之间约 15.7 秒空白，主要由 Tauri Builder 启动 + WebView 创建 + 前端 bundle 加载 + Vue 应用挂载占用；新增日志可逐一拆解各阶段耗时
+
+#### 日志格式增强：等级加方括号 + 调用路径
+- `src-tauri/src/logger.rs`：日志宏（`log_info!` / `log_warn!` / `log_error!` / `log_debug!` / `log_trace!`）改为传递 `file!()` + `line!()`，替代原 `module_path!()`；`Logger::log` 与公共 `logger::log` 签名改为 `(level, file, line, message)`；输出格式从 `[time] [LEVEL] message` 改为 `[time] [src/path.rs:line] [LEVEL] message`（等级置于调用路径之后），控制台同样输出路径段（灰色）；新增 `strip_to_src_relative` 辅助函数将 `file!()` 返回的路径统一裁剪到 `src/` 开头；`separator` 函数改用占位路径 `logger.rs:0`
+- `src/main.ts`：前端入口补三条 `[Startup][Frontend]` console.log（main.ts 入口、Vue app 创建、mount 调用），配合后端 setup 钩子时间戳可精确定位 dev 模式启动 10 秒空白期究竟花在 WebView2 加载、JS bundle 解析还是 Vue 应用挂载
+- 卡顿定位结论：日志显示 setup() hook 完成到首个 IPC 到达之间约 10 秒，由 Vite dev server 启动 + WebView2 加载 localhost:1420 + JS bundle 解析 + Vue 挂载占用；release 构建会快 3–5 倍
+
 ### 修复
+
+#### 移除 community/install/mod.rs 未使用的 Emitter 导入
+- `src-tauri/src/commands/community/install/mod.rs`：`use tauri::{AppHandle, Emitter, State};` 改为 `use tauri::{AppHandle, State};`，修复 `warning: unused import: Emitter`
 
 #### 整合包下载面板不显示名字
 - `src-tauri/src/commands/community/install/mod.rs`：`install_modpack` 中 `reset_stages` 后补充 `ds.version_name = req.instance_name.clone()`，修复前端从后端恢复下载状态时拿到空字符串覆盖正确名字的问题（普通版本下载无此问题）

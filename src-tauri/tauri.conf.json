@@ -25,12 +25,10 @@
       {
         "fullscreen": false,
         "decorations": false,
-        "resizable": true,
+        "resizable": false,
         "title": "MoLaunch",
-        "width": 1200,
-        "height": 800,
-        "minWidth": 1088,
-        "minHeight": 592,
+        "width": 1096,
+        "height": 592,
         "center": true,
         "useHttpsScheme": true
       }

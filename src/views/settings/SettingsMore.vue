@@ -17,6 +17,7 @@ import Card from '@/components/common/Card.vue'
 import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
 import SubTabBar from '@/components/common/SubTabBar.vue'
 import Button from '@/components/common/Button.vue'
+import MoLaunchIntro from '@/components/about/MoLaunchIntro.vue'
 import {
   GlobeAltIcon,
   HeartIcon,
@@ -155,6 +156,9 @@ function openLink(url: string) {
             </div>
           </div>
         </Card>
+
+        <!-- MoLaunch 实现原理（默认折叠，点击展开） -->
+        <MoLaunchIntro />
 
         <!-- 技术栈 -->
         <Card>

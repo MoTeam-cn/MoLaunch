@@ -52,12 +52,19 @@ pub fn run() {
     minecraft::community::secure_storage::init_enabled();
     minecraft::community::secure_storage::set_sdk(app_state.sdk.clone());
 
+    log_info!("[Startup] Pre-builder setup done, constructing Tauri Builder...");
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .manage(app_state)
+        .setup(|_app| {
+            // setup 钩子在窗口/webview 创建后、前端加载前调用
+            log_info!("[Startup] Tauri setup() hook entered — webview & window created");
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             // SDK 命令（lite 版本）
             commands::sdk::get_platform_info,
@@ -216,8 +223,10 @@ pub fn run() {
         });
 
     // 注册 cache-image 自定义 URI scheme（图片缓存协议，抽离至 minecraft::image_cache）
+    log_info!("[Startup] Registering cache-image URI scheme...");
     let builder = minecraft::image_cache::register_uri_scheme(builder);
 
+    log_info!("[Startup] All setup done, calling builder.run() — entering Tauri event loop (webview/window creation follows)...");
     builder
         .run(tauri::generate_context!())
         .expect("error while running MoLaunch");
