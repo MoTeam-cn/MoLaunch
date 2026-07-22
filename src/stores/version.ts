@@ -11,6 +11,7 @@ import type { VersionInfo } from '@/types/version'
 import type { DownloadProgress } from '@/types/download'
 import * as tauri from '@/utils/tauri'
 import { useLaunchState } from '@/composables/useLaunchState'
+import { safeCall } from '@/utils/async'
 
 // 重新导出 DownloadStage/DownloadProgress，保持向后兼容（其他文件可能从 '@/stores/version' import）
 export type { DownloadStage, DownloadProgress } from '@/types/download'
@@ -40,9 +41,7 @@ export const useVersionStore = defineStore('version', () => {
 
   // 持久化 selectedVersion：变化时自动保存到 config.ini
   watch(selectedVersion, (val) => {
-    tauri.setSelectedVersion(val).catch((e) => {
-      console.error('Failed to persist selectedVersion:', e)
-    })
+    safeCall(() => tauri.setSelectedVersion(val), 'persist selectedVersion')
   })
 
   /** 从 config.ini 恢复上次选中的版本（启动器启动时调用）
@@ -50,7 +49,7 @@ export const useVersionStore = defineStore('version', () => {
    * @param installedList 可选，已获取的已安装版本列表，避免重复调用 IPC
    */
   async function restoreSelectedVersion(installedList?: { id: string }[]) {
-    try {
+    await safeCall(async () => {
       const saved = await tauri.getSelectedVersion()
       if (saved) {
         // 验证版本是否仍然存在（复用传入的列表或重新获取）
@@ -62,9 +61,7 @@ export const useVersionStore = defineStore('version', () => {
           await tauri.setSelectedVersion(null)
         }
       }
-    } catch (e) {
-      console.error('Failed to restore selectedVersion:', e)
-    }
+    }, 'restore selectedVersion')
   }
 
   /** 快速恢复上次选中的版本（仅读取 config，不校验是否仍存在）
@@ -73,12 +70,8 @@ export const useVersionStore = defineStore('version', () => {
    * 后续应调用 `validateSelectedVersion` 校验版本是否仍然存在。
    */
   async function restoreSelectedVersionFast() {
-    try {
-      const saved = await tauri.getSelectedVersion()
-      if (saved) selectedVersion.value = saved
-    } catch (e) {
-      console.error('Failed to restore selectedVersion (fast):', e)
-    }
+    const saved = await safeCall(() => tauri.getSelectedVersion(), 'restore selectedVersion (fast)')
+    if (saved) selectedVersion.value = saved
   }
 
   /** 校验当前 selectedVersion 是否仍存在于已安装列表
@@ -94,11 +87,7 @@ export const useVersionStore = defineStore('version', () => {
     // 当前版本无效或为空
     if (current) {
       // 版本已不存在，清空持久化
-      try {
-        await tauri.setSelectedVersion(null)
-      } catch (e) {
-        console.error('Failed to clear selectedVersion:', e)
-      }
+      await safeCall(() => tauri.setSelectedVersion(null), 'clear selectedVersion')
     }
     // 自动回退到第一个已安装版本
     selectedVersion.value = installedList.length > 0 ? installedList[0].id : null

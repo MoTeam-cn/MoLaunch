@@ -16,6 +16,7 @@ import { toastSuccess, toastError } from '@/utils/toast'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Input from '@/components/common/Input.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
+import { safeCall } from '@/utils/async'
 
 const { selectedId, personalization, loadPersonalization } = useVersionSettings()
 
@@ -38,7 +39,7 @@ const advanceFields = reactive<AdvanceField[]>([
 ])
 
 async function loadSetup() {
-  try {
+  await safeCall(async () => {
     if (!personalization.value && selectedId.value) await loadPersonalization()
     const p = personalization.value
     if (p) {
@@ -46,9 +47,7 @@ async function loadSetup() {
       advanceFields[1].value = p.advanceGameArgs
       advanceFields[2].value = p.advanceRunCmd
     }
-  } catch (e) {
-    console.error('Failed to load advance fields:', e)
-  }
+  }, 'load advance fields')
 }
 
 /** 保存版本独立字段到 setup.ini */

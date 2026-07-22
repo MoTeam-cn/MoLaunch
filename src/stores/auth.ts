@@ -9,6 +9,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import type { AuthResult, LoginStatus, MsAccountInfo, OfflineAccountInfo, DeviceCodeInfo, PollResult } from '@/types/auth'
 import * as tauri from '@/utils/tauri'
 import { syncOfflineSkins } from '@/utils/default-skin'
+import { safeCall } from '@/utils/async'
 
 const STEP_LABELS: Record<string, string> = {
   exchanging: '授权成功，开始交换 Token...',
@@ -146,17 +147,18 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function loadMsAccounts() {
-    try { msAccounts.value = await tauri.getMsAccounts() }
-    catch (e) { console.error('Failed to load MS accounts:', e) }
+    const accounts = await safeCall(() => tauri.getMsAccounts(), 'load MS accounts')
+    if (accounts) msAccounts.value = accounts
   }
 
   async function loadOfflineAccounts() {
-    try {
-      offlineAccounts.value = await tauri.getOfflineAccounts()
+    const accounts = await safeCall(async () => {
+      const list = await tauri.getOfflineAccounts()
       // 同步离线账号皮肤选择到内存缓存
-      syncOfflineSkins(offlineAccounts.value)
-    }
-    catch (e) { console.error('Failed to load offline accounts:', e) }
+      syncOfflineSkins(list)
+      return list
+    }, 'load offline accounts')
+    if (accounts) offlineAccounts.value = accounts
   }
 
   async function removeMsAccount(uuid: string) {
@@ -192,11 +194,11 @@ export const useAuthStore = defineStore('auth', () => {
   async function restoreSession() {
     if (restoringPromise) return restoringPromise
     restoringPromise = (async () => {
-      try {
+      await safeCall(async () => {
         const result = await tauri.getLoginStatus()
         if (result) { currentUser.value = result; loginStatus.value = 'success' }
         await Promise.all([loadMsAccounts(), loadOfflineAccounts()])
-      } catch (e) { console.error('Failed to restore session:', e) }
+      }, 'restore session')
     })()
     try {
       await restoringPromise
@@ -207,7 +209,7 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logoutUser() {
-    try { await tauri.logout() } catch (e) { console.error('Failed to logout:', e) }
+    await safeCall(() => tauri.logout(), 'logout')
     cleanup(); currentUser.value = null; loginStatus.value = 'idle'
     error.value = null; msLoginStatus.value = 'idle'; deviceCodeInfo.value = null
   }

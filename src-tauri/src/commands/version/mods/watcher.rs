@@ -22,6 +22,7 @@ use std::time::Duration;
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use tauri::{AppHandle, Emitter, State};
 
+use crate::error_util::log_err;
 use crate::state::AppState;
 use crate::{log_error, log_info};
 
@@ -52,7 +53,7 @@ pub async fn watch_mods_dir(
     let mods_dir = get_mods_dir(&state, &version_id).await?;
 
     if !mods_dir.exists() {
-        std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(&mods_dir).map_err(log_err("Failed to create mods directory"))?;
     }
 
     log_info!("[ModsWatcher] 开始监听: {}", mods_dir.display());

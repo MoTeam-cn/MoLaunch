@@ -7,6 +7,21 @@
 
 ## [未发布]
 
+### 重构
+
+#### 代码质量 V2 - 阶段 1.6：F5 console.error 吞错模式迁移
+- 将 53 处"吞错模式"（catch 块仅 `console.error`，无 toast/rethrow/状态清理）迁移到 `utils/async.ts` 的 `safeCall`/`safeCallSync` 高阶函数
+- 覆盖 30 个文件（14 个 TS + 16 个 Vue），包括 stores（version/settings/sdk/plugins/java/auth）、composables（useConfigPage/useDownloadPolling/useLaunchState/useVersionSettings 等）、views（Downloads/Settings/SettingsOther 等）
+- 21 处非吞错模式（catch 有 toast/rethrow/状态清理/回退赋值）保留原 try/catch
+- 5 处有 finally 的简化为 `await safeCall(...)` + 平铺 cleanup（因 safeCall 已吞异常，cleanup 必然执行）
+- `sandbox-bootstrap.ts` 因字符串模板注入 iframe，无法 import 父级 safeCallSync，内联一份最小化实现
+
+#### 代码质量 V2 - 阶段 1.9：B3 log_err 样板迁移
+- 将 61 处 `.map_err(|e| e.to_string())` 样板迁移到 `error_util::log_err("语义化 label")`，覆盖 22 个 Rust 文件
+- `log_err` 在返回值不变（仍为 `e.to_string()`）的前提下，额外通过 `log_error!` 记录带 label 的错误日志，便于问题定位
+- 72 处 `.map_err(|e| format!(...))` 保留不迁移：这些调用刻意构造中文错误文案，前端 toast 直接展示，迁移到 log_err 会改变返回值破坏前端展示
+- `log_err_with`（带 context 参数版本）仍为零调用，保留供未来需要附加上下文（如版本号、路径）的场景使用
+
 ### 新增
 
 #### 内存优化双模式（轻量 / 强力）

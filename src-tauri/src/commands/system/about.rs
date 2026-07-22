@@ -6,6 +6,7 @@
 //! 数据存储为 markdown 表格格式的 .txt 文件，由 `utils::markdown_table` 模块解析，
 //! 修改数据只需更新 txt 文件并重新编译后端，无需改动业务代码。
 
+use crate::error_util::log_err;
 use crate::resources::read_resource;
 use crate::utils::markdown_table::parse_markdown_table;
 use serde::Serialize;
@@ -133,11 +134,11 @@ fn parse_authors(raw: &str) -> Vec<Author> {
 /// 数据源：`resources/about/` 下的 5 个 txt 文件（include_str! 嵌入二进制）
 #[tauri::command]
 pub async fn get_about_data() -> Result<AboutData, String> {
-    let ack_text = read_resource("about/acknowledgements.txt").map_err(|e| e.to_string())?;
-    let fe_text = read_resource("about/frontend-deps.txt").map_err(|e| e.to_string())?;
-    let fedev_text = read_resource("about/frontend-dev-deps.txt").map_err(|e| e.to_string())?;
-    let be_text = read_resource("about/backend-deps.txt").map_err(|e| e.to_string())?;
-    let lic_text = read_resource("about/licenses.txt").map_err(|e| e.to_string())?;
+    let ack_text = read_resource("about/acknowledgements.txt").map_err(log_err("Failed to read acknowledgements"))?;
+    let fe_text = read_resource("about/frontend-deps.txt").map_err(log_err("Failed to read frontend dependencies"))?;
+    let fedev_text = read_resource("about/frontend-dev-deps.txt").map_err(log_err("Failed to read frontend dev dependencies"))?;
+    let be_text = read_resource("about/backend-deps.txt").map_err(log_err("Failed to read backend dependencies"))?;
+    let lic_text = read_resource("about/licenses.txt").map_err(log_err("Failed to read licenses"))?;
 
     let acknowledgements = parse_markdown_table(&ack_text)
         .into_iter()

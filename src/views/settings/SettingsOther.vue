@@ -7,6 +7,7 @@ import Alert from '@/components/common/Alert.vue'
 import * as tauri from '@/utils/tauri'
 import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastInfo, toastSuccess } from '@/utils/toast'
+import { safeCall } from '@/utils/async'
 
 const sdkStore = useSdkStore()
 const logLevel = ref(3)
@@ -39,23 +40,15 @@ function getDeviceIdDisplay(): string {
 
 // 读取日志级别（统一走 getConfigMap，避免使用调试用 getConfigValue）
 async function loadLogLevel() {
-  try {
-    const cfg = await getConfigMap()
-    if (typeof cfg.logLevel === 'number') {
-      logLevel.value = cfg.logLevel
-    }
-  } catch (e) {
-    console.error('Failed to get log level:', e)
+  const cfg = await safeCall(() => getConfigMap(), 'get log level')
+  if (cfg && typeof cfg.logLevel === 'number') {
+    logLevel.value = cfg.logLevel
   }
 }
 
 // 保存日志级别（统一走 applyConfig，后端会同步调用 logger::set_level 立即生效）
 async function saveLogLevel(level: number) {
-  try {
-    await applyConfig({ logLevel: level })
-  } catch (e) {
-    console.error('Failed to save log level:', e)
-  }
+  await safeCall(() => applyConfig({ logLevel: level }), 'save log level')
 }
 
 // 监听日志级别变化
@@ -103,11 +96,8 @@ onMounted(async () => {
     configPath.value = '获取失败'
   }
   await loadLogLevel()
-  try {
-    devUnlocked.value = await tauri.isDeveloperUnlocked()
-  } catch (e) {
-    console.error('Failed to check developer unlocked:', e)
-  }
+  const unlocked = await safeCall(() => tauri.isDeveloperUnlocked(), 'check developer unlocked')
+  if (unlocked) devUnlocked.value = unlocked
 })
 </script>
 

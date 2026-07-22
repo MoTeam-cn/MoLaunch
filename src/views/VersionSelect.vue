@@ -17,6 +17,7 @@ import grassIcon from '@/assets/blocks/Grass.png'
 import { inferVersionType, typeMetaMap, type VersionTypeMeta } from '@/composables/useVersionMeta'
 import Button from '@/components/common/Button.vue'
 import FolderSidebar from './version-select/FolderSidebar.vue'
+import { safeCall } from '@/utils/async'
 import {
   ArrowLeftIcon,
   ArrowPathIcon,
@@ -72,7 +73,7 @@ const hasVersions = computed(() => installed.value.length > 0)
 /** 加载已安装版本列表 */
 async function loadInstalled() {
   loading.value = true
-  try {
+  await safeCall(async () => {
     const list = await tauri.listInstalledVersionsWithType()
     installed.value = list.map(v => ({
       id: v.id,
@@ -84,11 +85,8 @@ async function loadInstalled() {
       const exists = installed.value.some(v => v.id === selectedId.value)
       if (!exists) selectedId.value = installed.value[0].id
     }
-  } catch (e) {
-    console.error('Failed to load installed versions:', e)
-  } finally {
-    loading.value = false
-  }
+  }, 'load installed versions')
+  loading.value = false
 }
 
 /** 选中版本并返回主页 */

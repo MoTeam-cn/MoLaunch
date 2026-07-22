@@ -11,6 +11,7 @@
 //! 跨盘符 rename 失败时自动回退到递归复制。
 
 use super::{is_valid_plugin_id, plugins_root, read_plugin_manifest};
+use crate::error_util::log_err;
 use crate::log_info;
 use std::path::{Path, PathBuf};
 
@@ -36,7 +37,7 @@ pub async fn install_external_plugin_from_dir(source_dir: String) -> Result<Stri
         ));
     }
 
-    let manifest_str = std::fs::read_to_string(&src_manifest_path).map_err(|e| e.to_string())?;
+    let manifest_str = std::fs::read_to_string(&src_manifest_path).map_err(log_err("Failed to read source manifest"))?;
     let manifest: serde_json::Value =
         serde_json::from_str(&manifest_str).map_err(|e| format!("Invalid manifest.json: {}", e))?;
     let plugin_id = manifest
@@ -57,7 +58,7 @@ pub async fn install_external_plugin_from_dir(source_dir: String) -> Result<Stri
     }
 
     // 创建目标目录
-    std::fs::create_dir_all(&dst).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dst).map_err(log_err("Failed to create plugin directory"))?;
 
     // 递归复制
     if let Err(e) = copy_dir_recursive(&src, &dst) {
@@ -89,8 +90,8 @@ pub async fn install_external_plugin_from_zip(zip_path: String) -> Result<String
     }
 
     // 打开 ZIP
-    let file = std::fs::File::open(&zip_file).map_err(|e| e.to_string())?;
-    let mut archive = zip::ZipArchive::new(file).map_err(|e| e.to_string())?;
+    let file = std::fs::File::open(&zip_file).map_err(log_err("Failed to open ZIP file"))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(log_err("Failed to read ZIP archive"))?;
 
     // 探测 ZIP 前缀（扁平结构 "" 或单根目录 "xxx/"）
     let names: Vec<String> = archive.file_names().map(|s| s.to_string()).collect();
@@ -110,10 +111,10 @@ pub async fn install_external_plugin_from_zip(zip_path: String) -> Result<String
 
     let mut manifest_file = archive
         .by_index(manifest_idx)
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("Failed to read manifest from ZIP"))?;
     let mut manifest_str = String::new();
     std::io::Read::read_to_string(&mut manifest_file, &mut manifest_str)
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("Failed to read manifest content"))?;
     drop(manifest_file);
 
     let manifest: serde_json::Value =
@@ -134,7 +135,7 @@ pub async fn install_external_plugin_from_zip(zip_path: String) -> Result<String
         return Err(format!("Plugin already exists: {}", plugin_id));
     }
 
-    std::fs::create_dir_all(&dst).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dst).map_err(log_err("Failed to create plugin directory"))?;
 
     // 安全解压（防 Zip Slip）
     if let Err(e) = extract_zip_safely(&mut archive, &prefix, &dst) {

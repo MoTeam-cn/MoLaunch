@@ -9,6 +9,7 @@ import { ref, computed } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 import { inferVersionType, typeMetaMap } from '@/composables/useVersionMeta'
+import { safeCall } from '@/utils/async'
 import grassIcon from '@/assets/blocks/Grass.png'
 import cobblestoneIcon from '@/assets/blocks/CobbleStone.png'
 import commandBlockIcon from '@/assets/blocks/CommandBlock.png'
@@ -119,33 +120,26 @@ async function loadPersonalization() {
     personalization.value = null
     return
   }
-  try {
-    personalization.value = await tauri.getVersionPersonalization(selectedId.value)
-  } catch (e) {
-    console.error('Failed to load personalization:', e)
-  }
+  const data = await safeCall(() => tauri.getVersionPersonalization(selectedId.value!), 'load personalization')
+  if (data) personalization.value = data
 }
 
 /** 初始化（主文件 onMounted 调用） */
 async function initContext() {
-  try {
+  await safeCall(async () => {
     gameDir.value = await tauri.getGameDir()
     // 加载已安装版本类型映射（用于 inferVersionType 的 backendType，正确识别整合包版本类型）
-    try {
+    await safeCall(async () => {
       const vwt = await tauri.listInstalledVersionsWithType()
       const typeMap: Record<string, string> = {}
       vwt.forEach(v => { typeMap[v.id] = v.version_type })
       installedVersionTypes.value = typeMap
-    } catch (e) {
-      console.error('Failed to load installed version types:', e)
-    }
+    }, 'load installed version types')
     if (selectedId.value) {
       effectiveDir.value = await tauri.getVersionEffectiveDir(selectedId.value)
       await loadPersonalization()
     }
-  } catch (e) {
-    console.error('Failed to init version context:', e)
-  }
+  }, 'init version context')
 }
 
 /** 选中版本变化时刷新 effectiveDir */
@@ -162,14 +156,12 @@ async function refreshEffectiveDir() {
  * @param vwtList 可选，已获取的已安装版本列表，避免重复调用 IPC
  */
 async function refreshInstalledVersionTypes(vwtList?: { id: string; version_type: string }[]) {
-  try {
+  await safeCall(async () => {
     const vwt = vwtList ?? await tauri.listInstalledVersionsWithType()
     const typeMap: Record<string, string> = {}
     vwt.forEach(v => { typeMap[v.id] = v.version_type })
     installedVersionTypes.value = typeMap
-  } catch (e) {
-    console.error('Failed to refresh installed version types:', e)
-  }
+  }, 'refresh installed version types')
 }
 
 export function useVersionSettings() {

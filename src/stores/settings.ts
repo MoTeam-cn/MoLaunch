@@ -14,6 +14,7 @@ import type { Theme, Language } from '@/types/settings'
 import { applyPrimaryColor } from '@/utils/color'
 import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastSuccess } from '@/utils/toast'
+import { safeCall, safeCallSync } from '@/utils/async'
 
 export type LayoutMode = 'sidebar' | 'topnav'
 
@@ -29,7 +30,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const backendSynced = ref(false)
 
   function loadSettings() {
-    try {
+    safeCallSync(() => {
       const saved = localStorage.getItem('molaunch-settings')
       if (saved) {
         const parsed = JSON.parse(saved)
@@ -40,9 +41,7 @@ export const useSettingsStore = defineStore('settings', () => {
           primaryColor.value = parsed.primaryColor
         }
       }
-    } catch (e) {
-      console.error('Failed to load settings:', e)
-    }
+    }, 'load settings')
     // 加载后立即注入 CSS 变量（首屏前调用可避免闪烁）
     applyPrimaryColor(primaryColor.value)
   }
@@ -53,7 +52,7 @@ export const useSettingsStore = defineStore('settings', () => {
    * - 后端无值 → 把前端默认值同步到后端
    */
   async function syncPrimaryColorFromBackend() {
-    try {
+    await safeCall(async () => {
       const cfg = await getConfigMap()
       const backend = cfg.primaryColor
       if (backend && backend !== primaryColor.value) {
@@ -65,22 +64,18 @@ export const useSettingsStore = defineStore('settings', () => {
         await applyConfig({ primaryColor: primaryColor.value })
       }
       backendSynced.value = true
-    } catch (e) {
-      console.error('[Settings] Failed to sync primaryColor from backend:', e)
-    }
+    }, '[Settings] sync primaryColor from backend')
   }
 
   function saveSettings() {
-    try {
+    safeCallSync(() => {
       localStorage.setItem('molaunch-settings', JSON.stringify({
         layoutMode: layoutMode.value,
         theme: theme.value,
         language: language.value,
         primaryColor: primaryColor.value,
       }))
-    } catch (e) {
-      console.error('Failed to save settings:', e)
-    }
+    }, 'save settings')
   }
 
   function setLayoutMode(mode: LayoutMode) {
@@ -111,11 +106,7 @@ export const useSettingsStore = defineStore('settings', () => {
     saveSettings()
     toastSuccess(`主题色已更新为 ${color.toUpperCase()}`)
     // 异步写后端，失败仅日志不阻塞
-    try {
-      await applyConfig({ primaryColor: color })
-    } catch (e) {
-      console.error('[Settings] Failed to save primaryColor to backend:', e)
-    }
+    await safeCall(() => applyConfig({ primaryColor: color }), '[Settings] save primaryColor to backend')
   }
 
   loadSettings()

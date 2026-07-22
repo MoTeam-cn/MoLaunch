@@ -11,6 +11,7 @@
 //! 共享类型在 `super::` 中（`WindowPermissions` / `read_plugin_manifest`）。
 
 use super::{read_plugin_manifest, WindowPermissions};
+use crate::error_util::log_err;
 use crate::log_info;
 use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindowBuilder};
 
@@ -85,7 +86,7 @@ pub async fn plugin_create_window(
     let w = width.unwrap_or(win_perms.width);
     let h = height.unwrap_or(win_perms.height);
 
-    let parsed_url = tauri::Url::parse(&url).map_err(|e| e.to_string())?;
+    let parsed_url = tauri::Url::parse(&url).map_err(log_err("Failed to parse window URL"))?;
 
     let mut builder =
         WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::External(parsed_url))
@@ -96,7 +97,7 @@ pub async fn plugin_create_window(
         builder = builder.resizable(false);
     }
 
-    builder.build().map_err(|e| e.to_string())?;
+    builder.build().map_err(log_err("Failed to create plugin window"))?;
 
     log_info!(
         "插件 {} 创建窗口 {} ({}x{})",

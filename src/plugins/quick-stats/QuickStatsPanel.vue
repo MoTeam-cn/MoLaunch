@@ -8,19 +8,15 @@
 
 import { ref, onMounted } from 'vue'
 import { pluginSdk } from '@/plugins/sdk'
+import { safeCall } from '@/utils/async'
 
 const versionCount = ref(0)
 const loading = ref(true)
 
 onMounted(async () => {
-  try {
-    const versions = await pluginSdk.listInstalledVersions()
-    versionCount.value = versions.length
-  } catch (e) {
-    console.error('[QuickStats] 加载失败:', e)
-  } finally {
-    loading.value = false
-  }
+  const versions = await safeCall(() => pluginSdk.listInstalledVersions(), '[QuickStats] load installed versions')
+  if (versions) versionCount.value = versions.length
+  loading.value = false
 })
 </script>
 

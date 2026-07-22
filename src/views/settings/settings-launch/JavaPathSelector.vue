@@ -15,6 +15,7 @@ import { showError } from '@/utils/modal'
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
+import { safeCall } from '@/utils/async'
 
 const javaStore = useJavaStore()
 const detectingJava = ref(false)
@@ -57,21 +58,17 @@ async function handleAutoDetectJava() {
 }
 
 async function handleManualImportJava() {
-  try {
-    const selected = await tauri.selectFile('选择 javaw.exe', [
-      { name: 'Java 可执行文件 (javaw.exe)', extensions: ['exe'] },
-    ])
-    if (selected) {
-      // 验证必须是 javaw.exe
-      const fileName = selected.split('\\').pop()?.split('/').pop()?.toLowerCase()
-      if (fileName !== 'javaw.exe') {
-        showError('提示', '请选择 javaw.exe，而不是 java.exe')
-        return
-      }
-      javaStore.setJavaPath(selected)
+  const selected = await safeCall(() => tauri.selectFile('选择 javaw.exe', [
+    { name: 'Java 可执行文件 (javaw.exe)', extensions: ['exe'] },
+  ]), 'select Java')
+  if (selected) {
+    // 验证必须是 javaw.exe
+    const fileName = selected.split('\\').pop()?.split('/').pop()?.toLowerCase()
+    if (fileName !== 'javaw.exe') {
+      showError('提示', '请选择 javaw.exe，而不是 java.exe')
+      return
     }
-  } catch (e) {
-    console.error('Failed to select Java:', e)
+    javaStore.setJavaPath(selected)
   }
 }
 </script>

@@ -10,6 +10,7 @@
 //! - `samples/layout/layout-sample.xml` — XML 布局示例
 //! - `samples/layout/layout-sample.html` — HTML 布局示例
 
+use crate::error_util::log_err;
 use crate::{log_info, resources};
 use std::path::{Path, PathBuf};
 use std::io::Write;
@@ -26,7 +27,7 @@ pub async fn read_layout_sample(format: String) -> Result<String, String> {
         _ => return Err(format!("Unsupported layout format: {}", format)),
     };
 
-    resources::read_resource(resource_path).map_err(|e| e.to_string())
+    resources::read_resource(resource_path).map_err(log_err("Failed to read layout sample"))
 }
 
 /// 导出插件示例模板到指定路径
@@ -40,10 +41,10 @@ pub async fn export_plugin_sample(dest_path: String, as_zip: bool) -> Result<(),
     let dest = PathBuf::from(&dest_path);
 
     if as_zip {
-        export_zip(&dest).map_err(|e| e.to_string())?;
+        export_zip(&dest).map_err(log_err("Failed to export plugin sample as ZIP"))?;
         log_info!("插件示例已导出为 ZIP: {}", dest.display());
     } else {
-        export_folder(&dest).map_err(|e| e.to_string())?;
+        export_folder(&dest).map_err(log_err("Failed to export plugin sample as folder"))?;
         log_info!("插件示例已导出为文件夹: {}", dest.display());
     }
 

@@ -15,6 +15,7 @@ import { listen } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { showCrashDialog } from '@/utils/crashDialog'
+import { safeCall } from '@/utils/async'
 
 /** 崩溃类别（与后端 CrashCategory 枚举对应） */
 type CrashCategory = 'Java' | 'Memory' | 'Graphics' | 'Mod' | 'Forge' | 'Fabric' | 'OptiFine' | 'Unknown'
@@ -85,23 +86,20 @@ export function useLaunchState() {
   let unlistenFn: (() => void) | null = null
 
   async function setupGameExitListener() {
-    try {
-      unlistenFn = await listen<GameExitEvent>('game-exited', (event) => {
-        const { is_normal, exit_code, crash_info } = event.payload
-        runningPid.value = null
-        runningVersionId.value = null
-        if (is_normal) {
-          toastSuccess('游戏已退出')
-        } else if (crash_info) {
-          // 弹出崩溃分析对话框
-          showCrashDialog(crash_info)
-        } else {
-          toastError(`游戏已退出（代码: ${exit_code}）`)
-        }
-      })
-    } catch (e) {
-      console.error('Failed to setup game exit listener:', e)
-    }
+    const unlisten = await safeCall(() => listen<GameExitEvent>('game-exited', (event) => {
+      const { is_normal, exit_code, crash_info } = event.payload
+      runningPid.value = null
+      runningVersionId.value = null
+      if (is_normal) {
+        toastSuccess('游戏已退出')
+      } else if (crash_info) {
+        // 弹出崩溃分析对话框
+        showCrashDialog(crash_info)
+      } else {
+        toastError(`游戏已退出（代码: ${exit_code}）`)
+      }
+    }), 'setup game exit listener')
+    if (unlisten) unlistenFn = unlisten
   }
 
   function cleanupGameExitListener() {
@@ -179,19 +177,15 @@ export function useLaunchState() {
 
   /** 检查当前是否有运行中的游戏（启动器启动时调用） */
   async function checkRunningGame(): Promise<void> {
-    try {
-      const pid = await tauri.getRunningGame()
-      runningPid.value = pid
-    } catch (e) {
-      console.error('Failed to check running game:', e)
-    }
+    const pid = await safeCall(() => tauri.getRunningGame(), 'check running game')
+    if (pid !== undefined) runningPid.value = pid
   }
 
   /** 启动进度轮询（每 200ms 拉取一次后端进度） */
   function startProgressPolling() {
     stopProgressPolling()
     launchProgressTimer = window.setInterval(async () => {
-      try {
+      await safeCall(async () => {
         const progress = await tauri.getLaunchProgress()
         if (progress) {
           launchProgress.value = progress
@@ -199,9 +193,7 @@ export function useLaunchState() {
             stopProgressPolling()
           }
         }
-      } catch (e) {
-        console.error('Failed to get launch progress:', e)
-      }
+      }, 'get launch progress')
     }, 200)
   }
 

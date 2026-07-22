@@ -28,6 +28,7 @@ import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 import { showError, showConfirm } from '@/utils/modal'
 import { toastSuccess, toastInfo, toastWarning } from '@/utils/toast'
+import { safeCall } from '@/utils/async'
 
 /** 安装请求参数（与 LoaderSelect.vue 的 install emit 类型对齐） */
 export interface InstallOptions {
@@ -64,7 +65,8 @@ export function useVersionInstallActions() {
       installedVersionLogos.value = logoMap
     } catch (e) {
       console.error(e)
-      try { installedVersions.value = await tauri.listInstalledVersions() } catch (e2) { console.error(e2) }
+      const fallback = await safeCall(() => tauri.listInstalledVersions(), 'list installed versions (fallback)')
+      if (fallback) installedVersions.value = fallback
     }
   }
 

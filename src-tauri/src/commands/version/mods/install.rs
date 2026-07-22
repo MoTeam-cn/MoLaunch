@@ -1,5 +1,6 @@
 //! Mod 安装与文件操作命令（install_mod / open_mods_dir / get_version_mods_dir / reveal_mod_file）
 
+use crate::error_util::log_err;
 use crate::state::AppState;
 use crate::{log_error, log_info};
 use tauri::State;
@@ -84,7 +85,7 @@ pub async fn open_mods_dir(state: State<'_, AppState>, version_id: String) -> Re
     let mods_dir = get_mods_dir(&state, &version_id).await?;
 
     if !mods_dir.exists() {
-        std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(&mods_dir).map_err(log_err("Failed to create mods directory"))?;
     }
 
     let path_str = mods_dir.to_string_lossy().to_string();
@@ -101,7 +102,7 @@ pub async fn get_version_mods_dir(
     sanitize_version_id(&version_id)?;
     let mods_dir = get_mods_dir(&state, &version_id).await?;
     if !mods_dir.exists() {
-        std::fs::create_dir_all(&mods_dir).map_err(|e| e.to_string())?;
+        std::fs::create_dir_all(&mods_dir).map_err(log_err("Failed to create mods directory"))?;
     }
     Ok(mods_dir.to_string_lossy().to_string())
 }

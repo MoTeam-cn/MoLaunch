@@ -1,5 +1,6 @@
 //! 配置文件相关命令
 
+use crate::error_util::log_err;
 use crate::log_info;
 use crate::state::AppState;
 use tauri::State;
@@ -80,7 +81,7 @@ pub async fn set_config_value(
     let storage = crate::storage::Storage::instance();
     storage
         .set_config(&section, &key, &value)
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("Failed to set config value"))?;
 
     // 同步刷新内存中的 AppConfig，避免后续 save_config 用内存旧值覆盖 INI 新值
     // （此前仅 Log/level 做了特例补丁，其余字段存在数据覆盖风险）

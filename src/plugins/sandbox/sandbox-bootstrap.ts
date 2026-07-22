@@ -31,6 +31,11 @@ export const SANDBOX_BOOTSTRAP_SCRIPT = `
   /** 父窗口引用（sandbox iframe 中 parent 仍可访问，只是无法直接读属性） */
   const parentWindow = window.parent;
 
+  /** 安全执行同步函数，捕获异常并打印到控制台（沙箱内联版本，无法 import 父级 safeCallSync） */
+  function safeCallSync(fn, label) {
+    try { return fn(); } catch (e) { console.error('Failed to ' + label + ':', e); }
+  }
+
   /**
    * 发送 SDK 调用请求到父窗口
    * @param {string} method 方法名
@@ -124,7 +129,7 @@ export const SANDBOX_BOOTSTRAP_SCRIPT = `
       const cbs = listeners.get(data.name);
       if (cbs) {
         for (const cb of cbs) {
-          try { cb(data.payload); } catch (e) { console.error('[Sandbox] 事件回调异常:', e); }
+          safeCallSync(function() { cb(data.payload); }, '[Sandbox] run event callback');
         }
       }
       return;

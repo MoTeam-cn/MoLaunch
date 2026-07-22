@@ -25,6 +25,7 @@ pub mod sandbox;
 pub mod spawn;
 pub mod window;
 
+use crate::error_util::log_err;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
@@ -155,7 +156,7 @@ fn read_plugin_manifest(plugin_id: &str) -> Result<ExternalPluginManifest, Strin
         return Err(format!("Plugin manifest not found: {}", manifest_path.display()));
     }
 
-    let manifest_str = std::fs::read_to_string(&manifest_path).map_err(|e| e.to_string())?;
+    let manifest_str = std::fs::read_to_string(&manifest_path).map_err(log_err("Failed to read plugin manifest"))?;
     let manifest: ExternalPluginManifest =
         serde_json::from_str(&manifest_str).map_err(|e| format!("Invalid manifest.json: {}", e))?;
 

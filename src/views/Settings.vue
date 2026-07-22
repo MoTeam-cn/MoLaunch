@@ -21,6 +21,7 @@ import {
   PuzzlePieceIcon,
   CircleStackIcon,
 } from '@heroicons/vue/24/outline'
+import { safeCall } from '@/utils/async'
 
 const activeCategory = ref('launch')
 
@@ -69,13 +70,8 @@ function onDevModeChanged(e: Event) {
 }
 
 onMounted(async () => {
-  try {
-    // 通过统一配置接口读取 developerMode（注册表存储，走 get_config 分流）
-    const config = await getConfigMap()
-    devModeEnabled.value = config.developerMode
-  } catch (e) {
-    console.error('Failed to check developer mode:', e)
-  }
+  const config = await safeCall(() => getConfigMap(), 'check developer mode')
+  if (config) devModeEnabled.value = config.developerMode
   window.addEventListener('developer-mode-changed', onDevModeChanged)
 })
 

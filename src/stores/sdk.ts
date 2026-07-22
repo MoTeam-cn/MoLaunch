@@ -6,6 +6,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { SdkStatus } from '@/types/auth'
 import * as tauri from '@/utils/tauri'
+import { safeCall } from '@/utils/async'
 
 export const useSdkStore = defineStore('sdk', () => {
   // 状态
@@ -23,13 +24,11 @@ export const useSdkStore = defineStore('sdk', () => {
   async function fetchPlatformInfo() {
     // 已初始化则跳过，避免 App.vue 与 Home.vue 重复发起 IPC
     if (initialized.value) return
-    try {
+    await safeCall(async () => {
       status.value = await tauri.getPlatformInfo()
       version.value = await tauri.getSdkVersion()
       initialized.value = true
-    } catch (e) {
-      console.error('Failed to get platform info:', e)
-    }
+    }, 'get platform info')
   }
 
   async function fetchDeviceId() {

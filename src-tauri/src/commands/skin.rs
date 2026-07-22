@@ -7,6 +7,7 @@
 //! - 装备/取消披风
 //! - 下载 URL 图片到本地文件
 
+use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::image_cache::{self, CachedImage};
@@ -83,7 +84,7 @@ pub async fn get_skin_url(
                 .clone()
         } else {
             // 从 ms_accounts 查找
-            let persisted = state.auth_storage.load().await.map_err(|e| e.to_string())?;
+            let persisted = state.auth_storage.load().await.map_err(log_err("Failed to load auth storage"))?;
             persisted
                 .ms_accounts
                 .iter()

@@ -40,6 +40,7 @@ import {
   defaultSkins, getDefaultSkinEntry, getLocalSkinName, setLocalSkinName, bumpSkinVersion,
   parseSkinUrl, parseSkinVariant,
 } from '@/utils/default-skin'
+import { safeCall } from '@/utils/async'
 
 interface UseSkinOperationsOptions {
   /** 当前账号 UUID（来自 authStore.currentUser.uuid） */
@@ -119,13 +120,9 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
       console.error('[SkinManager] getSkinCapeInfo failed:', e)
       toastError(`获取皮肤信息失败: ${e}`)
     }
-    try {
-      const result = await getSkinUrl()
-      skinUrl.value = result?.url ?? null
-      dev && console.log('[SkinManager] getSkinUrl ok:', result?.cached ? 'cached' : 'remote')
-    } catch (e) {
-      console.error('[SkinManager] getSkinUrl failed:', e)
-    }
+    const skinResult = await safeCall(() => getSkinUrl(), '[SkinManager] getSkinUrl')
+    skinUrl.value = skinResult?.url ?? null
+    dev && console.log('[SkinManager] getSkinUrl ok:', skinResult?.cached ? 'cached' : 'remote')
     try {
       const result = await getCapeUrl()
       capeUrl.value = result?.url ?? null

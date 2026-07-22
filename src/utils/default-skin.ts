@@ -11,6 +11,7 @@
 import { ref } from 'vue'
 import { convertFileSrc } from '@tauri-apps/api/core'
 import { setOfflineSkin } from '@/utils/tauri'
+import { safeCall } from '@/utils/async'
 
 // 导入所有默认皮肤（Vite 会处理为 URL）
 import AlexSkin from '@/assets/Skins/Alex.png'
@@ -71,11 +72,7 @@ export function getLocalSkinName(uuid: string): string | null {
  */
 export async function setLocalSkinName(uuid: string, skinName: string): Promise<void> {
   offlineSkinMap.value.set(uuid, skinName)
-  try {
-    await setOfflineSkin(uuid, skinName)
-  } catch (e) {
-    console.error('Failed to persist offline skin:', e)
-  }
+  await safeCall(() => setOfflineSkin(uuid, skinName), 'persist offline skin')
 }
 
 /**

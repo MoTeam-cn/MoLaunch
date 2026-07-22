@@ -5,6 +5,7 @@
 //!
 //! 适用于皮肤、披风、头像、缩略图等所有需要缓存的远程图片场景。
 
+use crate::error_util::log_err;
 use crate::minecraft::image_cache::{self, CachedImage};
 use tauri::AppHandle;
 
@@ -26,11 +27,11 @@ pub async fn get_cached_image_url(url: String, app: AppHandle) -> Result<CachedI
 /// 失效指定 URL 的图片缓存（强制刷新）
 #[tauri::command]
 pub fn invalidate_cached_image(url: String) -> Result<(), String> {
-    image_cache::invalidate(&url).map_err(|e| e.to_string())
+    image_cache::invalidate(&url).map_err(log_err("Failed to invalidate cached image"))
 }
 
 /// 清空所有图片缓存
 #[tauri::command]
 pub fn clear_image_cache() -> Result<(), String> {
-    image_cache::clear_all().map_err(|e| e.to_string())
+    image_cache::clear_all().map_err(log_err("Failed to clear image cache"))
 }

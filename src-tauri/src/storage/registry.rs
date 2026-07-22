@@ -7,6 +7,8 @@
 //! 注册表路径：`HKEY_CURRENT_USER\Software\MoLaunch`
 
 #[cfg(windows)]
+use crate::error_util::log_err;
+#[cfg(windows)]
 use winreg::enums::*;
 #[cfg(windows)]
 use winreg::RegKey;
@@ -22,7 +24,7 @@ pub(crate) fn reg_key() -> Result<RegKey, String> {
         .or_else(|_| {
             hkcu.create_subkey(REG_SUBKEY)
                 .map(|(k, _)| k)
-                .map_err(|e| e.to_string())
+                .map_err(log_err("Failed to create registry subkey"))
         })
         .map_err(|e| format!("打开注册表失败: {}", e))
 }

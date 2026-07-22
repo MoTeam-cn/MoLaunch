@@ -12,6 +12,7 @@
 //! 共享类型在 `super::` 中（`ProcessPermissions` / `read_plugin_manifest`）。
 
 use super::read_plugin_manifest;
+use crate::error_util::log_err;
 use crate::log_info;
 use serde::Serialize;
 use std::path::PathBuf;
@@ -185,7 +186,7 @@ fn is_command_allowed(command: &str, allowed: &[String]) -> Result<bool, String>
 fn which_canonical(command: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(command);
     if path.is_absolute() {
-        return path.canonicalize().map_err(|e| e.to_string());
+        return path.canonicalize().map_err(log_err("Failed to canonicalize command path"));
     }
 
     let path_env = std::env::var("PATH").map_err(|_| "PATH not set".to_string())?;
@@ -203,14 +204,14 @@ fn which_canonical(command: &str) -> Result<PathBuf, String> {
             for ext in &[".exe", ".bat", ".cmd"] {
                 let candidate = dir_path.join(format!("{}{}", command, ext));
                 if candidate.exists() {
-                    return candidate.canonicalize().map_err(|e| e.to_string());
+                    return candidate.canonicalize().map_err(log_err("Failed to canonicalize command path"));
                 }
             }
         }
 
         let candidate = dir_path.join(command);
         if candidate.exists() {
-            return candidate.canonicalize().map_err(|e| e.to_string());
+            return candidate.canonicalize().map_err(log_err("Failed to canonicalize command path"));
         }
     }
 

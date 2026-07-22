@@ -38,6 +38,7 @@ import {
   fetchCustomLayoutContent,
   isValidHomePanelMode,
 } from '@/utils/pluginInstaller'
+import { safeCall } from '@/utils/async'
 
 export const usePluginStore = defineStore('plugins', () => {
   /** 已注册的插件清单（内置 + 外部） */
@@ -104,7 +105,7 @@ export const usePluginStore = defineStore('plugins', () => {
    * 都调用此函数统一持久化，确保跨游戏目录共享。
    */
   async function persistToBackend() {
-    try {
+    await safeCall(async () => {
       const data: PersonalizationData = {
         enabledMap: {},
         homePanelMode: homePanelMode.value,
@@ -114,9 +115,7 @@ export const usePluginStore = defineStore('plugins', () => {
         data.enabledMap[id] = state.enabled
       }
       await savePersonalizationData(data)
-    } catch (e) {
-      console.error('[Plugins] Failed to persist to backend:', e)
-    }
+    }, '[Plugins] persist to backend')
   }
 
   /**
@@ -324,11 +323,7 @@ export const usePluginStore = defineStore('plugins', () => {
   async function notifyGameLaunch(versionId: string) {
     for (const plugin of enabledPlugins.value) {
       if (plugin.hooks?.onGameLaunch) {
-        try {
-          await plugin.hooks.onGameLaunch(versionId)
-        } catch (e) {
-          console.error(`[Plugins] ${plugin.id} onGameLaunch failed:`, e)
-        }
+        await safeCall(() => plugin.hooks!.onGameLaunch!(versionId), `[Plugins] ${plugin.id} onGameLaunch`)
       }
     }
     window.dispatchEvent(new CustomEvent('plugin:game-launch', { detail: { versionId } }))
@@ -340,11 +335,7 @@ export const usePluginStore = defineStore('plugins', () => {
   async function notifyGameExit(versionId: string, exitCode: number | null) {
     for (const plugin of enabledPlugins.value) {
       if (plugin.hooks?.onGameExit) {
-        try {
-          await plugin.hooks.onGameExit(versionId, exitCode)
-        } catch (e) {
-          console.error(`[Plugins] ${plugin.id} onGameExit failed:`, e)
-        }
+        await safeCall(() => plugin.hooks!.onGameExit!(versionId, exitCode), `[Plugins] ${plugin.id} onGameExit`)
       }
     }
     window.dispatchEvent(

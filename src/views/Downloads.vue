@@ -16,6 +16,7 @@ import type { RawDownloadProgress } from '@/types/download'
 import DownloadStatsPanel from './downloads/DownloadStatsPanel.vue'
 import TaskGroupCard from '@/components/downloads/TaskGroupCard.vue'
 import { initDownloadPolling } from '@/composables/useDownloadPolling'
+import { safeCall } from '@/utils/async'
 
 const versionStore = useVersionStore()
 const router = useRouter()
@@ -29,7 +30,7 @@ onMounted(async () => {
   initDownloadPolling()
   const maxRetries = 6 // 最多重试 6 次，每次 500ms，共 3 秒
   for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
+    const success = await safeCall(async () => {
       const active = await isDownloading()
       if (active) {
         // 有下载任务，恢复状态
@@ -67,11 +68,11 @@ onMounted(async () => {
           })
         }
         checking.value = false
-        return // 成功恢复，不需要返回
+        return true // 成功恢复，不需要返回
       }
-    } catch (e) {
-      console.error('Failed to check download state:', e)
-    }
+      return false
+    }, 'check download state')
+    if (success === true) return
     // 等待 500ms 后重试
     if (attempt < maxRetries - 1) {
       await new Promise(resolve => setTimeout(resolve, 500))
@@ -128,17 +129,14 @@ const cancelling = ref(false)
 async function handleTogglePause() {
   if (togglingPause.value) return
   togglingPause.value = true
-  try {
+  await safeCall(async () => {
     if (isPaused.value) {
       await resumeDownload()
     } else {
       await pauseDownload()
     }
-  } catch (e) {
-    console.error('Failed to toggle pause:', e)
-  } finally {
-    togglingPause.value = false
-  }
+  }, 'toggle pause')
+  togglingPause.value = false
 }
 
 function handleCancel() {
@@ -148,15 +146,10 @@ function handleCancel() {
     async () => {
       if (cancelling.value) return
       cancelling.value = true
-      try {
-        await cancelDownload()
-      } catch (e) {
-        console.error('Failed to cancel download:', e)
-      } finally {
-        cancelling.value = false
-        // 确保取消后立即触发返回（避免轮询已停止时卡在空白页）
-        versionStore.finishDownload()
-      }
+      await safeCall(() => cancelDownload(), 'cancel download')
+      cancelling.value = false
+      // 确保取消后立即触发返回（避免轮询已停止时卡在空白页）
+      versionStore.finishDownload()
     },
   )
 }

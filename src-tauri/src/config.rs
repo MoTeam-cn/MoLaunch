@@ -2,6 +2,7 @@
 //!
 //! 使用 storage 模块管理配置文件（INI 格式）
 
+use crate::error_util::log_err;
 use crate::state::AppConfig;
 use crate::storage::Storage;
 use crate::{log_debug, log_info, log_warn};
@@ -309,7 +310,7 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         config.external_download_dir.as_deref().unwrap_or(""),
     );
 
-    storage.write_config(&ini).map_err(|e| e.to_string())?;
+    storage.write_config(&ini).map_err(log_err("Failed to save config"))?;
     log_debug!("Config saved to storage");
     Ok(())
 }

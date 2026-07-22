@@ -23,6 +23,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import type { JavaRequirements } from '@/types/java'
 import JavaCustomMode from './JavaCustomMode.vue'
+import { safeCall } from '@/utils/async'
 
 const javaStore = useJavaStore()
 const { selectedId, personalization } = useVersionSettings()
@@ -156,11 +157,8 @@ watch(personalization, async (p) => {
 
   // 加载 Java 需求（用 originalVersion 和 versionType 判断）
   const loader = ['forge', 'neoforge', 'fabric', 'quilt', 'optifine', 'liteloader'].includes(p.versionType) ? p.versionType : null
-  try {
-    javaReqs.value = await tauri.getJavaRequirements(p.originalVersion || p.versionType || '', loader)
-  } catch (e) {
-    console.error('Failed to load Java requirements:', e)
-  }
+  const reqs = await safeCall(() => tauri.getJavaRequirements(p.originalVersion || p.versionType || '', loader), 'load Java requirements')
+  if (reqs) javaReqs.value = reqs
 
   if (!javaStore.javaLoaded) await javaStore.detectJava()
 }, { immediate: true })

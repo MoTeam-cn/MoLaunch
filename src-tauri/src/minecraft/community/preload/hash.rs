@@ -5,11 +5,12 @@
 //! 2. **跳过空白字符**（0x09 制表符 / 0x0A 换行 / 0x0D 回车 / 0x20 空格）
 //! 3. 对处理后的字节流做 MurmurHash2（seed=1，与 CF 官方一致）
 
+use crate::error_util::log_err;
 use std::path::Path;
 
 /// 计算 CurseForge 用的 MurmurHash2 指纹
 pub fn compute_curseforge_fingerprint(path: &Path) -> Result<u32, String> {
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let bytes = std::fs::read(path).map_err(log_err("Failed to read file for fingerprint"))?;
     let filtered: Vec<u8> = bytes
         .iter()
         .copied()
@@ -20,7 +21,7 @@ pub fn compute_curseforge_fingerprint(path: &Path) -> Result<u32, String> {
 
 /// Modrinth 用的 SHA1 哈希（hex 字符串）
 pub fn compute_modrinth_sha1(path: &Path) -> Result<String, String> {
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let bytes = std::fs::read(path).map_err(log_err("Failed to read file for hash"))?;
     Ok(crate::minecraft::utils::file_checker::compute_sha1_hex(
         &bytes,
     ))

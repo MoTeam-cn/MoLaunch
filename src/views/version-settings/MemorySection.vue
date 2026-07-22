@@ -13,6 +13,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
+import { safeCall } from '@/utils/async'
 
 const { selectedId, personalization } = useVersionSettings()
 
@@ -74,7 +75,7 @@ async function handleSaveMemoryMode(mode: 'inherit' | 'auto' | 'custom') {
 // 自定义模式下防抖保存
 async function flushSaveMemory() {
   if (!selectedId.value || memoryMode.value !== 'custom') return
-  try {
+  await safeCall(async () => {
     await tauri.updateVersionPersonalization(selectedId.value, {
       maxMemory: maxMemory.value,
       minMemory: minMemory.value,
@@ -83,7 +84,7 @@ async function flushSaveMemory() {
       personalization.value.maxMemory = maxMemory.value
       personalization.value.minMemory = minMemory.value
     }
-  } catch (e) { console.error('Failed to save memory:', e) }
+  }, 'save memory')
 }
 
 const { scheduleSave: scheduleSaveMemory } = useDebouncedSave(flushSaveMemory, 500)
@@ -102,12 +103,12 @@ watch([minMemory, maxMemory], () => {
 })
 
 onMounted(async () => {
-  try {
-    const cfg = await tauri.getConfigMap()
+  const cfg = await safeCall(() => tauri.getConfigMap(), 'load global memory')
+  if (cfg) {
     globalMode.value = cfg.memoryMode
     globalMin.value = cfg.minMemory
     globalMax.value = cfg.maxMemory
-  } catch (e) { console.error('Failed to load global memory:', e) }
+  }
 
   // 从 personalization 读取版本独立内存
   const p = personalization.value

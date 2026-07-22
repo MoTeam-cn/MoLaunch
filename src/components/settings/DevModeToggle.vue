@@ -15,6 +15,7 @@ import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { toastError } from '@/utils/toast'
 import Alert from '@/components/common/Alert.vue'
 import Select from '@/components/common/Select.vue'
+import { safeCall } from '@/utils/async'
 
 const devUnlocked = ref(false)
 const devMode = ref(false)
@@ -33,12 +34,10 @@ async function toggleDevMode(v: boolean) {
 }
 
 onMounted(async () => {
-  try {
-    const config = await getConfigMap()
+  const config = await safeCall(() => getConfigMap(), 'load developer mode state')
+  if (config) {
     devUnlocked.value = config.developerUnlocked
     devMode.value = config.developerMode
-  } catch (e) {
-    console.error('Failed to load developer mode state:', e)
   }
 })
 </script>

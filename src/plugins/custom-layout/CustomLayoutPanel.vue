@@ -18,6 +18,7 @@ import type { LayoutSchema, LayoutSection, StatItem, ListField, ValueFormat } fr
 import type { LayoutFormat } from '@/types/plugin'
 import { toastInfo, toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { showInfo, showConfirm, showPrompt } from '@/utils/modal'
+import { safeCall, safeCallSync } from '@/utils/async'
 import {
   ChartBarIcon,
   CircleStackIcon,
@@ -63,14 +64,10 @@ function parseLayout() {
 
 /** 加载数据源 */
 async function loadData() {
-  try {
-    dataCtx.value = await loadDataContext()
-  } catch (e) {
-    console.error('[CustomLayout] 数据加载失败:', e)
-  } finally {
-    loading.value = false
-    refreshing.value = false
-  }
+  const ctx = await safeCall(() => loadDataContext(), '[CustomLayout] load data context')
+  if (ctx) dataCtx.value = ctx
+  loading.value = false
+  refreshing.value = false
 }
 
 /** 手动刷新 */
@@ -293,11 +290,7 @@ function renderHtmlShadow(container: HTMLElement, section: Extract<LayoutSection
 
   // 执行用户脚本
   if (section.script) {
-    try {
-      new Function(section.script)()
-    } catch (e) {
-      console.error('[CustomLayout] html section 脚本执行失败:', e)
-    }
+    safeCallSync(() => new Function(section.script)(), '[CustomLayout] run html section script')
   }
 }
 

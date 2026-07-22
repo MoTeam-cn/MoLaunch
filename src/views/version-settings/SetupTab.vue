@@ -19,6 +19,7 @@ import AdvanceFieldsPanel from '@/components/version-settings/AdvanceFieldsPanel
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import MemorySection from './MemorySection.vue'
 import JavaModeSelector from './setup-tab/JavaModeSelector.vue'
+import { safeCall } from '@/utils/async'
 
 const { selectedId, personalization, loadPersonalization } = useVersionSettings()
 
@@ -38,7 +39,7 @@ const advanceDisableLua = ref(false)
 // 无需 snakeMap 转换，直接用字段名同步共享状态即可
 
 async function loadSetup() {
-  try {
+  await safeCall(async () => {
     if (!personalization.value && selectedId.value) await loadPersonalization()
     const p = personalization.value
     if (p) {
@@ -51,9 +52,7 @@ async function loadSetup() {
       advanceDisableJlw.value = p.advanceDisableJlw
       advanceDisableLua.value = p.advanceDisableLua
     }
-  } catch (e) {
-    console.error('Failed to load setup:', e)
-  }
+  }, 'load setup')
 }
 
 /** 保存版本独立字段到 setup.ini */

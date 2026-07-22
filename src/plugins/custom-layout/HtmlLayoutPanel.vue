@@ -14,6 +14,7 @@
 import { ref, onMounted, watch, nextTick } from 'vue'
 import { pluginSdk } from '@/plugins/sdk'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import { safeCallSync } from '@/utils/async'
 
 const props = defineProps<{
   /** HTML 内容 */
@@ -82,11 +83,7 @@ function renderHtml() {
     scripts.forEach((scriptEl) => {
       const code = scriptEl.textContent || ''
       if (code.trim()) {
-        try {
-          new Function(code)()
-        } catch (e) {
-          console.error('[HtmlLayout] 脚本执行失败:', e)
-        }
+        safeCallSync(() => new Function(code)(), '[HtmlLayout] run user script')
       }
       // 移除已执行的 script 标签
       scriptEl.remove()

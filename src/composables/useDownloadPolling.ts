@@ -3,6 +3,7 @@ import { useVersionStore } from '@/stores/version'
 import { getDownloadProgress } from '@/utils/tauri'
 import { toastSuccess, toastError } from '@/utils/toast'
 import type { DownloadStage, RawDownloadStage } from '@/types/download'
+import { safeCall } from '@/utils/async'
 
 let pollTimer: ReturnType<typeof setInterval> | null = null
 let pollCount = 0
@@ -22,7 +23,7 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
 
   pollTimer = setInterval(async () => {
     pollCount++
-    try {
+    await safeCall(async () => {
       const progress = await getDownloadProgress()
 
       if (import.meta.env.DEV && pollCount % 10 === 0) {
@@ -109,9 +110,7 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
           return
         }
       }
-    } catch (e) {
-      console.error('[Polling] Error:', e)
-    }
+    }, '[Polling] poll download progress')
   }, 300)
 }
 

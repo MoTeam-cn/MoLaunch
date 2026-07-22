@@ -34,6 +34,7 @@ import type { Ref } from 'vue'
 import * as tauri from '@/utils/tauri'
 import type { ConfigPatch, ConfigSnapshot } from '@/utils/api/config'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
+import { safeCall } from '@/utils/async'
 
 interface UseConfigPageOptions {
   /** 防抖延迟（ms），默认 800 */
@@ -78,29 +79,19 @@ export function useConfigPage(options: UseConfigPageOptions = {}): UseConfigPage
   const { markDirty, flushSave, scheduleSave, isDirty } = useDebouncedSave(
     'patch',
     async (patch: ConfigPatch) => {
-      try {
-        await tauri.applyConfig(patch)
-      } catch (e) {
-        console.error(`Failed to ${errorLabel}:`, e)
-      }
+      await safeCall(() => tauri.applyConfig(patch), errorLabel)
     },
     delay,
   )
 
   // 加载配置：拉取全量快照 → 调用 onLoad 赋值 → nextTick → loaded=true
   async function reload(): Promise<void> {
-    try {
+    await safeCall(async () => {
       const cfg = await tauri.getConfigMap()
       if (onLoad) {
         await onLoad(cfg)
       }
-    } catch (e) {
-      if (onLoadError) {
-        onLoadError(e)
-      } else {
-        console.error(`Failed to load config:`, e)
-      }
-    }
+    }, 'load config', onLoadError)
     // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
     await nextTick()
     loaded.value = true

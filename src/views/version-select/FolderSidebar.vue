@@ -16,6 +16,7 @@ import {
   PlusIcon,
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
+import { safeCall } from '@/utils/async'
 
 interface McFolder {
   name: string
@@ -32,12 +33,10 @@ const switchingFolder = ref(false)
 
 /** 加载文件夹列表 */
 async function loadFolders() {
-  try {
+  await safeCall(async () => {
     folders.value = await tauri.listMcFolders()
     currentPath.value = await invoke<string>('get_game_dir')
-  } catch (e) {
-    console.error('Failed to load folders:', e)
-  }
+  }, 'load folders')
 }
 
 /** 切换文件夹 */

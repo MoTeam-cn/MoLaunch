@@ -7,6 +7,7 @@
 //! 懒加载：不在启动时解密，避免"启动即解密"触发杀软启发式（参考 AuthStorage 的按需模式）。
 //! enabled 同步从 INI 读；api_key 在首次 CurseForge 请求时于异步上下文解密并缓存。
 
+use crate::error_util::log_err;
 use crate::sdk::SdkInstance;
 use std::sync::{Arc, OnceLock, RwLock};
 
@@ -161,7 +162,7 @@ pub async fn save(
     // enabled 明文写入 INI
     storage
         .set_config(SECTION, KEY_ENABLED, if enabled { "true" } else { "false" })
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("Failed to save CurseForge enabled flag"))?;
 
     // api_key 加密后写入 INI
     let stored_key = if api_key.is_empty() {
@@ -177,7 +178,7 @@ pub async fn save(
     };
     storage
         .set_config(SECTION, KEY_API_KEY, &stored_key)
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("Failed to save CurseForge API key"))?;
 
     // 更新内存缓存
     let state = STATE.get_or_init(|| {

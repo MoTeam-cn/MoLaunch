@@ -7,6 +7,7 @@
 
 use tauri::{AppHandle, State};
 
+use crate::error_util::log_err;
 use crate::minecraft::community::preload::{preload_mods_detail, PreloadModInput};
 use crate::state::AppState;
 
@@ -38,7 +39,7 @@ pub async fn preload_mods_detail_cmd(
 
     // 扫描 mods 目录，构建预加载输入
     let mut inputs: Vec<PreloadModInput> = Vec::new();
-    let entries = std::fs::read_dir(&mods_dir).map_err(|e| e.to_string())?;
+    let entries = std::fs::read_dir(&mods_dir).map_err(log_err("Failed to read mods directory"))?;
     for entry in entries.flatten() {
         let path = entry.path();
         if !path.is_file() {

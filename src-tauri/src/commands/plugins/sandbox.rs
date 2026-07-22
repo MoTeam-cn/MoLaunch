@@ -8,6 +8,7 @@
 //! `plugins_root` / `read_plugin_manifest`）。
 
 use super::{is_valid_plugin_id, plugins_root, read_plugin_manifest, ExternalPluginEntry};
+use crate::error_util::log_err;
 use crate::log_info;
 
 /// 列出所有已安装的外部插件
@@ -22,10 +23,10 @@ pub async fn list_external_plugins() -> Result<Vec<ExternalPluginEntry>, String>
     }
 
     let mut entries = Vec::new();
-    let read_dir = std::fs::read_dir(&root).map_err(|e| e.to_string())?;
+    let read_dir = std::fs::read_dir(&root).map_err(log_err("Failed to list plugins directory"))?;
 
     for entry in read_dir {
-        let entry = entry.map_err(|e| e.to_string())?;
+        let entry = entry.map_err(log_err("Failed to read directory entry"))?;
         let path = entry.path();
         if !path.is_dir() {
             continue;
@@ -78,14 +79,14 @@ pub async fn read_external_plugin_file(
     let target = plugin_dir.join(&file_path);
 
     // canonicalize + starts_with 双重校验防止 `../` 路径遍历
-    let canonical_plugin_dir = plugin_dir.canonicalize().map_err(|e| e.to_string())?;
-    let canonical_target = target.canonicalize().map_err(|e| e.to_string())?;
+    let canonical_plugin_dir = plugin_dir.canonicalize().map_err(log_err("Failed to canonicalize plugin directory"))?;
+    let canonical_target = target.canonicalize().map_err(log_err("Failed to canonicalize target file"))?;
 
     if !canonical_target.starts_with(&canonical_plugin_dir) {
         return Err(format!("Path traversal denied: {}", file_path));
     }
 
-    std::fs::read_to_string(&canonical_target).map_err(|e| e.to_string())
+    std::fs::read_to_string(&canonical_target).map_err(log_err("Failed to read plugin file"))
 }
 
 /// 卸载外部插件（删除插件目录）
@@ -104,14 +105,14 @@ pub async fn uninstall_external_plugin(plugin_id: String) -> Result<(), String> 
     }
 
     // 二次 canonicalize 校验
-    let canonical_root = plugins_root().canonicalize().map_err(|e| e.to_string())?;
-    let canonical_dir = plugin_dir.canonicalize().map_err(|e| e.to_string())?;
+    let canonical_root = plugins_root().canonicalize().map_err(log_err("Failed to canonicalize plugins root"))?;
+    let canonical_dir = plugin_dir.canonicalize().map_err(log_err("Failed to canonicalize plugin directory"))?;
 
     if !canonical_dir.starts_with(&canonical_root) {
         return Err(format!("Path traversal denied: {}", plugin_id));
     }
 
-    std::fs::remove_dir_all(&canonical_dir).map_err(|e| e.to_string())?;
+    std::fs::remove_dir_all(&canonical_dir).map_err(log_err("Failed to uninstall plugin"))?;
     log_info!("插件 {} 已卸载", plugin_id);
 
     Ok(())

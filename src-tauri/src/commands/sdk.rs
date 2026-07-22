@@ -1,5 +1,6 @@
 //! SDK 管理命令（lite 版本）
 
+use crate::error_util::log_err;
 use crate::log_error;
 use crate::log_info;
 use crate::state::AppState;
@@ -50,7 +51,7 @@ pub async fn get_sdk_version(state: State<'_, AppState>) -> Result<Option<String
     log_info!("[Startup][IPC] get_sdk_version called");
     let sdk_guard = state.sdk.lock().await;
     match sdk_guard.as_ref() {
-        Some(sdk) => Ok(Some(sdk.version().map_err(|e| e.to_string())?)),
+        Some(sdk) => Ok(Some(sdk.version().map_err(log_err("Failed to get SDK version"))?)),
         None => Ok(None),
     }
 }

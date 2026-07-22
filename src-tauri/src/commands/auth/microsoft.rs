@@ -4,6 +4,7 @@
 //! - **Web Auth Code Flow**（官方 ID）：浏览器授权 → 拦截回调 code → 换取 token → 完成登录链
 //! - **Device Code Flow**（自定义 ID）：设备码 → 用户浏览器输入 → 轮询 → 完成登录链
 
+use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::auth::microsoft;
@@ -65,7 +66,7 @@ pub async fn ms_login_web_start(app: AppHandle) -> Result<(), String> {
 
     log_info!("Opening web auth window: {}", auth_url);
 
-    let url = tauri::Url::parse(&auth_url).map_err(|e| e.to_string())?;
+    let url = tauri::Url::parse(&auth_url).map_err(log_err("Failed to parse auth URL"))?;
 
     WebviewWindowBuilder::new(&app, "ms-auth", WebviewUrl::External(url))
         .title("Microsoft Login")
@@ -88,7 +89,7 @@ pub async fn ms_login_web_start(app: AppHandle) -> Result<(), String> {
             }
         })
         .build()
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("Failed to build auth window"))?;
 
     Ok(())
 }
@@ -128,7 +129,7 @@ pub async fn ms_login_request_device_code() -> Result<DeviceCodeInfo, String> {
     log_info!("Requesting Microsoft device code");
     let r = microsoft::request_device_code()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("Failed to request device code"))?;
     Ok(DeviceCodeInfo {
         user_code: r.user_code,
         verification_uri: r.verification_uri,
@@ -177,12 +178,12 @@ pub async fn ms_login_refresh(state: State<'_, AppState>) -> Result<LocalAuthRes
         .auth_storage
         .get_current_refresh_token()
         .await
-        .map_err(|e| e.to_string())?
+        .map_err(log_err("Failed to get refresh token"))?
         .ok_or_else(|| "No refresh token available".to_string())?;
 
     let result = microsoft::login_with_refresh_token(&refresh_token, |_| {})
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(log_err("Failed to refresh Microsoft login"))?;
 
     if let Err(e) = state
         .auth_storage

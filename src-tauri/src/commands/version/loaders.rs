@@ -1,3 +1,4 @@
+use crate::error_util::log_err;
 use crate::log_error;
 use crate::minecraft::loaders;
 use crate::state::AppState;
@@ -28,7 +29,7 @@ pub async fn list_forge_versions(
             })
         })
         .collect();
-    serde_json::to_string(&result).map_err(|e| e.to_string())
+    serde_json::to_string(&result).map_err(log_err("Failed to serialize Forge versions"))
 }
 
 /// List NeoForge versions
@@ -56,7 +57,7 @@ pub async fn list_neoforge_versions(
         })
         .collect();
 
-    serde_json::to_string(&result).map_err(|e| e.to_string())
+    serde_json::to_string(&result).map_err(log_err("Failed to serialize NeoForge versions"))
 }
 
 /// List Fabric versions
@@ -71,7 +72,7 @@ pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, 
             e.to_string()
         })?;
 
-    serde_json::to_string(&versions).map_err(|e| e.to_string())
+    serde_json::to_string(&versions).map_err(log_err("Failed to serialize Fabric versions"))
 }
 
 /// List OptiFine versions
@@ -95,7 +96,7 @@ pub async fn list_optifine_versions(state: State<'_, AppState>) -> Result<String
             })
         })
         .collect();
-    serde_json::to_string(&result).map_err(|e| e.to_string())
+    serde_json::to_string(&result).map_err(log_err("Failed to serialize OptiFine versions"))
 }
 
 /// List LiteLoader versions
@@ -115,7 +116,7 @@ pub async fn list_liteloader_versions(
             })?;
 
     let version_strings: Vec<String> = versions.iter().map(|v| v.version.clone()).collect();
-    serde_json::to_string(&version_strings).map_err(|e| e.to_string())
+    serde_json::to_string(&version_strings).map_err(log_err("Failed to serialize LiteLoader versions"))
 }
 
 /// Validate loaders compatibility

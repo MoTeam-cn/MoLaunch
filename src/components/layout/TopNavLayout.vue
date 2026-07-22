@@ -14,6 +14,7 @@ import {
   WrenchScrewdriverIcon,
 } from '@heroicons/vue/24/outline'
 import * as tauri from '@/utils/tauri'
+import { safeCall } from '@/utils/async'
 const appWindow = getCurrentWebviewWindow()
 
 const router = useRouter()
@@ -78,12 +79,8 @@ function handleDownloadClick() {
 }
 
 async function handleClose() {
-  try {
-    // 关闭窗口前先保存配置
-    await tauri.saveConfigToFile()
-  } catch (e) {
-    console.error('Failed to save config before close:', e)
-  }
+  // 关闭窗口前先保存配置
+  await safeCall(() => tauri.saveConfigToFile(), 'save config before close')
   await appWindow.close()
 }
 </script>

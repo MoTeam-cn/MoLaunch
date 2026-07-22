@@ -10,6 +10,7 @@
 //!
 //! URL 协议校验：仅允许 http/https，拒绝 file://、data: 等。
 
+use crate::error_util::log_err;
 use crate::{http, log_info, log_warn, utils::cache};
 use sha2::{Digest, Sha256};
 
@@ -46,7 +47,7 @@ pub async fn load_custom_layout(
                     if elapsed.as_secs() < TTL_SECONDS {
                         // 命中缓存
                         log_info!("自定义布局命中缓存: {}", url);
-                        return cache::read(&cache_rel).map_err(|e| e.to_string());
+                        return cache::read(&cache_rel).map_err(log_err("Failed to read layout cache"));
                     }
                     log_info!("自定义布局缓存已过期: {}", url);
                 }
