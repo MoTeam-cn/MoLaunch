@@ -105,9 +105,14 @@ function shortLabel(title: string): string {
 }
 
 function refresh() {
+  // 双重 nextTick + setTimeout 确保 v-if 切换后的子组件 DOM 完全渲染
   nextTick(() => {
-    scanItems()
-    bindScroll()
+    nextTick(() => {
+      setTimeout(() => {
+        scanItems()
+        bindScroll()
+      }, 0)
+    })
   })
 }
 
@@ -126,17 +131,17 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- 工具数 ≥ 3 时才显示 -->
+  <!-- 工具数 ≥ 3 时才显示，absolute 悬浮在内容区右侧，不影响滚动条位置 -->
   <div
     v-if="items.length >= 3"
-    class="flex flex-col items-center gap-1.5 sticky top-1/2 -translate-y-1/2"
+    class="absolute right-5 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1.5 bg-white/80 backdrop-blur-sm rounded-lg p-1.5 shadow-sm border border-gray-100"
   >
     <div
       v-for="item in items"
       :key="item.id"
       role="button"
       tabindex="0"
-      class="w-9 h-9 flex items-center justify-center rounded-md text-xs font-medium cursor-pointer transition-all duration-150 outline-none focus:ring-2 focus:ring-primary-300"
+      class="w-8 h-8 flex items-center justify-center rounded-md text-xs font-medium cursor-pointer transition-all duration-150 outline-none focus:ring-2 focus:ring-primary-300"
       :class="[
         activeId === item.id
           ? 'bg-primary-500 text-white shadow-sm scale-105'

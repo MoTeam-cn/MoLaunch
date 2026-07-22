@@ -127,9 +127,9 @@ const activeDesc = () =>
         <p class="text-xs text-gray-500 mt-1">{{ activeDesc() }}</p>
       </div>
 
-      <!-- 内容 + 右侧 TOC 双栏布局 -->
-      <div class="flex-1 flex overflow-hidden">
-        <div class="flex-1 overflow-y-auto p-6 tools-scroll-container">
+      <!-- 内容区（滚动条保持在最右侧，TOC 悬浮不占布局） -->
+      <div class="flex-1 relative overflow-hidden">
+        <div class="h-full overflow-y-auto p-6 tools-scroll-container">
           <ExternalDownload v-if="activeCategory === 'external-download'" />
           <QuickTools v-else-if="activeCategory === 'quick-tools'" />
           <ArchivePage v-else-if="activeCategory === 'archive'" />
@@ -138,10 +138,8 @@ const activeDesc = () =>
           <CalcPage v-else-if="activeCategory === 'calc'" />
           <DataPage v-else-if="activeCategory === 'data'" />
         </div>
-        <!-- 右侧 TOC 导航条（工具数 ≥ 3 时自动显示） -->
-        <aside class="w-14 shrink-0 border-l border-gray-100 bg-white flex items-center justify-center">
-          <ToolToc :refresh-key="tocRefreshKey" />
-        </aside>
+        <!-- 右侧悬浮 TOC 导航条（工具数 ≥ 3 时自动显示，不跟随滚动） -->
+        <ToolToc :refresh-key="tocRefreshKey" />
       </div>
     </div>
   </div>
