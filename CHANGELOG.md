@@ -9,6 +9,19 @@
 
 ### 变更
 
+#### 坐标距离计算工具（计算工具分类）
+- 输入两组 XYZ 坐标，实时计算欧氏距离、曼哈顿距离、切比雪夫距离
+- 地狱门坐标换算：主世界↔下界 1:8 比例双向换算
+- 交换 A/B 坐标按钮
+- 组件：`src/views/tools/calc/CoordCalculator.vue`
+
+#### 游戏内调色板工具（计算工具分类）
+- RGB 滑块 + HEX 输入框双向同步，实时预览颜色
+- RGB / HEX / HSL 三种格式互转
+- 16 种 Minecraft 染料色预设（点击切换）
+- 16 种 Minecraft 格式化代码（§0~§f，点击复制到剪贴板）
+- 组件：`src/views/tools/calc/ColorPalette.vue`
+
 #### 工具页侧边栏新增 5 个分类骨架
 - 在 `Tools.vue` 左侧侧边栏新增 5 个一级分类：存档管理 / Mod 工具 / 网络工具 / 计算工具 / 数据工具
 - 为每个分类新建页面组件（编排层）：`tools/archive/ArchivePage.vue`、`tools/mod-tools/ModToolsPage.vue`、`tools/network/NetworkPage.vue`、`tools/calc/CalcPage.vue`、`tools/data/DataPage.vue`
