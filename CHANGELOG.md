@@ -15,6 +15,9 @@
 - **Tooltip 组件替代原生 title**：所有 `:title="item.path"` 改用 `<Tooltip>` 组件（项目自定义组件约定）
 - **showConfirm 回调误用修复**：`executeCleanup` 中 `await showConfirm(...)` 当 Promise 用导致永远 return，已改为回调式用法
 - **拆分 CleanupGroupList.vue 子组件**：CleanupTool.vue 从 415 行降至 255 行，分组计算与渲染逻辑内聚到子组件（194 行），主组件只负责状态管理与编排
+- **路径溢出修复**：Tooltip 组件默认 `display: inline-flex` 宽度收缩到内容，导致内部 `truncate` 失效、长路径撑破父容器与右侧"X 个文件"重叠。改用 `block` prop 让 trigger 撑满父容器宽度，truncate 正确生效
+- **默认折叠状态**：扫描完成后所有分组默认折叠，用户先看到分组概览（组名 + 总大小 + 文件数 + 已选数），按需展开查看明细
+- **扫描完成 toast 提示**：扫描发现内容时 toast 提示"发现 N 项可清理内容，共 X"
 
 ### 修复
 

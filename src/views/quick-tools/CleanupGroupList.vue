@@ -175,7 +175,8 @@ function itemDisplayName(displayName: string): string {
                   </span>
                 </div>
                 <!-- 路径：用 Tooltip 组件展示完整路径，避免原生 title -->
-                <Tooltip :text="item.path" position="top" :delay="200">
+                <!-- block prop 让 trigger 撑满父容器宽度，内部 truncate 才能在 flex 布局下生效 -->
+                <Tooltip :text="item.path" position="top" :delay="200" block>
                   <div class="mt-0.5 truncate text-xs text-gray-400">{{ item.path }}</div>
                 </Tooltip>
               </div>

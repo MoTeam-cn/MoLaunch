@@ -57,9 +57,18 @@ async function startScan() {
         selectedPaths.value.add(item.path)
       }
     }
+    // 默认折叠所有分组：扫描完成后用户先看到分组概览，按需展开查看明细
+    const groupKeys = new Set<string>()
+    for (const item of result.items) {
+      const dashIdx = item.display_name.indexOf(' - ')
+      groupKeys.add(dashIdx > 0 ? item.display_name.substring(dashIdx + 3) : '全局')
+    }
+    collapsedGroups.value = groupKeys
     scanState.value = 'ready'
     if (result.items.length === 0) {
       toastInfo('未发现可清理的文件')
+    } else {
+      toastInfo(`发现 ${result.items.length} 项可清理内容，共 ${formatBytes(result.total_size)}`)
     }
   } catch (e) {
     toastError(`扫描失败: ${e instanceof Error ? e.message : String(e)}`)
