@@ -4,7 +4,9 @@
 //! 子模块：download（外部下载）/ filename（文件名获取）/ cleanup（清理垃圾）/ memory（内存优化）
 //! / mod_tools（Mod 依赖检测 + 去重）/ data_export（启动器数据导出）/ crash_analyzer（崩溃日志分析）
 //! / screenshot（截图管理）/ resourcepack（资源包管理）/ version_json（版本 JSON 读写）
+//! / archive（存档管理）/ network（网络延迟 + 服务器状态）/ nbt（NBT 数据查看）
 
+pub mod archive;
 pub mod cleanup;
 pub mod crash_analyzer;
 pub mod data_export;
@@ -12,6 +14,8 @@ pub mod download;
 pub mod filename;
 pub mod memory;
 pub mod mod_tools;
+pub mod nbt;
+pub mod network;
 pub mod resourcepack;
 pub mod screenshot;
 pub mod types;
@@ -108,6 +112,36 @@ pub async fn tools_manager(
             let p: VersionJsonSaveParams = serde_json::from_value(req.params)
                 .map_err(|e| format!("参数解析失败: {}", e))?;
             version_json::save(&state, p).await
+        }
+        // 存档管理
+        "archive_list" => archive::list(&state).await,
+        "archive_backup" => {
+            let p: ArchiveBackupParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            archive::backup(&state, p).await
+        }
+        "archive_restore" => {
+            let p: ArchiveRestoreParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            archive::restore(&state, p).await
+        }
+        // 网络延迟测试
+        "network_latency_test" => {
+            let p: NetworkLatencyTestParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            network::latency_test(&state, p).await
+        }
+        // 服务器状态检测
+        "server_ping" => {
+            let p: ServerPingParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            network::server_ping(&state, p).await
+        }
+        // NBT 数据查看
+        "nbt_parse" => {
+            let p: NbtParseParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            nbt::parse(&state, p).await
         }
         _ => Err(format!("未知操作: {}", req.action)),
     }

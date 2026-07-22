@@ -361,3 +361,149 @@ pub struct VersionJsonSaveResult {
     /// 是否成功
     pub success: bool,
 }
+
+// ===== 存档管理相关 =====
+
+/// 存档列表结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ArchiveListResult {
+    /// 存档条目（按名称排序）
+    pub items: Vec<ArchiveItem>,
+    /// 所有存档总字节数
+    pub total_size: u64,
+}
+
+/// 单个存档条目
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ArchiveItem {
+    /// 存档名称（文件夹名）
+    pub name: String,
+    /// 完整路径
+    pub path: String,
+    /// 大小（字节，递归）
+    pub size: u64,
+    /// 最后修改时间（Unix 秒级时间戳）
+    pub modified: u64,
+    /// 是否包含 level.dat（有效存档标志）
+    pub has_level_dat: bool,
+}
+
+/// 存档备份请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ArchiveBackupParams {
+    /// 存档名称（saves/ 下的文件夹名）
+    pub world_name: String,
+    /// 输出 zip 完整路径
+    pub output_path: String,
+    /// 是否排除玩家数据（true=导出分享包，false=完整备份）
+    pub exclude_player_data: bool,
+}
+
+/// 存档备份结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ArchiveBackupResult {
+    pub success: bool,
+    pub file_path: String,
+    pub file_size: u64,
+}
+
+/// 存档恢复请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ArchiveRestoreParams {
+    /// zip 文件完整路径
+    pub zip_path: String,
+    /// 恢复后的存档名称（为空则用 zip 文件名）
+    pub world_name: String,
+}
+
+/// 存档恢复结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ArchiveRestoreResult {
+    pub success: bool,
+    pub world_name: String,
+    pub message: String,
+}
+
+// ===== 网络延迟测试相关 =====
+
+/// 网络延迟测试请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NetworkLatencyTestParams {
+    /// 待测 URL 列表
+    pub urls: Vec<String>,
+}
+
+/// 网络延迟测试结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NetworkLatencyResult {
+    pub results: Vec<LatencyItem>,
+}
+
+/// 单个 URL 的延迟测试条目
+#[derive(Debug, Serialize, Deserialize)]
+pub struct LatencyItem {
+    pub url: String,
+    /// 延迟（毫秒），失败时为 None
+    pub latency_ms: Option<u64>,
+    /// HTTP 状态码（如 200），失败时为 0
+    pub status_code: u16,
+    /// 失败原因（成功时为空）
+    pub error: String,
+}
+
+// ===== 服务器状态检测相关 =====
+
+/// 服务器状态检测请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServerPingParams {
+    pub host: String,
+    pub port: u16,
+}
+
+/// 服务器状态检测结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ServerPingResult {
+    /// 服务器 MOTD（纯文本，已从 JSON/section 符号中提取）
+    pub motd: String,
+    /// 当前在线人数
+    pub online: i32,
+    /// 最大人数
+    pub max: i32,
+    /// 服务器版本（如 "1.20.4"）
+    pub version: String,
+    /// 延迟（毫秒）
+    pub latency_ms: u64,
+    /// Favicon（base64 data URI），无则为 None
+    pub favicon: Option<String>,
+    /// 失败原因（成功时为空）
+    pub error: String,
+}
+
+// ===== NBT 数据查看相关 =====
+
+/// NBT 解析请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NbtParseParams {
+    /// NBT 文件完整路径
+    pub file_path: String,
+}
+
+/// NBT 解析结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NbtParseResult {
+    /// 根节点
+    pub root: NbtNode,
+}
+
+/// NBT 树节点
+#[derive(Debug, Serialize, Deserialize)]
+pub struct NbtNode {
+    /// 节点名称
+    pub name: String,
+    /// 标签类型：compound / list / byte_array / int_array / long_array / string / int / short / long / float / double / byte
+    pub tag_type: String,
+    /// 值（仅叶子节点有值，compound/list 为 null）
+    pub value: Option<serde_json::Value>,
+    /// 子节点（仅 compound / list 有）
+    pub children: Vec<NbtNode>,
+}

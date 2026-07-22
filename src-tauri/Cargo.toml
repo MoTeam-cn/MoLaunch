@@ -42,6 +42,9 @@ urlencoding = "2.1"
 once_cell = "1"
 base64 = "0.22"
 encoding_rs = "0.8"
+# gzip 解压（NBT 文件通常为 gzip 压缩，如 player .dat / level.dat）
+# 注：simdnbt 0.6 依赖 nightly（portable_simd），无法在 stable 编译，NBT 解析改为手动实现
+flate2 = "1"
 # 文件系统监听（用于 mods 目录自动刷新，参考 PCL2 FileSystemWatcher）
 notify = "8"
 

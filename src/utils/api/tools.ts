@@ -329,3 +329,114 @@ export function versionJsonRead(versionId: string): Promise<VersionJsonReadResul
 export function versionJsonSave(versionId: string, content: string): Promise<VersionJsonSaveResult> {
   return toolsManager<VersionJsonSaveResult>('version_json_save', { version_id: versionId, content })
 }
+
+// ==================== 存档管理 ====================
+
+/** 存档条目 */
+export interface ArchiveItem {
+  name: string
+  path: string
+  size: number
+  modified: number
+  has_level_dat: boolean
+}
+
+/** 存档列表结果 */
+export interface ArchiveListResult {
+  items: ArchiveItem[]
+  total_size: number
+}
+
+/** 存档备份结果 */
+export interface ArchiveBackupResult {
+  success: boolean
+  file_path: string
+  file_size: number
+}
+
+/** 存档恢复结果 */
+export interface ArchiveRestoreResult {
+  success: boolean
+  world_name: string
+  message: string
+}
+
+/** 列出存档 */
+export function archiveList(): Promise<ArchiveListResult> {
+  return toolsManager<ArchiveListResult>('archive_list', {})
+}
+
+/** 备份存档（exclude_player_data=true 为导出分享包） */
+export function archiveBackup(worldName: string, outputPath: string, excludePlayerData: boolean): Promise<ArchiveBackupResult> {
+  return toolsManager<ArchiveBackupResult>('archive_backup', {
+    world_name: worldName,
+    output_path: outputPath,
+    exclude_player_data: excludePlayerData,
+  })
+}
+
+/** 从 zip 恢复存档 */
+export function archiveRestore(zipPath: string, worldName: string): Promise<ArchiveRestoreResult> {
+  return toolsManager<ArchiveRestoreResult>('archive_restore', {
+    zip_path: zipPath,
+    world_name: worldName,
+  })
+}
+
+// ==================== 网络延迟测试 ====================
+
+/** 延迟测试条目 */
+export interface LatencyItem {
+  url: string
+  latency_ms: number | null
+  status_code: number
+  error: string
+}
+
+/** 延迟测试结果 */
+export interface NetworkLatencyResult {
+  results: LatencyItem[]
+}
+
+/** 网络延迟测试 */
+export function networkLatencyTest(urls: string[]): Promise<NetworkLatencyResult> {
+  return toolsManager<NetworkLatencyResult>('network_latency_test', { urls })
+}
+
+// ==================== 服务器状态检测 ====================
+
+/** 服务器状态检测结果 */
+export interface ServerPingResult {
+  motd: string
+  online: number
+  max: number
+  version: string
+  latency_ms: number
+  favicon: string | null
+  error: string
+}
+
+/** 服务器状态检测（SLP 协议） */
+export function serverPing(host: string, port: number): Promise<ServerPingResult> {
+  return toolsManager<ServerPingResult>('server_ping', { host, port })
+}
+
+// ==================== NBT 数据查看 ====================
+
+/** NBT 树节点 */
+export interface NbtNode {
+  name: string
+  tag_type: string
+  value: unknown | null
+  children: NbtNode[]
+}
+
+/** NBT 解析结果 */
+export interface NbtParseResult {
+  root: NbtNode
+}
+
+/** 解析 NBT 文件 */
+export function nbtParse(filePath: string): Promise<NbtParseResult> {
+  return toolsManager<NbtParseResult>('nbt_parse', { file_path: filePath })
+}

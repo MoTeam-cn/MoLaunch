@@ -9,6 +9,33 @@
 
 ### 变更
 
+#### 存档管理工具（存档管理分类）
+- 后端：`archive.rs` 的 `list` 扫描 `{game_dir}/saves/` 子文件夹（递归计算大小、检测 level.dat）；`backup` 将存档打包为 zip（可选排除 playerdata/ 目录用于导出分享包）；`restore` 从 zip 解压到 saves/ 目录（目标已存在则失败，路径安全校验）
+- 前端：列出存档（名称、大小、修改时间、有效标志），点击备份弹出对话框填写输出路径 + 排除玩家数据选项，底部恢复区填写 zip 路径 + 存档名称，备份/恢复走 showConfirm 回调式
+- 后端类型：`ArchiveListResult` / `ArchiveItem` / `ArchiveBackupParams` / `ArchiveBackupResult` / `ArchiveRestoreParams` / `ArchiveRestoreResult`
+- 组件：`src/views/tools/archive/ArchiveManager.vue`，后端：`src-tauri/src/commands/tools/archive.rs`
+
+#### 网络延迟测试工具（网络工具分类）
+- 后端：`network.rs` 的 `latency_test` 用 reqwest 并发测试多个 URL 的 HTTP 延迟（10 秒超时），返回每个 URL 的延迟、状态码、错误信息
+- 前端：textarea 输入 URL 列表（每行一个），提供官方源/BMCLAPI/MCBBS 预设按钮一键填充，测试结果按延迟颜色分级（绿/黄/橙/红）
+- 后端类型：`NetworkLatencyTestParams` / `NetworkLatencyResult` / `LatencyItem`
+- 组件：`src/views/tools/network/NetworkLatencyTester.vue`，后端：`src-tauri/src/commands/tools/network.rs`
+
+#### 服务器状态检测工具（网络工具分类）
+- 后端：`network.rs` 的 `server_ping` 纯 Rust 手写 MC SLP 协议（1.7+ 版本），TCP 连接 → Handshake（VarInt 协议版本 -1 + 地址 + 端口 + next state=1）→ Status Request → 读取 JSON 响应 → Ping/Pong 计算延迟
+- MOTD 提取支持字符串和对象两种形式（含 extra 数组递归拼接），去除 §格式化代码；支持 Favicon base64 返回
+- VarInt 编码修复：对负数（如协议版本 -1）转 u32 位移避免无限循环
+- 前端：输入 host + port（默认 25565）→ 展示 Favicon + MOTD + 在线人数/版本/延迟三栏信息卡，延迟按颜色分级
+- 后端类型：`ServerPingParams` / `ServerPingResult`
+- 组件：`src/views/tools/network/ServerPinger.vue`
+
+#### NBT 数据查看工具（数据工具分类）
+- 后端：`nbt.rs` 手动实现 NBT 解析器（simcdnbt 需要 nightly Rust 不可用），用 flate2 gzip 解压 + 大端二进制解析，覆盖全部 13 种标签类型（TAG_End ~ TAG_Long_Array），含负长度校验和越界保护
+- 前端：输入 NBT 文件路径 → 递归树形展示（NbtTreeNode.vue 递归组件），每个节点显示类型徽章（按类型着色）+ 名称 + 值，支持展开/折叠，默认展开根节点
+- 后端类型：`NbtParseParams` / `NbtParseResult` / `NbtNode`
+- 组件：`src/views/tools/data/NbtViewer.vue` + `src/views/tools/data/NbtTreeNode.vue`（递归树组件），后端：`src-tauri/src/commands/tools/nbt.rs`
+- 依赖变更：移除 `simdnbt`（nightly-only），新增 `flate2 = "1"`（gzip 解压）
+
 #### 崩溃日志分析工具（数据工具分类）
 - 后端：`crash_analyzer.rs` 的 `analyze` 对 log_text 做大小写不敏感的子串/正则匹配，识别 6 类崩溃模式（java_version / missing_mod / memory / driver / mod_conflict / other）
 - 每条分析结果含分类、严重级别（error/warning/info）、标题、匹配行片段、中文修复建议

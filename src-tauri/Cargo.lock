@@ -2420,6 +2420,7 @@ dependencies = [
  "chrono",
  "encoding_rs",
  "env_logger",
+ "flate2",
  "futures-util",
  "hex",
  "libloading 0.8.9",
