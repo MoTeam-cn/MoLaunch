@@ -17,6 +17,13 @@ import grassIcon from '@/assets/blocks/Grass.png'
 import { inferVersionType, typeMetaMap, type VersionTypeMeta } from '@/composables/useVersionMeta'
 import Button from '@/components/common/Button.vue'
 import FolderSidebar from './version-select/FolderSidebar.vue'
+import {
+  ArrowLeftIcon,
+  ArrowPathIcon,
+  CheckIcon,
+  ArrowDownTrayIcon,
+  ArchiveBoxIcon,
+} from '@heroicons/vue/24/outline'
 
 const router = useRouter()
 const versionStore = useVersionStore()
@@ -102,14 +109,14 @@ onMounted(() => loadInstalled())
 </script>
 
 <template>
-  <div class="flex h-full">
+  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
     <!-- 左侧：文件夹列表（FolderSidebar 子组件） -->
     <FolderSidebar @switched="loadInstalled" />
 
     <!-- 右侧：版本列表 -->
     <div class="flex flex-1 flex-col overflow-hidden">
-      <!-- 顶部栏 -->
-      <header class="flex flex-none items-center justify-between border-b border-gray-200 bg-white px-4 py-3">
+      <!-- 顶部栏（对齐 Settings 标题栏规范：px-6 py-4 + text-lg + text-gray-900） -->
+      <header class="flex flex-none items-center justify-between border-b border-gray-200 bg-white px-6 py-4 shrink-0">
         <div class="flex items-center gap-3">
           <Button
             type="ghost"
@@ -117,13 +124,11 @@ onMounted(() => loadInstalled())
             @click="goBack"
           >
             <template #icon>
-              <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M12.7 4.3a1 1 0 010 1.4L8.4 10l4.3 4.3a1 1 0 01-1.4 1.4l-5-5a1 1 0 010-1.4l5-5a1 1 0 011.4 0z" clip-rule="evenodd" />
-              </svg>
+              <ArrowLeftIcon class="h-4 w-4" />
             </template>
             返回
           </Button>
-          <h1 class="text-base font-semibold text-gray-800">选择版本</h1>
+          <h2 class="text-lg font-semibold text-gray-900">选择版本</h2>
         </div>
         <Button
           type="ghost"
@@ -132,33 +137,26 @@ onMounted(() => loadInstalled())
           @click="loadInstalled"
         >
           <template #icon>
-            <svg class="h-4 w-4" :class="{ 'animate-spin': loading }" viewBox="0 0 20 20" fill="currentColor">
-              <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.1a7 7 0 0111.6 2.5 1 1 0 11-1.88.7A5 5 0 005.9 6.4H8a1 1 0 010 2H3a1 1 0 01-1-1V3a1 1 0 011-1zm5.3 14.3a1 1 0 011.4 0l5-5a1 1 0 00-1.4-1.4L10 14.6l-2.3-2.3a1 1 0 00-1.4 1.4l3 3z" clip-rule="evenodd" />
-            </svg>
+            <ArrowPathIcon class="h-4 w-4" :class="{ 'animate-spin': loading }" />
           </template>
           刷新
         </Button>
       </header>
 
-      <!-- 主体 -->
-      <main class="flex-1 overflow-y-auto p-4">
+      <!-- 主体（对齐 Settings 内容区规范：p-6） -->
+      <main class="flex-1 overflow-y-auto p-6">
         <!-- 加载中 -->
         <div v-if="loading && !hasVersions" class="flex h-full items-center justify-center">
           <div class="flex flex-col items-center gap-3 text-gray-400">
-            <svg class="h-8 w-8 animate-spin" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
-              <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-            </svg>
+            <ArrowPathIcon class="h-8 w-8 animate-spin" />
             <span class="text-sm">正在获取版本列表...</span>
           </div>
         </div>
 
         <!-- 空状态 -->
         <div v-else-if="!hasVersions" class="flex h-full items-center justify-center">
-          <div class="flex flex-col items-center gap-4 rounded-2xl border border-gray-200 bg-white px-12 py-10 text-center shadow-sm">
-            <svg class="h-12 w-12 text-gray-300" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M4 4a2 2 0 012-2h12a2 2 0 012 2v16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v4h12V4H6zm0 6v4h12v-4H6zm0 6v4h12v-4H6z" />
-            </svg>
+          <div class="flex flex-col items-center gap-4 rounded-lg border border-gray-200 bg-white px-12 py-10 text-center shadow-sm">
+            <ArchiveBoxIcon class="h-12 w-12 text-gray-300" />
             <div>
               <p class="text-base font-medium text-gray-700">无可用版本</p>
               <p class="mt-1 text-sm text-gray-400">当前文件夹下未找到任何已安装的版本</p>
@@ -168,33 +166,30 @@ onMounted(() => loadInstalled())
               @click="goToDownloads"
             >
               <template #icon>
-                <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M10 3a1 1 0 011 1v6.6l2.3-2.3a1 1 0 111.4 1.4l-4 4a1 1 0 01-1.4 0l-4-4a1 1 0 111.4-1.4L9 10.6V4a1 1 0 011-1z" />
-                  <path d="M4 14a1 1 0 011 1v1h10v-1a1 1 0 112 0v2a1 1 0 01-1 1H4a1 1 0 01-1-1v-2a1 1 0 011-1z" />
-                </svg>
+                <ArrowDownTrayIcon class="h-4 w-4" />
               </template>
               下载游戏
             </Button>
           </div>
         </div>
 
-        <!-- 版本分组卡片 -->
-        <div v-else class="mx-auto max-w-3xl space-y-4">
+        <!-- 版本分组卡片（对齐 Settings 卡片规范：rounded-lg + border-gray-300 + 无灰底头 + space-y-6） -->
+        <div v-else class="mx-auto max-w-3xl space-y-6">
           <section
             v-for="group in groups"
             :key="group.key"
-            class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm"
+            class="overflow-hidden rounded-lg border border-gray-300 bg-white"
           >
-            <div class="flex items-center justify-between border-b border-gray-100 bg-gray-50/60 px-4 py-2.5">
-              <h2 class="text-sm font-semibold text-gray-700">{{ group.title }}</h2>
-              <span class="rounded-full bg-gray-200/70 px-2 py-0.5 text-xs font-medium text-gray-500">
+            <div class="flex items-center justify-between px-5 pt-5 pb-3">
+              <h3 class="text-sm font-semibold text-gray-900">{{ group.title }}</h3>
+              <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
                 {{ group.versions.length }}
               </span>
             </div>
-            <ul class="divide-y divide-gray-50">
+            <ul class="divide-y divide-gray-100">
               <li v-for="ver in group.versions" :key="ver.id">
                 <button
-                  class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-primary-50/40"
+                  class="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-gray-50"
                   :class="{ 'bg-primary-50': ver.id === selectedId }"
                   @click="selectVersion(ver.id)"
                 >
@@ -203,9 +198,7 @@ onMounted(() => loadInstalled())
                     <div class="truncate text-sm font-medium text-gray-900">{{ ver.id }}</div>
                     <div class="mt-0.5 text-xs text-gray-400">{{ typeMeta(ver.inferredType).label }}</div>
                   </div>
-                  <svg v-if="ver.id === selectedId" class="h-5 w-5 flex-none text-primary-600" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.7 5.3a1 1 0 010 1.4l-7.5 7.5a1 1 0 01-1.4 0L3.3 9.7a1 1 0 011.4-1.4l3.8 3.8 6.8-6.8a1 1 0 011.4 0z" clip-rule="evenodd" />
-                  </svg>
+                  <CheckIcon v-if="ver.id === selectedId" class="h-5 w-5 flex-none text-primary-500" />
                 </button>
               </li>
             </ul>

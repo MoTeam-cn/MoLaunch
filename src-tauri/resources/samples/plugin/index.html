@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>示例插件</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; padding: 16px; margin: 0; color: #1f2937; }
+    h1 { font-size: 16px; margin: 0 0 12px; }
+    button { padding: 6px 12px; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; cursor: pointer; font-size: 12px; }
+    button:hover { background: #f3f4f6; }
+    #output { margin-top: 12px; padding: 8px; background: #f9fafb; border-radius: 4px; font-size: 11px; min-height: 20px; white-space: pre-wrap; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <h1>示例插件</h1>
+  <button id="btn-config">调用 SDK: getConfig</button>
+  <button id="btn-cache">调用 SDK: getCacheStats</button>
+  <div id="output">等待操作...</div>
+  <script>
+    function setOutput(text) {
+      document.getElementById('output').textContent = text;
+    }
+    document.getElementById('btn-config').addEventListener('click', async () => {
+      try {
+        const config = await window.molaunch.getConfig();
+        setOutput(JSON.stringify(config, null, 2));
+      } catch (e) {
+        setOutput('错误: ' + (e.message || e));
+      }
+    });
+    document.getElementById('btn-cache').addEventListener('click', async () => {
+      try {
+        const stats = await window.molaunch.getCacheStats();
+        setOutput(JSON.stringify(stats, null, 2));
+      } catch (e) {
+        setOutput('错误: ' + (e.message || e));
+      }
+    });
+  </script>
+</body>
+</html>

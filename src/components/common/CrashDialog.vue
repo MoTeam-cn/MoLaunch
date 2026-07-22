@@ -123,7 +123,7 @@
 import { ref, computed } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-shell'
-import { showSuccess, showError } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import { saveFile } from '@/utils/api/system'
 import type { CrashInfo } from '@/utils/crashDialog'
 import Button from '@/components/common/Button.vue'
@@ -152,7 +152,7 @@ async function openCrashReport() {
   try {
     await open(crashInfo.value.crash_report_path)
   } catch (e) {
-    showError('打开文件失败', String(e))
+    toastError('打开文件失败', String(e))
   }
 }
 
@@ -191,9 +191,9 @@ async function exportReport() {
       path: filePath,
       contents: lines.join('\n'),
     })
-    showSuccess('导出成功', `错误报告已保存到：${filePath}`)
+    toastSuccess('导出成功', `错误报告已保存到：${filePath}`)
   } catch (e) {
-    showError('导出失败', String(e))
+    toastError('导出失败', String(e))
   }
 }
 

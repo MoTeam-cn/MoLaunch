@@ -7,7 +7,7 @@
 import { ref, watch } from 'vue'
 import type { ResourceType, ResourceProject, SearchResult } from '@/types/community'
 import { searchResources } from '@/utils/api/community'
-import { showError } from '@/utils/toast'
+import { toastError } from '@/utils/toast'
 import { useVersionStore } from '@/stores/version'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import SearchBar from '@/components/community/SearchBar.vue'
@@ -54,7 +54,7 @@ async function doSearch() {
     pageSize.value = result.page_size
     finish()
   } catch (e: any) {
-    showError('搜索失败: ' + (e?.message || String(e)))
+    toastError('搜索失败: ' + (e?.message || String(e)))
     projects.value = []
     total.value = 0
     fail()

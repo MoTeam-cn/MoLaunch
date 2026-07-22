@@ -12,7 +12,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
-import { showError } from '@/utils/toast'
+import { toastError } from '@/utils/toast'
 import Alert from '@/components/common/Alert.vue'
 import Select from '@/components/common/Select.vue'
 
@@ -26,7 +26,7 @@ async function toggleDevMode(v: boolean) {
     // 通知 Settings.vue 父组件更新侧边菜单（dev 菜单项的显隐）
     window.dispatchEvent(new CustomEvent('developer-mode-changed', { detail: v }))
   } catch (e) {
-    showError('设置开发者模式失败：' + e)
+    toastError('设置开发者模式失败：' + e)
     // 回滚 UI 状态
     devMode.value = !v
   }

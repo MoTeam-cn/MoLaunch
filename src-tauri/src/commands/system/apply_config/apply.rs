@@ -40,6 +40,7 @@ pub(crate) async fn apply_config_inner(
         apply_launcher(config, &patch, &mut log_level_pending);
         apply_community(config, &patch);
         apply_launch_advanced(config, &patch);
+        apply_external_download(config, &patch);
     })
     .await?;
 
@@ -220,5 +221,18 @@ fn apply_launch_advanced(config: &mut crate::state::AppConfig, patch: &ConfigPat
     if let Some(v) = patch.launch_use_dedicated_gpu {
         log_info!("[Config] launch_use_dedicated_gpu = {}", v);
         config.launch_use_dedicated_gpu = v;
+    }
+}
+
+/// 外部下载工具域：external_download_dir
+///
+/// 双层 Option 语义：
+/// - `None`：不更新（保持原值）
+/// - `Some(None)`：清空（回退到默认 .Molaunch/Download/）
+/// - `Some(Some(dir))`：设置为指定目录
+fn apply_external_download(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+    if let Some(ref dir_opt) = patch.external_download_dir {
+        log_info!("[Config] external_download_dir = {:?}", dir_opt);
+        config.external_download_dir = dir_opt.clone();
     }
 }

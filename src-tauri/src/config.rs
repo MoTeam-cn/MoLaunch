@@ -151,6 +151,12 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         app_config.launch_use_dedicated_gpu = v == "true" || v == "1";
     }
 
+    // ExternalDownload
+    app_config.external_download_dir = config
+        .get("ExternalDownload", "dir")
+        .filter(|s| !s.is_empty())
+        .map(|s| s.clone());
+
     // Version
     app_config.selected_version = config
         .get("Version", "selected")
@@ -294,6 +300,13 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "Version",
         "selected",
         config.selected_version.as_deref().unwrap_or(""),
+    );
+
+    // ExternalDownload
+    ini.set(
+        "ExternalDownload",
+        "dir",
+        config.external_download_dir.as_deref().unwrap_or(""),
     );
 
     storage.write_config(&ini).map_err(|e| e.to_string())?;

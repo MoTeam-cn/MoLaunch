@@ -126,6 +126,25 @@ pub async fn save_file(
     Ok(result.map(|p| p.to_string()))
 }
 
+/// 写入文本文件到指定路径
+///
+/// 用于导出示例文件（插件模板、布局示例等），路径通常由 `save_file` 对话框返回。
+/// 若文件已存在则覆盖，父目录不存在时自动创建。
+#[tauri::command]
+pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
+    let path = std::path::PathBuf::from(&path);
+
+    // 确保父目录存在
+    if let Some(parent) = path.parent() {
+        crate::utils::fs::ensure_dir(parent)?;
+    }
+
+    std::fs::write(&path, content).map_err(|e| format!("写入文件失败: {}", e))?;
+
+    log_info!("[System] Text file written: {}", path.display());
+    Ok(())
+}
+
 /// 更新游戏目录（保留独立命令，因为调用方 version/manage.rs 在切换版本时直接调用）
 ///
 /// 重构说明：此命令保留，未合并到 `apply_config`，因为它在版本切换流程中被

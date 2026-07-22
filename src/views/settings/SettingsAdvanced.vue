@@ -7,6 +7,7 @@ import Select from '@/components/common/Select.vue'
 import DevModeToggle from '@/components/settings/DevModeToggle.vue'
 import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 import {
   ExclamationTriangleIcon,
   EyeIcon,
@@ -199,14 +200,15 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
           >
             <template #suffix>
               <Tooltip :text="cfShowKey ? '隐藏' : '显示'" position="top">
-                <button
-                  type="button"
-                  class="p-1 text-gray-400 hover:text-gray-600"
+                <Button
+                  type="ghost"
+                  size="mini"
+                  class="!h-6 !w-6 !p-0 text-gray-400 hover:!text-gray-600"
                   @click="cfShowKey = !cfShowKey"
                 >
                   <EyeSlashIcon v-if="cfShowKey" class="w-4 h-4" />
                   <EyeIcon v-else class="w-4 h-4" />
-                </button>
+                </Button>
               </Tooltip>
             </template>
           </Input>

@@ -32,6 +32,20 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         }
         "about/backend-deps.txt" => Some(include_str!("../resources/about/backend-deps.txt")),
         "about/licenses.txt" => Some(include_str!("../resources/about/licenses.txt")),
+        // 示例文件（供开发者测试调试，前端导出时通过 IPC 读取）
+        "samples/plugin/manifest.json" => {
+            Some(include_str!("../resources/samples/plugin/manifest.json"))
+        }
+        "samples/plugin/index.html" => Some(include_str!("../resources/samples/plugin/index.html")),
+        "samples/layout/layout-sample.json" => {
+            Some(include_str!("../resources/samples/layout/layout-sample.json"))
+        }
+        "samples/layout/layout-sample.xml" => {
+            Some(include_str!("../resources/samples/layout/layout-sample.xml"))
+        }
+        "samples/layout/layout-sample.html" => {
+            Some(include_str!("../resources/samples/layout/layout-sample.html"))
+        }
         _ => None,
     }
 }
@@ -184,8 +198,7 @@ pub fn extract_sdk() -> anyhow::Result<std::path::PathBuf> {
     let sdk_filename = crate::sdk::get_sdk_filename();
     let resource_path = format!("sdk/{}", sdk_filename);
 
-    let temp_dir = std::env::temp_dir().join("MoLaunch").join("sdk");
-    let target_path = temp_dir.join(sdk_filename);
+    let target_path = crate::utils::cache_temp::sdk_library_path(sdk_filename);
 
     extract_resource(&resource_path, &target_path)?;
 

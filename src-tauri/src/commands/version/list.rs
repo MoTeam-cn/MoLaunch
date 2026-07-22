@@ -3,7 +3,6 @@
 use crate::minecraft::download;
 use crate::minecraft::fools;
 use crate::minecraft::isolation::{self, IsolationMode};
-use crate::minecraft::sources::DownloadSourceMode;
 use crate::minecraft::version::scan as version_scan;
 use crate::minecraft::version::setup::VersionSetup;
 use crate::minecraft::version::state::VersionType;
@@ -20,10 +19,7 @@ use super::types::{VersionInfo, VersionListResult};
 pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResult, String> {
     log_info!("Fetching version list");
 
-    let config = state.config.lock().await;
-    let mirror_url = config.mirror_url.clone();
-    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
-    drop(config);
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let result = download::fetch_version_list(mirror_url.as_deref(), source_mode)
         .await
@@ -65,17 +61,12 @@ pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResu
 
 /// 解析时间字符串为Unix时间戳
 fn parse_timestamp(time_str: &str) -> i64 {
-    // 尝试解析ISO 8601格式
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(time_str) {
+    // 使用统一的时间解析工具，支持 RFC3339 / naive datetime / 纯日期
+    match crate::utils::datetime::parse_utc(time_str) {
         #[allow(deprecated)]
-        return dt.timestamp();
+        Some(dt) => dt.timestamp(),
+        None => 0,
     }
-    // 尝试解析其他格式
-    if let Ok(dt) = chrono::NaiveDateTime::parse_from_str(time_str, "%Y-%m-%dT%H:%M:%S") {
-        #[allow(deprecated)]
-        return dt.timestamp();
-    }
-    0
 }
 
 /// Installed version info
@@ -269,10 +260,8 @@ pub async fn get_version_effective_dir(
 ) -> Result<String, String> {
     sanitize_version_id(&version_id)?;
 
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    let global_isolation_mode = config.isolation_mode;
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let global_isolation_mode = state.config.lock().await.isolation_mode;
 
     // 版本独立隔离设置覆盖全局
     let isolation_mode = resolve_isolation_mode(&game_dir, &version_id, global_isolation_mode);

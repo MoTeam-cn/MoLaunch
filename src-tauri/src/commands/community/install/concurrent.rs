@@ -136,7 +136,7 @@ pub(super) fn extract_overrides(
         let target = instance_dir.join(relative);
         if let Some(parent) = target.parent() {
             if !parent.exists() {
-                std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+                crate::utils::fs::ensure_dir(parent)?;
             }
         }
 

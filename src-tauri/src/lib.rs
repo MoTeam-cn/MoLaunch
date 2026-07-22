@@ -52,6 +52,11 @@ pub fn run() {
     minecraft::community::secure_storage::init_enabled();
     minecraft::community::secure_storage::set_sdk(app_state.sdk.clone());
 
+    // 启动缓存定期清理任务（启动时立即清理一次，之后每 1h 重复执行）
+    // 清理超过 24h 的不重要缓存文件（图片、安装器、预加载、临时安装包等）
+    // 不清理 SDK 动态库和 Java Runtime（重要资源）
+    utils::cache_cleanup::spawn_cleanup_task();
+
     log_info!("[Startup] Pre-builder setup done, constructing Tauri Builder...");
 
     let builder = tauri::Builder::default()
@@ -72,10 +77,10 @@ pub fn run() {
             commands::sdk::is_sdk_initialized,
             commands::sdk::get_device_id,
             commands::sdk::check_update_lite,
-            // 认证命令
+            // 认证命令（account 子模块拆分为 ms / offline / session）
             commands::auth::offline::login_offline,
-            commands::auth::account::get_login_status,
-            commands::auth::account::logout,
+            commands::auth::account::session::get_login_status,
+            commands::auth::account::session::logout,
             // 微软登录命令
             commands::auth::microsoft::ms_login_get_config,
             commands::auth::microsoft::ms_login_web_start,
@@ -83,14 +88,14 @@ pub fn run() {
             commands::auth::microsoft::ms_login_request_device_code,
             commands::auth::microsoft::ms_login_poll,
             commands::auth::microsoft::ms_login_refresh,
-            commands::auth::account::get_ms_accounts,
-            commands::auth::account::remove_ms_account,
-            commands::auth::account::switch_ms_account,
-            commands::auth::account::get_offline_accounts,
-            commands::auth::account::remove_offline_account,
-            commands::auth::account::switch_offline_account,
-            commands::auth::account::set_offline_skin,
-            commands::auth::account::save_custom_skin,
+            commands::auth::account::ms::get_ms_accounts,
+            commands::auth::account::ms::remove_ms_account,
+            commands::auth::account::ms::switch_ms_account,
+            commands::auth::account::offline::get_offline_accounts,
+            commands::auth::account::offline::remove_offline_account,
+            commands::auth::account::offline::switch_offline_account,
+            commands::auth::account::offline::set_offline_skin,
+            commands::auth::account::offline::save_custom_skin,
             // 皮肤管理命令
             commands::skin::get_skin_cape_info,
             commands::skin::get_skin_url,
@@ -138,15 +143,16 @@ pub fn run() {
             // - personalization: 版本个性化设置
             commands::version::personalization::get_version_personalization,
             commands::version::personalization::update_version_personalization,
-            // - mods: Mod 管理
-            commands::version::mods::is_version_modable,
-            commands::version::mods::list_mods,
-            commands::version::mods::toggle_mod,
-            commands::version::mods::delete_mod,
-            commands::version::mods::install_mod,
-            commands::version::mods::open_mods_dir,
-            commands::version::mods::reveal_mod_file,
-            commands::version::mods::get_version_mods_dir,
+            // - mods: Mod 管理（命令分散到 list/manage/install/watcher 子模块，
+            //   tauri::command 宏 __cmd__ 符号无法 pub use 重导出，故使用完整路径注册）
+            commands::version::mods::list::is_version_modable,
+            commands::version::mods::list::list_mods,
+            commands::version::mods::manage::toggle_mod,
+            commands::version::mods::manage::delete_mod,
+            commands::version::mods::install::install_mod,
+            commands::version::mods::install::open_mods_dir,
+            commands::version::mods::install::reveal_mod_file,
+            commands::version::mods::install::get_version_mods_dir,
             commands::version::mods::watcher::watch_mods_dir,
             commands::version::mods::watcher::unwatch_mods_dir,
             // - preload: Mod 详情预加载
@@ -164,6 +170,7 @@ pub fn run() {
             commands::version::launch::cancel_launch,
             commands::version::launch::stop_game,
             commands::version::launch::get_running_game,
+            commands::version::launch::get_launch_history,
             // - script_export: 启动脚本导出
             commands::version::script_export::export_launch_script,
             // Java 命令
@@ -181,6 +188,7 @@ pub fn run() {
             commands::system::select_folder,
             commands::system::select_file,
             commands::system::save_file,
+            commands::system::write_text_file,
             // 统一配置读写命令（取代此前 33 个分散的 get_*/set_* 命令）
             commands::system::get_config,
             commands::system::apply_config,
@@ -194,6 +202,7 @@ pub fn run() {
             commands::system::unlock_developer_mode,
             commands::system::get_storage_dirs,
             commands::system::get_system_info,
+            commands::system::get_cache_stats,
             // 关于页面数据命令（从 resources/about/ 加载 markdown 表格数据）
             commands::system::get_about_data,
             // 日志查看命令（开发者模式）
@@ -206,12 +215,27 @@ pub fn run() {
             commands::community::detail::get_project_detail,
             commands::community::detail::get_project_versions,
             commands::community::detail::get_mcmod_url,
-            commands::community::install::download_resource,
-            commands::community::install::download_resource_to_path,
-            commands::community::install::format_download_filename,
-            commands::community::install::install_resource,
-            commands::community::install::install_modpack,
-            commands::community::install::get_resource_install_path,
+            commands::community::install::resource::download_resource,
+            commands::community::install::resource::download_resource_to_path,
+            commands::community::install::resource::format_download_filename,
+            commands::community::install::resource::install_resource,
+            commands::community::install::modpack::install_modpack,
+            commands::community::install::resource::get_resource_install_path,
+            // 插件系统命令（拆分到 plugins/ 子模块：sandbox / install / spawn / window / layout / export / personalization）
+            commands::plugins::sandbox::list_external_plugins,
+            commands::plugins::sandbox::read_external_plugin_file,
+            commands::plugins::sandbox::uninstall_external_plugin,
+            commands::plugins::install::install_external_plugin_from_dir,
+            commands::plugins::install::install_external_plugin_from_zip,
+            commands::plugins::spawn::plugin_spawn_process,
+            commands::plugins::window::plugin_create_window,
+            commands::plugins::layout::load_custom_layout,
+            commands::plugins::export::read_layout_sample,
+            commands::plugins::export::export_plugin_sample,
+            commands::plugins::personalization::read_personalization,
+            commands::plugins::personalization::write_personalization,
+            // 外部下载工具命令（统一 tools_manager 入口）
+            commands::tools::tools_manager,
         ])
         .on_window_event(|_window, event| {
             // 窗口关闭时保存配置

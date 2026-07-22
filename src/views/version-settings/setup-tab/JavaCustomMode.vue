@@ -12,7 +12,7 @@ import { computed } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { isJavaCompatible } from '@/utils/api/java'
-import { showSuccess, showError } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
@@ -79,8 +79,8 @@ async function handleSelectJavaFromList(value: string) {
   try {
     await tauri.updateVersionPersonalization(selectedId.value, { javaPath: value })
     if (personalization.value) personalization.value.java_path = value
-    showSuccess('Java 路径已保存')
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess('Java 路径已保存')
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 /** 手动导入 Java（选择 javaw.exe），导入后自动选中并保存 */
@@ -92,15 +92,15 @@ async function handleImportJava() {
   await javaStore.refreshJava()
   const found = javaStore.javaList.find(j => j.executable === filePath)
   if (!found) {
-    showError('所选文件不是有效的 Java 可执行文件')
+    toastError('所选文件不是有效的 Java 可执行文件')
     return
   }
   emit('update:customJavaPath', filePath)
   try {
     await tauri.updateVersionPersonalization(selectedId.value, { javaPath: filePath })
     if (personalization.value) personalization.value.java_path = filePath
-    showSuccess('Java 路径已保存')
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess('Java 路径已保存')
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 /** 刷新 Java 列表 */
@@ -108,9 +108,9 @@ async function handleRefreshJavaList() {
   emit('update:refreshingJava', true)
   try {
     await javaStore.refreshJava()
-    showSuccess(`已刷新 Java 列表，共找到 ${javaStore.javaList.length} 个 Java`)
+    toastSuccess(`已刷新 Java 列表，共找到 ${javaStore.javaList.length} 个 Java`)
   } catch (e) {
-    showError('刷新 Java 列表失败：' + String(e))
+    toastError('刷新 Java 列表失败：' + String(e))
   } finally {
     emit('update:refreshingJava', false)
   }

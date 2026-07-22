@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::shared;
-use super::{utils, LoaderVersion};
+use super::LoaderVersion;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::launcher_profiles;
@@ -113,8 +113,8 @@ pub async fn list_versions(
     }
 
     versions.sort_by(|a, b| {
-        let v_a = utils::parse_version_number(&a.version);
-        let v_b = utils::parse_version_number(&b.version);
+        let v_a = crate::utils::version::parse_number(&a.version);
+        let v_b = crate::utils::version::parse_number(&b.version);
         v_b.cmp(&v_a)
     });
 
@@ -179,8 +179,7 @@ pub async fn install(
 
     let file_name = format!("neoforge-{}-installer.jar", neoforge_version);
     let installer_url = sources::neoforge_installer_url(neoforge_version);
-    let temp_dir = std::env::temp_dir().join("MoLaunch").join("TaskTemp");
-    std::fs::create_dir_all(&temp_dir)?;
+    let temp_dir = crate::utils::cache_temp::ensure_task_temp_dir()?;
     let installer_path = temp_dir.join(&file_name);
 
     let hash_url = format!("{}.sha1", installer_url);

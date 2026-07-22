@@ -17,7 +17,7 @@ import { ref, computed, watch } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { isJavaCompatible } from '@/utils/api/java'
-import { showSuccess, showError } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
@@ -120,15 +120,15 @@ async function handleSaveJavaMode(mode: string) {
       folder: '已设置为使用版本文件夹中的 Java',
       custom: '已切换为指定 Java',
     }
-    showSuccess(labelMap[mode] || 'Java 模式已保存')
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess(labelMap[mode] || 'Java 模式已保存')
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 /** 保存 auto_version 模式的版本范围 */
 async function handleSaveJavaVersionRange() {
   if (!selectedId.value) return
   if (javaVersionRangeTip.value) {
-    showError(javaVersionRangeTip.value)
+    toastError(javaVersionRangeTip.value)
     return
   }
   try {
@@ -141,8 +141,8 @@ async function handleSaveJavaVersionRange() {
       personalization.value.javaVersionMin = javaVersionMin.value
       personalization.value.javaVersionMax = javaVersionMax.value
     }
-    showSuccess('Java 版本范围已保存')
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess('Java 版本范围已保存')
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 /** 监听 personalization 加载完成，初始化 Java 相关字段 + 加载 Java 需求 */

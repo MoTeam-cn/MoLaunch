@@ -36,11 +36,7 @@ pub fn total_bytes(files_to_download: &[(String, RuntimeFile)]) -> u64 {
 ///
 /// 存到官启默认 .minecraft 目录下，跨游戏目录共享，不随 game_dir 删除而丢失。
 pub fn get_runtime_dir(component: &str) -> Result<PathBuf, String> {
-    let appdata = std::env::var("APPDATA").map_err(|_| "无法获取 APPDATA 环境变量".to_string())?;
-    Ok(PathBuf::from(appdata)
-        .join(".minecraft")
-        .join("runtime")
-        .join(component))
+    crate::utils::cache_app::runtime_dir(component)
 }
 
 /// 在 runtime 目录中查找 java.exe

@@ -16,12 +16,13 @@ import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, ins
 import { installMerged } from '@/utils/api/loader'
 import { useVersionStore } from '@/stores/version'
 import { saveFile } from '@/utils/api/system'
-import { showSuccess, showError, toastInfo } from '@/utils/toast'
+import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showPrompt } from '@/utils/modal'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import HorizontalFilter from '@/components/common/HorizontalFilter.vue'
 import ResourceDetailHeader from './resource-detail/ResourceDetailHeader.vue'
+import { ArchiveBoxXMarkIcon } from '@heroicons/vue/24/outline'
 import VersionGroupCard from './resource-detail/VersionGroupCard.vue'
 
 const versionStore = useVersionStore()
@@ -69,7 +70,7 @@ watch(
         }
       }
     } catch (e: any) {
-      showError('加载版本列表失败: ' + (e?.message || String(e)))
+      toastError('加载版本列表失败: ' + (e?.message || String(e)))
       fail()
     } finally {
       loading.value = false
@@ -87,7 +88,7 @@ async function handleDownload(v: ResourceVersion) {
     try {
       const exists = await invoke<boolean>('plugin:fs|exists', { path: targetPath })
       if (exists) {
-        showError(`此版本已禁止更新 Mod：${finalFileName} 已存在。\n如需更新，请前往 版本设置 → 高级选项 关闭「禁止更新 Mod」`)
+        toastError(`此版本已禁止更新 Mod：${finalFileName} 已存在。\n如需更新，请前往 版本设置 → 高级选项 关闭「禁止更新 Mod」`)
         return
       }
     } catch (e) {
@@ -105,7 +106,7 @@ async function handleDownload(v: ResourceVersion) {
     await downloadResourceToPath(v.download_url, finalFileName, savePath)
     // 不调用 finishDownload，由轮询检测 is_complete 自动完成
   } catch (e: any) {
-    showError('下载失败: ' + (e?.message || String(e)))
+    toastError('下载失败: ' + (e?.message || String(e)))
     versionStore.finishDownload()
   } finally {
     downloading.value = null
@@ -143,9 +144,9 @@ async function handleInstallModpack(v: ResourceVersion) {
       loader === 'fabric' || loader === 'quilt' ? lv : undefined,
       undefined, undefined, instanceName,
     )
-    showSuccess(`整合包 ${instanceName} 安装完成`)
+    toastSuccess(`整合包 ${instanceName} 安装完成`)
   } catch (e: any) {
-    showError('整合包安装失败: ' + (e?.message || String(e)))
+    toastError('整合包安装失败: ' + (e?.message || String(e)))
     versionStore.finishDownload()
   } finally {
     downloading.value = null
@@ -251,8 +252,9 @@ function promptForInstanceName(defaultName: string): Promise<string | null> {
             </div>
 
             <!-- 空状态 -->
-            <div v-else class="py-12 text-center text-sm text-gray-400">
-              暂无版本数据
+            <div v-else class="py-12 flex flex-col items-center justify-center text-gray-400">
+              <ArchiveBoxXMarkIcon class="w-10 h-10 mb-3" />
+              <span class="text-sm">暂无版本数据</span>
             </div>
 
           </div>

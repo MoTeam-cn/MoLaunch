@@ -7,7 +7,7 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
-import { showSuccess, showError } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
 import type { JavaRequirements, JavaDownloadProgress } from '@/types/java'
 
@@ -39,10 +39,10 @@ async function handleDownload() {
   progress.value = null
   try {
     const javaPath = await tauri.downloadJava(targetMajor.value)
-    showSuccess(`Java ${targetMajor.value} 下载完成`)
+    toastSuccess(`Java ${targetMajor.value} 下载完成`)
     emit('downloaded', javaPath)
   } catch (e) {
-    showError('Java 下载失败：' + String(e))
+    toastError('Java 下载失败：' + String(e))
   } finally {
     downloading.value = false
     progress.value = null

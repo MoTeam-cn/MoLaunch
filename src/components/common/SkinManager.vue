@@ -23,6 +23,7 @@ import SkinUploadPanel from './skin-manager/SkinUploadPanel.vue'
 import SkinLocalSelector from './skin-manager/SkinLocalSelector.vue'
 import SkinPreviewPanel from './skin-manager/SkinPreviewPanel.vue'
 import AlertV2 from './AlertV2.vue'
+import Button from './Button.vue'
 import { useSkinOperations } from '@/composables/useSkinOperations'
 
 const props = defineProps<{ visible: boolean }>()
@@ -76,12 +77,14 @@ watch(() => props.visible, (v) => {
             <h3 class="text-base font-semibold text-gray-900">
               {{ isMicrosoft ? '皮肤与披风管理' : '本地皮肤选择' }}
             </h3>
-            <button
-              class="rounded-md p-1 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+            <Button
+              type="ghost"
+              size="mini"
+              class="!h-7 !w-7 !p-0 text-gray-400 hover:!text-gray-600 hover:!bg-gray-100"
               @click="close"
             >
               <svg class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 01-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 01-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z" clip-rule="evenodd" /></svg>
-            </button>
+            </Button>
           </div>
 
           <!-- 内容 -->

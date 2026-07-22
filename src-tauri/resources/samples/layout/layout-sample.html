@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>示例面板</title>
+</head>
+<body>
+  <h3>示例面板</h3>
+  <div class="grid grid-3">
+    <div class="card">
+      <div class="stat-label">缓存占用</div>
+      <div class="stat-value" id="cache-size">加载中...</div>
+    </div>
+    <div class="card">
+      <div class="stat-label">内存使用率</div>
+      <div class="stat-value" id="mem-usage">加载中...</div>
+    </div>
+    <div class="card">
+      <div class="stat-label">已装版本</div>
+      <div class="stat-value" id="ver-count">加载中...</div>
+    </div>
+  </div>
+  <div class="mt-4">
+    <div class="stat-label mb-2">内存使用</div>
+    <div class="progress-bar"><div class="progress-fill yellow" id="mem-bar" style="width:0%"></div></div>
+  </div>
+  <script>
+    async function loadData() {
+      try {
+        const stats = await window.molaunch.getCacheStats();
+        document.getElementById('cache-size').textContent = (stats.totalSize / 1024 / 1024).toFixed(1) + ' MB';
+      } catch (e) {}
+      try {
+        const mem = await window.molaunch.getSystemMemory();
+        document.getElementById('mem-usage').textContent = mem.usage_percent.toFixed(1) + '%';
+        const bar = document.getElementById('mem-bar');
+        if (bar) bar.style.width = mem.usage_percent + '%';
+      } catch (e) {}
+      try {
+        const versions = await window.molaunch.listInstalledVersions();
+        document.getElementById('ver-count').textContent = versions.length;
+      } catch (e) {}
+    }
+    loadData();
+    setInterval(loadData, 3000);
+  </script>
+</body>
+</html>

@@ -2,70 +2,89 @@
 /**
  * 返回顶部按钮组件
  * 蓝色主题 + 涟漪动画 + 平滑出现
+ *
+ * 显示策略：
+ * - 仅响应位于主内容区 <main> 内的滚动容器，过滤弹窗 / 下拉框等浮层
+ * - 迟滞阈值：未显示时需 scrollTop > 700 才出现；已显示时仅在 scrollTop ≤ 一屏高度时隐藏
+ *   （避免在临界点反复闪烁）
+ * - 路由切换时重置状态，防止旧按钮残留到新页面
  */
 
 import { ref, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ArrowUpIcon } from '@heroicons/vue/24/solid'
 import Tooltip from '@/components/common/Tooltip.vue'
 
 const visible = ref(false)
 const isHover = ref(false)
 let activeEl: Element | null = null
+const router = useRouter()
+
+/** 未显示时的出现阈值（像素） */
+const SHOW_THRESHOLD = 700
 
 function onScroll(e: Event) {
-  const el = e.target as Element
-  if (!el || !('scrollTop' in el) || !('scrollHeight' in el)) return
+  const el = e.target as Element | null
+  if (!el || !(el instanceof Element)) return
+  if (!('scrollTop' in el) || !('scrollHeight' in el)) return
 
-  // 排除非页面级滚动容器：下拉框、弹窗、详情面板等
-  // 这些容器通常是 fixed/absolute 定位，或位于 Teleport 的弹层内
-  if (isNonMainScroller(el)) return
+  // 仅响应主内容区内的滚动容器，过滤 Teleport 弹层 / 下拉框等
+  if (!el.closest('main')) return
 
-  const scrollHeight = el.scrollHeight
   const clientHeight = el.clientHeight
   const scrollTop = el.scrollTop
 
-  // 内容不够长，不显示
-  if (scrollHeight <= clientHeight * 1.5 || scrollHeight < 600) {
-    visible.value = false
-    return
-  }
-
-  // 滚动超过内容的 1/3 才显示
-  const scrollRatio = scrollTop / (scrollHeight - clientHeight)
-  visible.value = scrollRatio > 0.33
-  activeEl = el
-}
-
-/**
- * 判断是否为非页面级滚动容器（应被忽略）
- * - 弹窗（Teleport 到 body 的 fixed 容器内的子元素）
- * - 下拉框（绝对/固定定位的弹出层）
- * - 详情面板等浮层
- *
- * 判断依据：向上查找祖先，如果遇到 fixed 定位的元素，说明在弹层内
- */
-function isNonMainScroller(el: Element): boolean {
-  let node: Element | null = el
-  while (node && node !== document.body) {
-    const style = window.getComputedStyle(node)
-    if (style.position === 'fixed' || style.position === 'absolute') {
-      return true
+  if (visible.value) {
+    // 已显示：滚动回落到一屏高度以内时才隐藏
+    if (scrollTop <= clientHeight) {
+      visible.value = false
     }
-    node = node.parentElement
+  } else {
+    // 未显示：超过阈值时才出现
+    if (scrollTop > SHOW_THRESHOLD) {
+      visible.value = true
+      activeEl = el
+    }
   }
-  return false
 }
 
 function scrollToTop() {
-  const el = activeEl || document.documentElement
+  const el = activeEl && activeEl.isConnected ? activeEl : document.querySelector('main')
+  if (!el) return
   el.scrollTo({
     top: 0,
     behavior: 'smooth',
   })
 }
 
+/** 路由切换后重置状态，并检查新页面是否已处于滚动位置（如浏览器恢复滚动位置） */
+function refreshAfterRouteChange() {
+  visible.value = false
+  activeEl = null
+  // App.vue 使用 fade 过渡（200ms out + 200ms in），延迟至过渡结束后再检测
+  setTimeout(() => {
+    const main = document.querySelector('main')
+    if (!main) return
+    const scroller = findScrolledContainer(main)
+    if (scroller) onScroll({ target: scroller } as unknown as Event)
+  }, 450)
+}
+
+/** 在主内容区内查找已发生滚动的容器（用于路由切换后恢复按钮显示状态） */
+function findScrolledContainer(root: Element): Element | null {
+  const candidates = root.querySelectorAll('*')
+  for (let i = 0; i < candidates.length; i++) {
+    const node = candidates[i]
+    if (node.scrollTop > 0 && node.clientHeight < node.scrollHeight) {
+      return node
+    }
+  }
+  return null
+}
+
 onMounted(() => {
   document.addEventListener('scroll', onScroll, { capture: true, passive: true })
+  router.afterEach(refreshAfterRouteChange)
 })
 
 onUnmounted(() => {

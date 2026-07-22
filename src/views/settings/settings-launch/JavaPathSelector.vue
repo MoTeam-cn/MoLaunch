@@ -10,7 +10,7 @@
 import { ref, computed } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
-import { showInfo, showSuccess } from '@/utils/toast'
+import { toastInfo, toastSuccess } from '@/utils/toast'
 import { showError } from '@/utils/modal'
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
@@ -44,12 +44,12 @@ async function handleAutoDetectJava() {
   if (detectingJava.value) return
   detectingJava.value = true
   try {
-    showInfo('正在尝试搜索系统中存在的 Java...')
+    toastInfo('正在尝试搜索系统中存在的 Java...')
     await javaStore.refreshJava()
     if (javaStore.javaList.length > 0) {
-      showSuccess(`已找到 ${javaStore.javaList.length} 个可用 Java，请自行展开下拉框选择`)
+      toastSuccess(`已找到 ${javaStore.javaList.length} 个可用 Java，请自行展开下拉框选择`)
     } else {
-      showInfo('未检测到已安装的 Java')
+      toastInfo('未检测到已安装的 Java')
     }
   } finally {
     detectingJava.value = false

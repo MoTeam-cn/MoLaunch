@@ -23,11 +23,12 @@ pub fn detect_java(java_path: &Path) -> Result<JavaRuntime, String> {
     let javac_path = parent_dir.join("javac.exe");
     let is_jre = !javac_path.exists();
 
-    // [4] 运行 java -version
-    let output = match std::process::Command::new(&java_str)
-        .arg("-version")
-        .output()
-    {
+    // [4] 运行 java -version（走 shell 模块统一封装）
+    let output = match crate::minecraft::system::shell::run_executable_output(
+        &java_str,
+        &["-version".to_string()],
+        None,
+    ) {
         Ok(output) => output,
         Err(e) => return Err(format!("Failed to execute Java: {}", e)),
     };

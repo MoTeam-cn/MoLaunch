@@ -4,6 +4,8 @@ import SettingsLaunch from './settings/SettingsLaunch.vue'
 import SettingsDownload from './settings/SettingsDownload.vue'
 import SettingsPersonal from './settings/SettingsPersonal.vue'
 import SettingsAdvanced from './settings/SettingsAdvanced.vue'
+import SettingsPlugins from './settings/SettingsPlugins.vue'
+import SettingsCache from './settings/SettingsCache.vue'
 import SettingsOther from './settings/SettingsOther.vue'
 import SettingsDeveloper from './settings/SettingsDeveloper.vue'
 import SettingsMore from './settings/SettingsMore.vue'
@@ -16,6 +18,8 @@ import {
   CogIcon,
   CommandLineIcon,
   InformationCircleIcon,
+  PuzzlePieceIcon,
+  CircleStackIcon,
 } from '@heroicons/vue/24/outline'
 
 const activeCategory = ref('launch')
@@ -24,8 +28,10 @@ const activeCategory = ref('launch')
 const baseCategories = [
   { id: 'launch', label: '游戏启动', icon: RocketLaunchIcon, desc: 'Java、内存、游戏目录等启动参数' },
   { id: 'download', label: '下载配置', icon: ArrowDownTrayIcon, desc: '下载源、限速、并发等下载配置' },
-  { id: 'personal', label: '个性化', icon: PaintBrushIcon, desc: '主题、布局、语言等外观设置' },
+  { id: 'personal', label: '个性化', icon: PaintBrushIcon, desc: '主题、布局、语言、插件等外观设置' },
+  { id: 'plugins', label: '插件', icon: PuzzlePieceIcon, desc: '管理启动器内置与外部插件' },
   { id: 'advanced', label: '高阶配置', icon: CogIcon, desc: '代理、高级参数等' },
+  { id: 'cache', label: '缓存管理', icon: CircleStackIcon, desc: '查看各缓存目录占用、文件数量与自动清理策略' },
   { id: 'other', label: '其他', icon: EllipsisHorizontalIcon, desc: '日志、SDK 信息' },
   { id: 'about', label: '更多', icon: InformationCircleIcon, desc: '关于 MoLaunch、鸣谢、教程、法律信息' },
 ]
@@ -83,20 +89,24 @@ onUnmounted(() => {
     <!-- 左侧分类菜单 -->
     <aside class="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
       <div class="flex-1 overflow-y-auto py-4">
-        <button
+        <!-- 结构性侧边栏导航项，非视觉按钮 -->
+        <div
           v-for="cat in categories"
           :key="cat.id"
-          class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors"
+          role="button"
+          tabindex="0"
+          class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer"
           :class="[
             activeCategory === cat.id
               ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
               : 'text-gray-700 hover:bg-gray-50'
           ]"
           @click="activeCategory = cat.id"
+          @keydown.enter="activeCategory = cat.id"
         >
           <component :is="cat.icon" class="w-5 h-5 mr-3" />
           {{ cat.label }}
-        </button>
+        </div>
       </div>
     </aside>
 
@@ -110,13 +120,22 @@ onUnmounted(() => {
       </div>
 
       <div
-        class="flex-1 overflow-y-auto"
-        :class="activeCategory === 'about' ? '' : 'p-6'"
+        class="flex-1 overflow-hidden"
+        :class="[
+          // about 子组件已自带 p-6 内边距，避免双重 padding
+          activeCategory === 'about' ? '' : 'p-6',
+          // cache 页面需要内部管理滚动（顶部固定+列表滑动），去掉 padding 让子组件自管理
+          activeCategory === 'cache' ? '!p-0' : '',
+          // 非 cache 页面统一由外部容器提供纵向滚动
+          activeCategory !== 'cache' ? 'overflow-y-auto' : '',
+        ]"
       >
         <SettingsLaunch v-if="activeCategory === 'launch'" />
         <SettingsDownload v-else-if="activeCategory === 'download'" />
         <SettingsPersonal v-else-if="activeCategory === 'personal'" />
+        <SettingsPlugins v-else-if="activeCategory === 'plugins'" />
         <SettingsAdvanced v-else-if="activeCategory === 'advanced'" />
+        <SettingsCache v-else-if="activeCategory === 'cache'" />
         <SettingsOther v-else-if="activeCategory === 'other'" />
         <SettingsMore v-else-if="activeCategory === 'about'" />
         <SettingsDeveloper v-else-if="activeCategory === 'developer'" />

@@ -62,6 +62,12 @@ const router = createRouter({
       component: () => import('@/views/Downloads.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/apps/tools',
+      name: 'tools',
+      component: () => import('@/views/Tools.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

@@ -1,7 +1,13 @@
 <script setup lang="ts">
+/**
+ * 设置 - 开发者页面
+ *
+ * 展示日志查看、缓存目录路径、存储信息、系统信息等开发者专属内容。
+ * 缓存统计已迁移到独立的「缓存管理」页面（SettingsCache.vue，普通用户可见）。
+ */
 import { ref, computed, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
-import { showError } from '@/utils/toast'
+import { toastError } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
 import { osDisplay, archDisplay } from '@/utils/system-display'
 import LogViewer from '@/components/settings/LogViewer.vue'
@@ -19,7 +25,7 @@ async function loadStorageDirs() {
     storageDirs.value = await tauri.getStorageDirs()
   } catch (e) {
     console.error('Failed to load storage dirs:', e)
-    showError('获取存储目录失败：' + e)
+    toastError('获取存储目录失败：' + e)
   }
 }
 
@@ -27,7 +33,7 @@ async function openDir(path: string) {
   try {
     await tauri.openPath(path)
   } catch (e) {
-    showError('打开目录失败：' + e)
+    toastError('打开目录失败：' + e)
   }
 }
 
@@ -39,16 +45,18 @@ async function loadSystemInfo() {
     systemInfo.value = await tauri.getSystemInfo()
   } catch (e) {
     console.error('Failed to load system info:', e)
-    showError('获取系统信息失败：' + e)
+    toastError('获取系统信息失败：' + e)
   }
 }
 
-/** 缓存卡片条目（缓存目录 / 临时目录） */
+/** 缓存卡片条目（运行路径缓存 / 临时目录 / 系统临时缓存 / AppData 缓存） */
 const cacheEntries = computed<{ label: string; path: string }[]>(() => {
   if (!storageDirs.value) return []
   return [
-    { label: '缓存目录', path: storageDirs.value.cache },
-    { label: '临时目录', path: storageDirs.value.temp },
+    { label: '运行路径缓存', path: storageDirs.value.cache },
+    { label: '运行路径临时', path: storageDirs.value.temp },
+    { label: '系统临时缓存', path: storageDirs.value.cacheTemp },
+    { label: 'AppData 缓存', path: storageDirs.value.cacheApp },
   ]
 })
 
@@ -88,9 +96,9 @@ onMounted(async () => {
     <!-- 日志查看（自包含子组件，传入日志目录用于「打开目录」按钮） -->
     <LogViewer :logs-dir="storageDirs?.logs" />
 
-    <!-- 缓存目录 -->
+    <!-- 缓存目录（仅展示父目录路径，便于整体定位；详细统计见「缓存管理」页） -->
     <div v-if="storageDirs" class="bg-white rounded-lg border border-gray-300 overflow-hidden">
-      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">缓存</h3>
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">缓存目录</h3>
       <div class="divide-y divide-gray-200">
         <div
           v-for="entry in cacheEntries"

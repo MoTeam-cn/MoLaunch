@@ -6,7 +6,7 @@
  */
 import { ref, computed, watch, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
-import { showSuccess, showError, showWarning } from '@/utils/toast'
+import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -67,8 +67,8 @@ async function handleSaveMemoryMode(mode: 'inherit' | 'auto' | 'custom') {
     }
     memoryMode.value = mode
     if (mode === 'auto') applyAutoMemory()
-    showSuccess(mode === 'inherit' ? '已设置为跟随全局' : mode === 'auto' ? '已设置为自动配置' : '已切换为自定义')
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess(mode === 'inherit' ? '已设置为跟随全局' : mode === 'auto' ? '已设置为自动配置' : '已切换为自定义')
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 // 自定义模式下防抖保存
@@ -94,7 +94,7 @@ function autoSaveMemory() {
 }
 
 watch([minMemory, maxMemory], () => {
-  if (maxMemory.value < 512) { showWarning('最大内存不能小于 512 MB'); return }
+  if (maxMemory.value < 512) { toastWarning('最大内存不能小于 512 MB'); return }
   if (minMemory.value >= maxMemory.value) {
     minMemory.value = Math.floor(maxMemory.value / 2)
   }

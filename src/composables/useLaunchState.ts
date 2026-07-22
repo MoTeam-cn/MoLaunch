@@ -13,7 +13,7 @@
 import { ref, computed } from 'vue'
 import { listen } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
-import { showSuccess, showError, showWarning } from '@/utils/toast'
+import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { showCrashDialog } from '@/utils/crashDialog'
 
 /** 崩溃类别（与后端 CrashCategory 枚举对应） */
@@ -91,12 +91,12 @@ export function useLaunchState() {
         runningPid.value = null
         runningVersionId.value = null
         if (is_normal) {
-          showSuccess('游戏已退出')
+          toastSuccess('游戏已退出')
         } else if (crash_info) {
           // 弹出崩溃分析对话框
           showCrashDialog(crash_info)
         } else {
-          showError(`游戏已退出（代码: ${exit_code}）`)
+          toastError(`游戏已退出（代码: ${exit_code}）`)
         }
       })
     } catch (e) {
@@ -137,11 +137,11 @@ export function useLaunchState() {
       const pid = await tauri.launchGame(params)
       runningPid.value = pid
       runningVersionId.value = params.versionId
-      showSuccess(`游戏已启动（PID: ${pid}）`)
+      toastSuccess(`游戏已启动（PID: ${pid}）`)
       return pid
     } catch (e) {
       console.error('Failed to launch game:', e)
-      showError(e instanceof Error ? e.message : String(e))
+      toastError(e instanceof Error ? e.message : String(e))
       throw e
     } finally {
       stopProgressPolling()
@@ -157,7 +157,7 @@ export function useLaunchState() {
       await tauri.stopGame()
       runningPid.value = null
       runningVersionId.value = null
-      showWarning('游戏已停止')
+      toastWarning('游戏已停止')
     } catch (e) {
       console.error('Failed to stop game:', e)
       throw e

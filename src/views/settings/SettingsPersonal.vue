@@ -2,92 +2,40 @@
 /**
  * 设置 - 个性化页面
  *
- * - 外观：主题色、启动器语言
+ * - 外观：主题色、启动器语言 → AppearanceSection
+ * - 主页：主页右侧内容区模式选择 → HomePanelModeSection
  * - 游戏：默认界面语言（写入 options.txt 的 lang 字段）
- *
- * 主题色/启动器语言存储在前端 localStorage（settingsStore），
- * 游戏默认语言存储在后端 INI（通过 applyConfig / getConfigMap IPC）。
  */
-import { ref, watch, onMounted } from 'vue'
-import { useSettingsStore } from '@/stores/settings'
-import { getConfigMap, applyConfig } from '@/utils/api/config'
+import { ref, watch } from 'vue'
+import { useConfigPage } from '@/composables/useConfigPage'
 import Select from '@/components/common/Select.vue'
-import ColorPicker from '@/components/common/ColorPicker.vue'
-
-const settingsStore = useSettingsStore()
+import AppearanceSection from './personal/AppearanceSection.vue'
+import HomePanelModeSection from './personal/HomePanelModeSection.vue'
 
 // 游戏默认语言（后端配置，写入 options.txt 的 lang 字段）
-// "none"=不设置 / "zh_cn" / "en_us" / "ja_jp" / "ko_kr" 等
-// 默认 zh_cn（启动器语言固定简体中文，无需"跟随启动器"选项）
 const gameLanguage = ref('zh_cn')
 
-async function loadGameLanguage() {
-  try {
-    const cfg = await getConfigMap()
-    // 兼容旧配置：若读到 auto，回退为 zh_cn
+const { loaded: gameLanguageLoaded, markDirty: markGameLanguageDirty } = useConfigPage({
+  delay: 500,
+  errorLabel: 'save game language',
+  onLoad: (cfg) => {
     const val = cfg.gameLanguage
     gameLanguage.value = !val || val === 'auto' ? 'zh_cn' : val
-  } catch (e) {
-    console.error('Failed to load game language:', e)
-  }
-}
-
-async function saveGameLanguage(value: string | number) {
-  try {
-    await applyConfig({ gameLanguage: String(value) })
-  } catch (e) {
-    console.error('Failed to save game language:', e)
-  }
-}
-
-watch(gameLanguage, (newLang) => {
-  saveGameLanguage(newLang)
+  },
 })
 
-onMounted(loadGameLanguage)
+watch(gameLanguage, (newLang) => {
+  if (gameLanguageLoaded.value) markGameLanguageDirty('gameLanguage', String(newLang))
+})
 </script>
 
 <template>
   <div class="space-y-6">
     <!-- 外观 -->
-    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
-      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">外观</h3>
-      <div class="divide-y divide-gray-200">
-        <!-- 主题色（Arco Design 风格颜色选择器，控制所有 primary 蓝色区域） -->
-        <div class="px-5 py-4">
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-gray-900">主题色</p>
-              <p class="text-xs text-gray-500 mt-0.5">控制菜单栏、按钮、选中态等所有主色区域</p>
-            </div>
-            <div class="flex-none w-40">
-              <ColorPicker
-                :model-value="settingsStore.primaryColor"
-                @update:model-value="settingsStore.setPrimaryColor($event)"
-              />
-            </div>
-          </div>
-        </div>
-        <!-- 启动器语言 -->
-        <div class="px-5 py-4">
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-gray-900">启动器语言</p>
-              <p class="text-xs text-gray-500 mt-0.5">启动器界面语言，暂时仅支持简体中文</p>
-            </div>
-            <div class="flex-none w-40">
-              <Select
-                :model-value="settingsStore.language"
-                :options="[
-                  { label: '简体中文', value: 'zh-CN' },
-                ]"
-                @update:model-value="settingsStore.setLanguage(String($event))"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+    <AppearanceSection />
+
+    <!-- 主页 -->
+    <HomePanelModeSection />
 
     <!-- 游戏 -->
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">

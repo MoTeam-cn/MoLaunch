@@ -3,6 +3,8 @@
 //! Uses INI format for configuration
 
 pub mod cache;
+pub mod cache_app;
+pub mod cache_temp;
 pub mod ini;
 pub mod registry;
 
@@ -50,6 +52,7 @@ impl Storage {
         self.ensure_dir("logs")?;
         self.ensure_dir("cache")?;
         self.ensure_dir("temp")?;
+        self.ensure_dir("Download")?;
 
         self.sync_config()?;
 
@@ -90,6 +93,11 @@ impl Storage {
 
     pub fn temp_dir(&self) -> PathBuf {
         self.base_dir.join("temp")
+    }
+
+    /// 外部下载工具的默认保存目录（.Molaunch/Download/）
+    pub fn download_dir(&self) -> PathBuf {
+        self.base_dir.join("Download")
     }
 
     fn sync_config(&self) -> anyhow::Result<()> {

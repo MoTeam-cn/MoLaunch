@@ -68,3 +68,29 @@ export async function stopGame(): Promise<void> {
 export async function getRunningGame(): Promise<number | null> {
   return await invoke<number | null>('get_running_game')
 }
+
+/**
+ * 启动历史记录（最近启动过的版本）
+ *
+ * 后端在内存中累积，重启启动器后清空。
+ * 返回最近 50 条记录（按时间倒序，最近启动在前）。
+ */
+export interface LaunchHistoryEntry {
+  /** 版本 ID */
+  version_id: string
+  /** 启动时使用的用户名 */
+  username: string
+  /** 启动时间（RFC3339 字符串） */
+  launch_time: string
+  /** 进程 ID */
+  pid: number
+  /** 退出码（null 表示仍在运行或异常终止未收集到） */
+  exit_code: number | null
+}
+
+/**
+ * 获取启动历史记录
+ */
+export async function getLaunchHistory(): Promise<LaunchHistoryEntry[]> {
+  return await invoke<LaunchHistoryEntry[]>('get_launch_history')
+}

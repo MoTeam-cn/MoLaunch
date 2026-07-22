@@ -1,0 +1,252 @@
+<script setup lang="ts">
+/**
+ * 自定义布局配置区（格式 / 来源 / 内联编辑器 / URL 加载 / 示例导出）
+ *
+ * 由 HomePanelModeSection 在 panelMode === 'custom' 时渲染。
+ */
+import { ref, computed, onMounted } from 'vue'
+import { usePluginStore } from '@/stores/plugins'
+import { saveFile, writeTextFile } from '@/utils/api/system'
+import { readLayoutSample } from '@/utils/api/plugins'
+import { toastInfo, toastSuccess, toastError } from '@/utils/toast'
+import Select from '@/components/common/Select.vue'
+import Button from '@/components/common/Button.vue'
+import Input from '@/components/common/Input.vue'
+import {
+  ArrowPathIcon,
+  ArrowDownTrayIcon,
+} from '@heroicons/vue/24/outline'
+
+const pluginStore = usePluginStore()
+
+/** 自定义布局配置（从 store 读取） */
+const customConfig = computed(() => pluginStore.customLayoutConfig)
+
+/** 内联编辑器占位文本（根据格式返回示例） */
+const inlinePlaceholder = computed(() => {
+  switch (customConfig.value.format) {
+    case 'json':
+      return '{\n  "title": "我的面板",\n  "sections": [\n    { "type": "text", "content": "Hello" }\n  ]\n}'
+    case 'xml':
+      return '<panel title="我的面板">\n  <text>Hello</text>\n</panel>'
+    case 'html':
+    default:
+      return '<div>\n  <h3>我的面板</h3>\n  <p>Hello</p>\n</div>'
+  }
+})
+
+/** 布局格式选项 */
+const formatOptions = [
+  { label: 'JSON（结构化布局）', value: 'json' },
+  { label: 'HTML（直接渲染）', value: 'html' },
+  { label: 'XML（结构化布局）', value: 'xml' },
+]
+
+/** 布局来源选项 */
+const sourceOptions = [
+  { label: '内联（直接编辑）', value: 'inline' },
+  { label: 'URL（远程加载）', value: 'url' },
+]
+
+/** JSON/XML 内联内容编辑器（本地 ref，防抖同步到 store） */
+const inlineContentDraft = ref('')
+let inlineSyncTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 初始化内联内容 draft */
+function initInlineDraft() {
+  if (customConfig.value.source === 'inline') {
+    inlineContentDraft.value = customConfig.value.inlineContent
+  }
+}
+
+/** 内联内容变更（防抖 500ms 同步到 store） */
+function onInlineContentChange() {
+  if (inlineSyncTimer) clearTimeout(inlineSyncTimer)
+  inlineSyncTimer = setTimeout(async () => {
+    await pluginStore.setCustomLayoutConfig({ inlineContent: inlineContentDraft.value })
+  }, 500)
+}
+
+/** URL 刷新中 */
+const urlRefreshing = ref(false)
+
+/** 刷新 URL 缓存 */
+async function onRefreshUrl() {
+  if (urlRefreshing.value) return
+  if (!customConfig.value.url) {
+    toastError('请先填写 URL 地址')
+    return
+  }
+  urlRefreshing.value = true
+  try {
+    toastInfo('正在刷新布局缓存...')
+    await pluginStore.refreshCustomLayoutCache()
+    toastSuccess('布局缓存已刷新')
+  } catch (e) {
+    toastError(String(e))
+  } finally {
+    urlRefreshing.value = false
+  }
+}
+
+/** 切换布局格式 */
+async function onFormatChange(value: string | number) {
+  await pluginStore.setCustomLayoutConfig({ format: String(value) as 'json' | 'html' | 'xml' })
+}
+
+/** 切换布局来源 */
+async function onSourceChange(value: string | number) {
+  const source = String(value) as 'inline' | 'url'
+  await pluginStore.setCustomLayoutConfig({ source })
+  if (source === 'inline') {
+    initInlineDraft()
+  }
+}
+
+/** URL 输入防抖同步 */
+let urlSyncTimer: ReturnType<typeof setTimeout> | null = null
+function onUrlInput(event: Event) {
+  const value = (event.target as HTMLInputElement).value
+  if (urlSyncTimer) clearTimeout(urlSyncTimer)
+  urlSyncTimer = setTimeout(async () => {
+    await pluginStore.setCustomLayoutConfig({ url: value })
+  }, 500)
+}
+
+/** 缓存时间格式化 */
+const cachedTimeText = computed(() => {
+  if (!customConfig.value.cachedAt) return '未缓存'
+  const d = new Date(customConfig.value.cachedAt)
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+})
+
+/** 根据当前格式从后端读取示例布局并导出 */
+async function onExportSampleLayout() {
+  const format = customConfig.value.format
+  const ext = format
+  const defaultName = `layout-sample.${ext}`
+  try {
+    const content = await readLayoutSample(format)
+    const savePath = await saveFile(
+      '保存示例布局文件',
+      defaultName,
+      [{ name: `${ext.toUpperCase()} 文件`, extensions: [ext] }],
+    )
+    if (!savePath) return
+    await writeTextFile(savePath, content)
+    toastSuccess(`示例布局已导出至：${savePath}`)
+  } catch (e) {
+    toastError('导出示例失败：' + e)
+  }
+}
+
+onMounted(() => {
+  initInlineDraft()
+})
+</script>
+
+<template>
+  <div class="space-y-4">
+    <!-- 格式 + 来源（上下堆叠，避免并列时文字被截断） -->
+    <div class="space-y-3">
+      <div class="flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-gray-900">布局格式</p>
+          <p class="text-xs text-gray-500 mt-0.5">JSON/XML 结构化，HTML 直接渲染</p>
+        </div>
+        <div class="flex-none w-40">
+          <Select
+            :model-value="customConfig.format"
+            :options="formatOptions"
+            @update:model-value="onFormatChange"
+          />
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-4">
+        <div class="min-w-0">
+          <p class="text-sm font-medium text-gray-900">内容来源</p>
+          <p class="text-xs text-gray-500 mt-0.5">内联直接编辑，URL 远程加载并缓存</p>
+        </div>
+        <div class="flex-none w-40">
+          <Select
+            :model-value="customConfig.source"
+            :options="sourceOptions"
+            @update:model-value="onSourceChange"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- 导出示例文件（开发者测试用） -->
+    <div class="flex items-center justify-between rounded border border-dashed border-gray-300 bg-white/50 px-3 py-2">
+      <div class="min-w-0">
+        <p class="text-xs font-medium text-gray-700">导出示例布局文件</p>
+        <p class="mt-0.5 text-[11px] text-gray-400">
+          导出当前格式（{{ customConfig.format.toUpperCase() }}）的示例文件供开发者测试调试
+        </p>
+      </div>
+      <Button type="outline" size="small" @click="onExportSampleLayout">
+        <ArrowDownTrayIcon class="mr-1 h-3.5 w-3.5" />
+        导出示例
+      </Button>
+    </div>
+
+    <!-- 内联编辑器 -->
+    <div v-if="customConfig.source === 'inline'">
+      <div class="mb-2 flex items-center justify-between">
+        <p class="text-sm font-medium text-gray-900">
+          {{ customConfig.format === 'html' ? 'HTML' : customConfig.format === 'xml' ? 'XML' : 'JSON' }} 内容
+        </p>
+        <span class="text-[11px] text-gray-400">编辑后自动保存（防抖 500ms）</span>
+      </div>
+      <Input
+        textarea
+        :rows="16"
+        resize="vertical"
+        v-model="inlineContentDraft"
+        @input="onInlineContentChange"
+        :placeholder="inlinePlaceholder"
+        class="custom-layout-editor"
+      />
+    </div>
+
+    <!-- URL 加载 -->
+    <div v-else class="space-y-3">
+      <div>
+        <div class="mb-2 flex items-center justify-between">
+          <p class="text-sm font-medium text-gray-900">布局 URL</p>
+          <span class="text-[11px] text-gray-400">缓存时间：{{ cachedTimeText }}</span>
+        </div>
+        <div class="flex gap-2">
+          <input
+            :value="customConfig.url"
+            @input="onUrlInput"
+            type="text"
+            placeholder="https://example.com/layout.json"
+            class="flex-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+          />
+          <Button
+            type="outline"
+            size="small"
+            :disabled="urlRefreshing"
+            @click="onRefreshUrl"
+          >
+            <template #icon><ArrowPathIcon class="w-3.5 h-3.5" :class="{ 'animate-spin': urlRefreshing }" /></template>
+            刷新缓存
+          </Button>
+        </div>
+      </div>
+      <p class="text-[11px] text-gray-400">
+        URL 内容会下载并缓存到本地，启动器重启后自动加载缓存；点击「刷新缓存」可强制更新
+      </p>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* 代码编辑器：等宽字体 + 小字号，对齐原原生 textarea 的代码输入体验 */
+.custom-layout-editor :deep(.textarea-inner) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+}
+</style>

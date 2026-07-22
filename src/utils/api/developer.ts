@@ -39,10 +39,14 @@ export interface StorageDirs {
   config: string
   /** 日志目录 */
   logs: string
-  /** 缓存目录 */
+  /** 运行路径缓存目录（.Molaunch/cache/） */
   cache: string
-  /** 临时目录 */
+  /** 运行路径临时目录（.Molaunch/temp/） */
   temp: string
+  /** 系统临时目录缓存（<temp>/MoLaunch/，含 TaskTemp 和 sdk） */
+  cacheTemp: string
+  /** AppData 缓存目录（%APPDATA%/.minecraft/，Java Runtime） */
+  cacheApp: string
 }
 
 /** 获取所有存储目录路径 */
@@ -74,6 +78,41 @@ export interface SystemInfo {
 /** 获取系统信息 */
 export async function getSystemInfo(): Promise<SystemInfo> {
   return await invoke<SystemInfo>('get_system_info')
+}
+
+// ==================== 缓存统计 ====================
+
+/** 单个缓存子目录的统计信息 */
+export interface CacheStat {
+  /** 显示名称（如 "图片缓存"） */
+  name: string
+  /** 所属类别（"cache" / "cacheTemp" / "cacheApp"） */
+  category: string
+  /** 子目录相对路径（如 "images" / "TaskTemp" / "runtime"） */
+  subDir: string
+  /** 完整路径 */
+  path: string
+  /** 文件数量（递归统计） */
+  fileCount: number
+  /** 占用字节数（递归统计） */
+  totalSize: number
+  /** 自动清理 TTL（小时），null 表示不清理 */
+  ttlHours: number | null
+}
+
+/** 缓存统计结果（按类别分组） */
+export interface CacheStatsResult {
+  /** 运行路径缓存（.Molaunch/cache/） */
+  cache: CacheStat[]
+  /** 系统临时目录缓存（<temp>/MoLaunch/） */
+  cacheTemp: CacheStat[]
+  /** AppData 缓存（%APPDATA%/.minecraft/） */
+  cacheApp: CacheStat[]
+}
+
+/** 获取所有缓存目录的统计信息（文件数、占用大小、TTL） */
+export async function getCacheStats(): Promise<CacheStatsResult> {
+  return await invoke<CacheStatsResult>('get_cache_stats')
 }
 
 // ==================== 日志查看 ====================

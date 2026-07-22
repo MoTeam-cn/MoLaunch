@@ -6,7 +6,6 @@
 //! - `probe`: 服务器 Range 支持检测与文件大小探测
 //! - `download`: 单个分片的下载实现
 //! - `merge`: 分片合并
-//! - `util`: 格式化工具
 
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -14,19 +13,18 @@ use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Instant;
 use tokio::sync::Mutex;
 
+use crate::utils::format;
 use crate::{log_debug, log_info, log_warn};
 
 use self::download::download_chunk;
 use self::merge::merge_chunks;
 use self::probe::probe_file_size;
-use self::util::{format_bytes, format_speed};
 use super::rate_limiter::RateLimiter;
 use super::types::{DownloadStatus, GlobalProgress};
 
 pub mod download;
 pub mod merge;
 pub mod probe;
-pub mod util;
 
 // 对外保持 `super::chunk::supports_range` 调用路径稳定
 pub use probe::supports_range;
@@ -127,9 +125,9 @@ pub async fn download_chunked(
     log_info!(
         "[Chunk] 开始分片下载: {} ({}, {} chunks, 每块约 {})",
         local_path,
-        format_bytes(file_size),
+        format::bytes(file_size),
         chunk_count,
-        format_bytes(chunk_size)
+        format::bytes(chunk_size)
     );
 
     // 分片进度追踪：每个 chunk 已下载字节数
@@ -169,7 +167,7 @@ pub async fn download_chunked(
         match handle.await {
             Ok((idx, Ok(bytes))) => {
                 total_downloaded += bytes;
-                log_debug!("[Chunk] chunk {} 完成: {}", idx, format_bytes(bytes));
+                log_debug!("[Chunk] chunk {} 完成: {}", idx, format::bytes(bytes));
             }
             Ok((idx, Err(e))) => {
                 all_ok = false;
@@ -233,9 +231,9 @@ pub async fn download_chunked(
     log_info!(
         "[Chunk] 分片下载完成: {} ({}, {:.1}s, {})",
         local_path,
-        format_bytes(total_downloaded),
+        format::bytes(total_downloaded),
         elapsed,
-        format_speed(speed)
+        format::speed(speed)
     );
 
     ChunkDownloadResult {

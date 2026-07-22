@@ -61,6 +61,10 @@ pub struct ConfigPatch {
     pub launch_disable_lua: Option<bool>,
     pub launch_use_dedicated_gpu: Option<bool>,
 
+    // ===== 外部下载工具 =====
+    /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"
+    pub external_download_dir: Option<Option<String>>,
+
     // ===== 开发者模式（注册表存储，不进 AppConfig，内部分流到 registry）=====
     /// 开关是否开启（仅在已解锁时可生效）
     pub developer_mode: Option<bool>,
@@ -111,6 +115,8 @@ pub struct ConfigSnapshot {
     pub launch_disable_jlw: bool,
     pub launch_disable_lua: bool,
     pub launch_use_dedicated_gpu: bool,
+    // 外部下载工具
+    pub external_download_dir: Option<String>,
     // 开发者模式（从注册表读）
     pub developer_unlocked: bool,
     pub developer_mode: bool,
@@ -166,6 +172,7 @@ pub fn build_snapshot(
         launch_disable_jlw: config.launch_disable_jlw,
         launch_disable_lua: config.launch_disable_lua,
         launch_use_dedicated_gpu: config.launch_use_dedicated_gpu,
+        external_download_dir: config.external_download_dir.clone(),
         developer_unlocked: dev_unlocked,
         developer_mode: dev_mode,
     }

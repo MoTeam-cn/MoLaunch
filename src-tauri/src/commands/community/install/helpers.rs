@@ -1,21 +1,12 @@
 //! 社区资源下载安装 - 纯工具函数
 //!
-//! 包含字节数格式化、文件名格式拼接、安装目录解析、加载器 ID 解析等纯函数。
+//! 包含文件名格式拼接、安装目录解析、加载器 ID 解析等纯函数。
 //! 这些函数无副作用、无 I/O，便于单元测试与跨子模块复用。
+//!
+//! 注：字节数格式化已迁移到 `crate::utils::format::bytes`。
 
 use crate::minecraft::community::types::ResourceType;
 use std::path::PathBuf;
-
-/// 格式化字节数为人类可读大小（如 29.6 MB），用于日志输出
-pub(super) fn format_bytes(bytes: u64) -> String {
-    if bytes >= 1_048_576 {
-        format!("{:.1} MB", bytes as f64 / 1_048_576.0)
-    } else if bytes >= 1024 {
-        format!("{:.1} KB", bytes as f64 / 1024.0)
-    } else {
-        format!("{} B", bytes)
-    }
-}
 
 /// 根据 `community_filename_format` 拼接文件名
 ///

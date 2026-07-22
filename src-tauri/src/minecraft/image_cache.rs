@@ -37,7 +37,7 @@ use tauri::{AppHandle, Builder, Emitter, Runtime};
 use tokio::sync::Mutex;
 
 use crate::http::get_client;
-use crate::storage::cache::Cache;
+use crate::utils::cache;
 
 /// 缓存子目录名（相对于 cache 根目录）
 const IMAGE_CACHE_DIR: &str = "images";
@@ -74,7 +74,7 @@ fn cache_rel_path(url: &str) -> String {
 
 /// 缓存文件绝对路径
 pub fn cache_abs_path(url: &str) -> PathBuf {
-    Cache::instance().path(&cache_rel_path(url))
+    cache::path(&cache_rel_path(url))
 }
 
 /// 生成自定义 URI scheme URL
@@ -160,7 +160,7 @@ pub fn parse_hash_from_request(uri: &str) -> Option<String> {
 /// 用于 URI scheme handler：验证 hash 合法性后返回文件路径
 pub fn find_cache_by_hash(hash: &str) -> Option<PathBuf> {
     let rel = format!("{}/{}.png", IMAGE_CACHE_DIR, hash);
-    let path = Cache::instance().path(&rel);
+    let path = cache::path(&rel);
     if path.exists() && path.is_file() {
         Some(path)
     } else {
@@ -192,7 +192,7 @@ pub async fn get_image_url(remote_url: &str, app: Option<AppHandle>) -> CachedIm
     let rel = cache_rel_path(remote_url);
 
     // 缓存命中：返回自定义 URI scheme URL
-    if Cache::instance().exists(&rel) {
+    if cache::exists(&rel) {
         return CachedImage {
             url: cache_image_url(remote_url),
             cached: true,
@@ -273,7 +273,7 @@ async fn download_image(remote_url: &str) -> anyhow::Result<()> {
         .map_err(|e| anyhow::anyhow!("read image bytes failed: {}", e))?;
 
     let rel = cache_rel_path(remote_url);
-    Cache::instance().write_bytes(&rel, &bytes)?;
+    cache::write_bytes(&rel, &bytes)?;
 
     crate::log_info!("[ImageCache] 已缓存: {} ({} 字节)", remote_url, bytes.len());
 
@@ -283,12 +283,12 @@ async fn download_image(remote_url: &str) -> anyhow::Result<()> {
 /// 清除指定 URL 的缓存（用于强制刷新）
 pub fn invalidate(remote_url: &str) -> anyhow::Result<()> {
     let rel = cache_rel_path(remote_url);
-    Cache::instance().remove(&rel)
+    cache::remove(&rel)
 }
 
 /// 清空所有图片缓存
 pub fn clear_all() -> anyhow::Result<()> {
-    Cache::instance().clear_dir(IMAGE_CACHE_DIR)
+    cache::clear_dir(IMAGE_CACHE_DIR)
 }
 
 // ============================================================================

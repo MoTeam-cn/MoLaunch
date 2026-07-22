@@ -11,15 +11,14 @@ pub(super) fn resolve_embedded_jar(
     resource_name: &str,
     cache_rel: &str,
 ) -> Option<std::path::PathBuf> {
-    use crate::storage::cache::Cache;
-    let cache = Cache::instance();
-    if !cache.exists(cache_rel) {
-        if let Err(e) = crate::resources::extract_resource(resource_name, &cache.path(cache_rel)) {
+    use crate::utils::cache;
+    if !cache::exists(cache_rel) {
+        if let Err(e) = crate::resources::extract_resource(resource_name, &cache::path(cache_rel)) {
             crate::log_warn!("[Launch] 释放 {} 失败: {}", resource_name, e);
             return None;
         }
     }
-    Some(cache.path(cache_rel))
+    Some(cache::path(cache_rel))
 }
 
 /// 检查版本 JSON 的 libraries 中是否包含指定库名（如 "org.lwjgl:lwjgl:3.4.1"）

@@ -2,8 +2,9 @@
 //!
 //! 解析 Forge 官方网站的 HTML 版本列表页面。
 
-use super::utils;
 use super::LoaderVersion;
+use crate::utils::datetime;
+use crate::utils::version;
 
 /// 解析 Forge 官方 HTML 页面，提取版本列表
 ///
@@ -48,8 +49,8 @@ pub fn parse_forge_version_html(html: &str) -> anyhow::Result<Vec<LoaderVersion>
 
     // 按版本号降序排列
     versions.sort_by(|a, b| {
-        let v_a = utils::parse_version_number(&a.version);
-        let v_b = utils::parse_version_number(&b.version);
+        let v_a = version::parse_number(&a.version);
+        let v_b = version::parse_number(&b.version);
         v_b.cmp(&v_a)
     });
 
@@ -89,5 +90,5 @@ fn extract_release_time(row: &str) -> Option<String> {
     let time_str = &after[..end];
 
     // 使用公共函数转换 UTC -> 本地时间
-    utils::parse_utc_to_local(time_str)
+    datetime::format_utc_to_local(time_str)
 }

@@ -3,16 +3,16 @@
  * 加载器选择组件
  *
  * 子模块：
- *   - useLoaderData composable：负责获取 5 种加载器版本列表 + 缓存 + computed 版本项
+ *   - useLoaderData composable：获取 5 种加载器版本列表 + 缓存
+ *   - useLoaderCompatibility composable：MC 版本类型判断 + 兼容性检查
+ *   - useFabricApi composable：Fabric API 信息展示
  *
  * 本组件保留：
- *   - MC 版本类型判断（snapshot/fool/ancient + showXxx 标志）
- *   - 选中状态管理 + 兼容性检查
+ *   - 选中状态管理
  *   - 实例名生成 + 安装按钮
  */
 
-import { ref, onMounted, computed } from 'vue'
-import { useVersionStore } from '@/stores/version'
+import { ref, onMounted, computed, toRef } from 'vue'
 import { ChevronLeftIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import LoaderCard from '@/components/common/LoaderCard.vue'
 import Alert from '@/components/common/Alert.vue'
@@ -20,6 +20,7 @@ import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import FabricApiInfoCard from '@/components/install/FabricApiInfoCard.vue'
 import { useLoaderData } from '@/composables/useLoaderData'
+import { useLoaderCompatibility } from '@/composables/useLoaderCompatibility'
 import { useFabricApi } from '@/composables/useFabricApi'
 
 import anvilIcon from '@/assets/blocks/Anvil.png'
@@ -38,8 +39,6 @@ const emit = defineEmits<{
   install: [options: { mcVersion: string; forge?: string; neoforge?: string; fabric?: string; optifine?: string; liteloader?: string; instanceName: string }]
 }>()
 
-const versionStore = useVersionStore()
-
 // 选中状态
 const selectedForge = ref<string | null>(null)
 const selectedNeoforge = ref<string | null>(null)
@@ -51,32 +50,26 @@ const selectedLiteloader = ref<string | null>(null)
 const customInstanceName = ref('')
 const showNameInput = ref(false)
 
-// —— MC 版本类型判断 ——
-const mcNum = computed(() => {
-  const parts = props.mcVersion.split('.')
-  return (parseInt(parts[0]) || 0) * 10000 + (parseInt(parts[1]) || 0) * 100 + (parseInt(parts[2]) || 0)
+// —— MC 版本类型判断 + 兼容性检查 ——
+const mcVersionRef = toRef(props, 'mcVersion')
+const {
+  isSnapshot, isFool, isAncient,
+  showForge, showNeoforge, showFabric, showLiteloader, showOptifine,
+  getLoaderError, isLoaderDisabled,
+} = useLoaderCompatibility(mcVersionRef, {
+  forge: selectedForge,
+  neoforge: selectedNeoforge,
+  fabric: selectedFabric,
+  optifine: selectedOptifine,
+  liteloader: selectedLiteloader,
 })
-
-const versionInfo = computed(() => versionStore.getVersionById(props.mcVersion))
-const isSnapshot = computed(() => versionInfo.value?.version_type === 'snapshot')
-const isFool = computed(() => versionInfo.value?.version_type === 'fool')
-const isAncient = computed(() => {
-  const type = versionInfo.value?.version_type
-  return type === 'old_beta' || type === 'old_alpha' || mcNum.value < 10000
-})
-
-const showForge = computed(() => !isSnapshot.value && !isAncient.value && !isFool.value && mcNum.value >= 10501)
-const showNeoforge = computed(() => !isSnapshot.value && !isAncient.value && !isFool.value && mcNum.value >= 12001)
-const showFabric = computed(() => !isAncient.value && !isFool.value && mcNum.value > 11300)
-const showLiteloader = computed(() => !isSnapshot.value && !isAncient.value && !isFool.value && mcNum.value <= 11202)
-const showOptifine = computed(() => !isAncient.value && !isFool.value)
 
 // 加载器版本数据（获取 + 缓存 + computed 版本项）
 const {
   forgeItems, neoforgeItems, fabricItems, optifineItems, liteloaderItems,
   loadingForge, loadingNeoforge, loadingFabric, loadingOptifine, loadingLiteloader,
   fetchAll,
-} = useLoaderData(computed(() => props.mcVersion), {
+} = useLoaderData(mcVersionRef, {
   forge: showForge,
   neoforge: showNeoforge,
   fabric: showFabric,
@@ -85,49 +78,12 @@ const {
 })
 
 // —— Fabric API 信息 ——
-// 后端在 install_merged 时已自动安装最新版 Fabric API，
-// 此处仅做信息展示：告知用户将自动安装哪个版本，便于了解。
-// 状态管理 + 查询逻辑抽到 useFabricApi composable，展示抽到 FabricApiInfoCard 子组件
 const {
   fabricApiState,
   fabricApiLatest,
   fabricApiError,
   retry: retryFabricApi,
-} = useFabricApi(computed(() => props.mcVersion), selectedFabric)
-
-// —— 兼容性检查 ——
-function getLoaderError(loader: string): string | null {
-  if (loader === 'forge') {
-    if (selectedFabric.value) return '与 Fabric 不兼容'
-    if (selectedNeoforge.value) return '与 NeoForge 不兼容'
-  }
-  if (loader === 'neoforge') {
-    if (selectedForge.value) return '与 Forge 不兼容'
-    if (selectedFabric.value) return '与 Fabric 不兼容'
-    if (selectedOptifine.value) return '与 OptiFine 不兼容'
-  }
-  if (loader === 'fabric') {
-    if (selectedForge.value) return '与 Forge 不兼容'
-    if (selectedNeoforge.value) return '与 NeoForge 不兼容'
-  }
-  if (loader === 'optifine') {
-    if (selectedNeoforge.value) return '与 NeoForge 不兼容'
-  }
-  return null
-}
-
-function isLoaderDisabled(loader: string): boolean {
-  return getLoaderError(loader) !== null && !isLoaderSelected(loader)
-}
-
-function isLoaderSelected(loader: string): boolean {
-  if (loader === 'forge') return !!selectedForge.value
-  if (loader === 'neoforge') return !!selectedNeoforge.value
-  if (loader === 'fabric') return !!selectedFabric.value
-  if (loader === 'optifine') return !!selectedOptifine.value
-  if (loader === 'liteloader') return !!selectedLiteloader.value
-  return false
-}
+} = useFabricApi(mcVersionRef, selectedFabric)
 
 // —— 实例名 ——
 function getDefaultInstanceName(): string {
@@ -287,10 +243,7 @@ onMounted(() => {
       <div class="flex items-center justify-between">
         <span v-if="!hasSelection" class="text-xs text-gray-400">不选择加载器 = 安装原版</span>
         <span v-else class="text-xs text-gray-400">&nbsp;</span>
-        <Button
-          type="primary"
-          @click="handleInstall"
-        >
+        <Button type="primary" @click="handleInstall">
           <template #icon><ArrowDownTrayIcon class="w-4 h-4" /></template>
           开始安装
         </Button>

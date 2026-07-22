@@ -28,7 +28,7 @@ function goToDownloads() {
     <!-- 有下载任务时显示 -->
     <button
       v-if="versionStore.downloading"
-      class="fixed bottom-6 right-6 z-50 w-14 h-14 bg-primary-600 rounded-full shadow-lg flex items-center justify-center hover:bg-primary-700 active:scale-95 transition-all group"
+      class="fixed bottom-20 right-6 z-50 w-14 h-14 bg-primary-600 rounded-full shadow-lg flex items-center justify-center hover:bg-primary-700 active:scale-95 transition-all group"
       @click="goToDownloads"
     >
       <ArrowDownTrayIcon class="w-6 h-6 text-white group-hover:scale-110 transition-transform" />

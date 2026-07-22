@@ -26,7 +26,7 @@ use crate::state::AppState;
 use crate::{log_error, log_info};
 
 use super::helpers::get_mods_dir;
-use super::sanitize_version_id;
+use super::super::sanitize_version_id;
 
 /// 防抖静默期（ms）：收到事件后等待此时长无新事件才 emit
 const DEBOUNCE_QUIET_MS: u64 = 500;

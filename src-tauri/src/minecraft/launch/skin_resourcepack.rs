@@ -25,7 +25,7 @@
 //! ```
 
 use crate::log_info;
-use crate::minecraft::loaders::utils::parse_version_number;
+use crate::utils::version::parse_number as parse_version_number;
 use std::io::Write;
 use std::path::Path;
 

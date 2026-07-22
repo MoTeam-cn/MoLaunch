@@ -12,7 +12,7 @@ import { ref, watch } from 'vue'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
 import type { ResourceProject } from '@/types/community'
 import { getMcmodUrl } from '@/utils/api/community'
-import { showSuccess, showError } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import { formatDownloads } from '@/utils/format'
 import {
   XMarkIcon,
@@ -47,7 +47,7 @@ watch(
 /** 点击"转到 MC百科"：直接打开已查到的直链 */
 async function openMcmod() {
   if (!mcmodUrl.value) return
-  showSuccess('正在打开 MC 百科详情页')
+  toastSuccess('正在打开 MC 百科详情页')
   await openUrl(mcmodUrl.value)
 }
 
@@ -57,9 +57,9 @@ async function copyName() {
   if (!name) return
   try {
     await navigator.clipboard.writeText(name)
-    showSuccess('已复制: ' + name)
+    toastSuccess('已复制: ' + name)
   } catch {
-    showError('复制失败')
+    toastError('复制失败')
   }
 }
 </script>

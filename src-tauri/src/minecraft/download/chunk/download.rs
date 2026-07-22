@@ -10,7 +10,7 @@ use tokio::sync::Mutex;
 
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
-use super::util::format_bytes;
+use crate::utils::format;
 
 /// 下载单个分片
 ///
@@ -99,8 +99,8 @@ pub(super) async fn download_chunk(
                 return Err(format!(
                     "chunk {} 下载超时（15s 无数据流动，已下载 {} / {}）",
                     chunk_index,
-                    format_bytes(downloaded),
-                    format_bytes(expected_chunk_bytes)
+                    format::bytes(downloaded),
+                    format::bytes(expected_chunk_bytes)
                 )
                 .into());
             }

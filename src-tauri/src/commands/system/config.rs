@@ -59,6 +59,7 @@ fn is_valid_config_key(section: &str, key: &str) -> bool {
         ("Proxy", "mode") => true,
         ("Proxy", "type") => true,
         ("Proxy", "url") => true,
+        // Plugin 段已迁移至 AppData 常驻化存储（personalization.json），不再使用 INI
         _ => false,
     }
 }

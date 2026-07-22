@@ -55,10 +55,7 @@ pub fn get_sdk_filename() -> &'static str {
 /// `<temp>/MoLaunch/sdk/<filename>`。此函数仅返回路径，不触发释放。
 pub fn get_sdk_library_path() -> PathBuf {
     let sdk_filename = get_sdk_filename();
-    std::env::temp_dir()
-        .join("MoLaunch")
-        .join("sdk")
-        .join(sdk_filename)
+    crate::utils::cache_temp::sdk_library_path(sdk_filename)
 }
 
 /// 确保 SDK 已释放到临时目录，返回动态库路径

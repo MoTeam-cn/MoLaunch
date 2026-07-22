@@ -162,11 +162,8 @@ pub async fn install_fabric_api_for_version(
     hash: Option<String>,
 ) -> Result<(), String> {
     use crate::commands::version::mods::helpers::get_mods_dir;
-    use crate::minecraft::sources::DownloadSourceMode;
 
-    let config = state.config.lock().await;
-    let source_mode = DownloadSourceMode::from_str(&config.meta_source);
-    drop(config);
+    let (_, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let mods_dir: std::path::PathBuf = get_mods_dir(&state, &version_id).await?;
 

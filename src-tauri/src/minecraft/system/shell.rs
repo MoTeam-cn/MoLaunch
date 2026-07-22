@@ -242,6 +242,46 @@ pub fn restrict_file_permissions(path: &std::path::Path) {
     }
 }
 
+// ============ 通用可执行文件执行 ============
+
+/// 执行指定可执行文件并返回完整输出（同步阻塞）
+///
+/// 统一封装 `std::process::Command` 调用，提供：
+/// - `[Shell]` 前缀日志（记录 program + args + cwd）
+/// - Windows 下 CREATE_NO_WINDOW 标志（避免弹出控制台窗口）
+/// - 统一错误格式（含 [Shell] 前缀 + 日志）
+///
+/// 适用于：Java 二进制探测（`java -version`）、PreLaunch 命令执行（`cmd /C` / `sh -c`）
+/// 等需要直接调用外部可执行文件的场景。
+///
+/// **不适用**：异步子进程执行（请用 `tokio::process::Command`）、需要权限校验的
+/// 沙箱执行（请参考 `commands::plugins::spawn`）。
+pub fn run_executable_output(
+    program: &str,
+    args: &[String],
+    cwd: Option<&std::path::Path>,
+) -> Result<std::process::Output, String> {
+    log_info!(
+        "[Shell] run_executable: {} {} (cwd={})",
+        program,
+        args.join(" "),
+        cwd.map(|p| p.display().to_string())
+            .unwrap_or_else(|| "<inherit>".to_string())
+    );
+
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(args);
+    if let Some(cwd) = cwd {
+        cmd.current_dir(cwd);
+    }
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    cmd.output().map_err(|e| shell_err(program, e))
+}
+
 // ============ 辅助 ============
 
 /// 统一格式化 shell 命令错误（含 [Shell] 前缀 + 日志）
@@ -249,4 +289,95 @@ fn shell_err(op: &str, e: std::io::Error) -> String {
     let msg = format!("{} failed: {}", op, e);
     log_error!("[Shell] {}", msg);
     msg
+}
+
+// ============ 窗口管理（macOS / Linux） ============
+//
+// 以下函数封装 window_title 模块用到的外部命令，避免业务代码直接
+// 调用 std::process::Command。所有命令均带 [Shell] 前缀日志。
+
+/// macOS：运行 AppleScript（osascript -e <script>）
+///
+/// 返回 stdout（已 trim）。脚本失败时返回错误字符串（含 stderr）。
+/// 需要用户在"系统设置 > 隐私与安全性 > 辅助功能"中授权启动器。
+#[cfg(target_os = "macos")]
+pub fn run_osascript(script: &str) -> Result<std::process::Output, String> {
+    log_info!("[Shell] osascript -e <script>");
+    std::process::Command::new("osascript")
+        .arg("-e")
+        .arg(script)
+        .output()
+        .map_err(|e| shell_err("osascript", e))
+}
+
+/// Linux：xdotool search --pid <pid> [--onlyvisible]
+///
+/// 返回 stdout（窗口 ID 列表，每行一个）。命令不存在或执行失败返回错误。
+#[cfg(target_os = "linux")]
+pub fn xdotool_search_pid(pid: u32, only_visible: bool) -> Result<std::process::Output, String> {
+    log_info!(
+        "[Shell] xdotool search --pid {} (only_visible={})",
+        pid,
+        only_visible
+    );
+    let mut cmd = std::process::Command::new("xdotool");
+    cmd.arg("search").arg("--pid").arg(pid.to_string());
+    if only_visible {
+        cmd.arg("--onlyvisible");
+    }
+    cmd.output().map_err(|e| shell_err("xdotool search", e))
+}
+
+/// Linux：xdotool set_window --name <title> <window_id>
+#[cfg(target_os = "linux")]
+pub fn xdotool_set_window_name(
+    window_id: &str,
+    title: &str,
+) -> Result<std::process::Output, String> {
+    log_info!(
+        "[Shell] xdotool set_window --name '{}' {}",
+        title,
+        window_id
+    );
+    std::process::Command::new("xdotool")
+        .args(["set_window", "--name", title, window_id])
+        .output()
+        .map_err(|e| shell_err("xdotool set_window", e))
+}
+
+/// Linux：wmctrl -l -p（列出所有窗口，含 PID）
+#[cfg(target_os = "linux")]
+pub fn wmctrl_list() -> Result<std::process::Output, String> {
+    log_info!("[Shell] wmctrl -l -p");
+    std::process::Command::new("wmctrl")
+        .args(["-l", "-p"])
+        .output()
+        .map_err(|e| shell_err("wmctrl -l", e))
+}
+
+/// Linux：wmctrl -r <old_title> -T <new_title>
+#[cfg(target_os = "linux")]
+pub fn wmctrl_rename(old_title: &str, new_title: &str) -> Result<std::process::Output, String> {
+    log_info!(
+        "[Shell] wmctrl -r '{}' -T '{}'",
+        old_title,
+        new_title
+    );
+    std::process::Command::new("wmctrl")
+        .args(["-r", old_title, "-T", new_title])
+        .output()
+        .map_err(|e| shell_err("wmctrl -r", e))
+}
+
+/// Linux：ps -p <pid>（检查进程是否存在）
+///
+/// 返回 true 表示进程存在（exit code 0），false 表示进程不存在或 ps 不可用。
+#[cfg(target_os = "linux")]
+pub fn ps_pid_exists(pid: u32) -> bool {
+    log_info!("[Shell] ps -p {}", pid);
+    std::process::Command::new("ps")
+        .args(["-p", &pid.to_string()])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }

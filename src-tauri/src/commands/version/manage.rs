@@ -16,8 +16,8 @@ pub async fn fix_version_files(
     sanitize_version_id(&version_id)?;
     log_info!("Fixing version files for: {}", version_id);
 
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
     let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     let mirror_url = config.mirror_url.clone();
     let max_threads = config.max_download_threads as usize;
     let chunk_count = config.chunk_count as usize;

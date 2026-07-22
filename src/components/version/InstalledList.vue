@@ -9,9 +9,10 @@ import { CubeIcon, PlayIcon, TrashIcon, StopIcon, ArrowPathIcon } from '@heroico
 import { useVersionStore } from '@/stores/version'
 import { useAuthStore } from '@/stores/auth'
 import { showWarning, showError } from '@/utils/modal'
-import { showSuccess } from '@/utils/toast'
+import { toastSuccess } from '@/utils/toast'
 import { inferVersionType, getVersionTypeLabel, getVersionTypeBadgeClass } from '@/composables/useVersionMeta'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 
 const versionStore = useVersionStore()
 const authStore = useAuthStore()
@@ -72,7 +73,7 @@ async function handleLaunch(versionId: string) {
       username: authStore.currentUser?.name || 'Player',
       uuid: authStore.currentUser?.uuid || '',
     })
-    showSuccess(`游戏已启动 (PID: ${pid})`)
+    toastSuccess(`游戏已启动 (PID: ${pid})`)
   } catch (e) {
     showError('启动失败', String(e))
   }
@@ -85,7 +86,7 @@ async function handleStop(versionId: string) {
   }
   try {
     await versionStore.stopGame()
-    showSuccess('已停止', '游戏进程已终止')
+    toastSuccess('已停止', '游戏进程已终止')
   } catch (e) {
     showError('停止失败', String(e))
   }
@@ -167,42 +168,48 @@ function isLaunching(versionId: string) {
           <div class="flex items-center gap-2 flex-shrink-0">
             <!-- 运行中 - 显示停止按钮 -->
             <template v-if="isRunning(versionId)">
-              <button
+              <Button
+                type="text"
+                size="small"
                 class="play-btn stop-btn"
                 @click.stop="handleStop(versionId)"
               >
-                <StopIcon class="w-4 h-4" />
+                <StopIcon class="w-4 h-4 !mr-0" />
                 <span>Stop</span>
-              </button>
+              </Button>
             </template>
 
             <!-- 启动中 - 显示加载按钮 -->
             <template v-else-if="isLaunching(versionId)">
-              <button class="play-btn launching-btn" disabled>
-                <ArrowPathIcon class="w-4 h-4 animate-spin" />
+              <Button type="text" size="small" class="play-btn launching-btn" disabled>
+                <ArrowPathIcon class="w-4 h-4 !mr-0 animate-spin" />
                 <span>Launching...</span>
-              </button>
+              </Button>
             </template>
 
             <!-- 默认 - 显示启动按钮 (原版蓝色) -->
             <template v-else>
-              <button
+              <Button
+                type="text"
+                size="small"
                 class="play-btn launch-btn"
                 @click.stop="handleLaunch(versionId)"
               >
-                <PlayIcon class="w-4 h-4" />
+                <PlayIcon class="w-4 h-4 !mr-0" />
                 <span>Play</span>
-              </button>
+              </Button>
             </template>
 
             <!-- 卸载按钮 -->
             <Tooltip text="卸载" position="top">
-              <button
+              <Button
+                type="text"
+                size="mini"
                 class="delete-btn"
                 @click.stop="handleUninstall(versionId)"
               >
-                <TrashIcon class="w-4 h-4" />
-              </button>
+                <TrashIcon class="w-4 h-4 !mr-0" />
+              </Button>
             </Tooltip>
           </div>
         </div>

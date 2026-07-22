@@ -153,7 +153,7 @@ pub(super) async fn install_cf_mods(
     log_info!(
         "[Community] CF 下载 {} 个文件，总大小 {}",
         download_list.len(),
-        super::helpers::format_bytes(total_bytes)
+        crate::utils::format::bytes(total_bytes)
     );
 
     // 6. 并发下载

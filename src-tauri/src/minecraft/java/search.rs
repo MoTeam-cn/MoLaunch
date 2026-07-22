@@ -172,15 +172,13 @@ fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
     // Step 5: APPDATA\.minecraft\runtime\（官启自动下载的 Java 存放处）
     // runtime 下的 Java 跨游戏目录共享，必须搜索
     crate::log_info!("[Java] Step 5: Searching APPDATA .minecraft runtime...");
-    if let Ok(appdata) = std::env::var("APPDATA") {
-        let runtime_dir = Path::new(&appdata).join(".minecraft").join("runtime");
-        if runtime_dir.exists() {
-            crate::log_debug!(
-                "[Java] Step 5: Searching runtime directory: {}",
-                runtime_dir.display()
-            );
-            search_folder_recursive(&runtime_dir, &mut collector, true);
-        }
+    let runtime_dir = crate::utils::cache_app::runtime_base_dir();
+    if runtime_dir.exists() {
+        crate::log_debug!(
+            "[Java] Step 5: Searching runtime directory: {}",
+            runtime_dir.display()
+        );
+        search_folder_recursive(&runtime_dir, &mut collector, true);
     }
 
     // Step 6: 调用方追加的额外搜索路径（如游戏目录）

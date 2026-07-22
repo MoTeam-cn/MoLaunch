@@ -7,7 +7,7 @@
  * - emit upload，业务逻辑由父组件处理
  */
 import { open } from '@tauri-apps/plugin-shell'
-import { showError } from '@/utils/toast'
+import { toastError } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
 
 const props = defineProps<{
@@ -20,11 +20,11 @@ const emit = defineEmits<{
 }>()
 
 function openChangePassword() {
-  open('https://account.live.com/password/Change').catch(() => showError('打开网页失败'))
+  open('https://account.live.com/password/Change').catch(() => toastError('打开网页失败'))
 }
 
 function openChangeUsername() {
-  open('https://www.minecraft.net/zh-hans/msaprofile/mygames/editprofile').catch(() => showError('打开网页失败'))
+  open('https://www.minecraft.net/zh-hans/msaprofile/mygames/editprofile').catch(() => toastError('打开网页失败'))
 }
 </script>
 

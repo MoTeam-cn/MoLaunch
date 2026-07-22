@@ -13,6 +13,7 @@
  * - config.ts       全局配置读写（getConfig/applyConfig/refreshConfig + 缓存）
  * - skin.ts         皮肤与披风管理
  * - developer.ts    开发者模式（解锁/开关/日志/缓存/存储/系统信息）
+ * - plugins.ts      外部插件管理（扫描/读取/安装/卸载）
  *
  * 此文件仅为兼容现有 `import * as tauri from '@/utils/tauri'` 用法，
  * 不应再在此处直接添加新函数——请按域归类到对应子文件。
@@ -30,3 +31,4 @@ export * from './api/config'
 export * from './api/skin'
 export * from './api/image-cache'
 export * from './api/developer'
+export * from './api/plugins'

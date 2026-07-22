@@ -242,12 +242,9 @@ fn detect_loader_from_json(version_json: &serde_json::Value) -> Option<VersionTy
 fn is_old_version(release_time: &str) -> bool {
     use chrono::Datelike;
 
-    if let Ok(dt) = chrono::DateTime::parse_from_rfc3339(release_time) {
+    // 使用统一的时间解析工具
+    if let Some(dt) = crate::utils::datetime::parse_utc(release_time) {
         let year = dt.year();
-        return year >= 2000 && year < 2013;
-    }
-    if let Ok(naive) = chrono::NaiveDateTime::parse_from_str(release_time, "%Y-%m-%dT%H:%M:%S") {
-        let year = naive.year();
         return year >= 2000 && year < 2013;
     }
     false

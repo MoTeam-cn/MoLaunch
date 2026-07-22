@@ -11,6 +11,7 @@
  */
 import { formatBytes } from '@/utils/format'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -64,32 +65,39 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
         </span>
         <!-- 暂停/恢复按钮 -->
         <Tooltip :text="isPaused ? '恢复下载' : '暂停下载'" position="top">
-          <button
-            class="flex items-center gap-1 px-2 py-1 text-xs rounded-md transition-colors"
-            :class="isPaused
-              ? 'text-green-600 hover:bg-green-50'
-              : 'text-amber-600 hover:bg-amber-50'"
+          <Button
+            type="text"
+            size="mini"
             :disabled="togglingPause"
+            :class="isPaused
+              ? '!text-green-600 hover:!bg-green-50'
+              : '!text-amber-600 hover:!bg-amber-50'"
             @click="emit('togglePause')"
           >
-            <component
-              :is="isPaused ? PlayCircleIcon : PauseCircleIcon"
-              class="w-4 h-4"
-              :class="{ 'animate-pulse': togglingPause }"
-            />
+            <template #icon>
+              <component
+                :is="isPaused ? PlayCircleIcon : PauseCircleIcon"
+                class="w-4 h-4"
+                :class="{ 'animate-pulse': togglingPause }"
+              />
+            </template>
             {{ isPaused ? '恢复' : '暂停' }}
-          </button>
+          </Button>
         </Tooltip>
         <!-- 取消按钮 -->
         <Tooltip text="取消下载" position="top">
-          <button
-            class="flex items-center gap-1 px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded-md transition-colors"
+          <Button
+            type="text"
+            size="mini"
             :disabled="cancelling"
+            class="!text-red-600 hover:!bg-red-50"
             @click="emit('cancel')"
           >
-            <XCircleIcon class="w-4 h-4" :class="{ 'animate-pulse': cancelling }" />
+            <template #icon>
+              <XCircleIcon class="w-4 h-4" :class="{ 'animate-pulse': cancelling }" />
+            </template>
             取消
-          </button>
+          </Button>
         </Tooltip>
       </div>
     </div>
@@ -97,11 +105,15 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
     <!-- 任务分组列表（按 group 分组，可折叠展开看子阶段） -->
     <div class="divide-y divide-gray-100">
       <div v-for="g in taskGroups" :key="g.key" class="px-4 py-2">
-        <!-- 分组标题栏（点击折叠/展开） -->
-        <button
+        <!-- 分组标题栏（点击折叠/展开）— 结构性可点击行，非视觉按钮 -->
+        <div
+          role="button"
+          tabindex="0"
           class="w-full flex items-center gap-2 py-1"
-          :class="g.isIndependent ? 'cursor-default' : 'hover:bg-gray-50 rounded -mx-1 px-1'"
+          :class="g.isIndependent ? 'cursor-default' : 'hover:bg-gray-50 rounded -mx-1 px-1 cursor-pointer'"
           @click="g.isIndependent ? undefined : toggleGroup(g.key)"
+          @keydown.enter="g.isIndependent ? undefined : toggleGroup(g.key)"
+          @keydown.space.prevent="g.isIndependent ? undefined : toggleGroup(g.key)"
         >
           <!-- 状态图标 -->
           <div class="w-5 h-5 flex items-center justify-center shrink-0">
@@ -147,7 +159,7 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
             class="w-4 h-4 text-gray-400 transition-transform duration-200"
             :class="isExpanded(g.key) ? 'rotate-180' : 'rotate-0'"
           />
-        </button>
+        </div>
 
         <!-- 子阶段列表（独立分组只显示自身，不展开子列表） -->
         <div

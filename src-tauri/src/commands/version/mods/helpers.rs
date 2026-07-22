@@ -2,7 +2,8 @@
 //!
 //! 包含：
 //! - get_mods_dir：获取版本的 mods 目录路径（pub(crate)，供 preload 命令复用）
-//! - sanitize_file_name：校验文件名防路径遍历（pub(super)，供 mod.rs / file_ops.rs 共用）
+//!
+//! 注：sanitize_file_name 已迁移到 `crate::utils::path::sanitize_file_name`
 
 use crate::state::AppState;
 use tauri::State;
@@ -12,10 +13,8 @@ pub(crate) async fn get_mods_dir(
     state: &State<'_, AppState>,
     version_id: &str,
 ) -> Result<std::path::PathBuf, String> {
-    let config = state.config.lock().await;
-    let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-    let global_isolation_mode = config.isolation_mode;
-    drop(config);
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let global_isolation_mode = state.config.lock().await.isolation_mode;
 
     // 版本独立隔离设置覆盖全局
     let isolation_mode = crate::commands::version::list::resolve_isolation_mode(
@@ -34,17 +33,4 @@ pub(crate) async fn get_mods_dir(
     );
 
     Ok(effective_dir.join("mods"))
-}
-
-/// 校验文件名，防止路径遍历
-pub(super) fn sanitize_file_name(name: &str) -> Result<(), String> {
-    if name.is_empty()
-        || name.contains('/')
-        || name.contains('\\')
-        || name.contains("..")
-        || name.contains('\0')
-    {
-        return Err(format!("Invalid file name: {}", name));
-    }
-    Ok(())
 }

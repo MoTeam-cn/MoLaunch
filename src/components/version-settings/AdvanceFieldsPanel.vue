@@ -12,7 +12,7 @@
  */
 import { reactive, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
-import { showSuccess, showError } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Input from '@/components/common/Input.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
@@ -60,8 +60,8 @@ async function savePersonalField(field: AdvanceField['field'], value: string, na
     if (personalization.value) {
       (personalization.value as any)[field] = value
     }
-    showSuccess(`${name}已保存`)
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess(`${name}已保存`)
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 onMounted(loadSetup)

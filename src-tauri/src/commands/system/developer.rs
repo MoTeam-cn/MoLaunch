@@ -11,9 +11,12 @@
 
 use crate::log_info;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
-use crate::storage::cache::Cache;
 use crate::storage::registry::{reg_get_bool, reg_set_bool};
 use crate::storage::Storage;
+use crate::utils::cache;
+use crate::utils::cache_app;
+use crate::utils::cache_stats;
+use crate::utils::cache_temp;
 use serde::Serialize;
 
 /// 注册表键名：开发者模式是否已解锁
@@ -59,10 +62,14 @@ pub struct StorageDirs {
     pub config: String,
     /// 日志目录
     pub logs: String,
-    /// 缓存目录
+    /// 运行路径缓存目录（.Molaunch/cache/）
     pub cache: String,
-    /// 临时目录
+    /// 临时目录（.Molaunch/temp/）
     pub temp: String,
+    /// 系统临时目录缓存（<temp>/MoLaunch/，含 TaskTemp 和 sdk）
+    pub cache_temp: String,
+    /// AppData 缓存目录（%APPDATA%/.minecraft/，Java Runtime）
+    pub cache_app: String,
 }
 
 /// 获取所有存储目录路径（开发者页展示用）
@@ -73,8 +80,10 @@ pub fn get_storage_dirs() -> StorageDirs {
         base: storage.base_dir().to_string_lossy().to_string(),
         config: storage.config_path().to_string_lossy().to_string(),
         logs: storage.logs_dir().to_string_lossy().to_string(),
-        cache: Cache::instance().dir().to_string_lossy().to_string(),
+        cache: cache::dir().to_string_lossy().to_string(),
         temp: storage.temp_dir().to_string_lossy().to_string(),
+        cache_temp: cache_temp::dir().to_string_lossy().to_string(),
+        cache_app: cache_app::dir().to_string_lossy().to_string(),
     }
 }
 
@@ -114,4 +123,14 @@ pub fn get_system_info() -> SystemInfo {
         available_memory: mem.available,
         memory_usage_percent: mem.usage_percent,
     }
+}
+
+/// 获取所有缓存目录的统计信息（文件数、占用大小、TTL）
+///
+/// 在 `spawn_blocking` 中执行以避免阻塞主线程。
+#[tauri::command]
+pub async fn get_cache_stats() -> Result<cache_stats::CacheStatsResult, String> {
+    tauri::async_runtime::spawn_blocking(|| cache_stats::collect_all())
+        .await
+        .map_err(|e| format!("Failed to collect cache stats: {}", e))
 }

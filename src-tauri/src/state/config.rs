@@ -56,6 +56,9 @@ pub struct AppConfig {
     /// 使用高性能显卡（默认 false）
     /// 自动在 Windows 设置中将启动器和 Java 改为使用高性能显卡
     pub launch_use_dedicated_gpu: bool,
+    // ===== 外部下载工具 =====
+    /// 外部下载工具的自定义保存目录（None 或空则用默认 .Molaunch/Download/）
+    pub external_download_dir: Option<String>,
 }
 
 /// Minecraft 文件夹项
@@ -105,6 +108,7 @@ impl Default for AppConfig {
             launch_disable_jlw: false,
             launch_disable_lua: false,
             launch_use_dedicated_gpu: false,
+            external_download_dir: None,
         }
     }
 }

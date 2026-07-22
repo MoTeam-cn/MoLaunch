@@ -13,9 +13,10 @@ use crate::state::{AppState, StageStatus};
 use std::sync::Arc;
 
 use super::curseforge::CfManifest;
-use super::helpers::{format_bytes, parse_cf_loader_id, parse_mr_loader};
+use super::helpers::{parse_cf_loader_id, parse_mr_loader};
 use super::modrinth::MrIndex;
 use super::types::{ModpackFormat, ModpackInfo};
+use crate::utils::format;
 
 /// Stage 0：下载原始整合包到 instance 目录
 ///
@@ -100,7 +101,7 @@ pub(super) async fn download_modpack_archive(
     log_info!(
         "[Community] 整合包下载完成: {} ({})",
         file_name,
-        format_bytes(archive_size)
+        format::bytes(archive_size)
     );
 
     Ok(archive_size)

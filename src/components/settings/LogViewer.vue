@@ -7,13 +7,14 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
-import { showError, showSuccess } from '@/utils/toast'
+import { toastError, toastSuccess } from '@/utils/toast'
 import { parseLogLines, logLineClass, type LogLine } from '@/utils/log-display'
 import Select from '@/components/common/Select.vue'
 import Button from '@/components/common/Button.vue'
 import {
   FolderOpenIcon,
   ArrowPathIcon,
+  DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
 
 interface Props {
@@ -37,7 +38,7 @@ async function loadLogFiles() {
     }
   } catch (e) {
     console.error('Failed to list log files:', e)
-    showError('获取日志列表失败：' + e)
+    toastError('获取日志列表失败：' + e)
   }
 }
 
@@ -51,7 +52,7 @@ async function loadLogContent(filename: string) {
     logContent.value = await tauri.readLogFile(filename)
   } catch (e) {
     logContent.value = ''
-    showError('读取日志失败：' + e)
+    toastError('读取日志失败：' + e)
   } finally {
     logLoading.value = false
   }
@@ -64,7 +65,7 @@ async function onLogSelect(filename: string) {
 
 async function refreshLogs() {
   await loadLogFiles()
-  showSuccess('日志已刷新')
+  toastSuccess('日志已刷新')
 }
 
 async function openLogsDir() {
@@ -72,7 +73,7 @@ async function openLogsDir() {
   try {
     await tauri.openPath(props.logsDir)
   } catch (e) {
-    showError('打开目录失败：' + e)
+    toastError('打开目录失败：' + e)
   }
 }
 
@@ -128,9 +129,10 @@ onMounted(async () => {
           style="min-width: 280px"
           @update:model-value="onLogSelect(String($event))"
         />
-        <p v-if="logFiles.length === 0" class="text-xs text-gray-400 mt-2">
-          暂无日志文件
-        </p>
+        <div v-if="logFiles.length === 0" class="flex flex-col items-center justify-center py-6 text-gray-400">
+          <DocumentTextIcon class="w-8 h-8 mb-2" />
+          <span class="text-xs">暂无日志文件</span>
+        </div>
       </div>
 
       <!-- 日志内容 -->

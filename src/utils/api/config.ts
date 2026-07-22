@@ -54,6 +54,8 @@ export interface ConfigSnapshot {
   launchDisableJlw: boolean
   launchDisableLua: boolean
   launchUseDedicatedGpu: boolean
+  // 外部下载工具
+  externalDownloadDir: string | null
   // 开发者模式（从注册表读，developerUnlocked 为只读）
   developerUnlocked: boolean
   developerMode: boolean
@@ -102,6 +104,8 @@ export interface ConfigPatch {
   launchDisableJlw?: boolean
   launchDisableLua?: boolean
   launchUseDedicatedGpu?: boolean
+  // 外部下载工具（null 表示清空，回退默认 .Molaunch/Download/）
+  externalDownloadDir?: string | null
   // 开发者模式（注册表存储，后端内部分流到 registry，仅已解锁时可生效）
   developerMode?: boolean
 }

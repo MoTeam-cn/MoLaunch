@@ -11,6 +11,7 @@ import {
   HomeIcon,
   Cog6ToothIcon,
   CubeIcon,
+  WrenchScrewdriverIcon,
 } from '@heroicons/vue/24/outline'
 import * as tauri from '@/utils/tauri'
 const appWindow = getCurrentWebviewWindow()
@@ -38,6 +39,7 @@ onUnmounted(() => {
 const navItems = [
   { name: '首页', path: '/apps', icon: HomeIcon },
   { name: '下载', path: '/apps/versions', icon: CubeIcon, hasDblClick: true },
+  { name: '工具', path: '/apps/tools', icon: WrenchScrewdriverIcon },
   { name: '设置', path: '/apps/settings', icon: Cog6ToothIcon },
 ]
 
@@ -106,7 +108,9 @@ async function handleClose() {
             :key="item.path"
             class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
             :class="[
-              isActive(item.path) || (item.hasDblClick && isActive('/apps/downloads'))
+              isActive(item.path)
+                || (item.hasDblClick && isActive('/apps/downloads'))
+                || (item.path === '/apps/tools' && route.path.startsWith('/apps/tools'))
                 ? 'bg-white/20 text-white'
                 : 'text-white/70 hover:bg-white/10 hover:text-white'
             ]"

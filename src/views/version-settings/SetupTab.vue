@@ -10,7 +10,7 @@
  */
 import { ref, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
-import { showSuccess, showError } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Input from '@/components/common/Input.vue'
@@ -65,8 +65,8 @@ async function savePersonalField(field: string, value: string, name: string) {
     if (personalization.value) {
       (personalization.value as any)[field] = value
     }
-    showSuccess(`${name}已保存`)
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess(`${name}已保存`)
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 async function handleSaveIndie(val: number) {
@@ -74,8 +74,8 @@ async function handleSaveIndie(val: number) {
   try {
     await tauri.updateVersionPersonalization(selectedId.value, { indieType: val })
     if (personalization.value) personalization.value.indieType = val
-    showSuccess(val === 0 ? '已跟随全局设置' : val === 1 ? '已开启版本隔离' : '已关闭版本隔离')
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess(val === 0 ? '已跟随全局设置' : val === 1 ? '已开启版本隔离' : '已关闭版本隔离')
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 /** 保存高级选项开关 */
@@ -87,8 +87,8 @@ async function saveAdvanceSwitch(field: string, value: boolean, name: string) {
     if (personalization.value) {
       (personalization.value as any)[field] = value
     }
-    showSuccess(`${name}已保存`)
-  } catch (e) { showError('保存失败：' + String(e)) }
+    toastSuccess(`${name}已保存`)
+  } catch (e) { toastError('保存失败：' + String(e)) }
 }
 
 onMounted(loadSetup)

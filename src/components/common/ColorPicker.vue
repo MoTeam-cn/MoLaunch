@@ -16,6 +16,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { PRESET_COLORS } from '@/utils/color'
+import Tooltip from '@/components/common/Tooltip.vue'
 
 interface Props {
   /** 当前选中的 HEX 颜色（如 "#165dff"） */
@@ -215,25 +216,31 @@ onUnmounted(() => {
           <!-- 预设色板（4 列 × 3 行 = 12 色） -->
           <div class="cp-section-label">预设颜色</div>
           <div class="cp-preset-grid">
-            <button
+            <Tooltip
               v-for="color in PRESET_COLORS"
               :key="color"
-              type="button"
-              class="cp-preset-swatch"
-              :class="{ selected: color.toLowerCase() === modelValue.toLowerCase() }"
-              :style="{ backgroundColor: color }"
-              :title="color"
-              @click="select(color)"
+              :text="color"
+              position="top"
             >
-              <svg
-                v-if="color.toLowerCase() === modelValue.toLowerCase()"
-                class="cp-check"
-                viewBox="0 0 1024 1024"
-                fill="currentColor"
+              <div
+                role="button"
+                tabindex="0"
+                class="cp-preset-swatch"
+                :class="{ selected: color.toLowerCase() === modelValue.toLowerCase() }"
+                :style="{ backgroundColor: color }"
+                @click="select(color)"
+                @keydown.enter="select(color)"
               >
-                <path d="M912 192c-12.8 0-25.6 4.266667-34.133333 12.8L384 699.2 234.666667 548.266667c-17.066667-17.066667-46.933333-17.066667-64 0-17.066667 17.066667-17.066667 46.933333 0 64l179.2 179.2c8.533333 8.533333 21.333333 12.8 34.133333 12.8s25.6-4.266667 34.133333-12.8l520.533334-520.533334c17.066667-17.066667 17.066667-46.933333 0-64-8.533333-8.533333-21.333333-12.8-34.133334-12.8z" />
-              </svg>
-            </button>
+                <svg
+                  v-if="color.toLowerCase() === modelValue.toLowerCase()"
+                  class="cp-check"
+                  viewBox="0 0 1024 1024"
+                  fill="currentColor"
+                >
+                  <path d="M912 192c-12.8 0-25.6 4.266667-34.133333 12.8L384 699.2 234.666667 548.266667c-17.066667-17.066667-46.933333-17.066667-64 0-17.066667 17.066667-17.066667 46.933333 0 64l179.2 179.2c8.533333 8.533333 21.333333 12.8 34.133333 12.8s25.6-4.266667 34.133333-12.8l520.533334-520.533334c17.066667-17.066667 17.066667-46.933333 0-64-8.533333-8.533333-21.333333-12.8-34.133334-12.8z" />
+                </svg>
+              </div>
+            </Tooltip>
           </div>
 
           <!-- 自定义 HEX 输入 -->
@@ -258,218 +265,4 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
-/* ============================================================
- * 触发器
- * 复用 Select 触发器尺寸与背景，与项目自研组件视觉一致
- * ============================================================ */
-.color-picker {
-  position: relative;
-  min-width: 120px;
-  max-width: 100%;
-}
-
-.color-picker-trigger {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 32px;
-  padding: 0 12px;
-  box-sizing: border-box;
-  color: #1d2129;
-  font-size: 14px;
-  background-color: #f2f3f5;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  cursor: pointer;
-  user-select: none;
-  max-width: 100%;
-  transition: color 0.1s cubic-bezier(0, 0, 1, 1),
-    border-color 0.1s cubic-bezier(0, 0, 1, 1),
-    background-color 0.1s cubic-bezier(0, 0, 1, 1);
-}
-
-.color-picker-trigger:hover {
-  background-color: #e5e6eb;
-  border-color: transparent;
-}
-
-.color-picker-trigger.active {
-  background-color: #fff;
-  border-color: var(--color-primary-500);
-  box-shadow: none;
-}
-
-.color-picker-trigger.disabled {
-  color: #c9cdd4;
-  background-color: #f2f3f5;
-  border-color: transparent;
-  cursor: not-allowed;
-}
-
-.color-swatch {
-  width: 16px;
-  height: 16px;
-  border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  flex-shrink: 0;
-}
-
-.color-value {
-  flex: 1;
-  min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  font-family: 'Consolas', 'Monaco', monospace;
-  font-size: 13px;
-  letter-spacing: 0.3px;
-}
-
-.color-picker-arrow {
-  width: 12px;
-  height: 12px;
-  color: #86909c;
-  transition: transform 0.2s ease;
-  flex-shrink: 0;
-}
-
-.color-picker-arrow.rotated {
-  transform: rotate(180deg);
-}
-
-/* ============================================================
- * 下拉面板
- * ============================================================ */
-.color-picker-dropdown {
-  background-color: #fff;
-  border: 1px solid #e5e6eb;
-  border-radius: 4px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  padding: 12px;
-  box-sizing: border-box;
-}
-
-.cp-section-label {
-  font-size: 12px;
-  color: #86909c;
-  margin-bottom: 8px;
-}
-
-/* 非首个 section-label（即"自定义颜色"标题）需要与上方色板拉开距离 */
-.cp-section-label:not(:first-child) {
-  margin-top: 16px;
-}
-
-/* 预设色板：4 列 × 3 行 */
-.cp-preset-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
-}
-
-.cp-preset-swatch {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 1;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  border-radius: 2px;
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.1s cubic-bezier(0, 0, 1, 1);
-}
-
-.cp-preset-swatch:hover {
-  transform: scale(1.1);
-}
-
-.cp-preset-swatch.selected {
-  border: 2px solid #1d2129;
-}
-
-.cp-check {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 12px;
-  height: 12px;
-  color: #fff;
-  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.4));
-}
-
-/* 自定义 HEX 输入 */
-.cp-custom-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cp-preview {
-  width: 28px;
-  height: 28px;
-  border-radius: 2px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  flex-shrink: 0;
-}
-
-.color-picker-input {
-  flex: 1;
-  height: 32px;
-  padding: 0 10px;
-  box-sizing: border-box;
-  font-size: 13px;
-  font-family: 'Consolas', 'Monaco', monospace;
-  color: #1d2129;
-  background-color: #f2f3f5;
-  border: 1px solid transparent;
-  border-radius: 2px;
-  outline: none;
-  transition: all 0.1s cubic-bezier(0, 0, 1, 1);
-}
-
-.color-picker-input:hover {
-  background-color: #e5e6eb;
-}
-
-.color-picker-input:focus {
-  background-color: #fff;
-  border-color: var(--color-primary-500);
-}
-
-.color-picker-input.error {
-  border-color: #f53f3f;
-}
-
-.cp-error-msg {
-  margin-top: 6px;
-  font-size: 12px;
-  color: #f53f3f;
-}
-
-/* ============================================================
- * 弹出动画（复用 Select 的 scaleY + opacity）
- * ============================================================ */
-.cp-enter-active,
-.cp-leave-active {
-  transition: opacity 0.2s cubic-bezier(0.34, 0.69, 0.1, 1),
-    transform 0.2s cubic-bezier(0.34, 0.69, 0.1, 1);
-}
-.cp-enter-from,
-.cp-leave-to {
-  opacity: 0;
-  transform: scaleY(0.9);
-}
-.cp-enter-from-up,
-.cp-leave-to-up {
-  opacity: 0;
-  transform: scaleY(0.9);
-}
-.cp-enter-to,
-.cp-leave-from,
-.cp-enter-from-up,
-.cp-leave-from-up {
-  opacity: 1;
-  transform: scaleY(1);
-}
-</style>
+<style scoped src="./ColorPicker.css"></style>

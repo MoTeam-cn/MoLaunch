@@ -49,6 +49,11 @@ export async function saveFile(
   return await invoke<string | null>('save_file', { title, defaultName, filters, defaultDirectory })
 }
 
+/** 将文本内容写入指定路径的文件 */
+export async function writeTextFile(path: string, content: string): Promise<void> {
+  return await invoke<void>('write_text_file', { path, content })
+}
+
 /**
  * 更新游戏目录
  *

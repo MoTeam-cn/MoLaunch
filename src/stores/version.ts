@@ -67,6 +67,43 @@ export const useVersionStore = defineStore('version', () => {
     }
   }
 
+  /** 快速恢复上次选中的版本（仅读取 config，不校验是否仍存在）
+   *
+   * 用于首页首屏快速显示版本名 + 启用开始游戏按钮，避免阻塞在磁盘扫描上。
+   * 后续应调用 `validateSelectedVersion` 校验版本是否仍然存在。
+   */
+  async function restoreSelectedVersionFast() {
+    try {
+      const saved = await tauri.getSelectedVersion()
+      if (saved) selectedVersion.value = saved
+    } catch (e) {
+      console.error('Failed to restore selectedVersion (fast):', e)
+    }
+  }
+
+  /** 校验当前 selectedVersion 是否仍存在于已安装列表
+   *
+   * - 不存在则清空持久化，并自动回退到第一个已安装版本（若有）
+   * - 为空且 installedList 非空时自动选中第一个
+   */
+  async function validateSelectedVersion(installedList: { id: string }[]) {
+    const current = selectedVersion.value
+    if (current && installedList.some((v) => v.id === current)) {
+      return // 仍然有效
+    }
+    // 当前版本无效或为空
+    if (current) {
+      // 版本已不存在，清空持久化
+      try {
+        await tauri.setSelectedVersion(null)
+      } catch (e) {
+        console.error('Failed to clear selectedVersion:', e)
+      }
+    }
+    // 自动回退到第一个已安装版本
+    selectedVersion.value = installedList.length > 0 ? installedList[0].id : null
+  }
+
   // 加载器版本列表缓存（按 MC 版本号缓存）
   const loaderVersionsCache = ref<Record<string, {
     forge: string[]
@@ -165,6 +202,8 @@ export const useVersionStore = defineStore('version', () => {
     javaDownloadProgress,
     selectedVersion,
     restoreSelectedVersion,
+    restoreSelectedVersionFast,
+    validateSelectedVersion,
     loaderVersionsCache,
     fetchVersions,
     refreshVersions,

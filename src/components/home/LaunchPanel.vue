@@ -10,7 +10,7 @@ import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
-import { showError, showWarning } from '@/utils/toast'
+import { toastError, toastWarning } from '@/utils/toast'
 import AccountSelector from './AccountSelector.vue'
 import VersionSelector from './VersionSelector.vue'
 
@@ -37,8 +37,8 @@ const launchState = computed(() => {
 async function handleLaunch() {
   if (versionStore.launching) { versionStore.cancelLaunch(); return }
   if (versionStore.runningPid) { versionStore.stopGame(); return }
-  if (!authStore.isLoggedIn) { showWarning('请先登录'); return }
-  if (!versionStore.selectedVersion) { showWarning('请选择版本'); return }
+  if (!authStore.isLoggedIn) { toastWarning('请先登录'); return }
+  if (!versionStore.selectedVersion) { toastWarning('请选择版本'); return }
 
   const user = authStore.currentUser!
   try {
@@ -49,7 +49,7 @@ async function handleLaunch() {
       loginType: user.login_type,
     })
   } catch (e) {
-    showError('启动失败', String(e))
+    toastError('启动失败', String(e))
   }
 }
 </script>

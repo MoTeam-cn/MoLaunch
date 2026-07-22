@@ -6,7 +6,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import Alert from '@/components/common/Alert.vue'
 import * as tauri from '@/utils/tauri'
 import { getConfigMap, applyConfig } from '@/utils/api/config'
-import { showInfo, showSuccess } from '@/utils/toast'
+import { toastInfo, toastSuccess } from '@/utils/toast'
 
 const sdkStore = useSdkStore()
 const logLevel = ref(3)
@@ -76,7 +76,7 @@ async function onVersionClick() {
       await tauri.unlockDeveloperMode()
       devUnlocked.value = true
       versionClickCount.value = 0
-      showSuccess('已解锁开发者模式，可在「高阶配置」中开启')
+      toastSuccess('已解锁开发者模式，可在「高阶配置」中开启')
     } catch (e) {
       console.error('Failed to unlock developer mode:', e)
       showError('解锁失败：' + e)
@@ -85,7 +85,7 @@ async function onVersionClick() {
   }
 
   // 提示还需点击几次
-  showInfo(`再点击 ${remaining} 次解锁开发者模式`)
+  toastInfo(`再点击 ${remaining} 次解锁开发者模式`)
 
   // 1.5 秒内未完成 5 次点击则重置计数器
   if (versionClickTimer) clearTimeout(versionClickTimer)

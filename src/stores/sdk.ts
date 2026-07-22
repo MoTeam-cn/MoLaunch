@@ -21,6 +21,8 @@ export const useSdkStore = defineStore('sdk', () => {
 
   // 方法
   async function fetchPlatformInfo() {
+    // 已初始化则跳过，避免 App.vue 与 Home.vue 重复发起 IPC
+    if (initialized.value) return
     try {
       status.value = await tauri.getPlatformInfo()
       version.value = await tauri.getSdkVersion()

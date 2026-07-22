@@ -142,7 +142,7 @@ pub(super) async fn install_mr_files(
     log_info!(
         "[Community] MR 下载 {} 个文件，总大小 {}",
         download_list.len(),
-        super::helpers::format_bytes(total_bytes)
+        crate::utils::format::bytes(total_bytes)
     );
 
     super::concurrent::download_files_concurrent(

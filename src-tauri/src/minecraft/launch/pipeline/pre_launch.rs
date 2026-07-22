@@ -30,14 +30,11 @@ impl LaunchPipeline {
 
         let game_dir = self.config.game_dir.clone();
         let result = tokio::task::spawn_blocking(move || {
-            let mut cmd = std::process::Command::new(program);
-            cmd.args(&args).current_dir(&game_dir);
-            #[cfg(target_os = "windows")]
-            {
-                use std::os::windows::process::CommandExt;
-                cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
-            }
-            cmd.output()
+            crate::minecraft::system::shell::run_executable_output(
+                program,
+                &args,
+                Some(&game_dir),
+            )
         })
         .await;
 

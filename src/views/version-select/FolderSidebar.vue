@@ -8,9 +8,14 @@
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import * as tauri from '@/utils/tauri'
-import { showSuccess, showWarning, showError } from '@/utils/toast'
+import { toastSuccess, toastWarning, toastError } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
 import Button from '@/components/common/Button.vue'
+import {
+  FolderIcon,
+  PlusIcon,
+  XMarkIcon,
+} from '@heroicons/vue/24/outline'
 
 interface McFolder {
   name: string
@@ -44,9 +49,9 @@ async function switchFolder(folder: McFolder) {
     await tauri.switchMcFolder(folder.path)
     currentPath.value = folder.path
     emit('switched', folder.path)
-    showSuccess(`已切换到：${folder.name}`)
+    toastSuccess(`已切换到：${folder.name}`)
   } catch (e) {
-    showError(String(e))
+    toastError(String(e))
   } finally {
     switchingFolder.value = false
   }
@@ -72,15 +77,15 @@ async function addFolder() {
         if (!name.trim()) return
         try {
           folders.value = await tauri.addMcFolder(name.trim(), selected)
-          showSuccess('文件夹已添加')
+          toastSuccess('文件夹已添加')
         } catch (e) {
-          showError(String(e))
+          toastError(String(e))
         }
       },
       { defaultValue: defaultName, placeholder: '文件夹名称' },
     )
   } catch (e) {
-    showError(String(e))
+    toastError(String(e))
   }
 }
 
@@ -88,7 +93,7 @@ async function addFolder() {
 async function removeFolder(folder: McFolder, event: Event) {
   event.stopPropagation()
   if (folders.value.length <= 1) {
-    showWarning('至少需要保留一个文件夹')
+    toastWarning('至少需要保留一个文件夹')
     return
   }
   showConfirm(
@@ -99,9 +104,9 @@ async function removeFolder(folder: McFolder, event: Event) {
         folders.value = await tauri.removeMcFolder(folder.path)
         currentPath.value = await invoke<string>('get_game_dir')
         emit('switched', currentPath.value)
-        showSuccess('文件夹已移除')
+        toastSuccess('文件夹已移除')
       } catch (e) {
-        showError(String(e))
+        toastError(String(e))
       }
     },
   )
@@ -113,71 +118,50 @@ defineExpose({ loadFolders })
 </script>
 
 <template>
-  <aside class="flex w-64 flex-none flex-col border-r border-gray-200 bg-white">
-    <!-- 滚动区 -->
-    <div class="flex-1 overflow-y-auto px-3 pt-5">
-      <!-- 分组标题 -->
-      <div class="mb-1 px-2 text-xs font-medium text-gray-400">文件夹列表</div>
-      <!-- 文件夹项 -->
-      <ul class="space-y-0.5">
-        <li v-for="folder in folders" :key="folder.path">
-          <button
-            class="group relative flex w-full items-center pl-3 pr-2 py-2.5 text-left transition-colors"
-            :class="folder.path === currentPath
-              ? 'bg-primary-50/70 text-primary-700'
-              : 'text-gray-700 hover:bg-gray-50'"
-            :disabled="switchingFolder"
-            @click="switchFolder(folder)"
-          >
-            <!-- 选中时左侧高亮条 -->
-            <span
-              v-if="folder.path === currentPath"
-              class="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary-500"
-            />
-            <!-- 文件夹图标 -->
-            <svg
-              class="mr-2.5 h-4 w-4 flex-none"
-              :class="folder.path === currentPath ? 'text-primary-500' : 'text-gray-400'"
-              viewBox="0 0 20 20" fill="currentColor"
-            >
-              <path d="M2 6a2 2 0 012-2h4l2 2h6a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-            </svg>
-            <!-- 名称 + 路径 -->
-            <div class="min-w-0 flex-1">
-              <div class="truncate text-sm font-medium">{{ folder.name }}</div>
-              <div class="truncate text-xs text-gray-400">{{ folder.path }}</div>
-            </div>
-            <!-- hover 时显示的移除按钮 -->
-            <svg
-              v-if="folders.length > 1"
-              class="ml-1 h-4 w-4 flex-none text-gray-400 opacity-0 transition-opacity hover:text-gray-600 group-hover:opacity-100"
-              viewBox="0 0 20 20" fill="currentColor"
-              @click="removeFolder(folder, $event)"
-            >
-              <path fill-rule="evenodd" d="M4.3 4.3a1 1 0 011.4 0L10 8.6l4.3-4.3a1 1 0 111.4 1.4L11.4 10l4.3 4.3a1 1 0 01-1.4 1.4L10 11.4l-4.3 4.3a1 1 0 01-1.4-1.4L8.6 10 4.3 5.7a1 1 0 010-1.4z" clip-rule="evenodd" />
-            </svg>
-          </button>
-        </li>
-      </ul>
+  <aside class="flex w-48 flex-none flex-col border-r border-gray-200 bg-white">
+    <!-- 滚动区（对齐 Settings 侧边栏：py-4，按钮自带 px-4） -->
+    <div class="flex-1 overflow-y-auto py-4">
+      <!-- 文件夹项（对齐 Settings 选中态：右侧 border 高亮 + bg-primary-50 满色 + Heroicons 图标 w-5 h-5 mr-3） -->
+      <button
+        v-for="folder in folders"
+        :key="folder.path"
+        class="group relative flex w-full items-center px-4 py-2.5 text-left text-sm font-medium transition-colors"
+        :class="folder.path === currentPath
+          ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
+          : 'text-gray-700 hover:bg-gray-50'"
+        :disabled="switchingFolder"
+        @click="switchFolder(folder)"
+      >
+        <FolderIcon
+          class="w-5 h-5 mr-3 flex-none"
+          :class="folder.path === currentPath ? 'text-primary-500' : 'text-gray-400'"
+        />
+        <!-- 名称 + 路径 -->
+        <div class="min-w-0 flex-1">
+          <div class="truncate">{{ folder.name }}</div>
+          <div class="truncate text-xs font-normal text-gray-400">{{ folder.path }}</div>
+        </div>
+        <!-- hover 时显示的移除按钮 -->
+        <XMarkIcon
+          v-if="folders.length > 1"
+          class="ml-1 h-4 w-4 flex-none text-gray-400 opacity-0 transition-opacity hover:text-gray-600 group-hover:opacity-100"
+          @click="removeFolder(folder, $event)"
+        />
+      </button>
 
-      <!-- 分组标题：添加或导入 -->
-      <div class="mb-1 mt-5 px-2 text-xs font-medium text-gray-400">添加或导入</div>
-      <ul class="space-y-0.5">
-        <li>
-          <Button
-            type="ghost"
-            long
-            @click="addFolder"
-          >
-            <template #icon>
-              <svg class="h-4 w-4 flex-none text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" />
-              </svg>
-            </template>
-            添加已有文件夹
-          </Button>
-        </li>
-      </ul>
+      <!-- 分隔线 + 添加按钮 -->
+      <div class="mx-4 my-3 border-t border-gray-100" />
+      <Button
+        type="ghost"
+        long
+        class="!justify-start !px-4"
+        @click="addFolder"
+      >
+        <template #icon>
+          <PlusIcon class="h-4 w-4 flex-none text-gray-400" />
+        </template>
+        添加已有文件夹
+      </Button>
     </div>
   </aside>
 </template>

@@ -1,0 +1,178 @@
+//! 离线账号管理命令（列表 / 皮肤设置 / 自定义皮肤上传 / 删除 / 切换）
+//!
+//! `save_custom_skin` 将用户选择的 PNG 复制到 `<app_data>/custom_skins/<uuid>.png`，
+//! 并把 `custom:<path>|<variant>` 写入离线账号的 skin 字段。包含 PNG 文件头校验和
+//! 1MB 大小限制（比 Mojang 官方 24KB 宽松，因本地使用）。
+
+use tauri::State;
+
+use crate::error_util::log_err;
+use crate::log_info;
+use crate::minecraft::auth::storage::StoredOfflineAccount;
+use crate::state::{AppState, LocalAuthResult};
+
+use super::OfflineAccountInfo;
+
+/// 获取已存储的离线账号列表
+#[tauri::command]
+pub async fn get_offline_accounts(
+    state: State<'_, AppState>,
+) -> Result<Vec<OfflineAccountInfo>, String> {
+    log_info!("[Startup][IPC] get_offline_accounts called");
+    let persisted = state
+        .auth_storage
+        .load()
+        .await
+        .map_err(log_err("Failed to load auth storage"))?;
+    Ok(persisted
+        .offline_accounts
+        .iter()
+        .map(|a| OfflineAccountInfo {
+            username: a.username.clone(),
+            uuid: a.uuid.clone(),
+            skin: a.skin.clone(),
+        })
+        .collect())
+}
+
+/// 设置离线账号的皮肤选择
+#[tauri::command]
+pub async fn set_offline_skin(
+    state: State<'_, AppState>,
+    uuid: String,
+    skin: Option<String>,
+) -> Result<(), String> {
+    log_info!("Setting offline skin: uuid={}, skin={:?}", uuid, skin);
+    state
+        .auth_storage
+        .set_offline_skin(&uuid, skin.as_deref())
+        .await
+        .map_err(log_err("Failed to set offline skin"))
+}
+
+/// 保存自定义皮肤文件并设置到离线账号
+///
+/// 将用户选择的 PNG 文件复制到 `<app_data>/custom_skins/<uuid>.png`，
+/// 然后把 `custom:<path>|<variant>` 写入离线账号的 skin 字段。
+#[tauri::command]
+pub async fn save_custom_skin(
+    state: State<'_, AppState>,
+    uuid: String,
+    file_path: String,
+    variant: Option<String>,
+) -> Result<String, String> {
+    let variant = variant.unwrap_or_else(|| "classic".to_string());
+
+    // 读取源文件
+    let png_data = std::fs::read(&file_path).map_err(|e| format!("读取皮肤文件失败: {}", e))?;
+
+    // 验证 PNG 文件头
+    if png_data.len() < 8 || png_data[0..5] != [0x89, 0x50, 0x4E, 0x47, 0x0D] {
+        return Err("文件不是有效的 PNG 格式".to_string());
+    }
+
+    // 验证文件大小（< 1MB，比 Mojang 的 24KB 宽松，因为是本地使用）
+    if png_data.len() > 1024 * 1024 {
+        return Err("皮肤文件过大（超过 1MB）".to_string());
+    }
+
+    // 保存到 app data 目录
+    let skin_dir = crate::storage::Storage::instance()
+        .base_dir()
+        .join("custom_skins");
+    std::fs::create_dir_all(&skin_dir).map_err(|e| format!("创建皮肤目录失败: {}", e))?;
+
+    let dest_path = skin_dir.join(format!("{}.png", uuid));
+    std::fs::write(&dest_path, &png_data).map_err(|e| format!("保存皮肤文件失败: {}", e))?;
+
+    // 构建 skin 字段：custom:/path|slim 或 custom:/path|classic
+    let skin_value = format!("custom:{}|{}", dest_path.display(), variant);
+
+    // 写入注册表
+    state
+        .auth_storage
+        .set_offline_skin(&uuid, Some(&skin_value))
+        .await
+        .map_err(log_err("Failed to set offline skin"))?;
+
+    log_info!(
+        "Saved custom skin: uuid={}, file={}, variant={}",
+        uuid,
+        dest_path.display(),
+        variant
+    );
+
+    Ok(skin_value)
+}
+
+/// 删除已存储的离线账号
+#[tauri::command]
+pub async fn remove_offline_account(
+    state: State<'_, AppState>,
+    uuid: String,
+) -> Result<(), String> {
+    log_info!("Removing offline account: {}", uuid);
+    state
+        .auth_storage
+        .remove_offline_account(&uuid)
+        .await
+        .map_err(log_err("Failed to remove offline account"))
+}
+
+/// 切换到已存储的离线账号
+#[tauri::command]
+pub async fn switch_offline_account(
+    state: State<'_, AppState>,
+    uuid: String,
+) -> Result<LocalAuthResult, String> {
+    log_info!("Switching to offline account: {}", uuid);
+
+    let account: StoredOfflineAccount = state
+        .auth_storage
+        .get_offline_account(&uuid)
+        .await
+        .map_err(log_err("Failed to get offline account"))?
+        .ok_or_else(|| "离线账号不存在".to_string())?;
+
+    let auth_result = LocalAuthResult {
+        name: account.username.clone(),
+        uuid: account.uuid.clone(),
+        access_token: account.uuid.clone(),
+        client_token: account.uuid.clone(),
+        login_type: "Legacy".to_string(),
+        profile_json: None,
+    };
+
+    // 更新当前用户（持久化）
+    {
+        let mut persisted = state
+            .auth_storage
+            .load()
+            .await
+            .map_err(log_err("Failed to load auth storage"))?;
+        persisted.current_user = Some(crate::minecraft::auth::storage::CurrentUser {
+            name: account.username.clone(),
+            uuid: account.uuid.clone(),
+            access_token: account.uuid.clone(),
+            client_token: account.uuid.clone(),
+            login_type: "Legacy".to_string(),
+            profile_json: None,
+            refresh_token: None,
+            expires_at: None,
+        });
+        state
+            .auth_storage
+            .save(&persisted)
+            .await
+            .map_err(log_err("Failed to save auth storage"))?;
+    }
+
+    {
+        let mut auth = state.auth.lock().await;
+        auth.current_user = Some(auth_result.clone());
+        auth.is_logged_in = true;
+    }
+
+    log_info!("Switched to offline account: {}", account.username);
+    Ok(auth_result)
+}

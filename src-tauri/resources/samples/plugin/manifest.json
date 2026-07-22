@@ -1,0 +1,20 @@
+{
+  "id": "my-plugin",
+  "name": "示例插件",
+  "description": "用于测试调试的示例插件模板，可基于此修改后从文件夹或 ZIP 安装",
+  "version": "1.0.0",
+  "author": "Developer",
+  "entry": "index.html",
+  "permissions": ["getConfig", "getCacheStats"],
+  "processPermissions": {
+    "allowedCommands": ["java", "node"],
+    "timeoutMs": 30000,
+    "maxConcurrent": 1
+  },
+  "windowPermissions": {
+    "allowedDomains": ["example.com", "*.github.io"],
+    "width": 800,
+    "height": 600,
+    "resizable": true
+  }
+}

@@ -4,7 +4,6 @@ mod about;
 mod apply_config;
 mod config;
 mod developer;
-mod download;
 mod game;
 mod game_dir;
 mod proxy;
@@ -15,7 +14,7 @@ pub use config::*;
 pub use developer::*;
 pub use game_dir::*;
 
-// download/game/proxy 模块保留为占位（后续如需专属命令可扩展），
+// game/proxy 模块保留为占位（后续如需专属命令可扩展），
 // 所有 get/set 由 `get_config` / `apply_config` 统一处理。
 
 use crate::state::AppState;

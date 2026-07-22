@@ -1,0 +1,40 @@
+{
+  "title": "示例面板",
+  "icon": "chart-bar",
+  "sections": [
+    {
+      "type": "stat-grid",
+      "columns": 3,
+      "items": [
+        { "label": "缓存占用", "value": "{{cache.totalSize}}", "format": "bytes", "color": "primary" },
+        { "label": "内存使用率", "value": "{{system.usagePercent}}", "format": "percent", "color": "green" },
+        { "label": "已装版本", "value": "{{versions.count}}", "format": "number" }
+      ]
+    },
+    {
+      "type": "progress",
+      "label": "内存使用",
+      "value": "{{system.usedMemory}}",
+      "max": "{{system.totalMemory}}",
+      "format": "bytes",
+      "color": "yellow"
+    },
+    {
+      "type": "html",
+      "content": "<div class=\"card\"><h3>自定义 HTML 区域</h3><p>这里可以放任意 HTML+CSS+JS，内置设计系统 CSS 可直接使用：</p><div class=\"grid grid-3 mt-2\"><div class=\"stat\"><span class=\"stat-label\">按钮示例</span><button class=\"btn btn-primary btn-sm mt-2\" onclick=\"window.molaunch.toast('success','点击了 primary 按钮')\">primary 按钮</button></div><div class=\"stat\"><span class=\"stat-label\">徽章示例</span><div class=\"flex gap-2 mt-2\"><span class=\"badge badge-primary\">主色</span><span class=\"badge badge-green\">成功</span><span class=\"badge badge-red\">错误</span></div></div><div class=\"stat\"><span class=\"stat-label\">进度条示例</span><div class=\"progress-bar mt-2\"><div class=\"progress-fill yellow\" style=\"width:60%\"></div></div></div></div></div>",
+      "script": "console.log('示例脚本执行，内置设计系统 CSS 已就绪')",
+      "height": 200
+    },
+    {
+      "type": "list",
+      "title": "最近启动",
+      "source": "history.recent",
+      "fields": [
+        { "key": "version_id", "label": "版本" },
+        { "key": "launch_time", "label": "时间", "format": "text" }
+      ]
+    },
+    { "type": "divider" },
+    { "type": "text", "content": "数据每 3 秒自动刷新", "variant": "muted" }
+  ]
+}

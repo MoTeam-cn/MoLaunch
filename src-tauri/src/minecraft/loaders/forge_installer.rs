@@ -2,7 +2,7 @@
 //! 使用 bangbang93 的 forge_installer.jar 进行 Forge/NeoForge 安装
 
 use crate::resources;
-use crate::storage::cache::Cache;
+use crate::utils::cache;
 use crate::{log_debug, log_error, log_info, log_warn};
 use std::io::{BufRead, BufReader};
 use std::path::Path;
@@ -18,7 +18,7 @@ pub struct ForgeInstallProgress {
 /// 释放嵌入的资源文件到缓存目录
 pub fn extract_embedded_resources() -> anyhow::Result<(String, String)> {
     // 确保 cache 子目录存在
-    let cache_dir = Cache::instance().ensure_dir("forge_installer")?;
+    let cache_dir = cache::ensure_dir("forge_installer")?;
 
     let installer_path = cache_dir.join("forge-installer.jar");
     let wrapper_path = cache_dir.join("java-wrapper.jar");

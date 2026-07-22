@@ -9,6 +9,226 @@
 
 ### 新增
 
+#### 内存优化双模式（轻量 / 强力）
+- 后端 `src-tauri/src/commands/tools/memory.rs` 重写为 `NtSetSystemInformation` 方案（与 PCL2 一致）：
+  - 通过 FFI 声明 `ntdll.dll` 的 `NtSetSystemInformation` 未公开 API，配合 `SystemMemoryListInformation`（class 80）+ `SYSTEM_MEMORY_LIST_COMMAND` 枚举执行系统级内存操作
+  - 轻量模式（light）：仅调用 `MemoryEmptyWorkingSets`，一次系统调用清空所有进程工作集，释放几十~几百 MB，响应快、几乎无副作用
+  - 强力模式（strong）：依次执行 `MemoryFlushModifiedList` → `MemoryPurgeLowPriorityStandbyList` → `MemoryPurgeStandbyList` → `MemoryEmptyWorkingSets`，清空 standby list 可释放数 GB
+  - 移除原遍历进程 + `SetProcessWorkingSetSize` 方案，移除 `Cargo.toml` 中不再使用的 `Win32_System_Diagnostics_ToolHelp` feature
+  - Linux / macOS 保持原有 `malloc_trim` / `malloc_zone_pressure_relief` 实现
+- 修改 `src-tauri/src/commands/tools/types.rs`：新增 `MemoryOptimizeParams { mode: String }`，`MemoryOptimizeResult` 新增 `mode` 字段并统一字段单位为字节（`_bytes` 后缀）
+- 修改 `src-tauri/src/commands/tools/mod.rs`：`memory_optimize` 分支解析 `MemoryOptimizeParams` 并传递 mode 参数
+- 修改 `src/utils/api/tools.ts`：新增 `MemoryOptimizeMode` 类型（`'light' | 'strong'`），`MemoryOptimizeResult` 字段更新为 `_bytes` + `mode`，`memoryOptimize(mode)` 接受模式参数（默认 `light`）
+- 修改 `src/views/QuickTools.vue`：
+  - 新增轻量 / 强力模式选择器（复用 `Button` 组件 primary/outline 切换，移除 `SegmentedButtons`）
+  - 优化按钮移至右侧 flex 布局，与模式选择器并排显示
+  - 标题旁加问号图标 + `Tooltip`，多行说明两种模式的差异与副作用
+  - 选中强力模式时显示 `AlertV2` warning 提示，警告清空 standby list 会导致已缓存应用下次启动变慢
+  - 强力模式点击优化时弹出二次确认对话框，防止用户误操作
+  - 优化结果展示本次使用的模式标签，按钮文案随模式动态切换
+
+#### 插件系统基础框架（前端）
+- 新增插件系统类型定义 `src/types/plugin.ts`：
+  - `PluginCapabilities`：插件能力声明（homePanel 主页右侧内容区组件 / settingsPanel 插件设置组件）
+  - `PluginLifecycleHooks`：生命周期钩子（onEnable / onDisable / onGameLaunch / onGameExit / onDownloadComplete）
+  - `PluginManifest`：插件清单（id / name / description / version / author / capabilities / hooks）
+  - `PluginRuntimeState`：运行时状态（enabled / builtin / lastError）
+  - `HomePanelMode`：主页右侧内容区显示模式（`'default' | 'plugin:${string}'`）
+- 新增插件 SDK `src/plugins/sdk.ts`：提供有限的后端 API 包装（getConfig 过滤敏感字段 / listInstalledVersions / emit 强制 `plugin:` 前缀 / log），仅暴露安全的只读 API
+- 新增内置示例插件 `src/plugins/quick-stats/`：
+  - `index.ts`：插件清单，声明 homePanel 能力
+  - `QuickStatsPanel.vue`：显示已安装版本数量的简单面板
+- 新增插件注册中心 `src/plugins/index.ts`：维护 `builtinPlugins` 数组与 `findPlugin()` 查找函数，预留外部插件动态加载扩展点
+- 新增插件状态管理 store `src/stores/plugins.ts`：
+  - 双轨制持久化：前端 localStorage（首屏前同步读取避免闪烁）+ 后端 INI `[Plugin]` 节（跨设备同步）
+  - 提供 `setPluginEnabled` / `setHomePanelMode` / `syncFromBackend` / `notifyGameLaunch` / `notifyGameExit` 等 action
+  - 禁用当前 homePanelMode 对应插件时自动回退到 `default`
+- 新增插件管理页面 `src/views/settings/SettingsPlugins.vue`：
+  - 列表展示所有已注册插件（名称、描述、版本、作者、能力标识、启用开关）
+  - 内置插件标识（不可卸载，仅可禁用）
+  - 外部插件加载入口预留（当前置灰，后续版本支持）
+  - 空状态提示（图标 + 文字垂直水平居中）
+- 修改 `src/views/Settings.vue`：侧边栏在「个性化」与「高阶配置」之间新增「插件」菜单项（PuzzlePieceIcon 图标）
+- 修改 `src/views/settings/SettingsPersonal.vue`：新增「主页」配置区块，提供「右侧内容区」Select（默认启动日志 / 已启用且提供 homePanel 的插件）
+- 修改 `src/views/Home.vue`：右侧内容区改为动态组件渲染，根据 `homePanelMode` 决定渲染 LaunchLog 或插件 homePanel 组件（插件被禁用或不存在时回退到 LaunchLog）
+- 修改 `src/main.ts`：mount 前初始化 pluginStore（从 localStorage 同步加载），mount 后异步调用 `syncFromBackend()` 从后端 INI 同步配置（失败静默回退）
+
+#### 插件系统配置持久化（后端）
+- 修改 `src-tauri/src/commands/system/config.rs`：扩展 `is_valid_config_key` 白名单，放行 `[Plugin]` 节下的 `homePanelMode` 键与 `enabled_<id>` 键（id 为 kebab-case 插件 ID），支持插件配置通过 `set_config_value` 持久化到 INI 文件
+
+#### 业务插件扩展（内置）
+- 新增内置插件 `src/plugins/launch-history/`：启动历史面板
+  - `LaunchHistoryPanel.vue`：展示最近 50 条启动记录（版本名 / 启动时间 / 退出码），实时监听 `plugin:game-launch` / `plugin:game-exit` 事件刷新列表，退出状态以图标区分（成功 CheckCircleIcon / 失败 XCircleIcon）
+  - `index.ts`：插件清单，id=`launch-history`，声明 homePanel 能力
+- 新增内置插件 `src/plugins/system-monitor/`：系统状态监控面板
+  - `SystemMonitorPanel.vue`：内存使用进度条（>=80% 红色 / >=60% 黄色 / 否则绿色）+ 游戏进程状态 + SDK 初始化状态，每 3 秒轮询刷新
+  - `index.ts`：插件清单，id=`system-monitor`，声明 homePanel 能力
+- 新增内置插件 `src/plugins/version-stats/`：版本统计图表
+  - `VersionStatsPanel.vue`：按加载器分类横向条形图（vanilla / forge / fabric / neoforge / optifine / liteloader）+ 按主版本号分布统计
+  - `index.ts`：插件清单，id=`version-stats`，声明 homePanel 能力
+- 修改 `src/plugins/quick-stats/index.ts`：补充 `builtin: true` 字段以区分内置 / 外部插件
+- 修改 `src/plugins/index.ts`：注册 4 个内置插件（quick-stats / launch-history / system-monitor / version-stats）
+- 修改 `src/types/plugin.ts`：`PluginManifest.capabilities` 改为可选字段（`capabilities?`），新增 `builtin: boolean` 字段；新增 `ExternalPluginManifest` 接口（含 entry / permissions 字段）
+- 修改 `src/plugins/sdk.ts`：扩展 `PluginSdk` 接口，新增 `listInstalledVersionsWithType()` / `listLaunchHistory()` / `getSystemMemory()`（返回 total/used/available/usage_percent）/ `getRunningGamePid()` 四个方法
+- 修改 `src/utils/api/launch.ts`：新增 `LaunchHistoryEntry` 接口与 `getLaunchHistory()` 函数
+- 后端新增命令 `get_launch_history`（`src-tauri/src/commands/version/launch.rs`）：返回 `AppState.launch_history` 中最近 50 条记录（按时间倒序），并在 `lib.rs` 注册
+- 调用方适配：`Home.vue` / `SettingsPersonal.vue` / `SettingsPlugins.vue` 中 `manifest.capabilities()` 改为 `manifest.capabilities?.()` 以兼容外部插件不实现该字段的情况
+
+#### 外部插件沙箱加载机制
+- 后端新增外部插件管理模块 `src-tauri/src/commands/plugins/mod.rs`，提供 5 个 IPC 命令并在 `lib.rs` 注册：
+  - `list_external_plugins`：扫描 `<base_dir>/plugins/<plugin_id>/` 目录，读取每个插件的 `manifest.json`，要求 manifest.id 与目录名一致
+  - `read_external_plugin_file`：读取外部插件文件内容，使用 `canonicalize` + `starts_with` 双重校验防止 `../` 路径遍历攻击
+  - `install_external_plugin_from_dir`：递归复制源目录到 `plugins/<id>/`，安装前校验插件 ID 合法性（kebab-case：小写字母 + 数字 + 连字符，不以连字符开头 / 结尾）
+  - `install_external_plugin_from_zip`：从 ZIP 文件路径安装插件，支持扁平结构和单根目录结构两种 ZIP 格式，带 Zip Slip 路径遍历防护（canonicalize 父目录后校验目标在 dst 内），跨盘符 rename 失败时自动回退到递归复制
+  - `uninstall_external_plugin`：二次 canonicalize 校验后删除插件目录
+- 后端新增 `src-tauri/src/commands/mod.rs`：声明 `pub mod plugins;`
+- 前端新增外部插件 API 封装 `src/utils/api/plugins.ts`：导出 `ExternalPluginManifest` / `ExternalPluginEntry` 类型与 `listExternalPlugins` / `readExternalPluginFile` / `installExternalPluginFromDir` / `installExternalPluginFromZip` / `uninstallExternalPlugin` 五个函数，并在 `src/utils/tauri.ts` re-export
+- 前端新增沙箱引导脚本 `src/plugins/sandbox/sandbox-bootstrap.ts`：
+  - `SANDBOX_BOOTSTRAP_SCRIPT`：注入到 iframe 的引导脚本字符串，暴露 `window.molaunch` 全局对象（含 SDK 方法 + `onEvent` 事件订阅）
+  - 基于 postMessage 的通信协议（request / response / event / ready 四种消息类型）
+  - `buildSandboxHtml(pluginHtml, pluginId)`：构造完整 HTML 文档，在 `</body>` 前注入引导脚本
+- 前端新增沙箱代理组件 `src/plugins/sandbox/PluginSandbox.vue`：
+  - 使用 `<iframe sandbox="allow-scripts" :srcdoc="sandboxHtml">` 加载外部插件 HTML（无 `allow-same-origin`，确保 iframe 无法访问父窗口 DOM / cookie / localStorage）
+  - `handleMessage()`：监听 iframe postMessage，根据 manifest.permissions 白名单转发到 pluginSdk（`ALWAYS_ALLOWED = new Set(['emit', 'log'])` 始终放行）
+  - 桥接 `plugin:game-launch` / `plugin:game-exit` 事件到 iframe
+  - `onUnmounted` 时拒绝所有 pending 请求，避免内存泄漏
+- 前端完全重写 `src/stores/plugins.ts`：
+  - 新增 `externalManifestToPluginManifest()` 转换函数，使用 `markRaw(defineComponent({...}))` 为外部插件构造 PluginSandbox 包装组件作为 homePanel
+  - 同步外部插件 `permissions` 字段到 PluginManifest，供插件管理页展示
+  - 新增 `externalPluginsRaw` ref 保留原始外部插件清单
+  - 新增 `builtinPluginList` / `externalPluginList` 计算属性
+  - `initRuntimeStates()` 改为保留已存在状态，内置默认启用、外部默认禁用
+  - 新增 `loadExternalPlugins()`：扫描后端目录并合并清单
+  - 新增 `installFromDir(sourceDir)`：从文件夹安装后重新加载
+  - 新增 `installFromZip(zipPath)`：从 ZIP 文件路径安装后重新加载
+  - 新增 `uninstallExternal(pluginId)`：卸载后重新加载，若卸载的是当前 homePanelMode 对应插件则回退到 default
+  - `syncFromBackend()` 现在先调用 `loadExternalPlugins()` 确保外部插件能被后端 INI 配置覆盖
+  - `notifyGameLaunch` / `notifyGameExit` 现在同时派发 window CustomEvent 桥接到沙箱
+  - 将动态 `import('@tauri-apps/api/core')` 改为静态 import，消除 vite 构建的 mixed-import 警告
+- 前端扩展 `src/types/plugin.ts`：`PluginManifest` 新增可选 `permissions?: string[] | null` 字段（内置插件为 null 表示无沙箱限制，外部插件为数组）
+- 前端完全重写 `src/views/settings/SettingsPlugins.vue`：
+  - 修复 Tooltip 空 bug：`Tooltip` 组件 prop 是 `text` 不是 `content`，原代码 `:content="..."` 导致悬停时显示空 tooltip
+  - 列表展示所有插件（内置 + 外部），区分来源标识（内置灰色 / 外部蓝色），内置在前按 ID 排序
+  - 每个插件卡片新增「已声明权限」展示区：内置插件显示绿色「全部（无沙箱限制）」tag，外部插件显示蓝色权限 tag + 灰色始终允许权限 tag（emit / log 带 * 后缀）
+  - 顶部统计区新增内置 / 外部数量分类
+  - 外部插件卸载按钮（仅外部插件显示，`v-if="!manifest.builtin"`）
+  - 「从文件夹安装」按钮 + 「从 ZIP 文件安装」按钮（调用 `selectFile()` 选择 .zip 文件 + `pluginStore.installFromZip()`）
+  - 刷新按钮重新扫描外部插件
+  - 可用权限展示从纯文本改为 tag 列表（蓝色可用权限 + 灰色始终允许权限 + 「带 * 号的权限始终允许」说明）
+
+#### 缓存统计统一 IPC 端口
+- 后端新增 `src-tauri/src/utils/cache_stats.rs` 统一缓存统计工具：
+  - `CacheStat` 结构：name / category / subDir / path / fileCount / totalSize / ttlHours
+  - `CacheStatsResult` 结构：按类别分组（cache / cacheTemp / cacheApp）
+  - `collect_all()`：递归统计所有缓存子目录的文件数和占用大小，附带 TTL 信息
+  - 统计范围：cache 下 4 个子目录（images / forge_installer / preload_mods / launch，均 24h TTL）、cacheTemp 下 2 个子目录（TaskTemp 24h TTL / sdk 不清理）、cacheApp 下 runtime/{component} 每个 Java Runtime 单独统计（不清理）
+  - 不存在或为空的 runtime/ 目录返回占位项便于 UI 展示路径
+  - `walk_dir()` 递归遍历辅助函数，失败时静默跳过
+  - `root_dirs()` 返回三个缓存根目录路径列表（供 UI 展示父目录用）
+- 后端 `src-tauri/src/utils/mod.rs`：注册 `cache_stats` 子模块
+- 后端新增 `get_cache_stats` IPC 命令（`src-tauri/src/commands/system/developer.rs`）：在 `spawn_blocking` 中执行 `cache_stats::collect_all()`，避免阻塞主线程；在 `lib.rs` 注册
+- 前端 `src/utils/api/developer.ts`：新增 `CacheStat` / `CacheStatsResult` 类型与 `getCacheStats()` 函数
+- 前端 `src/views/settings/SettingsDeveloper.vue` 接入缓存统计展示：
+  - 新增「缓存统计」卡片，展示总文件数、总占用大小
+  - 列表展示每个子目录：名称 + TTL 标识（黄色 24h 自动清理 / 灰色不清理）+ 类别 tag + 文件数 + 占用大小 + 完整路径 + 打开按钮
+  - 刷新按钮（旋转图标动画）
+  - 原有「缓存目录」卡片保留，仅展示父目录路径便于整体定位
+  - `onMounted` 并行加载 storageDirs / systemInfo / cacheStats
+
+#### 通用工具函数提取（版本号解析 / 文件名校验 / 时间解析）
+- 排查后端各模块内的私有工具函数，将 3 个具有通用性的函数提取到 `utils` 下统一管理，消除 5 处重复实现
+- 新增 `src-tauri/src/utils/version.rs`：版本号解析工具，提供 `parse_number(version: &str) -> Vec<u32>`（如 "1.20.1" -> [1, 20, 1]）
+  - 从 `minecraft/loaders/utils.rs` 提取（原 `parse_version_number`）
+  - `minecraft/version/libraries.rs`：`compare_versions_ge` 中手写的 `a.split('.').filter_map(|p| p.parse().ok()).collect()` 重复实现改用 `utils::version::parse_number`
+- 新增 `src-tauri/src/utils/path.rs`：路径与文件名安全工具，提供 `sanitize_file_name(name: &str) -> Result<(), String>`（拒绝空字符串、路径分隔符、路径遍历 `..`、空字节）
+  - 从 `commands/version/mods/helpers.rs` 提取（原 `pub(super) fn sanitize_file_name`）
+- 新增 `src-tauri/src/utils/datetime.rs`：时间解析与格式化工具，提供 `parse_utc(s: &str) -> Option<DateTime<Utc>>` 和 `format_utc_to_local(s: &str) -> Option<String>`
+  - 从 `minecraft/loaders/utils.rs` 提取（原 `parse_utc_to_local`，重命名为 `format_utc_to_local`）
+  - 支持 4 种格式：RFC3339、naive datetime（T 分隔）、naive datetime（空格分隔）、纯日期
+  - `commands/version/list.rs`：`parse_timestamp` 中手写的 RFC3339 + naive datetime 解析改用 `utils::datetime::parse_utc`
+  - `minecraft/fools.rs`：`parse_april_fools_date` 中手写的时间解析改用 `utils::datetime::parse_utc`
+  - `minecraft/version/state.rs`：`is_old_version` 中手写的 RFC3339 + naive datetime 解析改用 `utils::datetime::parse_utc`
+- `src-tauri/src/utils/mod.rs`：注册 `version` / `path` / `datetime` 三个子模块
+- 调用方改造：
+  - `minecraft/loaders/forge.rs`：`utils::parse_version_number` → `crate::utils::version::parse_number`，`utils::parse_utc_to_local` → `crate::utils::datetime::format_utc_to_local`
+  - `minecraft/loaders/neoforge.rs`：同上
+  - `minecraft/loaders/forge_html.rs`：同上
+  - `minecraft/launch/skin_resourcepack.rs`：`crate::minecraft::loaders::utils::parse_version_number` → `crate::utils::version::parse_number`
+  - `commands/version/mods/mod.rs`：`helpers::sanitize_file_name` → `crate::utils::path::sanitize_file_name`
+- 文件删除：
+  - `minecraft/loaders/utils.rs`：**整个文件删除**，两个函数均已迁移到 `utils::version` 和 `utils::datetime`
+  - `minecraft/loaders/mod.rs`：移除 `pub mod utils;` 声明
+- 函数清理：
+  - `commands/version/mods/helpers.rs`：删除 `sanitize_file_name` 函数（已迁移到 `utils::path`），保留 `get_mods_dir`（业务专属）
+  - `commands/version/mods/mod.rs`：模块结构文档注释更新
+
+#### 字节数格式化统一工具函数
+- 后端此前有 3 处重复实现 `format_bytes` / `format_speed` 函数（cache_cleanup.rs、download/chunk/util.rs、community/install/helpers.rs），逻辑相同但实现略有差异（小数位数、是否支持 GB 等），违反 DRY 原则。本次改造统一收口到 `utils/format` 模块
+- 新增 `src-tauri/src/utils/format.rs`：提供 `bytes()` / `bytes_with()` / `speed()` / `speed_with()` 四个自由函数，支持 B/KB/MB/GB/TB 五档单位，可通过 `decimals` 参数指定小数位数（默认 1 位）
+- 实现细节：
+  - 通过循环确定单位档位，避免使用 `f64::log` 等不稳定的浮点对数计算
+  - 边界处理：0 字节返回 "0 B"，超出 TB 范围夹紧到 TB
+  - 速度格式化复用字节数格式化逻辑，追加 "/s" 后缀
+- `src-tauri/src/utils/mod.rs`：注册 `format` 子模块
+- 调用方改造（全部改用 `crate::utils::format`）：
+  - `src-tauri/src/utils/cache_cleanup.rs`：删除本地 `format_bytes` 函数，改用 `format::bytes_with(bytes, 2)`（缓存统计用 2 位小数）
+  - `src-tauri/src/minecraft/download/chunk/util.rs`：**整个文件删除**，原 `format_bytes` / `format_speed` 两个函数已迁移到 `utils::format`
+  - `src-tauri/src/minecraft/download/chunk/mod.rs`：移除 `pub mod util;` 和 `use self::util::{format_bytes, format_speed};`，改用 `use crate::utils::format;`，所有调用点改为 `format::bytes()` / `format::speed()`
+  - `src-tauri/src/minecraft/download/chunk/probe.rs`：改用 `use crate::utils::format;`
+  - `src-tauri/src/minecraft/download/chunk/download.rs`：改用 `use crate::utils::format;`
+  - `src-tauri/src/commands/community/install/helpers.rs`：删除本地 `format_bytes` 函数，模块文档注释更新
+  - `src-tauri/src/commands/community/install/modrinth.rs`：`super::helpers::format_bytes` → `crate::utils::format::bytes`
+  - `src-tauri/src/commands/community/install/curseforge.rs`：同上
+  - `src-tauri/src/commands/community/install/modpack_stages.rs`：`use super::helpers::format_bytes` → `use crate::utils::format`，调用点改为 `format::bytes()`
+  - `src-tauri/src/commands/community/install/mod.rs`：模块结构文档注释移除 `format_bytes` 描述
+
+#### 缓存定期清理机制（24h 自动清理）
+- 新增 `src-tauri/src/utils/cache_cleanup.rs`：自动清理超过 24h 的不重要缓存文件，避免磁盘占用无限增长
+- 清理范围：
+  - `.Molaunch/cache/images/`：图片缓存（皮肤、披风、头像），可重新下载
+  - `.Molaunch/cache/forge_installer/`：Forge 安装器注入资源，可重新释放
+  - `.Molaunch/cache/preload_mods/`：社区资源预加载缓存（已有 6h TTL，物理文件随本机制一并清理）
+  - `.Molaunch/cache/launch/`：嵌入 jar 释放（lwjgl-unsafe-agent、java-wrapper），可重新释放
+  - `<temp>/MoLaunch/TaskTemp/`：Forge/NeoForge 安装包临时下载
+- 不清理（重要资源）：
+  - `<temp>/MoLaunch/sdk/`：SDK 动态库，有 sha256 校验机制，运行中清理会导致加载失败
+  - `%APPDATA%/.minecraft/runtime/`：Java Runtime，下载耗时长，跨游戏目录共享
+- 触发时机：
+  - **启动时**：立即执行一次清理（清理上次运行遗留的过期文件）
+  - **定时任务**：每 1h 检查一次（避免频繁 IO，又能在合理时间内清理过期文件）
+- 实现细节：
+  - `run_cleanup()`：同步阻塞函数，遍历所有需清理目录，删除 mtime > 24h 的文件和空目录
+  - `spawn_cleanup_task()`：通过 `tauri::async_runtime::spawn_blocking` 在独立线程执行，避免阻塞 async 运行时
+  - 清理结果通过日志输出（删除文件数、目录数、释放空间大小、错误数、耗时）
+  - `CleanupResult` 结构体统计清理结果，`format_bytes()` 格式化字节数为人类可读字符串
+  - 过期判断基于文件 mtime，遇到系统时间异常（mtime 在未来）时跳过，避免误删
+- `src-tauri/src/utils/mod.rs`：注册 `cache_cleanup` 子模块
+- `src-tauri/src/lib.rs`：在 CurseForge 初始化后、Tauri Builder 构造前调用 `spawn_cleanup_task()`
+
+#### 缓存访问统一收口（utils 层 + storage 层分离）
+- 后端三种缓存位置此前散落在各业务模块中，通过直接拼接 `std::env::temp_dir()` / `std::env::var("APPDATA")` 或直接 `use crate::storage::cache::Cache` 访问，路径生成逻辑分散且无统一入口。本次改造将所有缓存访问收口到 `utils` 层自由函数，`storage` 层保留底层单例实现，业务模块不再直接依赖 `storage::cache*` 或手动拼接环境变量
+- 新增 `src-tauri/src/storage/cache_temp.rs`：系统临时目录缓存底层实现，管理 `<temp>/MoLaunch/` 目录，提供 `CacheTemp` 单例（`task_temp_dir()` / `ensure_task_temp_dir()` / `sdk_dir()` / `ensure_sdk_dir()` / `sdk_library_path()`），覆盖 Forge/NeoForge 安装包临时下载（TaskTemp）和 SDK 动态库释放（sdk）
+- 新增 `src-tauri/src/storage/cache_app.rs`：AppData 缓存底层实现，管理 `%APPDATA%/.minecraft/runtime/` 目录，提供 `CacheApp` 单例（`runtime_dir()` / `ensure_runtime_dir()`），覆盖 Java Runtime 存储（Mojang 官方位置，跨游戏目录共享）
+- 新增 `src-tauri/src/utils/cache.rs`：运行路径缓存工具（`.Molaunch/cache/`），包装 `storage::cache::Cache` 单例为自由函数（`dir` / `path` / `ensure_dir` / `exists` / `read` / `read_bytes` / `write` / `write_bytes` / `remove` / `list` / `clear_dir`）
+- 新增 `src-tauri/src/utils/cache_temp.rs`：系统临时目录缓存工具，包装 `storage::cache_temp::CacheTemp` 单例为自由函数
+- 新增 `src-tauri/src/utils/cache_app.rs`：AppData 缓存工具，包装 `storage::cache_app::CacheApp` 单例为自由函数
+- `src-tauri/src/storage/mod.rs`：注册 `cache_app` / `cache_temp` 子模块
+- `src-tauri/src/utils/mod.rs`：注册 `cache` / `cache_app` / `cache_temp` 子模块，文档注释中补充三种缓存位置对照表
+- 调用方改造（全部改用 `utils::cache*` 自由函数）：
+  - `src-tauri/src/minecraft/image_cache.rs`：图片缓存读写（`Cache::instance().path/exists/write_bytes/remove/clear_dir` → `cache::path/exists/write_bytes/remove/clear_dir`）
+  - `src-tauri/src/minecraft/loaders/forge_installer.rs`：Forge 安装器注入资源释放（`Cache::instance().ensure_dir` → `cache::ensure_dir`）
+  - `src-tauri/src/minecraft/launch/embedded.rs`：嵌入资源 jar 释放（`Cache::instance().exists/path` → `cache::exists/path`）
+  - `src-tauri/src/minecraft/community/preload/cache.rs`：社区资源预加载缓存读写（`Cache::instance().read/write` → `cache::read/write`）
+  - `src-tauri/src/minecraft/loaders/forge.rs` / `neoforge.rs`：安装包临时下载（`std::env::temp_dir().join("MoLaunch").join("TaskTemp")` + `std::fs::create_dir_all` → `utils::cache_temp::ensure_task_temp_dir`）
+  - `src-tauri/src/sdk/mod.rs`：SDK 动态库路径（`std::env::temp_dir().join("MoLaunch").join("sdk").join(filename)` → `utils::cache_temp::sdk_library_path`）
+  - `src-tauri/src/resources.rs`：SDK 释放目标路径（同上）
+  - `src-tauri/src/minecraft/java/download/files.rs`：Java Runtime 目录（`std::env::var("APPDATA").join(".minecraft").join("runtime").join(component)` → `utils::cache_app::runtime_dir`）
+  - `src-tauri/src/minecraft/java/search.rs`：Java 搜索 Step 5 搜索 APPDATA runtime 目录（`std::env::var("APPDATA").join(".minecraft").join("runtime")` → `utils::cache_app::runtime_base_dir`）
+- 开发者页扩展展示三种缓存位置：
+  - `src-tauri/src/commands/system/developer.rs`：`StorageDirs` 新增 `cache_temp` / `cache_app` 字段（serde 序列化为 `cacheTemp` / `cacheApp`），`get_storage_dirs` 命令返回所有缓存路径
+  - `src/utils/api/developer.ts`：`StorageDirs` 接口同步新增 `cacheTemp` / `cacheApp` 字段
+  - `src/views/settings/SettingsDeveloper.vue`：缓存卡片条目从 2 条扩展为 4 条（运行路径缓存 / 运行路径临时 / 系统临时缓存 / AppData 缓存），标签更清晰
+
 #### 统一 User-Agent 标识
 - `src-tauri/src/http.rs`：所有外部 HTTP 请求统一附加 UA 头，格式 `MoLaunch/<os> <version>`（如 `MoLaunch/windows 0.1.0`），覆盖皮肤/披风下载、头像缓存、BMCLAPI 镜像源、MC 文件下载、Java 下载、微软账号 OAuth 登录、社区资源下载等所有走 `http::get_client()` / `http::build_client()` 的请求；`<os>` 运行时取 `std::env::consts::OS`（windows/macos/linux），`<version>` 编译时通过 `env!("CARGO_PKG_VERSION")` 从 Cargo.toml 注入；替换原 reqwest 默认 UA `reqwest/<version>`，避免被部分 WAF/CDN 识别为爬虫返回 403
 
@@ -132,7 +352,257 @@
 - `src/main.ts`：前端入口补三条 `[Startup][Frontend]` console.log（main.ts 入口、Vue app 创建、mount 调用），配合后端 setup 钩子时间戳可精确定位 dev 模式启动 10 秒空白期究竟花在 WebView2 加载、JS bundle 解析还是 Vue 应用挂载
 - 卡顿定位结论：日志显示 setup() hook 完成到首个 IPC 到达之间约 10 秒，由 Vite dev server 启动 + WebView2 加载 localhost:1420 + JS bundle 解析 + Vue 挂载占用；release 构建会快 3–5 倍
 
+#### 插件子进程执行权限（spawnProcess）
+- 后端 `src-tauri/src/commands/plugins/mod.rs`：
+  - 新增 `ProcessPermissions` 结构（`allowed_commands` 命令白名单 / `timeout_ms` 单次超时默认 30s 最大 5min / `max_concurrent` 最大并发默认 1 最大 5）
+  - `ExternalPluginManifest` 新增 `process_permissions: Option<ProcessPermissions>` 字段，仅当 `permissions` 含 `spawnProcess` 时生效
+  - 新增 `ProcessResult` 结构（exit_code / stdout / stderr / timed_out / duration_ms）
+  - 新增 `plugin_spawn_process` IPC 命令：权限校验 → 命令白名单匹配（canonicalize 后比对，Windows 忽略大小写与 `.exe` 后缀）→ `tokio::process::Command` 非 shell 执行（防注入）→ 超时控制（`tokio::time::timeout` 包裹 `child.wait()`，超时调用 `child.kill()`）→ stdout/stderr 管道异步读取各截断到 1MB（在 UTF-8 字符边界切割）
+  - 新增辅助函数 `read_plugin_manifest` / `is_command_allowed` / `truncate_output`
+- 后端 `src-tauri/src/lib.rs`：注册 `plugin_spawn_process` 命令
+- 前端 `src/plugins/sdk.ts`：新增 `SpawnProcessOptions` / `ProcessResult` 类型，`PluginSdk` 接口新增 `spawnProcess()` 方法（内置插件实现直接抛错——内置插件有直接后端访问能力，不需要此方法；外部插件由 PluginSandbox 拦截处理）
+- 前端 `src/plugins/sandbox/sandbox-bootstrap.ts`：`window.molaunch` 暴露 `spawnProcess(command, args, options)` 方法
+- 前端 `src/plugins/sandbox/PluginSandbox.vue`：`handleMessage` 新增 `spawnProcess` 特殊桥接——权限校验通过后注入 `props.pluginId` 上下文（沙箱内 iframe 无 same-origin 无法获知自身 pluginId），直接 `invoke('plugin_spawn_process')` 调用后端命令
+
+#### 缓存统计 SDK 暴露 + 示例插件展示
+- 前端 `src/plugins/sdk.ts`：新增 `CacheStatEntry` / `CacheStatsResult` 类型，`PluginSdk` 接口新增 `getCacheStats()` 方法，`PluginSdkImpl` 实现 `getCacheStats()` 调用 `get_cache_stats` 命令；作为普通只读权限，内置与外部插件均可用
+- 前端 `src/plugins/sandbox/sandbox-bootstrap.ts`：`window.molaunch` 暴露 `getCacheStats()` 方法
+- 前端 `src/plugins/system-monitor/SystemMonitorPanel.vue` 完全重写：新增「缓存占用」卡片（总文件数 + 总大小 + 三分类明细：运行缓存 / 临时缓存 / AppData），手动刷新按钮（不轮询，避免 IPC 重复读取），`loadAll()` 现在并行加载 `getCacheStats()`
+
+#### 缓存管理独立页面（普通用户可见）
+- 前端新增 `src/views/settings/SettingsCache.vue`：缓存管理页面，普通用户可见（不需要开发者模式）
+  - 顶部三卡片总览：总占用 / 可自动清理 / 重要资源
+  - 详细列表：每个子目录含名称 + TTL 标识（黄色 24h 自动清理 / 灰色不清理）+ 类别 tag + 文件数 + 占用大小 + 路径 + 打开按钮
+  - 数据来源：`tauri.getCacheStats()` IPC 命令
+- 前端 `src/views/Settings.vue`：`baseCategories` 新增 `{ id: 'cache', label: '缓存管理', icon: CircleStackIcon }` 子菜单项，模板新增 `<SettingsCache v-else-if="activeCategory === 'cache'" />`
+- 前端 `src/views/settings/SettingsDeveloper.vue` 完全重写：移除缓存统计相关代码（cacheStats / cacheStatsLoading / loadCacheStats / cacheStatsEntries / cacheTotalSize / cacheTotalFiles / ArrowPathIcon 导入），`onMounted` 改为只加载 `loadStorageDirs()` + `loadSystemInfo()`，模板移除「缓存统计」卡片保留「缓存目录」（仅展示父目录路径）。缓存统计迁移到独立页后普通用户可见，开发者页仅保留路径定位功能
+
+#### 插件权限元信息表 + 插件管理页布局重写
+- 前端新增 `src/plugins/permissions.ts`：权限元信息单一数据源
+  - `PermissionMeta` 接口：name / description / useCase / risk（low/medium/high）/ alwaysAllowed / requiresExtraConfig
+  - `PERMISSION_REGISTRY` 数组：10 项权限（emit / log 始终允许，getConfig / listInstalledVersions / listInstalledVersionsWithType / listLaunchHistory / getSystemMemory / getRunningGamePid / getCacheStats 7 项普通权限，spawnProcess 高级权限）
+  - 导出 `ALWAYS_ALLOWED_PERMISSIONS` / `NORMAL_PERMISSIONS` / `ADVANCED_PERMISSIONS` / `RISK_STYLES`（风险等级 → 颜色样式映射）/ `getPermissionMeta()` 查询函数
+- 前端 `src/views/settings/SettingsPlugins.vue` 完全重写：
+  - 新增插件系统运行逻辑展示区（5 步流程图：扫描目录 → 解析清单 → 加载插件 → 权限校验 → 事件桥接，带箭头连接）
+  - 权限 tag 现在带 Tooltip，悬停显示 `${description} — ${useCase}`
+  - 高风险权限 tag 显示为红色 + 警告图标
+  - 新增可展开/收起的「可用权限说明」区域，分三组：
+    - 始终允许（灰色背景，emit / log）
+    - 普通权限（蓝色背景，含风险等级 tag）
+    - 高级权限（红色背景，含「需额外配置字段」提示，spawnProcess 需要 `processPermissions` 配置）
+  - manifest.json 示例更新，包含 `processPermissions` 配置（allowed_commands / timeout_ms / max_concurrent）
+
+#### 缓存监控内置插件 + 插件管理页布局优化
+- 前端新增内置插件 `src/plugins/cache-monitor/`：缓存监控面板，专用于主页右侧展示缓存磁盘占用
+  - `index.ts`：插件清单，id=`cache-monitor`，声明 homePanel 能力
+  - `CacheMonitorPanel.vue`：顶部三卡片概览（总占用 / 文件总数 / 可自动清理大小）+ 按分类分组明细（运行缓存 / 临时缓存 / AppData），每个子目录显示名称 + TTL 标识（黄色 24h / 灰色不清理）+ 文件数 + 占用大小 + 完整路径，手动刷新按钮（不轮询，避免 IPC 重复读取）
+  - 与 system-monitor 区分：system-monitor 综合展示内存/进程/SDK 状态，cache-monitor 专注缓存磁盘占用明细
+- 前端 `src/plugins/index.ts`：注册 cache-monitor 内置插件（现共 5 个内置插件）
+- 前端 `src/views/settings/SettingsPlugins.vue` 流程图布局优化：
+  - 5 个步骤方框改为 `flex-1` 等宽 + `items-stretch` 等高布局，消除原 `min-w-[140px]` 导致的方框大小不一致问题
+  - 箭头改为独立 flex 元素（`flex-none`），不参与伸缩，保证方框等宽
+  - 容器加 `min-w-[760px]` + `overflow-x-auto`，窄屏可横向滚动
+- 前端 `src/views/settings/SettingsPlugins.vue` 权限说明列表对齐优化：
+  - 三组权限（始终允许 / 普通 / 高级）的每项布局从 `flex` 改为 `grid grid-cols-[180px_1fr]`，权限名占固定 180px 列宽
+  - 所有描述文本左边缘对齐，不再因权限名长度不同导致描述参差不齐
+  - 普通权限和高级权限的风险等级 tag 改为 `flex-wrap`，窄屏可换行不溢出
+
+#### 默认模式右侧时钟卡片（HomeClockCard）
+- 新增 `src/components/home/HomeClockCard.vue`：默认模式下主页右侧渲染时钟卡片
+  - 顶部固定显示大时钟（HH:MM + 秒数 primary 色高亮）+ 日期 + 星期
+  - 底部轮播信息卡片，每 6 秒自动翻页切换：
+    - 内存使用（带进度条，≥80% 红色 / ≥60% 黄色 / 其他绿色）
+    - 已安装版本数（含最近版本 ID）
+    - 最近一次启动（版本 ID + 时间 + 退出状态）
+    - 缓存占用（总大小 + 文件数）
+  - 数据源通过 `Promise.all` 并行加载，单个失败跳过不阻塞轮播
+  - 翻页动画：`translateY ±12px` + `opacity` 淡入淡出（0.4s）
+  - 底部指示点支持点击切换，切换后重新计时
+- 修改 `src/views/Home.vue`：
+  - 新增 `showLaunchProgress` 状态（含 600ms 延迟隐藏），启动中渲染 LaunchLog，结束后切换到时钟卡片/插件/自定义布局
+  - `homePanelComponent` computed 默认模式回退从 LaunchLog 改为 HomeClockCard
+  - 插件未找到/未启用时回退到 HomeClockCard 而非 LaunchLog
+
+#### customLayoutConfig 配置读写重构
+- 移除 `customLayoutConfig` 后端 INI 持久化逻辑：
+  - `src/stores/plugins.ts`：删除 `persistCustomLayoutConfig` 方法，`setCustomLayoutConfig` / `refreshCustomLayoutCache` 仅保存到 localStorage
+  - `syncFromBackend` 不再从后端 INI 读取 `customLayoutConfig`，仅从前端 localStorage 恢复
+  - URL 来源的 cachedContent 通过独立的 `load_custom_layout` 命令单独获取（命中本地缓存文件 `.Molaunch/cache/custom_layout/<sha256>.txt`）
+- 理由：`customLayoutConfig` 包含 `cachedContent` 大字段不适合存 INI；URL 内容已有独立缓存文件，无需重复持久化
+- 移除 `src-tauri/src/commands/system/config.rs` 中 `("Plugin", "customLayoutConfig")` 白名单项（不再需要）
+
+#### 主页右侧内容区自定义布局模式（JSON / HTML / XML）
+- 新增 `src/plugins/custom-layout/` 自定义布局引擎模块，支持三种格式：
+  - **JSON**：结构化布局，启动器提供组件库（stat-grid 统计网格 / list 数据列表 / progress 进度条 / text 文本块 / divider 分割线），用户配置页面信息，支持 `{{dataSource.field}}` 值表达式插值
+  - **XML**：结构化布局，使用浏览器内置 `DOMParser` 解析，解析后统一转为 `LayoutSchema` 复用 JSON 渲染组件
+  - **HTML**：直接渲染 HTML，复用 `sandbox-bootstrap.ts` 的 `buildSandboxHtml` 注入 `window.molaunch` SDK，通过 `<iframe sandbox="allow-scripts">` 加载，与 PluginSandbox 区别为无权限白名单（用户自定义内容）但禁用 spawnProcess
+- 新增 `src/plugins/custom-layout/types.ts`：自定义布局 Schema 类型定义（`LayoutSection` 联合类型、`StatItem`、`ListField`、`LayoutSchema`、`ParseResult`）
+- 新增 `src/plugins/custom-layout/parser.ts`：JSON 和 XML 解析器，统一输出 `LayoutSchema`，包含校验逻辑（VALID_SECTION_TYPES / VALID_FORMATS / VALID_COLORS / VALID_VARIANTS）
+- 新增 `src/plugins/custom-layout/datasource.ts`：数据源加载与值解析，`loadDataContext()` 通过 `Promise.allSettled` 并行获取 cache/system/versions/history 数据，单个失败不阻塞其他；`resolveValue()` 解析 `{{key}}` 插值；`formatValue()` 支持 bytes/number/percent/text 格式化
+- 新增 `src/plugins/custom-layout/CustomLayoutPanel.vue`：JSON/XML 结构化布局渲染器，每 3 秒轮询数据源（不重新解析布局），支持图标映射（chart-bar / circle-stack / cpu-chip / clock）
+- 新增 `src/plugins/custom-layout/HtmlLayoutPanel.vue`：HTML 直接渲染组件，`BLOCKED_METHODS = new Set(['spawnProcess'])`
+- 新增 `src/plugins/custom-layout/index.vue`：自定义布局入口，根据 format 分发到 CustomLayoutPanel 或 HtmlLayoutPanel
+- 扩展 `src/types/plugin.ts`：
+  - `HomePanelMode` 类型扩展为 `'default' | \`plugin:${string}\` | 'custom'`
+  - 新增 `LayoutFormat = 'json' | 'html' | 'xml'` / `LayoutSource = 'inline' | 'url'`
+  - 新增 `CustomLayoutConfig` 接口（format / source / inlineContent / url / cachedContent / cachedAt）
+- 扩展 `src/stores/plugins.ts`：
+  - 新增 `DEFAULT_CUSTOM_LAYOUT` 常量与 `customLayoutConfig` ref
+  - `loadFromStorage` / `saveToStorage` 支持 customLayoutConfig
+  - 新增 `setCustomLayoutConfig(partial)` / `persistCustomLayoutConfig()` / `refreshCustomLayoutCache()` 方法
+  - `syncFromBackend` 读取后端 `customLayoutConfig` JSON 字符串解析；若 source=url 且无缓存自动调用 `load_custom_layout` 加载
+  - `refreshCustomLayoutCache()` 传入 `forceRefresh: true` 强制忽略本地缓存重新下载
+- 重写 `src/views/settings/SettingsPersonal.vue` 主页配置区：
+  - 顶层模式选择：默认 / 插件模式 / 自定义模式，通过 `panelMode` computed 派生
+  - 插件模式：条件渲染插件选择 Select（仅显示已启用且提供 homePanel 的插件）
+  - 自定义模式：条件渲染格式选择（JSON/HTML/XML）+ 来源选择（内联/URL）+ 内联编辑器（textarea 防抖 500ms 同步）/ URL 加载（含刷新按钮）
+  - 内联编辑器占位文本移至 `inlinePlaceholder` computed，避免模板内联 JS 表达式中转义引号导致 Vue 编译器解析失败
+  - 显示缓存时间 `cachedTimeText`
+- 修改 `src/views/Home.vue`：
+  - `homePanelComponent` computed 新增 `if (mode === 'custom') return CustomLayout` 分支
+  - 新增 `homePanelProps` computed：custom 模式返回 `{ config: pluginStore.customLayoutConfig }`，其他模式返回 `{}`
+  - 模板 `<component :is="homePanelComponent" v-bind="homePanelProps" />` 支持 props 传递
+
+#### 缓存监控与缓存设置页面布局优化（顶部固定 + 底部滑动）
+- 修改 `src/plugins/cache-monitor/CacheMonitorPanel.vue`：
+  - 标题栏改为 `flex flex-none`
+  - 概览卡片改为 `flex-none grid grid-cols-3 gap-3 mb-4`
+  - 分类明细改为 `flex-1 space-y-4 overflow-y-auto pr-1`
+  - 实现「顶部固定 + 底部滑动」布局
+- 重写 `src/views/settings/SettingsCache.vue` 模板结构：
+  - 外层改为 `flex h-full flex-col gap-4 p-6`
+  - Alert + 总览卡片组 `flex-none grid grid-cols-3 gap-4`
+  - 详细列表区域 `flex-1 min-h-0 ... flex flex-col`，内部列表 `flex-1 overflow-y-auto`
+- 修改 `src/views/Settings.vue`：容器 div 的 class 改为动态绑定，cache 页面 `!p-0` 去掉外层 padding 让子组件自管理滚动
+
+#### 自定义布局 URL 加载后端命令（load_custom_layout）
+- 后端新增 `load_custom_layout` IPC 命令（`src-tauri/src/commands/plugins/mod.rs`）：
+  - 接收 `url: String` 和可选 `force_refresh: Option<bool>` 参数
+  - URL 协议校验（仅允许 http/https，拒绝 file://、data: 等）
+  - 缓存文件路径使用 URL 的 sha256 哈希（64 字符十六进制），避免文件名冲突和路径注入
+  - 缓存位置：`.Molaunch/cache/custom_layout/<sha256>.txt`
+  - 非强制刷新时优先读取本地缓存，缓存不存在或读取失败时发起 HTTP 请求
+  - 响应大小上限 5MB（`MAX_CUSTOM_LAYOUT_BYTES`），超过则报错
+  - 响应必须为合法 UTF-8 文本，否则报错
+  - 写入缓存失败不阻塞返回内容（仅 warn 日志）
+  - 返回布局内容文本字符串，前端直接写入 `customLayoutConfig.cachedContent`
+- `src-tauri/src/commands/plugins/mod.rs`：新增 `use sha2::{Digest, Sha256}` 导入和 `hash_url()` 辅助函数
+- `src-tauri/src/lib.rs`：注册 `commands::plugins::load_custom_layout` 命令
+- `src-tauri/src/commands/system/config.rs`：`is_valid_config_key` 白名单新增 `("Plugin", "customLayoutConfig")` 项，支持自定义布局配置通过 `set_config_value` 持久化到 INI 文件
+- `src-tauri/src/utils/cache_cleanup.rs`：清理范围新增 `.Molaunch/cache/custom_layout/`（24h TTL），与 images/forge_installer/preload_mods/launch 一致
+- `src-tauri/src/utils/cache_stats.rs`：统计范围新增 `custom_layout` 子目录（24h TTL），供缓存管理页面展示
+
+#### 插件创建子窗口权限（createWindow）
+- 后端新增 `plugin_create_window` IPC 命令（`src-tauri/src/commands/plugins/mod.rs`）：
+  - 接收 `plugin_id` / `label` / `url` / `title` 参数，创建独立 WebviewWindow
+  - 权限校验：manifest 必须声明 `createWindow` 权限 + `window_permissions` 配置
+  - 域名白名单：URL 域名必须匹配 `window_permissions.allowed_domains`（支持 `*.` 通配符，如 `*.github.io`）
+  - URL 协议校验：仅允许 http/https，拒绝 file://、data: 等
+  - 窗口数量限制：每个插件最多 5 个窗口（`MAX_PLUGIN_WINDOWS`），label 格式 `plugin-<id>-<label>` 避免与内置窗口冲突
+  - 新增 `WindowPermissions` 结构体（allowed_domains / width / height / resizable，含 serde 默认值函数）
+  - 新增 `extract_domain` / `is_domain_allowed` 辅助函数（简单字符串解析，不依赖 url crate）
+  - `ExternalPluginManifest` 新增 `window_permissions: Option<WindowPermissions>` 字段
+- 后端 `src-tauri/src/lib.rs`：注册 `commands::plugins::plugin_create_window` 命令
+- 前端 SDK 扩展 `src/plugins/sdk.ts`：
+  - 新增 `CreateWindowOptions` 接口（label / url / title）
+  - `PluginSdk` 接口新增 `createWindow(options: CreateWindowOptions): Promise<void>`
+  - `PluginSdkImpl` 新增 `createWindow` 实现，内置插件调用直接抛错（内置插件有直接后端访问能力，不需开窗口）
+- 前端权限注册表 `src/plugins/permissions.ts`：`PERMISSION_REGISTRY` 新增 `createWindow` 权限项（high risk, requiresExtraConfig: 'windowPermissions'）
+- 前端沙箱引导 `src/plugins/sandbox/sandbox-bootstrap.ts`：`window.molaunch` 新增 `createWindow` 方法转发
+- 前端沙箱代理 `src/plugins/sandbox/PluginSandbox.vue`：新增 `createWindow` 消息处理（类似 `spawnProcess`，注入 pluginId 调用后端 `plugin_create_window`）
+- 前端 HTML 布局面板 `src/plugins/custom-layout/HtmlLayoutPanel.vue`：`BLOCKED_METHODS` 新增 `'createWindow'`（自定义 HTML 布局不允许创建窗口）
+
+#### 通用文本文件写入命令（write_text_file）
+- 后端新增 `write_text_file` IPC 命令（`src-tauri/src/commands/system/game_dir.rs`）：接收 `path` / `content` 参数，自动创建父目录后写入文本文件，用于前端导出示例文件场景
+- 后端 `src-tauri/src/lib.rs`：注册 `commands::system::write_text_file` 命令
+
+#### JSON/XML 布局新增 html section 类型（支持内联 JS/CSS）
+- 扩展 `src/plugins/custom-layout/types.ts`：`LayoutSection` 联合类型新增 `html` 类型，包含 `content`（HTML 内容）/ `script`（内联 JS）/ `style`（内联 CSS）/ `height`（iframe 高度，默认 200）字段
+- 扩展 `src/plugins/custom-layout/parser.ts`：
+  - `VALID_SECTION_TYPES` 新增 `'html'`
+  - JSON 解析：新增 `parseHtmlJson` 函数，校验 content 必须为字符串，script/style/height 可选
+  - XML 解析：新增 `parseHtmlXml` 函数，要求通过 `<content>` 子节点提供 HTML 内容（避免与 `<script>`/`<style>` 文本混淆），`<script>`/`<style>` 子节点提供 JS/CSS，`height` 属性设置 iframe 高度
+  - 文档注释更新：补充 JSON 和 XML 格式的 html section 示例
+- 扩展 `src/plugins/custom-layout/CustomLayoutPanel.vue`：
+  - 新增 `buildHtmlSrcDoc` 函数：将 content + style + script 组装为完整 HTML 文档字符串
+  - 模板新增 `html` section 渲染分支：通过 `<iframe sandbox="allow-scripts" :srcdoc="...">` 渲染（不含 `allow-same-origin`，iframe 运行在 null origin，无法访问父窗口 DOM/cookie/localStorage）
+
+#### 示例文件导出功能（插件页面 + 个性化自定义模式）
+- 示例文件存储于 `src-tauri/resources/samples/` 目录，通过 `include_str!` 嵌入二进制，前端通过 IPC 命令读取，不再硬编码在前端代码中：
+  - `samples/plugin/manifest.json`：插件示例清单（含全部可选权限配置字段）
+  - `samples/plugin/index.html`：插件示例入口（演示 SDK 调用 getConfig / getCacheStats）
+  - `samples/layout/layout-sample.json`：JSON 布局示例（含全部 section 类型，含 html section）
+  - `samples/layout/layout-sample.xml`：XML 布局示例（含 html section，CDATA 包裹 HTML 内容）
+  - `samples/layout/layout-sample.html`：HTML 布局示例（通过 window.molaunch 调用 SDK 加载数据，每 3 秒刷新）
+- 后端新增两个 IPC 命令（`src-tauri/src/commands/plugins/mod.rs`）：
+  - `read_layout_sample(format)`：根据格式从嵌入资源读取示例布局内容
+  - `export_plugin_sample(dest_path, as_zip)`：导出插件示例模板，支持文件夹（直接写入 manifest.json + index.html）和 ZIP（使用 zip crate 打包）两种方式
+- 后端 `src-tauri/src/resources.rs`：`embedded_text` 注册 5 个示例文件路径
+- 后端 `src-tauri/src/lib.rs`：注册 `read_layout_sample` 和 `export_plugin_sample` 命令
+- 插件管理页 `src/views/settings/SettingsPlugins.vue`：
+  - 移除前端硬编码的 SAMPLE_MANIFEST / SAMPLE_INDEX_HTML 常量
+  - 导出按钮改为卡片样式（虚线边框，与个性化页一致），支持「文件夹」和「ZIP 文件」双选
+  - 文件夹导出调用 `selectFolder` + `export_plugin_sample(asZip=false)`
+  - ZIP 导出调用 `saveFile` + `export_plugin_sample(asZip=true)`，后端使用 zip crate 现场打包
+- 个性化页 `src/views/settings/SettingsPersonal.vue`：
+  - 移除前端硬编码的 SAMPLE_JSON / SAMPLE_XML / SAMPLE_HTML 常量
+  - `onExportSampleLayout` 改为调用 `read_layout_sample` 从后端获取示例内容，再通过 `saveFile` + `write_text_file` 写入
+
 ### 修复
+
+#### 沙箱 iframe 中 Tauri 内部脚本崩溃 + bootstrap 注入顺序
+- `src/plugins/sandbox/sandbox-bootstrap.ts` 的 `buildSandboxHtml`：
+  - 注入 `window.__TAURI_INTERNALS__` 桩（`{ plugins: {}, invoke: ... }`），防止 Tauri 2 的内部 IPC 初始化脚本在 `sandbox="allow-scripts"`（无 `allow-same-origin`）的 iframe 中因 `window.__TAURI_INTERNALS__` 为 undefined 而抛出 `Cannot read properties of undefined (reading 'plugins')` 错误
+  - bootstrap 注入位置从 `</body>` 前改为 `<head>` 开头，确保 `window.molaunch` 在用户内联脚本执行前已定义（此前用户 HTML 中的 `<script>` 在 bootstrap 之前执行，导致 `window.molaunch` 为 undefined）
+- `src/plugins/custom-layout/CustomLayoutPanel.vue` 和 `HtmlLayoutPanel.vue`：
+  - iframe sandbox 从 `allow-scripts` 改为 `allow-scripts allow-same-origin`，使 Tauri 2 的 IPC 桥接脚本在所有 frame 中正常初始化（Tauri 2 通过 WebView2 的 `AddScriptToExecuteOnDocumentCreated` 在 `document_start` 向所有 frame 注入初始化脚本，无 `allow-same-origin` 时 IPC 不可用导致 `__TAURI_INTERNALS__` 为 undefined，后续脚本访问 `.plugins` 崩溃）
+  - 移除 html section 的 `__TAURI_INTERNALS__` 桩（`allow-same-origin` 后 Tauri 自行初始化，桩不再需要）
+
+#### progress section 新增 format 字段 + html section 内置设计系统 CSS
+- `src/plugins/custom-layout/types.ts`：progress section 联合类型新增 `format?: ValueFormat` 字段
+- `src/plugins/custom-layout/parser.ts`：`parseProgressJson` 和 `parseProgressXml` 均支持读取 `format` 属性
+- `src/plugins/custom-layout/CustomLayoutPanel.vue`：
+  - 进度条值显示使用 `section.format || 'text'` 进行格式化（此前硬编码 `'text'`，导致 bytes 值显示为原始数字）
+  - 无 label 时也显示当前值/最大值（右侧对齐）
+  - `buildHtmlSrcDoc` 注入内置设计系统 CSS（`DESIGN_SYSTEM_CSS`），提供与启动器主界面一致的视觉风格
+  - 可用类名：`.btn` / `.btn-primary` / `.btn-sm` / `.card` / `.card-title` / `.stat` / `.stat-label` / `.stat-value` / `.grid` / `.grid-2` / `.grid-3` / `.progress-bar` / `.progress-fill` / `.badge` / `.badge-primary` / `.badge-green` / `.badge-red` / `.badge-gray` / `.text-muted` / `.text-sm` / `.text-lg` / `.text-bold` / `.flex` / `.items-center` / `.justify-between` / `.gap-2` / `.gap-4` / `.mt-2` / `.mt-4` / `.mb-2` / `.mb-4`
+
+#### 示例布局字段名修正 + format 字段 + 设计系统类名演示
+- `src-tauri/resources/samples/layout/layout-sample.json` / `layout-sample.xml` / `layout-sample.html`：
+  - 修正字段名以匹配 `datasource.ts` 实际实现：`versions.installedCount` → `versions.count`、`system.memoryUsagePercent` → `system.usagePercent`
+  - progress section 新增 `format: "bytes"`，内存使用值正确格式化为 `8.0 GB` 等
+  - html section content 改用内置设计系统类名（`.card` / `.btn-primary` / `.badge` / `.progress-bar` 等）演示可用组件
+  - HTML 示例也改用设计系统类名（`.grid grid-3` / `.card` / `.stat-value` / `.progress-bar` / `.progress-fill`）
+
+#### 插件管理页导出区域布局优化
+- `src/views/settings/SettingsPlugins.vue`：导出插件示例模板卡片移至 manifest.json 示例上方，两者之间添加 `mt-4` 间距
+
+#### html section 内置前端组件 API（替代 alert/confirm/prompt）
+- `src/plugins/custom-layout/CustomLayoutPanel.vue`：
+  - `buildHtmlSrcDoc` 注入 `UI_API_SCRIPT`，提供 `window.molaunch.toast(type, text)` / `window.molaunch.alert(title, msg)` / `window.molaunch.confirm(title, msg)` / `window.molaunch.prompt(title, msg, default)` 四个 UI 组件 API
+  - iframe 内通过 postMessage 调用父窗口的前端组件（Toast / Modal），不再使用浏览器原生 alert/confirm/prompt
+  - 新增 `handleUiRequest` 消息处理器，onMounted 时注册、onUnmounted 时移除
+  - toast 类型支持 info / success / error / warning，对应启动器 Toast 组件
+  - confirm / prompt 返回 Promise，支持异步等待用户操作
+- `src-tauri/resources/samples/layout/layout-sample.json` 和 `layout-sample.xml`：html section 按钮从 `onclick="alert(...)"` 改为 `onclick="window.molaunch.toast('success', ...)"`
+
+#### 个性化配置常驻化存储到 AppData（全系统共享）
+- 后端 `src-tauri/src/commands/plugins/mod.rs`：新增 `read_personalization` / `write_personalization` IPC 命令
+  - 存储路径：`%APPDATA%/.MolaLaunch/personalization.json`
+  - 独立于游戏目录（game_dir），确保不同 game_dir 的启动器实例加载同一份配置
+  - JSON 格式存储 enabledMap / homePanelMode / customLayoutConfig 全部个性化数据
+  - `personalization_path()` 辅助函数处理路径解析和目录创建
+- 后端 `src-tauri/src/lib.rs`：注册 `read_personalization` / `write_personalization` 命令
+- 后端 `src-tauri/src/commands/system/config.rs`：移除 [Plugin] 段 INI 白名单（`homePanelMode` 和 `enabled_<id>`），不再通过 INI 存储插件配置
+- 前端 `src/stores/plugins.ts`：
+  - 移除 `STORAGE_KEY` 常量、`loadFromStorage()` / `saveToStorage()` / `persistPluginEnabled()` / `persistHomePanelMode()` 方法
+  - 新增 `persistToBackend()` 方法：全量收集 enabledMap + homePanelMode + customLayoutConfig，调用 `write_personalization` 写入 AppData
+  - `syncFromBackend()` 从 `read_personalization` 命令读取配置（替代原 `get_config_value` 逐键读取 INI）
+  - `setPluginEnabled` / `setHomePanelMode` / `setCustomLayoutConfig` / `refreshCustomLayoutCache` / `uninstallExternal` 均改为调用 `persistToBackend()`
+  - store 初始化仅调用 `initRuntimeStates()`（不再从 localStorage 读取），实际启用状态由 `syncFromBackend` 异步加载
+
+#### 插件安装按钮状态泄漏
+- `src/views/settings/SettingsPlugins.vue`：原单个 `installing` ref 被文件夹和 ZIP 两个按钮共用，点击「文件夹」时「ZIP 文件」按钮也显示「安装中」。修复为拆分 `installingFolder` / `installingZip` 独立 ref + `installingAny` computed 互斥（点击一个按钮时禁用另一个，但仅被点击的按钮显示 loading 态）
 
 #### 移除 community/install/mod.rs 未使用的 Emitter 导入
 - `src-tauri/src/commands/community/install/mod.rs`：`use tauri::{AppHandle, Emitter, State};` 改为 `use tauri::{AppHandle, State};`，修复 `warning: unused import: Emitter`
@@ -166,6 +636,172 @@
 #### CurseForge 批量查询绕过 source 策略
 - `src-tauri/src/minecraft/community/curseforge/mod.rs`：`http` 模块改为 `pub(crate)` 暴露 `cf_post`
 - `src-tauri/src/commands/community/install/curseforge.rs`：`install_cf_mods` 中的 `/mods/files` 批量查询从硬编码官方 API 改为 `cf_post`，走 source 策略（source=0 强制镜像，source=1 回退，source=2 官方）
+
+#### 返回顶部按钮临界点闪烁 + 弹层误触发 + 路由残留
+- `src/components/common/BackToTop.vue`：
+  - 引入迟滞阈值：未显示时需 `scrollTop > 700` 才出现，已显示时仅在 `scrollTop ≤ clientHeight`（一屏高度）时隐藏，避免在临界点反复闪烁
+  - 过滤逻辑从遍历祖先检查 `getComputedStyle().position`（开销大且误杀正常容器）改为 `el.closest('main')` 单次查询，仅响应主内容区内的滚动容器，Teleport 弹层 / 下拉框自动被过滤
+  - 新增路由切换刷新：监听 `router.afterEach` 重置 `visible` 与 `activeEl`，并在 fade 过渡结束后（450ms 延迟）扫描新页面已滚动容器恢复按钮状态
+  - `scrollToTop` 使用 `activeEl` 前增加 `isConnected` 检查，避免指向已卸载元素导致报错
+  - 移除原 `scrollHeight ≤ clientHeight * 1.5 || scrollHeight < 600` 内容长度判断（与基于绝对像素的迟滞阈值重复）
+- `src/components/common/DownloadPanel.vue`：浮动下载按钮位置从 `bottom-6`（24px）上移至 `bottom-20`（80px），与 `BackToTop`（bottom: 24px / 高度 44px）垂直错开 12px 间隙，避免两者同时可见时重叠
+
+#### 设置 - 更多页面无法下滑
+- `src/views/Settings.vue`：`about` 分类容器原先同时缺少 `p-6` 与 `overflow-y-auto`（仅 `overflow-hidden`），但 `SettingsMore` 子组件仅自带 `p-6` 内边距、并不自管理滚动，导致内容超出时无法下滑。修复为：仅 `cache` 分类由子组件自管理滚动并被排除 `overflow-y-auto`，其余分类（含 `about`）统一由外部容器提供纵向滚动
+
+#### 插件页权限说明折叠区改用公共 CollapsibleCard 组件
+- `src/views/settings/SettingsPlugins.vue`：「可用权限说明」面板原先自行用 `ref(false) + v-if` 实现展开/折叠，**无展开动画**且代码冗余。改造为使用项目已有的 `CollapsibleCard` 公共组件，获得 `grid-template-rows: 0fr→1fr` 平滑高度过渡动画，并移除 `permissionsExpanded` ref 与手写 SVG 箭头（改用 `ChevronDownIcon`），减少约 20 行代码
+
+#### 首页加载慢：版本显示与开始游戏按钮需等待数秒
+- `src/views/Home.vue` onMounted 改造为三阶段并行加载：
+  - **阶段1**（首屏快速显示）：并行执行 `restoreSession` + `detectJava` + 新增的 `restoreSelectedVersionFast`，后者仅一次 IPC 读 config（约 1ms）即乐观设置 `selectedVersion`，用户立刻看到版本名 + 开始游戏按钮变蓝，无需等待磁盘扫描或网络请求
+  - **阶段2**（后台并行）：`checkRunningGame` 与 `listInstalledVersionsWithType` 两个互不依赖的操作改为 `Promise.all` 并行（原先串行 4 个 await）
+  - **阶段3**（校验刷新）：磁盘扫描完成后调用 `validateSelectedVersion` 校验版本是否仍存在（不存在则清空持久化并回退到第一个已安装版本），并刷新版本类型映射缓存
+- **移除 `fetchVersions` 阻塞**：首页 onMounted 原先 `await versionStore.fetchVersions()` 拉取 Mojang 完整版本清单（1~3s 网络请求），但首页的 `VersionSelector` 与 `LaunchPanel` 根本不使用 `versions` 数组（仅版本下载页 `Versions.vue` 使用）。该调用已移除，由 `Versions.vue` 与 `useVersionInstallActions.ts` 在进入下载页时按需 lazy-load（已有 `if (versions.length === 0)` 去重 guard）
+- `src/stores/version.ts` 新增两个方法：
+  - `restoreSelectedVersionFast()`：仅读 config 不校验，用于首屏快速显示
+  - `validateSelectedVersion(installedList)`：校验当前 selectedVersion 是否仍存在，不存在则清空持久化并自动回退到第一个已安装版本
+- `src/stores/sdk.ts` `fetchPlatformInfo` 新增 `if (initialized.value) return` guard，避免 `App.vue` 与 `Home.vue` 重复发起 `get_platform_info` + `get_sdk_version` 两个 IPC（与 `javaStore.detectJava` 的 `javaLoaded` guard 模式一致）
+- `src/views/Home.vue`：移除未使用的 `sdkStore` import 与声明（fetchPlatformInfo 已由 App.vue 触发，Home.vue 不再调用）
+
+#### 版本选择页样式对齐 Settings 规范
+- `src/views/VersionSelect.vue`：
+  - 根容器从 `flex h-full` 改为 `flex h-full rounded-xl overflow-hidden bg-white shadow-sm`（与 Settings 根容器一致，提供圆角白底卡片化外观）
+  - 顶部栏 padding 从 `px-4 py-3` 改为 `px-6 py-4`，标题从 `<h1 class="text-base font-semibold text-gray-800">` 改为 `<h2 class="text-lg font-semibold text-gray-900">`
+  - 主体内边距从 `p-4` 改为 `p-6`
+  - 版本分组卡片完全对齐 Settings 卡片规范：`rounded-xl border-gray-200` → `rounded-lg border-gray-300`、卡片头从 `bg-gray-50/60 px-4 py-2.5` 改为 `px-5 pt-5 pb-3`（去灰底）、卡片头标题从 `text-gray-700` 改为 `text-gray-900`、列表行从 `px-4 py-3` 改为 `px-5 py-4`、卡片间距从 `space-y-4` 改为 `space-y-6`
+  - 列表项 hover 从 `hover:bg-primary-50/40`（40% 透明度）改为 `hover:bg-gray-50`（满色，与 Settings 一致）
+  - 选中态打勾图标颜色从 `text-primary-600` 改为 `text-primary-500`（与主色变量一致）
+  - 空状态卡片圆角从 `rounded-2xl` 改为 `rounded-lg`
+  - 所有内联 SVG 图标替换为 Heroicons：返回（`ArrowLeftIcon`）、刷新（`ArrowPathIcon`）、选中打勾（`CheckIcon`）、下载（`ArrowDownTrayIcon`）、空状态（`ArchiveBoxIcon`）
+- `src/views/version-select/FolderSidebar.vue`：
+  - 侧边栏宽度从 `w-64`（256px）改为 `w-48`（192px），与 Settings 侧边栏一致
+  - 滚动区内边距从 `px-3 pt-5` 改为 `py-4`（按钮自带 `px-4`，与 Settings 一致）
+  - 选中态高亮条从左侧绝对定位（`absolute left-0 h-5 w-0.5 bg-primary-500`）改为右侧 border（`border-r-2 border-primary-500`），与 Settings 侧边栏一致
+  - 选中态背景从 `bg-primary-50/70`（70% 透明度）改为 `bg-primary-50`（满色）
+  - 文件夹按钮 padding 从 `pl-3 pr-2 py-2.5` 改为 `px-4 py-2.5`
+  - 文件夹图标从内联 SVG（`h-4 w-4 mr-2.5`）替换为 Heroicons `FolderIcon`（`w-5 h-5 mr-3`），与 Settings 侧边栏图标规范一致
+  - 移除按钮图标替换为 `XMarkIcon`，添加按钮图标替换为 `PlusIcon`
+  - 移除"文件夹列表"和"添加或导入"两个分组小标题（Settings 侧边栏为扁平列表无分组标题），改为用一条 `border-t border-gray-100` 分隔线区分文件夹列表与添加按钮
+
+#### 个性化布局编辑器改用公共 Input 组件
+- `src/views/settings/SettingsPersonal.vue`：JSON/XML/HTML 内容编辑器原先使用原生 `<textarea>` 元素（带 `font-mono text-xs` 等宽字体小字号样式），违反项目"必须复用公共组件"规范。改为使用 `Input.vue` 公共组件的 textarea 模式（`<Input textarea :rows="16" resize="vertical">`），并通过 scoped `:deep(.textarea-inner)` 注入等宽字体与 12px 字号，保持与原原生 textarea 一致的代码输入体验
+
+#### 新增工具菜单 + 外部下载工具
+- 顶部菜单新增"工具"项（`WrenchScrewdriverIcon`），位于"下载"和"设置"之间，点击导航到 `/apps/tools` 工具列表页
+- `src/components/layout/TopNavLayout.vue`：navItems 数组新增工具菜单项，active 高亮逻辑新增 `/apps/tools` 前缀匹配（子页面访问时工具按钮也高亮）
+- `src/router/index.ts`：注册 `/apps/tools`（工具列表页）和 `/apps/tools/external-download`（外部下载工具页）两条路由
+- 新增 `src/views/Tools.vue`：工具列表页，卡片布局对齐 Settings 规范（`rounded-lg border-gray-300` + `px-5 py-4`），目前包含"外部下载工具"一个入口，点击进入子页面
+- 新增 `src/views/ExternalDownload.vue`：外部下载工具页面，功能包括：
+  - URL + 文件名输入表单（URL 变化时自动从末段推断文件名）
+  - 协议白名单校验（仅允许 http/https）
+  - 下载进度展示（百分比 + 已下载/总字节 + 速度），300ms 轮询
+  - 暂停/恢复/取消操作（复用全局 `pause_download` / `resume_download` / `cancel_download` IPC）
+  - 已下载文件列表（文件名 + 大小 + 修改时间），支持删除和打开下载目录
+  - 页面恢复机制（用户切回此页时检测正在进行的下载并恢复进度显示）
+  - 下载开始/完成/失败通过 Toast 提示
+
+#### 后端新增外部下载 IPC 命令
+- `src-tauri/src/storage/mod.rs`：新增 `download_dir()` 方法返回 `.Molaunch/Download/` 路径，`init()` 中自动创建该目录
+- `src-tauri/src/commands/system/download.rs`（原占位文件）：实现 4 个 IPC 命令：
+  - `download_external_file(url, file_name)`：校验 http/https 协议 + 文件名安全性后，通过 `DownloadManager` 下载到 `.Molaunch/Download/`，进度写入全局 `download_state`（分组"外部下载"），复用 `download_cancel_flag` / `download_pause_flag` 支持暂停/取消
+  - `get_external_download_dir()`：返回下载目录路径
+  - `list_external_downloads()`：列举已下载文件（名称/大小/修改时间），按修改时间倒序
+  - `delete_external_download(file_name)`：删除指定文件（含文件名安全校验）
+- `src-tauri/src/commands/system/mod.rs`：`pub use download::*` 导出新命令
+- `src-tauri/src/lib.rs`：`invoke_handler!` 注册 4 个新命令
+- 安全设计（参考 PCL2 百宝箱 `StartCustomDownload`）：
+  - 协议白名单：仅允许 `http://` 和 `https://`，拒绝 `file://`、`ftp://` 等
+  - 文件名安全校验：拒绝空字符串、含 `/` `\` `..` `\0` 的文件名，防路径遍历
+  - 外部 URL 不经过 `cdn_urls` 镜像策略，直接使用原始 URL
+
+#### 工具页改为侧边栏布局 + 外部下载支持自定义目录
+- `src/views/Tools.vue`：从卡片列表布局重写为与 Settings.vue 一致的侧边栏布局（左侧 `w-48` 菜单 + 右侧标题栏 + `v-if` 切换子组件），移除路由跳转改为组件内切换
+- `src/views/ExternalDownload.vue`：从独立路由页面改为 Tools 子组件（移除外层 `rounded-xl` 容器和返回按钮），新增下载目录选择器区块：
+  - 显示当前生效目录（只读 Input + 打开目录按钮）
+  - "选择目录"按钮调用系统文件夹选择对话框，通过 `applyConfig({ externalDownloadDir })` 持久化到 AppConfig
+  - "恢复默认"按钮（仅自定义目录时显示）清空配置回退到 `.Molaunch/Download/`
+  - 自定义/默认状态标签提示
+- `src/router/index.ts`：移除 `/apps/tools/external-download` 独立路由（ExternalDownload 已改为 Tools 子组件）
+- `src-tauri/src/state/config.rs`：AppConfig 新增 `external_download_dir: Option<String>` 字段（None 或空则用默认目录）
+- `src-tauri/src/config.rs`：`load_config` / `save_config` 新增 `[ExternalDownload] dir` 读写
+- `src-tauri/src/commands/system/download.rs`：提取 `resolve_external_download_dir` 公共 helper，`download_external_file` / `get_external_download_dir` / `list_external_downloads` / `delete_external_download` 四个命令统一从 config 读取自定义目录，为空则 fallback 到 `Storage::download_dir()`
+- `src-tauri/src/commands/system/apply_config/types.rs`：`ConfigPatch` 新增 `external_download_dir: Option<Option<String>>`（双层 Option 语义：None 不更新 / Some(None) 清空 / Some(Some(dir)) 设置），`ConfigSnapshot` 新增 `external_download_dir: Option<String>`，`build_snapshot` 镜像该字段
+- `src-tauri/src/commands/system/apply_config/apply.rs`：新增 `apply_external_download` 域子函数，在 `apply_config_inner` 闭包内统一调用
+- `src/utils/api/config.ts`：`ConfigSnapshot` / `ConfigPatch` 前端类型同步新增 `externalDownloadDir` 字段
+
+#### 工具模块化重构 + 便捷工具 + 自动获取文件名
+- **后端 tools 模块化**：新建 `src-tauri/src/commands/tools/` 文件夹，包含 6 个模块文件：
+  - `mod.rs`：模块声明 + `tools_manager` 统一 IPC 命令，通过 `ToolsRequest.action` 字段分发到 8 个子操作（download_file / get_download_dir / list_downloads / delete_download / fetch_filename / cleanup_scan / cleanup_execute / memory_optimize）
+  - `types.rs`：12 个请求/响应类型定义（ToolsRequest、DownloadFileParams、FetchFilenameResult、CleanupItem、MemoryOptimizeResult 等）
+  - `download.rs`：从原 `system/download.rs` 迁移的外部下载逻辑，函数改为普通 `pub async fn` 接收 typed params，保留 `resolve_external_download_dir` 公共 helper
+  - `filename.rs`：HEAD 优先 → 失败回退 GET with `Range: bytes=0-0`，解析 `Content-Disposition`（先 RFC 5987 `filename*=UTF-8''xxx` 用 `urlencoding::decode`，再 `filename="xxx"`），都没有则从 URL path 提取；同时取 `Content-Length` 作为 file_size
+  - `cleanup.rs`：扫描 `.minecraft` 下的 `logs`/`crash-reports`/`.mixin.out`/`screenshots` 四个目录（screenshots 标为"可选"），`execute` 用 `is_path_safe` 基于 canonicalize 做路径遍历防护，自底向上删除文件再删目录
+  - `memory.rs`：Windows 调用 `SetProcessWorkingSetSize(GetCurrentProcess(), usize::MAX, usize::MAX)` 释放进程工作集，sysinfo 0.29 API 取 `available_memory()` 前后差值返回 freed_kb
+- **旧代码清理**：删除 `src-tauri/src/commands/system/download.rs`，`system/mod.rs` 移除 `mod download; pub use download::*;`，`lib.rs` 移除 4 个旧命令注册替换为 `commands::tools::tools_manager`
+- `src-tauri/src/commands/mod.rs`：新增 `pub mod tools;`
+- **前端统一 API**：新建 `src/utils/api/tools.ts`，提供 `toolsManager<T>(action, params)` 泛型封装 + 8 个类型安全的具名函数（downloadFile / getDownloadDir / listDownloads / deleteDownload / fetchFilename / cleanupScan / cleanupExecute / memoryOptimize）
+- **ExternalDownload.vue 重新设计**：
+  - 下载目录 UI 从只读 Input + 挤压按钮重设计为灰底信息条（文件夹图标 + 路径文字 + 状态标签）+ 独立操作按钮行（选择目录 / 打开目录 / 恢复默认）
+  - 粘贴链接后自动获取文件名：watch URL 防抖 500ms → 调用 `fetch_filename` → 自动补全文件名输入框，期间输入框禁用并显示旋转加载图标；用户手动编辑文件名后停止自动补全
+  - 集成 versionStore 替代本地轮询：`startDownload` 时调用 `versionStore.startDownload(fileName)` 触发 `useDownloadPolling` 全局轮询，下载进度在下载管理页（Downloads.vue）以"外部下载"分组可见；watch `versionStore.downloading` 检测完成后自动刷新文件列表
+- **QuickTools.vue 新建**：便捷工具子组件，含三个区块：
+  - 清理游戏垃圾：扫描 → 勾选（非可选项默认选中）→ 确认清理 → 展示结果（清理大小/文件数/失败项），支持重新扫描
+  - 内存优化：一键优化按钮，展示前后可用内存对比和释放量
+  - 更多工具敬请期待：6 个占位卡片（存档备份恢复/Mod依赖检测/游戏日志分析/Java版本管理/服务器状态检测/世界存档管理），点击提示"敬请期待"
+- `src/views/Tools.vue`：侧边栏新增"便捷工具"菜单项（WrenchScrewdriverIcon），右侧内容区 v-if 切换 ExternalDownload / QuickTools
+
+#### 细化清理游戏垃圾扫描范围
+- `src-tauri/src/commands/tools/cleanup.rs` 扩展扫描目录：
+  - 固定子目录新增 `assets/cache`（资源索引缓存）、`.fabric/remapCache`（Fabric 重映射缓存），均为安全可清理内容
+  - 新增通配符扫描 `versions/*/natives/`：遍历 `.minecraft/versions/` 下每个版本目录的 `natives` 子目录（原生库提取目录，每次启动游戏重新提取），每个版本单独作为一个清理项（显示名 "原生库 - <版本名>"），按版本名排序保证展示稳定
+- 新增 `build_allowed_parents` 公共函数：scan 与 execute 共用，构建所有允许清理的目录列表（固定目录 + 所有 versions/*/natives），确保安全检查与扫描结果完全一致，避免路径遍历
+- 原有 `logs`/`crash-reports`/`.mixin.out`/`screenshots` 保持不变
+
+#### iframe sandbox 方案回退（保留 allow-same-origin）
+- `src/plugins/custom-layout/CustomLayoutPanel.vue` 与 `HtmlLayoutPanel.vue` 的 iframe sandbox 保留 `allow-scripts allow-same-origin`
+- 原因：Tauri 2 通过 WebView2 的 `AddScriptToExecuteOnDocumentCreated` 在所有页面 `<script>` 之前注入 IPC 初始化脚本，需同源才能正确设置 `__TAURI_INTERNALS__`；去掉 `allow-same-origin` 会导致 "Cannot read properties of undefined (reading 'plugins')" 报错（桩 `<script>` 来不及在 Tauri 脚本之前执行）
+- 自定义布局内容为用户可信配置，`allow-same-origin` 的安全风险可接受；sandbox 警告为 WebView 安全提示，不影响功能
+
+#### 内存优化跨平台 + 示例布局移除 html section + 内存显示格式优化
+- `src-tauri/src/commands/tools/memory.rs`：内存优化新增 Linux 和 macOS 平台支持：
+  - Windows：`SetProcessWorkingSetSize(GetCurrentProcess(), -1, -1)` 裁剪工作集（不变）
+  - Linux：FFI 调用 glibc `malloc_trim(0)` 归还堆碎片给 OS
+  - macOS：FFI 调用 `malloc_zone_pressure_relief(NULL, 0)` 释放所有 malloc zone 空闲内存（用 opaque `*mut c_void` 指针避免声明复杂的 `malloc_zone_t` 结构体）
+  - 提取 `release_process_memory()` 公共函数，用 `#[cfg(target_os)]` 分平台编译，sleep 从 100ms 调整为 150ms 让 OS 充分回收
+- `src-tauri/resources/samples/layout/layout-sample.json` 和 `layout-sample.xml`：恢复 html section（含自定义 HTML + 按钮 + 徽章 + 进度条示例 + `console.log` 脚本），验证 shadow DOM 渲染方案
+- `src/views/QuickTools.vue`：内存优化结果显示从单行改为两行布局——首行突出显示"已释放 X"，次行显示"系统可用内存 before → after"；移除 `formatMemoryKb`，直接用 `formatBytes` 格式化字节值
+
+#### 修复内存数据单位错误（16GB 物理内存显示 5.57TB 可用）
+- 根因：sysinfo 0.29.11 在 Windows 上 `available_memory()` 实际返回**字节**（而非文档声明的 KB），代码误将字节值标记为 KB 字段名，前端又 × 1024 导致放大 1024 倍
+- `src-tauri/src/commands/tools/memory.rs`：新增 `get_available_memory_bytes()` 函数，通过 `total_memory()` 量级判断 sysinfo 返回单位（>10亿视为字节，否则视为 KB × 1024），统一返回字节
+- `src-tauri/src/commands/tools/types.rs`：`MemoryOptimizeResult` 字段名从 `freed_kb`/`before_kb`/`after_kb` 改为 `freed_bytes`/`before_bytes`/`after_bytes`，语义准确
+- `src/views/QuickTools.vue`：更新字段名引用，用 `formatBytes()` 直接格式化（不再 × 1024）
+
+#### iframe → shadow DOM 渲染方案（彻底消除 sandbox 安全警告）
+- `src/plugins/custom-layout/CustomLayoutPanel.vue`：html section 从 `<iframe sandbox="allow-scripts allow-same-origin">` 改为 shadow DOM 渲染
+  - 新增 `renderHtmlShadow(container, section)` 函数：创建 shadow root → 注入设计系统 CSS + 用户样式 → innerHTML 插入用户 HTML → `new Function` 执行用户脚本
+  - 新增 `setupMolaunchApi()` 函数：直接在主窗口上下文定义 `window.molaunch`（toast/alert/confirm/prompt），无需 postMessage 桥接
+  - 移除 `buildHtmlSrcDoc`、`UI_API_SCRIPT`、`handleUiRequest` 和 message 监听器（iframe 专属逻辑）
+  - 用内容指纹（`dataset.renderedKey`）避免相同内容重复渲染
+- `src/plugins/custom-layout/HtmlLayoutPanel.vue`：整体从 iframe 改为 shadow DOM
+  - 新增 `renderHtml()` 函数：创建 shadow root → innerHTML 插入 HTML → 提取 `<script>` 标签并 `new Function` 执行（innerHTML 插入的 script 不自动执行）
+  - `window.molaunch` 通过 Proxy 代理到 `pluginSdk`（拦截 `spawnProcess`/`createWindow` 等危险方法）
+  - 移除 `buildSandboxHtml` 调用、`handleMessage` 和 message 监听器
+  - 用 `watch(props.content)` + `nextTick` 响应内容变化重新渲染
+- 优势：无 iframe → 无 sandbox 警告；无 Tauri IPC 注入 → 无 "Cannot read properties of undefined (reading 'plugins')" 报错；shadow DOM → CSS 隔离；`new Function` → JS 可执行
+
+#### 内存优化改为枚举所有进程裁剪工作集（与 PCL2 一致，释放量从几十 MB 提升到数 GB）
+- 根因：原实现仅对启动器自身进程调用 `SetProcessWorkingSetSize`，只释放了启动器自己的工作集（几十 MB）；PCL2 枚举系统所有进程逐个裁剪工作集，释放整个系统的物理内存（数 GB）
+- `src-tauri/src/commands/tools/memory.rs`：`release_process_memory` 改为遍历系统进程快照：
+  - 用 `CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)` 创建进程快照
+  - 用 `Process32FirstW` / `Process32NextW` 遍历所有进程
+  - 对每个进程用 `OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_SET_QUOTA, ...)` 打开
+  - 调用 `SetProcessWorkingSetSize(handle, -1, -1)` 裁剪工作集
+  - 对打开失败 / 设置失败的进程（如受保护的系统进程）静默跳过
+  - 统计成功 / 失败进程数并打印日志
+- `src-tauri/Cargo.toml`：windows crate 新增 `Win32_System_Diagnostics_ToolHelp` feature（进程快照 API）
+- sleep 从 150ms 调整为 500ms 让 OS 充分回收多进程工作集
 
 ### 优化
 
@@ -1848,6 +2484,179 @@
 ### 修复
 - 修复微软登录申请设备码时返回 `AADSTS700016` 错误（旧版 Minecraft 启动器 Client ID 与 `login.microsoftonline.com` v2.0 端点不兼容，改用 `login.live.com` 旧版端点）
 - 修复 `DeviceCodeModal.vue` 中 `openUrl` 导入错误（Tauri 2 shell 插件 API 变更为 `open`）
+
+### 重构（代码质量 V2 - 阶段 1：重复代码整合）
+
+> 完整审查报告见 `docs/CODE_QUALITY_REPORT_V2.md`。本阶段聚焦消除前后端重复代码与样板，不改变业务逻辑。
+
+#### 前端重复代码整合
+- **F3 formatBytes 重复实现消除**：`ExternalDownload.vue`、`QuickTools.vue`、`SystemMonitorPanel.vue`、`CacheMonitorPanel.vue`、`custom-layout/datasource.ts` 共 5 处本地 `formatBytes` 全部删除，统一改用 `@/utils/format` 的 `formatBytes`
+- **F4 toast 兼容别名删除**：移除 `src/utils/toast.ts` 底部的 `showInfo`/`showSuccess`/`showError`/`showWarning` 4 个兼容别名（与 `modal.ts` 同名导出冲突），强制 22 个调用文件迁移到 `toastXxx` 前缀命名（`AdvanceFieldsPanel.vue`、`InstalledList.vue`、`DevModeToggle.vue`、`LogViewer.vue`、`LaunchPanel.vue`、`CrashDialog.vue`、`AccountSelector.vue`、`ResourceDetail.vue`、`ResourceDetailHeader.vue`、`Community.vue`、`SetupTab.vue`、`FolderSidebar.vue`、`SkinUploadPanel.vue`、`JavaCustomMode.vue`、`JavaModeSelector.vue`、`MemorySection.vue`、`useLaunchState.ts`、`JavaDownloadBar.vue`、`SettingsDeveloper.vue`、`SettingsOther.vue`、`SettingsCache.vue`、`JavaPathSelector.vue`）
+- **F1 SettingsPersonal 配置读写**：`SettingsPersonal.vue` 的 `gameLanguage` 改用 `useConfigPage` composable，移除手动的 `loadGameLanguage`/`saveGameLanguage` 函数及 `getConfigMap`/`applyConfig` 直接调用
+- **F6 invoke() 绕过封装层消除**：新增 3 个 API 封装函数消除 Vue 组件直接 `invoke()` 调用：
+  - `src/utils/api/system.ts` 新增 `writeTextFile(path, content)`
+  - `src/utils/api/plugins.ts` 新增 `exportPluginSample(destPath, asZip)` 和 `readLayoutSample(format)`
+  - `SettingsPlugins.vue` 和 `SettingsPersonal.vue` 已迁移到封装函数
+- **F7 原生 confirm() 替换**：`SettingsPlugins.vue` 的原生 `confirm()` 改用 `@/utils/modal` 的 `showConfirm`
+- **F5 safeCall 迁移**：暂缓（safeCall 改变返回语义需逐个审查，留待后续逐步迁移）
+
+#### 后端重复样板整合
+- **B1 resolve_mirror_and_source 补完**：`commands/version/list.rs`、`commands/version/loaders.rs` 改用 `state::resolve_mirror_and_source` helper 消除 lock/clone/drop 样板；`java.rs`/`download.rs`/`manage.rs` 因使用 `download_source` 字段（文件下载源）而非 `meta_source`（版本列表源），与 helper 语义不同，保留手动实现
+- **B2 resolve_game_dir_from_state 补完**：`commands/version/mods/mod.rs`、`commands/community/install/mod.rs`、`commands/version/list.rs`、`commands/version/mods/helpers.rs`、`commands/version/script_export.rs`、`commands/version/download.rs`、`commands/version/manage.rs` 改用 `state::resolve_game_dir_from_state` helper；`folder.rs` 因需 `mut config` 调用 `save_config`（非只读样板）保留手动实现
+- **B4 utils::fs 模块创建**：新增 `src-tauri/src/utils/fs.rs`，提供 `ensure_dir(path)` 和 `read_to_string(path)` 两个 helper，替换 `commands/plugins/mod.rs`、`commands/system/game_dir.rs`、`commands/community/install/concurrent.rs` 共 5 处 `create_dir_all` 样板
+- **B3 log_err 迁移**：暂缓（167 处机械替换工作量大，仅改变错误日志格式不影响功能，helper 保留供新代码使用）
+
+### 重构（代码质量 V2 - 阶段 2：前端超长文件拆分）
+
+> 完整审查报告见 `docs/CODE_QUALITY_REPORT_V2.md`。本阶段聚焦拆分超过 300 行的 Vue 组件和超过 400 行的 TypeScript 文件，不改变业务逻辑。
+
+#### Vue 组件拆分（11 项）
+- **2.1 SettingsPlugins.vue（583 → 192）**：抽 `plugins/PluginFlowSteps.vue`（70 行）+ `plugins/PluginListSection.vue`（208 行）+ `plugins/PermissionTableSection.vue`（105 行）子组件，主文件仅保留外部插件安装入口
+- **2.2 ExternalDownload.vue（474 → 193）**：抽 `composables/useExternalDownload.ts`（265 行，URL+文件名+目录+下载状态+文件列表逻辑）+ `external-download/DownloadedFileList.vue`（70 行）子组件
+- **2.3 ColorPicker.vue（475 → 261）**：style 215 行提取到外部 `ColorPicker.css`，使用 Vue SFC `<style scoped src>` 引入
+- **2.4 SettingsPersonal.vue（472 → 73）**：抽 `personal/AppearanceSection.vue`（52 行）+ `personal/HomePanelModeSection.vue`（115 行）+ `personal/CustomLayoutSection.vue`（253 行）子组件
+- **2.5 SettingsMore.vue（467 → 76）**：抽 `more/AboutTab.vue`（158 行）+ `more/CreditsTab.vue`（245 行）+ `more/TutorialTab.vue`（25 行）+ `utils/aboutLogos.ts`（24 行，共享 logoMap+resolveLogo+openLink）
+- **2.6 Select.vue（431 → 211）**：style 221 行提取到外部 `Select.css`，使用 `<style scoped src>` 引入
+- **2.7 ModUpdateDialog.vue（424 → 194）**：抽 `composables/useModUpdate.ts`（208 行，版本查询+过滤+下载）+ `mod-tab/VersionTable.vue`（78 行）子组件
+- **2.8 QuickTools.vue（408 → 69）**：抽 `quick-tools/CleanupTool.vue`（244 行）+ `quick-tools/MemoryOptimizer.vue`（131 行）子组件，主文件保留敬请期待占位
+- **2.9 LoaderSelect.vue（317 → 270）**：抽 `composables/useLoaderCompatibility.ts`（95 行，MC 版本类型判断 + 加载器兼容性检查）
+- **2.10 HomeClockCard.vue（305 → 125）**：抽 `composables/useHomeClockCards.ts`（208 行，时钟 + 4 种轮播卡片加载 + 自动翻页）
+- **2.11 AccountSelector.vue（303 → 175）**：抽 `composables/useAccountCards.ts`（182 行，账号列表构建 + 切换/删除/登出）
+
+#### TypeScript 文件拆分（2 项）
+- **2.12 useModOperations.ts（582 → 125 编排层）**：拆为三个子 composable —— `composables/useModList.ts`（358 行，列表加载/过滤/单 Mod 操作/预加载/详情查询/版本上下文/文件监听）+ `composables/useModBatchOps.ts`（172 行，多选状态 + 批量启用/禁用/删除）+ `composables/useModUpdateDialog.ts`（78 行，更新对话框状态 + 打开/批量更新/安装完成回调），主文件仅做编排，对外 API 完全不变
+- **2.13 stores/plugins.ts（428 → 382）**：抽出纯函数和数据结构到 `@/utils/pluginInstaller`（130 行，包含 `PersonalizationData` 接口 + `DEFAULT_CUSTOM_LAYOUT` 默认值 + `externalManifestToPluginManifest` 清单转换 + `loadPersonalizationData`/`savePersonalizationData`/`fetchCustomLayoutContent` 后端封装 + `isValidHomePanelMode` 字符串校验），store 文件聚焦状态管理与生命周期编排
+
+### 重构（代码质量 V2 - 阶段 3：后端超长文件拆分）
+
+> 完整审查报告见 `docs/CODE_QUALITY_REPORT_V2.md`。本阶段聚焦拆分超过 400 行的 Rust 文件和超过 200 行的单函数，不改变业务逻辑。
+
+#### 3.1 commands/plugins/mod.rs 拆分（1230 → 178 编排层 + 7 子模块）
+- 拆为 `plugins/{mod,sandbox,install,spawn,window,layout,export,personalization}.rs`
+- `mod.rs`（178 行）保留共享类型（`ProcessPermissions` / `WindowPermissions` / `ExternalPluginManifest` / `ExternalPluginEntry`）+ 共享 helper（`plugins_root` / `is_valid_plugin_id` / `read_plugin_manifest`）+ 子模块声明
+- `sandbox.rs`（119 行）：`list_external_plugins` / `read_external_plugin_file` / `uninstall_external_plugin`
+- `install.rs`（269 行）：`install_external_plugin_from_dir` / `install_external_plugin_from_zip` + `copy_dir_recursive` / `determine_zip_prefix` / `extract_zip_safely` helper
+- `spawn.rs`（268 行）：`plugin_spawn_process` + `ProcessResult` / `is_command_allowed` / `which_canonical` / `paths_equal` / `truncate_output` helper（Windows 忽略大小写与 `.exe` 后缀，UTF-8 字符边界切割）
+- `window.rs`（174 行）：`plugin_create_window` + `extract_domain` / `is_domain_allowed` helper（支持 `*.` 通配符前缀）
+- `layout.rs`（89 行）：`load_custom_layout` + `hash_url` helper（sha256 缓存文件名，24h TTL）
+- `export.rs`（100 行）：`read_layout_sample` / `export_plugin_sample`（ZIP 现场打包用 zip crate）
+- `personalization.rs`（86 行）：`read_personalization` / `write_personalization` + `personalization_path` helper（Windows: `%APPDATA%/.MolaLaunch/personalization.json`）
+- `lib.rs` invoke_handler 改用完整子模块路径注册命令（`commands::plugins::sandbox::list_external_plugins` 等），因 `tauri::command` 宏生成的 `__cmd__` 符号无法通过 `pub use` 重导出（参考 `commands/community/install/mod.rs` 注释）
+
+#### 3.2 commands/version/launch.rs 拆分（555 → 287 mod.rs + 255 build_config + 111 failure）
+- 拆为 `launch/{mod,build_config,failure}.rs`，`launch_game` 函数从 ~410 行缩减为 65 行编排层
+- `mod.rs`（287 行）：共享类型（`GameExitEvent`）+ 共享 helper（`parse_server_enter` / `resolve_game_language`）+ `launch_game` 编排 + `spawn_exit_watcher` 退出监视 + 其他短命令（`get_launch_progress` / `cancel_launch` / `stop_game` / `get_running_game` / `get_launch_history`）
+- `build_config.rs`（255 行）：`build_launch_config` — 从全局配置 + 版本独立设置 + 前端入参构建 `LaunchConfig`（Java 路径解析 / 服务器地址 / 额外参数 / 内存 / 认证信息 / 离线皮肤 UUID 调整 + 资源包替换 / 隔离模式）
+- `failure.rs`（111 行）：`handle_launch_failure` — LaunchProcess 阶段失败时等待 watcher 崩溃分析（最多 15 秒）、构造 fallback CrashInfo、清理状态、发送 `game-exited` 事件
+- 所有 `#[tauri::command]` 函数留在 `mod.rs`（tauri::command 宏限制），非命令 helper 通过 `pub(super)` 暴露给父模块
+
+#### 3.3 minecraft/version/libraries.rs 拆分（503 → 52 mod.rs + 313 parse.rs + 101 filter.rs + 63 download.rs）
+- 拆为 `libraries/{mod,parse,filter,download}.rs`，公共 API 通过 `pub use` re-export 保持完全向后兼容
+- `mod.rs`（52 行）：`LibEntry` 结构 + `name()` 方法 + `maven_to_path` helper + 子模块 re-export
+- `parse.rs`（313 行）：`parse_libraries`（JSON 解析，3 分支：natives 字段 / Forge 26.2+ 新格式 / 普通库）+ `check_rules`（平台规则匹配）+ `is_native_matching_arch`（架构过滤）+ `deduplicate_libs` / `get_version_from_name` / `compare_versions_ge` 去重逻辑
+- `filter.rs`（101 行）：`find_missing_libs`（`std::thread::scope` 并行校验）+ `quick_check_lib`（快速模式：仅文件存在+大小；完整模式：SHA1 校验）
+- `download.rs`（63 行）：`build_download_urls`（BMCLAPI/maven/libraries 镜像替换 + mirror_url fallback）
+
+#### 3.4 minecraft/download/downloader.rs 拆分（384 → 15 mod.rs + 244 single.rs + 148 stream.rs）
+- 拆为 `downloader/{mod,single,stream}.rs`，公共 API 通过 `pub use` re-export 保持完全向后兼容（唯一调用方 `manager.rs` 无需修改）
+- `mod.rs`（15 行）：`MAX_UNVERIFIED_BYTES` 常量（`pub(crate)` 供 stream.rs 引用）+ 子模块 re-export
+- `single.rs`（244 行）：`download_single`（文件存在检查 + 目录创建 + 分片阈值计算 + URL 顺序循环 + 重试 + 分片/单流选择 + 校验）
+- `stream.rs`（148 行）：`download_from_url`（HTTP 请求 + 流式处理 + 限速 + 暂停/取消信号 + 全局进度增量更新 + 字节数上限校验）
+- 偏离 V2 报告建议：报告建议拆为 4 文件 `{mod,single,retry,merge}.rs`，实际拆为 3 文件 `{mod,single,stream}.rs`。原因：重试逻辑仅 `while attempt < max_retries` 3 行循环且与 URL 循环、分片/单流选择紧耦合，强行抽出 `retry.rs` 需传递 12 个参数，反而降低可读性；`merge.rs` 改名 `stream.rs` 更准确反映职责（单 URL 流式下载）
+
+#### 3.5 minecraft/version/scan.rs 拆分（334 → 168 mod.rs + 121 loaders.rs + 59 version_extract.rs）
+- 拆为 `scan/{mod,loaders,version_extract}.rs`，公共 API 通过 `pub(crate) use` re-export 保持向后兼容
+- `mod.rs`（168 行）：`VersionInfo` 结构 + `scan_installed_versions`（扫描 versions 目录）+ `parse_version_info`（解析单个版本 JSON）+ `get_version_chain`（继承链）+ `uninstall_version`（卸载）
+- `loaders.rs`（121 行）：`detect_loaders`（检测 OptiFine / Fabric / NeoForge / Forge / LiteLoader + 快照判断，调用 `version_extract::extract_original_version`）
+- `version_extract.rs`（59 行）：`extract_original_version`（5 策略提取原版版本号：inheritsFrom → --fml.mcVersion → downloads URL → jar → id 正则）
+- 偏离 V2 报告建议：报告建议拆为 `scan/{mod,loaders,assets}.rs`，实际将第三文件命名为 `version_extract.rs`。原因：该文件内容为原版版本号提取（5 策略正则/字段匹配），与"assets"（资源文件）无关，`version_extract.rs` 更准确反映职责
+
+#### 3.6 commands/version/script_export.rs 拆分（354 → 212 mod.rs + 106 content.rs + 80 resolve_java.rs）
+- 拆为 `script_export/{mod,content,resolve_java}.rs`，`export_launch_script` 是 `#[tauri::command]` 保留在 mod.rs
+- `mod.rs`（212 行）：`export_launch_script` 编排（版本设置 + 内存配置 + 隔离模式 + Java 路径 + 服务器解析 + 认证信息 + 离线皮肤 + 构建启动参数 + 调用 content 子模块）
+- `content.rs`（106 行）：`ScriptLaunchInfo` 结构（借用引用避免克隆）+ `build_script_content`（.bat 脚本生成：CRLF + GBK + 版权头 + 启动提示 + Java 命令 + 敏感参数脱敏）+ `write_script_file`（GBK 编码写入 + 文件权限限制）
+- `resolve_java.rs`（80 行）：`resolve_java_path`（用户指定路径校验兼容性 → 系统搜索 → select_best_java_with_loader）
+
+#### 3.7 commands/community/install/mod.rs 拆分（484 → 37 mod.rs + 293 resource.rs + 173 modpack.rs）
+- 拆为 `install/{mod,resource,modpack}.rs`，6 个 `#[tauri::command]` 按职责分散到子模块
+- `mod.rs`（37 行）：`pub mod` 声明（concurrent / curseforge / helpers / modpack / modpack_stages / modrinth / resource / types）+ 类型 re-export
+- `resource.rs`（293 行）：`download_resource`（下载到游戏目录）+ `download_resource_to_path`（下载到自定义路径）+ `install_resource`（语义化别名）+ `format_download_filename`（文件名格式化）+ `get_resource_install_path`（获取安装路径）
+- `modpack.rs`（173 行）：`install_modpack`（CF API Key 检查 → 下载原始包 → 解析格式 → 下载依赖 → 复制 overrides）
+- lib.rs 注册路径从 `install::*` 改为 `install::resource::*` / `install::modpack::*`，`commands/community/mod.rs` re-export 同步更新
+- 偏离 V2 报告建议：报告建议拆为 `{mod,modpack,overrides,loader}.rs`，实际拆为 `{mod,resource,modpack}.rs`。原因：`overrides` 提取逻辑已在 `concurrent.rs`、`loader` 解析逻辑已在 `modpack_stages.rs`，无需重复拆分；新增 `resource.rs` 容纳 5 个资源下载命令，比原报告的 `overrides`/`loader` 更贴合实际职责
+
+#### 3.8 commands/version/mods/mod.rs 拆分（406 → 31 mod.rs + 162 list.rs + 103 manage.rs + 126 install.rs）
+- 拆为 `mods/{mod,list,manage,install}.rs`，8 个 `#[tauri::command]` 按职责分散到子模块
+- `mod.rs`（31 行）：`pub mod` 声明（helpers / install / list / metadata / manage / types / watcher）+ 类型 re-export（`get_mods_dir` / `read_mod_metadata` / `ModInfo` / `ModMetadata`），原有 `watcher.rs`/`helpers.rs`/`metadata.rs`/`types.rs` 子模块保留不动
+- `list.rs`（162 行）：`is_version_modable`（检查版本是否可装 mod）+ `list_mods`（遍历 mods 目录读取元数据并返回列表）+ 私有 `infer_loader_type`（按文件名特征推断加载器类型）
+- `manage.rs`（103 行）：`toggle_mod`（启用/禁用 mod 通过 `.disabled` 后缀）+ `delete_mod`（删除 mod 文件）
+- `install.rs`（126 行）：`install_mod`（从 URL 下载并安装 mod）+ `open_mods_dir`（在资源管理器打开 mods 目录）+ `get_version_mods_dir`（返回 mods 目录路径）+ `reveal_mod_file`（在资源管理器定位到指定 mod 文件）
+- lib.rs 注册路径从 `mods::*` 改为 `mods::list::*` / `mods::manage::*` / `mods::install::*`（watcher 子模块原本已用完整路径）
+- 修复 `watcher.rs` 第 29 行 `use super::sanitize_version_id` 失效：该函数位于 `commands::version::sanitize_version_id`，应改为 `use super::super::sanitize_version_id`
+- 偏离 V2 报告建议：报告建议拆为 `{list,toggle,delete,install,watcher}.rs` 5 个子模块，实际拆为 `{mod,list,manage,install}.rs` 4 个（watcher 已存在）。原因：`toggle_mod` 与 `delete_mod` 函数过短（30~50 行）合并为 `manage.rs` 更紧凑，避免文件碎片化
+
+#### 3.9 minecraft/loaders/forge.rs 拆分（385 → 59 mod.rs + 152 install.rs + 174 legacy.rs）
+- 拆为 `forge/{mod,install,legacy}.rs`，原 `forge.rs` 已删除，由 `forge/` 目录替代
+- `mod.rs`（59 行）：模块入口 + `mod install; mod legacy;` + `pub use install::install;` + `list_versions`（BMCLAPI JSON 格式 / 官方 HTML 格式双解析）
+- `install.rs`（152 行）：`install` 调度器（下载 installer JAR → 根据 `forge_installer::needs_injector` 判断走 modern 或 legacy）+ `install_modern`（1.13+ injector 方式：launcher_profiles 初始化 → Mojang 映射下载 → 嵌入资源提取 → Java 查找 → 安装器执行 → 版本 JSON + MC JAR 复制）
+- `legacy.rs`（174 行）：`install_legacy`（1.7.10 ~ 1.12.2 旧版安装）：解析 `install_profile.json`，区分方式 2（含 `install` 字段，1.7.10 及更早，按 `filePath` 提取 JAR）和方式 1（含 `json` 字段，1.8~1.12.2，解压 `maven/` 到 libraries + 复制 MC JAR）
+- 子模块路径调整：`super::shared` / `super::forge_installer` 等同级模块引用改为 `super::super::shared` / `super::super::forge_installer`（多一层 `super`）
+- 偏离 V2 报告建议：报告建议拆为 `forge/{mod,install,profile}.rs`，实际拆为 `forge/{mod,install,legacy}.rs`。原因：函数名为 `install_legacy` 且职责为完整安装流程（含 profile 解析 + JAR 提取 + 版本 JSON 写入 + MC JAR 复制），不只是 profile 解析，`legacy.rs` 更准确反映文件职责
+
+#### 3.10 commands/auth/account.rs 拆分 + 应用 log_err（373 → 41 mod.rs + 117 ms.rs + 173 offline.rs + 95 session.rs）
+- 拆为 `account/{mod,ms,offline,session}.rs`，原 `account.rs` 已删除，由 `account/` 目录替代
+- `mod.rs`（41 行）：模块入口 + `pub mod ms; pub mod offline; pub mod session;` + `MsAccountInfo` + `OfflineAccountInfo` 数据类型
+- `ms.rs`（117 行）：微软账号管理 3 个命令（`get_ms_accounts` 列表 / `remove_ms_account` 删除 / `switch_ms_account` 切换含 token 过期自动刷新）
+- `offline.rs`（173 行）：离线账号管理 5 个命令（`get_offline_accounts` 列表 / `set_offline_skin` 皮肤设置 / `save_custom_skin` 自定义 PNG 上传含文件头 + 大小校验 / `remove_offline_account` 删除 / `switch_offline_account` 切换）
+- `session.rs`（95 行）：会话命令（`get_login_status` 内存→磁盘恢复优先级 + 微软 token 静默刷新 / `logout` 清空内存+磁盘当前用户）
+- 应用 `log_err`：14 处 `.map_err(|e| e.to_string())` 改为 `.map_err(log_err("描述性标签"))`，统一记录 `log_error!` 日志（如 `Failed to load auth storage` / `Failed to remove MS account` / `Failed to refresh MS token` 等）
+- 保留 3 处 `save_custom_skin` 中的 `format!("读取皮肤文件失败: {}", e)` 等中文错误文案，因前端依赖中文错误展示
+- lib.rs 注册路径从 `account::*` 改为 `account::ms::*` / `account::offline::*` / `account::session::*`，`commands/auth/mod.rs` re-export 同步更新
+
+#### 3.11 + 4.3 window_title.rs 拆分 + 9 处命令迁入 shell 模块（403 → 73 mod.rs + 155 windows.rs + 73 macos.rs + 99 linux.rs）
+- 拆为 `window_title/{mod,windows,macos,linux}.rs`，原 `window_title.rs` 已删除，由 `window_title/` 目录替代
+- `mod.rs`（73 行）：跨平台公共 API（`apply_window_title` 60s 等待 + 5 分钟持续改写轮询循环 + `render_title` 模板渲染支持 `{date}`/`{time}`）+ 平台分发 `use`（`#[cfg(windows)]` / `#[cfg(target_os="macos")]` / `#[cfg(target_os="linux")]`）+ 子模块声明
+- `windows.rs`（155 行）：Win32 API 实现（`EnumWindows` 枚举 + 三层过滤：类名 GLFW30/LWJGL/SunAwtFrame + 排除辅助窗口 + 进程启动时间 ≥ Java 进程；`SetWindowTextW` 改写标题）
+- `macos.rs`（73 行）：osascript 实现，改用 `crate::minecraft::system::shell::run_osascript`（原直接 `Command::new("osascript")` 迁移到 shell 模块）
+- `linux.rs`（99 行）：xdotool/wmctrl 实现，改用 `shell::xdotool_search_pid` / `shell::xdotool_set_window_name` / `shell::wmctrl_list` / `shell::wmctrl_rename` / `shell::ps_pid_exists`（原 7 处直接 `Command::new` 迁移到 shell 模块）
+- `minecraft/system/shell.rs` 新增 6 个封装函数（`#[cfg(target_os="...")]`）：
+  - macOS：`run_osascript(script) -> Result<Output, String>`
+  - Linux：`xdotool_search_pid(pid, only_visible)` / `xdotool_set_window_name(window_id, title)` / `wmctrl_list()` / `wmctrl_rename(old, new)` / `ps_pid_exists(pid) -> bool`
+  - 所有函数均带 `[Shell]` 前缀日志 + `shell_err` 统一错误格式
+- 完成 V2 报告 4.3：9 处跨平台 `std::process::Command::new` 全部迁入 shell 模块（macOS 2 处 + Linux 7 处）
+
+### 重构（代码质量 V2 - 阶段 4：约定违规修复）
+
+#### 4.1 + 4.2 shell 模块迁移
+- `minecraft/system/shell.rs` 新增 `run_executable_output(program, args, cwd) -> Result<Output, String>` 通用封装（统一 `[Shell]` 前缀日志 + Windows CREATE_NO_WINDOW + `shell_err` 错误格式）
+- `minecraft/java/detect.rs:27` 的 `java -version` 执行改用 `shell::run_executable_output`
+- `minecraft/launch/pipeline/pre_launch.rs:33` 的 `cmd /C` / `sh -c` 改用 `shell::run_executable_output`
+
+#### 4.4 插件子进程评估
+- 评估为不适用：`plugins/spawn.rs` 使用 `tokio::process::Command`（异步）+ 权限校验 + 命令白名单 + 超时控制 + 输出截断，是沙箱子进程执行器，非系统 shell 调用，不迁移
+
+#### 4.5 配置命令评估
+- 保留 `get_config_value` / `set_config_value` 命令：Java path 有意不走 AppConfig（存独立 `[Java]` INI section），这两个命令作为非 AppConfig 配置的通用读写出口
+
+#### 4.6 原生 button 替换（6 个文件 9 处）
+- `SkinManager.vue:79` 关闭按钮 → `<Button type="ghost" size="mini">`
+- `SettingsAdvanced.vue:202` 密码显示切换 → `<Button type="ghost" size="mini">`
+- `TaskGroupCard.vue:67,85` 暂停/恢复 + 取消按钮 → `<Button type="text" size="mini">`（保留语义色 via `!` class 覆盖）
+- `TaskGroupCard.vue:101` 分组折叠行 → `<div role="button">`（结构性元素）
+- `InstalledList.vue:170,181,189,200` play/stop/launch/delete 按钮 → `<Button type="text">` + 自定义 class 覆盖（`.play-btn` / `.delete-btn` scoped 样式保持）
+- `Settings.vue:92` 侧边栏分类项 → `<div role="button">`（结构性导航元素）
+- `OverviewTab.vue:57` 收藏按钮 → `<Button type="text" size="small">` + `!` class 覆盖（黄色/灰色语义色）
+- `OverviewTab.vue:103` Select 自定义触发器 → `<div role="button">`（Select 组件 trigger slot 结构性元素）
+
+#### 4.7 `:title` 属性替换为 `<Tooltip>`（3 处实际违规）
+- `ExternalDownload.vue:59` 下载目录 `<span :title>` → `<Tooltip>` 包裹
+- `HomeClockCard.vue:103` 轮播指示点 `:title` → `<Tooltip>` 包裹 + 原生 button 转 `<div role="button">`
+- `ColorPicker.vue:225` 预设色板 `:title` → `<Tooltip>` 包裹 + 原生 button 转 `<div role="button">`
+- `QuickTools.vue` 已无 `:title`（此前已修复）；`ResourceDetail.vue:241` 的 `:title` 是 `<VersionGroupCard>` 组件 prop 非原生 title 属性（误报）
+
+#### 4.8 空状态补 icon + 居中布局
+- `LogViewer.vue:131-133` 暂无日志 → `DocumentTextIcon` + flex 垂直水平居中
+- `ResourceDetail.vue:253-256` 暂无版本数据 → `ArchiveBoxXMarkIcon` + flex 垂直水平居中
 
 ### 待实现
 - Mod 管理功能
