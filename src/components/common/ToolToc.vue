@@ -2,18 +2,14 @@
 /**
  * 工具页右侧 TOC 导航条
  *
- * 自动扫描当前页面内 [data-toc-card] 元素，生成图标方格条。
- * - 每个方格显示工具标题前 2 字
- * - hover 时用 Tooltip 显示完整标题
- * - 点击滚动跳转到对应卡片
- * - 滚动时自动高亮当前可见项
- * - 工具数 < 3 时不显示
- *
- * 用法：父组件切换分类后递增 refreshKey 触发重新扫描。
+ * 默认收起：只显示一列灰色短横线（每项一条）。
+ * hover 整个 TOC 区：展开为带标题的方格条（宽度 + 透明度动画）。
+ * 当前可见项（滚动高亮）使用主题色。
+ * 点击跳转：在滚动容器内手动计算 scrollTop，预留顶部标题栏偏移，避免被遮住。
+ * 工具数 < 3 时不显示。
  */
 
 import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import Tooltip from '@/components/common/Tooltip.vue'
 
 interface TocItem {
   id: string
@@ -25,16 +21,22 @@ const props = defineProps<{
   refreshKey?: number | string
   /** 滚动容器选择器，默认 .tools-scroll-container */
   containerSelector?: string
+  /** 跳转时顶部预留偏移（避免被标题栏遮住），单位 px */
+  scrollOffset?: number
 }>()
 
 const items = ref<TocItem[]>([])
 const activeId = ref('')
+const hovered = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
 let scrollHandler: (() => void) | null = null
 
-/** 扫描 DOM 中的 [data-toc-card] 元素，构建 TOC 列表 */
+/** 扫描滚动容器内的 [data-toc-card] 元素，构建 TOC 列表 */
 function scanItems() {
-  const cards = document.querySelectorAll('[data-toc-card]')
+  const selector = props.containerSelector || '.tools-scroll-container'
+  const container = document.querySelector(selector) as HTMLElement | null
+  const root: ParentNode = container || document
+  const cards = root.querySelectorAll('[data-toc-card]')
   const list: TocItem[] = []
   cards.forEach((el) => {
     const id = el.getAttribute('data-toc-card') || ''
@@ -46,7 +48,6 @@ function scanItems() {
 
 /** 查找滚动容器并绑定 scroll 事件 */
 function bindScroll() {
-  // 清理旧监听
   unbindScroll()
   const selector = props.containerSelector || '.tools-scroll-container'
   scrollContainer.value = document.querySelector(selector) as HTMLElement | null
@@ -54,17 +55,16 @@ function bindScroll() {
 
   scrollHandler = () => {
     if (!scrollContainer.value || items.value.length === 0) return
-    const containerTop = scrollContainer.value.getBoundingClientRect().top
+    const containerRect = scrollContainer.value.getBoundingClientRect()
+    const offset = props.scrollOffset ?? 16
     let closest: { id: string; dist: number } | null = null
 
     for (const item of items.value) {
       const el = document.getElementById(item.id)
       if (!el) continue
       const rect = el.getBoundingClientRect()
-      // 计算卡片顶部与容器顶部的距离（正值=在下方，负值=已滚过）
-      const dist = rect.top - containerTop
-      // 优先选择距离顶部 20px 以内且最接近 0 的（即刚滚到顶部的卡片）
-      // 如果所有卡片都在上方（dist < 0），选最后一个
+      // 卡片顶部相对容器顶部的距离，减去预留偏移
+      const dist = rect.top - containerRect.top - offset
       if (!closest) {
         closest = { id: item.id, dist }
       } else if (dist >= 0 && dist < Math.abs(closest.dist)) {
@@ -87,25 +87,31 @@ function unbindScroll() {
   scrollHandler = null
 }
 
-/** 点击 TOC 项跳转到对应卡片 */
+/** 点击 TOC 项跳转：手动计算 scrollTop，预留顶部偏移避免被标题栏遮住 */
 function jumpTo(id: string) {
-  const el = document.getElementById(id)
-  if (el) {
-    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    activeId.value = id
-  }
+  const container = scrollContainer.value
+  const target = document.getElementById(id)
+  if (!container || !target) return
+  const containerRect = container.getBoundingClientRect()
+  const targetRect = target.getBoundingClientRect()
+  const offset = props.scrollOffset ?? 16
+  // 目标相对容器顶部的距离 - 预留偏移 = 需要滚动的距离
+  const delta = targetRect.top - containerRect.top - offset
+  container.scrollTo({
+    top: container.scrollTop + delta,
+    behavior: 'smooth',
+  })
+  activeId.value = id
 }
 
 /** 取标题前 2 字作为方格标识 */
 function shortLabel(title: string): string {
-  // 移除常见前缀（如"工具"、"管理"）取核心词
   const cleaned = title.replace(/^(工具|管理|器)$/, '')
   const base = cleaned.length >= 2 ? cleaned : title
   return base.slice(0, 2)
 }
 
 function refresh() {
-  // 双重 nextTick + setTimeout 确保 v-if 切换后的子组件 DOM 完全渲染
   nextTick(() => {
     nextTick(() => {
       setTimeout(() => {
@@ -131,28 +137,61 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <!-- 工具数 ≥ 3 时才显示，absolute 悬浮在内容区右侧，不影响滚动条位置 -->
+  <!-- 工具数 ≥ 3 时才显示。absolute 悬浮，不占布局空间，不影响滚动条位置 -->
   <div
     v-if="items.length >= 3"
-    class="absolute right-5 top-1/2 -translate-y-1/2 z-10 flex flex-col items-center gap-1.5 bg-white/80 backdrop-blur-sm rounded-lg p-1.5 shadow-sm border border-gray-100"
+    class="absolute right-4 top-1/2 -translate-y-1/2 z-10"
+    @mouseenter="hovered = true"
+    @mouseleave="hovered = false"
   >
+    <!-- 容器：宽度 + 圆角过渡动画。收起时窄条，展开时带背景的卡片 -->
     <div
-      v-for="item in items"
-      :key="item.id"
-      role="button"
-      tabindex="0"
-      class="w-8 h-8 flex items-center justify-center rounded-md text-xs font-medium cursor-pointer transition-all duration-150 outline-none focus:ring-2 focus:ring-primary-300"
-      :class="[
-        activeId === item.id
-          ? 'bg-primary-500 text-white shadow-sm scale-105'
-          : 'bg-gray-100 text-gray-500 hover:bg-gray-200 hover:text-gray-700',
-      ]"
-      @click="jumpTo(item.id)"
-      @keydown.enter="jumpTo(item.id)"
+      class="flex flex-col items-stretch gap-1 rounded-lg transition-all duration-200 ease-out"
+      :class="hovered
+        ? 'bg-white/95 backdrop-blur-sm shadow-md border border-gray-100 p-1.5 w-32'
+        : 'bg-transparent p-0.5 w-4'"
     >
-      <Tooltip :text="item.title" position="left" :delay="200">
-        <span>{{ shortLabel(item.title) }}</span>
-      </Tooltip>
+      <div
+        v-for="item in items"
+        :key="item.id"
+        role="button"
+        tabindex="0"
+        class="flex items-center gap-1.5 rounded-md cursor-pointer outline-none transition-colors duration-150"
+        :class="[
+          hovered ? 'px-2 py-1.5' : 'px-0 py-1 justify-center',
+          activeId === item.id
+            ? hovered
+              ? 'bg-primary-50 text-primary-700'
+              : ''
+            : hovered
+              ? 'text-gray-600 hover:bg-gray-100'
+              : '',
+        ]"
+        @click="jumpTo(item.id)"
+        @keydown.enter="jumpTo(item.id)"
+      >
+        <!-- 短横线（收起时显示） / 方块标识（展开时显示） -->
+        <span
+          v-if="!hovered"
+          class="block rounded-full transition-all duration-200"
+          :class="activeId === item.id
+            ? 'w-3 h-1 bg-primary-500'
+            : 'w-2 h-1 bg-gray-300'"
+        />
+        <span
+          v-else
+          class="flex-none w-6 h-6 flex items-center justify-center rounded text-xs font-medium transition-colors duration-150"
+          :class="activeId === item.id
+            ? 'bg-primary-500 text-white'
+            : 'bg-gray-100 text-gray-500'"
+        >{{ shortLabel(item.title) }}</span>
+        <!-- 展开时的标题文字（带 opacity 过渡） -->
+        <span
+          v-if="hovered"
+          class="flex-1 text-xs font-medium truncate transition-opacity duration-200"
+          :class="activeId === item.id ? 'text-primary-700' : 'text-gray-700'"
+        >{{ item.title }}</span>
+      </div>
     </div>
   </div>
 </template>

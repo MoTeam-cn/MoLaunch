@@ -139,7 +139,7 @@ const activeDesc = () =>
           <DataPage v-else-if="activeCategory === 'data'" />
         </div>
         <!-- 右侧悬浮 TOC 导航条（工具数 ≥ 3 时自动显示，不跟随滚动） -->
-        <ToolToc :refresh-key="tocRefreshKey" />
+        <ToolToc :refresh-key="tocRefreshKey" :scroll-offset="20" />
       </div>
     </div>
   </div>
