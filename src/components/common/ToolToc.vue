@@ -104,13 +104,6 @@ function jumpTo(id: string) {
   activeId.value = id
 }
 
-/** 取标题前 2 字作为方格标识 */
-function shortLabel(title: string): string {
-  const cleaned = title.replace(/^(工具|管理|器)$/, '')
-  const base = cleaned.length >= 2 ? cleaned : title
-  return base.slice(0, 2)
-}
-
 function refresh() {
   nextTick(() => {
     nextTick(() => {
@@ -156,7 +149,7 @@ onBeforeUnmount(() => {
         :key="item.id"
         role="button"
         tabindex="0"
-        class="flex items-center gap-1.5 rounded-md cursor-pointer outline-none transition-colors duration-150"
+        class="flex items-center rounded-md cursor-pointer outline-none transition-colors duration-150"
         :class="[
           hovered ? 'px-2 py-1.5' : 'px-0 py-1 justify-center',
           activeId === item.id
@@ -170,7 +163,7 @@ onBeforeUnmount(() => {
         @click="jumpTo(item.id)"
         @keydown.enter="jumpTo(item.id)"
       >
-        <!-- 短横线（收起时显示） / 方块标识（展开时显示） -->
+        <!-- 短横线（收起时显示） -->
         <span
           v-if="!hovered"
           class="block rounded-full transition-all duration-200"
@@ -178,17 +171,10 @@ onBeforeUnmount(() => {
             ? 'w-3 h-1 bg-primary-500'
             : 'w-2 h-1 bg-gray-300'"
         />
-        <span
-          v-else
-          class="flex-none w-6 h-6 flex items-center justify-center rounded text-xs font-medium transition-colors duration-150"
-          :class="activeId === item.id
-            ? 'bg-primary-500 text-white'
-            : 'bg-gray-100 text-gray-500'"
-        >{{ shortLabel(item.title) }}</span>
-        <!-- 展开时的标题文字（带 opacity 过渡） -->
+        <!-- 展开时的标题文字 -->
         <span
           v-if="hovered"
-          class="flex-1 text-xs font-medium truncate transition-opacity duration-200"
+          class="text-xs font-medium truncate transition-opacity duration-200"
           :class="activeId === item.id ? 'text-primary-700' : 'text-gray-700'"
         >{{ item.title }}</span>
       </div>
