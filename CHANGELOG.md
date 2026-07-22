@@ -7,6 +7,14 @@
 
 ## [未发布]
 
+### 修复
+
+#### 下载工具三处 Bug 修复
+- **分片下载显示多个文件**：`list_downloads` 过滤 `.partN` 临时分片文件（DownloadManager 分片下载时创建的 `file.zip.part0` ~ `file.zip.partN` 临时文件不再出现在"已下载文件"列表中），新增 `is_chunk_part_file` helper 判断文件名后缀
+- **删除按钮无 IPC 调用**：`useExternalDownload.ts` 中 `deleteFile` / `cancelDownloadTask` / `resetDownloadDir` 三处误用 `await showConfirm(...)` 当 Promise，但 `showConfirm` 是回调式（`showConfirm(title, msg, onConfirm, onCancel?)` 返回 void），`await undefined` 后 `if (!confirmed) return` 永远退出，导致三个操作全部失效。已改为回调式用法，确认后执行实际逻辑
+- **下载目录设置位置**：`ExternalDownload.vue` 的「下载目录」section 从页面顶部移到最下方，符合"先使用后配置"的交互习惯
+- **DownloadedFileList.vue 原生 `<button>` 改用 `<Button>` 组件**：遵循项目约定（必须用项目自定义组件而非原生 HTML）
+
 ### 变更
 
 #### 设置页面结构调整：拆分「其他」分类

@@ -5,6 +5,7 @@
 import type { ExternalDownloadEntry } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 import { DocumentIcon, ExclamationCircleIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 defineProps<{
@@ -58,12 +59,14 @@ function formatTime(unix: number): string {
           </div>
         </div>
         <Tooltip text="删除">
-          <button
-            class="flex-none rounded p-1 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-500"
+          <Button
+            type="ghost"
+            size="mini"
+            class="!h-7 !w-7 !p-0 text-gray-400 hover:!text-red-500"
             @click="emit('delete', file.name)"
           >
             <TrashIcon class="h-4 w-4" />
-          </button>
+          </Button>
         </Tooltip>
       </li>
     </ul>

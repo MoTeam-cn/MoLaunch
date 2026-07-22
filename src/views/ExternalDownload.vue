@@ -50,56 +50,6 @@ const {
 
 <template>
   <div class="mx-auto max-w-3xl space-y-6">
-    <!-- 下载目录设置区 -->
-    <section class="rounded-lg border border-gray-300 bg-white">
-      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">下载目录</h3>
-      <div class="px-5 pb-5 space-y-3">
-        <!-- 目录路径展示条 -->
-        <div class="flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-3">
-          <FolderOpenIcon class="h-5 w-5 flex-none text-primary-500" />
-          <Tooltip :text="downloadDir || '.Molaunch/Download/'" position="top">
-            <span class="flex-1 truncate text-sm text-gray-700">
-              {{ downloadDir || '.Molaunch/Download/' }}
-            </span>
-          </Tooltip>
-          <span
-            v-if="isCustomDir"
-            class="flex-none rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700"
-          >
-            自定义
-          </span>
-          <span
-            v-else
-            class="flex-none rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-500"
-          >
-            默认
-          </span>
-        </div>
-
-        <!-- 操作按钮 -->
-        <div class="flex items-center gap-2">
-          <Button type="outline" size="small" @click="selectDownloadDir">
-            <template #icon>
-              <FolderOpenIcon class="h-3.5 w-3.5" />
-            </template>
-            选择目录
-          </Button>
-          <Button type="outline" size="small" @click="openDownloadDir">
-            <template #icon>
-              <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" />
-            </template>
-            打开目录
-          </Button>
-          <Button v-if="isCustomDir" type="ghost" size="small" @click="resetDownloadDir">
-            <template #icon>
-              <ArrowPathIcon class="h-3.5 w-3.5" />
-            </template>
-            恢复默认
-          </Button>
-        </div>
-      </div>
-    </section>
-
     <!-- 下载输入区 -->
     <section class="rounded-lg border border-gray-300 bg-white">
       <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">新建下载</h3>
@@ -191,5 +141,55 @@ const {
 
     <!-- 已下载文件列表 -->
     <DownloadedFileList :files="files" @delete="deleteFile" />
+
+    <!-- 下载目录设置区 -->
+    <section class="rounded-lg border border-gray-300 bg-white">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">下载目录</h3>
+      <div class="px-5 pb-5 space-y-3">
+        <!-- 目录路径展示条 -->
+        <div class="flex items-center gap-3 rounded-lg bg-gray-50 px-4 py-3">
+          <FolderOpenIcon class="h-5 w-5 flex-none text-primary-500" />
+          <Tooltip :text="downloadDir || '.Molaunch/Download/'" position="top">
+            <span class="flex-1 truncate text-sm text-gray-700">
+              {{ downloadDir || '.Molaunch/Download/' }}
+            </span>
+          </Tooltip>
+          <span
+            v-if="isCustomDir"
+            class="flex-none rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700"
+          >
+            自定义
+          </span>
+          <span
+            v-else
+            class="flex-none rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-500"
+          >
+            默认
+          </span>
+        </div>
+
+        <!-- 操作按钮 -->
+        <div class="flex items-center gap-2">
+          <Button type="outline" size="small" @click="selectDownloadDir">
+            <template #icon>
+              <FolderOpenIcon class="h-3.5 w-3.5" />
+            </template>
+            选择目录
+          </Button>
+          <Button type="outline" size="small" @click="openDownloadDir">
+            <template #icon>
+              <ArrowTopRightOnSquareIcon class="h-3.5 w-3.5" />
+            </template>
+            打开目录
+          </Button>
+          <Button v-if="isCustomDir" type="ghost" size="small" @click="resetDownloadDir">
+            <template #icon>
+              <ArrowPathIcon class="h-3.5 w-3.5" />
+            </template>
+            恢复默认
+          </Button>
+        </div>
+      </div>
+    </section>
   </div>
 </template>

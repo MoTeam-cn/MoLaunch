@@ -111,21 +111,21 @@ export function useExternalDownload() {
   }
 
   async function resetDownloadDir() {
-    const confirmed = await showConfirm(
+    showConfirm(
       '恢复默认目录',
       '确定要恢复使用默认下载目录（.Molaunch/Download/）吗？已下载的文件不会被删除。',
+      async () => {
+        try {
+          await applyConfig({ externalDownloadDir: null })
+          customDir.value = null
+          await loadDownloadDir()
+          await refreshFiles()
+          toastInfo('已恢复默认下载目录')
+        } catch (e) {
+          toastError(`恢复失败: ${e instanceof Error ? e.message : String(e)}`)
+        }
+      },
     )
-    if (!confirmed) return
-
-    try {
-      await applyConfig({ externalDownloadDir: null })
-      customDir.value = null
-      await loadDownloadDir()
-      await refreshFiles()
-      toastInfo('已恢复默认下载目录')
-    } catch (e) {
-      toastError(`恢复失败: ${e instanceof Error ? e.message : String(e)}`)
-    }
   }
 
   async function openDownloadDir() {
@@ -200,15 +200,18 @@ export function useExternalDownload() {
   }
 
   async function cancelDownloadTask() {
-    const confirmed = await showConfirm('取消下载', '确定要取消当前下载任务吗？已下载的部分文件将被删除。')
-    if (!confirmed) return
-
-    try {
-      await cancelDownload()
-      toastInfo('下载已取消')
-    } catch (e) {
-      toastError(`取消失败: ${e instanceof Error ? e.message : String(e)}`)
-    }
+    showConfirm(
+      '取消下载',
+      '确定要取消当前下载任务吗？已下载的部分文件将被删除。',
+      async () => {
+        try {
+          await cancelDownload()
+          toastInfo('下载已取消')
+        } catch (e) {
+          toastError(`取消失败: ${e instanceof Error ? e.message : String(e)}`)
+        }
+      },
+    )
   }
 
   // ==================== 文件列表 ====================
@@ -221,16 +224,19 @@ export function useExternalDownload() {
   }
 
   async function deleteFile(name: string) {
-    const confirmed = await showConfirm('删除文件', `确定要删除 "${name}" 吗？此操作不可恢复。`)
-    if (!confirmed) return
-
-    try {
-      await deleteDownload(name)
-      toastSuccess(`已删除: ${name}`)
-      await refreshFiles()
-    } catch (e) {
-      toastError(`删除失败: ${e instanceof Error ? e.message : String(e)}`)
-    }
+    showConfirm(
+      '删除文件',
+      `确定要删除 "${name}" 吗？此操作不可恢复。`,
+      async () => {
+        try {
+          await deleteDownload(name)
+          toastSuccess(`已删除: ${name}`)
+          await refreshFiles()
+        } catch (e) {
+          toastError(`删除失败: ${e instanceof Error ? e.message : String(e)}`)
+        }
+      },
+    )
   }
 
   // ==================== 监听下载完成（刷新文件列表） ====================
