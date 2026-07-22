@@ -12,7 +12,11 @@ import ModDedupScanner from '@/views/tools/mod-tools/ModDedupScanner.vue'
 
 <template>
   <div class="mx-auto max-w-3xl space-y-6">
-    <ModDependencyChecker />
-    <ModDedupScanner />
+    <div id="tool-mod-dependency-checker" data-toc-card="tool-mod-dependency-checker" data-toc-title="依赖检测">
+      <ModDependencyChecker />
+    </div>
+    <div id="tool-mod-dedup-scanner" data-toc-card="tool-mod-dedup-scanner" data-toc-title="Mod 去重">
+      <ModDedupScanner />
+    </div>
   </div>
 </template>

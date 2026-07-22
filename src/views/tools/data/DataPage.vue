@@ -22,12 +22,26 @@ import ResourcePackConverter from '@/views/tools/data/ResourcePackConverter.vue'
 
 <template>
   <div class="mx-auto max-w-3xl space-y-6">
-    <JavaManager />
-    <CrashAnalyzer />
-    <VersionJsonEditor />
-    <NbtViewer />
-    <ScreenshotManager />
-    <DataExporter />
-    <ResourcePackConverter />
+    <div id="tool-java-manager" data-toc-card="tool-java-manager" data-toc-title="Java 管理">
+      <JavaManager />
+    </div>
+    <div id="tool-crash-analyzer" data-toc-card="tool-crash-analyzer" data-toc-title="崩溃分析">
+      <CrashAnalyzer />
+    </div>
+    <div id="tool-version-json-editor" data-toc-card="tool-version-json-editor" data-toc-title="版本 JSON">
+      <VersionJsonEditor />
+    </div>
+    <div id="tool-nbt-viewer" data-toc-card="tool-nbt-viewer" data-toc-title="NBT 查看">
+      <NbtViewer />
+    </div>
+    <div id="tool-screenshot-manager" data-toc-card="tool-screenshot-manager" data-toc-title="截图管理">
+      <ScreenshotManager />
+    </div>
+    <div id="tool-data-exporter" data-toc-card="tool-data-exporter" data-toc-title="数据导出">
+      <DataExporter />
+    </div>
+    <div id="tool-resourcepack-converter" data-toc-card="tool-resourcepack-converter" data-toc-title="资源包转换">
+      <ResourcePackConverter />
+    </div>
   </div>
 </template>

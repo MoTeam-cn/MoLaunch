@@ -14,6 +14,7 @@ import {
   ArrowUpTrayIcon,
   CheckCircleIcon,
   ShieldCheckIcon,
+  FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
@@ -21,6 +22,7 @@ import { toastSuccess, toastError } from '@/utils/toast'
 import { exportLauncherData, getDownloadDir } from '@/utils/api/tools'
 import type { ExportResult } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
+import { pickSavePath } from '@/utils/fileDialog'
 
 const includeConfig = ref(true)
 const includeVersions = ref(true)
@@ -73,6 +75,15 @@ function itemLabel(key: string): string {
     default: return key
   }
 }
+
+async function pickOutput() {
+  const path = await pickSavePath({
+    title: '选择导出 zip 保存位置',
+    defaultPath: outputPath.value || 'molaunch-export.zip',
+    filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
+  })
+  if (path) outputPath.value = path
+}
 </script>
 
 <template>
@@ -120,7 +131,14 @@ function itemLabel(key: string): string {
       <!-- 输出路径 -->
       <div>
         <label class="mb-1 block text-xs font-medium text-gray-700">输出 zip 路径</label>
-        <Input v-model="outputPath" placeholder="导出 zip 的完整路径" clearable />
+        <Input v-model="outputPath" placeholder="导出 zip 的完整路径" clearable>
+          <template #append>
+            <FolderOpenIcon
+              class="h-4 w-4 cursor-pointer text-gray-500 hover:text-primary-600 transition-colors"
+              @click="pickOutput"
+            />
+          </template>
+        </Input>
       </div>
 
       <!-- 导出按钮 -->

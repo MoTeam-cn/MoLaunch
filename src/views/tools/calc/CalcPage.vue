@@ -12,7 +12,11 @@ import ColorPalette from '@/views/tools/calc/ColorPalette.vue'
 
 <template>
   <div class="mx-auto max-w-3xl space-y-6">
-    <CoordCalculator />
-    <ColorPalette />
+    <div id="tool-coord-calculator" data-toc-card="tool-coord-calculator" data-toc-title="坐标计算">
+      <CoordCalculator />
+    </div>
+    <div id="tool-color-palette" data-toc-card="tool-color-palette" data-toc-title="调色板">
+      <ColorPalette />
+    </div>
   </div>
 </template>

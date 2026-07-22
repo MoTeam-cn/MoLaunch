@@ -15,6 +15,7 @@ import {
   ArrowDownTrayIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
+  FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
@@ -24,6 +25,7 @@ import { showConfirm } from '@/utils/modal'
 import { archiveList, archiveBackup, archiveRestore, getDownloadDir } from '@/utils/api/tools'
 import type { ArchiveItem } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
+import { pickFile, pickSavePath } from '@/utils/fileDialog'
 
 const items = ref<ArchiveItem[]>([])
 const totalSize = ref(0)
@@ -132,6 +134,23 @@ async function doRestore() {
   }
 }
 
+async function pickRestoreZip() {
+  const path = await pickFile({
+    title: '选择存档备份 zip',
+    filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
+  })
+  if (path) restoreZipPath.value = path
+}
+
+async function pickBackupOutput() {
+  const path = await pickSavePath({
+    title: '选择备份 zip 保存位置',
+    defaultPath: backupOutputPath.value || (backupTarget.value?.name + '-backup.zip'),
+    filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
+  })
+  if (path) backupOutputPath.value = path
+}
+
 onMounted(async () => {
   await loadList()
   try {
@@ -213,7 +232,14 @@ onMounted(async () => {
           v-model="restoreZipPath"
           placeholder="zip 文件完整路径"
           clearable
-        />
+        >
+          <template #append>
+            <FolderOpenIcon
+              class="h-4 w-4 cursor-pointer text-gray-500 hover:text-primary-600 transition-colors"
+              @click="pickRestoreZip"
+            />
+          </template>
+        </Input>
         <Input
           v-model="restoreWorldName"
           placeholder="恢复后的存档名称（留空则用 zip 文件名）"
@@ -250,7 +276,14 @@ onMounted(async () => {
         </div>
         <div>
           <label class="mb-1 block text-xs font-medium text-gray-700">输出 zip 路径</label>
-          <Input v-model="backupOutputPath" placeholder="输出 zip 完整路径" clearable />
+          <Input v-model="backupOutputPath" placeholder="输出 zip 完整路径" clearable>
+            <template #append>
+              <FolderOpenIcon
+                class="h-4 w-4 cursor-pointer text-gray-500 hover:text-primary-600 transition-colors"
+                @click="pickBackupOutput"
+              />
+            </template>
+          </Input>
         </div>
         <label class="flex items-center gap-2 cursor-pointer">
           <input v-model="backupExcludePlayer" type="checkbox" class="accent-primary-500" />

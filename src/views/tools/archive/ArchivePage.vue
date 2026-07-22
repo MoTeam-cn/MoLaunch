@@ -10,6 +10,8 @@ import ArchiveManager from '@/views/tools/archive/ArchiveManager.vue'
 
 <template>
   <div class="mx-auto max-w-3xl space-y-6">
-    <ArchiveManager />
+    <div id="tool-archive-manager" data-toc-card="tool-archive-manager" data-toc-title="存档管理">
+      <ArchiveManager />
+    </div>
   </div>
 </template>

@@ -11,6 +11,7 @@ import {
   CubeIcon,
   BoltIcon,
   DocumentIcon,
+  FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
@@ -18,6 +19,7 @@ import { toastError } from '@/utils/toast'
 import { nbtParse } from '@/utils/api/tools'
 import type { NbtNode } from '@/utils/api/tools'
 import NbtTreeNode from '@/views/tools/data/NbtTreeNode.vue'
+import { pickFile } from '@/utils/fileDialog'
 
 const filePath = ref('')
 const parsing = ref(false)
@@ -57,6 +59,17 @@ function countNodes(node: NbtNode): number {
   for (const child of node.children) count += countNodes(child)
   return count
 }
+
+async function pickNbtFile() {
+  const path = await pickFile({
+    title: '选择 NBT 文件',
+    filters: [
+      { name: 'NBT 数据文件', extensions: ['dat', 'nbt'] },
+      { name: '所有文件', extensions: ['*'] },
+    ],
+  })
+  if (path) filePath.value = path
+}
 </script>
 
 <template>
@@ -79,7 +92,14 @@ function countNodes(node: NbtNode): number {
             v-model="filePath"
             placeholder="如 .minecraft/saves/MyWorld/level.dat"
             clearable
-          />
+          >
+            <template #append>
+              <FolderOpenIcon
+                class="h-4 w-4 cursor-pointer text-gray-500 hover:text-primary-600 transition-colors"
+                @click="pickNbtFile"
+              />
+            </template>
+          </Input>
         </div>
         <Button type="primary" :loading="parsing" :disabled="!filePath.trim()" @click="doParse">
           <template #icon><BoltIcon class="h-4 w-4" /></template>

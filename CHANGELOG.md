@@ -9,6 +9,18 @@
 
 ### 变更
 
+#### 工具页文件选择器与 TOC 导航优化
+- 新增 `src/utils/fileDialog.ts`：封装 Tauri dialog 插件的 `pickFile` / `pickDirectory` / `pickSavePath` 三个函数，统一文件/文件夹选择对话框调用
+- 为 ArchiveManager（备份输出路径 + 恢复 zip 路径）、NbtViewer（NBT 文件路径）、DataExporter（导出输出路径）的输入框右侧添加文件选择器图标按钮（Input 的 append 插槽 + FolderOpenIcon），用户无需手动输入路径
+- 新增 `src/components/common/ToolToc.vue`：工具页右侧 TOC 导航条组件，自动扫描页面内 `[data-toc-card]` 元素生成图标方格条
+  - 每个方格显示工具标题前 2 字，hover 时用 Tooltip 组件显示完整标题
+  - 点击方格滚动跳转到对应工具卡片（scrollIntoView smooth）
+  - 滚动时自动高亮当前可见项（scroll 事件 + getBoundingClientRect 计算）
+  - 工具数 < 3 时自动隐藏
+- 修改 `Tools.vue` 布局：右侧内容区改为双栏（内容 + w-14 TOC 侧栏），滚动容器加 `.tools-scroll-container` class，分类切换时递增 `tocRefreshKey` 触发 TOC 重新扫描
+- 为所有 Page 组件（DataPage / CalcPage / ModToolsPage / NetworkPage / ArchivePage）的工具卡片包裹 div 加 `data-toc-card` + `data-toc-title` + `id` 锚点属性
+- 新增依赖：`@tauri-apps/plugin-dialog@^2`（前端 JS 包，后端 Rust 插件已就绪）
+
 #### 存档管理工具（存档管理分类）
 - 后端：`archive.rs` 的 `list` 扫描 `{game_dir}/saves/` 子文件夹（递归计算大小、检测 level.dat）；`backup` 将存档打包为 zip（可选排除 playerdata/ 目录用于导出分享包）；`restore` 从 zip 解压到 saves/ 目录（目标已存在则失败，路径安全校验）
 - 前端：列出存档（名称、大小、修改时间、有效标志），点击备份弹出对话框填写输出路径 + 排除玩家数据选项，底部恢复区填写 zip 路径 + 存档名称，备份/恢复走 showConfirm 回调式

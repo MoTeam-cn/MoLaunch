@@ -9,7 +9,7 @@
  * 分类：外部下载 / 便捷工具 / 存档管理 / Mod 工具 / 网络工具 / 计算工具 / 数据工具
  */
 
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import {
   ArrowDownTrayIcon,
   WrenchScrewdriverIcon,
@@ -26,6 +26,7 @@ import ModToolsPage from './tools/mod-tools/ModToolsPage.vue'
 import NetworkPage from './tools/network/NetworkPage.vue'
 import CalcPage from './tools/calc/CalcPage.vue'
 import DataPage from './tools/data/DataPage.vue'
+import ToolToc from '@/components/common/ToolToc.vue'
 
 interface ToolCategory {
   id: string
@@ -80,6 +81,16 @@ const categories: ToolCategory[] = [
 ]
 
 const activeCategory = ref<string>('quick-tools')
+// 分类切换时递增，触发 ToolToc 重新扫描
+const tocRefreshKey = ref(0)
+
+function switchCategory(id: string) {
+  if (activeCategory.value === id) return
+  activeCategory.value = id
+  nextTick(() => {
+    tocRefreshKey.value++
+  })
+}
 
 const activeDesc = () =>
   categories.find((c) => c.id === activeCategory.value)?.desc ?? ''
@@ -99,7 +110,7 @@ const activeDesc = () =>
               ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
               : 'text-gray-700 hover:bg-gray-50',
           ]"
-          @click="activeCategory = cat.id"
+          @click="switchCategory(cat.id)"
         >
           <component :is="cat.icon" class="w-5 h-5 mr-3" />
           {{ cat.label }}
@@ -116,14 +127,21 @@ const activeDesc = () =>
         <p class="text-xs text-gray-500 mt-1">{{ activeDesc() }}</p>
       </div>
 
-      <div class="flex-1 overflow-y-auto p-6">
-        <ExternalDownload v-if="activeCategory === 'external-download'" />
-        <QuickTools v-else-if="activeCategory === 'quick-tools'" />
-        <ArchivePage v-else-if="activeCategory === 'archive'" />
-        <ModToolsPage v-else-if="activeCategory === 'mod-tools'" />
-        <NetworkPage v-else-if="activeCategory === 'network'" />
-        <CalcPage v-else-if="activeCategory === 'calc'" />
-        <DataPage v-else-if="activeCategory === 'data'" />
+      <!-- 内容 + 右侧 TOC 双栏布局 -->
+      <div class="flex-1 flex overflow-hidden">
+        <div class="flex-1 overflow-y-auto p-6 tools-scroll-container">
+          <ExternalDownload v-if="activeCategory === 'external-download'" />
+          <QuickTools v-else-if="activeCategory === 'quick-tools'" />
+          <ArchivePage v-else-if="activeCategory === 'archive'" />
+          <ModToolsPage v-else-if="activeCategory === 'mod-tools'" />
+          <NetworkPage v-else-if="activeCategory === 'network'" />
+          <CalcPage v-else-if="activeCategory === 'calc'" />
+          <DataPage v-else-if="activeCategory === 'data'" />
+        </div>
+        <!-- 右侧 TOC 导航条（工具数 ≥ 3 时自动显示） -->
+        <aside class="w-14 shrink-0 border-l border-gray-100 bg-white flex items-center justify-center">
+          <ToolToc :refresh-key="tocRefreshKey" />
+        </aside>
       </div>
     </div>
   </div>
