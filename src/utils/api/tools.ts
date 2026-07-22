@@ -128,3 +128,82 @@ export function cleanupExecute(paths: string[]): Promise<CleanupExecuteResult> {
 export function memoryOptimize(mode: MemoryOptimizeMode = 'light'): Promise<MemoryOptimizeResult> {
   return toolsManager<MemoryOptimizeResult>('memory_optimize', { mode })
 }
+
+// ==================== Mod 依赖检测 ====================
+
+/** 缺失的依赖项 */
+export interface MissingDep {
+  /** 依赖此 mod 的文件名 */
+  required_by: string
+  /** 缺失的 mod_id */
+  mod_id: string
+}
+
+/** 冲突依赖项（未来扩展用） */
+export interface ConflictDep {
+  mod_id: string
+  reason: string
+}
+
+/** Mod 依赖检测结果 */
+export interface ModDependencyResult {
+  /** 依赖的 mod_id 不在已安装列表中 */
+  missing: MissingDep[]
+  /** 冲突依赖（暂时留空，未来扩展） */
+  conflicts: ConflictDep[]
+}
+
+/** Mod 依赖检测 */
+export function modDependencyCheck(versionId: string): Promise<ModDependencyResult> {
+  return toolsManager<ModDependencyResult>('mod_dependency_check', { version_id: versionId })
+}
+
+// ==================== Mod 去重扫描 ====================
+
+/** 重复 Mod 的单个版本条目 */
+export interface DuplicateVersion {
+  version: string
+  file_name: string
+  file_size: number
+}
+
+/** 重复的 Mod（同一 mod_id 有多个版本） */
+export interface DuplicateMod {
+  mod_id: string
+  versions: DuplicateVersion[]
+}
+
+/** Mod 去重扫描结果 */
+export interface ModDedupResult {
+  duplicates: DuplicateMod[]
+}
+
+/** Mod 去重扫描 */
+export function modDedupScan(versionId: string): Promise<ModDedupResult> {
+  return toolsManager<ModDedupResult>('mod_dedup_scan', { version_id: versionId })
+}
+
+// ==================== 启动器数据导出 ====================
+
+/** 启动器数据导出请求参数 */
+export interface ExportLauncherDataParams {
+  /** 导出 zip 的完整路径 */
+  output_path: string
+  include_config: boolean
+  include_versions: boolean
+  include_accounts: boolean
+}
+
+/** 启动器数据导出结果 */
+export interface ExportResult {
+  success: boolean
+  file_path: string
+  file_size: number
+  /** 导出的数据类型（"config" / "versions" / "accounts"） */
+  exported_items: string[]
+}
+
+/** 启动器数据导出 */
+export function exportLauncherData(params: ExportLauncherDataParams): Promise<ExportResult> {
+  return toolsManager<ExportResult>('export_launcher_data', params)
+}

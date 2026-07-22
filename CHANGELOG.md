@@ -9,6 +9,33 @@
 
 ### 变更
 
+#### Java 版本管理工具（数据工具分类）
+- 复用 `stores/java.ts` + `utils/api/java.ts`，列出系统检测到的 Java 运行时
+- 单击列表项设为默认 Java，支持「自动选择」模式（由后端启动流水线按版本需求匹配）
+- 列表项展示完整路径（Tooltip 组件）、版本号、Java 大版本徽章
+- 重新检测按钮触发 `store.refreshJava()`，空状态提示引导用户检测
+- 组件：`src/views/tools/data/JavaManager.vue`
+
+#### Mod 依赖检测工具（Mod 工具分类）
+- 后端：`mod_tools.rs` 的 `mod_dependency_check` 扫描 `versions/{id}/mods/` 下所有 .jar，读取每个 mod 的 dependencies（fabric.mod.json 的 depends / mods.toml 的 [[dependencies]]），与已安装 mod_id 集合比对，排除 minecraft/java/fabricloader/fabric-api/quilt_loader/quilted_fabric_api/forge/neoforge 内置依赖
+- 前端：选版本 → 调 `modDependencyCheck` → 按 required_by 分组展示缺失依赖列表，空状态提示「依赖均已满足」
+- 为 `ModMetadata` 新增 `dependencies: Vec<String>` 字段，`MetaBuilder` 新增 `add_dependencies()` 累积合并去重
+- 后端类型：`ModDependencyCheckParams` / `ModDependencyResult` / `MissingDep` / `ConflictDep`
+- 组件：`src/views/tools/mod-tools/ModDependencyChecker.vue`，后端：`src-tauri/src/commands/tools/mod_tools.rs`
+
+#### Mod 文件去重工具（Mod 工具分类）
+- 后端：`mod_tools.rs` 的 `mod_dedup_scan` 按 slug 分组，找出有多个版本的 mod，slug 为空的 mod 不参与去重，版本号空时回退到文件名
+- 前端：选版本 → 调 `modDedupScan` → 展示重复 mod 列表（mod_id + 多版本条目，含版本号徽章、文件名 Tooltip、文件大小）
+- 后端类型：`ModDedupScanParams` / `ModDedupResult` / `DuplicateMod` / `DuplicateVersion`
+- 组件：`src/views/tools/mod-tools/ModDedupScanner.vue`
+
+#### 启动器数据导出工具（数据工具分类）
+- 后端：`data_export.rs` 的 `export_launcher_data` 将 config / versions / accounts 打包为 zip
+- 账号脱敏：微软账号仅保留 username/uuid（不含 expires_at/is_expired），离线账号不含 skin 字段，current_user 仅含 name/uuid/login_type
+- 前端：勾选导出项 → 填写输出路径（默认预填下载目录下 molaunch-export.zip）→ 调 `exportLauncherData` → 展示导出结果（路径/大小/包含项）
+- 后端类型：`ExportLauncherDataParams` / `ExportResult`
+- 组件：`src/views/tools/data/DataExporter.vue`，后端：`src-tauri/src/commands/tools/data_export.rs`
+
 #### 坐标距离计算工具（计算工具分类）
 - 输入两组 XYZ 坐标，实时计算欧氏距离、曼哈顿距离、切比雪夫距离
 - 地狱门坐标换算：主世界↔下界 1:8 比例双向换算

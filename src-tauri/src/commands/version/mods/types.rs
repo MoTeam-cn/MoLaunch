@@ -47,6 +47,9 @@ pub(crate) struct ModMetadata {
     pub description: String,
     pub version: String,
     pub translated_name: String,
+    /// 依赖的 mod_id 列表（来自 fabric.mod.json 的 depends / mods.toml 的 [[dependencies]]）
+    /// mcmod.info 和 fml_cache_annotation 来源无依赖信息，保持空 vec
+    pub dependencies: Vec<String>,
 }
 
 /// jar 内 mod metadata 中间结构（仅在 mods 子模块内部使用，由 read_fabric_mod_meta 等填充，finalize_metadata 转换为 ModMetadata）
@@ -54,4 +57,6 @@ pub(super) struct ModMeta {
     pub slug: Option<String>,
     pub description: String,
     pub version: String,
+    /// 依赖的 mod_id 列表（由 MetaBuilder 累积合并，传给 ModMetadata）
+    pub dependencies: Vec<String>,
 }

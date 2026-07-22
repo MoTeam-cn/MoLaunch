@@ -94,6 +94,12 @@ pub(super) fn merge_fabric_mod_json<R: Read + std::io::Seek>(
     if let Some(ver) = json.get("version").and_then(|v| v.as_str()) {
         builder.set_version(ver.to_string());
     }
+
+    // 解析 depends 对象（key 是 mod_id），收集依赖列表
+    if let Some(depends) = json.get("depends").and_then(|v| v.as_object()) {
+        let dep_ids = depends.keys().map(|k| k.to_string());
+        builder.add_dependencies(dep_ids);
+    }
 }
 
 /// 合并 META-INF/mods.toml（Forge 1.13+/NeoForge）
@@ -177,6 +183,13 @@ pub(super) fn merge_mods_toml<R: Read + std::io::Seek>(
             builder.set_version(ver.clone());
         }
     }
+
+    // 从所有 [[dependencies]] 块收集 modId
+    let dep_ids = sections
+        .iter()
+        .filter(|(header, _)| header == "dependencies")
+        .filter_map(|(_, fields)| fields.get("modId").cloned());
+    builder.add_dependencies(dep_ids);
 }
 
 /// 合并 META-INF/fml_cache_annotation.json（Forge 1.7-1.12 注解缓存）

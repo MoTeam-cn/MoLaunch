@@ -69,11 +69,14 @@ pub(crate) fn read_mod_metadata(path: &std::path::Path) -> ModMetadata {
 /// - Display: 第一个非空、非占位符的值优先（后续不覆盖）
 /// - Description: 第一个长度>2的值优先（后续不覆盖）
 /// - Version: 第一个有效版本号优先（后续不覆盖），占位符标记为 "version"
+/// - Dependencies: 累积合并，去重保存所有来源声明的 mod_id
 struct MetaBuilder {
     slug: Option<String>,
     description: Option<String>,
     /// None = 未设置, Some("version") = 占位符标记, Some(其他) = 实际版本号
     version: Option<String>,
+    /// 依赖的 mod_id 列表（累积合并，去重）
+    dependencies: Vec<String>,
 }
 
 impl MetaBuilder {
@@ -82,6 +85,7 @@ impl MetaBuilder {
             slug: None,
             description: None,
             version: None,
+            dependencies: Vec::new(),
         }
     }
 
@@ -123,12 +127,29 @@ impl MetaBuilder {
         }
     }
 
+    /// 追加依赖的 mod_id 列表（去重，空值跳过）
+    ///
+    /// 多个来源（fabric.mod.json / mods.toml）可能各自声明依赖，
+    /// 全部累积到 `dependencies` 字段，由后续依赖检测统一消费。
+    fn add_dependencies(&mut self, ids: impl IntoIterator<Item = String>) {
+        for id in ids {
+            let v = id.trim().to_lowercase();
+            if v.is_empty() {
+                continue;
+            }
+            if !self.dependencies.iter().any(|d| d == &v) {
+                self.dependencies.push(v);
+            }
+        }
+    }
+
     /// 转换为 ModMeta
     fn build(self) -> ModMeta {
         ModMeta {
             slug: self.slug,
             description: self.description.unwrap_or_default(),
             version: self.version.unwrap_or_default(),
+            dependencies: self.dependencies,
         }
     }
 }
@@ -164,6 +185,7 @@ fn finalize_metadata(meta: ModMeta, path: &std::path::Path) -> ModMetadata {
         description: meta.description,
         version,
         translated_name: translated,
+        dependencies: meta.dependencies,
     }
 }
 
