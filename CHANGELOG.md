@@ -9,6 +9,13 @@
 
 ### 修复
 
+#### 清理游戏垃圾扫描返回空结果
+- **根因 1：natives 目录命名规则错误**：代码拼接 `versions/<ver>/natives`，但 MoLaunch 实际命名约定是 `versions/<ver>/<ver>-natives`（带版本前缀），导致扫描全部落空。已改为 `version_path.join(format!("{}-natives", version_name))`
+- **根因 2：未适配版本隔离模式**：MoLaunch 默认启用版本隔离（isolation_mode=4），日志、崩溃报告、Fabric 缓存等实际位于 `versions/<ver>/` 下而非 `.minecraft` 根目录，原 `SCAN_DIRS` 只扫描根目录导致这些目录全部被跳过
+- **修复**：新增 `VERSION_SCAN_DIRS` 配置，对每个版本目录追加扫描 `logs` / `crash-reports` / `.mixin.out` / `.fabric/processedMods` / `.fabric/remappedJars`，display_name 带 " - {version}" 后缀以区分
+- `build_allowed_parents` 同步更新，保证 execute 阶段安全检查与 scan 阶段路径完全一致
+- 保留 `ROOT_SCAN_DIRS` 兼容非版本隔离布局（isolation_mode=0）
+
 #### 下载工具三处 Bug 修复
 - **分片下载显示多个文件**：`list_downloads` 过滤 `.partN` 临时分片文件（DownloadManager 分片下载时创建的 `file.zip.part0` ~ `file.zip.partN` 临时文件不再出现在"已下载文件"列表中），新增 `is_chunk_part_file` helper 判断文件名后缀
 - **删除按钮无 IPC 调用**：`useExternalDownload.ts` 中 `deleteFile` / `cancelDownloadTask` / `resetDownloadDir` 三处误用 `await showConfirm(...)` 当 Promise，但 `showConfirm` 是回调式（`showConfirm(title, msg, onConfirm, onCancel?)` 返回 void），`await undefined` 后 `if (!confirmed) return` 永远退出，导致三个操作全部失效。已改为回调式用法，确认后执行实际逻辑
