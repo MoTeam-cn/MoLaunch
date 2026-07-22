@@ -7,6 +7,15 @@
 
 ## [未发布]
 
+### 变更
+
+#### 清理游戏垃圾 UI 重构
+- **文件树分组展示**：扫描结果按"全局 / 各版本"分组，每组可折叠（grid-rows 0fr↔1fr 动画）、可全选，display_name 带 " - {version}" 后缀的归入对应版本组，无后缀的归入"全局"组
+- **高度限制 + 滚动**：中部扫描结果区限制 `max-h-[400px]` + `overflow-y-auto`，顶部标题栏与底部操作栏固定，避免列表过长一直下拉
+- **Tooltip 组件替代原生 title**：所有 `:title="item.path"` 改用 `<Tooltip>` 组件（项目自定义组件约定）
+- **showConfirm 回调误用修复**：`executeCleanup` 中 `await showConfirm(...)` 当 Promise 用导致永远 return，已改为回调式用法
+- **拆分 CleanupGroupList.vue 子组件**：CleanupTool.vue 从 415 行降至 255 行，分组计算与渲染逻辑内聚到子组件（194 行），主组件只负责状态管理与编排
+
 ### 修复
 
 #### 清理游戏垃圾扫描返回空结果

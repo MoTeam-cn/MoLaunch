@@ -2,8 +2,15 @@
 /**
  * 清理游戏垃圾子组件
  *
- * 扫描 .minecraft 下的 logs/crash-reports/.mixin.out/screenshots，
+ * 扫描 .minecraft 下的 logs/crash-reports/.mixin.out/screenshots 等，
  * 用户勾选后清理。
+ *
+ * UI 布局：
+ * - 顶部固定：标题 + 扫描/重新扫描按钮
+ * - 中部滚动：扫描结果按分组展示（全局 / 各版本），每组可折叠（文件树形式）
+ * - 底部固定：已选汇总 + 清理选中按钮
+ *
+ * 分组计算与渲染委托给 CleanupGroupList.vue，本组件只负责状态管理与编排。
  */
 import { ref, computed } from 'vue'
 import {
@@ -18,18 +25,20 @@ import { showConfirm } from '@/utils/modal'
 import { cleanupScan, cleanupExecute } from '@/utils/api/tools'
 import type { CleanupItem, CleanupExecuteResult } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
+import CleanupGroupList from './CleanupGroupList.vue'
 
 const scanState = ref<'idle' | 'scanning' | 'ready' | 'cleaning'>('idle')
 const scanItems = ref<CleanupItem[]>([])
 const selectedPaths = ref<Set<string>>(new Set())
 const scanTotalSize = ref(0)
 const cleanResult = ref<CleanupExecuteResult | null>(null)
+const collapsedGroups = ref<Set<string>>(new Set())
 
-const selectedSize = computed(() => {
-  return scanItems.value
+const selectedSize = computed(() =>
+  scanItems.value
     .filter((item) => selectedPaths.value.has(item.path))
-    .reduce((sum, item) => sum + item.size, 0)
-})
+    .reduce((sum, item) => sum + item.size, 0),
+)
 
 const selectedCount = computed(() => selectedPaths.value.size)
 
@@ -37,6 +46,7 @@ async function startScan() {
   scanState.value = 'scanning'
   cleanResult.value = null
   selectedPaths.value.clear()
+  collapsedGroups.value.clear()
   try {
     const result = await cleanupScan()
     scanItems.value = result.items
@@ -63,44 +73,73 @@ function toggleSelect(path: string) {
   } else {
     selectedPaths.value.add(path)
   }
-  // 触发响应式更新
   selectedPaths.value = new Set(selectedPaths.value)
 }
 
-async function executeCleanup() {
+function toggleGroup(key: string) {
+  if (collapsedGroups.value.has(key)) {
+    collapsedGroups.value.delete(key)
+  } else {
+    collapsedGroups.value.add(key)
+  }
+  collapsedGroups.value = new Set(collapsedGroups.value)
+}
+
+// 全选/取消全选：需要拿到组内所有 item 的 path
+// 由于组计算在子组件内，这里通过 scanItems 重新匹配同组项
+function toggleGroupSelect(groupKey: string) {
+  const groupItems = scanItems.value.filter((item) => {
+    const dashIdx = item.display_name.indexOf(' - ')
+    const gk = dashIdx > 0 ? item.display_name.substring(dashIdx + 3) : '全局'
+    return gk === groupKey
+  })
+  const allSelected = groupItems.every((item) => selectedPaths.value.has(item.path))
+  if (allSelected) {
+    for (const item of groupItems) {
+      selectedPaths.value.delete(item.path)
+    }
+  } else {
+    for (const item of groupItems) {
+      selectedPaths.value.add(item.path)
+    }
+  }
+  selectedPaths.value = new Set(selectedPaths.value)
+}
+
+function executeCleanup() {
   if (selectedPaths.value.size === 0) {
     toastError('请至少选择一项要清理的内容')
     return
   }
 
-  const confirmed = await showConfirm(
+  showConfirm(
     '确认清理',
     `即将清理 ${selectedCount.value} 项内容，共 ${formatBytes(selectedSize.value)}。此操作不可恢复，确定继续吗？`,
+    async () => {
+      scanState.value = 'cleaning'
+      try {
+        const result = await cleanupExecute([...selectedPaths.value])
+        cleanResult.value = result
+        scanState.value = 'idle'
+        if (result.failed.length > 0) {
+          toastError(`清理完成，但 ${result.failed.length} 项失败`)
+        } else {
+          toastSuccess(`已清理 ${formatBytes(result.cleaned_size)}，释放 ${result.cleaned_files} 个文件`)
+        }
+        selectedPaths.value.clear()
+        scanItems.value = []
+      } catch (e) {
+        toastError(`清理失败: ${e instanceof Error ? e.message : String(e)}`)
+        scanState.value = 'ready'
+      }
+    },
   )
-  if (!confirmed) return
-
-  scanState.value = 'cleaning'
-  try {
-    const result = await cleanupExecute([...selectedPaths.value])
-    cleanResult.value = result
-    scanState.value = 'idle'
-    if (result.failed.length > 0) {
-      toastError(`清理完成，但 ${result.failed.length} 项失败`)
-    } else {
-      toastSuccess(`已清理 ${formatBytes(result.cleaned_size)}，释放 ${result.cleaned_files} 个文件`)
-    }
-    // 清空选中状态
-    selectedPaths.value.clear()
-    scanItems.value = []
-  } catch (e) {
-    toastError(`清理失败: ${e instanceof Error ? e.message : String(e)}`)
-    scanState.value = 'ready'
-  }
 }
 </script>
 
 <template>
-  <section class="rounded-lg border border-gray-300 bg-white">
+  <section class="rounded-lg border border-gray-300 bg-white overflow-hidden">
+    <!-- 顶部：标题 + 扫描按钮（固定） -->
     <div class="flex items-center justify-between px-5 pt-5 pb-3">
       <div class="flex items-center gap-2">
         <TrashIcon class="h-5 w-5 text-gray-700" />
@@ -120,9 +159,10 @@ async function executeCleanup() {
       </Button>
     </div>
 
-    <div class="px-5 pb-5">
+    <!-- 中部：扫描结果（高度限制 + 滚动） -->
+    <div class="px-5">
       <!-- 扫描中 -->
-      <div v-if="scanState === 'scanning'" class="flex h-24 items-center justify-center">
+      <div v-if="scanState === 'scanning'" class="flex h-24 items-center justify-center pb-5">
         <div class="flex flex-col items-center gap-2 text-gray-400">
           <ArrowPathIcon class="h-6 w-6 animate-spin text-primary-400" />
           <span class="text-xs">正在扫描...</span>
@@ -130,81 +170,30 @@ async function executeCleanup() {
       </div>
 
       <!-- 清理中 -->
-      <div v-else-if="scanState === 'cleaning'" class="flex h-24 items-center justify-center">
+      <div v-else-if="scanState === 'cleaning'" class="flex h-24 items-center justify-center pb-5">
         <div class="flex flex-col items-center gap-2 text-gray-400">
           <TrashIcon class="h-6 w-6 animate-pulse text-primary-400" />
           <span class="text-xs">正在清理...</span>
         </div>
       </div>
 
-      <!-- 扫描结果 -->
-      <div v-else-if="scanState === 'ready' && scanItems.length > 0" class="space-y-2">
-        <div
-          v-for="item in scanItems"
-          :key="item.path"
-          class="flex items-center gap-3 rounded-lg border px-4 py-3 transition-colors"
-          :class="
-            selectedPaths.has(item.path)
-              ? 'border-primary-300 bg-primary-50'
-              : 'border-gray-200 bg-gray-50'
-          "
-        >
-          <button
-            class="flex h-4 w-4 flex-none items-center justify-center rounded border transition-colors"
-            :class="
-              selectedPaths.has(item.path)
-                ? 'border-primary-500 bg-primary-500 text-white'
-                : 'border-gray-300 bg-white'
-            "
-            @click="toggleSelect(item.path)"
-          >
-            <CheckCircleIcon v-if="selectedPaths.has(item.path)" class="h-3 w-3" />
-          </button>
-          <div class="min-w-0 flex-1">
-            <div class="flex items-center gap-2">
-              <span class="text-sm font-medium text-gray-900">{{ item.display_name }}</span>
-              <span
-                class="rounded-full px-1.5 py-0.5 text-xs font-medium"
-                :class="
-                  item.category === '可选'
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-blue-100 text-blue-700'
-                "
-              >
-                {{ item.category }}
-              </span>
-            </div>
-            <div class="mt-0.5 truncate text-xs text-gray-400" :title="item.path">
-              {{ item.path }}
-            </div>
-          </div>
-          <div class="flex-none text-right">
-            <div class="text-sm font-medium text-gray-700">{{ formatBytes(item.size) }}</div>
-            <div class="text-xs text-gray-400">{{ item.file_count }} 个文件</div>
-          </div>
-        </div>
-
-        <!-- 清理操作栏 -->
-        <div class="flex items-center justify-between pt-2">
-          <span class="text-xs text-gray-500">
-            已选 {{ selectedCount }} 项，共 {{ formatBytes(selectedSize) }}
-          </span>
-          <Button
-            type="primary"
-            size="small"
-            :disabled="selectedCount === 0"
-            @click="executeCleanup"
-          >
-            <template #icon>
-              <TrashIcon class="h-3.5 w-3.5" />
-            </template>
-            清理选中
-          </Button>
-        </div>
+      <!-- 扫描结果：文件树分组展示（委托给 CleanupGroupList） -->
+      <div
+        v-else-if="scanState === 'ready' && scanItems.length > 0"
+        class="max-h-[400px] overflow-y-auto pr-1"
+      >
+        <CleanupGroupList
+          :items="scanItems"
+          :selected-paths="selectedPaths"
+          :collapsed-groups="collapsedGroups"
+          @toggle-select="toggleSelect"
+          @toggle-group="toggleGroup"
+          @toggle-group-select="toggleGroupSelect"
+        />
       </div>
 
       <!-- 清理结果 -->
-      <div v-else-if="cleanResult" class="space-y-3">
+      <div v-else-if="cleanResult" class="space-y-3 pb-5">
         <div class="flex items-center gap-3 rounded-lg bg-green-50 px-4 py-3">
           <CheckCircleIcon class="h-5 w-5 flex-none text-green-500" />
           <div class="flex-1">
@@ -233,12 +222,33 @@ async function executeCleanup() {
       </div>
 
       <!-- 空状态 -->
-      <div v-else class="flex h-24 items-center justify-center">
+      <div v-else class="flex h-24 items-center justify-center pb-5">
         <div class="flex flex-col items-center gap-2 text-gray-400">
           <ExclamationCircleIcon class="h-8 w-8" />
           <span class="text-xs">点击「扫描」按钮检查可清理的文件</span>
         </div>
       </div>
+    </div>
+
+    <!-- 底部：已选汇总 + 清理按钮（固定） -->
+    <div
+      v-if="scanState === 'ready' && scanItems.length > 0"
+      class="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-5 py-3"
+    >
+      <span class="text-xs text-gray-500">
+        已选 {{ selectedCount }} 项，共 {{ formatBytes(selectedSize) }}
+      </span>
+      <Button
+        type="primary"
+        size="small"
+        :disabled="selectedCount === 0"
+        @click="executeCleanup"
+      >
+        <template #icon>
+          <TrashIcon class="h-3.5 w-3.5" />
+        </template>
+        清理选中
+      </Button>
     </div>
   </section>
 </template>

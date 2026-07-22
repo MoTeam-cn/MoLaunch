@@ -47,24 +47,21 @@ coverage/
 
 # Web Cache
 node_modules
-logo_data
+/logo_data
 package-lock.json
 
 #SDK Cache
-sdk_data
+/sdk_data
 
 # Docs No Push
-docs
-debug-docs
+/docs
+/debug-docs
 
 # Cahce
-code-libs
+/code-libs
 
 # Tools
 /tools
 
 # API Server
-api-server
-
-# Logo Data
-logo_data
+/api-server
