@@ -10,6 +10,7 @@
  */
 import { computed } from 'vue'
 import {
+  CheckIcon,
   CheckCircleIcon,
   ChevronDownIcon,
   FolderIcon,
@@ -96,34 +97,44 @@ function itemDisplayName(displayName: string): string {
       :key="group.key"
       class="rounded-lg border border-gray-200 overflow-hidden"
     >
-      <!-- 分组标题（可折叠 + 全选） -->
-      <div class="flex items-center gap-2 bg-gray-50 px-3 py-2">
-        <button
-          class="flex-none rounded p-0.5 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
-          @click="emit('toggleGroup', group.key)"
-        >
-          <ChevronDownIcon
-            class="h-4 w-4 transition-transform duration-300"
-            :class="collapsedGroups.has(group.key) ? '-rotate-90' : ''"
-          />
-        </button>
+      <!-- 分组标题：整行点击展开/折叠，右侧独立全选按钮 -->
+      <div
+        class="flex items-center gap-2 bg-gray-50 px-3 py-2 cursor-pointer select-none hover:bg-gray-100"
+        @click="emit('toggleGroup', group.key)"
+      >
+        <ChevronDownIcon
+          class="h-4 w-4 flex-none text-gray-400 transition-transform duration-300"
+          :class="collapsedGroups.has(group.key) ? '-rotate-90' : ''"
+        />
         <component :is="groupIcon(group.key)" class="h-4 w-4 flex-none text-primary-500" />
-        <button class="flex-1 min-w-0 text-left" @click="emit('toggleGroupSelect', group.key)">
+        <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
             <span class="text-sm font-medium text-gray-800 truncate">{{ group.label }}</span>
             <span class="text-xs text-gray-400">
               {{ formatBytes(group.groupSize) }} · {{ group.groupFileCount }} 个文件
             </span>
           </div>
-        </button>
-        <!-- 组内全选状态指示 -->
+        </div>
+        <!-- 组内全选状态指示 + 全选切换按钮 -->
         <Tooltip
-          v-if="group.selectedCount > 0"
-          :text="`已选 ${group.selectedCount}/${group.items.length} 项，${formatBytes(group.selectedSize)}`"
+          :text="group.selectedCount === group.items.length && group.items.length > 0
+            ? '点击取消全选'
+            : `点击全选（已选 ${group.selectedCount}/${group.items.length} 项，${formatBytes(group.selectedSize)}）`"
           position="left"
         >
-          <span class="flex-none rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
-            {{ group.selectedCount }}/{{ group.items.length }}
+          <span
+            class="flex h-5 w-5 flex-none items-center justify-center rounded border transition-colors"
+            :class="
+              group.selectedCount === group.items.length && group.items.length > 0
+                ? 'border-primary-500 bg-primary-500 text-white'
+                : group.selectedCount > 0
+                  ? 'border-primary-400 bg-primary-100 text-primary-600'
+                  : 'border-gray-300 bg-white text-gray-400 hover:border-primary-300'
+            "
+            @click.stop="emit('toggleGroupSelect', group.key)"
+          >
+            <CheckIcon v-if="group.selectedCount === group.items.length && group.items.length > 0" class="h-3 w-3" />
+            <span v-else-if="group.selectedCount > 0" class="text-[10px] font-bold leading-none">{{ group.selectedCount }}</span>
           </span>
         </Tooltip>
       </div>
