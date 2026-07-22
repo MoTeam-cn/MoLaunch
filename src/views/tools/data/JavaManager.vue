@@ -86,43 +86,45 @@ async function refresh() {
         </div>
       </div>
 
-      <!-- Java 列表 -->
-      <div
-        v-for="j in javaStore.javaList"
-        :key="j.executable"
-        class="flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors"
-        :class="
-          javaStore.javaPath === j.executable
-            ? 'border-primary-400 bg-primary-50/60'
-            : 'border-gray-200 bg-white hover:bg-gray-50'
-        "
-        @click="selectJava(j.executable)"
-      >
-        <span
-          class="flex h-4 w-4 flex-none items-center justify-center rounded-full border-2 transition-colors"
-          :class="javaStore.javaPath === j.executable ? 'border-primary-500' : 'border-gray-300'"
+      <!-- Java 列表（限制高度，超出滚动） -->
+      <div class="max-h-[320px] overflow-y-auto space-y-2">
+        <div
+          v-for="j in javaStore.javaList"
+          :key="j.executable"
+          class="flex items-center gap-3 rounded-lg border px-3 py-2.5 cursor-pointer transition-colors"
+          :class="
+            javaStore.javaPath === j.executable
+              ? 'border-primary-400 bg-primary-50/60'
+              : 'border-gray-200 bg-white hover:bg-gray-50'
+          "
+          @click="selectJava(j.executable)"
         >
-          <span v-if="javaStore.javaPath === j.executable" class="h-2 w-2 rounded-full bg-primary-500" />
-        </span>
-        <CommandLineIcon class="h-4 w-4 flex-none text-gray-500" />
-        <div class="flex-1 min-w-0">
-          <Tooltip :text="j.executable" position="top" :delay="200" block>
-            <div class="truncate text-sm font-medium text-gray-900">{{ j.executable }}</div>
-          </Tooltip>
-          <div class="text-xs text-gray-400">版本 {{ j.version }}</div>
+          <span
+            class="flex h-4 w-4 flex-none items-center justify-center rounded-full border-2 transition-colors"
+            :class="javaStore.javaPath === j.executable ? 'border-primary-500' : 'border-gray-300'"
+          >
+            <span v-if="javaStore.javaPath === j.executable" class="h-2 w-2 rounded-full bg-primary-500" />
+          </span>
+          <CommandLineIcon class="h-4 w-4 flex-none text-gray-500" />
+          <div class="flex-1 min-w-0">
+            <Tooltip :text="j.executable" position="top" :delay="200" block>
+              <div class="truncate text-sm font-medium text-gray-900">{{ j.executable }}</div>
+            </Tooltip>
+            <div class="text-xs text-gray-400">版本 {{ j.version }}</div>
+          </div>
+          <span class="flex-none rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+            Java {{ j.major_version }}
+          </span>
         </div>
-        <span class="flex-none rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-          Java {{ j.major_version }}
-        </span>
-      </div>
 
-      <!-- 空状态 -->
-      <div
-        v-if="javaStore.javaLoaded && javaStore.javaList.length === 0"
-        class="flex flex-col items-center justify-center py-8 text-gray-400"
-      >
-        <ExclamationTriangleIcon class="h-8 w-8 mb-2" />
-        <span class="text-xs">未检测到任何 Java 运行时，请点击右上角"重新检测"</span>
+        <!-- 空状态 -->
+        <div
+          v-if="javaStore.javaLoaded && javaStore.javaList.length === 0"
+          class="flex flex-col items-center justify-center py-8 text-gray-400"
+        >
+          <ExclamationTriangleIcon class="h-8 w-8 mb-2" />
+          <span class="text-xs">未检测到任何 Java 运行时，请点击右上角"重新检测"</span>
+        </div>
       </div>
 
       <!-- 当前选中提示 -->
