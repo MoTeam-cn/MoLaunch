@@ -14,13 +14,23 @@ import CleanupTool from './quick-tools/CleanupTool.vue'
 import MemoryOptimizer from './quick-tools/MemoryOptimizer.vue'
 
 // ==================== 敬请期待 ====================
+// 15 个规划中的便捷工具，参考 PCL2/HMCL 常见工具集，避免与已实现功能重复
 const upcomingTools = [
-  { name: '存档备份恢复', desc: '备份和恢复游戏世界存档' },
-  { name: 'Mod 依赖检测', desc: '检测 Mod 依赖冲突和缺失' },
-  { name: '游戏日志分析', desc: '智能分析崩溃日志和游戏日志' },
-  { name: 'Java 版本管理', desc: '管理多个 Java 运行时' },
-  { name: '服务器状态检测', desc: '检测 Minecraft 服务器在线状态' },
-  { name: '世界存档管理', desc: '管理、导出和分享世界存档' },
+  { name: '存档备份恢复', desc: '备份和恢复游戏世界存档，支持多版本快照管理' },
+  { name: 'Mod 依赖检测', desc: '扫描已安装 Mod，检测依赖冲突和缺失项' },
+  { name: '崩溃日志分析', desc: '智能分析崩溃报告，定位问题 Mod 或配置' },
+  { name: 'Java 版本管理', desc: '管理多个 Java 运行时，一键切换默认版本' },
+  { name: '服务器状态检测', desc: '输入地址检测 Minecraft 服务器在线状态与延迟' },
+  { name: '世界存档管理', desc: '管理、导出和分享世界存档，支持 zip 打包' },
+  { name: '资源包转换', desc: '在 zip 与文件夹格式间转换资源包/数据包' },
+  { name: '版本 JSON 编辑', desc: '可视化编辑版本 JSON，调整继承关系与参数' },
+  { name: 'NBT 数据查看', desc: '解析玩家/方块/物品 NBT 数据为可读树形结构' },
+  { name: '坐标距离计算', desc: '计算两地坐标距离，辅助地狱门连通与导航' },
+  { name: '游戏内调色板', desc: '生成 Minecraft 可用的颜色代码，支持 RGB/HEX 互转' },
+  { name: '截图批量管理', desc: '批量浏览、重命名、压缩和导出游戏截图' },
+  { name: 'Mod 文件去重', desc: '扫描 mods 目录，找出重复或旧版本 Mod 文件' },
+  { name: '启动器数据导出', desc: '导出配置/版本/账号数据，便于迁移或备份' },
+  { name: '网络延迟测试', desc: '测试官方/镜像源连接速度，推荐最快下载源' },
 ]
 
 function onUpcomingClick(name: string) {
