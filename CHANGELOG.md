@@ -9,6 +9,31 @@
 
 ### 变更
 
+#### 崩溃日志分析工具（数据工具分类）
+- 后端：`crash_analyzer.rs` 的 `analyze` 对 log_text 做大小写不敏感的子串/正则匹配，识别 6 类崩溃模式（java_version / missing_mod / memory / driver / mod_conflict / other）
+- 每条分析结果含分类、严重级别（error/warning/info）、标题、匹配行片段、中文修复建议
+- 前端：粘贴崩溃日志文本 → 调 `crashAnalyze` → 展示识别出的崩溃原因条目，6 类分类标签 + 3 级严重级别样式
+- 后端类型：`CrashAnalyzeParams` / `CrashAnalyzeResult` / `CrashAnalysisItem`
+- 组件：`src/views/tools/data/CrashAnalyzer.vue`，后端：`src-tauri/src/commands/tools/crash_analyzer.rs`
+
+#### 截图批量管理工具（数据工具分类）
+- 后端：`screenshot.rs` 的 `list` 枚举 `{game_dir}/screenshots/` 下所有文件按修改时间降序排序；`delete` 批量删除截图，删除前校验每个 path 规范化后以 screenshots 目录为前缀（路径安全）
+- 前端：列举截图文件，支持多选与批量删除，删除走 `showConfirm` 回调式（项目规范），全选/反选、已选数量与总大小统计、空状态提示
+- 后端类型：`ScreenshotListResult` / `ScreenshotItem` / `ScreenshotDeleteParams` / `ScreenshotFailedItem` / `ScreenshotDeleteResult`
+- 组件：`src/views/tools/data/ScreenshotManager.vue`，后端：`src-tauri/src/commands/tools/screenshot.rs`
+
+#### 资源包转换工具（数据工具分类）
+- 后端：`resourcepack.rs` 的 `list` 枚举 `{game_dir}/resourcepacks/` 顶层条目（.zip 文件 → format=zip；目录 → format=folder）；`convert` 支持 folder → zip / zip → folder 双向转换，用 zip crate，路径校验
+- 前端：列举资源包，支持在 zip ↔ folder 两种格式间转换，转换走 `showConfirm` 回调式，目标已存在时后端返回失败提示
+- 后端类型：`ResourcePackListResult` / `ResourcePackItem` / `ResourcePackConvertParams` / `ResourcePackConvertResult`
+- 组件：`src/views/tools/data/ResourcePackConverter.vue`，后端：`src-tauri/src/commands/tools/resourcepack.rs`
+
+#### 版本 JSON 编辑工具（数据工具分类）
+- 后端：`version_json.rs` 的 `read` 读取 `{game_dir}/versions/{version_id}/{version_id}.json`；`save` 先用 `serde_json::from_str::<serde_json::Value>` 校验合法性，校验通过后写入文件，version_id 校验不含 `..` / 路径分隔符
+- 前端：选择已安装版本 → 读取 JSON → 编辑 → 保存，保存走 `showConfirm` 回调式二次确认，dirty 状态追踪、文件路径提示、未保存警告
+- 后端类型：`VersionJsonReadParams` / `VersionJsonReadResult` / `VersionJsonSaveParams` / `VersionJsonSaveResult`
+- 组件：`src/views/tools/data/VersionJsonEditor.vue`，后端：`src-tauri/src/commands/tools/version_json.rs`
+
 #### Java 版本管理工具（数据工具分类）
 - 复用 `stores/java.ts` + `utils/api/java.ts`，列出系统检测到的 Java 运行时
 - 单击列表项设为默认 Java，支持「自动选择」模式（由后端启动流水线按版本需求匹配）

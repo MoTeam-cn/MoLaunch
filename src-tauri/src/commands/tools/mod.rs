@@ -2,15 +2,20 @@
 //!
 //! 对外只暴露 `tools_manager` 一个 IPC 命令，通过请求体的 `action` 字段分发到不同子模块。
 //! 子模块：download（外部下载）/ filename（文件名获取）/ cleanup（清理垃圾）/ memory（内存优化）
-//! / mod_tools（Mod 依赖检测 + 去重）/ data_export（启动器数据导出）
+//! / mod_tools（Mod 依赖检测 + 去重）/ data_export（启动器数据导出）/ crash_analyzer（崩溃日志分析）
+//! / screenshot（截图管理）/ resourcepack（资源包管理）/ version_json（版本 JSON 读写）
 
 pub mod cleanup;
+pub mod crash_analyzer;
 pub mod data_export;
 pub mod download;
 pub mod filename;
 pub mod memory;
 pub mod mod_tools;
+pub mod resourcepack;
+pub mod screenshot;
 pub mod types;
+pub mod version_json;
 
 use crate::state::AppState;
 use tauri::State;
@@ -72,6 +77,37 @@ pub async fn tools_manager(
             let p: ExportLauncherDataParams = serde_json::from_value(req.params)
                 .map_err(|e| format!("参数解析失败: {}", e))?;
             data_export::export_launcher_data(&state, p).await
+        }
+        // 崩溃日志分析
+        "crash_analyze" => {
+            let p: CrashAnalyzeParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            crash_analyzer::analyze(&state, p).await
+        }
+        // 截图管理
+        "screenshot_list" => screenshot::list(&state).await,
+        "screenshot_delete" => {
+            let p: ScreenshotDeleteParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            screenshot::delete(&state, p).await
+        }
+        // 资源包管理
+        "resourcepack_list" => resourcepack::list(&state).await,
+        "resourcepack_convert" => {
+            let p: ResourcePackConvertParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            resourcepack::convert(&state, p).await
+        }
+        // 版本 JSON 读写
+        "version_json_read" => {
+            let p: VersionJsonReadParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            version_json::read(&state, p).await
+        }
+        "version_json_save" => {
+            let p: VersionJsonSaveParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            version_json::save(&state, p).await
         }
         _ => Err(format!("未知操作: {}", req.action)),
     }
