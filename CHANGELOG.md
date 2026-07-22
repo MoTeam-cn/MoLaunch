@@ -9,6 +9,14 @@
 
 ### 变更
 
+#### 工具页侧边栏新增 5 个分类骨架
+- 在 `Tools.vue` 左侧侧边栏新增 5 个一级分类：存档管理 / Mod 工具 / 网络工具 / 计算工具 / 数据工具
+- 为每个分类新建页面组件（编排层）：`tools/archive/ArchivePage.vue`、`tools/mod-tools/ModToolsPage.vue`、`tools/network/NetworkPage.vue`、`tools/calc/CalcPage.vue`、`tools/data/DataPage.vue`
+- 为 14 个工具创建占位组件（显示"即将实现"），后续批次逐步替换为完整实现
+- 从 `QuickTools.vue` 移除 `upcomingTools` 数组与"更多工具"section（已迁移到各分类页面）
+- 默认选中分类改为「便捷工具」（原为「外部下载」）
+- 新增实现计划文档 `docs/QUICK_TOOLS_IMPL_PLAN.md`
+
 #### 清理游戏垃圾 UI 重构
 - **文件树分组展示**：扫描结果按"全局 / 各版本"分组，每组可折叠（grid-rows 0fr↔1fr 动画）、可全选，display_name 带 " - {version}" 后缀的归入对应版本组，无后缀的归入"全局"组
 - **高度限制 + 滚动**：中部扫描结果区限制 `max-h-[400px]` + `overflow-y-auto`，顶部标题栏与底部操作栏固定，避免列表过长一直下拉
