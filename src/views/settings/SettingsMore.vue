@@ -2,8 +2,9 @@
 /**
  * 设置 - 更多页面（薄编排层）
  *
- * 顶部子菜单分为：关于 / 鸣谢 / 教程，三个子页签已拆分到 ./more/ 目录：
+ * 顶部子菜单分为：关于 / 系统信息 / 鸣谢 / 教程，四个子页签已拆分到 ./more/ 目录：
  * - 关于：MoLaunch 介绍、官网链接、技术栈 → AboutTab
+ * - 系统信息：应用版本、开发者模式解锁、SDK 信息 → SystemInfoTab
  * - 鸣谢：BMCLAPI / mcmod / MCIM API + 法律信息 + 许可与版权声明 → CreditsTab
  * - 教程：使用教程（占位）→ TutorialTab
  *
@@ -15,16 +16,19 @@ import SubTabBar from '@/components/common/SubTabBar.vue'
 import { getAboutData, type AboutData } from '@/utils/api/about'
 import {
   InformationCircleIcon,
+  CpuChipIcon,
   HeartIcon,
   BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import AboutTab from './more/AboutTab.vue'
+import SystemInfoTab from './more/SystemInfoTab.vue'
 import CreditsTab from './more/CreditsTab.vue'
 import TutorialTab from './more/TutorialTab.vue'
 
 // ── 子页签 ──
 const subTabs = [
   { id: 'about', label: '关于', icon: InformationCircleIcon },
+  { id: 'system', label: '系统信息', icon: CpuChipIcon },
   { id: 'credits', label: '鸣谢', icon: HeartIcon },
   { id: 'tutorial', label: '教程', icon: BookOpenIcon },
 ]
@@ -63,6 +67,7 @@ onMounted(loadAboutData)
         :loading="loading"
         :load-error="loadError"
       />
+      <SystemInfoTab v-else-if="activeSubTab === 'system'" />
       <CreditsTab
         v-else-if="activeSubTab === 'credits'"
         :about-data="aboutData"

@@ -1,17 +1,19 @@
 <script setup lang="ts">
-import { ref, watch, onMounted } from 'vue'
+/**
+ * 系统信息子页签：应用版本 + 开发者模式解锁 + SDK 信息
+ *
+ * 迁移自 SettingsOther.vue（已删除）：移除配置文件路径展示，
+ * 保留版本号 5 次点击解锁开发者模式与 SDK 状态展示。
+ */
+import { ref, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
-import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Alert from '@/components/common/Alert.vue'
 import * as tauri from '@/utils/tauri'
-import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastInfo, toastSuccess } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
 
 const sdkStore = useSdkStore()
-const logLevel = ref(3)
-const configPath = ref('')
 
 // 应用版本（从 package.json 注入，由 vite define 提供；点击 5 次解锁开发者模式）
 const appVersion = __APP_VERSION__
@@ -38,24 +40,6 @@ function getDeviceIdDisplay(): string {
   return id.length > 8 ? id.substring(0, 4) + '****' + id.substring(id.length - 4) : '****'
 }
 
-// 读取日志级别（统一走 getConfigMap，避免使用调试用 getConfigValue）
-async function loadLogLevel() {
-  const cfg = await safeCall(() => getConfigMap(), 'get log level')
-  if (cfg && typeof cfg.logLevel === 'number') {
-    logLevel.value = cfg.logLevel
-  }
-}
-
-// 保存日志级别（统一走 applyConfig，后端会同步调用 logger::set_level 立即生效）
-async function saveLogLevel(level: number) {
-  await safeCall(() => applyConfig({ logLevel: level }), 'save log level')
-}
-
-// 监听日志级别变化
-watch(logLevel, (newLevel) => {
-  saveLogLevel(newLevel)
-})
-
 // 版本号点击：连续 5 次解锁开发者模式
 async function onVersionClick() {
   if (devUnlocked.value) return
@@ -65,14 +49,11 @@ async function onVersionClick() {
 
   if (versionClickCount.value >= 5) {
     // 解锁
-    try {
-      await tauri.unlockDeveloperMode()
+    const ok = await safeCall(() => tauri.unlockDeveloperMode(), 'unlock developer mode')
+    if (ok !== undefined) {
       devUnlocked.value = true
       versionClickCount.value = 0
-      toastSuccess('已解锁开发者模式，可在「高阶配置」中开启')
-    } catch (e) {
-      console.error('Failed to unlock developer mode:', e)
-      showError('解锁失败：' + e)
+      toastSuccess('已解锁开发者模式，可在「进阶设置」中开启')
     }
     return
   }
@@ -89,13 +70,6 @@ async function onVersionClick() {
 }
 
 onMounted(async () => {
-  try {
-    configPath.value = await tauri.getConfigPath()
-  } catch (e) {
-    console.error('Failed to get config path:', e)
-    configPath.value = '获取失败'
-  }
-  await loadLogLevel()
   const unlocked = await safeCall(() => tauri.isDeveloperUnlocked(), 'check developer unlocked')
   if (unlocked) devUnlocked.value = unlocked
 })
@@ -103,40 +77,10 @@ onMounted(async () => {
 
 <template>
   <div class="space-y-6">
-    <!-- 系统设置 -->
+    <!-- 应用版本 + 开发者模式解锁入口 -->
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
-      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">系统</h3>
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">应用信息</h3>
       <div class="divide-y divide-gray-200">
-        <div class="px-5 py-4 flex items-center justify-between">
-          <div>
-            <p class="text-sm font-medium text-gray-900">日志级别</p>
-            <p class="text-xs text-gray-500 mt-0.5">控制日志输出的详细程度</p>
-          </div>
-          <Select
-            :model-value="logLevel"
-            :options="[
-              { label: '关闭', value: 0 },
-              { label: '错误', value: 1 },
-              { label: '警告', value: 2 },
-              { label: '信息', value: 3 },
-              { label: '调试', value: 4 },
-              { label: '跟踪', value: 5 },
-            ]"
-            style="min-width: 100px"
-            @update:model-value="logLevel = Number($event)"
-          />
-        </div>
-      </div>
-    </div>
-
-    <!-- 配置信息 -->
-    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
-      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">配置信息</h3>
-      <div class="divide-y divide-gray-200">
-        <div class="px-5 py-3">
-          <p class="text-sm text-gray-500 mb-1">配置文件路径</p>
-          <p class="text-xs text-gray-900 font-mono bg-gray-50 px-3 py-2 rounded break-all">{{ configPath || '加载中...' }}</p>
-        </div>
         <div
           class="px-5 py-3 flex items-center justify-between cursor-pointer select-none hover:bg-gray-50"
           @click="onVersionClick"

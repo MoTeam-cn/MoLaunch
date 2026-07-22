@@ -24,6 +24,9 @@ const cfEnabled = ref(false)
 const cfApiKey = ref('')
 const cfShowKey = ref(false)
 
+// 日志级别（控制日志输出详细程度，0=关闭 ~ 5=跟踪）
+const logLevel = ref(3)
+
 const { loaded, markDirty } = useConfigPage({
   delay: 1000,
   errorLabel: 'save advanced settings',
@@ -33,6 +36,7 @@ const { loaded, markDirty } = useConfigPage({
     proxyUrl.value = cfg.proxyUrl
     cfEnabled.value = cfg.curseforgeEnabled
     cfApiKey.value = cfg.curseforgeApiKey
+    logLevel.value = cfg.logLevel
   },
 })
 
@@ -44,6 +48,9 @@ watch(proxyUrl, (v) => markDirty('proxyUrl', v))
 // CurseForge：走加密存储（applyConfig 内部分流到 secure_storage）
 watch(cfEnabled, (v) => markDirty('curseforgeEnabled', v))
 watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
+
+// 日志级别：后端会同步调用 logger::set_level 立即生效
+watch(logLevel, (v) => markDirty('logLevel', v))
 </script>
 
 <template>
@@ -223,6 +230,32 @@ watch(cfApiKey, (v) => markDirty('curseforgeApiKey', v))
             </svg>
             <span>已配置，CurseForge 请求将走官方 API</span>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 系统设置（日志级别） -->
+    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">系统</h3>
+      <div class="divide-y divide-gray-200">
+        <div class="px-5 py-4 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-medium text-gray-900">日志级别</p>
+            <p class="text-xs text-gray-500 mt-0.5">控制日志输出的详细程度</p>
+          </div>
+          <Select
+            :model-value="logLevel"
+            :options="[
+              { label: '关闭', value: 0 },
+              { label: '错误', value: 1 },
+              { label: '警告', value: 2 },
+              { label: '信息', value: 3 },
+              { label: '调试', value: 4 },
+              { label: '跟踪', value: 5 },
+            ]"
+            style="min-width: 100px"
+            @update:model-value="logLevel = Number($event)"
+          />
         </div>
       </div>
     </div>

@@ -2,7 +2,7 @@
  * 开发者模式 API
  *
  * 触发流程：
- * 1. SettingsOther.vue 版本号连续点击 5 次 → unlockDeveloperMode()
+ * 1. SystemInfoTab.vue 版本号连续点击 5 次 → unlockDeveloperMode()
  * 2. SettingsAdvanced.vue 显示开关卡片（仅在已解锁时）→ applyConfig({ developerMode: true/false })
  * 3. Settings.vue 侧边菜单出现「开发者」项（仅在开关开启时）
  * 4. SettingsDeveloper.vue 展示日志/缓存/存储/系统信息

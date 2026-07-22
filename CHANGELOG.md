@@ -7,6 +7,18 @@
 
 ## [未发布]
 
+### 变更
+
+#### 设置页面结构调整：拆分「其他」分类
+- 删除侧边栏「其他」分类（SettingsOther.vue 已删除）
+- **日志级别** 迁移到「进阶设置」页（SettingsAdvanced.vue）的「系统」卡片，通过 useConfigPage 接入配置读写
+- **应用版本 + 开发者模式解锁入口 + SDK 信息** 迁移到「更多 → 系统信息」子页签（新建 SystemInfoTab.vue）
+- 「更多」顶部子菜单新增「系统信息」页签（关于 / 系统信息 / 鸣谢 / 教程）
+- 删除「配置文件路径」展示（不再需要）
+- 侧边栏「高阶配置」重命名为「进阶设置」，desc 同步更新为「日志、代理、CurseForge、社区资源等」
+- DevModeToggle.vue 与 developer.ts 注释同步：解锁触发点从「其他」改为「系统信息子页签」
+- Settings.vue 关闭开发者模式时的 fallback 路径从「其他」改为「更多」
+
 ### 重构
 
 #### 代码质量 V2 - 阶段 5.1：AppConfig struct 嵌套化
