@@ -49,15 +49,15 @@ pub fn validate_mirror_url(url: &str) -> Result<(), String> {
 
 /// 校验配置补丁：mirror_url SSRF、download_source / meta_source 枚举
 pub fn validate_patch(patch: &ConfigPatch) -> Result<(), String> {
-    if let Some(Some(ref url)) = patch.mirror_url {
+    if let Some(Some(ref url)) = patch.download.mirror_url {
         validate_mirror_url(url)?;
     }
-    if let Some(ref s) = patch.download_source {
+    if let Some(ref s) = patch.download.source {
         if !matches!(s.as_str(), "official" | "mirror" | "smart") {
             return Err(format!("无效的 download_source: {}", s));
         }
     }
-    if let Some(ref s) = patch.meta_source {
+    if let Some(ref s) = patch.download.meta_source {
         if !matches!(s.as_str(), "official" | "mirror" | "smart") {
             return Err(format!("无效的 meta_source: {}", s));
         }

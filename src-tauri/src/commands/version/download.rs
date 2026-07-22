@@ -36,12 +36,12 @@ pub async fn download_version(
 
     let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
     let config = state.config.lock().await;
-    let mirror_url = config.mirror_url.clone();
-    let max_threads = config.max_download_threads as usize;
-    let chunk_count = config.chunk_count as usize;
-    let speed_limit = config.max_download_speed;
+    let mirror_url = config.download.mirror_url.clone();
+    let max_threads = config.download.max_threads as usize;
+    let chunk_count = config.download.chunk_count as usize;
+    let speed_limit = config.download.max_speed;
     let source_mode =
-        crate::minecraft::sources::DownloadSourceMode::from_str(&config.download_source);
+        crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.source);
     drop(config);
 
     let game_path = game_dir.as_path();

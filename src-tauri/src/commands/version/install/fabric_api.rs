@@ -72,7 +72,7 @@ pub(crate) async fn auto_install_fabric_api(
             // 下载安装
             let source_mode_val = {
                 let config = state.config.lock().await;
-                crate::minecraft::sources::DownloadSourceMode::from_str(&config.meta_source)
+                crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.meta_source)
             };
 
             match crate::minecraft::loaders::fabric_api::install(

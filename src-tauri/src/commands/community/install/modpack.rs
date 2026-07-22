@@ -54,7 +54,7 @@ pub async fn install_modpack(
 
     // 解析游戏目录
     let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
-    let max_threads = state.config.lock().await.max_download_threads.max(1) as usize;
+    let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
 
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
     std::fs::create_dir_all(&instance_dir).map_err(|e| format!("创建整合包目录失败: {}", e))?;

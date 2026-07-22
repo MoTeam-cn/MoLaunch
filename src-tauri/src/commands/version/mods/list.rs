@@ -26,7 +26,7 @@ pub async fn is_version_modable(
 
     // 1. 检查个性化设置中是否强制为 "可安装Mod"
     let setup = VersionSetup::load_or_create(&version_dir, &version_id);
-    if let Some(dt) = setup.display_type {
+    if let Some(dt) = setup.display.display_type {
         if dt == 2 {
             return Ok(true);
         }

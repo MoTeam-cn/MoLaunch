@@ -2,19 +2,72 @@
 
 use serde::{Deserialize, Serialize};
 
+/// 代理配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ProxyConfig {
+    pub mode: String, // "none" | "system" | "custom"（原 proxy_mode）
+    pub kind: String, // "http" | "https" | "socks5"（原 proxy_type，避开 Rust 关键字 type）
+    pub url: String,  // 自定义代理地址，如 "127.0.0.1:7890"（原 proxy_url）
+}
+
+/// 下载配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DownloadConfig {
+    pub source: String,                      // "mirror" | "official" | "smart" — 文件下载源（原 download_source）
+    pub meta_source: String,                 // "mirror" | "official" | "smart" — 版本列表源（原 meta_source）
+    pub max_speed: u64,                      // 原 max_download_speed
+    pub max_threads: u32,                    // 原 max_download_threads
+    pub chunk_count: u32,                    // 原 chunk_count
+    pub mirror_url: Option<String>,          // 原 mirror_url
+    pub mirror_url_meta: Option<String>,     // 原 mirror_url_meta
+    pub mirror_url_download: Option<String>, // 原 mirror_url_download
+    pub mirror_mode: u32,                    // 原 mirror_mode
+}
+
+/// 内存配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MemoryConfig {
+    pub mode: String, // "auto" | "custom"（原 memory_mode）
+    pub min: u32,     // 原 min_memory
+    pub max: u32,     // 原 max_memory
+}
+
+/// 社区资源配置
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CommunityConfig {
+    /// 社区资源来源策略：0=尽量镜像 / 1=缓慢时换镜像 / 2=尽量官方（默认 2）
+    pub source: u8, // 原 community_source
+    /// 下载文件名格式：0=【译名】原名 / 1=[译名] 原名 / 2=译名-原名 / 3=原名-译名 / 4=仅原名（默认 1）
+    pub filename_format: u8, // 原 community_filename_format
+    /// Mod 管理页显示样式：0=标题译名/详情文件名 / 1=标题文件名/详情译名（默认 0）
+    pub mod_local_name_style: u8, // 原 community_mod_local_name_style
+    /// 在显示 Mod 加载器时忽略 Quilt（默认 true）
+    pub ignore_quilt: bool, // 原 community_ignore_quilt
+}
+
+/// 启动高级选项
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LaunchAdvancedConfig {
+    /// 禁用 Java Launch Wrapper（默认 false）
+    /// JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题
+    pub disable_jlw: bool, // 原 launch_disable_jlw
+    /// 禁用 LWJGL Unsafe Agent（默认 false）
+    /// LUA 用于修复 LWJGL 3.4.1 的一个性能问题
+    pub disable_lua: bool, // 原 launch_disable_lua
+    /// 使用高性能显卡（默认 false）
+    /// 自动在 Windows 设置中将启动器和 Java 改为使用高性能显卡
+    pub use_dedicated_gpu: bool, // 原 launch_use_dedicated_gpu
+}
+
 /// 应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
+    // ===== 通用（保持平铺）=====
     pub game_dir: String,
     /// Minecraft 文件夹列表（含默认和用户添加的）
     pub mc_folders: Vec<McFolder>,
-    pub max_download_threads: u32,
-    pub chunk_count: u32,
     pub isolation_mode: u32,
     pub log_level: u32,
-    pub min_memory: u32,
-    pub max_memory: u32,
-    pub memory_mode: String, // "auto" | "custom"
     pub theme: String,
     pub language: String,
     /// 游戏默认界面语言（写入 options.txt 的 lang 字段）
@@ -25,40 +78,18 @@ pub struct AppConfig {
     /// 主题主色 HEX（如 "#165dff"），前端读取后通过 applyPrimaryColor() 注入 CSS 变量
     /// 驱动 Tailwind primary-* 色阶与 main.css 中所有 var(--color-primary-*)
     pub primary_color: String,
-    pub mirror_url: Option<String>,
-    pub mirror_url_meta: Option<String>,
-    pub mirror_url_download: Option<String>,
-    pub mirror_mode: u32,
-    pub max_download_speed: u64,
-    pub download_source: String, // "mirror" | "official" | "smart" — 文件下载源
-    pub meta_source: String,     // "mirror" | "official" | "smart" — 版本列表源
-    pub proxy_mode: String,      // "none" | "system" | "custom"
-    pub proxy_type: String,      // "http" | "https" | "socks5"
-    pub proxy_url: String,       // 自定义代理地址，如 "127.0.0.1:7890"
     /// 上次选中的游戏版本（持久化，启动器重启后恢复）
     pub selected_version: Option<String>,
-    // ===== 社区资源配置 =====
-    /// 社区资源来源策略：0=尽量镜像 / 1=缓慢时换镜像 / 2=尽量官方（默认 2）
-    pub community_source: u8,
-    /// 下载文件名格式：0=【译名】原名 / 1=[译名] 原名 / 2=译名-原名 / 3=原名-译名 / 4=仅原名（默认 1）
-    pub community_filename_format: u8,
-    /// Mod 管理页显示样式：0=标题译名/详情文件名 / 1=标题文件名/详情译名（默认 0）
-    pub community_mod_local_name_style: u8,
-    /// 在显示 Mod 加载器时忽略 Quilt（默认 true）
-    pub community_ignore_quilt: bool,
-    // ===== 启动高级选项 =====
-    /// 禁用 Java Launch Wrapper（默认 false）
-    /// JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题
-    pub launch_disable_jlw: bool,
-    /// 禁用 LWJGL Unsafe Agent（默认 false）
-    /// LUA 用于修复 LWJGL 3.4.1 的一个性能问题
-    pub launch_disable_lua: bool,
-    /// 使用高性能显卡（默认 false）
-    /// 自动在 Windows 设置中将启动器和 Java 改为使用高性能显卡
-    pub launch_use_dedicated_gpu: bool,
     // ===== 外部下载工具 =====
     /// 外部下载工具的自定义保存目录（None 或空则用默认 .Molaunch/Download/）
     pub external_download_dir: Option<String>,
+
+    // ===== 分组 =====
+    pub proxy: ProxyConfig,
+    pub download: DownloadConfig,
+    pub memory: MemoryConfig,
+    pub community: CommunityConfig,
+    pub launch_advanced: LaunchAdvancedConfig,
 }
 
 /// Minecraft 文件夹项
@@ -79,36 +110,46 @@ impl Default for AppConfig {
                 name: "默认".to_string(),
                 path: default_game_dir,
             }],
-            max_download_threads: 8,
-            chunk_count: 4,
             isolation_mode: 4,
             log_level: 3,
-            min_memory: 0,
-            max_memory: 0,
-            memory_mode: "auto".to_string(),
             theme: "system".to_string(),
             language: "zh-CN".to_string(),
             game_language: "zh_cn".to_string(),
             primary_color: "#165dff".to_string(),
-            mirror_url: None,
-            mirror_url_meta: None,
-            mirror_url_download: None,
-            mirror_mode: 0,
-            max_download_speed: 0,
-            download_source: "smart".to_string(),
-            meta_source: "smart".to_string(),
-            proxy_mode: "none".to_string(),
-            proxy_type: "http".to_string(),
-            proxy_url: String::new(),
             selected_version: None,
-            community_source: 2,
-            community_filename_format: 1,
-            community_mod_local_name_style: 0,
-            community_ignore_quilt: true,
-            launch_disable_jlw: false,
-            launch_disable_lua: false,
-            launch_use_dedicated_gpu: false,
             external_download_dir: None,
+            proxy: ProxyConfig {
+                mode: "none".to_string(),
+                kind: "http".to_string(),
+                url: String::new(),
+            },
+            download: DownloadConfig {
+                source: "smart".to_string(),
+                meta_source: "smart".to_string(),
+                max_speed: 0,
+                max_threads: 8,
+                chunk_count: 4,
+                mirror_url: None,
+                mirror_url_meta: None,
+                mirror_url_download: None,
+                mirror_mode: 0,
+            },
+            memory: MemoryConfig {
+                mode: "auto".to_string(),
+                min: 0,
+                max: 0,
+            },
+            community: CommunityConfig {
+                source: 2,
+                filename_format: 1,
+                mod_local_name_style: 0,
+                ignore_quilt: true,
+            },
+            launch_advanced: LaunchAdvancedConfig {
+                disable_jlw: false,
+                disable_lua: false,
+                use_dedicated_gpu: false,
+            },
         }
     }
 }

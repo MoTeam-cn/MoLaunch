@@ -128,10 +128,10 @@ pub async fn install_merged(
     let (max_threads, chunk_count, speed_limit, download_source_mode) = {
         let config = state.config.lock().await;
         (
-            config.max_download_threads as usize,
-            config.chunk_count as usize,
-            config.max_download_speed,
-            DownloadSourceMode::from_str(&config.download_source),
+            config.download.max_threads as usize,
+            config.download.chunk_count as usize,
+            config.download.max_speed,
+            DownloadSourceMode::from_str(&config.download.source),
         )
     };
 

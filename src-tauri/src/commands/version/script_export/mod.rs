@@ -44,19 +44,19 @@ pub async fn export_launch_script(
     // 内存：版本独立设置 > 全局
     let min_memory;
     let max_memory;
-    match setup.memory_mode.as_deref().filter(|s| !s.is_empty()) {
+    match setup.java.memory_mode.as_deref().filter(|s| !s.is_empty()) {
         Some("auto") => {
             let (s_min, s_max) = crate::minecraft::system::suggest_memory();
             min_memory = s_min;
             max_memory = s_max;
         }
         Some("custom") => {
-            max_memory = setup.max_memory.unwrap_or(config.max_memory);
-            min_memory = setup.min_memory.unwrap_or_else(|| max_memory / 2);
+            max_memory = setup.java.max_memory.unwrap_or(config.memory.max);
+            min_memory = setup.java.min_memory.unwrap_or_else(|| max_memory / 2);
         }
         _ => {
-            min_memory = config.min_memory;
-            max_memory = config.max_memory;
+            min_memory = config.memory.min;
+            max_memory = config.memory.max;
         }
     }
     drop(config);
@@ -67,9 +67,9 @@ pub async fn export_launch_script(
     // Java 路径：前端传入 > custom 模式下的版本独立 > 自动检测
     // 注意：脚本导出仅支持 custom 模式的显式路径，auto_version/folder 模式按自动选择处理
     let resolved_java = java_path.or_else(|| {
-        let mode = setup.java_mode.as_deref().unwrap_or("").trim();
+        let mode = setup.java.java_mode.as_deref().unwrap_or("").trim();
         if mode.eq_ignore_ascii_case("custom") {
-            setup.java_path.clone().filter(|s| !s.is_empty())
+            setup.java.java_path.clone().filter(|s| !s.is_empty())
         } else {
             None
         }
@@ -87,6 +87,7 @@ pub async fn export_launch_script(
 
     // 服务器：从版本独立 server_enter 解析（"IP:Port" 格式）
     let (server_addr, server_port) = setup
+        .display
         .server_enter
         .as_deref()
         .filter(|s| !s.is_empty())
@@ -100,8 +101,8 @@ pub async fn export_launch_script(
             .map(|s| s.split_whitespace().map(String::from).collect())
             .unwrap_or_default()
     };
-    let extra_jvm_args = split_args(&setup.advance_jvm_args);
-    let extra_game_args = split_args(&setup.advance_game_args);
+    let extra_jvm_args = split_args(&setup.advanced.jvm_args);
+    let extra_game_args = split_args(&setup.advanced.game_args);
 
     // 构建认证信息
     // 安全修复：导出脚本时不使用真实 token（game_args 已脱敏为 ***）
@@ -202,7 +203,7 @@ pub async fn export_launch_script(
         jvm_args: &launch_args.jvm_args,
         main_class: &launch_args.main_class,
         game_args: &launch_args.game_args,
-        pre_launch_cmd: setup.advance_run_cmd.as_ref(),
+        pre_launch_cmd: setup.advanced.run_cmd.as_ref(),
     };
     let script = content::build_script_content(&script_info);
     content::write_script_file(&script, &save_path)?;

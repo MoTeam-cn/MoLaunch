@@ -76,57 +76,57 @@ impl VersionSetup {
             }
         };
 
-        let logo = pick_str("Logo", &setup.logo);
-        let custom_info = pick_str("CustomInfo", &setup.custom_info);
-        let display_type = pick_i32("DisplayType", setup.display_type);
-        let is_star = pick_bool("IsStar", setup.is_star);
-        let indie_type = pick_i32("IndieType", setup.indie_type);
-        let window_title = pick_str("WindowTitle", &setup.window_title);
-        let server_enter = pick_str("ServerEnter", &setup.server_enter);
-        let advance_jvm_args = pick_str("AdvanceJvmArgs", &setup.advance_jvm_args);
-        let advance_game_args = pick_str("AdvanceGameArgs", &setup.advance_game_args);
-        let advance_run_cmd = pick_str("AdvanceRunCmd", &setup.advance_run_cmd);
-        let java_path = pick_str("JavaPath", &setup.java_path);
-        let java_mode = pick_str("JavaMode", &setup.java_mode);
-        let java_version_min = pick_u32("JavaVersionMin", setup.java_version_min);
-        let java_version_max = pick_u32("JavaVersionMax", setup.java_version_max);
-        let memory_mode = pick_str("MemoryMode", &setup.memory_mode);
-        let min_memory = pick_u32("MinMemory", setup.min_memory);
-        let max_memory = pick_u32("MaxMemory", setup.max_memory);
+        let logo = pick_str("Logo", &setup.display.logo);
+        let custom_info = pick_str("CustomInfo", &setup.display.custom_info);
+        let display_type = pick_i32("DisplayType", setup.display.display_type);
+        let is_star = pick_bool("IsStar", setup.display.is_star);
+        let indie_type = pick_i32("IndieType", setup.display.indie_type);
+        let window_title = pick_str("WindowTitle", &setup.display.window_title);
+        let server_enter = pick_str("ServerEnter", &setup.display.server_enter);
+        let advance_jvm_args = pick_str("AdvanceJvmArgs", &setup.advanced.jvm_args);
+        let advance_game_args = pick_str("AdvanceGameArgs", &setup.advanced.game_args);
+        let advance_run_cmd = pick_str("AdvanceRunCmd", &setup.advanced.run_cmd);
+        let java_path = pick_str("JavaPath", &setup.java.java_path);
+        let java_mode = pick_str("JavaMode", &setup.java.java_mode);
+        let java_version_min = pick_u32("JavaVersionMin", setup.java.java_version_min);
+        let java_version_max = pick_u32("JavaVersionMax", setup.java.java_version_max);
+        let memory_mode = pick_str("MemoryMode", &setup.java.memory_mode);
+        let min_memory = pick_u32("MinMemory", setup.java.min_memory);
+        let max_memory = pick_u32("MaxMemory", setup.java.max_memory);
         let advance_disable_mod_update =
-            pick_bool("AdvanceDisableModUpdate", setup.advance_disable_mod_update);
+            pick_bool("AdvanceDisableModUpdate", setup.advanced.disable_mod_update);
         let advance_ignore_java_warning = pick_bool(
             "AdvanceIgnoreJavaWarning",
-            setup.advance_ignore_java_warning,
+            setup.advanced.ignore_java_warning,
         );
         let advance_disable_assets_verify = pick_bool(
             "AdvanceDisableAssetsVerify",
-            setup.advance_disable_assets_verify,
+            setup.advanced.disable_assets_verify,
         );
-        let advance_disable_jlw = pick_bool("AdvanceDisableJLW", setup.advance_disable_jlw);
-        let advance_disable_lua = pick_bool("AdvanceDisableLUA", setup.advance_disable_lua);
+        let advance_disable_jlw = pick_bool("AdvanceDisableJLW", setup.advanced.disable_jlw);
+        let advance_disable_lua = pick_bool("AdvanceDisableLUA", setup.advanced.disable_lua);
 
         let mut content = String::new();
         content.push_str("[info]\n");
-        content.push_str(&format!("OriginalVersion={}\n", setup.original_version));
-        content.push_str(&format!("Type={}\n", setup.version_type.as_str()));
+        content.push_str(&format!("OriginalVersion={}\n", setup.loader.original_version));
+        content.push_str(&format!("Type={}\n", setup.loader.version_type.as_str()));
 
-        if let Some(ref v) = setup.forge_version {
+        if let Some(ref v) = setup.loader.forge_version {
             content.push_str(&format!("ForgeVersion={}\n", v));
         }
-        if let Some(ref v) = setup.neoforge_version {
+        if let Some(ref v) = setup.loader.neoforge_version {
             content.push_str(&format!("NeoForgeVersion={}\n", v));
         }
-        if let Some(ref v) = setup.fabric_version {
+        if let Some(ref v) = setup.loader.fabric_version {
             content.push_str(&format!("FabricVersion={}\n", v));
         }
-        if let Some(ref v) = setup.quilt_version {
+        if let Some(ref v) = setup.loader.quilt_version {
             content.push_str(&format!("QuiltVersion={}\n", v));
         }
-        if let Some(ref v) = setup.optifine_version {
+        if let Some(ref v) = setup.loader.optifine_version {
             content.push_str(&format!("OptiFineVersion={}\n", v));
         }
-        if let Some(ref v) = setup.liteloader_version {
+        if let Some(ref v) = setup.loader.liteloader_version {
             content.push_str(&format!("LiteLoaderVersion={}\n", v));
         }
 

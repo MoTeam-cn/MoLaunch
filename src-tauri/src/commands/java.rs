@@ -258,8 +258,8 @@ pub async fn download_java(
     log_info!("[JavaDownload] Start downloading Java {}", target_major);
 
     let config = state.config.lock().await;
-    let dl_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.download_source);
-    let mirror_url = config.mirror_url.clone();
+    let dl_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.source);
+    let mirror_url = config.download.mirror_url.clone();
     drop(config);
 
     let java_exe = java::download::download_java_runtime(

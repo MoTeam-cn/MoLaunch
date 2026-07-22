@@ -112,7 +112,7 @@ pub(super) async fn install_cf_mods(
     }
 
     // 4. 读取用户设置的文件名格式
-    let filename_format = state.config.lock().await.community_filename_format;
+    let filename_format = state.config.lock().await.community.filename_format;
 
     // 5. 构造下载列表（CF 通常只有一个 download_url，包装为单元素数组）
     let mut download_list: Vec<(Vec<String>, String, u64)> = Vec::with_capacity(batch.data.len());

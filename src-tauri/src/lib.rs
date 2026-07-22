@@ -32,8 +32,8 @@ pub fn run() {
     let app_state = AppState::new();
     {
         let config = app_state.config.blocking_lock();
-        http::init_client(&config.proxy_mode, &config.proxy_type, &config.proxy_url);
-        log_info!("HTTP client initialized (proxy: {})", config.proxy_mode);
+        http::init_client(&config.proxy.mode, &config.proxy.kind, &config.proxy.url);
+        log_info!("HTTP client initialized (proxy: {})", config.proxy.mode);
 
         // 确保默认游戏目录存在
         // 启动时主动创建 .minecraft/versions/，避免用户首次点"打开游戏目录"时报路径不存在

@@ -76,7 +76,7 @@ pub(super) async fn install_mr_files(
     }
 
     // 3. 读取用户设置的文件名格式
-    let filename_format = state.config.lock().await.community_filename_format;
+    let filename_format = state.config.lock().await.community.filename_format;
 
     // 4. 构造下载列表
     let mut download_list: Vec<(Vec<String>, String, u64)> = Vec::with_capacity(mr_files.len());

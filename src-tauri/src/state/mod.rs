@@ -52,8 +52,8 @@ pub async fn resolve_game_dir_from_state(state: &AppState) -> PathBuf {
 /// ```ignore
 /// // 之前（4 行）：
 /// let config = state.config.lock().await;
-/// let mirror_url = config.mirror_url.clone();
-/// let source_mode = DownloadSourceMode::from_str(&config.meta_source);
+/// let mirror_url = config.download.mirror_url.clone();
+/// let source_mode = DownloadSourceMode::from_str(&config.download.meta_source);
 /// drop(config);
 ///
 /// // 之后（1 行）：
@@ -66,8 +66,8 @@ pub async fn resolve_mirror_and_source(
     crate::minecraft::sources::DownloadSourceMode,
 ) {
     let config = state.config.lock().await;
-    let mirror_url = config.mirror_url.clone();
-    let source_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.meta_source);
+    let mirror_url = config.download.mirror_url.clone();
+    let source_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.meta_source);
     drop(config);
     (mirror_url, source_mode)
 }

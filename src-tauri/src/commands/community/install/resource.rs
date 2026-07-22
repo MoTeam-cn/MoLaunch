@@ -33,9 +33,9 @@ pub async fn download_resource(
     let final_file_name = apply_filename_format(
         &req.file_name,
         req.translated_name.as_deref(),
-        config.community_filename_format,
+        config.community.filename_format,
     );
-    let chunk_count = config.chunk_count.max(1) as usize;
+    let chunk_count = config.download.chunk_count.max(1) as usize;
     drop(config);
 
     let target_dir = resolve_install_dir(&game_dir, req.resource_type, req.version_id.as_deref());
@@ -153,7 +153,7 @@ pub async fn format_download_filename(
     Ok(apply_filename_format(
         &file_name,
         translated_name.as_deref(),
-        config.community_filename_format,
+        config.community.filename_format,
     ))
 }
 
@@ -223,7 +223,7 @@ pub async fn download_resource_to_path(
     });
 
     let config = state.config.lock().await;
-    let chunk_count = config.chunk_count.max(1) as usize;
+    let chunk_count = config.download.chunk_count.max(1) as usize;
     drop(config);
 
     let manager = crate::minecraft::download::manager::DownloadManager::new(

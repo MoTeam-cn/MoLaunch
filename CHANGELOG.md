@@ -9,6 +9,29 @@
 
 ### 重构
 
+#### 代码质量 V2 - 阶段 5.1：AppConfig struct 嵌套化
+- 新增 5 个子 struct：`ProxyConfig`（mode/kind/url）、`DownloadConfig`（source/meta_source/max_speed/max_threads/chunk_count/mirror_*/mirror_mode）、`MemoryConfig`（mode/min/max）、`CommunityConfig`（source/filename_format/mod_local_name_style/ignore_quilt）、`LaunchAdvancedConfig`（disable_jlw/disable_lua/use_dedicated_gpu）
+- AppConfig 从 30 平铺字段变为 10 通用 + 5 分组，`proxy_type` 改名 `proxy.kind`（避开 Rust 关键字 `type`）
+- INI 手动映射代码（load_config/save_config）更新：section/key 名完全不变，用户配置文件零影响
+- 27 个文件的访问点迁移（如 `config.proxy_mode` → `config.proxy.mode`、`config.download_source` → `config.download.source`）
+- 编写 INI 迁移工具函数预留（`storage/ini.rs` 的 `merge_missing_from` 已支持旧 key 补全）
+
+#### 代码质量 V2 - 阶段 5.2：VersionSetup struct 嵌套化
+- 启用 4 个已建子 struct（`LoaderInfo` / `DisplayConfig` / `JavaConfig` / `AdvancedConfig`），移除 `#[allow(dead_code)]`
+- VersionSetup 从 30 平铺字段变为 4 嵌套（loader/display/java/advanced）
+- AdvancedConfig 字段去掉 `advance_` 前缀（如 `advance_jvm_args` → `jvm_args`），因已在 `advanced` 子 struct 中前缀冗余
+- setup.ini 读写代码更新：section/key 名完全不变
+- 10 个文件访问点迁移（如 `setup.java_path` → `setup.java.java_path`、`setup.advance_jvm_args` → `setup.advanced.jvm_args`）
+- PersonalizationUpdate 保持平铺（IPC 补丁 DTO，前端 camelCase JSON 传参），仅更新 apply 到 VersionSetup 时的访问路径
+
+#### 代码质量 V2 - 阶段 5.3：ConfigPatch / ConfigSnapshot struct 嵌套化
+- 新增 10 个子 struct：`ProxyPatch` / `DownloadPatch` / `MemoryPatch` / `CommunityPatch` / `LaunchAdvancedPatch` + 对应 5 个 Snapshot
+- 使用 `#[serde(flatten)]` 将子 struct 字段展平到父 struct 的 JSON 序列化中，配合 `#[serde(rename = "camelCaseKey")]` 保持前端 JSON key 完全不变（如 `proxyMode` / `downloadSource` / `mirrorUrl`）
+- `Vec<ConfigEntry>` 扁平传输格式不变，`get_config` / `apply_config` 的 IPC 逻辑零改动，前端零改动
+- build_snapshot 更新：从 AppConfig 嵌套字段映射到 ConfigSnapshot 嵌套子 struct
+- apply_config_inner 更新：从 ConfigPatch 嵌套字段映射到 AppConfig 嵌套字段
+- 3 个文件修改（types.rs + apply.rs + validate.rs）
+
 #### 代码质量 V2 - 阶段 1.6：F5 console.error 吞错模式迁移
 - 将 53 处"吞错模式"（catch 块仅 `console.error`，无 toast/rethrow/状态清理）迁移到 `utils/async.ts` 的 `safeCall`/`safeCallSync` 高阶函数
 - 覆盖 30 个文件（14 个 TS + 16 个 Vue），包括 stores（version/settings/sdk/plugins/java/auth）、composables（useConfigPage/useDownloadPolling/useLaunchState/useVersionSettings 等）、views（Downloads/Settings/SettingsOther 等）

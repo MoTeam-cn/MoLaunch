@@ -62,7 +62,7 @@ pub(super) async fn download_modpack_archive(
     });
 
     let config = state.config.lock().await;
-    let chunk_count = config.chunk_count.max(1) as usize;
+    let chunk_count = config.download.chunk_count.max(1) as usize;
     drop(config);
     let archive_manager = DownloadManager::new(4, chunk_count, 0, DownloadSourceMode::Smart)
         .with_cancel_flag(state.download_cancel_flag.clone())

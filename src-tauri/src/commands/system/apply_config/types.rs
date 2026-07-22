@@ -6,38 +6,82 @@
 
 use serde::{Deserialize, Serialize};
 
+// ============================================================
+// ConfigPatch 子 struct（serde(flatten) 展平到 ConfigPatch）
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ProxyPatch {
+    #[serde(rename = "proxyMode")]
+    pub mode: Option<String>,
+    #[serde(rename = "proxyType")]
+    pub kind: Option<String>,
+    #[serde(rename = "proxyUrl")]
+    pub url: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DownloadPatch {
+    #[serde(rename = "downloadSource")]
+    pub source: Option<String>,
+    #[serde(rename = "metaSource")]
+    pub meta_source: Option<String>,
+    #[serde(rename = "maxDownloadSpeed")]
+    pub max_speed: Option<u64>,
+    #[serde(rename = "maxDownloadThreads")]
+    pub max_threads: Option<u32>,
+    #[serde(rename = "chunkCount")]
+    pub chunk_count: Option<u32>,
+    /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
+    #[serde(rename = "mirrorUrl")]
+    pub mirror_url: Option<Option<String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MemoryPatch {
+    #[serde(rename = "memoryMode")]
+    pub mode: Option<String>,
+    #[serde(rename = "minMemory")]
+    pub min: Option<u32>,
+    #[serde(rename = "maxMemory")]
+    pub max: Option<u32>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CommunityPatch {
+    #[serde(rename = "communitySource")]
+    pub source: Option<u8>,
+    #[serde(rename = "communityFilenameFormat")]
+    pub filename_format: Option<u8>,
+    #[serde(rename = "communityModLocalNameStyle")]
+    pub mod_local_name_style: Option<u8>,
+    #[serde(rename = "communityIgnoreQuilt")]
+    pub ignore_quilt: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LaunchAdvancedPatch {
+    #[serde(rename = "launchDisableJlw")]
+    pub disable_jlw: Option<bool>,
+    #[serde(rename = "launchDisableLua")]
+    pub disable_lua: Option<bool>,
+    #[serde(rename = "launchUseDedicatedGpu")]
+    pub use_dedicated_gpu: Option<bool>,
+}
+
 /// 配置补丁：所有字段可选，仅传需要更新的字段
 ///
 /// 字段命名采用 camelCase 序列化（前端约定），与 `AppConfig` 的 snake_case
-/// 字段一一对应（通过 `#[serde(rename_all = "camelCase")]` 映射）
+/// 字段一一对应。通用字段通过 `#[serde(rename_all = "camelCase")]` 自动映射，
+/// 分组字段通过子 struct 的 `#[serde(rename = "...")]` 显式指定，并使用
+/// `#[serde(flatten)]` 展平到顶层 JSON（保持前端 `Vec<ConfigEntry>` 的 flat key 不变）。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigPatch {
-    // ===== 代理 =====
-    pub proxy_mode: Option<String>,
-    pub proxy_type: Option<String>,
-    pub proxy_url: Option<String>,
-
-    // ===== 下载 =====
-    /// "official" / "mirror" / "smart"
-    pub download_source: Option<String>,
-    pub meta_source: Option<String>,
-    pub max_download_speed: Option<u64>,
-    pub max_download_threads: Option<u32>,
-    pub chunk_count: Option<u32>,
-    /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
-    pub mirror_url: Option<Option<String>>,
-
-    // ===== 内存 =====
-    pub memory_mode: Option<String>,
-    pub min_memory: Option<u32>,
-    pub max_memory: Option<u32>,
-
-    // ===== 启动器 =====
+    // ===== 通用字段（保持平铺，rename_all = "camelCase" 自动映射）=====
     pub game_dir: Option<String>,
     pub isolation_mode: Option<u32>,
     pub log_level: Option<u32>,
-    pub selected_version: Option<Option<String>>,
     /// 游戏默认界面语言：写入 options.txt 的 lang 字段
     /// - "auto"：跟随启动器语言（旧配置兼容）
     /// - "zh_cn" / "en_us" / "ja_jp" / "ko_kr" 等 MC 标准语言代码
@@ -45,29 +89,92 @@ pub struct ConfigPatch {
     pub game_language: Option<String>,
     /// 主题主色 HEX（如 "#165dff"），前端注入 CSS 变量驱动 primary-* 色阶
     pub primary_color: Option<String>,
+    /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
+    pub selected_version: Option<Option<String>>,
+    /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"
+    pub external_download_dir: Option<Option<String>>,
 
-    // ===== 社区资源（INI 明文，进 AppConfig）=====
-    pub community_source: Option<u8>,
-    pub community_filename_format: Option<u8>,
-    pub community_mod_local_name_style: Option<u8>,
-    pub community_ignore_quilt: Option<bool>,
+    // ===== 分组字段（serde(flatten) 展平到顶层）=====
+    #[serde(flatten)]
+    pub proxy: ProxyPatch,
+    #[serde(flatten)]
+    pub download: DownloadPatch,
+    #[serde(flatten)]
+    pub memory: MemoryPatch,
+    #[serde(flatten)]
+    pub community: CommunityPatch,
+    #[serde(flatten)]
+    pub launch_advanced: LaunchAdvancedPatch,
 
     // ===== CurseForge（加密存储，不进 AppConfig，内部分流到 secure_storage）=====
     pub curseforge_enabled: Option<bool>,
     pub curseforge_api_key: Option<String>,
 
-    // ===== 启动高级选项 =====
-    pub launch_disable_jlw: Option<bool>,
-    pub launch_disable_lua: Option<bool>,
-    pub launch_use_dedicated_gpu: Option<bool>,
-
-    // ===== 外部下载工具 =====
-    /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"
-    pub external_download_dir: Option<Option<String>>,
-
     // ===== 开发者模式（注册表存储，不进 AppConfig，内部分流到 registry）=====
     /// 开关是否开启（仅在已解锁时可生效）
     pub developer_mode: Option<bool>,
+}
+
+// ============================================================
+// ConfigSnapshot 子 struct（serde(flatten) 展平到 ConfigSnapshot）
+// ============================================================
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ProxySnapshot {
+    #[serde(rename = "proxyMode")]
+    pub mode: String,
+    #[serde(rename = "proxyType")]
+    pub kind: String,
+    #[serde(rename = "proxyUrl")]
+    pub url: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct DownloadSnapshot {
+    #[serde(rename = "mirrorUrl")]
+    pub mirror_url: Option<String>,
+    #[serde(rename = "downloadSource")]
+    pub source: String,
+    #[serde(rename = "metaSource")]
+    pub meta_source: String,
+    #[serde(rename = "maxDownloadSpeed")]
+    pub max_speed: u64,
+    #[serde(rename = "maxDownloadThreads")]
+    pub max_threads: u32,
+    #[serde(rename = "chunkCount")]
+    pub chunk_count: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct MemorySnapshot {
+    #[serde(rename = "memoryMode")]
+    pub mode: String,
+    #[serde(rename = "minMemory")]
+    pub min: u32,
+    #[serde(rename = "maxMemory")]
+    pub max: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CommunitySnapshot {
+    #[serde(rename = "communitySource")]
+    pub source: u8,
+    #[serde(rename = "communityFilenameFormat")]
+    pub filename_format: u8,
+    #[serde(rename = "communityModLocalNameStyle")]
+    pub mod_local_name_style: u8,
+    #[serde(rename = "communityIgnoreQuilt")]
+    pub ignore_quilt: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct LaunchAdvancedSnapshot {
+    #[serde(rename = "launchDisableJlw")]
+    pub disable_jlw: bool,
+    #[serde(rename = "launchDisableLua")]
+    pub disable_lua: bool,
+    #[serde(rename = "launchUseDedicatedGpu")]
+    pub use_dedicated_gpu: bool,
 }
 
 /// 配置快照：返回所有配置字段的当前值
@@ -76,47 +183,40 @@ pub struct ConfigPatch {
 /// CurseForge 的 api_key 从 secure_storage 缓存读取（已解密），
 /// 若首次未解密则返回空字符串（懒加载，避免触发杀软误报）。
 /// 开发者模式从注册表读取（DeveloperUnlocked / DeveloperMode）。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// 通用字段通过 `#[serde(rename_all = "camelCase")]` 自动映射，
+/// 分组字段通过子 struct 的 `#[serde(rename = "...")]` 显式指定，并使用
+/// `#[serde(flatten)]` 展平到顶层 JSON（保持前端 `Vec<ConfigEntry>` 的 flat key 不变）。
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigSnapshot {
-    // 代理
-    pub proxy_mode: String,
-    pub proxy_type: String,
-    pub proxy_url: String,
-    // 下载
-    pub mirror_url: Option<String>,
-    pub download_source: String,
-    pub meta_source: String,
-    pub max_download_speed: u64,
-    pub max_download_threads: u32,
-    pub chunk_count: u32,
-    // 内存
-    pub memory_mode: String,
-    pub min_memory: u32,
-    pub max_memory: u32,
-    // 启动器
+    // ===== 通用字段（保持平铺，rename_all = "camelCase" 自动映射）=====
     pub game_dir: String,
     pub isolation_mode: u32,
     pub log_level: u32,
-    pub selected_version: Option<String>,
     /// 游戏默认界面语言
     pub game_language: String,
     /// 主题主色 HEX（如 "#165dff"）
     pub primary_color: String,
-    // 社区资源（INI 明文）
-    pub community_source: u8,
-    pub community_filename_format: u8,
-    pub community_mod_local_name_style: u8,
-    pub community_ignore_quilt: bool,
-    // CurseForge（从 secure_storage 缓存读，已解密）
-    pub curseforge_enabled: bool,
-    pub curseforge_api_key: String,
-    // 启动高级选项
-    pub launch_disable_jlw: bool,
-    pub launch_disable_lua: bool,
-    pub launch_use_dedicated_gpu: bool,
+    pub selected_version: Option<String>,
     // 外部下载工具
     pub external_download_dir: Option<String>,
+
+    // ===== 分组字段（serde(flatten) 展平到顶层）=====
+    #[serde(flatten)]
+    pub proxy: ProxySnapshot,
+    #[serde(flatten)]
+    pub download: DownloadSnapshot,
+    #[serde(flatten)]
+    pub memory: MemorySnapshot,
+    #[serde(flatten)]
+    pub community: CommunitySnapshot,
+    #[serde(flatten)]
+    pub launch_advanced: LaunchAdvancedSnapshot,
+
+    // ===== CurseForge（从 secure_storage 缓存读，已解密）=====
+    pub curseforge_enabled: bool,
+    pub curseforge_api_key: String,
     // 开发者模式（从注册表读）
     pub developer_unlocked: bool,
     pub developer_mode: bool,
@@ -145,34 +245,49 @@ pub fn build_snapshot(
     dev_mode: bool,
 ) -> ConfigSnapshot {
     ConfigSnapshot {
-        proxy_mode: config.proxy_mode.clone(),
-        proxy_type: config.proxy_type.clone(),
-        proxy_url: config.proxy_url.clone(),
-        mirror_url: config.mirror_url.clone(),
-        download_source: config.download_source.clone(),
-        meta_source: config.meta_source.clone(),
-        max_download_speed: config.max_download_speed,
-        max_download_threads: config.max_download_threads,
-        chunk_count: config.chunk_count,
-        memory_mode: config.memory_mode.clone(),
-        min_memory: config.min_memory,
-        max_memory: config.max_memory,
+        // 通用字段
         game_dir: config.game_dir.clone(),
         isolation_mode: config.isolation_mode,
         log_level: config.log_level,
-        selected_version: config.selected_version.clone(),
         game_language: config.game_language.clone(),
         primary_color: config.primary_color.clone(),
-        community_source: config.community_source,
-        community_filename_format: config.community_filename_format,
-        community_mod_local_name_style: config.community_mod_local_name_style,
-        community_ignore_quilt: config.community_ignore_quilt,
+        selected_version: config.selected_version.clone(),
+        external_download_dir: config.external_download_dir.clone(),
+
+        // 分组字段
+        proxy: ProxySnapshot {
+            mode: config.proxy.mode.clone(),
+            kind: config.proxy.kind.clone(),
+            url: config.proxy.url.clone(),
+        },
+        download: DownloadSnapshot {
+            mirror_url: config.download.mirror_url.clone(),
+            source: config.download.source.clone(),
+            meta_source: config.download.meta_source.clone(),
+            max_speed: config.download.max_speed,
+            max_threads: config.download.max_threads,
+            chunk_count: config.download.chunk_count,
+        },
+        memory: MemorySnapshot {
+            mode: config.memory.mode.clone(),
+            min: config.memory.min,
+            max: config.memory.max,
+        },
+        community: CommunitySnapshot {
+            source: config.community.source,
+            filename_format: config.community.filename_format,
+            mod_local_name_style: config.community.mod_local_name_style,
+            ignore_quilt: config.community.ignore_quilt,
+        },
+        launch_advanced: LaunchAdvancedSnapshot {
+            disable_jlw: config.launch_advanced.disable_jlw,
+            disable_lua: config.launch_advanced.disable_lua,
+            use_dedicated_gpu: config.launch_advanced.use_dedicated_gpu,
+        },
+
+        // 非 AppConfig 字段
         curseforge_enabled: cf_enabled,
         curseforge_api_key: cf_api_key.unwrap_or_default(),
-        launch_disable_jlw: config.launch_disable_jlw,
-        launch_disable_lua: config.launch_disable_lua,
-        launch_use_dedicated_gpu: config.launch_use_dedicated_gpu,
-        external_download_dir: config.external_download_dir.clone(),
         developer_unlocked: dev_unlocked,
         developer_mode: dev_mode,
     }

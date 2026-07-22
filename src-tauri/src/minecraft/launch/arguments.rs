@@ -61,9 +61,9 @@ pub fn build_launch_arguments(
         Ok(Some(setup)) => {
             log_info!(
                 "Loaded version type from setup.ini: {:?}",
-                setup.version_type
+                setup.loader.version_type
             );
-            setup.version_type
+            setup.loader.version_type
         }
         _ => {
             let detected = VersionType::detect_from_json(version_id, &json);

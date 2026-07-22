@@ -118,6 +118,7 @@ pub async fn list_installed_versions_with_type(
         // 读取版本独立 setup.ini 的 Logo 字段（空=自动判断）
         let version_dir = game_dir.join("versions").join(&version.id);
         let logo = VersionSetup::load_or_create(&version_dir, &version.id)
+            .display
             .logo
             .unwrap_or_default();
         result.push(InstalledVersionInfo {
@@ -143,7 +144,7 @@ pub fn resolve_isolation_mode(
 ) -> u32 {
     let version_dir = game_dir.join("versions").join(version_id);
     let setup = VersionSetup::load_or_create(&version_dir, version_id);
-    match setup.indie_type.unwrap_or(0) {
+    match setup.display.indie_type.unwrap_or(0) {
         1 => 4,           // 强制隔离 → IsolationAll
         2 => 0,           // 强制不隔离 → IsolationNone
         _ => global_mode, // 跟随全局

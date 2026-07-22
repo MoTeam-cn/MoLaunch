@@ -95,46 +95,46 @@ pub async fn set_config_value(
         }
         ("Java", "path") => {} // Java path 不在 AppConfig 中，走 INI [Java] 独立存储
         ("Download", "max_threads") => {
-            config.max_download_threads = value.parse().unwrap_or(0);
+            config.download.max_threads = value.parse().unwrap_or(0);
         }
         ("Download", "max_speed") => {
-            config.max_download_speed = value.parse().unwrap_or(0);
+            config.download.max_speed = value.parse().unwrap_or(0);
         }
-        ("Download", "source") => config.download_source = value.clone(),
-        ("Download", "meta_source") => config.meta_source = value.clone(),
+        ("Download", "source") => config.download.source = value.clone(),
+        ("Download", "meta_source") => config.download.meta_source = value.clone(),
         ("Download", "mirror_mode") => {
-            config.mirror_mode = value.parse().unwrap_or(0);
+            config.download.mirror_mode = value.parse().unwrap_or(0);
         }
         ("Download", "chunk_count") => {
-            config.chunk_count = value.parse().unwrap_or(0);
+            config.download.chunk_count = value.parse().unwrap_or(0);
         }
         ("Mirror", "url") => {
-            config.mirror_url = if value.is_empty() {
+            config.download.mirror_url = if value.is_empty() {
                 None
             } else {
                 Some(value.clone())
             }
         }
         ("Mirror", "url_meta") => {
-            config.mirror_url_meta = if value.is_empty() {
+            config.download.mirror_url_meta = if value.is_empty() {
                 None
             } else {
                 Some(value.clone())
             }
         }
         ("Mirror", "url_download") => {
-            config.mirror_url_download = if value.is_empty() {
+            config.download.mirror_url_download = if value.is_empty() {
                 None
             } else {
                 Some(value.clone())
             }
         }
-        ("Memory", "mode") => config.memory_mode = value.clone(),
+        ("Memory", "mode") => config.memory.mode = value.clone(),
         ("Memory", "min") => {
-            config.min_memory = value.parse().unwrap_or(0);
+            config.memory.min = value.parse().unwrap_or(0);
         }
         ("Memory", "max") => {
-            config.max_memory = value.parse().unwrap_or(0);
+            config.memory.max = value.parse().unwrap_or(0);
         }
         ("Log", "level") => {
             if let Ok(level) = value.parse::<u32>() {
@@ -152,9 +152,9 @@ pub async fn set_config_value(
                 log_info!("Log level changed to: {}", level);
             }
         }
-        ("Proxy", "mode") => config.proxy_mode = value.clone(),
-        ("Proxy", "type") => config.proxy_type = value.clone(),
-        ("Proxy", "url") => config.proxy_url = value.clone(),
+        ("Proxy", "mode") => config.proxy.mode = value.clone(),
+        ("Proxy", "type") => config.proxy.kind = value.clone(),
+        ("Proxy", "url") => config.proxy.url = value.clone(),
         _ => {}
     }
 

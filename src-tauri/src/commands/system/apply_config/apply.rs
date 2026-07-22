@@ -65,93 +65,93 @@ pub(crate) async fn apply_config_inner(
 // 域子函数（均在 update_config 闭包内调用，操作 &mut AppConfig）
 // ============================================================
 
-/// 代理域：proxy_mode / proxy_type / proxy_url
+/// 代理域：proxy.mode / proxy.kind / proxy.url
 fn apply_proxy(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
-    if let Some(ref mode) = patch.proxy_mode {
+    if let Some(ref mode) = patch.proxy.mode {
         log_info!("[Config] proxy_mode = {}", mode);
-        config.proxy_mode = mode.clone();
+        config.proxy.mode = mode.clone();
     }
-    if let Some(ref t) = patch.proxy_type {
+    if let Some(ref t) = patch.proxy.kind {
         log_info!("[Config] proxy_type = {}", t);
-        config.proxy_type = t.clone();
+        config.proxy.kind = t.clone();
     }
-    if let Some(ref url) = patch.proxy_url {
+    if let Some(ref url) = patch.proxy.url {
         log_info!("[Config] proxy_url = {}", url);
-        config.proxy_url = url.clone();
+        config.proxy.url = url.clone();
     }
 }
 
-/// 下载域：download_source / meta_source / max_download_speed / max_download_threads / chunk_count / mirror_url
+/// 下载域：download.source / meta_source / max_speed / max_threads / chunk_count / mirror_url
 fn apply_download(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
-    if let Some(ref source) = patch.download_source {
+    if let Some(ref source) = patch.download.source {
         log_info!("[Config] download_source = {}", source);
         let bmclapi = crate::minecraft::sources::BMCLAPI_BASE;
         match source.as_str() {
             "mirror" => {
-                config.mirror_url_download = Some(bmclapi.to_string());
-                config.mirror_url = Some(bmclapi.to_string());
-                config.mirror_mode = 0;
+                config.download.mirror_url_download = Some(bmclapi.to_string());
+                config.download.mirror_url = Some(bmclapi.to_string());
+                config.download.mirror_mode = 0;
             }
             "official" => {
-                config.mirror_url_download = None;
-                config.mirror_url = None;
-                config.mirror_mode = 0;
+                config.download.mirror_url_download = None;
+                config.download.mirror_url = None;
+                config.download.mirror_mode = 0;
             }
             "smart" => {
-                config.mirror_url_download = None;
-                config.mirror_url = None;
-                config.mirror_mode = 1;
+                config.download.mirror_url_download = None;
+                config.download.mirror_url = None;
+                config.download.mirror_mode = 1;
             }
             _ => {}
         }
-        config.download_source = source.clone();
+        config.download.source = source.clone();
     }
-    if let Some(ref source) = patch.meta_source {
+    if let Some(ref source) = patch.download.meta_source {
         log_info!("[Config] meta_source = {}", source);
         let bmclapi = crate::minecraft::sources::BMCLAPI_BASE;
         match source.as_str() {
-            "mirror" => config.mirror_url_meta = Some(bmclapi.to_string()),
-            "official" | "smart" => config.mirror_url_meta = None,
+            "mirror" => config.download.mirror_url_meta = Some(bmclapi.to_string()),
+            "official" | "smart" => config.download.mirror_url_meta = None,
             _ => {}
         }
-        config.meta_source = source.clone();
+        config.download.meta_source = source.clone();
     }
-    if let Some(speed) = patch.max_download_speed {
+    if let Some(speed) = patch.download.max_speed {
         log_info!("[Config] max_download_speed = {}", speed);
-        config.max_download_speed = speed;
+        config.download.max_speed = speed;
     }
-    if let Some(threads) = patch.max_download_threads {
+    if let Some(threads) = patch.download.max_threads {
         log_info!("[Config] max_download_threads = {}", threads);
-        config.max_download_threads = threads;
+        config.download.max_threads = threads;
     }
-    if let Some(count) = patch.chunk_count {
+    if let Some(count) = patch.download.chunk_count {
         log_info!("[Config] chunk_count = {}", count);
-        config.chunk_count = count;
+        config.download.chunk_count = count;
     }
-    if let Some(ref url_opt) = patch.mirror_url {
+    if let Some(ref url_opt) = patch.download.mirror_url {
         log_info!("[Config] mirror_url = {:?}", url_opt);
-        config.mirror_url = url_opt.clone();
+        config.download.mirror_url = url_opt.clone();
     }
 }
 
-/// 内存域：memory_mode（auto 联动清零）/ min_memory / max_memory
+/// 内存域：memory.mode（auto 联动清零）/ memory.min / memory.max
 fn apply_memory(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
-    if let Some(ref mode) = patch.memory_mode {
+    if let Some(ref mode) = patch.memory.mode {
         log_info!("[Config] memory_mode = {}", mode);
-        config.memory_mode = mode.clone();
+        config.memory.mode = mode.clone();
         if mode == "auto" {
             // 切换到自动模式时，清零内存值（保留原有联动）
-            config.min_memory = 0;
-            config.max_memory = 0;
+            config.memory.min = 0;
+            config.memory.max = 0;
         }
     }
-    if let Some(mem) = patch.min_memory {
+    if let Some(mem) = patch.memory.min {
         log_info!("[Config] min_memory = {}", mem);
-        config.min_memory = mem;
+        config.memory.min = mem;
     }
-    if let Some(mem) = patch.max_memory {
+    if let Some(mem) = patch.memory.max {
         log_info!("[Config] max_memory = {}", mem);
-        config.max_memory = mem;
+        config.memory.max = mem;
     }
 }
 
@@ -188,39 +188,39 @@ fn apply_launcher(
     }
 }
 
-/// 社区资源域：community_source / community_filename_format / community_mod_local_name_style / community_ignore_quilt
+/// 社区资源域：community.source / filename_format / mod_local_name_style / ignore_quilt
 fn apply_community(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
-    if let Some(source) = patch.community_source {
+    if let Some(source) = patch.community.source {
         log_info!("[Config] community_source = {}", source);
-        config.community_source = source;
+        config.community.source = source;
     }
-    if let Some(fmt) = patch.community_filename_format {
+    if let Some(fmt) = patch.community.filename_format {
         log_info!("[Config] community_filename_format = {}", fmt);
-        config.community_filename_format = fmt;
+        config.community.filename_format = fmt;
     }
-    if let Some(style) = patch.community_mod_local_name_style {
+    if let Some(style) = patch.community.mod_local_name_style {
         log_info!("[Config] community_mod_local_name_style = {}", style);
-        config.community_mod_local_name_style = style;
+        config.community.mod_local_name_style = style;
     }
-    if let Some(ignore) = patch.community_ignore_quilt {
+    if let Some(ignore) = patch.community.ignore_quilt {
         log_info!("[Config] community_ignore_quilt = {}", ignore);
-        config.community_ignore_quilt = ignore;
+        config.community.ignore_quilt = ignore;
     }
 }
 
-/// 启动高级选项域：launch_disable_jlw / launch_disable_lua / launch_use_dedicated_gpu
+/// 启动高级选项域：launch_advanced.disable_jlw / disable_lua / use_dedicated_gpu
 fn apply_launch_advanced(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
-    if let Some(v) = patch.launch_disable_jlw {
+    if let Some(v) = patch.launch_advanced.disable_jlw {
         log_info!("[Config] launch_disable_jlw = {}", v);
-        config.launch_disable_jlw = v;
+        config.launch_advanced.disable_jlw = v;
     }
-    if let Some(v) = patch.launch_disable_lua {
+    if let Some(v) = patch.launch_advanced.disable_lua {
         log_info!("[Config] launch_disable_lua = {}", v);
-        config.launch_disable_lua = v;
+        config.launch_advanced.disable_lua = v;
     }
-    if let Some(v) = patch.launch_use_dedicated_gpu {
+    if let Some(v) = patch.launch_advanced.use_dedicated_gpu {
         log_info!("[Config] launch_use_dedicated_gpu = {}", v);
-        config.launch_use_dedicated_gpu = v;
+        config.launch_advanced.use_dedicated_gpu = v;
     }
 }
 

@@ -66,7 +66,7 @@ pub(super) async fn download_files_concurrent(
 
     // 用 DownloadManager 下载（自动分片 + 多线程 + 重试 + URL fallback）
     let config = state.config.lock().await;
-    let chunk_count = config.chunk_count.max(1) as usize;
+    let chunk_count = config.download.chunk_count.max(1) as usize;
     drop(config);
     let manager = DownloadManager::new(max_threads, chunk_count, 0, DownloadSourceMode::Smart)
         .with_cancel_flag(state.download_cancel_flag.clone())
