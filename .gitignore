@@ -61,7 +61,7 @@ debug-docs
 code-libs
 
 # Tools
-tools
+/tools
 
 # API Server
 api-server
