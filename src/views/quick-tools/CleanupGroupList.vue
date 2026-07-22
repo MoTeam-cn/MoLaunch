@@ -115,15 +115,10 @@ function itemDisplayName(displayName: string): string {
             </span>
           </div>
         </div>
-        <!-- 组内全选状态指示 + 全选切换按钮 -->
-        <Tooltip
-          :text="group.selectedCount === group.items.length && group.items.length > 0
-            ? '点击取消全选'
-            : `点击全选（已选 ${group.selectedCount}/${group.items.length} 项，${formatBytes(group.selectedSize)}）`"
-          position="left"
-        >
+        <!-- 组内全选切换按钮：已选/总数直接显示在右侧徽章，避免 Tooltip 文案歧义 -->
+        <div class="flex flex-none items-center gap-1.5" @click.stop="emit('toggleGroupSelect', group.key)">
           <span
-            class="flex h-5 w-5 flex-none items-center justify-center rounded border transition-colors"
+            class="flex h-5 w-5 items-center justify-center rounded border transition-colors"
             :class="
               group.selectedCount === group.items.length && group.items.length > 0
                 ? 'border-primary-500 bg-primary-500 text-white'
@@ -131,12 +126,12 @@ function itemDisplayName(displayName: string): string {
                   ? 'border-primary-400 bg-primary-100 text-primary-600'
                   : 'border-gray-300 bg-white text-gray-400 hover:border-primary-300'
             "
-            @click.stop="emit('toggleGroupSelect', group.key)"
           >
             <CheckIcon v-if="group.selectedCount === group.items.length && group.items.length > 0" class="h-3 w-3" />
             <span v-else-if="group.selectedCount > 0" class="text-[10px] font-bold leading-none">{{ group.selectedCount }}</span>
           </span>
-        </Tooltip>
+          <span class="text-xs text-gray-500">{{ group.selectedCount }}/{{ group.items.length }}</span>
+        </div>
       </div>
 
       <!-- 分组内容（折叠动画） -->
