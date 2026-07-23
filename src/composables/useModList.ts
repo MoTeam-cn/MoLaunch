@@ -17,6 +17,7 @@
  */
 import { ref, computed, onUnmounted, type Ref, type ComputedRef } from 'vue'
 import * as tauri from '@/utils/tauri'
+import { pickFile } from '@/utils/fileDialog'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { useModsPreload } from '@/composables/useModsPreload'
@@ -238,9 +239,12 @@ export function useModList(options: UseModListOptions) {
   async function handleInstallMod() {
     if (!selectedId.value) return
     try {
-      const files = await tauri.selectFile('选择要安装的 Mod', [
-        { name: 'Mod 文件', extensions: ['jar', 'litemod', 'disabled', 'old'] },
-      ])
+      const files = await pickFile({
+        title: '选择要安装的 Mod',
+        filters: [
+          { name: 'Mod 文件', extensions: ['jar', 'litemod', 'disabled', 'old'] },
+        ],
+      })
       if (!files) return
       await tauri.installMod(selectedId.value, files)
       toastSuccess('Mod 安装成功')

@@ -6,8 +6,9 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import { usePluginStore } from '@/stores/plugins'
-import { saveFile, writeTextFile } from '@/utils/api/system'
+import { writeTextFile } from '@/utils/api/system'
 import { readLayoutSample } from '@/utils/api/plugins'
+import { pickSavePath } from '@/utils/fileDialog'
 import { toastInfo, toastSuccess, toastError } from '@/utils/toast'
 import Select from '@/components/common/Select.vue'
 import Button from '@/components/common/Button.vue'
@@ -127,11 +128,11 @@ async function onExportSampleLayout() {
   const defaultName = `layout-sample.${ext}`
   try {
     const content = await readLayoutSample(format)
-    const savePath = await saveFile(
-      '保存示例布局文件',
-      defaultName,
-      [{ name: `${ext.toUpperCase()} 文件`, extensions: [ext] }],
-    )
+    const savePath = await pickSavePath({
+      title: '保存示例布局文件',
+      defaultPath: defaultName,
+      filters: [{ name: `${ext.toUpperCase()} 文件`, extensions: [ext] }],
+    })
     if (!savePath) return
     await writeTextFile(savePath, content)
     toastSuccess(`示例布局已导出至：${savePath}`)

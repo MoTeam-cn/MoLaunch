@@ -15,7 +15,7 @@ import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, installModpack } from '@/utils/api/community'
 import { installMerged } from '@/utils/api/loader'
 import { useVersionStore } from '@/stores/version'
-import { saveFile } from '@/utils/api/system'
+import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showPrompt } from '@/utils/modal'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
@@ -96,7 +96,11 @@ async function handleDownload(v: ResourceVersion) {
     }
   }
 
-  const savePath = await saveFile('选择保存位置', finalFileName, [{ name: '所有文件', extensions: ['*'] }], props.modsDir)
+  const savePath = await pickSavePath({
+    title: '选择保存位置',
+    defaultPath: props.modsDir ? `${props.modsDir}/${finalFileName}` : finalFileName,
+    filters: [{ name: '所有文件', extensions: ['*'] }],
+  })
   if (!savePath) return
 
   downloading.value = v.id

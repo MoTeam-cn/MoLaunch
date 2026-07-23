@@ -180,14 +180,11 @@ pub fn run() {
             commands::java::get_java_requirements,
             commands::java::check_java_compatible,
             commands::java::download_java,
-            // 系统命令
+            // 系统命令（文件/文件夹选择对话框已统一走前端 @tauri-apps/plugin-dialog）
             commands::system::open_game_dir,
             commands::system::open_path,
             commands::system::reveal_in_explorer,
             commands::system::get_game_dir,
-            commands::system::select_folder,
-            commands::system::select_file,
-            commands::system::save_file,
             commands::system::write_text_file,
             // 统一配置读写命令（取代此前 33 个分散的 get_*/set_* 命令）
             commands::system::get_config,

@@ -9,6 +9,15 @@
 
 ### 变更
 
+#### 移除后端冗余的文件选择对话框命令
+- 删除 `src-tauri/src/commands/system/game_dir.rs` 中的 `select_folder` / `select_file` / `save_file` 三个 Tauri 命令及 `FileFilter` 结构体（这些命令本质只是把 `tauri-plugin-dialog` 又包了一层 Rust 边界，与前端 `@tauri-apps/plugin-dialog` 功能完全重叠）
+- 删除 `src-tauri/src/lib.rs` 中三个命令的 invoke_handler 注册
+- 删除 `src/utils/api/system.ts` 中的 `selectFolder` / `selectFile` / `saveFile` 三个前端封装函数
+- 保留 `write_text_file` 命令（非对话框，是写文本辅助命令，会自动创建父目录）
+- 统一使用 `src/utils/fileDialog.ts`（基于 `@tauri-apps/plugin-dialog`）的 `pickFile` / `pickDirectory` / `pickSavePath` 三个函数
+- 迁移 9 个文件 14 处调用点：CrashDialog.vue / FolderSidebar.vue / SettingsPlugins.vue / JavaCustomMode.vue / JavaPathSelector.vue / CustomLayoutSection.vue / ResourceDetail.vue / useExternalDownload.ts / useModList.ts / useVersionOverviewActions.ts / useSkinOperations.ts
+- CrashDialog.vue 的写文件方式从 `invoke('plugin:fs|write_text_file', ...)` 改为统一调用 `writeTextFile`（自动创建父目录 + 后端日志）
+
 #### 工具页文件选择器与 TOC 导航优化
 - 新增 `src/utils/fileDialog.ts`：封装 Tauri dialog 插件的 `pickFile` / `pickDirectory` / `pickSavePath` 三个函数，统一文件/文件夹选择对话框调用
 - 为 ArchiveManager（备份输出路径 + 恢复 zip 路径）、NbtViewer（NBT 文件路径）、DataExporter（导出输出路径）的输入框右侧添加文件选择器图标按钮（Input 的 append 插槽 + FolderOpenIcon），用户无需手动输入路径

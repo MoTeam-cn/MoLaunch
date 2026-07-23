@@ -11,6 +11,7 @@
 import { computed } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
+import { pickFile } from '@/utils/fileDialog'
 import { isJavaCompatible } from '@/utils/api/java'
 import { toastSuccess, toastError } from '@/utils/toast'
 import Select from '@/components/common/Select.vue'
@@ -85,9 +86,12 @@ async function handleSelectJavaFromList(value: string) {
 
 /** 手动导入 Java（选择 javaw.exe），导入后自动选中并保存 */
 async function handleImportJava() {
-  const filePath = await tauri.selectFile('选择 Java 可执行文件', [
-    { name: 'Java 可执行文件', extensions: ['exe'] },
-  ])
+  const filePath = await pickFile({
+    title: '选择 Java 可执行文件',
+    filters: [
+      { name: 'Java 可执行文件', extensions: ['exe'] },
+    ],
+  })
   if (!filePath) return
   await javaStore.refreshJava()
   const found = javaStore.javaList.find(j => j.executable === filePath)

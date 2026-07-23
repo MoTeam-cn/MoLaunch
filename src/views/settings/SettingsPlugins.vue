@@ -14,8 +14,8 @@ import { usePluginStore } from '@/stores/plugins'
 import Alert from '@/components/common/Alert.vue'
 import Button from '@/components/common/Button.vue'
 import { toastInfo, toastSuccess, toastError } from '@/utils/toast'
-import { selectFolder, selectFile, saveFile } from '@/utils/api/system'
 import { exportPluginSample } from '@/utils/api/plugins'
+import { pickFile, pickDirectory, pickSavePath } from '@/utils/fileDialog'
 import PluginFlowSteps from './plugins/PluginFlowSteps.vue'
 import PluginListSection from './plugins/PluginListSection.vue'
 import PermissionTableSection from './plugins/PermissionTableSection.vue'
@@ -38,7 +38,7 @@ async function onInstallFromFolder() {
   if (installingAny.value) return
   installingFolder.value = true
   try {
-    const folder = await selectFolder()
+    const folder = await pickDirectory()
     if (!folder) {
       return
     }
@@ -57,9 +57,12 @@ async function onInstallFromZip() {
   if (installingAny.value) return
   installingZip.value = true
   try {
-    const zipPath = await selectFile('选择插件 ZIP 文件', [
-      { name: 'ZIP 文件', extensions: ['zip'] },
-    ])
+    const zipPath = await pickFile({
+      title: '选择插件 ZIP 文件',
+      filters: [
+        { name: 'ZIP 文件', extensions: ['zip'] },
+      ],
+    })
     if (!zipPath) {
       return
     }
@@ -77,16 +80,16 @@ async function onInstallFromZip() {
 async function onExportPluginSample(asZip: boolean) {
   try {
     if (asZip) {
-      const savePath = await saveFile(
-        '保存示例插件 ZIP',
-        'plugin-sample.zip',
-        [{ name: 'ZIP 文件', extensions: ['zip'] }],
-      )
+      const savePath = await pickSavePath({
+        title: '保存示例插件 ZIP',
+        defaultPath: 'plugin-sample.zip',
+        filters: [{ name: 'ZIP 文件', extensions: ['zip'] }],
+      })
       if (!savePath) return
       await exportPluginSample(savePath, true)
       toastSuccess(`示例插件 ZIP 已导出至：${savePath}`)
     } else {
-      const folder = await selectFolder()
+      const folder = await pickDirectory()
       if (!folder) return
       await exportPluginSample(folder, false)
       toastSuccess(`示例插件已导出至：${folder}`)

@@ -17,6 +17,7 @@
 import { ref, nextTick, type ComputedRef, type Ref } from 'vue'
 import type { Router } from 'vue-router'
 import * as tauri from '@/utils/tauri'
+import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastWarning, toastInfo } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
 import type { VersionPersonalization } from '@/utils/tauri'
@@ -152,7 +153,11 @@ export function useVersionOverviewActions(options: UseVersionOverviewActionsOpti
     if (!authStore.isLoggedIn) return toastWarning('请先登录账号')
     const user = authStore.currentUser!
     try {
-      const savePath = await tauri.saveFile('选择脚本保存位置', `Run_${selectedId.value}.bat`, [{ name: '批处理文件', extensions: ['bat'] }])
+      const savePath = await pickSavePath({
+        title: '选择脚本保存位置',
+        defaultPath: `Run_${selectedId.value}.bat`,
+        filters: [{ name: '批处理文件', extensions: ['bat'] }],
+      })
       if (!savePath) return
       await tauri.exportLaunchScript(selectedId.value, user.name, user.uuid, user.login_type, javaStore.javaPath || null, savePath)
       toastSuccess('启动脚本已导出')

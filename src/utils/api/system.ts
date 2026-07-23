@@ -29,27 +29,12 @@ export async function getGameDir(): Promise<string> {
   return await invoke<string>('get_game_dir')
 }
 
-/** 选择文件夹（打开系统对话框） */
-export async function selectFolder(): Promise<string | null> {
-  return await invoke<string | null>('select_folder')
-}
-
-/** 选择文件（打开系统文件选择对话框） */
-export async function selectFile(title?: string, filters?: { name: string; extensions: string[] }[]): Promise<string | null> {
-  return await invoke<string | null>('select_file', { title, filters })
-}
-
-/** 保存文件对话框（让用户选择保存位置） */
-export async function saveFile(
-  title?: string,
-  defaultName?: string,
-  filters?: { name: string; extensions: string[] }[],
-  defaultDirectory?: string,
-): Promise<string | null> {
-  return await invoke<string | null>('save_file', { title, defaultName, filters, defaultDirectory })
-}
-
-/** 将文本内容写入指定路径的文件 */
+/**
+ * 将文本内容写入指定路径的文件
+ *
+ * 文件 / 文件夹选择对话框请使用 `@/utils/fileDialog`（基于 @tauri-apps/plugin-dialog）。
+ * 此命令仅负责写入文本，会自动创建父目录。
+ */
 export async function writeTextFile(path: string, content: string): Promise<void> {
   return await invoke<void>('write_text_file', { path, content })
 }

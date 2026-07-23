@@ -13,7 +13,8 @@ import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { formatBytes } from '@/utils/format'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
-import { selectFolder, openPath, pauseDownload, resumeDownload, cancelDownload } from '@/utils/api/system'
+import { openPath, pauseDownload, resumeDownload, cancelDownload } from '@/utils/api/system'
+import { pickDirectory } from '@/utils/fileDialog'
 import {
   downloadFile,
   getDownloadDir,
@@ -96,7 +97,7 @@ export function useExternalDownload() {
 
   // ==================== 下载目录管理 ====================
   async function selectDownloadDir() {
-    const folder = await selectFolder()
+    const folder = await pickDirectory()
     if (!folder) return
 
     try {

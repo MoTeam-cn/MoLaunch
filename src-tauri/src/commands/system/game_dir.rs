@@ -2,16 +2,13 @@
 //!
 //! Shell 命令（打开文件夹、选中文件等）已统一封装到
 //! `crate::minecraft::system::shell`，本模块仅保留 Tauri 命令包装层。
+//!
+//! 文件 / 文件夹选择对话框已统一改用前端 `@tauri-apps/plugin-dialog`，
+//! 后端不再重复封装 dialog 命令。
 
 use crate::log_info;
 use crate::state::AppState;
 use tauri::State;
-
-#[derive(serde::Deserialize)]
-pub struct FileFilter {
-    pub name: String,
-    pub extensions: Vec<String>,
-}
 
 /// 打开游戏目录
 #[tauri::command]
@@ -49,86 +46,9 @@ pub async fn get_game_dir(state: State<'_, AppState>) -> Result<String, String> 
     Ok(game_dir.to_string_lossy().to_string())
 }
 
-/// 选择文件夹
-#[tauri::command]
-pub async fn select_folder(
-    app: tauri::AppHandle,
-    current: Option<String>,
-) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-
-    let mut dialog = app.dialog().file();
-    if let Some(ref dir) = current {
-        dialog = dialog.set_directory(dir);
-    }
-
-    let result = dialog.blocking_pick_folder();
-    Ok(result.map(|p| p.to_string()))
-}
-
-/// 选择文件
-#[tauri::command]
-pub async fn select_file(
-    app: tauri::AppHandle,
-    title: Option<String>,
-    filters: Option<Vec<FileFilter>>,
-) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-
-    let mut dialog = app.dialog().file();
-    if let Some(t) = title {
-        dialog = dialog.set_title(&t);
-    }
-    if let Some(f) = filters {
-        for filter in f {
-            let exts: Vec<&str> = filter.extensions.iter().map(|s| s.as_str()).collect();
-            dialog = dialog.add_filter(&filter.name, &exts);
-        }
-    }
-
-    let result = dialog.blocking_pick_file();
-    Ok(result.map(|p| p.to_string()))
-}
-
-/// 保存文件对话框（让用户选择保存位置）
-#[tauri::command]
-pub async fn save_file(
-    app: tauri::AppHandle,
-    title: Option<String>,
-    default_name: Option<String>,
-    filters: Option<Vec<FileFilter>>,
-    default_directory: Option<String>,
-) -> Result<Option<String>, String> {
-    use tauri_plugin_dialog::DialogExt;
-
-    let mut dialog = app.dialog().file();
-    if let Some(t) = title {
-        dialog = dialog.set_title(&t);
-    }
-    if let Some(d) = default_directory {
-        // 设置对话框默认打开的目录（例如从 ModTab 打开时默认到整合包的 mods 文件夹）
-        let path = std::path::PathBuf::from(&d);
-        if path.exists() {
-            dialog = dialog.set_directory(&path);
-        }
-    }
-    if let Some(n) = default_name {
-        dialog = dialog.set_file_name(&n);
-    }
-    if let Some(f) = filters {
-        for filter in f {
-            let exts: Vec<&str> = filter.extensions.iter().map(|s| s.as_str()).collect();
-            dialog = dialog.add_filter(&filter.name, &exts);
-        }
-    }
-
-    let result = dialog.blocking_save_file();
-    Ok(result.map(|p| p.to_string()))
-}
-
 /// 写入文本文件到指定路径
 ///
-/// 用于导出示例文件（插件模板、布局示例等），路径通常由 `save_file` 对话框返回。
+/// 用于导出示例文件（插件模板、布局示例等），路径通常由前端 `pickSavePath` 对话框返回。
 /// 若文件已存在则覆盖，父目录不存在时自动创建。
 #[tauri::command]
 pub async fn write_text_file(path: String, content: String) -> Result<(), String> {

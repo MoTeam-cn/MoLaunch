@@ -121,10 +121,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-shell'
 import { toastSuccess, toastError } from '@/utils/toast'
-import { saveFile } from '@/utils/api/system'
+import { pickSavePath } from '@/utils/fileDialog'
+import { writeTextFile } from '@/utils/api/system'
 import type { CrashInfo } from '@/utils/crashDialog'
 import Button from '@/components/common/Button.vue'
 
@@ -180,17 +180,14 @@ async function exportReport() {
       lines.push('--- 游戏日志尾部 ---', ...info.log_tail, '')
     }
 
-    const filePath = await saveFile(
-      '选择保存位置',
-      `crash-report-${Date.now()}.txt`,
-      [{ name: '文本文件', extensions: ['txt'] }],
-    )
+    const filePath = await pickSavePath({
+      title: '选择保存位置',
+      defaultPath: `crash-report-${Date.now()}.txt`,
+      filters: [{ name: '文本文件', extensions: ['txt'] }],
+    })
     if (!filePath) return
 
-    await invoke('plugin:fs|write_text_file', {
-      path: filePath,
-      contents: lines.join('\n'),
-    })
+    await writeTextFile(filePath, lines.join('\n'))
     toastSuccess('导出成功', `错误报告已保存到：${filePath}`)
   } catch (e) {
     toastError('导出失败', String(e))

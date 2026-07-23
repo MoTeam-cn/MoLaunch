@@ -6,8 +6,8 @@
  * 父组件在文件夹切换后需要重新加载版本列表（通过 @switched 事件）。
  */
 import { ref, onMounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import * as tauri from '@/utils/tauri'
+import { pickDirectory } from '@/utils/fileDialog'
 import { toastSuccess, toastWarning, toastError } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
 import Button from '@/components/common/Button.vue'
@@ -59,7 +59,7 @@ async function switchFolder(folder: McFolder) {
 /** 添加文件夹 */
 async function addFolder() {
   try {
-    const selected = await invoke<string | null>('select_folder')
+    const selected = await pickDirectory({ title: '选择 .minecraft 文件夹' })
     if (!selected) return
 
     const normalized = selected.replace(/[\\/]+$/, '')

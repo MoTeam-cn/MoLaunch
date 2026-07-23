@@ -10,6 +10,7 @@
 import { ref, computed } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
+import { pickFile } from '@/utils/fileDialog'
 import { toastInfo, toastSuccess } from '@/utils/toast'
 import { showError } from '@/utils/modal'
 import Button from '@/components/common/Button.vue'
@@ -58,9 +59,12 @@ async function handleAutoDetectJava() {
 }
 
 async function handleManualImportJava() {
-  const selected = await safeCall(() => tauri.selectFile('选择 javaw.exe', [
-    { name: 'Java 可执行文件 (javaw.exe)', extensions: ['exe'] },
-  ]), 'select Java')
+  const selected = await safeCall(() => pickFile({
+    title: '选择 javaw.exe',
+    filters: [
+      { name: 'Java 可执行文件 (javaw.exe)', extensions: ['exe'] },
+    ],
+  }), 'select Java')
   if (selected) {
     // 验证必须是 javaw.exe
     const fileName = selected.split('\\').pop()?.split('/').pop()?.toLowerCase()

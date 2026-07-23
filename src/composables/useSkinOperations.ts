@@ -31,8 +31,9 @@
 import { ref, computed, type ComputedRef } from 'vue'
 import {
   getSkinCapeInfo, getSkinUrl, getCapeUrl, uploadSkin, equipCape, unequipCape,
-  selectFile, saveFile, downloadUrlToFile, type SkinCapeInfo,
+  downloadUrlToFile, type SkinCapeInfo,
 } from '@/utils/tauri'
+import { pickFile, pickSavePath } from '@/utils/fileDialog'
 import { onImageCached } from '@/composables/useImageCache'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { saveCustomSkin } from '@/utils/api/auth'
@@ -139,7 +140,7 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
 
   async function pickAndUpload() {
     try {
-      const filePath = await selectFile('选择皮肤 PNG 文件', [{ name: 'PNG 图片', extensions: ['png'] }])
+      const filePath = await pickFile({ title: '选择皮肤 PNG 文件', filters: [{ name: 'PNG 图片', extensions: ['png'] }] })
       if (!filePath) return
       await runWithRefresh('皮肤上传成功', () => uploadSkin(filePath, variant.value))
     } catch (e) {
@@ -184,7 +185,7 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
   /** 离线账号：上传自定义皮肤 PNG 文件 */
   async function onUploadCustomSkin() {
     try {
-      const filePath = await selectFile('选择皮肤 PNG 文件', [{ name: 'PNG 图片', extensions: ['png'] }])
+      const filePath = await pickFile({ title: '选择皮肤 PNG 文件', filters: [{ name: 'PNG 图片', extensions: ['png'] }] })
       if (!filePath) return
 
       uploading.value = true
@@ -212,7 +213,7 @@ export function useSkinOperations(options: UseSkinOperationsOptions) {
       return
     }
     const defaultName = `${username.value || 'skin'}_${variant.value === 'slim' ? 'alex' : 'steve'}.png`
-    const savePath = await saveFile('保存皮肤', defaultName, [{ name: 'PNG 图片', extensions: ['png'] }])
+    const savePath = await pickSavePath({ title: '保存皮肤', defaultPath: defaultName, filters: [{ name: 'PNG 图片', extensions: ['png'] }] })
     if (!savePath) return
     try {
       await downloadUrlToFile(skinUrl.value, savePath)
