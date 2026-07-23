@@ -1,7 +1,10 @@
 //! NBT 数据查看（解析玩家/方块/物品 NBT）
 //!
-//! 手动实现 NBT 解析器（big-endian 命名二进制标签格式）。
-//! 不使用 simdnbt —— 该 crate 依赖 nightly（`portable_simd`），无法在 stable 编译。
+//! 使用 `fastnbt` crate（stable 兼容，serde 设计）解析 NBT 二进制格式，
+//! 替代早期手动实现的解析器（约 296 行 → 约 130 行）。fastnbt 经社区验证，
+//! 可靠处理嵌套 TAG_List、空 compound、超大数组等边界情况。
+//!
+//! gzip 解压仍由 `flate2` 负责（NBT 文件如 player .dat / level.dat 通常 gzip 压缩）。
 //!
 //! 支持的标签类型（与 Minecraft NBT 规范一致）：
 //! `TAG_End=0, Byte=1, Short=2, Int=3, Long=4, Float=5, Double=6, Byte_Array=7,
@@ -9,31 +12,18 @@
 
 use std::io::Read;
 
+use fastnbt::Value as NbtValue;
+
 use crate::error_util::log_err;
 use crate::log_info;
 use crate::state::AppState;
 
 use super::types::{NbtNode, NbtParseParams, NbtParseResult};
 
-// ===== NBT 标签类型常量 =====
-const TAG_END: u8 = 0;
-const TAG_BYTE: u8 = 1;
-const TAG_SHORT: u8 = 2;
-const TAG_INT: u8 = 3;
-const TAG_LONG: u8 = 4;
-const TAG_FLOAT: u8 = 5;
-const TAG_DOUBLE: u8 = 6;
-const TAG_BYTE_ARRAY: u8 = 7;
-const TAG_STRING: u8 = 8;
-const TAG_LIST: u8 = 9;
-const TAG_COMPOUND: u8 = 10;
-const TAG_INT_ARRAY: u8 = 11;
-const TAG_LONG_ARRAY: u8 = 12;
-
 /// 解析 NBT 文件，返回 NbtNode 树
 ///
 /// 读取 `params.file_path` 指定的 NBT 文件（gzip 压缩或原始），
-/// 解析后转换为 `NbtNode` 树返回。
+/// 用 fastnbt 解析后转换为 `NbtNode` 树返回（保持前端 IPC 协议不变）。
 pub async fn parse(
     state: &AppState,
     params: NbtParseParams,
@@ -42,7 +32,7 @@ pub async fn parse(
     let file_path = params.file_path.clone();
     log_info!("[NBT] 解析文件: {}", file_path);
 
-    let root = tokio::task::spawn_blocking(move || -> Result<NbtNode, String> {
+    let (root_name, root_value) = tokio::task::spawn_blocking(move || -> Result<(String, NbtValue), String> {
         // 1. 读取文件字节
         let raw = std::fs::read(&file_path).map_err(log_err("NBT 读取文件失败"))?;
         if raw.is_empty() {
@@ -61,14 +51,25 @@ pub async fn parse(
             raw
         };
 
-        // 3. 解析 NBT 二进制格式
-        let mut reader = NbtReader::new(&data);
-        let root = parse_root(&mut reader)?;
-        root.ok_or_else(|| "NBT 文件无有效数据（根为 TAG_End）".to_string())
+        // 3. 根为 TAG_End（空 NBT）→ fastnbt 会报错，提前给出明确提示
+        if data.first() == Some(&0u8) {
+            return Err("NBT 文件无有效数据（根为 TAG_End）".to_string());
+        }
+
+        // 4. 读取根 compound 名称
+        // fastnbt::Value 不保留根名称（见 docs.rs/fastnbt Value 文档），
+        // 手动从字节流提取：[u8 tag_type][u16 name_len][name bytes][payload...]
+        let root_name = read_root_name(&data);
+
+        // 5. fastnbt 解析（serde 风格，处理剩余所有标签，含嵌套 List/Compound）
+        let value: NbtValue = fastnbt::from_bytes(&data)
+            .map_err(|e| format!("fastnbt 解析失败: {}", e))?;
+        Ok((root_name, value))
     })
     .await
     .map_err(log_err("NBT 解析任务失败"))??;
 
+    let root = convert_nbt(&root_name, &root_value);
     log_info!(
         "[NBT] 解析完成: 根节点 \"{}\" ({}), {} 个子节点",
         root.name,
@@ -80,122 +81,78 @@ pub async fn parse(
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
-// ===== NBT 解析器 =====
-
-/// 解析根标签：一个带名称的标签（通常为 TAG_Compound），或空（TAG_End）
-fn parse_root(r: &mut NbtReader) -> Result<Option<NbtNode>, String> {
-    let tag_type = r.read_u8()?;
-    if tag_type == TAG_END {
-        return Ok(None);
+/// 从 NBT 字节流读取根 compound 名称
+///
+/// NBT 根格式：`[u8 tag_type][u16 name_len][name bytes][payload...]`
+/// 长度不足或解析失败时返回空字符串（不阻塞解析）。
+fn read_root_name(data: &[u8]) -> String {
+    if data.len() < 3 {
+        return String::new();
     }
-    let name = r.read_string()?;
-    let mut node = parse_payload(r, tag_type)?;
-    node.name = name;
-    Ok(Some(node))
+    let len = u16::from_be_bytes([data[1], data[2]]) as usize;
+    if data.len() < 3 + len {
+        return String::new();
+    }
+    String::from_utf8_lossy(&data[3..3 + len]).into_owned()
 }
 
-/// 解析一个标签的 payload（不含类型字节与名称），返回 name 为空的 NbtNode
-fn parse_payload(r: &mut NbtReader, tag_type: u8) -> Result<NbtNode, String> {
-    match tag_type {
-        TAG_BYTE => {
-            let v = r.read_i8()?;
-            Ok(leaf("byte", to_value_or_null(v)))
-        }
-        TAG_SHORT => {
-            let v = r.read_i16_be()?;
-            Ok(leaf("short", to_value_or_null(v)))
-        }
-        TAG_INT => {
-            let v = r.read_i32_be()?;
-            Ok(leaf("int", to_value_or_null(v)))
-        }
-        TAG_LONG => {
-            let v = r.read_i64_be()?;
-            Ok(leaf("long", to_value_or_null(v)))
-        }
-        TAG_FLOAT => {
-            let v = r.read_f32_be()?;
-            Ok(leaf("float", to_value_or_null(v)))
-        }
-        TAG_DOUBLE => {
-            let v = r.read_f64_be()?;
-            Ok(leaf("double", to_value_or_null(v)))
-        }
-        TAG_BYTE_ARRAY => {
-            let len = read_array_len(r)?;
-            let bytes = r.read_bytes(len)?.to_vec();
-            Ok(leaf("byte_array", to_value_or_null(&bytes)))
-        }
-        TAG_STRING => {
-            let s = r.read_string()?;
-            Ok(leaf("string", serde_json::Value::String(s)))
-        }
-        TAG_LIST => {
-            let elem_type = r.read_u8()?;
-            let len = read_array_len(r)?;
-            let mut children = Vec::with_capacity(len);
-            for _ in 0..len {
-                children.push(parse_payload(r, elem_type)?);
-            }
-            Ok(NbtNode {
-                name: String::new(),
-                tag_type: "list".to_string(),
-                value: None,
-                children,
-            })
-        }
-        TAG_COMPOUND => {
-            let mut children = Vec::new();
-            loop {
-                let child_type = r.read_u8()?;
-                if child_type == TAG_END {
-                    break;
-                }
-                let child_name = r.read_string()?;
-                let mut node = parse_payload(r, child_type)?;
-                node.name = child_name;
-                children.push(node);
-            }
-            Ok(NbtNode {
-                name: String::new(),
+/// 将 fastnbt::Value 递归转换为 NbtNode（保持前端 IPC 协议不变）
+///
+/// 转换规则：
+/// - Compound → tag_type="compound"，children=HashMap 转 Vec<NbtNode>
+/// - List     → tag_type="list"，children=Vec<Value> 转 Vec<NbtNode>（list 元素 name 为空）
+/// - ByteArray → tag_type="byte_array"，value=Vec<u8>（0-255，与原手动实现一致）
+/// - 其他叶子 → tag_type=具体类型，value=serde_json 序列化
+fn convert_nbt(name: &str, value: &NbtValue) -> NbtNode {
+    match value {
+        NbtValue::Compound(map) => {
+            let children = map
+                .iter()
+                .map(|(k, v)| convert_nbt(k, v))
+                .collect();
+            NbtNode {
+                name: name.to_string(),
                 tag_type: "compound".to_string(),
                 value: None,
                 children,
-            })
-        }
-        TAG_INT_ARRAY => {
-            let len = read_array_len(r)?;
-            let mut arr = Vec::with_capacity(len);
-            for _ in 0..len {
-                arr.push(r.read_i32_be()?);
             }
-            Ok(leaf("int_array", to_value_or_null(&arr)))
         }
-        TAG_LONG_ARRAY => {
-            let len = read_array_len(r)?;
-            let mut arr = Vec::with_capacity(len);
-            for _ in 0..len {
-                arr.push(r.read_i64_be()?);
+        NbtValue::List(items) => {
+            let children = items.iter().map(|v| convert_nbt("", v)).collect();
+            NbtNode {
+                name: name.to_string(),
+                tag_type: "list".to_string(),
+                value: None,
+                children,
             }
-            Ok(leaf("long_array", to_value_or_null(&arr)))
         }
-        other => Err(format!("未知 NBT 标签类型: {}", other)),
+        NbtValue::Byte(v) => leaf(name, "byte", to_value_or_null(v)),
+        NbtValue::Short(v) => leaf(name, "short", to_value_or_null(v)),
+        NbtValue::Int(v) => leaf(name, "int", to_value_or_null(v)),
+        NbtValue::Long(v) => leaf(name, "long", to_value_or_null(v)),
+        NbtValue::Float(v) => leaf(name, "float", to_value_or_null(v)),
+        NbtValue::Double(v) => leaf(name, "double", to_value_or_null(v)),
+        NbtValue::ByteArray(arr) => {
+            // 原手动实现读取为 Vec<u8>（0-255），保持 JSON 输出兼容
+            let as_u8: Vec<u8> = arr.iter().map(|&b| b as u8).collect();
+            leaf(name, "byte_array", to_value_or_null(&as_u8))
+        }
+        NbtValue::String(s) => leaf(name, "string", serde_json::Value::String(s.clone())),
+        NbtValue::IntArray(arr) => {
+            let v: Vec<i32> = arr.iter().copied().collect();
+            leaf(name, "int_array", to_value_or_null(&v))
+        }
+        NbtValue::LongArray(arr) => {
+            let v: Vec<i64> = arr.iter().copied().collect();
+            leaf(name, "long_array", to_value_or_null(&v))
+        }
     }
 }
 
-/// 读取数组/列表长度（4 字节大端有符号整数），校验非负
-fn read_array_len(r: &mut NbtReader) -> Result<usize, String> {
-    let len = r.read_i32_be()?;
-    if len < 0 {
-        return Err(format!("NBT 长度为负: {}", len));
-    }
-    Ok(len as usize)
-}
-
-/// 构造叶子节点（name 为空，由调用方覆写）
-fn leaf(tag_type: &str, value: serde_json::Value) -> NbtNode {
+/// 构造叶子节点
+fn leaf(name: &str, tag_type: &str, value: serde_json::Value) -> NbtNode {
     NbtNode {
-        name: String::new(),
+        name: name.to_string(),
         tag_type: tag_type.to_string(),
         value: Some(value),
         children: Vec::new(),
@@ -205,92 +162,4 @@ fn leaf(tag_type: &str, value: serde_json::Value) -> NbtNode {
 /// 序列化为 serde_json::Value，失败（如 NaN/Inf 浮点）时降级为 null
 fn to_value_or_null<T: serde::Serialize>(v: T) -> serde_json::Value {
     serde_json::to_value(v).unwrap_or(serde_json::Value::Null)
-}
-
-// ===== NBT 字节读取器（大端） =====
-
-struct NbtReader<'a> {
-    data: &'a [u8],
-    pos: usize,
-}
-
-impl<'a> NbtReader<'a> {
-    fn new(data: &'a [u8]) -> Self {
-        Self { data, pos: 0 }
-    }
-
-    fn read_u8(&mut self) -> Result<u8, String> {
-        let b = *self
-            .data
-            .get(self.pos)
-            .ok_or_else(|| "NBT 意外结束（读取 u8）".to_string())?;
-        self.pos += 1;
-        Ok(b)
-    }
-
-    fn read_i8(&mut self) -> Result<i8, String> {
-        Ok(self.read_u8()? as i8)
-    }
-
-    fn read_i16_be(&mut self) -> Result<i16, String> {
-        let b = self.read_fixed(2)?;
-        Ok(i16::from_be_bytes([b[0], b[1]]))
-    }
-
-    fn read_i32_be(&mut self) -> Result<i32, String> {
-        let b = self.read_fixed(4)?;
-        Ok(i32::from_be_bytes([b[0], b[1], b[2], b[3]]))
-    }
-
-    fn read_i64_be(&mut self) -> Result<i64, String> {
-        let b = self.read_fixed(8)?;
-        Ok(i64::from_be_bytes([
-            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
-        ]))
-    }
-
-    fn read_f32_be(&mut self) -> Result<f32, String> {
-        let b = self.read_fixed(4)?;
-        Ok(f32::from_be_bytes([b[0], b[1], b[2], b[3]]))
-    }
-
-    fn read_f64_be(&mut self) -> Result<f64, String> {
-        let b = self.read_fixed(8)?;
-        Ok(f64::from_be_bytes([
-            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
-        ]))
-    }
-
-    /// 读取 NBT 字符串（2 字节大端长度前缀 + UTF-8 字节），用 lossy 转换
-    fn read_string(&mut self) -> Result<String, String> {
-        let len = self.read_u16_be()? as usize;
-        let bytes = self.read_bytes(len)?;
-        Ok(String::from_utf8_lossy(bytes).into_owned())
-    }
-
-    fn read_u16_be(&mut self) -> Result<u16, String> {
-        let b = self.read_fixed(2)?;
-        Ok(u16::from_be_bytes([b[0], b[1]]))
-    }
-
-    fn read_bytes(&mut self, len: usize) -> Result<&'a [u8], String> {
-        let end = self
-            .pos
-            .checked_add(len)
-            .ok_or_else(|| "NBT 长度溢出".to_string())?;
-        if end > self.data.len() {
-            return Err(format!(
-                "NBT 意外结束（读取 {} 字节，剩余 {}）",
-                len,
-                self.data.len() - self.pos
-            ));
-        }
-        let s = &self.data[self.pos..end];
-        self.pos = end;
-        Ok(s)
-    }
-
-    fn read_fixed(&mut self, n: usize) -> Result<&'a [u8], String> {
-        self.read_bytes(n)
-    }
 }
