@@ -93,8 +93,8 @@ function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldNam
         message="此种子地图还在测试中，不保护地图准确率，还待进一步更新测试，同时感谢 cubiomes 项目提供算法支持，虽然我们是基于他魔改的分支版本 =_="
       />
       <AlertV2
-        type="error"
-        message="本项目仍为半成品，不保证完全可用，部分版本（如 1.16）可能存在 WASM 内存越界问题，推荐等待后续更新。"
+        type="success"
+        message="本项目仍为半成品，目前测试 地图准确率不高，进一步优化好了，当然如果你有更好的方法 欢迎提出来"
       />
     </div>
 

@@ -9,6 +9,343 @@
 
 ### 变更
 
+#### 优化版本选择页分组卡片为可折叠展开动画
+- 优化：[VersionSelect.vue](src/views/VersionSelect.vue) 版本分组卡片改为可折叠，
+  默认全部收起，点击标题栏展开/收起。标题栏带分组类型图标（草方块/铁砧/Fabric 等，
+  复用 `typeMetaMap.icon`）+ 分组标题 + 数量徽标 + ChevronDown 旋转箭头。
+  内容区使用 `grid-template-rows 0fr→1fr` 平滑高度过渡动画，
+  与 [MoLaunchIntro.vue](src/components/about/MoLaunchIntro.vue) 的展开动画一致。
+- 自动展开：进入页面时自动展开当前选中版本所在的分组，用户无需手动查找。
+- 选中标识：选中项用左侧 2px primary 色边框 + 浅色背景标识（替代原整行浅色背景）。
+- 样式调整：分组标题栏图标从 `h-4 w-4` 放大为 `h-5 w-5` 与标题更搭；
+  padding 从 `px-5 py-4` 收紧为 `px-4 py-3`，卡片更紧凑不臃肿。
+- 背景：原实现每个分组默认展开全部版本，版本多时列表过长。改为默认收起后，
+  用户按需展开感兴趣的分组，列表更紧凑。
+
+#### 修复整合包安装 stage_index 硬编码导致进度显示错位
+- 背景：本地拖拽安装整合包时，mod 下载进度错误显示在"复制配置文件"阶段，
+  而"下载 MOD"阶段一直为 0%。根因是 stage_index 硬编码，未区分在线/本地两种 stage 结构。
+- 问题：[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)
+  `install_cf_mods` 硬编码 `stage_index=2`、[modrinth.rs](src-tauri/src/commands/community/install/modrinth.rs)
+  `install_mr_files` 硬编码 `stage_index=2`、[concurrent.rs](src-tauri/src/commands/community/install/concurrent.rs)
+  `extract_overrides` 硬编码 `set_stage_bytes(3, ...)`。
+  这组值只对"在线安装"（4 stages：0下载包/1解析/2下载MOD/3复制配置）正确，
+  对"本地拖拽"（3 stages：0解析/1下载MOD/2复制配置）错位一位。
+- 修复：三个函数都改为接受 `stage_index: usize` 参数，由调用方传入。
+  [modpack.rs](src-tauri/src/commands/community/install/modpack.rs)
+  在线安装传 2/3，本地拖拽传 1/2。
+
+#### 修复 CF 批量查询 mod info 用 GET /mods 返回 EOF 导致触发保底 URL 拼接
+- 背景：整合包安装时 `batch_get_mod_slugs` 调用 `GET /v1/mods?modIds=...`
+  批量查询 mod slug，CF 官方 API 返回空响应（`EOF while parsing a value at line 1 column 0`），
+  导致所有 mod 拿不到 slug，文件名无法应用 `community_filename_format` 翻译格式，
+  触发 `construct_cf_edge_url` 保底 URL 拼接（拼接出的 URL 直接 404）。
+- 根因：CF 官方 API `GET /v1/mods` 的 modIds 查询参数对数量敏感，
+  即使分批 50 个也偶发返回空响应；CF 官方推荐的批量查询接口是 `POST /v1/mods`，
+  请求体 `{"modIds":[...]}`，与 `POST /v1/mods/files` 一致，支持大批量 ID。
+- 修复：[mod.rs](src-tauri/src/minecraft/community/curseforge/mod.rs)
+  `batch_get_mod_slugs` 从 `cf_get("/mods?modIds=...")` 改为 `cf_post("/mods", {"modIds":[...]})`，
+  与 `fingerprint_search` 使用相同的 POST 接口。批次大小从 50 提升到 250，
+  平衡请求数与单次请求体大小。部分批次失败时只记录 warn 日志，不阻断整体查询。
+
+#### 优化整合包安装 mod 文件名处理与镜像源 Key 检查
+- 优化 1：[helpers.rs](src-tauri/src/commands/community/install/helpers.rs)
+  `apply_filename_format` 过滤译名中 Windows 文件名非法字符（`< > : " / \ | ? *` 及控制字符），
+  替换为下划线。修复 mcmod 译名含 `:` 等字符导致 `std::fs::File::create` 报 os error 的问题。
+- 优化 2：[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)
+  与 [modrinth.rs](src-tauri/src/commands/community/install/modrinth.rs)
+  移除 mod 文件名重命名日志（每个 mod 一条日志过于刷屏）。
+- 优化 3：[modpack.rs](src-tauri/src/commands/community/install/modpack.rs)
+  `install_modpack` 与 `install_local_modpack` 的 CF API Key 前置检查：
+  `source=0` 强制镜像时跳过检查（镜像站 mod.mcimirror.top 自带 Key 请求 CF，
+  用户无需配置自己的 Key 即可使用 /mods/files 等需要 Key 的接口）。
+  错误提示增加"或将下载源切换为「尽量镜像」使用镜像站"的引导。
+
+#### 安全兜底：镜像源域名强制不附加 CF API Key
+- 背景：用户担心 CurseForge API Key 泄露给镜像站。虽然上层 `get_cf_config` 在
+  source=0 强制镜像时已返回 `api_key=None`，source=1 回退镜像时也显式传 `None`，
+  但缺乏底层兜底，未来改动可能误把 key 带到镜像 URL。
+- 修复：[http.rs](src-tauri/src/minecraft/community/curseforge/http.rs)
+  `build_cf_request` 与 `build_cf_post_request` 在附加 `x-api-key` header 前检查
+  URL 域名：包含 `mcimirror.top` 时强制不附加 Key。镜像站自带 Key 请求 CF，
+  不需要用户 Key。即使上层逻辑误传 key 给镜像 URL，底层也会兜底剥离。
+
+#### 修复 CF CDN 分片下载 Range 404（supports_range 改用 GET + Range 检测）
+- 背景：CF CDN（edge.forgecdn.net）对 Range 请求返回 404，但 `supports_range`
+  用 HEAD 请求检测 `accept-ranges` header，CF CDN HEAD 虚假返回 `accept-ranges: bytes`，
+  导致代码误判支持分片，实际 GET + Range 返回 404，分片必然失败。
+  日志显示每个 mod 4 个 chunk 全部 404，浪费近 2 分钟才回退单流。
+- 根因：HEAD 请求的 `accept-ranges` header 不能反映服务端对实际 Range 请求的响应。
+  PCL2 不用 HEAD 预检，而是首线程不带 Range 拿 FileSize，后续线程带 Range 校验
+  ContentLength，Range 失败时切换源或回退单线程。
+- 修复：[probe.rs](src-tauri/src/minecraft/download/chunk/probe.rs)
+  `supports_range` 从 HEAD + `accept-ranges` 改为 GET + `Range: bytes=0-0`，
+  检查 HTTP 206 Partial Content 状态码。206 = 支持 Range，200/404/其他 = 不支持。
+  与 PCL2 的 GET + Range 动态检测策略一致，准确反映服务端真实行为。
+  CF CDN GET + Range 返回 404 时 `supports_range` 返回 false，直接走单流下载，
+  避免分片 404 浪费时间。
+
+#### 修复分片下载 404 后重试又走分片浪费近 2 分钟
+- 背景：CF CDN 对部分文件的 Range 请求返回 404，但完整 GET 请求返回 200。
+  分片 404 失败后回退单流，但单流也失败（见下条），重试时又走分片又 404，
+  浪费近 2 分钟才凑巧成功。日志显示 "尝试 1/3" → "尝试 2/3" 间隔 1分49秒。
+- 修复：[single.rs](src-tauri/src/minecraft/download/downloader/single.rs)
+  分片返回 404 时设置 `chunk_disabled = true`，后续重试直接跳过分片探测，
+  走单流下载。日志输出 "分片返回 404，禁用分片改走单流" 便于排查。
+
+#### 修复单流下载整体超时 5s 对大文件不够导致回退失败
+- 背景：分片 404 后回退单流，但 `stream.rs` 用 reqwest `.timeout(5s)` 设置整体超时，
+  89.8MB 文件 5 秒下载不完，单流也超时失败。导致大文件需要多次重试凑巧成功。
+- 根因：reqwest 的 `.timeout()` 是整个请求的超时，包括响应体流式读取。
+- 修复：[stream.rs](src-tauri/src/minecraft/download/downloader/stream.rs)
+  - 连接 + 响应头阶段：用 `tokio::time::timeout(timeout, send())` 包裹，
+    保持 5s/10s 短超时快速失败触发 URL 回退
+  - body 流式读取阶段：改用"无数据流动 15s 超时"（与 chunk 下载一致），
+    大文件慢速网络不受影响，只有真断流才会失败
+
+#### 修复 CurseForge 整合包 mods 不下载的关键 bug
+- 背景：用户反馈 CF 整合包（如 RLCraft 2.9.3）"安装完成"但 mods 目录为空。
+  对比 PCL2 源码（`ModModpack.vb` InstallPackCurseForge + `ResourceVersion.vb`
+  FromPlatformJson）后发现四个关键 bug。
+- Bug 1：[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)
+  `CfManifestFile` serde 字段映射错误：
+  - `#[serde(rename_all = "camelCase")]` 把 Rust `file_id` 映射到 JSON `fileId`（小写 d），
+    但 CF 官方 manifest.json 用 `fileID`（大写 ID），`fileId` ≠ `fileID` 导致反序列化失败，
+    所有 `file_id`/`project_id` 变成 None，`filter_map` 过滤后空 Vec，
+    触发"CF manifest 无有效 file_id，跳过依赖下载"日志。
+  - 修复：去掉 `rename_all = "camelCase"`，改用 `#[serde(alias = "fileID", alias = "fileId")]`
+    和 `#[serde(alias = "projectID", alias = "projectId")]` 兼容大写 ID（CF 官方）
+    和小写 id（部分第三方工具）两种写法。
+- Bug 2：[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)
+  `CfFileEntry` serde 字段映射错误：
+  - CF API `/v1/mods/files` 返回的 file id 字段名是 `id`（不是 `fileId`），
+    参考 PCL2 `ResourceVersion.FromPlatformJson` 中 `Data("id")`。
+    原 `rename_all = "camelCase"` 把 `file_id` 映射到 `fileId`，不匹配 `id`，
+    导致反序列化失败 `missing field fileId`。
+  - 修复：`#[serde(rename = "id")]` 把 `file_id` 映射到 JSON `id`。
+- Bug 3：[helpers.rs](src-tauri/src/commands/community/install/helpers.rs)
+  `construct_cf_edge_url`（downloadUrl 为空时的 CDN 直链兜底）：
+  - 原 `split_at(len-4)` 拆分方向反了，应为 `split_at(4)`（PCL2 Substring(0,4)/Substring(4)）。
+    例如 fileId=2725062 原逻辑拼成 `files/272/5062`（错），正确应为 `files/2725/62`。
+  - 原格式串漏掉 `file_name`，拼出的 URL 指向目录而非文件，下载必失败。
+  - 修复：`split_at(4)` + 余位 `parse::<i64>()` 去前导 0（与 PCL2 CInt 等价）
+    + 补上 `file_name`，最终格式 `{base}/files/{前4位}/{余位去0}/{file_name}`。
+- Bug 4：[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)
+  `install_cf_mods` 对 `batch.data` 为空时静默成功：
+  - `download_files_concurrent` 对空 `files` 列表直接返回 `Ok(())`（[concurrent.rs:28-32](src-tauri/src/commands/community/install/concurrent.rs#L28-L32)），
+    导致镜像源（mod.mcimirror.top）不支持 `/mods/files` 批量查询返回空 data 时，
+    `install_cf_mods` "成功"但 0 个 mod 下载，整合包"安装完成"而 mods 目录为空。
+  - 修复：在 `cf_post` 返回后增加空 data 校验，`batch.data.is_empty()` 时返回
+    `Err`，提示用户切换下载源到「缓慢时换镜像」或「尽量官方」（镜像源可能不支持
+    `/mods/files` POST 批量查询，需走官方 API）。
+- 参考 PCL2：PCL2 用同样的 `POST /v1/mods/files` 批量查询，`downloadUrl` 为空时
+  用 fileId 拼 `edge.forgecdn.net/files/{前4}/{余}/{FileName}` 兜底，并生成多个
+  CDN 域名变体（edge/media/mediafilez/overwolf 互换）+ MCIM 镜像源顺序尝试。
+- 验证：cargo check 0 errors，tsc 0 errors。需测试 RLCraft 2.9.3 等标准 CF 整合包
+  安装后 mods 目录是否有 170+ 个 jar 文件。
+
+#### 修复分片下载取消后仍重试的问题
+- 问题：用户在下载管理页暂停后取消任务，分片下载的 chunk 返回"下载已取消"错误，
+  但 [single.rs](src-tauri/src/minecraft/download/downloader/single.rs) 的重试循环
+  把它当作普通失败继续重试 max_retries=3 次，直到重试次数用完才停止，浪费时间
+  且日志刷屏 `[WARN] chunk N 失败: 下载已取消`。
+- 修复（[single.rs](src-tauri/src/minecraft/download/downloader/single.rs)）：
+  1. `while attempt < max_retries` 循环开头检查 `cancel_flag`，已取消时
+     `break 'url_loop` 跳出整个 URL 循环，不再重试。
+  2. 最终返回前检查 `cancel_flag`，已取消时返回 `error: "下载已取消"` 而非
+     `"所有下载源均失败"`，让上层准确判断取消状态。
+- 验证：cargo check 0 errors。需测试下载管理页暂停→取消后日志是否立即停止，
+  不再出现重试警告。
+
+#### 修复 CurseForge 整合包 manifest.json 解析失败（missing field projectId）
+- 问题：部分 CF 整合包 manifest.json 的 files 项缺失 `projectID` 字段，
+  导致 `CfManifestFile.project_id: i64` 反序列化失败，报错
+  `missing field projectId at line 21 column 5`。
+- 修复（[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)）：
+  - `CfManifestFile.project_id` 改为 `Option<i64>` + `#[serde(default)]`，兼容缺失字段。
+  - `install_cf_mods` 中 `project_ids` 用 `filter_map(|f| f.project_id)` 过滤 None。
+  - `file_translated` 构造改为 `project_id.and_then(...)` 链式调用，None 时跳过 slug 查询，
+    译名留空（仍正常下载，仅文件名不翻译）。
+- 参考 PCL2 ModModpack.vb InstallPackCurseForge：仅校验 `projectID` 和 `fileID` 存在，
+  不强制要求 projectID（部分老整合包仅 fileID）。
+- 验证：cargo check 0 errors 0 warnings。需测试缺失 projectID 的 CF 整合包安装。
+
+#### 修复安装失败时下载管理页卡在 0% 不退出的问题
+- 根因：后端 `install_modpack` / `install_local_modpack` / `install_merged` /
+  `download_version` 命令在 `?` 错误传播时没有重置 `download_state`，`is_active`
+  保持 true；前端 `isDownloading()` 轮询返回 true，Downloads.vue 的 watch 无法
+  触发 `router.back()`。
+- 后端修复（统一错误处理）：
+  - [modpack.rs](src-tauri/src/commands/community/install/modpack.rs)：`install_modpack`
+    和 `install_local_modpack` 将核心逻辑包在 `async { ... }.await` 中，外层
+    `if let Err(e) = result { ds.mark_failed(0); return Err(e); }` 统一处理错误，
+    确保任何阶段失败都重置 `is_active=false`。
+  - [install/mod.rs](src-tauri/src/commands/version/install/mod.rs)：`install_merged`
+    中 `download_version_full` 失败的 `map_err` 中添加 `ds.mark_failed(0)`。
+  - [download.rs](src-tauri/src/commands/version/download.rs)：`download_version`
+    中 `download_version_full` 失败的 `map_err` 中添加 `ds.mark_failed(0)`。
+- 前端修复（用户点击确定后自动退出下载页）：
+  - [useDragDrop.ts](src/composables/useDragDrop.ts)：`runModpackInstall` 的两个
+    catch 分支改用 `showModal({ type: 'error', ..., onConfirm: () => versionStore.finishDownload() })`，
+    用户点击确定后触发 `finishDownload()`，Downloads.vue 的 watch 自动 `router.back()`。
+  - [ResourceDetail.vue](src/components/community/ResourceDetail.vue)：`handleInstallModpack`
+    的 catch 分支同样改用 `showModal + onConfirm + finishDownload`。
+  - [useVersionInstallActions.ts](src/composables/useVersionInstallActions.ts)：
+    `onInstallRequest` 和 `handleDownload` 的 catch 分支同样改用
+    `showModal + onConfirm + finishDownload`。
+  - 设计原则：先显示错误弹窗（模态），用户点击确定后才调用 `finishDownload()`，
+    避免 watch 在 nextTick 触发 `router.back()` 导致弹窗一闪而过。
+- 验证：cargo check 0 errors 0 warnings，tsc 0 errors。需测试 CurseForge 整合包
+  在未配置 API Key 时拖拽安装，验证错误弹窗显示后点击确定能自动退出下载管理页。
+
+#### 统一所有下载场景的失败处理（showModal + 点击确定后退出）
+- 背景：之前只修复了整合包安装（`install_modpack` / `install_local_modpack`）、
+  版本下载（`download_version` / `install_merged`）的错误处理，但资源下载
+  （`download_resource_to_path`）、Mod 更新（`useModUpdate`）、外部下载
+  （`useExternalDownload`）仍用 `toastError + finishDownload`，不符合用户要求
+  "只要安装涉及到下载管理的地方都应该点击确定弹窗后退出"。
+- 前端统一修复（所有 `versionStore.startDownload` 调用点的 catch 分支）：
+  - [ResourceDetail.vue](src/components/community/ResourceDetail.vue)：`handleDownload`
+    （资源下载到本地）catch 改用 `showModal + onConfirm: finishDownload`。
+  - [useModUpdate.ts](src/composables/useModUpdate.ts)：`installSelected`
+    （Mod 更新下载）catch 改用 `showModal + onConfirm: finishDownload`，
+    移除不再使用的 `toastError` 导入，新增 `showModal` 导入。
+  - [useExternalDownload.ts](src/composables/useExternalDownload.ts)：`startDownload`
+    （外部 URL 下载）catch 改用 `showModal + onConfirm: finishDownload`，
+    新增 `showModal` 导入。
+- 轮询冲突修复（[useDownloadPolling.ts](src/composables/useDownloadPolling.ts)）：
+  - 问题：轮询检测到 `error_code != 0` 时会立即 `finishDownload + toastError`，
+    抢先于调用方 catch 的 `showModal`，导致用户被 `router.back()` 带走，看不到错误弹窗。
+  - 修复：`error_code` 路径改为只 `stopPolling`，不 `finishDownload`、不 `toastError`，
+    让调用方 catch 统一处理 `showModal + onConfirm: finishDownload`。
+    所有调用方（`useDragDrop` / `useVersionInstallActions` / `ResourceDetail` /
+    `useModUpdate` / `useExternalDownload`）都有 catch 处理，无遗漏。
+- 验证：tsc 0 errors。需测试资源下载、Mod 更新、外部下载失败时弹窗显示后点击确定能退出。
+
+#### 拓展拖拽安装整合包支持：HMCL / MMC / MCBBS 三种新格式
+- 背景：用户反馈 `hmcl`、`mmc`、`mcbbs` 这些类型的整合包无法拖拽安装，
+  而其他启动器（PCL2）均支持。分析 `code-libs/Plain Craft Launcher 2/Modules/Minecraft/ModModpack.vb`
+  发现 PCL2 支持 7 种格式（CurseForge / HMCL / MMC / MCBBS / Modrinth / LauncherPack / Compress），
+  而 MoLaunch 此前仅支持 CurseForge 和 Modrinth 两种。
+- 数据结构扩展（[src-tauri/src/commands/community/install/types.rs](src-tauri/src/commands/community/install/types.rs)）：
+  - `ModpackFormat` 枚举新增 `Hmcl` / `Mmc` / `Mcbbs` 三个变体。
+  - `ModpackInfo` 中间结构新增 `archive_base_folder`（关键文件层级前缀）、
+    `hmcl_manifest` / `mmc_pack` / `mcbbs_manifest` 三个 Option 字段。
+  - 移除原 `overrides_prefix` 单字段，改为由 `build_overrides_prefixes(format, base)`
+    动态构造前缀列表（CF/MR 双前缀，HMCL/MMC/MCBBS 单前缀）。
+- 新增三个数据结构模块（与现有 `curseforge.rs` / `modrinth.rs` 拆分约定一致）：
+  - [hmcl.rs](src-tauri/src/commands/community/install/hmcl.rs)：`HmclManifest { game_version, name }`
+  - [mmc.rs](src-tauri/src/commands/community/install/mmc.rs)：`MmcPack { components: Vec<MmcComponent> }`
+  - [mcbbs.rs](src-tauri/src/commands/community/install/mcbbs.rs)：`McbbsManifest { addons, name }`
+- 格式识别重写（[concurrent.rs](src-tauri/src/commands/community/install/concurrent.rs)）：
+  - 新增 `DetectedModpack` 结构体，包含 `format` / `archive_base_folder` /
+    `manifest_content` / `index_content` / `hmcl_content` / `mmc_content`。
+  - `detect_modpack_format` 改为返回 `DetectedModpack`，按 PCL2 优先级顺序扫描
+    关键文件：`mcbbs.packmeta` > `mmc-pack.json` > `modrinth.index.json` >
+    `manifest.json`（有 addons → Mcbbs，无 → Curseforge）> `modpack.json`。
+  - 两遍扫描：第一遍根目录，第二遍一级子目录（`archive_base_folder` 自动填充
+    `"subfolder/"` 前缀，与 PCL2 的 ArchiveBaseFolder 一致）。
+  - 新增 `build_overrides_prefixes` 函数：按 format 构造 overrides 前缀列表
+    （CF/MR：`overrides/` + `client-overrides/`；HMCL：`minecraft/`；MMC：`.minecraft/`；MCBBS：`overrides/`）。
+  - `extract_overrides` 改为接受 `prefixes: &[String]` 参数，按前缀列表匹配并去掉前缀。
+- 解析逻辑扩展（[modpack_stages.rs](src-tauri/src/commands/community/install/modpack_stages.rs)）：
+  - `parse_modpack_info` 改为接受 `&DetectedModpack` 引用，新增 HMCL/MMC/MCBBS 三个分支：
+    - HMCL：从 `modpack.json` 的 `gameVersion` 提取游戏版本；不解析加载器（与 PCL2 一致）。
+    - MMC：从 `mmc-pack.json` 的 `components[]` 按 uid 提取
+      `net.minecraft`（game）/ `net.minecraftforge`（forge）/
+      `net.neoforged`（neoforge）/ `net.fabricmc.fabric-loader`（fabric）；
+      跳过 `org.lwjgl.*`（与 PCL2 一致）。
+    - MCBBS：从 `mcbbs.packmeta` 或带 `addons` 的 `manifest.json` 的 `addons[]` 按 id 提取
+      `game` / `forge` / `neoforge` / `fabric` / `optifine`；遇到 `quilt` 直接报错
+      （PCL2 也不支持 Quilt）。
+- 安装流程调整（[modpack.rs](src-tauri/src/commands/community/install/modpack.rs)）：
+  - `install_modpack` 和 `install_local_modpack` 的 `match info.format` 新增
+    `Hmcl | Mmc | Mcbbs` 分支：跳过依赖 mods 下载（这些格式 mods 已打包在 overrides 中），
+    直接进入 Stage 3 解压 overrides。
+  - `extract_overrides` 调用改为传入 `build_overrides_prefixes(info.format, &info.archive_base_folder)`。
+- 前端类型扩展（[src/types/community.ts](src/types/community.ts)）：
+  `ModpackFormat` 类型扩展为 `'curseforge' | 'modrinth' | 'hmcl' | 'mmc' | 'mcbbs'`。
+- 行为对齐 PCL2：HMCL/MMC/MCBBS 整合包不下载依赖 mods，仅解压 overrides + 安装游戏本体。
+- 验证：cargo check 0 errors 0 warnings，tsc 0 errors。需测试三种新格式整合包
+  的拖拽安装流程，特别是 overrides 目录前缀正确性（HMCL 的 `minecraft/`、
+  MMC 的 `.minecraft/`、MCBBS 的 `overrides/`）。
+
+#### 新增拖拽全局遮蔽层 DragOverlay，提升拖拽体验
+- 背景：用户反馈拖拽整合包/Mod 时直接弹出实例名输入框过于生硬，缺乏其他启动器
+  （如 PCL2/HMCL）的全屏遮蔽层 + 图标 + 提示文案的视觉反馈。
+- 新增组件 [src/components/common/DragOverlay.vue](src/components/common/DragOverlay.vue)：
+  - 全屏 `fixed inset-0 z-[10001]` 半透明黑色背景 + backdrop-blur
+  - 中央虚线大卡片，根据拖拽类型显示不同图标和主标题：
+    整合包（ArchiveBoxIcon，primary 色）/ Mod（CubeIcon，emerald 色）/
+    批量 Mod（CubeIcon，emerald 色）/ 不支持的文件（ExclamationCircleIcon，amber 色）
+  - 卡片下方显示动态提示文案（如"松开以安装整合包"）与"将文件拖到此处释放"辅助提示
+  - 使用 Vue Transition 实现 0.18s opacity + scale 进入/离开动画，视觉柔和
+- 改造 [src/composables/useDragDrop.ts](src/composables/useDragDrop.ts)：
+  - 新增模块级单例 `dragState`（reactive），暴露 `active` / `hint` / `kind` 三字段
+  - 新增 `useDragDropState()` 返回 readonly 状态供 DragOverlay 订阅
+  - 新增 `classifyDrag(paths)` 函数，按扩展名预判拖拽类型与提示文案
+  - `onDragDropEvent` 事件处理改为 switch 分发：enter 显示遮蔽层，over 保持显示，
+    leave/drop 隐藏遮蔽层，drop 后异步分发到对应处理函数
+- [src/App.vue](src/App.vue) 顶层渲染 `<DragOverlay />`，随根组件生命周期自动管理。
+- 验证：tsc 通过，cargo check 通过。需测试拖拽 enter/leave/drop 各状态下遮蔽层
+  显示与隐藏是否平滑，不同文件类型图标和提示是否正确。
+
+#### 修复 CurseForge 整合包 manifest 中 files 项缺失 projectID 导致解析失败
+- 背景：用户拖入某些 CurseForge 整合包时报错
+  `解析 manifest.json 失败: missing field projectId at line 21 column 5`，
+  导致 Stage 1 直接中断。
+- 根因：`CfManifestFile.project_id` 原为必填 `i64` 字段，但部分第三方 CF 整合包
+  manifest 的 files 项仅含 `fileID`（无 `projectID`），强类型反序列化直接失败。
+  PCL2 ModModpack.vb 使用动态 JObject 解析，对缺失字段做跳过处理。
+- 修复（[src-tauri/src/commands/community/install/curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)）：
+  - `CfManifestFile.project_id` 改为 `Option<i64>` + `#[serde(default)]`，缺失时为 None。
+  - `install_cf_mods` 中 `project_ids` 改用 `filter_map` 过滤 None，缺失项跳过 slug 查询。
+  - `file_translated` 构造改为 `project_id.and_then(...)` 链式调用，缺失时译名直接为 None，
+    下载仍正常进行（仅文件名不应用 community_filename_format 译名重命名）。
+- 行为对齐 PCL2：缺失 projectID 不阻断安装，仅影响译名查询。
+- 验证：cargo check 通过。需测试缺失 projectID 的 CF 整合包能否正常解析并安装。
+
+#### 新增拖拽安装整合包与 Mod 功能（参考 PCL2 FormMain.FileDrag 路由分发）
+- 背景：MoLaunch 此前仅支持从社区资源页在线下载整合包，无法处理用户从本地
+  拖入的 .zip / .mrpack 整合包文件或 .jar / .litemod Mod 文件。参考 PCL2
+  的拖拽路由思路，为 MoLaunch 增加 CurseForge / Modrinth 两种格式的本地整合包
+  与 Mod 拖拽安装能力。
+- 后端（[src-tauri/src/commands/community/install/](src-tauri/src/commands/community/install/)）：
+  - 新增 `install_local_modpack` 命令（[modpack.rs](src-tauri/src/commands/community/install/modpack.rs)），
+    接收 `InstallLocalModpackRequest { file_path, instance_name }`，跳过 Stage 0
+    下载阶段，直接复用 Stage 1-3（解析 manifest → 下载依赖 mods → 解压 overrides）。
+    命令已在 [lib.rs](src-tauri/src/lib.rs) 的 invoke_handler 列表注册。
+  - 新增 `InstallLocalModpackRequest` 结构体（[types.rs](src-tauri/src/commands/community/install/types.rs)），
+    并在 [mod.rs](src-tauri/src/commands/community/install/mod.rs) re-export。
+  - 命令内部流程：校验文件存在 → 创建 instance 目录 → 重置 download_state
+    （3 个 stages：解析 / 下载 MOD / 复制配置）→ 打开 zip → detect_modpack_format
+    → CF 格式校验 API Key → parse_modpack_info → install_cf_mods / install_mr_files
+    → extract_overrides → 返回 InstallModpackResult。
+  - 清理死文件：删除 hmcl.rs / mmc.rs / mcbbs.rs（这三个文件定义了 HmclManifest /
+    MmcPack / McbbsManifest 结构体，但从未被 mod.rs 声明，完全未编译。当前
+    detect_modpack_format 只支持 CF / MR 两种格式，未来扩展时再添加）。
+- 前端：
+  - 新增 composable [src/composables/useDragDrop.ts](src/composables/useDragDrop.ts)，
+    使用 Tauri v2 `getCurrentWebview().onDragDropEvent` 监听拖拽事件，按扩展名
+    路由：`.zip`/`.mrpack` → 整合包安装，`.jar`/`.litemod`/`.disabled`/`.old`
+    → Mod 安装，`.rar` → 提示解压后重试，其他 → 提示无法识别。
+  - 整合包流程：弹窗输入实例名（默认取文件名去扩展名）→ `installLocalModpack`
+    → `installMerged` 安装游戏本体，进度通过 `download_state` 推送至 DownloadPanel。
+  - Mod 流程：弹窗选择目标版本（列出已安装版本）→ `installMod`，支持多文件
+    批量安装到同一版本。
+  - 在 [src/App.vue](src/App.vue) 根组件 setup 顶层调用 `useDragDrop()` 注册
+    全局监听，随根组件生命周期自动卸载。
+  - 扩展类型与 API：[src/types/community.ts](src/types/community.ts) 增加
+    `InstallLocalModpackRequest`；
+    [src/utils/api/community.ts](src/utils/api/community.ts) 新增
+    `installLocalModpack` 封装。
+- 验证：cargo check 通过（0 warning），tsc 通过。需测试：
+  (1) 拖入 CurseForge 整合包能否正确识别并安装（含缺失 projectID 的 manifest）；
+  (2) 拖入 Modrinth .mrpack 整合包能否正确安装；
+  (3) 拖入 .jar Mod 能否弹窗选版本并复制到 mods 目录；
+  (4) 拖入 .rar 能否给出友好提示；
+  (5) 多文件批量 Mod 安装的成功/失败统计。
+
 #### 种子地图新增半成品警告提示
 - 背景：1.16 版本 WASM 内存越界问题经四轮修复仍未彻底解决，需在 UI 上明确告知
   用户当前为半成品状态，避免误导。
