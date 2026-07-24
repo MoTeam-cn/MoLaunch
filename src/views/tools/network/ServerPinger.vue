@@ -20,6 +20,7 @@ import Input from '@/components/common/Input.vue'
 import { toastError } from '@/utils/toast'
 import { serverPing } from '@/utils/api/tools'
 import type { ServerPingResult } from '@/utils/api/tools'
+import { parseMcMotd } from '@/utils/motd'
 
 const host = ref('')
 const port = ref(25565)
@@ -109,7 +110,12 @@ function latencyColor(ms: number): string {
               class="h-12 w-12 flex-none rounded"
             />
             <div class="flex-1 min-w-0">
-              <div class="text-sm text-gray-800 whitespace-pre-wrap break-words">{{ result.motd || '（无 MOTD）' }}</div>
+              <div
+                v-if="result.motd_raw"
+                class="text-sm whitespace-pre-wrap break-words leading-relaxed"
+                v-html="parseMcMotd(result.motd_raw)"
+              />
+              <div v-else class="text-sm text-gray-800">{{ result.motd || '（无 MOTD）' }}</div>
             </div>
           </div>
 

@@ -500,6 +500,8 @@ pub struct ServerPingParams {
 pub struct ServerPingResult {
     /// 服务器 MOTD（纯文本，已从 JSON/section 符号中提取）
     pub motd: String,
+    /// 服务器 MOTD 原始文本（保留 § 格式化代码，供前端解析为彩色显示）
+    pub motd_raw: String,
     /// 当前在线人数
     pub online: i32,
     /// 最大人数

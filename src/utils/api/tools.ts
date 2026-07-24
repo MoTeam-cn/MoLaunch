@@ -419,6 +419,8 @@ export function networkLatencyTest(urls: string[]): Promise<NetworkLatencyResult
 /** 服务器状态检测结果 */
 export interface ServerPingResult {
   motd: string
+  /** 原始 MOTD（保留 § 格式化代码，供前端解析为彩色显示） */
+  motd_raw: string
   online: number
   max: number
   version: string

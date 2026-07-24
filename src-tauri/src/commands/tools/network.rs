@@ -111,6 +111,7 @@ pub async fn server_ping(
             );
             ServerPingResult {
                 motd: String::new(),
+                motd_raw: String::new(),
                 online: 0,
                 max: 0,
                 version: String::new(),
@@ -209,10 +210,11 @@ async fn ping_server(host: &str, port: u16) -> Result<ServerPingResult, String> 
         let latency = t2.saturating_sub(ts);
 
         // 提取字段
-        let motd = status
+        let motd_raw = status
             .get("description")
-            .map(extract_motd)
+            .map(extract_motd_raw)
             .unwrap_or_default();
+        let motd = strip_section_codes(&motd_raw);
         let players = status.get("players").cloned().unwrap_or_default();
         let online = players
             .get("online")
@@ -235,6 +237,7 @@ async fn ping_server(host: &str, port: u16) -> Result<ServerPingResult, String> 
 
         Ok(ServerPingResult {
             motd,
+            motd_raw,
             online,
             max,
             version,
@@ -295,14 +298,15 @@ async fn read_varint<R: AsyncRead + Unpin>(reader: &mut R) -> Result<i32, String
 
 // ===== MOTD 提取 =====
 
-/// 从 description 字段提取纯文本 MOTD
+/// 从 description 字段提取 MOTD 文本（保留 § 格式化代码）
 ///
 /// description 可能是：
 /// - 字符串：直接返回
 /// - 对象 `{ "text": "...", "extra": [...] }`：拼接 text 和所有 extra[].text
 ///
-/// 最后剥离 §格式化代码（§后跟一个字符）。
-fn extract_motd(description: &serde_json::Value) -> String {
+/// 注意：MC 服务器返回的 description 中 text 字段可能含 § 格式化代码（§+字符），
+/// 本函数保留这些代码（供前端彩色渲染）；如需纯文本用 `strip_section_codes`。
+fn extract_motd_raw(description: &serde_json::Value) -> String {
     let mut text = String::new();
     match description {
         serde_json::Value::String(s) => text.push_str(s),
@@ -318,7 +322,7 @@ fn extract_motd(description: &serde_json::Value) -> String {
         }
         _ => {}
     }
-    strip_section_codes(&text)
+    text
 }
 
 /// 递归收集 extra 数组中每个元素的 text 字段

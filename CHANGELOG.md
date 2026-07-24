@@ -3621,6 +3621,27 @@
   - `git rm --cached -r logo_data/`：同上清理 3 个 logo 数据文件。
   - [src-tauri/Cargo.toml](src-tauri/Cargo.toml)：`notify` 与 `windows` 依赖注释移除 "参考 PCL2 ..." 字样。
 
+#### 服务器状态检测 MOTD 彩色渲染（§ 格式化代码解析）
+- 背景：服务器状态检测工具的 MOTD 显示为纯文本，丢失了 Minecraft 多人联机 § 颜色/格式代码
+  的彩色效果（如 §a 绿色、§l 粗体、§c 红色），视觉体验差。
+- 根因：后端 [network.rs](src-tauri/src/commands/tools/network.rs) `extract_motd` 主动 `strip_section_codes`
+  剥离了 § 代码，前端 [ServerPinger.vue](src/views/tools/network/ServerPinger.vue) 直接 `{{ result.motd }}` 纯文本渲染。
+- 方案：后端新增 `motd_raw` 字段保留 § 代码（`motd` 纯文本字段保留向后兼容），前端新增 `parseMcMotd`
+  工具函数解析为带样式的 HTML span，组件 `v-html` 渲染。
+- 变更：
+  - [src-tauri/src/commands/tools/types.rs](src-tauri/src/commands/tools/types.rs)：
+    `ServerPingResult` 新增 `motd_raw: String` 字段（保留 § 格式化代码）。
+  - [src-tauri/src/commands/tools/network.rs](src-tauri/src/commands/tools/network.rs)：
+    `extract_motd` 重命名为 `extract_motd_raw`（保留 § 代码），调用处改为先取 raw 再 `strip_section_codes`
+    生成纯文本 `motd`，两字段一并返回。
+  - [src/utils/motd.ts](src/utils/motd.ts)：新建（120 行）。导出 `parseMcMotd(raw)` 函数，
+    解析 § + 颜色代码（0-9/a-g，对应 MC Java 调色板）和格式代码（k 混淆/l 粗体/m 删除线/n 下划线/o 斜体/r 重置）
+    为 HTML span + inline style。颜色代码隐式重置格式（对齐 MC 行为）。输出做 HTML 转义防 XSS。
+  - [src/utils/api/tools.ts](src/utils/api/tools.ts)：`ServerPingResult` 接口新增 `motd_raw: string` 字段。
+  - [src/views/tools/network/ServerPinger.vue](src/views/tools/network/ServerPinger.vue)：
+    MOTD 显示区改为 `v-html="parseMcMotd(result.motd_raw)"`（优先用 raw 解析彩色），
+    无 raw 时回退纯文本 `motd` 字段。
+
 ### 待实现
 - Mod 管理功能
 - 服务器列表功能
