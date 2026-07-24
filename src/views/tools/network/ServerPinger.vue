@@ -14,8 +14,11 @@ import {
   UsersIcon,
   ClockIcon,
   TagIcon,
+  DocumentTextIcon,
+  PaintBrushIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import Input from '@/components/common/Input.vue'
 import { toastError } from '@/utils/toast'
 import { serverPing } from '@/utils/api/tools'
@@ -26,6 +29,8 @@ const host = ref('')
 const port = ref(25565)
 const pinging = ref(false)
 const result = ref<ServerPingResult | null>(null)
+/** MOTD 显示模式：true=彩色（§ 解析），false=纯文本 */
+const motdColored = ref(true)
 
 async function doPing() {
   if (!host.value.trim()) return
@@ -102,20 +107,35 @@ function latencyColor(ms: number): string {
         <!-- 服务器信息 -->
         <template v-if="!result.error">
           <!-- Favicon + MOTD -->
-          <div v-if="result.favicon || result.motd" class="flex items-start gap-3 rounded-lg bg-gray-50 px-3 py-2.5">
-            <img
-              v-if="result.favicon"
-              :src="result.favicon"
-              alt="favicon"
-              class="h-12 w-12 flex-none rounded"
-            />
-            <div class="flex-1 min-w-0">
-              <div
-                v-if="result.motd_raw"
-                class="text-sm whitespace-pre-wrap break-words leading-relaxed"
-                v-html="parseMcMotd(result.motd_raw)"
+          <div v-if="result.favicon || result.motd" class="rounded-lg bg-gray-50 px-3 py-2.5">
+            <div class="flex items-start gap-3">
+              <img
+                v-if="result.favicon"
+                :src="result.favicon"
+                alt="favicon"
+                class="h-12 w-12 flex-none rounded"
               />
-              <div v-else class="text-sm text-gray-800">{{ result.motd || '（无 MOTD）' }}</div>
+              <div class="flex-1 min-w-0">
+                <div
+                  v-if="motdColored && result.motd_raw"
+                  class="text-sm whitespace-pre-wrap break-words leading-relaxed"
+                  v-html="parseMcMotd(result.motd_raw)"
+                />
+                <div v-else class="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
+                  {{ result.motd || '（无 MOTD）' }}
+                </div>
+              </div>
+              <!-- 彩色/纯文本切换 -->
+              <Tooltip
+                v-if="result.motd_raw && result.motd !== result.motd_raw"
+                :text="motdColored ? '切换为纯文本' : '切换为彩色'"
+              >
+                <Button type="ghost" size="small" @click="motdColored = !motdColored">
+                  <template #icon>
+                    <component :is="motdColored ? DocumentTextIcon : PaintBrushIcon" class="h-4 w-4" />
+                  </template>
+                </Button>
+              </Tooltip>
             </div>
           </div>
 

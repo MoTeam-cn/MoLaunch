@@ -3641,6 +3641,30 @@
   - [src/views/tools/network/ServerPinger.vue](src/views/tools/network/ServerPinger.vue)：
     MOTD 显示区改为 `v-html="parseMcMotd(result.motd_raw)"`（优先用 raw 解析彩色），
     无 raw 时回退纯文本 `motd` 字段。
+- 白底配色适配：MC 原版调色板为暗背景设计，亮色（a/b/c/d/e/g）在白底上刺眼难读。
+  [motd.ts](src/utils/motd.ts) `COLOR_MAP` 整体下调明度（如 #55FF55 → #1E8B1E、#FFFF55 → #B09000），
+  保留色相区分，确保白底可读性。
+- 纯文本/彩色切换：MOTD 区右侧新增切换按钮（复用 Button.vue + Tooltip.vue），
+  图标用 DocumentTextIcon/PaintBrushIcon（不用 Emoji）。仅当 `motd_raw` 与 `motd` 不一致时显示。
+
+#### 修复 23 个 tsc 类型错误（清零）
+- 背景：长期累积的 TypeScript 类型错误，虽不影响运行但污染类型检查输出。
+- 修复清单（共 12 文件）：
+  - [src/composables/useAccountCards.ts](src/composables/useAccountCards.ts) +
+    新建 [src/components/home/account-selector/types.ts](src/components/home/account-selector/types.ts)：
+    `AccountCardData` 接口抽离到独立 .ts（`*.vue` shim 不支持命名导出），`logoutUser` → `logout`。
+  - [src/stores/version.ts](src/stores/version.ts)：`loaderVersionsCache.forge` 类型从 `string[]`
+    改为 `{ version; is_recommended; release_time }[]`，与 `listForgeVersions` 返回值一致。
+  - [tsconfig.json](tsconfig.json)：`lib` 从 `ES2020` 改为 `ES2021`，支持 `Promise.any`。
+  - [src/composables/useModList.ts](src/composables/useModList.ts)：8 处 `toastSuccess(text1, text2)` 合并为单参数模板字符串。
+  - [src/composables/useModUpdate.ts](src/composables/useModUpdate.ts)：`props.mod` 在异步回调外捕获到局部变量 `mod` 避免非空收窄丢失。
+  - [src/composables/useSearchProgress.ts](src/composables/useSearchProgress.ts)：删除未使用 `startTime` 变量。
+  - [src/composables/useSkinOperations.ts](src/composables/useSkinOperations.ts)：删除未使用 `defaultSkins` import。
+  - [src/plugins/custom-layout/datasource.ts](src/plugins/custom-layout/datasource.ts)：删除空 import 语句。
+  - [src/router/index.ts](src/router/index.ts)：未使用 `from` 参数改为 `_from`。
+  - [src/stores/plugins.ts](src/stores/plugins.ts)：`ExternalPluginEntry` 改从 `@/utils/api/plugins` import；`onGameLaunch/onGameExit` 用 `Promise.resolve()` 包装返回值。
+  - [src/utils/api/config.ts](src/utils/api/config.ts)：`configCache as ConfigSnapshot` 改为 `as unknown as ConfigSnapshot`。
+  - [src/utils/api/skin.ts](src/utils/api/skin.ts) + [src/utils/tauri.ts](src/utils/tauri.ts)：`CachedImage` 接口移至 `image-cache.ts` 统一持有，删除 `skin.ts` 重复定义。
 
 ### 待实现
 - Mod 管理功能

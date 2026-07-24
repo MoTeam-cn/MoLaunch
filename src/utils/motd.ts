@@ -9,24 +9,30 @@
  * 输出已做 HTML 转义，防止 XSS。
  */
 
-/** MC 颜色代码 → CSS 颜色（对应 Java 版正颜色调色板） */
+/** MC 颜色代码 → CSS 颜色（白底可读适配版）
+ *
+ * MC 原版调色板为暗背景设计，亮色（a/b/c/d/e/g）在白底上刺眼难读。
+ * 本表整体下调明度，保留色相区分，确保白底可读性：
+ * - 亮色（a/b/c/d/e）从 #55FFFF → #0E9E9E 等，降低饱和度
+ * - 暗色（0/1/2/4/5）保持原值或略加深
+ */
 const COLOR_MAP: Record<string, string> = {
-  '0': '#000000', // black
+  '0': '#000000', // black（白底纯黑可读）
   '1': '#0000AA', // dark_blue
   '2': '#00AA00', // dark_green
   '3': '#00AAAA', // dark_aqua
   '4': '#AA0000', // dark_red
   '5': '#AA00AA', // dark_purple
-  '6': '#FFAA00', // gold
-  '7': '#AAAAAA', // gray
-  '8': '#555555', // dark_gray
-  '9': '#5555FF', // blue
-  a: '#55FF55', // green
-  b: '#55FFFF', // aqua
-  c: '#FF5555', // red
-  d: '#FF55FF', // light_purple
-  e: '#FFFF55', // yellow
-  g: '#DDD605', // minecoin_gold (1.16+)
+  '6': '#B07A00', // gold（原 #FFAA00 过亮，下调）
+  '7': '#6B6B6B', // gray（原 #AAAAAA 白底偏淡，加深）
+  '8': '#3D3D3D', // dark_gray（原 #555555 加深）
+  '9': '#1E6FFF', // blue（原 #5555FF 下调饱和度）
+  a: '#1E8B1E', // green（原 #55FF55 白底刺眼，大幅下调）
+  b: '#0E9E9E', // aqua（原 #55FFFF 大幅下调）
+  c: '#C93030', // red（原 #FF5555 下调）
+  d: '#C030C0', // light_purple（原 #FF55FF 下调）
+  e: '#B09000', // yellow（原 #FFFF55 白底几乎不可见，改棕黄）
+  g: '#8A7000', // minecoin_gold（原 #DDD605 下调）
 }
 
 /** 格式代码 → CSS 属性 */

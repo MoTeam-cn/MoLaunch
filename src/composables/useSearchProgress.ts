@@ -15,7 +15,6 @@ export function useSearchProgress() {
   let progressTimer: number | null = null
   let stageTimer: number | null = null
   let slowTimer: number | null = null
-  let startTime = 0
 
   /** 平台名（根据 source 动态生成提示文字） */
   let platformLabel = 'CurseForge 与 Modrinth'
@@ -32,7 +31,6 @@ export function useSearchProgress() {
     stage.value = 'requesting'
     percent.value = 5
     slowMerging.value = false
-    startTime = Date.now()
     progressTimer = window.setInterval(() => {
       if (percent.value < 85) {
         const remain = 85 - percent.value

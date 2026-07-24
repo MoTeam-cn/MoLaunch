@@ -207,7 +207,7 @@ export async function getConfigMap(force?: boolean): Promise<ConfigSnapshot> {
   }
   // 触发 getConfig 的请求并等待缓存写入
   await getConfig()
-  return configCache as ConfigSnapshot
+  return configCache as unknown as ConfigSnapshot
 }
 
 /**

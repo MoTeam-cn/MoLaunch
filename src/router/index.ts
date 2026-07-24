@@ -71,7 +71,7 @@ const router = createRouter({
   ],
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach((to, _from, next) => {
   const authStore = useAuthStore()
   // 会话恢复期间不拦截：restoreSession 是异步的，在 App.vue onMounted 中调用。
   // 若不跳过守卫，应用启动时 currentUser 还是 null，会把已登录用户错误地重定向到 /login。

@@ -19,7 +19,6 @@
  */
 
 import { pluginSdk } from '@/plugins/sdk'
-import type { CacheStatEntry, CacheStatsResult } from '@/plugins/sdk'
 import { formatBytes } from '@/utils/format'
 
 /** 数据源上下文（扁平化的键值对，供 {{key}} 插值） */

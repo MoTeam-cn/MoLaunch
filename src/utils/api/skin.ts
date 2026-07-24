@@ -3,6 +3,7 @@
  */
 
 import { invoke } from '@tauri-apps/api/core'
+import type { CachedImage } from './image-cache'
 
 export interface SkinInfo {
   id: string
@@ -31,16 +32,6 @@ export interface CapeInfo {
 export interface SkinCapeInfo {
   skins: SkinInfo[]
   capes: CapeInfo[]
-}
-
-/**
- * 缓存图片结果
- * - url: 立即用于渲染的 URL（本地缓存或远程）
- * - cached: true 表示本地缓存命中，无需网络
- */
-export interface CachedImage {
-  url: string
-  cached: boolean
 }
 
 /**

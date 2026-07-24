@@ -7,14 +7,7 @@
 import SkinAvatar from '@/components/common/SkinAvatar.vue'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
-
-export interface AccountCardData {
-  uuid: string
-  username: string
-  loginType: string  // '正版' | '离线'
-  isExpired?: boolean
-  isActive?: boolean
-}
+import type { AccountCardData } from './types'
 
 defineProps<{ card: AccountCardData }>()
 

@@ -12,7 +12,7 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { toastWarning } from '@/utils/toast'
-import type { AccountCardData } from '@/components/home/account-selector/AccountCard.vue'
+import type { AccountCardData } from '@/components/home/account-selector/types'
 
 export function useAccountCards() {
   const authStore = useAuthStore()
@@ -155,7 +155,7 @@ export function useAccountCards() {
     catch (e) { toastWarning(String(e)) }
   }
 
-  async function logout() { await authStore.logoutUser() }
+  async function logout() { await authStore.logout() }
 
   onMounted(() => {
     authStore.loadMsAccounts()

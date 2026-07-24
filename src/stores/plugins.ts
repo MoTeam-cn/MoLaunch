@@ -19,7 +19,6 @@ import type {
   PluginManifest,
   PluginRuntimeState,
   HomePanelMode,
-  ExternalPluginEntry,
   CustomLayoutConfig,
 } from '@/types/plugin'
 import { builtinPlugins } from '@/plugins'
@@ -28,6 +27,7 @@ import {
   installExternalPluginFromDir,
   installExternalPluginFromZip,
   uninstallExternalPlugin,
+  type ExternalPluginEntry,
 } from '@/utils/api/plugins'
 import {
   type PersonalizationData,
@@ -323,7 +323,7 @@ export const usePluginStore = defineStore('plugins', () => {
   async function notifyGameLaunch(versionId: string) {
     for (const plugin of enabledPlugins.value) {
       if (plugin.hooks?.onGameLaunch) {
-        await safeCall(() => plugin.hooks!.onGameLaunch!(versionId), `[Plugins] ${plugin.id} onGameLaunch`)
+        await safeCall(() => Promise.resolve(plugin.hooks!.onGameLaunch!(versionId)), `[Plugins] ${plugin.id} onGameLaunch`)
       }
     }
     window.dispatchEvent(new CustomEvent('plugin:game-launch', { detail: { versionId } }))
@@ -335,7 +335,7 @@ export const usePluginStore = defineStore('plugins', () => {
   async function notifyGameExit(versionId: string, exitCode: number | null) {
     for (const plugin of enabledPlugins.value) {
       if (plugin.hooks?.onGameExit) {
-        await safeCall(() => plugin.hooks!.onGameExit!(versionId, exitCode), `[Plugins] ${plugin.id} onGameExit`)
+        await safeCall(() => Promise.resolve(plugin.hooks!.onGameExit!(versionId, exitCode)), `[Plugins] ${plugin.id} onGameExit`)
       }
     }
     window.dispatchEvent(

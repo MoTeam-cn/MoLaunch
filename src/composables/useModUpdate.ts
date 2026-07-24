@@ -139,7 +139,8 @@ export function useModUpdate(
     if (!selectedVersion.value || !props.mod) return
 
     const version = selectedVersion.value
-    const oldFileName = props.mod.file_name
+    const mod = props.mod
+    const oldFileName = mod.file_name
 
     showConfirm(
       '确认安装',
@@ -156,7 +157,7 @@ export function useModUpdate(
           await downloadResourceToPath(version.download_url, version.file_name, modsDir)
 
           // 删除旧版本文件（如果文件名不同）
-          if (version.file_name !== oldFileName && version.file_name !== props.mod.enabled_name) {
+          if (version.file_name !== oldFileName && version.file_name !== mod.enabled_name) {
             try {
               await deleteMod(props.versionId, oldFileName)
             } catch {

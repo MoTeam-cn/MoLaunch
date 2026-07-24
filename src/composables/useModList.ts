@@ -135,7 +135,7 @@ export function useModList(options: UseModListOptions) {
         return saved ? { ...mod, ...saved } : mod
       })
     } catch (e) {
-      toastError('加载 Mod 列表失败', String(e))
+      toastError(`加载 Mod 列表失败：${String(e)}`)
       mods.value = []
     } finally {
       if (!silent) modsLoading.value = false
@@ -213,9 +213,9 @@ export function useModList(options: UseModListOptions) {
           is_enabled: enable,
         }
       }
-      toastSuccess(enable ? '已启用' : '已禁用', mod.enabled_name)
+      toastSuccess(`${enable ? '已启用' : '已禁用'}：${mod.enabled_name}`)
     } catch (e) {
-      toastError('操作失败', String(e))
+      toastError(`操作失败：${String(e)}`)
     }
   }
 
@@ -227,10 +227,10 @@ export function useModList(options: UseModListOptions) {
       async () => {
         try {
           await tauri.deleteMod(selectedId.value!, mod.file_name)
-          toastSuccess('Mod 已删除', mod.enabled_name)
+          toastSuccess(`Mod 已删除：${mod.enabled_name}`)
           await loadMods()
         } catch (e) {
-          toastError('删除失败', String(e))
+          toastError(`删除失败：${String(e)}`)
         }
       },
     )
@@ -250,7 +250,7 @@ export function useModList(options: UseModListOptions) {
       toastSuccess('Mod 安装成功')
       await loadMods()
     } catch (e) {
-      toastError('安装失败', String(e))
+      toastError(`安装失败：${String(e)}`)
     }
   }
 
@@ -259,7 +259,7 @@ export function useModList(options: UseModListOptions) {
     try {
       await tauri.openModsDir(selectedId.value)
     } catch (e) {
-      toastError('打开文件夹失败', String(e))
+      toastError(`打开文件夹失败：${String(e)}`)
     }
   }
 
@@ -269,7 +269,7 @@ export function useModList(options: UseModListOptions) {
     try {
       await tauri.revealModFile(selectedId.value, mod.file_name)
     } catch (e) {
-      toastError('打开文件位置失败', String(e))
+      toastError(`打开文件位置失败：${String(e)}`)
     }
   }
 

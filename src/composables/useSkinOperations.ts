@@ -38,7 +38,7 @@ import { onImageCached } from '@/composables/useImageCache'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { saveCustomSkin } from '@/utils/api/auth'
 import {
-  defaultSkins, getDefaultSkinEntry, getLocalSkinName, setLocalSkinName, bumpSkinVersion,
+  getDefaultSkinEntry, getLocalSkinName, setLocalSkinName, bumpSkinVersion,
   parseSkinUrl, parseSkinVariant,
 } from '@/utils/default-skin'
 import { safeCall } from '@/utils/async'

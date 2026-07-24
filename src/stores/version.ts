@@ -95,7 +95,7 @@ export const useVersionStore = defineStore('version', () => {
 
   // 加载器版本列表缓存（按 MC 版本号缓存）
   const loaderVersionsCache = ref<Record<string, {
-    forge: string[]
+    forge: { version: string; is_recommended: boolean; release_time: string }[]
     neoforge: { version: string; recommended: boolean }[]
     fabric: { version: string; stable: boolean }[]
     optifine: { display_name: string; is_preview: boolean }[]
@@ -164,7 +164,7 @@ export const useVersionStore = defineStore('version', () => {
 
   /** 设置加载器缓存 */
   function setLoaderCache(mcVersion: string, data: {
-    forge: string[]
+    forge: { version: string; is_recommended: boolean; release_time: string }[]
     neoforge: { version: string; recommended: boolean }[]
     fabric: { version: string; stable: boolean }[]
     optifine: { display_name: string; is_preview: boolean }[]
