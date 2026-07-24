@@ -1,0 +1,3 @@
+[submodule "src-tauri/cubiomes"]
+	path = src-tauri/cubiomes
+	url = https://github.com/MoTeam-cn/cubiomes
