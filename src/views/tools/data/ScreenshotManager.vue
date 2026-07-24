@@ -2,10 +2,11 @@
 /**
  * 截图批量管理
  *
- * 列举 {game_dir}/screenshots/ 下的截图文件，支持多选与批量删除。
+ * 列举 screenshots 目录下的截图文件，支持多选与批量删除。
+ * 默认扫全局 {game_dir}/screenshots/，可选具体版本按版本隔离配置解析路径。
  * 删除走 showConfirm 回调式（项目规范：业务逻辑放入 onConfirm 回调）。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   PhotoIcon,
   ArrowPathIcon,
@@ -14,10 +15,13 @@ import {
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Select from '@/components/common/Select.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { screenshotList, screenshotDelete } from '@/utils/api/tools'
 import type { ScreenshotItem } from '@/utils/api/tools'
+import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
+import { getConfigMap } from '@/utils/api/config'
 import { formatBytes } from '@/utils/format'
 
 const items = ref<ScreenshotItem[]>([])
@@ -26,6 +30,14 @@ const loading = ref(false)
 const deleting = ref(false)
 const selectedPaths = ref<Set<string>>(new Set())
 const loaded = ref(false)
+
+// 版本选择：'' = 全局（不隔离），其他 = 具体版本 ID
+const selectedVersionId = ref<string>('')
+const installedVersions = ref<InstalledVersionInfo[]>([])
+const versionOptions = computed(() => [
+  { label: '全局（不隔离）', value: '' },
+  ...installedVersions.value.map((v) => ({ label: v.id, value: v.id })),
+])
 
 const hasSelection = computed(() => selectedPaths.value.size > 0)
 
@@ -36,9 +48,10 @@ function formatDate(unixSec: number): string {
 async function loadList() {
   loading.value = true
   try {
-    const res = await screenshotList()
+    const res = await screenshotList(selectedVersionId.value || undefined)
     items.value = res.items
     totalSize.value = res.total_size
+    selectedPaths.value = new Set()
     loaded.value = true
   } catch (e) {
     toastError(`加载截图列表失败: ${e instanceof Error ? e.message : String(e)}`)
@@ -46,6 +59,21 @@ async function loadList() {
     loading.value = false
   }
 }
+
+async function loadVersions() {
+  try {
+    installedVersions.value = await listInstalledVersionsWithType()
+  } catch (e) {
+    console.warn('加载已安装版本失败', e)
+  }
+}
+
+// 版本切换时重新加载（首次加载由 onMounted 触发，跳过初始回调）
+watch(selectedVersionId, (newVal, oldVal) => {
+  if (oldVal !== '' || newVal !== '') {
+    loadList()
+  }
+})
 
 function toggleSelect(path: string) {
   const next = new Set(selectedPaths.value)
@@ -82,7 +110,7 @@ async function doDelete() {
   deleting.value = true
   try {
     const paths = Array.from(selectedPaths.value)
-    const res = await screenshotDelete(paths)
+    const res = await screenshotDelete(paths, selectedVersionId.value || undefined)
     if (res.failed.length > 0) {
       toastError(`${res.failed.length} 张删除失败：${res.failed[0].error}`)
     } else {
@@ -97,7 +125,18 @@ async function doDelete() {
   }
 }
 
-onMounted(loadList)
+onMounted(async () => {
+  await loadVersions()
+  // 全局隔离模式为 All(4) 时，所有版本都隔离，"全局（不隔离）"选项失去意义
+  // 默认选中第一个已安装版本，让用户直接看到版本隔离目录
+  const config = await getConfigMap()
+  if (config.isolationMode === 4 && installedVersions.value.length > 0) {
+    selectedVersionId.value = installedVersions.value[0].id
+    // watch 会自动触发 loadList
+  } else {
+    await loadList()
+  }
+})
 </script>
 
 <template>
@@ -108,6 +147,11 @@ onMounted(loadList)
       <span class="ml-auto text-xs text-gray-400">
         {{ items.length }} 张 · {{ formatBytes(totalSize) }}
       </span>
+      <Select
+        v-model="selectedVersionId"
+        :options="versionOptions"
+        class="w-44"
+      />
       <Button type="outline" size="small" :loading="loading" @click="loadList">
         <template #icon><ArrowPathIcon class="h-4 w-4" /></template>
         刷新

@@ -264,14 +264,19 @@ export interface ScreenshotDeleteResult {
   failed: ScreenshotFailedItem[]
 }
 
-/** 列举游戏截图 */
-export function screenshotList(): Promise<ScreenshotListResult> {
-  return toolsManager<ScreenshotListResult>('screenshot_list')
+/** 列出截图（可选 version_id 按版本隔离目录扫描） */
+export function screenshotList(versionId?: string): Promise<ScreenshotListResult> {
+  return toolsManager<ScreenshotListResult>('screenshot_list', {
+    version_id: versionId ?? null,
+  })
 }
 
-/** 批量删除截图 */
-export function screenshotDelete(paths: string[]): Promise<ScreenshotDeleteResult> {
-  return toolsManager<ScreenshotDeleteResult>('screenshot_delete', { paths })
+/** 批量删除截图（versionId 应与 list 时一致，用于路径校验） */
+export function screenshotDelete(paths: string[], versionId?: string): Promise<ScreenshotDeleteResult> {
+  return toolsManager<ScreenshotDeleteResult>('screenshot_delete', {
+    paths,
+    version_id: versionId ?? null,
+  })
 }
 
 // ==================== 资源包转换 ====================
@@ -297,9 +302,11 @@ export interface ResourcePackConvertResult {
   message: string
 }
 
-/** 列举资源包 */
-export function resourcepackList(): Promise<ResourcePackListResult> {
-  return toolsManager<ResourcePackListResult>('resourcepack_list')
+/** 列出资源包（可选 version_id 按版本隔离目录扫描） */
+export function resourcepackList(versionId?: string): Promise<ResourcePackListResult> {
+  return toolsManager<ResourcePackListResult>('resourcepack_list', {
+    version_id: versionId ?? null,
+  })
 }
 
 /** 转换资源包格式（zip ↔ folder） */
@@ -361,25 +368,29 @@ export interface ArchiveRestoreResult {
   message: string
 }
 
-/** 列出存档 */
-export function archiveList(): Promise<ArchiveListResult> {
-  return toolsManager<ArchiveListResult>('archive_list', {})
+/** 列出存档（可选 version_id 按版本隔离目录扫描） */
+export function archiveList(versionId?: string): Promise<ArchiveListResult> {
+  return toolsManager<ArchiveListResult>('archive_list', {
+    version_id: versionId ?? null,
+  })
 }
 
 /** 备份存档（exclude_player_data=true 为导出分享包） */
-export function archiveBackup(worldName: string, outputPath: string, excludePlayerData: boolean): Promise<ArchiveBackupResult> {
+export function archiveBackup(worldName: string, outputPath: string, excludePlayerData: boolean, versionId?: string): Promise<ArchiveBackupResult> {
   return toolsManager<ArchiveBackupResult>('archive_backup', {
     world_name: worldName,
     output_path: outputPath,
     exclude_player_data: excludePlayerData,
+    version_id: versionId ?? null,
   })
 }
 
 /** 从 zip 恢复存档 */
-export function archiveRestore(zipPath: string, worldName: string): Promise<ArchiveRestoreResult> {
+export function archiveRestore(zipPath: string, worldName: string, versionId?: string): Promise<ArchiveRestoreResult> {
   return toolsManager<ArchiveRestoreResult>('archive_restore', {
     zip_path: zipPath,
     world_name: worldName,
+    version_id: versionId ?? null,
   })
 }
 
@@ -440,3 +451,6 @@ export interface NbtParseResult {
 export function nbtParse(filePath: string): Promise<NbtParseResult> {
   return toolsManager<NbtParseResult>('nbt_parse', { file_path: filePath })
 }
+
+// 注：种子地图相关 API 已迁移至 src/utils/seedmap/ 模块。
+// cubiomes 通过 Emscripten 编译为 WASM，前端 Worker 直接调用 C 函数，不再走后端 IPC。

@@ -1,6 +1,8 @@
 //! 存档管理（备份/恢复/导出）
 //!
-//! - `list`：列出 `{game_dir}/saves/` 下所有子文件夹（存档），按名称排序
+//! - `list`：列出 saves 目录下所有子文件夹（存档），按名称排序
+//!   - 默认扫全局 `{game_dir}/saves/`
+//!   - 传入 `version_id` 时按版本隔离配置解析该版本的有效游戏目录
 //! - `backup`：将存档打包为 zip（可选排除 `playerdata/` 作为分享包）
 //! - `restore`：从 zip 解压恢复存档到 `saves/{world_name}/`
 
@@ -11,21 +13,42 @@ use std::path::{Path, PathBuf};
 use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
+use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
 use crate::state::AppState;
 use crate::state::resolve_game_dir;
 
 use super::types::{
-    ArchiveBackupParams, ArchiveBackupResult, ArchiveItem, ArchiveListResult, ArchiveRestoreParams,
-    ArchiveRestoreResult,
+    ArchiveBackupParams, ArchiveBackupResult, ArchiveItem, ArchiveListParams, ArchiveListResult,
+    ArchiveRestoreParams, ArchiveRestoreResult,
 };
 
-/// 列出 saves 目录下所有存档（子文件夹），按名称排序
-pub async fn list(state: &AppState) -> Result<serde_json::Value, String> {
+/// 解析 saves 目录（同 screenshot::resolve_shots_dir 的语义）
+async fn resolve_saves_dir(state: &AppState, version_id: Option<&str>) -> PathBuf {
     let game_dir = {
         let config = state.config.lock().await;
         resolve_game_dir(&config.game_dir)
     };
-    let saves_dir = game_dir.join("saves");
+    match version_id {
+        None => game_dir.join("saves"),
+        Some(vid) => {
+            let global_mode = state.config.lock().await.isolation_mode;
+            let isolation_mode =
+                crate::commands::version::list::resolve_isolation_mode(&game_dir, vid, global_mode);
+            let version_type =
+                crate::commands::version::list::detect_version_type_from_dir(&game_dir, vid);
+            let mode = IsolationMode::from_u32(isolation_mode);
+            let effective_dir = get_effective_game_dir(&game_dir, vid, mode, version_type);
+            effective_dir.join("saves")
+        }
+    }
+}
+
+/// 列出 saves 目录下所有存档（子文件夹），按名称排序
+pub async fn list(
+    state: &AppState,
+    params: ArchiveListParams,
+) -> Result<serde_json::Value, String> {
+    let saves_dir = resolve_saves_dir(state, params.version_id.as_deref()).await;
 
     log_info!("[Archive] 列目录: {}", saves_dir.display());
 
@@ -98,11 +121,7 @@ pub async fn backup(
     state: &AppState,
     params: ArchiveBackupParams,
 ) -> Result<serde_json::Value, String> {
-    let game_dir = {
-        let config = state.config.lock().await;
-        resolve_game_dir(&config.game_dir)
-    };
-    let saves_dir = game_dir.join("saves");
+    let saves_dir = resolve_saves_dir(state, params.version_id.as_deref()).await;
 
     // 路径安全：world_name 不允许为空、含 ".." 或路径分隔符
     if params.world_name.is_empty()
@@ -233,11 +252,7 @@ pub async fn restore(
     state: &AppState,
     params: ArchiveRestoreParams,
 ) -> Result<serde_json::Value, String> {
-    let game_dir = {
-        let config = state.config.lock().await;
-        resolve_game_dir(&config.game_dir)
-    };
-    let saves_dir = game_dir.join("saves");
+    let saves_dir = resolve_saves_dir(state, params.version_id.as_deref()).await;
 
     let zip_path = PathBuf::from(&params.zip_path);
     if !zip_path.is_file() {

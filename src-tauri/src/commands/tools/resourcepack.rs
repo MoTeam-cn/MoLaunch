@@ -1,6 +1,8 @@
 //! 资源包管理
 //!
-//! - `list`：列出 `{game_dir}/resourcepacks/` 下顶层条目（.zip 文件 / 目录）
+//! - `list`：列出 resourcepacks 目录下顶层条目（.zip 文件 / 目录）
+//!   - 默认扫全局 `{game_dir}/resourcepacks/`
+//!   - 传入 `version_id` 时按版本隔离配置解析该版本的有效游戏目录
 //! - `convert`：在 zip 与 folder 格式之间转换（folder → 打包为同名 .zip；zip → 解压为同名目录）
 
 use std::fs::File;
@@ -10,20 +12,43 @@ use std::path::{Path, PathBuf};
 use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
+use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
 use crate::state::AppState;
 use crate::state::resolve_game_dir;
 
 use super::types::{
-    ResourcePackConvertParams, ResourcePackConvertResult, ResourcePackItem, ResourcePackListResult,
+    ResourcePackConvertParams, ResourcePackConvertResult, ResourcePackItem, ResourcePackListParams,
+    ResourcePackListResult,
 };
 
-/// 列出 resourcepacks 目录下顶层条目（.zip 文件 → zip；目录 → folder）
-pub async fn list(state: &AppState) -> Result<serde_json::Value, String> {
+/// 解析资源包目录（同 screenshot::resolve_shots_dir 的语义）
+async fn resolve_packs_dir(state: &AppState, version_id: Option<&str>) -> PathBuf {
     let game_dir = {
         let config = state.config.lock().await;
         resolve_game_dir(&config.game_dir)
     };
-    let packs_dir = game_dir.join("resourcepacks");
+    match version_id {
+        None => game_dir.join("resourcepacks"),
+        Some(vid) => {
+            let global_mode = state.config.lock().await.isolation_mode;
+            let isolation_mode =
+                crate::commands::version::list::resolve_isolation_mode(&game_dir, vid, global_mode);
+            let version_type =
+                crate::commands::version::list::detect_version_type_from_dir(&game_dir, vid);
+            let mode = IsolationMode::from_u32(isolation_mode);
+            let effective_dir =
+                get_effective_game_dir(&game_dir, vid, mode, version_type);
+            effective_dir.join("resourcepacks")
+        }
+    }
+}
+
+/// 列出 resourcepacks 目录下顶层条目（.zip 文件 → zip；目录 → folder）
+pub async fn list(
+    state: &AppState,
+    params: ResourcePackListParams,
+) -> Result<serde_json::Value, String> {
+    let packs_dir = resolve_packs_dir(state, params.version_id.as_deref()).await;
 
     log_info!("[ResourcePack] 列目录: {}", packs_dir.display());
 
@@ -94,6 +119,8 @@ pub async fn convert(
     state: &AppState,
     params: ResourcePackConvertParams,
 ) -> Result<serde_json::Value, String> {
+    // convert 不需要 version_id（路径校验基于实际 packs_dir 解析）
+    // 简化处理：用全局 game_dir/resourcepacks 作为基准目录
     let game_dir = {
         let config = state.config.lock().await;
         resolve_game_dir(&config.game_dir)

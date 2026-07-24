@@ -1,6 +1,8 @@
 //! 游戏截图管理
 //!
-//! - `list`：列出 `{game_dir}/screenshots/` 下所有文件（不递归），按修改时间降序
+//! - `list`：列出 screenshots 目录下所有文件（不递归），按修改时间降序
+//!   - 默认扫全局 `{game_dir}/screenshots/`
+//!   - 传入 `version_id` 时按版本隔离配置解析该版本的有效游戏目录
 //! - `delete`：批量删除截图，删除前校验路径在 screenshots 目录内，防穿越
 
 use std::path::{Path, PathBuf};
@@ -8,21 +10,49 @@ use std::path::{Path, PathBuf};
 use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
+use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
 use crate::state::AppState;
 use crate::state::resolve_game_dir;
 
 use super::types::{
     ScreenshotDeleteParams, ScreenshotDeleteResult, ScreenshotFailedItem, ScreenshotItem,
-    ScreenshotListResult,
+    ScreenshotListParams, ScreenshotListResult,
 };
 
-/// 列出 screenshots 目录下所有文件（不递归），按 modified 降序
-pub async fn list(state: &AppState) -> Result<serde_json::Value, String> {
+/// 解析截图目录
+///
+/// - 不传 version_id：返回全局 game_dir/screenshots/
+/// - 传 version_id：按版本隔离配置解析该版本有效游戏目录后拼接 screenshots/
+///
+/// 复用 version::list::resolve_isolation_mode + minecraft::isolation::get_effective_game_dir，
+/// 与启动/Mod 管理等业务路径完全一致，避免重复实现隔离逻辑。
+async fn resolve_shots_dir(state: &AppState, version_id: Option<&str>) -> PathBuf {
     let game_dir = {
         let config = state.config.lock().await;
         resolve_game_dir(&config.game_dir)
     };
-    let shots_dir = game_dir.join("screenshots");
+    match version_id {
+        None => game_dir.join("screenshots"),
+        Some(vid) => {
+            let global_mode = state.config.lock().await.isolation_mode;
+            let isolation_mode =
+                crate::commands::version::list::resolve_isolation_mode(&game_dir, vid, global_mode);
+            let version_type =
+                crate::commands::version::list::detect_version_type_from_dir(&game_dir, vid);
+            let mode = IsolationMode::from_u32(isolation_mode);
+            let effective_dir =
+                get_effective_game_dir(&game_dir, vid, mode, version_type);
+            effective_dir.join("screenshots")
+        }
+    }
+}
+
+/// 列出 screenshots 目录下所有文件（不递归），按 modified 降序
+pub async fn list(
+    state: &AppState,
+    params: ScreenshotListParams,
+) -> Result<serde_json::Value, String> {
+    let shots_dir = resolve_shots_dir(state, params.version_id.as_deref()).await;
 
     log_info!("[Screenshot] 列目录: {}", shots_dir.display());
 
@@ -99,11 +129,7 @@ pub async fn delete(
     state: &AppState,
     params: ScreenshotDeleteParams,
 ) -> Result<serde_json::Value, String> {
-    let game_dir = {
-        let config = state.config.lock().await;
-        resolve_game_dir(&config.game_dir)
-    };
-    let shots_dir = game_dir.join("screenshots");
+    let shots_dir = resolve_shots_dir(state, params.version_id.as_deref()).await;
 
     log_info!("[Screenshot] 准备删除 {} 个文件", params.paths.len());
 

@@ -2,13 +2,14 @@
 /**
  * 资源包转换
  *
- * 列举 {game_dir}/resourcepacks/ 下的资源包（zip 文件 / 文件夹），
+ * 列举 resourcepacks 目录下的资源包（zip 文件 / 文件夹），
  * 支持在 zip ↔ folder 两种格式间转换。
  * - folder → zip：把目录内容打包为同名 .zip
  * - zip → folder：解压到同名目录
+ * 默认扫全局 {game_dir}/resourcepacks/，可选具体版本按版本隔离配置解析路径。
  * 转换走 showConfirm 回调式，目标已存在时后端返回失败提示。
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   Square3Stack3DIcon,
   ArrowPathIcon,
@@ -17,10 +18,13 @@ import {
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Select from '@/components/common/Select.vue'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { resourcepackList, resourcepackConvert } from '@/utils/api/tools'
 import type { ResourcePackItem } from '@/utils/api/tools'
+import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
+import { getConfigMap } from '@/utils/api/config'
 import { formatBytes } from '@/utils/format'
 
 const items = ref<ResourcePackItem[]>([])
@@ -28,10 +32,18 @@ const loading = ref(false)
 const converting = ref<string | null>(null)
 const loaded = ref(false)
 
+// 版本选择：'' = 全局（不隔离），其他 = 具体版本 ID
+const selectedVersionId = ref<string>('')
+const installedVersions = ref<InstalledVersionInfo[]>([])
+const versionOptions = computed(() => [
+  { label: '全局（不隔离）', value: '' },
+  ...installedVersions.value.map((v) => ({ label: v.id, value: v.id })),
+])
+
 async function loadList() {
   loading.value = true
   try {
-    const res = await resourcepackList()
+    const res = await resourcepackList(selectedVersionId.value || undefined)
     items.value = res.items
     loaded.value = true
   } catch (e) {
@@ -40,6 +52,21 @@ async function loadList() {
     loading.value = false
   }
 }
+
+async function loadVersions() {
+  try {
+    installedVersions.value = await listInstalledVersionsWithType()
+  } catch (e) {
+    console.warn('加载已安装版本失败', e)
+  }
+}
+
+// 版本切换时重新加载（首次加载由 onMounted 触发，跳过初始回调）
+watch(selectedVersionId, (newVal, oldVal) => {
+  if (oldVal !== '' || newVal !== '') {
+    loadList()
+  }
+})
 
 function requestConvert(item: ResourcePackItem) {
   const target = item.format === 'zip' ? 'folder' : 'zip'
@@ -67,6 +94,19 @@ async function doConvert(item: ResourcePackItem, target: 'zip' | 'folder') {
     converting.value = null
   }
 }
+
+onMounted(async () => {
+  await loadVersions()
+  // 全局隔离模式为 All(4) 时，所有版本都隔离，"全局（不隔离）"选项失去意义
+  // 默认选中第一个已安装版本，让用户直接看到版本隔离目录
+  const config = await getConfigMap()
+  if (config.isolationMode === 4 && installedVersions.value.length > 0) {
+    selectedVersionId.value = installedVersions.value[0].id
+    // watch 会自动触发 loadList
+  } else {
+    await loadList()
+  }
+})
 </script>
 
 <template>
@@ -75,6 +115,11 @@ async function doConvert(item: ResourcePackItem, target: 'zip' | 'folder') {
       <Square3Stack3DIcon class="h-5 w-5 text-gray-700" />
       <h3 class="text-sm font-semibold text-gray-900">资源包转换</h3>
       <span class="ml-auto text-xs text-gray-400">{{ items.length }} 个资源包</span>
+      <Select
+        v-model="selectedVersionId"
+        :options="versionOptions"
+        class="w-44"
+      />
       <Button type="outline" size="small" :loading="loading" @click="loadList">
         <template #icon><ArrowPathIcon class="h-4 w-4" /></template>
         刷新

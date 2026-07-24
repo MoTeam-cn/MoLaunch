@@ -6,10 +6,12 @@
  * - 左侧 w-48 菜单（activeCategory 切换高亮）
  * - 右侧内容区 v-if 切换子组件
  *
- * 分类：外部下载 / 便捷工具 / 存档管理 / Mod 工具 / 网络工具 / 计算工具 / 数据工具
+ * 分类（每分组 ≤ 3 个工具，重要/高频工具单独一栏）：
+ * 外部下载 / 便捷工具 / 存档管理 / Mod 工具 / 网络工具 / 计算工具
+ * / Java 管理 / 诊断工具 / 游戏资源 / 种子地图
  */
 
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch } from 'vue'
 import {
   ArrowDownTrayIcon,
   WrenchScrewdriverIcon,
@@ -17,15 +19,22 @@ import {
   PuzzlePieceIcon,
   SignalIcon,
   CalculatorIcon,
-  CircleStackIcon,
+  CommandLineIcon,
+  BugAntIcon,
+  SwatchIcon,
+  MapIcon,
 } from '@heroicons/vue/24/outline'
+import NavSidebar from '@/components/common/NavSidebar.vue'
 import ExternalDownload from './ExternalDownload.vue'
 import QuickTools from './QuickTools.vue'
 import ArchivePage from './tools/archive/ArchivePage.vue'
 import ModToolsPage from './tools/mod-tools/ModToolsPage.vue'
 import NetworkPage from './tools/network/NetworkPage.vue'
 import CalcPage from './tools/calc/CalcPage.vue'
-import DataPage from './tools/data/DataPage.vue'
+import JavaPage from './tools/java/JavaPage.vue'
+import DiagnosticPage from './tools/diagnostic/DiagnosticPage.vue'
+import GameResourcePage from './tools/game-resource/GameResourcePage.vue'
+import SeedMapPage from './tools/seedmap/SeedMapPage.vue'
 import ToolToc from '@/components/common/ToolToc.vue'
 
 interface ToolCategory {
@@ -46,7 +55,7 @@ const categories: ToolCategory[] = [
     id: 'quick-tools',
     label: '便捷工具',
     icon: WrenchScrewdriverIcon,
-    desc: '清理游戏垃圾、内存优化等实用工具',
+    desc: '清理游戏垃圾、内存优化、启动器数据导出等实用工具',
   },
   {
     id: 'archive',
@@ -73,24 +82,40 @@ const categories: ToolCategory[] = [
     desc: '坐标距离计算、游戏内调色板等计算辅助工具',
   },
   {
-    id: 'data',
-    label: '数据工具',
-    icon: CircleStackIcon,
-    desc: 'Java 管理、崩溃分析、JSON 编辑、NBT 查看、截图管理、数据导出、资源包转换',
+    id: 'java',
+    label: 'Java 管理',
+    icon: CommandLineIcon,
+    desc: '管理 Java 运行时版本，启动游戏的核心依赖',
+  },
+  {
+    id: 'diagnostic',
+    label: '诊断工具',
+    icon: BugAntIcon,
+    desc: '崩溃日志分析、版本 JSON 编辑、NBT 数据查看',
+  },
+  {
+    id: 'game-resource',
+    label: '游戏资源',
+    icon: SwatchIcon,
+    desc: '截图批量管理、资源包格式转换',
+  },
+  {
+    id: 'seedmap',
+    label: '种子地图',
+    icon: MapIcon,
+    desc: '输入种子加载 Minecraft 建筑位置地图，支持群系/结构查询',
   },
 ]
 
 const activeCategory = ref<string>('quick-tools')
-// 分类切换时递增，触发 ToolToc 重新扫描
+// 分类切换时递增，触发 ToolToc 重新扫描（含 NavSidebar 从 URL query.tab 恢复时）
 const tocRefreshKey = ref(0)
 
-function switchCategory(id: string) {
-  if (activeCategory.value === id) return
-  activeCategory.value = id
+watch(activeCategory, () => {
   nextTick(() => {
     tocRefreshKey.value++
   })
-}
+})
 
 const activeDesc = () =>
   categories.find((c) => c.id === activeCategory.value)?.desc ?? ''
@@ -98,25 +123,8 @@ const activeDesc = () =>
 
 <template>
   <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
-    <!-- 左侧分类菜单 -->
-    <aside class="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
-      <div class="flex-1 overflow-y-auto py-4">
-        <button
-          v-for="cat in categories"
-          :key="cat.id"
-          class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors"
-          :class="[
-            activeCategory === cat.id
-              ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
-              : 'text-gray-700 hover:bg-gray-50',
-          ]"
-          @click="switchCategory(cat.id)"
-        >
-          <component :is="cat.icon" class="w-5 h-5 mr-3" />
-          {{ cat.label }}
-        </button>
-      </div>
-    </aside>
+    <!-- 左侧分类菜单（公共组件，tab 同步到 URL query） -->
+    <NavSidebar v-model="activeCategory" :categories="categories" />
 
     <!-- 右侧内容区 -->
     <div class="flex-1 flex flex-col overflow-hidden">
@@ -136,7 +144,10 @@ const activeDesc = () =>
           <ModToolsPage v-else-if="activeCategory === 'mod-tools'" />
           <NetworkPage v-else-if="activeCategory === 'network'" />
           <CalcPage v-else-if="activeCategory === 'calc'" />
-          <DataPage v-else-if="activeCategory === 'data'" />
+          <JavaPage v-else-if="activeCategory === 'java'" />
+          <DiagnosticPage v-else-if="activeCategory === 'diagnostic'" />
+          <GameResourcePage v-else-if="activeCategory === 'game-resource'" />
+          <SeedMapPage v-else-if="activeCategory === 'seedmap'" />
         </div>
         <!-- 右侧悬浮 TOC 导航条（工具数 ≥ 3 时自动显示，不跟随滚动） -->
         <ToolToc :refresh-key="tocRefreshKey" :scroll-offset="20" />

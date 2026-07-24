@@ -5,6 +5,10 @@
 //! / mod_tools（Mod 依赖检测 + 去重）/ data_export（启动器数据导出）/ crash_analyzer（崩溃日志分析）
 //! / screenshot（截图管理）/ resourcepack（资源包管理）/ version_json（版本 JSON 读写）
 //! / archive（存档管理）/ network（网络延迟 + 服务器状态）/ nbt（NBT 数据查看）
+//!
+//! 注：种子地图工具（seedmap）已迁移至前端 WASM 方案，不再走后端 IPC。
+//! cubiomes C 库通过 Emscripten 编译为 WebAssembly，前端 Worker 直接调用，
+//! 后端只通过 `res://` 协议提供 .wasm/.js 文件（见 res_scheme.rs + build.rs）。
 
 pub mod archive;
 pub mod cleanup;
@@ -89,14 +93,22 @@ pub async fn tools_manager(
             crash_analyzer::analyze(&state, p).await
         }
         // 截图管理
-        "screenshot_list" => screenshot::list(&state).await,
+        "screenshot_list" => {
+            let p: ScreenshotListParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            screenshot::list(&state, p).await
+        }
         "screenshot_delete" => {
             let p: ScreenshotDeleteParams = serde_json::from_value(req.params)
                 .map_err(|e| format!("参数解析失败: {}", e))?;
             screenshot::delete(&state, p).await
         }
         // 资源包管理
-        "resourcepack_list" => resourcepack::list(&state).await,
+        "resourcepack_list" => {
+            let p: ResourcePackListParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            resourcepack::list(&state, p).await
+        }
         "resourcepack_convert" => {
             let p: ResourcePackConvertParams = serde_json::from_value(req.params)
                 .map_err(|e| format!("参数解析失败: {}", e))?;
@@ -114,7 +126,11 @@ pub async fn tools_manager(
             version_json::save(&state, p).await
         }
         // 存档管理
-        "archive_list" => archive::list(&state).await,
+        "archive_list" => {
+            let p: ArchiveListParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            archive::list(&state, p).await
+        }
         "archive_backup" => {
             let p: ArchiveBackupParams = serde_json::from_value(req.params)
                 .map_err(|e| format!("参数解析失败: {}", e))?;

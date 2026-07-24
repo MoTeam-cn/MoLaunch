@@ -17,6 +17,7 @@ import {
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import Button from '@/components/common/Button.vue'
+import NavSidebar from '@/components/common/NavSidebar.vue'
 import OverviewTab from './version-settings/OverviewTab.vue'
 import SetupTab from './version-settings/SetupTab.vue'
 import ModTab from './version-settings/ModTab.vue'
@@ -113,24 +114,7 @@ onMounted(async () => {
 
     <!-- 主体：左导航 + 右内容 -->
     <div v-else class="flex flex-1 overflow-hidden">
-      <aside class="w-48 flex-none border-r border-gray-200 bg-white">
-        <div class="flex-1 overflow-y-auto py-4">
-          <button
-            v-for="cat in categories"
-            :key="cat.id"
-            class="flex w-full items-center px-4 py-2.5 text-sm font-medium transition-colors"
-            :class="[
-              activeCategory === cat.id
-                ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
-                : 'text-gray-700 hover:bg-gray-50'
-            ]"
-            @click="activeCategory = cat.id"
-          >
-            <component :is="cat.icon" class="mr-3 h-5 w-5" />
-            {{ cat.label }}
-          </button>
-        </div>
-      </aside>
+      <NavSidebar v-model="activeCategory" :categories="categories" />
 
       <!-- 右侧内容区 -->
       <div class="flex flex-1 flex-col overflow-hidden">

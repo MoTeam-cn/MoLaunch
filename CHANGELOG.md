@@ -3586,6 +3586,19 @@
 - `LogViewer.vue:131-133` 暂无日志 → `DocumentTextIcon` + flex 垂直水平居中
 - `ResourceDetail.vue:253-256` 暂无版本数据 → `ArchiveBoxXMarkIcon` + flex 垂直水平居中
 
+#### 工具页扩展：版本隔离参数 + NavSidebar 公共组件
+- 截图管理 / 资源包转换 / 存档管理 三工具新增 `version_id` 参数，
+  适配版本隔离模式（按版本隔离配置解析 saves / screenshots / resourcepacks 目录）。
+  后端 [src-tauri/src/commands/tools/types.rs](src-tauri/src/commands/tools/types.rs) 新增 `*ListParams` 结构，
+  [mod.rs](src-tauri/src/commands/tools/mod.rs) 改为解析 params，
+  前端 [src/utils/api/tools.ts](src/utils/api/tools.ts) 对应 API 加 `versionId` 可选参数。
+- 抽取 [NavSidebar.vue](src/components/common/NavSidebar.vue) 公共组件，
+  [Settings.vue](src/views/Settings.vue) / [VersionSettings.vue](src/views/VersionSettings.vue) 移除内联侧边栏代码改用公共组件，
+  支持 tab 同步到 URL query。
+- 新增工具分类页骨架：[diagnostic](src/views/tools/diagnostic/) / [game-resource](src/views/tools/game-resource/) / [java](src/views/tools/java/)。
+- DataExporter 从数据工具迁入 [QuickTools.vue](src/views/QuickTools.vue)；[DataPage.vue](src/views/tools/data/DataPage.vue) 删除（拆分后无用）。
+- [toast.ts](src/utils/toast.ts) 的 error / warning / info 同步打印 console 日志便于追踪。
+
 ### 待实现
 - Mod 管理功能
 - 服务器列表功能

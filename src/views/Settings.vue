@@ -8,6 +8,7 @@ import SettingsPlugins from './settings/SettingsPlugins.vue'
 import SettingsCache from './settings/SettingsCache.vue'
 import SettingsDeveloper from './settings/SettingsDeveloper.vue'
 import SettingsMore from './settings/SettingsMore.vue'
+import NavSidebar from '@/components/common/NavSidebar.vue'
 import { getConfigMap } from '@/utils/api/config'
 import {
   RocketLaunchIcon,
@@ -79,29 +80,8 @@ onUnmounted(() => {
 
 <template>
   <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
-    <!-- 左侧分类菜单 -->
-    <aside class="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
-      <div class="flex-1 overflow-y-auto py-4">
-        <!-- 结构性侧边栏导航项，非视觉按钮 -->
-        <div
-          v-for="cat in categories"
-          :key="cat.id"
-          role="button"
-          tabindex="0"
-          class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer"
-          :class="[
-            activeCategory === cat.id
-              ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
-              : 'text-gray-700 hover:bg-gray-50'
-          ]"
-          @click="activeCategory = cat.id"
-          @keydown.enter="activeCategory = cat.id"
-        >
-          <component :is="cat.icon" class="w-5 h-5 mr-3" />
-          {{ cat.label }}
-        </div>
-      </div>
-    </aside>
+    <!-- 左侧分类菜单（公共组件，tab 同步到 URL query） -->
+    <NavSidebar v-model="activeCategory" :categories="categories" />
 
     <!-- 右侧内容区 -->
     <div class="flex-1 flex flex-col overflow-hidden">

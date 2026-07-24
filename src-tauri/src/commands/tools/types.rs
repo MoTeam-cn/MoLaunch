@@ -237,6 +237,16 @@ pub struct CrashAnalysisItem {
 
 // ===== 截图管理相关 =====
 
+/// 截图列表查询参数
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ScreenshotListParams {
+    /// 可选版本 ID
+    /// - 传入：按版本隔离配置解析该版本的有效游戏目录，扫 `<effective>/screenshots/`
+    /// - 不传：走全局 game_dir/screenshots/
+    #[serde(default)]
+    pub version_id: Option<String>,
+}
+
 /// 截图列表结果
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ScreenshotListResult {
@@ -264,6 +274,9 @@ pub struct ScreenshotItem {
 pub struct ScreenshotDeleteParams {
     /// 待删除的截图路径列表
     pub paths: Vec<String>,
+    /// 可选版本 ID（与 list 时传入的相同，用于解析截图目录做路径校验）
+    #[serde(default)]
+    pub version_id: Option<String>,
 }
 
 /// 截图删除失败项
@@ -293,6 +306,14 @@ pub struct ScreenshotDeleteResult {
 pub struct ResourcePackListResult {
     /// 资源包条目
     pub items: Vec<ResourcePackItem>,
+}
+
+/// 资源包列表查询参数
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ResourcePackListParams {
+    /// 可选版本 ID（同 ScreenshotListParams 语义）
+    #[serde(default)]
+    pub version_id: Option<String>,
 }
 
 /// 单个资源包条目
@@ -373,6 +394,14 @@ pub struct ArchiveListResult {
     pub total_size: u64,
 }
 
+/// 存档列表查询参数
+#[derive(Debug, Serialize, Deserialize, Default)]
+pub struct ArchiveListParams {
+    /// 可选版本 ID（同 ScreenshotListParams 语义）
+    #[serde(default)]
+    pub version_id: Option<String>,
+}
+
 /// 单个存档条目
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ArchiveItem {
@@ -397,6 +426,9 @@ pub struct ArchiveBackupParams {
     pub output_path: String,
     /// 是否排除玩家数据（true=导出分享包，false=完整备份）
     pub exclude_player_data: bool,
+    /// 可选版本 ID（用于解析版本隔离下的 saves 目录）
+    #[serde(default)]
+    pub version_id: Option<String>,
 }
 
 /// 存档备份结果
@@ -414,6 +446,9 @@ pub struct ArchiveRestoreParams {
     pub zip_path: String,
     /// 恢复后的存档名称（为空则用 zip 文件名）
     pub world_name: String,
+    /// 可选版本 ID（用于解析版本隔离下的 saves 目录）
+    #[serde(default)]
+    pub version_id: Option<String>,
 }
 
 /// 存档恢复结果
@@ -507,3 +542,6 @@ pub struct NbtNode {
     /// 子节点（仅 compound / list 有）
     pub children: Vec<NbtNode>,
 }
+
+// 注：种子地图相关类型已删除——工具迁移至前端 WASM 方案，不再走后端 IPC。
+// 前端通过 res:// 协议加载 cubiomes.wasm，在 Worker 中直接调用 cubiomes C 函数。

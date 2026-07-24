@@ -2,12 +2,13 @@
 /**
  * 存档管理
  *
- * 列出 {game_dir}/saves/ 下的存档，支持：
+ * 列出 saves 目录下的存档，支持：
  * - 备份：将存档打包为 zip（可选排除玩家数据）
  * - 恢复：从 zip 解压到 saves/ 目录
+ * 默认扫全局 {game_dir}/saves/，可选具体版本按版本隔离配置解析路径。
  * 备份/恢复路径通过 Input 手动填写（与 DataExporter 一致）。
  */
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import {
   ArchiveBoxIcon,
   ArrowPathIcon,
@@ -20,10 +21,13 @@ import {
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Select from '@/components/common/Select.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { archiveList, archiveBackup, archiveRestore, getDownloadDir } from '@/utils/api/tools'
 import type { ArchiveItem } from '@/utils/api/tools'
+import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
+import { getConfigMap } from '@/utils/api/config'
 import { formatBytes } from '@/utils/format'
 import { pickFile, pickSavePath } from '@/utils/fileDialog'
 
@@ -45,6 +49,14 @@ const restoring = ref(false)
 
 const downloadDir = ref('')
 
+// 版本选择：'' = 全局（不隔离），其他 = 具体版本 ID
+const selectedVersionId = ref<string>('')
+const installedVersions = ref<InstalledVersionInfo[]>([])
+const versionOptions = computed(() => [
+  { label: '全局（不隔离）', value: '' },
+  ...installedVersions.value.map((v) => ({ label: v.id, value: v.id })),
+])
+
 function formatDate(unixSec: number): string {
   return new Date(unixSec * 1000).toLocaleString('zh-CN', { hour12: false })
 }
@@ -52,7 +64,7 @@ function formatDate(unixSec: number): string {
 async function loadList() {
   loading.value = true
   try {
-    const res = await archiveList()
+    const res = await archiveList(selectedVersionId.value || undefined)
     items.value = res.items
     totalSize.value = res.total_size
     loaded.value = true
@@ -62,6 +74,21 @@ async function loadList() {
     loading.value = false
   }
 }
+
+async function loadVersions() {
+  try {
+    installedVersions.value = await listInstalledVersionsWithType()
+  } catch (e) {
+    console.warn('加载已安装版本失败', e)
+  }
+}
+
+// 版本切换时重新加载（首次加载由 onMounted 触发，跳过初始回调）
+watch(selectedVersionId, (newVal, oldVal) => {
+  if (oldVal !== '' || newVal !== '') {
+    loadList()
+  }
+})
 
 function startBackup(item: ArchiveItem) {
   backupTarget.value = item
@@ -92,6 +119,7 @@ async function doBackup() {
       backupTarget.value.name,
       backupOutputPath.value.trim(),
       backupExcludePlayer.value,
+      selectedVersionId.value || undefined,
     )
     if (res.success) {
       toastSuccess('备份成功：' + formatBytes(res.file_size))
@@ -118,7 +146,11 @@ function requestRestore() {
 async function doRestore() {
   restoring.value = true
   try {
-    const res = await archiveRestore(restoreZipPath.value.trim(), restoreWorldName.value.trim())
+    const res = await archiveRestore(
+      restoreZipPath.value.trim(),
+      restoreWorldName.value.trim(),
+      selectedVersionId.value || undefined,
+    )
     if (res.success) {
       toastSuccess('恢复成功：' + res.world_name)
       restoreZipPath.value = ''
@@ -152,7 +184,16 @@ async function pickBackupOutput() {
 }
 
 onMounted(async () => {
-  await loadList()
+  await loadVersions()
+  // 全局隔离模式为 All(4) 时，所有版本都隔离，"全局（不隔离）"选项失去意义
+  // 默认选中第一个已安装版本，让用户直接看到版本隔离目录
+  const config = await getConfigMap()
+  if (config.isolationMode === 4 && installedVersions.value.length > 0) {
+    selectedVersionId.value = installedVersions.value[0].id
+    // watch 会自动触发 loadList
+  } else {
+    await loadList()
+  }
   try {
     downloadDir.value = await getDownloadDir()
   } catch {
@@ -169,6 +210,11 @@ onMounted(async () => {
       <span class="ml-auto text-xs text-gray-400">
         {{ items.length }} 个存档 · {{ formatBytes(totalSize) }}
       </span>
+      <Select
+        v-model="selectedVersionId"
+        :options="versionOptions"
+        class="w-44"
+      />
       <Button type="outline" size="small" :loading="loading" @click="loadList">
         <template #icon><ArrowPathIcon class="h-4 w-4" /></template>
         刷新
