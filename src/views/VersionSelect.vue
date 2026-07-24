@@ -24,6 +24,7 @@ import {
   CheckIcon,
   ArrowDownTrayIcon,
   ArchiveBoxIcon,
+  ChevronDownIcon,
 } from '@heroicons/vue/24/outline'
 
 const router = useRouter()
@@ -49,6 +50,7 @@ function typeMeta(type: string): VersionTypeMeta {
 interface VersionGroup {
   key: string
   title: string
+  icon: string
   versions: InstalledVersion[]
 }
 const groups = computed<VersionGroup[]>(() => {
@@ -56,12 +58,25 @@ const groups = computed<VersionGroup[]>(() => {
   for (const v of installed.value) {
     const meta = typeMeta(v.inferredType)
     if (!map.has(v.inferredType)) {
-      map.set(v.inferredType, { key: v.inferredType, title: meta.groupTitle, versions: [] })
+      map.set(v.inferredType, { key: v.inferredType, title: meta.groupTitle, icon: meta.icon, versions: [] })
     }
     map.get(v.inferredType)!.versions.push(v)
   }
   return Array.from(map.values()).sort((a, b) => typeMeta(a.key).order - typeMeta(b.key).order)
 })
+
+// 分组折叠状态（默认全部收起，点击标题栏展开）
+// 用 expandedKeys 跟踪已展开的分组，空集合 = 全部收起
+const expandedKeys = ref<Set<string>>(new Set())
+function toggleGroup(key: string) {
+  const s = new Set(expandedKeys.value)
+  if (s.has(key)) s.delete(key)
+  else s.add(key)
+  expandedKeys.value = s
+}
+function isCollapsed(key: string) {
+  return !expandedKeys.value.has(key)
+}
 
 const selectedId = computed({
   get: () => versionStore.selectedVersion,
@@ -84,6 +99,13 @@ async function loadInstalled() {
     if (installed.value.length > 0) {
       const exists = installed.value.some(v => v.id === selectedId.value)
       if (!exists) selectedId.value = installed.value[0].id
+      // 自动展开当前选中版本所在的分组（用户进入页面即可看到选中项）
+      const selectedVer = installed.value.find(v => v.id === selectedId.value)
+      if (selectedVer) {
+        const s = new Set(expandedKeys.value)
+        s.add(selectedVer.inferredType)
+        expandedKeys.value = s
+      }
     }
   }, 'load installed versions')
   loading.value = false
@@ -171,35 +193,58 @@ onMounted(() => loadInstalled())
           </div>
         </div>
 
-        <!-- 版本分组卡片（对齐 Settings 卡片规范：rounded-lg + border-gray-300 + 无灰底头 + space-y-6） -->
+        <!-- 版本分组卡片（可折叠，默认收起，grid-rows 0fr→1fr 平滑动画） -->
         <div v-else class="mx-auto max-w-3xl space-y-6">
           <section
             v-for="group in groups"
             :key="group.key"
             class="overflow-hidden rounded-lg border border-gray-300 bg-white"
           >
-            <div class="flex items-center justify-between px-5 pt-5 pb-3">
-              <h3 class="text-sm font-semibold text-gray-900">{{ group.title }}</h3>
-              <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-                {{ group.versions.length }}
-              </span>
+            <!-- 标题栏（点击展开/折叠，对齐 MoLaunchIntro.vue 样式规范） -->
+            <button
+              type="button"
+              class="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-gray-50"
+              :aria-expanded="!isCollapsed(group.key)"
+              @click="toggleGroup(group.key)"
+            >
+              <div class="flex items-center gap-2.5">
+                <img :src="group.icon" class="h-5 w-5 rounded-sm" alt="">
+                <span class="text-sm font-semibold text-gray-900">{{ group.title }}</span>
+                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
+                  {{ group.versions.length }}
+                </span>
+              </div>
+              <ChevronDownIcon
+                class="h-4 w-4 flex-none text-gray-400 transition-transform duration-300 ease-in-out"
+                :class="isCollapsed(group.key) ? '' : 'rotate-180'"
+              />
+            </button>
+            <!-- 内容区（grid-template-rows 0fr→1fr 平滑高度过渡，与 MoLaunchIntro.vue 一致） -->
+            <div
+              class="grid transition-all duration-300 ease-in-out"
+              :class="isCollapsed(group.key) ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'"
+            >
+              <div class="overflow-hidden">
+                <ul class="divide-y divide-gray-100 border-t border-gray-100">
+                  <li v-for="ver in group.versions" :key="ver.id">
+                    <button
+                      class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50"
+                      :class="ver.id === selectedId
+                        ? 'border-l-2 border-primary-500 bg-primary-50/50'
+                        : 'border-l-2 border-transparent'"
+                      @click="selectVersion(ver.id)"
+                    >
+                      <img :src="resolveVersionIconWithLogo(ver.logo, ver.id, ver.version_type)" class="h-8 w-8 flex-none rounded" alt="">
+                      <div class="min-w-0 flex-1">
+                        <div class="truncate text-sm font-medium text-gray-900">{{ ver.id }}</div>
+                        <div class="mt-0.5 text-xs text-gray-400">{{ typeMeta(ver.inferredType).label }}</div>
+                      </div>
+                      <CheckIcon v-if="ver.id === selectedId" class="h-5 w-5 flex-none text-primary-500" />
+                    </button>
+                  </li>
+                </ul>
+              </div>
             </div>
-            <ul class="divide-y divide-gray-100">
-              <li v-for="ver in group.versions" :key="ver.id">
-                <button
-                  class="flex w-full items-center gap-3 px-5 py-4 text-left transition-colors hover:bg-gray-50"
-                  :class="{ 'bg-primary-50': ver.id === selectedId }"
-                  @click="selectVersion(ver.id)"
-                >
-                  <img :src="resolveVersionIconWithLogo(ver.logo, ver.id, ver.version_type)" class="h-8 w-8 flex-none rounded" alt="">
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate text-sm font-medium text-gray-900">{{ ver.id }}</div>
-                    <div class="mt-0.5 text-xs text-gray-400">{{ typeMeta(ver.inferredType).label }}</div>
-                  </div>
-                  <CheckIcon v-if="ver.id === selectedId" class="h-5 w-5 flex-none text-primary-500" />
-                </button>
-              </li>
-            </ul>
           </section>
         </div>
       </main>
