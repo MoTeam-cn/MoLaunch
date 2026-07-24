@@ -49,12 +49,12 @@ flate2 = "1"
 # NBT 解析（替代早期手动实现；simdnbt 依赖 nightly portable_simd 不可用，改用 fastnbt）
 # fastnbt 2.x：stable 兼容，serde 设计，社区验证，支持嵌套 TAG_List / 空 compound / 超大数组
 fastnbt = "2"
-# 文件系统监听（用于 mods 目录自动刷新，参考 PCL2 FileSystemWatcher）
+# 文件系统监听（用于 mods 目录自动刷新）
 notify = "8"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
-# Win32 API（用于游戏窗口标题修改，参考 PCL2 ModWatcher.vb）
+# Win32 API（用于游戏窗口标题修改）
 windows = { version = "0.58", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",

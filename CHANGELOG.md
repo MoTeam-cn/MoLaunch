@@ -3612,6 +3612,15 @@
 - 使用：clone 主仓库后需执行 `git submodule update --init --recursive` 拉取 cubiomes 源码，
   之后 build.rs 会自动调用 emcc 编译 WASM。
 
+#### 清理云端误追踪文件与 Cargo.toml 注释
+- 背景：`src-tauri/Cargo.lock` 与 `logo_data/` 早已在 `.gitignore` 排除，但早期误提交至云端
+  仍被追踪；`Cargo.toml` 两处依赖注释含 "参考 PCL2" 字样需移除。
+- 变更：
+  - [.gitignore](.gitignore)：`# Rust` 段新增 `src-tauri/Cargo.lock` 显式排除（与全局 `Cargo.lock` 并列）。
+  - `git rm --cached src-tauri/Cargo.lock`：从索引移除，本地文件保留，下次 push 后云端不再追踪。
+  - `git rm --cached -r logo_data/`：同上清理 3 个 logo 数据文件。
+  - [src-tauri/Cargo.toml](src-tauri/Cargo.toml)：`notify` 与 `windows` 依赖注释移除 "参考 PCL2 ..." 字样。
+
 ### 待实现
 - Mod 管理功能
 - 服务器列表功能
