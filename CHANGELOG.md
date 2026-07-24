@@ -3599,6 +3599,19 @@
 - DataExporter 从数据工具迁入 [QuickTools.vue](src/views/QuickTools.vue)；[DataPage.vue](src/views/tools/data/DataPage.vue) 删除（拆分后无用）。
 - [toast.ts](src/utils/toast.ts) 的 error / warning / info 同步打印 console 日志便于追踪。
 
+#### cubiomes 转为 git submodule
+- 背景：seedmap 架构迁移后 `src-tauri/cubiomes/` 是 fork 仓库（https://github.com/MoTeam-cn/cubiomes）
+  的本地 clone，含嵌套 `.git` 目录，git 无法将其内部源码（含 `cubiomes_wrapper.c`）作为普通文件
+  纳入主仓库，导致 clone 的人无法复现 WASM 编译。
+- 变更：
+  - cubiomes fork 仓库新增 commit `0617539`：`cubiomes_wrapper.c` 扩展 WASM 封装层，
+    支持群系查询与 7 个结构查找（ravine 系列 / nether_fossil / fossil / fossil_diamond）。
+  - 主仓库移除嵌套目录，改为 git submodule 引用：
+    - 新增 [.gitmodules](.gitmodules) 注册 `src-tauri/cubiomes` → `https://github.com/MoTeam-cn/cubiomes`。
+    - submodule 锚定 commit `0617539`（heads/master）。
+- 使用：clone 主仓库后需执行 `git submodule update --init --recursive` 拉取 cubiomes 源码，
+  之后 build.rs 会自动调用 emcc 编译 WASM。
+
 ### 待实现
 - Mod 管理功能
 - 服务器列表功能
