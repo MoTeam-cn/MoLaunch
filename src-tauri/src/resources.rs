@@ -84,6 +84,13 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "sdk/run_sdk_lib-linux-x86_64.so" => Some(include_bytes!(
             "../resources/sdk/run_sdk_lib-linux-x86_64.so"
         )),
+        // cubiomes WASM（前端种子地图工具通过 res:// 协议加载）
+        // 由 build.rs 调用 emcc 编译生成到 resources/wasm/
+        // - cubiomes.wasm: 二进制模块
+        // - cubiomes.js: Emscripten 胶水代码（MODULARIZE=1, EXPORT_NAME=createCubiomesModule）
+        //                worker 内通过 importScripts 加载并调用 createCubiomesModule() 实例化
+        "wasm/cubiomes.wasm" => Some(include_bytes!("../resources/wasm/cubiomes.wasm")),
+        "wasm/cubiomes.js" => Some(include_bytes!("../resources/wasm/cubiomes.js")),
         _ => None,
     }
 }

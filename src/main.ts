@@ -6,6 +6,7 @@ import { useSettingsStore } from './stores/settings'
 import { usePluginStore } from './stores/plugins'
 import { renderNonTauriWarning } from './utils/checkTauriEnv'
 import './assets/styles/main.css'
+import 'ol/ol.css'
 
 // 前端 JS 入口最早可执行点：此时 WebView2 已完成 HTML/JS bundle 加载
 // 与后端 setup() hook 的时间差 = WebView2 加载 localhost:1420 + JS bundle 解析耗时

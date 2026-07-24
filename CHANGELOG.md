@@ -16,9 +16,9 @@
   未尝试 stable 兼容的 `fastnbt`。
 - 复用：`fastnbt = "2"`（stable 兼容，serde 设计，社区验证）；`flate2` 保留（gzip 解压）。
 - 变更：
-  - [src-tauri/Cargo.toml](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/Cargo.toml)：
+  - [src-tauri/Cargo.toml](src-tauri/Cargo.toml)：
     新增 `fastnbt = "2"`，更新 simdnbt 注释说明改用 fastnbt。
-  - [src-tauri/src/commands/tools/nbt.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/src/commands/tools/nbt.rs)：
+  - [src-tauri/src/commands/tools/nbt.rs](src-tauri/src/commands/tools/nbt.rs)：
     重写（296 → 166 行）。`parse` 函数改用 `fastnbt::from_bytes` 解析，
     新增 `read_root_name`（fastnbt::Value 不保留根名称，手动从字节流提取），
     新增 `convert_nbt` 递归将 fastnbt::Value 转 NbtNode（保持前端 IPC 协议不变）。
@@ -30,10 +30,10 @@
 - 背景：Mineshaft / Slime_Chunks / Ravine / Fossil / Nether_Fossil 等结构无 webp 图标，
   此前用 OL Circle + STRUCTURE_ICONS.color 几何形状 fallback。
 - 变更：
-  - [src/assets/structures/](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/assets/structures/)：
+  - [src/assets/structures/](src/assets/structures/)：
     新增 6 个 webp 图标（从 https://minecraftsearch.com/images/structures/ 抓取）：
     mineshaft / slime_chunks / ravine / fossil / fossil_diamond / nether_fossil。
-  - [src/utils/seedmap/constants.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/constants.ts)：
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
     `getStructIconUrl` 新增 `ICON_NAME_ALIASES` 别名映射：
     Mega_Ravine / Underwater_Ravine / Mega_Underwater_Ravine → ravine.webp
     （参考 prompt-structures.md §图标资源 URL，canyon 系列共用同一图标）。
@@ -47,34 +47,34 @@
   见 ResourceDetailHeader.vue / ColorPalette.vue）；constants.ts 的 getStructIcon/getStructIconUrl；
   toast.ts 的 toastSuccess/toastError；项目自定义 Button.vue（避免原生 button）。
 - 变更：
-  - [src/utils/seedmap/format.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/format.ts)：
+  - [src/utils/seedmap/format.ts](src/utils/seedmap/format.ts)：
     新建。导出 `formatCoord(x, z)`（格式化 "X / Z"）+ `copyToClipboard(text)`（包装 navigator.clipboard），
     从 SeedMap.vue 拆出避免组件超 300 行。
-  - [src/utils/seedmap/biomeNames.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/biomeNames.ts)：
+  - [src/utils/seedmap/biomeNames.ts](src/utils/seedmap/biomeNames.ts)：
     新建。`BIOME_NAMES` 记录 60+ 个 biome ID → 中文名映射（参考 cubiomes/biomes.h 枚举），
     覆盖主世界 0~50、1.7 mutate 变种（id+128）、1.16 下界 170~173、1.17 洞穴 174~175、
     1.18 山地 177~182、1.19 183~184、1.20 185、1.21 186、26.2 187。导出 `getBiomeName(id)` 未知返回 '未知群系'。
-  - [src-tauri/cubiomes/cubiomes_wrapper.c](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/cubiomes/cubiomes_wrapper.c)：
+  - [src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)：
     新增 `cubiomes_get_biome_at_point(seed_str, mc, dim, large_biomes, scale, x, y, z)`。
     内部 setupGenerator + applySeed + getBiomeAt，返回 biome ID（< 0 出错）。
     坐标系约定：scale=1 时 x/y/z 为方块坐标，scale>1 时为 scale 坐标系（方块/scale），
     与 `cubiomes_gen_biomes_with_height_static` 对齐。
-  - [src-tauri/build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs)：
+  - [src-tauri/build.rs](src-tauri/build.rs)：
     EXPORTED_FUNCTIONS 新增 `_cubiomes_get_biome_at_point`。
-  - [src/utils/seedmap/types.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/types.ts)：
+  - [src/utils/seedmap/types.ts](src/utils/seedmap/types.ts)：
     新增 `BiomeAtPointMsg` / `BiomeAtPointResultMsg` / `BiomeAtPointParams` 类型，
     MainToWorkerMsg 联合加 BiomeAtPointMsg，WorkerToMainMsg 联合加 BiomeAtPointResultMsg。
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     handleMessage switch 加 `case 'biome_at_point'`，新增 `handleBiomeAtPoint(msg)`：
     writeSeedString → `_cubiomes_get_biome_at_point` → post biome_at_point_result。
-  - [src/utils/seedmap/workerPool.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/workerPool.ts)：
+  - [src/utils/seedmap/workerPool.ts](src/utils/seedmap/workerPool.ts)：
     新增 `getBiomeAtPoint(params)` 方法（enqueue 'biome_at_point'），
     onMessage switch 加 biome_at_point_result 分支，enqueue type 联合加 'biome_at_point'。
-  - [src/views/tools/data/StructPopup.vue](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/StructPopup.vue)：
+  - [src/views/tools/data/StructPopup.vue](src/views/tools/data/StructPopup.vue)：
     新建（76 行）。OL Overlay 内容组件，props=struct，emits=goto/close。
     显示：结构图标 + 名称 + formatCoord 坐标 + 群系校验状态 + 复制/前往/关闭按钮（全部用 Button.vue，
     heroicons 图标，不用 Emoji / 原生 HTML）。
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     引入 format.ts / biomeNames.ts / ol/Overlay。
     新增状态：`popupData` (含 struct + OL 坐标)、`mouseBiomeName`、`popupContainer` ref、`popupOverlay`。
     initMap 创建 Overlay（OL v10 API：autoPan 传 PanIntoViewOptions 对象，含 animation.duration + margin）。
@@ -84,7 +84,7 @@
     新增函数：copyCoord（toast 反馈）、goToStruct（animate zoom 8）、closePopup（清空 + setPosition(undefined)）。
     onMounted 加 `await nextTick()` 确保 popupContainer ref 已挂载。移除 selectedStruct（被 popupData 替代），
     保留 hoverStruct。
-  - [src/views/tools/data/SeedMap.vue](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/SeedMap.vue)：
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
     引入 StructPopup.vue + formatCoord。从 useSeedMap 解构 popupData/mouseBiomeName/popupContainer/copyCoord/goToStruct/closePopup。
     移除底部 "选中详情" div。mapContainer 内加 popupContainer div（始终挂载，OL Overlay 通过 element 引用），
     内部 StructPopup 用 v-if=popupData 控制。mouseBlock 悬浮提示加 mouseBiomeName 显示。
@@ -98,26 +98,26 @@
   共 7 个结构。跳过 dungeon_zombie/skeleton/spider（RNG 不可精确预测）、cheese_cave 系列（3D 噪声性能差）、
   lava_lake/lava_flooded_cave（同前）、enchanted_golden_apple（loot 表依赖）、sulfur_spring（需 fork cubiomes）。
 - 变更：
-  - [src-tauri/cubiomes/cubiomes_wrapper.c](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/cubiomes/cubiomes_wrapper.c)：
+  - [src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)：
     新增 `cubiomes_find_ravines`（CANYON_CARVER/UNDERWATER_CANYON_CARVER + checkCanyonStart，
     mega 通过 carveCanyon poses.size 阈值区分，阈值 200）、`cubiomes_find_nether_fossils`
     （soul_sand_valley 中心启发式，4 邻居 ≥2 匹配）、`cubiomes_find_fossils`
     （desert/swamp/mangrove_swamp 中心启发式，diamondMode 额外要求深层 deep_dark）三个查找函数。
     所有函数硬上限 64x64 chunks 防内存爆炸，biome ID 取自 cubiomes/biomes.h
     （soul_sand_valley=170, desert=2, swamp=6, mangrove_swamp=184, deep_dark=183）。
-  - [src-tauri/build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs)：
+  - [src-tauri/build.rs](src-tauri/build.rs)：
     EXPORTED_FUNCTIONS 新增 `_cubiomes_find_ravines` / `_cubiomes_find_nether_fossils` / `_cubiomes_find_fossils` 3 个导出。
-  - [src/utils/seedmap/structures.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/structures.ts)：
+  - [src/utils/seedmap/structures.ts](src/utils/seedmap/structures.ts)：
     `StructureQueryMode` 扩展 7 个新类型（'ravine' / 'mega_ravine' / 'underwater_ravine' /
     'mega_underwater_ravine' / 'nether_fossil' / 'fossil' / 'fossil_diamond'）；
     OVERWORLD_STRUCTURES 末尾追加 Ravine(212) / Mega_Ravine(213) / Underwater_Ravine(214) /
     Mega_Underwater_Ravine(215) / Fossil(221) / Fossil_Diamond(222) 6 条；
     NETHER_STRUCTURES 末尾追加 Nether_Fossil(204) 1 条。
-  - [src/utils/seedmap/constants.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/constants.ts)：
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
     STRUCTURE_ICONS 追加 7 个图标（颜色取自 prompt-structures.md：Ravine #7A6B5A、
     Mega_Ravine #5A4B3A、Underwater_Ravine #4A7A8B、Mega_Underwater_Ravine #3A6A7B、
     Nether_Fossil #D4C4A8、Fossil #E8D5B0、Fossil_Diamond #5DCED1）。
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     `handleFindStructures` 按 queryMode 分支调用 3 个新 WASM 函数；
     提取 `callChunkFinder` 公共闭包模式（chunk 范围计算 → buffer 分配 → WASM 调用 → 结果读取 → 释放），
     复用于 ravine/nether_fossil/fossil 三类查找；性能保护：mega 模式 chunk 范围上限 32x32
@@ -128,22 +128,22 @@
   原前端未接入，无法在地图上标记史莱姆区块。
   prompt-structures.md §findSlimeChunks 要求前端遍历可视范围内的 chunks 调 isSlimeChunk。
 - 变更：
-  - [src-tauri/cubiomes/cubiomes_wrapper.c](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/cubiomes/cubiomes_wrapper.c)：
+  - [src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)：
     - 新增 `cubiomes_is_slime_chunk(seed_str, chunk_x, chunk_z)` 返回 1/0
     - 内部调 cubiomes isSlimeChunk（无需 Generator，纯算法）
-  - [src-tauri/build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs)：
+  - [src-tauri/build.rs](src-tauri/build.rs)：
     - EXPORTED_FUNCTIONS 新增 `_cubiomes_is_slime_chunk`
-  - [src/utils/seedmap/structures.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/structures.ts)：
+  - [src/utils/seedmap/structures.ts](src/utils/seedmap/structures.ts)：
     - StructureQueryMode 新增 `'slime'` 类型
     - OVERWORLD_STRUCTURES 末尾添加 `Slime_Chunks`（id=-3 文档约定特殊值，queryMode='slime'）
-  - [src/utils/seedmap/constants.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/constants.ts)：
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
     - STRUCTURE_ICONS 添加 `Slime_Chunks`（shape='circle', color='#44FF44', label='史莱姆区块'）
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     - handleFindStructures 新增 queryMode='slime' 分支：
       遍历可视范围 chunk（block/16）调 `_cubiomes_is_slime_chunk`，是则添加到 structs
     - 性能优化：可视范围 chunk 数 > 10000 时跳过，避免卡死
     - 坐标用 chunk 中心方块（chunk*16 + 8）
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     - structureListForVersion 注释补充说明 slime_chunks 不被过滤（在结构列表中勾选）
     - 现有过滤 `s.queryMode !== 'stronghold'` 已天然保留 slime，无需修改逻辑
 
@@ -153,22 +153,22 @@
   prompt-structures.md §findStrongholds 要求基于 nextStronghold 迭代器
   一次性返回可视范围内的多座要塞。
 - 变更：
-  - [src-tauri/cubiomes/cubiomes_wrapper.c](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/cubiomes/cubiomes_wrapper.c)：
+  - [src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)：
     - 新增 `cubiomes_find_strongholds(seed_str, mc, max_count, out_buffer, out_len)`
     - 内部 setupGenerator + applySeed（nextStronghold 需 Generator 做群系校验）
     - initFirstStronghold 初始化迭代器，循环 nextStronghold 写入 x/z 到 out_buffer
     - max_count 强制上限 128（cubiomes 默认要塞总数），避免无限循环
-  - [src-tauri/build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs)：
+  - [src-tauri/build.rs](src-tauri/build.rs)：
     - EXPORTED_FUNCTIONS 新增 `_cubiomes_find_strongholds`
-  - [src/utils/seedmap/types.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/types.ts)：
+  - [src/utils/seedmap/types.ts](src/utils/seedmap/types.ts)：
     - SpecialsResult / SpecialsResultMsg 的 `firstStronghold` 改为
       `strongholds: {x,z}[]` 数组（兼容性注释标注原字段已废弃）
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     - handleSpecials 改调 `_cubiomes_find_strongholds(max_count=128)`
     - 从 HEAP32 读取要塞坐标数组，返回 strongholds: {x,z}[]
-  - [src/utils/seedmap/workerPool.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/workerPool.ts)：
+  - [src/utils/seedmap/workerPool.ts](src/utils/seedmap/workerPool.ts)：
     - specials_result 解析改为返回 `{ spawn, strongholds }`
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     - refreshSpecials 清空 strongholdSource 后遍历 strongholds 数组添加多个 Feature
     - OL 自动渲染所有 Feature（数量上限 128）
 
@@ -177,15 +177,15 @@
   区分结构查找逻辑，原 structures.ts 仅按 cubiomesType 遍历 region，
   未标注 Stronghold（cubiomes getStructurePos 不适用）和 Mineshaft（按 chunk 查找）的语义差异。
 - 变更：
-  - [src/utils/seedmap/structures.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/structures.ts)：
+  - [src/utils/seedmap/structures.ts](src/utils/seedmap/structures.ts)：
     - 新增 `StructureQueryMode` 类型与 `StructureTypeConfig.queryMode` 字段
     - 补充 Stronghold 到 OVERWORLD_STRUCTURES（id=25, queryMode='stronghold'）
     - 给 Mineshaft 标注 queryMode='mineshaft'（前端语义，cubiomes 内部统一处理）
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     - handleFindStructures 跳过 queryMode='stronghold' 的结构，
       避免与 specials 流程（cubiomes_first_stronghold）重复绘制首座要塞
     - region/mineshaft 沿用 cubiomes_get_structure_pos 遍历 region（cubiomes 内部统一）
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     - structureListForVersion 过滤 queryMode='stronghold'，由独立"要塞"按钮控制
     - 版本/维度切换清理逻辑同步过滤 stronghold
 - 未实现：
@@ -199,7 +199,7 @@
   原因：preload=0 不预加载相邻 zoom 级别；tile 加载失败后返回 emptyBitmap
   被 OL 视为成功，不重试；cacheSize=2048 偏小。
 - 变更：
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     - TileLayer 新增 `preload: 1`：预加载相邻 zoom 级别，减少拖拽/缩放时的边缘空白
     - cacheSize 从 2048 增大到 4096，避免大范围浏览时 tile 被过早清除
     - DataTile `transition` 从 150 改为 0：禁用淡入动画，tile 生成后立即显示
@@ -213,7 +213,7 @@
   导致 emcc.exe 无法找到依赖。另外 status() 模式下 emcc 的 stderr 输出会撑满 cargo 管道缓冲区，
   导致 build.rs 永久挂起。
 - 变更：
-  - [src-tauri/build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs)：
+  - [src-tauri/build.rs](src-tauri/build.rs)：
     - find_emcc 第3步（common_emsdk_paths）新增 EM_CONFIG 环境变量（指向 .emscripten）
     - 新增 find_subdir_bin 函数：自动扫描 emsdk 的 node/python 版本目录（如 22.16.0_64bit/bin）
     - 构建 PATH：emscripten + upstream/bin + node/bin + python + 原 PATH（跨平台分隔符）
@@ -226,7 +226,7 @@
   未覆盖的 biome 会显示为 DEFAULT_COLOR 灰色。cubiomes 内置 initBiomeColors
   覆盖全部 256 个 biome ID，颜色与官方 viewer 一致。
 - 变更：
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     - 新增模块级变量 `wasmBiomeColors: Uint8Array | null`
     - handleInit 中调用 `_cubiomes_init_biome_colors()` + `_cubiomes_get_all_biome_colors()`，
       复制 256×3 RGB 到独立 Uint8Array（避免 WASM 内存增长导致 HEAPU8 视图失效）
@@ -239,17 +239,17 @@
   但 generatorWorker.ts 调用时仍用旧签名（传 `false` 布尔），导致类型不匹配且新功能未启用。
   本次修复调用签名，并在 UI 暴露 Y 坐标/等高线/限高三个控件。
 - 变更：
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     - 修复 applyTerrainShading 调用：改传 `TerrainShadingOptions` 对象
       `{ scale, pixelsPerCell: TILE_SIZE / sx, doContour: msg.doContour, ymax: msg.ymax }`
     - 从 GenerateTileMsg 读取 doContour/ymax，支持 UI 动态控制
-  - [src/utils/seedmap/types.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/types.ts)：
+  - [src/utils/seedmap/types.ts](src/utils/seedmap/types.ts)：
     - GenerateTileMsg 和 GenerateTileParams 新增可选 `doContour`、`ymax` 字段
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     - 新增状态：`yCoord`（Y 坐标，默认 64）、`doContour`（等高线开关）、`ymaxLimit`（限高，0=不限）
     - generateTile 调用透传 y/doContour/ymax 参数
     - 新增 watch：yCoord/doContour/ymaxLimit 变化时刷新 biomeSource
-  - [src/views/tools/data/SeedMap.vue](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/SeedMap.vue)：
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
     - 坐标面板扩展为两行：第一行 X/Z/前往，第二行 Y/等高线/限高
     - 复用 showCoordPanel 控制显示/隐藏，不新增按钮
 
@@ -259,7 +259,7 @@
   原 out_buffer 模式每次调用需 JS 端 _malloc/_free 多个 buffer，代码冗余；
   pointer 模式由 C 端管理内部 buffer，JS 端通过 _get_*_pointer 读取，简化 Worker 代码。
 - 变更：
-  - [src-tauri/cubiomes/cubiomes_wrapper.c](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/cubiomes/cubiomes_wrapper.c)：
+  - [src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)：
     - 新增内部静态 buffer（g_biome_data/g_height_data/g_height_dims/g_biome_colors），
       用 realloc 动态扩容，避免固定大小限制
     - 新增 `cubiomes_gen_biomes_static` — 生成 biome 到内部 buffer（pointer 模式）
@@ -276,11 +276,11 @@
     - 新增 `cubiomes_free_static_buffers` — 释放内部 buffer（dispose 时调用）
     - Y 坐标转换：scale=1 时 y 直接用方块 Y；scale>1 时转 1:4 坐标（y/4）
     - 新增 `#include "util.h"`（initBiomeColors 声明）和 `#include <math.h>`（sqrt）
-  - [src-tauri/build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs)：
+  - [src-tauri/build.rs](src-tauri/build.rs)：
     - EXPORTED_FUNCTIONS 新增 13 个 pointer 模式函数导出
-  - [src/utils/seedmap/types.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/types.ts)：
+  - [src/utils/seedmap/types.ts](src/utils/seedmap/types.ts)：
     - GenerateTileMsg 和 GenerateTileParams 新增可选 `y` 字段（方块 Y 坐标，默认 64）
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     - handleGenerate 改用 pointer 模式 API：
       `_cubiomes_gen_biomes_with_height_static` / `_cubiomes_gen_biomes_static`
       替代原 out_buffer 模式的 `_cubiomes_gen_biomes_with_height` / `_cubiomes_gen_biomes`
@@ -294,21 +294,21 @@
   旧版本前端筛选栏不应显示这些结构的按钮；部分结构（如 Mineshaft）无 webp 图标资源，
   原 getStructStyle 直接用空 src 创建 Icon 导致地图上无可见标记。
 - 变更：
-  - [src/utils/seedmap/structures.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/structures.ts)：
+  - [src/utils/seedmap/structures.ts](src/utils/seedmap/structures.ts)：
     - StructureTypeConfig 新增 `javaSinceValue` 字段（cubiomes MC 枚举值，与 biomes.h 对齐）
     - 每个结构标注 Java 版引入版本（如 Village=1.0→10, Monument=1.8→11, Ancient_City=1.19→23, Trial_Chambers=1.21→26）
     - 新增 `getStructuresForVersion(mcVersion, dim)`：按 MC 版本 + 维度过滤结构清单，
       供前端筛选栏动态显示；Worker 仍用 `getStructuresByDimension`（全量遍历），
       因 cubiomes_get_structure_pos 对旧版本返回 0（无结构），安全跳过
-  - [src/utils/seedmap/constants.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/constants.ts)：
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
     - STRUCTURE_ICONS 新增 `Mineshaft` 定义（square, #6B5B3A, '废弃矿井'）
     - 修复 `Ruined_Portal_N` label 为 '废弃传送门（下界）'，`End_Gateway` label 为 '末地折跃门'，`Treasure` label 为 '埋藏宝藏'
     - `getStructStyle` 增加 Shape fallback：当结构无 webp 图标时，用 OL Circle + STRUCTURE_ICONS.color
       渲染几何形状（highlighted 时半径加大 + 白色描边），确保所有结构都有可见标记
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     - `structureListByDimension` 改为 `structureListForVersion`，用 `getStructuresForVersion(mcVersion, dimension)` 动态过滤
     - watch [mcVersion, dimension] 中清理已选但当前版本不可用的结构类型，避免筛选栏残留无效选中
-  - [src/views/tools/data/SeedMap.vue](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/SeedMap.vue)：
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
     - 结构筛选按钮适配新变量名 `structureListForVersion`
     - 无 webp 图标的结构按钮显示彩色小圆点 fallback（`<span>` + backgroundColor），避免 broken img
 
@@ -319,7 +319,7 @@
   但 generatorWorker 直接把方块坐标传给 Range.x/z，导致 cubiomes 按 scale 倍偏移生成，
   tile 内容完全错位、相邻 tile 边界不连续。
 - 变更：
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     - **核心修复**：handleGenerate 中将主线程传入的 blockX/blockZ（方块坐标）
       转换为 rangeX/rangeZ = blockX/scale, blockZ/scale 后再传给
       `_cubiomes_gen_biomes_with_height` / `_cubiomes_gen_biomes` 的 Range.x/z
@@ -330,7 +330,7 @@
       远观级别阴影细节本就不可见，跳过 applyTerrainShading
     - 保留 Z 轴翻转（OL top-left origin 下，tile y=0 顶部 = 北方 = max Z，
       cubiomes gz=0 = min Z = 南方，需翻转使 py=0↔gz=sz-1）
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     - loadBiomeTile 注释更新：明确 blockX/blockZ 始终是方块坐标，
       block→scale 转换由 worker 负责；EXTENT_HALF 与 blocksPerTile 都是 scale 整数倍，
       保证 startBlockX/Z 可被 scale 整除
@@ -340,19 +340,19 @@
 - 背景：图标应放在 src/assets 而非 public；地图图标过大；tile 边界不连续；
   默认进入页面应自动加载地图；坐标输入和大型群系应移到地图容器 overlay
 - 变更：
-  - [src/assets/structures/](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/assets/structures/)：
+  - [src/assets/structures/](src/assets/structures/)：
     22 个 webp 图标从 public/structures/ 迁移至此，与其他 assets 保持一致
-  - [src/utils/seedmap/constants.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/constants.ts)：
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
     新增 `getStructIconUrl`（通过 `import.meta.glob` 预加载 assets 图标 URL）；
     图标 scale 从 1.0/1.2 缩小到 0.4/0.5（约 13px，与原圆形标记相近）
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     - EXTENT_HALF 从 29_999_872 改为 29_999_104（16384 的整数倍，确保所有 zoom 级别 tile 对齐）
     - TileGrid origin 从 bottom-left 改为 top-left（标准 OL XYZ 方案），修复 OL 发送负 y 导致 startBlockZ 错误
     - startBlockZ 公式改为 `EXTENT_HALF - (y+1) * blocksPerTile`
     - 默认种子 12345 自动加载（onMounted），seedInput 保持空让用户自行输入
     - loadSeed 接受可选 seedOverride 参数
     - 新增 showCoordPanel 状态控制坐标输入面板展开/收起
-  - [src/views/tools/data/SeedMap.vue](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/SeedMap.vue)：
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
     - 移除"我的坐标"行和"大型群系"checkbox，改为地图容器 overlay 按钮
     - 左下角：大型群系切换按钮（Squares2X2 图标）+ 坐标输入按钮（MapPin 图标）
     - 坐标输入面板展开时显示 X/Z Input + 前往按钮
@@ -363,18 +363,18 @@
 #### 种子地图结构筛选 + 原站图标替换
 - 背景：默认只显示村庄和出生点，其他结构需要手动开启；原站的结构图标比方块形状更直观
 - 变更：
-  - [public/structures/](file:///c:/Users/XiaoMo/Desktop/MoLaunch/public/structures/)：
+  - [public/structures/](public/structures/)：
     从 minecraftsearch.com 下载 22 个结构 webp 图标（主世界 18 + 下界 3 + 末地 2）
-  - [src/utils/seedmap/constants.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/constants.ts)：
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
     `getStructStyle` 从形状（圆/方/三角/菱）改为使用 webp 图标，移除未使用的 `RegularShape`/`blackStroke`
-  - [src/utils/seedmap/structures.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/structures.ts)：
+  - [src/utils/seedmap/structures.ts](src/utils/seedmap/structures.ts)：
     新增 `OVERWORLD_STRUCTURES`/`NETHER_STRUCTURES`/`END_STRUCTURES` 数组导出，供筛选 UI 使用
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     出生点和要塞拆分为独立 layer（spawnLayer/strongholdLayer），支持单独显示/隐藏；
     新增 `selectedStructureTypes`（默认仅 Village）、`structureListByDimension`、
     `toggleStructureType`、`isStructureSelected`、`renderStructures`；
     切换结构类型时重新过滤渲染
-  - [src/views/tools/data/SeedMap.vue](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/SeedMap.vue)：
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
     地图下方新增结构筛选栏（button 形式），包含出生点/要塞开关 + 各维度结构按钮；
     选中状态高亮，未选中图标半透明；删除原有图例区块
 
@@ -383,30 +383,30 @@
   [MoTeam-cn/cubiomes](https://github.com/MoTeam-cn/cubiomes)（原生支持 MC_26_2），
   并基于项目根目录 `terrainShading.js` 实现地形阴影渲染（hillshade + terrace + contour）
 - 变更：
-  - [src-tauri/cubiomes/](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/cubiomes/)：
+  - [src-tauri/cubiomes/](src-tauri/cubiomes/)：
     替换为 fork 仓库 clone，支持 MC_1_21_5(29) ~ MC_26_2(34) 完整版本枚举
-  - [src-tauri/cubiomes/cubiomes_wrapper.c](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/cubiomes/cubiomes_wrapper.c)：
+  - [src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)：
     新增 `cubiomes_gen_biomes_with_height` 函数，一次返回 biome IDs + 高度数组（调用 `mapApproxHeight`，
     1.18+ 传 NULL 给 SurfaceNoise），用于 terrainShading 渲染
-  - [src-tauri/build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs)：
+  - [src-tauri/build.rs](src-tauri/build.rs)：
     恢复 `compile_cubiomes_wasm()` 自动编译，`sources` 新增 `terrainnoise.c`/`xradv.c`，
     `EXPORTED_FUNCTIONS` 新增 `_cubiomes_gen_biomes_with_height`
-  - [scripts/build-wasm.ps1](file:///c:/Users/XiaoMo/Desktop/MoLaunch/scripts/build-wasm.ps1)：
+  - [scripts/build-wasm.ps1](scripts/build-wasm.ps1)：
     同步更新源文件清单和导出函数，支持手动构建
-  - [src/utils/seedmap/terrainShading.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/terrainShading.ts)：
+  - [src/utils/seedmap/terrainShading.ts](src/utils/seedmap/terrainShading.ts)：
     新增，从 `terrainShading.js` 转换为 TypeScript，实现 hillshade（左上光源 azimuth=315°/altitude=30°）+
     terrace（方块边界台阶线）+ contour（等高线，可选）
-  - [src/utils/seedmap/generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
     回滚到 `createCubiomesModule` API，调用 `_cubiomes_gen_biomes_with_height` 获取 biome + 高度，
     应用 `applyTerrainShading` 渲染地形阴影，生成 ImageBitmap 返回主线程
-  - [src/views/tools/data/useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
     版本映射改用 fork 真实枚举值（26.2=34, 26.1=33, 1.21.9=31, 1.21.6=30, 1.21.5=29），
     默认 mcVersion/currentMc 改为 34（MC_26_2 = MC_NEWEST）
 
 #### 种子地图 generatorWorker 适配原站修改版 cubiomes API
 - 背景：WASM 文件已替换为原站 minecraftsearch.com 修改版（`CubiomesModule` 工厂名 + 状态化 API），
   旧版 `createCubiomesModule` + `_cubiomes_*` 封装函数 API 不再可用
-- 变更（[generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)）：
+- 变更（[generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)）：
   - 工厂函数名：`createCubiomesModule` → `CubiomesModule`
   - 种子参数：字符串指针 `_malloc` → `BigInt` 直接传入 `_apply_seed(BigInt, dimension)`
   - 群系生成：`_cubiomes_gen_biomes` → `_init_generator` + `_apply_seed` + `_generate_biome_image_rgba`（优先）或 `_generate_biome_range`（回退）
@@ -421,9 +421,9 @@
   原站 minecraftsearch.com 用修改版 cubiomes（内部值 29 = 1.21.5+/26.x），尚未开源。
   待原站更新后替换源码，届时手动构建一次即可。
 - 变更：
-  - [build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs)：注释掉 `compile_cubiomes_wasm()` 调用与 `rerun-if-changed`，保留函数定义（加 `#![allow(dead_code)]`）以备将来恢复。现有 `resources/wasm/cubiomes.{js,wasm}`（版本 28）继续使用
-  - 新增 [scripts/build-wasm.ps1](file:///c:/Users/XiaoMo/Desktop/MoLaunch/scripts/build-wasm.ps1)：手动构建脚本，参数与原 build.rs emcc 调用一致（源文件清单、导出函数、优化选项等）
-  - [package.json](file:///c:/Users/XiaoMo/Desktop/MoLaunch/package.json)：新增 `build:wasm` 脚本，运行 `powershell -ExecutionPolicy Bypass -File scripts/build-wasm.ps1`
+  - [build.rs](src-tauri/build.rs)：注释掉 `compile_cubiomes_wasm()` 调用与 `rerun-if-changed`，保留函数定义（加 `#![allow(dead_code)]`）以备将来恢复。现有 `resources/wasm/cubiomes.{js,wasm}`（版本 28）继续使用
+  - 新增 [scripts/build-wasm.ps1](scripts/build-wasm.ps1)：手动构建脚本，参数与原 build.rs emcc 调用一致（源文件清单、导出函数、优化选项等）
+  - [package.json](package.json)：新增 `build:wasm` 脚本，运行 `powershell -ExecutionPolicy Bypass -File scripts/build-wasm.ps1`
   - 将来替换原站 cubiomes 源码后，运行 `npm run build:wasm` 构建一次即可，无需 build.rs 自动编译
 
 #### 种子地图 MC 版本列表对齐原站（支持 26.2/26.1/1.21.9/1.21.6）
@@ -432,7 +432,7 @@
   1. 原站用修改版 cubiomes，内部值 29 对应 1.21.5/1.21.6/1.21.9/26.1/26.1.2/26.2（共享 worldgen）
   2. cubiomes 上游 master（Cubitect/cubiomes）最高仅 `MC_1_21_WD=28`（Winter Drop = 1.21.4），尚未支持 29
   3. 原站注释明确 "most releases are worldgen-identical to 1.21.5"，28 与 29 对大多数种子结果接近
-- 修复（[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)）：
+- 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - 扩展 `SEEDMAP_MC_VERSIONS`，新增 26.2/26.1.2/26.1/1.21.9/1.21.6/1.21.4 标签对齐原站 Latest 列表
   - 1.21.5+ 暂时复用 cubiomes `MC_1_21_WD(28)` 的 worldgen（cubiomes 上游支持 29 后再单独映射）
   - 默认版本仍为 28（对应最新标签 26.2）
@@ -443,7 +443,7 @@
 - 根因（逆向 cubiomes.js 工厂函数返回逻辑确认）：
   1. **`instantiateWasm` 回调返回 undefined 导致竞态（核心根因）**：Emscripten 工厂函数结尾为 `wasmExports = await createWasm(); await run(); return Module`，而 `createWasm` 执行 `return Module["instantiateWasm"](imports, receiveInstance)` —— 返回的是我们回调的返回值。之前的 `instantiateWasm` 回调没返回 Promise，`await createWasm()` 立即 resolve，`receiveInstance`（内含 `updateMemoryViews` 赋值 `HEAPU8`）尚未执行，导致 `await factory()` 返回时 `Module.HEAPU8` 为 undefined。后续 WASM 调用内部 `HEAPU8.set` 触发 `Cannot read properties of undefined`
   2. 并发 WASM 内存操作（辅助因素）：`async onmessage` 可能导致多条消息并发执行
-- 修复（[generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)）：
+- 修复（[generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)）：
   - **`instantiateWasm` 返回 Promise（核心修复）**：在 `cb(r.instance)` 执行后（即 `receiveInstance` → `updateMemoryViews` → `HEAPU8` 赋值完成后）才 `resolve`，确保 `await createWasm()` 真正等待 HEAPU8 就绪
   - 消息串行化：所有消息进入单一 `queue`，`drainQueue()` 一次只处理一条，杜绝并发 WASM 内存操作
   - `new Function` 执行胶水代码 + `ensureHeap()` 安全访问作为加固
@@ -453,34 +453,34 @@
 - 根因：
   1. `scale` 使用了 cubiomes 不支持的值（如 2, 8, 32），导致群系采样错误
   2. `mcVersion` 映射错误：1.21.5 用了 29，但 cubiomes `MC_1_21_WD=28`
-- 修复（[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)）：
+- 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - `scale` 改为从 `SUPPORTED_SCALES = [1, 4, 16, 64, 256]` 中选不超过 bpp 的最大值
   - `mcVersion` 默认值从 29 改为 28（cubiomes MC_1_21_WD=28）
   - `SEEDMAP_MC_VERSIONS` 映射表注释标注 cubiomes 枚举值来源
 
 #### 种子地图 init 协议修复
 - 问题：init 消息无 jobId，Worker 内 catch 不会 postError（因 `'jobId' in msg` 对 init 为 false），init 失败被吞掉导致 WorkerPool 永久 hang
-- 修复（[types.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/types.ts) + [workerPool.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/workerPool.ts)）：
+- 修复（[types.ts](src/utils/seedmap/types.ts) + [workerPool.ts](src/utils/seedmap/workerPool.ts)）：
   - `InitMsg` 和 `InitCompleteMsg` 加 `jobId` 字段
   - `WorkerPool.init()` 生成 jobId 并用作 pending key，`onMessage` 用 `msg.jobId` 查找
 
 #### 种子地图最大放大级别扩展 + 平滑缩放
 - 问题：最大 zoom 不够，无法看清方块细节；zoom 级别离散跳跃，看不到层级过渡
-- 修复（[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)）：
+- 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - RESOLUTIONS 扩展 2 级：增加 0.125 和 0.0625（8 像素、16 像素一个方块）
   - MAX_ZOOM 从 10 改为 12
   - `constrainResolution: false` 允许滚轮停在非整数 zoom，tile 用最近级别拉伸（配合 image-rendering: pixelated 保持像素清晰）
 
 #### 种子地图缩放平滑度与默认 zoom 调整
 - 问题：滚轮一次缩放跳多级 zoom，导致内容突变（草原变沙漠）；默认 zoom 太低看不到方块细节
-- 修复（[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)）：
+- 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - `MouseWheelZoom` 加 `maxDelta: 1, duration: 250`，限制单次滚轮缩放幅度，避免跳多级
   - 默认 zoom 从 4（16 bpp）改为 6（4 bpp），scale=4 采样更精细，接近原站的方块边界效果
   - loadSeed/resetView 的默认 zoom 同步改为 6
 
 #### 种子地图滚轮缩放锚点修复
 - 问题：滚轮放大后视口中心偏移，鼠标位置的内容在放大后变成旁边的内容
-- 修复（[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)）：
+- 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - 显式配置 `MouseWheelZoom({ useAnchor: true })`，确保滚轮缩放围绕鼠标位置
   - 用 `defaultInteractions({ mouseWheelZoom: false }).extend([new MouseWheelZoom(...)])` 保留其他默认交互（DragPan/DragZoom/KeyboardPan 等）
 - 注意：不同 zoom 级别 scale 不同，cubiomes 采样网格不重合是固有行为（原站也有此现象），无法完全消除
@@ -492,10 +492,10 @@
   - **`r.x`/`r.z` 是相对于 scale 的网格坐标，不是方块坐标**（scale>1 时）
   - 之前直接传方块坐标 `blockX` 给 `r.x`，导致采样位置 = `blockX * scale + mid`，放大了 scale 倍
   - scale=1 时 `r.x` 恰好是方块坐标，所以低 zoom 没问题；scale>1 时采样位置完全错位
-- 修复（[generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)）：
+- 修复（[generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)）：
   - 传给 cubiomes 前 `rangeX = floor(blockX / scale)`，`rangeZ = floor(blockZ / scale)`
   - 统一处理 scale=1 和 scale>1 两种情况
-- 修复（[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)）：
+- 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - `EXTENT_HALF` 从 30_000_000 改为 29_999_872（256 × 117187），确保是所有 scale（最大 256）的整数倍
   - 这样 tile 边界 `startBlockX = -EXTENT_HALF + x * blocksPerTile` 也是 scale 整数倍
   - cubiomes 采样网格与 tile 边界完美对齐
@@ -503,7 +503,7 @@
 #### 种子地图 tile 边界对齐修复（Z 轴方向）
 - 问题：相邻 tile 内容不连续（海洋旁突然变沙漠），边界对不齐
 - 根因：MC Z 轴向南递增，OL Y 轴向上递增，直接映射导致方向冲突；之前尝试 Y 翻转但 cubiomes 采样方向不匹配
-- 修复（[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)）：
+- 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - origin 改为左下角 `[-EXTENT_HALF, -EXTENT_HALF]`（MC 西南角）
   - `startBlockZ = -EXTENT_HALF + y * blocksPerTile`（不翻转，直接映射）
   - blocksPerTile 是 scale 整数倍，相邻 tile 采样网格自动对齐
@@ -519,7 +519,7 @@
   5. Y 轴未翻转（原站 `blockZ = origin[1] - tileZ × blocksPerTile`）→ tile 位置错位
   6. mcVersion 映射错误（1.21 用 21，原站 1.21.5→29, 1.21.1→26）
   7. origin 在左下角（原站左上角 `[-3e7, 3e7]`）
-- 修复（[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts)）：
+- 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - TILE_SIZE=64, EXTENT_HALF=30_000_000, RESOLUTIONS=[256,128,64,32,16,8,4,2,1,0.5,0.25]
   - MIN_ZOOM=0, MAX_ZOOM=10, 默认 zoom 4（16 bpp）
   - scale 连续选择 `bpp<=1?1:round(bpp)`
@@ -528,21 +528,21 @@
   - SEEDMAP_MC_VERSIONS 对齐原站 JAVA_MC_VERSION_MAP（1.21.5→29, 1.21.4→28, 1.21.1→26, 1.20→25 等）
   - TileLayer 加 cacheSize: 2048
   - loadSeed/resetView 默认 zoom 改 4，goToUserCoord 用 zoom 8
-- 修复（[generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts)）：
+- 修复（[generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)）：
   - TILE_SIZE=64（与前端一致，避免 tile 尺寸不匹配）
 
 #### 修复 "Cannot read properties of undefined (reading 'set')" — WASM HEAPU8 未导出
 - 根因：Emscripten 新版默认不把 HEAP 视图（HEAPU8/HEAPU32/HEAP32）暴露到 `Module` 对象，`cubiomes.js` 内 `HEAPU8` 是闭包局部变量；Worker 内 `Module.HEAPU8.set(bytes, ptr)` 因 `Module.HEAPU8` undefined 抛错
-- 修复：[build.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/build.rs) 的 `EXPORTED_RUNTIME_METHODS` 从 `ccall,cwrap` 改为 `ccall,cwrap,HEAPU8,HEAPU32,HEAP32`，强制 Emscripten 把 HEAP 视图挂到 `Module`
+- 修复：[build.rs](src-tauri/build.rs) 的 `EXPORTED_RUNTIME_METHODS` 从 `ccall,cwrap` 改为 `ccall,cwrap,HEAPU8,HEAPU32,HEAP32`，强制 Emscripten 把 HEAP 视图挂到 `Module`
 - 验证：重新编译后 `cubiomes.js` 中确认存在 `Module.HEAPU8` 赋值
-- [generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts) `handleInit` 加 `Module.HEAPU8` 二次校验，未就绪则抛明确错误（避免后续 `set` 调用产生不可读的 undefined 报错）
+- [generatorWorker.ts](src/utils/seedmap/generatorWorker.ts) `handleInit` 加 `Module.HEAPU8` 二次校验，未就绪则抛明确错误（避免后续 `set` 调用产生不可读的 undefined 报错）
 
 #### 修复 res:// 协议 404 + Canvas2D willReadFrequently 警告
-- res:// 404 根因：[res_scheme.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/src/res_scheme.rs) 的 `parse_res_path` 重复拼接 `web-common/` 前缀，返回 `web-common/web-common/wasm/cubiomes.js`，而 `embedded_bytes` 注册的 key 是 `wasm/cubiomes.js`（不带前缀），导致 `read_resource_bytes` 找不到资源
+- res:// 404 根因：[res_scheme.rs](src-tauri/src/res_scheme.rs) 的 `parse_res_path` 重复拼接 `web-common/` 前缀，返回 `web-common/web-common/wasm/cubiomes.js`，而 `embedded_bytes` 注册的 key 是 `wasm/cubiomes.js`（不带前缀），导致 `read_resource_bytes` 找不到资源
 - 修复：重写 `parse_res_path`，从 `/web-common/` 起始位置直接截取到 query string 前，去掉前导 `/`，不再重复拼接 `RES_ROOT`
 - 验证：`cargo test res_scheme` 7 个测试全部通过
 - Canvas2D willReadFrequently 根因：OL `Select` 交互的 `forEachFeatureAtPixel` 内部调 `getImageData` 做 hit detection，每帧 benchmark 触发浏览器性能警告
-- 修复：[useSeedMap.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/views/tools/data/useSeedMap.ts) 移除 `Select` 交互，改用 `map.on('pointermove'/'singleclick')` + 自实现 `findStructAtPixel`（遍历 `structSource.forEachFeature` 计算 Point 几何距离，完全绕过 OL hit canvas 路径）
+- 修复：[useSeedMap.ts](src/views/tools/data/useSeedMap.ts) 移除 `Select` 交互，改用 `map.on('pointermove'/'singleclick')` + 自实现 `findStructAtPixel`（遍历 `structSource.forEachFeature` 计算 Point 几何距离，完全绕过 OL hit canvas 路径）
   - HIT_TOLERANCE_PX=6（与 OL Select 默认 hitTolerance 一致）
   - pointermove 加 50ms 节流避免高频遍历
   - hover/click 高亮通过 `hoverFeat`/`clickFeat` 变量驱动 structLayer 的 style 回调
@@ -550,12 +550,12 @@
 #### 修复 Worker "Cannot use import statement outside a module" 报错
 - 问题：Vite 默认把 `new Worker(new URL('./generatorWorker.ts', import.meta.url))` 打包成 classic worker，但 `generatorWorker.ts` 用了 ES module 的 `import` 语法，classic worker 不支持
 - 修复：
-  - [workerPool.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/workerPool.ts) Worker 构造加 `{ type: 'module' }`，让 Vite 生成 ESM worker bundle
-  - [generatorWorker.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/seedmap/generatorWorker.ts) `importScripts`（classic worker 专属 API）改为 `fetch` + `new Function` 执行 Emscripten 胶水代码，兼容 module worker（参考 minecraftsearch.com 做法）
+  - [workerPool.ts](src/utils/seedmap/workerPool.ts) Worker 构造加 `{ type: 'module' }`，让 Vite 生成 ESM worker bundle
+  - [generatorWorker.ts](src/utils/seedmap/generatorWorker.ts) `importScripts`（classic worker 专属 API）改为 `fetch` + `new Function` 执行 Emscripten 胶水代码，兼容 module worker（参考 minecraftsearch.com 做法）
 
 #### Toast 非 success 方法同步打印控制台日志
 - 动机：方便追踪 error/warning/info 类 Toast 的触发来源与上下文
-- [toast.ts](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src/utils/toast.ts) `toastError` → `console.error`、`toastWarning` → `console.warn`、`toastInfo` → `console.info`，`toastSuccess` 保持静默
+- [toast.ts](src/utils/toast.ts) `toastError` → `console.error`、`toastWarning` → `console.warn`、`toastInfo` → `console.info`，`toastSuccess` 保持静默
 
 #### 种子地图架构迁移：后端 FFI → 前端 WASM WorkerPool
 - 动机：原方案在后端 Rust 通过 FFI 调 cubiomes C 库生成群系图，每张 tile 都要走 IPC 传递 RGBA 数据，开销大且无法多线程并行；与参考站 minecraftsearch.com 的纯前端 WASM + Worker 架构差距明显

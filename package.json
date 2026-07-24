@@ -10,13 +10,15 @@
     "tauri": "tauri",
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "typecheck": "vue-tsc --noEmit",
-    "test": "vitest"
+    "test": "vitest",
+    "build:wasm": "powershell -ExecutionPolicy Bypass -File scripts/build-wasm.ps1"
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-dialog": "^2.7.2",
     "@tauri-apps/plugin-shell": "^2.3.5",
+    "ol": "^10.9.0",
     "pinia": "^2.1.7",
     "skinview3d": "^3.4.2",
     "vue": "^3.4.15",

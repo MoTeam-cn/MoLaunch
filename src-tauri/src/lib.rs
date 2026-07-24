@@ -6,6 +6,7 @@ pub mod error_util;
 pub mod http;
 pub mod logger;
 pub mod minecraft;
+pub mod res_scheme;
 pub mod resources;
 pub mod sdk;
 pub mod state;
@@ -246,6 +247,10 @@ pub fn run() {
     // 注册 cache-image 自定义 URI scheme（图片缓存协议，抽离至 minecraft::image_cache）
     log_info!("[Startup] Registering cache-image URI scheme...");
     let builder = minecraft::image_cache::register_uri_scheme(builder);
+
+    // 注册 res:// 自定义 URI scheme（前端访问后端嵌入资源，如 WASM 文件）
+    log_info!("[Startup] Registering res:// URI scheme...");
+    let builder = res_scheme::register_res_scheme(builder);
 
     log_info!("[Startup] All setup done, calling builder.run() — entering Tauri event loop (webview/window creation follows)...");
     builder
