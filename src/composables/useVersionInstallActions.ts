@@ -26,7 +26,7 @@
 import { ref } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
-import { showError, showConfirm } from '@/utils/modal'
+import { showError, showConfirm, showModal } from '@/utils/modal'
 import { toastSuccess, toastInfo, toastWarning } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
 
@@ -101,8 +101,15 @@ export function useVersionInstallActions() {
       toastSuccess(`${options.instanceName} 安装完成`)
       await loadInstalledVersions()
     }).catch((e) => {
-      showError('安装失败', String(e))
-      versionStore.finishDownload()
+      // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+      showModal({
+        type: 'error',
+        title: '安装失败',
+        message: String(e),
+        onConfirm: () => {
+          versionStore.finishDownload()
+        },
+      })
     })
     // 不在这里调用 finishDownload，由轮询统一管理生命周期
   }
@@ -115,8 +122,16 @@ export function useVersionInstallActions() {
       await loadInstalledVersions()
       toastSuccess(`${versionId} 下载完成`)
     } catch (e) {
-      showError('下载失败', `无法下载版本 ${versionId}`, String(e))
-      versionStore.finishDownload()
+      // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+      showModal({
+        type: 'error',
+        title: '下载失败',
+        message: `无法下载版本 ${versionId}`,
+        details: String(e),
+        onConfirm: () => {
+          versionStore.finishDownload()
+        },
+      })
     }
     // 不在这里调用 finishDownload，由轮询统一管理生命周期
   }

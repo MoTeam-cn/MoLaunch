@@ -17,7 +17,7 @@ import { installMerged } from '@/utils/api/loader'
 import { useVersionStore } from '@/stores/version'
 import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import { showPrompt } from '@/utils/modal'
+import { showPrompt, showModal } from '@/utils/modal'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import HorizontalFilter from '@/components/common/HorizontalFilter.vue'
@@ -110,8 +110,16 @@ async function handleDownload(v: ResourceVersion) {
     await downloadResourceToPath(v.download_url, finalFileName, savePath)
     // 不调用 finishDownload，由轮询检测 is_complete 自动完成
   } catch (e: any) {
-    toastError('下载失败: ' + (e?.message || String(e)))
-    versionStore.finishDownload()
+    const msg = e?.message || String(e)
+    // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+    showModal({
+      type: 'error',
+      title: '下载失败',
+      message: msg,
+      onConfirm: () => {
+        versionStore.finishDownload()
+      },
+    })
   } finally {
     downloading.value = null
   }
@@ -150,8 +158,16 @@ async function handleInstallModpack(v: ResourceVersion) {
     )
     toastSuccess(`整合包 ${instanceName} 安装完成`)
   } catch (e: any) {
-    toastError('整合包安装失败: ' + (e?.message || String(e)))
-    versionStore.finishDownload()
+    const msg = e?.message || String(e)
+    // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+    showModal({
+      type: 'error',
+      title: '整合包安装失败',
+      message: msg,
+      onConfirm: () => {
+        versionStore.finishDownload()
+      },
+    })
   } finally {
     downloading.value = null
   }

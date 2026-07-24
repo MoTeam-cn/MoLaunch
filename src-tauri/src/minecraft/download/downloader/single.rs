@@ -88,6 +88,9 @@ pub async fn download_single(
     'url_loop: for url in urls {
         // 每个 URL 独立计数，确保 URL 回退时重试次数正确重置
         let mut attempt = 0;
+        // 分片 404 时禁用分片：CF CDN 对部分文件的 Range 请求会返回 404，
+        // 但完整 GET 请求正常。分片 404 后重试分片还会 404，直接走单流更高效。
+        let mut chunk_disabled = false;
 
         // 确定超时时间
         let timeout = match source_mode {
@@ -102,10 +105,19 @@ pub async fn download_single(
         };
 
         while attempt < max_retries {
+            // 取消信号检查：用户取消后立即跳出整个 URL 循环，不再继续尝试
+            // （否则"下载已取消"错误会被当作普通失败重试 max_retries 次，浪费时间）
+            if let Some(ref cf) = cancel_flag {
+                if cf.load(std::sync::atomic::Ordering::Relaxed) {
+                    log_info!("[Download] 检测到取消信号，停止重试: {}", task.local_path);
+                    break 'url_loop;
+                }
+            }
+
             attempt += 1;
 
-            // 尝试分片下载（大文件 + 服务器支持 Range）
-            if can_chunk {
+            // 尝试分片下载（大文件 + 服务器支持 Range + 未被 404 禁用）
+            if can_chunk && !chunk_disabled {
                 if attempt == 1 {
                     log_debug!("[Download] 检测分片支持: {}", url);
                 }
@@ -159,6 +171,18 @@ pub async fn download_single(
                                 status: DownloadStatus::Completed,
                                 error: None,
                             };
+                        }
+                    }
+
+                    // 分片返回 404 时禁用分片：CF CDN 对 Range 请求可能返回 404，
+                    // 但完整 GET 正常。后续重试直接走单流，避免浪费分片探测时间。
+                    if let Some(ref err) = chunk_result.error {
+                        if err.contains("404") {
+                            log_info!(
+                                "[Download] 分片返回 404，禁用分片改走单流: {}",
+                                url
+                            );
+                            chunk_disabled = true;
                         }
                     }
                     log_debug!("[Chunk] 分片下载失败: {:?}, 回退单流", chunk_result.error);
@@ -225,6 +249,21 @@ pub async fn download_single(
                     }
                 }
             }
+        }
+    }
+
+    // 取消信号优先于失败：用户主动取消时返回"下载已取消"而非"所有下载源均失败"
+    if let Some(ref cf) = cancel_flag {
+        if cf.load(std::sync::atomic::Ordering::Relaxed) {
+            log_info!("[Download] 下载已取消: {}", task.local_path);
+            return DownloadProgress {
+                task_id: task.id.clone(),
+                downloaded: 0,
+                total: 0,
+                speed: 0,
+                status: DownloadStatus::Failed,
+                error: Some("下载已取消".to_string()),
+            };
         }
     }
 

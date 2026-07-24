@@ -9,8 +9,8 @@ import { getProjectVersions, downloadResourceToPath } from '@/utils/api/communit
 import { getVersionModsDir, deleteMod, type ModInfo } from '@/utils/api/personalization'
 import { versionChangeType, type VersionChangeType } from '@/utils/version'
 import { formatBytes } from '@/utils/format'
-import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import { showConfirm } from '@/utils/modal'
+import { toastSuccess, toastInfo } from '@/utils/toast'
+import { showConfirm, showModal } from '@/utils/modal'
 import { useVersionStore } from '@/stores/version'
 import type { ResourceVersion, Platform } from '@/types/community'
 
@@ -170,8 +170,15 @@ export function useModUpdate(
           emit('update:visible', false)
         } catch (e: any) {
           const msg = typeof e === 'string' ? e : (e?.message || String(e))
-          toastError(`安装失败：${msg}`)
-          versionStore.finishDownload()
+          // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+          showModal({
+            type: 'error',
+            title: 'Mod 安装失败',
+            message: msg,
+            onConfirm: () => {
+              versionStore.finishDownload()
+            },
+          })
         } finally {
           installing.value = false
         }

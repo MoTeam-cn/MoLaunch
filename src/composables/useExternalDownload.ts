@@ -10,7 +10,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import { showConfirm } from '@/utils/modal'
+import { showConfirm, showModal } from '@/utils/modal'
 import { formatBytes } from '@/utils/format'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { openPath, pauseDownload, resumeDownload, cancelDownload } from '@/utils/api/system'
@@ -179,10 +179,16 @@ export function useExternalDownload() {
         fileName.value = ''
       })
       .catch((e) => {
-        if (versionStore.downloading) {
-          versionStore.finishDownload()
-        }
-        toastError(`下载失败: ${e instanceof Error ? e.message : String(e)}`)
+        const msg = e instanceof Error ? e.message : String(e)
+        // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+        showModal({
+          type: 'error',
+          title: '下载失败',
+          message: msg,
+          onConfirm: () => {
+            versionStore.finishDownload()
+          },
+        })
       })
   }
 

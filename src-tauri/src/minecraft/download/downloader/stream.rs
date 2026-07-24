@@ -13,6 +13,10 @@ use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
 
 /// 从单个 URL 下载（支持限速和动态超时，实时更新进度）
+///
+/// 超时策略（与 chunk 下载一致，避免大文件被整体超时误杀）：
+/// - 连接 + 响应头阶段：用传入的 `timeout`（Smart 模式 5s/10s）
+/// - body 流式读取阶段：无数据流动 15s 才报错（大文件慢速网络不受影响）
 pub(super) async fn download_from_url(
     client: &reqwest::Client,
     url: &str,
@@ -24,7 +28,13 @@ pub(super) async fn download_from_url(
     pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
     cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> Result<(u64, u64, u64), Box<dyn std::error::Error + Send + Sync>> {
-    let response = client.get(url).timeout(timeout).send().await?;
+    // 连接 + 响应头阶段用 tokio::time::timeout 包裹 send()
+    // （reqwest 的 .timeout() 是整体超时含 body 读取，大文件会被误杀）
+    let response = tokio::time::timeout(timeout, client.get(url).send())
+        .await
+        .map_err(|_| -> Box<dyn std::error::Error + Send + Sync> {
+            format!("连接超时（{}s）", timeout.as_secs()).into()
+        })??;
 
     if !response.status().is_success() {
         return Err(format!("HTTP 错误：{}", response.status()).into());
@@ -58,7 +68,11 @@ pub(super) async fn download_from_url(
         }
     };
 
-    while let Some(chunk) = stream.next().await {
+    // body 读取阶段：无数据流动 15s 才报错（与 chunk 下载一致）
+    // 这样大文件慢速网络不会被整体超时误杀，只有真断流才会失败
+    const STREAM_IDLE_TIMEOUT_SECS: u64 = 15;
+
+    loop {
         // 检查取消信号
         if let Some(ref flag) = cancel_flag {
             if flag.load(std::sync::atomic::Ordering::Relaxed) {
@@ -78,12 +92,28 @@ pub(super) async fn download_from_url(
                 tokio::time::sleep(Duration::from_millis(200)).await;
             }
         }
-        let chunk = match chunk {
-            Ok(c) => c,
-            Err(e) => {
+
+        let next_chunk = tokio::time::timeout(
+            Duration::from_secs(STREAM_IDLE_TIMEOUT_SECS),
+            stream.next(),
+        )
+        .await;
+        let chunk = match next_chunk {
+            Err(_elapsed) => {
+                rollback_progress(downloaded, &progress);
+                return Err(format!(
+                    "单流下载超时（{}s 无数据流动，已下载 {}）",
+                    STREAM_IDLE_TIMEOUT_SECS,
+                    crate::utils::format::bytes(downloaded)
+                )
+                .into());
+            }
+            Ok(None) => break, // 流结束
+            Ok(Some(Err(e))) => {
                 rollback_progress(downloaded, &progress);
                 return Err(Box::from(e) as Box<dyn std::error::Error + Send + Sync>);
             }
+            Ok(Some(Ok(c))) => c,
         };
         let chunk_size = chunk.len() as u64;
 

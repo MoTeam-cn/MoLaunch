@@ -154,6 +154,9 @@ pub async fn download_version(
     .await
     .map_err(|e| {
         log_error!("Failed to download version: {}", e);
+        // 重置 download_state，避免 is_active 仍为 true 导致前端下载管理页卡住
+        let mut ds = state.download_state.lock().unwrap();
+        ds.mark_failed(0);
         e.to_string()
     })?;
 

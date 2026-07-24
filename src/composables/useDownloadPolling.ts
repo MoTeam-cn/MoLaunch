@@ -1,7 +1,7 @@
 import { watch } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { getDownloadProgress } from '@/utils/tauri'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { toastSuccess } from '@/utils/toast'
 import type { DownloadStage, RawDownloadStage } from '@/types/download'
 import { safeCall } from '@/utils/async'
 
@@ -32,14 +32,15 @@ function startPolling(versionStore: ReturnType<typeof useVersionStore>) {
 
       if (progress && progress.stages && progress.stages.length > 0) {
         // 先检查错误码，避免在失败状态下继续轮询
+        // 注意：这里只 stopPolling，不 finishDownload / toastError。
+        // 失败的 UI 提示和 finishDownload 由调用方的 catch 统一处理
+        // （showModal + onConfirm: finishDownload），避免轮询抢先 finishDownload
+        // 导致调用方 showModal 还没显示用户就被 router.back() 带走。
         if (progress.error_code && progress.error_code !== 0) {
           if (import.meta.env.DEV) {
-            console.debug('[Polling] Download failed with error_code=', progress.error_code)
+            console.debug('[Polling] Download failed with error_code=', progress.error_code, ' (交给调用方 catch 处理)')
           }
           stopPolling()
-          const failedName = versionStore.downloadingVersion || '下载任务'
-          versionStore.finishDownload()
-          toastError(`${failedName} 下载失败`)
           return
         }
 
