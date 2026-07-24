@@ -8,6 +8,7 @@ import router from '@/router'
 import TopNavLayout from '@/components/layout/TopNavLayout.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
 import DownloadPanel from '@/components/common/DownloadPanel.vue'
+import DragOverlay from '@/components/common/DragOverlay.vue'
 import Modal from '@/components/common/Modal.vue'
 import CrashDialog from '@/components/common/CrashDialog.vue'
 import Toast from '@/components/common/Toast.vue'
@@ -19,6 +20,7 @@ import { setModalRef } from '@/utils/modal'
 import { setCrashDialogRef } from '@/utils/crashDialog'
 import { setToastRef } from '@/utils/toast'
 import { initDownloadPolling } from '@/composables/useDownloadPolling'
+import { useDragDrop } from '@/composables/useDragDrop'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
@@ -29,6 +31,9 @@ const crashDialogRef = ref<InstanceType<typeof CrashDialog> | null>(null)
 const toastRef = ref<InstanceType<typeof Toast> | null>(null)
 // 会话恢复期间的加载遮罩，避免未恢复登录态就触发其他页面 invoke
 const isRestoring = ref(true)
+
+// 注册全局拖拽事件监听（必须在 onMounted 中调用，onUnmounted 自动清理）
+useDragDrop()
 
 onMounted(() => {
   console.log('[Startup][Frontend] App.vue onMounted @', new Date().toISOString())
@@ -97,6 +102,7 @@ async function initApp() {
   <Modal ref="modalRef" />
   <CrashDialog ref="crashDialogRef" />
   <Toast ref="toastRef" />
+  <DragOverlay />
   <!-- 会话恢复期间的加载遮罩 -->
   <Teleport to="body">
     <Transition name="fade">

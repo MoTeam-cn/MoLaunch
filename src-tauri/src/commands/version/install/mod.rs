@@ -179,6 +179,9 @@ pub async fn install_merged(
         log_error!("Failed to download MC version: {}", e);
         // MC 本体下载失败：清理已下载的部分文件
         cleanup_failed_install(&game_dir, &mc_version, fabric_version.as_deref());
+        // 重置 download_state，避免 is_active 仍为 true 导致前端下载管理页卡住
+        let mut ds = state.download_state.lock().unwrap();
+        ds.mark_failed(0);
         e.to_string()
     })?;
 

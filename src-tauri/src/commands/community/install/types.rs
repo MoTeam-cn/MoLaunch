@@ -63,12 +63,39 @@ pub struct InstallModpackRequest {
     pub instance_name: String,
 }
 
+/// 本地整合包安装请求（拖拽安装）
+///
+/// 与 `InstallModpackRequest` 的差异：直接使用本地文件路径，跳过 Stage 0 下载。
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallLocalModpackRequest {
+    /// 本地整合包文件绝对路径（.zip / .mrpack）
+    pub file_path: String,
+    /// 整合包实例名（用于 versions/{instance_name}/ 目录）
+    pub instance_name: String,
+}
+
 /// 整合包格式
+///
+/// 识别优先级（参考 PCL2 ModModpack.vb）：
+/// 1. mcbbs.packmeta → Mcbbs
+/// 2. mmc-pack.json → Mmc
+/// 3. modrinth.index.json → Modrinth
+/// 4. manifest.json：有 addons → Mcbbs，无 addons → Curseforge
+/// 5. modpack.json → Hmcl
+/// 6. modpack.zip / modpack.mrpack → LauncherPack（暂未实现）
+/// 7. 其他 → Compress（暂未实现）
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ModpackFormat {
     Curseforge,
     Modrinth,
+    /// HMCL 整合包（modpack.json），overrides 在 `minecraft/` 目录
+    Hmcl,
+    /// MultiMC 整合包（mmc-pack.json + instance.cfg），overrides 在 `.minecraft/` 目录
+    Mmc,
+    /// MCBBS 整合包（mcbbs.packmeta 或带 addons 的 manifest.json），overrides 在 `overrides/` 目录
+    Mcbbs,
 }
 
 /// 整合包安装结果
@@ -95,20 +122,32 @@ pub struct InstallModpackResult {
 /// install_modpack Stage 1 解析得到的整合包信息（中间结构）
 ///
 /// 由 `modpack_stages::parse_modpack_info` 返回，供 install_modpack 后续阶段使用。
-/// 跨 CF / MR 两种格式统一为单一结构，避免 install_modpack 中 match 分支变量类型不一致。
+/// 跨 CF / MR / HMCL / MMC / MCBBS 五种格式统一为单一结构，
+/// 避免 install_modpack 中 match 分支变量类型不一致。
 pub(super) struct ModpackInfo {
     /// 识别出的整合包格式
     pub format: ModpackFormat,
-    /// 整合包内 minecraft.version / dependencies["minecraft"]
+    /// 整合包内 minecraft.version / dependencies["minecraft"] / gameVersion / addons.game
     pub game_version: String,
-    /// 加载器名称（forge / fabric / quilt / neoforge），空表示原版
+    /// 加载器名称（forge / fabric / quilt / neoforge / optifine），空表示原版
     pub loader: String,
     /// 加载器版本
     pub loader_version: String,
-    /// manifest / index 中 files[] 长度（用于日志展示）
+    /// manifest / index 中 files[] 长度（用于日志展示，HMCL/MMC/MCBBS 无依赖列表时为 0）
     pub mod_files_count: usize,
+    /// 关键文件所在层级前缀（如 `""` 或 `"subfolder/"`），与 `format` 一起决定 overrides 前缀
+    pub archive_base_folder: String,
     /// CF manifest（仅 Curseforge 格式有值）
     pub cf_manifest: Option<super::curseforge::CfManifest>,
     /// MR index（仅 Modrinth 格式有值）
     pub mr_index: Option<super::modrinth::MrIndex>,
+    /// HMCL manifest（仅 Hmcl 格式有值，保留供未来扩展：HMCL 整合包的 author/description 等元信息）
+    #[allow(dead_code)]
+    pub hmcl_manifest: Option<super::hmcl::HmclManifest>,
+    /// MMC pack（仅 Mmc 格式有值，保留供未来扩展：MMC instance.cfg 的 JVM 参数 / PreLaunchCommand 迁移）
+    #[allow(dead_code)]
+    pub mmc_pack: Option<super::mmc::MmcPack>,
+    /// MCBBS manifest（仅 Mcbbs 格式有值，保留供未来扩展：MCBBS launchInfo 的 javaArgument / launchArgument 迁移）
+    #[allow(dead_code)]
+    pub mcbbs_manifest: Option<super::mcbbs::McbbsManifest>,
 }

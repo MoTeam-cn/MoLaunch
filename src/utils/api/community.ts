@@ -17,6 +17,7 @@ import type {
   DownloadRequest,
   DownloadResult,
   InstallModpackRequest,
+  InstallLocalModpackRequest,
   InstallModpackResult,
 } from '@/types/community'
 
@@ -96,6 +97,19 @@ export async function getResourceInstallPath(
  */
 export async function installModpack(req: InstallModpackRequest): Promise<InstallModpackResult> {
   return await invoke<InstallModpackResult>('install_modpack', { req })
+}
+
+/**
+ * 安装本地整合包（拖拽安装）
+ *
+ * 与 `installModpack` 的差异：直接使用本地文件路径，跳过下载阶段。
+ * 共享解析 → 下载依赖 mods → 复制 overrides 流程。
+ * 完成后前端需调用 install_merged 安装游戏本体。
+ */
+export async function installLocalModpack(
+  req: InstallLocalModpackRequest,
+): Promise<InstallModpackResult> {
+  return await invoke<InstallModpackResult>('install_local_modpack', { req })
 }
 
 /**

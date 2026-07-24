@@ -107,8 +107,21 @@ export interface InstallModpackRequest {
   instanceName: string
 }
 
+/** 本地整合包安装请求（拖拽安装） */
+export interface InstallLocalModpackRequest {
+  /** 本地整合包文件绝对路径（.zip / .mrpack） */
+  filePath: string
+  /** 整合包实例名（用于 versions/{instanceName}/ 目录） */
+  instanceName: string
+}
+
 /** 整合包格式 */
-export type ModpackFormat = 'curseforge' | 'modrinth'
+export type ModpackFormat =
+  | 'curseforge'
+  | 'modrinth'
+  | 'hmcl'
+  | 'mmc'
+  | 'mcbbs'
 
 /** 整合包安装结果 */
 export interface InstallModpackResult {
