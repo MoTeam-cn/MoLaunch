@@ -20,6 +20,8 @@
 | Tailwind CSS | Copyright (c) Adam Wathan | MIT License | https://tailwindcss.com | https://github.com/tailwindlabs/tailwindcss/blob/master/LICENSE |
 | skinview3d | Copyright (c) 2021 bs-community | MIT License | https://github.com/bs-community/skinview3d | https://github.com/bs-community/skinview3d/blob/master/LICENSE |
 | Vue Virtual Scroller | Copyright (c) 2018 Guillaume Chau | MIT License | https://github.com/Akryum/vue-virtual-scroller | https://github.com/Akryum/vue-virtual-scroller/blob/master/LICENSE |
+| OpenLayers | Copyright (c) 2005-present OpenLayers Contributors. All rights reserved. | BSD-2-Clause | https://openlayers.org | https://github.com/openlayers/openlayers/blob/main/LICENSE.md |
+| Cubiomes | Copyright (c) 2019-2024 Cubitect | MIT License | https://github.com/Cubitect/cubiomes | https://github.com/Cubitect/cubiomes/blob/master/LICENSE |
 | Vite | Copyright (c) 2019-present Evan You & Vite Contributors | MIT License | https://vitejs.dev | https://github.com/vitejs/vite/blob/main/LICENSE |
 | TypeScript | Copyright (c) Microsoft Corporation | Apache License 2.0 | https://www.typescriptlang.org | https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt |
 | Vue Language Tools (vue-tsc) | Copyright (c) 2021-present Johnson Chu | MIT License | https://github.com/vuejs/language-tools | https://github.com/vuejs/language-tools/blob/master/LICENSE |

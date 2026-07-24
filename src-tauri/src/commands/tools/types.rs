@@ -459,6 +459,29 @@ pub struct ArchiveRestoreResult {
     pub message: String,
 }
 
+/// 提取存档种子请求参数
+///
+/// 用于种子地图工具"从存档加载"功能：读取指定存档的 level.dat，
+/// 解析其中 WorldGenSettings.seed（1.16+）或 RandomSeed（1.15 及更早），
+/// 返回十进制字符串（避免 JS Number 精度丢失，MC 种子是 i64）。
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExtractSaveSeedParams {
+    /// 存档名称（saves/ 下的文件夹名）
+    pub world_name: String,
+    /// 可选版本 ID（用于解析版本隔离下的 saves 目录）
+    #[serde(default)]
+    pub version_id: Option<String>,
+}
+
+/// 提取存档种子结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ExtractSaveSeedResult {
+    /// 种子（十进制字符串，i64 范围）
+    pub seed: String,
+    /// 种子来源字段名（WorldGenSettings.seed 或 RandomSeed）
+    pub source: String,
+}
+
 // ===== 网络延迟测试相关 =====
 
 /// 网络延迟测试请求参数

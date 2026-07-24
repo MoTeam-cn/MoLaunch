@@ -9,6 +9,501 @@
 
 ### 变更
 
+#### 种子地图新增半成品警告提示
+- 背景：1.16 版本 WASM 内存越界问题经四轮修复仍未彻底解决，需在 UI 上明确告知
+  用户当前为半成品状态，避免误导。
+- 变更：[src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue) 顶部
+  AlertV2 区域新增一条 error 提示："本项目仍为半成品，不保证完全可用，部分版本
+  （如 1.16）可能存在 WASM 内存越界问题，推荐等待后续更新。"
+- 原 cubiomes 致谢提示保留不变，两条 AlertV2 用 space-y-2 间距分隔。
+
+#### 修复 1.16 mapOceanMix 动态扩展导致共享 cache 越界（改用独立 malloc）
+- 背景：上述 NULL 检查 + getMaxArea 精确估算 + allocCache padding 三轮修复后，
+  1.16 拖动地图仍偶发 "memory access out of bounds"，26.2 正常。
+- 根因（最终定位）：`mapOceanMix`（layers.c）的 `lw`/`lh` 会根据 warm/frozen
+  ocean 位置动态扩展（最多 `w+17`、`h+17`），**无法被 `getMaxArea` 静态估算**：
+  1. 函数先扫描 `out[0..w*h)` 找 warm/frozen ocean，动态确定 `lx0/lx1/lz0/lz1`。
+  2. 然后用 `land = out + w*h` 作为共享 cache buffer 调用 `l->p->getMap`，
+     写入 `land[0..lw*lh)`。当 lw/lh 扩展时，`lw*lh` 可能超过 cache 尾部余量。
+  3. 内层 land chain（mapZoom 等）还会在 `land + lw*lh` 后叠加临时 buffer，
+     进一步突破 `getMaxArea` 估算的 `siz`。
+  4. native 路径 calloc 的对齐/分页余量偶发掩盖此问题，WASM 严格内存检查下
+     立即 trap。
+- 修复（[src-tauri/cubiomes/layers.c](src-tauri/cubiomes/layers.c) `mapOceanMix`）：
+  - 将 `land` 从共享 cache buffer (`out + w*h`) 改为独立 `malloc` 分配。
+  - 大小用 `getMinLayerCacheSize(l->p, lw, lh)` 精确计算 land chain 所需 buffer，
+    覆盖内层所有临时 buffer 叠加。
+  - malloc 失败返回 -1 走错误处理路径，getMap 失败 free(land) 后返回 err，
+    函数返回前 free(land) 释放。
+  - 添加 `#include "generator.h"` 以使用 `getMinLayerCacheSize` 函数。
+- 修复（[src-tauri/cubiomes/generator.c](src-tauri/cubiomes/generator.c) `allocCache`）：
+  - WASM padding 从 `len + len/2 + 1024` 减小为 `len + 16`（仅边界对齐余量）。
+  - 原因：mapOceanMix 已不共享 cache buffer，`getMaxArea` 的 p2/zoom 估算已修正，
+    不再需要大 padding 兜底，避免内存浪费。
+  - 更新 `getMaxArea` 注释，说明 mapOceanMix 已改用独立 malloc。
+- 验证：cargo check 通过；WASM 已重新编译（cubiomes.wasm 大小 772345 → 772437）。
+  需测试 1.16 地图加载与拖动（z=5/6/7/8 各级别）、26.2 结构加载（出生点/要塞）。
+
+#### 修复 1.16 拖动地图偶发 WASM "memory access out of bounds"
+- 背景：渲染 1.16 地图本身正常，但拖动加载新 tile 时偶发
+  "memory access out of bounds"，specials（出生点/要塞）也偶发失败；
+  1.18+ 版本不出现此问题。
+- 根因（两层，均与 WASM 内存分配偶发返回 NULL 有关）：
+  1. cubiomes 内部 `allocCache` 返回 NULL 未检查：`mapApproxHeight`
+     （generator.c）和 `locateBiome`（finders.c）调用 `allocCache` 后
+     未检查 NULL，`genBiomes(cache=NULL)` → `genArea` 内 `memset(NULL,...)`
+     触发 WASM OOB。1.18+ 走 biome noise 分支（不调 allocCache），不受影响。
+  2. cubiomes 内部 `malloc`/`calloc` 返回 NULL 未检查：`mapApproxHeight` 的
+     `double *depth = malloc(...)`、`checkForBiomesAtLayer` 的
+     `ids = calloc(...)`、`checkForTemps` 的 `area = calloc(...)` 均未检查
+     NULL。WASM 内存碎片化或接近 MAXIMUM_MEMORY 上限时偶发返回 NULL，
+     后续解引用触发 OOB trap，导致 tile load 和结构校验路径偶发失败。
+- 修复（cubiomes submodule 内 14 处 NULL 检查 + emcc 参数）：
+  - [src-tauri/cubiomes/generator.c](src-tauri/cubiomes/generator.c)
+    `genBiomes` 入口加 `if (!cache) return -1;`
+    `genArea` 加 `if (!layer || !out) return -1;` 兜底
+    `mapApproxHeight` 的 allocCache 后加 NULL 检查 + free(depth) 防泄漏
+    `mapApproxHeight` 的 depth malloc 后加 NULL 检查，返回 -1 走错误码 4
+    `mapOceanMixMod` 的 otyp malloc 后加 NULL 检查，返回 -1 走错误处理路径
+    `getBiomeAt` 的 allocCache 后加 NULL 检查，返回 none 安全降级
+  - [src-tauri/cubiomes/finders.c](src-tauri/cubiomes/finders.c)
+    `locateBiome` 的 allocCache 后加 NULL 检查，返回 out + passes=0 安全降级
+    `areBiomesViable` 的 allocCache 后加 NULL 检查，跳 L_no（已有 if(ids) free 保护）
+    `checkForBiomesAtLayer` 的 ids calloc 后加 NULL 检查，返回 0（不匹配）降级
+    `checkForTemps` 的 area calloc 后加 NULL 检查，返回 0（不通过）降级
+    `mapEndIslandHeight` 的 ids malloc 后加 NULL 检查，返回 0 降级（修复 -Wreturn-mismatch）
+    `floodFillGen` 的 queue malloc 后加 NULL 检查，返回 0 降级
+    `getBiomeCenters` 的 ids malloc 后加 NULL 检查，返回 0 降级
+    `checkForBiomes` MC_B1_7 分支 allocCache 后加 NULL 检查，返回 0 降级
+    `checkForBiomes` 主分支 allocCache 后加 NULL 检查，返回 0 降级
+    `checkForBiomes` 主分支 buf malloc 后加 NULL 检查，跳 L_end 用已填充 ids 匹配
+    `getBiomeCenters` 1.17- 分支 cache allocCache 后加 NULL 检查，跳 L_end 降级
+    `getParaRange` 的 skip malloc 后加 NULL 检查，置 err=-1 跳 L_end 降级
+    `getLargestRec` 的 meta calloc 后加 NULL 检查，返回 0 降级
+  - [src-tauri/cubiomes/biomenoise.c](src-tauri/cubiomes/biomenoise.c)
+    `mapEndBiome` 的 hmap malloc 后加 NULL 检查，返回 -1 走错误处理路径
+    `mapEnd` 的 buf malloc 后加 NULL 检查，返回 -1 走错误处理路径
+    `mapEndSurfaceHeight` 的 buf malloc 后加 NULL 检查，返回 -1 走错误处理路径
+  - [src-tauri/build_script/cubiomes_wasm.rs](src-tauri/build_script/cubiomes_wasm.rs)
+    emcc 加 `-s MAXIMUM_MEMORY=512MB`，显式设置内存上限，降低 calloc 失败概率
+- 影响：1.16 拖动时偶发 OOB 消除；26.2 结构加载失败消除；malloc/calloc 失败时
+  以错误码/空结果降级，JS 端重试机制（generatorWorker.ts 已有 MAX_RETRIES=2）接管，
+  不再 trap 中断 Worker。
+- 注意：cubiomes submodule 文件已修改，需提交到 fork 仓库 MoTeam-cn/cubiomes。
+  需重新编译 WASM（cargo run 时 build.rs 自动调 emcc）。
+
+#### 修复 1.16 layer stack cache 大小估算不足导致完全无法加载贴图
+- 背景：上述 NULL 检查修复后，1.16 仍完全无法加载贴图（所有 tile 报
+  "memory access out of bounds"），而 26.2 正常。说明根因不仅是偶发 NULL，
+  而是 cache 大小本身不足。
+- 根因：`getMinCacheSize` → `getMaxArea` 对 layer stack 的临时 buffer 估算不足：
+  1. `mapZoom`/`mapZoomFuzzy` 内部 `int *buf = out + pW*pH`，buf 大小 = newW*newH
+     = (2*pW)*(2*pH) = 4*pW*pH，但 `getMaxArea` 只累加 `areaX*areaZ ≈ pW*pH`
+     （差 4 倍）。
+  2. `mapOceanMix`/`mapRiverMix` 多层嵌套调用时，`out + w*h` 作为 land buffer,
+     内部 `land + lw*lh` 又作为下一层 buf，临时 buffer 嵌套叠加未被 `siz` 累加
+     完全覆盖。
+  3. native 环境下 calloc 通常返回对齐/分页的额外余量偶发掩盖此问题，WASM 内存
+     严格限制下立即触发 "memory access out of bounds"。
+- 修复（[src-tauri/cubiomes/generator.c](src-tauri/cubiomes/generator.c) `allocCache`）：
+  - WASM 编译路径（`#ifdef __EMSCRIPTEN__`）额外分配 200% padding + 4KB 固定空间
+    （`len * 3 + 1024`），作为 layer stack cache 边界 case 的兜底。
+  - native 编译路径不受影响，保持原 `calloc(len, sizeof(int))`。
+- 验证：WASM 已重新编译（cubiomes.wasm 大小 772190 → 772211）。需测试 1.16
+  地图加载与拖动是否正常，26.2 是否回归。
+
+#### 修复 1.16 拖动地图仍报 OOB（getMaxArea 对 p2 layer 估算少一倍）
+- 背景：上述 `allocCache` padding 修复后，1.16 拖动地图仍持续报
+  "memory access out of bounds"（z=5/6/8 各种 tile 坐标），26.2 正常。
+  说明 `len * 3` padding 仍不足以覆盖 layer stack 的真实临时 buffer 需求。
+- 根因（精确分析各 layer 的实际 buffer 占用）：
+  1. **p2 layer（mapHills edge=2 / mapRiverMix edge=0 / mapOceanMix edge=17）**：
+     parent1 写入 `out[0..area)`，parent2 写入 `out+area` 后的 `buf[0..area)`，
+     总占用 `2*area`；但 `getMaxArea` 只累加 `area`，**差 100%**。
+     - mapHills: `riv = out + pW*pH`，p2 写入 riv[0..pW*pH]，总 2*(w+2)*(h+2)
+     - mapRiverMix: `buf = out + w*h`，p2 写入 buf[0..w*h]，总 2*w*h
+     - mapOceanMix: `land = out + w*h`，p1 写入 land[0..lw*lh]（lw/lh 动态扩展
+       最多 ±8），总 w*h + (w+16)*(h+16) ≈ 2*w*h
+  2. **zoom=2 layer（mapZoom/mapZoomFuzzy edge=3）**：`buf = out + pW*pH` 后接
+     4*pW*pH，总占用 5*pW*pH ≈ 5/4*area，原版累加 area，**差 25%**。
+  3. **zoom=4 layer（mapVoronoi edge=3）**：`src = out + w*h` 后接 pw*ph，
+     总占用 w*h + pw*ph ≈ 17/16*area，原版差 6%。
+  4. 一个 layer stack 经过 6+ 层 zoom 和 2-3 层 p2 layer，100% 差距叠加后
+     `len * 3` padding 不够。
+- 修复（[src-tauri/cubiomes/generator.c](src-tauri/cubiomes/generator.c) `getMaxArea`）：
+  - WASM 路径（`#ifdef __EMSCRIPTEN__`）按 layer 类型准确累加：
+    - p2 + zoom==1: `area * 2`
+    - zoom==2: `area * 5 / 4 + 16`
+    - zoom==4: `area * 17 / 16 + 16`
+  - native 路径保持原 `area`（calloc 对齐余量掩盖此 bug，不影响）。
+  - `allocCache` 的 WASM padding 从 `len * 3 + 1024` 减小为 `len + len/2 + 1024`
+    （50% + 4KB），作为 mapOceanMix lw/lh 动态扩展等边界 case 兜底。
+- 修复（[src-tauri/build_script/cubiomes_wasm.rs](src-tauri/build_script/cubiomes_wasm.rs)
+  `needs_recompile`）：
+  - 为每个 .c/.h 源文件单独声明 `cargo:rerun-if-changed=<file>`。
+  - 原因：`cargo:rerun-if-changed=cubiomes` 只检查目录本身时间戳（文件增删），
+    不检查目录内文件内容修改。导致 generator.c 修改后 build.rs 不重跑，
+    WASM 不重新编译，修复不生效。
+- 验证：WASM 已重新编译（cubiomes.wasm 大小 772211 → 772345）。需测试 1.16
+  地图加载与拖动（z=5/6/8 各级别）是否正常，26.2 是否回归。
+
+#### 模块化 build.rs 拆分 emsdk 相关逻辑
+- 背景：build.rs 单文件 334 行，其中 emcc 查找、环境变量配置、WASM 编译命令
+  构建等 emsdk 相关逻辑占 312 行，主入口逻辑被淹没，难以维护。
+- 改造：将 emsdk 相关代码拆分为 build_script/ 子模块：
+  - [src-tauri/build_script/mod.rs](src-tauri/build_script/mod.rs)：模块入口
+  - [src-tauri/build_script/emsdk.rs](src-tauri/build_script/emsdk.rs)：emcc
+    可执行文件查找（EMSCRIPTEN_ROOT / PATH / 常见 emsdk 路径）与环境变量配置
+  - [src-tauri/build_script/cubiomes_wasm.rs](src-tauri/build_script/cubiomes_wasm.rs)：
+    WASM 编译入口、源文件清单、增量编译判断
+- 结果：[src-tauri/build.rs](src-tauri/build.rs) 精简至 20 行，仅负责调用
+  tauri_build::build() 和 compile_cubiomes_wasm()。
+- 命名说明：模块目录使用 build_script/ 而非 build/，避免与 build.rs 文件名
+  冲突导致 cargo 报 "file for module `build` found at both" 错误。
+- 验证：cargo check 通过。
+
+#### 修复 build.rs 构建日志被误报为 warning
+- 背景：cargo run 时输出 "warning: Compiling cubiomes to WebAssembly via emcc..."
+  和 "warning: cubiomes WASM compiled: ..."，让用户误以为构建有问题。
+- 根因：build.rs 用 println!("cargo:warning=...") 输出构建日志，cargo 会把
+  所有 cargo:warning 前缀的消息当 warning 标黄显示。
+- 修复：[src-tauri/build.rs](src-tauri/build.rs) 改用 eprintln! 直接输出到
+  stderr，不经过 cargo 的 warning 系统。日志仍可见但不被标黄。
+- 影响：构建日志清晰显示，不再误导读者和 IDE。
+
+#### 修复 1.17 及以下版本地图加载崩溃（SurfaceNoise NULL 解引用）
+- 背景：选择 MC 1.16 加载种子时地图一直显示加载中，26.2 正常。
+- 根因：cubiomes generator.c 的 mapApproxHeight 对 < MC_1_18 版本走旧 biome
+  深度算法分支，内部访问 sn->octdepth 和 sampleSurfaceNoise(sn,...)。但
+  cubiomes_wrapper.c 的两个 gen_biomes_with_height 函数对所有版本都传 sn=NULL，
+  1.17 及以下主世界/末地会 NULL 解引用导致 WASM 崩溃，Worker 卡死前端一直 loading。
+  1.18+ 走 NP_DEPTH 分支不访问 sn，所以正常。
+- 修复：[src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)
+  的 cubiomes_gen_biomes_with_height 和 cubiomes_gen_biomes_with_height_static
+  对 mc < MC_1_18 版本调用 initSurfaceNoise(&sn, dim, seed) 初始化后传入，
+  1.18+ 保持传 NULL。
+- 注意：需重新编译 WASM（cargo run 时 build.rs 自动调 emcc）。
+- 影响：1.7~1.17 所有旧版本地图加载恢复正常。
+
+#### 修复 MC 版本枚举映射错误导致旧版本加载失败
+- 背景：选择 MC 1.16 时地图一直显示加载中，但 26.2 最新版正常。
+- 根因：cubiomes/biomes.h 的 MCVersion 枚举从 MC_1_3_2=0 递增，
+  实际值 MC_1_16=14、MC_26_2=28=MC_NEWEST。但 useSeedMap.ts 中
+  SEEDMAP_MC_VERSIONS 的 value 比实际值大 6（如 1.16 标 20 实际应为 14，
+  26.2 标 34 实际应为 28）。26.2 value=34 超出枚举范围被 cubiomes 容错
+  回退到 MC_NEWEST 所以"正常"，1.16 value=20 实际对应 MC_1_21_1，
+  1.21.1 需要 1.18+ 的 noise generator 配置，与传入参数不匹配导致 genBiomes 失败。
+- 修复：[src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)
+  修正所有 SEEDMAP_MC_VERSIONS value 为实际 cubiomes 枚举值（1.7=4 ~ 26.2=28），
+  默认 mcVersion 从 34 改为 28，文件头注释补充完整枚举值对照表。
+  [src/views/tools/data/LoadSaveModal.vue](src/views/tools/data/LoadSaveModal.vue)
+  默认 mcVersion 从 34 改为 28。
+- 影响：所有 MC 版本（1.7~26.2）均能正确加载对应地形。
+
+#### 修复超大种子加载失败（WASM strtoll 精度问题）
+- 背景：种子 `-4335919219098812575`（绝对值 4.3e18，超过 JS Number 安全范围 2^53）
+  无法加载，地图一直显示加载中。`12345` 和 `-12345` 等小数字种子正常。
+- 根因：cubiomes_wrapper.c 的 parse_seed 使用 strtoll 解析十进制种子，
+  Emscripten WASM 环境下 strtoll 内部可能用 double 累加，对超大 i64 丢精度，
+  导致种子值错误、cubiomes genBiomes 无法生成对应地形。
+- 修复：[src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)
+  的 parse_seed 改为手动逐字符解析（uint64_t 累加），不依赖 strtoll，
+  确保十进制和十六进制种子的 64 位精度。负数种子通过 `(uint64_t)(-(int64_t)n)`
+  转为补码 u64。
+- 注意：此修改需要重新编译 WASM。运行 `cargo run` 时 build.rs 会自动调用 emcc
+  重新编译 cubiomes.{js,wasm}，前端通过 res:// 协议加载新文件。
+- 影响：所有 i64 范围内的十进制/十六进制种子（含负数）均能正确加载。
+
+#### 种子地图从存档加载功能 + 文案修正
+- 背景：用户希望直接选择启动器已安装版本和本地存档，自动提取 level.dat 种子加载
+  到种子地图，免去手动查找种子。同时修正 AlertV2 文案"不保准"→"不保护"。
+- 复用：archiveList（存档列表）、listInstalledVersionsWithType（版本列表）、
+  getVersionGameVersion（版本号解析）、fastnbt（NBT 解析，与 nbt.rs 共用）、
+  mapMcVersionToCubiomes（新增版本映射函数）、Select/Button/Tooltip 自定义组件、
+  DeviceCodeModal 的 Teleport 弹窗模式。
+- 变更：
+  - [src-tauri/src/commands/tools/archive.rs](src-tauri/src/commands/tools/archive.rs)：
+    新增 extract_save_seed 函数，读 level.dat 解析 WorldGenSettings.seed（1.16+）
+    或 RandomSeed（1.15 及更早），返回十进制字符串避免 JS 精度丢失。
+  - [src-tauri/src/commands/tools/types.rs](src-tauri/src/commands/tools/types.rs)：
+    新增 ExtractSaveSeedParams / ExtractSaveSeedResult 类型。
+  - [src-tauri/src/commands/tools/mod.rs](src-tauri/src/commands/tools/mod.rs)：
+    注册 extract_save_seed action。
+  - [src/utils/api/tools.ts](src/utils/api/tools.ts)：新增 extractSaveSeed API。
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    导出 mapMcVersionToCubiomes 函数，将 MC 版本号字符串映射到最近 cubiomes 枚举
+    （精确匹配优先，降级取 ≤ 目标的最大版本，无则取最老版本）。
+  - [src/views/tools/data/LoadSaveModal.vue](src/views/tools/data/LoadSaveModal.vue)：
+    新增从存档加载弹窗组件：选版本→自动拉取 saves→选存档→提取种子→映射版本→emit。
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：控制栏
+    "加载"按钮旁新增"从存档"按钮（FolderOpenIcon + Tooltip），打开 LoadSaveModal；
+    AlertV2 文案"不保准"→"不保护"。
+- 影响：用户可在种子地图页面直接从本地存档加载种子，自动匹配 MC 版本；文案修正
+  提升表达准确性。
+
+#### 种子地图鸣谢补充 + 测试警告提示
+- 背景：种子地图工具核心依赖 cubiomes 算法库和 OpenLayers 渲染引擎，需在设置-更多-鸣谢
+  中体现；同时地图仍在测试阶段，应在界面明确提示用户准确率待验证。
+- 复用：项目已有的 about 资源文件机制（include_str! 嵌入 + markdown 表格解析）、
+  AlertV2 组件（灰底简洁风格提示框）。
+- 变更：
+  - [src-tauri/resources/about/acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt)：
+    新增 Cubiomes（上游 Cubitect/cubiomes，本项目用 MoTeam-cn/cubiomes 分支，logo 和
+    作者头像均为 Cubitect.png）和 OpenLayers（logo 为 openlayers.png）两条鸣谢记录。
+  - [src-tauri/resources/about/frontend-deps.txt](src-tauri/resources/about/frontend-deps.txt)：
+    新增 OpenLayers ^10.9.0 前端运行时依赖。
+  - [src-tauri/resources/about/licenses.txt](src-tauri/resources/about/licenses.txt)：
+    新增 OpenLayers（BSD-2-Clause）和 Cubiomes（MIT）许可声明。
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
+    顶部控制栏下方新增 AlertV2 error 警告（醒目位置），提示地图测试中不保准确率，
+    并感谢 cubiomes 算法支持；底部新增 SeedMapIntro 收缩框容器。
+  - [src/views/tools/data/SeedMapIntro.vue](src/views/tools/data/SeedMapIntro.vue)：
+    新增种子地图实现原理介绍组件（约 300 字），风格与 MoLaunchIntro.vue 一致
+    （grid-template-rows 0fr→1fr 平滑过渡），涵盖 OpenLayers 渲染引擎、cubiomes
+    WASM 算法、Worker 串行队列、region 遍历与分块查找、性能优化等实现细节。
+- 影响：设置-更多-鸣谢页面展示 cubiomes 和 OpenLayers 项目信息与许可；种子地图
+  顶部明确标注测试状态管理用户预期，底部提供实现原理展开查看。
+
+#### 种子地图结构刷新实时性 + 群系校验开关 + 图标居中根因修复
+- 背景：用户反馈拖动地图到新区域后标记不显示（需反复拖动才出现），希望群系校验
+  过滤可由开关控制，且非 webp 图标（heroicons svg）在按钮中靠左不居中。
+- 根因：
+  1. 标记不实时：`refreshStructures` 并发控制 `if (structRefreshInProgress) return`
+     直接丢弃新请求，用户拖到新区域时若上次查找未完成，新区域查找被跳过且不再触发
+     （moveend 只在拖动结束时触发一次）。
+  2. 图标靠左：Button.vue 的 `.btn-size-mini > svg { margin-right: 4px }` 用于
+     图标+文字按钮的间距，但 `:empty` 选择器因 Vue slot 注释节点不匹配，导致图标-only
+     按钮的 svg 仍有 margin-right，在 flex 居中时向左偏移 4px。
+- 复用：项目自研 Button.vue（useSlots 检测）、Tooltip.vue、ShieldCheckIcon。
+- 变更：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    - `refreshStructures` 并发控制改为 pending 机制：查找期间有新请求时标记
+      `structPendingRefresh=true`，查找完成后自动补偿触发，避免新区域被遗漏。
+    - 新增 `showNonViable` ref（默认 false），控制是否显示未通过群系校验的候选位置。
+    - `renderStructures` 根据 `showNonViable` 决定是否过滤 viable=false。
+    - 新增 `watch(showNonViable)` 用已缓存数据重新渲染（无需重新查找）。
+  - [src/components/common/Button.vue](src/components/common/Button.vue)：
+    - 用 `useSlots()` 检测 default slot 是否有文本内容，动态添加 `btn-icon-only` class。
+    - CSS 中 `:empty` 选择器（因 Vue slot 注释节点失效）替换为 `btn-icon-only` class，
+      图标-only 按钮的 svg 和 spinner 的 margin-right 归零，flex 居中时真正居中。
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
+    - 筛选栏新增"群系校验"开关按钮（ShieldCheckIcon），点击切换 showNonViable。
+    - StructPopup 传入 `:show-viable="showNonViable"`，仅开启时显示校验状态。
+  - [src/views/tools/data/StructPopup.vue](src/views/tools/data/StructPopup.vue)：
+    - 新增 `showViable` prop，仅 showViable=true 时显示"已通过/未通过群系校验"提示。
+- 影响：拖动地图后新区域标记自动刷新（不再需要反复拖动），用户可按需开启群系校验
+  开关查看所有候选位置，所有图标-only 按钮中 svg 图标真正居中显示。
+
+#### 种子地图弹窗复制按钮 + 村庄间隔 + Tooltip 统一
+- 背景：用户反馈村庄间隔过近不符合实际游戏体验，点击村庄弹窗出现"未通过群系校验"
+  黄色字体让人困惑，复制按钮需改为复制坐标 + 复制 TP 命令，部分地图按钮用原生
+  `title` 而非自研 Tooltip 组件。
+- 根因（村庄间隔近）：cubiomes 按 region 返回候选位置（Village 每 32 chunks=512
+  blocks 一个 region 最多一个候选），但实际生成受 biome 限制。代码此前显示了所有
+  候选位置（包括 `viable=false` 未通过群系校验的），导致标记过密且弹窗出现黄色
+  "未通过群系校验"提示。ravine/fossil 等启发式结构 viable 始终为 true 不受影响。
+- 复用：项目自研 Tooltip.vue（替换原生 title）、Button.vue、format.ts 的
+  copyToClipboard、useSeedMap.ts 已有的 yCoord ref（前往坐标面板的 Y 输入）。
+- 变更：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    `renderStructures` 默认过滤 `viable=false` 的结构，仅显示通过群系校验的
+    真实生成位置，避免候选位置过密。ravine/fossil 等启发式结构不受影响。
+  - [src/views/tools/data/StructPopup.vue](src/views/tools/data/StructPopup.vue)：
+    - 新增 `yCoord` prop（继承前往坐标面板的 Y 值，默认 64）。
+    - 替换单个"复制"按钮为两个：复制坐标（`x z` 不带 y）+ 复制 TP（`/tp x y z`）。
+    - 移除"已通过/未通过群系校验"提示行（过滤后均为 viable=true，提示冗余）。
+    - min-width 200px→220px 适配两个并排按钮。
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
+    - 3 处原生 `title` 替换为 Tooltip 组件（复制坐标、大型群系、前往坐标）。
+    - 右下角缩放控件（放大/缩小/重置视图）补充 Tooltip 提示。
+    - StructPopup 传入 `:y-coord="yCoord"`，让 TP 命令继承面板 Y 值。
+- 影响：村庄标记间隔更接近实际游戏，弹窗不再出现"未通过群系校验"黄色提示，
+  用户可一键复制坐标或 TP 命令，所有图标按钮统一使用自研 Tooltip。
+
+#### 种子地图村庄不显示根因修复 + 图标居中
+- 背景：用户反馈默认只勾选村庄时，地图上逛了一大圈都看不到村庄标记。
+  同时反馈图标-only 按钮中图标偏左不居中。
+- 根因（村庄不显示）：`generatorWorker.ts` 中 `regionSize` 是 cubiomes 返回的
+  chunk 单位（如 Village=32 chunks=512 blocks），但代码直接用 `block/regionSize`
+  计算 region 坐标，未 ×16 转换。导致 region 数量膨胀 16²=256 倍，轻易超过
+  `REGION_TRAVERSE_LIMIT=5000` 而跳过 Village 查找。
+  修复前 zoom 6 下 Village 的 region 数 ≈60×60=3600（接近上限），
+  修复后 ≈4×4=16（远低于上限），正常缩放范围内均能查找到村庄。
+- 变更：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
+    `regionSize` 乘以 16 转为 block 单位（`regionSizeBlocks = regionSize * 16`），
+    region 坐标计算用 `block / regionSizeBlocks`。更新 REGION_TRAVERSE_LIMIT 注释。
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
+    所有图标-only 按钮添加 `!flex !justify-center !items-center`，图标居中显示。
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    `selectedStructureTypes` 默认改回 `['Village']`（避免全部勾选时标记过密）。
+- 影响：村庄在 zoom 4~10 范围内正常显示；所有图标-only 按钮内容居中。
+
+#### 种子地图损坏图标文件修复
+- 背景：用户反馈遗迹废墟、紫水晶洞、掠夺者前哨站、林地府邸、海底神殿等结构
+  图标不显示。检查文件头发现 9 个 .webp 文件实际是 HTML 内容（404/重定向页面
+  被错误保存为 .webp），文件头为 `<!DOCTYPE html>` 而非 webp 的 `RIFF`。
+- 变更：
+  - 从 docs/Map/minecraftsearch.com/images/structures 复制正确的原站图标，
+    文件名映射：amethyst_geode→geode、woodland_mansion→mansion、
+    ocean_monument→monument、pillager_outpost→outpost、buried_treasure→treasure、
+    trail_ruin→trail_ruins、ruined_portal→ruined_portal_n。
+  - 删除 bastion.webp 和 fortress.webp（原站无对应图标，保留色块 fallback）。
+- 影响：26 个 webp 图标文件全部有效（RIFF 格式），筛选栏和地图上的结构标记
+  正确显示 webp 图标。堡垒遗迹和下界要塞使用 Circle 色块 fallback。
+
+#### 种子地图筛选栏 UI 重构 + 要塞/出生点 hover 提示
+- 背景：用户反馈筛选栏图标+文字太占空间（多行换行），要塞/出生点红点无提示
+  导致不知道是什么。用户要求改为图标-only + tooltip 悬停显示文字，节省空间
+  单行排列；要塞和出生点在地图上 hover 时也显示提示。
+- 复用：项目自研 Tooltip.vue（Teleport + 自动边界检测 + Select 避让）；
+  useSeedMap.ts 已有的几何 hit detection 模式（遍历 source + 像素容差计算）。
+- 变更：
+  - [src/views/tools/data/SeedMap.vue](src/views/tools/data/SeedMap.vue)：
+    - 引入 Tooltip 组件，筛选栏所有按钮改为图标-only（`!w-7 !h-7 !p-0`），
+      外包 Tooltip 悬停显示结构中文名。
+    - 出生点/要塞按钮也改为图标-only + Tooltip。
+    - 新增 hoverMarker 悬浮提示（右上角），显示出生点/要塞名称和坐标。
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    - `findStructAtPixel` 重构为 `findFeatureAtPixel`，返回 `HitResult`（含
+      type/label/x/z），遍历 struct/spawn/stronghold 三个 source。
+    - 新增 `hoverMarker` ref（`{ label, x, z } | null`），pointermove 中根据
+      hit result 设置 hoverStruct 或 hoverMarker。
+    - singleclick 中对 spawn/stronghold 也标记坐标（无 popup 数据）。
+- 影响：筛选栏单行排列节省空间；hover 出生点显示"出生点 (x, z)"，
+  hover 要塞显示"要塞 (x, z)"，不再需要猜测红点含义。
+
+#### 种子地图结构标记不显示根因修复
+- 背景：经多轮修复（图标加载、缩小限制、Worker 健康恢复）后，地图标记仍为红点。
+  分析日志发现 `renderStructures` 中 `filtered=0`：`selectedStructureTypes` 默认
+  仅选中 `['Village']`，而当前视图返回的结构为 `Mansion`/`Ravine` 等，筛选后
+  无匹配项导致不渲染任何结构标记，用户只看到粉色要塞圆点（`getMarkerStyle('#E91E63')`），
+  误以为"图标变红点"。
+- 复用：`getStructuresForVersion(mcVersion, dimension)` 已有的版本/维度结构过滤逻辑，
+  与 `structureListForVersion` computed 和 `watch([mcVersion, dimension, largeBiomes])`
+  清理无效选中项的逻辑一致。
+- 变更：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    `selectedStructureTypes` 初始值从 `new Set(['Village'])` 改为全选默认版本/维度
+    （MC_26_2/主世界）所有可用结构（排除 stronghold，由独立按钮控制），确保地图
+    返回的结构默认全部渲染。清理调试日志（refreshStructures/renderStructures）。
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
+    移除 `getStructStyle` 的 styleDebugCount 调试日志。
+- 影响：默认加载种子后所有结构类型标记均可见（webp 图标），用户可按需在筛选栏
+  取消勾选不需要的结构类型。
+
+#### 种子地图缩小黑屏 + 图标红点修复
+- 背景：用户反馈缩小到一定程度全屏变黑、结构标记仍为红点而非 webp 图标。
+  根因：
+  1. 缩小黑屏：MIN_ZOOM=0 允许过度缩小，zoom 0~1 时单 tile 覆盖 8K~16K 方块，
+     生成耗时且 viewport 可视 tile 极少（2~4 个），大量空 bitmap 导致观感全黑。
+  2. 红点：`import.meta.glob` 在 Vite 5.0.x 不同环境（dev/build/Tauri webview）
+     返回类型不一致（`{ default: url }` 或 `url` 字符串），原代码仅处理 `{ default }` 形式，
+     部分环境下 `iconUrlMap` 为空导致全部退化为 Circle 色点。
+- 变更：
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    MIN_ZOOM 从 0 提升到 2，防止过度缩小。MAX_ZOOM 从 12 回退到 10（与原站对齐），
+    RESOLUTIONS 移除末尾两级（0.125, 0.0625），避免极端放大 height buffer 退化黑屏。
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
+    - `iconUrlMap` 加载逻辑用 `typeof mod === 'string'` 兼容 Vite 两种返回类型，
+      `iconUrlMap` 为空时打印 console.warn 便于诊断。
+    - OL Icon scale 从 0.4 提升到 0.6（高亮 0.8），显式指定 `anchorXUnits`/`anchorYUnits`
+      为 fraction，添加 `crossOrigin: 'anonymous'`。
+  - [src/utils/seedmap/terrainShading.ts](src/utils/seedmap/terrainShading.ts)：
+    移除已失效的 "zoom 12 时 hw=hh=1" 注释，改为通用防御性边界说明。
+- 影响：缩小最小到 zoom 2（64 像素/方块），放大最大到 zoom 10（4 像素/方块），
+  均与原站对齐。结构标记在所有环境下正确加载 webp 图标。
+
+#### 计算工具页面交互优化
+- 背景：用户反馈坐标计算工具的"交换 A/B"按钮为 icon-only ghost 样式，
+  视觉不清晰、难以点击；调色板染料色块使用原生 `<button>` 违反项目
+  "必须用自研组件"约束；CalcPage 曾误引入顶部 SubTabBar 菜单栏，
+  与"单列堆叠（参考 PCL2）"的 UI 偏好冲突。
+- 复用：项目自研 Button.vue（type="outline" + 文字标签）、Input.vue
+  （width prop 适配窄输入框）、Tooltip.vue；ColorPicker.vue 中预设色块
+  的 `<div role="button" tabindex="0">` 模式（无文字纯色块的标准实现）。
+- 变更：
+  - [src/views/tools/calc/CalcPage.vue](src/views/tools/calc/CalcPage.vue)：
+    移除 SubTabBar 顶部菜单栏，恢复单列垂直堆叠布局（CoordCalculator +
+    ColorPalette 两个工具卡片依次排列）。
+  - [src/views/tools/calc/CoordCalculator.vue](src/views/tools/calc/CoordCalculator.vue)：
+    交换按钮从 `type="ghost"` icon-only 改为 `type="outline"` + 文字标签
+    "交换"，外包 Tooltip 提示"交换 A 和 B"，提升可点击性与视觉清晰度。
+  - [src/views/tools/calc/ColorPalette.vue](src/views/tools/calc/ColorPalette.vue)：
+    染料预设色块从原生 `<button>` 改为 `<div role="button" tabindex="0">`
+    + `@keydown.enter`，与 ColorPicker.vue 预设色板实现一致；补充 cursor-pointer
+    和键盘可访问性。
+
+#### 种子地图黑屏 + 红点 + 无法继续加载修复（根因修复）
+- 背景：之前修复（分块查找 + 边界检查 + Worker 健康恢复）未解决根本问题。
+  经深入分析定位到三个独立根因：
+  1. 黑屏/无法继续加载：findStructures 在大范围（低 zoom）下遍历数百万 region，
+     每个 region 调 _malloc+_free，耗时数分钟，阻塞 Worker 串行队列导致 tile 生成饿死。
+  2. 红点：import.meta.glob 配合 `import:'default'` 在 Vite 5.0.x + Tauri 环境下
+     可能返回空对象，导致 getStructIconUrl 全量返回空字符串，触发 Circle fallback。
+- 复用：generatorWorker.ts 已有的 SLIME_CHUNK_LIMIT 范围限制模式；useSeedMap.ts 的
+  structRequestId 结果忽略机制；Vite 的 import.meta.glob 不带 import:'default' 的形式。
+- 变更：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
+    新增 REGION_TRAVERSE_LIMIT=5000 常量，handleFindStructures 的 region 遍历前
+    检查 region 总数，超过上限时跳过该结构类型（类比 SLIME_CHUNK_LIMIT）。
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    - 新增 STRUCT_MIN_ZOOM=4 常量和 updateStructLayerVisibility 函数，
+      zoom < 4 时隐藏结构图层并跳过 findStructures（避免大范围遍历阻塞 Worker）。
+    - moveend 事件中调用 updateStructLayerVisibility，loadSeed 中也调用。
+    - refreshStructures 添加 structRefreshInProgress 并发控制：上一次查找未完成时
+      跳过新请求，避免多个 findStructures 累积占用所有 Worker。
+  - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
+    import.meta.glob 移除 `import:'default'`（Vite 5.0.x 已知组合 bug），
+    改用 `{ default: url }` 模块对象手动取 .default，构建 iconUrlMap 直接映射，
+    getStructIconUrl 改为 O(1) 查表而非每次遍历 Object.entries。
+  - [src/utils/seedmap/workerPool.ts](src/utils/seedmap/workerPool.ts)：
+    pickWorker 返回类型改为 `WorkerHandle | null`，所有 Worker terminated 时
+    返回 null 而非 workers[0]，enqueue 对应 reject 而非向死 Worker postMessage。
+
+#### 种子地图缩放结构丢失修复
+- 背景：缩放种子地图时控制台刷屏 "[cubiomes] ravine/mega_ravine/
+  underwater_ravine/mega_underwater_ravine/fossil/fossil_diamond 范围过大，跳过"
+  警告，ravine/fossil 系列结构整片消失，地图标记退化为红点。
+  根因：`callChunkFinder` 单次 WASM 调用范围超过 sizeLimit 时直接跳过，
+  未做分块处理；`renderStructures` 中 `feat.setStyle` 静态设置样式绕过了
+  layer 动态 style 函数，导致 Icon 图标 URL 不生效。
+- 复用：layer 已配置的 `style: (feature) => getStructStyle(stype, highlighted)`
+  动态样式函数（含 hover/click 高亮 + Icon 图标逻辑）；`callFinderOnce`
+  单次调用辅助函数（已有 buffer 分配 + 结果读取 + 释放流程）。
+- 变更：
+  - [src/utils/seedmap/generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)：
+    `callChunkFinder` 改为分块查找模式：当 totalX/totalZ 超过 sizeLimit 时，
+    将大范围切分为 `sizeLimit × sizeLimit` 子块，逐个调用 `callFinderOnce`，
+    合并所有子块结果返回。ravine/nether_fossil/fossil 系列共用此逻辑。
+    移除 nether_fossil 范围过大的 `console.warn`（分块查找已确保大范围也能处理）。
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    `renderStructures` 移除 `feat.setStyle(getStructStyle(...))` 调用，
+    让 layer 动态 style 函数接管样式（确保 Icon 图标 URL 正确加载 +
+    hover/click 高亮生效）。
+
+#### 种子地图边界加载 + 极端缩放黑屏 + Worker 健康恢复
+- 背景：加载一定数量 tile 后边界地图无法继续加载（滚动无响应）；
+  缩放到极端级别（zoom=12，hsx=hsz=1）页面变黑；Worker 偶发错误后被
+  永久标记为 unhealthy，任务调度异常。
+- 复用：workerPool.ts 已有的 `pickWorker` 评分机制（pending 越少分越高）；
+  useSeedMap.ts 的 `emptyBitmap` 空白 tile 工厂；terrainShading.ts 的
+  clamp 索引模式。
+- 变更：
+  - [src/utils/seedmap/workerPool.ts](src/utils/seedmap/workerPool.ts)：
+    - `WorkerHandle` 新增 `terminated` 标志，避免向已 terminate 的 Worker 派发任务。
+    - `onMessage` 收到非 error 消息时重置 `healthy=true` + `errorCount=0`，
+      让 Worker 能从瞬时错误中恢复（避免一次偶发错误永久 unhealthy）。
+    - `pickWorker` 改为双轨选择：优先 healthy && idle Worker，无健康 Worker 时
+      fallback 到最空闲的非 terminated Worker（不再盲目选 workers[0]）。
+    - `onError` 累计 errorCount > MAX_ERRORS_PER_WORKER 时才 terminate。
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：
+    `loadBiomeTile` 添加防御性边界检查：`constrainOnlyCenter:true` 时 OL 可能
+    请求超出 EXTENT 的 tile，直接返回 emptyBitmap 避免无效 Worker 调用。
+  - [src/utils/seedmap/terrainShading.ts](src/utils/seedmap/terrainShading.ts)：
+    `cx`/`cz` 计算改为 `Math.min(Math.max(bx, 0), Math.max(0, hsx - 2))`，
+    确保 `hsx=1` 时 `hsx-2=-1` 不再产生负索引（修复极端缩放黑屏）。
+
 #### NBT 解析器改用 fastnbt（修复 KNOWN_ISSUES P1）
 - 背景：`docs/KNOWN_ISSUES.md` P1 记录 NBT 解析为手动实现（约 296 行），
   维护成本高、边界情况（嵌套 TAG_List / 空 compound / 超大数组）易出 bug。

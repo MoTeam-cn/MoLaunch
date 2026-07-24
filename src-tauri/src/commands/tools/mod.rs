@@ -141,6 +141,11 @@ pub async fn tools_manager(
                 .map_err(|e| format!("参数解析失败: {}", e))?;
             archive::restore(&state, p).await
         }
+        "extract_save_seed" => {
+            let p: ExtractSaveSeedParams = serde_json::from_value(req.params)
+                .map_err(|e| format!("参数解析失败: {}", e))?;
+            archive::extract_save_seed(&state, p).await
+        }
         // 网络延迟测试
         "network_latency_test" => {
             let p: NetworkLatencyTestParams = serde_json::from_value(req.params)

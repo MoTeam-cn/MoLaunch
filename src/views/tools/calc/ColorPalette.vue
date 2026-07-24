@@ -171,7 +171,7 @@ const formatCodes = [
         </div>
       </div>
 
-      <!-- Minecraft 染料预设 -->
+      <!-- Minecraft 染料预设（与 ColorPicker.vue 预设色块一致的 div role=button 模式） -->
       <div class="border-t border-gray-100 pt-4">
         <div class="text-xs font-medium text-gray-500 mb-2">Minecraft 染料色</div>
         <div class="grid grid-cols-8 gap-1.5">
@@ -181,11 +181,14 @@ const formatCodes = [
             :text="`${dye.name} ${dye.code} (${dye.rgb.join(', ')})`"
             position="top"
           >
-            <button
-              class="h-8 w-full rounded border border-gray-200 transition-transform hover:scale-110"
+            <div
+              role="button"
+              tabindex="0"
+              class="h-8 w-full rounded border border-gray-200 transition-transform hover:scale-110 cursor-pointer"
               :style="{ backgroundColor: `rgb(${dye.rgb.join(',')})` }"
               @click="selectDye(dye.rgb)"
-            ></button>
+              @keydown.enter="selectDye(dye.rgb)"
+            ></div>
           </Tooltip>
         </div>
       </div>

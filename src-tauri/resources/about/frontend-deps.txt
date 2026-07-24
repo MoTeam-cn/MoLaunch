@@ -19,3 +19,4 @@
 | Tailwind CSS | ^3.4.1 | https://tailwindcss.com | 原子化 CSS 框架 |
 | skinview3d | ^3.4.2 | https://github.com/bs-community/skinview3d | 3D 皮肤预览引擎 |
 | Vue Virtual Scroller | ^3.0.4 | https://github.com/Akryum/vue-virtual-scroller | 虚拟滚动列表 |
+| OpenLayers | ^10.9.0 | https://openlayers.org | 地图渲染引擎（种子地图瓦片/矢量图层/交互） |

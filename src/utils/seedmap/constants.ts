@@ -105,8 +105,39 @@ export function getStructIcon(stype: string): StructureIconDef {
   return STRUCTURE_ICONS[stype] ?? { shape: 'circle', color: '#FFF', label: stype }
 }
 
-// ===== 结构图标 URL（Vite import.meta.glob 预加载） =====
-const iconUrls = import.meta.glob('../../assets/structures/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+// ===== 结构图标 URL =====
+// Vite 5.0.x 在不同环境（dev/build/Tauri webview）下 import.meta.glob 返回类型不一致。
+// 尝试三种语法变体，任一成功即填充 iconUrlMap。
+const iconUrlMap: Record<string, string> = {}
+
+// 方式1: as:'url'（Vite 2-4 语法，Vite 5 兼容）→ 直接返回 url 字符串
+const glob1 = import.meta.glob('../../assets/structures/*.webp', { eager: true, as: 'url' }) as Record<string, string>
+for (const [key, val] of Object.entries(glob1)) {
+  const m = key.match(/\/([^/]+)\.webp$/)
+  if (m && typeof val === 'string' && val) iconUrlMap[m[1]] = val
+}
+
+// 方式2: query:'?url' + import:'default'（Vite 5 推荐语法）→ 直接返回 url 字符串
+if (Object.keys(iconUrlMap).length === 0) {
+  const glob2 = import.meta.glob('../../assets/structures/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
+  for (const [key, val] of Object.entries(glob2)) {
+    const m = key.match(/\/([^/]+)\.webp$/)
+    if (m && typeof val === 'string' && val) iconUrlMap[m[1]] = val
+  }
+}
+
+// 方式3: query:'?url' 无 import → 返回 { default: url } 模块对象
+if (Object.keys(iconUrlMap).length === 0) {
+  const glob3 = import.meta.glob('../../assets/structures/*.webp', { eager: true, query: '?url' }) as Record<string, any>
+  for (const [key, mod] of Object.entries(glob3)) {
+    const m = key.match(/\/([^/]+)\.webp$/)
+    if (!m) continue
+    const url = typeof mod === 'string' ? mod : mod?.default
+    if (url) iconUrlMap[m[1]] = url
+  }
+}
+
+console.log('[seedmap] iconUrlMap loaded:', Object.keys(iconUrlMap).length, 'icons, sample:', iconUrlMap['village'] ?? '(empty)')
 
 /**
  * 结构名 → 图标文件名别名映射
@@ -125,10 +156,7 @@ const ICON_NAME_ALIASES: Record<string, string> = {
 export function getStructIconUrl(stype: string): string {
   const raw = stype.toLowerCase()
   const name = ICON_NAME_ALIASES[raw] ?? raw
-  for (const [key, url] of Object.entries(iconUrls)) {
-    if (key.endsWith(`/${name}.webp`)) return url
-  }
-  return ''
+  return iconUrlMap[name] ?? ''
 }
 
 // ===== OL Style 工厂（缓存样式避免重复创建） =====
@@ -149,13 +177,17 @@ export function getStructStyle(stype: string, highlighted = false): Style {
   const def = getStructIcon(stype)
   let style: Style
   if (url) {
-    // 有 webp 图标：scale=0.4 → 约 13px（与 radius=7 的圆形标记相近）
-    const scale = highlighted ? 0.5 : 0.4
+    // 有 webp 图标：scale=0.6 → 约 19px（图标偏小在高密度结构区不易辨识）
+    // 不设 crossOrigin：Tauri webview 自定义协议（tauri://localhost）不支持 CORS 预检，
+    // 设 crossOrigin:'anonymous' 会导致图片加载静默失败，OL 退化为不可见（用户观感"红点"）
+    const scale = highlighted ? 0.8 : 0.6
     style = new Style({
       image: new Icon({
         src: url,
         scale,
         anchor: [0.5, 0.5],
+        anchorXUnits: 'fraction',
+        anchorYUnits: 'fraction',
       }),
     })
   } else {

@@ -394,6 +394,27 @@ export function archiveRestore(zipPath: string, worldName: string, versionId?: s
   })
 }
 
+/** 提取存档种子结果 */
+export interface ExtractSaveSeedResult {
+  /** 种子（十进制字符串，i64 范围） */
+  seed: string
+  /** 种子来源字段名（WorldGenSettings.seed 或 RandomSeed） */
+  source: string
+}
+
+/**
+ * 从存档 level.dat 提取种子
+ *
+ * 用于种子地图工具"从存档加载"功能：解析 level.dat 的 WorldGenSettings.seed
+ * （1.16+）或 RandomSeed（1.15 及更早），返回十进制字符串避免 JS 精度丢失。
+ */
+export function extractSaveSeed(worldName: string, versionId?: string): Promise<ExtractSaveSeedResult> {
+  return toolsManager<ExtractSaveSeedResult>('extract_save_seed', {
+    world_name: worldName,
+    version_id: versionId ?? null,
+  })
+}
+
 // ==================== 网络延迟测试 ====================
 
 /** 延迟测试条目 */

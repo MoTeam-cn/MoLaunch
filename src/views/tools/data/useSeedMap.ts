@@ -10,11 +10,18 @@
  * - 交互：OL 内置拖拽/缩放/惯性；pointermove/singleclick 事件做几何 hit detection
  *
  * zoom 体系（与原站对齐）：
- * - OL zoom 0~12（共 13 级）
- * - RESOLUTIONS = [256,128,64,32,16,8,4,2,1,0.5,0.25,0.125,0.0625]（方块/像素）
+ * - OL zoom 0~10（共 11 级）
+ * - RESOLUTIONS = [256,128,64,32,16,8,4,2,1,0.5,0.25]（方块/像素）
  * - tile 64×64 像素，每 tile 覆盖方块 = 64 × resolution
  * - cubiomes scale ∈ {1,4,16,64,256}，每级 zoom 取 ≤ bpp 的最大 scale 生成 biome
  *   （非 power-of-4 的 bpp 通过 sx/sz > TILE_SIZE 由 worker 降采样适配）
+ *
+ * MC 版本枚举（cubiomes/biomes.h MCVersion，从 MC_1_3_2=0 递增）：
+ * - MC_1_7=4, MC_1_8=5, MC_1_9=6, MC_1_10=7, MC_1_11=8, MC_1_12=9,
+ *   MC_1_13=10, MC_1_14=11, MC_1_15=12, MC_1_16_1=13, MC_1_16=14,
+ *   MC_1_17=15, MC_1_18=16, MC_1_19_2=17, MC_1_19=18, MC_1_20=19,
+ *   MC_1_21_1=20, MC_1_21_3=21, MC_1_21_4=22, MC_1_21_5=23, MC_1_21_6=24,
+ *   MC_1_21_9=25, MC_1_21_11=26, MC_26_1=27, MC_26_2=28(=MC_NEWEST)
  */
 import { ref, onMounted, onBeforeUnmount, watch, computed, nextTick } from 'vue'
 import { toastError, toastSuccess } from '@/utils/toast'
@@ -43,12 +50,16 @@ import { defaults as defaultInteractions } from 'ol/interaction'
 import MouseWheelZoom from 'ol/interaction/MouseWheelZoom'
 
 // ===== Zoom level 配置（与原站对齐） =====
-const MIN_ZOOM = 0
-const MAX_ZOOM = 12
+// MIN_ZOOM=3 防止过度缩小：zoom 0~2 时单 tile 覆盖 4K~16K 方块，viewport tile 极少，
+// 已加载区块外的区域为空 bitmap 导致观感"黑屏"。zoom 3（bpp=32）下 tile 生成快且覆盖合理。
+const MIN_ZOOM = 3
+// MAX_ZOOM=10 对应 resolution 0.25（4 像素/方块），与原站 minecraftsearch.com 对齐。
+// 之前曾扩展到 12（0.0625，16 像素/方块），但 zoom 11~12 下 height buffer 维度退化
+// （hw=hh=1），terrainShading 即使有 Math.max(0, hsx-2) 兜底仍会出现黑屏，故回退。
+const MAX_ZOOM = 10
 const TILE_SIZE = 64  // 原站用 64，不是 256
-// 13 级 resolution：从 256 bpp（最远）到 0.0625 bpp（最近，16 像素一个方块）
-// 比原站多 2 级（0.125, 0.0625），让用户能放大到看清方块细节
-const RESOLUTIONS = [256, 128, 64, 32, 16, 8, 4, 2, 1, 0.5, 0.25, 0.125, 0.0625]
+// 11 级 resolution：从 256 bpp（最远）到 0.25 bpp（最近，4 像素一个方块）
+const RESOLUTIONS = [256, 128, 64, 32, 16, 8, 4, 2, 1, 0.5, 0.25]
 
 // 投影 extent：约 ±3e7 方块
 // EXTENT_HALF 必须是最大 blocksPerTile（64×256=16384=2^14）的整数倍，
@@ -68,31 +79,74 @@ const EXTENT = [-EXTENT_HALF, -EXTENT_HALF, EXTENT_HALF, EXTENT_HALF]
  */
 const SEEDMAP_MC_VERSIONS = [
   // Latest（fork cubiomes 原生支持 MC_26_2）
-  { label: '26.2', value: 34 },
-  { label: '26.1', value: 33 },
-  { label: '1.21.9', value: 31 },
-  { label: '1.21.6', value: 30 },
-  { label: '1.21.5', value: 29 },
-  { label: '1.21.4', value: 28 },
-  { label: '1.21.3', value: 27 },
-  { label: '1.21.1', value: 26 },
-  { label: '1.20', value: 25 },
-  { label: '1.19.4', value: 24 },
-  { label: '1.19.2', value: 23 },
-  { label: '1.18', value: 22 },
+  // 枚举值来自 cubiomes/biomes.h MCVersion（从 MC_1_3_2=0 递增），
+  // 如 MC_1_16=14, MC_1_18=16, MC_1_21_4=22, MC_26_2=28=MC_NEWEST
+  { label: '26.2', value: 28 },
+  { label: '26.1', value: 27 },
+  { label: '1.21.9', value: 25 },
+  { label: '1.21.6', value: 24 },
+  { label: '1.21.5', value: 23 },
+  { label: '1.21.4', value: 22 },
+  { label: '1.21.3', value: 21 },
+  { label: '1.21.1', value: 20 },
+  { label: '1.20', value: 19 },
+  { label: '1.19.4', value: 18 },
+  { label: '1.19.2', value: 17 },
+  { label: '1.18', value: 16 },
   // Old
-  { label: '1.17', value: 21 }, { label: '1.16', value: 20 },
-  { label: '1.15', value: 18 }, { label: '1.14', value: 17 },
-  { label: '1.13', value: 16 }, { label: '1.12', value: 15 },
-  { label: '1.11', value: 14 }, { label: '1.10', value: 13 },
-  { label: '1.9', value: 12 }, { label: '1.8', value: 11 },
-  { label: '1.7', value: 10 },
+  { label: '1.17', value: 15 }, { label: '1.16', value: 14 },
+  { label: '1.15', value: 12 }, { label: '1.14', value: 11 },
+  { label: '1.13', value: 10 }, { label: '1.12', value: 9 },
+  { label: '1.11', value: 8 }, { label: '1.10', value: 7 },
+  { label: '1.9', value: 6 }, { label: '1.8', value: 5 },
+  { label: '1.7', value: 4 },
 ] as const
+
+/**
+ * 将 MC 版本号字符串（如 "1.21.5"、"1.20"、"26.2"）映射到 seedmap 支持的最近 cubiomes 枚举值。
+ *
+ * 规则：在所有 ≤ 目标版本的 seedmap 版本中取最大；若全大于目标（如 1.5），取最老版本。
+ * 版本比较按 "." 分段转数字逐段比较（"1.21.5" → [1,21,5]）。
+ *
+ * 用于"从存档加载"功能：存档版本可能不在 seedmap 支持列表中（如 1.21.7），
+ * 自动降级到最近的受支持版本。
+ *
+ * @returns 匹配的 cubiomes 枚举值；无法解析时返回 null
+ */
+export function mapMcVersionToCubiomes(mcVersion: string): number | null {
+  const parseVer = (s: string): number[] => {
+    const parts = s.split('.').map((p) => parseInt(p, 10))
+    return parts.some((n) => Number.isNaN(n)) ? [] : parts
+  }
+  const cmp = (a: number[], b: number[]): number => {
+    const len = Math.max(a.length, b.length)
+    for (let i = 0; i < len; i++) {
+      const av = a[i] ?? 0
+      const bv = b[i] ?? 0
+      if (av !== bv) return av - bv
+    }
+    return 0
+  }
+  const target = parseVer(mcVersion)
+  if (target.length === 0) return null
+
+  // 优先精确匹配 label
+  const exact = SEEDMAP_MC_VERSIONS.find((v) => cmp(parseVer(v.label), target) === 0)
+  if (exact) return exact.value
+
+  // 降级：取 ≤ target 中最大的；若无则取最老版本
+  const le = SEEDMAP_MC_VERSIONS
+    .map((v) => ({ v, parts: parseVer(v.label) }))
+    .filter((x) => cmp(x.parts, target) <= 0)
+    .sort((x, y) => cmp(x.parts, y.parts))
+  if (le.length > 0) return le[le.length - 1].v.value
+  return SEEDMAP_MC_VERSIONS[SEEDMAP_MC_VERSIONS.length - 1].value
+}
 
 export function useSeedMap() {
   // ===== 控件状态 =====
   const seedInput = ref<string>('')
-  const mcVersion = ref<number>(34)  // 默认最新版（26.2 = cubiomes MC_26_2 = MC_NEWEST）
+  const mcVersion = ref<number>(28)  // 默认最新版（26.2 = cubiomes MC_26_2 = MC_NEWEST = 28）
   const dimension = ref<Dimension>(0)
   const largeBiomes = ref<boolean>(false)
   const userX = ref<string>('')
@@ -119,6 +173,8 @@ export function useSeedMap() {
   const loading = ref<boolean>(false)
   const structures = ref<WorkerStructure[]>([])
   const hoverStruct = ref<WorkerStructure | null>(null)
+  /** 悬停 spawn/stronghold 时的提示数据（struct 走 hoverStruct） */
+  const hoverMarker = ref<{ label: string; x: number; z: number } | null>(null)
   const mouseBlock = ref<{ x: number; z: number } | null>(null)
   const lastClickBlock = ref<{ x: number; z: number } | null>(null)
   /** popup 浮窗数据（含 OL 坐标用于 Overlay 定位） */
@@ -127,7 +183,18 @@ export function useSeedMap() {
   const mouseBiomeName = ref<string>('')
   const showSpawn = ref<boolean>(true)
   const showStronghold = ref<boolean>(true)
+  // 默认只勾选村庄，避免全部勾选时地图标记过密。用户可按需在筛选栏勾选其他结构。
   const selectedStructureTypes = ref<Set<string>>(new Set(['Village']))
+  /**
+   * 是否显示未通过群系校验的结构候选位置（默认 false）。
+   *
+   * cubiomes 按 region 返回候选位置（如 Village 每 32 chunks=512 blocks 一个 region
+   * 最多一个候选），但实际生成受 biome 限制。viable=false 的候选位置实际不会生成
+   * 结构，显示它们会导致标记过密且弹窗出现"未通过群系校验"困惑提示。
+   * 默认 false 仅显示真实生成位置；用户可开启查看所有候选位置用于研究种子分布。
+   * ravine/fossil 等启发式结构 viable 始终为 true，不受此开关影响。
+   */
+  const showNonViable = ref<boolean>(false)
 
   // OL 实例（非响应式，用 let）
   const mapContainer = ref<HTMLDivElement | null>(null)
@@ -196,6 +263,7 @@ export function useSeedMap() {
         return getStructStyle(stype, highlighted)
       },
     })
+    structLayerRef = structLayer
 
     spawnSource = new VectorSource()
     spawnLayer = new VectorLayer({ source: spawnSource, style: getMarkerStyle('#4CAF50') })
@@ -251,41 +319,68 @@ export function useSeedMap() {
       ]),
     })
 
-    // 几何 hit detection：直接遍历 structSource 的 feature，计算像素距离
+    // 几何 hit detection：遍历 struct/spawn/stronghold 三个 source 的 feature，计算像素距离
     // 避免 OL Select 交互的 forEachFeatureAtPixel → getImageData 触发 willReadFrequently 警告
     // HIT_TOLERANCE_PX 为像素容差，与 OL Select 默认 hitTolerance 一致
     const HIT_TOLERANCE_PX = 6
-    function findStructAtPixel(pixel: number[]): Feature | null {
-      if (!map || !structSource) return null
+    type HitType = 'struct' | 'spawn' | 'stronghold'
+    interface HitResult {
+      feature: Feature
+      type: HitType
+      label: string
+      x: number
+      z: number
+    }
+    function findFeatureAtPixel(pixel: number[]): HitResult | null {
+      if (!map) return null
       const resolution = map.getView().getResolution() ?? 1
-      // 像素容差转坐标容差（resolution = 方块/像素）
       const tolCoord = HIT_TOLERANCE_PX * resolution
-      let best: Feature | null = null
+      const [cx, cz] = map.getCoordinateFromPixel(pixel)
+      let best: HitResult | null = null
       let bestDist = Infinity
-      structSource.forEachFeature((feat) => {
-        const geom = feat.getGeometry()
-        if (!geom || geom.getType() !== 'Point') return
-        const [fx, fz] = (geom as Point).getCoordinates()
-        const [cx, cz] = map!.getCoordinateFromPixel(pixel)
-        const dx = fx - cx
-        const dz = fz - cz
-        const dist = dx * dx + dz * dz
-        if (dist <= tolCoord * tolCoord && dist < bestDist) {
-          bestDist = dist
-          best = feat
-        }
-      })
+      const checkSource = (source: VectorSource | null, type: HitType, enabled: boolean) => {
+        if (!source || !enabled) return
+        source.forEachFeature((feat) => {
+          const geom = feat.getGeometry()
+          if (!geom || geom.getType() !== 'Point') return
+          const [fx, fz] = (geom as Point).getCoordinates()
+          const dx = fx - cx
+          const dz = fz - cz
+          const dist = dx * dx + dz * dz
+          if (dist <= tolCoord * tolCoord && dist < bestDist) {
+            bestDist = dist
+            if (type === 'struct') {
+              const struct = feat.get('data') as WorkerStructure
+              best = { feature: feat, type, label: getStructIcon(struct.stype).label, x: struct.x, z: struct.z }
+            } else {
+              best = { feature: feat, type, label: type === 'spawn' ? '出生点' : '要塞', x: Math.round(fx), z: Math.round(fz) }
+            }
+          }
+        })
+      }
+      checkSource(structSource, 'struct', true)
+      checkSource(spawnSource, 'spawn', showSpawn.value)
+      checkSource(strongholdSource, 'stronghold', showStronghold.value && dimension.value === 0)
       return best
     }
 
     map.on('singleclick', (e) => {
-      const feat = findStructAtPixel(e.pixel)
-      if (feat) {
-        clickFeat = feat
-        const struct = feat.get('data') as WorkerStructure
-        popupData.value = { struct, coord: [struct.x, struct.z] }
-        popupOverlay?.setPosition([struct.x, struct.z])
-        structSource!.changed()
+      const hit = findFeatureAtPixel(e.pixel)
+      if (hit) {
+        if (hit.type === 'struct') {
+          clickFeat = hit.feature
+          const struct = hit.feature.get('data') as WorkerStructure
+          popupData.value = { struct, coord: [struct.x, struct.z] }
+          popupOverlay?.setPosition([struct.x, struct.z])
+          structSource!.changed()
+        } else {
+          // spawn/stronghold：标记坐标 + 关闭 popup（无 popup 数据）
+          clickFeat = null
+          closePopup()
+          lastClickBlock.value = { x: hit.x, z: hit.z }
+          clickMarkerSource!.clear()
+          clickMarkerSource!.addFeature(new Feature({ geometry: new Point([hit.x, hit.z]) }))
+        }
       } else {
         // 点击空白：标记坐标 + 关闭 popup
         clickFeat = null
@@ -307,11 +402,31 @@ export function useSeedMap() {
       if (hoverThrottle) return
       hoverThrottle = window.setTimeout(() => {
         hoverThrottle = null
-        const feat = findStructAtPixel(e.pixel)
-        if (feat !== hoverFeat) {
-          hoverFeat = feat
-          hoverStruct.value = feat ? (feat.get('data') as WorkerStructure) : null
-          structSource!.changed()
+        const hit = findFeatureAtPixel(e.pixel)
+        if (hit) {
+          if (hit.type === 'struct') {
+            if (hit.feature !== hoverFeat) {
+              hoverFeat = hit.feature
+              hoverStruct.value = hit.feature.get('data') as WorkerStructure
+              hoverMarker.value = null
+              structSource!.changed()
+            }
+          } else {
+            // spawn/stronghold hover：显示 marker 提示
+            if (hoverFeat !== null) {
+              hoverFeat = null
+              hoverStruct.value = null
+              structSource!.changed()
+            }
+            hoverMarker.value = { label: hit.label, x: hit.x, z: hit.z }
+          }
+        } else {
+          if (hoverFeat !== null) {
+            hoverFeat = null
+            hoverStruct.value = null
+            structSource!.changed()
+          }
+          hoverMarker.value = null
         }
       }, 50)
       // biome 名称查询：debounce 300ms
@@ -320,6 +435,7 @@ export function useSeedMap() {
 
     let moveendTimer: number | null = null
     map.on('moveend', () => {
+      updateStructLayerVisibility()
       if (!currentSeed) return
       if (moveendTimer) clearTimeout(moveendTimer)
       moveendTimer = window.setTimeout(() => {
@@ -327,6 +443,19 @@ export function useSeedMap() {
         refreshStructures()
       }, 300)
     })
+  }
+
+  // ===== 结构图层可见性控制 =====
+  // 低 zoom（< 4）时可视范围过大，findStructures 遍历 region 数可达数百万，
+  // 会长时间阻塞 Worker 串行队列导致 tile 生成饿死（黑屏/无法继续加载）。
+  // 低 zoom 时隐藏结构图层并跳过查找，高 zoom 时恢复。
+  const STRUCT_MIN_ZOOM = 4
+  let structLayerRef: VectorLayer | null = null
+  function updateStructLayerVisibility() {
+    if (!map || !structLayerRef) return
+    const zoom = map.getView().getZoom() ?? 0
+    const visible = zoom >= STRUCT_MIN_ZOOM
+    structLayerRef.setVisible(visible)
   }
 
   // ===== 加载群系 tile =====
@@ -343,7 +472,7 @@ export function useSeedMap() {
       return createImageBitmap(c)
     }
     if (!currentSeed || !pool) return emptyBitmap()
-    // z 直接对应 RESOLUTIONS 索引（OL zoom 0~12）
+    // z 直接对应 RESOLUTIONS 索引（OL zoom 0~10）
     const res = RESOLUTIONS[z]
     if (!res) return emptyBitmap()
     const bpp = res // 方块/像素
@@ -365,6 +494,13 @@ export function useSeedMap() {
     // cubiomes scale 网格完全对齐，相邻 tile 内容连续。
     const startBlockX = Math.round(-EXTENT_HALF + x * blocksPerTile)
     const startBlockZ = Math.round(EXTENT_HALF - (y + 1) * blocksPerTile)
+    // 防御性边界检查：跳过 extent 范围外的 tile
+    // constrainOnlyCenter:true 时 OL 可能请求 extent 外的 tile，
+    // 这些 tile 无对应的世界数据，直接返回空 bitmap 避免无效 worker 调用
+    if (startBlockX + blocksPerTile <= -EXTENT_HALF || startBlockX >= EXTENT_HALF ||
+        startBlockZ + blocksPerTile <= -EXTENT_HALF || startBlockZ >= EXTENT_HALF) {
+      return emptyBitmap()
+    }
     const tileParams = {
       seed: currentSeed,
       mcVersion: currentMc,
@@ -388,7 +524,7 @@ export function useSeedMap() {
           await new Promise(r => setTimeout(r, 200))
           continue
         }
-        console.warn('tile load failed after retries', z, x, y, e)
+        console.error('[seedmap] tile load failed after retries', { z, x, y, error: e instanceof Error ? e.message : String(e) })
         return emptyBitmap()
       }
     }
@@ -397,8 +533,28 @@ export function useSeedMap() {
 
   // ===== 加载结构（按可视范围） =====
   let structRequestId = 0
+  /** 防止多个 findStructures 同时占用 Worker：上一次查找未完成时标记 pending */
+  let structRefreshInProgress = false
+  /** 查找期间有新请求到来时标记 pending，查找完成后自动补偿触发 */
+  let structPendingRefresh = false
   async function refreshStructures() {
     if (!currentSeed || !map || !pool) return
+    // 低 zoom 时跳过：可视范围过大导致 findStructures 遍历数百万 region，
+    // 长时间阻塞 Worker 串行队列，tile 生成被饿死（黑屏/无法继续加载）
+    const zoom = map.getView().getZoom() ?? 0
+    if (zoom < STRUCT_MIN_ZOOM) {
+      structures.value = []
+      structSource?.clear()
+      return
+    }
+    // 并发控制：上一次查找未完成时标记 pending，查找完成后补偿触发。
+    // 不能直接 return 丢弃请求，否则用户拖到新区域后该区域永远不会被刷新
+    // （moveend 只在拖动结束时触发一次，丢弃后无后续触发）。
+    if (structRefreshInProgress) {
+      structPendingRefresh = true
+      return
+    }
+    structRefreshInProgress = true
     const myId = ++structRequestId
     try {
       const view = map.getView()
@@ -420,6 +576,14 @@ export function useSeedMap() {
       renderStructures(items)
     } catch (e) {
       toastError('结构加载失败: ' + (e instanceof Error ? e.message : String(e)))
+    } finally {
+      structRefreshInProgress = false
+      // 补偿：查找期间有新请求（用户拖到新区域）时，自动触发一次刷新
+      if (structPendingRefresh) {
+        structPendingRefresh = false
+        // 延迟 0ms 让当前调用栈结束，避免同步递归
+        setTimeout(() => refreshStructures(), 0)
+      }
     }
   }
 
@@ -464,6 +628,7 @@ export function useSeedMap() {
     }
     biomeSource?.refresh()
     biomeLayer?.setVisible(true)
+    updateStructLayerVisibility()
     structSource?.clear()
     spawnSource?.clear()
     strongholdSource?.clear()
@@ -590,6 +755,9 @@ export function useSeedMap() {
   watch(showSpawn, (v) => { if (spawnLayer) spawnLayer.setVisible(v) })
   watch(showStronghold, (v) => { if (strongholdLayer) strongholdLayer.setVisible(v) })
 
+  // 群系校验开关变化时，用已缓存的结构数据重新渲染（无需重新查找）
+  watch(showNonViable, () => renderStructures(structures.value))
+
   // ===== 地形渲染选项变化：Y 坐标 / 等高线 / 高度限制 =====
   watch([yCoord, doContour, ymaxLimit], () => {
     if (!currentSeed) return
@@ -649,17 +817,28 @@ export function useSeedMap() {
   }
 
   // 根据筛选条件渲染结构
+  // 不对 feature 单独 setStyle：layer 已配置 style 函数（根据 hoverFeat/clickFeat
+  // 动态返回高亮/非高亮 Style）。若 feature 自带 style 会绕过 layer style 函数，
+  // 导致悬停/点击高亮失效，且 Icon 图标在样式缓存中可能不刷新。
+  //
+  // viable 过滤：默认 showNonViable=false，仅显示通过群系校验的真实生成位置。
+  // cubiomes 按 region 返回候选位置（如 Village 每 32 chunks=512 blocks 一个 region
+  // 最多一个候选），但实际生成受 biome 限制。未通过校验的候选位置实际不会生成结构，
+  // 显示它们会导致标记过密。用户可开启 showNonViable 查看所有候选位置。
+  // ravine/fossil 等启发式结构 viable 始终为 true，不受此过滤影响。
   function renderStructures(items: WorkerStructure[]) {
     if (!structSource) return
     structSource.clear()
-    const filtered = items.filter(s => selectedStructureTypes.value.has(s.stype))
+    const filtered = items.filter(s =>
+      selectedStructureTypes.value.has(s.stype)
+      && (showNonViable.value || s.viable),
+    )
     for (const st of filtered) {
       const feat = new Feature({
         geometry: new Point([st.x, st.z]),
         stype: st.stype,
         data: st,
       })
-      feat.setStyle(getStructStyle(st.stype, false))
       structSource.addFeature(feat)
     }
   }
@@ -667,10 +846,10 @@ export function useSeedMap() {
   return {
     seedInput, mcVersion, dimension, largeBiomes, userX, userZ,
     versionOptions, dimensionOptions,
-    loading, structures, hoverStruct, mouseBlock, lastClickBlock,
+    loading, structures, hoverStruct, hoverMarker, mouseBlock, lastClickBlock,
     popupData, mouseBiomeName,
     mapContainer, popupContainer,
-    showSpawn, showStronghold, showCoordPanel,
+    showSpawn, showStronghold, showCoordPanel, showNonViable,
     yCoord, doContour, ymaxLimit,
     selectedStructureTypes, structureListForVersion,
     loadSeed, goToUserCoord, zoomIn, zoomOut, resetView,

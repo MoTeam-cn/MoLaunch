@@ -72,8 +72,9 @@ export function applyTerrainShading(
       const oy = (py % heightCellPx) / heightCellPx
 
       // 采样高度（clamp 到有效范围，超出用 64 = 海平面）
-      const cx = Math.min(Math.max(bx, 0), hsx - 2)
-      const cz = Math.min(Math.max(bz, 0), hsz - 2)
+      // 防御性边界：hsx/hsz 较小时 hsx-2 可能为负，用 Math.max(0, hsx-2) 确保下界不为负
+      const cx = Math.min(Math.max(bx, 0), Math.max(0, hsx - 2))
+      const cz = Math.min(Math.max(bz, 0), Math.max(0, hsz - 2))
       const h00 = heights[cz * hsx + cx] ?? 64
       const h10 = heights[cz * hsx + Math.min(cx + 1, hsx - 1)] ?? h00
       const h01 = heights[Math.min(cz + 1, hsz - 1) * hsx + cx] ?? h00

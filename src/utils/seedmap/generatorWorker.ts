@@ -405,6 +405,14 @@ const CHUNK_FIND_LIMIT_MEGA = 32
 const MEGA_RAVINE_POSE_THRESHOLD = 200
 
 /**
+ * region 遍历总数上限：超过此值时跳过该结构类型查找，避免卡死 Worker。
+ * regionSize 单位为 chunk（×16 转 block 后计算 region 坐标），
+ * 5000 region 对 Village（regionSize=32 chunks=512 blocks）约覆盖
+ * 70×70 region = 36K×36K 方块，足够覆盖 zoom 4~10 的正常浏览范围。
+ */
+const REGION_TRAVERSE_LIMIT = 5000
+
+/**
  * 调用 cubiomes chunk 范围查找函数（ravines/nether_fossils/fossils 共用模式）
  *
  * 统一封装：chunk 范围计算 → buffer 分配 → WASM 调用 → 结果读取 → buffer 释放。
@@ -568,9 +576,9 @@ async function handleFindStructures(msg: FindStructuresMsg) {
             for (const r of results) {
               structs.push({ stype: tconf.name, x: r.x, z: r.z, viable: true })
             }
-          } else {
-            console.warn(`[cubiomes] nether_fossil 范围过大，跳过`)
           }
+          // callChunkFinder 返回 null（_malloc 失败）时静默跳过，
+          // 分块查找已确保大范围也能逐块处理，不再产生范围过大的情况
         } catch { /* nether_fossil 查找失败，跳过 */ }
         continue
       }
@@ -596,18 +604,26 @@ async function handleFindStructures(msg: FindStructuresMsg) {
       }
 
       try {
-        // 获取该结构类型的 regionSize
+        // 获取该结构类型的 regionSize（cubiomes 返回的是 chunk 单位，需 ×16 转 block）
         // cubiomes getStructurePos 内部按 StructureConfig.regionSize 处理：
         //   常规结构按 region 查找，Mineshaft 按 chunk 查找（queryMode='mineshaft'）
         //   都通过同一个 API 调用，无需分支
+        // 注意：regionSize 单位是 chunk（如 Village=32 chunks=512 blocks），
+        //   若不 ×16 直接用 block/regionSize，region 数量会膨胀 16^2=256 倍，
+        //   导致 REGION_TRAVERSE_LIMIT 被轻易触发而跳过结构查找。
         const regionSize = Module._cubiomes_get_region_size(tconf.id, mcVersion)
         if (!regionSize) continue
+        const regionSizeBlocks = regionSize * 16
 
         // 遍历覆盖可视范围的所有 region
-        const startRegX = Math.floor(minX / regionSize)
-        const endRegX = Math.floor(maxX / regionSize)
-        const startRegZ = Math.floor(minZ / regionSize)
-        const endRegZ = Math.floor(maxZ / regionSize)
+        const startRegX = Math.floor(minX / regionSizeBlocks)
+        const endRegX = Math.floor(maxX / regionSizeBlocks)
+        const startRegZ = Math.floor(minZ / regionSizeBlocks)
+        const endRegZ = Math.floor(maxZ / regionSizeBlocks)
+
+        // region 总数上限检查：超过时跳过该结构类型，避免卡死 Worker
+        const regionCount = (endRegX - startRegX + 1) * (endRegZ - startRegZ + 1)
+        if (regionCount > REGION_TRAVERSE_LIMIT) continue
 
         for (let rx = startRegX; rx <= endRegX; rx++) {
           for (let rz = startRegZ; rz <= endRegZ; rz++) {

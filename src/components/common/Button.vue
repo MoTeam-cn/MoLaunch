@@ -28,7 +28,7 @@
  *   添加
  * </Button>
  */
-import { computed } from 'vue'
+import { computed, useSlots } from 'vue'
 
 interface Props {
   /** 按钮类型 */
@@ -52,6 +52,27 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 defineEmits<{ click: [e: MouseEvent] }>()
+
+const slots = useSlots()
+/**
+ * 检测 default slot 是否有文本内容（用于区分图标-only 按钮）
+ *
+ * 图标-only 按钮（如 <Button><HomeIcon /></Button>）的 default slot 只有组件 vnode，
+ * 没有文本 vnode。此时 svg 的 margin-right 会让图标在 flex 居中时向左偏移，
+ * 需要去除 margin 让图标真正居中。
+ *
+ * 检测逻辑：default slot 的 vnode 中是否存在文本类型（type 为 Symbol 或 children 为非空字符串）。
+ */
+const hasText = computed(() => {
+  const vnodes = slots.default?.() ?? []
+  return vnodes.some(v => {
+    if (typeof v.children === 'string' && v.children.trim()) return true
+    if (Array.isArray(v.children)) {
+      return v.children.some(c => typeof c === 'string' && c.trim())
+    }
+    return false
+  })
+})
 
 /**
  * 类名使用静态映射而非动态拼接（`btn-${type}` / `btn-size-${size}`）。
@@ -90,7 +111,7 @@ const sizeClass = computed(() => {
       'btn',
       typeClass,
       sizeClass,
-      { 'btn-long': long, 'btn-loading': loading },
+      { 'btn-long': long, 'btn-loading': loading, 'btn-icon-only': !hasText },
     ]"
     :disabled="disabled || loading"
     @click="$emit('click', $event)"
@@ -149,8 +170,10 @@ const sizeClass = computed(() => {
   margin-right: 6px;
 }
 
-/* 没有 slot 文字内容时（纯图标按钮），去掉 margin */
-.btn:empty > :deep(svg:not(.btn-spinner)) {
+/* 没有 slot 文字内容时（纯图标按钮），去掉 margin
+   原 :empty 选择器因 Vue slot 注释节点不匹配，改用 btn-icon-only class
+   （由 useSlots 检测 default slot 是否有文本内容动态添加）*/
+.btn-icon-only > :deep(svg:not(.btn-spinner)) {
   margin-right: 0;
 }
 
@@ -161,7 +184,7 @@ const sizeClass = computed(() => {
   margin-right: 8px;
   animation: btn-spin 0.8s linear infinite;
 }
-.btn:empty .btn-spinner {
+.btn-icon-only .btn-spinner {
   margin-right: 0;
 }
 

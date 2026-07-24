@@ -25,6 +25,8 @@ interface JobResolver<T = unknown> {
 interface WorkerHandle {
   worker: Worker
   healthy: boolean
+  /** Worker 已 terminate，不可再派发任务 */
+  terminated: boolean
   seedReady: boolean
   /** pending 任务 Map<jobId, resolver> */
   pending: Map<string, JobResolver<any>>
@@ -41,7 +43,10 @@ export interface WorkerPoolOptions {
   workerCount?: number
 }
 
-const MAX_ERRORS_PER_WORKER = 5
+// 单个 Worker 最大错误次数：超过后 terminate。
+// 设为 50（而非 5）避免 tile 生成偶发失败（WASM 内存增长导致 HEAPU8 detach 等）
+// 累积触发 Worker 终止，进而导致所有 Worker 终止后地图全黑无法恢复。
+const MAX_ERRORS_PER_WORKER = 50
 
 export class WorkerPool {
   private workers: WorkerHandle[] = []
@@ -78,6 +83,7 @@ export class WorkerPool {
       const handle: WorkerHandle = {
         worker,
         healthy: false,
+        terminated: false,
         seedReady: false,
         pending: new Map(),
         seedResolve: null,
@@ -154,6 +160,11 @@ export class WorkerPool {
     if (this.disposed) return Promise.reject(new Error('WorkerPool 已 dispose'))
     if (this.workers.length === 0) return Promise.reject(new Error('WorkerPool 未 init'))
     const worker = this.pickWorker()
+    if (!worker) {
+      const terminatedCount = this.workers.filter(w => w.terminated).length
+      console.error(`[WorkerPool] 所有 ${this.workers.length} 个 Worker 已终止（terminated=${terminatedCount}），无法派发 ${type} 任务`)
+      return Promise.reject(new Error('所有 Worker 已终止，无法派发任务'))
+    }
     const jobId = `${type}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`
     return new Promise<T>((resolve, reject) => {
       worker.pending.set(jobId, { resolve: resolve as (v: unknown) => void, reject })
@@ -161,29 +172,45 @@ export class WorkerPool {
     })
   }
 
-  /** 选一个 Worker 派发任务：优先 healthy && seedReady && idle，否则 pending 最少 */
-  private pickWorker(): WorkerHandle {
-    let best = this.workers[0]
+  /** 选一个 Worker 派发任务：优先 healthy && idle，否则 pending 最少。所有 Worker terminated 时返回 null */
+  private pickWorker(): WorkerHandle | null {
+    let best: WorkerHandle | null = null
     let bestScore = -Infinity
+    // 所有 worker 都不健康时的 fallback：选 pending 最少的非 terminated worker
+    let fallback: WorkerHandle | null = null
+    let fallbackScore = -Infinity
     for (let i = 0; i < this.workers.length; i++) {
       const idx = (this.nextWorkerIdx + i) % this.workers.length
       const w = this.workers[idx]
-      if (!w.healthy) continue
-      // 评分：idle 最高，pending 越少越优先
+      if (w.terminated) continue  // 已终止的 worker 不可用
       const score = w.pending.size === 0 ? 1000 : 100 - w.pending.size
-      if (score > bestScore) {
-        bestScore = score
-        best = w
-        if (score === 1000) {
-          this.nextWorkerIdx = (idx + 1) % this.workers.length
-          break
+      if (w.healthy) {
+        if (score > bestScore) {
+          bestScore = score
+          best = w
+          if (score === 1000) {
+            this.nextWorkerIdx = (idx + 1) % this.workers.length
+            break
+          }
         }
+      } else if (score > fallbackScore) {
+        // 记录最空闲的 unhealthy worker（可能已从瞬时错误恢复）
+        fallbackScore = score
+        fallback = w
       }
     }
-    return best
+    // 没有 healthy worker 时用最空闲的 unhealthy（worker 可能已恢复但尚未收到消息重置标志）
+    // 所有 worker 都 terminated 时返回 null，enqueue 会 reject 而非向死 Worker postMessage
+    return best ?? fallback ?? null
   }
 
   private onMessage(worker: WorkerHandle, msg: WorkerToMainMsg) {
+    // 成功收到任何非 error 消息都说明 Worker 恢复了健康（从瞬时错误中恢复）
+    // 同时重置 errorCount，避免偶发错误随时间累积触发 terminate
+    if (msg.type !== 'error') {
+      worker.healthy = true
+      worker.errorCount = 0
+    }
     switch (msg.type) {
       case 'init_complete': {
         worker.healthy = true
@@ -250,6 +277,7 @@ export class WorkerPool {
     worker.healthy = false
     worker.errorCount++
     const errMsg = e.message || 'Worker 内部错误'
+    console.error(`[WorkerPool] Worker#${this.workers.indexOf(worker)} 错误 (#${worker.errorCount}):`, errMsg)
     // reject 所有 pending 任务
     for (const [id, entry] of worker.pending) {
       entry.reject(new Error('Worker 错误: ' + errMsg))
@@ -261,7 +289,8 @@ export class WorkerPool {
       worker.seedReject = null
     }
     if (worker.errorCount > MAX_ERRORS_PER_WORKER) {
-      // 重试次数超限：terminate 该 Worker
+      // 重试次数超限：terminate 该 Worker，标记为 terminated 避免再派发任务
+      worker.terminated = true
       try { worker.worker.terminate() } catch { /* ignore */ }
     }
   }
