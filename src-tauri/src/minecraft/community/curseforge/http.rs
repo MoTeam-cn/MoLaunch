@@ -145,16 +145,26 @@ pub(crate) async fn cf_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
 }
 
 /// 构造 CF GET 请求（附加 API Key header）
+///
+/// 安全兜底：URL 是镜像源域名（mod.mcimirror.top）时强制不附加 API Key，
+/// 防止用户 Key 泄露给镜像站。镜像站自带 Key 请求 CF，不需要用户 Key。
+/// 即使上层逻辑误传 key 给镜像 URL，底层也会兜底剥离。
 fn build_cf_request(url: &str, api_key: Option<&str>) -> reqwest::RequestBuilder {
     let mut req = crate::http::get_client().get(url);
+    let is_mirror = url.contains("mcimirror.top");
     if let Some(key) = api_key {
-        req = req.header("x-api-key", key);
-        req = req.header("Accept", "application/json");
+        if !is_mirror && !key.is_empty() {
+            req = req.header("x-api-key", key);
+            req = req.header("Accept", "application/json");
+        }
     }
     req
 }
 
 /// 构造 CF POST 请求（附加 API Key header + JSON body）
+///
+/// 安全兜底：URL 是镜像源域名（mod.mcimirror.top）时强制不附加 API Key，
+/// 防止用户 Key 泄露给镜像站。镜像站自带 Key 请求 CF，不需要用户 Key。
 fn build_cf_post_request(
     url: &str,
     api_key: Option<&str>,
@@ -164,9 +174,12 @@ fn build_cf_post_request(
         .post(url)
         .header("Content-Type", "application/json")
         .body(body);
+    let is_mirror = url.contains("mcimirror.top");
     if let Some(key) = api_key {
-        req = req.header("x-api-key", key);
-        req = req.header("Accept", "application/json");
+        if !is_mirror && !key.is_empty() {
+            req = req.header("x-api-key", key);
+            req = req.header("Accept", "application/json");
+        }
     }
     req
 }

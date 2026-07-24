@@ -40,6 +40,7 @@ pub(super) async fn install_mr_files(
     mr_files: &[MrFile],
     instance_dir: &std::path::Path,
     max_threads: usize,
+    stage_index: usize,
 ) -> Result<(), String> {
     if mr_files.is_empty() {
         log_info!("[Community] MR index 无依赖文件");
@@ -116,13 +117,6 @@ pub(super) async fn install_mr_files(
                     translated.as_deref(),
                     filename_format,
                 );
-                if final_name != orig_name {
-                    log_info!(
-                        "[Community] MR mod 文件名重命名: {} → {}",
-                        orig_name,
-                        final_name
-                    );
-                }
                 instance_dir
                     .join(parent)
                     .join(&final_name)
@@ -147,7 +141,7 @@ pub(super) async fn install_mr_files(
 
     super::concurrent::download_files_concurrent(
         state,
-        2,
+        stage_index,
         &download_list,
         max_threads,
         total_bytes,

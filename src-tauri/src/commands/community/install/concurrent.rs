@@ -103,15 +103,32 @@ pub(super) async fn download_files_concurrent(
     Ok(())
 }
 
-/// 从 zip 解压 overrides（和 client-overrides）到 instance 目录
+/// 从 zip 解压 overrides 到 instance 目录
+///
+/// `prefixes` 为 overrides 前缀列表（已含 archive_base_folder 前缀和末尾 `/`），
+/// 按格式决定：
+/// - CurseForge/Modrinth：`["{base}overrides/", "{base}client-overrides/"]`
+/// - HMCL：`["{base}minecraft/"]`
+/// - MMC：`["{base}.minecraft/"]`
+/// - MCBBS：`["{base}overrides/"]`
+///
+/// 靠前的前缀优先匹配；前缀被去掉后剩余路径作为 instance 目录下的相对路径。
+/// client-overrides 之类的次要前缀允许覆盖 overrides 已写入的同名文件。
 pub(super) fn extract_overrides(
     archive: &mut zip::ZipArchive<std::fs::File>,
     instance_dir: &std::path::Path,
     state: &AppState,
+    prefixes: &[String],
+    stage_index: usize,
 ) -> Result<(), String> {
     use std::io::Read;
     let mut count: usize = 0;
     let total = archive.len();
+
+    if prefixes.is_empty() {
+        log_info!("[Community] overrides 前缀为空，跳过解压");
+        return Ok(());
+    }
 
     for i in 0..archive.len() {
         let mut entry = archive
@@ -119,14 +136,14 @@ pub(super) fn extract_overrides(
             .map_err(|e| format!("读取 zip 条目失败: {}", e))?;
         let name = entry.name().to_string();
 
-        // CF/MR overrides/ 前缀 → 去掉前缀复制到 instance 目录
-        // MR client-overrides/ 前缀 → 同样去掉前缀复制到 instance 目录（覆盖 overrides）
-        let relative = if name.starts_with("overrides/") {
-            &name["overrides/".len()..]
-        } else if name.starts_with("client-overrides/") {
-            &name["client-overrides/".len()..]
-        } else {
-            continue;
+        // 按前缀列表顺序匹配，命中第一个前缀就去掉
+        let relative = prefixes
+            .iter()
+            .find_map(|p| name.strip_prefix(p.as_str()).map(|r| r));
+
+        let relative = match relative {
+            Some(r) => r,
+            None => continue,
         };
 
         if relative.is_empty() || relative.ends_with('/') {
@@ -152,58 +169,246 @@ pub(super) fn extract_overrides(
         // 每 10 个文件更新一次进度
         if count % 10 == 0 {
             let mut ds = state.download_state.lock().unwrap();
-            ds.set_stage_bytes(3, count as u64, total as u64);
+            ds.set_stage_bytes(stage_index, count as u64, total as u64);
         }
     }
 
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.set_stage_bytes(3, count as u64, total as u64);
+        ds.set_stage_bytes(stage_index, count as u64, total as u64);
     }
-    log_info!("[Community] overrides 解压完成 ({} 个文件)", count);
+    log_info!(
+        "[Community] overrides 解压完成 ({} 个文件，前缀: {:?})",
+        count,
+        prefixes
+    );
     Ok(())
 }
 
-/// 检测整合包格式，返回 (format, cf_manifest_content, mr_index_content)
+/// 检测到的整合包信息（detect_modpack_format 的返回值）
+///
+/// `archive_base_folder` 为整合包关键文件所在的层级前缀（如 `""` 或 `"subfolder/"`），
+/// 用于后续构造 overrides 完整前缀。
+pub(super) struct DetectedModpack {
+    pub format: super::types::ModpackFormat,
+    /// 关键文件所在层级前缀（如 `""` 或 `"subfolder/"`），已含末尾 `/`（根目录为空字符串）
+    pub archive_base_folder: String,
+    /// CF manifest.json 或 MCBBS manifest.json/mcbbs.packmeta 的原始内容
+    pub manifest_content: Option<String>,
+    /// MR modrinth.index.json 的原始内容
+    pub index_content: Option<String>,
+    /// HMCL modpack.json 的原始内容
+    pub hmcl_content: Option<String>,
+    /// MMC mmc-pack.json 的原始内容
+    pub mmc_content: Option<String>,
+}
+
+/// 检测整合包格式
+///
+/// 识别优先级（参考 PCL2 ModModpack.vb ModpackInstall）：
+/// 1. `mcbbs.packmeta` → Mcbbs
+/// 2. `mmc-pack.json` → Mmc
+/// 3. `modrinth.index.json` → Modrinth
+/// 4. `manifest.json`：有 `addons` 字段 → Mcbbs，无 → Curseforge
+/// 5. `modpack.json` → Hmcl
+///
+/// 第一遍扫描根目录关键文件，命中即返回；第二遍扫描一级子目录。
+/// `archive_base_folder` 在根目录命中时为 `""`，子目录命中时为 `"子目录/"`。
 pub(super) fn detect_modpack_format(
     archive: &mut zip::ZipArchive<std::fs::File>,
-) -> Result<(super::types::ModpackFormat, Option<String>, Option<String>), String> {
-    use super::types::ModpackFormat;
-    use std::io::Read;
-    let mut cf_content: Option<String> = None;
-    let mut mr_content: Option<String> = None;
+) -> Result<DetectedModpack, String> {
+    // 收集所有条目名及其索引
+    let entry_names: Vec<(usize, String)> = (0..archive.len())
+        .map(|i| {
+            let name = archive
+                .by_index(i)
+                .map(|e| e.name().to_string())
+                .unwrap_or_default();
+            (i, name)
+        })
+        .collect();
 
-    for i in 0..archive.len() {
-        let mut entry = archive
-            .by_index(i)
-            .map_err(|e| format!("读取 zip 条目失败: {}", e))?;
-        let name = entry.name().to_string();
-        let is_root = !name.contains('/');
+    // 按 PCL2 优先级顺序的关键文件名
+    // manifest.json 需要进一步判断 addons 字段，特殊处理
+    const PRIORITY: &[&str] = &[
+        "mcbbs.packmeta",
+        "mmc-pack.json",
+        "modrinth.index.json",
+        "manifest.json",
+        "modpack.json",
+    ];
 
-        if is_root && name == "manifest.json" {
-            let mut s = String::new();
-            entry
-                .read_to_string(&mut s)
-                .map_err(|e| format!("读取 manifest.json 失败: {}", e))?;
-            cf_content = Some(s);
-        } else if is_root && name == "modrinth.index.json" {
-            let mut s = String::new();
-            entry
-                .read_to_string(&mut s)
-                .map_err(|e| format!("读取 modrinth.index.json 失败: {}", e))?;
-            mr_content = Some(s);
+    // 第一遍：扫描根目录（路径不含 /），按优先级顺序查找
+    for key in PRIORITY {
+        for &(i, ref name) in &entry_names {
+            if name.contains('/') {
+                continue;
+            }
+            if name == *key {
+                if let Some(detected) = try_detect_at_root(archive, i, name, "")? {
+                    return Ok(detected);
+                }
+            }
         }
     }
 
-    let format = match (&cf_content, &mr_content) {
-        (Some(_), _) => ModpackFormat::Curseforge,
-        (_, Some(_)) => ModpackFormat::Modrinth,
-        (None, None) => {
-            return Err(
-                "无法识别的整合包格式：未找到 manifest.json 或 modrinth.index.json".to_string(),
-            );
+    // 第二遍：扫描一级子目录（路径形如 "subfolder/关键文件"），按优先级顺序查找
+    for key in PRIORITY {
+        for &(i, ref name) in &entry_names {
+            let parts: Vec<&str> = name.split('/').collect();
+            if parts.len() != 2 {
+                continue;
+            }
+            if parts[1] == *key {
+                let base = format!("{}/", parts[0]);
+                if let Some(detected) = try_detect_at_root(archive, i, parts[1], &base)? {
+                    return Ok(detected);
+                }
+            }
         }
-    };
+    }
 
-    Ok((format, cf_content, mr_content))
+    Err("无法识别的整合包格式：未找到 manifest.json / modrinth.index.json / modpack.json / mmc-pack.json / mcbbs.packmeta".to_string())
+}
+
+/// 尝试在指定 base_folder 下识别关键文件
+///
+/// `entry_index` 为关键文件在 zip 中的索引，`entry_name` 为关键文件名（不含 base_folder 前缀）。
+/// 命中返回 `Some(DetectedModpack)`，否则返回 `None`。
+fn try_detect_at_root(
+    archive: &mut zip::ZipArchive<std::fs::File>,
+    entry_index: usize,
+    entry_name: &str,
+    base_folder: &str,
+) -> Result<Option<DetectedModpack>, String> {
+    use super::types::ModpackFormat;
+    use std::io::Read;
+
+    // 按 PCL2 优先级判断
+    if entry_name == "mcbbs.packmeta" {
+        let mut s = String::new();
+        archive
+            .by_index(entry_index)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?
+            .read_to_string(&mut s)
+            .map_err(|e| format!("读取 mcbbs.packmeta 失败: {}", e))?;
+        log_info!("[Community] 检测到 MCBBS 整合包（mcbbs.packmeta）");
+        return Ok(Some(DetectedModpack {
+            format: ModpackFormat::Mcbbs,
+            archive_base_folder: base_folder.to_string(),
+            manifest_content: Some(s),
+            index_content: None,
+            hmcl_content: None,
+            mmc_content: None,
+        }));
+    }
+
+    if entry_name == "mmc-pack.json" {
+        let mut s = String::new();
+        archive
+            .by_index(entry_index)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?
+            .read_to_string(&mut s)
+            .map_err(|e| format!("读取 mmc-pack.json 失败: {}", e))?;
+        log_info!("[Community] 检测到 MMC 整合包（mmc-pack.json）");
+        return Ok(Some(DetectedModpack {
+            format: ModpackFormat::Mmc,
+            archive_base_folder: base_folder.to_string(),
+            manifest_content: None,
+            index_content: None,
+            hmcl_content: None,
+            mmc_content: Some(s),
+        }));
+    }
+
+    if entry_name == "modrinth.index.json" {
+        let mut s = String::new();
+        archive
+            .by_index(entry_index)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?
+            .read_to_string(&mut s)
+            .map_err(|e| format!("读取 modrinth.index.json 失败: {}", e))?;
+        log_info!("[Community] 检测到 Modrinth 整合包（modrinth.index.json）");
+        return Ok(Some(DetectedModpack {
+            format: ModpackFormat::Modrinth,
+            archive_base_folder: base_folder.to_string(),
+            manifest_content: None,
+            index_content: Some(s),
+            hmcl_content: None,
+            mmc_content: None,
+        }));
+    }
+
+    if entry_name == "manifest.json" {
+        let mut s = String::new();
+        archive
+            .by_index(entry_index)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?
+            .read_to_string(&mut s)
+            .map_err(|e| format!("读取 manifest.json 失败: {}", e))?;
+        // 判断是否有 addons 字段：有 → MCBBS，无 → CurseForge
+        let has_addons = serde_json::from_str::<serde_json::Value>(&s)
+            .ok()
+            .and_then(|v| v.get("addons").map(|a| !a.is_null()))
+            .unwrap_or(false);
+        if has_addons {
+            log_info!("[Community] 检测到 MCBBS 整合包（manifest.json 含 addons）");
+            Ok(Some(DetectedModpack {
+                format: ModpackFormat::Mcbbs,
+                archive_base_folder: base_folder.to_string(),
+                manifest_content: Some(s),
+                index_content: None,
+                hmcl_content: None,
+                mmc_content: None,
+            }))
+        } else {
+            log_info!("[Community] 检测到 CurseForge 整合包（manifest.json）");
+            Ok(Some(DetectedModpack {
+                format: ModpackFormat::Curseforge,
+                archive_base_folder: base_folder.to_string(),
+                manifest_content: Some(s),
+                index_content: None,
+                hmcl_content: None,
+                mmc_content: None,
+            }))
+        }
+    } else if entry_name == "modpack.json" {
+        let mut s = String::new();
+        archive
+            .by_index(entry_index)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?
+            .read_to_string(&mut s)
+            .map_err(|e| format!("读取 modpack.json 失败: {}", e))?;
+        log_info!("[Community] 检测到 HMCL 整合包（modpack.json）");
+        Ok(Some(DetectedModpack {
+            format: ModpackFormat::Hmcl,
+            archive_base_folder: base_folder.to_string(),
+            manifest_content: None,
+            index_content: None,
+            hmcl_content: Some(s),
+            mmc_content: None,
+        }))
+    } else {
+        Ok(None)
+    }
+}
+
+/// 根据 format 和 archive_base_folder 构造 overrides 前缀列表
+///
+/// 每个前缀已含 `archive_base_folder` 前缀和末尾 `/`，供 `extract_overrides` 直接匹配。
+pub(super) fn build_overrides_prefixes(
+    format: super::types::ModpackFormat,
+    base_folder: &str,
+) -> Vec<String> {
+    use super::types::ModpackFormat;
+    let base = base_folder;
+    match format {
+        ModpackFormat::Curseforge | ModpackFormat::Modrinth => vec![
+            format!("{}overrides/", base),
+            format!("{}client-overrides/", base),
+        ],
+        ModpackFormat::Hmcl => vec![format!("{}minecraft/", base)],
+        ModpackFormat::Mmc => vec![format!("{}.minecraft/", base)],
+        ModpackFormat::Mcbbs => vec![format!("{}overrides/", base)],
+    }
 }

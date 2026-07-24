@@ -34,11 +34,18 @@ pub(super) struct CfModLoader {
 }
 
 #[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[allow(dead_code)] // project_id / required 暂未参与依赖过滤，未来按 optional=false 跳过非必要 mod 时启用
+#[allow(dead_code)] // required 暂未参与依赖过滤，未来按 optional=false 跳过非必要 mod 时启用
 pub(super) struct CfManifestFile {
-    pub(super) project_id: i64,
-    pub(super) file_id: i64,
+    /// CurseForge project ID。
+    /// CF 官方 manifest.json 用 `projectID`（大写 ID），部分第三方工具用 `projectId`（小写 id），
+    /// 用 alias 兼容两者。None 时跳过 slug 查询与译名匹配。
+    #[serde(default, alias = "projectID", alias = "projectId")]
+    pub(super) project_id: Option<i64>,
+    /// CurseForge file ID。
+    /// CF 官方 manifest.json 用 `fileID`（大写 ID），部分第三方工具用 `fileId`（小写 id），
+    /// 用 alias 兼容两者。None 时跳过该 mod（与 PCL2 一致：projectID/fileID 为 null 时跳过并提示）。
+    #[serde(default, alias = "fileID", alias = "fileId")]
+    pub(super) file_id: Option<i64>,
     #[serde(default)]
     pub(super) required: bool,
 }
@@ -54,6 +61,9 @@ pub(super) struct CfFilesBatchResponse {
 #[serde(rename_all = "camelCase")]
 #[allow(dead_code)]
 pub(super) struct CfFileEntry {
+    /// CF API /mods/files 返回的 file id 字段名是 `id`（不是 fileId）
+    /// 参考 PCL2 ResourceVersion.FromPlatformJson：Data("id")
+    #[serde(rename = "id")]
     pub(super) file_id: i64,
     #[serde(default)]
     pub(super) file_name: String,
@@ -73,6 +83,7 @@ pub(super) async fn install_cf_mods(
     mods_dir: &std::path::Path,
     max_threads: usize,
     _instance_dir: &std::path::Path,
+    stage_index: usize,
 ) -> Result<(), String> {
     if manifest_files.is_empty() {
         log_info!("[Community] CF manifest 无依赖 mods");
@@ -80,7 +91,12 @@ pub(super) async fn install_cf_mods(
     }
 
     // 1. 批量查询下载信息
-    let file_ids: Vec<i64> = manifest_files.iter().map(|f| f.file_id).collect();
+    // file_id 为 None 的项跳过（与 PCL2 一致：projectID/fileID 为 null 时跳过并提示）
+    let file_ids: Vec<i64> = manifest_files.iter().filter_map(|f| f.file_id).collect();
+    if file_ids.is_empty() {
+        log_info!("[Community] CF manifest 无有效 file_id，跳过依赖下载");
+        return Ok(());
+    }
     log_info!("[Community] CF 批量查询 {} 个文件", file_ids.len());
 
     let (_enabled, _api_key) = secure_storage::get_config_async().await;
@@ -95,20 +111,37 @@ pub(super) async fn install_cf_mods(
 
     log_info!("[Community] CF 批量查询返回 {} 个文件", batch.data.len());
 
+    // 镜像源可能不支持 /mods/files 批量查询，返回 200 但 data 为空。
+    // 此时不能静默成功（否则整合包"安装完成"但 mods 目录为空），
+    // 必须报错让用户知道。参考 PCL2：PCL2 会在返回数量 < 请求数量时弹窗提示缺失。
+    if batch.data.is_empty() {
+        return Err(format!(
+            "CF 批量查询返回 0 个文件（请求 {} 个）。可能是当前下载源（镜像）不支持 /mods/files 批量查询，请在「设置 → 下载」中将下载源切换为「缓慢时换镜像」或「尽量官方」后重试。",
+            file_ids.len()
+        ));
+    }
+
     // 2. 批量查询 mod info 拿 slug（用于查 mcmod 译名 + 应用 community_filename_format）
-    //    manifest 提供 project_id 列表，调用 CF /mods?modIds=... 批量查询
-    let project_ids: Vec<i64> = manifest_files.iter().map(|f| f.project_id).collect();
+    //    manifest 提供 project_id 列表，调用 POST /v1/mods（请求体 {"modIds":[...]}）批量查询
+    //    部分 file 可能缺失 project_id（Option），过滤 None 后仅查询有 project_id 的项
+    let project_ids: Vec<i64> = manifest_files.iter().filter_map(|f| f.project_id).collect();
     let mod_slug_map =
         crate::minecraft::community::curseforge::batch_get_mod_slugs(&project_ids).await;
 
     // 3. 构造 file_id → 译名 映射（通过 manifest 关联 file_id 与 project_id）
+    //    project_id 为 None 的项跳过 slug 查询，译名留空（仍正常下载，仅文件名不翻译）
+    //    file_id 为 None 的项在此跳过（已在 file_ids 构造时过滤）
     let mut file_translated: std::collections::HashMap<i64, Option<String>> =
         std::collections::HashMap::new();
     for mf in manifest_files {
-        let slug = mod_slug_map.get(&mf.project_id);
-        let translated = slug
-            .and_then(|s| crate::minecraft::community::mcmod::lookup_cf(s).map(|n| n.to_string()));
-        file_translated.insert(mf.file_id, translated);
+        let Some(fid) = mf.file_id else { continue };
+        let translated = mf
+            .project_id
+            .and_then(|pid| {
+                let slug = mod_slug_map.get(&pid)?;
+                crate::minecraft::community::mcmod::lookup_cf(slug).map(|n| n.to_string())
+            });
+        file_translated.insert(fid, translated);
     }
 
     // 4. 读取用户设置的文件名格式
@@ -134,13 +167,6 @@ pub(super) async fn install_cf_mods(
             translated.as_deref(),
             filename_format,
         );
-        if final_name != entry.file_name {
-            log_info!(
-                "[Community] CF mod 文件名重命名: {} → {}",
-                entry.file_name,
-                final_name
-            );
-        }
         let target = mods_dir.join(&final_name);
         download_list.push((
             urls,
@@ -159,7 +185,7 @@ pub(super) async fn install_cf_mods(
     // 6. 并发下载
     super::concurrent::download_files_concurrent(
         state,
-        2,
+        stage_index,
         &download_list,
         max_threads,
         total_bytes,

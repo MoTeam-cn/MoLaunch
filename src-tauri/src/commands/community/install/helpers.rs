@@ -18,6 +18,8 @@ use std::path::PathBuf;
 /// - 4: 仅原名
 ///
 /// 无译名时统一返回原名。扩展名（含 .jar.disabled 等多段后缀）原样保留。
+/// 译名中 Windows 文件名非法字符（< > : " / \ | ? *）会被替换为下划线，
+/// 避免 `std::fs::File::create` 因非法文件名报 os error。
 pub(super) fn apply_filename_format(
     original: &str,
     translated: Option<&str>,
@@ -26,6 +28,27 @@ pub(super) fn apply_filename_format(
     let translated = match translated {
         Some(t) if !t.is_empty() => t,
         _ => return original.to_string(),
+    };
+
+    // 过滤 Windows 文件名非法字符（mcmod 译名可能含 : ？ 等）
+    // 控制字符（0-31）也一并过滤
+    let sanitized: String = translated
+        .chars()
+        .map(|c| {
+            if matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
+                || (c as u32) < 32
+            {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+
+    let translated = if sanitized.is_empty() {
+        return original.to_string();
+    } else {
+        sanitized.as_str()
     };
 
     // 分离扩展名（保留 .jar.disabled / .jar.old 等多段后缀）
@@ -129,6 +152,10 @@ pub(super) fn extract_mr_project_id(url: &str) -> Option<String> {
 
 /// 构造 CF edge 下载 URL（当 download_url 为空时的 fallback）
 ///
+/// 参考 PCL2 ResourceVersion.FromPlatformJson：
+///   `https://edge.forgecdn.net/files/{id前4位}/{id余位}/{FileName}`
+/// 余位用 i64 转换去掉前导 0（与 PCL2 CInt 一致），例如 2725062 → 2725/62
+///
 /// 根据 source 策略选择域名：source=0 用镜像，其余用官方
 pub(super) fn construct_cf_edge_url(file_id: i64, file_name: &str) -> String {
     let source = crate::minecraft::community::get_source_pref();
@@ -138,10 +165,14 @@ pub(super) fn construct_cf_edge_url(file_id: i64, file_name: &str) -> String {
         "https://edge.forgecdn.net"
     };
     let id_str = file_id.to_string();
-    if id_str.len() >= 6 {
-        let (p1, p2) = id_str.split_at(id_str.len() - 4);
-        format!("{}/files/{}/{}", base, p1, p2)
+    // PCL2：Substring(0, 4) / Substring(4)，fileId 至少 5 位才能拆分
+    if id_str.len() >= 5 {
+        let (p1, p2) = id_str.split_at(4);
+        // 余位 parse 为 i64 去掉前导 0（PCL2 CInt 等价）
+        let p2_num: i64 = p2.parse().unwrap_or(0);
+        format!("{}/files/{}/{}/{}", base, p1, p2_num, file_name)
     } else {
+        // fileId 过短无法拆分，回退 0/{file_name}
         format!("{}/files/0/{}", base, file_name)
     }
 }

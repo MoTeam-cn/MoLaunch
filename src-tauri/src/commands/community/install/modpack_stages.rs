@@ -2,7 +2,7 @@
 //!
 //! 从 install_modpack 中抽取的两个独立阶段，降低 install_modpack 自身行数：
 //! - `download_modpack_archive`：Stage 0，下载原始整合包到 instance 目录
-//! - `parse_modpack_info`：Stage 1，解析 manifest.json / modrinth.index.json 得到整合包信息
+//! - `parse_modpack_info`：Stage 1，解析 manifest/index 得到整合包信息
 
 use crate::log_info;
 use crate::minecraft::download::manager::DownloadManager;
@@ -12,8 +12,12 @@ use crate::minecraft::sources::DownloadSourceMode;
 use crate::state::{AppState, StageStatus};
 use std::sync::Arc;
 
+use super::concurrent::DetectedModpack;
 use super::curseforge::CfManifest;
 use super::helpers::{parse_cf_loader_id, parse_mr_loader};
+use super::hmcl::HmclManifest;
+use super::mcbbs::McbbsManifest;
+use super::mmc::MmcPack;
 use super::modrinth::MrIndex;
 use super::types::{ModpackFormat, ModpackInfo};
 use crate::utils::format;
@@ -107,22 +111,26 @@ pub(super) async fn download_modpack_archive(
     Ok(archive_size)
 }
 
-/// Stage 1：解析 manifest.json / modrinth.index.json 得到整合包信息
+/// Stage 1：解析整合包 manifest/index 得到整合包信息
 ///
-/// 根据 format 分支解析 CF manifest 或 MR index，提取：
-/// - game_version（CF: minecraft.version / MR: dependencies["minecraft"]）
-/// - loader + loader_version（CF: modLoaders primary / MR: dependencies["fabric-loader"|"quilt-loader"|...]）
-/// - mod_files_count（files 数组长度）
-/// - cf_manifest / mr_index（保留供 Stage 2 使用）
-pub(super) fn parse_modpack_info(
-    format: ModpackFormat,
-    manifest_content: Option<&str>,
-    index_content: Option<&str>,
-) -> Result<ModpackInfo, String> {
+/// 根据 format 分支解析对应 manifest，提取：
+/// - game_version（CF: minecraft.version / MR: dependencies["minecraft"] / HMCL: gameVersion /
+///   MMC: components[net.minecraft].version / MCBBS: addons[game]）
+/// - loader + loader_version（CF: modLoaders primary / MR: dependencies["fabric-loader"|...] /
+///   MMC: components[net.minecraftforge|net.fabricmc.fabric-loader|net.neoforged] /
+///   MCBBS: addons[forge|fabric|neoforge|optifine]）
+/// - mod_files_count（CF/MR: files 数组长度 / HMCL/MMC/MCBBS: 0，mods 已打包在 overrides 中）
+/// - archive_base_folder（关键文件所在层级前缀，供 extract_overrides 构造完整前缀）
+pub(super) fn parse_modpack_info(detected: &DetectedModpack) -> Result<ModpackInfo, String> {
+    let format = detected.format;
+    let archive_base_folder = detected.archive_base_folder.clone();
+
     match format {
         ModpackFormat::Curseforge => {
-            let manifest: CfManifest = serde_json::from_str(manifest_content.unwrap())
-                .map_err(|e| format!("解析 manifest.json 失败: {}", e))?;
+            let manifest: CfManifest = serde_json::from_str(
+                detected.manifest_content.as_deref().unwrap_or(""),
+            )
+            .map_err(|e| format!("解析 manifest.json 失败: {}", e))?;
             let gv = manifest.minecraft.version.clone();
             let (loader, ver) = manifest
                 .minecraft
@@ -139,13 +147,19 @@ pub(super) fn parse_modpack_info(
                 loader,
                 loader_version: ver,
                 mod_files_count: count,
+                archive_base_folder,
                 cf_manifest: Some(manifest),
                 mr_index: None,
+                hmcl_manifest: None,
+                mmc_pack: None,
+                mcbbs_manifest: None,
             })
         }
         ModpackFormat::Modrinth => {
-            let index: MrIndex = serde_json::from_str(index_content.unwrap())
-                .map_err(|e| format!("解析 modrinth.index.json 失败: {}", e))?;
+            let index: MrIndex = serde_json::from_str(
+                detected.index_content.as_deref().unwrap_or(""),
+            )
+            .map_err(|e| format!("解析 modrinth.index.json 失败: {}", e))?;
             let gv = index
                 .dependencies
                 .get("minecraft")
@@ -167,8 +181,179 @@ pub(super) fn parse_modpack_info(
                 loader,
                 loader_version: ver,
                 mod_files_count: count,
+                archive_base_folder,
                 cf_manifest: None,
                 mr_index: Some(index),
+                hmcl_manifest: None,
+                mmc_pack: None,
+                mcbbs_manifest: None,
+            })
+        }
+        ModpackFormat::Hmcl => {
+            let manifest: HmclManifest = serde_json::from_str(
+                detected.hmcl_content.as_deref().unwrap_or(""),
+            )
+            .map_err(|e| format!("解析 modpack.json 失败: {}", e))?;
+            let gv = manifest.game_version.clone();
+            // HMCL 整合包不指定加载器版本，仅含游戏版本；加载器信息（如有）打包在 overrides 中
+            // PCL2 的 InstallPackHMCL 也只读 gameVersion，不读 loader
+            let count = 0;
+            log_info!(
+                "[Community] HMCL 整合包: game={} name={}",
+                gv,
+                manifest.name
+            );
+            Ok(ModpackInfo {
+                format,
+                game_version: gv,
+                loader: String::new(),
+                loader_version: String::new(),
+                mod_files_count: count,
+                archive_base_folder,
+                cf_manifest: None,
+                mr_index: None,
+                hmcl_manifest: Some(manifest),
+                mmc_pack: None,
+                mcbbs_manifest: None,
+            })
+        }
+        ModpackFormat::Mmc => {
+            let pack: MmcPack = serde_json::from_str(
+                detected.mmc_content.as_deref().unwrap_or(""),
+            )
+            .map_err(|e| format!("解析 mmc-pack.json 失败: {}", e))?;
+            // 从 components 提取 game_version 和 loader
+            let mut gv = String::new();
+            let mut loader = String::new();
+            let mut loader_ver = String::new();
+            for comp in &pack.components {
+                match comp.uid.as_str() {
+                    "net.minecraft" => gv = comp.version.clone(),
+                    "net.minecraftforge" => {
+                        loader = "forge".to_string();
+                        loader_ver = comp.version.clone();
+                    }
+                    "net.neoforged" => {
+                        loader = "neoforge".to_string();
+                        loader_ver = comp.version.clone();
+                    }
+                    "net.fabricmc.fabric-loader" => {
+                        loader = "fabric".to_string();
+                        loader_ver = comp.version.clone();
+                    }
+                    _ => {
+                        // 跳过 org.lwjgl.* 等，与 PCL2 一致
+                        if !comp.uid.starts_with("org.lwjgl") {
+                            log_info!(
+                                "[Community] MMC 整合包跳过不支持的组件: uid={} version={}",
+                                comp.uid,
+                                comp.version
+                            );
+                        }
+                    }
+                }
+            }
+            if gv.is_empty() {
+                return Err(
+                    "MMC 整合包未提供 game 版本（缺少 net.minecraft 组件）".to_string(),
+                );
+            }
+            log_info!(
+                "[Community] MMC 整合包: game={} loader={}{}",
+                gv,
+                loader,
+                if loader_ver.is_empty() {
+                    String::new()
+                } else {
+                    format!("@{}", loader_ver)
+                }
+            );
+            Ok(ModpackInfo {
+                format,
+                game_version: gv,
+                loader,
+                loader_version: loader_ver,
+                mod_files_count: 0,
+                archive_base_folder,
+                cf_manifest: None,
+                mr_index: None,
+                hmcl_manifest: None,
+                mmc_pack: Some(pack),
+                mcbbs_manifest: None,
+            })
+        }
+        ModpackFormat::Mcbbs => {
+            let manifest: McbbsManifest = serde_json::from_str(
+                detected.manifest_content.as_deref().unwrap_or(""),
+            )
+            .map_err(|e| format!("解析 mcbbs.packmeta/manifest.json 失败: {}", e))?;
+            // 从 addons 提取 game_version 和 loader
+            let mut gv = String::new();
+            let mut loader = String::new();
+            let mut loader_ver = String::new();
+            for addon in &manifest.addons {
+                match addon.id.as_str() {
+                    "game" => gv = addon.version.clone(),
+                    "forge" => {
+                        loader = "forge".to_string();
+                        loader_ver = addon.version.clone();
+                    }
+                    "neoforge" => {
+                        loader = "neoforge".to_string();
+                        loader_ver = addon.version.clone();
+                    }
+                    "fabric" => {
+                        loader = "fabric".to_string();
+                        loader_ver = addon.version.clone();
+                    }
+                    "optifine" => {
+                        // OptiFine 作为独立加载器，与 PCL2 一致（OptiFineVersion 字段）
+                        loader = "optifine".to_string();
+                        loader_ver = addon.version.clone();
+                    }
+                    "quilt" => {
+                        // PCL2 直接拒绝 quilt，MoLaunch 暂也不支持
+                        return Err(
+                            "MCBBS 整合包要求 Quilt 加载器，MoLaunch 暂不支持 Quilt".to_string(),
+                        );
+                    }
+                    _ => {
+                        log_info!(
+                            "[Community] MCBBS 整合包跳过未知 addon: id={} version={}",
+                            addon.id,
+                            addon.version
+                        );
+                    }
+                }
+            }
+            if gv.is_empty() {
+                return Err(
+                    "MCBBS 整合包未提供 game 版本（addons 中缺少 id=game 项）".to_string(),
+                );
+            }
+            log_info!(
+                "[Community] MCBBS 整合包: game={} loader={}{} name={}",
+                gv,
+                loader,
+                if loader_ver.is_empty() {
+                    String::new()
+                } else {
+                    format!("@{}", loader_ver)
+                },
+                manifest.name
+            );
+            Ok(ModpackInfo {
+                format,
+                game_version: gv,
+                loader,
+                loader_version: loader_ver,
+                mod_files_count: 0,
+                archive_base_folder,
+                cf_manifest: None,
+                mr_index: None,
+                hmcl_manifest: None,
+                mmc_pack: None,
+                mcbbs_manifest: Some(manifest),
             })
         }
     }

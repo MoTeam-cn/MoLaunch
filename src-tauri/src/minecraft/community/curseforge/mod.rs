@@ -254,8 +254,13 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
 /// 批量查询 mod 工程信息，返回 `modId → slug` 映射
 ///
 /// 用于整合包安装时按 `community_filename_format` 重命名 mod 文件：
-/// manifest 提供 project_id 列表 → 调 `GET /v1/mods?modIds=...` 批量查询 →
-/// 拿到每个 mod 的 slug → 查 mcmod 译名 → 应用文件名格式。
+/// manifest 提供 project_id 列表 → 调 `POST /v1/mods`（请求体 `{"modIds":[...]}`）
+/// 批量查询 → 拿到每个 mod 的 slug → 查 mcmod 译名 → 应用文件名格式。
+///
+/// CF 官方 API `GET /v1/mods?modIds=...` 对 modIds 参数有数量限制（超 50 个会返回
+/// 空响应，body 为空导致 EOF 解析失败）。改用 `POST /v1/mods` 与 fingerprint_search
+/// 一致，请求体 `{"modIds":[...]}`，与 `POST /v1/mods/files` 同属 CF 官方推荐的
+/// 批量查询接口，支持大批量 ID。仍按 50 个一批分批查询，避免单次请求体过大。
 ///
 /// 失败时返回空 map（不阻断下载，只是文件名不应用格式）。
 pub async fn batch_get_mod_slugs(mod_ids: &[i64]) -> std::collections::HashMap<i64, String> {
@@ -263,33 +268,41 @@ pub async fn batch_get_mod_slugs(mod_ids: &[i64]) -> std::collections::HashMap<i
         return std::collections::HashMap::new();
     }
 
-    let ids_query = mod_ids
-        .iter()
-        .map(|id| id.to_string())
-        .collect::<Vec<_>>()
-        .join(",");
-    let path = format!("/mods?modIds={}", ids_query);
+    // CF POST /mods 支持大批量 ID（官方推荐批量查询接口），
+    // 按 250 个一批分批查询，平衡请求数与单次请求体大小
+    const BATCH_SIZE: usize = 250;
+    let mut map: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
 
     #[derive(Deserialize)]
     struct Resp {
+        #[serde(default)]
         data: Vec<CfModEntry>,
     }
 
-    match cf_get::<Resp>(&path).await {
-        Ok(resp) => {
-            let map: std::collections::HashMap<i64, String> = resp
-                .data
-                .into_iter()
-                .filter_map(|e| e.slug.map(|s| (e.id, s)))
-                .collect();
-            crate::log_info!("[Community] CF 批量查询 mod info 成功: {} 条", map.len());
-            map
-        }
-        Err(e) => {
-            crate::log_warn!("[Community] CF 批量查询 mod info 失败: {}", e);
-            std::collections::HashMap::new()
+    for chunk in mod_ids.chunks(BATCH_SIZE) {
+        // POST /v1/mods 请求体：{"modIds": [284754, 427597, ...]}
+        let body = serde_json::json!({ "modIds": chunk }).to_string();
+
+        match cf_post::<Resp>("/mods", body).await {
+            Ok(resp) => {
+                for e in resp.data {
+                    if let Some(s) = e.slug {
+                        map.insert(e.id, s);
+                    }
+                }
+            }
+            Err(e) => {
+                crate::log_warn!(
+                    "[Community] CF 批量查询 mod info 部分失败 ({} 个): {}",
+                    chunk.len(),
+                    e
+                );
+            }
         }
     }
+
+    crate::log_info!("[Community] CF 批量查询 mod info 完成: {} 条", map.len());
+    map
 }
 
 /// CurseForge modLoaderType 参数值
