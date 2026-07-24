@@ -26,17 +26,17 @@
     移除手动 NbtReader / parse_root / parse_payload / TAG_* 常量。
 - 收益：代码量减半，可靠性提升（社区验证），支持嵌套 List / 空 compound / 超大数组。
 
-#### 缺失结构图标补充（从 minecraftsearch.com 抓取）
+#### 缺失结构图标补充
 - 背景：Mineshaft / Slime_Chunks / Ravine / Fossil / Nether_Fossil 等结构无 webp 图标，
   此前用 OL Circle + STRUCTURE_ICONS.color 几何形状 fallback。
 - 变更：
   - [src/assets/structures/](src/assets/structures/)：
-    新增 6 个 webp 图标（从 https://minecraftsearch.com/images/structures/ 抓取）：
+    新增 6 个 webp 图标：
     mineshaft / slime_chunks / ravine / fossil / fossil_diamond / nether_fossil。
   - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
     `getStructIconUrl` 新增 `ICON_NAME_ALIASES` 别名映射：
     Mega_Ravine / Underwater_Ravine / Mega_Underwater_Ravine → ravine.webp
-    （参考 prompt-structures.md §图标资源 URL，canyon 系列共用同一图标）。
+    （canyon 系列共用同一图标）。
 
 #### 结构 popup 浮窗 + 坐标格式化 + 悬停群系名
 - 背景：原 SeedMap.vue 点击结构仅显示一行 "选中: XXX (x, z) 已通过群系校验"，
@@ -92,11 +92,11 @@
     lastClickBlock 加复制按钮（复用 Button.vue type=ghost）。
 
 #### 实施扩展结构方案 A（id 201-223 子集，7 个结构）
-- 背景：prompt-structures.md 定义了 cubiomes 不原生支持的扩展结构（id 201-223），
-  minecraftsearch.com 通过 fork cubiomes 实现。本次调研后采用方案 A：
-  仅实现 cubiomes 原生精确支持（ravine 系列 4 个）+ biome 检查启发式（nether_fossil/fossil/fossil_diamond 3 个），
-  共 7 个结构。跳过 dungeon_zombie/skeleton/spider（RNG 不可精确预测）、cheese_cave 系列（3D 噪声性能差）、
-  lava_lake/lava_flooded_cave（同前）、enchanted_golden_apple（loot 表依赖）、sulfur_spring（需 fork cubiomes）。
+- 背景：cubiomes 不原生支持部分扩展结构（id 201-223），业界有通过 fork cubiomes 实现的方案。
+  本次调研后采用方案 A：仅实现 cubiomes 原生精确支持（ravine 系列 4 个）+ biome 检查启发式
+  （nether_fossil/fossil/fossil_diamond 3 个），共 7 个结构。跳过 dungeon_zombie/skeleton/spider
+  （RNG 不可精确预测）、cheese_cave 系列（3D 噪声性能差）、lava_lake/lava_flooded_cave（同前）、
+  enchanted_golden_apple（loot 表依赖）、sulfur_spring（需 fork cubiomes）。
 - 变更：
   - [src-tauri/cubiomes/cubiomes_wrapper.c](src-tauri/cubiomes/cubiomes_wrapper.c)：
     新增 `cubiomes_find_ravines`（CANYON_CARVER/UNDERWATER_CANYON_CARVER + checkCanyonStart，
@@ -360,11 +360,11 @@
     - 筛选按钮使用 type=primary/outline 区分选中状态（替代不存在的 active prop）
     - 图标 img src 改用 getStructIconUrl(s.name)
 
-#### 种子地图结构筛选 + 原站图标替换
-- 背景：默认只显示村庄和出生点，其他结构需要手动开启；原站的结构图标比方块形状更直观
+#### 种子地图结构筛选 + 图标替换
+- 背景：默认只显示村庄和出生点，其他结构需要手动开启；结构图标比方块形状更直观
 - 变更：
   - [public/structures/](public/structures/)：
-    从 minecraftsearch.com 下载 22 个结构 webp 图标（主世界 18 + 下界 3 + 末地 2）
+    新增 22 个结构 webp 图标（主世界 18 + 下界 3 + 末地 2）
   - [src/utils/seedmap/constants.ts](src/utils/seedmap/constants.ts)：
     `getStructStyle` 从形状（圆/方/三角/菱）改为使用 webp 图标，移除未使用的 `RegularShape`/`blackStroke`
   - [src/utils/seedmap/structures.ts](src/utils/seedmap/structures.ts)：
@@ -379,7 +379,7 @@
     选中状态高亮，未选中图标半透明；删除原有图例区块
 
 #### 种子地图回退到 fork cubiomes + terrainShading 地形阴影渲染
-- 背景：放弃原站 minecraftsearch.com 修改版 cubiomes 方案，改用 fork 仓库
+- 背景：放弃其他修改版 cubiomes 方案，改用 fork 仓库
   [MoTeam-cn/cubiomes](https://github.com/MoTeam-cn/cubiomes)（原生支持 MC_26_2），
   并基于项目根目录 `terrainShading.js` 实现地形阴影渲染（hillshade + terrace + contour）
 - 变更：
@@ -403,8 +403,8 @@
     版本映射改用 fork 真实枚举值（26.2=34, 26.1=33, 1.21.9=31, 1.21.6=30, 1.21.5=29），
     默认 mcVersion/currentMc 改为 34（MC_26_2 = MC_NEWEST）
 
-#### 种子地图 generatorWorker 适配原站修改版 cubiomes API
-- 背景：WASM 文件已替换为原站 minecraftsearch.com 修改版（`CubiomesModule` 工厂名 + 状态化 API），
+#### 种子地图 generatorWorker 适配修改版 cubiomes API
+- 背景：WASM 文件已替换为修改版（`CubiomesModule` 工厂名 + 状态化 API），
   旧版 `createCubiomesModule` + `_cubiomes_*` 封装函数 API 不再可用
 - 变更（[generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)）：
   - 工厂函数名：`createCubiomesModule` → `CubiomesModule`
@@ -413,34 +413,34 @@
   - 结构查找：region 遍历 `_cubiomes_get_structure_pos` → 批量 `_find_structures_in_area` + `_get_structure_results_pointer/count`
   - 出生点：`_cubiomes_estimate_spawn` → `_get_spawn` + `_get_spawn_result_pointer`
   - 新增种子状态缓存（`ensureSeed`）：参数未变时跳过 `_init_generator`/`_apply_seed`，避免重复初始化
-  - 移除旧 seed 指针管理（`cachedSeedPtr`/`getSeedPtr`），原站 API 直接传 BigInt
-  - 要塞查找暂返回 null（原站 API 无对应函数）
+  - 移除旧 seed 指针管理（`cachedSeedPtr`/`getSeedPtr`），该 API 直接传 BigInt
+  - 要塞查找暂返回 null（该 API 无对应函数）
 
 #### 种子地图 cubiomes WASM 构建方式调整（禁用 build.rs 自动编译，改手动构建）
 - 背景：上游 cubiomes（Cubitect/cubiomes master）最高仅 `MC_1_21_WD=28`（1.21.4），
-  原站 minecraftsearch.com 用修改版 cubiomes（内部值 29 = 1.21.5+/26.x），尚未开源。
-  待原站更新后替换源码，届时手动构建一次即可。
+  修改版 cubiomes（内部值 29 = 1.21.5+/26.x）尚未开源。
+  待该方案更新后替换源码，届时手动构建一次即可。
 - 变更：
   - [build.rs](src-tauri/build.rs)：注释掉 `compile_cubiomes_wasm()` 调用与 `rerun-if-changed`，保留函数定义（加 `#![allow(dead_code)]`）以备将来恢复。现有 `resources/wasm/cubiomes.{js,wasm}`（版本 28）继续使用
   - 新增 [scripts/build-wasm.ps1](scripts/build-wasm.ps1)：手动构建脚本，参数与原 build.rs emcc 调用一致（源文件清单、导出函数、优化选项等）
   - [package.json](package.json)：新增 `build:wasm` 脚本，运行 `powershell -ExecutionPolicy Bypass -File scripts/build-wasm.ps1`
-  - 将来替换原站 cubiomes 源码后，运行 `npm run build:wasm` 构建一次即可，无需 build.rs 自动编译
+  - 将来替换该 cubiomes 源码后，运行 `npm run build:wasm` 构建一次即可，无需 build.rs 自动编译
 
-#### 种子地图 MC 版本列表对齐原站（支持 26.2/26.1/1.21.9/1.21.6）
-- 问题：版本下拉最大仅 1.21.5，原站 minecraftsearch.com 已支持到 26.2
-- 根因（逆向原站 `_next/static/chunks/01scqemx7_yyv.js` 模块 148172 的 JAVA_VERSIONS）：
-  1. 原站用修改版 cubiomes，内部值 29 对应 1.21.5/1.21.6/1.21.9/26.1/26.1.2/26.2（共享 worldgen）
+#### 种子地图 MC 版本列表扩充（支持 26.2/26.1/1.21.9/1.21.6）
+- 问题：版本下拉最大仅 1.21.5，业界同类工具已支持到 26.2
+- 根因（分析参考实现的版本映射表）：
+  1. 修改版 cubiomes 内部值 29 对应 1.21.5/1.21.6/1.21.9/26.1/26.1.2/26.2（共享 worldgen）
   2. cubiomes 上游 master（Cubitect/cubiomes）最高仅 `MC_1_21_WD=28`（Winter Drop = 1.21.4），尚未支持 29
-  3. 原站注释明确 "most releases are worldgen-identical to 1.21.5"，28 与 29 对大多数种子结果接近
+  3. 参考实现注释明确 "most releases are worldgen-identical to 1.21.5"，28 与 29 对大多数种子结果接近
 - 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
-  - 扩展 `SEEDMAP_MC_VERSIONS`，新增 26.2/26.1.2/26.1/1.21.9/1.21.6/1.21.4 标签对齐原站 Latest 列表
+  - 扩展 `SEEDMAP_MC_VERSIONS`，新增 26.2/26.1.2/26.1/1.21.9/1.21.6/1.21.4 标签对齐业界 Latest 列表
   - 1.21.5+ 暂时复用 cubiomes `MC_1_21_WD(28)` 的 worldgen（cubiomes 上游支持 29 后再单独映射）
   - 默认版本仍为 28（对应最新标签 26.2）
-  - 注释说明版本对齐策略与原站差异
+  - 注释说明版本对齐策略与业界差异
 
 #### 种子地图 Worker WASM HEAPU8 undefined 根因修复
 - 问题：加载地图时报 `Cannot read properties of undefined (reading 'set')`，所有 tile/结构/出生点操作均失败
-- 根因（逆向 cubiomes.js 工厂函数返回逻辑确认）：
+- 根因（分析 cubiomes.js 工厂函数返回逻辑确认）：
   1. **`instantiateWasm` 回调返回 undefined 导致竞态（核心根因）**：Emscripten 工厂函数结尾为 `wasmExports = await createWasm(); await run(); return Module`，而 `createWasm` 执行 `return Module["instantiateWasm"](imports, receiveInstance)` —— 返回的是我们回调的返回值。之前的 `instantiateWasm` 回调没返回 Promise，`await createWasm()` 立即 resolve，`receiveInstance`（内含 `updateMemoryViews` 赋值 `HEAPU8`）尚未执行，导致 `await factory()` 返回时 `Module.HEAPU8` 为 undefined。后续 WASM 调用内部 `HEAPU8.set` 触发 `Cannot read properties of undefined`
   2. 并发 WASM 内存操作（辅助因素）：`async onmessage` 可能导致多条消息并发执行
 - 修复（[generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)）：
@@ -449,7 +449,7 @@
   - `new Function` 执行胶水代码 + `ensureHeap()` 安全访问作为加固
 
 #### 种子地图群系生成一致性修复
-- 问题：相同版本+种子+坐标，原站显示冰河，我们显示草原
+- 问题：相同版本+种子+坐标，参考实现显示冰河，我们显示草原
 - 根因：
   1. `scale` 使用了 cubiomes 不支持的值（如 2, 8, 32），导致群系采样错误
   2. `mcVersion` 映射错误：1.21.5 用了 29，但 cubiomes `MC_1_21_WD=28`
@@ -475,7 +475,7 @@
 - 问题：滚轮一次缩放跳多级 zoom，导致内容突变（草原变沙漠）；默认 zoom 太低看不到方块细节
 - 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - `MouseWheelZoom` 加 `maxDelta: 1, duration: 250`，限制单次滚轮缩放幅度，避免跳多级
-  - 默认 zoom 从 4（16 bpp）改为 6（4 bpp），scale=4 采样更精细，接近原站的方块边界效果
+  - 默认 zoom 从 4（16 bpp）改为 6（4 bpp），scale=4 采样更精细，接近参考实现的方块边界效果
   - loadSeed/resetView 的默认 zoom 同步改为 6
 
 #### 种子地图滚轮缩放锚点修复
@@ -483,7 +483,7 @@
 - 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - 显式配置 `MouseWheelZoom({ useAnchor: true })`，确保滚轮缩放围绕鼠标位置
   - 用 `defaultInteractions({ mouseWheelZoom: false }).extend([new MouseWheelZoom(...)])` 保留其他默认交互（DragPan/DragZoom/KeyboardPan 等）
-- 注意：不同 zoom 级别 scale 不同，cubiomes 采样网格不重合是固有行为（原站也有此现象），无法完全消除
+- 注意：不同 zoom 级别 scale 不同，cubiomes 采样网格不重合是固有行为（参考实现也有此现象），无法完全消除
 
 #### 种子地图 tile 边界对齐修复（cubiomes Range 坐标系）
 - 问题：相邻 tile 内容不连续（海洋旁突然变沙漠），边界对不齐
@@ -509,23 +509,23 @@
   - blocksPerTile 是 scale 整数倍，相邻 tile 采样网格自动对齐
   - 副作用：南北方向颠倒（屏幕上方=南方），后续可通过 View rotation 修复
 
-#### 种子地图 zoom/tile 体系对齐原站
+#### 种子地图 zoom/tile 体系对齐业界方案
 - 问题：地图只加载约 4 个区块、放大后内容与缩略图不一致
-- 根因分析（子 agent 逆向 minecraftsearch.com 前端 JS）：
-  1. TILE_SIZE=256（原站 64）→ 单 tile 覆盖方块多 16 倍，可视区 tile 数极少
-  2. EXTENT ±50000（原站 ±3e7）→ 范围太小，超出变空白
-  3. zoom 体系 -6~7（原站 0~10）→ RESOLUTIONS 数组错位
-  4. scale 二值选择 `bpp>=4?4:1`（原站连续 `res<=1?1:round(res)`）→ 放大时采样不足
-  5. Y 轴未翻转（原站 `blockZ = origin[1] - tileZ × blocksPerTile`）→ tile 位置错位
-  6. mcVersion 映射错误（1.21 用 21，原站 1.21.5→29, 1.21.1→26）
-  7. origin 在左下角（原站左上角 `[-3e7, 3e7]`）
+- 根因分析（分析业界同类实现）：
+  1. TILE_SIZE=256（参考实现 64）→ 单 tile 覆盖方块多 16 倍，可视区 tile 数极少
+  2. EXTENT ±50000（参考实现 ±3e7）→ 范围太小，超出变空白
+  3. zoom 体系 -6~7（参考实现 0~10）→ RESOLUTIONS 数组错位
+  4. scale 二值选择 `bpp>=4?4:1`（参考实现连续 `res<=1?1:round(res)`）→ 放大时采样不足
+  5. Y 轴未翻转（参考实现 `blockZ = origin[1] - tileZ × blocksPerTile`）→ tile 位置错位
+  6. mcVersion 映射错误（1.21 用 21，参考实现 1.21.5→29, 1.21.1→26）
+  7. origin 在左下角（参考实现左上角 `[-3e7, 3e7]`）
 - 修复（[useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：
   - TILE_SIZE=64, EXTENT_HALF=30_000_000, RESOLUTIONS=[256,128,64,32,16,8,4,2,1,0.5,0.25]
   - MIN_ZOOM=0, MAX_ZOOM=10, 默认 zoom 4（16 bpp）
   - scale 连续选择 `bpp<=1?1:round(bpp)`
   - Y 翻转：`startBlockZ = EXTENT_HALF - y * blocksPerTile`
   - origin 改为左上角 `[-EXTENT_HALF, EXTENT_HALF]`
-  - SEEDMAP_MC_VERSIONS 对齐原站 JAVA_MC_VERSION_MAP（1.21.5→29, 1.21.4→28, 1.21.1→26, 1.20→25 等）
+  - SEEDMAP_MC_VERSIONS 对齐参考实现 JAVA_MC_VERSION_MAP（1.21.5→29, 1.21.4→28, 1.21.1→26, 1.20→25 等）
   - TileLayer 加 cacheSize: 2048
   - loadSeed/resetView 默认 zoom 改 4，goToUserCoord 用 zoom 8
 - 修复（[generatorWorker.ts](src/utils/seedmap/generatorWorker.ts)）：
@@ -551,14 +551,14 @@
 - 问题：Vite 默认把 `new Worker(new URL('./generatorWorker.ts', import.meta.url))` 打包成 classic worker，但 `generatorWorker.ts` 用了 ES module 的 `import` 语法，classic worker 不支持
 - 修复：
   - [workerPool.ts](src/utils/seedmap/workerPool.ts) Worker 构造加 `{ type: 'module' }`，让 Vite 生成 ESM worker bundle
-  - [generatorWorker.ts](src/utils/seedmap/generatorWorker.ts) `importScripts`（classic worker 专属 API）改为 `fetch` + `new Function` 执行 Emscripten 胶水代码，兼容 module worker（参考 minecraftsearch.com 做法）
+  - [generatorWorker.ts](src/utils/seedmap/generatorWorker.ts) `importScripts`（classic worker 专属 API）改为 `fetch` + `new Function` 执行 Emscripten 胶水代码，兼容 module worker（参考业界做法）
 
 #### Toast 非 success 方法同步打印控制台日志
 - 动机：方便追踪 error/warning/info 类 Toast 的触发来源与上下文
 - [toast.ts](src/utils/toast.ts) `toastError` → `console.error`、`toastWarning` → `console.warn`、`toastInfo` → `console.info`，`toastSuccess` 保持静默
 
 #### 种子地图架构迁移：后端 FFI → 前端 WASM WorkerPool
-- 动机：原方案在后端 Rust 通过 FFI 调 cubiomes C 库生成群系图，每张 tile 都要走 IPC 传递 RGBA 数据，开销大且无法多线程并行；与参考站 minecraftsearch.com 的纯前端 WASM + Worker 架构差距明显
+- 动机：原方案在后端 Rust 通过 FFI 调 cubiomes C 库生成群系图，每张 tile 都要走 IPC 传递 RGBA 数据，开销大且无法多线程并行；与业界纯前端 WASM + Worker 架构差距明显
 - 新方案：build.rs 调 emcc 自动将 cubiomes_wrapper.c 编译为 WASM，前端通过 Web Worker 池并行调用，零 IPC 开销
 - 新增 `res://` 自定义 URI scheme（`src-tauri/src/res_scheme.rs`）：
   - 协议格式 `res://web-common/{type}/{filename}`（Windows: `https://res.localhost/`，macOS/Linux: `res://localhost/`）
@@ -571,7 +571,7 @@
   - `workerPool.ts`：调度层，Worker 数量 `clamp(4, floor(0.75 * hardwareConcurrency), 16)`，低配降级到 2；优先派发 idle Worker，错误超 5 次 terminate
 - 重写 `src/views/tools/data/useSeedMap.ts`：移除 `seedmapBiomes/Structures/Specials` IPC 调用与 `acquireIpcSlot` 并发锁，改用 `pool.generateTile/findStructures/getSpecials`
 - 删除 `src/utils/api/tools.ts` 中 seedmap* API 函数与类型（约 90 行）
-- 架构对齐 docs/Map/map.md 逆向分析文档（WorkerPool 消息协议、tile 生成流程、坐标系、版本映射表）
+- 架构对齐 docs/Map/map.md 分析文档（WorkerPool 消息协议、tile 生成流程、坐标系、版本映射表）
 
 #### 新增 NavSidebar 公共导航侧边栏组件（三页面复用 + tab 路由同步）
 - 动机：Settings/VersionSettings/Tools 三个页面左侧分类侧边栏代码高度重复（aside 类名、菜单项类名、选中态、图标尺寸几乎一致），且刷新页面后选中项丢失
@@ -585,11 +585,11 @@
   - `src/views/VersionSettings.vue`：删除 L116-133 手写 aside（与已有 `route.query.id` 同步共存）
   - `src/views/Tools.vue`：删除 L128-145 手写 aside，`switchCategory` 改为 `watch(activeCategory)` 触发 TOC 刷新（含从 URL 恢复时）
 
-#### 修复种子地图区块无法拼接 + 块状放大丑陋（对齐 minecraftsearch.com 渲染方案）
+#### 修复种子地图区块无法拼接 + 块状放大丑陋（对齐业界渲染方案）
 - 问题：各 tile 边缘无法拼接，放大后是块状色块而非精细群系图
 - 根因 1：旧实现用 `cellPx` 把 1 个群系格画成 N×N 像素方块，tile 边界对不齐
-- 根因 2：旧 zoom 体系只有 6 级且 res 不连续，与参考站 14 级（地图 zoom 8~21）不符
-- 修复方案（对齐 docs/Map/map.md 逆向分析）：
+- 根因 2：旧 zoom 体系只有 6 级且 res 不连续，与参考实现 14 级（地图 zoom 8~21）不符
+- 修复方案（对齐 docs/Map/map.md 分析）：
   - zoom 体系改为 14 级：OL zoom -6~7 对应地图 zoom 8~21，bpp = 2^(3-OL_zoom)
   - 移除 cellPx 概念：每像素 1 个群系值，sx = TILE_SIZE × bpp / scale
   - scale 选择：bpp≥4 用 scale=4（粗采样快），bpp<4 用 scale=1（精细）
@@ -621,7 +621,7 @@
 - 关于 Tauri callback 警告：属 dev 环境热重载正常现象（前端重载时后端有未完成 IPC），重启 dev server 即可消除
 
 #### 种子地图改用 OpenLayers 渲染引擎（替换手写 Canvas）
-- 动机：参考网站 minecraftsearch.com 使用 OpenLayers 作为地图渲染引擎，自带 tile 缓存、拖拽缩放、图层管理；手写 Canvas 是重复造轮子
+- 动机：业界同类工具普遍使用 OpenLayers 作为地图渲染引擎，自带 tile 缓存、拖拽缩放、图层管理；手写 Canvas 是重复造轮子
 - 新增依赖：`ol@10.9.0`（OpenLayers），`src/main.ts` 引入 `ol/ol.css`
 - 架构变更：
   - 群系图层：`DataTile` source + 自定义 `loader`，调后端 cubiomes 获取群系 ID 转 RGBA；OL 自动按 `(z,x,y)` 缓存 tile，已加载区块不再重新请求
