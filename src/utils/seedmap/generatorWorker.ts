@@ -410,10 +410,13 @@ const MEGA_RAVINE_POSE_THRESHOLD = 200
  * 统一封装：chunk 范围计算 → buffer 分配 → WASM 调用 → 结果读取 → buffer 释放。
  * WASM 函数签名：(startCX, startCZ, numX, numZ, bufPtr, bufLen) → count
  *
+ * 当可视范围超过 sizeLimit 时，自动分块查找（将大范围切分为 sizeLimit×sizeLimit
+ * 的子块逐个调用 WASM，合并结果），避免缩放时结构被整片跳过导致地图空白。
+ *
  * @param fn         WASM 调用闭包（接收 chunk 范围 + buffer 指针/长度，返回结果数量）
  * @param minX/minZ/maxX/maxZ  可视范围方块坐标
- * @param sizeLimit  X/Z 方向 chunk 数上限（超过则跳过，返回 null）
- * @returns 坐标数组（每项 {x, z}），或 null（范围过大跳过 / 分配失败）
+ * @param sizeLimit  单次 WASM 调用 X/Z 方向 chunk 数上限（超过则分块查找）
+ * @returns 坐标数组（每项 {x, z}），可能为空数组；仅分配失败时返回 null
  */
 function callChunkFinder(
   fn: (startCX: number, startCZ: number, numX: number, numZ: number,
@@ -425,10 +428,36 @@ function callChunkFinder(
   const endCX = Math.floor(maxX / 16)
   const startCZ = Math.floor(minZ / 16)
   const endCZ = Math.floor(maxZ / 16)
-  const numX = endCX - startCX + 1
-  const numZ = endCZ - startCZ + 1
-  if (numX > sizeLimit || numZ > sizeLimit) return null
+  const totalX = endCX - startCX + 1
+  const totalZ = endCZ - startCZ + 1
 
+  // 范围在 sizeLimit 内：单次调用即可
+  if (totalX <= sizeLimit && totalZ <= sizeLimit) {
+    return callFinderOnce(fn, startCX, startCZ, totalX, totalZ)
+  }
+
+  // 范围超过 sizeLimit：分块查找，合并所有子块结果
+  const merged: { x: number; z: number }[] = []
+  for (let sx = 0; sx < totalX; sx += sizeLimit) {
+    for (let sz = 0; sz < totalZ; sz += sizeLimit) {
+      const chunkStartCX = startCX + sx
+      const chunkStartCZ = startCZ + sz
+      const chunkNumX = Math.min(sizeLimit, totalX - sx)
+      const chunkNumZ = Math.min(sizeLimit, totalZ - sz)
+      const sub = callFinderOnce(fn, chunkStartCX, chunkStartCZ, chunkNumX, chunkNumZ)
+      if (sub === null) return null
+      for (const r of sub) merged.push(r)
+    }
+  }
+  return merged
+}
+
+/** 单次 WASM chunk finder 调用（范围已确保 ≤ sizeLimit） */
+function callFinderOnce(
+  fn: (startCX: number, startCZ: number, numX: number, numZ: number,
+       bufPtr: number, bufLen: number) => number,
+  startCX: number, startCZ: number, numX: number, numZ: number,
+): { x: number; z: number }[] | null {
   /* 每结果占 2 个 int (x, z)，buffer 大小 = numX * numZ * 2（上限情况） */
   const bufLen = numX * numZ * 2
   const bufPtr = Module._malloc(bufLen * 4)
@@ -521,8 +550,6 @@ async function handleFindStructures(msg: FindStructuresMsg) {
             for (const r of results) {
               structs.push({ stype: tconf.name, x: r.x, z: r.z, viable: true })
             }
-          } else {
-            console.warn(`[cubiomes] ${qm} 范围过大，跳过`)
           }
         } catch { /* ravine 查找失败，跳过 */ }
         continue
@@ -563,8 +590,6 @@ async function handleFindStructures(msg: FindStructuresMsg) {
             for (const r of results) {
               structs.push({ stype: tconf.name, x: r.x, z: r.z, viable: true })
             }
-          } else {
-            console.warn(`[cubiomes] ${qm} 范围过大，跳过`)
           }
         } catch { /* fossil 查找失败，跳过 */ }
         continue

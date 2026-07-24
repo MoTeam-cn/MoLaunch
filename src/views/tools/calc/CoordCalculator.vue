@@ -11,6 +11,7 @@
 import { ref, computed } from 'vue'
 import { MapPinIcon, ArrowsRightLeftIcon } from '@heroicons/vue/24/outline'
 import Input from '@/components/common/Input.vue'
+import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 
 interface Coord {
@@ -106,12 +107,12 @@ function fmt(n: number): string {
       <!-- 交换按钮 -->
       <div class="flex justify-center">
         <Tooltip text="交换 A 和 B" position="top">
-          <button
-            class="rounded-full p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-            @click="swapPoints"
-          >
-            <ArrowsRightLeftIcon class="h-4 w-4" />
-          </button>
+          <Button type="outline" size="small" @click="swapPoints">
+            <template #icon>
+              <ArrowsRightLeftIcon class="h-4 w-4" />
+            </template>
+            交换
+          </Button>
         </Tooltip>
       </div>
 
@@ -138,20 +139,20 @@ function fmt(n: number): string {
       <div class="border-t border-gray-100 pt-4">
         <div class="text-xs font-medium text-gray-500 mb-2">地狱门坐标换算（1:8 比例）</div>
         <div class="flex items-center gap-2 mb-2">
-          <button
-            class="rounded px-2.5 py-1 text-xs font-medium transition-colors"
-            :class="convertMode === 'toNether' ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'"
+          <Button
+            :type="convertMode === 'toNether' ? 'primary' : 'outline'"
+            size="small"
             @click="convertMode = 'toNether'"
           >
             主世界 → 下界
-          </button>
-          <button
-            class="rounded px-2.5 py-1 text-xs font-medium transition-colors"
-            :class="convertMode === 'toOverworld' ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'"
+          </Button>
+          <Button
+            :type="convertMode === 'toOverworld' ? 'primary' : 'outline'"
+            size="small"
             @click="convertMode = 'toOverworld'"
           >
             下界 → 主世界
-          </button>
+          </Button>
         </div>
         <Input v-model="convertInput" placeholder="输入坐标，如 128 64 -256 或 128,64,-256" size="small" />
         <div v-if="convertResult" class="mt-2 rounded-lg bg-primary-50 px-3 py-2">

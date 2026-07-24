@@ -10,7 +10,9 @@
  * 纯前端计算，无后端调用
  */
 import { ref, computed, watch } from 'vue'
-import { SwatchIcon } from '@heroicons/vue/24/outline'
+import { SwatchIcon, ClipboardIcon } from '@heroicons/vue/24/outline'
+import Input from '@/components/common/Input.vue'
+import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 
 // 当前 RGB 值（0-255）
@@ -98,6 +100,26 @@ function copyToClipboard(text: string) {
 }
 
 const colorPreviewStyle = computed(() => `background-color: ${hexValue.value}`)
+
+/** Minecraft 16 色格式化代码（含色值 + 是否深色背景需浅色文字） */
+const formatCodes = [
+  { code: '§0', label: '黑', color: '#000', dark: true },
+  { code: '§1', label: '深蓝', color: '#0000AA', dark: true },
+  { code: '§2', label: '深绿', color: '#00AA00', dark: true },
+  { code: '§3', label: '青', color: '#00AAAA', dark: true },
+  { code: '§4', label: '深红', color: '#AA0000', dark: true },
+  { code: '§5', label: '紫', color: '#AA00AA', dark: true },
+  { code: '§6', label: '金', color: '#FFAA00', dark: true },
+  { code: '§7', label: '灰', color: '#AAAAAA', dark: false },
+  { code: '§8', label: '深灰', color: '#555555', dark: true },
+  { code: '§9', label: '蓝', color: '#5555FF', dark: true },
+  { code: '§a', label: '绿', color: '#55FF55', dark: false },
+  { code: '§b', label: '青绿', color: '#55FFFF', dark: false },
+  { code: '§c', label: '红', color: '#FF5555', dark: false },
+  { code: '§d', label: '粉', color: '#FF55FF', dark: false },
+  { code: '§e', label: '黄', color: '#FFFF55', dark: false },
+  { code: '§f', label: '白', color: '#FFFFFF', dark: false },
+]
 </script>
 
 <template>
@@ -117,40 +139,35 @@ const colorPreviewStyle = computed(() => `background-color: ${hexValue.value}`)
         <div class="flex-1 space-y-1.5">
           <div class="flex items-center gap-2">
             <span class="w-10 text-xs text-gray-500">HEX</span>
-            <input
-              v-model="hexInput"
-              class="flex-1 rounded border border-gray-300 px-2 py-1 text-xs font-mono"
-              placeholder="#165DFF"
-            />
+            <Input v-model="hexInput" placeholder="#165DFF" size="small" width="120px" />
             <Tooltip text="复制 HEX" position="top">
-              <button
-                class="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
-                @click="copyToClipboard(hexValue)"
-              >
-                <SwatchIcon class="h-3.5 w-3.5" />
-              </button>
+              <Button type="ghost" size="small" @click="copyToClipboard(hexValue)">
+                <template #icon>
+                  <ClipboardIcon class="h-3.5 w-3.5" />
+                </template>
+              </Button>
             </Tooltip>
           </div>
           <div class="text-xs text-gray-500">{{ hslValue }}</div>
         </div>
       </div>
 
-      <!-- RGB 滑块 -->
+      <!-- RGB 滑块（range 类型无自研组件，保留原生 input range；数字输入用自研 Input） -->
       <div class="space-y-2">
         <div class="flex items-center gap-2">
           <span class="w-4 text-xs font-medium text-gray-600">R</span>
           <input v-model.number="r" type="range" min="0" max="255" class="flex-1 h-1.5 cursor-pointer" />
-          <input v-model.number="r" type="number" min="0" max="255" class="w-14 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
+          <Input v-model.number="r" type="number" size="small" width="64px" />
         </div>
         <div class="flex items-center gap-2">
           <span class="w-4 text-xs font-medium text-gray-600">G</span>
           <input v-model.number="g" type="range" min="0" max="255" class="flex-1 h-1.5 cursor-pointer" />
-          <input v-model.number="g" type="number" min="0" max="255" class="w-14 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
+          <Input v-model.number="g" type="number" size="small" width="64px" />
         </div>
         <div class="flex items-center gap-2">
           <span class="w-4 text-xs font-medium text-gray-600">B</span>
           <input v-model.number="b" type="range" min="0" max="255" class="flex-1 h-1.5 cursor-pointer" />
-          <input v-model.number="b" type="number" min="0" max="255" class="w-14 rounded border border-gray-300 px-1.5 py-0.5 text-xs" />
+          <Input v-model.number="b" type="number" size="small" width="64px" />
         </div>
       </div>
 
@@ -177,32 +194,17 @@ const colorPreviewStyle = computed(() => `background-color: ${hexValue.value}`)
       <div class="border-t border-gray-100 pt-4">
         <div class="text-xs font-medium text-gray-500 mb-2">Minecraft 格式化代码</div>
         <div class="flex flex-wrap gap-1.5">
-          <button
-            v-for="code in [
-              { code: '§0', label: '黑', color: '#000' },
-              { code: '§1', label: '深蓝', color: '#0000AA' },
-              { code: '§2', label: '深绿', color: '#00AA00' },
-              { code: '§3', label: '青', color: '#00AAAA' },
-              { code: '§4', label: '深红', color: '#AA0000' },
-              { code: '§5', label: '紫', color: '#AA00AA' },
-              { code: '§6', label: '金', color: '#FFAA00' },
-              { code: '§7', label: '灰', color: '#AAAAAA' },
-              { code: '§8', label: '深灰', color: '#555555' },
-              { code: '§9', label: '蓝', color: '#5555FF' },
-              { code: '§a', label: '绿', color: '#55FF55' },
-              { code: '§b', label: '青绿', color: '#55FFFF' },
-              { code: '§c', label: '红', color: '#FF5555' },
-              { code: '§d', label: '粉', color: '#FF55FF' },
-              { code: '§e', label: '黄', color: '#FFFF55' },
-              { code: '§f', label: '白', color: '#FFFFFF' },
-            ]"
+          <Button
+            v-for="code in formatCodes"
             :key="code.code"
-            class="rounded px-2 py-1 text-xs font-mono transition-transform hover:scale-105"
-            :style="{ backgroundColor: code.color, color: ['§0', '§1', '§2', '§3', '§4', '§5', '§6', '§8', '§9'].includes(code.code) ? '#fff' : '#000' }"
+            type="ghost"
+            size="small"
+            class="font-mono"
+            :style="{ backgroundColor: code.color, color: code.dark ? '#fff' : '#000' }"
             @click="copyToClipboard(code.code)"
           >
             {{ code.code }}
-          </button>
+          </Button>
         </div>
       </div>
     </div>

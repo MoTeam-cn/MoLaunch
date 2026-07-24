@@ -3666,6 +3666,34 @@
   - [src/utils/api/config.ts](src/utils/api/config.ts)：`configCache as ConfigSnapshot` 改为 `as unknown as ConfigSnapshot`。
   - [src/utils/api/skin.ts](src/utils/api/skin.ts) + [src/utils/tauri.ts](src/utils/tauri.ts)：`CachedImage` 接口移至 `image-cache.ts` 统一持有，删除 `skin.ts` 重复定义。
 
+#### 修复种子地图缩放时 ravine/fossil 结构丢失（范围过大整片跳过）
+- 背景：用户反馈缩放地图时控制台疯狂输出 `[cubiomes] ravine 范围过大，跳过` /
+  `mega_ravine` / `underwater_ravine` / `fossil` / `fossil_diamond` 等警告，
+  导致这些结构类型在大缩放级别下完全无法加载（地图空白）。
+- 根因：[generatorWorker.ts](src/utils/seedmap/generatorWorker.ts) `callChunkFinder` 在
+  `numX > sizeLimit || numZ > sizeLimit`（非 mega 64 chunks / mega 32 chunks）时直接 `return null`
+  整片跳过。但缩放时可视范围常超过 1024 方块（64×16），导致所有 ravine/fossil 类结构被跳过。
+- 修复：将 `callChunkFinder` 改为**分块查找**模式：
+  - 范围在 `sizeLimit` 内：单次 WASM 调用（原逻辑）
+  - 范围超过 `sizeLimit`：将大范围切分为 `sizeLimit × sizeLimit` 的子块，逐个调用 WASM 查找，合并所有结果
+  - 抽取 `callFinderOnce` 函数承载单次调用（buffer 分配 → WASM 调用 → 结果读取 → 释放）
+  - 移除 3 处 `console.warn('范围过大，跳过')`（分块后不再返回 null，除非内存分配失败）
+- 效果：缩放时 ravine/fossil/nether_fossil 类结构正常加载，控制台无警告刷屏。
+
+#### 计算工具页面重构（自研组件替换原生 HTML + 交互优化）
+- 背景：计算工具页（坐标计算 + 调色板）多处使用原生 `<button>` / `<input>` 违反项目硬约束
+  （必须用自研组件），且交换按钮 icon-only 视觉不清晰。
+- 变更：
+  - [src/views/tools/calc/CoordCalculator.vue](src/views/tools/calc/CoordCalculator.vue)：
+    交换按钮改用 [Button.vue](src/components/common/Button.vue) type="outline" + 文字标签
+    （原 icon-only ghost 按钮视觉不清晰）；地狱门换算模式按钮改用 Button（primary/outline）。
+  - [src/views/tools/calc/ColorPalette.vue](src/views/tools/calc/ColorPalette.vue)：
+    HEX 输入改用 [Input.vue](src/components/common/Input.vue)；复制按钮、格式化代码按钮
+    改用 [Button.vue](src/components/common/Button.vue)；RGB 数字输入改用 Input。
+    RGB range 滑块保留原生（项目无 Slider 组件，range 是浏览器唯一实现，属合理例外）。
+    染料色块保留原生 button（纯色块无文字，Button 组件 padding/hover 不适用）。
+    抽取 `formatCodes` 常量到 script（原内联 v-for 数组），提升可读性。
+
 ### 待实现
 - Mod 管理功能
 - 服务器列表功能
