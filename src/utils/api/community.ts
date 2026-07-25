@@ -19,6 +19,7 @@ import type {
   InstallModpackRequest,
   InstallLocalModpackRequest,
   InstallModpackResult,
+  ModpackPreview,
 } from '@/types/community'
 
 /** 搜索社区资源 */
@@ -110,6 +111,17 @@ export async function installLocalModpack(
   req: InstallLocalModpackRequest,
 ): Promise<InstallModpackResult> {
   return await invoke<InstallModpackResult>('install_local_modpack', { req })
+}
+
+/**
+ * 预览本地整合包（拖拽安装前置步骤）
+ *
+ * 仅打开 zip + 检测格式 + 解析 manifest/index，不下载、不复制 overrides。
+ * 返回整合包基本信息 + 可选 Mod 列表，前端据弹窗询问用户是否下载可选 Mod。
+ * 用户选择后调用 `installLocalModpack` 传入 `includeOptional` 参数完成安装。
+ */
+export async function previewLocalModpack(filePath: string): Promise<ModpackPreview> {
+  return await invoke<ModpackPreview>('preview_local_modpack', { filePath })
 }
 
 /**

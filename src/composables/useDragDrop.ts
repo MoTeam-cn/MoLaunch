@@ -6,25 +6,23 @@
  *
  * - `.zip` / `.mrpack` → 整合包安装（弹窗输入实例名 → installLocalModpack → installMerged）
  * - `.jar` / `.litemod` / `.disabled` / `.old` → Mod 安装（弹窗选择目标版本 → installMod）
- * - `.rar` → 提示用户解压后重试
+ * - `.rar` → 拒绝并提示用户解压后重新压缩为 zip
  * - 其他 → 提示无法识别
  *
  * 拖拽进入时通过 `dragState` 暴露 enter/over/leave 状态，驱动 DragOverlay 全局遮蔽层。
- *
- * 参考 PCL2 FormMain.xaml.vb 的 FileDrag 路由分发实现。
  */
 
 import { onMounted, onUnmounted, reactive, readonly } from 'vue'
 import { getCurrentWebview } from '@tauri-apps/api/webview'
 import router from '@/router'
-import { installLocalModpack } from '@/utils/api/community'
+import { installLocalModpack, previewLocalModpack } from '@/utils/api/community'
 import { installMod } from '@/utils/api/personalization'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 import { installMerged } from '@/utils/api/loader'
 import { showError, showInfo, showModal, showPrompt } from '@/utils/modal'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { useVersionStore } from '@/stores/version'
-import type { InstallModpackResult } from '@/types/community'
+import type { InstallModpackResult, ModpackPreview } from '@/types/community'
 
 /** 支持的整合包扩展名 */
 const MODPACK_EXTENSIONS = ['zip', 'mrpack']
@@ -110,37 +108,115 @@ function hideOverlay(): void {
 }
 
 /**
- * 处理整合包拖拽：弹窗输入实例名 → installLocalModpack → installMerged
+ * 处理整合包拖拽：预览整合包 → 弹窗输入实例名 → 询问可选 Mod → installLocalModpack → installMerged
+ *
+ * 拖拽安装时弹窗询问用户是否下载可选 Mod：
+ * - CF: required=false 的 Mod 列表
+ * - MR: env.client=optional 的文件列表
+ * - HMCL/MMC/MCBBS: 无可选概念，直接安装
  *
  * 进度通过 download_state 推送，前端 DownloadPanel 自动展示。
  * 完成后跳转到下载页轮询 install_merged 进度。
  */
 async function handleModpackDrop(filePath: string): Promise<void> {
-  const defaultName = getFileNameWithoutExt(filePath)
+  // 1. 预览整合包：获取格式 + 可选 Mod 列表
+  let preview: ModpackPreview
+  try {
+    preview = await previewLocalModpack(filePath)
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    showError('整合包预览失败', msg)
+    return
+  }
 
+  const defaultName = getFileNameWithoutExt(filePath)
+  const loaderInfo = preview.loader
+    ? ` / ${preview.loader}${preview.loaderVersion ? ' ' + preview.loaderVersion : ''}`
+    : ''
+  const formatLabel = formatToLabel(preview.format)
+
+  // 2. 弹窗输入实例名
   showPrompt(
     '安装整合包',
-    `请输入整合包实例名（将创建 versions/{实例名}/ 目录）：`,
+    `检测到 ${formatLabel} 整合包（游戏 ${preview.gameVersion}${loaderInfo}）\n请输入整合包实例名（将创建 versions/{实例名}/ 目录）：`,
     async (instanceName) => {
       if (!instanceName.trim()) {
         toastError('实例名不能为空')
         return
       }
-      await runModpackInstall(filePath, instanceName.trim())
+      const name = instanceName.trim()
+
+      // 3. 无可选 Mod：直接安装（后端默认 includeOptional=true）
+      if (preview.optionalMods.length === 0) {
+        await runModpackInstall(filePath, name)
+        return
+      }
+
+      // 4. 有可选 Mod：弹窗询问是否下载
+      const modList = preview.optionalMods
+        .slice(0, 20)
+        .map((m) => `  - ${m.displayName}`)
+        .join('\n')
+      const moreHint =
+        preview.optionalMods.length > 20
+          ? `\n  ...等 ${preview.optionalMods.length} 个`
+          : ''
+      showModal({
+        type: 'info',
+        title: '下载可选 Mod',
+        message: `整合包含 ${preview.optionalMods.length} 个可选 Mod：\n${modList}${moreHint}\n\n是否下载这些可选 Mod？`,
+        confirmText: '下载',
+        cancelText: '不下载',
+        showCancel: true,
+        onConfirm: () => {
+          // 用户选择下载可选 Mod
+          runModpackInstall(filePath, name, true)
+        },
+        onCancel: () => {
+          // 用户选择不下载可选 Mod
+          runModpackInstall(filePath, name, false)
+        },
+      })
     },
     { defaultValue: defaultName, placeholder: '请输入实例名' },
   )
 }
 
+/** ModpackFormat 枚举转中文标签 */
+function formatToLabel(format: ModpackPreview['format']): string {
+  switch (format) {
+    case 'curseforge':
+      return 'CurseForge'
+    case 'modrinth':
+      return 'Modrinth'
+    case 'hmcl':
+      return 'HMCL'
+    case 'mmc':
+      return 'MultiMC'
+    case 'mcbbs':
+      return 'MCBBS'
+    case 'launcherpack':
+      return '带启动器整合包'
+    case 'compress':
+      return '普通压缩包'
+    default:
+      return '未知'
+  }
+}
+
 /** 执行整合包安装流程（install_local_modpack → install_merged） */
-async function runModpackInstall(filePath: string, instanceName: string): Promise<void> {
+async function runModpackInstall(
+  filePath: string,
+  instanceName: string,
+  includeOptional?: boolean,
+): Promise<void> {
   const versionStore = useVersionStore()
   // 跳转到下载页，让用户看到进度
   router.push({ name: 'downloads' })
 
   let result: InstallModpackResult
   try {
-    result = await installLocalModpack({ filePath, instanceName })
+    result = await installLocalModpack({ filePath, instanceName, includeOptional })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     // 后端已 mark_failed 重置 is_active，前端需 finishDownload 让 Downloads.vue watch 触发 router.back()
@@ -187,8 +263,7 @@ async function runModpackInstall(filePath: string, instanceName: string): Promis
 /**
  * 处理 Mod 拖拽：弹窗选择目标版本 → installMod
  *
- * 与 PCL2 不同，MoLaunch 的 install_mod 命令需要 versionId 参数，
- * 因此需要先弹窗让用户选择目标版本。
+ * install_mod 命令需要 versionId 参数，因此需要先弹窗让用户选择目标版本。
  */
 async function handleModDrop(filePath: string): Promise<void> {
   let versions: InstalledVersionInfo[] = []
@@ -237,7 +312,6 @@ async function handleModDrop(filePath: string): Promise<void> {
 /**
  * 处理单文件拖拽（路由分发）
  *
- * 与 PCL2 FormMain.FileDrag 一致的路由逻辑：
  * - 多文件拖拽：必须全部为 jar/litemod/disabled/old，否则提示一次只拖一个
  * - 单文件拖拽：按扩展名路由
  */
@@ -270,12 +344,12 @@ async function handleFileDrop(paths: string[]): Promise<void> {
   } else if (MOD_EXTENSIONS.includes(ext)) {
     await handleModDrop(filePath)
   } else if (ext === 'rar') {
-    showInfo(
+    showError(
       'RAR 格式不支持',
-      'PCL/MoLaunch 无法处理 rar 格式的压缩包，请在解压后重新压缩为 zip 格式再试。',
+      'MoLaunch 无法处理 rar 格式的压缩包，请解压后重新压缩为 zip 格式再试。',
     )
   } else {
-    showInfo(
+    showError(
       '无法识别的文件',
       `不支持的文件扩展名 .${ext}。支持的类型：整合包（.zip/.mrpack）、Mod（.jar/.litemod）。`,
     )

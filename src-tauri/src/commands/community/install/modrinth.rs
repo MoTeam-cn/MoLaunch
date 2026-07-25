@@ -19,6 +19,18 @@ pub(super) struct MrIndex {
     pub(super) files: Vec<MrFile>,
 }
 
+/// MR 文件 env 字段：控制客户端/服务端是否下载
+///
+/// `client` 取值：
+/// - `"required"`（默认）：必下载
+/// - `"optional"`：可选，前端弹窗询问
+/// - `"unsupported"`：跳过不下载
+#[derive(Debug, Default, Deserialize)]
+pub(super) struct MrFileEnv {
+    #[serde(default)]
+    pub(super) client: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct MrFile {
@@ -27,11 +39,52 @@ pub(super) struct MrFile {
     pub(super) downloads: Vec<String>,
     #[serde(default)]
     pub(super) file_size: u64,
+    #[serde(default)]
+    pub(super) env: MrFileEnv,
+}
+
+/// 校验 Modrinth 文件路径安全性
+///
+/// 防止路径穿越攻击：path 不能包含 `..`，不能是绝对路径，
+/// 且最终完整路径必须在 instance_dir 下。
+fn validate_mr_path(path: &str, instance_dir: &std::path::Path) -> Result<std::path::PathBuf, String> {
+    // 拒绝空路径
+    if path.is_empty() {
+        return Err("文件路径为空".to_string());
+    }
+    // 拒绝绝对路径（Windows 和 Unix）
+    if path.starts_with('/') || path.starts_with('\\')
+        || (path.len() >= 2 && path.as_bytes()[1] == b':')
+    {
+        return Err(format!("文件路径不能为绝对路径: {}", path));
+    }
+    // 拒绝包含 .. 的路径（防止穿越上级目录）
+    let normalized = path.replace('\\', "/");
+    for seg in normalized.split('/') {
+        if seg == ".." {
+            return Err(format!("文件路径不能包含 '..': {}", path));
+        }
+    }
+    let full = instance_dir.join(path);
+    // 最终校验：canonicalize 后必须在 instance_dir 下
+    let canonical = full
+        .parent()
+        .and_then(|p| p.canonicalize().ok())
+        .unwrap_or_default();
+    let instance_canonical = instance_dir.canonicalize().unwrap_or_default();
+    if !canonical.starts_with(&instance_canonical) {
+        return Err(format!("文件路径校验失败，越出实例目录: {}", path));
+    }
+    Ok(full)
 }
 
 /// 安装 MR 整合包依赖文件
 ///
 /// 遍历 files[] 直接下载（path 相对于 instance 目录，如 mods/xxx.jar）。
+/// - `env.client = "unsupported"` 的文件跳过
+/// - `env.client = "optional"` 的文件由调用方决定是否下载（通过 `include_optional` 参数）
+/// - 其他（含 None / "required"）正常下载
+///
 /// mods/ 目录下的 jar 文件按用户设置的 `community_filename_format` 重命名
 /// （从 downloads URL 提取 project_id → 批量查询拿 slug → 查 mcmod 译名 → 应用格式）。
 /// 非 mods/ 文件（resourcepacks/shaderpacks 等）保留原名（mcmod 数据库只覆盖 mod）。
@@ -41,6 +94,7 @@ pub(super) async fn install_mr_files(
     instance_dir: &std::path::Path,
     max_threads: usize,
     stage_index: usize,
+    include_optional: bool,
 ) -> Result<(), String> {
     if mr_files.is_empty() {
         log_info!("[Community] MR index 无依赖文件");
@@ -79,10 +133,26 @@ pub(super) async fn install_mr_files(
     // 3. 读取用户设置的文件名格式
     let filename_format = state.config.lock().await.community.filename_format;
 
-    // 4. 构造下载列表
+    // 4. 构造下载列表（跳过 unsupported，按 include_optional 决定 optional 文件）
     let mut download_list: Vec<(Vec<String>, String, u64)> = Vec::with_capacity(mr_files.len());
     let mut total_bytes: u64 = 0;
+    let mut skipped_unsupported: usize = 0;
+    let mut skipped_optional: usize = 0;
     for (i, f) in mr_files.iter().enumerate() {
+        // env.client 处理
+        let client_env = f.env.client.as_deref().unwrap_or("required");
+        match client_env {
+            "unsupported" => {
+                skipped_unsupported += 1;
+                continue;
+            }
+            "optional" if !include_optional => {
+                skipped_optional += 1;
+                continue;
+            }
+            _ => {}
+        }
+
         if f.downloads.is_empty() {
             log_info!("[Community] MR 文件无下载 URL，跳过: {}", f.path);
             continue;
@@ -104,10 +174,13 @@ pub(super) async fn install_mr_files(
             continue;
         }
 
+        // 路径穿越校验：防止恶意整合包写出 instance 目录
+        let validated = validate_mr_path(&f.path, instance_dir)?;
+
         // 对 mods/ 路径下的文件应用 community_filename_format
         let target_path_str = if f.path.starts_with("mods/") {
-            if let Some(parent) = std::path::Path::new(&f.path).parent() {
-                let orig_name = std::path::Path::new(&f.path)
+            if let Some(parent) = validated.parent() {
+                let orig_name = validated
                     .file_name()
                     .map(|s| s.to_string_lossy().to_string())
                     .unwrap_or_else(|| f.path.clone());
@@ -117,20 +190,29 @@ pub(super) async fn install_mr_files(
                     translated.as_deref(),
                     filename_format,
                 );
-                instance_dir
-                    .join(parent)
-                    .join(&final_name)
-                    .to_string_lossy()
-                    .to_string()
+                parent.join(&final_name).to_string_lossy().to_string()
             } else {
-                instance_dir.join(&f.path).to_string_lossy().to_string()
+                validated.to_string_lossy().to_string()
             }
         } else {
-            instance_dir.join(&f.path).to_string_lossy().to_string()
+            validated.to_string_lossy().to_string()
         };
 
         download_list.push((urls, target_path_str, f.file_size));
         total_bytes += f.file_size;
+    }
+
+    if skipped_unsupported > 0 {
+        log_info!(
+            "[Community] MR 跳过 {} 个 unsupported 文件",
+            skipped_unsupported
+        );
+    }
+    if skipped_optional > 0 {
+        log_info!(
+            "[Community] MR 跳过 {} 个 optional 文件（用户未选择下载）",
+            skipped_optional
+        );
     }
 
     log_info!(

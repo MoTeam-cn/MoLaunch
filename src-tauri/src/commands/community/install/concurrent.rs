@@ -121,14 +121,70 @@ pub(super) fn extract_overrides(
     prefixes: &[String],
     stage_index: usize,
 ) -> Result<(), String> {
-    use std::io::Read;
-    let mut count: usize = 0;
-    let total = archive.len();
-
     if prefixes.is_empty() {
         log_info!("[Community] overrides 前缀为空，跳过解压");
         return Ok(());
     }
+
+    // 解压重试：最多 5 次，每次失败后线性退避（N * 2 秒）
+    // 失败后不清空目标目录，采用覆盖写策略
+    const MAX_ATTEMPTS: usize = 5;
+    let total = archive.len();
+    let mut last_err: Option<String> = None;
+
+    for attempt in 1..=MAX_ATTEMPTS {
+        match extract_overrides_once(archive, instance_dir, state, prefixes, stage_index, total) {
+            Ok(count) => {
+                if attempt > 1 {
+                    log_info!(
+                        "[Community] overrides 第 {} 次重试解压成功 ({} 个文件)",
+                        attempt,
+                        count
+                    );
+                }
+                log_info!(
+                    "[Community] overrides 解压完成 ({} 个文件，前缀: {:?})",
+                    count,
+                    prefixes
+                );
+                return Ok(());
+            }
+            Err(e) => {
+                last_err = Some(e.clone());
+                if attempt < MAX_ATTEMPTS {
+                    let backoff_secs = attempt as u64 * 2;
+                    crate::log_warn!(
+                        "[Community] overrides 解压第 {} 次失败: {}，{} 秒后重试",
+                        attempt,
+                        e,
+                        backoff_secs
+                    );
+                    std::thread::sleep(std::time::Duration::from_secs(backoff_secs));
+                } else {
+                    crate::log_warn!(
+                        "[Community] overrides 解压 {} 次均失败: {}",
+                        MAX_ATTEMPTS,
+                        e
+                    );
+                }
+            }
+        }
+    }
+
+    Err(last_err.unwrap_or_else(|| "overrides 解压失败（未知原因）".to_string()))
+}
+
+/// 单次 overrides 解压（不带重试）
+fn extract_overrides_once(
+    archive: &mut zip::ZipArchive<std::fs::File>,
+    instance_dir: &std::path::Path,
+    state: &AppState,
+    prefixes: &[String],
+    stage_index: usize,
+    total: usize,
+) -> Result<usize, String> {
+    use std::io::Read;
+    let mut count: usize = 0;
 
     for i in 0..archive.len() {
         let mut entry = archive
@@ -177,12 +233,7 @@ pub(super) fn extract_overrides(
         let mut ds = state.download_state.lock().unwrap();
         ds.set_stage_bytes(stage_index, count as u64, total as u64);
     }
-    log_info!(
-        "[Community] overrides 解压完成 ({} 个文件，前缀: {:?})",
-        count,
-        prefixes
-    );
-    Ok(())
+    Ok(count)
 }
 
 /// 检测到的整合包信息（detect_modpack_format 的返回值）
@@ -201,16 +252,22 @@ pub(super) struct DetectedModpack {
     pub hmcl_content: Option<String>,
     /// MMC mmc-pack.json 的原始内容
     pub mmc_content: Option<String>,
+    /// MMC instance.cfg 的原始内容（仅 MMC 格式有值，用于配置迁移）
+    pub mmc_cfg_content: Option<String>,
+    /// LauncherPack 内层整合包在 zip 中的完整路径（如 `modpack.zip` 或 `subfolder/modpack.mrpack`）
+    pub launcher_inner_path: Option<String>,
 }
 
 /// 检测整合包格式
 ///
-/// 识别优先级（参考 PCL2 ModModpack.vb ModpackInstall）：
+/// 识别优先级：
 /// 1. `mcbbs.packmeta` → Mcbbs
 /// 2. `mmc-pack.json` → Mmc
 /// 3. `modrinth.index.json` → Modrinth
 /// 4. `manifest.json`：有 `addons` 字段 → Mcbbs，无 → Curseforge
 /// 5. `modpack.json` → Hmcl
+/// 6. 根目录/一级子目录含 `modpack.zip` 或 `modpack.mrpack` → LauncherPack
+/// 7. 其他 → Compress（普通压缩包）
 ///
 /// 第一遍扫描根目录关键文件，命中即返回；第二遍扫描一级子目录。
 /// `archive_base_folder` 在根目录命中时为 `""`，子目录命中时为 `"子目录/"`。
@@ -228,7 +285,7 @@ pub(super) fn detect_modpack_format(
         })
         .collect();
 
-    // 按 PCL2 优先级顺序的关键文件名
+    // 按优先级顺序的关键文件名
     // manifest.json 需要进一步判断 addons 字段，特殊处理
     const PRIORITY: &[&str] = &[
         "mcbbs.packmeta",
@@ -268,7 +325,105 @@ pub(super) fn detect_modpack_format(
         }
     }
 
-    Err("无法识别的整合包格式：未找到 manifest.json / modrinth.index.json / modpack.json / mmc-pack.json / mcbbs.packmeta".to_string())
+    // 第三遍：扫描根目录/一级子目录的 `modpack.zip` / `modpack.mrpack` → LauncherPack
+    // 带启动器整合包：外层 zip 内嵌一个真正的整合包，需提取后递归安装
+    for &(i, ref name) in &entry_names {
+        let base = if let Some(stripped) = name.strip_prefix("modpack.zip") {
+            if stripped.is_empty() {
+                ""
+            } else {
+                continue;
+            }
+        } else if let Some(stripped) = name.strip_prefix("modpack.mrpack") {
+            if stripped.is_empty() {
+                ""
+            } else {
+                continue;
+            }
+        } else {
+            continue;
+        };
+        let _ = i;
+        log_info!("[Community] 检测到带启动器整合包（内嵌 {}）", name);
+        return Ok(DetectedModpack {
+            format: super::types::ModpackFormat::LauncherPack,
+            archive_base_folder: base.to_string(),
+            manifest_content: None,
+            index_content: None,
+            hmcl_content: None,
+            mmc_content: None,
+            mmc_cfg_content: None,
+            launcher_inner_path: Some(name.clone()),
+        });
+    }
+    for &(i, ref name) in &entry_names {
+        let parts: Vec<&str> = name.split('/').collect();
+        if parts.len() != 2 {
+            continue;
+        }
+        if parts[1] == "modpack.zip" || parts[1] == "modpack.mrpack" {
+            let _ = i;
+            let base = format!("{}/", parts[0]);
+            log_info!("[Community] 检测到带启动器整合包（内嵌 {}）", name);
+            return Ok(DetectedModpack {
+                format: super::types::ModpackFormat::LauncherPack,
+                archive_base_folder: base,
+                manifest_content: None,
+                index_content: None,
+                hmcl_content: None,
+                mmc_content: None,
+                mmc_cfg_content: None,
+                launcher_inner_path: Some(name.clone()),
+            });
+        }
+    }
+
+    // 第四遍：Compress 兜底，扫描 `.minecraft/` 目录前缀
+    // 普通压缩包：用户直接压缩 .minecraft 目录，无关键 manifest 文件
+    let mut minecraft_prefix: Option<String> = None;
+    for &(_, ref name) in &entry_names {
+        // 命中 `.minecraft/` 在根目录或一级子目录
+        if let Some(rest) = name.strip_prefix(".minecraft/") {
+            if !rest.is_empty() {
+                minecraft_prefix = Some(".minecraft/".to_string());
+                break;
+            }
+        }
+        if let Some(rest) = name.strip_prefix("/.minecraft/") {
+            if !rest.is_empty() {
+                minecraft_prefix = Some("/.minecraft/".to_string());
+                break;
+            }
+        }
+        // 一级子目录形式：`subfolder/.minecraft/...`
+        let parts: Vec<&str> = name.split('/').collect();
+        if parts.len() >= 2 && parts[0] != ".minecraft" {
+            // 检测形如 `subfolder/.minecraft/...`
+            if parts.len() >= 3 && parts[1] == ".minecraft" {
+                let prefix = format!("{}/.minecraft/", parts[0]);
+                minecraft_prefix = Some(prefix);
+                break;
+            }
+        }
+    }
+    if let Some(prefix) = minecraft_prefix {
+        log_info!(
+            "[Community] 检测到普通压缩包整合包（.minecraft 前缀: {}）",
+            prefix
+        );
+        return Ok(DetectedModpack {
+            format: super::types::ModpackFormat::Compress,
+            archive_base_folder: prefix,
+            manifest_content: None,
+            index_content: None,
+            hmcl_content: None,
+            mmc_content: None,
+            mmc_cfg_content: None,
+            launcher_inner_path: None,
+        });
+    }
+
+    Err("无法识别的整合包格式：未找到 manifest.json / modrinth.index.json / modpack.json / mmc-pack.json / mcbbs.packmeta / modpack.zip / .minecraft/ 目录".to_string())
 }
 
 /// 尝试在指定 base_folder 下识别关键文件
@@ -284,7 +439,7 @@ fn try_detect_at_root(
     use super::types::ModpackFormat;
     use std::io::Read;
 
-    // 按 PCL2 优先级判断
+    // 按优先级判断
     if entry_name == "mcbbs.packmeta" {
         let mut s = String::new();
         archive
@@ -300,6 +455,8 @@ fn try_detect_at_root(
             index_content: None,
             hmcl_content: None,
             mmc_content: None,
+            mmc_cfg_content: None,
+            launcher_inner_path: None,
         }));
     }
 
@@ -311,6 +468,26 @@ fn try_detect_at_root(
             .read_to_string(&mut s)
             .map_err(|e| format!("读取 mmc-pack.json 失败: {}", e))?;
         log_info!("[Community] 检测到 MMC 整合包（mmc-pack.json）");
+
+        // 顺带读取同 base_folder 下的 instance.cfg（用于配置迁移：PreLaunchCommand/JvmArgs 等）
+        let cfg_path = format!("{}instance.cfg", base_folder);
+        let mut mmc_cfg_content: Option<String> = None;
+        for i in 0..archive.len() {
+            let Ok(mut entry) = archive.by_index(i) else {
+                continue;
+            };
+            if entry.name() == cfg_path {
+                let mut cfg = String::new();
+                if entry.read_to_string(&mut cfg).is_ok() {
+                    mmc_cfg_content = Some(cfg);
+                }
+                break;
+            }
+        }
+        if mmc_cfg_content.is_some() {
+            log_info!("[Community] MMC instance.cfg 已加载，将迁移配置到 setup.ini");
+        }
+
         return Ok(Some(DetectedModpack {
             format: ModpackFormat::Mmc,
             archive_base_folder: base_folder.to_string(),
@@ -318,6 +495,8 @@ fn try_detect_at_root(
             index_content: None,
             hmcl_content: None,
             mmc_content: Some(s),
+            mmc_cfg_content,
+            launcher_inner_path: None,
         }));
     }
 
@@ -336,6 +515,8 @@ fn try_detect_at_root(
             index_content: Some(s),
             hmcl_content: None,
             mmc_content: None,
+            mmc_cfg_content: None,
+            launcher_inner_path: None,
         }));
     }
 
@@ -360,6 +541,8 @@ fn try_detect_at_root(
                 index_content: None,
                 hmcl_content: None,
                 mmc_content: None,
+                mmc_cfg_content: None,
+            launcher_inner_path: None,
             }))
         } else {
             log_info!("[Community] 检测到 CurseForge 整合包（manifest.json）");
@@ -370,6 +553,8 @@ fn try_detect_at_root(
                 index_content: None,
                 hmcl_content: None,
                 mmc_content: None,
+                mmc_cfg_content: None,
+            launcher_inner_path: None,
             }))
         }
     } else if entry_name == "modpack.json" {
@@ -387,6 +572,8 @@ fn try_detect_at_root(
             index_content: None,
             hmcl_content: Some(s),
             mmc_content: None,
+            mmc_cfg_content: None,
+            launcher_inner_path: None,
         }))
     } else {
         Ok(None)
@@ -396,19 +583,38 @@ fn try_detect_at_root(
 /// 根据 format 和 archive_base_folder 构造 overrides 前缀列表
 ///
 /// 每个前缀已含 `archive_base_folder` 前缀和末尾 `/`，供 `extract_overrides` 直接匹配。
+/// CurseForge 支持 manifest.overrides 字段自定义覆写目录名（默认 "overrides"，
+/// 可为 "." 或 "./" 表示根目录）。
 pub(super) fn build_overrides_prefixes(
     format: super::types::ModpackFormat,
     base_folder: &str,
+    overrides_name: Option<&str>,
 ) -> Vec<String> {
     use super::types::ModpackFormat;
     let base = base_folder;
     match format {
-        ModpackFormat::Curseforge | ModpackFormat::Modrinth => vec![
+        ModpackFormat::Curseforge => {
+            // manifest.overrides 字段：默认 "overrides"，可为 "." / "./" 表示根目录
+            let ov = overrides_name.unwrap_or("overrides");
+            let prefix = if ov == "." || ov == "./" {
+                // 根目录：前缀为 base_folder 本身（匹配所有文件）
+                base.to_string()
+            } else {
+                format!("{}{}/", base, ov)
+            };
+            vec![prefix, format!("{}client-overrides/", base)]
+        }
+        ModpackFormat::Modrinth => vec![
             format!("{}overrides/", base),
             format!("{}client-overrides/", base),
         ],
         ModpackFormat::Hmcl => vec![format!("{}minecraft/", base)],
         ModpackFormat::Mmc => vec![format!("{}.minecraft/", base)],
         ModpackFormat::Mcbbs => vec![format!("{}overrides/", base)],
+        // LauncherPack 不会走到这里：上层 install 流程会先解压内层整合包再递归调用安装
+        ModpackFormat::LauncherPack => Vec::new(),
+        // Compress：archive_base_folder 已是 `.minecraft/` 前缀，直接作为 overrides 前缀
+        // 前缀本身已含末尾 `/`，extract_overrides 会去掉该前缀将内容解压到 instance 目录
+        ModpackFormat::Compress => vec![base.to_string()],
     }
 }

@@ -219,6 +219,7 @@ pub fn run() {
             commands::community::install::resource::install_resource,
             commands::community::install::modpack::install_modpack,
             commands::community::install::modpack::install_local_modpack,
+            commands::community::install::modpack::preview_local_modpack,
             commands::community::install::resource::get_resource_install_path,
             // 插件系统命令（拆分到 plugins/ 子模块：sandbox / install / spawn / window / layout / export / personalization）
             commands::plugins::sandbox::list_external_plugins,

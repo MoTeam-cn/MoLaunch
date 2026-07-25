@@ -105,6 +105,10 @@ export interface InstallModpackRequest {
   downloadUrl: string
   fileName: string
   instanceName: string
+  /** 是否下载可选 Mod（CF required=false / MR env.client=optional）。undefined 时默认 true */
+  includeOptional?: boolean
+  /** 外部 Logo 文件本地路径（CF/MR 平台下载时缓存的缩略图，复制到 MoLaunch/Logo.png） */
+  logoPath?: string
 }
 
 /** 本地整合包安装请求（拖拽安装） */
@@ -113,6 +117,10 @@ export interface InstallLocalModpackRequest {
   filePath: string
   /** 整合包实例名（用于 versions/{instanceName}/ 目录） */
   instanceName: string
+  /** 是否下载可选 Mod（由前端 preview 后弹窗询问用户传入，undefined 时默认 true） */
+  includeOptional?: boolean
+  /** 外部 Logo 文件本地路径（拖拽安装时通常为空） */
+  logoPath?: string
 }
 
 /** 整合包格式 */
@@ -122,6 +130,8 @@ export type ModpackFormat =
   | 'hmcl'
   | 'mmc'
   | 'mcbbs'
+  | 'launcherpack'
+  | 'compress'
 
 /** 整合包安装结果 */
 export interface InstallModpackResult {
@@ -131,6 +141,30 @@ export interface InstallModpackResult {
   loaderVersion: string
   archivePath: string
   instanceDir: string
+}
+
+/** 可选 Mod 信息（前端弹窗显示用） */
+export interface OptionalModInfo {
+  /** 显示名（CF: "CF File #{fileId}"，MR: path 末段） */
+  displayName: string
+  /** 文件大小（字节，CF 为 0 因为 manifest 不含大小） */
+  fileSize: number
+  /** CurseForge file_id（仅 CF 格式有值） */
+  fileId?: number | null
+  /** CurseForge project_id（仅 CF 格式有值） */
+  projectId?: number | null
+  /** Modrinth 文件路径（仅 MR 格式有值） */
+  path?: string | null
+}
+
+/** 整合包预览信息（拖拽安装前置步骤，弹窗询问可选 Mod 用） */
+export interface ModpackPreview {
+  format: ModpackFormat
+  gameVersion: string
+  loader: string
+  loaderVersion: string
+  /** 可选 Mod 列表（CF required=false / MR env.client=optional） */
+  optionalMods: OptionalModInfo[]
 }
 
 /** 来源选项 */

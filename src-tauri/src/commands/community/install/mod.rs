@@ -39,5 +39,5 @@ mod types;
 // 对外暴露数据类型（保持向后兼容）
 pub use types::{
     CommunityDownloadProgress, DownloadRequest, DownloadResult, InstallLocalModpackRequest,
-    InstallModpackRequest, InstallModpackResult, ModpackFormat,
+    InstallModpackRequest, InstallModpackResult, ModpackFormat, ModpackPreview, OptionalModInfo,
 };

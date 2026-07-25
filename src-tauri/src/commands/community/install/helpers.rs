@@ -152,9 +152,8 @@ pub(super) fn extract_mr_project_id(url: &str) -> Option<String> {
 
 /// 构造 CF edge 下载 URL（当 download_url 为空时的 fallback）
 ///
-/// 参考 PCL2 ResourceVersion.FromPlatformJson：
-///   `https://edge.forgecdn.net/files/{id前4位}/{id余位}/{FileName}`
-/// 余位用 i64 转换去掉前导 0（与 PCL2 CInt 一致），例如 2725062 → 2725/62
+/// 拼接规则：`https://edge.forgecdn.net/files/{id前4位}/{id余位}/{FileName}`
+/// 余位用 i64 转换去掉前导 0，例如 2725062 → 2725/62
 ///
 /// 根据 source 策略选择域名：source=0 用镜像，其余用官方
 pub(super) fn construct_cf_edge_url(file_id: i64, file_name: &str) -> String {
@@ -165,14 +164,123 @@ pub(super) fn construct_cf_edge_url(file_id: i64, file_name: &str) -> String {
         "https://edge.forgecdn.net"
     };
     let id_str = file_id.to_string();
-    // PCL2：Substring(0, 4) / Substring(4)，fileId 至少 5 位才能拆分
+    // fileId 至少 5 位才能拆分前 4 位 / 余位
     if id_str.len() >= 5 {
         let (p1, p2) = id_str.split_at(4);
-        // 余位 parse 为 i64 去掉前导 0（PCL2 CInt 等价）
+        // 余位 parse 为 i64 去掉前导 0（如 062 → 62）
         let p2_num: i64 = p2.parse().unwrap_or(0);
         format!("{}/files/{}/{}/{}", base, p1, p2_num, file_name)
     } else {
         // fileId 过短无法拆分，回退 0/{file_name}
         format!("{}/files/0/{}", base, file_name)
+    }
+}
+
+/// 校验整合包实例名是否合法
+///
+/// 入口校验规则：
+/// - 不能为空
+/// - 不能含 `!` 或 `;`（Java Classpath / 路径分隔符，Windows 路径含这些字符会导致 Java 启动失败）
+/// - 不能含 Windows 文件名非法字符 `< > : " / \ | ? *`
+/// - 不能含控制字符（0-31）
+///
+/// 返回 `Ok(())` 表示合法，`Err(reason)` 表示非法并给出具体原因。
+pub(super) fn validate_instance_name(name: &str) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("整合包实例名不能为空".to_string());
+    }
+    for c in name.chars() {
+        if c == '!' {
+            return Err(
+                "整合包实例名不能包含 \"!\" 字符（Java Classpath 分隔符，会导致启动失败）"
+                    .to_string(),
+            );
+        }
+        if c == ';' {
+            return Err(
+                "整合包实例名不能包含 \";\" 字符（路径分隔符，会导致启动失败）".to_string(),
+            );
+        }
+        if matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*') {
+            return Err(format!(
+                "整合包实例名不能包含 Windows 非法字符 \"{}\"",
+                c
+            ));
+        }
+        if (c as u32) < 32 {
+            return Err("整合包实例名不能包含控制字符".to_string());
+        }
+    }
+    // Windows 不允许文件夹名以 . 或空格结尾
+    if name.ends_with('.') || name.ends_with(' ') {
+        return Err("整合包实例名不能以 \".\" 或空格结尾".to_string());
+    }
+    // Windows 保留名（CON / PRN / AUX / NUL / COM1-9 / LPT1-9）
+    let upper = name.to_uppercase();
+    let reserved = [
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
+        "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    ];
+    if reserved.contains(&upper.as_str()) {
+        return Err(format!("整合包实例名不能使用 Windows 保留名 \"{}\"", name));
+    }
+    Ok(())
+}
+
+/// 校验整合包文件扩展名是否被支持
+///
+/// 拒绝 `.rar`（无开源解压库支持）和未识别扩展名。
+/// 返回 `Ok(())` 表示可继续安装，`Err(reason)` 表示拒绝并给出原因。
+pub(super) fn validate_modpack_extension(file_path: &str) -> Result<(), String> {
+    let lower = file_path.to_lowercase();
+    let ext = match lower.rfind('.') {
+        Some(p) => &lower[p + 1..],
+        None => "",
+    };
+    match ext {
+        "zip" | "mrpack" => Ok(()),
+        "rar" => Err(
+            "MoLaunch 无法处理 rar 格式的压缩包，请解压后重新压缩为 zip 格式再试。".to_string(),
+        ),
+        _ => Err(format!(
+            "不支持的整合包扩展名 .{}。仅支持 .zip / .mrpack。",
+            ext
+        )),
+    }
+}
+
+/// 整合包安装失败/取消后清理版本目录
+///
+/// 保护逻辑：若版本目录下已存在 `saves/` 或 `versions/` 子目录，
+/// 说明用户已独立启动过该版本，保留目录避免误删存档。
+/// 否则删除整个版本目录，避免残留半安装文件污染版本列表。
+///
+/// 删除失败仅记录警告，不传播错误（清理失败不应阻塞错误传播）。
+pub(super) fn cleanup_version_dir_on_failure(instance_dir: &std::path::Path) {
+    let has_saves = instance_dir.join("saves").exists();
+    let has_versions = instance_dir.join("versions").exists();
+    if has_saves || has_versions {
+        crate::log_warn!(
+            "[Community] 版本目录已含 saves/versions 子目录，保留不清理: {}",
+            instance_dir.display()
+        );
+        return;
+    }
+    // 失败后稍等 1 秒，让文件句柄释放（Windows 上文件可能仍被占用）
+    std::thread::sleep(std::time::Duration::from_secs(1));
+    match std::fs::remove_dir_all(instance_dir) {
+        Ok(()) => {
+            crate::log_warn!(
+                "[Community] 安装失败/取消，已清理版本目录: {}",
+                instance_dir.display()
+            );
+        }
+        Err(e) => {
+            crate::log_warn!(
+                "[Community] 清理版本目录失败: {} ({})",
+                instance_dir.display(),
+                e
+            );
+        }
     }
 }

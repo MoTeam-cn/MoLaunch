@@ -9,6 +9,66 @@
 
 ### 变更
 
+#### 修复种子地图 hover 检测不响应问题
+- 问题：[useSeedMap.ts](src/views/tools/data/useSeedMap.ts) `pointermove` 节流实现有 bug：
+  throttle 期间新位置被丢弃，超时回调使用闭包捕获的首次事件 `e.pixel`（已过期），
+  导致用户快速移动鼠标并停下时，停下的位置不被检测，hover 无反应，必须再动一下才能触发。
+- 修复：始终更新 `lastPixel` 变量，超时回调改用 `lastPixel` 而非闭包捕获的 `e.pixel`，
+  保证用户停下时的最新位置被检测。
+
+#### 修复 seedmap constants.ts 使用废弃 glob 语法触发 Vite 警告
+- 问题：[constants.ts](src/utils/seedmap/constants.ts) 使用了 Vite 2-4 的 `as: 'url'` 语法，
+  Vite 5 已废弃该语法，每次进入工具页面都会在后端控制台弹出
+  `The glob option "as" has been deprecated in favour of "query"` 警告。
+- 修复：移除三层 fallback（as:'url' / query+import / query）冗余写法，
+  统一使用 Vite 5 推荐语法 `query: '?url', import: 'default'`，直接返回 url 字符串。
+
+#### 整合包安装新增 LauncherPack 与 Compress 格式支持
+- 新增：[types.rs](src-tauri/src/commands/community/install/types.rs)
+  `ModpackFormat` 枚举新增 `LauncherPack`（带启动器整合包）和 `Compress`（普通压缩包兜底）两个变体，
+  与业界同类整合包分发格式对齐。
+- 检测：[concurrent.rs](src-tauri/src/commands/community/install/concurrent.rs)
+  `detect_modpack_format` 在常规 manifest 文件扫描未命中后，依次扫描：
+  1. 根目录/一级子目录的 `modpack.zip` 或 `modpack.mrpack` → 识别为 `LauncherPack`；
+  2. 含 `.minecraft/` 目录前缀 → 识别为 `Compress`，前缀作为 overrides 解压依据。
+- 递归安装：[modpack.rs](src-tauri/src/commands/community/install/modpack.rs)
+  `install_local_modpack` 入口预检测到 `LauncherPack` 时，提取内层整合包到
+  `.tmp_launcher_extract/` 临时目录后将 `archive_path` 替换为内层路径继续走主流程，
+  避免递归调用 async fn（`E0733`）和 `download_state` 重复重置。函数返回前清理临时文件。
+- Compress 解压：[concurrent.rs](src-tauri/src/commands/community/install/concurrent.rs)
+  `build_overrides_prefixes` 为 `Compress` 格式返回 `.minecraft/` 前缀，
+  `extract_overrides` 去掉该前缀后将内容解压到 instance 目录。
+- 前端：[community.ts](src/types/community.ts) `ModpackFormat` 类型新增 `'launcherpack' | 'compress'`；
+  [useDragDrop.ts](src/composables/useDragDrop.ts) `formatToLabel` 新增"带启动器整合包"和"普通压缩包"标签。
+
+#### 显式拒绝 .rar 格式整合包
+- 后端：[helpers.rs](src-tauri/src/commands/community/install/helpers.rs)
+  新增 `validate_modpack_extension`，显式拒绝 `.rar`（无开源解压库支持），
+  提示用户解压后重新压缩为 `.zip`。在 `install_modpack` 和 `install_local_modpack` 入口校验。
+- 前端：[useDragDrop.ts](src/composables/useDragDrop.ts)
+  拖拽 `.rar` 文件时显示"RAR 格式不支持"错误弹窗，提示解压后重新压缩为 zip。
+
+#### 清理代码中 PCL2 相关注释
+- 清理：移除 [useDragDrop.ts](src/composables/useDragDrop.ts)、
+  [MoLaunchIntro.vue](src/components/about/MoLaunchIntro.vue)、
+  [DragOverlay.vue](src/components/common/DragOverlay.vue)、
+  [auth/mod.rs](src-tauri/src/minecraft/auth/mod.rs)、
+  [language.rs](src-tauri/src/minecraft/language.rs)、
+  [build_config.rs](src-tauri/src/commands/version/launch/build_config.rs)、
+  [skin_resourcepack.rs](src-tauri/src/minecraft/launch/skin_resourcepack.rs)、
+  [chunk/probe.rs](src-tauri/src/minecraft/download/chunk/probe.rs)、
+  [tools/memory.rs](src-tauri/src/commands/tools/memory.rs)、
+  [install/mmc.rs](src-tauri/src/commands/community/install/mmc.rs)
+  中代码注释里对 PCL2 的引用，仅保留 [CreditsTab.vue](src/views/settings/more/CreditsTab.vue)
+  鸣谢页面与 [licenses.txt](src-tauri/resources/about/licenses.txt) 第三方许可声明。
+- 补充：进一步将版本目录下的 `PCL/` 子目录重命名为 `MoLaunch/`，
+  Logo 字段从 `PCL\Logo.png` 改为 `MoLaunch\Logo.png`。
+  涉及 [modpack_stages.rs](src-tauri/src/commands/community/install/modpack_stages.rs)
+  `migrate_modpack_config` 与 `copy_external_logo`、
+  [types.rs](src-tauri/src/commands/community/install/types.rs)、
+  [mmc.rs](src-tauri/src/commands/community/install/mmc.rs)、
+  [community.ts](src/types/community.ts) 中残留的 PCL 路径引用全部清除。
+
 #### 优化版本选择页分组卡片为可折叠展开动画
 - 优化：[VersionSelect.vue](src/views/VersionSelect.vue) 版本分组卡片改为可折叠，
   默认全部收起，点击标题栏展开/收起。标题栏带分组类型图标（草方块/铁砧/Fabric 等，

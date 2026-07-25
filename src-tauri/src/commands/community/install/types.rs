@@ -61,6 +61,14 @@ pub struct InstallModpackRequest {
     pub file_name: String,
     /// 整合包实例名（用于 versions/{instance_name}/ 目录）
     pub instance_name: String,
+    /// 是否下载可选 Mod（CF required=false / MR env.client=optional）。
+    /// None 时默认 true（在线资源页安装不弹窗）。
+    #[serde(default)]
+    pub include_optional: Option<bool>,
+    /// 外部 Logo 文件本地路径（CF/MR 平台下载时缓存的缩略图，复制到 MoLaunch/Logo.png）。
+    /// None 表示无外部 Logo，仅依赖 MMC iconKey 等内部图标迁移。
+    #[serde(default)]
+    pub logo_path: Option<String>,
 }
 
 /// 本地整合包安装请求（拖拽安装）
@@ -73,18 +81,64 @@ pub struct InstallLocalModpackRequest {
     pub file_path: String,
     /// 整合包实例名（用于 versions/{instance_name}/ 目录）
     pub instance_name: String,
+    /// 是否下载可选 Mod（CF required=false / MR env.client=optional）。
+    /// 由前端 preview 后弹窗询问用户传入。None 时默认 true（保持向后兼容）。
+    #[serde(default)]
+    pub include_optional: Option<bool>,
+    /// 外部 Logo 文件本地路径（拖拽安装时无外部 Logo，通常为 None）
+    #[serde(default)]
+    pub logo_path: Option<String>,
+}
+
+/// 可选 Mod 信息（用于前端弹窗显示）
+///
+/// CF: file_id + project_id（display_name 用 file_id 字符串，因 manifest 无 displayName 字段，
+/// MoLaunch 在解析阶段预览，不调用 /mods/files API）
+/// MR: path 末段作为 display_name
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OptionalModInfo {
+    /// 显示名（CF: "CF File #{file_id}"，MR: path 末段）
+    pub display_name: String,
+    /// 文件大小（字节，CF 为 0 因为 manifest 不含大小，MR 从 file_size 取）
+    pub file_size: u64,
+    /// CurseForge file_id（仅 CF 格式有值）
+    pub file_id: Option<i64>,
+    /// CurseForge project_id（仅 CF 格式有值，可能为 None）
+    pub project_id: Option<i64>,
+    /// Modrinth 文件路径（仅 MR 格式有值）
+    pub path: Option<String>,
+}
+
+/// 整合包预览信息（前端弹窗询问可选 Mod 用）
+///
+/// 由 `preview_local_modpack` 命令返回，前端根据 `optional_mods` 列表弹窗询问用户是否下载。
+/// 用户选择后调用 `install_local_modpack` 传入 `include_optional` 参数。
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackPreview {
+    /// 识别出的整合包格式
+    pub format: ModpackFormat,
+    /// 游戏版本
+    pub game_version: String,
+    /// 加载器名称
+    pub loader: String,
+    /// 加载器版本
+    pub loader_version: String,
+    /// 可选 Mod 列表（CF required=false / MR env.client=optional）
+    pub optional_mods: Vec<OptionalModInfo>,
 }
 
 /// 整合包格式
 ///
-/// 识别优先级（参考 PCL2 ModModpack.vb）：
+/// 识别优先级：
 /// 1. mcbbs.packmeta → Mcbbs
 /// 2. mmc-pack.json → Mmc
 /// 3. modrinth.index.json → Modrinth
 /// 4. manifest.json：有 addons → Mcbbs，无 addons → Curseforge
 /// 5. modpack.json → Hmcl
-/// 6. modpack.zip / modpack.mrpack → LauncherPack（暂未实现）
-/// 7. 其他 → Compress（暂未实现）
+/// 6. modpack.zip / modpack.mrpack → LauncherPack（带启动器整合包）
+/// 7. 其他 → Compress（普通压缩包，需含 `.minecraft/` 目录）
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ModpackFormat {
@@ -96,6 +150,12 @@ pub enum ModpackFormat {
     Mmc,
     /// MCBBS 整合包（mcbbs.packmeta 或带 addons 的 manifest.json），overrides 在 `overrides/` 目录
     Mcbbs,
+    /// 带启动器整合包：zip 内含 `modpack.zip` 或 `modpack.mrpack`，
+    /// 需先解压内层整合包到临时目录再递归安装
+    LauncherPack,
+    /// 普通压缩包兜底：无关键 manifest 文件，但含 `.minecraft/` 目录，
+    /// 将该目录内容作为 overrides 解压到 instance 目录
+    Compress,
 }
 
 /// 整合包安装结果
@@ -137,6 +197,8 @@ pub(super) struct ModpackInfo {
     pub mod_files_count: usize,
     /// 关键文件所在层级前缀（如 `""` 或 `"subfolder/"`），与 `format` 一起决定 overrides 前缀
     pub archive_base_folder: String,
+    /// CurseForge manifest.overrides 字段（自定义覆写目录名，默认 None 表示 "overrides"）
+    pub cf_overrides_name: Option<String>,
     /// CF manifest（仅 Curseforge 格式有值）
     pub cf_manifest: Option<super::curseforge::CfManifest>,
     /// MR index（仅 Modrinth 格式有值）
@@ -144,10 +206,14 @@ pub(super) struct ModpackInfo {
     /// HMCL manifest（仅 Hmcl 格式有值，保留供未来扩展：HMCL 整合包的 author/description 等元信息）
     #[allow(dead_code)]
     pub hmcl_manifest: Option<super::hmcl::HmclManifest>,
-    /// MMC pack（仅 Mmc 格式有值，保留供未来扩展：MMC instance.cfg 的 JVM 参数 / PreLaunchCommand 迁移）
+    /// MMC pack（仅 Mmc 格式有值，保留供未来扩展：components 元信息已用于 game_version/loader 解析）
     #[allow(dead_code)]
     pub mmc_pack: Option<super::mmc::MmcPack>,
-    /// MCBBS manifest（仅 Mcbbs 格式有值，保留供未来扩展：MCBBS launchInfo 的 javaArgument / launchArgument 迁移）
-    #[allow(dead_code)]
+    /// MMC instance.cfg 原始内容（仅 Mmc 格式有值，用于配置迁移）
+    pub mmc_cfg_content: Option<String>,
+    /// MCBBS manifest（仅 Mcbbs 格式有值，用于 launchInfo 迁移）
     pub mcbbs_manifest: Option<super::mcbbs::McbbsManifest>,
+    /// LauncherPack 内层整合包在 zip 中的完整路径（仅 LauncherPack 有值，用于解压递归安装）
+    #[allow(dead_code)]
+    pub launcher_inner_path: Option<String>,
 }

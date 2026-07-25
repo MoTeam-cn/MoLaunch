@@ -4,11 +4,56 @@ use crate::log_info;
 use crate::minecraft::community::secure_storage;
 use crate::minecraft::community::types::Platform;
 use crate::state::{AppState, DownloadStage, StageStatus};
+use once_cell::sync::Lazy;
+use std::collections::HashSet;
+use std::sync::Mutex;
 use tauri::State;
 
 use super::concurrent;
-use super::modpack_stages::{download_modpack_archive, parse_modpack_info};
-use super::types::{InstallLocalModpackRequest, InstallModpackRequest, InstallModpackResult, ModpackFormat};
+use super::modpack_stages::{
+    copy_external_logo, download_modpack_archive, extract_optional_mods, parse_modpack_info,
+};
+use super::types::{
+    InstallLocalModpackRequest, InstallModpackRequest, InstallModpackResult, ModpackFormat,
+    ModpackPreview,
+};
+
+/// 当前正在安装的整合包实例名集合（用于重复任务检查）
+///
+/// 防止同名整合包同时安装。InstallGuard 在 install_modpack / install_local_modpack
+/// 入口 acquire，函数返回时（成功或失败）通过 Drop 自动释放，无需手动清理。
+static INSTALLING_INSTANCES: Lazy<Mutex<HashSet<String>>> =
+    Lazy::new(|| Mutex::new(HashSet::new()));
+
+/// 整合包安装占用 guard：构造时插入实例名，Drop 时自动移除
+///
+/// 用法：`let _guard = InstallGuard::acquire(&req.instance_name)?;`
+/// 函数返回时（成功 Err 或 Ok）自动 Drop，无需手动 release。
+struct InstallGuard {
+    name: String,
+}
+
+impl InstallGuard {
+    fn acquire(name: &str) -> Result<Self, String> {
+        let mut set = INSTALLING_INSTANCES.lock().unwrap();
+        if set.contains(name) {
+            return Err(format!(
+                "整合包 \"{}\" 正在安装中，请等待当前安装完成或取消后再试",
+                name
+            ));
+        }
+        set.insert(name.to_string());
+        Ok(InstallGuard {
+            name: name.to_string(),
+        })
+    }
+}
+
+impl Drop for InstallGuard {
+    fn drop(&mut self) {
+        INSTALLING_INSTANCES.lock().unwrap().remove(&self.name);
+    }
+}
 
 /// 安装整合包
 ///
@@ -37,6 +82,13 @@ pub async fn install_modpack(
         req.download_url
     );
 
+    // 0. 实例名校验（入口拦截，避免后续创建目录失败或 Java 启动失败）
+    super::helpers::validate_instance_name(&req.instance_name)?;
+    super::helpers::validate_modpack_extension(&req.file_name)?;
+
+    // 0.1 重复任务检查（同实例名正在安装时拒绝，防止并发安装冲突）
+    let _guard = InstallGuard::acquire(&req.instance_name)?;
+
     // 1. CF 平台前置检查 API Key（在 reset_stages 之前，失败时不需要 mark_failed）
     //    source=0 强制镜像时跳过：镜像站（mod.mcimirror.top）自带 API Key 请求 CF，
     //    用户无需配置自己的 Key 即可使用需要 Key 的接口（如 /mods/files）。
@@ -63,16 +115,16 @@ pub async fn install_modpack(
         }
     }
 
+    // 解析游戏目录、创建 instance_dir（提到 async block 外，便于错误时清理版本目录）
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
+    let instance_dir = game_dir.join("versions").join(&req.instance_name);
+    std::fs::create_dir_all(&instance_dir)
+        .map_err(|e| format!("创建整合包目录失败: {}", e))?;
+
     // 核心逻辑包在 async block 中，便于统一错误处理（失败时 mark_failed 重置 is_active）
+    let instance_dir_ref = &instance_dir;
     let result: Result<InstallModpackResult, String> = async {
-        // 解析游戏目录
-        let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
-        let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
-
-        let instance_dir = game_dir.join("versions").join(&req.instance_name);
-        std::fs::create_dir_all(&instance_dir)
-            .map_err(|e| format!("创建整合包目录失败: {}", e))?;
-
         // 2. 重置 download_state，设置整合包专用 stages（统一方法）
         // 同时重置暂停/取消标志，防止上次残留导致新下载卡住
         {
@@ -93,7 +145,7 @@ pub async fn install_modpack(
             .store(false, std::sync::atomic::Ordering::Relaxed);
 
         // 3. Stage 0：下载原始整合包（委托 modpack_stages）
-        let archive_path = instance_dir.join(&req.file_name);
+        let archive_path = instance_dir_ref.join(&req.file_name);
         download_modpack_archive(&state, &archive_path, &req.download_url, &req.file_name).await?;
 
         // 4. Stage 1：打开 zip + 检测格式 + 解析 manifest/index（委托 modpack_stages::parse_modpack_info）
@@ -131,30 +183,36 @@ pub async fn install_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(2, StageStatus::Loading, 0.0);
         }
-        let mods_dir = instance_dir.join("mods");
+        let mods_dir = instance_dir_ref.join("mods");
         std::fs::create_dir_all(&mods_dir).map_err(|e| format!("创建 mods 目录失败: {}", e))?;
+
+        // include_optional：在线资源页安装默认 true（不弹窗），
+        // 拖拽安装由前端 preview 后弹窗询问用户传入。
+        let include_optional = req.include_optional.unwrap_or(true);
 
         match info.format {
             ModpackFormat::Curseforge => {
-                let manifest = info.cf_manifest.expect("CF manifest 应已解析");
+                let manifest = info.cf_manifest.as_ref().expect("CF manifest 应已解析");
                 super::curseforge::install_cf_mods(
                     &state,
                     &manifest.files,
                     &mods_dir,
                     max_threads,
-                    &instance_dir,
+                    instance_dir_ref,
                     2,
+                    include_optional,
                 )
                 .await?;
             }
             ModpackFormat::Modrinth => {
-                let index = info.mr_index.expect("MR index 应已解析");
+                let index = info.mr_index.as_ref().expect("MR index 应已解析");
                 super::modrinth::install_mr_files(
                     &state,
                     &index.files,
-                    &instance_dir,
+                    instance_dir_ref,
                     max_threads,
                     2,
+                    include_optional,
                 )
                 .await?;
             }
@@ -164,6 +222,17 @@ pub async fn install_modpack(
                     "[Community] {:?} 整合包无依赖 mods 列表，跳过 Stage 2",
                     info.format
                 );
+            }
+            // LauncherPack 在线下载场景不应出现（外层 zip 包含启动器+整合包，非平台分发格式）
+            ModpackFormat::LauncherPack => {
+                return Err(
+                    "在线下载的整合包不应为 LauncherPack 格式（带启动器整合包），请改用拖拽安装"
+                        .to_string(),
+                );
+            }
+            // Compress 普通压缩包：无依赖 mods 列表，全部内容在 .minecraft/ 目录下
+            ModpackFormat::Compress => {
+                log_info!("[Community] Compress 整合包无依赖 mods 列表，跳过 Stage 2");
             }
         }
         {
@@ -176,14 +245,26 @@ pub async fn install_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(3, StageStatus::Loading, 0.0);
         }
-        let prefixes =
-            concurrent::build_overrides_prefixes(info.format, &info.archive_base_folder);
-        concurrent::extract_overrides(&mut archive, &instance_dir, &state, &prefixes, 3)?;
+        let prefixes = concurrent::build_overrides_prefixes(
+            info.format,
+            &info.archive_base_folder,
+            info.cf_overrides_name.as_deref(),
+        );
+        concurrent::extract_overrides(&mut archive, instance_dir_ref, &state, &prefixes, 3)?;
         {
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(3, StageStatus::Finished, 1.0);
             // 不调用 mark_complete()：前端会紧接着调用 install_merged 安装 MC 本体，
             // 轮询必须继续。mark_complete 由 install_merged 在全部完成后调用。
+        }
+
+        // 迁移 MMC instance.cfg / MCBBS launchInfo 配置到版本 setup.ini
+        // 必须在 extract_overrides 之后：MMC iconKey 复制需要 overrides 已解压
+        super::modpack_stages::migrate_modpack_config(&info, instance_dir_ref, &req.instance_name)?;
+
+        // CF/MR 在线下载安装时复制外部 Logo（拖拽安装 logo_path 通常为 None，会自动跳过）
+        if let Err(e) = copy_external_logo(req.logo_path.as_deref(), instance_dir_ref) {
+            crate::log_warn!("[Community] 复制外部 Logo 失败（不中断安装）: {}", e);
         }
 
         log_info!("[Community] 整合包安装完成: {}", req.instance_name);
@@ -194,15 +275,16 @@ pub async fn install_modpack(
             loader: info.loader,
             loader_version: info.loader_version,
             archive_path: archive_path.to_string_lossy().to_string(),
-            instance_dir: instance_dir.to_string_lossy().to_string(),
+            instance_dir: instance_dir_ref.to_string_lossy().to_string(),
         })
     }
     .await;
 
-    // 错误时重置 download_state，避免 is_active 仍为 true 导致前端下载管理页卡住
+    // 错误时重置 download_state + 清理版本目录（带 saves/versions 保护）
     if let Err(e) = result {
         let mut ds = state.download_state.lock().unwrap();
         ds.mark_failed(0);
+        super::helpers::cleanup_version_dir_on_failure(&instance_dir);
         return Err(e);
     }
     result
@@ -230,22 +312,85 @@ pub async fn install_local_modpack(
         req.instance_name
     );
 
+    // 0. 实例名校验（入口拦截，避免后续创建目录失败或 Java 启动失败）
+    super::helpers::validate_instance_name(&req.instance_name)?;
+    super::helpers::validate_modpack_extension(&req.file_path)?;
+
+    // 0.1 重复任务检查（同实例名正在安装时拒绝，防止并发安装冲突）
+    let _guard = InstallGuard::acquire(&req.instance_name)?;
+
     // 1. 校验文件存在（在 reset_stages 之前，失败时不需要 mark_failed）
     let archive_path = std::path::PathBuf::from(&req.file_path);
     if !archive_path.exists() {
         return Err(format!("整合包文件不存在: {}", req.file_path));
     }
 
+    // 1.1 预检测：如果是 LauncherPack（带启动器整合包），先提取内层整合包到临时目录，
+    // 然后将 archive_path 替换为内层整合包路径继续走主流程。
+    // 避免递归调用 install_local_modpack（async fn 递归需要 boxing，且会重置 download_state）。
+    let archive_path_owned: std::path::PathBuf;
+    let _temp_cleanup: Option<std::path::PathBuf>; // 携带临时文件路径用于函数结束时清理
+    {
+        let pre_file = std::fs::File::open(&archive_path)
+            .map_err(|e| format!("打开整合包失败: {}", e))?;
+        let mut pre_archive = zip::ZipArchive::new(pre_file)
+            .map_err(|e| format!("解析 zip 失败: {}（可能不是有效的整合包）", e))?;
+        let pre_detected = concurrent::detect_modpack_format(&mut pre_archive)?;
+        if pre_detected.format == ModpackFormat::LauncherPack {
+            let inner_path = pre_detected.launcher_inner_path.as_deref().ok_or_else(|| {
+                "LauncherPack 检测异常：未记录内层整合包路径".to_string()
+            })?;
+            log_info!(
+                "[Community] LauncherPack：提取内层整合包 {} 到临时目录后继续安装",
+                inner_path
+            );
+
+            // 提取内层整合包到 instance_dir 同级的临时目录
+            let game_dir_pre = crate::state::resolve_game_dir_from_state(&state).await;
+            let temp_dir = game_dir_pre.join(".tmp_launcher_extract");
+            std::fs::create_dir_all(&temp_dir)
+                .map_err(|e| format!("创建临时目录失败: {}", e))?;
+            let inner_file_name = inner_path
+                .rsplit(['/', '\\'])
+                .next()
+                .unwrap_or("modpack.zip");
+            let inner_local_path = temp_dir.join(inner_file_name);
+            let mut inner_entry = pre_archive
+                .by_name(inner_path)
+                .map_err(|e| format!("读取内层整合包失败: {} ({})", inner_path, e))?;
+            use std::io::Read;
+            let mut buf = Vec::new();
+            inner_entry
+                .read_to_end(&mut buf)
+                .map_err(|e| format!("读取内层整合包内容失败: {}", e))?;
+            std::fs::write(&inner_local_path, &buf)
+                .map_err(|e| format!("写入内层整合包失败: {}", e))?;
+            log_info!(
+                "[Community] LauncherPack：内层整合包已提取到 {}",
+                inner_local_path.display()
+            );
+
+            archive_path_owned = inner_local_path.clone();
+            _temp_cleanup = Some(inner_local_path.clone());
+            // 临时目录留待函数结束时清理（temp_dir 路径已固定，下面手动清理）
+            let _ = temp_dir; // 不在此处删除，避免内层整合包还在使用
+        } else {
+            archive_path_owned = archive_path.clone();
+            _temp_cleanup = None;
+        }
+    }
+    let archive_path = &archive_path_owned;
+
+    // 解析游戏目录、创建 instance_dir（提到 async block 外，便于错误时清理版本目录）
+    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
+    let instance_dir = game_dir.join("versions").join(&req.instance_name);
+    std::fs::create_dir_all(&instance_dir)
+        .map_err(|e| format!("创建整合包目录失败: {}", e))?;
+
     // 核心逻辑包在 async block 中，便于统一错误处理（失败时 mark_failed 重置 is_active）
+    let instance_dir_ref = &instance_dir;
     let result: Result<InstallModpackResult, String> = async {
-        // 2. 解析游戏目录
-        let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
-        let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
-
-        let instance_dir = game_dir.join("versions").join(&req.instance_name);
-        std::fs::create_dir_all(&instance_dir)
-            .map_err(|e| format!("创建整合包目录失败: {}", e))?;
-
         // 3. 重置 download_state（本地拖拽跳过 Stage 0 下载，保留 3 个 stages）
         {
             let mut ds = state.download_state.lock().unwrap();
@@ -323,30 +468,35 @@ pub async fn install_local_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(1, StageStatus::Loading, 0.0);
         }
-        let mods_dir = instance_dir.join("mods");
+        let mods_dir = instance_dir_ref.join("mods");
         std::fs::create_dir_all(&mods_dir).map_err(|e| format!("创建 mods 目录失败: {}", e))?;
+
+        // include_optional：由前端 preview 后弹窗询问用户传入，None 默认 true（保持向后兼容）
+        let include_optional = req.include_optional.unwrap_or(true);
 
         match info.format {
             ModpackFormat::Curseforge => {
-                let manifest = info.cf_manifest.expect("CF manifest 应已解析");
+                let manifest = info.cf_manifest.as_ref().expect("CF manifest 应已解析");
                 super::curseforge::install_cf_mods(
                     &state,
                     &manifest.files,
                     &mods_dir,
                     max_threads,
-                    &instance_dir,
+                    instance_dir_ref,
                     1,
+                    include_optional,
                 )
                 .await?;
             }
             ModpackFormat::Modrinth => {
-                let index = info.mr_index.expect("MR index 应已解析");
+                let index = info.mr_index.as_ref().expect("MR index 应已解析");
                 super::modrinth::install_mr_files(
                     &state,
                     &index.files,
-                    &instance_dir,
+                    instance_dir_ref,
                     max_threads,
                     1,
+                    include_optional,
                 )
                 .await?;
             }
@@ -356,6 +506,16 @@ pub async fn install_local_modpack(
                     "[Community] {:?} 本地整合包无依赖 mods 列表，跳过 Stage 1",
                     info.format
                 );
+            }
+            // LauncherPack 不会走到这里：入口预检测已递归处理
+            ModpackFormat::LauncherPack => {
+                return Err(
+                    "LauncherPack 不应进入主安装流程（应在入口预检测阶段递归处理）".to_string(),
+                );
+            }
+            // Compress 普通压缩包：无依赖 mods 列表，全部内容在 .minecraft/ 目录下
+            ModpackFormat::Compress => {
+                log_info!("[Community] Compress 本地整合包无依赖 mods 列表，跳过 Stage 1");
             }
         }
         {
@@ -368,14 +528,26 @@ pub async fn install_local_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(2, StageStatus::Loading, 0.0);
         }
-        let prefixes =
-            concurrent::build_overrides_prefixes(info.format, &info.archive_base_folder);
-        concurrent::extract_overrides(&mut archive, &instance_dir, &state, &prefixes, 2)?;
+        let prefixes = concurrent::build_overrides_prefixes(
+            info.format,
+            &info.archive_base_folder,
+            info.cf_overrides_name.as_deref(),
+        );
+        concurrent::extract_overrides(&mut archive, instance_dir_ref, &state, &prefixes, 2)?;
         {
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(2, StageStatus::Finished, 1.0);
             // 不调用 mark_complete()：前端会紧接着调用 install_merged 安装 MC 本体，
             // 轮询必须继续。mark_complete 由 install_merged 在全部完成后调用。
+        }
+
+        // 迁移 MMC instance.cfg / MCBBS launchInfo 配置到版本 setup.ini
+        // 必须在 extract_overrides 之后：MMC iconKey 复制需要 overrides 已解压
+        super::modpack_stages::migrate_modpack_config(&info, instance_dir_ref, &req.instance_name)?;
+
+        // CF/MR 在线下载安装时复制外部 Logo（拖拽安装 logo_path 通常为 None，会自动跳过）
+        if let Err(e) = copy_external_logo(req.logo_path.as_deref(), instance_dir_ref) {
+            crate::log_warn!("[Community] 复制外部 Logo 失败（不中断安装）: {}", e);
         }
 
         log_info!("[Community] 本地整合包安装完成: {}", req.instance_name);
@@ -386,16 +558,77 @@ pub async fn install_local_modpack(
             loader: info.loader,
             loader_version: info.loader_version,
             archive_path: archive_path.to_string_lossy().to_string(),
-            instance_dir: instance_dir.to_string_lossy().to_string(),
+            instance_dir: instance_dir_ref.to_string_lossy().to_string(),
         })
     }
     .await;
 
-    // 错误时重置 download_state，避免 is_active 仍为 true 导致前端下载管理页卡住
+    // 错误时重置 download_state + 清理版本目录（带 saves/versions 保护）
     if let Err(e) = result {
         let mut ds = state.download_state.lock().unwrap();
         ds.mark_failed(0);
+        super::helpers::cleanup_version_dir_on_failure(&instance_dir);
+        // LauncherPack 临时文件清理
+        if let Some(tmp) = &_temp_cleanup {
+            let _ = std::fs::remove_file(tmp);
+            let _ = std::fs::remove_dir(tmp.parent().unwrap_or(std::path::Path::new(".")));
+        }
         return Err(e);
     }
+    // LauncherPack 临时文件清理（成功路径）
+    if let Some(tmp) = &_temp_cleanup {
+        let _ = std::fs::remove_file(tmp);
+        let _ = std::fs::remove_dir(tmp.parent().unwrap_or(std::path::Path::new(".")));
+    }
     result
+}
+
+/// 预览本地整合包（拖拽安装前置步骤）
+///
+/// 仅打开 zip + 检测格式 + 解析 manifest/index，不下载、不复制 overrides。
+/// 返回整合包基本信息 + 可选 Mod 列表，前端据弹窗询问用户是否下载可选 Mod。
+/// 用户选择后调用 `install_local_modpack` 传入 `include_optional` 参数完成安装。
+///
+/// RPC 模型需要拆分为 preview + install 两步，preview 阶段不阻塞、不调用 API。
+#[tauri::command]
+pub async fn preview_local_modpack(file_path: String) -> Result<ModpackPreview, String> {
+    log_info!("[Community] 预览本地整合包: {}", file_path);
+
+    super::helpers::validate_modpack_extension(&file_path)?;
+
+    let archive_path = std::path::PathBuf::from(&file_path);
+    if !archive_path.exists() {
+        return Err(format!("整合包文件不存在: {}", file_path));
+    }
+
+    let file =
+        std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file)
+        .map_err(|e| format!("解析 zip 失败: {}（可能不是有效的整合包）", e))?;
+
+    let detected = concurrent::detect_modpack_format(&mut archive)?;
+    let info = parse_modpack_info(&detected)?;
+
+    let optional_mods = extract_optional_mods(&info);
+
+    log_info!(
+        "[Community] 预览完成: format={:?} game={} loader={}{} optional_mods={}",
+        info.format,
+        info.game_version,
+        info.loader,
+        if info.loader_version.is_empty() {
+            String::new()
+        } else {
+            format!("@{}", info.loader_version)
+        },
+        optional_mods.len()
+    );
+
+    Ok(ModpackPreview {
+        format: info.format,
+        game_version: info.game_version,
+        loader: info.loader,
+        loader_version: info.loader_version,
+        optional_mods,
+    })
 }
