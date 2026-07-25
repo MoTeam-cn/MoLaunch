@@ -40,7 +40,7 @@ import type { LayoutSchema, LayoutSection, StatItem, ListField, ValueFormat, Par
 const VALID_SECTION_TYPES = new Set(['stat-grid', 'list', 'progress', 'text', 'divider', 'html'])
 
 /** 有效的值格式 */
-const VALID_FORMATS = new Set(['bytes', 'number', 'percent', 'text'])
+const VALID_FORMATS = new Set(['bytes', 'number', 'percent', 'text', 'datetime'])
 
 /** 有效的颜色主题 */
 const VALID_COLORS = new Set(['primary', 'green', 'yellow', 'red', 'gray'])

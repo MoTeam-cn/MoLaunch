@@ -31,7 +31,7 @@
       "source": "history.recent",
       "fields": [
         { "key": "version_id", "label": "版本" },
-        { "key": "launch_time", "label": "时间", "format": "text" }
+        { "key": "launch_time", "label": "时间", "format": "datetime" }
       ]
     },
     { "type": "divider" },

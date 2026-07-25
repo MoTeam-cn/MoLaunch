@@ -154,8 +154,32 @@ export function formatValue(value: string | number, format?: string): string {
     case 'percent':
       if (isNaN(num)) return String(value)
       return `${num.toFixed(1)}%`
+    case 'datetime':
+      return formatDateTime(value)
     case 'text':
     default:
       return String(value)
+  }
+}
+
+/**
+ * 格式化 RFC3339 时间字符串为 "MM-DD HH:mm"
+ *
+ * 用于自定义布局中 `launch_time` 等时间字段的显示。
+ * 与 `LaunchHistoryPanel.vue` 的 `formatTime` 保持一致的风格。
+ * 解析失败时原样返回，避免误导用户。
+ */
+function formatDateTime(value: string | number): string {
+  const str = String(value)
+  try {
+    const d = new Date(str)
+    if (isNaN(d.getTime())) return str
+    const mm = String(d.getMonth() + 1).padStart(2, '0')
+    const dd = String(d.getDate()).padStart(2, '0')
+    const hh = String(d.getHours()).padStart(2, '0')
+    const mi = String(d.getMinutes()).padStart(2, '0')
+    return `${mm}-${dd} ${hh}:${mi}`
+  } catch {
+    return str
   }
 }

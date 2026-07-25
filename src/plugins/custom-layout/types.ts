@@ -12,7 +12,7 @@
  */
 
 /** 值格式化方式 */
-export type ValueFormat = 'bytes' | 'number' | 'percent' | 'text'
+export type ValueFormat = 'bytes' | 'number' | 'percent' | 'text' | 'datetime'
 
 /** 统计网格项 */
 export interface StatItem {

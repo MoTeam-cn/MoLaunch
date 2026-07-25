@@ -11,7 +11,7 @@
   </html>
   <list title="最近启动" source="history.recent">
     <field key="version_id" label="版本" />
-    <field key="launch_time" label="时间" format="text" />
+    <field key="launch_time" label="时间" format="datetime" />
   </list>
   <divider />
   <text variant="muted">数据每 3 秒自动刷新</text>
