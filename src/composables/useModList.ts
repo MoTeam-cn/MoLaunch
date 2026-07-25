@@ -6,7 +6,7 @@
  * - 单个 Mod 操作：启用/禁用、删除、安装、打开目录、打开文件位置、显示详情
  * - 预加载事件监听（useModsPreload）
  * - 图片缓存事件监听（onImageCached）
- * - mods 目录文件变化监听（useTauriEvent 'mods-dir-changed'）
+ * - mods 目录文件变化监听（onGlobalEvent 'mods-dir-changed'）
  * - 详情查询桥接（useModDetailQuery）
  * - 版本上下文预取（gameVersion / modsDir / disableModUpdate）
  * - onMounted 初始化 + onUnmounted 清理
@@ -23,7 +23,7 @@ import { showConfirm } from '@/utils/modal'
 import { useModsPreload } from '@/composables/useModsPreload'
 import { useModDetailQuery } from '@/composables/useModDetailQuery'
 import { onImageCached } from '@/composables/useImageCache'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'
 import { modTitle } from '@/utils/mod-display'
 import type { ModInfo } from '@/utils/tauri'
 
@@ -45,6 +45,8 @@ export function useModList(options: UseModListOptions) {
   const modSearch = ref('')
   const isModableVersion = ref(false)
   const checkingModable = ref(false)
+  /** 组件是否仍挂载（init() 异步链中检查，卸载后不再触发 fire-and-forget invoke） */
+  let isMounted = true
 
   // 版本上下文（详情弹窗 + ResourceDetail 使用）
   const versionGameVersion = ref<string | null>(null)
@@ -75,8 +77,11 @@ export function useModList(options: UseModListOptions) {
    * 后端 `watch_mods_dir` 在 mods 目录文件变化时 emit `mods-dir-changed` 事件（500ms 防抖），
    * 本监听器收到事件后重新加载 mod 列表（loadMods 内部会合并保留预加载数据），
    * 并重新触发后台预加载（为新加入的 mod 查询 CF/MR 工程详情）。
+   *
+   * 使用全局单例 listener（`onGlobalEvent`），避免 Tauri 2.x `unlisten` 竞态
+   * 导致的 "Couldn't find callback id xxx" 警告。
    */
-  const { start: startModsDirListener } = useTauriEvent('mods-dir-changed', () => {
+  onGlobalEvent('mods-dir-changed', () => {
     loadMods(true)
     if (selectedId.value) {
       tauri.preloadModsDetail(selectedId.value).catch(e => {
@@ -84,7 +89,6 @@ export function useModList(options: UseModListOptions) {
       })
     }
   })
-  startModsDirListener()
 
   // 详情查询桥接
   const { detailVisible, detailProject, detailLoadingFor, handleShowInfo, handleOpenWiki } = useModDetailQuery()
@@ -287,16 +291,23 @@ export function useModList(options: UseModListOptions) {
    * 5. 启动 mods 目录文件监听
    * 6. 预取版本上下文（不阻塞 UI）
    * 7. 触发后台预加载
+   *
+   * 每个 await 后检查 isMounted：组件卸载后不再继续触发 fire-and-forget invoke
+   * （特别是 preloadModsDetail 会 tokio::spawn 后台 task 持续 emit 事件，
+   * 如果在组件卸载后才触发，会导致 listener 已被清理但 Rust 仍在 emit → callback 丢失警告）
    */
   async function init() {
     try {
       const cfg = await tauri.getConfigMap()
+      if (!isMounted) return
       modLocalNameStyle.value = cfg.communityModLocalNameStyle
     } catch { /* 默认 0 */ }
     startPreloadListener()
     await checkModable()
+    if (!isMounted) return
     if (isModableVersion.value) {
       await loadMods()
+      if (!isMounted) return
       if (selectedId.value) {
         tauri.watchModsDir(selectedId.value).catch(e => {
           console.debug('[ModTab] 启动文件监听失败:', e)
@@ -312,14 +323,24 @@ export function useModList(options: UseModListOptions) {
   }
 
   /**
-   * 组件卸载时停止 mods 目录文件监听
+   * 组件卸载时停止 mods 目录文件监听 + 取消后台预加载 task
    *
-   * `useTauriEvent` 的 `mods-dir-changed` 监听器由 onUnmounted 自动清理，
-   * 但后端的 `notify` watcher 需要显式调用 `unwatchModsDir` 停止，避免资源泄漏。
+   * `onGlobalEvent` 的 handler 由 onUnmounted 自动从 Set 中移除（Tauri listener 永不 unlisten，
+   * 避免 `unlisten` 竞态导致的 "Couldn't find callback id xxx" 警告）。
+   * 后端的 `notify` watcher 需要显式调用 `unwatchModsDir` 停止，避免资源泄漏。
+   * 同时设置 isMounted = false，让 init() 异步链不再继续触发 fire-and-forget invoke。
+   *
+   * **关键**：调用 `cancelPreloadModsDetail` abort 后台 spawn 的预加载 task，
+   * 避免无意义的后台计算（注意：image-cached 事件的 emit 由全局 listener 兜底，
+   * 不受此 abort 影响，仍需全局 listener 处理）。
    */
   onUnmounted(() => {
+    isMounted = false
     tauri.unwatchModsDir().catch(e => {
       console.debug('[ModTab] 停止文件监听失败:', e)
+    })
+    tauri.cancelPreloadModsDetail().catch(e => {
+      console.debug('[ModTab] 取消预加载失败:', e)
     })
   })
 

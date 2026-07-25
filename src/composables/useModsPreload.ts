@@ -15,16 +15,20 @@
  * - project 后到（project 字段非 null，同时 cached_logo_url 一起到）
  * 也可能一次性 emit（缓存命中时所有字段一起到）。
  *
+ * 使用全局单例 listener（`onGlobalEvent`），避免 Tauri 2.x `unlisten` 竞态
+ * 导致的 "Couldn't find callback id xxx" 警告。组件卸载时 handler 自动从 Set 移除，
+ * Tauri listener 永不 unlisten。
+ *
  * 使用方式：
  * ```ts
- * const { startListener, stopListener, isPreloadDone } = useModsPreload(mods)
- * onMounted(() => startListener())
- * onUnmounted(() => stopListener())
+ * const { isPreloadDone } = useModsPreload(mods)
+ * // 事件监听在构造时自动注册，无需手动 startListener
+ * // 组件卸载时 handler 自动移除
  * ```
  */
 
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { ref, type Ref } from 'vue'
+import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'
 import type { ModInfo } from '@/utils/api/personalization'
 import type { ResourceProject } from '@/types/community'
 
@@ -50,61 +54,47 @@ interface PreloadUpdatePayload {
  *
  * @param mods 响应式的 mod 列表 ref（按 file_name 匹配更新）
  * @returns `{ startListener, stopListener, isPreloadDone }`
+ *   - `startListener`/`stopListener` 保留为 no-op 以兼容旧调用方，
+ *     实际监听在构造时通过 `onGlobalEvent` 自动注册，`onUnmounted` 自动移除。
  */
 export function useModsPreload(mods: Ref<ModInfo[]>) {
-  let unlisten: UnlistenFn | null = null
-  let unlistenDone: UnlistenFn | null = null
   /** 预加载是否已完成（后端 emit `mods-preload-done` 后置 true） */
   const isPreloadDone = ref(false)
 
-  const startListener = async () => {
-    if (unlisten && unlistenDone) return // 防止重复监听
+  // 注册全局事件 handler（onUnmounted 自动移除 handler，Tauri listener 永不 unlisten）
+  onGlobalEvent<PreloadUpdatePayload>('mods-preload-update', (payload) => {
+    const { file_name } = payload
+    if (!file_name) return
 
-    unlisten = await listen<PreloadUpdatePayload>(
-      'mods-preload-update',
-      (event) => {
-        const payload = event.payload
-        const { file_name } = payload
-        if (!file_name) return
-
-        // 在 mods 数组中查找匹配的 mod（按 file_name）
-        // 用 for 循环 + 索引赋值确保 Vue 响应式触发更新
-        for (let i = 0; i < mods.value.length; i++) {
-          if (mods.value[i].file_name === file_name) {
-            const old = mods.value[i]
-            // 合并所有非 undefined 的字段
-            const updated: ModInfo = {
-              ...old,
-              ...(payload.slug !== undefined ? { slug: payload.slug } : {}),
-              ...(payload.description !== undefined ? { description: payload.description } : {}),
-              ...(payload.version !== undefined ? { version: payload.version } : {}),
-              ...(payload.cached_logo_url !== undefined ? { cached_logo_url: payload.cached_logo_url } : {}),
-              ...(payload.translated_name !== undefined ? { translated_name: payload.translated_name } : {}),
-              // project 仅在原值为空或新值非 null 时更新（避免覆盖已加载的更优结果）
-              ...(payload.project && !old.project ? { project: payload.project } : {}),
-            }
-            mods.value[i] = updated
-            break
-          }
+    // 在 mods 数组中查找匹配的 mod（按 file_name）
+    // 用 for 循环 + 索引赋值确保 Vue 响应式触发更新
+    for (let i = 0; i < mods.value.length; i++) {
+      if (mods.value[i].file_name === file_name) {
+        const old = mods.value[i]
+        // 合并所有非 undefined 的字段
+        const updated: ModInfo = {
+          ...old,
+          ...(payload.slug !== undefined ? { slug: payload.slug } : {}),
+          ...(payload.description !== undefined ? { description: payload.description } : {}),
+          ...(payload.version !== undefined ? { version: payload.version } : {}),
+          ...(payload.cached_logo_url !== undefined ? { cached_logo_url: payload.cached_logo_url } : {}),
+          ...(payload.translated_name !== undefined ? { translated_name: payload.translated_name } : {}),
+          // project 仅在原值为空或新值非 null 时更新（避免覆盖已加载的更优结果）
+          ...(payload.project && !old.project ? { project: payload.project } : {}),
         }
-      },
-    )
-
-    unlistenDone = await listen<void>('mods-preload-done', () => {
-      isPreloadDone.value = true
-    })
-  }
-
-  const stopListener = () => {
-    if (unlisten) {
-      unlisten()
-      unlisten = null
+        mods.value[i] = updated
+        break
+      }
     }
-    if (unlistenDone) {
-      unlistenDone()
-      unlistenDone = null
-    }
-  }
+  })
+
+  onGlobalEvent<void>('mods-preload-done', () => {
+    isPreloadDone.value = true
+  })
+
+  // 兼容旧 API：全局 listener 始终存活，无需手动 start/stop
+  const startListener = async () => {}
+  const stopListener = () => {}
 
   return { startListener, stopListener, isPreloadDone }
 }
