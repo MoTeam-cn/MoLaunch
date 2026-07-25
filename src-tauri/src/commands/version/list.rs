@@ -7,7 +7,7 @@ use crate::minecraft::version::scan as version_scan;
 use crate::minecraft::version::setup::VersionSetup;
 use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
-use crate::{log_error, log_info};
+use crate::{log_debug, log_error, log_info};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -101,7 +101,7 @@ pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<S
 pub async fn list_installed_versions_with_type(
     state: State<'_, AppState>,
 ) -> Result<Vec<InstalledVersionInfo>, String> {
-    log_info!("Fetching installed versions with type info");
+    log_debug!("Fetching installed versions with type info");
 
     let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
 
@@ -110,7 +110,7 @@ pub async fn list_installed_versions_with_type(
 
     for version in versions {
         let version_type = detect_version_type_from_dir(&game_dir, &version.id);
-        log_info!(
+        log_debug!(
             "[VersionList] detect type: id={} type={:?}",
             version.id,
             version_type
@@ -128,7 +128,7 @@ pub async fn list_installed_versions_with_type(
         });
     }
 
-    log_info!("Found {} versions with type info", result.len());
+    log_debug!("Found {} versions with type info", result.len());
     Ok(result)
 }
 
