@@ -1,29 +1,36 @@
 /**
  * Java 检测、校验、下载 API
+ *
+ * 注：底层已聚合为 `java_manager` 单一 IPC 入口，通过 `action` 字段分发。
+ * `getDeviceId` 例外：底层属于 SDK 命令，已聚合到 `sdk_manager` 入口。
+ * 类型定义与常量保留在此文件，业务调用点保持类型安全。
  */
 
-import { invoke } from '@tauri-apps/api/core'
 import type { JavaRuntime, JavaRequirements, JavaCompatResult } from '@/types/java'
+import { JAVA_ACTIONS, javaManager } from './java-manager'
+import { SDK_ACTIONS, sdkManager } from './sdk-manager'
 
 /**
  * 获取设备 ID
+ *
+ * 注：`get_device_id` 属于 SDK 命令，已聚合到 `sdk_manager` IPC 入口，通过 `action` 字段分发。
  */
 export async function getDeviceId(): Promise<string> {
-  return await invoke<string>('get_device_id')
+  return sdkManager<string>(SDK_ACTIONS.GET_DEVICE_ID)
 }
 
 /**
  * 检测 Java
  */
 export async function detectJava(): Promise<JavaRuntime> {
-  return await invoke<JavaRuntime>('detect_java')
+  return javaManager<JavaRuntime>(JAVA_ACTIONS.DETECT_JAVA)
 }
 
 /**
  * 列出所有 Java
  */
 export async function listJava(): Promise<JavaRuntime[]> {
-  return await invoke<JavaRuntime[]>('list_java')
+  return javaManager<JavaRuntime[]>(JAVA_ACTIONS.LIST_JAVA)
 }
 
 /**
@@ -33,7 +40,7 @@ export async function getJavaRequirements(
   mcVersion: string,
   loader?: string | null,
 ): Promise<JavaRequirements> {
-  return await invoke<JavaRequirements>('get_java_requirements', {
+  return javaManager<JavaRequirements>(JAVA_ACTIONS.GET_JAVA_REQUIREMENTS, {
     mcVersion,
     loader: loader ?? null,
   })
@@ -47,7 +54,7 @@ export async function checkJavaCompatible(
   mcVersion: string,
   loader?: string | null,
 ): Promise<JavaCompatResult> {
-  return await invoke<JavaCompatResult>('check_java_compatible', {
+  return javaManager<JavaCompatResult>(JAVA_ACTIONS.CHECK_JAVA_COMPATIBLE, {
     javaPath,
     mcVersion,
     loader: loader ?? null,
@@ -85,5 +92,5 @@ export type { JavaDownloadProgress } from '@/types/java'
  * 进度通过 `java-download-progress` 事件推送，监听 `JavaDownloadProgress` payload
  */
 export async function downloadJava(targetMajor: number): Promise<string> {
-  return await invoke<string>('download_java', { targetMajor })
+  return javaManager<string>(JAVA_ACTIONS.DOWNLOAD_JAVA, { targetMajor })
 }

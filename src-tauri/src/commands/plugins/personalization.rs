@@ -11,6 +11,9 @@
 //! - 其他平台: `~/.config/MolaLaunch/personalization.json`
 //!
 //! 文件格式：JSON（直接透传前端传来的 `serde_json::Value`，全量覆盖写入）。
+//!
+//! 注：原 2 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
+//! 子模块函数已去掉 `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch` 调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -19,7 +22,6 @@ use std::path::PathBuf;
 /// 读取个性化配置
 ///
 /// 文件不存在时返回空 JSON 对象 `{}`，调用方按 Partial 语义合并默认值。
-#[tauri::command]
 pub async fn read_personalization() -> Result<serde_json::Value, String> {
     let path = personalization_path()?;
 
@@ -42,7 +44,6 @@ pub async fn read_personalization() -> Result<serde_json::Value, String> {
 /// 写入个性化配置
 ///
 /// 全量覆盖写入。调用方传入完整的 `PersonalizationData` 结构。
-#[tauri::command]
 pub async fn write_personalization(data: serde_json::Value) -> Result<(), String> {
     let path = personalization_path()?;
 

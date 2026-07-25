@@ -20,9 +20,9 @@
 //! - modpack.rs: 整合包安装命令（install_modpack / install_local_modpack）
 //! - mod.rs: 模块入口 + pub mod 声明 + 类型 re-export
 //!
-//! 注意：所有 #[tauri::command] 命令分散在 resource.rs 和 modpack.rs 中，
-//! tauri::command 宏在定义处生成 __cmd__ 符号，不能通过 pub use 重导出，
-//! 故 lib.rs 使用完整路径注册（commands::community::install::resource::* / ::modpack::*）
+//! 注意：resource.rs / modpack.rs 中的子模块函数已去掉 `#[tauri::command]` 标注，
+//! 改为接收 `&AppState` / `&AppHandle`，由 `utils::community_manager::dispatch`
+//! 反序列化参数后调用。lib.rs 仅注册统一入口 `community_manager`。
 
 pub mod concurrent;
 pub mod curseforge;

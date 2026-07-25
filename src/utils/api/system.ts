@@ -2,31 +2,37 @@
  * 系统操作、目录选择、下载进度查询 API
  *
  * 全局配置读写（getConfig/applyConfig/refreshConfig 等）已拆分到 `./config.ts`。
+ *
+ * 注：9 个原 Tauri 命令（open_game_dir / open_path / reveal_in_explorer
+ * / get_game_dir / write_text_file / get_system_memory / set_game_dir
+ * / get_config_path / save_config_to_file）已聚合为 `system_manager` 单一 IPC 入口，
+ * 通过 `action` 字段分发。
  */
 
-import { invoke } from '@tauri-apps/api/core'
 import type { RawDownloadProgress } from '@/types/download'
+import { SYSTEM_ACTIONS, systemManager } from './system-manager'
+import { VERSION_PROGRESS_ACTIONS, versionProgressManager } from './version-progress-manager'
 
 // ==================== 系统操作 ====================
 
 /** 打开游戏目录 */
 export async function openGameDir(): Promise<void> {
-  return await invoke<void>('open_game_dir')
+  return systemManager<void>(SYSTEM_ACTIONS.OPEN_GAME_DIR)
 }
 
 /** 打开任意路径（文件夹或文件） */
 export async function openPath(path: string): Promise<void> {
-  return await invoke<void>('open_path', { path })
+  return systemManager<void>(SYSTEM_ACTIONS.OPEN_PATH, { path })
 }
 
 /** 在资源管理器中打开并选中指定文件（Windows: explorer /select, macOS: open -R） */
 export async function revealInExplorer(path: string): Promise<void> {
-  return await invoke<void>('reveal_in_explorer', { path })
+  return systemManager<void>(SYSTEM_ACTIONS.REVEAL_IN_EXPLORER, { path })
 }
 
 /** 获取游戏目录 */
 export async function getGameDir(): Promise<string> {
-  return await invoke<string>('get_game_dir')
+  return systemManager<string>(SYSTEM_ACTIONS.GET_GAME_DIR)
 }
 
 /**
@@ -36,62 +42,64 @@ export async function getGameDir(): Promise<string> {
  * 此命令仅负责写入文本，会自动创建父目录。
  */
 export async function writeTextFile(path: string, content: string): Promise<void> {
-  return await invoke<void>('write_text_file', { path, content })
+  return systemManager<void>(SYSTEM_ACTIONS.WRITE_TEXT_FILE, { path, content })
 }
 
 /**
  * 更新游戏目录
  *
- * 注意：此命令保留独立，因为它在版本切换流程中被内部调用。
- * 用户在设置页改 game_dir 时应走 `applyConfig({ gameDir })`。
+ * 通过 `system_manager` 的 `set_game_dir` action 调用。
+ * 用户在设置页改 game_dir 时应走 `applyConfig({ gameDir })`；
+ * 此命令用于版本切换等内部流程需要直接修改 game_dir 的场景。
  */
 export async function setGameDir(gameDir: string): Promise<void> {
-  return await invoke<void>('set_game_dir', { gameDir })
+  return systemManager<void>(SYSTEM_ACTIONS.SET_GAME_DIR, { gameDir })
 }
 
 /** 获取系统内存信息 */
 export async function getSystemMemory(): Promise<{ total: number; used: number; available: number; usage_percent: number }> {
-  return await invoke('get_system_memory')
+  return systemManager(SYSTEM_ACTIONS.GET_SYSTEM_MEMORY)
 }
 
 /** 获取配置文件路径 */
 export async function getConfigPath(): Promise<string> {
-  return await invoke<string>('get_config_path')
+  return systemManager<string>(SYSTEM_ACTIONS.GET_CONFIG_PATH)
 }
 
 /** 手动保存配置到文件 */
 export async function saveConfigToFile(): Promise<void> {
-  return await invoke<void>('save_config_to_file')
+  return systemManager<void>(SYSTEM_ACTIONS.SAVE_CONFIG_TO_FILE)
 }
 
 // ==================== 下载进度查询 ====================
+// 注：底层已聚合为 `version_progress_manager` 单一 IPC 入口，通过 `action` 字段分发。
 
 /** 获取下载进度快照（返回后端原始结构 RawDownloadProgress，由调用方做 fallback） */
 export async function getDownloadProgress(): Promise<RawDownloadProgress> {
-  return await invoke('get_download_progress')
+  return versionProgressManager<RawDownloadProgress>(VERSION_PROGRESS_ACTIONS.GET_DOWNLOAD_PROGRESS)
 }
 
 /** 检查是否正在下载 */
 export async function isDownloading(): Promise<boolean> {
-  return await invoke('is_downloading')
+  return versionProgressManager<boolean>(VERSION_PROGRESS_ACTIONS.IS_DOWNLOADING)
 }
 
 /** 重置下载进度 */
 export async function resetDownloadProgress(): Promise<void> {
-  return await invoke('reset_download_progress')
+  return versionProgressManager<void>(VERSION_PROGRESS_ACTIONS.RESET_DOWNLOAD_PROGRESS)
 }
 
 /** 取消下载（设置 cancel_flag，正在进行的下载会尽快中止） */
 export async function cancelDownload(): Promise<void> {
-  return await invoke('cancel_download')
+  return versionProgressManager<void>(VERSION_PROGRESS_ACTIONS.CANCEL_DOWNLOAD)
 }
 
 /** 暂停下载（设置 pause_flag，新任务不再开始，已进行的任务完成当前文件后等待） */
 export async function pauseDownload(): Promise<void> {
-  return await invoke('pause_download')
+  return versionProgressManager<void>(VERSION_PROGRESS_ACTIONS.PAUSE_DOWNLOAD)
 }
 
 /** 恢复下载（清除 pause_flag） */
 export async function resumeDownload(): Promise<void> {
-  return await invoke('resume_download')
+  return versionProgressManager<void>(VERSION_PROGRESS_ACTIONS.RESUME_DOWNLOAD)
 }

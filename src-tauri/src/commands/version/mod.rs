@@ -14,6 +14,10 @@ pub mod progress;
 pub mod script_export;
 pub mod types;
 
+use crate::state::AppState;
+use crate::utils::dispatcher::ActionRequest;
+use tauri::{AppHandle, State};
+
 // Re-export types
 pub use types::{DownloadProgressSnapshot, DownloadStageSnapshot, VersionInfo, VersionListResult};
 // Re-export commands (保持 lib.rs 中 commands::version::* 路径兼容)
@@ -27,6 +31,39 @@ pub use personalization::{
     get_version_personalization, update_version_personalization, VersionPersonalization,
 };
 pub use script_export::export_launch_script;
+
+/// 版本列表/文件夹/管理/个性化统一 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::version_list_manager::dispatch` 进行 action 分发。
+/// 原 17 个独立 Tauri 命令（6 list + 5 folder + 4 manage + 2 personalization）
+/// 均通过此入口聚合调用。
+#[tauri::command]
+pub async fn version_list_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::version_list_manager::dispatch(state, app, req).await
+}
+
+/// 统一版本安装管理 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::version_install_manager::dispatch` 进行 action 分发。
+///
+/// 聚合的 11 个 action 来自 download / install / loaders / preload 四个子模块，
+/// 详见 `utils::version_install_manager` 模块文档。
+#[tauri::command]
+pub async fn version_install_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::version_install_manager::dispatch(state, app, req).await
+}
 
 /// 校验版本 ID / 实例名，防止路径遍历
 pub fn sanitize_version_id(id: &str) -> Result<(), String> {

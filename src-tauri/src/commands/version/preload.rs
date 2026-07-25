@@ -4,8 +4,11 @@
 //! 后台异步并发从 CF/MR 批量查询每个 mod 的 ResourceProject，通过 Tauri event 推送。
 //!
 //! 列表加载完成后立即启动后台联网补全。
+//!
+//! 注：已聚合为 `version_install_manager` IPC 入口，本函数由
+//! `utils::version_install_manager::dispatch` 反序列化参数后调用。
 
-use tauri::{AppHandle, State};
+use tauri::AppHandle;
 
 use crate::error_util::log_err;
 use crate::minecraft::community::preload::{preload_mods_detail, PreloadModInput};
@@ -23,10 +26,9 @@ use super::sanitize_version_id;
 /// 4. 每查到一个 emit `mods-preload-update` 事件（payload: `{ file_name, project }`）
 ///
 /// 前端监听该事件，按 `file_name` 匹配更新对应 mod 的 `project` 字段。
-#[tauri::command]
 pub async fn preload_mods_detail_cmd(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    app: &AppHandle,
+    state: &AppState,
     version_id: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
@@ -77,8 +79,9 @@ pub async fn preload_mods_detail_cmd(
     );
 
     // 后台异步执行，不阻塞命令返回
+    let app_clone = app.clone();
     tokio::spawn(async move {
-        preload_mods_detail(app, version_id, inputs).await;
+        preload_mods_detail(app_clone, version_id, inputs).await;
     });
 
     Ok(())

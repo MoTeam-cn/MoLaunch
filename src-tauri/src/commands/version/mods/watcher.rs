@@ -15,12 +15,16 @@
 //! - `unwatch_mods_dir` 主动停止监听（ModTab 组件卸载时调用）
 //! - 全局 `Mutex<Option<RecommendedWatcher>>` 持有当前 watcher，保证同一时间只有一个监听
 //! - watcher drop 时 channel 关闭，防抖线程自动退出
+//!
+//! 注：原 2 个独立 Tauri 命令已聚合为 `version_mods_manager` IPC 入口，
+//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::version_mods_manager::dispatch` 反序列化参数后调用。
 
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
 use notify::{Event, EventKind, RecommendedWatcher, RecursiveMode, Watcher};
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter};
 
 use crate::error_util::log_err;
 use crate::state::AppState;
@@ -43,10 +47,9 @@ fn current_watcher() -> &'static Mutex<Option<RecommendedWatcher>> {
 ///
 /// 如果已有监听中的 watcher，会先停止旧的（drop 后自动停止），再启动新的。
 /// 文件变化通过 `mods-dir-changed` 事件通知前端，前端应监听此事件并调用 `list_mods` 刷新。
-#[tauri::command]
 pub async fn watch_mods_dir(
-    state: State<'_, AppState>,
-    app: AppHandle,
+    state: &AppState,
+    app: &AppHandle,
     version_id: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
@@ -118,7 +121,6 @@ pub async fn watch_mods_dir(
 }
 
 /// 停止监听 mods 目录（ModTab 组件卸载时调用）
-#[tauri::command]
 pub async fn unwatch_mods_dir() -> Result<(), String> {
     let mut guard = current_watcher()
         .lock()

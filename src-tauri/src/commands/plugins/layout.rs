@@ -9,6 +9,9 @@
 //! - `force_refresh=true` 时强制忽略本地缓存重新下载
 //!
 //! URL 协议校验：仅允许 http/https，拒绝 file://、data: 等。
+//!
+//! 注：原 Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，子模块函数已去掉
+//! `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch` 调用。
 
 use crate::error_util::log_err;
 use crate::{http, log_info, log_warn, utils::cache};
@@ -21,7 +24,6 @@ const TTL_SECONDS: u64 = 24 * 60 * 60;
 ///
 /// 流程：URL 协议校验 → 计算缓存文件名 → 检查本地缓存（命中且未过期 → 返回）
 /// → 下载 URL 内容 → 写入缓存 → 返回内容
-#[tauri::command]
 pub async fn load_custom_layout(
     url: String,
     force_refresh: Option<bool>,

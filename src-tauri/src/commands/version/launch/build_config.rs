@@ -6,7 +6,6 @@ use crate::minecraft::launch::{AuthInfo, LaunchConfig};
 use crate::minecraft::version::setup::VersionSetup;
 use crate::state::{resolve_game_dir, AppState};
 use crate::{log_info, log_warn};
-use tauri::State;
 
 use super::{parse_server_enter, resolve_game_language};
 
@@ -18,7 +17,7 @@ use super::{parse_server_enter, resolve_game_language};
 /// 安全修复：从后端 auth_storage 获取 access_token，避免前端 IPC 明文传输 token。
 /// 前端只传 username 和 uuid，后端根据 uuid 从注册表加载对应账号的 token。
 pub(super) async fn build_launch_config(
-    state: &State<'_, AppState>,
+    state: &AppState,
     app_handle: &tauri::AppHandle,
     version_id: &str,
     java_path: Option<String>,
@@ -98,29 +97,33 @@ pub(super) async fn build_launch_config(
     // 构建认证信息
     let login_type_str = login_type.unwrap_or_else(|| "Legacy".to_string());
     let is_legacy = login_type_str == "Legacy";
-    let (access_token, client_token) = {
+    let (access_token, client_token, server_url) = {
         match state.auth_storage.load().await {
             Ok(auth_state) => {
                 if let Some(ref current) = auth_state.current_user {
                     // 验证 current_user 的 uuid 与前端传入的 uuid 一致（防止越权）
                     if current.uuid == uuid {
-                        (current.access_token.clone(), current.client_token.clone())
+                        (
+                            current.access_token.clone(),
+                            current.client_token.clone(),
+                            current.server_url.clone(),
+                        )
                     } else {
                         log_warn!(
                             "当前登录账号 UUID ({}) 与请求的 UUID ({}) 不一致，使用空 token",
                             current.uuid,
                             uuid
                         );
-                        (String::new(), String::new())
+                        (String::new(), String::new(), None)
                     }
                 } else {
                     // 未登录或离线模式，token 为空
-                    (String::new(), String::new())
+                    (String::new(), String::new(), None)
                 }
             }
             Err(e) => {
                 log_warn!("从 auth_storage 加载 token 失败: {}，使用空 token", e);
-                (String::new(), String::new())
+                (String::new(), String::new(), None)
             }
         }
     };
@@ -131,6 +134,7 @@ pub(super) async fn build_launch_config(
         access_token,
         client_token,
         login_type: login_type_str,
+        server_url,
     };
 
     // 离线账号皮肤：根据用户选择的皮肤变体调整 UUID

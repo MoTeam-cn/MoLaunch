@@ -1,29 +1,33 @@
 /**
  * 版本列表与文件夹管理 API
+ *
+ * 注：底层已聚合为 `version_list_manager` / `version_install_manager` 两个 IPC 入口，
+ * 通过 `action` 字段分发。
  */
 
-import { invoke } from '@tauri-apps/api/core'
 import type { VersionList } from '@/types/version'
+import { VERSION_INSTALL_ACTIONS, versionInstallManager } from './version-install-manager'
+import { VERSION_LIST_ACTIONS, versionListManager } from './version-list-manager'
 
 /**
  * 获取版本列表
  */
 export async function listVersions(): Promise<VersionList> {
-  return await invoke<VersionList>('list_versions')
+  return versionListManager<VersionList>(VERSION_LIST_ACTIONS.LIST_VERSIONS)
 }
 
 /**
  * 下载版本
  */
 export async function downloadVersion(versionId: string): Promise<void> {
-  return await invoke<void>('download_version', { versionId })
+  return versionInstallManager<void>(VERSION_INSTALL_ACTIONS.DOWNLOAD_VERSION, { versionId })
 }
 
 /**
  * 获取已安装版本列表
  */
 export async function listInstalledVersions(): Promise<string[]> {
-  return await invoke<string[]>('list_installed_versions')
+  return versionListManager<string[]>(VERSION_LIST_ACTIONS.LIST_INSTALLED_VERSIONS)
 }
 
 export interface InstalledVersionInfo {
@@ -37,7 +41,9 @@ export interface InstalledVersionInfo {
  * 获取已安装版本列表（包含类型信息）
  */
 export async function listInstalledVersionsWithType(): Promise<InstalledVersionInfo[]> {
-  return await invoke<InstalledVersionInfo[]>('list_installed_versions_with_type')
+  return versionListManager<InstalledVersionInfo[]>(
+    VERSION_LIST_ACTIONS.LIST_INSTALLED_VERSIONS_WITH_TYPE,
+  )
 }
 
 /**
@@ -50,34 +56,34 @@ export interface McFolder {
 
 /** 列出所有 Minecraft 文件夹 */
 export async function listMcFolders(): Promise<McFolder[]> {
-  return await invoke<McFolder[]>('list_mc_folders')
+  return versionListManager<McFolder[]>(VERSION_LIST_ACTIONS.LIST_MC_FOLDERS)
 }
 
 /** 添加 Minecraft 文件夹（自动去重） */
 export async function addMcFolder(name: string, path: string): Promise<McFolder[]> {
-  return await invoke<McFolder[]>('add_mc_folder', { name, path })
+  return versionListManager<McFolder[]>(VERSION_LIST_ACTIONS.ADD_MC_FOLDER, { name, path })
 }
 
 /** 移除 Minecraft 文件夹 */
 export async function removeMcFolder(path: string): Promise<McFolder[]> {
-  return await invoke<McFolder[]>('remove_mc_folder', { path })
+  return versionListManager<McFolder[]>(VERSION_LIST_ACTIONS.REMOVE_MC_FOLDER, { path })
 }
 
 /** 切换当前 Minecraft 文件夹 */
 export async function switchMcFolder(path: string): Promise<string> {
-  return await invoke<string>('switch_mc_folder', { path })
+  return versionListManager<string>(VERSION_LIST_ACTIONS.SWITCH_MC_FOLDER, { path })
 }
 
 /** 重命名 Minecraft 文件夹 */
 export async function renameMcFolder(path: string, newName: string): Promise<McFolder[]> {
-  return await invoke<McFolder[]>('rename_mc_folder', { path, newName })
+  return versionListManager<McFolder[]>(VERSION_LIST_ACTIONS.RENAME_MC_FOLDER, { path, newName })
 }
 
 /**
  * 卸载版本
  */
 export async function uninstallVersion(versionId: string): Promise<void> {
-  return await invoke<void>('uninstall_version', { versionId })
+  return versionListManager<void>(VERSION_LIST_ACTIONS.UNINSTALL_VERSION, { versionId })
 }
 
 /**
@@ -85,5 +91,5 @@ export async function uninstallVersion(versionId: string): Promise<void> {
  * 隔离时返回 `{game_dir}/versions/{version_id}/`，非隔离时返回 `{game_dir}/`
  */
 export async function getVersionEffectiveDir(versionId: string): Promise<string> {
-  return await invoke<string>('get_version_effective_dir', { versionId })
+  return versionListManager<string>(VERSION_LIST_ACTIONS.GET_VERSION_EFFECTIVE_DIR, { versionId })
 }

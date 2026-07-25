@@ -5,6 +5,10 @@
 //!
 //! 数据存储为 markdown 表格格式的 .txt 文件，由 `utils::markdown_table` 模块解析，
 //! 修改数据只需更新 txt 文件并重新编译后端，无需改动业务代码。
+//!
+//! 注：原 `get_about_data` Tauri 命令已聚合为 `system_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::system_manager::dispatch` 反序列化参数后调用。
 
 use crate::error_util::log_err;
 use crate::resources::read_resource;
@@ -126,13 +130,12 @@ fn parse_authors(raw: &str) -> Vec<Author> {
 }
 
 // ============================================================
-// IPC 命令
+// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
 // ============================================================
 
 /// 一次性返回关于页面所需的全部数据
 ///
 /// 数据源：`resources/about/` 下的 5 个 txt 文件（include_str! 嵌入二进制）
-#[tauri::command]
 pub async fn get_about_data() -> Result<AboutData, String> {
     let ack_text = read_resource("about/acknowledgements.txt").map_err(log_err("Failed to read acknowledgements"))?;
     let fe_text = read_resource("about/frontend-deps.txt").map_err(log_err("Failed to read frontend dependencies"))?;

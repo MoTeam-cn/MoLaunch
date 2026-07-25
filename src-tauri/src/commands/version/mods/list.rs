@@ -1,10 +1,13 @@
 //! Mod 列表查询命令（list_mods / is_version_modable）
+//!
+//! 注：原 2 个独立 Tauri 命令已聚合为 `version_mods_manager` IPC 入口，
+//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::version_mods_manager::dispatch` 反序列化参数后调用。
 
 use crate::minecraft::version::setup::VersionSetup;
 use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
 use crate::{log_error, log_info};
-use tauri::State;
 
 use super::super::sanitize_version_id;
 use super::helpers::get_mods_dir;
@@ -13,9 +16,8 @@ use super::types::ModInfo;
 /// 判断版本是否可以安装 Mod
 ///
 /// 规则：版本含 Forge/Fabric/NeoForge/LiteLoader，或个性化分类被强制为 "可安装Mod"（display_type=2）
-#[tauri::command]
 pub async fn is_version_modable(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
 ) -> Result<bool, String> {
     sanitize_version_id(&version_id)?;
@@ -67,9 +69,8 @@ pub async fn is_version_modable(
 /// - 元数据（译名、描述、版本、logo、slug）全部返回空，由 `preload_mods_detail_cmd` 后台异步补全
 /// - 排序规则：只按 `file_name`（含扩展名）字母序升序，**禁用状态不参与排序**
 ///   （按 `ModList.OrderBy(Function(m) m.File.Name)` 的方式）
-#[tauri::command]
 pub async fn list_mods(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
 ) -> Result<Vec<ModInfo>, String> {
     sanitize_version_id(&version_id)?;

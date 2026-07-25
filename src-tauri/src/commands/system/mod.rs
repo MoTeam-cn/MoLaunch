@@ -1,11 +1,11 @@
 //! 系统命令模块
 
-mod about;
-mod apply_config;
-mod config;
-mod developer;
+pub mod about;
+pub mod apply_config;
+pub mod config;
+pub mod developer;
 mod game;
-mod game_dir;
+pub mod game_dir;
 mod proxy;
 
 pub use about::*;
@@ -18,6 +18,8 @@ pub use game_dir::*;
 // 所有 get/set 由 `get_config` / `apply_config` 统一处理。
 
 use crate::state::AppState;
+use crate::utils::dispatcher::ActionRequest;
+use tauri::{AppHandle, State};
 
 /// 更新配置并保存
 pub(crate) async fn update_config<F>(state: &AppState, updater: F) -> Result<(), String>
@@ -31,4 +33,31 @@ where
 
     crate::config::save_config(&config_clone)?;
     Ok(())
+}
+
+// ============================================================
+// 统一 IPC 入口（聚合 system / logger 模块 17 个命令）
+// ============================================================
+
+/// 统一系统模块 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::system_manager::dispatch` 进行 action 分发。
+///
+/// 注册的 action（17 个）：
+/// - game_dir（6 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
+///   / `get_game_dir` / `write_text_file` / `get_system_memory`
+/// - config（2 个）：`get_config_path` / `save_config_to_file`
+/// - developer（5 个）：`is_developer_unlocked` / `unlock_developer_mode`
+///   / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
+/// - about（1 个）：`get_about_data`
+/// - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
+#[tauri::command]
+pub async fn system_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::system_manager::dispatch(state, app, req).await
 }

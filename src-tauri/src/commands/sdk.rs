@@ -1,10 +1,17 @@
 //! SDK 管理命令（lite 版本）
+//!
+//! 注：原 5 个分散的 sdk Tauri 命令已聚合为 `sdk_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发到各子模块函数。
+//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState`，
+//! 由 `utils::sdk_manager::dispatch` 反序列化参数后调用。
+//! `ActionRequest` 与 `meta_manager` / `tools_manager` / `image_cache_manager` 共用同一请求体结构。
 
 use crate::error_util::log_err;
 use crate::log_error;
 use crate::log_info;
 use crate::state::AppState;
-use tauri::State;
+use crate::utils::dispatcher::ActionRequest;
+use tauri::{AppHandle, State};
 
 /// SDK 状态信息
 #[derive(serde::Serialize)]
@@ -15,8 +22,25 @@ pub struct SdkStatus {
     pub library_path: String,
 }
 
-/// 获取当前平台信息
+/// 统一 SDK IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::sdk_manager::dispatch` 进行 action 分发。
 #[tauri::command]
+pub async fn sdk_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::sdk_manager::dispatch(state, app, req).await
+}
+
+// ============================================================
+// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
+// ============================================================
+
+/// 获取当前平台信息
 pub async fn get_platform_info() -> Result<SdkStatus, String> {
     log_info!("[Startup][IPC] get_platform_info called");
     let platform = if cfg!(target_os = "windows") {
@@ -46,8 +70,7 @@ pub async fn get_platform_info() -> Result<SdkStatus, String> {
 }
 
 /// 获取 SDK 版本
-#[tauri::command]
-pub async fn get_sdk_version(state: State<'_, AppState>) -> Result<Option<String>, String> {
+pub async fn get_sdk_version(state: &AppState) -> Result<Option<String>, String> {
     log_info!("[Startup][IPC] get_sdk_version called");
     let sdk_guard = state.sdk.lock().await;
     match sdk_guard.as_ref() {
@@ -57,15 +80,13 @@ pub async fn get_sdk_version(state: State<'_, AppState>) -> Result<Option<String
 }
 
 /// 检查 SDK 是否已初始化
-#[tauri::command]
-pub async fn is_sdk_initialized(state: State<'_, AppState>) -> Result<bool, String> {
+pub async fn is_sdk_initialized(state: &AppState) -> Result<bool, String> {
     let sdk_guard = state.sdk.lock().await;
     Ok(sdk_guard.is_some())
 }
 
 /// 获取设备 ID
-#[tauri::command]
-pub async fn get_device_id(state: State<'_, AppState>) -> Result<String, String> {
+pub async fn get_device_id(state: &AppState) -> Result<String, String> {
     log_info!("[Startup][IPC] get_device_id called");
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
@@ -77,9 +98,8 @@ pub async fn get_device_id(state: State<'_, AppState>) -> Result<String, String>
 }
 
 /// 检查更新（轻量版）
-#[tauri::command]
 pub async fn check_update_lite(
-    state: State<'_, AppState>,
+    state: &AppState,
 ) -> Result<crate::sdk::UpdateInfoLite, String> {
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;

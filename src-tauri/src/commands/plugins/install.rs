@@ -9,6 +9,10 @@
 //!
 //! 安全：ZIP 解压带 Zip Slip 路径遍历防护（canonicalize 父目录后校验目标在 dst 内），
 //! 跨盘符 rename 失败时自动回退到递归复制。
+//!
+//! 注：原 2 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::plugins_manager::dispatch` 反序列化参数后调用。
 
 use super::{is_valid_plugin_id, plugins_root, read_plugin_manifest};
 use crate::error_util::log_err;
@@ -19,7 +23,6 @@ use std::path::{Path, PathBuf};
 ///
 /// 安装前校验插件 ID 合法性（kebab-case：小写字母 + 数字 + 连字符，
 /// 不以连字符开头 / 结尾）。返回安装后的插件 ID。
-#[tauri::command]
 pub async fn install_external_plugin_from_dir(source_dir: String) -> Result<String, String> {
     let src = PathBuf::from(&source_dir);
 
@@ -82,7 +85,6 @@ pub async fn install_external_plugin_from_dir(source_dir: String) -> Result<Stri
 ///
 /// 支持扁平结构和单根目录结构两种 ZIP 格式。带 Zip Slip 路径遍历防护。
 /// 跨盘符 rename 失败时自动回退到递归复制。
-#[tauri::command]
 pub async fn install_external_plugin_from_zip(zip_path: String) -> Result<String, String> {
     let zip_file = PathBuf::from(&zip_path);
     if !zip_file.exists() {

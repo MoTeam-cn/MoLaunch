@@ -4,9 +4,11 @@
  * 从后端 `get_about_data` 命令获取关于页面所需的全部数据
  * （特别鸣谢、技术栈、许可声明），数据源为 `src-tauri/resources/about/` 下的
  * markdown 表格格式 txt 文件，由后端 `utils::markdown_table` 模块解析。
+ *
+ * 注：底层已聚合为 `system_manager` 单一 IPC 入口，通过 `action` 字段分发。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { SYSTEM_ACTIONS, systemManager } from './system-manager'
 
 /** 作者信息 */
 export interface Author {
@@ -77,5 +79,5 @@ export interface AboutData {
  * 一次 IPC 调用返回所有内容，避免多次往返。
  */
 export async function getAboutData(): Promise<AboutData> {
-  return invoke<AboutData>('get_about_data')
+  return systemManager<AboutData>(SYSTEM_ACTIONS.GET_ABOUT_DATA)
 }

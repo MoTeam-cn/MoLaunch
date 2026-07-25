@@ -7,7 +7,6 @@ use crate::state::{AppState, DownloadStage, StageStatus};
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
 use std::sync::Mutex;
-use tauri::State;
 
 use super::concurrent;
 use super::modpack_stages::{
@@ -70,9 +69,8 @@ impl Drop for InstallGuard {
 /// 错误处理：任何阶段失败都会调用 `mark_failed(0)` 重置 `is_active=false`，
 /// 避免前端下载管理页卡在 0% 进度（前端轮询 `is_downloading` 会返回 false，
 /// Downloads.vue 的 watch 会自动 `router.back()`）。
-#[tauri::command]
 pub async fn install_modpack(
-    state: State<'_, AppState>,
+    state: &AppState,
     req: InstallModpackRequest,
 ) -> Result<InstallModpackResult, String> {
     log_info!(
@@ -116,7 +114,7 @@ pub async fn install_modpack(
     }
 
     // 解析游戏目录、创建 instance_dir（提到 async block 外，便于错误时清理版本目录）
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
     std::fs::create_dir_all(&instance_dir)
@@ -301,9 +299,8 @@ pub async fn install_modpack(
 /// 错误处理：任何阶段失败都会调用 `mark_failed(0)` 重置 `is_active=false`，
 /// 避免前端下载管理页卡在 0% 进度（前端轮询 `is_downloading` 会返回 false，
 /// Downloads.vue 的 watch 会自动 `router.back()`）。
-#[tauri::command]
 pub async fn install_local_modpack(
-    state: State<'_, AppState>,
+    state: &AppState,
     req: InstallLocalModpackRequest,
 ) -> Result<InstallModpackResult, String> {
     log_info!(
@@ -346,7 +343,7 @@ pub async fn install_local_modpack(
             );
 
             // 提取内层整合包到 instance_dir 同级的临时目录
-            let game_dir_pre = crate::state::resolve_game_dir_from_state(&state).await;
+            let game_dir_pre = crate::state::resolve_game_dir_from_state(state).await;
             let temp_dir = game_dir_pre.join(".tmp_launcher_extract");
             std::fs::create_dir_all(&temp_dir)
                 .map_err(|e| format!("创建临时目录失败: {}", e))?;
@@ -382,7 +379,7 @@ pub async fn install_local_modpack(
     let archive_path = &archive_path_owned;
 
     // 解析游戏目录、创建 instance_dir（提到 async block 外，便于错误时清理版本目录）
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
     std::fs::create_dir_all(&instance_dir)
@@ -590,7 +587,6 @@ pub async fn install_local_modpack(
 /// 用户选择后调用 `install_local_modpack` 传入 `include_optional` 参数完成安装。
 ///
 /// RPC 模型需要拆分为 preview + install 两步，preview 阶段不阻塞、不调用 API。
-#[tauri::command]
 pub async fn preview_local_modpack(file_path: String) -> Result<ModpackPreview, String> {
     log_info!("[Community] 预览本地整合包: {}", file_path);
 

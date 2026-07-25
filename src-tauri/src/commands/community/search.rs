@@ -27,7 +27,6 @@ pub struct CategoryTagInfo {
 }
 
 /// 搜索社区资源
-#[tauri::command]
 pub async fn search_resources(req: SearchRequest) -> Result<SearchResult, String> {
     // 解析 "CFId/MrSlug" 格式，根据来源选择对应 ID
     let category_id = req.category.as_ref().and_then(|c| {
@@ -64,7 +63,6 @@ pub async fn search_resources(req: SearchRequest) -> Result<SearchResult, String
 }
 
 /// 获取指定资源类型的分类标签列表
-#[tauri::command]
 pub async fn get_category_tags(
     resource_type: ResourceType,
 ) -> Result<Vec<CategoryTagInfo>, String> {

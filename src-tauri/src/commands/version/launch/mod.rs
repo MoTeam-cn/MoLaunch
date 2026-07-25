@@ -11,6 +11,7 @@ mod failure;
 use crate::minecraft::launch::{self, LaunchPipeline};
 use crate::state::{AppState, LaunchHistory};
 use crate::log_info;
+use crate::utils::dispatcher::ActionRequest;
 use std::sync::Arc;
 use tauri::{Emitter, State};
 
@@ -75,10 +76,12 @@ pub(super) fn resolve_game_language(game_language: &str, launcher_language: &str
 ///
 /// 安全修复：移除 access_token 参数，改为后端从 auth_storage 自行获取 token
 /// 前端只传 username 和 uuid，避免 token 在 IPC 请求体中明文传输
-#[tauri::command]
+///
+/// 注：原为独立 `#[tauri::command]`，已聚合为 `version_launch_manager` IPC 入口，
+/// 由 `utils::version_launch_manager::dispatch` 反序列化参数后调用。
 pub async fn launch_game(
-    state: State<'_, AppState>,
-    app_handle: tauri::AppHandle,
+    state: &AppState,
+    app_handle: &tauri::AppHandle,
     version_id: String,
     java_path: Option<String>,
     username: String,
@@ -93,8 +96,8 @@ pub async fn launch_game(
     log_info!("Launching game version: {}", version_id);
 
     let launch_config = build_launch_config(
-        &state,
-        &app_handle,
+        state,
+        app_handle,
         &version_id,
         java_path,
         username,
@@ -121,7 +124,7 @@ pub async fn launch_game(
     let result = match pipeline.execute().await {
         Ok(r) => r,
         Err(launch_err) => {
-            return Err(handle_launch_failure(&state, &app_handle, &pipeline, &version_id, launch_err).await);
+            return Err(handle_launch_failure(state, app_handle, &pipeline, &version_id, launch_err).await);
         }
     };
 
@@ -143,8 +146,9 @@ pub async fn launch_game(
     *state.current_pid.lock().await = Some(result.pid);
 
     // 启动退出监视任务（pipeline 现在是 Arc<LaunchPipeline>，无需持有锁）
+    // app_handle 在此函数中是借用，spawn_exit_watcher 需要 owned，故 clone（Arc 廉价）
     spawn_exit_watcher(
-        app_handle,
+        app_handle.clone(),
         pipeline,
         version_id,
         result.pid,
@@ -207,9 +211,10 @@ async fn spawn_exit_watcher(
 }
 
 /// 获取启动进度
-#[tauri::command]
+///
+/// 注：原为独立 `#[tauri::command]`，已聚合为 `version_launch_manager` IPC 入口。
 pub async fn get_launch_progress(
-    state: State<'_, AppState>,
+    state: &AppState,
 ) -> Result<Option<launch::LaunchProgress>, String> {
     let pipeline = state.launch_pipeline.lock().await;
     if let Some(ref pipeline) = *pipeline {
@@ -220,8 +225,9 @@ pub async fn get_launch_progress(
 }
 
 /// 取消启动
-#[tauri::command]
-pub async fn cancel_launch(state: State<'_, AppState>) -> Result<(), String> {
+///
+/// 注：原为独立 `#[tauri::command]`，已聚合为 `version_launch_manager` IPC 入口。
+pub async fn cancel_launch(state: &AppState) -> Result<(), String> {
     let pipeline = state.launch_pipeline.lock().await;
     if let Some(ref pipeline) = *pipeline {
         pipeline.cancel().await;
@@ -232,8 +238,9 @@ pub async fn cancel_launch(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 /// 停止游戏
-#[tauri::command]
-pub async fn stop_game(state: State<'_, AppState>) -> Result<(), String> {
+///
+/// 注：原为独立 `#[tauri::command]`，已聚合为 `version_launch_manager` IPC 入口。
+pub async fn stop_game(state: &AppState) -> Result<(), String> {
     let mut current_pid = state.current_pid.lock().await;
     if let Some(pid) = *current_pid {
         log_info!("Stopping game with PID: {}", pid);
@@ -265,8 +272,9 @@ pub async fn stop_game(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 /// 获取当前运行的游戏PID
-#[tauri::command]
-pub async fn get_running_game(state: State<'_, AppState>) -> Result<Option<u32>, String> {
+///
+/// 注：原为独立 `#[tauri::command]`，已聚合为 `version_launch_manager` IPC 入口。
+pub async fn get_running_game(state: &AppState) -> Result<Option<u32>, String> {
     let current_pid = state.current_pid.lock().await;
     Ok(*current_pid)
 }
@@ -276,11 +284,31 @@ pub async fn get_running_game(state: State<'_, AppState>) -> Result<Option<u32>,
 /// 返回最近启动过的版本记录（按时间倒序，最多 50 条）。
 /// 历史记录仅在内存中累积，重启启动器后清空。
 /// 供插件系统（如「启动历史」插件）和未来可能的统计功能使用。
-#[tauri::command]
-pub async fn get_launch_history(state: State<'_, AppState>) -> Result<Vec<LaunchHistory>, String> {
+///
+/// 注：原为独立 `#[tauri::command]`，已聚合为 `version_launch_manager` IPC 入口。
+pub async fn get_launch_history(state: &AppState) -> Result<Vec<LaunchHistory>, String> {
     let history = state.launch_history.lock().await;
     // 返回倒序副本（最近启动在前），最多 50 条避免历史过长
     let mut sorted: Vec<LaunchHistory> = history.iter().rev().take(50).cloned().collect();
     sorted.shrink_to_fit();
     Ok(sorted)
+}
+
+// ============================================================
+// 统一 IPC 入口（dispatcher 模式）
+// ============================================================
+
+/// 版本启动管理统一 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::version_launch_manager::dispatch` 进行 action 分发。
+/// 原 7 个独立 Tauri 命令（6 个 launch + 1 个 script_export）均通过此入口聚合调用。
+#[tauri::command]
+pub async fn version_launch_manager(
+    state: State<'_, AppState>,
+    app: tauri::AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::version_launch_manager::dispatch(state, app, req).await
 }

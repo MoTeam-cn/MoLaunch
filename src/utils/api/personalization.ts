@@ -1,9 +1,18 @@
 /**
  * 版本个性化、Mod 管理、选中版本、文件补全、脚本导出 API
+ *
+ * 注：底层命令已聚合为多个统一 IPC 入口，通过 `action` 字段分发：
+ * - 个性化 / 选中版本 / 文件补全 / 重命名版本 / 游戏版本号 → `version_list_manager`
+ * - Mod 管理 → `version_mods_manager`
+ * - 启动脚本导出 → `version_launch_manager`
+ * - mod 详情预加载 → `version_install_manager`
  */
 
-import { invoke } from '@tauri-apps/api/core'
 import type { ResourceProject } from '@/types/community'
+import { VERSION_INSTALL_ACTIONS, versionInstallManager } from './version-install-manager'
+import { VERSION_MODS_ACTIONS, versionModsManager } from './version-mods-manager'
+import { VERSION_LAUNCH_ACTIONS, versionLaunchManager } from './version-launch-manager'
+import { VERSION_LIST_ACTIONS, versionListManager } from './version-list-manager'
 
 /** 版本个性化信息 */
 export interface VersionPersonalization {
@@ -77,7 +86,7 @@ export interface PersonalizationUpdate {
  * 获取版本个性化设置
  */
 export async function getVersionPersonalization(versionId: string): Promise<VersionPersonalization> {
-  return await invoke<VersionPersonalization>('get_version_personalization', { versionId })
+  return versionListManager<VersionPersonalization>(VERSION_LIST_ACTIONS.GET_VERSION_PERSONALIZATION, { versionId })
 }
 
 /**
@@ -87,7 +96,7 @@ export async function updateVersionPersonalization(
   versionId: string,
   update: PersonalizationUpdate,
 ): Promise<void> {
-  return await invoke<void>('update_version_personalization', { versionId, update })
+  return versionListManager<void>(VERSION_LIST_ACTIONS.UPDATE_VERSION_PERSONALIZATION, { versionId, update })
 }
 
 /**
@@ -96,6 +105,8 @@ export async function updateVersionPersonalization(
  * 安全修复：移除 accessToken 参数，后端根据 uuid 自行从 auth_storage 获取 token
  *
  * @param javaPath 用户指定的 Java 路径（可选，为空时后端按 MC 版本自动检测）
+ *
+ * 注：底层已聚合为 `version_launch_manager` 单一 IPC 入口，通过 `action` 字段分发。
  */
 export async function exportLaunchScript(
   versionId: string,
@@ -105,7 +116,7 @@ export async function exportLaunchScript(
   javaPath: string | null,
   savePath: string,
 ): Promise<void> {
-  return await invoke<void>('export_launch_script', {
+  return versionLaunchManager<void>(VERSION_LAUNCH_ACTIONS.EXPORT_LAUNCH_SCRIPT, {
     versionId,
     username,
     uuid,
@@ -119,7 +130,7 @@ export async function exportLaunchScript(
  * 补全版本文件（校验并下载缺失的 libraries/assets）
  */
 export async function fixVersionFiles(versionId: string): Promise<void> {
-  return await invoke<void>('fix_version_files', { versionId })
+  return versionListManager<void>(VERSION_LIST_ACTIONS.FIX_VERSION_FILES, { versionId })
 }
 
 // ==================== Mod 管理 ====================
@@ -170,14 +181,14 @@ export interface ModInfo {
  * 判断版本是否可安装 Mod（含 Forge/Fabric/NeoForge/LiteLoader 或个性化分类为"可安装Mod"）
  */
 export async function isVersionModable(versionId: string): Promise<boolean> {
-  return await invoke<boolean>('is_version_modable', { versionId })
+  return versionModsManager<boolean>(VERSION_MODS_ACTIONS.IS_VERSION_MODABLE, { versionId })
 }
 
 /**
  * 列出版本的 Mod
  */
 export async function listMods(versionId: string): Promise<ModInfo[]> {
-  return await invoke<ModInfo[]>('list_mods', { versionId })
+  return versionModsManager<ModInfo[]>(VERSION_MODS_ACTIONS.LIST_MODS, { versionId })
 }
 
 /**
@@ -190,35 +201,45 @@ export async function toggleMod(
   fileName: string,
   enable: boolean,
 ): Promise<string> {
-  return await invoke<string>('toggle_mod', { versionId, fileName, enable })
+  return versionModsManager<string>(VERSION_MODS_ACTIONS.TOGGLE_MOD, {
+    versionId,
+    fileName,
+    enable,
+  })
 }
 
 /**
  * 删除 Mod
  */
 export async function deleteMod(versionId: string, fileName: string): Promise<void> {
-  return await invoke<void>('delete_mod', { versionId, fileName })
+  return versionModsManager<void>(VERSION_MODS_ACTIONS.DELETE_MOD, { versionId, fileName })
 }
 
 /**
  * 从外部文件安装 Mod（复制到 mods 目录）
  */
 export async function installMod(versionId: string, sourcePath: string): Promise<void> {
-  return await invoke<void>('install_mod', { versionId, sourcePath })
+  return versionModsManager<void>(VERSION_MODS_ACTIONS.INSTALL_MOD, {
+    versionId,
+    sourcePath,
+  })
 }
 
 /**
  * 打开版本的 mods 目录（自动创建）
  */
 export async function openModsDir(versionId: string): Promise<void> {
-  return await invoke<void>('open_mods_dir', { versionId })
+  return versionModsManager<void>(VERSION_MODS_ACTIONS.OPEN_MODS_DIR, { versionId })
 }
 
 /**
  * 在资源管理器中打开并选中指定 Mod 文件
  */
 export async function revealModFile(versionId: string, fileName: string): Promise<void> {
-  return await invoke<void>('reveal_mod_file', { versionId, fileName })
+  return versionModsManager<void>(VERSION_MODS_ACTIONS.REVEAL_MOD_FILE, {
+    versionId,
+    fileName,
+  })
 }
 
 /**
@@ -227,7 +248,7 @@ export async function revealModFile(versionId: string, fileName: string): Promis
  * 用于资源详情弹窗点击"下载"按钮时默认保存到 mods 文件夹。
  */
 export async function getVersionModsDir(versionId: string): Promise<string> {
-  return await invoke<string>('get_version_mods_dir', { versionId })
+  return versionModsManager<string>(VERSION_MODS_ACTIONS.GET_VERSION_MODS_DIR, { versionId })
 }
 
 /**
@@ -242,14 +263,14 @@ export async function getVersionModsDir(versionId: string): Promise<string> {
  * 应在 ModTab 组件 `onMounted` 时调用，配合 `unwatchModsDir` 在 `onUnmounted` 时清理。
  */
 export async function watchModsDir(versionId: string): Promise<void> {
-  return await invoke<void>('watch_mods_dir', { versionId })
+  return versionModsManager<void>(VERSION_MODS_ACTIONS.WATCH_MODS_DIR, { versionId })
 }
 
 /**
  * 停止监听 mods 目录（ModTab 组件卸载时调用）
  */
 export async function unwatchModsDir(): Promise<void> {
-  return await invoke<void>('unwatch_mods_dir')
+  return versionModsManager<void>(VERSION_MODS_ACTIONS.UNWATCH_MODS_DIR)
 }
 
 /**
@@ -259,7 +280,7 @@ export async function unwatchModsDir(): Promise<void> {
  * 返回 null 表示无法识别（JSON 缺失或所有策略都未命中）。
  */
 export async function getVersionGameVersion(versionId: string): Promise<string | null> {
-  return await invoke<string | null>('get_version_game_version', { versionId })
+  return versionListManager<string | null>(VERSION_LIST_ACTIONS.GET_VERSION_GAME_VERSION, { versionId })
 }
 
 /**
@@ -274,26 +295,26 @@ export async function getVersionGameVersion(versionId: string): Promise<string |
  * 详情按钮点击时判断 `mod.project` 是否就绪，就绪直接弹 ResourceDetail（零延迟）。
  */
 export async function preloadModsDetail(versionId: string): Promise<void> {
-  return await invoke<void>('preload_mods_detail_cmd', { versionId })
+  return versionInstallManager<void>(VERSION_INSTALL_ACTIONS.PRELOAD_MODS_DETAIL_CMD, { versionId })
 }
 
 /**
  * 重命名版本
  */
 export async function renameVersion(versionId: string, newName: string): Promise<void> {
-  return await invoke<void>('rename_version', { versionId, newName })
+  return versionListManager<void>(VERSION_LIST_ACTIONS.RENAME_VERSION, { versionId, newName })
 }
 
 /**
  * 获取上次选中的版本（持久化）
  */
 export async function getSelectedVersion(): Promise<string | null> {
-  return await invoke<string | null>('get_selected_version')
+  return versionListManager<string | null>(VERSION_LIST_ACTIONS.GET_SELECTED_VERSION)
 }
 
 /**
  * 保存当前选中的版本（持久化到 config.ini）
  */
 export async function setSelectedVersion(versionId: string | null): Promise<void> {
-  return await invoke<void>('set_selected_version', { versionId })
+  return versionListManager<void>(VERSION_LIST_ACTIONS.SET_SELECTED_VERSION, { versionId })
 }

@@ -5,14 +5,16 @@
 //!
 //! 文件 / 文件夹选择对话框已统一改用前端 `@tauri-apps/plugin-dialog`，
 //! 后端不再重复封装 dialog 命令。
+//!
+//! 注：原 7 个分散的 Tauri 命令（含 `set_game_dir`）已聚合为 `system_manager`
+//! 一个 IPC 入口，通过请求体的 `action` 字段分发。子模块函数已去掉
+//! `#[tauri::command]` 标注，由 `utils::system_manager::dispatch` 反序列化参数后调用。
 
 use crate::log_info;
 use crate::state::AppState;
-use tauri::State;
 
 /// 打开游戏目录
-#[tauri::command]
-pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn open_game_dir(state: &AppState) -> Result<(), String> {
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
 
@@ -27,20 +29,17 @@ pub async fn open_game_dir(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 /// 打开任意路径（文件夹或文件）
-#[tauri::command]
 pub async fn open_path(path: String) -> Result<(), String> {
     crate::minecraft::system::shell::open_path(&path)
 }
 
-/// Tauri 命令包装：在资源管理器中打开并选中指定文件
-#[tauri::command]
+/// 在资源管理器中打开并选中指定文件
 pub async fn reveal_in_explorer(path: String) -> Result<(), String> {
     crate::minecraft::system::shell::reveal_in_file_manager(&path)
 }
 
 /// 获取游戏目录
-#[tauri::command]
-pub async fn get_game_dir(state: State<'_, AppState>) -> Result<String, String> {
+pub async fn get_game_dir(state: &AppState) -> Result<String, String> {
     let config = state.config.lock().await;
     let game_dir = crate::state::resolve_game_dir(&config.game_dir);
     Ok(game_dir.to_string_lossy().to_string())
@@ -50,7 +49,6 @@ pub async fn get_game_dir(state: State<'_, AppState>) -> Result<String, String> 
 ///
 /// 用于导出示例文件（插件模板、布局示例等），路径通常由前端 `pickSavePath` 对话框返回。
 /// 若文件已存在则覆盖，父目录不存在时自动创建。
-#[tauri::command]
 pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
     let path = std::path::PathBuf::from(&path);
 
@@ -65,13 +63,13 @@ pub async fn write_text_file(path: String, content: String) -> Result<(), String
     Ok(())
 }
 
-/// 更新游戏目录（保留独立命令，因为调用方 version/manage.rs 在切换版本时直接调用）
+/// 更新游戏目录
 ///
-/// 重构说明：此命令保留，未合并到 `apply_config`，因为它在版本切换流程中被
-/// 内部逻辑调用，不是用户设置页触发的。用户在设置页改 game_dir 时走
-/// `apply_config({ gameDir: ... })`。
-#[tauri::command]
-pub async fn set_game_dir(state: State<'_, AppState>, game_dir: String) -> Result<(), String> {
+/// 通过 `system_manager` 的 `set_game_dir` action 暴露给前端。
+///
+/// 未合并到 `apply_config`：因为它在版本切换等内部流程中可能被直接调用，
+/// 与用户设置页触发的 `apply_config({ gameDir: ... })` 走不同代码路径。
+pub async fn set_game_dir(state: &AppState, game_dir: String) -> Result<(), String> {
     log_info!("Game directory changed to: {}", game_dir);
     super::update_config(&state, |config| {
         config.game_dir = game_dir;
@@ -80,7 +78,6 @@ pub async fn set_game_dir(state: State<'_, AppState>, game_dir: String) -> Resul
 }
 
 /// 获取系统内存信息
-#[tauri::command]
 pub async fn get_system_memory() -> Result<crate::minecraft::system::SystemMemory, String> {
     Ok(crate::minecraft::system::get_system_memory())
 }

@@ -9,6 +9,9 @@
 //! - `samples/layout/layout-sample.json` — JSON 布局示例
 //! - `samples/layout/layout-sample.xml` — XML 布局示例
 //! - `samples/layout/layout-sample.html` — HTML 布局示例
+//!
+//! 注：原 2 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
+//! 子模块函数已去掉 `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch` 调用。
 
 use crate::error_util::log_err;
 use crate::{log_info, resources};
@@ -18,7 +21,6 @@ use std::io::Write;
 /// 从嵌入资源读取示例布局内容
 ///
 /// 支持 `json` / `xml` / `html` 三种格式，对应 `samples/layout/layout-sample.<ext>`。
-#[tauri::command]
 pub async fn read_layout_sample(format: String) -> Result<String, String> {
     let resource_path = match format.as_str() {
         "json" => "samples/layout/layout-sample.json",
@@ -36,7 +38,6 @@ pub async fn read_layout_sample(format: String) -> Result<String, String> {
 /// - `as_zip=true`：使用 zip crate 现场打包到 ZIP 文件
 ///
 /// 嵌入资源：`samples/plugin/manifest.json` + `samples/plugin/index.html`
-#[tauri::command]
 pub async fn export_plugin_sample(dest_path: String, as_zip: bool) -> Result<(), String> {
     let dest = PathBuf::from(&dest_path);
 

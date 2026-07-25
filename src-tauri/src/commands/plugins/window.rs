@@ -9,6 +9,10 @@
 //! - 窗口 label 使用 `plugin-<id>-<label>` 格式，避免与内置窗口冲突
 //!
 //! 共享类型在 `super::` 中（`WindowPermissions` / `read_plugin_manifest`）。
+//!
+//! 注：原 Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，子模块函数已去掉
+//! `#[tauri::command]` 标注，参数 `AppHandle` 改为 `&AppHandle`，
+//! 由 `utils::plugins_manager::dispatch` 调用。
 
 use super::{read_plugin_manifest, WindowPermissions};
 use crate::error_util::log_err;
@@ -21,9 +25,8 @@ const MAX_WINDOWS_PER_PLUGIN: usize = 5;
 /// 创建插件子窗口
 ///
 /// 流程：权限校验 → 域名白名单校验 → 数量限制校验 → label 唯一性校验 → 构建 WebviewWindow
-#[tauri::command]
 pub async fn plugin_create_window(
-    app: AppHandle,
+    app: &AppHandle,
     plugin_id: String,
     label: String,
     url: String,
@@ -89,7 +92,7 @@ pub async fn plugin_create_window(
     let parsed_url = tauri::Url::parse(&url).map_err(log_err("Failed to parse window URL"))?;
 
     let mut builder =
-        WebviewWindowBuilder::new(&app, &window_label, WebviewUrl::External(parsed_url))
+        WebviewWindowBuilder::new(app, &window_label, WebviewUrl::External(parsed_url))
             .title(&title)
             .inner_size(w, h);
 

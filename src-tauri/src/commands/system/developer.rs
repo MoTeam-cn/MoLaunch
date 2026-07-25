@@ -8,6 +8,10 @@
 //! 存储位置：Windows 注册表 `HKCU\Software\MoLaunch` 下的两个布尔值
 //! - `DeveloperUnlocked`：是否已解锁（决定开关卡片是否显示）
 //! - `DeveloperMode`：开关是否开启（决定侧边菜单 developer 项是否显示）
+//!
+//! 注：原 5 个分散 Tauri 命令已聚合为 `system_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::system_manager::dispatch` 反序列化参数后调用。
 
 use crate::log_info;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
@@ -33,7 +37,6 @@ pub const KEY_DEV_MODE: &str = "DeveloperMode";
 ///
 /// 未解锁时返回 false，「高阶配置」页不显示开发者模式开关卡片。
 /// 开关的开启状态由 `get_config` / `apply_config` 统一管理（developerMode 字段）。
-#[tauri::command]
 pub fn is_developer_unlocked() -> bool {
     reg_get_bool(KEY_DEV_UNLOCKED)
 }
@@ -42,7 +45,6 @@ pub fn is_developer_unlocked() -> bool {
 ///
 /// 调用后「高阶配置」页将显示开发者模式开关卡片。
 /// 已解锁时重复调用是幂等的。
-#[tauri::command]
 pub fn unlock_developer_mode() -> Result<(), String> {
     log_info!("[Developer] 开发者模式已解锁");
     reg_set_bool(KEY_DEV_UNLOCKED, true)
@@ -73,7 +75,6 @@ pub struct StorageDirs {
 }
 
 /// 获取所有存储目录路径（开发者页展示用）
-#[tauri::command]
 pub fn get_storage_dirs() -> StorageDirs {
     let storage = Storage::instance();
     StorageDirs {
@@ -110,7 +111,6 @@ pub struct SystemInfo {
 }
 
 /// 获取系统信息（开发者页展示用）
-#[tauri::command]
 pub fn get_system_info() -> SystemInfo {
     let mem = get_system_memory();
     SystemInfo {
@@ -128,7 +128,6 @@ pub fn get_system_info() -> SystemInfo {
 /// 获取所有缓存目录的统计信息（文件数、占用大小、TTL）
 ///
 /// 在 `spawn_blocking` 中执行以避免阻塞主线程。
-#[tauri::command]
 pub async fn get_cache_stats() -> Result<cache_stats::CacheStatsResult, String> {
     tauri::async_runtime::spawn_blocking(|| cache_stats::collect_all())
         .await

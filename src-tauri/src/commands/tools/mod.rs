@@ -1,6 +1,8 @@
 //! 工具模块（统一 IPC 入口）
 //!
-//! 对外只暴露 `tools_manager` 一个 IPC 命令，通过请求体的 `action` 字段分发到不同子模块。
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，替代原 match 语句。
+//! 25+ 个 tools action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
+//!
 //! 子模块：download（外部下载）/ filename（文件名获取）/ cleanup（清理垃圾）/ memory（内存优化）
 //! / mod_tools（Mod 依赖检测 + 去重）/ data_export（启动器数据导出）/ crash_analyzer（崩溃日志分析）
 //! / screenshot（截图管理）/ resourcepack（资源包管理）/ version_json（版本 JSON 读写）
@@ -25,145 +27,174 @@ pub mod screenshot;
 pub mod types;
 pub mod version_json;
 
+use once_cell::sync::Lazy;
+use tauri::{AppHandle, State};
+
+use crate::handler;
 use crate::state::AppState;
-use tauri::State;
+use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 use types::*;
+
+static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
+    let mut d = Dispatcher::new();
+
+    // 外部下载
+    d.register("download_file", handler!(state, _app, params, {
+        let p: DownloadFileParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        download::download_file(&state, p).await
+    }));
+    d.register("get_download_dir", handler!(state, _app, _params, {
+        download::get_download_dir(&state).await
+    }));
+    d.register("list_downloads", handler!(state, _app, _params, {
+        download::list_downloads(&state).await
+    }));
+    d.register("delete_download", handler!(state, _app, params, {
+        let p: DeleteDownloadParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        download::delete_download(&state, p).await
+    }));
+
+    // 文件名获取
+    d.register("fetch_filename", handler!(_state, _app, params, {
+        let p: FetchFilenameParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        filename::fetch_filename(p).await
+    }));
+
+    // 清理游戏垃圾
+    d.register("cleanup_scan", handler!(state, _app, _params, {
+        cleanup::scan(&state).await
+    }));
+    d.register("cleanup_execute", handler!(_state, _app, params, {
+        let p: CleanupExecuteParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        cleanup::execute(p).await
+    }));
+
+    // 内存优化
+    d.register("memory_optimize", handler!(_state, _app, params, {
+        let p: MemoryOptimizeParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        memory::optimize(p).await
+    }));
+
+    // Mod 依赖检测
+    d.register("mod_dependency_check", handler!(state, _app, params, {
+        let p: ModDependencyCheckParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        mod_tools::mod_dependency_check(&state, p).await
+    }));
+    // Mod 去重扫描
+    d.register("mod_dedup_scan", handler!(state, _app, params, {
+        let p: ModDedupScanParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        mod_tools::mod_dedup_scan(&state, p).await
+    }));
+
+    // 启动器数据导出
+    d.register("export_launcher_data", handler!(state, _app, params, {
+        let p: ExportLauncherDataParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        data_export::export_launcher_data(&state, p).await
+    }));
+
+    // 崩溃日志分析
+    d.register("crash_analyze", handler!(state, _app, params, {
+        let p: CrashAnalyzeParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        crash_analyzer::analyze(&state, p).await
+    }));
+
+    // 截图管理
+    d.register("screenshot_list", handler!(state, _app, params, {
+        let p: ScreenshotListParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        screenshot::list(&state, p).await
+    }));
+    d.register("screenshot_delete", handler!(state, _app, params, {
+        let p: ScreenshotDeleteParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        screenshot::delete(&state, p).await
+    }));
+
+    // 资源包管理
+    d.register("resourcepack_list", handler!(state, _app, params, {
+        let p: ResourcePackListParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        resourcepack::list(&state, p).await
+    }));
+    d.register("resourcepack_convert", handler!(state, _app, params, {
+        let p: ResourcePackConvertParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        resourcepack::convert(&state, p).await
+    }));
+
+    // 版本 JSON 读写
+    d.register("version_json_read", handler!(state, _app, params, {
+        let p: VersionJsonReadParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        version_json::read(&state, p).await
+    }));
+    d.register("version_json_save", handler!(state, _app, params, {
+        let p: VersionJsonSaveParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        version_json::save(&state, p).await
+    }));
+
+    // 存档管理
+    d.register("archive_list", handler!(state, _app, params, {
+        let p: ArchiveListParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        archive::list(&state, p).await
+    }));
+    d.register("archive_backup", handler!(state, _app, params, {
+        let p: ArchiveBackupParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        archive::backup(&state, p).await
+    }));
+    d.register("archive_restore", handler!(state, _app, params, {
+        let p: ArchiveRestoreParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        archive::restore(&state, p).await
+    }));
+    d.register("extract_save_seed", handler!(state, _app, params, {
+        let p: ExtractSaveSeedParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        archive::extract_save_seed(&state, p).await
+    }));
+
+    // 网络延迟测试
+    d.register("network_latency_test", handler!(state, _app, params, {
+        let p: NetworkLatencyTestParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        network::latency_test(&state, p).await
+    }));
+    // 服务器状态检测
+    d.register("server_ping", handler!(state, _app, params, {
+        let p: ServerPingParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        network::server_ping(&state, p).await
+    }));
+
+    // NBT 数据查看
+    d.register("nbt_parse", handler!(state, _app, params, {
+        let p: NbtParseParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        nbt::parse(&state, p).await
+    }));
+
+    d
+});
 
 /// 统一工具 IPC 入口
 #[tauri::command]
 pub async fn tools_manager(
     state: State<'_, AppState>,
-    req: ToolsRequest,
+    app: AppHandle,
+    req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
-    match req.action.as_str() {
-        // 外部下载
-        "download_file" => {
-            let p: DownloadFileParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            download::download_file(&state, p).await
-        }
-        "get_download_dir" => download::get_download_dir(&state).await,
-        "list_downloads" => download::list_downloads(&state).await,
-        "delete_download" => {
-            let p: DeleteDownloadParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            download::delete_download(&state, p).await
-        }
-        // 文件名获取
-        "fetch_filename" => {
-            let p: FetchFilenameParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            filename::fetch_filename(p).await
-        }
-        // 清理游戏垃圾
-        "cleanup_scan" => cleanup::scan(&state).await,
-        "cleanup_execute" => {
-            let p: CleanupExecuteParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            cleanup::execute(p).await
-        }
-        // 内存优化
-        "memory_optimize" => {
-            let p: MemoryOptimizeParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            memory::optimize(p).await
-        }
-        // Mod 依赖检测
-        "mod_dependency_check" => {
-            let p: ModDependencyCheckParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            mod_tools::mod_dependency_check(&state, p).await
-        }
-        // Mod 去重扫描
-        "mod_dedup_scan" => {
-            let p: ModDedupScanParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            mod_tools::mod_dedup_scan(&state, p).await
-        }
-        // 启动器数据导出
-        "export_launcher_data" => {
-            let p: ExportLauncherDataParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            data_export::export_launcher_data(&state, p).await
-        }
-        // 崩溃日志分析
-        "crash_analyze" => {
-            let p: CrashAnalyzeParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            crash_analyzer::analyze(&state, p).await
-        }
-        // 截图管理
-        "screenshot_list" => {
-            let p: ScreenshotListParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            screenshot::list(&state, p).await
-        }
-        "screenshot_delete" => {
-            let p: ScreenshotDeleteParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            screenshot::delete(&state, p).await
-        }
-        // 资源包管理
-        "resourcepack_list" => {
-            let p: ResourcePackListParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            resourcepack::list(&state, p).await
-        }
-        "resourcepack_convert" => {
-            let p: ResourcePackConvertParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            resourcepack::convert(&state, p).await
-        }
-        // 版本 JSON 读写
-        "version_json_read" => {
-            let p: VersionJsonReadParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            version_json::read(&state, p).await
-        }
-        "version_json_save" => {
-            let p: VersionJsonSaveParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            version_json::save(&state, p).await
-        }
-        // 存档管理
-        "archive_list" => {
-            let p: ArchiveListParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            archive::list(&state, p).await
-        }
-        "archive_backup" => {
-            let p: ArchiveBackupParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            archive::backup(&state, p).await
-        }
-        "archive_restore" => {
-            let p: ArchiveRestoreParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            archive::restore(&state, p).await
-        }
-        "extract_save_seed" => {
-            let p: ExtractSaveSeedParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            archive::extract_save_seed(&state, p).await
-        }
-        // 网络延迟测试
-        "network_latency_test" => {
-            let p: NetworkLatencyTestParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            network::latency_test(&state, p).await
-        }
-        // 服务器状态检测
-        "server_ping" => {
-            let p: ServerPingParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            network::server_ping(&state, p).await
-        }
-        // NBT 数据查看
-        "nbt_parse" => {
-            let p: NbtParseParams = serde_json::from_value(req.params)
-                .map_err(|e| format!("参数解析失败: {}", e))?;
-            nbt::parse(&state, p).await
-        }
-        _ => Err(format!("未知操作: {}", req.action)),
-    }
+    let state = state.inner().clone();
+    DISPATCHER.dispatch(state, app, req).await
 }

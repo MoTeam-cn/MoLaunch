@@ -4,13 +4,17 @@
 //! - get_mods_dir：获取版本的 mods 目录路径（pub(crate)，供 preload 命令复用）
 //!
 //! 注：sanitize_file_name 已迁移到 `crate::utils::path::sanitize_file_name`
+//!
+//! 注：原 mods 模块的 4 个 Tauri 命令文件已聚合为 `version_mods_manager` IPC 入口，
+//! 函数签名从 `&State<'_, AppState>` 改为 `&AppState`；
+//! preload.rs 和 loaders.rs 中现有的 `get_mods_dir(&state, ...)` 调用通过
+//! `State::Deref<Target = AppState>` 的 deref coercion 仍可编译。
 
 use crate::state::AppState;
-use tauri::State;
 
 /// 获取版本的 mods 目录路径（内部辅助函数，pub(crate) 供 preload 命令复用）
 pub(crate) async fn get_mods_dir(
-    state: &State<'_, AppState>,
+    state: &AppState,
     version_id: &str,
 ) -> Result<std::path::PathBuf, String> {
     let game_dir = crate::state::resolve_game_dir_from_state(&state).await;

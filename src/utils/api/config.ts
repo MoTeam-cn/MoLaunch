@@ -5,9 +5,13 @@
  * 此前分散的 17 个 set_* 函数已移除，由 ConfigPatch 的对应字段取代。
  *
  * 从 system.ts 拆分而来：系统操作/下载进度查询仍保留在 system.ts。
+ *
+ * 注：底层 `get_config` / `apply_config` / `get_config_value` / `set_config_value`
+ * 4 个命令已聚合为 `config_manager` 单一 IPC 入口，通过 `action` 字段分发。
+ * `get_config_path` / `save_config_to_file` 仍走独立 invoke（不在聚合范围）。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { CONFIG_ACTIONS, configManager } from './config-manager'
 
 // ==================== 配置快照与补丁类型 ====================
 
@@ -152,7 +156,7 @@ export async function getConfig(keys?: string[], force?: boolean): Promise<Confi
   // 无缓存：发起请求（合并并发请求为单个 Promise）
   if (!configCache) {
     if (!configPromise) {
-      configPromise = invoke<ConfigEntry[]>('get_config', {
+      configPromise = configManager<ConfigEntry[]>(CONFIG_ACTIONS.GET_CONFIG, {
         keys: keys && keys.length > 0 ? keys : null,
       })
         .then((entries) => {
@@ -230,7 +234,7 @@ export async function applyConfig(patch: ConfigPatch): Promise<void> {
       entries.push({ key, value })
     }
   }
-  await invoke<void>('apply_config', { entries })
+  await configManager<void>(CONFIG_ACTIONS.APPLY_CONFIG, { entries })
   // 同步更新缓存（乐观更新，避免下次 getConfig 读到旧值）
   if (configCache) {
     Object.assign(configCache as object, patch)
@@ -251,7 +255,7 @@ export function refreshConfig(): void {
 
 /** 获取配置值（从 storage 读取） */
 export async function getConfigValue(section: string, key: string): Promise<string | null> {
-  return await invoke<string | null>('get_config_value', { section, key })
+  return configManager<string | null>(CONFIG_ACTIONS.GET_CONFIG_VALUE, { section, key })
 }
 
 /**
@@ -260,5 +264,5 @@ export async function getConfigValue(section: string, key: string): Promise<stri
  * 保留此命令用于调试/迁移场景。正常配置更新应走 `applyConfig`。
  */
 export async function setConfigValue(section: string, key: string, value: string): Promise<void> {
-  return await invoke<void>('set_config_value', { section, key, value })
+  return configManager<void>(CONFIG_ACTIONS.SET_CONFIG_VALUE, { section, key, value })
 }

@@ -1,9 +1,15 @@
 //! Java 管理命令
+//!
+//! 注：原 6 个分散的 java Tauri 命令已聚合为 `java_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发到各子模块函数。
+//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState` / `&AppHandle`，
+//! 由 `utils::java_manager::dispatch` 反序列化参数后调用。
 
 use crate::log_info;
 use crate::minecraft::java;
 use crate::minecraft::java_selector;
 use crate::state::AppState;
+use crate::utils::dispatcher::ActionRequest;
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, State};
 
@@ -56,9 +62,26 @@ pub struct JavaCompatResult {
     pub warning: String,
 }
 
-/// 检测 Java
+/// 统一 Java 管理 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::java_manager::dispatch` 进行 action 分发。
 #[tauri::command]
-pub async fn detect_java(_state: State<'_, AppState>) -> Result<JavaRuntimeInfo, String> {
+pub async fn java_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::java_manager::dispatch(state, app, req).await
+}
+
+// ============================================================
+// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
+// ============================================================
+
+/// 检测 Java
+pub async fn detect_java(_state: &AppState) -> Result<JavaRuntimeInfo, String> {
     log_info!("Detecting Java...");
 
     // 从环境变量中查找Java
@@ -87,8 +110,7 @@ pub async fn detect_java(_state: State<'_, AppState>) -> Result<JavaRuntimeInfo,
 }
 
 /// 列出所有 Java
-#[tauri::command]
-pub async fn list_java(_state: State<'_, AppState>) -> Result<Vec<JavaRuntimeInfo>, String> {
+pub async fn list_java(_state: &AppState) -> Result<Vec<JavaRuntimeInfo>, String> {
     log_info!("Listing all Java runtimes...");
 
     let java_list = java::search_java();
@@ -111,11 +133,10 @@ pub async fn list_java(_state: State<'_, AppState>) -> Result<Vec<JavaRuntimeInf
 }
 
 /// 根据 MC 版本选择最佳 Java
-#[tauri::command]
 pub async fn select_java_for_mc(
     mc_version: String,
     user_java_path: Option<String>,
-    _state: State<'_, AppState>,
+    _state: &AppState,
 ) -> Result<JavaRuntimeInfo, String> {
     log_info!("Selecting Java for MC {}...", mc_version);
 
@@ -160,7 +181,6 @@ pub async fn select_java_for_mc(
 }
 
 /// 获取 MC 版本的 Java 需求（支持加载器约束）
-#[tauri::command]
 pub async fn get_java_requirements(
     mc_version: String,
     loader: Option<String>,
@@ -182,7 +202,6 @@ pub async fn get_java_requirements(
 /// - `java_path`: Java 可执行文件路径（如 "C:\\jdk-17\\bin\\java.exe"）
 /// - `mc_version`: MC 版本号
 /// - `loader`: 加载器类型（可选）
-#[tauri::command]
 pub async fn check_java_compatible(
     java_path: String,
     mc_version: String,
@@ -249,11 +268,10 @@ pub async fn check_java_compatible(
 /// ```
 ///
 /// 返回下载的 java.exe 完整路径
-#[tauri::command]
 pub async fn download_java(
     target_major: u32,
-    app: AppHandle,
-    state: State<'_, AppState>,
+    app: &AppHandle,
+    state: &AppState,
 ) -> Result<String, String> {
     log_info!("[JavaDownload] Start downloading Java {}", target_major);
 
@@ -266,7 +284,7 @@ pub async fn download_java(
         target_major,
         dl_mode,
         mirror_url.as_deref(),
-        Some(&app),
+        Some(app),
     )
     .await?;
 

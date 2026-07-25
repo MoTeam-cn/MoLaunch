@@ -6,17 +6,19 @@
 //! - remove_mc_folder：移除文件夹
 //! - switch_mc_folder：切换当前文件夹
 //! - rename_mc_folder：重命名文件夹
+//!
+//! 注：原 5 个独立 Tauri 命令已聚合为 `version_list_manager` IPC 入口，
+//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::version_list_manager::dispatch` 反序列化参数后调用。
 
 use crate::config::save_config;
 use crate::state::{AppState, McFolder};
 use crate::{log_info, log_warn};
-use tauri::State;
 
 /// 列出所有 Minecraft 文件夹
 ///
 /// 返回的 path 统一为绝对路径，便于前端比较和展示
-#[tauri::command]
-pub async fn list_mc_folders(state: State<'_, AppState>) -> Result<Vec<McFolder>, String> {
+pub async fn list_mc_folders(state: &AppState) -> Result<Vec<McFolder>, String> {
     let config = state.config.lock().await;
     let folders: Vec<McFolder> = config
         .mc_folders
@@ -35,9 +37,8 @@ pub async fn list_mc_folders(state: State<'_, AppState>) -> Result<Vec<McFolder>
 ///
 /// - 自动去重：路径相同则更新名称
 /// - 路径规范化：统一为绝对路径存储
-#[tauri::command]
 pub async fn add_mc_folder(
-    state: State<'_, AppState>,
+    state: &AppState,
     name: String,
     path: String,
 ) -> Result<Vec<McFolder>, String> {
@@ -91,9 +92,8 @@ pub async fn add_mc_folder(
 ///
 /// - 不允许移除最后一个文件夹
 /// - 如果移除的是当前文件夹，自动切换到第一个
-#[tauri::command]
 pub async fn remove_mc_folder(
-    state: State<'_, AppState>,
+    state: &AppState,
     path: String,
 ) -> Result<Vec<McFolder>, String> {
     log_info!("Removing MC folder: {}", path);
@@ -134,8 +134,7 @@ pub async fn remove_mc_folder(
 }
 
 /// 切换当前 Minecraft 文件夹
-#[tauri::command]
-pub async fn switch_mc_folder(state: State<'_, AppState>, path: String) -> Result<String, String> {
+pub async fn switch_mc_folder(state: &AppState, path: String) -> Result<String, String> {
     log_info!("Switching MC folder to: {}", path);
 
     let mut config = state.config.lock().await;
@@ -161,9 +160,8 @@ pub async fn switch_mc_folder(state: State<'_, AppState>, path: String) -> Resul
 }
 
 /// 重命名 Minecraft 文件夹
-#[tauri::command]
 pub async fn rename_mc_folder(
-    state: State<'_, AppState>,
+    state: &AppState,
     path: String,
     new_name: String,
 ) -> Result<Vec<McFolder>, String> {

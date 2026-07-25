@@ -267,10 +267,13 @@ pub fn log(level: LogLevel, file: &str, line: u32, message: &str) {
 }
 
 /// 记录分割线
+///
+/// 分割线属于辅助性日志（Java Search、NeoForge List 等），
+/// 默认日志级别下不显示，避免噪音。需要时通过 debug 模式查看。
 pub fn separator(title: &str) {
     let line = format!("========== {} ==========", title);
     // 分割线没有调用方信息，用空字符串占位
-    log(LogLevel::Info, "logger.rs", 0, &line);
+    log(LogLevel::Debug, "logger.rs", 0, &line);
 }
 
 /// 将 `file!()` 返回的路径裁剪为项目内相对路径（以 src/ 开头）
@@ -324,21 +327,22 @@ pub fn read_log_file_inner(filename: &str) -> anyhow::Result<String> {
 }
 
 // ============================================================
-// Tauri 命令包装（供开发者模式「日志查看」调用）
+// 日志查看包装（供 system_manager dispatcher 调用）
 // ============================================================
 //
 // 原函数返回 PathBuf / Vec<String> / anyhow::Result<String>，
-// 不能直接作为 #[tauri::command]（PathBuf 需要序列化、&str 参数需要 owned）。
-// 这里提供薄包装层转换为 Tauri 友好的返回类型。
+// 这里提供薄包装层转换为序列化友好的返回类型。
+//
+// 注：原 3 个分散 Tauri 命令已聚合为 `system_manager` 一个 IPC 入口，
+// 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
+// 由 `utils::system_manager::dispatch` 反序列化参数后调用。
 
 /// 获取今日日志文件完整路径（字符串形式）
-#[tauri::command]
 pub fn get_log_path() -> String {
     get_log_path_inner().to_string_lossy().to_string()
 }
 
 /// 获取所有日志文件名列表（最新的在前）
-#[tauri::command]
 pub fn list_log_files() -> Vec<String> {
     list_log_files_inner()
 }
@@ -347,7 +351,6 @@ pub fn list_log_files() -> Vec<String> {
 ///
 /// `filename` 仅允许 `.log` 后缀，且不得包含路径分隔符（防止路径遍历）。
 /// 安全修复：返回前对内容进行脱敏，避免前端日志查看器显示 token 等敏感信息
-#[tauri::command]
 pub fn read_log_file(filename: String) -> Result<String, String> {
     if filename.is_empty()
         || filename.contains('/')

@@ -4,16 +4,18 @@ use crate::{log_error, log_info};
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Instant;
-use tauri::{Emitter, State};
+use tauri::{AppHandle, Emitter};
 
 use super::sanitize_version_id;
 use super::types::DownloadStageSnapshot;
 
 /// Download version
-#[tauri::command]
+///
+/// 注：已聚合为 `version_install_manager` IPC 入口，本函数由
+/// `utils::version_install_manager::dispatch` 反序列化参数后调用。
 pub async fn download_version(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
+    app: &AppHandle,
+    state: &AppState,
     version_id: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;

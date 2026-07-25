@@ -6,6 +6,10 @@
 //!
 //! 共享类型与 helper 在 `super::` 中（`ExternalPluginEntry` / `is_valid_plugin_id` /
 //! `plugins_root` / `read_plugin_manifest`）。
+//!
+//! 注：原 3 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::plugins_manager::dispatch` 反序列化参数后调用。
 
 use super::{is_valid_plugin_id, plugins_root, read_plugin_manifest, ExternalPluginEntry};
 use crate::error_util::log_err;
@@ -15,7 +19,6 @@ use crate::log_info;
 ///
 /// 扫描 `<base_dir>/plugins/` 目录，读取每个插件的 `manifest.json`，
 /// 要求 manifest.id 与目录名一致。manifest 损坏的插件会被跳过（日志记录）。
-#[tauri::command]
 pub async fn list_external_plugins() -> Result<Vec<ExternalPluginEntry>, String> {
     let root = plugins_root();
     if !root.exists() {
@@ -61,7 +64,6 @@ pub async fn list_external_plugins() -> Result<Vec<ExternalPluginEntry>, String>
 ///
 /// 安全限制：`file_path` 必须是相对路径，且解析后必须位于插件目录内。
 /// 使用 `canonicalize` + `starts_with` 双重校验防止 `../` 路径遍历攻击。
-#[tauri::command]
 pub async fn read_external_plugin_file(
     plugin_id: String,
     file_path: String,
@@ -92,7 +94,6 @@ pub async fn read_external_plugin_file(
 /// 卸载外部插件（删除插件目录）
 ///
 /// 二次 canonicalize 校验确保不会逃逸出 `plugins/` 根目录。
-#[tauri::command]
 pub async fn uninstall_external_plugin(plugin_id: String) -> Result<(), String> {
     if !is_valid_plugin_id(&plugin_id) {
         return Err(format!("Invalid plugin id: {}", plugin_id));

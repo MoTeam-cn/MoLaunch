@@ -14,20 +14,25 @@
  * 注意：开发者模式的「获取/修改」已统一到 get_config / apply_config
  * （ConfigSnapshot.developerMode / ConfigPatch.developerMode），
  * 此文件仅保留解锁触发动作和日志/缓存/存储/系统信息查询。
+ *
+ * 注：8 个原 Tauri 命令（is_developer_unlocked / unlock_developer_mode
+ * / get_storage_dirs / get_system_info / get_cache_stats / get_log_path
+ * / list_log_files / read_log_file）已聚合为 `system_manager` 单一 IPC 入口，
+ * 通过 `action` 字段分发。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { SYSTEM_ACTIONS, systemManager } from './system-manager'
 
 // ==================== 解锁 ====================
 
 /** 查询开发者模式是否已解锁（用户连续点击版本号 5 次后解锁） */
 export async function isDeveloperUnlocked(): Promise<boolean> {
-  return await invoke<boolean>('is_developer_unlocked')
+  return systemManager<boolean>(SYSTEM_ACTIONS.IS_DEVELOPER_UNLOCKED)
 }
 
 /** 解锁开发者模式（连续点击版本号 5 次后调用） */
 export async function unlockDeveloperMode(): Promise<void> {
-  return await invoke<void>('unlock_developer_mode')
+  return systemManager<void>(SYSTEM_ACTIONS.UNLOCK_DEVELOPER_MODE)
 }
 
 // ==================== 存储目录 ====================
@@ -51,7 +56,7 @@ export interface StorageDirs {
 
 /** 获取所有存储目录路径 */
 export async function getStorageDirs(): Promise<StorageDirs> {
-  return await invoke<StorageDirs>('get_storage_dirs')
+  return systemManager<StorageDirs>(SYSTEM_ACTIONS.GET_STORAGE_DIRS)
 }
 
 // ==================== 系统信息 ====================
@@ -77,7 +82,7 @@ export interface SystemInfo {
 
 /** 获取系统信息 */
 export async function getSystemInfo(): Promise<SystemInfo> {
-  return await invoke<SystemInfo>('get_system_info')
+  return systemManager<SystemInfo>(SYSTEM_ACTIONS.GET_SYSTEM_INFO)
 }
 
 // ==================== 缓存统计 ====================
@@ -112,22 +117,22 @@ export interface CacheStatsResult {
 
 /** 获取所有缓存目录的统计信息（文件数、占用大小、TTL） */
 export async function getCacheStats(): Promise<CacheStatsResult> {
-  return await invoke<CacheStatsResult>('get_cache_stats')
+  return systemManager<CacheStatsResult>(SYSTEM_ACTIONS.GET_CACHE_STATS)
 }
 
 // ==================== 日志查看 ====================
 
 /** 获取今日日志文件完整路径 */
 export async function getLogPath(): Promise<string> {
-  return await invoke<string>('get_log_path')
+  return systemManager<string>(SYSTEM_ACTIONS.GET_LOG_PATH)
 }
 
 /** 获取所有日志文件名列表（最新的在前） */
 export async function listLogFiles(): Promise<string[]> {
-  return await invoke<string[]>('list_log_files')
+  return systemManager<string[]>(SYSTEM_ACTIONS.LIST_LOG_FILES)
 }
 
 /** 读取指定日志文件内容 */
 export async function readLogFile(filename: string): Promise<string> {
-  return await invoke<string>('read_log_file', { filename })
+  return systemManager<string>(SYSTEM_ACTIONS.READ_LOG_FILE, { filename })
 }

@@ -7,7 +7,7 @@ use std::sync::Arc;
 use crate::log_info;
 use crate::minecraft::community::types::ResourceType;
 use crate::state::{AppState, DownloadStage};
-use tauri::{AppHandle, State};
+use tauri::AppHandle;
 
 use super::helpers::{apply_filename_format, resolve_install_dir};
 use super::types::{DownloadRequest, DownloadResult};
@@ -21,14 +21,13 @@ use super::types::{DownloadRequest, DownloadResult};
 /// - ResourcePack → versions/{vid}/resourcepacks/
 /// - Shader → versions/{vid}/shaderpacks/
 /// - DataPack → versions/{vid}/datapacks/
-#[tauri::command]
 pub async fn download_resource(
-    state: State<'_, AppState>,
+    state: &AppState,
     req: DownloadRequest,
 ) -> Result<DownloadResult, String> {
     log_info!("[Community] Downloading {} from {}", req.file_name, req.url);
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let config = state.config.lock().await;
     let final_file_name = apply_filename_format(
         &req.file_name,
@@ -143,9 +142,8 @@ pub async fn download_resource(
 ///
 /// 详情页"下载到任意路径"流程使用：前端在弹保存对话框前调用此命令，
 /// 获取格式化后的文件名作为默认名，避免使用原始名导致设置不生效。
-#[tauri::command]
 pub async fn format_download_filename(
-    state: State<'_, AppState>,
+    state: &AppState,
     file_name: String,
     translated_name: Option<String>,
 ) -> Result<String, String> {
@@ -161,10 +159,9 @@ pub async fn format_download_filename(
 ///
 /// 走 DownloadManager（支持多 URL fallback + 分片 + 暂停/取消），
 /// 进度通过 `download_state` 统一通道，前端在下载管理页面展示。
-#[tauri::command]
 pub async fn download_resource_to_path(
-    state: State<'_, AppState>,
-    _app: AppHandle,
+    state: &AppState,
+    _app: &AppHandle,
     url: String,
     file_name: String,
     save_path: String,
@@ -270,22 +267,20 @@ pub async fn download_resource_to_path(
 }
 
 /// 安装资源文件（与 download_resource 相同，语义化命名）
-#[tauri::command]
 pub async fn install_resource(
-    state: State<'_, AppState>,
+    state: &AppState,
     req: DownloadRequest,
 ) -> Result<DownloadResult, String> {
     download_resource(state, req).await
 }
 
 /// 获取资源默认安装路径（用于前端显示"打开文件夹"）
-#[tauri::command]
 pub async fn get_resource_install_path(
-    state: State<'_, AppState>,
+    state: &AppState,
     resource_type: ResourceType,
     version_id: Option<String>,
 ) -> Result<String, String> {
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
 
     let path = resolve_install_dir(&game_dir, resource_type, version_id.as_deref());
     Ok(path.to_string_lossy().to_string())

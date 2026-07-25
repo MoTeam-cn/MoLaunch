@@ -1,13 +1,29 @@
 use crate::state::{AppState, DownloadState, StageStatus};
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use super::types::{DownloadProgressSnapshot, DownloadStageSnapshot};
+use crate::utils::dispatcher::ActionRequest;
+
+/// 统一下载进度 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::version_progress_manager::dispatch` 进行 action 分发。
+#[tauri::command]
+pub async fn version_progress_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::version_progress_manager::dispatch(state, app, req).await
+}
+
+// ============================================================
+// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
+// ============================================================
 
 /// Get download progress
-#[tauri::command]
-pub async fn get_download_progress(
-    state: State<'_, AppState>,
-) -> Result<DownloadProgressSnapshot, String> {
+pub async fn get_download_progress(state: &AppState) -> Result<DownloadProgressSnapshot, String> {
     let ds = state.download_state.lock().unwrap();
     let is_paused = state
         .download_pause_flag
@@ -46,23 +62,20 @@ pub async fn get_download_progress(
 }
 
 /// Check if downloading
-#[tauri::command]
-pub async fn is_downloading(state: State<'_, AppState>) -> Result<bool, String> {
+pub async fn is_downloading(state: &AppState) -> Result<bool, String> {
     let ds = state.download_state.lock().unwrap();
     Ok(ds.is_active)
 }
 
 /// Reset download progress
-#[tauri::command]
-pub async fn reset_download_progress(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn reset_download_progress(state: &AppState) -> Result<(), String> {
     let mut ds = state.download_state.lock().unwrap();
     *ds = DownloadState::default();
     Ok(())
 }
 
 /// 取消下载（设置 cancel_flag，正在进行的下载会尽快中止）
-#[tauri::command]
-pub async fn cancel_download(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn cancel_download(state: &AppState) -> Result<(), String> {
     state
         .download_cancel_flag
         .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -74,8 +87,7 @@ pub async fn cancel_download(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 /// 暂停下载（设置 pause_flag，新任务不再开始，已进行的任务完成当前文件后等待）
-#[tauri::command]
-pub async fn pause_download(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn pause_download(state: &AppState) -> Result<(), String> {
     state
         .download_pause_flag
         .store(true, std::sync::atomic::Ordering::Relaxed);
@@ -83,8 +95,7 @@ pub async fn pause_download(state: State<'_, AppState>) -> Result<(), String> {
 }
 
 /// 恢复下载（清除 pause_flag）
-#[tauri::command]
-pub async fn resume_download(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn resume_download(state: &AppState) -> Result<(), String> {
     state
         .download_pause_flag
         .store(false, std::sync::atomic::Ordering::Relaxed);

@@ -1,20 +1,26 @@
 //! 配置文件相关命令
+//!
+//! 注：原 4 个分散 Tauri 命令（`get_config_path` / `save_config_to_file`
+//! / `get_config_value` / `set_config_value`）已聚合为 `config_manager` +
+//! `system_manager` 两个 IPC 入口，通过请求体的 `action` 字段分发。
+//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState`，
+//! 由 `utils::config_manager::dispatch` / `utils::system_manager::dispatch`
+//! 反序列化参数后调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
 use crate::state::AppState;
-use tauri::State;
+use crate::utils::dispatcher::ActionRequest;
+use tauri::{AppHandle, State};
 
 /// 获取配置文件路径
-#[tauri::command]
 pub async fn get_config_path() -> Result<String, String> {
     let storage = crate::storage::Storage::instance();
     Ok(storage.config_path().to_string_lossy().to_string())
 }
 
 /// 手动保存配置到文件
-#[tauri::command]
-pub async fn save_config_to_file(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn save_config_to_file(state: &AppState) -> Result<(), String> {
     let config = state.config.lock().await;
     crate::config::save_config(&config)?;
     log_info!("Config saved manually");
@@ -22,7 +28,6 @@ pub async fn save_config_to_file(state: State<'_, AppState>) -> Result<(), Strin
 }
 
 /// 获取配置值（从 storage 读取）
-#[tauri::command]
 pub async fn get_config_value(section: String, key: String) -> Result<Option<String>, String> {
     let storage = crate::storage::Storage::instance();
     Ok(storage.get_config(&section, &key))
@@ -66,9 +71,8 @@ fn is_valid_config_key(section: &str, key: &str) -> bool {
 }
 
 /// 设置配置值（写入 storage + 同步内存 AppConfig）
-#[tauri::command]
 pub async fn set_config_value(
-    state: State<'_, AppState>,
+    state: &AppState,
     section: String,
     key: String,
     value: String,
@@ -159,4 +163,28 @@ pub async fn set_config_value(
     }
 
     Ok(())
+}
+
+// ============================================================
+// 统一 IPC 入口（聚合 get_config / apply_config / get_config_value / set_config_value）
+// ============================================================
+
+/// 统一配置管理 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::config_manager::dispatch` 进行 action 分发。
+///
+/// 注册的 action（4 个）：
+/// - `get_config`：读取配置（扁平化数组）
+/// - `apply_config`：统一配置更新
+/// - `get_config_value`：读取单个 INI 配置值
+/// - `set_config_value`：设置单个 INI 配置值
+#[tauri::command]
+pub async fn config_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::config_manager::dispatch(state, app, req).await
 }

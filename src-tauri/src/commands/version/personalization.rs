@@ -1,10 +1,13 @@
 //! 版本个性化设置读写
+//!
+//! 注：原 2 个独立 Tauri 命令已聚合为 `version_list_manager` IPC 入口，
+//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::version_list_manager::dispatch` 反序列化参数后调用。
 
 use crate::minecraft::version::setup::{PersonalizationUpdate, VersionSetup};
 use crate::state::AppState;
 use crate::{log_error, log_info};
 use serde::{Deserialize, Serialize};
-use tauri::State;
 
 use super::list::version_type_to_string;
 use super::sanitize_version_id;
@@ -61,9 +64,8 @@ pub struct VersionPersonalization {
 }
 
 /// 获取版本个性化设置
-#[tauri::command]
 pub async fn get_version_personalization(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
 ) -> Result<VersionPersonalization, String> {
     sanitize_version_id(&version_id)?;
@@ -102,9 +104,8 @@ pub async fn get_version_personalization(
 }
 
 /// 更新版本个性化字段（传 null/undefined 的字段不会被修改）
-#[tauri::command]
 pub async fn update_version_personalization(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
     update: PersonalizationUpdate,
 ) -> Result<(), String> {

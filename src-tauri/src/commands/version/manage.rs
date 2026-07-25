@@ -1,16 +1,19 @@
 //! 版本管理：文件补全、重命名、选中版本持久化
+//!
+//! 注：原 4 个独立 Tauri 命令已聚合为 `version_list_manager` IPC 入口，
+//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::version_list_manager::dispatch` 反序列化参数后调用。
 
 use crate::state::AppState;
 use crate::{log_error, log_info};
-use tauri::{Emitter, State};
+use tauri::Emitter;
 
 use super::sanitize_version_id;
 
 /// 补全版本文件（校验并下载缺失的 libraries/assets）
-#[tauri::command]
 pub async fn fix_version_files(
-    state: State<'_, AppState>,
-    app_handle: tauri::AppHandle,
+    state: &AppState,
+    app_handle: &tauri::AppHandle,
     version_id: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
@@ -77,9 +80,8 @@ pub async fn fix_version_files(
 }
 
 /// 重命名版本
-#[tauri::command]
 pub async fn rename_version(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
     new_name: String,
 ) -> Result<(), String> {
@@ -157,16 +159,14 @@ pub async fn rename_version(
 }
 
 /// 获取上次选中的版本（持久化）
-#[tauri::command]
-pub async fn get_selected_version(state: State<'_, AppState>) -> Result<Option<String>, String> {
+pub async fn get_selected_version(state: &AppState) -> Result<Option<String>, String> {
     let config = state.config.lock().await;
     Ok(config.selected_version.clone())
 }
 
 /// 保存当前选中的版本（持久化到 config.ini）
-#[tauri::command]
 pub async fn set_selected_version(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: Option<String>,
 ) -> Result<(), String> {
     crate::commands::system::update_config(&state, |config| {

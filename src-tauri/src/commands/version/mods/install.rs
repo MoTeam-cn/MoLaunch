@@ -1,18 +1,20 @@
 //! Mod 安装与文件操作命令（install_mod / open_mods_dir / get_version_mods_dir / reveal_mod_file）
+//!
+//! 注：原 4 个独立 Tauri 命令已聚合为 `version_mods_manager` IPC 入口，
+//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::version_mods_manager::dispatch` 反序列化参数后调用。
 
 use crate::error_util::log_err;
 use crate::state::AppState;
 use crate::{log_error, log_info};
-use tauri::State;
 
 use super::super::sanitize_version_id;
 use super::helpers::get_mods_dir;
 use crate::utils::path::sanitize_file_name;
 
 /// 从外部文件安装 Mod（复制到 mods 目录）
-#[tauri::command]
 pub async fn install_mod(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
     source_path: String,
 ) -> Result<(), String> {
@@ -79,8 +81,7 @@ pub async fn install_mod(
 }
 
 /// 打开版本的 mods 目录（自动创建）
-#[tauri::command]
-pub async fn open_mods_dir(state: State<'_, AppState>, version_id: String) -> Result<(), String> {
+pub async fn open_mods_dir(state: &AppState, version_id: String) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
     let mods_dir = get_mods_dir(&state, &version_id).await?;
 
@@ -94,9 +95,8 @@ pub async fn open_mods_dir(state: State<'_, AppState>, version_id: String) -> Re
 }
 
 /// 获取版本的 mods 目录路径（不打开，用于前端下载 mod 时指定保存位置）
-#[tauri::command]
 pub async fn get_version_mods_dir(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
 ) -> Result<String, String> {
     sanitize_version_id(&version_id)?;
@@ -108,9 +108,8 @@ pub async fn get_version_mods_dir(
 }
 
 /// 在资源管理器中打开并选中指定 Mod 文件
-#[tauri::command]
 pub async fn reveal_mod_file(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
     file_name: String,
 ) -> Result<(), String> {

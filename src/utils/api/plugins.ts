@@ -7,9 +7,11 @@
  * - installExternalPluginFromDir()：从源目录安装插件
  * - installExternalPluginFromZip()：从 ZIP 字节数组安装插件
  * - uninstallExternalPlugin()：卸载插件（删除目录）
+ *
+ * 注：底层已聚合为 `plugins_manager` 单一 IPC 入口，通过 `action` 字段分发。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { PLUGINS_ACTIONS, pluginsManager } from './plugins-manager'
 
 /** 外部插件清单（对应后端 ExternalPluginManifest） */
 export interface ExternalPluginManifest {
@@ -34,7 +36,7 @@ export interface ExternalPluginEntry extends ExternalPluginManifest {
  * 列出所有已安装的外部插件
  */
 export async function listExternalPlugins(): Promise<ExternalPluginEntry[]> {
-  return await invoke<ExternalPluginEntry[]>('list_external_plugins')
+  return await pluginsManager<ExternalPluginEntry[]>(PLUGINS_ACTIONS.LIST_EXTERNAL_PLUGINS)
 }
 
 /**
@@ -46,7 +48,7 @@ export async function readExternalPluginFile(
   pluginId: string,
   filePath: string,
 ): Promise<string> {
-  return await invoke<string>('read_external_plugin_file', {
+  return await pluginsManager<string>(PLUGINS_ACTIONS.READ_EXTERNAL_PLUGIN_FILE, {
     pluginId,
     filePath,
   })
@@ -58,7 +60,9 @@ export async function readExternalPluginFile(
  * 返回安装后的插件 ID。
  */
 export async function installExternalPluginFromDir(sourceDir: string): Promise<string> {
-  return await invoke<string>('install_external_plugin_from_dir', { sourceDir })
+  return await pluginsManager<string>(PLUGINS_ACTIONS.INSTALL_EXTERNAL_PLUGIN_FROM_DIR, {
+    sourceDir,
+  })
 }
 
 /**
@@ -71,14 +75,16 @@ export async function installExternalPluginFromDir(sourceDir: string): Promise<s
  * 返回安装后的插件 ID。
  */
 export async function installExternalPluginFromZip(zipPath: string): Promise<string> {
-  return await invoke<string>('install_external_plugin_from_zip', { zipPath })
+  return await pluginsManager<string>(PLUGINS_ACTIONS.INSTALL_EXTERNAL_PLUGIN_FROM_ZIP, {
+    zipPath,
+  })
 }
 
 /**
  * 卸载外部插件（删除插件目录）
  */
 export async function uninstallExternalPlugin(pluginId: string): Promise<void> {
-  return await invoke<void>('uninstall_external_plugin', { pluginId })
+  return await pluginsManager<void>(PLUGINS_ACTIONS.UNINSTALL_EXTERNAL_PLUGIN, { pluginId })
 }
 
 /**
@@ -87,7 +93,10 @@ export async function uninstallExternalPlugin(pluginId: string): Promise<void> {
  * @param asZip true 导出 ZIP，false 导出文件夹
  */
 export async function exportPluginSample(destPath: string, asZip: boolean): Promise<void> {
-  return await invoke<void>('export_plugin_sample', { destPath, asZip })
+  return await pluginsManager<void>(PLUGINS_ACTIONS.EXPORT_PLUGIN_SAMPLE, {
+    destPath,
+    asZip,
+  })
 }
 
 /**
@@ -95,5 +104,5 @@ export async function exportPluginSample(destPath: string, asZip: boolean): Prom
  * @param format 布局格式：'json' / 'xml' / 'html'
  */
 export async function readLayoutSample(format: string): Promise<string> {
-  return await invoke<string>('read_layout_sample', { format })
+  return await pluginsManager<string>(PLUGINS_ACTIONS.READ_LAYOUT_SAMPLE, { format })
 }

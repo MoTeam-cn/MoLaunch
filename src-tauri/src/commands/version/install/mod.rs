@@ -22,7 +22,7 @@ use crate::minecraft::sources::DownloadSourceMode;
 use crate::state::{AppState, StageStatus};
 use crate::{log_error, log_info, log_warn};
 use std::sync::Arc;
-use tauri::{Emitter, State};
+use tauri::{AppHandle, Emitter};
 
 use super::{sanitize_mc_version, sanitize_version_id};
 use cleanup::cleanup_failed_install;
@@ -35,11 +35,13 @@ use version_naming::resolve_unique_instance_name;
 use super::list::detect_version_type_from_dir;
 
 /// Merged install (MC + loader)
-#[tauri::command]
+///
+/// 注：已聚合为 `version_install_manager` IPC 入口，本函数由
+/// `utils::version_install_manager::dispatch` 反序列化参数后调用。
 #[allow(clippy::too_many_arguments)]
 pub async fn install_merged(
-    app: tauri::AppHandle,
-    state: State<'_, AppState>,
+    app: &AppHandle,
+    state: &AppState,
     mc_version: String,
     forge_version: Option<String>,
     neoforge_version: Option<String>,

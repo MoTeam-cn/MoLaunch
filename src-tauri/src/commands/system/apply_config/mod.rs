@@ -9,6 +9,11 @@
 //! 1. 校验阶段（mirror_url SSRF 防护、download_source/meta_source 枚举校验）
 //! 2. 加密字段分流（CurseForge API Key 走 secure_storage，不进 AppConfig）
 //! 3. 普通字段统一更新（update_config 闭包内一次性赋值 + 联动 + 副作用）
+//!
+//! 注：原 `get_config` / `apply_config` 两个分散 Tauri 命令已聚合为 `config_manager`
+//! 一个 IPC 入口（注册在 `commands::system::config`），通过请求体的 `action` 字段分发。
+//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState`，
+//! 由 `utils::config_manager::dispatch` 反序列化参数后调用。
 
 mod apply;
 mod secure;
@@ -18,7 +23,6 @@ mod validate;
 pub use types::{ConfigEntry, ConfigPatch, ConfigSnapshot};
 
 use crate::state::AppState;
-use tauri::State;
 
 /// 读取配置（扁平化数组返回，支持按 keys 过滤）
 ///
@@ -29,9 +33,8 @@ use tauri::State;
 ///
 /// CurseForge 的 `api_key` 使用异步读取（`get_config_async`），
 /// 首次调用会触发 SDK DES 解密并缓存，避免此前懒加载导致首次返回空字符串的 bug。
-#[tauri::command]
 pub async fn get_config(
-    state: State<'_, AppState>,
+    state: &AppState,
     keys: Option<Vec<String>>,
 ) -> Result<Vec<ConfigEntry>, String> {
     // 异步触发解密（修复懒加载导致 apiKey 不返回的 bug）
@@ -80,9 +83,8 @@ pub async fn get_config(
 /// - `null` 表示清除（Some(None)）
 /// - 非空字符串表示设置（Some(Some("xxx"))）
 /// - 不存在表示不更新（None）
-#[tauri::command]
 pub async fn apply_config(
-    state: State<'_, AppState>,
+    state: &AppState,
     entries: Vec<ConfigEntry>,
 ) -> Result<(), String> {
     // 将扁平数组转为 Map，再反序列化为 ConfigPatch

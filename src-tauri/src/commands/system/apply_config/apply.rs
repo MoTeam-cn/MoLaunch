@@ -13,11 +13,10 @@ use super::types::ConfigPatch;
 use super::validate;
 use crate::log_info;
 use crate::state::AppState;
-use tauri::State;
 
 /// 配置更新核心逻辑（从扁平参数构建 `ConfigPatch` 后调用）
 pub(crate) async fn apply_config_inner(
-    state: State<'_, AppState>,
+    state: &AppState,
     patch: ConfigPatch,
 ) -> Result<(), String> {
     // ===== 1. 校验阶段 =====

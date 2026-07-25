@@ -10,6 +10,9 @@
 //! - stdout/stderr 管道异步读取各截断到 1MB（在 UTF-8 字符边界切割）
 //!
 //! 共享类型在 `super::` 中（`ProcessPermissions` / `read_plugin_manifest`）。
+//!
+//! 注：原 Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，子模块函数已去掉
+//! `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch` 调用。
 
 use super::read_plugin_manifest;
 use crate::error_util::log_err;
@@ -43,7 +46,6 @@ pub struct ProcessResult {
 /// 执行插件子进程命令
 ///
 /// 流程：权限校验 → 命令白名单匹配 → 非 shell 执行 → 超时控制 → 管道异步读取 + 截断
-#[tauri::command]
 pub async fn plugin_spawn_process(
     plugin_id: String,
     command: String,

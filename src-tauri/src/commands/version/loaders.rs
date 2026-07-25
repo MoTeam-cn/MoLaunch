@@ -1,15 +1,19 @@
+//! 加载器版本查询与安装命令
+//!
+//! 注：原 8 个独立 Tauri 命令已聚合为 `version_install_manager` IPC 入口，
+//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::version_install_manager::dispatch` 反序列化参数后调用。
+
 use crate::error_util::log_err;
 use crate::log_error;
 use crate::minecraft::loaders;
 use crate::state::AppState;
-use tauri::State;
 
 /// List Forge versions
-#[tauri::command]
 pub async fn list_forge_versions(
-    state: State<'_, AppState>,
+    state: &AppState,
     mc_version: String,
-) -> Result<String, String> {
+) -> Result<Vec<serde_json::Value>, String> {
     let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions = loaders::list_forge_versions(&mc_version, mirror_url.as_deref(), source_mode)
@@ -29,15 +33,14 @@ pub async fn list_forge_versions(
             })
         })
         .collect();
-    serde_json::to_string(&result).map_err(log_err("Failed to serialize Forge versions"))
+    Ok(result)
 }
 
 /// List NeoForge versions
-#[tauri::command]
 pub async fn list_neoforge_versions(
-    state: State<'_, AppState>,
+    state: &AppState,
     mc_version: String,
-) -> Result<String, String> {
+) -> Result<Vec<serde_json::Value>, String> {
     let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions = loaders::list_neoforge_versions(&mc_version, mirror_url.as_deref(), source_mode)
@@ -57,12 +60,11 @@ pub async fn list_neoforge_versions(
         })
         .collect();
 
-    serde_json::to_string(&result).map_err(log_err("Failed to serialize NeoForge versions"))
+    Ok(result)
 }
 
 /// List Fabric versions
-#[tauri::command]
-pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, String> {
+pub async fn list_fabric_versions(state: &AppState) -> Result<serde_json::Value, String> {
     let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions = loaders::list_fabric_versions(mirror_url.as_deref(), source_mode)
@@ -72,12 +74,11 @@ pub async fn list_fabric_versions(state: State<'_, AppState>) -> Result<String, 
             e.to_string()
         })?;
 
-    serde_json::to_string(&versions).map_err(log_err("Failed to serialize Fabric versions"))
+    serde_json::to_value(&versions).map_err(log_err("Failed to serialize Fabric versions"))
 }
 
 /// List OptiFine versions
-#[tauri::command]
-pub async fn list_optifine_versions(state: State<'_, AppState>) -> Result<String, String> {
+pub async fn list_optifine_versions(state: &AppState) -> Result<Vec<serde_json::Value>, String> {
     let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions = loaders::list_optifine_versions(mirror_url.as_deref(), source_mode)
@@ -96,15 +97,14 @@ pub async fn list_optifine_versions(state: State<'_, AppState>) -> Result<String
             })
         })
         .collect();
-    serde_json::to_string(&result).map_err(log_err("Failed to serialize OptiFine versions"))
+    Ok(result)
 }
 
 /// List LiteLoader versions
-#[tauri::command]
 pub async fn list_liteloader_versions(
-    state: State<'_, AppState>,
+    state: &AppState,
     mc_version: String,
-) -> Result<String, String> {
+) -> Result<Vec<String>, String> {
     let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
 
     let versions =
@@ -116,11 +116,10 @@ pub async fn list_liteloader_versions(
             })?;
 
     let version_strings: Vec<String> = versions.iter().map(|v| v.version.clone()).collect();
-    serde_json::to_string(&version_strings).map_err(log_err("Failed to serialize LiteLoader versions"))
+    Ok(version_strings)
 }
 
 /// Validate loaders compatibility
-#[tauri::command]
 pub async fn validate_loaders(
     _mc_version: String,
     _forge_version: Option<String>,
@@ -135,9 +134,7 @@ pub async fn validate_loaders(
 ///
 /// 从 Modrinth 查询 fabric-api 版本列表并按 MC 版本筛选
 ///
-/// 直接返回 Vec<FabricApiVersion>，Tauri 自动序列化为 JSON 数组，
-/// 前端无需 JSON.parse
-#[tauri::command]
+/// 直接返回 Vec<FabricApiVersion>，由 dispatcher 序列化为 JSON 数组。
 pub async fn list_fabric_api_versions(
     mc_version: String,
 ) -> Result<Vec<loaders::fabric_api::FabricApiVersion>, String> {
@@ -154,9 +151,8 @@ pub async fn list_fabric_api_versions(
 /// Install Fabric API for a specific version
 ///
 /// 下载到版本对应的 mods 目录（考虑版本隔离）
-#[tauri::command]
 pub async fn install_fabric_api_for_version(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
     download_url: String,
     file_name: String,

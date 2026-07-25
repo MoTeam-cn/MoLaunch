@@ -8,9 +8,16 @@
  * - 仅暴露安全的、只读的 API，不暴露任何可能破坏启动器状态的命令
  * - 所有写操作都通过事件系统，由启动器核心模块决定是否执行
  * - spawnProcess 为高级权限，仅外部插件可用（通过沙箱桥接注入 pluginId）
+ *
+ * 注：底层 IPC 已聚合为 13 个 manager 单一入口（system_manager / config_manager
+ * / version_list_manager / version_launch_manager 等），本文件通过对应 manager
+ * 调用，不再直接使用 `invoke('xxx')`。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { CONFIG_ACTIONS, configManager } from '@/utils/api/config-manager'
+import { SYSTEM_ACTIONS, systemManager } from '@/utils/api/system-manager'
+import { VERSION_LAUNCH_ACTIONS, versionLaunchManager } from '@/utils/api/version-launch-manager'
+import { VERSION_LIST_ACTIONS, versionListManager } from '@/utils/api/version-list-manager'
 
 /** 缓存统计条目（与后端 CacheStat 对应） */
 export interface CacheStatEntry {
@@ -192,11 +199,12 @@ export interface PluginSdk {
  */
 class PluginSdkImpl implements PluginSdk {
   async getConfig(): Promise<Record<string, unknown>> {
-    // 调用现有 get_config 命令，但仅返回非敏感字段
+    // 调用 config_manager 的 get_config action，仅返回非敏感字段
     // 当前版本返回全部字段，后续可加白名单过滤
-    const entries = await invoke<Array<{ key: string; value: unknown }>>('get_config', {
-      keys: null,
-    })
+    const entries = await configManager<Array<{ key: string; value: unknown }>>(
+      CONFIG_ACTIONS.GET_CONFIG,
+      { keys: null },
+    )
     const result: Record<string, unknown> = {}
     for (const e of entries) {
       // 过滤敏感字段
@@ -207,17 +215,17 @@ class PluginSdkImpl implements PluginSdk {
   }
 
   async listInstalledVersions(): Promise<string[]> {
-    return await invoke<string[]>('list_installed_versions')
+    return versionListManager<string[]>(VERSION_LIST_ACTIONS.LIST_INSTALLED_VERSIONS)
   }
 
   async listInstalledVersionsWithType() {
-    return await invoke<Array<{ id: string; version_type: string; logo: string }>>(
-      'list_installed_versions_with_type',
+    return versionListManager<Array<{ id: string; version_type: string; logo: string }>>(
+      VERSION_LIST_ACTIONS.LIST_INSTALLED_VERSIONS_WITH_TYPE,
     )
   }
 
   async listLaunchHistory() {
-    return await invoke<
+    return versionLaunchManager<
       Array<{
         version_id: string
         username: string
@@ -225,24 +233,24 @@ class PluginSdkImpl implements PluginSdk {
         pid: number
         exit_code: number | null
       }>
-    >('get_launch_history')
+    >(VERSION_LAUNCH_ACTIONS.GET_LAUNCH_HISTORY)
   }
 
   async getSystemMemory() {
-    return await invoke<{
+    return systemManager<{
       total: number
       used: number
       available: number
       usage_percent: number
-    }>('get_system_memory')
+    }>(SYSTEM_ACTIONS.GET_SYSTEM_MEMORY)
   }
 
   async getRunningGamePid(): Promise<number | null> {
-    return await invoke<number | null>('get_running_game')
+    return versionLaunchManager<number | null>(VERSION_LAUNCH_ACTIONS.GET_RUNNING_GAME)
   }
 
   async getCacheStats(): Promise<CacheStatsResult> {
-    return await invoke<CacheStatsResult>('get_cache_stats')
+    return systemManager<CacheStatsResult>(SYSTEM_ACTIONS.GET_CACHE_STATS)
   }
 
   async spawnProcess(

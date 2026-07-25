@@ -6,7 +6,7 @@
 //!
 //! ## 模块结构
 //!
-//! - `mod.rs`（本文件）：共享类型 + 共享 helper + 子模块声明 + 命令 re-export
+//! - `mod.rs`（本文件）：共享类型 + 共享 helper + 子模块声明 + 统一 IPC 入口
 //! - `install`：从文件夹 / ZIP 安装外部插件
 //! - `sandbox`：列出 / 读取 / 卸载外部插件（沙箱内部访问）
 //! - `spawn`：插件子进程执行（带权限校验 + 命令白名单 + 超时控制）
@@ -14,9 +14,13 @@
 //! - `layout`：自定义布局 URL 加载 + 本地缓存
 //! - `export`：示例文件导出（manifest + index.html）
 //! - `personalization`：个性化配置读写（%APPDATA%/.MolaLaunch/personalization.json）
+//!
+//! 注：原 12 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发到各子模块函数。
+//! 子模块函数已去掉 `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch`
+//! 反序列化参数后调用。
 
-// 子模块声明为 pub，让 lib.rs invoke_handler 可通过完整路径注册命令
-// （tauri::command 宏在定义处生成 __cmd__ 符号，无法通过 pub use 重导出）
+// 子模块声明为 pub，让 utils::plugins_manager 可通过完整路径调用子模块函数
 pub mod export;
 pub mod install;
 pub mod layout;
@@ -26,8 +30,29 @@ pub mod spawn;
 pub mod window;
 
 use crate::error_util::log_err;
+use crate::state::AppState;
+use crate::utils::dispatcher::ActionRequest;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use tauri::{AppHandle, State};
+
+// ============================================================
+// 统一 IPC 入口
+// ============================================================
+
+/// 统一插件系统 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::plugins_manager::dispatch` 进行 action 分发。
+#[tauri::command]
+pub async fn plugins_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::plugins_manager::dispatch(state, app, req).await
+}
 
 // ==================== 共享类型 ====================
 

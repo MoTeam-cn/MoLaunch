@@ -1,19 +1,11 @@
-//! 工具模块的统一请求 / 响应类型定义
+//! 工具模块的统一响应类型定义
 //!
-//! - `ToolsRequest` 作为 `tools_manager` IPC 入口的统一请求体
-//! - 各子模块的参数 / 响应类型集中声明在此，便于跨模块复用与序列化
+//! 各子模块的参数 / 响应类型集中声明在此，便于跨模块复用与序列化。
+//!
+//! 注：原 `ToolsRequest` 已替换为通用的 `utils::dispatcher::ActionRequest`，
+//! 与 `meta_manager` 共用同一请求体结构。
 
 use serde::{Deserialize, Serialize};
-
-/// 统一请求体
-///
-/// `action` 决定分发到哪个子模块函数，`params` 由对应子模块自行反序列化。
-#[derive(Debug, Serialize, Deserialize)]
-pub struct ToolsRequest {
-    pub action: String,
-    #[serde(default)]
-    pub params: serde_json::Value,
-}
 
 // ===== 外部下载相关 =====
 

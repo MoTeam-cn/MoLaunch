@@ -3,9 +3,11 @@
  *
  * 重构后配置更新走统一 `applyConfig` 接口（见 system.ts），
  * 本文件仅保留读取命令与业务命令（搜索/详情/安装）。
+ *
+ * 注：底层已聚合为 `community_manager` 单一 IPC 入口，通过 `action` 字段分发。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { COMMUNITY_ACTIONS, communityManager } from './community-manager'
 import type {
   SearchResult,
   SearchParams,
@@ -24,12 +26,12 @@ import type {
 
 /** 搜索社区资源 */
 export async function searchResources(params: SearchParams): Promise<SearchResult> {
-  return await invoke<SearchResult>('search_resources', { req: params })
+  return communityManager<SearchResult>(COMMUNITY_ACTIONS.SEARCH_RESOURCES, params)
 }
 
 /** 获取分类标签列表 */
 export async function getCategoryTags(resourceType: ResourceType): Promise<CategoryTagInfo[]> {
-  return await invoke<CategoryTagInfo[]>('get_category_tags', { resourceType })
+  return communityManager<CategoryTagInfo[]>(COMMUNITY_ACTIONS.GET_CATEGORY_TAGS, { resourceType })
 }
 
 /** 获取工程详情 */
@@ -38,8 +40,10 @@ export async function getProjectDetail(
   projectId: string,
   resourceType: ResourceType,
 ): Promise<ResourceProject> {
-  return await invoke<ResourceProject>('get_project_detail', {
-    req: { platform, projectId, resourceType },
+  return communityManager<ResourceProject>(COMMUNITY_ACTIONS.GET_PROJECT_DETAIL, {
+    platform,
+    projectId,
+    resourceType,
   })
 }
 
@@ -48,12 +52,15 @@ export async function getProjectVersions(
   platform: Platform,
   projectId: string,
 ): Promise<ResourceVersion[]> {
-  return await invoke<ResourceVersion[]>('get_project_versions', { platform, projectId })
+  return communityManager<ResourceVersion[]>(COMMUNITY_ACTIONS.GET_PROJECT_VERSIONS, {
+    platform,
+    projectId,
+  })
 }
 
 /** 下载安装资源 */
 export async function downloadResource(req: DownloadRequest): Promise<DownloadResult> {
-  return await invoke<DownloadResult>('download_resource', { req })
+  return communityManager<DownloadResult>(COMMUNITY_ACTIONS.DOWNLOAD_RESOURCE, req)
 }
 
 /** 下载资源到自定义路径（流式 + 进度推送） */
@@ -62,7 +69,11 @@ export async function downloadResourceToPath(
   fileName: string,
   savePath: string,
 ): Promise<DownloadResult> {
-  return await invoke<DownloadResult>('download_resource_to_path', { url, fileName, savePath })
+  return communityManager<DownloadResult>(COMMUNITY_ACTIONS.DOWNLOAD_RESOURCE_TO_PATH, {
+    url,
+    fileName,
+    savePath,
+  })
 }
 
 /**
@@ -75,7 +86,7 @@ export async function formatDownloadFilename(
   fileName: string,
   translatedName?: string | null,
 ): Promise<string> {
-  return await invoke<string>('format_download_filename', {
+  return communityManager<string>(COMMUNITY_ACTIONS.FORMAT_DOWNLOAD_FILENAME, {
     fileName,
     translatedName: translatedName ?? null,
   })
@@ -86,7 +97,10 @@ export async function getResourceInstallPath(
   resourceType: ResourceType,
   versionId?: string,
 ): Promise<string> {
-  return await invoke<string>('get_resource_install_path', { resourceType, versionId })
+  return communityManager<string>(COMMUNITY_ACTIONS.GET_RESOURCE_INSTALL_PATH, {
+    resourceType,
+    versionId,
+  })
 }
 
 /**
@@ -97,7 +111,7 @@ export async function getResourceInstallPath(
  * 完成后前端需调用 install_merged 安装游戏本体。
  */
 export async function installModpack(req: InstallModpackRequest): Promise<InstallModpackResult> {
-  return await invoke<InstallModpackResult>('install_modpack', { req })
+  return communityManager<InstallModpackResult>(COMMUNITY_ACTIONS.INSTALL_MODPACK, req)
 }
 
 /**
@@ -110,7 +124,7 @@ export async function installModpack(req: InstallModpackRequest): Promise<Instal
 export async function installLocalModpack(
   req: InstallLocalModpackRequest,
 ): Promise<InstallModpackResult> {
-  return await invoke<InstallModpackResult>('install_local_modpack', { req })
+  return communityManager<InstallModpackResult>(COMMUNITY_ACTIONS.INSTALL_LOCAL_MODPACK, req)
 }
 
 /**
@@ -121,7 +135,7 @@ export async function installLocalModpack(
  * 用户选择后调用 `installLocalModpack` 传入 `includeOptional` 参数完成安装。
  */
 export async function previewLocalModpack(filePath: string): Promise<ModpackPreview> {
-  return await invoke<ModpackPreview>('preview_local_modpack', { filePath })
+  return communityManager<ModpackPreview>(COMMUNITY_ACTIONS.PREVIEW_LOCAL_MODPACK, { filePath })
 }
 
 /**
@@ -131,7 +145,7 @@ export async function previewLocalModpack(filePath: string): Promise<ModpackPrev
  * 查不到返回 null，前端可回退到搜索 URL
  */
 export async function getMcmodUrl(platform: Platform, slug: string): Promise<string | null> {
-  return await invoke<string | null>('get_mcmod_url', { platform, slug })
+  return communityManager<string | null>(COMMUNITY_ACTIONS.GET_MCMOD_URL, { platform, slug })
 }
 
 // ==================== CurseForge 配置（读写走 getConfig/applyConfig）====================

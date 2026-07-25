@@ -1,14 +1,11 @@
 //! 网络工具（延迟测试 + 服务器状态检测 SLP）
 
-use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use futures_util::future::join_all;
-use reqwest::Client;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
 use crate::state::AppState;
@@ -19,8 +16,10 @@ use super::types::{
 
 /// 并发测试多个 URL 的 HTTP 延迟
 ///
-/// 复用同一个 `reqwest::Client`（10 秒超时），用 `join_all` 并发请求所有 URL。
-/// 失败时 `latency_ms=None`、`status_code=0`、`error` 填失败原因。
+/// 通过 `crate::http::get_client()` 复用全局 HTTP 客户端（自动应用用户配置的代理、
+/// User-Agent、连接池），在每个请求上附加 10 秒超时（测速场景的合理上限）。
+/// 用 `join_all` 并发请求所有 URL，失败时 `latency_ms=None`、`status_code=0`、
+/// `error` 填失败原因。
 pub async fn latency_test(
     state: &AppState,
     params: NetworkLatencyTestParams,
@@ -32,12 +31,8 @@ pub async fn latency_test(
 
     log_info!("[NetworkLatency] 测试 {} 个 URL", params.urls.len());
 
-    let client = Arc::new(
-        Client::builder()
-            .timeout(Duration::from_secs(10))
-            .build()
-            .map_err(log_err("构建 HTTP client 失败"))?,
-    );
+    // 复用全局客户端（统一代理 / User-Agent / 连接池），请求级别覆盖超时为 10s
+    let client = crate::http::get_client();
 
     let futures: Vec<_> = params
         .urls
@@ -46,7 +41,12 @@ pub async fn latency_test(
             let client = client.clone();
             async move {
                 let start = Instant::now();
-                match client.get(&url).send().await {
+                match client
+                    .get(&url)
+                    .timeout(Duration::from_secs(10))
+                    .send()
+                    .await
+                {
                     Ok(resp) => {
                         let latency = start.elapsed().as_millis() as u64;
                         let status = resp.status().as_u16();

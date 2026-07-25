@@ -7,7 +7,7 @@ use crate::minecraft::launch::{CrashCategory, CrashInfo, LaunchPipeline, LaunchS
 use crate::state::AppState;
 use crate::{log_debug, log_error, log_info};
 use std::sync::Arc;
-use tauri::{Emitter, State};
+use tauri::Emitter;
 
 use super::GameExitEvent;
 
@@ -21,7 +21,7 @@ use super::GameExitEvent;
 /// 4. 发送 game-exited 事件让前端展示崩溃对话框
 /// 5. 返回错误字符串（调用方包装为 Err）
 pub(super) async fn handle_launch_failure(
-    state: &State<'_, AppState>,
+    state: &AppState,
     app_handle: &tauri::AppHandle,
     pipeline: &Arc<LaunchPipeline>,
     version_id: &str,

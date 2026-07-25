@@ -1,4 +1,8 @@
 //! 版本列表、类型检测、隔离解析
+//!
+//! 注：原 6 个独立 Tauri 命令已聚合为 `version_list_manager` IPC 入口，
+//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
+//! 由 `utils::version_list_manager::dispatch` 反序列化参数后调用。
 
 use crate::minecraft::download;
 use crate::minecraft::fools;
@@ -9,14 +13,12 @@ use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
 use crate::{log_debug, log_error, log_info};
 use serde::{Deserialize, Serialize};
-use tauri::State;
 
 use super::sanitize_version_id;
 use super::types::{VersionInfo, VersionListResult};
 
 /// Get version list
-#[tauri::command]
-pub async fn list_versions(state: State<'_, AppState>) -> Result<VersionListResult, String> {
+pub async fn list_versions(state: &AppState) -> Result<VersionListResult, String> {
     log_info!("Fetching version list");
 
     let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
@@ -79,8 +81,7 @@ pub struct InstalledVersionInfo {
 }
 
 /// Get installed versions
-#[tauri::command]
-pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+pub async fn list_installed_versions(state: &AppState) -> Result<Vec<String>, String> {
     log_info!("Fetching installed versions");
 
     let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
@@ -97,9 +98,8 @@ pub async fn list_installed_versions(state: State<'_, AppState>) -> Result<Vec<S
 }
 
 /// Get installed versions with type info
-#[tauri::command]
 pub async fn list_installed_versions_with_type(
-    state: State<'_, AppState>,
+    state: &AppState,
 ) -> Result<Vec<InstalledVersionInfo>, String> {
     log_debug!("Fetching installed versions with type info");
 
@@ -231,9 +231,8 @@ pub(super) fn version_type_to_string(version_type: &VersionType) -> String {
 }
 
 /// Uninstall version
-#[tauri::command]
 pub async fn uninstall_version(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
@@ -254,9 +253,8 @@ pub async fn uninstall_version(
 ///
 /// 隔离时返回 `{game_dir}/versions/{version_id}/`
 /// 非隔离时返回 `{game_dir}/`
-#[tauri::command]
 pub async fn get_version_effective_dir(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
 ) -> Result<String, String> {
     sanitize_version_id(&version_id)?;
@@ -283,9 +281,8 @@ pub async fn get_version_effective_dir(
 /// 3. downloads.client.url 正则匹配
 /// 4. JSON 的 `jar` 字段
 /// 5. JSON 的 `id` 字段正则匹配
-#[tauri::command]
 pub async fn get_version_game_version(
-    state: State<'_, AppState>,
+    state: &AppState,
     version_id: String,
 ) -> Result<Option<String>, String> {
     sanitize_version_id(&version_id)?;

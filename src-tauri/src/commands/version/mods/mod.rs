@@ -8,11 +8,12 @@
 //! - list.rs: 列表查询命令（list_mods / is_version_modable + infer_loader_type）
 //! - manage.rs: 管理命令（toggle_mod / delete_mod）
 //! - install.rs: 安装与文件操作命令（install_mod / open_mods_dir / get_version_mods_dir / reveal_mod_file）
-//! - mod.rs: 模块入口 + pub mod 声明 + 类型 re-export
+//! - mod.rs: 模块入口 + pub mod 声明 + 类型 re-export + version_mods_manager IPC 入口
 //!
-//! 注意：所有 #[tauri::command] 命令分散在 list/manage/install/watcher 子模块中，
-//! tauri::command 宏在定义处生成 __cmd__ 符号，不能通过 pub use 重导出，
-//! 故 lib.rs 使用完整路径注册（commands::version::mods::list::* / ::manage::* / ::install::* / ::watcher::*）
+//! 注意：原 10 个分散的 version::mods Tauri 命令已聚合为 `version_mods_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发到各子模块函数。子模块函数已去掉 `#[tauri::command]` 标注，
+//! 改为接收 `&AppState` / `&AppHandle`，由 `utils::version_mods_manager::dispatch`
+//! 反序列化参数后调用。lib.rs 只需注册 `commands::version::mods::version_mods_manager` 一个命令。
 
 pub(crate) mod helpers;
 pub mod install;
@@ -21,6 +22,24 @@ mod metadata;
 pub mod manage;
 mod types;
 pub mod watcher;
+
+use crate::state::AppState;
+use crate::utils::dispatcher::ActionRequest;
+use tauri::{AppHandle, State};
+
+/// 统一版本 Mod 管理 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::version_mods_manager::dispatch` 进行 action 分发。
+#[tauri::command]
+pub async fn version_mods_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::version_mods_manager::dispatch(state, app, req).await
+}
 
 // 对外暴露类型和辅助函数（保持向后兼容路径）
 // 注意：ModMetadata 在 metadata.rs 中是私有 use 引入的（use super::types::ModMetadata），

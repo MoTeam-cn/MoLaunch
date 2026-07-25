@@ -1,8 +1,11 @@
 /**
  * 启动游戏相关 API
+ *
+ * 注：底层已聚合为 `version_launch_manager` 单一 IPC 入口，通过 `action` 字段分发
+ * （原 6 个 launch 命令均通过该入口调用）。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { VERSION_LAUNCH_ACTIONS, versionLaunchManager } from './version-launch-manager'
 
 /**
  * 启动游戏
@@ -21,16 +24,16 @@ export async function launchGame(params: {
   serverAddress?: string
   serverPort?: number
 }): Promise<number> {
-  return await invoke<number>('launch_game', {
+  return versionLaunchManager<number>(VERSION_LAUNCH_ACTIONS.LAUNCH_GAME, {
     versionId: params.versionId,
     javaPath: params.javaPath ?? null,
     username: params.username,
     uuid: params.uuid,
+    loginType: params.loginType ?? null,
     windowWidth: params.windowWidth ?? null,
     windowHeight: params.windowHeight ?? null,
     serverAddress: params.serverAddress ?? null,
     serverPort: params.serverPort ?? null,
-    loginType: params.loginType ?? null,
   })
 }
 
@@ -45,28 +48,28 @@ export interface LaunchProgress {
  * 获取启动进度
  */
 export async function getLaunchProgress(): Promise<LaunchProgress | null> {
-  return await invoke<LaunchProgress | null>('get_launch_progress')
+  return versionLaunchManager<LaunchProgress | null>(VERSION_LAUNCH_ACTIONS.GET_LAUNCH_PROGRESS)
 }
 
 /**
  * 取消启动
  */
 export async function cancelLaunch(): Promise<void> {
-  return await invoke<void>('cancel_launch')
+  return versionLaunchManager<void>(VERSION_LAUNCH_ACTIONS.CANCEL_LAUNCH)
 }
 
 /**
  * 停止游戏
  */
 export async function stopGame(): Promise<void> {
-  return await invoke<void>('stop_game')
+  return versionLaunchManager<void>(VERSION_LAUNCH_ACTIONS.STOP_GAME)
 }
 
 /**
  * 获取当前运行的游戏PID
  */
 export async function getRunningGame(): Promise<number | null> {
-  return await invoke<number | null>('get_running_game')
+  return versionLaunchManager<number | null>(VERSION_LAUNCH_ACTIONS.GET_RUNNING_GAME)
 }
 
 /**
@@ -92,5 +95,5 @@ export interface LaunchHistoryEntry {
  * 获取启动历史记录
  */
 export async function getLaunchHistory(): Promise<LaunchHistoryEntry[]> {
-  return await invoke<LaunchHistoryEntry[]>('get_launch_history')
+  return versionLaunchManager<LaunchHistoryEntry[]>(VERSION_LAUNCH_ACTIONS.GET_LAUNCH_HISTORY)
 }

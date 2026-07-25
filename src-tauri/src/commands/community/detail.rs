@@ -17,7 +17,6 @@ pub struct DetailRequest {
 }
 
 /// 获取工程详情
-#[tauri::command]
 pub async fn get_project_detail(req: DetailRequest) -> Result<ResourceProject, String> {
     match req.platform {
         Platform::CurseForge => curseforge::get_project(&req.project_id, req.resource_type).await,
@@ -26,7 +25,6 @@ pub async fn get_project_detail(req: DetailRequest) -> Result<ResourceProject, S
 }
 
 /// 获取工程版本列表
-#[tauri::command]
 pub async fn get_project_versions(
     platform: Platform,
     project_id: String,
@@ -41,7 +39,6 @@ pub async fn get_project_versions(
 ///
 /// 通过 moddata.txt 的 slug → 行号（= class id）查表，拼接 `https://www.mcmod.cn/class/<id>.html`
 /// 查不到返回 None，前端可回退到搜索 URL
-#[tauri::command]
 pub async fn get_mcmod_url(platform: Platform, slug: String) -> Result<Option<String>, String> {
     Ok(
         crate::minecraft::community::mcmod::lookup_class_id(platform, &slug)

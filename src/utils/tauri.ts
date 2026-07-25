@@ -4,6 +4,7 @@
  * 实现按域拆分到 `./api/*`：
  * - sdk.ts          SDK 平台信息
  * - auth.ts         离线登录 + 微软登录 + 账号管理
+ * - authlib.ts      authlib-injector 外置登录（yggdrasil 协议）+ 账号管理
  * - version.ts      版本列表与文件夹管理
  * - personalization.ts  版本个性化 + Mod + 文件补全 + 脚本导出
  * - java.ts         Java 检测/校验/下载
@@ -21,6 +22,7 @@
 
 export * from './api/sdk'
 export * from './api/auth'
+export * from './api/authlib'
 export * from './api/version'
 export * from './api/personalization'
 export * from './api/java'
