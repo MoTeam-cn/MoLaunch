@@ -8,6 +8,7 @@
 
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { ShieldCheckIcon, ServerStackIcon, UserIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
 import { toastError, toastWarning } from '@/utils/toast'
@@ -18,10 +19,40 @@ const authStore = useAuthStore()
 const versionStore = useVersionStore()
 const router = useRouter()
 
-// 账号类型标签
-const accountTypeLabel = computed(() => {
-  if (!authStore.isLoggedIn) return '未登录'
-  return authStore.currentUser?.login_type === 'Microsoft' ? '正版账号' : '离线账号'
+/**
+ * 顶部胶囊显示信息
+ *
+ * 优先级：
+ * 1. 游戏运行中：绿色背景 + 脉冲圆点 + "运行中 · 版本名"，复用已有胶囊空间，不挤压账号区
+ * 2. 账号类型（三分流：Microsoft / AuthlibInjector / Legacy）
+ *   - Microsoft 正版账号：ShieldCheckIcon，蓝色，"正版账号"
+ *   - AuthlibInjector 外置账号：ServerStackIcon，紫色，"外置账号"
+ *   - Legacy 离线账号：UserIcon，灰色，"离线账号"
+ *   - 未登录：UserIcon，灰色，"未登录"
+ */
+const topPillMeta = computed(() => {
+  // 游戏运行中：用绿色胶囊替代账号类型，复用空间避免挤压账号卡片区
+  if (versionStore.runningPid) {
+    const versionId = versionStore.runningVersionId || versionStore.selectedVersion || ''
+    return {
+      isRunning: true,
+      label: versionId ? `运行中 · ${versionId}` : '运行中',
+      icon: null,
+      bgClass: 'bg-green-50',
+      textClass: 'text-green-700',
+    }
+  }
+  const t = authStore.currentUser?.login_type
+  if (authStore.isLoggedIn && t === 'Microsoft') {
+    return { isRunning: false, label: '正版账号', icon: ShieldCheckIcon, bgClass: 'bg-primary-50/60', textClass: 'text-primary-700', iconClass: 'text-primary-600' }
+  }
+  if (authStore.isLoggedIn && t === 'AuthlibInjector') {
+    return { isRunning: false, label: '外置账号', icon: ServerStackIcon, bgClass: 'bg-primary-50/60', textClass: 'text-primary-700', iconClass: 'text-purple-600' }
+  }
+  if (authStore.isLoggedIn) {
+    return { isRunning: false, label: '离线账号', icon: UserIcon, bgClass: 'bg-primary-50/60', textClass: 'text-primary-700', iconClass: 'text-gray-400' }
+  }
+  return { isRunning: false, label: '未登录', icon: UserIcon, bgClass: 'bg-primary-50/60', textClass: 'text-gray-500', iconClass: 'text-gray-400' }
 })
 
 // 启动按钮状态：白底 + 主题色细边框 + 主题色文字，文字色=边框色
@@ -56,19 +87,29 @@ async function handleLaunch() {
 
 <template>
   <div class="flex h-full flex-col">
-    <!-- 顶部：账号类型胶囊指示器 -->
+    <!-- 顶部：账号类型 / 运行中状态胶囊指示器（复用同一空间，运行中时替换为绿色运行状态） -->
     <div class="flex justify-center px-4 pt-4">
-      <div class="flex items-center gap-1.5 rounded-full bg-primary-50/60 px-3 py-1">
-        <!-- 盾牌图标 -->
-        <svg v-if="authStore.isLoggedIn && authStore.currentUser?.login_type === 'Microsoft'" class="h-3.5 w-3.5 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
-          <path d="M10 1l7 3v6c0 4.5-3 8-7 9-4-1-7-4.5-7-9V4l7-3z" />
-        </svg>
-        <!-- 离线图标 -->
-        <svg v-else class="h-3.5 w-3.5 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-          <path fill-rule="evenodd" d="M12.6 4.4a1 1 0 011.4 1.4L7.4 12.4a1 1 0 01-1.4-1.4l6.6-6.6zM4 10a6 6 0 0111.2-3 1 1 0 11-1.8.9 4 4 0 00-6.4 4.8l1.4-1.4a1 1 0 011.4 1.4l-3 3a1 1 0 01-1.4 0l-.5-.5A6 6 0 014 10z" clip-rule="evenodd" />
-        </svg>
-        <span class="text-xs font-medium" :class="authStore.isLoggedIn ? 'text-primary-700' : 'text-gray-500'">
-          {{ accountTypeLabel }}
+      <div
+        class="flex max-w-full items-center gap-1.5 rounded-full px-3 py-1"
+        :class="topPillMeta.bgClass"
+      >
+        <!-- 运行中：脉冲圆点 -->
+        <span
+          v-if="topPillMeta.isRunning"
+          class="h-2 w-2 flex-none animate-pulse rounded-full bg-green-500"
+        />
+        <!-- 账号类型图标 -->
+        <component
+          v-else-if="topPillMeta.icon"
+          :is="topPillMeta.icon"
+          class="h-3.5 w-3.5 flex-none"
+          :class="topPillMeta.iconClass"
+        />
+        <span
+          class="truncate text-xs font-medium"
+          :class="topPillMeta.textClass"
+        >
+          {{ topPillMeta.label }}
         </span>
       </div>
     </div>
@@ -76,13 +117,6 @@ async function handleLaunch() {
     <!-- 中部：账号卡片区域（弹性填充，垂直居中） -->
     <div class="flex flex-1 items-center justify-center overflow-y-auto px-4 py-2">
       <AccountSelector />
-    </div>
-
-    <!-- 运行中提示 -->
-    <div v-if="versionStore.runningPid" class="mx-4 mb-2 flex items-center gap-2 rounded-lg bg-green-50 px-3 py-2">
-      <div class="h-2 w-2 animate-pulse rounded-full bg-green-500" />
-      <span class="text-xs font-medium text-green-700">游戏运行中</span>
-      <span class="ml-auto truncate text-xs text-green-600">{{ versionStore.runningVersionId }}</span>
     </div>
 
     <!-- 底部：版本选择 + 版本设置 + 启动按钮 -->
