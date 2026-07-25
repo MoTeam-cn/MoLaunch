@@ -3,13 +3,13 @@
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，替代原 11 个独立 Tauri 命令。
 //! 11 个 version_install action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
 //!
-//! 命令清单（11 个，按子模块分组）：
+//! 命令清单（12 个，按子模块分组）：
 //! - download.rs（1 个）：`download_version`
 //! - install/mod.rs（1 个）：`install_merged`
 //! - loaders.rs（8 个）：`list_forge_versions` / `list_neoforge_versions`
 //!   / `list_fabric_versions` / `list_optifine_versions` / `list_liteloader_versions`
 //!   / `validate_loaders` / `list_fabric_api_versions` / `install_fabric_api_for_version`
-//! - preload.rs（1 个）：`preload_mods_detail_cmd`
+//! - preload.rs（2 个）：`preload_mods_detail_cmd` / `cancel_preload_mods_detail_cmd`
 //!
 //! 注意事项：
 //! - 子模块函数接收 `&AppState` / `&AppHandle`，handler 内调用时用 `&state` / `&app`
@@ -180,6 +180,11 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         let p: VersionIdParams = serde_json::from_value(params)
             .map_err(|e| format!("参数解析失败: {}", e))?;
         preload::preload_mods_detail_cmd(&app, &state, p.version_id).await?;
+        Ok(serde_json::Value::Null)
+    }));
+
+    d.register("cancel_preload_mods_detail_cmd", handler!(_state, _app, _params, {
+        preload::cancel_preload_mods_detail_cmd().await?;
         Ok(serde_json::Value::Null)
     }));
 

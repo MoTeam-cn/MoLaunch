@@ -43,8 +43,9 @@ export const VERSION_INSTALL_ACTIONS = {
   VALIDATE_LOADERS: 'validate_loaders',
   LIST_FABRIC_API_VERSIONS: 'list_fabric_api_versions',
   INSTALL_FABRIC_API_FOR_VERSION: 'install_fabric_api_for_version',
-  // preload.rs（1 个）
+  // preload.rs（2 个）
   PRELOAD_MODS_DETAIL_CMD: 'preload_mods_detail_cmd',
+  CANCEL_PRELOAD_MODS_DETAIL_CMD: 'cancel_preload_mods_detail_cmd',
 } as const
 
 /** action 名称类型 */

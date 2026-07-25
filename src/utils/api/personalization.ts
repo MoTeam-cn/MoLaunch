@@ -299,6 +299,17 @@ export async function preloadModsDetail(versionId: string): Promise<void> {
 }
 
 /**
+ * 取消当前正在运行的 mod 详情预加载 task
+ *
+ * ModTab 组件卸载时调用，abort 后台 spawn 的预加载 task，
+ * 避免 task 继续 emit `mods-preload-update` 给已注销的前端 listener
+ * 触发 `Couldn't find callback id xxx` 警告。
+ */
+export async function cancelPreloadModsDetail(): Promise<void> {
+  return versionInstallManager<void>(VERSION_INSTALL_ACTIONS.CANCEL_PRELOAD_MODS_DETAIL_CMD)
+}
+
+/**
  * 重命名版本
  */
 export async function renameVersion(versionId: string, newName: string): Promise<void> {
