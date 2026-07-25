@@ -9,6 +9,358 @@
 
 ### 变更
 
+#### 完成 IPC dispatcher 迁移收尾：set_game_dir 聚合 + plugins/sdk.ts 走 manager
+- 痛点：IPC dispatcher 迁移收尾阶段发现两处遗漏：(1) `set_game_dir` 后端有 `#[tauri::command]` 标注但未在 `lib.rs` 注册，前端 `setGameDir()` 调用会失败；(2) `plugins/sdk.ts` 中 7 处 `invoke('xxx')` 仍走裸 IPC 命令，未通过 13 个 manager 入口，与统一 dispatcher 架构不一致。
+- 后端：
+  - 修改 [commands/system/game_dir.rs](src-tauri/src/commands/system/game_dir.rs)：`set_game_dir` 去掉 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`，与 `open_game_dir` / `get_game_dir` 等同级函数签名一致；模块头注释从"6 个 Tauri 命令 + set_game_dir 保留独立"改为"7 个 Tauri 命令全部聚合"
+  - 修改 [utils/system_manager.rs](src-tauri/src/utils/system_manager.rs)：新增 `SetGameDirParams` 结构体（`#[serde(rename_all = "camelCase")]` game_dir 字段），DISPATCHER 注册 `set_game_dir` action（handler 用 `state, _app, params`，调用 `set_game_dir(&state, p.game_dir)`）；文件头注释从"17 个 action"改为"18 个 action"，game_dir 分组从"6 个"改为"7 个"
+- 前端：
+  - 修改 [utils/api/system-manager.ts](src/utils/api/system-manager.ts)：`SYSTEM_ACTIONS` 新增 `SET_GAME_DIR: 'set_game_dir'`，文件头注释从"17 个 action"改为"18 个 action"，game_dir 分组从"6 个"改为"7 个"
+  - 修改 [utils/api/system.ts](src/utils/api/system.ts)：`setGameDir` 改为 `systemManager<void>(SYSTEM_ACTIONS.SET_GAME_DIR, { gameDir })`，移除 `import { invoke } from '@tauri-apps/api/core'`（本文件已无裸 invoke 调用）；文件头注释从"8 个原 Tauri 命令 + set_game_dir 保留独立"改为"9 个原 Tauri 命令全部聚合"
+  - 修改 [plugins/sdk.ts](src/plugins/sdk.ts)：7 处 `invoke<XXX>('yyy')` 改为通过对应 manager + ACTIONS 常量调用，移除 `import { invoke }`，改为导入 4 个 manager（configManager / systemManager / versionLaunchManager / versionListManager）+ 4 个 ACTIONS 常量
+    - `getConfig` → `configManager(CONFIG_ACTIONS.GET_CONFIG, { keys: null })`
+    - `listInstalledVersions` → `versionListManager(VERSION_LIST_ACTIONS.LIST_INSTALLED_VERSIONS)`
+    - `listInstalledVersionsWithType` → `versionListManager(VERSION_LIST_ACTIONS.LIST_INSTALLED_VERSIONS_WITH_TYPE)`
+    - `listLaunchHistory` → `versionLaunchManager(VERSION_LAUNCH_ACTIONS.GET_LAUNCH_HISTORY)`
+    - `getSystemMemory` → `systemManager(SYSTEM_ACTIONS.GET_SYSTEM_MEMORY)`
+    - `getRunningGamePid` → `versionLaunchManager(VERSION_LAUNCH_ACTIONS.GET_RUNNING_GAME)`
+    - `getCacheStats` → `systemManager(SYSTEM_ACTIONS.GET_CACHE_STATS)`
+- 收益：前端再无裸 `invoke('xxx')` 调用（除 13 个 manager 入口本身的 `invoke('xxx_manager')`），所有 IPC 调用统一走 `XxxManager(XXX_ACTIONS.YYY, params)` 模式，IPC 命令收敛为 13 个 manager 入口；`set_game_dir` 不再是"未注册的死代码"，前端可正常通过 `setGameDir()` 调用
+- 验证：`cargo check` 0 错误 0 警告；`eslint` 0 错误（4 个原有 `_xxx` 未使用 warning 与本次修改无关）；`tsc --noEmit --skipLibCheck` 通过
+
+#### 聚合 13 个 community IPC 命令为 1 个 community_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::community` 下 4 个子模块（search 2 个 / detail 3 个 / install::resource 5 个 / install::modpack 3 个）共 13 个独立 Tauri 命令分散注册，与 `image_cache_manager` / `meta_manager` / `tools_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/community_manager.rs](src-tauri/src/utils/community_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 13 个 action，7 个参数结构体（`ResourceTypeParams` / `ProjectVersionsParams` / `McmodUrlParams` / `DownloadToPathParams` / `FormatFilenameParams` / `ResourceInstallPathParams` / `FilePathParams`）均使用 `#[serde(rename_all = "camelCase")]`；对于 `req: SomeRequest` 类型参数（search_resources / get_project_detail / download_resource / install_resource / install_modpack / install_local_modpack）直接将 params 反序列化为对应 Request 类型，避免冗余包裹结构体
+    - `search_resources` / `get_category_tags` / `get_project_detail` / `get_project_versions` / `get_mcmod_url` / `preview_local_modpack` 不需要 state（handler 用 `_state, _app`）
+    - `download_resource` / `format_download_filename` / `install_resource` / `get_resource_install_path` / `install_modpack` / `install_local_modpack` 仅需 state（handler 用 `state, _app`）
+    - `download_resource_to_path` 需要 state 和 app（handler 用 `state, app`，原 `_app: AppHandle` 改为 `_app: &AppHandle`）
+  - 改造 4 个原命令文件去掉 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`、`AppHandle` → `&AppHandle`：
+    - [commands/community/search.rs](src-tauri/src/commands/community/search.rs)（search_resources / get_category_tags，无 state/app 参数，签名不变）
+    - [commands/community/detail.rs](src-tauri/src/commands/community/detail.rs)（get_project_detail / get_project_versions / get_mcmod_url，无 state/app 参数，签名不变）
+    - [commands/community/install/resource.rs](src-tauri/src/commands/community/install/resource.rs)（download_resource / download_resource_to_path / format_download_filename / install_resource / get_resource_install_path，`State<'_, AppState>` → `&AppState`，`_app: AppHandle` → `_app: &AppHandle`）
+    - [commands/community/install/modpack.rs](src-tauri/src/commands/community/install/modpack.rs)（install_modpack / install_local_modpack / preview_local_modpack，`State<'_, AppState>` → `&AppState`，移除 `use tauri::State`）
+  - 新增 [commands/community/mod.rs](src-tauri/src/commands/community/mod.rs) 的 `#[tauri::command] pub async fn community_manager(state, app, req)` 转发入口
+- 前端：
+  - 新增 [utils/api/community-manager.ts](src/utils/api/community-manager.ts)：`communityManager(action, params)` 入口和 `COMMUNITY_ACTIONS` 常量（13 个 action 全部大写蛇形命名，值为小写下划线），`CommunityAction` 类型
+  - 修改 [utils/api/community.ts](src/utils/api/community.ts)：12 个 `invoke('xxx')` 改为 `communityManager(COMMUNITY_ACTIONS.XXX, ...)`（searchResources / getCategoryTags / getProjectDetail / getProjectVersions / downloadResource / downloadResourceToPath / formatDownloadFilename / getResourceInstallPath / installModpack / installLocalModpack / previewLocalModpack / getMcmodUrl），保留所有类型定义和导出
+- 收益：IPC 命令从 13 个收敛为 1 个，与 `image_cache_manager` / `meta_manager` / `tools_manager` 模式一致，降低注册和维护成本；后续新增社区资源相关命令只需在 `community_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 17 个 system + logger IPC 命令为 1 个 system_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::system` 下 4 个子模块（game_dir 6 个 / config 2 个 / developer 5 个 / about 1 个）+ crate 顶层 `logger` 模块（3 个）共 17 个独立 Tauri 命令分散注册，与 `image_cache_manager` / `meta_manager` / `config_manager` / `tools_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/system_manager.rs](src-tauri/src/utils/system_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 17 个 action，3 个参数结构体（`PathParams` / `WriteTextFileParams` / `ReadLogFileParams`）均使用 `#[serde(rename_all = "camelCase")]`
+    - `open_game_dir` / `get_game_dir` / `save_config_to_file` 需要 state（handler 用 `state, _app`）
+    - `open_path` / `reveal_in_explorer` / `write_text_file` / `read_log_file` 需要参数（handler 用 `_state, _app, params`）
+    - `is_developer_unlocked` 返回 bool（非 Result）、`get_storage_dirs` 返回 `StorageDirs`、`get_system_info` 返回 `SystemInfo`、`get_log_path` 返回 `String`、`list_log_files` 返回 `Vec<String>`，handler 内用 `Ok(serde_json::to_value(r).map_err(|e| e.to_string())?)` 包装
+  - 改造 5 个原命令文件去掉 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`：
+    - [commands/system/game_dir.rs](src-tauri/src/commands/system/game_dir.rs)（open_game_dir / open_path / reveal_in_explorer / get_game_dir / write_text_file / get_system_memory；`set_game_dir` 保留独立 Tauri 命令，版本切换流程内部调用）
+    - [commands/system/config.rs](src-tauri/src/commands/system/config.rs)（get_config_path / save_config_to_file；其他 `get_config_value` / `set_config_value` / `config_manager` 已由其他 agent 迁移）
+    - [commands/system/developer.rs](src-tauri/src/commands/system/developer.rs)（is_developer_unlocked / unlock_developer_mode / get_storage_dirs / get_system_info / get_cache_stats）
+    - [commands/system/about.rs](src-tauri/src/commands/system/about.rs)（get_about_data）
+    - [logger.rs](src-tauri/src/logger.rs)（get_log_path / list_log_files / read_log_file；logger 在 crate 顶层模块，不在 commands/ 下）
+  - 新增 [commands/system/mod.rs](src-tauri/src/commands/system/mod.rs) 的 `#[tauri::command] pub async fn system_manager(state, app, req)` 转发入口
+- 前端：
+  - 新增 [utils/api/system-manager.ts](src/utils/api/system-manager.ts)：`systemManager(action, params)` 入口和 `SYSTEM_ACTIONS` 常量（17 个 action 全部大写蛇形命名，值为小写下划线），`SystemAction` 类型
+  - 修改 [utils/api/system.ts](src/utils/api/system.ts)：8 个 `invoke('xxx')` 改为 `systemManager(SYSTEM_ACTIONS.XXX, ...)`（openGameDir / openPath / revealInExplorer / getGameDir / writeTextFile / getSystemMemory / getConfigPath / saveConfigToFile），`setGameDir` 保留 `invoke('set_game_dir')`，下载进度相关函数已被其他 agent 迁移到 `versionProgressManager` 保持原样
+  - 修改 [utils/api/developer.ts](src/utils/api/developer.ts)：8 个 `invoke('xxx')` 改为 `systemManager(SYSTEM_ACTIONS.XXX, ...)`（isDeveloperUnlocked / unlockDeveloperMode / getStorageDirs / getSystemInfo / getCacheStats / getLogPath / listLogFiles / readLogFile），保留 `StorageDirs` / `SystemInfo` / `CacheStat` / `CacheStatsResult` 类型定义和导出
+  - 修改 [utils/api/about.ts](src/utils/api/about.ts)：`getAboutData` 由 `invoke('get_about_data')` 改为 `systemManager(SYSTEM_ACTIONS.GET_ABOUT_DATA)`，移除未使用的 `invoke` 导入，保留 `Author` / `AcknowledgementItem` / `DependencyItem` / `LicenseItem` / `AboutData` 类型定义
+- 收益：IPC 命令从 17 个收敛为 1 个，与 `image_cache_manager` / `meta_manager` / `config_manager` 模式一致，降低注册和维护成本；后续新增 system / logger 相关命令只需在 `system_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 11 个 version download/install/loaders/preload IPC 命令为 1 个 version_install_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::version` 下 4 个子模块（download 1 个 / install 1 个 / loaders 8 个 / preload 1 个）共 11 个独立 Tauri 命令分散注册，与 `image_cache_manager` / `version_list_manager` / `version_mods_manager` / `version_launch_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/version_install_manager.rs](src-tauri/src/utils/version_install_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 11 个 action，5 个参数结构体（VersionIdParams / McVersionParams / InstallMergedParams / ValidateLoadersParams / InstallFabricApiParams）均使用 `#[serde(rename_all = "camelCase")]`；`download_version` / `install_merged` / `preload_mods_detail_cmd` 同时需要 state 和 app（handler 用 `state, app`），`validate_loaders` / `list_fabric_api_versions` 不需要 state（handler 用 `_state`），其余 loaders 命令仅需 state（handler 用 `_app`）
+  - 改造 4 个原命令文件去掉 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`、`AppHandle` → `&AppHandle`：
+    - [commands/version/download.rs](src-tauri/src/commands/version/download.rs)（download_version）
+    - [commands/version/install/mod.rs](src-tauri/src/commands/version/install/mod.rs)（install_merged，保留 `#[allow(clippy::too_many_arguments)]`）
+    - [commands/version/loaders.rs](src-tauri/src/commands/version/loaders.rs)（8 个函数；list_forge_versions / list_neoforge_versions / list_optifine_versions 返回类型从 `Result<String, String>` 改为 `Result<Vec<serde_json::Value>, String>`、list_fabric_versions 改为 `Result<serde_json::Value, String>`、list_liteloader_versions 改为 `Result<Vec<String>, String>`，由 dispatcher 直接序列化为 JSON Value，前端不再需要 JSON.parse）
+    - [commands/version/preload.rs](src-tauri/src/commands/version/preload.rs)（preload_mods_detail_cmd，`tokio::spawn` 内的 `app` 改为 `app.clone()` 因为参数变为 `&AppHandle`）
+  - 新增 [commands/version/mod.rs](src-tauri/src/commands/version/mod.rs) 的 `#[tauri::command] pub async fn version_install_manager(state, app, req)` 转发入口
+- 前端：
+  - 新增 [utils/api/version-install-manager.ts](src/utils/api/version-install-manager.ts)：`versionInstallManager(action, params)` 入口和 `VERSION_INSTALL_ACTIONS` 常量（11 个 action 全部大写蛇形命名，值为小写下划线），`VersionInstallAction` 类型
+  - 修改 [utils/api/version.ts](src/utils/api/version.ts)：`downloadVersion` 由 `invoke('download_version', { versionId })` 改为 `versionInstallManager(VERSION_INSTALL_ACTIONS.DOWNLOAD_VERSION, { versionId })`，移除未使用的 `invoke` 导入（其他函数仍走 `versionListManager`）
+  - 修改 [utils/api/loader.ts](src/utils/api/loader.ts)：9 个函数（listForgeVersions / listNeoforgeVersions / listFabricVersions / listOptifineVersions / listLiteloaderVersions / validateLoaders / installMerged / listFabricApiVersions / installFabricApiForVersion）由 `invoke('xxx', {...})` 改为 `versionInstallManager(VERSION_INSTALL_ACTIONS.XXX, {...})`，移除 `JSON.parse` 包装（dispatcher 直接返回 JSON Value），保留 `FabricApiVersion` 类型定义和导出
+  - 修改 [utils/api/personalization.ts](src/utils/api/personalization.ts)：仅 `preloadModsDetail` 由 `invoke('preload_mods_detail_cmd', { versionId })` 改为 `versionInstallManager(VERSION_INSTALL_ACTIONS.PRELOAD_MODS_DETAIL_CMD, { versionId })`，其他函数（个性化 / 选中版本 / 文件补全 / mod 管理 / 脚本导出）保持原样
+- 收益：IPC 命令从 11 个收敛为 1 个，与 `image_cache_manager` / `version_list_manager` / `version_mods_manager` / `version_launch_manager` 模式一致，降低注册和维护成本；后续新增版本下载/安装/加载器/预加载相关命令只需在 `version_install_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 12 个 plugins IPC 命令为 1 个 plugins_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::plugins` 模块的 12 个命令（sandbox 3 个 + install 2 个 + spawn 1 个 + window 1 个 + layout 1 个 + export 2 个 + personalization 2 个）独立注册为 Tauri 命令，与 `image_cache_manager` / `meta_manager` / `tools_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/plugins_manager.rs](src-tauri/src/utils/plugins_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 12 个 action，10 个参数结构体（PluginIdParams / ReadExternalPluginFileParams / SourceDirParams / ZipPathParams / PluginSpawnProcessParams / PluginCreateWindowParams / LoadCustomLayoutParams / ReadLayoutSampleParams / ExportPluginSampleParams / WritePersonalizationParams）均使用 `#[serde(rename_all = "camelCase")]`；所有 action 均不需要 `AppState`，handler 内用 `_state` 忽略；`plugin_create_window` 需要 `&app` 用于创建 WebviewWindow
+  - 改造 7 个原命令文件去掉 `#[tauri::command]` 标注：
+    - [commands/plugins/sandbox.rs](src-tauri/src/commands/plugins/sandbox.rs)（list_external_plugins / read_external_plugin_file / uninstall_external_plugin，3 个函数均无 state/app 参数，签名不变）
+    - [commands/plugins/install.rs](src-tauri/src/commands/plugins/install.rs)（install_external_plugin_from_dir / install_external_plugin_from_zip，签名不变）
+    - [commands/plugins/spawn.rs](src-tauri/src/commands/plugins/spawn.rs)（plugin_spawn_process，签名不变）
+    - [commands/plugins/window.rs](src-tauri/src/commands/plugins/window.rs)（plugin_create_window，参数 `app: AppHandle` 改为 `app: &AppHandle`，`WebviewWindowBuilder::new(&app, ...)` 改为 `WebviewWindowBuilder::new(app, ...)` 适配 `Manager` trait bound）
+    - [commands/plugins/layout.rs](src-tauri/src/commands/plugins/layout.rs)（load_custom_layout，签名不变）
+    - [commands/plugins/export.rs](src-tauri/src/commands/plugins/export.rs)（read_layout_sample / export_plugin_sample，签名不变）
+    - [commands/plugins/personalization.rs](src-tauri/src/commands/plugins/personalization.rs)（read_personalization / write_personalization，签名不变）
+  - 新增 [commands/plugins/mod.rs](src-tauri/src/commands/plugins/mod.rs) 的 `#[tauri::command] pub async fn plugins_manager(state, app, req)` 转发入口
+- 前端：
+  - 新增 [utils/api/plugins-manager.ts](src/utils/api/plugins-manager.ts)：`pluginsManager(action, params)` 入口和 `PLUGINS_ACTIONS` 常量（12 个 action 全部大写蛇形命名，值为小写下划线），`PluginsAction` 类型
+  - 修改 [utils/api/plugins.ts](src/utils/api/plugins.ts)：7 个 `invoke('xxx', {...})` 改为 `pluginsManager(PLUGINS_ACTIONS.XXX, {...})`，函数签名、类型定义（`ExternalPluginManifest` / `ExternalPluginEntry`）和外部调用点保持不变
+  - 修改 [utils/pluginInstaller.ts](src/utils/pluginInstaller.ts)：`loadPersonalizationData` / `savePersonalizationData` / `fetchCustomLayoutContent` 3 个函数由 `invoke('xxx', {...})` 改为 `pluginsManager(PLUGINS_ACTIONS.XXX, {...})`，移除未使用的 `invoke` 导入
+  - 修改 [plugins/sandbox/PluginSandbox.vue](src/plugins/sandbox/PluginSandbox.vue)：`spawnProcess` / `createWindow` 两个特殊处理分支由 `invoke('plugin_spawn_process', {...})` / `invoke('plugin_create_window', {...})` 改为 `pluginsManager(PLUGINS_ACTIONS.PLUGIN_SPAWN_PROCESS, {...})` / `pluginsManager(PLUGINS_ACTIONS.PLUGIN_CREATE_WINDOW, {...})`，移除未使用的 `invoke` 导入
+- 收益：IPC 命令从 12 个收敛为 1 个，与 `image_cache_manager` / `meta_manager` / `tools_manager` / `sdk_manager` / `skin_manager` / `version_mods_manager` / `java_manager` / `config_manager` 模式一致，降低注册和维护成本；后续新增 plugins 相关命令只需在 `plugins_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 17 个 version 子模块 IPC 命令为 1 个 version_list_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::version` 下 4 个子模块（list 6 个 / folder 5 个 / manage 4 个 / personalization 2 个）共 17 个独立 Tauri 命令分散注册，与 `image_cache_manager` / `version_mods_manager` / `version_launch_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/version_list_manager.rs](src-tauri/src/utils/version_list_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 17 个 action，7 个参数结构体（VersionIdParams / AddMcFolderParams / McFolderPathParams / RenameMcFolderParams / RenameVersionParams / SetSelectedVersionParams / UpdatePersonalizationParams）均使用 `#[serde(rename_all = "camelCase")]`；`fix_version_files` 需要 `AppHandle`（emit `version-fix-progress` 事件），handler 用 `&app` 调用
+  - 改造 4 个原命令文件去掉 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`、`AppHandle` → `&AppHandle`：
+    - [commands/version/list.rs](src-tauri/src/commands/version/list.rs)（list_versions / list_installed_versions / list_installed_versions_with_type / uninstall_version / get_version_effective_dir / get_version_game_version）
+    - [commands/version/folder.rs](src-tauri/src/commands/version/folder.rs)（list_mc_folders / add_mc_folder / remove_mc_folder / switch_mc_folder / rename_mc_folder）
+    - [commands/version/manage.rs](src-tauri/src/commands/version/manage.rs)（fix_version_files：`app_handle: tauri::AppHandle` → `app_handle: &tauri::AppHandle`，保留 `Emitter` trait；rename_version / get_selected_version / set_selected_version）
+    - [commands/version/personalization.rs](src-tauri/src/commands/version/personalization.rs)（get_version_personalization / update_version_personalization）
+  - 新增 [commands/version/mod.rs](src-tauri/src/commands/version/mod.rs) 的 `#[tauri::command] pub async fn version_list_manager(state, app, req)` 转发入口
+- 前端：
+  - 新增 [utils/api/version-list-manager.ts](src/utils/api/version-list-manager.ts)：`versionListManager(action, params)` 入口和 `VERSION_LIST_ACTIONS` 常量（17 个 action 全部大写蛇形命名，值为小写下划线），`VersionListAction` 类型
+  - 修改 [utils/api/version.ts](src/utils/api/version.ts)：10 个 `invoke('xxx')` 改为 `versionListManager(VERSION_LIST_ACTIONS.XXX, ...)`（listVersions / listInstalledVersions / listInstalledVersionsWithType / listMcFolders / addMcFolder / removeMcFolder / switchMcFolder / renameMcFolder / uninstallVersion / getVersionEffectiveDir），保留 `downloadVersion` 走原 `invoke('download_version')` 调用，保留 `InstalledVersionInfo` / `McFolder` 类型定义
+  - 修改 [utils/api/personalization.ts](src/utils/api/personalization.ts)：7 个 `invoke('xxx')` 改为 `versionListManager(VERSION_LIST_ACTIONS.XXX, ...)`（getVersionPersonalization / updateVersionPersonalization / fixVersionFiles / renameVersion / getSelectedVersion / setSelectedVersion / getVersionGameVersion），保留 `VersionPersonalization` / `PersonalizationUpdate` 类型定义，保留 mod 管理 / 脚本导出 / 预加载等其他命令原样不动；因本文件不再直接调用 `invoke`，移除未使用的 `invoke` 导入
+- 收益：IPC 命令从 17 个收敛为 1 个，与 `image_cache_manager` / `version_mods_manager` / `version_launch_manager` 模式一致，降低注册和维护成本；后续新增版本列表/文件夹/管理/个性化相关命令只需在 `version_list_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 5 个 sdk + 7 个 skin IPC 命令为 sdk_manager / skin_manager 两个入口（参照 image_cache_manager 模式）
+- 痛点：`commands::sdk` 模块的 5 个命令（get_platform_info / get_sdk_version / is_sdk_initialized / get_device_id / check_update_lite）和 `commands::skin` 模块的 7 个命令（get_skin_cape_info / get_skin_url / get_cape_url / upload_skin / equip_cape / unequip_cape / download_url_to_file）独立注册为 Tauri 命令，与 `image_cache_manager` / `meta_manager` / `tools_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/sdk_manager.rs](src-tauri/src/utils/sdk_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 5 个 action，5 个 action 均无参数（handler 内用 `_params` 忽略）；`get_platform_info` 不需要 state（handler 内用 `_state` / `_app`），其余 4 个用 `&state` 访问 `state.sdk` 锁
+  - 新增 [utils/skin_manager.rs](src-tauri/src/utils/skin_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 7 个 action，4 个参数结构体（GetSkinUrlParams / UploadSkinParams / EquipCapeParams / DownloadUrlToFileParams）均使用 `#[serde(rename_all = "camelCase")]`；`download_url_to_file` 不需要 state（handler 内用 `_state` / `_app`），3 个图片缓存相关 action 用 `&app` 调 `image_cache::get_image_url`
+  - 修改 [commands/sdk.rs](src-tauri/src/commands/sdk.rs)：去掉 5 个函数的 `#[tauri::command]`，`State<'_, AppState>` 改为 `&AppState`，新增 `#[tauri::command] pub async fn sdk_manager(state, app, req)` 转发入口，保留 `SdkStatus` 结构体导出
+  - 修改 [commands/skin.rs](src-tauri/src/commands/skin.rs)：去掉 7 个函数的 `#[tauri::command]`，`State<'_, AppState>` 改为 `&AppState`、`AppHandle` 改为 `&AppHandle`（`get_skin_url` / `get_cape_url` 内的 `Some(app)` 改为 `Some(app.clone())`），新增 `#[tauri::command] pub async fn skin_manager(state, app, req)` 转发入口，保留 `invalidate_skin_cache` / `invalidate_cape_cache` 私有辅助函数
+- 前端：
+  - 新增 [utils/api/sdk-manager.ts](src/utils/api/sdk-manager.ts)：导出 `sdkManager(action, params)` 函数和 `SDK_ACTIONS` 常量（5 个 action，大写蛇形键 + 小写下划线值），`SdkAction` 类型
+  - 新增 [utils/api/skin-manager.ts](src/utils/api/skin-manager.ts)：导出 `skinManager(action, params)` 函数和 `SKIN_ACTIONS` 常量（7 个 action），`SkinAction` 类型
+  - 修改 [utils/api/sdk.ts](src/utils/api/sdk.ts)：`getPlatformInfo` / `getSdkVersion` 由 `invoke('xxx')` 改为 `sdkManager(SDK_ACTIONS.XXX)`，保留 `SdkStatus` 类型导入
+  - 修改 [utils/api/skin.ts](src/utils/api/skin.ts)：7 个函数由 `invoke('xxx', {...})` 改为 `skinManager(SKIN_ACTIONS.XXX, {...})`，保留 `SkinInfo` / `CapeInfo` / `SkinCapeInfo` 类型定义和导出
+  - 修改 [utils/api/java.ts](src/utils/api/java.ts)：`getDeviceId` 由 `invoke('get_device_id')` 改为 `sdkManager(SDK_ACTIONS.GET_DEVICE_ID)`（`get_device_id` 属于 SDK 命令，已随 sdk_manager 迁移；其他 Java 命令仍走 `javaManager`），移除未使用的 `invoke` 导入
+- 收益：sdk/skin 模块的 12 个分散 Tauri 命令聚合为 2 个 IPC 入口（`sdk_manager` / `skin_manager`），与 `image_cache_manager` / `meta_manager` / `tools_manager` 模式统一，lib.rs 注册项减少 12 行；前端 `java.ts` 的 `getDeviceId` 一并迁移到 `sdkManager`，避免运行时找不到 `get_device_id` 命令
+
+#### 聚合 10 个 version::mods IPC 命令为 1 个 version_mods_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::version::mods` 模块的 10 个 mod 管理命令（list/manage/install/watcher 四个子模块各 2-4 个）独立注册为 Tauri 命令，与 `image_cache_manager` / `meta_manager` / `version_progress_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/version_mods_manager.rs](src-tauri/src/utils/version_mods_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 10 个 action（list.rs 2 个 + manage.rs 2 个 + install.rs 4 个 + watcher.rs 2 个），5 个参数结构体（VersionIdParams / ToggleModParams / DeleteModParams / InstallModParams / RevealModFileParams）均使用 `#[serde(rename_all = "camelCase")]`
+  - 改造 4 个原命令文件去掉 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`、`AppHandle` → `&AppHandle`：
+    - [commands/version/mods/list.rs](src-tauri/src/commands/version/mods/list.rs)（is_version_modable / list_mods）
+    - [commands/version/mods/manage.rs](src-tauri/src/commands/version/mods/manage.rs)（toggle_mod / delete_mod）
+    - [commands/version/mods/install.rs](src-tauri/src/commands/version/mods/install.rs)（install_mod / open_mods_dir / reveal_mod_file / get_version_mods_dir）
+    - [commands/version/mods/watcher.rs](src-tauri/src/commands/version/mods/watcher.rs)（watch_mods_dir / unwatch_mods_dir；unwatch_mods_dir 无参数无 state，handler 用 `_state, _app, _params`）
+  - 同步 [commands/version/mods/helpers.rs](src-tauri/src/commands/version/mods/helpers.rs)：`get_mods_dir` 参数从 `&State<'_, AppState>` 改为 `&AppState`；preload.rs 和 loaders.rs 中现有调用通过 `State::Deref<Target = AppState>` 的 deref coercion 保持编译
+  - 新增 [commands/version/mods/mod.rs](src-tauri/src/commands/version/mods/mod.rs) 的 `#[tauri::command] pub async fn version_mods_manager(state, app, req)` 转发入口
+- 前端：
+  - 新增 [utils/api/version-mods-manager.ts](src/utils/api/version-mods-manager.ts)：`versionModsManager(action, params)` 入口和 `VERSION_MODS_ACTIONS` 常量（10 个 action 全部大写蛇形命名，值为小写下划线）
+  - 修改 [utils/api/personalization.ts](src/utils/api/personalization.ts)：Mod 管理区段的 10 个 `invoke('xxx')` 改为 `versionModsManager(VERSION_MODS_ACTIONS.XXX, ...)`，函数签名和外部调用点保持不变；区段内其他命令（个性化 / 选中版本 / 文件补全 / 脚本导出 / 预加载）保持原样
+- 收益：IPC 命令从 10 个收敛为 1 个，与 `image_cache_manager` / `meta_manager` / `version_progress_manager` 模式一致，降低注册和维护成本；后续新增 mod 管理相关命令只需在 `version_mods_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 6 个 java IPC 命令为 1 个 java_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::java` 模块的 6 个命令（`detect_java` / `list_java` / `select_java_for_mc` / `get_java_requirements` / `check_java_compatible` / `download_java`）独立注册为 Tauri 命令，与 `image_cache_manager` / `meta_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/java_manager.rs](src-tauri/src/utils/java_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 6 个 action；4 个带参数 action 定义 `#[serde(rename_all = "camelCase")]` 参数结构体（`SelectJavaForMcParams` / `GetJavaRequirementsParams` / `CheckJavaCompatibleParams` / `DownloadJavaParams`），`detect_java` / `list_java` 无额外参数用 `handler!(state, _app, _params, { ... })`
+  - 改造 [commands/java.rs](src-tauri/src/commands/java.rs)：去掉 6 个原函数的 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`、`AppHandle` → `&AppHandle`；新增 `#[tauri::command] pub async fn java_manager(state, app, req)` 转发入口
+- 前端：
+  - 新增 [utils/api/java-manager.ts](src/utils/api/java-manager.ts)：`javaManager(action, params)` 入口和 `JAVA_ACTIONS` 常量（6 个 action 全部大写蛇形命名）
+  - 修改 [utils/api/java.ts](src/utils/api/java.ts)：6 个 `invoke('xxx')` 改为 `javaManager(JAVA_ACTIONS.XXX, ...)`，函数签名、类型定义和外部调用点保持不变
+- 收益：IPC 命令从 6 个收敛为 1 个，与 `image_cache_manager` / `meta_manager` 模式一致，降低注册和维护成本；后续新增 Java 相关命令只需在 `java_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 4 个 config IPC 命令为 1 个 config_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::system::apply_config`（2 个：`get_config` / `apply_config`）和 `commands::system::config`（2 个：`get_config_value` / `set_config_value`）共 4 个独立 Tauri 命令，与 `image_cache_manager` / `meta_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/config_manager.rs](src-tauri/src/utils/config_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 4 个 action；4 个 action 均定义 `#[serde(rename_all = "camelCase")]` 参数结构体（`GetConfigParams` / `ApplyConfigParams` / `GetConfigValueParams` / `SetConfigValueParams`）
+  - 改造 [commands/system/apply_config/mod.rs](src-tauri/src/commands/system/apply_config/mod.rs)：去掉 `get_config` / `apply_config` 的 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`，移除未使用的 `use tauri::State`
+  - 改造 [commands/system/apply_config/apply.rs](src-tauri/src/commands/system/apply_config/apply.rs)：`apply_config_inner` 参数 `State<'_, AppState>` → `&AppState`，移除未使用的 `use tauri::State`
+  - 改造 [commands/system/config.rs](src-tauri/src/commands/system/config.rs)：去掉 `get_config_value` / `set_config_value` 的 `#[tauri::command]` 标注，`set_config_value` 参数 `State<'_, AppState>` → `&AppState`；新增 `#[tauri::command] pub async fn config_manager(state, app, req)` 转发入口；`get_config_path` / `save_config_to_file` 不在本次聚合范围，保持原样
+- 前端：
+  - 新增 [utils/api/config-manager.ts](src/utils/api/config-manager.ts)：`configManager(action, params)` 入口和 `CONFIG_ACTIONS` 常量（4 个 action 全部大写蛇形命名）
+  - 修改 [utils/api/config.ts](src/utils/api/config.ts)：4 个 `invoke('xxx')` 改为 `configManager(CONFIG_ACTIONS.XXX, ...)`，移除未使用的 `invoke` 导入，函数签名、类型定义和外部调用点保持不变
+- 收益：IPC 命令从 4 个收敛为 1 个，与 `image_cache_manager` / `meta_manager` 模式一致，降低注册和维护成本；后续新增配置相关命令只需在 `config_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 7 个 version::launch + version::script_export IPC 命令为 1 个 version_launch_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::version::launch`（6 个：`launch_game` / `get_launch_progress` / `cancel_launch` / `stop_game` / `get_running_game` / `get_launch_history`）和 `commands::version::script_export`（1 个：`export_launch_script`）共 7 个独立 Tauri 命令，与 `image_cache_manager` / `meta_manager` / `version_progress_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/version_launch_manager.rs](src-tauri/src/utils/version_launch_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 7 个 action；`launch_game` 和 `export_launch_script` 定义 `#[serde(rename_all = "camelCase")]` 参数结构体（`LaunchGameParams` / `ExportLaunchScriptParams`），其余 5 个无参数 action 用 `handler!(state, _app, _params, { ... })`
+  - 改造 [commands/version/launch/mod.rs](src-tauri/src/commands/version/launch/mod.rs)：去掉 6 个原函数的 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`、`AppHandle` → `&AppHandle`；`spawn_exit_watcher` 调用处改为 `app_handle.clone()`（借用转 owned）；新增 `#[tauri::command] pub async fn version_launch_manager(state, app, req)` 转发入口
+  - 改造 [commands/version/launch/build_config.rs](src-tauri/src/commands/version/launch/build_config.rs) 和 [failure.rs](src-tauri/src/commands/version/launch/failure.rs)：helper 函数参数 `&State<'_, AppState>` → `&AppState`，移除未使用的 `use tauri::State`
+  - 改造 [commands/version/script_export/mod.rs](src-tauri/src/commands/version/script_export/mod.rs)：去掉 `export_launch_script` 的 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`
+- 前端：
+  - 新增 [utils/api/version-launch-manager.ts](src/utils/api/version-launch-manager.ts)：`versionLaunchManager(action, params)` 入口和 `VERSION_LAUNCH_ACTIONS` 常量（7 个 action 全部大写蛇形命名）
+  - 修改 [utils/api/launch.ts](src/utils/api/launch.ts)：6 个 `invoke('xxx')` 改为 `versionLaunchManager(VERSION_LAUNCH_ACTIONS.XXX, ...)`，函数签名、类型定义和外部调用点保持不变
+  - 修改 [utils/api/personalization.ts](src/utils/api/personalization.ts)：`exportLaunchScript` 的 `invoke('export_launch_script')` 改为 `versionLaunchManager(VERSION_LAUNCH_ACTIONS.EXPORT_LAUNCH_SCRIPT, ...)`；其他命令保持原样
+- 收益：IPC 命令从 7 个收敛为 1 个，与 `image_cache_manager` / `meta_manager` / `version_progress_manager` 模式一致，降低注册和维护成本；后续新增启动相关命令只需在 `version_launch_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 聚合 6 个 version::progress IPC 命令为 1 个 version_progress_manager（参照 image_cache_manager 模式）
+- 痛点：`commands::version::progress` 模块的 6 个下载进度命令（`get_download_progress` / `is_downloading` / `reset_download_progress` / `cancel_download` / `pause_download` / `resume_download`）独立注册为 Tauri 命令，与 `image_cache_manager` / `meta_manager` 的 dispatcher 聚合模式不一致，注册和维护成本高。
+- 后端：
+  - 新增 [utils/version_progress_manager.rs](src-tauri/src/utils/version_progress_manager.rs)：用 `static DISPATCHER: Lazy<Dispatcher>` 注册 6 个 action，6 个 handler 均为 `handler!(state, _app, _params, { ... })`（仅需 state，无额外参数）
+  - 改造 [commands/version/progress.rs](src-tauri/src/commands/version/progress.rs)：去掉 6 个原函数的 `#[tauri::command]` 标注，参数 `State<'_, AppState>` → `&AppState`；新增 `#[tauri::command] pub async fn version_progress_manager(state, app, req)` 转发入口
+- 前端：
+  - 新增 [utils/api/version-progress-manager.ts](src/utils/api/version-progress-manager.ts)：`versionProgressManager(action, params)` 入口和 `VERSION_PROGRESS_ACTIONS` 常量（6 个 action 全部大写蛇形命名）
+  - 修改 [utils/api/system.ts](src/utils/api/system.ts)：下载进度查询区段的 6 个 `invoke('xxx')` 改为 `versionProgressManager(VERSION_PROGRESS_ACTIONS.XXX)`，函数签名和外部调用点保持不变；区段内其他系统命令保持原样
+- 收益：IPC 命令从 6 个收敛为 1 个，与 `image_cache_manager` / `meta_manager` 模式一致，降低注册和维护成本；后续新增下载进度相关命令只需在 `version_progress_manager.rs` 的 DISPATCHER 中追加 register 即可
+
+#### 修复外置账号未在皮肤站设置皮肤时弹窗 3D 预览空白且无提示
+- 痛点：外置登录账号（AuthlibInjector）在皮肤站未设置皮肤时，yggdrasil API 返回 `textures: {}`，后端 `parse_skin_cape_info` 解析后 `skin_url=None`、`cape_url=None`。前端 `useSkinOperations.loadInfo()` 直接把 null 赋给 `skinUrl`，导致 SkinManager 弹窗的 3D 预览（SkinModel3D）显示"暂无皮肤"空状态，且无任何提示告知用户原因。
+- 修改 [utils/default-skin.ts](src/utils/default-skin.ts)：新增 `STEVE_SKIN_URL` 常量导出，用于外置账号未设置皮肤时的顶替（与 yggdrasil 协议"未设置皮肤按 Steve 处理"一致，离线/微软账号仍按 UUID hash 分配）
+- 修改 [composables/useSkinOperations.ts](src/composables/useSkinOperations.ts)：
+  - 新增 `authlibUsingDefaultSkin` ref 标志，标识外置账号是否正在用默认皮肤顶替
+  - `loadInfo` 外置账号分支：`data.skin_url` 为 null 时用 `STEVE_SKIN_URL` 顶上 `skinUrl`，并置 `authlibUsingDefaultSkin = true`；披风保持 null（不顶默认披风）
+  - 每次 `loadInfo` 开头重置 `authlibUsingDefaultSkin = false`，避免状态残留
+- 修改 [components/common/SkinManager.vue](src/components/common/SkinManager.vue)：
+  - 解构 `authlibUsingDefaultSkin`，新增 AlertV2 提示（info 类型）：`当前账号未在皮肤站设置皮肤，已显示默认 Steve 皮肤。上传皮肤后将替换为此账号的形象。`
+  - "删除皮肤"按钮在 `authlibUsingDefaultSkin=true` 时禁用，避免误删（当前 skinUrl 是默认皮肤而非服务器皮肤）
+- 修改 [components/common/SkinAvatar.vue](src/components/common/SkinAvatar.vue)：外置账号分支无皮肤时回退到 `STEVE_SKIN_URL`（原为 UUID 哈希默认皮肤，与皮肤站"默认 Steve"行为不一致），保持头像与弹窗 3D 预览一致
+- 收益：外置账号未设置皮肤时，弹窗 3D 预览与账号头像一致显示 Steve，顶部 info 提示告知用户原因，删除按钮禁用避免误操作
+
+#### 降低 Java 搜索和 shell 调用日志级别为 debug
+- 痛点：Java 搜索过程日志（候选数、步骤1-5、有效 Java）和 shell 调用日志（`[Shell] run_executable: javaw.exe -version`）默认 info 级别下刷屏，影响日志可读性。
+- 修改 [minecraft/java/search.rs](src-tauri/src/minecraft/java/search.rs)：7 处 `log_info!` 改为 `log_debug!`（搜索开始/候选数/步骤1-5/有效Java）
+- 修改 [minecraft/system/shell.rs](src-tauri/src/minecraft/system/shell.rs)：`run_executable_output` 的 `[Shell] run_executable` 日志由 `log_info!` 改为 `log_debug!`（Java 二进制探测等 shell 调用属于内部实现细节）
+- 修改 [logger.rs](src-tauri/src/logger.rs)：`separator` 函数日志级别由 `Info` 改为 `Debug`，`========== Java Search ==========` 等分割线不再默认显示
+- 收益：默认日志级别下 Java 搜索过程和 shell 调用日志不再刷屏，需要排查时切换到 debug 模式查看
+
+#### 实现 yggdrasil 协议皮肤管理 API，修复外置账号皮肤按钮走离线 API 的 bug
+- 痛点：外置登录账号（AuthlibInjector）点击皮肤按钮时，SkinManager 用 `isMicrosoft` 二值判断将其归入离线分支，调用 `setOfflineSkin` / `saveCustomSkin`，后端在 `offline_accounts` 中找不到 uuid 报错"离线账号不存在"。SkinAvatar 同样将外置账号当作离线账号，显示 UUID 哈希默认皮肤而非从 yggdrasil 服务器拉取。
+- 后端（yggdrasil 皮肤管理 5 个端点）：
+  - [authlib/types.rs](src-tauri/src/minecraft/auth/authlib/types.rs)：新增 `ProfileProperty`、`ProfileInfo`、`TexturesPayload`、`SkinCapeInfo` 等结构体，用于解析角色属性和材质信息（Base64 解码 textures property）
+  - [authlib/client.rs](src-tauri/src/minecraft/auth/authlib/client.rs)：新增 `fetch_profile`（GET /sessionserver/session/minecraft/profile/{uuid}）、`upload_skin`、`delete_skin`、`upload_cape`、`delete_cape` 5 个 yggdrasil API 端点封装，以及 `parse_skin_cape_info` 从 ProfileInfo 解析皮肤/披风信息
+  - [commands/auth/authlib.rs](src-tauri/src/commands/auth/authlib.rs)：新增 `authlib_get_skin_info`、`authlib_upload_skin`、`authlib_delete_skin`、`authlib_upload_cape`、`authlib_delete_cape` 5 个命令，统一从 `auth_storage.get_authlib_account` 取 access_token，PNG 文件由后端读取校验（避免前端引入 `@tauri-apps/plugin-fs` 依赖）
+  - [utils/meta_manager.rs](src-tauri/src/utils/meta_manager.rs)：注册 5 个皮肤 action 到 dispatcher
+- 前端（三分流重构：微软 / 外置 / 离线）：
+  - [composables/useSkinOperations.ts](src/composables/useSkinOperations.ts)：重构为三分流，`loadInfo` / `pickAndUpload` 根据 `loginType` 分别调用 `authlibGetSkinInfo` / `authlibUploadSkin` / `authlibDeleteSkin` / `authlibUploadCape` / `authlibDeleteCape`（外置）、`getSkinCapeInfo` / `uploadSkin`（微软）、`getLocalSkinName` / `saveCustomSkin`（离线）；新增 `canUploadSkin` / `canUploadCape` computed 据 `uploadableTextures` 动态启用上传按钮
+  - [components/common/SkinManager.vue](src/components/common/SkinManager.vue)：模板三分流，外置账号显示皮肤/披风上传删除面板（据 `uploadableTextures` 动态显示），不支持上传时提示"此 yggdrasil 服务器不支持上传皮肤或披风"
+  - [components/common/SkinAvatar.vue](src/components/common/SkinAvatar.vue)：新增 `serverUrl` prop，`loadAvatar` 新增 `AuthlibInjector` 分支调用 `authlibGetSkinInfo` 从 yggdrasil 服务器拉取皮肤 URL，失败或无皮肤时回退到 UUID 哈希默认皮肤
+  - [components/home/account-selector/AccountCard.vue](src/components/home/account-selector/AccountCard.vue)：修复 `loginType` 映射，将 '外置' 正确映射为 'AuthlibInjector'（原代码 `card.loginType === '正版' ? 'Microsoft' : 'Offline'` 将外置账号误归为离线），传递 `serverUrl` prop 供 SkinAvatar 调用 yggdrasil API
+  - [utils/api/authlib.ts](src/utils/api/authlib.ts)：新增 `authlibGetSkinInfo` / `authlibUploadSkin` / `authlibDeleteSkin` / `authlibUploadCape` / `authlibDeleteCape` 5 个 API 封装
+  - [types/auth.ts](src/types/auth.ts)：新增 `AuthlibSkinCapeInfo` 类型定义（snake_case 字段名匹配后端 Serialize 输出）
+  - [utils/api/meta-manager.ts](src/utils/api/meta-manager.ts)：新增 5 个 `META_ACTIONS` 常量
+  - [stores/auth.ts](src/stores/auth.ts)：`currentUser` 类型由 `AuthResult | null` 收紧为 `LocalAuthResult | null`，使 SkinManager 中 `authStore.currentUser?.server_url` 访问有类型保障（后端所有登录方法均返回 `LocalAuthResult`，结构兼容赋值不受影响）
+- 收益：外置账号可查看/上传/删除皮肤和披风（据服务器 `uploadableTextures` 权限动态显示），账号卡片头像正确从 yggdrasil 服务器拉取皮肤，微软/离线账号功能不受影响
+
+#### 抽象通用 action 分发器（dispatcher），meta_manager 和 tools_manager 共用
+- 痛点：meta_manager 和 tools_manager 各自维护冗长的 match 语句，新增 action 要改两处逻辑，且无法复用分发机制。
+- 新增 [utils/dispatcher.rs](src-tauri/src/utils/dispatcher.rs)：
+  - `ActionRequest`：统一请求体（替代原 `MetaRequest` / `ToolsRequest`）
+  - `Dispatcher`：注册式分发器，`register(action, handler)` + `dispatch(state, app, req)`
+  - `Handler`：统一签名，用 owned `AppState` + `AppHandle` 参数避免 HRTB 复杂性
+  - `handler!` 宏：自动包装 `Box::pin(async move { ... })`，简化注册代码
+- 配套 [state/app.rs](src-tauri/src/state/app.rs)：`AppState` 派生 `Clone`（所有字段均为 `Arc<...>`，克隆开销极低），让 dispatcher 能以 owned 参数接收 state
+- 重构 [utils/meta_manager.rs](src-tauri/src/utils/meta_manager.rs)：23 个 auth action 改为 `static DISPATCHER: Lazy<Dispatcher>` + register 调用
+- 重构 [commands/tools/mod.rs](src-tauri/src/commands/tools/mod.rs)：25+ 个 tools action 改为注册式
+- 删除 `MetaRequest` 和 `ToolsRequest`，统一使用 `ActionRequest`
+- 收益：新增 action 只需一行 register，无需改 match；分发机制复用，降低维护成本
+
+#### 聚合 23 个 auth IPC 命令为 1 个 meta_manager（参照 tools_manager 模式）
+- 痛点：auth 相关 IPC 命令多达 23 个（离线 6 + 微软 9 + authlib 6 + 会话 2），注册和维护成本高。
+- 后端：
+  - 新增 [utils/meta_manager.rs](src-tauri/src/utils/meta_manager.rs)：统一分发逻辑，接收 `MetaRequest { action, params }`，按 action 分发到各子模块函数。Params 结构体统一用 `#[serde(rename_all = "camelCase")]`，与前端约定一致
+  - 新增 [commands/auth/mod.rs](src-tauri/src/commands/auth/mod.rs) 的 `meta_manager` IPC 命令，只负责转发请求到 utils 工具
+  - 去掉原有 23 个命令的 `#[tauri::command]` 标注，改为普通 `pub async fn` 供 dispatch 调用；参数类型 `State<'_, AppState>` → `&AppState`、`AppHandle` → `&AppHandle`（涉及 offline.rs / microsoft.rs / authlib.rs / account/{ms,offline,session}.rs，以及 microsoft.rs 的 complete_login 辅助函数和 authlib.rs 的 authlib_relogin_with_password 辅助函数）
+  - [lib.rs](src-tauri/src/lib.rs) 删除 23 个原命令注册，只注册 `commands::auth::meta_manager` 一个命令
+- 前端：
+  - 新增 [utils/api/meta-manager.ts](src/utils/api/meta-manager.ts)：统一 API 入口 `metaManager(action, params)` 和 `META_ACTIONS` 常量
+  - 迁移所有调用点：[utils/api/auth.ts](src/utils/api/auth.ts)（17 个 invoke）和 [utils/api/authlib.ts](src/utils/api/authlib.ts)（6 个 invoke）全部改用 `metaManager`，其他业务文件通过 `@/utils/tauri` 中转调用，无需改动
+- 收益：IPC 命令从 23 个收敛为 1 个，与 tools_manager 模式一致，降低注册和维护成本；后续新增 auth 命令只需在 `meta_manager.rs` 的 dispatch 中追加分支即可
+
+#### 修复 authlib 登录报错 "missing field access_token"
+- 问题：外置登录时服务器返回 200 但反序列化失败，报 `missing field access_token at line 1 column 1382`。
+- 根因：[authlib/types.rs](src-tauri/src/minecraft/auth/authlib/types.rs) 的 `AuthResponse` 等 6 个结构体
+  缺少 `#[serde(rename_all = "camelCase")]` 标注。yggdrasil 协议规范要求字段为 camelCase
+  （如 `accessToken`），但 serde 默认按 Rust 字段名 snake_case 查找（`access_token`），
+  导致 required 字段找不到触发反序列化错误。
+- 修复：给 `AuthenticateRequest`、`RefreshRequest`、`ValidateRequest`、`AuthResponse`、
+  `ServerMetadata` 5 个结构体添加 `#[serde(rename_all = "camelCase")]`。
+  `Profile`、`ProfileId`、`Agent` 字段名无下划线不受影响，无需标注。
+- 对比：项目其他模块（curseforge、microsoft、launcher_profiles）均已正确使用 rename_all，
+  唯独 authlib 模块遗漏，本次修复对齐项目约定。
+
+#### 外置登录服务器地址自动补全（用户只需输入域名或皮肤站页面地址）
+- 痛点：原先用户必须输入完整路径 `https://littleskin.cn/api/yggdrasil`，太麻烦。
+- 新增 [utils/authlib-url.ts](src/utils/authlib-url.ts)：yggdrasil 服务器 URL 规范化工具，按以下规则自动补全：
+  1. 去除首尾空白和首尾斜杠
+  2. 若无 `http://` 或 `https://` 协议头，自动补 `https://`
+  3. 若路径以 `/api/yggdrasil` 结尾，直接使用
+  4. 若路径为空或为皮肤站页面路径（`/user`、`/index`、`/register`、`/login`、`/skin` 等），
+     去掉原路径，替换为 `/api/yggdrasil`（解决用户粘贴皮肤站页面地址的问题）
+  5. 其它非标准路径保留用户输入（可能是自建服务器）
+- 修改 [ExternalLoginPanel.vue](src/components/common/ExternalLoginPanel.vue)：
+  - placeholder 改为 `如 littleskin.cn 或 https://littleskin.cn`
+  - `fetchMeta` 和 `handleLogin` 使用 `computed` 的 `normalizedUrl` 而非原始输入
+  - 输入框下方实时显示"将使用：https://xxx/api/yggdrasil"提示，让用户知道最终请求地址
+  - 底部说明改为"输入域名即可，自动补全协议和 /api/yggdrasil 路径"
+- 支持的输入形式示例：
+  - `littleskin.cn` → `https://littleskin.cn/api/yggdrasil`
+  - `https://littleskin.cn` → `https://littleskin.cn/api/yggdrasil`
+  - `littleskin.cn/api/yggdrasil` → `https://littleskin.cn/api/yggdrasil`
+  - `https://littleskin.cn/user` → `https://littleskin.cn/api/yggdrasil`（自动去掉 /user）
+  - `https://littleskin.cn/index` → `https://littleskin.cn/api/yggdrasil`（自动去掉 /index）
+  - `https://littleskin.cn/skin/edit` → `https://littleskin.cn/api/yggdrasil`（前缀匹配）
+  - `https://example.com/custom` → 保留为 `https://example.com/custom`（非标准路径保留）
+
+#### 修复登录页 Tab 切换动画僵硬 + 切换外置登录后内容空白
+- 问题 1：登录页切换登录方式时内容瞬间替换，无过渡动画，体验僵硬。
+- 问题 2：切换到外置登录 Tab 后，再切回离线/微软 Tab 内容空白不显示。
+- 根因：[ExternalLoginPanel.vue](src/components/common/ExternalLoginPanel.vue) 内部包含
+  `<Teleport>`（ProfileSelectModal 弹窗），`<Transition mode="out-in">` 的 leave 钩子
+  会等待 CSS transitionend 事件，Teleport 可能干扰事件触发，导致 leave 卡住、
+  新内容不 enter，表现为切换后空白。
+- 修复：
+  - [SubTabBar.vue](src/components/common/SubTabBar.vue) 指示线改为所有 Tab 均渲染 span，
+    通过 `opacity` + `scaleX` + `transition-all` 实现平滑淡入淡出 + 缩放过渡（200ms ease-out），
+    替代原先 `v-if` 瞬间 mount/unmount。
+  - [Login.vue](src/views/Login.vue) 放弃 `<Transition>` 组件，改用 `:key="activeTab"` 触发
+    Vue 重新挂载 + CSS `@keyframes` animation 自动播放。不依赖 transitionend 事件，
+    不受 Teleport 干扰，稳定可靠。动画效果为 opacity + translateY 8px（200ms ease-out），
+    与指示线动画同步。同时尊重 `prefers-reduced-motion` 设置。
+  - [ExternalLoginPanel.vue](src/components/common/ExternalLoginPanel.vue) 用外层
+    `<div class="space-y-3">` 包裹主表单和 ProfileSelectModal，形成单一根节点，
+    消除 Vue Transition 的多根节点警告。
+
+#### 修复 network.rs 延迟测试绕过全局 HTTP 客户端
+- 问题：[commands/tools/network.rs](src-tauri/src/commands/tools/network.rs) 的 `latency_test` 函数
+  自行用 `Client::builder().timeout(10s).build()` 构造客户端，未走 `crate::http::get_client()`，
+  导致用户配置的代理和项目统一 User-Agent 对测速功能不生效。
+- 修复：改用 `crate::http::get_client()` 获取全局客户端，在每个请求上附加
+  `.timeout(Duration::from_secs(10))` 保留测速超时设定。删除 `use reqwest::Client` 和
+  `use std::sync::Arc`（不再需要手动 Arc 包裹，reqwest::Client 内部已是 Arc）。
+- 收益：测速功能现在自动应用用户配置的代理和统一 User-Agent，与其它 HTTP 请求行为一致。
+
+#### 重构 authlib 请求层：URL 收口到 sources.rs，请求统一走 http.rs
+- 背景：[authlib/client.rs](src-tauri/src/minecraft/auth/authlib/client.rs) 原先在文件内
+  硬编码 `https://authlib-injector.yushi.moe/artifact/latest.json` 等 URL，
+  并自行实现了 `fetch_text`、`download_bytes` 等请求函数，与项目约定不符
+  （[sources.rs](src-tauri/src/minecraft/sources.rs) 顶部明确要求"所有远程 URL 必须在此文件定义常量"）。
+- 变更：
+  - [sources.rs](src-tauri/src/minecraft/sources.rs) 新增 `AUTHLIB_INJECTOR_OFFICIAL`、
+    `AUTHLIB_INJECTOR_LATEST_PATH`、`AUTHLIB_INJECTOR_BMCLAPI` 常量，
+    及 `authlib_injector_meta_url_official()` / `authlib_injector_meta_url_mirror()` 构造函数。
+  - [http.rs](src-tauri/src/http.rs) 新增 3 个通用函数：
+    `get_text_with_status`（GET 返回状态码+文本）、
+    `post_json_with_status`（POST JSON 返回状态码+文本）、
+    `fetch_bytes`（GET 二进制）。
+  - [authlib/client.rs](src-tauri/src/minecraft/auth/authlib/client.rs) 删除自实现的
+    `client()`、`fetch_text`、`download_bytes` 函数，所有请求改走 `crate::http` 模块；
+    URL 改用 `sources` 模块常量。`YggdrasilError` 业务错误转换保留不变。
+- 收益：URL 与请求逻辑收口到统一模块，便于后续维护和镜像源切换；
+
+#### 再次修复主页「添加账号」按钮点击无反应（深层原因）
+- 问题：上一轮仅修复了路由守卫层面，实际仍存在多个深层原因导致点击无反应：
+  1. [useSwipeNavigation.ts](src/composables/useSwipeNavigation.ts) `onPointerDown` 使用
+     `target.closest('button')` 检测交互元素，但 SVG 子元素（如 `<path>`）的 `closest`
+     在 Tauri WebView 中可能不跨越 SVG-HTML 边界，导致点击「添加账号」按钮内的图标时
+     被错误识别为拖拽起点，触发 `setPointerCapture` 劫持 pointer 事件。
+  2. [useAccountCards.ts](src/composables/useAccountCards.ts) `watch(cards)` 逻辑缺陷：
+     当 `currentIndex` 指向「添加账号」卡片（末尾）时，`currentCard` 为 `undefined`，
+     `!currentCard?.isActive` 为 `true`，导致账号列表异步加载触发 cards 变化时，
+     `currentIndex` 被强制重置回 active 卡片，用户刚切到「添加账号」卡片就被拉回。
+  3. `switchAccount`/`removeAccount` 未处理 `'外置'` 类型，外置账号无法切换/删除。
+  4. `onMounted` 未调用 `loadAuthlibAccounts`，外置登录账号不显示在卡片栏。
+- 修复：
+  - `onPointerDown` 改用 `e.composedPath()` 遍历事件路径，按 `tagName` 检测交互元素，
+    可靠跨越 SVG-HTML 边界。
+  - `watch(cards)` 增加 `currentIndex === newCards.length` 提前返回，避免「添加账号」
+    卡片被误重置。
+  - `switchAccount`/`removeAccount` 新增 `'外置'` 分支，通过 `serverUrl + uuid` 双键定位。
+  - `onMounted` 补充 `authStore.loadAuthlibAccounts()` 调用。
+  - `addAccount` 添加 `try/catch` 捕获 `NavigationFailure`，便于排查静默失败。
+
 #### 修复版本选择页 FolderSidebar 调用未定义 invoke 报错
 - 问题：[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue) 第 38、104 行
   直接调用 `invoke<string>('get_game_dir')`，但未导入 `invoke`，
