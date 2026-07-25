@@ -9,6 +9,67 @@
 
 ### 变更
 
+#### 导出功能添加进度条 + 固定底栏导出按钮
+- 痛点：用户反馈导出过程只有按钮转圈，看不到具体进度；且导出按钮在页面底部，需要滚动到底才能点击，体验不佳
+- 后端改动（进度事件推送）：
+  - [types.rs](src-tauri/src/commands/version/export/types.rs)：新增 `ExportStage` 枚举（init/scan/network/zip/done/failed）和 `ExportProgress` 结构体（stage/percent/message/versionId），含 `ExportProgress::new` 构造函数（percent 自动 clamp 到 0-100）
+  - [mod.rs](src-tauri/src/commands/version/export/mod.rs)：定义 `EXPORT_PROGRESS_EVENT = "export-progress"` 常量，新增 `emit_progress(app, version_id, stage, percent, message)` 函数；`export_modpack` 在各阶段调用 emit：Init(1%)/Scan(3%→10%)/Network(12%→50%)/Zip(52%→95%)/Done(100%)/Failed(0%)，并传递 `app: &AppHandle` 给 `build_modpack_zip`
+  - [zip.rs](src-tauri/src/commands/version/export/zip.rs)：新增 `emit_zip_progress(app, version_id, current, total)` 函数（50-95% 区间按文件数线性插值）；6 个 builder（Modrinth/CurseForge/HMCL/MultiMC/MCBBS/Compress）全部加 `app: &AppHandle` 参数，在文件写入循环中按 i+1/total 调用 emit，确保大文件打包时进度实时更新
+- 前端改动（监听 + UI）：
+  - [version-export-manager.ts](src/utils/api/version-export-manager.ts)：新增 `EXPORT_PROGRESS_EVENT` 常量、`ExportStage` 类型联合、`ExportProgress` 接口（与后端 serde camelCase 对齐）
+  - [useExportTab.ts](src/composables/useExportTab.ts)：新增 `exportProgress`/`exportStage`/`exportMessage` 三个 ref；新增 `startProgressListener`/`stopProgressListener`/`resetProgress`；在 `onMounted` 启动 `listen<ExportProgress>('export-progress')` 监听，按 `versionId` 过滤避免切换版本时残留旧事件；`onUnmounted` 自动 unlisten；`handleExport` 开始前 `resetProgress()`，结束 3 秒后重置（保留完成/失败状态显示）
+  - [ExportTab.vue](src/views/version-settings/ExportTab.vue)：参考 [LoaderSelect.vue](src/views/LoaderSelect.vue) 改为三段式 flex 列布局：中段 `flex-1 overflow-y-auto` 放基本信息 + 导出选项表单（`max-w-2xl` 居中），底段 `shrink-0 border-t` 固定操作栏（左状态提示 + 右导出按钮 + 上方进度条）；导出按钮使用项目自定义 [Button.vue](src/components/common/Button.vue) 组件（`type="primary"` + `:loading="exporting"`），图标全部改用 Heroicons（`ArrowUpTrayIcon`/`CheckIcon`/`XMarkIcon`/`DocumentArrowDownIcon`/`DocumentArrowUpIcon`）；导出中按钮文案显示"扫描文件 23%"（动态阶段+百分比），上方显示 1px 水平进度条；完成显示对勾图标+"导出完成"，失败显示叉号图标+"导出失败"；底栏左侧 `bottomHint` 显示当前格式/进度/状态文案
+  - [VersionSettings.vue](src/views/VersionSettings.vue)：将 export tab 加入 `flex flex-col` 分支（与 mod tab 一致），让 ExportTab 自管内部滚动 + 固定底栏布局
+- 验证：`cargo check` 0 错误 0 警告；`eslint` 0 错误（vue-tsc 环境预存问题不影响）
+
+#### 重构导出功能依赖解析，复用 VersionSetup 消除重复造轮子
+- 痛点：用户指出 zip.rs 中自造的 MC 版本/加载器检测逻辑（`extract_fabric_version` / `extract_loader_version` / `extract_loader_from_libraries` / `extract_mc_version_from_id`）是重复造轮子，且按 version_id 字符串名字提取加载器版本不可靠（如 RLCraft 的 id 是 "RLCraft 1.12.2 - Release v2.9.3"，不含 `forge-` 关键字）
+- 复用方案：项目已有 `crate::minecraft::version::setup::VersionSetup::from_version_json(version_dir, version_id)` 返回完整 `LoaderInfo`（含 `version_type` + 6 种加载器版本号 + `original_version`），与启动游戏、扫描版本列表走同一套检测逻辑（`state.rs::detect_version_type` 关键字优先 + `libraries[]` maven 坐标兜底，正确区分 Fabric/Quilt/Forge/NeoForge/OptiFine/LiteLoader）
+- 改动：[zip.rs](src-tauri/src/commands/version/export/zip.rs) 删除 4 个自造函数，新增 `parse_loader_info(instance_dir, version_id) -> (VersionType, Option<String>)` 和重写 `parse_dependencies`，全部委托给 `VersionSetup::from_version_json`；`build_cf_loader_id` / `build_mmc_zip` / `build_mcbbs_zip` 改为基于 `VersionType` 枚举 match 分发，避免字符串 key 查找；`build_hmcl_zip` 也复用 `parse_dependencies` 获取 mc 版本（替代 `extract_mc_version_from_id`）
+- 影响范围：所有 6 种导出格式的依赖解析统一走 `VersionSetup`，与启动游戏 / 扫描版本列表 / Java 检查等模块完全一致；Quilt 现在能正确识别（之前 `scan/loaders.rs::detect_loaders` 把 Quilt 误判为 Fabric，但 `VersionSetup::from_version_json` 走 `state.rs::detect_loader_from_json` 能正确区分）
+- 验证：`cargo check` 0 错误 0 警告
+
+#### 修复导出扫描漏文件和加载器检测失败
+- 痛点：用户测试 CurseForge 格式导出 RLCraft 实例，结果 zip 内只有 resourcepacks 文件夹和 2 个 txt 文件，mods/ 目录下的所有 jar 全部漏扫；同时 manifest.modLoaders 为空（未检测到 Forge 加载器）
+- 根因 1：[scan.rs](src-tauri/src/commands/version/export/scan.rs) 的 `glob_to_regex` 将规则 `mods/` 转成 regex `^mods/$`，只匹配字面量字符串 `mods/`，不匹配 `mods/xxx.jar`。规则 `mods/` 的语义是"匹配 mods 目录下所有内容"，应等价于 `mods/*`
+- 修复 1：在 `compile_rules` 中对以 `/` 结尾的 pattern 自动追加 `*`，使其生成 `^mods/.*$` 正确匹配目录下所有文件。影响范围：所有目录前缀规则（`mods/`/`coremods/`/`config/`/`resourcepacks/`/`shaderpacks/`/`saves/` 等）现在都能正确扫描
+- 根因 2：[zip.rs](src-tauri/src/commands/version/export/zip.rs) 的 `parse_dependencies` 仅从 version json 的 `id` 字段用正则 `forge-([\d.]+)` 提取加载器版本，但 RLCraft 的 id 是 "RLCraft 1.12.2 - Release v2.9.3"（不含 `forge-`），且 1.12.2 老版 Forge 的 version json 用 `net.minecraftforge:forge:1.12.2-14.23.5.2860` 这种 maven 坐标，id 字段不含加载器版本号
+- 修复 2：新增 `extract_loader_from_libraries` 函数，优先从 version json 的 `libraries[]` 数组中按 maven 坐标前缀（`net.minecraftforge:forge:` / `net.neoforged:neoforge:` / `net.fabricmc:fabric-loader:` / `org.quiltmc:quilt-loader:`）提取加载器版本。老版 Forge 坐标 `1.12.2-14.23.5.2860` 取 `-` 后的部分作为加载器版本。原 id/mainClass/content 兜底逻辑保留作为 fallback
+- 验证：`cargo check` 0 错误 0 警告
+
+#### 扩展导出功能支持 6 种整合包格式（与导入格式对齐）
+- 痛点：之前导出只支持 Modrinth 格式（.mrpack），用户无法导出 CurseForge/HMCL/MMC/MCBBS/普通压缩包格式，与导入支持的 7 种格式（除 LauncherPack 外）不对齐
+- 后端改动：
+  - [types.rs](src-tauri/src/commands/version/export/types.rs)：新增 `ExportFormat` 枚举（6 个变体：Modrinth/Curseforge/Hmcl/Mmc/Mcbbs/Compress），含 `extension()` 和 `requires_online_check()` 方法；`ExportModpackParams` 新增 `format` 字段（默认 Modrinth）；`ModDownloadInfo` 新增 `project_id`/`file_id` 字段（CF 格式导出用）
+  - [zip.rs](src-tauri/src/commands/version/export/zip.rs)：重构 `build_modpack_zip` 为 dispatcher，按 format 分发到 6 个 builder：
+    - `build_modrinth_zip`（已有逻辑）：modrinth.index.json + overrides/
+    - `build_curseforge_zip`：manifest.json + modlist.html + overrides/，联网获取到 projectID/fileID 的 mod 写入 files[]，未获取到的直接打包
+    - `build_hmcl_zip`：modpack.json + minecraft/，所有文件直接打包
+    - `build_mmc_zip`：mmc-pack.json + instance.cfg + .minecraft/，按 version json 解析 components[]
+    - `build_mcbbs_zip`：mcbbs.packmeta + overrides/，按 version json 解析 addons[]
+    - `build_compress_zip`：直接打包 .minecraft/，无 manifest
+    - 抽取 `create_zip_writer`/`write_file_entry`/`write_string_entry` 共用工具，复用 `parse_dependencies` 解析 minecraft + 加载器版本
+  - [mod.rs](src-tauri/src/commands/version/export/mod.rs)：`export_modpack` 加 `format.requires_online_check()` 守卫，非联网格式即使误传 `check_hosted_assets=true` 也强制跳过联网
+  - [network.rs](src-tauri/src/commands/version/export/network.rs)：`merge_cf_results` 把 CF 返回的 `project_id`/`file_id` 填入 `ModDownloadInfo`，供 CF 格式 manifest 使用
+- 跨模块改动：[community/types.rs](src-tauri/src/minecraft/community/types.rs) 的 `FileDownloadInfo` 新增 `project_id`/`file_id` 字段；[curseforge/mod.rs](src-tauri/src/minecraft/community/curseforge/mod.rs) 的 `fingerprint_search_with_downloads` 从 `exactMatches[i].id`（modId）和 `file.id` 填充这两个字段；[modrinth/mod.rs](src-tauri/src/minecraft/community/modrinth/mod.rs) 设置为 None
+- 前端改动：
+  - [version-export-manager.ts](src/utils/api/version-export-manager.ts)：新增 `ExportFormat` 类型联合、`ExportFormatOption` 接口、`EXPORT_FORMAT_OPTIONS` 常量（6 个格式元信息，含 label/description/extension/supportsOnlineCheck）、`findExportFormat` 工具函数；`ExportModpackParams` 新增 `format` 字段
+  - [useExportTab.ts](src/composables/useExportTab.ts)：新增 `exportFormat` ref（默认 'modrinth'）、`currentFormatMeta`/`supportsOnlineCheck`/`formatOptions` 计算属性；`handleExport` 根据格式选择扩展名（.mrpack / .zip）和文件对话框标题；非联网格式强制 `finalCheckHostedAssets=false` 避免无效联网请求
+  - [ExportTab.vue](src/views/version-settings/ExportTab.vue)：顶部添加"导出格式" Select 下拉（含格式描述），联网检查和仅 Modrinth 选项仅在 `supportsOnlineCheck` 为 true 时显示；Tooltip 文案动态显示当前格式
+- 决策记录：参考 PCL2 仅支持 Modrinth 格式导出，但用户要求"支持什么格式导入就支持什么格式导出"，故实现 6 种格式（除 LauncherPack，因 MoLaunch 不带启动器分发）；CurseForge 联网查不到 projectID/fileID 的 mod 按用户选择直接打包到 overrides
+- 验证：`cargo check` 0 错误 0 警告；`eslint` 0 错误
+
+#### 完成版本设置 → 导出子页前端实现（Modrinth 格式整合包导出）
+- 痛点：版本设置页左侧导航已有"导出"Tab，但此前为占位"功能开发中"。后端 `version_export_manager` 已实现 4 个 action（get_export_options / export_modpack / save_export_config / load_export_config）和 ~20 个静态选项 + 资源包/存档/光影包动态子选项扫描、Modrinth+CurseForge 联网检查、`modrinth.index.json` 生成、zip 打包等完整能力，但前端缺少 UI 入口。
+- 前端新增 3 个文件：
+  - [utils/api/version-export-manager.ts](src/utils/api/version-export-manager.ts)：API 层，定义 `versionExportManager` 入口、`VERSION_EXPORT_ACTIONS` 常量、4 个数据类型接口（`ExportOption` / `ExportModpackParams` / `ExportModpackResult` / `SaveConfigParams` / `LoadConfigResult`）和 4 个强类型高层 API 函数（`getExportOptions` / `exportModpack` / `saveExportConfig` / `loadExportConfig`），与后端 `utils::version_export_manager::DISPATCHER` 注册的 action 一一对应
+  - [composables/useExportTab.ts](src/composables/useExportTab.ts)：业务逻辑 composable，封装状态管理（packName / packVersion / checkHostedAssets / modrinthUploadMode / exportOptions）+ 4 个 handler（loadOptions / toggleOption / handleSaveConfig / handleLoadConfig / handleExport），`applyConfigOverride` 复刻后端 `config.rs::apply_config_to_options` 的必选项保护逻辑（enabled=false 的选项不允许取消勾选）
+  - [views/version-settings/ExportTab.vue](src/views/version-settings/ExportTab.vue)：主页面组件（145 行，远低于 300 行硬约束），布局为单列 max-w-2xl：基本信息卡片（整合包名称/版本/联网检查/仅 Modrinth）+ 导出选项卡片（含读取/保存配置按钮）+ 操作按钮区
+  - [views/version-settings/export-tab/ExportOptions.vue](src/views/version-settings/export-tab/ExportOptions.vue)：选项列表组件（98 行），按 `parent` 字段分组渲染顶层/子选项，必选项（enabled=false）显示"必选"标签并禁用勾选框，可见性由 `visible` 字段控制，子选项缩进 + 左侧分隔线，空状态垂直水平居中
+- 修改 [views/VersionSettings.vue](src/views/VersionSettings.vue)：替换原占位 `<div v-else>功能开发中</div>` 为 `<ExportTab v-else-if="activeCategory === 'export'" />`，import 新组件
+- 设计原则：复用项目自定义组件（Input / Button / Tooltip），不引入新依赖；composable 模式与 `useVersionOverviewActions` 一致；选项状态原地修改 `checked` 字段避免整树重渲染；文件对话框走 `pickSavePath` / `pickFile`（基于 @tauri-apps/plugin-dialog）
+- 验证：`eslint` 0 错误（仅 1 个预存在的 `_id` 未使用 warning，与本次修改无关）；`cargo check` 0 错误 0 警告（后端未改动，仅验证未引入回归）
+
 #### 修复 Mod 管理页顶部筛选 tag 文字换行问题
 - 痛点：版本设置 → Mod 管理页中，当 mods 文件数量较多（数字 badge 变宽）时，顶部"全部/已启用/已禁用"筛选 tag 组被 flex 默认 shrink 行为压缩，导致 tag 内中文文字（"全部"/"已启用"/"已禁用"）折行显示，视觉拥挤。
 - 修改 [src/views/version-settings/mod-tab/ModToolbar.vue](src/views/version-settings/mod-tab/ModToolbar.vue)：3 处 Tailwind 类调整
