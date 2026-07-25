@@ -107,7 +107,7 @@ pub fn set_game_language(
     }
 
     // 写入语言设置
-    // 先写 "-" 触发缓存清理，再写目标值（PCL2 风格）
+    // 先写 "-" 触发缓存清理，再写目标值
     log_info!(
         "[Language] Overwriting lang: {} -> {} (cache clear via '-')",
         current_lang.as_deref().unwrap_or("(none)"),

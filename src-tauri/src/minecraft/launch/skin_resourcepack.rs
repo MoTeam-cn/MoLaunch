@@ -1,4 +1,4 @@
-//! 离线账号皮肤资源包生成模块（PCL2 方案 B）
+//! 离线账号皮肤资源包生成模块（方案 B）
 //!
 //! 通过生成资源包 zip 替换原版玩家纹理，让离线账号的自定义皮肤在游戏中生效。
 //! 与 `adjust_uuid_for_skin_variant`（方案 A）互补：
@@ -39,7 +39,7 @@ const DEFAULT_SKINS_1193: &[&str] = &[
 
 /// 根据MC版本返回对应的 pack_format
 ///
-/// 参考 PCL2 的版本映射，覆盖 1.6 到 1.20.5+
+/// 版本映射覆盖 1.6 到 1.20.5+
 fn get_pack_format(mc_version: &str) -> u32 {
     let v = parse_version_number(mc_version);
     let major = v.first().copied().unwrap_or(0);

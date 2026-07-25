@@ -7,7 +7,7 @@ use crate::utils::format;
 
 /// 检测服务器是否真正支持 Range 请求
 ///
-/// 用 GET + Range:bytes=0-0 检测（与 PCL2 一致），检查 HTTP 206 Partial Content。
+/// 用 GET + Range:bytes=0-0 检测，检查 HTTP 206 Partial Content。
 /// 不用 HEAD 预检：CF CDN（edge.forgecdn.net）HEAD 会虚假返回
 /// `accept-ranges: bytes`，但实际 GET + Range 返回 404，导致分片必然失败。
 /// GET + Range 能准确反映服务端对 Range 请求的真实响应。

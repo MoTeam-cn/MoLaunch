@@ -134,7 +134,7 @@ pub(super) async fn build_launch_config(
     };
 
     // 离线账号皮肤：根据用户选择的皮肤变体调整 UUID
-    // PCL2 方案 A：通过递增 UUID 末位让 MC 离线模式哈希到目标皮肤模型（Steve/Alex）
+    // 方案 A：通过递增 UUID 末位让 MC 离线模式哈希到目标皮肤模型（Steve/Alex）
     let auth_info = if is_legacy {
         match state.auth_storage.load().await {
             Ok(auth_state) => {

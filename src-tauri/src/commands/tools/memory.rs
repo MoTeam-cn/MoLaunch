@@ -18,7 +18,7 @@
 //!
 //! ## 平台实现
 //! - **Windows**：通过 `NtSetSystemInformation` + `SystemMemoryListInformation`
-//!   执行系统级内存操作（与 PCL2 方案一致）。
+//!   执行系统级内存操作。
 //! - **Linux**：调用 glibc 的 `malloc_trim(0)` 归还堆碎片给 OS。
 //! - **macOS**：调用 `malloc_zone_pressure_relief(NULL, 0)` 释放所有 malloc zone 的空闲内存。
 //!

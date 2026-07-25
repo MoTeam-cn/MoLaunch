@@ -77,7 +77,7 @@ pub fn generate_offline_uuid(username: &str) -> String {
 
 /// 调整离线 UUID 以匹配指定的皮肤变体
 ///
-/// 使用 PCL2 的判定方法：取 UUID 第 8/16/24/32 位十六进制字符，
+/// Minecraft 离线模式判定皮肤变体的方法：取 UUID 第 8/16/24/32 位十六进制字符，
 /// 将其异或后对 2 取模，结果为 0 对应 Steve（classic），为 1 对应 Alex（slim）。
 /// 通过暴力递增 UUID 末位十六进制字符，直到判定结果与目标变体一致。
 pub fn adjust_uuid_for_skin_variant(uuid: &str, slim: bool) -> String {
@@ -92,7 +92,7 @@ pub fn adjust_uuid_for_skin_variant(uuid: &str, slim: bool) -> String {
             .filter(|c| c.is_ascii_hexdigit())
             .collect();
 
-        // PCL2 方法：第 8/16/24/32 位 hex 异或后 mod 2
+        // 第 8/16/24/32 位 hex 异或后 mod 2
         let v = hex[7].to_digit(16).unwrap()
             ^ hex[15].to_digit(16).unwrap()
             ^ hex[23].to_digit(16).unwrap()

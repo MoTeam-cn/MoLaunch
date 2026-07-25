@@ -9,7 +9,7 @@
  * - 技术栈选型（Tauri 2 + Vue 3 + Rust）
  * - 启动器核心实现（版本管理、Java 检测、游戏启动）
  * - 联机模块（FRP 隧道集成）
- * - UI 设计理念（参考 PCL2 / Arco Design）
+ * - UI 设计理念（单列布局 / Arco Design 紧凑风格）
  * - 数据存储与安全（本地加密、设备 ID 绑定）
  */
 import { ref } from 'vue'
@@ -58,7 +58,7 @@ function toggle() {
             按版本号自动匹配最优运行时。联机功能内置 FRP 隧道客户端，通过 SDK 动态库
             （Windows dll / macOS dylib / Linux so，编译时嵌入二进制并释放到临时目录加载）
             创建隧道，无需用户手动配置端口映射。账号系统支持离线登录与微软登录，
-            凭据通过设备 ID 派生密钥加密后存储在本地。UI 设计参考 PCL2 的单列布局与
+            凭据通过设备 ID 派生密钥加密后存储在本地。UI 设计采用单列布局与
             Arco Design 的紧凑组件风格，自研 Select / Button / Tooltip 等组件以保持视觉一致性。
           </p>
         </div>
