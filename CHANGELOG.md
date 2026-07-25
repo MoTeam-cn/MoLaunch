@@ -9,6 +9,55 @@
 
 ### 变更
 
+#### 统一应用图标配置（favicon + Tauri 窗口图标）
+- 痛点：原 [index.html](index.html) 使用 Vite 默认的 `/vite.svg` 作为 favicon，且 Tauri 动态创建的窗口（插件窗口、微软登录窗口）未设置图标，标题栏显示系统默认图标
+- 修复：
+  - [index.html](index.html)：favicon 改为引用 [src/assets/logo.svg](src/assets/logo.svg)
+  - [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json)：`bundle.icon` 数组新增 `Images/logo.png`，作为 Tauri 应用打包图标与默认窗口图标来源
+  - [src-tauri/src/commands/plugins/window.rs](src-tauri/src/commands/plugins/window.rs)：插件子窗口创建时通过 `app.default_window_icon()` 复用默认图标
+  - [src-tauri/src/commands/auth/microsoft.rs](src-tauri/src/commands/auth/microsoft.rs)：微软登录窗口创建时同样复用默认图标
+- 效果：所有 Tauri 创建的窗口（主窗口、插件窗口、登录窗口）统一显示 `logo.png` 图标，favicon 显示 `logo.svg`
+
+#### 优化 Vite 构建的产物路径分类与文件名清理
+- 痛点：原构建产物所有文件混在 `dist/assets/` 根目录，且 Vue 组件 chunk 文件名带丑陋后缀（如 `AlertV2.vue_vue_type_script_setup_true_lang-xxx.js`）
+- 修复：在 [vite.config.ts](vite.config.ts) 的 `build.rollupOptions.output` 中配置：
+  - `entryFileNames: 'assets/js/[name]-[hash].js'` —— 入口 JS 统一输出到 `assets/js/`
+  - `chunkFileNames` 函数 —— 清理 Vue 组件的 `.vue_vue_type_script_setup_true_lang` 后缀，仅保留组件名
+  - `assetFileNames` 函数 —— 按扩展名分类：`.css` → `assets/css/`，`.js` → `assets/js/`，其他 → `assets/common/`
+- 效果：`dist/assets/` 下分类为 `js/`、`css/`、`common/` 三个子目录，文件名干净
+
+#### 禁用 Vite 资源内联（base64）避免污染 JS chunk
+- 痛点：Vite 默认 `assetsInlineLimit: 4096`，小于 4KB 的资源会被内联为 base64 到 JS，导致 JS chunk 体积膨胀且无法被浏览器缓存
+- 修复：在 [vite.config.ts](vite.config.ts) 设置 `assetsInlineLimit: 0`，所有资源一律输出为独立文件
+- 收益：Tauri 应用走本地文件系统加载，无 HTTP 请求开销，独立文件更利于缓存与调试
+
+#### 解决 Vite 5 资源双输出导致的冗余文件问题
+- 痛点：Vite 5.4.x 处理 webp 等资源时，无论用 `import.meta.glob` 还是静态 import，都会同时输出到 `assets/`（默认）和 `assetFileNames` 指定的子目录（如 `assets/common/`），导致同一份文件存在两份。JS 实际引用子目录下的文件，`assets/` 根目录下的文件无人引用
+- 根因：Vite 5.4 的 asset plugin 在处理 `import.meta.glob` 的 `?url` 模式导入的资源时，会在 `assetFileNames` 指定路径和默认 `assets/` 路径各 emit 一次。CSS/JS 走不同流程不受影响，仅图片等资源会双输出
+- 修复：在 [vite.config.ts](vite.config.ts) 的 `assetFileNames` 函数中，将图片等普通资源的输出路径设为 `assets/` 根目录（与默认输出位置一致），仅 CSS 输出到 `assets/css/`、JS 输出到 `assets/js/`。这样双输出位置相同，文件名带 hash 完全一致，第二份输出会覆盖第一份，最终只有一份文件
+- 效果：构建后 `dist/assets/` 根目录下 25 个 webp、25 个 png、1 个 jpg、1 个 svg，无冗余文件
+
+#### 优化 Vite 构建的 chunk 分离策略
+- 痛点：原构建产物中 `Home.js` 580KB、`Tools.js` 517KB、`index.js` 249KB，单个业务 chunk 堆积了大量第三方依赖（ol/skinview3d/three 等），导致首屏加载慢、缓存命中率低
+- 根因：`vite.config.ts` 未配置 `build.rollupOptions.output.manualChunks`，Rollup 默认把所有动态导入共享的依赖合并到入口 chunk
+- 修复：在 [vite.config.ts](vite.config.ts) 的 `build.rollupOptions.output.manualChunks` 中按「稳定性 + 用途」拆分第三方依赖：
+  - `vendor-vue`：Vue 框架核心（vue / vue-router / pinia / vue-demi / @vue/*）—— 109KB，几乎不变
+  - `vendor-tauri`：Tauri JS 桥接层（@tauri-apps/*）—— 20KB
+  - `vendor-ol`：OpenLayers 地图库及依赖（ol / rbush / quickselect）—— 324KB，仅 Tools 页加载
+  - `vendor-skinview3d`：3D 皮肤预览库及依赖（skinview3d / three / skinview-utils）—— 504KB，仅皮肤管理加载
+  - `vendor-heroicons`：Heroicons 图标库（650+ 图标文件）—— 48KB
+  - `vendor-misc`：其他第三方依赖兜底
+- 效果（生产构建对比）：
+  | Chunk | 修改前 | 修改后 |
+  |-------|-------|-------|
+  | Home.js | 580 KB | 75 KB（-87%）|
+  | Tools.js | 517 KB | 183 KB（-65%）|
+  | index.js | 249 KB | 108 KB（-57%）|
+- 收益：
+  - 首屏（Home 页）只加载 vendor-vue + vendor-tauri + vendor-heroicons + Home.js，不再下载 ol/skinview3d/three
+  - ol 和 skinview3d 改为按需加载（进入 Tools / 皮肤管理才下载）
+  - 第三方依赖独立 chunk，业务代码更新不会让浏览器重新下载 vendor
+
 #### 修复自定义布局底部"数据每 3 秒自动刷新"重复显示问题
 - 痛点：用户反馈主页右侧自定义布局内容区底部出现两个"数据每 3 秒自动刷新"提示
 - 根因：JSON/XML 示例文件已包含 `{ "type": "text", "content": "数据每 3 秒自动刷新" }` 的 text section，但 [CustomLayoutPanel.vue](src/plugins/custom-layout/CustomLayoutPanel.vue) 在 sections 渲染容器末尾又硬编码了一个相同的 `<p>数据每 3 秒自动刷新</p>`，导致重复
