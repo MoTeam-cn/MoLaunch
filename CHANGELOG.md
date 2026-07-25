@@ -9,6 +9,46 @@
 
 ### 变更
 
+#### 修复自定义布局底部"数据每 3 秒自动刷新"重复显示问题
+- 痛点：用户反馈主页右侧自定义布局内容区底部出现两个"数据每 3 秒自动刷新"提示
+- 根因：JSON/XML 示例文件已包含 `{ "type": "text", "content": "数据每 3 秒自动刷新" }` 的 text section，但 [CustomLayoutPanel.vue](src/plugins/custom-layout/CustomLayoutPanel.vue) 在 sections 渲染容器末尾又硬编码了一个相同的 `<p>数据每 3 秒自动刷新</p>`，导致重复
+- 修复：移除渲染面板中硬编码的提示行，让用户通过布局文件自行控制是否显示该提示（示例 JSON/XML 已示范）
+- 验证：删除一行 `<p>`，无逻辑变更，渲染流程不变
+
+#### 自定义布局支持一键填入示例模板
+- 痛点：用户反馈设置 - 个性化 - 自定义主页，要使用示例模板需先「导出文件 → 打开文件 → 复制内容 → 粘贴到内联编辑器」四步，繁琐不便
+- 修复：
+  - [CustomLayoutSection.vue](src/views/settings/personal/CustomLayoutSection.vue) 新增 `onFillTemplate` 函数：直接从后端读取当前格式的示例布局内容，填入内联编辑器并同步到 store
+  - 原「导出示例」按钮区改为「示例模板」区，包含两个按钮：
+    - 「填入模板」（仅 inline 模式显示）：直接填入到内联编辑器
+    - 「导出文件」：保留原导出文件功能
+  - 保护逻辑：
+    - 来源为 URL 时提示先切换到内联模式（URL 模式下内联编辑器不可见，不显示「填入模板」按钮）
+    - 内联编辑器已有内容时弹窗确认避免覆盖
+- 验证：ESLint 0 错误；文件 286 行（300 行限制内）
+
+#### 自定义布局新增 datetime 格式（修复最近启动时间未格式化问题）
+- 痛点：用户反馈设置 - 个性化 - 自定义主页右侧内容区，默认 JSON/XML 示例的"最近启动"列表直接显示后端返回的 RFC3339 时间字符串（如 `2026-07-25T23:13:05.728551100+08:00`），无法阅读
+- 根因：示例 JSON/XML 中 `launch_time` 字段使用 `format: "text"`，直接原样输出字符串；`formatValue` 函数也不支持时间格式化
+- 修复：
+  - [types.ts](src/plugins/custom-layout/types.ts)：`ValueFormat` 类型新增 `'datetime'`
+  - [parser.ts](src/plugins/custom-layout/parser.ts)：`VALID_FORMATS` 集合新增 `'datetime'`，使 JSON/XML 解析器接受该格式
+  - [datasource.ts](src/plugins/custom-layout/datasource.ts)：`formatValue` 新增 `datetime` 分支，调用新增的 `formatDateTime` 函数将 RFC3339 转为 `MM-DD HH:mm`（与 `LaunchHistoryPanel.vue` 的 `formatTime` 风格一致）
+  - [layout-sample.json](src-tauri/resources/samples/layout/layout-sample.json) / [layout-sample.xml](src-tauri/resources/samples/layout/layout-sample.xml)：`launch_time` 字段 `format` 从 `text` 改为 `datetime`
+- 验证：ESLint 0 错误
+
+#### 修复首页账号类型显示错误（外置登录误显示为离线账号）
+- 痛点：用户反馈首页启动面板顶部账号类型胶囊指示器，外置登录账号也显示为"离线账号"，且图标是手动 SVG 绘制
+- 根因：[LaunchPanel.vue](src/components/home/LaunchPanel.vue) 的 `accountTypeLabel` 只判断了 `Microsoft` 和"其他"，把 `AuthlibInjector` 也归到了"离线账号"；图标使用内联 SVG 而非项目统一的 Heroicons 组件库
+- 修复：
+  - 将 `accountTypeLabel` 重构为 `accountTypeMeta`，三分流返回 `{ label, icon, color }`
+    - Microsoft 正版账号：`ShieldCheckIcon`，`text-primary-600`，"正版账号"
+    - AuthlibInjector 外置账号：`ServerStackIcon`，`text-purple-600`，"外置账号"
+    - Legacy 离线账号：`UserIcon`，`text-gray-400`，"离线账号"
+    - 未登录：`UserIcon`，`text-gray-400`，"未登录"
+  - 模板用 `<component :is="accountTypeMeta.icon">` 渲染 Heroicons 图标，移除两段内联 SVG
+- 验证：ESLint 0 错误
+
 #### 彻底修复 Tauri callback 丢失警告（全局单例 listener 方案）
 - 痛点：上一轮修复（`isMounted` 检查 + `cancelPreloadModsDetail` abort 后台 task）后，用户反馈 Mod 管理 ↔ 设置 tab 切换仍触发 `[TAURI] Couldn't find callback id xxx` 警告
 - 根因：Tauri 2.x `unlisten` 的固有竞态无法通过前端 `isMounted` 检查消除
