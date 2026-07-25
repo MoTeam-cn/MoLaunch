@@ -9,6 +9,41 @@
 
 ### 变更
 
+#### 彻底修复 Tauri callback 丢失警告（全局单例 listener 方案）
+- 痛点：上一轮修复（`isMounted` 检查 + `cancelPreloadModsDetail` abort 后台 task）后，用户反馈 Mod 管理 ↔ 设置 tab 切换仍触发 `[TAURI] Couldn't find callback id xxx` 警告
+- 根因：Tauri 2.x `unlisten` 的固有竞态无法通过前端 `isMounted` 检查消除
+  - `_unlisten` 先同步删除前端 callback（`callbacks.delete(id)`），再异步通知 Rust 删 listener
+  - 两步之间 Rust 的 `emit` 会调用已删除的 callback id → 警告
+  - `image-cached` 事件是最主要触发源：`image_cache::spawn_download` 是独立 `tokio::spawn`，不受 `cancelPreloadModsDetail` 控制，ModTab 卸载后图片下载 task 仍在运行并 emit
+  - `mods-preload-update`/`mods-preload-done`/`mods-dir-changed` 同样存在竞态窗口
+- 修复方案（全局单例 listener，彻底绕开 `unlisten` 竞态）：
+  - 新增 [useGlobalTauriEvent.ts](src/composables/useGlobalTauriEvent.ts)：为每个事件名维护一个全局单例 Tauri listener（永不 `unlisten`），组件通过 `onGlobalEvent` 注册 handler 到本地 `Set`，`onUnmounted` 仅从 Set 移除 handler，Tauri listener 保留 → 无 callback 删除竞态
+  - [useImageCache.ts](src/composables/useImageCache.ts)：`onImageCached` 改用 `onGlobalEvent`，`image-cached` 事件的单例 listener 全局存活
+  - [useModsPreload.ts](src/composables/useModsPreload.ts)：`mods-preload-update`/`mods-preload-done` 改用 `onGlobalEvent`，移除 `listen`/`unlisten`/`isMounted` 逻辑，`startListener`/`stopListener` 保留为 no-op 兼容旧调用方
+  - [useModList.ts](src/composables/useModList.ts)：`mods-dir-changed` 改用 `onGlobalEvent`，移除 `useTauriEvent` 依赖
+  - `useTauriEvent.ts` 保留但不再被任何文件引用（适合不需要全局单例的场景）
+- 效果：Tauri listener 永不 unlisten → Rust `emit` 永远能找到 callback → 警告彻底消除
+
+#### 修复 Mod 管理 / 设置 tab 来回切换触发 Tauri callback 丢失警告
+- 痛点：用户反馈在版本设置页 Mod 管理和设置两个侧边菜单来回切换，会触发 `[TAURI] Couldn't find callback id xxx. This might happen when the app is reloaded while Rust is running an asynchronous operation.` 警告
+- 根因分析（Tauri 2.x 官方 `_unlisten` 实现存在固有竞态 + 项目 listener 泄漏）：
+  - Tauri 2.x 的 `_unlisten` 是"先同步删前端 callback、再异步通知 Rust 删 listener"，两步之间 Rust 端的 `emit` 会调用已删除的 callback id 触发警告
+  - 项目 `preload_mods_detail_cmd` 内部 `tokio::spawn` 后台 task 持续 emit `mods-preload-update`/`mods-preload-done`，`watch_mods_dir` 的防抖线程持续 emit `mods-dir-changed`
+  - `useModsPreload` 完全没有 `onUnmounted` 自动清理，依赖外部手动调用 `stopListener`，容易遗漏
+  - `useTauriEvent` 和 `useModsPreload` 的 `start()` 是 async 但调用方 fire-and-forget，如果 `await listen` 期间组件已卸载，`stop()` 看到 `unlisten === null` 直接返回，listener 泄漏
+  - `useModList.init()` 异步链中 fire-and-forget 调用 `watchModsDir`/`preloadModsDetail`，组件卸载后仍会触发 `tokio::spawn` 后台 task
+- 修复方案（前端 P0 最小修复）：
+  - [useTauriEvent.ts](src/composables/useTauriEvent.ts)：新增 `isMounted` 标志，`start()` 的 `await listen` 完成后检查 `isMounted`，若已卸载立即 `unlisten()` 新句柄避免泄漏；handler 内部也检查 `isMounted` 跳过卸载后的回调
+  - [useModsPreload.ts](src/composables/useModsPreload.ts)：补上 `onUnmounted(() => stopListener())` 自动清理（之前完全依赖外部调用，是最大漏洞）；同样加 `isMounted` 检查，两个 `await listen` 之间窗口期也能正确 unlisten 新句柄
+  - [useModList.ts](src/composables/useModList.ts)：`init()` 在每个 `await` 后检查 `isMounted`，组件卸载后不再继续触发 fire-and-forget invoke（特别是 `preloadModsDetail` 会 spawn 后台 task 持续 emit）；`onUnmounted` 中设置 `isMounted = false`
+- 修复方案（后端 P1 根治，彻底切断 emit 源）：
+  - [preload.rs](src-tauri/src/commands/version/preload.rs)：新增全局 `CURRENT_PRELOAD: OnceLock<Mutex<Option<AbortHandle>>>` 保存当前 spawn task 的 AbortHandle；`preload_mods_detail_cmd` spawn 前 `abort_current_preload()` 取消旧 task（避免多个 task 并发 emit）；新增 `cancel_preload_mods_detail_cmd` 命令供前端卸载时调用
+  - [version_install_manager.rs](src-tauri/src/utils/version_install_manager.rs)：注册 `cancel_preload_mods_detail_cmd` action（无参数无 state，handler 用 `_state, _app, _params`）
+  - [version-install-manager.ts](src/utils/api/version-install-manager.ts)：新增 `CANCEL_PRELOAD_MODS_DETAIL_CMD` action 常量
+  - [personalization.ts](src/utils/api/personalization.ts)：新增 `cancelPreloadModsDetail()` 函数封装
+  - [useModList.ts](src/composables/useModList.ts)：`onUnmounted` 调用 `tauri.cancelPreloadModsDetail()` abort 后台 task，task 在下一个 await 点终止，不再 emit 给已注销的 listener
+- 验证：`cargo check` 0 错误 0 警告；`eslint` 0 错误（修改文件无新增警告）
+
 #### 导出功能添加进度条 + 固定底栏导出按钮
 - 痛点：用户反馈导出过程只有按钮转圈，看不到具体进度；且导出按钮在页面底部，需要滚动到底才能点击，体验不佳
 - 后端改动（进度事件推送）：
