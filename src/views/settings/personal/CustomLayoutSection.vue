@@ -9,13 +9,15 @@ import { usePluginStore } from '@/stores/plugins'
 import { writeTextFile } from '@/utils/api/system'
 import { readLayoutSample } from '@/utils/api/plugins'
 import { pickSavePath } from '@/utils/fileDialog'
-import { toastInfo, toastSuccess, toastError } from '@/utils/toast'
+import { toastInfo, toastSuccess, toastError, toastWarning } from '@/utils/toast'
+import { showConfirm } from '@/utils/modal'
 import Select from '@/components/common/Select.vue'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import {
   ArrowPathIcon,
   ArrowDownTrayIcon,
+  DocumentArrowDownIcon,
 } from '@heroicons/vue/24/outline'
 
 const pluginStore = usePluginStore()
@@ -141,6 +143,48 @@ async function onExportSampleLayout() {
   }
 }
 
+/**
+ * 填入示例模板到内联编辑器
+ *
+ * 直接从后端读取当前格式的示例布局内容，填入内联编辑器并同步到 store，
+ * 省去用户「导出文件 → 打开文件 → 复制内容 → 粘贴到编辑器」的繁琐流程。
+ *
+ * 保护逻辑：
+ * - 来源为 URL 时提示先切换到内联模式（URL 模式下内联编辑器不可见）
+ * - 内联编辑器已有内容时弹窗确认避免覆盖
+ */
+const fillingTemplate = ref(false)
+async function onFillTemplate() {
+  if (customConfig.value.source !== 'inline') {
+    toastWarning('请先切换内容来源为「内联」模式')
+    return
+  }
+  if (inlineContentDraft.value.trim()) {
+    const confirmed = await new Promise<boolean>((resolve) => {
+      showConfirm(
+        '覆盖现有内容',
+        '内联编辑器中已有内容，填入模板将覆盖现有内容，是否继续？',
+        () => resolve(true),
+        () => resolve(false),
+      )
+    })
+    if (!confirmed) return
+  }
+
+  fillingTemplate.value = true
+  try {
+    const content = await readLayoutSample(customConfig.value.format)
+    inlineContentDraft.value = content
+    if (inlineSyncTimer) clearTimeout(inlineSyncTimer)
+    await pluginStore.setCustomLayoutConfig({ inlineContent: content })
+    toastSuccess('已填入示例模板')
+  } catch (e) {
+    toastError('填入示例失败：' + e)
+  } finally {
+    fillingTemplate.value = false
+  }
+}
+
 onMounted(() => {
   initInlineDraft()
 })
@@ -178,18 +222,30 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 导出示例文件（开发者测试用） -->
+    <!-- 示例模板操作（填入内联编辑器 / 导出文件） -->
     <div class="flex items-center justify-between rounded border border-dashed border-gray-300 bg-white/50 px-3 py-2">
       <div class="min-w-0">
-        <p class="text-xs font-medium text-gray-700">导出示例布局文件</p>
+        <p class="text-xs font-medium text-gray-700">示例模板（{{ customConfig.format.toUpperCase() }}）</p>
         <p class="mt-0.5 text-[11px] text-gray-400">
-          导出当前格式（{{ customConfig.format.toUpperCase() }}）的示例文件供开发者测试调试
+          填入到内联编辑器快速开始，或导出为文件供外部编辑
         </p>
       </div>
-      <Button type="outline" size="small" @click="onExportSampleLayout">
-        <ArrowDownTrayIcon class="mr-1 h-3.5 w-3.5" />
-        导出示例
-      </Button>
+      <div class="flex flex-none gap-2">
+        <Button
+          v-if="customConfig.source === 'inline'"
+          type="outline"
+          size="small"
+          :disabled="fillingTemplate"
+          @click="onFillTemplate"
+        >
+          <DocumentArrowDownIcon class="mr-1 h-3.5 w-3.5" />
+          填入模板
+        </Button>
+        <Button type="outline" size="small" @click="onExportSampleLayout">
+          <ArrowDownTrayIcon class="mr-1 h-3.5 w-3.5" />
+          导出文件
+        </Button>
+      </div>
     </div>
 
     <!-- 内联编辑器 -->
