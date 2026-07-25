@@ -460,8 +460,6 @@ onUnmounted(() => {
             class="w-full overflow-hidden rounded-md border border-gray-200"
           />
         </template>
-
-        <p class="pt-1 text-xs text-gray-400">数据每 3 秒自动刷新</p>
       </div>
     </template>
   </div>
