@@ -96,6 +96,11 @@ pub async fn plugin_create_window(
             .title(&title)
             .inner_size(w, h);
 
+    // 应用默认窗口图标（来自 tauri.conf.json 的 bundle.icon 中的 PNG）
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone()).map_err(|e| e.to_string())?;
+    }
+
     if !win_perms.resizable {
         builder = builder.resizable(false);
     }
