@@ -21,7 +21,7 @@ export function useAccountCards() {
   const currentIndex = ref(0)
 
   /**
-   * 账号卡片列表（微软账号 + 离线账号，顺序稳定）
+   * 账号卡片列表（微软账号 + 离线账号 + authlib 账号，顺序稳定）
    *
    * 关键：cards 的顺序不随 currentUser 变化而重排，
    * 当前账号通过 isActive=true 标记，这样切换账号时 currentIndex 指向稳定不变。
@@ -49,12 +49,24 @@ export function useAccountCards() {
         isActive: acc.uuid === currentUuid,
       })
     }
+    // authlib 外置登录账号
+    for (const acc of authStore.authlibAccounts) {
+      list.push({
+        uuid: acc.uuid,
+        username: acc.player_name,
+        loginType: '外置',
+        isActive: acc.uuid === currentUuid,
+        serverName: acc.server_name,
+        serverUrl: acc.server_url,
+      })
+    }
     // 如果当前账号不在任何列表里（理论上不应发生），追加到末尾
     if (authStore.currentUser && !list.some(c => c.uuid === currentUuid)) {
+      const loginType = authStore.currentUser.login_type
       list.push({
         uuid: authStore.currentUser.uuid,
         username: authStore.currentUser.name,
-        loginType: authStore.currentUser.login_type === 'Microsoft' ? '正版' : '离线',
+        loginType: loginType === 'Microsoft' ? '正版' : loginType === 'AuthlibInjector' ? '外置' : '离线',
         isActive: true,
       })
     }
@@ -70,7 +82,10 @@ export function useAccountCards() {
   const currentUsername = computed(() => authStore.currentUser?.name ?? '')
   const currentLoginType = computed(() => {
     if (!authStore.currentUser) return ''
-    return authStore.currentUser.login_type === 'Microsoft' ? '正版账号' : '离线账号'
+    const t = authStore.currentUser.login_type
+    if (t === 'Microsoft') return '正版账号'
+    if (t === 'AuthlibInjector') return '外置账号'
+    return '离线账号'
   })
 
   /**
@@ -78,12 +93,18 @@ export function useAccountCards() {
    *
    * 首次加载或账号列表变化时，把 currentIndex 移到 active 卡片。
    * 切换账号时 cards 顺序稳定，currentIndex 不变。
+   *
+   * 关键：当 currentIndex 指向"添加账号"卡片（末尾）时，currentCard 是 undefined，
+   * 不能因此误判为"未指向 active 卡片"而强制重置——用户主动切到"添加账号"
+   * 卡片后应停留在那里，等点击按钮跳转登录页。
    */
   watch(cards, (newCards) => {
     const total = newCards.length + (hasAddCard.value ? 1 : 0)
     if (currentIndex.value >= total) {
       currentIndex.value = Math.max(0, total - 1)
     }
+    // 用户主动停在"添加账号"卡片时，不要因账号列表变化把它拉回 active 卡片
+    if (currentIndex.value === newCards.length) return
     // 如果当前索引不是 active 卡片，且存在 active 卡片，移过去
     const currentCard = newCards[currentIndex.value]
     const activeIndex = newCards.findIndex(c => c.isActive)
@@ -127,6 +148,14 @@ export function useAccountCards() {
     try {
       if (loginType === '正版') {
         await authStore.switchMsAccount(targetUuid)
+      } else if (loginType === '外置') {
+        // authlib 账号需要 server_url + uuid 双键定位
+        const card = cards.value.find(c => c.uuid === targetUuid && c.loginType === '外置')
+        if (card?.serverUrl) {
+          await authStore.switchAuthlibAccount(card.serverUrl, targetUuid)
+        } else {
+          toastWarning('未找到该外置账号的服务器信息')
+        }
       } else {
         await authStore.switchOfflineAccount(targetUuid)
       }
@@ -146,6 +175,13 @@ export function useAccountCards() {
     try {
       if (loginType === '正版') {
         await authStore.removeMsAccount(targetUuid)
+      } else if (loginType === '外置') {
+        const card = cards.value.find(c => c.uuid === targetUuid && c.loginType === '外置')
+        if (card?.serverUrl) {
+          await authStore.removeAuthlibAccount(card.serverUrl, targetUuid)
+        } else {
+          toastWarning('未找到该外置账号的服务器信息')
+        }
       } else {
         await authStore.removeOfflineAccount(targetUuid)
       }
@@ -160,6 +196,8 @@ export function useAccountCards() {
   onMounted(() => {
     authStore.loadMsAccounts()
     authStore.loadOfflineAccounts()
+    // authlib 账号也需要加载，否则外置登录账号不显示在卡片栏
+    authStore.loadAuthlibAccounts()
   })
 
   return {

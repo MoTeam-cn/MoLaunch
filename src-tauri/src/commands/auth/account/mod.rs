@@ -7,9 +7,9 @@
 //!   save_custom_skin / remove_offline_account / switch_offline_account）
 //! - session.rs: 会话命令（get_login_status / logout）
 //!
-//! 注意：所有 #[tauri::command] 命令分散到 ms/offline/session 子模块，
-//! tauri::command 宏在定义处生成 __cmd__ 符号，不能通过 pub use 重导出，
-//! 故 lib.rs 使用完整路径注册（commands::auth::account::ms::* / ::offline::* / ::session::*）
+//! 注：原 `#[tauri::command]` 标注已移除，所有函数改为接收 `&AppState`，
+//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
+//! `utils::meta_manager::dispatch` 分发调用。
 
 pub mod ms;
 pub mod offline;

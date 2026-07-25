@@ -61,7 +61,22 @@ async function onCardLogout(card: AccountCardData, event: Event) {
   }
 }
 
-function addAccount() { router.push({ path: '/login', query: { add: '1' } }) }
+/**
+ * 跳转到登录页添加新账号
+ *
+ * 关键：query 带 add=1，路由守卫据此放行已登录用户进入 /login
+ * （否则守卫会把已登录用户重定向回 /apps，表现为"点击没反应"）
+ *
+ * 添加错误捕获：Vue Router 4 中 router.push 若被守卫拒绝会静默 resolve，
+ * 这里手动捕获 NavigationFailure 并打印，便于排查"点击没反应"类问题。
+ */
+async function addAccount() {
+  try {
+    await router.push({ path: '/login', query: { add: '1' } })
+  } catch (err) {
+    console.error('[AccountSelector] 跳转登录页失败:', err)
+  }
+}
 
 // 拖动/滚轮导航（onSwitch 回调即 switchTo，switchTo 内部自带 switching 检查）
 const {

@@ -1,8 +1,10 @@
 /**
  * 皮肤与披风管理 API
+ *
+ * 注：底层已聚合为 `skin_manager` 单一 IPC 入口，通过 `action` 字段分发。
  */
 
-import { invoke } from '@tauri-apps/api/core'
+import { SKIN_ACTIONS, skinManager } from './skin-manager'
 import type { CachedImage } from './image-cache'
 
 export interface SkinInfo {
@@ -38,7 +40,7 @@ export interface SkinCapeInfo {
  * 获取当前账号的皮肤/披风信息
  */
 export async function getSkinCapeInfo(): Promise<SkinCapeInfo> {
-  return await invoke<SkinCapeInfo>('get_skin_cape_info')
+  return skinManager<SkinCapeInfo>(SKIN_ACTIONS.GET_SKIN_CAPE_INFO)
 }
 
 /**
@@ -52,7 +54,7 @@ export async function getSkinCapeInfo(): Promise<SkinCapeInfo> {
  * - cached: false 表示远程 URL，后端会异步下载，完成后 emit 'image-cached' 事件
  */
 export async function getSkinUrl(uuid?: string): Promise<CachedImage | null> {
-  return await invoke<CachedImage | null>('get_skin_url', { uuid: uuid ?? null })
+  return skinManager<CachedImage | null>(SKIN_ACTIONS.GET_SKIN_URL, { uuid: uuid ?? null })
 }
 
 /**
@@ -61,7 +63,7 @@ export async function getSkinUrl(uuid?: string): Promise<CachedImage | null> {
  * 返回 CachedImage，同 getSkinUrl
  */
 export async function getCapeUrl(): Promise<CachedImage | null> {
-  return await invoke<CachedImage | null>('get_cape_url')
+  return skinManager<CachedImage | null>(SKIN_ACTIONS.GET_CAPE_URL)
 }
 
 /**
@@ -71,7 +73,7 @@ export async function getCapeUrl(): Promise<CachedImage | null> {
  * 用户选择保存位置后，后端直接从 URL 下载并写入文件。
  */
 export async function downloadUrlToFile(url: string, path: string): Promise<void> {
-  return await invoke<void>('download_url_to_file', { url, path })
+  return skinManager<void>(SKIN_ACTIONS.DOWNLOAD_URL_TO_FILE, { url, path })
 }
 
 /**
@@ -80,19 +82,19 @@ export async function downloadUrlToFile(url: string, path: string): Promise<void
  * @param variant 'classic' (Steve) 或 'slim' (Alex)
  */
 export async function uploadSkin(filePath: string, variant: 'classic' | 'slim'): Promise<void> {
-  return await invoke<void>('upload_skin', { filePath, variant })
+  return skinManager<void>(SKIN_ACTIONS.UPLOAD_SKIN, { filePath, variant })
 }
 
 /**
  * 装备披风
  */
 export async function equipCape(capeId: string): Promise<void> {
-  return await invoke<void>('equip_cape', { capeId })
+  return skinManager<void>(SKIN_ACTIONS.EQUIP_CAPE, { capeId })
 }
 
 /**
  * 取消披风
  */
 export async function unequipCape(): Promise<void> {
-  return await invoke<void>('unequip_cape')
+  return skinManager<void>(SKIN_ACTIONS.UNEQUIP_CAPE)
 }

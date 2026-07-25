@@ -1,5 +1,6 @@
 //! 认证模块
 
+pub mod authlib;
 pub mod microsoft;
 pub mod storage;
 

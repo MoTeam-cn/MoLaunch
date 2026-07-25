@@ -3,8 +3,10 @@
 //! `save_custom_skin` 将用户选择的 PNG 复制到 `<app_data>/custom_skins/<uuid>.png`，
 //! 并把 `custom:<path>|<variant>` 写入离线账号的 skin 字段。包含 PNG 文件头校验和
 //! 1MB 大小限制（比 Mojang 官方 24KB 宽松，因本地使用）。
-
-use tauri::State;
+//!
+//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState`，
+//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
+//! `utils::meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -14,9 +16,8 @@ use crate::state::{AppState, LocalAuthResult};
 use super::OfflineAccountInfo;
 
 /// 获取已存储的离线账号列表
-#[tauri::command]
 pub async fn get_offline_accounts(
-    state: State<'_, AppState>,
+    state: &AppState,
 ) -> Result<Vec<OfflineAccountInfo>, String> {
     log_info!("[Startup][IPC] get_offline_accounts called");
     let persisted = state
@@ -36,9 +37,8 @@ pub async fn get_offline_accounts(
 }
 
 /// 设置离线账号的皮肤选择
-#[tauri::command]
 pub async fn set_offline_skin(
-    state: State<'_, AppState>,
+    state: &AppState,
     uuid: String,
     skin: Option<String>,
 ) -> Result<(), String> {
@@ -54,9 +54,8 @@ pub async fn set_offline_skin(
 ///
 /// 将用户选择的 PNG 文件复制到 `<app_data>/custom_skins/<uuid>.png`，
 /// 然后把 `custom:<path>|<variant>` 写入离线账号的 skin 字段。
-#[tauri::command]
 pub async fn save_custom_skin(
-    state: State<'_, AppState>,
+    state: &AppState,
     uuid: String,
     file_path: String,
     variant: Option<String>,
@@ -106,9 +105,8 @@ pub async fn save_custom_skin(
 }
 
 /// 删除已存储的离线账号
-#[tauri::command]
 pub async fn remove_offline_account(
-    state: State<'_, AppState>,
+    state: &AppState,
     uuid: String,
 ) -> Result<(), String> {
     log_info!("Removing offline account: {}", uuid);
@@ -120,9 +118,8 @@ pub async fn remove_offline_account(
 }
 
 /// 切换到已存储的离线账号
-#[tauri::command]
 pub async fn switch_offline_account(
-    state: State<'_, AppState>,
+    state: &AppState,
     uuid: String,
 ) -> Result<LocalAuthResult, String> {
     log_info!("Switching to offline account: {}", uuid);
@@ -141,6 +138,8 @@ pub async fn switch_offline_account(
         client_token: account.uuid.clone(),
         login_type: "Legacy".to_string(),
         profile_json: None,
+        server_url: None,
+        server_name: None,
     };
 
     // 更新当前用户（持久化）
@@ -159,6 +158,8 @@ pub async fn switch_offline_account(
             profile_json: None,
             refresh_token: None,
             expires_at: None,
+            server_url: None,
+            server_name: None,
         });
         state
             .auth_storage

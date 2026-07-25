@@ -33,9 +33,22 @@ export function useSwipeNavigation(
     // 只响应主键（左键）或触摸
     if (e.button !== 0 && e.pointerType === 'mouse') return
     // 如果 pointerdown 起源于交互元素（按钮/链接/输入框等），跳过拖拽处理，
-    // 让 click 事件正常派发到按钮，避免 setPointerCapture 劫持点击导致按钮无响应
-    const target = e.target as Element | null
-    if (target?.closest('button, a, input, select, textarea, [role="button"]')) return
+    // 让 click 事件正常派发到按钮，避免 setPointerCapture 劫持点击导致按钮无响应。
+    // 使用 composedPath 而非 target.closest，因为 SVG 子元素（如 <path>）的 closest
+    // 在某些 WebView 中可能不跨越 SVG-HTML 边界，导致按钮点击被错误识别为拖拽。
+    const path = e.composedPath()
+    for (const el of path) {
+      if (!(el instanceof Element)) continue
+      const tag = el.tagName.toLowerCase()
+      if (
+        tag === 'button' ||
+        tag === 'a' ||
+        tag === 'input' ||
+        tag === 'select' ||
+        tag === 'textarea' ||
+        el.getAttribute('role') === 'button'
+      ) return
+    }
     isDragging.value = true
     isAnimating.value = false
     dragMoved.value = false

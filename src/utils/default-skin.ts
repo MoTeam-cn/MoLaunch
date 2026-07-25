@@ -44,6 +44,15 @@ export const defaultSkins: DefaultSkinEntry[] = [
 ]
 
 /**
+ * Steve 默认皮肤 URL
+ *
+ * 用于外置账号（AuthlibInjector）未在皮肤站设置皮肤时的顶替，
+ * 与 yggdrasil 协议"未设置皮肤时服务器按 Steve 处理"的行为一致。
+ * 离线/微软账号仍按 UUID hash 分配默认皮肤（见 `getDefaultSkin`）。
+ */
+export const STEVE_SKIN_URL: string = SteveSkin
+
+/**
  * 内存缓存：uuid → 皮肤名称
  *
  * 由 auth store 在 loadOfflineAccounts 后调用 syncOfflineSkins 填充。

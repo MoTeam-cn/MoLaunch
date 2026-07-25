@@ -1,11 +1,16 @@
 //! 皮肤管理命令
 //!
-//! 提供 Tauri 命令接口，供前端调用：
+//! 提供皮肤/披风管理的子模块函数，供 `skin_manager` dispatcher 调用：
 //! - 获取皮肤/披风信息
 //! - 获取皮肤/披风 PNG 下载 URL（带本地缓存，方案 C）
 //! - 上传皮肤
 //! - 装备/取消披风
 //! - 下载 URL 图片到本地文件
+//!
+//! 注：原 7 个分散的 skin Tauri 命令已聚合为 `skin_manager` 一个 IPC 入口，
+//! 通过请求体的 `action` 字段分发到各子模块函数。
+//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState` / `&AppHandle`，
+//! 由 `utils::skin_manager::dispatch` 反序列化参数后调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -13,17 +18,35 @@ use crate::log_warn;
 use crate::minecraft::image_cache::{self, CachedImage};
 use crate::minecraft::skin;
 use crate::state::AppState;
+use crate::utils::dispatcher::ActionRequest;
 use tauri::{AppHandle, State};
+
+/// 统一皮肤管理 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::skin_manager::dispatch` 进行 action 分发。
+#[tauri::command]
+pub async fn skin_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::skin_manager::dispatch(state, app, req).await
+}
+
+// ============================================================
+// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
+// ============================================================
 
 /// 获取当前账号的皮肤/披风信息（从 profile_json 解析）
 ///
 /// 返回前会对每个 skin/cape 的 url 做缓存处理，填充 cached_url 和 cached 字段：
 /// - 缓存命中：cached_url 为 cache-image:// 本地 URL，cached: true
 /// - 缓存未命中：cached_url 为远程 URL，cached: false，后端异步下载完成后 emit image-cached 事件
-#[tauri::command]
 pub async fn get_skin_cape_info(
-    state: State<'_, AppState>,
-    app: AppHandle,
+    state: &AppState,
+    app: &AppHandle,
 ) -> Result<skin::SkinCapeInfo, String> {
     let auth = state.auth.lock().await;
     let profile_json = auth
@@ -61,10 +84,9 @@ pub async fn get_skin_cape_info(
 /// 返回 `CachedImage`：
 /// - `cached: true` 表示返回的是本地缓存 URL（无需网络）
 /// - `cached: false` 表示返回的是远程 URL，后端会异步下载到缓存，完成后 emit `image-cached` 事件
-#[tauri::command]
 pub async fn get_skin_url(
-    state: State<'_, AppState>,
-    app: AppHandle,
+    state: &AppState,
+    app: &AppHandle,
     uuid: Option<String>,
 ) -> Result<Option<CachedImage>, String> {
     let auth = state.auth.lock().await;
@@ -104,7 +126,7 @@ pub async fn get_skin_url(
 
     let remote_url = skin::get_skin_url(&profile_json);
     match remote_url {
-        Some(url) => Ok(Some(image_cache::get_image_url(&url, Some(app)).await)),
+        Some(url) => Ok(Some(image_cache::get_image_url(&url, Some(app.clone())).await)),
         None => Ok(None),
     }
 }
@@ -114,10 +136,9 @@ pub async fn get_skin_url(
 /// 返回 `CachedImage`：
 /// - `cached: true` 表示返回的是本地缓存 URL（无需网络）
 /// - `cached: false` 表示返回的是远程 URL，后端会异步下载到缓存，完成后 emit `image-cached` 事件
-#[tauri::command]
 pub async fn get_cape_url(
-    state: State<'_, AppState>,
-    app: AppHandle,
+    state: &AppState,
+    app: &AppHandle,
 ) -> Result<Option<CachedImage>, String> {
     let auth = state.auth.lock().await;
     let profile_json = auth
@@ -129,7 +150,7 @@ pub async fn get_cape_url(
     drop(auth);
 
     match remote_url {
-        Some(url) => Ok(Some(image_cache::get_image_url(&url, Some(app)).await)),
+        Some(url) => Ok(Some(image_cache::get_image_url(&url, Some(app.clone())).await)),
         None => Ok(None),
     }
 }
@@ -138,9 +159,8 @@ pub async fn get_cape_url(
 ///
 /// `variant`: "classic"（Steve 模型）或 "slim"（Alex 模型）
 /// `file_path`: PNG 文件本地路径（后端直接读取，避免前端 base64 转换）
-#[tauri::command]
 pub async fn upload_skin(
-    state: State<'_, AppState>,
+    state: &AppState,
     file_path: String,
     variant: String,
 ) -> Result<(), String> {
@@ -190,8 +210,7 @@ pub async fn upload_skin(
 }
 
 /// 装备披风
-#[tauri::command]
-pub async fn equip_cape(state: State<'_, AppState>, cape_id: String) -> Result<(), String> {
+pub async fn equip_cape(state: &AppState, cape_id: String) -> Result<(), String> {
     let access_token = {
         let auth = state.auth.lock().await;
         auth.current_user
@@ -227,8 +246,7 @@ pub async fn equip_cape(state: State<'_, AppState>, cape_id: String) -> Result<(
 }
 
 /// 取消披风
-#[tauri::command]
-pub async fn unequip_cape(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn unequip_cape(state: &AppState) -> Result<(), String> {
     let access_token = {
         let auth = state.auth.lock().await;
         auth.current_user
@@ -271,7 +289,6 @@ pub async fn unequip_cape(state: State<'_, AppState>) -> Result<(), String> {
 /// 特殊处理：当 URL 为 `cache-image.localhost` 或 `cache-image://` 格式时，
 /// 这是 Tauri WebView 内部虚拟 URL（由 register_uri_scheme_protocol 注册），
 /// 后端 reqwest 无法访问。此时直接从本地缓存文件读取。
-#[tauri::command]
 pub async fn download_url_to_file(url: String, path: String) -> Result<(), String> {
     log_info!("[Skin] 下载 URL 到文件: {} -> {}", url, path);
 

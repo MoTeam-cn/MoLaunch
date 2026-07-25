@@ -4,17 +4,32 @@
  * - 头像 + 用户名 + 类型/状态 + 皮肤/登出按钮
  * - 纯展示组件，所有操作通过 emit 上抛由父组件处理
  */
+import { computed } from 'vue'
 import SkinAvatar from '@/components/common/SkinAvatar.vue'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import type { AccountCardData } from './types'
 
-defineProps<{ card: AccountCardData }>()
+const props = defineProps<{ card: AccountCardData }>()
 
 const emit = defineEmits<{
   skin: [card: AccountCardData]
   logout: [card: AccountCardData, event: Event]
 }>()
+
+/**
+ * 将中文登录类型映射为 SkinAvatar 使用的内部标识
+ *
+ * SkinAvatar 据此分支选择皮肤加载策略：
+ * - 'Microsoft'：从后端 profile_json 解析（微软账号）
+ * - 'AuthlibInjector'：调用 authlibGetSkinInfo 从 yggdrasil 服务器拉取（外置账号）
+ * - 'Offline'：使用本地默认皮肤（离线账号）
+ */
+const avatarLoginType = computed(() => {
+  if (props.card.loginType === '正版') return 'Microsoft'
+  if (props.card.loginType === '外置') return 'AuthlibInjector'
+  return 'Offline'
+})
 </script>
 
 <template>
@@ -25,7 +40,7 @@ const emit = defineEmits<{
         ? 'border-primary-500 bg-primary-50'
         : 'border-gray-200 bg-white hover:border-primary-300'"
     >
-      <!-- 头像（双层立体头像，离线账号显示默认皮肤） -->
+      <!-- 头像（双层立体头像，外置账号从 yggdrasil 服务器拉取皮肤） -->
       <div class="mb-3 flex justify-center">
         <SkinAvatar
           :uuid="card.uuid"
@@ -33,13 +48,22 @@ const emit = defineEmits<{
           :size="96"
           :overlay="true"
           :rounded="false"
-          :login-type="card.loginType === '正版' ? 'Microsoft' : 'Offline'"
+          :login-type="avatarLoginType"
+          :server-url="card.serverUrl ?? ''"
         />
       </div>
 
       <!-- 用户名 -->
       <div class="truncate text-center text-base font-medium" :class="card.isActive ? 'text-primary-700' : 'text-gray-800'">
         {{ card.username }}
+      </div>
+
+      <!-- 服务器副标题（仅外置登录账号显示） -->
+      <div
+        v-if="card.loginType === '外置' && card.serverName"
+        class="mt-0.5 truncate text-center text-xs text-gray-400"
+      >
+        {{ card.serverName }}
       </div>
 
       <!-- 账号类型 + 状态 -->

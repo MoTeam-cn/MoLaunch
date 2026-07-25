@@ -17,8 +17,9 @@
 
 import { ref, watch, computed, onMounted } from 'vue'
 import { getSkinUrl } from '@/utils/tauri'
+import { authlibGetSkinInfo } from '@/utils/api/authlib'
 import { onImageCached } from '@/composables/useImageCache'
-import { getDefaultSkin, skinVersion } from '@/utils/default-skin'
+import { getDefaultSkin, STEVE_SKIN_URL, skinVersion } from '@/utils/default-skin'
 import { loadImage, clipImageRegion } from '@/utils/image-crop'
 
 const props = withDefaults(defineProps<{
@@ -32,10 +33,12 @@ const props = withDefaults(defineProps<{
   username?: string
   /** 是否禁用圆角（用于列表小头像） */
   rounded?: boolean
-  /** 登录类型：'Microsoft' | 'Offline'，离线账号使用默认皮肤 */
+  /** 登录类型：'Microsoft' | 'AuthlibInjector' | 'Offline'，决定皮肤加载策略 */
   loginType?: string
   /** 直接传入皮肤 PNG URL（优先级最高，用于皮肤选择网格等场景） */
   skinUrl?: string
+  /** yggdrasil API 根地址（仅 AuthlibInjector 账号需要，用于从服务器拉取皮肤） */
+  serverUrl?: string
 }>(), {
   uuid: '',
   size: 64,
@@ -44,6 +47,7 @@ const props = withDefaults(defineProps<{
   rounded: true,
   loginType: '',
   skinUrl: '',
+  serverUrl: '',
 })
 
 /** 脸层图片（8x8 区域） */
@@ -105,11 +109,25 @@ async function loadAvatar() {
   loading.value = true
   loadFailed.value = false
   try {
-    // 优先级：直接传入的 skinUrl > 离线账号默认皮肤 > 微软账号后端获取 URL
+    // 优先级：直接传入的 skinUrl > AuthlibInjector（yggdrasil API）> Offline（本地默认）> Microsoft（后端获取）
     let pngUrl: string
     if (props.skinUrl) {
       pngUrl = props.skinUrl
       currentRemoteUrl.value = null  // 直接传入的 URL 不参与缓存刷新
+    } else if (props.loginType === 'AuthlibInjector') {
+      // 外置账号：从 yggdrasil 服务器拉取角色属性，解析 textures 取皮肤 URL
+      // 失败或无皮肤时回退到 Steve（与 yggdrasil 协议"未设置皮肤按 Steve 处理"一致）
+      if (props.serverUrl && props.uuid) {
+        try {
+          const info = await authlibGetSkinInfo(props.serverUrl, props.uuid)
+          pngUrl = info.skin_url ?? STEVE_SKIN_URL
+        } catch {
+          pngUrl = STEVE_SKIN_URL
+        }
+      } else {
+        pngUrl = STEVE_SKIN_URL
+      }
+      currentRemoteUrl.value = null
     } else if (props.loginType === 'Offline') {
       // 离线账号：使用用户选择的皮肤（从注册表同步到内存）或 uuid hash 默认
       pngUrl = getDefaultSkin(props.uuid || props.username)
@@ -214,7 +232,7 @@ onImageCached((remoteUrl) => {
 })
 
 onMounted(loadAvatar)
-watch(() => [props.uuid, props.loginType, props.skinUrl, skinVersion.value], loadAvatar)
+watch(() => [props.uuid, props.loginType, props.skinUrl, props.serverUrl, skinVersion.value], loadAvatar)
 </script>
 
 <template>

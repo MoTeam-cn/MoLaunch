@@ -9,8 +9,14 @@ use super::auth::AuthState;
 use super::config::AppConfig;
 use super::download::DownloadState;
 use super::launch::LaunchHistory;
+use crate::commands::auth::authlib::PendingAuthlibLogin;
 
 /// 应用全局状态
+///
+/// 派生 `Clone`：所有字段均为 `Arc<...>`，克隆只是原子计数自增，开销极低。
+/// `utils::dispatcher::Dispatcher` 的 handler 使用 owned `AppState` 参数（避免 HRTB），
+/// IPC 入口通过 `state.inner().clone()` 获取 owned 实例后转发给 dispatcher。
+#[derive(Clone)]
 pub struct AppState {
     pub sdk: Arc<TokioMutex<Option<SdkInstance>>>,
     pub config: Arc<TokioMutex<AppConfig>>,
@@ -24,6 +30,11 @@ pub struct AppState {
     pub download_cancel_flag: Arc<std::sync::atomic::AtomicBool>,
     /// 下载暂停信号（设置为 true 时，新任务不再开始，已进行的任务完成当前文件后等待）
     pub download_pause_flag: Arc<std::sync::atomic::AtomicBool>,
+    /// authlib 多角色登录的待处理上下文
+    ///
+    /// `authlib_login` 返回 `NeedSelect` 时暂存，前端选定 profile 后
+    /// `authlib_select_profile` 取出使用。同一时间只允许一个待处理登录。
+    pub authlib_pending: Arc<TokioMutex<Option<PendingAuthlibLogin>>>,
 }
 
 impl Default for AppState {
@@ -73,6 +84,7 @@ impl AppState {
             launch_pipeline: Arc::new(TokioMutex::new(None)),
             download_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             download_pause_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            authlib_pending: Arc::new(TokioMutex::new(None)),
         }
     }
 }

@@ -3,8 +3,10 @@
 //! `get_login_status` 实现优先级：内存 → 磁盘恢复（含微软 token 静默刷新）。
 //! 启动时前端首次调用以恢复登录态，若微软 token 过期会尝试 `login_with_refresh_token`
 //! 静默续期，失败则回退到磁盘中的旧 token（让后续操作再触发交互式登录）。
-
-use tauri::State;
+//!
+//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState`，
+//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
+//! `utils::meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -13,9 +15,8 @@ use crate::minecraft::auth::microsoft;
 use crate::state::{AppState, LocalAuthResult};
 
 /// 获取当前登录状态（优先内存，其次磁盘恢复）
-#[tauri::command]
 pub async fn get_login_status(
-    state: State<'_, AppState>,
+    state: &AppState,
 ) -> Result<Option<LocalAuthResult>, String> {
     log_info!("[Startup][IPC] get_login_status called");
     {
@@ -59,6 +60,8 @@ pub async fn get_login_status(
                                 client_token: String::new(),
                                 login_type: "Microsoft".to_string(),
                                 profile_json: Some(r.profile_json.clone()),
+                                server_url: None,
+                                server_name: None,
                             };
                             let mut auth = state.auth.lock().await;
                             auth.current_user = Some(auth_result.clone());
@@ -78,6 +81,8 @@ pub async fn get_login_status(
             client_token: user.client_token,
             login_type: user.login_type,
             profile_json: user.profile_json,
+            server_url: user.server_url,
+            server_name: user.server_name,
         };
         let mut auth = state.auth.lock().await;
         auth.current_user = Some(auth_result.clone());
@@ -89,8 +94,7 @@ pub async fn get_login_status(
 }
 
 /// 登出
-#[tauri::command]
-pub async fn logout(state: State<'_, AppState>) -> Result<(), String> {
+pub async fn logout(state: &AppState) -> Result<(), String> {
     {
         let mut auth = state.auth.lock().await;
         auth.current_user = None;

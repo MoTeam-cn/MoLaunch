@@ -3,6 +3,10 @@
 //! 两种流程：
 //! - **Web Auth Code Flow**（官方 ID）：浏览器授权 → 拦截回调 code → 换取 token → 完成登录链
 //! - **Device Code Flow**（自定义 ID）：设备码 → 用户浏览器输入 → 轮询 → 完成登录链
+//!
+//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState` / `&AppHandle`，
+//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
+//! `utils::meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -10,7 +14,7 @@ use crate::log_warn;
 use crate::minecraft::auth::microsoft;
 use crate::state::{AppState, LocalAuthResult};
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter};
 
 /// 登录流程配置（前端根据此结果决定使用哪种 UI）
 #[derive(Debug, Clone, Serialize)]
@@ -42,7 +46,6 @@ pub enum PollResult {
 }
 
 /// 获取登录流程配置
-#[tauri::command]
 pub async fn ms_login_get_config() -> Result<LoginConfig, String> {
     let flow = if microsoft::is_official_client() {
         "web"
@@ -55,8 +58,7 @@ pub async fn ms_login_get_config() -> Result<LoginConfig, String> {
 }
 
 /// Web Auth Code Flow：打开 Webview 窗口让用户登录
-#[tauri::command]
-pub async fn ms_login_web_start(app: AppHandle) -> Result<(), String> {
+pub async fn ms_login_web_start(app: &AppHandle) -> Result<(), String> {
     use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
     let auth_url = microsoft::build_auth_url();
@@ -68,7 +70,7 @@ pub async fn ms_login_web_start(app: AppHandle) -> Result<(), String> {
 
     let url = tauri::Url::parse(&auth_url).map_err(log_err("Failed to parse auth URL"))?;
 
-    WebviewWindowBuilder::new(&app, "ms-auth", WebviewUrl::External(url))
+    WebviewWindowBuilder::new(app, "ms-auth", WebviewUrl::External(url))
         .title("Microsoft Login")
         .inner_size(800.0, 600.0)
         .on_navigation(move |url| {
@@ -95,10 +97,9 @@ pub async fn ms_login_web_start(app: AppHandle) -> Result<(), String> {
 }
 
 /// Web Auth Code Flow：用授权码完成登录链
-#[tauri::command]
 pub async fn ms_login_web_exchange(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    app: &AppHandle,
+    state: &AppState,
     code: String,
 ) -> Result<PollResult, String> {
     let _ = app.emit("ms-login-progress", "exchanging");
@@ -116,7 +117,7 @@ pub async fn ms_login_web_exchange(
     let refresh_token = oauth_token.refresh_token.clone().unwrap_or_default();
     complete_login(
         &app_handle,
-        &state,
+        state,
         &oauth_token.access_token,
         &refresh_token,
     )
@@ -124,7 +125,6 @@ pub async fn ms_login_web_exchange(
 }
 
 /// Device Code Flow：申请设备码
-#[tauri::command]
 pub async fn ms_login_request_device_code() -> Result<DeviceCodeInfo, String> {
     log_info!("Requesting Microsoft device code");
     let r = microsoft::request_device_code()
@@ -141,10 +141,9 @@ pub async fn ms_login_request_device_code() -> Result<DeviceCodeInfo, String> {
 }
 
 /// Device Code Flow：轮询授权状态
-#[tauri::command]
 pub async fn ms_login_poll(
-    app: AppHandle,
-    state: State<'_, AppState>,
+    app: &AppHandle,
+    state: &AppState,
     device_code: String,
 ) -> Result<PollResult, String> {
     let poll_result = match microsoft::poll_device_code(&device_code).await {
@@ -165,14 +164,13 @@ pub async fn ms_login_poll(
         Some(token) => {
             let _ = app.emit("ms-login-progress", "exchanging");
             let refresh_token = token.refresh_token.clone().unwrap_or_default();
-            complete_login(&app, &state, &token.access_token, &refresh_token).await
+            complete_login(app, state, &token.access_token, &refresh_token).await
         }
     }
 }
 
 /// 微软登录：使用 Refresh Token 静默刷新
-#[tauri::command]
-pub async fn ms_login_refresh(state: State<'_, AppState>) -> Result<LocalAuthResult, String> {
+pub async fn ms_login_refresh(state: &AppState) -> Result<LocalAuthResult, String> {
     log_info!("Attempting silent Microsoft token refresh");
     let refresh_token = state
         .auth_storage
@@ -217,13 +215,15 @@ fn to_local_auth(r: &microsoft::MicrosoftLoginResult) -> LocalAuthResult {
         client_token: String::new(),
         login_type: "Microsoft".to_string(),
         profile_json: Some(r.profile_json.clone()),
+        server_url: None,
+        server_name: None,
     }
 }
 
 /// 完成 Token 交换链并持久化（Web Flow 和 Device Code Flow 共用）
 async fn complete_login(
     app: &AppHandle,
-    state: &State<'_, AppState>,
+    state: &AppState,
     access_token: &str,
     refresh_token: &str,
 ) -> Result<PollResult, String> {

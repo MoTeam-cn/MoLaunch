@@ -1,15 +1,17 @@
 //! 离线登录命令
+//!
+//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState`，
+//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
+//! `utils::meta_manager::dispatch` 分发调用。
 
 use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::auth;
 use crate::state::{AppState, LocalAuthResult};
-use tauri::State;
 
 /// 离线登录
-#[tauri::command]
 pub async fn login_offline(
-    state: State<'_, AppState>,
+    state: &AppState,
     username: String,
 ) -> Result<LocalAuthResult, String> {
     log_info!("Offline login attempt for user: {}", username);
@@ -29,6 +31,8 @@ pub async fn login_offline(
         client_token: result.client_token,
         login_type: "Legacy".to_string(),
         profile_json: None,
+        server_url: None,
+        server_name: None,
     };
 
     {

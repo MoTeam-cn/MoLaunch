@@ -1,12 +1,12 @@
 /**
  * 认证状态管理
- * 支持离线登录和微软登录（Web Auth Code Flow / Device Code Flow）
+ * 支持离线登录、微软登录（Web Auth Code Flow / Device Code Flow）和 authlib 外置登录（yggdrasil 协议）
  */
 
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
-import type { AuthResult, LoginStatus, MsAccountInfo, OfflineAccountInfo, DeviceCodeInfo, PollResult } from '@/types/auth'
+import type { AuthlibAccountInfo, DeviceCodeInfo, LocalAuthResult, LoginStatus, MsAccountInfo, OfflineAccountInfo, PollResult } from '@/types/auth'
 import * as tauri from '@/utils/tauri'
 import { syncOfflineSkins } from '@/utils/default-skin'
 import { safeCall } from '@/utils/async'
@@ -21,7 +21,10 @@ const STEP_LABELS: Record<string, string> = {
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const currentUser = ref<AuthResult | null>(null)
+  // 使用 LocalAuthResult 而非 AuthResult：后端所有登录方法（离线/微软/authlib）
+  // 统一返回 LocalAuthResult，含 server_url / server_name 字段（仅 authlib 账号有值）。
+  // AuthResult 结构上可赋值给 LocalAuthResult（额外字段均为可选），赋值不受影响。
+  const currentUser = ref<LocalAuthResult | null>(null)
   const loginStatus = ref<LoginStatus>('idle')
   const error = ref<string | null>(null)
   const msLoginStatus = ref<'idle' | 'requesting' | 'waiting' | 'exchanging' | 'success' | 'error'>('idle')
@@ -29,6 +32,7 @@ export const useAuthStore = defineStore('auth', () => {
   const deviceCodeInfo = ref<DeviceCodeInfo | null>(null)
   const msAccounts = ref<MsAccountInfo[]>([])
   const offlineAccounts = ref<OfflineAccountInfo[]>([])
+  const authlibAccounts = ref<AuthlibAccountInfo[]>([])
   const msLoginStep = ref('')
   const msLoginStepLabel = computed(() => STEP_LABELS[msLoginStep.value] ?? '')
   /** 会话恢复中标志：应用启动时为 true，restoreSession 完成后置为 false。
@@ -187,6 +191,33 @@ export const useAuthStore = defineStore('auth', () => {
     } catch (e) { error.value = String(e); loginStatus.value = 'error'; throw e }
   }
 
+  // ============================================================
+  // authlib 外置登录（yggdrasil 协议）账号管理
+  // ============================================================
+
+  /** 加载已保存的 authlib 账号列表 */
+  async function loadAuthlibAccounts() {
+    const accounts = await safeCall(() => tauri.getAuthlibAccounts(), 'load authlib accounts')
+    if (accounts) authlibAccounts.value = accounts
+  }
+
+  /** 删除指定 authlib 账号（按 server_url + uuid 定位） */
+  async function removeAuthlibAccount(serverUrl: string, uuid: string) {
+    try {
+      await tauri.removeAuthlibAccount(serverUrl, uuid)
+      await loadAuthlibAccounts()
+    } catch (e) { error.value = String(e); throw e }
+  }
+
+  /** 切换到已保存的 authlib 账号（三步降级：validate → refresh → 用密码重登） */
+  async function switchAuthlibAccount(serverUrl: string, uuid: string) {
+    loginStatus.value = 'loading'; error.value = null
+    try {
+      currentUser.value = await tauri.switchAuthlibAccount(serverUrl, uuid)
+      loginStatus.value = 'success'
+    } catch (e) { error.value = String(e); loginStatus.value = 'error'; throw e }
+  }
+
   // 防重入：App.vue 和 Home.vue 都会在 onMounted 调用 restoreSession，
   // 用 Promise 缓存避免并发触发多次 silent refresh（否则会冲击 Mojang API 触发 429 风控）
   let restoringPromise: Promise<void> | null = null
@@ -197,7 +228,7 @@ export const useAuthStore = defineStore('auth', () => {
       await safeCall(async () => {
         const result = await tauri.getLoginStatus()
         if (result) { currentUser.value = result; loginStatus.value = 'success' }
-        await Promise.all([loadMsAccounts(), loadOfflineAccounts()])
+        await Promise.all([loadMsAccounts(), loadOfflineAccounts(), loadAuthlibAccounts()])
       }, 'restore session')
     })()
     try {
@@ -216,11 +247,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   return {
     currentUser, loginStatus, error, msLoginStatus, msFlow, deviceCodeInfo,
-    msAccounts, offlineAccounts, msLoginStep, msLoginStepLabel,
+    msAccounts, offlineAccounts, authlibAccounts, msLoginStep, msLoginStepLabel,
     isLoggedIn, username, isMicrosoftLogin, isMsLoggingIn, isRestoring,
     loginOffline, startMsLogin, cancelMsLogin, refreshMsToken,
     loadMsAccounts, loadOfflineAccounts, removeMsAccount, switchMsAccount,
     removeOfflineAccount, switchOfflineAccount,
+    loadAuthlibAccounts, removeAuthlibAccount, switchAuthlibAccount,
     restoreSession, logout: logoutUser,
   }
 })

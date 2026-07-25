@@ -2,8 +2,10 @@
 //!
 //! `switch_ms_account` 含 token 过期自动刷新逻辑：检测到 `expires_at` 过期时调用
 //! `microsoft::login_with_refresh_token` 静默续期，刷新成功后回写 `auth_storage`。
-
-use tauri::State;
+//!
+//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState`，
+//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
+//! `utils::meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -14,8 +16,7 @@ use crate::state::{AppState, LocalAuthResult};
 use super::MsAccountInfo;
 
 /// 获取已存储的微软账号列表
-#[tauri::command]
-pub async fn get_ms_accounts(state: State<'_, AppState>) -> Result<Vec<MsAccountInfo>, String> {
+pub async fn get_ms_accounts(state: &AppState) -> Result<Vec<MsAccountInfo>, String> {
     log_info!("[Startup][IPC] get_ms_accounts called");
     let persisted = state
         .auth_storage
@@ -35,8 +36,7 @@ pub async fn get_ms_accounts(state: State<'_, AppState>) -> Result<Vec<MsAccount
 }
 
 /// 删除已存储的微软账号
-#[tauri::command]
-pub async fn remove_ms_account(state: State<'_, AppState>, uuid: String) -> Result<(), String> {
+pub async fn remove_ms_account(state: &AppState, uuid: String) -> Result<(), String> {
     log_info!("Removing Microsoft account: {}", uuid);
     state
         .auth_storage
@@ -46,9 +46,8 @@ pub async fn remove_ms_account(state: State<'_, AppState>, uuid: String) -> Resu
 }
 
 /// 切换到已存储的微软账号
-#[tauri::command]
 pub async fn switch_ms_account(
-    state: State<'_, AppState>,
+    state: &AppState,
     uuid: String,
 ) -> Result<LocalAuthResult, String> {
     log_info!("Switching to Microsoft account: {}", uuid);
@@ -89,6 +88,8 @@ pub async fn switch_ms_account(
         client_token: String::new(),
         login_type: "Microsoft".to_string(),
         profile_json: Some(account.profile_json.clone()),
+        server_url: None,
+        server_name: None,
     };
 
     // 更新当前用户（持久化）
@@ -107,6 +108,8 @@ pub async fn switch_ms_account(
             profile_json: Some(account.profile_json.clone()),
             refresh_token: Some(refresh_token),
             expires_at: Some(expires_at),
+            server_url: None,
+            server_name: None,
         });
         state
             .auth_storage
