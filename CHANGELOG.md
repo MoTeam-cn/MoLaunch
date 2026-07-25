@@ -9,6 +9,21 @@
 
 ### 变更
 
+#### 修复版本选择页 FolderSidebar 调用未定义 invoke 报错
+- 问题：[FolderSidebar.vue](src/views/version-select/FolderSidebar.vue) 第 38、104 行
+  直接调用 `invoke<string>('get_game_dir')`，但未导入 `invoke`，
+  导致进入版本选择页时前端报错 `ReferenceError: invoke is not defined`，文件夹列表加载失败。
+- 修复：改用项目已有的封装 `tauri.getGameDir()`（来自 [utils/api/system.ts](src/utils/api/system.ts)），
+  与 [useVersionSettings.ts](src/composables/useVersionSettings.ts) 中的调用方式保持一致。
+
+#### 修复主页「添加账号」按钮点击无反应
+- 问题：[AccountSelector.vue](src/components/home/AccountSelector.vue) `addAccount` 调用
+  `router.push('/login')`，但 [router/index.ts](src/router/index.ts) 路由守卫第 85 行
+  `to.path === '/login' && authStore.isLoggedIn` 会把已登录用户重定向回 `/apps`，
+  导致点击「添加账号」按钮视觉上"没反应"。
+- 修复：`addAccount` 改为 `router.push({ path: '/login', query: { add: '1' } })`，
+  路由守卫识别 `query.add === '1'` 时跳过重定向，放行进入登录页。
+
 #### 修复种子地图 hover 检测不响应问题
 - 问题：[useSeedMap.ts](src/views/tools/data/useSeedMap.ts) `pointermove` 节流实现有 bug：
   throttle 期间新位置被丢弃，超时回调使用闭包捕获的首次事件 `e.pixel`（已过期），

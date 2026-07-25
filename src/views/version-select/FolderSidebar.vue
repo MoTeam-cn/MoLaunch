@@ -35,7 +35,7 @@ const switchingFolder = ref(false)
 async function loadFolders() {
   await safeCall(async () => {
     folders.value = await tauri.listMcFolders()
-    currentPath.value = await invoke<string>('get_game_dir')
+    currentPath.value = await tauri.getGameDir()
   }, 'load folders')
 }
 
@@ -101,7 +101,7 @@ async function removeFolder(folder: McFolder, event: Event) {
     async () => {
       try {
         folders.value = await tauri.removeMcFolder(folder.path)
-        currentPath.value = await invoke<string>('get_game_dir')
+        currentPath.value = await tauri.getGameDir()
         emit('switched', currentPath.value)
         toastSuccess('文件夹已移除')
       } catch (e) {

@@ -82,8 +82,9 @@ router.beforeEach((to, _from, next) => {
   }
   if (to.meta.requiresAuth && !authStore.isLoggedIn) {
     next('/login')
-  } else if (to.path === '/login' && authStore.isLoggedIn) {
+  } else if (to.path === '/login' && authStore.isLoggedIn && to.query.add !== '1') {
     // 已登录用户访问登录页，重定向到首页
+    // 例外：query 带 add=1 时表示用户主动点击「添加账号」，放行进入登录页
     next('/apps')
   } else {
     next()

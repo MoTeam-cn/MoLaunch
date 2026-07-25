@@ -61,7 +61,7 @@ async function onCardLogout(card: AccountCardData, event: Event) {
   }
 }
 
-function addAccount() { router.push('/login') }
+function addAccount() { router.push({ path: '/login', query: { add: '1' } }) }
 
 // 拖动/滚轮导航（onSwitch 回调即 switchTo，switchTo 内部自带 switching 检查）
 const {
