@@ -69,11 +69,11 @@ defineEmits<{
       </div>
 
       <div class="ml-auto flex items-center gap-2">
-        <div class="flex items-center gap-1.5 rounded-lg bg-gray-100 p-1">
+        <div class="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-gray-100 p-1">
           <button
             v-for="opt in filterOptions"
             :key="opt.v"
-            class="flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors"
+            class="flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-xs font-medium transition-colors"
             :class="modFilter === opt.v
               ? 'bg-white text-primary-700 shadow-sm'
               : 'text-gray-500 hover:text-gray-700'"
@@ -81,7 +81,7 @@ defineEmits<{
           >
             {{ opt.l }}
             <span
-              class="rounded-full px-1.5 py-0.5 text-[10px] leading-none"
+              class="whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10px] tabular-nums leading-none"
               :class="modFilter === opt.v
                 ? 'bg-primary-100 text-primary-700'
                 : 'bg-gray-200 text-gray-500'"

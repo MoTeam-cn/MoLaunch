@@ -9,6 +9,14 @@
 
 ### 变更
 
+#### 修复 Mod 管理页顶部筛选 tag 文字换行问题
+- 痛点：版本设置 → Mod 管理页中，当 mods 文件数量较多（数字 badge 变宽）时，顶部"全部/已启用/已禁用"筛选 tag 组被 flex 默认 shrink 行为压缩，导致 tag 内中文文字（"全部"/"已启用"/"已禁用"）折行显示，视觉拥挤。
+- 修改 [src/views/version-settings/mod-tab/ModToolbar.vue](src/views/version-settings/mod-tab/ModToolbar.vue)：3 处 Tailwind 类调整
+  - 筛选 tag 组容器：`flex items-center gap-1.5 rounded-lg bg-gray-100 p-1` → `flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-gray-100 p-1`（整个 tag 组不被父容器压缩）
+  - 单个按钮：`flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-medium transition-colors` → 加 `whitespace-nowrap`（文字强制不换行）
+  - 计数 badge：`rounded-full px-1.5 py-0.5 text-[10px] leading-none` → 加 `whitespace-nowrap tabular-nums`（数字不换行 + 等宽数字避免多位数抖动）
+- 验证：`eslint` 0 错误；窗口窄时搜索框优先让出空间，tag 组保持完整宽度
+
 #### 完成 IPC dispatcher 迁移收尾：set_game_dir 聚合 + plugins/sdk.ts 走 manager
 - 痛点：IPC dispatcher 迁移收尾阶段发现两处遗漏：(1) `set_game_dir` 后端有 `#[tauri::command]` 标注但未在 `lib.rs` 注册，前端 `setGameDir()` 调用会失败；(2) `plugins/sdk.ts` 中 7 处 `invoke('xxx')` 仍走裸 IPC 命令，未通过 13 个 manager 入口，与统一 dispatcher 架构不一致。
 - 后端：
