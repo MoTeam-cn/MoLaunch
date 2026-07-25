@@ -21,6 +21,7 @@ import NavSidebar from '@/components/common/NavSidebar.vue'
 import OverviewTab from './version-settings/OverviewTab.vue'
 import SetupTab from './version-settings/SetupTab.vue'
 import ModTab from './version-settings/ModTab.vue'
+import ExportTab from './version-settings/ExportTab.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -125,22 +126,16 @@ onMounted(async () => {
           <p class="mt-1 text-xs text-gray-500">{{ currentCategory()?.desc }}</p>
         </div>
 
-        <!-- Mod 管理页由 ModTab 自己管理布局（工具栏固定 + 列表独立滚动），
+        <!-- Mod 管理页 / 导出页由各自组件自管布局（固定工具栏/底栏 + 内部滚动），
              其他 tab 共用外层滚动容器 -->
         <div
           class="flex-1 overflow-hidden"
-          :class="activeCategory === 'mod' ? 'flex flex-col' : 'overflow-y-auto p-6'"
+          :class="(activeCategory === 'mod' || activeCategory === 'export') ? 'flex flex-col' : 'overflow-y-auto p-6'"
         >
           <OverviewTab v-if="activeCategory === 'overview'" />
           <SetupTab v-else-if="activeCategory === 'setup'" />
           <ModTab v-else-if="activeCategory === 'mod'" />
-          <!-- 导出子页（占位） -->
-          <div v-else class="flex h-full items-center justify-center">
-            <div class="flex flex-col items-center gap-3 text-gray-400">
-              <component :is="currentCategory()?.icon" class="h-10 w-10" />
-              <p class="text-sm">功能开发中</p>
-            </div>
-          </div>
+          <ExportTab v-else-if="activeCategory === 'export'" />
         </div>
       </div>
     </div>
