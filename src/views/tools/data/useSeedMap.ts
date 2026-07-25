@@ -392,17 +392,22 @@ export function useSeedMap() {
       }
     })
     // pointermove 节流（避免高频遍历 feature）
+    // 始终更新 lastPixel，超时回调用最新位置而非首次事件位置，
+    // 否则用户快速移动并停下时，停下的位置不被检测（旧实现用闭包捕获的 e.pixel 已过期）。
     let hoverThrottle: number | null = null
+    let lastPixel: number[] | null = null
     map.on('pointermove', (e) => {
       if (e.dragging) return
       const [cx, cz] = e.coordinate
       const blockX = Math.round(cx)
       const blockZ = Math.round(cz)
       mouseBlock.value = { x: blockX, z: blockZ }
+      lastPixel = e.pixel
       if (hoverThrottle) return
       hoverThrottle = window.setTimeout(() => {
         hoverThrottle = null
-        const hit = findFeatureAtPixel(e.pixel)
+        if (!lastPixel) return
+        const hit = findFeatureAtPixel(lastPixel)
         if (hit) {
           if (hit.type === 'struct') {
             if (hit.feature !== hoverFeat) {

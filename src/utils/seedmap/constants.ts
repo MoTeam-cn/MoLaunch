@@ -106,35 +106,16 @@ export function getStructIcon(stype: string): StructureIconDef {
 }
 
 // ===== 结构图标 URL =====
-// Vite 5.0.x 在不同环境（dev/build/Tauri webview）下 import.meta.glob 返回类型不一致。
-// 尝试三种语法变体，任一成功即填充 iconUrlMap。
+// Vite 5 推荐语法：query:'?url' + import:'default'，直接返回 url 字符串。
 const iconUrlMap: Record<string, string> = {}
-
-// 方式1: as:'url'（Vite 2-4 语法，Vite 5 兼容）→ 直接返回 url 字符串
-const glob1 = import.meta.glob('../../assets/structures/*.webp', { eager: true, as: 'url' }) as Record<string, string>
-for (const [key, val] of Object.entries(glob1)) {
+const globModules = import.meta.glob('@/assets/structures/*.webp', {
+  eager: true,
+  query: '?url',
+  import: 'default',
+}) as Record<string, string>
+for (const [key, val] of Object.entries(globModules)) {
   const m = key.match(/\/([^/]+)\.webp$/)
   if (m && typeof val === 'string' && val) iconUrlMap[m[1]] = val
-}
-
-// 方式2: query:'?url' + import:'default'（Vite 5 推荐语法）→ 直接返回 url 字符串
-if (Object.keys(iconUrlMap).length === 0) {
-  const glob2 = import.meta.glob('../../assets/structures/*.webp', { eager: true, query: '?url', import: 'default' }) as Record<string, string>
-  for (const [key, val] of Object.entries(glob2)) {
-    const m = key.match(/\/([^/]+)\.webp$/)
-    if (m && typeof val === 'string' && val) iconUrlMap[m[1]] = val
-  }
-}
-
-// 方式3: query:'?url' 无 import → 返回 { default: url } 模块对象
-if (Object.keys(iconUrlMap).length === 0) {
-  const glob3 = import.meta.glob('../../assets/structures/*.webp', { eager: true, query: '?url' }) as Record<string, any>
-  for (const [key, mod] of Object.entries(glob3)) {
-    const m = key.match(/\/([^/]+)\.webp$/)
-    if (!m) continue
-    const url = typeof mod === 'string' ? mod : mod?.default
-    if (url) iconUrlMap[m[1]] = url
-  }
 }
 
 console.log('[seedmap] iconUrlMap loaded:', Object.keys(iconUrlMap).length, 'icons, sample:', iconUrlMap['village'] ?? '(empty)')
