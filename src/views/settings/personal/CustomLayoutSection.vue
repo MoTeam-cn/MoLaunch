@@ -201,13 +201,13 @@ onMounted(() => {
         <span class="text-[11px] text-gray-400">编辑后自动保存（防抖 500ms）</span>
       </div>
       <Input
+        v-model="inlineContentDraft"
         textarea
         :rows="16"
         resize="vertical"
-        v-model="inlineContentDraft"
-        @input="onInlineContentChange"
         :placeholder="inlinePlaceholder"
         class="custom-layout-editor"
+        @input="onInlineContentChange"
       />
     </div>
 
@@ -221,10 +221,10 @@ onMounted(() => {
         <div class="flex gap-2">
           <input
             :value="customConfig.url"
-            @input="onUrlInput"
             type="text"
             placeholder="https://example.com/layout.json"
             class="flex-1 rounded border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+            @input="onUrlInput"
           />
           <Button
             type="outline"

@@ -170,7 +170,8 @@ onUnmounted(() => {
             <span>
               {{ formatBytes(memory.used) }} / {{ formatBytes(memory.total) }}
             </span>
-            <span class="font-medium" :class="{
+            <span
+class="font-medium" :class="{
               'text-red-500': memory.usage_percent >= 80,
               'text-yellow-600': memory.usage_percent >= 60 && memory.usage_percent < 80,
               'text-green-600': memory.usage_percent < 60,

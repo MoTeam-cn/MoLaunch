@@ -338,8 +338,8 @@ onUnmounted(() => {
       <div v-if="schema.title" class="flex flex-none items-center justify-between mb-4">
         <div class="flex items-center gap-2">
           <component
-            v-if="titleIcon"
             :is="titleIcon"
+            v-if="titleIcon"
             class="h-5 w-5 text-primary-500"
           />
           <h3 class="text-base font-semibold text-gray-900">{{ schema.title }}</h3>
