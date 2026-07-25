@@ -70,9 +70,16 @@ pub async fn ms_login_web_start(app: &AppHandle) -> Result<(), String> {
 
     let url = tauri::Url::parse(&auth_url).map_err(log_err("Failed to parse auth URL"))?;
 
-    WebviewWindowBuilder::new(app, "ms-auth", WebviewUrl::External(url))
+    let mut builder = WebviewWindowBuilder::new(app, "ms-auth", WebviewUrl::External(url))
         .title("Microsoft Login")
-        .inner_size(800.0, 600.0)
+        .inner_size(800.0, 600.0);
+
+    // 应用默认窗口图标（来自 tauri.conf.json 的 bundle.icon 中的 PNG）
+    if let Some(icon) = app.default_window_icon() {
+        builder = builder.icon(icon.clone()).map_err(|e| e.to_string())?;
+    }
+
+    builder
         .on_navigation(move |url| {
             if url.as_str().starts_with(&redirect_uri) {
                 if let Some(code) = url
