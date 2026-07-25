@@ -19,7 +19,7 @@ mod types;
 use serde::Deserialize;
 
 use super::common::urlencode_params;
-use super::types::{ResourceProject, ResourceType, ResourceVersion};
+use super::types::{FileDownloadInfo, ResourceProject, ResourceType, ResourceVersion};
 use convert::{convert_project, convert_version};
 use http::{cf_get, cf_post};
 use types::{CfFile, CfFilesResponse, CfModEntry, CfSearchResponse};
@@ -143,6 +143,96 @@ pub async fn fingerprint_search(
     crate::log_info!(
         "[Community] CF fingerprint 批量查询完成：{} 个工程 → {} 个本地文件",
         modid_to_project.len(),
+        result.len()
+    );
+
+    Ok(result)
+}
+
+/// 按 MurmurHash2 指纹批量查询 CurseForge 文件下载信息（导出整合包专用）
+///
+/// 与 `fingerprint_search` 不同，本函数不查询工程详情（省一次 API 调用），
+/// 直接从 `/v1/fingerprints/432` 响应的 `exactMatches[i].file` 中提取
+/// `downloadUrl` / `fileLength`，用于直接写入 `modrinth.index.json` 的 files 数组。
+///
+/// CF API 不返回 SHA1/SHA512，由调用方（导出模块）本地计算后填入。
+///
+/// 返回 `fingerprint → FileDownloadInfo` 映射（未查到的不在 map 中）。
+pub async fn fingerprint_search_with_downloads(
+    fingerprints: Vec<u32>,
+) -> Result<std::collections::HashMap<u32, FileDownloadInfo>, String> {
+    if fingerprints.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // POST /v1/fingerprints/432 请求体：{"fingerprints": [...]}
+    let body = serde_json::json!({
+        "fingerprints": fingerprints
+    })
+    .to_string();
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct FingerprintResp {
+        #[serde(default)]
+        data: FingerprintData,
+    }
+
+    #[derive(Deserialize, Default)]
+    #[serde(rename_all = "camelCase")]
+    struct FingerprintData {
+        #[serde(default)]
+        exact_matches: Vec<ExactMatch>,
+    }
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct ExactMatch {
+        /// CF project id（modId），用于导出 CF 格式整合包时写入 manifest.files[].projectID
+        #[serde(default)]
+        id: Option<i64>,
+        #[serde(default)]
+        file: Option<CfFile>,
+    }
+
+    let resp: FingerprintResp = cf_post("/fingerprints/432", body).await?;
+    crate::log_info!(
+        "[Community] CF fingerprint (with downloads) 查询命中 {} / {} 个",
+        resp.data.exact_matches.len(),
+        fingerprints.len()
+    );
+
+    if resp.data.exact_matches.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // 构建 fingerprint → FileDownloadInfo 映射
+    // 用 exactMatches[i].file.fileFingerprint 反查本地指纹
+    let mut result: std::collections::HashMap<u32, FileDownloadInfo> =
+        std::collections::HashMap::new();
+    for m in &resp.data.exact_matches {
+        let Some(file) = m.file.as_ref() else { continue };
+        let Some(download_url) = file.download_url.as_ref() else { continue };
+        if download_url.is_empty() {
+            continue;
+        }
+        // CF 不返回 SHA1/SHA512，由调用方本地计算后填入
+        // project_id 来自 exactMatches[i].id（即 modId），file_id 来自 file.id
+        result.insert(
+            file.file_fingerprint,
+            FileDownloadInfo {
+                download_url: download_url.clone(),
+                file_size: file.file_length,
+                sha1: String::new(),
+                sha512: None,
+                project_id: m.id,
+                file_id: Some(file.id),
+            },
+        );
+    }
+
+    crate::log_info!(
+        "[Community] CF fingerprint (with downloads) 完成：{} 个文件获取到下载地址",
         result.len()
     );
 

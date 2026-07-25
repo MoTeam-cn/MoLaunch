@@ -15,7 +15,7 @@ mod types;
 use serde::Deserialize;
 
 use super::common::urlencode_params;
-use super::types::{ResourceProject, ResourceType, ResourceVersion};
+use super::types::{FileDownloadInfo, ResourceProject, ResourceType, ResourceVersion};
 use convert::{build_facets, convert_hit, convert_project, convert_version};
 use http::{mr_get, mr_post};
 use types::{MrFile, MrProject, MrSearchResponse, MrVersion};
@@ -129,6 +129,98 @@ pub async fn version_files_search(
     crate::log_info!(
         "[Community] MR version_files 批量查询完成：{} 个工程 → {} 个本地文件",
         pid_to_project.len(),
+        result.len()
+    );
+
+    Ok(result)
+}
+
+/// 按 SHA1 批量查询 Modrinth 文件下载信息（导出整合包专用）
+///
+/// 与 `version_files_search` 不同，本函数不查询工程详情（省一次 API 调用），
+/// 直接从 `/v2/version_files` 响应中提取 `files[0]` 的下载 URL、大小、SHA1/SHA512，
+/// 用于直接写入 `modrinth.index.json` 的 files 数组。
+///
+/// 返回 `sha1 → FileDownloadInfo` 映射（未查到的不在 map 中）。
+pub async fn version_files_search_with_downloads(
+    sha1s: Vec<String>,
+) -> Result<std::collections::HashMap<String, FileDownloadInfo>, String> {
+    if sha1s.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // POST /v2/version_files 请求体：{"hashes": [...], "algorithm": "sha1"}
+    let body = serde_json::json!({
+        "hashes": sha1s,
+        "algorithm": "sha1"
+    })
+    .to_string();
+
+    // 响应结构：{ "<sha1>": { "files": [{ "url": "...", "size": N, "hashes": { "sha1": "...", "sha512": "..." }}] } }
+    type VersionFilesResp = std::collections::HashMap<String, MrVersionFileEntry>;
+
+    #[derive(Deserialize)]
+    struct MrVersionFileEntry {
+        #[serde(default)]
+        files: Vec<MrFile>,
+    }
+
+    let resp: VersionFilesResp = mr_post("/version_files", body).await?;
+    crate::log_info!(
+        "[Community] MR version_files (with downloads) 查询命中 {} / {} 个",
+        resp.len(),
+        sha1s.len()
+    );
+
+    if resp.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+
+    // 构建 sha1 → FileDownloadInfo 映射
+    let mut result: std::collections::HashMap<String, FileDownloadInfo> =
+        std::collections::HashMap::new();
+    for (sha1, entry) in &resp {
+        // 选取 primary 文件，若无 primary 则取第一个
+        let file = entry
+            .files
+            .iter()
+            .find(|f| f.primary.unwrap_or(false))
+            .or_else(|| entry.files.first());
+        let Some(file) = file else { continue };
+
+        if file.url.is_empty() {
+            continue;
+        }
+
+        // 校验 file.hashes.sha1 与查询的 sha1 一致（防 MR 返回错位）
+        let file_sha1 = file
+            .hashes
+            .as_ref()
+            .and_then(|h| h.sha1.as_deref())
+            .unwrap_or("");
+        if !file_sha1.is_empty() && file_sha1 != sha1 {
+            continue;
+        }
+
+        result.insert(
+            sha1.clone(),
+            FileDownloadInfo {
+                download_url: file.url.clone(),
+                file_size: file.size.unwrap_or(0),
+                sha1: sha1.clone(),
+                sha512: file
+                    .hashes
+                    .as_ref()
+                    .and_then(|h| h.sha512.clone()),
+                // Modrinth 不使用 CF 的 project_id/file_id 概念
+                project_id: None,
+                file_id: None,
+            },
+        );
+    }
+
+    crate::log_info!(
+        "[Community] MR version_files (with downloads) 完成：{} 个文件获取到下载地址",
         result.len()
     );
 

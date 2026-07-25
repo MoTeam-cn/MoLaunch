@@ -181,6 +181,29 @@ pub struct ResourceVersion {
     pub dependencies: Vec<String>,
 }
 
+/// 联网查询得到的 mod 文件下载信息（导出整合包专用）
+///
+/// 由 `modrinth::version_files_search_with_downloads` 和
+/// `curseforge::fingerprint_search_with_downloads` 返回，
+/// 用于直接写入 `modrinth.index.json` 的 files 数组。
+#[derive(Debug, Clone)]
+pub struct FileDownloadInfo {
+    /// 下载地址（与平台返回的 URL 一致，CF 已包含 CDN 路径）
+    pub download_url: String,
+    /// 文件大小（字节）
+    pub file_size: u64,
+    /// SHA1 hash（hex，MR 来自 API 响应；CF 可能为空，由调用方本地计算）
+    pub sha1: String,
+    /// SHA512 hash（hex，MR 来自 API 响应；CF 不提供，由调用方本地计算）
+    pub sha512: Option<String>,
+    /// CurseForge project id（仅 CF 查询结果设置，MR 为 None）
+    /// 用于导出 CurseForge 格式整合包时写入 manifest.files[].projectID
+    pub project_id: Option<i64>,
+    /// CurseForge file id（仅 CF 查询结果设置，MR 为 None）
+    /// 用于导出 CurseForge 格式整合包时写入 manifest.files[].fileID
+    pub file_id: Option<i64>,
+}
+
 /// 搜索请求参数
 #[derive(Debug, Clone, Deserialize)]
 pub struct SearchParams {

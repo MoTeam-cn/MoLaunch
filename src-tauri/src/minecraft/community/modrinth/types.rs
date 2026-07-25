@@ -101,6 +101,9 @@ pub(crate) struct MrFile {
 #[derive(Debug, Deserialize)]
 pub(crate) struct MrHashes {
     pub sha1: Option<String>,
+    /// SHA512 hash（hex），MR API 在 hashes 字段中返回，导出整合包时需要
+    #[serde(default)]
+    pub sha512: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

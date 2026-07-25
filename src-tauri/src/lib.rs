@@ -91,6 +91,8 @@ pub fn run() {
             commands::version::progress::version_progress_manager,
             // - version_launch_manager：launch + script_export（7 个 action）
             commands::version::launch::version_launch_manager,
+            // - version_export_manager：导出整合包（4 个 action）
+            commands::version::version_export_manager,
             // Java 命令（6 个 action，已聚合为 java_manager 单一入口）
             commands::java::java_manager,
             // 系统命令（17 个 action，含 game_dir/config/developer/about/logger，已聚合为 system_manager 单一入口）

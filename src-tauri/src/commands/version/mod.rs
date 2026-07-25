@@ -1,6 +1,7 @@
 //! Version management commands
 
 pub mod download;
+pub mod export;
 pub mod folder;
 pub mod install;
 pub mod launch;
@@ -63,6 +64,23 @@ pub async fn version_install_manager(
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
     crate::utils::version_install_manager::dispatch(state, app, req).await
+}
+
+/// 统一版本导出管理 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `crate::utils::version_export_manager::dispatch` 进行 action 分发。
+///
+/// 聚合 4 个 action：get_export_options / export_modpack /
+/// save_export_config / load_export_config。
+#[tauri::command]
+pub async fn version_export_manager(
+    state: State<'_, AppState>,
+    app: AppHandle,
+    req: ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    crate::utils::version_export_manager::dispatch(state, app, req).await
 }
 
 /// 校验版本 ID / 实例名，防止路径遍历
