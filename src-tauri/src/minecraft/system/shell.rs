@@ -14,7 +14,7 @@
 //! - 统一日志（[Shell] 前缀，调用前后都记录）
 //! - 错误转换为 String（Tauri 命令可直接返回）
 
-use crate::{log_error, log_info};
+use crate::{log_debug, log_error, log_info};
 
 // ============ 路径校验 ============
 
@@ -261,7 +261,7 @@ pub fn run_executable_output(
     args: &[String],
     cwd: Option<&std::path::Path>,
 ) -> Result<std::process::Output, String> {
-    log_info!(
+    log_debug!(
         "[Shell] run_executable: {} {} (cwd={})",
         program,
         args.join(" "),

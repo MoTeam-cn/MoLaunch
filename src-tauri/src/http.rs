@@ -112,3 +112,53 @@ pub async fn fetch_url_to_file(url: &str, local_path: &std::path::Path) -> anyho
     std::fs::write(local_path, &content)?;
     Ok(content)
 }
+
+/// GET 请求并返回 (HTTP 状态码, 响应体文本)
+///
+/// 与 `fetch_url` 不同，本函数保留状态码信息，便于调用方按状态码做差异化错误处理
+/// （如 yggdrasil 协议中 204 表示 validate 成功，403 表示 token 失效）。
+///
+/// 网络错误（无法连接服务器）时返回 Err；HTTP 任意状态码（含 4xx/5xx）均返回 Ok。
+pub async fn get_text_with_status(url: &str) -> anyhow::Result<(u16, String)> {
+    let client = get_client();
+    let resp = client.get(url).send().await?;
+    let status = resp.status().as_u16();
+    let text = resp.text().await.unwrap_or_default();
+    Ok((status, text))
+}
+
+/// POST JSON 请求并返回 (HTTP 状态码, 响应体文本)
+///
+/// 统一的 POST JSON 入口，自动设置 `Content-Type: application/json; charset=utf-8`
+/// 和 `Accept-Language: zh-CN` 请求头。
+/// 与 `fetch_url` 不同，本函数保留状态码信息，便于调用方按状态码做差异化错误处理。
+///
+/// 网络错误（无法连接服务器）时返回 Err；HTTP 任意状态码（含 4xx/5xx）均返回 Ok。
+pub async fn post_json_with_status<T: serde::Serialize>(
+    url: &str,
+    body: &T,
+) -> anyhow::Result<(u16, String)> {
+    let client = get_client();
+    let resp = client
+        .post(url)
+        .header("Content-Type", "application/json; charset=utf-8")
+        .header("Accept-Language", "zh-CN")
+        .json(body)
+        .send()
+        .await?;
+    let status = resp.status().as_u16();
+    let text = resp.text().await.unwrap_or_default();
+    Ok((status, text))
+}
+
+/// GET 请求并返回二进制内容
+///
+/// 用于下载 jar/图片等二进制资源。HTTP 非 2xx 返回 Err。
+pub async fn fetch_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
+    let client = get_client();
+    let resp = client.get(url).send().await?;
+    if !resp.status().is_success() {
+        return Err(anyhow::anyhow!("HTTP error: {}", resp.status()));
+    }
+    Ok(resp.bytes().await?.to_vec())
+}

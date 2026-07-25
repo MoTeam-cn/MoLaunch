@@ -76,12 +76,12 @@ pub fn search_java() -> Vec<JavaRuntime> {
 /// `extra_paths` 用于追加搜索根目录（如游戏目录、APPDATA 等），会全遍历搜索。
 pub fn search_java_with_paths(extra_paths: &[PathBuf]) -> Vec<JavaRuntime> {
     crate::log_separator!("Java Search");
-    crate::log_info!("[Java] Starting Java search...");
+    crate::log_debug!("[Java] Starting Java search...");
 
     // 1. 收集候选路径（环境变量 / 全磁盘 / 用户目录 / 启动器目录 / runtime / 额外路径）
     let java_candidates = collect_java_candidates(extra_paths);
 
-    crate::log_info!(
+    crate::log_debug!(
         "[Java] Found {} candidates, verifying...",
         java_candidates.len()
     );
@@ -96,7 +96,7 @@ pub fn search_java_with_paths(extra_paths: &[PathBuf]) -> Vec<JavaRuntime> {
             .then(b.is_64bit.cmp(&a.is_64bit))
     });
 
-    crate::log_info!(
+    crate::log_debug!(
         "[Java] Search completed, found {} valid Java installations",
         java_list.len()
     );
@@ -138,17 +138,17 @@ fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
     let mut collector = CandidateCollector::new();
 
     // Step 1: 环境变量扫描
-    crate::log_info!("[Java] Step 1: Checking environment variables...");
+    crate::log_debug!("[Java] Step 1: Checking environment variables...");
     collect_from_env(&mut collector);
 
     // Step 2: 全磁盘扫描（关键词匹配）
-    crate::log_info!("[Java] Step 2: Searching local drives...");
+    crate::log_debug!("[Java] Step 2: Searching local drives...");
     for drive in get_local_drives() {
         search_folder_recursive(&drive, &mut collector, false);
     }
 
     // Step 3: 用户目录深度搜索
-    crate::log_info!("[Java] Step 3: Searching user directories...");
+    crate::log_debug!("[Java] Step 3: Searching user directories...");
     if let Some(user_profile) = std::env::var_os("USERPROFILE") {
         let base = Path::new(&user_profile);
         search_folder_recursive(base, &mut collector, false);
@@ -171,7 +171,7 @@ fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
 
     // Step 5: APPDATA\.minecraft\runtime\（官启自动下载的 Java 存放处）
     // runtime 下的 Java 跨游戏目录共享，必须搜索
-    crate::log_info!("[Java] Step 5: Searching APPDATA .minecraft runtime...");
+    crate::log_debug!("[Java] Step 5: Searching APPDATA .minecraft runtime...");
     let runtime_dir = crate::utils::cache_app::runtime_base_dir();
     if runtime_dir.exists() {
         crate::log_debug!(
@@ -231,7 +231,7 @@ fn verify_java_candidates(candidates: &[PathBuf]) -> Vec<JavaRuntime> {
     for path in candidates {
         match detect_java(path) {
             Ok(java) => {
-                crate::log_info!("[Java] Valid: {} ({})", java.version, java.path_folder);
+                crate::log_debug!("[Java] Valid: {} ({})", java.version, java.path_folder);
                 java_list.push(java);
             }
             Err(e) => {

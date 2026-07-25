@@ -80,6 +80,24 @@ pub const LIBRARY_REPLACEMENTS: &[(&str, &str)] = &[(
 /// MCIMirror CDN 镜像基础 URL
 pub const CDN_MIRROR: &str = "https://mod.mcimirror.top";
 
+// ── authlib-injector（外置登录支持库）下载源 ──
+/// authlib-injector 官方源（yushi.moe）
+pub const AUTHLIB_INJECTOR_OFFICIAL: &str = "https://authlib-injector.yushi.moe";
+/// authlib-injector 最新版元数据路径（拼接在官方源后）
+pub const AUTHLIB_INJECTOR_LATEST_PATH: &str = "/artifact/latest.json";
+/// authlib-injector BMCLAPI 镜像源
+pub const AUTHLIB_INJECTOR_BMCLAPI: &str = "https://bmclapi2.bangbang93.com/mirrors/authlib-injector";
+
+/// authlib-injector 最新版元数据官方 URL
+pub fn authlib_injector_meta_url_official() -> String {
+    format!("{}{}", AUTHLIB_INJECTOR_OFFICIAL, AUTHLIB_INJECTOR_LATEST_PATH)
+}
+
+/// authlib-injector 最新版元数据 BMCLAPI 镜像 URL
+pub fn authlib_injector_meta_url_mirror() -> String {
+    format!("{}{}", AUTHLIB_INJECTOR_BMCLAPI, AUTHLIB_INJECTOR_LATEST_PATH)
+}
+
 /// CurseForge CDN 官方域名列表
 pub const CF_CDN_DOMAINS: &[&str] = &["https://edge.forgecdn.net", "https://media.forgecdn.net"];
 

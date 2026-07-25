@@ -87,6 +87,15 @@ impl LaunchPipeline {
         &self,
         java_path: &PathBuf,
     ) -> Result<LaunchArguments, LaunchError> {
+        // 外置登录（authlib-injector）：确保 authlib-injector.jar 已下载到缓存
+        // 仅当 auth_info.server_url 有值时执行。失败不阻塞启动，
+        // add_authlib_args 内部会检测 jar 是否存在并打印警告。
+        if let Some(ref server_url) = self.config.auth_info.server_url {
+            if !server_url.is_empty() {
+                let _ = crate::minecraft::auth::authlib::ensure_authlib_injector_jar(Some(server_url)).await;
+            }
+        }
+
         super::super::build_launch_arguments(
             &self.config.game_dir,
             &self.config.version_id,

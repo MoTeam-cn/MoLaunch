@@ -106,6 +106,7 @@ pub fn build_launch_arguments(
         min_memory,
         max_memory,
         java_path,
+        auth_info,
         extra_jvm_args,
         &json,
         disable_jlw,

@@ -10,8 +10,10 @@
  *
  * 拆分目的：把与 store 状态无关的纯逻辑从 stores/plugins.ts 移出，
  * 让 store 文件聚焦于状态管理与生命周期编排。
+ *
+ * 注：底层 `read_personalization` / `write_personalization` / `load_custom_layout`
+ * 已聚合为 `plugins_manager` 单一 IPC 入口，通过 `action` 字段分发。
  */
-import { invoke } from '@tauri-apps/api/core'
 import { markRaw, h, defineComponent } from 'vue'
 import type {
   PluginManifest,
@@ -20,6 +22,7 @@ import type {
   CustomLayoutConfig,
 } from '@/types/plugin'
 import PluginSandbox from '@/plugins/sandbox/PluginSandbox.vue'
+import { PLUGINS_ACTIONS, pluginsManager } from '@/utils/api/plugins-manager'
 
 /** 个性化配置结构（与后端 personalization.json 对应） */
 export interface PersonalizationData {
@@ -85,27 +88,27 @@ export function externalManifestToPluginManifest(
 /**
  * 从后端 AppData 读取个性化配置
  *
- * 包装 invoke('read_personalization')，返回 Partial 类型供调用方合并默认值。
+ * 包装 pluginsManager(READ_PERSONALIZATION)，返回 Partial 类型供调用方合并默认值。
  * 文件位置：%APPDATA%/.MolaLaunch/personalization.json
  */
 export async function loadPersonalizationData(): Promise<Partial<PersonalizationData>> {
-  return await invoke<Partial<PersonalizationData>>('read_personalization')
+  return await pluginsManager<Partial<PersonalizationData>>(PLUGINS_ACTIONS.READ_PERSONALIZATION)
 }
 
 /**
  * 将个性化配置持久化到后端 AppData
  *
- * 包装 invoke('write_personalization')，全量覆盖写入。
+ * 包装 pluginsManager(WRITE_PERSONALIZATION)，全量覆盖写入。
  * 文件位置：%APPDATA%/.MolaLaunch/personalization.json
  */
 export async function savePersonalizationData(data: PersonalizationData): Promise<void> {
-  await invoke('write_personalization', { data })
+  await pluginsManager<void>(PLUGINS_ACTIONS.WRITE_PERSONALIZATION, { data })
 }
 
 /**
  * 从后端加载 URL 自定义布局内容
  *
- * 包装 invoke('load_custom_layout')，命中本地缓存或强制刷新。
+ * 包装 pluginsManager(LOAD_CUSTOM_LAYOUT)，命中本地缓存或强制刷新。
  * 后端按 url 的 sha256 哈希作为缓存文件名，缓存目录 .Molaunch/cache/custom_layout/。
  *
  * @param url 布局文件的 URL
@@ -115,7 +118,10 @@ export async function fetchCustomLayoutContent(
   url: string,
   forceRefresh = false,
 ): Promise<string> {
-  return await invoke<string>('load_custom_layout', { url, forceRefresh })
+  return await pluginsManager<string>(PLUGINS_ACTIONS.LOAD_CUSTOM_LAYOUT, {
+    url,
+    forceRefresh,
+  })
 }
 
 /**

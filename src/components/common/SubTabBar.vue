@@ -46,10 +46,11 @@ function selectTab(id: string) {
     >
       <component :is="tab.icon" v-if="tab.icon" class="h-4 w-4" />
       {{ tab.label }}
-      <!-- 底部选中指示线 -->
+      <!-- 底部选中指示线（所有 tab 均渲染，通过 opacity + scaleX 平滑过渡） -->
       <span
-        v-if="modelValue === tab.id"
-        class="absolute bottom-0 left-2 right-2 h-0.5 rounded-full bg-primary-500"
+        class="absolute bottom-0 left-2 right-2 h-0.5 origin-center rounded-full bg-primary-500 transition-all duration-200 ease-out"
+        :class="modelValue === tab.id ? 'opacity-100' : 'opacity-0'"
+        :style="{ transform: modelValue === tab.id ? 'scaleX(1)' : 'scaleX(0)' }"
       />
     </button>
   </div>

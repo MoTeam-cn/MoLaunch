@@ -1,6 +1,8 @@
 //! JVM 参数构建
 //!
 //! 构建逻辑：
+//! - Authlib：仅当 auth_info.server_url 有值时注入 -javaagent:authlib-injector.jar
+//!   （需配合 `ensure_authlib_injector_jar` 预下载 jar 到缓存目录）
 //! - LUA：仅当版本库列表包含 org.lwjgl:lwjgl:3.4.1 时注入 -javaagent
 //! - JLW：仅当非 GBK 编码、路径非纯 ASCII、且无自定义 -javaagent 时启用
 //!   - Java 9+ 添加 --add-exports cpw.mods.bootstraplauncher
@@ -8,14 +10,22 @@
 //!   - 末尾添加 -jar java-wrapper.jar（覆盖 mainClass 作为入口）
 //!
 //! `build_jvm_args` 按关注点拆分为多个 helper：
-//! - `add_lua_args`:       LUA（LWJGL Unsafe Agent）注入
-//! - `add_gc_args`:        根据 Java 主版本号选择 GC 策略
-//! - `add_json_jvm_args`:  解析版本 JSON 的 arguments.jvm
-//! - `add_jlw_args`:       JLW（Java Launch Wrapper）注入
+//! - `add_authlib_args`:    Authlib-injector 外置登录注入（yggdrasil 协议）
+//! - `add_lua_args`:        LUA（LWJGL Unsafe Agent）注入
+//! - `add_gc_args`:         根据 Java 主版本号选择 GC 策略
+//! - `add_json_jvm_args`:   解析版本 JSON 的 arguments.jvm
+//! - `add_jlw_args`:        JLW（Java Launch Wrapper）注入
 
 use std::path::Path;
 
 use super::embedded::{has_library, resolve_embedded_jar};
+use super::AuthInfo;
+
+/// authlib-injector.jar 在缓存目录的相对路径
+///
+/// 由 `ensure_authlib_injector_jar`（阶段 3.3 实现）异步下载到此处。
+/// `add_authlib_args` 同步读取，不存在则跳过注入并打印警告。
+const AUTHLIB_INJECTOR_JAR_REL: &str = "launch/authlib-injector.jar";
 
 /// Build JVM arguments
 pub(super) fn build_jvm_args(
@@ -25,6 +35,7 @@ pub(super) fn build_jvm_args(
     min_memory: u32,
     max_memory: u32,
     java_path: &Path,
+    auth_info: &AuthInfo,
     extra_jvm_args: &[String],
     json: &serde_json::Value,
     disable_jlw: bool,
@@ -34,6 +45,13 @@ pub(super) fn build_jvm_args(
 
     // 检测 Java 主版本号（用于决定 GC 策略和 JLW 的 --add-exports）
     let java_major = crate::minecraft::java::detect_java_version(&java_path.to_string_lossy());
+
+    // ===== Authlib-injector（外置登录，yggdrasil 协议）=====
+    // 必须在 LUA/JLW 之前注入，避免与 JLW 的 -javaagent 冲突判定
+    // （JLW 检测到 extra_jvm_args 含 -javaagent 时会禁用，但 authlib 注入的是 args
+    //  而非 extra_jvm_args，所以不冲突；放最前是为了让 -javaagent 出现在 args 首位，
+    //  便于排查）
+    add_authlib_args(&mut args, auth_info);
 
     // ===== LUA（LWJGL Unsafe Agent）=====
     add_lua_args(&mut args, json, disable_lua);
@@ -66,6 +84,87 @@ pub(super) fn build_jvm_args(
     add_jlw_args(&mut args, game_dir, java_major, extra_jvm_args, disable_jlw);
 
     Ok(args)
+}
+
+/// Authlib-injector（外置登录，yggdrasil 协议）
+///
+/// 仅当 `auth_info.server_url` 有值时注入，即 AuthlibInjector 登录类型。
+///
+/// 注入参数：
+/// - `-javaagent:authlib-injector.jar=<server_url>`：指定 yggdrasil API 根地址
+/// - `-Dauthlibinjector.yggdrasil.prefetched=<base64_metadata>`（可选）：
+///   预取的服务器元数据（base64 编码的 JSON），避免游戏运行时拉取，提升启动速度
+///
+/// authlib-injector.jar 由 `ensure_authlib_injector_jar`（启动前异步调用）下载到缓存目录。
+/// 若缓存中不存在 jar，则跳过注入并警告（游戏将无法使用外置登录）。
+///
+/// 预取元数据缓存路径与 server_url 一一对应（按 host 区分），避免切换服务器时复用错误元数据。
+fn add_authlib_args(args: &mut Vec<String>, auth_info: &AuthInfo) {
+    let server_url = match auth_info.server_url.as_ref() {
+        Some(url) if !url.is_empty() => url,
+        _ => return, // 非外置登录，跳过
+    };
+
+    if !crate::utils::cache::exists(AUTHLIB_INJECTOR_JAR_REL) {
+        crate::log_warn!(
+            "[Launch] authlib-injector.jar 不存在于缓存，跳过 authlib 注入（外置登录将不可用）"
+        );
+        return;
+    }
+    let jar_path = crate::utils::cache::path(AUTHLIB_INJECTOR_JAR_REL);
+
+    // 注入 -javaagent:jar=server_url
+    args.push(format!(
+        "-javaagent:{}={}",
+        jar_path.to_string_lossy(),
+        server_url
+    ));
+
+    // 注入预取元数据（若已缓存）
+    if let Some(prefetched) = read_prefetched_metadata(server_url) {
+        args.push(format!(
+            "-Dauthlibinjector.yggdrasil.prefetched={}",
+            prefetched
+        ));
+    }
+
+    crate::log_info!("[Launch] 注入 authlib-injector: server={}", server_url);
+}
+
+/// 读取已缓存的预取服务器元数据（base64 编码）
+///
+/// 缓存路径：`launch/authlib-prefetched-<host>.txt`
+/// 返回 None 表示无缓存（authlib-injector 将在游戏启动时自行拉取）
+fn read_prefetched_metadata(server_url: &str) -> Option<String> {
+    let host = extract_host(server_url)?;
+    let rel = format!("launch/authlib-prefetched-{}.txt", host);
+    crate::utils::cache::read(&rel).ok().filter(|s| !s.is_empty())
+}
+
+/// 从 server_url 提取 host 部分，用作缓存文件名的安全标识
+///
+/// 仅保留字母、数字、点、连字符，其他字符替换为 `_`，避免文件名非法字符。
+fn extract_host(server_url: &str) -> Option<String> {
+    let after_scheme = server_url
+        .strip_prefix("https://")
+        .or_else(|| server_url.strip_prefix("http://"))
+        .unwrap_or(server_url);
+    let host_part = after_scheme.split('/').next()?;
+    let sanitized: String = host_part
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '.' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if sanitized.is_empty() {
+        None
+    } else {
+        Some(sanitized)
+    }
 }
 
 /// LUA（LWJGL Unsafe Agent）

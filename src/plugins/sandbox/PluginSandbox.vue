@@ -11,11 +11,11 @@
  * - 监听 plugin:game-launch / plugin:game-exit 等事件，转发给 iframe
  */
 import { ref, onMounted, onUnmounted } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
 import { pluginSdk } from '@/plugins/sdk'
 import type { ProcessResult, CreateWindowOptions } from '@/plugins/sdk'
 import { buildSandboxHtml } from './sandbox-bootstrap'
 import { readExternalPluginFile } from '@/utils/api/plugins'
+import { PLUGINS_ACTIONS, pluginsManager } from '@/utils/api/plugins-manager'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{
@@ -86,14 +86,14 @@ async function handleMessage(event: MessageEvent) {
       return
     }
 
-    // spawnProcess 特殊处理：注入 pluginId 上下文，直接调用后端命令
+    // spawnProcess 特殊处理：注入 pluginId 上下文，调用 plugins_manager dispatcher
     // args 格式: [command, args[], options?]
     if (method === 'spawnProcess') {
       try {
         const command = String(args?.[0] ?? '')
         const procArgs = Array.isArray(args?.[1]) ? args[1] as string[] : []
         const options = (args?.[2] ?? {}) as { cwd?: string }
-        const result = await invoke<ProcessResult>('plugin_spawn_process', {
+        const result = await pluginsManager<ProcessResult>(PLUGINS_ACTIONS.PLUGIN_SPAWN_PROCESS, {
           pluginId: props.pluginId,
           command,
           args: procArgs,
@@ -109,12 +109,12 @@ async function handleMessage(event: MessageEvent) {
       return
     }
 
-    // createWindow 特殊处理：注入 pluginId 上下文，直接调用后端命令
+    // createWindow 特殊处理：注入 pluginId 上下文，调用 plugins_manager dispatcher
     // args 格式: [options]
     if (method === 'createWindow') {
       try {
         const opts = (args?.[0] ?? {}) as Partial<CreateWindowOptions>
-        await invoke('plugin_create_window', {
+        await pluginsManager<void>(PLUGINS_ACTIONS.PLUGIN_CREATE_WINDOW, {
           pluginId: props.pluginId,
           label: String(opts.label ?? ''),
           url: String(opts.url ?? ''),

@@ -65,6 +65,11 @@ pub struct AuthInfo {
     pub access_token: String,
     pub client_token: String,
     pub login_type: String,
+    /// authlib 登录的 yggdrasil API 根地址（仅 AuthlibInjector 登录时有值）
+    /// 启动游戏时用于构建 -javaagent:authlib-injector.jar 和
+    /// -Dauthlibinjector.yggdrasil.prefetched 参数
+    #[serde(default)]
+    pub server_url: Option<String>,
 }
 
 impl std::fmt::Debug for AuthInfo {
@@ -75,6 +80,7 @@ impl std::fmt::Debug for AuthInfo {
             .field("access_token", &"***")
             .field("client_token", &"***")
             .field("login_type", &self.login_type)
+            .field("server_url", &self.server_url)
             .finish()
     }
 }
@@ -152,6 +158,7 @@ mod tests {
             access_token: "secret_token".to_string(),
             client_token: "client_secret".to_string(),
             login_type: "Microsoft".to_string(),
+            server_url: None,
         };
         let debug_str = format!("{:?}", auth);
         assert!(debug_str.contains("***"));
