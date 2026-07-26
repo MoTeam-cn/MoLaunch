@@ -33,6 +33,7 @@ pub mod meta_manager;
 pub mod online_manager;
 pub mod path;
 pub mod plugins_manager;
+pub mod signaling_manager;
 pub mod sdk_manager;
 pub mod skin_manager;
 pub mod system_manager;

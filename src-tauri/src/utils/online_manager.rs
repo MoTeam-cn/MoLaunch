@@ -291,6 +291,10 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             .map_err(|e| e.to_string())
     }));
 
+    // === 信令相关 action（阶段二：房间创建/加入/退出/踢人/保活等）===
+    // 由 signaling_manager 模块统一注册，避免本文件超过 500 行
+    crate::utils::signaling_manager::register_signaling_actions(&mut d);
+
     d
 });
 

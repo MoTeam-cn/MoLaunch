@@ -84,14 +84,12 @@ pub struct TimeData {
 }
 
 /// 业务接口调用结果（解密后）
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct BusinessResult<T> {
     pub code: u32,
     pub data: Option<T>,
     pub msg: String,
     pub req_id: String,
-    /// HTTP 状态码（用于区分 401/403/404 等错误场景）
-    pub http_status: u16,
 }
 
 /// 客户端错误
@@ -406,10 +404,28 @@ impl OnlineClient {
         let url = format!("{}{}", self.base_url, path);
         let jwt = &creds.device_token;
 
+        crate::log_info!(
+            "[Online] call_v1 开始: {} {} (csrf={}, body={}, device_pk={})",
+            method,
+            path,
+            if need_csrf { "yes" } else { "no" },
+            if body.is_some() { "yes" } else { "no" },
+            creds.device_pk
+        );
+
         // GET 请求需要 CSRF（因为 /v1 全局 CSRF 中间件校验所有非 /v3 请求）
         // 实际上 GET 也是非幂等的（按 api-server 配置），所以统一获取
         let csrf_token = if need_csrf {
-            self.get_csrf_token(jwt).await?
+            match self.get_csrf_token(jwt).await {
+                Ok(t) => {
+                    crate::log_debug!("[Online] CSRF 获取成功, len={}", t.len());
+                    t
+                }
+                Err(e) => {
+                    crate::log_warn!("[Online] CSRF 获取失败: {}", e);
+                    return Err(e);
+                }
+            }
         } else {
             String::new()
         };
@@ -417,7 +433,17 @@ impl OnlineClient {
         // 请求体加密（如果有）
         let req_body: Option<Envelope> = if let Some(body_val) = body {
             let plaintext = serde_json::to_vec(body_val)?;
-            Some(seal(&plaintext, &creds.device_public_key_b64u)?.envelope)
+            crate::log_debug!(
+                "[Online] 请求体明文长度={}B, 加密中...",
+                plaintext.len()
+            );
+            let sealed = seal(&plaintext, &creds.device_public_key_b64u)?;
+            crate::log_debug!(
+                "[Online] 请求体加密完成 (payload_len={}, key_len={})",
+                sealed.envelope.payload.len(),
+                sealed.envelope.key.len()
+            );
+            Some(sealed.envelope)
         } else {
             None
         };
@@ -451,8 +477,32 @@ impl OnlineClient {
         let status = resp.status().as_u16();
         let body_text = resp.text().await?;
 
+        crate::log_info!(
+            "[Online] call_v1 响应: {} {} status={}, body_len={}B",
+            method,
+            path,
+            status,
+            body_text.len()
+        );
+
+        if status != 200 {
+            crate::log_warn!(
+                "[Online] call_v1 非 200: {} {} status={}, body={}",
+                method,
+                path,
+                status,
+                body_text
+            );
+        }
+
         // 解析响应
         let body_json: serde_json::Value = serde_json::from_str(&body_text).map_err(|_| {
+            crate::log_error!(
+                "[Online] call_v1 响应 JSON 解析失败: {} {} body_len={}B",
+                method,
+                path,
+                body_text.len()
+            );
             ClientError::HttpStatus {
                 status,
                 body: body_text.clone(),
@@ -461,6 +511,11 @@ impl OnlineClient {
 
         // 判断是否为加密信封
         if is_envelope(&body_json) {
+            crate::log_debug!(
+                "[Online] call_v1 响应为加密信封, 解密中: {} {}",
+                method,
+                path
+            );
             let envelope: Envelope = serde_json::from_value(body_json)?;
 
             // 用本地 X25519 私钥解密
@@ -475,24 +530,59 @@ impl OnlineClient {
             secret_bytes.copy_from_slice(&secret_bytes_vec);
 
             let plaintext = open(&envelope, &secret_bytes)?;
+            crate::log_debug!(
+                "[Online] call_v1 解密成功: {} {} 明文长度={}B",
+                method,
+                path,
+                plaintext.len()
+            );
             let unified: UnifiedResponse<T> = serde_json::from_slice(&plaintext)?;
+
+            if unified.code != 1 {
+                crate::log_warn!(
+                    "[Online] call_v1 业务失败: {} {} code={}, msg={}, req_id={}",
+                    method,
+                    path,
+                    unified.code,
+                    unified.msg,
+                    unified.req_id
+                );
+            } else {
+                crate::log_info!(
+                    "[Online] call_v1 业务成功: {} {} req_id={}",
+                    method,
+                    path,
+                    unified.req_id
+                );
+            }
 
             Ok(BusinessResult {
                 code: unified.code,
                 data: unified.data,
                 msg: unified.msg,
                 req_id: unified.req_id,
-                http_status: status,
             })
         } else {
             // 明文响应（401/400/500）
+            crate::log_debug!(
+                "[Online] call_v1 响应为明文: {} {}",
+                method,
+                path
+            );
             let unified: UnifiedResponse<T> = serde_json::from_value(body_json)?;
+            crate::log_warn!(
+                "[Online] call_v1 明文响应: {} {} code={}, msg={}, req_id={}",
+                method,
+                path,
+                unified.code,
+                unified.msg,
+                unified.req_id
+            );
             Ok(BusinessResult {
                 code: unified.code,
                 data: unified.data,
                 msg: unified.msg,
                 req_id: unified.req_id,
-                http_status: status,
             })
         }
     }

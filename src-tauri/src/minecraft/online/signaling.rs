@@ -34,82 +34,121 @@ pub struct CreateRoomRequest {
 }
 
 /// 创建房间响应
-#[derive(Debug, Clone, Deserialize)]
+///
+/// `rename_all = "camelCase"`：序列化输出 camelCase 给前端
+/// `alias`：反序列化时接受 api-server 返回的 snake_case
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateRoomResponse {
+    #[serde(alias = "room_code")]
     pub room_code: String,
+    #[serde(alias = "host_virtual_ip")]
     pub host_virtual_ip: String,
     pub subnet: String,
+    #[serde(alias = "created_at")]
     pub created_at: u64,
+    #[serde(alias = "expires_at")]
     pub expires_at: u64,
 }
 
 /// 房间公开信息
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct RoomInfoResponse {
+    #[serde(alias = "room_code")]
     pub room_code: String,
+    #[serde(alias = "host_device_pk")]
     pub host_device_pk: String,
+    #[serde(alias = "max_players")]
     pub max_players: u32,
+    #[serde(alias = "player_count")]
     pub player_count: u32,
+    #[serde(alias = "has_password")]
     pub has_password: bool,
+    #[serde(alias = "stun_servers")]
     pub stun_servers: Vec<String>,
     pub status: String,
+    #[serde(alias = "created_at")]
     pub created_at: u64,
+    #[serde(alias = "expires_at")]
     pub expires_at: u64,
     /// 房主 MC 版本（客户端扩展字段，由创建房间时上报）
-    #[serde(default)]
+    #[serde(default, alias = "host_mc_version")]
     pub host_mc_version: String,
     /// 房主 MC 端口（客户端扩展字段）
-    #[serde(default)]
+    #[serde(default, alias = "host_mc_port")]
     pub host_mc_port: u16,
 }
 
 /// 加入房间响应
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct JoinRoomResponse {
+    #[serde(alias = "participant_id")]
     pub participant_id: String,
+    #[serde(alias = "host_sdp_offer")]
     pub host_sdp_offer: String,
+    #[serde(alias = "host_ice_candidates")]
     pub host_ice_candidates: Vec<String>,
+    #[serde(alias = "stun_servers")]
     pub stun_servers: Vec<String>,
+    #[serde(alias = "player_virtual_ip")]
     pub player_virtual_ip: String,
     pub subnet: String,
 }
 
 /// 待确认 Answer
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PendingAnswer {
+    #[serde(alias = "participant_id")]
     pub participant_id: String,
+    #[serde(alias = "device_pk")]
     pub device_pk: String,
+    #[serde(alias = "sdp_answer")]
     pub sdp_answer: String,
+    #[serde(alias = "ice_candidates")]
     pub ice_candidates: Vec<String>,
+    #[serde(alias = "player_virtual_ip")]
     pub player_virtual_ip: String,
+    #[serde(alias = "joined_at")]
     pub joined_at: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ListAnswersResponse {
     pub answers: Vec<PendingAnswer>,
 }
 
 /// 参与者信息
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct ParticipantInfo {
+    #[serde(alias = "participant_id")]
     pub participant_id: String,
+    #[serde(alias = "device_pk")]
     pub device_pk: String,
+    #[serde(alias = "virtual_ip")]
     pub virtual_ip: String,
     pub status: String,
+    #[serde(alias = "joined_at")]
     pub joined_at: u64,
+    #[serde(alias = "confirmed_at")]
     pub confirmed_at: u64,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ListParticipantsResponse {
     pub participants: Vec<ParticipantInfo>,
 }
 
 /// keepalive 响应
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct KeepaliveResponse {
+    #[serde(alias = "expires_at")]
     pub expires_at: u64,
+    #[serde(alias = "server_time")]
     pub server_time: u64,
 }
 

@@ -173,11 +173,12 @@ pub fn build_register_request(
     let payload_json = serde_json::to_string(&payload)
         .map_err(|e| CryptoError::PemParseFailed(format!("序列化注册载荷失败: {}", e)))?;
 
-    crate::log_debug!(
-        "[Online] 注册 content 载荷长度={}B, deviceid={}, nonce={}",
+    crate::log_info!(
+        "[Online] 注册 content 载荷: 长度={}B, deviceid={}, nonce={}, timestamp={}",
         payload_json.len(),
         device_id,
-        nonce
+        nonce,
+        timestamp
     );
 
     // RSA-OAEP 加密 content
@@ -187,7 +188,11 @@ pub fn build_register_request(
     // 签名材料
     let sign_material = format!("{}.{}.{}", payload_json, nonce, timestamp);
     let signature_b64u = kp.ed25519.sign_b64u(sign_material.as_bytes());
-    crate::log_debug!("[Online] 注册请求构造完成，签名材料长度={}B", sign_material.len());
+    crate::log_info!(
+        "[Online] 注册请求构造完成: 签名材料长度={}B, content密文长度={}B",
+        sign_material.len(),
+        encrypted_content.len()
+    );
 
     let req = RegisterRequest {
         deviceid: device_id.to_string(),
