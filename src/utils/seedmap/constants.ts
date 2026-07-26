@@ -107,6 +107,8 @@ export function getStructIcon(stype: string): StructureIconDef {
 
 // ===== 结构图标 URL =====
 // Vite 5 推荐语法：query:'?url' + import:'default'，直接返回 url 字符串。
+// 注：Vite 5.4 中该模式会触发资源双输出，已在 vite.config.ts 的 assetFileNames 中
+//     将图片输出路径设为 assets/ 根目录（与默认位置一致）避免冗余文件。
 const iconUrlMap: Record<string, string> = {}
 const globModules = import.meta.glob('@/assets/structures/*.webp', {
   eager: true,
@@ -117,8 +119,6 @@ for (const [key, val] of Object.entries(globModules)) {
   const m = key.match(/\/([^/]+)\.webp$/)
   if (m && typeof val === 'string' && val) iconUrlMap[m[1]] = val
 }
-
-console.log('[seedmap] iconUrlMap loaded:', Object.keys(iconUrlMap).length, 'icons, sample:', iconUrlMap['village'] ?? '(empty)')
 
 /**
  * 结构名 → 图标文件名别名映射

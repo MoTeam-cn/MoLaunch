@@ -9,6 +9,155 @@
 
 ### 变更
 
+#### 房主轮询待确认 Answer 失败时显示实际错误 + 30s 防刷屏
+- 痛点：用户反馈房主轮询 list_answers 时全部返回 `code=1002, msg="资源不存在"`，但前端 [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 的 `pollAnswers` 在 `result.code !== 1` 时仅 `console.warn`，UI 无任何提示，用户无法感知错误，也无法判断是房间不存在、非房主、网络异常、还是 api-server 走了 fallback
+- 根因（双重）：
+  - 部署侧：用户当前部署的 api-server 是旧版本（响应体仍含 `http_status` 字段、msg 是 generic "资源不存在"），未包含 `signaling_error_to_envelope` 返回具体 msg（如"房间不存在"/"仅房主可执行此操作"）的改动，也未包含 v1/v3 路由前缀修复
+  - 前端侧：`pollAnswers` 业务失败时静默不显示 toast，用户只能从浏览器控制台看到 warn 日志
+- 修复：[src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 的 `pollAnswers` 函数在 `result.code !== 1` 时调用新增的 `maybeToastError` 辅助函数，弹 toast 显示实际 `result.msg`（如"资源不存在"/"房间不存在"/"仅房主可执行此操作"），同时打印包含 `code/msg/req_id` 的详细 warn 日志便于排查；异常路径（网络错误等）同样弹 toast 显示异常 message
+- 防刷屏：5s 轮询下连续失败会刷屏，新增 `lastAnswerErrorToastAt` ref + `ANSWER_ERROR_TOAST_INTERVAL = 30_000` 常量，30 秒内只弹一次 toast；成功时重置计时器，下次失败可立即弹
+- 注意：本次仅前端治标，**根本解决需更新 api-server 部署到最新版本**（包含 `signaling_error_to_envelope` 返回具体 msg + v1/v3 路由前缀修复 + 移除响应体 `http_status` 字段），更新后前端 toast 将显示具体业务错误而非 generic "资源不存在"
+- 验证：`npx eslint src/components/online/RoomHostPanel.vue` 0 错误 0 警告
+
+#### 联机模块 /v1 业务接口补充全链路日志 + 注册接口 RSA-3072 适配 + 默认地址 placeholder 修正
+- 痛点一：用户点击注册报错 `Failed to [Online] register device: 构造注册请求失败: RSA 加密失败: message too long`。根因：api-server 默认生成 RSA-2048 密钥，注册 content JSON（含 ed25519_pub + x25519_pub + deviceid + timestamp + nonce，约 209B）超过 RSA-2048 + OAEP-SHA256 的最大明文上限 190B
+  - 修复：[api-server/src/server/mod.rs](api-server/src/server/mod.rs) 的 `load_or_generate_rsa_keypair` 函数将生成位数从 2048 改为 3072（RSA-3072 + OAEP-SHA256 最大 318B，足够承载注册 content），警告日志同步改为"自动生成 3072 位密钥对"，并补充注释说明 RSA-2048 不足的原因
+  - 同步：[api-server/src/utils/mosign.rs](api-server/src/utils/mosign.rs) 的 `test_rsa_oaep_roundtrip` 测试用例从 2048 改为 3072，与生产保持一致避免误导后续开发者
+  - 注意：已存在 RSA 密钥文件不会被自动覆盖（`load_or_generate_rsa_keypair` 检测两文件均存在时直接读取），用户需手动删除 api-server 部署目录下的 RSA 私钥/公钥文件后重启服务，才会重新生成 3072 位密钥
+- 痛点二：联机模块 /v1 业务接口（信令房间创建/加入/退出等）调用失败时后端无任何日志，无法定位是网络、加密、解密、业务码、还是 CSRF 问题
+  - 修复：[src-tauri/src/minecraft/online/client.rs](src-tauri/src/minecraft/online/client.rs) 的 `OnlineClient::call_v1` 方法补充全链路日志：
+    - `log_info!`：调用开始（method/path/是否需 CSRF/是否带 body/device_pk）、HTTP 响应（status/body_len）、业务成功（req_id）
+    - `log_debug!`：CSRF 获取成功、请求体加密明文长度 + 加密后 payload/key 长度、响应为加密信封解密中、解密成功明文长度、响应为明文
+    - `log_warn!`：CSRF 获取失败、HTTP 非 200、业务失败（code/msg/req_id）、明文响应（401/400/500 走明文路径）
+    - `log_error!`：响应 JSON 解析失败
+- 痛点三：[src/views/settings/SettingsOnline.vue](src/views/settings/SettingsOnline.vue) 输入框 placeholder 仍显示旧地址 `https://api.molaunch.moteam.top`，与实际默认地址 `https://api.molaunch.moiu.cn`（[src-tauri/src/state/config.rs](src-tauri/src/state/config.rs) `OnlineConfig::default`）不一致，对用户产生误导
+  - 修复：placeholder 改为 `https://api.molaunch.moiu.cn`，与 `DEFAULT_API_SERVER_URL` 常量及后端默认值统一
+- 验证：`cargo check --lib --manifest-path src-tauri/Cargo.toml` 0 错误 0 警告；`cargo check --manifest-path api-server/Cargo.toml` 0 错误 0 警告
+
+#### 修复信令参数/响应字段命名不一致导致"参数解析失败: missing field `room_code`" + 前端字段访问 undefined
+- 痛点：用户点击加入房间，后端返回 `参数解析失败: missing field `room_code``。根因：前端 [src/utils/api/online-manager.ts](src/utils/api/online-manager.ts) 发送 camelCase 参数（`{ roomCode, password }`），但 [src-tauri/src/utils/signaling_manager.rs](src-tauri/src/utils/signaling_manager.rs) 的 Params 结构体（`JoinRoomParams` / `RoomCodeParams` / `CreateRoomParams` / `SubmitAnswerParams` / `ConfirmParams` / `KickParams` / `UnbanParams`）未标注 `#[serde(rename_all = "camelCase")]`，serde 默认按 snake_case 反序列化，导致 `roomCode` 无法映射到 `room_code` 字段
+- 关联问题：[src-tauri/src/minecraft/online/signaling.rs](src-tauri/src/minecraft/online/signaling.rs) 的 6 个响应类型（`CreateRoomResponse` / `RoomInfoResponse` / `JoinRoomResponse` / `PendingAnswer` / `ParticipantInfo` / `KeepaliveResponse`）同样未标注 `rename_all`，api-server 返回 snake_case（如 `room_code` / `host_virtual_ip`），反序列化虽然能成功（字段名与 Rust 字段名一致），但序列化发给前端时输出 snake_case（`room_code`），而前端 [src/types/online.ts](src/types/online.ts) 期望 camelCase（`roomCode`），导致前端访问 `data.roomCode` 得到 `undefined`
+- 变更：
+  - [src-tauri/src/utils/signaling_manager.rs](src-tauri/src/utils/signaling_manager.rs)：7 个 Params 结构体统一添加 `#[serde(rename_all = "camelCase")]`
+  - [src-tauri/src/minecraft/online/signaling.rs](src-tauri/src/minecraft/online/signaling.rs)：6 个响应类型添加 `#[serde(rename_all = "camelCase")]`（让序列化输出 camelCase 给前端）+ 每个字段添加 `#[serde(alias = "snake_case_name")]`（让反序列化接受 api-server 返回的 snake_case），实现"反序列化兼容 snake_case、序列化输出 camelCase"的双向适配
+  - 不修改 `StunServersResponse` / `ListAnswersResponse` / `ListParticipantsResponse`（单字段且为单词，无命名差异）
+  - 不修改 `DeviceStatus` / `ServerTimeInfo` / `BusinessResult`（前端 [src/types/online.ts](src/types/online.ts) 已使用 snake_case 定义，与后端一致）
+- 复用：serde 官方 `rename_all` + `alias` 组合（项目其他模块如 `system_manager.rs` / `version_list_manager.rs` / `skin_manager.rs` 均采用相同模式，仅 Params 单向 camelCase；本次响应类型因 api-server 返回 snake_case 而额外加 alias）
+- 验证：`cargo check --lib` 0 错误 0 警告
+
+#### 修复 vite.config.ts import attributes 语法导致 dev 启动失败
+- 痛点：`npm run dev` 启动报错 `Bundling with import attributes is not currently supported`，根因是 [vite.config.ts](vite.config.ts) 第 4 行 `import pkg from './package.json' with { type: 'json' }` 使用了 ES2024 import attributes 语法，当前 esbuild 版本不支持
+- 变更：改为普通 import `import pkg from './package.json'`（[tsconfig.json](tsconfig.json) 第 10 行已启用 `resolveJsonModule: true`，esbuild 默认支持 JSON 导入，无需 import attributes）
+- 验证：项目内全局搜索 `with { type: 'json' }` 无其他匹配
+
+#### 修复 dev 启动后依赖预构建扫描 code-libs 报错
+- 痛点：修复 import attributes 后首次启动 dev 触发 `Re-optimizing dependencies because vite config has changed`，vite 默认扫描项目根目录下所有 .ts/.vue 文件，扫到了 [code-libs/arco-design-vue-main/packages/arco-vue-docs/](code-libs/arco-design-vue-main/packages/arco-vue-docs/) 目录里的 170+ 个文档源码文件，这些文件引用了 `vue-i18n` / `@web-vue/components/*` / `@arco-design/arco-vue-docs-navbar` / `@stackblitz/sdk` 等未安装的依赖，导致依赖预构建报错 `The following dependencies are imported but could not be resolved`
+- 根因：`code-libs/arco-design-vue-main` 是 Arco Design Vue 源码副本，仅作查阅参考用（已在 `.gitignore` 第 62 行排除），不应参与 vite 依赖预构建扫描
+- 变更：[vite.config.ts](vite.config.ts) 新增 `optimizeDeps.entries: ['index.html', 'src/main.ts']`，显式指定扫描入口为应用真实入口，避免 vite 默认全项目扫描
+- 复用：vite 官方 `optimizeDeps.entries` 配置项（无需引入额外插件）
+- 验证：项目入口 `src/main.ts` 已确认存在
+
+#### 修复信令 action 未注册导致"未知操作: room_join" + signaling_handler 重命名为 signaling_manager
+- 痛点：用户点击加入房间，后端返回 `未知操作: room_join`。根因：[src-tauri/src/utils/signaling_manager.rs](src-tauri/src/utils/signaling_manager.rs) 中定义了 `register_signaling_actions` 函数（注册 12 个信令 action：`get_stun_servers` / `room_create` / `room_info` / `room_close` / `room_join` / `answer_submit` / `answers_list` / `participant_confirm` / `room_keepalive` / `room_leave` / `participant_kick` / `participant_unban` / `participants_list`），但 [src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs) 的 DISPATCHER 中**从未调用这个函数**，导致所有信令 action 都没有注册到 dispatcher，前端调用时统一回落到 `未知操作: {action}` 错误分支
+- 命名问题：原文件名 `signaling_handler.rs` 不符合项目 `xxx_manager.rs` 命名惯例（utils 目录下 14 个业务模块全部叫 `xxx_manager.rs`，无 `xxx_handler.rs`），重命名为 `signaling_manager.rs`
+- 变更：
+  - 重命名 `signaling_handler.rs` → `signaling_manager.rs`，文件顶部注释由"信令 action 处理器"改为"信令 action 管理器"，并补充"命名遵循项目 `xxx_manager.rs` 惯例"说明
+  - [src-tauri/src/utils/mod.rs](src-tauri/src/utils/mod.rs)：新增 `pub mod signaling_manager;` 模块声明（原文件存在但未在 mod.rs 中声明，导致 `crate::utils::signaling_manager` 路径无法解析）
+  - [src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs)：在 DISPATCHER 的 Lazy 闭包末尾、`d` 返回前，调用 `crate::utils::signaling_manager::register_signaling_actions(&mut d);` 注册全部信令 action
+  - [src-tauri/src/minecraft/online/client.rs](src-tauri/src/minecraft/online/client.rs)：`BusinessResult<T>` 加 `Serialize` derive（signaling_manager 中 `serde_json::to_value` 调用需要 `T: Serialize`）
+  - [src-tauri/src/minecraft/online/signaling.rs](src-tauri/src/minecraft/online/signaling.rs)：8 个响应/嵌套类型加 `Serialize` derive（CreateRoomResponse / RoomInfoResponse / JoinRoomResponse / PendingAnswer / ListAnswersResponse / ParticipantInfo / ListParticipantsResponse / KeepaliveResponse，原仅 Deserialize）
+  - [src-tauri/src/utils/signaling_manager.rs](src-tauri/src/utils/signaling_manager.rs)：清理未使用的导入（`tauri::AppHandle` 和 6 个 Response 类型，仅 `CreateRoomRequest` 在 handler 中实际使用）
+- 复用：
+  - `signaling_manager::register_signaling_actions` 函数（阶段二已实现，本次只是补上调用）
+  - `Dispatcher::register` 机制（与 auth_* action 一致的注册方式）
+- 验证：`cargo check --lib` 0 错误 0 警告
+
+#### Input.vue 补充 hint 提示渲染（参考 Arco FormItemMessage）
+- 痛点：[src/components/common/Input.vue](src/components/common/Input.vue) 之前已定义 `hint` / `hintType` 两个 props，但 template 完全没有渲染，导致传入 hint 后输入框下方无任何提示显示。用户反馈"这输入框下也没显示错误提示啊"
+- 调研：阅读 `code-libs/arco-design-vue-main/packages/web-vue/components/input/input.tsx` 与 `form/form-item-message.vue` + `form/style/index.less`，确认 Arco 原始 Input 组件本身不渲染提示文字，提示统一由 FormItem 的 FormItemMessage 子组件渲染（min-height 20px 防抖动 + form-blink 透明度动画 + 错误色 form-color-tip-text_error）
+- 变更：
+  - [src/components/common/Input.vue](src/components/common/Input.vue)（365 行，含 200+ 行历史样式；本次净增 6 行）：
+    - template 外层包裹 `<span class="input-root">`（display: inline-block; width: 100%），承载原 input-wrapper + 下方提示文字
+    - 新增 `<transition name="input-hint">` 包裹的 `<div class="input-hint" :class="`input-hint-${hintType}`" role="alert">` 渲染 hint 文字
+    - 新增 `.input-hint` 样式：margin-top 4px、min-height 20px、font-size 12px、line-height 20px（与 Arco form-font-error-text-size 一致）
+    - 颜色三态：`.input-hint-error` 红色（#f53f3f Arco red-6）、`.input-hint-success` 绿色（#00b42a Arco green-6）、`.input-hint-default` 灰色（#86909c Arco gray-7）
+    - 出现/消失动画：`opacity 0 → 1` 过渡 0.2s ease（参考 Arco form-blink）
+  - [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue)（183 行，300 限制内）：
+    - 新增 `roomCodeHint` / `roomCodeHintType` 两个 computed，根据 `joinForm.roomCode` 长度动态切换：
+      - 空时：default 提示"请输入 6 位房间码（数字 + 大写字母）"
+      - 1-5 位：error 提示"还需输入 N 位"
+      - 6 位：success 提示"房间码格式正确"
+      - 超过 6 位：error 提示"房间码不能超过 6 位"
+    - 房间码 Input 绑定 `:hint="roomCodeHint"` 和 `:hint-type="roomCodeHintType"`
+    - 房间码行布局由 `items-center` 改为 `items-start`，label 加 `pt-2 shrink-0`，避免 hint 出现时 label 被居中推到 input 与 hint 中间
+- 复用：
+  - Arco FormItemMessage 的设计模式（min-height 防抖动 + 透明度动画 + 错误色编码）
+  - 项目已有的 `hint` / `hintType` props 定义（无需新增 prop）
+- 验证：ESLint 对 2 个变更文件 0 错误 0 警告（Input.vue 的 maxlength warning 为历史问题）；vue-tsc 类型检查 2 个文件无错误
+
+#### 联机主页改用侧边栏布局（与设置页一致）+ NavSidebar 支持子菜单
+- 痛点：
+  1. 联机主页原为纯 web 风格的纵向单列卡片堆叠，与启动器整体风格（[Settings.vue](src/views/Settings.vue) 侧边栏布局）不一致，用户反馈"在纯 web 页面还行，但我这是启动器"
+  2. 创建/加入房间原来是 RoomManager 内部的水平 tab，用户希望改成「房间管理」下的子菜单（在最外部的侧边栏上）
+  3. 加入房间表单的 `maxlength="6"` 传字符串导致 Vue 警告 `Invalid prop: type check failed`
+  4. 房间码输入 123（不足 6 位）也能请求后端，缺少长度校验
+- 变更：
+  - 扩展 [src/components/common/NavSidebar.vue](src/components/common/NavSidebar.vue)（181 行，300 限制内）支持二级子菜单：
+    - `NavCategory` 接口新增可选 `children?: NavCategory[]` 字段（向后兼容，[Settings.vue](src/views/Settings.vue) 等无 children 的调用方行为不变）
+    - 父项点击：有 children 则 toggle 展开/收起，无 children 则 emit id
+    - 子项点击：emit id；父项高亮条件包含「子项选中」
+    - `watch(modelValue)` 自动展开包含选中子项的父项
+    - 子菜单展开/收起动画：`grid-template-rows: 0fr → 1fr` + `opacity` + ChevronDown 图标 `rotate-180` 旋转，三者同步 `transition-all duration-200`
+  - 重构 [src/views/Online.vue](src/views/Online.vue)（178 行，300 限制内）：改用与 [Settings.vue](src/views/Settings.vue) 一致的 `flex h-full rounded-xl overflow-hidden bg-white shadow-sm` + `NavSidebar` + 右侧标题栏 + 内容区布局
+    - 左侧分类：「设备」（始终显示）+「房间管理」（仅 `isReady` 时显示，含 children: 「创建房间」「加入房间」）
+    - 右侧顶部：分类 label + desc（子项优先）+ 状态徽章（未注册/需登录/已就绪）+ 联机设置入口
+    - 右侧内容区：`OnlineDevicePanel` / `RoomManager(:mode="activeCategory")` 切换
+    - 状态联动：`watch(isReady)` 登录成功自动跳到「创建房间」子项，JWT 过期自动切回「设备」
+  - 新增 [src/components/online/OnlineDevicePanel.vue](src/components/online/OnlineDevicePanel.vue)（190 行，300 限制内）：从原 [Online.vue](src/views/Online.vue) 拆出的设备面板，包含加载占位 / 注册引导 / 登录卡片 / NAT 类型检测 / 设备信息；NAT 检测直接调用 `detectNatTypeWithStun`（无需 useWebRTC 实例）
+  - 重构 [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue)（183 行，300 限制内）：
+    - 移除 NAT 检测卡片（已移到 OnlineDevicePanel）
+    - 移除内部子菜单（已移到外部 NavSidebar）
+    - 新增 `mode: 'create' | 'join'` prop，由父组件传入；role=null 时根据 mode 显示创建/加入表单
+    - role=host/guest 时无论 mode 都显示对应面板（保证房间内切换子菜单不丢连接）
+    - 修复 `maxlength="6"` → `:maxlength="6"`（字符串改数字，消除 Vue 警告）
+    - 房间码校验从「非空」改为「长度===6」，不足 6 位直接 toastError 不请求后端
+- 复用：
+  - `NavSidebar`：扩展后的公共组件，与 [Settings.vue](src/views/Settings.vue) 共用，自动同步 `?tab=` 到 URL（含子项 id）
+  - `Card` / `Button` / `Input` / `Tooltip`：项目自定义组件
+  - `useOnlineStore`：与 [RoomManager.vue](src/components/online/RoomManager.vue) 共享 `deviceStatus` 与房间状态
+  - `detectNatTypeWithStun` / `NAT_TYPE_META` / `getNatFeasibilityColorClass`：[src/utils/online/nat-type.ts](src/utils/online/nat-type.ts) 工具函数
+  - `formatTimestamp`：阶段一新增的公共工具函数
+- 验证：ESLint 对 6 个变更文件（NavSidebar.vue / Online.vue / OnlineDevicePanel.vue / RoomManager.vue / RoomHostPanel.vue / RoomGuestPanel.vue）0 错误 0 警告
+
+#### 联机功能阶段二：信令 + WebRTC + NAT 检测 + 房间管理 UI
+- 背景：阶段一完成认证 + 路由 + 设置面板后，[Online.vue](src/views/Online.vue) 房间管理位置仍是"功能开发中"占位。阶段二补齐信令 IPC、WebRTC composable、NAT 检测与房主/加入方双面板 UI
+- 范围决策：全量二阶段（信令 + WebRTC + 房间管理）；WebRTC PeerConnection 放在前端；本次不做虚拟网卡（仅做 P2P SDP/ICE 交换，不创建虚拟网卡）
+- 后端：
+  - 新增 [src-tauri/src/utils/signaling_handler.rs](src-tauri/src/utils/signaling_handler.rs)：12 个信令 action 处理器（`get_stun_servers` / `room_create` / `room_info` / `room_close` / `room_join` / `answer_submit` / `answers_list` / `participant_confirm` / `room_keepalive` / `room_leave` / `participant_kick` / `participant_unban` / `participants_list`），每个处理器带 INFO 开始日志 + DEBUG 关键步骤日志 + ERROR 错误分支日志
+  - 修改 [src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs)：在 `handle_action` 中按 action 名分发到 signaling_handler，保持原有认证 action 不变
+- 前端类型与 IPC：
+  - 修改 [src/types/online.ts](src/types/online.ts)：新增 `BusinessResult<T>`（code/data/msg/time/req_id）、`StunServersResponse`、`CreateRoomParams` / `CreateRoomResponse`、`RoomInfoResponse` / `JoinRoomResponse`、`PendingAnswer` / `ListAnswersResponse`、`ParticipantInfo` / `ListParticipantsResponse` / `KeepaliveResponse`、`NatType` 联合类型与 `NatDetectionResult`
+  - 修改 [src/utils/api/online-manager.ts](src/utils/api/online-manager.ts)：新增 12 个信令 IPC wrapper（`getStunServers` / `createRoom` / `getRoomInfo` / `closeRoom` / `joinRoom` / `submitAnswer` / `listAnswers` / `confirmParticipant` / `keepaliveRoom` / `leaveRoom` / `kickParticipant` / `unbanParticipant` / `listParticipants`）
+- 前端 WebRTC 与 NAT 检测：
+  - 新增 [src/composables/useWebRTC.ts](src/composables/useWebRTC.ts)：WebRTC composable，封装 `RTCPeerConnection` 生命周期，暴露 `createOffer` / `setRemoteOfferAndCreateAnswer` / `setRemoteAnswer` / `detectNatType` / `close` / `connectionState` / `detectingNat` 等
+  - 新增 [src/utils/online/nat-type.ts](src/utils/online/nat-type.ts)：NAT 类型检测与 tooltip 元数据
+    - `NAT_TYPE_META`：6 种 NAT 类型（Open / FullCone / RestrictedCone / PortRestrictedCone / Symmetric / Blocked / Unknown）的 label、color、feasibility、tooltip 文案，tooltip 说明该类型的联机可行性（高/中/低）与适用场景
+    - `detectNatTypeWithStun`：创建临时 PeerConnection（不污染主连接），通过 ICE candidate 类型组合判定 NAT 类型
+    - `getNatFeasibilityColorClass`：根据 feasibility 返回 Tailwind 颜色类（high=green、medium=yellow、low=red）
+- 前端状态管理与 UI：
+  - 修改 [src/stores/online.ts](src/stores/online.ts)：新增 `RoomState` 接口与 `roomState` ref，新增 `hostCreateRoom` / `hostCloseRoom` / `guestJoinRoom` / `guestLeaveRoom` / `refreshParticipants` / `keepalive` / `kickParticipant` 等方法
+  - 新增 [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue)（254 行，300 限制内）：房间管理主控制器，根据 `roomState.role` 切换 NAT 检测卡片 + 房主/加入方面板 + 创建/加入房间表单；通过 `provide` 把 `useWebRTC` 实例注入子组件
+  - 新增 [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue)（260 行，300 限制内）：房主面板，包含房间信息（房间码/最大人数/剩余有效期/子网/STUN/MC 版本）、P2P 连接状态、待确认连接列表（接受/拒绝）、参与者管理（踢出/封禁）、5 秒轮询 answers + 10 秒轮询 participants + 5 分钟 keepalive 定时器
+  - 新增 [src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)（156 行，300 限制内）：加入方面板，包含房间信息、P2P 连接状态（已连接时显示"在 MC 中直接连接到房主虚拟 IP"提示）、退出房间
+  - 修改 [src/views/Online.vue](src/views/Online.vue)：`isReady` 分支由"功能开发中"占位替换为 `<RoomManager />`
+- 复用：
+  - `Card` / `Button` / `Input` / `Tooltip`：项目自定义组件（[src/components/common/](src/components/common/)），符合"禁止使用原生 HTML 元素"约定
+  - `showConfirm` / `toastSuccess` / `toastError`：全局 Modal/Toast 服务（[src/utils/modal.ts](src/utils/modal.ts)）
+  - `useOnlineStore`：与 [Online.vue](src/views/Online.vue) 共享 deviceStatus 与房间状态
+  - `formatTimestamp`：阶段一新增的公共工具函数
+- 修复：3 个 Room*.vue 文件末尾被误追加的 `</content></invoke>` 标签导致 `vue/no-parsing-error`；[src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 中 `lastKeepalive` / `lastPollAnswers` ref 只赋值不读取，删除死代码消除 `vue/no-ref-as-operand`
+- 验证：ESLint 对 9 个变更文件 0 错误 0 警告；`cargo check --lib` 7.40s，0 警告 0 错误
+
 #### 联机模块日志补全 + 默认 api-server 地址变更 + RSA 长度诊断
 - 痛点：
   1. 联机模块后端几乎无日志，注册/登录失败时无法定位问题环节
@@ -16,6 +165,7 @@
   3. 注册报错 `RSA 加密失败: message too long`，根因是 api-server 使用 RSA-2048（最大明文 190B）而注册 content JSON 约 209B，超出限制
 - 变更：
   - [src-tauri/src/state/config.rs](src-tauri/src/state/config.rs)：`OnlineConfig::default` 默认地址由 `https://api.molaunch.moteam.top` 改为 `https://api.molaunch.moiu.cn`
+  - [src-tauri/resources/defaults/config.ini](src-tauri/resources/defaults/config.ini)：`[Online] api_server_url` 同步更新为新域名
   - [src/views/settings/SettingsOnline.vue](src/views/settings/SettingsOnline.vue)：`DEFAULT_API_SERVER_URL` 常量同步更新
   - [src-tauri/src/minecraft/online/crypto.rs](src-tauri/src/minecraft/online/crypto.rs)：`rsa_oaep_encrypt` 增加 RSA 位数/明文长度/max_allowed 日志（DEBUG），明文超长时返回清晰错误提示（指明需 RSA-3072 或 RSA-4096）
   - [src-tauri/src/minecraft/online/auth.rs](src-tauri/src/minecraft/online/auth.rs)：`build_register_request` / `build_login_request` 增加 content 长度、deviceid/device_pk、nonce 日志（DEBUG）
