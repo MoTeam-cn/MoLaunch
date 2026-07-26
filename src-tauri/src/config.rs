@@ -166,6 +166,13 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.clone());
 
+    // Online（联机 api-server 地址，未配置时保留默认值）
+    if let Some(url) = config.get("Online", "api_server_url") {
+        if !url.is_empty() {
+            app_config.online.api_server_url = url;
+        }
+    }
+
     log_info!("Config loaded from storage");
     Ok(Some(app_config))
 }
@@ -323,6 +330,9 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "dir",
         config.external_download_dir.as_deref().unwrap_or(""),
     );
+
+    // Online
+    ini.set("Online", "api_server_url", &config.online.api_server_url);
 
     storage.write_config(&ini).map_err(log_err("Failed to save config"))?;
     log_debug!("Config saved to storage");

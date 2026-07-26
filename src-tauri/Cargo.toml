@@ -52,6 +52,24 @@ fastnbt = "2"
 # 文件系统监听（用于 mods 目录自动刷新）
 notify = "8"
 
+# 联机功能加密依赖（MoSign-v1 协议 + ECIES 加密信封）
+# Ed25519 签名（设备身份与注册签名）
+ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8"] }
+# X25519 ECDH 密钥协商（登录会话密钥派生 + ECIES 信封）
+x25519-dalek = { version = "2", features = ["static_secrets"] }
+# HKDF-SHA256 密钥派生（mosign-v1-session-key / mosign-v1-ecies-envelope）
+hkdf = "0.12"
+# HMAC-SHA256（登录签名，密钥为 ECDH 派生的 session_key）
+hmac = "0.12"
+# AES-256-GCM（登录 content 加密 + ECIES 信封 payload 加密）
+aes-gcm = "0.10"
+# RSA-OAEP（注册时 content 加密，需内置云端 RSA 公钥）
+rsa = "0.9"
+# 随机数生成（密钥生成、nonce、签名）
+rand = "0.8"
+# PEM 格式密钥解析（内置云端 RSA 公钥 PEM）
+pem = "3"
+
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 # Win32 API（用于游戏窗口标题修改）

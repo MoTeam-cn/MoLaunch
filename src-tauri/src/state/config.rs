@@ -59,6 +59,28 @@ pub struct LaunchAdvancedConfig {
     pub use_dedicated_gpu: bool, // 原 launch_use_dedicated_gpu
 }
 
+/// 联机功能配置
+///
+/// 仅持久化「api_server_url」一项：联机服务端地址（默认生产地址）。
+/// 设备密钥与 JWT 不在此处，由 `minecraft::online::storage` 独立持久化
+/// （走 SDK DES 加密 + 单独文件，与 auth_storage 一致的位置）。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OnlineConfig {
+    /// 联机 api-server 地址（默认 `https://api.molaunch.moiu.cn`）
+    ///
+    /// 用户可在「设置 → 联机」页修改。前端通过 `applyConfig({ onlineApiServerUrl })` 更新，
+    /// 后端 `online_manager` 读取此值构造 `OnlineClient`。
+    pub api_server_url: String,
+}
+
+impl Default for OnlineConfig {
+    fn default() -> Self {
+        Self {
+            api_server_url: "https://api.molaunch.moiu.cn".to_string(),
+        }
+    }
+}
+
 /// 应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -90,6 +112,7 @@ pub struct AppConfig {
     pub memory: MemoryConfig,
     pub community: CommunityConfig,
     pub launch_advanced: LaunchAdvancedConfig,
+    pub online: OnlineConfig,
 }
 
 /// Minecraft 文件夹项
@@ -150,6 +173,7 @@ impl Default for AppConfig {
                 disable_lua: false,
                 use_dedicated_gpu: false,
             },
+            online: OnlineConfig::default(),
         }
     }
 }

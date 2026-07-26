@@ -69,6 +69,12 @@ pub struct LaunchAdvancedPatch {
     pub use_dedicated_gpu: Option<bool>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct OnlinePatch {
+    #[serde(rename = "onlineApiServerUrl")]
+    pub api_server_url: Option<String>,
+}
+
 /// 配置补丁：所有字段可选，仅传需要更新的字段
 ///
 /// 字段命名采用 camelCase 序列化（前端约定），与 `AppConfig` 的 snake_case
@@ -105,6 +111,8 @@ pub struct ConfigPatch {
     pub community: CommunityPatch,
     #[serde(flatten)]
     pub launch_advanced: LaunchAdvancedPatch,
+    #[serde(flatten)]
+    pub online: OnlinePatch,
 
     // ===== CurseForge（加密存储，不进 AppConfig，内部分流到 secure_storage）=====
     pub curseforge_enabled: Option<bool>,
@@ -177,6 +185,20 @@ pub struct LaunchAdvancedSnapshot {
     pub use_dedicated_gpu: bool,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OnlineSnapshot {
+    #[serde(rename = "onlineApiServerUrl")]
+    pub api_server_url: String,
+}
+
+impl Default for OnlineSnapshot {
+    fn default() -> Self {
+        Self {
+            api_server_url: String::new(),
+        }
+    }
+}
+
 /// 配置快照：返回所有配置字段的当前值
 ///
 /// 用于前端一次性读取全部配置，取代此前分散的 14 个 get_* 命令。
@@ -213,6 +235,8 @@ pub struct ConfigSnapshot {
     pub community: CommunitySnapshot,
     #[serde(flatten)]
     pub launch_advanced: LaunchAdvancedSnapshot,
+    #[serde(flatten)]
+    pub online: OnlineSnapshot,
 
     // ===== CurseForge（从 secure_storage 缓存读，已解密）=====
     pub curseforge_enabled: bool,
@@ -283,6 +307,9 @@ pub fn build_snapshot(
             disable_jlw: config.launch_advanced.disable_jlw,
             disable_lua: config.launch_advanced.disable_lua,
             use_dedicated_gpu: config.launch_advanced.use_dedicated_gpu,
+        },
+        online: OnlineSnapshot {
+            api_server_url: config.online.api_server_url.clone(),
         },
 
         // 非 AppConfig 字段

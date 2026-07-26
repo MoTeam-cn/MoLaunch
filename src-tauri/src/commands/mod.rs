@@ -4,6 +4,7 @@ pub mod auth;
 pub mod community;
 pub mod image_cache;
 pub mod java;
+pub mod online;
 pub mod plugins;
 pub mod sdk;
 pub mod skin;

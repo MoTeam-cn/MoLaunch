@@ -105,6 +105,8 @@ pub fn run() {
             commands::plugins::plugins_manager,
             // 外部下载工具命令（25 个 action，已聚合为 tools_manager 单一入口）
             commands::tools::tools_manager,
+            // 联机功能命令（6 个 action，阶段一认证相关，已聚合为 online_manager 单一入口）
+            commands::online::online_manager,
         ])
         .on_window_event(|_window, event| {
             // 窗口关闭时保存配置

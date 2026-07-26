@@ -40,6 +40,7 @@ pub(crate) async fn apply_config_inner(
         apply_community(config, &patch);
         apply_launch_advanced(config, &patch);
         apply_external_download(config, &patch);
+        apply_online(config, &patch);
     })
     .await?;
 
@@ -233,5 +234,17 @@ fn apply_external_download(config: &mut crate::state::AppConfig, patch: &ConfigP
     if let Some(ref dir_opt) = patch.external_download_dir {
         log_info!("[Config] external_download_dir = {:?}", dir_opt);
         config.external_download_dir = dir_opt.clone();
+    }
+}
+
+/// 联机域：online.api_server_url
+///
+/// 空字符串视为不更新（避免前端误传空值清空配置）
+fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+    if let Some(ref url) = patch.online.api_server_url {
+        if !url.is_empty() {
+            log_info!("[Config] online_api_server_url = {}", url);
+            config.online.api_server_url = url.clone();
+        }
     }
 }

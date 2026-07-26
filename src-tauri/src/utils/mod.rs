@@ -30,6 +30,7 @@ pub mod image_cache_manager;
 pub mod java_manager;
 pub mod markdown_table;
 pub mod meta_manager;
+pub mod online_manager;
 pub mod path;
 pub mod plugins_manager;
 pub mod sdk_manager;
