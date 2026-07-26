@@ -14,7 +14,7 @@
  */
 
 import { ref, computed, watch, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useOnlineStore } from '@/stores/online'
 import NavSidebar from '@/components/common/NavSidebar.vue'
 import Button from '@/components/common/Button.vue'
@@ -38,6 +38,7 @@ interface NavCategory {
   children?: NavCategory[]
 }
 
+const route = useRoute()
 const router = useRouter()
 const onlineStore = useOnlineStore()
 
@@ -116,12 +117,27 @@ const activeLabel = computed(() => {
   return ''
 })
 
-/** isReady 变化时自动切换分类 */
+/**
+ * isReady 变化时自动切换分类
+ *
+ * 变 true 时优先从 URL `?tab=` 恢复激活项（刷新页面保留路径），
+ * URL 无效才默认跳到「创建房间」。
+ * 变 false 时强制切回「设备」（JWT 过期 / 退出登录）。
+ *
+ * 注意：NavSidebar 自身 onMounted 也会读 route.query.tab，但 categories
+ * 依赖 isReady，refreshStatus 异步完成前 categories 还不含 room 子项，
+ * 故此处需在 isReady 变化时再次校验 URL。
+ */
 watch(isReady, (ready) => {
-  if (ready && activeCategory.value === 'device') {
-    // 登录成功 → 自动跳到创建房间
-    activeCategory.value = 'create'
-  } else if (!ready && activeCategory.value !== 'device') {
+  if (ready) {
+    const tab = route.query.tab
+    if (tab === 'create' || tab === 'join') {
+      activeCategory.value = tab
+    } else if (activeCategory.value === 'device') {
+      // 登录成功且 URL 无有效 tab → 默认跳到创建房间
+      activeCategory.value = 'create'
+    }
+  } else if (activeCategory.value !== 'device') {
     // JWT 过期 / 退出登录 → 切回设备
     activeCategory.value = 'device'
   }

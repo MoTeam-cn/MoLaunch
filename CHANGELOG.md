@@ -22,6 +22,11 @@
 - 复用：项目已有的 `ArrowPathIcon` / `CheckCircleIcon`（heroicons vue outline），无新依赖
 - 验证：`npx vue-tsc --noEmit` 本次修改的 3 个文件 0 新增类型错误（项目历史遗留错误与本次修改无关）
 
+#### 修复刷新后侧边栏子菜单激活态丢失
+- 痛点：用户反馈选择「房间管理 → 加入房间」子菜单后刷新页面，激活态回到「创建房间」或「设备」。根因：[src/views/Online.vue](src/views/Online.vue) 的 `activeCategory` 初始化为 `'device'`，`watch(isReady)` 在登录成功时直接跳 `'create'`，未读取 URL `?tab=`；NavSidebar 自身 `onMounted` 虽读 `route.query.tab`，但 `categories` 依赖 `isReady`，`refreshStatus` 异步完成前 categories 还不含 room 子项，导致 NavSidebar 校验失败不 emit
+- 变更：[src/views/Online.vue](src/views/Online.vue) 引入 `useRoute`，`watch(isReady)` 变 true 时优先从 `route.query.tab` 恢复激活项（仅接受 `'create' | 'join'`），URL 无效才默认跳 `'create'`；变 false 时仍强制切回 `'device'`
+- 验证：手动测试路径 — 登录后选「加入房间」→ 刷新页面 → 激活态保留在「加入房间」
+
 #### 房主轮询待确认 Answer 失败时显示实际错误 + 30s 防刷屏
 - 痛点：用户反馈房主轮询 list_answers 时全部返回 `code=1002, msg="资源不存在"`，但前端 [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 的 `pollAnswers` 在 `result.code !== 1` 时仅 `console.warn`，UI 无任何提示，用户无法感知错误，也无法判断是房间不存在、非房主、网络异常、还是 api-server 走了 fallback
 - 根因（双重）：
