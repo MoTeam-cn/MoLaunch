@@ -9,6 +9,11 @@
 
 ### 变更
 
+#### 移除顶部导航栏 SDK 就绪状态指示器
+- 痛点：[src/components/layout/TopNavLayout.vue](src/components/layout/TopNavLayout.vue) 顶部 nav 右侧显示「就绪 / 加载中」小圆点 + 文字，用户反馈不需要
+- 变更：删除该状态指示器（圆点 + 文字 + 包裹容器），并清理未使用的 `useSdkStore` 导入与 `sdkStore` 实例
+- 影响：顶部 nav 右侧仅保留窗口控制按钮（最小化 / 最大化 / 关闭）
+
 #### 房主轮询待确认 Answer 失败时显示实际错误 + 30s 防刷屏
 - 痛点：用户反馈房主轮询 list_answers 时全部返回 `code=1002, msg="资源不存在"`，但前端 [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 的 `pollAnswers` 在 `result.code !== 1` 时仅 `console.warn`，UI 无任何提示，用户无法感知错误，也无法判断是房间不存在、非房主、网络异常、还是 api-server 走了 fallback
 - 根因（双重）：

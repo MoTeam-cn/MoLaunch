@@ -5,7 +5,6 @@
 
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { useSdkStore } from '@/stores/sdk'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import {
   HomeIcon,
@@ -20,7 +19,6 @@ const appWindow = getCurrentWebviewWindow()
 
 const router = useRouter()
 const route = useRoute()
-const sdkStore = useSdkStore()
 const isMaximized = ref(false)
 const unlistenResized = ref<(() => void) | null>(null)
 
@@ -123,15 +121,8 @@ async function handleClose() {
         <!-- 中间拖拽空隙 -->
         <div data-tauri-drag-region class="flex-1 h-full" />
 
-        <!-- 右侧：SDK 状态 + 窗口控制 -->
+        <!-- 右侧：窗口控制 -->
         <div class="flex items-center h-full">
-          <div data-tauri-drag-region class="flex items-center h-full px-2">
-            <div class="flex items-center text-xs pointer-events-none">
-              <div class="w-1.5 h-1.5 rounded-full mr-1.5" :class="sdkStore.isReady ? 'bg-green-400' : 'bg-yellow-300'" />
-              <span class="text-white/60">{{ sdkStore.isReady ? '就绪' : '加载中' }}</span>
-            </div>
-          </div>
-
           <!-- 最小化 -->
           <button
             class="h-full w-11 flex items-center justify-center hover:bg-white/10 transition-colors group"
