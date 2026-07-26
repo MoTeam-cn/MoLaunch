@@ -9,6 +9,53 @@
 
 ### 变更
 
+#### 联机模块日志补全 + 默认 api-server 地址变更 + RSA 长度诊断
+- 痛点：
+  1. 联机模块后端几乎无日志，注册/登录失败时无法定位问题环节
+  2. 默认 api-server 地址需切换到新域名 `api.molaunch.moiu.cn`
+  3. 注册报错 `RSA 加密失败: message too long`，根因是 api-server 使用 RSA-2048（最大明文 190B）而注册 content JSON 约 209B，超出限制
+- 变更：
+  - [src-tauri/src/state/config.rs](src-tauri/src/state/config.rs)：`OnlineConfig::default` 默认地址由 `https://api.molaunch.moteam.top` 改为 `https://api.molaunch.moiu.cn`
+  - [src/views/settings/SettingsOnline.vue](src/views/settings/SettingsOnline.vue)：`DEFAULT_API_SERVER_URL` 常量同步更新
+  - [src-tauri/src/minecraft/online/crypto.rs](src-tauri/src/minecraft/online/crypto.rs)：`rsa_oaep_encrypt` 增加 RSA 位数/明文长度/max_allowed 日志（DEBUG），明文超长时返回清晰错误提示（指明需 RSA-3072 或 RSA-4096）
+  - [src-tauri/src/minecraft/online/auth.rs](src-tauri/src/minecraft/online/auth.rs)：`build_register_request` / `build_login_request` 增加 content 长度、deviceid/device_pk、nonce 日志（DEBUG）
+  - [src-tauri/src/minecraft/online/client.rs](src-tauri/src/minecraft/online/client.rs)：
+    - `get_server_time` / `get_jwks` / `register` / `login` / `logout` 五个 HTTP 方法全部增加请求发起日志（DEBUG/INFO）、响应状态码+body 长度日志、非 200/异常分支 WARN/ERROR 日志
+    - `fetch_server_rsa_pem` 从 JWK `n` 字段直接计算 RSA 位数并日志输出（INFO），位数 < 3072 时主动 WARN 提示将触发 "message too long"
+  - [src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs)：6 个 action 处理器全部补充开始日志（INFO）、关键步骤日志（DEBUG）、错误分支 ERROR 日志，便于从日志即可定位失败环节
+- RSA 问题结论：客户端无法绕过（协议规定 content 用 RSA-OAEP 加密），**需在 api-server 端重新生成 RSA-3072 或 RSA-4096 密钥**（修改 [api-server/examples/generate_keys.rs](api-server/examples/generate_keys.rs) 的 `RSA_BITS` 后重新执行）
+- api-server 端修复：[api-server/examples/generate_keys.rs](api-server/examples/generate_keys.rs) `RSA_BITS` 由 `2048` 改为 `3072`，注释说明位数选择理由（注册 content 约 209B，RSA-3072 + OAEP-SHA256 最大 318B 足够）。**部署步骤**：在 api-server 目录执行 `cargo run --example generate_keys` 重新生成 `config/keys/private.pem` 与 `public.pem`，重启服务后注册接口可正常加密
+- 验证：`cargo check --lib` 4.66s，0 警告 0 错误
+
+#### 联机功能阶段一：前端接入（路由 + 顶导 + 设置 Tab）
+- 背景：联机功能后端骨架（MoSign-v1 认证 + `online_manager` IPC + `OnlineConfig`）已就绪，[Online.vue](src/views/Online.vue) 主页骨架已创建，但未接入路由/导航/设置，且 [Online.vue](src/views/Online.vue) 引用的 `formatTimestamp` 在 [src/utils/format.ts](src/utils/format.ts) 中不存在
+- 变更：
+  - [src/utils/format.ts](src/utils/format.ts)：新增 `formatTimestamp(unixSeconds)` 函数，格式化 Unix 秒为 `YYYY-MM-DD HH:mm:ss`（本地时区），修复 [Online.vue](src/views/Online.vue) 的断裂导入
+  - [src/router/index.ts](src/router/index.ts)：注册 `/apps/online` 路由，懒加载 [Online.vue](src/views/Online.vue)
+  - [src/components/layout/TopNavLayout.vue](src/components/layout/TopNavLayout.vue)：顶导菜单在「下载」与「工具」之间新增「联机」入口（`UserGroupIcon`）
+  - [src/views/Settings.vue](src/views/Settings.vue)：侧栏 `baseCategories` 在「进阶设置」之后新增「联机」分类（`GlobeAltIcon`），并接入 `SettingsOnline` 组件；`?tab=online` 跳转由现有 [NavSidebar.vue](src/components/common/NavSidebar.vue) 自动处理（无需额外代码）
+  - 新增 [src/views/settings/SettingsOnline.vue](src/views/settings/SettingsOnline.vue)（248 行，300 限制内）：
+    - api-server 地址输入（防抖 800ms 自动保存，走统一 `applyConfig`，复用 `useConfigPage`）
+    - 重置为默认按钮（一键还原 `https://api.molaunch.moteam.top`）
+    - 测试连通性按钮（调用 `auth_get_server_time`，展示服务器时间/时区/UTC 偏移/本地时间差）
+    - 设备登出 / 清除凭证按钮（复用 `useOnlineStore`，清除前经 `showConfirm` 全局 Modal 二次确认）
+- 复用：
+  - `useConfigPage`：与 [SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue) 一致的加载 + 防抖保存 + `loaded` 守卫
+  - `useOnlineStore`：与 [Online.vue](src/views/Online.vue) 共享 `deviceStatus` 与 `logout/clear` 状态
+  - `showConfirm`：全局 Modal 服务（[src/utils/modal.ts](src/utils/modal.ts)），替代 `window.confirm`
+  - `formatTimestamp`：新增的公共工具函数，供 [Online.vue](src/views/Online.vue) 与 [SettingsOnline.vue](src/views/settings/SettingsOnline.vue) 共用
+- 验证：ESLint 对 6 个变更文件 0 错误 0 警告
+
+#### 修复联机后端模块 6 处编译警告
+- 痛点：`cargo check --lib` 报 6 处警告（unused imports × 4 + private_interfaces × 1 + dead_code × 1）
+- 修复：
+  - [src-tauri/src/minecraft/online/crypto.rs](src-tauri/src/minecraft/online/crypto.rs)：移除未使用的 `Verifier`（ed25519_dalek）与 `EphemeralSecret`（x25519_dalek）导入
+  - [src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs)：移除未使用的 `Deserialize`（serde）与 `DeviceCredentials`（storage）导入
+  - [src-tauri/src/minecraft/online/client.rs](src-tauri/src/minecraft/online/client.rs)：
+    - `JwkKey` 结构体加 `#[allow(dead_code)]`（`kid`/`alg`/`use_` 为 JWKS 规范标准字段，阶段二接入 JWT 签名验证时使用）
+    - `get_jwks` 由 `pub async fn` 改为 `async fn`（仅模块内 `verify_jwt` 调用，无需对外暴露，消除 `private_interfaces` 警告）
+- 验证：`cargo check --lib` 31.23s，0 警告 0 错误
+
 #### 统一应用图标配置（favicon + Tauri 窗口图标）
 - 痛点：原 [index.html](index.html) 使用 Vite 默认的 `/vite.svg` 作为 favicon，且 Tauri 动态创建的窗口（插件窗口、微软登录窗口）未设置图标，标题栏显示系统默认图标
 - 修复：
