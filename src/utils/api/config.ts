@@ -63,6 +63,8 @@ export interface ConfigSnapshot {
   // 开发者模式（从注册表读，developerUnlocked 为只读）
   developerUnlocked: boolean
   developerMode: boolean
+  // 联机（api-server 地址）
+  onlineApiServerUrl: string
 }
 
 /**
@@ -112,6 +114,8 @@ export interface ConfigPatch {
   externalDownloadDir?: string | null
   // 开发者模式（注册表存储，后端内部分流到 registry，仅已解锁时可生效）
   developerMode?: boolean
+  // 联机（api-server 地址，空字符串后端会忽略不更新）
+  onlineApiServerUrl?: string
 }
 
 // ==================== 配置缓存与读写（带全局缓存）====================

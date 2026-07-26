@@ -12,6 +12,7 @@ import {
   Cog6ToothIcon,
   CubeIcon,
   WrenchScrewdriverIcon,
+  UserGroupIcon,
 } from '@heroicons/vue/24/outline'
 import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
@@ -40,6 +41,7 @@ onUnmounted(() => {
 const navItems = [
   { name: '首页', path: '/apps', icon: HomeIcon },
   { name: '下载', path: '/apps/versions', icon: CubeIcon, hasDblClick: true },
+  { name: '联机', path: '/apps/online', icon: UserGroupIcon },
   { name: '工具', path: '/apps/tools', icon: WrenchScrewdriverIcon },
   { name: '设置', path: '/apps/settings', icon: Cog6ToothIcon },
 ]

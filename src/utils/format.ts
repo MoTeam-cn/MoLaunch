@@ -71,3 +71,15 @@ export function formatDate(dateStr: string): string {
   if (!dateStr) return ''
   return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
 }
+
+/**
+ * 格式化 Unix 时间戳（秒）为 YYYY-MM-DD HH:mm:ss（本地时区）
+ *
+ * 用于展示登录时间、JWT 过期时间等场景。无效或非正数返回 '-'。
+ */
+export function formatTimestamp(unixSeconds: number): string {
+  if (!Number.isFinite(unixSeconds) || unixSeconds <= 0) return '-'
+  const d = new Date(unixSeconds * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+}

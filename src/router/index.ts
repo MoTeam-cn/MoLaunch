@@ -68,6 +68,12 @@ const router = createRouter({
       component: () => import('@/views/Tools.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/apps/online',
+      name: 'online',
+      component: () => import('@/views/Online.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

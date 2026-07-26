@@ -8,6 +8,7 @@ import SettingsPlugins from './settings/SettingsPlugins.vue'
 import SettingsCache from './settings/SettingsCache.vue'
 import SettingsDeveloper from './settings/SettingsDeveloper.vue'
 import SettingsMore from './settings/SettingsMore.vue'
+import SettingsOnline from './settings/SettingsOnline.vue'
 import NavSidebar from '@/components/common/NavSidebar.vue'
 import { getConfigMap } from '@/utils/api/config'
 import {
@@ -19,6 +20,7 @@ import {
   InformationCircleIcon,
   PuzzlePieceIcon,
   CircleStackIcon,
+  GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
 import { safeCall } from '@/utils/async'
 
@@ -31,6 +33,7 @@ const baseCategories = [
   { id: 'personal', label: '个性化', icon: PaintBrushIcon, desc: '主题、布局、语言、插件等外观设置' },
   { id: 'plugins', label: '插件', icon: PuzzlePieceIcon, desc: '管理启动器内置与外部插件' },
   { id: 'advanced', label: '进阶设置', icon: CogIcon, desc: '日志、代理、CurseForge、社区资源等' },
+  { id: 'online', label: '联机', icon: GlobeAltIcon, desc: 'api-server 地址、设备认证、连通性测试' },
   { id: 'cache', label: '缓存管理', icon: CircleStackIcon, desc: '查看各缓存目录占用、文件数量与自动清理策略' },
   { id: 'about', label: '更多', icon: InformationCircleIcon, desc: '关于 MoLaunch、系统信息、鸣谢、教程、法律信息' },
 ]
@@ -108,6 +111,7 @@ onUnmounted(() => {
         <SettingsPersonal v-else-if="activeCategory === 'personal'" />
         <SettingsPlugins v-else-if="activeCategory === 'plugins'" />
         <SettingsAdvanced v-else-if="activeCategory === 'advanced'" />
+        <SettingsOnline v-else-if="activeCategory === 'online'" />
         <SettingsCache v-else-if="activeCategory === 'cache'" />
         <SettingsMore v-else-if="activeCategory === 'about'" />
         <SettingsDeveloper v-else-if="activeCategory === 'developer'" />
