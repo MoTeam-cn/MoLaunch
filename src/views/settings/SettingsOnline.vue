@@ -161,7 +161,7 @@ onMounted(() => {
                 </Button>
               </Tooltip>
             </div>
-            <Input v-model="apiUrl" placeholder="https://api.molaunch.moteam.top" class="font-mono" />
+            <Input v-model="apiUrl" placeholder="https://api.molaunch.moiu.cn" class="font-mono" />
             <div class="mt-2 flex items-center gap-2 flex-wrap">
               <Button type="outline" size="small" :loading="testing" @click="handleTestConnection">
                 <template #icon><GlobeAltIcon class="w-4 h-4" /></template>

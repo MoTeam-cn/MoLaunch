@@ -1,49 +1,131 @@
 <script setup lang="ts">
 /**
- * 联机主页（阶段一骨架）
+ * 联机主页
  *
- * 单列布局，根据设备认证状态显示不同内容：
- * - 未注册：注册引导卡片
- * - 已注册未登录：登录卡片 + 设备信息
- * - 已登录：房间创建/加入入口（阶段二占位「功能开发中」）
+ * 采用与 [Settings.vue](src/views/Settings.vue) 一致的侧边栏布局：
+ * - 左侧 NavSidebar：设备 / 房间管理（房间管理下有「创建房间」「加入房间」两个子项）
+ * - 右侧内容区：根据 activeCategory 切换 OnlineDevicePanel / RoomManager
  *
- * 阶段二会替换「功能开发中」为房间管理界面（房主/加入方）。
- * 阶段三会接入 MC 版本检测与启动流程。
+ * 状态联动：
+ * - 未注册 / 未登录时仅显示「设备」分类
+ * - 登录成功（isReady=true）后自动追加「房间管理」分类并展开子项，选中「创建房间」
+ * - JWT 过期（isReady=false）自动切回「设备」分类
+ * - 已进入房间时（role=host/guest），RoomManager 自动显示对应面板
  */
 
-import { computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOnlineStore } from '@/stores/online'
+import NavSidebar from '@/components/common/NavSidebar.vue'
 import Button from '@/components/common/Button.vue'
-import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import OnlineDevicePanel from '@/components/online/OnlineDevicePanel.vue'
+import RoomManager from '@/components/online/RoomManager.vue'
 import {
-  UserPlusIcon,
-  ArrowRightOnRectangleIcon,
-  UserCircleIcon,
-  ServerStackIcon,
   Cog6ToothIcon,
-  GlobeAltIcon,
-  ClockIcon,
-  KeyIcon,
+  DevicePhoneMobileIcon,
+  ServerStackIcon,
+  PlusIcon,
+  ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
-import { formatTimestamp } from '@/utils/format'
+import type { Component } from 'vue'
+
+interface NavCategory {
+  id: string
+  label: string
+  icon: Component
+  desc?: string
+  children?: NavCategory[]
+}
 
 const router = useRouter()
 const onlineStore = useOnlineStore()
 
-/** 设备状态（null 表示未拉取） */
 const status = computed(() => onlineStore.deviceStatus)
-/** 是否未注册（含未查询的情况） */
-const isUnregistered = computed(() => !status.value || !status.value.registered)
-/** 是否已注册但未登录或 JWT 过期 */
-const needLogin = computed(
-  () => !!status.value && status.value.registered && (!status.value.logged_in || status.value.token_expired),
-)
-/** 是否已就绪（已注册且 JWT 有效） */
 const isReady = computed(
   () => !!status.value && status.value.registered && status.value.logged_in && !status.value.token_expired,
 )
+
+/** 当前激活分类（device / create / join） */
+const activeCategory = ref<'device' | 'create' | 'join'>('device')
+
+/** 设备分类（始终可用） */
+const deviceCategory: NavCategory = {
+  id: 'device',
+  label: '设备',
+  icon: DevicePhoneMobileIcon,
+  desc: '注册联机设备、登录获取访问凭证、查看设备 ID 与 JWT 状态',
+}
+
+/** 房间管理分类（仅已就绪时可用），包含「创建房间」「加入房间」两个子项 */
+const roomCategory: NavCategory = {
+  id: 'room',
+  label: '房间管理',
+  icon: ServerStackIcon,
+  desc: '检测 NAT 类型、创建或加入房间、管理参与者与 P2P 连接',
+  children: [
+    {
+      id: 'create',
+      label: '创建房间',
+      icon: PlusIcon,
+      desc: '作为房主创建新房间，等待其他玩家加入',
+    },
+    {
+      id: 'join',
+      label: '加入房间',
+      icon: ArrowRightOnRectangleIcon,
+      desc: '通过房间码加入已有房间',
+    },
+  ],
+}
+
+/** 实际渲染的分类列表：未就绪时只显示「设备」 */
+const categories = computed<NavCategory[]>(() => {
+  return isReady.value ? [deviceCategory, roomCategory] : [deviceCategory]
+})
+
+/** 状态徽章文案与颜色 */
+const badge = computed(() => {
+  if (isReady.value) return { text: '已就绪', dotClass: 'bg-green-500', wrapClass: 'bg-green-50 text-green-700' }
+  const isUnregistered = !status.value || !status.value.registered
+  if (isUnregistered) return { text: '未注册', dotClass: 'bg-gray-400', wrapClass: 'bg-gray-100 text-gray-600' }
+  return { text: '需登录', dotClass: 'bg-yellow-500', wrapClass: 'bg-yellow-50 text-yellow-700' }
+})
+
+/** 当前激活分类的描述（子项优先） */
+const activeDesc = computed(() => {
+  for (const cat of categories.value) {
+    if (cat.id === activeCategory.value) return cat.desc ?? ''
+    if (cat.children) {
+      const child = cat.children.find(c => c.id === activeCategory.value)
+      if (child) return child.desc ?? ''
+    }
+  }
+  return ''
+})
+
+/** 当前激活分类的标签（子项优先） */
+const activeLabel = computed(() => {
+  for (const cat of categories.value) {
+    if (cat.id === activeCategory.value) return cat.label
+    if (cat.children) {
+      const child = cat.children.find(c => c.id === activeCategory.value)
+      if (child) return child.label
+    }
+  }
+  return ''
+})
+
+/** isReady 变化时自动切换分类 */
+watch(isReady, (ready) => {
+  if (ready && activeCategory.value === 'device') {
+    // 登录成功 → 自动跳到创建房间
+    activeCategory.value = 'create'
+  } else if (!ready && activeCategory.value !== 'device') {
+    // JWT 过期 / 退出登录 → 切回设备
+    activeCategory.value = 'device'
+  }
+})
 
 onMounted(() => {
   void onlineStore.refreshStatus()
@@ -52,150 +134,44 @@ onMounted(() => {
 function goSettings() {
   router.push('/apps/settings?tab=online')
 }
-
-async function handleRegister() {
-  await onlineStore.register()
-}
-
-async function handleLogin() {
-  await onlineStore.login()
-}
 </script>
 
 <template>
-  <div class="h-full overflow-y-auto">
-    <div class="mx-auto max-w-3xl px-6 py-6 space-y-6">
-      <!-- 顶部标题 + 状态徽章 -->
-      <div class="flex items-center justify-between">
-        <div>
-          <h1 class="text-xl font-semibold text-gray-900">联机</h1>
-          <p class="text-xs text-gray-500 mt-1">通过 P2P 与好友一起游玩 Minecraft</p>
-        </div>
-        <div class="flex items-center gap-2">
-          <span
-            class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
-            :class="isReady
-              ? 'bg-green-50 text-green-700'
-              : isUnregistered
-                ? 'bg-gray-100 text-gray-600'
-                : 'bg-yellow-50 text-yellow-700'"
-          >
+  <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+    <!-- 左侧分类菜单（支持子菜单展开动画） -->
+    <NavSidebar v-model="activeCategory" :categories="categories" />
+
+    <!-- 右侧内容区 -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- 顶部标题栏 -->
+      <div class="px-6 py-4 bg-white border-b border-gray-200 shrink-0">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-gray-900">{{ activeLabel }}</h2>
+            <p class="text-xs text-gray-500 mt-1">{{ activeDesc }}</p>
+          </div>
+          <div class="flex items-center gap-2">
             <span
-class="w-1.5 h-1.5 rounded-full mr-1.5"
-              :class="isReady ? 'bg-green-500' : isUnregistered ? 'bg-gray-400' : 'bg-yellow-500'" />
-            {{ isReady ? '已就绪' : isUnregistered ? '未注册' : '需登录' }}
-          </span>
-          <Tooltip text="联机设置">
-            <Button type="ghost" size="small" @click="goSettings">
-              <template #icon><Cog6ToothIcon class="w-4 h-4" /></template>
-            </Button>
-          </Tooltip>
+              class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium"
+              :class="badge.wrapClass"
+            >
+              <span class="w-1.5 h-1.5 rounded-full mr-1.5" :class="badge.dotClass" />
+              {{ badge.text }}
+            </span>
+            <Tooltip text="联机设置">
+              <Button type="ghost" size="small" @click="goSettings">
+                <template #icon><Cog6ToothIcon class="w-4 h-4" /></template>
+              </Button>
+            </Tooltip>
+          </div>
         </div>
       </div>
 
-      <!-- 加载占位 -->
-      <div v-if="onlineStore.refreshing && !status" class="bg-white rounded-lg border border-gray-300 p-8">
-        <div class="flex items-center justify-center gap-3 text-gray-400">
-          <svg class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
-            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-          </svg>
-          <span class="text-sm">正在加载设备状态...</span>
-        </div>
+      <!-- 内容区 -->
+      <div class="flex-1 overflow-y-auto p-6">
+        <OnlineDevicePanel v-if="activeCategory === 'device'" />
+        <RoomManager v-else :mode="activeCategory" />
       </div>
-
-      <!-- 未注册：注册引导 -->
-      <Card v-else-if="isUnregistered" title="注册设备">
-        <div class="py-6 flex flex-col items-center text-center">
-          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50">
-            <UserPlusIcon class="h-7 w-7 text-primary-600" />
-          </div>
-          <div class="mb-2 text-sm font-semibold text-gray-700">注册联机设备</div>
-          <p class="mb-5 text-xs text-gray-500 max-w-md">
-            注册将为你的设备生成唯一的密钥对，用于联机服务的身份验证。
-            密钥保存在本地，不会上传到云端。
-          </p>
-          <Button type="primary" :loading="onlineStore.loading" @click="handleRegister">
-            <template #icon><UserPlusIcon class="w-4 h-4" /></template>
-            立即注册
-          </Button>
-        </div>
-      </Card>
-
-      <!-- 已注册未登录：登录卡片 -->
-      <Card v-else-if="needLogin" title="设备登录">
-        <div class="py-6 flex flex-col items-center text-center">
-          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-50">
-            <ArrowRightOnRectangleIcon class="h-7 w-7 text-yellow-600" />
-          </div>
-          <div class="mb-2 text-sm font-semibold text-gray-700">
-            {{ status?.token_expired ? '登录已过期' : '设备未登录' }}
-          </div>
-          <p class="mb-5 text-xs text-gray-500 max-w-md">
-            {{ status?.token_expired
-              ? 'JWT 已过期，需要重新登录以继续使用联机功能。'
-              : '设备已注册但未登录，点击下方按钮登录以获取访问凭证。' }}
-          </p>
-          <Button type="primary" :loading="onlineStore.loading" @click="handleLogin">
-            <template #icon><ArrowRightOnRectangleIcon class="w-4 h-4" /></template>
-            登录设备
-          </Button>
-        </div>
-      </Card>
-
-      <!-- 已就绪：房间入口（阶段二占位） -->
-      <Card v-else-if="isReady" title="房间管理">
-        <div class="py-8 flex flex-col items-center text-center">
-          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
-            <ServerStackIcon class="h-7 w-7 text-gray-400" />
-          </div>
-          <div class="mb-2 text-sm font-semibold text-gray-700">功能开发中</div>
-          <p class="text-xs text-gray-500 max-w-md">
-            房间创建、加入、WebRTC 连接、虚拟网卡等功能将在阶段二实现。
-            当前阶段仅完成设备认证骨架。
-          </p>
-        </div>
-      </Card>
-
-      <!-- 设备信息（已注册时显示） -->
-      <Card v-if="status?.registered" title="设备信息">
-        <div class="divide-y divide-gray-100">
-          <div class="px-1 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-2 text-sm text-gray-600">
-              <UserCircleIcon class="w-4 h-4 text-gray-400" />
-              <span>设备 ID</span>
-            </div>
-            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ status.device_id || '-' }}</code>
-          </div>
-          <div class="px-1 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-2 text-sm text-gray-600">
-              <GlobeAltIcon class="w-4 h-4 text-gray-400" />
-              <span>api-server</span>
-            </div>
-            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded max-w-[260px] truncate">
-              {{ status.api_server_url || '-' }}
-            </code>
-          </div>
-          <div class="px-1 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-2 text-sm text-gray-600">
-              <ClockIcon class="w-4 h-4 text-gray-400" />
-              <span>最后登录</span>
-            </div>
-            <span class="text-xs text-gray-900">
-              {{ status.last_login_at ? formatTimestamp(status.last_login_at) : '从未登录' }}
-            </span>
-          </div>
-          <div class="px-1 py-3 flex items-center justify-between">
-            <div class="flex items-center gap-2 text-sm text-gray-600">
-              <KeyIcon class="w-4 h-4 text-gray-400" />
-              <span>JWT 过期时间</span>
-            </div>
-            <span class="text-xs" :class="status.token_expired ? 'text-red-600' : 'text-gray-900'">
-              {{ status.token_expires_at ? formatTimestamp(status.token_expires_at) : '-' }}
-            </span>
-          </div>
-        </div>
-      </Card>
     </div>
   </div>
 </template>

@@ -15,11 +15,26 @@
  * - `auth_logout`：登出设备（撤销 JWT，保留密钥）
  * - `auth_clear`：清除设备凭证（注销设备，删除本地密钥）
  *
- * 阶段二/三补充：房间管理、信令、WebRTC、虚拟网卡、MC 端口探测。
+ * 阶段二补充 13 个 action（信令相关）：
+ * - `room_get_stun` / `room_create` / `room_get` / `room_close`
+ * - `room_join` / `room_submit_answer` / `room_list_answers` / `room_confirm`
+ * - `room_keepalive` / `room_leave` / `room_kick` / `room_unban` / `room_list_participants`
  */
 
 import { invoke } from '@tauri-apps/api/core'
-import type { DeviceStatus, ServerTimeInfo } from '@/types/online'
+import type {
+  BusinessResult,
+  CreateRoomParams,
+  CreateRoomResponse,
+  DeviceStatus,
+  JoinRoomResponse,
+  KeepaliveResponse,
+  ListAnswersResponse,
+  ListParticipantsResponse,
+  RoomInfoResponse,
+  ServerTimeInfo,
+  StunServersResponse,
+} from '@/types/online'
 
 /**
  * 调用 online_manager IPC
@@ -39,19 +54,34 @@ export async function onlineManager<T = unknown>(
  * 与后端 `utils::online_manager::DISPATCHER` 注册的 action 一一对应。
  */
 export const ONLINE_ACTIONS = {
+  // 认证
   AUTH_STATUS: 'auth_status',
   AUTH_GET_SERVER_TIME: 'auth_get_server_time',
   AUTH_REGISTER: 'auth_register',
   AUTH_LOGIN: 'auth_login',
   AUTH_LOGOUT: 'auth_logout',
   AUTH_CLEAR: 'auth_clear',
+  // 信令
+  ROOM_GET_STUN: 'room_get_stun',
+  ROOM_CREATE: 'room_create',
+  ROOM_GET: 'room_get',
+  ROOM_CLOSE: 'room_close',
+  ROOM_JOIN: 'room_join',
+  ROOM_SUBMIT_ANSWER: 'room_submit_answer',
+  ROOM_LIST_ANSWERS: 'room_list_answers',
+  ROOM_CONFIRM: 'room_confirm',
+  ROOM_KEEPALIVE: 'room_keepalive',
+  ROOM_LEAVE: 'room_leave',
+  ROOM_KICK: 'room_kick',
+  ROOM_UNBAN: 'room_unban',
+  ROOM_LIST_PARTICIPANTS: 'room_list_participants',
 } as const
 
 /** action 名称类型 */
 export type OnlineAction = typeof ONLINE_ACTIONS[keyof typeof ONLINE_ACTIONS]
 
 // ============================================================
-// 类型安全的便捷封装（每个 action 一个函数）
+// 认证相关便捷封装
 // ============================================================
 
 /** 查询当前设备状态（不发起网络请求，仅读本地凭证） */
@@ -82,4 +112,122 @@ export function logoutDevice(): Promise<{ success: boolean }> {
 /** 清除设备凭证（注销设备，删除本地密钥） */
 export function clearDevice(): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.AUTH_CLEAR)
+}
+
+// ============================================================
+// 信令相关便捷封装（阶段二）
+//
+// 所有信令 action 返回 `BusinessResult<T>`（含 code/data/msg/time/req_id），
+// 调用方需检查 `code === 1` 后取 `data` 字段使用。
+// ============================================================
+
+/** 获取 STUN 服务器列表 */
+export function getStunServers(): Promise<BusinessResult<StunServersResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_GET_STUN)
+}
+
+/** 创建房间（房主上传 SDP Offer + ICE） */
+export function createRoom(
+  params: CreateRoomParams,
+): Promise<BusinessResult<CreateRoomResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_CREATE, params)
+}
+
+/** 查询房间公开信息 */
+export function getRoomInfo(
+  roomCode: string,
+): Promise<BusinessResult<RoomInfoResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_GET, { roomCode })
+}
+
+/** 关闭房间（仅房主） */
+export function closeRoom(
+  roomCode: string,
+): Promise<BusinessResult<unknown>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_CLOSE, { roomCode })
+}
+
+/** 加入房间 */
+export function joinRoom(
+  roomCode: string,
+  password = '',
+): Promise<BusinessResult<JoinRoomResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_JOIN, { roomCode, password })
+}
+
+/** 提交 SDP Answer（加入方） */
+export function submitAnswer(
+  roomCode: string,
+  participantId: string,
+  sdpAnswer: string,
+  iceCandidates: string[],
+): Promise<BusinessResult<unknown>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_SUBMIT_ANSWER, {
+    roomCode,
+    participantId,
+    sdpAnswer,
+    iceCandidates,
+  })
+}
+
+/** 拉取待确认 Answer 列表（房主轮询） */
+export function listAnswers(
+  roomCode: string,
+): Promise<BusinessResult<ListAnswersResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_LIST_ANSWERS, { roomCode })
+}
+
+/** 确认/拒绝连接（房主） */
+export function confirmParticipant(
+  roomCode: string,
+  participantId: string,
+  accepted: boolean,
+): Promise<BusinessResult<unknown>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_CONFIRM, {
+    roomCode,
+    participantId,
+    accepted,
+  })
+}
+
+/** 房主保活（续期 + 更新保活时间戳） */
+export function keepaliveRoom(
+  roomCode: string,
+): Promise<BusinessResult<KeepaliveResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_KEEPALIVE, { roomCode })
+}
+
+/** 退出房间（加入方） */
+export function leaveRoom(
+  roomCode: string,
+): Promise<BusinessResult<unknown>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_LEAVE, { roomCode })
+}
+
+/** 踢出参与者（房主，可选封禁） */
+export function kickParticipant(
+  roomCode: string,
+  participantId: string,
+  banDurationSeconds: number | null,
+): Promise<BusinessResult<unknown>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_KICK, {
+    roomCode,
+    participantId,
+    banDurationSeconds,
+  })
+}
+
+/** 解封参与者（房主） */
+export function unbanParticipant(
+  roomCode: string,
+  devicePk: string,
+): Promise<BusinessResult<unknown>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_UNBAN, { roomCode, devicePk })
+}
+
+/** 查询参与者列表（房主） */
+export function listParticipants(
+  roomCode: string,
+): Promise<BusinessResult<ListParticipantsResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_LIST_PARTICIPANTS, { roomCode })
 }
