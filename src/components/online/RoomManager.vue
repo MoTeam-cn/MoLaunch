@@ -26,6 +26,8 @@ import RoomGuestPanel from './RoomGuestPanel.vue'
 import {
   PlusIcon,
   ArrowRightOnRectangleIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { submitAnswer } from '@/utils/api/online-manager'
 import { toastError } from '@/utils/toast'
@@ -75,6 +77,26 @@ const roomCodeHintType = computed<'default' | 'error' | 'success'>(() => {
   return 'error'
 })
 
+/**
+ * 创建房间步骤指示器
+ *
+ * - `stun`：获取 STUN 服务器列表
+ * - `offer`：生成本地 SDP Offer + 收集 ICE 候选（最长 5 秒）
+ * - `create`：调用后端创建房间
+ *
+ * UI 根据当前 step 高亮当前步骤、打勾已完成步骤、灰化未完成步骤。
+ */
+const createSteps = [
+  { key: 'stun' as const, label: '获取 STUN 服务器' },
+  { key: 'offer' as const, label: '生成本地连接信息' },
+  { key: 'create' as const, label: '创建房间' },
+]
+const stepOrder = ['stun', 'offer', 'create'] as const
+const currentStepIndex = computed(() => {
+  if (!store.roomCreateStep) return -1
+  return stepOrder.indexOf(store.roomCreateStep)
+})
+
 /** 房主创建房间 */
 async function handleCreateRoom() {
   if (!createForm.value.mcVersion) {
@@ -91,8 +113,13 @@ async function handleCreateRoom() {
   }
 
   try {
+    store.roomCreateStep = 'stun'
     const stun = await store.fetchStunServers()
+
+    store.roomCreateStep = 'offer'
     const { sdp, iceCandidates } = await hostWebrtc.createOffer(stun)
+
+    store.roomCreateStep = 'create'
     await store.hostCreateRoom(
       sdp,
       iceCandidates,
@@ -100,9 +127,12 @@ async function handleCreateRoom() {
       createForm.value.password,
       createForm.value.mcVersion,
       createForm.value.mcPort,
+      stun,
     )
   } catch (e) {
     toastError(`创建房间失败：${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    store.roomCreateStep = null
   }
 }
 
@@ -164,6 +194,38 @@ async function handleJoinRoom() {
             <template #icon><PlusIcon class="w-4 h-4" /></template>
             创建房间
           </Button>
+          <!-- 创建进度反馈：三步指示器（当前步高亮 + spinner，已完成打勾，未完成灰化） -->
+          <div
+            v-if="store.roomCreateStep"
+            class="mt-2 space-y-1.5 px-3 py-2.5 bg-primary-50/50 rounded-lg border border-primary-100"
+          >
+            <div
+              v-for="(step, idx) in createSteps"
+              :key="step.key"
+              class="flex items-center gap-2 text-xs transition-colors"
+              :class="[
+                idx === currentStepIndex
+                  ? 'text-primary-700 font-medium'
+                  : idx < currentStepIndex
+                    ? 'text-green-600'
+                    : 'text-gray-400',
+              ]"
+            >
+              <ArrowPathIcon
+                v-if="idx === currentStepIndex"
+                class="w-3.5 h-3.5 animate-spin"
+              />
+              <CheckCircleIcon
+                v-else-if="idx < currentStepIndex"
+                class="w-3.5 h-3.5"
+              />
+              <span
+                v-else
+                class="w-3.5 h-3.5 rounded-full border border-current opacity-40"
+              />
+              <span>{{ step.label }}</span>
+            </div>
+          </div>
         </div>
       </div>
     </Card>

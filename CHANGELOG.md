@@ -14,6 +14,14 @@
 - 变更：删除该状态指示器（圆点 + 文字 + 包裹容器），并清理未使用的 `useSdkStore` 导入与 `sdkStore` 实例
 - 影响：顶部 nav 右侧仅保留窗口控制按钮（最小化 / 最大化 / 关闭）
 
+#### 创建房间增加三步进度反馈
+- 痛点：用户反馈点击「创建房间」按钮后界面卡顿数秒无任何提示，等待体验差。根因：[src/components/online/RoomManager.vue](src/components/online/RoomManager.vue) 的 `handleCreateRoom` 串行执行 3 个异步操作（获取 STUN 服务器 → `hostWebrtc.createOffer` 含 ICE 收集最长 5 秒 → 调用后端创建房间），期间仅按钮 `loading` 态无阶段性进度反馈
+- 变更：
+  - [src/stores/online.ts](src/stores/online.ts) 新增 `RoomCreateStep` 类型（`'stun' | 'offer' | 'create' | null`）与 `roomCreateStep` ref，`hostCreateRoom` 接受可选 `preloadedStun` 参数避免 STUN 重复获取，`finally` 中清空 step
+  - [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue) 的 `handleCreateRoom` 在每步前设置 `store.roomCreateStep`，模板在按钮下方渲染三步指示器（当前步 primary 高亮 + spinner，已完成步 green 打勾，未完成步 gray 灰化）
+- 复用：项目已有的 `ArrowPathIcon` / `CheckCircleIcon`（heroicons vue outline），无新依赖
+- 验证：`npx vue-tsc --noEmit` 本次修改的 3 个文件 0 新增类型错误（项目历史遗留错误与本次修改无关）
+
 #### 房主轮询待确认 Answer 失败时显示实际错误 + 30s 防刷屏
 - 痛点：用户反馈房主轮询 list_answers 时全部返回 `code=1002, msg="资源不存在"`，但前端 [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 的 `pollAnswers` 在 `result.code !== 1` 时仅 `console.warn`，UI 无任何提示，用户无法感知错误，也无法判断是房间不存在、非房主、网络异常、还是 api-server 走了 fallback
 - 根因（双重）：

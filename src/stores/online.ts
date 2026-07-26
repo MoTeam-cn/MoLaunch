@@ -50,6 +50,16 @@ import { safeCall } from '@/utils/async'
 /** 房间角色 */
 export type RoomRole = 'host' | 'guest' | null
 
+/**
+ * 创建房间步骤（UI 进度反馈用）
+ *
+ * - `stun`：获取 STUN 服务器列表
+ * - `offer`：生成本地 SDP Offer + 收集 ICE 候选
+ * - `create`：调用后端创建房间
+ * - `null`：未在创建中 / 已完成 / 失败
+ */
+export type RoomCreateStep = 'stun' | 'offer' | 'create' | null
+
 /** 房间状态（阶段二） */
 export interface RoomState {
   /** 角色：房主 / 加入方 / null（未在房间） */
@@ -112,6 +122,8 @@ export const useOnlineStore = defineStore('online', () => {
   const roomState = ref<RoomState>(emptyRoom())
   /** 是否正在执行房间操作 */
   const roomLoading = ref(false)
+  /** 创建房间当前步骤（UI 进度反馈，null 表示未在创建中） */
+  const roomCreateStep = ref<RoomCreateStep>(null)
   /** STUN 服务器列表缓存（房间创建/加入前预取） */
   const stunServers = ref<string[]>([])
 
@@ -264,6 +276,7 @@ export const useOnlineStore = defineStore('online', () => {
    * @param password 房间密码（空字符串表示无密码）
    * @param hostMcVersion 房主 MC 版本
    * @param hostMcPort 房主 MC 端口
+   * @param preloadedStun 可选，调用方已预取的 STUN 列表（避免重复获取）
    * @returns 创建房间响应
    */
   async function hostCreateRoom(
@@ -273,10 +286,11 @@ export const useOnlineStore = defineStore('online', () => {
     password: string,
     hostMcVersion: string,
     hostMcPort: number,
+    preloadedStun?: string[],
   ): Promise<CreateRoomResponse> {
     roomLoading.value = true
     try {
-      const stun = await fetchStunServers()
+      const stun = preloadedStun ?? (await fetchStunServers())
       const result = await createRoom({
         sdpOffer,
         iceCandidates,
@@ -308,6 +322,7 @@ export const useOnlineStore = defineStore('online', () => {
       return data
     } finally {
       roomLoading.value = false
+      roomCreateStep.value = null
     }
   }
 
@@ -425,6 +440,7 @@ export const useOnlineStore = defineStore('online', () => {
     // 房间状态
     roomState,
     roomLoading,
+    roomCreateStep,
     stunServers,
     // NAT 检测
     natResult,
