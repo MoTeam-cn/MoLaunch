@@ -100,8 +100,8 @@ async function handleLaunch() {
         />
         <!-- 账号类型图标 -->
         <component
-          v-else-if="topPillMeta.icon"
           :is="topPillMeta.icon"
+          v-else-if="topPillMeta.icon"
           class="h-3.5 w-3.5 flex-none"
           :class="topPillMeta.iconClass"
         />
