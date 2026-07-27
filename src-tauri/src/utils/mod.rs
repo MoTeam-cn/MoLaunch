@@ -37,6 +37,7 @@ pub mod signaling_manager;
 pub mod sdk_manager;
 pub mod skin_manager;
 pub mod system_manager;
+pub mod tun_manager;
 pub mod version;
 pub mod version_export_manager;
 pub mod version_install_manager;

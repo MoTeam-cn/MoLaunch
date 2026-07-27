@@ -1,5 +1,6 @@
 //! 应用全局状态（AppState）
 
+use crate::minecraft::online::bridge::VirtualLanBridge;
 use crate::sdk::SdkInstance;
 use crate::{log_info, log_warn};
 use std::sync::{Arc, Mutex};
@@ -35,6 +36,11 @@ pub struct AppState {
     /// `authlib_login` 返回 `NeedSelect` 时暂存，前端选定 profile 后
     /// `authlib_select_profile` 取出使用。同一时间只允许一个待处理登录。
     pub authlib_pending: Arc<TokioMutex<Option<PendingAuthlibLogin>>>,
+    /// 联机虚拟网卡桥接器（阶段三子任务 5：TUN ↔ DataChannel 桥接）
+    ///
+    /// 房主与加入方共用同一实例，每次进入房间时 `tun_start` 创建并替换，
+    /// `tun_stop` 关闭并置 None。同一时间仅允许一个桥接实例。
+    pub virtual_lan_bridge: Arc<TokioMutex<Option<VirtualLanBridge>>>,
 }
 
 impl Default for AppState {
@@ -85,6 +91,7 @@ impl AppState {
             download_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             download_pause_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             authlib_pending: Arc::new(TokioMutex::new(None)),
+            virtual_lan_bridge: Arc::new(TokioMutex::new(None)),
         }
     }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 加入方面板（阶段二）
+ * 加入方面板（阶段二 + 阶段三子任务 5）
  *
  * 显示内容：
  * - 房间信息卡片（房间码、自己的虚拟 IP、房主 MC 版本/端口）
@@ -10,11 +10,16 @@
  *
  * 加入方无需轮询 answers（房主会主动 confirm），
  * 仅在房间状态异常时由用户主动退出。
+ *
+ * 数据分发（阶段三子任务 5）：
+ * - `useVirtualLan` 启动后端 TUN 桥接 → `onTunPacket` 回调通过 `guestWebrtc.dataChannel.send(raw)` 发给房主
+ * - watch `guestWebrtc.dataChannel`：DataChannel 就绪后绑定 `onMessage` → `lan.forwardToTun` 转发到 TUN
  */
 
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, watch } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
+import { useVirtualLan } from '@/composables/useVirtualLan'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import { showConfirm } from '@/utils/modal'
@@ -29,6 +34,43 @@ import {
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebRTC') as ReturnType<typeof useWebRTC>
+
+/**
+ * TUN 桥接：TUN 读到包 → 通过 DataChannel 发给房主
+ *
+ * DataChannel 可能尚未就绪（PC 协商中），readyState 检查跳过未就绪通道。
+ */
+const lan = useVirtualLan({
+  onTunPacket: (raw) => {
+    const channel = guestWebrtc.dataChannel.value
+    if (channel && channel.readyState === 'open') {
+      try {
+        channel.send(raw)
+      } catch (e) {
+        console.warn('[Online] 加入方 DataChannel.send 失败:', e)
+      }
+    }
+  },
+})
+
+/**
+ * 监听 DataChannel 就绪，绑定 onMessage → 转发到后端 TUN
+ *
+ * `useWebRTC` 在 `pc.ondatachannel` 触发时填充 `dataChannel.value`，
+ * 此处 watch 在 dataChannel 变化时重新绑定 handler。
+ */
+watch(
+  () => guestWebrtc.dataChannel.value,
+  (channel) => {
+    if (!channel) return
+    guestWebrtc.setDataChannelHandlers({
+      onMessage: (raw) => {
+        void lan.forwardToTun(raw)
+      },
+    })
+  },
+  { immediate: true },
+)
 
 const room = computed(() => store.roomState)
 const connState = guestWebrtc.connectionState
@@ -55,6 +97,8 @@ function handleLeaveRoom() {
     '退出后将断开与房主的 P2P 连接。确定退出？',
     async () => {
       try {
+        // 先停止 TUN 桥接，再关 PC，最后调后端退出
+        await lan.stop()
         guestWebrtc.close()
         await store.guestLeaveRoom()
       } catch (e) {
@@ -69,6 +113,12 @@ function handleLeaveRoom() {
 onMounted(() => {
   // 加入方拉取一次房间信息同步元数据
   void store.refreshRoomInfo()
+
+  // 启动 TUN 桥接：进入面板即创建 TUN 接口，开始读包 → dataChannel.send
+  // 失败仅 toast（如 wintun.dll 缺失 / 无管理员权限），不阻塞信令流程
+  void lan.start(store.roomState.selfVirtualIp, store.roomState.subnet).catch((e) => {
+    toastError(`虚拟网卡启动失败：${e instanceof Error ? e.message : String(e)}`)
+  })
 })
 </script>
 

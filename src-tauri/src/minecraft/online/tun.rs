@@ -5,7 +5,8 @@
 //!
 //! # 平台约束
 //!
-//! - **Windows**：需在可执行文件同目录放置 `wintun.dll`（从 https://wintun.net/ 下载）
+//! - **Windows**：默认从可执行文件同目录搜索 `wintun.dll`；若调用方通过 `wintun_dll_path`
+//!   显式指定路径（如 Tauri resources 解析的路径），则优先使用该路径
 //! - **Linux/macOS**：需 root 或 CAP_NET_ADMIN 权限创建 TUN 接口
 //!
 //! # 设计
@@ -23,10 +24,11 @@
 //! - 多队列：Linux 支持，提升吞吐
 
 use std::io;
+use std::path::Path;
 use tun_rs::{AsyncDevice, DeviceBuilder};
 
 // 项目日志宏（logger.rs 中定义）
-use crate::{log_info, log_warn};
+use crate::{log_debug, log_info, log_warn};
 
 /// 虚拟网卡接口元信息
 #[derive(Debug, Clone)]
@@ -58,12 +60,19 @@ impl VirtualNet {
     /// - `ipv4`：虚拟 IPv4 地址（如 `10.244.1.1`）
     /// - `prefix_len`：子网前缀长度（如 24，对应 `10.244.1.0/24`）
     /// - `mtu`：MTU，默认 1400（避免 WebRTC DataChannel 分片）
+    /// - `wintun_dll_path`：Windows 专属，显式指定 `wintun.dll` 路径（如 Tauri resources
+    ///   解析的路径）；传 `None` 则回退到 Windows 默认 DLL 搜索（可执行文件同目录等）
     ///
     /// # 错误
     ///
     /// - Windows：缺少 `wintun.dll` 或无管理员权限
     /// - Linux/macOS：无 root 或 CAP_NET_ADMIN 权限
-    pub async fn create(ipv4: &str, prefix_len: u8, mtu: u16) -> io::Result<Self> {
+    pub async fn create(
+        ipv4: &str,
+        prefix_len: u8,
+        mtu: u16,
+        wintun_dll_path: Option<&Path>,
+    ) -> io::Result<Self> {
         log_info!(
             "[Online] 创建 TUN 接口: ipv4={}/{}, mtu={}",
             ipv4,
@@ -71,10 +80,29 @@ impl VirtualNet {
             mtu
         );
 
-        let device = DeviceBuilder::new()
+        let mut builder = DeviceBuilder::new()
             .ipv4(ipv4, prefix_len, None)
-            .mtu(mtu)
-            .build_async()?;
+            .mtu(mtu);
+
+        // Windows 专属：显式指定 wintun.dll 路径，避免依赖默认 DLL 搜索顺序
+        #[cfg(windows)]
+        {
+            if let Some(path) = wintun_dll_path {
+                let path_str = path.to_string_lossy().into_owned();
+                log_debug!("[Online] 使用 wintun.dll 路径: {}", path_str);
+                builder = builder.with(|b| {
+                    b.wintun_file(path_str.clone());
+                });
+            }
+        }
+
+        // 非 Windows 平台忽略 wintun_dll_path 参数
+        #[cfg(not(windows))]
+        {
+            let _ = wintun_dll_path;
+        }
+
+        let device = builder.build_async()?;
 
         let info = VirtualNetInfo {
             name: format!("tun-molaunch"),
@@ -124,7 +152,7 @@ impl VirtualNet {
 ///
 /// 返回接口信息与读包结果（超时 1 秒，读不到包也算成功）。
 pub async fn poc_create_and_recv() -> io::Result<VirtualNetInfo> {
-    let mut net = VirtualNet::create("10.244.99.1", 24, 1400).await?;
+    let mut net = VirtualNet::create("10.244.99.1", 24, 1400, None).await?;
 
     let mut buf = [0u8; 65535];
     // 用 tokio::time::timeout 包装，1 秒内读不到包也返回成功（说明接口可用）

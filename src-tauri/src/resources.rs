@@ -91,6 +91,18 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         //                worker 内通过 importScripts 加载并调用 createCubiomesModule() 实例化
         "wasm/cubiomes.wasm" => Some(include_bytes!("../resources/wasm/cubiomes.wasm")),
         "wasm/cubiomes.js" => Some(include_bytes!("../resources/wasm/cubiomes.js")),
+        // wintun.dll（Windows 联机模块 TUN 接口驱动，按 target_arch 嵌入对应架构版本）
+        // 来源：https://www.wintun.net/（WireGuard 项目，已签名）
+        // 运行时由 `extract_wintun` 释放到 %APPDATA%/.MolaLaunch/wintun.dll
+        // 注册统一逻辑路径 `wintun/wintun.dll`，编译时按架构选择不同物理文件
+        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+        "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/amd64/wintun.dll")),
+        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
+        "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/arm64/wintun.dll")),
+        #[cfg(all(target_os = "windows", target_arch = "x86"))]
+        "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/x86/wintun.dll")),
+        #[cfg(all(target_os = "windows", target_arch = "arm"))]
+        "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/arm/wintun.dll")),
         _ => None,
     }
 }
@@ -208,6 +220,51 @@ pub fn extract_sdk() -> anyhow::Result<std::path::PathBuf> {
     let target_path = crate::utils::cache_temp::sdk_library_path(sdk_filename);
 
     extract_resource(&resource_path, &target_path)?;
+
+    Ok(target_path)
+}
+
+/// 释放 wintun.dll 到 AppData 全局目录（Windows 专属）
+///
+/// wintun.dll 是 WireGuard 项目的 Windows 虚拟网卡驱动，由 `tun-rs` 在运行时
+/// 通过 `libloading` 加载。放 AppData 而非 temp 目录，避免 temp 被清理导致后续
+/// 启动失败；放全局位置而非启动器目录，支持多实例共享同一份驱动。
+///
+/// # 释放路径
+///
+/// - **Windows**：`%APPDATA%/.MolaLaunch/wintun.dll`
+///   （与 `OnlineStorage::appdata_device_path` 同根目录，便于统一管理）
+/// - **非 Windows**：本函数不存在（`#[cfg(target_os = "windows")]` 编译期排除）
+///
+/// # 架构支持
+///
+/// 编译时 `embedded_bytes` 按 `target_arch` 选择对应架构的 dll 嵌入：
+/// - `x86_64` → `resources/wintun/amd64/wintun.dll`
+/// - `aarch64` → `resources/wintun/arm64/wintun.dll`
+/// - `x86` → `resources/wintun/x86/wintun.dll`
+/// - `arm` → `resources/wintun/arm/wintun.dll`
+///
+/// 运行时统一释放到 `%APPDATA%/.MolaLaunch/wintun.dll`，调用方无需关心架构。
+///
+/// # 释放策略
+///
+/// 复用 `extract_resource` 的 sha256 校验机制：
+/// - 首次释放：写入 dll + sha256 校验文件
+/// - 后续启动：hash 一致 → 跳过写盘；hash 不一致（主程序更新后嵌入的 dll 变了）→ 覆盖释放
+///
+/// # 调用方
+///
+/// `minecraft::online::bridge::VirtualLanBridge::start` 在创建 TUN 接口前调用，
+/// 拿到释放后的绝对路径后传给 `VirtualNet::create(..., Some(path))`。
+#[cfg(target_os = "windows")]
+pub fn extract_wintun() -> anyhow::Result<std::path::PathBuf> {
+    let appdata = std::env::var("APPDATA")
+        .map_err(|_| anyhow::anyhow!("APPDATA environment variable not set"))?;
+    let target_path = std::path::PathBuf::from(appdata)
+        .join(".MolaLaunch")
+        .join("wintun.dll");
+
+    extract_resource("wintun/wintun.dll", &target_path)?;
 
     Ok(target_path)
 }

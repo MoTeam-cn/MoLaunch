@@ -9,6 +9,39 @@
 
 ### 变更
 
+#### wintun.dll 分发方案落地（阶段三子任务 1 待办项）
+- 背景：Windows 平台 `tun-rs` 通过 `libloading` 加载 `wintun.dll`，原方案要求用户手动把 dll 放到可执行文件同目录，便携性差且安装版路径不可写。改为编译时嵌入 + 运行时释放到 AppData 全局目录，实现"开箱即用 + 多实例共享"
+- 资源嵌入：[src-tauri/src/resources.rs](src-tauri/src/resources.rs) `embedded_bytes` 注册 `wintun/wintun.dll` 逻辑路径，按 `target_arch` 编译时选择对应架构的物理文件（`x86_64`→amd64、`aarch64`→arm64、`x86`→x86、`arm`→arm），全部用 `#[cfg(target_os = "windows")]` 包裹，非 Windows 平台不嵌入
+- 资源释放：新增 `extract_wintun()` 函数（`#[cfg(target_os = "windows")]`），复用 `extract_resource` 的 sha256 校验机制，释放到 `%APPDATA%/.MolaLaunch/wintun.dll`（与 `OnlineStorage::appdata_device_path` 同根目录）；首次释放写 dll + sha256 校验文件，后续启动 hash 一致则跳过，主程序更新后嵌入 dll 变了则自动覆盖
+- TUN 接口适配：[src-tauri/src/minecraft/online/tun.rs](src-tauri/src/minecraft/online/tun.rs) `VirtualNet::create` 新增 `wintun_dll_path: Option<&Path>` 参数，Windows 下通过 `DeviceBuilder::with(|b| b.wintun_file(path.clone()))` 显式指定 dll 路径，避免依赖默认 DLL 搜索顺序；非 Windows 平台参数被忽略
+- 桥接调用：[src-tauri/src/minecraft/online/bridge.rs](src-tauri/src/minecraft/online/bridge.rs) `VirtualLanBridge::start` 在创建 TUN 接口前调 `crate::resources::extract_wintun()` 拿到释放路径，传入 `VirtualNet::create`；释放失败时回退到默认 DLL 搜索（可执行文件同目录等）
+- 资源文件：`src-tauri/resources/wintun/{amd64,arm64,x86,arm}/wintun.dll` 4 个架构版本（来源 https://www.wintun.net/，WireGuard 项目，已签名，未修改字节）
+- 验证：`cargo check --lib` 通过
+- 后续：实际运行时验证需用户在管理员权限下启动联机模块，观察日志 `wintun.dll 已释放` 与 `TUN 接口已创建`
+
+#### TUN 桥接数据分发打通（阶段三子任务 5 数据分发）
+- 背景：前端 mesh 拓扑 WebRTC 主体已就绪，本次将后端 `VirtualLanBridge`（TUN 接口 + 读写循环）与前端 `hostMesh.broadcastPacket` / `guestWebrtc.dataChannel.send` 打通，实现 TUN ↔ DataChannel 双向数据转发
+- 后端改动：
+  - [src-tauri/src/state/app.rs](src-tauri/src/state/app.rs) `AppState` 新增 `virtual_lan_bridge: Arc<TokioMutex<Option<VirtualLanBridge>>>` 字段，房主与加入方共用同一桥接实例
+  - 新增 [src-tauri/src/utils/tun_manager.rs](src-tauri/src/utils/tun_manager.rs) 注册 3 个 IPC action：
+    - `tun_start`：若已有 bridge 先停止 → 创建 TUN 接口（绑定 ipv4/prefix_len）→ 启动 select! 读写循环 → 返回接口信息
+    - `tun_forward_to`：base64 解码 DataChannel 消息 → 协议帧 decode → 写入 TUN（控制消息跳过）
+    - `tun_stop`：abort 读写循环 task + 标记 BridgeState::Closed（幂等）
+  - [src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs) `DISPATCHER` 初始化追加 `register_tun_actions` 注册
+  - [src-tauri/src/utils/mod.rs](src-tauri/src/utils/mod.rs) 导出 `tun_manager` 模块
+  - 二进制传输约定：Tauri IPC 走 JSON，二进制数据用 base64 字符串传递（`message_base64` 字段），IP 包 MTU 1400 字节 base64 后约 1870 字节
+- 前端类型改动：
+  - [src/types/online.ts](src/types/online.ts) 新增 `TunStartParams` / `TunStartResponse` / `TunForwardResponse` 类型；导出 `EVENT_TUN_PACKET_OUT` 事件名常量与 `TunPacketPayload` 类型（`number[]`）
+- 前端 API 客户端改动：
+  - [src/utils/api/online-manager.ts](src/utils/api/online-manager.ts) `ONLINE_ACTIONS` 追加 `TUN_START` / `TUN_FORWARD_TO` / `TUN_STOP`；新增 `tunStart(params)` / `tunForwardTo(dataChannelMessage)` / `tunStop()` 三个便捷封装；`tunForwardTo` 内部分块处理 ArrayBuffer → base64（避免 `apply` 参数上限）
+- 前端 composable 改动：
+  - 新增 [src/composables/useVirtualLan.ts](src/composables/useVirtualLan.ts) 虚拟网卡桥接 composable：`start(selfVirtualIp, subnet)` 解析 CIDR → 调用 `tunStart` → 订阅 `online://tun-packet-out` 事件；`onTunPacket` 回调由调用方注入（房主调 `hostMesh.broadcastPacket`，加入方调 `dataChannel.send`）；`forwardToTun(raw)` 转发 DataChannel 收到的二进制到后端 TUN；`stop()` 停止桥接；onUnmounted 自动清理监听器；导出 `parsePrefixLen(subnet)` 工具函数
+- 前端组件改动：
+  - [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 注入 `useVirtualLan`，`onTunPacket` 回调调 `hostMesh.broadcastPacket(raw)` 下发所有已联通参与者；`generateOfferForParticipant` 在 `createOfferFor` 后通过 `hostMesh.setDataChannelHandlers` 绑定 `onMessage` → `lan.forwardToTun`（`setupDataChannelHandlers` 仅更新传入字段，不影响默认 onOpen/onClose）；`onMounted` 启动 TUN 桥接；`handleCloseRoom` 改为 `lan.stop` → `hostMesh.close` → `store.hostCloseRoom` 顺序释放
+  - [src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) 注入 `useVirtualLan`，`onTunPacket` 回调在 DataChannel readyState='open' 时调 `channel.send(raw)`；`watch(guestWebrtc.dataChannel)` 在 DataChannel 就绪时绑定 `onMessage` → `lan.forwardToTun`（`immediate: true` 处理已就绪场景）；`onMounted` 启动 TUN 桥接；`handleLeaveRoom` 改为 `lan.stop` → `guestWebrtc.close` → `store.guestLeaveRoom` 顺序释放
+- 数据流：后端 TUN 读包 → `protocol::encode` → emit `online://tun-packet-out` → 前端 listen → `hostMesh.broadcastPacket` 或 `dataChannel.send`；前端 DataChannel.onmessage → ArrayBuffer → base64 → invoke `tun_forward_to` → 后端 base64 decode → `protocol::decode` → 写入 TUN
+- 验证：`cargo check --lib` 通过；`vue-tsc --noEmit` 本次修改的 7 个文件 0 新增类型错误；`eslint` 7 个文件全部通过
+
 #### 前端 mesh 拓扑 WebRTC 整套改造（阶段三子任务 5 前端主体）
 - 背景：后端 per-participant Offer 接口与前端 API 客户端打底已完成，本次完成前端 WebRTC 层与 Vue 组件的 mesh 拓扑改造，使房主能为每个参与者维护独立 PeerConnection
 - 改动：

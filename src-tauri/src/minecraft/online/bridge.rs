@@ -88,8 +88,29 @@ impl VirtualLanBridge {
             prefix_len
         );
 
+        // Windows 专属：从 AppData 释放并加载 wintun.dll
+        // （编译时 include_bytes! 嵌入二进制，运行时释放到 %APPDATA%/.MolaLaunch/wintun.dll）
+        #[cfg(windows)]
+        let wintun_path: Option<std::path::PathBuf> = {
+            match crate::resources::extract_wintun() {
+                Ok(p) => {
+                    log_debug!("[Online] wintun.dll 已释放: {}", p.display());
+                    Some(p)
+                }
+                Err(e) => {
+                    log_warn!(
+                        "[Online] 释放 wintun.dll 失败: {}, 回退到默认 DLL 搜索",
+                        e
+                    );
+                    None
+                }
+            }
+        };
+        #[cfg(not(windows))]
+        let wintun_path: Option<std::path::PathBuf> = None;
+
         // 创建 TUN 接口
-        let net = VirtualNet::create(ipv4, prefix_len, 1400)
+        let net = VirtualNet::create(ipv4, prefix_len, 1400, wintun_path.as_deref())
             .await
             .map_err(|e| {
                 log_error!("[Online] TUN 接口创建失败: {}", e);
@@ -112,7 +133,7 @@ impl VirtualLanBridge {
         let seq = Arc::new(AtomicU32::new(0));
         let state = Arc::new(Mutex::new(BridgeState::Running));
 
-        let mut device = net.into_device();
+        let device = net.into_device();
 
         // 启动读写循环 task
         let state_clone = state.clone();

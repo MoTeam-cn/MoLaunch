@@ -11,11 +11,16 @@
  * - 5min keepalive
  *
  * WebRTC 实例通过 inject 从父级 RoomManager 获取（hostMesh，多 PC 管理器）。
+ *
+ * 数据分发（阶段三子任务 5）：
+ * - `useVirtualLan` 启动后端 TUN 桥接 → `onTunPacket` 回调调 `hostMesh.broadcastPacket` 下发所有参与者
+ * - 每个新参与者的 DataChannel 在 `createOfferFor` 后绑定 `onMessage` → `lan.forwardToTun` 转发到 TUN
  */
 
 import { computed, inject, onMounted, onUnmounted, ref } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
+import { useVirtualLan } from '@/composables/useVirtualLan'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -40,6 +45,13 @@ import {
 
 const store = useOnlineStore()
 const hostMesh = inject('hostMesh') as ReturnType<typeof useWebRTCMesh>
+
+/** TUN 桥接：TUN 读到包 → 广播给所有已联通参与者 */
+const lan = useVirtualLan({
+  onTunPacket: (raw) => {
+    hostMesh.broadcastPacket(raw)
+  },
+})
 
 const pendingAnswers = ref<PendingAnswer[]>([])
 const polling = ref(false)
@@ -75,7 +87,7 @@ const remainingText = computed(() => {
 /**
  * 为单个参与者生成 SDP Offer 并上传到后端
  *
- * 流程：hostMesh.createOfferFor → uploadParticipantOffer
+ * 流程：hostMesh.createOfferFor → 绑定 onMessage → uploadParticipantOffer
  * 失败时 toast 提示但不阻塞其他参与者。
  */
 async function generateOfferForParticipant(participantId: string) {
@@ -83,6 +95,15 @@ async function generateOfferForParticipant(participantId: string) {
   offerGenerating.value.add(participantId)
   try {
     const { sdp, iceCandidates } = await hostMesh.createOfferFor(participantId, stunServers.value)
+
+    // 绑定 DataChannel.onMessage：参与者发来的包 → 转发到后端 TUN
+    // setupDataChannelHandlers 仅更新传入字段，不影响 createOfferFor 默认绑定的 onOpen/onClose
+    hostMesh.setDataChannelHandlers(participantId, {
+      onMessage: (raw) => {
+        void lan.forwardToTun(raw)
+      },
+    })
+
     const result = await uploadParticipantOffer(
       store.roomState.roomCode,
       participantId,
@@ -232,6 +253,8 @@ async function doKeepalive() {
 function handleCloseRoom() {
   showConfirm('关闭房间', '关闭后所有加入方将被断开连接，且无法恢复。确定关闭？', async () => {
     try {
+      // 先停止 TUN 桥接，再关闭 mesh，最后调后端关闭房间
+      await lan.stop()
       hostMesh.close()
       await store.hostCloseRoom()
     } catch (e) {
@@ -260,12 +283,19 @@ onMounted(() => {
   answerTimer = setInterval(() => void pollAnswers(), 5000)
   // 保活 5min
   keepaliveTimer = setInterval(() => void doKeepalive(), 5 * 60 * 1000)
+
+  // 启动 TUN 桥接：房主进入面板即创建 TUN 接口，开始读包 → broadcastPacket
+  // 失败仅 toast（如 wintun.dll 缺失 / 无管理员权限），不阻塞信令流程
+  void lan.start(store.roomState.selfVirtualIp, store.roomState.subnet).catch((e) => {
+    toastError(`虚拟网卡启动失败：${e instanceof Error ? e.message : String(e)}`)
+  })
 })
 
 onUnmounted(() => {
   if (answerTimer) clearInterval(answerTimer)
   if (keepaliveTimer) clearInterval(keepaliveTimer)
   if (participantsTimer) clearInterval(participantsTimer)
+  // lan.stop 由 useVirtualLan 的 onUnmounted 自动处理
 })
 </script>
 

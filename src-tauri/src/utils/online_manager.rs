@@ -2,6 +2,11 @@
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发。
 //! 阶段一注册 6 个认证相关 action，阶段二/三补充房间/信令/WebRTC/虚拟网卡/端口探测。
+//!
+//! 阶段三子任务 5 新增 3 个 TUN 桥接 action（由 `tun_manager` 注册）：
+//! - `tun_start`：创建 TUN 接口 + 启动读写循环 + emit `online://tun-packet-out` 事件
+//! - `tun_forward_to`：前端 DataChannel 收到消息后调用，解码协议帧并写入 TUN
+//! - `tun_stop`：停止桥接，销毁 TUN 接口
 
 use once_cell::sync::Lazy;
 use serde::Serialize;
@@ -294,6 +299,10 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     // === 信令相关 action（阶段二：房间创建/加入/退出/踢人/保活等）===
     // 由 signaling_manager 模块统一注册，避免本文件超过 500 行
     crate::utils::signaling_manager::register_signaling_actions(&mut d);
+
+    // === TUN 桥接管理 action（阶段三子任务 5：数据分发打通）===
+    // 由 tun_manager 模块统一注册，提供 tun_start / tun_forward_to / tun_stop 三个 action
+    crate::utils::tun_manager::register_tun_actions(&mut d);
 
     d
 });

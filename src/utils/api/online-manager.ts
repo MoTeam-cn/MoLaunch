@@ -23,6 +23,11 @@
  * 阶段三补充 2 个 action（mesh 拓扑：参与者级 SDP Offer）：
  * - `room_upload_participant_offer`：房主为指定参与者上传独立 SDP Offer + ICE
  * - `room_fetch_participant_offer`：参与者轮询拉取房主为自己生成的 SDP Offer
+ *
+ * 阶段三子任务 5 补充 3 个 action（TUN 桥接：数据分发打通）：
+ * - `tun_start`：创建 TUN 接口 + 启动读写循环 + emit `online://tun-packet-out` 事件
+ * - `tun_forward_to`：前端 DataChannel 收到消息后调用，base64 编码传入，后端解码并写入 TUN
+ * - `tun_stop`：停止桥接，销毁 TUN 接口
  */
 
 import { invoke } from '@tauri-apps/api/core'
@@ -39,6 +44,9 @@ import type {
   RoomInfoResponse,
   ServerTimeInfo,
   StunServersResponse,
+  TunForwardResponse,
+  TunStartParams,
+  TunStartResponse,
 } from '@/types/online'
 
 /**
@@ -83,6 +91,10 @@ export const ONLINE_ACTIONS = {
   // mesh 拓扑：参与者级 SDP Offer
   ROOM_UPLOAD_PARTICIPANT_OFFER: 'room_upload_participant_offer',
   ROOM_FETCH_PARTICIPANT_OFFER: 'room_fetch_participant_offer',
+  // TUN 桥接：数据分发打通
+  TUN_START: 'tun_start',
+  TUN_FORWARD_TO: 'tun_forward_to',
+  TUN_STOP: 'tun_stop',
 } as const
 
 /** action 名称类型 */
@@ -271,4 +283,62 @@ export function fetchParticipantOffer(
     roomCode,
     participantId,
   })
+}
+
+// ============================================================
+// TUN 桥接管理（阶段三子任务 5：数据分发打通）
+//
+// 3 个 action 与后端 `utils::tun_manager` 注册一一对应。
+// 数据流：
+// - 后端 TUN 读包 → emit `online://tun-packet-out` 事件 → 前端 listen → DataChannel.send
+// - 前端 DataChannel.onmessage → ArrayBuffer → base64 → invoke `tun_forward_to` → 写入 TUN
+// ============================================================
+
+/**
+ * 启动 TUN 桥接（房主与加入方通用）
+ *
+ * 调用后后端会：
+ * 1. 若已有 bridge，先停止（防止泄漏）
+ * 2. 创建 TUN 接口（绑定 ipv4/prefix_len）
+ * 3. 启动 select! 单读写循环 task
+ * 4. emit `online://tun-packet-out` 事件给前端（每读到 IP 包就 emit）
+ *
+ * @param params 含虚拟 IP 与子网前缀长度
+ * @returns 接口信息（接口名 / IP / 前缀长度 / MTU）
+ */
+export function tunStart(params: TunStartParams): Promise<TunStartResponse> {
+  return onlineManager<TunStartResponse>(ONLINE_ACTIONS.TUN_START, params)
+}
+
+/**
+ * 将 DataChannel 收到的消息转发到后端 TUN
+ *
+ * 前端从 `DataChannel.onmessage` 拿到 `ArrayBuffer` 后，转 base64 调用此函数。
+ * 后端 base64 解码 → 协议帧 decode → 写入 TUN 接口。
+ *
+ * @param dataChannelMessage DataChannel 收到的二进制消息（协议帧编码后的字节）
+ * @returns 是否为数据包 + IP 包字节数
+ */
+export function tunForwardTo(
+  dataChannelMessage: ArrayBuffer | Uint8Array,
+): Promise<TunForwardResponse> {
+  // ArrayBuffer / Uint8Array → base64 字符串
+  const bytes = dataChannelMessage instanceof Uint8Array
+    ? dataChannelMessage
+    : new Uint8Array(dataChannelMessage)
+  // 分块处理避免 apply 参数上限（DataChannel 消息一般 < 64KB，但稳妥起见分块）
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize) as unknown as number[])
+  }
+  const messageBase64 = btoa(binary)
+  return onlineManager<TunForwardResponse>(ONLINE_ACTIONS.TUN_FORWARD_TO, {
+    messageBase64,
+  })
+}
+
+/** 停止 TUN 桥接，销毁 TUN 接口（幂等） */
+export function tunStop(): Promise<{ success: boolean }> {
+  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.TUN_STOP)
 }
