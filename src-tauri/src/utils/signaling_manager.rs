@@ -48,6 +48,18 @@ pub struct CreateRoomParams {
     pub host_mc_version: String,
     #[serde(default)]
     pub host_mc_port: u16,
+    /// 是否启用白名单（阶段三子任务 8 安全加强）
+    ///
+    /// `true` 时仅 `whitelist` 数组中的设备可加入；
+    /// `true` 且 `whitelist` 为空 = 拒绝所有人加入（仅房主）。
+    #[serde(default)]
+    pub whitelist_enabled: bool,
+    /// 白名单设备 `device_id` 数组（友好标识，服务端转换为 device_pk 落库）
+    ///
+    /// 仅当 `whitelist_enabled = true` 时生效。房主可在房间运行期间通过
+    /// `room_add_whitelist` / `room_remove_whitelist` 动态增删。
+    #[serde(default)]
+    pub whitelist: Vec<String>,
 }
 
 fn default_max_players() -> u32 {
@@ -121,6 +133,34 @@ pub struct ParticipantOfferParams {
     pub participant_id: String,
 }
 
+// ===== 白名单管理参数（阶段三子任务 8 安全加强） =====
+
+/// 添加白名单条目的参数
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AddWhitelistParams {
+    pub room_code: String,
+    /// 待添加的设备 `device_id`（友好标识）
+    pub device_id: String,
+}
+
+/// 移除白名单条目的参数
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveWhitelistParams {
+    pub room_code: String,
+    /// 待移除的设备 `device_id`（友好标识）
+    pub device_id: String,
+}
+
+/// 修改白名单启用状态的参数
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetWhitelistEnabledParams {
+    pub room_code: String,
+    pub enabled: bool,
+}
+
 // ============================================================
 // 辅助函数
 // ============================================================
@@ -174,6 +214,11 @@ pub fn register_signaling_actions(d: &mut Dispatcher) {
     register_list_participants(d);
     register_upload_participant_offer(d);
     register_fetch_participant_offer(d);
+    // 阶段三子任务 8：房主白名单管理
+    register_list_whitelist(d);
+    register_add_whitelist(d);
+    register_remove_whitelist(d);
+    register_set_whitelist_enabled(d);
 }
 
 // ============================================================
@@ -201,8 +246,9 @@ fn register_create_room(d: &mut Dispatcher) {
         let creds = load_creds(&state).await?;
         let client = make_client(&state).await;
         log_info!(
-            "[Online] room_create: max_players={}, mc_version={}, mc_port={}, ice_servers={}",
-            p.max_players, p.host_mc_version, p.host_mc_port, p.ice_servers.len()
+            "[Online] room_create: max_players={}, mc_version={}, mc_port={}, ice_servers={}, whitelist_enabled={}, whitelist={}",
+            p.max_players, p.host_mc_version, p.host_mc_port, p.ice_servers.len(),
+            p.whitelist_enabled, p.whitelist.len()
         );
         let req = CreateRoomRequest {
             sdp_offer: p.sdp_offer,
@@ -213,6 +259,8 @@ fn register_create_room(d: &mut Dispatcher) {
             ice_servers: p.ice_servers,
             host_mc_version: p.host_mc_version,
             host_mc_port: p.host_mc_port,
+            whitelist_enabled: p.whitelist_enabled,
+            whitelist: p.whitelist,
         };
         let result = client.signaling_create_room(&creds, &req).await
             .map_err(|e| {
@@ -486,6 +534,89 @@ fn register_fetch_participant_offer(d: &mut Dispatcher) {
             .await
             .map_err(|e| {
                 log_error!("[Online] room_fetch_participant_offer 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+// ============================================================
+// 白名单管理 action（阶段三子任务 8 安全加强）
+// ============================================================
+
+fn register_list_whitelist(d: &mut Dispatcher) {
+    d.register("room_list_whitelist", handler!(state, _app, params, {
+        let p: RoomCodeParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_debug!("[Online] room_list_whitelist: code={}", p.room_code);
+        let result = client.signaling_list_whitelist(&creds, &p.room_code).await
+            .map_err(|e| {
+                log_error!("[Online] room_list_whitelist 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+fn register_add_whitelist(d: &mut Dispatcher) {
+    d.register("room_add_whitelist", handler!(state, _app, params, {
+        let p: AddWhitelistParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_info!(
+            "[Online] room_add_whitelist: code={}, device_id={}",
+            p.room_code, p.device_id
+        );
+        let result = client
+            .signaling_add_whitelist(&creds, &p.room_code, &p.device_id)
+            .await
+            .map_err(|e| {
+                log_error!("[Online] room_add_whitelist 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+fn register_remove_whitelist(d: &mut Dispatcher) {
+    d.register("room_remove_whitelist", handler!(state, _app, params, {
+        let p: RemoveWhitelistParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_info!(
+            "[Online] room_remove_whitelist: code={}, device_id={}",
+            p.room_code, p.device_id
+        );
+        let result = client
+            .signaling_remove_whitelist(&creds, &p.room_code, &p.device_id)
+            .await
+            .map_err(|e| {
+                log_error!("[Online] room_remove_whitelist 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+fn register_set_whitelist_enabled(d: &mut Dispatcher) {
+    d.register("room_set_whitelist_enabled", handler!(state, _app, params, {
+        let p: SetWhitelistEnabledParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_info!(
+            "[Online] room_set_whitelist_enabled: code={}, enabled={}",
+            p.room_code, p.enabled
+        );
+        let result = client
+            .signaling_set_whitelist_enabled(&creds, &p.room_code, p.enabled)
+            .await
+            .map_err(|e| {
+                log_error!("[Online] room_set_whitelist_enabled 失败: {}", e);
                 e.to_string()
             })?;
         serde_json::to_value(result).map_err(|e| e.to_string())

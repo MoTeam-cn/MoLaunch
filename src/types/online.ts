@@ -134,6 +134,22 @@ export interface CreateRoomParams {
   iceServers?: IceServerEntry[]
   hostMcVersion: string
   hostMcPort: number
+  /**
+   * 是否启用白名单（阶段三子任务 8 安全加强）
+   *
+   * `true` 时仅 `whitelist` 数组中的设备可加入；
+   * `true` 且 `whitelist` 为空 = 拒绝所有人加入（仅房主可进入）。
+   * 默认 `false`（不启用白名单，允许任何已注册设备加入）。
+   */
+  whitelistEnabled?: boolean
+  /**
+   * 初始白名单设备 `device_id` 数组（阶段三子任务 8 安全加强）
+   *
+   * 仅当 `whitelistEnabled = true` 时生效；未启用时此字段被忽略。
+   * 房主可在房间运行期间通过 `room_list_whitelist` / `room_add_whitelist` /
+   * `room_remove_whitelist` / `room_set_whitelist_enabled` 动态管理。
+   */
+  whitelist?: string[]
 }
 
 /** 创建房间响应 */
@@ -165,6 +181,13 @@ export interface RoomInfoResponse {
   expiresAt: number
   hostMcVersion: string
   hostMcPort: number
+  /**
+   * 是否启用白名单（阶段三子任务 8 安全加强）
+   *
+   * `true` 时仅白名单内设备可加入；`false` 时允许任何已注册设备加入。
+   * 加入方据此判断是否提示房主将自己加入白名单。
+   */
+  whitelistEnabled: boolean
 }
 
 /** 加入房间响应 */
@@ -327,4 +350,30 @@ export interface NatDetectionResult {
   publicIp?: string
   /** 检测错误信息（失败时） */
   error?: string
+}
+
+// ============================================================
+// 房主白名单管理（阶段三子任务 8 安全加强）
+//
+// 对应后端 `minecraft::online::signaling::WhitelistEntry` / `WhitelistResponse`。
+// 房主可启用白名单后指定允许加入的设备（按 `device_id` 友好标识），
+// 启用且白名单为空 = 拒绝所有人加入（仅房主可进入）。
+// ============================================================
+
+/** 白名单条目（房主查询/管理用） */
+export interface WhitelistEntry {
+  /** 设备主键（UUID） */
+  devicePk: string
+  /** 设备友好标识（如 `mcsdk-xxxx-xxxx-xxxx-xxxx`） */
+  deviceId: string
+  /** 加入白名单时间（Unix 秒） */
+  addedAt: number
+}
+
+/** 白名单列表响应 */
+export interface WhitelistResponse {
+  /** 是否启用白名单 */
+  enabled: boolean
+  /** 白名单条目数组 */
+  entries: WhitelistEntry[]
 }

@@ -9,6 +9,25 @@
 
 ### 变更
 
+#### 联机模块房主白名单管理：创建表单 + 运行期管理 + 4 个 IPC action（阶段三子任务 8 安全加强）
+- 背景：阶段三子任务 8 安全加强项。房主可启用白名单后指定允许加入的设备（按 `device_id` 友好标识），启用且白名单为空 = 拒绝所有人加入（仅房主可进入），便于私密联机。本次完成启动器侧前端 + Tauri 中间件 + Rust 客户端扩展，与已就绪的 api-server 后端（迁移 008 + 仓库层 + 服务层 + 控制器 + OpenAPI）端到端打通
+- 改动：
+  - [src-tauri/src/minecraft/online/signaling.rs](src-tauri/src/minecraft/online/signaling.rs) 新增 `WhitelistEntry` / `WhitelistResponse` / `AddWhitelistRequest` / `SetWhitelistEnabledRequest` 类型；`CreateRoomRequest` 新增 `whitelist_enabled` + `whitelist` 字段；`RoomInfoResponse` 新增 `whitelist_enabled` 字段；`OnlineClient` 新增 4 个客户端方法 `signaling_list_whitelist` / `signaling_add_whitelist` / `signaling_remove_whitelist` / `signaling_set_whitelist_enabled`
+  - [src-tauri/src/utils/signaling_manager.rs](src-tauri/src/utils/signaling_manager.rs) 新增 4 个 IPC action 注册（`room_list_whitelist` / `room_add_whitelist` / `room_remove_whitelist` / `room_set_whitelist_enabled`），含 `AddWhitelistParams` / `RemoveWhitelistParams` / `SetWhitelistEnabledParams` 参数结构体；`CreateRoomParams` 新增 `whitelist_enabled` + `whitelist` 字段
+  - [src/types/online.ts](src/types/online.ts) `CreateRoomParams` 新增 `whitelistEnabled` + `whitelist` 字段；`RoomInfoResponse` 新增 `whitelistEnabled` 字段；新增 `WhitelistEntry` / `WhitelistResponse` 类型
+  - [src/utils/api/online-manager.ts](src/utils/api/online-manager.ts) 新增 4 个 IPC 封装函数 `listWhitelist` / `addWhitelist` / `removeWhitelist` / `setWhitelistEnabled`；`ONLINE_ACTIONS` 常量追加 4 个 action 名
+  - [src/stores/online.ts](src/stores/online.ts) `RoomState` 新增 `whitelistEnabled` 字段；`hostCreateRoom` 方法签名追加 `whitelistEnabled` + `whitelist` 两个可选参数；新增 `whitelistEntries` + `whitelistLoading` 两个状态；新增 4 个 store 方法 `refreshWhitelist` / `addWhitelistEntry` / `removeWhitelistEntry` / `updateWhitelistEnabled`；`refreshRoomInfo` 同步 `whitelistEnabled`；`resetRoomState` 清空 `whitelistEntries`
+  - 新增 [src/components/online/WhitelistEditor.vue](src/components/online/WhitelistEditor.vue)（288 行）：白名单编辑器子组件，支持两种模式：`create` 模式纯本地 v-model 双向绑定 `{ enabled, deviceIds }`，`runtime` 模式调用后端 API 实时增删；含启用开关 + 输入框 + 列表 + 增删按钮 + 「启用且为空」拒绝所有人警告 + 空状态 icon+text 垂直水平居中
+  - [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue) 创建房间表单新增「白名单」section（`WhitelistEditor` create 模式），`handleCreateRoom` 透传 `whitelistForm.enabled` + `whitelistForm.deviceIds` 到 `hostCreateRoom`
+  - [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 新增「白名单管理」Card（位于「P2P 连接」与「待确认加入请求」之间），使用 `WhitelistEditor` runtime 模式，Card extra 角标显示当前启用状态
+- 复用：
+  - 复用项目自定义组件 `Input.vue` / `Button.vue` / `Tooltip.vue` / `Card.vue`，遵循「禁止原生 HTML 控件」约定（checkbox 沿用项目惯例 `accent-primary-500`，与 ExportTab / ArchiveManager 一致）
+  - `safeCall` / `toastSuccess` / `toastError` 复用既有工具
+  - IPC 沿用 `onlineManager(action, params)` 统一入口 + `ONLINE_ACTIONS` 常量，与既有 13 个信令 action + 1 个 TURN action + 2 个 mesh action + 3 个 TUN action 完全一致
+  - 类型定义复用 `BusinessResult<T>` 统一响应包装
+- 验证：`vue-tsc --noEmit` 本次修改 6 个文件 0 新增错误（项目其他预存错误与本次改动无关）；`eslint` 6 个目标文件全部通过；行数检查 `WhitelistEditor.vue` 288 行、`RoomHostPanel.vue` 212 行、`RoomManager.vue` 277 行，均符合 300 行约束
+- 后续：部署 api-server v0.1.10+ 后端，端到端实测白名单创建/加入/动态增删流程；接入加入方被拒后的 UI 提示（房主添加自己到白名单）
+
 #### 联机模块 TURN 中继支持 阶段 F + G：房主拉取系统 TURN + DataChannel 广播 / 加入方接收 + PC 配置更新（阶段三子任务 7）
 - 背景：阶段 E（DataChannel TurnServers 控制消息 0x05 协议层）+ H（用户自定义 TURN 配置 UI）+ I（持久化）+ J（编译验证）已就绪，本次推进阶段 F（房主侧：拉取系统 TURN → 合并用户自定义 → DataChannel 广播）与阶段 G（加入方侧：接收 TurnServers 控制消息 → 更新本地 ICE 配置 → `pc.setConfiguration` 热更新），子任务 7 编码部分全部完成
 - 改动：

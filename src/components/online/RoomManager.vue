@@ -26,6 +26,7 @@ import Card from '@/components/common/Card.vue'
 import Input from '@/components/common/Input.vue'
 import RoomHostPanel from './RoomHostPanel.vue'
 import RoomGuestPanel from './RoomGuestPanel.vue'
+import WhitelistEditor from './WhitelistEditor.vue'
 import {
   PlusIcon,
   ArrowRightOnRectangleIcon,
@@ -60,6 +61,14 @@ const createForm = ref({
   mcVersion: '',
   mcPort: 25565,
 })
+
+/**
+ * 白名单表单状态（阶段三子任务 8 安全加强）
+ *
+ * 由 [WhitelistEditor.vue](src/components/online/WhitelistEditor.vue) 通过
+ * v-model 双向绑定，房主创建房间时一并提交到后端。
+ */
+const whitelistForm = ref({ enabled: false, deviceIds: [] as string[] })
 /** 加入房间表单 */
 const joinForm = ref({
   roomCode: '',
@@ -129,6 +138,8 @@ async function handleCreateRoom() {
       createForm.value.mcVersion,
       createForm.value.mcPort,
       stun,
+      whitelistForm.value.enabled,
+      whitelistForm.value.deviceIds,
     )
   } catch (e) {
     toastError(`创建房间失败：${e instanceof Error ? e.message : String(e)}`)
@@ -192,6 +203,11 @@ async function handleJoinRoom() {
         <div class="flex items-center gap-3">
           <label class="w-20 text-xs text-gray-600">房间密码</label>
           <Input v-model="createForm.password" placeholder="留空表示无密码" />
+        </div>
+        <!-- 白名单（阶段三子任务 8）：房主创建房间时可选启用 -->
+        <div class="pt-1">
+          <div class="text-xs text-gray-600 mb-1.5">白名单</div>
+          <WhitelistEditor v-model="whitelistForm" mode="create" />
         </div>
         <div class="pt-2">
           <Button type="primary" long :loading="store.roomLoading" @click="handleCreateRoom">

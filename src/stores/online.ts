@@ -29,6 +29,8 @@ import type {
   RoomInfoResponse,
   StunServersResponse,
   TurnServersResponse,
+  WhitelistEntry,
+  WhitelistResponse,
 } from '@/types/online'
 import {
   getAuthStatus,
@@ -45,6 +47,10 @@ import {
   keepaliveRoom,
   listParticipants,
   getTurnServers,
+  listWhitelist,
+  addWhitelist,
+  removeWhitelist,
+  setWhitelistEnabled,
 } from '@/utils/api/online-manager'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { toastSuccess, toastError } from '@/utils/toast'
@@ -104,6 +110,13 @@ export interface RoomState {
   participants: ParticipantInfo[]
   /** 加入方的 participant_id */
   participantId: string | null
+  /**
+   * 是否启用白名单（阶段三子任务 8 安全加强）
+   *
+   * `true` 时仅白名单内设备可加入；`false` 时允许任何已注册设备加入。
+   * 房主创建房间时由表单开关决定，运行期可通过 `setWhitelistEnabled` 动态修改。
+   */
+  whitelistEnabled: boolean
 }
 
 /** 创建空房间状态 */
@@ -122,6 +135,7 @@ function emptyRoom(): RoomState {
     hostMcPort: 0,
     participants: [],
     participantId: null,
+    whitelistEnabled: false,
   }
 }
 
@@ -312,6 +326,8 @@ export const useOnlineStore = defineStore('online', () => {
    * @param hostMcVersion 房主 MC 版本
    * @param hostMcPort 房主 MC 端口
    * @param preloadedStun 可选，调用方已预取的 STUN 列表（避免重复获取）
+   * @param whitelistEnabled 是否启用白名单（阶段三子任务 8，默认 false）
+   * @param whitelist 初始白名单 `device_id` 数组（仅在 `whitelistEnabled=true` 时生效）
    * @returns 创建房间响应
    */
   async function hostCreateRoom(
@@ -322,6 +338,8 @@ export const useOnlineStore = defineStore('online', () => {
     hostMcVersion: string,
     hostMcPort: number,
     preloadedStun?: string[],
+    whitelistEnabled: boolean = false,
+    whitelist: string[] = [],
   ): Promise<CreateRoomResponse> {
     roomLoading.value = true
     try {
@@ -340,6 +358,8 @@ export const useOnlineStore = defineStore('online', () => {
         iceServers,
         hostMcVersion,
         hostMcPort,
+        whitelistEnabled,
+        whitelist,
       })
       if (result.code !== 1 || !result.data) {
         throw new Error(result.msg || '创建房间失败')
@@ -359,6 +379,7 @@ export const useOnlineStore = defineStore('online', () => {
         hostMcPort,
         participants: [],
         participantId: null,
+        whitelistEnabled,
       }
       toastSuccess(`房间已创建：${data.roomCode}`)
       return data
@@ -412,6 +433,8 @@ export const useOnlineStore = defineStore('online', () => {
         hostMcPort: 0,
         participants: [],
         participantId: data.participantId,
+        // 阶段三子任务 8：加入方初始白名单状态由后续 refreshRoomInfo() 同步
+        whitelistEnabled: false,
       }
       // 拉取房间公开信息补全元数据
       await refreshRoomInfo()
@@ -445,6 +468,8 @@ export const useOnlineStore = defineStore('online', () => {
     roomState.value.expiresAt = info.expiresAt
     roomState.value.hostMcVersion = info.hostMcVersion
     roomState.value.hostMcPort = info.hostMcPort
+    // 阶段三子任务 8：同步白名单启用状态（房主/加入方均可见）
+    roomState.value.whitelistEnabled = info.whitelistEnabled ?? false
     if (roomState.value.role === 'guest') {
       // 加入方需要 ICE 服务器与房主一致（优先 iceServers，回退 stunServers）
       roomState.value.stunServers = info.stunServers ?? roomState.value.stunServers
@@ -504,9 +529,120 @@ export const useOnlineStore = defineStore('online', () => {
     customTurnServers.value = servers
   }
 
+  // ============================================================
+  // 房主白名单管理（阶段三子任务 8 安全加强）
+  //
+  // 4 个方法对应 4 个后端 action：list / add / remove / setEnabled。
+  // 仅房主可调用，加入方无权管理白名单。
+  // 启用白名单且条目为空 = 拒绝所有人加入（仅房主可进入）。
+  // ============================================================
+
+  /** 白名单条目列表（房主管理用） */
+  const whitelistEntries = ref<WhitelistEntry[]>([])
+  /** 白名单是否正在加载/操作中 */
+  const whitelistLoading = ref(false)
+
+  /**
+   * 拉取当前房间的白名单列表（房主）
+   *
+   * 同步 `roomState.whitelistEnabled` 与 `whitelistEntries`。
+   * @returns 白名单响应；失败时返回 null
+   */
+  async function refreshWhitelist(): Promise<WhitelistResponse | null> {
+    if (roomState.value.role !== 'host' || !roomState.value.roomCode) return null
+    whitelistLoading.value = true
+    try {
+      const result = await listWhitelist(roomState.value.roomCode)
+      if (result.code !== 1 || !result.data) return null
+      const data = result.data
+      roomState.value.whitelistEnabled = data.enabled
+      whitelistEntries.value = data.entries ?? []
+      return data
+    } finally {
+      whitelistLoading.value = false
+    }
+  }
+
+  /**
+   * 添加白名单条目（房主）
+   *
+   * @param deviceId 设备友好标识（`mcsdk-xxxx-xxxx-xxxx-xxxx`）
+   * @returns 是否添加成功
+   */
+  async function addWhitelistEntry(deviceId: string): Promise<boolean> {
+    if (roomState.value.role !== 'host' || !roomState.value.roomCode) return false
+    const trimmed = deviceId.trim()
+    if (!trimmed) {
+      toastError('设备 ID 不能为空')
+      return false
+    }
+    whitelistLoading.value = true
+    try {
+      const result = await addWhitelist(roomState.value.roomCode, trimmed)
+      if (result.code !== 1) {
+        toastError(result.msg || '添加白名单失败')
+        return false
+      }
+      toastSuccess(`已添加白名单：${trimmed}`)
+      await refreshWhitelist()
+      return true
+    } finally {
+      whitelistLoading.value = false
+    }
+  }
+
+  /**
+   * 移除白名单条目（房主）
+   *
+   * @param deviceId 设备友好标识
+   * @returns 是否移除成功
+   */
+  async function removeWhitelistEntry(deviceId: string): Promise<boolean> {
+    if (roomState.value.role !== 'host' || !roomState.value.roomCode) return false
+    whitelistLoading.value = true
+    try {
+      const result = await removeWhitelist(roomState.value.roomCode, deviceId)
+      if (result.code !== 1) {
+        toastError(result.msg || '移除白名单失败')
+        return false
+      }
+      toastSuccess(`已移除白名单：${deviceId}`)
+      await refreshWhitelist()
+      return true
+    } finally {
+      whitelistLoading.value = false
+    }
+  }
+
+  /**
+   * 修改白名单启用状态（房主）
+   *
+   * 关闭白名单不影响已落库的条目，再次启用时无需重新添加。
+   * 同步更新 `roomState.whitelistEnabled`。
+   * @param enabled 是否启用白名单
+   * @returns 是否修改成功
+   */
+  async function updateWhitelistEnabled(enabled: boolean): Promise<boolean> {
+    if (roomState.value.role !== 'host' || !roomState.value.roomCode) return false
+    whitelistLoading.value = true
+    try {
+      const result = await setWhitelistEnabled(roomState.value.roomCode, enabled)
+      if (result.code !== 1) {
+        toastError(result.msg || '修改白名单状态失败')
+        return false
+      }
+      roomState.value.whitelistEnabled = enabled
+      toastSuccess(enabled ? '已启用白名单' : '已关闭白名单')
+      return true
+    } finally {
+      whitelistLoading.value = false
+    }
+  }
+
   /** 重置房间状态（不调用后端，仅清空本地） */
   function resetRoomState(): void {
     roomState.value = emptyRoom()
+    whitelistEntries.value = []
   }
 
   return {
@@ -523,6 +659,9 @@ export const useOnlineStore = defineStore('online', () => {
     // TURN 相关状态（阶段三子任务 7）
     customTurnServers,
     systemTurnServers,
+    // 白名单状态（阶段三子任务 8）
+    whitelistEntries,
+    whitelistLoading,
     // NAT 检测
     natResult,
     // 设备认证方法
@@ -544,6 +683,11 @@ export const useOnlineStore = defineStore('online', () => {
     keepalive,
     fetchTurnServers,
     setCustomTurnServers,
+    // 白名单方法
+    refreshWhitelist,
+    addWhitelistEntry,
+    removeWhitelistEntry,
+    updateWhitelistEnabled,
     resetRoomState,
   }
 })

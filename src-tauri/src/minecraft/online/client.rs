@@ -382,10 +382,10 @@ impl OnlineClient {
     ///
     /// 参数：
     /// - `creds`：设备凭证（含 JWT、device_public_key、X25519 私钥）
-    /// - `method`：HTTP 方法（"GET" / "POST" / "DELETE"）
+    /// - `method`：HTTP 方法（"GET" / "POST" / "PUT" / "PATCH" / "DELETE"）
     /// - `path`：接口路径（如 "/v1/signaling/stun"）
     /// - `body`：请求体明文（GET 传 None）
-    /// - `need_csrf`：是否需要 CSRF token（POST/DELETE 需要，GET 不需要）
+    /// - `need_csrf`：是否需要 CSRF token（POST/PUT/PATCH/DELETE 需要，GET 不需要）
     pub async fn call_v1<T: serde::de::DeserializeOwned>(
         &self,
         creds: &DeviceCredentials,
@@ -452,6 +452,8 @@ impl OnlineClient {
         let req_builder = match method.to_uppercase().as_str() {
             "GET" => get_client().get(&url),
             "POST" => get_client().post(&url),
+            "PUT" => get_client().put(&url),
+            "PATCH" => get_client().patch(&url),
             "DELETE" => get_client().delete(&url),
             other => {
                 return Err(ClientError::Business {

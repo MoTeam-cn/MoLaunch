@@ -26,6 +26,7 @@ import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import PendingAnswerList from './PendingAnswerList.vue'
 import ParticipantList from './ParticipantList.vue'
+import WhitelistEditor from './WhitelistEditor.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 import {
   XCircleIcon,
@@ -35,6 +36,7 @@ import {
   WifiIcon,
   ClipboardDocumentIcon,
   InformationCircleIcon,
+  ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -160,6 +162,17 @@ async function copyVirtualIp() {
           <span>已联通，请在 Minecraft 内按 Esc → 「开放给局域网」开关。开放后启动器会自动捕获端口并广播给所有参与者，加入方在「多人游戏 → 直接连接」输入你的虚拟 IP 即可加入</span>
         </div>
       </div>
+    </Card>
+
+    <!-- 白名单管理（阶段三子任务 8 安全加强）：房主运行期增删 + 启用开关 -->
+    <Card title="白名单管理">
+      <template #extra>
+        <div class="flex items-center gap-1 text-xs" :class="room.whitelistEnabled ? 'text-primary-600' : 'text-gray-400'">
+          <ShieldCheckIcon class="w-3.5 h-3.5" />
+          <span>{{ room.whitelistEnabled ? '已启用' : '未启用' }}</span>
+        </div>
+      </template>
+      <WhitelistEditor mode="runtime" :room-code="room.roomCode" />
     </Card>
 
     <PendingAnswerList
