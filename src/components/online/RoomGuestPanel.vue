@@ -22,14 +22,17 @@ import { useWebRTC } from '@/composables/useWebRTC'
 import { useVirtualLan } from '@/composables/useVirtualLan'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import { showConfirm } from '@/utils/modal'
-import { toastError } from '@/utils/toast'
+import { toastError, toastSuccess } from '@/utils/toast'
+import { decode, CONTROL_SUBTYPE, parseHostMcPortPayload } from '@/utils/online/protocol'
 import {
   XCircleIcon,
   ClockIcon,
   ServerStackIcon,
   WifiIcon,
   ExclamationTriangleIcon,
+  ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -54,7 +57,10 @@ const lan = useVirtualLan({
 })
 
 /**
- * 监听 DataChannel 就绪，绑定 onMessage → 转发到后端 TUN
+ * 监听 DataChannel 就绪，绑定 onMessage：
+ * - Control + HostMcPort：更新本地 store.roomState.hostMcPort（房主开放 LAN 后广播）
+ * - Data（IP 包）：转发到后端 TUN 接口
+ * - 其他消息：静默丢弃（不支持的控制子类型或损坏帧）
  *
  * `useWebRTC` 在 `pc.ondatachannel` 触发时填充 `dataChannel.value`，
  * 此处 watch 在 dataChannel 变化时重新绑定 handler。
@@ -65,7 +71,19 @@ watch(
     if (!channel) return
     guestWebrtc.setDataChannelHandlers({
       onMessage: (raw) => {
-        void lan.forwardToTun(raw)
+        const msg = decode(raw)
+        if (!msg) return
+        if (msg.kind === 'control' && msg.subtype === CONTROL_SUBTYPE.HOST_MC_PORT) {
+          const port = parseHostMcPortPayload(msg.payload)
+          if (port !== null && port > 0) {
+            store.roomState.hostMcPort = port
+            console.info(`[Online] 加入方收到房主 MC 端口: ${port}`)
+          }
+          return
+        }
+        if (msg.kind === 'data') {
+          void lan.forwardToTun(raw)
+        }
       },
     })
   },
@@ -110,6 +128,17 @@ function handleLeaveRoom() {
   )
 }
 
+/** 复制文本到剪贴板（复用项目惯例 navigator.clipboard.writeText） */
+async function copyText(text: string, label: string) {
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    toastSuccess(`已复制${label}: ${text}`)
+  } catch {
+    toastError('复制失败')
+  }
+}
+
 onMounted(() => {
   // 加入方拉取一次房间信息同步元数据
   void store.refreshRoomInfo()
@@ -141,7 +170,14 @@ onMounted(() => {
             <WifiIcon class="w-4 h-4 text-gray-400" />
             <span>我的虚拟 IP</span>
           </div>
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ room.selfVirtualIp }}</code>
+          <div class="flex items-center gap-1">
+            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ room.selfVirtualIp }}</code>
+            <Tooltip text="复制我的虚拟 IP">
+              <Button type="ghost" size="mini" @click="copyText(room.selfVirtualIp, '我的虚拟 IP')">
+                <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
+              </Button>
+            </Tooltip>
+          </div>
         </div>
         <div class="px-1 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm text-gray-600">
@@ -186,8 +222,27 @@ onMounted(() => {
         </span>
       </div>
       <div v-if="connState === 'connected'" class="mt-2 p-2 bg-green-50 rounded text-xs text-green-700">
-        <ExclamationTriangleIcon class="w-3.5 h-3.5 inline mr-1" />
-        连接已建立，请在 Minecraft 中使用「多人联机 → 直接连接 → {{ room.hostVirtualIp || '房主虚拟 IP' }}」加入
+        <div class="flex items-start gap-1.5">
+          <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <div class="flex-1">
+            <div>连接已建立，请在 Minecraft 中「多人游戏 → 直接连接」输入房主虚拟 IP 加入</div>
+            <div class="mt-1 flex items-center gap-1.5">
+              <code class="bg-white px-1.5 py-0.5 rounded text-green-800 border border-green-200">
+                {{ room.hostVirtualIp || '（等待房主广播）' }}
+              </code>
+              <Tooltip text="复制房主虚拟 IP">
+                <Button
+                  type="ghost"
+                  size="mini"
+                  :disabled="!room.hostVirtualIp"
+                  @click="copyText(room.hostVirtualIp, '房主虚拟 IP')"
+                >
+                  <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
+                </Button>
+              </Tooltip>
+            </div>
+          </div>
+        </div>
       </div>
       <div v-else-if="connState === 'failed'" class="mt-2 p-2 bg-red-50 rounded text-xs text-red-700">
         <ExclamationTriangleIcon class="w-3.5 h-3.5 inline mr-1" />

@@ -9,6 +9,16 @@
 
 ### 变更
 
+#### 联机模块 Minecraft 服务器绑定 UI 引导（阶段三子任务 6 UI 收尾）
+- 背景：阶段三子任务 6 已完成 JVM 参数注入（`-Djava.net.preferIPv4Stack=true`）、GameWatcher 自动捕获 MC LAN 端口、HostMcPort 控制消息广播与接收。本次补齐 UI 层引导提示与复制虚拟 IP 快捷操作，让房主与加入方都能直观知道下一步该做什么
+- 改动：
+  - [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 虚拟 IP 行右侧新增「复制虚拟 IP」按钮（`ghost/mini` + `ClipboardDocumentIcon` + `Tooltip`），点击调用 `navigator.clipboard.writeText` 复制并 toast 提示
+  - [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) P2P 连接卡片内新增蓝色引导提示框（`connectedCount > 0` 时显示）：使用 `InformationCircleIcon` + 文案「已联通，请在 Minecraft 内按 Esc → 「开放给局域网」开关。开放后启动器会自动捕获端口并广播给所有参与者，加入方在「多人游戏 → 直接连接」输入你的虚拟 IP 即可加入」
+  - [src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) 「我的虚拟 IP」行右侧新增「复制我的虚拟 IP」按钮（同 `ghost/mini` + `ClipboardDocumentIcon` 风格）
+  - [src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) 优化「连接已建立」提示：从单行文字升级为带房主虚拟 IP 高亮 code 块 + 「复制房主虚拟 IP」按钮的两行布局，IP 未就绪时显示「（等待房主广播）」占位且按钮禁用
+- 复用：剪贴板写入复用项目惯例 `navigator.clipboard.writeText`（见 `ResourceDetailHeader.vue` / `DeviceCodeModal.vue` / `seedmap/format.ts`）；`Button` + `Tooltip` + `Card` 组件沿用 `ParticipantList.vue` 既有风格；新增 `InformationCircleIcon` 来自 `@heroicons/vue/24/outline`，与项目其他蓝色提示框一致
+- 验证：`vue-tsc --noEmit` 两个目标文件 0 新增类型错误（项目其他预存错误与本次改动无关）；`eslint` 两个文件全部通过；行数检查 `RoomHostPanel.vue` 164 行、`RoomGuestPanel.vue` 232 行，均符合 300 行约束
+
 #### 联机模块近期代码走查优化（阶段三子任务 5 收尾）
 - 背景：子任务 5 主体与数据分发打通后做一轮代码走查，发现 `bridge.rs` 残留无用字段与过时设计注释、`useWebRTCMesh.closeParticipant` 冗余清理 negotiating 标志、`useVirtualLan.onUnmounted` 冗余清理 unlisten、`RoomHostPanel.vue` 405 行违反 300 行约束
 - 改动：

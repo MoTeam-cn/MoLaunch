@@ -17,11 +17,34 @@ pub use types::{CrashCategory, CrashInfo, ExitInfo, GameState, LoadProgress, Log
 
 use crate::log_info;
 use log_parser::{detect_load_progress, parse_log_line};
+use regex::Regex;
 use std::collections::VecDeque;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
+use tauri::Emitter;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::{Mutex, RwLock};
+
+/// 联机模块 MC 局域网端口检测事件名
+///
+/// GameWatcher 在 stdout 检测到 "Local game hosted on port XXXXX" 或
+/// "Started LAN game on port XXXXX" 时，通过此事件通知前端联机模块。
+/// payload 为 u16 端口号。
+pub const ONLINE_MC_PORT_DETECTED_EVENT: &str = "online://mc-port-detected";
+
+/// MC 开放局域网时 stdout 输出的端口正则
+///
+/// 匹配 MC 标准日志格式：
+/// - "Local game hosted on port 49152"（单人开放 LAN）
+/// - "Started LAN game on port 49152"（部分版本）
+static LAN_PORT_RE: OnceLock<Regex> = OnceLock::new();
+
+fn lan_port_regex() -> &'static Regex {
+    LAN_PORT_RE.get_or_init(|| {
+        Regex::new(r"(?:Local game hosted|Started LAN game) on port (\d{1,5})")
+            .expect("LAN port regex 编译失败")
+    })
+}
 
 /// 游戏进程监控器
 pub struct GameWatcher {
@@ -50,17 +73,22 @@ pub struct GameWatcher {
     /// 手动停止标志（stop_game 调用时设为 true，watcher 检测到后跳过崩溃分析）
     /// 修复：之前 kill_process_tree 后游戏以非 0 退出码退出，watcher 误判为崩溃并触发分析
     manual_stop: Arc<std::sync::atomic::AtomicBool>,
+    /// Tauri AppHandle（用于 emit 联机端口检测事件）
+    /// None 时跳过 emit（防御性兜底，实际场景下 build_launch_config 总是注入 Some）
+    app_handle: Option<tauri::AppHandle>,
 }
 
 impl GameWatcher {
     /// 创建新的监控器
     ///
     /// `window_title`：自定义窗口标题，非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题
+    /// `app_handle`：Tauri AppHandle，用于在 stdout 检测到 LAN 端口时 emit 事件给联机模块
     pub fn new(
         pid: u32,
         game_dir: PathBuf,
         version_id: String,
         window_title: Option<String>,
+        app_handle: Option<tauri::AppHandle>,
     ) -> Self {
         let (exit_tx, exit_rx) = tokio::sync::watch::channel(None);
         Self {
@@ -75,6 +103,7 @@ impl GameWatcher {
             version_id,
             window_title,
             manual_stop: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            app_handle,
         }
     }
 
@@ -130,6 +159,7 @@ impl GameWatcher {
             let state = self.state.clone();
             let load_progress = self.load_progress.clone();
             let max_lines = self.max_log_lines;
+            let app_handle = self.app_handle.clone();
 
             tokio::spawn(async move {
                 let mut reader = BufReader::new(stdout);
@@ -166,6 +196,26 @@ impl GameWatcher {
                                 let mut state_guard = state.write().await;
                                 if *state_guard == GameState::Starting {
                                     *state_guard = GameState::Loading;
+                                }
+                            }
+
+                            // 联机模块：检测 MC 开放局域网端口
+                            // 匹配 "Local game hosted on port XXXXX" 或 "Started LAN game on port XXXXX"
+                            // 命中后 emit 事件给前端，前端房主面板收到后通过 DataChannel 广播给参与者
+                            if let Some(caps) = lan_port_regex().captures(&line) {
+                                if let Some(port_str) = caps.get(1) {
+                                    if let Ok(port) = port_str.as_str().parse::<u16>() {
+                                        log_info!(
+                                            "[Watcher] 检测到 MC 局域网端口: {}（联机模块自动捕获）",
+                                            port
+                                        );
+                                        if let Some(ref handle) = app_handle {
+                                            let _ = handle.emit(
+                                                ONLINE_MC_PORT_DETECTED_EVENT,
+                                                port,
+                                            );
+                                        }
+                                    }
                                 }
                             }
 

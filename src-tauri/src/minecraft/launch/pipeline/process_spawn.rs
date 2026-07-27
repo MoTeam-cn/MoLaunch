@@ -69,11 +69,14 @@ impl LaunchPipeline {
 
         // 创建监控器（game_dir 使用隔离目录，确保崩溃分析在正确目录查找日志）
         // 传入 window_title：非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题
+        // 传入 app_handle：用于在 stdout 检测到 MC 局域网端口时 emit 事件给联机模块
+        // 注：build_launch_config 总是注入 app_handle（Some），此处 None 兜底仅防御性
         let watcher = GameWatcher::new(
             pid,
             std::path::PathBuf::from(&args.game_dir),
             self.config.version_id.clone(),
             self.config.window_title.clone(),
+            self.config.app_handle.clone(),
         );
 
         // 启动监控

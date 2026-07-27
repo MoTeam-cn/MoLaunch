@@ -20,6 +20,7 @@
  */
 
 import { ref, onMounted, onUnmounted } from 'vue'
+import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useOnlineStore } from '@/stores/online'
 import type { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import type { useVirtualLan } from '@/composables/useVirtualLan'
@@ -32,6 +33,7 @@ import {
 import type { PendingAnswer } from '@/types/online'
 import { showConfirm } from '@/utils/modal'
 import { toastSuccess, toastError } from '@/utils/toast'
+import { encodeHostMcPort } from '@/utils/online/protocol'
 
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
@@ -243,6 +245,10 @@ export function useRoomHost(options: {
   let answerTimer: ReturnType<typeof setInterval> | null = null
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null
   let participantsTimer: ReturnType<typeof setInterval> | null = null
+  /** MC 端口检测事件监听器卸载函数 */
+  let mcPortUnlisten: UnlistenFn | null = null
+  /** HostMcPort 控制消息的本地 seq 计数器（与 TUN 数据包 seq 独立，避免混淆） */
+  let mcPortSeq = 0
 
   onMounted(() => {
     void pollParticipants()
@@ -260,12 +266,31 @@ export function useRoomHost(options: {
     void lan.start(store.roomState.selfVirtualIp, store.roomState.subnet).catch((e) => {
       toastError(`虚拟网卡启动失败：${e instanceof Error ? e.message : String(e)}`)
     })
+
+    // 监听后端 GameWatcher 的 MC 局域网端口检测事件
+    // 房主在 MC 中「Open to LAN」后，watcher 捕获 stdout 端口 → emit 此事件
+    // 收到后：1) 更新本地 store.roomState.hostMcPort  2) 通过 DataChannel 广播给所有已联通参与者
+    void listen<number>('online://mc-port-detected', (event) => {
+      const port = event.payload
+      if (!port || port <= 0) return
+      store.roomState.hostMcPort = port
+      const sent = hostMesh.broadcastPacket(encodeHostMcPort(mcPortSeq++, port))
+      console.info(
+        `[Online] 房主 MC 局域网端口已捕获: ${port}，已广播给 ${sent} 个参与者`,
+      )
+    }).then((unlisten) => {
+      mcPortUnlisten = unlisten
+    })
   })
 
   onUnmounted(() => {
     if (answerTimer) clearInterval(answerTimer)
     if (keepaliveTimer) clearInterval(keepaliveTimer)
     if (participantsTimer) clearInterval(participantsTimer)
+    if (mcPortUnlisten) {
+      mcPortUnlisten()
+      mcPortUnlisten = null
+    }
     // lan.stop 由 useVirtualLan 的 onUnmounted 自动处理
   })
 

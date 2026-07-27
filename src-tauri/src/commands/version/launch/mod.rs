@@ -91,6 +91,7 @@ pub async fn launch_game(
     window_height: Option<u32>,
     server_address: Option<String>,
     server_port: Option<u32>,
+    extra_jvm_args: Option<Vec<String>>,
 ) -> Result<u32, String> {
     sanitize_version_id(&version_id)?;
     log_info!("Launching game version: {}", version_id);
@@ -107,6 +108,7 @@ pub async fn launch_game(
         window_height,
         server_address,
         server_port,
+        extra_jvm_args,
     )
     .await;
 

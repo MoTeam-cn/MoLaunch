@@ -23,14 +23,18 @@ import { useVirtualLan } from '@/composables/useVirtualLan'
 import { useRoomHost } from '@/composables/useRoomHost'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import PendingAnswerList from './PendingAnswerList.vue'
 import ParticipantList from './ParticipantList.vue'
+import { toastSuccess, toastError } from '@/utils/toast'
 import {
   XCircleIcon,
   UsersIcon,
   ClockIcon,
   ServerStackIcon,
   WifiIcon,
+  ClipboardDocumentIcon,
+  InformationCircleIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -76,6 +80,18 @@ const remainingText = computed(() => {
 function participantStateText(participantId: string): string {
   return hostMesh.getConnState(participantId) ?? 'unknown'
 }
+
+/** 复制虚拟 IP 到剪贴板（复用项目惯例 navigator.clipboard.writeText） */
+async function copyVirtualIp() {
+  const ip = room.value.selfVirtualIp
+  if (!ip) return
+  try {
+    await navigator.clipboard.writeText(ip)
+    toastSuccess(`已复制: ${ip}`)
+  } catch {
+    toastError('复制失败')
+  }
+}
 </script>
 
 <template>
@@ -94,7 +110,14 @@ function participantStateText(participantId: string): string {
           <div class="flex items-center gap-2 text-sm text-gray-600">
             <WifiIcon class="w-4 h-4 text-gray-400" /><span>虚拟 IP</span>
           </div>
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ room.selfVirtualIp }}</code>
+          <div class="flex items-center gap-1">
+            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ room.selfVirtualIp }}</code>
+            <Tooltip text="复制虚拟 IP">
+              <Button type="ghost" size="mini" @click="copyVirtualIp">
+                <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
+              </Button>
+            </Tooltip>
+          </div>
         </div>
         <div class="px-1 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm text-gray-600">
@@ -128,6 +151,13 @@ function participantStateText(participantId: string): string {
         <div class="flex items-center justify-between">
           <span class="text-xs text-gray-500">总参与者数</span>
           <span class="text-xs text-gray-900">{{ room.participants.length }}</span>
+        </div>
+        <div
+          v-if="connectedCount > 0"
+          class="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700 flex gap-1.5 items-start"
+        >
+          <InformationCircleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+          <span>已联通，请在 Minecraft 内按 Esc → 「开放给局域网」开关。开放后启动器会自动捕获端口并广播给所有参与者，加入方在「多人游戏 → 直接连接」输入你的虚拟 IP 即可加入</span>
         </div>
       </div>
     </Card>

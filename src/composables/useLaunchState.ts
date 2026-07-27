@@ -16,6 +16,7 @@ import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { showCrashDialog } from '@/utils/crashDialog'
 import { safeCall } from '@/utils/async'
+import { useOnlineStore } from '@/stores/online'
 
 /** 崩溃类别（与后端 CrashCategory 枚举对应） */
 type CrashCategory = 'Java' | 'Memory' | 'Graphics' | 'Mod' | 'Forge' | 'Fabric' | 'OptiFine' | 'Unknown'
@@ -123,6 +124,9 @@ export function useLaunchState() {
     windowHeight?: number
     serverAddress?: string
     serverPort?: number
+    /** 临时追加的 JVM 参数（单次启动有效，不写入 setup.ini）
+     *  用途：联机模块启动 MC 时追加 -Djava.net.preferIPv4Stack=true */
+    extraJvmArgs?: string[]
   }): Promise<number> {
     launching.value = true
     launchingVersionId.value = params.versionId
@@ -132,7 +136,17 @@ export function useLaunchState() {
     await startJavaDownloadListener()
 
     try {
-      const pid = await tauri.launchGame(params)
+      // 联机模块自动注入：若当前在房间内（房主或加入方），追加 -Djava.net.preferIPv4Stack=true
+      // 确保 MC 优先使用 IPv4 网络栈，避免虚拟局域网（TUN 接口为 IPv4）通信失败
+      // 调用方显式传入的 extraJvmArgs 优先级最高，自动注入只在其未传时生效
+      let extraJvmArgs = params.extraJvmArgs
+      if (!extraJvmArgs) {
+        const onlineStore = useOnlineStore()
+        if (onlineStore.roomState.role === 'host' || onlineStore.roomState.role === 'guest') {
+          extraJvmArgs = ['-Djava.net.preferIPv4Stack=true']
+        }
+      }
+      const pid = await tauri.launchGame({ ...params, extraJvmArgs })
       runningPid.value = pid
       runningVersionId.value = params.versionId
       toastSuccess(`游戏已启动（PID: ${pid}）`)

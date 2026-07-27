@@ -28,6 +28,7 @@ pub(super) async fn build_launch_config(
     window_height: Option<u32>,
     server_address: Option<String>,
     server_port: Option<u32>,
+    extra_jvm_args_override: Option<Vec<String>>,
 ) -> LaunchConfig {
     let config = state.config.lock().await;
     let game_dir = resolve_game_dir(&config.game_dir);
@@ -76,7 +77,12 @@ pub(super) async fn build_launch_config(
             .map(|s| s.split_whitespace().map(String::from).collect())
             .unwrap_or_default()
     };
-    let extra_jvm_args = split_args(&setup.advanced.jvm_args);
+    let mut extra_jvm_args = split_args(&setup.advanced.jvm_args);
+    // 联机模块临时追加的 JVM 参数（单次启动有效，不持久化到 setup.ini）
+    // 用途：联机启动 MC 时追加 -Djava.net.preferIPv4Stack=true，确保虚拟局域网通信正常
+    if let Some(override_args) = extra_jvm_args_override {
+        extra_jvm_args.extend(override_args);
+    }
     let extra_game_args = split_args(&setup.advanced.game_args);
     let pre_launch_cmd = setup.advanced.run_cmd.clone().filter(|s| !s.is_empty());
 

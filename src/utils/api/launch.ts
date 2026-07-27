@@ -23,6 +23,9 @@ export async function launchGame(params: {
   windowHeight?: number
   serverAddress?: string
   serverPort?: number
+  /** 临时追加的 JVM 参数（单次启动有效，不写入 setup.ini）
+   *  用途：联机模块启动 MC 时追加 -Djava.net.preferIPv4Stack=true */
+  extraJvmArgs?: string[]
 }): Promise<number> {
   return versionLaunchManager<number>(VERSION_LAUNCH_ACTIONS.LAUNCH_GAME, {
     versionId: params.versionId,
@@ -34,6 +37,7 @@ export async function launchGame(params: {
     windowHeight: params.windowHeight ?? null,
     serverAddress: params.serverAddress ?? null,
     serverPort: params.serverPort ?? null,
+    extraJvmArgs: params.extraJvmArgs ?? null,
   })
 }
 

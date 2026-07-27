@@ -30,6 +30,7 @@
 //! - `0x01` = Heartbeat（心跳，payload 仅 1 字节 subtype）
 //! - `0x02` = StatusQuery（状态查询，payload 仅 1 字节 subtype）
 //! - `0x03` = StatusResponse（状态响应，payload = subtype + 状态 JSON）
+//! - `0x04` = HostMcPort（房主 MC 局域网端口，payload = subtype + 2 字节大端序 u16 端口）
 //!
 //! # 设计决策
 //!
@@ -74,6 +75,8 @@ pub enum ControlSubtype {
     StatusQuery = 0x02,
     /// 状态响应
     StatusResponse = 0x03,
+    /// 房主 MC 局域网端口（房主开放 LAN 后广播给所有参与者）
+    HostMcPort = 0x04,
 }
 
 impl ControlSubtype {
@@ -82,6 +85,7 @@ impl ControlSubtype {
             0x01 => Some(Self::Heartbeat),
             0x02 => Some(Self::StatusQuery),
             0x03 => Some(Self::StatusResponse),
+            0x04 => Some(Self::HostMcPort),
             _ => None,
         }
     }
@@ -217,6 +221,28 @@ pub fn status_response_message(seq: u32, status_json: &[u8]) -> Message {
     }
 }
 
+/// 便捷构造：房主 MC 局域网端口控制消息
+///
+/// 房主开放 LAN 后，通过 DataChannel 广播此消息通知所有参与者。
+/// payload 编码：2 字节大端序 u16 端口号。
+pub fn host_mc_port_message(seq: u32, port: u16) -> Message {
+    Message::Control {
+        seq,
+        subtype: ControlSubtype::HostMcPort,
+        payload: port.to_be_bytes().to_vec(),
+    }
+}
+
+/// 解析 HostMcPort 控制消息的 payload 为端口号
+///
+/// 期望 payload 长度为 2 字节（大端序 u16）。其他长度返回 None。
+pub fn parse_host_mc_port_payload(payload: &[u8]) -> Option<u16> {
+    if payload.len() != 2 {
+        return None;
+    }
+    Some(u16::from_be_bytes([payload[0], payload[1]]))
+}
+
 /// 便捷构造：错误消息
 pub fn error_message(seq: u32, message: &str) -> Message {
     Message::Error { seq, message: message.to_string() }
@@ -262,6 +288,35 @@ mod tests {
         let encoded = encode(&original);
         let decoded = decode(&encoded).unwrap();
         assert_eq!(decoded, original);
+    }
+
+    #[test]
+    fn test_host_mc_port_roundtrip() {
+        let port: u16 = 49152;
+        let original = host_mc_port_message(3, port);
+        let encoded = encode(&original);
+        // type(1) + seq(4) + length(2) + subtype(1) + port(2) = 10 字节
+        assert_eq!(encoded.len(), 10);
+
+        let decoded = decode(&encoded).unwrap();
+        assert_eq!(decoded, original);
+
+        // 验证 payload 解析
+        match decoded {
+            Message::Control { payload, subtype, .. } => {
+                assert_eq!(subtype, ControlSubtype::HostMcPort);
+                assert_eq!(parse_host_mc_port_payload(&payload), Some(port));
+            }
+            _ => panic!("期望 Control 消息"),
+        }
+    }
+
+    #[test]
+    fn test_parse_host_mc_port_invalid_payload() {
+        // 长度不为 2 的 payload 应返回 None
+        assert_eq!(parse_host_mc_port_payload(&[]), None);
+        assert_eq!(parse_host_mc_port_payload(&[0x01]), None);
+        assert_eq!(parse_host_mc_port_payload(&[0x01, 0x02, 0x03]), None);
     }
 
     #[test]

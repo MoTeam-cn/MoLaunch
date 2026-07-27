@@ -42,6 +42,9 @@ struct LaunchGameParams {
     window_height: Option<u32>,
     server_address: Option<String>,
     server_port: Option<u32>,
+    /// 临时追加的 JVM 参数（单次启动有效，不写入 setup.ini）
+    /// 用途：联机模块启动 MC 时追加 -Djava.net.preferIPv4Stack=true
+    extra_jvm_args: Option<Vec<String>>,
 }
 
 /// export_launch_script 参数（与原 export_launch_script 命令参数一一对应，字段名 camelCase）
@@ -78,6 +81,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             p.window_height,
             p.server_address,
             p.server_port,
+            p.extra_jvm_args,
         )
         .await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
