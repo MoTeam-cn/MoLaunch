@@ -24,12 +24,11 @@
 //!
 //! # 模块职责
 //!
-//! - `VirtualLanBridge`：持有 TUN 接口 + 读写循环句柄 + 包序列号
-//! - `start_host_bridge()`：房主侧启动桥接（创建 TUN + 启动读写循环 + 启动事件转发 task）
+//! - `VirtualLanBridge`：持有 TUN 接口写通道 + 读写循环 task 句柄 + 桥接状态
+//! - `start()`：创建 TUN 接口 + 启动 select! 单读写循环 task（房主与加入方通用）
 //! - `forward_from_datachannel()`：前端收到 DataChannel 消息后调用，解码并写入 TUN
 //! - `stop()`：停止桥接，销毁 TUN
 
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -53,15 +52,13 @@ pub enum BridgeState {
 
 /// 虚拟局域网桥接器
 ///
-/// 持有 TUN 接口、读写循环句柄与包序列号。
+/// 持有 TUN 接口写通道、读写循环 task 句柄与桥接状态。
 /// 房主与加入方共用此结构，区别仅在于 TUN 接口的虚拟 IP 分配。
 pub struct VirtualLanBridge {
     /// 写入 TUN 的发送端（前端 DataChannel 收到的包通过此通道写入 TUN）
     write_tx: tokio::sync::mpsc::Sender<Vec<u8>>,
     /// 读写循环 task 句柄（合并 select! 单循环，abort 可停止）
     handle: tokio::task::JoinHandle<()>,
-    /// 包序列号（原子计数器，协议帧的 seq 字段）
-    seq: Arc<AtomicU32>,
     /// 桥接状态
     state: Arc<Mutex<BridgeState>>,
 }
@@ -120,27 +117,19 @@ impl VirtualLanBridge {
         let info = net.info().clone();
         log_info!("[Online] TUN 接口已就绪: {:?}", info);
 
-        // 启动写循环（需保留 write_tx 给前端转发用）
-        // 注意：start_write_loop 会消费 VirtualNet 的 device，但 info 已 clone
-        // 这里需要拆分：write_loop 持有 device 的写权限，read_loop 持有 device 的读权限
-        // 但 tun-rs 的 AsyncDevice 是单所有权的，无法同时读写
-        // 解决方案：用 Arc<Mutex<AsyncDevice>> 包装，但 tun-rs 的 AsyncDevice 已经是 async 的
-        // 退一步：用两个独立的 VirtualNet 实例？不行，一个接口只能有一个 device
-        // 正确方案：只启动一个循环，同时处理读写
-        //
-        // 重新设计：不拆分 read/write loop，改为单循环 + select!
+        // 启动读写循环 task：单循环 + select! 同时处理 TUN 读包和前端写包
         let (write_tx, mut write_rx) = tokio::sync::mpsc::channel::<Vec<u8>>(128);
-        let seq = Arc::new(AtomicU32::new(0));
         let state = Arc::new(Mutex::new(BridgeState::Running));
 
         let device = net.into_device();
 
         // 启动读写循环 task
         let state_clone = state.clone();
-        let seq_clone = seq.clone();
         let app_handle_clone = app_handle.clone();
         let handle = tokio::spawn(async move {
             let mut buf = vec![0u8; 65535];
+            // 协议帧 seq 计数器：task 内部维护，外部无需读取
+            let mut seq: u32 = 0;
             log_info!("[Online] TUN 读写循环启动: {}", info.name);
 
             loop {
@@ -150,8 +139,8 @@ impl VirtualLanBridge {
                         match read_result {
                             Ok(len) if len > 0 => {
                                 let packet = &buf[..len];
-                                let seq_val = seq_clone.fetch_add(1, Ordering::SeqCst);
-                                let msg = protocol::data_message(seq_val, packet);
+                                let msg = protocol::data_message(seq, packet);
+                                seq = seq.wrapping_add(1);
                                 let encoded = protocol::encode(&msg);
 
                                 // 通过 Tauri 事件发给前端
@@ -193,7 +182,6 @@ impl VirtualLanBridge {
         Ok(Self {
             write_tx,
             handle,
-            seq,
             state,
         })
     }
@@ -294,15 +282,6 @@ mod tests {
     fn test_bridge_state_default() {
         let state = BridgeState::Stopped;
         assert_eq!(state, BridgeState::Stopped);
-    }
-
-    #[test]
-    fn test_seq_atomic_counter() {
-        let seq = Arc::new(AtomicU32::new(0));
-        assert_eq!(seq.fetch_add(1, Ordering::SeqCst), 0);
-        assert_eq!(seq.fetch_add(1, Ordering::SeqCst), 1);
-        assert_eq!(seq.fetch_add(1, Ordering::SeqCst), 2);
-        assert_eq!(seq.load(Ordering::SeqCst), 3);
     }
 
     #[test]

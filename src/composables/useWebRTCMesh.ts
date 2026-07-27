@@ -219,6 +219,9 @@ export function useWebRTCMesh() {
    * 关闭指定参与者的 PC + DataChannel
    *
    * 用于踢出/参与者离开场景。不抛错（幂等）。
+   *
+   * 注：不在此清理 `negotiating` 标志 —— 若 closeParticipant 在 createOfferFor 进行中被调用，
+   * createOfferFor 的 finally 块会负责清理；其余场景 negotiating 本就为 false。
    */
   function closeParticipant(participantId: string) {
     const conn = conns.value.get(participantId)
@@ -238,7 +241,6 @@ export function useWebRTCMesh() {
       conns.value.delete(participantId)
       channelOpen.set(participantId, false)
       setConnState(participantId, 'closed')
-      negotiating.set(participantId, false)
     }
   }
 

@@ -204,10 +204,7 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
 
   onUnmounted(() => {
     isMounted = false
-    if (unlisten) {
-      unlisten()
-      unlisten = null
-    }
+    // unlisten 由 stop() 内部统一清理（stop 会处理 running=true/false 两种分支）
     // 后端 stop 不阻塞卸载（异步触发即可）
     void stop()
   })

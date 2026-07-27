@@ -9,6 +9,16 @@
 
 ### 变更
 
+#### 联机模块近期代码走查优化（阶段三子任务 5 收尾）
+- 背景：子任务 5 主体与数据分发打通后做一轮代码走查，发现 `bridge.rs` 残留无用字段与过时设计注释、`useWebRTCMesh.closeParticipant` 冗余清理 negotiating 标志、`useVirtualLan.onUnmounted` 冗余清理 unlisten、`RoomHostPanel.vue` 405 行违反 300 行约束
+- 改动：
+  - [src-tauri/src/minecraft/online/bridge.rs](src-tauri/src/minecraft/online/bridge.rs) 移除 `VirtualLanBridge.seq: Arc<AtomicU32>` 字段与 `AtomicU32`/`Ordering` 导入；seq 计数器下沉为读写循环 task 内的局部 `u32` 变量（`wrapping_add` 自增），协议帧 seq 字段保持不变；清理模块职责注释中不存在的 `start_host_bridge()` 与 line 125-131 的过时设计讨论注释；移除失效的 `test_seq_atomic_counter` 测试
+  - [src/composables/useWebRTCMesh.ts](src/composables/useWebRTCMesh.ts) `closeParticipant` 不再清理 `negotiating` 标志 —— 若 closeParticipant 在 `createOfferFor` 进行中被调用，`createOfferFor` 的 finally 块会负责清理；其余场景 negotiating 本就为 false。避免与 `createOfferFor` 的 finally 块重复
+  - [src/composables/useVirtualLan.ts](src/composables/useVirtualLan.ts) `onUnmounted` 移除冗余的 `unlisten()` 清理 —— `stop()` 内部已统一处理 `running=true/false` 两种分支的 unlisten 释放；保留 `isMounted = false` 与 `void stop()` 即可
+  - 拆分 [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue)（405 → 156 行）：内联的「待确认 Answer 列表」与「参与者列表」模板替换为已有的 [PendingAnswerList.vue](src/components/online/PendingAnswerList.vue) 与 [ParticipantList.vue](src/components/online/ParticipantList.vue) 子组件；信令轮询、Offer 生成、确认/踢出/关闭房间等全部业务逻辑抽到新增 [src/composables/useRoomHost.ts](src/composables/useRoomHost.ts)（279 行），组件只保留 computed 与 UI 渲染
+- 复用：`useRoomHost.ts` 通过参数注入 `hostMesh` 与 `lan` 实例，不重新创建 WebRTC/TUN 资源；子组件 `PendingAnswerList`/`ParticipantList` 早在前次拆分时已建立，本次集成进父组件
+- 验证：`cargo check --lib` 通过；`vue-tsc --noEmit` 联机模块 7 个文件 0 新增类型错误；`eslint` 7 个文件全部通过
+
 #### wintun.dll 分发方案落地（阶段三子任务 1 待办项）
 - 背景：Windows 平台 `tun-rs` 通过 `libloading` 加载 `wintun.dll`，原方案要求用户手动把 dll 放到可执行文件同目录，便携性差且安装版路径不可写。改为编译时嵌入 + 运行时释放到 AppData 全局目录，实现"开箱即用 + 多实例共享"
 - 资源嵌入：[src-tauri/src/resources.rs](src-tauri/src/resources.rs) `embedded_bytes` 注册 `wintun/wintun.dll` 逻辑路径，按 `target_arch` 编译时选择对应架构的物理文件（`x86_64`→amd64、`aarch64`→arm64、`x86`→x86、`arm`→arm），全部用 `#[cfg(target_os = "windows")]` 包裹，非 Windows 平台不嵌入
