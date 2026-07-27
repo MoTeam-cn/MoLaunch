@@ -121,6 +121,11 @@ pub struct CreateRoomResponse {
     pub created_at: u64,
     #[serde(alias = "expires_at")]
     pub expires_at: u64,
+    /// DataChannel 加密密钥（Base64Url 编码的 32 字节 AES-256 密钥）
+    ///
+    /// 阶段三子任务 8 新增。空字符串表示服务器未启用加密（兼容旧服务器）。
+    #[serde(default, alias = "room_key")]
+    pub room_key: String,
 }
 
 /// 房间公开信息
@@ -185,6 +190,11 @@ pub struct JoinRoomResponse {
     #[serde(alias = "player_virtual_ip")]
     pub player_virtual_ip: String,
     pub subnet: String,
+    /// DataChannel 加密密钥（Base64Url 编码的 32 字节 AES-256 密钥，与房主一致）
+    ///
+    /// 阶段三子任务 8 新增。空字符串表示服务器未启用加密（兼容旧服务器）。
+    #[serde(default, alias = "room_key")]
+    pub room_key: String,
 }
 
 /// 待确认 Answer

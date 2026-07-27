@@ -117,6 +117,14 @@ export interface RoomState {
    * 房主创建房间时由表单开关决定，运行期可通过 `setWhitelistEnabled` 动态修改。
    */
   whitelistEnabled: boolean
+  /**
+   * DataChannel 加密密钥（Base64Url 编码的 32 字节 AES-256 密钥）
+   *
+   * 阶段三子任务 8 新增。空字符串表示未启用加密（兼容旧服务器）。
+   * 房主创建房间 / 加入方加入房间时由后端下发，房主与参与者共享同一密钥。
+   * 前端 protocol.ts 用此密钥做 AES-GCM 加解密。
+   */
+  roomKey: string
 }
 
 /** 创建空房间状态 */
@@ -136,6 +144,7 @@ function emptyRoom(): RoomState {
     participants: [],
     participantId: null,
     whitelistEnabled: false,
+    roomKey: '',
   }
 }
 
@@ -380,6 +389,8 @@ export const useOnlineStore = defineStore('online', () => {
         participants: [],
         participantId: null,
         whitelistEnabled,
+        // 阶段三子任务 8：DataChannel 加密密钥（空字符串表示未启用）
+        roomKey: data.roomKey ?? '',
       }
       toastSuccess(`房间已创建：${data.roomCode}`)
       return data
@@ -435,6 +446,8 @@ export const useOnlineStore = defineStore('online', () => {
         participantId: data.participantId,
         // 阶段三子任务 8：加入方初始白名单状态由后续 refreshRoomInfo() 同步
         whitelistEnabled: false,
+        // 阶段三子任务 8：DataChannel 加密密钥（与房主一致，空字符串表示未启用）
+        roomKey: data.roomKey ?? '',
       }
       // 拉取房间公开信息补全元数据
       await refreshRoomInfo()

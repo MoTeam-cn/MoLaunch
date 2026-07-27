@@ -35,6 +35,7 @@ import type { IceServerEntry, PendingAnswer } from '@/types/online'
 import { showConfirm } from '@/utils/modal'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { encodeHostMcPort, encodeTurnServers } from '@/utils/online/protocol'
+import { importRoomKey } from '@/utils/online/crypto'
 
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
@@ -275,10 +276,12 @@ export function useRoomHost(options: {
       }
       // 更新本地 iceServers，影响后续 generateOfferForParticipant
       store.roomState.iceServers = merged
-      const sent = hostMesh.broadcastPacket(encodeTurnServers(turnSeq++, merged))
-      console.info(
-        `[Online] 房主已广播 ICE 服务器列表：${systemTurn.length} 系统 TURN + ${store.customTurnServers.length} 自定义 TURN，已发送给 ${sent} 个参与者`,
-      )
+      // 阶段三子任务 8：broadcastPacket 异步加密后发送，sent 计数仅用于日志
+      void hostMesh.broadcastPacket(encodeTurnServers(turnSeq++, merged)).then((sent) => {
+        console.info(
+          `[Online] 房主已广播 ICE 服务器列表：${systemTurn.length} 系统 TURN + ${store.customTurnServers.length} 自定义 TURN，已发送给 ${sent} 个参与者`,
+        )
+      })
     } catch (e) {
       console.warn('[Online] 拉取/广播 TURN 服务器失败:', e)
     }
@@ -306,6 +309,12 @@ export function useRoomHost(options: {
     // 保活 5min
     keepaliveTimer = setInterval(() => void doKeepalive(), 5 * 60 * 1000)
 
+    // 阶段三子任务 8：注入 DataChannel 加密密钥（空字符串表示未启用加密，importRoomKey 返回 null）
+    // 在 lan.start 之前注入，确保首个 TUN 包就能正确加密
+    void importRoomKey(store.roomState.roomKey).then((key) => {
+      hostMesh.setRoomKey(key)
+    })
+
     // 启动 TUN 桥接：房主进入面板即创建 TUN 接口，开始读包 → broadcastPacket
     // 失败仅 toast（如 wintun.dll 缺失 / 无管理员权限），不阻塞信令流程
     void lan.start(store.roomState.selfVirtualIp, store.roomState.subnet).catch((e) => {
@@ -323,10 +332,12 @@ export function useRoomHost(options: {
       const port = event.payload
       if (!port || port <= 0) return
       store.roomState.hostMcPort = port
-      const sent = hostMesh.broadcastPacket(encodeHostMcPort(mcPortSeq++, port))
-      console.info(
-        `[Online] 房主 MC 局域网端口已捕获: ${port}，已广播给 ${sent} 个参与者`,
-      )
+      // 阶段三子任务 8：broadcastPacket 异步加密后发送，sent 计数仅用于日志
+      void hostMesh.broadcastPacket(encodeHostMcPort(mcPortSeq++, port)).then((sent) => {
+        console.info(
+          `[Online] 房主 MC 局域网端口已捕获: ${port}，已广播给 ${sent} 个参与者`,
+        )
+      })
     }).then((unlisten) => {
       mcPortUnlisten = unlisten
     })

@@ -9,6 +9,29 @@
 
 ### 变更
 
+#### 联机模块 DataChannel AES-GCM 加密：房主/加入方双向加密 + 透明集成（阶段三子任务 8 安全加强）
+- 背景：阶段三子任务 8 安全加强 Part B。后端在创建/加入房间时下发 32 字节 AES-256 密钥（Base64Url 编码存于 `rooms.room_key`），前端在 DataChannel 收发前对完整协议帧（含头部）做 AES-GCM 加解密，保证 P2P 链路即便被中间人嗅探也无法解读 IP 包内容。空字符串密钥表示未启用加密（兼容旧服务器），加密层对业务代码完全透明
+- 改动：
+  - 新增 [src/utils/online/crypto.ts](src/utils/online/crypto.ts)（162 行）：AES-GCM 加解密工具模块。`importRoomKey(base64Key)` 接受 Base64Url/Base64 编码的 32 字节密钥，导入为 Web Crypto API 的 `CryptoKey`（空字符串/格式非法/长度不匹配时返回 null 并 warn）；`encryptFrame(plaintext, key)` 生成 12 字节随机 IV → AES-GCM 加密 → 返回 `IV || ciphertext+tag`；`decryptFrame(encrypted, key)` 切分 IV 与密文 → AES-GCM 解密，认证失败静默返回 null
+  - [src/utils/online/webrtc-helpers.ts](src/utils/online/webrtc-helpers.ts) 新增 `wrapHandlersWithDecrypt(handlers, roomKey)` 共享工具：将业务 `onMessage` 包装为「先解密再回调」版本，`roomKey.value` 为 null 时透传；通过闭包捕获 ShallowRef 运行时读取最新值，支持房间运行期动态注入密钥
+  - [src/composables/useWebRTCMesh.ts](src/composables/useWebRTCMesh.ts) 新增 `roomKey: ShallowRef<CryptoKey | null>` 内部状态 + `setRoomKey(key)` 方法；`broadcastPacket(raw)` 与 `sendToParticipant(id, raw)` 改为 `Promise<number>` / `Promise<boolean>` 异步方法（roomKey 非空时先 `encryptFrame` 再发送）；`setDataChannelHandlers` 调用 `wrapHandlersWithDecrypt` 包装业务 onMessage；`close()` 清除 roomKey 避免复用残留
+  - [src/composables/useWebRTC.ts](src/composables/useWebRTC.ts) 同步新增 `roomKey` + `setRoomKey` + `wrapHandlersWithDecrypt` 集成；新增 `sendPacket(raw): Promise<boolean>` 方法替代业务侧直接 `channel.send`（roomKey 非空时自动加密）；`close()` 清除 roomKey
+  - [src/composables/useRoomHost.ts](src/composables/useRoomHost.ts) `onMounted` 在 `lan.start` 之前 `importRoomKey(store.roomState.roomKey)` + `hostMesh.setRoomKey(key)`；`fetchAndBroadcastTurnServers` 与 `mc-port-detected` 监听器中的 `broadcastPacket` 调用改为 `void ...then(sent => log)` 适配异步 API
+  - [src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) `onMounted` 新增 `importRoomKey` + `guestWebrtc.setRoomKey`；`useVirtualLan.onTunPacket` 改用 `guestWebrtc.sendPacket(raw)` 走加密通道（替代直接 `channel.send`）
+  - [src/stores/online.ts](src/stores/online.ts) `hostCreateRoom` / `guestJoinRoom` 的 `roomState` 赋值补 `roomKey: data.roomKey ?? ''` 字段（之前 RoomState 接口已声明但未填充）
+- 设计取舍：
+  - 加密层放在 composable 边界（broadcastPacket/sendPacket/sendToParticipant + setDataChannelHandlers），业务层（useRoomHost / RoomGuestPanel 的 onMessage 回调）完全无感知，无需修改协议帧处理逻辑
+  - `broadcastPacket` 改为异步：Web Crypto API 的 `crypto.subtle.encrypt` 是 async-only，必须接受这一约束。3 个调用点（useRoomHost × 2 + useVirtualLan onTunPacket × 1）均改为 `void ...then()` 模式，sent 计数仅用于日志，不阻塞主流程
+  - IV 明文发送：AES-GCM 标准做法，IV 不需要保密，只需保证同一密钥下不重复。`crypto.getRandomValues` 提供密码学安全随机数
+  - 加密整帧（含头部）：避免元数据泄露（type/seq/length 也可被流量分析），且 GCM 认证标签覆盖整帧防篡改
+  - 密钥长度校验在 `importRoomKey` 内完成，32 字节非匹配时返回 null 并降级为透传，避免运行时 `crypto.subtle.importKey` 抛错中断流程
+- 复用：
+  - Web Crypto API（`crypto.subtle`）为浏览器/Tauri webview 原生能力，不引入第三方加密库
+  - `wrapHandlersWithDecrypt` 抽到 `webrtc-helpers.ts` 共享，useWebRTC 与 useWebRTCMesh 复用同一份解密包装逻辑，避免重复实现
+  - `ShallowRef<CryptoKey | null>` 闭包捕获模式让运行时动态注入/清除密钥成为可能，无需重建 composable
+- 验证：`vue-tsc --noEmit` 本次修改 7 个文件 0 新增错误（项目其他预存错误与本次改动无关）；`eslint` 7 个目标文件全部通过
+- 后续：部署 api-server v0.1.10+ 后端，端到端实测加密生效（房主/加入方互通正常 + 抓包验证 DataChannel 流量为加密密文）；如需禁用加密可在 api-server 配置 `room_key` 为空字符串
+
 #### 联机模块房主白名单管理：创建表单 + 运行期管理 + 4 个 IPC action（阶段三子任务 8 安全加强）
 - 背景：阶段三子任务 8 安全加强项。房主可启用白名单后指定允许加入的设备（按 `device_id` 友好标识），启用且白名单为空 = 拒绝所有人加入（仅房主可进入），便于私密联机。本次完成启动器侧前端 + Tauri 中间件 + Rust 客户端扩展，与已就绪的 api-server 后端（迁移 008 + 仓库层 + 服务层 + 控制器 + OpenAPI）端到端打通
 - 改动：

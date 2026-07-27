@@ -159,6 +159,12 @@ export interface CreateRoomResponse {
   subnet: string
   createdAt: number
   expiresAt: number
+  /**
+   * DataChannel 加密密钥（Base64Url 编码的 32 字节 AES-256 密钥）
+   *
+   * 阶段三子任务 8 新增。空字符串表示服务器未启用加密（兼容旧服务器）。
+   */
+  roomKey: string
 }
 
 /** 房间公开信息 */
@@ -205,6 +211,12 @@ export interface JoinRoomResponse {
   iceServers: IceServerEntry[]
   playerVirtualIp: string
   subnet: string
+  /**
+   * DataChannel 加密密钥（Base64Url 编码的 32 字节 AES-256 密钥，与房主一致）
+   *
+   * 阶段三子任务 8 新增。空字符串表示服务器未启用加密（兼容旧服务器）。
+   */
+  roomKey: string
 }
 
 /** 待确认 Answer */

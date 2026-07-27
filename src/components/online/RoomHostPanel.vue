@@ -42,10 +42,10 @@ import {
 const store = useOnlineStore()
 const hostMesh = inject('hostMesh') as ReturnType<typeof useWebRTCMesh>
 
-/** TUN 桥接：TUN 读到包 → 广播给所有已联通参与者 */
+/** TUN 桥接：TUN 读到包 → 广播给所有已联通参与者（阶段三子任务 8：异步加密后发送） */
 const lan = useVirtualLan({
   onTunPacket: (raw) => {
-    hostMesh.broadcastPacket(raw)
+    void hostMesh.broadcastPacket(raw)
   },
 })
 

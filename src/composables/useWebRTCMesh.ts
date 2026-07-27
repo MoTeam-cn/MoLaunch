@@ -1,5 +1,5 @@
 /**
- * WebRTC mesh composable（房主专用，阶段三子任务 5，子任务 7 ICE/TURN 重构）
+ * WebRTC mesh composable（房主专用，阶段三子任务 5，子任务 7 ICE/TURN 重构，子任务 8 加密）
  *
  * 房主为每个新加入的参与者维护独立 PeerConnection + DataChannel，
  * 实现 1-N 的虚拟局域网数据分发：
@@ -20,6 +20,10 @@
  * 取代旧的 `stunServers: string[]`。房主侧 ICE 服务器列表由 `useRoomHost` 从
  * `store.roomState.iceServers` 透传，包含 STUN + 用户自定义 TURN + 系统 TURN。
  *
+ * 阶段三子任务 8：`setRoomKey(key)` 注入 AES-GCM 密钥后，`broadcastPacket` /
+ * `sendToParticipant` 自动加密原始帧，`setDataChannelHandlers` 绑定的 `onMessage`
+ * 自动先解密再回调。密钥为 null 时透传原始帧（兼容未启用加密的服务器）。
+ *
  * @example 房主为参与者生成 Offer
  * const mesh = useWebRTCMesh()
  * const { sdp, iceCandidates } = await mesh.createOfferFor(participantId, iceServers)
@@ -34,8 +38,11 @@ import {
   collectIceCandidates,
   createDataChannel,
   setupDataChannelHandlers,
+  wrapHandlersWithDecrypt,
   type WebRtcConnectionState,
+  type DataChannelHandlers,
 } from '@/utils/online/webrtc-helpers'
+import { encryptFrame } from '@/utils/online/crypto'
 import type { IceServerEntry } from '@/types/online'
 
 /** 创建 Offer / Answer 的结果 */
@@ -69,6 +76,26 @@ export function useWebRTCMesh() {
   const channelOpen = reactive<Map<string, boolean>>(new Map())
   /** 是否正在为某个参与者协商（key=participantId） */
   const negotiating = reactive<Map<string, boolean>>(new Map())
+  /**
+   * DataChannel 加密密钥（阶段三子任务 8）
+   *
+   * null 表示未启用加密（兼容旧服务器）；非 null 时 `broadcastPacket` /
+   * `sendToParticipant` 自动加密，`setDataChannelHandlers` 绑定的
+   * `onMessage` 自动先解密再回调业务层。
+   */
+  const roomKey = shallowRef<CryptoKey | null>(null)
+
+  /**
+   * 注入 / 清除 DataChannel 加密密钥
+   *
+   * 房主创建房间后调用 `importRoomKey(store.roomState.roomKey)` 导入密钥，
+   * 再调用此方法注入。房间关闭时调用 `setRoomKey(null)` 清除。
+   *
+   * @param key AES-GCM 密钥；null 表示禁用加密（透传原始帧）
+   */
+  function setRoomKey(key: CryptoKey | null): void {
+    roomKey.value = key
+  }
 
   /**
    * 同步指定参与者的连接状态到 reactive map
@@ -139,17 +166,20 @@ export function useWebRTCMesh() {
    *
    * 业务侧在 createOfferFor 之后调用，注入实际收包逻辑（如转发到 TUN）。
    *
+   * 阶段三子任务 8：若 `roomKey` 已注入，传入的 `onMessage` 会被自动包装为
+   * 「先解密再回调」，业务层收到的 `raw` 是已解密的原始协议帧。
+   *
    * @param participantId 参与者 ID
    * @param handlers 处理器集合，未传的字段不绑定
    */
   function setDataChannelHandlers(
     participantId: string,
-    handlers: Parameters<typeof setupDataChannelHandlers>[1],
+    handlers: DataChannelHandlers,
   ) {
     const conn = conns.value.get(participantId)
-    if (conn) {
-      setupDataChannelHandlers(conn.channel, handlers)
-    }
+    if (!conn) return
+    const wrapped = wrapHandlersWithDecrypt(handlers, roomKey)
+    setupDataChannelHandlers(conn.channel, wrapped)
   }
 
   /**
@@ -185,15 +215,21 @@ export function useWebRTCMesh() {
    *
    * 用于房主 TUN 读到的 IP 包下发到所有参与者。
    *
-   * @param raw 二进制数据（ArrayBuffer）
+   * 阶段三子任务 8：若 `roomKey` 已注入，先加密 `raw` 再发送；否则透传原始帧。
+   * 加密使用同一密钥为每个参与者生成独立 IV（`encryptFrame` 内部随机生成），
+   * 因此同一明文对不同参与者的密文不同，但加密只执行一次后广播给所有通道。
+   *
+   * @param raw 二进制数据（ArrayBuffer，原始协议帧）
    * @returns 实际发送到的参与者数量
    */
-  function broadcastPacket(raw: ArrayBuffer): number {
+  async function broadcastPacket(raw: ArrayBuffer): Promise<number> {
+    const key = roomKey.value
+    const payload = key ? await encryptFrame(raw, key) : raw
     let sent = 0
     for (const [participantId, conn] of conns.value) {
       if (channelOpen.get(participantId) && conn.channel.readyState === 'open') {
         try {
-          conn.channel.send(raw)
+          conn.channel.send(payload)
           sent++
         } catch {
           /* 单个通道发送失败不影响其他 */
@@ -206,14 +242,18 @@ export function useWebRTCMesh() {
   /**
    * 向单个参与者发送二进制包
    *
+   * 阶段三子任务 8：若 `roomKey` 已注入，先加密 `raw` 再发送。
+   *
    * @param participantId 参与者 ID
-   * @param raw 二进制数据
+   * @param raw 二进制数据（原始协议帧）
    */
-  function sendToParticipant(participantId: string, raw: ArrayBuffer): boolean {
+  async function sendToParticipant(participantId: string, raw: ArrayBuffer): Promise<boolean> {
     const conn = conns.value.get(participantId)
     if (!conn || conn.channel.readyState !== 'open') return false
+    const key = roomKey.value
+    const payload = key ? await encryptFrame(raw, key) : raw
     try {
-      conn.channel.send(raw)
+      conn.channel.send(payload)
       return true
     } catch {
       return false
@@ -252,12 +292,14 @@ export function useWebRTCMesh() {
   /**
    * 关闭所有 PeerConnection 并释放资源
    *
-   * 房间关闭时调用。幂等。
+   * 房间关闭时调用。幂等。同时清除加密密钥，避免复用 composable 时残留旧密钥。
    */
   function close() {
     for (const participantId of Array.from(conns.value.keys())) {
       closeParticipant(participantId)
     }
+    // 阶段三子任务 8：清除加密密钥
+    roomKey.value = null
   }
 
   /**
@@ -292,6 +334,7 @@ export function useWebRTCMesh() {
     setDataChannelHandlers,
     broadcastPacket,
     sendToParticipant,
+    setRoomKey,
     closeParticipant,
     close,
     getConnState,

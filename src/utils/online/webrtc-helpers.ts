@@ -1,11 +1,12 @@
 /**
- * WebRTC 共享工具（阶段三子任务 5 抽取，子任务 7 扩展 ICE/TURN）
+ * WebRTC 共享工具（阶段三子任务 5 抽取，子任务 7 扩展 ICE/TURN，子任务 8 加密包装）
  *
  * 房主侧 `useWebRTCMesh.ts` 与加入方侧 `useWebRTC.ts` 共用的底层函数：
  * - `createPeerConnection`：构造 RTCPeerConnection（接受 `IceServerEntry[]`，含 STUN + TURN 凭据）
  * - `collectIceCandidates`：等待 ICE 收集完成（非 trickle 模式，一次性返回全部 candidate）
  * - `createDataChannel`：在指定 PC 上创建 DataChannel
  * - `setupDataChannelHandlers`：统一绑定 onopen/onmessage/onerror/onclose
+ * - `wrapHandlersWithDecrypt`：将业务 onMessage 包装为「先解密再回调」（子任务 8 加密）
  * - `stunUrlsToIceServers` / `resolveIceServers` / `buildIceServers`：ICE 服务器列表构造与回退
  *
  * 设计约束：
@@ -13,6 +14,8 @@
  * - 不引入业务概念（participantId 等），由上层 composable 维护映射
  */
 
+import { type ShallowRef } from 'vue'
+import { decryptFrame } from '@/utils/online/crypto'
 import type { IceServerEntry } from '@/types/online'
 
 /** WebRTC 连接状态（与 RTCPeerConnection.connectionState 对齐） */
@@ -225,4 +228,40 @@ export function setupDataChannelHandlers(
   }
   if (handlers.onError) channel.onerror = handlers.onError
   if (handlers.onClose) channel.onclose = handlers.onClose
+}
+
+/**
+ * 将业务 onMessage 包装为「先解密再回调」
+ *
+ * 阶段三子任务 8 加密支持。`roomKey.value` 为 null 时直接返回原 handlers（透传），
+ * 非空时将 `onMessage` 替换为异步解密版本：DataChannel 收到加密帧 → `decryptFrame`
+ * 解密 → 解密成功才回调业务 onMessage；解密失败静默丢弃（GCM 认证失败 / 数据损坏）。
+ *
+ * 调用方（useWebRTC / useWebRTCMesh）在 `setDataChannelHandlers` 中使用此函数，
+ * 业务层无感知加密存在。
+ *
+ * @param handlers 业务侧传入的处理器（onMessage 期望收到原始协议帧）
+ * @param roomKey 加密密钥的 ShallowRef（null 表示未启用加密）
+ * @returns 包装后的处理器（透传或含解密包装）
+ */
+export function wrapHandlersWithDecrypt(
+  handlers: DataChannelHandlers,
+  roomKey: ShallowRef<CryptoKey | null>,
+): DataChannelHandlers {
+  if (!handlers.onMessage) return handlers
+  const userOnMessage = handlers.onMessage
+  // 闭包捕获 roomKey 引用，运行时读取最新值（支持房间运行期动态注入密钥）
+  const wrappedOnMessage = (raw: ArrayBuffer): void => {
+    const key = roomKey.value
+    if (!key) {
+      // 未启用加密：直接回调
+      userOnMessage(raw)
+      return
+    }
+    // 启用加密：异步解密后回调
+    void decryptFrame(raw, key).then((decrypted) => {
+      if (decrypted) userOnMessage(decrypted)
+    })
+  }
+  return { ...handlers, onMessage: wrappedOnMessage }
 }

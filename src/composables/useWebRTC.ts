@@ -1,5 +1,5 @@
 /**
- * WebRTC composable（加入方专用，阶段三子任务 5 mesh 拓扑，子任务 7 ICE/TURN 重构）
+ * WebRTC composable（加入方专用，阶段三子任务 5 mesh 拓扑，子任务 7 ICE/TURN 重构，子任务 8 加密）
  *
  * 房主侧多 PC 管理见 `useWebRTCMesh.ts`。本 composable 仅负责加入方单 PC：
  * - 轮询房主为自己生成的 SDP Offer（mesh 拓扑，房主 per-participant Offer）
@@ -16,6 +16,9 @@
  * 阶段三子任务 7：所有 PC 构造方法接受 `IceServerEntry[]`（含 STUN + TURN 凭据），
  * 取代旧的 `stunServers: string[]`。NAT 检测仍接受 `string[]`（仅用 STUN 探测）。
  *
+ * 阶段三子任务 8：`setRoomKey(key)` 注入 AES-GCM 密钥后，`setDataChannelHandlers`
+ * 绑定的 `onMessage` 自动先解密再回调。密钥为 null 时透传原始帧（兼容未启用加密的服务器）。
+ *
  * @example 加入房间
  * const webrtc = useWebRTC()
  * const { sdp, iceCandidates } = await webrtc.fetchOfferAndAnswer(
@@ -29,8 +32,11 @@ import {
   createPeerConnection,
   collectIceCandidates,
   setupDataChannelHandlers,
+  wrapHandlersWithDecrypt,
   type WebRtcConnectionState,
+  type DataChannelHandlers,
 } from '@/utils/online/webrtc-helpers'
+import { encryptFrame } from '@/utils/online/crypto'
 import { detectNatTypeWithStun } from '@/utils/online/nat-type'
 import { fetchParticipantOffer } from '@/utils/api/online-manager'
 import type { IceServerEntry, NatDetectionResult } from '@/types/online'
@@ -68,6 +74,25 @@ export function useWebRTC() {
   const natResult = ref<NatDetectionResult | null>(null)
   /** 是否正在检测 NAT */
   const detectingNat = ref(false)
+  /**
+   * DataChannel 加密密钥（阶段三子任务 8）
+   *
+   * null 表示未启用加密（兼容旧服务器）；非 null 时 `sendPacket` 自动加密，
+   * `setDataChannelHandlers` 绑定的 `onMessage` 自动先解密再回调。
+   */
+  const roomKey = shallowRef<CryptoKey | null>(null)
+
+  /**
+   * 注入 / 清除 DataChannel 加密密钥
+   *
+   * 加入方加入房间后调用 `importRoomKey(store.roomState.roomKey)` 导入密钥，
+   * 再调用此方法注入。退出房间时调用 `setRoomKey(null)` 清除。
+   *
+   * @param key AES-GCM 密钥；null 表示禁用加密（透传原始帧）
+   */
+  function setRoomKey(key: CryptoKey | null): void {
+    roomKey.value = key
+  }
 
   /**
    * 创建 PeerConnection 并绑定状态同步 + DataChannel 接收
@@ -102,11 +127,36 @@ export function useWebRTC() {
    *
    * 用于在 ondatachannel 触发后或协商完成后，由业务侧注入收包逻辑。
    *
+   * 阶段三子任务 8：若 `roomKey` 已注入，传入的 `onMessage` 会被自动包装为
+   * 「先解密再回调」，业务层收到的 `raw` 是已解密的原始协议帧。
+   *
    * @param handlers 处理器集合，未传的字段不绑定
    */
-  function setDataChannelHandlers(handlers: Parameters<typeof setupDataChannelHandlers>[1]) {
-    if (dataChannel.value) {
-      setupDataChannelHandlers(dataChannel.value, handlers)
+  function setDataChannelHandlers(handlers: DataChannelHandlers) {
+    if (!dataChannel.value) return
+    const wrapped = wrapHandlersWithDecrypt(handlers, roomKey)
+    setupDataChannelHandlers(dataChannel.value, wrapped)
+  }
+
+  /**
+   * 向房主发送二进制包（TUN 上行）
+   *
+   * 阶段三子任务 8：若 `roomKey` 已注入，先加密 `raw` 再发送；否则透传原始帧。
+   * DataChannel 未就绪或发送异常时返回 false，调用方应静默跳过（TUN 包丢失不影响后续）。
+   *
+   * @param raw 原始协议帧
+   * @returns 是否发送成功
+   */
+  async function sendPacket(raw: ArrayBuffer): Promise<boolean> {
+    const channel = dataChannel.value
+    if (!channel || channel.readyState !== 'open') return false
+    const key = roomKey.value
+    const payload = key ? await encryptFrame(raw, key) : raw
+    try {
+      channel.send(payload)
+      return true
+    } catch {
+      return false
     }
   }
 
@@ -217,7 +267,7 @@ export function useWebRTC() {
   /**
    * 关闭 PeerConnection 并释放资源
    *
-   * 关闭 DataChannel → close PeerConnection → 清空引用
+   * 关闭 DataChannel → close PeerConnection → 清空引用 → 清除加密密钥
    */
   function close() {
     try {
@@ -238,6 +288,8 @@ export function useWebRTC() {
         pc.value = null
       }
       connectionState.value = 'closed'
+      // 阶段三子任务 8：清除加密密钥，避免复用 composable 时残留旧密钥
+      roomKey.value = null
     } catch {
       /* ignore */
     }
@@ -260,6 +312,8 @@ export function useWebRTC() {
     setRemoteOfferAndCreateAnswer,
     fetchOfferAndAnswer,
     setDataChannelHandlers,
+    sendPacket,
+    setRoomKey,
     detectNatType,
     close,
   }

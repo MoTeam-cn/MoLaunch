@@ -26,6 +26,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import { showConfirm } from '@/utils/modal'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { decode, CONTROL_SUBTYPE, parseHostMcPortPayload, decodeTurnServersPayload } from '@/utils/online/protocol'
+import { importRoomKey } from '@/utils/online/crypto'
 import {
   XCircleIcon,
   ClockIcon,
@@ -41,18 +42,12 @@ const guestWebrtc = inject('guestWebRTC') as ReturnType<typeof useWebRTC>
 /**
  * TUN 桥接：TUN 读到包 → 通过 DataChannel 发给房主
  *
- * DataChannel 可能尚未就绪（PC 协商中），readyState 检查跳过未就绪通道。
+ * 阶段三子任务 8：使用 `guestWebrtc.sendPacket` 走加密通道（若 roomKey 已注入），
+ * 不再直接调 `channel.send`。DataChannel 未就绪时 sendPacket 内部静默返回 false。
  */
 const lan = useVirtualLan({
   onTunPacket: (raw) => {
-    const channel = guestWebrtc.dataChannel.value
-    if (channel && channel.readyState === 'open') {
-      try {
-        channel.send(raw)
-      } catch (e) {
-        console.warn('[Online] 加入方 DataChannel.send 失败:', e)
-      }
-    }
+    void guestWebrtc.sendPacket(raw)
   },
 })
 
@@ -185,6 +180,11 @@ async function copyText(text: string, label: string) {
 onMounted(() => {
   // 加入方拉取一次房间信息同步元数据
   void store.refreshRoomInfo()
+
+  // 阶段三子任务 8：注入 DataChannel 加密密钥（空字符串表示未启用加密，importRoomKey 返回 null）
+  void importRoomKey(store.roomState.roomKey).then((key) => {
+    guestWebrtc.setRoomKey(key)
+  })
 
   // 启动 TUN 桥接：进入面板即创建 TUN 接口，开始读包 → dataChannel.send
   // 失败仅 toast（如 wintun.dll 缺失 / 无管理员权限），不阻塞信令流程
