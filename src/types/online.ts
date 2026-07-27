@@ -142,6 +142,8 @@ export interface ParticipantInfo {
   status: 'joined' | 'answered' | 'confirmed' | 'rejected' | 'kicked' | 'left'
   joinedAt: number
   confirmedAt: number
+  /** 房主是否已为该参与者生成 SDP Offer（mesh 拓扑，true 表示 offer 已就绪） */
+  hostOfferReady: boolean
 }
 
 /** 参与者列表响应 */
@@ -153,6 +155,31 @@ export interface ListParticipantsResponse {
 export interface KeepaliveResponse {
   expiresAt: number
   serverTime: number
+}
+
+// ============================================================
+// mesh 拓扑：参与者级 SDP Offer（阶段三子任务 5）
+//
+// 房主为每个新加入的参与者单独创建 PeerConnection + Offer 后上传；
+// 参与者轮询拉取自己的 Offer，ready=false 表示房主尚未生成。
+// ============================================================
+
+/** 房主上传 SDP Offer 请求参数 */
+export interface UploadParticipantOfferParams {
+  roomCode: string
+  participantId: string
+  sdpOffer: string
+  iceCandidates: string[]
+}
+
+/** 参与者拉取 SDP Offer 响应 */
+export interface ParticipantOfferResponse {
+  /** Offer 是否已就绪（等价于 sdpOffer 非空） */
+  ready: boolean
+  /** SDP Offer（未就绪时为空字符串） */
+  sdpOffer: string
+  /** ICE Candidates 数组（未就绪时为空数组） */
+  iceCandidates: string[]
 }
 
 // ============================================================

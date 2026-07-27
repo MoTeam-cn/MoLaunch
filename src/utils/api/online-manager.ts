@@ -19,6 +19,10 @@
  * - `room_get_stun` / `room_create` / `room_get` / `room_close`
  * - `room_join` / `room_submit_answer` / `room_list_answers` / `room_confirm`
  * - `room_keepalive` / `room_leave` / `room_kick` / `room_unban` / `room_list_participants`
+ *
+ * 阶段三补充 2 个 action（mesh 拓扑：参与者级 SDP Offer）：
+ * - `room_upload_participant_offer`：房主为指定参与者上传独立 SDP Offer + ICE
+ * - `room_fetch_participant_offer`：参与者轮询拉取房主为自己生成的 SDP Offer
  */
 
 import { invoke } from '@tauri-apps/api/core'
@@ -31,6 +35,7 @@ import type {
   KeepaliveResponse,
   ListAnswersResponse,
   ListParticipantsResponse,
+  ParticipantOfferResponse,
   RoomInfoResponse,
   ServerTimeInfo,
   StunServersResponse,
@@ -75,6 +80,9 @@ export const ONLINE_ACTIONS = {
   ROOM_KICK: 'room_kick',
   ROOM_UNBAN: 'room_unban',
   ROOM_LIST_PARTICIPANTS: 'room_list_participants',
+  // mesh 拓扑：参与者级 SDP Offer
+  ROOM_UPLOAD_PARTICIPANT_OFFER: 'room_upload_participant_offer',
+  ROOM_FETCH_PARTICIPANT_OFFER: 'room_fetch_participant_offer',
 } as const
 
 /** action 名称类型 */
@@ -230,4 +238,37 @@ export function listParticipants(
   roomCode: string,
 ): Promise<BusinessResult<ListParticipantsResponse>> {
   return onlineManager(ONLINE_ACTIONS.ROOM_LIST_PARTICIPANTS, { roomCode })
+}
+
+// ============================================================
+// mesh 拓扑：参与者级 SDP Offer（阶段三子任务 5）
+//
+// 房主为每个新加入的参与者单独创建 PeerConnection + Offer 后上传；
+// 参与者轮询拉取自己的 Offer，ready=false 表示房主尚未生成。
+// ============================================================
+
+/** 房主为指定参与者上传 SDP Offer（mesh 拓扑） */
+export function uploadParticipantOffer(
+  roomCode: string,
+  participantId: string,
+  sdpOffer: string,
+  iceCandidates: string[],
+): Promise<BusinessResult<unknown>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_UPLOAD_PARTICIPANT_OFFER, {
+    roomCode,
+    participantId,
+    sdpOffer,
+    iceCandidates,
+  })
+}
+
+/** 参与者拉取房主为自己生成的 SDP Offer（mesh 拓扑，轮询用） */
+export function fetchParticipantOffer(
+  roomCode: string,
+  participantId: string,
+): Promise<BusinessResult<ParticipantOfferResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_FETCH_PARTICIPANT_OFFER, {
+    roomCode,
+    participantId,
+  })
 }

@@ -17,6 +17,7 @@ use crate::log_error;
 use crate::log_info;
 use crate::minecraft::online::client::OnlineClient;
 use crate::minecraft::online::signaling::CreateRoomRequest;
+use crate::minecraft::online::signaling::UploadParticipantOfferRequest;
 use crate::minecraft::online::storage::OnlineStorage;
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
@@ -95,6 +96,25 @@ pub struct UnbanParams {
     pub device_pk: String,
 }
 
+/// 房主为指定参与者上传 SDP Offer 的参数（mesh 拓扑）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadParticipantOfferParams {
+    pub room_code: String,
+    pub participant_id: String,
+    pub sdp_offer: String,
+    #[serde(default)]
+    pub ice_candidates: Vec<String>,
+}
+
+/// 参与者拉取房主为自己生成的 SDP Offer 的参数（mesh 拓扑）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParticipantOfferParams {
+    pub room_code: String,
+    pub participant_id: String,
+}
+
 // ============================================================
 // 辅助函数
 // ============================================================
@@ -144,6 +164,8 @@ pub fn register_signaling_actions(d: &mut Dispatcher) {
     register_kick(d);
     register_unban(d);
     register_list_participants(d);
+    register_upload_participant_offer(d);
+    register_fetch_participant_offer(d);
 }
 
 // ============================================================
@@ -383,6 +405,52 @@ fn register_list_participants(d: &mut Dispatcher) {
         let result = client.signaling_list_participants(&creds, &p.room_code).await
             .map_err(|e| {
                 log_error!("[Online] room_list_participants 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+fn register_upload_participant_offer(d: &mut Dispatcher) {
+    d.register("room_upload_participant_offer", handler!(state, _app, params, {
+        let p: UploadParticipantOfferParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_debug!(
+            "[Online] room_upload_participant_offer: code={}, participant={}",
+            p.room_code, p.participant_id
+        );
+        let req = UploadParticipantOfferRequest {
+            sdp_offer: p.sdp_offer,
+            ice_candidates: p.ice_candidates,
+        };
+        let result = client
+            .signaling_upload_participant_offer(&creds, &p.room_code, &p.participant_id, &req)
+            .await
+            .map_err(|e| {
+                log_error!("[Online] room_upload_participant_offer 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+fn register_fetch_participant_offer(d: &mut Dispatcher) {
+    d.register("room_fetch_participant_offer", handler!(state, _app, params, {
+        let p: ParticipantOfferParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_debug!(
+            "[Online] room_fetch_participant_offer: code={}, participant={}",
+            p.room_code, p.participant_id
+        );
+        let result = client
+            .signaling_fetch_participant_offer(&creds, &p.room_code, &p.participant_id)
+            .await
+            .map_err(|e| {
+                log_error!("[Online] room_fetch_participant_offer 失败: {}", e);
                 e.to_string()
             })?;
         serde_json::to_value(result).map_err(|e| e.to_string())

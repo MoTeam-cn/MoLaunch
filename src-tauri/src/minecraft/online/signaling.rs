@@ -135,11 +135,36 @@ pub struct ParticipantInfo {
     pub joined_at: u64,
     #[serde(alias = "confirmed_at")]
     pub confirmed_at: u64,
+    /// 房主是否已为该参与者生成 SDP Offer（mesh 拓扑，true 表示 offer 已就绪）
+    #[serde(default)]
+    pub host_offer_ready: bool,
 }
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ListParticipantsResponse {
     pub participants: Vec<ParticipantInfo>,
+}
+
+/// 房主为指定参与者上传 SDP Offer 的请求体（mesh 拓扑）
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UploadParticipantOfferRequest {
+    pub sdp_offer: String,
+    pub ice_candidates: Vec<String>,
+}
+
+/// 参与者拉取房主为自己生成的 SDP Offer 的响应（mesh 拓扑）
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ParticipantOfferResponse {
+    /// Offer 是否已就绪（等价于 sdp_offer 非空）
+    pub ready: bool,
+    /// SDP Offer（未就绪时为空字符串）
+    #[serde(default)]
+    pub sdp_offer: String,
+    /// ICE Candidates 数组（未就绪时为空数组）
+    #[serde(default)]
+    pub ice_candidates: Vec<String>,
 }
 
 /// keepalive 响应
@@ -317,6 +342,43 @@ impl OnlineClient {
     ) -> Result<BusinessResult<ListParticipantsResponse>, ClientError> {
         let path = format!("/v1/signaling/rooms/{}/participants", room_code);
         self.call_v1::<ListParticipantsResponse>(creds, "GET", &path, None, false)
+            .await
+    }
+
+    /// 房主为指定参与者上传 SDP Offer（PUT /v1/signaling/rooms/{code}/participants/{participant_id}/offer）
+    ///
+    /// mesh 拓扑：房主轮询 participants 列表发现 `host_offer_ready=false` 的 `joined` 参与者时，
+    /// 为其创建独立 PeerConnection + DataChannel + Offer，然后调用本接口上传。
+    pub async fn signaling_upload_participant_offer(
+        &self,
+        creds: &DeviceCredentials,
+        room_code: &str,
+        participant_id: &str,
+        req: &UploadParticipantOfferRequest,
+    ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
+        let path = format!(
+            "/v1/signaling/rooms/{}/participants/{}/offer",
+            room_code, participant_id
+        );
+        let body = serde_json::to_value(req)?;
+        self.call_v1::<serde_json::Value>(creds, "PUT", &path, Some(&body), true)
+            .await
+    }
+
+    /// 参与者拉取房主为自己生成的 SDP Offer（GET /v1/signaling/rooms/{code}/participants/{participant_id}/offer）
+    ///
+    /// mesh 拓扑：参与者 join 后轮询本接口，`ready=false` 表示房主尚未生成 Offer。
+    pub async fn signaling_fetch_participant_offer(
+        &self,
+        creds: &DeviceCredentials,
+        room_code: &str,
+        participant_id: &str,
+    ) -> Result<BusinessResult<ParticipantOfferResponse>, ClientError> {
+        let path = format!(
+            "/v1/signaling/rooms/{}/participants/{}/offer",
+            room_code, participant_id
+        );
+        self.call_v1::<ParticipantOfferResponse>(creds, "GET", &path, None, false)
             .await
     }
 }
