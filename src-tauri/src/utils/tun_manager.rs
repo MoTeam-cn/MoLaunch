@@ -158,26 +158,35 @@ fn register_tun_forward_to(d: &mut Dispatcher) {
                 format!("base64 解码失败: {}", e)
             })?;
 
-        // 取当前 bridge
-        let bridge_opt = state.virtual_lan_bridge.lock().await;
-        let bridge = match bridge_opt.as_ref() {
-            Some(b) => b,
-            None => {
-                log_warn!("[Online] tun_forward_to: bridge 未启动，忽略消息");
-                return Err("TUN bridge 未启动".to_string());
+        // 取当前 bridge 的 write_tx clone（不持有 Mutex 守卫跨 await，防死锁）
+        let write_tx = {
+            let guard = state.virtual_lan_bridge.lock().await;
+            match guard.as_ref() {
+                Some(b) => b.write_tx_clone(),
+                None => {
+                    log_warn!("[Online] tun_forward_to: bridge 未启动，忽略消息");
+                    return Err("TUN bridge 未启动".to_string());
+                }
             }
         };
+        // guard 已释放，write_tx 是 mpsc::Sender，可安全跨 await
 
-        // 调用 bridge.forward_from_datachannel（不能跨 await 持有 Mutex 守卫，先 clone 引用）
-        // VirtualLanBridge 内部 write_tx 是 Sender，可安全跨 await
-        let result = bridge.forward_from_datachannel(&raw).await
+        // 同步解码 DataChannel 消息（无需持有 bridge 引用）
+        let decoded = VirtualLanBridge::decode_from_datachannel(&raw)
             .map_err(|e| {
-                log_warn!("[Online] tun_forward_to 失败: {}", e);
+                log_warn!("[Online] tun_forward_to 解码失败: {}", e);
                 e
             })?;
 
-        let (is_data, packet_len) = match &result {
-            Some(packet) => (true, packet.len()),
+        let (is_data, packet_len) = match &decoded {
+            Some(packet) => {
+                // 写入 TUN（跨 await，但不持有 Mutex 守卫）
+                if write_tx.send(packet.clone()).await.is_err() {
+                    log_warn!("[Online] tun_forward_to: TUN 写通道已关闭");
+                    return Err("TUN 写通道已关闭".to_string());
+                }
+                (true, packet.len())
+            }
             None => (false, 0),
         };
 

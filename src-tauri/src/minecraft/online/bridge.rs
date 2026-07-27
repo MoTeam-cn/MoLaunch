@@ -26,7 +26,7 @@
 //!
 //! - `VirtualLanBridge`：持有 TUN 接口写通道 + 读写循环 task 句柄 + 桥接状态
 //! - `start()`：创建 TUN 接口 + 启动 select! 单读写循环 task（房主与加入方通用）
-//! - `forward_from_datachannel()`：前端收到 DataChannel 消息后调用，解码并写入 TUN
+//! - `decode_from_datachannel()`：前端收到 DataChannel 消息后调用，解码返回 IP 包 payload
 //! - `stop()`：停止桥接，销毁 TUN
 
 use std::sync::Arc;
@@ -186,24 +186,28 @@ impl VirtualLanBridge {
         })
     }
 
-    /// 前端收到 DataChannel 消息后调用，转发 IP 包写入 TUN
+    /// 克隆 TUN 写通道发送端（供调用方在释放 Mutex 守卫后跨 await 发送）
+    ///
+    /// `mpsc::Sender` 是 Cloneable 的，clone 后可在释放 Mutex 守卫后安全跨 await 使用，
+    /// 避免在 `tun_forward_to` 中跨 await 持有 `virtual_lan_bridge` Mutex 守卫导致死锁。
+    pub fn write_tx_clone(&self) -> tokio::sync::mpsc::Sender<Vec<u8>> {
+        self.write_tx.clone()
+    }
+
+    /// 解码 DataChannel 消息（同步，不写入 TUN）
     ///
     /// 前端从 DataChannel.onmessage 收到二进制消息后，
-    /// 通过 IPC `online_manager` action `tun_forward_to` 调用此方法。
+    /// 通过 IPC `online_manager` action `tun_forward_to` 调用。
     ///
-    /// # 参数
-    ///
-    /// - `raw_message`：DataChannel 收到的原始二进制消息（协议帧编码后的字节）
+    /// 调用方应在释放 Mutex 守卫后，将返回的 payload 通过 `write_tx_clone()` 获取的
+    /// 发送端写入 TUN，避免跨 await 持有 Mutex 守卫。
     ///
     /// # 返回
     ///
-    /// - `Ok(Some(packet))`：解码成功，返回 IP 包（已写入 TUN）
-    /// - `Ok(None)`：控制消息（心跳等），非 IP 包，不写入 TUN
+    /// - `Ok(Some(packet))`：数据消息，返回 IP 包 payload（调用方需写入 TUN）
+    /// - `Ok(None)`：控制/错误消息，非 IP 包，不写入 TUN
     /// - `Err`：协议帧解码失败
-    pub async fn forward_from_datachannel(
-        &self,
-        raw_message: &[u8],
-    ) -> Result<Option<Vec<u8>>, String> {
+    pub fn decode_from_datachannel(raw_message: &[u8]) -> Result<Option<Vec<u8>>, String> {
         let msg = protocol::decode(raw_message).map_err(|e| {
             log_warn!("[Online] DataChannel 消息解码失败: {}", e);
             e.to_string()
@@ -216,10 +220,6 @@ impl VirtualLanBridge {
                     seq,
                     payload.len()
                 );
-                // 写入 TUN
-                if self.write_tx.send(payload.clone()).await.is_err() {
-                    return Err("TUN 写通道已关闭".to_string());
-                }
                 Ok(Some(payload))
             }
             Message::Control { seq, subtype, payload } => {

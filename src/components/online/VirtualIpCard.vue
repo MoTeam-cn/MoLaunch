@@ -1,0 +1,45 @@
+<script setup lang="ts">
+/**
+ * 虚拟 IP 显示卡片行（阶段三走查重构）
+ *
+ * 从 RoomGuestPanel.vue / RoomHostPanel.vue 抽出的公共行组件：
+ * 左侧图标 + 标签，右侧 IP 代码块 + 复制按钮。
+ * 复制逻辑自包含，调用方无需传入 copyText。
+ */
+import { WifiIcon, ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
+import { toastSuccess, toastError } from '@/utils/toast'
+
+defineProps<{
+  ip: string
+  label: string
+}>()
+
+async function copyIp(text: string, label: string) {
+  if (!text) return
+  try {
+    await navigator.clipboard.writeText(text)
+    toastSuccess(`已复制${label}: ${text}`)
+  } catch {
+    toastError('复制失败')
+  }
+}
+</script>
+
+<template>
+  <div class="px-1 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2 text-sm text-gray-600">
+      <WifiIcon class="w-4 h-4 text-gray-400" />
+      <span>{{ label }}</span>
+    </div>
+    <div class="flex items-center gap-1">
+      <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ ip }}</code>
+      <Tooltip :text="`复制${label}`">
+        <Button type="ghost" size="mini" @click="copyIp(ip, label)">
+          <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
+        </Button>
+      </Tooltip>
+    </div>
+  </div>
+</template>

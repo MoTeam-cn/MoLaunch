@@ -281,7 +281,7 @@ export function useRoomHost(options: {
         console.info(
           `[Online] 房主已广播 ICE 服务器列表：${systemTurn.length} 系统 TURN + ${store.customTurnServers.length} 自定义 TURN，已发送给 ${sent} 个参与者`,
         )
-      })
+      }).catch((e) => console.warn('[Online] 广播 ICE 服务器列表失败:', e))
     } catch (e) {
       console.warn('[Online] 拉取/广播 TURN 服务器失败:', e)
     }
@@ -311,9 +311,9 @@ export function useRoomHost(options: {
 
     // 阶段三子任务 8：注入 DataChannel 加密密钥（空字符串表示未启用加密，importRoomKey 返回 null）
     // 在 lan.start 之前注入，确保首个 TUN 包就能正确加密
-    void importRoomKey(store.roomState.roomKey).then((key) => {
-      hostMesh.setRoomKey(key)
-    })
+    void importRoomKey(store.roomState.roomKey)
+      .then((key) => hostMesh.setRoomKey(key))
+      .catch((e) => console.warn('[Online] 加密密钥导入失败:', e))
 
     // 启动 TUN 桥接：房主进入面板即创建 TUN 接口，开始读包 → broadcastPacket
     // 失败仅 toast（如 wintun.dll 缺失 / 无管理员权限），不阻塞信令流程
@@ -337,10 +337,10 @@ export function useRoomHost(options: {
         console.info(
           `[Online] 房主 MC 局域网端口已捕获: ${port}，已广播给 ${sent} 个参与者`,
         )
-      })
+      }).catch((e) => console.warn('[Online] 广播 MC 端口失败:', e))
     }).then((unlisten) => {
       mcPortUnlisten = unlisten
-    })
+    }).catch((e) => console.warn('[Online] 注册 MC 端口检测事件监听失败:', e))
   })
 
   onUnmounted(() => {

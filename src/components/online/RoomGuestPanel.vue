@@ -31,10 +31,10 @@ import {
   XCircleIcon,
   ClockIcon,
   ServerStackIcon,
-  WifiIcon,
   ExclamationTriangleIcon,
   ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
+import VirtualIpCard from './VirtualIpCard.vue'
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebRTC') as ReturnType<typeof useWebRTC>
@@ -182,9 +182,9 @@ onMounted(() => {
   void store.refreshRoomInfo()
 
   // 阶段三子任务 8：注入 DataChannel 加密密钥（空字符串表示未启用加密，importRoomKey 返回 null）
-  void importRoomKey(store.roomState.roomKey).then((key) => {
-    guestWebrtc.setRoomKey(key)
-  })
+  void importRoomKey(store.roomState.roomKey)
+    .then((key) => guestWebrtc.setRoomKey(key))
+    .catch((e) => console.warn('[Online] 加入方加密密钥导入失败:', e))
 
   // 启动 TUN 桥接：进入面板即创建 TUN 接口，开始读包 → dataChannel.send
   // 失败仅 toast（如 wintun.dll 缺失 / 无管理员权限），不阻塞信令流程
@@ -208,20 +208,7 @@ onMounted(() => {
             {{ room.roomCode }}
           </code>
         </div>
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <WifiIcon class="w-4 h-4 text-gray-400" />
-            <span>我的虚拟 IP</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ room.selfVirtualIp }}</code>
-            <Tooltip text="复制我的虚拟 IP">
-              <Button type="ghost" size="mini" @click="copyText(room.selfVirtualIp, '我的虚拟 IP')">
-                <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
-              </Button>
-            </Tooltip>
-          </div>
-        </div>
+        <VirtualIpCard :ip="room.selfVirtualIp" label="我的虚拟 IP" />
         <div class="px-1 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm text-gray-600">
             <ServerStackIcon class="w-4 h-4 text-gray-400" />

@@ -9,6 +9,16 @@
 
 ### 变更
 
+#### 联机模块走查修复：并发安全 + Mutex 死锁 + Vue 行数 + Promise 未处理（5 项）
+- 背景：联机模块代码走查发现 5 个问题（3 个并发/Mutex 严重），本次一次性修复
+- 改动：
+  - **Top 1+2 并发安全**：[api-server/src/services/signaling.rs](api-server/src/services/signaling.rs) `join_room` 将 `next_ip_suffix` 递增、已加入检查、人数上限检查、参与者插入合并到单个数据库事务中。使用 `UPDATE rooms SET next_ip_suffix = next_ip_suffix + 1 ... RETURNING` 原子递增并锁定房间行，PostgreSQL 行锁 / SQLite 库锁串行化同房间并发加入，消除虚拟 IP 重复分配与人数超限竞态
+  - **Top 3 Mutex 跨 await**：[src-tauri/src/minecraft/online/bridge.rs](src-tauri/src/minecraft/online/bridge.rs) 将 `forward_from_datachannel` 拆分为同步 `decode_from_datachannel` + `write_tx_clone()`；[src-tauri/src/utils/tun_manager.rs](src-tauri/src/utils/tun_manager.rs) `tun_forward_to` 先在 guard 作用域内 clone `write_tx`，释放 guard 后再跨 await 发送，消除死锁风险
+  - **Top 4 Vue 行数**：新增 [src/components/online/VirtualIpCard.vue](src/components/online/VirtualIpCard.vue)（46 行）提取虚拟 IP 显示行（图标 + 标签 + IP 代码块 + 复制按钮，复制逻辑自包含）；[src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) 使用该组件，从 304 行降至 291 行
+  - **Top 5 Promise 未处理**：[src/composables/useRoomHost.ts](src/composables/useRoomHost.ts) 为 4 处 fire-and-forget Promise（TURN 广播、importRoomKey、MC 端口广播、listen 注册）加 `.catch()`；[src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) importRoomKey 同步加 catch
+- 复用：`VirtualIpCard.vue` 复用 `Button.vue` / `Tooltip.vue` / `toastSuccess` / `toastError`，与 RoomGuestPanel 原 copyText 逻辑一致
+- 验证：api-server cargo check 通过，src-tauri cargo check 通过，vue-tsc 0 新增错误（既有错误均在未修改文件），eslint 3 个目标文件通过
+
 #### 联机模块 SFU 拓扑评估：保持 mesh + 限制人数 ≤5（阶段三子任务 9）
 - 背景：阶段三子任务 9 评估 mesh 拓扑在 5+ 人时是否需要切换 SFU。基于 Minecraft LAN 流量模型（~100 KB/s）测算，5 人房主上行约 0.4 Mbps（家庭宽带舒适），10 人达 0.9 Mbps（多数家庭宽带扛不住）。结合项目定位（轻量启动器，对标 PCL2，2-5 人开黑为主），决策保持 mesh 拓扑 + 限制人数 ≤5，未来 5+ 人刚需时再评估 SFU
 - 改动：
