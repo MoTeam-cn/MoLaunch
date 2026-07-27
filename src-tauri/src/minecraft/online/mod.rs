@@ -7,6 +7,9 @@
 //! - `storage`：设备密钥持久化（Ed25519/X25519 私钥、device_pk、device_token）
 //! - `client`：api-server HTTP 客户端封装（统一加 ECIES 信封、JWT 携带）
 //! - `signaling`：信令接口客户端（房间创建/加入/退出/踢人/保活等，阶段二实现）
+//! - `tun`：虚拟网卡管理（阶段三：TUN 接口创建/读写，基于 tun-rs crate）
+//! - `protocol`：DataChannel 消息协议（阶段三：二进制帧格式，IP 包封装）
+//! - `bridge`：DataChannel ↔ TUN 桥接（阶段三：协调 TUN 读写与前端事件转发）
 //!
 //! 协议参考：
 //! - `api-server/docs/auth.md`：MoSign-v1 设备认证协议
@@ -18,8 +21,11 @@
 //! - 所有 `/v1` 业务请求必须走 ECIES 加密信封
 
 pub mod auth;
+pub mod bridge;
 pub mod client;
 pub mod crypto;
 pub mod ecies;
+pub mod protocol;
 pub mod signaling;
 pub mod storage;
+pub mod tun;

@@ -70,6 +70,11 @@ rand = "0.8"
 # PEM 格式密钥解析（内置云端 RSA 公钥 PEM）
 pem = "3"
 
+# 虚拟网卡（阶段三：TUN 接口管理，跨平台 TUN/TAP 库）
+# Windows 底层为 Wintun 驱动，需随程序分发 wintun.dll
+# Linux/macOS 需 root 或 CAP_NET_ADMIN 权限
+tun-rs = { version = "2", features = ["async_tokio"] }
+
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 # Win32 API（用于游戏窗口标题修改）

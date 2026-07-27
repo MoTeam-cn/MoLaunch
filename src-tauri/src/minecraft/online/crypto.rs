@@ -288,6 +288,7 @@ pub enum CryptoError {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ed25519_dalek::Verifier;
 
     #[test]
     fn test_ed25519_sign_verify() {
