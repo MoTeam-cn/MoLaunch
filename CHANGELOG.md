@@ -9,6 +9,67 @@
 
 ### 变更
 
+#### 联机模块 TURN 中继支持 阶段 F + G：房主拉取系统 TURN + DataChannel 广播 / 加入方接收 + PC 配置更新（阶段三子任务 7）
+- 背景：阶段 E（DataChannel TurnServers 控制消息 0x05 协议层）+ H（用户自定义 TURN 配置 UI）+ I（持久化）+ J（编译验证）已就绪，本次推进阶段 F（房主侧：拉取系统 TURN → 合并用户自定义 → DataChannel 广播）与阶段 G（加入方侧：接收 TurnServers 控制消息 → 更新本地 ICE 配置 → `pc.setConfiguration` 热更新），子任务 7 编码部分全部完成
+- 改动：
+  - [src/composables/useRoomHost.ts](src/composables/useRoomHost.ts) 新增 `fetchAndBroadcastTurnServers()`：调用 `store.fetchTurnServers` 拉取经服务端三层负载过滤后的系统 TURN → 通过 `buildIceServers({ stunServers, customTurnServers, systemTurnServers })` 合并为统一 ICE 列表 → 更新 `store.roomState.iceServers`（影响后续 `generateOfferForParticipant` 为新参与者生成 PC 时的 ICE 配置）→ `encodeTurnServers(turnSeq++, merged)` 编码 + `hostMesh.broadcastPacket` 下发给所有已联通参与者；新增独立 `turnSeq` 计数器（与 `mcPortSeq` / TUN 数据包 seq 独立避免混淆）；`onMounted` 在 `lan.start` 之后触发一次，房间刚创建时参与者尚未联通 broadcastPacket 返回 0 属正常
+  - [src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) `watch(dataChannel)` 的 `onMessage` 新增 `CONTROL_SUBTYPE.TURN_SERVERS` 分支：`decodeTurnServersPayload(msg.payload)` 解析房主广播的 ICE 列表 → 更新 `store.roomState.iceServers` → 调用 `pc.setConfiguration({ iceServers, iceTransportPolicy: 'all' })` 热更新当前 PC 配置（已建立连接需 ICE restart 完全生效，此处仅更新配置不主动 restart，避免中断现有连接）；解析失败或空列表时静默丢弃保持现有 PC 不变
+- 设计取舍（不主动重建 PC 的原因）：
+  - mesh 拓扑下房主为每个参与者生成 Offer，加入方无法单方面触发重新协商
+  - 强制 close + 重新 `fetchOfferAndAnswer` 需要房主配合重新生成 Offer，链路过长且会中断现有数据传输
+  - TURN 通常在房间初期下发，PC 已建立时 STUN/TURN 已完成 ICE 收集，更新配置主要为后续 ICE restart（如有）预留
+- 复用：
+  - `buildIceServers` / `encodeTurnServers` / `decodeTurnServersPayload` 均为阶段 D/E 已抽取的共享工具，未新增重复实现
+  - `store.fetchTurnServers` / `store.customTurnServers` 为阶段 C 已预留的 store 方法，本次直接调用
+  - `pc.setConfiguration` 为 WebRTC 标准接口，未引入额外封装
+- 验证：`vue-tsc --noEmit` 两个目标文件 0 新增错误（项目其他预存错误与本次改动无关）；`eslint` 两个文件全部通过；行数检查 `RoomGuestPanel.vue` 290 行（符合 300 行约束）、`useRoomHost.ts` 330 行（composable 无硬性行数约束）
+- 后续：子任务 7 编码部分全部完成，下一步为端到端实测（部署 api-server v0.1.10+，Symmetric NAT 环境下验证 TURN 中转生效，PC ICE 收集包含 relay candidate）
+
+#### 联机模块 TURN 中继支持 阶段 E + H + I：DataChannel TurnServers 协议 + 用户自定义 TURN 配置 UI + 持久化（阶段三子任务 7）
+- 背景：阶段 A-D 已完成后端配置/迁移/服务/控制器 + Tauri 中间件 + 前端类型/API/Store + webrtc-helpers 抽取。本次推进阶段 E（DataChannel 协议扩展 TurnServers 0x05 控制消息，前后端对齐）、阶段 H（SettingsOnline 用户自定义 TURN 配置 UI）、阶段 I（启动器配置层 OnlineConfig.custom_turn_servers 持久化），为阶段 F（房主拉取系统 TURN 后广播）与阶段 G（加入方接收后重建 PC）铺路
+- 改动：
+  - [src-tauri/src/minecraft/online/protocol.rs](src-tauri/src/minecraft/online/protocol.rs) `ControlSubtype` 新增 `TurnServers = 0x05`；新增 `turn_servers_message(seq, json_payload)` 便捷构造函数（payload 为 `IceServerEntry[]` 的 JSON UTF-8 字节）；模块文档补充 TurnServers 帧格式说明；新增 2 个单元测试（roundtrip + 空列表）
+  - [src/utils/online/protocol.ts](src/utils/online/protocol.ts) `CONTROL_SUBTYPE` 新增 `TURN_SERVERS: 0x05`；新增 `encodeTurnServers(seq, iceServers)` 编码 `IceServerEntry[]` 为 JSON UTF-8 二进制帧；新增 `decodeTurnServersPayload(payload)` 解析 JSON 为 `IceServerEntry[]`（含字段校验，非法结构返回 null）；模块文档同步
+  - [src-tauri/src/state/config.rs](src-tauri/src/state/config.rs) `OnlineConfig` 新增 `custom_turn_servers: Vec<IceServerEntry>` 字段（`#[serde(default)]` 兼容旧配置），`Default` 初始化为空 `Vec`
+  - [src-tauri/src/commands/system/apply_config/types.rs](src-tauri/src/commands/system/apply_config/types.rs) `OnlinePatch` 新增 `custom_turn_servers: Option<Vec<IceServerEntry>>`（`#[serde(rename = "onlineCustomTurnServers")]`）；`OnlineSnapshot` 新增 `custom_turn_servers: Vec<IceServerEntry>`；`build_snapshot` 同步克隆
+  - [src-tauri/src/commands/system/apply_config/apply.rs](src-tauri/src/commands/system/apply_config/apply.rs) `apply_online` 新增 `custom_turn_servers` 字段更新分支（`Some` 即更新，含空数组表示清空）
+  - [src/utils/api/config.ts](src/utils/api/config.ts) `ConfigSnapshot` 新增 `onlineCustomTurnServers: IceServerEntry[]`；`ConfigPatch` 新增 `onlineCustomTurnServers?: IceServerEntry[]`
+  - 新增 [src/components/online/TurnServerEntryEditor.vue](src/components/online/TurnServerEntryEditor.vue)（119 行）：单个 TURN 服务器条目编辑器子组件，v-model 双向绑定 `IceServerEntry`，支持 URL/username/credential 三字段编辑 + 移除按钮；URL 输入支持逗号/空白分隔多 URL，校验 `turn:/turns:/stun:` 前缀
+  - [src/views/settings/SettingsOnline.vue](src/views/settings/SettingsOnline.vue) 新增「ICE 服务器配置」section：v-for 渲染 `customTurnServers` 列表 + 空状态提示（icon + text 垂直水平居中）+ 添加按钮；通过 `useConfigPage` 的 `onLoad` 从配置加载，`watch` deep + `markDirty('onlineCustomTurnServers', v)` 防抖保存，同时同步到 `onlineStore.setCustomTurnServers(v)` 供房主创建房间时读取
+- 复用：
+  - 后端 `IceServerEntry` 类型直接复用 `minecraft::online::signaling::IceServerEntry`（已实现 Serialize/Deserialize/Clone），不新增类型
+  - 前端 `IceServerEntry` 类型复用 `src/types/online.ts` 既有定义
+  - `useConfigPage` composable 复用既有加载 + 防抖保存 + loaded 守卫模式（与 `apiUrl` 一致）
+  - `onlineStore.setCustomTurnServers` 复用 store 既有方法（阶段 C 已预留）
+  - 表单组件复用 `Input.vue`（含 hint/hintType）+ `Button.vue`（ghost/mini）+ `Tooltip.vue`，遵循项目「禁止原生 HTML 控件」约定
+  - 单条目编辑抽到 `TurnServerEntryEditor.vue` 子组件，保证 `SettingsOnline.vue` 296 行不超 300 行硬约束
+- 验证：`cargo check -p mo-launch` 通过；`cargo test minecraft::online::protocol` 11 个测试全部通过（含新增 2 个 TurnServers 测试）；`vue-tsc --noEmit` 新增/修改文件 0 错误；`eslint` 4 个目标文件全部通过；行数检查 `SettingsOnline.vue` 296 行、`TurnServerEntryEditor.vue` 119 行，均符合 300 行约束
+- 后续：阶段 F（房主 useRoomHost 拉取系统 TURN + 合并用户自定义 + DataChannel 广播）、阶段 G（加入方接收 TurnServers 控制消息后重建 PC）
+
+#### 联机模块 TURN 中继支持 阶段 D：webrtc-helpers 抽取 + useWebRTC/useWebRTCMesh 参数类型重构（阶段三子任务 7）
+- 背景：阶段 C 已将前端类型/API/Store 与后端 `ice_servers` 字段对齐，本次推进阶段 D：把 ICE 服务器合并/回退逻辑从 store 抽到 `webrtc-helpers.ts` 共享，`useWebRTC` / `useWebRTCMesh` 的 PC 构造方法从 `stunServers: string[]` 改为 `iceServers: IceServerEntry[]`，让 TURN 凭据能一路传到 `RTCIceServer`，为阶段 E（DataChannel TurnServers 控制消息广播）与阶段 F（房主拉取系统 TURN 后广播）铺路
+- 改动：
+  - [src/utils/online/webrtc-helpers.ts](src/utils/online/webrtc-helpers.ts) 新增 `stunUrlsToIceServers(urls)` / `resolveIceServers(ice, stun)` / `buildIceServers({ stun, custom, system })` 三个工具函数；`createPeerConnection` 重构为接受 `IceServerEntry[]`，按需展开 `urls` / `username` / `credential` 到 `RTCIceServer`，`iceTransportPolicy` 保持 `'all'`（P2P 优先 + relay 兜底）
+  - [src/composables/useWebRTC.ts](src/composables/useWebRTC.ts) `ensurePeerConnection` / `setRemoteOfferAndCreateAnswer` / `fetchOfferAndAnswer` 三个方法参数从 `stunServers: string[]` 改为 `iceServers: IceServerEntry[]`；`detectNatType(stunServers?: string[])` 保持 `string[]`（NAT 探测只用 STUN，无需 TURN 凭据）
+  - [src/composables/useWebRTCMesh.ts](src/composables/useWebRTCMesh.ts) `createOfferFor(participantId, iceServers: IceServerEntry[])` 参数类型重构
+  - [src/composables/useRoomHost.ts](src/composables/useRoomHost.ts) `generateOfferForParticipant` 改为传 `store.roomState.iceServers`（旧房间回退用 `stunUrlsToIceServers(stunServers)`）
+  - [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue) `handleJoinRoom` 用 `resolveIceServers(joinResp.iceServers, joinResp.stunServers)` 解析加入方 ICE 服务器列表后传给 `fetchOfferAndAnswer`
+  - [src/stores/online.ts](src/stores/online.ts) 删除本地 `stunUrlsToIceServers` / `resolveIceServers`，改从 `webrtc-helpers` 导入；`hostCreateRoom` 改用 `buildIceServers({ stunServers, customTurnServers })` 合并 ICE 列表
+- 复用：未引入新组件；`stunUrlsToIceServers` / `resolveIceServers` / `buildIceServers` 三函数集中放 `webrtc-helpers.ts`，被 store + 两个 composable + 两个调用方共用；`createPeerConnection` 沿用既有 `RTCPeerConnection` 构造，仅扩展字段映射
+- 验证：`vue-tsc --noEmit` 联机模块 6 个文件 0 新增错误（项目其他预存错误与本次改动无关）；`eslint` 6 个文件全部通过
+- 后续：阶段 E 将扩展 DataChannel 协议增加 TurnServers 控制消息（0x05），房主拉取系统 TURN 后通过 DataChannel 广播给所有参与者
+
+#### 联机模块 TURN 中继支持 阶段 C：前端类型 + API 客户端 + Store（阶段三子任务 7）
+- 背景：阶段 A（后端配置/迁移/服务/控制器）与阶段 B（Tauri 中间件）已就绪，本次推进阶段 C，将前端类型/API/Store 与后端 `ice_servers` 字段对齐，并把 STUN+TURN 合并逻辑收敛到 store 层，为阶段 D 的 `buildIceServers` 抽取与 `useWebRTC` 参数类型重构铺路
+- 改动：
+  - [src/types/online.ts](src/types/online.ts) 新增 `IceServerEntry`（`urls` + 可选 `username`/`credential`，对齐浏览器 `RTCIceServer`）与 `TurnServersResponse`（`servers` + `enabled` + `currentTotalLoad` + `loadThreshold`）；`CreateRoomParams` 增加可选 `iceServers`；`RoomInfoResponse` / `JoinRoomResponse` 增加 `iceServers`（保留 `stunServers` 兼容字段，旧房间回退使用）
+  - [src/utils/api/online-manager.ts](src/utils/api/online-manager.ts) `ONLINE_ACTIONS` 追加 `ROOM_GET_TURN`；新增 `getTurnServers(roomCode): Promise<BusinessResult<TurnServersResponse>>` 封装（房主独占）
+  - [src/stores/online.ts](src/stores/online.ts) `RoomState` 新增 `iceServers: IceServerEntry[]` 字段；新增 `customTurnServers`（用户自定义，由 SettingsOnline 配置）+ `systemTurnServers`（系统下发快照）两个 ref；`hostCreateRoom` 合并 STUN + customTurn 为 `iceServers` 上报后端；`guestJoinRoom` 用 `resolveIceServers` 优先 iceServers 回退 stunServers；`refreshRoomInfo` 同步 iceServers；新增 `fetchTurnServers`（房主独占，调 `room_get_turn`）+ `setCustomTurnServers` 方法
+  - 私有工具函数 `stunUrlsToIceServers(urls)` 与 `resolveIceServers(ice, stun)`：前者用于旧客户端兼容转换，后者用于响应解析时的优先级回退；为阶段 D 抽取到 `webrtc-helpers.ts` 做准备
+- 复用：未引入新组件；类型与后端 `IceServerEntry` / `TurnServersResponse` 镜像一致；`getTurnServers` 沿用 `onlineManager` + `ONLINE_ACTIONS` 既有模式（参照 `getStunServers` / `listParticipants`）；`safeCall` / `toastSuccess` 等工具复用项目惯例
+- 验证：`vue-tsc --noEmit` 联机模块三个文件 0 新增错误（项目其他预存错误与本次改动无关）；`eslint` 三个文件全部通过
+- 后续：阶段 D 将抽取 `buildIceServers` 到 `webrtc-helpers.ts`，并重构 `useWebRTC` / `useWebRTCMesh` 接受 `IceServerEntry[]` 参数
+
 #### 联机模块 Minecraft 服务器绑定 UI 引导（阶段三子任务 6 UI 收尾）
 - 背景：阶段三子任务 6 已完成 JVM 参数注入（`-Djava.net.preferIPv4Stack=true`）、GameWatcher 自动捕获 MC LAN 端口、HostMcPort 控制消息广播与接收。本次补齐 UI 层引导提示与复制虚拟 IP 快捷操作，让房主与加入方都能直观知道下一步该做什么
 - 改动：

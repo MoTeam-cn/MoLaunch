@@ -74,13 +74,64 @@ export interface StunServersResponse {
   servers: string[]
 }
 
+/**
+ * ICE 服务器条目（统一 STUN + TURN）
+ *
+ * 阶段三子任务 7 新增。对应后端 `IceServerEntry`：
+ * - `urls` 长度 ≥ 1，首项通常为 `stun:` / `turn:` / `turns:` 协议 URL
+ * - `username` / `credential` 仅 TURN 需要填充（STUN 缺省）
+ *
+ * 浏览器侧 `RTCIceServer` 接口对齐：
+ * ```ts
+ * { urls: ['stun:stun.example.com:3478'] }
+ * { urls: ['turn:turn.example.com:3478?transport=udp'], username: 'foo', credential: 'bar' }
+ * ```
+ */
+export interface IceServerEntry {
+  urls: string[]
+  /** TURN 用户名（STUN 时缺省） */
+  username?: string
+  /** TURN 凭据（STUN 时缺省） */
+  credential?: string
+}
+
+/**
+ * TURN 服务器列表响应（房主独占接口）
+ *
+ * 阶段三子任务 7 新增。对应后端 `TurnServersResponse`：
+ * - `servers`：经服务端负载过滤后的可下发 TURN 条目（可能为空数组）
+ * - `enabled`：全局 TURN 开关（false 时始终不下发）
+ * - `currentTotalLoad`：当前集群已用负载（用于客户端展示/调试）
+ * - `loadThreshold`：集群负载阈值（≥ 时本次不下发新 TURN）
+ *
+ * 房主拉取后通过 DataChannel 控制消息 0x05 广播给房间内所有参与者。
+ */
+export interface TurnServersResponse {
+  /** 过滤后的 TURN 服务器列表（可能为空） */
+  servers: IceServerEntry[]
+  /** TURN 全局开关 */
+  enabled: boolean
+  /** 当前集群总负载 */
+  currentTotalLoad: number
+  /** 集群负载阈值 */
+  loadThreshold: number
+}
+
 /** 创建房间请求参数 */
 export interface CreateRoomParams {
   sdpOffer: string
   iceCandidates: string[]
   maxPlayers: number
   password: string
+  /** 兼容字段：旧客户端仅传 STUN URL 字符串数组 */
   stunServers: string[]
+  /**
+   * ICE 服务器列表（新客户端优先，可含 TURN 凭据）
+   *
+   * 阶段三子任务 7 新增。非空时后端优先落库；为空时后端将 `stunServers` 转换为
+   * `IceServerEntry` 后落库，保证旧客户端兼容。
+   */
+  iceServers?: IceServerEntry[]
   hostMcVersion: string
   hostMcPort: number
 }
@@ -101,7 +152,14 @@ export interface RoomInfoResponse {
   maxPlayers: number
   playerCount: number
   hasPassword: boolean
+  /** 兼容字段：旧房间仅含 STUN URL 数组 */
   stunServers: string[]
+  /**
+   * ICE 服务器列表（含 STUN + TURN 凭据）
+   *
+   * 阶段三子任务 7 新增。新房间非空；旧房间可能为空数组，需回退到 `stunServers`。
+   */
+  iceServers: IceServerEntry[]
   status: 'waiting' | 'active' | 'closed'
   createdAt: number
   expiresAt: number
@@ -114,7 +172,14 @@ export interface JoinRoomResponse {
   participantId: string
   hostSdpOffer: string
   hostIceCandidates: string[]
+  /** 兼容字段：旧房间仅含 STUN URL 数组 */
   stunServers: string[]
+  /**
+   * ICE 服务器列表（含 STUN + TURN 凭据）
+   *
+   * 阶段三子任务 7 新增。新房间非空；旧房间可能为空数组，需回退到 `stunServers`。
+   */
+  iceServers: IceServerEntry[]
   playerVirtualIp: string
   subnet: string
 }

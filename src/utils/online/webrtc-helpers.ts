@@ -1,16 +1,19 @@
 /**
- * WebRTC 共享工具（阶段三子任务 5 抽取）
+ * WebRTC 共享工具（阶段三子任务 5 抽取，子任务 7 扩展 ICE/TURN）
  *
  * 房主侧 `useWebRTCMesh.ts` 与加入方侧 `useWebRTC.ts` 共用的底层函数：
- * - `createPeerConnection`：构造 RTCPeerConnection（仅 STUN 配置，不含 DataChannel）
+ * - `createPeerConnection`：构造 RTCPeerConnection（接受 `IceServerEntry[]`，含 STUN + TURN 凭据）
  * - `collectIceCandidates`：等待 ICE 收集完成（非 trickle 模式，一次性返回全部 candidate）
  * - `createDataChannel`：在指定 PC 上创建 DataChannel
  * - `setupDataChannelHandlers`：统一绑定 onopen/onmessage/onerror/onclose
+ * - `stunUrlsToIceServers` / `resolveIceServers` / `buildIceServers`：ICE 服务器列表构造与回退
  *
  * 设计约束：
  * - 不持有任何响应式状态，纯函数便于复用与单测
  * - 不引入业务概念（participantId 等），由上层 composable 维护映射
  */
+
+import type { IceServerEntry } from '@/types/online'
 
 /** WebRTC 连接状态（与 RTCPeerConnection.connectionState 对齐） */
 export type WebRtcConnectionState =
@@ -51,18 +54,92 @@ export const P2P_DATA_CHANNEL_OPTIONS: RTCDataChannelInit = {
 }
 
 /**
+ * 将 STUN URL 字符串数组转换为 IceServerEntry 数组
+ *
+ * 用于向后兼容：旧客户端仅传 `stunServers: string[]`，新代码统一使用 `IceServerEntry`。
+ * STUN 不需要用户名/凭据，仅 `urls` 字段填充。
+ *
+ * @param urls STUN 服务器 URL 数组（如 `['stun:stun.l.google.com:19302']`）
+ */
+export function stunUrlsToIceServers(urls: string[]): IceServerEntry[] {
+  if (!urls.length) return []
+  return [{ urls: [...urls] }]
+}
+
+/**
+ * 从房间响应中解析最终使用的 ICE 服务器列表
+ *
+ * 优先级：`iceServers`（非空）→ `stunServers`（回退）→ 空数组
+ *
+ * 用于解析后端 `RoomInfoResponse` / `JoinRoomResponse`，新房间 `iceServers` 非空，
+ * 旧房间可能仅有 `stunServers`。
+ *
+ * @param iceServers 新格式 ICE 服务器列表（含 TURN 凭据）
+ * @param stunServers 旧格式 STUN URL 字符串数组
+ */
+export function resolveIceServers(
+  iceServers: IceServerEntry[] | undefined,
+  stunServers: string[] | undefined,
+): IceServerEntry[] {
+  if (iceServers && iceServers.length > 0) return iceServers
+  if (stunServers && stunServers.length > 0) return stunUrlsToIceServers(stunServers)
+  return []
+}
+
+/** `buildIceServers` 输入参数 */
+export interface BuildIceServersOptions {
+  /** STUN 服务器 URL 数组（来自 `room_get_stun`） */
+  stunServers?: string[]
+  /** 用户自定义 TURN 服务器（来自 SettingsOnline 配置，备用） */
+  customTurnServers?: IceServerEntry[]
+  /** 系统提供的 TURN 服务器（来自 `room_get_turn`，房主独占） */
+  systemTurnServers?: IceServerEntry[]
+}
+
+/**
+ * 合并 STUN + 用户自定义 TURN + 系统 TURN 为统一 ICE 服务器列表
+ *
+ * 阶段三子任务 7 抽取。调用场景：
+ * - 房主创建房间时：`buildIceServers({ stunServers, customTurnServers })` → 上报后端
+ * - 房主运行期间广播：`buildIceServers({ stunServers, customTurnServers, systemTurnServers })` → DataChannel 下发
+ *
+ * 顺序约定：STUN 在前（优先 P2P 直连），用户自定义 TURN 居中（备用），系统 TURN 在后（兜底）。
+ * 调用方负责去重（一般 STUN/TURN 来源不同，无需去重）。
+ */
+export function buildIceServers(options: BuildIceServersOptions): IceServerEntry[] {
+  const { stunServers, customTurnServers, systemTurnServers } = options
+  const result: IceServerEntry[] = []
+  if (stunServers && stunServers.length > 0) {
+    result.push(...stunUrlsToIceServers(stunServers))
+  }
+  if (customTurnServers && customTurnServers.length > 0) {
+    result.push(...customTurnServers)
+  }
+  if (systemTurnServers && systemTurnServers.length > 0) {
+    result.push(...systemTurnServers)
+  }
+  return result
+}
+
+/**
  * 创建 RTCPeerConnection
  *
- * @param stunServers STUN 服务器 URL 数组（如 `stun:stun.l.google.com:19302`）
+ * @param iceServers ICE 服务器条目数组（可含 STUN + TURN 凭据）
  * @throws 当前环境不支持 RTCPeerConnection 时抛错
  */
-export function createPeerConnection(stunServers: string[]): RTCPeerConnection {
+export function createPeerConnection(iceServers: IceServerEntry[]): RTCPeerConnection {
   if (typeof RTCPeerConnection === 'undefined') {
     throw new Error('当前环境不支持 RTCPeerConnection')
   }
   const config: RTCConfiguration = {
-    iceServers: stunServers.map((url) => ({ urls: url })),
-    // 仅 STUN，不配置 TURN（阶段二不实现中转）
+    iceServers: iceServers.map((entry) => {
+      const server: RTCIceServer = { urls: entry.urls }
+      if (entry.username) server.username = entry.username
+      if (entry.credential) server.credential = entry.credential
+      return server
+    }),
+    // iceTransportPolicy='all' 同时收集 host/srflx/relay candidate
+    // 若未来需要强制走 TURN 中转可改为 'relay'，当前默认允许 P2P 直连优先
     iceTransportPolicy: 'all',
   }
   return new RTCPeerConnection(config)

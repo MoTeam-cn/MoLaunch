@@ -1,4 +1,4 @@
-//! DataChannel 消息协议（阶段三子任务 2）
+//! DataChannel 消息协议（阶段三子任务 2，子任务 7 扩展 TurnServers）
 //!
 //! 定义 P2P DataChannel 上传输的二进制消息帧格式，用于虚拟网卡 IP 包转发
 //! 与控制消息（心跳、状态查询）。
@@ -31,6 +31,7 @@
 //! - `0x02` = StatusQuery（状态查询，payload 仅 1 字节 subtype）
 //! - `0x03` = StatusResponse（状态响应，payload = subtype + 状态 JSON）
 //! - `0x04` = HostMcPort（房主 MC 局域网端口，payload = subtype + 2 字节大端序 u16 端口）
+//! - `0x05` = TurnServers（房主广播 TURN 服务器列表，payload = subtype + JSON UTF-8 字节）
 //!
 //! # 设计决策
 //!
@@ -38,6 +39,9 @@
 //! - **大端序**：网络字节序，跨平台一致
 //! - **u16 length**：DataChannel 单条消息最大 16KB（浏览器限制），u16 足够
 //! - **seq 字段**：DataChannel 配置 `maxRetransmits: 0`（UDP 语义），seq 用于检测丢包
+//! - **TurnServers 用 JSON 而非二进制**：TURN 列表含 `urls: Vec<String>` + 可选
+//!   `username`/`credential`，结构复杂且广播频率低（仅房主拉取系统 TURN 后下发一次），
+//!   JSON 编码简洁可读，单条 TURN 列表 < 1KB，远低于 16KB 上限
 
 use std::io::{self, Cursor, Read};
 
@@ -77,6 +81,13 @@ pub enum ControlSubtype {
     StatusResponse = 0x03,
     /// 房主 MC 局域网端口（房主开放 LAN 后广播给所有参与者）
     HostMcPort = 0x04,
+    /// 房主广播 TURN 服务器列表（房主拉取系统 TURN 后下发，参与者接收后重建 PC）
+    ///
+    /// payload 为 JSON UTF-8 字节，结构为 `IceServerEntry[]`：
+    /// ```json
+    /// [{"urls":["turn:turn.example.com:3478"],"username":"foo","credential":"bar"}]
+    /// ```
+    TurnServers = 0x05,
 }
 
 impl ControlSubtype {
@@ -86,6 +97,7 @@ impl ControlSubtype {
             0x02 => Some(Self::StatusQuery),
             0x03 => Some(Self::StatusResponse),
             0x04 => Some(Self::HostMcPort),
+            0x05 => Some(Self::TurnServers),
             _ => None,
         }
     }
@@ -243,6 +255,27 @@ pub fn parse_host_mc_port_payload(payload: &[u8]) -> Option<u16> {
     Some(u16::from_be_bytes([payload[0], payload[1]]))
 }
 
+/// 便捷构造：TurnServers 控制消息
+///
+/// 房主拉取系统 TURN 服务器后，通过 DataChannel 广播此消息给所有参与者。
+/// payload 为 JSON UTF-8 字节，调用方负责 `serde_json::to_vec(&ice_servers)` 序列化。
+///
+/// JSON 结构示例：
+/// ```json
+/// [{"urls":["turn:turn.example.com:3478"],"username":"foo","credential":"bar"}]
+/// ```
+///
+/// # Panics
+/// 不会 panic。即使 `json_payload` 为空数组也会构造合法消息（参与者收到后
+/// 应跳过空列表，不重建 PC）。
+pub fn turn_servers_message(seq: u32, json_payload: &[u8]) -> Message {
+    Message::Control {
+        seq,
+        subtype: ControlSubtype::TurnServers,
+        payload: json_payload.to_vec(),
+    }
+}
+
 /// 便捷构造：错误消息
 pub fn error_message(seq: u32, message: &str) -> Message {
     Message::Error { seq, message: message.to_string() }
@@ -317,6 +350,38 @@ mod tests {
         assert_eq!(parse_host_mc_port_payload(&[]), None);
         assert_eq!(parse_host_mc_port_payload(&[0x01]), None);
         assert_eq!(parse_host_mc_port_payload(&[0x01, 0x02, 0x03]), None);
+    }
+
+    #[test]
+    fn test_turn_servers_roundtrip() {
+        // 模拟 IceServerEntry[] 的 JSON 序列化字节
+        let json = br#"[{"urls":["turn:turn.example.com:3478"],"username":"foo","credential":"bar"}]"#;
+        let original = turn_servers_message(7, json);
+        let encoded = encode(&original);
+        // type(1) + seq(4) + length(2) + subtype(1) + json(N) = 8 + N
+        assert_eq!(encoded.len(), 8 + json.len());
+
+        let decoded = decode(&encoded).unwrap();
+        assert_eq!(decoded, original);
+
+        // 验证 payload 字节与原 JSON 一致
+        match decoded {
+            Message::Control { subtype, payload, .. } => {
+                assert_eq!(subtype, ControlSubtype::TurnServers);
+                assert_eq!(payload.as_slice(), json);
+            }
+            _ => panic!("期望 Control 消息"),
+        }
+    }
+
+    #[test]
+    fn test_turn_servers_empty_list() {
+        // 空列表也应能编码/解码（参与者收到后跳过，不重建 PC）
+        let empty_json = b"[]";
+        let original = turn_servers_message(1, empty_json);
+        let encoded = encode(&original);
+        let decoded = decode(&encoded).unwrap();
+        assert_eq!(decoded, original);
     }
 
     #[test]

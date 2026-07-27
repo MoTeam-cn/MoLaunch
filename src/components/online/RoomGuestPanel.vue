@@ -25,7 +25,7 @@ import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { showConfirm } from '@/utils/modal'
 import { toastError, toastSuccess } from '@/utils/toast'
-import { decode, CONTROL_SUBTYPE, parseHostMcPortPayload } from '@/utils/online/protocol'
+import { decode, CONTROL_SUBTYPE, parseHostMcPortPayload, decodeTurnServersPayload } from '@/utils/online/protocol'
 import {
   XCircleIcon,
   ClockIcon,
@@ -59,11 +59,25 @@ const lan = useVirtualLan({
 /**
  * 监听 DataChannel 就绪，绑定 onMessage：
  * - Control + HostMcPort：更新本地 store.roomState.hostMcPort（房主开放 LAN 后广播）
+ * - Control + TurnServers：更新本地 ICE 配置并尝试 setConfiguration（阶段三子任务 7 阶段 G）
  * - Data（IP 包）：转发到后端 TUN 接口
  * - 其他消息：静默丢弃（不支持的控制子类型或损坏帧）
  *
  * `useWebRTC` 在 `pc.ondatachannel` 触发时填充 `dataChannel.value`，
  * 此处 watch 在 dataChannel 变化时重新绑定 handler。
+ *
+ * # TURN 服务器更新策略
+ *
+ * 房主拉取系统 TURN 后通过 DataChannel 广播给所有参与者。加入方收到后：
+ * 1. 更新 `store.roomState.iceServers`（影响后续 PC 重建时的 ICE 配置）
+ * 2. 调用 `pc.setConfiguration` 更新当前 PC 配置（已建立连接需 ICE restart 完全生效，
+ *    此处仅更新配置，不主动触发 restart，避免中断现有连接）
+ * 3. 若 PC 尚未建立（negotiating 中），下次 `ensurePeerConnection` 会使用新配置
+ *
+ * 不主动重建 PC 的原因：
+ * - mesh 拓扑下房主为每个参与者生成 Offer，加入方无法单方面触发重新协商
+ * - 强制 close + 重新 fetchOfferAndAnswer 需要房主配合重新生成 Offer，链路过长
+ * - 当前 TURN 通常在房间初期下发，PC 已建立时 STUN/TURN 已完成 ICE 收集
  */
 watch(
   () => guestWebrtc.dataChannel.value,
@@ -79,6 +93,35 @@ watch(
             store.roomState.hostMcPort = port
             console.info(`[Online] 加入方收到房主 MC 端口: ${port}`)
           }
+          return
+        }
+        if (msg.kind === 'control' && msg.subtype === CONTROL_SUBTYPE.TURN_SERVERS) {
+          const turnServers = decodeTurnServersPayload(msg.payload)
+          if (!turnServers || turnServers.length === 0) {
+            console.info('[Online] 加入方收到房主广播的空 ICE 列表，忽略')
+            return
+          }
+          // 更新本地 ICE 服务器配置（影响后续 PC 重建）
+          store.roomState.iceServers = turnServers
+          // 尝试更新当前 PC 配置（已建立连接需 ICE restart 完全生效）
+          const currentPc = guestWebrtc.pc.value
+          if (currentPc) {
+            try {
+              currentPc.setConfiguration({
+                iceServers: turnServers.map((entry) => {
+                  const server: RTCIceServer = { urls: entry.urls }
+                  if (entry.username) server.username = entry.username
+                  if (entry.credential) server.credential = entry.credential
+                  return server
+                }),
+                iceTransportPolicy: 'all',
+              })
+              console.info('[Online] 加入方已更新 PeerConnection ICE 配置（需 ICE restart 完全生效）')
+            } catch (e) {
+              console.warn('[Online] 加入方更新 PC 配置失败:', e)
+            }
+          }
+          console.info(`[Online] 加入方收到房主广播的 ICE 服务器列表：${turnServers.length} 条`)
           return
         }
         if (msg.kind === 'data') {

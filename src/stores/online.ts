@@ -21,12 +21,14 @@ import { ref } from 'vue'
 import type {
   CreateRoomResponse,
   DeviceStatus,
+  IceServerEntry,
   JoinRoomResponse,
   ListParticipantsResponse,
   NatDetectionResult,
   ParticipantInfo,
   RoomInfoResponse,
   StunServersResponse,
+  TurnServersResponse,
 } from '@/types/online'
 import {
   getAuthStatus,
@@ -42,10 +44,15 @@ import {
   leaveRoom,
   keepaliveRoom,
   listParticipants,
+  getTurnServers,
 } from '@/utils/api/online-manager'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
+import {
+  buildIceServers,
+  resolveIceServers,
+} from '@/utils/online/webrtc-helpers'
 
 /** 房间角色 */
 export type RoomRole = 'host' | 'guest' | null
@@ -76,8 +83,19 @@ export interface RoomState {
   maxPlayers: number
   /** 房间过期时间（Unix 秒） */
   expiresAt: number
-  /** STUN 服务器列表（房间内一致） */
+  /**
+   * STUN 服务器列表（兼容字段，旧房间使用）
+   *
+   * 阶段三子任务 7 后优先使用 `iceServers`；此字段仅当 `iceServers` 为空时回退使用。
+   */
   stunServers: string[]
+  /**
+   * ICE 服务器列表（统一 STUN + TURN，含凭据）
+   *
+   * 阶段三子任务 7 新增。WebRTC PeerConnection 配置优先使用此字段。
+   * 房主创建房间时由 STUN + 用户自定义 TURN 组合；加入方从后端响应获取。
+   */
+  iceServers: IceServerEntry[]
   /** 房主 MC 版本（加入方需匹配） */
   hostMcVersion: string
   /** 房主 MC 端口 */
@@ -99,6 +117,7 @@ function emptyRoom(): RoomState {
     maxPlayers: 0,
     expiresAt: 0,
     stunServers: [],
+    iceServers: [],
     hostMcVersion: '',
     hostMcPort: 0,
     participants: [],
@@ -126,6 +145,22 @@ export const useOnlineStore = defineStore('online', () => {
   const roomCreateStep = ref<RoomCreateStep>(null)
   /** STUN 服务器列表缓存（房间创建/加入前预取） */
   const stunServers = ref<string[]>([])
+  /**
+   * 用户自定义 TURN 服务器列表
+   *
+   * 阶段三子任务 7 新增。由 SettingsOnline UI 配置，通过 `apply_config` 持久化
+   * （阶段 I 接入）。房主创建房间时与 STUN 合并为 `iceServers` 上报后端；
+   * 房主拉取系统 TURN 后再与此列表合并，通过 DataChannel 广播给参与者。
+   * 加入方不能直接配置，仅接收房主广播。
+   */
+  const customTurnServers = ref<IceServerEntry[]>([])
+  /**
+   * 系统提供的 TURN 服务器快照（房主独占）
+   *
+   * 阶段三子任务 7 新增。房主调用 `fetchTurnServers` 后填充；包含负载过滤后的
+   * 可用 TURN 列表 + 集群负载快照（用于 UI 调试展示）。
+   */
+  const systemTurnServers = ref<TurnServersResponse | null>(null)
 
   // ===== NAT 检测 =====
   /** NAT 检测结果（null 表示未检测） */
@@ -291,12 +326,18 @@ export const useOnlineStore = defineStore('online', () => {
     roomLoading.value = true
     try {
       const stun = preloadedStun ?? (await fetchStunServers())
+      // 阶段三子任务 7：合并 STUN + 用户自定义 TURN 为统一 iceServers
+      const iceServers: IceServerEntry[] = buildIceServers({
+        stunServers: stun,
+        customTurnServers: customTurnServers.value,
+      })
       const result = await createRoom({
         sdpOffer,
         iceCandidates,
         maxPlayers,
         password,
         stunServers: stun,
+        iceServers,
         hostMcVersion,
         hostMcPort,
       })
@@ -313,6 +354,7 @@ export const useOnlineStore = defineStore('online', () => {
         maxPlayers,
         expiresAt: data.expiresAt,
         stunServers: stun,
+        iceServers,
         hostMcVersion,
         hostMcPort,
         participants: [],
@@ -354,6 +396,8 @@ export const useOnlineStore = defineStore('online', () => {
         throw new Error(result.msg || '加入房间失败')
       }
       const data = result.data
+      // 阶段三子任务 7：优先使用 iceServers，旧房间回退到 stunServers
+      const iceServers = resolveIceServers(data.iceServers, data.stunServers)
       roomState.value = {
         role: 'guest',
         roomCode,
@@ -363,6 +407,7 @@ export const useOnlineStore = defineStore('online', () => {
         maxPlayers: 0,
         expiresAt: 0,
         stunServers: data.stunServers ?? [],
+        iceServers,
         hostMcVersion: '',
         hostMcPort: 0,
         participants: [],
@@ -401,8 +446,12 @@ export const useOnlineStore = defineStore('online', () => {
     roomState.value.hostMcVersion = info.hostMcVersion
     roomState.value.hostMcPort = info.hostMcPort
     if (roomState.value.role === 'guest') {
-      // 加入方需要 STUN 与房主一致
+      // 加入方需要 ICE 服务器与房主一致（优先 iceServers，回退 stunServers）
       roomState.value.stunServers = info.stunServers ?? roomState.value.stunServers
+      const resolved = resolveIceServers(info.iceServers, info.stunServers)
+      if (resolved.length > 0) {
+        roomState.value.iceServers = resolved
+      }
     }
     return info
   }
@@ -426,6 +475,35 @@ export const useOnlineStore = defineStore('online', () => {
     return result.data
   }
 
+  /**
+   * 房主拉取系统提供的 TURN 服务器列表（房主独占接口）
+   *
+   * 阶段三子任务 7 新增。服务端基于全局开关、单机负载、集群总负载三层过滤后
+   * 下发可用 TURN 服务器。结果缓存到 `systemTurnServers`，供房主在 UI 展示
+   * 负载状况，并用于与 `customTurnServers` 合并后通过 DataChannel 广播给参与者。
+   *
+   * @returns TURN 服务器响应（含负载快照）；失败时返回 null
+   */
+  async function fetchTurnServers(): Promise<TurnServersResponse | null> {
+    if (roomState.value.role !== 'host' || !roomState.value.roomCode) return null
+    const result = await getTurnServers(roomState.value.roomCode)
+    if (result.code !== 1 || !result.data) return null
+    systemTurnServers.value = result.data
+    return result.data
+  }
+
+  /**
+   * 设置用户自定义 TURN 服务器列表
+   *
+   * 阶段三子任务 7 新增。由 SettingsOnline UI 调用，配置持久化由调用方负责
+   * （阶段 I 接入 `apply_config`）。房主创建房间时会自动与 STUN 合并为 `iceServers`。
+   *
+   * @param servers TURN 服务器条目数组
+   */
+  function setCustomTurnServers(servers: IceServerEntry[]): void {
+    customTurnServers.value = servers
+  }
+
   /** 重置房间状态（不调用后端，仅清空本地） */
   function resetRoomState(): void {
     roomState.value = emptyRoom()
@@ -442,6 +520,9 @@ export const useOnlineStore = defineStore('online', () => {
     roomLoading,
     roomCreateStep,
     stunServers,
+    // TURN 相关状态（阶段三子任务 7）
+    customTurnServers,
+    systemTurnServers,
     // NAT 检测
     natResult,
     // 设备认证方法
@@ -461,6 +542,8 @@ export const useOnlineStore = defineStore('online', () => {
     refreshRoomInfo,
     refreshParticipants,
     keepalive,
+    fetchTurnServers,
+    setCustomTurnServers,
     resetRoomState,
   }
 })

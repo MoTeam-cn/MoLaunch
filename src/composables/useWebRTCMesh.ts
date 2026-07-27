@@ -1,9 +1,9 @@
 /**
- * WebRTC mesh composable（房主专用，阶段三子任务 5）
+ * WebRTC mesh composable（房主专用，阶段三子任务 5，子任务 7 ICE/TURN 重构）
  *
  * 房主为每个新加入的参与者维护独立 PeerConnection + DataChannel，
  * 实现 1-N 的虚拟局域网数据分发：
- * - `createOfferFor(participantId, stunServers)`：为新参与者创建 PC + DataChannel + Offer
+ * - `createOfferFor(participantId, iceServers)`：为新参与者创建 PC + DataChannel + Offer
  * - `setRemoteAnswer(participantId, sdp, ice)`：收到该参与者 Answer 后设置远端
  * - `broadcastPacket(raw)`：向所有已连接 DataChannel 广播二进制包（TUN 下行）
  * - `sendToParticipant(participantId, raw)`：向单个参与者发送
@@ -16,9 +16,13 @@
  * - 连接状态以 `Map<participantId, WebRtcConnectionState>` 形式响应式暴露
  * - onUnmounted 自动 close 所有 PC，避免泄漏
  *
+ * 阶段三子任务 7：`createOfferFor` 接受 `IceServerEntry[]`（含 STUN + TURN 凭据），
+ * 取代旧的 `stunServers: string[]`。房主侧 ICE 服务器列表由 `useRoomHost` 从
+ * `store.roomState.iceServers` 透传，包含 STUN + 用户自定义 TURN + 系统 TURN。
+ *
  * @example 房主为参与者生成 Offer
  * const mesh = useWebRTCMesh()
- * const { sdp, iceCandidates } = await mesh.createOfferFor(participantId, stunServers)
+ * const { sdp, iceCandidates } = await mesh.createOfferFor(participantId, iceServers)
  * await uploadParticipantOffer(roomCode, participantId, sdp, iceCandidates)
  * // 参与者提交 Answer 后：
  * await mesh.setRemoteAnswer(participantId, answerSdp, answerIce)
@@ -32,6 +36,7 @@ import {
   setupDataChannelHandlers,
   type WebRtcConnectionState,
 } from '@/utils/online/webrtc-helpers'
+import type { IceServerEntry } from '@/types/online'
 
 /** 创建 Offer / Answer 的结果 */
 export interface SdpResult {
@@ -85,12 +90,12 @@ export function useWebRTCMesh() {
    * 4. createOffer → setLocalDescription → 收集 ICE → 返回
    *
    * @param participantId 参与者 ID
-   * @param stunServers STUN 服务器 URL 数组
+   * @param iceServers ICE 服务器条目数组（含 STUN + TURN 凭据）
    * @returns SDP Offer + ICE candidates，由调用方上传到后端
    */
   async function createOfferFor(
     participantId: string,
-    stunServers: string[],
+    iceServers: IceServerEntry[],
   ): Promise<SdpResult> {
     // 已存在旧连接 → 先清理（不应发生，防御性处理）
     if (conns.value.has(participantId)) {
@@ -99,7 +104,7 @@ export function useWebRTCMesh() {
 
     negotiating.set(participantId, true)
     try {
-      const pc = createPeerConnection(stunServers)
+      const pc = createPeerConnection(iceServers)
       const channel = createDataChannel(pc)
 
       // 连接状态同步

@@ -6,11 +6,12 @@
  * - api-server 地址输入（防抖自动保存 800ms，走统一 applyConfig）
  * - 重置为默认按钮（一键还原官方地址）
  * - 测试连通性按钮（调用 auth_get_server_time，显示服务器时间/时区/偏移/时间差）
+ * - ICE 服务器配置：用户自定义 TURN 服务器列表（阶段三子任务 7 阶段 H）
  * - 设备登出 / 清除凭证按钮（调用 online store，复用其 toast 提示）
  *
  * 复用：
  * - useConfigPage：与 SettingsAdvanced 一致的加载 + 防抖保存 + loaded 守卫
- * - useOnlineStore：deviceStatus + logout/clear（与 Online.vue 共享状态）
+ * - useOnlineStore：deviceStatus + logout/clear + setCustomTurnServers（与 Online.vue 共享状态）
  * - showConfirm：全局 Modal 服务（替代 window.confirm）
  * - formatTimestamp：utils/format 中新增的时间戳格式化函数
  */
@@ -24,6 +25,7 @@ import { formatTimestamp } from '@/utils/format'
 import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import TurnServerEntryEditor from '@/components/online/TurnServerEntryEditor.vue'
 import {
   GlobeAltIcon,
   ArrowPathIcon,
@@ -31,7 +33,10 @@ import {
   TrashIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  PlusIcon,
+  ServerStackIcon,
 } from '@heroicons/vue/24/outline'
+import type { IceServerEntry } from '@/types/online'
 
 /** 官方默认 api-server 地址（与后端 OnlineConfig::default 一致） */
 const DEFAULT_API_SERVER_URL = 'https://api.molaunch.moiu.cn'
@@ -46,6 +51,8 @@ const { loaded, markDirty, flushSave } = useConfigPage({
   errorLabel: 'save online settings',
   onLoad: (cfg) => {
     apiUrl.value = cfg.onlineApiServerUrl
+    // 阶段三子任务 7：加载用户自定义 TURN 列表（默认空数组）
+    customTurnServers.value = cfg.onlineCustomTurnServers ?? []
   },
 })
 
@@ -54,6 +61,31 @@ watch(apiUrl, (v) => markDirty('onlineApiServerUrl', v))
 function handleResetToDefault() {
   apiUrl.value = DEFAULT_API_SERVER_URL
   toastSuccess('已重置为默认地址（自动保存）')
+}
+
+// ============ ICE 服务器配置（阶段三子任务 7 阶段 H） ============
+const customTurnServers = ref<IceServerEntry[]>([])
+
+// watch deep：任一条目字段变更触发防抖保存 + store 同步（store 为房主创建房间的运行时数据源）
+watch(
+  customTurnServers,
+  (v) => {
+    markDirty('onlineCustomTurnServers', v)
+    onlineStore.setCustomTurnServers(v)
+  },
+  { deep: true },
+)
+
+function handleAddTurnServer() {
+  customTurnServers.value.push({ urls: [], username: undefined, credential: undefined })
+}
+
+function handleRemoveTurnServer(index: number) {
+  customTurnServers.value.splice(index, 1)
+}
+
+function handleUpdateTurnServer(index: number, entry: IceServerEntry) {
+  customTurnServers.value[index] = entry
 }
 
 // ============ 测试连通性 ============
@@ -199,6 +231,45 @@ onMounted(() => {
               </div>
               <p class="text-xs text-gray-600 break-all">{{ testResult.message }}</p>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ICE 服务器配置（阶段三子任务 7 阶段 H） -->
+      <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+        <div class="px-5 pt-5 pb-3 flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-gray-900">ICE 服务器配置</h3>
+            <p class="text-xs text-gray-500 mt-0.5">
+              自定义 TURN 服务器（P2P 直连失败时的中转备用方案），自动保存（800ms 防抖）
+            </p>
+          </div>
+        </div>
+        <div class="divide-y divide-gray-200">
+          <!-- 空状态：icon + text 垂直水平居中 -->
+          <div
+            v-if="customTurnServers.length === 0"
+            class="flex flex-col items-center justify-center py-8"
+          >
+            <ServerStackIcon class="w-8 h-8 text-gray-300 mb-2" />
+            <p class="text-xs text-gray-500">未配置自定义 TURN 服务器</p>
+            <p class="text-xs text-gray-400 mt-1">系统将仅使用 STUN + 官方 TURN（如可用）</p>
+          </div>
+          <!-- TURN 服务器条目列表 -->
+          <TurnServerEntryEditor
+            v-for="(entry, idx) in customTurnServers"
+            :key="idx"
+            :model-value="entry"
+            :index="idx"
+            @update:model-value="(v) => handleUpdateTurnServer(idx, v)"
+            @remove="handleRemoveTurnServer(idx)"
+          />
+          <!-- 添加按钮 -->
+          <div class="px-5 py-3">
+            <Button type="ghost" size="small" long @click="handleAddTurnServer">
+              <template #icon><PlusIcon class="w-4 h-4" /></template>
+              添加 TURN 服务器
+            </Button>
           </div>
         </div>
       </div>

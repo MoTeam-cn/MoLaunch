@@ -17,6 +17,7 @@ use crate::log_error;
 use crate::log_info;
 use crate::minecraft::online::client::OnlineClient;
 use crate::minecraft::online::signaling::CreateRoomRequest;
+use crate::minecraft::online::signaling::IceServerEntry;
 use crate::minecraft::online::signaling::UploadParticipantOfferRequest;
 use crate::minecraft::online::storage::OnlineStorage;
 use crate::state::AppState;
@@ -38,6 +39,11 @@ pub struct CreateRoomParams {
     pub password: String,
     #[serde(default)]
     pub stun_servers: Vec<String>,
+    /// ICE 服务器列表（新客户端优先，可包含 STUN + TURN 凭据）
+    ///
+    /// 阶段三子任务 7 新增。为空时服务端使用 `stun_servers` 转换为 IceServerEntry 后落库。
+    #[serde(default)]
+    pub ice_servers: Vec<IceServerEntry>,
     #[serde(default)]
     pub host_mc_version: String,
     #[serde(default)]
@@ -160,6 +166,8 @@ pub fn register_signaling_actions(d: &mut Dispatcher) {
     register_list_answers(d);
     register_confirm(d);
     register_keepalive(d);
+    // 阶段三子任务 7：房主独占 TURN 拉取接口
+    register_get_turn_servers(d);
     register_leave_room(d);
     register_kick(d);
     register_unban(d);
@@ -193,8 +201,8 @@ fn register_create_room(d: &mut Dispatcher) {
         let creds = load_creds(&state).await?;
         let client = make_client(&state).await;
         log_info!(
-            "[Online] room_create: max_players={}, mc_version={}, mc_port={}",
-            p.max_players, p.host_mc_version, p.host_mc_port
+            "[Online] room_create: max_players={}, mc_version={}, mc_port={}, ice_servers={}",
+            p.max_players, p.host_mc_version, p.host_mc_port, p.ice_servers.len()
         );
         let req = CreateRoomRequest {
             sdp_offer: p.sdp_offer,
@@ -202,6 +210,7 @@ fn register_create_room(d: &mut Dispatcher) {
             max_players: p.max_players,
             password: p.password,
             stun_servers: p.stun_servers,
+            ice_servers: p.ice_servers,
             host_mc_version: p.host_mc_version,
             host_mc_port: p.host_mc_port,
         };
@@ -338,6 +347,32 @@ fn register_keepalive(d: &mut Dispatcher) {
                 log_error!("[Online] room_keepalive 失败: {}", e);
                 e.to_string()
             })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+/// 房主独占接口：拉取服务端 TURN 服务器列表（阶段三子任务 7）
+///
+/// 服务端经负载与启用状态过滤后返回 TURN 服务器数组，
+/// 房主拉取后通过 P2P DataChannel 广播 `TurnServers` 控制消息给所有参与者。
+fn register_get_turn_servers(d: &mut Dispatcher) {
+    d.register("room_get_turn", handler!(state, _app, params, {
+        let p: RoomCodeParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_debug!("[Online] room_get_turn: code={}", p.room_code);
+        let result = client.signaling_get_turn_servers(&creds, &p.room_code).await
+            .map_err(|e| {
+                log_error!("[Online] room_get_turn 失败: {}", e);
+                e.to_string()
+            })?;
+        if let Some(ref data) = result.data {
+            log_info!(
+                "[Online] 房主拉取 TURN 服务器: enabled={}, servers={}, total_load={}, threshold={}",
+                data.enabled, data.servers.len(), data.current_total_load, data.load_threshold
+            );
+        }
         serde_json::to_value(result).map_err(|e| e.to_string())
     }));
 }

@@ -15,13 +15,18 @@
  *   - subtype=0x02 StatusQuery
  *   - subtype=0x03 StatusResponse
  *   - subtype=0x04 HostMcPort（payload 为 2 字节大端序 u16 端口）
+ *   - subtype=0x05 TurnServers（payload 为 JSON UTF-8 字节，结构 IceServerEntry[]）
  * - type=0x03 Error：UTF-8 错误描述
  *
  * 用途：
  * - 前端 DataChannel.onMessage 收到 ArrayBuffer 后，用 `decode` 解析消息类型
  * - 房主侧检测到 MC 局域网端口后，用 `encodeHostMcPort` 编码并广播给所有参与者
  * - 加入方侧解码后，若为 HostMcPort 控制消息，更新本地 store.roomState.hostMcPort
+ * - 房主拉取系统 TURN 服务器后，用 `encodeTurnServers` 编码并广播给所有参与者
+ * - 加入方侧解码后，若为 TurnServers 控制消息，重建 PeerConnection 以应用新 ICE 配置
  */
+
+import type { IceServerEntry } from '@/types/online'
 
 /** 消息类型枚举值（与后端 MessageType 一致） */
 export const MESSAGE_TYPE = {
@@ -36,6 +41,7 @@ export const CONTROL_SUBTYPE = {
   STATUS_QUERY: 0x02,
   STATUS_RESPONSE: 0x03,
   HOST_MC_PORT: 0x04,
+  TURN_SERVERS: 0x05,
 } as const
 
 /** 帧头部长度（type + seq + length = 1 + 4 + 2 = 7 字节） */
@@ -121,4 +127,70 @@ export function encodeHostMcPort(seq: number, port: number): ArrayBuffer {
 export function parseHostMcPortPayload(payload: Uint8Array): number | null {
   if (payload.length !== 2) return null
   return (payload[0] << 8) | payload[1]
+}
+
+/**
+ * 编码 TurnServers 控制消息为二进制帧
+ *
+ * 房主拉取系统 TURN 服务器后，调用此函数生成 ArrayBuffer，
+ * 通过 hostMesh.broadcastPacket 下发给所有已联通的参与者。
+ *
+ * payload 为 `IceServerEntry[]` 的 JSON UTF-8 字节，结构示例：
+ * ```json
+ * [{"urls":["turn:turn.example.com:3478"],"username":"foo","credential":"bar"}]
+ * ```
+ *
+ * 帧结构（与后端 protocol.rs encode 一致）：
+ * - type(1) = 0x02 Control
+ * - seq(4) = 大端序 u32
+ * - length(2) = 1 + jsonBytes.length（subtype 1 字节 + JSON N 字节）
+ * - subtype(1) = 0x05 TurnServers
+ * - json(N) = UTF-8 编码的 JSON 字符串
+ *
+ * 单条 TURN 列表通常 < 1KB，远低于 DataChannel 16KB 上限。
+ * 即使 `iceServers` 为空数组也会构造合法消息（参与者收到后应跳过空列表，不重建 PC）。
+ */
+export function encodeTurnServers(seq: number, iceServers: IceServerEntry[]): ArrayBuffer {
+  const json = JSON.stringify(iceServers)
+  const jsonBytes = new TextEncoder().encode(json)
+  // type(1) + seq(4) + length(2) + subtype(1) + json(N) = 8 + N
+  const buf = new ArrayBuffer(8 + jsonBytes.length)
+  const view = new DataView(buf)
+  view.setUint8(0, MESSAGE_TYPE.CONTROL)
+  view.setUint32(1, seq, false) // big-endian
+  view.setUint16(5, 1 + jsonBytes.length, false) // length = subtype(1) + json(N)
+  view.setUint8(7, CONTROL_SUBTYPE.TURN_SERVERS)
+  new Uint8Array(buf, 8, jsonBytes.length).set(jsonBytes)
+  return buf
+}
+
+/**
+ * 从 Control + TurnServers 消息的 payload 解析 ICE 服务器列表
+ *
+ * 期望 payload 为 `IceServerEntry[]` 的 JSON UTF-8 字节。
+ * 解析失败时返回 null（调用方应静默丢弃，保持现有 PC 不变）。
+ *
+ * @returns 解析后的 ICE 服务器列表；空数组表示房主明确下发空列表
+ *          （如系统 TURN 全部不可用），调用方可据此决定是否重建 PC
+ */
+export function decodeTurnServersPayload(payload: Uint8Array): IceServerEntry[] | null {
+  try {
+    const json = new TextDecoder().decode(payload)
+    const parsed = JSON.parse(json)
+    if (!Array.isArray(parsed)) return null
+    // 校验每项结构：必须有 urls 数组
+    const result: IceServerEntry[] = []
+    for (const item of parsed) {
+      if (!item || typeof item !== 'object' || !Array.isArray(item.urls)) {
+        return null
+      }
+      const entry: IceServerEntry = { urls: item.urls as string[] }
+      if (typeof item.username === 'string') entry.username = item.username
+      if (typeof item.credential === 'string') entry.credential = item.credential
+      result.push(entry)
+    }
+    return result
+  } catch {
+    return null
+  }
 }

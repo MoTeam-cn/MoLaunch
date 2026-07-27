@@ -4,6 +4,7 @@
 //! - `ConfigSnapshot`：`get_config` 返回的全量配置快照
 //! - `ConfigEntry`：扁平化 key-value 对，前后端 IPC 格式对称
 
+use crate::minecraft::online::signaling::IceServerEntry;
 use serde::{Deserialize, Serialize};
 
 // ============================================================
@@ -73,6 +74,12 @@ pub struct LaunchAdvancedPatch {
 pub struct OnlinePatch {
     #[serde(rename = "onlineApiServerUrl")]
     pub api_server_url: Option<String>,
+    /// 用户自定义 TURN 服务器列表（阶段三子任务 7 新增）
+    ///
+    /// `Some` 表示要更新此字段（含空数组，表示清空所有自定义 TURN）；
+    /// `None` 表示不更新。
+    #[serde(rename = "onlineCustomTurnServers")]
+    pub custom_turn_servers: Option<Vec<IceServerEntry>>,
 }
 
 /// 配置补丁：所有字段可选，仅传需要更新的字段
@@ -189,12 +196,16 @@ pub struct LaunchAdvancedSnapshot {
 pub struct OnlineSnapshot {
     #[serde(rename = "onlineApiServerUrl")]
     pub api_server_url: String,
+    /// 用户自定义 TURN 服务器列表（阶段三子任务 7 新增）
+    #[serde(rename = "onlineCustomTurnServers", default)]
+    pub custom_turn_servers: Vec<IceServerEntry>,
 }
 
 impl Default for OnlineSnapshot {
     fn default() -> Self {
         Self {
             api_server_url: String::new(),
+            custom_turn_servers: Vec::new(),
         }
     }
 }
@@ -310,6 +321,7 @@ pub fn build_snapshot(
         },
         online: OnlineSnapshot {
             api_server_url: config.online.api_server_url.clone(),
+            custom_turn_servers: config.online.custom_turn_servers.clone(),
         },
 
         // 非 AppConfig 字段

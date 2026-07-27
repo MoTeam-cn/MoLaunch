@@ -30,10 +30,11 @@ import {
   kickParticipant,
   uploadParticipantOffer,
 } from '@/utils/api/online-manager'
-import type { PendingAnswer } from '@/types/online'
+import { buildIceServers, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
+import type { IceServerEntry, PendingAnswer } from '@/types/online'
 import { showConfirm } from '@/utils/modal'
 import { toastSuccess, toastError } from '@/utils/toast'
-import { encodeHostMcPort } from '@/utils/online/protocol'
+import { encodeHostMcPort, encodeTurnServers } from '@/utils/online/protocol'
 
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
@@ -85,8 +86,12 @@ export function useRoomHost(options: {
     if (offerGenerating.value.has(participantId)) return
     offerGenerating.value.add(participantId)
     try {
-      const stunServers = store.roomState.stunServers ?? []
-      const { sdp, iceCandidates } = await hostMesh.createOfferFor(participantId, stunServers)
+      // 阶段三子任务 7：优先使用 iceServers（含 STUN + 用户自定义 TURN + 系统 TURN）
+      // 旧房间 iceServers 为空时回退到 stunServers 并转为 IceServerEntry[]
+      const iceServers: IceServerEntry[] = store.roomState.iceServers.length > 0
+        ? store.roomState.iceServers
+        : stunUrlsToIceServers(store.roomState.stunServers)
+      const { sdp, iceCandidates } = await hostMesh.createOfferFor(participantId, iceServers)
 
       // 绑定 DataChannel.onMessage：参与者发来的包 → 转发到后端 TUN
       // setupDataChannelHandlers 仅更新传入字段，不影响 createOfferFor 默认绑定的 onOpen/onClose
@@ -241,6 +246,44 @@ export function useRoomHost(options: {
     })
   }
 
+  /**
+   * 拉取系统 TURN 服务器并广播给已联通参与者（阶段三子任务 7 阶段 F）
+   *
+   * 流程：
+   * 1. 调 `store.fetchTurnServers`（房主独占接口）拉取经服务端负载过滤的可用 TURN
+   * 2. 与 STUN + 用户自定义 TURN 合并为统一 iceServers
+   * 3. 更新本地 `store.roomState.iceServers`（影响后续 `generateOfferForParticipant`）
+   * 4. 通过 `encodeTurnServers` 编码 + `hostMesh.broadcastPacket` 下发
+   *
+   * 失败仅 warn，不阻塞主流程（系统 TURN 不可用时降级为 STUN + 用户自定义 TURN）。
+   * 房间刚创建时参与者尚未联通，broadcastPacket 返回 0 属正常；后续参与者 PC 建立后
+   * 由房主手动重新触发或下次轮询时通过其他机制获取（当前实现仅 onMounted 触发一次）。
+   */
+  async function fetchAndBroadcastTurnServers() {
+    if (store.roomState.role !== 'host' || !store.roomState.roomCode) return
+    try {
+      const turnResp = await store.fetchTurnServers()
+      const systemTurn: IceServerEntry[] = turnResp?.servers ?? []
+      const merged = buildIceServers({
+        stunServers: store.roomState.stunServers,
+        customTurnServers: store.customTurnServers,
+        systemTurnServers: systemTurn,
+      })
+      if (merged.length === 0) {
+        console.info('[Online] 房主无可用 ICE 服务器，跳过 TURN 广播')
+        return
+      }
+      // 更新本地 iceServers，影响后续 generateOfferForParticipant
+      store.roomState.iceServers = merged
+      const sent = hostMesh.broadcastPacket(encodeTurnServers(turnSeq++, merged))
+      console.info(
+        `[Online] 房主已广播 ICE 服务器列表：${systemTurn.length} 系统 TURN + ${store.customTurnServers.length} 自定义 TURN，已发送给 ${sent} 个参与者`,
+      )
+    } catch (e) {
+      console.warn('[Online] 拉取/广播 TURN 服务器失败:', e)
+    }
+  }
+
   // 定时器句柄
   let answerTimer: ReturnType<typeof setInterval> | null = null
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null
@@ -249,6 +292,8 @@ export function useRoomHost(options: {
   let mcPortUnlisten: UnlistenFn | null = null
   /** HostMcPort 控制消息的本地 seq 计数器（与 TUN 数据包 seq 独立，避免混淆） */
   let mcPortSeq = 0
+  /** TurnServers 控制消息的本地 seq 计数器（与 HostMcPort/TUN 数据包 seq 独立） */
+  let turnSeq = 0
 
   onMounted(() => {
     void pollParticipants()
@@ -266,6 +311,10 @@ export function useRoomHost(options: {
     void lan.start(store.roomState.selfVirtualIp, store.roomState.subnet).catch((e) => {
       toastError(`虚拟网卡启动失败：${e instanceof Error ? e.message : String(e)}`)
     })
+
+    // 房主进入面板后拉取系统 TURN 服务器并广播给已联通参与者（阶段三子任务 7 阶段 F）
+    // 失败仅 warn，不阻塞主流程；房间刚创建时参与者尚未联通，broadcastPacket 返回 0 属正常
+    void fetchAndBroadcastTurnServers()
 
     // 监听后端 GameWatcher 的 MC 局域网端口检测事件
     // 房主在 MC 中「Open to LAN」后，watcher 捕获 stdout 端口 → emit 此事件

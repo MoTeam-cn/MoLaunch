@@ -33,6 +33,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import { submitAnswer } from '@/utils/api/online-manager'
+import { resolveIceServers } from '@/utils/online/webrtc-helpers'
 import { toastError } from '@/utils/toast'
 
 defineProps<{
@@ -146,10 +147,12 @@ async function handleJoinRoom() {
   try {
     const joinResp = await store.guestJoinRoom(code, joinForm.value.password)
     // mesh 拓扑：房主为本参与者单独生成 Offer，需要轮询拉取
+    // 阶段三子任务 7：优先使用 joinResp.iceServers（含 TURN 凭据），旧房间回退到 stunServers
+    const iceServers = resolveIceServers(joinResp.iceServers, joinResp.stunServers)
     const { sdp, iceCandidates } = await guestWebrtc.fetchOfferAndAnswer(
       code,
       joinResp.participantId,
-      joinResp.stunServers ?? [],
+      iceServers,
     )
     const result = await submitAnswer(code, joinResp.participantId, sdp, iceCandidates)
     if (result.code !== 1) {

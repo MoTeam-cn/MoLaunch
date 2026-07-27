@@ -1,5 +1,6 @@
 //! 应用配置（AppConfig + McFolder + 路径解析）
 
+use crate::minecraft::online::signaling::IceServerEntry;
 use serde::{Deserialize, Serialize};
 
 /// 代理配置
@@ -61,7 +62,10 @@ pub struct LaunchAdvancedConfig {
 
 /// 联机功能配置
 ///
-/// 仅持久化「api_server_url」一项：联机服务端地址（默认生产地址）。
+/// 持久化「api_server_url」+「custom_turn_servers」两项：
+/// - `api_server_url`：联机服务端地址（默认生产地址）
+/// - `custom_turn_servers`：用户自定义 TURN 服务器列表（阶段三子任务 7 新增）
+///
 /// 设备密钥与 JWT 不在此处，由 `minecraft::online::storage` 独立持久化
 /// （走 SDK DES 加密 + 单独文件，与 auth_storage 一致的位置）。
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -71,12 +75,20 @@ pub struct OnlineConfig {
     /// 用户可在「设置 → 联机」页修改。前端通过 `applyConfig({ onlineApiServerUrl })` 更新，
     /// 后端 `online_manager` 读取此值构造 `OnlineClient`。
     pub api_server_url: String,
+    /// 用户自定义 TURN 服务器列表（阶段三子任务 7 新增）
+    ///
+    /// 默认空数组。用户可在「设置 → 联机 → ICE 服务器配置」页增删条目，前端通过
+    /// `applyConfig({ onlineCustomTurnServers })` 持久化。房主创建房间时与系统 STUN/TURN
+    /// 合并后上报后端，作为房间内 P2P 兜底中转备用方案。
+    #[serde(default)]
+    pub custom_turn_servers: Vec<IceServerEntry>,
 }
 
 impl Default for OnlineConfig {
     fn default() -> Self {
         Self {
             api_server_url: "https://api.molaunch.moiu.cn".to_string(),
+            custom_turn_servers: Vec::new(),
         }
     }
 }

@@ -20,6 +20,9 @@
  * - `room_join` / `room_submit_answer` / `room_list_answers` / `room_confirm`
  * - `room_keepalive` / `room_leave` / `room_kick` / `room_unban` / `room_list_participants`
  *
+ * 阶段三子任务 7 补充 1 个 action（TURN 中继）：
+ * - `room_get_turn`：房主独占，拉取经服务端负载过滤后的 TURN 服务器列表（含集群负载快照）
+ *
  * 阶段三补充 2 个 action（mesh 拓扑：参与者级 SDP Offer）：
  * - `room_upload_participant_offer`：房主为指定参与者上传独立 SDP Offer + ICE
  * - `room_fetch_participant_offer`：参与者轮询拉取房主为自己生成的 SDP Offer
@@ -44,6 +47,7 @@ import type {
   RoomInfoResponse,
   ServerTimeInfo,
   StunServersResponse,
+  TurnServersResponse,
   TunForwardResponse,
   TunStartParams,
   TunStartResponse,
@@ -88,6 +92,8 @@ export const ONLINE_ACTIONS = {
   ROOM_KICK: 'room_kick',
   ROOM_UNBAN: 'room_unban',
   ROOM_LIST_PARTICIPANTS: 'room_list_participants',
+  // TURN 中继：房主独占（阶段三子任务 7）
+  ROOM_GET_TURN: 'room_get_turn',
   // mesh 拓扑：参与者级 SDP Offer
   ROOM_UPLOAD_PARTICIPANT_OFFER: 'room_upload_participant_offer',
   ROOM_FETCH_PARTICIPANT_OFFER: 'room_fetch_participant_offer',
@@ -250,6 +256,26 @@ export function listParticipants(
   roomCode: string,
 ): Promise<BusinessResult<ListParticipantsResponse>> {
   return onlineManager(ONLINE_ACTIONS.ROOM_LIST_PARTICIPANTS, { roomCode })
+}
+
+// ============================================================
+// TURN 中继管理（阶段三子任务 7）
+//
+// 仅房主可调用 `room_get_turn`，服务端会基于全局开关、单机负载、集群总负载
+// 三层过滤后下发可用的 TURN 服务器。房主拉取后通过 DataChannel 控制消息
+// 0x05 广播给房间内所有参与者（加入方不能直接调用此接口）。
+// ============================================================
+
+/**
+ * 房主拉取 TURN 服务器列表
+ *
+ * @param roomCode 房间码
+ * @returns TURN 服务器列表 + 全局开关 + 集群负载快照
+ */
+export function getTurnServers(
+  roomCode: string,
+): Promise<BusinessResult<TurnServersResponse>> {
+  return onlineManager(ONLINE_ACTIONS.ROOM_GET_TURN, { roomCode })
 }
 
 // ============================================================

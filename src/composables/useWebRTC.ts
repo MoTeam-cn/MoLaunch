@@ -1,5 +1,5 @@
 /**
- * WebRTC composable（加入方专用，阶段三子任务 5 mesh 拓扑）
+ * WebRTC composable（加入方专用，阶段三子任务 5 mesh 拓扑，子任务 7 ICE/TURN 重构）
  *
  * 房主侧多 PC 管理见 `useWebRTCMesh.ts`。本 composable 仅负责加入方单 PC：
  * - 轮询房主为自己生成的 SDP Offer（mesh 拓扑，房主 per-participant Offer）
@@ -13,10 +13,13 @@
  * - 复用 `utils/online/webrtc-helpers.ts` 的底层函数，避免与 useWebRTCMesh 重复实现
  * - onUnmounted 自动 close PeerConnection，避免泄漏
  *
+ * 阶段三子任务 7：所有 PC 构造方法接受 `IceServerEntry[]`（含 STUN + TURN 凭据），
+ * 取代旧的 `stunServers: string[]`。NAT 检测仍接受 `string[]`（仅用 STUN 探测）。
+ *
  * @example 加入房间
  * const webrtc = useWebRTC()
  * const { sdp, iceCandidates } = await webrtc.fetchOfferAndAnswer(
- *   roomCode, participantId, stunServers,
+ *   roomCode, participantId, iceServers,
  * )
  * await submitAnswer(roomCode, participantId, sdp, iceCandidates)
  */
@@ -30,7 +33,7 @@ import {
 } from '@/utils/online/webrtc-helpers'
 import { detectNatTypeWithStun } from '@/utils/online/nat-type'
 import { fetchParticipantOffer } from '@/utils/api/online-manager'
-import type { NatDetectionResult } from '@/types/online'
+import type { IceServerEntry, NatDetectionResult } from '@/types/online'
 
 /** 创建 Offer / Answer 的结果 */
 export interface SdpResult {
@@ -69,11 +72,11 @@ export function useWebRTC() {
   /**
    * 创建 PeerConnection 并绑定状态同步 + DataChannel 接收
    *
-   * @param stunServers STUN 服务器 URL 数组
+   * @param iceServers ICE 服务器条目数组（含 STUN + TURN 凭据）
    */
-  function ensurePeerConnection(stunServers: string[]): RTCPeerConnection {
+  function ensurePeerConnection(iceServers: IceServerEntry[]): RTCPeerConnection {
     if (pc.value) return pc.value
-    const newPc = createPeerConnection(stunServers)
+    const newPc = createPeerConnection(iceServers)
 
     // 连接状态同步
     newPc.onconnectionstatechange = () => {
@@ -112,18 +115,18 @@ export function useWebRTC() {
    *
    * 流程：setRemoteDescription(offer) → createAnswer → setLocalDescription → 收集 ICE → 返回
    *
-   * @param stunServers STUN 服务器列表（与房主保持一致）
+   * @param iceServers ICE 服务器条目数组（与房主保持一致，含 STUN + TURN 凭据）
    * @param remoteSdp 房主的 SDP Offer
    * @param remoteIce 房主的 ICE candidate 数组
    */
   async function setRemoteOfferAndCreateAnswer(
-    stunServers: string[],
+    iceServers: IceServerEntry[],
     remoteSdp: string,
     remoteIce: string[],
   ): Promise<SdpResult> {
     negotiating.value = true
     try {
-      const targetPc = ensurePeerConnection(stunServers)
+      const targetPc = ensurePeerConnection(iceServers)
       await targetPc.setRemoteDescription({ type: 'offer', sdp: remoteSdp })
       // 添加房主的 ICE candidates
       for (const candidate of remoteIce) {
@@ -156,14 +159,14 @@ export function useWebRTC() {
    *
    * @param roomCode 房间码
    * @param participantId 本参与者的 ID（来自 joinRoom 响应）
-   * @param stunServers STUN 服务器列表
+   * @param iceServers ICE 服务器条目数组（含 STUN + TURN 凭据）
    * @param pollIntervalMs 轮询间隔，默认 2000ms
    * @param timeoutMs 总超时，默认 30000ms（超时抛错）
    */
   async function fetchOfferAndAnswer(
     roomCode: string,
     participantId: string,
-    stunServers: string[],
+    iceServers: IceServerEntry[],
     pollIntervalMs: number = DEFAULT_POLL_INTERVAL_MS,
     timeoutMs: number = DEFAULT_POLL_TIMEOUT_MS,
   ): Promise<SdpResult> {
@@ -182,7 +185,7 @@ export function useWebRTC() {
         }
         if (result.data.ready && result.data.sdpOffer) {
           return await setRemoteOfferAndCreateAnswer(
-            stunServers,
+            iceServers,
             result.data.sdpOffer,
             result.data.iceCandidates ?? [],
           )

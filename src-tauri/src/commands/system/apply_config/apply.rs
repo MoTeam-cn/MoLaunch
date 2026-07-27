@@ -237,14 +237,19 @@ fn apply_external_download(config: &mut crate::state::AppConfig, patch: &ConfigP
     }
 }
 
-/// 联机域：online.api_server_url
+/// 联机域：online.api_server_url + online.custom_turn_servers
 ///
-/// 空字符串视为不更新（避免前端误传空值清空配置）
+/// - `api_server_url`：空字符串视为不更新（避免前端误传空值清空配置）
+/// - `custom_turn_servers`：`Some` 即更新（含空数组，表示清空所有自定义 TURN）
 fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(ref url) = patch.online.api_server_url {
         if !url.is_empty() {
             log_info!("[Config] online_api_server_url = {}", url);
             config.online.api_server_url = url.clone();
         }
+    }
+    if let Some(ref servers) = patch.online.custom_turn_servers {
+        log_info!("[Config] online_custom_turn_servers count = {}", servers.len());
+        config.online.custom_turn_servers = servers.clone();
     }
 }
