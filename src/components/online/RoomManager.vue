@@ -62,6 +62,19 @@ const createForm = ref({
   mcPort: 25565,
 })
 
+/** 最大人数输入框提示（阶段三子任务 9）：mesh 拓扑 5+ 人带宽压力陡增，超限显示 error */
+const maxPlayersHint = computed(() => {
+  const v = createForm.value.maxPlayers
+  if (v < 2) return '至少需要 2 人（房主 + 1 参与者）'
+  if (v > 5) return 'mesh 模式不建议超过 5 人，请使用专业服务器'
+  return 'mesh 模式建议 2-5 人，超过请使用专业服务器'
+})
+const maxPlayersHintType = computed<'default' | 'error' | 'success'>(() => {
+  const v = createForm.value.maxPlayers
+  if (v < 2 || v > 5) return 'error'
+  return 'default'
+})
+
 /**
  * 白名单表单状态（阶段三子任务 8 安全加强）
  *
@@ -118,8 +131,8 @@ async function handleCreateRoom() {
     toastError('MC 端口无效：端口范围 1-65535')
     return
   }
-  if (createForm.value.maxPlayers < 2 || createForm.value.maxPlayers > 20) {
-    toastError('人数无效：最大人数范围 2-20')
+  if (createForm.value.maxPlayers < 2 || createForm.value.maxPlayers > 5) {
+    toastError('人数无效：mesh 模式最大人数范围为 2-5')
     return
   }
 
@@ -198,7 +211,13 @@ async function handleJoinRoom() {
         </div>
         <div class="flex items-center gap-3">
           <label class="w-20 text-xs text-gray-600">最大人数</label>
-          <Input v-model="createForm.maxPlayers" type="number" placeholder="4" />
+          <Input
+            v-model="createForm.maxPlayers"
+            type="number"
+            placeholder="4"
+            :hint="maxPlayersHint"
+            :hint-type="maxPlayersHintType"
+          />
         </div>
         <div class="flex items-center gap-3">
           <label class="w-20 text-xs text-gray-600">房间密码</label>

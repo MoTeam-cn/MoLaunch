@@ -37,6 +37,7 @@ import {
   ClipboardDocumentIcon,
   InformationCircleIcon,
   ShieldCheckIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -94,6 +95,25 @@ async function copyVirtualIp() {
     toastError('复制失败')
   }
 }
+
+/**
+ * 当前总人数（含房主）
+ */
+const totalPlayers = computed(() => room.value.participants.length + 1)
+
+/**
+ * 是否接近人数上限（阶段三子任务 9 mesh 拓扑预警）
+ *
+ * 当总人数 >= maxPlayers - 1 时（即还差 1 人就满），显示橙色预警条，
+ * 提示房主继续邀请可能导致上行带宽不足。
+ * maxPlayers <= 2 时不预警（2 人房间本就最小单位）。
+ */
+const nearPlayerLimit = computed(
+  () =>
+    room.value.maxPlayers > 2 &&
+    totalPlayers.value >= room.value.maxPlayers - 1 &&
+    room.value.participants.length > 0,
+)
 </script>
 
 <template>
@@ -139,8 +159,16 @@ async function copyVirtualIp() {
           <div class="flex items-center gap-2 text-sm text-gray-600">
             <UsersIcon class="w-4 h-4 text-gray-400" /><span>人数</span>
           </div>
-          <span class="text-xs text-gray-900">{{ room.participants.length + 1 }} / {{ room.maxPlayers }}</span>
+          <span class="text-xs text-gray-900">{{ totalPlayers }} / {{ room.maxPlayers }}</span>
         </div>
+      </div>
+      <!-- 阶段三子任务 9：接近人数上限时显示 mesh 拓扑带宽预警 -->
+      <div
+        v-if="nearPlayerLimit"
+        class="mt-2 px-2 py-2 bg-amber-50 rounded text-xs text-amber-700 flex gap-1.5 items-start"
+      >
+        <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
+        <span>接近人数上限（{{ totalPlayers }}/{{ room.maxPlayers }}），mesh 拓扑下房主上行带宽随人数线性增长，继续邀请可能出现卡顿，建议改用专业服务器</span>
       </div>
     </Card>
 

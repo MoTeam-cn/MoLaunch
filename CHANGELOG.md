@@ -9,6 +9,31 @@
 
 ### 变更
 
+#### 联机模块 SFU 拓扑评估：保持 mesh + 限制人数 ≤5（阶段三子任务 9）
+- 背景：阶段三子任务 9 评估 mesh 拓扑在 5+ 人时是否需要切换 SFU。基于 Minecraft LAN 流量模型（~100 KB/s）测算，5 人房主上行约 0.4 Mbps（家庭宽带舒适），10 人达 0.9 Mbps（多数家庭宽带扛不住）。结合项目定位（轻量启动器，对标 PCL2，2-5 人开黑为主），决策保持 mesh 拓扑 + 限制人数 ≤5，未来 5+ 人刚需时再评估 SFU
+- 改动：
+  - 后端 [api-server/config/default.toml](api-server/config/default.toml) `[signaling].max_players` 从 `20` 调整为 `5`（mesh 拓扑压力测算安全边界）
+  - 后端 [api-server/src/models/signaling.rs](api-server/src/models/signaling.rs) `CreateRoomRequest.max_players` 字段注释补充默认 5
+  - 后端 [api-server/docs/signaling.md](api-server/docs/signaling.md) 创建房间接口 `max_players` 字段范围说明更新
+  - 后端 [api-server/docs/admin.md](api-server/docs/admin.md) 房间示例与全局设置 `max_players` 示例值从 20 改为 5
+  - 前端 [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue) 创建房间表单校验从 `< 2 || > 20` 收紧到 `< 2 || > 5`；最大人数 Input 新增 `maxPlayersHint` / `maxPlayersHintType` 动态 computed：默认态显示「mesh 模式建议 2-5 人，超过请使用专业服务器」，超出 5 或小于 2 时切换 error 态
+  - 前端 [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) 新增 `totalPlayers` / `nearPlayerLimit` computed，运行期总人数 ≥ `maxPlayers - 1` 时在房间信息卡片底部显示橙色（amber-50/700）预警条 + `ExclamationTriangleIcon` 图标，提示房主「mesh 拓扑下房主上行带宽随人数线性增长，继续邀请可能出现卡顿，建议改用专业服务器」
+- 新增文档：
+  - [docs/online/sfu-evaluation.md](docs/online/sfu-evaluation.md)（178 行）完整 SFU 评估文档：
+    - mesh vs SFU vs MCU 三大拓扑对比
+    - 2-15 人带宽/CPU 压力测算表（5 人 0.4 Mbps / 10 人 0.9 Mbps / 15+ 不可用）
+    - SFU 候选方案对比（mediasoup / livekit / janus / 云 SFU / 混合拓扑）+ 推荐选择（短期 mesh / 中期 mediasoup / 长期 livekit）
+    - 切换 SFU 时的协议变更预览（信令扩展 + composable 改造 + 数据分发层复用）
+    - 触发 SFU 切换的 4 个条件（带宽不足 / 产品需求 / 商业化 / 竞争压力）
+- 设计取舍：
+  - 不引入 SFU 服务端进程：mediasoup/livekit 等需独立进程 + UDP 端口段 + 额外运维，违反 P2P 轻量定位
+  - 后端 `max_players` 仍保留为可配置项：未来引入 SFU 时只需放开配置 + 新增 topology 字段，无需破坏性改动
+  - 前端预警用 amber 色而非红色：接近上限并非错误，仅提示用户权衡
+- 复用：
+  - `Input` 组件 `hint` / `hint-type` props 复用项目既有约定（参考 RoomManager 房间码输入框）
+  - `ExclamationTriangleIcon` 来自 @heroicons/vue/24/outline，与项目其他预警提示风格一致
+- 验证：vue-tsc 0 新增错误，eslint 两个目标文件通过，RoomManager.vue 298 行 / RoomHostPanel.vue 226 行，均符合 300 行约束
+
 #### 联机模块 DataChannel AES-GCM 加密：房主/加入方双向加密 + 透明集成（阶段三子任务 8 安全加强）
 - 背景：阶段三子任务 8 安全加强 Part B。后端在创建/加入房间时下发 32 字节 AES-256 密钥（Base64Url 编码存于 `rooms.room_key`），前端在 DataChannel 收发前对完整协议帧（含头部）做 AES-GCM 加解密，保证 P2P 链路即便被中间人嗅探也无法解读 IP 包内容。空字符串密钥表示未启用加密（兼容旧服务器），加密层对业务代码完全透明
 - 改动：
