@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /**
- * 联机房间管理（阶段二主控制器）
+ * 联机房间管理（阶段三 mesh 拓扑主控制器）
  *
  * 由父组件 [Online.vue](src/views/Online.vue) 通过 `mode` prop 指定当前模式：
  * - `mode='create'`：显示创建房间表单（role=null 时）或房主面板（role=host 时）
@@ -9,15 +9,18 @@
  * 已进入房间时（role=host/guest），无论 mode 如何都显示对应面板，
  * 保证用户在房间内切换子菜单不会丢失连接。
  *
- * WebRTC 实例归属：
- * - `hostWebrtc` 与 `guestWebrtc` 均在 setup 阶段创建，确保 onUnmounted 生效
- * - 大厅阶段调用 `hostWebrtc.createOffer` 或 `guestWebrtc.setRemoteOfferAndCreateAnswer`
- * - 进入房间后通过 `provide` 传递给对应面板复用（继续处理 setRemoteAnswer / 状态监听）
+ * WebRTC 实例归属（mesh 拓扑）：
+ * - `hostMesh`：房主侧 useWebRTCMesh，管理 N 个参与者的独立 PC
+ *   房主创建房间时不再生成本地 Offer，改为参与者加入后由 RoomHostPanel 轮询触发 createOfferFor
+ * - `guestWebrtc`：加入方侧 useWebRTC（单 PC），通过 fetchOfferAndAnswer 轮询房主为自己生成的 Offer
+ * - 两个实例均在 setup 阶段创建，确保 onUnmounted 生效
+ * - 进入房间后通过 `provide` 传递给对应面板复用
  */
 
 import { ref, provide, computed } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
+import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Input from '@/components/common/Input.vue'
@@ -37,16 +40,16 @@ defineProps<{
   mode: 'create' | 'join'
 }>()
 
-/** provide key：房主 / 加入方 WebRTC 实例（子面板 inject 复用同一 PC） */
-const HOST_WEBRTC_KEY = 'hostWebRTC'
+/** provide key：房主 mesh / 加入方 WebRTC 实例（子面板 inject 复用） */
+const HOST_MESH_KEY = 'hostMesh'
 const GUEST_WEBRTC_KEY = 'guestWebRTC'
 
 const store = useOnlineStore()
-// 房主与加入方各一份独立 PC，避免角色切换时 PC 状态污染
-const hostWebrtc = useWebRTC('host')
-const guestWebrtc = useWebRTC('guest')
+// 房主 mesh 多 PC 管理器 + 加入方单 PC，独立实例避免角色切换时 PC 状态污染
+const hostMesh = useWebRTCMesh()
+const guestWebrtc = useWebRTC()
 
-provide(HOST_WEBRTC_KEY, hostWebrtc)
+provide(HOST_MESH_KEY, hostMesh)
 provide(GUEST_WEBRTC_KEY, guestWebrtc)
 
 /** 创建房间表单 */
@@ -78,26 +81,24 @@ const roomCodeHintType = computed<'default' | 'error' | 'success'>(() => {
 })
 
 /**
- * 创建房间步骤指示器
+ * 创建房间步骤指示器（mesh 拓扑）
  *
+ * mesh 模式下房主创建房间时不再生成本地 Offer（Offer 改为 per-participant 按需生成），
+ * 因此步骤精简为两步：
  * - `stun`：获取 STUN 服务器列表
- * - `offer`：生成本地 SDP Offer + 收集 ICE 候选（最长 5 秒）
  * - `create`：调用后端创建房间
- *
- * UI 根据当前 step 高亮当前步骤、打勾已完成步骤、灰化未完成步骤。
  */
 const createSteps = [
   { key: 'stun' as const, label: '获取 STUN 服务器' },
-  { key: 'offer' as const, label: '生成本地连接信息' },
   { key: 'create' as const, label: '创建房间' },
 ]
-const stepOrder = ['stun', 'offer', 'create'] as const
+const stepOrder = ['stun', 'create'] as const
 const currentStepIndex = computed(() => {
   if (!store.roomCreateStep) return -1
   return stepOrder.indexOf(store.roomCreateStep)
 })
 
-/** 房主创建房间 */
+/** 房主创建房间（mesh 拓扑：不生成本地 Offer，参与者加入后再 per-participant 生成） */
 async function handleCreateRoom() {
   if (!createForm.value.mcVersion) {
     toastError('请填写 MC 版本：创建房间前需指明房主的 Minecraft 版本')
@@ -116,13 +117,12 @@ async function handleCreateRoom() {
     store.roomCreateStep = 'stun'
     const stun = await store.fetchStunServers()
 
-    store.roomCreateStep = 'offer'
-    const { sdp, iceCandidates } = await hostWebrtc.createOffer(stun)
-
     store.roomCreateStep = 'create'
+    // mesh 拓扑：sdpOffer/iceCandidates 不再由房主在创建时提供
+    // 后端 create_room 字段保留是为了向后兼容，传空值即可
     await store.hostCreateRoom(
-      sdp,
-      iceCandidates,
+      '',
+      [],
       createForm.value.maxPlayers,
       createForm.value.password,
       createForm.value.mcVersion,
@@ -136,7 +136,7 @@ async function handleCreateRoom() {
   }
 }
 
-/** 加入方加入房间 */
+/** 加入方加入房间（mesh 拓扑：轮询房主为自己生成的 Offer → 创建 Answer → 提交） */
 async function handleJoinRoom() {
   const code = joinForm.value.roomCode.trim().toUpperCase()
   if (code.length !== 6) {
@@ -145,10 +145,11 @@ async function handleJoinRoom() {
   }
   try {
     const joinResp = await store.guestJoinRoom(code, joinForm.value.password)
-    const { sdp, iceCandidates } = await guestWebrtc.setRemoteOfferAndCreateAnswer(
+    // mesh 拓扑：房主为本参与者单独生成 Offer，需要轮询拉取
+    const { sdp, iceCandidates } = await guestWebrtc.fetchOfferAndAnswer(
+      code,
+      joinResp.participantId,
       joinResp.stunServers ?? [],
-      joinResp.hostSdpOffer,
-      joinResp.hostIceCandidates ?? [],
     )
     const result = await submitAnswer(code, joinResp.participantId, sdp, iceCandidates)
     if (result.code !== 1) {
@@ -194,7 +195,7 @@ async function handleJoinRoom() {
             <template #icon><PlusIcon class="w-4 h-4" /></template>
             创建房间
           </Button>
-          <!-- 创建进度反馈：三步指示器（当前步高亮 + spinner，已完成打勾，未完成灰化） -->
+          <!-- 创建进度反馈：两步指示器（当前步高亮 + spinner，已完成打勾，未完成灰化） -->
           <div
             v-if="store.roomCreateStep"
             class="mt-2 space-y-1.5 px-3 py-2.5 bg-primary-50/50 rounded-lg border border-primary-100"

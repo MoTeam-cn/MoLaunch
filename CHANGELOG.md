@@ -9,6 +9,17 @@
 
 ### 变更
 
+#### 前端 mesh 拓扑 WebRTC 整套改造（阶段三子任务 5 前端主体）
+- 背景：后端 per-participant Offer 接口与前端 API 客户端打底已完成，本次完成前端 WebRTC 层与 Vue 组件的 mesh 拓扑改造，使房主能为每个参与者维护独立 PeerConnection
+- 改动：
+  - [src/composables/useWebRTC.ts](src/composables/useWebRTC.ts) 改造为加入方专用：移除 `role` 参数与 host 逻辑（`createOffer` / `setRemoteAnswer`）；复用 `webrtc-helpers.ts` 的 `createPeerConnection` / `collectIceCandidates` / `setupDataChannelHandlers`；新增 `fetchOfferAndAnswer(roomCode, participantId, stunServers)` 轮询方法（默认 2s 间隔、30s 超时），内部循环 `fetchParticipantOffer` 直到 `ready=true` 后调用 `setRemoteOfferAndCreateAnswer`
+  - 新增 [src/composables/useWebRTCMesh.ts](src/composables/useWebRTCMesh.ts) 房主多 PC 管理器：内部维护 `Map<participantId, {pc, channel}>`，对外暴露 `createOfferFor` / `setRemoteAnswer` / `broadcastPacket` / `sendToParticipant` / `closeParticipant` / `close`；连接状态与 channel open 状态以 `reactive(Map)` 暴露给 UI；onUnmounted 自动关闭所有 PC
+  - [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue) 改用 `useWebRTCMesh` 作为房主实例、`useWebRTC` 作为加入方实例；`handleCreateRoom` 不再调用 `hostWebrtc.createOffer`（mesh 模式下 Offer 改为 per-participant 按需生成），创建步骤精简为 stun + create 两步；`handleJoinRoom` 改用 `guestWebrtc.fetchOfferAndAnswer` 完成协商
+  - [src/components/online/RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) inject key 改为 `'hostMesh'`；新增 5s `pollParticipants` 轮询：扫描 `status='joined' && !hostOfferReady` 的参与者 → 并发 `hostMesh.createOfferFor` → `uploadParticipantOffer`；`handleConfirm` 接受连接时调用 `hostMesh.setRemoteAnswer(participantId, ...)`，拒绝时调用 `hostMesh.closeParticipant`；踢出时也调用 `closeParticipant` 释放 PC；P2P 状态卡片改为显示「已联通 / 已确认」计数
+  - [src/stores/online.ts](src/stores/online.ts) `RoomCreateStep` 类型收窄为 `'stun' | 'create' | null`（移除不再使用的 `'offer'`）
+- 复用：底层 PC 创建 / ICE 收集 / DataChannel 设置全部走 `webrtc-helpers.ts`，房主与加入方两侧零重复实现
+- 验证：`vue-tsc --noEmit` 本次修改的 6 个文件 0 新增类型错误；`eslint` 6 个文件全部通过
+
 #### 前端 mesh 拓扑 API 客户端打底（阶段三子任务 5 前端先行）
 - 背景：子任务 5 后端已完成 per-participant SDP Offer 接口（`PUT/GET /v1/signaling/rooms/{code}/participants/{participant_id}/offer`），前端需新增对应 action 封装，为后续 `useWebRTCMesh.ts` 与 `Room*Panel.vue` 改造打底
 - 后端改动：

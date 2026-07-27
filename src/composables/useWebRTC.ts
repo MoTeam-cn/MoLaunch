@@ -1,46 +1,36 @@
 /**
- * WebRTC composable
+ * WebRTC composable（加入方专用，阶段三子任务 5 mesh 拓扑）
  *
- * 封装 RTCPeerConnection 生命周期管理，提供联机所需的：
- * - SDP Offer / Answer 创建
- * - ICE candidate 收集（非 trickle，一次性上报全部）
- * - 远端 SDP / ICE 设置
- * - 连接状态追踪（new/connecting/connected/disconnected/failed/closed）
+ * 房主侧多 PC 管理见 `useWebRTCMesh.ts`。本 composable 仅负责加入方单 PC：
+ * - 轮询房主为自己生成的 SDP Offer（mesh 拓扑，房主 per-participant Offer）
+ * - 设置远端 Offer → 创建 Answer → 收集 ICE → 提交 Answer
+ * - 连接状态追踪 + DataChannel 接收（房主创建，加入方 ondatachannel 接收）
  * - NAT 类型检测（创建临时 PeerConnection，复用 utils/online/nat-type）
  *
  * 设计约束：
- * - 房主与加入方使用同一 composable，通过 `role` 区分创建 offer / answer
  * - 不实现 trickle ICE，等待 iceGatheringState === 'complete' 后一次性返回所有 candidate
  *   （后端 `signaling_*` 接口约定 ice_candidates 为数组，非流式）
+ * - 复用 `utils/online/webrtc-helpers.ts` 的底层函数，避免与 useWebRTCMesh 重复实现
  * - onUnmounted 自动 close PeerConnection，避免泄漏
  *
- * @example 房主创建 offer
- * const webrtc = useWebRTC('host')
- * const { sdp, iceCandidates } = await webrtc.createOffer(['stun:stun.l.google.com:19302'])
- * // ... 上传到服务端 ...
- * // 收到加入方 answer 后：
- * await webrtc.setRemoteAnswer(answer.sdpAnswer, answer.iceCandidates)
- *
- * @example 加入方创建 answer
- * const webrtc = useWebRTC('guest')
- * const { sdp, iceCandidates } = await webrtc.setRemoteOfferAndCreateAnswer(
- *   stunServers, joinResp.hostSdpOffer, joinResp.hostIceCandidates,
+ * @example 加入房间
+ * const webrtc = useWebRTC()
+ * const { sdp, iceCandidates } = await webrtc.fetchOfferAndAnswer(
+ *   roomCode, participantId, stunServers,
  * )
- * // ... 提交到服务端 ...
+ * await submitAnswer(roomCode, participantId, sdp, iceCandidates)
  */
 
 import { onUnmounted, ref, shallowRef } from 'vue'
+import {
+  createPeerConnection,
+  collectIceCandidates,
+  setupDataChannelHandlers,
+  type WebRtcConnectionState,
+} from '@/utils/online/webrtc-helpers'
 import { detectNatTypeWithStun } from '@/utils/online/nat-type'
+import { fetchParticipantOffer } from '@/utils/api/online-manager'
 import type { NatDetectionResult } from '@/types/online'
-
-/** WebRTC 连接状态 */
-export type WebRtcConnectionState =
-  | 'new'
-  | 'connecting'
-  | 'connected'
-  | 'disconnected'
-  | 'failed'
-  | 'closed'
 
 /** 创建 Offer / Answer 的结果 */
 export interface SdpResult {
@@ -50,19 +40,24 @@ export interface SdpResult {
   iceCandidates: string[]
 }
 
+/** fetchOfferAndAnswer 默认轮询参数 */
+const DEFAULT_POLL_INTERVAL_MS = 2000
+const DEFAULT_POLL_TIMEOUT_MS = 30_000
+
 /**
- * WebRTC composable
+ * 加入方 WebRTC composable
  *
- * @param role 角色：'host' = 房主（createOffer），'guest' = 加入方（createAnswer）
+ * 内部维护单一 PeerConnection，生命周期由 composable 管理。
+ * 调用 `fetchOfferAndAnswer` 完成 SDP 协商；调用 `close` 主动释放。
  */
-export function useWebRTC(role: 'host' | 'guest' = 'host') {
+export function useWebRTC() {
   /** 当前 PeerConnection（shallowRef 避免深度响应式开销） */
   const pc = shallowRef<RTCPeerConnection | null>(null)
   /** 连接状态 */
   const connectionState = ref<WebRtcConnectionState>('new')
   /** ICE 收集状态 */
   const iceGatheringState = ref<RTCIceGatheringState>('new')
-  /** 是否正在创建 Offer / Answer */
+  /** 是否正在协商（fetchOfferAndAnswer / setRemoteOfferAndCreateAnswer 期间为 true） */
   const negotiating = ref(false)
   /** 数据通道（房主创建，加入方在 ondatachannel 接收） */
   const dataChannel = shallowRef<RTCDataChannel | null>(null)
@@ -72,20 +67,13 @@ export function useWebRTC(role: 'host' | 'guest' = 'host') {
   const detectingNat = ref(false)
 
   /**
-   * 创建 PeerConnection
+   * 创建 PeerConnection 并绑定状态同步 + DataChannel 接收
    *
    * @param stunServers STUN 服务器 URL 数组
    */
-  function createPeerConnection(stunServers: string[]): RTCPeerConnection {
-    if (typeof RTCPeerConnection === 'undefined') {
-      throw new Error('当前环境不支持 RTCPeerConnection')
-    }
-    const config: RTCConfiguration = {
-      iceServers: stunServers.map((url) => ({ urls: url })),
-      // 仅使用 STUN，不配置 TURN（联机阶段二不实现中转）
-      iceTransportPolicy: 'all',
-    }
-    const newPc = new RTCPeerConnection(config)
+  function ensurePeerConnection(stunServers: string[]): RTCPeerConnection {
+    if (pc.value) return pc.value
+    const newPc = createPeerConnection(stunServers)
 
     // 连接状态同步
     newPc.onconnectionstatechange = () => {
@@ -95,22 +83,11 @@ export function useWebRTC(role: 'host' | 'guest' = 'host') {
       iceGatheringState.value = newPc.iceGatheringState
     }
 
-    // 房主创建 DataChannel 用于 P2P 数据传输
-    // （阶段三虚拟网卡数据通过该通道传输）
-    if (role === 'host') {
-      try {
-        dataChannel.value = newPc.createDataChannel('molaunch-p2p', {
-          ordered: false,
-          maxRetransmits: 0,
-        })
-      } catch {
-        /* ignore */
-      }
-    } else {
-      // 加入方监听房主创建的 DataChannel
-      newPc.ondatachannel = (event) => {
-        dataChannel.value = event.channel
-      }
+    // 加入方监听房主创建的 DataChannel
+    newPc.ondatachannel = (event) => {
+      dataChannel.value = event.channel
+      // 默认绑定空 handler，业务侧可通过 setDataChannelHandlers 重新绑定
+      setupDataChannelHandlers(event.channel, {})
     }
 
     pc.value = newPc
@@ -118,81 +95,20 @@ export function useWebRTC(role: 'host' | 'guest' = 'host') {
   }
 
   /**
-   * 收集所有 ICE candidate（等待 iceGatheringState === 'complete'）
+   * 重新绑定 DataChannel 事件处理器
    *
-   * 非 trickle 模式：必须等待全部收集完成后再返回，否则上报的 candidate 不全
-   * 导致 P2P 协商失败。超时 5 秒兜底（极端网络环境下 STUN 慢响应）。
+   * 用于在 ondatachannel 触发后或协商完成后，由业务侧注入收包逻辑。
    *
-   * 收集完成后会还原 targetPc.onicecandidate / onicegatheringstatechange 回调，
-   * 保留外层 createPeerConnection 中设置的状态同步逻辑。
+   * @param handlers 处理器集合，未传的字段不绑定
    */
-  function collectIceCandidates(targetPc: RTCPeerConnection, timeoutMs = 5000): Promise<string[]> {
-    return new Promise((resolve) => {
-      const candidates: string[] = []
-      let settled = false
-
-      // 保留外层已设置的 gathering 回调（createPeerConnection 中的状态同步）
-      const origGatheringHandler = targetPc.onicegatheringstatechange
-      const origIceHandler = targetPc.onicecandidate
-
-      const restore = () => {
-        targetPc.onicecandidate = origIceHandler
-        targetPc.onicegatheringstatechange = origGatheringHandler
-      }
-
-      const finish = () => {
-        if (settled) return
-        settled = true
-        restore()
-        clearTimeout(timer)
-        resolve(candidates)
-      }
-
-      targetPc.onicecandidate = (event) => {
-        if (event.candidate && event.candidate.candidate) {
-          candidates.push(event.candidate.candidate)
-        }
-      }
-
-      targetPc.onicegatheringstatechange = (event) => {
-        if (typeof origGatheringHandler === 'function') {
-          origGatheringHandler.call(targetPc, event)
-        }
-        if (targetPc.iceGatheringState === 'complete') {
-          finish()
-        }
-      }
-
-      // 超时兜底：5 秒内未 complete 也用已有 candidate 返回
-      const timer = setTimeout(finish, timeoutMs)
-    })
-  }
-
-  /**
-   * 房主创建 SDP Offer
-   *
-   * 流程：createOffer → setLocalDescription → 收集 ICE → 返回
-   *
-   * @param stunServers STUN 服务器列表
-   */
-  async function createOffer(stunServers: string[]): Promise<SdpResult> {
-    negotiating.value = true
-    try {
-      const targetPc = pc.value ?? createPeerConnection(stunServers)
-      const offer = await targetPc.createOffer()
-      await targetPc.setLocalDescription(offer)
-      const iceCandidates = await collectIceCandidates(targetPc)
-      return {
-        sdp: targetPc.localDescription?.sdp ?? offer.sdp,
-        iceCandidates,
-      }
-    } finally {
-      negotiating.value = false
+  function setDataChannelHandlers(handlers: Parameters<typeof setupDataChannelHandlers>[1]) {
+    if (dataChannel.value) {
+      setupDataChannelHandlers(dataChannel.value, handlers)
     }
   }
 
   /**
-   * 加入方设置远端 Offer 后创建 Answer
+   * 设置远端 Offer 后创建 Answer
    *
    * 流程：setRemoteDescription(offer) → createAnswer → setLocalDescription → 收集 ICE → 返回
    *
@@ -207,7 +123,7 @@ export function useWebRTC(role: 'host' | 'guest' = 'host') {
   ): Promise<SdpResult> {
     negotiating.value = true
     try {
-      const targetPc = pc.value ?? createPeerConnection(stunServers)
+      const targetPc = ensurePeerConnection(stunServers)
       await targetPc.setRemoteDescription({ type: 'offer', sdp: remoteSdp })
       // 添加房主的 ICE candidates
       for (const candidate of remoteIce) {
@@ -221,7 +137,7 @@ export function useWebRTC(role: 'host' | 'guest' = 'host') {
       await targetPc.setLocalDescription(answer)
       const iceCandidates = await collectIceCandidates(targetPc)
       return {
-        sdp: targetPc.localDescription?.sdp ?? answer.sdp,
+        sdp: targetPc.localDescription?.sdp ?? answer.sdp ?? '',
         iceCandidates,
       }
     } finally {
@@ -230,25 +146,52 @@ export function useWebRTC(role: 'host' | 'guest' = 'host') {
   }
 
   /**
-   * 房主设置加入方的 Answer
+   * 轮询房主为自己生成的 SDP Offer，收到后立即创建 Answer 并返回
    *
-   * 流程：setRemoteDescription(answer) → 添加 ICE → 等待连接建立
+   * mesh 拓扑核心流程：
+   * 1. 调用 `fetchParticipantOffer` 拉取房主为本参与者生成的 Offer
+   * 2. `ready=false` 时按 `pollIntervalMs` 间隔重试，直到 `timeoutMs` 超时
+   * 3. `ready=true` 时调用 `setRemoteOfferAndCreateAnswer` 生成本地 Answer
+   * 4. 返回 `{ sdp, iceCandidates }`，由调用方提交给后端 `submitAnswer`
    *
-   * @param remoteSdp 加入方的 SDP Answer
-   * @param remoteIce 加入方的 ICE candidate 数组
+   * @param roomCode 房间码
+   * @param participantId 本参与者的 ID（来自 joinRoom 响应）
+   * @param stunServers STUN 服务器列表
+   * @param pollIntervalMs 轮询间隔，默认 2000ms
+   * @param timeoutMs 总超时，默认 30000ms（超时抛错）
    */
-  async function setRemoteAnswer(remoteSdp: string, remoteIce: string[]): Promise<void> {
-    const targetPc = pc.value
-    if (!targetPc) {
-      throw new Error('PeerConnection 未初始化，请先调用 createOffer')
-    }
-    await targetPc.setRemoteDescription({ type: 'answer', sdp: remoteSdp })
-    for (const candidate of remoteIce) {
-      try {
-        await targetPc.addIceCandidate({ candidate })
-      } catch {
-        /* 单个 candidate 失败不阻塞整体协商 */
+  async function fetchOfferAndAnswer(
+    roomCode: string,
+    participantId: string,
+    stunServers: string[],
+    pollIntervalMs: number = DEFAULT_POLL_INTERVAL_MS,
+    timeoutMs: number = DEFAULT_POLL_TIMEOUT_MS,
+  ): Promise<SdpResult> {
+    const deadline = Date.now() + timeoutMs
+    negotiating.value = true
+    try {
+      // 轮询房主生成的 Offer，超时抛错
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        if (Date.now() >= deadline) {
+          throw new Error(`等待房主生成 SDP Offer 超时（${timeoutMs / 1000}s）`)
+        }
+        const result = await fetchParticipantOffer(roomCode, participantId)
+        if (result.code !== 1 || !result.data) {
+          throw new Error(result.msg || '拉取房主 SDP Offer 失败')
+        }
+        if (result.data.ready && result.data.sdpOffer) {
+          return await setRemoteOfferAndCreateAnswer(
+            stunServers,
+            result.data.sdpOffer,
+            result.data.iceCandidates ?? [],
+          )
+        }
+        // 未就绪，等待下一轮
+        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
       }
+    } finally {
+      negotiating.value = false
     }
   }
 
@@ -310,10 +253,10 @@ export function useWebRTC(role: 'host' | 'guest' = 'host') {
     natResult,
     detectingNat,
     // 方法
-    createPeerConnection,
-    createOffer,
+    ensurePeerConnection,
     setRemoteOfferAndCreateAnswer,
-    setRemoteAnswer,
+    fetchOfferAndAnswer,
+    setDataChannelHandlers,
     detectNatType,
     close,
   }

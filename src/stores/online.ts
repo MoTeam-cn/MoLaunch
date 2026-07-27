@@ -53,12 +53,12 @@ export type RoomRole = 'host' | 'guest' | null
 /**
  * 创建房间步骤（UI 进度反馈用）
  *
+ * mesh 拓扑下房主创建房间不再生成本地 Offer（改为 per-participant 按需生成）：
  * - `stun`：获取 STUN 服务器列表
- * - `offer`：生成本地 SDP Offer + 收集 ICE 候选
  * - `create`：调用后端创建房间
  * - `null`：未在创建中 / 已完成 / 失败
  */
-export type RoomCreateStep = 'stun' | 'offer' | 'create' | null
+export type RoomCreateStep = 'stun' | 'create' | null
 
 /** 房间状态（阶段二） */
 export interface RoomState {
