@@ -9,6 +9,28 @@
 
 ### 变更
 
+#### 前端 mesh 拓扑 API 客户端打底（阶段三子任务 5 前端先行）
+- 背景：子任务 5 后端已完成 per-participant SDP Offer 接口（`PUT/GET /v1/signaling/rooms/{code}/participants/{participant_id}/offer`），前端需新增对应 action 封装，为后续 `useWebRTCMesh.ts` 与 `Room*Panel.vue` 改造打底
+- 后端改动：
+  - [src-tauri/src/utils/signaling_manager.rs](src-tauri/src/utils/signaling_manager.rs) 新增 `UploadParticipantOfferParams` + `ParticipantOfferParams` 参数结构体；`register_signaling_actions` 追加 `register_upload_participant_offer` + `register_fetch_participant_offer`，分别注册 `room_upload_participant_offer` 和 `room_fetch_participant_offer` 两个 action，调用 `OnlineClient::signaling_upload_participant_offer` / `signaling_fetch_participant_offer`
+- 前端类型改动：
+  - [src/types/online.ts](src/types/online.ts) `ParticipantInfo` 增加必填字段 `hostOfferReady: boolean`（房主判断是否需要为本参与者生成 Offer）；新增 `UploadParticipantOfferParams` + `ParticipantOfferResponse` 类型
+- 前端 API 客户端改动：
+  - [src/utils/api/online-manager.ts](src/utils/api/online-manager.ts) `ONLINE_ACTIONS` 追加 `ROOM_UPLOAD_PARTICIPANT_OFFER` / `ROOM_FETCH_PARTICIPANT_OFFER`；新增 `uploadParticipantOffer(roomCode, participantId, sdpOffer, iceCandidates)` 和 `fetchParticipantOffer(roomCode, participantId)` 便捷封装；更新头部注释
+- 验证：`cargo check --lib` 通过；`vue-tsc --noEmit` 本次修改的 3 个文件 0 新增类型错误
+
+#### 联机设备凭证迁移至 AppData 全局目录
+- 痛点：[src-tauri/src/minecraft/online/storage.rs](src-tauri/src/minecraft/online/storage.rs) 原将 `device.json` 存在 `<exe_dir>/.Molaunch/online/device.json`（启动器目录下），每个启动器实例独立维护一份设备身份，用户复制/移动启动器目录后需重新注册设备，与 api-server 设备表产生重复条目
+- 变更：
+  - 新路径：Windows `%APPDATA%/.MolaLaunch/online/device.json`，macOS/Linux `~/.config/MolaLaunch/online/device.json`（命名风格沿用 `personalization.rs` 的 `.MolaLaunch` 惯例，确保跨实例共享设备身份）
+  - `OnlineStorage` 不再走 `Storage::instance()` 的便携式目录，新增 `appdata_device_path()` 直接解析 AppData 绝对路径；`legacy_device_path()` 仅用于一次性迁移检测
+  - `load` 增加自动迁移逻辑：新路径不存在但旧路径存在 → 原样转写（不重新加解密，保留原 DES 密文）→ 删旧文件 → 加载新路径；写入失败时回退从旧路径直接加载，删除失败时仅 WARN，下次启动再尝试（幂等）
+  - `save` 写入新路径后同步清理旧路径文件，避免重复迁移
+  - `clear` 同时删除新/旧路径文件，确保注销设备时彻底清除
+- 兼容性：保留 `OnlineStorage::new(sdk)` / `clear()` 等公共 API 签名不变，调用方 `online_manager.rs` / `signaling_manager.rs` 无需改动
+- 影响：`api-server` 设备表无影响（device_pk 不变，仅本地存储位置变更）
+- 验证：`cargo check --lib` 通过；`minecraft::online::storage` 模块 2 个单元测试全部通过
+
 #### 移除顶部导航栏 SDK 就绪状态指示器
 - 痛点：[src/components/layout/TopNavLayout.vue](src/components/layout/TopNavLayout.vue) 顶部 nav 右侧显示「就绪 / 加载中」小圆点 + 文字，用户反馈不需要
 - 变更：删除该状态指示器（圆点 + 文字 + 包裹容器），并清理未使用的 `useSdkStore` 导入与 `sdkStore` 实例
