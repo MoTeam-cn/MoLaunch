@@ -9,6 +9,15 @@
 
 ### 变更
 
+#### 修复大文件下载被全局 30s timeout 误杀问题
+- 背景：用户反馈 132.7 MB 文件分片下载时 chunk 0/1 报 `request or response body error: operation timed out`，8 秒就超时
+- 根因：[http.rs](src-tauri/src/http.rs) 全局 HTTP 客户端构建时设置了 `.timeout(Duration::from_secs(30))`，这是 reqwest 的整体超时（连接+响应头+body 读取）。分片下载（33MB/chunk）和单流下载在慢速网络下 30s 下载不完 body 就被误杀
+- 修复：
+  - [chunk/download.rs](src-tauri/src/minecraft/download/chunk/download.rs) `client.get(url)` 加 `.timeout(Duration::from_secs(86400))`（24h 兜底），覆盖全局 30s。实际超时由现有"无数据流动 15s"机制控制，只有真断流才报错
+  - [stream.rs](src-tauri/src/minecraft/download/downloader/stream.rs) 同样加 `.timeout(Duration::from_secs(86400))`，连接阶段仍由 `tokio::time::timeout(5s/10s)` 控制，body 读取阶段由"无数据流动 15s"控制
+- 复用：沿用现有 `STREAM_IDLE_TIMEOUT_SECS = 15` 和 chunk 15s 无数据流动超时机制，不引入新逻辑
+- 验证：`cargo check` 通过（4.17s 零错误零警告）
+
 #### 修复日志脱敏误伤 URL 路径问题
 - 背景：用户反馈下载日志中 URL 显示为 `https://cdn-modrinth.mocdn.***.0.14-mc-1.20.1-forge.jar`，`net/data/.../physics-mod-3` 被替换为 `***`
 - 根因：[logger/sanitize.rs](src-tauri/src/logger/sanitize.rs) `long_token_re` 正则字符集 `[A-Za-z0-9+/=_-]` 包含 `/`，导致 URL 路径段 `net/data/l9m9tuPN/versions/M8j2mfGj/physics-mod-3`（49 字符，含 `/` 和 `-`）被整体当作长 token 替换

@@ -33,11 +33,12 @@ pub(super) async fn download_chunk(
 ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
     let range_header = format!("bytes={}-{}", start, end);
 
-    // 注意：不设置 reqwest 整体 .timeout()，因为那是整个请求（含 body 读取）的硬超时，
-    // 大文件慢速网络会被误杀。改用 stream 读取阶段的"无数据流动 15s 超时"（见下方 loop）
+    // 覆盖全局客户端的 30s timeout：大文件分片下载需要更长时间
+    // 实际超时由下方 loop 里的"无数据流动 15s"控制，reqwest timeout 仅作 24h 兜底
     let response = client
         .get(url)
         .header("Range", &range_header)
+        .timeout(Duration::from_secs(86400))
         .send()
         .await?;
 

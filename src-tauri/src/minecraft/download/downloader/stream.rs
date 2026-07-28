@@ -28,13 +28,17 @@ pub(super) async fn download_from_url(
     pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
     cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> Result<(u64, u64, u64), Box<dyn std::error::Error + Send + Sync>> {
-    // 连接 + 响应头阶段用 tokio::time::timeout 包裹 send()
-    // （reqwest 的 .timeout() 是整体超时含 body 读取，大文件会被误杀）
-    let response = tokio::time::timeout(timeout, client.get(url).send())
-        .await
-        .map_err(|_| -> Box<dyn std::error::Error + Send + Sync> {
-            format!("连接超时（{}s）", timeout.as_secs()).into()
-        })??;
+    // 连接 + 响应头阶段用 tokio::time::timeout 包裹 send()（5s/10s）
+    // 覆盖全局客户端的 30s timeout 为 24h 兜底，避免大文件 body 读取被误杀
+    // 实际超时由下方 loop 里的"无数据流动 15s"控制
+    let response = tokio::time::timeout(
+        timeout,
+        client.get(url).timeout(Duration::from_secs(86400)).send(),
+    )
+    .await
+    .map_err(|_| -> Box<dyn std::error::Error + Send + Sync> {
+        format!("连接超时（{}s）", timeout.as_secs()).into()
+    })??;
 
     if !response.status().is_success() {
         return Err(format!("HTTP 错误：{}", response.status()).into());
