@@ -102,6 +102,8 @@ export const ONLINE_ACTIONS = {
   TUN_START: 'tun_start',
   TUN_FORWARD_TO: 'tun_forward_to',
   TUN_STOP: 'tun_stop',
+  // TUN 权限不足时以管理员权限重启
+  RESTART_AS_ADMIN: 'restart_as_admin',
   // 房主白名单管理（阶段三子任务 8 安全加强）
   ROOM_LIST_WHITELIST: 'room_list_whitelist',
   ROOM_ADD_WHITELIST: 'room_add_whitelist',
@@ -373,6 +375,16 @@ export function tunForwardTo(
 /** 停止 TUN 桥接，销毁 TUN 接口（幂等） */
 export function tunStop(): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.TUN_STOP)
+}
+
+/**
+ * 以管理员权限重启启动器
+ *
+ * `tun_start` 返回 `TUN_PERMISSION_DENIED:` 前缀错误时，前端经用户确认后调用。
+ * 后端通过 `ShellExecuteW("runas")` 触发 UAC 提权并延迟退出当前进程。
+ */
+export function restartAsAdmin(): Promise<{ success: boolean }> {
+  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.RESTART_AS_ADMIN)
 }
 
 // ============================================================

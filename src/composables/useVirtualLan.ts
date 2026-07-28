@@ -44,6 +44,7 @@ import {
   tunStart,
   tunForwardTo,
   tunStop,
+  restartAsAdmin,
 } from '@/utils/api/online-manager'
 import {
   EVENT_TUN_PACKET_OUT,
@@ -51,6 +52,7 @@ import {
   type TunPacketPayload,
   type TunStartResponse,
 } from '@/types/online'
+import { showConfirmAsync } from '@/utils/modal'
 
 /** useVirtualLan 选项 */
 export interface UseVirtualLanOptions {
@@ -142,11 +144,27 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
     const prefixLen = parsePrefixLen(subnet)
 
     // 调用后端启动 TUN
-    const info = await tunStart({ ipv4: selfVirtualIp, prefixLen })
-    interfaceInfo.value = info
-    running.value = true
-    lastError.value = null
-    return info
+    try {
+      const info = await tunStart({ ipv4: selfVirtualIp, prefixLen })
+      interfaceInfo.value = info
+      running.value = true
+      lastError.value = null
+      return info
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      // 后端检测到权限不足（os error 5）且非管理员时返回此前缀
+      if (msg.startsWith('TUN_PERMISSION_DENIED:')) {
+        const prompt = msg.split(':').slice(1).join(':')
+        const confirmed = await showConfirmAsync('需要管理员权限', prompt)
+        if (confirmed) {
+          // 触发 UAC 提权重启，后端延迟 500ms 退出当前进程
+          await restartAsAdmin()
+        }
+        lastError.value = msg
+        throw e
+      }
+      throw e
+    }
   }
 
   /**

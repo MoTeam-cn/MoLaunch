@@ -9,6 +9,44 @@
 
 ### 变更
 
+#### 弹窗 Promise 化修复内存优化强力模式 + 插件卸载确认无响应
+- 背景：`showConfirm` 为回调式签名返回 `void`，在 async 函数中被误用为 Promise（`await showConfirm(...)` 立即 resolve），导致内存优化「强力模式」复选框点击后无反应、插件卸载确认弹窗点击后无后续动作
+- 改动：
+  - **modal.ts 新增 `showConfirmAsync`**：[src/utils/modal.ts](src/utils/modal.ts) 包装 `showConfirm` 为 `Promise<boolean>`，适配 `await` 场景
+  - **MemoryOptimizer.vue 修复**：[src/views/quick-tools/MemoryOptimizer.vue](src/views/quick-tools/MemoryOptimizer.vue) 强力模式二次确认改用 `showConfirmAsync`
+  - **PluginListSection.vue 修复**：[src/views/settings/plugins/PluginListSection.vue](src/views/settings/plugins/PluginListSection.vue) 卸载确认改用 `showConfirmAsync`
+- 验证：`vue-tsc --noEmit` 类型检查通过
+
+#### TUN 虚拟网卡权限不足自动提权重启（PCL2 风格）
+- 背景：用户反馈联机创建房间后 TUN 接口创建失败（`os error 5` 拒绝访问），原因是 wintun.dll 创建虚拟网卡需要管理员权限。PCL2 的做法是自动退出程序并以管理员权限重新启动
+- 改动：
+  - **shell.rs 新增 `is_admin()` + `relaunch_as_admin()`**：[src-tauri/src/minecraft/system/shell.rs](src-tauri/src/minecraft/system/shell.rs) 新增管理员权限检测（Windows: `OpenProcessToken` + `GetTokenInformation(TokenElevation)`）和提权重启（Windows: `ShellExecuteW` with verb `"runas"` 触发 UAC 对话框）。参考 PCL2 `ModBase.RunAsAdmin`（`ProcessStartInfo.Verb = "runas"`）实现
+  - **tun_start 检测权限错误**：[src-tauri/src/utils/tun_manager.rs](src-tauri/src/utils/tun_manager.rs) `tun_start` action 在 TUN 创建失败时检测 `os error 5` / `拒绝访问` / `Permission denied`，若非管理员则返回 `TUN_PERMISSION_DENIED:` 前缀错误标记
+  - **新增 `restart_as_admin` action**：前端确认后调用，后端 `relaunch_as_admin()` 启动提权进程，延迟 500ms 退出当前进程
+  - **前端自动弹确认框**：[src/composables/useVirtualLan.ts](src/composables/useVirtualLan.ts) `start()` 检测 `TUN_PERMISSION_DENIED:` 前缀，调 `showConfirmAsync` 弹出「需要管理员权限」确认框，用户确认后调 `restartAsAdmin()` 触发 UAC 提权重启
+  - **Cargo.toml 补 Windows API features**：[src-tauri/Cargo.toml](src-tauri/Cargo.toml) `windows` crate 追加 `Win32_Security`（TokenElevation / TOKEN_QUERY）和 `Win32_UI_Shell`（ShellExecuteW）features
+- 设计取舍：
+  - **不使用 app.manifest requireAdministrator**：PCL2 通过 manifest 始终以管理员运行，但 MoLaunch 不应强制每次启动都弹 UAC。仅在 TUN 创建实际失败时才请求提权，用户体验更好
+  - **前端确认而非后端自动重启**：给用户选择权，避免突然退出程序。用户拒绝 UAC 后可手动切回其他功能
+  - **延迟 500ms 退出**：给前端留时间收到 IPC 响应，避免 invoke Promise 未 resolve 就退出导致前端报错
+- 复用：
+  - `ShellExecuteW` 已在 shell.rs `reveal_in_file_manager` 中使用，本次复用相同的 FFI 模式（`#[link(name = "shell32")]` + `to_wide_null` 辅助函数）
+  - `showConfirmAsync` 已在 MemoryOptimizer.vue / PluginListSection.vue 中使用，本次联机模块首次复用
+- 验证：`cargo check` 编译通过，`vue-tsc --noEmit` 类型检查无新增错误
+
+#### 联机侧边栏新增「房间详情」菜单项
+- 背景：用户反馈创建房间后侧边栏没有「房间详情」入口，无法切换到其他菜单（设备/创建/加入）后再回到房间面板，体验固定不灵活
+- 改动：
+  - **动态追加「房间详情」子项**：[src/views/Online.vue](src/views/Online.vue) 在 `roomState.role !== null`（房主或加入方）时，动态向「房间管理」分类追加 `room_details` 子项（HomeIcon 图标），离开房间后自动移除
+  - **activeCategory 扩展**：从 `'device' | 'create' | 'join'` 扩展为 `'device' | 'create' | 'join' | 'room_details'`，支持 URL `?tab=room_details` 恢复
+  - **自动切换**：进入房间时自动跳到 `room_details`；离开房间时若停在 `room_details` 自动切回 `create`
+  - **RoomManager mode 映射**：`room_details` 模式下根据 role 映射为 `create`（host）或 `join`（guest），RoomManager 内部已有 role 判断逻辑会自动显示对应面板
+- 设计取舍：
+  - **子项而非独立分类**：房间详情属于房间管理的子功能，放在 room 分类下逻辑清晰，不增加顶级分类数量
+  - **动态追加而非始终存在**：未在房间时不显示房间详情菜单项，避免用户误点进入空白页面
+  - **mode 映射而非扩展 RoomManager mode 类型**：RoomManager 已有 role 判断逻辑（host → RoomHostPanel / guest → RoomGuestPanel），mode 仅用于未在房间时显示创建/加入表单。映射后 RoomManager 无需改动
+- 验证：`vue-tsc --noEmit` 类型检查通过（Online.vue 无错误）
+
 #### 联机房间挂起 + 白名单 mcsdk- 前缀隐藏
 - 背景：用户反馈进入房间后切换侧边栏菜单（设备 ↔ 创建 ↔ 加入）会断开 WebRTC 连接，房间详情无法挂着；白名单列表和输入框直接显示 `mcsdk-xxxx-xxxx-xxxx-xxxx` 前缀，视觉冗余
 - 改动：

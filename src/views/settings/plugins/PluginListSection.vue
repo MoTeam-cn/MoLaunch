@@ -12,7 +12,7 @@ import {
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
-import { showConfirm } from '@/utils/modal'
+import { showConfirmAsync } from '@/utils/modal'
 import {
   PuzzlePieceIcon,
   ComputerDesktopIcon,
@@ -92,7 +92,7 @@ async function onTogglePlugin(pluginId: string, value: string | number) {
 
 /** 卸载 */
 async function onUninstallPlugin(pluginId: string, pluginName: string) {
-  const confirmed = await showConfirm(
+  const confirmed = await showConfirmAsync(
     '确认卸载',
     `确定卸载插件「${pluginName}」吗？此操作将删除插件目录，不可恢复。`,
   )

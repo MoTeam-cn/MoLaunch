@@ -15,7 +15,7 @@ import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import AlertV2 from '@/components/common/AlertV2.vue'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import { showConfirm } from '@/utils/modal'
+import { showConfirmAsync } from '@/utils/modal'
 import { memoryOptimize } from '@/utils/api/tools'
 import type { MemoryOptimizeMode, MemoryOptimizeResult } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
@@ -33,7 +33,7 @@ function setMemMode(mode: MemoryOptimizeMode) {
 async function optimizeMemory() {
   // 强力模式需二次确认
   if (memMode.value === 'strong') {
-    const confirmed = await showConfirm(
+    const confirmed = await showConfirmAsync(
       '确认强力优化',
       '强力模式将清空系统待机内存列表，可能导致已缓存的应用（如浏览器、其他游戏）下次启动变慢。确定继续吗？',
     )

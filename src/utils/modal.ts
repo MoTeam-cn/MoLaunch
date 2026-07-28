@@ -70,6 +70,22 @@ export function showConfirm(title: string, message: string, onConfirm: () => voi
 }
 
 /**
+ * Promise 化确认弹窗
+ *
+ * `showConfirm` 的回调式签名在 async 函数中容易误用（忘记传回调、误以为返回 Promise）。
+ * 此函数包装为 `Promise<boolean>`，适配 `await` 场景。
+ *
+ * @param title 标题
+ * @param message 提示消息
+ * @returns true=确认，false=取消
+ */
+export function showConfirmAsync(title: string, message: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    showConfirm(title, message, () => resolve(true), () => resolve(false))
+  })
+}
+
+/**
  * 输入框弹窗（替代 window.prompt）
  *
  * @param title 标题

@@ -29,6 +29,7 @@ import {
   ServerStackIcon,
   PlusIcon,
   ArrowRightOnRectangleIcon,
+  HomeIcon,
 } from '@heroicons/vue/24/outline'
 import type { Component } from 'vue'
 
@@ -69,8 +70,8 @@ const isReady = computed(
   () => !!status.value && status.value.registered && status.value.logged_in && !status.value.token_expired,
 )
 
-/** 当前激活分类（device / create / join） */
-const activeCategory = ref<'device' | 'create' | 'join'>('device')
+/** 当前激活分类（device / create / join / room_details） */
+const activeCategory = ref<'device' | 'create' | 'join' | 'room_details'>('device')
 
 /** 设备分类（始终可用） */
 const deviceCategory: NavCategory = {
@@ -102,9 +103,26 @@ const roomCategory: NavCategory = {
   ],
 }
 
-/** 实际渲染的分类列表：未就绪时只显示「设备」 */
+/** 是否在房间中（role=host/guest） */
+const isInRoom = computed(() => onlineStore.roomState.role !== null)
+
+/** 房间详情子项（仅在房间中时追加到 room 管理子菜单） */
+const roomDetailsChild: NavCategory = {
+  id: 'room_details',
+  label: '房间详情',
+  icon: HomeIcon,
+  desc: '查看当前房间状态、参与者列表与连接信息',
+}
+
+/** 实际渲染的分类列表：未就绪时只显示「设备」；在房间中时追加「房间详情」子项 */
 const categories = computed<NavCategory[]>(() => {
-  return isReady.value ? [deviceCategory, roomCategory] : [deviceCategory]
+  if (!isReady.value) return [deviceCategory]
+  // 在房间中时动态追加「房间详情」子项到 room 分类
+  const roomWithDetails: NavCategory = {
+    ...roomCategory,
+    children: [...roomCategory.children!, roomDetailsChild],
+  }
+  return [deviceCategory, roomWithDetails]
 })
 
 /** 状态徽章文案与颜色 */
@@ -153,7 +171,7 @@ const activeLabel = computed(() => {
 watch(isReady, (ready) => {
   if (ready) {
     const tab = route.query.tab
-    if (tab === 'create' || tab === 'join') {
+    if (tab === 'create' || tab === 'join' || tab === 'room_details') {
       activeCategory.value = tab
     } else if (activeCategory.value === 'device') {
       // 登录成功且 URL 无有效 tab → 默认跳到创建房间
@@ -162,6 +180,22 @@ watch(isReady, (ready) => {
   } else if (activeCategory.value !== 'device') {
     // JWT 过期 / 退出登录 → 切回设备
     activeCategory.value = 'device'
+  }
+})
+
+/**
+ * 房间状态变化时自动切换分类
+ *
+ * - 进入房间（role: null → host/guest）：自动切到「房间详情」
+ * - 离开房间（role: host/guest → null）：若当前在「房间详情」，切回创建/加入
+ */
+watch(isInRoom, (inRoom) => {
+  if (inRoom) {
+    // 进入房间 → 自动跳到房间详情
+    activeCategory.value = 'room_details'
+  } else if (activeCategory.value === 'room_details') {
+    // 离开房间且当前停在房间详情 → 切回创建房间
+    activeCategory.value = 'create'
   }
 })
 
@@ -208,7 +242,10 @@ function goSettings() {
       <!-- 内容区 -->
       <div class="flex-1 overflow-y-auto p-6">
         <OnlineDevicePanel v-if="activeCategory === 'device'" />
-        <RoomManager v-else :mode="activeCategory" />
+        <RoomManager
+          v-else
+          :mode="activeCategory === 'room_details' ? (onlineStore.roomState.role === 'guest' ? 'join' : 'create') : activeCategory"
+        />
       </div>
     </div>
   </div>

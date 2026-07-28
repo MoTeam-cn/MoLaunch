@@ -96,6 +96,7 @@ pub fn register_tun_actions(d: &mut Dispatcher) {
     register_tun_start(d);
     register_tun_forward_to(d);
     register_tun_stop(d);
+    register_restart_as_admin(d);
 }
 
 // ============================================================
@@ -122,11 +123,29 @@ fn register_tun_start(d: &mut Dispatcher) {
         }
 
         // 创建新 bridge
-        let bridge = VirtualLanBridge::start(&p.ipv4, p.prefix_len, app.clone()).await
-            .map_err(|e| {
-                log_error!("[Online] tun_start 失败: {}", e);
-                e.to_string()
-            })?;
+        let bridge = match VirtualLanBridge::start(&p.ipv4, p.prefix_len, app.clone()).await {
+            Ok(b) => b,
+            Err(e) => {
+                let err_str = e.to_string();
+                log_error!("[Online] tun_start 失败: {}", err_str);
+
+                // 检测权限错误：Windows 上 wintun.dll 创建 TUN 接口需要管理员权限
+                // os error 5 = ERROR_ACCESS_DENIED
+                let is_permission_error = err_str.contains("os error 5")
+                    || err_str.contains("拒绝访问")
+                    || err_str.contains("Permission denied");
+
+                if is_permission_error && !crate::minecraft::system::shell::is_admin() {
+                    // 返回特殊错误标记，前端据此弹出管理员重启确认框
+                    return Err(
+                        "TUN_PERMISSION_DENIED:需要管理员权限来创建虚拟网卡，是否以管理员权限重启启动器？"
+                            .to_string()
+                    );
+                }
+
+                return Err(err_str);
+            }
+        };
 
         // 取接口元信息（在 bridge 启动后只能从外部记的入参里取，bridge 内部 info 已 move）
         // 这里直接用入参回传，TUN info 在 bridge 启动日志里已打印
@@ -211,6 +230,29 @@ fn register_tun_stop(d: &mut Dispatcher) {
         } else {
             log_debug!("[Online] tun_stop: bridge 未启动，跳过");
         }
+
+        serde_json::to_value(serde_json::json!({ "success": true }))
+            .map_err(|e| e.to_string())
+    }));
+}
+
+/// `restart_as_admin` action
+///
+/// 前端在 `tun_start` 返回 `TUN_PERMISSION_DENIED:` 错误并经用户确认后调用。
+/// 后端以管理员权限重启当前进程（ShellExecuteW "runas"），延迟 500ms 退出当前进程。
+fn register_restart_as_admin(d: &mut Dispatcher) {
+    d.register("restart_as_admin", handler!(_state, app, _params, {
+        log_info!("[Online] restart_as_admin: 以管理员权限重启");
+
+        crate::minecraft::system::shell::relaunch_as_admin(&[])?;
+
+        // 延迟退出当前进程，给前端留时间收到 IPC 响应
+        let app_clone = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+            log_info!("[Online] 退出当前进程（管理员重启）");
+            app_clone.exit(0);
+        });
 
         serde_json::to_value(serde_json::json!({ "success": true }))
             .map_err(|e| e.to_string())
