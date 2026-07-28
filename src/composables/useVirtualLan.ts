@@ -52,7 +52,7 @@ import {
   type TunPacketPayload,
   type TunStartResponse,
 } from '@/types/online'
-import { showConfirmAsync } from '@/utils/modal'
+import { showConfirmAsync, showInfo } from '@/utils/modal'
 
 /** useVirtualLan 选项 */
 export interface UseVirtualLanOptions {
@@ -158,7 +158,11 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
         const confirmed = await showConfirmAsync('需要管理员权限', prompt)
         if (confirmed) {
           // 触发 UAC 提权重启，后端延迟 500ms 退出当前进程
-          await restartAsAdmin()
+          // dev 模式下后端不重启，返回 dev_mode 标记，此处展示提示
+          const result = await restartAsAdmin()
+          if (result.dev_mode) {
+            showInfo('开发模式提示', result.message ?? '请用管理员权限终端运行 npm run tauri dev')
+          }
         }
         lastError.value = msg
         throw e

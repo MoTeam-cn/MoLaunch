@@ -381,10 +381,20 @@ export function tunStop(): Promise<{ success: boolean }> {
  * 以管理员权限重启启动器
  *
  * `tun_start` 返回 `TUN_PERMISSION_DENIED:` 前缀错误时，前端经用户确认后调用。
- * 后端通过 `ShellExecuteW("runas")` 触发 UAC 提权并延迟退出当前进程。
+ * - release 模式：后端通过 `ShellExecuteW("runas")` 触发 UAC 提权并延迟退出当前进程
+ * - dev 模式：后端返回 `dev_mode: true` 不重启（避免丢失 Vite dev server 连接），
+ *   前端应提示用户用管理员权限终端运行 `npm run tauri dev`
  */
-export function restartAsAdmin(): Promise<{ success: boolean }> {
-  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.RESTART_AS_ADMIN)
+export interface RestartAsAdminResult {
+  success: boolean
+  /** dev 模式下为 true，表示未自动重启，需提示用户手动以管理员权限启动 */
+  dev_mode?: boolean
+  /** dev 模式下的提示文案 */
+  message?: string
+}
+
+export function restartAsAdmin(): Promise<RestartAsAdminResult> {
+  return onlineManager<RestartAsAdminResult>(ONLINE_ACTIONS.RESTART_AS_ADMIN)
 }
 
 // ============================================================

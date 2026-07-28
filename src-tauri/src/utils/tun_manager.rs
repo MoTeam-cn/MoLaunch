@@ -239,10 +239,24 @@ fn register_tun_stop(d: &mut Dispatcher) {
 /// `restart_as_admin` action
 ///
 /// 前端在 `tun_start` 返回 `TUN_PERMISSION_DENIED:` 错误并经用户确认后调用。
-/// 后端以管理员权限重启当前进程（ShellExecuteW "runas"），延迟 500ms 退出当前进程。
+/// - release 模式：以管理员权限重启当前进程（ShellExecuteW "runas"），延迟 500ms 退出当前进程
+/// - dev 模式：不自动重启（ShellExecuteW 启动的 exe 会丢失 cargo run 注入的 dev 环境变量，
+///   导致无法连接 Vite dev server），返回 `dev_mode` 标记，前端提示用户用管理员权限终端
+///   运行 `npm run tauri dev`
 fn register_restart_as_admin(d: &mut Dispatcher) {
     d.register("restart_as_admin", handler!(_state, app, _params, {
         log_info!("[Online] restart_as_admin: 以管理员权限重启");
+
+        // dev 模式：直接返回提示，不重启进程
+        if cfg!(debug_assertions) {
+            log_info!("[Online] restart_as_admin: dev 模式，跳过自动重启，提示用户用管理员终端启动");
+            return serde_json::to_value(serde_json::json!({
+                "success": false,
+                "dev_mode": true,
+                "message": "开发模式下无法自动重启，请用管理员权限的终端运行 npm run tauri dev",
+            }))
+                .map_err(|e| e.to_string());
+        }
 
         crate::minecraft::system::shell::relaunch_as_admin(&[])?;
 

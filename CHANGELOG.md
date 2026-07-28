@@ -9,6 +9,16 @@
 
 ### 变更
 
+#### TUN 管理员重启 dev 模式跳过自动重启
+- 背景：`npm run tauri dev` 模式下触发 `restart_as_admin`，后端用 `ShellExecuteW("runas")` 启动 `target/debug/molaunch.exe`，但新进程丢失了 cargo run 注入的 dev 环境变量，导致无法连接 Vite dev server，前端加载失败
+- 改动：
+  - **后端 dev 模式跳过重启**：[src-tauri/src/utils/tun_manager.rs](src-tauri/src/utils/tun_manager.rs) `register_restart_as_admin` 在 `cfg!(debug_assertions)` 为 true 时直接返回 `{ success: false, dev_mode: true, message: "开发模式下无法自动重启，请用管理员权限的终端运行 npm run tauri dev" }`，不调用 `relaunch_as_admin`，不退出当前进程；release 模式保持原自动重启逻辑
+  - **前端类型与提示**：[src/utils/api/online-manager.ts](src/utils/api/online-manager.ts) `restartAsAdmin` 返回类型改为 `RestartAsAdminResult`（新增 `dev_mode?: boolean` 和 `message?: string`）；[src/composables/useVirtualLan.ts](src/composables/useVirtualLan.ts) 调用 `restartAsAdmin` 后检查 `result.dev_mode`，若为 true 则 `showInfo` 提示用户用管理员权限终端启动 `npm run tauri dev`
+- 复用：
+  - 复用现有 `showInfo` 弹窗工具，无需新增组件
+  - 复用 `cfg!(debug_assertions)` 编译期判定，无运行时开销
+- 验证：`cargo check` + `vue-tsc --noEmit` 通过
+
 #### NavSidebar 支持 disabled 态 + 联机房间子项互斥灰显
 - 背景：用户反馈联机页面侧边栏「房间详情」在未创建/加入房间时也可点击，但点击后无内容可显示，体验混乱。期望未在房间时该项灰色不可点击，进入房间后才可正常使用；同时在房间中时「创建房间」「加入房间」应灰显（必须先退出房间）
 - 改动：
