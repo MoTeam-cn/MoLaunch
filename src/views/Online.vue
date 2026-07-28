@@ -23,6 +23,7 @@ import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import OnlineDevicePanel from '@/components/online/OnlineDevicePanel.vue'
 import RoomManager from '@/components/online/RoomManager.vue'
+import LobbyBrowser from '@/components/online/LobbyBrowser.vue'
 import {
   Cog6ToothIcon,
   DevicePhoneMobileIcon,
@@ -30,6 +31,7 @@ import {
   PlusIcon,
   ArrowRightOnRectangleIcon,
   HomeIcon,
+  GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
 import type { Component } from 'vue'
 
@@ -72,8 +74,8 @@ const isReady = computed(
   () => !!status.value && status.value.registered && status.value.logged_in && !status.value.token_expired,
 )
 
-/** 当前激活分类（device / create / join / room_details） */
-const activeCategory = ref<'device' | 'create' | 'join' | 'room_details'>('device')
+/** 当前激活分类（device / lobby / create / join / room_details） */
+const activeCategory = ref<'device' | 'lobby' | 'create' | 'join' | 'room_details'>('device')
 
 /** 设备分类（始终可用） */
 const deviceCategory: NavCategory = {
@@ -105,6 +107,14 @@ const roomCategory: NavCategory = {
   ],
 }
 
+/** 大厅分类（仅已就绪时可用，浏览公开房间列表） */
+const lobbyCategory: NavCategory = {
+  id: 'lobby',
+  label: '联机大厅',
+  icon: GlobeAltIcon,
+  desc: '浏览公开房间列表，搜索整合包房间并一键加入',
+}
+
 /** 是否在房间中（role=host/guest） */
 const isInRoom = computed(() => onlineStore.roomState.role !== null)
 
@@ -132,7 +142,7 @@ const categories = computed<NavCategory[]>(() => {
     roomDetailsChild.value,
   ]
   const roomWithDetails: NavCategory = { ...roomCategory, children }
-  return [deviceCategory, roomWithDetails]
+  return [deviceCategory, lobbyCategory, roomWithDetails]
 })
 
 /** 状态徽章文案与颜色 */
@@ -214,11 +224,37 @@ watch(isInRoom, (inRoom) => {
 
 onMounted(() => {
   void onlineStore.refreshStatus()
+  // 进入联机页自动检测 NAT 类型（已有结果时跳过，结果保留在 store 中侧边栏切换不丢失）
+  void onlineStore.detectNat()
 })
 
 function goSettings() {
   router.push('/apps/settings?tab=online')
 }
+
+// ============================================================
+// keep-alive 动态组件（侧边栏切换时保留各面板状态）
+// ============================================================
+// OnlineDevicePanel / LobbyBrowser / RoomManager 各自缓存，
+// 切换侧边栏菜单时仅 deactivate → activate，不触发 onUnmounted，
+// 表单输入 / 搜索结果 / 分页位置等组件级状态完整保留。
+// 房间连接（WebRTC 实例）由 Online.vue provide，不受影响。
+const currentComponent = computed(() => {
+  switch (activeCategory.value) {
+    case 'device': return OnlineDevicePanel
+    case 'lobby': return LobbyBrowser
+    default: return RoomManager
+  }
+})
+
+/** 仅 RoomManager 需要 mode prop，其余组件传空对象避免 fallthrough */
+const currentProps = computed<Record<string, unknown>>(() => {
+  if (activeCategory.value === 'device' || activeCategory.value === 'lobby') return {}
+  const mode: 'create' | 'join' = activeCategory.value === 'room_details'
+    ? (onlineStore.roomState.role === 'guest' ? 'join' : 'create')
+    : (activeCategory.value === 'join' ? 'join' : 'create')
+  return { mode }
+})
 </script>
 
 <template>
@@ -252,13 +288,11 @@ function goSettings() {
         </div>
       </div>
 
-      <!-- 内容区 -->
+      <!-- 内容区（keep-alive 缓存各面板，侧边栏切换时保留状态） -->
       <div class="flex-1 overflow-y-auto p-6">
-        <OnlineDevicePanel v-if="activeCategory === 'device'" />
-        <RoomManager
-          v-else
-          :mode="activeCategory === 'room_details' ? (onlineStore.roomState.role === 'guest' ? 'join' : 'create') : activeCategory"
-        />
+        <keep-alive>
+          <component :is="currentComponent" v-bind="currentProps" />
+        </keep-alive>
       </div>
     </div>
   </div>

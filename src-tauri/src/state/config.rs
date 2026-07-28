@@ -9,6 +9,12 @@ pub struct ProxyConfig {
     pub mode: String, // "none" | "system" | "custom"（原 proxy_mode）
     pub kind: String, // "http" | "https" | "socks5"（原 proxy_type，避开 Rust 关键字 type）
     pub url: String,  // 自定义代理地址，如 "127.0.0.1:7890"（原 proxy_url）
+    /// IP 协议版本偏好
+    /// - `"v4"`: 强制 IPv4（local_address = 0.0.0.0）
+    /// - `"auto"`: 自动选择（测试 v4/v6 连通性，选稳定的那个）
+    /// - `"any"`: 随意解析（不设置 local_address，跟随 DNS 服务器）
+    #[serde(default)]
+    pub ip_version: String,
 }
 
 /// 下载配置
@@ -23,6 +29,13 @@ pub struct DownloadConfig {
     pub mirror_url_meta: Option<String>,     // 原 mirror_url_meta
     pub mirror_url_download: Option<String>, // 原 mirror_url_download
     pub mirror_mode: u32,                    // 原 mirror_mode
+    /// 是否将 `cdn.modrinth.com` 替换为 `cdn-raw.modrinth.com`（绕过中国大陆 cdn-alt 跳转）
+    ///
+    /// 默认 false（关闭）。仅在开发者模式解锁后可在「设置 → 开发者模式」中开启。
+    /// 开启后 `sources::rewrite_mr_cdn` 生效，所有 Modrinth CDN 下载 URL 入口处
+    /// 先做域名替换，再按 source 策略走镜像/官方。
+    #[serde(default)]
+    pub modrinth_cdn_raw_enabled: bool,
 }
 
 /// 内存配置
@@ -157,6 +170,7 @@ impl Default for AppConfig {
                 mode: "none".to_string(),
                 kind: "http".to_string(),
                 url: String::new(),
+                ip_version: "any".to_string(),
             },
             download: DownloadConfig {
                 source: "smart".to_string(),
@@ -168,6 +182,7 @@ impl Default for AppConfig {
                 mirror_url_meta: None,
                 mirror_url_download: None,
                 mirror_mode: 0,
+                modrinth_cdn_raw_enabled: false,
             },
             memory: MemoryConfig {
                 mode: "auto".to_string(),

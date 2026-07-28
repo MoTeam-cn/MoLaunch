@@ -22,6 +22,7 @@ import {
   CubeIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import CachedImage from '@/components/common/CachedImage.vue'
 
 const props = defineProps<{ project: ResourceProject }>()
 const emit = defineEmits<{ close: [] }>()
@@ -68,8 +69,13 @@ async function copyName() {
   <!-- 头部：Logo + 标题 + 操作按钮 -->
   <div class="flex items-start gap-3 p-4 border-b border-gray-200">
     <div class="shrink-0 w-12 h-12 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-      <img v-if="project.logo_url" :src="project.logo_url" :alt="project.raw_name" class="w-full h-full object-cover">
-      <CubeIcon v-else class="w-6 h-6 text-gray-400" />
+      <CachedImage
+        :src="project.logo_url"
+        :alt="project.raw_name"
+        class="w-full h-full object-cover"
+      >
+        <template #fallback><CubeIcon class="w-6 h-6 text-gray-400" /></template>
+      </CachedImage>
     </div>
     <div class="flex-1 min-w-0">
       <h2 class="text-base font-semibold text-gray-900 truncate">

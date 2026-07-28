@@ -69,6 +69,24 @@ pub struct InstallModpackRequest {
     /// None 表示无外部 Logo，仅依赖 MMC iconKey 等内部图标迁移。
     #[serde(default)]
     pub logo_path: Option<String>,
+    // ===== 联机大厅阶段 3：平台来源元数据（用于写入 modpack.meta.json） =====
+    /// 平台工程 ID（CF project id / MR project id）。
+    /// 在线资源页安装时由前端从工程详情响应传入；None 时跳过 modpack.meta.json 写入。
+    #[serde(default)]
+    pub project_id: Option<String>,
+    /// 平台文件 ID（CF file id / MR version id）。
+    /// 在线资源页安装时由前端从版本列表响应传入。
+    #[serde(default)]
+    pub file_id: Option<String>,
+    /// 整合包自身版本号（如 `2.9.3`，来自平台版本列表的 version/displayName）。
+    #[serde(default)]
+    pub modpack_version: Option<String>,
+    /// 整合包文件大小（字节，来自平台版本列表的 size/fileLength）。
+    #[serde(default)]
+    pub file_size: Option<u64>,
+    /// 整合包名称（来自平台工程详情的 raw_name/translated_name）。
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 /// 本地整合包安装请求（拖拽安装）

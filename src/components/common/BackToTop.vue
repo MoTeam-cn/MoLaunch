@@ -10,10 +10,11 @@
  * - 路由切换时重置状态，防止旧按钮残留到新页面
  */
 
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowUpIcon } from '@heroicons/vue/24/solid'
 import Tooltip from '@/components/common/Tooltip.vue'
+import { backToTopVisible } from '@/composables/useFloatingButtonState'
 
 const visible = ref(false)
 const isHover = ref(false)
@@ -21,7 +22,10 @@ let activeEl: Element | null = null
 const router = useRouter()
 
 /** 未显示时的出现阈值（像素） */
-const SHOW_THRESHOLD = 700
+const SHOW_THRESHOLD = 400
+
+// 同步可见状态到共享 ref，供 DownloadPanel 调整位置
+watch(visible, (v) => { backToTopVisible.value = v })
 
 function onScroll(e: Event) {
   const el = e.target as Element | null

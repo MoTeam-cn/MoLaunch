@@ -71,6 +71,48 @@ pub struct TurnServersResponse {
     pub load_threshold: u32,
 }
 
+/// 整合包元数据（联机大厅阶段 3 新增）
+///
+/// 房主创建房间时关联本地已安装整合包，上报元数据给 api-server。
+/// 加入方拉取房间详情后据此判断是否需要一键安装。
+///
+/// **安全设计**：不包含 `download_url` 字段。加入方通过现有 `getProjectVersions`
+/// IPC 反查平台 API 获取下载链接，避免 api-server 成为 URL 分发中心。
+///
+/// 字段与 api-server `room_modpacks` 表一致（详见 docs/online/lobby-modpack-share.md §3.2）。
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ModpackMeta {
+    /// 来源平台（仅 `curseforge` / `modrinth`）
+    pub source: String,
+    /// CF project id 或 MR project id
+    pub project_id: String,
+    /// CF file id 或 MR version id
+    pub file_id: String,
+    /// 整合包对应的 MC 版本（如 `1.12.2`）
+    pub mc_version: String,
+    /// 整合包自身版本号（如 `2.9.3`，来自 manifest）
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub modpack_version: Option<String>,
+    /// 整合包名称（来自 manifest）
+    pub name: String,
+    /// 加载器类型（`forge` / `fabric` / `neoforge` / `quilt`）
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub loader: Option<String>,
+    /// 加载器版本号
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub loader_version: Option<String>,
+    /// 整合包文件大小（字节，仅展示用，来自 manifest）
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub file_size: Option<u64>,
+    /// mods 文件数（仅展示用，来自 manifest）
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub file_count: Option<u32>,
+    /// manifest.json SHA-256，用于加入方校验本地是否已装同款
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub manifest_hash: Option<String>,
+}
+
 /// 创建房间请求
 #[derive(Debug, Clone, Serialize)]
 pub struct CreateRoomRequest {
@@ -89,6 +131,37 @@ pub struct CreateRoomRequest {
     pub host_mc_version: String,
     /// 房主 MC 端口（客户端扩展字段，启动器探测本地 Java 进程端口后填入）
     pub host_mc_port: u16,
+    /// 房主加载器类型（联机大厅阶段 1 新增）
+    ///
+    /// 客户端从 `setup.ini` 的 `Type` 字段读取，值为 `forge` / `fabric` / `neoforge` /
+    /// `quilt` / `optifine` / `liteloader` / `release` / `snapshot` / `old` / `unknown`。
+    /// 服务端可据此在大厅列表展示加载器图标，加入方据此判断兼容性。
+    /// `None` 表示旧客户端未上报（兼容字段）。
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub host_loader: Option<String>,
+    /// 房主加载器版本号（联机大厅阶段 1 新增）
+    ///
+    /// 客户端从 `setup.ini` 的 `ForgeVersion` / `FabricVersion` / ... 字段读取，
+    /// 如 `47.3.0`。无加载器（原版）或 setup.ini 缺失时为 `None`。
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub host_loader_version: Option<String>,
+    /// 房间类型（联机大厅阶段 2 新增）
+    ///
+    /// - `private`：仅房间码加入（默认，兼容旧客户端）
+    /// - `public`：加入大厅，可被大厅浏览页检索到
+    ///
+    /// 客户端未传时后端默认 `private`，保证旧客户端行为不变。
+    /// 注：`CreateRoomRequest` 仅序列化（不反序列化），故无需 `#[serde(default)]`，
+    /// 由 `signaling_manager::CreateRoomParams` 反序列化时填默认值。
+    #[serde(skip_serializing_if = "std::string::String::is_empty", default)]
+    pub room_type: String,
+    /// 大厅 ID（联机大厅阶段 2 新增）
+    ///
+    /// 仅当 `room_type = "lobby"` 时生效，标识房间归属的大厅。
+    /// 当前固定为 `global`（全球大厅），后续阶段 5 大厅浏览页支持多大厅选择后扩展。
+    /// `private` 房间忽略此字段；`lobby` 房间未传时后端兜底 `global`。
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub lobby_id: Option<String>,
     /// 是否启用白名单（阶段三子任务 8 安全加强）
     ///
     /// `true` 时仅 `whitelist` 数组中的设备可加入；
@@ -103,6 +176,13 @@ pub struct CreateRoomRequest {
     /// 房主可在房间运行期间通过 `POST /v1/signaling/rooms/:code/whitelist` 动态增删。
     #[serde(skip_serializing_if = "Vec::is_empty", default)]
     pub whitelist: Vec<String>,
+    /// 整合包元数据（联机大厅阶段 3 新增）
+    ///
+    /// 房主创建房间时关联本地已安装整合包。`None` 表示无整合包（纯原版房间）。
+    /// 客户端从 `versions/{id}/modpack.meta.json` 读取后填充此字段。
+    /// 不包含 `download_url`，加入方通过现有 IPC 反查平台 API 获取。
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub modpack: Option<ModpackMeta>,
 }
 
 /// 创建房间响应
@@ -167,6 +247,20 @@ pub struct RoomInfoResponse {
     /// 加入方据此判断是否提示房主添加自己到白名单。
     #[serde(default, alias = "whitelist_enabled")]
     pub whitelist_enabled: bool,
+    /// 房间类型（联机大厅阶段 2，`private` / `public`，旧服务器缺省 `private`）
+    #[serde(default, alias = "room_type")]
+    pub room_type: String,
+    /// 房主加载器类型（联机大厅阶段 1，如 `forge` / `fabric`，旧服务器缺省 None）
+    #[serde(default, alias = "host_loader")]
+    pub host_loader: Option<String>,
+    /// 房主加载器版本号（联机大厅阶段 1，如 `47.3.0`，旧服务器缺省 None）
+    #[serde(default, alias = "host_loader_version")]
+    pub host_loader_version: Option<String>,
+    /// 整合包元数据（联机大厅阶段 3，`None` 表示纯原版房间）
+    ///
+    /// 加入方据此判断是否需要一键安装，通过 `check_local_modpack` IPC 校验本地是否已装同款。
+    #[serde(default, alias = "modpack")]
+    pub modpack: Option<ModpackMeta>,
 }
 
 /// 加入房间响应
@@ -245,6 +339,33 @@ pub struct ListParticipantsResponse {
     pub participants: Vec<ParticipantInfo>,
 }
 
+/// 房间封禁记录（对应 api-server `RoomBan`）
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RoomBan {
+    pub id: String,
+    #[serde(alias = "room_code")]
+    pub room_code: String,
+    #[serde(alias = "device_pk")]
+    pub device_pk: String,
+    /// 0=永久封禁；>0=解封 Unix 秒时间戳
+    #[serde(alias = "banned_until")]
+    pub banned_until: i64,
+    #[serde(alias = "created_at")]
+    pub created_at: i64,
+}
+
+/// 封禁列表响应（对应 api-server `ListBansResponse`）
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListBansResponse {
+    /// 当前有效封禁记录（永久 + 未过期临时）
+    pub bans: Vec<RoomBan>,
+    /// 服务端当前 Unix 秒，便于客户端计算剩余封禁时长
+    #[serde(alias = "server_time")]
+    pub server_time: i64,
+}
+
 /// 房主为指定参与者上传 SDP Offer 的请求体（mesh 拓扑）
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -319,6 +440,123 @@ pub struct AddWhitelistRequest {
 pub struct SetWhitelistEnabledRequest {
     /// 是否启用白名单
     pub enabled: bool,
+}
+
+// ============================== 大厅类型（联机大厅阶段 5） ==============================
+
+/// 大厅房间列表查询参数
+///
+/// 对应 `GET /v1/signaling/lobby/rooms` 的 query string。
+/// 所有字段均为可选，未传时服务端使用默认值。
+#[derive(Debug, Clone, Serialize)]
+pub struct LobbyListQuery {
+    /// 大厅分类 ID，默认 `global`
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lobby_id: Option<String>,
+    /// 页码，默认 1
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page: Option<u32>,
+    /// 每页数量，默认 20，上限 50
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub page_size: Option<u32>,
+    /// `true` 仅返回有整合包的房间；`false` 仅返回无整合包房间；`None` 不过滤
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub has_modpack: Option<bool>,
+    /// 按房主加载器过滤（`forge` / `fabric` / `neoforge` / `quilt` / `vanilla`）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub loader: Option<String>,
+    /// 按房主 MC 版本或整合包 MC 版本过滤
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub game_version: Option<String>,
+    /// 模糊匹配房主 MC 版本或整合包名称
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keyword: Option<String>,
+}
+
+/// 大厅整合包摘要（列表页轻量版，剔除 `manifest_hash` / `loader_version`）
+///
+/// 与 `ModpackMeta` 的差异：
+/// - 多出 `modpack_id`（服务端主键，详情页可用于去重）
+/// - 缺少 `manifest_hash` / `loader_version`（减少列表页载荷）
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LobbyModpackSummary {
+    /// 整合包记录主键（UUID）
+    #[serde(alias = "modpack_id")]
+    pub modpack_id: String,
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub modpack_version: Option<String>,
+    /// 来源平台（`curseforge` / `modrinth`）
+    pub source: String,
+    #[serde(alias = "project_id")]
+    pub project_id: String,
+    #[serde(alias = "file_id")]
+    pub file_id: String,
+    #[serde(alias = "mc_version")]
+    pub mc_version: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub loader: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub file_size: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub file_count: Option<u32>,
+}
+
+/// 大厅房间列表项
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LobbyRoomItem {
+    pub room_code: String,
+    #[serde(alias = "host_device_pk")]
+    pub host_device_pk: String,
+    #[serde(default, alias = "host_mc_version")]
+    pub host_mc_version: String,
+    #[serde(default, alias = "host_loader")]
+    pub host_loader: Option<String>,
+    #[serde(default, alias = "host_loader_version")]
+    pub host_loader_version: Option<String>,
+    #[serde(alias = "max_players")]
+    pub max_players: u32,
+    #[serde(alias = "player_count")]
+    pub player_count: u32,
+    #[serde(alias = "has_password")]
+    pub has_password: bool,
+    pub status: String,
+    #[serde(alias = "created_at")]
+    pub created_at: u64,
+    #[serde(alias = "expires_at")]
+    pub expires_at: u64,
+    /// 整合包摘要，`None` 表示纯原版房间
+    #[serde(default, alias = "modpack")]
+    pub modpack: Option<LobbyModpackSummary>,
+}
+
+/// 大厅房间列表响应
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LobbyListResponse {
+    pub total: u32,
+    pub page: u32,
+    #[serde(alias = "page_size")]
+    pub page_size: u32,
+    pub items: Vec<LobbyRoomItem>,
+}
+
+/// 大厅分类条目
+#[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct LobbyCategory {
+    pub id: String,
+    pub name: String,
+    #[serde(alias = "room_count")]
+    pub room_count: u32,
+}
+
+/// 大厅分类列表响应
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LobbyCategoriesResponse {
+    pub categories: Vec<LobbyCategory>,
 }
 
 // ============================== 客户端扩展方法 ==============================
@@ -492,6 +730,20 @@ impl OnlineClient {
             .await
     }
 
+    /// 查询房间封禁列表（GET /v1/signaling/rooms/{code}/bans，仅房主）
+    ///
+    /// 返回当前有效的封禁记录（永久 + 未过期临时），已过期的临时封禁不返回。
+    /// 同时返回服务端当前时间 `server_time`，便于客户端计算剩余封禁时长。
+    pub async fn signaling_list_bans(
+        &self,
+        creds: &DeviceCredentials,
+        room_code: &str,
+    ) -> Result<BusinessResult<ListBansResponse>, ClientError> {
+        let path = format!("/v1/signaling/rooms/{}/bans", room_code);
+        self.call_v1::<ListBansResponse>(creds, "GET", &path, None, false)
+            .await
+    }
+
     /// 查询参与者列表（GET /v1/signaling/rooms/{code}/participants）
     pub async fn signaling_list_participants(
         &self,
@@ -605,5 +857,62 @@ impl OnlineClient {
         // PATCH 方法需要加密信封
         self.call_v1::<serde_json::Value>(creds, "PATCH", &path, Some(&body), true)
             .await
+    }
+
+    // ===== 大厅浏览（联机大厅阶段 5） =====
+
+    /// 查询大厅公开房间列表（GET /v1/signaling/lobby/rooms）
+    ///
+    /// 支持分页与过滤（加载器 / MC 版本 / 整合包 / 关键词）。
+    /// 列表接口不返回 SDP/ICE/room_key 等敏感字段，加入方需走完整 join 流程。
+    pub async fn signaling_list_lobby_rooms(
+        &self,
+        creds: &DeviceCredentials,
+        query: &LobbyListQuery,
+    ) -> Result<BusinessResult<LobbyListResponse>, ClientError> {
+        // 手动拼接 query string，避免引入 serde_urlencoded 依赖
+        let mut pairs: Vec<String> = Vec::new();
+        if let Some(ref v) = query.lobby_id {
+            pairs.push(format!("lobby_id={}", urlencoding::encode(v)));
+        }
+        if let Some(v) = query.page {
+            pairs.push(format!("page={}", v));
+        }
+        if let Some(v) = query.page_size {
+            pairs.push(format!("page_size={}", v));
+        }
+        if let Some(v) = query.has_modpack {
+            pairs.push(format!("has_modpack={}", v));
+        }
+        if let Some(ref v) = query.loader {
+            pairs.push(format!("loader={}", urlencoding::encode(v)));
+        }
+        if let Some(ref v) = query.game_version {
+            pairs.push(format!("game_version={}", urlencoding::encode(v)));
+        }
+        if let Some(ref v) = query.keyword {
+            pairs.push(format!("keyword={}", urlencoding::encode(v)));
+        }
+        let qs = if pairs.is_empty() { String::new() } else { format!("?{}", pairs.join("&")) };
+        let path = format!("/v1/signaling/lobby/rooms{}", qs);
+        self.call_v1::<LobbyListResponse>(creds, "GET", &path, None, false)
+            .await
+    }
+
+    /// 查询大厅分类列表（GET /v1/signaling/lobby/categories）
+    ///
+    /// MVP 阶段仅返回 `global` 一个分类，`room_count` 实时统计。
+    pub async fn signaling_list_lobby_categories(
+        &self,
+        creds: &DeviceCredentials,
+    ) -> Result<BusinessResult<LobbyCategoriesResponse>, ClientError> {
+        self.call_v1::<LobbyCategoriesResponse>(
+            creds,
+            "GET",
+            "/v1/signaling/lobby/categories",
+            None,
+            false,
+        )
+        .await
     }
 }

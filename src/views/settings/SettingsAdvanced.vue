@@ -18,6 +18,8 @@ import {
 const proxyMode = ref<'none' | 'system' | 'custom'>('none')
 const proxyType = ref<'http' | 'https' | 'socks5'>('http')
 const proxyUrl = ref('')
+// IP 协议版本偏好：v4=强制 IPv4 / auto=自动测试 / any=跟随 DNS
+const ipVersion = ref<'v4' | 'auto' | 'any'>('any')
 
 // CurseForge API Key 配置（加密存储到 INI）
 const cfEnabled = ref(false)
@@ -34,6 +36,7 @@ const { loaded, markDirty } = useConfigPage({
     proxyMode.value = cfg.proxyMode as typeof proxyMode.value
     proxyType.value = cfg.proxyType as typeof proxyType.value
     proxyUrl.value = cfg.proxyUrl
+    ipVersion.value = (cfg.ipVersion as typeof ipVersion.value) || 'any'
     cfEnabled.value = cfg.curseforgeEnabled
     cfApiKey.value = cfg.curseforgeApiKey
     logLevel.value = cfg.logLevel
@@ -44,6 +47,7 @@ const { loaded, markDirty } = useConfigPage({
 watch(proxyMode, (v) => markDirty('proxyMode', v))
 watch(proxyType, (v) => markDirty('proxyType', v))
 watch(proxyUrl, (v) => markDirty('proxyUrl', v))
+watch(ipVersion, (v) => markDirty('ipVersion', v))
 
 // CurseForge：走加密存储（applyConfig 内部分流到 secure_storage）
 watch(cfEnabled, (v) => markDirty('curseforgeEnabled', v))
@@ -136,6 +140,31 @@ watch(logLevel, (v) => markDirty('logLevel', v))
             <Input v-model="proxyUrl" placeholder="127.0.0.1:7890" />
             <p class="text-xs text-gray-400 mt-1">格式：IP地址:端口号，例如 127.0.0.1:7890</p>
           </div>
+        </div>
+
+        <!-- IP 协议版本偏好（独立行，不受代理模式影响） -->
+        <div class="px-5 py-4">
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900">IP 协议版本</p>
+              <p class="text-xs text-gray-500 mt-0.5">控制客户端使用的 IP 协议（部分域名 IPv6 链路质量差时可切换为 v4）</p>
+            </div>
+            <div class="flex-none w-40">
+              <Select
+                v-model="ipVersion"
+                :options="[
+                  { label: '强制 IPv4', value: 'v4' },
+                  { label: '自动选择', value: 'auto' },
+                  { label: '跟随 DNS', value: 'any' },
+                ]"
+              />
+            </div>
+          </div>
+          <p class="text-xs text-gray-400 mt-2">
+            <template v-if="ipVersion === 'v4'">仅解析 A 记录，避免 IPv6 链路问题</template>
+            <template v-else-if="ipVersion === 'auto'">测试 v4/v6 连通性，自动选更稳定的一方</template>
+            <template v-else>不限制，由操作系统/DNS 决定</template>
+          </p>
         </div>
       </div>
     </div>

@@ -29,9 +29,11 @@ import {
   confirmParticipant,
   kickParticipant,
   uploadParticipantOffer,
+  listBannedParticipants,
+  unbanParticipant,
 } from '@/utils/api/online-manager'
 import { buildIceServers, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
-import type { IceServerEntry, PendingAnswer } from '@/types/online'
+import type { IceServerEntry, PendingAnswer, RoomBan } from '@/types/online'
 import { showConfirm } from '@/utils/modal'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { encodeHostMcPort, encodeTurnServers } from '@/utils/online/protocol'
@@ -55,6 +57,10 @@ export function useRoomHost(options: {
 
   /** 待确认 Answer 列表（pollAnswers 5s 刷新） */
   const pendingAnswers = ref<PendingAnswer[]>([])
+  /** 封禁列表（仅房主，按需刷新：挂载时 + 踢人带封禁后 + 解封后） */
+  const bannedList = ref<RoomBan[]>([])
+  /** 服务端当前时间（Unix 秒，由 listBannedParticipants 返回，用于计算剩余封禁时长） */
+  const banServerTime = ref(0)
   /** 正在轮询参与者（防重入） */
   const polling = ref(false)
   /** 正在为参与者生成 Offer 的集合，防止重复生成（key=participantId） */
@@ -217,20 +223,53 @@ export function useRoomHost(options: {
     }
   }
 
-  /** 踢出参与者（不封禁） */
-  function handleKick(participantId: string, devicePk: string) {
-    showConfirm('踢出参与者', `确定踢出 ${devicePk.slice(0, 8)}...？`, async () => {
-      try {
-        const result = await kickParticipant(store.roomState.roomCode, participantId, null)
-        if (result.code !== 1) throw new Error(result.msg || '踢出失败')
-        // 关闭对应 PC
-        hostMesh.closeParticipant(participantId)
-        toastSuccess('已踢出')
-        await store.refreshParticipants()
-      } catch (e) {
-        toastError(`踢出失败：${e instanceof Error ? e.message : String(e)}`)
+  /** 踢出参与者（可选封禁时长：null=不封禁 / 0=永久 / N=封禁N秒） */
+  async function handleKick(participantId: string, _devicePk: string, banDuration: number | null) {
+    try {
+      const result = await kickParticipant(store.roomState.roomCode, participantId, banDuration)
+      if (result.code !== 1) throw new Error(result.msg || '踢出失败')
+      // 关闭对应 PC
+      hostMesh.closeParticipant(participantId)
+      const msg = banDuration === null
+        ? '已踢出'
+        : banDuration === 0
+          ? '已踢出并永久封禁'
+          : `已踢出并封禁 ${Math.round(banDuration / 60)} 分钟`
+      toastSuccess(msg)
+      await store.refreshParticipants()
+      // 阶段 6.2：带封禁的踢出刷新封禁列表
+      if (banDuration !== null) void refreshBans()
+    } catch (e) {
+      toastError(`踢出失败：${e instanceof Error ? e.message : String(e)}`)
+    }
+  }
+
+  /** 刷新封禁列表（仅房主，按需调用：挂载时 / 踢人带封禁后 / 解封后） */
+  async function refreshBans() {
+    if (store.roomState.role !== 'host' || !store.roomState.roomCode) return
+    try {
+      const result = await listBannedParticipants(store.roomState.roomCode)
+      if (result.code === 1 && result.data) {
+        bannedList.value = result.data.bans ?? []
+        banServerTime.value = result.data.serverTime ?? 0
+      } else {
+        console.warn(`[Online] refreshBans 业务失败: code=${result.code}, msg=${result.msg}`)
       }
-    })
+    } catch (e) {
+      console.warn('[Online] refreshBans 异常:', e)
+    }
+  }
+
+  /** 解封参与者（仅房主） */
+  async function handleUnban(devicePk: string) {
+    try {
+      const result = await unbanParticipant(store.roomState.roomCode, devicePk)
+      if (result.code !== 1) throw new Error(result.msg || '解封失败')
+      toastSuccess('已解封')
+      await refreshBans()
+    } catch (e) {
+      toastError(`解封失败：${e instanceof Error ? e.message : String(e)}`)
+    }
   }
 
   /** 关闭房间 */
@@ -302,6 +341,8 @@ export function useRoomHost(options: {
     void pollParticipants()
     void pollAnswers()
     void doKeepalive()
+    // 阶段 6.2：加载初始封禁列表
+    void refreshBans()
     // 参与者轮询 5s（同时触发 Offer 生成）
     participantsTimer = setInterval(() => void pollParticipants(), 5000)
     // Answer 轮询 5s
@@ -357,8 +398,12 @@ export function useRoomHost(options: {
   return {
     pendingAnswers,
     offerGenerating,
+    bannedList,
+    banServerTime,
     handleConfirm,
     handleKick,
+    handleUnban,
+    refreshBans,
     handleCloseRoom,
   }
 }

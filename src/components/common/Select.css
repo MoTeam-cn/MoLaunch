@@ -83,6 +83,44 @@
 }
 
 /* ============================================================
+ * 清空按钮（参考 ArcoDesign allow-clear 实现）
+ * 默认隐藏，hover 触发器时显示，并用兄弟选择器隐藏箭头
+ * 图标 12×12，圆形 hover 背景 20×20
+ * ============================================================ */
+.select-clear-btn {
+  display: none;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background-color 0.1s cubic-bezier(0, 0, 1, 1);
+}
+
+.select-clear-btn svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  color: #86909c;
+}
+
+/* hover 触发器时：显示清空按钮 + 隐藏后续兄弟箭头 */
+.select-trigger:hover .select-clear-btn {
+  display: flex;
+}
+
+.select-trigger:hover .select-clear-btn ~ .select-arrow {
+  display: none;
+}
+
+/* 清空按钮自身 hover：浅灰圆形背景（比触发器 hover 略深以保证可见） */
+.select-clear-btn:hover {
+  background-color: #d9dce0;
+}
+
+/* ============================================================
  * 下拉面板
  * bg: #fff, border 1px #e5e6eb, radius 4px, shadow 0 4px 10px
  * padding: 4px 0, max-height 200px

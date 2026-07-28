@@ -2,14 +2,24 @@
 /**
  * 浮动下载按钮
  * 右下角圆形按钮 + 进度环，点击进入下载管理页面
+ *
+ * 位置协调：BackToTop 可见时上移（bottom-24=96px）腾出空间，
+ * 不可见时贴底（bottom-6=24px），避免预留空位。
  */
 
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
+import { backToTopVisible } from '@/composables/useFloatingButtonState'
 
 const router = useRouter()
 const versionStore = useVersionStore()
+
+/** BackToTop 可见时上移避让，不可见时贴底 */
+const positionClass = computed(() =>
+  backToTopVisible.value ? 'bottom-24' : 'bottom-6',
+)
 
 function goToDownloads() {
   router.push('/apps/downloads')
@@ -28,7 +38,7 @@ function goToDownloads() {
     <!-- 有下载任务时显示 -->
     <button
       v-if="versionStore.downloading"
-      class="fixed bottom-20 right-6 z-50 w-14 h-14 bg-primary-600 rounded-full shadow-lg flex items-center justify-center hover:bg-primary-700 active:scale-95 transition-all group"
+      :class="['fixed right-6 z-50 w-14 h-14 bg-primary-600 rounded-full shadow-lg flex items-center justify-center hover:bg-primary-700 active:scale-95 transition-all group', positionClass]"
       @click="goToDownloads"
     >
       <ArrowDownTrayIcon class="w-6 h-6 text-white group-hover:scale-110 transition-transform" />

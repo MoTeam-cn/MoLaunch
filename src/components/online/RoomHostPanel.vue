@@ -16,7 +16,7 @@
  * - 每个新参与者的 DataChannel 在 `createOfferFor` 后绑定 `onMessage` → `lan.forwardToTun` 转发到 TUN
  */
 
-import { computed, inject } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import { useVirtualLan } from '@/composables/useVirtualLan'
@@ -26,6 +26,8 @@ import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import PendingAnswerList from './PendingAnswerList.vue'
 import ParticipantList from './ParticipantList.vue'
+import BannedList from './BannedList.vue'
+import KickConfirmDialog from './KickConfirmDialog.vue'
 import WhitelistEditor from './WhitelistEditor.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 import {
@@ -53,12 +55,34 @@ const lan = useVirtualLan({
 /** 房主业务逻辑（轮询 + Offer 生成 + 交互处理 + timer 管理） */
 const {
   pendingAnswers,
+  bannedList,
+  banServerTime,
   handleConfirm,
   handleKick,
+  handleUnban,
+  refreshBans,
   handleCloseRoom,
 } = useRoomHost({ hostMesh, lan })
 
 const room = computed(() => store.roomState)
+
+/** 踢出确认弹窗状态（null=关闭，有值=正在选择封禁时长） */
+const kickTarget = ref<{ participantId: string; devicePk: string; virtualIp?: string } | null>(null)
+
+function onKick(participantId: string, devicePk: string) {
+  const p = room.value.participants.find((x) => x.participantId === participantId)
+  kickTarget.value = { participantId, devicePk, virtualIp: p?.virtualIp }
+}
+
+function onConfirmKick(banDuration: number | null) {
+  const target = kickTarget.value
+  kickTarget.value = null
+  if (target) void handleKick(target.participantId, target.devicePk, banDuration)
+}
+
+function onCloseKick() {
+  kickTarget.value = null
+}
 /** 已联通参与者数（channel open） */
 const connectedCount = computed(() => hostMesh.connectedCount())
 /** 已确认参与者数（status='confirmed'） */
@@ -213,7 +237,24 @@ const nearPlayerLimit = computed(
       v-if="room.participants.length > 0"
       :participants="room.participants"
       :conn-state-text="participantStateText"
-      @kick="handleKick"
+      @kick="onKick"
+    />
+
+    <!-- 封禁列表 + 解封操作（阶段 6.2，仅房主） -->
+    <BannedList
+      :bans="bannedList"
+      :server-time="banServerTime"
+      @unban="handleUnban"
+      @refresh="refreshBans"
+    />
+
+    <!-- 踢出确认弹窗（选择封禁时长） -->
+    <KickConfirmDialog
+      v-if="kickTarget"
+      :device-pk="kickTarget.devicePk"
+      :virtual-ip="kickTarget.virtualIp"
+      @close="onCloseKick"
+      @confirm="onConfirmKick"
     />
 
     <div class="pt-2">
