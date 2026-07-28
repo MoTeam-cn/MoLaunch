@@ -9,11 +9,11 @@
 
 ### 变更
 
-#### NavSidebar 支持 disabled 态 + 联机「房间详情」灰色不可点
-- 背景：用户反馈联机页面侧边栏「房间详情」在未创建/加入房间时也可点击，但点击后无内容可显示，体验混乱。期望未在房间时该项灰色不可点击，进入房间后才可正常使用
+#### NavSidebar 支持 disabled 态 + 联机房间子项互斥灰显
+- 背景：用户反馈联机页面侧边栏「房间详情」在未创建/加入房间时也可点击，但点击后无内容可显示，体验混乱。期望未在房间时该项灰色不可点击，进入房间后才可正常使用；同时在房间中时「创建房间」「加入房间」应灰显（必须先退出房间）
 - 改动：
   - **NavSidebar 扩展 disabled 字段**：[src/components/common/NavSidebar.vue](src/components/common/NavSidebar.vue) `NavCategory` 接口新增可选 `disabled?: boolean` 字段；父项和子项渲染时根据 disabled 添加 `text-gray-300 cursor-not-allowed` 样式（替换原 `cursor-pointer`）；`handleClick` 在 disabled 时直接 return 不切换；子项 `@click` 改为 `!child.disabled && emit(...)`；URL 恢复逻辑同步检查 disabled，避免刷新页面恢复到不可用项
-  - **Online.vue 房间详情动态 disabled**：[src/views/Online.vue](src/views/Online.vue) `roomDetailsChild` 从常量改为 `computed`，`disabled: !isInRoom.value`；`categories` 始终追加该子项（让用户知道有此功能），未在房间时灰色不可点；`watch(isReady)` 的 URL 恢复逻辑增加 `tab === 'room_details' && isInRoom.value` 校验
+  - **Online.vue 房间子项动态 disabled**：[src/views/Online.vue](src/views/Online.vue) `roomDetailsChild` 从常量改为 `computed`，`disabled: !isInRoom.value`；`categories` 中「创建房间」「加入房间」子项根据 `isInRoom` 设置 `disabled: inRoom`（在房间时灰显），「房间详情」反之。子项 disabled 规则：未在房间时「创建/加入」可用、「房间详情」灰；在房间中时「创建/加入」灰、「房间详情」可用。`watch(isReady)` 的 URL 恢复逻辑增加 `tab === 'room_details' && isInRoom.value` 校验
 - 复用：
   - 复用 NavSidebar 现有 `NavCategory` 接口，仅新增可选字段，向后兼容 VersionSettings / Tools / Settings 等其他使用方
   - 复用现有 `isInRoom` computed，无需新增状态判断

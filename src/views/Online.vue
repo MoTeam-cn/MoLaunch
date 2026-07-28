@@ -117,13 +117,21 @@ const roomDetailsChild = computed<NavCategory>(() => ({
   disabled: !isInRoom.value,
 }))
 
-/** 实际渲染的分类列表：未就绪时只显示「设备」；就绪后追加「房间详情」子项（未在房间时灰色） */
+/** 实际渲染的分类列表
+ *
+ * 子项 disabled 规则：
+ * - 未在房间：「创建房间」「加入房间」可用，「房间详情」灰色
+ * - 在房间中：「创建房间」「加入房间」灰色（必须先退出房间），「房间详情」可用
+ */
 const categories = computed<NavCategory[]>(() => {
   if (!isReady.value) return [deviceCategory]
-  const roomWithDetails: NavCategory = {
-    ...roomCategory,
-    children: [...roomCategory.children!, roomDetailsChild.value],
-  }
+  const inRoom = isInRoom.value
+  const children: NavCategory[] = [
+    { ...roomCategory.children![0], disabled: inRoom },
+    { ...roomCategory.children![1], disabled: inRoom },
+    roomDetailsChild.value,
+  ]
+  const roomWithDetails: NavCategory = { ...roomCategory, children }
   return [deviceCategory, roomWithDetails]
 })
 
