@@ -33,8 +33,9 @@ pub fn sanitize_sensitive_info(s: &str) -> String {
 
     let long_token_re = LONG_TOKEN_RE.get_or_init(|| {
         // 长度 >= 40 的连续 base64/hex 字符串（可能是 token）
-        // 排除路径、UUID（含连字符）等
-        Regex::new(r"\b[A-Za-z0-9+/=_-]{40,}\b").unwrap()
+        // 字符集不含 `/`，避免把 URL 路径（如 net/data/xxx/versions/yyy/name）整体误判为 token
+        // JWT 和 url-safe base64 token 不含 `/`，不受影响
+        Regex::new(r"\b[A-Za-z0-9+=_-]{40,}\b").unwrap()
     });
 
     let mut result = s.to_string();
@@ -88,5 +89,13 @@ mod tests {
         let result = sanitize_sensitive_info(input);
         assert!(result.contains("***"));
         assert!(!result.contains("abc123def456ghi789"));
+    }
+
+    #[test]
+    fn test_sanitize_preserves_urls() {
+        // URL 路径含 `/`，不应被 long_token_re 误判为 token
+        let input = "https://cdn-modrinth.mocdn.net/data/l9m9tuPN/versions/M8j2mfGj/physics-mod-3.0.14-mc-1.20.1-forge.jar";
+        let result = sanitize_sensitive_info(input);
+        assert_eq!(input, result, "URL should not be sanitized");
     }
 }

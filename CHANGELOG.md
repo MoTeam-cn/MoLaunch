@@ -9,6 +9,13 @@
 
 ### 变更
 
+#### 修复日志脱敏误伤 URL 路径问题
+- 背景：用户反馈下载日志中 URL 显示为 `https://cdn-modrinth.mocdn.***.0.14-mc-1.20.1-forge.jar`，`net/data/.../physics-mod-3` 被替换为 `***`
+- 根因：[logger/sanitize.rs](src-tauri/src/logger/sanitize.rs) `long_token_re` 正则字符集 `[A-Za-z0-9+/=_-]` 包含 `/`，导致 URL 路径段 `net/data/l9m9tuPN/versions/M8j2mfGj/physics-mod-3`（49 字符，含 `/` 和 `-`）被整体当作长 token 替换
+- 修复：从字符集移除 `/`，改为 `[A-Za-z0-9+=_-]{40,}`。URL 路径会被 `/` 断开成短段（每段不足 40 字符阈值），真实 JWT/url-safe base64 token 不含 `/`，不受影响
+- 测试：新增 `test_sanitize_preserves_urls` 用例验证 URL 不被误伤，5 个测试全部通过
+- 验证：`cargo test --lib logger::sanitize` 通过（5 passed; 0 failed）
+
 #### logger 模块拆分（单文件 455 行 → 目录模块 3 文件）
 - 背景：[src-tauri/src/logger.rs](src-tauri/src/logger.rs) 单文件 455 行，接近 400 行关注阈值，职责混杂（核心日志器 + 文件查看 API + 脱敏 + 测试），需按职责拆分提升可维护性
 - 改动：
