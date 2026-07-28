@@ -9,6 +9,22 @@
 
 ### 变更
 
+#### 请求日志 req_id 落库修复 + UA 解析增强 + 中间件顺序调整
+- 背景：用户反馈 `/v1/admin/rooms` 与 `/v1/admin/devices` 分页参数反序列化报错（`invalid type: string "1", expected u32`），同时 `/v1/admin/logs` 接口按 req_id 查询返回空（数据库里 req_id 字段是空字符串），HTTP 日志文件中 MoLaunch 客户端设备类型显示 `Unknown`（UA 含小写 `windows` 未识别）
+- 改动：
+  - **中间件顺序调整**：[api-server/src/server/mod.rs](api-server/src/server/mod.rs) 将 `request_id` 中间件从最内层移到最外层（最后添加 layer），调整为 `request_id → request_logger → rate_limit → jwt_guard → handler`。原顺序 `request_logger → rate_limit → request_id` 导致 `request_logger` 在 `next.run(req).await` 之前提取 `req.extensions().get::<RequestId>()` 时 `RequestId` 尚未注入，req_id 字段被写为空字符串
+  - **device_pk 提取时机修正**：[api-server/src/middlewares/jwt.rs](api-server/src/middlewares/jwt.rs) `jwt_guard` 在 `next.run(req).await` 之后将 `CurrentDevice` 同时注入到 `response.extensions()`；[api-server/src/middlewares/request_logger.rs](api-server/src/middlewares/request_logger.rs) `request_logger` 将 `device_pk` 提取从 `next.run(req).await` 之前移到之后，从 `response.extensions()` 读取。原实现因 `request_logger` 位于 `jwt_guard` 外层无法访问 `req.extensions()` 中的 `CurrentDevice`，导致 `device_pk` 字段恒为 None
+  - **UA 解析 - MoLaunch 客户端**：[api-server/src/utils/ua_parser.rs](api-server/src/utils/ua_parser.rs) `detect_device` 在通用匹配之前识别 `MoLaunch/<os> <version>` 格式（`<os>` 来自 `std::env::consts::OS` 全小写），映射 `windows` / `macos` / `linux` / `ios` / `android` 到标准平台名。原实现仅匹配大写 `Windows` 等关键字，导致 `MoLaunch/windows 0.1.0` 识别为 `Unknown`
+  - **UA 解析 - Bot 大小写不敏感**：`is_bot` 改为 `to_lowercase()` 后匹配，补充 `sogou` / `bytespider` / `applebot` / `facebookexternalhit` / `twitterbot` / `linkedinbot` / `telegrambot` / `discordbot` / `whatsapp` 关键字。原实现仅匹配固定大小写关键字，`bingbot`（小写）/ `Sogou web spider` 等漏识别
+  - **测试覆盖**：新增 5 个测试用例（`test_molaunch_client` 修正为实际 UA 格式、`test_molaunch_client_macos` / `test_molaunch_client_linux` 跨平台、`test_bingbot_case_insensitive` / `test_baiduspider_case_insensitive` / `test_sogou_spider_case_insensitive` 大小写不敏感验证），共 17 个 UA 解析测试全部通过
+- 设计取舍：
+  - **request_id 放最外层**：确保所有响应（含被限流/封禁的）都带 `Req-ID` 响应头，且 `request_logger` 能在 `next.run(req).await` 之前从 `req.extensions()` 提取 `RequestId`。代价是 `request_logger` 看不到 `device_pk`（由更内层的 `jwt_guard` 注入），故同步修改 `jwt_guard` 把 `CurrentDevice` 也注入到 `response.extensions()` 供外层提取
+  - **response.extensions() 传递 CurrentDevice**：`response.extensions()` 不会被序列化到响应体，不影响客户端；仅占少量内存用于跨中间层数据传递
+- 复用：
+  - `request_logger` 沿用 `RequestId` / `CurrentDevice` Extension 模式，与既有中间件风格一致
+  - `is_bot` 沿用关键字匹配策略，仅扩展关键字列表与大小写不敏感
+- 验证：api-server `cargo check --all-targets` 通过；`cargo test --lib utils::ua_parser` 17 个测试全部通过
+
 #### 联机大厅 + 整合包云端共享（阶段四）+ 配置热重载 + 多算法密码 Hash
 - 背景：阶段四联机大厅允许房主创建公开房间供其他用户浏览加入；整合包云端共享让加入方在加入前感知「这个房间需要什么整合包」并可一键安装。同时修复配置文件热重载日志显示但实际未生效的问题，扩展 admin_guard 支持多种密码哈希算法
 - 改动：
