@@ -9,6 +9,23 @@
 
 ### 变更
 
+#### IPC 敏感信息泄露修复（token / device_pk 序列化隔离）
+- 背景：用户反馈 `meta_manager` 的 `switch_ms_account` action 返回的 `LocalAuthResult` 携带 `access_token` / `client_token` 明文，经子 agent 全面排查发现项目内存在 4 处同类泄露点（token 通过 Serialize 结构透传到前端 IPC）
+- 改动：
+  - **LocalAuthResult**：[src-tauri/src/state/auth.rs](src-tauri/src/state/auth.rs) 给 `access_token` / `client_token` 加 `#[serde(skip)]`，序列化到 IPC 时跳过。`profile_json` 保留（前端 `useSkinOperations` / `AccountCard` 解析微软账号皮肤/披风 URL 用于头像显示，不含 token）。启动游戏时 `build_launch_config` 已直接从后端 `auth_storage` 读取 token 注入启动参数，前端无需访问 token 明文
+  - **AuthlibLoginResult::NeedSelect**：[src-tauri/src/commands/auth/authlib.rs](src-tauri/src/commands/auth/authlib.rs) 给 `access_token` / `client_token` 加 `#[serde(skip)]`。前端选定 profile 后调用 `authlib_select_profile`，后端从 `state.authlib_pending`（内存暂存）取出 token 完成 refresh，不依赖前端回传
+  - **DeviceStatus**：[src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs) 给 `device_pk` 加 `#[serde(skip)]`。前端无需自己的 device_pk（房间管理 kick/unban 操作中用到的是其他参与者的 device_pk，来自服务器房间状态而非 DeviceStatus）；后端 `build_login_request` 等内部逻辑直接从 `OnlineStorage` 读取 device_pk，不依赖前端回传
+- 设计取舍：
+  - **CurseForge API Key 保持明文回显**：CurseForge API Key 是用户自己申请的本地数据，Tauri 桌面应用无 XSS 风险，且 SettingsAdvanced.vue 配置页依赖明文回显到输入框（点眼睛查看）的 UX，经用户确认保持现状
+  - **MicrosoftLoginResult 不修改**：该结构仅用于内部持久化（serde_json 序列化后 SDK DES 加密落盘），不直接作为 IPC 返回值；`complete_login` 通过 `to_local_auth` 转换为 `LocalAuthResult` 再返回前端。加 `#[serde(skip)]` 会破坏持久化反序列化（token 字段丢失），故保持现状
+  - **profile_json 保留序列化**：含 Mojang 返回的角色属性（皮肤/披风 URL），不含 token；前端 `useSkinOperations` / `AccountCard` 依赖此字段解析头像显示
+  - **使用 `#[serde(skip)]` 而非 `#[serde(skip_serializing)]`**：LocalAuthResult / DeviceStatus 主要用于 IPC 返回（序列化），无持久化反序列化场景；`skip` 同时阻止 Deserialize 时读取字段（用 Default），避免未来误用
+- 复用：
+  - `build_launch_config` 早已实现「从后端 auth_storage 直接读取 token 注入启动参数」的安全模式，本次修复仅需阻断 IPC 序列化路径，无需改造启动链路
+  - `state.authlib_pending` 早已实现「多角色登录上下文内存暂存」，`authlib_select_profile` 从中取 token，无需前端回传
+- 排查范围：子 agent 全面扫描 17 个 IPC manager 入口及其分发子命令，确认 4 处真实泄露点（CRITICAL × 2 / MEDIUM × 1）+ 1 处协议必要暴露（IceServerEntry.credential / room_key，WebRTC 协议要求保持现状）
+- 验证：`cargo check` 通过（9.30s，无警告无错误）
+
 #### 请求日志 req_id 落库修复 + UA 解析增强 + 中间件顺序调整
 - 背景：用户反馈 `/v1/admin/rooms` 与 `/v1/admin/devices` 分页参数反序列化报错（`invalid type: string "1", expected u32`），同时 `/v1/admin/logs` 接口按 req_id 查询返回空（数据库里 req_id 字段是空字符串），HTTP 日志文件中 MoLaunch 客户端设备类型显示 `Unknown`（UA 含小写 `windows` 未识别）
 - 改动：

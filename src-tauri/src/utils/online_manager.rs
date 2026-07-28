@@ -31,11 +31,17 @@ use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 // ============================================================
 
 /// 设备状态返回
+///
+/// 安全说明：`device_pk` 标记 `#[serde(skip)]`，不暴露给前端。
+/// 前端无需自己的 device_pk（房间管理操作中用到的是其他参与者的 device_pk，
+/// 来自服务器房间状态而非 DeviceStatus）。后端 `build_login_request` 等
+/// 内部逻辑直接从 `OnlineStorage` 读取 device_pk，不依赖前端回传。
 #[derive(Debug, Clone, Serialize)]
 pub struct DeviceStatus {
     pub registered: bool,
     pub logged_in: bool,
     pub token_expired: bool,
+    #[serde(skip)]
     pub device_pk: String,
     pub device_id: String,
     pub token_expires_at: u64,

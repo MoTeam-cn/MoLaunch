@@ -49,6 +49,10 @@ use crate::state::{AppState, LocalAuthResult};
 ///
 /// - `Success`：单角色或服务器已选定角色，含可直接使用的 `LocalAuthResult`
 /// - `NeedSelect`：多角色且无 selected_profile，前端需弹窗让用户选择
+///
+/// 安全说明：`NeedSelect` 中的 `access_token` / `client_token` 标记 `#[serde(skip)]`，
+/// 不会序列化到 IPC 返回前端。前端选定 profile 后调用 `authlib_select_profile`，
+/// 后端从 `state.authlib_pending`（内存暂存）取出 token 完成刷新，不依赖前端回传。
 #[derive(Debug, Serialize)]
 #[serde(tag = "status")]
 pub enum AuthlibLoginResult {
@@ -56,7 +60,9 @@ pub enum AuthlibLoginResult {
     Success { user: LocalAuthResult },
     #[serde(rename = "need_select")]
     NeedSelect {
+        #[serde(skip)]
         access_token: String,
+        #[serde(skip)]
         client_token: String,
         available_profiles: Vec<Profile>,
     },
