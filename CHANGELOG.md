@@ -9,6 +9,24 @@
 
 ### 变更
 
+#### 存储结构体移除 Serialize derive（方案 C 防御性加固）
+- 背景：`switch_ms_account` 等命令返回 `LocalAuthResult`（已 `#[serde(skip)]` 保护），但底层持久化结构体（`StoredMsAccount` / `StoredAuthlibAccount` / `CurrentUser` / `DeviceCredentials` / `MicrosoftLoginResult` 等）仍派生 `Serialize`，存在被未来误用 `serde_json::to_value` 直接返回前端导致 token/密码/私钥泄露的风险
+- 改动（采用方案 C：移除 `Serialize` derive，强制编译期阻止 `to_value` 误用）：
+  - **auth/storage/types.rs**：[src-tauri/src/minecraft/auth/storage/types.rs](src-tauri/src/minecraft/auth/storage/types.rs) `StoredMsAccount` / `StoredAuthlibAccount` / `CurrentUser` / `PersistedAuthState` 移除 `Serialize` derive，仅保留 `Deserialize`（从注册表加密 JSON 反序列化）；为 `StoredMsAccount` / `StoredAuthlibAccount` 新增 `to_storage_json()` 方法手动构建包含全部字段（含 token/password）的 JSON 供持久化使用
+  - **auth/storage/mod.rs**：[src-tauri/src/minecraft/auth/storage/mod.rs](src-tauri/src/minecraft/auth/storage/mod.rs) `save` 方法中 `to_string(&state.ms_accounts)` / `to_string(&state.authlib_accounts)` 改用 `iter().map(|a| a.to_storage_json()).collect::<Vec<_>>()` 手动序列化，`offline_accounts` 无敏感字段保持原样
+  - **minecraft/online/storage.rs**：[src-tauri/src/minecraft/online/storage.rs](src-tauri/src/minecraft/online/storage.rs) `DeviceCredentials` 移除 `Serialize` derive，新增 `to_storage_json()` 方法（含 Ed25519 私钥种子 / X25519 私钥 / device_pk / device_token），`save` 方法改用 `to_string(&creds.to_storage_json())`
+  - **auth/microsoft/types.rs**：[src-tauri/src/minecraft/auth/microsoft/types.rs](src-tauri/src/minecraft/auth/microsoft/types.rs) `MicrosoftLoginResult` / `OAuthTokenResponse` / `XblTokenResponse` / `XstsTokenResponse` / `MinecraftLoginResponse` / `DeviceCodeResponse` / `MicrosoftLoginError` 移除 `Serialize` derive（仅内部模块间传递，持久化由 `StoredMsAccount` 接管）；`MinecraftProfile` 保留 `Serialize`（`exchange.rs::login_with_xbl` 用 `to_string(&profile)` 构建 `profile_json`，仅含皮肤披风 URL 不含 token）
+  - **community/secure_config.rs**：[src-tauri/src/commands/community/secure_config.rs](src-tauri/src/commands/community/secure_config.rs) `CfConfig` 移除 `Serialize` derive（占位结构体，含 `api_key`）
+- 安全保障：
+  - 移除 `Serialize` 后，`serde_json::to_value(&stored)` 编译失败，强制开发者使用专用 View 结构体（`MsAccountInfo` / `AuthlibAccountInfo` / `LocalAuthResult` / `DeviceStatus`）返回前端
+  - View 结构体的敏感字段已标记 `#[serde(skip)]`（`LocalAuthResult.access_token` / `client_token`、`DeviceStatus.device_pk`、`AuthlibLoginResult::NeedSelect.access_token` / `client_token`）
+  - 持久化场景通过 `to_storage_json()` 方法显式构建完整 JSON，功能等价于原 `Serialize` derive，但调用点明确可审计
+- 复用：
+  - `MsAccountInfo` / `AuthlibAccountInfo` / `LocalAuthResult` / `DeviceStatus` 等 View 结构体已存在，本次无需新增
+  - `to_storage_json()` 模式参考 `DeviceCredentials` 已有的 `is_registered()` / `is_token_expired()` 方法风格
+- 验证：`cargo check` 编译通过
+
+
 #### 弹窗 Promise 化修复内存优化强力模式 + 插件卸载确认无响应
 - 背景：`showConfirm` 为回调式签名返回 `void`，在 async 函数中被误用为 Promise（`await showConfirm(...)` 立即 resolve），导致内存优化「强力模式」复选框点击后无反应、插件卸载确认弹窗点击后无后续动作
 - 改动：

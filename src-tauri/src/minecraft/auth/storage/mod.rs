@@ -371,14 +371,16 @@ impl AuthStorage {
                 }
             }
 
-            // 写入多账号列表
+            // 写入多账号列表（通过 to_storage_json 手动序列化，避免派生 Serialize 误暴露 token）
             if !state.ms_accounts.is_empty() {
-                let json = serde_json::to_string(&state.ms_accounts)
+                let arr: Vec<serde_json::Value> =
+                    state.ms_accounts.iter().map(|a| a.to_storage_json()).collect();
+                let json = serde_json::to_string(&arr)
                     .map_err(|e| format!("序列化账号列表失败: {}", e))?;
                 self.reg_set_encrypted(&key, KEY_MS_ACCOUNTS, &json).await?;
             }
 
-            // 写入离线账号列表
+            // 写入离线账号列表（无敏感字段，可直接序列化）
             if !state.offline_accounts.is_empty() {
                 let json = serde_json::to_string(&state.offline_accounts)
                     .map_err(|e| format!("序列化离线账号列表失败: {}", e))?;
@@ -386,9 +388,14 @@ impl AuthStorage {
                     .await?;
             }
 
-            // 写入 authlib 账号列表
+            // 写入 authlib 账号列表（通过 to_storage_json 手动序列化，避免派生 Serialize 误暴露 password/token）
             if !state.authlib_accounts.is_empty() {
-                let json = serde_json::to_string(&state.authlib_accounts)
+                let arr: Vec<serde_json::Value> = state
+                    .authlib_accounts
+                    .iter()
+                    .map(|a| a.to_storage_json())
+                    .collect();
+                let json = serde_json::to_string(&arr)
                     .map_err(|e| format!("序列化 authlib 账号列表失败: {}", e))?;
                 self.reg_set_encrypted(&key, KEY_AUTHLIB_ACCOUNTS, &json)
                     .await?;

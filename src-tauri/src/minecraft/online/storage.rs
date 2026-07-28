@@ -24,7 +24,7 @@ use crate::log_info;
 use crate::log_warn;
 use crate::sdk::SdkInstance;
 use crate::storage::Storage;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -34,7 +34,11 @@ use tokio::sync::Mutex as TokioMutex;
 const DEVICE_FILE: &str = "online/device.json";
 
 /// 持久化的设备凭证
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+///
+/// 安全约束（方案 C）：仅派生 `Deserialize`（从加密文件反序列化），**不派生 `Serialize`**。
+/// 含 Ed25519 私钥种子、X25519 私钥、device_pk、device_token 等高敏感字段，
+/// 持久化写入时调用 `to_storage_json()`；IPC 返回前端用 `DeviceStatus`（已 `#[serde(skip)]` device_pk）。
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct DeviceCredentials {
     /// Ed25519 私钥种子（32 字节，Base64Url）
     pub ed25519_seed_b64u: String,
@@ -70,6 +74,20 @@ impl DeviceCredentials {
         }
         let now = chrono::Utc::now().timestamp() as u64;
         now + 60 >= self.token_expires_at
+    }
+
+    /// 构建包含全部字段（含私钥/JWT）的 JSON，仅供持久化写入加密文件使用
+    pub fn to_storage_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "ed25519_seed_b64u": self.ed25519_seed_b64u,
+            "x25519_secret_b64u": self.x25519_secret_b64u,
+            "device_pk": self.device_pk,
+            "device_token": self.device_token,
+            "token_expires_at": self.token_expires_at,
+            "device_public_key_b64u": self.device_public_key_b64u,
+            "device_id": self.device_id,
+            "last_login_at": self.last_login_at,
+        })
     }
 }
 
@@ -190,8 +208,9 @@ impl OnlineStorage {
     /// 保存设备凭证
     ///
     /// 写入新路径（AppData），并尝试清理旧路径文件以防重复迁移。
+    /// 通过 `to_storage_json()` 手动序列化，避免派生 `Serialize` 误将私钥/JWT 暴露到 IPC。
     pub async fn save(&self, creds: &DeviceCredentials) -> Result<(), String> {
-        let json = serde_json::to_string(creds)
+        let json = serde_json::to_string(&creds.to_storage_json())
             .map_err(|e| format!("序列化设备凭证失败: {}", e))?;
 
         // 优先加密存储；SDK 不可用时降级为明文（带警告）

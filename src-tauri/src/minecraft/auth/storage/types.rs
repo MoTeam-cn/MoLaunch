@@ -1,11 +1,22 @@
 //! 认证持久化数据结构
+//!
+//! 安全约束（方案 C：移除 `Serialize` derive 强制编译期阻止 IPC 误用）：
+//! - `StoredMsAccount` / `StoredAuthlibAccount` / `CurrentUser` / `PersistedAuthState`
+//!   仅派生 `Deserialize`（用于从注册表加密 JSON 反序列化），**不派生 `Serialize`**。
+//! - 持久化场景（写入注册表）通过 `to_storage_json()` 方法手动构建包含全部字段的 JSON，
+//!   避免 `serde_json::to_value` 误将敏感字段（token/password）序列化到 IPC 返回。
+//! - IPC 返回前端必须使用专用 View 结构体：`MsAccountInfo` / `AuthlibAccountInfo` /
+//!   `LocalAuthResult` / `DeviceStatus`，这些结构体的敏感字段已标记 `#[serde(skip)]`。
 
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 use super::super::microsoft::MicrosoftLoginResult;
 
 /// 持久化的微软账号信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// 含 `access_token` / `refresh_token` 敏感字段，仅派生 `Deserialize`（从注册表反序列化）。
+/// 持久化写入时调用 `to_storage_json()`；IPC 返回前端用 `MsAccountInfo` 过滤。
+#[derive(Debug, Clone, Deserialize)]
 pub struct StoredMsAccount {
     pub username: String,
     pub uuid: String,
@@ -13,6 +24,20 @@ pub struct StoredMsAccount {
     pub refresh_token: String,
     pub expires_at: u64,
     pub profile_json: String,
+}
+
+impl StoredMsAccount {
+    /// 构建包含全部字段（含 token）的 JSON，仅供持久化写入注册表使用
+    pub fn to_storage_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "username": self.username,
+            "uuid": self.uuid,
+            "access_token": self.access_token,
+            "refresh_token": self.refresh_token,
+            "expires_at": self.expires_at,
+            "profile_json": self.profile_json,
+        })
+    }
 }
 
 impl From<&MicrosoftLoginResult> for StoredMsAccount {
@@ -29,7 +54,9 @@ impl From<&MicrosoftLoginResult> for StoredMsAccount {
 }
 
 /// 持久化的离线账号信息
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// 无敏感字段（仅 username/uuid/skin），保留 `Serialize` 便于持久化。
+#[derive(Debug, Clone, serde::Serialize, Deserialize)]
 pub struct StoredOfflineAccount {
     pub username: String,
     pub uuid: String,
@@ -40,9 +67,9 @@ pub struct StoredOfflineAccount {
 
 /// 持久化的 yggdrasil（authlib-injector 外置登录）账号信息
 ///
-/// 每个账号绑定一个 yggdrasil 服务器（server_url），与微软/离线账号平级。
-/// 密码以加密形式存储（注册表整体加密），用于 token 失效后自动重新登录。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// 含 `password` / `access_token` / `client_token` 敏感字段，仅派生 `Deserialize`。
+/// 持久化写入时调用 `to_storage_json()`；IPC 返回前端用 `AuthlibAccountInfo` 过滤。
+#[derive(Debug, Clone, Deserialize)]
 pub struct StoredAuthlibAccount {
     /// 登录账号（邮箱或用户名）
     pub username: String,
@@ -62,8 +89,27 @@ pub struct StoredAuthlibAccount {
     pub server_name: String,
 }
 
+impl StoredAuthlibAccount {
+    /// 构建包含全部字段（含 password/token）的 JSON，仅供持久化写入注册表使用
+    pub fn to_storage_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "username": self.username,
+            "password": self.password,
+            "access_token": self.access_token,
+            "client_token": self.client_token,
+            "uuid": self.uuid,
+            "player_name": self.player_name,
+            "server_url": self.server_url,
+            "server_name": self.server_name,
+        })
+    }
+}
+
 /// 持久化的认证状态
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+///
+/// 仅派生 `Deserialize` + `Default`（内存态由 `AuthStorage::load` 逐字段构造）。
+/// `AuthStorage::save` 逐字段写入注册表，不依赖整体 `Serialize`。
+#[derive(Debug, Clone, Deserialize, Default)]
 pub struct PersistedAuthState {
     /// 当前登录的账号（离线/微软/authlib）
     pub current_user: Option<CurrentUser>,
@@ -78,7 +124,10 @@ pub struct PersistedAuthState {
 }
 
 /// 当前登录用户（持久化用）
-#[derive(Debug, Clone, Serialize, Deserialize)]
+///
+/// 含 `access_token` / `client_token` / `refresh_token` 敏感字段，仅派生 `Deserialize`。
+/// `AuthStorage::save` 逐字段写入注册表；IPC 返回前端用 `LocalAuthResult`（已 `#[serde(skip)]`）。
+#[derive(Debug, Clone, Deserialize)]
 pub struct CurrentUser {
     pub name: String,
     pub uuid: String,
