@@ -13,9 +13,11 @@
  * - 已进入房间时（role=host/guest），RoomManager 自动显示对应面板
  */
 
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useOnlineStore } from '@/stores/online'
+import { useWebRTC } from '@/composables/useWebRTC'
+import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import NavSidebar from '@/components/common/NavSidebar.vue'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -29,6 +31,26 @@ import {
   ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'
 import type { Component } from 'vue'
+
+/**
+ * WebRTC 实例提升到页面级（房间挂起改造）
+ *
+ * 原实现：RoomManager.vue 内创建 hostMesh / guestWebrtc，切换侧边栏菜单时
+ * RoomManager 被 v-if 卸载 → onUnmounted 触发 close() → WebRTC 连接断开。
+ *
+ * 现实现：实例提升到 Online.vue，RoomManager 改为 inject。切换侧边栏菜单
+ * （device ↔ create ↔ join）时 RoomManager 卸载但 WebRTC 实例保持，
+ * 房间连接不断。仅离开联机页面（Online.vue 卸载）时才 close()。
+ *
+ * provide key 与原 RoomManager.vue 保持一致（'hostMesh' / 'guestWebrtc'），
+ * 子组件 RoomHostPanel / RoomGuestPanel 的 inject 链路无需改动。
+ */
+const HOST_MESH_KEY = 'hostMesh'
+const GUEST_WEBRTC_KEY = 'guestWebrtc'
+const hostMesh = useWebRTCMesh()
+const guestWebrtc = useWebRTC()
+provide(HOST_MESH_KEY, hostMesh)
+provide(GUEST_WEBRTC_KEY, guestWebrtc)
 
 interface NavCategory {
   id: string

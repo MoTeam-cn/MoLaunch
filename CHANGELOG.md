@@ -9,6 +9,23 @@
 
 ### 变更
 
+#### 联机房间挂起 + 白名单 mcsdk- 前缀隐藏
+- 背景：用户反馈进入房间后切换侧边栏菜单（设备 ↔ 创建 ↔ 加入）会断开 WebRTC 连接，房间详情无法挂着；白名单列表和输入框直接显示 `mcsdk-xxxx-xxxx-xxxx-xxxx` 前缀，视觉冗余
+- 改动：
+  - **WebRTC 实例提升到页面级**：[src/views/Online.vue](src/views/Online.vue) 在页面 setup 阶段创建 `hostMesh` / `guestWebrtc` 并 `provide`，实例生命周期绑定到 Online.vue。切换侧边栏菜单时 RoomManager 被 v-if 卸载不会触发 `onUnmounted → close()`，房间连接保持不断
+  - **RoomManager.vue 改为 inject**：[src/components/online/RoomManager.vue](src/components/online/RoomManager.vue) 移除本地 `useWebRTCMesh()` / `useWebRTC()` 创建和 `provide`，改为 `inject` 获取 Online.vue 的实例引用。`hostMesh` 仅 RoomHostPanel 自行 inject，RoomManager 不再需要
+  - **RoomGuestPanel inject key 修复**：[src/components/online/RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) inject key 从 `'guestWebRTC'`（大写 RTC）修正为 `'guestWebrtc'`（小写 rtc），与 Online.vue 的 provide key 对齐。原不匹配导致 inject 返回 undefined
+  - **新建 device-id.ts 工具**：[src/utils/online/device-id.ts](src/utils/online/device-id.ts) 提供 `stripMcsdkPrefix` / `ensureMcsdkPrefix` 两个函数，统一处理 `mcsdk-` 前缀的剥离与补全
+  - **WhitelistEditor 前缀隐藏**：[src/components/online/WhitelistEditor.vue](src/components/online/WhitelistEditor.vue) 列表展示用 `stripMcsdkPrefix` 去前缀，添加时用 `ensureMcsdkPrefix` 自动补前缀，placeholder 从 `mcsdk-xxxx-xxxx-xxxx-xxxx` 改为 `xxxx-xxxx-xxxx-xxxx`。内部存储与后端交互始终使用完整前缀
+- 设计取舍：
+  - **实例提升而非 keep-alive**：`<keep-alive>` 会缓存组件 DOM 但 composable 的 `onUnmounted` 仍会触发，无法保持 WebRTC 连接。提升实例到页面级是最小改动方案
+  - **displayEntries 而非直接改 raw 数据**：展示用 `{ raw, display }` 二元组，raw 用于内部操作（移除、提交后端），display 用于 UI 渲染。避免去前缀后丢失原始 ID 导致无法匹配
+  - **device-id.ts 放 utils/online/**：与 `webrtc-helpers.ts` / `nat-type.ts` / `crypto.ts` / `protocol.ts` 同级，属于联机模块的工具函数
+- 复用：
+  - `useWebRTC` / `useWebRTCMesh` composable 未改动，仅调整调用位置
+  - `stripMcsdkPrefix` / `ensureMcsdkPrefix` 可被未来其他展示设备 ID 的组件复用（如 OnlineDevicePanel）
+- 验证：`vue-tsc --noEmit` 类型检查通过（RoomManager.vue / WhitelistEditor.vue / RoomGuestPanel.vue 无错误）
+
 #### 联机创建房间表单改造（MC 版本下拉 + 白名单折叠 + 布局美化）
 - 背景：用户反馈创建房间时 MC 版本需要手动输入字符串，容易出错且无法利用启动器已安装版本列表；白名单在创建表单底部平铺展开，即使不启用也占大量视觉空间；整体布局字段标签过窄、间距紧凑，视觉不舒服
 - 改动：

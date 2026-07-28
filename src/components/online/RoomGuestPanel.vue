@@ -37,7 +37,7 @@ import {
 import VirtualIpCard from './VirtualIpCard.vue'
 
 const store = useOnlineStore()
-const guestWebrtc = inject('guestWebRTC') as ReturnType<typeof useWebRTC>
+const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
 
 /**
  * TUN 桥接：TUN 读到包 → 通过 DataChannel 发给房主

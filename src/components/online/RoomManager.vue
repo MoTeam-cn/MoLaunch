@@ -9,18 +9,18 @@
  * 已进入房间时（role=host/guest），无论 mode 如何都显示对应面板，
  * 保证用户在房间内切换子菜单不会丢失连接。
  *
- * WebRTC 实例归属（mesh 拓扑）：
- * - `hostMesh`：房主侧 useWebRTCMesh，管理 N 个参与者的独立 PC
- *   房主创建房间时不再生成本地 Offer，改为参与者加入后由 RoomHostPanel 轮询触发 createOfferFor
- * - `guestWebrtc`：加入方侧 useWebRTC（单 PC），通过 fetchOfferAndAnswer 轮询房主为自己生成的 Offer
- * - 两个实例均在 setup 阶段创建，确保 onUnmounted 生效
- * - 进入房间后通过 `provide` 传递给对应面板复用
+ * WebRTC 实例归属（mesh 拓扑，房间挂起改造）：
+ * - `hostMesh` / `guestWebrtc` 实例由 [Online.vue](src/views/Online.vue) 在页面级创建并 provide，
+ *   本组件通过 inject 获取引用，**不在本地创建**。
+ * - 切换侧边栏菜单（device ↔ create ↔ join）时 RoomManager 被 v-if 卸载，
+ *   但 WebRTC 实例生命周期绑定在 Online.vue，不会触发 onUnmounted → close()，
+ *   房间连接保持不断。仅离开联机页面时才销毁。
+ * - 子面板 RoomHostPanel / RoomGuestPanel 同样 inject 获取，链路一致。
  */
 
-import { ref, provide, computed } from 'vue'
+import { ref, inject, computed } from 'vue'
 import { useOnlineStore } from '@/stores/online'
-import { useWebRTC } from '@/composables/useWebRTC'
-import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
+import type { useWebRTC } from '@/composables/useWebRTC'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Input from '@/components/common/Input.vue'
@@ -39,17 +39,11 @@ defineProps<{
   mode: 'create' | 'join'
 }>()
 
-/** provide key：房主 mesh / 加入方 WebRTC 实例（子面板 inject 复用） */
-const HOST_MESH_KEY = 'hostMesh'
-const GUEST_WEBRTC_KEY = 'guestWebrtc'
-
 const store = useOnlineStore()
-// 房主 mesh 多 PC 管理器 + 加入方单 PC，独立实例避免角色切换时 PC 状态污染
-const hostMesh = useWebRTCMesh()
-const guestWebrtc = useWebRTC()
-
-provide(HOST_MESH_KEY, hostMesh)
-provide(GUEST_WEBRTC_KEY, guestWebrtc)
+// WebRTC 实例由 Online.vue 页面级 provide，本组件 inject 获取加入方实例引用。
+// 切换侧边栏菜单时本组件卸载不会触发实例 close()，房间连接保持。
+// 房主侧 hostMesh 由 RoomHostPanel 自行 inject，此处无需获取。
+const guestWebrtc = inject<ReturnType<typeof useWebRTC>>('guestWebrtc')!
 
 /** 加入房间表单 */
 const joinForm = ref({

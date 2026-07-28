@@ -30,6 +30,7 @@ import {
   UserPlusIcon,
 } from '@heroicons/vue/24/outline'
 import { toastError } from '@/utils/toast'
+import { stripMcsdkPrefix, ensureMcsdkPrefix } from '@/utils/online/device-id'
 
 const props = withDefaults(
   defineProps<{
@@ -88,6 +89,16 @@ const displayDeviceIds = computed(() => {
   return runtimeEntries.value.map((e) => e.deviceId)
 })
 
+/**
+ * 展示用条目列表
+ *
+ * - `raw`：完整设备 ID（含 `mcsdk-` 前缀），用于内部存储与后端交互
+ * - `display`：去前缀的设备 ID，用于 UI 展示
+ */
+const displayEntries = computed(() =>
+  displayDeviceIds.value.map((id) => ({ raw: id, display: stripMcsdkPrefix(id) })),
+)
+
 /** 当前是否启用白名单 */
 const isEnabled = computed(() => {
   if (props.mode === 'create') return createEnabled.value
@@ -96,7 +107,7 @@ const isEnabled = computed(() => {
 
 /** 是否展示"启用且为空"的警告（拒绝所有人加入） */
 const showEmptyWarning = computed(
-  () => isEnabled.value && displayDeviceIds.value.length === 0,
+  () => isEnabled.value && displayEntries.value.length === 0,
 )
 
 /** 校验设备 ID 格式（mcsdk-xxxx-xxxx-xxxx-xxxx 或非空字符串） */
@@ -106,18 +117,19 @@ function validateDeviceId(id: string): boolean {
   return true
 }
 
-/** create 模式：添加本地设备 ID */
+/** create 模式：添加本地设备 ID（自动补全 mcsdk- 前缀） */
 function handleCreateAdd() {
   const trimmed = createInput.value.trim()
   if (!validateDeviceId(trimmed)) {
     toastError('设备 ID 不能为空')
     return
   }
-  if (createDeviceIds.value.includes(trimmed)) {
-    toastError(`设备 ID 已存在：${trimmed}`)
+  const fullId = ensureMcsdkPrefix(trimmed)
+  if (createDeviceIds.value.includes(fullId)) {
+    toastError(`设备 ID 已存在：${stripMcsdkPrefix(fullId)}`)
     return
   }
-  createDeviceIds.value = [...createDeviceIds.value, trimmed]
+  createDeviceIds.value = [...createDeviceIds.value, fullId]
   createInput.value = ''
 }
 
@@ -126,14 +138,15 @@ function handleCreateRemove(deviceId: string) {
   createDeviceIds.value = createDeviceIds.value.filter((id) => id !== deviceId)
 }
 
-/** runtime 模式：调用后端添加白名单 */
+/** runtime 模式：调用后端添加白名单（自动补全 mcsdk- 前缀） */
 async function handleRuntimeAdd() {
   const trimmed = runtimeInput.value.trim()
   if (!validateDeviceId(trimmed)) {
     toastError('设备 ID 不能为空')
     return
   }
-  const ok = await store.addWhitelistEntry(trimmed)
+  const fullId = ensureMcsdkPrefix(trimmed)
+  const ok = await store.addWhitelistEntry(fullId)
   if (ok) runtimeInput.value = ''
 }
 
@@ -229,7 +242,7 @@ onMounted(() => {
     <div class="flex items-center gap-2">
       <Input
         v-model="currentInput"
-        placeholder="设备 ID（如 mcsdk-xxxx-xxxx-xxxx-xxxx）"
+        placeholder="设备 ID（如 xxxx-xxxx-xxxx-xxxx）"
         class="font-mono"
         :disabled="mode === 'runtime' && loading"
         @keyup.enter="onAdd"
@@ -248,25 +261,25 @@ onMounted(() => {
     </div>
 
     <!-- 白名单列表 -->
-    <div v-if="displayDeviceIds.length > 0" class="space-y-1.5">
+    <div v-if="displayEntries.length > 0" class="space-y-1.5">
       <div class="text-xs font-medium text-gray-600 flex items-center gap-1.5">
         <UserPlusIcon class="w-3.5 h-3.5" />
-        <span>已添加 {{ displayDeviceIds.length }} 个设备</span>
+        <span>已添加 {{ displayEntries.length }} 个设备</span>
       </div>
       <div class="space-y-1 max-h-40 overflow-y-auto">
         <div
-          v-for="deviceId in displayDeviceIds"
-          :key="deviceId"
+          v-for="entry in displayEntries"
+          :key="entry.raw"
           class="flex items-center justify-between px-3 py-1.5 bg-gray-50 rounded"
         >
-          <code class="text-xs text-gray-900 truncate">{{ deviceId }}</code>
+          <code class="text-xs text-gray-900 truncate">{{ entry.display }}</code>
           <Tooltip text="移除">
             <Button
               type="ghost"
               size="mini"
               class="!h-6 !w-6 !p-0 text-gray-400 hover:!text-red-500 shrink-0 ml-2"
               :disabled="mode === 'runtime' && loading"
-              @click="onRemove(deviceId)"
+              @click="onRemove(entry.raw)"
             >
               <TrashIcon class="w-3.5 h-3.5" />
             </Button>
