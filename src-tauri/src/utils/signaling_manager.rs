@@ -18,6 +18,8 @@ use crate::log_info;
 use crate::minecraft::online::client::OnlineClient;
 use crate::minecraft::online::signaling::CreateRoomRequest;
 use crate::minecraft::online::signaling::IceServerEntry;
+use crate::minecraft::online::signaling::LobbyListQuery;
+use crate::minecraft::online::signaling::ModpackMeta;
 use crate::minecraft::online::signaling::UploadParticipantOfferRequest;
 use crate::minecraft::online::storage::OnlineStorage;
 use crate::state::AppState;
@@ -48,6 +50,30 @@ pub struct CreateRoomParams {
     pub host_mc_version: String,
     #[serde(default)]
     pub host_mc_port: u16,
+    /// 房主加载器类型（联机大厅阶段 1 新增）
+    ///
+    /// 客户端从 `setup.ini` 的 `Type` 字段读取（`forge` / `fabric` / ... / `release`）。
+    /// `None` 表示旧客户端未上报，服务端兼容落库为 NULL。
+    #[serde(default)]
+    pub host_loader: Option<String>,
+    /// 房主加载器版本号（联机大厅阶段 1 新增）
+    ///
+    /// 客户端从 `setup.ini` 的 `ForgeVersion` / `FabricVersion` / ... 字段读取。
+    /// 无加载器或 setup.ini 缺失时为 `None`。
+    #[serde(default)]
+    pub host_loader_version: Option<String>,
+    /// 房间类型（联机大厅阶段 2 新增）
+    ///
+    /// - `private`：仅房间码加入（默认）
+    /// - `lobby`：加入大厅，可被大厅浏览页检索到
+    #[serde(default = "default_room_type")]
+    pub room_type: String,
+    /// 大厅 ID（联机大厅阶段 2 新增）
+    ///
+    /// 仅当 `room_type = "lobby"` 时生效。当前固定为 `global`，
+    /// 阶段 5 大厅浏览页支持多大厅选择后扩展。
+    #[serde(default)]
+    pub lobby_id: Option<String>,
     /// 是否启用白名单（阶段三子任务 8 安全加强）
     ///
     /// `true` 时仅 `whitelist` 数组中的设备可加入；
@@ -60,10 +86,22 @@ pub struct CreateRoomParams {
     /// `room_add_whitelist` / `room_remove_whitelist` 动态增删。
     #[serde(default)]
     pub whitelist: Vec<String>,
+    /// 整合包元数据（联机大厅阶段 3 新增）
+    ///
+    /// `None` 表示无整合包（纯原版房间）；`Some` 时服务端 UPSERT 到
+    /// `room_modpacks` 表并关联到 rooms.modpack_id。
+    /// 前端从 `versions/{id}/modpack.meta.json` 读取后填充。
+    #[serde(default)]
+    pub modpack: Option<ModpackMeta>,
 }
 
 fn default_max_players() -> u32 {
     8
+}
+
+/// `CreateRoomParams::room_type` 的默认值（`private`，与 `signaling.rs` 保持一致）
+fn default_room_type() -> String {
+    "private".to_string()
 }
 
 #[derive(Debug, Deserialize)]
@@ -161,6 +199,28 @@ pub struct SetWhitelistEnabledParams {
     pub enabled: bool,
 }
 
+/// 大厅房间列表查询参数（联机大厅阶段 5）
+///
+/// 所有字段可选，未传时服务端使用默认值（lobby_id=global, page=1, page_size=20）。
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct LobbyListParams {
+    #[serde(default)]
+    pub lobby_id: Option<String>,
+    #[serde(default)]
+    pub page: Option<u32>,
+    #[serde(default)]
+    pub page_size: Option<u32>,
+    #[serde(default)]
+    pub has_modpack: Option<bool>,
+    #[serde(default)]
+    pub loader: Option<String>,
+    #[serde(default)]
+    pub game_version: Option<String>,
+    #[serde(default)]
+    pub keyword: Option<String>,
+}
+
 // ============================================================
 // 辅助函数
 // ============================================================
@@ -211,6 +271,8 @@ pub fn register_signaling_actions(d: &mut Dispatcher) {
     register_leave_room(d);
     register_kick(d);
     register_unban(d);
+    // 阶段 6.2：房主查询封禁列表
+    register_list_bans(d);
     register_list_participants(d);
     register_upload_participant_offer(d);
     register_fetch_participant_offer(d);
@@ -219,6 +281,9 @@ pub fn register_signaling_actions(d: &mut Dispatcher) {
     register_add_whitelist(d);
     register_remove_whitelist(d);
     register_set_whitelist_enabled(d);
+    // 联机大厅阶段 5：大厅浏览
+    register_list_lobby_rooms(d);
+    register_list_lobby_categories(d);
 }
 
 // ============================================================
@@ -246,9 +311,12 @@ fn register_create_room(d: &mut Dispatcher) {
         let creds = load_creds(&state).await?;
         let client = make_client(&state).await;
         log_info!(
-            "[Online] room_create: max_players={}, mc_version={}, mc_port={}, ice_servers={}, whitelist_enabled={}, whitelist={}",
-            p.max_players, p.host_mc_version, p.host_mc_port, p.ice_servers.len(),
-            p.whitelist_enabled, p.whitelist.len()
+            "[Online] room_create: max_players={}, mc_version={}, mc_port={}, loader={:?}, loader_version={:?}, room_type={}, lobby_id={:?}, ice_servers={}, whitelist_enabled={}, whitelist={}, modpack={}",
+            p.max_players, p.host_mc_version, p.host_mc_port,
+            p.host_loader, p.host_loader_version,
+            p.room_type, p.lobby_id,
+            p.ice_servers.len(), p.whitelist_enabled, p.whitelist.len(),
+            p.modpack.as_ref().map(|m| format!("{}({}:{})", m.source, m.project_id, m.file_id)).unwrap_or_else(|| "none".to_string())
         );
         let req = CreateRoomRequest {
             sdp_offer: p.sdp_offer,
@@ -259,8 +327,13 @@ fn register_create_room(d: &mut Dispatcher) {
             ice_servers: p.ice_servers,
             host_mc_version: p.host_mc_version,
             host_mc_port: p.host_mc_port,
+            host_loader: p.host_loader,
+            host_loader_version: p.host_loader_version,
+            room_type: p.room_type,
+            lobby_id: p.lobby_id,
             whitelist_enabled: p.whitelist_enabled,
             whitelist: p.whitelist,
+            modpack: p.modpack,
         };
         let result = client.signaling_create_room(&creds, &req).await
             .map_err(|e| {
@@ -478,6 +551,22 @@ fn register_unban(d: &mut Dispatcher) {
     }));
 }
 
+fn register_list_bans(d: &mut Dispatcher) {
+    d.register("room_list_bans", handler!(state, _app, params, {
+        let p: RoomCodeParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_debug!("[Online] room_list_bans: code={}", p.room_code);
+        let result = client.signaling_list_bans(&creds, &p.room_code).await
+            .map_err(|e| {
+                log_error!("[Online] room_list_bans 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
 fn register_list_participants(d: &mut Dispatcher) {
     d.register("room_list_participants", handler!(state, _app, params, {
         let p: RoomCodeParams = serde_json::from_value(params)
@@ -617,6 +706,52 @@ fn register_set_whitelist_enabled(d: &mut Dispatcher) {
             .await
             .map_err(|e| {
                 log_error!("[Online] room_set_whitelist_enabled 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+// ============================================================
+// 大厅浏览 action（联机大厅阶段 5）
+// ============================================================
+
+fn register_list_lobby_rooms(d: &mut Dispatcher) {
+    d.register("lobby_list_rooms", handler!(state, _app, params, {
+        let p: LobbyListParams = serde_json::from_value(params)
+            .unwrap_or_default();
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_debug!(
+            "[Online] lobby_list_rooms: lobby={:?}, page={:?}, size={:?}, loader={:?}, keyword={:?}",
+            p.lobby_id, p.page, p.page_size, p.loader, p.keyword
+        );
+        let query = LobbyListQuery {
+            lobby_id: p.lobby_id,
+            page: p.page,
+            page_size: p.page_size,
+            has_modpack: p.has_modpack,
+            loader: p.loader,
+            game_version: p.game_version,
+            keyword: p.keyword,
+        };
+        let result = client.signaling_list_lobby_rooms(&creds, &query).await
+            .map_err(|e| {
+                log_error!("[Online] lobby_list_rooms 失败: {}", e);
+                e.to_string()
+            })?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+}
+
+fn register_list_lobby_categories(d: &mut Dispatcher) {
+    d.register("lobby_list_categories", handler!(state, _app, _params, {
+        let creds = load_creds(&state).await?;
+        let client = make_client(&state).await;
+        log_debug!("[Online] lobby_list_categories");
+        let result = client.signaling_list_lobby_categories(&creds).await
+            .map_err(|e| {
+                log_error!("[Online] lobby_list_categories 失败: {}", e);
                 e.to_string()
             })?;
         serde_json::to_value(result).map_err(|e| e.to_string())

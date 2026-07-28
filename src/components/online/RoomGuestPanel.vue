@@ -35,6 +35,7 @@ import {
   ClipboardDocumentIcon,
 } from '@heroicons/vue/24/outline'
 import VirtualIpCard from './VirtualIpCard.vue'
+import ModpackRequirementCard from './ModpackRequirementCard.vue'
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
@@ -234,6 +235,9 @@ onMounted(() => {
         </div>
       </div>
     </Card>
+
+    <!-- 整合包要求（联机大厅阶段 4：房主关联整合包时显示，自动校验本地是否已装同款） -->
+    <ModpackRequirementCard v-if="room.hostModpack" :modpack="room.hostModpack" />
 
     <!-- P2P 连接状态 -->
     <Card title="P2P 连接">
