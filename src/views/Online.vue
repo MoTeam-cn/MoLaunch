@@ -59,6 +59,8 @@ interface NavCategory {
   icon: Component
   desc?: string
   children?: NavCategory[]
+  /** 禁用态：未满足前置条件时灰色不可点击（如未在房间时的「房间详情」） */
+  disabled?: boolean
 }
 
 const route = useRoute()
@@ -106,21 +108,21 @@ const roomCategory: NavCategory = {
 /** 是否在房间中（role=host/guest） */
 const isInRoom = computed(() => onlineStore.roomState.role !== null)
 
-/** 房间详情子项（仅在房间中时追加到 room 管理子菜单） */
-const roomDetailsChild: NavCategory = {
+/** 房间详情子项（始终追加到 room 管理子菜单，未在房间时 disabled 灰色不可点） */
+const roomDetailsChild = computed<NavCategory>(() => ({
   id: 'room_details',
   label: '房间详情',
   icon: HomeIcon,
   desc: '查看当前房间状态、参与者列表与连接信息',
-}
+  disabled: !isInRoom.value,
+}))
 
-/** 实际渲染的分类列表：未就绪时只显示「设备」；在房间中时追加「房间详情」子项 */
+/** 实际渲染的分类列表：未就绪时只显示「设备」；就绪后追加「房间详情」子项（未在房间时灰色） */
 const categories = computed<NavCategory[]>(() => {
   if (!isReady.value) return [deviceCategory]
-  // 在房间中时动态追加「房间详情」子项到 room 分类
   const roomWithDetails: NavCategory = {
     ...roomCategory,
-    children: [...roomCategory.children!, roomDetailsChild],
+    children: [...roomCategory.children!, roomDetailsChild.value],
   }
   return [deviceCategory, roomWithDetails]
 })
@@ -171,8 +173,11 @@ const activeLabel = computed(() => {
 watch(isReady, (ready) => {
   if (ready) {
     const tab = route.query.tab
-    if (tab === 'create' || tab === 'join' || tab === 'room_details') {
+    if (tab === 'create' || tab === 'join') {
       activeCategory.value = tab
+    } else if (tab === 'room_details' && isInRoom.value) {
+      // 仅在房间中时才恢复到房间详情，否则该项 disabled 不可用
+      activeCategory.value = 'room_details'
     } else if (activeCategory.value === 'device') {
       // 登录成功且 URL 无有效 tab → 默认跳到创建房间
       activeCategory.value = 'create'

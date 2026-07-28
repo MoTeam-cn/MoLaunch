@@ -30,6 +30,8 @@ interface NavCategory {
   desc?: string
   /** 可选子菜单项（有 children 时父项点击展开/收起，不切换选中态） */
   children?: NavCategory[]
+  /** 可选禁用态：灰色不可点击，用于「房间详情」等需要前置条件的菜单项 */
+  disabled?: boolean
 }
 
 const props = defineProps<{
@@ -70,8 +72,9 @@ function toggleExpand(id: string) {
   expandedMap.value = { ...expandedMap.value, [id]: !expandedMap.value[id] }
 }
 
-/** 父项点击：有 children 则 toggle 展开，无 children 则 emit id */
+/** 父项点击：disabled 不响应；有 children 则 toggle 展开，无 children 则 emit id */
 function handleClick(cat: NavCategory) {
+  if (cat.disabled) return
   if (cat.children && cat.children.length > 0) {
     toggleExpand(cat.id)
   } else {
@@ -97,21 +100,24 @@ watch(() => props.modelValue, (val) => {
 }, { immediate: true })
 
 // 页面加载时从 URL query.tab 恢复选中项（刷新页面保留路径）
+// 跳过 disabled 项：避免恢复到不可用的菜单（如未在房间时恢复到「房间详情」）
 onMounted(() => {
   const tab = route.query.tab as string | undefined
   if (tab && tab !== props.modelValue) {
-    // 检查 tab 是否在 categories 中（含 children）
-    const allIds = new Set<string>()
+    // 检查 tab 是否在 categories 中（含 children）且未禁用
     for (const cat of props.categories) {
-      allIds.add(cat.id)
+      if (cat.id === tab && !cat.disabled) {
+        emit('update:modelValue', tab)
+        return
+      }
       if (cat.children) {
         for (const child of cat.children) {
-          allIds.add(child.id)
+          if (child.id === tab && !child.disabled) {
+            emit('update:modelValue', tab)
+            return
+          }
         }
       }
-    }
-    if (allIds.has(tab)) {
-      emit('update:modelValue', tab)
     }
   }
 })
@@ -132,11 +138,13 @@ watch(() => props.modelValue, (val) => {
         <!-- 父项（无 children 时为普通项，有 children 时为可展开项） -->
         <button
           type="button"
-          class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors cursor-pointer"
+          class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors"
           :class="[
-            isParentActive(cat)
-              ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500'
-              : 'text-gray-700 hover:bg-gray-50',
+            cat.disabled
+              ? 'text-gray-300 cursor-not-allowed'
+              : isParentActive(cat)
+                ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500 cursor-pointer'
+                : 'text-gray-700 hover:bg-gray-50 cursor-pointer',
           ]"
           @click="handleClick(cat)"
         >
@@ -161,13 +169,15 @@ watch(() => props.modelValue, (val) => {
               v-for="child in cat.children"
               :key="child.id"
               type="button"
-              class="w-full flex items-center pl-11 pr-4 py-2 text-sm transition-colors cursor-pointer"
+              class="w-full flex items-center pl-11 pr-4 py-2 text-sm transition-colors"
               :class="[
-                modelValue === child.id
-                  ? 'text-primary-700 bg-primary-50/50 font-medium'
-                  : 'text-gray-600 hover:bg-gray-50',
+                child.disabled
+                  ? 'text-gray-300 cursor-not-allowed'
+                  : modelValue === child.id
+                    ? 'text-primary-700 bg-primary-50/50 font-medium cursor-pointer'
+                    : 'text-gray-600 hover:bg-gray-50 cursor-pointer',
               ]"
-              @click="emit('update:modelValue', child.id)"
+              @click="!child.disabled && emit('update:modelValue', child.id)"
             >
               <component :is="child.icon" class="w-4 h-4 mr-2.5 shrink-0" />
               {{ child.label }}
