@@ -24,7 +24,6 @@ import type {
   IceServerEntry,
   JoinRoomResponse,
   ListParticipantsResponse,
-  ModpackMeta,
   NatDetectionResult,
   ParticipantInfo,
   RoomInfoResponse,
@@ -60,7 +59,6 @@ import {
   buildIceServers,
   resolveIceServers,
 } from '@/utils/online/webrtc-helpers'
-import { detectNatTypeWithStun } from '@/utils/online/nat-type'
 
 /** 房间角色 */
 export type RoomRole = 'host' | 'guest' | null
@@ -127,14 +125,6 @@ export interface RoomState {
    * 前端 protocol.ts 用此密钥做 AES-GCM 加解密。
    */
   roomKey: string
-  /**
-   * 房主整合包元数据（联机大厅阶段 4 新增）
-   *
-   * `undefined` 表示纯原版房间（房主未关联整合包）；
-   * 加入方通过 `refreshRoomInfo` 从 `RoomInfoResponse.modpack` 同步，
-   * 据此判断是否需要一键安装。
-   */
-  hostModpack: ModpackMeta | undefined
 }
 
 /** 创建空房间状态 */
@@ -155,7 +145,6 @@ function emptyRoom(): RoomState {
     participantId: null,
     whitelistEnabled: false,
     roomKey: '',
-    hostModpack: undefined,
   }
 }
 
@@ -199,44 +188,6 @@ export const useOnlineStore = defineStore('online', () => {
   // ===== NAT 检测 =====
   /** NAT 检测结果（null 表示未检测） */
   const natResult = ref<NatDetectionResult | null>(null)
-  /** NAT 检测中（避免重复触发） */
-  const natDetecting = ref(false)
-
-  /**
-   * 执行 NAT 类型检测（写入 natResult，侧边栏切换不丢失）
-   *
-   * - 已有结果或正在检测时跳过（避免重复请求）
-   * - 检测失败时不覆盖已有结果（保留上次成功值）
-   * - 供 Online.vue 进入页面时自动调用 + OnlineDevicePanel.vue 手动刷新调用
-   */
-  async function detectNat(): Promise<void> {
-    if (natResult.value || natDetecting.value) return
-    if (typeof RTCPeerConnection === 'undefined') return
-    natDetecting.value = true
-    try {
-      const result = await detectNatTypeWithStun()
-      natResult.value = result
-    } catch (e) {
-      console.warn('[Online] NAT detection failed:', e)
-    } finally {
-      natDetecting.value = false
-    }
-  }
-
-  /** 强制重新检测 NAT（手动刷新时调用，忽略已有结果） */
-  async function forceDetectNat(): Promise<void> {
-    if (natDetecting.value) return
-    if (typeof RTCPeerConnection === 'undefined') return
-    natDetecting.value = true
-    try {
-      const result = await detectNatTypeWithStun()
-      natResult.value = result
-    } catch (e) {
-      console.warn('[Online] NAT detection failed:', e)
-    } finally {
-      natDetecting.value = false
-    }
-  }
 
   /**
    * 拉取最新设备状态（不发起网络请求，仅读本地凭证 + 后端配置）
@@ -386,11 +337,6 @@ export const useOnlineStore = defineStore('online', () => {
    * @param preloadedStun 可选，调用方已预取的 STUN 列表（避免重复获取）
    * @param whitelistEnabled 是否启用白名单（阶段三子任务 8，默认 false）
    * @param whitelist 初始白名单 `device_id` 数组（仅在 `whitelistEnabled=true` 时生效）
-   * @param hostLoader 房主加载器类型（联机大厅阶段 1，如 `forge`/`fabric`，默认空字符串=未上报）
-   * @param hostLoaderVersion 房主加载器版本号（联机大厅阶段 1，如 `47.3.0`，默认空字符串=未上报）
-   * @param roomType 房间类型（联机大厅阶段 2，`private` 仅房间码 / `lobby` 加入大厅，默认 `private`）
-   * @param lobbyId 大厅 ID（仅 `roomType='lobby'` 时生效，当前固定 `global`）
-   * @param modpack 整合包元数据（联机大厅阶段 3，`undefined` 表示纯原版房间）
    * @returns 创建房间响应
    */
   async function hostCreateRoom(
@@ -403,11 +349,6 @@ export const useOnlineStore = defineStore('online', () => {
     preloadedStun?: string[],
     whitelistEnabled: boolean = false,
     whitelist: string[] = [],
-    hostLoader: string = '',
-    hostLoaderVersion: string = '',
-    roomType: 'private' | 'lobby' = 'private',
-    lobbyId?: string,
-    modpack?: ModpackMeta,
   ): Promise<CreateRoomResponse> {
     roomLoading.value = true
     try {
@@ -426,18 +367,8 @@ export const useOnlineStore = defineStore('online', () => {
         iceServers,
         hostMcVersion,
         hostMcPort,
-        // 联机大厅阶段 1：拆分 MC 版本上报，加载器类型 + 版本号
-        // 空字符串视为未上报，转换为 undefined 让后端落库为 NULL（兼容旧客户端）
-        hostLoader: hostLoader || undefined,
-        hostLoaderVersion: hostLoaderVersion || undefined,
-        // 联机大厅阶段 2：房间类型 + 大厅 ID
-        // private 时 lobbyId 不传（后端忽略）；lobby 时必传（当前固定 global）
-        roomType,
-        lobbyId: roomType === 'lobby' ? (lobbyId ?? 'global') : undefined,
         whitelistEnabled,
         whitelist,
-        // 联机大厅阶段 3：整合包元数据（undefined=纯原版房间，不上报）
-        modpack,
       })
       if (result.code !== 1 || !result.data) {
         throw new Error(result.msg || '创建房间失败')
@@ -460,8 +391,6 @@ export const useOnlineStore = defineStore('online', () => {
         whitelistEnabled,
         // 阶段三子任务 8：DataChannel 加密密钥（空字符串表示未启用）
         roomKey: data.roomKey ?? '',
-        // 联机大厅阶段 4：房主创建房间时记录关联的整合包元数据
-        hostModpack: modpack,
       }
       toastSuccess(`房间已创建：${data.roomCode}`)
       return data
@@ -554,8 +483,6 @@ export const useOnlineStore = defineStore('online', () => {
     roomState.value.hostMcPort = info.hostMcPort
     // 阶段三子任务 8：同步白名单启用状态（房主/加入方均可见）
     roomState.value.whitelistEnabled = info.whitelistEnabled ?? false
-    // 联机大厅阶段 4：同步房主整合包元数据（undefined=纯原版房间）
-    roomState.value.hostModpack = info.modpack
     if (roomState.value.role === 'guest') {
       // 加入方需要 ICE 服务器与房主一致（优先 iceServers，回退 stunServers）
       roomState.value.stunServers = info.stunServers ?? roomState.value.stunServers
@@ -750,9 +677,6 @@ export const useOnlineStore = defineStore('online', () => {
     whitelistLoading,
     // NAT 检测
     natResult,
-    natDetecting,
-    detectNat,
-    forceDetectNat,
     // 设备认证方法
     refreshStatus,
     syncApiServerUrlFromConfig,

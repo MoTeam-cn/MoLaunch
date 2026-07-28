@@ -33,22 +33,15 @@ interface Props {
   disabled?: boolean
   /** 是否使用自定义选项渲染（启用后选项高度自适应，不再固定 36px） */
   customOption?: boolean
-  /** 是否允许清空选项（参考 ArcoDesign allow-clear，hover 时显示清空按钮） */
-  allowClear?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   placeholder: '请选择',
   disabled: false,
   customOption: false,
-  allowClear: false,
 })
 
-const emit = defineEmits<{
-  'update:modelValue': [value: string | number]
-  /** 点击清空按钮时触发 */
-  clear: [ev: MouseEvent]
-}>()
+const emit = defineEmits<{ 'update:modelValue': [value: string | number] }>()
 
 const open = ref(false)
 const closing = ref(false)
@@ -59,18 +52,6 @@ const openUpward = ref(false)
 const selectedLabel = computed(
   () => props.options.find(o => o.value === props.modelValue)?.label || props.placeholder,
 )
-
-/** 当前是否有选中值（用于清空按钮显示判断） */
-const hasValue = computed(() => props.options.some(o => o.value === props.modelValue))
-/** 是否显示清空按钮（参考 ArcoDesign：allowClear && !disabled && hasValue） */
-const showClearBtn = computed(() => props.allowClear && !props.disabled && hasValue.value)
-
-/** 清空选项（阻止冒泡避免打开下拉，emit 空字符串与 ArcoDesign 单选行为一致） */
-function handleClear(e: MouseEvent) {
-  e.stopPropagation()
-  emit('update:modelValue', '')
-  emit('clear', e)
-}
 
 function select(value: string | number) {
   emit('update:modelValue', value)
@@ -169,19 +150,8 @@ onUnmounted(() => {
         <span v-if="$slots.selected" class="select-value">
           <slot name="selected" :label="selectedLabel" />
         </span>
-        <span v-else class="select-value" :class="{ placeholder: !hasValue }">
+        <span v-else class="select-value" :class="{ placeholder: !options.find(o => o.value === modelValue) }">
           {{ selectedLabel }}
-        </span>
-        <!-- 清空按钮（allow-clear，hover 时显示，位于箭头之前便于用兄弟选择器隐藏箭头） -->
-        <span
-          v-if="showClearBtn"
-          class="select-clear-btn"
-          @click="handleClear"
-          @mousedown.stop.prevent
-        >
-          <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="butt" stroke-linejoin="miter">
-            <path d="M9.857 9.858 24 24m0 0 14.142 14.142M24 24 38.142 9.858M24 24 9.857 38.142" />
-          </svg>
         </span>
         <svg
           class="select-arrow"

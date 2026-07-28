@@ -133,7 +133,7 @@ async function handleDownload(v: ResourceVersion) {
  */
 async function handleInstallModpack(v: ResourceVersion) {
   if (!props.project) return
-  const { platform, resource_type, translated_name, raw_name, id: projectId } = props.project
+  const { platform, resource_type, translated_name, raw_name } = props.project
   if (resource_type !== 'ModPack') return
 
   const defaultName = translated_name || raw_name || v.file_name.replace(/\.(zip|mrpack)$/i, '')
@@ -146,19 +146,7 @@ async function handleInstallModpack(v: ResourceVersion) {
   versionStore.startDownload(instanceName)
 
   try {
-    // 联机大厅阶段 3：传入平台来源元数据，后端安装完成后写入 modpack.meta.json
-    // 用于创建联机房间时上报整合包信息，加入方据此判断是否需要一键安装
-    const result = await installModpack({
-      platform,
-      downloadUrl: v.download_url,
-      fileName: v.file_name,
-      instanceName,
-      projectId,
-      fileId: v.id,
-      modpackVersion: v.version,
-      fileSize: v.size,
-      name: translated_name || raw_name,
-    })
+    const result = await installModpack({ platform, downloadUrl: v.download_url, fileName: v.file_name, instanceName })
     const loader = result.loader
     const lv = result.loaderVersion
     await installMerged(

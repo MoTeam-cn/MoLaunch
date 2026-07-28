@@ -18,7 +18,7 @@
  * 阶段二补充 13 个 action（信令相关）：
  * - `room_get_stun` / `room_create` / `room_get` / `room_close`
  * - `room_join` / `room_submit_answer` / `room_list_answers` / `room_confirm`
- * - `room_keepalive` / `room_leave` / `room_kick` / `room_unban` / `room_list_bans` / `room_list_participants`
+ * - `room_keepalive` / `room_leave` / `room_kick` / `room_unban` / `room_list_participants`
  *
  * 阶段三子任务 7 补充 1 个 action（TURN 中继）：
  * - `room_get_turn`：房主独占，拉取经服务端负载过滤后的 TURN 服务器列表（含集群负载快照）
@@ -42,11 +42,7 @@ import type {
   JoinRoomResponse,
   KeepaliveResponse,
   ListAnswersResponse,
-  ListBansResponse,
   ListParticipantsResponse,
-  LobbyCategoriesResponse,
-  LobbyListQuery,
-  LobbyListResponse,
   ParticipantOfferResponse,
   RoomInfoResponse,
   ServerTimeInfo,
@@ -96,8 +92,6 @@ export const ONLINE_ACTIONS = {
   ROOM_LEAVE: 'room_leave',
   ROOM_KICK: 'room_kick',
   ROOM_UNBAN: 'room_unban',
-  // 阶段 6.2：房主查询封禁列表
-  ROOM_LIST_BANS: 'room_list_bans',
   ROOM_LIST_PARTICIPANTS: 'room_list_participants',
   // TURN 中继：房主独占（阶段三子任务 7）
   ROOM_GET_TURN: 'room_get_turn',
@@ -115,9 +109,6 @@ export const ONLINE_ACTIONS = {
   ROOM_ADD_WHITELIST: 'room_add_whitelist',
   ROOM_REMOVE_WHITELIST: 'room_remove_whitelist',
   ROOM_SET_WHITELIST_ENABLED: 'room_set_whitelist_enabled',
-  // 大厅浏览（联机大厅阶段 5）
-  LOBBY_LIST_ROOMS: 'lobby_list_rooms',
-  LOBBY_LIST_CATEGORIES: 'lobby_list_categories',
 } as const
 
 /** action 名称类型 */
@@ -266,18 +257,6 @@ export function unbanParticipant(
   devicePk: string,
 ): Promise<BusinessResult<unknown>> {
   return onlineManager(ONLINE_ACTIONS.ROOM_UNBAN, { roomCode, devicePk })
-}
-
-/**
- * 查询房间封禁列表（仅房主）
- *
- * 返回当前有效的封禁记录（永久 + 未过期临时），已过期的临时封禁不返回。
- * 同时返回服务端当前时间 `serverTime`，便于客户端计算剩余封禁时长。
- */
-export function listBannedParticipants(
-  roomCode: string,
-): Promise<BusinessResult<ListBansResponse>> {
-  return onlineManager(ONLINE_ACTIONS.ROOM_LIST_BANS, { roomCode })
 }
 
 /** 查询参与者列表（房主） */
@@ -479,35 +458,4 @@ export function setWhitelistEnabled(
     roomCode,
     enabled,
   })
-}
-
-// ============================================================
-// 大厅浏览（联机大厅阶段 5）
-//
-// 2 个 action 与后端 `utils::signaling_manager` 注册一一对应：
-// - `lobby_list_rooms`：分页查询公开房间列表，支持加载器/版本/关键词过滤
-// - `lobby_list_categories`：查询大厅分类列表（MVP 阶段仅 `global`）
-//
-// 列表接口不返回 SDP/ICE/room_key 等敏感字段，加入方需走完整 join 流程。
-// ============================================================
-
-/**
- * 查询大厅公开房间列表
- *
- * @param query 查询参数（页码/过滤/关键词），所有字段可选
- * @returns 房间列表 + 分页信息
- */
-export function listLobbyRooms(
-  query?: LobbyListQuery,
-): Promise<BusinessResult<LobbyListResponse>> {
-  return onlineManager(ONLINE_ACTIONS.LOBBY_LIST_ROOMS, query ?? {})
-}
-
-/**
- * 查询大厅分类列表
- *
- * MVP 阶段仅返回 `global` 一个分类，`roomCount` 实时统计。
- */
-export function listLobbyCategories(): Promise<BusinessResult<LobbyCategoriesResponse>> {
-  return onlineManager(ONLINE_ACTIONS.LOBBY_LIST_CATEGORIES)
 }

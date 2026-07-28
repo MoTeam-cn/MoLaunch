@@ -1,21 +1,18 @@
 //! 版本列表/文件夹/管理/个性化命令的统一分发逻辑（version_list_manager 的工具实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发。
-//! 19 个 action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER，
-//! 聚合原 `version::list`（8 个）+ `version::folder`（5 个）+ `version::manage`（4 个）
-//! + `version::personalization`（2 个）共 19 个独立 IPC 命令。
+//! 17 个 action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER，
+//! 聚合原 `version::list`（6 个）+ `version::folder`（5 个）+ `version::manage`（4 个）
+//! + `version::personalization`（2 个）共 17 个独立 IPC 命令。
 //!
-//! 命令清单（19 个，按子模块分组）：
-//! - list.rs（8 个）：
+//! 命令清单（17 个，按子模块分组）：
+//! - list.rs（6 个）：
 //!   - `list_versions`：获取版本列表
 //!   - `list_installed_versions`：获取已安装版本 ID 列表
 //!   - `list_installed_versions_with_type`：获取已安装版本列表（含类型/图标）
 //!   - `uninstall_version`：卸载版本
 //!   - `get_version_effective_dir`：获取版本有效游戏目录（考虑隔离）
 //!   - `get_version_game_version`：获取版本对应的 MC 游戏版本号
-//!   - `get_version_loader_info`：获取版本加载器信息（类型 + 版本号，联机大厅阶段 1 新增）
-//!   - `read_local_modpack_meta`：读取本地整合包元数据（联机大厅阶段 3 新增）
-//!   - `check_local_modpack`：校验本地是否已安装指定整合包（联机大厅阶段 4 新增）
 //! - folder.rs（5 个）：
 //!   - `list_mc_folders`：列出所有 MC 文件夹
 //!   - `add_mc_folder`：添加 MC 文件夹（自动去重）
@@ -54,16 +51,6 @@ use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 #[serde(rename_all = "camelCase")]
 struct VersionIdParams {
     version_id: String,
-}
-
-/// check_local_modpack 参数（联机大厅阶段 4 新增）
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct CheckLocalModpackParams {
-    manifest_hash: Option<String>,
-    source: String,
-    project_id: String,
-    file_id: String,
 }
 
 /// add_mc_folder 参数
@@ -154,30 +141,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             .map_err(|e| format!("参数解析失败: {}", e))?;
         let r = list::get_version_game_version(&state, p.version_id).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
-
-    d.register("get_version_loader_info", handler!(state, _app, params, {
-        let p: VersionIdParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let (loader_type, loader_version) = list::get_version_loader_info(&state, p.version_id).await?;
-        serde_json::to_value(serde_json::json!({
-            "loaderType": loader_type,
-            "loaderVersion": loader_version,
-        })).map_err(|e| e.to_string())
-    }));
-
-    d.register("read_local_modpack_meta", handler!(state, _app, params, {
-        let p: VersionIdParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let meta = list::read_local_modpack_meta(&state, p.version_id).await?;
-        serde_json::to_value(meta).map_err(|e| e.to_string())
-    }));
-
-    d.register("check_local_modpack", handler!(state, _app, params, {
-        let p: CheckLocalModpackParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let result = list::check_local_modpack(&state, p.manifest_hash, p.source, p.project_id, p.file_id).await?;
-        serde_json::to_value(result).map_err(|e| e.to_string())
     }));
 
     // === folder.rs（5 个） ===

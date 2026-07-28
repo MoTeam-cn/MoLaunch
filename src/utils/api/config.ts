@@ -27,8 +27,6 @@ export interface ConfigSnapshot {
   proxyMode: string
   proxyType: string
   proxyUrl: string
-  /** IP 协议版本偏好："v4"（强制 IPv4）/ "auto"（自动测试）/ "any"（跟随 DNS） */
-  ipVersion: string
   // 下载
   mirrorUrl: string | null
   downloadSource: string
@@ -36,8 +34,6 @@ export interface ConfigSnapshot {
   maxDownloadSpeed: number
   maxDownloadThreads: number
   chunkCount: number
-  /** Modrinth CDN 直连开关（开发者模式可见，默认 false） */
-  modrinthCdnRawEnabled: boolean
   // 内存
   memoryMode: string
   minMemory: number
@@ -85,8 +81,6 @@ export interface ConfigPatch {
   proxyMode?: string
   proxyType?: string
   proxyUrl?: string
-  /** IP 协议版本偏好："v4" / "auto" / "any" */
-  ipVersion?: string
   // 下载
   downloadSource?: string                                  // "official" / "mirror" / "smart"
   metaSource?: string                                      // "official" / "mirror" / "smart"
@@ -94,8 +88,6 @@ export interface ConfigPatch {
   maxDownloadThreads?: number
   chunkCount?: number
   mirrorUrl?: string | null                               // null 表示清空
-  /** Modrinth CDN 直连开关（开发者模式可见，默认 false） */
-  modrinthCdnRawEnabled?: boolean
   // 内存
   memoryMode?: string                                      // "auto" / "custom"
   minMemory?: number

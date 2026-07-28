@@ -109,17 +109,6 @@ export interface InstallModpackRequest {
   includeOptional?: boolean
   /** 外部 Logo 文件本地路径（CF/MR 平台下载时缓存的缩略图，复制到 MoLaunch/Logo.png） */
   logoPath?: string
-  // ===== 联机大厅阶段 3：平台来源元数据（用于写入 modpack.meta.json） =====
-  /** 平台工程 ID（CF project id / MR project id）。undefined 时跳过 modpack.meta.json 写入 */
-  projectId?: string
-  /** 平台文件 ID（CF file id / MR version id） */
-  fileId?: string
-  /** 整合包自身版本号（如 2.9.3，来自平台版本列表的 version/displayName） */
-  modpackVersion?: string
-  /** 整合包文件大小（字节，来自平台版本列表的 size/fileLength） */
-  fileSize?: number
-  /** 整合包名称（来自平台工程详情的 raw_name/translated_name） */
-  name?: string
 }
 
 /** 本地整合包安装请求（拖拽安装） */

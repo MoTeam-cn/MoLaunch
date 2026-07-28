@@ -7,31 +7,15 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
-import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { toastError } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
 import { osDisplay, archDisplay } from '@/utils/system-display'
 import LogViewer from '@/components/settings/LogViewer.vue'
 import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
-import { safeCall } from '@/utils/async'
 import {
   FolderOpenIcon,
   DocumentTextIcon,
 } from '@heroicons/vue/24/outline'
-
-// ==================== 实验性功能 ====================
-const modrinthCdnRawEnabled = ref(false)
-
-async function toggleModrinthCdnRaw(v: boolean) {
-  try {
-    await applyConfig({ modrinthCdnRawEnabled: v })
-    modrinthCdnRawEnabled.value = v
-  } catch (e) {
-    toastError('设置 Modrinth CDN 直连失败：' + e)
-    modrinthCdnRawEnabled.value = !v
-  }
-}
 
 // ==================== 存储目录 ====================
 const storageDirs = ref<tauri.StorageDirs | null>(null)
@@ -103,51 +87,12 @@ const systemEntries = computed<{ key: string; label: string; value: string }[]>(
 })
 
 onMounted(async () => {
-  await Promise.all([
-    loadStorageDirs(),
-    loadSystemInfo(),
-    safeCall(async () => {
-      const config = await getConfigMap()
-      modrinthCdnRawEnabled.value = config.modrinthCdnRawEnabled
-    }, 'load developer config'),
-  ])
+  await Promise.all([loadStorageDirs(), loadSystemInfo()])
 })
 </script>
 
 <template>
   <div class="space-y-6">
-    <!-- 实验性功能 -->
-    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
-      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">实验性功能</h3>
-      <div class="divide-y divide-gray-200">
-        <!-- Modrinth CDN 直连开关 -->
-        <div class="px-5 py-4">
-          <div class="flex items-center justify-between gap-4">
-            <div class="min-w-0">
-              <p class="text-sm font-medium text-gray-900">Modrinth CDN 直连</p>
-              <p class="text-xs text-gray-500 mt-0.5">
-                将 cdn.modrinth.com 替换为 cdn-raw.modrinth.com（绕过中国大陆 cdn-alt 跳转）
-              </p>
-            </div>
-            <div class="flex-none w-40">
-              <Select
-                :model-value="modrinthCdnRawEnabled ? 'true' : 'false'"
-                :options="[
-                  { label: '已开启', value: 'true' },
-                  { label: '已关闭', value: 'false' },
-                ]"
-                @update:model-value="toggleModrinthCdnRaw($event === 'true')"
-              />
-            </div>
-          </div>
-          <p class="text-xs text-gray-400 mt-2">
-            <template v-if="modrinthCdnRawEnabled">已开启：Modrinth 下载走 cdn-raw 直连</template>
-            <template v-else>已关闭：Modrinth 下载走官方 CDN（可能跳转 cdn-alt）</template>
-          </p>
-        </div>
-      </div>
-    </div>
-
     <!-- 日志查看（自包含子组件，传入日志目录用于「打开目录」按钮） -->
     <LogViewer :logs-dir="storageDirs?.logs" />
 

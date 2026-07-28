@@ -117,79 +117,6 @@ export interface TurnServersResponse {
   loadThreshold: number
 }
 
-/**
- * 整合包元数据（联机大厅阶段 3 新增）
- *
- * 房主创建房间时关联本地已安装整合包，上报给 api-server。
- * 加入方拉取房间详情后据此判断是否需要一键安装。
- *
- * **安全设计**：不包含 `downloadUrl` 字段。加入方通过现有 `getProjectVersions`
- * IPC 反查平台 API 获取下载链接，避免 api-server 成为 URL 分发中心。
- *
- * 对应后端 `minecraft::online::signaling::ModpackMeta`。
- */
-export interface ModpackMeta {
-  /** 来源平台（`curseforge` / `modrinth`） */
-  source: string
-  /** CF project id 或 MR project id */
-  projectId: string
-  /** CF file id 或 MR version id */
-  fileId: string
-  /** 整合包对应的 MC 版本（如 `1.12.2`） */
-  mcVersion: string
-  /** 整合包自身版本号（如 `2.9.3`） */
-  modpackVersion?: string
-  /** 整合包名称 */
-  name: string
-  /** 加载器类型（`forge` / `fabric` / `neoforge` / `quilt`） */
-  loader?: string
-  /** 加载器版本号 */
-  loaderVersion?: string
-  /** 整合包文件大小（字节，仅展示用） */
-  fileSize?: number
-  /** mods 文件数（仅展示用） */
-  fileCount?: number
-  /** manifest.json SHA-256，用于加入方校验本地是否已装同款 */
-  manifestHash?: string
-}
-
-/**
- * 本地整合包元数据文件（`versions/{id}/modpack.meta.json`）
- *
- * 整合包安装完成时由后端写入，创建联机房间时读取并转换为 `ModpackMeta` 上报。
- * 与 `ModpackMeta` 字段一致，额外含 `installedAt` 本地记录（不上报）。
- *
- * 对应后端 `minecraft::version::modpack_meta::ModpackMetaFile`。
- */
-export interface ModpackMetaFile {
-  source: string
-  projectId: string
-  fileId: string
-  mcVersion: string
-  modpackVersion?: string
-  name: string
-  loader?: string
-  loaderVersion?: string
-  fileSize?: number
-  fileCount?: number
-  manifestHash?: string
-  /** 安装时间（Unix 秒，仅本地记录，不上报） */
-  installedAt: number
-}
-
-/**
- * 校验本地是否已安装指定整合包的结果（联机大厅阶段 4 新增）
- *
- * 对应后端 `commands::version::list::CheckLocalModpackResult`。
- * 加入方加入房间后据此判断是否需要一键安装房主要求的整合包。
- */
-export interface CheckLocalModpackResult {
-  /** 是否已安装 */
-  installed: boolean
-  /** 匹配的 version_id（`installed=false` 时为 undefined） */
-  versionId?: string
-}
-
 /** 创建房间请求参数 */
 export interface CreateRoomParams {
   sdpOffer: string
@@ -208,39 +135,6 @@ export interface CreateRoomParams {
   hostMcVersion: string
   hostMcPort: number
   /**
-   * 房主加载器类型（联机大厅阶段 1 新增）
-   *
-   * 客户端从 `setup.ini` 的 `Type` 字段读取，值为 `forge` / `fabric` / `neoforge` /
-   * `quilt` / `optifine` / `liteloader` / `release` / `snapshot` / `old` / `unknown`。
-   * 服务端可据此在大厅列表展示加载器图标，加入方据此判断兼容性。
-   * 未传时后端落库为 NULL（兼容旧客户端）。
-   */
-  hostLoader?: string
-  /**
-   * 房主加载器版本号（联机大厅阶段 1 新增）
-   *
-   * 客户端从 `setup.ini` 的 `ForgeVersion` / `FabricVersion` / ... 字段读取，
-   * 如 `47.3.0`。无加载器（原版）或 setup.ini 缺失时为空字符串。
-   */
-  hostLoaderVersion?: string
-  /**
-   * 房间类型（联机大厅阶段 2 新增）
-   *
-   * - `private`：仅房间码加入（默认，兼容旧客户端）
-   * - `lobby`：加入大厅，可被大厅浏览页检索到
-   *
-   * 未传时后端默认 `private`。
-   */
-  roomType?: 'private' | 'lobby'
-  /**
-   * 大厅 ID（联机大厅阶段 2 新增）
-   *
-   * 仅当 `roomType = 'lobby'` 时生效，标识房间归属的大厅。
-   * 当前固定为 `global`（全球大厅），阶段 5 大厅浏览页支持多大厅选择后扩展。
-   * `private` 房间忽略此字段。
-   */
-  lobbyId?: string
-  /**
    * 是否启用白名单（阶段三子任务 8 安全加强）
    *
    * `true` 时仅 `whitelist` 数组中的设备可加入；
@@ -256,14 +150,6 @@ export interface CreateRoomParams {
    * `room_remove_whitelist` / `room_set_whitelist_enabled` 动态管理。
    */
   whitelist?: string[]
-  /**
-   * 整合包元数据（联机大厅阶段 3 新增）
-   *
-   * `undefined` 表示无整合包（纯原版房间）；传入时服务端 UPSERT 到
-   * `room_modpacks` 表并关联到 `rooms.modpack_id`。
-   * 前端从 `versions/{id}/modpack.meta.json` 读取后填充（见 `readLocalModpackMeta`）。
-   */
-  modpack?: ModpackMeta
 }
 
 /** 创建房间响应 */
@@ -308,24 +194,6 @@ export interface RoomInfoResponse {
    * 加入方据此判断是否提示房主将自己加入白名单。
    */
   whitelistEnabled: boolean
-  /**
-   * 房间类型（联机大厅阶段 2，`private` / `public`，旧服务器缺省空字符串）
-   */
-  roomType?: string
-  /**
-   * 房主加载器类型（联机大厅阶段 1，如 `forge` / `fabric`，旧服务器缺省 undefined）
-   */
-  hostLoader?: string
-  /**
-   * 房主加载器版本号（联机大厅阶段 1，如 `47.3.0`，旧服务器缺省 undefined）
-   */
-  hostLoaderVersion?: string
-  /**
-   * 整合包元数据（联机大厅阶段 3，`undefined` 表示纯原版房间）
-   *
-   * 加入方据此判断是否需要一键安装，通过 `checkLocalModpack` IPC 校验本地是否已装同款。
-   */
-  modpack?: ModpackMeta
 }
 
 /** 加入房间响应 */
@@ -381,25 +249,6 @@ export interface ParticipantInfo {
 /** 参与者列表响应 */
 export interface ListParticipantsResponse {
   participants: ParticipantInfo[]
-}
-
-/** 房间封禁记录（房主查询用） */
-export interface RoomBan {
-  id: string
-  roomCode: string
-  devicePk: string
-  /** 0=永久封禁；>0=解封 Unix 秒时间戳 */
-  bannedUntil: number
-  /** 封禁发起 Unix 秒时间戳 */
-  createdAt: number
-}
-
-/** 封禁列表响应（仅房主） */
-export interface ListBansResponse {
-  /** 当前有效封禁记录（永久 + 未过期临时），已过期的不返回 */
-  bans: RoomBan[]
-  /** 服务端当前 Unix 秒，便于客户端计算剩余封禁时长 */
-  serverTime: number
 }
 
 /** keepalive 响应 */
@@ -539,89 +388,4 @@ export interface WhitelistResponse {
   enabled: boolean
   /** 白名单条目数组 */
   entries: WhitelistEntry[]
-}
-
-// ============================================================
-// 大厅浏览（联机大厅阶段 5）
-//
-// 对应后端 `minecraft::online::signaling::Lobby*` 类型。
-// 大厅列表接口不返回 SDP/ICE/room_key 等敏感字段，
-// 加入方需调用 `POST /v1/signaling/rooms/{code}/join` 走完整加入流程。
-// ============================================================
-
-/** 大厅房间列表查询参数 */
-export interface LobbyListQuery {
-  /** 大厅分类 ID，默认 `global` */
-  lobbyId?: string
-  /** 页码，默认 1 */
-  page?: number
-  /** 每页数量，默认 20，上限 50 */
-  pageSize?: number
-  /** `true` 仅返回有整合包的房间；`false` 仅返回无整合包房间；不传则不过滤 */
-  hasModpack?: boolean
-  /** 按房主加载器过滤（`forge` / `fabric` / `neoforge` / `quilt` / `vanilla`） */
-  loader?: string
-  /** 按房主 MC 版本或整合包 MC 版本过滤 */
-  gameVersion?: string
-  /** 模糊匹配房主 MC 版本或整合包名称 */
-  keyword?: string
-}
-
-/**
- * 大厅整合包摘要（列表页轻量版）
- *
- * 与 `ModpackMeta` 的差异：
- * - 多出 `modpackId`（服务端主键）
- * - 缺少 `manifestHash` / `loaderVersion`（减少列表页载荷）
- */
-export interface LobbyModpackSummary {
-  /** 整合包记录主键（UUID） */
-  modpackId: string
-  name: string
-  modpackVersion?: string
-  /** 来源平台（`curseforge` / `modrinth`） */
-  source: string
-  projectId: string
-  fileId: string
-  mcVersion: string
-  loader?: string
-  fileSize?: number
-  fileCount?: number
-}
-
-/** 大厅房间列表项 */
-export interface LobbyRoomItem {
-  roomCode: string
-  hostDevicePk: string
-  hostMcVersion: string
-  hostLoader?: string
-  hostLoaderVersion?: string
-  maxPlayers: number
-  playerCount: number
-  hasPassword: boolean
-  status: 'waiting' | 'active' | 'closed'
-  createdAt: number
-  expiresAt: number
-  /** 整合包摘要，`undefined` 表示纯原版房间 */
-  modpack?: LobbyModpackSummary
-}
-
-/** 大厅房间列表响应 */
-export interface LobbyListResponse {
-  total: number
-  page: number
-  pageSize: number
-  items: LobbyRoomItem[]
-}
-
-/** 大厅分类条目 */
-export interface LobbyCategory {
-  id: string
-  name: string
-  roomCount: number
-}
-
-/** 大厅分类列表响应 */
-export interface LobbyCategoriesResponse {
-  categories: LobbyCategory[]
 }

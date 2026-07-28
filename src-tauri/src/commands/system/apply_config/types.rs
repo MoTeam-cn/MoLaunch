@@ -19,8 +19,6 @@ pub struct ProxyPatch {
     pub kind: Option<String>,
     #[serde(rename = "proxyUrl")]
     pub url: Option<String>,
-    #[serde(rename = "ipVersion")]
-    pub ip_version: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -38,9 +36,6 @@ pub struct DownloadPatch {
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     #[serde(rename = "mirrorUrl")]
     pub mirror_url: Option<Option<String>>,
-    /// Modrinth CDN 直连开关（开发者模式可见，默认 false）
-    #[serde(rename = "modrinthCdnRawEnabled")]
-    pub modrinth_cdn_raw_enabled: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -147,8 +142,6 @@ pub struct ProxySnapshot {
     pub kind: String,
     #[serde(rename = "proxyUrl")]
     pub url: String,
-    #[serde(rename = "ipVersion")]
-    pub ip_version: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -165,9 +158,6 @@ pub struct DownloadSnapshot {
     pub max_threads: u32,
     #[serde(rename = "chunkCount")]
     pub chunk_count: u32,
-    /// Modrinth CDN 直连开关（开发者模式可见，默认 false）
-    #[serde(rename = "modrinthCdnRawEnabled")]
-    pub modrinth_cdn_raw_enabled: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -304,7 +294,6 @@ pub fn build_snapshot(
             mode: config.proxy.mode.clone(),
             kind: config.proxy.kind.clone(),
             url: config.proxy.url.clone(),
-            ip_version: config.proxy.ip_version.clone(),
         },
         download: DownloadSnapshot {
             mirror_url: config.download.mirror_url.clone(),
@@ -313,7 +302,6 @@ pub fn build_snapshot(
             max_speed: config.download.max_speed,
             max_threads: config.download.max_threads,
             chunk_count: config.download.chunk_count,
-            modrinth_cdn_raw_enabled: config.download.modrinth_cdn_raw_enabled,
         },
         memory: MemorySnapshot {
             mode: config.memory.mode.clone(),

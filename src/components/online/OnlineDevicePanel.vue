@@ -6,13 +6,12 @@
  * - 未注册：注册引导卡片
  * - 已注册未登录 / JWT 过期：登录卡片
  * - 已注册：设备信息卡片（设备 ID / api-server / 最后登录 / JWT 过期时间）
- * - 网络环境：NAT 类型检测（复用 store 的 detectNat / forceDetectNat，无需 useWebRTC 实例）
+ * - 网络环境：NAT 类型检测（直接调用 detectNatTypeWithStun，无需 useWebRTC 实例）
  *
  * 状态来源：useOnlineStore.deviceStatus（由 Online.vue 在 onMounted 时刷新）
- *           useOnlineStore.natResult（由 Online.vue 进入页面时自动检测，侧边栏切换不丢失）
  */
 
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
@@ -29,8 +28,9 @@ import {
   SignalSlashIcon,
 } from '@heroicons/vue/24/outline'
 import { formatTimestamp } from '@/utils/format'
+import { detectNatTypeWithStun } from '@/utils/online/nat-type'
 import { NAT_TYPE_META, getNatFeasibilityColorClass } from '@/utils/online/nat-type'
-import { stripMcsdkPrefix } from '@/utils/online/device-id'
+import { toastError } from '@/utils/toast'
 
 const onlineStore = useOnlineStore()
 
@@ -49,11 +49,18 @@ async function handleLogin() {
 }
 
 // ============ NAT 类型检测 ============
-// 复用 store 的 natDetecting 状态（与 Online.vue 自动检测共享，避免重复触发）
-const detectingNat = computed(() => onlineStore.natDetecting)
+const detectingNat = ref(false)
 
 async function handleDetectNat() {
-  await onlineStore.forceDetectNat()
+  detectingNat.value = true
+  try {
+    const result = await detectNatTypeWithStun()
+    onlineStore.natResult = result
+  } catch (e) {
+    toastError(`NAT 检测失败：${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    detectingNat.value = false
+  }
 }
 </script>
 
@@ -151,7 +158,7 @@ async function handleDetectNat() {
             <UserCircleIcon class="w-4 h-4 text-gray-400" />
             <span>设备 ID</span>
           </div>
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ status.device_id ? stripMcsdkPrefix(status.device_id) : '-' }}</code>
+          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ status.device_id || '-' }}</code>
         </div>
         <div class="px-1 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm text-gray-600">

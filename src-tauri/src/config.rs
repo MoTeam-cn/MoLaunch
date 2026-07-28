@@ -76,10 +76,6 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(mode) = config.get("Download", "mirror_mode") {
         app_config.download.mirror_mode = mode.parse().unwrap_or(app_config.download.mirror_mode);
     }
-    app_config.download.modrinth_cdn_raw_enabled = config
-        .get("Download", "modrinth_cdn_raw_enabled")
-        .as_deref()
-        == Some("true");
 
     // Mirror
     app_config.download.mirror_url = config.get("Mirror", "url");
@@ -129,8 +125,6 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.proxy.mode = config.get_or("Proxy", "mode", &app_config.proxy.mode);
     app_config.proxy.kind = config.get_or("Proxy", "type", &app_config.proxy.kind);
     app_config.proxy.url = config.get_or("Proxy", "url", &app_config.proxy.url);
-    app_config.proxy.ip_version =
-        config.get_or("Proxy", "ip_version", &app_config.proxy.ip_version);
 
     // Community（社区资源配置）
     if let Some(v) = config.get("Community", "source") {
@@ -231,15 +225,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
         "mirror_mode",
         &config.download.mirror_mode.to_string(),
     );
-    ini.set(
-        "Download",
-        "modrinth_cdn_raw_enabled",
-        if config.download.modrinth_cdn_raw_enabled {
-            "true"
-        } else {
-            "false"
-        },
-    );
 
     // Mirror
     if let Some(ref url) = config.download.mirror_url {
@@ -276,7 +261,6 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("Proxy", "mode", &config.proxy.mode);
     ini.set("Proxy", "type", &config.proxy.kind);
     ini.set("Proxy", "url", &config.proxy.url);
-    ini.set("Proxy", "ip_version", &config.proxy.ip_version);
 
     // Community
     ini.set(

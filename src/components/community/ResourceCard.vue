@@ -15,7 +15,6 @@ import {
   CubeIcon,
 } from '@heroicons/vue/24/outline'
 import { formatDownloads } from '@/utils/format'
-import CachedImage from '@/components/common/CachedImage.vue'
 
 const props = defineProps<{ project: ResourceProject }>()
 const emit = defineEmits<{ click: [project: ResourceProject] }>()
@@ -66,13 +65,14 @@ const platformLabel = computed(() => props.project.platform)
   >
     <!-- Logo -->
     <div class="shrink-0 w-11 h-11 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-      <CachedImage
+      <img
+        v-if="project.logo_url"
         :src="project.logo_url"
         :alt="project.raw_name"
         class="w-full h-full object-cover"
+        @error="($event.target as HTMLImageElement).style.display = 'none'"
       >
-        <template #fallback><CubeIcon class="w-5 h-5 text-gray-400" /></template>
-      </CachedImage>
+      <CubeIcon v-else class="w-5 h-5 text-gray-400" />
     </div>
 
     <!-- 中间信息 -->

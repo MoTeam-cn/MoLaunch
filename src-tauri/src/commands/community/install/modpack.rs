@@ -3,7 +3,6 @@
 use crate::log_info;
 use crate::minecraft::community::secure_storage;
 use crate::minecraft::community::types::Platform;
-use crate::minecraft::version::modpack_meta::ModpackMetaFile;
 use crate::state::{AppState, DownloadStage, StageStatus};
 use once_cell::sync::Lazy;
 use std::collections::HashSet;
@@ -264,56 +263,6 @@ pub async fn install_modpack(
         // CF/MR 在线下载安装时复制外部 Logo（拖拽安装 logo_path 通常为 None，会自动跳过）
         if let Err(e) = copy_external_logo(req.logo_path.as_deref(), instance_dir_ref) {
             crate::log_warn!("[Community] 复制外部 Logo 失败（不中断安装）: {}", e);
-        }
-
-        // 联机大厅阶段 3：写入 modpack.meta.json（仅在线安装且有平台来源信息时）
-        // 拖拽安装（install_local_modpack）无 project_id/file_id，跳过写入。
-        // 写入失败不中断安装流程（整合包已安装成功，仅影响联机大厅上报）。
-        if let (Some(project_id), Some(file_id)) = (&req.project_id, &req.file_id) {
-            let source = match req.platform {
-                Platform::CurseForge => "curseforge",
-                Platform::Modrinth => "modrinth",
-            };
-            let meta = ModpackMetaFile {
-                source: source.to_string(),
-                project_id: project_id.clone(),
-                file_id: file_id.clone(),
-                mc_version: info.game_version.clone(),
-                modpack_version: req.modpack_version.clone(),
-                name: req.name.clone().unwrap_or_else(|| req.instance_name.clone()),
-                loader: if info.loader.is_empty() {
-                    None
-                } else {
-                    Some(info.loader.clone())
-                },
-                loader_version: if info.loader_version.is_empty() {
-                    None
-                } else {
-                    Some(info.loader_version.clone())
-                },
-                file_size: req.file_size,
-                file_count: Some(info.mod_files_count as u32),
-                // manifest_hash 暂未实现：需在 parse_modpack_info 中计算 manifest 原始内容 SHA-256
-                // 阶段 4 加入方校验本地已装时再补充
-                manifest_hash: None,
-                installed_at: std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0),
-            };
-            if let Err(e) = meta.save(instance_dir_ref) {
-                crate::log_warn!(
-                    "[Community] 写入 modpack.meta.json 失败（不中断安装）: {}",
-                    e
-                );
-            } else {
-                log_info!(
-                    "[Community] modpack.meta.json 已写入: {}:{} ({})",
-                    source,
-                    project_id,
-                    file_id
-                );
-            }
         }
 
         log_info!("[Community] 整合包安装完成: {}", req.instance_name);
