@@ -155,24 +155,20 @@ pub(super) fn extract_mr_project_id(url: &str) -> Option<String> {
 /// 拼接规则：`https://edge.forgecdn.net/files/{id前4位}/{id余位}/{FileName}`
 /// 余位用 i64 转换去掉前导 0，例如 2725062 → 2725/62
 ///
-/// 根据 source 策略选择域名：source=0 用镜像，其余用官方
+/// 始终使用官方域名构造，镜像替换由调用方通过 `cdn_urls()` 处理
+/// （source=0 时 cdn_urls 会替换为 mocdn/mcimirror 镜像）
 pub(super) fn construct_cf_edge_url(file_id: i64, file_name: &str) -> String {
-    let source = crate::minecraft::community::get_source_pref();
-    let base = if source == 0 {
-        crate::minecraft::sources::CDN_MIRROR
-    } else {
-        "https://edge.forgecdn.net"
-    };
+    const CF_EDGE_BASE: &str = "https://edge.forgecdn.net";
     let id_str = file_id.to_string();
     // fileId 至少 5 位才能拆分前 4 位 / 余位
     if id_str.len() >= 5 {
         let (p1, p2) = id_str.split_at(4);
         // 余位 parse 为 i64 去掉前导 0（如 062 → 62）
         let p2_num: i64 = p2.parse().unwrap_or(0);
-        format!("{}/files/{}/{}/{}", base, p1, p2_num, file_name)
+        format!("{}/files/{}/{}/{}", CF_EDGE_BASE, p1, p2_num, file_name)
     } else {
         // fileId 过短无法拆分，回退 0/{file_name}
-        format!("{}/files/0/{}", base, file_name)
+        format!("{}/files/0/{}", CF_EDGE_BASE, file_name)
     }
 }
 

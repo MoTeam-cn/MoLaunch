@@ -2,7 +2,7 @@
  * 版本列表/文件夹/管理/个性化模块统一 API 入口
  *
  * 后端 `version_list_manager` IPC 命令通过 `action` 字段分发到不同子模块
- * （list 6 个 + folder 5 个 + manage 4 个 + personalization 2 个，共 17 个 action），
+ * （list 8 个 + folder 5 个 + manage 4 个 + personalization 2 个，共 19 个 action），
  * 参照 `image_cache_manager` / `meta_manager` / `version_mods_manager` 模式。
  *
  * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
@@ -30,13 +30,17 @@ export async function versionListManager<T = unknown>(
  * 常量名使用大写蛇形，值使用小写下划线。
  */
 export const VERSION_LIST_ACTIONS = {
-  // list.rs（6 个）
+  // list.rs（8 个）
   LIST_VERSIONS: 'list_versions',
   LIST_INSTALLED_VERSIONS: 'list_installed_versions',
   LIST_INSTALLED_VERSIONS_WITH_TYPE: 'list_installed_versions_with_type',
   UNINSTALL_VERSION: 'uninstall_version',
   GET_VERSION_EFFECTIVE_DIR: 'get_version_effective_dir',
   GET_VERSION_GAME_VERSION: 'get_version_game_version',
+  GET_VERSION_LOADER_INFO: 'get_version_loader_info',
+  READ_LOCAL_MODPACK_META: 'read_local_modpack_meta',
+  // 联机大厅阶段 4 新增：校验本地是否已安装指定整合包（加入方判断是否需要一键安装）
+  CHECK_LOCAL_MODPACK: 'check_local_modpack',
   // folder.rs（5 个）
   LIST_MC_FOLDERS: 'list_mc_folders',
   ADD_MC_FOLDER: 'add_mc_folder',
