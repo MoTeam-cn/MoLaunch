@@ -199,7 +199,9 @@ pub async fn download_all_files(
         let mut success = false;
 
         for url in &urls {
-            match client.get(url).send().await {
+            // Java 运行时文件约 50-100MB，覆盖全局 30s timeout 为 5 分钟
+            // 避免慢速网络下大文件下载被误杀
+            match client.get(url).timeout(std::time::Duration::from_secs(300)).send().await {
                 Ok(resp) => {
                     if resp.status().is_success() {
                         match resp.bytes().await {
