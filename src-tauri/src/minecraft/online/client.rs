@@ -5,126 +5,19 @@
 //! - `/v1/*` 业务接口：自动加 ECIES 信封、JWT 携带、CSRF 校验
 //!
 //! 接口参考：`api-server/docs/auth.md`、`api-server/docs/signaling.md`
-
-use serde::{Deserialize, Serialize};
+//!
+//! 类型与错误定义见 `client_types.rs`，本文件通过 `pub use` 重导出，
+//! 外部模块（如 `signaling.rs`）的 `use super::client::{BusinessResult, ClientError, OnlineClient}` 无需改动。
 
 use super::auth::{LoginRequest, LoginResponse, RegisterRequest, RegisterResponse};
+use super::client_types::{CsrfResponse, JwkKey, JwksResponse, TimeData, TimeResponse, UnifiedResponse};
 use super::ecies::{is_envelope, open, seal, Envelope};
 use super::storage::DeviceCredentials;
 use crate::http::get_client;
 use crate::minecraft::online::crypto::{b64u_decode, CryptoError};
 
-/// 统一响应格式
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct UnifiedResponse<T = serde_json::Value> {
-    pub code: u32,
-    pub data: Option<T>,
-    pub msg: String,
-    #[serde(default)]
-    pub time: String,
-    #[serde(default)]
-    pub req_id: String,
-}
-
-/// JWKS 公钥
-///
-/// `kid` / `alg` / `use_` 字段为 JWKS 规范标准字段，当前未参与校验，
-/// 阶段二接入 JWT 签名验证时会用于匹配 `kid` 与算法。
-#[derive(Debug, Clone, Deserialize)]
-#[allow(dead_code)]
-struct JwkKey {
-    kty: String,
-    kid: String,
-    alg: String,
-    #[serde(rename = "use")]
-    use_: String,
-    n: String,
-    e: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct JwksResponse {
-    code: u32,
-    data: Option<JwksData>,
-    msg: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct JwksData {
-    keys: Vec<JwkKey>,
-}
-
-/// CSRF Token 响应
-#[derive(Debug, Clone, Deserialize)]
-pub struct CsrfResponse {
-    pub code: u32,
-    pub data: Option<CsrfData>,
-    pub msg: String,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct CsrfData {
-    pub token: String,
-}
-
-/// 时间校准响应
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct TimeResponse {
-    pub code: u32,
-    pub data: Option<TimeData>,
-    pub msg: String,
-}
-
-#[derive(Debug, Clone, Deserialize, Serialize)]
-pub struct TimeData {
-    pub server_time: u64,
-    pub rfc3339: String,
-    pub timezone: String,
-    pub offset_seconds: i32,
-}
-
-/// 业务接口调用结果（解密后）
-#[derive(Debug, Clone, Serialize)]
-pub struct BusinessResult<T> {
-    pub code: u32,
-    pub data: Option<T>,
-    pub msg: String,
-    pub req_id: String,
-}
-
-/// 客户端错误
-#[derive(Debug, thiserror::Error)]
-pub enum ClientError {
-    #[error("网络请求失败: {0}")]
-    Network(#[from] reqwest::Error),
-
-    #[error("HTTP {status}: {body}")]
-    HttpStatus { status: u16, body: String },
-
-    #[error("JSON 解析失败: {0}")]
-    Json(#[from] serde_json::Error),
-
-    #[error("加密错误: {0}")]
-    Crypto(#[from] CryptoError),
-
-    #[error("业务错误 [{code}]: {msg}")]
-    Business { code: u32, msg: String },
-
-    #[error("设备未注册或凭证缺失")]
-    NotRegistered,
-
-    #[error("JWT 已过期")]
-    TokenExpired,
-
-    #[error("JWKS 中找不到 kid={0} 的公钥")]
-    JwksKidNotFound(String),
-
-    #[error("RSA 公钥重建失败: {0}")]
-    RsaRebuildFailed(String),
-
-    #[error("响应不是 ECIES 加密信封（明文响应）: {0}")]
-    NotEnvelope(String),
-}
+// 重导出类型供外部模块使用（signaling.rs 等 `use super::client::{BusinessResult, ClientError, OnlineClient}`）
+pub use super::client_types::{BusinessResult, ClientError};
 
 /// api-server 客户端
 pub struct OnlineClient {
@@ -233,7 +126,7 @@ impl OnlineClient {
                 key_bits
             );
         }
-        jwk_to_pem(&key)
+        key.to_pem()
     }
 
     /// 获取 CSRF Token（GET /v3/csrf/token）
@@ -404,13 +297,12 @@ impl OnlineClient {
         let url = format!("{}{}", self.base_url, path);
         let jwt = &creds.device_token;
 
-        crate::log_info!(
-            "[Online] call_v1 开始: {} {} (csrf={}, body={}, device_pk={})",
+        crate::log_debug!(
+            "[Online] call_v1 开始: {} {} (csrf={}, body={})",
             method,
             path,
             if need_csrf { "yes" } else { "no" },
             if body.is_some() { "yes" } else { "no" },
-            creds.device_pk
         );
 
         // GET 请求需要 CSRF（因为 /v1 全局 CSRF 中间件校验所有非 /v3 请求）
@@ -479,7 +371,7 @@ impl OnlineClient {
         let status = resp.status().as_u16();
         let body_text = resp.text().await?;
 
-        crate::log_info!(
+        crate::log_debug!(
             "[Online] call_v1 响应: {} {} status={}, body_len={}B",
             method,
             path,
@@ -550,7 +442,7 @@ impl OnlineClient {
                     unified.req_id
                 );
             } else {
-                crate::log_info!(
+                crate::log_debug!(
                     "[Online] call_v1 业务成功: {} {} req_id={}",
                     method,
                     path,
@@ -588,24 +480,6 @@ impl OnlineClient {
             })
         }
     }
-}
-
-/// 将 JWKS 的 (n, e) 转换为 PEM SPKI 格式
-///
-/// 用于注册时传给 `rsa_oaep_encrypt`。
-fn jwk_to_pem(key: &JwkKey) -> Result<String, ClientError> {
-    use rsa::pkcs8::EncodePublicKey;
-    use rsa::{BigUint, RsaPublicKey};
-
-    let n_bytes = b64u_decode(&key.n)?;
-    let e_bytes = b64u_decode(&key.e)?;
-    let n = BigUint::from_bytes_be(&n_bytes);
-    let e = BigUint::from_bytes_be(&e_bytes);
-    let pub_key = RsaPublicKey::new(n, e)
-        .map_err(|e| ClientError::RsaRebuildFailed(e.to_string()))?;
-    pub_key
-        .to_public_key_pem(rsa::pkcs8::LineEnding::LF)
-        .map_err(|e| ClientError::RsaRebuildFailed(e.to_string()))
 }
 
 #[cfg(test)]

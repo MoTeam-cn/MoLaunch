@@ -23,6 +23,7 @@
 pub mod auth;
 pub mod bridge;
 pub mod client;
+pub mod client_types;
 pub mod crypto;
 pub mod ecies;
 pub mod protocol;

@@ -9,6 +9,18 @@
 
 ### 变更
 
+#### online/client.rs 模块化 + call_v1 日志降级
+- 背景：用户反馈 `online/client.rs` 超过 500 行（566 行），且 `call_v1` 的 INFO 级别日志过于冗长，每次业务请求都打印 4 行 INFO（开始/响应/业务成功/业务失败），刷屏严重且日志中泄露了 `device_pk` 设备标识
+- 改动：
+  - **新建 client_types.rs**：[src-tauri/src/minecraft/online/client_types.rs](src-tauri/src/minecraft/online/client_types.rs) 从 `client.rs` 拆出类型定义（`UnifiedResponse` / `JwkKey` / `JwksResponse` / `CsrfResponse` / `TimeResponse` / `BusinessResult` / `ClientError`）和 `jwk_to_pem` 函数（改为 `JwkKey::to_pem()` 方法），118 行
+  - **client.rs 瘦身**：[src-tauri/src/minecraft/online/client.rs](src-tauri/src/minecraft/online/client.rs) 删除内联类型定义和 `jwk_to_pem`，改用 `use super::client_types::{...}` 导入；通过 `pub use super::client_types::{BusinessResult, ClientError}` 重导出，`signaling.rs` 等外部模块的 `use super::client::{BusinessResult, ClientError, OnlineClient}` 无需改动。从 566 行降至 461 行
+  - **mod.rs 注册新模块**：[src-tauri/src/minecraft/online/mod.rs](src-tauri/src/minecraft/online/mod.rs) 追加 `pub mod client_types;`
+  - **call_v1 日志降级**：3 处 `log_info!` → `log_debug!`（call_v1 开始 / 响应状态 / 业务成功），同时移除 `device_pk` 字段避免设备标识泄露到 INFO 日志
+- 复用：
+  - 类型定义和错误类型原样迁移到 `client_types.rs`，无逻辑变更
+  - `JwkKey::to_pem()` 方法内部实现与原 `jwk_to_pem()` 函数完全一致，仅改为方法形式
+- 验证：`cargo check` 编译通过
+
 #### 存储结构体移除 Serialize derive（方案 C 防御性加固）
 - 背景：`switch_ms_account` 等命令返回 `LocalAuthResult`（已 `#[serde(skip)]` 保护），但底层持久化结构体（`StoredMsAccount` / `StoredAuthlibAccount` / `CurrentUser` / `DeviceCredentials` / `MicrosoftLoginResult` 等）仍派生 `Serialize`，存在被未来误用 `serde_json::to_value` 直接返回前端导致 token/密码/私钥泄露的风险
 - 改动（采用方案 C：移除 `Serialize` derive，强制编译期阻止 `to_value` 误用）：
