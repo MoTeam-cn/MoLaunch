@@ -31,9 +31,12 @@ pub(crate) async fn apply_config_inner(
     // ===== 3. 普通字段统一更新 =====
     // log_level 变更需闭包外立即生效，用 Option 收集待应用的值（避免跨 await 持有锁）
     let mut log_level_pending: Option<u32> = None;
+    // 代理变更需闭包外重建 HTTP 客户端（同 log_level 模式，避免跨 await 持有锁）
+    // 四元组：(mode, kind, url, ip_version)
+    let mut proxy_pending: Option<(String, String, String, String)> = None;
 
     super::super::update_config(&state, |config| {
-        apply_proxy(config, &patch);
+        apply_proxy(config, &patch, &mut proxy_pending);
         apply_download(config, &patch);
         apply_memory(config, &patch);
         apply_launcher(config, &patch, &mut log_level_pending);
@@ -58,6 +61,16 @@ pub(crate) async fn apply_config_inner(
         crate::logger::set_level(log_level);
     }
 
+    // 代理变更需重建 HTTP 客户端（热更新，无需重启应用）
+    if let Some((mode, kind, url, ip_version)) = proxy_pending {
+        crate::http::init_client(&mode, &kind, &url, &ip_version);
+        log_info!(
+            "[Config] HTTP client rebuilt (proxy: {}, ip_version: {})",
+            mode,
+            ip_version
+        );
+    }
+
     Ok(())
 }
 
@@ -65,19 +78,42 @@ pub(crate) async fn apply_config_inner(
 // 域子函数（均在 update_config 闭包内调用，操作 &mut AppConfig）
 // ============================================================
 
-/// 代理域：proxy.mode / proxy.kind / proxy.url
-fn apply_proxy(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+/// 代理域：proxy.mode / proxy.kind / proxy.url / proxy.ip_version
+///
+/// 任一字段变更即收集完整四元组到 `proxy_pending`，供闭包外重建 HTTP 客户端。
+fn apply_proxy(
+    config: &mut crate::state::AppConfig,
+    patch: &ConfigPatch,
+    proxy_pending: &mut Option<(String, String, String, String)>,
+) {
+    let mut changed = false;
     if let Some(ref mode) = patch.proxy.mode {
         log_info!("[Config] proxy_mode = {}", mode);
         config.proxy.mode = mode.clone();
+        changed = true;
     }
     if let Some(ref t) = patch.proxy.kind {
         log_info!("[Config] proxy_type = {}", t);
         config.proxy.kind = t.clone();
+        changed = true;
     }
     if let Some(ref url) = patch.proxy.url {
         log_info!("[Config] proxy_url = {}", url);
         config.proxy.url = url.clone();
+        changed = true;
+    }
+    if let Some(ref v) = patch.proxy.ip_version {
+        log_info!("[Config] ip_version = {}", v);
+        config.proxy.ip_version = v.clone();
+        changed = true;
+    }
+    if changed {
+        *proxy_pending = Some((
+            config.proxy.mode.clone(),
+            config.proxy.kind.clone(),
+            config.proxy.url.clone(),
+            config.proxy.ip_version.clone(),
+        ));
     }
 }
 
@@ -131,6 +167,10 @@ fn apply_download(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(ref url_opt) = patch.download.mirror_url {
         log_info!("[Config] mirror_url = {:?}", url_opt);
         config.download.mirror_url = url_opt.clone();
+    }
+    if let Some(v) = patch.download.modrinth_cdn_raw_enabled {
+        log_info!("[Config] modrinth_cdn_raw_enabled = {}", v);
+        config.download.modrinth_cdn_raw_enabled = v;
     }
 }
 
