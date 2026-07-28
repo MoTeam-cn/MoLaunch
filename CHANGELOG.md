@@ -9,6 +9,30 @@
 
 ### 变更
 
+#### 联机大厅 + 整合包云端共享（阶段四）+ 配置热重载 + 多算法密码 Hash
+- 背景：阶段四联机大厅允许房主创建公开房间供其他用户浏览加入；整合包云端共享让加入方在加入前感知「这个房间需要什么整合包」并可一键安装。同时修复配置文件热重载日志显示但实际未生效的问题，扩展 admin_guard 支持多种密码哈希算法
+- 改动：
+  - **数据模型**：新增 [api-server/migrations/sqlite/012_room_lobby_modpack.sql](api-server/migrations/sqlite/012_room_lobby_modpack.sql) 与 [api-server/migrations/postgres/012_room_lobby_modpack.sql](api-server/migrations/postgres/012_room_lobby_modpack.sql)：`rooms` 表新增 `room_type` / `lobby_id` / `modpack_id` / `host_mc_version` / `host_loader` / `host_loader_version` / `host_mc_port` 7 个字段；新建 `room_modpacks` 表存储整合包元数据（PK `modpack_id` + 唯一索引 `(source, project_id, file_id)`）
+  - **整合包元数据（不含 URL）**：[api-server/src/models/signaling.rs](api-server/src/models/signaling.rs) 新增 `ModpackMeta` 结构（`source` / `project_id` / `file_id` / `mc_version` / `modpack_version` / `name` / `loader` / `loader_version` / `file_size` / `file_count` / `manifest_hash`），**故意不包含 `download_url` 字段**；加入方通过本地 IPC `getProjectVersions(platform, project_id)` 反查匹配 `file_id` 的 `ResourceVersion` 自行获取下载链接，避免 api-server 成为 URL 分发中心
+  - **房间创建扩展**：[api-server/src/services/signaling.rs](api-server/src/services/signaling.rs) `create_room` 新增 `room_type` 校验（`lobby` / `private`）、`modpack` 元数据校验（`source` 白名单 + 必填字段非空校验）；通过 `upsert_modpack` + `link_room_modpack` 关联房间与整合包（重开房间时复用既有 `modpack_id`）
+  - **房间详情扩展**：`get_room_info` 响应新增 `room_type` / `host_mc_version` / `host_loader` / `host_loader_version` / `host_mc_port` / `whitelist_enabled` / `ice_servers` / `modpack` 字段；`modpack_id` 非空时反查 `room_modpacks` 表返回完整元数据
+  - **大厅列表**：[api-server/src/repositories/signaling.rs](api-server/src/repositories/signaling.rs) 新增 `list_lobby_rooms` 动态拼装 WHERE 条件（`lobby_id` / `has_modpack` / `loader` / `game_version` / `keyword` 过滤），仅返回 `room_type='lobby'` 且 `status IN ('waiting','active')` 且未过期的房间；[api-server/src/services/signaling.rs](api-server/src/services/signaling.rs) `list_lobby_rooms` 将 `LobbyRoomRow` 映射为 `LobbyRoomItem`，列表页仅返回轻量级 `LobbyModpackSummary`（剔除 `manifest_hash` / `loader_version`）
+  - **新接口**：[api-server/src/controllers/v1/signaling.rs](api-server/src/controllers/v1/signaling.rs) 新增 `GET /v1/signaling/lobby/rooms`（分页 + 过滤）与 `GET /v1/signaling/lobby/categories`（MVP 阶段仅 `global`，`room_count` 实时统计）
+  - **配置热重载修复**：[api-server/src/middlewares/admin_guard.rs](api-server/src/middlewares/admin_guard.rs) / [api-server/src/middlewares/csrf.rs](api-server/src/middlewares/csrf.rs) / [api-server/src/middlewares/request_logger.rs](api-server/src/middlewares/request_logger.rs) 中间件改为持有 `ConfigStore` 而非启动时快照，每次请求读取最新配置；[api-server/src/config/watcher.rs](api-server/src/config/watcher.rs) 移除 `ReloadHook` 机制，简化为单线程文件监听 + `ArcSwap` 配置原子替换
+  - **多算法密码 Hash**：[api-server/src/middlewares/admin_guard.rs](api-server/src/middlewares/admin_guard.rs) 扩展支持 `bcrypt` / `SHA1` / `SHA256` 三种哈希算法，按前缀（`$2` / 40 位十六进制 / 64 位十六进制）自动识别并校验；[api-server/Cargo.toml](api-server/Cargo.toml) 新增 `sha1` 依赖
+  - **新错误枚举**：`SignalingError` 新增 `InvalidRoomType` / `InvalidModpackSource` / `InvalidModpackFields` 三类业务错误
+- 设计取舍：
+  - **不传 download_url**：原始用户反馈要求房主创建房间时不应直接传 URL 等敏感参数。后端仅存储平台 + 项目 ID + 文件 ID + 版本信息，加入方通过本地 IPC 反查 URL，避免 api-server 成为 URL 分发中心，同时规避 URL 时效性问题
+  - **整合包元数据独立表**：避免 `rooms` 表过宽；多房间复用同一整合包时通过 `(source, project_id, file_id)` 唯一索引 UPSERT 复用记录，仅更新 `room_code` 关联
+  - **list_lobby_rooms 参数 9 个**：数据访问层参数较多但都是必需过滤条件，引入查询结构体会增加耦合与代码量，故用 `#[allow(clippy::too_many_arguments)]` 注解保留现状
+  - **大厅分类 MVP 仅 global**：未来扩展地区/语言分类时可从配置或数据库读取，当前阶段保持最小实现
+- 复用：
+  - `LobbyListQuery` 沿用 `IntoParams` 派生宏，与既有查询参数风格一致
+  - `ModpackMeta` / `Room` / `RoomParticipant` 沿用 `#[serde(rename_all = "camelCase")]` 命名约定
+  - 大厅接口响应加密复用 `EnvelopeService::seal_unified`，与既有信令接口一致
+- 验证：api-server `cargo check --all-targets` 通过；`cargo clippy --all-targets` 仅剩既存代码警告（本次新增代码仅 `list_lobby_rooms` 参数过多 1 项已用 `#[allow]` 修复）；`cargo test --lib --no-run` 测试编译通过；既有 77 个测试无 signaling 相关用例受影响
+- 文档同步：[docs/online/design.md](docs/online/design.md) 4.3 路由表补充 7 个新路由、4.5 错误码表补充 6 个新错误；[api-server/docs/signaling.md](api-server/docs/signaling.md) 接口列表补充、创建/查询房间接口字段补充、`rooms` 表新字段与 `room_modpacks` 表说明、新增「联机大厅与整合包云端共享」章节含接口详情与一键安装流程；[docs/online/lobby-modpack-share.md](docs/online/lobby-modpack-share.md) 设计文档已在前序步骤同步
+
 #### 联机模块走查修复：并发安全 + Mutex 死锁 + Vue 行数 + Promise 未处理（5 项）
 - 背景：联机模块代码走查发现 5 个问题（3 个并发/Mutex 严重），本次一次性修复
 - 改动：
