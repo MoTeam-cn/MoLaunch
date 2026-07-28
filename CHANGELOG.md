@@ -9,6 +9,16 @@
 
 ### 变更
 
+#### logger 模块拆分（单文件 455 行 → 目录模块 3 文件）
+- 背景：[src-tauri/src/logger.rs](src-tauri/src/logger.rs) 单文件 455 行，接近 400 行关注阈值，职责混杂（核心日志器 + 文件查看 API + 脱敏 + 测试），需按职责拆分提升可维护性
+- 改动：
+  - `logger.rs` 删除，改为 `logger/` 目录模块：[mod.rs](src-tauri/src/logger/mod.rs)（300 行：LogLevel + Logger 结构体 + init/set_level/log/separator + 宏 + strip_to_src_relative）、[viewer.rs](src-tauri/src/logger/viewer.rs)（77 行：日志文件路径查询/列表/读取 API）、[sanitize.rs](src-tauri/src/logger/sanitize.rs)（92 行：敏感信息脱敏 + 4 个测试用例）
+  - `mod.rs` 通过 `pub use sanitize::sanitize_sensitive_info;` 和 `pub use viewer::{get_log_path, list_log_files, read_log_file};` 重新导出，保持 `crate::logger::*` 公共路径完全不变
+  - `#[macro_export]` 宏内部 `$crate::logger::log` / `$crate::logger::LogLevel` / `$crate::logger::separator` 路径零改动
+  - 所有调用方（system_manager.rs / config.rs / apply.rs / lib.rs）零改动
+- 复用：沿用原文件全部实现逻辑，仅按职责拆分文件边界，无功能变更
+- 验证：`cargo check` 通过（10.61s 零错误零警告）
+
 #### 致谢页新增 MoCDN 条目
 - 背景：前序提交已将 `cdn-modrinth.mocdn.net` / `cdn-curseforge.mocdn.net` 自建 CDN 镜像接入下载链路，需在「关于」页致谢列表中补充 MoCDN 项目说明与作者信息
 - 改动：
