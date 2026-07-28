@@ -31,9 +31,12 @@ const tipRef = ref<HTMLElement | null>(null)
 const tipStyle = ref<Record<string, string>>({})
 const arrowStyle = ref<Record<string, string>>({})
 let timer: ReturnType<typeof setTimeout> | null = null
+let hideTimer: ReturnType<typeof setTimeout> | null = null
 let observer: MutationObserver | null = null
 
 function show() {
+  // 清除待执行的隐藏定时器（鼠标从 tooltip body 移回 trigger 时取消隐藏）
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
   timer = setTimeout(() => {
     visible.value = true
     nextTick(() => {
@@ -45,8 +48,16 @@ function show() {
 
 function hide() {
   if (timer) { clearTimeout(timer); timer = null }
-  visible.value = false
-  stopObserver()
+  // 延迟隐藏，给鼠标从 trigger 移到 tooltip body 的时间（便于复制文字）
+  hideTimer = setTimeout(() => {
+    visible.value = false
+    stopObserver()
+  }, 150)
+}
+
+/** 鼠标移入 tooltip body 时取消隐藏（支持复制文字） */
+function cancelHide() {
+  if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
 }
 
 /** 检测拟放置矩形是否与任何 select-dropdown 重叠（用于避让 Select 下拉框） */
@@ -158,6 +169,7 @@ function stopObserver() {
 
 onUnmounted(() => {
   if (timer) clearTimeout(timer)
+  if (hideTimer) clearTimeout(hideTimer)
   stopObserver()
 })
 </script>
@@ -166,7 +178,7 @@ onUnmounted(() => {
   <div ref="triggerRef" class="tooltip-trigger" :class="{ 'tooltip-trigger--block': block }" @mouseenter="show" @mouseleave="hide" @focus="show" @blur="hide">
     <slot />
     <teleport to="body">
-      <div v-if="visible" ref="tipRef" :style="tipStyle" class="tooltip-body">
+      <div v-if="visible && text" ref="tipRef" :style="tipStyle" class="tooltip-body" @mouseenter="cancelHide" @mouseleave="hide">
         {{ text }}
         <div class="tooltip-arrow" :style="arrowStyle"></div>
       </div>
@@ -198,6 +210,9 @@ onUnmounted(() => {
   max-width: 360px;
   word-break: break-word;
   white-space: pre-line;
+  /* 支持鼠标移入复制文字 */
+  cursor: text;
+  user-select: text;
 }
 
 .tooltip-arrow {
