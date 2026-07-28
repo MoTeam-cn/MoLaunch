@@ -9,6 +9,13 @@
 
 ### 变更
 
+#### 致谢页新增 MoCDN 条目
+- 背景：前序提交已将 `cdn-modrinth.mocdn.net` / `cdn-curseforge.mocdn.net` 自建 CDN 镜像接入下载链路，需在「关于」页致谢列表中补充 MoCDN 项目说明与作者信息
+- 改动：
+  - [src-tauri/resources/about/acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt) 表格新增一行：`MoCDN | https://mocdn.net | 提供 CurseForge 和 Modrinth 的文件下载加速服务，自建 CDN 镜像用于绕过中国大陆 cdn-alt 跳转提升下载速度 | mocdn-logo.png | MoTeam:MoTeam.png`
+  - 复用已有资源文件 [src/assets/AboutIcon/mocdn-logo.png](src/assets/AboutIcon/mocdn-logo.png)（logo）与 [src/assets/AboutIcon/MoTeam.png](src/assets/AboutIcon/MoTeam.png)（作者头像），无需新增资源
+- 复用：沿用 acknowledgements.txt 现有表格格式（`| name | home | desc | logo | authors |`），`include_str!` 嵌入机制无需改动
+
 #### Modrinth CDN 域名替换为 cdn-raw.modrinth.com（绕过中国大陆 cdn-alt 跳转）
 - 背景：Modrinth 官方 CDN `cdn.modrinth.com` 对中国大陆用户会 302 跳转到慢速 `cdn-alt.modrinth.com`，导致下载速度极差；`cdn-raw.modrinth.com` 是 Modrinth 官方直连域名，路径结构与原始 CDN 完全一致，仅替换域名即可绕过跳转
 - 改动：

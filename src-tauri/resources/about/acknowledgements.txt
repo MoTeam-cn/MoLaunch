@@ -17,3 +17,4 @@
 | MCIM API (mod.mcimirror.top) | https://mcimirror.top | CurseForge 和 Modrinth 国内镜像服务，用于加速社区 Mod 搜索、元数据查询和文件下载 | mcimirror.webp | z0z0r4:z0z0r4.png |
 | Cubiomes | https://github.com/Cubitect/cubiomes | Minecraft Java 版群系与结构生成算法库（C），种子地图工具的核心算法来源。本项目使用 MoTeam-cn/cubiomes 分支，原生支持 MC 1.7~26.2 | Cubitect.png | Cubitect:Cubitect.png |
 | OpenLayers | https://openlayers.org | 高性能开源地图渲染引擎，种子地图工具的瓦片渲染、矢量图层与交互基础 | openlayers.png | OpenLayers Contributors |
+| MoCDN | https://mocdn.net | 提供 CurseForge 和 Modrinth 的文件下载加速服务，自建 CDN 镜像用于绕过中国大陆 cdn-alt 跳转提升下载速度 | mocdn-logo.png | MoTeam:MoTeam.png |
