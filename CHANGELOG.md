@@ -9,6 +9,22 @@
 
 ### 变更
 
+#### 联机创建房间表单改造（MC 版本下拉 + 白名单折叠 + 布局美化）
+- 背景：用户反馈创建房间时 MC 版本需要手动输入字符串，容易出错且无法利用启动器已安装版本列表；白名单在创建表单底部平铺展开，即使不启用也占大量视觉空间；整体布局字段标签过窄、间距紧凑，视觉不舒服
+- 改动：
+  - **新建 CreateRoomForm.vue**：[src/components/online/CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) 从 RoomManager.vue 拆分创建房间表单为独立组件（234 行，符合 300 行约束）。MC 版本输入从 `<Input>` 改为 [Select.vue](src/components/common/Select.vue) 下拉，数据源复用 `listInstalledVersionsWithType()` IPC（已安装版本列表，含 version_type 标识 forge/fabric/neoforge 等）。选择后用 version_id 作为 mcVersion 上报（含 loader 信息，比单纯版本号更有意义，房主和加入方可直接判断兼容性）
+  - **白名单改高级设置折叠**：白名单区块从创建表单底部平铺改为独立 [CollapsibleCard.vue](src/components/common/CollapsibleCard.vue)「高级设置」，默认收起，标题栏显示白名单状态徽章（已启用/未启用），点击展开后显示 WhitelistEditor
+  - **RoomManager.vue 精简**：[src/components/online/RoomManager.vue](src/components/online/RoomManager.vue) 移除创建表单相关代码（createForm / whitelistForm / maxPlayersHint / createSteps / handleCreateRoom），引用 CreateRoomForm 组件。精简后从 298 行降至 142 行
+  - **布局美化**：字段标签宽度从 w-20（80px）加宽到 w-24（96px）适配「MC 版本」等长标签；字段间距从 space-y-3 调整为 space-y-4；标签增加 `shrink-0` 防止窄屏压缩；白名单独立成卡与基础信息卡片视觉分离
+- 设计取舍：
+  - **mcVersion 字段填 version_id 而非真实版本号**：如 "1.20.1-forge-47.3.0" 而非 "1.20.1"。理由：version_id 包含 loader 信息，对加入方判断兼容性更有意义；后端 rooms 表的 host_mc_version 字段存 version_id 也合理；避免调用 `getVersionGameVersion` 异步解析的真实版本号丢失 loader 上下文。若后续 api-server 阶段四的 host_loader / host_loader_version 字段需要联机客户端上报，再扩展 IPC 字段
+  - **不调用 getVersionGameVersion 解析真实版本号**：减少 IPC 调用，version_id 已包含足够信息
+  - **房主运行期面板白名单未同步改造**：本次仅改造创建表单的白名单折叠。房主面板（RoomHostPanel.vue）的白名单是运行期管理，已有独立 Card 包裹和状态徽章，保持现状
+- 复用：
+  - `listInstalledVersionsWithType()` IPC 早已存在，项目内 7 处 Vue 组件复用（VersionSelect / Home / ModDependencyChecker 等），本次联机模块首次复用
+  - `Select.vue` / `CollapsibleCard.vue` / `WhitelistEditor.vue` 均为项目已有公共组件，未引入新依赖
+- 验证：`vue-tsc --noEmit` 类型检查通过（RoomManager.vue / CreateRoomForm.vue 无错误，项目其他历史遗留类型错误不在本次修改范围）
+
 #### IPC 敏感信息泄露修复（token / device_pk 序列化隔离）
 - 背景：用户反馈 `meta_manager` 的 `switch_ms_account` action 返回的 `LocalAuthResult` 携带 `access_token` / `client_token` 明文，经子 agent 全面排查发现项目内存在 4 处同类泄露点（token 通过 Serialize 结构透传到前端 IPC）
 - 改动：
