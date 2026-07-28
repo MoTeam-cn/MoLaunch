@@ -15,8 +15,10 @@
 - 修复：
   - [chunk/download.rs](src-tauri/src/minecraft/download/chunk/download.rs) `client.get(url)` 加 `.timeout(Duration::from_secs(86400))`（24h 兜底），覆盖全局 30s。实际超时由现有"无数据流动 15s"机制控制，只有真断流才报错
   - [stream.rs](src-tauri/src/minecraft/download/downloader/stream.rs) 同样加 `.timeout(Duration::from_secs(86400))`，连接阶段仍由 `tokio::time::timeout(5s/10s)` 控制，body 读取阶段由"无数据流动 15s"控制
+  - [java/download/files.rs](src-tauri/src/minecraft/java/download/files.rs) Java 运行时下载（50-100MB）加 `.timeout(Duration::from_secs(300))`（5 分钟），覆盖全局 30s
 - 复用：沿用现有 `STREAM_IDLE_TIMEOUT_SECS = 15` 和 chunk 15s 无数据流动超时机制，不引入新逻辑
-- 验证：`cargo check` 通过（4.17s 零错误零警告）
+- 排查：全项目搜索 `.send().await` / `.bytes().await`，确认 API 请求和小文件场景 30s 全局 timeout 合理，仅大文件下载场景需覆盖
+- 验证：`cargo check` 通过（零错误零警告）
 
 #### 修复日志脱敏误伤 URL 路径问题
 - 背景：用户反馈下载日志中 URL 显示为 `https://cdn-modrinth.mocdn.***.0.14-mc-1.20.1-forge.jar`，`net/data/.../physics-mod-3` 被替换为 `***`
@@ -38,7 +40,7 @@
 #### 致谢页新增 MoCDN 条目
 - 背景：前序提交已将 `cdn-modrinth.mocdn.net` / `cdn-curseforge.mocdn.net` 自建 CDN 镜像接入下载链路，需在「关于」页致谢列表中补充 MoCDN 项目说明与作者信息
 - 改动：
-  - [src-tauri/resources/about/acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt) 表格新增一行：`MoCDN | https://mocdn.net | 提供 CurseForge 和 Modrinth 的文件下载加速服务，自建 CDN 镜像用于绕过中国大陆 cdn-alt 跳转提升下载速度 | mocdn-logo.png | MoTeam:MoTeam.png`
+  - [src-tauri/resources/about/acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt) 表格新增一行：`MoCDN | https://mocdn.net | 提供 CurseForge 和 Modrinth 的文件下载加速服务 | mocdn-logo.png | MoTeam:MoTeam.png`
   - 复用已有资源文件 [src/assets/AboutIcon/mocdn-logo.png](src/assets/AboutIcon/mocdn-logo.png)（logo）与 [src/assets/AboutIcon/MoTeam.png](src/assets/AboutIcon/MoTeam.png)（作者头像），无需新增资源
 - 复用：沿用 acknowledgements.txt 现有表格格式（`| name | home | desc | logo | authors |`），`include_str!` 嵌入机制无需改动
 
