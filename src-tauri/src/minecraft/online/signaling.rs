@@ -330,7 +330,7 @@ pub struct ParticipantInfo {
     #[serde(alias = "confirmed_at")]
     pub confirmed_at: u64,
     /// 房主是否已为该参与者生成 SDP Offer（mesh 拓扑，true 表示 offer 已就绪）
-    #[serde(default)]
+    #[serde(default, alias = "host_offer_ready")]
     pub host_offer_ready: bool,
 }
 
@@ -367,8 +367,10 @@ pub struct ListBansResponse {
 }
 
 /// 房主为指定参与者上传 SDP Offer 的请求体（mesh 拓扑）
+///
+/// 无 `rename_all`：此结构体仅 Serialize（客户端→服务端），服务端期望 snake_case。
+/// 若加 `rename_all = "camelCase"` 会序列化为 `sdpOffer`/`iceCandidates`，服务端反序列化失败。
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct UploadParticipantOfferRequest {
     pub sdp_offer: String,
     pub ice_candidates: Vec<String>,
@@ -381,10 +383,10 @@ pub struct ParticipantOfferResponse {
     /// Offer 是否已就绪（等价于 sdp_offer 非空）
     pub ready: bool,
     /// SDP Offer（未就绪时为空字符串）
-    #[serde(default)]
+    #[serde(default, alias = "sdp_offer")]
     pub sdp_offer: String,
     /// ICE Candidates 数组（未就绪时为空数组）
-    #[serde(default)]
+    #[serde(default, alias = "ice_candidates")]
     pub ice_candidates: Vec<String>,
 }
 
@@ -485,7 +487,7 @@ pub struct LobbyModpackSummary {
     #[serde(alias = "modpack_id")]
     pub modpack_id: String,
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(skip_serializing_if = "Option::is_none", default, alias = "modpack_version")]
     pub modpack_version: Option<String>,
     /// 来源平台（`curseforge` / `modrinth`）
     pub source: String,
@@ -497,9 +499,9 @@ pub struct LobbyModpackSummary {
     pub mc_version: String,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub loader: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(skip_serializing_if = "Option::is_none", default, alias = "file_size")]
     pub file_size: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(skip_serializing_if = "Option::is_none", default, alias = "file_count")]
     pub file_count: Option<u32>,
 }
 
@@ -507,6 +509,7 @@ pub struct LobbyModpackSummary {
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct LobbyRoomItem {
+    #[serde(alias = "room_code")]
     pub room_code: String,
     #[serde(alias = "host_device_pk")]
     pub host_device_pk: String,

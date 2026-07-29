@@ -9,6 +9,17 @@
 
 ### 修复
 
+#### 信令结构体字段名大小写全面修复（7 个字段缺失 alias）
+
+- **现象**：mesh 拓扑房主为参与者生成 Offer 后，客户端拉取 `ParticipantOfferResponse` 时 `sdp_offer`/`ice_candidates` 为空；参与者列表中 `host_offer_ready` 永远为 false；大厅列表 `LobbyModpackSummary` 的 `modpack_version`/`file_size`/`file_count` 丢失；大厅房间列表 `LobbyRoomItem.room_code` 为空
+- **根因**：api-server 的 `ParticipantInfo`、`ParticipantOfferResponse`、`LobbyModpackSummary`、`LobbyRoomItem` 均无 `#[serde(rename_all = "camelCase")]`，序列化输出 snake_case；客户端同名结构体带 `rename_all = "camelCase"`，反序列化时期望 camelCase，多词字段名不匹配导致静默回退为默认值
+- **`src-tauri/src/minecraft/online/signaling.rs`**：
+  - `ParticipantInfo.host_offer_ready` 添加 `#[serde(alias = "host_offer_ready")]`
+  - `ParticipantOfferResponse.sdp_offer`/`ice_candidates` 添加 `#[serde(alias = "...")]`
+  - `LobbyModpackSummary.modpack_version`/`file_size`/`file_count` 添加 `#[serde(alias = "...")]`
+  - `LobbyRoomItem.room_code` 添加 `#[serde(alias = "room_code")]`（其余字段此前已有 alias）
+- 全面核对客户端与服务端所有共享结构体，确认无其他字段名大小写不匹配
+
 #### 创建房间时整合包元数据反序列化失败（ModpackMeta 字段名大小写不一致）
 
 - **现象**：创建关联整合包的房间时，apiServer 返回 `解密请求信封失败 error=业务数据反序列化失败`
