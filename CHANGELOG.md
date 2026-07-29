@@ -9,6 +9,40 @@
 
 ### 变更
 
+#### 客户端自动更新能力落地（方案 B 第二阶段：客户端集成）
+- 背景：服务端更新服务（api-server `/v1/updates/*` + S3 presigned URL）与 CI/CD 流水线（`.github/workflows/release.yml`）已就绪，客户端需接入 Tauri 官方 updater plugin 完成端到端自动更新闭环
+- 设计文档：[docs/updater/design.md](docs/updater/design.md) §4 客户端实现
+- 改动：
+  - **Tauri 配置**（[src-tauri/tauri.conf.json](src-tauri/tauri.conf.json)）：
+    - `plugins.updater.pubkey` 填入 Ed25519 公钥（`npx tauri signer generate` 生成）
+    - `endpoints` 修正为 `https://api.molaunch.moiu.cn/v1/updates/manifest/raw`（之前文档占位为 `api.molaunch.net`，实际域名为 `moiu.cn`）
+    - `app.security.csp` 的 `connect-src` 追加 `https://api.molaunch.moiu.cn`（查询 manifest）与 `https://download.mocdn.net`（下载 presigned URL）
+    - `windows.installMode = passive`（NSIS 进度条小窗口，无需用户交互）
+  - **Rust 依赖**（[src-tauri/Cargo.toml](src-tauri/Cargo.toml)）：新增 `tauri-plugin-updater = "2"` + `tauri-plugin-process = "2"`
+  - **JS 依赖**（[package.json](package.json)）：新增 `@tauri-apps/plugin-updater` + `@tauri-apps/plugin-process`
+  - **Plugin 注册**（[src-tauri/src/lib.rs](src-tauri/src/lib.rs)）：`tauri::Builder` 链追加 `tauri_plugin_updater::Builder::new().build()` + `tauri_plugin_process::init()`
+  - **权限配置**（[src-tauri/capabilities/migrated.json](src-tauri/capabilities/migrated.json)）：追加 `updater:default` / `process:default` / `process:allow-relaunch`
+  - **更新工具单例**（[src/utils/updater.ts](src/utils/updater.ts)，新增）：
+    - 参照 `utils/modal.ts` / `utils/toast.ts` 的 module-level 单例模式
+    - 暴露 `updateState`（响应式状态：status / version / notes / forceUpdate / downloaded / total / error / showDialog）
+    - 提供 `checkForUpdate({ silent })` / `downloadAndInstall()` / `closeDialog()` / `initAutoCheck()` 四个函数
+    - 静默模式（启动 5s + 每 6h 定时）仅在发现更新时弹窗，无更新/检查失败均不打扰用户
+    - 手动模式（关于页按钮触发）无论结果都给用户反馈（toast 或弹窗）
+    - 强制更新（`manifest.force_update=true`）时禁用关闭按钮、禁用遮罩/ESC 关闭
+    - dev 模式（`import.meta.env.DEV`）跳过自动检查，避免 dev 版本号低于发布版本时反复触发更新
+  - **更新弹窗组件**（[src/components/about/UpdateDialog.vue](src/components/about/UpdateDialog.vue)，新增，242 行）：
+    - 监听 `updateState.showDialog` 自动显示/隐藏
+    - 状态切换：检查中 loading → 发现新版本（版本号 + 更新日志 + 按钮）→ 下载进度条 → 安装中 loading（即将重启）→ 错误信息
+    - 强制更新时不显示"稍后"按钮，仅"立即更新"
+    - 复用项目自定义 `Button.vue`，未使用原生 `<button>`（除关闭按钮 X 图标）
+  - **关于页入口**（[src/views/settings/more/AboutTab.vue](src/views/settings/more/AboutTab.vue)）：在 MoLaunch 介绍卡片右上角追加"检查更新"按钮（`outline` 样式 + ArrowPathIcon），点击触发 `checkForUpdate({ silent: false })`
+  - **App.vue 集成**（[src/App.vue](src/App.vue)）：`onMounted` 调用 `initAutoCheck()` 注册启动 5s + 每 6h 定时检查；模板挂载 `<UpdateDialog />` 全局弹窗
+  - **CI/CD 同步**（[.github/workflows/release.yml](.github/workflows/release.yml)）：版本注册地址修正为 `https://api.molaunch.moiu.cn/v1/admin/updates/releases`
+  - **设计文档同步**（[docs/updater/design.md](docs/updater/design.md)）：所有 `api.molaunch.net` 占位域名替换为实际 `api.molaunch.moiu.cn`
+- 复用：参照 `utils/modal.ts` 的 module-level 单例模式（`setModalRef` 注入）+ `utils/toast.ts` 的 toast 反馈机制 + 项目自定义 `Button.vue` 组件
+- 端到端流程：客户端启动 5s 静默检查 → api-server 查询 `app_releases` 表 → S3 presigned URL 下发 → Tauri plugin 下载并校验 Ed25519 签名 → NSIS passive 模式安装 → `relaunch()` 重启主进程
+- 验证：`cargo check` + `npm run typecheck` 待执行（需先安装新依赖 `npm install`）
+
 #### 修复大文件下载被全局 30s timeout 误杀问题
 - 背景：用户反馈 132.7 MB 文件分片下载时 chunk 0/1 报 `request or response body error: operation timed out`，8 秒就超时
 - 根因：[http.rs](src-tauri/src/http.rs) 全局 HTTP 客户端构建时设置了 `.timeout(Duration::from_secs(30))`，这是 reqwest 的整体超时（连接+响应头+body 读取）。分片下载（33MB/chunk）和单流下载在慢速网络下 30s 下载不完 body 就被误杀
