@@ -1,18 +1,20 @@
 <script setup lang="ts">
 /**
- * 关于子页签：MoLaunch 介绍 + 实现原理 + 技术栈
+ * 关于子页签：MoLaunch 介绍 + 实现原理 + 技术栈 + 检查更新入口
  */
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import MoLaunchIntro from '@/components/about/MoLaunchIntro.vue'
 import { openLink } from '@/utils/aboutLogos'
+import { checkForUpdate } from '@/utils/updater'
 import type { AboutData } from '@/utils/api/about'
 import logoMoLaunch from '@/assets/logo.svg'
 import {
   GlobeAltIcon,
   CodeBracketIcon,
   ArrowTopRightOnSquareIcon,
+  ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{
@@ -27,6 +29,19 @@ const appVersion = __APP_VERSION__
 const frontendDeps = computed(() => props.aboutData?.frontendDeps ?? [])
 const frontendDevDeps = computed(() => props.aboutData?.frontendDevDeps ?? [])
 const backendDeps = computed(() => props.aboutData?.backendDeps ?? [])
+
+// 检查更新按钮状态（仅按钮自身 loading，弹窗由 UpdateDialog 全局组件展示）
+const checking = ref(false)
+
+async function onCheckUpdate() {
+  if (checking.value) return
+  checking.value = true
+  try {
+    await checkForUpdate({ silent: false })
+  } finally {
+    checking.value = false
+  }
+}
 </script>
 
 <template>
@@ -42,10 +57,21 @@ const backendDeps = computed(() => props.aboutData?.backendDeps ?? [])
       </div>
     </template>
     <template #extra>
-      <Button type="text" size="small" @click="openLink('https://molaunch.moiu.cn')">
-        <template #icon><GlobeAltIcon class="h-3.5 w-3.5" /></template>
-        点我前往
-      </Button>
+      <div class="flex items-center gap-2">
+        <Button
+          type="outline"
+          size="small"
+          :loading="checking"
+          @click="onCheckUpdate"
+        >
+          <template #icon><ArrowPathIcon class="h-3.5 w-3.5" /></template>
+          检查更新
+        </Button>
+        <Button type="text" size="small" @click="openLink('https://molaunch.moiu.cn')">
+          <template #icon><GlobeAltIcon class="h-3.5 w-3.5" /></template>
+          点我前往
+        </Button>
+      </div>
     </template>
 
     <div class="space-y-3">

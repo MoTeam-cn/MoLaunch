@@ -74,6 +74,11 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
+        // 自动更新 plugin（检测/下载/校验/启动 NSIS installer 子程序）
+        // See: docs/updater/design.md §4.1.4
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        // 重启主进程 plugin（更新文件替换完成后调用 relaunch）
+        .plugin(tauri_plugin_process::init())
         .manage(app_state)
         .setup(|_app| {
             // setup 钩子在窗口/webview 创建后、前端加载前调用

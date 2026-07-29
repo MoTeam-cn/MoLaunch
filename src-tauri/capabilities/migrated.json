@@ -30,6 +30,9 @@
     "fs:allow-remove",
     "fs:allow-rename",
     "fs:allow-copy-file",
-    "notification:default"
+    "notification:default",
+    "updater:default",
+    "process:default",
+    "process:allow-restart"
   ]
 }

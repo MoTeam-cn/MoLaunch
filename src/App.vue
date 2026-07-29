@@ -12,6 +12,7 @@ import DragOverlay from '@/components/common/DragOverlay.vue'
 import Modal from '@/components/common/Modal.vue'
 import CrashDialog from '@/components/common/CrashDialog.vue'
 import Toast from '@/components/common/Toast.vue'
+import UpdateDialog from '@/components/about/UpdateDialog.vue'
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
@@ -19,6 +20,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { setModalRef } from '@/utils/modal'
 import { setCrashDialogRef } from '@/utils/crashDialog'
 import { setToastRef } from '@/utils/toast'
+import { initAutoCheck } from '@/utils/updater'
 import { initDownloadPolling } from '@/composables/useDownloadPolling'
 import { useDragDrop } from '@/composables/useDragDrop'
 
@@ -41,6 +43,8 @@ onMounted(() => {
   setCrashDialogRef(crashDialogRef.value)
   setToastRef(toastRef.value)
   initDownloadPolling()
+  // 启动自动更新检查（启动后 5s + 每 6 小时；dev 模式自动跳过）
+  initAutoCheck()
   initApp()
 })
 
@@ -102,6 +106,7 @@ async function initApp() {
   <Modal ref="modalRef" />
   <CrashDialog ref="crashDialogRef" />
   <Toast ref="toastRef" />
+  <UpdateDialog />
   <DragOverlay />
   <!-- 会话恢复期间的加载遮罩 -->
   <Teleport to="body">

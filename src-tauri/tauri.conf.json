@@ -20,7 +20,17 @@
   "mainBinaryName": "MoLaunch",
   "version": "0.1.0",
   "identifier": "com.moteam.molaunch",
-  "plugins": {},
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://api.molaunch.moiu.cn/v1/updates/manifest/raw?target={{target}}&arch={{arch}}&current_version={{current_version}}"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEyNTgyQTQ3NDU5RjIwMTcKUldRWElKOUZSeXBZRXZJT2pkWUZtQkUvODdlYTdVZjgvRWFFN0FqYXhYTmhhVTdYU1lVLzY5NkUK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "app": {
     "windows": [
       {
@@ -35,7 +45,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; img-src 'self' data: blob: cache-image: https://cache-image.localhost res: https://res.localhost https://*.minecraft.net https://*.mojang.com https://crafatar.com https://bmclapi2.bangbang93.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost https://cache-image.localhost res: https://res.localhost https://*.minecraft.net https://*.mojang.com https://login.live.com https://login.microsoftonline.com https://*.xboxlive.com https://bmclapi2.bangbang93.com https://maven.minecraftforge.net https://maven.neoforged.net https://maven.fabricmc.net; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+      "csp": "default-src 'self'; img-src 'self' data: blob: cache-image: https://cache-image.localhost res: https://res.localhost https://*.minecraft.net https://*.mojang.com https://crafatar.com https://bmclapi2.bangbang93.com; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' ipc: http://ipc.localhost https://cache-image.localhost res: https://res.localhost https://*.minecraft.net https://*.mojang.com https://login.live.com https://login.microsoftonline.com https://*.xboxlive.com https://bmclapi2.bangbang93.com https://maven.minecraftforge.net https://maven.neoforged.net https://maven.fabricmc.net https://api.molaunch.moiu.cn https://download.mocdn.net; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     }
   }
 }
