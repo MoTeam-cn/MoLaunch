@@ -13,28 +13,32 @@ permissions:
   contents: write
 
 jobs:
-  # 构建并发布
-  build-and-release:
-    name: Build & Release
+  # 构建并上传到 S3 + 注册版本到 api-server
+  build-and-upload:
+    name: Build & Upload (${{ matrix.platform }})
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          # Windows
+          # Windows（NSIS 安装包，updater 主格式）
           - platform: windows
             os: windows-latest
             target: x86_64-pc-windows-msvc
-
-          # macOS
+            arch: x86_64
+            bundle_type: nsis
+          # macOS（app.tar.gz，updater 主格式）
           - platform: macos
             os: macos-latest
             target: aarch64-apple-darwin
-
-          # Linux
+            arch: aarch64
+            bundle_type: app
+          # Linux（AppImage，updater 主格式）
           - platform: linux
             os: ubuntu-22.04
             target: x86_64-unknown-linux-gnu
+            arch: x86_64
+            bundle_type: appimage
 
     steps:
       - uses: actions/checkout@v4
@@ -93,15 +97,139 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 启用签名（tauri-action 检测到此环境变量后自动对安装包签名，生成 .sig 文件）
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           tauriScript: npx tauri
+          # Windows 优先使用 NSIS 安装包（而非 MSI），与 updater 协议一致
+          updaterJsonPreferNsis: true
 
-  # 创建 GitHub Release
+      # ===== S3 上传 + 版本注册 =====
+      # See: docs/updater/design.md §5.2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.S3_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.S3_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.S3_REGION }}
+
+      - name: Upload to S3 and register release
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          PLATFORM="${{ matrix.platform }}"
+
+          # 定位安装包与签名文件（按平台选择 updater 主格式）
+          BUNDLE_DIR="src-tauri/target/release/bundle"
+          case "$PLATFORM" in
+            windows)
+              SETUP_FILE=$(find "$BUNDLE_DIR/nsis" -name "*-setup.exe" 2>/dev/null | head -1)
+              ;;
+            macos)
+              SETUP_FILE=$(find "$BUNDLE_DIR/macos" -name "*.app.tar.gz" ! -name "*.sig" 2>/dev/null | head -1)
+              ;;
+            linux)
+              SETUP_FILE=$(find "$BUNDLE_DIR/appimage" -name "*.AppImage" ! -name "*.sig" 2>/dev/null | head -1)
+              ;;
+          esac
+
+          if [ -z "$SETUP_FILE" ] || [ ! -f "$SETUP_FILE" ]; then
+            echo "::error::未找到安装包文件 (platform=$PLATFORM)"
+            exit 1
+          fi
+
+          SIG_FILE="${SETUP_FILE}.sig"
+          if [ ! -f "$SIG_FILE" ]; then
+            echo "::error::签名文件不存在: $SIG_FILE"
+            exit 1
+          fi
+
+          FILENAME=$(basename "$SETUP_FILE")
+          S3_KEY="updater/v${VERSION}/${PLATFORM}/${FILENAME}"
+          SIG_KEY="${S3_KEY}.sig"
+
+          echo "上传安装包: $SETUP_FILE -> s3://${{ secrets.S3_BUCKET }}/${S3_KEY}"
+          aws s3 cp "$SETUP_FILE" "s3://${{ secrets.S3_BUCKET }}/${S3_KEY}" \
+            --endpoint-url ${{ secrets.S3_ENDPOINT }}
+
+          echo "上传签名文件: $SIG_FILE -> s3://${{ secrets.S3_BUCKET }}/${SIG_KEY}"
+          aws s3 cp "$SIG_FILE" "s3://${{ secrets.S3_BUCKET }}/${SIG_KEY}" \
+            --endpoint-url ${{ secrets.S3_ENDPOINT }}
+
+          # .sig 文件内容即为 base64 签名字符串（tauri signer 输出格式）
+          # 去除换行后直接作为 signature 字段
+          SIGNATURE_B64=$(tr -d '\n\r ' < "$SIG_FILE")
+
+          # 文件大小（跨平台 stat 兼容）
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            FILE_SIZE=$(stat -f%z "$SETUP_FILE")
+          else
+            FILE_SIZE=$(stat -c%s "$SETUP_FILE")
+          fi
+
+          # 构造发布请求体
+          # download_url 传 S3 对象 key（相对路径），api-server 查询时动态生成 presigned URL
+          cat > release-payload.json <<EOF
+          {
+            "version": "${VERSION}",
+            "channel": "stable",
+            "platform": "${PLATFORM}",
+            "arch": "${{ matrix.arch }}",
+            "bundle_type": "${{ matrix.bundle_type }}",
+            "download_url": "${S3_KEY}",
+            "signature": "${SIGNATURE_B64}",
+            "file_size": ${FILE_SIZE},
+            "file_hash": "",
+            "release_notes": "",
+            "release_url": "https://github.com/${{ github.repository }}/releases/tag/v${VERSION}",
+            "rollout_pct": 100,
+            "force_update": false,
+            "min_version": ""
+          }
+          EOF
+
+          # ===== MoSign-v2 签名 =====
+          # See: docs/updater/design.md §6 MoSign-v2 协议
+          # string-to-sign = METHOD\nPATH\nTIMESTAMP\nNONCE\nBODY_SHA256_HEX
+          # signature = HMAC-SHA256(action_push_key, string_to_sign).hex()
+          TIMESTAMP=$(date +%s)
+          NONCE=$(openssl rand -hex 16)
+          BODY_SHA256=$(openssl dgst -sha256 -r release-payload.json | awk '{print $1}')
+          STRING_TO_SIGN="POST\n/v3/ci/releases\n${TIMESTAMP}\n${NONCE}\n${BODY_SHA256}"
+          SIGNATURE=$(printf "%b" "${STRING_TO_SIGN}" | openssl dgst -sha256 -hmac "${{ secrets.MOLAUNCH_ACTION_PUSH_KEY }}" | awk '{print $NF}')
+
+          echo "MoSign-v2 签名参数："
+          echo "  timestamp: ${TIMESTAMP}"
+          echo "  nonce: ${NONCE}"
+          echo "  body_sha256: ${BODY_SHA256}"
+          echo "  signature: ${SIGNATURE}"
+
+          echo "注册版本到 api-server（MoSign-v2 鉴权）..."
+          HTTP_STATUS=$(curl -sS -o register-response.txt -w "%{http_code}" \
+            -X POST "https://api.molaunch.moiu.cn/v3/ci/releases" \
+            -H "Content-Type: application/json" \
+            -H "X-MoSign-Version: MoSign-v2" \
+            -H "X-MoSign-Timestamp: ${TIMESTAMP}" \
+            -H "X-MoSign-Nonce: ${NONCE}" \
+            -H "X-MoSign-Signature: ${SIGNATURE}" \
+            -d @release-payload.json)
+
+          echo "注册响应 (HTTP $HTTP_STATUS):"
+          cat register-response.txt
+
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::版本注册失败 (HTTP $HTTP_STATUS)"
+            exit 1
+          fi
+
+          echo "版本 ${VERSION} (${PLATFORM}) 已注册到 api-server"
+
+  # 创建 GitHub Release 页面（仅历史回顾，不作为下载源）
   release:
-    name: Create Release
-    needs: build-and-release
+    name: Create GitHub Release (history)
+    needs: build-and-upload
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -129,20 +257,12 @@ jobs:
           else
             LOG=$(git log ${PREV_TAG}..HEAD --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))")
           fi
-          
+
           {
             echo "LOG<<EOF"
             echo "$LOG"
             echo "EOF"
           } >> $GITHUB_OUTPUT
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-
-      - name: List artifacts
-        run: find artifacts -type f
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
@@ -152,29 +272,36 @@ jobs:
             ## MoLaunch ${{ steps.get_version.outputs.VERSION }}
 
             ### Downloads
-            - Windows: `MoLaunch_${{ steps.get_version.outputs.VERSION }}_x64-setup.exe` 或 `MoLaunch_${{ steps.get_version.outputs.VERSION }}_x64_en-US.msi`
-            - macOS: `MoLaunch_${{ steps.get_version.outputs.VERSION }}_aarch64.dmg`
-            - Linux: `mo-launch_${{ steps.get_version.outputs.VERSION }}_amd64.deb` 或 `mo-launch_${{ steps.get_version.outputs.VERSION }}_amd64.AppImage`
+            安装包已上传至 S3 存储桶，客户端可通过启动器「检查更新」自动获取。
+            本页面仅用于发布历史回顾与变更记录。
 
             ### Commits
             ${{ steps.changelog.outputs.LOG }}
 
             ---
             See [CHANGELOG.md](CHANGELOG.md) for details.
-          files: |
-            artifacts/**/*.exe
-            artifacts/**/*.msi
-            artifacts/**/*.dmg
-            artifacts/**/*.AppImage
-            artifacts/**/*.deb
-            artifacts/**/*.rpm
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-# 说明：启用 Tauri 代码签名需在 GitHub Settings > Secrets and variables > Actions > Repository secrets
-# 中配置以下两个值：
-#   - TAURI_SIGNING_PRIVATE_KEY           用于签名的私钥（通过 `tauri signer generate` 生成）
-#   - TAURI_SIGNING_PRIVATE_KEY_PASSWORD  生成私钥时设置的密码
-# 配置后 Release 构建将自动对安装包签名，以支持更新校验（CWE-494/CWE-347）。
+# 说明：
+# 1. Tauri 代码签名：在 GitHub Settings > Secrets and variables > Actions > Repository secrets 配置：
+#    - TAURI_SIGNING_PRIVATE_KEY           用于签名的私钥（通过 `tauri signer generate` 生成）
+#    - TAURI_SIGNING_PRIVATE_KEY_PASSWORD  生成私钥时设置的密码
+#
+# 2. S3 兼容存储桶：在 GitHub Settings > Secrets and variables > Actions > Repository secrets 配置：
+#    - S3_ACCESS_KEY_ID                    S3 兼容存储桶的 Access Key
+#    - S3_SECRET_ACCESS_KEY                S3 兼容存储桶的 Secret Key
+#    - S3_REGION                           区域（自建存储桶通常填 us-east-1）
+#    - S3_BUCKET                           存储桶名（如 molaunch-releases）
+#    - S3_ENDPOINT                         S3 兼容端点（如 https://s3.mocdn.net）
+#
+# 3. api-server 版本注册（MoSign-v2 鉴权）：
+#    - MOLAUNCH_ACTION_PUSH_KEY            CI 推送专用密钥（生成：openssl rand -hex 32）
+#                                         对应 api-server 配置项 ci.action_push_key
+#                                         仅用于 /v3/ci/releases 注册版本，与 admin 密码隔离
+#
+# 4. 安装包上传路径规范：s3://{bucket}/updater/v{version}/{platform}/{filename}
+#    platform 取值：windows / macos / linux（与数据库 app_releases.platform 一致）
+#    客户端查询 /v1/updates/manifest 时由 api-server 动态生成 presigned URL（1h 有效）
