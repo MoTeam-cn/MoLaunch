@@ -7,6 +7,95 @@
 
 ## [未发布]
 
+### 修复
+
+#### 创建房间时整合包元数据反序列化失败（ModpackMeta 字段名大小写不一致）
+
+- **现象**：创建关联整合包的房间时，apiServer 返回 `解密请求信封失败 error=业务数据反序列化失败`
+- **根因**：客户端 `ModpackMeta`（`src-tauri/src/minecraft/online/signaling.rs`）标注了 `#[serde(rename_all = "camelCase")]`，序列化后字段名为 `projectId`/`fileId`/`mcVersion`/`modpackVersion`/`loaderVersion`/`fileSize`/`fileCount`/`manifestHash`；服务端 `ModpackMeta`（`api-server/src/models/signaling.rs`）无 `rename_all` 注解，反序列化时期望 `project_id`/`file_id`/`mc_version`/...（snake_case），导致 `serde_json::from_slice::<CreateRoomRequest>` 找不到必需字段而失败。ECIES 解密本身成功，问题在解密后的 JSON 结构不匹配
+- **`api-server/src/models/signaling.rs`**：`ModpackMeta` 添加 `#[serde(rename_all = "camelCase")]`，与客户端序列化一致。数据库操作（`row_to_modpack` / `upsert_modpack`）通过 `row.try_get("column_name")` 和 `meta.field_name` 直接访问，不依赖 serde，不受影响
+
+#### 启动时无条件调用 refresh 接口（token 未过期也刷新）
+
+- **现象**：每次启动或切换到联机页时，即使本地 access token 未过期，后端 `auth_init` 仍主动调用 `refresh_credentials` 向云端验证有效性，产生不必要的网络请求
+- **根因**：`src-tauri/src/utils/online_manager.rs` 的 `auth_init` action 在 `!creds.is_token_expired()` 分支中，主动调用 `refresh_credentials` 做"云端验证"，注释称用于检测云端撤销 token（如 RSA 密钥变更）。但前端 `onlineManager` 已有 1003 自动重试机制（refresh → login → register 降级链），token 被撤销时业务请求会收到 code=1003 触发无感重认证，无需启动时主动 refresh
+- **`src-tauri/src/utils/online_manager.rs`**：`auth_init` 在 access token 未过期时直接返回本地凭证，不再调用 `refresh_credentials`。仅在 token 真正过期时才走 refresh / login 流程，与"刷新接口是给 token 过期准备的"设计意图一致
+
+#### 硬刷新联机页时"云端连接失败"遮罩闪现
+
+- **现象**：在联机页按 Ctrl+Shift+R 硬刷新后，页面短暂显示"云端连接失败"遮罩，然后随 `initAuth` 完成而消失
+- **根因**：`App.vue` 的启动流程中，`isRestoring = false`（加载遮罩消失）后 `Online.vue` 先于 `initAuth()` 挂载。此时 `cloudConnected` 默认 `false` 且 `initializing` 默认 `false`，`Online.vue` 的 `v-if="!cloudConnected && !isInRoom"` 判定为 true，显示"云端连接失败"遮罩。待 `initAuth` 完成、`cloudConnected` 变 `true` 后遮罩才消失，形成闪烁
+- **`src/stores/online.ts`**：`initializing` 初始值从 `false` 改为 `true`，表示"启动认证尚未完成"，避免 `Online.vue` 在 `initAuth` 完成前误判为连接失败
+- **`src/views/Online.vue`**：空状态遮罩的 `v-if` 增加 `!onlineStore.initializing` 条件，仅在 `initAuth` 已完成（`initializing=false`）且 `cloudConnected=false` 时才显示遮罩
+
+#### 联机页面切换后其他页面空白（transition mode="out-in" 不挂载新组件）
+
+- **现象**：从联机页切走后目标页面空白，刷新后直接访问正常；控制台无错误
+- **根因**：`App.vue` 的 `<router-view>` 外层使用了 `<transition mode="out-in">`。通过 transition 钩子日志确认：联机页的 `beforeLeave → leave → afterLeave` 完整触发，但新组件的 `beforeEnter` 从未触发，Vue 3 的 transition 在 `mode="out-in"` 下离开动画完成后未挂载新组件
+- **`src/views/Online.vue`**：模板存在两个根元素（`v-if`/`v-else` 各一个 `<div>`），Vue 3 Transition 在 `mode="out-in"` 下要求过渡目标为单根组件。用外层 `<div class="h-full">` 包裹两个条件分支使其成为单根组件
+- **`src/App.vue`**：移除 `<transition mode="out-in">`（该模式下 transition 在联机页离开后不挂载新组件，是 Vue 3 的已知异常行为），改用默认模式 `<transition name="route">`（同时进出，新组件立即挂载）。添加 `:key="route.path"` 确保路由切换时创建新组件实例。用 wrapper div（`relative h-full`）提供 absolute 定位上下文，`.route-leave-active` 设置 `position: absolute` 让离开组件脱离布局流，避免两个组件垂直排列导致高度溢出。路由过渡与加载遮罩过渡使用独立的 transition name（`route` / `fade`）避免 CSS 互相干扰
+
+#### 联机页面图标导入错误导致路由跳转崩溃
+
+- **`src/views/Online.vue`**：`@heroicons/vue/24/outline` v2 中不存在 `CloudOffIcon` 导出（v2 移除了 CloudOff/CloudSlash 等图标，仅保留 `CloudIcon` / `CloudArrowDownIcon` / `CloudArrowUpIcon`），导致点击顶部 nav 联机按钮时 Vue Router 报 `SyntaxError: does not provide an export named 'CloudOffIcon'` 并阻塞导航。改为使用 `CloudIcon`（配合灰色样式表示未连接状态）。全项目扫描 98 个使用的图标，确认无其他缺失导入
+
+#### 下载菜单切换卡顿（移除无意义的本地版本扫描）
+
+- **`src/views/Versions.vue`**：onMounted 原先并行调用 `versionStore.fetchVersions()` 和 `loadInstalledVersions()`，后者通过 IPC 扫描本地安装目录（`tauri.listInstalledVersionsWithType`），是耗时操作。但返回的已安装版本（如 `Zombie Invade 100 Days` 等自定义整合包）与原版下载列表的版本 id 不匹配，`installedVersions` / `installedVersionLogos` / `installedVersionTypes` 在原版列表中从未命中，标记已安装状态和版本图标均走 fallback 路径，该调用无实际意义。移除 onMounted 中的 `loadInstalledVersions()` 调用，仅保留 `fetchVersions()`。手动刷新（`handleRefresh`）和卸载（`handleUninstall`）时仍会调用 `loadInstalledVersions` 更新列表
+
+#### HTTP 日志 req_id 字段渲染为空（前后端字段名不一致）
+
+- **`src-tauri/src/minecraft/online/http_log.rs`**：`HttpLogEntry` 结构体字段 `req_id`（snake_case）未添加 `#[serde(rename_all = "camelCase")]`，序列化后 JSON 字段名为 `req_id`，但前端 TypeScript 类型定义期望 `reqId`（camelCase），导致 `entry.reqId` 为 `undefined`，表格渲染留空。添加 `#[serde(rename_all = "camelCase")]` 注解，序列化后字段名与前端匹配
+
+#### 路由切换动画优化（添加位移过渡）
+
+- **`src/App.vue`**：路由过渡原先仅有 opacity 渐变，切换时视觉生硬。添加 `transform: translateY(6px)` / `translateY(-6px)` 位移效果（进入组件从下方滑入，离开组件向上滑出），动画时长从 0.2s 调整为 0.25s，过渡更自然流畅
+
+#### call_v1 对 code=1003 未授权响应的正确处理
+
+- 背景：服务端返回 `code=1003`（未授权）时，`call_v1` 仍返回 `Ok(BusinessResult{code:1003})`，调用方无法区分"未授权"和普通业务失败，导致 token 被撤销（如 RSA 密钥变更、同设备多端登录）后联机页面持续报错无法恢复
+- 改动：
+  - **`src-tauri/src/minecraft/online/client_types.rs`**：新增 `ClientError::Unauthorized { msg, req_id }` 变体，Display 仅展示 msg（req_id 由 HTTP 日志记录，用户可自行翻阅）
+  - **`src-tauri/src/minecraft/online/client.rs`**：`call_v1` 检测到 `unified.code == 1003` 时返回 `Err(ClientError::Unauthorized)`（加密信封和明文响应两条路径都处理）
+  - **`src/utils/api/online-manager.ts`**：`onlineManager` 函数检测到错误包含 `code=1003` 时，自动静默走降级链重新认证（`auth_refresh` → `auth_login` → `auth_register`），认证成功后重试原请求一次。不再调用 `auth_init`（它仅检查本地过期时间，本地未过期时直接返回旧凭证，无法发现云端撤销）
+
+#### HTTP 日志 req_id 未记录到加密响应
+
+- 背景：`call_v1` 在解密前调用 `extract_req_id(&body_text)` 提取 req_id，但加密信封的 `body_text` 不含 `req_id` 字段（req_id 在解密后的 `unified` 响应体中），导致加密响应的 HTTP 日志 req_id 始终为空
+- 改动：**`src-tauri/src/minecraft/online/client.rs`** 将 `log_http_request` 调用从解密前移至解密后，在加密分支和明文分支各自使用 `unified.req_id` 记录日志；JSON 解析失败时用 `extract_req_id` 兜底
+
+#### 程序启动时主动向云端验证 token 有效性
+
+- 背景：`auth_init` 在本地 token 未过期时直接返回旧凭证，不向云端验证，导致 token 被云端撤销（如 RSA 密钥变更）后用户无法感知，首次业务请求才报 1003
+- 改动：**`src-tauri/src/utils/online_manager.rs`** `auth_init` 在本地 token 未过期时主动调用 `refresh_credentials` 向云端验证一次，refresh 成功则更新凭证，失败则返回旧凭证（降级由 `onlineManager` 1003 重试机制处理）
+
+#### 开发者页面布局优化
+
+- 背景：HTTP 日志和普通日志使用自定义折叠逻辑（无动画）、原生 `<select>` / `<button>`，与项目 UI 风格不一致
+- 改动：
+  - **`src/components/common/CollapsibleCard.vue`**：新增 `expand` 事件（展开时触发，支持父组件懒加载）和 `actions` 插槽（标题栏右侧操作按钮区域）；标题栏从 `<button>` 改为 `<div>` 避免嵌套 button
+  - **`src/components/settings/HttpLogViewer.vue`**：改用 `CollapsibleCard`（带动画）+ 项目 `Select` + 项目 `Button`，工具栏靠右对齐，首次展开时懒加载
+  - **`src/components/settings/LogViewer.vue`**：改用 `CollapsibleCard`（带动画），新增 `defaultOpen` prop（默认 false 收起），展开时懒加载，`onMounted` 不再自动加载日志
+  - **`src/views/settings/SettingsDeveloper.vue`**：HTTP 日志移至普通日志上方
+
+### 新增
+
+#### HTTP 请求日志系统（联机 API 调用追踪）
+
+- 背景：联机接口出现问题时难以追踪 `req_id`，需要在开发者模式查看 HTTP 请求历史
+- 新增模块 **`src-tauri/src/minecraft/online/http_log.rs`**：
+  - `log_http_request(method, path, status, req_id)`：追加写入到 `.Molaunch/logs/http_YYYY-MM-DD.log`
+  - 日志格式：`[2026-07-29 19:47:32.123] POST /v3/auth/refresh 200 req_id=xxx`
+  - `read_http_logs(date, limit)`：读取并解析为结构化 `HttpLogEntry` 数组
+  - `list_http_log_files()`：列出所有 HTTP 日志文件（最新的在前）
+  - `extract_req_id(body)`：从响应体 JSON 中提取 `req_id`
+  - 4 个单元测试覆盖解析逻辑
+- **`src-tauri/src/minecraft/online/client.rs`**：在所有 8 个请求点（`call_v1` / `register` / `login` / `logout` / `refresh` / `get_csrf_token` / `get_server_time` / `get_jwks`）收到响应后调用 `log_http_request`
+- **`src-tauri/src/utils/system_manager.rs`**：新增 2 个 IPC action — `read_http_logs`（参数 `date` / `limit`）/ `list_http_log_files`
+- **`src/utils/api/system-manager.ts` + `developer.ts`**：新增 `READ_HTTP_LOGS` / `LIST_HTTP_LOG_FILES` action 常量和 `readHttpLogs` / `listHttpLogFiles` API 函数，`HttpLogEntry` 类型定义
+- **`src/components/settings/HttpLogViewer.vue`**（新组件，192 行）：可折叠的 HTTP 日志表格，默认收起，展开时才加载日志（避免页面卡顿）；支持选择日期、刷新；表格列：时间 / 方法 / 路径 / 状态码 / req_id，状态码和方法按颜色区分
+- **`src/views/settings/SettingsDeveloper.vue`**：在日志查看器下方引入 `HttpLogViewer` 组件
+
 ### 变更
 
 #### API 服务端地址切换检测（device.json 凭证一致性）

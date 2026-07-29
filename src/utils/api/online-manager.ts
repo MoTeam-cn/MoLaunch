@@ -60,7 +60,25 @@ import type {
 } from '@/types/online'
 
 /**
+ * 认证类 action 前缀，这些 action 本身就是认证相关的，1003 时不自动重试
+ */
+const AUTH_ACTION_PREFIX = 'auth_'
+
+/** 防止并发触发多次静默重认证 */
+let isReauthing = false
+
+/**
  * 调用 online_manager IPC
+ *
+ * 检测到服务端返回 code=1003（未授权）时，自动静默走降级链重新认证：
+ * 1. `auth_refresh`（用 refresh_token 换新 access_token）
+ * 2. refresh 失败 → `auth_login`（用本地 ECDH 密钥签名换新 JWT）
+ * 3. login 失败 → `auth_register`（重新注册设备，适用于云端 RSA 密钥变更）
+ * 认证成功后重试原请求一次。认证类 action（`auth_*`）不自动重试，直接抛出错误。
+ *
+ * 注意：不调用 `auth_init`，因为它仅检查本地 token 过期时间，本地未过期时
+ * 直接返回旧凭证，无法发现云端已撤销 token，导致重试请求仍然 1003。
+ *
  * @param action 操作名称（取自 ONLINE_ACTIONS 常量）
  * @param params 参数对象（字段名使用 camelCase）
  */
@@ -68,7 +86,36 @@ export async function onlineManager<T = unknown>(
   action: string,
   params?: unknown,
 ): Promise<T> {
-  return invoke<T>('online_manager', { req: { action, params: params ?? null } })
+  try {
+    return await invoke<T>('online_manager', { req: { action, params: params ?? null } })
+  } catch (e) {
+    const errMsg = e instanceof Error ? e.message : String(e)
+    // 仅对非认证类 action 且错误包含 code=1003 时自动重试
+    if (
+      errMsg.includes('code=1003') &&
+      !action.startsWith(AUTH_ACTION_PREFIX) &&
+      !isReauthing
+    ) {
+      isReauthing = true
+      try {
+        console.warn('[OnlineManager] 检测到 1003 未授权，静默重新认证后重试')
+        // 降级链：refresh → login → register
+        try {
+          await invoke('online_manager', { req: { action: 'auth_refresh', params: null } })
+        } catch {
+          try {
+            await invoke('online_manager', { req: { action: 'auth_login', params: null } })
+          } catch {
+            await invoke('online_manager', { req: { action: 'auth_register', params: null } })
+          }
+        }
+        return await invoke<T>('online_manager', { req: { action, params: params ?? null } })
+      } finally {
+        isReauthing = false
+      }
+    }
+    throw e
+  }
 }
 
 /**

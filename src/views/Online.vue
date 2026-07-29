@@ -32,7 +32,7 @@ import {
   ArrowRightOnRectangleIcon,
   HomeIcon,
   GlobeAltIcon,
-  CloudOffIcon,
+  CloudIcon,
 } from '@heroicons/vue/24/outline'
 import type { Component } from 'vue'
 
@@ -261,25 +261,33 @@ const currentProps = computed<Record<string, unknown>>(() => {
 </script>
 
 <template>
-  <!-- 云端连接失败且未在房间：整页空状态遮罩（阻止通过 URL 直接访问绕过 TopNavLayout 禁用） -->
-  <!-- 已在房间时不遮罩，保留 P2P 连接，云端 API 失败由各调用方 toast 兜底 -->
-  <div
-    v-if="!onlineStore.cloudConnected && !isInRoom"
-    class="flex flex-col items-center justify-center h-full rounded-xl bg-white shadow-sm p-8"
-  >
-    <CloudOffIcon class="w-12 h-12 text-gray-300 mb-4" />
-    <p class="text-sm font-medium text-gray-900">云端连接失败</p>
-    <p class="text-xs text-gray-500 mt-2 text-center max-w-sm">
-      {{ onlineStore.cloudError || '与云端 API 连接失败，联机功能暂不可用。' }}
-    </p>
-    <p class="text-xs text-gray-400 mt-1">可在「联机设置」页尝试重新连接</p>
-    <Button type="outline" size="small" class="mt-4" @click="goSettings">
-      <template #icon><Cog6ToothIcon class="w-4 h-4" /></template>
-      打开联机设置
-    </Button>
-  </div>
+  <!--
+    单根包裹：App.vue 的 <transition mode="out-in"> 要求子组件为单根，
+    多根（v-if/v-else 两个根 div）会导致路由切换时 transition 卡住、
+    新组件无法挂载（表现为切走联机页后其他页面空白）。
+    外层 div 保持 h-full 以继承父容器高度。
+  -->
+  <div class="h-full">
+    <!-- 云端连接失败且未在房间：整页空状态遮罩（阻止通过 URL 直接访问绕过 TopNavLayout 禁用） -->
+    <!-- 已在房间时不遮罩，保留 P2P 连接，云端 API 失败由各调用方 toast 兜底 -->
+    <!-- initializing 期间不显示遮罩：避免启动过程中 initAuth 未完成时闪现"云端连接失败" -->
+    <div
+      v-if="!onlineStore.cloudConnected && !onlineStore.initializing && !isInRoom"
+      class="flex flex-col items-center justify-center h-full rounded-xl bg-white shadow-sm p-8"
+    >
+      <CloudIcon class="w-12 h-12 text-gray-300 mb-4" />
+      <p class="text-sm font-medium text-gray-900">云端连接失败</p>
+      <p class="text-xs text-gray-500 mt-2 text-center max-w-sm">
+        {{ onlineStore.cloudError || '与云端 API 连接失败，联机功能暂不可用。' }}
+      </p>
+      <p class="text-xs text-gray-400 mt-1">可在「联机设置」页尝试重新连接</p>
+      <Button type="outline" size="small" class="mt-4" @click="goSettings">
+        <template #icon><Cog6ToothIcon class="w-4 h-4" /></template>
+        打开联机设置
+      </Button>
+    </div>
 
-  <div v-else class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+    <div v-else class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
     <!-- 左侧分类菜单（支持子菜单展开动画） -->
     <NavSidebar v-model="activeCategory" :categories="categories" />
 
@@ -316,5 +324,6 @@ const currentProps = computed<Record<string, unknown>>(() => {
         </keep-alive>
       </div>
     </div>
+  </div>
   </div>
 </template>

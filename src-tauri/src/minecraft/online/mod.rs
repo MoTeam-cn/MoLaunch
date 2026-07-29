@@ -6,6 +6,7 @@
 //! - `auth`：MoSign-v1 设备注册/登录/登出
 //! - `storage`：设备密钥持久化（Ed25519/X25519 私钥、device_pk、device_token）
 //! - `client`：api-server HTTP 客户端封装（统一加 ECIES 信封、JWT 携带）
+//! - `http_log`：HTTP 请求日志（记录到 `.Molaunch/logs/http_YYYY-MM-DD.log`，供开发者模式追踪 req_id）
 //! - `signaling`：信令接口客户端（房间创建/加入/退出/踢人/保活等，阶段二实现）
 //! - `tun`：虚拟网卡管理（阶段三：TUN 接口创建/读写，基于 tun-rs crate）
 //! - `protocol`：DataChannel 消息协议（阶段三：二进制帧格式，IP 包封装）
@@ -26,6 +27,7 @@ pub mod client;
 pub mod client_types;
 pub mod crypto;
 pub mod ecies;
+pub mod http_log;
 pub mod protocol;
 pub mod signaling;
 pub mod storage;

@@ -12,6 +12,7 @@ import { toastError } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
 import { osDisplay, archDisplay } from '@/utils/system-display'
 import LogViewer from '@/components/settings/LogViewer.vue'
+import HttpLogViewer from '@/components/settings/HttpLogViewer.vue'
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import { safeCall } from '@/utils/async'
@@ -147,6 +148,9 @@ onMounted(async () => {
         </div>
       </div>
     </div>
+
+    <!-- HTTP 请求日志（联机 API 调用追踪，默认收起，展开才加载） -->
+    <HttpLogViewer />
 
     <!-- 日志查看（自包含子组件，传入日志目录用于「打开目录」按钮） -->
     <LogViewer :logs-dir="storageDirs?.logs" />

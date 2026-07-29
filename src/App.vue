@@ -109,11 +109,25 @@ async function initApp() {
 
 <template>
   <TopNavLayout>
-    <router-view v-slot="{ Component }">
-      <transition name="fade" mode="out-in">
-        <component :is="Component" />
-      </transition>
-    </router-view>
+    <!--
+      wrapper div 提供 relative 定位上下文，让路由切换时离开组件的
+      position: absolute 相对于此容器而非 main（main 有 p-2 padding）。
+      h-full 继承 main 的高度（main 是 flex-1 子项，有确定高度）。
+    -->
+    <div class="relative h-full">
+      <router-view v-slot="{ Component, route }">
+        <!--
+          不使用 mode="out-in"：Vue 3 transition 在 mode="out-in" 下，联机页
+          （含 WebRTC composable）离开动画完成后（afterLeave 触发）新组件的
+          beforeEnter 不触发，导致目标页面空白。改用默认模式（同时进出），
+          新组件会立即挂载，避免空白。leave-active 设置 position: absolute
+          让离开组件脱离布局流，避免两个组件垂直排列导致高度溢出。
+        -->
+        <transition name="route">
+          <component :is="Component" :key="route.path" />
+        </transition>
+      </router-view>
+    </div>
   </TopNavLayout>
   <Teleport to="body">
     <BackToTop />
@@ -138,6 +152,7 @@ async function initApp() {
 </template>
 
 <style>
+/* 加载遮罩过渡（isRestoring） */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;
@@ -146,5 +161,30 @@ async function initApp() {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* 路由切换过渡（默认模式，非 out-in） */
+.route-enter-active,
+.route-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.route-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.route-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+/* 离开组件脱离布局流，避免与新组件垂直排列导致高度溢出 */
+.route-leave-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
 }
 </style>

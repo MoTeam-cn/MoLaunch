@@ -11,6 +11,7 @@
 //!   / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
 //! - about（1 个）：`get_about_data`
 //! - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
+//! - http_log（2 个）：`read_http_logs` / `list_http_log_files`
 //! - updater（2 个）：`check_update` / `download_and_install_update`
 //!
 //! 注意事项：
@@ -67,6 +68,17 @@ struct WriteTextFileParams {
 #[serde(rename_all = "camelCase")]
 struct ReadLogFileParams {
     filename: String,
+}
+
+/// 读取 HTTP 日志的参数
+///
+/// - `date`: 日期字符串（`YYYY-MM-DD`），None 表示今天
+/// - `limit`: 最多返回条数（从末尾截取最新的），None 表示全部
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadHttpLogsParams {
+    date: Option<String>,
+    limit: Option<usize>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -176,6 +188,23 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             .map_err(|e| format!("参数解析失败: {}", e))?;
         let r = read_log_file(p.filename)?;
         serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    // === HTTP 请求日志（联机 API 调用追踪） ===
+    // 读取指定日期的 HTTP 日志（结构化），供开发者模式表格展示
+    d.register("read_http_logs", handler!(_state, _app, params, {
+        let p: ReadHttpLogsParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let r = crate::minecraft::online::http_log::read_http_logs(
+            p.date.as_deref(),
+            p.limit,
+        );
+        serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+    // 列出所有 HTTP 日志文件名（http_*.log，最新的在前）
+    d.register("list_http_log_files", handler!(_state, _app, _params, {
+        let r = crate::minecraft::online::http_log::list_http_log_files();
+        Ok(serde_json::to_value(r).map_err(|e| e.to_string())?)
     }));
 
     // === updater（2 个） ===

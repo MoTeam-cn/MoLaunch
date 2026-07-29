@@ -136,3 +136,37 @@ export async function listLogFiles(): Promise<string[]> {
 export async function readLogFile(filename: string): Promise<string> {
   return systemManager<string>(SYSTEM_ACTIONS.READ_LOG_FILE, { filename })
 }
+
+// ==================== HTTP 请求日志 ====================
+
+/** HTTP 日志条目（结构化，供表格展示） */
+export interface HttpLogEntry {
+  /** 时间戳（本地时间，`YYYY-MM-DD HH:MM:SS.mmm`） */
+  timestamp: string
+  /** HTTP 方法（GET/POST/PUT/DELETE） */
+  method: string
+  /** 请求路径（不含 base_url，如 `/v3/auth/refresh`） */
+  path: string
+  /** HTTP 状态码 */
+  status: number
+  /** 响应中的 `req_id`（可能为空） */
+  reqId: string
+}
+
+/**
+ * 读取 HTTP 请求日志（联机 API 调用追踪）
+ *
+ * @param date 日期字符串（`YYYY-MM-DD`），不传表示今天
+ * @param limit 最多返回条数（从末尾截取最新的），不传表示全部
+ */
+export async function readHttpLogs(
+  date?: string,
+  limit?: number,
+): Promise<HttpLogEntry[]> {
+  return systemManager<HttpLogEntry[]>(SYSTEM_ACTIONS.READ_HTTP_LOGS, { date, limit })
+}
+
+/** 列出所有 HTTP 日志文件名（`http_*.log`，最新的在前） */
+export async function listHttpLogFiles(): Promise<string[]> {
+  return systemManager<string[]>(SYSTEM_ACTIONS.LIST_HTTP_LOG_FILES)
+}

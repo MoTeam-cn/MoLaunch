@@ -559,7 +559,11 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             Some(creds) => {
                 // 凭证完整：检查 token 状态
                 if !creds.is_token_expired() {
-                    log_debug!("[Online] auth_init: access token 未过期，直接返回");
+                    // 本地 access token 未过期 → 直接返回，不主动 refresh。
+                    // 若云端已撤销 token（如 RSA 密钥变更），后续业务请求会收到 code=1003，
+                    // 由前端 onlineManager 的 1003 自动重试机制（refresh → login → register）兜底，
+                    // 实现"仅在真正失效时才刷新"的无感刷新，避免每次启动都打 refresh 接口。
+                    log_debug!("[Online] auth_init: access token 未过期，直接使用本地凭证");
                     creds
                 } else if !creds.is_refresh_token_expired() {
                     // access token 过期 + refresh_token 可用 → 自动续期

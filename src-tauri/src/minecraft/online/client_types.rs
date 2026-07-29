@@ -124,6 +124,12 @@ pub enum ClientError {
     #[error("业务错误 [{code}]: {msg}")]
     Business { code: u32, msg: String },
 
+    /// 服务端返回 code=1003（未授权）：token 被撤销或 RSA 密钥变更
+    ///
+    /// Display 仅展示 msg（req_id 由 HTTP 日志记录，用户可自行翻阅，无需弹窗显示）
+    #[error("未授权 (code=1003): {msg}")]
+    Unauthorized { msg: String, req_id: String },
+
     #[error("设备未注册或凭证缺失")]
     NotRegistered,
 

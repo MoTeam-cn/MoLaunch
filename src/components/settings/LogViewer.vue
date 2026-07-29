@@ -2,15 +2,16 @@
 /**
  * 日志查看器卡片
  *
- * 自包含组件：内部加载日志文件列表 / 读取日志内容 / 渲染日志列表。
+ * 使用 CollapsibleCard 实现带动画的展开/收起，默认收起，展开时才加载日志（懒加载）。
  * 父组件只需传入 `logsDir`（用于「打开目录」按钮），其余状态自行管理。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { parseLogLines, logLineClass, type LogLine } from '@/utils/log-display'
 import Select from '@/components/common/Select.vue'
 import Button from '@/components/common/Button.vue'
+import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
 import {
   FolderOpenIcon,
   ArrowPathIcon,
@@ -20,13 +21,20 @@ import {
 interface Props {
   /** 日志目录路径（用于「打开目录」按钮，未传则不显示该按钮） */
   logsDir?: string
+  /** 是否默认展开（默认 false，收起不加载） */
+  defaultOpen?: boolean
 }
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), {
+  logsDir: undefined,
+  defaultOpen: false,
+})
 
 const logFiles = ref<string[]>([])
 const selectedLogFile = ref<string>('')
 const logContent = ref<string>('')
 const logLoading = ref(false)
+/** 是否已首次加载（避免重复加载） */
+const loaded = ref(false)
 
 async function loadLogFiles() {
   try {
@@ -77,6 +85,13 @@ async function openLogsDir() {
   }
 }
 
+/** CollapsibleCard 展开事件：首次展开时懒加载 */
+async function onExpand() {
+  if (loaded.value) return
+  loaded.value = true
+  await loadLogFiles()
+}
+
 // Select 选项：日志文件列表
 function logFileOptions() {
   return logFiles.value.map(f => ({ label: f, value: f }))
@@ -87,101 +102,94 @@ const logLines = computed<LogLine[]>(() => {
   if (!logContent.value) return []
   return parseLogLines(logContent.value)
 })
-
-onMounted(async () => {
-  await loadLogFiles()
-})
 </script>
 
 <template>
-  <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
-    <div class="px-5 pt-5 pb-3 flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-gray-900">日志</h3>
-      <div class="flex items-center gap-2">
-        <Button
-          type="outline"
-          size="small"
-          :disabled="logLoading"
-          @click="refreshLogs"
-        >
-          <template #icon><ArrowPathIcon class="w-3.5 h-3.5" :class="logLoading ? 'animate-spin' : ''" /></template>
-          刷新
-        </Button>
-        <Button
-          v-if="logsDir"
-          type="outline"
-          size="small"
-          @click="openLogsDir"
-        >
-          <template #icon><FolderOpenIcon class="w-3.5 h-3.5" /></template>
-          打开目录
-        </Button>
+  <CollapsibleCard title="日志" :default-open="defaultOpen" @expand="onExpand">
+    <!-- 标题栏右侧操作按钮 -->
+    <template #actions>
+      <Button
+        type="outline"
+        size="small"
+        :disabled="logLoading"
+        @click="refreshLogs"
+      >
+        <template #icon>
+          <ArrowPathIcon class="w-3.5 h-3.5" :class="logLoading ? 'animate-spin' : ''" />
+        </template>
+        刷新
+      </Button>
+      <Button
+        v-if="logsDir"
+        type="outline"
+        size="small"
+        @click="openLogsDir"
+      >
+        <template #icon><FolderOpenIcon class="w-3.5 h-3.5" /></template>
+        打开目录
+      </Button>
+    </template>
+
+    <!-- 日志文件选择 -->
+    <div class="px-5 py-4">
+      <p class="text-sm text-gray-500 mb-2">选择日志文件</p>
+      <Select
+        :model-value="selectedLogFile"
+        :options="logFileOptions()"
+        style="min-width: 280px"
+        @update:model-value="onLogSelect(String($event))"
+      />
+      <div v-if="logFiles.length === 0" class="flex flex-col items-center justify-center py-6 text-gray-400">
+        <DocumentTextIcon class="w-8 h-8 mb-2" />
+        <span class="text-xs">暂无日志文件</span>
       </div>
     </div>
 
-    <div class="divide-y divide-gray-200">
-      <!-- 日志文件选择 -->
-      <div class="px-5 py-4">
-        <p class="text-sm text-gray-500 mb-2">选择日志文件</p>
-        <Select
-          :model-value="selectedLogFile"
-          :options="logFileOptions()"
-          style="min-width: 280px"
-          @update:model-value="onLogSelect(String($event))"
-        />
-        <div v-if="logFiles.length === 0" class="flex flex-col items-center justify-center py-6 text-gray-400">
-          <DocumentTextIcon class="w-8 h-8 mb-2" />
-          <span class="text-xs">暂无日志文件</span>
-        </div>
+    <!-- 日志内容 -->
+    <div class="px-5 py-4 border-t border-gray-100">
+      <div class="flex items-center justify-between mb-2">
+        <p class="text-sm text-gray-500">日志内容</p>
+        <span v-if="logLoading" class="text-xs text-gray-400">加载中...</span>
+        <span v-else-if="selectedLogFile" class="text-xs text-gray-400 font-mono">
+          {{ selectedLogFile }}
+        </span>
       </div>
-
-      <!-- 日志内容 -->
-      <div class="px-5 py-4">
-        <div class="flex items-center justify-between mb-2">
-          <p class="text-sm text-gray-500">日志内容</p>
-          <span v-if="logLoading" class="text-xs text-gray-400">加载中...</span>
-          <span v-else-if="selectedLogFile" class="text-xs text-gray-400 font-mono">
-            {{ selectedLogFile }}
-          </span>
-        </div>
-        <div class="bg-gray-900 rounded-lg p-3 log-viewer">
-          <div v-if="logLines.length > 0" class="log-list">
-            <div
-              v-for="item in logLines"
-              :key="item.no"
-              class="flex hover:bg-gray-800/50 log-row"
-            >
-              <span class="text-gray-600 select-none w-10 shrink-0 text-right pr-3 tabular-nums text-xs leading-5 log-line-no">{{ item.no }}</span>
-              <span
-                class="pl-3 border-l border-gray-800 whitespace-pre text-xs leading-5 font-mono log-line-text"
-                :class="logLineClass(item.level)"
-              >{{ item.text || ' ' }}</span>
-            </div>
+      <div class="bg-gray-900 rounded-lg p-3 log-viewer">
+        <div v-if="logLines.length > 0" class="log-list">
+          <div
+            v-for="item in logLines"
+            :key="item.no"
+            class="flex hover:bg-gray-800/50 log-row"
+          >
+            <span class="text-gray-600 select-none w-10 shrink-0 text-right pr-3 tabular-nums text-xs leading-5 log-line-no">{{ item.no }}</span>
+            <span
+              class="pl-3 border-l border-gray-800 whitespace-pre text-xs leading-5 font-mono log-line-text"
+              :class="logLineClass(item.level)"
+            >{{ item.text || ' ' }}</span>
           </div>
-          <p v-else class="text-xs text-gray-500 font-mono">无内容</p>
         </div>
+        <p v-else class="text-xs text-gray-500 font-mono">无内容</p>
       </div>
     </div>
-  </div>
+  </CollapsibleCard>
 </template>
 
 <style scoped>
-/* 日志列表容器：双向滚动（纵向 + 横向）
-   放弃 RecycleScroller 虚拟滚动，因为其 absolute 定位的 item-view 无法正常横向滚动 */
+/* 日志列表容器：双向滚动（纵向 + 横向） */
 .log-viewer .log-list {
   max-height: 360px;
-  overflow: auto; /* 同时允许纵向和横向滚动 */
+  overflow: auto;
   background: #111827; /* gray-900 */
 }
 
-/* 行容器：确保不换行，宽度适应内容（让横向滚动条出现） */
+/* 行容器：确保不换行，宽度适应内容 */
 .log-viewer .log-row {
   white-space: nowrap;
   width: max-content;
   min-width: 100%;
 }
 
-/* 自定义滚动条：黑色背景上的深灰色滚动条（纵向 + 横向） */
+/* 自定义滚动条 */
 .log-viewer .log-list::-webkit-scrollbar {
   width: 8px;
   height: 8px;

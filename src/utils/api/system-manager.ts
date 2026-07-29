@@ -7,7 +7,7 @@
  * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
  * 故前端 params 对象的字段名一律使用 camelCase。
  *
- * 注册的 action（20 个）：
+ * 注册的 action（22 个）：
  * - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
  *   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
  * - config（2 个）：`get_config_path` / `save_config_to_file`
@@ -15,6 +15,7 @@
  *   / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
  * - about（1 个）：`get_about_data`
  * - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
+ * - http_log（2 个）：`read_http_logs` / `list_http_log_files`
  * - updater（2 个）：`check_update` / `download_and_install_update`
  */
 
@@ -62,6 +63,9 @@ export const SYSTEM_ACTIONS = {
   GET_LOG_PATH: 'get_log_path',
   LIST_LOG_FILES: 'list_log_files',
   READ_LOG_FILE: 'read_log_file',
+  // http_log（2 个）—— 联机 API 调用追踪
+  READ_HTTP_LOGS: 'read_http_logs',
+  LIST_HTTP_LOG_FILES: 'list_http_log_files',
   // updater（2 个）—— Windows 便携版自实现 + macOS/Linux 转发官方 plugin
   CHECK_UPDATE: 'check_update',
   DOWNLOAD_AND_INSTALL_UPDATE: 'download_and_install_update',

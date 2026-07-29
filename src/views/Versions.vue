@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /** 下载页面 */
 import { ref, computed, onMounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
@@ -113,7 +113,8 @@ onMounted(async () => {
     loading.value = true
   }
   try {
-    await Promise.all([versionStore.fetchVersions(), loadInstalledVersions()])
+    // 仅拉取版本清单，不扫描本地已安装版本（原版下载列表不依赖 installedVersions）
+    await versionStore.fetchVersions()
   } catch (e) {
     showError('获取版本列表失败', String(e))
   }

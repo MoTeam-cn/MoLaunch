@@ -49,6 +49,7 @@ impl OnlineClient {
         let resp = get_client().get(&url).send().await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
+        super::http_log::log_http_request("GET", "/v3/time", status, &super::http_log::extract_req_id(&body));
         crate::log_debug!(
             "[Online] /v3/time 响应 status={}, body_len={}",
             status,
@@ -78,6 +79,7 @@ impl OnlineClient {
         let resp = get_client().get(&url).send().await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
+        super::http_log::log_http_request("GET", "/v3/.well-known/jwks.json", status, &super::http_log::extract_req_id(&body));
         crate::log_debug!(
             "[Online] /v3/.well-known/jwks.json 响应 status={}, body_len={}",
             status,
@@ -141,6 +143,7 @@ impl OnlineClient {
             .await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
+        super::http_log::log_http_request("GET", "/v3/csrf/token", status, &super::http_log::extract_req_id(&body));
         if status != 200 {
             return Err(ClientError::HttpStatus { status, body });
         }
@@ -169,6 +172,7 @@ impl OnlineClient {
             .await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
+        super::http_log::log_http_request("POST", "/v3/auth/register", status, &super::http_log::extract_req_id(&body));
         crate::log_info!(
             "[Online] /v3/auth/register 响应 status={}, body_len={}",
             status,
@@ -214,6 +218,7 @@ impl OnlineClient {
             .await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
+        super::http_log::log_http_request("POST", "/v3/auth/login", status, &super::http_log::extract_req_id(&body));
         crate::log_info!(
             "[Online] /v3/auth/login 响应 status={}, body_len={}",
             status,
@@ -253,6 +258,7 @@ impl OnlineClient {
             .await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
+        super::http_log::log_http_request("POST", "/v3/auth/logout", status, &super::http_log::extract_req_id(&body));
         crate::log_info!(
             "[Online] /v3/auth/logout 响应 status={}, body_len={}",
             status,
@@ -290,6 +296,7 @@ impl OnlineClient {
             .await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
+        super::http_log::log_http_request("POST", "/v3/auth/refresh", status, &super::http_log::extract_req_id(&body));
         crate::log_info!(
             "[Online] /v3/auth/refresh 响应 status={}, body_len={}",
             status,
@@ -439,18 +446,27 @@ impl OnlineClient {
         }
 
         // 解析响应
-        let body_json: serde_json::Value = serde_json::from_str(&body_text).map_err(|_| {
-            crate::log_error!(
-                "[Online] call_v1 响应 JSON 解析失败: {} {} body_len={}B",
-                method,
-                path,
-                body_text.len()
-            );
-            ClientError::HttpStatus {
-                status,
-                body: body_text.clone(),
+        //
+        // HTTP 请求日志的 req_id 从解密后的 unified 响应体提取（加密信封的
+        // body_text 不含 req_id 字段），故日志记录移至解密完成后统一执行。
+        // JSON 解析失败时用 extract_req_id 兜底（明文错误响应可能含 req_id）。
+        let body_json: serde_json::Value = match serde_json::from_str(&body_text) {
+            Ok(v) => v,
+            Err(_) => {
+                crate::log_error!(
+                    "[Online] call_v1 响应 JSON 解析失败: {} {} body_len={}B",
+                    method,
+                    path,
+                    body_text.len()
+                );
+                let fallback_req_id = super::http_log::extract_req_id(&body_text);
+                super::http_log::log_http_request(method, path, status, &fallback_req_id);
+                return Err(ClientError::HttpStatus {
+                    status,
+                    body: body_text.clone(),
+                });
             }
-        })?;
+        };
 
         // 判断是否为加密信封
         if is_envelope(&body_json) {
@@ -499,6 +515,17 @@ impl OnlineClient {
                 );
             }
 
+            // 记录 HTTP 请求日志（加密分支：req_id 从解密后的 unified 提取）
+            super::http_log::log_http_request(method, path, status, &unified.req_id);
+
+            // code=1003 表示未授权（token 被撤销或 RSA 密钥变更），返回错误以便上层处理
+            if unified.code == 1003 {
+                return Err(ClientError::Unauthorized {
+                    msg: unified.msg,
+                    req_id: unified.req_id,
+                });
+            }
+
             Ok(BusinessResult {
                 code: unified.code,
                 data: unified.data,
@@ -521,6 +548,18 @@ impl OnlineClient {
                 unified.msg,
                 unified.req_id
             );
+
+            // 记录 HTTP 请求日志（明文分支：req_id 从 unified 提取）
+            super::http_log::log_http_request(method, path, status, &unified.req_id);
+
+            // code=1003 表示未授权（token 被撤销或 RSA 密钥变更），返回错误以便上层处理
+            if unified.code == 1003 {
+                return Err(ClientError::Unauthorized {
+                    msg: unified.msg,
+                    req_id: unified.req_id,
+                });
+            }
+
             Ok(BusinessResult {
                 code: unified.code,
                 data: unified.data,

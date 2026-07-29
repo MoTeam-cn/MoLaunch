@@ -182,8 +182,16 @@ export const useOnlineStore = defineStore('online', () => {
   const cloudConnected = ref(false)
   /** 云端连接错误信息（cloudConnected=false 时非空，用于弹窗提示） */
   const cloudError = ref<string | null>(null)
-  /** 是否正在执行启动认证 / 重连 */
-  const initializing = ref(false)
+  /**
+   * 是否正在执行启动认证 / 重连
+   *
+   * 初始值为 `true`：App.vue 在 onMounted 中调用 `initAuth()` 之前，
+   * Online.vue 可能已经挂载（路由为 /apps/online 时硬刷新场景）。
+   * 若初始为 `false`，Online.vue 的 `!cloudConnected && !initializing` 判断为 true，
+   * 会短暂显示"云端连接失败"遮罩，直到 initAuth 完成才消失（闪烁）。
+   * 初始为 `true` 可让遮罩在 initAuth 完成前不显示，避免误判。
+   */
+  const initializing = ref(true)
 
   // ===== 房间状态 =====
   /** 当前房间状态（null 表示未在房间） */
