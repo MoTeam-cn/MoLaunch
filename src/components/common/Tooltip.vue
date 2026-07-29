@@ -137,9 +137,10 @@ function calcPosition() {
   }
 
   // 边界修正
+  // top 下限 56px = 顶部 nav 48px + 8px 间距，避免 tooltip 遮蔽顶部 nav
   if (left < 8) left = 8
   if (left + tipW > vw - 8) left = vw - tipW - 8
-  if (top < 8) top = 8
+  if (top < 56) top = 56
   if (top + tipH > vh - 8) top = vh - tipH - 8
 
   tipStyle.value = {

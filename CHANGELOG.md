@@ -9,6 +9,11 @@
 
 ### 修复
 
+#### 所有弹窗不再遮蔽顶部 nav
+
+- **`src/components/layout/TopNavLayout.vue`**：header 添加 `relative z-[10002]`，高于所有弹窗层级（Modal z-10000 / Toast z-10001 / Tooltip z-9999），确保顶部 nav 始终可见
+- **`src/components/common/Tooltip.vue`**：边界修正 top 下限从 8px 改为 56px（nav 48px + 8px 间距），避免 tooltip 被夹紧到 nav 区域内
+
 #### 联机房间生命周期治理（僵尸房间 / 参与者泄漏 / 房主在线检测）
 
 - **问题 1：加入方 30s 握手超时退出未通知服务端**
