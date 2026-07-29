@@ -10,7 +10,7 @@
  * - 默认收起，首次展开时才加载日志（懒加载，避免页面卡顿）
  * - 日期选择使用项目 Select 组件，刷新使用项目 Button 组件
  * - 工具栏靠右对齐
- * - 表格展示：时间 / 方法 / 路径 / 状态码 / req_id
+ * - 表格展示：时间 / 方法 / req_id / 路径 / 状态码（倒序，最新在第一行）
  */
 import { ref, computed } from 'vue'
 import { ArrowPathIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
@@ -26,6 +26,9 @@ const logFiles = ref<string[]>([])
 const selectedFile = ref<string>('')
 /** 是否已首次加载（避免重复加载） */
 const loaded = ref(false)
+
+/** 倒序排列（最新请求在第一行，无需下滑查看） */
+const reversedEntries = computed(() => [...entries.value].reverse())
 
 /** 从文件名提取日期显示文本（`http_2026-07-29.log` → `2026-07-29`） */
 const fileToDate = (f: string): string => f.replace(/^http_/, '').replace(/\.log$/, '')
@@ -146,24 +149,18 @@ async function copyReqId(reqId: string) {
           <tr>
             <th class="text-left font-medium px-3 py-2 whitespace-nowrap">时间</th>
             <th class="text-left font-medium px-3 py-2 whitespace-nowrap">方法</th>
+            <th class="text-left font-medium px-3 py-2 whitespace-nowrap">req_id</th>
             <th class="text-left font-medium px-3 py-2 whitespace-nowrap">路径</th>
             <th class="text-left font-medium px-3 py-2 whitespace-nowrap">状态</th>
-            <th class="text-left font-medium px-3 py-2 whitespace-nowrap">req_id</th>
           </tr>
         </thead>
         <tbody class="divide-y divide-gray-100">
-          <tr v-for="(entry, i) in entries" :key="i" class="hover:bg-gray-50">
+          <tr v-for="(entry, i) in reversedEntries" :key="i" class="hover:bg-gray-50">
             <td class="px-3 py-1.5 text-gray-500 whitespace-nowrap font-mono">
               {{ entry.timestamp }}
             </td>
             <td class="px-3 py-1.5 whitespace-nowrap font-mono font-medium" :class="methodColor(entry.method)">
               {{ entry.method }}
-            </td>
-            <td class="px-3 py-1.5 text-gray-700 font-mono whitespace-nowrap">
-              {{ entry.path }}
-            </td>
-            <td class="px-3 py-1.5 whitespace-nowrap font-mono" :class="statusColor(entry.status)">
-              {{ entry.status }}
             </td>
             <td
               class="px-3 py-1.5 text-gray-400 font-mono whitespace-nowrap cursor-pointer hover:text-primary-600 transition-colors"
@@ -171,6 +168,12 @@ async function copyReqId(reqId: string) {
               @click="copyReqId(entry.reqId)"
             >
               {{ entry.reqId || '-' }}
+            </td>
+            <td class="px-3 py-1.5 text-gray-700 font-mono whitespace-nowrap">
+              {{ entry.path }}
+            </td>
+            <td class="px-3 py-1.5 whitespace-nowrap font-mono" :class="statusColor(entry.status)">
+              {{ entry.status }}
             </td>
           </tr>
         </tbody>

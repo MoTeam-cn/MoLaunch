@@ -106,6 +106,36 @@ impl Default for OnlineConfig {
     }
 }
 
+/// TLS 证书配置
+///
+/// `trust_mode` 控制信任源组合，`http::build_client` 据此调用 certs 模块加载对应根证书：
+/// - `"builtin"`：仅 webpki-roots（reqwest 内置）
+/// - `"system"`：仅操作系统根证书（rustls-native-certs 加载）
+/// - `"custom"`：仅 certs 目录下的用户自定义 PEM
+/// - `"system+custom"` / `"builtin+custom"`：组合模式
+/// - `"all"`：三种来源全部加载
+///
+/// `IgnoreTls`（开发者模式注册表键）开启时跳过所有证书校验，
+/// 此字段配置的信任源不再生效。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TlsConfig {
+    /// 信任源模式：system / builtin / custom / system+custom / builtin+custom / all
+    #[serde(default = "default_trust_mode")]
+    pub trust_mode: String,
+}
+
+fn default_trust_mode() -> String {
+    "builtin".to_string()
+}
+
+impl Default for TlsConfig {
+    fn default() -> Self {
+        TlsConfig {
+            trust_mode: default_trust_mode(),
+        }
+    }
+}
+
 /// 应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
@@ -138,6 +168,7 @@ pub struct AppConfig {
     pub community: CommunityConfig,
     pub launch_advanced: LaunchAdvancedConfig,
     pub online: OnlineConfig,
+    pub tls: TlsConfig,
 }
 
 /// Minecraft 文件夹项
@@ -201,6 +232,7 @@ impl Default for AppConfig {
                 use_dedicated_gpu: false,
             },
             online: OnlineConfig::default(),
+            tls: TlsConfig::default(),
         }
     }
 }

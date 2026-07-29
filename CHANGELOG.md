@@ -7,6 +7,96 @@
 
 ## [未发布]
 
+### 新增
+
+#### 下载进度 WebSocket 推送（替代前端 300ms 轮询）
+
+- **背景**：前端 `useDownloadPolling.ts` 每 300ms 调用 `get_download_progress` IPC 轮询下载进度，devtools 网络面板刷屏且看不到响应内容。改为 WebSocket 服务器推送，devtools 面板干净，可在 WS Frames 面板查看进度消息流
+- **`src-tauri/Cargo.toml`**：新增 `tokio-tungstenite = "0.21"` 依赖，tokio 添加 `"net"` + `"io-util"` feature
+- **`src-tauri/src/ws/mod.rs`**（新增）：WS 服务器模块——监听 `127.0.0.1:0` 随机端口；每个连接订阅 `progress_tx` broadcast channel；200ms 节流推送（高频进度更新自动合并，避免 UI 刷屏）；支持 Close 帧处理和 lagged 容错
+- **`src-tauri/src/state/app.rs`**：`AppState` 新增 `progress_tx: Arc<broadcast::Sender<serde_json::Value>>`（容量 16）和 `ws_port: Arc<OnceLock<u16>>`
+- **`src-tauri/src/commands/version/download.rs`**：`progress_callback` / `stage_callback` / 完成处三路推送——`app.emit("download-progress")` + `progress_tx.send(snapshot)`；`build_snapshot` 加 `is_paused: bool` 参数和 `version_name` 字段
+- **`src-tauri/src/commands/version/progress.rs`**：`cancel_download` / `pause_download` / `resume_download` 改变 flag 后通过 `broadcast_current` 广播当前状态 snapshot，前端 WS 即时感知控制信号变化
+- **`src-tauri/src/utils/system_manager.rs`**：注册 `get_ws_port` action（返回 WS 端口，0 表示未启动）
+- **`src-tauri/src/lib.rs`**：`.setup()` 钩子中 `tauri::async_runtime::spawn(ws::start_server)` 启动 WS 服务器
+- **`src/utils/api/system-manager.ts`**：`SYSTEM_ACTIONS` 新增 `GET_WS_PORT`
+- **`src/utils/api/system.ts`**：新增 `getWsPort()` 函数
+- **`src/composables/useDownloadStream.ts`**（新增，替代 `useDownloadPolling.ts`）：监听 `versionStore.downloading` 建立/关闭 WS 连接；`onmessage` 解析 JSON 更新 store；断线 3 秒自动重连；WS 服务器未启动时 500ms 重试获取端口
+- **`src/App.vue`** + **`src/views/Downloads.vue`**：`initDownloadPolling()` → `initDownloadStream()`
+- **删除**：`src/composables/useDownloadPolling.ts`（已被 WS 方案完全替代）
+
+#### WebSocket 推送修复（连接成功但无消息 + CSP 阻止 + 初始状态丢失）
+
+- **问题**：前端反馈 WS 连接成功但收不到任何消息，且 `version_progress_manager` IPC 被请求两次（`isDownloading` + `getDownloadProgress` 初始状态恢复）
+- **`src-tauri/tauri.conf.json`**：CSP `connect-src` 补充 `ws://127.0.0.1:*` + `http://127.0.0.1:*`（`useHttpsScheme: true` 下 https 页面连接 ws 属于混合内容，需显式放行）
+- **`src-tauri/src/ws/mod.rs`**：`handle_connection` 连接建立后立即推送一次当前 `download_state` snapshot —— 解决 broadcast 订阅时序问题（subscribe 之前的消息全部丢失，前端进入下载页时能立即收到当前进度，无需等待下一次 callback）；添加关键诊断日志（连接建立 / 初始 snapshot 推送 / 首条广播消息 / 连接关闭）
+- **`src/composables/useDownloadStream.ts`**：`initDownloadStream` 添加 `watchRegistered` guard，防止 App.vue + Downloads.vue 重复调用注册多个 watch
+- **`src/views/Downloads.vue`**：移除 `initDownloadStream()` 调用（App.vue 已全局初始化），仅保留初始状态恢复逻辑
+
+#### 取消下载时日志刷屏修复
+
+- **问题**：用户取消整合包安装时，`download_files_concurrent` 中所有进行中的文件（如 111 个 mod）都会失败并逐个打印 3 条 INFO 日志（下载失败 + URL + 失败详情），共 333 条日志刷屏
+- **`src-tauri/src/commands/community/install/concurrent.rs`**：收集失败前检查 `download_cancel_flag`，若为取消导致的失败：跳过逐个日志，只打印一条总结 `[Community] 下载已取消，N 个文件未完成`，返回简洁错误 `下载已取消`；非取消场景保留原有详细日志便于排障
+
+#### 整合包/资源下载进度 WS 推送缺失修复
+
+- **问题**：MC 本体下载的 `progress_callback` 有 `progress_tx.send()` 广播，但整合包安装（`download_files_concurrent` / `download_modpack_archive`）和资源下载（`download_resource` / `download_resource_to_path`）的 4 个 `progress_callback` 只更新了 `download_state`，**没有广播到 WS**，导致前端 WS 只收到连接时的初始 snapshot，后续进度无推送
+- **`src-tauri/src/commands/version/download.rs`**：新增 `pub fn broadcast_current(state: &AppState)` 公共函数 —— 读取 `download_state` + `pause_flag` 构造 snapshot 并 `progress_tx.send()`，供各下载路径的 callback 统一调用
+- **`src-tauri/src/commands/version/progress.rs`**：私有 `broadcast_current` 改为委托 `super::download::broadcast_current`，避免重复实现；移除未使用的 `build_snapshot` import
+- **`src-tauri/src/commands/community/install/concurrent.rs`**：`download_files_concurrent` 的 `progress_callback` 添加 `broadcast_current` 调用
+- **`src-tauri/src/commands/community/install/modpack_stages.rs`**：`download_modpack_archive` 的 `stage0_callback` 添加 `broadcast_current` 调用
+- **`src-tauri/src/commands/community/install/resource.rs`**：`download_resource` + `download_resource_to_path` 两处 `progress_callback` 添加 `broadcast_current` 调用
+
+#### 取消下载时弹错误窗修复
+
+- **问题**：用户主动取消下载时，后端返回的错误（如 `下载整合包失败: 下载已取消`）会被前端的 catch 块当作真实失败处理，弹出 `整合包安装失败` / `下载失败` 错误窗，用户体验差（取消是用户主动行为，不应弹错误窗）
+- **`src/utils/async.ts`**：新增 `isCancelledError(error: unknown): boolean` 工具函数 —— 检测错误消息是否包含 `下载已取消` 或 `下载被取消`，统一识别取消错误
+- **`src/composables/useModpackInstall.ts`** + **`src/composables/useVersionInstallActions.ts`**（install + download 两处）+ **`src/composables/useModUpdate.ts`** + **`src/composables/useExternalDownload.ts`** + **`src/composables/useDragDrop.ts`**（modpack + merged 两处）+ **`src/components/community/ResourceDetail.vue`**：catch 分支新增 `isCancelledError` 检查 —— 取消错误仅 `toastInfo('下载已取消')` + `versionStore.finishDownload()` 退出下载页，不弹错误窗；真实失败保留原有 `showModal` 行为
+
+#### WebSocket 鉴权（防止本机其他进程窃听下载进度）
+
+- **背景**：WS 服务器监听 `127.0.0.1:0` 随机端口，虽然仅本机可访问，但本机其他进程（如恶意软件、抓包工具）仍可直接连接端口窃取下载进度数据。新增 token 鉴权机制，确保只有持 token 的客户端能接收进度推送
+- **`src-tauri/src/state/app.rs`**：`AppState` 新增 `ws_token: Arc<OnceLock<String>>` 字段
+- **`src-tauri/src/ws/`**（模块化重构）：
+  - `mod.rs`：模块声明 + re-export `start_server` + `broadcast_progress`（精简注释）
+  - `auth.rs`（新增）：`generate_ws_token`（OsRng 32 字节 → 64 位十六进制）+ `verify_auth_message` + `auth_ok_message` + `AUTH_TIMEOUT_SECS` 常量
+  - `server.rs`（新增）：`start_server` 启动服务器并生成 token 写入 `AppState`；`handle_connection` 鉴权阶段（3 秒超时校验首条消息）→ 鉴权通过后推送初始 snapshot + 200ms 节流推送后续进度
+- **`src-tauri/src/utils/system_manager.rs`**：`get_ws_port` 返回值从 `u16` 改为 `{port: u16, token: string}` 对象
+- **`src/utils/api/system.ts`**：`getWsPort()` 返回类型从 `number` 改为 `WsPortInfo { port, token }`，新增 `WsPortInfo` 接口
+- **`src/composables/useDownloadStream.ts`**：
+  - 新增 `authenticated` 标志，鉴权前不处理进度消息
+  - `onopen` 后立即发送 `{"type":"auth","token":"<token>"}` 鉴权消息
+  - `onmessage` 收到 `auth_ok` 后才标记 `authenticated = true`，后续消息才交给 `handleProgress`
+  - `closeStream` / `onclose` 重置 `authenticated`
+
+### 新增
+
+#### TLS 证书管理（内置证书库 + 自定义证书 + 信任源模式）
+
+- **背景**：reqwest 切换到 `rustls-tls` 后端，支持内置证书库（webpki-roots）/ 系统证书库 / 自定义证书三种信任源组合，防止抓包和中间人攻击
+- **`src-tauri/Cargo.toml`**：reqwest 添加 `default-features = false` + `rustls-tls` 特性，新增 `rustls-native-certs = "0.6"` 依赖
+- **`src-tauri/src/certs.rs`**（新增）：证书管理模块——`cert_dir()` 定位 `%APPDATA%/.Molaunch/certs/` 目录；`list_custom_certs()` / `add_custom_cert()` / `remove_custom_cert()` 增删查自定义 PEM；`load_custom_root_certificates()` / `load_system_root_certificates()` 加载信任根；`parse_pem_meta()` 简易解析 Subject CN 和过期时间
+- **`src-tauri/src/state/config.rs`**：新增 `TlsConfig` 结构体（`trust_mode` 字段），默认 `"builtin"`
+- **`src-tauri/src/http.rs`**：`build_client` 按信任源模式组合加载根证书，`IgnoreTls` 开启时 `danger_accept_invalid_certs(true)`
+- **`src-tauri/src/commands/system/developer.rs`**：新增 `KEY_IGNORE_TLS` 常量和 `is_ignore_tls()` 函数（三重校验：DeveloperUnlocked + DeveloperMode + IgnoreTls）
+- **`src-tauri/src/commands/system/apply_config/`**：`ConfigPatch` 新增 `tls_trust_mode` / `ignore_tls` 字段；`ConfigSnapshot` 新增 `TlsSnapshot`；`apply_tls()` + `secure::apply_ignore_tls()` 分别处理 INI 和注册表持久化；trust_mode 变更后热重建 HTTP 客户端
+- **`src-tauri/src/utils/system_manager.rs`**：注册 `list_custom_certs` / `add_custom_cert` / `remove_custom_cert` 三个 IPC action
+- **`src/utils/api/config.ts`**：`ConfigSnapshot` + `ConfigPatch` 补充 `tlsTrustMode` / `ignoreTls` 字段
+- **`src/utils/api/system-manager.ts`**：`SYSTEM_ACTIONS` 补充 `LIST_CUSTOM_CERTS` / `ADD_CUSTOM_CERT` / `REMOVE_CUSTOM_CERT`
+- **`src/utils/api/developer.ts`**：新增 `CustomCertInfo` 接口 + `listCustomCerts()` / `addCustomCert()` / `removeCustomCert()` 函数
+
+### 重构
+
+#### 开发者设置页面拆分为子页签（SubTabBar + 5 个子组件）
+
+- **背景**：原 `SettingsDeveloper.vue`（225 行）将实验性功能、日志、缓存、存储、系统信息堆叠在单页，内容过多且无分类。重构后接入 `SubTabBar` 组件（与「更多」页一致），按职责拆分为 5 个子页签
+- **`src/views/settings/SettingsDeveloper.vue`**：重构为薄编排层（~90 行），仅管理 SubTabBar 导航 + 共享数据加载（storageDirs / systemInfo），props 下发给子页签
+- **`src/views/settings/developer/ExperimentalTab.vue`**（新增）：Modrinth CDN 直连开关
+- **`src/views/settings/developer/CertsTab.vue`**（新增）：TLS 信任源模式选择 + 忽略 TLS 开关 + 自定义证书表格（添加 / 删除 .pem 文件）
+- **`src/views/settings/developer/LogsTab.vue`**（新增）：HTTP 请求日志 + 应用日志（均为自包含 CollapsibleCard）
+- **`src/views/settings/developer/StorageTab.vue`**（新增）：缓存目录 + 存储信息（打开 / 定位按钮）
+- **`src/views/settings/developer/SystemTab.vue`**（新增）：系统信息（版本 / OS / 架构 / 内存）
+
 ### 修复
 
 #### 所有弹窗不再遮蔽顶部 nav

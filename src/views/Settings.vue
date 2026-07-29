@@ -98,8 +98,8 @@ onUnmounted(() => {
       <div
         class="flex-1 overflow-hidden"
         :class="[
-          // about 子组件已自带 p-6 内边距，避免双重 padding
-          activeCategory === 'about' ? '' : 'p-6',
+          // about / developer 子组件已自带 p-6 内边距（SubTabBar 需贴边），避免双重 padding
+          activeCategory === 'about' || activeCategory === 'developer' ? '' : 'p-6',
           // cache 页面需要内部管理滚动（顶部固定+列表滑动），去掉 padding 让子组件自管理
           activeCategory === 'cache' ? '!p-0' : '',
           // 非 cache 页面统一由外部容器提供纵向滚动
