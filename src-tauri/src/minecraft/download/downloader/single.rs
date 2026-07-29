@@ -73,30 +73,9 @@ pub async fn download_single(
     // （重复探测会导致 progress.total_bytes 被 saturating_add 多次，前端显示总大小翻倍）
     let mut file_size = task.expected_size.max(0) as u64;
 
-    // expected_size=0 时主动探测一次真实大小并回填 progress.total_bytes
-    // 统一 chunk 和单流两条路径：chunk 路径在 probe_file_size 后已 saturating_add，
-    // 单流路径（CurseForge CDN 不支持 Range 时回退）不会回填，导致 total_bytes 一直为 0，
-    // 前端 stage 显示「0/1 文件」、全局总大小显示「计算中...」
-    if file_size == 0 {
-        if let Some(first_url) = urls.first() {
-            let probed = super::super::chunk::probe_file_size(client, first_url).await;
-            if probed > 0 {
-                file_size = probed;
-                if let Some(ref prog) = progress {
-                    let mut p = prog.lock().unwrap();
-                    p.total_bytes = p.total_bytes.saturating_add(probed);
-                }
-                log_debug!(
-                    "[Download] 预探测文件大小: {} ({})",
-                    task.local_path,
-                    crate::utils::format::bytes(probed)
-                );
-            }
-        }
-    }
-
-    // file_size 已知时按大小判断是否分片；file_size=0（探测失败）时直接尝试分片，
+    // file_size 已知时按大小判断是否分片；file_size=0（未知大小）时直接尝试分片，
     // 由 chunk::download_chunked 内部探测真实大小并分片。
+    // 这样整合包原始包（expected_size=0）能自动走分片，无需在调用方手动探测。
     let can_chunk = if file_size == 0 {
         chunk_count > 1
     } else {

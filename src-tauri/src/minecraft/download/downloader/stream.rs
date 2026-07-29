@@ -45,6 +45,18 @@ pub(super) async fn download_from_url(
     }
 
     let total_size = response.content_length().unwrap_or(0);
+
+    // 回填全局 total_bytes：download_batch 初始化时按 expected_size 求和，
+    // 整合包归档 expected_size=0 导致初始 total_bytes=0。单流路径拿到 content_length
+    // 后必须回填，否则前端 stage 显示「0/1 文件」、global_bytes_total 显示「计算中...」。
+    // 与 chunk/mod.rs 的 probe_file_size 回填逻辑（line 73-76）对齐，统一两条路径。
+    if total_size > 0 {
+        if let Some(ref p) = progress {
+            let mut p = p.lock().unwrap();
+            p.total_bytes = p.total_bytes.saturating_add(total_size);
+        }
+    }
+
     let mut downloaded: u64 = 0;
     let start_time = Instant::now();
 
@@ -62,12 +74,14 @@ pub(super) async fn download_from_url(
     }
     let mut file = std::fs::File::create(local_path)?;
 
-    // 回滚已增量加到 progress 的字节数（downloaded>0 时才需要）
-    let rollback_progress = |downloaded: u64, progress: &Option<Arc<StdMutex<GlobalProgress>>>| {
-        if downloaded > 0 {
+    // 回滚已增量加到 progress 的字节数和 total_bytes（downloaded>0 或 total_size>0 时才需要）
+    // 失败时回滚 total 避免 download_single 的 3 次重试导致 total 翻倍
+    let rollback_progress = move |downloaded: u64, progress: &Option<Arc<StdMutex<GlobalProgress>>>| {
+        if downloaded > 0 || total_size > 0 {
             if let Some(ref p) = progress {
                 let mut p = p.lock().unwrap();
                 p.downloaded_bytes = p.downloaded_bytes.saturating_sub(downloaded);
+                p.total_bytes = p.total_bytes.saturating_sub(total_size);
             }
         }
     };

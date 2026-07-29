@@ -55,12 +55,17 @@
 
 #### 整合包下载 total_bytes=0 修复（前端显示「计算中...」+「0/1 文件」）
 
-- **问题**：整合包原始包 `DownloadTask.expected_size=0`（依赖运行时探测），`download_batch` 启动时 `total_bytes = sum(expected_size) = 0`。当走单流路径时（CurseForge CDN 不支持 Range 时回退），`stream.rs` 只更新 `downloaded_bytes`，不回填 `total_bytes`，导致：
-  - stage 0 的 `bytes_total=0`，前端按文件数显示「0/1 文件」而非字节大小
+- **问题**：整合包原始包 `DownloadTask.expected_size=0`（依赖运行时探测），`download_batch` 启动时 `total_bytes = sum(expected_size) = 0`。CurseForge CDN 不支持 Range 请求（GET + Range 返回 404），`download_single` 回退单流路径，`stream.rs` 拿到 `content_length` 后只用于返回值和 byte_limit 校验，**不回填 `progress.total_bytes`**，导致：
+  - stage 0 的 `bytes_total=0`，`sync_stage_from_progress` 回退按文件数算进度，前端显示「0/1 文件」
   - `sync_stage_from_progress` 累加 `global_bytes_total=0`，全局总大小显示「计算中...」
-  - 与 MC 本体下载（`expected_size` 来自 version JSON）行为不一致
-- **`src-tauri/src/minecraft/download/downloader/single.rs`**：`download_single` 入口处 `file_size=0` 时主动调用 `chunk::probe_file_size` 探测真实大小（GET + Range:bytes=0-0，通过 Content-Range 拿总大小），并 `saturating_add` 到 `progress.total_bytes` —— 统一 chunk 和单流两条路径，chunk 路径已在内部分支回填，单流路径此前缺失
-- **`src-tauri/src/minecraft/download/chunk/mod.rs`**：`pub use probe::{probe_file_size, supports_range};` 导出 `probe_file_size` 供 `download_single` 调用；移除私有 `use self::probe::probe_file_size;` 避免重复导入
+  - global 加权进度卡 0%
+  - 与 chunked 路径行为不一致（`chunk/mod.rs` 第 73-76 行在 `probe_file_size` 后会回填 `total_bytes`）
+  - 与 MC 本体下载行为不一致（`expected_size` 来自 version JSON >0，初始 `total_bytes` 就正确）
+- **根因分析**：WS 推送与 IPC 轮询读取的数据源完全相同（都是 `state.download_state`），snapshot 字段构造无差异。之前轮询「正常」是错觉——之前测试的整合包源支持 Range（走 chunked 路径回填了 total_bytes），现在 CurseForge 源不支持 Range（走 stream 路径不回填），与传输层无关
+- **`src-tauri/src/minecraft/download/downloader/stream.rs`**：
+  - 拿到 `response.content_length()` 后立即 `saturating_add` 到 `progress.total_bytes`，与 chunked 路径的回填逻辑对齐，统一两条路径
+  - `rollback_progress` 闭包改为 `move` 捕获 `total_size`，失败时回滚 `total_bytes`，避免 `download_single` 的 3 次重试导致 total 翻倍
+- **可复用性**：所有走单流路径的下载（CF 整合包归档、CF mod 文件回退单流、资源下载回退单流）都受益，无需在调用方手动探测
 
 #### WebSocket 鉴权（防止本机其他进程窃听下载进度）
 
