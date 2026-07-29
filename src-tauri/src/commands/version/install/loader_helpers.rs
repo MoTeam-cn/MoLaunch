@@ -1,13 +1,56 @@
 //! 加载器安装辅助函数
 //!
 //! - `install_single_loader` 通用加载器安装（更新/添加 stage + 调用 loaders::install_loader）
-//! - `start_progress_ticker` 模拟进度上涨（在加载器安装期间给用户视觉反馈）
+//! - `start_progress_ticker` 分段线性伪进度（在加载器安装期间给用户视觉反馈）
 
 use crate::minecraft::loaders;
 use crate::state::{AppState, StageStatus};
 use crate::{log_error, log_info};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+
+/// Forge/NeoForge 伪进度曲线：0→50% @4%/s, 50→80% @3%/s, 80→100% @1%/s
+///
+/// 总计约 42.5 秒达到 100%，前期稳定上涨，后期缓慢趋近
+const FORGE_TICKER: &[(f64, f64)] = &[(50.0, 4.0), (80.0, 3.0), (100.0, 1.0)];
+
+/// Fabric 伪进度曲线：0→50% @6%/s, 50→80% @4%/s, 80→100% @2%/s
+///
+/// 比 Forge 快一点，总计约 25.8 秒达到 100%
+const FABRIC_TICKER: &[(f64, f64)] = &[(50.0, 6.0), (80.0, 4.0), (100.0, 2.0)];
+
+/// 整合包解析伪进度曲线：0→90% @5%/s
+///
+/// 解析完成前缓慢上涨，解析完成后 stop 并跳 100%
+const PARSE_TICKER: &[(f64, f64)] = &[(90.0, 5.0)];
+
+/// 分段线性曲线进度计算
+///
+/// `segments` 为 `[(cap, speed_per_sec), ...]`，表示每个分段的目标值和速度
+/// 例如 `[(50.0, 4.0), (80.0, 3.0), (100.0, 1.0)]` 表示：
+/// - 0% → 50%：每秒 4%（12.5 秒）
+/// - 50% → 80%：每秒 3%（10 秒）
+/// - 80% → 100%：每秒 1%（20 秒）
+fn compute_linear_progress(elapsed_secs: f64, segments: &[(f64, f64)]) -> f64 {
+    let mut current = 0.0;
+    let mut remaining_time = elapsed_secs;
+
+    for (cap, speed) in segments {
+        let segment_width = cap - current;
+        let segment_duration = if *speed > 0.0 {
+            segment_width / speed
+        } else {
+            0.0
+        };
+        if remaining_time <= segment_duration {
+            return current + remaining_time * speed;
+        }
+        current = *cap;
+        remaining_time -= segment_duration;
+    }
+
+    current
+}
 
 /// 安装单个加载器的通用辅助函数
 /// 如果阶段已存在（最后一个阶段是加载器安装），则更新它；否则添加新阶段
@@ -53,9 +96,16 @@ pub(crate) async fn install_single_loader(
 
     log_info!("[Merged] Installing {} {}", loader_name, loader_version);
 
-    // 启动进度模拟器（对数曲线，前期快后期慢）
+    // 根据加载器类型选择伪进度曲线
+    // Forge/NeoForge 安装较慢（含 Java 进程），用慢曲线；Fabric 纯 HTTP 下载，用快曲线
+    let ticker_segments: &'static [(f64, f64)] = match loader_type {
+        loaders::LoaderType::Fabric => FABRIC_TICKER,
+        _ => FORGE_TICKER,
+    };
+
+    // 启动进度模拟器（分段线性曲线）
     // 统一由 ticker 管理伪进度，加载器 install 内部不需要手写 progress_callback
-    let ticker_stop = start_progress_ticker(state, None, 5.0, 95.0);
+    let ticker_stop = start_progress_ticker(state, None, ticker_segments);
 
     // 安装加载器（progress_callback 传 None，进度由 ticker 统一管理）
     match loaders::install_loader(
@@ -96,21 +146,19 @@ pub(crate) async fn install_single_loader(
     }
 }
 
-/// 启动进度模拟器：对数曲线上涨（前期快后期慢），直到 stop 信号为 true
+/// 启动进度模拟器：分段线性曲线上涨，直到 stop 信号为 true
 ///
-/// 使用 `current = start + (cap - start) * (1 - exp(-elapsed / tau))` 曲线：
-/// - 1 秒后约 30%（快速安装也能看到明显进度）
-/// - 3 秒后约 60%
-/// - 10 秒后约 92%
-/// - 30 秒后约 95%（卡在上限，等安装完成跳 100%）
+/// `segments` 为 `[(cap, speed_per_sec), ...]`，例如 `[(50.0, 4.0), (80.0, 3.0), (100.0, 1.0)]`：
+/// - 0% → 50%：每秒 4%（12.5 秒）
+/// - 50% → 80%：每秒 3%（10 秒）
+/// - 80% → 100%：每秒 1%（20 秒）
 ///
 /// - `stage_index` 为 None 时更新最后一个阶段（兼容加载器安装场景）
 /// - 每次更新后广播到 WS，让前端实时看到伪进度动画
 pub(crate) fn start_progress_ticker(
     state: &AppState,
     stage_index: Option<usize>,
-    start: f64,
-    cap: f64,
+    segments: &'static [(f64, f64)],
 ) -> Arc<AtomicBool> {
     let stop = Arc::new(AtomicBool::new(false));
     let stop_clone = stop.clone();
@@ -118,7 +166,6 @@ pub(crate) fn start_progress_ticker(
     let app_state = state.clone();
 
     tokio::spawn(async move {
-        let tau = 3.0; // 时间常数：控制曲线上升速度
         let mut elapsed_ms: u64 = 0;
         let step_ms: u64 = 200;
         let mut interval = tokio::time::interval(std::time::Duration::from_millis(step_ms));
@@ -131,9 +178,7 @@ pub(crate) fn start_progress_ticker(
             }
             elapsed_ms += step_ms;
             let elapsed_secs = elapsed_ms as f64 / 1000.0;
-            // 对数曲线：1 - exp(-t/tau)
-            let factor = 1.0 - (-elapsed_secs / tau).exp();
-            let current = start + (cap - start) * factor;
+            let current = compute_linear_progress(elapsed_secs, segments);
 
             {
                 let mut ds = download_state.lock().unwrap();
@@ -151,4 +196,14 @@ pub(crate) fn start_progress_ticker(
     });
 
     stop
+}
+
+/// 整合包解析阶段的伪进度曲线（供 modpack.rs 调用）
+///
+/// 0→90% @5%/s，解析完成后 stop 并跳 100%
+pub(crate) fn start_parse_ticker(
+    state: &AppState,
+    stage_index: usize,
+) -> Arc<AtomicBool> {
+    start_progress_ticker(state, Some(stage_index), PARSE_TICKER)
 }

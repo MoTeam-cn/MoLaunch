@@ -152,13 +152,11 @@ pub async fn install_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(1, StageStatus::Loading, 0.0);
         }
-        // 启动伪进度 ticker（对数曲线 0→90%），解析完成后 stop 并跳 100%
+        // 启动伪进度 ticker（分段线性 0→90% @5%/s），解析完成后 stop 并跳 100%
         // 避免解析阶段（打开 zip + detect format + parse manifest）卡顿无反馈
-        let parse_ticker = crate::commands::version::install::loader_helpers::start_progress_ticker(
+        let parse_ticker = crate::commands::version::install::loader_helpers::start_parse_ticker(
             state,
-            Some(1),
-            0.0,
-            90.0,
+            1,
         );
         let file =
             std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
@@ -470,12 +468,10 @@ pub async fn install_local_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(0, StageStatus::Loading, 0.0);
         }
-        // 启动伪进度 ticker（对数曲线 0→90%），解析完成后 stop 并跳 100%
-        let parse_ticker = crate::commands::version::install::loader_helpers::start_progress_ticker(
+        // 启动伪进度 ticker（分段线性 0→90% @5%/s），解析完成后 stop 并跳 100%
+        let parse_ticker = crate::commands::version::install::loader_helpers::start_parse_ticker(
             state,
-            Some(0),
-            0.0,
-            90.0,
+            0,
         );
         let file =
             std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;

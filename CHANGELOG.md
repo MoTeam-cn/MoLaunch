@@ -71,11 +71,14 @@
 
 - **问题**：解析整合包阶段（打开 zip + 检测格式 + 解析 manifest）是本地同步操作，直接 `set_stage_status(Loading, 0.0)` → 同步操作 → `set_stage_status(Finished, 1.0)` 跳过，无中间进度反馈。大整合包（如 SkyFactory 4）解析需 3s，用户看到卡顿感
 - **`src-tauri/src/commands/version/install/loader_helpers.rs`**：重构 `start_progress_ticker` 函数 ——
-  - 签名改为接受 `&AppState` + `stage_index: Option<usize>`（None 更新 last stage，兼容加载器安装场景）
-  - 每次更新 progress 后调用 `broadcast_current` 广播到 WS，让前端实时看到伪进度动画
-  - 旧调用方 `install_single_loader` 适配新签名 `start_progress_ticker(state, None, 5.0, 95.0)`
+  - 从对数曲线改为**分段线性曲线**，接受 `segments: &'static [(f64, f64)]` 参数（`[(cap, speed_per_sec), ...]`）
+  - 新增 `compute_linear_progress` 分段线性计算函数 + `start_parse_ticker` 整合包解析专用入口
+  - Forge/NeoForge 曲线：0→50% @4%/s, 50→80% @3%/s, 80→100% @1%/s（总计 42.5s）
+  - Fabric 曲线：0→50% @6%/s, 50→80% @4%/s, 80→100% @2%/s（总计 25.8s，比 Forge 快）
+  - 整合包解析曲线：0→90% @5%/s（18s 到顶，解析完成 stop 跳 100%）
+  - 每次更新 progress 后调用 `broadcast_current` 广播到 WS
 - **`src-tauri/src/commands/version/install/mod.rs`**：`loader_helpers` 模块从 `mod` 改为 `pub(crate) mod`，供 `commands/community/install/modpack.rs` 跨模块调用
-- **`src-tauri/src/commands/community/install/modpack.rs`**：两处解析阶段（在线安装 stage 1 + 拖拽安装 stage 0）启动 `start_progress_ticker(state, Some(idx), 0.0, 90.0)` —— 对数曲线 0→90% 缓慢上涨，解析完成后 `store(true)` stop 并跳 100%。错误返回前也 stop ticker 避免泄漏
+- **`src-tauri/src/commands/community/install/modpack.rs`**：两处解析阶段（在线安装 stage 1 + 拖拽安装 stage 0）调用 `start_parse_ticker(state, idx)` —— 分段线性 0→90% @5%/s 缓慢上涨，解析完成后 `store(true)` stop 并跳 100%。错误返回前也 stop ticker 避免泄漏
 
 #### 关于「下载 MOD 阶段总大小持续增长」的说明
 
