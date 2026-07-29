@@ -1,10 +1,10 @@
 //! 加密 / 注册表字段分流
 //!
 //! CurseForge API Key 走 secure_storage（SDK DES 加密），不进 AppConfig；
-//! 开发者模式走注册表（DeveloperUnlocked / DeveloperMode），不进 AppConfig。
+//! 开发者模式走注册表（DeveloperUnlocked / DeveloperMode / IgnoreTls），不进 AppConfig。
 //! 这两块在 `apply_config_inner` 中先于普通字段更新执行。
 
-use super::super::developer::{KEY_DEV_MODE, KEY_DEV_UNLOCKED};
+use super::super::developer::{KEY_DEV_MODE, KEY_DEV_UNLOCKED, KEY_IGNORE_TLS};
 use super::types::ConfigPatch;
 use crate::log_info;
 use crate::state::AppState;
@@ -14,11 +14,15 @@ pub async fn read_curseforge() -> (bool, Option<String>) {
     crate::minecraft::community::secure_storage::get_config_async().await
 }
 
-/// 读取开发者模式状态（注册表）：(是否已解锁, 是否已开启)
-pub fn read_developer() -> (bool, bool) {
+/// 读取开发者模式状态（注册表）：(是否已解锁, 是否已开启, 是否忽略 TLS)
+///
+/// `ignore_tls` 仅在 `DeveloperUnlocked=true` 且 `DeveloperMode=true` 时才读取 `IgnoreTls` 键，
+/// 确保开发者模式被关闭后 ignore_tls 自动回退为 false。
+pub fn read_developer() -> (bool, bool, bool) {
     let unlocked = crate::storage::registry::reg_get_bool(KEY_DEV_UNLOCKED);
     let mode = unlocked && crate::storage::registry::reg_get_bool(KEY_DEV_MODE);
-    (unlocked, mode)
+    let ignore_tls = mode && crate::storage::registry::reg_get_bool(KEY_IGNORE_TLS);
+    (unlocked, mode, ignore_tls)
 }
 
 /// 应用 CurseForge 配置（加密存储，不进 AppConfig）
@@ -50,6 +54,27 @@ pub fn apply_developer_mode(patch: &ConfigPatch) -> Result<(), String> {
         }
         log_info!("[Config] developer_mode = {}", enabled);
         crate::storage::registry::reg_set_bool(KEY_DEV_MODE, enabled)
+            .map_err(|e| format!("写入注册表失败: {}", e))?;
+    }
+    Ok(())
+}
+
+/// 应用 IgnoreTls 开关（注册表，不进 AppConfig）
+///
+/// 仅在开发者模式已解锁且已开启时可生效，与 `is_ignore_tls()` 的判定链一致。
+/// 关闭开发者模式时此开关也被视为 false（`read_developer` 会联动）。
+pub fn apply_ignore_tls(patch: &ConfigPatch) -> Result<(), String> {
+    if let Some(enabled) = patch.ignore_tls {
+        let unlocked = crate::storage::registry::reg_get_bool(KEY_DEV_UNLOCKED);
+        if !unlocked {
+            return Err("开发者模式尚未解锁".to_string());
+        }
+        let mode = crate::storage::registry::reg_get_bool(KEY_DEV_MODE);
+        if !mode {
+            return Err("开发者模式未开启，无法启用 IgnoreTls".to_string());
+        }
+        log_info!("[Config] ignore_tls = {}", enabled);
+        crate::storage::registry::reg_set_bool(KEY_IGNORE_TLS, enabled)
             .map_err(|e| format!("写入注册表失败: {}", e))?;
     }
     Ok(())

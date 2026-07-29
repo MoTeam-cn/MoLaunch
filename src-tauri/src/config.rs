@@ -179,6 +179,10 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         }
     }
 
+    // TLS（信任源模式，未配置时保留默认 builtin）
+    app_config.tls.trust_mode =
+        config.get_or("TLS", "trust_mode", &app_config.tls.trust_mode);
+
     log_info!("Config loaded from storage");
     Ok(Some(app_config))
 }
@@ -349,6 +353,9 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
 
     // Online
     ini.set("Online", "api_server_url", &config.online.api_server_url);
+
+    // TLS（信任源模式持久化，IgnoreTls 走注册表不在此处）
+    ini.set("TLS", "trust_mode", &config.tls.trust_mode);
 
     storage.write_config(&ini).map_err(log_err("Failed to save config"))?;
     log_debug!("Config saved to storage");

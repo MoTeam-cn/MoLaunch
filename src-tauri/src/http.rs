@@ -1,9 +1,13 @@
 //! HTTP 客户端模块
-//! 统一管理 reqwest 客户端构建，支持代理配置 + IP 协议版本偏好
+//! 统一管理 reqwest 客户端构建，支持代理配置 + IP 协议版本偏好 + TLS 信任源
 //!
 //! 代理热更新：`init_client` 使用 `RwLock<Option<Client>>` 而非 `OnceLock`，
 //! 用户在设置页修改代理或 IP 版本偏好后 `apply_config` 会再次调用 `init_client` 重建客户端，
 //! 无需重启应用即可生效。
+//!
+//! TLS 信任源：`trust_mode` 控制 builtin/system/custom 三种根证书来源的组合。
+//! `ignore_tls=true`（开发者模式注册表键 IgnoreTls）开启时跳过所有证书校验，
+//! 用于联机服务端自签名证书调试等场景。
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{OnceLock, RwLock};
@@ -36,11 +40,29 @@ fn user_agent() -> &'static str {
 /// 初始化或重建全局 HTTP 客户端
 ///
 /// - 应用启动时调用一次（`lib.rs`）
-/// - 代理/IP 版本配置变更后再次调用（`apply_config` 副作用阶段）
+/// - 代理/IP 版本/TLS 配置变更后再次调用（`apply_config` 副作用阶段）
 ///
 /// 重复调用安全：直接覆盖旧客户端，进行中的请求仍使用旧客户端完成。
-pub fn init_client(proxy_mode: &str, proxy_type: &str, proxy_url: &str, ip_version: &str) {
-    let client = build_client(proxy_mode, proxy_type, proxy_url, ip_version, Duration::from_secs(30));
+///
+/// - `trust_mode`：信任源模式（builtin/system/custom/组合/all），见 `state::TlsConfig`
+/// - `ignore_tls`：是否跳过证书校验（开发者模式注册表键，开启后 `trust_mode` 被忽略）
+pub fn init_client(
+    proxy_mode: &str,
+    proxy_type: &str,
+    proxy_url: &str,
+    ip_version: &str,
+    trust_mode: &str,
+    ignore_tls: bool,
+) {
+    let client = build_client(
+        proxy_mode,
+        proxy_type,
+        proxy_url,
+        ip_version,
+        Duration::from_secs(30),
+        trust_mode,
+        ignore_tls,
+    );
     let mut guard = HTTP_CLIENT.write().expect("HTTP_CLIENT poisoned");
     *guard = Some(client);
 }
@@ -55,10 +77,12 @@ pub fn get_client() -> reqwest::Client {
         }
     }
     // 未初始化兜底（理论上 lib.rs 启动时已 init，此处防御性处理）
+    // 启用内置根证书确保 TLS 正常（与初始化路径默认 builtin 模式一致）
     reqwest::Client::builder()
         .timeout(Duration::from_secs(30))
         .user_agent(user_agent())
         .no_proxy()
+        .tls_built_in_root_certs(true)
         .build()
         .expect("Failed to build default HTTP client")
 }
@@ -69,12 +93,21 @@ pub fn get_client() -> reqwest::Client {
 /// - `"v4"`: 强制 IPv4（`local_address = 0.0.0.0`，reqwest 仅解析 A 记录）
 /// - `"auto"`: 自动选择（测试 v4/v6 连通性，选稳定的那个）
 /// - `"any"` 或其他: 随意解析（不设置 `local_address`，跟随 DNS 服务器）
+///
+/// `trust_mode` 控制 TLS 信任源组合（仅在 `ignore_tls=false` 时生效）：
+/// - 包含 `builtin` 或为 `all`：启用 reqwest 内置 webpki-roots
+/// - 包含 `system` 或为 `all`：加载操作系统根证书（rustls-native-certs）
+/// - 包含 `custom` 或为 `all`：加载 certs 目录下的用户自定义 PEM
+///
+/// `ignore_tls=true` 时跳过所有证书校验（`danger_accept_invalid_certs(true)`）。
 pub fn build_client(
     proxy_mode: &str,
     proxy_type: &str,
     proxy_url: &str,
     ip_version: &str,
     timeout: Duration,
+    trust_mode: &str,
+    ignore_tls: bool,
 ) -> reqwest::Client {
     let mut builder = reqwest::Client::builder()
         .timeout(timeout)
@@ -84,6 +117,32 @@ pub fn build_client(
     let local_addr = resolve_local_address(ip_version);
     if let Some(addr) = local_addr {
         builder = builder.local_address(addr);
+    }
+
+    // ===== TLS 信任源配置 =====
+    if ignore_tls {
+        // 开发者模式：跳过所有证书校验（仅用于自签名证书调试）
+        builder = builder.danger_accept_invalid_certs(true);
+    } else {
+        // 解析信任源模式（支持组合，如 "system+custom"）
+        let use_builtin = trust_mode.contains("builtin") || trust_mode == "all";
+        let use_system = trust_mode.contains("system") || trust_mode == "all";
+        let use_custom = trust_mode.contains("custom") || trust_mode == "all";
+
+        // 关闭默认的内置根证书，改由下方精确控制
+        // （reqwest rustls-tls 后端默认加载 webpki-roots，需显式关闭后按需开启）
+        builder = builder.tls_built_in_root_certs(use_builtin);
+
+        if use_system {
+            for cert in crate::certs::load_system_root_certificates() {
+                builder = builder.add_root_certificate(cert);
+            }
+        }
+        if use_custom {
+            for cert in crate::certs::load_custom_root_certificates() {
+                builder = builder.add_root_certificate(cert);
+            }
+        }
     }
 
     match proxy_mode {

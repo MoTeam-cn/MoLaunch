@@ -29,6 +29,12 @@ pub const KEY_DEV_UNLOCKED: &str = "DeveloperUnlocked";
 /// 注册表键名：开发者模式是否开启
 pub const KEY_DEV_MODE: &str = "DeveloperMode";
 
+/// 注册表键名：是否忽略 TLS 证书校验（仅开发者模式可开启）
+///
+/// 开启后 `http::build_client` 会调用 `danger_accept_invalid_certs(true)`，
+/// 跳过所有证书校验，用于联机服务端自签名证书调试等场景。
+pub const KEY_IGNORE_TLS: &str = "IgnoreTls";
+
 // ============================================================
 // 解锁与开关
 // ============================================================
@@ -48,6 +54,17 @@ pub fn is_developer_unlocked() -> bool {
 pub fn unlock_developer_mode() -> Result<(), String> {
     log_info!("[Developer] 开发者模式已解锁");
     reg_set_bool(KEY_DEV_UNLOCKED, true)
+}
+
+/// 查询是否忽略 TLS 证书校验（仅在开发者模式已开启时返回 true）
+///
+/// 与 `is_developer_unlocked` 不同，本函数同时校验 `DeveloperUnlocked`
+/// 与 `DeveloperMode` 两个开关，确保仅开发者模式实际开启时才允许忽略 TLS。
+/// 任何一层关闭均返回 false，避免开发者模式被关闭后 IgnoreTls 仍生效。
+pub fn is_ignore_tls() -> bool {
+    let unlocked = reg_get_bool(KEY_DEV_UNLOCKED);
+    let mode = reg_get_bool(KEY_DEV_MODE);
+    unlocked && mode && reg_get_bool(KEY_IGNORE_TLS)
 }
 
 // ============================================================

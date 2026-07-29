@@ -170,3 +170,30 @@ export async function readHttpLogs(
 export async function listHttpLogFiles(): Promise<string[]> {
   return systemManager<string[]>(SYSTEM_ACTIONS.LIST_HTTP_LOG_FILES)
 }
+
+// ==================== TLS 证书管理 ====================
+
+/** 自定义证书信息（list_custom_certs 返回项） */
+export interface CustomCertInfo {
+  /** 文件名（certs 目录下的相对名称，如 `my-root.pem`） */
+  filename: string
+  /** 证书 Subject CN（解析失败时回退为文件名） */
+  subject: string
+  /** 证书过期时间（PEM 解析失败时为空字符串） */
+  notAfter: string
+}
+
+/** 列出 certs 目录下所有 `.pem` 文件 */
+export async function listCustomCerts(): Promise<CustomCertInfo[]> {
+  return systemManager<CustomCertInfo[]>(SYSTEM_ACTIONS.LIST_CUSTOM_CERTS)
+}
+
+/** 添加自定义证书（从源路径复制 PEM 文件到 certs 目录） */
+export async function addCustomCert(path: string): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.ADD_CUSTOM_CERT, { path })
+}
+
+/** 删除自定义证书（按文件名删除 certs 目录下对应文件） */
+export async function removeCustomCert(filename: string): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.REMOVE_CUSTOM_CERT, { filename })
+}

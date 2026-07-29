@@ -72,6 +72,11 @@ export interface ConfigSnapshot {
   onlineApiServerUrl: string
   /** 用户自定义 TURN 服务器列表（阶段三子任务 7 新增） */
   onlineCustomTurnServers: IceServerEntry[]
+  // TLS 证书
+  /** TLS 信任源模式：builtin / system / custom / system+custom / builtin+custom / all */
+  tlsTrustMode: string
+  /** 是否忽略 TLS 证书校验（开发者模式注册表键，仅开发者模式开启时生效） */
+  ignoreTls: boolean
 }
 
 /**
@@ -133,6 +138,11 @@ export interface ConfigPatch {
    * 传空数组表示清空所有自定义 TURN；不传（undefined）表示不更新。
    */
   onlineCustomTurnServers?: IceServerEntry[]
+  // TLS 证书
+  /** TLS 信任源模式：builtin / system / custom / system+custom / builtin+custom / all */
+  tlsTrustMode?: string
+  /** 是否忽略 TLS 证书校验（仅开发者模式开启时可生效） */
+  ignoreTls?: boolean
 }
 
 // ==================== 配置缓存与读写（带全局缓存）====================

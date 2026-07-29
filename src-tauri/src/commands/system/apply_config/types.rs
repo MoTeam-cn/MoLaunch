@@ -133,6 +133,14 @@ pub struct ConfigPatch {
     // ===== 开发者模式（注册表存储，不进 AppConfig，内部分流到 registry）=====
     /// 开关是否开启（仅在已解锁时可生效）
     pub developer_mode: Option<bool>,
+
+    // ===== TLS（trust_mode 进 AppConfig；ignore_tls 走注册表，仅在开发者模式可开启）=====
+    /// TLS 信任源模式：builtin / system / custom / system+custom / builtin+custom / all
+    #[serde(rename = "tlsTrustMode")]
+    pub tls_trust_mode: Option<String>,
+    /// 是否忽略 TLS 证书校验（开发者模式注册表键，仅在 developer_mode 开启时可生效）
+    #[serde(rename = "ignoreTls")]
+    pub ignore_tls: Option<bool>,
 }
 
 // ============================================================
@@ -220,6 +228,27 @@ impl Default for OnlineSnapshot {
     }
 }
 
+/// TLS 配置快照（serde(flatten) 展平到 ConfigSnapshot）
+///
+/// - `trust_mode`：来自 `AppConfig.tls.trust_mode`（INI 持久化）
+/// - `ignore_tls`：来自注册表 `IgnoreTls`（开发者模式键，不进 AppConfig）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TlsSnapshot {
+    #[serde(rename = "tlsTrustMode")]
+    pub trust_mode: String,
+    #[serde(rename = "ignoreTls")]
+    pub ignore_tls: bool,
+}
+
+impl Default for TlsSnapshot {
+    fn default() -> Self {
+        Self {
+            trust_mode: "builtin".to_string(),
+            ignore_tls: false,
+        }
+    }
+}
+
 /// 配置快照：返回所有配置字段的当前值
 ///
 /// 用于前端一次性读取全部配置，取代此前分散的 14 个 get_* 命令。
@@ -258,6 +287,8 @@ pub struct ConfigSnapshot {
     pub launch_advanced: LaunchAdvancedSnapshot,
     #[serde(flatten)]
     pub online: OnlineSnapshot,
+    #[serde(flatten)]
+    pub tls: TlsSnapshot,
 
     // ===== CurseForge（从 secure_storage 缓存读，已解密）=====
     pub curseforge_enabled: bool,
@@ -279,7 +310,7 @@ pub struct ConfigEntry {
 
 /// 从已锁定的 `AppConfig` 构建配置快照
 ///
-/// CurseForge / 开发者模式字段由调用方提前读取（分别在 secure_storage 缓存与
+/// CurseForge / 开发者模式 / IgnoreTls 字段由调用方提前读取（分别在 secure_storage 缓存与
 /// 注册表中），其余字段从 `AppConfig` 镜像。集中在此处避免散落在命令实现里，
 /// 也使 `get_config` 命令体保持简短。
 pub fn build_snapshot(
@@ -288,6 +319,7 @@ pub fn build_snapshot(
     cf_api_key: Option<String>,
     dev_unlocked: bool,
     dev_mode: bool,
+    ignore_tls: bool,
 ) -> ConfigSnapshot {
     ConfigSnapshot {
         // 通用字段
@@ -334,6 +366,10 @@ pub fn build_snapshot(
         online: OnlineSnapshot {
             api_server_url: config.online.api_server_url.clone(),
             custom_turn_servers: config.online.custom_turn_servers.clone(),
+        },
+        tls: TlsSnapshot {
+            trust_mode: config.tls.trust_mode.clone(),
+            ignore_tls,
         },
 
         // 非 AppConfig 字段

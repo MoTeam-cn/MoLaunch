@@ -2,11 +2,11 @@
 //!
 //! `apply_config_inner` 三段式分流：
 //! 1. 校验（validate 模块：mirror_url SSRF、download_source / meta_source 枚举）
-//! 2. 加密字段分流（secure 模块：CurseForge / 开发者模式，不进 AppConfig）
-//! 3. 普通字段统一更新（`update_config` 闭包内按域调用 6 个子函数 + 副作用）
+//! 2. 加密字段分流（secure 模块：CurseForge / 开发者模式 / IgnoreTls，不进 AppConfig）
+//! 3. 普通字段统一更新（`update_config` 闭包内按域调用 7 个子函数 + 副作用）
 //!
-//! 6 个域子函数：代理 / 下载 / 内存 / 启动器 / 社区 / 启动高级。
-//! CurseForge 与开发者模式不在闭包内（分别走 secure_storage 与注册表）。
+//! 7 个域子函数：代理 / 下载 / 内存 / 启动器 / 社区 / 启动高级 / TLS。
+//! CurseForge / 开发者模式 / IgnoreTls 不在闭包内（分别走 secure_storage 与注册表）。
 
 use super::secure;
 use super::types::ConfigPatch;
@@ -28,12 +28,17 @@ pub(crate) async fn apply_config_inner(
     // ===== 2b. 开发者模式分流（注册表，不进 AppConfig）=====
     secure::apply_developer_mode(&patch)?;
 
+    // ===== 2c. IgnoreTls 分流（注册表，仅开发者模式可开启）=====
+    secure::apply_ignore_tls(&patch)?;
+
     // ===== 3. 普通字段统一更新 =====
     // log_level 变更需闭包外立即生效，用 Option 收集待应用的值（避免跨 await 持有锁）
     let mut log_level_pending: Option<u32> = None;
     // 代理变更需闭包外重建 HTTP 客户端（同 log_level 模式，避免跨 await 持有锁）
     // 四元组：(mode, kind, url, ip_version)
     let mut proxy_pending: Option<(String, String, String, String)> = None;
+    // TLS 变更需闭包外重建 HTTP 客户端（trust_mode + ignore_tls）
+    let mut tls_pending: Option<bool> = None;
 
     super::super::update_config(&state, |config| {
         apply_proxy(config, &patch, &mut proxy_pending);
@@ -44,6 +49,7 @@ pub(crate) async fn apply_config_inner(
         apply_launch_advanced(config, &patch);
         apply_external_download(config, &patch);
         apply_online(config, &patch);
+        apply_tls(config, &patch, &mut tls_pending);
     })
     .await?;
 
@@ -61,13 +67,27 @@ pub(crate) async fn apply_config_inner(
         crate::logger::set_level(log_level);
     }
 
-    // 代理变更需重建 HTTP 客户端（热更新，无需重启应用）
-    if let Some((mode, kind, url, ip_version)) = proxy_pending {
-        crate::http::init_client(&mode, &kind, &url, &ip_version);
+    // 代理或 TLS 变更需重建 HTTP 客户端（热更新，无需重启应用）
+    if proxy_pending.is_some() || tls_pending.is_some() {
+        // 锁定读取最新配置（包含刚更新的 proxy + tls 字段）
+        let config = state.config.lock().await;
+        let (mode, kind, url, ip_version, trust_mode) = (
+            config.proxy.mode.clone(),
+            config.proxy.kind.clone(),
+            config.proxy.url.clone(),
+            config.proxy.ip_version.clone(),
+            config.tls.trust_mode.clone(),
+        );
+        drop(config);
+        // ignore_tls 走注册表，开发者模式关闭时自动为 false
+        let ignore_tls = crate::commands::system::developer::is_ignore_tls();
+        crate::http::init_client(&mode, &kind, &url, &ip_version, &trust_mode, ignore_tls);
         log_info!(
-            "[Config] HTTP client rebuilt (proxy: {}, ip_version: {})",
+            "[Config] HTTP client rebuilt (proxy: {}, ip_version: {}, trust_mode: {}, ignore_tls: {})",
             mode,
-            ip_version
+            ip_version,
+            trust_mode,
+            ignore_tls
         );
     }
 
@@ -291,5 +311,21 @@ fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(ref servers) = patch.online.custom_turn_servers {
         log_info!("[Config] online_custom_turn_servers count = {}", servers.len());
         config.online.custom_turn_servers = servers.clone();
+    }
+}
+
+/// TLS 域：tls.trust_mode
+///
+/// `trust_mode` 变更收集到 `tls_pending`，供闭包外重建 HTTP 客户端。
+/// `ignore_tls` 不在此处（走注册表，由 `secure::apply_ignore_tls` 处理）。
+fn apply_tls(
+    config: &mut crate::state::AppConfig,
+    patch: &ConfigPatch,
+    tls_pending: &mut Option<bool>,
+) {
+    if let Some(ref mode) = patch.tls_trust_mode {
+        log_info!("[Config] tls_trust_mode = {}", mode);
+        config.tls.trust_mode = mode.clone();
+        *tls_pending = Some(true);
     }
 }
