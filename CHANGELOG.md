@@ -67,6 +67,22 @@
   - `rollback_progress` 闭包改为 `move` 捕获 `total_size`，失败时回滚 `total_bytes`，避免 `download_single` 的 3 次重试导致 total 翻倍
 - **可复用性**：所有走单流路径的下载（CF 整合包归档、CF mod 文件回退单流、资源下载回退单流）都受益，无需在调用方手动探测
 
+#### 整合包解析阶段伪进度动画（消除卡顿无反馈）
+
+- **问题**：解析整合包阶段（打开 zip + 检测格式 + 解析 manifest）是本地同步操作，直接 `set_stage_status(Loading, 0.0)` → 同步操作 → `set_stage_status(Finished, 1.0)` 跳过，无中间进度反馈。大整合包（如 SkyFactory 4）解析需 3s，用户看到卡顿感
+- **`src-tauri/src/commands/version/install/loader_helpers.rs`**：重构 `start_progress_ticker` 函数 ——
+  - 签名改为接受 `&AppState` + `stage_index: Option<usize>`（None 更新 last stage，兼容加载器安装场景）
+  - 每次更新 progress 后调用 `broadcast_current` 广播到 WS，让前端实时看到伪进度动画
+  - 旧调用方 `install_single_loader` 适配新签名 `start_progress_ticker(state, None, 5.0, 95.0)`
+- **`src-tauri/src/commands/version/install/mod.rs`**：`loader_helpers` 模块从 `mod` 改为 `pub(crate) mod`，供 `commands/community/install/modpack.rs` 跨模块调用
+- **`src-tauri/src/commands/community/install/modpack.rs`**：两处解析阶段（在线安装 stage 1 + 拖拽安装 stage 0）启动 `start_progress_ticker(state, Some(idx), 0.0, 90.0)` —— 对数曲线 0→90% 缓慢上涨，解析完成后 `store(true)` stop 并跳 100%。错误返回前也 stop ticker 避免泄漏
+
+#### 关于「下载 MOD 阶段总大小持续增长」的说明
+
+- **现象**：stage 2「下载 MOD」的 `bytes_total` 随下载进度缓慢增长（如 296MB → 325MB）
+- **原因**：CF API `/mods/files` 批量查询接口对部分文件不返回 `fileLength` 字段（`CfFileEntry.file_length` 带 `#[serde(default)]`，缺失时为 0），`download_batch` 初始化 `total_bytes = sum(expected_size)` 偏小。走单流路径时 `stream.rs` 通过 `content_length` 回填真实大小，`total_bytes` 持续累加
+- **结论**：这是 CF API 数据不完整导致的**正确行为**，非 bug。`stream.rs` 的回填是必要的修正——否则 `total_bytes` 会一直为 0（回到修复前的「计算中...」问题）。前端可后续优化：`bytesTotal` 变化时加 CSS transition 平滑过渡
+
 #### WebSocket 鉴权（防止本机其他进程窃听下载进度）
 
 - **背景**：WS 服务器监听 `127.0.0.1:0` 随机端口，虽然仅本机可访问，但本机其他进程（如恶意软件、抓包工具）仍可直接连接端口窃取下载进度数据。新增 token 鉴权机制，确保只有持 token 的客户端能接收进度推送

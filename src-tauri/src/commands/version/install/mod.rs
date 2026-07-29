@@ -11,7 +11,7 @@
 
 pub mod cleanup;
 mod fabric_api;
-mod loader_helpers;
+pub(crate) mod loader_helpers;
 mod post_install;
 mod setup_persist;
 mod stages;

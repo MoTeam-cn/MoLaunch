@@ -152,6 +152,14 @@ pub async fn install_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(1, StageStatus::Loading, 0.0);
         }
+        // 启动伪进度 ticker（对数曲线 0→90%），解析完成后 stop 并跳 100%
+        // 避免解析阶段（打开 zip + detect format + parse manifest）卡顿无反馈
+        let parse_ticker = crate::commands::version::install::loader_helpers::start_progress_ticker(
+            state,
+            Some(1),
+            0.0,
+            90.0,
+        );
         let file =
             std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
         let mut archive = zip::ZipArchive::new(file)
@@ -159,6 +167,7 @@ pub async fn install_modpack(
 
         let detected = concurrent::detect_modpack_format(&mut archive)?;
         let info = parse_modpack_info(&detected)?;
+        parse_ticker.store(true, std::sync::atomic::Ordering::Relaxed);
 
         {
             let mut ds = state.download_state.lock().unwrap();
@@ -461,6 +470,13 @@ pub async fn install_local_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(0, StageStatus::Loading, 0.0);
         }
+        // 启动伪进度 ticker（对数曲线 0→90%），解析完成后 stop 并跳 100%
+        let parse_ticker = crate::commands::version::install::loader_helpers::start_progress_ticker(
+            state,
+            Some(0),
+            0.0,
+            90.0,
+        );
         let file =
             std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
         let mut archive = zip::ZipArchive::new(file)
@@ -475,6 +491,7 @@ pub async fn install_local_modpack(
             if source != 0 {
                 let (enabled, api_key) = secure_storage::get_config_async().await;
                 if !enabled {
+                    parse_ticker.store(true, std::sync::atomic::Ordering::Relaxed);
                     return Err(
                         "CurseForge 整合包安装需要 API Key。请在「设置 → 社区资源」中启用 CurseForge 官方源并填写 API Key，或将下载源切换为「尽量镜像」使用镜像站。"
                             .to_string(),
@@ -482,6 +499,7 @@ pub async fn install_local_modpack(
                 }
                 let key_empty = api_key.as_deref().map_or(true, |k| k.is_empty());
                 if key_empty {
+                    parse_ticker.store(true, std::sync::atomic::Ordering::Relaxed);
                     return Err(
                         "CurseForge 整合包安装需要 API Key。已在设置中启用但未填写 API Key，请补全后重试，或将下载源切换为「尽量镜像」使用镜像站。"
                             .to_string(),
@@ -494,6 +512,7 @@ pub async fn install_local_modpack(
         }
 
         let info = parse_modpack_info(&detected)?;
+        parse_ticker.store(true, std::sync::atomic::Ordering::Relaxed);
         {
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(0, StageStatus::Finished, 1.0);

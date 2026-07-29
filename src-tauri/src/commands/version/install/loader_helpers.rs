@@ -55,7 +55,7 @@ pub(crate) async fn install_single_loader(
 
     // 启动进度模拟器（对数曲线，前期快后期慢）
     // 统一由 ticker 管理伪进度，加载器 install 内部不需要手写 progress_callback
-    let ticker_stop = start_progress_ticker(state.download_state.clone(), 5.0, 95.0);
+    let ticker_stop = start_progress_ticker(state, None, 5.0, 95.0);
 
     // 安装加载器（progress_callback 传 None，进度由 ticker 统一管理）
     match loaders::install_loader(
@@ -103,13 +103,19 @@ pub(crate) async fn install_single_loader(
 /// - 3 秒后约 60%
 /// - 10 秒后约 92%
 /// - 30 秒后约 95%（卡在上限，等安装完成跳 100%）
+///
+/// - `stage_index` 为 None 时更新最后一个阶段（兼容加载器安装场景）
+/// - 每次更新后广播到 WS，让前端实时看到伪进度动画
 pub(crate) fn start_progress_ticker(
-    state: Arc<std::sync::Mutex<crate::state::DownloadState>>,
+    state: &AppState,
+    stage_index: Option<usize>,
     start: f64,
     cap: f64,
 ) -> Arc<AtomicBool> {
     let stop = Arc::new(AtomicBool::new(false));
     let stop_clone = stop.clone();
+    let download_state = state.download_state.clone();
+    let app_state = state.clone();
 
     tokio::spawn(async move {
         let tau = 3.0; // 时间常数：控制曲线上升速度
@@ -129,10 +135,18 @@ pub(crate) fn start_progress_ticker(
             let factor = 1.0 - (-elapsed_secs / tau).exp();
             let current = start + (cap - start) * factor;
 
-            let mut ds = state.lock().unwrap();
-            if let Some(last) = ds.stages.last_mut() {
-                last.progress = current / 100.0;
+            {
+                let mut ds = download_state.lock().unwrap();
+                let stage = match stage_index {
+                    Some(idx) => ds.stages.get_mut(idx),
+                    None => ds.stages.last_mut(),
+                };
+                if let Some(stage) = stage {
+                    stage.progress = current / 100.0;
+                }
             }
+            // 广播到 WS，让前端实时看到伪进度动画
+            crate::commands::version::download::broadcast_current(&app_state);
         }
     });
 
