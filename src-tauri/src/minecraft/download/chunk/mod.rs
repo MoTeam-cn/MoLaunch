@@ -18,7 +18,6 @@ use crate::{log_debug, log_info, log_warn};
 
 use self::download::download_chunk;
 use self::merge::merge_chunks;
-use self::probe::probe_file_size;
 use super::rate_limiter::RateLimiter;
 use super::types::{DownloadStatus, GlobalProgress};
 
@@ -27,7 +26,7 @@ pub mod merge;
 pub mod probe;
 
 // 对外保持 `super::chunk::supports_range` 调用路径稳定
-pub use probe::supports_range;
+pub use probe::{probe_file_size, supports_range};
 
 /// 分片下载结果
 pub struct ChunkDownloadResult {

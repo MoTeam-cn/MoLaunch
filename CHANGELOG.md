@@ -53,6 +53,15 @@
 - **`src/utils/async.ts`**：新增 `isCancelledError(error: unknown): boolean` 工具函数 —— 检测错误消息是否包含 `下载已取消` 或 `下载被取消`，统一识别取消错误
 - **`src/composables/useModpackInstall.ts`** + **`src/composables/useVersionInstallActions.ts`**（install + download 两处）+ **`src/composables/useModUpdate.ts`** + **`src/composables/useExternalDownload.ts`** + **`src/composables/useDragDrop.ts`**（modpack + merged 两处）+ **`src/components/community/ResourceDetail.vue`**：catch 分支新增 `isCancelledError` 检查 —— 取消错误仅 `toastInfo('下载已取消')` + `versionStore.finishDownload()` 退出下载页，不弹错误窗；真实失败保留原有 `showModal` 行为
 
+#### 整合包下载 total_bytes=0 修复（前端显示「计算中...」+「0/1 文件」）
+
+- **问题**：整合包原始包 `DownloadTask.expected_size=0`（依赖运行时探测），`download_batch` 启动时 `total_bytes = sum(expected_size) = 0`。当走单流路径时（CurseForge CDN 不支持 Range 时回退），`stream.rs` 只更新 `downloaded_bytes`，不回填 `total_bytes`，导致：
+  - stage 0 的 `bytes_total=0`，前端按文件数显示「0/1 文件」而非字节大小
+  - `sync_stage_from_progress` 累加 `global_bytes_total=0`，全局总大小显示「计算中...」
+  - 与 MC 本体下载（`expected_size` 来自 version JSON）行为不一致
+- **`src-tauri/src/minecraft/download/downloader/single.rs`**：`download_single` 入口处 `file_size=0` 时主动调用 `chunk::probe_file_size` 探测真实大小（GET + Range:bytes=0-0，通过 Content-Range 拿总大小），并 `saturating_add` 到 `progress.total_bytes` —— 统一 chunk 和单流两条路径，chunk 路径已在内部分支回填，单流路径此前缺失
+- **`src-tauri/src/minecraft/download/chunk/mod.rs`**：`pub use probe::{probe_file_size, supports_range};` 导出 `probe_file_size` 供 `download_single` 调用；移除私有 `use self::probe::probe_file_size;` 避免重复导入
+
 #### WebSocket 鉴权（防止本机其他进程窃听下载进度）
 
 - **背景**：WS 服务器监听 `127.0.0.1:0` 随机端口，虽然仅本机可访问，但本机其他进程（如恶意软件、抓包工具）仍可直接连接端口窃取下载进度数据。新增 token 鉴权机制，确保只有持 token 的客户端能接收进度推送
