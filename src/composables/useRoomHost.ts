@@ -337,14 +337,15 @@ export function useRoomHost(options: {
   /** TurnServers 控制消息的本地 seq 计数器（与 HostMcPort/TUN 数据包 seq 独立） */
   let turnSeq = 0
 
-  /** 启动三路信令轮询定时器（参与者 5s / Answer 5s / 保活 5min） */
+  /** 启动三路信令轮询定时器（参与者 5s / Answer 5s / 保活 30s） */
   function startTimers() {
     if (participantsTimer) clearInterval(participantsTimer)
     if (answerTimer) clearInterval(answerTimer)
     if (keepaliveTimer) clearInterval(keepaliveTimer)
     participantsTimer = setInterval(() => void pollParticipants(), 5000)
     answerTimer = setInterval(() => void pollAnswers(), 5000)
-    keepaliveTimer = setInterval(() => void doKeepalive(), 5 * 60 * 1000)
+    // 30s 保活：服务端 keepalive_timeout=120s，2 个周期未上报即判定失联
+    keepaliveTimer = setInterval(() => void doKeepalive(), 30 * 1000)
   }
 
   /** 停止所有轮询定时器（云端断开或组件卸载时调用，避免持续失败刷屏） */

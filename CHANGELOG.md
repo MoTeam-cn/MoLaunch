@@ -9,6 +9,24 @@
 
 ### 修复
 
+#### 联机房间生命周期治理（僵尸房间 / 参与者泄漏 / 房主在线检测）
+
+- **问题 1：加入方 30s 握手超时退出未通知服务端**
+  - **现象**：加入方超时后仅清本地状态，服务端参与者记录仍为 `joined`，大厅显示 `2/4`（实际 `1/4`）
+  - **`src/components/online/RoomManager.vue`**：catch 块在 `resetRoomState()` 前先调 `store.guestLeaveRoom()`（`DELETE /rooms/{code}/participants/me`），API 失败不阻塞本地退出
+- **问题 2：窗口关闭时无联机清理**
+  - **现象**：房主关窗 → 房间僵尸；加入方关窗 → 参与者记录泄漏
+  - **`src/components/layout/TopNavLayout.vue`**：`handleClose` 根据 `roomState.role` 分流——房主调 `hostCloseRoom()`，加入方调 `guestLeaveRoom()`，3s 超时保护不卡关窗
+- **问题 3：房主关闭程序后房间占用太久**
+  - **`src/composables/useRoomHost.ts`**：keepalive 间隔从 5min 缩短到 30s
+  - **`api-server/config/default.toml` + `api-server/src/config/settings.rs`**：`keepalive_timeout` 1800s→120s，`cleanup_interval` 300s→60s
+  - **容错链**：正常关窗→即时清理；异常退出→最迟 3 分钟回收（120s 失联判定 + 60s 扫描间隔）
+
+#### 房主不能加入自己的房间（join_room 新增 HostCannotJoinSelf 校验）
+
+- **`api-server/src/services/signaling.rs`**：`join_room` 步骤 2.5 新增 `host_device_pk == device_pk` 校验，返回 `HostCannotJoinSelf`（400 Bad Request）
+- **`api-server/src/controllers/v1/signaling.rs`**：错误映射函数添加 `HostCannotJoinSelf` 分支
+
 #### 信令结构体字段名大小写全面修复（7 个字段缺失 alias）
 
 - **现象**：mesh 拓扑房主为参与者生成 Offer 后，客户端拉取 `ParticipantOfferResponse` 时 `sdp_offer`/`ice_candidates` 为空；参与者列表中 `host_offer_ready` 永远为 false；大厅列表 `LobbyModpackSummary` 的 `modpack_version`/`file_size`/`file_count` 丢失；大厅房间列表 `LobbyRoomItem.room_code` 为空

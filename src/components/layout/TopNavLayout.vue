@@ -83,6 +83,20 @@ function handleDownloadClick() {
 async function handleClose() {
   // 关闭窗口前先保存配置
   await safeCall(() => tauri.saveConfigToFile(), 'save config before close')
+  // 联机状态清理：根据角色通知服务端退出房间，避免僵尸房间/参与者记录
+  // 3s 超时保护，网络问题不卡住关窗；API 失败不阻塞关窗（服务端 keepalive 超时兜底）
+  const role = onlineStore.roomState.role
+  if (role === 'host') {
+    await Promise.race([
+      onlineStore.hostCloseRoom().catch(() => {}),
+      new Promise<void>((r) => setTimeout(r, 3000)),
+    ])
+  } else if (role === 'guest') {
+    await Promise.race([
+      onlineStore.guestLeaveRoom().catch(() => {}),
+      new Promise<void>((r) => setTimeout(r, 3000)),
+    ])
+  }
   await appWindow.close()
 }
 </script>
