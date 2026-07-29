@@ -271,18 +271,21 @@ impl OnlineClient {
 
     /// 续期 access token（POST /v3/auth/refresh）
     ///
-    /// 该接口无需 JWT/CSRF 头，仅凭 refresh_token 即可换取新的 access_token + refresh_token。
+    /// 采用与登录一致的 MoSign-v1 协议：ECDH 派生会话密钥 + AES-256-GCM 加密 content +
+    /// HMAC-SHA256 签名。`refresh_token` 放在加密的 content 内，明文不出现在请求体。
     /// 服务端会轮换 refresh_token（旧 refresh_token 用后失效）。
-    pub async fn refresh(&self, refresh_token: &str) -> Result<RefreshResponse, ClientError> {
+    pub async fn refresh(&self, req: &RefreshRequest) -> Result<RefreshResponse, ClientError> {
         let url = format!("{}/v3/auth/refresh", self.base_url);
-        crate::log_info!("[Online] POST {} (refresh_token_len={})", url, refresh_token.len());
-        let req = RefreshRequest {
-            refresh_token: refresh_token.to_string(),
-        };
+        crate::log_info!(
+            "[Online] POST {} (device_pk={}, content_len={})",
+            url,
+            req.device_pk,
+            req.content.len()
+        );
         let resp = get_client()
             .post(&url)
             .header("Content-Type", "application/json")
-            .json(&req)
+            .json(req)
             .send()
             .await?;
         let status = resp.status().as_u16();

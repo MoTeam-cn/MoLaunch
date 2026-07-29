@@ -9,15 +9,12 @@ use std::sync::OnceLock;
 ///
 /// 识别并替换以下模式：
 /// 1. JWT 格式 token：`eyJxxx.yyy.zzz`（三段，点分隔）
-/// 2. Minecraft access_token：通常以 "eyJ" 开头的长字符串
-/// 3. 长度 >= 40 的 hex/base64 字符串（可能是 token）
-/// 4. JSON 中的 token 字段：`"access_token":"xxx"` / `"accessToken":"xxx"`
+/// 2. JSON 中的 token 字段：`"access_token":"xxx"` / `"accessToken":"xxx"`
 ///
-/// 保留短字符串和普通日志内容，只替换明显的 token 特征。
+/// 保留短字符串、URL、hash 等普通日志内容，只替换明确的 token 特征。
 pub fn sanitize_sensitive_info(s: &str) -> String {
     static JWT_RE: OnceLock<Regex> = OnceLock::new();
     static JSON_TOKEN_RE: OnceLock<Regex> = OnceLock::new();
-    static LONG_TOKEN_RE: OnceLock<Regex> = OnceLock::new();
 
     let jwt_re = JWT_RE.get_or_init(|| {
         // JWT 格式：eyJ 开头，三段点分隔，每段至少 10 字符
@@ -31,13 +28,6 @@ pub fn sanitize_sensitive_info(s: &str) -> String {
         ).unwrap()
     });
 
-    let long_token_re = LONG_TOKEN_RE.get_or_init(|| {
-        // 长度 >= 40 的连续 base64/hex 字符串（可能是 token）
-        // 字符集不含 `/`，避免把 URL 路径（如 net/data/xxx/versions/yyy/name）整体误判为 token
-        // JWT 和 url-safe base64 token 不含 `/`，不受影响
-        Regex::new(r"\b[A-Za-z0-9+=_-]{40,}\b").unwrap()
-    });
-
     let mut result = s.to_string();
 
     // 1. 替换 JWT 格式 token
@@ -47,9 +37,6 @@ pub fn sanitize_sensitive_info(s: &str) -> String {
     result = json_token_re
         .replace_all(&result, r#""$1":"***""#)
         .to_string();
-
-    // 3. 替换超长 token 字符串（最后执行，避免误伤已脱敏的 ***）
-    result = long_token_re.replace_all(&result, "***").to_string();
 
     result
 }
@@ -84,18 +71,18 @@ mod tests {
     }
 
     #[test]
-    fn test_sanitize_long_token() {
-        let input = "Token: abc123def456ghi789jkl012mno345pqr678stu901vwx234yz";
-        let result = sanitize_sensitive_info(input);
-        assert!(result.contains("***"));
-        assert!(!result.contains("abc123def456ghi789"));
-    }
-
-    #[test]
     fn test_sanitize_preserves_urls() {
-        // URL 路径含 `/`，不应被 long_token_re 误判为 token
+        // URL 路径含 `/`，不应被误判为 token
         let input = "https://cdn-modrinth.mocdn.net/data/l9m9tuPN/versions/M8j2mfGj/physics-mod-3.0.14-mc-1.20.1-forge.jar";
         let result = sanitize_sensitive_info(input);
         assert_eq!(input, result, "URL should not be sanitized");
+    }
+
+    #[test]
+    fn test_sanitize_preserves_texture_url_with_hex_hash() {
+        // Minecraft 材质 URL 末尾是 64 字符 hex hash，不应被脱敏
+        let input = "https://textures.minecraft.net/texture/a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
+        let result = sanitize_sensitive_info(input);
+        assert_eq!(input, result, "texture URL hash should not be sanitized");
     }
 }

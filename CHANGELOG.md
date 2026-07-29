@@ -9,6 +9,40 @@
 
 ### 变更
 
+#### API 服务端地址切换检测（device.json 凭证一致性）
+
+- 背景：用户在设置页切换 `api_server_url` 后，`device.json` 中的旧凭证（device_pk / refresh_token / 密钥对）对新域名无效，但此前未检测这种不一致，导致请求发到新域名时 401 或 ECDH 派生失败
+- 改动：
+  - **`src-tauri/src/minecraft/online/storage.rs`**：`DeviceCredentials` 新增 `api_server_url: String` 字段（`#[serde(default)]` 向后兼容旧凭证），`to_storage_json()` 同步写入该字段
+  - **`src-tauri/src/utils/online_manager.rs`**：
+    - `auth_init`：加载凭证后检查 `creds.api_server_url != api_url`，不一致则丢弃旧凭证走重新注册流程，注册成功后 `new_creds.api_server_url = api_url.clone()` 再 save
+    - `refresh_credentials` / `login_fresh`：save 前若 `api_server_url` 为空（旧版凭证）补上当前服务端地址
+    - `load_creds_with_auto_refresh`：加一致性检查，不一致时返回错误引导前端重新 `initAuth`
+
+#### 设备凭证文件权限加固
+
+- **`src-tauri/src/minecraft/online/storage.rs`**：`save()` 函数写入文件后，Unix 下显式 `set_permissions(0o600)`，防止其他用户读取私钥 / token
+
+#### 日志脱敏误伤 URL hash 修复
+
+- 背景：`sanitize_sensitive_info()` 中的 `LONG_TOKEN_RE`（`\b[A-Za-z0-9+=_-]{40,}\b`）会把 URL 末尾的 64 字符 hex hash 误判为 token 并替换为 `***`，导致 `[ImageCache] 已缓存: https://textures.minecraft.net/texture/***` 这样的日志无法用于排查
+- 改动：**`src-tauri/src/logger/sanitize.rs`** 移除 `LONG_TOKEN_RE` 整条规则（static 定义 + 初始化 + 调用 + 测试用例），只保留 JWT 格式检测和 JSON token 字段检测两条规则。新增 `test_sanitize_preserves_texture_url_with_hex_hash` 测试用例防止回退
+- 验证：`cargo test --lib sanitize` 6 个测试全部通过
+
+#### refresh 接口请求格式升级为 MoSign-v1 协议
+
+- 背景：api-server 的 `/v3/auth/refresh` 原请求体仅 `{ "refresh_token": "xxx" }` 明文 JSON，且路由公开无认证门槛——攻击者只要拿到 refresh_token（30 天有效期）即可直接换 access token，无身份绑定、无时间戳防重放、无签名校验。改为与 `/v3/auth/login` 完全一致的 MoSign-v1 协议结构，refresh_token 放在 AES-256-GCM 加密的 content 内
+- 改动：
+  - **`src-tauri/src/minecraft/online/auth.rs`**：
+    - `RefreshRequest` 改为 `{device_pk, v, nonce, signature, content, timestamp}`（与 `LoginRequest` 同结构）
+    - 新增 `RefreshPayload<'a>`（content 加密前的明文 JSON）：`{device_pk, timestamp, nonce, refresh_token}`
+    - 新增 `pub fn build_refresh_request(creds: &DeviceCredentials) -> Result<RefreshRequest, CryptoError>`，复用 `build_login_request` 的 8 步 ECDH+AES+HMAC 流程，仅 payload 多 `refresh_token` 字段
+  - **`src-tauri/src/minecraft/online/client.rs`**：`refresh` 方法签名由 `refresh(&self, refresh_token: &str)` 改为 `refresh(&self, req: &RefreshRequest)`，请求体直接 `.json(req)` 发送
+  - **`src-tauri/src/utils/online_manager.rs`**：`refresh_credentials` 函数改为先 `build_refresh_request(&creds)?` 构造请求，再 `client.refresh(&req).await?`；同步导入 `build_refresh_request`
+- 复用：完全复用 `build_login_request` 的 ECDH 派生 + HKDF + AES-256-GCM + HMAC-SHA256 流程与 `crypto.rs` 原语；`DeviceCredentials` 已含 ECDH 所需全部字段（`x25519_secret_b64u` / `device_public_key_b64u` / `device_pk` / `refresh_token`），无需改 `storage.rs`
+- 兼容性：**破坏性变更**，旧 api-server（明文 refresh_token）与新客户端不兼容；新 api-server 与旧客户端不兼容。必须服务端+客户端同步升级
+- 验证：`cargo check --lib` 通过；前端 `auth_refresh` action 不接收前端参数，对前端完全透明无需改动
+
 #### 联机页面云端连接失败降级处理
 
 - 背景：程序启动时静默初始化云端认证（`initAuth`），失败后需自动禁用所有联机功能。此前仅 `TopNavLayout` 和 `SettingsOnline` 消费了 `cloudConnected` 状态，联机主页及子组件未做降级，用户可通过 URL 直接访问 `/apps/online` 绕过顶部导航禁用。

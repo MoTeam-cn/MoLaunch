@@ -18,9 +18,9 @@ use crate::log_warn;
 use crate::log_error;
 use crate::log_debug;
 use crate::minecraft::online::auth::{
-    build_login_request, build_register_request, finalize_credentials_with_login,
-    finalize_credentials_with_refresh, finalize_credentials_with_register, generate_device_id,
-    OnlineKeyPair,
+    build_login_request, build_refresh_request, build_register_request,
+    finalize_credentials_with_login, finalize_credentials_with_refresh,
+    finalize_credentials_with_register, generate_device_id, OnlineKeyPair,
 };
 use crate::minecraft::online::client::OnlineClient;
 use crate::minecraft::online::storage::{DeviceCredentials, OnlineStorage};
@@ -122,7 +122,11 @@ async fn refresh_credentials(
     }
 
     let client = make_client(state).await;
-    let resp = client.refresh(&creds.refresh_token).await.map_err(|e| {
+    let req = build_refresh_request(&creds).map_err(|e| {
+        log_error!("[Online] 构造 refresh 请求失败: {}", e);
+        format!("构造 refresh 请求失败: {}", e)
+    })?;
+    let resp = client.refresh(&req).await.map_err(|e| {
         log_error!("[Online] refresh 请求失败: {}", e);
         format!("refresh 请求失败: {}", e)
     })?;
@@ -131,7 +135,11 @@ async fn refresh_credentials(
         format!("refresh 失败: {}", resp.msg)
     })?;
 
-    let updated = finalize_credentials_with_refresh(creds, &data);
+    let mut updated = finalize_credentials_with_refresh(creds, &data);
+    // 确保旧版凭证（无 api_server_url 字段）在 refresh 后也补上当前服务端地址
+    if updated.api_server_url.is_empty() {
+        updated.api_server_url = read_api_server_url(state).await;
+    }
     let storage = make_storage(state);
     storage.save(&updated).await.map_err(|e| {
         log_error!("[Online] 持久化 refresh 凭证失败: {}", e);
@@ -163,6 +171,14 @@ pub async fn load_creds_with_auto_refresh(
         .ok_or_else(|| "设备未注册，请先注册".to_string())?;
     if !creds.is_registered() {
         return Err("设备未注册，请先注册".to_string());
+    }
+    // 检查 api_server_url 一致性：切换服务端地址后旧凭证对新域名无效
+    let api_url = read_api_server_url(state).await;
+    if !creds.api_server_url.is_empty() && creds.api_server_url != api_url {
+        return Err(format!(
+            "API 服务端地址已切换 ({} → {})，请重新初始化联机",
+            creds.api_server_url, api_url
+        ));
     }
     if !creds.is_token_expired() {
         return Ok(creds);
@@ -203,7 +219,11 @@ async fn login_fresh(state: &AppState) -> Result<DeviceCredentials, String> {
         format!("登录失败: {}", resp.msg)
     })?;
 
-    let updated = finalize_credentials_with_login(creds, &data);
+    let mut updated = finalize_credentials_with_login(creds, &data);
+    // 确保旧版凭证（无 api_server_url 字段）在 login 后也补上当前服务端地址
+    if updated.api_server_url.is_empty() {
+        updated.api_server_url = read_api_server_url(state).await;
+    }
     storage.save(&updated).await.map_err(|e| {
         log_error!("[Online] login_fresh: 持久化登录凭证失败: {}", e);
         e.to_string()
@@ -479,6 +499,19 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         // 加载本地凭证（None = 首次启动未注册）
         let existing = storage.load().await.unwrap_or(None);
 
+        // 检查凭证与服务端地址一致性：用户切换 api_server_url 后旧凭证对新域名无效
+        let existing = match existing {
+            Some(ref creds) if !creds.api_server_url.is_empty() && creds.api_server_url != api_url => {
+                log_warn!(
+                    "[Online] auth_init: 检测到 API 服务端地址切换 ({} → {})，旧凭证失效，重新注册",
+                    creds.api_server_url,
+                    api_url
+                );
+                None
+            }
+            other => other,
+        };
+
         let creds = match existing {
             None => {
                 // 首次启动：静默注册
@@ -508,6 +541,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
                 })?;
 
                 new_creds = finalize_credentials_with_register(new_creds, &data);
+                new_creds.api_server_url = api_url.clone();
                 storage.save(&new_creds).await.map_err(|e| {
                     log_error!("[Online] auth_init: 持久化设备凭证失败: {}", e);
                     e.to_string()

@@ -63,6 +63,9 @@ pub struct DeviceCredentials {
     pub device_id: String,
     /// 最后登录时间（Unix 秒）
     pub last_login_at: u64,
+    /// 签发此凭证的 API 服务端地址（用于检测 api_server_url 切换后旧凭证失效）
+    #[serde(default)]
+    pub api_server_url: String,
 }
 
 impl DeviceCredentials {
@@ -107,6 +110,7 @@ impl DeviceCredentials {
             "device_public_key_b64u": self.device_public_key_b64u,
             "device_id": self.device_id,
             "last_login_at": self.last_login_at,
+            "api_server_url": self.api_server_url,
         })
     }
 }
@@ -249,6 +253,15 @@ impl OnlineStorage {
         }
         std::fs::write(&new_path, &stored)
             .map_err(|e| format!("写入设备凭证失败: {}", e))?;
+
+        // Unix 下显式设置文件权限为 0o600（仅当前用户可读写），防止其他用户读取私钥/token
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if let Err(e) = std::fs::set_permissions(&new_path, std::fs::Permissions::from_mode(0o600)) {
+                log_warn!("[Online] 设置设备凭证文件权限 0o600 失败: {}", e);
+            }
+        }
 
         // 保存成功后清理旧路径文件（如有），避免下次启动重复迁移
         let legacy_path = Self::legacy_device_path();

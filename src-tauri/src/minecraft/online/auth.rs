@@ -86,10 +86,18 @@ pub struct LoginData {
     pub refresh_token: String,
 }
 
-/// refresh 请求体
+/// refresh 请求体（与 `LoginRequest` 完全一致的 MoSign-v1 协议结构）
+///
+/// `refresh_token` 放在加密的 content 内（即 `RefreshPayload`），明文不出现在请求体。
+/// 即使 refresh_token 泄露，攻击者无设备 X25519 私钥也无法构造合法请求。
 #[derive(Debug, Clone, Serialize)]
 pub struct RefreshRequest {
-    pub refresh_token: String,
+    pub device_pk: String,
+    pub v: &'static str,
+    pub nonce: String,
+    pub signature: String,
+    pub content: String,
+    pub timestamp: u64,
 }
 
 /// refresh 响应
@@ -132,6 +140,18 @@ struct LoginPayload<'a> {
     device_pk: &'a str,
     timestamp: u64,
     nonce: &'a str,
+}
+
+/// 刷新载荷（content 解密后的明文 JSON）
+///
+/// 与 `LoginPayload` 字段一致，额外携带 `refresh_token`。
+/// refresh_token 不在请求体明文中传输，仅出现在 AES-256-GCM 加密的 content 内。
+#[derive(Debug, Serialize)]
+struct RefreshPayload<'a> {
+    device_pk: &'a str,
+    timestamp: u64,
+    nonce: &'a str,
+    refresh_token: &'a str,
 }
 
 /// 注册请求体
@@ -363,6 +383,81 @@ pub fn finalize_credentials_with_login(
     };
     creds.last_login_at = now;
     creds
+}
+
+/// 构造刷新请求（与 `build_login_request` 一致的 MoSign-v1 协议流程，payload 多 refresh_token 字段）
+///
+/// 参数：
+/// - `creds`：已持久化的设备凭证（含 X25519 私钥、device_pk、device_public_key、refresh_token）
+pub fn build_refresh_request(
+    creds: &DeviceCredentials,
+) -> Result<RefreshRequest, CryptoError> {
+    // 1. 恢复本地 X25519 私钥
+    let secret_bytes_vec = b64u_decode(&creds.x25519_secret_b64u)?;
+    if secret_bytes_vec.len() != 32 {
+        return Err(CryptoError::InvalidKeyLength {
+            expected: 32,
+            actual: secret_bytes_vec.len(),
+        });
+    }
+    let mut secret_bytes = [0u8; 32];
+    secret_bytes.copy_from_slice(&secret_bytes_vec);
+    let our_x25519 = X25519StaticKeyPair::from_bytes(&secret_bytes);
+
+    // 2. 解析云端 X25519 公钥
+    let peer_public = super::crypto::x25519_public_from_b64u(&creds.device_public_key_b64u)?;
+
+    // 3. ECDH 派生共享密钥
+    let shared = our_x25519.diffie_hellman(&peer_public);
+
+    // 4. 生成 nonce + timestamp
+    let timestamp = now_timestamp();
+    let nonce = generate_nonce_b64u();
+    let nonce_bytes = b64u_decode(&nonce)?;
+
+    // 5. HKDF 派生 session_key
+    let session_key_bytes = hkdf_sha256(&shared, &nonce_bytes, SESSION_KEY_INFO, 32)?;
+    let mut session_key = [0u8; 32];
+    session_key.copy_from_slice(&session_key_bytes);
+
+    // 6. 构造 content 载荷（含 refresh_token，加密保护）
+    let payload = RefreshPayload {
+        device_pk: &creds.device_pk,
+        timestamp,
+        nonce: &nonce,
+        refresh_token: &creds.refresh_token,
+    };
+    let payload_json = serde_json::to_string(&payload)
+        .map_err(|e| CryptoError::PemParseFailed(format!("序列化刷新载荷失败: {}", e)))?;
+
+    crate::log_debug!(
+        "[Online] 刷新 content 载荷长度={}B, device_pk={}, nonce={}",
+        payload_json.len(),
+        creds.device_pk,
+        nonce
+    );
+
+    // 7. AES-256-GCM 加密 content
+    let encrypted_content = super::crypto::aes_gcm_encrypt(&session_key, payload_json.as_bytes())?;
+    let content_b64u = b64u_encode(&encrypted_content);
+
+    // 8. HMAC-SHA256 签名
+    let sign_material = format!("{}.{}.{}", payload_json, nonce, timestamp);
+    let mut hmac = Hmac::<Sha256>::new_from_slice(&session_key)
+        .map_err(|_| CryptoError::HkdfExpandFailed)?;
+    hmac.update(sign_material.as_bytes());
+    let signature_bytes = hmac.finalize().into_bytes();
+    let signature_b64u = b64u_encode(&signature_bytes);
+    crate::log_debug!("[Online] 刷新请求构造完成");
+
+    Ok(RefreshRequest {
+        device_pk: creds.device_pk.clone(),
+        v: PROTOCOL_VERSION,
+        nonce,
+        signature: signature_b64u,
+        content: content_b64u,
+        timestamp,
+    })
 }
 
 /// 用 refresh 响应更新设备凭证（仅续期 access token + 轮换 refresh_token）
