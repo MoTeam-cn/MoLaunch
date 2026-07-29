@@ -3,9 +3,11 @@
  * 下载管理页左侧统计面板
  * 所有统计数据通过 props 接收（父组件已 computed）
  */
+import { ref, watch } from 'vue'
 import { formatBytes, formatSpeed } from '@/utils/format'
+import Tooltip from '@/components/common/Tooltip.vue'
 
-defineProps<{
+const props = defineProps<{
   currentStageName: string
   percentage: number
   speed: number
@@ -13,6 +15,22 @@ defineProps<{
   bytesTotal: number
   filesRemaining: number
 }>()
+
+// 总大小变化时短暂高亮（CF API 部分文件无 fileLength，下载时通过 content_length 回填修正）
+const totalUpdating = ref(false)
+let updateTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  () => props.bytesTotal,
+  (newVal, oldVal) => {
+    if (newVal !== oldVal && newVal > 0) {
+      totalUpdating.value = true
+      if (updateTimer) clearTimeout(updateTimer)
+      updateTimer = setTimeout(() => {
+        totalUpdating.value = false
+      }, 600)
+    }
+  },
+)
 </script>
 
 <template>
@@ -55,9 +73,19 @@ defineProps<{
         <div class="text-sm font-medium text-gray-900">
           {{ formatBytes(bytesDownloaded) }}
         </div>
-        <div class="text-xs text-gray-400">
-          {{ bytesTotal > 0 ? formatBytes(bytesTotal) : '计算中...' }}
-        </div>
+        <Tooltip
+          v-if="bytesTotal > 0"
+          text="部分文件大小由下载时探测，总大小可能会逐步修正"
+          position="top"
+        >
+          <div
+            class="text-xs transition-colors duration-300"
+            :class="totalUpdating ? 'text-primary-500 font-medium' : 'text-gray-400'"
+          >
+            {{ formatBytes(bytesTotal) }}
+          </div>
+        </Tooltip>
+        <div v-else class="text-xs text-gray-400">计算中...</div>
       </div>
 
       <!-- 分割线 -->

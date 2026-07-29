@@ -84,7 +84,8 @@
 
 - **现象**：stage 2「下载 MOD」的 `bytes_total` 随下载进度缓慢增长（如 296MB → 325MB）
 - **原因**：CF API `/mods/files` 批量查询接口对部分文件不返回 `fileLength` 字段（`CfFileEntry.file_length` 带 `#[serde(default)]`，缺失时为 0），`download_batch` 初始化 `total_bytes = sum(expected_size)` 偏小。走单流路径时 `stream.rs` 通过 `content_length` 回填真实大小，`total_bytes` 持续累加
-- **结论**：这是 CF API 数据不完整导致的**正确行为**，非 bug。`stream.rs` 的回填是必要的修正——否则 `total_bytes` 会一直为 0（回到修复前的「计算中...」问题）。前端可后续优化：`bytesTotal` 变化时加 CSS transition 平滑过渡
+- **结论**：这是 CF API 数据不完整导致的**正确行为**，非 bug。`stream.rs` 的回填是必要的修正——否则 `total_bytes` 会一直为 0（回到修复前的「计算中...」问题）
+- **`src/views/downloads/DownloadStatsPanel.vue`**：总大小变化时短暂高亮（`text-primary-500` 600ms）+ Tooltip 提示「部分文件大小由下载时探测，总大小可能会逐步修正」，让用户理解总大小修正是正常行为
 
 #### WebSocket 鉴权（防止本机其他进程窃听下载进度）
 
