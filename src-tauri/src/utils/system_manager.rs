@@ -1,9 +1,9 @@
 //! 系统模块统一分发逻辑（system_manager 的工具实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，替代每个 action 一条 Tauri 命令。
-//! 18 个 system action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
+//! 20 个 system action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
 //!
-//! 命令清单（18 个，按子模块分组）：
+//! 命令清单（20 个，按子模块分组）：
 //! - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
 //!   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
 //! - config（2 个）：`get_config_path` / `save_config_to_file`
@@ -11,6 +11,7 @@
 //!   / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
 //! - about（1 个）：`get_about_data`
 //! - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
+//! - updater（2 个）：`check_update` / `download_and_install_update`
 //!
 //! 注意事项：
 //! - 子模块函数接收 `&AppState`（或不接收 state），handler 内调用时用 `&state` / 忽略 `_state`
@@ -38,6 +39,7 @@ use crate::commands::system::{
         get_game_dir, get_system_memory, open_game_dir, open_path, reveal_in_explorer,
         set_game_dir, write_text_file,
     },
+    updater,
 };
 use crate::handler;
 use crate::logger::{get_log_path, list_log_files, read_log_file};
@@ -174,6 +176,20 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             .map_err(|e| format!("参数解析失败: {}", e))?;
         let r = read_log_file(p.filename)?;
         serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    // === updater（2 个） ===
+    // Windows 便携版自实现 + macOS/Linux 转发官方 plugin
+    // See: docs/updater/design.md §4
+    d.register("check_update", handler!(_state, app, _params, {
+        let r = updater::check_update(&app).await?;
+        serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+    d.register("download_and_install_update", handler!(_state, app, params, {
+        let p: updater::UpdateInfo = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        updater::download_and_install(&app, p).await?;
+        Ok(serde_json::Value::Null)
     }));
 
     d

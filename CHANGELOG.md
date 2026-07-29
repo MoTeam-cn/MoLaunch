@@ -9,6 +9,107 @@
 
 ### 变更
 
+#### 联机页面云端连接失败降级处理
+
+- 背景：程序启动时静默初始化云端认证（`initAuth`），失败后需自动禁用所有联机功能。此前仅 `TopNavLayout` 和 `SettingsOnline` 消费了 `cloudConnected` 状态，联机主页及子组件未做降级，用户可通过 URL 直接访问 `/apps/online` 绕过顶部导航禁用。
+- 改动：
+  - **联机主页空状态遮罩**（[src/views/Online.vue](src/views/Online.vue)）：
+    - `cloudConnected=false && !isInRoom` 时显示整页空状态遮罩（CloudOffIcon + 错误信息 +「打开联机设置」按钮）
+    - `onMounted` 检查 `cloudConnected`，false 时跳过 `refreshStatus` / `detectNat` 避免无意义请求
+    - 已在房间时（`isInRoom=true`）不遮罩，保留 P2P 连接，云端 API 失败由 toast 兜底
+    - 覆盖所有子组件（LobbyBrowser / CreateRoomForm / RoomManager / OnlineDevicePanel），无需逐个降级
+  - **房主轮询定时器暂停**（[src/composables/useRoomHost.ts](src/composables/useRoomHost.ts)）：
+    - 提取 `startTimers()` / `stopTimers()` 函数，消除 `onMounted` / `onUnmounted` 中的重复 setInterval/clearInterval 逻辑
+    - 新增 `watch(store.cloudConnected)` 监听器：云端断开时 `stopTimers()` 暂停三路轮询（参与者 5s / Answer 5s / 保活 5min），恢复时 `startTimers()` 重启
+    - 避免云端断开后轮询持续失败刷屏（虽有 30s 防刷屏 toast，但仍浪费请求）
+- 复用：`Online.vue` 已有的 `goSettings()` 函数和 `Cog6ToothIcon` 图标；空状态样式遵循项目约定（icon + text 垂直水平居中）
+- 设计决策：
+  - 不在 `useWebRTC.fetchOfferAndAnswer` 中检查 `cloudConnected`，因为它是加入房间时的一次性调用（非持续轮询），且引入 store 耦合到底层 composable 不合适
+  - 不在 `LobbyBrowser` / `CreateRoomForm` / `RoomManager` / `OnlineDevicePanel` 中单独降级，因为 `Online.vue` 的页面级遮罩已覆盖未在房间的所有场景
+  - 已在房间时云端断开的边缘场景（关闭房间 / 踢人 / 退出房间等操作失败）由现有 toast 错误提示兜底
+
+#### updater.exe 实时构建机制（CI + build.rs 双保险）
+
+- 背景：updater.exe 是 Windows 便携版更新器的独立 Cargo 项目编译产物，之前以二进制文件形式内嵌在 `resources/updater/` 目录中。为避免二进制文件污染仓库历史、保证 CI 每次构建使用最新源码，改为实时构建机制。
+- 改动：
+  - **build.rs 自动构建**（[src-tauri/build_script/updater.rs](src-tauri/build_script/updater.rs)，新增）：
+    - 新增 `updater` 模块（`#[cfg(target_os = "windows")]`，非 Windows 平台编译期排除）
+    - 增量编译判断：检测 `updater/src/*.rs`、`updater/Cargo.toml`、`updater/build.rs` 是否比 `resources/updater/updater.exe` 新
+    - 源码变化或产物不存在时自动调用 `cargo build --release` 编译 updater 项目
+    - 编译产物从 `updater/target/release/molaunch_updater.exe` 复制到 `resources/updater/updater.exe`
+    - 为每个源文件声明 `cargo:rerun-if-changed`，确保内容修改触发 build.rs 重跑
+    - 复用 `cubiomes_wasm.rs` 的增量编译模式（`output()` 捕获 stdout/stderr 避免管道阻塞）
+  - **build.rs 注册**（[src-tauri/build.rs](src-tauri/build.rs)）：
+    - 在 `main()` 末尾添加 `#[cfg(target_os = "windows")] build_script::updater::build_updater()`
+  - **build_script/mod.rs**（[src-tauri/build_script/mod.rs](src-tauri/build_script/mod.rs)）：
+    - 新增 `#[cfg(target_os = "windows")] pub mod updater`
+  - **CI 工作流**（[.github/workflows/release.yml](.github/workflows/release.yml)）：
+    - Windows 平台在 `Build Tauri` 之前新增 `Build updater.exe (Windows only)` 步骤
+    - `Swatinem/rust-cache@v2` 新增 `src-tauri/updater` 工作空间，缓存 updater 编译产物加速 CI
+    - CI 显式构建可利用 rust-cache 加速且日志清晰，build.rs 作为本地开发双保险
+  - **.gitignore 排除规则**（[.gitignore](.gitignore)）：
+    - 新增 `src-tauri/resources/updater/updater.exe`（编译产物不入库）
+    - 新增 `src-tauri/updater/target/`（updater 独立项目编译产物）
+- 复用：增量编译判断逻辑参考 `cubiomes_wasm.rs` 的 `needs_recompile` 实现；`output()` 捕获模式参考 `cubiomes_wasm.rs` 的 emcc 调用
+- 验证：`git status` 确认 updater.exe 未被 git 跟踪；build.rs 编译逻辑通过 `cargo check` 验证
+
+#### 联机模块接入 refresh_token 双 token 机制 + 启动静默登录/注册
+
+- 背景：api-server 已完成 refresh_token 改造，`/v3/auth/register` 和 `/v3/auth/login` 响应新增 `refresh_token` 字段，新增 `/v3/auth/refresh` 接口（access_token 1h + refresh_token 30d）。客户端需对接双 token 机制，避免 access_token 过期后用户被强制重新登录，并在启动时静默完成注册/登录/续期，实现「无感联机」。
+- 改动：
+  - **DeviceCredentials 新增字段**（[src-tauri/src/minecraft/online/storage.rs](src-tauri/src/minecraft/online/storage.rs)）：
+    - 新增 `refresh_token: String` + `refresh_expires_at: u64`，均加 `#[serde(default)]` 兼容旧版凭证文件
+    - 新增 `is_refresh_token_expired()` 方法（容差 60 秒，`refresh_expires_at == 0` 视为已过期）
+    - `to_storage_json()` 纳入新字段，保持不派生 `Serialize` 的安全约束
+  - **响应类型新增 refresh_token**（[src-tauri/src/minecraft/online/auth.rs](src-tauri/src/minecraft/online/auth.rs)）：
+    - `RegisterData` / `LoginData` 新增 `refresh_token: String`（`#[serde(default)]` 兼容老服务端）
+    - 新增 `RefreshRequest` / `RefreshResponse` / `RefreshData` 结构
+    - 新增常量 `REFRESH_TOKEN_TTL_SECS = 30 * 24 * 3600`
+    - `finalize_credentials_with_register` / `finalize_credentials_with_login` 纳入 refresh_token + refresh_expires_at
+    - 新增 `finalize_credentials_with_refresh(creds, data)`：更新 access_token，服务端轮换 refresh_token 时替换本地
+  - **OnlineClient 新增 refresh 方法**（[src-tauri/src/minecraft/online/client.rs](src-tauri/src/minecraft/online/client.rs)）：
+    - `pub async fn refresh(&self, refresh_token: &str) -> Result<RefreshResponse, ClientError>`
+    - 调用 `POST /v3/auth/refresh`，无需 JWT/CSRF 头
+  - **online_manager 新增 2 个 action**（[src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs)）：
+    - `auth_refresh`：手动续期 access token（前端「刷新凭证」按钮或内部流程调用）
+    - `auth_init`：启动静默登录/注册决策树（无凭证→注册 / token 有效→直接返回 / token 过期+refresh 有效→续期 / 双 token 过期→重新登录）
+    - 新增 `AuthInitResult { status, error }` 返回结构
+    - 新增 `refresh_credentials` / `login_fresh` / `load_creds_with_auto_refresh` / `build_device_status` 辅助函数，消除各 action 重复构造逻辑
+  - **信令 action 自动续期**（[src-tauri/src/utils/signaling_manager.rs](src-tauri/src/utils/signaling_manager.rs)）：
+    - `load_creds` 复用 `online_manager::load_creds_with_auto_refresh`，access token 过期时自动 refresh，无需各信令 action 单独处理
+    - 移除不再使用的 `OnlineStorage` 导入
+- 复用：`refresh_credentials` 被 `auth_refresh` / `auth_init` / `load_creds_with_auto_refresh` 三处共用；`login_fresh` 封装 ECDH 登录流程供 `auth_init` 降级使用；`build_device_status` 消除 4 处 DeviceStatus 内联构造
+- 安全：保持 MoSign-v1 签名验证逻辑不变；保持 DeviceCredentials 不派生 Serialize；保持存储加密机制不变；新字段 `#[serde(default)]` 兼容旧版凭证文件
+- 验证：`cargo check` 通过（零错误零警告）
+
+#### Windows 便携版自更新机制（方案 B 落地：updater.exe 子进程替换）
+
+- 背景：Windows 便携版（单 exe 直接运行）与 Tauri 官方 updater plugin 不兼容（官方 plugin Windows 端必须依赖 NSIS installer）。为支持便携版自更新，采用平台分流：Windows 自实现 updater.exe 子进程替换，macOS/Linux 保留官方 plugin。
+- 设计文档：[docs/updater/design.md](docs/updater/design.md) §2.3 混合方案
+- 改动：
+  - **updater.exe 独立 Cargo 项目**（[src-tauri/updater/](src-tauri/updater/)，新增）：
+    - 依赖 std + windows crate + ed25519-dalek + base64 + sha2，体积 370KB
+    - 模块化拆分：`main.rs`（入口编排）/ `args.rs`（参数解析）/ `platform.rs`（Windows API）/ `verify.rs`（签名校验）/ `log.rs`（日志）
+    - 接收 `--old-exe` / `--new-exe` / `--pid` / `--signature` 四个参数
+    - 等待主进程退出（OpenProcess + WaitForSingleObject，30s 超时）
+    - **minisign 签名校验**：硬编码 Ed25519 公钥（来自 `tauri.conf.json` 的 `plugins.updater.pubkey`），用 ed25519-dalek 验证新 exe 的 SHA-512 prehash 签名，防止篡改
+    - 替换 exe（MoveFileExW + MOVEFILE_REPLACE_EXISTING，失败回退备份方案）
+    - 启动新 exe 后自身退出
+    - **winres 嵌入版本信息**：`build.rs` 使用 winres crate 嵌入 FileDescription / ProductName / LegalCopyright + 图标，exe 详细信息不再为空
+    - **README.md**：替代代码注释，记录功能、参数、退出码、模块结构、安全设计
+  - **资源注册**（[src-tauri/src/resources.rs](src-tauri/src/resources.rs)）：
+    - `embedded_bytes` 新增 `#[cfg(target_os = "windows")] "updater/updater.exe"` 分支
+    - 新增 `extract_updater()` 函数，释放到 `%APPDATA%/.Molaunch/updater/updater.exe`（复用 sha256 校验机制）
+  - **统一更新命令**（[src-tauri/src/commands/system/updater.rs](src-tauri/src/commands/system/updater.rs)，新增）：
+    - `check_update`：所有平台复用 `tauri-plugin-updater` 的 check() 获取 manifest，提取 force_update / url / signature 扩展字段
+    - `download_and_install`：Windows 自实现（下载 exe → 释放 updater.exe → 启动子进程并传递 `--signature` → 退出主程序），macOS/Linux 转发官方 plugin
+    - 在 `system_manager` 注册 2 个 action（`check_update` / `download_and_install_update`）
+  - **前端改造**（[src/utils/updater.ts](src/utils/updater.ts)）：
+    - 从直接调用 `@tauri-apps/plugin-updater` 改为调用 `systemManager('check_update')` / `systemManager('download_and_install_update', updateInfo)`
+    - 前端不关心平台差异，后端根据 `cfg!(target_os = "windows")` 分流
+    - `UpdateDialog.vue` 无需改动（接口未变）
+  - **system-manager API**（[src/utils/api/system-manager.ts](src/utils/api/system-manager.ts)）：`SYSTEM_ACTIONS` 新增 `CHECK_UPDATE` / `DOWNLOAD_AND_INSTALL_UPDATE`
+
 #### 客户端自动更新能力落地（方案 B 第二阶段：客户端集成）
 - 背景：服务端更新服务（api-server `/v1/updates/*` + S3 presigned URL）与 CI/CD 流水线（`.github/workflows/release.yml`）已就绪，客户端需接入 Tauri 官方 updater plugin 完成端到端自动更新闭环
 - 设计文档：[docs/updater/design.md](docs/updater/design.md) §4 客户端实现

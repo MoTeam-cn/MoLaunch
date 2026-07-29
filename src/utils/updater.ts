@@ -1,19 +1,24 @@
 /**
  * 客户端自动更新工具（module-level 单例）
  *
- * 设计参考：`utils/modal.ts` / `utils/toast.ts` 的 module-level 单例模式。
+ * 调用后端 `system_manager` 的 `check_update` / `download_and_install_update` action，
+ * 后端根据平台内部分流：
+ * - **Windows 便携版**：自实现下载 + 启动 updater.exe 子进程替换 exe
+ * - **macOS / Linux**：转发到 `tauri-plugin-updater` 官方 plugin
+ *
+ * 前端不关心平台差异，统一调用 `systemManager`。
+ *
  * - 状态用 `reactive` 暴露，组件可直接 watch
  * - `checkForUpdate` / `downloadAndInstall` / `closeDialog` 为纯函数，可在任意位置调用
  * - `initAutoCheck` 在 App.vue 启动时调用一次，注册启动 5s + 每 6h 定时检查
  *
  * 配套组件：`src/components/about/UpdateDialog.vue`
  *
- * See: docs/updater/design.md §4.2
+ * See: docs/updater/design.md §4
  */
 
 import { reactive } from 'vue'
-import { check, type Update, type DownloadEvent } from '@tauri-apps/plugin-updater'
-import { relaunch } from '@tauri-apps/plugin-process'
+import { systemManager, SYSTEM_ACTIONS } from '@/utils/api/system-manager'
 import { toastInfo, toastError } from '@/utils/toast'
 
 export type UpdateStatus =
@@ -26,6 +31,16 @@ export type UpdateStatus =
   | 'done'
   | 'error'
 
+/** 后端返回的更新信息（与 Rust `UpdateInfo` 结构对应） */
+interface UpdateInfo {
+  available: boolean
+  version: string
+  notes: string
+  forceUpdate: boolean
+  downloadUrl: string
+  signature: string
+}
+
 export interface UpdateState {
   /** 当前状态 */
   status: UpdateStatus
@@ -35,9 +50,9 @@ export interface UpdateState {
   notes: string
   /** 是否强制更新（来自 manifest 扩展字段） */
   forceUpdate: boolean
-  /** 已下载字节数 */
+  /** 已下载字节数（当前版本不报告精确进度，保持 0） */
   downloaded: number
-  /** 总字节数 */
+  /** 总字节数（当前版本不报告精确进度，保持 0） */
   total: number
   /** 错误信息 */
   error: string
@@ -57,8 +72,8 @@ export const updateState = reactive<UpdateState>({
   showDialog: false,
 })
 
-/** 当前待安装的 Update 对象（checkForUpdate 后缓存，downloadAndInstall 使用） */
-let pendingUpdate: Update | null = null
+/** 当前待安装的更新信息（checkForUpdate 后缓存，downloadAndInstall 使用） */
+let pendingUpdate: UpdateInfo | null = null
 
 /** 防止并发检查 */
 let checking = false
@@ -85,21 +100,18 @@ export async function checkForUpdate(opts: { silent?: boolean } = {}): Promise<v
   }
 
   try {
-    const update = await check()
-    if (update?.available) {
-      // 读取 rawJson 中的 force_update 扩展字段（api-server 下发，Tauri plugin 会忽略未知字段）
-      // Update.rawJson 是 manifest 接口返回的原始 JSON，包含 MoLaunch 扩展的 force_update 字段
-      const forceUpdate = update.rawJson?.force_update === true
+    const info = await systemManager<UpdateInfo>(SYSTEM_ACTIONS.CHECK_UPDATE)
 
+    if (info?.available) {
       updateState.status = 'available'
-      updateState.version = update.version
-      updateState.notes = update.body ?? ''
-      updateState.forceUpdate = forceUpdate
+      updateState.version = info.version
+      updateState.notes = info.notes ?? ''
+      updateState.forceUpdate = info.forceUpdate === true
       updateState.downloaded = 0
       updateState.total = 0
       updateState.error = ''
       updateState.showDialog = true
-      pendingUpdate = update
+      pendingUpdate = info
     } else {
       updateState.status = 'no-update'
       updateState.showDialog = false
@@ -124,7 +136,12 @@ export async function checkForUpdate(opts: { silent?: boolean } = {}): Promise<v
  * 下载并安装更新
  *
  * 调用前提：updateState.status === 'available'（即 checkForUpdate 已发现更新）。
- * 流程：下载（带进度回调）→ 安装（plugin 内部替换文件）→ relaunch 重启主进程。
+ * 后端行为：
+ * - Windows：下载新 exe → 启动 updater.exe → 主程序退出 → updater 替换 exe → 启动新版
+ * - macOS/Linux：转发官方 plugin → 下载/验签/替换 → relaunch
+ *
+ * 注意：后端调用成功返回后主程序会立即退出，前端不会收到响应。
+ * 如果收到错误响应，说明下载或启动失败。
  */
 export async function downloadAndInstall(): Promise<void> {
   if (installing) return
@@ -140,18 +157,10 @@ export async function downloadAndInstall(): Promise<void> {
   updateState.error = ''
 
   try {
-    await pendingUpdate.downloadAndInstall((event: DownloadEvent) => {
-      if (event.event === 'Started' && event.data.contentLength) {
-        updateState.total = event.data.contentLength
-      } else if (event.event === 'Progress' && event.data.chunkLength) {
-        updateState.downloaded += event.data.chunkLength
-      }
-    })
+    // 后端调用成功后主程序会退出，不会执行到这里
+    await systemManager(SYSTEM_ACTIONS.DOWNLOAD_AND_INSTALL_UPDATE, pendingUpdate)
 
     updateState.status = 'installing'
-    // 文件替换已完成，重启主进程加载新版
-    await relaunch()
-    // relaunch 后进程退出，以下代码不会执行
     updateState.status = 'done'
   } catch (e) {
     updateState.status = 'error'

@@ -17,7 +17,8 @@ import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
 import { useSettingsStore } from '@/stores/settings'
-import { setModalRef } from '@/utils/modal'
+import { useOnlineStore } from '@/stores/online'
+import { setModalRef, showError } from '@/utils/modal'
 import { setCrashDialogRef } from '@/utils/crashDialog'
 import { setToastRef } from '@/utils/toast'
 import { initAutoCheck } from '@/utils/updater'
@@ -28,6 +29,7 @@ const sdkStore = useSdkStore()
 const authStore = useAuthStore()
 const javaStore = useJavaStore()
 const settingsStore = useSettingsStore()
+const onlineStore = useOnlineStore()
 const modalRef = ref<InstanceType<typeof Modal> | null>(null)
 const crashDialogRef = ref<InstanceType<typeof CrashDialog> | null>(null)
 const toastRef = ref<InstanceType<typeof Toast> | null>(null)
@@ -73,6 +75,20 @@ async function initApp() {
 
   // 登录态已恢复，关闭加载遮罩
   isRestoring.value = false
+
+  // 联机云端初始化（静默注册/登录/刷新 token）
+  // 失败不阻塞主流程，仅弹窗提示并禁用联机功能
+  console.log('[Startup][Frontend] awaiting onlineStore.initAuth...')
+  const cloudOk = await onlineStore.initAuth()
+  console.log('[Startup][Frontend] initAuth done, cloudConnected =', cloudOk)
+  if (!cloudOk) {
+    // 云端连接失败，弹窗提示用户（联机按钮将自动禁用）
+    showError(
+      '云端连接失败',
+      '与云端 API 连接失败，联机功能可能不可用。',
+      `原因：${onlineStore.cloudError || '未知错误'}\n可在「设置 → 联机」页尝试重新连接。`,
+    )
+  }
 
   // 会话恢复后修正路由：
   // - 已登录但停在 /login → 跳首页

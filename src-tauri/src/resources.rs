@@ -103,6 +103,13 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/x86/wintun.dll")),
         #[cfg(all(target_os = "windows", target_arch = "arm"))]
         "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/arm/wintun.dll")),
+        // updater.exe（Windows 便携版更新器，独立子进程）
+        // 来源：src-tauri/updater/ 独立 Cargo 项目构建产物
+        // 运行时由 `extract_updater` 释放到 %APPDATA%/.Molaunch/updater/updater.exe
+        // 作用：主程序退出后替换 exe 文件，绕过 Windows 文件锁
+        // See: docs/updater/design.md §4 Windows 便携版 updater
+        #[cfg(target_os = "windows")]
+        "updater/updater.exe" => Some(include_bytes!("../resources/updater/updater.exe")),
         _ => None,
     }
 }
@@ -220,6 +227,42 @@ pub fn extract_sdk() -> anyhow::Result<std::path::PathBuf> {
     let target_path = crate::utils::cache_temp::sdk_library_path(sdk_filename);
 
     extract_resource(&resource_path, &target_path)?;
+
+    Ok(target_path)
+}
+
+/// 释放 updater.exe 到 AppData 全局目录（Windows 专属）
+///
+/// updater.exe 是便携版更新器，由 `src-tauri/updater/` 独立 Cargo 项目构建，
+/// 编译时通过 `include_bytes!` 嵌入主程序，运行时释放到 AppData 供更新流程调用。
+///
+/// # 释放路径
+///
+/// - **Windows**：`%APPDATA%/.Molaunch/updater/updater.exe`
+/// - **非 Windows**：本函数不存在（`#[cfg(target_os = "windows")]` 编译期排除）
+///
+/// # 释放策略
+///
+/// 复用 `extract_resource` 的 sha256 校验机制：
+/// - 首次释放：写入 updater.exe + sha256 校验文件
+/// - 后续启动：hash 一致 → 跳过写盘；hash 不一致（主程序更新后嵌入的 updater 变了）→ 覆盖释放
+///
+/// # 调用方
+///
+/// `commands::system::updater::download_and_install` 在启动 updater.exe 子进程前调用，
+/// 拿到释放后的绝对路径后传给 `std::process::Command::new`。
+///
+/// See: docs/updater/design.md §4 Windows 便携版 updater
+#[cfg(target_os = "windows")]
+pub fn extract_updater() -> anyhow::Result<std::path::PathBuf> {
+    let appdata = std::env::var("APPDATA")
+        .map_err(|_| anyhow::anyhow!("APPDATA environment variable not set"))?;
+    let target_path = std::path::PathBuf::from(appdata)
+        .join(".Molaunch")
+        .join("updater")
+        .join("updater.exe");
+
+    extract_resource("updater/updater.exe", &target_path)?;
 
     Ok(target_path)
 }

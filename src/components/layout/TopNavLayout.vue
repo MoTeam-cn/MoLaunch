@@ -15,7 +15,9 @@ import {
 } from '@heroicons/vue/24/outline'
 import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
+import { useOnlineStore } from '@/stores/online'
 const appWindow = getCurrentWebviewWindow()
+const onlineStore = useOnlineStore()
 
 const router = useRouter()
 const route = useRoute()
@@ -39,7 +41,7 @@ onUnmounted(() => {
 const navItems = [
   { name: '首页', path: '/apps', icon: HomeIcon },
   { name: '下载', path: '/apps/versions', icon: CubeIcon, hasDblClick: true },
-  { name: '联机', path: '/apps/online', icon: UserGroupIcon },
+  { name: '联机', path: '/apps/online', icon: UserGroupIcon, cloudDependent: true },
   { name: '工具', path: '/apps/tools', icon: WrenchScrewdriverIcon },
   { name: '设置', path: '/apps/settings', icon: Cog6ToothIcon },
 ]
@@ -103,7 +105,11 @@ async function handleClose() {
           <button
             v-for="item in navItems"
             :key="item.path"
-            class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
+            :disabled="item.cloudDependent && !onlineStore.cloudConnected"
+            :title="item.cloudDependent && !onlineStore.cloudConnected
+              ? '云端连接失败，联机功能暂不可用（可在设置中重试）'
+              : ''"
+            class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
             :class="[
               isActive(item.path)
                 || (item.hasDblClick && isActive('/apps/downloads'))
@@ -111,7 +117,9 @@ async function handleClose() {
                 ? 'bg-white/20 text-white'
                 : 'text-white/70 hover:bg-white/10 hover:text-white'
             ]"
-            @click="item.hasDblClick ? handleDownloadClick() : navigateTo(item.path)"
+            @click="item.cloudDependent && !onlineStore.cloudConnected
+              ? null
+              : (item.hasDblClick ? handleDownloadClick() : navigateTo(item.path))"
           >
             <component :is="item.icon" class="w-4 h-4 mr-1.5" />
             {{ item.name }}

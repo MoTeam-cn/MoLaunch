@@ -21,7 +21,6 @@ use crate::minecraft::online::signaling::IceServerEntry;
 use crate::minecraft::online::signaling::LobbyListQuery;
 use crate::minecraft::online::signaling::ModpackMeta;
 use crate::minecraft::online::signaling::UploadParticipantOfferRequest;
-use crate::minecraft::online::storage::OnlineStorage;
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 
@@ -226,20 +225,11 @@ pub struct LobbyListParams {
 // ============================================================
 
 /// 加载设备凭证（需已注册）
+///
+/// 若 access token 已过期，自动调用 refresh_token 续期；refresh_token 也过期时返回错误。
+/// 复用 `online_manager::load_creds_with_auto_refresh`，避免信令 action 各自处理续期逻辑。
 async fn load_creds(state: &AppState) -> Result<crate::minecraft::online::storage::DeviceCredentials, String> {
-    let storage = OnlineStorage::new(state.sdk.clone());
-    let creds = storage
-        .load()
-        .await
-        .map_err(|e| e.to_string())?
-        .ok_or_else(|| "设备未注册，请先注册".to_string())?;
-    if !creds.is_registered() {
-        return Err("设备未注册，请先注册".to_string());
-    }
-    if creds.is_token_expired() {
-        return Err("JWT 已过期，请重新登录".to_string());
-    }
-    Ok(creds)
+    crate::utils::online_manager::load_creds_with_auto_refresh(state).await
 }
 
 /// 创建 OnlineClient

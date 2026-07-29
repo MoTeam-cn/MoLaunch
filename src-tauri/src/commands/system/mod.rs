@@ -7,6 +7,7 @@ pub mod developer;
 mod game;
 pub mod game_dir;
 mod proxy;
+pub mod updater;
 
 pub use about::*;
 pub use apply_config::*;
@@ -44,14 +45,15 @@ where
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
 /// `crate::utils::system_manager::dispatch` 进行 action 分发。
 ///
-/// 注册的 action（17 个）：
-/// - game_dir（6 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
-///   / `get_game_dir` / `write_text_file` / `get_system_memory`
+/// 注册的 action（20 个）：
+/// - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
+///   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
 /// - config（2 个）：`get_config_path` / `save_config_to_file`
 /// - developer（5 个）：`is_developer_unlocked` / `unlock_developer_mode`
 ///   / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
 /// - about（1 个）：`get_about_data`
 /// - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
+/// - updater（2 个）：`check_update` / `download_and_install_update`
 #[tauri::command]
 pub async fn system_manager(
     state: State<'_, AppState>,

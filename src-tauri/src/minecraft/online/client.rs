@@ -9,7 +9,7 @@
 //! 类型与错误定义见 `client_types.rs`，本文件通过 `pub use` 重导出，
 //! 外部模块（如 `signaling.rs`）的 `use super::client::{BusinessResult, ClientError, OnlineClient}` 无需改动。
 
-use super::auth::{LoginRequest, LoginResponse, RegisterRequest, RegisterResponse};
+use super::auth::{LoginRequest, LoginResponse, RefreshRequest, RefreshResponse, RegisterRequest, RegisterResponse};
 use super::client_types::{CsrfResponse, JwkKey, JwksResponse, TimeData, TimeResponse, UnifiedResponse};
 use super::ecies::{is_envelope, open, seal, Envelope};
 use super::storage::DeviceCredentials;
@@ -267,6 +267,52 @@ impl OnlineClient {
             return Err(ClientError::HttpStatus { status, body });
         }
         Ok(())
+    }
+
+    /// 续期 access token（POST /v3/auth/refresh）
+    ///
+    /// 该接口无需 JWT/CSRF 头，仅凭 refresh_token 即可换取新的 access_token + refresh_token。
+    /// 服务端会轮换 refresh_token（旧 refresh_token 用后失效）。
+    pub async fn refresh(&self, refresh_token: &str) -> Result<RefreshResponse, ClientError> {
+        let url = format!("{}/v3/auth/refresh", self.base_url);
+        crate::log_info!("[Online] POST {} (refresh_token_len={})", url, refresh_token.len());
+        let req = RefreshRequest {
+            refresh_token: refresh_token.to_string(),
+        };
+        let resp = get_client()
+            .post(&url)
+            .header("Content-Type", "application/json")
+            .json(&req)
+            .send()
+            .await?;
+        let status = resp.status().as_u16();
+        let body = resp.text().await?;
+        crate::log_info!(
+            "[Online] /v3/auth/refresh 响应 status={}, body_len={}",
+            status,
+            body.len()
+        );
+        if status != 200 && status != 400 && status != 401 {
+            crate::log_error!(
+                "[Online] refresh HTTP 异常: status={}, body={}",
+                status,
+                body
+            );
+            return Err(ClientError::HttpStatus { status, body });
+        }
+        let parsed: RefreshResponse = serde_json::from_str(&body)?;
+        if parsed.code != 1 {
+            crate::log_warn!(
+                "[Online] refresh 业务失败: code={}, msg={}",
+                parsed.code,
+                parsed.msg
+            );
+            return Err(ClientError::Business {
+                code: parsed.code,
+                msg: parsed.msg,
+            });
+        }
+        Ok(parsed)
     }
 
     // ============================== /v1 业务接口 ==============================

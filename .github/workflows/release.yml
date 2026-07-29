@@ -70,7 +70,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
         with:
-          workspaces: src-tauri
+          workspaces: |
+            src-tauri
+            src-tauri/updater
 
       - name: Update version
         shell: bash
@@ -92,6 +94,23 @@ jobs:
           else
             sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
           fi
+
+      # ===== Windows 便携版 updater.exe 预构建 =====
+      # updater 是独立 Cargo 项目，主程序通过 include_bytes! 嵌入其编译产物。
+      # 必须在 Build Tauri 之前完成，因为主程序编译时 build.rs 的 include_bytes! 需要该文件。
+      # （build.rs 也有自动构建逻辑作为本地开发双保险，CI 显式构建可利用 rust-cache 加速）
+      - name: Build updater.exe (Windows only)
+        if: matrix.platform == 'windows'
+        shell: bash
+        run: |
+          echo "[CI] Building updater.exe..."
+          cd src-tauri/updater
+          cargo build --release
+          cd ../..
+          mkdir -p src-tauri/resources/updater
+          cp src-tauri/updater/target/release/molaunch_updater.exe src-tauri/resources/updater/updater.exe
+          echo "[CI] updater.exe 已生成:"
+          ls -la src-tauri/resources/updater/updater.exe
 
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0

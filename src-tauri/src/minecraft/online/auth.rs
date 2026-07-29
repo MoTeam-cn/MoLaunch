@@ -39,6 +39,9 @@ pub const PROTOCOL_VERSION: &str = "MoSign-v1";
 /// HKDF info for session key（与服务端约定）
 const SESSION_KEY_INFO: &[u8] = b"mosign-v1-session-key";
 
+/// refresh_token 有效期（30 天，秒）
+pub const REFRESH_TOKEN_TTL_SECS: u64 = 30 * 24 * 3600;
+
 /// 注册响应
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct RegisterResponse {
@@ -59,6 +62,9 @@ pub struct RegisterData {
     pub device_pk: String,
     /// JWT 有效期（秒）
     pub expires_in: u64,
+    /// refresh_token（用于续期 access token，30 天有效期）
+    #[serde(default)]
+    pub refresh_token: String,
 }
 
 /// 登录响应
@@ -74,6 +80,39 @@ pub struct LoginResponse {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct LoginData {
     pub device_token: String,
+    pub expires_in: u64,
+    /// refresh_token（用于续期 access token，30 天有效期）
+    #[serde(default)]
+    pub refresh_token: String,
+}
+
+/// refresh 请求体
+#[derive(Debug, Clone, Serialize)]
+pub struct RefreshRequest {
+    pub refresh_token: String,
+}
+
+/// refresh 响应
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RefreshResponse {
+    pub code: u32,
+    pub data: Option<RefreshData>,
+    pub msg: String,
+    #[serde(default)]
+    pub time: String,
+    #[serde(default)]
+    pub req_id: String,
+}
+
+/// refresh 响应数据
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct RefreshData {
+    /// 新的 access token
+    pub device_token: String,
+    /// 新的 refresh_token（服务端轮换）
+    #[serde(default)]
+    pub refresh_token: String,
+    /// access token 有效期（秒）
     pub expires_in: u64,
 }
 
@@ -218,11 +257,18 @@ pub fn finalize_credentials_with_register(
     mut creds: DeviceCredentials,
     resp: &RegisterData,
 ) -> DeviceCredentials {
+    let now = now_timestamp();
     creds.device_pk = resp.device_pk.clone();
     creds.device_token = resp.device_token.clone();
     creds.device_public_key_b64u = resp.device_public_key.clone();
-    creds.token_expires_at = now_timestamp() + resp.expires_in;
-    creds.last_login_at = now_timestamp();
+    creds.token_expires_at = now + resp.expires_in;
+    creds.refresh_token = resp.refresh_token.clone();
+    creds.refresh_expires_at = if resp.refresh_token.is_empty() {
+        0
+    } else {
+        now + REFRESH_TOKEN_TTL_SECS
+    };
+    creds.last_login_at = now;
     creds
 }
 
@@ -306,9 +352,37 @@ pub fn finalize_credentials_with_login(
     mut creds: DeviceCredentials,
     resp: &LoginData,
 ) -> DeviceCredentials {
+    let now = now_timestamp();
     creds.device_token = resp.device_token.clone();
-    creds.token_expires_at = now_timestamp() + resp.expires_in;
-    creds.last_login_at = now_timestamp();
+    creds.token_expires_at = now + resp.expires_in;
+    creds.refresh_token = resp.refresh_token.clone();
+    creds.refresh_expires_at = if resp.refresh_token.is_empty() {
+        0
+    } else {
+        now + REFRESH_TOKEN_TTL_SECS
+    };
+    creds.last_login_at = now;
+    creds
+}
+
+/// 用 refresh 响应更新设备凭证（仅续期 access token + 轮换 refresh_token）
+///
+/// 服务端轮换 refresh_token：新 refresh_token 非空时替换本地存储，
+/// 空（兼容老服务端未轮换）时保留原 refresh_token，过期时间统一续 30 天。
+pub fn finalize_credentials_with_refresh(
+    mut creds: DeviceCredentials,
+    data: &RefreshData,
+) -> DeviceCredentials {
+    let now = now_timestamp();
+    creds.device_token = data.device_token.clone();
+    creds.token_expires_at = now + data.expires_in;
+    if !data.refresh_token.is_empty() {
+        creds.refresh_token = data.refresh_token.clone();
+    }
+    if !creds.refresh_token.is_empty() {
+        creds.refresh_expires_at = now + REFRESH_TOKEN_TTL_SECS;
+    }
+    creds.last_login_at = now;
     creds
 }
 

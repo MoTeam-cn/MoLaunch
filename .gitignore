@@ -33,6 +33,10 @@ src-tauri/WixTools/
 src-tauri/NSIS/
 src-tauri/gen/
 
+# Updater（独立 Cargo 项目，CI/build.rs 实时构建产物，不入库）
+src-tauri/resources/updater/updater.exe
+src-tauri/updater/target/
+
 # Rust
 **/*.rs.bk
 Cargo.lock

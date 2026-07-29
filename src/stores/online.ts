@@ -39,6 +39,8 @@ import {
   loginDevice,
   logoutDevice,
   clearDevice,
+  initAuth as initAuthApi,
+  refreshAuth as refreshAuthApi,
   getStunServers,
   createRoom,
   getRoomInfo,
@@ -169,6 +171,19 @@ export const useOnlineStore = defineStore('online', () => {
   const refreshing = ref(false)
   /** 当前 api-server 地址（从后端配置同步） */
   const apiServerUrl = ref('')
+  /**
+   * 云端连接状态（全局降级开关）
+   *
+   * - `true`：云端 API 可用，联机功能正常
+   * - `false`：云端 API 不可用（启动初始化失败），联机按钮禁用、相关功能降级
+   *
+   * 由 `initAuth()` 在启动时设置；`reconnect()` 可手动重试。
+   */
+  const cloudConnected = ref(false)
+  /** 云端连接错误信息（cloudConnected=false 时非空，用于弹窗提示） */
+  const cloudError = ref<string | null>(null)
+  /** 是否正在执行启动认证 / 重连 */
+  const initializing = ref(false)
 
   // ===== 房间状态 =====
   /** 当前房间状态（null 表示未在房间） */
@@ -357,6 +372,86 @@ export const useOnlineStore = defineStore('online', () => {
       return true
     }
     return false
+  }
+
+  /**
+   * 启动静默认证（程序启动时调用一次）
+   *
+   * 调用后端 `auth_init` action，自动完成：
+   * - 首次启动无凭证 → 静默注册
+   * - access token 过期 → refresh_token 续期或重新登录
+   *
+   * 根据结果设置 `cloudConnected`：
+   * - 成功 → `cloudConnected = true`，联机功能可用
+   * - 失败 → `cloudConnected = false`，联机按钮禁用，`cloudError` 存错误信息
+   *
+   * @returns 是否成功连接云端
+   */
+  async function initAuth(): Promise<boolean> {
+    initializing.value = true
+    cloudError.value = null
+    const result = await safeCall(
+      async () => {
+        const res = await initAuthApi()
+        deviceStatus.value = res.status
+        apiServerUrl.value = res.status.api_server_url
+        if (res.error) {
+          cloudConnected.value = false
+          cloudError.value = res.error
+          return false
+        }
+        cloudConnected.value = true
+        return true
+      },
+      '[Online] init auth',
+    )
+    initializing.value = false
+    // safeCall 返回 undefined 表示异常，返回 false 表示云端失败
+    if (result === undefined) {
+      cloudConnected.value = false
+      cloudError.value = '联机服务初始化异常'
+      return false
+    }
+    return result
+  }
+
+  /**
+   * 手动重新连接云端（设置页"重新连接"按钮调用）
+   *
+   * 流程：
+   * 1. 调用 `refreshAuth` 尝试用 refresh_token 换新 token
+   * 2. refresh 失败 → 调用 `initAuth` 走完整初始化（含注册/登录）
+   *
+   * @returns 是否重连成功
+   */
+  async function reconnect(): Promise<boolean> {
+    initializing.value = true
+    cloudError.value = null
+    // 先尝试 refresh，失败再走完整 initAuth
+    const refreshed = await safeCall(
+      async () => {
+        const status = await refreshAuthApi()
+        deviceStatus.value = status
+        apiServerUrl.value = status.api_server_url
+        return true
+      },
+      '[Online] reconnect via refresh',
+    )
+    if (refreshed) {
+      cloudConnected.value = true
+      initializing.value = false
+      toastSuccess('已重新连接到云端')
+      return true
+    }
+    // refresh 失败，走完整初始化
+    const ok = await initAuth()
+    initializing.value = false
+    if (ok) {
+      toastSuccess('已重新连接到云端')
+    } else {
+      toastError(cloudError.value || '重连失败，请检查网络或 api-server 地址')
+    }
+    return ok
   }
 
   // ============================================================
@@ -737,6 +832,10 @@ export const useOnlineStore = defineStore('online', () => {
     loading,
     refreshing,
     apiServerUrl,
+    // 云端连接状态（全局降级开关）
+    cloudConnected,
+    cloudError,
+    initializing,
     // 房间状态
     roomState,
     roomLoading,
@@ -761,6 +860,9 @@ export const useOnlineStore = defineStore('online', () => {
     login,
     logout,
     clear,
+    // 启动静默认证 + 重连
+    initAuth,
+    reconnect,
     // 房间方法
     fetchStunServers,
     hostCreateRoom,

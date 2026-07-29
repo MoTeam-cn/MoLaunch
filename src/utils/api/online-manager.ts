@@ -35,6 +35,7 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import type {
+  AuthInitResult,
   BusinessResult,
   CreateRoomParams,
   CreateRoomResponse,
@@ -83,6 +84,10 @@ export const ONLINE_ACTIONS = {
   AUTH_LOGIN: 'auth_login',
   AUTH_LOGOUT: 'auth_logout',
   AUTH_CLEAR: 'auth_clear',
+  // 启动静默认证（refresh_token 自动续期 + 首次注册 + 重新登录）
+  AUTH_INIT: 'auth_init',
+  // 手动刷新 token（用 refresh_token 换新 access_token）
+  AUTH_REFRESH: 'auth_refresh',
   // 信令
   ROOM_GET_STUN: 'room_get_stun',
   ROOM_CREATE: 'room_create',
@@ -155,6 +160,30 @@ export function logoutDevice(): Promise<{ success: boolean }> {
 /** 清除设备凭证（注销设备，删除本地密钥） */
 export function clearDevice(): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.AUTH_CLEAR)
+}
+
+/**
+ * 启动静默认证（程序启动时调用一次）
+ *
+ * 决策链：
+ * 1. 无本地凭证 → 静默注册
+ * 2. access token 未过期 → 直接返回
+ * 3. access token 过期 + refresh_token 有效 → 自动 refresh 续期
+ * 4. refresh 失败或双 token 过期 → 自动重新登录（ECDH）
+ *
+ * @returns 认证结果（status + error；error 非 null 表示云端连接失败需降级）
+ */
+export function initAuth(): Promise<AuthInitResult> {
+  return onlineManager<AuthInitResult>(ONLINE_ACTIONS.AUTH_INIT)
+}
+
+/**
+ * 手动刷新 access token（用 refresh_token 换新 token 对）
+ *
+ * 供设置页"重新连接"按钮调用，或 token 过期时业务调用方主动续期。
+ */
+export function refreshAuth(): Promise<DeviceStatus> {
+  return onlineManager<DeviceStatus>(ONLINE_ACTIONS.AUTH_REFRESH)
 }
 
 // ============================================================

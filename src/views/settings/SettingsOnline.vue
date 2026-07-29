@@ -35,6 +35,7 @@ import {
   ExclamationTriangleIcon,
   PlusIcon,
   ServerStackIcon,
+  WifiIcon,
 } from '@heroicons/vue/24/outline'
 import type { IceServerEntry } from '@/types/online'
 
@@ -86,6 +87,11 @@ function handleRemoveTurnServer(index: number) {
 
 function handleUpdateTurnServer(index: number, entry: IceServerEntry) {
   customTurnServers.value[index] = entry
+}
+
+// ============ 云端重新连接 ============
+async function handleReconnect() {
+  await onlineStore.reconnect()
 }
 
 // ============ 测试连通性 ============
@@ -179,6 +185,45 @@ onMounted(() => {
       <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
         <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">api-server 配置</h3>
         <div class="divide-y divide-gray-200">
+          <!-- 云端连接状态 -->
+          <div class="px-5 py-4">
+            <div class="flex items-center justify-between gap-4">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-900">云端连接状态</p>
+                <p class="text-xs text-gray-500 mt-0.5">
+                  <template v-if="onlineStore.cloudConnected">
+                    已连接，联机功能可用
+                  </template>
+                  <template v-else-if="onlineStore.cloudError">
+                    {{ onlineStore.cloudError }}
+                  </template>
+                  <template v-else>
+                    未连接
+                  </template>
+                </p>
+              </div>
+              <div class="flex items-center gap-2">
+                <!-- 连接状态指示灯 -->
+                <span
+                  class="inline-flex items-center gap-1 text-xs"
+                  :class="onlineStore.cloudConnected ? 'text-green-600' : 'text-red-600'"
+                >
+                  <CheckCircleIcon v-if="onlineStore.cloudConnected" class="w-4 h-4" />
+                  <ExclamationTriangleIcon v-else class="w-4 h-4" />
+                  {{ onlineStore.cloudConnected ? '已连接' : '未连接' }}
+                </span>
+                <Button
+                  type="outline"
+                  size="small"
+                  :loading="onlineStore.initializing"
+                  @click="handleReconnect"
+                >
+                  <template #icon><WifiIcon class="w-4 h-4" /></template>
+                  重新连接
+                </Button>
+              </div>
+            </div>
+          </div>
           <!-- 服务器地址 -->
           <div class="px-5 py-4">
             <div class="flex items-center justify-between mb-2">

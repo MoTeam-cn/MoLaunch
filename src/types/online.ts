@@ -31,6 +31,19 @@ export interface DeviceStatus {
 }
 
 /**
+ * 启动静默认证结果
+ *
+ * 对应后端 `utils::online_manager::AuthInitResult`。
+ * 由 `auth_init` action 返回，前端据此设置 `cloudConnected` 全局状态。
+ */
+export interface AuthInitResult {
+  /** 设备认证状态快照 */
+  status: DeviceStatus
+  /** 错误信息（null 表示成功；非 null 表示云端连接失败，需降级） */
+  error: string | null
+}
+
+/**
  * 服务器时间信息
  *
  * 对应后端 `utils::online_manager::ServerTimeInfo`。

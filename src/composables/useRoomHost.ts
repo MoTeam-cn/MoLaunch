@@ -19,7 +19,7 @@
  * const { pendingAnswers, handleConfirm, handleKick, handleCloseRoom } = useRoomHost({ hostMesh, lan })
  */
 
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'
 import { useOnlineStore } from '@/stores/online'
 import type { useWebRTCMesh } from '@/composables/useWebRTCMesh'
@@ -337,18 +337,30 @@ export function useRoomHost(options: {
   /** TurnServers 控制消息的本地 seq 计数器（与 HostMcPort/TUN 数据包 seq 独立） */
   let turnSeq = 0
 
+  /** 启动三路信令轮询定时器（参与者 5s / Answer 5s / 保活 5min） */
+  function startTimers() {
+    if (participantsTimer) clearInterval(participantsTimer)
+    if (answerTimer) clearInterval(answerTimer)
+    if (keepaliveTimer) clearInterval(keepaliveTimer)
+    participantsTimer = setInterval(() => void pollParticipants(), 5000)
+    answerTimer = setInterval(() => void pollAnswers(), 5000)
+    keepaliveTimer = setInterval(() => void doKeepalive(), 5 * 60 * 1000)
+  }
+
+  /** 停止所有轮询定时器（云端断开或组件卸载时调用，避免持续失败刷屏） */
+  function stopTimers() {
+    if (participantsTimer) { clearInterval(participantsTimer); participantsTimer = null }
+    if (answerTimer) { clearInterval(answerTimer); answerTimer = null }
+    if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null }
+  }
+
   onMounted(() => {
     void pollParticipants()
     void pollAnswers()
     void doKeepalive()
     // 阶段 6.2：加载初始封禁列表
     void refreshBans()
-    // 参与者轮询 5s（同时触发 Offer 生成）
-    participantsTimer = setInterval(() => void pollParticipants(), 5000)
-    // Answer 轮询 5s
-    answerTimer = setInterval(() => void pollAnswers(), 5000)
-    // 保活 5min
-    keepaliveTimer = setInterval(() => void doKeepalive(), 5 * 60 * 1000)
+    startTimers()
 
     // 阶段三子任务 8：注入 DataChannel 加密密钥（空字符串表示未启用加密，importRoomKey 返回 null）
     // 在 lan.start 之前注入，确保首个 TUN 包就能正确加密
@@ -384,10 +396,17 @@ export function useRoomHost(options: {
     }).catch((e) => console.warn('[Online] 注册 MC 端口检测事件监听失败:', e))
   })
 
+  // 云端连接状态变化时暂停/恢复轮询（避免云端断开后持续失败刷屏）
+  watch(() => store.cloudConnected, (connected) => {
+    if (connected) {
+      startTimers()
+    } else {
+      stopTimers()
+    }
+  })
+
   onUnmounted(() => {
-    if (answerTimer) clearInterval(answerTimer)
-    if (keepaliveTimer) clearInterval(keepaliveTimer)
-    if (participantsTimer) clearInterval(participantsTimer)
+    stopTimers()
     if (mcPortUnlisten) {
       mcPortUnlisten()
       mcPortUnlisten = null

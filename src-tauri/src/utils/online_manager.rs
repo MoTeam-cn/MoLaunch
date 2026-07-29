@@ -19,10 +19,11 @@ use crate::log_error;
 use crate::log_debug;
 use crate::minecraft::online::auth::{
     build_login_request, build_register_request, finalize_credentials_with_login,
-    finalize_credentials_with_register, generate_device_id, OnlineKeyPair,
+    finalize_credentials_with_refresh, finalize_credentials_with_register, generate_device_id,
+    OnlineKeyPair,
 };
 use crate::minecraft::online::client::OnlineClient;
-use crate::minecraft::online::storage::OnlineStorage;
+use crate::minecraft::online::storage::{DeviceCredentials, OnlineStorage};
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
@@ -58,6 +59,18 @@ pub struct ServerTimeInfo {
     pub offset_seconds: i32,
 }
 
+/// 启动静默登录/注册结果
+///
+/// 前端启动时调用 `auth_init`，根据 `status` 更新 `cloudConnected`：
+/// - `error = None` 且 `status.logged_in = true` → 联机就绪
+/// - `error = Some(msg)` → 联机不可用，前端展示 msg 并将 cloudConnected 置 false
+#[derive(Debug, Clone, Serialize)]
+pub struct AuthInitResult {
+    pub status: DeviceStatus,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
 // ============================================================
 // 辅助函数
 // ============================================================
@@ -76,6 +89,131 @@ fn make_storage(state: &AppState) -> OnlineStorage {
 /// 创建 OnlineClient 实例
 async fn make_client(state: &AppState) -> OnlineClient {
     OnlineClient::new(&read_api_server_url(state).await)
+}
+
+/// 从凭证构造 DeviceStatus（消除各 action 重复构造逻辑）
+fn build_device_status(creds: &DeviceCredentials, api_server_url: String) -> DeviceStatus {
+    DeviceStatus {
+        registered: creds.is_registered(),
+        logged_in: !creds.device_token.is_empty(),
+        token_expired: creds.is_token_expired(),
+        device_pk: creds.device_pk.clone(),
+        device_id: creds.device_id.clone(),
+        token_expires_at: creds.token_expires_at,
+        last_login_at: creds.last_login_at,
+        api_server_url,
+    }
+}
+
+/// 用本地 refresh_token 续期 access token
+///
+/// 调用前置条件：`creds.refresh_token` 非空且未过期（由调用方校验）。
+/// 流程：client.refresh → finalize_credentials_with_refresh → save → 返回新凭证。
+/// 供 `auth_refresh` action、`auth_init` 启动续期、信令 action 自动续期共用。
+async fn refresh_credentials(
+    state: &AppState,
+    creds: DeviceCredentials,
+) -> Result<DeviceCredentials, String> {
+    if creds.refresh_token.is_empty() {
+        return Err("本地未持有 refresh_token，无法续期".to_string());
+    }
+    if creds.is_refresh_token_expired() {
+        return Err("refresh_token 已过期，请重新登录".to_string());
+    }
+
+    let client = make_client(state).await;
+    let resp = client.refresh(&creds.refresh_token).await.map_err(|e| {
+        log_error!("[Online] refresh 请求失败: {}", e);
+        format!("refresh 请求失败: {}", e)
+    })?;
+    let data = resp.data.ok_or_else(|| {
+        log_error!("[Online] refresh 失败: msg={}", resp.msg);
+        format!("refresh 失败: {}", resp.msg)
+    })?;
+
+    let updated = finalize_credentials_with_refresh(creds, &data);
+    let storage = make_storage(state);
+    storage.save(&updated).await.map_err(|e| {
+        log_error!("[Online] 持久化 refresh 凭证失败: {}", e);
+        e.to_string()
+    })?;
+
+    log_info!(
+        "[Online] access token 已续期: device_pk={}, token_expires_at={}",
+        updated.device_pk,
+        updated.token_expires_at
+    );
+    Ok(updated)
+}
+
+/// 加载本地凭证，若 access token 过期则自动 refresh 续期
+///
+/// 供信令等业务 action 在调用 call_v1 前统一过闸，避免 401 中断。
+/// - access token 未过期 → 直接返回凭证
+/// - access token 过期 + refresh_token 可用 → 自动续期后返回新凭证
+/// - access token 过期 + refresh_token 也过期 → 返回错误（前端引导重新登录）
+pub async fn load_creds_with_auto_refresh(
+    state: &AppState,
+) -> Result<DeviceCredentials, String> {
+    let storage = make_storage(state);
+    let creds = storage
+        .load()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "设备未注册，请先注册".to_string())?;
+    if !creds.is_registered() {
+        return Err("设备未注册，请先注册".to_string());
+    }
+    if !creds.is_token_expired() {
+        return Ok(creds);
+    }
+
+    log_info!("[Online] access token 已过期，尝试 refresh 续期");
+    refresh_credentials(state, creds).await
+}
+
+/// 用本地密钥重新登录（ECDH + AES-GCM），刷新 access_token + refresh_token
+///
+/// 供 `auth_init` 在 refresh_token 过期或 refresh 失败时降级使用。
+/// 与 `auth_login` action 共用 MoSign-v1 登录协议，但不返回 DeviceStatus，
+/// 仅返回更新后的凭证，由调用方决定如何构造返回值。
+async fn login_fresh(state: &AppState) -> Result<DeviceCredentials, String> {
+    let storage = make_storage(state);
+    let creds = storage
+        .load()
+        .await
+        .map_err(|e| e.to_string())?
+        .ok_or_else(|| "设备未注册，请先注册".to_string())?;
+    if !creds.is_registered() {
+        return Err("设备未注册，请先注册".to_string());
+    }
+
+    let req = build_login_request(&creds).map_err(|e| {
+        log_error!("[Online] login_fresh: 构造登录请求失败: {}", e);
+        format!("构造登录请求失败: {}", e)
+    })?;
+
+    let client = make_client(state).await;
+    let resp = client.login(&req).await.map_err(|e| {
+        log_error!("[Online] login_fresh: 登录请求失败: {}", e);
+        format!("登录请求失败: {}", e)
+    })?;
+    let data = resp.data.ok_or_else(|| {
+        log_error!("[Online] login_fresh: 登录失败: msg={}", resp.msg);
+        format!("登录失败: {}", resp.msg)
+    })?;
+
+    let updated = finalize_credentials_with_login(creds, &data);
+    storage.save(&updated).await.map_err(|e| {
+        log_error!("[Online] login_fresh: 持久化登录凭证失败: {}", e);
+        e.to_string()
+    })?;
+
+    log_info!(
+        "[Online] login_fresh: 重新登录成功: device_pk={}",
+        updated.device_pk
+    );
+    Ok(updated)
 }
 
 // ============================================================
@@ -299,6 +437,117 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         })?;
         log_info!("[Online] 设备凭证已清除");
         serde_json::to_value(serde_json::json!({ "success": true }))
+            .map_err(|e| e.to_string())
+    }));
+
+    // 用 refresh_token 续期 access token
+    //
+    // 前置条件：本地凭证已注册且持有未过期的 refresh_token。
+    // 供前端「手动续期」按钮或 auth_init 内部流程调用。
+    d.register("auth_refresh", handler!(state, _app, _params, {
+        log_info!("[Online] auth_refresh 开始");
+        let storage = make_storage(&state);
+        let creds = storage.load().await
+            .map_err(|e| e.to_string())?
+            .ok_or_else(|| "设备未注册，请先注册".to_string())?;
+        if !creds.is_registered() {
+            return Err("设备未注册，请先注册".to_string());
+        }
+
+        let updated = refresh_credentials(&state, creds).await.map_err(|e| {
+            log_warn!("[Online] auth_refresh 续期失败: {}", e);
+            e
+        })?;
+
+        serde_json::to_value(build_device_status(&updated, read_api_server_url(&state).await))
+            .map_err(|e| e.to_string())
+    }));
+
+    // 启动静默登录/注册（前端启动时调用一次）
+    //
+    // 决策树：
+    // 1. 本地无凭证 → 自动注册（生成密钥对 + 调 auth_register）
+    // 2. 本地有凭证 + access token 未过期 → 直接返回
+    // 3. 本地有凭证 + access token 过期 + refresh_token 未过期 → 自动 refresh
+    // 4. 本地有凭证 + access token 过期 + refresh_token 过期 → 自动 login
+    // 5. 任何步骤失败 → 返回 DeviceStatus + error（前端 cloudConnected = false）
+    d.register("auth_init", handler!(state, _app, _params, {
+        log_info!("[Online] auth_init 开始");
+        let api_url = read_api_server_url(&state).await;
+        let storage = make_storage(&state);
+
+        // 加载本地凭证（None = 首次启动未注册）
+        let existing = storage.load().await.unwrap_or(None);
+
+        let creds = match existing {
+            None => {
+                // 首次启动：静默注册
+                log_info!("[Online] auth_init: 本地无凭证，开始静默注册");
+                let kp = OnlineKeyPair::generate();
+                let device_id = generate_device_id();
+
+                let client = make_client(&state).await;
+                let server_rsa_pem = client.fetch_server_rsa_pem().await.map_err(|e| {
+                    log_error!("[Online] auth_init: 获取云端 RSA 公钥失败: {}", e);
+                    e.to_string()
+                })?;
+
+                let (req, mut new_creds) = build_register_request(&kp, &device_id, &server_rsa_pem)
+                    .map_err(|e| {
+                        log_error!("[Online] auth_init: 构造注册请求失败: {}", e);
+                        format!("构造注册请求失败: {}", e)
+                    })?;
+
+                let resp = client.register(&req).await.map_err(|e| {
+                    log_error!("[Online] auth_init: 注册请求失败: {}", e);
+                    format!("注册请求失败: {}", e)
+                })?;
+                let data = resp.data.ok_or_else(|| {
+                    log_error!("[Online] auth_init: 注册失败: msg={}", resp.msg);
+                    format!("注册失败: {}", resp.msg)
+                })?;
+
+                new_creds = finalize_credentials_with_register(new_creds, &data);
+                storage.save(&new_creds).await.map_err(|e| {
+                    log_error!("[Online] auth_init: 持久化设备凭证失败: {}", e);
+                    e.to_string()
+                })?;
+                log_info!(
+                    "[Online] auth_init: 静默注册成功: device_pk={}",
+                    new_creds.device_pk
+                );
+                new_creds
+            }
+            Some(creds) if !creds.is_registered() => {
+                // 凭证存在但不完整（异常状态），拒绝静默操作，前端引导手动处理
+                return Err("本地凭证不完整，请在设置页重新注册设备".to_string());
+            }
+            Some(creds) => {
+                // 凭证完整：检查 token 状态
+                if !creds.is_token_expired() {
+                    log_debug!("[Online] auth_init: access token 未过期，直接返回");
+                    creds
+                } else if !creds.is_refresh_token_expired() {
+                    // access token 过期 + refresh_token 可用 → 自动续期
+                    log_info!("[Online] auth_init: access token 已过期，静默 refresh 续期");
+                    match refresh_credentials(&state, creds).await {
+                        Ok(updated) => updated,
+                        Err(e) => {
+                            log_warn!("[Online] auth_init: refresh 续期失败: {}，尝试重新登录", e);
+                            // refresh 失败（如 refresh_token 被服务端撤销），降级走 login 流程
+                            login_fresh(&state).await?
+                        }
+                    }
+                } else {
+                    // access token + refresh_token 均过期 → 重新登录
+                    log_info!("[Online] auth_init: refresh_token 已过期，静默重新登录");
+                    login_fresh(&state).await?
+                }
+            }
+        };
+
+        let status = build_device_status(&creds, api_url);
+        serde_json::to_value(AuthInitResult { status, error: None })
             .map_err(|e| e.to_string())
     }));
 
