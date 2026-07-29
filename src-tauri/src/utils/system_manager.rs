@@ -1,9 +1,9 @@
 //! 系统模块统一分发逻辑（system_manager 的工具实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，替代每个 action 一条 Tauri 命令。
-//! 20 个 system action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
+//! 24 个 system action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
 //!
-//! 命令清单（20 个，按子模块分组）：
+//! 命令清单（24 个，按子模块分组）：
 //! - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
 //!   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
 //! - config（2 个）：`get_config_path` / `save_config_to_file`
@@ -13,6 +13,8 @@
 //! - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
 //! - http_log（2 个）：`read_http_logs` / `list_http_log_files`
 //! - updater（2 个）：`check_update` / `download_and_install_update`
+//! - certs（3 个）：`list_custom_certs` / `add_custom_cert` / `remove_custom_cert`
+//! - ws（1 个）：`get_ws_port`（获取下载进度推送 WS 端口）
 //!
 //! 注意事项：
 //! - 子模块函数接收 `&AppState`（或不接收 state），handler 内调用时用 `&state` / 忽略 `_state`
@@ -24,6 +26,7 @@
 //! - `get_system_info` 返回 `SystemInfo`（非 Result），同样包装
 //! - `get_log_path` 返回 `String`（非 Result），同样包装
 //! - `list_log_files` 返回 `Vec<String>`（非 Result），同样包装
+//! - `list_custom_certs` 返回 `Vec<CustomCertInfo>`（非 Result），同样包装
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -85,6 +88,20 @@ struct ReadHttpLogsParams {
 #[serde(rename_all = "camelCase")]
 struct SetGameDirParams {
     game_dir: String,
+}
+
+/// 添加自定义证书的参数（源文件路径）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AddCustomCertParams {
+    path: String,
+}
+
+/// 删除自定义证书的参数（证书文件名）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RemoveCustomCertParams {
+    filename: String,
 }
 
 // ============================================================
@@ -219,6 +236,40 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             .map_err(|e| format!("参数解析失败: {}", e))?;
         updater::download_and_install(&app, p).await?;
         Ok(serde_json::Value::Null)
+    }));
+
+    // === certs（3 个）=== 自定义 TLS 证书管理
+    // 列出 certs 目录下所有 .pem 文件（含 subject / not_after 元信息）
+    // 返回 Vec<CustomCertInfo>（非 Result），handler 内用 Ok(to_value(r)?) 包装
+    d.register("list_custom_certs", handler!(_state, _app, _params, {
+        let r = crate::certs::list_custom_certs();
+        Ok(serde_json::to_value(r).map_err(|e| e.to_string())?)
+    }));
+    // 添加自定义证书（从源路径复制 PEM 文件到 certs 目录）
+    d.register("add_custom_cert", handler!(_state, _app, params, {
+        let p: AddCustomCertParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        crate::certs::add_custom_cert(&p.path)?;
+        Ok(serde_json::Value::Null)
+    }));
+    // 删除自定义证书（按文件名删除 certs 目录下对应文件）
+    d.register("remove_custom_cert", handler!(_state, _app, params, {
+        let p: RemoveCustomCertParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        crate::certs::remove_custom_cert(&p.filename)?;
+        Ok(serde_json::Value::Null)
+    }));
+
+    // ws（1 个）：获取 WebSocket 服务器端口 + 鉴权 token（前端建 WS 连接用）
+    // 返回 {port: u16, token: string}，port=0 表示 WS 服务器尚未启动
+    // token 用于客户端建连后首条消息鉴权，防止本机其他进程窃听下载进度
+    d.register("get_ws_port", handler!(state, _app, _params, {
+        let port = state.ws_port.get().copied().unwrap_or(0u16);
+        let token = state.ws_token.get().cloned().unwrap_or_default();
+        Ok(serde_json::json!({
+            "port": port,
+            "token": token,
+        }))
     }));
 
     d

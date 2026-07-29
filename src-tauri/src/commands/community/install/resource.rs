@@ -73,19 +73,25 @@ pub async fn download_resource(
     };
 
     // 进度回调：sync_stage_from_progress 统一同步到 download_state
+    // 同时广播到 WS 让前端实时收到资源下载进度
     let cb_state = state.download_state.clone();
+    let state_for_cb = state.clone();
     let progress_callback: Arc<
         dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
     > = Arc::new(move |p| {
-        let mut ds = cb_state.lock().unwrap();
-        ds.sync_stage_from_progress(
-            0,
-            p.downloaded_bytes,
-            p.total_bytes,
-            p.completed_files,
-            p.total_files,
-            p.current_speed,
-        );
+        {
+            let mut ds = cb_state.lock().unwrap();
+            ds.sync_stage_from_progress(
+                0,
+                p.downloaded_bytes,
+                p.total_bytes,
+                p.completed_files,
+                p.total_files,
+                p.current_speed,
+            );
+        }
+        // 广播进度到 WS（确保资源下载路径也能推送）
+        crate::commands::version::download::broadcast_current(&state_for_cb);
     });
 
     let manager = crate::minecraft::download::manager::DownloadManager::new(
@@ -204,19 +210,25 @@ pub async fn download_resource_to_path(
     };
 
     // 进度回调：sync_stage_from_progress 统一同步到 download_state
+    // 同时广播到 WS 让前端实时收到资源下载进度
     let cb_state = state.download_state.clone();
+    let state_for_cb = state.clone();
     let progress_callback: Arc<
         dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
     > = Arc::new(move |p| {
-        let mut ds = cb_state.lock().unwrap();
-        ds.sync_stage_from_progress(
-            0,
-            p.downloaded_bytes,
-            p.total_bytes,
-            p.completed_files,
-            p.total_files,
-            p.current_speed,
-        );
+        {
+            let mut ds = cb_state.lock().unwrap();
+            ds.sync_stage_from_progress(
+                0,
+                p.downloaded_bytes,
+                p.total_bytes,
+                p.completed_files,
+                p.total_files,
+                p.current_speed,
+            );
+        }
+        // 广播进度到 WS（确保资源下载路径也能推送）
+        crate::commands::version::download::broadcast_current(&state_for_cb);
     });
 
     let config = state.config.lock().await;

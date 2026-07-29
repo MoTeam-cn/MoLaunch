@@ -48,20 +48,26 @@ pub(super) async fn download_files_concurrent(
 
     // 进度回调：DownloadManager 已内置 300ms timer + 滑动窗口速度计算
     // 直接用 sync_stage_from_progress 统一同步，无需额外 timer / 原子计数器 / 速度计算
+    // 广播到 WS 让前端实时收到进度（双路：emit 兼容旧 listen + WS 推送）
     let progress_state = state.download_state.clone();
     let progress_stage_index = stage_index;
+    let state_for_cb = state.clone();
     let progress_callback: Arc<
         dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
     > = Arc::new(move |p| {
-        let mut ds = progress_state.lock().unwrap();
-        ds.sync_stage_from_progress(
-            progress_stage_index,
-            p.downloaded_bytes,
-            p.total_bytes,
-            p.completed_files,
-            p.total_files,
-            p.current_speed,
-        );
+        {
+            let mut ds = progress_state.lock().unwrap();
+            ds.sync_stage_from_progress(
+                progress_stage_index,
+                p.downloaded_bytes,
+                p.total_bytes,
+                p.completed_files,
+                p.total_files,
+                p.current_speed,
+            );
+        }
+        // 广播进度到 WS（确保整合包下载路径也能推送）
+        crate::commands::version::download::broadcast_current(&state_for_cb);
     });
 
     // 用 DownloadManager 下载（自动分片 + 多线程 + 重试 + URL fallback）
@@ -74,6 +80,10 @@ pub(super) async fn download_files_concurrent(
     let results = manager.download_batch(tasks, Some(progress_callback)).await;
 
     // 收集失败
+    // 取消导致的失败不逐个打印日志，避免大量文件同时失败时刷屏
+    let is_cancelled = state
+        .download_cancel_flag
+        .load(std::sync::atomic::Ordering::Relaxed);
     let mut errors: Vec<String> = Vec::new();
     for (i, r) in results.iter().enumerate() {
         if r.status != crate::minecraft::download::types::DownloadStatus::Completed
@@ -81,13 +91,24 @@ pub(super) async fn download_files_concurrent(
         {
             let (urls, path, _) = &files[i];
             let err = r.error.clone().unwrap_or_else(|| format!("{:?}", r.status));
-            log_info!("[Community] 下载失败: {} → {}", path, err);
-            log_info!("[Community] 尝试过的 URL: {}", urls.join(" | "));
+            // 仅非取消场景逐个打印失败详情（取消时所有进行中的文件都会失败，逐个打印会刷屏）
+            if !is_cancelled {
+                log_info!("[Community] 下载失败: {} → {}", path, err);
+                log_info!("[Community] 尝试过的 URL: {}", urls.join(" | "));
+            }
             errors.push(format!("{}: {}", urls.join(" | "), err));
         }
     }
 
     if !errors.is_empty() {
+        if is_cancelled {
+            // 用户主动取消：只打印一条总结，返回简洁错误
+            log_info!(
+                "[Community] 下载已取消，{} 个文件未完成",
+                errors.len()
+            );
+            return Err("下载已取消".to_string());
+        }
         log_info!("[Community] 共 {} 个文件下载失败：", errors.len());
         for (i, e) in errors.iter().enumerate() {
             log_info!("[Community] 失败 #{}: {}", i + 1, e);

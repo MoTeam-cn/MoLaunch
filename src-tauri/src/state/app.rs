@@ -12,6 +12,12 @@ use super::download::DownloadState;
 use super::launch::LaunchHistory;
 use crate::commands::auth::authlib::PendingAuthlibLogin;
 
+/// 下载进度广播通道容量
+///
+/// broadcast channel 满时丢弃旧消息（lagged），只保留最新 16 条。
+/// WS 连接端 200ms 节流，正常情况下不会 lag。
+const PROGRESS_CHANNEL_CAPACITY: usize = 16;
+
 /// 应用全局状态
 ///
 /// 派生 `Clone`：所有字段均为 `Arc<...>`，克隆只是原子计数自增，开销极低。
@@ -41,6 +47,20 @@ pub struct AppState {
     /// 房主与加入方共用同一实例，每次进入房间时 `tun_start` 创建并替换，
     /// `tun_stop` 关闭并置 None。同一时间仅允许一个桥接实例。
     pub virtual_lan_bridge: Arc<TokioMutex<Option<VirtualLanBridge>>>,
+    /// 下载进度广播通道（WS 服务器订阅后推送给前端）
+    ///
+    /// 后端在 progress_callback / stage_callback / cancel / pause / resume 时
+    /// 通过 `broadcast_progress` 发送 snapshot，WS 服务器订阅后以 200ms 节流推送。
+    pub progress_tx: Arc<tokio::sync::broadcast::Sender<serde_json::Value>>,
+    /// WebSocket 服务器端口（启动后写入，前端通过 `get_ws_port` IPC 查询）
+    ///
+    /// `OnceLock` 保证只写入一次（WS 服务器启动时），后续读取无需锁。
+    pub ws_port: Arc<std::sync::OnceLock<u16>>,
+    /// WebSocket 鉴权 token（启动时随机生成，前端建连后首条消息需携带）
+    ///
+    /// 防止本机其他进程或恶意软件直接连接 WS 端口窃取下载进度数据。
+    /// 与 `ws_port` 一起在 `get_ws_port` IPC 中返回给前端。
+    pub ws_token: Arc<std::sync::OnceLock<String>>,
 }
 
 impl Default for AppState {
@@ -79,6 +99,9 @@ impl AppState {
         // 创建 SDK Arc（需先创建以便共享给 auth_storage）
         let sdk_arc = Arc::new(TokioMutex::new(sdk));
 
+        // 下载进度广播通道（WS 服务器订阅后推送给前端）
+        let (progress_tx, _) = tokio::sync::broadcast::channel(PROGRESS_CHANNEL_CAPACITY);
+
         Self {
             sdk: sdk_arc.clone(),
             config: Arc::new(TokioMutex::new(config)),
@@ -92,6 +115,9 @@ impl AppState {
             download_pause_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             authlib_pending: Arc::new(TokioMutex::new(None)),
             virtual_lan_bridge: Arc::new(TokioMutex::new(None)),
+            progress_tx: Arc::new(progress_tx),
+            ws_port: Arc::new(std::sync::OnceLock::new()),
+            ws_token: Arc::new(std::sync::OnceLock::new()),
         }
     }
 }

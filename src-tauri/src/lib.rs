@@ -1,5 +1,6 @@
 //! MoLaunch 库入口
 
+pub mod certs;
 pub mod commands;
 pub mod config;
 pub mod error_util;
@@ -12,8 +13,10 @@ pub mod sdk;
 pub mod state;
 pub mod storage;
 pub mod utils;
+pub mod ws;
 
 use state::AppState;
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -29,20 +32,27 @@ pub fn run() {
     // 初始化日志系统（从配置文件加载日志级别和输出选项）
     logger::init_from_config();
 
-    // 初始化 HTTP 客户端（根据代理配置）
+    // 初始化 HTTP 客户端（根据代理 + TLS 配置）
+    // ignore_tls 走注册表（DeveloperUnlocked + DeveloperMode + IgnoreTls 三层判定），
+    // 仅开发者模式实际开启时才返回 true
     let app_state = AppState::new();
     {
         let config = app_state.config.blocking_lock();
+        let ignore_tls = commands::system::developer::is_ignore_tls();
         http::init_client(
             &config.proxy.mode,
             &config.proxy.kind,
             &config.proxy.url,
             &config.proxy.ip_version,
+            &config.tls.trust_mode,
+            ignore_tls,
         );
         log_info!(
-            "HTTP client initialized (proxy: {}, ip_version: {})",
+            "HTTP client initialized (proxy: {}, ip_version: {}, trust_mode: {}, ignore_tls: {})",
             config.proxy.mode,
-            config.proxy.ip_version
+            config.proxy.ip_version,
+            config.tls.trust_mode,
+            ignore_tls
         );
 
         // 确保默认游戏目录存在
@@ -80,9 +90,18 @@ pub fn run() {
         // 重启主进程 plugin（更新文件替换完成后调用 relaunch）
         .plugin(tauri_plugin_process::init())
         .manage(app_state)
-        .setup(|_app| {
+        .setup(|app| {
             // setup 钩子在窗口/webview 创建后、前端加载前调用
             log_info!("[Startup] Tauri setup() hook entered — webview & window created");
+
+            // 启动 WebSocket 服务器（下载进度推送，替代前端轮询）
+            // 监听 127.0.0.1:0 随机端口，端口写入 AppState.ws_port 供前端查询
+            let app_handle = app.handle().clone();
+            let state = app.state::<AppState>().inner().clone();
+            tauri::async_runtime::spawn(async move {
+                ws::start_server(app_handle, state).await;
+            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

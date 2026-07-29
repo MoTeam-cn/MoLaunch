@@ -22,7 +22,7 @@ import { setModalRef, showError } from '@/utils/modal'
 import { setCrashDialogRef } from '@/utils/crashDialog'
 import { setToastRef } from '@/utils/toast'
 import { initAutoCheck } from '@/utils/updater'
-import { initDownloadPolling } from '@/composables/useDownloadPolling'
+import { initDownloadStream } from '@/composables/useDownloadStream'
 import { useDragDrop } from '@/composables/useDragDrop'
 
 const sdkStore = useSdkStore()
@@ -44,7 +44,7 @@ onMounted(() => {
   setModalRef(modalRef.value)
   setCrashDialogRef(crashDialogRef.value)
   setToastRef(toastRef.value)
-  initDownloadPolling()
+  initDownloadStream()
   // 启动自动更新检查（启动后 5s + 每 6 小时；dev 模式自动跳过）
   initAutoCheck()
   initApp()

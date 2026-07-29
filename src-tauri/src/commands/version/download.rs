@@ -63,6 +63,8 @@ pub async fn download_version(
     let sw = speed_window.clone();
     let acc_bytes_for_progress = accumulated_bytes.clone();
     let acc_total_for_progress = accumulated_total.clone();
+    let progress_tx_for_cb = state.progress_tx.clone();
+    let pause_flag_for_cb = state.download_pause_flag.clone();
     let progress_callback = Arc::new(move |progress: download_types::GlobalProgress| {
         {
             let base_bytes = *acc_bytes_for_progress.lock().unwrap();
@@ -106,9 +108,12 @@ pub async fn download_version(
             }
         }
         let ds = state_for_progress.lock().unwrap();
-        let snapshot = build_snapshot(&ds, &version_id_clone);
+        let is_paused = pause_flag_for_cb.load(std::sync::atomic::Ordering::Relaxed);
+        let snapshot = build_snapshot(&ds, &version_id_clone, is_paused);
         drop(ds);
-        let _ = app_clone.emit("download-progress", snapshot);
+        // 双路推送：Tauri 事件（兼容旧 listen）+ WS 广播（前端 devtools 可见）
+        let _ = app_clone.emit("download-progress", &snapshot);
+        let _ = progress_tx_for_cb.send(snapshot);
     });
 
     // Stage callback
@@ -117,6 +122,8 @@ pub async fn download_version(
     let vid_for_stage = version_id.clone();
     let acc_bytes_for_stage = accumulated_bytes.clone();
     let acc_total_for_stage = accumulated_total.clone();
+    let progress_tx_for_stage = state.progress_tx.clone();
+    let pause_flag_for_stage = state.download_pause_flag.clone();
     let stage_callback = Arc::new(move |stage_index: usize, _stage_name: &str| {
         let mut ds = state_for_stage.lock().unwrap();
         // 标记上一个阶段完成，并累加字节
@@ -134,9 +141,11 @@ pub async fn download_version(
             ds.stages[stage_index].status = StageStatus::Loading;
             ds.stages[stage_index].progress = 0.0;
         }
-        let snapshot = build_snapshot(&ds, &vid_for_stage);
+        let is_paused = pause_flag_for_stage.load(std::sync::atomic::Ordering::Relaxed);
+        let snapshot = build_snapshot(&ds, &vid_for_stage, is_paused);
         drop(ds);
-        let _ = app_for_stage.emit("download-progress", snapshot);
+        let _ = app_for_stage.emit("download-progress", &snapshot);
+        let _ = progress_tx_for_stage.send(snapshot);
     });
 
     // Full download flow
@@ -182,6 +191,13 @@ pub async fn download_version(
         }
     }
 
+    // 广播最终完成状态（WS 推送 is_complete=true，前端据此触发 finishDownload）
+    {
+        let ds = state.download_state.lock().unwrap();
+        let snapshot = build_snapshot(&ds, &version_id, false);
+        let _ = state.progress_tx.send(snapshot);
+    }
+
     let _ = app.emit(
         "download-complete",
         serde_json::json!({
@@ -198,7 +214,22 @@ pub async fn download_version(
     Ok(())
 }
 
-pub fn build_snapshot(ds: &DownloadState, version_id: &str) -> serde_json::Value {
+/// 构造当前 download_state snapshot 并广播到 WS
+///
+/// 供各下载路径的 progress_callback 调用，确保 WS 推送覆盖所有下载路径
+/// （MC 本体 / 整合包安装 / 资源下载）。调用方只需传入 `&AppState`。
+pub fn broadcast_current(state: &AppState) {
+    let ds = state.download_state.lock().unwrap();
+    let is_paused = state
+        .download_pause_flag
+        .load(std::sync::atomic::Ordering::Relaxed);
+    let version_name = ds.version_name.clone();
+    let snapshot = build_snapshot(&ds, &version_name, is_paused);
+    drop(ds);
+    let _ = state.progress_tx.send(snapshot);
+}
+
+pub fn build_snapshot(ds: &DownloadState, version_id: &str, is_paused: bool) -> serde_json::Value {
     let stages: Vec<DownloadStageSnapshot> = ds
         .stages
         .iter()
@@ -217,12 +248,13 @@ pub fn build_snapshot(ds: &DownloadState, version_id: &str) -> serde_json::Value
             files_downloaded: s.files_downloaded,
             files_total: s.files_total,
             group: s.group.clone(),
-            is_paused: None,
+            is_paused: if is_paused { Some(true) } else { None },
         })
         .collect();
 
     serde_json::json!({
         "version_id": version_id,
+        "version_name": ds.version_name,
         "stages": stages,
         "current_stage_index": ds.current_stage_index,
         "global_speed": ds.global_speed,

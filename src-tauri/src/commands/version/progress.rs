@@ -83,6 +83,8 @@ pub async fn cancel_download(state: &AppState) -> Result<(), String> {
     state
         .download_pause_flag
         .store(false, std::sync::atomic::Ordering::Relaxed);
+    // 广播当前状态（前端 WS 据此感知取消）
+    broadcast_current(state);
     Ok(())
 }
 
@@ -91,6 +93,8 @@ pub async fn pause_download(state: &AppState) -> Result<(), String> {
     state
         .download_pause_flag
         .store(true, std::sync::atomic::Ordering::Relaxed);
+    // 广播暂停状态（stages 中 is_paused=true，前端 UI 切换为暂停图标）
+    broadcast_current(state);
     Ok(())
 }
 
@@ -99,5 +103,18 @@ pub async fn resume_download(state: &AppState) -> Result<(), String> {
     state
         .download_pause_flag
         .store(false, std::sync::atomic::Ordering::Relaxed);
+    // 广播恢复状态（stages 中 is_paused=null，前端 UI 切换为下载图标）
+    broadcast_current(state);
     Ok(())
+}
+
+/// 构造当前下载状态 snapshot 并广播到 WS（供 cancel/pause/resume 调用）
+///
+/// 注：cancel/pause/resume 只改 atomic flag，不写 download_state。
+/// 此函数读取当前 download_state + pause_flag 构造 snapshot，
+/// 让前端通过 WS 即时感知控制信号变化，无需轮询。
+///
+/// 复用 `super::download::broadcast_current`，避免重复实现。
+fn broadcast_current(state: &AppState) {
+    super::download::broadcast_current(state);
 }

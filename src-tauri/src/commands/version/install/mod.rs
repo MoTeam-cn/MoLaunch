@@ -139,6 +139,10 @@ pub async fn install_merged(
 
     // progress callback：统一用 sync_stage_from_progress 同步 GlobalProgress 到 download_state
     let state_clone = state.download_state.clone();
+    let progress_tx_for_cb = state.progress_tx.clone();
+    let pause_flag_for_cb = state.download_pause_flag.clone();
+    let app_for_cb = app.clone();
+    let version_name_for_cb = state.download_state.lock().unwrap().version_name.clone();
     let progress_callback = Arc::new(move |progress: download_types::GlobalProgress| {
         let mut ds = state_clone.lock().unwrap();
         ds.is_active = progress.is_active;
@@ -151,14 +155,30 @@ pub async fn install_merged(
             progress.total_files,
             progress.current_speed,
         );
+        // 广播进度（Tauri 事件 + WS 推送）
+        let is_paused = pause_flag_for_cb.load(std::sync::atomic::Ordering::Relaxed);
+        let snapshot = super::download::build_snapshot(&ds, &version_name_for_cb, is_paused);
+        drop(ds);
+        let _ = app_for_cb.emit("download-progress", &snapshot);
+        let _ = progress_tx_for_cb.send(snapshot);
     });
 
     // Stage callback：统一用 set_current_stage 切换阶段
     let state_for_stage = state.download_state.clone();
+    let progress_tx_for_stage = state.progress_tx.clone();
+    let pause_flag_for_stage = state.download_pause_flag.clone();
+    let app_for_stage = app.clone();
+    let version_name_for_stage = state.download_state.lock().unwrap().version_name.clone();
     let stage_callback = Arc::new(move |stage_index: usize, _stage_name: &str| {
         let actual_index = stage_offset + stage_index;
         let mut ds = state_for_stage.lock().unwrap();
         ds.set_current_stage(actual_index);
+        // 广播阶段切换
+        let is_paused = pause_flag_for_stage.load(std::sync::atomic::Ordering::Relaxed);
+        let snapshot = super::download::build_snapshot(&ds, &version_name_for_stage, is_paused);
+        drop(ds);
+        let _ = app_for_stage.emit("download-progress", &snapshot);
+        let _ = progress_tx_for_stage.send(snapshot);
     });
 
     // Step 1: 下载原版 MC
@@ -184,6 +204,10 @@ pub async fn install_merged(
         // 重置 download_state，避免 is_active 仍为 true 导致前端下载管理页卡住
         let mut ds = state.download_state.lock().unwrap();
         ds.mark_failed(0);
+        // 广播失败状态（WS 推送 error_code，前端据此停止 WS 流）
+        let snapshot = super::download::build_snapshot(&ds, &ds.version_name, false);
+        drop(ds);
+        let _ = state.progress_tx.send(snapshot);
         e.to_string()
     })?;
 
@@ -294,6 +318,12 @@ pub async fn install_merged(
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.mark_complete();
+    }
+    // 广播最终完成状态（WS 推送 is_complete=true，前端据此触发 finishDownload）
+    {
+        let ds = state.download_state.lock().unwrap();
+        let snapshot = super::download::build_snapshot(&ds, &ds.version_name, false);
+        let _ = state.progress_tx.send(snapshot);
     }
     let _ = app.emit(
         "install-merged-progress",

@@ -7,7 +7,7 @@
  * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
  * 故前端 params 对象的字段名一律使用 camelCase。
  *
- * 注册的 action（22 个）：
+ * 注册的 action（26 个）：
  * - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
  *   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
  * - config（2 个）：`get_config_path` / `save_config_to_file`
@@ -17,6 +17,8 @@
  * - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
  * - http_log（2 个）：`read_http_logs` / `list_http_log_files`
  * - updater（2 个）：`check_update` / `download_and_install_update`
+ * - certs（3 个）：`list_custom_certs` / `add_custom_cert` / `remove_custom_cert`
+ * - ws（1 个）：`get_ws_port`（下载进度推送 WS 端口）
  */
 
 import { invoke } from '@tauri-apps/api/core'
@@ -69,6 +71,12 @@ export const SYSTEM_ACTIONS = {
   // updater（2 个）—— Windows 便携版自实现 + macOS/Linux 转发官方 plugin
   CHECK_UPDATE: 'check_update',
   DOWNLOAD_AND_INSTALL_UPDATE: 'download_and_install_update',
+  // certs（3 个）—— 自定义 TLS 证书管理
+  LIST_CUSTOM_CERTS: 'list_custom_certs',
+  ADD_CUSTOM_CERT: 'add_custom_cert',
+  REMOVE_CUSTOM_CERT: 'remove_custom_cert',
+  // ws（1 个）—— 下载进度推送 WebSocket 端口
+  GET_WS_PORT: 'get_ws_port',
 } as const
 
 /** action 名称类型 */
