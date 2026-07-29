@@ -20,7 +20,8 @@ import { installMod } from '@/utils/api/personalization'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 import { installMerged } from '@/utils/api/loader'
 import { showError, showInfo, showModal, showPrompt } from '@/utils/modal'
-import { toastError, toastSuccess } from '@/utils/toast'
+import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
+import { isCancelledError } from '@/utils/async'
 import { useVersionStore } from '@/stores/version'
 import type { InstallModpackResult, ModpackPreview } from '@/types/community'
 
@@ -219,7 +220,13 @@ async function runModpackInstall(
     result = await installLocalModpack({ filePath, instanceName, includeOptional })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    // 后端已 mark_failed 重置 is_active，前端需 finishDownload 让 Downloads.vue watch 触发 router.back()
+    // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
+    if (isCancelledError(err)) {
+      toastInfo('下载已取消')
+      versionStore.finishDownload()
+      return
+    }
+    // 真实失败：后端已 mark_failed 重置 is_active，前端需 finishDownload 让 Downloads.vue watch 触发 router.back()
     // 用 showModal 支持确认回调，用户点击确定后才退出下载页，避免弹窗一闪而过
     showModal({
       type: 'error',
@@ -248,6 +255,12 @@ async function runModpackInstall(
     toastSuccess(`整合包 ${instanceName} 安装完成`)
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
+    // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
+    if (isCancelledError(err)) {
+      toastInfo('下载已取消')
+      versionStore.finishDownload()
+      return
+    }
     // 同上：后端已 mark_failed，前端用 showModal + onConfirm 让用户点击确定后退出下载页
     showModal({
       type: 'error',

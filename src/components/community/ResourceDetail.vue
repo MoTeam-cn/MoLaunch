@@ -18,6 +18,7 @@ import { useVersionStore } from '@/stores/version'
 import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showPrompt, showModal } from '@/utils/modal'
+import { isCancelledError } from '@/utils/async'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import HorizontalFilter from '@/components/common/HorizontalFilter.vue'
@@ -171,7 +172,13 @@ async function handleInstallModpack(v: ResourceVersion) {
     toastSuccess(`整合包 ${instanceName} 安装完成`)
   } catch (e: any) {
     const msg = e?.message || String(e)
-    // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+    // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
+    if (isCancelledError(e)) {
+      toastInfo('下载已取消')
+      versionStore.finishDownload()
+      return
+    }
+    // 真实失败：后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
     showModal({
       type: 'error',
       title: '整合包安装失败',

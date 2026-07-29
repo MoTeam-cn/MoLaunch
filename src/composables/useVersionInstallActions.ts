@@ -28,7 +28,7 @@ import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 import { showError, showConfirm, showModal } from '@/utils/modal'
 import { toastSuccess, toastInfo, toastWarning } from '@/utils/toast'
-import { safeCall } from '@/utils/async'
+import { isCancelledError, safeCall } from '@/utils/async'
 
 /** 安装请求参数（与 LoaderSelect.vue 的 install emit 类型对齐） */
 export interface InstallOptions {
@@ -101,7 +101,13 @@ export function useVersionInstallActions() {
       toastSuccess(`${options.instanceName} 安装完成`)
       await loadInstalledVersions()
     }).catch((e) => {
-      // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+      // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
+      if (isCancelledError(e)) {
+        toastInfo('下载已取消')
+        versionStore.finishDownload()
+        return
+      }
+      // 真实失败：后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
       showModal({
         type: 'error',
         title: '安装失败',
@@ -122,7 +128,13 @@ export function useVersionInstallActions() {
       await loadInstalledVersions()
       toastSuccess(`${versionId} 下载完成`)
     } catch (e) {
-      // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+      // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
+      if (isCancelledError(e)) {
+        toastInfo('下载已取消')
+        versionStore.finishDownload()
+        return
+      }
+      // 真实失败：后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
       showModal({
         type: 'error',
         title: '下载失败',

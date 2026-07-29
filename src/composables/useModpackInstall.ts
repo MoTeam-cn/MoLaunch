@@ -23,7 +23,8 @@ import { useVersionStore } from '@/stores/version'
 import { getProjectVersions, installModpack } from '@/utils/api/community'
 import { installMerged } from '@/utils/api/loader'
 import { showPrompt, showModal } from '@/utils/modal'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
+import { isCancelledError } from '@/utils/async'
 import type { ModpackMeta } from '@/types/online'
 import type { Platform, ResourceVersion } from '@/types/community'
 
@@ -119,7 +120,13 @@ export function useModpackInstall() {
       return true
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
-      // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
+      // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
+      if (isCancelledError(err)) {
+        toastInfo('下载已取消')
+        versionStore.finishDownload()
+        return false
+      }
+      // 真实失败：后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
       showModal({
         type: 'error',
         title: '整合包安装失败',
