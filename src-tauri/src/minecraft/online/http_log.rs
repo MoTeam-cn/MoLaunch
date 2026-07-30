@@ -2,16 +2,6 @@
 //!
 //! 将客户端对 api-server 的每次请求记录到 `.Molaunch/logs/http_YYYY-MM-DD.log`，
 //! 供开发者模式侧边栏加载表格展示，方便通过 `req_id` 追踪请求链路。
-//!
-//! 日志格式（每行一条）：
-//! ```text
-//! [2026-07-29 19:47:32.123] POST /v3/auth/refresh 200 req_id=2026072919478SNCOE6PWP
-//! ```
-//!
-//! 设计要点：
-//! - 仅记录请求元信息（方法/路径/状态码/req_id），不记录请求体和响应体
-//! - 追加写入，按天分文件，避免内存堆积
-//! - `req_id` 从响应体解析得到；若响应非 JSON 或解析失败则留空
 
 use crate::storage::Storage;
 use serde::Serialize;
@@ -174,44 +164,5 @@ fn parse_log_line(line: &str) -> Option<HttpLogEntry> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_log_line() {
-        let line = "[2026-07-29 19:47:32.123] POST /v3/auth/refresh 200 req_id=2026072919478SNCOE6PWP";
-        let entry = parse_log_line(line).unwrap();
-        assert_eq!(entry.timestamp, "2026-07-29 19:47:32.123");
-        assert_eq!(entry.method, "POST");
-        assert_eq!(entry.path, "/v3/auth/refresh");
-        assert_eq!(entry.status, 200);
-        assert_eq!(entry.req_id, "2026072919478SNCOE6PWP");
-    }
-
-    #[test]
-    fn test_parse_log_line_no_req_id() {
-        let line = "[2026-07-29 19:47:32.123] GET /v3/csrf/token 200";
-        let entry = parse_log_line(line).unwrap();
-        assert_eq!(entry.method, "GET");
-        assert_eq!(entry.path, "/v3/csrf/token");
-        assert_eq!(entry.status, 200);
-        assert_eq!(entry.req_id, "");
-    }
-
-    #[test]
-    fn test_parse_invalid_line() {
-        assert!(parse_log_line("not a log line").is_none());
-        assert!(parse_log_line("").is_none());
-    }
-
-    #[test]
-    fn test_extract_req_id() {
-        let body = r#"{"code":1,"data":null,"msg":"ok","req_id":"ABC123"}"#;
-        assert_eq!(extract_req_id(body), "ABC123");
-
-        let body_no_id = r#"{"code":1,"data":null,"msg":"ok"}"#;
-        assert_eq!(extract_req_id(body_no_id), "");
-
-        assert_eq!(extract_req_id("not json"), "");
-    }
-}
+#[path = "http_log_tests.rs"]
+mod tests;

@@ -1,10 +1,7 @@
 //! P2P 联机信令接口客户端
 //!
 //! 对接 api-server `/v1/signaling/*` 接口，实现房间创建/加入/退出/踢人/保活等。
-//!
 //! 接口参考：`api-server/docs/signaling.md`
-//!
-//! 阶段一仅声明类型与接口签名，阶段二填充实现。
 
 use serde::{Deserialize, Serialize};
 

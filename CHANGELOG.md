@@ -20,6 +20,35 @@
 - **验证**：`cargo check` 零警告零错误；`cargo test --lib` 91 个测试全部通过
 - **不变**：业务逻辑代码零改动，测试用例数量不减
 
+#### 代码清理批次 2：online 模块测试分离 + 注释精简
+
+- **测试分离**：将内联 `#[cfg(test)] mod tests` 提取到同级 `_tests.rs` 文件，源文件保持干净
+  - `src-tauri/src/minecraft/online/http_log.rs`（4 个测试）→ 新建 `http_log_tests.rs`
+  - `src-tauri/src/minecraft/online/client.rs`（1 个测试）→ 新建 `client_tests.rs`
+  - `src-tauri/src/minecraft/online/storage.rs`（2 个测试）→ 新建 `storage_tests.rs`
+  - `src-tauri/src/minecraft/online/auth.rs`（2 个测试）→ 新建 `auth_tests.rs`
+  - `src-tauri/src/minecraft/online/bridge.rs`（2 个测试）→ 新建 `bridge_tests.rs`
+  - `src-tauri/src/minecraft/online/protocol.rs`（11 个测试）→ 新建 `protocol_tests.rs`
+  - `src-tauri/src/minecraft/online/tun.rs`（1 个测试）→ 新建 `tun_tests.rs`
+  - `src-tauri/src/minecraft/online/crypto.rs`（4 个测试，含 `use ed25519_dalek::Verifier;`）→ 新建 `crypto_tests.rs`
+  - `src-tauri/src/minecraft/online/ecies.rs`（2 个测试，含 `use crate::minecraft::online::crypto::X25519StaticKeyPair;`）→ 新建 `ecies_tests.rs`
+  - 源文件末尾统一用 `#[cfg(test)] #[path = "<module>_tests.rs"] mod tests;` 引入
+- **注释精简**：online 目录 12 个文件精简冗余模块文档（超过 3 行的精简到 1-5 行）
+  - `ecies.rs` 24 行协议说明 → 3 行（详细协议在 `api-server/docs/auth.md`）
+  - `auth.rs` 23 行注册/登录流程文档 → 3 行
+  - `bridge.rs` 31 行架构图 → 4 行
+  - `protocol.rs` 44 行帧格式文档 → 5 行
+  - `tun.rs` 24 行平台约束/设计/扩展 → 4 行
+  - `storage.rs` 22 行存储内容/加密策略 → 7 行
+  - `http_log.rs` 14 行日志格式/设计要点 → 3 行
+  - `crypto.rs` 11 行算法列表 → 4 行
+  - `client.rs` 10 行 → 6 行（保留接口列表）
+  - `mod.rs` 23 行子模块清单 → 4 行（子模块清单与 `pub mod` 重复）
+  - `signaling.rs` 删除过时的"阶段一仅声明"说明
+  - `client_types.rs` 已简洁（5 行），未改动
+- **验证**：`cargo check` 零警告零错误；`cargo test --lib` 91 个测试全部通过（online 模块 29 个测试全通过）
+- **不变**：业务逻辑代码零改动，测试用例数量不减
+
 ### 新增
 
 #### DownloadManager 重构阶段 6：加载器 installer 统一 from_config

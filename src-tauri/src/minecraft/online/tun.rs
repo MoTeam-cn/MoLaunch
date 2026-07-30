@@ -2,26 +2,7 @@
 //!
 //! 跨平台 TUN 接口的创建、配置、读写与销毁。
 //! 基于 `tun-rs` crate，Windows 底层为 Wintun 驱动，Linux/macOS 为系统原生 TUN。
-//!
-//! # 平台约束
-//!
-//! - **Windows**：默认从可执行文件同目录搜索 `wintun.dll`；若调用方通过 `wintun_dll_path`
-//!   显式指定路径（如 Tauri resources 解析的路径），则优先使用该路径
-//! - **Linux/macOS**：需 root 或 CAP_NET_ADMIN 权限创建 TUN 接口
-//!
-//! # 设计
-//!
-//! - `VirtualNet`：TUN 接口抽象，持有 `AsyncDevice` 与接口元信息
-//! - `create_virtual_net()`：创建 TUN 接口并分配虚拟 IP
-//! - `VirtualNet::recv_packet()`：从 TUN 读出一个 IP 包
-//! - `VirtualNet::send_packet()`：向 TUN 写入一个 IP 包
-//! - `VirtualNet::close()`：销毁 TUN 接口（Drop 时自动调用）
-//!
-//! # 后续扩展
-//!
-//! - 路由配置：`ip route add 10.244.0.0/16 dev tun0`（当前 tun-rs 自动配置）
-//! - DNS 配置：Windows 支持，Linux 走 `/etc/resolv.conf`
-//! - 多队列：Linux 支持，提升吞吐
+//! Windows 需 `wintun.dll`，Linux/macOS 需 root 或 CAP_NET_ADMIN 权限。
 
 use std::io;
 use std::path::Path;
@@ -179,21 +160,5 @@ pub async fn poc_create_and_recv() -> io::Result<VirtualNetInfo> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// 单元测试：VirtualNetInfo 构造
-    #[test]
-    fn test_virtual_net_info() {
-        let info = VirtualNetInfo {
-            name: "tun-test".to_string(),
-            ipv4: "10.244.1.1".to_string(),
-            prefix_len: 24,
-            mtu: 1400,
-        };
-        assert_eq!(info.name, "tun-test");
-        assert_eq!(info.ipv4, "10.244.1.1");
-        assert_eq!(info.prefix_len, 24);
-        assert_eq!(info.mtu, 1400);
-    }
-}
+#[path = "tun_tests.rs"]
+mod tests;

@@ -5,9 +5,6 @@
 //! - `/v1/*` 业务接口：自动加 ECIES 信封、JWT 携带、CSRF 校验
 //!
 //! 接口参考：`api-server/docs/auth.md`、`api-server/docs/signaling.md`
-//!
-//! 类型与错误定义见 `client_types.rs`，本文件通过 `pub use` 重导出，
-//! 外部模块（如 `signaling.rs`）的 `use super::client::{BusinessResult, ClientError, OnlineClient}` 无需改动。
 
 use super::auth::{LoginRequest, LoginResponse, RefreshRequest, RefreshResponse, RegisterRequest, RegisterResponse};
 use super::client_types::{CsrfResponse, JwkKey, JwksResponse, TimeData, TimeResponse, UnifiedResponse};
@@ -571,14 +568,5 @@ impl OnlineClient {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_client_url_trim() {
-        let c1 = OnlineClient::new("https://api.example.com/");
-        assert_eq!(c1.base_url(), "https://api.example.com");
-        let c2 = OnlineClient::new("https://api.example.com");
-        assert_eq!(c2.base_url(), "https://api.example.com");
-    }
-}
+#[path = "client_tests.rs"]
+mod tests;

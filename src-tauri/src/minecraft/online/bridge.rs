@@ -1,33 +1,8 @@
 //! DataChannel ↔ TUN 桥接（阶段三子任务 3）
 //!
 //! 协调 TUN 接口读写循环与前端 DataChannel 的事件转发。
-//!
-//! # 架构
-//!
-//! 由于 WebRTC DataChannel 在前端（浏览器）管理，后端 TUN 接口在 Rust 侧，
-//! 桥接通过 Tauri 事件 + IPC 命令实现：
-//!
-//! ```text
-//! 后端 TUN 读包               前端 DataChannel
-//!   │                            │
-//!   │ 1. VirtualNet 读到 IP 包   │
-//!   │ 2. 编码为协议帧             │
-//!   │ 3. Tauri 事件 ─────────>   │
-//!   │              online://     │ 4. DataChannel.send(ArrayBuffer)
-//!   │              tun-packet-out│
-//!   │                            │
-//!   │   5. DataChannel.onmessage │
-//!   │ <───────── IPC 命令        │
-//!   │ 6. tun_forward_to          │ 7. 解码协议帧
-//!   │ 7. 解码 → 写入 TUN          │
-//! ```
-//!
-//! # 模块职责
-//!
-//! - `VirtualLanBridge`：持有 TUN 接口写通道 + 读写循环 task 句柄 + 桥接状态
-//! - `start()`：创建 TUN 接口 + 启动 select! 单读写循环 task（房主与加入方通用）
-//! - `decode_from_datachannel()`：前端收到 DataChannel 消息后调用，解码返回 IP 包 payload
-//! - `stop()`：停止桥接，销毁 TUN
+//! 后端 TUN 读包 → Tauri 事件 → 前端 DataChannel.send；
+//! 前端 DataChannel.onmessage → IPC 命令 → 写入 TUN。
 
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -275,18 +250,5 @@ impl Drop for VirtualLanBridge {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_bridge_state_default() {
-        let state = BridgeState::Stopped;
-        assert_eq!(state, BridgeState::Stopped);
-    }
-
-    #[test]
-    fn test_event_name_format() {
-        assert!(EVENT_TUN_PACKET_OUT.starts_with("online://"));
-        assert!(EVENT_TUN_PACKET_OUT.contains("tun-packet-out"));
-    }
-}
+#[path = "bridge_tests.rs"]
+mod tests;

@@ -1,26 +1,7 @@
 //! MoSign-v1 设备认证协议
 //!
 //! 实现 MoLaunch API Server 的设备注册/登录/登出流程。
-//! 协议参考：`api-server/docs/auth.md`
-//!
-//! ## 注册流程（POST /v3/auth/register）
-//!
-//! 1. 启动器生成 Ed25519 + X25519 密钥对（持久化）
-//! 2. 构造 content 载荷 JSON：`{ed25519_pub, x25519_pub, deviceid, timestamp, nonce}`
-//! 3. 用云端 RSA 公钥 RSA-OAEP-SHA256 加密 content
-//! 4. 签名材料 `"${payloadJson}.${nonce}.${timestamp}"`，用 Ed25519 私钥签名
-//! 5. 提交 `{deviceid, v, noop=x25519_pub, nonce, signature, content, timestamp}`
-//! 6. 持久化响应中的 `device_token`、`device_public_key`、`device_pk`
-//!
-//! ## 登录流程（POST /v3/auth/login）
-//!
-//! 1. 用本地 X25519 私钥 + 云端 X25519 公钥 ECDH 派生 shared
-//! 2. HKDF-SHA256 派生 session_key（salt=nonce, info="mosign-v1-session-key"）
-//! 3. 构造 content 载荷 JSON：`{device_pk, timestamp, nonce}`
-//! 4. 用 session_key 做 AES-256-GCM 加密 content
-//! 5. 用 session_key 做 HMAC-SHA256 签名 `"${payloadJson}.${nonce}.${timestamp}"`
-//! 6. 提交 `{device_pk, v, nonce, signature, content, timestamp}`
-//! 7. 持久化新 JWT
+//! 协议参考：`api-server/docs/auth.md`（注册/登录/刷新的完整流程与算法清单）
 
 use hmac::{Hmac, Mac};
 use serde::{Deserialize, Serialize};
@@ -498,42 +479,5 @@ impl OnlineKeyPair {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_generate_device_id_format() {
-        let id = generate_device_id();
-        assert!(id.starts_with("mcsdk-"));
-        // 4 段，每段 4 字符十六进制
-        let parts: Vec<&str> = id.split('-').collect();
-        assert_eq!(parts.len(), 5);
-        assert_eq!(parts[0], "mcsdk");
-        for part in &parts[1..] {
-            assert_eq!(part.len(), 4);
-            assert!(part.chars().all(|c| c.is_ascii_hexdigit()));
-        }
-    }
-
-    #[test]
-    fn test_build_login_request_round_trip() {
-        // 模拟设备已注册的状态
-        let kp = OnlineKeyPair::generate();
-        let mut creds = DeviceCredentials::default();
-        creds.ed25519_seed_b64u = b64u_encode(&kp.ed25519.seed());
-        creds.x25519_secret_b64u = b64u_encode(&kp.x25519.secret_bytes());
-        creds.device_pk = "test-device-pk".to_string();
-        creds.device_public_key_b64u = kp.x25519.public_b64u(); // 用自己公钥模拟云端公钥（仅测试流程）
-        creds.device_id = "mcsdk-test".to_string();
-
-        // 由于云端公钥 = 自己公钥，ECDH 会产生 shared（虽然不真实，但流程可走通）
-        let req = build_login_request(&creds);
-        // 由于 ECDH 需要真正的对方公钥，这里可能失败，但能验证流程
-        assert!(req.is_ok(), "登录请求构造应成功");
-        let req = req.unwrap();
-        assert_eq!(req.device_pk, "test-device-pk");
-        assert_eq!(req.v, PROTOCOL_VERSION);
-        assert!(!req.signature.is_empty());
-        assert!(!req.content.is_empty());
-    }
-}
+#[path = "auth_tests.rs"]
+mod tests;

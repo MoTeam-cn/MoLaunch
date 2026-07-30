@@ -4,22 +4,8 @@
 //! - Windows: `%APPDATA%/.MolaLaunch/online/device.json`
 //! - macOS/Linux: `~/.config/MolaLaunch/online/device.json`
 //!
-//! 旧路径（v1，已废弃）：`<exe_dir>/.Molaunch/online/device.json`
-//! 首次启动检测旧路径存在时自动迁移到新路径，迁移成功后删除旧文件。
-//!
-//! 存储内容：
-//! - Ed25519 私钥种子（32 字节，Base64Url）
-//! - X25519 静态私钥（32 字节，Base64Url）
-//! - device_pk（UUID 字符串）
-//! - device_token（JWT 字符串，access token，1h 有效期）
-//! - refresh_token（用于续期 access token，30d 有效期）
-//! - device_public_key（云端 X25519 公钥，Base64Url）
-//! - last_login_at（Unix 秒时间戳）
-//!
-//! 加密策略：
-//! - 文件整体 JSON 序列化后用 SDK DES 加密为字符串存储（与 AuthStorage 一致）
-//! - SDK 不可用时降级为明文 JSON（带 WARN 日志，跨平台兼容）
-//! - 文件权限：Unix 设为 0o600，Windows 默认 ACL 仅当前用户可读
+//! 旧路径（v1，已废弃）：`<exe_dir>/.Molaunch/online/device.json`，首次启动自动迁移。
+//! 加密策略：文件整体 JSON 序列化后用 SDK DES 加密；SDK 不可用时降级明文（带 WARN）。
 
 use crate::log_info;
 use crate::log_warn;
@@ -329,36 +315,5 @@ impl OnlineStorage {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_registered() {
-        let empty = DeviceCredentials::default();
-        assert!(!empty.is_registered());
-
-        let mut creds = DeviceCredentials::default();
-        creds.device_pk = "uuid".to_string();
-        creds.ed25519_seed_b64u = "seed".to_string();
-        creds.x25519_secret_b64u = "sec".to_string();
-        creds.device_public_key_b64u = "pub".to_string();
-        assert!(creds.is_registered());
-    }
-
-    #[test]
-    fn test_is_token_expired() {
-        let mut creds = DeviceCredentials::default();
-        // token_expires_at = 0 视为已过期
-        assert!(creds.is_token_expired());
-
-        // 设为未来 1 小时
-        let future = (chrono::Utc::now().timestamp() + 3600) as u64;
-        creds.token_expires_at = future;
-        assert!(!creds.is_token_expired());
-
-        // 设为过去
-        let past = (chrono::Utc::now().timestamp() - 100) as u64;
-        creds.token_expires_at = past;
-        assert!(creds.is_token_expired());
-    }
-}
+#[path = "storage_tests.rs"]
+mod tests;
