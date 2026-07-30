@@ -218,5 +218,3 @@ function handleClose() {
     </transition>
   </teleport>
 </template>
-</content>
-</invoke>
