@@ -310,6 +310,9 @@ pub struct ResourcePackConvertParams {
     pub path: String,
     /// 目标格式：zip / folder
     pub target_format: String,
+    /// 可选版本 ID（同 ResourcePackListParams 语义，按版本隔离配置解析基准目录）
+    #[serde(default)]
+    pub version_id: Option<String>,
 }
 
 /// 资源包转换结果

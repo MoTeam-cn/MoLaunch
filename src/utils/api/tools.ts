@@ -361,9 +361,17 @@ export function resourcepackList(versionId?: string): Promise<ResourcePackListRe
   })
 }
 
-/** 转换资源包格式（zip ↔ folder） */
-export function resourcepackConvert(path: string, targetFormat: 'zip' | 'folder'): Promise<ResourcePackConvertResult> {
-  return toolsManager<ResourcePackConvertResult>(TOOLS_ACTIONS.RESOURCEPACK_CONVERT, { path, target_format: targetFormat })
+/** 转换资源包格式（zip ↔ folder，可选 versionId 按版本隔离目录校验路径） */
+export function resourcepackConvert(
+  path: string,
+  targetFormat: 'zip' | 'folder',
+  versionId?: string,
+): Promise<ResourcePackConvertResult> {
+  return toolsManager<ResourcePackConvertResult>(TOOLS_ACTIONS.RESOURCEPACK_CONVERT, {
+    path,
+    target_format: targetFormat,
+    version_id: versionId ?? null,
+  })
 }
 
 // ==================== 版本 JSON 编辑 ====================

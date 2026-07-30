@@ -119,13 +119,16 @@ pub async fn convert(
     state: &AppState,
     params: ResourcePackConvertParams,
 ) -> Result<serde_json::Value, String> {
-    // convert 不需要 version_id（路径校验基于实际 packs_dir 解析）
-    // 简化处理：用全局 game_dir/resourcepacks 作为基准目录
-    let game_dir = {
-        let config = state.config.lock().await;
-        resolve_game_dir(&config.game_dir)
-    };
-    let packs_dir = game_dir.join("resourcepacks");
+    // 与 list 保持一致：按 version_id 解析版本隔离目录，避免版本隔离模式下全局 resourcepacks 不存在
+    let packs_dir = resolve_packs_dir(state, params.version_id.as_deref()).await;
+
+    // 目录不存在时给出明确提示（而非 canonicalize 抛 os error 2）
+    if !packs_dir.exists() {
+        return Err(format!(
+            "resourcepacks 目录不存在: {}（请在游戏中放置资源包后再转换）",
+            packs_dir.display()
+        ));
+    }
 
     // 路径安全：源路径规范化后必须在 resourcepacks 目录内
     let packs_canon = match packs_dir.canonicalize() {

@@ -81,7 +81,7 @@ function requestConvert(item: ResourcePackItem) {
 async function doConvert(item: ResourcePackItem, target: 'zip' | 'folder') {
   converting.value = item.path
   try {
-    const res = await resourcepackConvert(item.path, target)
+    const res = await resourcepackConvert(item.path, target, selectedVersionId.value || undefined)
     if (res.success) {
       toastSuccess(`转换成功：${res.output_path}`)
       await loadList()
