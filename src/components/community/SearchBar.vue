@@ -13,6 +13,7 @@ import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import { MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { getCategoryTags } from '@/utils/api/community'
+import { useSearchHistory } from '@/composables/useSearchHistory'
 
 const props = defineProps<{
   query: string
@@ -74,6 +75,35 @@ function onInput() {
   }, 500)
 }
 
+/** 搜索历史（localStorage 持久化，最近 5 条） */
+const { history: searchHistory, add: addHistory } = useSearchHistory()
+const showHistory = ref(false)
+
+function onFocus() {
+  if (searchHistory.value.length > 0) {
+    showHistory.value = true
+  }
+}
+
+function onBlur() {
+  // 延迟隐藏，让历史项 mousedown 先触发
+  setTimeout(() => { showHistory.value = false }, 150)
+}
+
+function selectHistory(term: string) {
+  localQuery.value = term
+  emit('update:query', term)
+  showHistory.value = false
+  commitSearch()
+}
+
+/** 主动搜索（回车/搜索按钮/点击历史）：记录历史 + 触发搜索 */
+function commitSearch() {
+  const term = localQuery.value.trim()
+  if (term) addHistory(term)
+  emit('search')
+}
+
 /** Select 选项变化时同步更新并立即触发搜索 */
 function selectAndUpdate(field: 'source' | 'modLoader' | 'category', value: number | string) {
   emit(`update:${field}` as any, value)
@@ -85,17 +115,36 @@ function selectAndUpdate(field: 'source' | 'modLoader' | 'category', value: numb
   <div class="space-y-2.5">
     <!-- 第一行：名称 + 来源 + 搜索按钮 -->
     <div class="grid grid-cols-[1fr_auto_auto_auto] gap-3 items-center">
-      <Input
-        v-model="localQuery"
-        placeholder="搜索资源名称..."
-        class="w-full"
-        @input="onInput"
-        @keydown.enter="emit('search')"
-      >
-        <template #prefix>
-          <MagnifyingGlassIcon class="w-4 h-4 text-gray-400" />
-        </template>
-      </Input>
+      <div class="relative">
+        <Input
+          v-model="localQuery"
+          placeholder="搜索资源名称..."
+          class="w-full"
+          @input="onInput"
+          @focus="onFocus"
+          @blur="onBlur"
+          @keydown.enter="commitSearch"
+        >
+          <template #prefix>
+            <MagnifyingGlassIcon class="w-4 h-4 text-gray-400" />
+          </template>
+        </Input>
+        <!-- 搜索历史下拉（focus 时展示，点击历史项填充并搜索） -->
+        <div
+          v-if="showHistory && searchHistory.length > 0"
+          class="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-20 overflow-hidden"
+        >
+          <div
+            v-for="term in searchHistory"
+            :key="term"
+            class="px-3 py-1.5 text-sm text-gray-700 hover:bg-primary-50 hover:text-primary-700 cursor-pointer flex items-center gap-2 transition-colors"
+            @mousedown.prevent="selectHistory(term)"
+          >
+            <MagnifyingGlassIcon class="w-3.5 h-3.5 text-gray-400 shrink-0" />
+            <span class="truncate flex-1">{{ term }}</span>
+          </div>
+        </div>
+      </div>
       <div class="w-36">
         <Select
           :model-value="source"
@@ -103,7 +152,7 @@ function selectAndUpdate(field: 'source' | 'modLoader' | 'category', value: numb
           @update:model-value="selectAndUpdate('source', $event as number)"
         />
       </div>
-      <Button type="primary" size="small" @click="emit('search')">
+      <Button type="primary" size="small" @click="commitSearch">
         <template #icon>
           <MagnifyingGlassIcon class="w-4 h-4" />
         </template>

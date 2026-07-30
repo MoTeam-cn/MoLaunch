@@ -10,6 +10,7 @@
 import { FolderOpenIcon } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import type { ResourceType } from '@/types/community'
+import { useTabPersistence } from '@/composables/useTabPersistence'
 
 interface Category {
   id: string
@@ -21,7 +22,7 @@ interface CommunityCategory extends Category {
   type: ResourceType
 }
 
-defineProps<{
+const props = defineProps<{
   /** 顶部官方下载分类 */
   topCategories: Category[]
   /** 社区资源分类 */
@@ -30,12 +31,20 @@ defineProps<{
   activeCategory: string
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   /** 点击分类项（父组件需同步清空 selectedVersion） */
   select: [category: string]
   /** 点击"打开游戏目录" */
   openGameDir: []
 }>()
+
+// tab 选中态 URL 持久化（与 NavSidebar 同机制：刷新保留 + 切换页面回来保留）
+useTabPersistence(
+  () => props.activeCategory,
+  (tab) => props.topCategories.some(c => c.id === tab)
+    || props.communityCategories.some(c => c.id === tab),
+  (tab) => emit('select', tab),
+)
 </script>
 
 <template>

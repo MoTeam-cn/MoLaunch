@@ -19,9 +19,9 @@
  *
  * 向后兼容：categories 项的 children 字段可选，未传时行为与原版一致（无子菜单）
  */
-import { ref, watch, onMounted, computed, type Component } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, watch, computed, type Component } from 'vue'
 import { ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { useTabPersistence } from '@/composables/useTabPersistence'
 
 interface NavCategory {
   id: string
@@ -42,9 +42,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:modelValue', id: string): void
 }>()
-
-const route = useRoute()
-const router = useRouter()
 
 /** 展开状态：按父项 id 记录 */
 const expandedMap = ref<Record<string, boolean>>({})
@@ -99,36 +96,23 @@ watch(() => props.modelValue, (val) => {
   }
 }, { immediate: true })
 
-// 页面加载时从 URL query.tab 恢复选中项（刷新页面保留路径）
-// 跳过 disabled 项：避免恢复到不可用的菜单（如未在房间时恢复到「房间详情」）
-onMounted(() => {
-  const tab = route.query.tab as string | undefined
-  if (tab && tab !== props.modelValue) {
-    // 检查 tab 是否在 categories 中（含 children）且未禁用
+// tab 选中态 URL 持久化（onMounted 恢复 + watch 写入，逻辑抽取到 useTabPersistence）
+useTabPersistence(
+  () => props.modelValue,
+  (tab) => {
+    // 校验 tab 是否在 categories 中（含 children）且未禁用
     for (const cat of props.categories) {
-      if (cat.id === tab && !cat.disabled) {
-        emit('update:modelValue', tab)
-        return
-      }
+      if (cat.id === tab && !cat.disabled) return true
       if (cat.children) {
         for (const child of cat.children) {
-          if (child.id === tab && !child.disabled) {
-            emit('update:modelValue', tab)
-            return
-          }
+          if (child.id === tab && !child.disabled) return true
         }
       }
     }
-  }
-})
-
-// 选中项变化时同步到 URL query（不产生历史记录，保留其他 query 参数）
-watch(() => props.modelValue, (val) => {
-  const currentTab = route.query.tab as string | undefined
-  if (val !== currentTab) {
-    router.replace({ query: { ...route.query, tab: val } })
-  }
-})
+    return false
+  },
+  (tab) => emit('update:modelValue', tab),
+)
 </script>
 
 <template>
