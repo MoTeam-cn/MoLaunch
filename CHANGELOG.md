@@ -7,6 +7,17 @@
 
 ## [未发布]
 
+### 重构
+
+#### CI 发布工作流改用 Node.js 上传脚本（消除 MoSign-v2 签名不一致）
+
+- 背景：`release.yml` 中上传/签名/注册逻辑使用内联 shell（heredoc + curl + openssl + node -e），存在 shell/Node 数据传递导致的签名不一致问题（heredoc 生成的 JSON 与 Node.js 签名读取的文件字节可能存在差异）
+- 改动：
+  - **新建** [scripts/ci-upload.cjs](scripts/ci-upload.cjs)：纯 Node.js 上传脚本，仅用内置模块（crypto/fs/https/http），无 npm 依赖。`JSON.stringify()` 生成 body Buffer，签名计算和 HTTP 请求使用同一 Buffer，保证 SHA256 完全一致。支持 S3 307 临时重定向
+  - **重构** [.github/workflows/release.yml](.github/workflows/release.yml)：「Upload to S3 and register release」步骤从 173 行内联 shell 缩减为 1 行 `node scripts/ci-upload.cjs` 调用；安装包定位逻辑拆分为独立 step（Locate installer and signature）；底部说明更新
+- 接口适配：MoLaunch 主仓库使用 `/v3/ci/presign-upload` 和 `/v3/ci/releases`（非 frp 版本），`CreateReleaseRequest` 字段包含 `channel` / `bundle_type` / `force_update` / `min_version` 等
+- 复用说明：脚本结构参考 `Frp/hack/ci-upload.cjs`，适配 MoLaunch 接口差异（上传 2 个文件：安装包 + .sig 签名文件；请求体字段更多）
+
 ### 新增
 
 #### Frp 联机功能阶段二前端（外部厂商安装/启禁 + 实时日志 + 认证中心占位 + apiServer 预留）

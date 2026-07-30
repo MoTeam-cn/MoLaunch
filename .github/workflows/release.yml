@@ -128,16 +128,14 @@ jobs:
       # See: docs/updater/design.md §5.2 / §6 MoSign-v2 协议
       # CI 不接触 S3 凭证，通过 /v3/ci/presign-upload 获取 PUT presigned URL 直传。
       # GitHub Secrets 仅保留 MOLAUNCH_ACTION_PUSH_KEY 一个（MoSign-v2 签名密钥）。
+      # 签名/上传/注册全部由 scripts/ci-upload.cjs 纯 Node.js 完成，消除 shell/Node
+      # 数据传递导致的签名不一致问题（JSON.stringify 生成 body Buffer，签名和请求共用）。
 
-      - name: Upload to S3 and register release
+      - name: Locate installer and signature
+        id: locate
         shell: bash
-        env:
-          MOLAUNCH_ACTION_PUSH_KEY: ${{ secrets.MOLAUNCH_ACTION_PUSH_KEY }}
         run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
           PLATFORM="${{ matrix.platform }}"
-
-          # ===== 1. 定位安装包与签名文件 =====
           BUNDLE_DIR="src-tauri/target/release/bundle"
           case "$PLATFORM" in
             windows)
@@ -162,146 +160,22 @@ jobs:
             exit 1
           fi
 
-          SETUP_FILENAME=$(basename "$SETUP_FILE")
-          SIG_FILENAME=$(basename "$SIG_FILE")
+          echo "setup_file=$SETUP_FILE" >> $GITHUB_OUTPUT
+          echo "sig_file=$SIG_FILE" >> $GITHUB_OUTPUT
 
-          # .sig 文件内容即为 base64 签名字符串（tauri signer 输出格式）
-          SIGNATURE_B64=$(tr -d '\n\r ' < "$SIG_FILE")
-
-          # 文件大小（跨平台 stat 兼容）
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            FILE_SIZE=$(stat -f%z "$SETUP_FILE")
-          else
-            FILE_SIZE=$(stat -c%s "$SETUP_FILE")
-          fi
-
-          # ===== 2. 批量获取 S3 预签名上传 URL =====
-          # POST /v3/ci/presign-upload，body = {version, platform, filenames: [setup, sig]}
-          cat > presign-payload.json <<EOF
-          {
-            "version": "${VERSION}",
-            "platform": "${PLATFORM}",
-            "filenames": ["${SETUP_FILENAME}", "${SIG_FILENAME}"]
-          }
-          EOF
-
-          PRESIGN_TIMESTAMP=$(date +%s)
-          PRESIGN_NONCE=$(openssl rand -hex 16)
-          PRESIGN_BODY_SHA256=$(openssl dgst -sha256 -r presign-payload.json | awk '{print $1}')
-          PRESIGN_STRING_TO_SIGN="POST\n/v3/ci/presign-upload\n${PRESIGN_TIMESTAMP}\n${PRESIGN_NONCE}\n${PRESIGN_BODY_SHA256}"
-          PRESIGN_SIGNATURE=$(printf "%b" "${PRESIGN_STRING_TO_SIGN}" | openssl dgst -sha256 -hmac "${MOLAUNCH_ACTION_PUSH_KEY}" | awk '{print $NF}')
-
-          echo "请求预签名上传 URL（MoSign-v2 鉴权）..."
-          PRESIGN_HTTP_STATUS=$(curl -sS -o presign-response.json -w "%{http_code}" \
-            -X POST "https://api.molaunch.moiu.cn/v3/ci/presign-upload" \
-            -H "Content-Type: application/json" \
-            -H "X-MoSign-Version: MoSign-v2" \
-            -H "X-MoSign-Timestamp: ${PRESIGN_TIMESTAMP}" \
-            -H "X-MoSign-Nonce: ${PRESIGN_NONCE}" \
-            -H "X-MoSign-Signature: ${PRESIGN_SIGNATURE}" \
-            -d @presign-payload.json)
-
-          echo "预签名响应 (HTTP $PRESIGN_HTTP_STATUS):"
-          cat presign-response.json
-
-          if [ "$PRESIGN_HTTP_STATUS" != "200" ]; then
-            echo "::error::获取预签名 URL 失败 (HTTP $PRESIGN_HTTP_STATUS)"
-            exit 1
-          fi
-
-          # ===== 3. 解析响应，用 curl PUT 直传到 S3 =====
-          # 用 Node.js 解析 JSON 响应（跨平台兼容，无需 jq）
-          node <<NODE_SCRIPT
-          const fs = require('fs');
-          const resp = JSON.parse(fs.readFileSync('presign-response.json', 'utf8'));
-          if (resp.code !== 1 || !resp.data || !Array.isArray(resp.data.uploads)) {
-            console.error('::error::预签名响应格式异常:', JSON.stringify(resp));
-            process.exit(1);
-          }
-          // 输出 upload_url 和 download_key 到临时文件供 bash 读取
-          const map = {};
-          for (const item of resp.data.uploads) {
-            map[item.filename] = item;
-          }
-          fs.writeFileSync('presign-map.json', JSON.stringify(map));
-          console.log('已解析 ' + resp.data.uploads.length + ' 个上传 URL，有效期 ' + resp.data.expires_in + ' 秒');
-          NODE_SCRIPT
-
-          SETUP_UPLOAD_URL=$(node -e "const m=require('./presign-map.json');process.stdout.write(m['${SETUP_FILENAME}'].upload_url)")
-          SETUP_DOWNLOAD_KEY=$(node -e "const m=require('./presign-map.json');process.stdout.write(m['${SETUP_FILENAME}'].download_key)")
-          SIG_UPLOAD_URL=$(node -e "const m=require('./presign-map.json');process.stdout.write(m['${SIG_FILENAME}'].upload_url)")
-
-          echo "上传安装包: $SETUP_FILE -> S3 (key=$SETUP_DOWNLOAD_KEY)"
-          curl -sS -X PUT --upload-file "$SETUP_FILE" "$SETUP_UPLOAD_URL"
-          if [ $? -ne 0 ]; then
-            echo "::error::安装包上传失败"
-            exit 1
-          fi
-
-          echo "上传签名文件: $SIG_FILE -> S3"
-          curl -sS -X PUT --upload-file "$SIG_FILE" "$SIG_UPLOAD_URL"
-          if [ $? -ne 0 ]; then
-            echo "::error::签名文件上传失败"
-            exit 1
-          fi
-
-          echo "S3 上传完成"
-
-          # ===== 4. 注册版本到 api-server =====
-          # download_url 传 S3 对象 key（相对路径），api-server 查询时动态生成 presigned URL
-          cat > release-payload.json <<EOF
-          {
-            "version": "${VERSION}",
-            "channel": "stable",
-            "platform": "${PLATFORM}",
-            "arch": "${{ matrix.arch }}",
-            "bundle_type": "${{ matrix.bundle_type }}",
-            "download_url": "${SETUP_DOWNLOAD_KEY}",
-            "signature": "${SIGNATURE_B64}",
-            "file_size": ${FILE_SIZE},
-            "file_hash": "",
-            "release_notes": "",
-            "release_url": "https://github.com/${{ github.repository }}/releases/tag/v${VERSION}",
-            "rollout_pct": 100,
-            "force_update": false,
-            "min_version": ""
-          }
-          EOF
-
-          # ===== MoSign-v2 签名 =====
-          # See: docs/updater/design.md §6 MoSign-v2 协议
-          # string-to-sign = METHOD\nPATH\nTIMESTAMP\nNONCE\nBODY_SHA256_HEX
-          # signature = HMAC-SHA256(action_push_key, string_to_sign).hex()
-          TIMESTAMP=$(date +%s)
-          NONCE=$(openssl rand -hex 16)
-          BODY_SHA256=$(openssl dgst -sha256 -r release-payload.json | awk '{print $1}')
-          STRING_TO_SIGN="POST\n/v3/ci/releases\n${TIMESTAMP}\n${NONCE}\n${BODY_SHA256}"
-          SIGNATURE=$(printf "%b" "${STRING_TO_SIGN}" | openssl dgst -sha256 -hmac "${MOLAUNCH_ACTION_PUSH_KEY}" | awk '{print $NF}')
-
-          echo "MoSign-v2 签名参数："
-          echo "  timestamp: ${TIMESTAMP}"
-          echo "  nonce: ${NONCE}"
-          echo "  body_sha256: ${BODY_SHA256}"
-
-          echo "注册版本到 api-server（MoSign-v2 鉴权）..."
-          HTTP_STATUS=$(curl -sS -o register-response.txt -w "%{http_code}" \
-            -X POST "https://api.molaunch.moiu.cn/v3/ci/releases" \
-            -H "Content-Type: application/json" \
-            -H "X-MoSign-Version: MoSign-v2" \
-            -H "X-MoSign-Timestamp: ${TIMESTAMP}" \
-            -H "X-MoSign-Nonce: ${NONCE}" \
-            -H "X-MoSign-Signature: ${SIGNATURE}" \
-            -d @release-payload.json)
-
-          echo "注册响应 (HTTP $HTTP_STATUS):"
-          cat register-response.txt
-
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "::error::版本注册失败 (HTTP $HTTP_STATUS)"
-            exit 1
-          fi
-
-          echo "版本 ${VERSION} (${PLATFORM}) 已注册到 api-server"
+      - name: Upload to S3 and register release
+        shell: bash
+        env:
+          MOLAUNCH_ACTION_PUSH_KEY: ${{ secrets.MOLAUNCH_ACTION_PUSH_KEY }}
+        run: |
+          node scripts/ci-upload.cjs \
+            "${{ steps.version.outputs.VERSION }}" \
+            "${{ matrix.platform }}" \
+            "${{ matrix.arch }}" \
+            "${{ matrix.bundle_type }}" \
+            "${{ steps.locate.outputs.setup_file }}" \
+            "${{ steps.locate.outputs.sig_file }}" \
+            "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
 
   # 创建 GitHub Release 页面（仅历史回顾，不作为下载源）
   release:
@@ -372,9 +246,14 @@ jobs:
 #                                         对应 api-server 配置项 ci.action_push_key
 #                                         用途：MoSign-v2 HMAC 签名（/v3/ci/releases、/v3/ci/presign-upload）
 #    S3 凭证（access_key_id / secret_access_key / region / bucket / endpoint）仅由 api-server 持有，
-#    CI 通过 POST /v3/ci/presign-upload 换取 PUT presigned URL 后直接 curl 上传文件到 S3，
+#    CI 通过 POST /v3/ci/presign-upload 换取 PUT presigned URL 后直接上传文件到 S3，
 #    全程不接触 S3 凭证，无需在 GitHub Secrets 单独配置。
 #
-# 3. 安装包上传路径规范：s3://{bucket}/updater/v{version}/{platform}/{filename}
+# 3. 上传/签名/注册逻辑由 scripts/ci-upload.cjs 纯 Node.js 实现：
+#    - JSON.stringify() 生成 body Buffer，签名和 HTTP 请求共用同一 Buffer，消除签名不一致
+#    - 无 heredoc / curl / openssl / shell 变量展开，行为确定
+#    - 支持 S3 307 临时重定向
+#
+# 4. 安装包上传路径规范：s3://{bucket}/updater/v{version}/{platform}/{filename}
 #    platform 取值：windows / macos / linux（与数据库 app_releases.platform 一致）
 #    客户端查询 /v1/updates/manifest 时由 api-server 动态生成 GET presigned URL（1h 有效）
