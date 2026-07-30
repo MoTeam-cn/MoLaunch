@@ -14,8 +14,8 @@ use crate::commands::system::{
     about::get_about_data,
     config::{get_config_path, save_config_to_file},
     developer::{
-        get_cache_stats, get_storage_dirs, get_system_info, is_developer_unlocked,
-        unlock_developer_mode,
+        close_devtools, get_cache_stats, get_storage_dirs, get_system_info, is_devtools_open,
+        is_developer_unlocked, open_devtools, unlock_developer_mode,
     },
     game_dir::{
         get_game_dir, get_system_memory, open_game_dir, open_path, reveal_in_explorer,
@@ -148,6 +148,20 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register("get_cache_stats", handler!(_state, _app, _params, {
         let r = get_cache_stats().await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    // devtools 控制（3 个）：要求开发者模式已解锁且已开启，普通用户无法触发
+    d.register("open_devtools", handler!(_state, app, _params, {
+        open_devtools(&app)?;
+        Ok(serde_json::Value::Null)
+    }));
+    d.register("close_devtools", handler!(_state, app, _params, {
+        close_devtools(&app)?;
+        Ok(serde_json::Value::Null)
+    }));
+    d.register("is_devtools_open", handler!(_state, app, _params, {
+        let r = is_devtools_open(&app)?;
+        Ok(serde_json::to_value(r).map_err(|e| e.to_string())?)
     }));
 
     d.register("get_about_data", handler!(_state, _app, _params, {

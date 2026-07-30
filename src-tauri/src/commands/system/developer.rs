@@ -1,13 +1,15 @@
 //! 开发者模式相关命令
 //!
 //! 触发流程：
-//! 1. 用户在「其他」页连续点击应用版本号 5 次 → 调用 `unlock_developer_mode`
-//! 2. 解锁后「高阶配置」顶部显示「开发者模式」开关卡片 → 调用 `set_developer_mode`
+//! 1. 用户在「更多 → 系统信息」子页签连续点击应用版本号 5 次，或在同页
+//!    「设备 ID」行连续双击 5 次 → 调用 `unlock_developer_mode`
+//! 2. 解锁后「进阶设置」顶部显示「开发者模式」开关卡片 → 调用 `apply_config({developerMode})`
 //! 3. 开关开启后「设置」侧边菜单出现「开发者」项 → 进入 SettingsDeveloper.vue
+//! 4. 开发者页面可通过「打开开发者工具」按钮调用 `open_devtools` 调出 WebView2 DevTools
 //!
 //! 存储位置：Windows 注册表 `HKCU\Software\MoLaunch` 下的两个布尔值
 //! - `DeveloperUnlocked`：是否已解锁（决定开关卡片是否显示）
-//! - `DeveloperMode`：开关是否开启（决定侧边菜单 developer 项是否显示）
+//! - `DeveloperMode`：开关是否开启（决定侧边菜单 developer 项是否显示 + devtools 是否可调出）
 
 use crate::log_info;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
@@ -18,6 +20,7 @@ use crate::utils::cache_app;
 use crate::utils::cache_stats;
 use crate::utils::cache_temp;
 use serde::Serialize;
+use tauri::{AppHandle, Manager};
 
 /// 注册表键名：开发者模式是否已解锁
 pub const KEY_DEV_UNLOCKED: &str = "DeveloperUnlocked";
@@ -139,4 +142,63 @@ pub async fn get_cache_stats() -> Result<cache_stats::CacheStatsResult, String> 
     tauri::async_runtime::spawn_blocking(|| cache_stats::collect_all())
         .await
         .map_err(|e| format!("Failed to collect cache stats: {}", e))
+}
+
+// ==================== DevTools 控制 ====================
+//
+// 安全约束：所有 devtools 控制函数均要求 DeveloperUnlocked=true && DeveloperMode=true
+// 双层校验，确保普通用户即使绕过前端按钮直接调 IPC 也无法打开 devtools。
+// 任何一层关闭均拒绝调用，避免开发者模式被关闭后 devtools 仍可调出。
+
+/// 校验当前用户是否有权限使用 devtools（开发者模式已解锁且已开启）
+fn require_dev_mode() -> Result<(), String> {
+    if !is_developer_unlocked() {
+        return Err("开发者模式未解锁".to_string());
+    }
+    if !reg_get_bool(KEY_DEV_MODE) {
+        return Err("开发者模式未开启".to_string());
+    }
+    Ok(())
+}
+
+/// 打开主窗口的 WebView2 DevTools
+///
+/// 在开发者模式已开启时调用 `WebviewWindow::open_devtools()` 调出开发者工具。
+/// 重复调用是幂等的（DevTools 已打开时不会重复打开）。
+pub fn open_devtools(app: &AppHandle) -> Result<(), String> {
+    require_dev_mode()?;
+    if let Some(window) = app.get_webview_window("main") {
+        window.open_devtools();
+        log_info!("[Developer] DevTools opened");
+        Ok(())
+    } else {
+        Err("主窗口未找到".to_string())
+    }
+}
+
+/// 关闭主窗口的 WebView2 DevTools
+pub fn close_devtools(app: &AppHandle) -> Result<(), String> {
+    require_dev_mode()?;
+    if let Some(window) = app.get_webview_window("main") {
+        window.close_devtools();
+        log_info!("[Developer] DevTools closed");
+        Ok(())
+    } else {
+        Err("主窗口未找到".to_string())
+    }
+}
+
+/// 查询主窗口的 DevTools 是否已打开
+///
+/// 返回 false 的情况：
+/// - DevTools 实际未打开
+/// - 开发者模式未开启（拒绝查询，避免绕过校验探测状态）
+/// - 主窗口未找到
+pub fn is_devtools_open(app: &AppHandle) -> Result<bool, String> {
+    require_dev_mode()?;
+    if let Some(window) = app.get_webview_window("main") {
+        Ok(window.is_devtools_open())
+    } else {
+        Ok(false)
+    }
 }
