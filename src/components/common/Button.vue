@@ -136,6 +136,9 @@ const sizeClass = computed(() => {
   height: 24px;
   padding: 0 11px;
   font-size: 12px;
+  /* line-height 收紧到 1，让文本行高接近 font-size，
+     与 14px icon 在 flex 居中后视觉中心对齐（默认 1.5715 会让文本偏高） */
+  line-height: 1;
 }
 .btn-size-small {
   height: 28px;
@@ -164,7 +167,7 @@ const sizeClass = computed(() => {
   margin-right: 8px;
 }
 .btn-size-mini > :deep(svg:not(.btn-spinner)) {
-  margin-right: 4px;
+  margin-right: 8px;
 }
 .btn-size-small > :deep(svg:not(.btn-spinner)) {
   margin-right: 6px;

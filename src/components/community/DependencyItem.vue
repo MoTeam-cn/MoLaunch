@@ -7,6 +7,7 @@
  */
 import type { ResolvedDependency } from '@/types/community'
 import Tooltip from '@/components/common/Tooltip.vue'
+import CachedImage from '@/components/common/CachedImage.vue'
 import {
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -59,10 +60,13 @@ const hasCompatibleVersion = () => props.dep.suggestedVersion !== null
 
     <!-- logo -->
     <div class="w-8 h-8 shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
-      <img v-if="logoUrl()" :src="logoUrl()" :alt="projectName()" class="w-full h-full object-cover" />
-      <svg v-else class="w-5 h-5 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-      </svg>
+      <CachedImage :src="logoUrl()" :alt="projectName()" class="w-full h-full object-cover">
+        <template #fallback>
+          <svg class="w-5 h-5 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+          </svg>
+        </template>
+      </CachedImage>
     </div>
 
     <!-- 名称 + 版本 -->
