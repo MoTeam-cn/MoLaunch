@@ -5,7 +5,7 @@
  * 顶部子菜单分为：实验性功能 / DevTools / 证书与安全 / 日志 / 存储 / 系统信息，
  * 六个子页签已拆分到 ./developer/ 目录：
  * - 实验性功能：Modrinth CDN 直连 → ExperimentalTab
- * - DevTools：WebView2 开发者工具调出/关闭 → DevToolsTab
+ * - DevTools：WebView2 开发者工具调出/关闭 + 测试版水印隐藏解锁 → DevToolsTab
  * - 证书与安全：TLS 信任源 + 忽略 TLS + 自定义证书管理 → CertsTab
  * - 日志：HTTP 请求日志 + 应用日志 → LogsTab
  * - 存储：缓存目录 + 存储信息 → StorageTab
@@ -13,11 +13,18 @@
  *
  * 数据来源：storageDirs / systemInfo 由本文件统一加载并经 props 下发；
  * ExperimentalTab / CertsTab 各自加载所需配置，保持职责内聚。
+ *
+ * 开发者页面独占快捷键：
+ * - Ctrl/Cmd + Shift + D：切换 DevTools 打开/关闭
+ * - Alt + 1~6：切换子页签（1=实验性 / 2=DevTools / 3=证书 / 4=日志 / 5=存储 / 6=系统信息）
+ * - 仅在本组件存活时生效（onUnmounted 自动解绑），由 useDevShortcuts 在 capture
+ *   阶段 stopImmediatePropagation 抢占事件流，绕过 useDevToolsGuard 全局防护
  */
 import { ref, onMounted } from 'vue'
 import SubTabBar from '@/components/common/SubTabBar.vue'
 import * as tauri from '@/utils/tauri'
 import { toastError } from '@/utils/toast'
+import { useDevShortcuts } from '@/composables/useDevShortcuts'
 import {
   BeakerIcon,
   CommandLineIcon,
@@ -43,6 +50,15 @@ const subTabs = [
   { id: 'system', label: '系统信息', icon: CpuChipIcon },
 ]
 const activeSubTab = ref('experimental')
+
+// ── 开发者页面独占快捷键 ──
+// Alt+1~6 切换子页签；Ctrl+Shift+D 切换 DevTools（由 composable 内部处理）
+useDevShortcuts({
+  onSwitchTab: (index: number) => {
+    const tab = subTabs[index]
+    if (tab) activeSubTab.value = tab.id
+  },
+})
 
 // ── 共享数据（storageDirs / systemInfo 统一加载，props 下发） ──
 const storageDirs = ref<tauri.StorageDirs | null>(null)
