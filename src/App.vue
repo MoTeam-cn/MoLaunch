@@ -13,6 +13,7 @@ import Modal from '@/components/common/Modal.vue'
 import CrashDialog from '@/components/common/CrashDialog.vue'
 import Toast from '@/components/common/Toast.vue'
 import UpdateDialog from '@/components/about/UpdateDialog.vue'
+import Watermark from '@/components/common/Watermark.vue'
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
@@ -24,6 +25,7 @@ import { setToastRef } from '@/utils/toast'
 import { initAutoCheck } from '@/utils/updater'
 import { initDownloadStream } from '@/composables/useDownloadStream'
 import { useDragDrop } from '@/composables/useDragDrop'
+import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
@@ -38,6 +40,9 @@ const isRestoring = ref(true)
 
 // 注册全局拖拽事件监听（必须在 onMounted 中调用，onUnmounted 自动清理）
 useDragDrop()
+// 全局 DevTools 防护：禁用右键菜单 + 拦截 F12/Ctrl+Shift+I 等 devtools 快捷键
+// 后端 open_devtools action 仍可在开发者模式开启时调出，普通用户无法绕过
+useDevToolsGuard()
 
 onMounted(() => {
   console.log('[Startup][Frontend] App.vue onMounted @', new Date().toISOString())
@@ -138,6 +143,8 @@ async function initApp() {
   <Toast ref="toastRef" />
   <UpdateDialog />
   <DragOverlay />
+  <!-- 测试版水印：仅在测试版构建（package.json version 含 beta/alpha/rc/canary 后缀）时渲染 -->
+  <Watermark />
   <!-- 会话恢复期间的加载遮罩 -->
   <Teleport to="body">
     <Transition name="fade">
