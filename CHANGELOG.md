@@ -9,6 +9,91 @@
 
 ### 新增
 
+#### Frp 联机功能阶段二前端（外部厂商安装/启禁 + 实时日志 + 认证中心占位 + apiServer 预留）
+
+- 背景：在阶段一（系统默认厂商 + frpc 配置文件启动）基础上，前端先行落地阶段二接口契约与 UI，覆盖外部厂商安装/卸载/启禁、frpc 实时日志流、认证中心占位、apiServer 公共 Frp 服务器 API 预留封装；后端 action 与 Tauri event 待阶段二后端实现后联调
+- 设计依据：[docs/FRP_MANAGER_DESIGN.md](docs/FRP_MANAGER_DESIGN.md)、[docs/FRP_PUBLIC_SERVER_API_DESIGN.md](docs/FRP_PUBLIC_SERVER_API_DESIGN.md)
+- 改动：
+  - **前端类型扩展**（[src/types/frp.ts](src/types/frp.ts)）：`ProviderInfo` 追加 `enabled` / `distribution` / `homepage` 字段；新增 `LogFileInfo` / `LogFileContent` / `FrpcLogEvent` / `FrpTunnelStatusEvent` / `InstallProviderParams` / `ProviderIdParams` / `ReadLogParams` 类型，与后端 action 列表一一对应
+  - **前端 IPC API**（[src/utils/api/frp-manager.ts](src/utils/api/frp-manager.ts)）：`FRP_ACTIONS` 追加 `INSTALL_PROVIDER_FROM_DIR` / `INSTALL_PROVIDER_FROM_ZIP` / `UNINSTALL_PROVIDER` / `ENABLE_PROVIDER` / `DISABLE_PROVIDER` / `LIST_LOG_FILES` / `READ_LOG_FILE` 共 7 个常量；新增 `installProviderFromDir` / `installProviderFromZip` / `uninstallProvider` / `enableProvider` / `disableProvider` / `listLogFiles` / `readLogFile` 便捷封装
+  - **前端 Store 扩展**（[src/stores/frp.ts](src/stores/frp.ts)）：新增 `logs` / `logsLoading` / `selectedLogTunnelId` / `logFiles` / `logsHasMore` / `providerActionLoading` state；新增 `installProviderFromDir` / `installProviderFromZip` / `uninstallProvider` / `toggleProvider` / `loadLogFiles` / `readLogs` / `clearLogs` 共 7 个 actions，统一 toast 错误提示，与 `stores/online.ts` 风格一致
+  - **侧边栏分类扩展**（[src/composables/useFrpSidebar.ts](src/composables/useFrpSidebar.ts)）：`frpCategory.children` 追加「认证中心」（`auth`，ShieldCheckIcon）和「运行日志」（`logs`，DocumentTextIcon）两个子项；`FrpSubCategory` 类型扩展为 `'providers' | 'tunnels' | 'auth' | 'logs'`
+  - **厂商列表增强**（[src/components/frp/ProviderList.vue](src/components/frp/ProviderList.vue)）：顶部操作栏新增「从文件夹安装」「从 ZIP 安装」两个按钮（复用 `pickDirectory` / `pickFile`）；厂商卡片增加 authType 徽章（none=绿/oauth2=蓝/device_code=紫/api_key=黄）和 distribution 徽章（system=灰/bundled=蓝/url=青）；外部厂商卡片增加启用/禁用 Select 切换 + 「卸载」按钮（`showConfirm` 二次确认），禁用态卡片半透明显示；空状态 icon + text 垂直水平居中；组件 245 行，未超 300 行约束
+  - **穿透管理增强**（[src/components/frp/TunnelManager.vue](src/components/frp/TunnelManager.vue)）：创建表单新增「厂商」Select 字段（仅列出 `enabled && (frpcReady || builtin)` 的厂商，默认 `system-default`）；厂商选择联动：未就绪的外部厂商显示 amber 色提示「请先在厂商列表页下载 frpc」；隧道卡片增加厂商名徽章（通过 `providerId` 在 providers 列表中查找 name）；组件 297 行，未超 300 行约束
+  - **运行日志组件**（新建 [src/components/frp/FrpLogs.vue](src/components/frp/FrpLogs.vue)）：顶部工具栏（隧道 ID Select + 级别 Select + 刷新 + 清空），中部深色背景日志流（max-height 60vh + 垂直滚动），每行按级别着色（复用 `logLineClass` from `@/utils/log-display`，禁止重复定义颜色）；底部状态栏（当前隧道 + 行数 + 是否还有更多）；`onMounted` 启动 `frpc-log` 和 `frp-tunnel-status` 两个 Tauri event 监听（复用 `useTauriEvent` composable，自动 onUnmounted unlisten），实时日志按选中隧道过滤后追加到 `store.logs`，隧道停止时自动刷新历史日志；初始加载 `store.readLogs(selectedLogTunnelId)` 读取历史；空状态 icon + text 垂直水平居中；组件 154 行
+  - **认证中心占位**（新建 [src/components/frp/AuthCenter.vue](src/components/frp/AuthCenter.vue)）：阶段三完整实现，阶段二仅显示 ShieldCheckIcon + 「认证中心」+ 「此功能将在阶段三上线，敬请期待」占位 UI，避免侧边栏菜单点击后空白
+  - **联机页面集成**（[src/views/Online.vue](src/views/Online.vue)）：导入 `FrpLogs` 和 `AuthCenter` 组件，`currentComponent` switch 追加 `case 'auth': return AuthCenter` 和 `case 'logs': return FrpLogs`，`activeCategory` 类型已包含 `'auth' | 'logs'` 无需修改
+  - **apiServer 公共服务预留**（新建 [src/utils/api/frp-public-server.ts](src/utils/api/frp-public-server.ts)）：定义 `PublicFrpServer` / `AllocateRequest` / `AllocateResponse` 类型，`listPublicFrpServers` / `allocatePublicFrpServer` / `releasePublicFrpServer` 三个函数当前直接抛错（`'apiServer 公共 Frp 服务器 API 尚未实现'`），等 apiServer 实现 `/v1/frp/*` 路由后改为实际 HTTP 请求；当前不引入 `invoke` / `fetch` 依赖以避免未使用 import 警告
+- 复用清单：
+  - 文件选择：`pickFile` / `pickDirectory` from `@/utils/fileDialog`（禁止直接用 `@tauri-apps/plugin-dialog`）
+  - 二次确认：`showConfirm` from `@/utils/modal`
+  - 日志颜色：`logLineClass` / `parseLogLines` / `LogLine` from `@/utils/log-display`（项目约定 ERROR=red-400 / WARN=yellow-400 / INFO=green-400 / DEBUG=cyan-400 / TRACE=slate-500）
+  - Tauri event：`useTauriEvent` composable（自动 onUnmounted unlisten，参考 `JavaDownloadBar.vue` 模式）
+  - Toast：`toastSuccess` / `toastError` from `@/utils/toast`
+  - 自定义组件：`Button` / `Input` / `Select` / `Tooltip`（禁止用原生 `<button>` / `<input>` / `<select>` / `title`）
+- 约束遵守：
+  - Vue 组件行数：ProviderList 245 / TunnelManager 297 / FrpLogs 154 / AuthCenter 19，均 ≤ 300
+  - 单列布局（参考 PCL2）：厂商卡片、隧道卡片、日志流均为单列
+  - 空状态：icon + text 垂直水平居中（ProviderList / TunnelManager / FrpLogs 均遵守）
+  - 不使用 Emoji，全部使用 Heroicons 图标 + 文字标签
+- 待联调：后端 action（`install_provider_from_dir` 等 7 个）和 Tauri event（`frpc-log` / `frp-tunnel-status`）实现后即可联调；apiServer `/v1/frp/*` 路由实现后改写 `frp-public-server.ts` 抛错为实际请求
+- 用户反馈：阶段二前端按规格实现，待后端 action 落地后联调
+
+#### Frp 联机功能阶段二后端（外部厂商系统 + 日志格式改造 + Tauri event 推送 + 日志读取 action）
+
+- 背景：在阶段一后端（系统默认厂商 + frpc 进程管理）和阶段二前端（外部厂商安装/启禁 + 实时日志 UI）基础上，实现阶段二后端：外部厂商安装/卸载/启禁、日志格式改造（`[HH:MM:SS.ms] [LEVEL] line`）、frpc-log / frp-tunnel-status event 实时推送、日志读取 action
+- 设计依据：[docs/FRP_MANAGER_DESIGN.md](docs/FRP_MANAGER_DESIGN.md) §4.1（厂商清单结构）、§4.2（frpc 分发方式）、阶段二前端已落地的 action 契约和 event payload
+- 改动：
+  - **共享类型扩展**（[src-tauri/src/commands/frp/mod.rs](src-tauri/src/commands/frp/mod.rs)）：新增 `ProviderManifest` / `BinaryConfig` / `DownloadConfig` / `AuthConfig`（厂商 manifest.json 反序列化结构，`auth.type` 用 `#[serde(rename = "type")]` 处理关键字）；新增 `LogFileInfo` / `LogFileContent`（日志读取返回类型）；`ProviderInfo` 扩展 `enabled` / `distribution` / `homepage` 字段；新增 `providers_state_path()` 路径函数 + `validate_provider_id()` 公共校验函数（kebab-case，最长 64 字符）；`AuthConfig` 实现 `Default`（默认 auth_type=none）以支持 `#[serde(default)]`
+  - **厂商管理改造**（[src-tauri/src/commands/frp/provider.rs](src-tauri/src/commands/frp/provider.rs)）：`list_providers` 改造为扫描 `<base_dir>/providers/` 下外部厂商目录 + 读取 manifest.json + 合并内置系统默认厂商，manifest 损坏或 id 不匹配的厂商跳过；新增 `install_provider_from_dir` / `install_provider_from_zip`（支持扁平/单根目录 ZIP，Zip Slip 防护 + canonicalize 父目录 starts_with 校验，参考插件系统 `extract_zip_safely` 等价实现）；新增 `uninstall_provider`（双重 canonicalize 防路径遍历）/ `enable_provider` / `disable_provider`（状态持久化到 `<base_dir>/frp/providers.json`）；`ensure_frpc` 增加 `provider_id: Option<String>` 参数，外部厂商 distribution=bundled 校验文件存在，distribution=url 实现 HTTPS + 域名白名单 + SHA256 校验 + archive 解压；新增 `get_frpc_path_for_provider` 按厂商返回 frpc 路径；新增 `read_provider_manifest` / `read_providers_state` / `write_providers_state` / `copy_dir_recursive` / `determine_zip_prefix` / `extract_zip_safely` / `validate_download_url` / `compute_sha256` / `extract_archive` 辅助函数
+  - **进程管理改造**（[src-tauri/src/commands/frp/process.rs](src-tauri/src/commands/frp/process.rs)）：日志格式从 `[<unix_seconds>] [source] line` 改为 `[HH:MM:SS.ms] [LEVEL] line`（用 `chrono::Local::now().format("%H:%M:%S%.3f")`，LEVEL 推断：行内含 [E]/error/panic → ERROR，stderr → WARN，stdout → INFO）；`capture_stream` 增加 `app: AppHandle` 参数，每读到一行除写文件还 `app.emit("frpc-log", payload)` 推送实时日志（payload 含 tunnelId/tunnelName/line/timestamp/level，字段名 camelCase）；`FrpcHandle` 结构从 `{ child, pid }` 改为 `{ pid, stop_tx }`，child 移入 monitor task；`start_tunnel` 签名增加 `app: AppHandle`，按隧道 `provider_id` 选择对应厂商 frpc（调用 `ensure_frpc` + `get_frpc_path_for_provider`），spawn monitor task 用 `tokio::select!` 同时等待 child.wait() 和 stop_rx，退出时从 RUNNING 移除并 `app.emit("frp-tunnel-status", payload)` 推送状态变更（payload 含 tunnelId/tunnelName/status/pid/exitCode/error）；`stop_tunnel` 改造为先取出 stop_tx 并 drop 通知 monitor，再用 `kill_process_tree` 兜底；新增 `list_log_files`（扫描 logs 目录按修改时间倒序）和 `read_log_file`（尾部 maxLines 行，默认 500）
+  - **沙箱校验增强**（[src-tauri/src/commands/frp/sandbox.rs](src-tauri/src/commands/frp/sandbox.rs)）：`validate_tunnel` 顶部增加 `provider_id` 非空 + kebab-case 格式校验（复用 `validate_provider_id`，不在后端校验厂商是否存在或启用，由前端 store 在创建前校验）
+  - **分发层扩展**（[src-tauri/src/utils/frp_manager.rs](src-tauri/src/utils/frp_manager.rs)）：注册 7 个新 action（`install_provider_from_dir` / `install_provider_from_zip` / `uninstall_provider` / `enable_provider` / `disable_provider` / `list_log_files` / `read_log_file`）；`start_tunnel` handler 改用 `app` 参数（`app.clone()` 传给 `process::start_tunnel`）；`ensure_frpc` handler 接收可选 `provider_id` 参数（`unwrap_or_default` 兼容空 params）；新增 `EnsureFrpcParams` / `InstallProviderParams` / `ProviderIdParams` / `ReadLogParams` 参数结构体
+- 复用清单：
+  - 插件系统模式：`copy_dir_recursive` / `determine_zip_prefix` / `extract_zip_safely` 等价实现于 frp 模块内（不 import 插件系统私有函数，避免跨模块耦合）
+  - 路径遍历防护：参考 `commands/plugins/sandbox.rs` 的双重 canonicalize + starts_with 模式
+  - shell 调用：`crate::minecraft::system::shell::kill_process_tree`（项目硬约束）
+  - HTTP 客户端：`crate::http::get_client()`
+  - 日志宏：`crate::log_info!` / `crate::log_warn!`
+  - 时间格式化：`chrono::Local::now().format("%H:%M:%S%.3f")`（Cargo.toml 已有 chrono 0.4 依赖）
+  - SHA256：`sha2::Sha256` + `hex::encode`（Cargo.toml 已有 sha2 0.10 + hex 0.4）
+  - handler! 宏：`_state, _app, _params`（不需要 app）/ `_state, app, params`（需要 app）
+- 约束遵守：
+  - Rust 文件行数：mod.rs 250 / provider.rs 723 / process.rs 398 / sandbox.rs 82 / frp_manager.rs 160；provider.rs 超 500 行（厂商管理职责集中，后续可拆分 install.rs），其余均在关注范围内
+  - 所有新增 pub 函数和类型均有文档注释
+  - 不引入新依赖（chrono / sha2 / hex / zip / reqwest 均已在 Cargo.toml）
+  - shell 调用走 `crate::minecraft::system::shell` 模块
+  - event 名用 kebab-case，payload 字段名 camelCase
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（零错误零警告）
+- 用户反馈：阶段二后端按规格实现，与阶段二前端 action 契约和 event payload 对齐，可联调
+
+#### Frp 联机功能阶段一（厂商系统 + 隧道管理 + frpc 进程）
+
+- 背景：用户要求为联机功能添加 Frp 内网穿透支持，需在联机页面侧边栏新增「Frp 管理」分类，第一阶段实现系统默认厂商（Frp 原版）的 frpc + 配置文件启动方式，为后续引入外部厂商、OAuth/Device Code 认证和 API 集成预留高度可扩展架构
+- 设计依据：[docs/FRP_MANAGER_DESIGN.md](docs/FRP_MANAGER_DESIGN.md)（厂商系统、认证体系、安全沙箱方案）、[docs/FRP_PUBLIC_SERVER_API_DESIGN.md](docs/FRP_PUBLIC_SERVER_API_DESIGN.md)（apiServer 公共 frps 服务器 API）
+- 改动：
+  - **后端 Frp 命令模块**（新建 [src-tauri/src/commands/frp/](src-tauri/src/commands/frp/)）：
+    - `mod.rs`：定义 `TunnelType` / `TunnelStatus` / `Tunnel` / `CreateTunnelParams` / `TunnelIdParams` 等共享类型，提供统一 IPC 入口 `frp_manager`，接收 `ActionRequest` 转发到 `utils/frp_manager::dispatch`
+    - `provider.rs`：内置系统默认厂商（`system-default`），frpc 首次使用时从 GitHub Releases 下载 v0.61.0 到 `<base_dir>/providers/system-default/frpc.exe`（参考 McSDK 释放模式，不随安装包打包），ZIP 解压提取 frpc 二进制并校验非空，`ensure_frpc` / `is_frpc_ready` / `frpc_path` 等函数
+    - `tunnel.rs`：隧道 CRUD，持久化到 `<base_dir>/frp/tunnels.json`，`generate_config` 按 TOML 格式生成 frpc 配置文件至 `<base_dir>/frp/config/<tunnel_id>.toml`，含 serverAddr/serverPort/tokentransport.tls/customDomains 等
+    - `process.rs`：frpc 进程管理，启动时校验 frpc 就绪 + 生成配置 + spawn 子进程（Windows `CREATE_NO_WINDOW` 不弹控制台），异步捕获 stdout/stderr 增量写入 `<base_dir>/frp/logs/<tunnel_id>.log`，全局 `Mutex<HashMap<String, FrpcHandle>>` 维护运行进程表，`start_tunnel` / `stop_tunnel` / `get_tunnel_status` / `list_tunnels_with_status` 等
+    - `sandbox.rs`：`validate_tunnel` 校验隧道名称（禁止换行/引号/反斜杠防 TOML 注入，长度 ≤64）、服务器地址（禁止协议前缀、换行、引号、反斜杠，长度 ≤255）、端口范围、token 长度（≤512）等
+  - **后端统一分发**（新建 [src-tauri/src/utils/frp_manager.rs](src-tauri/src/utils/frp_manager.rs)）：`Lazy<Dispatcher>` 注册 7 个 action（`list_providers` / `ensure_frpc` / `list_tunnels` / `create_tunnel` / `delete_tunnel` / `start_tunnel` / `stop_tunnel` / `get_tunnel_status`），通过 `handler!` 宏绑定
+  - **后端 IPC 注册**（[src-tauri/src/lib.rs](src-tauri/src/lib.rs)）：`invoke_handler` 注册 `frp_manager` 命令
+  - **前端类型定义**（新建 [src/types/frp.ts](src/types/frp.ts)）：`TunnelType` / `TunnelStatus` / `Tunnel` / `TunnelWithStatus` / `ProviderInfo` / `CreateTunnelParams` 等类型，与后端 `snake_case` 序列化对应
+  - **前端 IPC API**（新建 [src/utils/api/frp-manager.ts](src/utils/api/frp-manager.ts)）：`FRP_ACTIONS` 常量 + `frpManager<T>(action, params)` 统一入口 + `listProviders` / `ensureFrpc` / `listTunnels` / `createTunnel` / `deleteTunnel` / `startTunnel` / `stopTunnel` / `getTunnelStatus` 便捷封装
+  - **前端 Pinia Store**（新建 [src/stores/frp.ts](src/stores/frp.ts)）：`useFrpStore` 管理 providers / tunnels / loading 状态，封装 `loadProviders` / `downloadFrpc` / `loadTunnels` / `createTunnel` / `deleteTunnel` / `startTunnel` / `stopTunnel` 等 actions，统一 toast 错误提示
+  - **前端侧边栏分类**（新建 [src/composables/useFrpSidebar.ts](src/composables/useFrpSidebar.ts)）：`frpCategory` 含「厂商列表」+「穿透管理」两个子项，icon + desc 完整配置
+  - **联机页面集成**（[src/views/Online.vue](src/views/Online.vue)）：导入 `frpCategory` + `ProviderList` + `TunnelManager`，`categories` 计算属性追加 `frpCategory`（无房间状态联动，始终可用），`currentComponent` 支持 `providers` / `tunnels` 子分类
+  - **厂商列表组件**（新建 [src/components/frp/ProviderList.vue](src/components/frp/ProviderList.vue)）：展示已安装厂商卡片（图标 + 名称 + 内置标签 + 认证类型标签 + 版本/作者 + frpc 就绪状态），系统默认厂商未就绪时提供「下载 frpc」按钮，空状态使用 icon + 文字垂直水平居中
+  - **穿透管理组件**（新建 [src/components/frp/TunnelManager.vue](src/components/frp/TunnelManager.vue)）：顶部操作栏（隧道数量 + 创建按钮），创建表单（隧道名称 + 类型 + 本地 IP/端口 + 服务器地址/端口 + 远程端口 + token + TLS 开关），隧道列表卡片（名称 + 运行状态标签 + 类型标签 + 本地/远程地址 + 启动/停止/删除操作按钮），复用项目自定义 `Button` / `Input` / `Select` / `Tooltip` 组件
+- 架构特点：
+  - **厂商系统可扩展**：参考插件系统设计，`manifest.binary.distribution` 支持 `bundled`/`url` 两种模式，`url` 模式需配置域名白名单，为后续引入外部厂商（自带 frpc/core）预留接口
+  - **认证体系预留**：`ProviderInfo.authType` 支持 `none`/`oauth2`/`device_code`/`api_key`，仅用于拉取厂商配置文件，token 存储使用 OS 密钥存储（阶段二实现）
+  - **安全沙箱**：配置生成前 `validate_tunnel` 校验所有用户输入，防止 TOML 注入、路径遍历、协议前缀注入；frpc 子进程 `CREATE_NO_WINDOW` 隔离
+- 用户反馈："现在添加下，我目前要给联机功能添加 Frp联机功能，所以需要一个Frp管理页面，侧边栏加上就行……目前厂商就一个 系统默认，这个就是Frp原版，只支持Frpc+配置文件启动……参考我们启动器的插件系统，也通过那样管理，后续可能还需要引入厂商的API，所以需要高度可自定义化"
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（零错误零警告）；`vue-tsc` 因 Node v24 兼容性问题跳过（已知环境问题，非代码错误）
+
 #### 联机大厅加入按钮在房间中时禁用
 
 - 背景：用户反馈已创建/加入房间后，联机大厅中的「加入」按钮仍可点击，导致可重复加入不同房间，需禁用并提示先退出当前房间
@@ -199,6 +284,33 @@
 - **前置列表图片懒加载警告**（`src/components/community/resource-detail/DependencyInlineList.vue`）：移除 `loading="lazy"` 属性，CachedImage 组件已有缓存机制，浏览器原生懒加载触发 Chromium `[Intervention]` 控制台警告
 
 ### 重构
+
+#### Frp provider.rs 拆分为 provider.rs + install.rs + binary.rs
+
+- 背景：`src-tauri/src/commands/frp/provider.rs` 达 723 行，超 500 行关注线，职责混合（厂商列表 + 状态管理 + 安装/卸载 + frpc 下载），拆分为三个职责清晰的模块
+- 改动：
+  - **新增 [binary.rs](src-tauri/src/commands/frp/binary.rs)（269 行）**：frpc 二进制下载职责
+    - 公开入口：`ensure_frpc`（按 provider_id 分发到系统默认/外部厂商）
+    - 系统默认：`ensure_system_default_frpc`（GitHub Releases ZIP 下载 + 提取）
+    - 外部厂商：`ensure_external_frpc`（HTTPS + 域名白名单 + SHA256 + 可选解压）
+    - 辅助：`validate_download_url` / `compute_sha256` / `extract_archive` / `frpc_download_info` / `current_platform` / `frpc_filename`
+  - **新增 [install.rs](src-tauri/src/commands/frp/install.rs)（234 行）**：安装/卸载职责
+    - 安装：`install_provider_from_dir` / `install_provider_from_zip`（Zip Slip 防护）
+    - 卸载：`uninstall_provider`（路径遍历防护）
+    - 辅助：`build_provider_info` / `copy_dir_recursive` / `determine_zip_prefix` / `extract_zip_safely`
+  - **精简 [provider.rs](src-tauri/src/commands/frp/provider.rs)（723→247 行）**：仅保留厂商列表 + 状态管理 + 路径辅助 + 启用/禁用
+    - 路径函数：`system_default_dir` / `frpc_path` / `get_frpc_path_for_provider` / `is_frpc_ready` / `is_external_frpc_ready`
+    - 状态持久化：`read_providers_state` / `write_providers_state`
+    - manifest 读取：`read_provider_manifest`
+    - 列表：`list_providers`
+    - 启禁：`enable_provider` / `disable_provider`
+  - **可见性调整**：provider.rs 中被 install.rs/binary.rs 调用的函数从 `fn`（私有）改为 `pub(super)`，包括 `system_default_dir` / `frpc_path` / `is_frpc_ready` / `is_external_frpc_ready` / `read_providers_state` / `write_providers_state` / `read_provider_manifest`；`FRPC_VERSION` 常量改为 `pub(super)`；`get_frpc_path_for_provider` 保持 `pub`（process.rs 跨模块调用）
+  - **模块注册**（[mod.rs](src-tauri/src/commands/frp/mod.rs)）：新增 `pub mod binary;` 和 `pub mod install;`，更新模块文档注释
+  - **调用方更新**：
+    - [frp_manager.rs](src-tauri/src/utils/frp_manager.rs)：`ensure_frpc` 改为 `frp::binary::`；`install_provider_from_dir` / `install_provider_from_zip` / `uninstall_provider` 改为 `frp::install::`
+    - [process.rs](src-tauri/src/commands/frp/process.rs)：`ensure_frpc` 改为 `crate::commands::frp::binary::ensure_frpc`（`get_frpc_path_for_provider` 仍在 provider）
+- 复用清单：未引入新依赖，所有函数均为原 provider.rs 中的已有实现，仅做文件间迁移 + 可见性调整；`build_provider_info` 抽取了 install.rs 中重复 2 次的 ProviderInfo 构建逻辑
+- 约束遵守：provider.rs 247 / install.rs 234 / binary.rs 269，均在合理范围内；cargo check 通过无错误无警告
 
 #### ResourceDetail.vue 拆分降至 300 行以内
 
