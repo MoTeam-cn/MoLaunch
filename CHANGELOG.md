@@ -9,6 +9,23 @@
 
 ### 新增
 
+#### DevTools 状态判断修复 + 全局快捷键禁用 + 水印解锁参数
+
+- 背景：用户反馈三个问题：① 后端 `is_devtools_open` 明明 DevTools 已打开却返回 false；② 启动器需要禁用所有快捷键，仅在开发者页面提供独占快捷键；③ 测试版水印让用户看着"有点吐"，需要可在 DevTools 打开前提下解锁隐藏
+- 改动：
+  - **后端 DevTools 状态修复**（[src-tauri/src/commands/system/developer.rs](src-tauri/src/commands/system/developer.rs)）：根因是 Tauri 2 的 `WebviewWindow::is_devtools_open()` 在 Windows WebView2 上始终返回 false（WebView2 不提供查询 API）。引入 `static DEVTOOLS_OPEN: AtomicBool` 由后端自行维护：`open_devtools()` 成功后置 true，`close_devtools()` 置 false，`is_devtools_open()` 返回该状态。新增 `reset_devtools_state()` 用于窗口销毁时重置
+  - **窗口销毁兜底**（[src-tauri/src/lib.rs](src-tauri/src/lib.rs)）：`on_window_event` 中监听 `WindowEvent::Destroyed`，调用 `reset_devtools_state()` 防止状态泄露
+  - **全局快捷键禁用扩展**（[src/composables/useDevToolsGuard.ts](src/composables/useDevToolsGuard.ts)）：从仅拦截 DevTools 快捷键扩展为拦截所有非编辑类快捷键——F1~F12 全部拦截、Ctrl/Cmd+Shift+任意字母数字全部拦截、Ctrl/Cmd+Alt+字母拦截、Ctrl/Cmd+字母（除 c/v/x/z/y/a 编辑键外）拦截、Alt+字母拦截（避免激活菜单栏）。保留编辑键确保 input/textarea 正常使用
+  - **开发者页面独占快捷键**（新建 [src/composables/useDevShortcuts.ts](src/composables/useDevShortcuts.ts)）：在 capture 阶段 `stopImmediatePropagation` 抢占事件流，绕过全局防护。绑定 `Ctrl/Cmd+Shift+D` 切换 DevTools 打开/关闭、`Alt+1~6` 切换子页签（1=实验性 / 2=DevTools / 3=证书 / 4=日志 / 5=存储 / 6=系统信息）。仅在 SettingsDeveloper.vue 存活时生效
+  - **水印解锁 composable**（新建 [src/composables/useWatermarkUnlock.ts](src/composables/useWatermarkUnlock.ts)）：管理水印隐藏状态。`hide()` 前置调用 `isDevToolsOpen()` 校验，true 才允许隐藏；状态存 sessionStorage（重启恢复显示）；解锁后启动 5 秒轮询，DevTools 关闭则自动恢复水印
+  - **水印组件监听解锁**（[src/components/common/Watermark.vue](src/components/common/Watermark.vue)）：`showWatermark` 计算属性追加 `!unlocked.value` 条件；onMounted 启动 `syncWithDevTools()` 轮询
+  - **DevTools 子页签新增水印解锁卡片**（[src/views/settings/developer/DevToolsTab.vue](src/views/settings/developer/DevToolsTab.vue)）：仅测试版构建显示。提供「隐藏水印」/「恢复水印」按钮，DevTools 未打开时给出"需先打开 DevTools"提示
+  - **SettingsDeveloper 挂载独占快捷键**（[src/views/settings/SettingsDeveloper.vue](src/views/settings/SettingsDeveloper.vue)）：onMounted 调用 `useDevShortcuts({ onSwitchTab })`，Alt+1~6 切换子页签
+  - **构建阻塞修复（项目已有 bug）**（[src/utils/version.ts](src/utils/version.ts)）：补全 `compareVersion(a, b)` / `versionChangeType(current, target)` / `VersionChangeType` 类型导出。`useVersionGroups.ts` 和 `useModUpdate.ts` 引用了这些符号但 version.ts 从未导出，导致 `vite build` 失败。本次为完成构建验证最小补全
+  - **设计文档**（新建 [docs/DEVTOOLS_STATE_AND_SHORTCUTS_DESIGN.md](docs/DEVTOOLS_STATE_AND_SHORTCUTS_DESIGN.md)）：完整设计方案
+- 用户反馈："目前那些都已经完成，目前修复下 后端判断devtools打开的逻辑，明明打开的，结果返回false关闭？？？然后启动器直接禁用所有快捷键，直接在开发者页面加一套快捷键，只能在开发者页面才能触发，你自己搭配下，然后就是前端水印加一个解锁参数，这个必须在devtools打开的情况下才能解锁，你设计下吧，因为我看着也有点吐"
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（零错误零警告）；`npx vite build` 通过
+
 #### 测试版水印 + 设备 ID 追踪 + DevTools 防护
 
 - 背景：MoLaunch 进入测试阶段，测试版分发给内部测试用户。为防止未授权外传，需要全屏水印 + 设备 ID 追踪 + 禁用右键/DevTools 快捷键，仅在开发者模式开启时才能通过设置页按钮调出 WebView2 DevTools
