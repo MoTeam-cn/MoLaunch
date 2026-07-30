@@ -7,6 +7,22 @@
 
 ## [未发布]
 
+### 新增
+
+#### 中文搜索本地映射（参考 PCL2 实现）
+
+- 背景：MoLaunch 原样透传中文关键词给 CurseForge / Modrinth 官方 API，两大平台索引不含中文，中文搜索几乎返回空结果。PCL2 通过内置 MC百科（mcmod.cn）本地数据库实现中文搜索，本次参考其思路在 MoLaunch 中实现等价功能
+- 改动：
+  - **模糊匹配算法**（新建 [src-tauri/src/minecraft/community/fuzzy.rs](src-tauri/src/minecraft/community/fuzzy.rs)）：移植 PCL2 `ModBase.vb:818-946` 的 `SearchSimilarity` / `Search` 算法，基于最长公共子串的相似度，考虑长度加成（`1.4^(3+len) - 3.6`）和位置加成（`1 + 0.3 * max(0, 3-|qp-sp|)`），含 `SearchSource` / `SearchEntry<T>` 泛型类型和单元测试
+  - **数据层扩展**（[src-tauri/src/minecraft/community/mcmod.rs](src-tauri/src/minecraft/community/mcmod.rs)）：`Entry` 新增 `popularity` 字段（解析 moddata.txt 最后一行排行数据）；`Database` 新增 `entries: Vec<ChineseSearchEntry>` 反查列表；新增 `search_by_chinese(query) -> RewriteResult` 公开函数，用本地模糊匹配把中文关键词重写为 CurseForge/Modrinth 英文 Slug/单词，并收集 Modrinth Slug 直查列表（最多 100 个）；新增 `extract_words` 单词提取（过滤停用词、单字、纯数字、子串去重）
+  - **模块导出**（[src-tauri/src/minecraft/community/mod.rs](src-tauri/src/minecraft/community/mod.rs)）：导出 `fuzzy` 模块
+  - **调度层拦截**（[src-tauri/src/minecraft/community/searcher.rs](src-tauri/src/minecraft/community/searcher.rs)）：在 `search()` 入口新增 `is_chinese` 检测（CJK 统一汉字 + 扩展 A + 兼容 ideographs），检测到中文时调 `mcmod::search_by_chinese` 重写查询词；三路并行（CF 搜索 + MR 搜索 + MR Slug 直查）通过 `tokio::join!` 调度，各自独立超时/错误隔离；中文未命中时回退原词透传
+  - **Modrinth Slug 直查**（[src-tauri/src/minecraft/community/modrinth/mod.rs](src-tauri/src/minecraft/community/modrinth/mod.rs)）：新增 `get_projects_by_slugs(slugs, rtype) -> Vec<ResourceProject>`，调 `GET /v2/projects?ids=[...]` 批量拉取工程详情（slug 作为 project_id 别名），复用 `convert_project` 转换并写入缓存，失败返回空 Vec 不阻断搜索
+  - **实现文档**（新建 [docs/CHINESE_SEARCH_IMPLEMENTATION.md](docs/CHINESE_SEARCH_IMPLEMENTATION.md)）：记录最终代码结构、与设计文档差异、验证方法、性能考量
+- 用户反馈："我搜索模组或整合包时使用中文，两个平台都返回空，PCL2 用中文都能搜出来"
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（零错误零警告）；`cargo test fuzzy` / `cargo test mcmod` 单元测试通过
+- 参考：PCL2 `code-libs/Plain Craft Launcher 2/Modules/Resource/ResourceSearcher.vb` 189-290 行
+
 ### 修复
 
 #### 资源包转换在版本隔离模式下报 "resourcepacks 目录解析失败: os error 2"
