@@ -16,7 +16,7 @@
 //! - `helpers::get_mods_dir`：获取版本 mods 目录
 
 use std::collections::{HashSet, VecDeque};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
@@ -69,25 +69,36 @@ pub struct DependencyCheckResult {
 /// 检查 mod 版本的前置依赖
 ///
 /// 流程：
-/// 1. 获取 mods 目录，扫描本地已安装 mod 的 slug 集合
+/// 1. 解析 mods 目录（优先 version_id，其次 mods_dir 参数，都无则跳过已安装扫描）
 /// 2. BFS 递归解析 dependencies（限 3 层，visited 集合防环）
 ///   - 查项目详情（复用 community 缓存）
-///   - 检查是否已安装（slug 比对）
+///   - 检查是否已安装（slug 比对，无 mods 目录时全部视为未安装）
 ///   - 未安装则选最佳版本（按 game_version + mod_loader 筛选）
 ///   - 取该版本的 dependencies 继续递归
 /// 3. 返回缺失项 + 已满足项
 ///
 /// 单个依赖查询失败不阻断整体流程，log_warn 后跳过。
+///
+/// # 场景
+/// - 版本管理场景：传 version_id，自动解析 mods 目录并扫描已安装
+/// - Community 场景：version_id=None + mods_dir=None，跳过已安装扫描，所有前置返回 missing
 pub async fn check_mod_dependencies(
     state: &AppState,
-    version_id: &str,
+    version_id: Option<&str>,
+    mods_dir: Option<&str>,
     platform: Platform,
     root_version: &ResourceVersion,
     game_version: &str,
     mod_loader: u32,
 ) -> Result<DependencyCheckResult, String> {
-    let mods_dir = super::helpers::get_mods_dir(state, version_id).await?;
-    let installed_slugs = scan_installed_mod_slugs(&mods_dir);
+    let installed_slugs = match (version_id, mods_dir) {
+        (Some(vid), _) => {
+            let mods_dir = super::helpers::get_mods_dir(state, vid).await?;
+            scan_installed_mod_slugs(&mods_dir)
+        }
+        (None, Some(dir)) => scan_installed_mod_slugs(Path::new(dir)),
+        (None, None) => HashSet::new(),
+    };
 
     crate::log_info!(
         "[Mods] 前置依赖检查：platform={} root={} deps={} game={} loader={} installed={}",
@@ -316,7 +327,7 @@ pub struct InstallResult {
 /// 批量安装主 mod + 用户勾选的前置 mod
 ///
 /// 流程：
-/// 1. 获取 mods 目录
+/// 1. 解析下载目录（优先 version_id 获取 mods 目录，其次 target_dir 参数）
 /// 2. 构造下载任务列表（主 mod + 前置的 suggested_version）
 /// 3. 启动 DownloadSession（1 个 stage "下载 Mod 及前置"）
 /// 4. download_batch 并发下载，进度推送下载管理页
@@ -324,13 +335,24 @@ pub struct InstallResult {
 ///
 /// suggested_version 为 None 的前置记为失败（未找到兼容版本）。
 /// download_url 为空的版本记为失败。
+///
+/// # 场景
+/// - 版本管理场景：传 version_id，自动解析 mods 目录
+/// - Community 场景：version_id=None + target_dir=Some，下载到用户选择的文件夹
 pub async fn install_mod_with_dependencies(
     state: &AppState,
-    version_id: &str,
+    version_id: Option<&str>,
+    target_dir: Option<&str>,
     main_version: &ResourceVersion,
     deps: &[ResolvedDependency],
 ) -> Result<InstallResult, String> {
-    let mods_dir = super::helpers::get_mods_dir(state, version_id).await?;
+    let mods_dir = match (version_id, target_dir) {
+        (Some(vid), _) => super::helpers::get_mods_dir(state, vid).await?,
+        (None, Some(dir)) => PathBuf::from(dir),
+        (None, None) => {
+            return Err("必须提供 version_id 或 target_dir 之一".to_string());
+        }
+    };
     if !mods_dir.exists() {
         std::fs::create_dir_all(&mods_dir)
             .map_err(|e| format!("创建 mods 目录失败: {}", e))?;

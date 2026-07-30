@@ -74,7 +74,10 @@ struct UpdateModParams {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CheckModDependenciesParams {
-    version_id: String,
+    /// 版本 ID（版本管理场景必填，Community 场景可空）
+    version_id: Option<String>,
+    /// 自定义 mods 目录（Community 场景无 version_id 时使用，可选；为空则跳过已安装扫描）
+    mods_dir: Option<String>,
     /// 平台名："CurseForge" 或 "Modrinth"
     platform: String,
     /// 用户选中的资源版本（含 dependencies 字段）
@@ -89,7 +92,10 @@ struct CheckModDependenciesParams {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct InstallModWithDepsParams {
-    version_id: String,
+    /// 版本 ID（版本管理场景必填，Community 场景可空）
+    version_id: Option<String>,
+    /// 自定义下载目录（Community 场景无 version_id 时必填）
+    target_dir: Option<String>,
     /// 主 mod 版本（用户在详情页选中的版本）
     main_version: ResourceVersion,
     /// 用户勾选要安装的前置（含 suggested_version）
@@ -197,7 +203,8 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         let platform = parse_platform(&p.platform)?;
         let result: DependencyCheckResult = check_mod_dependencies(
             &state,
-            &p.version_id,
+            p.version_id.as_deref(),
+            p.mods_dir.as_deref(),
             platform,
             &p.mod_version,
             &p.game_version,
@@ -212,7 +219,8 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             .map_err(|e| format!("参数解析失败: {}", e))?;
         let result: InstallResult = install_mod_with_dependencies(
             &state,
-            &p.version_id,
+            p.version_id.as_deref(),
+            p.target_dir.as_deref(),
             &p.main_version,
             &p.deps,
         )
