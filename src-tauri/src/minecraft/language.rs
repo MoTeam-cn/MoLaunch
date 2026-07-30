@@ -1,12 +1,6 @@
 //! 游戏配置管理模块
 //!
-//! 在启动前自动设置游戏语言等配置。
-//!
-//! ## 语言代码大小写规则
-//! MC 1.0 ~ 1.10 的 `lang` 字段必须使用大写后缀（如 `zh_CN`），否则切换回英文；
-//! MC 1.11+ 必须使用小写后缀（如 `zh_cn`），大写反而切英文。
-//! 调用方传入的 `target_lang` 应使用小写形式（如 `zh_cn`、`en_us`），
-//! 本模块会根据 `mc_version` 自动转为正确的大小写。
+//! 启动前自动设置游戏语言，根据 MC 版本调整大小写（1.10- 大写，1.11+ 小写）。
 
 use crate::{log_info, log_warn};
 use std::path::Path;
@@ -247,40 +241,5 @@ pub fn set_force_unicode_font(game_dir: &Path, enable: bool) -> anyhow::Result<(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_adjust_lang_case() {
-        // MC 1.0 ~ 1.10：后缀大写
-        assert_eq!(adjust_lang_case("zh_cn", "1.0"), "zh_CN");
-        assert_eq!(adjust_lang_case("zh_cn", "1.5.2"), "zh_CN");
-        assert_eq!(adjust_lang_case("zh_cn", "1.10.2"), "zh_CN");
-        assert_eq!(adjust_lang_case("en_us", "1.8.9"), "en_US");
-
-        // MC 1.11+：小写
-        assert_eq!(adjust_lang_case("zh_cn", "1.11.2"), "zh_cn");
-        assert_eq!(adjust_lang_case("zh_cn", "1.12.2"), "zh_cn");
-        assert_eq!(adjust_lang_case("zh_cn", "1.13.2"), "zh_cn");
-        assert_eq!(adjust_lang_case("zh_cn", "1.20.1"), "zh_cn");
-        assert_eq!(adjust_lang_case("zh_CN", "1.20.1"), "zh_cn");
-
-        // MC 26+：小写
-        assert_eq!(adjust_lang_case("zh_cn", "26.2"), "zh_cn");
-        assert_eq!(adjust_lang_case("zh_cn", "27.1"), "zh_cn");
-
-        // 无下划线的代码原样返回
-        assert_eq!(adjust_lang_case("none", "1.20.1"), "none");
-        assert_eq!(adjust_lang_case("auto", "1.20.1"), "auto");
-    }
-
-    #[test]
-    fn test_to_upper_suffix() {
-        assert_eq!(to_upper_suffix("zh_cn"), "zh_CN");
-        assert_eq!(to_upper_suffix("en_us"), "en_US");
-        assert_eq!(to_upper_suffix("ja_jp"), "ja_JP");
-        assert_eq!(to_upper_suffix("ko_kr"), "ko_KR");
-        // 无下划线的原样返回
-        assert_eq!(to_upper_suffix("none"), "none");
-    }
-}
+#[path = "language_tests.rs"]
+mod tests;

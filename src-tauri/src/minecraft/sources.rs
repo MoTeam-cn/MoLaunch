@@ -1,20 +1,12 @@
 //! 统一镜像源管理模块
 //!
-//! 所有涉及官方/镜像源请求的逻辑统一在此管理。
-//! - 403 (Forbidden): 直接跳过，不重试
-//! - 429 (Too Many Requests): 直接跳过，不重试
-//! - 其他错误: 可重试
-//!
-//! ## URL 管理规范
-//! 所有远程 URL 必须在此文件定义常量，禁止在其他文件硬编码。
+//! 管理官方/镜像源 URL 常量与请求逻辑：403/429 直接跳过，其他错误可重试。
 
 use crate::minecraft::community::common::fmt_elapsed;
 use crate::{log_debug, log_info, log_warn};
 use std::time::Instant;
 
-// ═══════════════════════════════════════════════════════════
 // 基础 URL 常量
-// ═══════════════════════════════════════════════════════════
 
 /// BMCLAPI 基础 URL
 pub const BMCLAPI_BASE: &str = "https://bmclapi2.bangbang93.com";
@@ -51,9 +43,7 @@ pub const BMCLAPI_NEOFORGE_LEGACY: &str =
     "/neoforge/meta/api/maven/details/releases/net/neoforged/forge";
 pub const BMCLAPI_LITELOADER: &str = "/maven/com/mumfrey/liteloader/versions.json";
 
-// ═══════════════════════════════════════════════════════════
 // 域名替换规则
-// ═══════════════════════════════════════════════════════════
 
 /// Mojang 域名 -> BMCLAPI（直传）
 pub const MOJANG_REPLACEMENTS: &[(&str, &str)] = &[
@@ -225,9 +215,7 @@ pub fn cdn_urls(url: &str) -> Vec<String> {
     }
 }
 
-// ═══════════════════════════════════════════════════════════
 // 动态路径构建
-// ═══════════════════════════════════════════════════════════
 
 /// BMCLAPI Forge 版本列表路径
 pub fn bmclapi_forge_path(mc_version: &str) -> String {
@@ -271,9 +259,7 @@ pub fn liteloader_json_url(mc_version: &str, loader_version: &str) -> String {
     )
 }
 
-// ═══════════════════════════════════════════════════════════
 // HTTP 状态码处理
-// ═══════════════════════════════════════════════════════════
 
 /// 判断 HTTP 状态码是否应该直接跳过（不重试）
 /// - 403 Forbidden: 服务器拒绝，重试无意义
@@ -290,9 +276,7 @@ pub fn is_mirror_url(url: &str) -> bool {
     url.contains("bmclapi") || url.contains("mocdn") || url.contains("mcimirror")
 }
 
-// ═══════════════════════════════════════════════════════════
 // 下载源模式
-// ═══════════════════════════════════════════════════════════
 
 /// 下载源模式
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -313,9 +297,7 @@ impl DownloadSourceMode {
     }
 }
 
-// ═══════════════════════════════════════════════════════════
 // URL 构建函数
-// ═══════════════════════════════════════════════════════════
 
 /// 构建候选 URL 列表（根据下载源模式排序）
 ///
@@ -401,9 +383,7 @@ pub fn build_replace_urls(
     }
 }
 
-// ═══════════════════════════════════════════════════════════
 // 统一请求函数
-// ═══════════════════════════════════════════════════════════
 
 /// 统一的带回退的 HTTP GET 请求
 ///
@@ -458,49 +438,5 @@ pub async fn fetch_with_fallback(urls: &[String]) -> anyhow::Result<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_is_mirror_url_bmclapi() {
-        assert!(is_mirror_url("https://bmclapi2.bangbang93.com/version/1.20.1/json"));
-        assert!(is_mirror_url("https://bmclapi-mirror.example.com/file.jar"));
-    }
-
-    #[test]
-    fn test_is_mirror_url_mocdn() {
-        assert!(is_mirror_url("https://mocdn.net/file.jar"));
-        assert!(is_mirror_url("https://meta.mocdn.net/version.json"));
-    }
-
-    #[test]
-    fn test_is_mirror_url_mcimirror() {
-        assert!(is_mirror_url("https://mod.mcimirror.top/file.jar"));
-        assert!(is_mirror_url("https://mcimirror.top/asset.zip"));
-    }
-
-    #[test]
-    fn test_is_mirror_url_official() {
-        assert!(!is_mirror_url("https://piston-meta.mojang.com/v1/packages/abc.json"));
-        assert!(!is_mirror_url("https://resources.download.minecraft.net/abc/def"));
-        assert!(!is_mirror_url("https://meta.fabricmc.net/v2/versions/loader"));
-    }
-
-    #[test]
-    fn test_is_mirror_url_empty_and_edge() {
-        assert!(!is_mirror_url(""));
-        assert!(!is_mirror_url("https://example.com"));
-        // 包含 bmclapi 子串但不是域名
-        assert!(is_mirror_url("https://example.com/bmclapi/path"));
-    }
-
-    #[test]
-    fn test_download_source_mode_from_str() {
-        assert_eq!(DownloadSourceMode::from_str("official"), DownloadSourceMode::Official);
-        assert_eq!(DownloadSourceMode::from_str("mirror"), DownloadSourceMode::Mirror);
-        assert_eq!(DownloadSourceMode::from_str("smart"), DownloadSourceMode::Smart);
-        // 未知值默认 Smart
-        assert_eq!(DownloadSourceMode::from_str("unknown"), DownloadSourceMode::Smart);
-        assert_eq!(DownloadSourceMode::from_str(""), DownloadSourceMode::Smart);
-    }
-}
+#[path = "sources_tests.rs"]
+mod tests;

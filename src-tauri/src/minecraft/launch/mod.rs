@@ -1,21 +1,6 @@
-//! Game launch module
+//! 游戏启动模块
 //!
-//! This module provides Minecraft launch functionality:
-//! - Build launch arguments (JVM args, game args, classpath)
-//! - Launch game process
-//! - Version isolation support
-//! - Complete launch pipeline
-//! - Game process monitoring and crash detection
-//!
-//! Architecture:
-//! - pipeline.rs:  完整的启动流水线，支持并行执行和进度追踪
-//! - watcher.rs:   游戏进程监控和崩溃检测
-//! - mod.rs:       模块入口与公共类型（LaunchArguments / AuthInfo）
-//! - arguments.rs: 启动参数构建编排入口（build_launch_arguments）
-//! - classpath.rs: Classpath 构建（含继承版本递归）
-//! - jvm_args.rs:  JVM 参数构建（含 LUA / JLW 拆分）
-//! - game_args.rs: 游戏参数构建
-//! - embedded.rs:  嵌入资源释放与库检测
+//! 提供启动参数构建、进程启动/监控、版本隔离；子模块见 pipeline/watcher/arguments 等。
 
 use serde::{Deserialize, Serialize};
 
@@ -128,41 +113,5 @@ pub(crate) fn sanitize_args_for_log(args: &[String]) -> Vec<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_sanitize_args() {
-        let args = vec![
-            "--username".to_string(),
-            "player".to_string(),
-            "--accessToken".to_string(),
-            "eyJhbGciOiJIUzI1NiJ9.secret.token".to_string(),
-            "--uuid".to_string(),
-            "abc-123".to_string(),
-            "--version".to_string(),
-            "1.16.5".to_string(),
-        ];
-        let sanitized = sanitize_args_for_log(&args);
-        assert_eq!(sanitized[1], "player");
-        assert_eq!(sanitized[3], "***"); // accessToken 值脱敏
-        assert_eq!(sanitized[5], "***"); // uuid 值脱敏
-        assert_eq!(sanitized[7], "1.16.5"); // 普通参数不脱敏
-    }
-
-    #[test]
-    fn test_auth_info_debug() {
-        let auth = AuthInfo {
-            username: "test".to_string(),
-            uuid: "uuid".to_string(),
-            access_token: "secret_token".to_string(),
-            client_token: "client_secret".to_string(),
-            login_type: "Microsoft".to_string(),
-            server_url: None,
-        };
-        let debug_str = format!("{:?}", auth);
-        assert!(debug_str.contains("***"));
-        assert!(!debug_str.contains("secret_token"));
-        assert!(!debug_str.contains("client_secret"));
-    }
-}
+#[path = "mod_tests.rs"]
+mod tests;

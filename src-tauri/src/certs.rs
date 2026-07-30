@@ -1,15 +1,6 @@
 //! TLS 证书管理模块
 //!
-//! 提供三部分能力：
-//! - 自定义证书目录管理（`%APPDATA%/.Molaunch/certs/`，增删查）
-//! - 自定义根证书加载（`load_custom_root_certificates` → `Vec<reqwest::Certificate>`）
-//! - 系统根证书加载（`load_system_root_certificates` → `Vec<reqwest::Certificate>`）
-//!
-//! 信任源模式由 `AppConfig.tls.trust_mode` 控制，`http::build_client` 按模式组合调用上述加载器。
-//! `IgnoreTls`（开发者模式注册表键）开启时，跳过所有证书校验（`danger_accept_invalid_certs(true)`）。
-//!
-//! 文件名安全：所有接受 `filename` 的接口均通过 `validate_filename` 校验，
-//! 仅允许 `[a-zA-Z0-9._-]+`，防止 `../` 路径遍历。
+//! 提供自定义/系统根证书加载与 certs 目录管理，信任源模式由 `AppConfig.tls.trust_mode` 控制。
 
 use crate::log_info;
 use crate::storage::Storage;
@@ -211,9 +202,7 @@ pub fn load_system_root_certificates() -> Vec<reqwest::Certificate> {
     certs
 }
 
-// ============================================================
 // PEM 元信息解析（简易实现，避免引入 x509-parser 依赖）
-// ============================================================
 
 /// 从 PEM 字节中解析 Subject CN 和 NOT AFTER 时间
 ///
@@ -304,22 +293,5 @@ fn extract_not_after(text: &str) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_validate_filename_valid() {
-        assert!(validate_filename("my-cert.pem").is_ok());
-        assert!(validate_filename("root_2024.PEM").is_ok());
-        assert!(validate_filename("ca-1.crt").is_ok());
-    }
-
-    #[test]
-    fn test_validate_filename_invalid() {
-        assert!(validate_filename("").is_err());
-        assert!(validate_filename("../evil.pem").is_err());
-        assert!(validate_filename("path\\to\\cert.pem").is_err());
-        assert!(validate_filename("ca cert.pem").is_err());
-        assert!(validate_filename("ca:cert.pem").is_err());
-    }
-}
+#[path = "certs_tests.rs"]
+mod tests;

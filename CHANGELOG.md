@@ -49,6 +49,23 @@
 - **验证**：`cargo check` 零警告零错误；`cargo test --lib` 91 个测试全部通过（online 模块 29 个测试全通过）
 - **不变**：业务逻辑代码零改动，测试用例数量不减
 
+#### 代码清理批次 3：分散文件测试分离 + 注释精简
+
+- **测试分离**：9 个文件提取内联测试到同级 `_tests.rs`（共 35 个测试）
+  - `src-tauri/src/certs.rs`（2 测试）→ `certs_tests.rs`
+  - `src-tauri/src/minecraft/sources.rs`（6 测试）→ `minecraft/sources_tests.rs`
+  - `src-tauri/src/minecraft/language.rs`（2 测试）→ `minecraft/language_tests.rs`
+  - `src-tauri/src/minecraft/isolation.rs`（5 测试）→ `minecraft/isolation_tests.rs`
+  - `src-tauri/src/minecraft/launch/mod.rs`（2 测试）→ `minecraft/launch/mod_tests.rs`
+  - `src-tauri/src/minecraft/launch/skin_resourcepack.rs`（4 测试）→ `minecraft/launch/skin_resourcepack_tests.rs`
+  - `src-tauri/src/minecraft/version/state.rs`（4 测试）→ `minecraft/version/state_tests.rs`
+  - `src-tauri/src/storage/ini.rs`（3 测试）→ `storage/ini_tests.rs`
+  - `src-tauri/src/utils/markdown_table.rs`（7 测试）→ `utils/markdown_table_tests.rs`
+  - `minecraft/version/setup/mod.rs` 和 `minecraft/java_selector/mod.rs` 已有独立 `tests.rs`，无需改动
+- **注释精简**：11 个文件精简模块文档（超 3 行 → 1-3 行）
+- **验证**：`cargo check` 零警告零错误；`cargo test --lib` 91 个测试全部通过
+- **不变**：业务逻辑代码零改动，测试用例数量不减
+
 ### 新增
 
 #### DownloadManager 重构阶段 6：加载器 installer 统一 from_config

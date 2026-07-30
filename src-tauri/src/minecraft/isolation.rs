@@ -1,13 +1,6 @@
 //! 版本隔离模块
 //!
-//! 管理版本隔离策略，决定每个版本使用独立目录还是共享目录。
-//!
-//! 5 种隔离模式：
-//! - 0: 关闭 — 所有版本共享 mods、config、saves 等目录
-//! - 1: 隔离可安装 Mod 的版本 — Forge/Fabric/NeoForge 等使用独立目录，原版共享
-//! - 2: 隔离非正式版 — snapshot/愚人节/远古版使用独立目录，正式版共享
-//! - 3: 隔离非正式版 + Mod 版本 — 以上两种的组合
-//! - 4: 隔离所有版本 — 每个版本完全独立
+//! 管理版本隔离策略（5 种模式：关闭/仅Mod/仅非正式/两者/全部），决定使用独立或共享目录。
 
 use super::version::state::VersionType;
 use std::path::{Path, PathBuf};
@@ -99,89 +92,5 @@ pub fn ensure_modded_dirs(version_dir: &Path) -> std::io::Result<()> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_should_isolate_disabled() {
-        let mode = IsolationMode::Disabled;
-        assert!(!should_isolate(mode, VersionType::Release));
-        assert!(!should_isolate(mode, VersionType::Forge));
-        assert!(!should_isolate(mode, VersionType::Snapshot));
-    }
-
-    #[test]
-    fn test_should_isolate_modded_only() {
-        let mode = IsolationMode::ModdedOnly;
-        assert!(!should_isolate(mode, VersionType::Release));
-        assert!(should_isolate(mode, VersionType::Forge));
-        assert!(should_isolate(mode, VersionType::Fabric));
-        assert!(should_isolate(mode, VersionType::OptiFine));
-        assert!(!should_isolate(mode, VersionType::Snapshot));
-    }
-
-    #[test]
-    fn test_should_isolate_non_release_only() {
-        let mode = IsolationMode::NonReleaseOnly;
-        assert!(!should_isolate(mode, VersionType::Release));
-        assert!(!should_isolate(mode, VersionType::Forge)); // Forge is release
-        assert!(should_isolate(mode, VersionType::Snapshot));
-        assert!(should_isolate(mode, VersionType::Fool));
-        assert!(should_isolate(mode, VersionType::Old));
-    }
-
-    #[test]
-    fn test_should_isolate_all() {
-        let mode = IsolationMode::All;
-        assert!(should_isolate(mode, VersionType::Release));
-        assert!(should_isolate(mode, VersionType::Forge));
-        assert!(should_isolate(mode, VersionType::Snapshot));
-    }
-
-    #[test]
-    fn test_get_effective_game_dir() {
-        let game_dir = Path::new("/home/user/.minecraft");
-
-        // 隔离模式下，Mod 版本使用版本目录
-        let result = get_effective_game_dir(
-            game_dir,
-            "1.20.1-forge-47.2.0",
-            IsolationMode::All,
-            VersionType::Forge,
-        );
-        assert_eq!(
-            result,
-            PathBuf::from("/home/user/.minecraft/versions/1.20.1-forge-47.2.0")
-        );
-
-        // 非隔离模式下，使用根目录
-        let result = get_effective_game_dir(
-            game_dir,
-            "1.20.1-forge-47.2.0",
-            IsolationMode::Disabled,
-            VersionType::Forge,
-        );
-        assert_eq!(result, PathBuf::from("/home/user/.minecraft"));
-
-        // ModdedOnly 模式下，原版不隔离
-        let result = get_effective_game_dir(
-            game_dir,
-            "1.20.1",
-            IsolationMode::ModdedOnly,
-            VersionType::Release,
-        );
-        assert_eq!(result, PathBuf::from("/home/user/.minecraft"));
-
-        // ModdedOnly 模式下，Mod 版本隔离
-        let result = get_effective_game_dir(
-            game_dir,
-            "1.20.1-forge-47.2.0",
-            IsolationMode::ModdedOnly,
-            VersionType::Forge,
-        );
-        assert_eq!(
-            result,
-            PathBuf::from("/home/user/.minecraft/versions/1.20.1-forge-47.2.0")
-        );
-    }
-}
+#[path = "isolation_tests.rs"]
+mod tests;

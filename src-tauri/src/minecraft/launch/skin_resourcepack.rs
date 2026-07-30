@@ -1,28 +1,6 @@
 //! 离线账号皮肤资源包生成模块（方案 B）
 //!
-//! 通过生成资源包 zip 替换原版玩家纹理，让离线账号的自定义皮肤在游戏中生效。
-//! 与 `adjust_uuid_for_skin_variant`（方案 A）互补：
-//! - 方案 A 调整 UUID 保证模型类型（classic/slim）正确
-//! - 方案 B 用资源包替换所有角色纹理为用户选定的皮肤，确保 1.19.3+ 也精确显示
-//!
-//! 资源包结构：
-//! ```text
-//! MoLaunch Skin.zip
-//! ├── pack.mcmeta          (pack_format 按版本选择)
-//! ├── pack.png             (资源包图标，用皮肤文件本身)
-//! └── assets/minecraft/textures/entity/
-//!     ├── alex.png         (1.19.3 以前)
-//!     ├── steve.png        (1.19.3 以前)
-//!     └── player/          (1.19.3+)
-//!         ├── slim/
-//!         │   ├── alex.png
-//!         │   ├── ari.png
-//!         │   └── ... (9 个角色)
-//!         └── wide/
-//!             ├── steve.png
-//!             ├── kai.png
-//!             └── ... (9 个角色)
-//! ```
+//! 生成资源包 zip 替换原版玩家纹理，让离线账号自定义皮肤生效（与方案 A 互补）。
 
 use crate::log_info;
 use crate::utils::version::parse_number as parse_version_number;
@@ -337,38 +315,5 @@ pub fn remove_skin_resourcepack(game_dir: &Path) {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_pack_format() {
-        assert_eq!(get_pack_format("1.12.2"), 4);
-        assert_eq!(get_pack_format("1.16.5"), 7);
-        assert_eq!(get_pack_format("1.19.2"), 9);
-        assert_eq!(get_pack_format("1.19.3"), 12);
-        assert_eq!(get_pack_format("1.20.1"), 15);
-    }
-
-    #[test]
-    fn test_is_1193_plus() {
-        assert!(!is_version_1193_plus("1.19.2"));
-        assert!(is_version_1193_plus("1.19.3"));
-        assert!(is_version_1193_plus("1.20.1"));
-    }
-
-    #[test]
-    fn test_texture_paths_1192() {
-        let paths = get_texture_paths("1.19.2", true);
-        assert_eq!(paths.len(), 1);
-        assert!(paths[0].contains("alex.png"));
-    }
-
-    #[test]
-    fn test_texture_paths_1193() {
-        let paths = get_texture_paths("1.19.3", false);
-        assert_eq!(paths.len(), 9);
-        // DEFAULT_SKINS_1193 按字母序排列，第一个是 alex
-        assert!(paths[0].contains("player/wide/alex.png"));
-        assert!(paths[6].contains("player/wide/steve.png"));
-    }
-}
+#[path = "skin_resourcepack_tests.rs"]
+mod tests;

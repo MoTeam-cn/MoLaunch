@@ -1,12 +1,6 @@
 //! Java 版本选择算法模块
 //!
-//! 子模块组织：
-//! - `rules`: MC 版本 → Java 版本约束区间规则
-//! - `compat`: Java 兼容性校验与文案
-//! - `weight`: Java 版本权重
-//! - `select`: 最佳 Java 选择算法
-//! - `installer`: 加载器安装器专用 Java 选择
-//! - `tests`: 单元测试
+//! 子模块：rules/compat/weight/select/installer/tests。
 
 mod compat;
 mod installer;
