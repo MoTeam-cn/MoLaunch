@@ -118,11 +118,11 @@ function handleClose() {
     >
       <div
         v-if="visible"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[10003] flex items-start justify-center px-4 pt-14 pb-4"
         @click.self="handleClose"
       >
         <div class="absolute inset-0 bg-black/40" />
-        <div class="relative w-full max-w-lg bg-white rounded-lg shadow-xl flex flex-col max-h-[85vh]">
+        <div class="relative w-full max-w-lg bg-white rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-100px)] mt-2">
           <!-- 头部 -->
           <div class="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <div class="flex items-center gap-2 min-w-0">
