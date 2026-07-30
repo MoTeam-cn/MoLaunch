@@ -281,6 +281,58 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
     Ok(versions)
 }
 
+/// 通过 Slug 列表批量查询 Modrinth 工程（中文搜索专用）
+///
+/// Modrinth 的 `GET /v2/projects?ids=[...]` 接口接受 project_id，
+/// 但 slug 也可以作为 project_id 的别名传入，从而实现按 slug 批量拉取工程信息。
+///
+/// 用于中文搜索：本地 moddata.txt 数据库匹配出中文关键词对应的 MR slug 列表后，
+/// 调本函数批量拉取工程详情，绕过 MR 搜索 API 对中文支持不佳的问题。
+///
+/// # 参数
+/// - `slugs`：Modrinth slug 列表（最多 100 个，超出截断）
+/// - `rtype`：资源类型（用于填充 ResourceProject.resource_type）
+///
+/// # 返回
+/// 工程列表（查询失败返回空 Vec，不阻断搜索）
+pub async fn get_projects_by_slugs(
+    slugs: &[String],
+    rtype: ResourceType,
+) -> Vec<ResourceProject> {
+    if slugs.is_empty() {
+        return Vec::new();
+    }
+
+    // Modrinth /projects 限制单次最多 100 个 id，本地保护性截断
+    let slugs_slice: Vec<&String> = slugs.iter().take(100).collect();
+    let ids_json = serde_json::to_string(&slugs_slice).unwrap_or_else(|_| "[]".to_string());
+    let encoded = urlencoding::encode(&ids_json).to_string();
+    let path = format!("/projects?ids={}", encoded);
+
+    match mr_get::<Vec<MrProject>>(&path).await {
+        Ok(projects) => {
+            let result: Vec<ResourceProject> = projects
+                .iter()
+                .map(|p| {
+                    let project = convert_project(p, rtype);
+                    super::cache::set_project("MR", &p.id, &project);
+                    project
+                })
+                .collect();
+            crate::log_info!(
+                "[Community] MR Slug 直查成功: {} / {} 个",
+                result.len(),
+                slugs_slice.len()
+            );
+            result
+        }
+        Err(e) => {
+            crate::log_warn!("[Community] MR Slug 直查失败: {}", e);
+            Vec::new()
+        }
+    }
+}
+
 /// 批量查询 project 信息，返回 `project_id → slug` 映射
 ///
 /// 用于整合包安装时按 `community_filename_format` 重命名 mod 文件：
