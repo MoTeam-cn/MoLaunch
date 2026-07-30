@@ -19,7 +19,10 @@ import type {
 
 /** check_mod_dependencies 入参 */
 export interface CheckDepsParams {
-  versionId: string
+  /** 版本 ID（版本管理场景必填，Community 场景可空） */
+  versionId?: string
+  /** 自定义 mods 目录（Community 场景无 versionId 时使用，可选；为空则跳过已安装扫描） */
+  modsDir?: string
   platform: string
   modVersion: ResourceVersion
   gameVersion: string
@@ -28,7 +31,10 @@ export interface CheckDepsParams {
 
 /** install_mod_with_dependencies 入参 */
 export interface InstallDepsParams {
-  versionId: string
+  /** 版本 ID（版本管理场景必填，Community 场景可空） */
+  versionId?: string
+  /** 自定义下载目录（Community 场景无 versionId 时必填） */
+  targetDir?: string
   mainVersion: ResourceVersion
   deps: ResolvedDependency[]
 }
