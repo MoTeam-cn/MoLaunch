@@ -116,7 +116,7 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
         crate::minecraft::community::version_extract::extract_version_from_name(&file.display_name);
 
     // 提取 required 依赖（relationType=3），排除 Fabric API（306612）和 Quilt API（634179）
-    // 与 PCL2 ResourceVersion.vb 的过滤逻辑一致
+    // 这两个 API 通常作为平台基础库自动加载，无需重复提示用户安装
     let dependencies: Vec<String> = file
         .dependencies
         .iter()

@@ -1,6 +1,6 @@
 //! 文件扫描 + 规则匹配
 //!
-//! 参考 PCL2 PageInstanceExport.xaml.vb 的 SearchFolder 逻辑：
+//! 目录扫描逻辑：
 //! 1. 递归扫描实例目录（跳过 assets/versions/libraries 等大目录）
 //! 2. 对每个文件，检查相对路径是否匹配用户勾选选项的规则
 //! 3. 规则按顺序应用，`!` 开头表排除，后面的覆盖前面的
@@ -244,7 +244,7 @@ fn scan_dir(
 
 /// 判断路径是否为 mod 文件（用于联网检查阶段筛选）
 ///
-/// 参考 PCL2：扩展名为 .zip/.rar/.jar/.disabled/.old，且路径含
+/// 压缩包/模组判定：扩展名为 .zip/.rar/.jar/.disabled/.old，且路径含
 /// mods/packs/openloader/resource
 pub fn is_mod_like_file(relative_path: &str) -> bool {
     let lower = relative_path.to_lowercase();

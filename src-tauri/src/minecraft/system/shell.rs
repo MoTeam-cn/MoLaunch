@@ -334,14 +334,13 @@ pub fn is_admin() -> bool {
     }
 }
 
-/// 以管理员权限重新启动当前程序（PCL2 风格）
+/// 以管理员权限重新启动当前程序
 ///
 /// - Windows: `ShellExecuteW` with verb `"runas"` 触发 UAC 提权对话框
 /// - macOS: `osascript` 请求管理员权限执行
 /// - Linux: `pkexec` 请求策略Kit 授权
 ///
 /// 调用后当前进程应自行退出，新进程以管理员权限运行。
-/// 参考实现：PCL2 `ModBase.RunAsAdmin`（`ProcessStartInfo.Verb = "runas"`）。
 pub fn relaunch_as_admin(args: &[String]) -> Result<(), String> {
     let exe_path = std::env::current_exe()
         .map_err(|e| format!("获取当前 exe 路径失败: {}", e))?;

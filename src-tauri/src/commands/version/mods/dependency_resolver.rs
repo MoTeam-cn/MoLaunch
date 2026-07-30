@@ -29,7 +29,7 @@ use crate::minecraft::download::DownloadSession;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::state::AppState;
 
-/// 递归深度上限（PCL2 不递归，MoLaunch 做一键安装需要处理深层依赖，3 层覆盖 99% 场景）
+/// 递归深度上限（业界同类启动器通常不递归，MoLaunch 做一键安装需要处理深层依赖，3 层覆盖 99% 场景）
 const MAX_DEPTH: u32 = 3;
 
 /// 依赖类型
@@ -265,7 +265,7 @@ async fn get_versions_by_platform(
 
 /// 按 game_version + mod_loader 筛选最佳版本
 ///
-/// 策略（参考 PCL2 隐式策略）：
+/// 策略：
 /// 1. 过滤：game_versions 包含目标版本 + mod_loaders 与目标加载器兼容
 /// 2. 优先 Release，其次 Beta，最后 Alpha
 /// 3. 同优先级选最新（按 release_date 降序）

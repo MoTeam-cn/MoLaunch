@@ -1,9 +1,11 @@
 //! 模糊匹配算法
 //!
-//! 移植自 PCL2 `ModBase.vb:818-946` 的 `SearchSimilarity` / `Search` 算法。
-//! 用于中文搜索本地映射：在 moddata.txt 数据库中用中文关键词匹配对应的 CurseForge/Modrinth Slug。
+//! 用于中文搜索本地映射：在 moddata.txt 数据库中用中文关键词匹配对应的
+//! CurseForge / Modrinth Slug，把中文重写为英文关键词后再调平台 API。
 //!
-//! 算法核心：基于最长公共子串的相似度，考虑长度加成和位置加成。
+//! 算法核心：基于最长公共子串的相似度，结合长度增益与位置邻近度加权，
+//! 归一化后得到 0~1 区间的分数。设计目标是对短查询（如中文 Mod 名）有较高
+//! 容错性，同时避免长字符串误匹配。
 
 /// 单个用于搜索的文本源
 ///
@@ -52,19 +54,37 @@ impl<T> SearchEntry<T> {
     }
 }
 
+/// 长度增益系数：匹配子串越长，增益增长越快（指数底数）
+const LEN_GAIN_BASE: f64 = 1.42;
+/// 长度增益偏移：使得 len=1 时增益为正、len=0 时增益为负（不触发）
+const LEN_GAIN_OFFSET: f64 = 2.8;
+/// 位置邻近度影响范围：|qp - sp| 不超过此值时才有加成
+const POS_BONUS_RANGE: i32 = 4;
+/// 位置邻近度最大加成倍数
+const POS_BONUS_STEP: f64 = 0.25;
+/// 归一化分子的调节常数（影响短源字符串的最终得分上限）
+const NORM_NUMERATOR: f64 = 2.5;
+/// 归一化分母的长度补偿（避免过短源字符串得分虚高）
+const NORM_LEN_PAD: f64 = 12.0;
+
 /// 计算源字符串与查询字符串的相似度（0-1）
 ///
-/// 移植自 PCL2 `ModBase.vb:818` `SearchSimilarity`
+/// 算法：基于最长公共子串的累积匹配长度，结合：
+/// - 长度增益：`LEN_GAIN_BASE^(2+len) - LEN_GAIN_OFFSET`，子串越长权重越高
+/// - 位置邻近度：查询位置与源位置越接近，权重越高
+///   `1 + POS_BONUS_STEP * max(0, POS_BONUS_RANGE - |qp - sp|)`
+/// - 归一化：`(累积增益 / 查询长度) * (NORM_NUMERATOR / sqrt(源长度 + NORM_LEN_PAD))`
+/// - 短查询补偿：查询长度 ≤ 2 时额外乘以 `2.5 - 0.5 * 查询长度`
 ///
-/// 算法：基于最长公共子串，考虑长度加成（`1.4^(3+len) - 3.6`）和位置加成（`1 + 0.3 * max(0, 3-|qp-sp|)`）
-/// 最终分数：`(lenSum / queryLength) * (3 / sqrt(sourceLength + 15))`
-/// 短查询（≤2 字符）额外乘以 `3 - queryLength`
+/// # 参数
+/// - `source`：被匹配的源字符串（如数据库名条目）
+/// - `query`：用户输入的查询字符串
 pub fn search_similarity(source: &str, query: &str) -> f64 {
     if source.is_empty() || query.is_empty() {
         return 0.0;
     }
 
-    // 都做 lowercase + 去空格
+    // 统一小写并去除空格，降低噪声
     let source_lower: String = source
         .to_lowercase()
         .chars()
@@ -84,6 +104,7 @@ pub fn search_similarity(source: &str, query: &str) -> f64 {
         return 0.0;
     }
 
+    // 工作副本：匹配过的片段会被移除，避免同一片段被重复计入
     let mut work_source: Vec<char> = source_chars.clone();
     let mut len_sum = 0.0_f64;
     let mut qp = 0;
@@ -93,6 +114,7 @@ pub fn search_similarity(source: &str, query: &str) -> f64 {
         let mut sp_max = 0;
         let current_len = work_source.len();
         let mut sp = 0;
+        // 在工作副本中扫描，找出从 qp 开始能与 query 匹配的最长子串
         while sp < current_len {
             let mut len = 0;
             while qp + len < query_len
@@ -105,25 +127,29 @@ pub fn search_similarity(source: &str, query: &str) -> f64 {
                 len_max = len;
                 sp_max = sp;
             }
+            // 跳过已匹配片段，避免重复扫描
             sp += if len > 0 { len } else { 1 };
         }
 
         if len_max > 0 {
-            // 移除已匹配的部分，防止重复匹配
+            // 移除已匹配片段，防止后续重复计入
             work_source.drain(sp_max..sp_max + len_max);
-            // 长度加成
-            let inc_weight = 1.4_f64.powi(3 + len_max as i32) - 3.6;
-            // 位置加成（位置越接近开头权重越高）
+            // 长度增益：子串越长增益越高（指数增长）
+            let inc_weight = LEN_GAIN_BASE.powi(2 + len_max as i32) - LEN_GAIN_OFFSET;
+            // 位置邻近度：query 位置与 source 位置越接近，加成越高
             let pos_diff = (qp as i32 - sp_max as i32).abs();
-            let pos_bonus = 1.0 + 0.3 * (3 - pos_diff).max(0) as f64;
+            let pos_bonus = 1.0 + POS_BONUS_STEP * (POS_BONUS_RANGE - pos_diff).max(0) as f64;
             len_sum += inc_weight * pos_bonus;
         }
+        // 推进 query 指针：匹配了就跳过已匹配长度，没匹配就前进 1
         qp += if len_max > 0 { len_max } else { 1 };
     }
 
-    let length_factor = 3.0 / (source_len as f64 + 15.0).sqrt();
+    // 归一化：用源字符串长度做分母调节，避免长字符串得分虚高
+    let length_factor = NORM_NUMERATOR / (source_len as f64 + NORM_LEN_PAD).sqrt();
+    // 短查询补偿：1~2 字符的查询额外加权，提升短中文词的召回率
     let short_query_factor = if query_len <= 2 {
-        3.0 - query_len as f64
+        2.5 - 0.5 * query_len as f64
     } else {
         1.0
     };
@@ -132,7 +158,7 @@ pub fn search_similarity(source: &str, query: &str) -> f64 {
 
 /// 多文本源加权相似度
 ///
-/// 每个 SearchSource 内部多个别名只取最高相似度，各 SearchSource 之间按权重加权平均
+/// 每个 `SearchSource` 内部多个别名只取最高相似度，各 `SearchSource` 之间按权重加权平均
 pub fn search_similarity_weighted(sources: &[SearchSource], query: &str) -> f64 {
     let mut total_weight = 0.0_f64;
     let mut sum = 0.0_f64;
@@ -156,8 +182,6 @@ pub fn search_similarity_weighted(sources: &[SearchSource], query: &str) -> f64 
 }
 
 /// 多段文本加权搜索，返回相似度较高的前 N 项
-///
-/// 移植自 PCL2 `ModBase.vb:916` `Search`
 ///
 /// 会修改 `entries` 中每项的 `similarity` 与 `absolute_right` 字段。
 ///
@@ -218,7 +242,7 @@ pub fn search<'a, T>(
     for idx in candidates {
         let entry = &entries[idx];
         if entry.absolute_right {
-            result.append(&mut vec![&entries[idx]]);
+            result.push(&entries[idx]);
         } else {
             if blur_count >= max_blur_count {
                 break;
@@ -231,34 +255,5 @@ pub fn search<'a, T>(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_search_similarity_exact_match() {
-        let score = search_similarity("工业时代2", "工业时代");
-        assert!(score > 0.5, "exact match should have high score, got {}", score);
-    }
-
-    #[test]
-    fn test_search_similarity_no_match() {
-        let score = search_similarity("完全不同的文本xyz", "工业时代");
-        assert!(score < 0.1, "no match should have low score, got {}", score);
-    }
-
-    #[test]
-    fn test_search_similarity_empty() {
-        assert_eq!(search_similarity("", "test"), 0.0);
-        assert_eq!(search_similarity("test", ""), 0.0);
-    }
-
-    #[test]
-    fn test_search_similarity_weighted() {
-        let sources = vec![
-            SearchSource::new(vec!["工业时代2".to_string()], 1.0),
-            SearchSource::new(vec!["industrial craft".to_string()], 0.5),
-        ];
-        let score = search_similarity_weighted(&sources, "工业时代");
-        assert!(score > 0.3, "weighted match should have decent score, got {}", score);
-    }
-}
+#[path = "fuzzy_tests.rs"]
+mod tests;

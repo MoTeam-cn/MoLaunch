@@ -173,7 +173,7 @@ pub(crate) fn convert_version(v: &MrVersion) -> ResourceVersion {
     };
 
     // 提取 required 依赖，排除 Fabric API（P7dR8mSH）和 Quilt API（qvIfYCYJ）
-    // 与 PCL2 ResourceVersion.vb 的过滤逻辑一致
+    // 这两个 API 通常作为平台基础库自动加载，无需重复提示用户安装
     let dependencies: Vec<String> = v
         .dependencies
         .iter()

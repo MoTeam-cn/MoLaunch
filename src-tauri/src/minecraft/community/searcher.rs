@@ -4,7 +4,7 @@
 //!
 //! 中文搜索：检测到查询包含中文时，先用本地 moddata.txt 数据库模糊匹配，
 //! 把中文关键词重写为英文 Slug/单词后再调平台 API，并对 Modrinth 走 Slug 直查，
-//! 绕过两大平台对中文搜索支持不佳的问题（参考 PCL2 `ResourceSearcher.vb`）。
+//! 绕过两大平台对中文搜索支持不佳的问题。
 
 use super::mcmod;
 use super::types::{ResourceProject, SearchParams, SearchResult};

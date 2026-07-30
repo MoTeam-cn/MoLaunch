@@ -4,7 +4,7 @@
 //! 关键设计：moddata.txt 第 N 行 → mcmod.cn class id = N（空行也占行号）
 //!
 //! 中文搜索：`search_by_chinese` 用本地模糊匹配把中文关键词映射到 CurseForge/Modrinth Slug，
-//! 提取英文单词作为搜索关键词（参考 PCL2 `ResourceSearcher.vb` 189-290 行）。
+//! 提取英文单词作为搜索关键词。
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;
@@ -266,7 +266,7 @@ pub fn lookup_class_id(platform: super::types::Platform, slug: &str) -> Option<u
 
 // ===== 中文搜索本地映射 =====
 //
-// 参考 PCL2 `ResourceSearcher.vb` 189-290 行：
+// 实现思路：
 // 1. 检测中文关键词 → 2. 本地数据库模糊匹配 → 3. 提取英文 Slug/英文名 → 4. 重写搜索关键词
 
 /// 中文关键词本地搜索
@@ -286,7 +286,7 @@ pub fn search_by_chinese(query: &str) -> RewriteResult {
         return RewriteResult::default();
     }
 
-    // 构建模糊搜索条目（与 PCL2 一致：中文名主部分权重 1，英文名+Slug 权重 0.5）
+    // 构建模糊搜索条目（中文名主部分权重 1，英文名+Slug 权重 0.5）
     let mut search_entries: Vec<SearchEntry<&ChineseSearchEntry>> = DATABASE
         .entries
         .iter()
@@ -405,8 +405,6 @@ pub fn search_by_chinese(query: &str) -> RewriteResult {
 
 /// 从匹配的条目中提取候选英文单词
 ///
-/// 移植自 PCL2 `ResourceSearcher.vb:202-230` `ExtractWords`
-///
 /// 来源：Slug（`-` 替换为空格）+ 英文名（中文名括号内部分）
 /// 清洗：过滤单字、常见词（the/of/mod/and/forge/fabric/for/quilt/neoforge）、纯数字
 /// 去重 + 子串去重
@@ -488,47 +486,5 @@ fn can_form(s: &str, words: &[String]) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_parse_slug_part() {
-        // @slug → 仅 Modrinth
-        let (cf, mr) = parse_slug_part("@redpower2-core");
-        assert_eq!(cf, None);
-        assert_eq!(mr, Some("redpower2-core".to_string()));
-
-        // slug@ → CF=MR=slug
-        let (cf, mr) = parse_slug_part("industrial-craft@");
-        assert_eq!(cf, Some("industrial-craft".to_string()));
-        assert_eq!(mr, Some("industrial-craft".to_string()));
-
-        // cf@mr → 双平台不同 slug
-        let (cf, mr) = parse_slug_part("railcraft@railcraft-reborn");
-        assert_eq!(cf, Some("railcraft".to_string()));
-        assert_eq!(mr, Some("railcraft-reborn".to_string()));
-
-        // slug → 仅 CurseForge
-        let (cf, mr) = parse_slug_part("buildcraft");
-        assert_eq!(cf, Some("buildcraft".to_string()));
-        assert_eq!(mr, None);
-    }
-
-    #[test]
-    fn test_process_wildcard() {
-        // * 替换为 (Slug 去横线首字母大写)
-        let result = process_wildcard("林业*", "forestry@");
-        assert!(result.contains("Forestry"), "wildcard should be replaced, got {}", result);
-    }
-
-    #[test]
-    fn test_extract_words() {
-        let words = extract_words(
-            "工业时代2 (Industrial Craft 2)",
-            Some("industrial-craft"),
-            Some("industrial-craft"),
-        );
-        assert!(words.contains(&"industrial".to_string()), "should contain industrial, got {:?}", words);
-        assert!(words.contains(&"craft".to_string()), "should contain craft, got {:?}", words);
-    }
-}
+#[path = "mcmod_tests.rs"]
+mod tests;

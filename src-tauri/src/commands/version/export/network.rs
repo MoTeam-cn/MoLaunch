@@ -1,6 +1,6 @@
 //! 联网检查：Modrinth hash + CurseForge fingerprint
 //!
-//! 参考 PCL2 PageInstanceExport.xaml.vb 的"联网获取文件信息"步骤。
+//! 联网获取文件信息步骤。
 //! 对扫描到的 mod 文件并发查询 Modrinth 和 CurseForge，获取下载地址。
 //! 获取到地址的文件不直接打包进 overrides，而是写入 modrinth.index.json。
 
