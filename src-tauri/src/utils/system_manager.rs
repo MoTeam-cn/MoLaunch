@@ -15,7 +15,7 @@ use crate::commands::system::{
     config::{get_config_path, save_config_to_file},
     developer::{
         close_devtools, get_cache_stats, get_storage_dirs, get_system_info, is_devtools_open,
-        is_developer_unlocked, open_devtools, unlock_developer_mode,
+        is_developer_unlocked, lock_developer_mode, open_devtools, unlock_developer_mode,
     },
     game_dir::{
         get_game_dir, get_system_memory, open_game_dir, open_path, reveal_in_explorer,
@@ -135,6 +135,10 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     }));
     d.register("unlock_developer_mode", handler!(_state, _app, _params, {
         unlock_developer_mode()?;
+        Ok(serde_json::Value::Null)
+    }));
+    d.register("lock_developer_mode", handler!(_state, app, _params, {
+        lock_developer_mode(&app)?;
         Ok(serde_json::Value::Null)
     }));
     d.register("get_storage_dirs", handler!(_state, _app, _params, {

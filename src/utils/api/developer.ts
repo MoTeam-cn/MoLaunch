@@ -6,6 +6,8 @@
  * 2. SettingsAdvanced.vue 显示开关卡片（仅在已解锁时）→ applyConfig({ developerMode: true/false })
  * 3. Settings.vue 侧边菜单出现「开发者」项（仅在开关开启时）
  * 4. SettingsDeveloper.vue 展示日志/缓存/存储/系统信息
+ * 5. 撤销：DevModeToggle.vue 底部「撤销解锁」按钮 → lockDeveloperMode()
+ *    （后端同时重置 DeveloperUnlocked/DeveloperMode/IgnoreTls 并关闭 DevTools）
  *
  * 存储位置：Windows 注册表 HKCU\Software\MoLaunch 下的两个布尔值
  * - DeveloperUnlocked：是否已解锁（决定开关卡片是否显示）
@@ -13,11 +15,11 @@
  *
  * 注意：开发者模式的「获取/修改」已统一到 get_config / apply_config
  * （ConfigSnapshot.developerMode / ConfigPatch.developerMode），
- * 此文件仅保留解锁触发动作和日志/缓存/存储/系统信息查询。
+ * 此文件仅保留解锁/撤销触发动作和日志/缓存/存储/系统信息查询。
  *
  * 注：8 个原 Tauri 命令（is_developer_unlocked / unlock_developer_mode
- * / get_storage_dirs / get_system_info / get_cache_stats / get_log_path
- * / list_log_files / read_log_file）已聚合为 `system_manager` 单一 IPC 入口，
+ * / lock_developer_mode / get_storage_dirs / get_system_info / get_cache_stats
+ * / get_log_path / list_log_files / read_log_file）已聚合为 `system_manager` 单一 IPC 入口，
  * 通过 `action` 字段分发。
  */
 
@@ -33,6 +35,19 @@ export async function isDeveloperUnlocked(): Promise<boolean> {
 /** 解锁开发者模式（由 CreditsTab.vue 法律信息中的隐藏字段触发） */
 export async function unlockDeveloperMode(): Promise<void> {
   return systemManager<void>(SYSTEM_ACTIONS.UNLOCK_DEVELOPER_MODE)
+}
+
+/**
+ * 撤销开发者模式解锁
+ *
+ * 后端同时重置 `DeveloperUnlocked` / `DeveloperMode` / `IgnoreTls` 三个注册表项，
+ * 并关闭已打开的 DevTools。调用后开发者相关能力全部失效。
+ *
+ * 调用方应在二次确认后调用，并监听 `developer-mode-changed` 事件（payload=false）
+ * 更新侧边菜单显隐。
+ */
+export async function lockDeveloperMode(): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.LOCK_DEVELOPER_MODE)
 }
 
 // ==================== 存储目录 ====================

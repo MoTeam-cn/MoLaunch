@@ -46,8 +46,8 @@ where
 /// - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
 ///   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
 /// - config（2 个）：`get_config_path` / `save_config_to_file`
-/// - developer（5 个）：`is_developer_unlocked` / `unlock_developer_mode`
-///   / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
+/// - developer（6 个）：`is_developer_unlocked` / `unlock_developer_mode`
+///   / `lock_developer_mode` / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
 /// - about（1 个）：`get_about_data`
 /// - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
 /// - updater（2 个）：`check_update` / `download_and_install_update`

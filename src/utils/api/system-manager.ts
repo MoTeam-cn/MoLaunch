@@ -11,8 +11,8 @@
  * - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
  *   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
  * - config（2 个）：`get_config_path` / `save_config_to_file`
- * - developer（5 个）：`is_developer_unlocked` / `unlock_developer_mode`
- *   / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
+ * - developer（6 个）：`is_developer_unlocked` / `unlock_developer_mode`
+ *   / `lock_developer_mode` / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
  * - devtools（3 个）：`open_devtools` / `close_devtools` / `is_devtools_open`
  *   （开发者模式解锁且开启时可调出 WebView2 DevTools）
  * - about（1 个）：`get_about_data`
@@ -55,9 +55,10 @@ export const SYSTEM_ACTIONS = {
   // config（2 个）
   GET_CONFIG_PATH: 'get_config_path',
   SAVE_CONFIG_TO_FILE: 'save_config_to_file',
-  // developer（5 个）
+  // developer（6 个）
   IS_DEVELOPER_UNLOCKED: 'is_developer_unlocked',
   UNLOCK_DEVELOPER_MODE: 'unlock_developer_mode',
+  LOCK_DEVELOPER_MODE: 'lock_developer_mode',
   GET_STORAGE_DIRS: 'get_storage_dirs',
   GET_SYSTEM_INFO: 'get_system_info',
   GET_CACHE_STATS: 'get_cache_stats',

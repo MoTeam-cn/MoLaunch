@@ -9,6 +9,18 @@
 
 ### 新增
 
+#### 开发者模式撤销解锁
+
+- 背景：用户反馈已解锁开发者模式后无法撤销，缺少关闭入口
+- 改动：
+  - **后端撤销函数**（[src-tauri/src/commands/system/developer.rs](src-tauri/src/commands/system/developer.rs)）：新增 `lock_developer_mode(app)`，依次重置 `DeveloperMode` / `IgnoreTls` / `DeveloperUnlocked` 三个注册表项，若 DevTools 已打开则先关闭并重置 `DEVTOOLS_OPEN` 标志。任一步失败向上抛错保证状态一致
+  - **IPC 注册**（[src-tauri/src/utils/system_manager.rs](src-tauri/src/utils/system_manager.rs)）：DISPATCHER 注册 `lock_developer_mode` action，通过 `app` 参数传递 AppHandle
+  - **前端 API**（[src/utils/api/developer.ts](src/utils/api/developer.ts)）：新增 `lockDeveloperMode()` 调用 `SYSTEM_ACTIONS.LOCK_DEVELOPER_MODE`
+  - **SYSTEM_ACTIONS 扩展**（[src/utils/api/system-manager.ts](src/utils/api/system-manager.ts)）：新增 `LOCK_DEVELOPER_MODE: 'lock_developer_mode'` 常量，developer 分组从 5 个增至 6 个
+  - **撤销按钮**（[src/components/settings/DevModeToggle.vue](src/components/settings/DevModeToggle.vue)）：开关卡片底部新增「撤销解锁」按钮，点击弹 `showConfirm` 二次确认，确认后调用 `lockDeveloperMode()`，同步本地 `devUnlocked` / `devMode` 为 false，派发 `developer-mode-changed` 事件（payload=false）通知父组件隐藏侧边菜单「开发者」项，toast 提示「已撤销开发者模式」
+  - **文档注释同步**：developer.rs 模块头新增第 5 步撤销流程；developer.ts 文件头同步更新
+- 用户反馈："你也添加个撤销开发者模式的方法啊"
+
 #### 开发者模式触发迁移 + 许可声明补全
 
 - 背景：用户要求将开发者模式触发入口从系统信息页迁移至鸣谢法律信息中的隐藏字段，防止普通用户随意触发；同时在许可声明中补充 McSDK 与 cubiomes（xpple fork）的版权信息

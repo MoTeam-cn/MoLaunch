@@ -6,6 +6,8 @@
 //! 2. 解锁后「进阶设置」顶部显示「开发者模式」开关卡片 → 调用 `apply_config({developerMode})`
 //! 3. 开关开启后「设置」侧边菜单出现「开发者」项 → 进入 SettingsDeveloper.vue
 //! 4. 开发者页面可通过「打开开发者工具」按钮调用 `open_devtools` 调出 WebView2 DevTools
+//! 5. 撤销：开关卡片底部「撤销解锁」按钮 → 二次确认 → 调用 `lock_developer_mode`
+//!    （同时重置 DeveloperUnlocked/DeveloperMode/IgnoreTls 并关闭 DevTools）
 //!
 //! 存储位置：Windows 注册表 `HKCU\Software\MoLaunch` 下的两个布尔值
 //! - `DeveloperUnlocked`：是否已解锁（决定开关卡片是否显示）
@@ -67,6 +69,35 @@ pub fn is_developer_unlocked() -> bool {
 pub fn unlock_developer_mode() -> Result<(), String> {
     log_info!("[Developer] 开发者模式已解锁");
     reg_set_bool(KEY_DEV_UNLOCKED, true)
+}
+
+/// 撤销开发者模式解锁（写入注册表 `DeveloperUnlocked=false`）
+///
+/// 同时重置 `DeveloperMode` 和 `IgnoreTls` 两个关联开关，确保撤销后开发者
+/// 相关能力全部失效。若 DevTools 当前已打开，尝试关闭后重置状态标志。
+///
+/// 撤销后：
+/// - 「高阶配置」页开发者模式开关卡片隐藏
+/// - 侧边菜单「开发者」项隐藏（通过 `developer-mode-changed` 事件通知前端）
+/// - DevTools 无法再被调出（`require_dev_mode()` 校验失败）
+/// - IgnoreTls 失效（`is_ignore_tls()` 返回 false）
+///
+/// 已撤销时重复调用是幂等的。
+pub fn lock_developer_mode(app: &AppHandle) -> Result<(), String> {
+    // 若 DevTools 已打开，先关闭（不强制要求关闭成功，避免 WebView2 异常阻断撤销）
+    if DEVTOOLS_OPEN.load(Ordering::SeqCst) {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.close_devtools();
+        }
+        DEVTOOLS_OPEN.store(false, Ordering::SeqCst);
+    }
+    // 顺序：先关 DeveloperMode（触发 require_dev_mode 校验失败），再关 IgnoreTls，
+    //       最后清 DeveloperUnlocked。任一步失败均向上抛错，保证状态一致。
+    reg_set_bool(KEY_DEV_MODE, false)?;
+    reg_set_bool(KEY_IGNORE_TLS, false)?;
+    reg_set_bool(KEY_DEV_UNLOCKED, false)?;
+    log_info!("[Developer] 开发者模式已撤销解锁");
+    Ok(())
 }
 
 /// 查询是否忽略 TLS 证书校验（仅在开发者模式已开启时返回 true）
