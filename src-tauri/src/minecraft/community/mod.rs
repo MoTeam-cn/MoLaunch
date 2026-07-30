@@ -3,6 +3,7 @@
 pub mod cache;
 pub mod common;
 pub mod curseforge;
+pub mod fuzzy;
 pub mod mcmod;
 pub mod modrinth;
 pub mod preload;
