@@ -188,8 +188,8 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     }));
 
     // Windows 便携版自实现 + macOS/Linux 转发官方 plugin
-    d.register("check_update", handler!(_state, app, _params, {
-        let r = updater::check_update(&app).await?;
+    d.register("check_update", handler!(state, app, _params, {
+        let r = updater::check_update(&state, &app).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
     }));
     d.register("download_and_install_update", handler!(_state, app, params, {
@@ -197,6 +197,20 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             .map_err(|e| format!("参数解析失败: {}", e))?;
         updater::download_and_install(&app, p).await?;
         Ok(serde_json::Value::Null)
+    }));
+
+    // Windows 便携版后台静默下载新版本到 appdata/last.exe
+    d.register("download_update_to_appdata", handler!(_state, _app, params, {
+        let p: updater::UpdateInfo = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let downloaded = updater::download_update_to_appdata(p).await?;
+        Ok(serde_json::to_value(downloaded).map_err(|e| e.to_string())?)
+    }));
+
+    // 退出时检查并应用待安装更新（last.exe → 替换主 exe）
+    d.register("apply_pending_update", handler!(_state, app, _params, {
+        let has_update = updater::apply_pending_update(&app).await?;
+        Ok(serde_json::to_value(has_update).map_err(|e| e.to_string())?)
     }));
 
     d.register("list_custom_certs", handler!(_state, _app, _params, {

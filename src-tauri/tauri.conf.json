@@ -23,7 +23,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://api.molaunch.moiu.cn/v1/updates/manifest/raw?target={{target}}&arch={{arch}}&current_version={{current_version}}"
+        "https://api.molaunch.moiu.cn/v3/updates/manifest?target={{target}}&arch={{arch}}&current_version={{current_version}}"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEyNTgyQTQ3NDU5RjIwMTcKUldRWElKOUZSeXBZRXZJT2pkWUZtQkUvODdlYTdVZjgvRWFFN0FqYXhYTmhhVTdYU1lVLzY5NkUK",
       "windows": {

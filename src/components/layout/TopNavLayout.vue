@@ -16,6 +16,7 @@ import {
 import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
 import { useOnlineStore } from '@/stores/online'
+import { applyPendingUpdate } from '@/utils/updater'
 const appWindow = getCurrentWebviewWindow()
 const onlineStore = useOnlineStore()
 
@@ -97,6 +98,9 @@ async function handleClose() {
       new Promise<void>((r) => setTimeout(r, 3000)),
     ])
   }
+  // Windows 便携版：退出前检查是否有待安装更新（appdata/last.exe）
+  // 有则启动 updater.exe 替换主 exe，退出后 updater 接管，下次启动即为新版本
+  await applyPendingUpdate().catch(() => false)
   await appWindow.close()
 }
 </script>

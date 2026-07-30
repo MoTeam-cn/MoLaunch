@@ -68,9 +68,12 @@ export const SYSTEM_ACTIONS = {
   // http_log（2 个）—— 联机 API 调用追踪
   READ_HTTP_LOGS: 'read_http_logs',
   LIST_HTTP_LOG_FILES: 'list_http_log_files',
-  // updater（2 个）—— Windows 便携版自实现 + macOS/Linux 转发官方 plugin
+  // updater（4 个）—— Windows 便携版自实现 + macOS/Linux 转发官方 plugin
   CHECK_UPDATE: 'check_update',
   DOWNLOAD_AND_INSTALL_UPDATE: 'download_and_install_update',
+  // Windows 后台静默下载新版本到 appdata/last.exe + 退出时应用替换
+  DOWNLOAD_UPDATE_TO_APPDATA: 'download_update_to_appdata',
+  APPLY_PENDING_UPDATE: 'apply_pending_update',
   // certs（3 个）—— 自定义 TLS 证书管理
   LIST_CUSTOM_CERTS: 'list_custom_certs',
   ADD_CUSTOM_CERT: 'add_custom_cert',
