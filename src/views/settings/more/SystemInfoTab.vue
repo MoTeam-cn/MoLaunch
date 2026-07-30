@@ -4,6 +4,11 @@
  *
  * 迁移自 SettingsOther.vue（已删除）：移除配置文件路径展示，
  * 保留版本号 5 次点击解锁开发者模式与 SDK 状态展示。
+ *
+ * 开发者模式解锁触发点（任选其一，互不冲突）：
+ * 1. 连续点击应用版本号 5 次（1.5 秒内完成）
+ * 2. 连续双击设备 ID 行 5 次（4 秒内完成）
+ * 第二种方式作为备用触发，避免单一触发点失效时无法解锁。
  */
 import { ref, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
@@ -23,21 +28,50 @@ const devUnlocked = ref(false)
 const versionClickCount = ref(0)
 let versionClickTimer: ReturnType<typeof setTimeout> | null = null
 
+// 设备 ID 双击解锁：连续双击 5 次（4 秒内完成）
+const deviceIdDblClickCount = ref(0)
+let deviceIdDblClickTimer: ReturnType<typeof setTimeout> | null = null
+
 // 设备 ID 显示状态：默认打码，双击切换全额显示
 // 设备 ID 用于本地数据加密存储，请勿泄露
 const deviceIdRevealed = ref(false)
 
 function onDeviceIdDblClick() {
-  if (!sdkStore.deviceId) return
-  deviceIdRevealed.value = !deviceIdRevealed.value
+  // 已解锁状态下双击仅切换全额显示
+  if (devUnlocked.value) {
+    if (!sdkStore.deviceId) return
+    deviceIdRevealed.value = !deviceIdRevealed.value
+    return
+  }
+
+  // 未解锁状态下双击累计 5 次解锁
+  deviceIdDblClickCount.value++
+  const remaining = 5 - deviceIdDblClickCount.value
+
+  if (deviceIdDblClickCount.value >= 5) {
+    unlockDevMode()
+    deviceIdDblClickCount.value = 0
+    return
+  }
+
+  toastInfo(`再双击 ${remaining} 次解锁开发者模式`)
+
+  // 4 秒内未完成 5 次双击则重置计数器（双击间隔较长，给用户更宽裕的时间）
+  if (deviceIdDblClickTimer) clearTimeout(deviceIdDblClickTimer)
+  deviceIdDblClickTimer = setTimeout(() => {
+    deviceIdDblClickCount.value = 0
+    deviceIdDblClickTimer = null
+  }, 4000)
 }
 
 // 计算设备 ID 显示值（打码 / 全额）
 function getDeviceIdDisplay(): string {
   const id = sdkStore.deviceId
   if (!id) return '未获取'
-  if (deviceIdRevealed.value) return id
-  return id.length > 8 ? id.substring(0, 4) + '****' + id.substring(id.length - 4) : '****'
+  // 去除 mcsdk- 前缀后展示
+  const display = id.startsWith('mcsdk-') ? id.slice(6) : id
+  if (deviceIdRevealed.value) return display
+  return display.length > 8 ? display.substring(0, 4) + '****' + display.substring(display.length - 4) : '****'
 }
 
 // 版本号点击：连续 5 次解锁开发者模式
@@ -48,13 +82,8 @@ async function onVersionClick() {
   const remaining = 5 - versionClickCount.value
 
   if (versionClickCount.value >= 5) {
-    // 解锁
-    const ok = await safeCall(() => tauri.unlockDeveloperMode(), 'unlock developer mode')
-    if (ok !== undefined) {
-      devUnlocked.value = true
-      versionClickCount.value = 0
-      toastSuccess('已解锁开发者模式，可在「进阶设置」中开启')
-    }
+    await unlockDevMode()
+    versionClickCount.value = 0
     return
   }
 
@@ -67,6 +96,15 @@ async function onVersionClick() {
     versionClickCount.value = 0
     versionClickTimer = null
   }, 1500)
+}
+
+/** 调用后端解锁开发者模式（共用函数，版本号点击和设备 ID 双击共用） */
+async function unlockDevMode() {
+  const ok = await safeCall(() => tauri.unlockDeveloperMode(), 'unlock developer mode')
+  if (ok !== undefined) {
+    devUnlocked.value = true
+    toastSuccess('已解锁开发者模式，可在「进阶设置」中开启')
+  }
 }
 
 onMounted(async () => {
@@ -117,7 +155,13 @@ onMounted(async () => {
         >
           <div class="flex items-center gap-2">
             <span class="text-sm text-gray-500">设备 ID</span>
-            <Tooltip text="双击切换全额显示 / 打码" position="top" :delay="200">
+            <Tooltip
+              :text="devUnlocked
+                ? '双击切换全额显示 / 打码'
+                : '连续双击 5 次解锁开发者模式（备用入口）'"
+              position="top"
+              :delay="200"
+            >
               <svg class="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>

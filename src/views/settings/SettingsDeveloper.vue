@@ -2,9 +2,10 @@
 /**
  * 设置 - 开发者页面（薄编排层）
  *
- * 顶部子菜单分为：实验性功能 / 证书与安全 / 日志 / 存储 / 系统信息，
- * 五个子页签已拆分到 ./developer/ 目录：
+ * 顶部子菜单分为：实验性功能 / DevTools / 证书与安全 / 日志 / 存储 / 系统信息，
+ * 六个子页签已拆分到 ./developer/ 目录：
  * - 实验性功能：Modrinth CDN 直连 → ExperimentalTab
+ * - DevTools：WebView2 开发者工具调出/关闭 → DevToolsTab
  * - 证书与安全：TLS 信任源 + 忽略 TLS + 自定义证书管理 → CertsTab
  * - 日志：HTTP 请求日志 + 应用日志 → LogsTab
  * - 存储：缓存目录 + 存储信息 → StorageTab
@@ -19,12 +20,14 @@ import * as tauri from '@/utils/tauri'
 import { toastError } from '@/utils/toast'
 import {
   BeakerIcon,
+  CommandLineIcon,
   ShieldCheckIcon,
   DocumentTextIcon,
   FolderOpenIcon,
   CpuChipIcon,
 } from '@heroicons/vue/24/outline'
 import ExperimentalTab from './developer/ExperimentalTab.vue'
+import DevToolsTab from './developer/DevToolsTab.vue'
 import CertsTab from './developer/CertsTab.vue'
 import LogsTab from './developer/LogsTab.vue'
 import StorageTab from './developer/StorageTab.vue'
@@ -33,6 +36,7 @@ import SystemTab from './developer/SystemTab.vue'
 // ── 子页签 ──
 const subTabs = [
   { id: 'experimental', label: '实验性功能', icon: BeakerIcon },
+  { id: 'devtools', label: 'DevTools', icon: CommandLineIcon },
   { id: 'certs', label: '证书与安全', icon: ShieldCheckIcon },
   { id: 'logs', label: '日志', icon: DocumentTextIcon },
   { id: 'storage', label: '存储', icon: FolderOpenIcon },
@@ -78,6 +82,7 @@ onMounted(async () => {
     <!-- 内容区 -->
     <div class="space-y-6 p-6">
       <ExperimentalTab v-if="activeSubTab === 'experimental'" />
+      <DevToolsTab v-else-if="activeSubTab === 'devtools'" />
       <CertsTab v-else-if="activeSubTab === 'certs'" />
       <LogsTab v-else-if="activeSubTab === 'logs'" :logs-dir="storageDirs?.logs" />
       <StorageTab v-else-if="activeSubTab === 'storage'" :storage-dirs="storageDirs" />
