@@ -1,16 +1,6 @@
-//! CurseForge API 客户端
+//! CurseForge API 客户端（API 文档: https://docs.curseforge.com/）
 //!
-//! API 文档: https://docs.curseforge.com/
-//!
-//! 支持两种模式：
-//! - 镜像模式（默认）：走 MCIM 镜像源，无需 API Key
-//! - 官方模式：用户配置 API Key 后走官方 API，速度更快且支持完整字段
-//!
-//! 模块结构：
-//! - types.rs: CF API 响应数据结构（CfModEntry / CfFile 等）
-//! - convert.rs: CF 响应到统一资源模型的转换（convert_project / convert_version / parse_cf_download_url）
-//! - http.rs: HTTP 请求层（cf_get / cf_post + source 策略回退）
-//! - mod.rs: 公共 API（search / get_project / get_versions / fingerprint_search / batch_get_mod_slugs）
+//! 支持镜像模式（默认走 MCIM 镜像源，无需 API Key）和官方模式（用户配置 API Key 后走官方 API）
 
 mod convert;
 pub(crate) mod http;

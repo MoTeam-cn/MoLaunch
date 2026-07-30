@@ -1,6 +1,4 @@
-//! Forge HTML 解析模块
-//!
-//! 解析 Forge 官方网站的 HTML 版本列表页面。
+//! Forge HTML 解析模块：解析 Forge 官方网站的 HTML 版本列表页面
 
 use super::LoaderVersion;
 use crate::utils::datetime;

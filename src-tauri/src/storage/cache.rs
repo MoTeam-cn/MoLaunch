@@ -1,10 +1,7 @@
 //! Cache storage module - manages `.Molaunch/cache` directory
 //!
-//! All cache file operations (read / write / remove / list) must go through
-//! this module instead of manually拼接 `cache/` 前缀或使用 `std::env::temp_dir`。
-//!
-//! 设计与 `Storage` 一致：全局单例 + OnceLock 懒加载，
-//! 缓存根目录由 `Storage::cache_dir()` 提供。
+//! 所有缓存文件读写都应通过 `Cache::instance()` 进行。
+//! 设计与 `Storage` 一致：全局单例 + OnceLock 懒加载。
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -14,9 +11,6 @@ use super::Storage;
 static CACHE: OnceLock<Cache> = OnceLock::new();
 
 /// 缓存存储组件
-///
-/// 所有缓存文件读写都应通过 `Cache::instance()` 进行，
-/// 确保缓存路径统一管理（`.Molaunch/cache/`）。
 pub struct Cache {
     cache_dir: PathBuf,
 }

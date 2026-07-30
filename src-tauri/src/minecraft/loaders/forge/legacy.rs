@@ -1,10 +1,6 @@
 //! Legacy Forge installation (1.7.10 ~ 1.12.2)
 //!
-//! 旧版 Forge 安装器以 `install_profile.json` 为入口，存在两种格式：
-//! - 方式 2（1.7.10 及更早）：JSON 含 `install` 字段，按 `filePath` 从 zip 提取 JAR 到 libraries
-//! - 方式 1（1.8 ~ 1.12.2）：JSON 含 `json` 字段，按该字段名读取版本 JSON，并解压 `maven/` 到 libraries
-//!
-//! 两种方式均会写入版本 JSON 并按需复制原版 JAR 到 Forge 版本目录
+//! 以 `install_profile.json` 为入口，两种格式：方式 2（1.7.10-，含 `install` 字段）；方式 1（1.8~1.12.2，含 `json` 字段并解压 maven/）
 
 use std::path::Path;
 use std::sync::Arc;

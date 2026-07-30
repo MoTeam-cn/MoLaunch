@@ -1,28 +1,7 @@
 //! 时间解析与格式化工具
 //!
-//! 提供统一的时间字符串解析函数，支持多种常见格式，
-//! 避免在各业务模块中重复实现 RFC3339 / naive datetime 的解析逻辑。
-//!
-//! ## 支持格式
-//!
-//! | 格式 | 示例 |
-//! |------|------|
-//! | RFC3339 / ISO8601（带时区） | `2023-09-08T12:00:00+08:00`、`2023-09-08T12:00:00Z` |
-//! | Naive datetime（T 分隔，视为 UTC） | `2023-09-08T12:00:00` |
-//! | Naive datetime（空格分隔，视为 UTC） | `2023-09-08 12:00:00` |
-//! | 纯日期（视为 UTC 00:00） | `2023-09-08` |
-//!
-//! ## 使用示例
-//!
-//! ```rust,ignore
-//! use crate::utils::datetime;
-//!
-//! // 解析为 UTC DateTime
-//! let dt = datetime::parse_utc("2023-09-08T12:00:00Z")?;
-//!
-//! // 格式化为本地时间字符串
-//! let local = datetime::format_utc_to_local("2023-09-08T12:00:00Z");
-//! ```
+//! 提供统一的时间字符串解析函数，支持 RFC3339、naive datetime（T/空格分隔）、
+//! 纯日期格式，naive 格式视为 UTC。
 
 use chrono::{DateTime, Local, TimeZone, Utc};
 

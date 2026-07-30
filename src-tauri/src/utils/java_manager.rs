@@ -1,21 +1,10 @@
 //! Java 管理统一分发逻辑（java_manager 的工具实现）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发。
-//! 6 个 java action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
-//!
-//! 命令清单（6 个）：
-//! - `detect_java`：检测系统 Java（自动选最佳）
-//! - `list_java`：列出所有可用 Java
-//! - `select_java_for_mc`：按 MC 版本选最佳 Java
-//! - `get_java_requirements`：获取 MC 版本的 Java 需求（支持加载器约束）
-//! - `check_java_compatible`：检查指定 Java 是否兼容 MC 版本
-//! - `download_java`：下载 Mojang 官方 Java Runtime
-//!
-//! 注意：
-//! - `detect_java` / `list_java` / `select_java_for_mc` 保留 `&AppState` 参数（原签名一致），
-//!   handler 内用 `state` 传入；`detect_java` / `list_java` 实际未使用 state
-//! - `get_java_requirements` / `check_java_compatible` 不需要 state/app，handler 内用 `_state` / `_app`
-//! - `download_java` 需要 state（读取下载源配置）和 app（推送 `java-download-progress` 事件）
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，6 个 action：
+//! `detect_java` / `list_java` / `select_java_for_mc` / `get_java_requirements` /
+//! `check_java_compatible` / `download_java`。
+//! `get_java_requirements` / `check_java_compatible` 不需要 state/app；
+//! `download_java` 需要 state（读下载源）和 app（emit `java-download-progress`）。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -26,9 +15,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-// ============================================================
-// action 参数
-// ============================================================
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -58,9 +44,6 @@ struct DownloadJavaParams {
     target_major: u32,
 }
 
-// ============================================================
-// Dispatcher 注册
-// ============================================================
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();

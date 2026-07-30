@@ -1,19 +1,7 @@
 //! 游戏窗口标题修改（跨平台）
 //!
-//! 启动后轮询找到属于 MC 进程的窗口，改写标题。
-//! 支持 `{date}` 和 `{time}` 实时替换。
-//!
-//! 平台实现：
-//! - Windows：Win32 `SetWindowTextW`（直接 API 调用，最可靠）
-//! - macOS：AppleScript `osascript`（通过 shell 模块统一调用）
-//! - Linux：`wmctrl` 或 `xdotool` 外部命令（通过 shell 模块统一调用，
-//!   需用户安装，Wayland 下可能不支持）
-//!
-//! 模块结构：
-//! - mod.rs: 跨平台公共 API（apply_window_title + render_title）+ 平台分发
-//! - windows.rs: Windows Win32 实现（EnumWindows + SetWindowTextW）
-//! - macos.rs: macOS osascript 实现（通过 shell::run_osascript）
-//! - linux.rs: Linux xdotool/wmctrl 实现（通过 shell::xdotool_* / shell::wmctrl_*）
+//! 启动后轮询找到 MC 进程的窗口并改写标题，支持 `{date}` / `{time}` 实时替换。
+//! 平台实现：Windows 用 Win32 `SetWindowTextW`，macOS 用 osascript，Linux 用 wmctrl/xdotool。
 
 use std::time::Duration;
 

@@ -1,10 +1,6 @@
 //! 整合包元数据本地持久化（`versions/{id}/modpack.meta.json`）
 //!
-//! 整合包安装完成时由 `commands::community::install` 写入，
-//! 创建联机房间时由 `read_local_modpack_meta` IPC 读取并上报给 api-server。
-//!
-//! 与 `minecraft::online::signaling::ModpackMeta` 字段一致，可直接转换。
-//! 设计原则：不存储 `download_url`（安全考虑，由加入方实时反查平台 API）。
+//! 安装时写入，创建联机房间时读取上报。与 `ModpackMeta` 字段一致，不存储 `download_url`（安全考虑）。
 
 use std::path::{Path, PathBuf};
 

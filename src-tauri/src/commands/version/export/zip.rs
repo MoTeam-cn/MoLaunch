@@ -73,8 +73,6 @@ fn emit_zip_progress(app: &AppHandle, version_id: &str, current: usize, total: u
     );
 }
 
-// ============== 共用工具 ==============
-
 /// 创建 zip writer + 父目录
 fn create_zip_writer(pack_path: &Path) -> Result<(zip::ZipWriter<File>, zip::write::SimpleFileOptions), String> {
     if let Some(parent) = pack_path.parent() {
@@ -201,8 +199,6 @@ fn parse_loader_info(instance_dir: &Path, version_id: &str) -> (VersionType, Opt
     (setup.loader.version_type, v)
 }
 
-// ============== Modrinth 格式 ==============
-
 /// 构建 Modrinth 格式整合包（.mrpack）
 fn build_modrinth_zip(
     instance_dir: &Path,
@@ -287,8 +283,6 @@ fn build_index_json(
         dependencies: dependencies.clone(),
     }
 }
-
-// ============== CurseForge 格式 ==============
 
 /// 构建 CurseForge 格式整合包（.zip）
 ///
@@ -436,8 +430,6 @@ fn build_modlist_html(mod_infos: &[ModDownloadInfo]) -> String {
     html
 }
 
-// ============== HMCL 格式 ==============
-
 /// 构建 HMCL 格式整合包（.zip）
 ///
 /// - modpack.json: gameVersion + name
@@ -489,8 +481,6 @@ fn build_hmcl_zip(
     zip.finish().map_err(|e| format!("完成 zip 写入失败: {}", e))?;
     Ok(())
 }
-
-// ============== MultiMC 格式 ==============
 
 /// 构建 MultiMC 格式整合包（.zip）
 ///
@@ -565,8 +555,6 @@ fn build_mmc_zip(
     zip.finish().map_err(|e| format!("完成 zip 写入失败: {}", e))?;
     Ok(())
 }
-
-// ============== MCBBS 格式 ==============
 
 /// 构建 MCBBS 格式整合包(.zip）
 ///
@@ -643,8 +631,6 @@ fn build_mcbbs_zip(
     Ok(())
 }
 
-// ============== Compress 格式 ==============
-
 /// 构建 Compress 格式整合包（.zip 兜底）
 ///
 /// 直接打包 .minecraft/ 前缀，无 manifest 文件。
@@ -667,8 +653,6 @@ fn build_compress_zip(files: &[ExportFileInfo], pack_path: &Path, app: &AppHandl
     zip.finish().map_err(|e| format!("完成 zip 写入失败: {}", e))?;
     Ok(())
 }
-
-// ============== CF manifest 数据结构 ==============
 
 #[derive(serde::Serialize)]
 struct CfManifest {

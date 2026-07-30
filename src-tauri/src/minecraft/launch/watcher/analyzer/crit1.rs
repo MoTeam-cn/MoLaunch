@@ -14,17 +14,17 @@ pub(super) fn analyze_crit1(
     error_lines: &[String],
     crash_report_path: Option<&Path>,
 ) -> Option<CrashInfo> {
-    // --- 崩溃报告分析（高优先级）---
+    // 崩溃报告分析（高优先级）
     if let Some(info) = analyze_crash_report(log_crash, error_lines, crash_report_path) {
         return Some(info);
     }
 
-    // --- 游戏日志分析（高优先级）---
+    // 游戏日志分析（高优先级）
     if let Some(info) = analyze_game_log(log_mc, error_lines, crash_report_path) {
         return Some(info);
     }
 
-    // --- hs_err 日志分析（JVM 崩溃）---
+    // hs_err 日志分析（JVM 崩溃）
     if let Some(info) = analyze_hs_err(log_hs, error_lines, crash_report_path) {
         return Some(info);
     }

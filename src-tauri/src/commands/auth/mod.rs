@@ -1,17 +1,12 @@
 //! 认证命令模块
 //!
-//! 支持离线登录、微软登录（Web Auth Code Flow / Device Code Flow）和
-//! authlib-injector 外置登录（yggdrasil 协议）。
-//! 流程选择由 Client ID 自动决定：
+//! 支持离线 / 微软（Web Auth Code Flow / Device Code Flow）/ authlib-injector
+//! 外置登录（yggdrasil 协议）。流程选择由 Client ID 自动决定：
 //! - 官方 ID（默认）：Web Auth Code Flow + login.live.com 旧版端点
 //! - 自定义 ID：Device Code Flow + login.microsoftonline.com v2.0 端点
 //!
-//! 注：原 23 个分散的 auth Tauri 命令已聚合为 `meta_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发到各子模块函数。
-//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState` / `&AppHandle`，
-//! 由 `utils::meta_manager::dispatch` 反序列化参数后调用。
-//! `MetaRequest` 已替换为通用的 `utils::dispatcher::ActionRequest`，
-//! 与 `tools_manager` 共用同一请求体结构。
+//! 子模块函数接收 `&AppState` / `&AppHandle`，由 `utils::meta_manager::dispatch`
+//! 反序列化参数后调用，请求体为通用 `utils::dispatcher::ActionRequest`。
 
 pub mod account;
 pub mod authlib;

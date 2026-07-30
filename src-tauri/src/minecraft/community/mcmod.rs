@@ -1,10 +1,7 @@
 //! MC 百科（mcmod.cn）数据库
 //!
-//! 加载内置 moddata.txt，通过工程 Slug 查找中文译名和 MC 百科 class id
-//! 仅对 Mod / 数据包类型生效
-//!
-//! 关键设计：moddata.txt 第 N 行 → mcmod.cn class id = N
-//! 空行也占用行号（i += 1 在 Continue For 之前）
+//! 加载内置 moddata.txt，通过工程 Slug 查找中文译名和 MC 百科 class id。
+//! 关键设计：moddata.txt 第 N 行 → mcmod.cn class id = N（空行也占行号）
 
 use once_cell::sync::Lazy;
 use std::collections::HashMap;

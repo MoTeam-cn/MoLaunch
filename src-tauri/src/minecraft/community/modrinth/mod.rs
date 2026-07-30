@@ -1,12 +1,4 @@
-//! Modrinth API 客户端
-//!
-//! API 文档: https://docs.modrinth.com/
-//!
-//! 模块结构：
-//! - types.rs: MR API 响应数据结构（MrHit / MrProject / MrVersion 等）+ 官方/镜像基地址常量
-//! - convert.rs: MR 响应到统一资源模型的转换（convert_hit / convert_project / convert_version / build_facets）
-//! - http.rs: HTTP 请求层（pick_base + mr_get / mr_post + source 策略回退镜像）
-//! - mod.rs: 公共 API（search / get_project / get_versions / version_files_search / batch_get_project_slugs）
+//! Modrinth API 客户端（API 文档: https://docs.modrinth.com/）
 
 mod convert;
 mod http;

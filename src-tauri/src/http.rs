@@ -119,7 +119,7 @@ pub fn build_client(
         builder = builder.local_address(addr);
     }
 
-    // ===== TLS 信任源配置 =====
+    // TLS 信任源配置
     if ignore_tls {
         // 开发者模式：跳过所有证书校验（仅用于自签名证书调试）
         builder = builder.danger_accept_invalid_certs(true);

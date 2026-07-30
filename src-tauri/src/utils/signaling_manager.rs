@@ -1,13 +1,8 @@
 //! 信令 action 管理器（房间创建/加入/退出/踢人/保活等）
 //!
-//! 由 `online_manager::DISPATCHER` 调用 `register_signaling_actions` 注册全部信令 action。
-//! 拆分到独立模块避免 `online_manager.rs` 超过 500 行。命名遵循项目 `xxx_manager.rs` 惯例。
-//!
-//! 所有信令 action 统一流程：
-//! 1. 从 params 解析参数
-//! 2. 加载设备凭证（需已注册）
-//! 3. 调用 `OnlineClient` 对应的 `signaling_*` 方法
-//! 4. 返回业务数据
+//! 由 `online_manager::DISPATCHER` 调用 `register_signaling_actions` 注册。
+//! 拆分独立模块避免 `online_manager.rs` 超过 500 行。
+//! 流程：解析 params → 加载凭证 → 调用 `OnlineClient::signaling_*` → 返回数据。
 
 use serde::Deserialize;
 
@@ -24,9 +19,6 @@ use crate::minecraft::online::signaling::UploadParticipantOfferRequest;
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 
-// ============================================================
-// 参数结构体
-// ============================================================
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -170,8 +162,6 @@ pub struct ParticipantOfferParams {
     pub participant_id: String,
 }
 
-// ===== 白名单管理参数（阶段三子任务 8 安全加强） =====
-
 /// 添加白名单条目的参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -220,9 +210,6 @@ pub struct LobbyListParams {
     pub keyword: Option<String>,
 }
 
-// ============================================================
-// 辅助函数
-// ============================================================
 
 /// 加载设备凭证（需已注册）
 ///
@@ -241,9 +228,6 @@ async fn make_client(state: &AppState) -> OnlineClient {
     OnlineClient::new(&base_url)
 }
 
-// ============================================================
-// 注册入口
-// ============================================================
 
 /// 注册全部信令 action 到 dispatcher
 pub fn register_signaling_actions(d: &mut Dispatcher) {
@@ -276,9 +260,6 @@ pub fn register_signaling_actions(d: &mut Dispatcher) {
     register_list_lobby_categories(d);
 }
 
-// ============================================================
-// 各 action 注册
-// ============================================================
 
 fn register_get_stun(d: &mut Dispatcher) {
     d.register("room_get_stun", handler!(state, _app, _params, {
@@ -619,9 +600,6 @@ fn register_fetch_participant_offer(d: &mut Dispatcher) {
     }));
 }
 
-// ============================================================
-// 白名单管理 action（阶段三子任务 8 安全加强）
-// ============================================================
 
 fn register_list_whitelist(d: &mut Dispatcher) {
     d.register("room_list_whitelist", handler!(state, _app, params, {
@@ -702,9 +680,6 @@ fn register_set_whitelist_enabled(d: &mut Dispatcher) {
     }));
 }
 
-// ============================================================
-// 大厅浏览 action（联机大厅阶段 5）
-// ============================================================
 
 fn register_list_lobby_rooms(d: &mut Dispatcher) {
     d.register("lobby_list_rooms", handler!(state, _app, params, {

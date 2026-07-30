@@ -1,6 +1,4 @@
 //! Java 下载相关数据类型
-//!
-//! 包含 Mojang all.json 与 manifest.json 反序列化所需的全部结构体。
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

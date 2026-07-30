@@ -1,11 +1,8 @@
 //! macOS 实现：AppleScript（通过 shell 模块统一调用 osascript）
 //!
 //! 通过 System Events 按 PID 找到进程窗口并修改其 name 属性。
-//!
-//! 注意：
-//! - 需要用户在"系统设置 > 隐私与安全性 > 辅助功能"中授权启动器
-//! - Java 应用的窗口由 JVM 管理，System Events 可能无法直接修改其标题，
-//!   此情况会输出警告日志但不影响游戏运行
+//! 需用户在"系统设置 > 隐私与安全性 > 辅助功能"中授权启动器；
+//! Java 应用窗口由 JVM 管理，可能无法修改（输出警告但不影响游戏运行）。
 
 use crate::minecraft::system::shell::run_osascript;
 
@@ -28,12 +25,7 @@ pub async fn is_window_visible(pid: u32) -> bool {
     }
 }
 
-/// 改写指定 PID 的窗口标题
-/// 通过 AppleScript 的 System Events 修改进程窗口标题
-///
-/// 注意：Java 应用的窗口由 JVM 管理，System Events 可能无法直接修改其标题。
-/// 这种情况下会输出警告日志，但不影响游戏运行。
-/// macOS 需要用户在"系统设置 > 隐私与安全性 > 辅助功能"中授权启动器。
+/// 改写指定 PID 的窗口标题（通过 AppleScript System Events）
 pub async fn set_window_title(pid: u32, title: &str) {
     // 转义标题中的双引号和反斜杠
     let escaped_title = title.replace('\\', "\\\\").replace('"', "\\\"");

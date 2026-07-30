@@ -1,13 +1,7 @@
 //! 日志文件查看 API
 //!
 //! 供 system_manager dispatcher 调用，提供日志文件路径查询、列表、读取功能。
-//!
-//! 原函数返回 PathBuf / Vec<String> / anyhow::Result<String>，
-//! 这里提供薄包装层转换为序列化友好的返回类型。
-//!
-//! 注：原 3 个分散 Tauri 命令已聚合为 `system_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
-//! 由 `utils::system_manager::dispatch` 反序列化参数后调用。
+//! 薄包装层将 PathBuf / Vec<String> / anyhow::Result<String> 转为序列化友好类型。
 
 use crate::storage::Storage;
 use std::path::PathBuf;

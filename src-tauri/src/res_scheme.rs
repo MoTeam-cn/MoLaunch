@@ -5,13 +5,9 @@
 //!   - Windows/Android: `https://res.localhost/web-common/{type}/{filename}`
 //!   - macOS/Linux: `res://localhost/web-common/{type}/{filename}`
 //!
-//! ## 设计要点
-//!
-//! - 参照 `minecraft::image_cache` 的 `register_uri_scheme` 模式
-//! - 资源来自 `resources.rs` 的 `read_resource_bytes`（编译期嵌入）
-//! - URL 路径白名单校验，防止路径遍历
-//! - 所有响应附带 CORS 头，允许 Worker fetch
-//! - WASM 文件返回 `application/wasm` MIME，支持 `WebAssembly.compileStreaming`
+//! 资源来自 `resources.rs`（编译期嵌入），URL 路径白名单校验防路径遍历，
+//! 响应附带 CORS 头允许 Worker fetch，WASM 返回 `application/wasm` MIME
+//! 支持 `WebAssembly.compileStreaming`。
 
 use std::path::{Component, Path, PathBuf};
 use tauri::{http::Response, Builder, Runtime};
@@ -22,12 +18,7 @@ pub const RES_SCHEME: &str = "res";
 /// 资源根路径前缀（URL 中固定为 `/web-common/`）
 pub const RES_ROOT: &str = "web-common";
 
-/// 注册 `res://` 自定义 URI scheme
-///
-/// 在 `lib.rs` 中调用：
-/// ```ignore
-/// let builder = res_scheme::register_res_scheme(builder);
-/// ```
+/// 注册 `res://` 自定义 URI scheme（在 `lib.rs` 中调用）
 pub fn register_res_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder.register_uri_scheme_protocol(RES_SCHEME, |_ctx, request| {
         handle_res_request(&request)

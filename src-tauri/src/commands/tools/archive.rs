@@ -349,8 +349,6 @@ pub async fn restore(
     }
 }
 
-// ===== 辅助函数 =====
-
 /// 递归计算目录总字节数
 fn dir_total_size(dir: &Path) -> u64 {
     let mut total: u64 = 0;

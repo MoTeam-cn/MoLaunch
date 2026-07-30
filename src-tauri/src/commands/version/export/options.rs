@@ -23,8 +23,6 @@ const SUB_OPTION_BLACKLIST: &[&str] = &["Quark Programmer Art.zip", "+ EuphoriaP
 pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
     let mut opts = Vec::new();
     let rules_suffix = format!("|{}", GLOBAL_EXCLUDES.join("|"));
-
-    // === 游戏本体（必选） ===
     opts.push(ExportOption {
         id: "basic".into(),
         title: "游戏本体".into(),
@@ -37,8 +35,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
         enabled: false, // 必选，不可取消
         visible: true,
     });
-
-    // === 游戏本体设置 ===
     opts.push(ExportOption {
         id: "options".into(),
         title: "游戏本体设置".into(),
@@ -51,8 +47,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
         enabled: true,
         visible: has_file_or_dir(instance_dir, &["options.txt", "configureddefaults"]),
     });
-
-    // === 游戏本体个人信息 ===
     opts.push(ExportOption {
         id: "personal_info".into(),
         title: "游戏本体个人信息".into(),
@@ -65,8 +59,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
         enabled: true,
         visible: has_file_or_dir(instance_dir, &["hotbar.nbt", "command_history.txt"]),
     });
-
-    // === OptiFine 设置 ===
     opts.push(ExportOption {
         id: "optifine".into(),
         title: "OptiFine 设置".into(),
@@ -79,8 +71,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
         enabled: true,
         visible: has_file_or_dir(instance_dir, &["optionsof.txt", "optionsshaders.txt"]),
     });
-
-    // === Mod ===
     let has_mods = instance_dir.join("mods").is_dir()
         || instance_dir.join("coremods").is_dir()
         || instance_dir.join("lib").is_dir();
@@ -239,8 +229,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
             visible: instance_dir.join("patchouli_data.json").is_file(),
         });
     }
-
-    // === 资源包（含动态子选项） ===
     let has_rp = instance_dir.join("resourcepacks").is_dir()
         || instance_dir.join("texturepacks").is_dir();
     opts.push(ExportOption {
@@ -260,8 +248,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
             opts.push(sub);
         }
     }
-
-    // === 光影包（含动态子选项） ===
     let has_sp = instance_dir.join("shaderpacks").is_dir();
     opts.push(ExportOption {
         id: "shaderpacks".into(),
@@ -280,8 +266,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
             opts.push(sub);
         }
     }
-
-    // === 截图 ===
     opts.push(ExportOption {
         id: "screenshots".into(),
         title: "截图".into(),
@@ -294,8 +278,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
         enabled: true,
         visible: instance_dir.join("screenshots").is_dir(),
     });
-
-    // === 导出的结构 ===
     opts.push(ExportOption {
         id: "schematics".into(),
         title: "导出的结构".into(),
@@ -308,8 +290,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
         enabled: true,
         visible: instance_dir.join("schematics").is_dir(),
     });
-
-    // === 录像回放 ===
     opts.push(ExportOption {
         id: "replay".into(),
         title: "录像回放".into(),
@@ -323,8 +303,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
         visible: instance_dir.join("replay_recordings").is_dir()
             || instance_dir.join("replay_videos").is_dir(),
     });
-
-    // === 单人游戏存档（含动态子选项） ===
     let has_saves = instance_dir.join("saves").is_dir();
     opts.push(ExportOption {
         id: "saves".into(),
@@ -343,8 +321,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
             opts.push(sub);
         }
     }
-
-    // === 协议 ===
     opts.push(ExportOption {
         id: "licence".into(),
         title: "协议".into(),
@@ -357,8 +333,6 @@ pub fn build_all_options(instance_dir: &Path) -> Vec<ExportOption> {
         enabled: true,
         visible: has_licence_file(instance_dir),
     });
-
-    // === 多人游戏服务器列表 ===
     opts.push(ExportOption {
         id: "servers".into(),
         title: "多人游戏服务器列表".into(),

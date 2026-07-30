@@ -1,10 +1,6 @@
 //! Modrinth HTTP 请求层
 //!
-//! 包含：
-//! - pick_base：根据 source 策略选择官方/镜像源
-//! - mr_get / mr_post：通用 GET/POST 请求封装
-//!   - source=1 时官方失败自动回退镜像（404 不重试，因为镜像也是 404）
-//!   - source=0 强制镜像，source=2 强制官方
+//! source=1 时官方失败自动回退镜像（404 不重试，镜像也是 404）；source=0 强制镜像，source=2 强制官方
 
 use std::time::Instant;
 

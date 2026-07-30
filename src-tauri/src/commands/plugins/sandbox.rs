@@ -1,15 +1,7 @@
 //! 外部插件沙箱内部访问（列出 / 读取 / 卸载）
 //!
-//! - `list_external_plugins`：扫描 `<base_dir>/plugins/<plugin_id>/` 目录
-//! - `read_external_plugin_file`：读取插件文件内容（路径遍历防护）
-//! - `uninstall_external_plugin`：卸载插件（删除目录）
-//!
-//! 共享类型与 helper 在 `super::` 中（`ExternalPluginEntry` / `is_valid_plugin_id` /
-//! `plugins_root` / `read_plugin_manifest`）。
-//!
-//! 注：原 3 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
-//! 由 `utils::plugins_manager::dispatch` 反序列化参数后调用。
+//! 共享类型与 helper 在 `super::` 中（`ExternalPluginEntry` /
+//! `is_valid_plugin_id` / `plugins_root` / `read_plugin_manifest`）。
 
 use super::{is_valid_plugin_id, plugins_root, read_plugin_manifest, ExternalPluginEntry};
 use crate::error_util::log_err;

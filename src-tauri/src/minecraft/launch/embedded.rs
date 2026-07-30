@@ -5,7 +5,6 @@
 
 /// 解析嵌入资源 jar 的缓存路径
 ///
-/// 从缓存目录释放指定 jar，返回路径。
 /// 首次使用从嵌入资源释放。
 pub(super) fn resolve_embedded_jar(
     resource_name: &str,

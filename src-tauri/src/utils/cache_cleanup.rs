@@ -1,30 +1,8 @@
 //! 缓存定期清理模块
 //!
-//! 自动清理超过 24h 的不重要缓存文件，避免磁盘占用无限增长。
-//!
-//! ## 清理范围
-//!
-//! | 位置 | 清理策略 | 说明 |
-//! |------|----------|------|
-//! | `.Molaunch/cache/images/` | 24h | 图片缓存（皮肤、披风、头像），可重新下载 |
-//! | `.Molaunch/cache/forge_installer/` | 24h | Forge 安装器注入资源，可重新释放 |
-//! | `.Molaunch/cache/preload_mods/` | 24h | 社区资源预加载缓存，已有 6h TTL |
-//! | `.Molaunch/cache/launch/` | 24h | 嵌入 jar 释放（lwjgl-unsafe-agent、java-wrapper） |
-//! | `.Molaunch/cache/custom_layout/` | 24h | 自定义布局 URL 下载缓存，可重新下载 |
-//! | `<temp>/MoLaunch/TaskTemp/` | 24h | Forge/NeoForge 安装包临时下载 |
-//!
-//! ## 不清理
-//!
-//! | 位置 | 原因 |
-//! |------|------|
-//! | `<temp>/MoLaunch/sdk/` | SDK 动态库，有 sha256 校验机制，运行中清理会导致加载失败 |
-//! | `%APPDATA%/.minecraft/runtime/` | Java Runtime，重要资源，下载耗时长，跨游戏目录共享 |
-//! | `.Molaunch/cache/` 根目录其他文件 | 避免误删业务数据 |
-//!
-//! ## 触发时机
-//!
-//! - **启动时**：执行一次清理（清理上次运行遗留的过期文件）
-//! - **定时任务**：每 1h 检查一次（避免频繁 IO，又能在合理时间内清理过期文件）
+//! 自动清理超过 24h 的不重要缓存文件（images / forge_installer / preload_mods /
+//! launch / custom_layout / TaskTemp）。SDK 动态库和 Java Runtime 不清理。
+//! 启动时执行一次，之后每 1h 检查一次。
 
 use std::path::Path;
 use std::time::{Duration, SystemTime};

@@ -1,10 +1,4 @@
-//! Java检测和管理模块
-//!
-//! 子模块组织：
-//! - `download`: Java 自动下载（Mojang Runtime 索引）
-//! - `detect`: 单个 Java 检测与版本号解析
-//! - `search`: 系统级 Java 搜索（环境变量 / 磁盘 / 用户目录等）
-//! - `select`: 基于版本区间的基础选择（MC 版本感知选择见 `java_selector`）
+//! Java 检测和管理模块
 
 pub mod download;
 

@@ -1,9 +1,6 @@
 //! HTTP 文本获取与索引/清单拉取
 //!
-//! 提供：
-//! - `fetch_text_with_fallback`：低层多源回退文本获取
-//! - `fetch_index`：阶段 1，拉取并解析 all.json
-//! - `fetch_manifest`：阶段 3，拉取并解析 manifest.json
+//! `fetch_text_with_fallback` 低层多源回退；`fetch_index` 拉取 all.json；`fetch_manifest` 拉取 manifest.json
 
 use crate::minecraft::sources::{build_replace_urls, DownloadSourceMode};
 

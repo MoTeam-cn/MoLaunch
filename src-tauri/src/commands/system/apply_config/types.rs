@@ -7,9 +7,6 @@
 use crate::minecraft::online::signaling::IceServerEntry;
 use serde::{Deserialize, Serialize};
 
-// ============================================================
-// ConfigPatch 子 struct（serde(flatten) 展平到 ConfigPatch）
-// ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProxyPatch {
@@ -96,7 +93,7 @@ pub struct OnlinePatch {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigPatch {
-    // ===== 通用字段（保持平铺，rename_all = "camelCase" 自动映射）=====
+    // 通用字段（保持平铺，rename_all = "camelCase" 自动映射）
     pub game_dir: Option<String>,
     pub isolation_mode: Option<u32>,
     pub log_level: Option<u32>,
@@ -112,7 +109,7 @@ pub struct ConfigPatch {
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"
     pub external_download_dir: Option<Option<String>>,
 
-    // ===== 分组字段（serde(flatten) 展平到顶层）=====
+    // 分组字段（serde(flatten) 展平到顶层）
     #[serde(flatten)]
     pub proxy: ProxyPatch,
     #[serde(flatten)]
@@ -126,15 +123,15 @@ pub struct ConfigPatch {
     #[serde(flatten)]
     pub online: OnlinePatch,
 
-    // ===== CurseForge（加密存储，不进 AppConfig，内部分流到 secure_storage）=====
+    // CurseForge（加密存储，不进 AppConfig，内部分流到 secure_storage）
     pub curseforge_enabled: Option<bool>,
     pub curseforge_api_key: Option<String>,
 
-    // ===== 开发者模式（注册表存储，不进 AppConfig，内部分流到 registry）=====
+    // 开发者模式（注册表存储，不进 AppConfig，内部分流到 registry）
     /// 开关是否开启（仅在已解锁时可生效）
     pub developer_mode: Option<bool>,
 
-    // ===== TLS（trust_mode 进 AppConfig；ignore_tls 走注册表，仅在开发者模式可开启）=====
+    // TLS（trust_mode 进 AppConfig；ignore_tls 走注册表，仅在开发者模式可开启）
     /// TLS 信任源模式：builtin / system / custom / system+custom / builtin+custom / all
     #[serde(rename = "tlsTrustMode")]
     pub tls_trust_mode: Option<String>,
@@ -143,9 +140,6 @@ pub struct ConfigPatch {
     pub ignore_tls: Option<bool>,
 }
 
-// ============================================================
-// ConfigSnapshot 子 struct（serde(flatten) 展平到 ConfigSnapshot）
-// ============================================================
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ProxySnapshot {
@@ -262,7 +256,7 @@ impl Default for TlsSnapshot {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ConfigSnapshot {
-    // ===== 通用字段（保持平铺，rename_all = "camelCase" 自动映射）=====
+    // 通用字段（保持平铺，rename_all = "camelCase" 自动映射）
     pub game_dir: String,
     pub isolation_mode: u32,
     pub log_level: u32,
@@ -274,7 +268,7 @@ pub struct ConfigSnapshot {
     // 外部下载工具
     pub external_download_dir: Option<String>,
 
-    // ===== 分组字段（serde(flatten) 展平到顶层）=====
+    // 分组字段（serde(flatten) 展平到顶层）
     #[serde(flatten)]
     pub proxy: ProxySnapshot,
     #[serde(flatten)]
@@ -290,7 +284,7 @@ pub struct ConfigSnapshot {
     #[serde(flatten)]
     pub tls: TlsSnapshot,
 
-    // ===== CurseForge（从 secure_storage 缓存读，已解密）=====
+    // CurseForge（从 secure_storage 缓存读，已解密）
     pub curseforge_enabled: bool,
     pub curseforge_api_key: String,
     // 开发者模式（从注册表读）

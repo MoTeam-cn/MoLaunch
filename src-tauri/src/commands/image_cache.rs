@@ -4,10 +4,6 @@
 //! 将任意远程图片 URL 转为缓存 URL（方案 C：混合缓存）。
 //!
 //! 适用于皮肤、披风、头像、缩略图等所有需要缓存的远程图片场景。
-//!
-//! 注：原 3 个分散的 image_cache Tauri 命令已聚合为 `image_cache_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
-//! 由 `utils::image_cache_manager::dispatch` 反序列化参数后调用。
 
 use crate::error_util::log_err;
 use crate::minecraft::image_cache::{self, CachedImage};
@@ -29,9 +25,6 @@ pub async fn image_cache_manager(
     crate::utils::image_cache_manager::dispatch(state, app, req).await
 }
 
-// ============================================================
-// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
-// ============================================================
 
 /// 获取图片的缓存 URL（通用接口）
 ///

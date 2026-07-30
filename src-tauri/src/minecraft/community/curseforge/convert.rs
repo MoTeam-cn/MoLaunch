@@ -1,9 +1,4 @@
 //! CurseForge 响应到统一资源模型的转换
-//!
-//! 包含：
-//! - convert_project：CF 工程条目 → ResourceProject
-//! - convert_version：CF 文件 → ResourceVersion
-//! - parse_cf_download_url：构造 CF 下载 URL
 
 use super::super::mcmod::lookup_cf;
 use super::super::tags::translate_curseforge_tag;

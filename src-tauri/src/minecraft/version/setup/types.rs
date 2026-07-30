@@ -1,10 +1,6 @@
 //! 版本 Setup 数据结构
 //!
-//! PersonalizationUpdate（更新补丁）与 VersionSetup（完整快照）。
-//!
-//! VersionSetup 按职责拆分为 4 个嵌套子 struct：
-//! `LoaderInfo`（加载器信息）/ `DisplayConfig`（显示配置）/
-//! `JavaConfig`（Java 与内存）/ `AdvancedConfig`（高级选项）。
+//! PersonalizationUpdate（更新补丁）与 VersionSetup（完整快照，按职责拆分为 LoaderInfo / DisplayConfig / JavaConfig / AdvancedConfig）
 
 use super::super::state::VersionType;
 use serde::{Deserialize, Serialize};

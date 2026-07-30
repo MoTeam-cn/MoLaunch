@@ -1,16 +1,7 @@
 //! 版本号提取工具
 //!
 //! 从文件名或显示名中提取版本号，用于 CurseForge 等不直接提供版本号的平台。
-//!
-//! CurseForge 的 `Version` 字段为 `Nothing`，用 `Display`（即 `displayName`）
-//! 作为 fallback 进行版本对比。
-//!
-//! CurseForge 的 `displayName` 通常类似：
-//! - `jei-1.20.1-15.2.0.27.jar`
-//! - `JustEnoughItems 1.20.1-15.2.0.27`
-//! - `alltheleaks-1.1.1+1.20.1-forge.jar`
-//!
-//! 需要从中提取 mod 版本号（而非 MC 版本号）。
+//! 例：`jei-1.20.1-15.2.0.27.jar` / `alltheleaks-1.1.1+1.20.1-forge.jar` → 提取 mod 版本号（非 MC 版本号）
 
 /// 从文件名或显示名提取版本号
 ///

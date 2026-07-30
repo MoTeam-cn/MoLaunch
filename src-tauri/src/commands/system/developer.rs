@@ -8,10 +8,6 @@
 //! 存储位置：Windows 注册表 `HKCU\Software\MoLaunch` 下的两个布尔值
 //! - `DeveloperUnlocked`：是否已解锁（决定开关卡片是否显示）
 //! - `DeveloperMode`：开关是否开启（决定侧边菜单 developer 项是否显示）
-//!
-//! 注：原 5 个分散 Tauri 命令已聚合为 `system_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
-//! 由 `utils::system_manager::dispatch` 反序列化参数后调用。
 
 use crate::log_info;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
@@ -35,9 +31,6 @@ pub const KEY_DEV_MODE: &str = "DeveloperMode";
 /// 跳过所有证书校验，用于联机服务端自签名证书调试等场景。
 pub const KEY_IGNORE_TLS: &str = "IgnoreTls";
 
-// ============================================================
-// 解锁与开关
-// ============================================================
 
 /// 查询开发者模式是否已解锁（用户连续点击版本号 5 次后解锁）
 ///
@@ -67,9 +60,6 @@ pub fn is_ignore_tls() -> bool {
     unlocked && mode && reg_get_bool(KEY_IGNORE_TLS)
 }
 
-// ============================================================
-// 存储目录与系统信息（开发者页展示用）
-// ============================================================
 
 /// 存储目录信息
 #[derive(Debug, Serialize)]

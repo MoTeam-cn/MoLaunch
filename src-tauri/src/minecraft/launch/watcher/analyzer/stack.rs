@@ -1,7 +1,6 @@
 //! 第二级堆栈分析
 //!
-//! 从崩溃报告、运行时日志、hs_err 的堆栈信息中提取关键字，
-//! 过滤后推断可能的 Mod 名称。
+//! 从崩溃报告/运行时日志/hs_err 堆栈中提取关键字，过滤后推断可能的 Mod 名称。
 
 use super::super::types::{CrashCategory, CrashInfo};
 use std::path::Path;

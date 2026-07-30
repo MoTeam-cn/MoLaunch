@@ -1,8 +1,4 @@
-//! VersionSetup 加载逻辑
-//!
-//! - `load`              从 setup.ini 加载
-//! - `load_or_create`    加载或从 JSON 推断（不存在则推断并保存，旧格式自动补全）
-//! - `from_version_json` 从版本 JSON 文件推断 Setup（兼容旧版本）
+//! VersionSetup 加载逻辑：load / load_or_create / from_version_json
 
 use std::path::Path;
 

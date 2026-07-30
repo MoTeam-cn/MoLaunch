@@ -1,7 +1,6 @@
 //! 日志行解析与加载进度检测
 //!
-//! 原 `GameWatcher::parse_log_line` / `extract_log_level` / `detect_load_progress`
-//! 静态方法的纯函数实现，与监控器结构体解耦。
+//! 纯函数实现，与监控器结构体解耦。
 
 use super::types::{LoadProgress, LogEntry, LogLevel};
 

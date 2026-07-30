@@ -1,9 +1,4 @@
 //! setup.ini 解析与版本号检测的辅助函数
-//!
-//! 原 setup.rs 模块级自由函数：parse_ini / extract_maven_version /
-//! read_setup_version_and_loader / read_mc_version_from_json / detect_version_and_loader
-//!
-//! 另含 VersionSetup 的路径相关关联函数：file_path / exists
 
 use std::path::{Path, PathBuf};
 

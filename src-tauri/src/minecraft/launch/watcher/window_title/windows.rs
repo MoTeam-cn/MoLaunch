@@ -1,11 +1,7 @@
 //! Windows 实现：Win32 API（最可靠，无需外部依赖）
 //!
-//! 通过 `EnumWindows` 枚举所有顶层窗口，按三层过滤匹配 MC 窗口：
-//! 1. 窗口类名（GLFW30 / LWJGL / SunAwtFrame）
-//! 2. 窗口标题（排除 PopupMessageWindow 和 GLFW 开头的辅助窗口）
-//! 3. 窗口进程启动时间 ≥ Java 进程启动时间（兼容子进程）
-//!
-//! 匹配后用 `SetWindowTextW` 改写标题。
+//! `EnumWindows` 枚举顶层窗口，按类名（GLFW30/LWJGL/SunAwtFrame）+ 标题过滤
+//! + 进程启动时间（兼容子进程）三层匹配，命中后用 `SetWindowTextW` 改写标题。
 
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
 use windows::Win32::System::Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
@@ -100,10 +96,7 @@ fn get_window_text(hwnd: HWND) -> String {
     }
 }
 
-/// EnumWindows 回调函数
-/// 1. 检查类名：GLFW30 / LWJGL / SunAwtFrame
-/// 2. 检查标题：排除 PopupMessageWindow 和以 GLFW 开头的辅助窗口
-/// 3. 检查进程启动时间：窗口进程的启动时间 >= Java 进程启动时间
+/// EnumWindows 回调：按类名 → 标题 → 可见性 → 启动时间依次过滤
 extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
     unsafe {
         let data = &mut *(lparam.0 as *mut EnumData);

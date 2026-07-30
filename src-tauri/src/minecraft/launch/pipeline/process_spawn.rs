@@ -18,31 +18,25 @@ impl LaunchPipeline {
 
         let mut cmd = Command::new(java_path);
 
-        // 添加JVM参数
         for arg in &args.jvm_args {
             cmd.arg(arg);
         }
 
-        // 添加主类
         cmd.arg(&args.main_class);
 
-        // 添加游戏参数
         for arg in &args.game_args {
             cmd.arg(arg);
         }
 
-        // 设置工作目录（使用 effective_game_dir，即隔离目录）
-        // args.game_dir 是 build_launch_arguments 内部通过 isolation::get_effective_game_dir 计算的有效目录
+        // 工作目录使用 effective_game_dir（隔离目录）
         cmd.current_dir(&args.game_dir);
 
-        // 设置环境变量（APPDATA 也指向隔离目录，某些 Mod 会读取）
+        // APPDATA 也指向隔离目录，某些 Mod 会读取
         cmd.env("appdata", &args.game_dir);
 
-        // 重定向stdout和stderr以便监控
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
 
-        // Windows: 不显示控制台窗口
         #[cfg(target_os = "windows")]
         {
             cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
@@ -67,10 +61,8 @@ impl LaunchPipeline {
         let pid = child.id().unwrap_or(0);
         log_info!("Game process started with PID: {}", pid);
 
-        // 创建监控器（game_dir 使用隔离目录，确保崩溃分析在正确目录查找日志）
-        // 传入 window_title：非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题
-        // 传入 app_handle：用于在 stdout 检测到 MC 局域网端口时 emit 事件给联机模块
-        // 注：build_launch_config 总是注入 app_handle（Some），此处 None 兜底仅防御性
+        // 创建监控器：game_dir 用隔离目录以便崩溃分析在正确目录查找日志；
+        // window_title / app_handle 由 build_launch_config 注入（None 仅防御性兜底）
         let watcher = GameWatcher::new(
             pid,
             std::path::PathBuf::from(&args.game_dir),

@@ -1,11 +1,7 @@
 //! 配置文件相关命令
 //!
-//! 注：原 4 个分散 Tauri 命令（`get_config_path` / `save_config_to_file`
-//! / `get_config_value` / `set_config_value`）已聚合为 `config_manager` +
-//! `system_manager` 两个 IPC 入口，通过请求体的 `action` 字段分发。
-//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState`，
-//! 由 `utils::config_manager::dispatch` / `utils::system_manager::dispatch`
-//! 反序列化参数后调用。
+//! 子模块函数接收 `&AppState`，由 `utils::config_manager::dispatch` /
+//! `utils::system_manager::dispatch` 反序列化参数后调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -165,9 +161,6 @@ pub async fn set_config_value(
     Ok(())
 }
 
-// ============================================================
-// 统一 IPC 入口（聚合 get_config / apply_config / get_config_value / set_config_value）
-// ============================================================
 
 /// 统一配置管理 IPC 入口
 ///

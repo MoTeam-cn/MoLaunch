@@ -1,9 +1,4 @@
 //! SDK 管理命令（lite 版本）
-//!
-//! 注：原 5 个分散的 sdk Tauri 命令已聚合为 `sdk_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发到各子模块函数。
-//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState`，
-//! 由 `utils::sdk_manager::dispatch` 反序列化参数后调用。
 //! `ActionRequest` 与 `meta_manager` / `tools_manager` / `image_cache_manager` 共用同一请求体结构。
 
 use crate::error_util::log_err;
@@ -36,9 +31,6 @@ pub async fn sdk_manager(
     crate::utils::sdk_manager::dispatch(state, app, req).await
 }
 
-// ============================================================
-// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
-// ============================================================
 
 /// 获取当前平台信息
 pub async fn get_platform_info() -> Result<SdkStatus, String> {

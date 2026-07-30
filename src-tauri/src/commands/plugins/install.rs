@@ -1,18 +1,8 @@
 //! 外部插件安装（文件夹 / ZIP）
 //!
-//! - `install_external_plugin_from_dir`：递归复制源目录到 `plugins/<id>/`
-//! - `install_external_plugin_from_zip`：从 ZIP 文件路径安装
-//!
-//! ZIP 结构支持：
-//! - 扁平结构（根直接包含 manifest.json）
-//! - 单根目录结构（ZIP 内有一个根目录，其下包含 manifest.json）
-//!
-//! 安全：ZIP 解压带 Zip Slip 路径遍历防护（canonicalize 父目录后校验目标在 dst 内），
+//! ZIP 支持扁平结构（根直接含 manifest.json）和单根目录结构。
+//! 解压带 Zip Slip 路径遍历防护（canonicalize 父目录后校验目标在 dst 内），
 //! 跨盘符 rename 失败时自动回退到递归复制。
-//!
-//! 注：原 2 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
-//! 由 `utils::plugins_manager::dispatch` 反序列化参数后调用。
 
 use super::{is_valid_plugin_id, plugins_root, read_plugin_manifest};
 use crate::error_util::log_err;

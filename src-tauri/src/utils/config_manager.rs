@@ -1,19 +1,8 @@
 //! 配置管理统一分发逻辑（config_manager 的工具实现）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发。
-//! 4 个 config action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
-//!
-//! 命令清单（4 个）：
-//! - `get_config`：读取配置（扁平化数组，支持 keys 过滤）
-//! - `apply_config`：统一配置更新（接收 ConfigEntry 数组）
-//! - `get_config_value`：读取单个 INI 配置值（直读 storage）
-//! - `set_config_value`：设置单个 INI 配置值（直写 INI + 同步内存 AppConfig）
-//!
-//! 注意：
-//! - `get_config` / `apply_config` / `set_config_value` 需要 state
-//! - `get_config_value` 不需要 state（直接读 storage），handler 内用 `_state`
-//! - 4 个命令均不需要 AppHandle，handler 内用 `_app` 忽略
-//! - `get_config_path` / `save_config_to_file` 不在本次聚合范围，仍保留为独立 Tauri 命令
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，4 个 action：
+//! `get_config` / `apply_config` / `get_config_value` / `set_config_value`。
+//! `get_config_value` 不需要 state；4 个命令均不需要 `AppHandle`。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -25,9 +14,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-// ============================================================
-// action 参数
-// ============================================================
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -56,9 +42,6 @@ struct SetConfigValueParams {
     value: String,
 }
 
-// ============================================================
-// Dispatcher 注册
-// ============================================================
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();

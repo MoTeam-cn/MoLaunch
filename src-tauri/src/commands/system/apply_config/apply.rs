@@ -19,19 +19,16 @@ pub(crate) async fn apply_config_inner(
     state: &AppState,
     patch: ConfigPatch,
 ) -> Result<(), String> {
-    // ===== 1. 校验阶段 =====
     validate::validate_patch(&patch)?;
 
-    // ===== 2. 加密字段分流（CurseForge API Key）=====
+    // 2. 加密字段分流（CurseForge API Key）
     secure::apply_curseforge(&state, &patch).await?;
 
-    // ===== 2b. 开发者模式分流（注册表，不进 AppConfig）=====
+    // 2b. 开发者模式分流（注册表，不进 AppConfig）
     secure::apply_developer_mode(&patch)?;
 
-    // ===== 2c. IgnoreTls 分流（注册表，仅开发者模式可开启）=====
+    // 2c. IgnoreTls 分流（注册表，仅开发者模式可开启）
     secure::apply_ignore_tls(&patch)?;
-
-    // ===== 3. 普通字段统一更新 =====
     // log_level 变更需闭包外立即生效，用 Option 收集待应用的值（避免跨 await 持有锁）
     let mut log_level_pending: Option<u32> = None;
     // 代理变更需闭包外重建 HTTP 客户端（同 log_level 模式，避免跨 await 持有锁）
@@ -53,7 +50,7 @@ pub(crate) async fn apply_config_inner(
     })
     .await?;
 
-    // ===== 副作用阶段（闭包外执行）=====
+    // 副作用阶段（闭包外执行）
     // log_level 变更需要立即生效（参考此前 set_config_value 的特例补丁）
     if let Some(level) = log_level_pending {
         let log_level = match level {
@@ -94,9 +91,6 @@ pub(crate) async fn apply_config_inner(
     Ok(())
 }
 
-// ============================================================
-// 域子函数（均在 update_config 闭包内调用，操作 &mut AppConfig）
-// ============================================================
 
 /// 代理域：proxy.mode / proxy.kind / proxy.url / proxy.ip_version
 ///

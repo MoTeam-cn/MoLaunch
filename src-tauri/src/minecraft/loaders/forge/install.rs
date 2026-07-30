@@ -1,8 +1,4 @@
-//! Forge 安装调度器 + Modern 安装（1.13+）
-//!
-//! - `install`：根据 Forge 版本判断走 modern（1.13+，使用 injector）还是 legacy（1.12.2 及以下）
-//! - `install_modern`：通过 `forge_installer` 模块的 injector 方式安装，包含 Mojang 映射下载、
-//!   嵌入资源提取、Java 查找、安装器执行、生成版本 JSON 复制等步骤
+//! Forge 安装调度器 + Modern 安装（1.13+，injector 方式）
 
 use std::path::Path;
 use std::sync::Arc;

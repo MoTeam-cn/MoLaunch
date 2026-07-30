@@ -1,20 +1,6 @@
 //! JVM 参数构建
 //!
-//! 构建逻辑：
-//! - Authlib：仅当 auth_info.server_url 有值时注入 -javaagent:authlib-injector.jar
-//!   （需配合 `ensure_authlib_injector_jar` 预下载 jar 到缓存目录）
-//! - LUA：仅当版本库列表包含 org.lwjgl:lwjgl:3.4.1 时注入 -javaagent
-//! - JLW：仅当非 GBK 编码、路径非纯 ASCII、且无自定义 -javaagent 时启用
-//!   - Java 9+ 添加 --add-exports cpw.mods.bootstraplauncher
-//!   - 添加 -Doolloo.jlw.tmpdir={pure_directory}
-//!   - 末尾添加 -jar java-wrapper.jar（覆盖 mainClass 作为入口）
-//!
-//! `build_jvm_args` 按关注点拆分为多个 helper：
-//! - `add_authlib_args`:    Authlib-injector 外置登录注入（yggdrasil 协议）
-//! - `add_lua_args`:        LUA（LWJGL Unsafe Agent）注入
-//! - `add_gc_args`:         根据 Java 主版本号选择 GC 策略
-//! - `add_json_jvm_args`:   解析版本 JSON 的 arguments.jvm
-//! - `add_jlw_args`:        JLW（Java Launch Wrapper）注入
+//! 按 helper 拆分：authlib/lua/gc/json_jvm/jlw，由 `build_jvm_args` 编排。
 
 use std::path::Path;
 
@@ -46,23 +32,19 @@ pub(super) fn build_jvm_args(
     // 检测 Java 主版本号（用于决定 GC 策略和 JLW 的 --add-exports）
     let java_major = crate::minecraft::java::detect_java_version(&java_path.to_string_lossy());
 
-    // ===== Authlib-injector（外置登录，yggdrasil 协议）=====
-    // 必须在 LUA/JLW 之前注入，避免与 JLW 的 -javaagent 冲突判定
-    // （JLW 检测到 extra_jvm_args 含 -javaagent 时会禁用，但 authlib 注入的是 args
-    //  而非 extra_jvm_args，所以不冲突；放最前是为了让 -javaagent 出现在 args 首位，
-    //  便于排查）
+    // Authlib-injector 必须在 LUA/JLW 之前注入，让 -javaagent 出现在 args 首位便于排查
     add_authlib_args(&mut args, auth_info);
 
-    // ===== LUA（LWJGL Unsafe Agent）=====
+    // LUA（LWJGL Unsafe Agent）
     add_lua_args(&mut args, json, disable_lua);
 
     args.push(format!("-Xms{}M", min_memory));
     args.push(format!("-Xmx{}M", max_memory));
 
-    // ===== GC 策略 =====
+    // GC 策略
     add_gc_args(&mut args, java_major);
 
-    // ===== 版本 JSON 的 arguments.jvm（必需 JVM 参数）=====
+    // 版本 JSON 的 arguments.jvm（必需 JVM 参数）
     add_json_jvm_args(&mut args, json, game_dir, version_id);
 
     // 用户额外 JVM 参数（版本独立 > 全局）
@@ -80,7 +62,7 @@ pub(super) fn build_jvm_args(
         natives_dir.to_string_lossy()
     ));
 
-    // ===== JLW（Java Launch Wrapper）=====
+    // JLW（Java Launch Wrapper）
     add_jlw_args(&mut args, game_dir, java_major, extra_jvm_args, disable_jlw);
 
     Ok(args)
@@ -88,17 +70,9 @@ pub(super) fn build_jvm_args(
 
 /// Authlib-injector（外置登录，yggdrasil 协议）
 ///
-/// 仅当 `auth_info.server_url` 有值时注入，即 AuthlibInjector 登录类型。
-///
-/// 注入参数：
-/// - `-javaagent:authlib-injector.jar=<server_url>`：指定 yggdrasil API 根地址
-/// - `-Dauthlibinjector.yggdrasil.prefetched=<base64_metadata>`（可选）：
-///   预取的服务器元数据（base64 编码的 JSON），避免游戏运行时拉取，提升启动速度
-///
-/// authlib-injector.jar 由 `ensure_authlib_injector_jar`（启动前异步调用）下载到缓存目录。
-/// 若缓存中不存在 jar，则跳过注入并警告（游戏将无法使用外置登录）。
-///
-/// 预取元数据缓存路径与 server_url 一一对应（按 host 区分），避免切换服务器时复用错误元数据。
+/// 仅当 `auth_info.server_url` 有值时注入。
+/// jar 由 `ensure_authlib_injector_jar` 预下载到缓存，不存在则跳过并警告。
+/// 预取元数据按 host 缓存，避免切换服务器时复用错误元数据。
 fn add_authlib_args(args: &mut Vec<String>, auth_info: &AuthInfo) {
     let server_url = match auth_info.server_url.as_ref() {
         Some(url) if !url.is_empty() => url,
@@ -113,14 +87,12 @@ fn add_authlib_args(args: &mut Vec<String>, auth_info: &AuthInfo) {
     }
     let jar_path = crate::utils::cache::path(AUTHLIB_INJECTOR_JAR_REL);
 
-    // 注入 -javaagent:jar=server_url
     args.push(format!(
         "-javaagent:{}={}",
         jar_path.to_string_lossy(),
         server_url
     ));
 
-    // 注入预取元数据（若已缓存）
     if let Some(prefetched) = read_prefetched_metadata(server_url) {
         args.push(format!(
             "-Dauthlibinjector.yggdrasil.prefetched={}",

@@ -1,14 +1,8 @@
 //! 游戏目录相关命令
 //!
-//! Shell 命令（打开文件夹、选中文件等）已统一封装到
-//! `crate::minecraft::system::shell`，本模块仅保留 Tauri 命令包装层。
-//!
-//! 文件 / 文件夹选择对话框已统一改用前端 `@tauri-apps/plugin-dialog`，
-//! 后端不再重复封装 dialog 命令。
-//!
-//! 注：原 7 个分散的 Tauri 命令（含 `set_game_dir`）已聚合为 `system_manager`
-//! 一个 IPC 入口，通过请求体的 `action` 字段分发。子模块函数已去掉
-//! `#[tauri::command]` 标注，由 `utils::system_manager::dispatch` 反序列化参数后调用。
+//! Shell 命令（打开文件夹、选中文件等）走 `crate::minecraft::system::shell`；
+//! 文件 / 文件夹选择对话框走前端 `@tauri-apps/plugin-dialog`。
+//! 子模块函数由 `utils::system_manager::dispatch` 反序列化参数后调用。
 
 use crate::log_info;
 use crate::state::AppState;

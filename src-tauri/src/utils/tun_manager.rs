@@ -1,31 +1,8 @@
 //! TUN 桥接管理 action（阶段三子任务 5：数据分发打通）
 //!
-//! 由 `online_manager::DISPATCHER` 调用 `register_tun_actions` 注册 3 个 IPC action：
-//! - `tun_start`：创建 TUN 接口 + 启动读写循环 + 开始向前端 emit `online://tun-packet-out` 事件
-//! - `tun_forward_to`：前端 DataChannel 收到消息后调用，解码协议帧并写入 TUN
-//! - `tun_stop`：停止桥接，销毁 TUN 接口
-//!
-//! # 数据流
-//!
-//! ```text
-//! 后端 TUN 读包               前端 DataChannel
-//!   │                            │
-//!   │ 1. TUN.recv → IP 包        │
-//!   │ 2. protocol::encode → 帧   │
-//!   │ 3. emit(EVENT_TUN_PACKET_OUT, frame)
-//!   │ ──────────────────────>    │ 4. listen → broadcastPacket / channel.send
-//!   │                            │
-//!   │                            │ 5. DataChannel.onmessage → ArrayBuffer
-//!   │ <──────────────────────    │ 6. invoke('online_manager', {action:'tun_forward_to', params:{message: base64}})
-//!   │ 7. base64 decode → frame   │
-//!   │ 8. protocol::decode → IP   │
-//!   │ 9. TUN.send → 写入接口     │
-//! ```
-//!
-//! # 二进制传输约定
-//!
-//! Tauri IPC 走 JSON 序列化，二进制数据用 base64 字符串传递（`message_base64` 字段）。
-//! IP 包 MTU 1400 字节，base64 后约 1870 字节，开销可接受。
+//! 由 `online_manager::DISPATCHER` 调用 `register_tun_actions` 注册 3 个 action：
+//! `tun_start` / `tun_forward_to` / `tun_stop`。
+//! 二进制数据通过 `message_base64` 字段以 base64 字符串经 Tauri IPC 传递。
 
 use base64::Engine;
 use serde::{Deserialize, Serialize};
@@ -38,9 +15,6 @@ use crate::log_warn;
 use crate::minecraft::online::bridge::VirtualLanBridge;
 use crate::utils::dispatcher::Dispatcher;
 
-// ============================================================
-// 参数 / 返回类型
-// ============================================================
 
 /// `tun_start` 参数
 #[derive(Debug, Deserialize)]
@@ -87,9 +61,6 @@ pub struct TunForwardResponse {
     pub packet_len: usize,
 }
 
-// ============================================================
-// 注册入口
-// ============================================================
 
 /// 注册全部 TUN 管理 action 到 dispatcher
 pub fn register_tun_actions(d: &mut Dispatcher) {
@@ -99,9 +70,6 @@ pub fn register_tun_actions(d: &mut Dispatcher) {
     register_restart_as_admin(d);
 }
 
-// ============================================================
-// 各 action 注册
-// ============================================================
 
 fn register_tun_start(d: &mut Dispatcher) {
     d.register("tun_start", handler!(state, app, params, {

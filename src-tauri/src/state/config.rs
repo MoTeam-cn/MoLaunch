@@ -139,7 +139,7 @@ impl Default for TlsConfig {
 /// 应用配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    // ===== 通用（保持平铺）=====
+    // 通用（保持平铺）
     pub game_dir: String,
     /// Minecraft 文件夹列表（含默认和用户添加的）
     pub mc_folders: Vec<McFolder>,
@@ -157,11 +157,11 @@ pub struct AppConfig {
     pub primary_color: String,
     /// 上次选中的游戏版本（持久化，启动器重启后恢复）
     pub selected_version: Option<String>,
-    // ===== 外部下载工具 =====
+    // 外部下载工具
     /// 外部下载工具的自定义保存目录（None 或空则用默认 .Molaunch/Download/）
     pub external_download_dir: Option<String>,
 
-    // ===== 分组 =====
+    // 分组
     pub proxy: ProxyConfig,
     pub download: DownloadConfig,
     pub memory: MemoryConfig,

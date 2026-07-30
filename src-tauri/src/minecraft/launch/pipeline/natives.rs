@@ -16,7 +16,6 @@ impl LaunchPipeline {
             .join(&self.config.version_id);
         let natives_dir = version_dir.join(format!("{}-natives", self.config.version_id));
 
-        // 创建natives目录
         tokio::fs::create_dir_all(&natives_dir)
             .await
             .map_err(|e| LaunchError {

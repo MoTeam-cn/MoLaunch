@@ -1,9 +1,6 @@
 //! 系统临时目录缓存模块 - 管理 `<temp>/MoLaunch/` 目录
 //!
-//! 用于存放需要快速失效或支持热更新的临时文件：
-//! - `TaskTemp/`：Forge/NeoForge 安装包临时下载（安装后可清理）
-//! - `sdk/`：SDK 动态库释放（支持热更新和主程序更新自动覆盖）
-//!
+//! 存放 `TaskTemp/`（安装包临时下载）和 `sdk/`（SDK 动态库释放）。
 //! 设计与 `Storage` / `Cache` 一致：全局单例 + OnceLock 懒加载。
 
 use std::path::PathBuf;
@@ -17,9 +14,6 @@ const SUBDIR_SDK: &str = "sdk";
 static CACHE_TEMP: OnceLock<CacheTemp> = OnceLock::new();
 
 /// 系统临时目录缓存组件
-///
-/// 管理 `<temp>/MoLaunch/` 下的子目录，所有临时文件读写都应通过
-/// `CacheTemp::instance()` 进行，确保路径统一管理。
 pub struct CacheTemp {
     base_dir: PathBuf,
 }

@@ -1,10 +1,4 @@
 //! Libraries dependency resolution module
-//!
-//! 模块结构：
-//! - mod.rs: LibEntry 结构 + maven_to_path helper + 公共 API re-export
-//! - parse.rs: parse_libraries + check_rules + is_native_matching_arch + 去重逻辑
-//! - filter.rs: find_missing_libs + quick_check_lib（并行文件校验）
-//! - download.rs: build_download_urls（下载 URL 构建 + 镜像替换）
 
 mod download;
 mod filter;

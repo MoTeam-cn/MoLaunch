@@ -18,9 +18,6 @@ pub async fn version_progress_manager(
     crate::utils::version_progress_manager::dispatch(state, app, req).await
 }
 
-// ============================================================
-// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
-// ============================================================
 
 /// Get download progress
 pub async fn get_download_progress(state: &AppState) -> Result<DownloadProgressSnapshot, String> {

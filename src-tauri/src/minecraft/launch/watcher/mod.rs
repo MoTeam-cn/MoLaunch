@@ -1,12 +1,6 @@
 //! 游戏进程监控器
 //!
-//! 监控游戏状态和崩溃检测。
-//!
-//! 按关注点拆分为 3 个子模块：
-//! - `types`       GameState / ExitInfo / CrashInfo / CrashCategory / LogLevel / LogEntry / LoadProgress
-//! - `log_parser`  parse_log_line / extract_log_level / detect_load_progress 纯函数
-//! - `analyzer`    analyze_crash / analyze_stack_for_mod / analyze_crash_report / parse_crash_report
-//! - `mod.rs`      GameWatcher 结构体 + start_monitoring / stop 核心流程
+//! 监控游戏状态与崩溃检测；子模块：types / log_parser / analyzer / window_title。
 
 mod analyzer;
 mod log_parser;
@@ -199,9 +193,7 @@ impl GameWatcher {
                                 }
                             }
 
-                            // 联机模块：检测 MC 开放局域网端口
-                            // 匹配 "Local game hosted on port XXXXX" 或 "Started LAN game on port XXXXX"
-                            // 命中后 emit 事件给前端，前端房主面板收到后通过 DataChannel 广播给参与者
+                            // 联机模块：检测 MC 开放局域网端口，命中后 emit 事件给前端
                             if let Some(caps) = lan_port_regex().captures(&line) {
                                 if let Some(port_str) = caps.get(1) {
                                     if let Ok(port) = port_str.as_str().parse::<u16>() {
@@ -272,10 +264,7 @@ impl GameWatcher {
             });
         }
 
-        // 启动窗口标题修改
-        // 如果设置了自定义窗口标题，启动后轮询找到 MC 窗口，改写标题
-        // 支持 {date} 和 {time} 实时替换
-        // 跨平台：Windows 用 Win32 API，macOS 用 osascript，Linux 用 wmctrl/xdotool
+        // 启动窗口标题修改：轮询找到 MC 窗口并改写标题，支持 {date}/{time} 实时替换
         if let Some(ref title) = self.window_title {
             let title = title.clone();
             let pid = self.pid;

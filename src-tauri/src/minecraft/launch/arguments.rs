@@ -1,7 +1,6 @@
 //! Launch arguments orchestration
 //!
-//! 编排 classpath / jvm_args / game_args 子模块，构建完整的启动参数。
-//! 负责版本隔离目录计算、版本类型检测、语言设置等编排逻辑。
+//! 编排 classpath / jvm_args / game_args 子模块，构建完整启动参数。
 
 use crate::log_info;
 use crate::minecraft::isolation::{self, IsolationMode};

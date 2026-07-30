@@ -1,7 +1,6 @@
 //! 文件校验补全与启动参数构建
 //!
-//! 包含 `validate_and_fix_files`（文件完整性检查与补全）和
-//! `build_arguments`（委托 `launch::build_launch_arguments` 构建启动参数）。
+//! `validate_and_fix_files` + `build_arguments`（委托 launch::build_launch_arguments）。
 
 use std::path::PathBuf;
 

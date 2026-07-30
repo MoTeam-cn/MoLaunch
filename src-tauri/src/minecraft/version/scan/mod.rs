@@ -1,8 +1,4 @@
-//! 版本管理模块（模块入口）
-//!
-//! 模块拆分：
-//! - `loaders`: 加载器类型检测（OptiFine / Fabric / NeoForge / Forge / LiteLoader / Snapshot）
-//! - `version_extract`: 原版版本号提取（多策略）
+//! 版本管理模块（模块入口）：loaders 加载器检测 + version_extract 原版版本号提取
 
 mod loaders;
 mod version_extract;

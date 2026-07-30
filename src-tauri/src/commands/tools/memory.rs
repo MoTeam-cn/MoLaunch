@@ -85,8 +85,6 @@ fn get_available_memory_bytes() -> u64 {
     }
 }
 
-// ===== Windows: NtSetSystemInformation =====
-
 #[cfg(target_os = "windows")]
 mod nt {
     /// SYSTEM_INFORMATION_CLASS 中的 SystemMemoryListInformation（值 = 80）

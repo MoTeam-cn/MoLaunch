@@ -1,10 +1,6 @@
 //! Fabric API 自动补充模块
 //!
-//! Fabric API 加载逻辑：
-//! - 从 Modrinth 官方源获取 fabric-api 版本列表（project_id = P7dR8mSH）
-//! - 按 MC 版本筛选兼容版本（使用 game_versions 字段精确匹配）
-//! - 按发布日期降序排序（最新在前）
-//! - 自动选择最新版本并下载到 mods 目录（考虑版本隔离）
+//! 从 Modrinth（project_id = P7dR8mSH）获取 fabric-api 版本列表，按 MC 版本筛选并自动下载到 mods 目录
 
 use std::path::Path;
 use std::sync::Arc;

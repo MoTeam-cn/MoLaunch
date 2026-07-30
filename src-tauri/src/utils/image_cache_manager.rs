@@ -1,15 +1,8 @@
 //! 通用图片缓存统一分发逻辑（image_cache_manager 的工具实现）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发。
-//! 3 个 image_cache action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
-//!
-//! 命令清单（3 个）：
-//! - `get_cached_image_url`：获取图片缓存 URL（命中返回本地 URL，未命中返回远程 URL 并异步缓存）
-//! - `invalidate_cached_image`：失效指定 URL 的缓存
-//! - `clear_image_cache`：清空所有图片缓存
-//!
-//! 注意：image_cache 命令不需要 `AppState`，handler 内用 `_state` 忽略；
-//! `get_cached_image_url` 需要 `AppHandle`（用于 emit `image-cached` 事件）。
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，3 个 action：
+//! `get_cached_image_url` / `invalidate_cached_image` / `clear_image_cache`。
+//! 不需要 `AppState`；`get_cached_image_url` 需要 `AppHandle`（emit `image-cached`）。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -20,9 +13,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-// ============================================================
-// action 参数
-// ============================================================
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -30,9 +20,6 @@ struct UrlParams {
     url: String,
 }
 
-// ============================================================
-// Dispatcher 注册
-// ============================================================
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();

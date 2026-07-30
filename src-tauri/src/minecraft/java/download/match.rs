@@ -1,8 +1,6 @@
 //! Java 版本与 Mojang component 匹配
 //!
-//! Mojang 的 all.json 按 component 名分类（如 java-runtime-gamma）。
-//! version.name 格式通常为 "{major}.{minor}.{patch}"，可用于匹配。
-//! 匹配策略：先精确 key，再模糊 version.name，最后按约定回退。
+//! 匹配策略：先精确 key，再模糊 version.name，最后按约定回退（如 21→java-runtime-gamma）
 
 use serde_json::Value;
 

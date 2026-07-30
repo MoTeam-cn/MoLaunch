@@ -1,19 +1,8 @@
 //! 个性化配置读写（%APPDATA%/.MolaLaunch/personalization.json）
 //!
-//! - `read_personalization`：读取个性化配置
-//! - `write_personalization`：写入个性化配置
-//!
-//! 设计目的：将个性化配置（插件启用状态 / 主页模式 / 自定义布局配置）
-//! 存储到 AppData 而非游戏目录，确保不同 game_dir 的启动器实例加载同一份配置。
-//!
-//! 存储路径：
-//! - Windows: `%APPDATA%/.MolaLaunch/personalization.json`
-//! - 其他平台: `~/.config/MolaLaunch/personalization.json`
-//!
-//! 文件格式：JSON（直接透传前端传来的 `serde_json::Value`，全量覆盖写入）。
-//!
-//! 注：原 2 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
-//! 子模块函数已去掉 `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch` 调用。
+//! 将个性化配置（插件启用状态 / 主页模式 / 自定义布局配置）存储到 AppData
+//! 而非游戏目录，确保不同 game_dir 的启动器实例加载同一份配置。
+//! JSON 格式，直接透传前端 `serde_json::Value`，全量覆盖写入。
 
 use crate::error_util::log_err;
 use crate::log_info;

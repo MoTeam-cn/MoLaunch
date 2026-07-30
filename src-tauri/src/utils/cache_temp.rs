@@ -1,15 +1,7 @@
 //! 系统临时目录缓存工具（`<temp>/MoLaunch/`）
 //!
-//! 对外提供自由函数式 API，包装 `storage::cache_temp::CacheTemp` 单例。
-//! 所有业务模块应通过本模块访问系统临时目录缓存，而非直接拼接 `std::env::temp_dir()`。
-//!
-//! ## 缓存目录结构
-//!
-//! ```text
-//! <temp>/MoLaunch/
-//!   TaskTemp/  - Forge/NeoForge 安装包临时下载（安装后可清理）
-//!   sdk/       - SDK 动态库释放（支持热更新和主程序更新自动覆盖）
-//! ```
+//! 自由函数式 API，包装 `storage::cache_temp::CacheTemp` 单例。
+//! 业务模块应通过本模块访问系统临时目录缓存。
 
 use std::path::PathBuf;
 

@@ -1,9 +1,4 @@
-//! VersionSetup 保存逻辑
-//!
-//! - `save`              保留个性化字段的保存
-//! - `save_full`         覆盖所有字段的完整保存
-//! - `save_with_options` 保存实现（保留策略由参数控制）
-//! - `ensure_complete`   按模板补全缺失字段
+//! VersionSetup 保存逻辑：save / save_full / save_with_options / ensure_complete
 
 use std::path::Path;
 

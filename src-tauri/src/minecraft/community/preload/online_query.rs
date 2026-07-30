@@ -1,10 +1,7 @@
 //! CF/MR 在线批量查询 + 结果合并 + 事件推送
 //!
-//! 对应 `preload_mods_detail` 的第 3-4 步：
-//! 1. `tokio::join!` 并发调 CF `/fingerprints` + MR `/version_files`
-//! 2. 合并结果：CF 优先（CF 收录更全），CF 没有再用 MR
-//! 3. 每查到一个 project 就 emit `mods-preload-update` 事件
-//! 4. 返回完整 `cache_map`（含元数据 + project）供持久化缓存写入
+//! `tokio::join!` 并发调 CF `/fingerprints` + MR `/version_files`，CF 优先（收录更全），
+//! 每查到一个 project 就 emit `mods-preload-update` 事件
 
 use std::collections::HashMap;
 

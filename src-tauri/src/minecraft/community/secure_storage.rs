@@ -1,11 +1,7 @@
 //! CurseForge API Key 加密存储（INI + 懒加载）
 //!
-//! 存储策略：
-//! - `[CurseForge] enabled` 明文 INI（开关状态非敏感）
-//! - `[CurseForge] api_key` 使用 SDK DES 加密后存 INI（敏感字段不落明文）
-//!
-//! 懒加载：不在启动时解密，避免"启动即解密"触发杀软启发式（参考 AuthStorage 的按需模式）。
-//! enabled 同步从 INI 读；api_key 在首次 CurseForge 请求时于异步上下文解密并缓存。
+//! enabled 明文存 INI；api_key 用 SDK DES 加密后存 INI。
+//! 懒加载：不在启动时解密，避免触发杀软启发式；首次 CF 请求时于异步上下文解密并缓存。
 
 use crate::error_util::log_err;
 use crate::sdk::SdkInstance;

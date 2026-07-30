@@ -1,11 +1,7 @@
 //! JAR 元数据读取 + hash 计算
 //!
-//! 对应 `preload_mods_detail` 的第 2 步：用 `tokio::task::spawn_blocking`
-//! 在阻塞线程池中并发读取每个 mod 的 JAR 元数据并计算 CF/MR 双平台 hash。
-//! zip 读取是同步 IO，故放在 spawn_blocking 中执行。
-//!
-//! 每完成一个 mod 就立即 emit 元数据事件（前端马上能看到译名、logo、版本等），
-//! 不必等联网查询完成。
+//! 用 `tokio::task::spawn_blocking` 并发读 JAR 元数据并计算 CF/MR 双平台 hash（zip 读取是同步 IO）。
+//! 每完成一个 mod 就立即 emit 元数据事件（前端马上能看到译名、logo、版本等）
 
 use std::path::PathBuf;
 use std::sync::Arc;

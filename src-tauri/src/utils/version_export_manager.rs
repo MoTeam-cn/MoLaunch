@@ -1,13 +1,7 @@
 //! 版本导出命令统一分发逻辑（version_export_manager 的工具实现）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发。
-//! 4 个 action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER：
-//!
-//! 命令清单（4 个）：
-//! - `get_export_options`：获取当前版本可用的导出选项列表（含动态子选项扫描）
-//! - `export_modpack`：执行整合包导出（生成 Modrinth 格式 zip）
-//! - `save_export_config`：保存当前导出配置到 .ini 文件
-//! - `load_export_config`：从 .ini 文件读取导出配置
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，4 个 action：
+//! `get_export_options` / `export_modpack` / `save_export_config` / `load_export_config`。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -21,9 +15,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-// ============================================================
-// 各 action 的强类型参数
-// ============================================================
 
 /// get_export_options 参数
 #[derive(Debug, Deserialize)]
@@ -42,9 +33,6 @@ struct LoadConfigParams {
     config_path: String,
 }
 
-// ============================================================
-// Dispatcher 注册
-// ============================================================
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();

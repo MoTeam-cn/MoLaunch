@@ -1,8 +1,4 @@
 //! 预加载相关数据类型
-//!
-//! - `PreloadUpdate`：推送给前端的事件 payload
-//! - `PreloadModInput`：命令层传入的预加载输入
-//! - `HashedMod`：JAR 元数据 + 双平台 hash 的中间结果（子模块间传递）
 
 use serde::Serialize;
 

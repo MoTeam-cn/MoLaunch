@@ -1,9 +1,7 @@
 //! Windows 注册表通用操作（storage 子模块）
 //!
-//! 将原本位于 `minecraft::auth::storage::registry` 的注册表低层操作
-//! 提升至 `storage::registry` 模块，供 AuthStorage 与开发者模式等
-//! 多处复用。认证专用键名常量仍保留在 `minecraft::auth::storage::registry`。
-//!
+//! 提供 AuthStorage 与开发者模式等多处复用的注册表低层操作。
+//! 认证专用键名常量仍保留在 `minecraft::auth::storage::registry`。
 //! 注册表路径：`HKEY_CURRENT_USER\Software\MoLaunch`
 
 #[cfg(windows)]
@@ -52,10 +50,6 @@ pub(crate) fn reg_delete(key: &RegKey, name: &str) -> Result<(), String> {
     }
 }
 
-// ============================================================
-// 非_windows 平台桩实现（保证跨平台编译通过）
-// ============================================================
-
 #[cfg(not(windows))]
 pub(crate) fn reg_key() -> Result<(), String> {
     Err("注册表仅在 Windows 平台可用".to_string())
@@ -76,13 +70,8 @@ pub(crate) fn reg_delete(_key: &(), _name: &str) -> Result<(), String> {
     Err("注册表仅在 Windows 平台可用".to_string())
 }
 
-// ============================================================
-// 高层便捷 API（供 commands/system/developer.rs 等使用）
-// ============================================================
-
 /// 读取注册表 bool 值（"true"/"1" 视为 true，其余为 false）
 ///
-/// 供开发者模式开关等纯布尔状态读取使用。
 /// 不存在时返回 false（而非 None），便于调用方直接判断。
 #[cfg(windows)]
 pub(crate) fn reg_get_bool(name: &str) -> bool {

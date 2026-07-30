@@ -1,11 +1,7 @@
 //! 社区资源命令模块
 //!
-//! 提供搜索、详情、安装三大类功能。
-//!
-//! 注：原 13 个分散的 community Tauri 命令已聚合为 `community_manager` 单一 IPC 入口，
-//! 通过请求体的 `action` 字段分发。子模块函数已去掉 `#[tauri::command]` 标注，
-//! 参数签名改为 `&AppState` / `&AppHandle`，由 `utils::community_manager::dispatch`
-//! 反序列化参数后调用。
+//! 提供搜索、详情、安装三大类功能。子模块函数接收 `&AppState` / `&AppHandle`，
+//! 由 `utils::community_manager::dispatch` 反序列化参数后调用。
 
 pub mod community_config;
 pub mod detail;

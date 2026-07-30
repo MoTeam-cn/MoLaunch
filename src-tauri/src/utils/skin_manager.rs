@@ -1,19 +1,8 @@
 //! 皮肤模块统一分发逻辑（skin_manager 的工具实现）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发。
-//! 7 个 skin action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
-//!
-//! 命令清单（7 个）：
-//! - `get_skin_cape_info`：获取当前账号的皮肤/披风信息（需要 state + app）
-//! - `get_skin_url`：获取皮肤 PNG URL（带本地缓存，需要 state + app + uuid）
-//! - `get_cape_url`：获取当前已装备披风的下载 URL（带本地缓存，需要 state + app）
-//! - `upload_skin`：上传/修改皮肤（需要 state + file_path + variant）
-//! - `equip_cape`：装备披风（需要 state + cape_id）
-//! - `unequip_cape`：取消披风（需要 state）
-//! - `download_url_to_file`：下载指定 URL 的图片到本地文件（不需要 state，只用 url + path）
-//!
-//! 注意：`download_url_to_file` 不需要 state，handler 内用 `_state` / `_app` 忽略；
-//! `get_skin_cape_info` / `get_skin_url` / `get_cape_url` 需要 `&app` 用于图片缓存。
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，7 个 action 覆盖皮肤/披风查询、
+//! 上传、装备、下载。`download_url_to_file` 不需要 state；`get_skin_cape_info` /
+//! `get_skin_url` / `get_cape_url` 需要 `&app` 用于图片缓存。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -24,9 +13,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-// ============================================================
-// action 参数
-// ============================================================
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -54,9 +40,6 @@ struct DownloadUrlToFileParams {
     path: String,
 }
 
-// ============================================================
-// Dispatcher 注册
-// ============================================================
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();

@@ -1,17 +1,9 @@
 //! 应用状态管理
 //!
-//! 按关注点拆分为 5 个子模块：
-//! - `app`      AppState（聚合 SDK / 配置 / 认证 / 下载 / 启动历史等 Arc 句柄）
-//! - `auth`     LocalAuthResult + AuthState
-//! - `config`   AppConfig + McFolder + resolve_game_dir
-//! - `download` StageStatus + DownloadStage + DownloadState
-//! - `launch`   LaunchHistory
-//!
+//! 按关注点拆分为 5 个子模块（app / auth / config / download / launch），
 //! 通过 `pub use` 统一 re-export，保持 `crate::state::X` 路径向后兼容。
-//!
-//! 另外提供两个 helper 函数消除后端重复的 lock/clone/drop 套件：
-//! - `resolve_game_dir_from_state` 消除 19 处 game_dir 提取套件
-//! - `resolve_mirror_and_source` 消除 10 处 mirror_url + source_mode 提取套件
+//! 另提供 `resolve_game_dir_from_state` / `resolve_mirror_and_source` 两个 helper
+//! 消除后端重复的 lock/clone/drop 套件。
 
 mod app;
 mod auth;
@@ -27,18 +19,7 @@ pub use config::{resolve_game_dir, AppConfig, McFolder};
 pub use download::{DownloadStage, DownloadState, StageStatus};
 pub use launch::LaunchHistory;
 
-/// 从 AppState 提取 game_dir（消除 19 处 lock/resolve/drop 三行套件）
-///
-/// # 示例
-/// ```ignore
-/// // 之前（3 行）：
-/// let config = state.config.lock().await;
-/// let game_dir = crate::state::resolve_game_dir(&config.game_dir);
-/// drop(config);
-///
-/// // 之后（1 行）：
-/// let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
-/// ```
+/// 从 AppState 提取 game_dir（消除 lock/resolve/drop 三行套件）
 pub async fn resolve_game_dir_from_state(state: &AppState) -> PathBuf {
     let config = state.config.lock().await;
     let game_dir = resolve_game_dir(&config.game_dir);
@@ -46,19 +27,7 @@ pub async fn resolve_game_dir_from_state(state: &AppState) -> PathBuf {
     game_dir
 }
 
-/// 从 AppState 提取 mirror_url 和 source_mode（消除 10 处 lock/clone/from_str/drop 四行套件）
-///
-/// # 示例
-/// ```ignore
-/// // 之前（4 行）：
-/// let config = state.config.lock().await;
-/// let mirror_url = config.download.mirror_url.clone();
-/// let source_mode = DownloadSourceMode::from_str(&config.download.meta_source);
-/// drop(config);
-///
-/// // 之后（1 行）：
-/// let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
-/// ```
+/// 从 AppState 提取 mirror_url 和 source_mode（消除 lock/clone/from_str/drop 四行套件）
 pub async fn resolve_mirror_and_source(
     state: &AppState,
 ) -> (

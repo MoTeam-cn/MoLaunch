@@ -7,8 +7,6 @@
 
 use serde::{Deserialize, Serialize};
 
-// ===== 外部下载相关 =====
-
 /// 外部下载请求参数
 #[derive(Debug, Serialize, Deserialize)]
 pub struct DownloadFileParams {
@@ -52,8 +50,6 @@ pub struct FetchFilenameResult {
     pub file_size: u64,
 }
 
-// ===== 清理相关 =====
-
 /// 单个可清理项
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CleanupItem {
@@ -93,8 +89,6 @@ pub struct CleanupExecuteResult {
     pub failed: Vec<CleanupFailedItem>,
 }
 
-// ===== 内存优化相关 =====
-
 /// 内存优化请求参数
 #[derive(Debug, Serialize, Deserialize)]
 pub struct MemoryOptimizeParams {
@@ -111,8 +105,6 @@ pub struct MemoryOptimizeResult {
     /// 本次优化使用的模式："light" / "strong"
     pub mode: String,
 }
-
-// ===== Mod 依赖检测相关 =====
 
 /// Mod 依赖检测请求参数
 #[derive(Debug, Serialize, Deserialize)]
@@ -145,8 +137,6 @@ pub struct ConflictDep {
     pub reason: String,
 }
 
-// ===== Mod 去重扫描相关 =====
-
 /// Mod 去重扫描请求参数
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ModDedupScanParams {
@@ -174,8 +164,6 @@ pub struct DuplicateVersion {
     pub file_size: u64,
 }
 
-// ===== 启动器数据导出相关 =====
-
 /// 启动器数据导出请求参数
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ExportLauncherDataParams {
@@ -195,8 +183,6 @@ pub struct ExportResult {
     /// 导出的数据类型（"config" / "versions" / "accounts"）
     pub exported_items: Vec<String>,
 }
-
-// ===== 崩溃日志分析相关 =====
 
 /// 崩溃日志分析请求参数
 #[derive(Debug, Serialize, Deserialize)]
@@ -226,8 +212,6 @@ pub struct CrashAnalysisItem {
     /// 中文修复建议
     pub suggestion: String,
 }
-
-// ===== 截图管理相关 =====
 
 /// 截图列表查询参数
 #[derive(Debug, Serialize, Deserialize, Default)]
@@ -291,8 +275,6 @@ pub struct ScreenshotDeleteResult {
     pub failed: Vec<ScreenshotFailedItem>,
 }
 
-// ===== 资源包管理相关 =====
-
 /// 资源包列表结果
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ResourcePackListResult {
@@ -341,8 +323,6 @@ pub struct ResourcePackConvertResult {
     pub message: String,
 }
 
-// ===== 版本 JSON 读写相关 =====
-
 /// 版本 JSON 读取请求参数
 #[derive(Debug, Serialize, Deserialize)]
 pub struct VersionJsonReadParams {
@@ -374,8 +354,6 @@ pub struct VersionJsonSaveResult {
     /// 是否成功
     pub success: bool,
 }
-
-// ===== 存档管理相关 =====
 
 /// 存档列表结果
 #[derive(Debug, Serialize, Deserialize)]
@@ -474,8 +452,6 @@ pub struct ExtractSaveSeedResult {
     pub source: String,
 }
 
-// ===== 网络延迟测试相关 =====
-
 /// 网络延迟测试请求参数
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NetworkLatencyTestParams {
@@ -500,8 +476,6 @@ pub struct LatencyItem {
     /// 失败原因（成功时为空）
     pub error: String,
 }
-
-// ===== 服务器状态检测相关 =====
 
 /// 服务器状态检测请求参数
 #[derive(Debug, Serialize, Deserialize)]
@@ -530,8 +504,6 @@ pub struct ServerPingResult {
     /// 失败原因（成功时为空）
     pub error: String,
 }
-
-// ===== NBT 数据查看相关 =====
 
 /// NBT 解析请求参数
 #[derive(Debug, Serialize, Deserialize)]

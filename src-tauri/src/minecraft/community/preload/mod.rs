@@ -1,23 +1,10 @@
 //! 本地 Mod 详情预加载
 //!
-//! 在 `list_mods` 返回后（同步阶段只做文件枚举），后台异步完成两件事：
-//! 1. **读 JAR 元数据**（slug / 描述 / 版本 / logo / 译名）
-//! 2. **批量 hash 查询 CF/MR 工程详情**
+//! `list_mods` 同步只做文件枚举（瞬间返回），本模块异步补全元数据：
+//! 1. 读 JAR 元数据（slug / 描述 / 版本 / logo / 译名）
+//! 2. 批量 hash 查询 CF/MR 工程详情
 //!
-//! 两件事都通过 `mods-preload-update` 事件推送给前端，前端按 `file_name` 匹配更新。
-//! 元数据读完就先 emit（前端立即看到译名、logo），不必等联网查询完成。
-//!
-//! 核心设计：
-//! - **两阶段加载**：`list_mods` 同步只做文件枚举（瞬间返回），本模块异步补全所有元数据
-//! - **持久化缓存**：结果写入 `.Molaunch/cache/preload_mods/{version_id}.json`，6h TTL
-//! - **事件驱动**：每读到一个 mod 的元数据/project 就 emit，前端逐个刷新
-//!
-//! 模块结构：
-//! - types.rs: PreloadUpdate / PreloadModInput / HashedMod
-//! - cache.rs: 持久化缓存读写
-//! - hash.rs: CurseForge MurmurHash2 + Modrinth SHA1 指纹
-//! - jar_metadata.rs: JAR 元数据读取 + hash 计算（spawn_blocking）
-//! - online_query.rs: CF/MR 在线查询 + 结果合并 + 事件推送
+//! 通过 `mods-preload-update` 事件推送前端，持久化缓存写入 `.Molaunch/cache/preload_mods/{version_id}.json`（6h TTL）
 
 mod cache;
 mod hash;

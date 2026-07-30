@@ -252,8 +252,6 @@ async fn ping_server(host: &str, port: u16) -> Result<ServerPingResult, String> 
         .map_err(|_| format!("SLP 交换超时 (5s): {}:{}", host, port))?
 }
 
-// ===== VarInt 编解码 + 字符串写入 =====
-
 /// 写 VarInt 到 buf
 ///
 /// 内部转 u32 进行位移以正确处理负数（如协议版本 -1）。
@@ -295,8 +293,6 @@ async fn read_varint<R: AsyncRead + Unpin>(reader: &mut R) -> Result<i32, String
     }
     Ok(result)
 }
-
-// ===== MOTD 提取 =====
 
 /// 从 description 字段提取 MOTD 文本（保留 § 格式化代码）
 ///

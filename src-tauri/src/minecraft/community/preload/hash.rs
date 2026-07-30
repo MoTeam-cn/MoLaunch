@@ -1,9 +1,6 @@
 //! CurseForge MurmurHash2 + Modrinth SHA1 指纹计算
 //!
-//! 算法步骤：
-//! 1. 读取文件所有字节
-//! 2. **跳过空白字符**（0x09 制表符 / 0x0A 换行 / 0x0D 回车 / 0x20 空格）
-//! 3. 对处理后的字节流做 MurmurHash2（seed=1，与 CF 官方一致）
+//! 跳过空白字符（0x09/0x0A/0x0D/0x20）后做 MurmurHash2（seed=1，与 CF 官方一致）
 
 use crate::error_util::log_err;
 use std::path::Path;

@@ -1,30 +1,8 @@
 //! 认证模块统一分发逻辑（meta_manager 的工具实现）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，替代原 match 语句。
-//! 28 个 auth action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
-//!
-//! 命令清单（28 个，按子模块分组）：
-//! - 离线登录（offline.rs）：`login_offline`
-//! - 离线账号（account/offline.rs）：`get_offline_accounts` / `remove_offline_account`
-//!   / `switch_offline_account` / `set_offline_skin` / `save_custom_skin`
-//! - 微软登录（microsoft.rs）：`ms_login_get_config` / `ms_login_web_start`
-//!   / `ms_login_web_exchange` / `ms_login_request_device_code` / `ms_login_poll`
-//!   / `ms_login_refresh`
-//! - 微软账号（account/ms.rs）：`get_ms_accounts` / `remove_ms_account`
-//!   / `switch_ms_account`
-//! - authlib 外置登录（authlib.rs）：`authlib_fetch_server_meta` / `authlib_login`
-//!   / `authlib_select_profile` / `switch_authlib_account` / `get_authlib_accounts`
-//!   / `remove_authlib_account` / `authlib_get_skin_info` / `authlib_upload_skin`
-//!   / `authlib_delete_skin` / `authlib_upload_cape` / `authlib_delete_cape`
-//! - 会话通用（account/session.rs）：`get_login_status` / `logout`
-//!
-//! 注意事项：
-//! - 子模块函数接收 `&AppState` / `&AppHandle`，handler 内调用时用 `&state` / `&app`
-//!   （`state` 是 owned `AppState`，`&state` 直接得到 `&AppState`）
-//! - 部分命令不需要 state（`ms_login_get_config` / `ms_login_request_device_code`
-//!   / `authlib_fetch_server_meta`），但仍统一传入，handler 内忽略即可（用 `_state`）
-//! - 部分命令需要 AppHandle（`ms_login_web_start` / `ms_login_web_exchange` / `ms_login_poll`），
-//!   handler 内用 `&app`
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，28 个 auth action 覆盖
+//! offline / microsoft / authlib 登录及账号管理、会话通用操作。
+//! `ms_login_web_start` / `ms_login_web_exchange` / `ms_login_poll` 需要 `&app`。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
@@ -38,9 +16,6 @@ use crate::minecraft::auth::authlib::Profile;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-// ============================================================
-// 各 action 的强类型参数
-// ============================================================
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -114,7 +89,6 @@ struct RemoveAuthlibAccountParams {
     uuid: String,
 }
 
-// === authlib 皮肤管理参数（5 个） ===
 // 命名遵循"action + Params"约定，字段使用 camelCase（与前端 params 对象一致）。
 
 #[derive(Debug, Deserialize)]
@@ -157,22 +131,15 @@ struct AuthlibDeleteCapeParams {
     uuid: String,
 }
 
-// ============================================================
-// Dispatcher 注册
-// ============================================================
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
-
-    // === 离线登录 ===
     d.register("login_offline", handler!(state, _app, params, {
         let p: LoginOfflineParams = serde_json::from_value(params)
             .map_err(|e| format!("参数解析失败: {}", e))?;
         let r = auth_offline::login_offline(&state, p.username).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
     }));
-
-    // === 离线账号管理 ===
     d.register("get_offline_accounts", handler!(state, _app, _params, {
         let r = offline::get_offline_accounts(&state).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
@@ -201,8 +168,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         let r = offline::save_custom_skin(&state, p.uuid, p.file_path, p.variant).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
     }));
-
-    // === 微软登录 ===
     d.register("ms_login_get_config", handler!(_state, _app, _params, {
         let r = microsoft::ms_login_get_config().await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
@@ -231,8 +196,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         let r = microsoft::ms_login_refresh(&state).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
     }));
-
-    // === 微软账号管理 ===
     d.register("get_ms_accounts", handler!(state, _app, _params, {
         let r = ms::get_ms_accounts(&state).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
@@ -249,8 +212,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         let r = ms::switch_ms_account(&state, p.uuid).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
     }));
-
-    // === authlib 外置登录 ===
     d.register("authlib_fetch_server_meta", handler!(_state, _app, params, {
         let p: AuthlibFetchServerMetaParams = serde_json::from_value(params)
             .map_err(|e| format!("参数解析失败: {}", e))?;
@@ -285,8 +246,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         authlib::remove_authlib_account(&state, p.server_url, p.uuid).await?;
         serde_json::to_value(()).map_err(|e| e.to_string())
     }));
-
-    // === authlib 皮肤管理（5 个 yggdrasil 端点封装） ===
     d.register("authlib_get_skin_info", handler!(state, _app, params, {
         let p: AuthlibSkinInfoParams = serde_json::from_value(params)
             .map_err(|e| format!("参数解析失败: {}", e))?;
@@ -317,8 +276,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         authlib::authlib_delete_cape(&state, p.server_url, p.uuid).await?;
         serde_json::to_value(()).map_err(|e| e.to_string())
     }));
-
-    // === 会话通用 ===
     d.register("get_login_status", handler!(state, _app, _params, {
         let r = session::get_login_status(&state).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())

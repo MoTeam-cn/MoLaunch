@@ -1,17 +1,8 @@
 //! 示例文件导出（manifest + index.html）
 //!
-//! - `read_layout_sample`：从嵌入资源读取示例布局内容
-//! - `export_plugin_sample`：导出插件示例模板到指定路径
-//!
-//! 嵌入资源路径（在 `resources.rs` 的 `embedded_text` 中登记）：
-//! - `samples/plugin/manifest.json` — 示例插件 manifest
-//! - `samples/plugin/index.html` — 示例插件入口 HTML
-//! - `samples/layout/layout-sample.json` — JSON 布局示例
-//! - `samples/layout/layout-sample.xml` — XML 布局示例
-//! - `samples/layout/layout-sample.html` — HTML 布局示例
-//!
-//! 注：原 2 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
-//! 子模块函数已去掉 `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch` 调用。
+//! 嵌入资源在 `resources.rs` 的 `embedded_text` 中登记：
+//! `samples/plugin/manifest.json` / `samples/plugin/index.html` /
+//! `samples/layout/layout-sample.{json,xml,html}`。
 
 use crate::error_util::log_err;
 use crate::{log_info, resources};

@@ -66,6 +66,21 @@
 - **验证**：`cargo check` 零警告零错误；`cargo test --lib` 91 个测试全部通过
 - **不变**：业务逻辑代码零改动，测试用例数量不减
 
+#### 代码清理批次 4-6：全项目注释精简
+
+- **批次 4 launch 模块**（18 文件）：launch 目录剩余文件精简模块文档和冗余内联注释
+  - `jvm_args.rs` 18 行设计文档→3 行；`watcher/window_title/mod.rs` 16 行→4 行；`pipeline/mod.rs` 12 行→4 行
+  - 删除 process_spawn.rs / java_check.rs / natives.rs 中显而易见的内联注释
+- **批次 5 community/version/java/loaders 模块**（34 文件）：4 个目录注释精简
+  - community/preload/mod.rs 21 行→7 行；java/download/mod.rs 13 行→4 行
+  - 删除多处函数清单、模块结构图、装饰分隔线
+- **批次 6 utils/state/storage/sdk/ws/commands/顶层**（14 文件）：剩余目录注释精简
+  - 删除 commands 目录所有"注：原 N 个分散的 Tauri 命令已聚合为..."冗余注释
+  - 精简 http.rs / res_scheme.rs / resources.rs / error_util.rs 过长文档注释
+  - state/config.rs 装饰分隔符 `// ===== xxx =====` → `// xxx`
+- **验证**：`cargo check` 零警告零错误；`cargo test --lib` 91 个测试全部通过
+- **不变**：业务逻辑代码零改动，测试用例数量不减
+
 ### 新增
 
 #### DownloadManager 重构阶段 6：加载器 installer 统一 from_config

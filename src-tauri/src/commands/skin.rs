@@ -6,11 +6,6 @@
 //! - 上传皮肤
 //! - 装备/取消披风
 //! - 下载 URL 图片到本地文件
-//!
-//! 注：原 7 个分散的 skin Tauri 命令已聚合为 `skin_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发到各子模块函数。
-//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState` / `&AppHandle`，
-//! 由 `utils::skin_manager::dispatch` 反序列化参数后调用。
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -35,9 +30,6 @@ pub async fn skin_manager(
     crate::utils::skin_manager::dispatch(state, app, req).await
 }
 
-// ============================================================
-// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
-// ============================================================
 
 /// 获取当前账号的皮肤/披风信息（从 profile_json 解析）
 ///

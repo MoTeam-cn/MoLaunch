@@ -1,9 +1,6 @@
 //! AppData 缓存模块 - 管理 `%APPDATA%/.minecraft/runtime/` 目录
 //!
-//! 用于存放 Java Runtime（Mojang 官方位置）：
-//! - 跨游戏目录共享，不随 game_dir 删除而丢失
-//! - 与官启兼容，可被官启和本启动器共同使用
-//!
+//! Java Runtime 存到官启默认 .minecraft 目录下，跨游戏目录共享、与官启兼容。
 //! 设计与 `Storage` / `Cache` 一致：全局单例 + OnceLock 懒加载。
 
 use std::path::PathBuf;
@@ -17,9 +14,6 @@ const DIR_MINECRAFT: &str = ".minecraft";
 static CACHE_APP: OnceLock<CacheApp> = OnceLock::new();
 
 /// AppData 缓存组件
-///
-/// 管理 `%APPDATA%/.minecraft/runtime/` 下的 Java Runtime 目录。
-/// 所有 AppData 下的缓存读写都应通过 `CacheApp::instance()` 进行。
 pub struct CacheApp {
     base_dir: PathBuf,
 }
@@ -53,8 +47,6 @@ impl CacheApp {
     /// 获取指定 component 的 Java Runtime 目录
     ///
     /// 路径：`%APPDATA%/.minecraft/runtime/{component}/`
-    ///
-    /// 存到官启默认 .minecraft 目录下，跨游戏目录共享，不随 game_dir 删除而丢失。
     pub fn runtime_dir(&self, component: &str) -> Result<PathBuf, String> {
         if self.base_dir.as_os_str().is_empty() {
             return Err("无法获取 APPDATA 环境变量".to_string());

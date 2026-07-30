@@ -1,10 +1,4 @@
 //! Modrinth 响应到统一资源模型的转换
-//!
-//! 包含：
-//! - convert_hit：MR 搜索命中 → ResourceProject
-//! - convert_project：MR 工程详情 → ResourceProject
-//! - convert_version：MR 版本 → ResourceVersion
-//! - build_facets：构建 MR facets 查询参数（参考 Modrinth API 文档）
 
 use super::super::types::{
     ModLoaders, Platform, ReleaseType, ResourceProject, ResourceType, ResourceVersion,

@@ -69,7 +69,6 @@ pub struct InstallModpackRequest {
     /// None 表示无外部 Logo，仅依赖 MMC iconKey 等内部图标迁移。
     #[serde(default)]
     pub logo_path: Option<String>,
-    // ===== 联机大厅阶段 3：平台来源元数据（用于写入 modpack.meta.json） =====
     /// 平台工程 ID（CF project id / MR project id）。
     /// 在线资源页安装时由前端从工程详情响应传入；None 时跳过 modpack.meta.json 写入。
     #[serde(default)]

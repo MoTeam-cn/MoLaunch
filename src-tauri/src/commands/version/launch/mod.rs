@@ -296,9 +296,6 @@ pub async fn get_launch_history(state: &AppState) -> Result<Vec<LaunchHistory>, 
     Ok(sorted)
 }
 
-// ============================================================
-// 统一 IPC 入口（dispatcher 模式）
-// ============================================================
 
 /// 版本启动管理统一 IPC 入口
 ///

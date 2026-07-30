@@ -1,15 +1,7 @@
 //! Java 自动下载模块 - 编排入口
 //!
-//! 从 Mojang 官方 Java Runtime 索引下载 Java
-//! 下载源：piston-meta.mojang.com（官方）/ bmclapi2.bangbang93.com（镜像）
-//! 下载到 {APPDATA}\.minecraft\runtime\{component}\（跨游戏目录共享）
-//!
-//! 5 阶段流水线：
-//! 1. fetching    - 拉取 all.json 索引
-//! 2. matching    - 匹配 Mojang component
-//! 3. manifest    - 拉取文件清单
-//! 4. downloading - 下载全部文件（含断点续传与 SHA1 校验）
-//! 5. verifying   - 调用 detect_java 验证
+//! 从 Mojang Java Runtime 索引下载到 `{APPDATA}\.minecraft\runtime\{component}\`（跨游戏目录共享）
+//! 5 阶段流水线：fetching → matching → manifest → downloading → verifying
 
 mod constants;
 mod fetch;

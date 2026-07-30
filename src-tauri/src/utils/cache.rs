@@ -1,17 +1,7 @@
 //! 运行路径缓存工具（`.Molaunch/cache/`）
 //!
-//! 对外提供自由函数式 API，包装 `storage::cache::Cache` 单例。
-//! 所有业务模块应通过本模块访问运行路径缓存，而非直接使用 `storage::cache::Cache`。
-//!
-//! ## 缓存目录结构
-//!
-//! ```text
-//! .Molaunch/cache/
-//!   images/           - 图片缓存（皮肤、披风、头像）
-//!   forge_installer/  - Forge 安装器注入资源
-//!   preload_mods/     - 社区资源预加载缓存
-//!   <embedded jars>   - 嵌入资源释放
-//! ```
+//! 自由函数式 API，包装 `storage::cache::Cache` 单例。
+//! 业务模块应通过本模块访问运行路径缓存。
 
 use std::path::PathBuf;
 

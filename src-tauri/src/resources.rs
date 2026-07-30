@@ -214,12 +214,8 @@ pub fn extract_resource(resource_path: &str, target_path: &Path) -> anyhow::Resu
 /// 释放 SDK 动态库到临时目录，返回释放后的文件路径
 ///
 /// SDK 在编译时通过 `include_bytes!` 嵌入二进制，运行时释放到
-/// `<temp>/MoLaunch/sdk/` 目录供 `libloading` 加载。
-///
-/// 释放策略（复用 `extract_resource` 的 sha256 校验机制）：
-/// - **SDK 热更新**（手动替换临时目录文件）：hash 文件不变仍匹配 → 跳过释放，加载热更新后的文件
-/// - **主程序更新后启动**：嵌入 SDK 的 sha256 变了，与 hash 文件不匹配 → 自动释放覆盖旧版
-/// - **临时目录被清理**：文件不存在 → 重新释放
+/// `<temp>/MoLaunch/sdk/` 目录供 `libloading` 加载。复用 `extract_resource`
+/// 的 sha256 校验机制：hash 一致跳过释放（支持手动热更新），hash 不一致自动覆盖。
 pub fn extract_sdk() -> anyhow::Result<std::path::PathBuf> {
     let sdk_filename = crate::sdk::get_sdk_filename();
     let resource_path = format!("sdk/{}", sdk_filename);
@@ -234,25 +230,10 @@ pub fn extract_sdk() -> anyhow::Result<std::path::PathBuf> {
 /// 释放 updater.exe 到 AppData 全局目录（Windows 专属）
 ///
 /// updater.exe 是便携版更新器，由 `src-tauri/updater/` 独立 Cargo 项目构建，
-/// 编译时通过 `include_bytes!` 嵌入主程序，运行时释放到 AppData 供更新流程调用。
-///
-/// # 释放路径
-///
-/// - **Windows**：`%APPDATA%/.Molaunch/updater/updater.exe`
-/// - **非 Windows**：本函数不存在（`#[cfg(target_os = "windows")]` 编译期排除）
-///
-/// # 释放策略
-///
-/// 复用 `extract_resource` 的 sha256 校验机制：
-/// - 首次释放：写入 updater.exe + sha256 校验文件
-/// - 后续启动：hash 一致 → 跳过写盘；hash 不一致（主程序更新后嵌入的 updater 变了）→ 覆盖释放
-///
-/// # 调用方
-///
-/// `commands::system::updater::download_and_install` 在启动 updater.exe 子进程前调用，
-/// 拿到释放后的绝对路径后传给 `std::process::Command::new`。
-///
-/// See: docs/updater/design.md §4 Windows 便携版 updater
+/// 编译时通过 `include_bytes!` 嵌入主程序，运行时释放到
+/// `%APPDATA%/.Molaunch/updater/updater.exe` 供更新流程调用。
+/// 复用 `extract_resource` 的 sha256 校验机制。
+/// 调用方为 `commands::system::updater::download_and_install`。
 #[cfg(target_os = "windows")]
 pub fn extract_updater() -> anyhow::Result<std::path::PathBuf> {
     let appdata = std::env::var("APPDATA")
@@ -273,32 +254,9 @@ pub fn extract_updater() -> anyhow::Result<std::path::PathBuf> {
 /// 通过 `libloading` 加载。放 AppData 而非 temp 目录，避免 temp 被清理导致后续
 /// 启动失败；放全局位置而非启动器目录，支持多实例共享同一份驱动。
 ///
-/// # 释放路径
-///
-/// - **Windows**：`%APPDATA%/.MolaLaunch/wintun.dll`
-///   （与 `OnlineStorage::appdata_device_path` 同根目录，便于统一管理）
-/// - **非 Windows**：本函数不存在（`#[cfg(target_os = "windows")]` 编译期排除）
-///
-/// # 架构支持
-///
-/// 编译时 `embedded_bytes` 按 `target_arch` 选择对应架构的 dll 嵌入：
-/// - `x86_64` → `resources/wintun/amd64/wintun.dll`
-/// - `aarch64` → `resources/wintun/arm64/wintun.dll`
-/// - `x86` → `resources/wintun/x86/wintun.dll`
-/// - `arm` → `resources/wintun/arm/wintun.dll`
-///
-/// 运行时统一释放到 `%APPDATA%/.MolaLaunch/wintun.dll`，调用方无需关心架构。
-///
-/// # 释放策略
-///
-/// 复用 `extract_resource` 的 sha256 校验机制：
-/// - 首次释放：写入 dll + sha256 校验文件
-/// - 后续启动：hash 一致 → 跳过写盘；hash 不一致（主程序更新后嵌入的 dll 变了）→ 覆盖释放
-///
-/// # 调用方
-///
-/// `minecraft::online::bridge::VirtualLanBridge::start` 在创建 TUN 接口前调用，
-/// 拿到释放后的绝对路径后传给 `VirtualNet::create(..., Some(path))`。
+/// 编译时 `embedded_bytes` 按 `target_arch` 选择对应架构的 dll 嵌入（amd64/arm64/x86/arm），
+/// 运行时统一释放到 `%APPDATA%/.MolaLaunch/wintun.dll`。复用 `extract_resource`
+/// 的 sha256 校验机制。调用方为 `minecraft::online::bridge::VirtualLanBridge::start`。
 #[cfg(target_os = "windows")]
 pub fn extract_wintun() -> anyhow::Result<std::path::PathBuf> {
     let appdata = std::env::var("APPDATA")

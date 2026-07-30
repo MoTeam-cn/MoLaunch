@@ -1,9 +1,4 @@
 //! Java 管理命令
-//!
-//! 注：原 6 个分散的 java Tauri 命令已聚合为 `java_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发到各子模块函数。
-//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState` / `&AppHandle`，
-//! 由 `utils::java_manager::dispatch` 反序列化参数后调用。
 
 use crate::log_info;
 use crate::minecraft::java;
@@ -76,9 +71,6 @@ pub async fn java_manager(
     crate::utils::java_manager::dispatch(state, app, req).await
 }
 
-// ============================================================
-// 子模块函数（供 dispatcher handler 调用，不再注册为独立 Tauri 命令）
-// ============================================================
 
 /// 检测 Java
 pub async fn detect_java(_state: &AppState) -> Result<JavaRuntimeInfo, String> {

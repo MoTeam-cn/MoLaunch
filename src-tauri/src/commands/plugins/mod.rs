@@ -1,26 +1,10 @@
 //! 插件系统命令模块（编排层）
 //!
-//! 提供外部插件目录扫描、文件读取、卸载、安装等命令。
-//! 外部插件存放于 `<base_dir>/plugins/<plugin_id>/` 目录下，
-//! 每个插件目录包含 manifest.json 和入口 HTML 文件。
-//!
-//! ## 模块结构
-//!
-//! - `mod.rs`（本文件）：共享类型 + 共享 helper + 子模块声明 + 统一 IPC 入口
-//! - `install`：从文件夹 / ZIP 安装外部插件
-//! - `sandbox`：列出 / 读取 / 卸载外部插件（沙箱内部访问）
-//! - `spawn`：插件子进程执行（带权限校验 + 命令白名单 + 超时控制）
-//! - `window`：插件子窗口创建（带域名白名单 + 数量限制）
-//! - `layout`：自定义布局 URL 加载 + 本地缓存
-//! - `export`：示例文件导出（manifest + index.html）
-//! - `personalization`：个性化配置读写（%APPDATA%/.MolaLaunch/personalization.json）
-//!
-//! 注：原 12 个分散的 plugins Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，
-//! 通过请求体的 `action` 字段分发到各子模块函数。
-//! 子模块函数已去掉 `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch`
-//! 反序列化参数后调用。
+//! 外部插件存放于 `<base_dir>/plugins/<plugin_id>/`，每个插件目录包含
+//! manifest.json 和入口 HTML。子模块按职责拆分：install / sandbox / spawn /
+//! window / layout / export / personalization。
+//! 所有子模块函数由 `utils::plugins_manager::dispatch` 统一反序列化参数后调用。
 
-// 子模块声明为 pub，让 utils::plugins_manager 可通过完整路径调用子模块函数
 pub mod export;
 pub mod install;
 pub mod layout;
@@ -36,9 +20,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::{AppHandle, State};
 
-// ============================================================
-// 统一 IPC 入口
-// ============================================================
 
 /// 统一插件系统 IPC 入口
 ///
@@ -53,8 +34,6 @@ pub async fn plugins_manager(
     let state = state.inner().clone();
     crate::utils::plugins_manager::dispatch(state, app, req).await
 }
-
-// ==================== 共享类型 ====================
 
 /// 子进程权限配置（manifest.json 的 processPermissions 字段）
 ///
@@ -148,8 +127,6 @@ pub struct ExternalPluginEntry {
     /// 插件目录绝对路径
     pub dir: String,
 }
-
-// ==================== 共享 helper（submodules 通过 super:: 访问） ====================
 
 /// 获取外部插件根目录（`<base_dir>/plugins/`）
 fn plugins_root() -> PathBuf {

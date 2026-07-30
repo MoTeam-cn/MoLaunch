@@ -1,7 +1,6 @@
 //! 游戏参数构建
 //!
-//! 解析版本 JSON 的 arguments.game（或旧版 minecraftArguments），
-//! 替换占位符并补充窗口、服务器、用户额外参数。
+//! 解析版本 JSON 的 arguments.game（或旧版 minecraftArguments）并替换占位符。
 
 use std::path::Path;
 
@@ -128,11 +127,6 @@ pub(super) fn build_game_args(
     }
 
     // custom_info 为空时，从参数列表删除 --versionType 及其值
-    //   If Arguments.Contains("--versionType") Then
-    //       Dim Index As Integer = Arguments.IndexOf("--versionType")
-    //       Arguments.RemoveAt(Index)
-    //       If Index < Arguments.Count Then Arguments.RemoveAt(Index)
-    //   End If
     if custom_info_str.is_empty() {
         if let Some(pos) = final_args.iter().position(|a| a == "--versionType") {
             final_args.remove(pos); // 删除 --versionType

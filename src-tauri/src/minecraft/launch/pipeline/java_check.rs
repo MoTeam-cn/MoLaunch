@@ -9,7 +9,6 @@ use super::{LaunchError, LaunchPipeline, LaunchStage};
 impl LaunchPipeline {
     /// 检测Java
     pub(super) async fn detect_java(&self) -> Result<PathBuf, LaunchError> {
-        // 获取版本目录
         let version_dir = self
             .config
             .game_dir
@@ -219,12 +218,10 @@ impl LaunchPipeline {
 
     /// 递归查找目录下的 bin/{exe_name}（最多 4 层深度，避免遍历过大）
     fn search_java_in_dir(dir: &std::path::Path, exe_name: &str) -> Option<PathBuf> {
-        // 直接检查 dir/bin/{exe_name}
         let direct = dir.join("bin").join(exe_name);
         if direct.exists() {
             return Some(direct);
         }
-        // 限制深度为 4 层
         fn walk(dir: &std::path::Path, exe_name: &str, depth: u32) -> Option<PathBuf> {
             if depth > 4 {
                 return None;

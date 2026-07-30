@@ -1,7 +1,4 @@
-//! 文件系统操作与文件下载
-//!
-//! 包含 runtime 目录定位、java.exe 查找、路径穿越校验、断点续传判定，
-//! 以及核心的文件下载循环（阶段 4）。
+//! 文件系统操作与文件下载（阶段 4：runtime 目录定位 + 路径穿越校验 + 断点续传 + 下载循环）
 
 use std::path::{Path, PathBuf};
 use tauri::AppHandle;

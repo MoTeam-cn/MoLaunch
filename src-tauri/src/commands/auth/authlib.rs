@@ -41,9 +41,6 @@ use crate::minecraft::auth::authlib::{
 use crate::minecraft::auth::storage::StoredAuthlibAccount;
 use crate::state::{AppState, LocalAuthResult};
 
-// ============================================================
-// 前端可见的数据类型
-// ============================================================
 
 /// authlib 登录结果
 ///
@@ -104,9 +101,6 @@ impl From<ServerMetadata> for AuthlibServerMeta {
     }
 }
 
-// ============================================================
-// 命令实现
-// ============================================================
 
 /// 获取 yggdrasil 服务器元数据
 ///
@@ -453,12 +447,8 @@ pub async fn remove_authlib_account(
         .map_err(log_err("Failed to remove authlib account"))
 }
 
-// ============================================================
-// yggdrasil 皮肤管理命令（5 个，参考 yggdrasil-api-analysis.md 4.3/4.4 节）
-//
-// 统一从 `auth_storage.get_authlib_account` 取 access_token，
-// 调用 `authlib::client` 的对应端点。token 过期返回 401 时由前端提示用户重新登录。
-// ============================================================
+// yggdrasil 皮肤管理命令（5 个）：统一从 `auth_storage.get_authlib_account`
+// 取 access_token，调用 `authlib::client` 端点。token 过期返回 401 由前端提示重新登录。
 
 /// 查询外置账号的皮肤/披风信息
 ///
@@ -618,9 +608,6 @@ async fn read_png_file(file_path: &str) -> Result<Vec<u8>, String> {
     .map_err(|e| format!("读取文件任务失败: {}", e))?
 }
 
-// ============================================================
-// AppState 扩展：暂存多角色登录上下文
-// ============================================================
 
 /// 多角色登录的待处理上下文
 ///

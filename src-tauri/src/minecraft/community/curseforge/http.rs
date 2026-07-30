@@ -1,10 +1,6 @@
 //! CurseForge HTTP 请求层
 //!
-//! 包含：
-//! - 配置读取（get_cf_config）：根据 source 策略选择官方/镜像源
-//! - cf_get / cf_post：通用 GET/POST 请求封装
-//!   - source=1 时官方失败自动回退镜像
-//!   - source=0 强制镜像，source=2 强制官方
+//! source=1 时官方失败自动回退镜像；source=0 强制镜像，source=2 强制官方
 
 use std::time::Instant;
 

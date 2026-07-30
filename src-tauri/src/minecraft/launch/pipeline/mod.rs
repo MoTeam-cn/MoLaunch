@@ -1,15 +1,7 @@
-//! Launch pipeline - 完整的Minecraft启动流程
-//! 支持并行执行和进度追踪
+//! Launch pipeline - 完整的 Minecraft 启动流程
 //!
-//! 结构：
-//! - pipeline/mod.rs: 结构体定义 + 公共 API + 模块编排
-//! - pipeline/types.rs: 数据类型（阶段/进度/配置/结果/错误）
-//! - pipeline/execute.rs: execute 编排与进度更新
-//! - pipeline/validate.rs: 文件校验补全与启动参数构建
-//! - pipeline/java_check.rs: Java 检测与校验
-//! - pipeline/natives.rs: Natives 原生库解压
-//! - pipeline/pre_launch.rs: 启动前命令执行
-//! - pipeline/process_spawn.rs: 游戏进程启动与早期崩溃检测
+//! 支持并行执行与进度追踪。子模块：types / execute / validate / java_check /
+//! natives / pre_launch / process_spawn。
 
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};

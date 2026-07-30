@@ -1,7 +1,6 @@
 //! Java 选择模块（基于版本区间的简单选择）
 //!
-//! 注意：复杂的 MC 版本感知选择逻辑在 `minecraft::java_selector` 模块中，
-//! 这里仅提供基于 MinVer/MaxVer 的基础筛选，复用 `java_selector::get_java_version_weight`。
+//! 复杂的 MC 版本感知选择逻辑在 `minecraft::java_selector`，此处仅做 MinVer/MaxVer 筛选并复用其权重系统
 
 use super::JavaRuntime;
 

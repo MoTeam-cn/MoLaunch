@@ -1,22 +1,7 @@
 //! AppData 缓存工具（`%APPDATA%/.minecraft/runtime/`）
 //!
-//! 对外提供自由函数式 API，包装 `storage::cache_app::CacheApp` 单例。
-//! 所有业务模块应通过本模块访问 AppData 下的 Java Runtime 目录，
-//! 而非直接读取 `APPDATA` 环境变量拼接路径。
-//!
-//! ## 缓存目录结构
-//!
-//! ```text
-//! %APPDATA%/.minecraft/
-//!   runtime/
-//!     {component}/  - Java Runtime（Mojang 官方位置，跨游戏目录共享）
-//! ```
-//!
-//! ## 设计说明
-//!
-//! Java Runtime 存到官启默认 .minecraft 目录下：
-//! - 跨游戏目录共享，不随 game_dir 删除而丢失
-//! - 与官启兼容，可被官启和本启动器共同使用
+//! 自由函数式 API，包装 `storage::cache_app::CacheApp` 单例。
+//! Java Runtime 存到官启默认 .minecraft 目录下，跨游戏目录共享、与官启兼容。
 
 use std::path::PathBuf;
 

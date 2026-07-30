@@ -1,10 +1,6 @@
-//! 崩溃分析（运行时日志 + 崩溃报告文件 + hs_err + latest.log）
+//! 崩溃分析（运行时日志 + 崩溃报告 + hs_err + latest.log）
 //!
-//! CrashAnalyzer 四步流程：
-//! 1. Collect  — 收集 crash-reports/*.txt、hs_err_pid*.log、logs/latest.log、运行时日志
-//! 2. Prepare  — 提取各源文本（头N行 + 尾M行）
-//! 3. Analyze  — 三级关键字匹配（高优先级精准 → 堆栈分析 → 低优先级）
-//! 4. Output   — 返回 CrashInfo（含 reason/suggestion/crash_report_path/log_tail）
+//! 流程：Collect → Analyze（三级匹配：crit1 精准 → stack 堆栈 → crit3 宽松）→ Output。
 
 mod collect;
 mod crit1;
@@ -30,10 +26,10 @@ pub(crate) async fn analyze_crash(
 
     crate::log_info!("[CrashAnalyzer] 开始崩溃分析（exit_code={}）", exit_code);
 
-    // ===== 步骤1: Collect — 收集各源文本 =====
+    // 步骤1: Collect — 收集各源文本
     let sources = collect::collect_sources(logs, game_dir);
 
-    // ===== 步骤2: Analyze — 三级关键字匹配 =====
+    // 步骤2: Analyze — 三级关键字匹配
 
     // 第一级：高优先级精准匹配
     if let Some(info) = crit1::analyze_crit1(
@@ -78,7 +74,7 @@ pub(crate) async fn analyze_crash(
         return Some(info);
     }
 
-    // ===== 兜底：未识别的崩溃 =====
+    // 兜底：未识别的崩溃
     crate::log_info!("[CrashAnalyzer] 未匹配到已知崩溃模式，返回通用崩溃信息");
     let log_tail: Vec<String> = if !sources.latest_log_tail.is_empty() {
         sources.latest_log_tail

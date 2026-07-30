@@ -1,11 +1,7 @@
 //! Linux 实现：wmctrl / xdotool 外部命令（通过 shell 模块统一调用）
 //!
-//! 优先用 xdotool（支持按 PID 查找窗口），fallback 到 wmctrl（按标题匹配）。
-//!
-//! 注意：
-//! - X11 下 xdotool/wmctrl 可正常工作
-//! - Wayland 下大多数合成器出于安全限制不允许程序修改其他窗口标题
-//!   这是 Wayland 的设计限制，非代码问题
+//! 优先 xdotool（按 PID 查找），fallback 到 wmctrl（按标题匹配）。
+//! Wayland 下多数合成器禁止修改其他窗口标题，这是 Wayland 设计限制。
 
 use crate::minecraft::system::shell::{
     ps_pid_exists, wmctrl_list, wmctrl_rename, xdotool_search_pid, xdotool_set_window_name,
@@ -42,13 +38,7 @@ pub async fn is_window_visible(pid: u32) -> bool {
     ps_pid_exists(pid)
 }
 
-/// 改写指定 PID 的窗口标题
-/// 优先用 xdotool（支持按 PID 查找窗口），其次 wmctrl（按标题匹配）
-///
-/// 注意：
-/// - X11 下 xdotool/wmctrl 可正常工作
-/// - Wayland 下大多数合成器出于安全限制不允许程序修改其他窗口标题
-///   这是 Wayland 的设计限制，非代码问题
+/// 改写指定 PID 的窗口标题（xdotool 优先，wmctrl 兜底）
 pub async fn set_window_title(pid: u32, title: &str) {
     // 方案 1：xdotool search --pid <pid> 然后 set_window --name
     if let Ok(output) = xdotool_search_pid(pid, true) {

@@ -1,23 +1,7 @@
 //! 缓存统计工具
 //!
 //! 提供统一的缓存目录统计能力，返回每个子目录的文件数、占用大小、TTL 等信息。
-//! 供 IPC 命令 `get_cache_stats` 使用，开发者页和未来可能的外部暴露接口复用。
-//!
-//! ## 统计范围
-//!
-//! | 类别 | 子目录 | TTL | 说明 |
-//!------|--------|-----|------|
-//! | `cache` | images/ | 24h | 图片缓存 |
-//! | `cache` | forge_installer/ | 24h | Forge 安装器注入资源 |
-//! | `cache` | preload_mods/ | 24h | 社区资源预加载缓存 |
-//! | `cache` | launch/ | 24h | 嵌入 jar 释放 |
-//! | `cache` | custom_layout/ | 24h | 自定义布局 URL 下载缓存 |
-//! | `cache_temp` | TaskTemp/ | 24h | 安装包临时下载 |
-//! | `cache_temp` | sdk/ | - | SDK 动态库（不清理，有 sha256 校验） |
-//! | `cache_app` | runtime/ | - | Java Runtime（不清理，重要资源） |
-//!
-//! 注意：`cache_app/runtime/` 统计的是其下的 component 子目录，
-//! 因为 runtime/ 本身是 Mojang 官方目录，可能包含其他启动器的内容。
+//! 供 IPC 命令 `get_cache_stats` 使用。
 
 use std::path::{Path, PathBuf};
 

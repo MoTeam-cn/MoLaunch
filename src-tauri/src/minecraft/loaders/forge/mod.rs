@@ -1,9 +1,4 @@
 //! Forge loader module
-//!
-//! 模块结构：
-//! - mod.rs: list_versions（Forge 版本列表查询，BMCLAPI JSON / 官方 HTML 双格式）+ 模块入口
-//! - install.rs: install 调度器 + install_modern（1.13+ 安装，injector 方式）
-//! - legacy.rs: install_legacy（1.7.10 ~ 1.12.2 旧版安装，解析 install_profile.json）
 
 mod install;
 mod legacy;
