@@ -24,6 +24,11 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import OnlineDevicePanel from '@/components/online/OnlineDevicePanel.vue'
 import RoomManager from '@/components/online/RoomManager.vue'
 import LobbyBrowser from '@/components/online/LobbyBrowser.vue'
+import ProviderList from '@/components/frp/ProviderList.vue'
+import TunnelManager from '@/components/frp/TunnelManager.vue'
+import FrpLogs from '@/components/frp/FrpLogs.vue'
+import AuthCenter from '@/components/frp/AuthCenter.vue'
+import { frpCategory } from '@/composables/useFrpSidebar'
 import {
   Cog6ToothIcon,
   DevicePhoneMobileIcon,
@@ -75,8 +80,8 @@ const isReady = computed(
   () => !!status.value && status.value.registered && status.value.logged_in && !status.value.token_expired,
 )
 
-/** 当前激活分类（device / lobby / create / join / room_details） */
-const activeCategory = ref<'device' | 'lobby' | 'create' | 'join' | 'room_details'>('device')
+/** 当前激活分类（device / lobby / create / join / room_details / providers / tunnels / auth / logs） */
+const activeCategory = ref<'device' | 'lobby' | 'create' | 'join' | 'room_details' | 'providers' | 'tunnels' | 'auth' | 'logs'>('device')
 
 /** 设备分类（始终可用） */
 const deviceCategory: NavCategory = {
@@ -143,7 +148,7 @@ const categories = computed<NavCategory[]>(() => {
     roomDetailsChild.value,
   ]
   const roomWithDetails: NavCategory = { ...roomCategory, children }
-  return [deviceCategory, lobbyCategory, roomWithDetails]
+  return [deviceCategory, lobbyCategory, roomWithDetails, frpCategory]
 })
 
 /** 状态徽章文案与颜色 */
@@ -246,6 +251,10 @@ const currentComponent = computed(() => {
   switch (activeCategory.value) {
     case 'device': return OnlineDevicePanel
     case 'lobby': return LobbyBrowser
+    case 'providers': return ProviderList
+    case 'tunnels': return TunnelManager
+    case 'auth': return AuthCenter
+    case 'logs': return FrpLogs
     default: return RoomManager
   }
 })
