@@ -2,7 +2,7 @@
  * 开发者模式 API
  *
  * 触发流程：
- * 1. SystemInfoTab.vue 版本号连续点击 5 次 → unlockDeveloperMode()
+ * 1. CreditsTab.vue 法律信息中隐藏字段连续点击 7 次 → unlockDeveloperMode()
  * 2. SettingsAdvanced.vue 显示开关卡片（仅在已解锁时）→ applyConfig({ developerMode: true/false })
  * 3. Settings.vue 侧边菜单出现「开发者」项（仅在开关开启时）
  * 4. SettingsDeveloper.vue 展示日志/缓存/存储/系统信息
@@ -25,12 +25,12 @@ import { SYSTEM_ACTIONS, systemManager } from './system-manager'
 
 // ==================== 解锁 ====================
 
-/** 查询开发者模式是否已解锁（用户连续点击版本号 5 次后解锁） */
+/** 查询开发者模式是否已解锁（用户在鸣谢法律信息中触发隐藏字段后解锁） */
 export async function isDeveloperUnlocked(): Promise<boolean> {
   return systemManager<boolean>(SYSTEM_ACTIONS.IS_DEVELOPER_UNLOCKED)
 }
 
-/** 解锁开发者模式（连续点击版本号 5 次后调用） */
+/** 解锁开发者模式（由 CreditsTab.vue 法律信息中的隐藏字段触发） */
 export async function unlockDeveloperMode(): Promise<void> {
   return systemManager<void>(SYSTEM_ACTIONS.UNLOCK_DEVELOPER_MODE)
 }

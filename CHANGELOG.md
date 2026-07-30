@@ -9,6 +9,19 @@
 
 ### 新增
 
+#### 开发者模式触发迁移 + 许可声明补全
+
+- 背景：用户要求将开发者模式触发入口从系统信息页迁移至鸣谢法律信息中的隐藏字段，防止普通用户随意触发；同时在许可声明中补充 McSDK 与 cubiomes（xpple fork）的版权信息
+- 改动：
+  - **移除旧触发点**（[src/views/settings/more/SystemInfoTab.vue](src/views/settings/more/SystemInfoTab.vue)）：移除版本号连续点击 5 次解锁、设备 ID 双击 5 次备用解锁逻辑。版本号改为纯展示文本，设备 ID 双击仅保留切换全额显示/打码功能。清理 `devUnlocked` / `versionClickCount` / `deviceIdDblClickCount` 等状态与 `unlockDeveloperMode` / `safeCall` / `toastInfo` / `toastSuccess` 等无用导入
+  - **新增隐藏触发字段**（[src/views/settings/more/CreditsTab.vue](src/views/settings/more/CreditsTab.vue)）：在法律信息 → 版权声明中，将「MoTeam」字段包装为可点击 span，连续点击 7 次（3 秒内）触发 `unlockDeveloperMode()`。无任何视觉提示（无 cursor pointer、无 hover 效果、无 tooltip、无倒计时 toast），完全隐藏于普通文本中。已解锁后点击无效，避免重复调用后端
+  - **文档注释同步更新**：
+    - [src-tauri/src/commands/system/developer.rs](src-tauri/src/commands/system/developer.rs)：模块级触发流程注释与 `is_developer_unlocked` 函数注释更新为新触发方式
+    - [src/utils/api/developer.ts](src/utils/api/developer.ts)：文件头触发流程注释与 `isDeveloperUnlocked` / `unlockDeveloperMode` 函数注释更新
+    - [src/components/settings/DevModeToggle.vue](src/components/settings/DevModeToggle.vue) 与 [src/views/settings/SettingsAdvanced.vue](src/views/settings/SettingsAdvanced.vue)：解锁触发点注释更新
+  - **许可声明补全**（[src-tauri/resources/about/licenses.txt](src-tauri/resources/about/licenses.txt)）：在原版 Cubiomes 条目后追加两条——McSDK（Apache License 2.0，标注「自有项目，无需强制遵守」）与 Cubiomes (xpple fork)（MIT License，版权 Cubitect, xpple，来源指向 MoTeam-cn/cubiomes submodule 仓库）
+- 用户反馈："激活开发者模式目前改成啥了，我不知道，我倒是想改成 更多侧边栏中的鸣谢的法律信息展开里面的一个特殊字段触发了，防止别人随意就触发了，其他的都去掉，然后后端资源库里面的那几个txt文件中 许可和版权声明里面加上 McSDK和 cubiomes"
+
 #### DevTools 状态判断修复 + 全局快捷键禁用 + 水印解锁参数
 
 - 背景：用户反馈三个问题：① 后端 `is_devtools_open` 明明 DevTools 已打开却返回 false；② 启动器需要禁用所有快捷键，仅在开发者页面提供独占快捷键；③ 测试版水印让用户看着"有点吐"，需要可在 DevTools 打开前提下解锁隐藏
@@ -17,8 +30,8 @@
   - **窗口销毁兜底**（[src-tauri/src/lib.rs](src-tauri/src/lib.rs)）：`on_window_event` 中监听 `WindowEvent::Destroyed`，调用 `reset_devtools_state()` 防止状态泄露
   - **全局快捷键禁用扩展**（[src/composables/useDevToolsGuard.ts](src/composables/useDevToolsGuard.ts)）：从仅拦截 DevTools 快捷键扩展为拦截所有非编辑类快捷键——F1~F12 全部拦截、Ctrl/Cmd+Shift+任意字母数字全部拦截、Ctrl/Cmd+Alt+字母拦截、Ctrl/Cmd+字母（除 c/v/x/z/y/a 编辑键外）拦截、Alt+字母拦截（避免激活菜单栏）。保留编辑键确保 input/textarea 正常使用
   - **开发者页面独占快捷键**（新建 [src/composables/useDevShortcuts.ts](src/composables/useDevShortcuts.ts)）：在 capture 阶段 `stopImmediatePropagation` 抢占事件流，绕过全局防护。绑定 `Ctrl/Cmd+Shift+D` 切换 DevTools 打开/关闭、`Alt+1~6` 切换子页签（1=实验性 / 2=DevTools / 3=证书 / 4=日志 / 5=存储 / 6=系统信息）。仅在 SettingsDeveloper.vue 存活时生效
-  - **水印解锁 composable**（新建 [src/composables/useWatermarkUnlock.ts](src/composables/useWatermarkUnlock.ts)）：管理水印隐藏状态。`hide()` 前置调用 `isDevToolsOpen()` 校验，true 才允许隐藏；状态存 sessionStorage（重启恢复显示）；解锁后启动 5 秒轮询，DevTools 关闭则自动恢复水印
-  - **水印组件监听解锁**（[src/components/common/Watermark.vue](src/components/common/Watermark.vue)）：`showWatermark` 计算属性追加 `!unlocked.value` 条件；onMounted 启动 `syncWithDevTools()` 轮询
+  - **水印解锁 composable**（新建 [src/composables/useWatermarkUnlock.ts](src/composables/useWatermarkUnlock.ts)）：管理水印隐藏状态。`hide()` 前置调用 `isDevToolsOpen()` 校验，true 才允许隐藏；状态纯内存（不写入 sessionStorage/localStorage），刷新页面/重启应用即恢复显示，防止外部持久关闭水印。隐藏后启动 5 秒轮询检测 DevTools 状态，DevTools 关闭时自动恢复水印并同步 DevToolsTab 按钮状态（`unlocked` 为全局共享 ref）
+  - **水印组件监听解锁**（[src/components/common/Watermark.vue](src/components/common/Watermark.vue)）：`showWatermark` 计算属性追加 `!unlocked.value` 条件；onMounted 调用 `syncWithDevTools()` 启动轮询监听
   - **DevTools 子页签新增水印解锁卡片**（[src/views/settings/developer/DevToolsTab.vue](src/views/settings/developer/DevToolsTab.vue)）：仅测试版构建显示。提供「隐藏水印」/「恢复水印」按钮，DevTools 未打开时给出"需先打开 DevTools"提示
   - **SettingsDeveloper 挂载独占快捷键**（[src/views/settings/SettingsDeveloper.vue](src/views/settings/SettingsDeveloper.vue)）：onMounted 调用 `useDevShortcuts({ onSwitchTab })`，Alt+1~6 切换子页签
   - **构建阻塞修复（项目已有 bug）**（[src/utils/version.ts](src/utils/version.ts)）：补全 `compareVersion(a, b)` / `versionChangeType(current, target)` / `VersionChangeType` 类型导出。`useVersionGroups.ts` 和 `useModUpdate.ts` 引用了这些符号但 version.ts 从未导出，导致 `vite build` 失败。本次为完成构建验证最小补全

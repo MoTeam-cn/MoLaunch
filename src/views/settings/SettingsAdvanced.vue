@@ -76,7 +76,7 @@ watch(logLevel, (v) => markDirty('logLevel', v))
     </div>
 
     <template v-else>
-    <!-- 开发者模式（仅在「其他」页连续点击版本号 5 次解锁后显示） -->
+    <!-- 开发者模式（仅在「鸣谢 → 法律信息」中触发隐藏字段解锁后显示） -->
     <DevModeToggle />
 
     <!-- 代理配置 -->

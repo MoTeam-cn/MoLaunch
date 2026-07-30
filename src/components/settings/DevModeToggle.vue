@@ -5,7 +5,8 @@
  * 自包含组件：自行加载解锁状态与开关状态，开关变更时通过 window 自定义事件
  * `developer-mode-changed` 通知父级（Settings.vue）更新侧边菜单显隐。
  *
- * 解锁触发点在 SystemInfoTab.vue（更多 → 系统信息，连续点击版本号 5 次）。
+ * 解锁触发点在 CreditsTab.vue（更多 → 鸣谢 → 法律信息，连续点击版权声明中
+ * 「MoTeam」字段 7 次）。
  *
  * 数据来源：get_config / apply_config（developerMode 字段），
  * 解锁状态通过 developerUnlocked 只读字段获取。
@@ -43,7 +44,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <!-- 仅在「系统信息」子页签连续点击版本号 5 次解锁后显示 -->
+  <!-- 仅在「鸣谢 → 法律信息」中触发隐藏字段解锁后显示 -->
   <div v-if="devUnlocked" class="bg-white rounded-lg border border-gray-300 overflow-hidden">
     <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">开发者模式</h3>
 

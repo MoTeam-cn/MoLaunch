@@ -1,8 +1,8 @@
 //! 开发者模式相关命令
 //!
 //! 触发流程：
-//! 1. 用户在「更多 → 系统信息」子页签连续点击应用版本号 5 次，或在同页
-//!    「设备 ID」行连续双击 5 次 → 调用 `unlock_developer_mode`
+//! 1. 用户在「更多 → 鸣谢 → 法律信息」展开后，连续点击版权声明中「MoTeam」
+//!    字段 7 次（3 秒内）→ 调用 `unlock_developer_mode`
 //! 2. 解锁后「进阶设置」顶部显示「开发者模式」开关卡片 → 调用 `apply_config({developerMode})`
 //! 3. 开关开启后「设置」侧边菜单出现「开发者」项 → 进入 SettingsDeveloper.vue
 //! 4. 开发者页面可通过「打开开发者工具」按钮调用 `open_devtools` 调出 WebView2 DevTools
@@ -52,7 +52,7 @@ pub const KEY_IGNORE_TLS: &str = "IgnoreTls";
 static DEVTOOLS_OPEN: AtomicBool = AtomicBool::new(false);
 
 
-/// 查询开发者模式是否已解锁（用户连续点击版本号 5 次后解锁）
+/// 查询开发者模式是否已解锁（用户在鸣谢法律信息中触发隐藏字段后解锁）
 ///
 /// 未解锁时返回 false，「高阶配置」页不显示开发者模式开关卡片。
 /// 开关的开启状态由 `get_config` / `apply_config` 统一管理（developerMode 字段）。

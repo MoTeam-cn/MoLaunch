@@ -1,13 +1,18 @@
 <script setup lang="ts">
 /**
  * 鸣谢子页签：特别鸣谢 + 法律信息 + 许可与版权声明
+ *
+ * 开发者模式隐藏触发：法律信息 → 版权声明中「MoTeam」字段连续点击 7 次
+ * （3 秒内完成）。无任何视觉提示，防止普通用户随意触发。已解锁后点击无效。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import Card from '@/components/common/Card.vue'
 import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
 import Button from '@/components/common/Button.vue'
 import { resolveLogo, openLink } from '@/utils/aboutLogos'
 import type { AboutData } from '@/utils/api/about'
+import { unlockDeveloperMode, isDeveloperUnlocked } from '@/utils/api/developer'
+import { toastSuccess } from '@/utils/toast'
 import {
   HeartIcon,
   ArrowTopRightOnSquareIcon,
@@ -40,6 +45,43 @@ function toggleItemExpanded(name: string) {
 function isItemExpanded(name: string): boolean {
   return expandedItems.value.has(name)
 }
+
+// ── 开发者模式隐藏触发：版权声明中「MoTeam」连续点击 7 次 ──
+// 无视觉提示、无 toast 倒计时反馈，仅在解锁成功时提示一次。
+// 已解锁后点击无效，避免重复调用后端。
+const devClickCount = ref(0)
+let devClickTimer: ReturnType<typeof setTimeout> | null = null
+const devUnlocked = ref(false)
+
+function onCopyrightFieldClick() {
+  if (devUnlocked.value) return
+  devClickCount.value++
+  if (devClickCount.value >= 7) {
+    devClickCount.value = 0
+    if (devClickTimer) { clearTimeout(devClickTimer); devClickTimer = null }
+    unlockDeveloperMode()
+      .then(() => {
+        devUnlocked.value = true
+        toastSuccess('已解锁开发者模式，可在「进阶设置」中开启')
+      })
+      .catch(() => { /* 静默失败，不暴露触发点 */ })
+    return
+  }
+  // 3 秒内未完成 7 次点击则重置计数器
+  if (devClickTimer) clearTimeout(devClickTimer)
+  devClickTimer = setTimeout(() => {
+    devClickCount.value = 0
+    devClickTimer = null
+  }, 3000)
+}
+
+onMounted(async () => {
+  try {
+    devUnlocked.value = await isDeveloperUnlocked()
+  } catch {
+    /* 静默 */
+  }
+})
 </script>
 
 <template>
@@ -157,7 +199,7 @@ function isItemExpanded(name: string): boolean {
           版权声明
         </div>
         <p class="mt-1 text-[12px] leading-relaxed text-gray-500">
-          Copyright &copy; 2026 MoTeam. All Rights Reserved.<br>
+          Copyright &copy; 2026 <span @click="onCopyrightFieldClick">MoTeam</span>. All Rights Reserved.<br>
           本软件为开源软件，遵循 MIT 许可协议发布，源代码托管于 GitHub。
         </p>
       </div>

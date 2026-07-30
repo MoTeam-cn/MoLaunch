@@ -22,6 +22,8 @@
 | Vue Virtual Scroller | Copyright (c) 2018 Guillaume Chau | MIT License | https://github.com/Akryum/vue-virtual-scroller | https://github.com/Akryum/vue-virtual-scroller/blob/master/LICENSE |
 | OpenLayers | Copyright (c) 2005-present OpenLayers Contributors. All rights reserved. | BSD-2-Clause | https://openlayers.org | https://github.com/openlayers/openlayers/blob/main/LICENSE.md |
 | Cubiomes | Copyright (c) 2019-2024 Cubitect | MIT License | https://github.com/Cubitect/cubiomes | https://github.com/Cubitect/cubiomes/blob/master/LICENSE |
+| McSDK | Copyright (c) 2026 MoTeam | Apache License 2.0（自有项目，无需强制遵守） | https://github.com/MoTeam-cn/Mc_SDK | https://github.com/MoTeam-cn/Mc_SDK/blob/main/LICENSE |
+| Cubiomes (xpple fork) | Copyright (c) 2019-2024 Cubitect, xpple | MIT License | https://github.com/MoTeam-cn/cubiomes | https://github.com/MoTeam-cn/cubiomes/blob/master/LICENSE |
 | Vite | Copyright (c) 2019-present Evan You & Vite Contributors | MIT License | https://vitejs.dev | https://github.com/vitejs/vite/blob/main/LICENSE |
 | TypeScript | Copyright (c) Microsoft Corporation | Apache License 2.0 | https://www.typescriptlang.org | https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt |
 | Vue Language Tools (vue-tsc) | Copyright (c) 2021-present Johnson Chu | MIT License | https://github.com/vuejs/language-tools | https://github.com/vuejs/language-tools/blob/master/LICENSE |

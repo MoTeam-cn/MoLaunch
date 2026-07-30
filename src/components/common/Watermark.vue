@@ -18,8 +18,8 @@
  * 解锁隐藏（开发者调试用）：
  * - DevToolsTab.vue 提供「隐藏水印」按钮，调用 `useWatermarkUnlock.hide()`
  * - 隐藏前提：DevTools 已打开（后端 AtomicBool 维护状态）
- * - 解锁状态存 sessionStorage，重启后恢复显示
- * - DevTools 关闭时自动恢复水印（轮询检测）
+ * - 状态纯内存（不持久化），刷新页面/重启应用即恢复显示
+ * - 隐藏后启动轮询，DevTools 关闭时自动恢复水印显示
  *
  * 集成位置：App.vue 顶层 Teleport 到 body，全局生效
  */
@@ -31,7 +31,7 @@ import { isPreReleaseBuild } from '@/utils/version'
 const data = useWatermarkData()
 const { unlocked, syncWithDevTools } = useWatermarkUnlock()
 
-// 启动 DevTools 状态同步（解锁状态下轮询，关闭时自动恢复水印）
+// 启动 DevTools 状态同步（unlocked=true 时轮询，DevTools 关闭自动恢复水印）
 syncWithDevTools()
 
 /** 是否显示水印：测试版构建 + 设备 ID 已就绪 + 未解锁隐藏 */
