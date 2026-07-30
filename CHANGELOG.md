@@ -9,6 +9,40 @@
 
 ### 新增
 
+#### DownloadManager 重构阶段 2.5：补 fix_version_files 接入
+
+- **背景**：阶段 2 改造了 `download_version_full`，但 `fix_version_files`（启动时文件补全 + 手动补全命令）仍用旧签名（4 个独立参数），且 `validate.rs` 中硬编码 `8/4/0/Smart`，用户设置的限速/分片/线程数对启动时文件补全不生效。阶段 2.5 将 fix_version_files 接入统一构造方式
+- **`src-tauri/src/minecraft/launch/pipeline/types.rs`**（`LaunchConfig`）：新增 `max_threads`/`chunk_count`/`speed_limit` 三个字段（`#[serde(default)]`，默认值 8/4/0 与历史硬编码一致），用于启动时文件补全构造 DownloadManager
+- **`src-tauri/src/commands/version/launch/build_config.rs`**（`build_launch_config`）：从 `config.download` 填充三个新字段
+- **`src-tauri/src/minecraft/download/fix.rs`**（`fix_version_files`）：签名收敛 —— 删除 `max_threads`/`chunk_count`/`speed_limit`/`source_mode` 4 个参数，改为接收 `&DownloadManager`（与 `download_client_jar`/`download_libraries`/`download_assets` 签名一致），调用方负责构造 manager
+- **`src-tauri/src/commands/version/manage.rs`**（`fix_version_files` 命令）：用 `DownloadManager::from_state(state).await` 构造 manager，替代手工提取 4 个字段
+- **`src-tauri/src/minecraft/launch/pipeline/validate.rs`**（`validate_and_fix_files`）：用 `DownloadManager::from_config` + LaunchConfig 中的下载参数构造 manager，替代之前硬编码 `8/4/0/Smart`，用户设置的限速/分片/线程数现在对启动时文件补全也生效；同时使用 `mirror_url`（之前硬编码 None）
+- **不变**：`utils/version_list_manager.rs` 调用的是 command 层 `manage::fix_version_files`（签名未变），无需修改
+
+#### DownloadManager 重构阶段 2：MC 本体流程接入
+
+- **背景**：阶段 1 完成基础设施（`DownloadManagerConfig` + `from_state` 工厂），阶段 2 改造 MC 本体下载流程，解决三个核心问题：
+  1. `download_version_full` 签名臃肿（11 个参数，其中 6 个用于构造 DownloadManager），调用方重复提取 config
+  2. `download_version` 命令独立调用时只 `clear` stages 不重建，`progress_callback` 中 `ds.stages[idx]` 越界（设计文档问题 #10）
+  3. `download_version` 命令用手工 `accumulated_bytes`/`accumulated_total`/`speed_window` 累加进度，与 `install_merged` 的 `sync_stage_from_progress` 算法不一致（设计文档问题 #4）
+- **`src-tauri/src/minecraft/download/full_download.rs`**：`download_version_full` 签名收敛 —— 删除 `max_threads`/`chunk_count`/`speed_limit`/`source_mode`/`cancel_flag`/`pause_flag` 6 个参数，新增 `state: &AppState`；内部用 `DownloadManager::from_state(state).await.with_cancel_flag(...).with_pause_flag(...)` 一行构造，参数统一从 config 读取
+- **`src-tauri/src/commands/version/download.rs`**（`download_version` 命令）：
+  - 修复 stages bug：用 `reset_stages` 注册 5 个 MC 本体 stages（版本清单/版本信息/客户端/库文件/资源文件），替代之前只 `clear` 不重建
+  - 统一进度同步：删除 `accumulated_bytes`/`accumulated_total`/`speed_window` 三个手工累加变量，改用 `sync_stage_from_progress`（与 `install_merged` 行为一致）
+  - 统一阶段切换：`stage_callback` 改用 `set_current_stage`（自动标记前一阶段 Finished）
+  - 完成标记：用 `mark_complete()` 替代手工 `is_active=false` + 循环标记 stages
+- **`src-tauri/src/commands/version/install/mod.rs`**（`install_merged`）：适配 `download_version_full` 新签名，删除 6 个传参，改为传 `state`；保留 `max_threads` 提取（`install_all_loaders` 仍需要）
+- **不变**：`fix_version_files` 及 launch pipeline 调用点暂不改动（涉及 `LaunchPipeline` 无 `AppState` 引用，留到后续阶段）；`download_client_jar`/`download_libraries`/`download_assets` 签名不变
+
+#### DownloadManager 重构阶段 1：基础设施
+
+- **背景**：DownloadManager 实例化在 13 处调用点参数不一致（仅 MC 本体流程读 config，其余硬编码 4/0/Smart），且 3 处重复 `state.config.lock() → extract → drop` 套件。阶段 1 新增统一工厂方法，为后续阶段收敛调用点做准备
+- **`src-tauri/src/minecraft/download/config.rs`**（新增）：`DownloadManagerConfig` struct + `from_state()` —— 从 AppConfig 提取 max_threads / chunk_count / speed_limit / source_mode 四字段，统一收敛重复的 lock/extract 逻辑
+- **`src-tauri/src/minecraft/download/manager.rs`**：`DownloadManager` 新增 `from_config(&DownloadManagerConfig)` + `from_state(&AppState)` 工厂方法；`reorder_urls` 改用 `sources::is_mirror_url()` 替代硬编码 `contains("bmclapi"/"mirror")`，修复 mocdn URL 被误分类为官方源的 bug
+- **`src-tauri/src/minecraft/sources.rs`**：新增 `is_mirror_url(url)` 公共函数，识别 BMCLAPI / mocdn.net / mcimirror.top 三类镜像域名
+- **`src-tauri/src/minecraft/download/mod.rs`**：注册 `config` 子模块
+- **不变**：现有 13 处 `DownloadManager::new` 调用点暂不改动（阶段 2+ 逐步迁移），对外 API 完全稳定
+
 #### 移除 mod.mcimirror.top CDN 文件下载镜像
 
 - **背景**：`mod.mcimirror.top` 作为 CurseForge/Modrinth CDN 文件下载的兜底镜像，实际请求会 302 重定向到官方 CDN，无加速效果且增加额外跳转延迟，已无存在意义

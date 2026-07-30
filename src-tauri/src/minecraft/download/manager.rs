@@ -7,9 +7,11 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 use super::super::sources::DownloadSourceMode;
+use super::config::DownloadManagerConfig;
 use super::downloader;
 use super::rate_limiter::RateLimiter;
 use super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
+use crate::state::AppState;
 
 /// 下载管理器
 pub struct DownloadManager {
@@ -44,6 +46,21 @@ impl DownloadManager {
             cancel_flag: None,
             pause_flag: None,
         }
+    }
+
+    /// 从 DownloadManagerConfig 构造（统一参数来源，避免硬编码）
+    pub fn from_config(config: &DownloadManagerConfig) -> Self {
+        Self::new(
+            config.max_threads,
+            config.chunk_count,
+            config.speed_limit,
+            config.source_mode,
+        )
+    }
+
+    /// 从 AppState 提取下载配置并构造（统一收敛 3 处重复的 lock/extract/drop）
+    pub async fn from_state(state: &AppState) -> Self {
+        Self::from_config(&DownloadManagerConfig::from_state(state).await)
     }
 
     /// 设置取消信号（用于支持前端取消下载）
@@ -89,7 +106,7 @@ impl DownloadManager {
         let mut mirror_urls = Vec::new();
 
         for url in urls {
-            if url.contains("bmclapi") || url.contains("mirror") {
+            if super::super::sources::is_mirror_url(url) {
                 mirror_urls.push(url.clone());
             } else {
                 official_urls.push(url.clone());

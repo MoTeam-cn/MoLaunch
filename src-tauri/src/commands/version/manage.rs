@@ -20,14 +20,13 @@ pub async fn fix_version_files(
     log_info!("Fixing version files for: {}", version_id);
 
     let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
-    let config = state.config.lock().await;
-    let mirror_url = config.download.mirror_url.clone();
-    let max_threads = config.download.max_threads as usize;
-    let chunk_count = config.download.chunk_count as usize;
-    let speed_limit = config.download.max_speed;
-    let source_mode =
-        crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.source);
-    drop(config);
+    let mirror_url = {
+        let config = state.config.lock().await;
+        config.download.mirror_url.clone()
+    };
+
+    // 统一用 DownloadManager::from_state 构造（替代手工提取 4 个字段）
+    let manager = crate::minecraft::download::manager::DownloadManager::from_state(state).await;
 
     // 通知前端开始
     let _ = app_handle.emit(
@@ -43,10 +42,7 @@ pub async fn fix_version_files(
         &version_id,
         &game_dir,
         mirror_url.as_deref(),
-        max_threads,
-        chunk_count,
-        speed_limit,
-        source_mode,
+        &manager,
     )
     .await;
 

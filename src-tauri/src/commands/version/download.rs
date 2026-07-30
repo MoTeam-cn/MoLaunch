@@ -1,9 +1,7 @@
 use crate::minecraft::download::{self, types as download_types};
-use crate::state::{AppState, DownloadState, StageStatus};
+use crate::state::{AppState, DownloadState, DownloadStage, StageStatus};
 use crate::{log_error, log_info};
-use std::collections::VecDeque;
 use std::sync::Arc;
-use std::time::Instant;
 use tauri::{AppHandle, Emitter};
 
 use super::sanitize_version_id;
@@ -21,91 +19,62 @@ pub async fn download_version(
     sanitize_version_id(&version_id)?;
     log_info!("Downloading version: {}", version_id);
 
-    // 清空上一次下载的 stages（避免累积）
-    // 修复：之前只重置已有 stages 的状态，不清空数组，多次下载后 stages 越来越长
+    // 重置 cancel/pause flag（确保每次下载都是干净状态）
+    state
+        .download_cancel_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+    state
+        .download_pause_flag
+        .store(false, std::sync::atomic::Ordering::Relaxed);
+
+    // 修复 stages bug：之前只 clear 不重建，progress_callback 中 ds.stages[idx] 越界
+    // 统一用 reset_stages 注册 5 个 MC 本体 stages（与 download_version_full 的 stage_callback 索引对应）
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.stages.clear();
-        ds.is_active = true;
-        ds.is_complete = false;
-        ds.current_stage_index = 0;
-        ds.global_speed = 0;
-        ds.global_bytes_downloaded = 0;
-        ds.global_bytes_total = 0;
-        ds.error_code = 0;
+        ds.reset_stages(vec![
+            DownloadStage::new_grouped("版本清单", 5.0, "MC本体安装"),
+            DownloadStage::new_grouped("版本信息", 5.0, "MC本体安装"),
+            DownloadStage::new_grouped("客户端", 30.0, "MC本体安装"),
+            DownloadStage::new_grouped("库文件", 30.0, "MC本体安装"),
+            DownloadStage::new_grouped("资源文件", 30.0, "MC本体安装"),
+        ]);
         ds.version_name = version_id.clone();
     }
 
     let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
-    let config = state.config.lock().await;
-    let mirror_url = config.download.mirror_url.clone();
-    let max_threads = config.download.max_threads as usize;
-    let chunk_count = config.download.chunk_count as usize;
-    let speed_limit = config.download.max_speed;
-    let source_mode =
-        crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.source);
-    drop(config);
+    // 注意：source_mode 用 config.download.source（文件下载源），保持原行为
+    // fetch_version_list / fetch_with_retry 用这个 source_mode 决定元数据获取方式
+    let (mirror_url, source_mode) = {
+        let config = state.config.lock().await;
+        let mirror_url = config.download.mirror_url.clone();
+        let source_mode =
+            crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.source);
+        (mirror_url, source_mode)
+    };
 
     let game_path = game_dir.as_path();
     let app_clone = app.clone();
     let version_id_clone = version_id.clone();
     let state_clone = state.download_state.clone();
 
-    // 滑动窗口速度计算
-    let speed_window = Arc::new(std::sync::Mutex::new(VecDeque::<(u64, Instant)>::new()));
-
-    // 跨阶段累计字节跟踪
-    let accumulated_bytes = Arc::new(std::sync::Mutex::new(0u64));
-    let accumulated_total = Arc::new(std::sync::Mutex::new(0u64));
-
-    // Create progress callback
+    // 统一进度回调：sync_stage_from_progress 替代手工累加
+    // 删除 accumulated_bytes/accumulated_total/speed_window：DownloadManager 内部 timer 已计算 current_speed
     let state_for_progress = state_clone.clone();
-    let sw = speed_window.clone();
-    let acc_bytes_for_progress = accumulated_bytes.clone();
-    let acc_total_for_progress = accumulated_total.clone();
     let progress_tx_for_cb = state.progress_tx.clone();
     let pause_flag_for_cb = state.download_pause_flag.clone();
     let progress_callback = Arc::new(move |progress: download_types::GlobalProgress| {
         {
-            let base_bytes = *acc_bytes_for_progress.lock().unwrap();
-            let base_total = *acc_total_for_progress.lock().unwrap();
             let mut ds = state_for_progress.lock().unwrap();
             ds.is_active = progress.is_active;
-            ds.global_bytes_downloaded = base_bytes + progress.downloaded_bytes;
-            ds.global_bytes_total = base_total + progress.total_bytes;
-
-            // 更新当前阶段的进度
             let idx = ds.current_stage_index;
-            if idx < ds.stages.len() {
-                let stage = &mut ds.stages[idx];
-                stage.bytes_downloaded = progress.downloaded_bytes;
-                stage.bytes_total = progress.total_bytes;
-                stage.files_downloaded = progress.completed_files;
-                stage.files_total = progress.total_files;
-                if progress.total_bytes > 0 {
-                    stage.progress =
-                        (progress.downloaded_bytes as f64 / progress.total_bytes as f64).min(1.0);
-                }
-                stage.status = StageStatus::Loading;
-            }
-
-            // 滑动窗口速度计算
-            {
-                let mut window = sw.lock().unwrap();
-                window.push_back((ds.global_bytes_downloaded, Instant::now()));
-                if window.len() > 10 {
-                    window.pop_front();
-                }
-                if window.len() >= 2 {
-                    let (first_bytes, first_time) = window.front().unwrap();
-                    let (last_bytes, last_time) = window.back().unwrap();
-                    let bytes_diff = last_bytes.saturating_sub(*first_bytes);
-                    let time_diff = last_time.duration_since(*first_time).as_secs_f64();
-                    if time_diff > 0.0 {
-                        ds.global_speed = (bytes_diff as f64 / time_diff) as u64;
-                    }
-                }
-            }
+            ds.sync_stage_from_progress(
+                idx,
+                progress.downloaded_bytes,
+                progress.total_bytes,
+                progress.completed_files,
+                progress.total_files,
+                progress.current_speed,
+            );
         }
         let ds = state_for_progress.lock().unwrap();
         let is_paused = pause_flag_for_cb.load(std::sync::atomic::Ordering::Relaxed);
@@ -116,31 +85,15 @@ pub async fn download_version(
         let _ = progress_tx_for_cb.send(snapshot);
     });
 
-    // Stage callback
+    // Stage callback：统一用 set_current_stage 切换阶段（与 install_merged 行为一致）
     let state_for_stage = state_clone.clone();
     let app_for_stage = app.clone();
     let vid_for_stage = version_id.clone();
-    let acc_bytes_for_stage = accumulated_bytes.clone();
-    let acc_total_for_stage = accumulated_total.clone();
     let progress_tx_for_stage = state.progress_tx.clone();
     let pause_flag_for_stage = state.download_pause_flag.clone();
     let stage_callback = Arc::new(move |stage_index: usize, _stage_name: &str| {
         let mut ds = state_for_stage.lock().unwrap();
-        // 标记上一个阶段完成，并累加字节
-        if ds.current_stage_index < ds.stages.len() && stage_index > 0 {
-            let prev = ds.current_stage_index;
-            if prev < ds.stages.len() {
-                ds.stages[prev].status = StageStatus::Finished;
-                ds.stages[prev].progress = 1.0;
-                *acc_bytes_for_stage.lock().unwrap() += ds.stages[prev].bytes_downloaded;
-                *acc_total_for_stage.lock().unwrap() += ds.stages[prev].bytes_total;
-            }
-        }
-        ds.current_stage_index = stage_index;
-        if stage_index < ds.stages.len() {
-            ds.stages[stage_index].status = StageStatus::Loading;
-            ds.stages[stage_index].progress = 0.0;
-        }
+        ds.set_current_stage(stage_index);
         let is_paused = pause_flag_for_stage.load(std::sync::atomic::Ordering::Relaxed);
         let snapshot = build_snapshot(&ds, &vid_for_stage, is_paused);
         drop(ds);
@@ -150,17 +103,13 @@ pub async fn download_version(
 
     // Full download flow
     let result = download::download_version_full(
+        state,
         &version_id,
         game_path,
         mirror_url.as_deref(),
-        max_threads,
-        chunk_count,
-        speed_limit,
         source_mode,
         Some(progress_callback),
         Some(stage_callback),
-        Some(state.download_cancel_flag.clone()),
-        Some(state.download_pause_flag.clone()),
     )
     .await
     .map_err(|e| {
@@ -182,13 +131,7 @@ pub async fn download_version(
 
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.is_active = false;
-        ds.is_complete = true;
-        // 标记所有阶段完成
-        for stage in ds.stages.iter_mut() {
-            stage.status = StageStatus::Finished;
-            stage.progress = 1.0;
-        }
+        ds.mark_complete();
     }
 
     // 广播最终完成状态（WS 推送 is_complete=true，前端据此触发 finishDownload）

@@ -7,6 +7,16 @@ use std::path::PathBuf;
 
 use super::super::AuthInfo;
 
+/// LaunchConfig.max_threads 默认值（与历史硬编码值一致，保持向后兼容）
+fn default_max_threads() -> u32 {
+    8
+}
+
+/// LaunchConfig.chunk_count 默认值（与历史硬编码值一致，保持向后兼容）
+fn default_chunk_count() -> u32 {
+    4
+}
+
 /// 启动阶段枚举
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum LaunchStage {
@@ -116,6 +126,15 @@ pub struct LaunchConfig {
     pub download_source: String,
     /// 自定义镜像源 URL（None 或空则用 BMCLAPI）
     pub mirror_url: Option<String>,
+    /// 文件下载并发线程数（用于启动时文件补全 fix_version_files）
+    #[serde(default = "default_max_threads")]
+    pub max_threads: u32,
+    /// 单文件分片数（用于启动时文件补全，0/1 = 单流）
+    #[serde(default = "default_chunk_count")]
+    pub chunk_count: u32,
+    /// 全局限速 bytes/sec（0 = 不限速，用于启动时文件补全）
+    #[serde(default)]
+    pub speed_limit: u64,
     /// 额外JVM参数
     pub extra_jvm_args: Vec<String>,
     /// 额外游戏参数

@@ -2,21 +2,20 @@
 
 use std::path::Path;
 
-use super::super::sources::DownloadSourceMode;
 use super::super::version::json_merge;
 use super::manager::DownloadManager;
 use super::stages::{download_assets, download_client_jar, download_libraries};
 use crate::log_info;
 
 /// 补全版本文件
+///
+/// 改造：签名收敛为接收 `&DownloadManager`（与 `download_client_jar`/`download_libraries`/`download_assets` 一致），
+/// 调用方负责构造 manager（manage.rs 用 `from_state`，validate.rs 用 `from_config`）。
 pub async fn fix_version_files(
     version_id: &str,
     game_dir: &Path,
     mirror_url: Option<&str>,
-    max_threads: usize,
-    chunk_count: usize,
-    speed_limit: u64,
-    source_mode: DownloadSourceMode,
+    manager: &DownloadManager,
 ) -> anyhow::Result<()> {
     let json_path = game_dir
         .join("versions")
@@ -33,9 +32,6 @@ pub async fn fix_version_files(
     // merge_version_json 会处理父版本不存在的情况（容错机制）
     let merged_json = json_merge::merge_version_json(&json, game_dir)?;
 
-    // 复用单个 DownloadManager 实例（与 download_version_full 一致）
-    let manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
-
     // 1. 下载主 jar（client.jar）
     // 修复：传原始 json 给 download_client_jar（含 inheritsFrom，用于判断 jar 路径）
     // 之前只传 merged_json，但 merge_version_json 会移除 inheritsFrom，
@@ -46,7 +42,7 @@ pub async fn fix_version_files(
         game_dir,
         version_id,
         mirror_url,
-        &manager,
+        manager,
         None,
     )
     .await
@@ -65,7 +61,7 @@ pub async fn fix_version_files(
         &merged_json,
         game_dir,
         mirror_url,
-        &manager,
+        manager,
         None,
         true, // quick_check
     )
@@ -76,7 +72,7 @@ pub async fn fix_version_files(
         &merged_json,
         game_dir,
         mirror_url,
-        &manager,
+        manager,
         None,
         true, // quick_check
     )

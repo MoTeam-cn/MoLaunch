@@ -241,6 +241,10 @@ pub(super) async fn build_launch_config(
         java_version_max: resolved_java_version_max,
         download_source: config.download.source.clone(),
         mirror_url: config.download.mirror_url.clone(),
+        // 启动时文件补全用：从全局 config 读取下载参数（替代之前 validate.rs 硬编码 8/4/0）
+        max_threads: config.download.max_threads,
+        chunk_count: config.download.chunk_count,
+        speed_limit: config.download.max_speed,
         extra_jvm_args,
         extra_game_args,
         pre_launch_cmd,

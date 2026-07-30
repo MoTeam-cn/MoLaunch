@@ -54,20 +54,25 @@ impl LaunchPipeline {
         self.update_progress(LaunchStage::ValidateFiles, 0.4, "正在检查并补全文件...")
             .await;
 
-        // 使用配置中的参数
-        let game_dir = self.config.game_dir.clone();
-        let version_id = self.config.version_id.clone();
-        let source_mode = crate::minecraft::sources::DownloadSourceMode::Smart;
+        // 用 LaunchConfig 中的下载参数构造 DownloadManager（build_launch_config 已从全局 config 填充）
+        // 替代之前硬编码的 8/4/0/Smart，用户设置的限速/分片/线程数现在对启动时文件补全也生效
+        let download_config = crate::minecraft::download::config::DownloadManagerConfig {
+            max_threads: self.config.max_threads as usize,
+            chunk_count: self.config.chunk_count as usize,
+            speed_limit: self.config.speed_limit,
+            source_mode: crate::minecraft::sources::DownloadSourceMode::from_str(
+                &self.config.download_source,
+            ),
+        };
+        let manager = crate::minecraft::download::manager::DownloadManager::from_config(
+            &download_config,
+        );
 
-        // 直接调用异步函数，使用默认参数
         crate::minecraft::download::fix_version_files(
-            &version_id,
-            &game_dir,
-            None, // mirror_url
-            8,    // max_threads
-            4,    // chunk_count
-            0,    // speed_limit
-            source_mode,
+            &self.config.version_id,
+            &self.config.game_dir,
+            self.config.mirror_url.as_deref(),
+            &manager,
         )
         .await
         .map_err(|e| LaunchError {

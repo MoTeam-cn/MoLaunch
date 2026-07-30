@@ -127,12 +127,10 @@ pub async fn install_merged(
 
     // 读取下载相关配置
     let (mirror_url, loader_source_mode) = crate::state::resolve_mirror_and_source(&state).await;
-    let (max_threads, chunk_count, speed_limit, download_source_mode) = {
+    let (max_threads, download_source_mode) = {
         let config = state.config.lock().await;
         (
             config.download.max_threads as usize,
-            config.download.chunk_count as usize,
-            config.download.max_speed,
             DownloadSourceMode::from_str(&config.download.source),
         )
     };
@@ -184,17 +182,13 @@ pub async fn install_merged(
     // Step 1: 下载原版 MC
     log_info!("[Merged] Downloading base MC version: {}", mc_version);
     let result = download::download_version_full(
+        state,
         &mc_version,
         game_dir.as_path(),
         mirror_url.as_deref(),
-        max_threads,
-        chunk_count,
-        speed_limit,
         download_source_mode,
         Some(progress_callback),
         Some(stage_callback),
-        Some(state.download_cancel_flag.clone()),
-        Some(state.download_pause_flag.clone()),
     )
     .await
     .map_err(|e| {

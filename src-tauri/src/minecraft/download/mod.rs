@@ -1,6 +1,7 @@
 //! 下载管理模块 - 完整版本下载流程
 //!
 //! 模块拆分：
+//! - `config`: DownloadManager 构造配置（从 AppConfig 提取）
 //! - `version_list`: 版本清单获取与解析
 //! - `full_download`: 完整版本下载主流程
 //! - `stages`: 客户端 JAR / 库文件 / 资源文件等下载阶段
@@ -10,6 +11,7 @@
 
 pub mod assets;
 pub mod chunk;
+pub mod config;
 pub mod downloader;
 pub mod fix;
 pub mod full_download;

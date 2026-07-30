@@ -14,6 +14,7 @@ use super::stages::{download_assets, download_client_jar, download_libraries};
 use super::types::GlobalProgress;
 use super::util::fetch_with_retry;
 use super::version_list::{fetch_version_list, get_version_json_url};
+use crate::state::AppState;
 
 /// 版本下载结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -28,32 +29,30 @@ pub struct VersionDownloadResult {
 }
 
 /// 完整版本下载
-#[allow(clippy::too_many_arguments, clippy::type_complexity)]
+///
+/// 改造：参数收敛为 `state`，内部用 `DownloadManager::from_state` 统一构造，
+/// 取消/暂停 flag 自动接入 `state.download_cancel_flag` / `download_pause_flag`，
+/// 调用方只需关心 `progress_callback` / `stage_callback`。
 pub async fn download_version_full(
+    state: &AppState,
     version_id: &str,
     game_dir: &Path,
     mirror_url: Option<&str>,
-    max_threads: usize,
-    chunk_count: usize,
-    speed_limit: u64,
     source_mode: DownloadSourceMode,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
     stage_callback: Option<Arc<dyn Fn(usize, &str) + Send + Sync>>,
-    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
-    pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
 ) -> anyhow::Result<VersionDownloadResult> {
     let version_dir = game_dir.join("versions").join(version_id);
     std::fs::create_dir_all(&version_dir)?;
 
     // 复用单个 DownloadManager 实例（避免每个阶段 new 一个独立 manager + 独立 timer）
     // client_jar / asset_index 只传 1 个 task（自然单线程），libraries / assets 传多 task
-    let mut manager = DownloadManager::new(max_threads, chunk_count, speed_limit, source_mode);
-    if let Some(flag) = cancel_flag {
-        manager = manager.with_cancel_flag(flag);
-    }
-    if let Some(flag) = pause_flag {
-        manager = manager.with_pause_flag(flag);
-    }
+    // 参数统一从 state 读取（max_threads/chunk_count/speed_limit/source_mode），
+    // flag 自动接入 state 的全局 cancel/pause flag
+    let manager = DownloadManager::from_state(state)
+        .await
+        .with_cancel_flag(state.download_cancel_flag.clone())
+        .with_pause_flag(state.download_pause_flag.clone());
 
     // Step 1: 版本清单
     if let Some(ref cb) = stage_callback {
