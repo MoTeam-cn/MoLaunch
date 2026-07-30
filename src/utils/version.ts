@@ -113,3 +113,41 @@ export function getBuildFingerprint(): string {
   if (!info.isPreRelease) return ''
   return `${info.raw}`
 }
+
+/**
+ * 比较两个版本号字符串的大小
+ *
+ * 用于版本列表排序（如 useVersionGroups.ts 中按版本号降序排列）。
+ * 支持形如 `1.20.1` / `1.20.1-forge` / `0.1.0-beta.1` 的版本号，
+ * 按数字段逐段比较，非数字段视为 0。
+ *
+ * @returns 负数表示 a < b，0 表示相等，正数表示 a > b
+ */
+export function compareVersion(a: string, b: string): number {
+  const pa = (a || '').split(/[.-]/).map(s => parseInt(s, 10)).filter(n => !isNaN(n))
+  const pb = (b || '').split(/[.-]/).map(s => parseInt(s, 10)).filter(n => !isNaN(n))
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const na = pa[i] ?? 0
+    const nb = pb[i] ?? 0
+    if (na !== nb) return na - nb
+  }
+  return 0
+}
+
+/** Mod 版本变化类型（升级 / 降级 / 同版本 / 未知） */
+export type VersionChangeType = 'upgrade' | 'downgrade' | 'same' | 'unknown'
+
+/**
+ * 判断从 `current` 升级/降级到 `target` 的变化类型
+ *
+ * 用于 Mod 更新对话框展示「升级 / 降级 / 同版本」徽标。
+ * 任一版本号为空时返回 'unknown'。
+ */
+export function versionChangeType(current: string, target: string): VersionChangeType {
+  if (!current || !target) return 'unknown'
+  const cmp = compareVersion(current, target)
+  if (cmp < 0) return 'upgrade'
+  if (cmp > 0) return 'downgrade'
+  return 'same'
+}
