@@ -134,15 +134,27 @@ async fn install_modern(
         cb(50.0);
     }
 
-    super::super::forge_installer::run_forge_installer(
-        &java_path,
-        &installer_path.to_string_lossy(),
-        &injector_path,
-        &wrapper_path,
-        &game_dir.to_string_lossy(),
-        false,
-        None,
-    )?;
+    // 用 spawn_blocking 包裹同步阻塞的 run_forge_installer，避免阻塞 tokio worker 线程
+    // 否则 ticker 的 tokio::spawn 任务无法被调度，伪进度会卡住不动
+    let java_path_owned = java_path.to_string();
+    let installer_path_str = installer_path.to_string_lossy().to_string();
+    let injector_path_owned = injector_path.to_string();
+    let wrapper_path_owned = wrapper_path.to_string();
+    let game_dir_str = game_dir.to_string_lossy().to_string();
+
+    tokio::task::spawn_blocking(move || {
+        super::super::forge_installer::run_forge_installer(
+            &java_path_owned,
+            &installer_path_str,
+            &injector_path_owned,
+            &wrapper_path_owned,
+            &game_dir_str,
+            false,
+            None,
+        )
+    })
+    .await
+    .map_err(|e| anyhow::anyhow!("Forge installer task panicked: {}", e))??;
 
     if let Some(ref cb) = progress_callback {
         cb(80.0);

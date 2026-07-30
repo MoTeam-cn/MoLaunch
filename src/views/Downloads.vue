@@ -7,15 +7,15 @@
  * - 无任务时：空状态（DownloadEmptyState 子组件）
  */
 
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { showConfirm } from '@/utils/modal'
 import { pauseDownload, resumeDownload, cancelDownload, getDownloadProgress, isDownloading } from '@/utils/tauri'
-import type { RawDownloadProgress } from '@/types/download'
 import DownloadStatsPanel from './downloads/DownloadStatsPanel.vue'
 import TaskGroupCard from '@/components/downloads/TaskGroupCard.vue'
 import { safeCall } from '@/utils/async'
+import { applyProgressPatch } from '@/utils/downloadProgress'
 
 const versionStore = useVersionStore()
 const router = useRouter()
@@ -94,7 +94,40 @@ watch(hasActiveDownload, (active, wasActive) => {
 const progress = computed(() => versionStore.downloadProgress)
 const isPaused = computed(() => progress.value?.isPaused ?? false)
 
-const percentage = computed(() => progress.value?.percentage || 0)
+// 定时刷新 now，驱动 percentage 伪进度补丁重算
+// 后端 ticker 到 95% 后卡住，前端基于 now 继续小数点上涨到 99.9%
+const now = ref(Date.now())
+const percentageStartTime = ref<number | null>(null)
+let nowTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  nowTimer = setInterval(() => { now.value = Date.now() }, 200)
+})
+onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer)
+})
+
+const realPercentage = computed(() => progress.value?.percentage || 0)
+
+// 监听真实进度，在进入 95% 区间时记录起始时间（副作用放 watch，不放 computed）
+watch(realPercentage, (val) => {
+  const ratio = val / 100
+  if (ratio >= 0.95 && ratio < 1) {
+    if (percentageStartTime.value === null) {
+      percentageStartTime.value = Date.now()
+    }
+  } else {
+    percentageStartTime.value = null
+  }
+})
+
+const percentage = computed(() => {
+  const real = realPercentage.value
+  const ratio = real / 100
+  if (ratio < 0.95 || ratio >= 1) return real
+  if (percentageStartTime.value === null) return real
+  const patched = applyProgressPatch(ratio, percentageStartTime.value, now.value)
+  return parseFloat((patched * 100).toFixed(1))
+})
 const speed = computed(() => progress.value?.global_speed || 0)
 const bytesDownloaded = computed(() => progress.value?.global_bytes_downloaded || 0)
 const bytesTotal = computed(() => progress.value?.global_bytes_total || 0)

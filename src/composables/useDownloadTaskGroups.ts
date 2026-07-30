@@ -4,10 +4,11 @@
  * 将下载阶段按 `group` 字段聚合：有 group 的聚合成一个任务分组卡片，
  * 无 group 的独立成卡片。计算每个分组的聚合状态、加权进度和字节累加。
  *
- * 抽取自 Downloads.vue，任务分组显示。
+ * 支持伪进度补丁：当分组进度 >= 95% 且未完成时，基于时间继续小数点上涨到 99.9%。
  */
 import { computed, ref } from 'vue'
 import type { DownloadStage, StageStatus } from '@/types/download'
+import { applyProgressPatch } from '@/utils/downloadProgress'
 
 /** 下载任务分组（聚合同一 group 的多个 stage） */
 export interface TaskGroup {
@@ -19,7 +20,7 @@ export interface TaskGroup {
   stages: DownloadStage[]
   /** 聚合状态：组内任一 failed → failed；全部 finished → finished；任一 loading → loading；否则 waiting */
   status: StageStatus
-  /** 分组加权进度（0-1，按 stage.weight 加权平均） */
+  /** 分组加权进度（0-1，按 stage.weight 加权平均，含伪进度补丁） */
   progress: number
   /** 分组已下载字节（Finished + Loading 阶段累加） */
   bytesDownloaded: number
@@ -33,10 +34,18 @@ export interface TaskGroup {
  * 按分组聚合下载阶段
  *
  * @param stages getter 函数，返回当前所有下载阶段（通常来自 downloadProgress.stages）
+ * @param now 可选，当前时间戳 getter（用于伪进度补丁的时间计算），默认返回 Date.now()
  * @returns taskGroups 计算属性 + 折叠/展开控制函数
  */
-export function useDownloadTaskGroups(stages: () => DownloadStage[]) {
+export function useDownloadTaskGroups(
+  stages: () => DownloadStage[],
+  now: () => number = () => Date.now(),
+) {
+  // patch 状态：每个 group key 对应进入 95% 区间的起始时间戳
+  const patchStartTimes = ref<Map<string, number>>(new Map())
+
   const taskGroups = computed<TaskGroup[]>(() => {
+    const nowMs = now()
     const groups: TaskGroup[] = []
     const groupMap = new Map<string, TaskGroup>()
 
@@ -85,6 +94,20 @@ export function useDownloadTaskGroups(stages: () => DownloadStage[]) {
         if (s.status === 'finished' || s.status === 'loading') {
           g.bytesDownloaded += s.bytes_downloaded
           g.bytesTotal += s.bytes_total
+        }
+      }
+
+      // 伪进度补丁：loading 且 progress >= 0.95 时，基于时间继续小数点上涨
+      if (g.status === 'loading' && g.progress >= 0.95 && g.progress < 1) {
+        if (!patchStartTimes.value.has(g.key)) {
+          patchStartTimes.value.set(g.key, nowMs)
+        }
+        g.progress = applyProgressPatch(g.progress, patchStartTimes.value.get(g.key)!, nowMs)
+      } else {
+        // 离开补丁区间（已完成或回退到 95% 以下），清除起始时间
+        patchStartTimes.value.delete(g.key)
+        if (g.status === 'finished') {
+          g.progress = 1
         }
       }
     }

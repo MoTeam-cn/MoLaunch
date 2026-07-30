@@ -20,6 +20,7 @@ import {
   PlayCircleIcon,
   XCircleIcon,
 } from '@heroicons/vue/24/outline'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useDownloadTaskGroups } from '@/composables/useDownloadTaskGroups'
 import type { DownloadStage } from '@/types/download'
 
@@ -45,7 +46,21 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => props.stages)
+// 定时刷新 now，驱动 useDownloadTaskGroups 的伪进度补丁重算
+// 后端 ticker 到 95% 后卡住，前端基于 now 继续小数点上涨到 99.9%
+const now = ref(Date.now())
+let nowTimer: ReturnType<typeof setInterval> | null = null
+onMounted(() => {
+  nowTimer = setInterval(() => { now.value = Date.now() }, 200)
+})
+onUnmounted(() => {
+  if (nowTimer) clearInterval(nowTimer)
+})
+
+const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(
+  () => props.stages,
+  () => now.value,
+)
 </script>
 
 <template>
@@ -150,7 +165,7 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
             v-if="g.status === 'loading'"
             class="text-xs text-primary-600 font-medium"
           >
-            {{ Math.round(g.progress * 100) }}%
+            {{ (g.progress * 100).toFixed(1) }}%
           </span>
           <span v-else-if="g.status === 'finished'" class="text-xs text-green-600 font-medium">100%</span>
           <!-- 展开箭头（只有非独立分组才有） -->
@@ -196,7 +211,7 @@ const { taskGroups, toggleGroup, isExpanded } = useDownloadTaskGroups(() => prop
               {{ s.files_downloaded }} / {{ s.files_total }} 文件
             </span>
             <span v-if="s.status === 'loading'" class="text-xs text-primary-600 font-medium">
-              {{ Math.round(s.progress * 100) }}%
+              {{ (s.progress * 100).toFixed(1) }}%
             </span>
             <span v-else-if="s.status === 'finished'" class="text-xs text-green-600">100%</span>
           </div>

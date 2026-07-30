@@ -7,6 +7,22 @@
 
 ## [未发布]
 
+### 修复
+
+#### Forge 安装伪进度卡住 + 前端伪进度补丁
+
+- **问题1**：安装 Forge 时伪进度卡在 47% 不动。根因：`forge/install.rs` 在 `async fn install_modern` 中直接同步调用 `run_forge_installer`（`pub fn`，内部用 `std::process::Command` 阻塞），阻塞 tokio worker 线程，导致 `ticker` 的 `tokio::spawn` 任务无法被调度
+  - **修复**：`src-tauri/src/minecraft/loaders/forge/install.rs` 用 `tokio::task::spawn_blocking` 包裹 `run_forge_installer`，释放 worker 线程给 ticker
+- **问题2**：伪进度涨到 93% 假完成（实际安装未完成）。根因：`FORGE_TICKER` 曲线 cap 是 100%，42.5 秒就到顶
+  - **修复**：`src-tauri/src/commands/version/install/loader_helpers.rs` 调慢曲线 + cap 改为 95%（永不到 100%，真正完成后由调用方跳 100%）
+    - Forge：0→30% @1.5%/s, 30→60% @1.0%/s, 60→85% @0.6%/s, 85→95% @0.3%/s（总 ~120 秒）
+    - Fabric：0→40% @3%/s, 40→70% @2%/s, 70→90% @1%/s, 90→95% @0.3%/s（总 ~64 秒）
+- **问题3**：后端 ticker 到 95% 卡住后前端进度不动。根因：前端直接显示后端真实进度，无补丁
+  - **修复**：新增 `src/utils/downloadProgress.ts` 伪进度补丁工具函数（`applyProgressPatch`），对数曲线趋近 99.9%，永不到 100%
+  - `src/composables/useDownloadTaskGroups.ts` 加 `now` 参数 + `patchStartTimes` Map，loading 且 progress >= 0.95 的分组应用补丁
+  - `src/components/downloads/TaskGroupCard.vue` 加 `now` ref（200ms 定时更新），分组进度和子阶段进度显示改用 `toFixed(1)` 小数点
+  - `src/views/Downloads.vue` 总进度 `percentage` 应用补丁，`watch` 监听真实进度设置 `percentageStartTime`（副作用放 watch 不放 computed）
+
 ### 重构
 
 #### 代码清理批次 1：download 模块测试分离 + 注释精简
