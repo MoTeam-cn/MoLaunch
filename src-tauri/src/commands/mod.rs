@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod community;
+pub mod frp;
 pub mod image_cache;
 pub mod java;
 pub mod online;

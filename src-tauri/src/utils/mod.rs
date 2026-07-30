@@ -13,6 +13,7 @@ pub mod config_manager;
 pub mod datetime;
 pub mod dispatcher;
 pub mod format;
+pub mod frp_manager;
 pub mod fs;
 pub mod image_cache_manager;
 pub mod java_manager;

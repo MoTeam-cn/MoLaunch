@@ -140,6 +140,8 @@ pub fn run() {
             commands::tools::tools_manager,
             // 联机功能命令（6 个 action，阶段一认证相关，已聚合为 online_manager 单一入口）
             commands::online::online_manager,
+            // Frp 内网穿透命令（8 个 action，厂商/隧道/进程管理，已聚合为 frp_manager 单一入口）
+            commands::frp::frp_manager,
         ])
         .on_window_event(|_window, event| {
             // 窗口关闭时保存配置
