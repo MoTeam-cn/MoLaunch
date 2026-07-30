@@ -9,6 +9,69 @@
 
 ### 修复
 
+#### 资源包转换在版本隔离模式下报 "resourcepacks 目录解析失败: os error 2"
+
+- 背景：`convert` 函数与 `list` 函数路径解析逻辑不一致——`list` 通过 `resolve_packs_dir` 支持版本隔离并对不存在目录做优雅降级；`convert` 硬编码用全局 `game_dir/resourcepacks`，既忽略 `version_id`，又缺少 `exists()` 预检查。用户启用版本隔离、选中具体版本时，列表能正常加载（走版本隔离目录），但点击"转换为文件夹"会因全局 `resourcepacks` 目录不存在而 `canonicalize()` 立即抛出 `os error 2`
+- 改动：
+  - **后端参数类型**（[src-tauri/src/commands/tools/types.rs](src-tauri/src/commands/tools/types.rs)）：`ResourcePackConvertParams` 新增 `version_id: Option<String>` 字段（`#[serde(default)]`，与 `ResourcePackListParams` 语义一致），保持向后兼容
+  - **后端 convert 函数**（[src-tauri/src/commands/tools/resourcepack.rs](src-tauri/src/commands/tools/resourcepack.rs)）：移除"convert 不需要 version_id"错误注释，改用 `resolve_packs_dir(state, params.version_id.as_deref())` 解析基准目录（与 `list` 完全一致）；在 `canonicalize` 之前增加 `exists()` 预检查，目录不存在时返回明确提示"resourcepacks 目录不存在: {path}（请在游戏中放置资源包后再转换）"而非裸 `os error 2`
+  - **前端 API**（[src/utils/api/tools.ts](src/utils/api/tools.ts)）：`resourcepackConvert` 新增可选 `versionId?: string` 参数，传递 `version_id: versionId ?? null`
+  - **前端组件**（[src/views/tools/data/ResourcePackConverter.vue](src/views/tools/data/ResourcePackConverter.vue)）：`doConvert` 调用 `resourcepackConvert` 时透传 `selectedVersionId.value`，确保转换走与列表相同的版本隔离目录
+- 用户反馈："我选择转换为文件夹按钮，他给我个报错？resourcepacks 目录解析失败: 系统找不到指定的文件。 (os error 2)"
+- 验证：`cargo check -p mo-launch` 通过（零错误零警告）
+
+### 新增
+
+#### api-server v3 无鉴权更新查询接口
+
+- **`GET /v3/updates/manifest`**（`api-server/src/controllers/v3/updates.rs`）：
+  - 新增 v3 简化版更新清单端点，无鉴权（不要求 JWT/CSRF），供 Tauri 客户端直接查询
+  - 仅返回基础信息（`version` / `url` / `signature` / `notes`），不含 `pub_date` / `force_update` / `release_url` / `rollout_pct` 等 v1 扩展字段
+  - 复用 `UpdatesService::check_for_update` 业务逻辑，`device_pk` 传空字符串（灰度按 `hash("")` 计算，全量发布不受影响）
+  - 无可用更新返回 HTTP 204，更新服务未启用返回 503，参数错误返回 400
+  - 用户反馈："顺便修复updater接口的问题，目前只提供了 /v1业务接口，也应该提供 /v3业务接口，但是/v3必须比 /v1的updater提供信息少，只返回基础信息就行了"
+- **路由注册**（`api-server/src/controllers/v3/mod.rs`）：`/updates` 子模块挂载到 v3 公共路由树
+- **OpenAPI 文档**（`api-server/src/docs/registry.rs`）：合并 `V3UpdatesApiDoc`，Swagger UI 可见 `/v3/updates/manifest` 端点
+
+### 修复
+
+#### MoLaunch updater 切换到 v3 无鉴权端点
+
+- `src-tauri/src/commands/system/updater.rs`：
+  - `UPDATER_PATH` 从 `/v1/updates/manifest/raw` 改为 `/v3/updates/manifest`（无鉴权端点）
+  - 移除 JWT 加载逻辑（`load_creds_with_auto_refresh`）和 `Authorization: Bearer` 请求头，v3 端点无需鉴权
+  - 日志不再输出 `(auth: true/false)` 标识
+  - 用户反馈："目前updater的返回raw是要鉴权，没有豁免的，到时候修复下apiServer"
+- `src-tauri/tauri.conf.json`：
+  - `plugins.updater.endpoints[0]` 从 `/v1/updates/manifest/raw` 改为 `/v3/updates/manifest`（macOS/Linux 官方 plugin 读取此配置）
+
+#### 联机设置 Server 地址开发者模式校验 + 组件拆分
+
+- **后端校验**（`src-tauri/src/commands/system/apply_config/apply.rs`）：
+  - `apply_online` 函数在更新 `api_server_url` 前调用 `secure::read_developer()` 检查开发者模式状态
+  - 开发者模式关闭时静默忽略更新（不写入 config.ini，不报错），与 `ignore_tls` 关闭联动语义一致
+  - 用户反馈："后端 apply_config 添加下判断，如果更新 Server 地址，必须检查开发者模式是否打开，关闭状态不准更新，即使更新了 config.ini 的字段也自动无视"
+- **前端联动**（`src/views/settings/SettingsOnline.vue` + `src/components/settings/ApiServerCard.vue`）：
+  - 新增 `devMode` 状态，从 `useConfigPage` 的 `onLoad` 读取 `cfg.developerMode`
+  - 开发者模式关闭时：禁用服务器地址输入框、禁用重置按钮、隐藏测试连通性按钮、显示「需开启开发者模式才能修改服务器地址」提示
+  - `watch(apiUrl)` 在 `devMode=false` 时不触发 `markDirty`，避免误传无效 patch
+  - 监听 `DevModeToggle.vue` 分发的 `developer-mode-changed` 自定义事件，实时联动可编辑状态
+- **组件拆分**（解决 Vue 文件 ≤ 300 行硬约束）：
+  - 新建 `src/components/settings/ApiServerCard.vue`（232 行）：包含云端连接状态、服务器地址（开发者模式校验）、测试连通性，自管理加载状态（`useConfigPage` 独立实例，共享全局配置缓存）
+  - `SettingsOnline.vue` 从 387 行降至 177 行：仅保留 ICE 服务器配置 + 设备管理，`<ApiServerCard />` 自管理加载占位
+
+#### 诊断工具版本 JSON 编辑器「未保存的修改」误报
+
+- `src/views/tools/data/VersionJsonEditor.vue`：`watch(content, ...)` 添加 `{ flush: 'sync' }` 选项
+  - **根因**：默认 `flush: 'pre'`（微任务）在 `loading.value=false` 之后才执行 watcher，导致 `loadJson` 中 `content.value = res.content` 赋值时 `loading` 已为 false，误设 `dirty=true`
+  - **修复**：`flush: 'sync'` 确保 watcher 在 `content` 赋值时同步执行，此时 `loading.value` 仍为 true，不误设 dirty
+
+#### 联机设置页面布局调整
+
+- `src/views/settings/SettingsOnline.vue`（已迁移至 `ApiServerCard.vue`）：
+  - 测试连通性按钮容器改为 `flex justify-between`，按钮靠右，左侧显示「（默认地址）」提示
+  - 连接成功/失败提示改为 `flex justify-end`，右对齐与按钮对齐
+
 #### 检查更新报错 "missing field version" + 不走代理
 
 - `src-tauri/src/commands/system/updater.rs`：
@@ -17,6 +80,15 @@
   - 新增 `platform_target()`：构造目标三元组用于 endpoint 模板替换
   - 新增 `is_version_newer()`：简单 semver 比较（major.minor.patch）
   - `UpdaterExt` 导入改为 `#[cfg(not(target_os = "windows"))]`（仅 macOS/Linux 下载安装路径使用）
+
+#### 检查更新继承联机 base_url + 携带 JWT auth
+
+- `src-tauri/src/commands/system/updater.rs`：
+  - **base_url**：`UPDATER_ENDPOINT` 常量拆分为 `UPDATER_PATH`（仅路径模板），base_url 改为从 `AppConfig.online.api_server_url` 读取，不再硬编码 `https://api.molaunch.moiu.cn`
+  - **鉴权**：`check_update` 签名新增 `&AppState` 参数，调用 `load_creds_with_auto_refresh` 尝试加载设备 JWT，有则携带 `Authorization: Bearer {jwt}` 头；未注册设备时无 auth 请求（服务端后续将添加 raw endpoint 豁免）
+  - **日志**：`[Updater] 检查更新` 日志新增 `(auth: true/false)` 标识是否携带鉴权
+- `src-tauri/src/utils/system_manager.rs`：`check_update` handler 从 `handler!(_state, app, ...)` 改为 `handler!(state, app, ...)`，传入 `&state` 供读取配置和凭证
+  - **target 参数修复**：`platform_target()` 从返回目标三元组（`x86_64-pc-windows-msvc`）改为返回 OS 名称（`windows` / `macos` / `linux`），与服务端校验一致（服务端报错「平台取值非法」）
 
 #### 前置检查场景区分 + 下载按钮分阶段文字 + 下载完成自动撤销
 
@@ -743,6 +815,27 @@
     - 前端不关心平台差异，后端根据 `cfg!(target_os = "windows")` 分流
     - `UpdateDialog.vue` 无需改动（接口未变）
   - **system-manager API**（[src/utils/api/system-manager.ts](src/utils/api/system-manager.ts)）：`SYSTEM_ACTIONS` 新增 `CHECK_UPDATE` / `DOWNLOAD_AND_INSTALL_UPDATE`
+
+#### Windows 便携版自动更新（静默下载 + 退出时替换）
+- 背景：此前 Windows 自实现流程需用户手动点击「检查更新 → 下载安装」，体验不连贯。改为后台静默下载新版本到 appdata，用户退出程序时自动替换主 exe，下次启动即为新版本，全程零打扰。
+- 设计文档：[docs/updater/design.md](docs/updater/design.md) §4 Windows 便携版 updater
+- 改动：
+  - **后端新增 2 个命令**（[src-tauri/src/commands/system/updater.rs](src-tauri/src/commands/system/updater.rs)）：
+    - `download_update_to_appdata(info)`：使用 `crate::http::get_client()` 下载新版本 exe 到 `%APPDATA%/.Molaunch/last.exe`（确保父目录存在），不走 NSIS installer，复用代理配置
+    - `apply_pending_update(app)`：退出时检查 `last.exe` 是否存在——存在则释放 `updater.exe` 并启动子进程（传递 `--old-exe` / `--new-exe` / `--pid`），返回 true 由调用方退出主程序；不存在则返回 false 正常退出
+    - 新增 `last_exe_path()` 辅助函数（Windows 平台返回 `%APPDATA%/.Molaunch/last.exe`）
+    - 在 `system_manager` 注册 2 个 action（`download_update_to_appdata` / `apply_pending_update`），与既有 `check_update` / `download_and_install_update` 共存
+  - **前端定时检查 + 退出触发**（[src/utils/updater.ts](src/utils/updater.ts)）：
+    - `initAutoCheck` 平台分流：Windows 10 分钟间隔静默检查 + 自动下载到 appdata；macOS/Linux 6 小时间隔 + 弹窗手动安装
+    - 新增 `silentCheckAndDownload()`：Windows 专属，发现新版本后调 `download_update_to_appdata`，记录 `appdataDownloadedVersion` 防止定时重复下载同一版本
+    - 新增 `applyPendingUpdate()`：前端退出时调用，转调后端 `apply_pending_update` 命令
+    - Dev 模式（`import.meta.env.DEV`）跳过自动检查，避免 dev 版本号低于发布版反复触发更新
+  - **退出时触发替换**（[src/components/layout/TopNavLayout.vue](src/components/layout/TopNavLayout.vue)）：
+    - `handleClose` 在保存配置 + 联机状态清理后、`appWindow.close()` 前调用 `await applyPendingUpdate().catch(() => false)`
+    - 返回 true 时后端已启动 updater.exe 子进程，主程序退出后 updater 接管替换 exe，下次启动即为新版本
+  - **system-manager API**（[src/utils/api/system-manager.ts](src/utils/api/system-manager.ts)）：`SYSTEM_ACTIONS` 新增 `DOWNLOAD_UPDATE_TO_APPDATA` / `APPLY_PENDING_UPDATE`
+- 用户反馈："tauri 改下，后端默认检查更新还是走 v1... 前端改下，设置10分钟一个检查点，定时请求updater接口获取更新，当然只对windows生效... 检查到新版本后，自动下载文件到appdata目录，命名为 last.exe，后续更新版本自动替换掉... updater.exe在Tauri程序被用户点击右上角退出的时候，自动调用替换"
+- 验证：`cargo check -p mo-launch` 通过（零错误零警告）
 
 #### 客户端自动更新能力落地（方案 B 第二阶段：客户端集成）
 - 背景：服务端更新服务（api-server `/v1/updates/*` + S3 presigned URL）与 CI/CD 流水线（`.github/workflows/release.yml`）已就绪，客户端需接入 Tauri 官方 updater plugin 完成端到端自动更新闭环
