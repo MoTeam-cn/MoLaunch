@@ -53,10 +53,21 @@ impl Default for UpdateInfo {
 /// （force_update / url / signature）返回给前端。
 pub async fn check_update(app: &AppHandle) -> Result<UpdateInfo, String> {
     let updater = app.updater().map_err(|e| format!("updater 初始化失败: {e}"))?;
-    let update = updater
-        .check()
-        .await
-        .map_err(|e| format!("检查更新失败: {e}"))?;
+
+    // 服务器在"无可用更新"时可能返回空 manifest（缺少 version 字段），
+    // tauri-plugin-updater 内部反序列化会报 "missing field `version`"。
+    // 捕获此 serde 错误并视为"无更新"，避免向用户报错。
+    let update = match updater.check().await {
+        Ok(u) => u,
+        Err(e) => {
+            let err_str = e.to_string();
+            if err_str.contains("missing field") {
+                log::info!("[Updater] 服务器返回空 manifest（无可用更新）: {}", err_str);
+                return Ok(UpdateInfo::default());
+            }
+            return Err(format!("检查更新失败: {err_str}"));
+        }
+    };
 
     match update {
         Some(update) => {
