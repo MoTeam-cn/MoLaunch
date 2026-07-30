@@ -148,6 +148,13 @@ pub fn run() {
                 // 这里需要获取AppState，但由于生命周期限制，我们简化处理
                 log_info!("Config will be saved on exit");
             }
+            // 主窗口销毁时重置 DevTools 打开状态
+            // WebView2 不提供查询 API，后端用 AtomicBool 维护状态；
+            // 窗口销毁后状态应重置，避免下次启动前状态泄露
+            if let tauri::WindowEvent::Destroyed { .. } = event {
+                commands::system::developer::reset_devtools_state();
+                log_info!("[Developer] Window destroyed, devtools state reset");
+            }
         });
 
     // 注册 cache-image 自定义 URI scheme（图片缓存协议，抽离至 minecraft::image_cache）

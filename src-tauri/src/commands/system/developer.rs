@@ -10,6 +10,12 @@
 //! 存储位置：Windows 注册表 `HKCU\Software\MoLaunch` 下的两个布尔值
 //! - `DeveloperUnlocked`：是否已解锁（决定开关卡片是否显示）
 //! - `DeveloperMode`：开关是否开启（决定侧边菜单 developer 项是否显示 + devtools 是否可调出）
+//!
+//! DevTools 打开状态维护：
+//! Tauri 2 的 `WebviewWindow::is_devtools_open()` 在 Windows WebView2 上始终返回 false
+//! （WebView2 不提供查询 DevTools 是否打开的原生 API），因此后端使用 `AtomicBool`
+//! 自行维护状态：`open_devtools` 成功后置 true，`close_devtools` 置 false，
+//! 主窗口销毁时通过 `reset_devtools_state` 重置（兜底，防止状态泄露）。
 
 use crate::log_info;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
@@ -20,6 +26,7 @@ use crate::utils::cache_app;
 use crate::utils::cache_stats;
 use crate::utils::cache_temp;
 use serde::Serialize;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager};
 
 /// 注册表键名：开发者模式是否已解锁
@@ -33,6 +40,16 @@ pub const KEY_DEV_MODE: &str = "DeveloperMode";
 /// 开启后 `http::build_client` 会调用 `danger_accept_invalid_certs(true)`，
 /// 跳过所有证书校验，用于联机服务端自签名证书调试等场景。
 pub const KEY_IGNORE_TLS: &str = "IgnoreTls";
+
+/// DevTools 打开状态（全局原子标志）
+///
+/// WebView2 不提供查询 DevTools 是否打开的 API，Tauri 的
+/// `WebviewWindow::is_devtools_open()` 在 Windows 上始终返回 false，
+/// 因此由后端自行维护：
+/// - `open_devtools()` 成功后置 true
+/// - `close_devtools()` 成功后置 false
+/// - 主窗口销毁时通过 `reset_devtools_state()` 重置为 false
+static DEVTOOLS_OPEN: AtomicBool = AtomicBool::new(false);
 
 
 /// 查询开发者模式是否已解锁（用户连续点击版本号 5 次后解锁）
@@ -165,10 +182,14 @@ fn require_dev_mode() -> Result<(), String> {
 ///
 /// 在开发者模式已开启时调用 `WebviewWindow::open_devtools()` 调出开发者工具。
 /// 重复调用是幂等的（DevTools 已打开时不会重复打开）。
+///
+/// 状态维护：成功调用后置 `DEVTOOLS_OPEN=true`，供 `is_devtools_open` 查询。
+/// WebView2 本身无查询 API，必须由后端自行维护状态。
 pub fn open_devtools(app: &AppHandle) -> Result<(), String> {
     require_dev_mode()?;
     if let Some(window) = app.get_webview_window("main") {
         window.open_devtools();
+        DEVTOOLS_OPEN.store(true, Ordering::SeqCst);
         log_info!("[Developer] DevTools opened");
         Ok(())
     } else {
@@ -177,10 +198,13 @@ pub fn open_devtools(app: &AppHandle) -> Result<(), String> {
 }
 
 /// 关闭主窗口的 WebView2 DevTools
+///
+/// 状态维护：成功调用后置 `DEVTOOLS_OPEN=false`。
 pub fn close_devtools(app: &AppHandle) -> Result<(), String> {
     require_dev_mode()?;
     if let Some(window) = app.get_webview_window("main") {
         window.close_devtools();
+        DEVTOOLS_OPEN.store(false, Ordering::SeqCst);
         log_info!("[Developer] DevTools closed");
         Ok(())
     } else {
@@ -191,14 +215,25 @@ pub fn close_devtools(app: &AppHandle) -> Result<(), String> {
 /// 查询主窗口的 DevTools 是否已打开
 ///
 /// 返回 false 的情况：
-/// - DevTools 实际未打开
+/// - DevTools 实际未打开（`DEVTOOLS_OPEN=false`）
 /// - 开发者模式未开启（拒绝查询，避免绕过校验探测状态）
 /// - 主窗口未找到
+///
+/// 注意：不使用 Tauri 的 `WebviewWindow::is_devtools_open()`，因为该方法
+/// 在 Windows WebView2 上始终返回 false（WebView2 不提供查询 API）。
 pub fn is_devtools_open(app: &AppHandle) -> Result<bool, String> {
     require_dev_mode()?;
-    if let Some(window) = app.get_webview_window("main") {
-        Ok(window.is_devtools_open())
+    if app.get_webview_window("main").is_some() {
+        Ok(DEVTOOLS_OPEN.load(Ordering::SeqCst))
     } else {
         Ok(false)
     }
+}
+
+/// 重置 DevTools 打开状态为 false
+///
+/// 在主窗口销毁/关闭时调用，防止下次启动前状态泄露（实际上进程退出后
+/// `static` 也会重置，但显式调用更稳妥，便于将来支持窗口重建场景）。
+pub fn reset_devtools_state() {
+    DEVTOOLS_OPEN.store(false, Ordering::SeqCst);
 }
