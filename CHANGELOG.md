@@ -9,9 +9,14 @@
 
 ### 修复
 
-#### 检查更新报错 "missing field version"
+#### 检查更新报错 "missing field version" + 不走代理
 
-- `src-tauri/src/commands/system/updater.rs`：服务器在"无可用更新"时返回空 manifest（缺少 `version` 字段），`tauri-plugin-updater` 内部反序列化报 `missing field \`version\``。`check_update` 捕获含 `missing field` 的 serde 错误并视为"无更新"返回 `UpdateInfo::default()`，其他错误正常透传
+- `src-tauri/src/commands/system/updater.rs`：
+  - **根因**：`tauri-plugin-updater` 内部使用自己的 HTTP 客户端，既不走 `http.rs` 配置的代理，又在服务器返回空 manifest（无 `version` 字段）时报 serde 反序列化错误
+  - **修复**：`check_update` 不再依赖 `updater.check()`，改为使用 `crate::http::get_client()`（走用户配置的代理）手动请求 manifest endpoint，解析 JSON 并比较版本
+  - 新增 `platform_target()`：构造目标三元组用于 endpoint 模板替换
+  - 新增 `is_version_newer()`：简单 semver 比较（major.minor.patch）
+  - `UpdaterExt` 导入改为 `#[cfg(not(target_os = "windows"))]`（仅 macOS/Linux 下载安装路径使用）
 
 #### 前置检查场景区分 + 下载按钮分阶段文字 + 下载完成自动撤销
 
