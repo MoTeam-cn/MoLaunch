@@ -7,31 +7,22 @@
  * - 版本按游戏版本分组卡片（VersionGroupCard 子组件，可折叠/展开带动画）
  * - 加载进度条
  * - 下载进度浮层（DownloadProgressOverlay 子组件）
+ *
+ * 下载/前置检查/整合包安装逻辑分别抽到 useResourceDownload / useResourceModpackInstall composable。
  */
-
 import { ref, watch, nextTick } from 'vue'
-import { invoke } from '@tauri-apps/api/core'
-import type { ResourceProject, ResourceVersion, ResolvedDependency } from '@/types/community'
-import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, installModpack } from '@/utils/api/community'
-import { installMerged } from '@/utils/api/loader'
-import { getVersionLoaderInfo } from '@/utils/api/version'
-import { getVersionGameVersion, getVersionModsDir } from '@/utils/api/personalization'
-import { useVersionStore } from '@/stores/version'
-import { pickSavePath } from '@/utils/fileDialog'
-import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import { showPrompt, showModal } from '@/utils/modal'
-import { isCancelledError } from '@/utils/async'
-import { loaderToFlag } from '@/utils/mod-display'
+import type { ResourceProject, ResourceVersion } from '@/types/community'
+import { getProjectVersions } from '@/utils/api/community'
+import { toastError } from '@/utils/toast'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
-import { useDependencyCheck } from '@/composables/useDependencyCheck'
+import { useResourceDownload } from '@/composables/useResourceDownload'
+import { useResourceModpackInstall } from '@/composables/useResourceModpackInstall'
 import HorizontalFilter from '@/components/common/HorizontalFilter.vue'
 import ResourceDetailHeader from './resource-detail/ResourceDetailHeader.vue'
 import { ArchiveBoxXMarkIcon } from '@heroicons/vue/24/outline'
 import VersionGroupCard from './resource-detail/VersionGroupCard.vue'
 import DependencyConfirmDialog from './DependencyConfirmDialog.vue'
-
-const versionStore = useVersionStore()
 
 interface Props {
   visible: boolean
@@ -50,28 +41,20 @@ const emit = defineEmits<{ close: [] }>()
 
 const versions = ref<ResourceVersion[]>([])
 const loading = ref(false)
-const downloading = ref<string | null>(null)
 
 const { groups, filterOptions, versionFilter, toggleGroup, setFilter, expandedOf, mountedOf } = useVersionGroups(() => versions.value)
 const { percent, slowMerging, stageText, start, finish, fail } = useSearchProgress()
 
-// 前置 Mod 检查
+// 下载 + 前置 Mod 检查逻辑（直接传 props 保持响应式，composable 内部通过 options.xxx 访问最新值）
 const {
-  checking: depsChecking,
-  installing: depsInstalling,
-  missing: depsMissing,
-  upToDate: depsUpToDate,
-  check: checkDeps,
-  install: installDeps,
-  reset: resetDeps,
-} = useDependencyCheck()
+  downloading, downloadStage, showDependencyDialog, pendingMainVersion,
+  depsMap, depsLoadingSet,
+  depsChecking, depsInstalling, depsMissing, depsUpToDate,
+  handleDownload, handleDependencyConfirm, handleDependencyClose, handleLoadDeps,
+} = useResourceDownload(props)
 
-// 前置确认弹窗状态
-const showDependencyDialog = ref(false)
-// 暂存待安装的主 Mod（弹窗确认后用于 install 调用）
-const pendingMainVersion = ref<ResourceVersion | null>(null)
-// 暂存前置检查解析出的上下文（versionId/gameVersion/modsDir），Community 场景下按需获取
-const pendingContext = ref<{ versionId: string; gameVersion: string; modsDir: string } | null>(null)
+// 整合包安装逻辑（共享 useResourceDownload 的 downloading 状态）
+const { handleInstallModpack } = useResourceModpackInstall(props, downloading)
 
 watch(
   [() => props.visible, () => props.project],
@@ -81,6 +64,8 @@ watch(
     if (v === oldV && p === oldP) return
     loading.value = true
     versions.value = []
+    depsMap.value = new Map()
+    depsLoadingSet.value = new Set()
     setFilter('')
     start(p.platform === 'CurseForge' ? 1 : p.platform === 'Modrinth' ? 2 : 0)
     try {
@@ -101,275 +86,6 @@ watch(
     }
   },
 )
-
-async function handleDownload(v: ResourceVersion) {
-  if (!props.project) return
-  const finalFileName = await formatDownloadFilename(v.file_name, props.project.translated_name)
-
-  // 禁止更新 Mod 拦截：如果目标文件在 mods 目录已存在（即"更新"场景），阻止下载
-  if (props.disableModUpdate && props.modsDir) {
-    const targetPath = `${props.modsDir}/${finalFileName}`.replace(/\\/g, '/')
-    try {
-      const exists = await invoke<boolean>('plugin:fs|exists', { path: targetPath })
-      if (exists) {
-        toastError(`此版本已禁止更新 Mod：${finalFileName} 已存在。\n如需更新，请前往 版本设置 → 高级选项 关闭「禁止更新 Mod」`)
-        return
-      }
-    } catch (e) {
-      console.debug('[ResourceDetail] 检查文件存在性失败:', e)
-    }
-  }
-
-  // 前置 Mod 检查：仅 Mod 类型启用（Community 场景下 versionId/gameVersion/modsDir 缺失时按需获取）
-  if (props.project.resource_type === 'Mod') {
-    const hasMissing = await runDependencyCheck(v)
-    if (hasMissing) {
-      // 弹窗等用户确认，确认后由 handleDependencyConfirm 走 install 流程
-      return
-    }
-    // 无缺失：继续走下方原有流程
-  }
-
-  const savePath = await pickSavePath({
-    title: '选择保存位置',
-    defaultPath: props.modsDir ? `${props.modsDir}/${finalFileName}` : finalFileName,
-    filters: [{ name: '所有文件', extensions: ['*'] }],
-  })
-  if (!savePath) return
-
-  downloading.value = v.id
-  versionStore.startDownload(finalFileName)
-  toastInfo(`开始下载: ${finalFileName}`)
-  try {
-    await downloadResourceToPath(v.download_url, finalFileName, savePath)
-    // 不调用 finishDownload，由轮询检测 is_complete 自动完成
-  } catch (e: any) {
-    const msg = e?.message || String(e)
-    // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
-    showModal({
-      type: 'error',
-      title: '下载失败',
-      message: msg,
-      onConfirm: () => {
-        versionStore.finishDownload()
-      },
-    })
-  } finally {
-    downloading.value = null
-  }
-}
-
-/**
- * 触发前置 Mod 检查并打开确认弹窗
- *
- * 流程：
- * 1. 解析 versionId（props.versionId 优先，回退 versionStore.selectedVersion）
- * 2. 并行获取 gameVersion / modsDir / loaderType（缺失的才获取）
- * 3. 调用 check_mod_dependencies IPC
- * 4. 有缺失 → 暂存主 Mod + 上下文，打开弹窗
- *
- * @returns true=已弹窗等用户确认，false=无缺失或检查失败可直接下载
- */
-async function runDependencyCheck(v: ResourceVersion): Promise<boolean> {
-  if (!props.project) return false
-
-  // 解析 versionId（Community 场景下 props.versionId 可能为空，回退 versionStore.selectedVersion）
-  const versionId = props.versionId || versionStore.selectedVersion || ''
-  if (!versionId) {
-    console.debug('[ResourceDetail] 前置检查跳过：无 versionId')
-    return false
-  }
-
-  // 并行获取缺失的上下文（gameVersion / modsDir / loaderType）
-  const [gameVersion, modsDir, loaderInfo] = await Promise.all([
-    props.gameVersion ? Promise.resolve(props.gameVersion) : getVersionGameVersion(versionId).catch(() => null),
-    props.modsDir ? Promise.resolve(props.modsDir) : getVersionModsDir(versionId).catch(() => ''),
-    getVersionLoaderInfo(versionId).catch(() => ({ loaderType: 'release', loaderVersion: '' })),
-  ])
-
-  if (!gameVersion) {
-    console.debug('[ResourceDetail] 前置检查跳过：无 gameVersion')
-    return false
-  }
-  if (!modsDir) {
-    console.debug('[ResourceDetail] 前置检查跳过：无 modsDir')
-    return false
-  }
-
-  const modLoader = loaderToFlag(loaderInfo.loaderType)
-  pendingContext.value = { versionId, gameVersion, modsDir }
-
-  try {
-    const hasMissing = await checkDeps({
-      versionId,
-      platform: props.project.platform,
-      modVersion: v,
-      gameVersion,
-      modLoader,
-    })
-    if (hasMissing) {
-      pendingMainVersion.value = v
-      showDependencyDialog.value = true
-      return true
-    }
-  } catch (e: any) {
-    // 检查失败不阻断下载，仅提示并降级到普通下载
-    const msg = e?.message || String(e)
-    console.debug('[ResourceDetail] 前置 Mod 检查失败:', msg)
-    toastInfo('前置 Mod 检查失败，直接下载主 Mod')
-  }
-  return false
-}
-
-/**
- * 用户在 DependencyConfirmDialog 点击"确认安装"后回调
- *
- * 调用 install_mod_with_dependencies IPC，后端启动 DownloadSession 并发下载主 Mod + 勾选前置。
- * 进度通过 WS 推送到下载管理页。
- */
-async function handleDependencyConfirm(selectedDeps: ResolvedDependency[]) {
-  const main = pendingMainVersion.value
-  const ctx = pendingContext.value
-  if (!main || !ctx) return
-
-  showDependencyDialog.value = false
-  downloading.value = main.id
-  versionStore.startDownload(main.file_name)
-  const totalFiles = 1 + selectedDeps.length
-  toastInfo(`开始下载: ${main.file_name}（含 ${selectedDeps.length} 个前置，共 ${totalFiles} 个文件）`)
-
-  try {
-    const result = await installDeps({
-      versionId: ctx.versionId,
-      mainVersion: main,
-      deps: selectedDeps,
-    })
-    if (result.failedCount > 0) {
-      // 部分失败：toast 警告，但仍由 WS 推送 mark_complete 触发退出
-      toastInfo(`安装完成：成功 ${result.installedCount} / ${totalFiles}，失败 ${result.failedCount}`)
-    } else {
-      toastSuccess(`安装完成：共 ${result.installedCount} 个文件`)
-    }
-  } catch (e: any) {
-    const msg = e?.message || String(e)
-    if (isCancelledError(e)) {
-      toastInfo('下载已取消')
-      versionStore.finishDownload()
-      return
-    }
-    showModal({
-      type: 'error',
-      title: '安装失败',
-      message: msg,
-      onConfirm: () => {
-        versionStore.finishDownload()
-      },
-    })
-  } finally {
-    downloading.value = null
-    pendingMainVersion.value = null
-    pendingContext.value = null
-    resetDeps()
-  }
-}
-
-/** 用户在 DependencyConfirmDialog 点击取消（不下载） */
-function handleDependencyClose() {
-  showDependencyDialog.value = false
-  pendingMainVersion.value = null
-  pendingContext.value = null
-  resetDeps()
-}
-
-/**
- * 安装整合包：下载原始包 + 解析 + 下载依赖 mods + 复制 overrides → 安装游戏本体 + 加载器
- * 进度走 download_state，复用 DownloadPanel
- *
- * 点击下载后先弹窗询问安装名称，用户可自定义；取消则中止安装。
- */
-async function handleInstallModpack(v: ResourceVersion) {
-  if (!props.project) return
-  const { platform, resource_type, translated_name, raw_name, id: projectId } = props.project
-  if (resource_type !== 'ModPack') return
-
-  const defaultName = translated_name || raw_name || v.file_name.replace(/\.(zip|mrpack)$/i, '')
-
-  // 弹窗询问安装名称，允许用户自定义（取消则中止）
-  const instanceName = await promptForInstanceName(defaultName)
-  if (!instanceName) return
-
-  downloading.value = v.id
-  versionStore.startDownload(instanceName)
-
-  try {
-    // 联机大厅阶段 3：传入平台来源元数据，后端安装完成后写入 modpack.meta.json
-    // 用于创建联机房间时上报整合包信息，加入方据此判断是否需要一键安装
-    const result = await installModpack({
-      platform,
-      downloadUrl: v.download_url,
-      fileName: v.file_name,
-      instanceName,
-      projectId,
-      fileId: v.id,
-      modpackVersion: v.version,
-      fileSize: v.size,
-      name: translated_name || raw_name,
-    })
-    const loader = result.loader
-    const lv = result.loaderVersion
-    await installMerged(
-      result.gameVersion,
-      loader === 'forge' ? lv : undefined,
-      loader === 'neoforge' ? lv : undefined,
-      loader === 'fabric' || loader === 'quilt' ? lv : undefined,
-      undefined, undefined, instanceName,
-    )
-    toastSuccess(`整合包 ${instanceName} 安装完成`)
-  } catch (e: any) {
-    const msg = e?.message || String(e)
-    // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
-    if (isCancelledError(e)) {
-      toastInfo('下载已取消')
-      versionStore.finishDownload()
-      return
-    }
-    // 真实失败：后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
-    showModal({
-      type: 'error',
-      title: '整合包安装失败',
-      message: msg,
-      onConfirm: () => {
-        versionStore.finishDownload()
-      },
-    })
-  } finally {
-    downloading.value = null
-  }
-}
-
-/**
- * 弹窗询问整合包安装名称
- *
- * 将 callback 风格的 showPrompt 包装为 Promise，便于在 async 流程中 await。
- * 用户确认返回 trim 后的名称（空则回退默认名）；取消返回 null。
- */
-function promptForInstanceName(defaultName: string): Promise<string | null> {
-  return new Promise((resolve) => {
-    showPrompt(
-      '安装整合包',
-      '请输入整合包的安装名称：',
-      (value: string) => {
-        const trimmed = value.trim()
-        resolve(trimmed || defaultName)
-      },
-      {
-        defaultValue: defaultName,
-        placeholder: '请输入安装名称',
-        onCancel: () => resolve(null),
-      },
-    )
-  })
-}
 </script>
 
 <template>
@@ -384,11 +100,11 @@ function promptForInstanceName(defaultName: string): Promise<string | null> {
     >
       <div
         v-if="visible && project"
-        class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+        class="fixed inset-0 z-[10000] flex items-start justify-center px-4 pt-14 pb-4"
         @click.self="emit('close')"
       >
         <div class="absolute inset-0 bg-black/40" />
-        <div class="relative w-full max-w-2xl bg-white rounded-lg shadow-xl flex flex-col max-h-[85vh]">
+        <div class="relative w-full max-w-2xl bg-white rounded-lg shadow-xl flex flex-col max-h-[calc(100vh-100px)] mt-2">
           <!-- 头部 + 操作按钮 -->
           <ResourceDetailHeader :project="project" @close="emit('close')" />
 
@@ -438,10 +154,14 @@ function promptForInstanceName(defaultName: string): Promise<string | null> {
                 :expanded="expandedOf(g.title)"
                 :mounted="mountedOf(g.title)"
                 :downloading="downloading"
+                :download-stage="downloadStage"
                 :is-modpack="project.resource_type === 'ModPack'"
+                :deps-map="depsMap"
+                :deps-loading-set="depsLoadingSet"
                 @toggle="toggleGroup(g.title)"
                 @download="handleDownload"
                 @install="handleInstallModpack"
+                @load-deps="handleLoadDeps"
               />
             </div>
 

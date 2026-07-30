@@ -9,16 +9,19 @@
  *
  * 内部 helper：releaseColor、loaderNames（仅本组件使用）
  */
-import type { ResourceVersion } from '@/types/community'
+import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { ModLoaderFlags } from '@/types/community'
 import { formatBytes, formatDownloads } from '@/utils/format'
+import { ref } from 'vue'
 import {
   ChevronDownIcon,
   CubeIcon,
   ArrowDownTrayIcon,
   RocketLaunchIcon,
+  Squares2X2Icon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import DependencyInlineList from './DependencyInlineList.vue'
 
 defineProps<{
   title: string
@@ -26,14 +29,35 @@ defineProps<{
   expanded: boolean
   mounted: boolean
   downloading: string | null
+  /** 下载阶段（按钮文字分阶段显示） */
+  downloadStage: 'idle' | 'requesting' | 'waiting' | 'downloading'
   isModpack: boolean
+  /** 前置项目详情缓存（key=version_id） */
+  depsMap: Map<string, ResourceProject[]>
+  /** 正在加载前置的 version_id 集合 */
+  depsLoadingSet: Set<string>
 }>()
 
 const emit = defineEmits<{
   toggle: []
   download: [version: ResourceVersion]
   install: [version: ResourceVersion]
+  /** 懒加载请求查询该版本的前置项目详情 */
+  loadDeps: [version: ResourceVersion]
 }>()
+
+/** 当前展开前置列表的 version_id 集合 */
+const expandedDeps = ref(new Set<string>())
+
+function toggleDeps(v: ResourceVersion) {
+  if (expandedDeps.value.has(v.id)) {
+    expandedDeps.value.delete(v.id)
+  } else {
+    expandedDeps.value.add(v.id)
+    // 首次展开时通知父组件懒加载前置详情
+    emit('loadDeps', v)
+  }
+}
 
 function loaderNames(flags: number): string[] {
   const list: string[] = []
@@ -104,38 +128,60 @@ function releaseColor(rt: string): string {
           <div
             v-for="v in versions"
             :key="v.id"
-            class="flex items-center gap-2 px-2 py-2 rounded-md hover:bg-gray-50 transition-colors"
+            class="px-2 py-2 rounded-md hover:bg-gray-50 transition-colors"
           >
-            <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-1.5">
-                <span class="px-1 py-0.5 rounded text-[9px] font-medium" :class="releaseColor(v.release_type)">{{ v.release_type }}</span>
-                <span class="text-sm text-gray-900 truncate">{{ v.display || v.file_name }}</span>
+            <div class="flex items-center gap-2">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-1 py-0.5 rounded text-[9px] font-medium" :class="releaseColor(v.release_type)">{{ v.release_type }}</span>
+                  <span class="text-sm text-gray-900 truncate">{{ v.display || v.file_name }}</span>
+                </div>
+                <div class="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400">
+                  <span>{{ v.game_versions.slice(0, 3).join(', ') }}</span>
+                  <span v-for="l in loaderNames(v.mod_loaders)" :key="l" class="text-blue-500">{{ l }}</span>
+                  <span>{{ formatBytes(v.size) }}</span>
+                  <span>{{ formatDownloads(v.download_count) }} 下载</span>
+                </div>
               </div>
-              <div class="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400">
-                <span>{{ v.game_versions.slice(0, 3).join(', ') }}</span>
-                <span v-for="l in loaderNames(v.mod_loaders)" :key="l" class="text-blue-500">{{ l }}</span>
-                <span>{{ formatBytes(v.size) }}</span>
-                <span>{{ formatDownloads(v.download_count) }} 下载</span>
+              <Button
+                type="primary"
+                size="mini"
+                class="shrink-0"
+                :loading="downloading === v.id"
+                @click="isModpack ? emit('install', v) : emit('download', v)"
+              >
+                <template #icon>
+                  <RocketLaunchIcon v-if="isModpack" class="w-3.5 h-3.5" />
+                  <ArrowDownTrayIcon v-else class="w-3.5 h-3.5" />
+                </template>
+                <template v-if="downloading === v.id">
+                  <template v-if="isModpack">安装中...</template>
+                  <template v-else-if="downloadStage === 'requesting'">请求中...</template>
+                  <template v-else-if="downloadStage === 'waiting'">等待中...</template>
+                  <template v-else>下载中...</template>
+                </template>
+                <template v-else>
+                  {{ isModpack ? '安装' : '下载' }}
+                </template>
+              </Button>
+            </div>
+            <!-- 前置依赖：仅 Mod 且有 dependencies 时展示 -->
+            <div v-if="!isModpack && v.dependencies.length > 0" class="mt-1">
+              <button
+                type="button"
+                class="inline-flex items-center gap-1 text-[11px] text-primary-600 hover:text-primary-700 font-medium transition-colors"
+                @click="toggleDeps(v)"
+              >
+                <Squares2X2Icon class="w-3 h-3" />
+                <span>{{ expandedDeps.has(v.id) ? '收起前置' : `查看 ${v.dependencies.length} 个前置` }}</span>
+              </button>
+              <div v-if="expandedDeps.has(v.id)" class="mt-0.5">
+                <DependencyInlineList
+                  :deps="depsMap.get(v.id) || []"
+                  :loading="depsLoadingSet.has(v.id)"
+                />
               </div>
             </div>
-            <Button
-              type="primary"
-              size="mini"
-              class="shrink-0"
-              :loading="downloading === v.id"
-              @click="isModpack ? emit('install', v) : emit('download', v)"
-            >
-              <template #icon>
-                <RocketLaunchIcon v-if="isModpack" class="w-3.5 h-3.5" />
-                <ArrowDownTrayIcon v-else class="w-3.5 h-3.5" />
-              </template>
-              <template v-if="downloading === v.id">
-                {{ isModpack ? '安装中...' : '下载中...' }}
-              </template>
-              <template v-else>
-                {{ isModpack ? '安装' : '下载' }}
-              </template>
-            </Button>
           </div>
         </div>
       </div>
