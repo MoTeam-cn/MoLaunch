@@ -11,9 +11,9 @@ use std::sync::Arc;
 
 use crate::minecraft::community::modrinth;
 use crate::minecraft::community::types::ResourceVersion;
+use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
-use crate::minecraft::sources::DownloadSourceMode;
 
 /// Fabric API 在 Modrinth 上的 project_id（slug = fabric-api）
 const FABRIC_API_PROJECT_ID: &str = "P7dR8mSH";
@@ -118,7 +118,7 @@ pub async fn install(
     file_name: &str,
     mods_dir: &Path,
     hash: Option<&str>,
-    source_mode: DownloadSourceMode,
+    config: &DownloadManagerConfig,
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
 ) -> anyhow::Result<()> {
     if let Some(ref cb) = progress_callback {
@@ -134,7 +134,7 @@ pub async fn install(
     let urls = crate::minecraft::sources::cdn_urls(download_url);
 
     let local_path = mods_dir.join(file_name);
-    let manager = DownloadManager::new(1, 0, 0, source_mode);
+    let manager = DownloadManager::from_config(config);
     let task = DownloadTask {
         id: "fabric_api".to_string(),
         urls,

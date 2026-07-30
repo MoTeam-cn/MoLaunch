@@ -99,7 +99,6 @@ pub(super) async fn install_cf_mods(
     state: &AppState,
     manifest_files: &[CfManifestFile],
     mods_dir: &std::path::Path,
-    max_threads: usize,
     instance_dir: &std::path::Path,
     stage_index: usize,
     include_optional: bool,
@@ -269,7 +268,6 @@ pub(super) async fn install_cf_mods(
         state,
         stage_index,
         &download_list,
-        max_threads,
         total_bytes,
     )
     .await?;

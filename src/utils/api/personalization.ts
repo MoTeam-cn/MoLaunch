@@ -252,6 +252,35 @@ export async function getVersionModsDir(versionId: string): Promise<string> {
 }
 
 /**
+ * 原子化更新 Mod（下载新版本 + 删旧版本）
+ *
+ * 阶段 4 新增：后端封装"下载新版本 → 删旧版本"为原子操作。
+ * 下载失败时不删旧文件，确保用户不会因更新失败失去原有 mod。
+ * 进度通过 DownloadSession 统一推送，前端下载管理页可见（分组"Mod 更新"）。
+ *
+ * @param versionId 版本 ID
+ * @param oldFileName 旧 mod 文件名（可能是 .disabled 后缀）
+ * @param downloadUrl 新版本下载 URL
+ * @param newFileName 新版本文件名
+ * @param expectedSize 新版本预期大小（字节）
+ */
+export async function updateMod(
+  versionId: string,
+  oldFileName: string,
+  downloadUrl: string,
+  newFileName: string,
+  expectedSize: number,
+): Promise<void> {
+  return versionModsManager<void>(VERSION_MODS_ACTIONS.UPDATE_MOD, {
+    versionId,
+    oldFileName,
+    downloadUrl,
+    newFileName,
+    expectedSize,
+  })
+}
+
+/**
  * 开始监听版本 mods 目录的文件变化
  *
  * 后台启动 `notify` 文件监听，当 mods 目录中的文件被创建/修改/删除时，

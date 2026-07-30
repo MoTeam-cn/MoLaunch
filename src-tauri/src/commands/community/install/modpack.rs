@@ -116,7 +116,8 @@ pub async fn install_modpack(
 
     // 解析游戏目录、创建 instance_dir（提到 async block 外，便于错误时清理版本目录）
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
-    let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
+    // max_threads 不再在此提取：download_files_concurrent 改用 DownloadSession::attach，
+    // 内部从 config 读取 max_threads（避免双重数据源）
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
     std::fs::create_dir_all(&instance_dir)
         .map_err(|e| format!("创建整合包目录失败: {}", e))?;
@@ -203,7 +204,6 @@ pub async fn install_modpack(
                     &state,
                     &manifest.files,
                     &mods_dir,
-                    max_threads,
                     instance_dir_ref,
                     2,
                     include_optional,
@@ -216,7 +216,6 @@ pub async fn install_modpack(
                     &state,
                     &index.files,
                     instance_dir_ref,
-                    max_threads,
                     2,
                     include_optional,
                 )
@@ -438,7 +437,8 @@ pub async fn install_local_modpack(
 
     // 解析游戏目录、创建 instance_dir（提到 async block 外，便于错误时清理版本目录）
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
-    let max_threads = state.config.lock().await.download.max_threads.max(1) as usize;
+    // max_threads 不再在此提取：download_files_concurrent 改用 DownloadSession::attach，
+    // 内部从 config 读取 max_threads（避免双重数据源）
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
     std::fs::create_dir_all(&instance_dir)
         .map_err(|e| format!("创建整合包目录失败: {}", e))?;
@@ -544,7 +544,6 @@ pub async fn install_local_modpack(
                     &state,
                     &manifest.files,
                     &mods_dir,
-                    max_threads,
                     instance_dir_ref,
                     1,
                     include_optional,
@@ -557,7 +556,6 @@ pub async fn install_local_modpack(
                     &state,
                     &index.files,
                     instance_dir_ref,
-                    max_threads,
                     1,
                     include_optional,
                 )

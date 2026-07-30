@@ -3,6 +3,7 @@
 //! 安装 Fabric Loader 后自动下载最新兼容的 Fabric API 到 mods 目录。
 //! 失败不阻断主流程，仅标记阶段为失败。
 
+use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::isolation::{self, IsolationMode};
 use crate::minecraft::version::state::VersionType;
 use crate::state::{AppState, DownloadStage, StageStatus};
@@ -70,17 +71,14 @@ pub(crate) async fn auto_install_fabric_api(
             }
 
             // 下载安装
-            let source_mode_val = {
-                let config = state.config.lock().await;
-                crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.meta_source)
-            };
+            let config = DownloadManagerConfig::from_state_for_meta(state).await;
 
             match crate::minecraft::loaders::fabric_api::install(
                 &latest.download_url,
                 &latest.file_name,
                 &mods_dir,
                 latest.hash.as_deref(),
-                source_mode_val,
+                &config,
                 None,
             )
             .await

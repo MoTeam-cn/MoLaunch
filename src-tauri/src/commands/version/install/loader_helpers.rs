@@ -3,6 +3,7 @@
 //! - `install_single_loader` 通用加载器安装（更新/添加 stage + 调用 loaders::install_loader）
 //! - `start_progress_ticker` 分段线性伪进度（在加载器安装期间给用户视觉反馈）
 
+use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::loaders;
 use crate::state::{AppState, StageStatus};
 use crate::{log_error, log_info};
@@ -62,8 +63,8 @@ pub(crate) async fn install_single_loader(
     mc_version: &str,
     game_dir: &std::path::Path,
     mirror_url: Option<&str>,
-    max_threads: usize,
-    source_mode: crate::minecraft::sources::DownloadSourceMode,
+    _max_threads: usize,
+    _source_mode: crate::minecraft::sources::DownloadSourceMode,
 ) -> Result<(), String> {
     // 检查是否已有加载器安装阶段（通过名称判断）
     let has_loader_stage = {
@@ -107,6 +108,9 @@ pub(crate) async fn install_single_loader(
     // 统一由 ticker 管理伪进度，加载器 install 内部不需要手写 progress_callback
     let ticker_stop = start_progress_ticker(state, None, ticker_segments);
 
+    // 构造下载配置（读 meta_source，保持 installer 历史行为）
+    let config = DownloadManagerConfig::from_state_for_meta(state).await;
+
     // 安装加载器（progress_callback 传 None，进度由 ticker 统一管理）
     match loaders::install_loader(
         loader_type,
@@ -114,9 +118,8 @@ pub(crate) async fn install_single_loader(
         loader_version,
         game_dir,
         mirror_url,
-        max_threads,
         None,
-        source_mode,
+        &config,
     )
     .await
     {

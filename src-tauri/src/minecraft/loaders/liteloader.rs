@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::LoaderVersion;
+use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::sources::{self, DownloadSourceMode};
@@ -60,7 +61,7 @@ pub async fn install(
     game_dir: &Path,
     mirror_url: Option<&str>,
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
-    source_mode: DownloadSourceMode,
+    config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
     if let Some(ref cb) = progress_callback {
         cb(0.0);
@@ -108,7 +109,7 @@ pub async fn install(
         ],
     };
 
-    let manager = DownloadManager::new(1, 0, 0, source_mode);
+    let manager = DownloadManager::from_config(config);
     let task = DownloadTask {
         id: "liteloader_json".to_string(),
         urls,

@@ -245,7 +245,14 @@ const AUTHLIB_INJECTOR_JAR_REL: &str = "launch/authlib-injector.jar";
 ///
 /// 失败时不阻塞启动：返回 Err 由调用方决定是否继续（无外置登录也能进游戏，
 /// 只是角色加载/皮肤显示会异常）。
-pub async fn ensure_authlib_injector_jar(server_url: Option<&str>) -> Result<std::path::PathBuf, String> {
+///
+/// **阶段 5 改造**：下载方式从 `http::fetch_bytes` 改为 `DownloadManager::download_batch`，
+/// 统一走项目下载基础设施（获得限速/URL fallback/进度推送能力）。
+/// sha256 校验保持手动实现（DownloadManager 的 expected_hash 用 sha1，与 authlib 的 sha256 不兼容）。
+pub async fn ensure_authlib_injector_jar(
+    server_url: Option<&str>,
+    manager: &crate::minecraft::download::DownloadManager,
+) -> Result<std::path::PathBuf, String> {
     // 1. 缓存命中
     if crate::utils::cache::exists(AUTHLIB_INJECTOR_JAR_REL) {
         crate::log_debug!("[Authlib] authlib-injector.jar 缓存命中");
@@ -263,14 +270,35 @@ pub async fn ensure_authlib_injector_jar(server_url: Option<&str>) -> Result<std
         &meta.sha256[..8]
     );
 
-    // 3. 下载二进制（通过 http.rs 统一入口）
-    let bytes = crate::http::fetch_bytes(&meta.download_url)
-        .await
-        .map_err(|e| format!("下载 authlib-injector.jar 失败: {}", e))?;
+    // 3. 通过 DownloadManager 下载到缓存路径（统一限速/URL fallback/进度推送）
+    use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
+    let target_path = crate::utils::cache::path(AUTHLIB_INJECTOR_JAR_REL);
+    // 确保父目录存在（DownloadManager 取消下载时需创建父目录，避免 os error 2）
+    if let Some(parent) = target_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+    }
+    let task = DownloadTask {
+        id: "authlib_injector".to_string(),
+        urls: vec![meta.download_url.clone()],
+        local_path: target_path.to_string_lossy().to_string(),
+        expected_size: 0, // 不校验 size，下载后手动 sha256 校验
+        expected_hash: None, // 不校验 hash，下载后手动 sha256 校验（sha256 与 DownloadManager 的 sha1 不兼容）
+    };
+    let results = manager.download_batch(vec![task], None).await;
+    let result = results.first().ok_or("下载结果为空")?;
+    if result.status != DownloadStatus::Completed && result.status != DownloadStatus::Skipped {
+        let err = result.error.clone().unwrap_or_else(|| "未知错误".to_string());
+        return Err(format!("下载 authlib-injector.jar 失败: {}", err));
+    }
 
-    // 4. 校验 sha256
+    // 4. 读取下载的文件 + 校验 sha256
+    let bytes = tokio::fs::read(&target_path)
+        .await
+        .map_err(|e| format!("读取下载的 authlib-injector.jar 失败: {}", e))?;
     let actual_sha = sha256_hex(&bytes);
     if actual_sha != meta.sha256 {
+        // 校验失败：删除损坏的文件
+        let _ = std::fs::remove_file(&target_path);
         return Err(format!(
             "authlib-injector.jar sha256 校验失败：期望 {}，实际 {}",
             meta.sha256,
@@ -278,17 +306,14 @@ pub async fn ensure_authlib_injector_jar(server_url: Option<&str>) -> Result<std
         ));
     }
 
-    // 5. 写入缓存
-    crate::utils::cache::write_bytes(AUTHLIB_INJECTOR_JAR_REL, &bytes)
-        .map_err(|e| format!("写入 authlib-injector.jar 缓存失败: {}", e))?;
     crate::log_info!("[Authlib] authlib-injector.jar 下载完成 (sha256={})", &meta.sha256[..8]);
 
-    // 6. 预取服务器元数据
+    // 5. 预取服务器元数据
     if let Some(url) = server_url {
         prefetch_metadata_if_missing(url).await;
     }
 
-    Ok(crate::utils::cache::path(AUTHLIB_INJECTOR_JAR_REL))
+    Ok(target_path)
 }
 
 /// 预取服务器元数据并缓存（base64 编码），若对应 host 的缓存已存在则跳过

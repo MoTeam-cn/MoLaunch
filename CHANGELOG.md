@@ -7,7 +7,108 @@
 
 ## [未发布]
 
+### 重构
+
+#### 代码清理批次 1：download 模块测试分离 + 注释精简
+
+- **测试分离**：将内联 `#[cfg(test)] mod tests` 提取到同级 `_tests.rs` 文件，源文件保持干净
+  - `src-tauri/src/minecraft/download/manager.rs`（8 个测试）→ 新建 `manager_tests.rs`，源文件末尾用 `#[cfg(test)] #[path = "manager_tests.rs"] mod tests;` 引入
+  - `src-tauri/src/minecraft/download/rate_limiter.rs`（6 个测试）→ 新建 `rate_limiter_tests.rs`，同样方式引入
+- **注释精简**：download 目录 10 个文件精简冗余注释
+  - 模块文档超 3 行的精简到 1-3 行（session.rs 30 行→3 行、mod.rs 12 行→3 行、config.rs 5 行→3 行、downloader/mod.rs 6 行→2 行、chunk/mod.rs 9 行→3 行、chunk/merge.rs 4 行→3 行）
+  - 删除显而易见的内联注释（如 `// 确保目录存在` 紧跟 `create_dir_all`）
+- **验证**：`cargo check` 零警告零错误；`cargo test --lib` 91 个测试全部通过
+- **不变**：业务逻辑代码零改动，测试用例数量不减
+
 ### 新增
+
+#### DownloadManager 重构阶段 6：加载器 installer 统一 from_config
+
+- **背景**：6 个加载器 installer（forge/fabric/neoforge/liteloader/fabric_api/shared）都用 `DownloadManager::new(1, 0, 0, source_mode)` 硬编码，用户设置的 `max_threads`/`chunk_count`/`speed_limit` 对加载器安装不生效。阶段 6 统一改为 `DownloadManager::from_config(config)`，让用户设置生效
+- **`src-tauri/src/minecraft/download/config.rs`**：新增 `DownloadManagerConfig::from_state_for_meta(state)` 方法（读 `config.download.meta_source`，保持 installer 历史行为；与 `from_state` 的唯一区别是读 meta_source 而非 source）
+- **6 个 installer 签名改造**（`source_mode: DownloadSourceMode` → `config: &DownloadManagerConfig`）：
+  - `src-tauri/src/minecraft/loaders/shared.rs`（`download_mojang_mappings`）
+  - `src-tauri/src/minecraft/loaders/fabric.rs`（`install`）
+  - `src-tauri/src/minecraft/loaders/fabric_api.rs`（`install`）
+  - `src-tauri/src/minecraft/loaders/liteloader.rs`（`install`）
+  - `src-tauri/src/minecraft/loaders/neoforge.rs`（`install` + 透传 config 给 shared）
+  - `src-tauri/src/minecraft/loaders/forge/install.rs`（`install` + `install_modern` + 透传 config 给 shared）
+- **`src-tauri/src/minecraft/loaders/mod.rs`**（`install_loader` 分发器）：移除 `_max_threads` 参数，`source_mode` → `config: &DownloadManagerConfig`；OptiFine 分支传 `config.source_mode`（optifine 签名不变）
+- **3 个调用方改造**（用 `from_state_for_meta` 构造 config）：
+  - `src-tauri/src/commands/version/install/loader_helpers.rs`（`install_single_loader`）
+  - `src-tauri/src/commands/version/install/fabric_api.rs`（`auto_install_fabric_api`）
+  - `src-tauri/src/commands/version/loaders.rs`（`install_fabric_api_for_version`）
+- **关键决策**：
+  - 保持 `meta_source` 语义：installer 历史用 `meta_source`（元数据源），新增 `from_state_for_meta` 方法保持原行为
+  - `install_single_loader` 保留 `_max_threads`/`_source_mode` 参数：stages.rs 调用方未列入改造范围，遵循最小修改原则保留签名（前缀 `_` 标记未用）
+  - OptiFine 不改签名：`optifine::install` 保留 `source_mode` 参数，分发器调用时传 `config.source_mode`
+- **不变**：`install_legacy` 不改（不接收 source_mode 参数）；stages.rs 调用方不改
+
+#### DownloadManager 重构阶段 5：authlib-injector 接入 DownloadManager
+
+- **背景**：`ensure_authlib_injector_jar` 原用 `http::fetch_bytes` 下载 jar 二进制，与项目下载基础设施割裂。阶段 5 将其接入 DownloadManager，统一走项目下载基础设施（获得限速/URL fallback/进度推送能力），同时提取 `download_manager()` 辅助方法消除 validate.rs 中 manager 构造重复
+- **`src-tauri/src/minecraft/auth/authlib/client.rs`**（`ensure_authlib_injector_jar`）：加 `manager: &DownloadManager` 参数
+  - 下载方式从 `http::fetch_bytes` 改为 `DownloadManager::download_batch`
+  - 下载到 cache 路径后读取文件 + 手动 sha256 校验（DownloadManager 的 expected_hash 用 sha1，与 authlib 的 sha256 不兼容）
+  - 校验失败删除损坏文件（避免下次缓存命中读到损坏文件）
+  - 不传 expected_size（sha256 校验间接保证完整性）
+- **`src-tauri/src/minecraft/launch/pipeline/validate.rs`**：
+  - 提取 `download_manager(&self)` 私有辅助方法（消除 `validate_and_fix_files` + `build_arguments` 重复构造 11 行 manager 代码）
+  - `validate_and_fix_files` 用 `self.download_manager()` 替代内联构造（行为不变，纯重构）
+  - `build_arguments` 构造 manager 传入 `ensure_authlib_injector_jar`（用户设置的限速/分片/线程数现在对 authlib-injector.jar 下载也生效）
+- **`src-tauri/src/minecraft/download/mod.rs`**：re-export `DownloadManager`（与 `DownloadSession` re-export 风格一致，方便外部 `use crate::minecraft::download::DownloadManager`）
+- **关键决策**：
+  - 接入 DownloadManager 而非保留 http::fetch_bytes：为了架构一致性，所有下载统一走 DownloadManager
+  - sha256 手动校验：DownloadManager 的 expected_hash 用 sha1，与 authlib 的 sha256 不兼容，无法复用
+  - urls 只用 `meta.download_url`：fetch_authlib_injector_meta 内部已有 primary + mirror 两个 meta URL，无需再做镜像替换
+  - 提取 `download_manager()` 辅助方法：避免在两个方法中复制 manager 构造代码
+- **不变**：`crate::http::fetch_bytes` 保留（其他模块可能仍在用）；sha256 校验逻辑不变（仍手动实现）；缓存命中路径不变（cache::exists 检查）
+
+#### DownloadManager 重构阶段 4：Mod 更新原子化
+
+- **背景**：阶段 3 完成 DownloadSession 会话编排层后，Mod 更新流程仍用 3 个 IPC（`getVersionModsDir` + `downloadResourceToPath` + `deleteMod`）拼接，前端负责"下载→删旧"编排，存在两个问题：(1) 下载失败时旧文件可能已被部分覆盖（虽然下载到新文件名，但前端逻辑分散);(2) 前端编排逻辑与后端下载基础设施割裂，无法享受 DownloadSession 的统一进度推送。阶段 4 将"下载新版本 + 删旧版本"封装为后端原子操作 `update_mod`
+- **`src-tauri/src/commands/version/mods/update.rs`**（新增）：`update_mod` 命令，封装"下载新版本 → 删旧版本"为原子操作
+  - 使用 `DownloadSession::start_grouped` 启动会话（分组"Mod 更新"，2 stages：下载新版本 80% / 替换旧版本 20%）
+  - 下载新版本到 mods 目录（用 `sources::cdn_urls` 生成多 URL fallback）
+  - **原子性保证**：下载失败时 `mark_failed` 并返回错误，**不删旧文件**；下载成功才删旧文件（仅当 `old_file_name != new_file_name`）
+  - 进度通过 DownloadSession 统一推送，前端下载管理页可见
+- **`src-tauri/src/commands/version/mods/mod.rs`**：声明 `pub mod update`，更新模块结构说明
+- **`src-tauri/src/utils/version_mods_manager.rs`**：新增 `UpdateModParams` 参数结构 + 注册 `update_mod` action 到 DISPATCHER（第 11 个 action）
+- **`src-tauri/src/lib.rs`**：更新注释 "10 个 action" → "11 个 action"
+- **`src/utils/api/version-mods-manager.ts`**：`VERSION_MODS_ACTIONS` 常量补 `UPDATE_MOD`
+- **`src/utils/api/personalization.ts`**：新增 `updateMod` 函数（调用 `versionModsManager('update_mod', ...)`）
+- **`src/composables/useModUpdate.ts`**（`installSelected`）：从 3 IPC 降为 1 IPC
+  - 移除 `getVersionModsDir` + `downloadResourceToPath` + `deleteMod` 三个调用
+  - 改为单一 `updateMod` 调用，后端负责获取 mods 目录 + 下载 + 删旧
+  - 移除前端 `version.file_name !== mod.enabled_name` 检查（后端 `old_file_name != new_file_name` 已覆盖所有情况，且原检查会导致 .disabled 旧文件残留不清理）
+- **关键决策**：
+  - 原子性在后端保证而非前端：前端 3 IPC 拼接在并发/异常场景下可能出现"下载成功但删旧失败"导致状态不一致；后端单 IPC 内部可控
+  - 旧文件清理逻辑简化：原前端检查 `version.file_name !== oldFileName && version.file_name !== mod.enabled_name`，第二个条件导致"新文件名等于启用名时不删旧 .disabled 文件"的 bug（旧 .disabled 文件残留）；后端只检查 `old_file_name != new_file_name`，行为更正确
+  - `expected_size` 透传：前端传 `version.size`，后端用于下载校验
+- **不变**：`update_mod` 通过 `version_mods_manager` IPC 入口分发（该命令已在 lib.rs 注册），无需新增 invoke_handler 注册；`useModUpdate.ts` 的版本列表查询/过滤/选中逻辑不变
+
+#### DownloadManager 重构阶段 3：整合包 + 资源 + 外部下载接入 DownloadSession
+
+- **背景**：阶段 2.5 完成后，5 个调用点仍硬编码 `DownloadManager::new(4, chunk_count, 0, Smart)` 或 `new(max_threads, chunk_count, 0, Smart)`，用户设置的 `speed_limit` / `source_mode` 对整合包 / 资源 / 外部下载全部不生效；同时 5 处 callback 闭包复制粘贴（`sync_stage_from_progress + broadcast_current`），5 处 `reset_stages + flag 重置` 重复。阶段 3 引入 `DownloadSession` 会话编排层，统一消灭这些重复
+- **`src-tauri/src/minecraft/download/session.rs`**（新增）：`DownloadSession` 会话编排层，封装 `reset_stages + flag 重置 + manager 构造 + callback 工厂`
+  - `start_grouped(state, group, stages)`：顶层入口用（资源 / 外部下载），自动 reset_stages + 重置 flag + 构造 manager
+  - `attach(state)`：子流程用（整合包下载 / mods 批量下载），仅构造 manager（stages / flag 已由父函数处理）
+  - `make_progress_callback(state, stage_index)`：统一 callback 工厂（消除 5 处闭包复制）
+  - `manager()` / `mark_complete` / `mark_failed`
+- **`src-tauri/src/minecraft/download/config.rs`**（`DownloadManagerConfig::from_state`）：`chunk_count` 加 `max(1)` 保持与历史调用方一致（防御性，避免 0 值传入分片逻辑）
+- **`src-tauri/src/minecraft/download/mod.rs`**：注册 `session` 子模块并 `pub use DownloadSession`
+- **`src-tauri/src/commands/community/install/resource.rs`**（`download_resource` / `download_resource_to_path`）：用 `DownloadSession::start_grouped` 替代手工 `reset_stages + flag 重置 + DownloadManager::new + callback 闭包`，删除 2 处闭包复制 + 2 处硬编码 `new(4, chunk_count, 0, Smart)`
+- **`src-tauri/src/commands/tools/download.rs`**（`download_file`）：用 `DownloadSession::start_grouped` 替代手工初始化，删除 1 处闭包复制 + 1 处硬编码 `new(4, chunk_count, 0, Smart)`
+- **`src-tauri/src/commands/community/install/modpack_stages.rs`**（`download_modpack_archive`）：用 `DownloadSession::attach` 替代手工 `DownloadManager::new + callback 闭包`（stages / flag 已由 `install_modpack` 处理），删除 1 处闭包复制 + 1 处硬编码 `new(4, chunk_count, 0, Smart)`
+- **`src-tauri/src/commands/community/install/concurrent.rs`**（`download_files_concurrent`）：用 `DownloadSession::attach` 替代手工 `DownloadManager::new + callback 闭包`，删除 1 处闭包复制 + 1 处硬编码 `new(max_threads, chunk_count, 0, Smart)`；**移除 `max_threads` 参数** —— `DownloadSession::attach` 内部已从 config 读取，避免双重数据源
+- **`src-tauri/src/commands/community/install/curseforge.rs`**（`install_cf_mods`）：移除 `max_threads` 参数（透传给 `download_files_concurrent` 的，已无用）
+- **`src-tauri/src/commands/community/install/modrinth.rs`**（`install_mr_files`）：移除 `max_threads` 参数（同上）
+- **`src-tauri/src/commands/community/install/modpack.rs`**（`install_modpack` / `install_modpack_local`）：移除 2 处 `max_threads` 提取 + 4 处传参
+- **关键决策**：
+  - `DownloadSession` 提供两种入口：`start_grouped`（顶层，完整初始化）+ `attach`（子流程，仅 manager）—— 后者用于 `install_modpack` 已 reset_stages + flag 重置的场景，避免覆盖父会话状态
+  - `max_threads` 参数链彻底移除（4 个文件）—— 之前 `install_modpack` 从 config 读 `max_threads` → 透传给 `install_cf_mods`/`install_mr_files` → 透传给 `download_files_concurrent` → 构造 `DownloadManager::new(max_threads, ...)`；现在 `DownloadSession::attach` 内部从 config 直接读，数据流单一化
+  - 用户设置的 `speed_limit` / `source_mode` 现在对**所有下载场景生效**（整合包 / 资源 / 外部 / mods 批量），之前这 5 处硬编码 `speed_limit=0` / `source_mode=Smart`，用户设置不生效
+- **不变**：`install_modpack` / `install_modpack_local` 顶层的 `reset_stages + flag 重置` 保留（这些是父会话职责，子流程 `attach` 不应处理）；`DownloadManager` / `download_batch` / chunk / stream 实现完全不动
 
 #### DownloadManager 重构阶段 2.5：补 fix_version_files 接入
 

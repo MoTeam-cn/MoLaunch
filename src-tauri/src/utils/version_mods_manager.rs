@@ -1,9 +1,9 @@
 //! 版本 Mod 管理统一分发逻辑（version_mods_manager 的工具实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发。
-//! 10 个 version::mods action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
+//! 11 个 version::mods action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
 //!
-//! 命令清单（10 个，按子模块分组）：
+//! 命令清单（11 个，按子模块分组）：
 //! - list.rs（2 个）：
 //!   - `is_version_modable`：判断版本是否可安装 Mod
 //!   - `list_mods`：列出版本 mods 目录中的 mod（同步阶段，只枚举文件）
@@ -15,6 +15,8 @@
 //!   - `open_mods_dir`：打开 mods 目录
 //!   - `reveal_mod_file`：在资源管理器中选中 mod 文件
 //!   - `get_version_mods_dir`：获取 mods 目录路径（不打开）
+//! - update.rs（1 个，阶段 4 新增）：
+//!   - `update_mod`：原子化更新 mod（下载新版本 + 删旧版本）
 //! - watcher.rs（2 个）：
 //!   - `watch_mods_dir`：监听 mods 目录变化（需要 AppHandle emit 事件）
 //!   - `unwatch_mods_dir`：停止监听（无参数无 state）
@@ -28,7 +30,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::version::mods::{install, list, manage, watcher};
+use crate::commands::version::mods::{install, list, manage, update, watcher};
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
@@ -76,6 +78,17 @@ struct InstallModParams {
 struct RevealModFileParams {
     version_id: String,
     file_name: String,
+}
+
+/// update_mod 参数（阶段 4 新增）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct UpdateModParams {
+    version_id: String,
+    old_file_name: String,
+    download_url: String,
+    new_file_name: String,
+    expected_size: i64,
 }
 
 // ============================================================
@@ -142,6 +155,22 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             .map_err(|e| format!("参数解析失败: {}", e))?;
         let r = install::get_version_mods_dir(&state, p.version_id).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    // === update.rs（1 个，阶段 4 新增） ===
+    d.register("update_mod", handler!(state, _app, params, {
+        let p: UpdateModParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        update::update_mod(
+            &state,
+            p.version_id,
+            p.old_file_name,
+            p.download_url,
+            p.new_file_name,
+            p.expected_size,
+        )
+        .await?;
+        serde_json::to_value(()).map_err(|e| e.to_string())
     }));
 
     // === watcher.rs（2 个） ===

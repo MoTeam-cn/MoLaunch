@@ -8,10 +8,11 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::{log_info, log_warn};
+use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::launcher_profiles;
-use crate::minecraft::sources::{self, DownloadSourceMode};
+use crate::minecraft::sources;
 
 use super::super::shared;
 use super::legacy::install_legacy;
@@ -23,7 +24,7 @@ pub async fn install(
     game_dir: &Path,
     mirror_url: Option<&str>,
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
-    source_mode: DownloadSourceMode,
+    config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
     if let Some(ref cb) = progress_callback {
         cb(0.0);
@@ -46,10 +47,10 @@ pub async fn install(
         &installer_url,
         mirror_url,
         sources::MAVEN_REPLACEMENTS,
-        source_mode,
+        config.source_mode,
     );
 
-    let manager = DownloadManager::new(1, 0, 0, source_mode);
+    let manager = DownloadManager::from_config(config);
     let task = DownloadTask {
         id: "forge_installer".to_string(),
         urls,
@@ -78,7 +79,7 @@ pub async fn install(
             &installer_path,
             game_dir,
             progress_callback,
-            source_mode,
+            config,
         )
         .await
     } else {
@@ -100,7 +101,7 @@ async fn install_modern(
     installer_path: &Path,
     game_dir: &Path,
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
-    source_mode: DownloadSourceMode,
+    config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
     log_info!("[Forge] Installing {} for MC {}", forge_version, mc_version);
 
@@ -114,7 +115,7 @@ async fn install_modern(
 
     // 下载 Mojang 映射文件
     if let Err(e) =
-        shared::download_mojang_mappings(mc_version, game_dir, installer_path, source_mode).await
+        shared::download_mojang_mappings(mc_version, game_dir, installer_path, config).await
     {
         log_warn!("[Forge] Failed to download mappings: {}", e);
     }

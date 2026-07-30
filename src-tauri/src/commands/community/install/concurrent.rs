@@ -6,24 +6,24 @@
 //! - `detect_modpack_format`：检测整合包格式（CF manifest.json / MR modrinth.index.json）
 
 use crate::log_info;
+use crate::minecraft::download::DownloadSession;
 use crate::state::AppState;
-use std::sync::Arc;
 
 /// 并发下载多个文件，进度汇总到 download_state 的指定 stage
 ///
-/// 统一走 DownloadManager：自动按文件大小走分片下载（>1MB/chunk 走 chunk::download_chunked）
+/// 统一走 DownloadSession::attach：自动按文件大小走分片下载（>1MB/chunk 走 chunk::download_chunked）
 /// 或普通下载（小文件直连），与 MC 本体/库/assets 走同一套下载基础设施。
 /// 进度通过 `sync_stage_from_progress` 统一同步到 download_state（速度/字节累加由统一方法处理）。
+///
+/// 改造：移除 `max_threads` 参数 —— DownloadSession::attach 内部已从 config 读取 max_threads，
+/// 避免双重数据源（调用方从 config 读一次，session 内部又读一次）。
 pub(super) async fn download_files_concurrent(
     state: &AppState,
     stage_index: usize,
     files: &[(Vec<String>, String, u64)], // (urls, target_path, file_size)
-    max_threads: usize,
     _precomputed_total: u64,
 ) -> Result<(), String> {
-    use crate::minecraft::download::manager::DownloadManager;
     use crate::minecraft::download::types::DownloadTask;
-    use crate::minecraft::sources::DownloadSourceMode;
 
     if files.is_empty() {
         let mut ds = state.download_state.lock().unwrap();
@@ -46,38 +46,15 @@ pub(super) async fn download_files_concurrent(
 
     let total_count = files.len() as u64;
 
-    // 进度回调：DownloadManager 已内置 300ms timer + 滑动窗口速度计算
-    // 直接用 sync_stage_from_progress 统一同步，无需额外 timer / 原子计数器 / 速度计算
-    // 广播到 WS 让前端实时收到进度（双路：emit 兼容旧 listen + WS 推送）
-    let progress_state = state.download_state.clone();
-    let progress_stage_index = stage_index;
-    let state_for_cb = state.clone();
-    let progress_callback: Arc<
-        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
-    > = Arc::new(move |p| {
-        {
-            let mut ds = progress_state.lock().unwrap();
-            ds.sync_stage_from_progress(
-                progress_stage_index,
-                p.downloaded_bytes,
-                p.total_bytes,
-                p.completed_files,
-                p.total_files,
-                p.current_speed,
-            );
-        }
-        // 广播进度到 WS（确保整合包下载路径也能推送）
-        crate::commands::version::download::broadcast_current(&state_for_cb);
-    });
-
-    // 用 DownloadManager 下载（自动分片 + 多线程 + 重试 + URL fallback）
-    let config = state.config.lock().await;
-    let chunk_count = config.download.chunk_count.max(1) as usize;
-    drop(config);
-    let manager = DownloadManager::new(max_threads, chunk_count, 0, DownloadSourceMode::Smart)
-        .with_cancel_flag(state.download_cancel_flag.clone())
-        .with_pause_flag(state.download_pause_flag.clone());
-    let results = manager.download_batch(tasks, Some(progress_callback)).await;
+    // 子流程接入：仅构造 manager + callback（stages / flag 已由 install_modpack 处理）
+    // manager 内部从 config 读取 max_threads/chunk_count/speed_limit/source_mode，
+    // 用户设置的限速/源策略现在对整合包 mods 下载也生效（之前硬编码 speed_limit=0/Smart）
+    let session = DownloadSession::attach(state).await;
+    let progress_callback = session.make_progress_callback(state, stage_index);
+    let results = session
+        .manager()
+        .download_batch(tasks, Some(progress_callback))
+        .await;
 
     // 收集失败
     // 取消导致的失败不逐个打印日志，避免大量文件同时失败时刷屏

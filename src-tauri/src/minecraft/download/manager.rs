@@ -338,3 +338,7 @@ impl DownloadManager {
         self.progress.lock().unwrap().clone()
     }
 }
+
+#[cfg(test)]
+#[path = "manager_tests.rs"]
+mod tests;

@@ -33,7 +33,6 @@ pub struct AssetIndexMeta {
 
 /// 从版本 JSON 中获取资源索引元数据
 pub fn get_asset_index_meta(json: &serde_json::Value) -> Option<AssetIndexMeta> {
-    // 优先从 assetIndex 获取
     if let Some(index) = json.get("assetIndex") {
         let id = index["id"].as_str()?;
         let sha1 = index["sha1"].as_str().unwrap_or_default();

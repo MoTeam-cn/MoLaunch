@@ -118,7 +118,7 @@ pub fn run() {
             commands::version::version_list_manager,
             // - version_install_manager：download + install + loaders + preload（11 个 action）
             commands::version::version_install_manager,
-            // - version_mods_manager：mods 下 list/manage/install/watcher（10 个 action）
+            // - version_mods_manager：mods 下 list/manage/install/update/watcher（11 个 action）
             commands::version::mods::version_mods_manager,
             // - version_progress_manager：下载进度与控制（6 个 action）
             commands::version::progress::version_progress_manager,

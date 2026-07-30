@@ -8,11 +8,10 @@
 //! 返回值统一用 `serde_json::to_value` 包装为 `serde_json::Value`。
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::log_info;
+use crate::minecraft::download::DownloadSession;
 use crate::state::AppState;
-use crate::state::DownloadStage;
 use crate::storage::Storage;
 use crate::utils::path::sanitize_file_name;
 
@@ -24,7 +23,7 @@ use super::types::{
 ///
 /// - 校验 http/https 协议
 /// - 校验文件名安全性
-/// - 复用 DownloadManager（支持进度 / 暂停 / 取消），进度写入 download_state（分组"外部下载"）
+/// - 复用 DownloadSession（支持进度 / 暂停 / 取消），进度写入 download_state（分组"外部下载"）
 /// - 返回保存路径与文件大小
 pub async fn download_file(
     state: &AppState,
@@ -54,23 +53,12 @@ pub async fn download_file(
         save_path.display()
     );
 
-    // 重置 download_state，注册单阶段任务（分组"外部下载"）
+    // 启动 DownloadSession：统一 reset_stages + flag 重置 + manager 构造
+    let session = DownloadSession::start_grouped(state, "外部下载", vec![(&file_name, 1.0)]).await;
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.reset_stages(vec![DownloadStage::new_grouped(
-            &file_name,
-            1.0,
-            "外部下载",
-        )]);
         ds.version_name = file_name.clone();
     }
-    // 重置 cancel/pause flag（防止上次任务残留状态影响新任务）
-    state
-        .download_cancel_flag
-        .store(false, std::sync::atomic::Ordering::Relaxed);
-    state
-        .download_pause_flag
-        .store(false, std::sync::atomic::Ordering::Relaxed);
 
     // 构造下载任务（直接使用原始 URL，不经过 cdn_urls —— 外部 URL 不应走镜像策略）
     let task = crate::minecraft::download::types::DownloadTask {
@@ -81,36 +69,13 @@ pub async fn download_file(
         expected_hash: None,
     };
 
-    // 进度回调：sync_stage_from_progress 统一同步到 download_state
-    let cb_state = state.download_state.clone();
-    let progress_callback: Arc<
-        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
-    > = Arc::new(move |p| {
-        let mut ds = cb_state.lock().unwrap();
-        ds.sync_stage_from_progress(
-            0,
-            p.downloaded_bytes,
-            p.total_bytes,
-            p.completed_files,
-            p.total_files,
-            p.current_speed,
-        );
-    });
+    // 统一进度回调工厂（消除闭包复制）
+    let progress_callback = session.make_progress_callback(state, 0);
 
-    let config = state.config.lock().await;
-    let chunk_count = config.download.chunk_count.max(1) as usize;
-    drop(config);
-
-    let manager = crate::minecraft::download::manager::DownloadManager::new(
-        4,
-        chunk_count,
-        0,
-        crate::minecraft::sources::DownloadSourceMode::Smart,
-    )
-    .with_cancel_flag(state.download_cancel_flag.clone())
-    .with_pause_flag(state.download_pause_flag.clone());
-
-    let results = manager.download_batch(vec![task], Some(progress_callback)).await;
+    let results = session
+        .manager()
+        .download_batch(vec![task], Some(progress_callback))
+        .await;
 
     let result = results.first().ok_or("下载结果为空")?;
 
@@ -120,19 +85,13 @@ pub async fn download_file(
             .error
             .clone()
             .unwrap_or_else(|| "未知错误".to_string());
-        {
-            let mut ds = state.download_state.lock().unwrap();
-            ds.mark_failed(1);
-        }
+        session.mark_failed(state, 1);
         return Err(err);
     }
 
     let size = std::fs::metadata(&save_path).map(|m| m.len()).unwrap_or(0);
 
-    {
-        let mut ds = state.download_state.lock().unwrap();
-        ds.mark_complete();
-    }
+    session.mark_complete(state);
 
     log_info!(
         "[ExternalDownload] 下载完成: {} ({} bytes)",

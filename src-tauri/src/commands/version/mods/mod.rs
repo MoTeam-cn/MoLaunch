@@ -8,6 +8,7 @@
 //! - list.rs: 列表查询命令（list_mods / is_version_modable + infer_loader_type）
 //! - manage.rs: 管理命令（toggle_mod / delete_mod）
 //! - install.rs: 安装与文件操作命令（install_mod / open_mods_dir / get_version_mods_dir / reveal_mod_file）
+//! - update.rs: Mod 更新命令（update_mod —— 阶段 4 新增，原子化下载+删旧）
 //! - mod.rs: 模块入口 + pub mod 声明 + 类型 re-export + version_mods_manager IPC 入口
 //!
 //! 注意：原 10 个分散的 version::mods Tauri 命令已聚合为 `version_mods_manager` 一个 IPC 入口，
@@ -21,6 +22,7 @@ pub mod list;
 mod metadata;
 pub mod manage;
 mod types;
+pub mod update;
 pub mod watcher;
 
 use crate::state::AppState;

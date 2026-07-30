@@ -39,6 +39,8 @@ export const VERSION_MODS_ACTIONS = {
   OPEN_MODS_DIR: 'open_mods_dir',
   REVEAL_MOD_FILE: 'reveal_mod_file',
   GET_VERSION_MODS_DIR: 'get_version_mods_dir',
+  // update.rs（1 个，阶段 4 新增）
+  UPDATE_MOD: 'update_mod',
   // watcher.rs（2 个）
   WATCH_MODS_DIR: 'watch_mods_dir',
   UNWATCH_MODS_DIR: 'unwatch_mods_dir',

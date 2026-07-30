@@ -53,7 +53,6 @@ pub async fn download_single(
         urls
     );
 
-    // 确保目录存在
     if let Some(parent) = Path::new(&task.local_path).parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             return DownloadProgress {

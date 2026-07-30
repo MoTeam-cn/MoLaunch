@@ -6,6 +6,7 @@
 
 use crate::error_util::log_err;
 use crate::log_error;
+use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::loaders;
 use crate::state::AppState;
 
@@ -160,7 +161,7 @@ pub async fn install_fabric_api_for_version(
 ) -> Result<(), String> {
     use crate::commands::version::mods::helpers::get_mods_dir;
 
-    let (_, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
+    let config = DownloadManagerConfig::from_state_for_meta(&state).await;
 
     let mods_dir: std::path::PathBuf = get_mods_dir(&state, &version_id).await?;
 
@@ -175,7 +176,7 @@ pub async fn install_fabric_api_for_version(
         &file_name,
         &mods_dir,
         hash.as_deref(),
-        source_mode,
+        &config,
         None,
     )
     .await

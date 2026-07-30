@@ -1,11 +1,6 @@
 //! 单文件分片并发下载模块
-//!
 //! 将大文件拆分为多个 chunk，使用 HTTP Range 请求并发下载，最后合并。
-//!
-//! 子模块：
-//! - `probe`: 服务器 Range 支持检测与文件大小探测
-//! - `download`: 单个分片的下载实现
-//! - `merge`: 分片合并
+//! 子模块：`probe`（Range 检测/大小探测）、`download`（分片下载）、`merge`（合并）
 
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
@@ -86,7 +81,6 @@ pub async fn download_chunked(
         };
     }
 
-    // 确保目录存在
     if let Some(parent) = Path::new(local_path).parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
             return ChunkDownloadResult {

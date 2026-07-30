@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
 
+use crate::minecraft::download::config::DownloadManagerConfig;
 use super::sources::DownloadSourceMode;
 
 /// Loader type
@@ -85,9 +86,8 @@ pub async fn install_loader(
     loader_version: &str,
     game_dir: &Path,
     mirror_url: Option<&str>,
-    _max_threads: usize,
     progress_callback: Option<Arc<dyn Fn(f64) + Send + Sync>>,
-    source_mode: DownloadSourceMode,
+    config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
     match loader_type {
         LoaderType::Forge => {
@@ -97,7 +97,7 @@ pub async fn install_loader(
                 game_dir,
                 mirror_url,
                 progress_callback,
-                source_mode,
+                config,
             )
             .await
         }
@@ -108,7 +108,7 @@ pub async fn install_loader(
                 game_dir,
                 mirror_url,
                 progress_callback,
-                source_mode,
+                config,
             )
             .await
         }
@@ -119,12 +119,13 @@ pub async fn install_loader(
                 game_dir,
                 mirror_url,
                 progress_callback,
-                source_mode,
+                config,
             )
             .await
         }
         LoaderType::OptiFine => {
-            optifine::install(mc_version, loader_version, progress_callback, source_mode).await
+            optifine::install(mc_version, loader_version, progress_callback, config.source_mode)
+                .await
         }
         LoaderType::LiteLoader => {
             liteloader::install(
@@ -133,7 +134,7 @@ pub async fn install_loader(
                 game_dir,
                 mirror_url,
                 progress_callback,
-                source_mode,
+                config,
             )
             .await
         }

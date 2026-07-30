@@ -209,7 +209,6 @@ pub(super) async fn download_chunk(
         if let Some(ref fp) = file_progress {
             let delta = downloaded.saturating_sub(prev_chunk_bytes);
             let mut p = fp.lock().unwrap();
-            // 增量累加，避免覆盖其他并发文件的进度
             p.downloaded_bytes = p.downloaded_bytes.saturating_add(delta);
         }
 

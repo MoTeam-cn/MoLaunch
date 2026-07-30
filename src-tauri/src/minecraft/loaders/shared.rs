@@ -3,9 +3,10 @@
 use crate::{log_error, log_info, log_warn};
 use std::path::{Path, PathBuf};
 
+use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
-use crate::minecraft::sources::{self, DownloadSourceMode};
+use crate::minecraft::sources;
 
 /// Find Java for installation (minimum Java 8u60)
 pub fn find_java_for_install(_game_dir: &Path) -> anyhow::Result<String> {
@@ -43,7 +44,7 @@ pub async fn download_mojang_mappings(
     mc_version: &str,
     game_dir: &Path,
     installer_path: &Path,
-    source_mode: DownloadSourceMode,
+    config: &DownloadManagerConfig,
 ) -> anyhow::Result<()> {
     let file = std::fs::File::open(installer_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
@@ -95,7 +96,7 @@ pub async fn download_mojang_mappings(
         return Ok(());
     }
 
-    let version_list = super::super::download::fetch_version_list(None, source_mode).await?;
+    let version_list = super::super::download::fetch_version_list(None, config.source_mode).await?;
     let json_url = super::super::download::get_version_json_url(&version_list.value, mc_version)
         .ok_or_else(|| anyhow::anyhow!("Version {} not found", mc_version))?;
 
@@ -114,9 +115,9 @@ pub async fn download_mojang_mappings(
 
     std::fs::create_dir_all(&local_dir)?;
 
-    let urls = sources::build_replace_urls(url, None, sources::MOJANG_REPLACEMENTS, source_mode);
+    let urls = sources::build_replace_urls(url, None, sources::MOJANG_REPLACEMENTS, config.source_mode);
 
-    let manager = DownloadManager::new(1, 0, 0, source_mode);
+    let manager = DownloadManager::from_config(config);
     let task = DownloadTask {
         id: "mappings".to_string(),
         urls,

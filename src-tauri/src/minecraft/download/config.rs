@@ -1,8 +1,6 @@
 //! DownloadManager 构造配置
 //!
-//! 从 `AppConfig.download` 提取 DownloadManager 所需的 4 个字段，
-//! 消灭调用层重复的 `state.config.lock() → extract → drop` 套件。
-//! 现有 3 处重复（download.rs / install/mod.rs / manage.rs）统一收敛到 `from_state`。
+//! 从 `AppConfig.download` 提取 DownloadManager 所需字段，收敛调用层重复的 lock/extract 套件。
 
 use crate::minecraft::sources::DownloadSourceMode;
 use crate::state::AppState;
@@ -31,9 +29,28 @@ impl DownloadManagerConfig {
         let config = state.config.lock().await;
         Self {
             max_threads: config.download.max_threads as usize,
-            chunk_count: config.download.chunk_count as usize,
+            // max(1) 保持与 resource.rs / concurrent.rs / tools/download.rs 历史行为一致
+            // （chunk_count=0 在 chunk/mod.rs 中虽被 `<= 1` 提前 return 保护，但 max(1) 更防御性）
+            chunk_count: config.download.chunk_count.max(1) as usize,
             speed_limit: config.download.max_speed,
             source_mode: DownloadSourceMode::from_str(&config.download.source),
+        }
+    }
+
+    /// 从 AppState 提取下载配置（使用 meta_source 而非 source）
+    ///
+    /// 阶段 6 新增：加载器 installer 历史用 `meta_source`（元数据源）构造 DownloadManager，
+    /// 本方法保持该行为，同时让用户设置的 `max_threads`/`chunk_count`/`speed_limit` 对 installer 生效。
+    ///
+    /// 与 `from_state` 的唯一区别：`source_mode` 读 `config.download.meta_source`（元数据源），
+    /// 而非 `config.download.source`（文件下载源）。
+    pub async fn from_state_for_meta(state: &AppState) -> Self {
+        let config = state.config.lock().await;
+        Self {
+            max_threads: config.download.max_threads as usize,
+            chunk_count: config.download.chunk_count.max(1) as usize,
+            speed_limit: config.download.max_speed,
+            source_mode: DownloadSourceMode::from_str(&config.download.meta_source),
         }
     }
 }

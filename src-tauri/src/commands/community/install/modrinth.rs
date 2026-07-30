@@ -94,7 +94,6 @@ pub(super) async fn install_mr_files(
     state: &AppState,
     mr_files: &[MrFile],
     instance_dir: &std::path::Path,
-    max_threads: usize,
     stage_index: usize,
     include_optional: bool,
 ) -> Result<(), String> {
@@ -227,7 +226,6 @@ pub(super) async fn install_mr_files(
         state,
         stage_index,
         &download_list,
-        max_threads,
         total_bytes,
     )
     .await?;

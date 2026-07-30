@@ -5,12 +5,10 @@
 //! - `parse_modpack_info`：Stage 1，解析 manifest/index 得到整合包信息
 
 use crate::log_info;
-use crate::minecraft::download::manager::DownloadManager;
+use crate::minecraft::download::DownloadSession;
 use crate::minecraft::download::types::DownloadStatus;
 use crate::minecraft::download::types::DownloadTask;
-use crate::minecraft::sources::DownloadSourceMode;
 use crate::state::{AppState, StageStatus};
-use std::sync::Arc;
 
 use super::concurrent::DetectedModpack;
 use super::curseforge::CfManifest;
@@ -24,7 +22,8 @@ use crate::utils::format;
 
 /// Stage 0：下载原始整合包到 instance 目录
 ///
-/// 通过 DownloadManager 下载（自动分片 + 多线程 + 重试 + URL fallback），
+/// 通过 DownloadSession::attach 复用 install_modpack 父会话的 stages / flag 状态，
+/// 仅构造 manager + callback（不再 reset_stages / 重置 flag）。
 /// 进度通过 `sync_stage_from_progress` 统一同步到 download_state 的 Stage 0。
 ///
 /// 返回 archive_size（字节数），供日志输出。
@@ -49,35 +48,11 @@ pub(super) async fn download_modpack_archive(
         expected_hash: None,
     };
 
-    // stage 0 的进度回调：统一用 sync_stage_from_progress 同步 GlobalProgress 到 download_state
-    // 同时广播到 WS 让前端实时收到整合包下载进度
-    let stage0_state = state.download_state.clone();
-    let state_for_cb = state.clone();
-    let stage0_callback: Arc<
-        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
-    > = Arc::new(move |p| {
-        {
-            let mut ds = stage0_state.lock().unwrap();
-            ds.sync_stage_from_progress(
-                0,
-                p.downloaded_bytes,
-                p.total_bytes,
-                p.completed_files,
-                p.total_files,
-                p.current_speed,
-            );
-        }
-        // 广播进度到 WS（确保整合包归档下载也能推送）
-        crate::commands::version::download::broadcast_current(&state_for_cb);
-    });
-
-    let config = state.config.lock().await;
-    let chunk_count = config.download.chunk_count.max(1) as usize;
-    drop(config);
-    let archive_manager = DownloadManager::new(4, chunk_count, 0, DownloadSourceMode::Smart)
-        .with_cancel_flag(state.download_cancel_flag.clone())
-        .with_pause_flag(state.download_pause_flag.clone());
-    let archive_results = archive_manager
+    // 子流程接入：仅构造 manager + callback（stages / flag 已由 install_modpack 处理）
+    let session = DownloadSession::attach(state).await;
+    let stage0_callback = session.make_progress_callback(state, 0);
+    let archive_results = session
+        .manager()
         .download_batch(vec![archive_task], Some(stage0_callback))
         .await;
 

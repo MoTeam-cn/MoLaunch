@@ -72,3 +72,7 @@ impl RateLimiter {
         (needed / self.bytes_per_second as f64 * 1000.0) as u64
     }
 }
+
+#[cfg(test)]
+#[path = "rate_limiter_tests.rs"]
+mod tests;

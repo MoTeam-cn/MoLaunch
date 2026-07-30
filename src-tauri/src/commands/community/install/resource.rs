@@ -2,11 +2,11 @@
 //! format_download_filename / get_resource_install_path）
 
 use std::path::PathBuf;
-use std::sync::Arc;
 
 use crate::log_info;
 use crate::minecraft::community::types::ResourceType;
-use crate::state::{AppState, DownloadStage};
+use crate::minecraft::download::DownloadSession;
+use crate::state::AppState;
 use tauri::AppHandle;
 
 use super::helpers::{apply_filename_format, resolve_install_dir};
@@ -14,7 +14,8 @@ use super::types::{DownloadRequest, DownloadResult};
 
 /// 下载资源文件到游戏目录（用于"快速安装"）
 ///
-/// 走 DownloadManager（支持多 URL fallback + 分片 + 暂停/取消），
+/// 走 DownloadSession（封装 DownloadManager + reset_stages + flag 重置 + callback 工厂），
+/// 支持 多 URL fallback + 分片 + 暂停/取消，
 /// 进度通过 `download_state` 统一通道，前端在下载管理页面展示。
 ///
 /// - Mod → versions/{vid}/mods/
@@ -34,7 +35,6 @@ pub async fn download_resource(
         req.translated_name.as_deref(),
         config.community.filename_format,
     );
-    let chunk_count = config.download.chunk_count.max(1) as usize;
     drop(config);
 
     let target_dir = resolve_install_dir(&game_dir, req.resource_type, req.version_id.as_deref());
@@ -46,22 +46,18 @@ pub async fn download_resource(
 
     let target_path = target_dir.join(&final_file_name);
 
-    // 重置 download_state，注册单阶段任务（分组"社区资源"）
+    // 启动 DownloadSession：统一 reset_stages + flag 重置 + manager 构造
+    // （之前手工 lock + reset_stages + store flag + DownloadManager::new 6 步合并为 1 行）
+    let session = DownloadSession::start_grouped(
+        state,
+        "社区资源",
+        vec![(&final_file_name, 1.0)],
+    )
+    .await;
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.reset_stages(vec![DownloadStage::new_grouped(
-            &final_file_name,
-            1.0,
-            "社区资源",
-        )]);
         ds.version_name = final_file_name.clone();
     }
-    state
-        .download_cancel_flag
-        .store(false, std::sync::atomic::Ordering::Relaxed);
-    state
-        .download_pause_flag
-        .store(false, std::sync::atomic::Ordering::Relaxed);
 
     // 构造下载任务（cdn_urls 根据 source 策略生成多 URL fallback）
     let task = crate::minecraft::download::types::DownloadTask {
@@ -72,38 +68,11 @@ pub async fn download_resource(
         expected_hash: None,
     };
 
-    // 进度回调：sync_stage_from_progress 统一同步到 download_state
-    // 同时广播到 WS 让前端实时收到资源下载进度
-    let cb_state = state.download_state.clone();
-    let state_for_cb = state.clone();
-    let progress_callback: Arc<
-        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
-    > = Arc::new(move |p| {
-        {
-            let mut ds = cb_state.lock().unwrap();
-            ds.sync_stage_from_progress(
-                0,
-                p.downloaded_bytes,
-                p.total_bytes,
-                p.completed_files,
-                p.total_files,
-                p.current_speed,
-            );
-        }
-        // 广播进度到 WS（确保资源下载路径也能推送）
-        crate::commands::version::download::broadcast_current(&state_for_cb);
-    });
+    // 统一进度回调工厂（消除闭包复制）
+    let progress_callback = session.make_progress_callback(state, 0);
 
-    let manager = crate::minecraft::download::manager::DownloadManager::new(
-        4,
-        chunk_count,
-        0,
-        crate::minecraft::sources::DownloadSourceMode::Smart,
-    )
-    .with_cancel_flag(state.download_cancel_flag.clone())
-    .with_pause_flag(state.download_pause_flag.clone());
-
-    let results = manager
+    let results = session
+        .manager()
         .download_batch(vec![task], Some(progress_callback))
         .await;
 
@@ -115,10 +84,7 @@ pub async fn download_resource(
             .error
             .clone()
             .unwrap_or_else(|| "未知错误".to_string());
-        {
-            let mut ds = state.download_state.lock().unwrap();
-            ds.mark_failed(1);
-        }
+        session.mark_failed(state, 1);
         return Err(err);
     }
 
@@ -126,10 +92,7 @@ pub async fn download_resource(
         .map(|m| m.len())
         .unwrap_or(0);
 
-    {
-        let mut ds = state.download_state.lock().unwrap();
-        ds.mark_complete();
-    }
+    session.mark_complete(state);
 
     log_info!(
         "[Community] Downloaded {} ({} bytes) to {}",
@@ -163,7 +126,8 @@ pub async fn format_download_filename(
 
 /// 下载资源文件到自定义路径（用户通过文件管理器选择）
 ///
-/// 走 DownloadManager（支持多 URL fallback + 分片 + 暂停/取消），
+/// 走 DownloadSession（封装 DownloadManager + reset_stages + flag 重置 + callback 工厂），
+/// 支持 多 URL fallback + 分片 + 暂停/取消，
 /// 进度通过 `download_state` 统一通道，前端在下载管理页面展示。
 pub async fn download_resource_to_path(
     state: &AppState,
@@ -183,22 +147,12 @@ pub async fn download_resource_to_path(
         }
     }
 
-    // 重置 download_state，注册单阶段任务（分组"社区资源"）
+    // 启动 DownloadSession：统一 reset_stages + flag 重置 + manager 构造
+    let session = DownloadSession::start_grouped(state, "社区资源", vec![(&file_name, 1.0)]).await;
     {
         let mut ds = state.download_state.lock().unwrap();
-        ds.reset_stages(vec![DownloadStage::new_grouped(
-            &file_name,
-            1.0,
-            "社区资源",
-        )]);
         ds.version_name = file_name.clone();
     }
-    state
-        .download_cancel_flag
-        .store(false, std::sync::atomic::Ordering::Relaxed);
-    state
-        .download_pause_flag
-        .store(false, std::sync::atomic::Ordering::Relaxed);
 
     // 构造下载任务（cdn_urls 根据 source 策略生成多 URL fallback）
     let task = crate::minecraft::download::types::DownloadTask {
@@ -209,42 +163,11 @@ pub async fn download_resource_to_path(
         expected_hash: None,
     };
 
-    // 进度回调：sync_stage_from_progress 统一同步到 download_state
-    // 同时广播到 WS 让前端实时收到资源下载进度
-    let cb_state = state.download_state.clone();
-    let state_for_cb = state.clone();
-    let progress_callback: Arc<
-        dyn Fn(crate::minecraft::download::types::GlobalProgress) + Send + Sync,
-    > = Arc::new(move |p| {
-        {
-            let mut ds = cb_state.lock().unwrap();
-            ds.sync_stage_from_progress(
-                0,
-                p.downloaded_bytes,
-                p.total_bytes,
-                p.completed_files,
-                p.total_files,
-                p.current_speed,
-            );
-        }
-        // 广播进度到 WS（确保资源下载路径也能推送）
-        crate::commands::version::download::broadcast_current(&state_for_cb);
-    });
+    // 统一进度回调工厂（消除闭包复制）
+    let progress_callback = session.make_progress_callback(state, 0);
 
-    let config = state.config.lock().await;
-    let chunk_count = config.download.chunk_count.max(1) as usize;
-    drop(config);
-
-    let manager = crate::minecraft::download::manager::DownloadManager::new(
-        4,
-        chunk_count,
-        0,
-        crate::minecraft::sources::DownloadSourceMode::Smart,
-    )
-    .with_cancel_flag(state.download_cancel_flag.clone())
-    .with_pause_flag(state.download_pause_flag.clone());
-
-    let results = manager
+    let results = session
+        .manager()
         .download_batch(vec![task], Some(progress_callback))
         .await;
 
@@ -256,19 +179,13 @@ pub async fn download_resource_to_path(
             .error
             .clone()
             .unwrap_or_else(|| "未知错误".to_string());
-        {
-            let mut ds = state.download_state.lock().unwrap();
-            ds.mark_failed(1);
-        }
+        session.mark_failed(state, 1);
         return Err(err);
     }
 
     let size = std::fs::metadata(&save_path).map(|m| m.len()).unwrap_or(0);
 
-    {
-        let mut ds = state.download_state.lock().unwrap();
-        ds.mark_complete();
-    }
+    session.mark_complete(state);
 
     log_info!("[Community] 下载完成: {} ({} bytes)", file_name, size);
 

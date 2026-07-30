@@ -5,8 +5,8 @@
  * 调用方传入响应式 props 与 emit，即可获得所有派生状态与操作函数。
  */
 import { ref, computed, watch } from 'vue'
-import { getProjectVersions, downloadResourceToPath } from '@/utils/api/community'
-import { getVersionModsDir, deleteMod, type ModInfo } from '@/utils/api/personalization'
+import { getProjectVersions } from '@/utils/api/community'
+import { updateMod, type ModInfo } from '@/utils/api/personalization'
 import { versionChangeType, type VersionChangeType } from '@/utils/version'
 import { formatBytes } from '@/utils/format'
 import { toastSuccess, toastInfo } from '@/utils/toast'
@@ -149,22 +149,18 @@ export function useModUpdate(
       async () => {
         installing.value = true
         try {
-          // 获取 mods 目录
-          const modsDir = await getVersionModsDir(props.versionId)
-
-          // 下载新版本到 mods 目录（走 DownloadManager，进度在下载管理页面展示）
+          // 原子化更新：后端封装"下载新版本 → 删旧版本"为单一 IPC
+          // 下载失败时不删旧文件（后端保证原子性）
+          // 进度通过 DownloadSession 统一推送（分组"Mod 更新"）
           versionStore.startDownload(version.file_name)
           toastInfo(`开始下载: ${version.file_name}`)
-          await downloadResourceToPath(version.download_url, version.file_name, modsDir)
-
-          // 删除旧版本文件（如果文件名不同）
-          if (version.file_name !== oldFileName && version.file_name !== mod.enabled_name) {
-            try {
-              await deleteMod(props.versionId, oldFileName)
-            } catch {
-              // 删除旧文件失败不阻断流程
-            }
-          }
+          await updateMod(
+            props.versionId,
+            oldFileName,
+            version.download_url,
+            version.file_name,
+            version.size,
+          )
 
           toastSuccess(`已安装 ${version.version}`)
           emit('installed')

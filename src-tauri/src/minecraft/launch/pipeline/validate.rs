@@ -11,6 +11,23 @@ use super::super::LaunchArguments;
 use super::{LaunchError, LaunchPipeline, LaunchStage};
 
 impl LaunchPipeline {
+    /// 从 LaunchConfig 构造 DownloadManager（validate_and_fix_files + build_arguments 复用）
+    ///
+    /// 阶段 5 提取：消除 validate_and_fix_files 与 build_arguments 中的 manager 构造重复。
+    /// 用户设置的 max_threads/chunk_count/speed_limit/download_source 对启动时文件补全
+    /// 和 authlib-injector.jar 下载都生效。
+    fn download_manager(&self) -> crate::minecraft::download::manager::DownloadManager {
+        let download_config = crate::minecraft::download::config::DownloadManagerConfig {
+            max_threads: self.config.max_threads as usize,
+            chunk_count: self.config.chunk_count as usize,
+            speed_limit: self.config.speed_limit,
+            source_mode: crate::minecraft::sources::DownloadSourceMode::from_str(
+                &self.config.download_source,
+            ),
+        };
+        crate::minecraft::download::manager::DownloadManager::from_config(&download_config)
+    }
+
     /// 检查文件完整性并自动补全
     pub(super) async fn validate_and_fix_files(&self) -> Result<(), LaunchError> {
         let version_dir = self
@@ -56,17 +73,7 @@ impl LaunchPipeline {
 
         // 用 LaunchConfig 中的下载参数构造 DownloadManager（build_launch_config 已从全局 config 填充）
         // 替代之前硬编码的 8/4/0/Smart，用户设置的限速/分片/线程数现在对启动时文件补全也生效
-        let download_config = crate::minecraft::download::config::DownloadManagerConfig {
-            max_threads: self.config.max_threads as usize,
-            chunk_count: self.config.chunk_count as usize,
-            speed_limit: self.config.speed_limit,
-            source_mode: crate::minecraft::sources::DownloadSourceMode::from_str(
-                &self.config.download_source,
-            ),
-        };
-        let manager = crate::minecraft::download::manager::DownloadManager::from_config(
-            &download_config,
-        );
+        let manager = self.download_manager();
 
         crate::minecraft::download::fix_version_files(
             &self.config.version_id,
@@ -95,9 +102,15 @@ impl LaunchPipeline {
         // 外置登录（authlib-injector）：确保 authlib-injector.jar 已下载到缓存
         // 仅当 auth_info.server_url 有值时执行。失败不阻塞启动，
         // add_authlib_args 内部会检测 jar 是否存在并打印警告。
+        // 阶段 5：通过 DownloadManager 下载（统一限速/URL fallback），与 validate_and_fix_files 复用 manager 构造
         if let Some(ref server_url) = self.config.auth_info.server_url {
             if !server_url.is_empty() {
-                let _ = crate::minecraft::auth::authlib::ensure_authlib_injector_jar(Some(server_url)).await;
+                let manager = self.download_manager();
+                let _ = crate::minecraft::auth::authlib::ensure_authlib_injector_jar(
+                    Some(server_url),
+                    &manager,
+                )
+                .await;
             }
         }
 
