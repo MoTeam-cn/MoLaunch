@@ -28,6 +28,7 @@ import { watch } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { getWsPort } from '@/utils/tauri'
 import { toastSuccess } from '@/utils/toast'
+import { isDownloading, getDownloadProgress } from '@/utils/api/system'
 import type { DownloadStage, RawDownloadProgress, RawDownloadStage } from '@/types/download'
 import { safeCall } from '@/utils/async'
 
@@ -226,6 +227,11 @@ function closeStream() {
  * - true → 建立 WS 连接
  * - false → 关闭 WS 连接
  *
+ * 启动时主动检查后端下载状态：
+ * - 应用刷新/重启后 `versionStore.downloading` 为 false，但后端可能仍在下载
+ * - 主动调用 `isDownloading` 检查，若仍在下载则 `startDownload` 恢复状态，
+ *   随后 watch 检测到 downloading=true 自动建立 WS 连接接收后续进度
+ *
  * 内部有 guard 防止多次调用注册多个 watch（Downloads.vue 也会调用此函数作为保险）。
  */
 export function initDownloadStream() {
@@ -234,10 +240,19 @@ export function initDownloadStream() {
 
   const versionStore = useVersionStore()
 
+  // 启动时主动检查后端是否有进行中的下载任务
+  void (async () => {
+    const active = await safeCall(() => isDownloading(), 'init check downloading')
+    if (active) {
+      const raw = await safeCall(() => getDownloadProgress(), 'init get progress')
+      versionStore.startDownload(raw?.version_name || '')
+    }
+  })()
+
   watch(
     () => versionStore.downloading,
-    (isDownloading) => {
-      if (isDownloading) {
+    (downloading) => {
+      if (downloading) {
         void openStream()
       } else {
         closeStream()

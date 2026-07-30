@@ -37,9 +37,11 @@ watch(
   <div class="w-56 border-r border-gray-200 bg-white flex flex-col shrink-0">
     <div class="flex-1 px-5 py-6 space-y-5">
       <!-- 当前阶段 -->
-      <div>
+      <div class="overflow-hidden">
         <div class="text-xs text-gray-500 mb-1">当前阶段</div>
-        <div class="text-base font-semibold text-gray-900">{{ currentStageName }}</div>
+        <Tooltip :text="currentStageName" position="right" block>
+          <div class="text-base font-semibold text-gray-900 truncate">{{ currentStageName || '-' }}</div>
+        </Tooltip>
       </div>
 
       <!-- 分割线 -->
