@@ -197,3 +197,23 @@ export async function addCustomCert(path: string): Promise<void> {
 export async function removeCustomCert(filename: string): Promise<void> {
   return systemManager<void>(SYSTEM_ACTIONS.REMOVE_CUSTOM_CERT, { filename })
 }
+
+// ==================== DevTools 控制 ====================
+//
+// 调用前要求开发者模式已解锁且已开启，后端 require_dev_mode() 双层校验。
+// 普通用户即使绕过前端按钮直接调 IPC 也无法触发。
+
+/** 打开主窗口的 WebView2 DevTools（开发者模式开启时可调用） */
+export async function openDevTools(): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.OPEN_DEVTOOLS)
+}
+
+/** 关闭主窗口的 WebView2 DevTools */
+export async function closeDevTools(): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.CLOSE_DEVTOOLS)
+}
+
+/** 查询主窗口的 DevTools 是否已打开（开发者模式未开启时返回 false） */
+export async function isDevToolsOpen(): Promise<boolean> {
+  return systemManager<boolean>(SYSTEM_ACTIONS.IS_DEVTOOLS_OPEN)
+}

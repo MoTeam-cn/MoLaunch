@@ -7,12 +7,14 @@
  * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
  * 故前端 params 对象的字段名一律使用 camelCase。
  *
- * 注册的 action（26 个）：
+ * 注册的 action（29 个）：
  * - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
  *   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
  * - config（2 个）：`get_config_path` / `save_config_to_file`
  * - developer（5 个）：`is_developer_unlocked` / `unlock_developer_mode`
  *   / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
+ * - devtools（3 个）：`open_devtools` / `close_devtools` / `is_devtools_open`
+ *   （开发者模式解锁且开启时可调出 WebView2 DevTools）
  * - about（1 个）：`get_about_data`
  * - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
  * - http_log（2 个）：`read_http_logs` / `list_http_log_files`
@@ -59,6 +61,11 @@ export const SYSTEM_ACTIONS = {
   GET_STORAGE_DIRS: 'get_storage_dirs',
   GET_SYSTEM_INFO: 'get_system_info',
   GET_CACHE_STATS: 'get_cache_stats',
+  // devtools（3 个）—— 调出/关闭/查询 WebView2 开发者工具
+  // 后端 require_dev_mode() 校验 DeveloperUnlocked && DeveloperMode，普通用户无法触发
+  OPEN_DEVTOOLS: 'open_devtools',
+  CLOSE_DEVTOOLS: 'close_devtools',
+  IS_DEVTOOLS_OPEN: 'is_devtools_open',
   // about（1 个）
   GET_ABOUT_DATA: 'get_about_data',
   // logger（3 个）
