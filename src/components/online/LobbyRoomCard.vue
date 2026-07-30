@@ -21,6 +21,8 @@ const props = defineProps<{
   room: LobbyRoomItem
   /** 加入中（禁用按钮防重复点击） */
   joining?: boolean
+  /** 当前已在房间中（禁用加入按钮，需先退出/关闭当前房间） */
+  inRoom?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -96,7 +98,23 @@ function handleJoin() {
         <UsersIcon class="w-3.5 h-3.5" />
         <span>{{ room.playerCount }} / {{ room.maxPlayers }}</span>
       </div>
+      <Tooltip
+        v-if="inRoom"
+        text="您当前在房间中哟，如果要加入 请先退出或者关闭房间"
+        position="top"
+        :delay="200"
+      >
+        <Button
+          type="primary"
+          size="small"
+          disabled
+        >
+          <template #icon><ArrowRightOnRectangleIcon class="w-3.5 h-3.5" /></template>
+          加入
+        </Button>
+      </Tooltip>
       <Button
+        v-else
         type="primary"
         size="small"
         :loading="joining"

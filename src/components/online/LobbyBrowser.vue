@@ -12,13 +12,13 @@
  * 加入流程复用 Online.vue provide 的 guestWebrtc + store.guestJoinRoom，
  * 加入成功后 store.roomState.role 变化触发 Online.vue watch(isInRoom) 自动跳转房间详情。
  */
-import { ref, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
 import { listLobbyRooms } from '@/utils/api/online-manager'
 import { resolveIceServers } from '@/utils/online/webrtc-helpers'
 import { showPrompt } from '@/utils/modal'
-import { toastError } from '@/utils/toast'
+import { toastError, toastInfo } from '@/utils/toast'
 import Input from '@/components/common/Input.vue'
 import Select from '@/components/common/Select.vue'
 import Button from '@/components/common/Button.vue'
@@ -35,6 +35,9 @@ import {
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
+
+/** 当前是否已在房间中（role !== null）。在房间中时禁用大厅加入按钮，需先退出/关闭当前房间 */
+const isInRoom = computed(() => store.roomState.role !== null)
 
 const rooms = ref<LobbyRoomItem[]>([])
 const total = ref(0)
@@ -104,6 +107,11 @@ function onPageChange(p: number) {
 }
 
 async function handleJoin(room: LobbyRoomItem) {
+  // 兜底校验：按钮已 disabled，但防止未来代码变更绕过
+  if (isInRoom.value) {
+    toastInfo('您当前在房间中哟，如果要加入 请先退出或者关闭房间')
+    return
+  }
   // 房间关联了整合包时先弹确认窗，供加入方校验/安装整合包
   if (room.modpack) {
     confirmRoom.value = room
@@ -194,6 +202,7 @@ onMounted(() => {
         :key="room.roomCode"
         :room="room"
         :joining="joiningCode === room.roomCode"
+        :in-room="isInRoom"
         @join="handleJoin"
       />
     </div>

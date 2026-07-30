@@ -9,6 +9,15 @@
 
 ### 新增
 
+#### 联机大厅加入按钮在房间中时禁用
+
+- 背景：用户反馈已创建/加入房间后，联机大厅中的「加入」按钮仍可点击，导致可重复加入不同房间，需禁用并提示先退出当前房间
+- 改动：
+  - **LobbyBrowser.vue**（[src/components/online/LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：从 `useOnlineStore` 派生 `isInRoom` computed（`roomState.role !== null`），传递给 `LobbyRoomCard` 的 `in-room` prop；`handleJoin` 顶部追加兜底校验，若 `isInRoom` 为 true 则 `toastInfo('您当前在房间中哟，如果要加入 请先退出或者关闭房间')` 并 return
+  - **LobbyRoomCard.vue**（[src/components/online/LobbyRoomCard.vue](src/components/online/LobbyRoomCard.vue)）：新增 `inRoom?: boolean` prop。当 `inRoom` 为 true 时，加入按钮渲染为 `disabled` 状态（视觉变灰），并用 `Tooltip` 包裹显示提示文字「您当前在房间中哟，如果要加入 请先退出或者关闭房间」；为 false 时保持原有逻辑（loading/disabled/click）
+- 效果：在房间中时大厅所有房间卡片的加入按钮自动变灰，hover 显示提示文字，点击无响应（disabled）；离开房间后按钮自动恢复可用
+- 用户反馈："如果前端成功创建或者加入了房间，那么前端侧边栏目前禁用了加入和创建房间按钮，联机大厅中的加入按钮给我禁用了，直接提示您当前在房间中哟，如果要加入 请先退出或者关闭房间"
+
 #### 开发者模式撤销解锁
 
 - 背景：用户反馈已解锁开发者模式后无法撤销，缺少关闭入口
