@@ -12,6 +12,7 @@ use super::secure;
 use super::types::ConfigPatch;
 use super::validate;
 use crate::log_info;
+use crate::log_warn;
 use crate::state::AppState;
 
 /// 配置更新核心逻辑（从扁平参数构建 `ConfigPatch` 后调用）
@@ -294,12 +295,20 @@ fn apply_external_download(config: &mut crate::state::AppConfig, patch: &ConfigP
 /// 联机域：online.api_server_url + online.custom_turn_servers
 ///
 /// - `api_server_url`：空字符串视为不更新（避免前端误传空值清空配置）
+///   **开发者模式校验**：仅在开发者模式已开启时允许更新（防止用户误改 + config.ini 直改保护）；
+///   关闭状态下静默忽略，不写入 config.ini，不报错（与 ignore_tls 关闭联动语义一致）。
 /// - `custom_turn_servers`：`Some` 即更新（含空数组，表示清空所有自定义 TURN）
 fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(ref url) = patch.online.api_server_url {
         if !url.is_empty() {
-            log_info!("[Config] online_api_server_url = {}", url);
-            config.online.api_server_url = url.clone();
+            // 开发者模式校验：未开启时静默忽略，保护 config.ini 不被写入
+            let (_, dev_mode, _) = secure::read_developer();
+            if dev_mode {
+                log_info!("[Config] online_api_server_url = {}", url);
+                config.online.api_server_url = url.clone();
+            } else {
+                log_warn!("[Config] 开发者模式未开启，禁止更新 online_api_server_url（保持原值）");
+            }
         }
     }
     if let Some(ref servers) = patch.online.custom_turn_servers {

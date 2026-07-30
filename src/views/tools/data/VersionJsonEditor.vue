@@ -34,9 +34,12 @@ const dirty = ref(false)
 
 const canSave = computed(() => selectedVersion.value !== '' && dirty.value && content.value.trim() !== '')
 
+// flush:'sync' 确保 watcher 在 content 赋值时同步执行，
+// 此时 loading.value 仍为 true，不会误设 dirty。
+// 默认 flush:'pre'（微任务）会在 loading.value=false 之后才执行，导致刚加载就误报"有未保存的修改"。
 watch(content, () => {
   if (!loading.value) dirty.value = true
-})
+}, { flush: 'sync' })
 
 onMounted(async () => {
   try {
