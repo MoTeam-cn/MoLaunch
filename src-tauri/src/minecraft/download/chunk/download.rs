@@ -11,12 +11,16 @@ use tokio::sync::Mutex;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
 use crate::utils::format;
+use crate::{log_debug, log_warn};
 
 /// 下载单个分片
 ///
 /// 新增 `pause_flag` / `cancel_flag` 参数：分片数据流 loop 里检查暂停/取消信号，
 /// 暂停时 sleep 等待恢复，取消时立即返回错误。
 /// 修复：之前分片下载完全不受暂停/取消控制，一旦开始就停不下来。
+///
+/// 断点续传：入口检测 `.part` 文件已下载字节数，调整 Range 起点 + append 模式打开文件。
+/// 失败时 `.part` 文件被保留（由 `download_chunked` 控制清理），重试时可续传。
 #[allow(clippy::too_many_arguments)]
 pub(super) async fn download_chunk(
     client: &reqwest::Client,
@@ -31,7 +35,56 @@ pub(super) async fn download_chunk(
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
 ) -> Result<u64, Box<dyn std::error::Error + Send + Sync>> {
-    let range_header = format!("bytes={}-{}", start, end);
+    let expected_chunk_bytes = end.saturating_sub(start).saturating_add(1);
+
+    // 断点续传：检测 .part 文件已下载字节数
+    let resume_from = match std::fs::metadata(part_path) {
+        Ok(meta) => {
+            let existing = meta.len();
+            if existing == expected_chunk_bytes {
+                // .part 文件已完成，直接返回（可能是上次下载成功但未清理）
+                log_debug!(
+                    "[Chunk] chunk {} .part 已完成 ({} bytes)，跳过下载",
+                    chunk_index,
+                    existing
+                );
+                if let Some(cp) = chunk_progress.get(chunk_index) {
+                    let mut cp = cp.lock().unwrap();
+                    *cp = existing;
+                }
+                if let Some(ref fp) = file_progress {
+                    let mut p = fp.lock().unwrap();
+                    p.downloaded_bytes = p.downloaded_bytes.saturating_add(existing);
+                }
+                return Ok(existing);
+            } else if existing > expected_chunk_bytes {
+                // .part 文件比期望大（异常情况，可能是上次下载损坏），删除重新下载
+                log_warn!(
+                    "[Chunk] chunk {} .part 文件大小异常 ({} > {})，删除重新下载",
+                    chunk_index,
+                    existing,
+                    expected_chunk_bytes
+                );
+                let _ = std::fs::remove_file(part_path);
+                0
+            } else if existing > 0 {
+                // 续传：从 existing 字节开始
+                log_debug!(
+                    "[Chunk] chunk {} 续传: 已有 {} / {} bytes",
+                    chunk_index,
+                    existing,
+                    expected_chunk_bytes
+                );
+                existing
+            } else {
+                0
+            }
+        }
+        Err(_) => 0,
+    };
+
+    let actual_start = start + resume_from;
+    let range_header = format!("bytes={}-{}", actual_start, end);
 
     // 覆盖全局客户端的 30s timeout：大文件分片下载需要更长时间
     // 实际超时由下方 loop 里的"无数据流动 15s"控制，reqwest timeout 仅作 24h 兜底
@@ -47,12 +100,15 @@ pub(super) async fn download_chunk(
     }
 
     let mut stream = response.bytes_stream();
-    let mut file = std::fs::File::create(part_path)?;
-    let mut downloaded: u64 = 0;
+    // append 模式打开文件（保留已有内容用于续传）
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(part_path)?;
+    let mut downloaded: u64 = resume_from;
 
     // 单分片字节数上限：期望为 end-start+1，允许 2 倍冗余，
     // 防止被劫持镜像源在 Range 请求中返回超量数据导致磁盘耗尽
-    let expected_chunk_bytes = end.saturating_sub(start).saturating_add(1);
     let chunk_byte_limit = expected_chunk_bytes.saturating_mul(2);
 
     // 回滚闭包：失败时回滚本次增量加到 file_progress 的字节数

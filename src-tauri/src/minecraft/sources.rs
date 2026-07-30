@@ -77,8 +77,6 @@ pub const LIBRARY_REPLACEMENTS: &[(&str, &str)] = &[(
 )];
 
 // ── 社区资源 CDN 镜像（CurseForge + Modrinth 统一由 source 策略控制）──
-/// MCIMirror CDN 镜像基础 URL（兜底镜像）
-pub const CDN_MIRROR: &str = "https://mod.mcimirror.top";
 
 /// Modrinth CDN 原始域名（官方 CDN，对中国大陆用户会跳转到慢速 cdn-alt）
 const MR_CDN_OFFICIAL: &str = "https://cdn.modrinth.com";
@@ -94,7 +92,7 @@ const MR_CDN_RAW: &str = "https://cdn-raw.modrinth.com";
 const MR_MOCDN_MIRROR: &str = "https://cdn-modrinth.mocdn.net";
 
 /// CurseForge 自建 CDN 镜像域名（仅支持 edge.forgecdn.net 路径）
-/// media.forgecdn.net 路径不支持，仍走 MCIMirror 兜底
+/// media.forgecdn.net 路径不支持，走官方源
 const CF_MOCDN_MIRROR: &str = "https://cdn-curseforge.mocdn.net";
 
 // ── authlib-injector（外置登录支持库）下载源 ──
@@ -141,37 +139,34 @@ fn get_modrinth_cdn_raw_enabled() -> bool {
         == Some("true")
 }
 
-/// 将 CDN URL 替换为所有可用镜像 URL（内部函数，不判断 source 策略）
+/// 将 CDN URL 替换为可用镜像 URL（内部函数，不判断 source 策略）
 ///
-/// 返回的 Vec 按优先级排序：自建 CDN（mocdn.net）优先，MCIMirror 兜底。
-/// 非 CDN URL 返回空 Vec。
+/// 返回自建 CDN（mocdn.net）镜像 URL。非 CDN URL 或无可用镜像时返回空 Vec。
 ///
 /// 域名替换规则：
-/// - `cdn-raw.modrinth.com`（经 rewrite_mr_cdn 替换后）→ `cdn-modrinth.mocdn.net` + `mod.mcimirror.top`
-/// - `cdn.modrinth.com`（未经 rewrite，防御性兼容）→ `cdn-modrinth.mocdn.net` + `mod.mcimirror.top`
-/// - `edge.forgecdn.net` → `cdn-curseforge.mocdn.net` + `mod.mcimirror.top`
-/// - `media.forgecdn.net` → `mod.mcimirror.top`（mocdn 不支持此域名，仅 MCIMirror）
+/// - `cdn-raw.modrinth.com`（经 rewrite_mr_cdn 替换后）→ `cdn-modrinth.mocdn.net`
+/// - `cdn.modrinth.com`（未经 rewrite，防御性兼容）→ `cdn-modrinth.mocdn.net`
+/// - `edge.forgecdn.net` → `cdn-curseforge.mocdn.net`
+/// - `media.forgecdn.net` → 无镜像（mocdn 不支持此域名，走官方）
 fn apply_cdn_mirrors(url: &str) -> Vec<String> {
     let mut mirrors = Vec::new();
 
     // Modrinth CDN: cdn-raw.modrinth.com（rewrite 后）或 cdn.modrinth.com（防御性兼容）
-    // → mocdn（优先）+ mcimirror（兜底）
+    // → mocdn 镜像
     if url.starts_with(MR_CDN_RAW) {
         mirrors.push(url.replacen(MR_CDN_RAW, MR_MOCDN_MIRROR, 1));
-        mirrors.push(url.replacen(MR_CDN_RAW, CDN_MIRROR, 1));
     } else if url.starts_with(MR_CDN_OFFICIAL) {
         mirrors.push(url.replacen(MR_CDN_OFFICIAL, MR_MOCDN_MIRROR, 1));
-        mirrors.push(url.replacen(MR_CDN_OFFICIAL, CDN_MIRROR, 1));
     }
-    // CurseForge edge.forgecdn.net → mocdn（优先）+ mcimirror（兜底）
+    // CurseForge edge.forgecdn.net → mocdn 镜像
     else if url.starts_with("https://edge.forgecdn.net") {
-        mirrors.push(url.replacen("https://edge.forgecdn.net", CF_MOCDN_MIRROR, 1));
-        mirrors.push(url.replacen("https://edge.forgecdn.net", CDN_MIRROR, 1));
+        mirrors.push(url.replacen(
+            "https://edge.forgecdn.net",
+            CF_MOCDN_MIRROR,
+            1,
+        ));
     }
-    // CurseForge media.forgecdn.net → 仅 mcimirror（mocdn 不支持此域名路径）
-    else if url.starts_with("https://media.forgecdn.net") {
-        mirrors.push(url.replacen("https://media.forgecdn.net", CDN_MIRROR, 1));
-    }
+    // media.forgecdn.net: mocdn 不支持此域名路径，无镜像，走官方
 
     mirrors
 }
@@ -206,8 +201,8 @@ pub fn replace_cdn(url: &str) -> String {
 /// 当 `modrinth_cdn_raw_enabled` 开启时，入口处先将 `cdn.modrinth.com` 替换为
 /// `cdn-raw.modrinth.com`（绕过中国大陆 cdn-alt 跳转），再按 source 策略构造候选 URL 列表。
 ///
-/// - source=0（尽量镜像）：`[mocdn镜像URL, mcimirror镜像URL]`
-/// - source=1（缓慢时换镜像）：`[官方URL, mocdn镜像URL, mcimirror镜像URL]`（官方优先，失败自动 fallback）
+/// - source=0（尽量镜像）：`[mocdn镜像URL]`（无镜像的 CDN 返回官方 URL）
+/// - source=1（缓慢时换镜像）：`[官方URL, mocdn镜像URL]`（官方优先，失败自动 fallback）
 /// - source=2（尽量官方）：`[官方URL]`
 pub fn cdn_urls(url: &str) -> Vec<String> {
     let url = if get_modrinth_cdn_raw_enabled() {

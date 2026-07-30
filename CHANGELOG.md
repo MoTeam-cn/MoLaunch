@@ -9,6 +9,20 @@
 
 ### 新增
 
+#### 移除 mod.mcimirror.top CDN 文件下载镜像
+
+- **背景**：`mod.mcimirror.top` 作为 CurseForge/Modrinth CDN 文件下载的兜底镜像，实际请求会 302 重定向到官方 CDN，无加速效果且增加额外跳转延迟，已无存在意义
+- **`src-tauri/src/minecraft/sources.rs`**：移除 `CDN_MIRROR` 常量；`apply_cdn_mirrors` 移除所有 mcimirror 兜底分支，仅保留 mocdn.net 镜像；`media.forgecdn.net` 路径因 mocdn 不支持，改为直接走官方源；更新 `cdn_urls` 文档注释
+- **`src-tauri/src/commands/community/install/helpers.rs`**：更新 `extract_mr_project_id` / `construct_cf_edge_url` 注释中的镜像源示例（mcimirror → mocdn）
+- **保留**：CurseForge/Modrinth 的 **API 镜像**（`CF_MIRROR_BASE` / `MR_MIRROR_BASE`，用于免 API Key 访问）不受影响，仍有实际价值
+
+#### 分片下载断点续传 + 合并前大小校验
+
+- **背景**：分片下载任一 chunk 失败后，`.part` 文件被整体清理，重试必须从 0 重下，慢速网络下体验差；同时若服务端提前断流（`bytes_stream` 提前 `Ok(None)`），`download_chunk` 仍返回 `Ok(downloaded)`，导致部分下载被误合并为损坏的目标文件，启动时才暴露问题
+- **`src-tauri/src/minecraft/download/chunk/download.rs`**：入口检测 `.part` 文件已下载字节数实现断点续传 —— `existing == expected` 跳过下载直接返回；`existing > expected` 视为损坏删除重下；`0 < existing < expected` 调整 Range 起点 `actual_start = start + resume_from` 并以 `append` 模式打开文件续传；新增 `expected_chunk_bytes` 与 `chunk_byte_limit`（2 倍冗余）防止被劫持镜像源返回超量数据；失败时 `.part` 文件保留用于重试续传
+- **`src-tauri/src/minecraft/download/chunk/mod.rs`**：`all_ok=false` 路径与合并失败路径均不再清理 `.part` 文件，保留用于重试续传；回滚 `file_progress.downloaded_bytes` 避免重试时进度偏高/超过 total
+- **`src-tauri/src/minecraft/download/chunk/merge.rs`**：`merge_chunks` 新增 `file_size` 参数，合并前逐个校验每个 `.part` 文件大小与期望值匹配（前 `chunk_count-1` 片为 `file_size / chunk_count`，最后一片为余数），不匹配则返回 `InvalidData` 错误拒绝合并，避免部分下载被误合并为损坏文件
+
 #### 下载进度 WebSocket 推送（替代前端 300ms 轮询）
 
 - **背景**：前端 `useDownloadPolling.ts` 每 300ms 调用 `get_download_progress` IPC 轮询下载进度，devtools 网络面板刷屏且看不到响应内容。改为 WebSocket 服务器推送，devtools 面板干净，可在 WS Frames 面板查看进度消息流

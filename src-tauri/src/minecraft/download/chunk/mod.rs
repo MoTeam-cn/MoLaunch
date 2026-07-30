@@ -183,10 +183,7 @@ pub async fn download_chunked(
     }
 
     if !all_ok {
-        // 清理临时文件
-        for i in 0..chunk_count {
-            let _ = std::fs::remove_file(format!("{}.part{}", local_path, i));
-        }
+        // 断点续传：不清理 .part 文件，保留用于重试时续传
         // 回滚 file_progress：本次分片下载增量加的部分无效（文件将被重新下载），
         // 避免重试时 downloaded_bytes 持续累加导致进度偏高/超过 total
         if let Some(ref fp) = file_progress {
@@ -202,11 +199,11 @@ pub async fn download_chunked(
         };
     }
 
-    // 合并分片到目标文件
-    if let Err(e) = merge_chunks(local_path, chunk_count) {
-        for i in 0..chunk_count {
-            let _ = std::fs::remove_file(format!("{}.part{}", local_path, i));
-        }
+    // 合并分片到目标文件（合并前会校验每个 .part 大小匹配期望值，
+    // 避免服务端提前断流导致的部分下载被误合并为损坏文件）
+    if let Err(e) = merge_chunks(local_path, chunk_count, file_size) {
+        // 断点续传：不清理 .part 文件，保留用于重试时续传
+        // （合并失败通常是某分片大小不匹配，保留已下载部分可避免重头下载）
         return ChunkDownloadResult {
             downloaded: total_downloaded,
             total: file_size,

@@ -130,7 +130,7 @@ pub(super) fn parse_mr_loader(key: &str, value: &str) -> (&'static str, String) 
 /// 从 Modrinth 下载 URL 提取 project_id
 ///
 /// URL 格式：`https://cdn.modrinth.com/data/<project_id>/versions/<version_id>/<filename>`
-/// 或镜像源 `https://mod.mcimirror.top/.../data/<project_id>/...` 等。
+/// 或镜像源 `https://cdn-modrinth.mocdn.net/.../data/<project_id>/...` 等。
 /// 提取失败返回 None（不影响下载，只是无法应用文件名格式）。
 pub(super) fn extract_mr_project_id(url: &str) -> Option<String> {
     // 匹配 /data/<id>/ 片段，id 为字母数字短串（Modrinth 项目 ID 格式）
@@ -156,7 +156,7 @@ pub(super) fn extract_mr_project_id(url: &str) -> Option<String> {
 /// 余位用 i64 转换去掉前导 0，例如 2725062 → 2725/62
 ///
 /// 始终使用官方域名构造，镜像替换由调用方通过 `cdn_urls()` 处理
-/// （source=0 时 cdn_urls 会替换为 mocdn/mcimirror 镜像）
+/// （source=0 时 cdn_urls 会替换为 mocdn 镜像）
 pub(super) fn construct_cf_edge_url(file_id: i64, file_name: &str) -> String {
     const CF_EDGE_BASE: &str = "https://edge.forgecdn.net";
     let id_str = file_id.to_string();
