@@ -44,6 +44,9 @@ export const VERSION_MODS_ACTIONS = {
   // watcher.rs（2 个）
   WATCH_MODS_DIR: 'watch_mods_dir',
   UNWATCH_MODS_DIR: 'unwatch_mods_dir',
+  // dependency_resolver.rs（2 个，前置 mod 检查与安装）
+  CHECK_MOD_DEPENDENCIES: 'check_mod_dependencies',
+  INSTALL_MOD_WITH_DEPENDENCIES: 'install_mod_with_dependencies',
 } as const
 
 /** action 名称类型 */

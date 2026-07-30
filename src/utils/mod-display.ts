@@ -5,6 +5,7 @@
  * 以及为百科搜索去除 mod 名称中的版本号。
  */
 import type { ModInfo } from '@/utils/tauri'
+import { ModLoaderFlags } from '@/types/community'
 
 /** 根据 modLocalNameStyle 返回 Mod 标题（主显示名） */
 export function modTitle(mod: ModInfo, style: number): string {
@@ -31,6 +32,24 @@ export function loaderVisual(type: string): { label: string } {
   if (t === 'quilt') return { label: 'Quilt' }
   if (t === 'liteloader') return { label: 'LiteLoader' }
   return { label: '未知' }
+}
+
+/**
+ * 加载器类型名转 ModLoaderFlags 位枚举值
+ *
+ * 用于前置 Mod 检查等需要把当前版本加载器传给后端的场景（后端按 flag 筛选兼容版本）。
+ * 未识别的加载器返回 0（None）。
+ */
+export function loaderToFlag(loader: string): number {
+  const t = loader.toLowerCase()
+  const map: Record<string, number> = {
+    forge: ModLoaderFlags.Forge,
+    liteloader: ModLoaderFlags.LiteLoader,
+    fabric: ModLoaderFlags.Fabric,
+    quilt: ModLoaderFlags.Quilt,
+    neoforge: ModLoaderFlags.NeoForge,
+  }
+  return map[t] || 0
 }
 
 /**

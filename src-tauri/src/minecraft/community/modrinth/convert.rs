@@ -172,11 +172,14 @@ pub(crate) fn convert_version(v: &MrVersion) -> ResourceVersion {
         (String::new(), String::new(), None, 0)
     };
 
+    // 提取 required 依赖，排除 Fabric API（P7dR8mSH）和 Quilt API（qvIfYCYJ）
+    // 与 PCL2 ResourceVersion.vb 的过滤逻辑一致
     let dependencies: Vec<String> = v
         .dependencies
         .iter()
         .filter(|d| d.dependency_type.as_deref() == Some("required"))
         .filter_map(|d| d.project_id.clone())
+        .filter(|pid| !pid.is_empty() && pid != "P7dR8mSH" && pid != "qvIfYCYJ")
         .collect();
 
     ResourceVersion {

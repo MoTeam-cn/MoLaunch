@@ -11,20 +11,24 @@
 
 import { ref, watch, nextTick } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { ResourceProject, ResourceVersion } from '@/types/community'
+import type { ResourceProject, ResourceVersion, ResolvedDependency } from '@/types/community'
 import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, installModpack } from '@/utils/api/community'
 import { installMerged } from '@/utils/api/loader'
+import { getVersionLoaderInfo } from '@/utils/api/version'
 import { useVersionStore } from '@/stores/version'
 import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showPrompt, showModal } from '@/utils/modal'
 import { isCancelledError } from '@/utils/async'
+import { loaderToFlag } from '@/utils/mod-display'
 import { useVersionGroups, getFilterVersionName } from '@/composables/useVersionGroups'
 import { useSearchProgress } from '@/composables/useSearchProgress'
+import { useDependencyCheck } from '@/composables/useDependencyCheck'
 import HorizontalFilter from '@/components/common/HorizontalFilter.vue'
 import ResourceDetailHeader from './resource-detail/ResourceDetailHeader.vue'
 import { ArchiveBoxXMarkIcon } from '@heroicons/vue/24/outline'
 import VersionGroupCard from './resource-detail/VersionGroupCard.vue'
+import DependencyConfirmDialog from './DependencyConfirmDialog.vue'
 
 const versionStore = useVersionStore()
 
@@ -49,6 +53,22 @@ const downloading = ref<string | null>(null)
 
 const { groups, filterOptions, versionFilter, toggleGroup, setFilter, expandedOf, mountedOf } = useVersionGroups(() => versions.value)
 const { percent, slowMerging, stageText, start, finish, fail } = useSearchProgress()
+
+// 前置 Mod 检查
+const {
+  checking: depsChecking,
+  installing: depsInstalling,
+  missing: depsMissing,
+  upToDate: depsUpToDate,
+  check: checkDeps,
+  install: installDeps,
+  reset: resetDeps,
+} = useDependencyCheck()
+
+// 前置确认弹窗状态
+const showDependencyDialog = ref(false)
+// 暂存待安装的主 Mod（弹窗确认后用于 install 调用）
+const pendingMainVersion = ref<ResourceVersion | null>(null)
 
 watch(
   [() => props.visible, () => props.project],
@@ -97,6 +117,19 @@ async function handleDownload(v: ResourceVersion) {
     }
   }
 
+  // 前置 Mod 检查：仅 ModTab 场景（有 modsDir + versionId + gameVersion + 是 Mod 类型）启用
+  // Community 场景（无 modsDir）走原有"选择保存位置"流程
+  const canCheckDeps = !!(props.modsDir && props.versionId && props.gameVersion
+    && props.project.resource_type === 'Mod')
+  if (canCheckDeps) {
+    const hasMissing = await runDependencyCheck(v)
+    if (hasMissing) {
+      // 弹窗等用户确认，确认后由 handleDependencyConfirm 走 install 流程
+      return
+    }
+    // 无缺失：继续走下方原有流程
+  }
+
   const savePath = await pickSavePath({
     title: '选择保存位置',
     defaultPath: props.modsDir ? `${props.modsDir}/${finalFileName}` : finalFileName,
@@ -124,6 +157,106 @@ async function handleDownload(v: ResourceVersion) {
   } finally {
     downloading.value = null
   }
+}
+
+/**
+ * 触发前置 Mod 检查并打开确认弹窗
+ *
+ * 流程：
+ * 1. 获取当前版本加载器（getVersionLoaderInfo），转 ModLoaderFlags
+ * 2. 调用 check_mod_dependencies IPC
+ * 3. 有缺失 → 暂存主 Mod 并打开弹窗
+ *
+ * @returns true=已弹窗等用户确认，false=无缺失或检查失败可直接下载
+ */
+async function runDependencyCheck(v: ResourceVersion): Promise<boolean> {
+  if (!props.project || !props.versionId || !props.gameVersion) return false
+
+  let modLoader = 0
+  try {
+    const info = await getVersionLoaderInfo(props.versionId)
+    modLoader = loaderToFlag(info.loaderType)
+  } catch (e) {
+    console.debug('[ResourceDetail] 获取加载器信息失败，按 0 检查:', e)
+  }
+
+  try {
+    const hasMissing = await checkDeps({
+      versionId: props.versionId,
+      platform: props.project.platform,
+      modVersion: v,
+      gameVersion: props.gameVersion,
+      modLoader,
+    })
+    if (hasMissing) {
+      pendingMainVersion.value = v
+      showDependencyDialog.value = true
+      return true
+    }
+  } catch (e: any) {
+    // 检查失败不阻断下载，仅提示并降级到普通下载
+    const msg = e?.message || String(e)
+    console.debug('[ResourceDetail] 前置 Mod 检查失败:', msg)
+    toastInfo('前置 Mod 检查失败，直接下载主 Mod')
+  }
+  return false
+}
+
+/**
+ * 用户在 DependencyConfirmDialog 点击"确认安装"后回调
+ *
+ * 调用 install_mod_with_dependencies IPC，后端启动 DownloadSession 并发下载主 Mod + 勾选前置。
+ * 进度通过 WS 推送到下载管理页。
+ */
+async function handleDependencyConfirm(selectedDeps: ResolvedDependency[]) {
+  const main = pendingMainVersion.value
+  if (!main || !props.versionId) return
+
+  showDependencyDialog.value = false
+  downloading.value = main.id
+  versionStore.startDownload(main.file_name)
+  const totalFiles = 1 + selectedDeps.length
+  toastInfo(`开始下载: ${main.file_name}（含 ${selectedDeps.length} 个前置，共 ${totalFiles} 个文件）`)
+
+  try {
+    const result = await installDeps({
+      versionId: props.versionId,
+      mainVersion: main,
+      deps: selectedDeps,
+    })
+    if (result.failedCount > 0) {
+      // 部分失败：toast 警告，但仍由 WS 推送 mark_complete 触发退出
+      toastInfo(`安装完成：成功 ${result.installedCount} / ${totalFiles}，失败 ${result.failedCount}`)
+    } else {
+      toastSuccess(`安装完成：共 ${result.installedCount} 个文件`)
+    }
+  } catch (e: any) {
+    const msg = e?.message || String(e)
+    if (isCancelledError(e)) {
+      toastInfo('下载已取消')
+      versionStore.finishDownload()
+      return
+    }
+    showModal({
+      type: 'error',
+      title: '安装失败',
+      message: msg,
+      onConfirm: () => {
+        versionStore.finishDownload()
+      },
+    })
+  } finally {
+    downloading.value = null
+    pendingMainVersion.value = null
+    resetDeps()
+  }
+}
+
+/** 用户在 DependencyConfirmDialog 点击取消（不下载） */
+function handleDependencyClose() {
+  showDependencyDialog.value = false
+  pendingMainVersion.value = null
+  resetDeps()
 }
 
 /**
@@ -300,5 +433,17 @@ function promptForInstanceName(defaultName: string): Promise<string | null> {
         </div>
       </div>
     </transition>
+
+    <!-- 前置 Mod 确认弹窗（独立 teleport，避免嵌套在详情弹窗内影响层级） -->
+    <DependencyConfirmDialog
+      :visible="showDependencyDialog"
+      :missing="depsMissing"
+      :up-to-date="depsUpToDate"
+      :main-name="pendingMainVersion?.file_name || ''"
+      :installing="depsInstalling"
+      :checking="depsChecking"
+      @close="handleDependencyClose"
+      @confirm="handleDependencyConfirm"
+    />
   </teleport>
 </template>

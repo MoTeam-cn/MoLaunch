@@ -8,8 +8,13 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
+use crate::commands::version::mods::dependency_resolver::{
+    check_mod_dependencies, install_mod_with_dependencies, DependencyCheckResult, InstallResult,
+    ResolvedDependency,
+};
 use crate::commands::version::mods::{install, list, manage, update, watcher};
 use crate::handler;
+use crate::minecraft::community::types::{Platform, ResourceVersion};
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
@@ -63,6 +68,41 @@ struct UpdateModParams {
     download_url: String,
     new_file_name: String,
     expected_size: i64,
+}
+
+/// check_mod_dependencies 参数（前置 mod 检查）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CheckModDependenciesParams {
+    version_id: String,
+    /// 平台名："CurseForge" 或 "Modrinth"
+    platform: String,
+    /// 用户选中的资源版本（含 dependencies 字段）
+    mod_version: ResourceVersion,
+    /// 目标游戏版本（如 "1.20.1"）
+    game_version: String,
+    /// 目标加载器 flags（1=Forge, 4=Fabric, 16=NeoForge, 8=Quilt）
+    mod_loader: u32,
+}
+
+/// install_mod_with_dependencies 参数（主 mod + 前置批量安装）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct InstallModWithDepsParams {
+    version_id: String,
+    /// 主 mod 版本（用户在详情页选中的版本）
+    main_version: ResourceVersion,
+    /// 用户勾选要安装的前置（含 suggested_version）
+    deps: Vec<ResolvedDependency>,
+}
+
+/// 解析平台名字符串到 Platform 枚举
+fn parse_platform(s: &str) -> Result<Platform, String> {
+    match s.to_lowercase().as_str() {
+        "curseforge" | "cf" => Ok(Platform::CurseForge),
+        "modrinth" | "mr" => Ok(Platform::Modrinth),
+        _ => Err(format!("不支持的平台: {}", s)),
+    }
 }
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
@@ -149,6 +189,35 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register("unwatch_mods_dir", handler!(_state, _app, _params, {
         watcher::unwatch_mods_dir().await?;
         serde_json::to_value(()).map_err(|e| e.to_string())
+    }));
+
+    d.register("check_mod_dependencies", handler!(state, _app, params, {
+        let p: CheckModDependenciesParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let platform = parse_platform(&p.platform)?;
+        let result: DependencyCheckResult = check_mod_dependencies(
+            &state,
+            &p.version_id,
+            platform,
+            &p.mod_version,
+            &p.game_version,
+            p.mod_loader,
+        )
+        .await?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
+    }));
+
+    d.register("install_mod_with_dependencies", handler!(state, _app, params, {
+        let p: InstallModWithDepsParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let result: InstallResult = install_mod_with_dependencies(
+            &state,
+            &p.version_id,
+            &p.main_version,
+            &p.deps,
+        )
+        .await?;
+        serde_json::to_value(result).map_err(|e| e.to_string())
     }));
 
     d

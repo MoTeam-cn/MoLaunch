@@ -24,6 +24,7 @@ pub mod manage;
 mod types;
 pub mod update;
 pub mod watcher;
+pub mod dependency_resolver;
 
 use crate::state::AppState;
 use crate::utils::dispatcher::ActionRequest;

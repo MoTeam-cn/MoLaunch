@@ -7,6 +7,34 @@
 
 ## [未发布]
 
+### 新增
+
+#### Mod 前置依赖自动检查与一键安装
+
+- **后端依赖解析器**：新增 `src-tauri/src/commands/version/mods/dependency_resolver.rs`
+  - `check_mod_dependencies` IPC：BFS 递归解析 Mod 版本的 dependencies，限 3 层深度，visited 集合防环
+  - `install_mod_with_dependencies` IPC：构造主 Mod + 勾选前置的下载任务，复用 `DownloadSession::start_grouped` 单 stage 并发下载，进度推送下载管理页
+  - 版本筛选：按 game_version + mod_loader 过滤，Release > Beta > Alpha，同优先级选最新 release_date
+  - 已安装比对：`is_project_installed` 用 slug + id 双重比对本地 jar 元数据
+- **CurseForge 文件级 dependencies**：`src-tauri/src/minecraft/community/curseforge/types.rs` 补充 `CfFileDependency` 结构体，`convert.rs` 提取 relationType=3 的 required 依赖（排除 Fabric API 306612 / Quilt API 634179）
+- **Modrinth dependencies 排除项**：`src-tauri/src/minecraft/community/modrinth/convert.rs` 过滤 dependency_type="required"，排除 Fabric API `P7dR8mSH` / Quilt API `qvIfYCYJ`
+- **前端类型与 composable**：
+  - `src/types/community.ts` 新增 `DepType` / `ResolvedDependency` / `DependencyCheckResult` / `DependencyInstallResult`
+  - `src/utils/api/version-mods-manager.ts` 新增 `CHECK_MOD_DEPENDENCIES` / `INSTALL_MOD_WITH_DEPENDENCIES` action
+  - `src/composables/useDependencyCheck.ts` 封装 IPC 调用与状态管理（checking / installing / missing / upToDate）
+- **前端弹窗组件**：
+  - `src/components/community/DependencyItem.vue` 单个前置项卡片（复选框 + logo + 名称 + 平台 + 建议版本 + 递归深度标识）
+  - `src/components/community/DependencyConfirmDialog.vue` 确认弹窗（缺失列表 + 全选/反选 + 已满足前置折叠区 + "安装主 Mod + N 个前置"按钮）
+- **ResourceDetail 集成**：`src/components/community/ResourceDetail.vue` handleDownload 流程改造
+  - ModTab 场景（有 modsDir + versionId + gameVersion + Mod 类型）下先调 `getVersionLoaderInfo` 拿 loaderType 转 flag，调 `check_mod_dependencies`
+  - 有缺失 → 弹窗等用户确认 → 调 `install_mod_with_dependencies` 一键下载主 Mod + 勾选前置
+  - 无缺失或 Community 场景 → 走原 pickSavePath 流程
+  - 检查失败不阻断下载，toast 提示后降级到普通下载
+- **useModUpdate 集成**：`src/composables/useModUpdate.ts` installSelected 完成后调 `scanMissingDepsAfterInstall` 兜底
+  - 有缺失时 toastInfo 提示缺失数量 + 前 3 个名称，引导用户去资源页安装
+  - 检查失败不阻断主流程
+- **公共工具抽取**：`src/utils/mod-display.ts` 新增 `loaderToFlag` 函数（加载器名 → ModLoaderFlags 位枚举），`useModUpdate.ts` 改为 import 公共版本，避免重复实现
+
 ### 修复
 
 #### Forge 安装伪进度卡住 + 前端伪进度补丁

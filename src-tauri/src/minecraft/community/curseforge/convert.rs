@@ -115,6 +115,15 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
     let version =
         crate::minecraft::community::version_extract::extract_version_from_name(&file.display_name);
 
+    // 提取 required 依赖（relationType=3），排除 Fabric API（306612）和 Quilt API（634179）
+    // 与 PCL2 ResourceVersion.vb 的过滤逻辑一致
+    let dependencies: Vec<String> = file
+        .dependencies
+        .iter()
+        .filter(|d| d.relation_type == 3 && d.mod_id != 306612 && d.mod_id != 634179)
+        .map(|d| d.mod_id.to_string())
+        .collect();
+
     ResourceVersion {
         id: file.id.to_string(),
         display: file.display_name.clone(),
@@ -128,7 +137,7 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
         download_url,
         hash,
         size: file.file_length,
-        dependencies: Vec::new(),
+        dependencies,
     }
 }
 

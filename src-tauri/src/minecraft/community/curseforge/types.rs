@@ -93,6 +93,20 @@ pub(crate) struct CfFile {
     pub hashes: Vec<CfHash>,
     #[serde(default)]
     pub file_length: u64,
+    /// 文件级依赖关系（relationType: 1=embedded, 2=optional, 3=required, 4=tool, 5=incompatible）
+    #[serde(default)]
+    pub dependencies: Vec<CfFileDependency>,
+}
+
+/// CurseForge 文件依赖项
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct CfFileDependency {
+    /// 依赖的 modId
+    pub mod_id: i64,
+    /// 依赖类型：1=embedded, 2=optional, 3=required, 4=tool, 5=incompatible
+    #[serde(default)]
+    pub relation_type: u32,
 }
 
 #[derive(Debug, Deserialize)]

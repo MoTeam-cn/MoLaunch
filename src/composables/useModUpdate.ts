@@ -8,11 +8,13 @@ import { ref, computed, watch } from 'vue'
 import { getProjectVersions } from '@/utils/api/community'
 import { updateMod, type ModInfo } from '@/utils/api/personalization'
 import { versionChangeType, type VersionChangeType } from '@/utils/version'
+import { loaderToFlag } from '@/utils/mod-display'
 import { formatBytes } from '@/utils/format'
 import { toastSuccess, toastInfo } from '@/utils/toast'
 import { showConfirm, showModal } from '@/utils/modal'
 import { isCancelledError } from '@/utils/async'
 import { useVersionStore } from '@/stores/version'
+import { useDependencyCheck } from '@/composables/useDependencyCheck'
 import type { ResourceVersion, Platform } from '@/types/community'
 
 interface UseModUpdateProps {
@@ -20,18 +22,6 @@ interface UseModUpdateProps {
   mcVersion: string
   versionId: string
   visible: boolean
-}
-
-/** 加载器名称转 flag（用于按加载器过滤版本列表） */
-function loaderToFlag(loader: string): number {
-  const flags: Record<string, number> = {
-    forge: 1,
-    liteloader: 2,
-    fabric: 4,
-    quilt: 8,
-    neoforge: 16,
-  }
-  return flags[loader] || 0
 }
 
 /** 发布类型样式 */
@@ -49,6 +39,7 @@ export function useModUpdate(
   emit: (event: 'installed' | 'update:visible', ...args: any[]) => void,
 ) {
   const versionStore = useVersionStore()
+  const { check: checkDeps, missing: missingDeps } = useDependencyCheck()
   const loading = ref(false)
   const versions = ref<ResourceVersion[]>([])
   const error = ref('')
@@ -165,6 +156,10 @@ export function useModUpdate(
           toastSuccess(`已安装 ${version.version}`)
           emit('installed')
           emit('update:visible', false)
+
+          // 安装后扫描兜底：检查新版本是否引入缺失前置
+          // 不实际安装（避免与 updateMod 删除逻辑冲突），仅 toast 提示用户去资源页安装
+          await scanMissingDepsAfterInstall(version)
         } catch (e: any) {
           const msg = typeof e === 'string' ? e : (e?.message || String(e))
           // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
@@ -187,6 +182,38 @@ export function useModUpdate(
         }
       },
     )
+  }
+
+  /**
+   * 安装后扫描缺失前置（兜底）
+   *
+   * 在 updateMod 成功后调用 check_mod_dependencies，若有缺失则 toast 提示
+   * 用户前往社区资源页安装。检查失败不阻断主流程（仅 console.debug）。
+   */
+  async function scanMissingDepsAfterInstall(version: ResourceVersion) {
+    if (!props.mod?.project || !props.versionId || !props.mcVersion) return
+    const modLoader = loaderToFlag(modLoaderType.value)
+    try {
+      const hasMissing = await checkDeps({
+        versionId: props.versionId,
+        platform: props.mod.project.platform,
+        modVersion: version,
+        gameVersion: props.mcVersion,
+        modLoader,
+      })
+      if (hasMissing) {
+        const count = missingDeps.value.length
+        // 列出前 3 个缺失前置名称（如译名不存在回退 raw_name）
+        const names = missingDeps.value
+          .slice(0, 3)
+          .map(d => d.project.translated_name || d.project.raw_name)
+          .join('、')
+        const suffix = count > 3 ? ' 等' : ''
+        toastInfo(`新版本检测到 ${count} 个缺失前置：${names}${suffix}，请前往社区资源页安装`)
+      }
+    } catch (e: any) {
+      console.debug('[useModUpdate] 前置扫描失败:', e?.message || e)
+    }
   }
 
   // 监听 visible 变化，打开时加载版本

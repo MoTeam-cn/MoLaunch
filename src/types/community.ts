@@ -194,3 +194,40 @@ export const LOADER_OPTIONS = [
   { label: 'Quilt', value: ModLoaderFlags.Quilt },
   { label: 'LiteLoader', value: ModLoaderFlags.LiteLoader },
 ] as const
+
+// ===== 前置 Mod 检查与安装（对应后端 dependency_resolver.rs） =====
+
+/** 依赖类型 */
+export type DepType = 'required' | 'optional'
+
+/** 已解析的依赖项 */
+export interface ResolvedDependency {
+  /** 依赖项目详情 */
+  project: ResourceProject
+  /** 依赖类型 */
+  dependencyType: DepType
+  /** 建议安装的版本（按 game_version + mod_loader 筛选的最佳版本） */
+  suggestedVersion: ResourceVersion | null
+  /** 是否已安装 */
+  isInstalled: boolean
+  /** 递归深度（0=直接前置，1=前置的前置） */
+  depth: number
+}
+
+/** 依赖检查结果 */
+export interface DependencyCheckResult {
+  /** 缺失的依赖 */
+  missing: ResolvedDependency[]
+  /** 已满足的依赖 */
+  upToDate: ResolvedDependency[]
+}
+
+/** 安装结果 */
+export interface DependencyInstallResult {
+  /** 成功安装的文件数 */
+  installedCount: number
+  /** 失败的文件数 */
+  failedCount: number
+  /** 失败详情 */
+  failures: string[]
+}
