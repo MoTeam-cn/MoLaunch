@@ -15,6 +15,7 @@ import type { ResourceProject, ResourceVersion, ResolvedDependency } from '@/typ
 import { getProjectVersions, downloadResourceToPath, formatDownloadFilename, installModpack } from '@/utils/api/community'
 import { installMerged } from '@/utils/api/loader'
 import { getVersionLoaderInfo } from '@/utils/api/version'
+import { getVersionGameVersion, getVersionModsDir } from '@/utils/api/personalization'
 import { useVersionStore } from '@/stores/version'
 import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
@@ -69,6 +70,8 @@ const {
 const showDependencyDialog = ref(false)
 // 暂存待安装的主 Mod（弹窗确认后用于 install 调用）
 const pendingMainVersion = ref<ResourceVersion | null>(null)
+// 暂存前置检查解析出的上下文（versionId/gameVersion/modsDir），Community 场景下按需获取
+const pendingContext = ref<{ versionId: string; gameVersion: string; modsDir: string } | null>(null)
 
 watch(
   [() => props.visible, () => props.project],
@@ -117,11 +120,8 @@ async function handleDownload(v: ResourceVersion) {
     }
   }
 
-  // 前置 Mod 检查：仅 ModTab 场景（有 modsDir + versionId + gameVersion + 是 Mod 类型）启用
-  // Community 场景（无 modsDir）走原有"选择保存位置"流程
-  const canCheckDeps = !!(props.modsDir && props.versionId && props.gameVersion
-    && props.project.resource_type === 'Mod')
-  if (canCheckDeps) {
+  // 前置 Mod 检查：仅 Mod 类型启用（Community 场景下 versionId/gameVersion/modsDir 缺失时按需获取）
+  if (props.project.resource_type === 'Mod') {
     const hasMissing = await runDependencyCheck(v)
     if (hasMissing) {
       // 弹窗等用户确认，确认后由 handleDependencyConfirm 走 install 流程
@@ -163,29 +163,48 @@ async function handleDownload(v: ResourceVersion) {
  * 触发前置 Mod 检查并打开确认弹窗
  *
  * 流程：
- * 1. 获取当前版本加载器（getVersionLoaderInfo），转 ModLoaderFlags
- * 2. 调用 check_mod_dependencies IPC
- * 3. 有缺失 → 暂存主 Mod 并打开弹窗
+ * 1. 解析 versionId（props.versionId 优先，回退 versionStore.selectedVersion）
+ * 2. 并行获取 gameVersion / modsDir / loaderType（缺失的才获取）
+ * 3. 调用 check_mod_dependencies IPC
+ * 4. 有缺失 → 暂存主 Mod + 上下文，打开弹窗
  *
  * @returns true=已弹窗等用户确认，false=无缺失或检查失败可直接下载
  */
 async function runDependencyCheck(v: ResourceVersion): Promise<boolean> {
-  if (!props.project || !props.versionId || !props.gameVersion) return false
+  if (!props.project) return false
 
-  let modLoader = 0
-  try {
-    const info = await getVersionLoaderInfo(props.versionId)
-    modLoader = loaderToFlag(info.loaderType)
-  } catch (e) {
-    console.debug('[ResourceDetail] 获取加载器信息失败，按 0 检查:', e)
+  // 解析 versionId（Community 场景下 props.versionId 可能为空，回退 versionStore.selectedVersion）
+  const versionId = props.versionId || versionStore.selectedVersion || ''
+  if (!versionId) {
+    console.debug('[ResourceDetail] 前置检查跳过：无 versionId')
+    return false
   }
+
+  // 并行获取缺失的上下文（gameVersion / modsDir / loaderType）
+  const [gameVersion, modsDir, loaderInfo] = await Promise.all([
+    props.gameVersion ? Promise.resolve(props.gameVersion) : getVersionGameVersion(versionId).catch(() => null),
+    props.modsDir ? Promise.resolve(props.modsDir) : getVersionModsDir(versionId).catch(() => ''),
+    getVersionLoaderInfo(versionId).catch(() => ({ loaderType: 'release', loaderVersion: '' })),
+  ])
+
+  if (!gameVersion) {
+    console.debug('[ResourceDetail] 前置检查跳过：无 gameVersion')
+    return false
+  }
+  if (!modsDir) {
+    console.debug('[ResourceDetail] 前置检查跳过：无 modsDir')
+    return false
+  }
+
+  const modLoader = loaderToFlag(loaderInfo.loaderType)
+  pendingContext.value = { versionId, gameVersion, modsDir }
 
   try {
     const hasMissing = await checkDeps({
-      versionId: props.versionId,
+      versionId,
       platform: props.project.platform,
       modVersion: v,
-      gameVersion: props.gameVersion,
+      gameVersion,
       modLoader,
     })
     if (hasMissing) {
@@ -210,7 +229,8 @@ async function runDependencyCheck(v: ResourceVersion): Promise<boolean> {
  */
 async function handleDependencyConfirm(selectedDeps: ResolvedDependency[]) {
   const main = pendingMainVersion.value
-  if (!main || !props.versionId) return
+  const ctx = pendingContext.value
+  if (!main || !ctx) return
 
   showDependencyDialog.value = false
   downloading.value = main.id
@@ -220,7 +240,7 @@ async function handleDependencyConfirm(selectedDeps: ResolvedDependency[]) {
 
   try {
     const result = await installDeps({
-      versionId: props.versionId,
+      versionId: ctx.versionId,
       mainVersion: main,
       deps: selectedDeps,
     })
@@ -248,6 +268,7 @@ async function handleDependencyConfirm(selectedDeps: ResolvedDependency[]) {
   } finally {
     downloading.value = null
     pendingMainVersion.value = null
+    pendingContext.value = null
     resetDeps()
   }
 }
@@ -256,6 +277,7 @@ async function handleDependencyConfirm(selectedDeps: ResolvedDependency[]) {
 function handleDependencyClose() {
   showDependencyDialog.value = false
   pendingMainVersion.value = null
+  pendingContext.value = null
   resetDeps()
 }
 
