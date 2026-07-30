@@ -9,6 +9,29 @@
 
 ### 新增
 
+#### 测试版水印 + 设备 ID 追踪 + DevTools 防护
+
+- 背景：MoLaunch 进入测试阶段，测试版分发给内部测试用户。为防止未授权外传，需要全屏水印 + 设备 ID 追踪 + 禁用右键/DevTools 快捷键，仅在开发者模式开启时才能通过设置页按钮调出 WebView2 DevTools
+- 改动：
+  - **后端 devtools 控制**（[src-tauri/src/commands/system/developer.rs](src-tauri/src/commands/system/developer.rs)）：新增 `open_devtools` / `close_devtools` / `is_devtools_open` 三个函数，均通过 `require_dev_mode()` 双层校验（`DeveloperUnlocked` && `DeveloperMode`），普通用户即使绕过前端按钮直接调 IPC 也无法触发
+  - **后端 IPC 注册**（[src-tauri/src/utils/system_manager.rs](src-tauri/src/utils/system_manager.rs)）：DISPATCHER 注册 3 个 devtools action
+  - **Cargo.toml 启用 devtools feature**（[src-tauri/Cargo.toml](src-tauri/Cargo.toml)）：`tauri = { version = "2", features = ["devtools"] }`，让 release 构建也支持 `open_devtools()` 调用
+  - **版本号后缀解析**（新建 [src/utils/version.ts](src/utils/version.ts)）：解析 `package.json` version 后缀（beta/alpha/rc/canary），判定是否为测试版；提供 `isPreReleaseBuild()` / `getBuildFingerprint()` 等便捷函数
+  - **前端 devtools API**（[src/utils/api/developer.ts](src/utils/api/developer.ts)）：新增 `openDevTools()` / `closeDevTools()` / `isDevToolsOpen()` 三个 IPC 调用
+  - **SYSTEM_ACTIONS 扩展**（[src/utils/api/system-manager.ts](src/utils/api/system-manager.ts)）：新增 `OPEN_DEVTOOLS` / `CLOSE_DEVTOOLS` / `IS_DEVTOOLS_OPEN` 三个 action 常量
+  - **水印数据 composable**（新建 [src/composables/useWatermarkData.ts](src/composables/useWatermarkData.ts)）：提供水印组件所需的设备 ID（去 `mcsdk-` 前缀）、版本号、屏印哈希（djb2 算法，按小时分桶）、时间标签
+  - **DevTools 防护 composable**（新建 [src/composables/useDevToolsGuard.ts](src/composables/useDevToolsGuard.ts)）：capture 阶段拦截 `contextmenu` / `keydown`（F12 / Ctrl+Shift+I/J/C/K / Cmd+Opt+I/J/C/K / Ctrl+U）/ `dragstart`，禁用右键菜单与 DevTools 快捷键
+  - **水印组件**（新建 [src/components/common/Watermark.vue](src/components/common/Watermark.vue)）：全屏 45° 斜向重复文字水印，使用 SVG `<pattern>` 实现可重复单元格（280×140px），三行文字（测试版标识+版本号 / 设备ID / 屏印哈希+时间），文字 `rgba(0,0,0,0.06)` 低对比度，`pointer-events: none` 不影响交互；SVG 元素携带 `data-device` / `data-hash` / `data-time` / `data-build` 属性便于追溯
+  - **DevTools 子页签**（新建 [src/views/settings/developer/DevToolsTab.vue](src/views/settings/developer/DevToolsTab.vue)）：开发者页面新增 DevTools 子页签，提供「打开 DevTools」/「关闭 DevTools」按钮
+  - **SettingsDeveloper 注册子页签**（[src/views/settings/SettingsDeveloper.vue](src/views/settings/SettingsDeveloper.vue)）：在 subTabs 中追加 `devtools` 项
+  - **SystemInfoTab 备用解锁**（[src/views/settings/more/SystemInfoTab.vue](src/views/settings/more/SystemInfoTab.vue)）：新增设备 ID 双击 5 次备用解锁入口（4 秒内完成），已解锁状态下双击切换全额显示
+  - **App.vue 集成**（[src/App.vue](src/App.vue)）：引入 `Watermark` 组件 + `useDevToolsGuard` composable，全局生效
+  - **版本号变更为测试版**（[package.json](package.json) / [src-tauri/tauri.conf.json](src-tauri/tauri.conf.json)）：`0.1.0` → `0.1.0-beta.1`
+  - **设计文档**（新建 [docs/WATERMARK_AND_DEVTOOLS_DESIGN.md](docs/WATERMARK_AND_DEVTOOLS_DESIGN.md)）：完整设计方案
+  - **实现文档**（新建 [docs/WATERMARK_AND_DEVTOOLS_IMPLEMENTATION.md](docs/WATERMARK_AND_DEVTOOLS_IMPLEMENTATION.md)）：最终实现说明
+- 用户反馈："看下前端，现在添加测试版水印，因为我要打算发布测试版了，需要水印以及追踪id，也就是设备id，别带 mcsdk- 前缀。充分做好防止被去查水印的情况，同时做好屏印，即使被通过截图或者拍照传出去，也可以迅速追踪解密图片信息获得设备id和时间，然后就是因为是前端实现，做好被通过技术手段去掉水印的反制手段，然后添加右键菜单禁用，后续想通过右键或者快捷键调出 WebView2的开发者等其他模式不允许，然后去 设置页面的开发者侧边栏菜单页面去添加可以通过在那点击按钮弹出来，这样安全方便，然后目前触发开发者模式好像无法触发了，之前我设计的是 双击五次设备id，目前没有了，你设计一个新方案出来我瞅瞅呢"
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（零错误零警告）
+
 #### 中文搜索本地映射（参考 PCL2 实现）
 
 - 背景：MoLaunch 原样透传中文关键词给 CurseForge / Modrinth 官方 API，两大平台索引不含中文，中文搜索几乎返回空结果。PCL2 通过内置 MC百科（mcmod.cn）本地数据库实现中文搜索，本次参考其思路在 MoLaunch 中实现等价功能
