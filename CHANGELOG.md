@@ -7,6 +7,96 @@
 
 ## [未发布]
 
+### 修复
+
+#### 前置检查场景区分 + 下载按钮分阶段文字 + 下载完成自动撤销
+
+- **场景区分**（`src/composables/useResourceDownload.ts`）：
+  - Community 场景（下载页 Mod 搜索弹窗，无 `versionId`）：不再检查前置 Mod，直接调用文件选择对话框让用户选保存位置
+  - 版本管理场景（从版本设置 Mod 列表进入，有 `versionId`）：仅当 Mod 类型且有 `dependencies` 时才触发前置检查
+  - 用户反馈："直接在那个页面下载的话，不用询问是否补充前置了，除非从版本设置的 mod 列表过来选择 mod 的情况"
+- **下载按钮分阶段文字**（`src/composables/useResourceDownload.ts` + `src/components/community/resource-detail/VersionGroupCard.vue`）：
+  - 新增 `downloadStage` 响应式状态（`'idle' | 'requesting' | 'waiting' | 'downloading'`），区分下载全流程阶段
+  - 按钮文字分阶段显示：请求中（前置检查/准备）→ 等待中（前置弹窗等待用户确认）→ 下载中（实际下载）
+  - 通过 `ResourceDetail.vue` 将 `downloadStage` 透传给 `VersionGroupCard`
+  - 用户反馈："点击下载按钮，没显示补充前置的过度阶段显示请求中..，然后显示了前置 mod 的弹窗阶段改成 等待中... 然后我在弹窗选择下载后，才显示下载中"
+- **下载完成自动撤销**（`src/composables/useResourceDownload.ts`）：
+  - `handleDownload`：`downloadResourceToPath` IPC 返回成功后，若 `versionStore.downloading` 仍为 true（WS 因时序未收到 `is_complete`），直接调用 `finishDownload` + `toastSuccess` 兜底
+  - `handleDependencyConfirm`：`installDeps` IPC 返回成功后，同样兜底 `finishDownload`
+  - `finishDownload` 幂等（仅置 false/null），WS 已完成时无副作用
+  - 用户反馈："下载模组完成后，DownloadManager 不会自动撤销，进入页面显示没下，但实际 toast 都提示了"
+- **前置列表图片懒加载警告**（`src/components/community/resource-detail/DependencyInlineList.vue`）：移除 `loading="lazy"` 属性，CachedImage 组件已有缓存机制，浏览器原生懒加载触发 Chromium `[Intervention]` 控制台警告
+
+### 重构
+
+#### ResourceDetail.vue 拆分降至 300 行以内
+
+- `src/components/community/ResourceDetail.vue`：从 527 行降至 190 行（项目硬约束 Vue 组件 ≤ 300 行）
+  - 下载 + 前置 Mod 检查逻辑抽到 `src/composables/useResourceDownload.ts`（downloading / 弹窗状态 / depsMap / handleDownload / runDependencyCheck / handleDependencyConfirm / handleDependencyClose / handleLoadDeps）
+  - 整合包安装逻辑抽到 `src/composables/useResourceModpackInstall.ts`（handleInstallModpack / promptForInstanceName），与联机大厅 `useModpackInstall.ts` 流程一致但入参不同（ResourceProject + ResourceVersion vs ModpackMeta），故独立封装
+  - 组件仅保留版本列表加载 watch、useVersionGroups / useSearchProgress 编排、模板
+- **响应式修正**：composable 直接接收 `props`（Vue 3 reactive proxy）而非快照对象，避免用户切换资源时 composable 仍看到旧 project
+- **复用约定**：两个 composable 均复用 useDependencyCheck / getProjectDetail / formatDownloadFilename / pickSavePath / installModpack / installMerged / showModal / versionStore 现有约定，无新增 API
+
+### 修复
+
+#### Community 场景前置 Mod 检查 + 弹窗层级修复
+
+- **根因**：Community 场景下（下载页 Mod 搜索弹窗）点击下载按钮不弹出前置确认弹窗。`useResourceDownload.ts` 的 `runDependencyCheck` 在 `versionId` 为空时直接 `return false` 跳过检查，而 Community 场景下 `versionStore.selectedVersion` 为空；且后端 `check_mod_dependencies` / `install_mod_with_dependencies` 强制要求 `version_id` 来解析 mods 目录
+- **后端改造**（`src-tauri/src/commands/version/mods/dependency_resolver.rs` + `src-tauri/src/utils/version_mods_manager.rs`）：
+  - `check_mod_dependencies`：`version_id` 改为 `Option<&str>`，新增 `mods_dir: Option<&str>`。优先用 version_id 解析 mods 目录，其次用传入的 mods_dir，都无则跳过已安装扫描（所有前置返回 missing）
+  - `install_mod_with_dependencies`：`version_id` 改为 `Option<&str>`，新增 `target_dir: Option<&str>`。无 version_id 时用 target_dir 作为下载目录
+  - 参数结构体 `CheckModDependenciesParams` / `InstallModWithDepsParams` 同步更新
+- **前端改造**（`src/composables/useDependencyCheck.ts` + `src/composables/useResourceDownload.ts`）：
+  - `CheckDepsParams.versionId` 改为可选，新增 `modsDir?`；`InstallDepsParams.versionId` 改为可选，新增 `targetDir?`
+  - `runDependencyCheck`：Community 场景下从 `modVersion.game_versions` 推断 gameVersion（过滤加载器名称）、从 `modVersion.mod_loaders` 取 modLoader，传 `versionId=undefined + modsDir=undefined` 调用检查
+  - `handleDependencyConfirm`：Community 场景下先调 `pickDirectory` 选保存文件夹，install 时传 `targetDir`
+  - `handleDownload`：开始即设 `downloading = v.id`，检查依赖期间按钮显示 loading 防止重复点击；`finally` 中仅在未进入前置弹窗时清空 loading
+  - `handleDependencyClose`：补充清空 `downloading`，修复取消弹窗后按钮仍 loading 的遗漏
+- **弹窗层级修复**（`src/components/community/DependencyConfirmDialog.vue`）：z-index 从 `z-[10000]` 提升为 `z-[10003]`（高于顶部 nav 的 `z-[10002]` 和 ResourceDetail 的 `z-[10000]`），解决前置确认弹窗被 nav 遮挡问题
+
+#### 下载管理页交互修复（按钮遮挡 / 阶段文字截断 / 进度自恢复 / 按钮间距）
+
+- `src/components/common/DownloadPanel.vue`：浮动下载按钮 z-index 从 `z-50` 提升为 `z-[10001]`，高于所有弹窗遮蔽罩（z-10000），避免资源详情/前置确认弹窗打开时下载按钮被遮蔽罩遮挡
+- `src/views/downloads/DownloadStatsPanel.vue`：当前阶段文字添加 `truncate` 单行截断 + `Tooltip`（block 模式）完整展示，避免阶段名过长撑高布局挤压下方内容
+- `src/composables/useDownloadStream.ts`：`initDownloadStream` 启动时主动调用 `isDownloading` 检查后端下载状态，若仍在下载则 `startDownload(raw.version_name)` 恢复状态并触发 watch 建立 WS 连接，解决刷新后进度不自恢复、下载完成无提示问题；watch 回调参数改名 `isDownloading`→`downloading` 避免遮蔽导入的同名函数
+- `src/components/common/Button.vue`：mini 尺寸按钮 icon 与文字间距从 4px 调整为 6px，改善版本列表下载按钮内 icon 与「下载」文字视觉间距
+
+#### 前置 Mod 图片缓存 + 下载页 tab 留存 + 搜索历史 + 按钮对齐
+
+- `src/components/community/resource-detail/DependencyInlineList.vue` / `src/components/community/DependencyItem.vue`：前置列表 `<img>` 替换为 `<CachedImage>` 组件，复用后端 `image_cache_manager` 缓存，避免每次渲染发起远程请求
+- `src/composables/useTabPersistence.ts`（新建）：抽取 NavSidebar 的 URL query `tab` 同步逻辑为 composable（onMounted 读取 + watch router.replace 写入）
+- `src/components/common/NavSidebar.vue`：改用 `useTabPersistence`，移除内联 onMounted + watch，逻辑等价
+- `src/views/downloads/DownloadSidebar.vue`：接入 `useTabPersistence`，实现与工具页相同的 tab 留存（刷新保留 + 切换页面回来保留），不再重置为默认 `vanilla`
+- `src/composables/useSearchHistory.ts`（新建）：搜索历史 composable，localStorage 持久化（key `molaunch-search-history`），最近 5 条，去重置顶，复用 `safeCallSync` 范式
+- `src/components/community/SearchBar.vue`：搜索框 focus 时展示历史下拉，点击历史项填充并搜索；仅主动搜索（回车/搜索按钮/点击历史）记录历史，防抖自动搜索不记录
+- `src/components/common/Button.vue`：mini 尺寸 `line-height` 设为 1（文本行高贴近 font-size，与 14px icon 居中后视觉对齐），icon `margin-right` 最终调整为 8px
+
+#### 资源详情弹窗被顶部导航栏遮挡
+
+- `src/components/community/ResourceDetail.vue`：
+  - 弹窗 z-index 从 `z-[9999]` 提升为 `z-[10000]`（与 Modal 一致，仍低于 nav 的 z-[10002]）
+  - 外层 flex 容器对齐从 `items-center` 改为 `items-start`，padding 改为 `px-4 pt-14 pb-4`，弹窗加 `mt-2`
+  - 弹窗最大高度从 `max-h-[85vh]` 改为 `max-h-[calc(100vh-100px)]`，给顶部 nav（高 48px）留出避让空间
+- `src/components/community/DependencyConfirmDialog.vue`：
+  - 同步应用相同的避让策略（items-start + pt-14 + mt-2 + max-h calc(100vh-100px)）
+
+#### 前置 Mod 检查不弹窗排查辅助
+
+- `src/composables/useResourceDownload.ts`（原 ResourceDetail.vue）：
+  - `handleDownload` 前置检查分支入口加 `console.warn` 日志，输出 `resource_type` 确认是否进入前置检查
+  - `runDependencyCheck` 所有跳过分支和完成分支的日志从 `console.debug` 改为 `console.warn`，确保在 devtools 默认级别下可见
+  - 新增关键日志：`前置检查：mod=X platform=X 依赖数=N game=X loader=X` 和 `前置检查完成：缺失=N 已满足=N`，便于区分"Mod 本身无依赖"与"检查流程未触发"
+
+#### 前置 Mod 列表内联展示（详情页直接查看）
+
+- `src/components/community/resource-detail/DependencyInlineList.vue`：新增组件，展示前置 mod 的 logo + 名称 + 平台标签，支持 loading 状态
+- `src/components/community/resource-detail/VersionGroupCard.vue`：
+  - 版本条目下方，仅 Mod 类型且有 dependencies 时展示"查看 N 个前置"按钮
+  - 点击按钮展开/收起 DependencyInlineList，首次展开 emit `loadDeps` 事件让父组件懒加载查询前置项目详情
+  - 新增 `depsMap` / `depsLoadingSet` props 接收父组件缓存的前置详情
+- `src/composables/useResourceDownload.ts` `handleLoadDeps`：对 `version.dependencies` 里每个 project_id 调用 `getProjectDetail` 查询详情，存入 `depsMap`，已缓存不重复查询
+
 ### 新增
 
 #### Mod 前置依赖自动检查与一键安装
