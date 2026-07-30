@@ -9,6 +9,10 @@
 
 ### 修复
 
+#### 检查更新报错 "missing field version"
+
+- `src-tauri/src/commands/system/updater.rs`：服务器在"无可用更新"时返回空 manifest（缺少 `version` 字段），`tauri-plugin-updater` 内部反序列化报 `missing field \`version\``。`check_update` 捕获含 `missing field` 的 serde 错误并视为"无更新"返回 `UpdateInfo::default()`，其他错误正常透传
+
 #### 前置检查场景区分 + 下载按钮分阶段文字 + 下载完成自动撤销
 
 - **场景区分**（`src/composables/useResourceDownload.ts`）：
