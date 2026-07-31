@@ -7,6 +7,12 @@
 
 ## [未发布]
 
+### 调整
+
+#### Checkbox 组件注释精简
+
+- 精简 [src/components/common/Checkbox.vue](src/components/common/Checkbox.vue) 的 script 顶部块注释（从 17 行缩减到 4 行），移除冗余的视觉规格描述与"复刻 ArcoDesign"字样，仅保留组件名与用法示例；style 内两处"参考 ArcoDesign"注释同步移除
+
 ### 新增
 
 #### Dev 调试 API（window.molaunch）
