@@ -48,6 +48,8 @@ tokio-tungstenite = "0.21"
 #     v0.7.x 对应 rustls 0.22+，不兼容 reqwest 0.11
 rustls-native-certs = "0.6"
 sysinfo = "0.29"
+# 枚举本机网络连接（列出监听端口，供 Frp 内网端口选择）
+netstat2 = "0.9"
 sha1 = "0.10"
 sha2 = "0.10"
 md5 = "0.7"

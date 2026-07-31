@@ -63,6 +63,42 @@ pub async fn delete_tunnel(id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// 更新隧道配置
+///
+/// 更新持久化的 tunnels.json 并重新生成 frpc TOML 配置文件。
+/// 若隧道正在运行，调用方应先停止隧道再更新（本函数不处理进程）。
+pub async fn update_tunnel(params: UpdateTunnelParams) -> Result<Tunnel, String> {
+    let mut tunnels = read_tunnels()?;
+
+    // 名称唯一性校验（排除自身）——须在 iter_mut 借用前完成，避免可变/不可变借用冲突
+    if tunnels.iter().any(|t| t.id != params.id && t.name == params.name) {
+        return Err(format!("隧道名称已存在: {}", params.name));
+    }
+
+    let tunnel = tunnels.iter_mut().find(|t| t.id == params.id)
+        .ok_or_else(|| format!("隧道不存在: {}", params.id))?;
+
+    tunnel.name = params.name;
+    tunnel.provider_id = params.provider_id;
+    tunnel.tunnel_type = params.tunnel_type;
+    tunnel.local_ip = params.local_ip.unwrap_or_else(|| "127.0.0.1".to_string());
+    tunnel.local_port = params.local_port;
+    tunnel.server_addr = params.server_addr;
+    tunnel.server_port = params.server_port;
+    tunnel.remote_port = params.remote_port;
+    tunnel.token = params.token;
+    tunnel.use_tls = params.use_tls.unwrap_or(false);
+
+    let updated = tunnel.clone();
+    write_tunnels(&tunnels)?;
+
+    // 重新生成 frpc TOML 配置（覆盖旧文件）
+    generate_config(&updated)?;
+
+    log_info!("[Frp] 隧道已更新: {} ({})", updated.name, updated.id);
+    Ok(updated)
+}
+
 /// 生成 frpc TOML 配置文件
 ///
 /// 写入 `<base_dir>/frp/config/<tunnel_id>.toml`，返回文件路径。
@@ -231,4 +267,20 @@ pub struct CreateTunnelParams {
 #[serde(rename_all = "camelCase")]
 pub struct TunnelIdParams {
     pub id: String,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UpdateTunnelParams {
+    pub id: String,
+    pub name: String,
+    pub provider_id: String,
+    pub tunnel_type: TunnelType,
+    pub local_ip: Option<String>,
+    pub local_port: u16,
+    pub server_addr: String,
+    pub server_port: u16,
+    pub remote_port: u16,
+    pub token: Option<String>,
+    pub use_tls: Option<bool>,
 }

@@ -3,7 +3,7 @@
 //! 校验用户输入的隧道参数，防止注入和非法值。
 //! 启动隧道前调用 `validate_tunnel` 进行校验。
 
-use super::tunnel::CreateTunnelParams;
+use super::tunnel::{CreateTunnelParams, UpdateTunnelParams};
 use super::{validate_provider_id, TunnelType};
 
 /// 校验创建隧道参数
@@ -88,4 +88,24 @@ pub fn validate_tunnel(params: &CreateTunnelParams) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+/// 校验更新隧道参数
+///
+/// `UpdateTunnelParams` 与 `CreateTunnelParams` 字段一致（仅多一个 `id`），
+/// 转换为 `CreateTunnelParams` 后复用 `validate_tunnel` 的校验逻辑，避免重复实现规则。
+pub fn validate_tunnel_update(p: &UpdateTunnelParams) -> Result<(), String> {
+    let create = CreateTunnelParams {
+        name: p.name.clone(),
+        provider_id: p.provider_id.clone(),
+        tunnel_type: p.tunnel_type.clone(),
+        local_ip: p.local_ip.clone(),
+        local_port: p.local_port,
+        server_addr: p.server_addr.clone(),
+        server_port: p.server_port,
+        remote_port: p.remote_port,
+        token: p.token.clone(),
+        use_tls: p.use_tls,
+    };
+    validate_tunnel(&create)
 }

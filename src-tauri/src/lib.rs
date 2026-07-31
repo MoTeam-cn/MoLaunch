@@ -167,6 +167,10 @@ pub fn run() {
     log_info!("[Startup] Registering res:// URI scheme...");
     let builder = res_scheme::register_res_scheme(builder);
 
+    // 注册 picker:// 自定义 URI scheme（选择器子窗口 HTML 渲染）
+    log_info!("[Startup] Registering picker URI scheme...");
+    let builder = commands::tools::picker_window::register_picker_scheme(builder);
+
     log_info!("[Startup] All setup done, calling builder.run() — entering Tauri event loop (webview/window creation follows)...");
     builder
         .run(tauri::generate_context!())
