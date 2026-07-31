@@ -9,6 +9,31 @@
 
 ### 重构
 
+#### 注释规范整改（V3 代码质量报告 P2）
+
+- 背景：V3 报告 P2 违规——后端 .rs 文件头部 `//!` 注释超过 5 行（版权声明除外）、多处 `///` 文档注释超过 10 行、6 处无用注释（主要为代码复述/陈旧型），违反"头部注释 ≤5 行、方法注释不得浮夸、无用注释必须移除"硬约束
+- 改动（仅删减/精简注释文字，未改动任何代码逻辑）：
+  - **头部 `//!` 注释**：85 个后端 .rs 文件头部注释精简至 ≤5 行，保留模块用途、关键设计与安全要点，去除冗余实现细节
+  - **`///` 文档注释**：全部超 10 行的文档注释精简至 ≤10 行（grep 复核无残留），涉及 http.rs / version/libraries/filter.rs / image_cache.rs / commands/system/mod.rs / auth/authlib/types.rs / community/modrinth/mod.rs / loaders/forge_html.rs / online/protocol.rs / state/config.rs / community/curseforge/mod.rs / java_selector/rules.rs / community/fuzzy.rs / community/mcmod.rs / download/assets.rs / version/preload.rs / version/mods/update.rs / system/shell.rs / commands/java.rs / online/crypto.rs / frp/provider.rs / system/developer.rs / community/install/helpers.rs / tools/crash_analyzer.rs / community/install/mmc.rs / frp/log_redact.rs 等
+  - **无用注释清理**：移除 6 处无用/陈旧注释——minecraft/online/bridge.rs 3 处（描述 write_tx 关闭但实际用 `handle.abort()` 的陈旧注释 + 复述 abort 调用）、commands/frp/process.rs 1 处（描述未实现分支的陈旧注释）、logger/mod.rs 1 处（复述 `file.write_all` 的 "// 写入文件"）、lib.rs 1 处（误导性 "需要获取 AppState" 注释，实际仅打印日志）
+- 验证：`cargo check` 通过无错误无警告（26s）；仅删减注释文字，未改动任何代码逻辑
+
+#### 拆分超长 TS 文件（V3 代码质量报告 P2）
+
+- 背景：V3 报告 P2 违规——7 个 TS 文件超过 400 行关注阈值（types/online 596 / utils/api/tools 494 / utils/api/online-manager 540 / composables/useDragDrop 455 / stores/frp 527 / stores/online 856 / views/tools/data/useSeedMap 828），违反"TypeScript 文件 >400 行需关注"硬约束。generatorWorker.ts 682 行经评估后保留（见下文说明）
+- 改动（全部采用主文件 re-export 保持调用方路径完全兼容，零调用方改动）：
+  - **types/online.ts**（596 → 25 行）：按域拆分为 `types/online/` 下 8 个子文件（`auth.ts`/`signaling.ts`/`modpack.ts`/`room.ts`/`tun.ts`/`nat.ts`/`whitelist.ts`/`lobby.ts`），主文件 `export * from './online/xxx'` 聚合
+  - **utils/api/tools.ts**（494 → 27 行）：按工具类别拆分为 `utils/api/tools/` 下 7 个子文件（`core.ts`/`download.ts`/`cleanup.ts`/`mod.ts`/`data.ts`/`archive.ts`/`network.ts`），主文件 re-export
+  - **utils/api/online-manager.ts**（540 → 28 行）：按 action 类别拆分为 `utils/api/online-manager/` 下 8 个子文件（`core.ts`/`auth.ts`/`room.ts`/`turn.ts`/`mesh.ts`/`tun.ts`/`whitelist.ts`/`lobby.ts`），主文件 re-export
+  - **composables/useDragDrop.ts**（455 → 92 行）：拆分为 `composables/useDragDrop/` 下 `state.ts`（拖拽状态+扩展名常量+classifyDrag+hideOverlay）与 `handlers.ts`（文件类型分发与安装处理），主文件保留 useDragDrop() 生命周期函数并 re-export 子模块
+  - **stores/frp.ts**（527 → 385 行）：抽取 `stores/frp/authSlice.ts`（useFrpAuthSlice：认证 state + actions），主文件解构合并 auth 切片
+  - **stores/online.ts**（856 → 67 行）：拆分为 `stores/online/` 下 `types.ts`（RoomRole/RoomState/emptyRoom）+ 4 个 Pinia 切片（`authSlice.ts`/`roomSlice.ts`/`whitelistSlice.ts`/`natSlice.ts`），主文件组合切片并 re-export 类型
+  - **views/tools/data/useSeedMap.ts**（828 → 545 行）：抽取 `useSeedMap/config.ts`（Zoom/extent 常量 + SEEDMAP_MC_VERSIONS + mapMcVersionToCubiomes）、`useSeedMap/tileLoader.ts`（createTileLoader 工厂）、`useSeedMap/structureManager.ts`（createStructureManager 工厂），主文件保留 initMap + 事件处理 + 生命周期
+- generatorWorker.ts（682 行）保留未拆：WASM Worker 所有 handler 共享可变 `Module` 状态 + 紧耦合辅助函数（ensureHeap/writeSeedString/callChunkFinder/callFinderOnce），拆分需引入复杂 context 传递且不改善可读性；按约束"WASM Worker 如逻辑密集难拆可不拆"保留
+- 附带修复（stores/online.ts 拆分引入的 tsc 错误）：
+  - [src/stores/online/roomSlice.ts](src/stores/online/roomSlice.ts)：移除未使用的 `toastError` 导入；`guestJoinRoom` 的 roomState 对象补全缺失的 `hostModpack: undefined` 字段（RoomState 类型要求该字段必须存在）
+- 验证：`tsc --noEmit` 零新增错误（仅预存于未修改文件的 4 个错误：htmlShadowRenderer.ts/renderHelpers.ts 3 个来自 CustomLayoutPanel 拆分、crypto.ts 1 个 TypeScript 5.7+ ArrayBuffer 严格模式兼容问题）
+
 #### config 整合：移除 get_config_value/set_config_value 单字段命令
 
 - 背景：V3 代码质量报告 P1 违规——配置读写未走统一的 `apply_config`/`get_config`，仍存在 `get_config_value`/`set_config_value` 单字段命令，违反"配置读写统一走 `apply_config`/`get_config`，不应新增 `set_*`/`get_*` 单字段命令"硬约束
