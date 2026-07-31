@@ -80,6 +80,26 @@ pub struct AllocationIdParams {
     pub allocation_id: String,
 }
 
+/// 保存 API Key 参数
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SaveApiKeyParams {
+    pub provider_id: String,
+    pub api_key: String,
+}
+
+/// 执行厂商认证适配器脚本参数（对应 §7.5 沙箱）
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunAuthAdapterParams {
+    pub provider_id: String,
+    /// 要执行的命令（必须在厂商 allowedCommands 白名单内）
+    pub command: String,
+    /// 命令参数
+    #[serde(default)]
+    pub args: Vec<String>,
+}
+
 // ============================================================
 // 在线调用辅助函数（与 signaling_manager 风格一致）
 // ============================================================
@@ -224,6 +244,81 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         let p: ReadLogParams = serde_json::from_value(params)
             .map_err(|e| format!("参数解析失败: {}", e))?;
         let r = frp::process::read_log_file(p.tunnel_id, p.max_lines).await?;
+        serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    // ============================================================
+    // 认证体系（阶段三：OAuth2 / Device Code / API Key）
+    // ============================================================
+
+    d.register("get_auth_status", handler!(_state, _app, params, {
+        let p: ProviderIdParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let r = frp::auth::get_auth_status(&p.provider_id).await?;
+        serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    d.register("start_oauth2", handler!(state, _app, params, {
+        let p: ProviderIdParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let r = frp::auth::start_oauth2(&state, &p.provider_id).await?;
+        serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    d.register("start_device_code", handler!(state, _app, params, {
+        let p: ProviderIdParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let r = frp::auth::start_device_code(&state, &p.provider_id).await?;
+        serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    d.register("poll_device_code", handler!(state, _app, params, {
+        let p: ProviderIdParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let r = frp::auth::poll_device_code(&state, &p.provider_id).await?;
+        serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    d.register("refresh_token", handler!(state, _app, params, {
+        let p: ProviderIdParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        frp::auth::refresh_token(&state, &p.provider_id).await?;
+        serde_json::to_value(()).map_err(|e| e.to_string())
+    }));
+
+    d.register("revoke_auth", handler!(_state, _app, params, {
+        let p: ProviderIdParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        frp::auth::revoke_auth(&p.provider_id).await?;
+        serde_json::to_value(()).map_err(|e| e.to_string())
+    }));
+
+    d.register("save_api_key", handler!(_state, _app, params, {
+        let p: SaveApiKeyParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        frp::auth::save_api_key(&p.provider_id, &p.api_key).await?;
+        serde_json::to_value(()).map_err(|e| e.to_string())
+    }));
+
+    // ============================================================
+    // 厂商 API 引擎（阶段三：api-schema.json 解析 + 配置拉取）
+    // ============================================================
+
+    d.register("fetch_vendor_config", handler!(state, _app, params, {
+        let p: ProviderIdParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let r = frp::api_schema::fetch_vendor_config(&state, &p.provider_id).await?;
+        serde_json::to_value(r).map_err(|e| e.to_string())
+    }));
+
+    // ============================================================
+    // 认证适配器脚本沙箱（阶段四 §7.5）
+    // ============================================================
+
+    d.register("run_auth_adapter", handler!(_state, _app, params, {
+        let p: RunAuthAdapterParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        let r = frp::sandbox::run_auth_adapter(&p.provider_id, p.command, p.args).await?;
         serde_json::to_value(r).map_err(|e| e.to_string())
     }));
 

@@ -75,6 +75,51 @@ pub fn open_path(path: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 用系统默认浏览器打开 URL
+///
+/// 仅允许 http/https 协议，防止任意协议跳转（如 file://、javascript:）。
+/// - Windows: `cmd /c start "" "<url>"`
+/// - macOS: `open <url>`
+/// - Linux: `xdg-open <url>`
+///
+/// 与 `open_path` 区别：不校验路径存在性（URL 不是文件系统路径），
+/// 仅校验协议白名单。用于 Frp OAuth2 授权跳转、Device Code 验证链接等场景。
+pub fn open_url(url: &str) -> Result<(), String> {
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return Err("仅允许打开 http/https URL".to_string());
+    }
+    log_info!("[Shell] open_url: {}", url);
+
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x08000000;
+        std::process::Command::new("cmd")
+            .args(["/c", "start", "", url])
+            .creation_flags(CREATE_NO_WINDOW)
+            .spawn()
+            .map_err(|e| shell_err("open_url", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| shell_err("open_url", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(url)
+            .spawn()
+            .map_err(|e| shell_err("open_url", e))?;
+    }
+
+    Ok(())
+}
+
 /// 在文件管理器中打开父目录并选中指定文件
 ///
 /// - Windows: 用 Win32 API `ShellExecuteW` 直接调用 explorer.exe，传参 `/select,"<path>"`

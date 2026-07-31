@@ -6,8 +6,11 @@
 //! binary（frpc 二进制下载）/ tunnel（CRUD/配置生成）/ process（进程管理/日志）/ sandbox（校验）。
 //! 所有子模块函数由 `utils::frp_manager::dispatch` 统一反序列化参数后调用。
 
+pub mod api_schema;
+pub mod auth;
 pub mod binary;
 pub mod install;
+pub mod log_redact;
 pub mod process;
 pub mod provider;
 pub mod sandbox;
@@ -140,6 +143,37 @@ pub struct ProviderManifest {
     /// 认证方式（默认 none）
     #[serde(default)]
     pub auth: AuthConfig,
+    /// 网络权限（限制 frpc 可连接的服务器，可选）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub network_permissions: Option<NetworkPermissions>,
+    /// 进程权限（限制厂商认证适配器脚本的执行，可选）
+    ///
+    /// 对应设计文档 §7.5 认证适配器沙箱。仅当厂商提供自定义认证脚本
+    /// （如 Node.js / Python）时启用，命令必须通过 `which_canonical` 解析后
+    /// 与 `allowed_commands` 白名单匹配，非 shell 执行，超时默认 30 秒、
+    /// 最大 5 分钟，stdout/stderr 各截断到 1MB，工作目录限制在厂商目录内。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub process_permissions: Option<ProcessPermissions>,
+}
+
+/// 进程权限配置（限制厂商认证适配器脚本执行）
+///
+/// 对应设计文档 §7.5。命令必须通过 `which_canonical` 解析后与白名单匹配，
+/// 非 shell 执行防注入，超时默认 30 秒、最大 5 分钟，stdout/stderr 各截断到 1MB。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProcessPermissions {
+    /// 允许执行的命令白名单（如 ["node", "python"]）
+    #[serde(default)]
+    pub allowed_commands: Vec<String>,
+    /// 超时毫秒，默认 30000，最大 300000
+    #[serde(default = "default_process_timeout_ms")]
+    pub timeout_ms: u64,
+}
+
+/// serde 默认值：进程超时 30 秒
+fn default_process_timeout_ms() -> u64 {
+    30_000
 }
 
 /// frpc 二进制分发配置
@@ -178,14 +212,94 @@ pub struct AuthConfig {
     #[serde(default = "default_auth_type")]
     #[serde(rename = "type")]
     pub auth_type: String,
+    /// OAuth2 配置（type=oauth2 时必填）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oauth2: Option<OAuth2Config>,
+    /// Device Code 配置（type=device_code 时必填）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub device_code: Option<DeviceCodeConfig>,
+    /// API Key 配置（type=api_key 时必填）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_key: Option<ApiKeyConfig>,
 }
 
 impl Default for AuthConfig {
     fn default() -> Self {
         AuthConfig {
             auth_type: default_auth_type(),
+            oauth2: None,
+            device_code: None,
+            api_key: None,
         }
     }
+}
+
+/// 网络权限配置（限制 frpc 可连接的服务器）
+///
+/// 对应设计文档 §7.2 配置校验中的网络白名单。当 `allow_custom_server=false` 时，
+/// `server_addr` 必须在 `allowed_servers` 白名单内；系统默认厂商始终允许自定义服务器。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NetworkPermissions {
+    /// 允许的 frps 服务器地址白名单（域名或 IP[:端口]）
+    #[serde(default)]
+    pub allowed_servers: Vec<String>,
+    /// 是否允许自定义服务器（false=仅白名单内的服务器）
+    #[serde(default)]
+    pub allow_custom_server: bool,
+}
+
+/// OAuth2 配置（auth.type=oauth2 时必填）
+///
+/// 参见 FRP_MANAGER_DESIGN.md §6.3。本地启动 HTTP 服务监听 redirectPort 接收回调，
+/// 浏览器跳转走 `crate::minecraft::system::shell::open_url`，token 交换在后端完成。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OAuth2Config {
+    /// 授权页 URL
+    pub authorize_url: String,
+    /// token 交换 URL
+    pub token_url: String,
+    /// 客户端 ID
+    pub client_id: String,
+    /// 权限范围
+    #[serde(default)]
+    pub scopes: Vec<String>,
+    /// 回调端口（本地启动 HTTP 服务接收 callback）
+    pub redirect_port: u16,
+}
+
+/// Device Code 配置（auth.type=device_code 时必填）
+///
+/// 参见 FRP_MANAGER_DESIGN.md §6.4。POST deviceCodeUrl 获取设备码，
+/// 前端显示用户码 + 验证链接 + 倒计时，后端按 interval 轮询 tokenUrl。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeviceCodeConfig {
+    /// 设备码请求 URL
+    pub device_code_url: String,
+    /// token 轮询 URL
+    pub token_url: String,
+    /// 客户端 ID
+    pub client_id: String,
+    /// 权限范围
+    #[serde(default)]
+    pub scopes: Vec<String>,
+    /// 轮询间隔（秒），默认 5
+    #[serde(default = "default_poll_interval")]
+    pub poll_interval: u64,
+}
+
+/// API Key 配置（auth.type=api_key 时必填）
+///
+/// 用户手动获取 Key 填入，存储到 OS 密钥存储，调用厂商 API 时注入请求头。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiKeyConfig {
+    /// 获取 API Key 的 URL（前端提供跳转入口）
+    pub obtain_url: String,
+    /// API Key 在请求头中的字段名
+    pub header_name: String,
 }
 
 /// 日志文件信息（list_log_files 返回）
@@ -213,6 +327,11 @@ fn default_distribution() -> String {
 /// serde 默认值：none
 fn default_auth_type() -> String {
     "none".to_string()
+}
+
+/// serde 默认值：Device Code 轮询间隔 5 秒
+fn default_poll_interval() -> u64 {
+    5
 }
 
 // ============================================================

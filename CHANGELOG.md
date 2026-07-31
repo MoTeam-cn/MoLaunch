@@ -7,6 +7,109 @@
 
 ## [未发布]
 
+### 新增
+
+#### Frp 阶段四：安全加固
+
+- 背景：完善 Frp 后端安全防护，覆盖网络白名单强制校验、frpc 进程隔离、日志脱敏、API 重定向防护四项，对应设计文档 §7 安全沙箱（§7.2 配置校验、§7.3 进程隔离、§7.7 frpc 二进制下载安全）
+- 改动：
+  - **网络白名单强制校验**（[src-tauri/src/commands/frp/sandbox.rs](src-tauri/src/commands/frp/sandbox.rs)）：
+    - `validate_tunnel` 新增 `validate_network_permissions` 校验：读取厂商 manifest 的 `networkPermissions`，当 `allow_custom_server=false` 时 `server_addr` 必须在 `allowedServers` 白名单内（host 级匹配，允许白名单只写 host 或 host:port）
+    - 新增 `is_private_address` 函数：非系统默认厂商禁止连接内网地址（10.0.0.0/8、172.16.0.0/12、192.168.0.0/16、127.0.0.0/8），防止 SSRF；系统默认厂商豁免（用户自建 frps 可能位于内网）
+    - 新增本地端口特权端口检查：`local_port < 1024` 拒绝（防止 frpc 获取不必要的系统权限）
+  - **frpc 进程环境变量清空 + Job Object**（[src-tauri/src/commands/frp/process.rs](src-tauri/src/commands/frp/process.rs)）：
+    - frpc 子进程启动时 `env_clear()` 清空环境变量，仅保留 `PATH`，防止敏感环境变量泄露
+    - Windows 下新增 `assign_process_to_job_object` 函数：创建带 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 的 Job Object 并关联子进程，确保启动器退出时 frpc 自动终止（防止僵尸进程）；依赖 `windows` crate 的 `Win32_System_JobObjects` feature（需在 Cargo.toml 启用）
+    - `capture_stream` 新增 1MB 截断：单流（stdout/stderr）捕获超过 1MB 后写入截断提示并停止捕获，防止内存膨胀
+    - `capture_stream` 集成 `log_redact::redact_log`：每行日志脱敏后再写入文件/推送前端
+  - **日志脱敏模块**（新增 [src-tauri/src/commands/frp/log_redact.rs](src-tauri/src/commands/frp/log_redact.rs)）：
+    - 实现 `pub fn redact_log(line: &str) -> String`：用正则匹配 `token`/`password`/`secret`/`api_key`/`auth_token`/`access_token`/`refresh_token` 字段（不区分大小写），将值替换为 `***`，保留字段名、分隔符和引号风格
+    - 支持 TOML（`token = "xxx"` / `token=xxx`）与 JSON（`"token":"xxx"`）两种格式
+    - `\b` 词边界确保只匹配完整字段名，不误匹配 `my_token` 等带前缀字段
+  - **API 重定向防护**（[src-tauri/src/commands/frp/binary.rs](src-tauri/src/commands/frp/binary.rs)）：
+    - `ensure_external_frpc` 的 HTTP 下载改用 `reqwest::redirect::Policy::none()` 禁止自动重定向
+    - 手动检查 3xx 响应的 `Location` 头，解析重定向 URL 并校验域名是否在 `allowed_domains` 白名单内，不在白名单返回错误
+    - 最多跟随 5 次重定向，防止无限循环；现有 SHA256 校验和文件写入逻辑保持不变
+  - **共享类型扩展**（[src-tauri/src/commands/frp/mod.rs](src-tauri/src/commands/frp/mod.rs)）：
+    - 新增 `pub mod log_redact;` 模块声明
+    - 新增 `NetworkPermissions` 结构体（`allowed_servers` + `allow_custom_server`）
+    - 新增 `ProcessPermissions` 结构体（`allowed_commands` + `timeout_ms`，默认 30000ms，上限 300000ms）
+    - `ProviderManifest` 新增 `network_permissions: Option<NetworkPermissions>` 与 `process_permissions: Option<ProcessPermissions>` 字段（`#[serde(skip_serializing_if = "Option::is_none")]`）
+    - 修复并发编辑导致的 `AuthConfig` 结构体闭合缺陷（补全 `}` 与 Default impl 的 oauth2/device_code/api_key 字段）
+  - **认证适配器脚本沙箱**（[src-tauri/src/commands/frp/sandbox.rs](src-tauri/src/commands/frp/sandbox.rs)，对应 §7.5）：
+    - 新增 `pub async fn run_auth_adapter(provider_id, command, args) -> Result<ProcessResult, String>`：沙箱化执行厂商自定义认证脚本
+    - 流程：读取厂商 manifest 的 `process_permissions` → `is_command_allowed` 校验命令白名单 → 工作目录强制设为厂商目录 → `env_clear()` 清空环境变量仅保留 `PATH` → `tokio::time::timeout` 超时控制（默认 30s，上限 5min）→ 非 shell 执行 `Command::new` 防注入 → `truncate_output` 截断 stdout/stderr 到 1MB
+    - 系统默认厂商直接拒绝（不提供自定义脚本）；`allowed_commands` 为空时拒绝
+    - 新增 `run_auth_adapter` IPC action（参数 `RunAuthAdapterParams { providerId, command, args }`），返回 `ProcessResult { exitCode, stdout, stderr, timedOut, durationMs }`
+  - **spawn.rs 工具函数提升可见性**（[src-tauri/src/commands/plugins/spawn.rs](src-tauri/src/commands/plugins/spawn.rs)）：
+    - 将 `which_canonical` / `is_command_allowed` / `paths_equal` / `truncate_output` 四个函数从私有 `fn` 改为 `pub(crate) fn`
+    - 将 `MAX_OUTPUT_BYTES` / `MAX_TIMEOUT_MS` 常量改为 `pub(crate)`
+    - 设计文档 §7.5 明确要求"复用 spawn.rs:164-221"，避免在 frp 模块重复实现 which/白名单/截断逻辑
+- 复用说明：
+  - `is_private_address` 复用 `std::net::Ipv4Addr::is_private`/`is_loopback` 标准库方法，不重复实现 CIDR 判断
+  - 重定向域名白名单匹配复用 `binary.rs` 既有 `host_matches` 函数（支持 `*.example.com` 一级通配符）
+  - 日志脱敏的正则方案与项目已用的 `regex` crate 一致，`once_cell::sync::Lazy` 复用 process.rs 既有模式
+  - 认证适配器沙箱复用 `spawn.rs` 的 `is_command_allowed` / `truncate_output` / `MAX_TIMEOUT_MS` / `ProcessResult`，不重复实现命令白名单与输出截断
+- 待办（用户后续处理）：
+  - 需在 `src-tauri/Cargo.toml` 的 `windows` features 中添加 `"Win32_System_JobObjects"` 以启用 Job Object 编译
+- 安全收益：防止 frpc 子进程泄露敏感环境变量、防止僵尸进程、防止 SSRF、防止日志泄露 token/密码、防止下载重定向劫持
+
+#### Frp 阶段三：认证体系（auth）
+
+- 背景：Frp 阶段三需支持 OAuth2 / Device Code / API Key 三种认证流程，token 使用 OS 密钥存储（Windows Credential Manager / macOS Keychain / Linux Secret Service），认证后拉取厂商配置（参见设计文档 §6）
+- 改动：
+  - **新增认证模块**（新增 [src-tauri/src/commands/frp/auth.rs](src-tauri/src/commands/frp/auth.rs)）：
+    - OS 密钥存储：使用 `keyring` crate，service=`frp:<provider_id>`，username=`access_token` / `refresh_token` / `expires_at` / `scopes`；keyring 不可用时返回明确错误
+    - `get_auth_status(provider_id)`：查询认证状态（authenticated + authType + expiresAt + scopes），系统默认厂商始终 authenticated
+    - `start_oauth2(state, provider_id)`：本地 `tokio::net::TcpListener` 监听 127.0.0.1:redirectPort 接收回调，浏览器跳转走 `shell::open_url`（项目约束），5 分钟超时，code 换取 token 后存储
+    - `start_device_code(state, provider_id)`：POST deviceCodeUrl 获取设备码，device_code 存入内存会话（`Lazy<Mutex<HashMap>>`），返回 userCode + verificationUri + expiresIn + interval
+    - `poll_device_code(state, provider_id)`：按 interval 轮询 tokenUrl，处理 pending / success / expired / declined / slow_down 五种状态
+    - `refresh_token(state, provider_id)`：用 refresh_token 刷新 access_token
+    - `revoke_auth(provider_id)`：删除所有 keyring 密钥 + Device Code 会话
+    - `save_api_key(provider_id, api_key)`：API Key 直接存储为 access_token（无过期/无刷新）
+    - `load_token(provider_id)`：读取 access_token（供 api_schema 模块调用，补全 api_schema 的依赖）
+  - **mod.rs 扩展 AuthConfig**（[src-tauri/src/commands/frp/mod.rs](src-tauri/src/commands/frp/mod.rs)）：新增 `OAuth2Config` / `DeviceCodeConfig` / `ApiKeyConfig` 三个子配置结构体，AuthConfig 添加可选 oauth2 / device_code / api_key 字段；声明 `pub mod auth;`
+  - **shell.rs 新增 open_url**（[src-tauri/src/minecraft/system/shell.rs](src-tauri/src/minecraft/system/shell.rs)）：跨平台打开 http/https URL（Windows cmd start / macOS open / Linux xdg-open），仅校验协议白名单不校验路径存在性，供 OAuth2 浏览器跳转使用
+  - **前端类型**（[src/types/frp.ts](src/types/frp.ts)）：新增 AuthStatus / OAuth2Result / DeviceCodeResult / DeviceCodePollResult / DeviceCodePollStatus / SaveApiKeyParams
+  - **前端 IPC 封装**（[src/utils/api/frp-manager.ts](src/utils/api/frp-manager.ts)）：新增 getAuthStatus / startOAuth2 / startDeviceCode / pollDeviceCode / refreshToken / revokeAuth / saveApiKey 七个封装函数 + 对应 FRP_ACTIONS 常量
+  - **Pinia store**（[src/stores/frp.ts](src/stores/frp.ts)）：新增认证状态管理（authStatuses / authLoading / authActionLoading / deviceCodeInfos / deviceCodePolling / apiKeyInputs）+ 八个认证 actions
+  - **认证中心 UI**（[src/components/frp/AuthCenter.vue](src/components/frp/AuthCenter.vue)）：替换占位 UI，实现单列卡片布局（259 行），覆盖四种认证类型 + 状态徽章 + Device Code 倒计时轮询 + API Key 输入 + 刷新/撤销操作，空状态 icon+text 居中
+- 复用说明：
+  - 复用 `super::provider::read_provider_manifest` 读取厂商清单，未重复实现 manifest 解析
+  - 复用 `crate::http::get_client()` 全局 HTTP 客户端，未新建 reqwest::Client
+  - 复用 `once_cell::sync::Lazy` 静态模式（与 frp_manager.rs 一致）存储 Device Code 会话
+  - 复用 `crate::log_info!` / `crate::log_debug!` / `crate::log_error!` 宏
+  - 前端复用 Button / Tooltip / Input 自定义组件 + showConfirm 确认弹窗 + ProviderList.vue 的徽章配色方案
+- 依赖说明：
+  - `keyring` crate 尚未添加到 Cargo.toml（代码中直接 use，由后续统一添加依赖）
+  - OAuth2 state 生成基于系统时间纳秒 + PID，非密码学安全但足以防止本地回调伪造
+- 待后续处理（不在本次修改范围）：
+  - `src-tauri/src/utils/frp_manager.rs`：注册 get_auth_status / start_oauth2 / start_device_code / poll_device_code / refresh_token / revoke_auth / save_api_key 七个 IPC action
+  - `src-tauri/Cargo.toml`：添加 `keyring` 依赖
+  - `src-tauri/src/lib.rs`：如有需要调整模块声明
+
+#### Frp 阶段三：厂商 API 引擎模块（api_schema）
+
+- 背景：Frp 阶段三需支持认证后调用厂商 API 拉取 frpc 配置（frps 地址/端口/token/分配端口等），不同厂商的 API 路径/请求方式/响应格式各不相同，需按厂商打包的 api-schema.json 动态执行，避免为每个厂商硬编码适配逻辑
+- 改动：
+  - **新增 API 引擎模块**（新增 [src-tauri/src/commands/frp/api_schema.rs](src-tauri/src/commands/frp/api_schema.rs)）：
+    - 类型定义：`ApiSchema` / `AuthInjection` / `Endpoints` / `ApiEndpoint` / `ApiParam` / `ConfigPayload`，全部带 `serde(rename_all = "camelCase")` 与设计文档 §7.6.2 schema 结构对齐
+    - `load_api_schema(provider_id)`：读取并解析 `<providers>/<id>/api-schema.json`，校验 version=1 + baseUrl 为 HTTPS
+    - `fetch_vendor_config(state, provider_id)`：认证后拉取配置主流程（加载 schema → 加载 token → 获取 device_id → 构造 HTTP 请求 → 响应映射 → 返回 ConfigPayload）
+    - `render_config_template(provider_id, payload)`：读取 `config-template.toml`，替换 `{server_addr}` / `{server_port}` / `{token}` / `{assigned_remote_port}` / `{assigned_subdomain}` / `{自定义变量}` 占位符，字符串值做 TOML 转义
+    - `get_json_path(value, path)`：按 dot 路径从 JSON Value 取值（pub，供外部复用）
+    - HTTP 请求引擎：token 按 auth_injection.location 注入 header/query/body，params 模板填充 `{device_id}`，GET 参数走 query string、POST 参数走 JSON body
+    - 安全约束（设计文档 §7.6.6）：超时默认 10s 最大 30s、响应体限制 1MB、重定向防护使用 `redirect::Policy::none()` + 手动校验 Location 同域白名单（最多 5 跳）、baseUrl 强制 HTTPS
+    - 响应映射：按 response_mapping 的 dot 路径取值，标准字段名（兼容 camelCase/snake_case）写入 ConfigPayload，非标准字段名视为自定义变量
+  - **mod.rs 注册模块**（[src-tauri/src/commands/frp/mod.rs](src-tauri/src/commands/frp/mod.rs)）：新增 `pub mod api_schema;` 声明
+- 复用说明：
+  - 复用 `super::{providers_root, validate_provider_id}` 路径与校验辅助函数，未重复实现厂商目录定位逻辑
+  - 复用 `crate::commands::sdk::get_device_id` 获取 device_id，未重复 SDK 调用逻辑
+  - TOML 字符串转义逻辑与 `tunnel.rs::escape_toml_string` 一致，因目标函数为私有且 tunnel.rs 不在本次修改范围，独立保留同名实现
+- 依赖说明：
+  - `crate::commands::frp::auth::load_token(provider_id) -> Result<String, String>`（async）由 auth 模块提供，用于从 OS 密钥存储读取 access_token；已在本次 auth 模块中实现
+- 测试：覆盖 get_json_path / build_url / compute_timeout / extract_host / resolve_url / map_response（标准字段 + 自定义变量 + 必填缺失）/ render_config_template 占位符替换 + TOML 转义
+
 ### 调整
 
 #### Checkbox 组件注释精简

@@ -239,12 +239,51 @@ async fn ensure_external_frpc(
     }
 
     log_info!("[Frp] 开始下载外部厂商 frpc: {} ({})", provider_id, dl.url);
-    let client = crate::http::get_client();
-    let response = client
-        .get(&dl.url)
-        .send()
-        .await
-        .map_err(|e| format!("下载失败: {}", e))?;
+
+    // 构造禁止自动重定向的 client，手动校验重定向域名（防止重定向到非白名单域名）
+    // 对应设计文档 §7.7 frpc 二进制下载安全
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .build()
+        .map_err(|e| format!("构造 HTTP 客户端失败: {}", e))?;
+
+    let mut current_url = dl.url.clone();
+    let mut redirects = 0u32;
+    const MAX_REDIRECTS: u32 = 5;
+    let response = loop {
+        let resp = client
+            .get(&current_url)
+            .send()
+            .await
+            .map_err(|e| format!("下载失败: {}", e))?;
+
+        // 3xx 重定向：手动校验 Location 域名是否在白名单内
+        if resp.status().is_redirection() {
+            redirects += 1;
+            if redirects > MAX_REDIRECTS {
+                return Err("重定向次数超过限制".to_string());
+            }
+            let location = resp
+                .headers()
+                .get(reqwest::header::LOCATION)
+                .and_then(|v| v.to_str().ok())
+                .ok_or_else(|| "重定向响应缺少 Location 头".to_string())?;
+            let base = reqwest::Url::parse(&current_url)
+                .map_err(|e| format!("解析 URL 失败: {}", e))?;
+            let next_url = base
+                .join(location)
+                .map_err(|e| format!("解析重定向 URL 失败: {}", e))?;
+            let host = next_url.host_str().unwrap_or("");
+            if !dl.allowed_domains.iter().any(|d| host_matches(host, d)) {
+                return Err(format!("重定向域名 {} 不在白名单中", host));
+            }
+            log_info!("[Frp] 重定向到白名单域名: {}", next_url);
+            current_url = next_url.to_string();
+            continue;
+        }
+        break resp;
+    };
+
     if !response.status().is_success() {
         return Err(format!("下载失败: HTTP {}", response.status()));
     }

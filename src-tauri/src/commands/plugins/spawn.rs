@@ -24,9 +24,9 @@ use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 
 /// stdout/stderr 最大字节数（1MB）
-const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 /// 超时上限（5 分钟）
-const MAX_TIMEOUT_MS: u64 = 300_000;
+pub(crate) const MAX_TIMEOUT_MS: u64 = 300_000;
 
 /// 子进程执行结果
 #[derive(Debug, Serialize)]
@@ -161,7 +161,7 @@ pub async fn plugin_spawn_process(
 /// 校验命令是否在白名单内
 ///
 /// canonicalize 后比对，Windows 忽略大小写与 `.exe` 后缀。
-fn is_command_allowed(command: &str, allowed: &[String]) -> Result<bool, String> {
+pub(crate) fn is_command_allowed(command: &str, allowed: &[String]) -> Result<bool, String> {
     // 先尝试 canonicalize 输入命令
     let canonical = which_canonical(command).ok();
 
@@ -185,7 +185,7 @@ fn is_command_allowed(command: &str, allowed: &[String]) -> Result<bool, String>
 }
 
 /// 简单的 which 实现：通过 PATH 查找命令的完整路径并 canonicalize
-fn which_canonical(command: &str) -> Result<PathBuf, String> {
+pub(crate) fn which_canonical(command: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(command);
     if path.is_absolute() {
         return path.canonicalize().map_err(log_err("Failed to canonicalize command path"));
@@ -221,7 +221,7 @@ fn which_canonical(command: &str) -> Result<PathBuf, String> {
 }
 
 /// 路径相等比较（Windows 忽略大小写与 `.exe` 后缀）
-fn paths_equal(a: &std::path::Path, b: &std::path::Path) -> bool {
+pub(crate) fn paths_equal(a: &std::path::Path, b: &std::path::Path) -> bool {
     #[cfg(windows)]
     {
         let a_str = a.to_string_lossy().to_lowercase();
@@ -240,7 +240,7 @@ fn paths_equal(a: &std::path::Path, b: &std::path::Path) -> bool {
 ///
 /// 超过上限时从上限位置向前回退到 UTF-8 字符边界（非 continuation byte），
 /// 避免 String::from_utf8_lossy 出现替换字符。
-fn truncate_output(bytes: &[u8]) -> String {
+pub(crate) fn truncate_output(bytes: &[u8]) -> String {
     if bytes.len() <= MAX_OUTPUT_BYTES {
         return String::from_utf8_lossy(bytes).to_string();
     }

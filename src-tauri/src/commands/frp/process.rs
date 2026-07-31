@@ -92,6 +92,12 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
     cmd.stderr(std::process::Stdio::piped());
     cmd.stdin(std::process::Stdio::null());
 
+    // 清空环境变量，仅保留 PATH（防止敏感环境变量泄露给 frpc 子进程）
+    // 对应设计文档 §7.3 进程隔离
+    let path_env = std::env::var("PATH").unwrap_or_default();
+    cmd.env_clear();
+    cmd.env("PATH", path_env);
+
     // Windows: CREATE_NO_WINDOW，不弹出控制台窗口
     #[cfg(target_os = "windows")]
     {
@@ -106,6 +112,16 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
     let pid = child
         .id()
         .ok_or_else(|| "无法获取 frpc 进程 PID".to_string())?;
+
+    // Windows: 关联到 Job Object，启动器退出时 frpc 自动终止（防止僵尸进程）
+    // 对应设计文档 §7.3 进程隔离。失败仅记录警告，不阻断启动（stop_tunnel 仍可用
+    // taskkill /T /F 兜底清理）。
+    #[cfg(target_os = "windows")]
+    {
+        if let Err(e) = assign_process_to_job_object(pid) {
+            log_warn!("[Frp] 关联 Job Object 失败 ({}): {}", tunnel.id, e);
+        }
+    }
 
     // 取出 stdout/stderr 管道
     let stdout = child.stdout.take();
@@ -257,10 +273,73 @@ pub async fn get_tunnel_status(id: String) -> Result<TunnelStatus, String> {
     }
 }
 
+/// Windows: 将 frpc 进程关联到 Job Object
+///
+/// 创建带 `JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE` 标志的 Job Object 并关联子进程，
+/// 确保启动器退出时 frpc 自动终止，防止僵尸进程。
+///
+/// 故意不关闭 job 句柄：保持 Job Object 存活直到启动器进程退出。
+/// 启动器退出时 OS 自动关闭所有句柄，Job Object 销毁触发 KILL_ON_JOB_CLOSE，
+/// 所有关联的 frpc 进程被强制终止。
+///
+/// 依赖 `windows` crate 的 `Win32_System_JobObjects` feature（需在 Cargo.toml 启用）。
+#[cfg(target_os = "windows")]
+fn assign_process_to_job_object(pid: u32) -> Result<(), String> {
+    use std::ffi::c_void;
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+        SetInformationJobObject,
+    };
+    use windows::Win32::System::Threading::{
+        OpenProcess, PROCESS_SET_QUOTA, PROCESS_TERMINATE,
+    };
+
+    unsafe {
+        // 1. 创建 Job Object
+        let job = CreateJobObjectW(None, None)
+            .map_err(|e| format!("创建 Job Object 失败: {}", e))?;
+
+        // 2. 配置 KILL_ON_JOB_CLOSE：Job 句柄关闭时杀掉所有关联进程
+        let mut info = JOBOBJECT_EXTENDED_LIMIT_INFORMATION::default();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const c_void,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        )
+        .map_err(|e| format!("设置 Job Object 信息失败: {}", e))?;
+
+        // 3. 打开子进程句柄
+        let process = OpenProcess(PROCESS_SET_QUOTA | PROCESS_TERMINATE, false, pid)
+            .map_err(|e| format!("打开 frpc 进程失败: {}", e))?;
+
+        // 4. 关联到 Job Object
+        AssignProcessToJobObject(job, process)
+            .map_err(|e| format!("关联进程到 Job Object 失败: {}", e))?;
+
+        // 5. 关闭 process 句柄（已关联到 Job，句柄不再需要）
+        let _ = CloseHandle(process);
+
+        // 6. 故意不关闭 job 句柄：保持 Job Object 存活直到启动器退出
+        //    HANDLE 在 windows 0.58 为 Copy 类型（无 Drop），不调用 CloseHandle 即保持开启
+    }
+    Ok(())
+}
+
+/// 单流日志捕获上限（1MB），超过后停止捕获防止内存膨胀
+const MAX_STREAM_BYTES: usize = 1024 * 1024;
+
 /// 异步捕获 frpc stdout/stderr 并写入日志文件 + 推送 frpc-log event
 ///
 /// 每行格式：`[HH:MM:SS.ms] [LEVEL] <line>`。
 /// LEVEL 推断：行内含 [E]/error/panic → ERROR，stderr → WARN，stdout → INFO。
+///
+/// 安全措施（对应设计文档 §7.3）：
+/// - 每行经 `log_redact::redact_log` 脱敏后再写入文件/推送前端
+/// - 单流捕获上限 1MB，超过后写入截断提示并停止捕获
 async fn capture_stream(
     reader: impl tokio::io::AsyncRead + Unpin,
     log_path: std::path::PathBuf,
@@ -271,6 +350,7 @@ async fn capture_stream(
 ) {
     let mut reader = BufReader::new(reader);
     let mut lines = Vec::new();
+    let mut total_bytes: usize = 0;
     let mut buf = String::new();
 
     loop {
@@ -278,11 +358,43 @@ async fn capture_stream(
         match reader.read_line(&mut buf).await {
             Ok(0) => break, // EOF
             Ok(_) => {
-                let line = buf.trim_end();
-                if line.is_empty() {
+                let raw = buf.trim_end();
+                if raw.is_empty() {
                     continue;
                 }
-                let level = infer_log_level(source, line);
+                // 日志脱敏：将 token / 密码等敏感值替换为 ***
+                let line = super::log_redact::redact_log(raw);
+
+                // 1MB 截断检查：超过上限后写入截断提示并停止捕获该流
+                let line_len = line.len();
+                if total_bytes + line_len > MAX_STREAM_BYTES {
+                    let timestamp = chrono_now();
+                    let truncated = format!(
+                        "[{}] [WARN] 日志输出已超过 1MB 上限，停止捕获该流\n",
+                        timestamp
+                    );
+                    lines.push(truncated.clone());
+                    flush_log(&log_path, &mut lines, tunnel_id);
+                    let _ = app.emit(
+                        "frpc-log",
+                        serde_json::json!({
+                            "tunnelId": tunnel_id,
+                            "tunnelName": tunnel_name,
+                            "line": truncated.trim_end(),
+                            "timestamp": now_ms(),
+                            "level": "WARN",
+                        }),
+                    );
+                    log_warn!(
+                        "[Frp] {} 日志超过 1MB 上限，停止捕获 ({})",
+                        source,
+                        tunnel_id
+                    );
+                    return;
+                }
+                total_bytes += line_len;
+
+                let level = infer_log_level(source, &line);
                 let timestamp = chrono_now();
                 let formatted = format!("[{}] [{}] {}\n", timestamp, level, line);
                 lines.push(formatted.clone());

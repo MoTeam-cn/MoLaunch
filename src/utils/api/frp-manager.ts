@@ -10,12 +10,17 @@ import { invoke } from '@tauri-apps/api/core'
 import type {
   AllocatePublicServerParams,
   AllocateResponse,
+  AuthStatus,
   CreateTunnelParams,
+  DeviceCodePollResult,
+  DeviceCodeResult,
+  OAuth2Result,
   UpdateTunnelParams,
   LogFileContent,
   LogFileInfo,
   ProviderInfo,
   PublicFrpServer,
+  SaveApiKeyParams,
   Tunnel,
   TunnelStatus,
   TunnelWithStatus,
@@ -63,6 +68,20 @@ export const FRP_ACTIONS = {
   RELEASE_PUBLIC_SERVER: 'release_public_server',
   /** 续期分配（POST /v1/frp/keepalive） */
   KEEPALIVE_PUBLIC_SERVER: 'keepalive_public_server',
+  /** 查询认证状态 */
+  GET_AUTH_STATUS: 'get_auth_status',
+  /** 启动 OAuth2 授权流程 */
+  START_OAUTH2: 'start_oauth2',
+  /** 启动 Device Code 流程 */
+  START_DEVICE_CODE: 'start_device_code',
+  /** 轮询 Device Code token */
+  POLL_DEVICE_CODE: 'poll_device_code',
+  /** 刷新 token */
+  REFRESH_TOKEN: 'refresh_token',
+  /** 撤销认证 */
+  REVOKE_AUTH: 'revoke_auth',
+  /** 保存 API Key */
+  SAVE_API_KEY: 'save_api_key',
 } as const
 
 /**
@@ -184,4 +203,43 @@ export function releasePublicServer(allocationId: string): Promise<void> {
 /** 续期分配（frpc 运行期间定时调用，延长过期时间） */
 export function keepalivePublicServer(allocationId: string): Promise<unknown> {
   return frpManager(FRP_ACTIONS.KEEPALIVE_PUBLIC_SERVER, { allocationId })
+}
+
+// ============================================================
+// 认证体系（阶段三：OAuth2 / Device Code / API Key）
+// ============================================================
+
+/** 查询指定厂商的认证状态 */
+export function getAuthStatus(providerId: string): Promise<AuthStatus> {
+  return frpManager<AuthStatus>(FRP_ACTIONS.GET_AUTH_STATUS, { providerId })
+}
+
+/** 启动 OAuth2 授权流程（打开浏览器，等待回调，换取 token） */
+export function startOAuth2(providerId: string): Promise<OAuth2Result> {
+  return frpManager<OAuth2Result>(FRP_ACTIONS.START_OAUTH2, { providerId })
+}
+
+/** 启动 Device Code 流程（获取用户码 + 验证链接） */
+export function startDeviceCode(providerId: string): Promise<DeviceCodeResult> {
+  return frpManager<DeviceCodeResult>(FRP_ACTIONS.START_DEVICE_CODE, { providerId })
+}
+
+/** 轮询 Device Code token（前端按 interval 调用） */
+export function pollDeviceCode(providerId: string): Promise<DeviceCodePollResult> {
+  return frpManager<DeviceCodePollResult>(FRP_ACTIONS.POLL_DEVICE_CODE, { providerId })
+}
+
+/** 刷新 token（手动触发或自动刷新） */
+export function refreshToken(providerId: string): Promise<void> {
+  return frpManager<void>(FRP_ACTIONS.REFRESH_TOKEN, { providerId })
+}
+
+/** 撤销认证（删除所有存储的 token） */
+export function revokeAuth(providerId: string): Promise<void> {
+  return frpManager<void>(FRP_ACTIONS.REVOKE_AUTH, { providerId })
+}
+
+/** 保存 API Key（auth_type=api_key 的厂商） */
+export function saveApiKey(params: SaveApiKeyParams): Promise<void> {
+  return frpManager<void>(FRP_ACTIONS.SAVE_API_KEY, params)
 }

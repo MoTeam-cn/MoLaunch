@@ -1,10 +1,19 @@
-//! 安全沙箱：隧道配置校验
+//! 安全沙箱：隧道配置校验 + 认证适配器脚本沙箱
 //!
-//! 校验用户输入的隧道参数，防止注入和非法值。
-//! 启动隧道前调用 `validate_tunnel` 进行校验。
+//! 两项职责：
+//! - `validate_tunnel`：校验用户输入的隧道参数，防止注入和非法值（§7.2）
+//! - `run_auth_adapter`：沙箱化执行厂商认证适配器脚本（§7.5）
 
+use super::provider::{read_provider_manifest, SYSTEM_DEFAULT_ID};
 use super::tunnel::{CreateTunnelParams, UpdateTunnelParams};
-use super::{validate_provider_id, TunnelType};
+use super::{validate_provider_id, TunnelType, ProcessPermissions};
+use crate::commands::plugins::spawn::{
+    is_command_allowed, truncate_output, ProcessResult, MAX_TIMEOUT_MS,
+};
+use crate::commands::frp::providers_root;
+use std::time::{Duration, Instant};
+use tokio::io::AsyncReadExt;
+use tokio::process::Command;
 
 /// 校验创建隧道参数
 pub fn validate_tunnel(params: &CreateTunnelParams) -> Result<(), String> {
@@ -66,6 +75,10 @@ pub fn validate_tunnel(params: &CreateTunnelParams) -> Result<(), String> {
     if params.local_port == 0 {
         return Err("本地端口不能为 0".to_string());
     }
+    // 禁止绑定特权端口（< 1024），防止 frpc 获取不必要的系统权限
+    if params.local_port < 1024 {
+        return Err("本地端口不能小于 1024".to_string());
+    }
     if params.remote_port == 0 {
         return Err("远程端口不能为 0".to_string());
     }
@@ -87,7 +100,87 @@ pub fn validate_tunnel(params: &CreateTunnelParams) -> Result<(), String> {
         TunnelType::Tcp | TunnelType::Udp => {}
     }
 
+    // 网络白名单强制校验（厂商 manifest 的 networkPermissions + 内网地址检查）
+    validate_network_permissions(params)?;
+
     Ok(())
+}
+
+/// 网络白名单强制校验
+///
+/// 对应设计文档 §7.2 配置校验。两项检查：
+/// 1. 若厂商 `network_permissions.allow_custom_server=false`，`server_addr` 必须在
+///    `allowed_servers` 白名单内（系统默认厂商无 manifest，允许自定义服务器）。
+/// 2. 非系统默认厂商禁止连接内网地址（10.0.0.0/8、172.16.0.0/12、192.168.0.0/16、
+///    127.0.0.0/8），防止 SSRF。系统默认厂商豁免（用户自建 frps 可能位于内网）。
+fn validate_network_permissions(params: &CreateTunnelParams) -> Result<(), String> {
+    use super::provider::{read_provider_manifest, SYSTEM_DEFAULT_ID};
+
+    let is_system_default = params.provider_id == SYSTEM_DEFAULT_ID;
+
+    if !is_system_default {
+        // 读取厂商 manifest 的 networkPermissions
+        let manifest = read_provider_manifest(&params.provider_id)
+            .map_err(|e| format!("读取厂商清单失败: {}", e))?;
+
+        if let Some(ref net_perm) = manifest.network_permissions {
+            if !net_perm.allow_custom_server {
+                let server_addr = params.server_addr.trim();
+                let allowed = &net_perm.allowed_servers;
+                // 白名单匹配：完整匹配或 host 部分匹配（允许白名单只写 host 或 host:port）
+                let addr_host = server_addr.split(':').next().unwrap_or(server_addr);
+                let matched = allowed.iter().any(|s| {
+                    let s = s.trim();
+                    if s == server_addr {
+                        return true;
+                    }
+                    let s_host = s.split(':').next().unwrap_or(s);
+                    s_host == addr_host
+                });
+                if !matched {
+                    return Err(format!(
+                        "服务器地址 {} 不在厂商 {} 的允许列表内",
+                        server_addr, params.provider_id
+                    ));
+                }
+            }
+        }
+    }
+
+    // 内网地址检查：非系统默认厂商禁止连接内网地址（防止 SSRF）
+    if !is_system_default {
+        let server_addr = params.server_addr.trim();
+        if is_private_address(server_addr) {
+            return Err("非系统默认厂商禁止连接内网地址".to_string());
+        }
+    }
+
+    Ok(())
+}
+
+/// 判断地址是否为内网/回环地址
+///
+/// 支持 `host` 和 `host:port` 两种形式。非字面量 IP（域名）仅检查 `localhost`。
+/// 覆盖范围：10.0.0.0/8、172.16.0.0/12、192.168.0.0/16（`Ipv4Addr::is_private`）、
+/// 127.0.0.0/8（`Ipv4Addr::is_loopback`）。
+fn is_private_address(addr: &str) -> bool {
+    use std::net::{IpAddr, SocketAddr};
+    // 优先按 SocketAddr 解析（处理 host:port），再按裸 IP 解析
+    let ip = if let Ok(s) = addr.parse::<SocketAddr>() {
+        Some(s.ip())
+    } else if let Ok(ip) = addr.parse::<IpAddr>() {
+        Some(ip)
+    } else {
+        None
+    };
+    if let Some(ip) = ip {
+        return match ip {
+            IpAddr::V4(v4) => v4.is_private() || v4.is_loopback(),
+            IpAddr::V6(v6) => v6.is_loopback(),
+        };
+    }
+    // 非字面量 IP（域名）：仅检查 localhost
+    addr.eq_ignore_ascii_case("localhost")
 }
 
 /// 校验更新隧道参数
@@ -108,4 +201,150 @@ pub fn validate_tunnel_update(p: &UpdateTunnelParams) -> Result<(), String> {
         use_tls: p.use_tls,
     };
     validate_tunnel(&create)
+}
+
+// ============================================================
+// 认证适配器脚本沙箱（§7.5）
+// ============================================================
+
+/// 沙箱化执行厂商认证适配器脚本
+///
+/// 对应设计文档 §7.5。流程：
+/// 1. 读取厂商 manifest 的 `process_permissions`（不存在则拒绝执行）
+/// 2. 校验命令在 `allowed_commands` 白名单（复用 `spawn::is_command_allowed`）
+/// 3. 工作目录强制设为厂商目录（`<base_dir>/providers/<provider_id>/`），
+///    防止脚本访问其他路径
+/// 4. 超时控制（`timeout_ms` 默认 30 秒，最大 5 分钟，复用 `MAX_TIMEOUT_MS`）
+/// 5. 非 shell 执行（`tokio::process::Command::new` + `.args()`，防注入）
+/// 6. `env_clear()` 清空环境变量，仅保留 `PATH`（防止敏感环境变量泄露）
+/// 7. stdout/stderr 各截断到 1MB（复用 `spawn::truncate_output`）
+///
+/// 系统默认厂商不提供自定义脚本，直接拒绝。
+pub async fn run_auth_adapter(
+    provider_id: &str,
+    command: String,
+    args: Vec<String>,
+) -> Result<ProcessResult, String> {
+    use crate::log_info;
+
+    // 1. 系统默认厂商不提供自定义脚本
+    if provider_id == SYSTEM_DEFAULT_ID {
+        return Err("系统默认厂商不支持自定义认证适配器脚本".to_string());
+    }
+
+    // 2. 校验厂商 ID 合法性
+    validate_provider_id(provider_id)?;
+
+    // 3. 读取厂商 manifest 的 process_permissions
+    let manifest = read_provider_manifest(provider_id)?;
+    let proc_perms: &ProcessPermissions = manifest
+        .process_permissions
+        .as_ref()
+        .ok_or_else(|| format!("厂商 {} 未配置 processPermissions，禁止执行认证适配器脚本", provider_id))?;
+
+    if proc_perms.allowed_commands.is_empty() {
+        return Err(format!("厂商 {} 的 allowedCommands 白名单为空", provider_id));
+    }
+
+    // 4. 校验命令在白名单内（复用 spawn::is_command_allowed）
+    if !is_command_allowed(&command, &proc_perms.allowed_commands)? {
+        return Err(format!(
+            "命令不在厂商 {} 的白名单内: {}",
+            provider_id, command
+        ));
+    }
+
+    // 5. 校验超时上限（默认 30s，最大 5min）
+    let timeout_ms = proc_perms.timeout_ms.min(MAX_TIMEOUT_MS);
+    let timeout = Duration::from_millis(timeout_ms);
+
+    // 6. 工作目录强制设为厂商目录
+    let provider_dir = providers_root().join(provider_id);
+    if !provider_dir.exists() {
+        return Err(format!("厂商目录不存在: {}", provider_dir.display()));
+    }
+
+    log_info!(
+        "[Frp Sandbox] 执行认证适配器: provider={}, command={}, args={:?}, timeout={}ms",
+        provider_id, command, args, timeout_ms
+    );
+
+    // 7. 构建 Command（非 shell 执行，防注入）
+    let mut cmd = Command::new(&command);
+    cmd.args(&args);
+    cmd.current_dir(&provider_dir);
+    cmd.stdout(std::process::Stdio::piped());
+    cmd.stderr(std::process::Stdio::piped());
+    cmd.stdin(std::process::Stdio::null());
+
+    // 8. 清空环境变量，仅保留 PATH（防止敏感环境变量泄露）
+    cmd.env_clear();
+    if let Ok(path) = std::env::var("PATH") {
+        cmd.env("PATH", path);
+    }
+
+    let start = Instant::now();
+
+    let mut child = cmd
+        .spawn()
+        .map_err(|e| format!("启动认证适配器失败 '{}': {}", command, e))?;
+
+    let stdout_handle = child.stdout.take();
+    let stderr_handle = child.stderr.take();
+
+    // 9. 并行读取 stdout/stderr
+    let stdout_task = tokio::spawn(async move {
+        if let Some(mut stdout) = stdout_handle {
+            let mut buf = Vec::new();
+            stdout.read_to_end(&mut buf).await.ok();
+            buf
+        } else {
+            Vec::new()
+        }
+    });
+
+    let stderr_task = tokio::spawn(async move {
+        if let Some(mut stderr) = stderr_handle {
+            let mut buf = Vec::new();
+            stderr.read_to_end(&mut buf).await.ok();
+            buf
+        } else {
+            Vec::new()
+        }
+    });
+
+    // 10. 超时包裹 child.wait()
+    let (exit_code, timed_out) = match tokio::time::timeout(timeout, child.wait()).await {
+        Ok(Ok(status)) => (status.code(), false),
+        Ok(Err(e)) => {
+            return Err(format!("等待认证适配器退出失败: {}", e));
+        }
+        Err(_) => {
+            // 超时：kill 进程
+            let _ = child.kill().await;
+            (None, true)
+        }
+    };
+
+    let stdout_bytes = stdout_task.await.unwrap_or_default();
+    let stderr_bytes = stderr_task.await.unwrap_or_default();
+
+    // 11. 截断输出到 1MB（复用 spawn::truncate_output）
+    let stdout = truncate_output(&stdout_bytes);
+    let stderr = truncate_output(&stderr_bytes);
+
+    let duration_ms = start.elapsed().as_millis() as u64;
+
+    log_info!(
+        "[Frp Sandbox] 认证适配器完成: provider={}, exit_code={:?}, 耗时={}ms, 超时={}",
+        provider_id, exit_code, duration_ms, timed_out
+    );
+
+    Ok(ProcessResult {
+        exit_code,
+        stdout,
+        stderr,
+        timed_out,
+        duration_ms,
+    })
 }
