@@ -35,6 +35,7 @@ import * as tauri from '@/utils/tauri'
 import type { ConfigPatch, ConfigSnapshot } from '@/utils/api/config'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
 import { safeCall } from '@/utils/async'
+import { toastError } from '@/utils/toast'
 
 interface UseConfigPageOptions {
   /** 防抖延迟（ms），默认 800 */
@@ -79,7 +80,7 @@ export function useConfigPage(options: UseConfigPageOptions = {}): UseConfigPage
   const { markDirty, flushSave, scheduleSave, isDirty } = useDebouncedSave(
     'patch',
     async (patch: ConfigPatch) => {
-      await safeCall(() => tauri.applyConfig(patch), errorLabel)
+      await safeCall(() => tauri.applyConfig(patch), errorLabel, () => toastError('配置保存失败'))
     },
     delay,
   )
@@ -91,7 +92,10 @@ export function useConfigPage(options: UseConfigPageOptions = {}): UseConfigPage
       if (onLoad) {
         await onLoad(cfg)
       }
-    }, 'load config', onLoadError)
+    }, 'load config', (e) => {
+      toastError('配置加载失败')
+      onLoadError?.(e)
+    })
     // 等待 watch 回调执行完毕（避免加载值被误判为用户改动触发保存）
     await nextTick()
     loaded.value = true

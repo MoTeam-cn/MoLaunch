@@ -14,6 +14,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import { toastSuccess, toastError } from '@/utils/toast'
 
 export type ModalType = 'error' | 'warning' | 'info' | 'success'
 
@@ -91,9 +92,13 @@ function handleCancel() {
   options.value.onCancel?.()
 }
 
-function copyDetails() {
-  if (options.value.details) {
-    navigator.clipboard.writeText(options.value.details)
+async function copyDetails() {
+  if (!options.value.details) return
+  try {
+    await navigator.clipboard.writeText(options.value.details)
+    toastSuccess('已复制错误详情')
+  } catch {
+    toastError('复制失败')
   }
 }
 

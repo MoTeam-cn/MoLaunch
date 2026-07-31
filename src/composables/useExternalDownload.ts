@@ -132,7 +132,11 @@ export function useExternalDownload() {
 
   async function openDownloadDir() {
     if (!downloadDir.value) return
-    await openPath(downloadDir.value)
+    try {
+      await openPath(downloadDir.value)
+    } catch (e) {
+      toastError('打开目录失败: ' + (e instanceof Error ? e.message : String(e)))
+    }
   }
 
   async function loadDownloadDir() {

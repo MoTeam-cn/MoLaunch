@@ -17,7 +17,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
-import { toastError } from '@/utils/toast'
+import { toastSuccess, toastWarning, toastError } from '@/utils/toast'
 import { modDependencyCheck } from '@/utils/api/tools'
 import type { ModDependencyResult, MissingDep } from '@/utils/api/tools'
 import { listInstalledVersionsWithType } from '@/utils/api/version'
@@ -48,6 +48,11 @@ async function runCheck() {
   result.value = null
   try {
     result.value = await modDependencyCheck(selectedVersion.value)
+    if (result.value.missing.length > 0) {
+      toastWarning('检测完成，发现 ' + result.value.missing.length + ' 个缺失依赖')
+    } else {
+      toastSuccess('检测完成，所有依赖均已满足')
+    }
   } catch (e) {
     toastError(`依赖检测失败: ${e instanceof Error ? e.message : String(e)}`)
   } finally {

@@ -16,7 +16,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
-import { toastError } from '@/utils/toast'
+import { toastSuccess, toastWarning, toastError } from '@/utils/toast'
 import { modDedupScan } from '@/utils/api/tools'
 import type { ModDedupResult } from '@/utils/api/tools'
 import { listInstalledVersionsWithType } from '@/utils/api/version'
@@ -48,6 +48,11 @@ async function runScan() {
   result.value = null
   try {
     result.value = await modDedupScan(selectedVersion.value)
+    if (result.value.duplicates.length > 0) {
+      toastWarning('扫描完成，发现 ' + result.value.duplicates.length + ' 个重复 mod')
+    } else {
+      toastSuccess('扫描完成，未发现重复 mod')
+    }
   } catch (e) {
     toastError(`去重扫描失败: ${e instanceof Error ? e.message : String(e)}`)
   } finally {

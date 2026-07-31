@@ -10,7 +10,7 @@ import { updateMod, type ModInfo } from '@/utils/api/personalization'
 import { versionChangeType, type VersionChangeType } from '@/utils/version'
 import { loaderToFlag } from '@/utils/mod-display'
 import { formatBytes } from '@/utils/format'
-import { toastSuccess, toastInfo } from '@/utils/toast'
+import { toastSuccess, toastInfo, toastError } from '@/utils/toast'
 import { showConfirm, showModal } from '@/utils/modal'
 import { isCancelledError } from '@/utils/async'
 import { useVersionStore } from '@/stores/version'
@@ -121,6 +121,7 @@ export function useModUpdate(
       }
     } catch (e: any) {
       error.value = typeof e === 'string' ? e : (e?.message || String(e))
+      toastError('查询版本列表失败：' + String(e))
     } finally {
       loading.value = false
     }

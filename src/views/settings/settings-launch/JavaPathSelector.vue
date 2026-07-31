@@ -73,6 +73,7 @@ async function handleManualImportJava() {
       return
     }
     javaStore.setJavaPath(selected)
+    toastSuccess('Java 路径已设置')
   }
 }
 </script>

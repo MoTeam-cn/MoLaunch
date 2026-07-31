@@ -10,6 +10,7 @@ import { open } from '@tauri-apps/plugin-shell'
 import { useAuthStore } from '@/stores/auth'
 import Button from '@/components/common/Button.vue'
 import { CheckIcon } from '@heroicons/vue/24/solid'
+import { toastSuccess, toastError } from '@/utils/toast'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'success'): void }>()
@@ -43,12 +44,19 @@ const ALLOWED_URIS = [
 // 打开登录页失败/被拦截时的提示信息
 const uriError = ref('')
 
-async function copyToClipboard(text: string) {
-  try { await navigator.clipboard.writeText(text) } catch { /* ignore */ }
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    toastSuccess('设备码已复制到剪贴板')
+    return true
+  } catch {
+    toastError('复制失败，请手动复制')
+    return false
+  }
 }
 
 async function openBrowser(url: string) {
-  try { await open(url) } catch { /* ignore */ }
+  try { await open(url) } catch { toastError('打开浏览器失败，请手动访问该链接') }
 }
 
 /** 用户主动点击：打开 Microsoft 登录页（带白名单校验） */
@@ -84,7 +92,7 @@ watch(() => authStore.deviceCodeInfo, (info) => {
 })
 
 watch(() => authStore.msLoginStatus, (status) => {
-  if (status === 'success') { emit('success'); router.push('/apps') }
+  if (status === 'success') { toastSuccess('登录成功'); emit('success'); router.push('/apps') }
 })
 
 onUnmounted(() => authStore.cancelMsLogin())

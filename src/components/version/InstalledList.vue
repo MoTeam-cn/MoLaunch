@@ -8,8 +8,7 @@ import { computed } from 'vue'
 import { CubeIcon, PlayIcon, TrashIcon, StopIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { useVersionStore } from '@/stores/version'
 import { useAuthStore } from '@/stores/auth'
-import { showWarning, showError } from '@/utils/modal'
-import { toastSuccess } from '@/utils/toast'
+import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { inferVersionType, getVersionTypeLabel, getVersionTypeBadgeClass } from '@/composables/useVersionMeta'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
@@ -39,31 +38,31 @@ function inferType(id: string): string {
 async function handleLaunch(versionId: string) {
   // 防呆检查 - 使用toast提示
   if (!authStore.isLoggedIn) {
-    showWarning('提示', '请先登录后再启动游戏')
+    toastWarning('请先登录后再启动游戏')
     return
   }
 
   // 检查是否是当前版本正在启动
   if (versionStore.launchingVersionId === versionId) {
-    showWarning('提示', '该版本正在启动中')
+    toastWarning('该版本正在启动中')
     return
   }
 
   // 检查是否有其他版本正在启动
   if (versionStore.launching) {
-    showWarning('提示', '有其他版本正在启动中')
+    toastWarning('有其他版本正在启动中')
     return
   }
 
   // 检查当前版本是否正在运行
   if (versionStore.runningVersionId === versionId) {
-    showWarning('提示', '该版本已在运行中')
+    toastWarning('该版本已在运行中')
     return
   }
 
   // 检查是否有其他版本正在运行
   if (versionStore.runningPid) {
-    showWarning('提示', '有其他版本正在运行中')
+    toastWarning('有其他版本正在运行中')
     return
   }
 
@@ -75,7 +74,7 @@ async function handleLaunch(versionId: string) {
     })
     toastSuccess(`游戏已启动 (PID: ${pid})`)
   } catch (e) {
-    showError('启动失败', String(e))
+    toastError('启动失败：' + String(e))
   }
 }
 
@@ -86,9 +85,9 @@ async function handleStop(versionId: string) {
   }
   try {
     await versionStore.stopGame()
-    toastSuccess('已停止', '游戏进程已终止')
+    toastSuccess('已停止，游戏进程已终止')
   } catch (e) {
-    showError('停止失败', String(e))
+    toastError('停止失败：' + String(e))
   }
 }
 

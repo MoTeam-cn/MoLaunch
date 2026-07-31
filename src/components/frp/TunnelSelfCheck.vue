@@ -11,6 +11,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { checkTunnels, type TunnelCheckResult, type CheckEntry } from '@/utils/frp-tunnel-check'
+import { toastInfo, toastError } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import {
@@ -52,6 +53,9 @@ async function runCheck() {
   checking.value = true
   try {
     results.value = await checkTunnels(props.tunnels, props.providers)
+    toastInfo('自检完成')
+  } catch (e) {
+    toastError('自检失败：' + (e instanceof Error ? e.message : String(e)))
   } finally {
     checking.value = false
     hasChecked.value = true

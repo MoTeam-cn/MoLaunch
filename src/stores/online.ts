@@ -355,6 +355,7 @@ export const useOnlineStore = defineStore('online', () => {
         await refreshStatus()
       },
       '[Online] logout device',
+      (e) => toastError('登出失败：' + String(e)),
     )
     loading.value = false
     if (ok !== undefined) {
@@ -373,6 +374,7 @@ export const useOnlineStore = defineStore('online', () => {
         await refreshStatus()
       },
       '[Online] clear device',
+      (e) => toastError('清除凭证失败：' + String(e)),
     )
     loading.value = false
     if (ok !== undefined) {

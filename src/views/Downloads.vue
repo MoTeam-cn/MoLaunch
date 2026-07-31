@@ -11,6 +11,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { showConfirm } from '@/utils/modal'
+import { toastInfo, toastError, toastWarning } from '@/utils/toast'
 import { pauseDownload, resumeDownload, cancelDownload, getDownloadProgress, isDownloading } from '@/utils/tauri'
 import DownloadStatsPanel from './downloads/DownloadStatsPanel.vue'
 import TaskGroupCard from '@/components/downloads/TaskGroupCard.vue'
@@ -79,6 +80,7 @@ onMounted(async () => {
   }
   // 重试完毕仍无任务，显示暂无任务极简画面，1.5 秒后返回上一页
   checking.value = false
+  toastWarning('未检测到下载任务，已返回')
   await new Promise(resolve => setTimeout(resolve, 1500))
   router.back()
 })
@@ -164,10 +166,14 @@ async function handleTogglePause() {
   await safeCall(async () => {
     if (isPaused.value) {
       await resumeDownload()
+      toastInfo('下载已恢复')
     } else {
       await pauseDownload()
+      toastInfo('下载已暂停')
     }
-  }, 'toggle pause')
+  }, 'toggle pause', () => {
+    toastError('操作失败')
+  })
   togglingPause.value = false
 }
 
@@ -178,8 +184,12 @@ function handleCancel() {
     async () => {
       if (cancelling.value) return
       cancelling.value = true
-      await safeCall(() => cancelDownload(), 'cancel download')
+      const ok = await safeCall(() => cancelDownload(), 'cancel download', () => {
+        toastError('取消失败')
+      })
       cancelling.value = false
+      if (ok === undefined) return
+      toastInfo('下载已取消')
       // 确保取消后立即触发返回（避免轮询已停止时卡在空白页）
       versionStore.finishDownload()
     },

@@ -13,6 +13,7 @@ import { getProjectDetail, getMcmodUrl } from '@/utils/api/community'
 import { showInfo } from '@/utils/modal'
 import { formatBytes } from '@/utils/format'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
+import { toastError } from '@/utils/toast'
 import { modTitle, loaderVisual, stripModVersion } from '@/utils/mod-display'
 import type { ResourceProject } from '@/types/community'
 import type { ModInfo } from '@/utils/tauri'
@@ -155,7 +156,11 @@ export function useModDetailQuery() {
     // 回退：打开 mcmod.cn 搜索页（注意：URL 是 search.mcmod.cn/s?key=，不是 www.mcmod.cn/search?key=）
     const keyword = stripModVersion(mod.translated_name || mod.file_name)
     const searchUrl = `https://search.mcmod.cn/s?key=${encodeURIComponent(keyword)}`
-    await openUrl(searchUrl)
+    try {
+      await openUrl(searchUrl)
+    } catch {
+      toastError('打开百科失败')
+    }
   }
 
   return { detailVisible, detailProject, detailLoadingFor, handleShowInfo, handleOpenWiki }

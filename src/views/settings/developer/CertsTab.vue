@@ -20,7 +20,7 @@ import {
   type CustomCertInfo,
 } from '@/utils/api/developer'
 import { pickFile } from '@/utils/fileDialog'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { toastSuccess, toastError, toastInfo, toastWarning } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
 import Select from '@/components/common/Select.vue'
 import Button from '@/components/common/Button.vue'
@@ -48,6 +48,7 @@ async function changeTrustMode(v: string | number) {
   try {
     await applyConfig({ tlsTrustMode: mode })
     tlsTrustMode.value = mode
+    toastInfo('信任源模式已切换')
   } catch (e) {
     toastError('设置信任源模式失败：' + e)
   }
@@ -60,6 +61,7 @@ async function toggleIgnoreTls(v: boolean) {
   try {
     await applyConfig({ ignoreTls: v })
     ignoreTls.value = v
+    toastWarning(v ? '已开启忽略 TLS 证书校验，存在安全风险，请及时关闭' : '已关闭忽略 TLS 证书校验')
   } catch (e) {
     toastError('设置忽略 TLS 失败：' + e)
     ignoreTls.value = !v
@@ -75,7 +77,7 @@ async function loadCerts() {
   certsLoading.value = true
   await safeCall(async () => {
     certs.value = await listCustomCerts()
-  }, 'load custom certs')
+  }, 'load custom certs', () => toastError('加载自定义证书失败'))
   certsLoading.value = false
 }
 

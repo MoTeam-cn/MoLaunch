@@ -18,7 +18,7 @@ import { authlibFetchServerMeta, authlibLogin, authlibSelectProfile } from '@/ut
 import { normalizeAuthlibServerUrl, willAutoCompletePath } from '@/utils/authlib-url'
 import type { AuthlibProfile, AuthlibServerMeta } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'
-import { toastWarning } from '@/utils/toast'
+import { toastWarning, toastSuccess, toastError } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import ProfileSelectModal from './ProfileSelectModal.vue'
@@ -98,6 +98,7 @@ async function handleLogin() {
       authStore.currentUser = result.user
       authStore.loginStatus = 'success'
       await authStore.loadAuthlibAccounts()
+      toastSuccess('外置登录成功')
       emit('success')
       return
     }
@@ -121,6 +122,7 @@ async function onProfileSelect(profile: AuthlibProfile) {
     authStore.loginStatus = 'success'
     await authStore.loadAuthlibAccounts()
     showProfileModal.value = false
+    toastSuccess('外置登录成功')
     emit('success')
   } catch (e) {
     error.value = String(e)
@@ -139,7 +141,7 @@ function onProfileClose() {
 /** 打开注册链接 */
 function openRegister() {
   if (serverMeta.value?.register_url) {
-    open(serverMeta.value.register_url).catch(() => {})
+    open(serverMeta.value.register_url).catch(() => toastError('打开注册页面失败'))
   }
 }
 </script>

@@ -7,6 +7,134 @@
 
 ## [未发布]
 
+### 重构
+
+#### 拆分超 300 行 Vue 组件（满足项目硬约束）
+
+- 背景：项目记忆明确约束 Vue 组件文件不得超过 300 行，4 个组件超标（CustomLayoutPanel 466 / Input 396 / ArchiveManager 335 / Online 356），需拆分以满足约束并提升可维护性
+- 改动（保持现有功能、样式、API、交互完全不变，仅做职责切分）：
+  - **CustomLayoutPanel**（[src/plugins/custom-layout/CustomLayoutPanel.vue](src/plugins/custom-layout/CustomLayoutPanel.vue)）：466 → 164 行。提取 `LayoutSectionRenderer.vue`（按 section type 渲染 stat-grid/list/progress/text/divider/html，141 行）、`renderHelpers.ts`（纯函数 + 颜色映射常量，78 行）、`htmlShadowRenderer.ts`（shadow DOM 渲染 + setupMolaunchApi，156 行）。复用 `@/composables/usePolling` 替代手写 setInterval
+  - **Input**（[src/components/common/Input.vue](src/components/common/Input.vue)）：396 → 203 行。采用与 `Select.vue` / `ColorPicker.vue` 一致的模式，将样式提取到 [src/components/common/Input.css](src/components/common/Input.css)（192 行），主文件用 `<style scoped src="./Input.css">` 引入。Props/Emits/Slots 接口未变，31 个引用方零改动
+  - **ArchiveManager**（[src/views/tools/archive/ArchiveManager.vue](src/views/tools/archive/ArchiveManager.vue)）：335 → 191 行。提取 `ArchiveBackupDialog.vue`（备份弹窗表单与逻辑，143 行）、`ArchiveRestorePanel.vue`（恢复面板表单与逻辑，114 行）。通过 props/emit 接口协调，模态弹窗语义保持等价
+  - **Online**（[src/views/Online.vue](src/views/Online.vue)）：356 → 165 行。提取 `useOnlineNav.ts`（导航分类配置 + isReady/isInRoom 状态计算 + 自动切换分类 watch，217 行）、`CloudDisconnectedMask.vue`（云端连接失败遮罩，41 行）、`OnlineTopBar.vue`（顶部标题栏 + 状态徽章，56 行）。provide 链路（hostMesh/guestWebrtc/goToLogs）零改动
+
+### 修复
+
+#### toast 函数误用 BUG 修复（双参数被静默丢弃）
+
+- 背景：`toast.ts` 中 `toastSuccess` / `toastError` / `toastWarning` / `toastInfo` 仅接受单参数，部分调用方误传 2 个参数，第二个参数被静默丢弃，导致用户看到的提示文案不完整
+- 改动（统一改为单参数字符串拼接）：
+  - [src/components/version/InstalledList.vue](src/components/version/InstalledList.vue)：`toastSuccess('已停止', '游戏进程已终止')` → `toastSuccess('已停止，游戏进程已终止')`；启动/停止失败的 `showError` 改为 `toastError`，防呆检查的 `showWarning` 改为 `toastWarning`（移除 `@/utils/modal` 依赖）
+  - [src/components/home/LaunchPanel.vue](src/components/home/LaunchPanel.vue)：`toastError('启动失败', String(e))` → `toastError('启动失败：' + String(e))`；补 `toastSuccess('游戏已启动')` / `toastInfo('已取消启动')` / `toastInfo('已停止游戏')`
+  - [src/components/common/CrashDialog.vue](src/components/common/CrashDialog.vue)：`openCrashReport` / `exportReport` 的 3 处 toast 双参数调用改为单参数拼接
+
+#### Home / Login 模块补全缺失的 toast 提示
+
+- 背景：登录、账号切换、外链打开、设备码复制等操作成功/失败均无反馈，或仅 `console.error` / `.catch(() => {})` 静默吞错
+- 改动（仅在各操作的成功/失败分支追加 toast 调用，不改其他逻辑）：
+  - [src/views/Login.vue](src/views/Login.vue)：离线/微软/外置登录成功补 `toastSuccess('登录成功')`；`openBuyPage` / `openOfficialSite` 失败补 `toastError`
+  - [src/components/home/AccountSelector.vue](src/components/home/AccountSelector.vue)：`addAccount` 跳转登录页失败补 `toastError`
+  - [src/components/common/ExternalLoginPanel.vue](src/components/common/ExternalLoginPanel.vue)：外置登录成功补 `toastSuccess('外置登录成功')`；`openRegister` 失败补 `toastError`
+  - [src/components/common/DeviceCodeModal.vue](src/components/common/DeviceCodeModal.vue)：`copyToClipboard` 改为返回 `Promise<boolean>`，成功/失败均 toast；`openBrowser` 失败补 `toastError`；微软登录成功补 `toastSuccess`
+
+#### Version 模块 composables 补全缺失的 toast 提示
+
+- 背景：账号登出/删除/切换、Mod 列表刷新、版本列表刷新、文件选择取消、内存配置自动保存等场景缺失用户反馈
+- 改动（仅在各操作的成功/失败分支追加 toast 调用，不改其他逻辑）：
+  - [src/composables/useAccountCards.ts](src/composables/useAccountCards.ts)：`logout` / `removeAccount` / `switchAccount` 成功补 `toastSuccess`，失败由 `toastWarning` 提级为 `toastError`
+  - [src/composables/useModList.ts](src/composables/useModList.ts)：`loadMods` 非 silent 调用成功补 `toastSuccess('Mod 列表已刷新')`；`handleInstallMod` 取消选择补 `toastInfo('已取消安装')`
+  - [src/composables/useModUpdate.ts](src/composables/useModUpdate.ts)：`loadVersions` 失败补 `toastError('查询版本列表失败')`
+  - [src/composables/useExportTab.ts](src/composables/useExportTab.ts)：3 处文件选择取消补 `toastInfo('已取消保存/读取/导出')`
+  - [src/composables/useVersionOverviewActions.ts](src/composables/useVersionOverviewActions.ts)：`handleExportScript` 取消选择补 `toastInfo('已取消导出')`
+  - [src/views/version-settings/MemorySection.vue](src/views/version-settings/MemorySection.vue)：`flushSaveMemory` 的 `safeCall` 补 `onError` 回调 `toastError('内存配置保存失败')`
+  - [src/views/version-settings/setup-tab/JavaCustomMode.vue](src/views/version-settings/setup-tab/JavaCustomMode.vue)：`handleImportJava` 取消选择补 `toastInfo('已取消导入')`
+  - [src/views/version-select/FolderSidebar.vue](src/views/version-select/FolderSidebar.vue)：加载文件夹列表失败补 `toastError`；`addFolder` 取消选择补 `toastInfo('已取消选择')`
+  - [src/views/VersionSelect.vue](src/views/VersionSelect.vue)：`loadInstalled` 由 `safeCall` 改为 try/catch，进入时 `toastInfo('正在刷新版本列表...')`，成功 `toastSuccess('版本列表已刷新')`，失败 `toastError`
+
+#### utils 通用层 / 联机 / Modal 补全缺失的 toast 提示
+
+- 背景：通用工具函数 `openLink`、百科搜索、地图 tile 加载、Modal 复制、房间离开等场景静默吞错
+- 改动（仅在各操作的成功/失败分支追加 toast 调用，不改其他逻辑）：
+  - [src/utils/aboutLogos.ts](src/utils/aboutLogos.ts)：`openLink` 失败补 `toastError('打开链接失败')`（被 AboutTab / CreditsTab 等多处复用，统一兜底）
+  - [src/composables/useModDetailQuery.ts](src/composables/useModDetailQuery.ts)：mcmod 搜索页打开失败补 `toastError('打开百科失败')`
+  - [src/views/tools/data/useSeedMap.ts](src/views/tools/data/useSeedMap.ts)：tile 加载首次失败补 `toastError('地图加载失败，请重试')`（带 `tileErrorToastShown` 防抖标志，成功后重置，避免刷屏）；specials 请求失败补 `toastError('加载 specials 失败')`
+  - [src/components/common/Modal.vue](src/components/common/Modal.vue)：`copyDetails` 改为 async + try/catch，成功 `toastSuccess('已复制错误详情')`，失败 `toastError('复制失败')`
+  - [src/components/layout/TopNavLayout.vue](src/components/layout/TopNavLayout.vue) / [src/components/online/RoomManager.vue](src/components/online/RoomManager.vue)：`hostCloseRoom` / `guestLeaveRoom` 失败补 `toastError('离开房间失败')`
+
+#### Settings 开发者配置加载补全缺失的 toast 提示
+
+- 背景：开发者页多个子 Tab 的 onMounted 加载失败仅 `console.error`，用户无感知
+- 改动（仅给 `safeCall` 补第三参数 `onError`，不改其他逻辑）：
+  - [src/views/settings/developer/CertsTab.vue](src/views/settings/developer/CertsTab.vue)：加载自定义证书列表失败补 `toastError('加载自定义证书失败')`
+  - [src/views/settings/developer/DevToolsTab.vue](src/views/settings/developer/DevToolsTab.vue)：查询 DevTools 状态失败补 `toastError('查询 DevTools 状态失败')`
+  - [src/views/settings/developer/ExperimentalTab.vue](src/views/settings/developer/ExperimentalTab.vue)：加载开发者配置失败补 `toastError('加载开发者配置失败')`
+  - [src/views/settings/settings-launch/MemoryAllocation.vue](src/views/settings/settings-launch/MemoryAllocation.vue)：获取系统内存失败补 `toastError('获取系统内存信息失败')`
+  - [src/views/Settings.vue](src/views/Settings.vue)：读取开发者模式失败补 `toastError('读取开发者模式失败')`
+  - [src/views/version-settings/SetupTab.vue](src/views/version-settings/SetupTab.vue)：`loadSetup` 失败补 `toastError('加载版本设置失败')`
+  - [src/views/version-settings/setup-tab/JavaModeSelector.vue](src/views/version-settings/setup-tab/JavaModeSelector.vue)：加载 Java 需求失败补 `toastError('加载 Java 需求失败')`
+
+#### stores 层补全缺失的 toast 提示
+
+- 背景：`online` store 的 `logout` / `clear`、`plugins` store 的 `persistToBackend` 内部 `safeCall` 未传 `onError`，失败仅 console；外层调用方无法感知
+- 改动（在 store 层统一加 toast，避免每个调用方重复处理）：
+  - [src/stores/online.ts](src/stores/online.ts)：`logout` 失败补 `toastError('登出失败')`；`clear` 失败补 `toastError('清除凭证失败')`
+  - [src/stores/plugins.ts](src/stores/plugins.ts)：`persistToBackend` 内部 `safeCall` 补 `onError` 回调 `toastError('保存设置失败')`，统一覆盖 `setHomePanelMode` / `setCustomLayoutConfig` 等所有持久化调用点（移除子 agent 在调用方加的冗余 try/catch）
+
+#### Settings 模块补全缺失的 toast 提示
+
+- 背景：Settings 各子页的部分操作（保存、加载、刷新、开关切换、连接测试）缺少用户可见反馈，仅打印 console，用户无法感知操作结果
+- 改动（仅在各操作的成功/失败分支追加 toast 调用，不改其他逻辑）：
+  - **公共 composable**（[src/composables/useConfigPage.ts](src/composables/useConfigPage.ts)）：防抖保存失败补 `toastError('配置保存失败')`；reload 加载失败补 `toastError('配置加载失败')`（保留原 `onLoadError` 回调，成功分支不动避免打扰）
+  - **缓存管理**（[src/views/settings/SettingsCache.vue](src/views/settings/SettingsCache.vue)）：`loadCacheStats` 刷新成功后 `toastSuccess('缓存统计已刷新')`
+  - **HTTP 日志**（[src/components/settings/HttpLogViewer.vue](src/components/settings/HttpLogViewer.vue)）：`loadEntries` 改为返回 `Promise<boolean>`，`onRefresh` 仅在成功时 `toastSuccess('HTTP 日志已刷新')`（避免失败时同时弹错误与成功提示）
+  - **开发者模式**（[src/components/settings/DevModeToggle.vue](src/components/settings/DevModeToggle.vue)）：`toggleDevMode` 成功后 `toastInfo` 提示开关状态
+  - **实验性功能**（[src/views/settings/developer/ExperimentalTab.vue](src/views/settings/developer/ExperimentalTab.vue)）：`toggleModrinthCdnRaw` 成功后 `toastInfo` 提示开关状态
+  - **证书与安全**（[src/views/settings/developer/CertsTab.vue](src/views/settings/developer/CertsTab.vue)）：`changeTrustMode` 成功后 `toastInfo('信任源模式已切换')`；`toggleIgnoreTls` 成功后 `toastWarning` 提示安全风险
+  - **api-server**（[src/components/settings/ApiServerCard.vue](src/components/settings/ApiServerCard.vue)）：`handleTestConnection` 成功 `toastSuccess('连接成功')`、失败 `toastError('连接失败')`
+  - **Java 路径**（[src/views/settings/settings-launch/JavaPathSelector.vue](src/views/settings/settings-launch/JavaPathSelector.vue)）：`handleManualImportJava` 设置成功后 `toastSuccess('Java 路径已设置')`
+
+#### 联机模块补全缺失的 toast 提示
+
+- 背景：联机各交互（设备注册/登录、NAT 检测、封禁列表刷新、版本加载、大厅刷新）部分分支仅打印 console 或静默兜底，用户无可见反馈
+- 改动（仅在各操作的成功/失败分支追加 toast 调用，不改其他逻辑）：
+  - **设备面板**（[src/components/online/OnlineDevicePanel.vue](src/components/online/OnlineDevicePanel.vue)）：`handleRegister` 失败 `toastError('设备注册失败，请稍后重试')`；`handleLogin` 失败 `toastError('设备登录失败，请稍后重试')`；`handleDetectNat` 成功 `toastSuccess('NAT 检测完成')`，异常或 `natResult.error` 有值时 `toastError('NAT 检测失败，请检查网络后重试')`
+  - **房主运营 composable**（[src/composables/useRoomHost.ts](src/composables/useRoomHost.ts)）：`refreshBans` 成功 `toastSuccess('封禁列表已刷新')`，业务失败（code!==1）`toastError(result.msg || '刷新封禁列表失败')`，异常 `toastError('刷新封禁列表失败')`
+  - **创建房间表单**（[src/components/online/CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：`onMounted` 加载版本列表失败补 `toastError('加载已安装版本列表失败，请重试')`；`onVersionSelect` 解析失败兜底时补 `toastWarning('版本信息解析失败，已使用版本 ID 作为兜底，请核对加载器类型')`
+  - **大厅浏览**（[src/components/online/LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：`fetchRooms` 改为返回 `Promise<boolean>`，新增 `handleManualRefresh` 仅在点击刷新按钮且成功时 `toastInfo('已刷新房间列表')`（onMounted/搜索/翻页等自动加载不提示）
+
+#### 工具页补全缺失的 toast 提示
+
+- 背景：`src/views/tools/` 下多个工具组件的操作（复制、检测、扫描、刷新、分析）缺失用户可见反馈，且 ColorPalette.vue 内联了 copyToClipboard 违反项目复用规则
+- 改动（仅在各操作的成功/失败分支追加 toast 调用，不改其他逻辑）：
+  - **调色板**（[src/views/tools/calc/ColorPalette.vue](src/views/tools/calc/ColorPalette.vue)）：删除内联 copyToClipboard（直接 navigator.clipboard?.writeText），改用 `@/utils/seedmap/format` 的共享 copyToClipboard（返回 Promise<boolean>）；新增 copyHex / copyCode 异步处理函数，复制成功 `toastSuccess`、失败 `toastError('复制失败')`
+  - **服务器检测**（[src/views/tools/network/ServerPinger.vue](src/views/tools/network/ServerPinger.vue)）：`doPing` 成功（res.error 为空）后 `toastSuccess('检测完成，延迟 ' + res.latency_ms + ' ms')`
+  - **Mod 去重**（[src/views/tools/mod-tools/ModDedupScanner.vue](src/views/tools/mod-tools/ModDedupScanner.vue)）：`runScan` 成功后按 duplicates.length 给 `toastWarning`（有重复）/ `toastSuccess`（无重复）
+  - **Mod 依赖检测**（[src/views/tools/mod-tools/ModDependencyChecker.vue](src/views/tools/mod-tools/ModDependencyChecker.vue)）：`runCheck` 成功后按 missing.length 给 `toastWarning`（有缺失）/ `toastSuccess`（无缺失）
+  - **存档管理 / 资源包转换 / 截图管理**（ArchiveManager.vue / ResourcePackConverter.vue / ScreenshotManager.vue）：新增 `refresh()` 包装函数（await loadList 后 `toastSuccess('已刷新')`），刷新按钮改调 refresh()，避免 onMounted/watch 触发时也弹 toast；loadVersions catch 块的 console.warn 替换为 `toastError('加载版本列表失败')`
+  - **崩溃分析**（[src/views/tools/data/CrashAnalyzer.vue](src/views/tools/data/CrashAnalyzer.vue)）：`runAnalyze` 有结果时 `toastSuccess` 提示识别原因数量（与原有"未识别到已知崩溃模式"的 toastInfo 互补）
+- 复用说明：复用 `@/utils/toast` 的 toastSuccess/toastError/toastWarning/toastInfo；复用 `@/utils/seedmap/format` 的 copyToClipboard 共享函数，删除 ColorPalette 内联实现
+
+#### Community 与 Downloads 模块补全缺失的 toast 提示
+
+- 背景：Community 资源搜索/详情与 Downloads 下载管理的部分操作（分类加载失败、打开官网、搜索无结果、重置筛选、暂停/恢复/取消下载、重试失败踢回、打开下载目录）缺失用户可见反馈，仅 console 或静默兜底，用户无感知
+- 改动（仅在各操作的成功/失败分支追加 toast 调用，不改其他逻辑）：
+  - **搜索筛选栏**（[src/components/community/SearchBar.vue](src/components/community/SearchBar.vue)）：`watch(resourceType)` 的 catch 块原连参数都没接收，改为 `catch (e)` 并补 `toastError('分类标签加载失败，请检查网络')`
+  - **资源详情头部**（[src/components/community/resource-detail/ResourceDetailHeader.vue](src/components/community/resource-detail/ResourceDetailHeader.vue)）：新增 `openWebsite` 函数包装 `openUrl(project.website)`，与 openMcmod 对齐补 `toastInfo('正在打开官网')`；MC 百科直链查询 catch 块补 `toastWarning('MC 百科信息查询失败')`（保留原 console.debug）
+  - **社区资源内容区**（[src/views/Community.vue](src/views/Community.vue)）：`doSearch` 成功但 `projects.length === 0` 时 `toastInfo('未找到匹配的资源')`；`onReset` 重置筛选后 `toastInfo('已重置筛选条件')`
+  - **下载管理页**（[src/views/Downloads.vue](src/views/Downloads.vue)）：`handleTogglePause` 利用 `safeCall` 的 onError 回调失败 `toastError('操作失败')`，成功分支按暂停/恢复分别 `toastInfo('下载已暂停' / '下载已恢复')`；`handleCancel` 改用 `safeCall` 返回值判断成功失败，失败 `toastError('取消失败')` 并提前 return，成功 `toastInfo('下载已取消')` 后再 `finishDownload`（确保 toast 在 router.back 触发前调用）；`onMounted` 重试 6 次仍无任务时 `toastWarning('未检测到下载任务，已返回')`
+  - **外部下载 composable**（[src/composables/useExternalDownload.ts](src/composables/useExternalDownload.ts)）：`openDownloadDir` 原 无 try/catch，补 try/catch + `toastError('打开目录失败')`，错误信息拼接 `e.message`
+- 复用说明：复用 `@/utils/toast` 的 toastSuccess/toastError/toastWarning/toastInfo；Downloads.vue 复用 `safeCall` 既有的 onError 回调签名（第三参数）判断失败，不引入新工具函数；handleCancel 失败时提前 return 避免在 finishDownload 触发 router.back 后 toast 丢失
+
+#### FRP 模块补全缺失的 toast 提示
+
+- 背景：FRP 各组件的刷新、清空、认证流程、自检等操作缺少用户可见反馈，用户无法感知操作结果
+- 改动（仅在各操作的成功/失败分支追加 toast 调用，不改其他逻辑）：
+  - **认证中心**（[src/components/frp/AuthCenter.vue](src/components/frp/AuthCenter.vue)）：`openUrl` 失败 `toastError('打开链接失败')`（移除 `/* ignore */`）；`handleStartOAuth2` 成功 `toastInfo('认证窗口已在浏览器打开，请完成后返回')`；`handleStartDeviceCode` 成功 `toastInfo('Device Code 流程已启动，请访问验证链接输入用户码')`；`handleCancelDeviceCode` 加 `toastInfo('已取消 Device Code 流程')`；刷新按钮原内联 `store.loadAuthStatuses()` 抽出为 `handleRefreshAuthStatuses`，成功后 `toastInfo('认证状态已刷新')`
+  - **FRP 日志**（[src/components/frp/FrpLogs.vue](src/components/frp/FrpLogs.vue)）：`handleRefresh` 成功 `toastInfo('日志已刷新')`；`handleClear` 加 `toastInfo('日志已清空')`
+  - **厂商列表**（[src/components/frp/ProviderList.vue](src/components/frp/ProviderList.vue)）：`handleRefresh` 成功 `toastInfo('厂商列表已刷新')`
+  - **隧道管理**（[src/components/frp/TunnelManager.vue](src/components/frp/TunnelManager.vue)）：`handleRefresh` 成功 `toastInfo('隧道列表已刷新')`
+  - **隧道自检**（[src/components/frp/TunnelSelfCheck.vue](src/components/frp/TunnelSelfCheck.vue)）：`runCheck` 补 `catch (e) { toastError('自检失败：' + ...) }`，成功完成 `toastInfo('自检完成')`
+
 ### 新增
 
 #### Frp 阶段四：安全加固

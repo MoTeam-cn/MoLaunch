@@ -74,13 +74,15 @@ async function loadLogFiles() {
   }
 }
 
-async function loadEntries() {
+async function loadEntries(): Promise<boolean> {
   loading.value = true
   try {
     entries.value = await readHttpLogs(selectedDate.value, 200)
+    return true
   } catch (e) {
     toastError('读取 HTTP 日志失败：' + e)
     entries.value = []
+    return false
   } finally {
     loading.value = false
   }
@@ -99,7 +101,9 @@ async function onRefresh() {
     loaded.value = true
     await loadLogFiles()
   }
-  await loadEntries()
+  if (await loadEntries()) {
+    toastSuccess('HTTP 日志已刷新')
+  }
 }
 
 async function onFileChange(value: string) {

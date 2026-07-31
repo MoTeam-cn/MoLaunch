@@ -91,7 +91,7 @@ async function handleJoinRoom() {
     toastError(`加入房间失败：${e instanceof Error ? e.message : String(e)}`)
     // 通知服务端删除参与者记录，避免僵尸数据导致大厅显示 2/4
     // API 失败不阻塞本地退出（服务端定期清理兜底）
-    await store.guestLeaveRoom().catch(() => {})
+    await store.guestLeaveRoom().catch(() => toastError('离开房间失败'))
     store.resetRoomState()
     guestWebrtc.close()
   }

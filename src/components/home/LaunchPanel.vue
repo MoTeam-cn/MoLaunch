@@ -11,7 +11,7 @@ import { useRouter } from 'vue-router'
 import { ShieldCheckIcon, ServerStackIcon, UserIcon } from '@heroicons/vue/24/outline'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
-import { toastError, toastWarning } from '@/utils/toast'
+import { toastError, toastWarning, toastSuccess, toastInfo } from '@/utils/toast'
 import AccountSelector from './AccountSelector.vue'
 import VersionSelector from './VersionSelector.vue'
 
@@ -66,8 +66,8 @@ const launchState = computed(() => {
 })
 
 async function handleLaunch() {
-  if (versionStore.launching) { versionStore.cancelLaunch(); return }
-  if (versionStore.runningPid) { versionStore.stopGame(); return }
+  if (versionStore.launching) { versionStore.cancelLaunch(); toastInfo('已取消启动'); return }
+  if (versionStore.runningPid) { versionStore.stopGame(); toastInfo('已停止游戏'); return }
   if (!authStore.isLoggedIn) { toastWarning('请先登录'); return }
   if (!versionStore.selectedVersion) { toastWarning('请选择版本'); return }
 
@@ -79,8 +79,9 @@ async function handleLaunch() {
       uuid: user.uuid,
       loginType: user.login_type,
     })
+    toastSuccess('游戏已启动')
   } catch (e) {
-    toastError('启动失败', String(e))
+    toastError('启动失败：' + String(e))
   }
 }
 </script>

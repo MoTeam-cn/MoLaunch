@@ -23,6 +23,7 @@ import {
   GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
 import { safeCall } from '@/utils/async'
+import { toastError } from '@/utils/toast'
 
 const activeCategory = ref('launch')
 
@@ -71,7 +72,7 @@ function onDevModeChanged(e: Event) {
 }
 
 onMounted(async () => {
-  const config = await safeCall(() => getConfigMap(), 'check developer mode')
+  const config = await safeCall(() => getConfigMap(), 'check developer mode', () => toastError('读取开发者模式失败'))
   if (config) devModeEnabled.value = config.developerMode
   window.addEventListener('developer-mode-changed', onDevModeChanged)
 })

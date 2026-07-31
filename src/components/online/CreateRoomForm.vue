@@ -17,7 +17,7 @@ import {
 import { getVersionGameVersion } from '@/utils/api/personalization'
 import type { ModpackMeta } from '@/types/online'
 import { PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
-import { toastError } from '@/utils/toast'
+import { toastError, toastWarning } from '@/utils/toast'
 
 const store = useOnlineStore()
 
@@ -59,6 +59,7 @@ onMounted(async () => {
     installedVersions.value = await listInstalledVersionsWithType()
   } catch (e) {
     console.error('Failed to load installed versions:', e)
+    toastError('加载已安装版本列表失败，请重试')
   } finally {
     versionsLoading.value = false
   }
@@ -98,6 +99,7 @@ async function onVersionSelect(value: string | number) {
     createForm.value.hostLoaderVersion = loaderInfo.loaderVersion
   } catch (e) {
     console.error('Failed to resolve version info:', e)
+    toastWarning('版本信息解析失败，已使用版本 ID 作为兜底，请核对加载器类型')
     createForm.value.mcVersion = versionId
     createForm.value.hostLoader = 'release'
     createForm.value.hostLoaderVersion = ''

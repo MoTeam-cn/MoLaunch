@@ -13,7 +13,7 @@ import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { pickFile } from '@/utils/fileDialog'
 import { isJavaCompatible } from '@/utils/api/java'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
@@ -92,7 +92,7 @@ async function handleImportJava() {
       { name: 'Java 可执行文件', extensions: ['exe'] },
     ],
   })
-  if (!filePath) return
+  if (!filePath) { toastInfo('已取消导入'); return }
   await javaStore.refreshJava()
   const found = javaStore.javaList.find(j => j.executable === filePath)
   if (!found) {

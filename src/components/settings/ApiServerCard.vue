@@ -14,7 +14,7 @@ import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { getServerTime } from '@/utils/api/online-manager'
 import { useConfigPage } from '@/composables/useConfigPage'
-import { toastSuccess } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import { formatTimestamp } from '@/utils/format'
 import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
@@ -92,11 +92,13 @@ async function handleTestConnection() {
       timezone: info.timezone,
       offsetSeconds: info.offset_seconds,
     }
+    toastSuccess('连接成功')
   } catch (e) {
     testResult.value = {
       success: false,
       message: e instanceof Error ? e.message : String(e),
     }
+    toastError('连接失败')
   } finally {
     testing.value = false
   }

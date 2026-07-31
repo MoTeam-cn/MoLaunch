@@ -17,6 +17,7 @@ import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
 import { safeCall } from '@/utils/async'
+import { toastError } from '@/utils/toast'
 
 const minMemory = ref(512)
 const maxMemory = ref(2048)
@@ -50,7 +51,7 @@ const { loaded, markDirty } = useConfigPage({
     await safeCall(async () => {
       systemMemory.value = await tauri.getSystemMemory()
       applyAutoMemory()
-    }, 'get system memory')
+    }, 'get system memory', () => toastError('获取系统内存信息失败'))
     startMemoryPolling()
   },
 })

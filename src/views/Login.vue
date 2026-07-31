@@ -17,6 +17,7 @@ import Input from '@/components/common/Input.vue'
 import DeviceCodeModal from '@/components/common/DeviceCodeModal.vue'
 import SubTabBar from '@/components/common/SubTabBar.vue'
 import ExternalLoginPanel from '@/components/common/ExternalLoginPanel.vue'
+import { toastSuccess, toastError } from '@/utils/toast'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -49,6 +50,7 @@ async function handleLogin() {
 
   try {
     await authStore.loginOffline(username.value.trim())
+    toastSuccess('登录成功')
     router.push('/apps')
   } catch (e) {
     error.value = String(e)
@@ -72,6 +74,7 @@ function handleMsLogin() {
 // 微软登录成功
 function onMsLoginSuccess() {
   showMsModal.value = false
+  toastSuccess('登录成功')
   router.push('/apps')
 }
 
@@ -82,17 +85,18 @@ function onMsModalClose() {
 
 // 外置登录成功
 function onExternalLoginSuccess() {
+  toastSuccess('登录成功')
   router.push('/apps')
 }
 
 // 打开购买页面
 function openBuyPage() {
-  open('https://www.xbox.com/zh-cn/games/store/minecraft-java-bedrock-edition-for-pc/9nxp44l49shj').catch(() => {})
+  open('https://www.xbox.com/zh-cn/games/store/minecraft-java-bedrock-edition-for-pc/9nxp44l49shj').catch(() => toastError('打开购买页面失败'))
 }
 
 // 打开 Minecraft 官网
 function openOfficialSite() {
-  open('https://www.minecraft.net/').catch(() => {})
+  open('https://www.minecraft.net/').catch(() => toastError('打开官网失败'))
 }
 </script>
 

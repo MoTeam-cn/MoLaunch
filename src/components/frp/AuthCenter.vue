@@ -10,6 +10,7 @@ import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Input from '@/components/common/Input.vue'
 import { showConfirm } from '@/utils/modal'
+import { toastInfo, toastError } from '@/utils/toast'
 import {
   ShieldCheckIcon,
   ArrowPathIcon,
@@ -75,12 +76,13 @@ function formatCountdown(sec: number): string {
 
 /** 打开外部链接 */
 async function openUrl(url: string): Promise<void> {
-  try { await open(url) } catch { /* ignore */ }
+  try { await open(url) } catch { toastError('打开链接失败') }
 }
 
 /** 启动 OAuth2 认证 */
 async function handleStartOAuth2(pid: string): Promise<void> {
   await store.startOAuth2Auth(pid)
+  toastInfo('认证窗口已在浏览器打开，请完成后返回')
 }
 
 /** 启动 Device Code 流程 + 自动轮询 */
@@ -89,6 +91,7 @@ async function handleStartDeviceCode(pid: string): Promise<void> {
   if (!ok) return
   const info = store.deviceCodeInfos[pid]
   if (info) startPolling(pid, info.interval, info.expiresIn)
+  toastInfo('Device Code 流程已启动，请访问验证链接输入用户码')
 }
 
 /** 启动倒计时 + 轮询定时器 */
@@ -123,6 +126,7 @@ function clearTimers(pid: string): void {
 function handleCancelDeviceCode(pid: string): void {
   clearTimers(pid)
   store.cancelDeviceCode(pid)
+  toastInfo('已取消 Device Code 流程')
 }
 
 /** 刷新 token */
@@ -141,6 +145,12 @@ function handleRevokeAuth(p: ProviderInfo): void {
 async function handleSaveApiKey(pid: string): Promise<void> {
   const key = store.apiKeyInputs[pid] || ''
   await store.saveApiKeyAuth(pid, key)
+}
+
+/** 刷新认证状态 */
+async function handleRefreshAuthStatuses(): Promise<void> {
+  await store.loadAuthStatuses()
+  toastInfo('认证状态已刷新')
 }
 
 let nowTimer: ReturnType<typeof setInterval> | null = null
@@ -164,7 +174,7 @@ onUnmounted(() => {
     <div class="flex items-center justify-between flex-wrap gap-2">
       <p class="text-sm text-gray-500">共 {{ providers.length }} 个厂商</p>
       <Tooltip text="刷新认证状态">
-        <Button type="ghost" size="small" :loading="loading" @click="store.loadAuthStatuses()">
+        <Button type="ghost" size="small" :loading="loading" @click="handleRefreshAuthStatuses">
           <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
         </Button>
       </Tooltip>

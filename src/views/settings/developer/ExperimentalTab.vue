@@ -7,7 +7,7 @@
  */
 import { ref, onMounted } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
-import { toastError } from '@/utils/toast'
+import { toastError, toastInfo } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
 import Select from '@/components/common/Select.vue'
 
@@ -18,6 +18,7 @@ async function toggleModrinthCdnRaw(v: boolean) {
   try {
     await applyConfig({ modrinthCdnRawEnabled: v })
     modrinthCdnRawEnabled.value = v
+    toastInfo(v ? '已开启 Modrinth CDN 直连' : '已关闭 Modrinth CDN 直连')
   } catch (e) {
     toastError('设置 Modrinth CDN 直连失败：' + e)
     modrinthCdnRawEnabled.value = !v
@@ -28,7 +29,7 @@ onMounted(async () => {
   await safeCall(async () => {
     const config = await getConfigMap()
     modrinthCdnRawEnabled.value = config.modrinthCdnRawEnabled
-  }, 'load developer config')
+  }, 'load developer config', () => toastError('加载开发者配置失败'))
 })
 </script>
 

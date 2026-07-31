@@ -23,6 +23,7 @@ import AccountIndicator from './account-selector/AccountIndicator.vue'
 import LoginPrompt from './account-selector/LoginPrompt.vue'
 import { useSwipeNavigation } from '@/composables/useSwipeNavigation'
 import { useAccountCards } from '@/composables/useAccountCards'
+import { toastError } from '@/utils/toast'
 
 const router = useRouter()
 
@@ -75,6 +76,7 @@ async function addAccount() {
     await router.push({ path: '/login', query: { add: '1' } })
   } catch (err) {
     console.error('[AccountSelector] 跳转登录页失败:', err)
+    toastError('跳转登录页失败')
   }
 }
 

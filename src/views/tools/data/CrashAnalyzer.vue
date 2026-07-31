@@ -14,7 +14,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
-import { toastError, toastInfo } from '@/utils/toast'
+import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { crashAnalyze } from '@/utils/api/tools'
 import type { CrashAnalyzeResult } from '@/utils/api/tools'
 
@@ -50,6 +50,8 @@ async function runAnalyze() {
     result.value = await crashAnalyze(logText.value)
     if (result.value.analyses.length === 0) {
       toastInfo('未识别到已知崩溃模式，请检查日志或手动排查')
+    } else {
+      toastSuccess('分析完成，识别出 ' + result.value.analyses.length + ' 个可能原因')
     }
   } catch (e) {
     toastError(`分析失败: ${e instanceof Error ? e.message : String(e)}`)

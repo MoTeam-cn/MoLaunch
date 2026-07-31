@@ -17,6 +17,7 @@ import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
 import { useOnlineStore } from '@/stores/online'
 import { applyPendingUpdate } from '@/utils/updater'
+import { toastError } from '@/utils/toast'
 const appWindow = getCurrentWebviewWindow()
 const onlineStore = useOnlineStore()
 
@@ -89,12 +90,12 @@ async function handleClose() {
   const role = onlineStore.roomState.role
   if (role === 'host') {
     await Promise.race([
-      onlineStore.hostCloseRoom().catch(() => {}),
+      onlineStore.hostCloseRoom().catch(() => toastError('离开房间失败')),
       new Promise<void>((r) => setTimeout(r, 3000)),
     ])
   } else if (role === 'guest') {
     await Promise.race([
-      onlineStore.guestLeaveRoom().catch(() => {}),
+      onlineStore.guestLeaveRoom().catch(() => toastError('离开房间失败')),
       new Promise<void>((r) => setTimeout(r, 3000)),
     ])
   }

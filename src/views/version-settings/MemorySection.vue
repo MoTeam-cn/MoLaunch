@@ -84,7 +84,7 @@ async function flushSaveMemory() {
       personalization.value.maxMemory = maxMemory.value
       personalization.value.minMemory = minMemory.value
     }
-  }, 'save memory')
+  }, 'save memory', (e) => toastError('内存配置保存失败：' + String(e)))
 }
 
 const { scheduleSave: scheduleSaveMemory } = useDebouncedSave(flushSaveMemory, 500)

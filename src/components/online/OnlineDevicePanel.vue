@@ -31,6 +31,7 @@ import {
 import { formatTimestamp } from '@/utils/format'
 import { NAT_TYPE_META, getNatFeasibilityColorClass } from '@/utils/online/nat-type'
 import { stripMcsdkPrefix } from '@/utils/online/device-id'
+import { toastSuccess, toastError } from '@/utils/toast'
 
 const onlineStore = useOnlineStore()
 
@@ -41,11 +42,13 @@ const needLogin = computed(
 )
 
 async function handleRegister() {
-  await onlineStore.register()
+  const ok = await onlineStore.register()
+  if (!ok) toastError('设备注册失败，请稍后重试')
 }
 
 async function handleLogin() {
-  await onlineStore.login()
+  const ok = await onlineStore.login()
+  if (!ok) toastError('设备登录失败，请稍后重试')
 }
 
 // ============ NAT 类型检测 ============
@@ -53,7 +56,16 @@ async function handleLogin() {
 const detectingNat = computed(() => onlineStore.natDetecting)
 
 async function handleDetectNat() {
-  await onlineStore.forceDetectNat()
+  try {
+    await onlineStore.forceDetectNat()
+    if (onlineStore.natResult?.error) {
+      toastError('NAT 检测失败，请检查网络后重试')
+    } else {
+      toastSuccess('NAT 检测完成')
+    }
+  } catch {
+    toastError('NAT 检测失败，请检查网络后重试')
+  }
 }
 </script>
 

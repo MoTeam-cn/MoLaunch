@@ -8,7 +8,7 @@
 import { ref, computed, onMounted, inject } from 'vue'
 import { useFrpStore } from '@/stores/frp'
 import { showConfirm } from '@/utils/modal'
-import { toastWarning } from '@/utils/toast'
+import { toastWarning, toastInfo } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import TunnelCreateForm from './TunnelCreateForm.vue'
@@ -80,7 +80,7 @@ async function handleUpdate(params: UpdateTunnelParams) {
 async function handleStart(id: string) { await store.startTunnel(id) }
 async function handleStop(id: string) { await store.stopTunnel(id) }
 
-async function handleRefresh() { await store.loadTunnels() }
+async function handleRefresh() { await store.loadTunnels(); toastInfo('隧道列表已刷新') }
 
 function handleViewLogs(id: string) { goToLogs(id) }
 

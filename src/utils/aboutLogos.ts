@@ -2,6 +2,7 @@
  * 关于页面的共享工具：Logo 映射 + 外链打开
  */
 import { open as shellOpen } from '@tauri-apps/plugin-shell'
+import { toastError } from '@/utils/toast'
 
 // Logo 资源：AboutIcon 目录下所有图片，构建 文件名 -> URL 映射表
 // 使用 import.meta.glob eager 模式预加载，运行时按文件名查 URL
@@ -19,5 +20,5 @@ export function resolveLogo(filename: string): string {
 
 /** 打开外部链接（静默处理错误） */
 export function openLink(url: string): void {
-  shellOpen(url).catch(() => {})
+  shellOpen(url).catch(() => toastError('打开链接失败'))
 }

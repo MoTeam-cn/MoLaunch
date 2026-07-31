@@ -8,7 +8,7 @@
 import { ref, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { pickDirectory } from '@/utils/fileDialog'
-import { toastSuccess, toastWarning, toastError } from '@/utils/toast'
+import { toastSuccess, toastWarning, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
 import Button from '@/components/common/Button.vue'
 import {
@@ -36,7 +36,7 @@ async function loadFolders() {
   await safeCall(async () => {
     folders.value = await tauri.listMcFolders()
     currentPath.value = await tauri.getGameDir()
-  }, 'load folders')
+  }, 'load folders', () => toastError('加载文件夹列表失败'))
 }
 
 /** 切换文件夹 */
@@ -60,7 +60,7 @@ async function switchFolder(folder: McFolder) {
 async function addFolder() {
   try {
     const selected = await pickDirectory({ title: '选择 .minecraft 文件夹' })
-    if (!selected) return
+    if (!selected) { toastInfo('已取消选择'); return }
 
     const normalized = selected.replace(/[\\/]+$/, '')
     const parts = normalized.split(/[\\/]/)

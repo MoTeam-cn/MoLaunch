@@ -9,7 +9,7 @@
  */
 import { ref, computed, onMounted } from 'vue'
 import * as tauri from '@/utils/tauri'
-import { toastError } from '@/utils/toast'
+import { toastError, toastSuccess } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
 import Button from '@/components/common/Button.vue'
 import Alert from '@/components/common/Alert.vue'
@@ -26,6 +26,7 @@ async function loadCacheStats() {
   loading.value = true
   try {
     cacheStats.value = await tauri.getCacheStats()
+    toastSuccess('缓存统计已刷新')
   } catch (e) {
     console.error('Failed to load cache stats:', e)
     toastError('获取缓存统计失败：' + e)

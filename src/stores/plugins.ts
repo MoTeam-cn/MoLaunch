@@ -39,6 +39,7 @@ import {
   isValidHomePanelMode,
 } from '@/utils/pluginInstaller'
 import { safeCall } from '@/utils/async'
+import { toastError } from '@/utils/toast'
 
 export const usePluginStore = defineStore('plugins', () => {
   /** 已注册的插件清单（内置 + 外部） */
@@ -115,7 +116,7 @@ export const usePluginStore = defineStore('plugins', () => {
         data.enabledMap[id] = state.enabled
       }
       await savePersonalizationData(data)
-    }, '[Plugins] persist to backend')
+    }, '[Plugins] persist to backend', (e) => toastError('保存设置失败：' + String(e)))
   }
 
   /**
@@ -276,7 +277,11 @@ export const usePluginStore = defineStore('plugins', () => {
    */
   async function setHomePanelMode(mode: HomePanelMode) {
     homePanelMode.value = mode
-    await persistToBackend()
+    try {
+      await persistToBackend()
+    } catch (e) {
+      toastError('保存设置失败：' + String(e))
+    }
   }
 
   /**
@@ -287,7 +292,11 @@ export const usePluginStore = defineStore('plugins', () => {
    */
   async function setCustomLayoutConfig(partial: Partial<CustomLayoutConfig>) {
     customLayoutConfig.value = { ...customLayoutConfig.value, ...partial }
-    await persistToBackend()
+    try {
+      await persistToBackend()
+    } catch (e) {
+      toastError('保存设置失败：' + String(e))
+    }
   }
 
   /**

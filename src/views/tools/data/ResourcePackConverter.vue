@@ -53,11 +53,16 @@ async function loadList() {
   }
 }
 
+async function refresh() {
+  await loadList()
+  toastSuccess('已刷新')
+}
+
 async function loadVersions() {
   try {
     installedVersions.value = await listInstalledVersionsWithType()
-  } catch (e) {
-    console.warn('加载已安装版本失败', e)
+  } catch {
+    toastError('加载版本列表失败')
   }
 }
 
@@ -120,7 +125,7 @@ onMounted(async () => {
         :options="versionOptions"
         class="w-44"
       />
-      <Button type="outline" size="small" :loading="loading" @click="loadList">
+      <Button type="outline" size="small" :loading="loading" @click="refresh">
         <template #icon><ArrowPathIcon class="h-4 w-4" /></template>
         刷新
       </Button>

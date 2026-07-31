@@ -20,7 +20,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Input from '@/components/common/Input.vue'
-import { toastError } from '@/utils/toast'
+import { toastSuccess, toastError } from '@/utils/toast'
 import { serverPing } from '@/utils/api/tools'
 import type { ServerPingResult } from '@/utils/api/tools'
 import { parseMcMotd } from '@/utils/motd'
@@ -41,6 +41,8 @@ async function doPing() {
     result.value = res
     if (res.error) {
       toastError('检测失败：' + res.error)
+    } else {
+      toastSuccess('检测完成，延迟 ' + res.latency_ms + ' ms')
     }
   } catch (e) {
     toastError('检测失败: ' + (e instanceof Error ? e.message : String(e)))

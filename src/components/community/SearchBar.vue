@@ -14,6 +14,7 @@ import Input from '@/components/common/Input.vue'
 import { MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { getCategoryTags } from '@/utils/api/community'
 import { useSearchHistory } from '@/composables/useSearchHistory'
+import { toastError } from '@/utils/toast'
 
 const props = defineProps<{
   query: string
@@ -41,8 +42,9 @@ watch(
   async (rt) => {
     try {
       categories.value = await getCategoryTags(rt)
-    } catch {
+    } catch (e) {
       categories.value = []
+      toastError('分类标签加载失败，请检查网络')
     }
   },
   { immediate: true },

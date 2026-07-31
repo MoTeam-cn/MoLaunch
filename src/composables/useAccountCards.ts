@@ -11,7 +11,7 @@
  */
 import { ref, computed, watch, onMounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { toastWarning } from '@/utils/toast'
+import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import type { AccountCardData } from '@/components/home/account-selector/types'
 
 export function useAccountCards() {
@@ -160,8 +160,9 @@ export function useAccountCards() {
         await authStore.switchOfflineAccount(targetUuid)
       }
       // 切换账号不改变皮肤数据，无需 bumpSkinVersion（皮肤变更由 SkinManager 负责）
+      toastSuccess('已切换账号')
     } catch (e) {
-      toastWarning(String(e))
+      toastError('切换账号失败：' + String(e))
       // 失败时回滚 currentIndex 到实际当前账号
       const activeIndex = cards.value.findIndex(c => c.isActive)
       if (activeIndex >= 0) currentIndex.value = activeIndex
@@ -187,11 +188,19 @@ export function useAccountCards() {
       }
       // 删除后调整索引
       if (currentIndex.value > 0) currentIndex.value--
+      toastSuccess('账号已删除')
     }
-    catch (e) { toastWarning(String(e)) }
+    catch (e) { toastError('删除账号失败：' + String(e)) }
   }
 
-  async function logout() { await authStore.logout() }
+  async function logout() {
+    try {
+      await authStore.logout()
+      toastSuccess('已退出登录')
+    } catch (e) {
+      toastError('退出登录失败：' + String(e))
+    }
+  }
 
   onMounted(() => {
     authStore.loadMsAccounts()

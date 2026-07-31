@@ -15,6 +15,7 @@
 import { onMounted, computed } from 'vue'
 import { useFrpStore } from '@/stores/frp'
 import { showConfirm } from '@/utils/modal'
+import { toastInfo } from '@/utils/toast'
 import { pickFile, pickDirectory } from '@/utils/fileDialog'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -71,6 +72,7 @@ onMounted(() => {
 
 async function handleRefresh() {
   await store.loadProviders()
+  toastInfo('厂商列表已刷新')
 }
 
 async function handleDownloadFrpc() {

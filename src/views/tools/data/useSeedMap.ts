@@ -68,6 +68,12 @@ const EXTENT_HALF = 29_999_104  // 16384 × 1831 = 2^14 × 1831
 const EXTENT = [-EXTENT_HALF, -EXTENT_HALF, EXTENT_HALF, EXTENT_HALF]
 
 /**
+ * tile 加载失败 toast 防抖标志：
+ * 首次失败时置 true 并 toast，成功后重置为 false，避免连续失败刷屏。
+ */
+let tileErrorToastShown = false
+
+/**
  * MC 版本列表（与 cubiomes MC_* 枚举值映射；见 cubiomes/biomes.h:5-46）
  *
  * 版本支持说明：
@@ -523,13 +529,19 @@ export function useSeedMap() {
     const MAX_RETRIES = 2
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {
-        return await pool.generateTile(tileParams)
+        const bitmap = await pool.generateTile(tileParams)
+        tileErrorToastShown = false
+        return bitmap
       } catch (e) {
         if (attempt < MAX_RETRIES) {
           await new Promise(r => setTimeout(r, 200))
           continue
         }
         console.error('[seedmap] tile load failed after retries', { z, x, y, error: e instanceof Error ? e.message : String(e) })
+        if (!tileErrorToastShown) {
+          tileErrorToastShown = true
+          toastError('地图加载失败，请重试')
+        }
         return emptyBitmap()
       }
     }
@@ -615,6 +627,7 @@ export function useSeedMap() {
       }
     } catch (e) {
       console.warn('specials 失败:', e)
+      toastError('加载 specials 失败')
     }
   }
 

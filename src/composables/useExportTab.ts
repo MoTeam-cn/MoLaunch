@@ -174,7 +174,7 @@ export function useExportTab(options: UseExportTabOptions) {
       defaultPath: `${packName.value || 'export'}.ini`,
       filters: [{ name: 'INI 配置文件', extensions: ['ini'] }],
     })
-    if (!savePath) return
+    if (!savePath) { toastInfo('已取消保存'); return }
     try {
       await saveExportConfig({
         configPath: savePath,
@@ -197,7 +197,7 @@ export function useExportTab(options: UseExportTabOptions) {
       title: '读取导出配置',
       filters: [{ name: 'INI 配置文件', extensions: ['ini'] }],
     })
-    if (!file) return
+    if (!file) { toastInfo('已取消读取'); return }
     try {
       const cfg = await loadExportConfig(file)
       if (cfg.packName) packName.value = cfg.packName
@@ -229,7 +229,7 @@ export function useExportTab(options: UseExportTabOptions) {
       defaultPath: `${packName.value}-${packVersion.value}.${meta.extension}`,
       filters: [{ name: `${meta.label} 整合包`, extensions: [meta.extension] }],
     })
-    if (!savePath) return
+    if (!savePath) { toastInfo('已取消导出'); return }
 
     // 非联网格式强制关闭 checkHostedAssets（避免无意义的联网请求）
     const finalCheckHostedAssets = supportsOnlineCheck.value && checkHostedAssets.value

@@ -62,7 +62,7 @@ const loaderOptions = [
 /** 搜索防抖定时器 */
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-async function fetchRooms() {
+async function fetchRooms(): Promise<boolean> {
   loading.value = true
   try {
     const result = await listLobbyRooms({
@@ -74,18 +74,27 @@ async function fetchRooms() {
     if (result.code === 1 && result.data) {
       rooms.value = result.data.items
       total.value = result.data.total
+      return true
     } else {
       toastError(result.msg || '获取大厅列表失败')
       rooms.value = []
       total.value = 0
+      return false
     }
   } catch (e) {
     toastError(e instanceof Error ? e.message : String(e))
     rooms.value = []
     total.value = 0
+    return false
   } finally {
     loading.value = false
   }
+}
+
+/** 手动刷新（仅点击刷新按钮时调用）：成功时提示，自动加载/搜索/翻页不提示 */
+async function handleManualRefresh() {
+  const ok = await fetchRooms()
+  if (ok) toastInfo('已刷新房间列表')
 }
 
 function onSearchInput() {
@@ -174,7 +183,7 @@ onMounted(() => {
       </Input>
       <Select v-model="loader" :options="loaderOptions" style="width: 180px" @update:model-value="onLoaderChange" />
       <Tooltip text="刷新列表">
-        <Button type="ghost" size="small" :loading="loading" @click="fetchRooms">
+        <Button type="ghost" size="small" :loading="loading" @click="handleManualRefresh">
           <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
         </Button>
       </Tooltip>

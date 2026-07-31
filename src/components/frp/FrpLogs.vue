@@ -20,6 +20,7 @@ import { useTauriEvent } from '@/composables/useTauriEvent'
 import { parseLogLines, logLineClass, type LogLine } from '@/utils/log-display'
 import { translateLogLine } from '@/utils/frp-log-translate'
 import { diagnoseLogs, diagnoseBadgeClass, type DiagnoseResult } from '@/utils/frp-log-diagnose'
+import { toastInfo } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -112,10 +113,12 @@ watch(() => store.selectedLogTunnelId, (id) => {
 
 async function handleRefresh() {
   await Promise.all([store.loadLogFiles(), store.readLogs(store.selectedLogTunnelId)])
+  toastInfo('日志已刷新')
 }
 
 function handleClear() {
   store.clearLogs()
+  toastInfo('日志已清空')
 }
 
 /** 单行日志显示文本：开启翻译时追加中文释义 */

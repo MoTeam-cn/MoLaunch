@@ -14,6 +14,8 @@ import { SwatchIcon, ClipboardIcon } from '@heroicons/vue/24/outline'
 import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import { toastSuccess, toastError } from '@/utils/toast'
+import { copyToClipboard } from '@/utils/seedmap/format'
 
 // 当前 RGB 值（0-255）
 const r = ref(22)
@@ -95,8 +97,16 @@ function selectDye(rgb: number[]) {
   b.value = rgb[2]
 }
 
-function copyToClipboard(text: string) {
-  navigator.clipboard?.writeText(text)
+async function copyHex() {
+  const ok = await copyToClipboard(hexValue.value)
+  if (ok) toastSuccess('已复制 HEX: ' + hexValue.value)
+  else toastError('复制失败')
+}
+
+async function copyCode(code: string) {
+  const ok = await copyToClipboard(code)
+  if (ok) toastSuccess('已复制: ' + code)
+  else toastError('复制失败')
 }
 
 const colorPreviewStyle = computed(() => `background-color: ${hexValue.value}`)
@@ -141,7 +151,7 @@ const formatCodes = [
             <span class="w-10 text-xs text-gray-500">HEX</span>
             <Input v-model="hexInput" placeholder="#165DFF" size="small" width="120px" />
             <Tooltip text="复制 HEX" position="top">
-              <Button type="ghost" size="small" @click="copyToClipboard(hexValue)">
+              <Button type="ghost" size="small" @click="copyHex">
                 <template #icon>
                   <ClipboardIcon class="h-3.5 w-3.5" />
                 </template>
@@ -204,7 +214,7 @@ const formatCodes = [
             size="small"
             class="font-mono"
             :style="{ backgroundColor: code.color, color: code.dark ? '#fff' : '#000' }"
-            @click="copyToClipboard(code.code)"
+            @click="copyCode(code.code)"
           >
             {{ code.code }}
           </Button>

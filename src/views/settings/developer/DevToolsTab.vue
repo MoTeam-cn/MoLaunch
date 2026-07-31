@@ -41,7 +41,7 @@ const { unlocked: watermarkUnlocked, hide: hideWatermark, show: showWatermark } 
 const isPreRelease = computed(() => isPreReleaseBuild())
 
 async function refreshState() {
-  const r = await safeCall(() => isDevToolsOpen(), 'query devtools state')
+  const r = await safeCall(() => isDevToolsOpen(), 'query devtools state', () => toastError('查询 DevTools 状态失败'))
   if (typeof r === 'boolean') isOpen.value = r
 }
 

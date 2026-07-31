@@ -52,7 +52,7 @@ async function loadSetup() {
       advanceDisableJlw.value = p.advanceDisableJlw
       advanceDisableLua.value = p.advanceDisableLua
     }
-  }, 'load setup')
+  }, 'load setup', () => toastError('加载版本设置失败'))
 }
 
 /** 保存版本独立字段到 setup.ini */

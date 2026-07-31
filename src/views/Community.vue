@@ -7,7 +7,7 @@
 import { ref, watch } from 'vue'
 import type { ResourceType, ResourceProject, SearchResult } from '@/types/community'
 import { searchResources } from '@/utils/api/community'
-import { toastError } from '@/utils/toast'
+import { toastError, toastInfo } from '@/utils/toast'
 import { useVersionStore } from '@/stores/version'
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import SearchBar from '@/components/community/SearchBar.vue'
@@ -53,6 +53,9 @@ async function doSearch() {
     total.value = result.total_count
     pageSize.value = result.page_size
     finish()
+    if (projects.value.length === 0) {
+      toastInfo('未找到匹配的资源')
+    }
   } catch (e: any) {
     toastError('搜索失败: ' + (e?.message || String(e)))
     projects.value = []
@@ -82,6 +85,7 @@ function onReset() {
   source.value = 0
   category.value = ''
   page.value = 0
+  toastInfo('已重置筛选条件')
   doSearch()
 }
 

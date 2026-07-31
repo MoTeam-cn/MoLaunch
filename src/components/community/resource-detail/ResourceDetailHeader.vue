@@ -12,7 +12,7 @@ import { ref, watch } from 'vue'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
 import type { ResourceProject } from '@/types/community'
 import { getMcmodUrl } from '@/utils/api/community'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { toastSuccess, toastError, toastInfo, toastWarning } from '@/utils/toast'
 import { formatDownloads } from '@/utils/format'
 import {
   XMarkIcon,
@@ -40,6 +40,7 @@ watch(
       mcmodUrl.value = await getMcmodUrl(p.platform, p.slug)
     } catch (e) {
       console.debug('[ResourceDetailHeader] 查询 MC 百科直链失败:', e)
+      toastWarning('MC 百科信息查询失败')
     }
   },
   { immediate: true },
@@ -50,6 +51,13 @@ async function openMcmod() {
   if (!mcmodUrl.value) return
   toastSuccess('正在打开 MC 百科详情页')
   await openUrl(mcmodUrl.value)
+}
+
+/** 点击"转到平台官网"：直接打开 project.website */
+async function openWebsite() {
+  if (!props.project.website) return
+  toastInfo('正在打开官网')
+  await openUrl(props.project.website)
 }
 
 /** 复制资源名称到剪贴板 */
@@ -105,7 +113,7 @@ class="px-1.5 py-0.5 rounded text-[10px] font-medium"
       v-if="project.website"
       type="primary"
       size="small"
-      @click="openUrl(project.website)"
+      @click="openWebsite"
     >
       <template #icon><ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" /></template>
       转到 {{ project.platform }}

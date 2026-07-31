@@ -152,7 +152,7 @@ async function openCrashReport() {
   try {
     await open(crashInfo.value.crash_report_path)
   } catch (e) {
-    toastError('打开文件失败', String(e))
+    toastError('打开文件失败：' + String(e))
   }
 }
 

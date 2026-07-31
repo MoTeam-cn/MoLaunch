@@ -157,7 +157,7 @@ watch(personalization, async (p) => {
 
   // 加载 Java 需求（用 originalVersion 和 versionType 判断）
   const loader = ['forge', 'neoforge', 'fabric', 'quilt', 'optifine', 'liteloader'].includes(p.versionType) ? p.versionType : null
-  const reqs = await safeCall(() => tauri.getJavaRequirements(p.originalVersion || p.versionType || '', loader), 'load Java requirements')
+  const reqs = await safeCall(() => tauri.getJavaRequirements(p.originalVersion || p.versionType || '', loader), 'load Java requirements', () => toastError('加载 Java 需求失败'))
   if (reqs) javaReqs.value = reqs
 
   if (!javaStore.javaLoaded) await javaStore.detectJava()

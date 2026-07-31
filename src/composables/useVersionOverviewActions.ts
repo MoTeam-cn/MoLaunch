@@ -158,7 +158,7 @@ export function useVersionOverviewActions(options: UseVersionOverviewActionsOpti
         defaultPath: `Run_${selectedId.value}.bat`,
         filters: [{ name: '批处理文件', extensions: ['bat'] }],
       })
-      if (!savePath) return
+      if (!savePath) { toastInfo('已取消导出'); return }
       await tauri.exportLaunchScript(selectedId.value, user.name, user.uuid, user.login_type, javaStore.javaPath || null, savePath)
       toastSuccess('启动脚本已导出')
       // 导出后自动打开所在文件夹并选中导出的文件
