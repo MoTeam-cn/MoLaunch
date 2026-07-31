@@ -6,14 +6,16 @@
  *
  * 隧道状态同步：监听 `frp-tunnel-status` Tauri event，frpc 进程退出时
  * 自动刷新 tunnels 列表，避免列表显示"运行中"但实际已停止。
+ *
+ * 认证相关 state + actions 已抽取到 stores/frp/authSlice.ts（useFrpAuthSlice），
+ * 主文件仅保留核心的厂商/隧道/日志管理，并在返回对象中解构合并 auth 切片，
+ * 保持 useFrpStore() 对调用方完全兼容。
  */
 
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 import type {
-  AuthStatus,
   CreateTunnelParams,
-  DeviceCodeResult,
   LogFileInfo,
   ProviderInfo,
   TunnelWithStatus,
@@ -36,16 +38,10 @@ import {
   disableProvider as apiDisableProvider,
   listLogFiles as apiListLogFiles,
   readLogFile as apiReadLogFile,
-  getAuthStatus as apiGetAuthStatus,
-  startOAuth2 as apiStartOAuth2,
-  startDeviceCode as apiStartDeviceCode,
-  pollDeviceCode as apiPollDeviceCode,
-  refreshToken as apiRefreshToken,
-  revokeAuth as apiRevokeAuth,
-  saveApiKey as apiSaveApiKey,
 } from '@/utils/api/frp-manager'
 import { useTauriEvent } from '@/composables/useTauriEvent'
 import { toastSuccess, toastError } from '@/utils/toast'
+import { useFrpAuthSlice } from './frp/authSlice'
 
 export const useFrpStore = defineStore('frp', () => {
   // ============================================================
@@ -82,21 +78,10 @@ export const useFrpStore = defineStore('frp', () => {
   const statusListenerStarted = ref(false)
 
   // ============================================================
-  // 认证状态（阶段三）
+  // 认证切片（阶段三）：state + actions 由 useFrpAuthSlice 提供
   // ============================================================
 
-  /** 各厂商认证状态（key = providerId） */
-  const authStatuses = ref<Record<string, AuthStatus>>({})
-  /** 认证状态批量加载中 */
-  const authLoading = ref(false)
-  /** 单个厂商认证操作中（OAuth2/刷新/撤销等） */
-  const authActionLoading = ref<Record<string, boolean>>({})
-  /** Device Code 流程信息（key = providerId） */
-  const deviceCodeInfos = ref<Record<string, DeviceCodeResult>>({})
-  /** Device Code 轮询中（key = providerId） */
-  const deviceCodePolling = ref<Record<string, boolean>>({})
-  /** API Key 输入值（key = providerId） */
-  const apiKeyInputs = ref<Record<string, string>>({})
+  const authSlice = useFrpAuthSlice(providers)
 
   // ============================================================
   // Actions
@@ -361,155 +346,6 @@ export const useFrpStore = defineStore('frp', () => {
     logsHasMore.value = false
   }
 
-  // ============================================================
-  // 认证 Actions（阶段三）
-  // ============================================================
-
-  /** 设置单个厂商的认证操作 loading */
-  function setAuthActionLoading(providerId: string, loading: boolean): void {
-    authActionLoading.value[providerId] = loading
-  }
-
-  /** 批量加载所有需认证厂商的认证状态 */
-  async function loadAuthStatuses(): Promise<void> {
-    authLoading.value = true
-    try {
-      for (const p of providers.value) {
-        if (p.authType === 'none') continue
-        try {
-          const status = await apiGetAuthStatus(p.id)
-          authStatuses.value[p.id] = status
-        } catch {
-          // 单个厂商失败不影响其他厂商
-        }
-      }
-    } finally {
-      authLoading.value = false
-    }
-  }
-
-  /** 刷新单个厂商的认证状态 */
-  async function refreshAuthStatus(providerId: string): Promise<void> {
-    try {
-      const status = await apiGetAuthStatus(providerId)
-      authStatuses.value[providerId] = status
-    } catch {
-      // 静默失败
-    }
-  }
-
-  /** 启动 OAuth2 授权流程 */
-  async function startOAuth2Auth(providerId: string): Promise<boolean> {
-    setAuthActionLoading(providerId, true)
-    try {
-      await apiStartOAuth2(providerId)
-      toastSuccess('OAuth2 认证成功')
-      await refreshAuthStatus(providerId)
-      return true
-    } catch (e) {
-      toastError('OAuth2 认证失败：' + e)
-      return false
-    } finally {
-      setAuthActionLoading(providerId, false)
-    }
-  }
-
-  /** 启动 Device Code 流程 */
-  async function startDeviceCodeAuth(providerId: string): Promise<boolean> {
-    setAuthActionLoading(providerId, true)
-    try {
-      const info = await apiStartDeviceCode(providerId)
-      deviceCodeInfos.value[providerId] = info
-      return true
-    } catch (e) {
-      toastError('启动 Device Code 失败：' + e)
-      return false
-    } finally {
-      setAuthActionLoading(providerId, false)
-    }
-  }
-
-  /** 轮询 Device Code token（前端按 interval 调用，返回是否应继续轮询） */
-  async function pollDeviceCodeAuth(providerId: string): Promise<boolean> {
-    deviceCodePolling.value[providerId] = true
-    try {
-      const result = await apiPollDeviceCode(providerId)
-      if (result.status === 'success') {
-        toastSuccess('Device Code 认证成功')
-        delete deviceCodeInfos.value[providerId]
-        await refreshAuthStatus(providerId)
-        return false
-      }
-      if (result.status === 'expired' || result.status === 'declined') {
-        const msg = result.status === 'expired' ? '设备码已过期，请重新认证' : '用户拒绝授权'
-        toastError(msg)
-        delete deviceCodeInfos.value[providerId]
-        return false
-      }
-      // pending / slow_down -> 继续轮询
-      return true
-    } catch (e) {
-      toastError('轮询 Device Code 失败：' + e)
-      delete deviceCodeInfos.value[providerId]
-      return false
-    } finally {
-      deviceCodePolling.value[providerId] = false
-    }
-  }
-
-  /** 取消 Device Code 流程（清除前端状态） */
-  function cancelDeviceCode(providerId: string): void {
-    delete deviceCodeInfos.value[providerId]
-  }
-
-  /** 刷新 token */
-  async function refreshTokenAuth(providerId: string): Promise<boolean> {
-    setAuthActionLoading(providerId, true)
-    try {
-      await apiRefreshToken(providerId)
-      toastSuccess('token 已刷新')
-      await refreshAuthStatus(providerId)
-      return true
-    } catch (e) {
-      toastError('刷新 token 失败：' + e)
-      return false
-    } finally {
-      setAuthActionLoading(providerId, false)
-    }
-  }
-
-  /** 撤销认证 */
-  async function revokeAuthAuth(providerId: string): Promise<boolean> {
-    setAuthActionLoading(providerId, true)
-    try {
-      await apiRevokeAuth(providerId)
-      toastSuccess('已撤销认证')
-      await refreshAuthStatus(providerId)
-      return true
-    } catch (e) {
-      toastError('撤销认证失败：' + e)
-      return false
-    } finally {
-      setAuthActionLoading(providerId, false)
-    }
-  }
-
-  /** 保存 API Key */
-  async function saveApiKeyAuth(providerId: string, apiKey: string): Promise<boolean> {
-    setAuthActionLoading(providerId, true)
-    try {
-      await apiSaveApiKey({ providerId, apiKey })
-      toastSuccess('API Key 已保存')
-      await refreshAuthStatus(providerId)
-      return true
-    } catch (e) {
-      toastError('保存 API Key 失败：' + e)
-      return false
-    } finally {
-      setAuthActionLoading(providerId, false)
-    }
-  }
-
   return {
     // state
     providers,
@@ -525,12 +361,8 @@ export const useFrpStore = defineStore('frp', () => {
     logFiles,
     logsHasMore,
     lastTunnelStatus,
-    authStatuses,
-    authLoading,
-    authActionLoading,
-    deviceCodeInfos,
-    deviceCodePolling,
-    apiKeyInputs,
+    // auth slice（state + actions）
+    ...authSlice,
     // actions
     loadProviders,
     downloadFrpc,
@@ -549,14 +381,5 @@ export const useFrpStore = defineStore('frp', () => {
     loadLogFiles,
     readLogs,
     clearLogs,
-    loadAuthStatuses,
-    refreshAuthStatus,
-    startOAuth2Auth,
-    startDeviceCodeAuth,
-    pollDeviceCodeAuth,
-    cancelDeviceCode,
-    refreshTokenAuth,
-    revokeAuthAuth,
-    saveApiKeyAuth,
   }
 })
