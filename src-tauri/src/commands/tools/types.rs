@@ -508,6 +508,29 @@ pub struct ServerPingResult {
     pub error: String,
 }
 
+/// TCP 端口连通性检测请求参数
+///
+/// 用于 Frp 等非 Minecraft 协议服务的端口可达性检查：
+/// 仅做 TCP 三次握手，不发送任何应用层数据，3 秒超时。
+/// 与 `ServerPingParams`（SLP 协议）的区别：本检测不依赖应用层协议，
+/// 适用于 frps / 数据库 / 任意 TCP 服务。
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TcpCheckParams {
+    pub host: String,
+    pub port: u16,
+}
+
+/// TCP 端口连通性检测结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct TcpCheckResult {
+    /// 是否可连接
+    pub reachable: bool,
+    /// TCP 握手耗时（毫秒），失败时为 0
+    pub latency_ms: u64,
+    /// 失败原因（成功时为空）
+    pub error: String,
+}
+
 /// NBT 解析请求参数
 #[derive(Debug, Serialize, Deserialize)]
 pub struct NbtParseParams {
@@ -533,6 +556,51 @@ pub struct NbtNode {
     pub value: Option<serde_json::Value>,
     /// 子节点（仅 compound / list 有）
     pub children: Vec<NbtNode>,
+}
+
+/// 本机监听端口条目
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenPortInfo {
+    /// 本地绑定的完整地址（如 "0.0.0.0:7000" / "127.0.0.1:25565"）
+    pub local_addr: String,
+    /// 端口号
+    pub port: u16,
+    /// 协议：tcp / udp
+    pub protocol: String,
+    /// 占用该端口的进程名（拿不到时为 None）
+    pub process_name: Option<String>,
+    /// 占用该端口的进程 PID（拿不到时为 None）
+    pub pid: Option<u32>,
+}
+
+/// 列出本机监听端口结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct ListOpenPortsResult {
+    pub ports: Vec<OpenPortInfo>,
+}
+
+/// 选择器子窗口请求参数
+///
+/// `template` 指定后端 resources 中的模板名（如 "port-picker"），由 URI scheme
+/// handler 读取模板并注入 `data` 后渲染。不再由前端传入完整 HTML，防止注入。
+///
+/// `csp` 为可选的 Content-Security-Policy 策略字符串，由前端按模板类型配置，
+/// 后端在 picker:// 响应头中注入，限制子窗口可加载的资源范围。
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenPickerWindowParams {
+    pub title: String,
+    pub template: String,
+    #[serde(default)]
+    pub data: serde_json::Value,
+    #[serde(default)]
+    pub width: Option<f64>,
+    #[serde(default)]
+    pub height: Option<f64>,
+    /// Content-Security-Policy 策略字符串（前端配置，通过 IPC 传递）
+    /// 后端在创建 picker:// 响应时注入到 HTTP 响应头中
+    #[serde(default)]
+    pub csp: Option<String>,
 }
 
 // 注：种子地图相关类型已删除——工具迁移至前端 WASM 方案，不再走后端 IPC。

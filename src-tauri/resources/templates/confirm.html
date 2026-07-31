@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>确认</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1e1e2e; color: #cdd6f4;
+      height: 100vh; display: flex; flex-direction: column;
+      padding: 24px; user-select: none;
+    }
+    .title {
+      font-size: 16px; font-weight: 600; margin-bottom: 12px;
+      color: #cdd6f4;
+    }
+    .message {
+      flex: 1; font-size: 14px; color: #a6adc8;
+      line-height: 1.6; overflow-y: auto; user-select: text;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .actions {
+      display: flex; gap: 8px; justify-content: flex-end;
+      margin-top: 20px;
+    }
+    button {
+      padding: 8px 20px; border-radius: 4px; cursor: pointer;
+      font-size: 13px; font-weight: 500; border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+      min-width: 80px;
+    }
+    .btn-cancel {
+      background: #313244; color: #cdd6f4; border-color: #45475a;
+    }
+    .btn-cancel:hover { background: #45475a; }
+    .btn-confirm {
+      background: #89b4fa; color: #1e1e2e;
+    }
+    .btn-confirm:hover { background: #b4befe; }
+    .btn-confirm.danger {
+      background: #f38ba8; color: #1e1e2e;
+    }
+    .btn-confirm.danger:hover { background: #eba0ac; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+  </style>
+</head>
+<body oncontextmenu="return false">
+  <div class="title" id="title">确认</div>
+  <div class="message" id="message"></div>
+  <div class="actions">
+    <button class="btn-cancel" id="btn-cancel">取消</button>
+    <button class="btn-confirm" id="btn-confirm">确认</button>
+  </div>
+  <script>
+    // 禁用 DevTools 快捷键
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
+    });
+
+    var DATA = window.__PICKER_DATA__ || {};
+    var titleEl = document.getElementById('title');
+    var messageEl = document.getElementById('message');
+    var cancelBtn = document.getElementById('btn-cancel');
+    var confirmBtn = document.getElementById('btn-confirm');
+
+    // 注入数据
+    if (DATA.message) {
+      messageEl.textContent = DATA.message;
+    }
+    if (DATA.cancelText) {
+      cancelBtn.textContent = DATA.cancelText;
+    }
+    if (DATA.confirmText) {
+      confirmBtn.textContent = DATA.confirmText;
+    }
+    if (DATA.danger) {
+      confirmBtn.classList.add('danger');
+    }
+
+    // 选择结果通过 picker-result:// 协议返回
+    function select(value) {
+      location.href = 'picker-result://?value=' + value;
+    }
+
+    cancelBtn.addEventListener('click', function() { select('false'); });
+    confirmBtn.addEventListener('click', function() { select('true'); });
+
+    // ESC 键取消
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') select('false');
+      if (e.key === 'Enter') select('true');
+    });
+  </script>
+</body>
+</html>

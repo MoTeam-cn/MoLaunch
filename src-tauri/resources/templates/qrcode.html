@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>二维码</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1e1e2e; color: #cdd6f4;
+      height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      padding: 24px; user-select: none; gap: 16px;
+    }
+    .qr-container {
+      background: #fff; padding: 16px; border-radius: 8px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      min-width: 272px; min-height: 272px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    /* qrcodejs 渲染的 canvas/table 居中 */
+    .qr-container canvas,
+    .qr-container img,
+    .qr-container table {
+      display: block !important;
+      margin: 0 auto;
+    }
+    .label {
+      font-size: 13px; color: #a6adc8; text-align: center;
+      max-width: 280px; word-break: break-all; user-select: text;
+    }
+    .text-preview {
+      font-size: 11px; color: #6c7086; text-align: center;
+      max-width: 280px; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; user-select: text;
+    }
+    .loading {
+      display: flex; align-items: center; justify-content: center;
+      width: 240px; height: 240px; color: #6c7086;
+    }
+    .spinner {
+      width: 24px; height: 24px;
+      border: 3px solid #45475a; border-top-color: #89b4fa;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .error {
+      color: #f38ba8; font-size: 14px; text-align: center;
+    }
+  </style>
+</head>
+<body oncontextmenu="return false">
+  <div class="qr-container" id="qr-container">
+    <div class="loading" id="loading">
+      <div class="spinner"></div>
+    </div>
+  </div>
+  <div class="label" id="label"></div>
+  <div class="text-preview" id="text-preview"></div>
+  <script>
+    // 禁用 DevTools 快捷键
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
+    });
+
+    var DATA = window.__PICKER_DATA__ || {};
+    var qrContainer = document.getElementById('qr-container');
+    var loadingEl = document.getElementById('loading');
+    var labelEl = document.getElementById('label');
+    var textPreviewEl = document.getElementById('text-preview');
+
+    var text = DATA.text || '';
+    var label = DATA.label || '';
+
+    if (!text) {
+      loadingEl.innerHTML = '<div class="error">未提供二维码内容</div>';
+    } else {
+      // 显示标签和原文预览
+      if (label) {
+        labelEl.textContent = label;
+      }
+      textPreviewEl.textContent = text;
+      textPreviewEl.title = text;
+
+      // 动态加载 qrcode.min.js（通过 res:// 协议读取后端嵌入资源）
+      // Windows 上 Tauri 把 res:// 转为 https://res.localhost/
+      var resBase = window.location.protocol === 'https:'
+        ? 'https://res.localhost/web-common'
+        : 'res://localhost/web-common';
+      var qrcodeUrl = resBase + '/view/qrcode.min.js';
+
+      var script = document.createElement('script');
+      script.src = qrcodeUrl;
+      script.onload = function() {
+        try {
+          if (typeof QRCode === 'undefined') {
+            loadingEl.innerHTML = '<div class="error">二维码库加载失败</div>';
+            return;
+          }
+          // 清空 loading，创建二维码容器
+          loadingEl.style.display = 'none';
+          // qrcodejs 会向容器内追加 canvas/table/img，需要清空容器但保留 loading 隐藏
+          var qrTarget = document.createElement('div');
+          qrTarget.style.display = 'flex';
+          qrTarget.style.alignItems = 'center';
+          qrTarget.style.justifyContent = 'center';
+          qrContainer.appendChild(qrTarget);
+
+          // 使用 qrcodejs 生成二维码（自动选择 canvas/svg/table 渲染）
+          new QRCode(qrTarget, {
+            text: text,
+            width: 240,
+            height: 240,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.H
+          });
+        } catch (e) {
+          loadingEl.style.display = 'flex';
+          loadingEl.innerHTML = '<div class="error">二维码生成失败: ' + e.message + '</div>';
+        }
+      };
+      script.onerror = function() {
+        loadingEl.innerHTML = '<div class="error">无法加载 qrcode.min.js</div>';
+      };
+      document.head.appendChild(script);
+    }
+  </script>
+</body>
+</html>

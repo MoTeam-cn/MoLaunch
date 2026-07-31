@@ -123,6 +123,12 @@ export const TOOLS_ACTIONS = {
   NETWORK_LATENCY_TEST: 'network_latency_test',
   // 服务器状态检测
   SERVER_PING: 'server_ping',
+  // TCP 端口连通性检测（Frp 等非 MC 协议服务）
+  TCP_CHECK: 'tcp_check',
+  // 列出本机监听端口（供 Frp 内网端口选择）
+  LIST_OPEN_PORTS: 'list_open_ports',
+  // 选择器子窗口（通用 HTML 渲染 + on_navigation 选择回调）
+  OPEN_PICKER_WINDOW: 'open_picker_window',
   // NBT 数据查看
   NBT_PARSE: 'nbt_parse',
 } as const
@@ -513,6 +519,45 @@ export interface ServerPingResult {
 /** 服务器状态检测（SLP 协议） */
 export function serverPing(host: string, port: number): Promise<ServerPingResult> {
   return toolsManager<ServerPingResult>(TOOLS_ACTIONS.SERVER_PING, { host, port })
+}
+
+/** TCP 端口连通性检测结果 */
+export interface TcpCheckResult {
+  /** 是否可连接 */
+  reachable: boolean
+  /** TCP 握手耗时（毫秒），失败时为 0 */
+  latency_ms: number
+  /** 失败原因（成功时为空） */
+  error: string
+}
+
+/**
+ * TCP 端口连通性检测（仅三次握手，3 秒超时）
+ *
+ * 用于 Frp 等非 Minecraft 协议服务的端口可达性检查，
+ * 与 `serverPing`（SLP 协议）的区别：不发送应用层数据，适用于任意 TCP 服务。
+ */
+export function tcpCheck(host: string, port: number): Promise<TcpCheckResult> {
+  return toolsManager<TcpCheckResult>(TOOLS_ACTIONS.TCP_CHECK, { host, port })
+}
+
+/** 本机监听端口条目 */
+export interface OpenPortInfo {
+  local_addr: string
+  port: number
+  protocol: string
+  process_name: string | null
+  pid: number | null
+}
+
+/** 列出本机监听端口结果 */
+export interface ListOpenPortsResult {
+  ports: OpenPortInfo[]
+}
+
+/** 列出本机所有监听中的 TCP/UDP 端口（供 Frp 内网端口选择） */
+export function listOpenPorts(): Promise<ListOpenPortsResult> {
+  return toolsManager<ListOpenPortsResult>(TOOLS_ACTIONS.LIST_OPEN_PORTS)
 }
 
 // ==================== NBT 数据查看 ====================

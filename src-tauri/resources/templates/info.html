@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>信息</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1e1e2e; color: #cdd6f4;
+      height: 100vh; display: flex; flex-direction: column;
+      padding: 24px; user-select: none;
+    }
+    .title {
+      font-size: 18px; font-weight: 600; margin-bottom: 16px;
+      color: #cdd6f4; padding-bottom: 12px;
+      border-bottom: 1px solid #313244;
+    }
+    .content {
+      flex: 1; font-size: 14px; color: #a6adc8;
+      line-height: 1.7; overflow-y: auto; user-select: text;
+      white-space: pre-wrap; word-break: break-word;
+    }
+    .content b, .content strong { color: #cdd6f4; font-weight: 600; }
+    .content i, .content em { color: #f9e2af; font-style: italic; }
+    .content code {
+      background: #313244; padding: 2px 6px; border-radius: 3px;
+      font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 13px;
+      color: #f38ba8;
+    }
+    .content p { margin-bottom: 8px; }
+    .content br { line-height: 1.8; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+  </style>
+</head>
+<body oncontextmenu="return false">
+  <div class="title" id="title">信息</div>
+  <div class="content" id="content"></div>
+  <script>
+    // 禁用 DevTools 快捷键
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
+    });
+
+    var DATA = window.__PICKER_DATA__ || {};
+    var titleEl = document.getElementById('title');
+    var contentEl = document.getElementById('content');
+
+    if (DATA.title) {
+      titleEl.textContent = DATA.title;
+      document.title = DATA.title;
+    }
+    if (DATA.content) {
+      // 支持简单 HTML：b/i/code/br/p，其他标签转义
+      var allowed = /<\/?(b|strong|i|em|code|br|p)\s*>/gi;
+      var escaped = DATA.content
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/&lt;(\/?)(b|strong|i|em|code|br|p)\s*&gt;/gi, '<$1$2>');
+      contentEl.innerHTML = escaped;
+    }
+  </script>
+</body>
+</html>

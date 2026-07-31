@@ -7,6 +7,7 @@
 //! / mod_tools（Mod 依赖检测 + 去重）/ data_export（启动器数据导出）/ crash_analyzer（崩溃日志分析）
 //! / screenshot（截图管理）/ resourcepack（资源包管理）/ version_json（版本 JSON 读写）
 //! / archive（存档管理）/ network（网络延迟 + 服务器状态）/ nbt（NBT 数据查看）
+//! / picker_window（选择器子窗口，通用 HTML 渲染 + on_navigation 选择回调）
 //!
 //! 注：种子地图工具（seedmap）已迁移至前端 WASM 方案，不再走后端 IPC。
 //! cubiomes C 库通过 Emscripten 编译为 WebAssembly，前端 Worker 直接调用，
@@ -22,6 +23,7 @@ pub mod memory;
 pub mod mod_tools;
 pub mod nbt;
 pub mod network;
+pub mod picker_window;
 pub mod resourcepack;
 pub mod screenshot;
 pub mod types;
@@ -176,6 +178,24 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         let p: ServerPingParams = serde_json::from_value(params)
             .map_err(|e| format!("参数解析失败: {}", e))?;
         network::server_ping(&state, p).await
+    }));
+    // TCP 端口连通性检测（Frp 等非 MC 协议服务）
+    d.register("tcp_check", handler!(state, _app, params, {
+        let p: TcpCheckParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        network::tcp_check(&state, p).await
+    }));
+
+    // 列出本机监听端口（供 Frp 内网端口选择）
+    d.register("list_open_ports", handler!(state, _app, _params, {
+        network::list_open_ports(&state).await
+    }));
+
+    // 选择器子窗口（通用 HTML 渲染 + on_navigation 选择回调）
+    d.register("open_picker_window", handler!(_state, app, params, {
+        let p: OpenPickerWindowParams = serde_json::from_value(params)
+            .map_err(|e| format!("参数解析失败: {}", e))?;
+        picker_window::open_picker_window(app, p).await
     }));
 
     // NBT 数据查看

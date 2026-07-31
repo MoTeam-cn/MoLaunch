@@ -46,6 +46,16 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         "samples/layout/layout-sample.html" => {
             Some(include_str!("../resources/samples/layout/layout-sample.html"))
         }
+        // picker 子窗口 HTML 模板（由 picker_window URI scheme handler 读取并注入数据）
+        "templates/port-picker.html" => Some(include_str!("../resources/templates/port-picker.html")),
+        "templates/redirect.html" => Some(include_str!("../resources/templates/redirect.html")),
+        "templates/confirm.html" => Some(include_str!("../resources/templates/confirm.html")),
+        "templates/info.html" => Some(include_str!("../resources/templates/info.html")),
+        "templates/image-viewer.html" => {
+            Some(include_str!("../resources/templates/image-viewer.html"))
+        },
+        "templates/markdown.html" => Some(include_str!("../resources/templates/markdown.html")),
+        "templates/qrcode.html" => Some(include_str!("../resources/templates/qrcode.html")),
         _ => None,
     }
 }
@@ -103,6 +113,14 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/x86/wintun.dll")),
         #[cfg(all(target_os = "windows", target_arch = "arm"))]
         "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/arm/wintun.dll")),
+        // marked.min.js（Markdown 渲染库，picker markdown 模板通过 res:// 协议加载）
+        // 来源：https://cdn.jsdelivr.net/npm/marked/marked.min.js
+        // 用于 picker 子窗口的 markdown.html 模板渲染 markdown 文本
+        "view/marked.min.js" => Some(include_bytes!("../resources/view/marked.min.js")),
+        // qrcode.min.js（二维码生成库，picker qrcode 模板通过 res:// 协议加载）
+        // 来源：https://github.com/davidshimjs/qrcodejs
+        // 用于 picker 子窗口的 qrcode.html 模板生成二维码（DOM 渲染，离线可用）
+        "view/qrcode.min.js" => Some(include_bytes!("../resources/view/qrcode.min.js")),
         // updater.exe（Windows 便携版更新器，独立子进程）
         // 来源：src-tauri/updater/ 独立 Cargo 项目构建产物
         // 运行时由 `extract_updater` 释放到 %APPDATA%/.Molaunch/updater/updater.exe

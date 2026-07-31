@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>选择端口</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #1e1e2e; color: #cdd6f4;
+      padding: 12px; height: 100vh; display: flex; flex-direction: column;
+      user-select: none;
+    }
+    .toolbar { display: flex; gap: 6px; margin-bottom: 8px; }
+    .search {
+      flex: 1; padding: 6px 10px; background: #313244; border: 1px solid #45475a;
+      border-radius: 4px; color: #cdd6f4; font-size: 13px; user-select: text;
+      height: 30px;
+    }
+    .search:focus { outline: none; border-color: #89b4fa; }
+    .refresh {
+      width: 30px; height: 30px; flex-shrink: 0; display: flex; align-items: center;
+      justify-content: center; background: #313244; border: 1px solid #45475a;
+      border-radius: 4px; color: #a6adc8; cursor: pointer; padding: 0;
+      transition: background 0.15s, color 0.15s, transform 0.1s;
+    }
+    .refresh:hover { background: #45475a; color: #cdd6f4; }
+    .refresh:active { transform: scale(0.95); }
+    .refresh svg { width: 14px; height: 14px; }
+    .refresh.spinning svg { animation: spin 0.8s linear infinite; }
+    @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .list-wrap { flex: 1; position: relative; overflow: hidden; display: flex; flex-direction: column; }
+    .list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+    .overlay {
+      position: absolute; inset: 0; background: rgba(30, 30, 46, 0.55);
+      display: none; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; color: #cdd6f4; font-size: 12px; z-index: 10;
+      backdrop-filter: blur(1px);
+    }
+    .overlay.show { display: flex; }
+    .overlay .spinner {
+      width: 22px; height: 22px; border: 2px solid #45475a;
+      border-top-color: #89b4fa; border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    /* 分组容器 */
+    .group { display: flex; flex-direction: column; }
+    .group + .group { margin-top: 2px; }
+    .group-header {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px; cursor: pointer; color: #a6adc8;
+      font-size: 12px; user-select: none; border-radius: 4px;
+      transition: background 0.15s;
+    }
+    .group-header:hover { background: #313244; }
+    .group-header .arrow {
+      width: 12px; height: 12px; flex-shrink: 0;
+      transition: transform 0.15s ease;
+    }
+    .group-header.collapsed .arrow { transform: rotate(-90deg); }
+    .group-title { font-weight: 600; flex: 1; }
+    .group-count {
+      font-size: 11px; color: #6c7086;
+      background: #313244; padding: 1px 6px; border-radius: 8px;
+      min-width: 18px; text-align: center;
+    }
+    .group-body { display: flex; flex-direction: column; }
+    .item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; border-radius: 4px; cursor: pointer; transition: background 0.15s;
+    }
+    .item:hover { background: #313244; }
+    .info { display: flex; align-items: center; gap: 6px; min-width: 0; }
+    .port { font-weight: 600; font-size: 14px; color: #89b4fa; }
+    .protocol { font-size: 11px; color: #6c7086; text-transform: uppercase; }
+    .ip {
+      font-size: 11px; color: #6c7086;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .process { font-size: 12px; color: #a6adc8; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .empty {
+      flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 8px; color: #6c7086; font-size: 13px; text-align: center;
+    }
+    .empty svg { width: 32px; height: 32px; opacity: 0.6; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
+  </style>
+</head>
+<body oncontextmenu="return false">
+  <div class="toolbar">
+    <input class="search" id="search" placeholder="搜索端口、IP 或进程名..." autocomplete="off">
+    <button class="refresh" id="refresh" title="刷新" onclick="fetchData(true)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M23 4v6h-6"/><path d="M1 20v-6h6"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
+    </button>
+  </div>
+  <div class="list-wrap">
+    <div class="list" id="list"></div>
+    <div class="overlay" id="overlay">
+      <div class="spinner"></div>
+      <span>刷新中...</span>
+    </div>
+  </div>
+  <script>
+    // 禁用 DevTools 快捷键
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
+    });
+
+    var DATA = window.__PICKER_DATA__ || { ports: [] };
+    var allPorts = [];
+    var listEl = document.getElementById('list');
+    var searchEl = document.getElementById('search');
+    var refreshEl = document.getElementById('refresh');
+    var overlayEl = document.getElementById('overlay');
+    var dataUrl = window.location.href.replace(/\/$/, '') + '/data';
+    /** 记录用户手动折叠/展开状态，避免数据刷新时丢失 */
+    var groupCollapseState = {};
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function emptyHtml(msg) {
+      return '<div class="empty">' +
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">' +
+        '<circle cx="12" cy="12" r="9"/><path d="M8 12h8"/></svg>' +
+        '<span>' + escapeHtml(msg) + '</span></div>';
+    }
+
+    /** 从 local_addr "IP:端口" 中提取 IP 部分（IPv6 形如 "[::]:7000" 也兼容） */
+    function extractIp(localAddr) {
+      if (!localAddr) return '';
+      var idx = localAddr.lastIndexOf(':');
+      if (idx === -1) return localAddr;
+      return localAddr.substring(0, idx);
+    }
+
+    /** 判断是否 Java 进程（含 javaw / java.exe 等） */
+    function isJavaProcess(name) {
+      if (!name) return false;
+      var n = name.toLowerCase();
+      // 去掉扩展名后再判断，避免 java.exe 误判
+      n = n.replace(/\.(exe|bat|cmd)$/i, '');
+      return n === 'java' || n === 'javaw' || n.indexOf('java') === 0;
+    }
+
+    /** 按端口升序排序 */
+    function sortByPortAsc(a, b) { return a.port - b.port; }
+
+    /** 分组：Java 进程 → 其他有程序名 → 无程序名；组内按端口升序 */
+    function groupPorts(ports) {
+      var java = [], named = [], unnamed = [];
+      ports.forEach(function(p) {
+        if (!p.process_name) unnamed.push(p);
+        else if (isJavaProcess(p.process_name)) java.push(p);
+        else named.push(p);
+      });
+      java.sort(sortByPortAsc);
+      named.sort(sortByPortAsc);
+      unnamed.sort(sortByPortAsc);
+      return [
+        { key: 'java', title: 'Java 进程', items: java, defaultCollapsed: false },
+        { key: 'named', title: '其他进程', items: named, defaultCollapsed: false },
+        { key: 'unnamed', title: '无进程名', items: unnamed, defaultCollapsed: true },
+      ].filter(function(g) { return g.items.length > 0; });
+    }
+
+    function renderGroup(group) {
+      var collapsed = groupCollapseState.hasOwnProperty(group.key)
+        ? groupCollapseState[group.key]
+        : group.defaultCollapsed;
+      var html = '<div class="group">' +
+        '<div class="group-header' + (collapsed ? ' collapsed' : '') + '" onclick="toggleGroup(\'' + group.key + '\')">' +
+        '<svg class="arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' +
+        '<span class="group-title">' + escapeHtml(group.title) + '</span>' +
+        '<span class="group-count">' + group.items.length + '</span>' +
+        '</div>' +
+        '<div class="group-body" id="group-' + group.key + '"' + (collapsed ? ' style="display:none"' : '') + '>';
+      html += group.items.map(function(p) {
+        var ip = extractIp(p.local_addr);
+        return '<div class="item" onclick="location.href=\'picker-result://?value=' + p.port + '\'">' +
+          '<div class="info"><span class="port">' + p.port + '</span>' +
+          '<span class="protocol">' + (p.protocol || '').toUpperCase() + '</span>' +
+          (ip ? '<span class="ip">' + escapeHtml(ip) + '</span>' : '') + '</div>' +
+          '<div class="process">' + escapeHtml(p.process_name || '—') + '</div></div>';
+      }).join('');
+      html += '</div></div>';
+      return html;
+    }
+
+    function toggleGroup(key) {
+      var body = document.getElementById('group-' + key);
+      if (!body) return;
+      var header = body.previousElementSibling;
+      var willCollapse = body.style.display !== 'none';
+      body.style.display = willCollapse ? 'none' : '';
+      if (willCollapse) header.classList.add('collapsed');
+      else header.classList.remove('collapsed');
+      groupCollapseState[key] = willCollapse;
+    }
+
+    function applyFilter(q) {
+      q = (q || '').toLowerCase();
+      var filtered = allPorts.filter(function(p) {
+        var hay = (p.port + ' ' + p.protocol + ' ' + (p.process_name || '') + ' ' + (p.local_addr || '')).toLowerCase();
+        return hay.indexOf(q) !== -1;
+      });
+      if (filtered.length === 0) {
+        listEl.innerHTML = emptyHtml(q ? '无匹配结果' : '未发现监听端口');
+        return;
+      }
+      var groups = groupPorts(filtered);
+      listEl.innerHTML = groups.map(renderGroup).join('');
+    }
+
+    function render(ports) {
+      allPorts = Array.isArray(ports) ? ports : [];
+      applyFilter(searchEl.value);
+    }
+
+    /** 拉取最新端口数据
+     *  @param {boolean} withOverlay 是否显示遮蔽罩（用户主动点击刷新 / 首次空数据时为 true）
+     */
+    function fetchData(withOverlay) {
+      if (withOverlay) overlayEl.classList.add('show');
+      refreshEl.classList.add('spinning');
+      fetch(dataUrl)
+        .then(function(r) { return r.json(); })
+        .then(function(data) { render(data.ports || []); })
+        .catch(function() {})
+        .finally(function() {
+          refreshEl.classList.remove('spinning');
+          if (withOverlay) overlayEl.classList.remove('show');
+        });
+    }
+
+    searchEl.addEventListener('input', function() { applyFilter(this.value); });
+
+    // 初始数据渲染（后端注入）
+    render(DATA.ports || []);
+
+    // 首次立即拉取一次：DATA 为空时显示遮蔽罩（解决"打开后要等才有数据"）
+    // DATA 已有数据时静默刷新，确保数据新鲜
+    var hasInitialData = Array.isArray(DATA.ports) && DATA.ports.length > 0;
+    fetchData(!hasInitialData);
+
+    // 定时刷新（3 秒，不显示遮蔽罩）
+    setInterval(function() { fetchData(false); }, 3000);
+  </script>
+</body>
+</html>
