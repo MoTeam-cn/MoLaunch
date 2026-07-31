@@ -3,7 +3,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::log_info;
+use crate::log_debug;
 
 use super::super::utils::file_checker::FileChecker;
 use super::super::version::libraries;
@@ -51,7 +51,7 @@ pub async fn download_client_jar(
         );
 
     if checker.is_valid(&jar_path.to_string_lossy()) {
-        log_info!(
+        log_debug!(
             "[Download] Client JAR already exists at {}, skipping",
             jar_path.display()
         );
@@ -62,7 +62,7 @@ pub async fn download_client_jar(
         .as_str()
         .ok_or_else(|| anyhow::anyhow!("Client JAR URL not found in version {} (merged json may be missing downloads.client)", version_id))?;
 
-    log_info!(
+    log_debug!(
         "[Download] Downloading client JAR to {}",
         jar_path.display()
     );
@@ -111,7 +111,7 @@ pub async fn download_libraries(
     let all_libs = libraries::parse_libraries(json, game_dir);
     let missing_libs = libraries::find_missing_libs(&all_libs, game_dir, quick_check);
 
-    log_info!(
+    log_debug!(
         "[Libraries] Total: {}, Missing: {} (mode: {})",
         all_libs.len(),
         missing_libs.len(),
@@ -166,7 +166,7 @@ pub async fn download_assets(
     let index_path = assets::get_asset_index_path(game_dir, &index_meta.id);
 
     if !index_path.exists() {
-        log_info!("[Assets] Downloading asset index: {}", index_meta.id);
+        log_debug!("[Assets] Downloading asset index: {}", index_meta.id);
         let index_urls = assets::get_asset_index_urls(&index_meta, source_mode_of(manager));
         let task = DownloadTask {
             id: "asset_index".to_string(),
@@ -196,7 +196,7 @@ pub async fn download_assets(
     let all_assets = assets::parse_asset_index(&index_json, game_dir);
     let missing_assets = assets::find_missing_assets(&all_assets, quick_check);
 
-    log_info!(
+    log_debug!(
         "[Assets] Total: {}, Missing: {} (mode: {})",
         all_assets.len(),
         missing_assets.len(),

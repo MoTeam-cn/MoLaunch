@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use crate::log_info;
+use crate::log_debug;
 
 use super::super::sources::DownloadSourceMode;
 use super::super::version::json_merge;
@@ -58,12 +58,12 @@ pub async fn download_version_full(
     if let Some(ref cb) = stage_callback {
         cb(0, "版本清单");
     }
-    log_info!("[Download] Step 1/5: Fetching version JSON URL");
+    log_debug!("[Download] Step 1/5: Fetching version JSON URL");
     let version_list = fetch_version_list(mirror_url, source_mode).await?;
     let json_url = get_version_json_url(&version_list.value, version_id)
         .ok_or_else(|| anyhow::anyhow!("Version {} not found", version_id))?;
 
-    log_info!("[Download] Step 1/5: Downloading version JSON");
+    log_debug!("[Download] Step 1/5: Downloading version JSON");
     let json_path = version_dir.join(format!("{}.json", version_id));
     let json_content = fetch_with_retry(&json_url, &json_path, mirror_url, source_mode).await?;
     let version_json: serde_json::Value = serde_json::from_str(&json_content)?;
@@ -72,7 +72,7 @@ pub async fn download_version_full(
     if let Some(ref cb) = stage_callback {
         cb(1, "版本信息");
     }
-    log_info!("[Download] Step 2/5: Merging JSON inheritance");
+    log_debug!("[Download] Step 2/5: Merging JSON inheritance");
     let merged_json = json_merge::merge_version_json(&version_json, game_dir)?;
     let merged_json_str = serde_json::to_string_pretty(&merged_json)?;
     std::fs::write(&json_path, &merged_json_str)?;
@@ -81,7 +81,7 @@ pub async fn download_version_full(
     if let Some(ref cb) = stage_callback {
         cb(2, "客户端");
     }
-    log_info!("[Download] Step 3/5: Downloading client JAR");
+    log_debug!("[Download] Step 3/5: Downloading client JAR");
     download_client_jar(
         &version_json,
         &merged_json,
@@ -97,7 +97,7 @@ pub async fn download_version_full(
     if let Some(ref cb) = stage_callback {
         cb(3, "库文件");
     }
-    log_info!("[Download] Step 4/5: Downloading Libraries");
+    log_debug!("[Download] Step 4/5: Downloading Libraries");
     let (libs_total, libs_downloaded, libs_skipped) = download_libraries(
         &merged_json,
         game_dir,
@@ -112,7 +112,7 @@ pub async fn download_version_full(
     if let Some(ref cb) = stage_callback {
         cb(4, "资源文件");
     }
-    log_info!("[Download] Step 5/5: Downloading Assets");
+    log_debug!("[Download] Step 5/5: Downloading Assets");
     let (assets_total, assets_downloaded, assets_skipped) = download_assets(
         &merged_json,
         game_dir,
@@ -123,7 +123,7 @@ pub async fn download_version_full(
     )
     .await?;
 
-    log_info!(
+    log_debug!(
         "[Download] Done: Libs {}/{}, Assets {}/{}",
         libs_downloaded,
         libs_total,

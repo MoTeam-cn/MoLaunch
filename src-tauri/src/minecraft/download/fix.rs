@@ -5,7 +5,7 @@ use std::path::Path;
 use super::super::version::json_merge;
 use super::manager::DownloadManager;
 use super::stages::{download_assets, download_client_jar, download_libraries};
-use crate::log_info;
+use crate::log_debug;
 
 /// 补全版本文件
 ///
@@ -47,7 +47,7 @@ pub async fn fix_version_files(
     )
     .await
     {
-        log_info!(
+        log_debug!(
             "[Fix] download_client_jar failed (may be expected for some versions): {}",
             e
         );

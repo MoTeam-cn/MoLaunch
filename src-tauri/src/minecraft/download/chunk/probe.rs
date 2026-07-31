@@ -2,7 +2,7 @@
 
 use std::time::Duration;
 
-use crate::log_info;
+use crate::log_debug;
 use crate::utils::format;
 
 /// 检测服务器是否真正支持 Range 请求
@@ -43,7 +43,7 @@ pub async fn probe_file_size(client: &reqwest::Client, url: &str) -> u64 {
                 if let Ok(s) = cr.to_str() {
                     if let Some(total) = s.rsplit('/').next() {
                         if let Ok(n) = total.parse::<u64>() {
-                            log_info!("[Chunk] 探测文件大小: {} ({})", format::bytes(n), url);
+                            log_debug!("[Chunk] 探测文件大小: {} ({})", format::bytes(n), url);
                             return n;
                         }
                     }

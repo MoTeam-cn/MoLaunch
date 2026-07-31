@@ -1,6 +1,6 @@
 //! Download manager - batch download with progress tracking
 
-use crate::log_info;
+use crate::log_debug;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::time::{Duration, Instant};
@@ -219,20 +219,20 @@ impl DownloadManager {
             // 检查取消信号
             if self.is_cancelled() {
                 let remaining = total_task_count - task_index;
-                log_info!("[Download] 检测到取消信号，跳过剩余 {} 个任务", remaining);
+                log_debug!("[Download] 检测到取消信号，跳过剩余 {} 个任务", remaining);
                 break;
             }
 
             // 检查暂停信号：暂停时等待恢复或取消（只打印一次暂停日志）
             if self.is_paused() && !self.is_cancelled() {
-                log_info!("[Download] 下载已暂停，等待恢复...");
+                log_debug!("[Download] 下载已暂停，等待恢复...");
             }
             while self.is_paused() && !self.is_cancelled() {
                 tokio::time::sleep(Duration::from_millis(500)).await;
             }
             if self.is_cancelled() {
                 let remaining = total_task_count - task_index;
-                log_info!(
+                log_debug!(
                     "[Download] 暂停期间检测到取消信号，跳过剩余 {} 个任务",
                     remaining
                 );

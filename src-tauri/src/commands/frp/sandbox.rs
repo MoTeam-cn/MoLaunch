@@ -1,6 +1,5 @@
 //! 安全沙箱：隧道配置校验 + 认证适配器脚本沙箱
 //!
-//! 两项职责：
 //! - `validate_tunnel`：校验用户输入的隧道参数，防止注入和非法值（§7.2）
 //! - `run_auth_adapter`：沙箱化执行厂商认证适配器脚本（§7.5）
 
@@ -207,25 +206,18 @@ pub fn validate_tunnel_update(p: &UpdateTunnelParams) -> Result<(), String> {
 // 认证适配器脚本沙箱（§7.5）
 // ============================================================
 
-/// 沙箱化执行厂商认证适配器脚本
+/// 沙箱化执行厂商认证适配器脚本（§7.5）
 ///
-/// 对应设计文档 §7.5。流程：
-/// 1. 读取厂商 manifest 的 `process_permissions`（不存在则拒绝执行）
-/// 2. 校验命令在 `allowed_commands` 白名单（复用 `spawn::is_command_allowed`）
-/// 3. 工作目录强制设为厂商目录（`<base_dir>/providers/<provider_id>/`），
-///    防止脚本访问其他路径
-/// 4. 超时控制（`timeout_ms` 默认 30 秒，最大 5 分钟，复用 `MAX_TIMEOUT_MS`）
-/// 5. 非 shell 执行（`tokio::process::Command::new` + `.args()`，防注入）
-/// 6. `env_clear()` 清空环境变量，仅保留 `PATH`（防止敏感环境变量泄露）
-/// 7. stdout/stderr 各截断到 1MB（复用 `spawn::truncate_output`）
-///
+/// 流程：读取厂商 `process_permissions` → 校验命令在白名单（`spawn::is_command_allowed`）
+/// → 工作目录锁定厂商目录 → 超时控制（默认 30s，最大 5min）→ 非 shell 执行防注入
+/// → `env_clear()` 仅保留 PATH → stdout/stderr 各截断到 1MB。
 /// 系统默认厂商不提供自定义脚本，直接拒绝。
 pub async fn run_auth_adapter(
     provider_id: &str,
     command: String,
     args: Vec<String>,
 ) -> Result<ProcessResult, String> {
-    use crate::log_info;
+    use crate::log_debug;
 
     // 1. 系统默认厂商不提供自定义脚本
     if provider_id == SYSTEM_DEFAULT_ID {
@@ -264,7 +256,7 @@ pub async fn run_auth_adapter(
         return Err(format!("厂商目录不存在: {}", provider_dir.display()));
     }
 
-    log_info!(
+    log_debug!(
         "[Frp Sandbox] 执行认证适配器: provider={}, command={}, args={:?}, timeout={}ms",
         provider_id, command, args, timeout_ms
     );
@@ -335,7 +327,7 @@ pub async fn run_auth_adapter(
 
     let duration_ms = start.elapsed().as_millis() as u64;
 
-    log_info!(
+    log_debug!(
         "[Frp Sandbox] 认证适配器完成: provider={}, exit_code={:?}, 耗时={}ms, 超时={}",
         provider_id, exit_code, duration_ms, timed_out
     );

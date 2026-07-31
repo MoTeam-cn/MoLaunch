@@ -9,7 +9,7 @@ use std::time::Instant;
 use tokio::sync::Mutex;
 
 use crate::utils::format;
-use crate::{log_debug, log_info, log_warn};
+use crate::{log_debug, log_warn};
 
 use self::download::download_chunk;
 use self::merge::merge_chunks;
@@ -116,7 +116,7 @@ pub async fn download_chunked(
         ranges.push((start, end));
     }
 
-    log_info!(
+    log_debug!(
         "[Chunk] 开始分片下载: {} ({}, {} chunks, 每块约 {})",
         local_path,
         format::bytes(file_size),
@@ -219,7 +219,7 @@ pub async fn download_chunked(
         0
     };
 
-    log_info!(
+    log_debug!(
         "[Chunk] 分片下载完成: {} ({}, {:.1}s, {})",
         local_path,
         format::bytes(total_downloaded),

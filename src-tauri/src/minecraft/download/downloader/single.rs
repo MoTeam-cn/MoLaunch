@@ -10,7 +10,7 @@ use super::super::super::sources::DownloadSourceMode;
 use super::super::super::utils::file_checker::FileChecker;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
-use crate::{log_debug, log_info, log_warn};
+use crate::{log_debug, log_warn};
 
 /// 下载单个文件（统一逻辑：顺序尝试 URL，超时自动切换，大文件分片下载）
 pub async fn download_single(
@@ -108,7 +108,7 @@ pub async fn download_single(
             // （否则"下载已取消"错误会被当作普通失败重试 max_retries 次，浪费时间）
             if let Some(ref cf) = cancel_flag {
                 if cf.load(std::sync::atomic::Ordering::Relaxed) {
-                    log_info!("[Download] 检测到取消信号，停止重试: {}", task.local_path);
+                    log_debug!("[Download] 检测到取消信号，停止重试: {}", task.local_path);
                     break 'url_loop;
                 }
             }
@@ -121,7 +121,7 @@ pub async fn download_single(
                     log_debug!("[Download] 检测分片支持: {}", url);
                 }
                 if super::super::chunk::supports_range(client, url).await {
-                    log_info!(
+                    log_debug!(
                         "[Download] 使用分片下载: {} ({} chunks, 尝试 {}/{})",
                         url,
                         chunk_count,
@@ -177,7 +177,7 @@ pub async fn download_single(
                     // 但完整 GET 正常。后续重试直接走单流，避免浪费分片探测时间。
                     if let Some(ref err) = chunk_result.error {
                         if err.contains("404") {
-                            log_info!(
+                            log_debug!(
                                 "[Download] 分片返回 404，禁用分片改走单流: {}",
                                 url
                             );
@@ -254,7 +254,7 @@ pub async fn download_single(
     // 取消信号优先于失败：用户主动取消时返回"下载已取消"而非"所有下载源均失败"
     if let Some(ref cf) = cancel_flag {
         if cf.load(std::sync::atomic::Ordering::Relaxed) {
-            log_info!("[Download] 下载已取消: {}", task.local_path);
+            log_debug!("[Download] 下载已取消: {}", task.local_path);
             return DownloadProgress {
                 task_id: task.id.clone(),
                 downloaded: 0,
