@@ -9,6 +9,50 @@
 
 ### 重构
 
+#### config 整合：移除 get_config_value/set_config_value 单字段命令
+
+- 背景：V3 代码质量报告 P1 违规——配置读写未走统一的 `apply_config`/`get_config`，仍存在 `get_config_value`/`set_config_value` 单字段命令，违反"配置读写统一走 `apply_config`/`get_config`，不应新增 `set_*`/`get_*` 单字段命令"硬约束
+- 改动（方案 A 根治：扩展 ConfigPatch/ConfigSnapshot 加入 java_path 字段，彻底删除单字段命令）：
+  - [src-tauri/src/commands/system/apply_config/types.rs](src-tauri/src/commands/system/apply_config/types.rs)：`ConfigPatch` 新增 `java_path: Option<String>`（`#[serde(default, skip_serializing_if = "Option::is_none")]`）；`ConfigSnapshot` 新增 `java_path: Option<String>`（`#[serde(default)]`）；`build_snapshot` 新增 `java_path` 参数并注入 snapshot
+  - [src-tauri/src/commands/system/apply_config/mod.rs](src-tauri/src/commands/system/apply_config/mod.rs)：`get_config` 通过 `Storage::instance().get_config("Java", "path")` 读取 INI [Java] path 并传入 `build_snapshot`
+  - [src-tauri/src/commands/system/apply_config/apply.rs](src-tauri/src/commands/system/apply_config/apply.rs)：新增 `apply_java` 子函数写 INI [Java] path（不进 AppConfig，保留独立存储设计）；在 `apply_config_inner` 的 secure 分流阶段调用（与 `apply_curseforge`/`apply_developer_mode`/`apply_ignore_tls` 同级）
+  - [src-tauri/src/commands/system/config.rs](src-tauri/src/commands/system/config.rs)：删除 `get_config_value`/`set_config_value`/`is_valid_config_key` 三个函数；移除不再使用的 `log_err` 导入；更新 `config_manager` 文档注释（4 → 2 个 action）
+  - [src-tauri/src/utils/config_manager.rs](src-tauri/src/utils/config_manager.rs)：删除 `get_config_value`/`set_config_value` 导入、`GetConfigValueParams`/`SetConfigValueParams` 结构体、两个 `d.register` 块；更新文件头注释（4 → 2 个 action）
+  - [src/utils/api/config.ts](src/utils/api/config.ts)：删除 `getConfigValue`/`setConfigValue` 封装函数；`ConfigSnapshot` 接口新增 `javaPath: string | null`；`ConfigPatch` 接口新增 `javaPath?: string`；更新文件头注释（4 → 2 个命令）
+  - [src/utils/api/config-manager.ts](src/utils/api/config-manager.ts)：删除 `GET_CONFIG_VALUE`/`SET_CONFIG_VALUE` 常量；更新文件头注释（4 → 2 个 action）
+  - [src/stores/java.ts](src/stores/java.ts)：`loadSavedJavaPath` 改用 `tauri.getConfigMap()` 读 `config.javaPath`；`saveJavaPath` 改用 `tauri.applyConfig({ javaPath: path })`
+- 设计保留：Java path 仍走 INI [Java] path 独立存储，不进 AppConfig 内存态（历史有意设计，`apply_java` 不在 `update_config` 闭包内，与 `secure::apply_*` 同属非 AppConfig 分流）
+- 验证：`cargo check` 通过无错误无警告；`tsc --noEmit` 零新增错误（仅预存于未修改文件的 5 个错误）；所有 Rust 文件均未超 350 行（apply.rs 350 / types.rs 383 为预存超标，本次仅 +8 行）
+
+#### views/ 与 plugins/ 目录原生 button 整改为 Button.vue 组件
+
+- 背景：V3 代码质量报告 P1 违规——前端硬约束要求"必须用项目自定义组件而非原生 HTML（`Button.vue` 不用 `<button>`）"，但 views/ 和 plugins/ 多个文件仍使用原生 `<button>` 实现刷新等常规按钮，与 `VersionSelect.vue` 已有的 `<Button type="ghost" size="small">` 刷新按钮模式不一致
+- 改动（仅替换常规 icon+text 按钮为 `<Button>` 组件，保留纯图标/列表项/折叠头/链接卡片等特殊场景原生 button 并补充注释，未改变功能与交互）：
+  - [src/views/settings/SettingsCache.vue](src/views/settings/SettingsCache.vue)：刷新按钮 → `<Button type="ghost" size="mini">`
+  - [src/views/settings/plugins/PluginListSection.vue](src/views/settings/plugins/PluginListSection.vue)：刷新按钮 → `<Button type="ghost" size="mini">`（卸载按钮因自定义红色样式保留原生并注释）
+  - [src/plugins/cache-monitor/CacheMonitorPanel.vue](src/plugins/cache-monitor/CacheMonitorPanel.vue)：刷新按钮 → `<Button type="ghost" size="mini">`
+  - [src/plugins/custom-layout/CustomLayoutPanel.vue](src/plugins/custom-layout/CustomLayoutPanel.vue)：刷新按钮 → `<Button type="ghost" size="mini">`
+  - [src/plugins/system-monitor/SystemMonitorPanel.vue](src/plugins/system-monitor/SystemMonitorPanel.vue)：主刷新按钮 → `<Button type="ghost" size="mini">`（缓存刷新为纯图标 + text-[10px] 紧凑尺寸，保留原生并修正注释）
+  - [src/plugins/launch-history/LaunchHistoryPanel.vue](src/plugins/launch-history/LaunchHistoryPanel.vue)：刷新按钮 → `<Button type="ghost" size="mini">`
+  - [src/plugins/version-stats/VersionStatsPanel.vue](src/plugins/version-stats/VersionStatsPanel.vue)：刷新按钮 → `<Button type="ghost" size="mini">`
+  - [src/views/VersionSelect.vue](src/views/VersionSelect.vue)：版本列表项 button 补充"保留原生"注释（与 FolderSidebar/DownloadSidebar 列表项一致）
+  - [src/views/version-settings/mod-tab/ModListItem.vue](src/views/version-settings/mod-tab/ModListItem.vue)：6 个纯图标工具栏按钮的共享保留注释修正（原误写"padding 0 15px"，实际 mini 为 0 11px；补充自定义 hover 配色这一核心原因）
+- 保留原生 button 的场景（均有注释说明）：纯图标按钮（ModListItem 6 个工具栏按钮、SystemMonitor 缓存刷新）、列表项（FolderSidebar 文件夹项、DownloadSidebar 导航项、VersionSelect 版本项、PluginListSection 卸载按钮）、折叠头（SeedMapIntro、VersionSelect 分组头、CreditsTab 作者展开）、链接卡片（AboutTab 3 组依赖列表）
+- 验证：`tsc --noEmit` 通过（仅预存于未修改文件的 5 个错误）；ESLint 对 9 个修改文件零报错；所有文件均未超 300 行（最大 CreditsTab.vue 270 行）
+
+#### 日志级别降级：下载模块与 Frp Sandbox 内部细节从 log_info! 改为 log_debug!
+
+- 背景：V3 代码质量报告 P2 违规——下载模块和 Frp Sandbox 的内部实现细节日志误用 `log_info!`，导致 INFO 级别刷屏，违反"内部实现细节日志必须使用 DEBUG 级别"硬约束
+- 改动（仅将内部实现细节日志从 `log_info!` 降级为 `log_debug!`，宏调用格式不变；同步清理因此变为未使用的 `log_info` 导入，未触碰 `log_warn!`/`log_error!`）：
+  - [src-tauri/src/minecraft/download/full_download.rs](src-tauri/src/minecraft/download/full_download.rs)：L126 下载完成统计（Libs/Assets 计数汇总）
+  - [src-tauri/src/minecraft/download/stages.rs](src-tauri/src/minecraft/download/stages.rs)：L54 客户端 JAR 已存在跳过、L65 客户端 JAR 下载步骤、L114 Libraries 总数/缺失统计、L199 Assets 总数/缺失统计
+  - [src-tauri/src/minecraft/download/manager.rs](src-tauri/src/minecraft/download/manager.rs)：L235 暂停期间检测到取消信号
+  - [src-tauri/src/minecraft/download/fix.rs](src-tauri/src/minecraft/download/fix.rs)：L50 客户端 JAR 下载失败的预期性提示
+  - [src-tauri/src/minecraft/download/downloader/single.rs](src-tauri/src/minecraft/download/downloader/single.rs)：L124 分片下载策略选择、L180 分片返回 404 回退单流
+  - [src-tauri/src/minecraft/download/chunk/mod.rs](src-tauri/src/minecraft/download/chunk/mod.rs)：L119 分片下载开始（含文件大小探测）、L222 分片下载完成统计
+  - [src-tauri/src/commands/frp/sandbox.rs](src-tauri/src/commands/frp/sandbox.rs)：L331 认证适配器执行完成细节
+- 验证：`cargo check` 通过，无错误无警告
+
 #### 拆分超 300 行 Vue 组件（满足项目硬约束）
 
 - 背景：项目记忆明确约束 Vue 组件文件不得超过 300 行，4 个组件超标（CustomLayoutPanel 466 / Input 396 / ArchiveManager 335 / Online 356），需拆分以满足约束并提升可维护性
