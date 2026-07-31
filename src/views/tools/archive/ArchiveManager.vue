@@ -7,46 +7,37 @@
  * - 恢复：从 zip 解压到 saves/ 目录
  * 默认扫全局 {game_dir}/saves/，可选具体版本按版本隔离配置解析路径。
  * 备份/恢复路径通过 Input 手动填写（与 DataExporter 一致）。
+ *
+ * 子组件拆分（避免主文件超 300 行）：
+ * - ArchiveBackupDialog：备份弹窗（target/downloadDir/versionId → close）
+ * - ArchiveRestorePanel：恢复面板（versionId → restored 触发列表刷新）
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import {
   ArchiveBoxIcon,
   ArrowPathIcon,
   ArrowUpTrayIcon,
-  ArrowDownTrayIcon,
-  CheckCircleIcon,
   ExclamationCircleIcon,
-  FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Input from '@/components/common/Input.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Select from '@/components/common/Select.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
-import { showConfirm } from '@/utils/modal'
-import { archiveList, archiveBackup, archiveRestore, getDownloadDir } from '@/utils/api/tools'
+import { archiveList, getDownloadDir } from '@/utils/api/tools'
 import type { ArchiveItem } from '@/utils/api/tools'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 import { getConfigMap } from '@/utils/api/config'
 import { formatBytes } from '@/utils/format'
-import { pickFile, pickSavePath } from '@/utils/fileDialog'
+import ArchiveBackupDialog from './ArchiveBackupDialog.vue'
+import ArchiveRestorePanel from './ArchiveRestorePanel.vue'
 
 const items = ref<ArchiveItem[]>([])
 const totalSize = ref(0)
 const loading = ref(false)
 const loaded = ref(false)
 
-// 备份对话框状态
+// 备份弹窗控制：非 null 即弹窗打开（由列表内「备份」按钮赋值，由弹窗 close 事件置空）
 const backupTarget = ref<ArchiveItem | null>(null)
-const backupOutputPath = ref('')
-const backupExcludePlayer = ref(false)
-const backing = ref(false)
-
-// 恢复对话框状态
-const restoreZipPath = ref('')
-const restoreWorldName = ref('')
-const restoring = ref(false)
 
 const downloadDir = ref('')
 
@@ -76,11 +67,16 @@ async function loadList() {
   }
 }
 
+async function refresh() {
+  await loadList()
+  toastSuccess('已刷新')
+}
+
 async function loadVersions() {
   try {
     installedVersions.value = await listInstalledVersionsWithType()
-  } catch (e) {
-    console.warn('加载已安装版本失败', e)
+  } catch {
+    toastError('加载版本列表失败')
   }
 }
 
@@ -90,99 +86,6 @@ watch(selectedVersionId, (newVal, oldVal) => {
     loadList()
   }
 })
-
-function startBackup(item: ArchiveItem) {
-  backupTarget.value = item
-  backupOutputPath.value = downloadDir.value + '\\' + item.name + '-backup.zip'
-  backupExcludePlayer.value = false
-}
-
-function cancelBackup() {
-  backupTarget.value = null
-}
-
-function requestBackup() {
-  if (!backupTarget.value || !backupOutputPath.value.trim()) return
-  const name = backupTarget.value.name
-  const mode = backupExcludePlayer.value ? '导出分享包（排除玩家数据）' : '完整备份'
-  showConfirm(
-    '确认备份存档',
-    '将备份存档「' + name + '」（' + mode + '）到：' + backupOutputPath.value,
-    () => doBackup(),
-  )
-}
-
-async function doBackup() {
-  if (!backupTarget.value) return
-  backing.value = true
-  try {
-    const res = await archiveBackup(
-      backupTarget.value.name,
-      backupOutputPath.value.trim(),
-      backupExcludePlayer.value,
-      selectedVersionId.value || undefined,
-    )
-    if (res.success) {
-      toastSuccess('备份成功：' + formatBytes(res.file_size))
-      backupTarget.value = null
-    } else {
-      toastError('备份失败，请检查路径和权限')
-    }
-  } catch (e) {
-    toastError('备份失败: ' + (e instanceof Error ? e.message : String(e)))
-  } finally {
-    backing.value = false
-  }
-}
-
-function requestRestore() {
-  if (!restoreZipPath.value.trim()) return
-  showConfirm(
-    '确认恢复存档',
-    '将从 zip 文件恢复存档' + (restoreWorldName.value.trim() ? '「' + restoreWorldName.value.trim() + '」' : '') + '，目标已存在时会失败。',
-    () => doRestore(),
-  )
-}
-
-async function doRestore() {
-  restoring.value = true
-  try {
-    const res = await archiveRestore(
-      restoreZipPath.value.trim(),
-      restoreWorldName.value.trim(),
-      selectedVersionId.value || undefined,
-    )
-    if (res.success) {
-      toastSuccess('恢复成功：' + res.world_name)
-      restoreZipPath.value = ''
-      restoreWorldName.value = ''
-      await loadList()
-    } else {
-      toastError('恢复失败：' + res.message)
-    }
-  } catch (e) {
-    toastError('恢复失败: ' + (e instanceof Error ? e.message : String(e)))
-  } finally {
-    restoring.value = false
-  }
-}
-
-async function pickRestoreZip() {
-  const path = await pickFile({
-    title: '选择存档备份 zip',
-    filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
-  })
-  if (path) restoreZipPath.value = path
-}
-
-async function pickBackupOutput() {
-  const path = await pickSavePath({
-    title: '选择备份 zip 保存位置',
-    defaultPath: backupOutputPath.value || (backupTarget.value?.name + '-backup.zip'),
-    filters: [{ name: 'ZIP 压缩包', extensions: ['zip'] }],
-  })
-  if (path) backupOutputPath.value = path
-}
 
 onMounted(async () => {
   await loadVersions()
@@ -216,7 +119,7 @@ onMounted(async () => {
         :options="versionOptions"
         class="w-44"
       />
-      <Button type="outline" size="small" :loading="loading" @click="loadList">
+      <Button type="outline" size="small" :loading="loading" @click="refresh">
         <template #icon><ArrowPathIcon class="h-4 w-4" /></template>
         刷新
       </Button>
@@ -252,7 +155,7 @@ onMounted(async () => {
             type="outline"
             size="small"
             class="flex-none"
-            @click="startBackup(item)"
+            @click="backupTarget = item"
           >
             <template #icon><ArrowUpTrayIcon class="h-3.5 w-3.5" /></template>
             备份
@@ -270,85 +173,18 @@ onMounted(async () => {
       </div>
 
       <!-- 恢复区 -->
-      <div class="rounded-lg border border-gray-200 p-4 space-y-3">
-        <div class="flex items-center gap-1.5 text-xs font-medium text-gray-700">
-          <ArrowDownTrayIcon class="h-4 w-4" />
-          从 zip 恢复存档
-        </div>
-        <Input
-          v-model="restoreZipPath"
-          placeholder="zip 文件完整路径"
-          clearable
-        >
-          <template #append>
-            <FolderOpenIcon
-              class="h-4 w-4 cursor-pointer text-gray-500 hover:text-primary-600 transition-colors"
-              @click="pickRestoreZip"
-            />
-          </template>
-        </Input>
-        <Input
-          v-model="restoreWorldName"
-          placeholder="恢复后的存档名称（留空则用 zip 文件名）"
-          clearable
-        />
-        <div class="flex justify-end">
-          <Button
-            type="primary"
-            :loading="restoring"
-            :disabled="!restoreZipPath.trim()"
-            @click="requestRestore"
-          >
-            <template #icon><ArrowDownTrayIcon class="h-4 w-4" /></template>
-            {{ restoring ? '恢复中...' : '恢复' }}
-          </Button>
-        </div>
-      </div>
+      <ArchiveRestorePanel
+        :version-id="selectedVersionId"
+        @restored="loadList"
+      />
     </div>
 
     <!-- 备份弹窗 -->
-    <div
-      v-if="backupTarget"
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
-      @click.self="cancelBackup"
-    >
-      <div class="w-96 rounded-lg bg-white shadow-xl border border-gray-200 p-5 space-y-4">
-        <div class="flex items-center gap-2">
-          <ArrowUpTrayIcon class="h-5 w-5 text-gray-700" />
-          <h4 class="text-sm font-semibold text-gray-900">备份存档</h4>
-        </div>
-        <div class="text-xs text-gray-500">
-          存档名称：<span class="font-medium text-gray-700">{{ backupTarget.name }}</span>
-          （{{ formatBytes(backupTarget.size) }}）
-        </div>
-        <div>
-          <label class="mb-1 block text-xs font-medium text-gray-700">输出 zip 路径</label>
-          <Input v-model="backupOutputPath" placeholder="输出 zip 完整路径" clearable>
-            <template #append>
-              <FolderOpenIcon
-                class="h-4 w-4 cursor-pointer text-gray-500 hover:text-primary-600 transition-colors"
-                @click="pickBackupOutput"
-              />
-            </template>
-          </Input>
-        </div>
-        <div class="flex items-center gap-2">
-          <Checkbox v-model="backupExcludePlayer">排除玩家数据（导出分享包）</Checkbox>
-        </div>
-        <div class="flex justify-end gap-2">
-          <Button type="outline" size="small" @click="cancelBackup">取消</Button>
-          <Button
-            type="primary"
-            size="small"
-            :loading="backing"
-            :disabled="!backupOutputPath.trim()"
-            @click="requestBackup"
-          >
-            <template #icon><CheckCircleIcon class="h-4 w-4" /></template>
-            确认备份
-          </Button>
-        </div>
-      </div>
-    </div>
+    <ArchiveBackupDialog
+      :target="backupTarget"
+      :download-dir="downloadDir"
+      :version-id="selectedVersionId"
+      @close="backupTarget = null"
+    />
   </section>
 </template>
