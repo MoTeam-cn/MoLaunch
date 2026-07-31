@@ -1,19 +1,19 @@
 <script setup lang="ts">
 /**
- * 穿透管理
- *
- * 隧道列表 + 创建表单 + 启停/删除操作。
- * 阶段二支持厂商选择：内置 system-default + 外部厂商（仅 enabled && frpcReady）。
- * 厂商选择联动：未就绪的外部厂商显示 frpc 下载提示。
+ * 穿透管理：隧道列表 + 创建/编辑表单 + 启停/删除/自检操作。
+ * 状态同步：监听 frp-tunnel-status 事件自动刷新列表，避免异常退出后仍显示运行中。
+ * 创建/编辑表单抽出至 TunnelCreateForm.vue（含模式切换/地址端口并列/2 秒自动检测），
+ * 自检面板在 TunnelSelfCheck.vue，跳转日志通过 inject('goToLogs')。
  */
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { useFrpStore } from '@/stores/frp'
 import { showConfirm } from '@/utils/modal'
+import { toastWarning } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
-import type { CreateTunnelParams, TunnelType } from '@/types/frp'
+import TunnelCreateForm from './TunnelCreateForm.vue'
+import TunnelSelfCheck from './TunnelSelfCheck.vue'
+import type { CreateTunnelParams, TunnelWithStatus, UpdateTunnelParams } from '@/types/frp'
 import {
   ArrowPathIcon,
   PlusIcon,
@@ -23,92 +23,66 @@ import {
   ChevronDownIcon,
   GlobeAltIcon,
   ServerIcon,
-  ExclamationCircleIcon,
+  DocumentTextIcon,
+  PencilIcon,
+  ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useFrpStore()
+
+/** 跳转到日志页查看指定隧道（由 Online.vue provide 的 emitter） */
+const goToLogs = inject<(tunnelId: string) => void>('goToLogs', () => {})
 
 const tunnels = computed(() => store.tunnels)
 const loading = computed(() => store.tunnelsLoading)
 const actionLoading = computed(() => store.tunnelActionLoading)
 const providers = computed(() => store.providers)
 
-/** 可选厂商：仅启用且 frpc 就绪（system-default 始终可选） */
-const providerOptions = computed(() =>
-  providers.value
-    .filter(p => p.enabled && (p.frpcReady || p.builtin))
-    .map(p => ({ label: p.name, value: p.id })),
-)
-
-/** 当前选中厂商对象（用于联动提示） */
-const selectedProvider = computed(() =>
-  providers.value.find(p => p.id === form.providerId),
-)
-
 /** 厂商名查找（隧道卡片展示用） */
 function providerName(id: string): string {
   return providers.value.find(p => p.id === id)?.name ?? id
 }
 
-/** 创建表单展开 */
 const showForm = ref(false)
-
-/** 隧道类型选项 */
-const typeOptions = [
-  { label: 'TCP', value: 'tcp' },
-  { label: 'UDP', value: 'udp' },
-]
-
-/** 创建表单 */
-const form = reactive({
-  name: '',
-  providerId: 'system-default',
-  tunnelType: 'tcp' as TunnelType,
-  localIp: '127.0.0.1',
-  localPort: 25565,
-  serverAddr: '',
-  serverPort: 7000,
-  remotePort: 30000,
-  token: '',
-  useTls: false,
-})
+const showSelfCheck = ref(false)
 
 onMounted(() => {
   void store.loadTunnels()
   void store.loadProviders()
+  // 启动隧道状态事件监听器（store 内部防重复注册）
+  store.startTunnelStatusListener()
 })
 
-function resetForm() {
-  Object.assign(form, {
-    name: '', providerId: 'system-default', tunnelType: 'tcp' as TunnelType,
-    localIp: '127.0.0.1', localPort: 25565, serverAddr: '',
-    serverPort: 7000, remotePort: 30000, token: '', useTls: false,
-  })
+async function handleCreate(params: CreateTunnelParams) {
+  const ok = await store.createTunnel(params)
+  if (ok) showForm.value = false
 }
 
-async function handleCreate() {
-  if (!form.name.trim()) return
-  const params: CreateTunnelParams = {
-    name: form.name.trim(),
-    providerId: form.providerId,
-    tunnelType: form.tunnelType,
-    localIp: form.localIp || '127.0.0.1',
-    localPort: form.localPort,
-    serverAddr: form.serverAddr.trim(),
-    serverPort: form.serverPort,
-    remotePort: form.remotePort,
-    token: form.token.trim() || undefined,
-    useTls: form.useTls,
+/** 编辑表单展开的隧道 ID */
+const editingTunnelId = ref<string | null>(null)
+const editingTunnel = computed(() =>
+  tunnels.value.find(t => t.id === editingTunnelId.value),
+)
+
+function handleEdit(tunnel: TunnelWithStatus) {
+  if (tunnel.status === 'running') {
+    toastWarning('请先停止隧道再编辑')
+    return
   }
-  const ok = await store.createTunnel(params)
-  if (ok) {
-    resetForm()
-    showForm.value = false
-  }
+  editingTunnelId.value = tunnel.id
+}
+
+async function handleUpdate(params: UpdateTunnelParams) {
+  const ok = await store.updateTunnel(params)
+  if (ok) editingTunnelId.value = null
 }
 
 async function handleStart(id: string) { await store.startTunnel(id) }
 async function handleStop(id: string) { await store.stopTunnel(id) }
+
+async function handleRefresh() { await store.loadTunnels() }
+
+function handleViewLogs(id: string) { goToLogs(id) }
 
 function handleDelete(id: string, name: string) {
   showConfirm(
@@ -128,90 +102,95 @@ function handleDelete(id: string, name: string) {
       <p class="text-sm text-gray-500">
         共 {{ tunnels.length }} 条隧道
       </p>
-      <Button
-        type="primary"
-        size="small"
-        @click="showForm = !showForm"
-      >
-        <template #icon>
-          <PlusIcon v-if="!showForm" class="w-4 h-4" />
-          <ChevronDownIcon v-else class="w-4 h-4" />
-        </template>
-        {{ showForm ? '收起' : '创建隧道' }}
-      </Button>
-    </div>
-
-    <!-- 创建表单 -->
-    <div v-if="showForm" class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">厂商</label>
-        <Select v-model="form.providerId" :options="providerOptions" />
-        <p
-          v-if="selectedProvider && !selectedProvider.frpcReady && !selectedProvider.builtin"
-          class="mt-1 flex items-center gap-1 text-xs text-amber-600"
-        >
-          <ExclamationCircleIcon class="w-3.5 h-3.5" />
-          该厂商 frpc 未就绪，启动隧道前请先在「厂商列表」页下载 frpc
-        </p>
-      </div>
-      <div class="grid grid-cols-2 gap-3">
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">隧道名称</label>
-          <Input v-model="form.name" placeholder="我的隧道" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">隧道类型</label>
-          <Select v-model="form.tunnelType" :options="typeOptions" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">本地 IP</label>
-          <Input v-model="form.localIp" placeholder="127.0.0.1" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">本地端口</label>
-          <Input v-model="form.localPort" type="number" placeholder="25565" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">服务器地址</label>
-          <Input v-model="form.serverAddr" placeholder="frps.example.com" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">服务器端口</label>
-          <Input v-model="form.serverPort" type="number" placeholder="7000" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">远程端口</label>
-          <Input v-model="form.remotePort" type="number" placeholder="30000" />
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Token（可选）</label>
-          <Input v-model="form.token" placeholder="留空表示无鉴权" />
-        </div>
-      </div>
       <div class="flex items-center gap-2">
-        <input
-          v-model="form.useTls"
-          type="checkbox"
-          class="w-4 h-4 rounded border-gray-300 text-primary-600"
-        />
-        <span class="text-xs text-gray-700">启用 TLS 加密</span>
-      </div>
-      <div class="flex justify-end gap-2 pt-1">
-        <Button type="outline" size="small" @click="showForm = false">取消</Button>
+        <Tooltip text="隧道自检">
+          <Button type="ghost" size="small" @click="showSelfCheck = !showSelfCheck">
+            <template #icon><ShieldCheckIcon class="w-4 h-4" /></template>
+          </Button>
+        </Tooltip>
+        <Tooltip text="刷新列表">
+          <Button
+            type="ghost"
+            size="small"
+            :loading="loading"
+            @click="handleRefresh"
+          >
+            <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
+          </Button>
+        </Tooltip>
         <Button
           type="primary"
           size="small"
-          :loading="actionLoading"
-          :disabled="!form.name.trim() || !form.serverAddr.trim()"
-          @click="handleCreate"
+          @click="showForm = !showForm"
         >
-          创建
+          <template #icon>
+            <PlusIcon v-if="!showForm" class="w-4 h-4" />
+            <ChevronDownIcon v-else class="w-4 h-4 transition-transform duration-300" :class="showForm ? 'rotate-180' : ''" />
+          </template>
+          {{ showForm ? '收起' : '创建隧道' }}
         </Button>
       </div>
     </div>
 
+    <!-- 创建表单（带展开/收起动画） -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out origin-top"
+      leave-active-class="transition-all duration-200 ease-in origin-top"
+      enter-from-class="opacity-0 scale-y-95 -translate-y-2"
+      leave-to-class="opacity-0 scale-y-95 -translate-y-2"
+    >
+      <TunnelCreateForm
+        v-if="showForm"
+        :providers="providers"
+        :action-loading="actionLoading"
+        @create="handleCreate"
+        @cancel="showForm = false"
+      />
+    </Transition>
+
+    <!-- 编辑表单 -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out origin-top"
+      leave-active-class="transition-all duration-200 ease-in origin-top"
+      enter-from-class="opacity-0 scale-y-95 -translate-y-2"
+      leave-to-class="opacity-0 scale-y-95 -translate-y-2"
+    >
+      <TunnelCreateForm
+        v-if="editingTunnel"
+        :providers="providers"
+        :action-loading="actionLoading"
+        :edit-tunnel="editingTunnel"
+        @update="handleUpdate"
+        @cancel="editingTunnelId = null"
+      />
+    </Transition>
+
+    <!-- 自检面板 -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out origin-top"
+      leave-active-class="transition-all duration-200 ease-in origin-top"
+      enter-from-class="opacity-0 scale-y-95 -translate-y-2"
+      leave-to-class="opacity-0 scale-y-95 -translate-y-2"
+    >
+      <TunnelSelfCheck
+        v-if="showSelfCheck"
+        :tunnels="tunnels"
+        :providers="providers"
+        @close="showSelfCheck = false"
+      />
+    </Transition>
+
     <!-- 隧道列表 -->
-    <div v-if="tunnels.length > 0" class="space-y-3">
+    <TransitionGroup
+      v-if="tunnels.length > 0"
+      tag="div"
+      class="space-y-3"
+      enter-active-class="transition-all duration-300 ease-out"
+      leave-active-class="transition-all duration-200 ease-in absolute"
+      enter-from-class="opacity-0 translate-y-2"
+      leave-to-class="opacity-0 -translate-y-2"
+      move-class="transition-transform duration-300"
+    >
       <div
         v-for="tunnel in tunnels"
         :key="tunnel.id"
@@ -222,11 +201,15 @@ function handleDelete(id: string, name: string) {
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-sm font-semibold text-gray-900">{{ tunnel.name }}</span>
               <span
-                class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium"
+                class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium"
                 :class="tunnel.status === 'running'
                   ? 'bg-green-50 text-green-700'
                   : 'bg-gray-100 text-gray-500'"
               >
+                <span
+                  class="w-1.5 h-1.5 rounded-full"
+                  :class="tunnel.status === 'running' ? 'bg-green-500 animate-pulse' : 'bg-gray-400'"
+                />
                 {{ tunnel.status === 'running' ? '运行中' : '已停止' }}
               </span>
               <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700 uppercase">
@@ -270,6 +253,24 @@ function handleDelete(id: string, name: string) {
               <template #icon><StopIcon class="w-3.5 h-3.5" /></template>
               停止
             </Button>
+            <Tooltip text="编辑配置">
+              <Button
+                type="ghost"
+                size="mini"
+                @click="handleEdit(tunnel)"
+              >
+                <template #icon><PencilIcon class="w-3.5 h-3.5" /></template>
+              </Button>
+            </Tooltip>
+            <Tooltip text="查看日志">
+              <Button
+                type="ghost"
+                size="mini"
+                @click="handleViewLogs(tunnel.id)"
+              >
+                <template #icon><DocumentTextIcon class="w-3.5 h-3.5" /></template>
+              </Button>
+            </Tooltip>
             <Tooltip text="删除隧道">
               <Button
                 type="ghost"
@@ -282,7 +283,7 @@ function handleDelete(id: string, name: string) {
           </div>
         </div>
       </div>
-    </div>
+    </TransitionGroup>
 
     <!-- 空状态 -->
     <div v-else-if="!loading" class="flex flex-col items-center justify-center py-16">

@@ -8,10 +8,14 @@
 
 import { invoke } from '@tauri-apps/api/core'
 import type {
+  AllocatePublicServerParams,
+  AllocateResponse,
   CreateTunnelParams,
+  UpdateTunnelParams,
   LogFileContent,
   LogFileInfo,
   ProviderInfo,
+  PublicFrpServer,
   Tunnel,
   TunnelStatus,
   TunnelWithStatus,
@@ -27,6 +31,8 @@ export const FRP_ACTIONS = {
   LIST_TUNNELS: 'list_tunnels',
   /** 创建隧道 */
   CREATE_TUNNEL: 'create_tunnel',
+  /** 更新隧道配置 */
+  UPDATE_TUNNEL: 'update_tunnel',
   /** 删除隧道 */
   DELETE_TUNNEL: 'delete_tunnel',
   /** 启动隧道 */
@@ -49,6 +55,14 @@ export const FRP_ACTIONS = {
   LIST_LOG_FILES: 'list_log_files',
   /** 读取指定隧道的日志文件内容 */
   READ_LOG_FILE: 'read_log_file',
+  /** 列出可用的公共 frps 服务器（GET /v1/frp/servers） */
+  LIST_PUBLIC_SERVERS: 'list_public_servers',
+  /** 分配端口 + per-user token（POST /v1/frp/allocate） */
+  ALLOCATE_PUBLIC_SERVER: 'allocate_public_server',
+  /** 释放分配（POST /v1/frp/release） */
+  RELEASE_PUBLIC_SERVER: 'release_public_server',
+  /** 续期分配（POST /v1/frp/keepalive） */
+  KEEPALIVE_PUBLIC_SERVER: 'keepalive_public_server',
 } as const
 
 /**
@@ -86,6 +100,11 @@ export function listTunnels(): Promise<TunnelWithStatus[]> {
 /** 创建隧道 */
 export function createTunnel(params: CreateTunnelParams): Promise<Tunnel> {
   return frpManager(FRP_ACTIONS.CREATE_TUNNEL, params)
+}
+
+/** 更新隧道配置（编辑隧道） */
+export function updateTunnel(params: UpdateTunnelParams): Promise<Tunnel> {
+  return frpManager<Tunnel>(FRP_ACTIONS.UPDATE_TUNNEL, params)
 }
 
 /** 删除隧道 */
@@ -141,4 +160,28 @@ export function listLogFiles(): Promise<LogFileInfo[]> {
 /** 读取指定隧道的日志文件内容 */
 export function readLogFile(tunnelId: string, maxLines?: number): Promise<LogFileContent> {
   return frpManager<LogFileContent>(FRP_ACTIONS.READ_LOG_FILE, { tunnelId, maxLines })
+}
+
+// ============================================================
+// 公共 frps 服务器（对接 apiServer `/v1/frp/*`）
+// ============================================================
+
+/** 列出可用的公共 frps 服务器 */
+export function listPublicServers(): Promise<PublicFrpServer[]> {
+  return frpManager<PublicFrpServer[]>(FRP_ACTIONS.LIST_PUBLIC_SERVERS)
+}
+
+/** 分配端口 + per-user token */
+export function allocatePublicServer(params: AllocatePublicServerParams): Promise<AllocateResponse> {
+  return frpManager<AllocateResponse>(FRP_ACTIONS.ALLOCATE_PUBLIC_SERVER, params)
+}
+
+/** 释放分配（停止隧道时调用，便于端口回收） */
+export function releasePublicServer(allocationId: string): Promise<void> {
+  return frpManager<void>(FRP_ACTIONS.RELEASE_PUBLIC_SERVER, { allocationId })
+}
+
+/** 续期分配（frpc 运行期间定时调用，延长过期时间） */
+export function keepalivePublicServer(allocationId: string): Promise<unknown> {
+  return frpManager(FRP_ACTIONS.KEEPALIVE_PUBLIC_SERVER, { allocationId })
 }

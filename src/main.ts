@@ -5,6 +5,7 @@ import router from './router'
 import { useSettingsStore } from './stores/settings'
 import { usePluginStore } from './stores/plugins'
 import { renderNonTauriWarning } from './utils/checkTauriEnv'
+import { setupDevApi } from './utils/dev-api'
 import './assets/styles/main.css'
 import 'ol/ol.css'
 
@@ -34,6 +35,9 @@ if (renderNonTauriWarning()) {
 
   app.mount('#app')
   console.log('[Startup][Frontend] app.mount("#app") called @', new Date().toISOString())
+
+  // 挂载调试 API（仅 dev 模式可用，生产构建中被 setupDevApi 内部 early-return）
+  setupDevApi(router)
 
   // mount 后异步从后端 INI 同步插件配置（[Plugin] 节）
   // 失败时静默回退到 localStorage，不影响首屏

@@ -83,6 +83,24 @@ const isReady = computed(
 /** 当前激活分类（device / lobby / create / join / room_details / providers / tunnels / auth / logs） */
 const activeCategory = ref<'device' | 'lobby' | 'create' | 'join' | 'room_details' | 'providers' | 'tunnels' | 'auth' | 'logs'>('device')
 
+/**
+ * 跳转到 Frp 日志页查看指定隧道
+ *
+ * TunnelManager 卡片「查看日志」按钮调用，切换到 logs 分类并预选 tunnelId。
+ * 用 provide/inject 而非 props，避免组件层级耦合（TunnelManager 通过 keep-alive 缓存）。
+ *
+ * 必须放在 activeCategory 声明之后（const 未 hoist）。
+ */
+function goToLogs(tunnelId: string): void {
+  activeCategory.value = 'logs'
+  // 直接写入 frp store，FrpLogs onMounted 会读取该值
+  // 这里用动态导入避免循环依赖
+  void import('@/stores/frp').then(({ useFrpStore }) => {
+    useFrpStore().selectedLogTunnelId = tunnelId
+  })
+}
+provide('goToLogs', goToLogs)
+
 /** 设备分类（始终可用） */
 const deviceCategory: NavCategory = {
   id: 'device',
