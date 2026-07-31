@@ -14,6 +14,7 @@ import {
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import Checkbox from '@/components/common/Checkbox.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Select from '@/components/common/Select.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
@@ -164,15 +165,12 @@ onMounted(async () => {
 
       <!-- 操作栏 -->
       <div v-if="items.length > 0" class="flex items-center gap-2">
-        <label class="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600">
-          <input
-            type="checkbox"
-            class="accent-primary-500"
+        <div class="flex items-center gap-1.5 text-xs text-gray-600">
+          <Checkbox
             :checked="selectedPaths.size === items.length && items.length > 0"
             @change="toggleSelectAll"
-          />
-          全选
-        </label>
+          />全选
+        </div>
         <span v-if="hasSelection" class="text-xs text-gray-400">
           已选 {{ selectedPaths.size }} 项 · {{ formatBytes(sumSize(selectedPaths)) }}
         </span>
@@ -198,9 +196,8 @@ onMounted(async () => {
           :class="selectedPaths.has(item.path) ? 'bg-primary-50/60' : 'hover:bg-gray-50'"
           @click="toggleSelect(item.path)"
         >
-          <input
-            type="checkbox"
-            class="accent-primary-500 flex-none"
+          <Checkbox
+            class="flex-none"
             :checked="selectedPaths.has(item.path)"
             @click.stop="toggleSelect(item.path)"
           />

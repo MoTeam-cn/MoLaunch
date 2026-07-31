@@ -21,6 +21,7 @@ import { ref, computed, watch, onMounted } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
+import Checkbox from '@/components/common/Checkbox.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import {
   PlusIcon,
@@ -211,13 +212,11 @@ onMounted(() => {
 <template>
   <div class="space-y-3">
     <!-- 启用开关 -->
-    <label class="flex items-center gap-2 cursor-pointer">
-      <input
+    <div class="flex items-center gap-2 cursor-pointer">
+      <Checkbox
         :checked="isEnabled"
-        type="checkbox"
-        class="accent-primary-500"
         :disabled="mode === 'runtime' && loading"
-        @change="onToggleEnabled(($event.target as HTMLInputElement).checked)"
+        @change="onToggleEnabled"
       />
       <ShieldCheckIcon
         class="w-4 h-4"
@@ -227,7 +226,7 @@ onMounted(() => {
       <span class="text-xs text-gray-400">
         {{ isEnabled ? '仅白名单内设备可加入' : '允许任何已注册设备加入' }}
       </span>
-    </label>
+    </div>
 
     <!-- 启用且为空的警告 -->
     <div

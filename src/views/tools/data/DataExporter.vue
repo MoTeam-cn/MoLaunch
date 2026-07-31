@@ -17,6 +17,7 @@ import {
   FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import Checkbox from '@/components/common/Checkbox.vue'
 import Input from '@/components/common/Input.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { exportLauncherData, getDownloadDir } from '@/utils/api/tools'
@@ -100,32 +101,32 @@ async function pickOutput() {
       <!-- 导出项勾选 -->
       <div class="space-y-2">
         <label class="block text-xs font-medium text-gray-700">选择导出内容</label>
-        <label
+        <div
           class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer hover:bg-gray-50"
           :class="{ 'border-primary-300 bg-primary-50/40': includeConfig }"
         >
-          <input v-model="includeConfig" type="checkbox" class="accent-primary-500" />
+          <Checkbox v-model="includeConfig" />
           <span class="text-sm text-gray-800">启动器配置</span>
           <span class="text-xs text-gray-400">（游戏目录、Java 路径、窗口设置等）</span>
-        </label>
-        <label
+        </div>
+        <div
           class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer hover:bg-gray-50"
           :class="{ 'border-primary-300 bg-primary-50/40': includeVersions }"
         >
-          <input v-model="includeVersions" type="checkbox" class="accent-primary-500" />
+          <Checkbox v-model="includeVersions" />
           <span class="text-sm text-gray-800">版本列表</span>
           <span class="text-xs text-gray-400">（已安装版本 ID 与类型）</span>
-        </label>
-        <label
+        </div>
+        <div
           class="flex items-center gap-2 rounded-lg border border-gray-200 px-3 py-2 cursor-pointer hover:bg-gray-50"
           :class="{ 'border-primary-300 bg-primary-50/40': includeAccounts }"
         >
-          <input v-model="includeAccounts" type="checkbox" class="accent-primary-500" />
+          <Checkbox v-model="includeAccounts" />
           <span class="text-sm text-gray-800">账号信息</span>
           <span class="flex items-center gap-1 text-xs text-green-600">
             <ShieldCheckIcon class="h-3 w-3" />已脱敏（仅含用户名/UUID，不含 token）
           </span>
-        </label>
+        </div>
       </div>
 
       <!-- 输出路径 -->

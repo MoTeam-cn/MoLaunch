@@ -19,6 +19,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
+import Checkbox from '@/components/common/Checkbox.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Select from '@/components/common/Select.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
@@ -130,29 +131,21 @@ const bottomHint = computed(() => {
             <template v-if="supportsOnlineCheck">
               <div class="flex items-start gap-3">
                 <span class="w-24 flex-none pt-1 text-xs text-gray-500">联网检查</span>
-                <label class="flex flex-1 cursor-pointer items-start gap-2">
-                  <input
-                    v-model="checkHostedAssets"
-                    type="checkbox"
-                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                  >
+                <div class="flex flex-1 items-start gap-2">
+                  <Checkbox v-model="checkHostedAssets" />
                   <span class="text-xs leading-5 text-gray-600">
                     联网查询 Mod 下载地址（Modrinth + CurseForge），不勾选则直接打包文件到 overrides
                   </span>
-                </label>
+                </div>
               </div>
               <div class="flex items-start gap-3">
                 <span class="w-24 flex-none pt-1 text-xs text-gray-500">仅 Modrinth</span>
-                <label class="flex flex-1 cursor-pointer items-start gap-2">
-                  <input
-                    v-model="modrinthUploadMode"
-                    type="checkbox"
-                    class="mt-0.5 h-4 w-4 rounded border-gray-300 text-primary-500 focus:ring-primary-500"
-                  >
+                <div class="flex flex-1 items-start gap-2">
+                  <Checkbox v-model="modrinthUploadMode" />
                   <span class="text-xs leading-5 text-gray-600">
                     仅从 Modrinth 查询（跳过 CurseForge），适用于准备上传到 Modrinth 的整合包
                   </span>
-                </label>
+                </div>
               </div>
             </template>
           </div>

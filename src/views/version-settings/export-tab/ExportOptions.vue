@@ -11,6 +11,7 @@
  * 与父组件 ExportTab 通过 v-model:checked 双向绑定，保持选项状态同步。
  */
 import { computed } from 'vue'
+import Checkbox from '@/components/common/Checkbox.vue'
 import type { ExportOption } from '@/utils/api/version-export-manager'
 
 interface Props {
@@ -48,18 +49,16 @@ function getChildren(parentId: string): ExportOption[] {
   <div v-else class="space-y-1">
     <div v-for="opt in topLevelOptions" :key="opt.id">
       <!-- 顶层选项 -->
-      <label
+      <div
         class="flex cursor-pointer items-start gap-3 rounded-md px-2 py-1.5 transition-colors"
         :class="opt.enabled ? 'hover:bg-gray-50' : 'cursor-not-allowed opacity-80'"
         @click.prevent="opt.enabled && emit('toggle', opt)"
       >
-        <input
-          type="checkbox"
+        <Checkbox
           :checked="opt.checked"
           :disabled="!opt.enabled"
-          class="mt-0.5 h-4 w-4 flex-none cursor-pointer rounded border-gray-300 text-primary-500 focus:ring-primary-500"
           @click.stop.prevent="opt.enabled && emit('toggle', opt)"
-        >
+        />
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5">
             <span class="text-sm text-gray-800">{{ opt.title }}</span>
@@ -70,28 +69,26 @@ function getChildren(parentId: string): ExportOption[] {
           </div>
           <div v-if="opt.description" class="mt-0.5 text-xs text-gray-400">{{ opt.description }}</div>
         </div>
-      </label>
+      </div>
 
       <!-- 子选项 -->
       <div v-if="getChildren(opt.id).length > 0" class="ml-7 mt-0.5 space-y-0.5 border-l border-gray-100 pl-3">
-        <label
+        <div
           v-for="sub in getChildren(opt.id)"
           :key="sub.id"
           class="flex cursor-pointer items-start gap-3 rounded-md px-2 py-1 transition-colors hover:bg-gray-50"
           @click.prevent="sub.enabled && emit('toggle', sub)"
         >
-          <input
-            type="checkbox"
+          <Checkbox
             :checked="sub.checked"
             :disabled="!sub.enabled"
-            class="mt-0.5 h-4 w-4 flex-none cursor-pointer rounded border-gray-300 text-primary-500 focus:ring-primary-500"
             @click.stop.prevent="sub.enabled && emit('toggle', sub)"
-          >
+        />
           <div class="min-w-0 flex-1">
             <div class="text-sm text-gray-700">{{ sub.title }}</div>
             <div v-if="sub.description" class="mt-0.5 text-xs text-gray-400">{{ sub.description }}</div>
           </div>
-        </label>
+        </div>
       </div>
     </div>
   </div>

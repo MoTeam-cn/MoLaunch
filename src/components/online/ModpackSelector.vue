@@ -16,6 +16,7 @@ import { ref, computed, watch } from 'vue'
 import { readLocalModpackMeta } from '@/utils/api/version'
 import { formatBytes } from '@/utils/format'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Checkbox from '@/components/common/Checkbox.vue'
 import type { ModpackMeta, ModpackMetaFile } from '@/types/online'
 import {
   CubeIcon,
@@ -94,12 +95,10 @@ async function loadMeta() {
 }
 
 /** 切换启用状态 */
-function onToggle(e: Event) {
-  const target = e.target as HTMLInputElement
-  const checked = target.checked
-  // 未选版本时不允许勾选，强制恢复未勾选状态（Tooltip 会提示原因）
+function onToggle(checked: boolean) {
+  // 未选版本时不允许勾选（Tooltip 会提示原因）
+  // Checkbox 受控模式下会自动恢复 :checked 绑定的值，无需手动操作 DOM
   if (checked && !props.versionId) {
-    target.checked = false
     return
   }
   enabled.value = checked
@@ -132,22 +131,17 @@ watch(
   <div class="space-y-2.5">
     <!-- 启用开关（未选版本时灰色 + Tooltip 提示，不再 disabled 以允许 hover 触发） -->
     <Tooltip :text="tooltipText" position="top" block>
-      <label
+      <div
         class="flex items-center gap-2 w-full"
         :class="versionId ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'"
       >
-        <input
-          :checked="enabled"
-          type="checkbox"
-          class="accent-primary-500"
-          @change="onToggle"
-        />
+        <Checkbox :checked="enabled" @change="onToggle" />
         <CubeIcon class="w-4 h-4" :class="enabled ? 'text-primary-600' : 'text-gray-400'" />
         <span class="text-sm text-gray-800">关联整合包</span>
         <span class="text-xs text-gray-400">
           {{ enabled ? '已关联本地整合包元数据' : '上报给加入方以便校验或一键安装' }}
         </span>
-      </label>
+      </div>
     </Tooltip>
 
     <!-- 读取中 -->

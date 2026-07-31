@@ -19,6 +19,7 @@ import {
   FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import Checkbox from '@/components/common/Checkbox.vue'
 import Input from '@/components/common/Input.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Select from '@/components/common/Select.vue'
@@ -331,10 +332,9 @@ onMounted(async () => {
             </template>
           </Input>
         </div>
-        <label class="flex items-center gap-2 cursor-pointer">
-          <input v-model="backupExcludePlayer" type="checkbox" class="accent-primary-500" />
-          <span class="text-xs text-gray-600">排除玩家数据（导出分享包）</span>
-        </label>
+        <div class="flex items-center gap-2">
+          <Checkbox v-model="backupExcludePlayer">排除玩家数据（导出分享包）</Checkbox>
+        </div>
         <div class="flex justify-end gap-2">
           <Button type="outline" size="small" @click="cancelBackup">取消</Button>
           <Button
