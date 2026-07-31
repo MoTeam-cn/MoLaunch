@@ -11,14 +11,41 @@
 | name | version | url | desc |
 | --- | --- | --- | --- |
 | Tauri 2 | 2 | https://v2.tauri.app | 跨平台桌面应用框架 |
+| Tauri Plugins | 2 | https://v2.tauri.app | 官方插件集（shell/dialog/fs/notification/updater/process） |
 | Tokio | 1.35 | https://tokio.rs | Rust 异步运行时 |
-| Reqwest | 0.11 | https://docs.rs/reqwest | HTTP 客户端 |
+| Reqwest | 0.11 | https://docs.rs/reqwest | HTTP 客户端（rustls-tls） |
+| tokio-tungstenite | 0.21 | https://docs.rs/tokio-tungstenite | WebSocket 服务器（下载进度推送） |
+| rustls-native-certs | 0.6 | https://docs.rs/rustls-native-certs | 操作系统信任根证书加载 |
 | Serde | 1.0 | https://serde.rs | 序列化/反序列化框架 |
+| serde_json | 1.0 | https://docs.rs/serde_json | JSON 序列化 |
+| anyhow | 1 | https://docs.rs/anyhow | 错误处理 |
+| thiserror | 1.0 | https://docs.rs/thiserror | 自定义错误类型 |
+| log | 0.4 | https://docs.rs/log | 日志门面 |
+| env_logger | 0.10 | https://docs.rs/env_logger | 日志后端 |
+| once_cell | 1 | https://docs.rs/once_cell | 全局单例（Lazy 初始化） |
 | libloading | 0.8 | https://docs.rs/libloading | 动态库加载（SDK FFI） |
 | zip | 2 | https://docs.rs/zip | ZIP 压缩/解压（jar 读取） |
+| flate2 | 1 | https://docs.rs/flate2 | gzip 解压（NBT 文件 .dat） |
+| fastnbt | 2 | https://docs.rs/fastnbt | NBT 数据解析（存档 level.dat 等） |
 | notify | 8 | https://docs.rs/notify | 文件系统监听（mods 目录刷新） |
-| sysinfo | 0.29 | https://docs.rs/sysinfo | 系统信息收集 |
+| sysinfo | 0.29 | https://docs.rs/sysinfo | 系统信息收集（进程/内存） |
+| netstat2 | 0.9 | https://docs.rs/netstat2 | 本机网络连接枚举（Frp 内网端口选择） |
 | sha1 / sha2 / md5 | — | https://docs.rs/sha2 | 哈希校验 |
+| hex | 0.4 | https://docs.rs/hex | 十六进制编解码 |
+| base64 | 0.22 | https://docs.rs/base64 | Base64 编解码 |
+| encoding_rs | 0.8 | https://docs.rs/encoding_rs | 字符编码转换 |
+| urlencoding | 2.1 | https://docs.rs/urlencoding | URL 编码 |
 | regex | 1 | https://docs.rs/regex | 正则表达式 |
 | chrono | 0.4 | https://docs.rs/chrono | 日期时间处理 |
+| futures-util | 0.3 | https://docs.rs/futures-util | 异步工具（join_all 等） |
+| Ed25519-Dalek | 2 | https://docs.rs/ed25519-dalek | Ed25519 签名（设备身份/注册签名） |
+| X25519-Dalek | 2 | https://docs.rs/x25519-dalek | X25519 ECDH 密钥协商（会话密钥派生） |
+| hkdf | 0.12 | https://docs.rs/hkdf | HKDF-SHA256 密钥派生 |
+| hmac | 0.12 | https://docs.rs/hmac | HMAC-SHA256 登录签名 |
+| aes-gcm | 0.10 | https://docs.rs/aes-gcm | AES-256-GCM 加密（登录/ECIES 信封） |
+| rsa | 0.9 | https://docs.rs/rsa | RSA-OAEP 加密（注册 content 加密） |
+| rand | 0.8 | https://docs.rs/rand | 随机数生成（密钥/nonce） |
+| pem | 3 | https://docs.rs/pem | PEM 格式密钥解析 |
+| tun-rs | 2 | https://docs.rs/tun-rs | 虚拟网卡 TUN 接口管理（联机功能） |
 | windows | 0.58 | https://docs.rs/windows | Windows API 绑定（窗口标题修改） |
+| winreg | 0.52 | https://docs.rs/winreg | Windows 注册表读写（仅 Windows） |

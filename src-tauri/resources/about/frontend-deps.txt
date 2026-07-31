@@ -15,8 +15,13 @@
 | Pinia | ^2.1.7 | https://pinia.vuejs.org | Vue 状态管理库 |
 | Tauri API | ^2.11.1 | https://v2.tauri.app | Tauri 前端 API（IPC 调用） |
 | Tauri Plugin Shell | ^2.3.5 | https://v2.tauri.app/plugin/shell/ | Tauri Shell 插件 |
+| Tauri Plugin Dialog | ^2.7.2 | https://v2.tauri.app/plugin/dialog/ | Tauri 对话框插件（文件/消息弹窗） |
+| Tauri Plugin Process | ^2.0.0 | https://v2.tauri.app/plugin/process/ | Tauri 进程管理插件（重启应用） |
+| Tauri Plugin Updater | ^2.0.0 | https://v2.tauri.app/plugin/updater/ | Tauri 自动更新插件 |
 | Heroicons Vue | ^2.2.0 | https://heroicons.com | Tailwind CSS 图标库 |
 | Tailwind CSS | ^3.4.1 | https://tailwindcss.com | 原子化 CSS 框架 |
 | skinview3d | ^3.4.2 | https://github.com/bs-community/skinview3d | 3D 皮肤预览引擎 |
 | Vue Virtual Scroller | ^3.0.4 | https://github.com/Akryum/vue-virtual-scroller | 虚拟滚动列表 |
 | OpenLayers | ^10.9.0 | https://openlayers.org | 地图渲染引擎（种子地图瓦片/矢量图层/交互） |
+| marked | — | https://github.com/markedjs/marked | Markdown 解析库（嵌入资源，picker 子窗口 markdown 模板通过 res:// 协议加载 view/marked.min.js） |
+| qrcodejs | — | https://github.com/davidshimjs/qrcodejs | 二维码生成库（嵌入资源，picker 子窗口 qrcode 模板通过 res:// 协议加载 view/qrcode.min.js，DOM 渲染离线可用） |

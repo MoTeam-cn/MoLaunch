@@ -7,6 +7,385 @@
 
 ## [未发布]
 
+### 新增
+
+#### Dev 调试 API（window.molaunch）
+
+- 背景：联机/Frp 等页面在开发调试时缺少便捷入口，每次测试子窗口、IPC、路由跳转都需要走完整业务流程，效率低；同时 picker 子窗口各模板（port-picker / confirm / info / image-viewer / markdown / qrcode / redirect）缺少集中测试入口
+- 改动：
+  - **新增调试 API 模块**（新增 [src/utils/dev-api.ts](src/utils/dev-api.ts)）：
+    - 导出 `setupDevApi(router)` 函数，仅在 `import.meta.env.DEV` 时挂载 `window.molaunch`，生产构建中 early-return 不影响 bundle 体积与安全性
+    - 通过 `Object.defineProperty` 设置 `writable:false / configurable:false` 防止运行时被覆盖
+    - 子命令：
+      - `help()`：打印所有命令用法与示例
+      - `templates()`：列出所有 picker 模板名
+      - `picker(template, data?)`：打开 picker 子窗口（选择型返回值，展示型返回 undefined），自动复用 `utils/picker-window.ts` 既有 `openPickerWindow` / `openDisplayWindow`，避免重复实现
+      - `pickPort()`：打开端口选择器（port-picker 模板快捷方式），返回 `number | null`
+      - `navigate(path)`：通过注入的 router 实例跳转路由
+      - `tools(action, params?)`：调用 `tools_manager` IPC（透传 action/params）
+      - `frp(action, params?)`：调用 `frp_manager` IPC（透传 action/params）
+      - `stores()`：动态 import 全部 8 个 Pinia store（auth/frp/java/online/plugins/sdk/settings/version），返回各自 `$state`，错误隔离单个 store 故障不影响其他
+    - 全局类型：通过 `declare global { interface Window { molaunch?: MolaunchDevAPI } }` 让 TypeScript 识别 `window.molaunch`
+  - **挂载入口**（[src/main.ts](src/main.ts)）：app.mount 后调用 `setupDevApi(router)`，dev 模式下控制台输出就绪日志
+- 复用说明：
+  - picker 子命令直接调用 `utils/picker-window.ts` 既有便捷函数，未重复封装 invoke/事件监听逻辑
+  - tools/frp 子命令复用 `@tauri-apps/api/core` 的 invoke，与 `utils/api/tools.ts` / `utils/api/frp-manager.ts` 的请求结构一致（`{ req: { action, params } }`）
+  - stores 子命令用动态 import 加载 store 模块，避免影响首屏 bundle
+- 安全收益：生产构建中 `window.molaunch` 不存在，DevTools 无法通过此入口触发 IPC
+
+### 新增
+
+#### Checkbox 公共组件 + 全局替换原生复选框
+
+- 背景：项目前端共有 13 处使用原生 `<input type="checkbox">`，视觉风格不统一（`accent-primary-500` / `h-4 w-4 rounded border-gray-300` 等多种 class），且缺乏 hover 背景效果、半选状态、scale 动画等 ArcoDesign 标准交互；项目规则要求复用自定义组件而非原生 HTML
+- 改动：
+  - **新增 Checkbox 组件**（新增 [src/components/common/Checkbox.vue](src/components/common/Checkbox.vue)）：
+    - 复刻 Arco Design Vue 的 Checkbox 组件，视觉与交互完全对齐：14x14 方框、2px 边框、2px 圆角、icon-hover 28x28 圆形浅色背景、选中时主色底 + 白色勾选图标（scale 0→1 overshoot 动画）、半选时白色横条、禁用浅灰底
+    - API 同时支持 `v-model`（双向绑定）和 `:checked` + `@change`（受控模式）两种用法，覆盖项目中所有复选框场景
+    - 支持 `disabled`、`indeterminate`（半选）、`defaultChecked`（非受控默认值）props
+    - 隐藏原生 input（opacity:0 + 宽高0）保留焦点可达性与键盘操作，用自定义 icon 模拟视觉
+    - 顶部版权注释与 Button.vue / Input.vue 一致（Arco Design Vue 衍生 + MIT License）
+  - **全局替换 13 处原生复选框**（8 个文件）：
+    - [src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue)：启用 TLS 加密（v-model）
+    - [src/components/online/ModpackSelector.vue](src/components/online/ModpackSelector.vue)：关联整合包开关（:checked + @change），onToggle 签名从 Event 改为 boolean
+    - [src/components/online/WhitelistEditor.vue](src/components/online/WhitelistEditor.vue)：启用白名单开关（:checked + @change），简化 onToggleEnabled 调用
+    - [src/views/version-settings/ExportTab.vue](src/views/version-settings/ExportTab.vue)：联网检查、仅 Modrinth（v-model）
+    - [src/views/version-settings/export-tab/ExportOptions.vue](src/views/version-settings/export-tab/ExportOptions.vue)：导出选项顶层/子选项勾选（:checked + @click.stop.prevent）
+    - [src/views/tools/archive/ArchiveManager.vue](src/views/tools/archive/ArchiveManager.vue)：排除玩家数据（v-model）
+    - [src/views/tools/data/ScreenshotManager.vue](src/views/tools/data/ScreenshotManager.vue)：全选 + 列表项选择（:checked + @change / @click.stop）
+    - [src/views/tools/data/DataExporter.vue](src/views/tools/data/DataExporter.vue)：导出项勾选（v-model）
+  - **外层 `<label>` → `<div>`**：Checkbox 根元素是 `<label>`，原代码中多处将 input 包裹在 `<label>` 内实现点击触发，替换后 label 嵌套 label 非法，故将外层 `<label>` 改为 `<div>`，保留 cursor-pointer 等 class
+- 复用说明：
+  - Checkbox 组件复刻 ArcoDesign 的 checkbox.tsx + style/index.less + icon-check.tsx，未引入第三方依赖
+  - 颜色变量复用项目 CSS 变量（var(--color-primary-500) / var(--color-primary-300) 等），跟随主题色变化
+  - 勾选图标 SVG 路径直接复用 ArcoDesign 的 IconCheck 组件
+- 体验收益：所有复选框视觉统一为 ArcoDesign 风格，hover 有浅色背景反馈，选中有 scale 动画，禁用状态清晰可辨
+
+### 修复
+
+#### port-picker 子窗口刷新体验优化
+
+- 背景：[src-tauri/resources/templates/port-picker.html](src-tauri/resources/templates/port-picker.html) 的刷新按钮尺寸 34x34px 偏大、与 30px 高度的搜索框不协调；打开页面后若后端注入数据为空需等待 3 秒定时器才触发首次 fetchData；点击刷新按钮只有按钮自身 spinning 动画，缺少遮蔽罩+"刷新中..."文字反馈
+- 改动：
+  - **刷新按钮调小**（[src-tauri/resources/templates/port-picker.html](src-tauri/resources/templates/port-picker.html)）：34x34 → 30x30，与搜索框 30px 高度对齐；按钮内 SVG 显式设为 14x14，避免默认撑满父容器；搜索框 padding 8px 12px → 6px 10px、显式 height 30px；toolbar gap 8px → 6px
+  - **首次立即拉取**：渲染后端注入的 `DATA.ports` 后立即调用 `fetchData()`，不再等 3 秒定时器；若 `DATA.ports` 为空则显示遮蔽罩 + "刷新中..."，解决"打开后要等才有数据"问题；DATA 已有数据时静默刷新，确保数据新鲜
+  - **刷新遮蔽罩**：新增 `.list-wrap` 容器包裹列表 + 遮蔽罩；遮蔽罩 absolute 覆盖列表区域，半透明 Catppuccin Mocha 背景 + 1px blur + 22x22 蓝色环形 spinner + "刷新中..." 文字；用户点击刷新按钮时显示，fetchData 完成后隐藏；定时器触发的静默刷新不显示遮蔽罩，避免 3 秒一次闪屏
+  - **fetchData 参数化**：`fetchData(withOverlay: boolean)`，点击刷新按钮传 `true`，首次空数据传 `true`，定时器传 `false`
+- 复用说明：模板仍使用原生 fetch + 后端 `/data` 接口，未引入第三方库；样式沿用 Catppuccin Mocha 暗色主题，与既有 redirect.html / port-picker.html 风格一致
+- 体验收益：刷新按钮不再"显得突兀"；打开子窗口立即拉取最新端口列表；点击刷新有明确视觉反馈
+
+#### port-picker 端口列表分组排序折叠 + IP 显示
+
+- 背景：[src-tauri/resources/templates/port-picker.html](src-tauri/resources/templates/port-picker.html) 此前端口列表为纯平铺结构，无法区分 Java 进程与其他进程；用户选择 Minecraft 服务器端口时，Java 进程监听的端口是最常见目标，但被淹没在大量无关端口中；同时列表未显示监听 IP，用户无法区分 127.0.0.1 与 0.0.0.0 等绑定地址
+- 改动：
+  - **端口列表分组**（[src-tauri/resources/templates/port-picker.html](src-tauri/resources/templates/port-picker.html)）：新增 `groupPorts` 函数将端口分为三组——Java 进程（含 javaw / java.exe 等变体，去掉扩展名后判断）→ 其他有程序名 → 无程序名；每组内按端口号升序排序
+  - **默认折叠无程序名组**：Java 进程组与其他进程组默认展开，无程序名组默认折叠，减少视觉噪音；新增 `groupCollapseState` 记录用户手动折叠/展开状态，避免 3 秒定时刷新丢失交互状态
+  - **分组标题栏**：新增 `.group-header` 样式，含折叠箭头（SVG，旋转动画 0.15s）、分组标题、端口数量徽标；点击标题栏调用 `toggleGroup` 切换显示
+  - **显示监听 IP**：每行新增 `.ip` 元素显示从 `local_addr` 提取的 IP 部分（`extractIp` 用 `lastIndexOf(':')` 兼容 IPv6 `[::]:7000` 形式），等宽字体 11px 灰色，与端口号、协议并列
+  - **搜索框 placeholder 更新**：`搜索端口或进程名...` → `搜索端口、IP 或进程名...`，提示用户可搜索 IP
+- 复用说明：复用既有 `local_addr` 字段（`OpenPortInfo` 结构体已含此字段），未新增后端接口；分组与折叠逻辑在前端实现，不影响 `/data` 接口契约
+- 体验收益：Java 进程（如 Minecraft 服务器）排在最前便于快速定位；无程序名的系统端口默认折叠减少干扰；IP 显示帮助区分绑定地址
+
+#### 隧道创建表单端口选择按钮宽度收窄
+
+- 背景：[src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue) 的本地端口选择按钮此前用 `InputGroup :ratio="[4, 1]"` 让按钮占 1/5 宽度，并配合 `class="w-full"` + `Tooltip block` 让按钮撑满列宽，视觉上按钮过宽与图标按钮的预期不符
+- 改动：
+  - **改用 flex 布局**（[src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue)）：移除 `InputGroup`，改为 `div.flex.items-center.gap-2`，Input `class="flex-1"` 撑满剩余空间，Button 不传 `w-full` 自适应图标宽度
+  - **Tooltip 移除 block**：取消 `block` prop，让 Tooltip 收缩到按钮宽度，避免 tooltip 触发区域过宽
+  - **清理未使用 import**：移除 `InputGroup` 的 import，避免 lint 报未使用警告
+- 复用说明：与同文件中其他 form 控件（如"本地 IP" 单 Input）的布局风格保持一致，未引入新模式
+- 视觉收益：端口选择按钮变为标准 32px 图标按钮，与搜索框对齐协调
+
+#### InputGroup 内 Input 上下堆叠修复
+
+- 背景：[src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue) 的服务器地址与端口使用 `<InputGroup :ratio="[3, 1]">` 布局，但 InputGroup 组件此前在"端口选择按钮宽度收窄"改动中被误删 import，导致 Vue 将 `<InputGroup>` 当作未知元素渲染，内部的两个 Input 失去 grid 容器约束，按默认流布局上下堆叠
+- 改动：
+  - **恢复 InputGroup import**（[src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue)）：重新添加 `import InputGroup from '@/components/common/InputGroup.vue'`，让组件正常渲染 grid 容器
+  - **强化 grid item blockify**（[src/components/common/InputGroup.vue](src/components/common/InputGroup.vue)）：新增 `.input-group :deep(.input-root) { display: block; width: 100%; }`，确保 Input 组件的 `<span class="input-root">` 根元素在 grid 中表现为块级，让 `grid-template-columns` 列宽正确分配
+- 复用说明：仅恢复被误删的 import + 补充 :deep 样式，未修改 Input 组件本身
+- 体验收益：服务器地址与端口现在能正确按 3:1 比例左右排列
+
+#### qrcode 模板改用本地库 + 依赖版权名单更新
+
+- 背景：qrcode.html 此前通过在线 API（api.qrserver.com）生成二维码，需联网且无法离线使用；同时 about 目录下的依赖版权名单（frontend-deps.txt / backend-deps.txt）缺少近期新增的依赖（Tauri Plugin dialog/process/updater、netstat2、tokio-tungstenite、fastnbt、加密套件等）和嵌入资源（marked.min.js、qrcode.min.js）的版权声明
+- 改动：
+  - **qrcode 改用本地库**（[src-tauri/resources/templates/qrcode.html](src-tauri/resources/templates/qrcode.html) + [src-tauri/src/resources.rs](src-tauri/src/resources.rs) + [src/config/picker-templates.ts](src/config/picker-templates.ts)）：
+    - `resources.rs` 的 `embedded_bytes` 新增 `view/qrcode.min.js` 分支（davidshimjs/qrcodejs 库，DOM 渲染）
+    - `qrcode.html` 重写：通过 `res://` 协议动态加载 `view/qrcode.min.js`，调用 `new QRCode(element, {text, width, height, colorDark, colorLight, correctLevel})` 生成二维码，完全离线可用；移除在线 API 调用
+    - `picker-templates.ts` 中 qrcode 模板 CSP 更新：`script-src` 新增 `res:` 允许加载本地库；`img-src` 移除 `https:` 不再允许外部图片
+  - **前端依赖名单补齐**（[src-tauri/resources/about/frontend-deps.txt](src-tauri/resources/about/frontend-deps.txt)）：新增 `Tauri Plugin Dialog ^2.7.2`、`Tauri Plugin Process ^2.0.0`、`Tauri Plugin Updater ^2.0.0`；新增嵌入资源版权声明 `marked`（Markdown 解析库）和 `qrcodejs`（二维码生成库）
+  - **后端依赖名单补齐**（[src-tauri/resources/about/backend-deps.txt](src-tauri/resources/about/backend-deps.txt)）：新增 `Tauri Plugins 2`（官方插件集）、`tokio-tungstenite 0.21`（WebSocket）、`rustls-native-certs 0.6`（根证书）、`serde_json 1.0`、`anyhow 1`、`thiserror 1.0`、`log 0.4`、`env_logger 0.10`、`once_cell 1`、`flate2 1`（gzip）、`fastnbt 2`（NBT 解析）、`netstat2 0.9`（端口枚举）、`hex 0.4`、`base64 0.22`、`encoding_rs 0.8`、`urlencoding 2.1`、`futures-util 0.3`、`Ed25519-Dalek 2`、`X25519-Dalek 2`、`hkdf 0.12`、`hmac 0.12`、`aes-gcm 0.10`、`rsa 0.9`、`rand 0.8`、`pem 3`、`tun-rs 2`（虚拟网卡）、`winreg 0.52`（注册表）
+- 复用说明：
+  - qrcode.html 的 `res://` 加载逻辑与 markdown.html 完全一致（动态判断 protocol 构造 URL）
+  - qrcodejs 库的 DOM 渲染 API 直接使用，无需封装
+- 离线收益：qrcode 模板不再依赖网络，可在无网环境下生成二维码
+
+### 新增
+
+#### Picker 子窗口多模板 + CSP 策略 + 便捷调用函数
+
+- 背景：picker 子窗口此前仅 `port-picker` 和 `redirect` 两个模板，用户需要更多示例模板（确认框、信息展示、图片查看、Markdown 渲染、二维码）；同时白名单是前端 JS 校验，无法限制子窗口内可加载的资源范围；白名单域名错误（`moiteam.cn` 应为 `moteam.top`）
+- 改动：
+  - **白名单域名修正**（[src/config/picker-templates.ts](src/config/picker-templates.ts)）：`*.moiteam.cn` → `moteam.top` + `*.moteam.top` + `*.molaunch.moiu.cn`，覆盖项目实际使用的服务域名
+  - **5 个新模板**（新增 [src-tauri/resources/templates/](src-tauri/resources/templates/)）：
+    - `confirm.html`：确认对话框，标题 + 消息 + 确认/取消按钮，支持 danger 红色样式，点击返回 `true`/`false`，支持 Enter/Esc 快捷键
+    - `info.html`：信息展示，标题 + 正文（支持 b/i/code/br/p 简单 HTML），自动转义其他标签
+    - `image-viewer.html`：图片查看器，工具栏（缩小/重置/放大）+ 滚轮缩放 + 拖拽平移，居中显示
+    - `markdown.html`：Markdown 渲染，通过 `res://` 协议加载后端嵌入的 `marked.min.js`，GFM + breaks 启用，暗色主题样式
+    - `qrcode.html`：二维码展示，通过在线 API 生成 240x240 二维码，显示标签和原文预览
+  - **CSP 策略化**（[src/config/picker-templates.ts](src/config/picker-templates.ts) + [src-tauri/src/commands/tools/picker_window.rs](src-tauri/src/commands/tools/picker_window.rs) + [src-tauri/src/commands/tools/types.rs](src-tauri/src/commands/tools/types.rs)）：
+    - 前端：每个模板配置 `csp` 字段（Content-Security-Policy），定义 `BASE_CSP` 通用策略 + 各模板特化策略（image-viewer 扩展 img-src https/http；markdown 扩展 script-src res:；qrcode 扩展 img-src https:）
+    - 后端：`OpenPickerWindowParams` 新增 `csp: Option<String>` 字段；`picker_window.rs` 新增 `PICKER_CSP_STORE` 存储 CSP；`build_response` 函数将 CSP 注入 HTTP 响应头 `Content-Security-Policy`
+    - 前端：`PickerWindowParams` 接口新增 `csp?: string`；`openPickerWindow`/`openDisplayWindow` 自动从模板配置读取 CSP，调用方可覆盖
+  - **便捷调用函数**（[src/utils/picker-window.ts](src/utils/picker-window.ts)）：
+    - 新增 `openDisplayWindow(params)`：展示型窗口基类，用户关窗即 resolve（适用于无返回值的模板）
+    - 新增 `openConfirmWindow({title?, message, confirmText?, cancelText?, danger?})`：返回 `Promise<boolean>`
+    - 新增 `openInfoWindow({title, content})`：信息展示
+    - 新增 `openImageViewerWindow({url, alt?})`：图片查看
+    - 新增 `openMarkdownWindow({title, content})`：Markdown 渲染
+    - 新增 `openQrcodeWindow({text, label?})`：二维码展示
+    - `openRedirectWindow` 重构为调用 `openDisplayWindow`
+  - **资源注册**（[src-tauri/src/resources.rs](src-tauri/src/resources.rs)）：`embedded_text` 新增 5 个模板分支（confirm/info/image-viewer/markdown/qrcode）；`embedded_bytes` 新增 `view/marked.min.js` 分支（供 markdown 模板通过 `res://` 协议加载）
+  - **后端通用化模板读取**（[src-tauri/src/commands/tools/picker_window.rs](src-tauri/src/commands/tools/picker_window.rs)）：URI scheme handler 不再写死 `port-picker`/`redirect` 分支，统一从 `templates/<name>.html` 读取模板；port-picker 的 `/data` 请求保留特殊处理返回实时端口列表；新增 `cleanup_picker_stores` 函数统一清理模板/数据/CSP 存储
+- 复用说明：
+  - 所有模板复用 Catppuccin Mocha 暗色主题风格，与 redirect.html/port-picker.html 一致
+  - 所有模板复用 `window.__PICKER_DATA__` 注入约定和右键/DevTools 快捷键禁用逻辑
+  - 便捷函数复用 `openPickerWindow`/`openDisplayWindow` 基类，避免重复事件监听/invoke 逻辑
+  - CSP 配置集中在 `picker-templates.ts`，修改策略只需改配置文件
+- 安全收益：CSP 通过 HTTP 响应头注入，浏览器级别限制子窗口可加载的资源范围，防止模板被注入恶意资源；`script-src res:` 仅允许 markdown 模板从 `res://` 协议加载 marked.min.js
+
+#### Picker 模板配置文件 + 重定向子窗口便捷函数
+
+- 背景：picker 子窗口的模板默认参数（标题、尺寸）与重定向白名单此前无集中管理位置，新增重定向场景需改逻辑代码且白名单校验散落。本次将模板配置下沉到独立配置文件，并提供 `openRedirectWindow` 便捷函数封装白名单校验 + 窗口创建
+- 改动：
+  - **模板配置文件**（新增 [src/config/picker-templates.ts](src/config/picker-templates.ts)）：定义 `PickerTemplateConfig` 接口与 `PICKER_TEMPLATES` 配置表（含 `port-picker`、`redirect` 两个模板的默认标题/尺寸/白名单）；提供 `isUrlAllowed(url, allowedDomains)` 校验函数（支持精确匹配与 `*.example.com` 通配符前缀）与 `getTemplateConfig(template)` 读取函数
+  - **重定向便捷函数**（[src/utils/picker-window.ts](src/utils/picker-window.ts)）：新增 `openRedirectWindow(url)`，先从配置表读取 `redirect` 模板配置，调用 `isUrlAllowed` 校验 URL 域名白名单，校验通过后复用同文件 `openPickerWindow` 创建子窗口；返回 `Promise<void>`（重定向窗口无需返回值）
+- 复用说明：
+  - `openRedirectWindow` 直接复用同文件既有 `openPickerWindow`，未重复事件监听/invoke 逻辑
+  - 白名单与默认尺寸集中在配置文件，修改白名单只需改 `PICKER_TEMPLATES`，不需动 `picker-window.ts`
+- 约束遵循：配置文件独立放在 `src/config/` 目录，不与逻辑文件混用；无 emoji；遵循最小修改原则（仅新增 1 个配置文件 + 1 个函数 + 1 行 import）
+
+#### Picker 子窗口重定向模板（后端）+ 安全措施
+
+- 背景：picker 子窗口此前仅支持 port-picker 模板，缺少通用的重定向页面；同时子窗口未禁用右键菜单与 DevTools 快捷键，存在调试与查看源码入口。本次新增 redirect 模板并补充安全措施
+- 改动：
+  - **重定向模板**（新增 [src-tauri/resources/templates/redirect.html](src-tauri/resources/templates/redirect.html)）：Catppuccin Mocha 暗色主题，居中显示 spinner + "正在跳转..." + 目标 URL；JS 从 `window.__PICKER_DATA__` 读取 `{ url }`，1 秒后自动 `location.href = url` 跳转，无效 URL 显示错误提示
+  - **安全措施**（[src-tauri/resources/templates/port-picker.html](src-tauri/resources/templates/port-picker.html) + redirect.html）：`<body oncontextmenu="return false">` 禁用右键；JS 拦截 F12、Ctrl+Shift+I/J/C、Ctrl+U 快捷键禁用 DevTools 入口
+  - **资源注册**（[src-tauri/src/resources.rs](src-tauri/src/resources.rs)）：`embedded_text` 新增 `templates/redirect.html` 分支
+  - **数据存储**（[src-tauri/src/commands/tools/picker_window.rs](src-tauri/src/commands/tools/picker_window.rs)）：新增 `PICKER_DATA_STORE`（picker_id → data JSON），`open_picker_window` 存储前端传入的 `data`，`on_navigation` 与 `on_window_event` 清理时同步移除；URI scheme handler 新增 `redirect` 模板分支，读取存储的 data 注入模板
+  - **禁用 DevTools**（[src-tauri/src/commands/tools/picker_window.rs](src-tauri/src/commands/tools/picker_window.rs)）：`WebviewWindowBuilder` 链式调用添加 `.devtools(false)`，子窗口级别关闭 DevTools
+- 复用说明：
+  - redirect 模板复用 port-picker 的配色与 `window.__PICKER_DATA__` 注入约定
+  - 模板读取复用 `crate::resources::read_resource`，与所有文本资源读取一致
+  - 数据存储复用 `PICKER_TEMPLATES` 的 `Lazy<Mutex<HashMap>>` 模式与清理逻辑
+- 安全收益：子窗口禁用右键与 DevTools 快捷键，防止用户查看模板源码与调试；`.devtools(false)` 在窗口级别关闭 DevTools
+
+### 重构
+
+#### Picker 子窗口模板化（后端 resources + 实时刷新端口列表）
+
+- 背景：原 picker 子窗口由前端传入完整 HTML 字符串，后端原样存储返回，存在前端注入风险且端口列表无法实时刷新。本次将 HTML 模板下沉到后端 resources，并支持端口列表定时刷新
+- 改动：
+  - **HTML 模板**（新增 [src-tauri/resources/templates/port-picker.html](src-tauri/resources/templates/port-picker.html)）：自包含暗色 Catppuccin Mocha 页面，搜索框 + 刷新按钮工具栏，端口列表点击导航 `picker-result://?value=<port>`；JS 从 `window.__PICKER_DATA__` 读取初始数据，定时（3 秒）fetch `./data` 实时刷新列表不刷新页面，搜索框实时筛选，刷新按钮手动触发，空状态 icon + text 垂直水平居中
+  - **资源注册**（[src-tauri/src/resources.rs](src-tauri/src/resources.rs)）：`embedded_text` 新增 `templates/port-picker.html` 分支，编译时 include_str! 嵌入，运行时零文件 IO
+  - **同步端口枚举**（[src-tauri/src/commands/tools/network.rs](src-tauri/src/commands/tools/network.rs)）：新增 `list_open_ports_sync()` 提取 netstat2 + sysinfo 枚举逻辑，返回 `Vec<OpenPortInfo>`；`list_open_ports` 重构为调用本函数后序列化，消除逻辑重复
+  - **picker_window 重构**（[src-tauri/src/commands/tools/picker_window.rs](src-tauri/src/commands/tools/picker_window.rs)）：移除 `PICKER_HTML_STORE`，新增 `PICKER_TEMPLATES`（picker_id → template_name）；`open_picker_window` 存储模板名而非 HTML；URI scheme handler 按模板名分发——`port-picker` 模板实时调用 `list_open_ports_sync()`，`/data` 请求返回 JSON，页面请求返回模板 + 注入初始数据；`extract_picker_id` 改为查找以 `picker-` 开头的路径段以正确处理 `/data` 后缀
+  - **类型更新**（[src-tauri/src/commands/tools/types.rs](src-tauri/src/commands/tools/types.rs)）：`OpenPickerWindowParams` 移除 `html` 字段，改为 `template: String` + `#[serde(default)] data: serde_json::Value`
+- 复用说明：
+  - `list_open_ports_sync` 复用原 `list_open_ports` 的 netstat2 + sysinfo 枚举逻辑，async 版本改为薄封装避免重复
+  - 模板读取复用 `crate::resources::read_resource`，与所有文本资源读取一致
+  - URI scheme 注册模式与 `res_scheme.rs` / 原 picker scheme 一致
+- 安全收益：HTML 模板由后端控制，前端无法注入任意 HTML/JS；端口数据由后端实时生成，前端仅传模板名
+- 约束遵循：遵循 `log_info!` 宏约定；无 emoji；空状态 icon + text 居中
+
+#### Picker 子窗口模板化（前端适配）
+
+- 背景：picker 子窗口此前的 HTML 由前端 `generatePortPickerHtml` 生成并整段传给后端，HTML 模板与转义逻辑散落在前端工具文件中。本次将 HTML 模板迁移至后端 resources，前端只传 `template` 名称与 `data`，由后端加载模板并注入数据，统一模板管理职责
+- 改动：
+  - **接口变更**（[src/utils/picker-window.ts](src/utils/picker-window.ts)）：`PickerWindowParams` 从 `{ title, html, width?, height? }` 改为 `{ title, template, data?, width?, height? }`；`openPickerWindow` 内部 invoke 调用直接透传 params，自动携带新字段；同步更新文件顶部用法文档
+  - **删除前端 HTML 生成器**：移除 [src/utils/frp-port-picker.ts](src/utils/frp-port-picker.ts)（`generatePortPickerHtml` 及 HTML/属性转义逻辑已迁至后端 resources 模板）
+  - **表单适配**（[src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue)）：`handleSelectPort` 不再调用 `listOpenPorts` + `generatePortPickerHtml`，改为 `openPickerWindow({ template: 'port-picker', data: {} })`；移除 `generatePortPickerHtml` 导入与 `listOpenPorts` 导入（`tcpCheck` 保留）
+  - **修复按钮布局对齐**：本地端口选择区原用 `flex gap-1.5` + `flex-1` 手动布局，Button 宽度随内容（图标 vs spinner）变化导致加载/非加载状态宽度不一致；改用 `InputGroup :ratio="[4, 1]"` 复用既有 Grid 布局组件，Tooltip 加 `block` prop 让 trigger 填满 grid 列宽，Button 加 `w-full` 填满 trigger，确保两种状态下宽度一致
+- 复用说明：
+  - 复用既有 `InputGroup` 组件（已在服务器地址+端口处使用），未新增布局组件
+  - 复用 Tooltip 的 `block` prop（组件既有的"撑满父容器"开关），未新增样式
+- 约束遵循：TunnelCreateForm.vue 273 行 ≤ 300；遵循自定义组件约定（InputGroup/Tooltip/Button/Input）；无 emoji；最小修改原则
+
+### 增强
+
+#### 选择器子窗口工具 + Frp 端口选择器（前端 UI）
+
+- 背景：Frp 隧道表单此前的本机端口选择为内联下拉浮层（点击外部关闭、手动维护 openPorts/portPanelRef 等状态），与子窗口选择方案相比交互受限且占用组件行数。本次引入通用 picker 子窗口工具替换内联下拉
+- 改动：
+  - **通用 picker 工具**（新增 [src/utils/picker-window.ts](src/utils/picker-window.ts)）：封装 `openPickerWindow({ title, html, width?, height? })`，内部先 await 注册 `picker-result` / `picker-cancelled` 事件监听拿到 unlisten 句柄，再调用 `tools_manager` 的 `open_picker_window` action 创建子窗口；用户点击选项 → `picker-result` 事件 → resolve(value)；用户关闭窗口 → `picker-cancelled` 事件 → reject；invoke 失败时完整清理已注册监听器，参照 `useTauriEvent.ts` 的 async/await 模式避免 listener 泄漏
+  - **端口选择器 HTML 生成器**（新增 [src/utils/frp-port-picker.ts](src/utils/frp-port-picker.ts)）：`generatePortPickerHtml(ports)` 生成自包含 HTML（暗色 Catppuccin Mocha 配色），含搜索框 + 端口列表；点击项导航到 `picker-result://?value=<port>` 由后端 on_navigation 拦截；HTML/属性转义防止进程名注入
+  - **action 注册**（[src/utils/api/tools.ts](src/utils/api/tools.ts)）：`TOOLS_ACTIONS` 新增 `OPEN_PICKER_WINDOW: 'open_picker_window'`，与后端分发器对齐
+  - **表单集成**（[src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue)）：移除内联下拉相关状态（showPortPanel/openPorts/openPortsLoading/portPanelRef）与函数（togglePortPanel/loadOpenPorts/selectPort/handlePortClickOutside）及 onMounted/onUnmounted 的 click 外部监听；新增 `portSelecting` ref 与 `handleSelectPort` 函数，按钮加 `:loading="portSelecting"`；修正 `OpenPortInfo` 类型原误从 `@/types/frp` 导入（实际未导出）的问题
+- 复用说明：
+  - 完全复用 `listOpenPorts` / `tcpCheck`（@/utils/api/tools），未重复端口枚举逻辑
+  - picker 工具参照 `useTauriEvent.ts` 的 unlisten 句柄管理模式，与项目既有事件监听风格一致
+  - Button 的 `:loading` prop 复用项目既有约定（加载时图标槽位自动替换为 spinner）
+  - 端口项点击导航协议 `picker-result://` 与后端 on_navigation 拦截契约对齐
+- 约束遵循：Vue 组件 272 行 ≤ 300；仅新增 2 个工具文件，未新建组件；遵循自定义组件约定（Button/Tooltip/Input/Select）；无 emoji
+
+#### 选择器子窗口工具（后端 Rust）
+
+- 背景：前端 picker 工具已就绪（`openPickerWindow` + `picker-result://` 导航协议），但后端缺少对应的 `open_picker_window` IPC action 与 `picker://` URI scheme 注册，子窗口无法实际创建和渲染 HTML
+- 改动：
+  - **picker_window 模块**（新增 [src-tauri/src/commands/tools/picker_window.rs](src-tauri/src/commands/tools/picker_window.rs)）：`open_picker_window(app, params)` 生成唯一 picker ID（时间戳+原子计数器），存储 HTML 到全局 `PICKER_HTML_STORE`，通过 `WebviewWindowBuilder` + `WebviewUrl::CustomProtocol` 加载 `picker://localhost/<id>`；`on_navigation` 拦截 `picker-result://?value=XXX` 导航，emit `picker-result` 事件后关闭窗口；`on_window_event` 监听 `Destroyed`，用户未选择关窗时 emit `picker-cancelled` 事件
+  - **URI scheme 注册**（`register_picker_scheme`）：注册 `picker://` 自定义协议，从 URL 路径提取 picker_id，从全局存储取出 HTML 返回（兼容 Windows `https://picker.localhost/` 转换）
+  - **类型定义**（[src-tauri/src/commands/tools/types.rs](src-tauri/src/commands/tools/types.rs)）：新增 `OpenPickerWindowParams`（title/html/width?/height?，camelCase 反序列化），遵循项目类型集中定义约定
+  - **action 注册**（[src-tauri/src/commands/tools/mod.rs](src-tauri/src/commands/tools/mod.rs)）：DISPATCHER 新增 `open_picker_window` action，位于 `list_open_ports` 之后
+  - **scheme 注册**（[src-tauri/src/lib.rs](src-tauri/src/lib.rs)）：在 `res_scheme::register_res_scheme` 之后调用 `register_picker_scheme`
+- 复用说明：
+  - `register_uri_scheme_protocol` 模式参照 `res_scheme.rs` 和 `minecraft/image_cache.rs`
+  - `WebviewWindowBuilder` + `on_navigation` 模式参照 `commands/auth/microsoft.rs`
+  - `handler!` 宏 + Dispatcher 注册模式与现有 25 个 tools action 完全一致
+  - 类型定义放在 `types.rs`（与所有其他工具参数类型一致），子模块通过 `use super::types::` 导入
+- 防重复设计：`PICKER_COMPLETED` 全局集合标记已完成选择的 picker ID，避免 `on_navigation` emit `picker-result` 后窗口 `Destroyed` 再重复 emit `picker-cancelled`
+- 约束遵循：Rust 模块 207 行；遵循 `log_info!` 日志宏约定；无 emoji
+
+#### Frp 隧道自检面板集成（前端 UI）
+
+- 背景：`TunnelSelfCheck.vue` 组件与 `frp-tunnel-check.ts` 工具已就绪，但 `TunnelManager.vue` 仅导入未实际挂载，自检入口缺失。本次补全集成
+- 改动：
+  - **自检入口**（[src/components/frp/TunnelManager.vue](src/components/frp/TunnelManager.vue)）：顶部操作栏新增「隧道自检」按钮（ShieldCheckIcon，位于刷新按钮左侧），点击切换 `showSelfCheck` 控制面板展开/收起
+  - **自检面板**：编辑表单与隧道列表之间插入 `Transition` + `TunnelSelfCheck` 组件，复用既有展开动画（透明度+缩放+位移），传入 `tunnels` / `providers` props，`@close` 收起面板
+  - **行数控制**：将 `handleRefresh` / `handleViewLogs` 压缩为单行，腾出行数空间；TunnelManager.vue 278 行 ≤ 300
+- 复用说明：
+  - 完全复用 `TunnelSelfCheck.vue` 组件（props/emits 已定义），未重复自检逻辑
+  - 动画 class 与创建/编辑表单 Transition 完全一致，保持视觉统一
+  - Button / Tooltip / heroicons 均复用项目既有约定
+- 约束遵循：仅修改 TunnelManager.vue 一个文件，未新建文件；遵循 300 行约束与自定义组件约定
+
+#### Frp 隧道编辑模式 + 本机开放端口选择（前端 UI）
+
+- 背景：此前仅有创建隧道入口，修改名称/端口/token 等需删除重建；本机端口需手动查找。本次实现编辑隧道配置 UI 并集成 list_open_ports 工具到创建/编辑表单
+- 改动：
+  - **composable 抽离**（新增 [src/composables/usePublicServers.ts](src/composables/usePublicServers.ts)）：将 TunnelCreateForm.vue 的公共服务器逻辑（publicServers ref / loadPublicServers / handlePublicServerChange / publicServerOptions computed）抽至独立 composable，form 由调用方传入，避免组件超 300 行约束
+  - **编辑模式**（[src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue)）：新增 `editTunnel?: Tunnel` prop 与 `update` emit；onMounted 预填表单（mode 固定 self）；编辑模式隐藏服务器模式切换；提交按钮文案切换「保存」/「创建」；handleSubmit 按 isEdit 分流 emit update/create
+  - **本机端口选择**（[src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue)）：本地端口输入框旁加 ServerStackIcon 按钮，点击调用 `listOpenPorts()` 拉取本机监听端口，下拉浮层展示端口号+协议+进程名，点击自动填入 localPort；加载中 spinner，失败 toast 提示，点击外部关闭
+  - **store action**（[src/stores/frp.ts](src/stores/frp.ts)）：新增 `updateTunnel(params)` action，完全参照 createTunnel 风格（tunnelActionLoading + toastSuccess + loadTunnels 刷新）；补充 `apiUpdateTunnel` 与 `UpdateTunnelParams` 导入
+  - **编辑入口**（[src/components/frp/TunnelManager.vue](src/components/frp/TunnelManager.vue)）：每条隧道卡片操作区加「编辑配置」按钮（PencilIcon，位于启动/停止与查看日志之间）；运行中隧道点击编辑时 toastWarning 提示「请先停止隧道再编辑」；编辑表单用独立 Transition 包裹，保存成功后自动收起
+- 复用说明：
+  - 公共服务器逻辑通过 composable 抽离复用，零逻辑重复
+  - 编辑表单完全复用 TunnelCreateForm.vue 组件（通过 editTunnel prop 切换模式），未新建独立编辑组件
+  - updateTunnel action 复用 createTunnel 的 loading/toast/刷新模式
+  - 本机端口下拉样式参考 Select.vue（白底、gray 边框、圆角、阴影）
+  - toastWarning / showConfirm / Button / Tooltip / Input 等均复用项目既有组件与工具
+- 验证：`npx tsc --noEmit --skipLibCheck` 与 `npx vue-tsc --noEmit --skipLibCheck` 过滤 TunnelCreateForm/TunnelManager/stores/frp/usePublicServers 零错误；TunnelCreateForm.vue 272 行、TunnelManager.vue 271 行均 ≤ 300
+- 约束遵循：仅新增 1 个 composable 文件（usePublicServers.ts，因组件超 300 行约束必须抽取）；遵循项目自定义组件约定（Button/Input/Select/Tooltip）、heroicons 无 emoji、单列布局风格
+
+#### 列出本机监听端口（list_open_ports 工具，供 Frp 内网端口选择）
+
+- 背景：Frp 创建隧道时需要选择本机内网端口进行映射，此前缺少枚举本机监听端口的工具，用户需手动查端口。新增 `list_open_ports` action 返回所有 LISTEN 状态的 TCP 端口与全部 UDP 端口（含占用进程信息），供前端 Frp 隧道配置复用
+- 改动：
+  - **依赖**（[src-tauri/Cargo.toml](src-tauri/Cargo.toml)）：新增 `netstat2 = "0.9"`（跨平台枚举网络套接字，使用 OS 底层 API 而非命令行工具）
+  - **后端类型**（[src-tauri/src/commands/tools/types.rs](src-tauri/src/commands/tools/types.rs)）：新增 `OpenPortInfo`（local_addr / port / protocol / process_name / pid）与 `ListOpenPortsResult`
+  - **后端实现**（[src-tauri/src/commands/tools/network.rs](src-tauri/src/commands/tools/network.rs)）：新增 `list_open_ports(state)` 函数，用 `netstat2::get_sockets_info` 枚举 IPv4/IPv6 的 TCP+UDP 套接字，筛选 TCP `Listen` 状态（UDP 无状态全部视为监听），通过 `sysinfo::System::new_all()` + `Pid::from_u32` 查进程名；按 port 升序排序并按 (port, protocol, local_addr) 去重；与 `tcp_check` / `server_ping` 风格一致（读 game_dir、log_info!、返回 `serde_json::Value`）
+  - **action 注册**（[src-tauri/src/commands/tools/mod.rs](src-tauri/src/commands/tools/mod.rs)）：`tcp_check` 之后、NBT 之前注册 `list_open_ports`，走 `handler!` 宏无参数模式
+  - **前端 API**（[src/utils/api/tools.ts](src/utils/api/tools.ts)）：`TOOLS_ACTIONS` 加 `LIST_OPEN_PORTS`；`tcpCheck` 之后新增 `OpenPortInfo` / `ListOpenPortsResult` 接口与 `listOpenPorts()` 封装
+- 复用说明：
+  - netstat2 0.9 实际 API 为 `get_sockets_info(AddressFamilyFlags, ProtocolFlags)` 返回 `SocketInfo`（非任务描述中假设的 `get_active_connections`/`ConnectionInfo`），`ProtocolSocketInfo::Tcp(TcpSocketInfo)` 为元组变体且 `local_addr: IpAddr` + `local_port: u16` 分离字段，已按实际 API 实现
+  - sysinfo 0.29 需导入 `SystemExt` / `ProcessExt` / `PidExt` 三个 trait 才能调用 `new_all` / `process` / `name` / `from_u32`
+  - 注册与封装模式完全复用 `tcp_check` 的既有约定（handler! 宏、toolsManager 泛型封装）
+- 验证：`cargo check` 编译通过零错误零警告
+- 约束遵循：未创建新文件，未修改 Vue 组件；遵循 log_info! 宏、Result<T, String> 错误处理、handler! 注册约定
+- 待实测（前端 UI 由其他 agent 处理）：① 调用返回本机监听端口列表；② 进程名解析正确；③ TCP/UDP 端口均能枚举
+
+#### Frp 编辑隧道配置（update_tunnel 后端 + 前端 API 封装）
+
+- 背景：原仅有创建/删除隧道能力，缺少编辑已有隧道配置的入口；用户修改名称、端口、token、TLS 等需删除重建。新增 `update_tunnel` action 支持就地编辑并重新生成 frpc TOML
+- 改动：
+  - **后端 update_tunnel**（[src-tauri/src/commands/frp/tunnel.rs](src-tauri/src/commands/frp/tunnel.rs)）：新增 `update_tunnel(params)` 函数，校验隧道存在 + 名称唯一性（排除自身）后更新 `tunnels.json` 并调用现有 `generate_config` 覆盖重生成 frpc TOML；新增 `UpdateTunnelParams` 结构体（字段同 `CreateTunnelParams` + `id`，`serde rename_all = "camelCase"`）。注意：名称唯一性校验须在 `iter_mut().find()` 之前执行，否则可变借用与 `iter().any()` 不可变借用冲突（任务原始代码片段的固有借用问题，已修正顺序）
+  - **沙箱校验复用**（[src-tauri/src/commands/frp/sandbox.rs](src-tauri/src/commands/frp/sandbox.rs)）：`validate_tunnel` 仅接受 `&CreateTunnelParams`；新增 `validate_tunnel_update(p: &UpdateTunnelParams)` 将其转换为 `CreateTunnelParams` 后委托 `validate_tunnel`，零逻辑重复，校验规则（厂商 ID/名称/地址/端口/Token/类型）完全复用
+  - **action 注册**（[src-tauri/src/utils/frp_manager.rs](src-tauri/src/utils/frp_manager.rs)）：`UpdateTunnelParams` 加入 import；`delete_tunnel` 注册之后、frpc 进程管理之前注册 `update_tunnel`，走 `handler!` 宏 + `frp::sandbox::validate_tunnel_update` 校验 + `frp::tunnel::update_tunnel` 调用，与 `create_tunnel` 模式一致
+  - **前端类型**（[src/types/frp.ts](src/types/frp.ts)）：`CreateTunnelParams` 之后新增 `UpdateTunnelParams` 接口（多 `id` 字段）
+  - **前端 API 封装**（[src/utils/api/frp-manager.ts](src/utils/api/frp-manager.ts)）：`FRP_ACTIONS` 加 `UPDATE_TUNNEL: 'update_tunnel'`；`createTunnel` 之后新增 `updateTunnel(params): Promise<Tunnel>`，import 补 `UpdateTunnelParams`
+- 复用说明：
+  - 校验逻辑复用 `validate_tunnel`（通过转换委托，未复制任何校验规则）
+  - 配置生成复用现有 `generate_config` / `build_frpc_toml`
+  - 持久化复用 `read_tunnels` / `write_tunnels`
+  - 注册模式复用 `handler!` 宏，与 `create_tunnel` / `delete_tunnel` 完全一致
+- 验证：`cargo check` 我修改的 3 个 Rust 文件（tunnel.rs / sandbox.rs / frp_manager.rs）零错误；剩余编译错误均位于未触碰的 `network.rs`（先前会话遗留的 sysinfo/netstat2 版本 API 问题，与本次改动无关）
+- 约束遵循：未创建新文件，未修改 Vue 组件 / stores/frp.ts；遵循 `log_info!` 宏、`camelCase` serde、`handler!` 注册约定
+- 待实测（前端 UI 由其他 agent 处理）：① 编辑隧道后 tunnels.json 正确更新；② frpc TOML 覆盖重生成；③ 名称重复时拒绝；④ 隧道运行中编辑（调用方应先停止）
+
+#### Frp 穿透管理体验改进（状态同步 + 日志诊断 + 翻译 + 跳转 + 动画）
+
+- 背景：用户反馈 6 个问题：① 隧道异常退出后列表仍显示"运行中"；② 选择"全部隧道"不返回日志；③ frpc 日志全是英文难以理解；④ 缺少退出原因诊断；⑤ 穿透管理列表无刷新按钮；⑥ 想从隧道卡片一键跳转查看日志
+- 改动：
+  - **隧道状态同步**（[src/stores/frp.ts](src/stores/frp.ts)）：新增 `startTunnelStatusListener` 监听 `frp-tunnel-status` Tauri event，frpc 进程退出时自动静默刷新 `tunnels` 列表（`refreshTunnelsSilent`，不触发 loading 避免抖动）；异常退出（带 error 字段）时弹 toast 提示；[TunnelManager.vue](src/components/frp/TunnelManager.vue) onMounted 启动监听器
+  - **全部隧道日志合并**（[src-tauri/src/commands/frp/process.rs](src-tauri/src/commands/frp/process.rs)）：`read_log_file` 当 `tunnel_id` 为空时调用新增 `read_all_logs` 合并所有日志文件，按行内时间戳排序（支持 `[HH:MM:SS.ms]` / `[YYYY-MM-DD HH:MM:SS.ms]` / frpc 原生格式三种时间戳），限 500 行
+  - **日志诊断面板**（新增 [src/utils/frp-log-diagnose.ts](src/utils/frp-log-diagnose.ts)）：基于关键词模式匹配分析退出原因，覆盖网络层（超时/拒绝/DNS）/鉴权层（token 错误/超时）/配置层（端口占用/配置错误）/服务端（协议不匹配）5 类场景；[FrpLogs.vue](src/components/frp/FrpLogs.vue) 顶部显示诊断卡片（标题+类别徽章+详情+建议+关键日志证据），异常退出时自动展开
+  - **中文翻译**（新增 [src/utils/frp-log-translate.ts](src/utils/frp-log-translate.ts)）：30+ 条翻译规则覆盖 frpc 常见日志关键词（start frpc service / try to connect / i/o timeout / login failed 等），长短语优先匹配避免重复翻译；[FrpLogs.vue](src/components/frp/FrpLogs.vue) 加翻译开关按钮，开启后日志行尾追加 `｜ 中文释义`
+  - **刷新按钮**（[src/components/frp/TunnelManager.vue](src/components/frp/TunnelManager.vue)）：顶部操作栏加刷新按钮，触发 `loadTunnels` 重新拉取列表
+  - **查看日志按钮**（[src/components/frp/TunnelManager.vue](src/components/frp/TunnelManager.vue)）：每条隧道卡片加「查看日志」按钮，点击通过 `inject('goToLogs')` 调用 [Online.vue](src/views/Online.vue) provide 的 `goToLogs` 函数，切换到 logs 分类并预选 tunnelId
+  - **创建表单动画**（[src/components/frp/TunnelManager.vue](src/components/frp/TunnelManager.vue)）：Transition 包裹表单，展开/收起带透明度+scale-y+位移过渡；TransitionGroup 包裹隧道列表，新增/删除带平移过渡；状态徽章加脉冲动画点（运行中绿色闪烁）
+- 复用说明：
+  - 事件监听复用 `useTauriEvent` composable（自动 onUnmounted unlisten）
+  - 日志颜色复用 `logLineClass`（项目约定）
+  - 跳转用 provide/inject 而非 props，避免 keep-alive 缓存组件的层级耦合
+  - 翻译和诊断规则独立在 utils/ 下，便于维护扩展
+- 验证：`cargo check` 编译通过；`tsc --noEmit` 无 frp 相关错误（仅 online.ts/crypto.ts 原有问题）
+- 待实测：① 启动一个会失败的隧道（错误地址）验证状态自动同步 + 诊断面板；② 选「全部隧道」验证日志合并；③ 翻译开关；④ 刷新按钮；⑤ 查看日志跳转
+
+#### Frp 创建隧道增强（公共服务器模式 + 地址端口并列 + 自动连通性检测）
+
+- 背景：阶段二遗留的「官方公共服务器」UI 对接 + 用户希望服务器地址输入后 3 秒自动检测可连接性，且地址和端口支持并列输入调整占比
+- 改动：
+  - **TCP 连通性检测后端**（[src-tauri/src/commands/tools/network.rs](src-tauri/src/commands/tools/network.rs)）：新增 `tcp_check` action，仅做 TCP 三次握手（3 秒超时），不发送应用层数据，适用于 Frp 等非 Minecraft 协议服务；不复用 `server_ping`（SLP 协议对 Frp 端口会卡 5 秒超时）；配套类型 `TcpCheckParams` / `TcpCheckResult` 加在 [types.rs](src-tauri/src/commands/tools/types.rs)，[mod.rs](src-tauri/src/commands/tools/mod.rs) 注册 action
+  - **前端 API 封装**（[src/utils/api/tools.ts](src/utils/api/tools.ts)）：新增 `tcpCheck(host, port)` 与 `TcpCheckResult` 类型
+  - **创建表单抽出**（新增 [src/components/frp/TunnelCreateForm.vue](src/components/frp/TunnelCreateForm.vue)，[TunnelManager.vue](src/components/frp/TunnelManager.vue) 回归 228 行）：原内联表单抽为独立组件（263 行），主文件仅负责列表展示与操作，符合 Vue 组件 ≤300 行约束
+  - **模式切换**：表单顶部加「用户自备服务器 / 官方公共服务器」下拉；官方模式调用 `listPublicServers` 拉取公共服务器列表（显示名称/区域/负载/在线人数），选择后调 `allocatePublicServer` 自动分配端口 + per-user token，回填 serverAddr/serverPort/remotePort/token/useTls（字段只读）
+  - **地址端口并列**：新增可复用公共组件 [InputGroup.vue](src/components/common/InputGroup.vue)（基于 CSS Grid，`ratio` prop 控制各列占比，`gap` 控制列间距，支持任意数量子项），自备模式下服务器地址与端口用 `:ratio="[3, 1]"` 并列（3:1 占比），全项目其他表单可直接复用
+  - **3 秒自动检测**：自备模式下监听 serverAddr / serverPort 变化，3 秒无操作自动调 `tcpCheck`，输入下方显示「可连接（Nms）」/「不可连接：原因」/「检测中...」；用 `checkSeq` 序号过滤过期请求避免竞态
+- 复用说明：
+  - 公共服务器接口复用 `listPublicServers` / `allocatePublicServer`（[frp-manager.ts](src/utils/api/frp-manager.ts) 已有封装）
+  - 表单组件用项目自定义 `Input` / `Select` / `Button`，原生 checkbox 因项目无自定义 Checkbox 组件保持与原代码一致
+  - 父子通信用 props + emit，父组件 v-if 控制挂载实现自然重置，无需手动 resetForm
+- 验证：`cargo check` 编译通过；`tsc --noEmit --skipLibCheck` 无 frp/tools 相关错误
+- 待实测：① 切换官方模式验证公共服务器列表加载与分配回填；② 自备模式输入地址后 3 秒验证连通性检测；③ 地址端口并列占比显示
+
+### 修复
+
+#### Frp frpc ZIP 提取改为跨平台自探测 + DownloadManager 集成
+
+- 背景：用户反馈 `extract_frpc_from_zip` 仅匹配当前平台文件名（Windows=frpc.exe，macOS/Linux=frpc），若 apiServer 返回的 ZIP 内文件名与当前平台不一致（如 macOS ZIP 内是 `frpc` 无后缀，或嵌套层级不固定），会导致提取失败；同时 frpc 下载此前使用裸 `reqwest::get()` 无进度反馈、不支持暂停/取消
+- 改动：
+  - **跨平台自探测**（[src-tauri/src/commands/frp/binary.rs](src-tauri/src/commands/frp/binary.rs)）：`extract_frpc_from_zip` 不再仅匹配 `frpc_filename()` 单一文件名，改为同时匹配 `basename == "frpc" || basename == "frpc.exe"`，翻遍 ZIP 所有层级目录收集候选条目；排序优先级为「当前平台首选名优先 → 路径短优先（浅层目录）」，兼容 GitHub Releases / apiServer 分发 / 扁平打包 / 任意嵌套层级四种格式；basename 精确匹配确保不会误提取 LICENSE / frpc.toml / frpc.ini 等附加文件
+  - **DownloadManager 集成**（[src-tauri/src/commands/frp/binary.rs](src-tauri/src/commands/frp/binary.rs)）：`ensure_system_default_frpc` 移除裸 `reqwest::get()` 调用，改用 `DownloadSession::start_grouped(state, "frpc 下载", [("frpc 二进制", 1.0)])` 初始化下载会话，构造 `DownloadTask` 调 `download_batch` 执行下载，复用全局 `download_cancel_flag` / `download_pause_flag` 支持暂停/取消；`download_state.version_name` 设为 `frpc v<version>` 供下载管理页展示；失败时调 `session.mark_failed(state, 1)` 并清理半成品 ZIP
+- 复用说明：DownloadSession 模式参考 [src-tauri/src/commands/tools/download.rs](src-tauri/src/commands/tools/download.rs) 的 `download_file` 实现，与外部下载、整合包安装等场景共享同一套进度回调/flag 重置/manager 构造逻辑
+- 验证：`cargo check` 编译通过；dev 模式启动正常，Tauri 窗口创建成功
+- 待实测：进度反馈/暂停/取消/版本号显示/ZIP 提取（含跨平台文件名场景）
+
+#### Frp 版本号查询修复（apiServer 校验语义化版本 + list_providers 显示云端最新版本）
+
+- 背景：用户实测反馈两个问题：① 查询 apiServer `GET /v1/frp/manifest` 时空版本号直接返回 `code=1001: 版本号格式非法（不符合语义化版本规则）`；② 厂商列表系统默认厂商版本号仍显示固定 `0.61.0`，未反映云端最新版本
+- 改动：
+  - **manifest 查询传 0.0.0**（[src-tauri/src/commands/frp/binary.rs](src-tauri/src/commands/frp/binary.rs)）：`ensure_system_default_frpc` 中 `current_version` 从 `read_frpc_version().unwrap_or_default()`（空字符串）改为 `read_frpc_version().unwrap_or_else(|| "0.0.0".to_string())`，本地未安装时传 `0.0.0` 表示"查询最新版本"，符合 apiServer 语义化版本校验规则
+  - **新增 fetch_latest_frpc_version**（[src-tauri/src/commands/frp/binary.rs](src-tauri/src/commands/frp/binary.rs)）：`pub(super) async fn fetch_latest_frpc_version(state)` 请求 apiServer `GET /v1/frp/manifest`（传 `current_version=0.0.0`）获取最新版本号，不下载文件，仅返回 `manifest.version`；`api_server_platform_arch` 同步改为 `pub(super)` 供此函数复用
+  - **list_providers 显示云端最新版本**（[src-tauri/src/commands/frp/provider.rs](src-tauri/src/commands/frp/provider.rs)）：函数签名增加 `state: &AppState` 参数；系统默认厂商版本号策略改为：本地已安装（frpc_ready=true）从 `frpc_version.txt` 读取真实版本，本地未安装调 `fetch_latest_frpc_version(state)` 获取云端最新版本，失败回退显示"未安装"；删除不再使用的 `FRPC_VERSION = "0.61.0"` 常量
+  - **IPC action 传 state**（[src-tauri/src/utils/frp_manager.rs](src-tauri/src/utils/frp_manager.rs)）：`list_providers` action 从 `handler!(_state, ...)` 改为 `handler!(state, ...)`，透传 `AppState` 给 `list_providers`
+- 复用说明：`fetch_latest_frpc_version` 复用 `ensure_system_default_frpc` 的 manifest 查询逻辑（`load_creds_with_auto_refresh` + `OnlineClient::frp_get_manifest`），仅去掉下载部分，与 `signaling_manager` 的"GET 明文 + 自动 JWT"风格一致
+- 验证：`cargo check` 编译通过，无警告
+- 待实测：厂商列表首次加载（本地未安装）应显示云端最新版本号（如 `0.70.1`），点击"下载 frpc"应成功查询 manifest 并下载
+
+#### Frp frpc 下载 ZIP 提取失败 + 版本号硬编码 + pnpm 残留物清理
+
+- 背景：阶段三 frpc 下载切到 apiServer 后，用户测试发现三个问题：① 点击「下载 frpc」报错 `ZIP 中未找到 frpc 二进制（期望条目 frp_0.70.1_windows_amd64/frpc.exe）`；② 厂商列表显示版本号仍为硬编码的 `v0.61.0` 而非实际下载的 `0.70.1`；③ 项目根目录存在 pnpm 残留文件
+- 根因分析：
+  - **ZIP 提取失败**：apiServer 分发的 ZIP 命名为 `frp_client_0.70.1_windows_x86_64.zip`，内部目录为 `frp_client_0.70.1_windows_x86_64/frpc.exe`（带 `client` + `x86_64` 架构名），但 `extract_frpc_from_zip` 硬编码期望 GitHub 格式 `frp_0.70.1_windows_amd64/frpc.exe`（无 `client` + `amd64` 架构名），导致精确匹配失败
+  - **版本号硬编码**：`FRPC_VERSION = "0.61.0"` 常量同时用于 manifest 查询的 `current_version` 参数和 `list_providers` 的 UI 显示，本地未安装时仍上报虚假版本号，下载完成后 UI 也显示旧版本
+  - **pnpm 残留**：`pnpm-lock.yaml` 和 `pnpm-workspace.yaml` 被误提交到 git，且 `.gitignore` 忽略了 `package-lock.json`（npm 锁文件）
+- 改动：
+  - **ZIP 提取逻辑重写**（[src-tauri/src/commands/frp/binary.rs](src-tauri/src/commands/frp/binary.rs)）：`extract_frpc_from_zip` 不再接收 `entry_dir` 参数，改为遍历 ZIP 所有条目，查找文件名为 `frpc` / `frpc.exe` 的非目录条目，按路径长度排序选择最浅匹配（优先顶层目录或根级），兼容 GitHub、apiServer、扁平打包三种格式；移除不再使用的 `github_platform_arch` 函数
+  - **版本元数据文件**（[src-tauri/src/commands/frp/provider.rs](src-tauri/src/commands/frp/provider.rs)）：新增 `frpc_version_path()` / `read_frpc_version()` / `write_frpc_version()` 三个函数，版本存储在 `<system_default_dir>/frpc_version.txt`；`list_providers` 改为从版本文件读取真实版本，缺失时回退 `FRPC_VERSION` 常量（旧版兜底）；`ensure_system_default_frpc` 查询 manifest 时本地未安装传空字符串强制 apiServer 返回最新，下载成功后写入 `manifest.version` 到版本文件
+  - **注释更新**（[src-tauri/src/commands/frp/provider.rs](src-tauri/src/commands/frp/provider.rs)）：文件头注释从「从 GitHub Releases 下载」改为「从 apiServer `/v1/frp/manifest` 接口获取下载 URL」；`FRPC_VERSION` 常量注释标注为「旧版兜底，不参与 manifest 查询」
+  - **pnpm 残留清理**：`git rm pnpm-lock.yaml pnpm-workspace.yaml`（移除 git 追踪 + 文件系统）；[.gitignore](.gitignore) 追加 `pnpm-lock.yaml` / `pnpm-workspace.yaml` 忽略规则；移除 `package-lock.json` 的忽略规则并 `git add` 提交 npm 锁文件
+- 验证：`cargo check` 编译通过，无警告
+- 待观察：frpc 下载当前使用裸 `reqwest::get()` 无进度反馈，未走项目 `DownloadManager`（适用于 Minecraft 批量分片下载，frpc 单文件 6MB 场景待评估是否需要集成）
+
 ### 重构
 
 #### CI 发布工作流改用 Node.js 上传脚本（消除 MoSign-v2 签名不一致）
@@ -19,6 +398,33 @@
 - 复用说明：脚本结构参考 `Frp/hack/ci-upload.cjs`，适配 MoLaunch 接口差异（上传 2 个文件：安装包 + .sig 签名文件；请求体字段更多）
 
 ### 新增
+
+#### Frp 联机功能阶段三（frpc 下载切到 apiServer + 公共 frps 服务器接口对接）
+
+- 背景：apiServer 端 `GET /v1/frp/manifest` 与 `/v1/frp/servers` / `/allocate` / `/release` / `/keepalive` 路由已就绪，MoLaunch 客户端需对接：移除 GitHub Releases 下载源，改由 apiServer 统一分发 frpc；同时落地公共 frps 服务器分配/释放/续期链路，为前端「公共服务器」隧道创建模式铺路
+- 设计依据：[docs/FRP_MANAGER_DESIGN.md](docs/FRP_MANAGER_DESIGN.md)、[docs/FRP_PUBLIC_SERVER_API_DESIGN.md](docs/FRP_PUBLIC_SERVER_API_DESIGN.md)
+- 改动：
+  - **新增 OnlineClient Frp 扩展**（新建 [src-tauri/src/minecraft/online/frp.rs](src-tauri/src/minecraft/online/frp.rs)）：封装 `frp_get_manifest` / `frp_list_public_servers` / `frp_allocate` / `frp_release` / `frp_keepalive` 5 个方法，复用 `OnlineClient::call_v1`（GET 明文 + 自动 JWT，POST 走 ECIES 加密信封 + CSRF）。数据结构 `FrpManifestQuery` / `FrpManifest` / `PublicFrpServer` / `AllocateRequest` / `AllocateResponse` / `AllocateServerInfo` / `ReleaseRequest` / `KeepaliveRequest` 与 apiServer `models/frp_server.rs` 字段一一对应，反序列化使用 `alias` 兼容 snake_case，序列化输出 camelCase 给前端
+  - **模块注册**（[src-tauri/src/minecraft/online/mod.rs](src-tauri/src/minecraft/online/mod.rs)）：声明 `pub mod frp;`，与 `auth` / `signaling` / `tun` 等子模块并列
+  - **frpc 下载源切换**（[src-tauri/src/commands/frp/binary.rs](src-tauri/src/commands/frp/binary.rs)）：`ensure_system_default_frpc` 完全移除 GitHub Releases 直链下载逻辑，改为：① `load_creds_with_auto_refresh` 加载设备凭证；② 构造 `FrpManifestQuery`（component=client，platform/arch 由 `api_server_platform_arch` 探测）；③ 调 `frp_get_manifest` 获取最新版本 URL；④ 下载 ZIP + `extract_frpc_from_zip` 提取 frpc 二进制。`ensure_frpc` 签名增加 `state: &AppState` 参数以加载凭证与 apiServer URL
+  - **公共服务器 IPC action**（[src-tauri/src/utils/frp_manager.rs](src-tauri/src/utils/frp_manager.rs)）：新增 `list_public_servers` / `allocate_public_server` / `release_public_server` / `keepalive_public_server` 4 个 action，每个 action 复用 `load_creds` / `make_client` 辅助函数（与 `signaling_manager` 风格一致），统一处理 `code != 1` 业务错误；`ensure_frpc` action 调整为传入 `state`；`start_tunnel` action 调整为传入 `state`（透传给 `ensure_frpc` 以支持外部厂商 frpc 下载）
+  - **进程管理签名调整**（[src-tauri/src/commands/frp/process.rs](src-tauri/src/commands/frp/process.rs)）：`start_tunnel` 签名增加 `state: &AppState` 参数，透传给 `ensure_frpc` 调用，确保启动隧道时能按需触发 frpc 下载
+  - **前端类型扩展**（[src/types/frp.ts](src/types/frp.ts)）：新增 `PublicFrpServer` / `AllocatePublicServerParams` / `AllocateServerInfo` / `AllocateResponse` / `AllocationIdParams` 5 个类型，与后端 Rust 结构体字段一一对应（camelCase）
+  - **前端 IPC 封装**（[src/utils/api/frp-manager.ts](src/utils/api/frp-manager.ts)）：`FRP_ACTIONS` 追加 `LIST_PUBLIC_SERVERS` / `ALLOCATE_PUBLIC_SERVER` / `RELEASE_PUBLIC_SERVER` / `KEEPALIVE_PUBLIC_SERVER` 4 个常量；新增 `listPublicServers` / `allocatePublicServer` / `releasePublicServer` / `keepalivePublicServer` 4 个便捷封装
+  - **删除冗余占位文件**（删除 [src/utils/api/frp-public-server.ts](src/utils/api/frp-public-server.ts)）：原占位文件定义的类型与函数已迁移到 `types/frp.ts` 与 `frp-manager.ts`，避免重复定义
+- 复用清单：
+  - 凭证加载：`load_creds_with_auto_refresh` from `crate::utils::online_manager`（与信令 action 共用，禁止各 action 重复实现续期逻辑）
+  - OnlineClient：`crate::minecraft::online::client::OnlineClient`（JWT + ECIES + CSRF 统一封装）
+  - dispatcher handler 宏：`handler!(state, _app, params, ...)`（与 `signaling_manager` / `online_manager` 风格一致）
+  - SHA256 / ZIP 提取：复用 `binary.rs` 既有 `compute_sha256` / `extract_frpc_from_zip` / `extract_archive`（禁止重复造轮子）
+  - 前端 IPC 入口：`frpManager` from `@/utils/api/frp-manager`（单入口分发，禁止直连 fetch apiServer）
+- 未复用说明：`api_server_platform_arch` / `github_platform_arch` 为 frpc 下载专用辅助函数（apiServer 与 GitHub ZIP 目录命名规则不同），未抽取到公共模块因其仅 frpc 下载场景使用，避免过度抽象
+- 约束遵守：
+  - 完全移除 GitHub 源：`binary.rs` 不再保留任何 GitHub Releases URL 或降级逻辑，apiServer 成为唯一 frpc 分发渠道
+  - 配置读写统一：通过 `state.config.lock().await.online.api_server_url` 读取 apiServer 地址，未新增 `set_*` / `get_*` 单字段命令
+  - 最小修改：仅修改 `start_tunnel` 签名增加 `state` 参数，未改动 `stop_tunnel` / `get_tunnel_status` 等无需 state 的函数
+- 验证：`cargo check` 编译通过；`tsc --noEmit` 无 Frp 相关错误（仅 2 个预存的 `online.ts` / `crypto.ts` 错误，与本次改动无关）
+- 待联调：前端「公共服务器」隧道创建 UI 实现后即可联调 `listPublicServers` → `allocatePublicServer` → `keepalivePublicServer`（定时）→ `releasePublicServer`（停止）完整链路
 
 #### Frp 联机功能阶段二前端（外部厂商安装/启禁 + 实时日志 + 认证中心占位 + apiServer 预留）
 

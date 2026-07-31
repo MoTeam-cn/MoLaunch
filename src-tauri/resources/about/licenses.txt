@@ -43,3 +43,25 @@
 | notify | Copyright (c) notify-rs developers | CC0-1.0 / Artistic-2.0 | https://docs.rs/notify | https://github.com/notify-rs/notify/blob/main/LICENSE-CC0 |
 | sysinfo | Copyright (c) 2015 Guillaume Gomez | MIT License | https://docs.rs/sysinfo | https://github.com/GuillaumeGomez/sysinfo/blob/master/LICENSE |
 | Plain Craft Launcher 2 (PCL2) | Copyright © 成都瓜皮龙科技有限公司（龙腾猫跃）2016. All Rights Reserved. | PCL 分发有限许可（自定义许可） | https://github.com/Meloong-Git/PCL | https://github.com/Meloong-Git/PCL/blob/main/LICENCE |
+| marked | Copyright (c) 2014-2018, Christopher Jeffrey | MIT License | https://github.com/markedjs/marked | https://github.com/markedjs/marked/blob/master/LICENSE |
+| qrcodejs | Copyright (c) 2012 davidshimjs | MIT License | https://github.com/davidshimjs/qrcodejs | https://github.com/davidshimjs/qrcodejs/blob/master/LICENSE |
+| tokio-tungstenite | Copyright (c) 2017 Daniel Abramov | MIT License | https://docs.rs/tokio-tungstenite | https://github.com/snapview/tokio-tungstenite/blob/master/LICENSE |
+| netstat2 | Copyright (c) 2021 ivxvm | MIT License | https://docs.rs/netstat2 | https://github.com/ivxvm/netstat2-rs/blob/master/LICENSE |
+| flate2 | Copyright (c) 2014 Alex Crichton | MIT / Apache-2.0 | https://docs.rs/flate2 | https://github.com/rust-lang/flate2-rs/blob/main/LICENSE-MIT |
+| fastnbt | Copyright (c) 2020 Tom O'Callaghan | MIT / Apache-2.0 | https://docs.rs/fastnbt | https://github.com/owengage/fastnbt/blob/main/LICENSE-MIT |
+| anyhow | Copyright (c) 2019-present David Tolnay | MIT / Apache-2.0 | https://docs.rs/anyhow | https://github.com/dtolnay/anyhow/blob/master/LICENSE-MIT |
+| thiserror | Copyright (c) 2019-present David Tolnay | MIT / Apache-2.0 | https://docs.rs/thiserror | https://github.com/dtolnay/thiserror/blob/master/LICENSE-MIT |
+| Ed25519-Dalek | Copyright (c) 2017 isis agora lovecruft | BSD-3-Clause | https://docs.rs/ed25519-dalek | https://github.com/dalek-cryptography/ed25519-dalek/blob/main/LICENSE |
+| X25519-Dalek | Copyright (c) 2017 isis agora lovecruft | BSD-3-Clause | https://docs.rs/x25519-dalek | https://github.com/dalek-cryptography/x25519-dalek/blob/main/LICENSE |
+| hkdf | Copyright (c) 2017 Artyom Pavlov | MIT / Apache-2.0 | https://docs.rs/hkdf | https://github.com/RustCrypto/KDFs/blob/master/LICENSE |
+| hmac | Copyright (c) 2017 Artyom Pavlov | MIT / Apache-2.0 | https://docs.rs/hmac | https://github.com/RustCrypto/MACs/blob/master/LICENSE |
+| aes-gcm | Copyright (c) 2018 Artyom Pavlov | MIT / Apache-2.0 | https://docs.rs/aes-gcm | https://github.com/RustCrypto/AEADs/blob/master/LICENSE |
+| rsa | Copyright (c) 2016-2017 RustCrypto Developers | MIT / Apache-2.0 | https://docs.rs/rsa | https://github.com/RustCrypto/RSA/blob/master/LICENSE |
+| rand | Copyright (c) 2018 The Rand Project Developers | MIT / Apache-2.0 | https://docs.rs/rand | https://github.com/rust-random/rand/blob/master/LICENSE-MIT |
+| pem | Copyright (c) 2017 Jonathan Creekmore | MIT License | https://docs.rs/pem | https://github.com/jcreekmore/pem-rs/blob/master/LICENSE |
+| tun-rs | Copyright (c) 2024 xmh0511 | MIT License | https://docs.rs/tun-rs | https://github.com/xmh0511/tun-rs/blob/master/LICENSE |
+| winreg | Copyright (c) 2015 Igor Aleksanov | MIT License | https://docs.rs/winreg | https://github.com/gentoo90/winreg-rs/blob/master/LICENSE |
+| rustls-native-certs | Copyright (c) 2017 Joseph Birr-Pixton | Apache-2.0 / ISC | https://docs.rs/rustls-native-certs | https://github.com/rustls/rustls-native-certs/blob/main/LICENSE |
+| once_cell | Copyright (c) 2018 The Rust Project Developers | MIT / Apache-2.0 | https://docs.rs/once_cell | https://github.com/matklad/once_cell/blob/master/LICENSE-MIT |
+| serde_json | Copyright (c) 2014-2024 The Serde Developers | MIT / Apache-2.0 | https://docs.rs/serde_json | https://github.com/serde-rs/json/blob/master/LICENSE-MIT |
+| @tauri-apps/cli | Copyright (c) 2019-2024 Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://v2.tauri.app | https://github.com/tauri-apps/tauri/blob/dev/LICENSE |
