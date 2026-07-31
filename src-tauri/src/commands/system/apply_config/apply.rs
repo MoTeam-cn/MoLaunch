@@ -30,6 +30,8 @@ pub(crate) async fn apply_config_inner(
 
     // 2c. IgnoreTls 分流（注册表，仅开发者模式可开启）
     secure::apply_ignore_tls(&patch)?;
+    // 2d. Java path 分流（INI [Java] path 独立存储，不进 AppConfig）
+    apply_java(&patch)?;
     // log_level 变更需闭包外立即生效，用 Option 收集待应用的值（避免跨 await 持有锁）
     let mut log_level_pending: Option<u32> = None;
     // 代理变更需闭包外重建 HTTP 客户端（同 log_level 模式，避免跨 await 持有锁）
@@ -331,4 +333,18 @@ fn apply_tls(
         config.tls.trust_mode = mode.clone();
         *tls_pending = Some(true);
     }
+}
+
+/// Java 路径域：写 INI [Java] path（不进 AppConfig，保留独立存储设计）
+///
+/// 与 `secure::apply_*` 同属"非 AppConfig 分流"，不进 AppConfig 内存态，故不在 `update_config` 闭包内。
+fn apply_java(patch: &ConfigPatch) -> Result<(), String> {
+    if let Some(ref path) = patch.java_path {
+        let storage = crate::storage::Storage::instance();
+        storage
+            .set_config("Java", "path", path)
+            .map_err(|e| format!("写入 Java path 失败: {}", e))?;
+        log_info!("[Config] java_path = {}", path);
+    }
+    Ok(())
 }

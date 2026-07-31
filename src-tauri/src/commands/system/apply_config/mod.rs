@@ -41,11 +41,21 @@ pub async fn get_config(
     let (cf_enabled, cf_api_key) = secure::read_curseforge().await;
     // 读取开发者模式状态（注册表，不进 AppConfig）：含 ignore_tls
     let (dev_unlocked, dev_mode, ignore_tls) = secure::read_developer();
+    // 读取 Java 路径（INI [Java] path 独立存储，不进 AppConfig）
+    let java_path = crate::storage::Storage::instance().get_config("Java", "path");
 
     // 构建全量快照（持有 config 锁的最短时间）
     let snapshot = {
         let config = state.config.lock().await;
-        types::build_snapshot(&config, cf_enabled, cf_api_key, dev_unlocked, dev_mode, ignore_tls)
+        types::build_snapshot(
+            &config,
+            cf_enabled,
+            cf_api_key,
+            dev_unlocked,
+            dev_mode,
+            ignore_tls,
+            java_path,
+        )
     };
 
     // 序列化为 JSON 对象，再转为扁平数组

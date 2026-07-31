@@ -6,8 +6,8 @@
  *
  * 从 system.ts 拆分而来：系统操作/下载进度查询仍保留在 system.ts。
  *
- * 注：底层 `get_config` / `apply_config` / `get_config_value` / `set_config_value`
- * 4 个命令已聚合为 `config_manager` 单一 IPC 入口，通过 `action` 字段分发。
+ * 注：底层 `get_config` / `apply_config` 2 个命令已聚合为 `config_manager`
+ * 单一 IPC 入口，通过 `action` 字段分发。
  * `get_config_path` / `save_config_to_file` 仍走独立 invoke（不在聚合范围）。
  */
 
@@ -65,6 +65,8 @@ export interface ConfigSnapshot {
   launchUseDedicatedGpu: boolean
   // 外部下载工具
   externalDownloadDir: string | null
+  /** Java 路径（从 INI [Java] path 读取，不进 AppConfig） */
+  javaPath: string | null
   // 开发者模式（从注册表读，developerUnlocked 为只读）
   developerUnlocked: boolean
   developerMode: boolean
@@ -128,6 +130,8 @@ export interface ConfigPatch {
   launchUseDedicatedGpu?: boolean
   // 外部下载工具（null 表示清空，回退默认 .Molaunch/Download/）
   externalDownloadDir?: string | null
+  /** Java 路径（独立存储于 INI [Java] path，不进 AppConfig） */
+  javaPath?: string
   // 开发者模式（注册表存储，后端内部分流到 registry，仅已解锁时可生效）
   developerMode?: boolean
   // 联机（api-server 地址，空字符串后端会忽略不更新；自定义 TURN 列表）
@@ -280,20 +284,4 @@ export async function applyConfig(patch: ConfigPatch): Promise<void> {
 export function refreshConfig(): void {
   configCache = null
   configPromise = null
-}
-
-// ==================== 配置通用读写（直写 INI）====================
-
-/** 获取配置值（从 storage 读取） */
-export async function getConfigValue(section: string, key: string): Promise<string | null> {
-  return configManager<string | null>(CONFIG_ACTIONS.GET_CONFIG_VALUE, { section, key })
-}
-
-/**
- * 设置配置值（直写 INI，不走 AppConfig）
- *
- * 保留此命令用于调试/迁移场景。正常配置更新应走 `applyConfig`。
- */
-export async function setConfigValue(section: string, key: string, value: string): Promise<void> {
-  return configManager<void>(CONFIG_ACTIONS.SET_CONFIG_VALUE, { section, key, value })
 }

@@ -1,15 +1,13 @@
 //! 配置管理统一分发逻辑（config_manager 的工具实现）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，4 个 action：
-//! `get_config` / `apply_config` / `get_config_value` / `set_config_value`。
-//! `get_config_value` 不需要 state；4 个命令均不需要 `AppHandle`。
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，2 个 action：
+//! `get_config` / `apply_config`。两个命令均不需要 `AppHandle`。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
 use crate::commands::system::apply_config::{apply_config, get_config, ConfigEntry};
-use crate::commands::system::config::{get_config_value, set_config_value};
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
@@ -27,21 +25,6 @@ struct ApplyConfigParams {
     entries: Vec<ConfigEntry>,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GetConfigValueParams {
-    section: String,
-    key: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct SetConfigValueParams {
-    section: String,
-    key: String,
-    value: String,
-}
-
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
@@ -57,20 +40,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         let p: ApplyConfigParams = serde_json::from_value(params)
             .map_err(|e| format!("参数解析失败: {}", e))?;
         apply_config(&state, p.entries).await?;
-        Ok(serde_json::Value::Null)
-    }));
-
-    d.register("get_config_value", handler!(_state, _app, params, {
-        let p: GetConfigValueParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = get_config_value(p.section, p.key).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
-
-    d.register("set_config_value", handler!(state, _app, params, {
-        let p: SetConfigValueParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        set_config_value(&state, p.section, p.key, p.value).await?;
         Ok(serde_json::Value::Null)
     }));
 

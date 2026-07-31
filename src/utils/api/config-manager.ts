@@ -7,11 +7,9 @@
  * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
  * 故前端 params 对象的字段名一律使用 camelCase。
  *
- * 注册的 action（4 个）：
+ * 注册的 action（2 个）：
  * - `get_config`：读取配置（扁平化数组）
  * - `apply_config`：统一配置更新
- * - `get_config_value`：读取单个 INI 配置值
- * - `set_config_value`：设置单个 INI 配置值
  *
  * 注：`get_config_path` / `save_config_to_file` 不在本次聚合范围，仍走独立 invoke。
  */
@@ -39,8 +37,6 @@ export async function configManager<T = unknown>(
 export const CONFIG_ACTIONS = {
   GET_CONFIG: 'get_config',
   APPLY_CONFIG: 'apply_config',
-  GET_CONFIG_VALUE: 'get_config_value',
-  SET_CONFIG_VALUE: 'set_config_value',
 } as const
 
 /** action 名称类型 */

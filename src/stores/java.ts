@@ -12,18 +12,19 @@ export const useJavaStore = defineStore('java', () => {
   const javaList = ref<{ executable: string; version: string; major_version: number }[]>([])
   const javaLoaded = ref(false)
 
-  // 从 storage 读取保存的 Java 路径
+  // 从配置读取保存的 Java 路径（走统一 get_config，INI [Java] path 独立存储）
   async function loadSavedJavaPath(): Promise<string | null> {
     try {
-      return await tauri.getConfigValue('Java', 'path')
+      const config = await tauri.getConfigMap()
+      return config.javaPath ?? null
     } catch (e) {
       return null
     }
   }
 
-  // 保存 Java 路径到 storage
+  // 保存 Java 路径到配置（走统一 apply_config，写 INI [Java] path）
   async function saveJavaPath(path: string) {
-    await safeCall(() => tauri.setConfigValue('Java', 'path', path), 'save Java path')
+    await safeCall(() => tauri.applyConfig({ javaPath: path }), 'save Java path')
   }
 
   async function detectJava() {

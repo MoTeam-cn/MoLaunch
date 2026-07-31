@@ -108,6 +108,9 @@ pub struct ConfigPatch {
     pub selected_version: Option<Option<String>>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"
     pub external_download_dir: Option<Option<String>>,
+    /// Java 路径（独立存储于 INI [Java] path，不进 AppConfig）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub java_path: Option<String>,
 
     // 分组字段（serde(flatten) 展平到顶层）
     #[serde(flatten)]
@@ -267,6 +270,9 @@ pub struct ConfigSnapshot {
     pub selected_version: Option<String>,
     // 外部下载工具
     pub external_download_dir: Option<String>,
+    /// Java 路径（从 INI [Java] path 读取，不进 AppConfig）
+    #[serde(default)]
+    pub java_path: Option<String>,
 
     // 分组字段（serde(flatten) 展平到顶层）
     #[serde(flatten)]
@@ -314,6 +320,7 @@ pub fn build_snapshot(
     dev_unlocked: bool,
     dev_mode: bool,
     ignore_tls: bool,
+    java_path: Option<String>,
 ) -> ConfigSnapshot {
     ConfigSnapshot {
         // 通用字段
@@ -324,6 +331,7 @@ pub fn build_snapshot(
         primary_color: config.primary_color.clone(),
         selected_version: config.selected_version.clone(),
         external_download_dir: config.external_download_dir.clone(),
+        java_path,
 
         // 分组字段
         proxy: ProxySnapshot {
