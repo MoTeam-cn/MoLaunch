@@ -1,6 +1,8 @@
 # Dependencies
 node_modules/
 .pnpm-store/
+pnpm-lock.yaml
+pnpm-workspace.yaml
 
 # Build
 dist/
@@ -53,7 +55,6 @@ coverage/
 # Web Cache
 node_modules
 /logo_data
-package-lock.json
 
 #SDK Cache
 /sdk_data
