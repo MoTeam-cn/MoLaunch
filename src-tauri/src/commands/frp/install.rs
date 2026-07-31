@@ -1,11 +1,6 @@
-//! 厂商安装/卸载
+//! 厂商安装/卸载：外部厂商安装（文件夹/ZIP + Zip Slip 防护）、卸载（路径遍历防护）。
 //!
-//! 从 `provider.rs` 拆分，职责：
-//! - 外部厂商安装（文件夹 / ZIP + Zip Slip 防护）
-//! - 外部厂商卸载（路径遍历防护）
-//!
-//! frpc 二进制下载逻辑见 [`super::binary`]。
-//! 厂商列表/状态/启禁见 [`super::provider`]。
+//! frpc 二进制下载见 [`super::binary`]，厂商列表/状态/启禁见 [`super::provider`]。
 
 use super::provider::{
     is_external_frpc_ready, read_providers_state, write_providers_state, SYSTEM_DEFAULT_ID,
@@ -67,7 +62,7 @@ pub async fn install_provider_from_zip(zip_path: String) -> Result<ProviderInfo,
         .map_err(|e| format!("解析 ZIP 失败: {}", e))?;
 
     let names: Vec<String> = archive.file_names().map(|s| s.to_string()).collect();
-    let prefix = determine_zip_prefix(&names);
+    let prefix = determine_zip_prefix(&names)?;
 
     let manifest_entry = if prefix.is_empty() {
         "manifest.json".to_string()
@@ -191,7 +186,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
 /// - 若 ZIP 中存在根级文件（无 `/` 分隔），视为扁平结构
 /// - 若所有文件都在同一根目录下，返回 "xxx/"
 /// - 多根目录或无文件，视为扁平结构
-fn determine_zip_prefix(names: &[String]) -> String {
+fn determine_zip_prefix(names: &[String]) -> Result<String, String> {
     let mut root_dirs = std::collections::HashSet::new();
     let mut has_flat_files = false;
     for name in names {
@@ -205,13 +200,15 @@ fn determine_zip_prefix(names: &[String]) -> String {
         }
     }
     if has_flat_files {
-        return String::new();
+        return Ok(String::new());
     }
     if root_dirs.len() == 1 {
-        let root = root_dirs.iter().next().unwrap();
-        return format!("{}/", root);
+        let root = root_dirs.iter().next().ok_or_else(|| {
+            "ZIP 前缀探测失败：根目录集合为空（不应发生，len 已校验为 1）".to_string()
+        })?;
+        return Ok(format!("{}/", root));
     }
-    String::new()
+    Ok(String::new())
 }
 
 /// 安全解压 ZIP（防 Zip Slip：canonicalize 父目录后校验目标在 dst 内）

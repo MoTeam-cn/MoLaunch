@@ -228,8 +228,10 @@ impl LaunchPipeline {
                     || entry_name.ends_with(".so")
                     || entry_name.ends_with(".dylib")
                 {
-                    let out_path =
-                        natives_dir.join(std::path::Path::new(&entry_name).file_name().unwrap());
+                    let file_name = std::path::Path::new(&entry_name)
+                        .file_name()
+                        .ok_or_else(|| format!("无效的 zip entry: {}", entry_name))?;
+                    let out_path = natives_dir.join(file_name);
 
                     let mut buffer = Vec::new();
                     entry

@@ -1,7 +1,6 @@
 //! 外部插件安装（文件夹 / ZIP）
 //!
-//! ZIP 支持扁平结构（根直接含 manifest.json）和单根目录结构。
-//! 解压带 Zip Slip 路径遍历防护（canonicalize 父目录后校验目标在 dst 内），
+//! 支持扁平结构和单根目录结构，带 Zip Slip 路径遍历防护。
 //! 跨盘符 rename 失败时自动回退到递归复制。
 
 use super::{is_valid_plugin_id, plugins_root, read_plugin_manifest};
@@ -87,7 +86,7 @@ pub async fn install_external_plugin_from_zip(zip_path: String) -> Result<String
 
     // 探测 ZIP 前缀（扁平结构 "" 或单根目录 "xxx/"）
     let names: Vec<String> = archive.file_names().map(|s| s.to_string()).collect();
-    let prefix = determine_zip_prefix(&names);
+    let prefix = determine_zip_prefix(&names)?;
 
     // 从 ZIP 中读取 manifest.json 确定 plugin_id
     let manifest_entry = if prefix.is_empty() {
@@ -174,7 +173,7 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> std::io::Result<()> {
 /// - 若 ZIP 中存在根级文件（无 `/` 分隔），视为扁平结构
 /// - 若所有文件都在同一根目录下，返回 "xxx/"
 /// - 多根目录或无文件，视为扁平结构
-fn determine_zip_prefix(names: &[String]) -> String {
+fn determine_zip_prefix(names: &[String]) -> Result<String, String> {
     let mut root_dirs = std::collections::HashSet::new();
     let mut has_flat_files = false;
 
@@ -192,17 +191,20 @@ fn determine_zip_prefix(names: &[String]) -> String {
 
     // 如果有扁平文件，视为扁平结构
     if has_flat_files {
-        return String::new();
+        return Ok(String::new());
     }
 
     // 如果只有一个根目录，返回 "xxx/"
     if root_dirs.len() == 1 {
-        let root = root_dirs.iter().next().unwrap();
-        return format!("{}/", root);
+        let root = root_dirs
+            .iter()
+            .next()
+            .ok_or_else(|| "ZIP 无有效根目录".to_string())?;
+        return Ok(format!("{}/", root));
     }
 
     // 多根或无根，视为扁平结构
-    String::new()
+    Ok(String::new())
 }
 
 /// 安全解压 ZIP（防 Zip Slip：canonicalize 父目录后校验目标在 dst 内）
