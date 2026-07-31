@@ -1,11 +1,8 @@
 //! 微软登录配置
-//!
-//! Client ID 通过编译时环境变量 `MOLAUNCH_MS_CLIENT_ID` 传入。
-//! 未设置时默认使用 Minecraft 官方启动器 ID，该 ID 已拥有 Minecraft API 权限，
-//! 但不支持 v2.0 Device Code Flow，只能使用旧版 login.live.com 端点 + Web Auth Code Flow。
-//!
-//! 自定义 Client ID 需要通过 https://aka.ms/mce-reviewappid 申请 Minecraft API 权限，
-//! 否则 MC Token 交换步骤会返回 403 "Invalid app registration"。
+//! Client ID 通过编译时环境变量 `MOLAUNCH_MS_CLIENT_ID` 传入。未设置时默认用 Minecraft
+//! 官方启动器 ID（已拥有 Minecraft API 权限，但不支持 v2.0 Device Code Flow，只能用旧版
+//! login.live.com 端点 + Web Auth Code Flow）。自定义 Client ID 须通过
+//! https://aka.ms/mce-reviewappid 申请 Minecraft API 权限，否则 MC Token 交换返回 403。
 
 /// Minecraft 官方启动器 Client ID（已拥有 Minecraft API 权限）
 const OFFICIAL_CLIENT_ID: &str = "00000000402b5328";

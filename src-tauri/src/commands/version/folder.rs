@@ -1,15 +1,8 @@
 //! Minecraft 文件夹管理命令
 //!
-//! 支持多文件夹管理：
-//! - list_mc_folders：列出所有文件夹
-//! - add_mc_folder：添加文件夹（自动去重）
-//! - remove_mc_folder：移除文件夹
-//! - switch_mc_folder：切换当前文件夹
-//! - rename_mc_folder：重命名文件夹
-//!
-//! 注：原 5 个独立 Tauri 命令已聚合为 `version_list_manager` IPC 入口，
-//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
-//! 由 `utils::version_list_manager::dispatch` 反序列化参数后调用。
+//! 多文件夹管理：list/add（自动去重）/remove/switch/rename。原 5 个独立 Tauri 命令
+//! 已聚合为 `version_list_manager` IPC 入口，通过 `action` 字段分发；函数去
+//! `#[tauri::command]` 标注，由 `utils::version_list_manager::dispatch` 反序列化参数后调用。
 
 use crate::config::save_config;
 use crate::state::{AppState, McFolder};

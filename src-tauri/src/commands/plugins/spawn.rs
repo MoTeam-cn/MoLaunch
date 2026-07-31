@@ -1,18 +1,8 @@
 //! 插件子进程执行（带权限校验 + 命令白名单 + 超时控制）
-//!
-//! - `plugin_spawn_process`：执行子进程命令
-//!
-//! 安全限制：
-//! - command 必须在 manifest.processPermissions.allowedCommands 白名单内
-//! - 命令名会被 canonicalize 后与白名单匹配，支持绝对路径或 PATH 查找结果
-//! - 非 shell 执行（`tokio::process::Command`），防止注入
-//! - 超时默认 30 秒，最大 5 分钟（`tokio::time::timeout` 包裹 `child.wait()`，超时 `child.kill()`）
-//! - stdout/stderr 管道异步读取各截断到 1MB（在 UTF-8 字符边界切割）
-//!
-//! 共享类型在 `super::` 中（`ProcessPermissions` / `read_plugin_manifest`）。
-//!
-//! 注：原 Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，子模块函数已去掉
-//! `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch` 调用。
+//! `plugin_spawn_process` 执行子进程命令。安全限制：command 必须在 manifest
+//! processPermissions.allowedCommands 白名单内（canonicalize 后匹配，支持绝对路径或 PATH
+//! 查找）；非 shell 执行（`tokio::process::Command`）防注入；超时默认 30s 最大 5min
+//! （`tokio::time::timeout` 包 `child.wait()`，超时 `child.kill()`）；stdout/stderr 异步读取各截断 1MB。已聚合为 `plugins_manager` IPC 入口。
 
 use super::read_plugin_manifest;
 use crate::error_util::log_err;

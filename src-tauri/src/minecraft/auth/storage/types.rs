@@ -1,12 +1,8 @@
 //! 认证持久化数据结构
-//!
 //! 安全约束（方案 C：移除 `Serialize` derive 强制编译期阻止 IPC 误用）：
-//! - `StoredMsAccount` / `StoredAuthlibAccount` / `CurrentUser` / `PersistedAuthState`
-//!   仅派生 `Deserialize`（用于从注册表加密 JSON 反序列化），**不派生 `Serialize`**。
-//! - 持久化场景（写入注册表）通过 `to_storage_json()` 方法手动构建包含全部字段的 JSON，
-//!   避免 `serde_json::to_value` 误将敏感字段（token/password）序列化到 IPC 返回。
-//! - IPC 返回前端必须使用专用 View 结构体：`MsAccountInfo` / `AuthlibAccountInfo` /
-//!   `LocalAuthResult` / `DeviceStatus`，这些结构体的敏感字段已标记 `#[serde(skip)]`。
+//! `StoredMsAccount`/`StoredAuthlibAccount`/`CurrentUser`/`PersistedAuthState` 仅派生
+//! `Deserialize`（注册表加密 JSON 反序列化），不派生 `Serialize`；持久化通过 `to_storage_json()`
+//! 手动构建 JSON 避免 `serde_json::to_value` 误将敏感字段序列化到 IPC。IPC 返回前端须用专用 View 结构体（敏感字段标 `#[serde(skip)]`）。
 
 use serde::Deserialize;
 

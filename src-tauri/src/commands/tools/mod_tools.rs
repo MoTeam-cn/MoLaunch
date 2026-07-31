@@ -1,11 +1,8 @@
 //! Mod 依赖检测 + 去重扫描
-//!
-//! - `mod_dependency_check`：扫描版本 mods 目录下所有 .jar，读取依赖列表，
-//!   找出依赖的 mod_id 不在已安装列表中的项（排除 minecraft / java / fabricloader
-//!   / fabric-api 等内置依赖）。
-//! - `mod_dedup_scan`：按 slug 分组，找出有多个版本的 mod，组装成 DuplicateMod 列表。
-//!
-//! 路径安全：本模块只读取，不删除，无需 path safety 检查。
+//! `mod_dependency_check` 扫描版本 mods 目录下所有 .jar 读依赖列表，找出依赖 mod_id 不在
+//! 已安装列表中的项（排除 minecraft/java/fabricloader/fabric-api 等内置依赖）。
+//! `mod_dedup_scan` 按 slug 分组找出多版本 mod 组装成 DuplicateMod 列表。
+//! 路径安全：本模块只读取不删除，无需 path safety 检查。
 
 use std::collections::HashMap;
 use std::path::Path;

@@ -1,23 +1,8 @@
 //! 开发者模式相关命令
-//!
-//! 触发流程：
-//! 1. 用户在「更多 → 鸣谢 → 法律信息」展开后，连续点击版权声明中「MoTeam」
-//!    字段 7 次（3 秒内）→ 调用 `unlock_developer_mode`
-//! 2. 解锁后「进阶设置」顶部显示「开发者模式」开关卡片 → 调用 `apply_config({developerMode})`
-//! 3. 开关开启后「设置」侧边菜单出现「开发者」项 → 进入 SettingsDeveloper.vue
-//! 4. 开发者页面可通过「打开开发者工具」按钮调用 `open_devtools` 调出 WebView2 DevTools
-//! 5. 撤销：开关卡片底部「撤销解锁」按钮 → 二次确认 → 调用 `lock_developer_mode`
-//!    （同时重置 DeveloperUnlocked/DeveloperMode/IgnoreTls 并关闭 DevTools）
-//!
-//! 存储位置：Windows 注册表 `HKCU\Software\MoLaunch` 下的两个布尔值
-//! - `DeveloperUnlocked`：是否已解锁（决定开关卡片是否显示）
-//! - `DeveloperMode`：开关是否开启（决定侧边菜单 developer 项是否显示 + devtools 是否可调出）
-//!
-//! DevTools 打开状态维护：
-//! Tauri 2 的 `WebviewWindow::is_devtools_open()` 在 Windows WebView2 上始终返回 false
-//! （WebView2 不提供查询 DevTools 是否打开的原生 API），因此后端使用 `AtomicBool`
-//! 自行维护状态：`open_devtools` 成功后置 true，`close_devtools` 置 false，
-//! 主窗口销毁时通过 `reset_devtools_state` 重置（兜底，防止状态泄露）。
+//! 解锁流程：法律信息中点「MoTeam」7 次（3 秒内）→ `unlock_developer_mode` → 显示「开发者
+//! 模式」开关卡片 → `apply_config({developerMode})` → 侧边菜单出现「开发者」项 →
+//! `open_devtools` 调 WebView2 DevTools；撤销走 `lock_developer_mode`。存储：Windows 注册表
+//! `HKCU\Software\MoLaunch` 下 DeveloperUnlocked/DeveloperMode；DevTools 状态用 `AtomicBool` 维护。
 
 use crate::log_info;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
@@ -71,18 +56,11 @@ pub fn unlock_developer_mode() -> Result<(), String> {
     reg_set_bool(KEY_DEV_UNLOCKED, true)
 }
 
-/// 撤销开发者模式解锁（写入注册表 `DeveloperUnlocked=false`）
+/// 撤销开发者模式解锁（写注册表 `DeveloperUnlocked=false`）
 ///
-/// 同时重置 `DeveloperMode` 和 `IgnoreTls` 两个关联开关，确保撤销后开发者
-/// 相关能力全部失效。若 DevTools 当前已打开，尝试关闭后重置状态标志。
-///
-/// 撤销后：
-/// - 「高阶配置」页开发者模式开关卡片隐藏
-/// - 侧边菜单「开发者」项隐藏（通过 `developer-mode-changed` 事件通知前端）
-/// - DevTools 无法再被调出（`require_dev_mode()` 校验失败）
-/// - IgnoreTls 失效（`is_ignore_tls()` 返回 false）
-///
-/// 已撤销时重复调用是幂等的。
+/// 同时重置 `DeveloperMode` 和 `IgnoreTls`，确保开发者能力全部失效；DevTools 已开则尝试关闭。
+/// 撤销后：高阶配置开关卡片隐藏、侧边「开发者」项隐藏（emit `developer-mode-changed`）、
+/// DevTools 无法调出（`require_dev_mode()` 失败）、IgnoreTls 失效。已撤销时调用幂等。
 pub fn lock_developer_mode(app: &AppHandle) -> Result<(), String> {
     // 若 DevTools 已打开，先关闭（不强制要求关闭成功，避免 WebView2 异常阻断撤销）
     if DEVTOOLS_OPEN.load(Ordering::SeqCst) {

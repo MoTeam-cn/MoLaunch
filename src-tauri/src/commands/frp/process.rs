@@ -1,10 +1,8 @@
-//! frpc 进程管理：启动 / 停止 / 状态查询 + 日志捕获 + 退出监听
-//!
-//! 运行中的 frpc 进程通过全局 `HashMap<tunnel_id, FrpcHandle>` 管理。
-//! stdout/stderr 被异步捕获并写入 `<base_dir>/frp/logs/<tunnel_id>.log`，
-//! 同时通过 `frpc-log` event 实时推送给前端。
-//! frpc 进程退出时通过 `frp-tunnel-status` event 通知前端。
-//! 停止隧道时先 kill 子进程，再用 taskkill /T /F 兜底清理进程树。
+//! frpc 进程管理：启动/停止/状态查询 + 日志捕获 + 退出监听
+//! 运行中的 frpc 进程通过全局 `HashMap<tunnel_id, FrpcHandle>` 管理。stdout/stderr 异步
+//! 捕获写入 `<base_dir>/frp/logs/<tunnel_id>.log`，同时通过 `frpc-log` event 实时推送前端。
+//! frpc 退出时通过 `frp-tunnel-status` event 通知前端；停止隧道时先 kill 子进程再用
+//! taskkill /T /F 兜底清理进程树。
 
 use super::tunnel;
 use super::{
@@ -616,8 +614,7 @@ async fn read_all_logs(max: usize) -> Result<LogFileContent, String> {
     let lines: Vec<String> = entries[start..]
         .iter()
         .map(|(ts, tid, line)| {
-            // 行内若已含时间戳则原样返回；否则补前缀 `[tid]`
-            // 这里所有行都已有时间戳前缀（capture_stream 写入时统一加），直接返回
+            // 所有行都已有时间戳前缀（capture_stream 写入时统一加），直接返回
             let _ = (ts, tid);
             line.clone()
         })

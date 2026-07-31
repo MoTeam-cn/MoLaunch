@@ -1,8 +1,6 @@
 //! MC 百科（mcmod.cn）数据库
-//!
 //! 加载内置 moddata.txt，通过工程 Slug 查找中文译名和 MC 百科 class id。
 //! 关键设计：moddata.txt 第 N 行 → mcmod.cn class id = N（空行也占行号）
-//!
 //! 中文搜索：`search_by_chinese` 用本地模糊匹配把中文关键词映射到 CurseForge/Modrinth Slug，
 //! 提取英文单词作为搜索关键词。
 
@@ -271,15 +269,12 @@ pub fn lookup_class_id(platform: super::types::Platform, slug: &str) -> Option<u
 
 /// 中文关键词本地搜索
 ///
-/// 在 moddata.txt 数据库中用模糊匹配查找中文关键词对应的 Mod 条目，
-/// 提取英文 Slug/英文名作为新的搜索关键词。
+/// 在 moddata.txt 中模糊匹配中文关键词对应的 Mod 条目，提取英文 Slug/英文名作为新关键词。
 ///
-/// # 返回
-/// - `cf_keyword`：CurseForge 重写后的英文关键词（CurseForge 要求所有词都匹配，只选 1 个最佳 Mod）
-/// - `mr_keyword`：Modrinth 重写后的英文关键词（多匹配加权出最佳英文词）
-/// - `mr_slugs`：Modrinth Slug 直查列表（最多 100 个，用于调 `/v2/projects` 批量拉取）
-///
-/// 若均返回 None / 空，则本地数据库未匹配上，调用方应回退到原样透传
+/// - `cf_keyword`：CurseForge 重写英文关键词（CF 要求全词匹配，只选 1 个最佳 Mod）
+/// - `mr_keyword`：Modrinth 重写英文关键词（多匹配加权出最佳英文词）
+/// - `mr_slugs`：Modrinth Slug 直查列表（最多 100，调 `/v2/projects` 批量拉取）
+/// 均为 None/空时本地未匹配，调用方应回退原样透传。
 pub fn search_by_chinese(query: &str) -> RewriteResult {
     let query = query.trim().to_lowercase();
     if query.is_empty() {

@@ -1,14 +1,8 @@
 //! yggdrasil 登录编排
-//!
-//! 三步降级策略（与业界同类启动器行为一致）：
-//! 1. validate → 缓存的 token 仍有效则直接复用
-//! 2. refresh  → token 失效则刷新
-//! 3. authenticate → 刷新失败则用账号密码重新登录
-//!
-//! 多角色（available_profiles > 1）处理：
-//! - 首次登录返回 `LoginOutcome::NeedSelect`，前端弹窗让用户选择
-//! - 选定后调用 `refresh_with_profile` 完成登录
-//! - 已保存账号切换时，若缓存了 selected_profile 则直接复用
+//! 三步降级（与同类启动器一致）：validate（缓存 token 仍有效则复用）→ refresh（失效则刷新）
+//! → authenticate（刷新失败则密码重登）。多角色（available_profiles>1）首次登录返回
+//! `LoginOutcome::NeedSelect`，前端选择后调 `refresh_with_profile`；已保存账号切换时若缓存
+//! selected_profile 则直接复用。
 
 use super::client::{self, YggdrasilError};
 use super::types::{AuthResponse, Profile, ProfileId};

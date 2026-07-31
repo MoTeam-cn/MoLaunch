@@ -1,32 +1,8 @@
-//! 通用图片缓存组件
-//!
-//! 用于缓存皮肤、披风、头像等远程 PNG 图片。
-//!
-//! ## 设计（方案 C：混合缓存 + 自定义 URI scheme）
-//!
-//! - 首次加载：返回远程 URL，前端立即渲染；后端 `tokio::spawn` 异步下载到本地缓存
-//! - 二次加载：返回自定义 URI scheme URL（`cache-image://{hash}.png`），零网络请求
-//! - 缓存 key：URL 的 SHA1 hash，URL 变化时自动失效
-//! - 下载完成：emit `image-cached` 事件通知前端刷新
-//!
-//! ## 安全性
-//!
-//! 不使用 Tauri 的 asset protocol（会暴露完整本地文件路径），
-//! 而是注册自定义 URI scheme `cache-image`，前端只能通过 hash 请求，
-//! 后端验证 hash 合法性后返回文件内容，无法构造任意路径读取本地文件。
-//!
-//! ## 缓存目录结构
-//!
-//! ```text
-//! .Molaunch/cache/
-//!   images/
-//!     {sha1(url)}.png
-//! ```
-//!
-//! ## 事件格式
-//!
-//! 事件名：`image-cached`
-//! Payload：`{ remote_url: String, local_url: String }`
+//! 通用图片缓存组件（皮肤/披风/头像等远程 PNG）
+//! 混合缓存：首次返回远程 URL，后端异步下载到本地；二次返回自定义 URI scheme
+//! `cache-image://{hash}.png`，零网络请求，下载完成 emit `image-cached` 通知前端。
+//! 缓存 key 为 URL 的 SHA1，URL 变化自动失效；不用 asset protocol（暴露本地路径），后端
+//! 验证 hash 合法性后返回文件，避免任意路径读取。
 
 use std::collections::HashSet;
 use std::path::PathBuf;
@@ -170,16 +146,10 @@ pub fn find_cache_by_hash(hash: &str) -> Option<PathBuf> {
 
 /// 获取图片 URL（缓存优先，未命中时异步预下载）
 ///
-/// - 如果本地缓存存在，返回自定义 URI scheme URL（`cached: true`）
-/// - 如果本地缓存不存在，返回远程 URL（`cached: false`），并 spawn 异步任务下载
-///
-/// # 参数
-/// - `remote_url`: 远程图片 URL（不可是 cache-image 虚拟 URL）
-/// - `app`: Tauri AppHandle，用于下载完成后 emit 事件
-///
-/// # 防御性检查
-/// 如果传入的 URL 已经是 cache-image 虚拟 URL（误用），
-/// 直接返回它本身标记为 cached，避免用 reqwest 去下载虚拟 URL 导致连接失败。
+/// - 缓存命中：返回自定义 URI scheme URL（`cached: true`）
+/// - 未命中：返回远程 URL（`cached: false`），spawn 异步下载，完成后 emit `image-cached`
+/// - `remote_url`：远程图片 URL（不可是 cache-image 虚拟 URL）；`app`：emit 事件用
+/// - 防御：误传 cache-image 虚拟 URL 时直接返回 cached，避免 reqwest 下载虚拟 URL 失败
 pub async fn get_image_url(remote_url: &str, app: Option<AppHandle>) -> CachedImage {
     // 防御：如果误传 cache-image 虚拟 URL，直接返回，不发起 reqwest 下载
     if is_cache_url(remote_url) {
@@ -297,16 +267,11 @@ pub fn clear_all() -> anyhow::Result<()> {
 
 /// 在 Tauri Builder 上注册 `cache-image` 自定义 URI scheme 协议
 ///
-/// 将图片缓存协议处理从 `lib.rs` 抽离到此模块，`lib.rs` 只需调用
-/// `image_cache::register_uri_scheme(builder)` 即可完成注册。
-///
-/// ## 协议行为
-///
-/// - 请求格式：`https://cache-image.localhost/{hash}.png`（Windows/Android）
-///   或 `cache-image://localhost/{hash}.png`（macOS/Linux）
-/// - hash 必须为 40 位十六进制（SHA1），否则返回 403
-/// - 仅在 `images/` 子目录下查找文件，防止路径遍历攻击
-/// - 所有响应附带 `Access-Control-Allow-Origin: *` 头
+/// `lib.rs` 调 `image_cache::register_uri_scheme(builder)` 完成注册。协议行为：
+/// - 请求格式 `https://cache-image.localhost/{hash}.png`（Win/Android）或
+///   `cache-image://localhost/{hash}.png`（macOS/Linux）
+/// - hash 必须 40 位十六进制（SHA1），否则 403；仅在 `images/` 子目录查找，防路径遍历
+/// - 响应附带 `Access-Control-Allow-Origin: *`
 pub fn register_uri_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
     builder.register_uri_scheme_protocol(CACHE_IMAGE_SCHEME, |_ctx, request| {
         handle_cache_image_request(&request)

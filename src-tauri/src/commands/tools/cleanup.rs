@@ -1,27 +1,8 @@
-//! 清理游戏垃圾文件
-//!
-//! 扫描 `.minecraft` 目录下的可清理内容，分为三类：
-//!
-//! ## 根目录固定子目录（兼容非版本隔离布局）
-//! - `logs/` - 游戏日志（安全）
-//! - `crash-reports/` - 崩溃报告（安全）
-//! - `.mixin.out/` - Mixin 编译输出（安全）
-//! - `assets/cache/` - 资源索引缓存（安全，可重新下载）
-//! - `.fabric/remapCache/` - Fabric 重映射缓存（安全）
-//! - `screenshots/` - 截图（可选，用户可能想保留）
-//!
-//! ## 版本目录下子目录（版本隔离模式，MoLaunch 默认 isolation_mode=4）
-//! - `versions/<ver>/logs/` - 版本独立游戏日志
-//! - `versions/<ver>/crash-reports/` - 版本独立崩溃报告
-//! - `versions/<ver>/.mixin.out/` - 版本独立 Mixin 编译输出
-//! - `versions/<ver>/.fabric/processedMods/` - Fabric 处理过的 mod 缓存
-//! - `versions/<ver>/.fabric/remappedJars/` - Fabric 重映射 jar 缓存
-//!
-//! ## 原生库提取目录
-//! - `versions/<ver>/<ver>-natives/` - 每个版本的原生库提取目录（安全，每次启动重新提取）
-//!   注意：MoLaunch 的命名约定是带版本前缀的 `<ver>-natives`，不是 `natives`
-//!
-//! `execute` 删除时严格做路径安全检查，仅允许删除扫描阶段发现的目录，避免路径遍历攻击。
+//! 清理游戏垃圾文件（扫描 `.minecraft` 下可清理内容，分三类）
+//! 根目录固定子目录：logs/crash-reports/.mixin.out/assets/cache/.fabric/remapCache/screenshots；
+//! 版本目录下子目录（版本隔离模式）：logs/crash-reports/.mixin.out/.fabric/processedMods/
+//! remappedJars；原生库提取目录 `<ver>-natives`（非 natives）。
+//! `execute` 删除时严格路径安全检查，仅删扫描阶段发现的目录，避免路径遍历攻击。
 
 use std::path::{Path, PathBuf};
 

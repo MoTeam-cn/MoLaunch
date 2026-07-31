@@ -1,14 +1,8 @@
 //! 联机功能命令模块
-//!
-//! 提供 MoLaunch 客户端联机能力的 IPC 入口，包括：
-//! - 设备认证（注册/登录/登出/状态查询/服务器时间）
-//! - 房间管理（创建/加入/退出/关闭，阶段二实现）
-//! - 信令流程（轮询/确认/踢人/保活，阶段二实现）
-//! - 虚拟网卡（Wintun/TUN，阶段二实现）
-//! - MC 端口探测（阶段三实现）
-//!
-//! 所有 action 通过 `online_manager` 单一 IPC 入口聚合，由
-//! `crate::utils::online_manager::dispatch` 按 action 字段分发。
+//! 提供 MoLaunch 客户端联机能力 IPC 入口：设备认证（注册/登录/登出/状态查询/服务器时间）、
+//! 房间管理（创建/加入/退出/关闭，阶段二）、信令流程（轮询/确认/踢人/保活，阶段二）、虚拟网卡
+//! （Wintun/TUN，阶段二）、MC 端口探测（阶段三）。所有 action 通过 `online_manager` 单一
+//! IPC 入口聚合，由 `utils::online_manager::dispatch` 分发。
 
 use tauri::{AppHandle, State};
 

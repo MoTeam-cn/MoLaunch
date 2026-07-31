@@ -1,13 +1,8 @@
-//! `res://` 自定义 URI scheme 协议
-//!
-//! 提供前端访问后端嵌入资源（如 WASM 文件）的能力。
-//! 协议格式：`res://web-common/{type}/{filename}`
-//!   - Windows/Android: `https://res.localhost/web-common/{type}/{filename}`
-//!   - macOS/Linux: `res://localhost/web-common/{type}/{filename}`
-//!
-//! 资源来自 `resources.rs`（编译期嵌入），URL 路径白名单校验防路径遍历，
-//! 响应附带 CORS 头允许 Worker fetch，WASM 返回 `application/wasm` MIME
-//! 支持 `WebAssembly.compileStreaming`。
+//! `res://` 自定义 URI scheme 协议：前端访问后端嵌入资源（WASM 等）
+//! 协议格式 `res://web-common/{type}/{filename}`（Windows/Android 转 `https://res.localhost/...`，
+//! macOS/Linux 为 `res://localhost/...`）。资源来自 `resources.rs`（编译期嵌入），
+//! URL 路径白名单校验防路径遍历，响应附 CORS 头允许 Worker fetch，
+//! WASM 返回 `application/wasm` MIME 支持 `WebAssembly.compileStreaming`。
 
 use std::path::{Component, Path, PathBuf};
 use tauri::{http::Response, Builder, Runtime};

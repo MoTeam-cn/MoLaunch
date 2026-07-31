@@ -1,19 +1,8 @@
 //! 统一配置更新命令
-//!
-//! 用单个 `apply_config` IPC 接口取代此前分散在 proxy/download/game/community
-//! 等模块的 19 个 `set_*` setter 命令。前端通过传入 `ConfigPatch`（所有字段
-//! `Option<T>`，仅传需要改的字段）一次性完成多字段更新，后端在单次
-//! `update_config` 闭包内完成字段赋值与联动，避免多次 IPC 往返和多次落盘。
-//!
-//! 三段式分流：
-//! 1. 校验阶段（mirror_url SSRF 防护、download_source/meta_source 枚举校验）
-//! 2. 加密字段分流（CurseForge API Key 走 secure_storage，不进 AppConfig）
-//! 3. 普通字段统一更新（update_config 闭包内一次性赋值 + 联动 + 副作用）
-//!
-//! 注：原 `get_config` / `apply_config` 两个分散 Tauri 命令已聚合为 `config_manager`
-//! 一个 IPC 入口（注册在 `commands::system::config`），通过请求体的 `action` 字段分发。
-//! 子模块函数已去掉 `#[tauri::command]` 标注，改为接收 `&AppState`，
-//! 由 `utils::config_manager::dispatch` 反序列化参数后调用。
+//! 单个 `apply_config` IPC 取代此前分散在 proxy/download/game/community 等模块的 19 个
+//! `set_*` setter。前端传 `ConfigPatch`（全 `Option<T>`，仅传需改字段）一次性多字段更新，
+//! 后端在单次 `update_config` 闭包内完成赋值与联动。三段式分流：校验（mirror_url SSRF 防护、
+//! download_source/meta_source 枚举校验）→ 加密字段分流 → 普通字段统一更新。已聚合为 `config_manager` IPC 入口。
 
 mod apply;
 mod secure;

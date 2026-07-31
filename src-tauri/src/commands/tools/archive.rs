@@ -1,11 +1,8 @@
 //! 存档管理（备份/恢复/导出/种子提取）
-//!
-//! - `list`：列出 saves 目录下所有子文件夹（存档），按名称排序
-//!   - 默认扫全局 `{game_dir}/saves/`
-//!   - 传入 `version_id` 时按版本隔离配置解析该版本的有效游戏目录
-//! - `backup`：将存档打包为 zip（可选排除 `playerdata/` 作为分享包）
-//! - `restore`：从 zip 解压恢复存档到 `saves/{world_name}/`
-//! - `extract_save_seed`：读取存档 level.dat 解析种子（种子地图工具"从存档加载"用）
+//! `list` 列出 saves 目录下所有子文件夹（按名称排序，默认扫全局 `{game_dir}/saves/`，
+//! 传入 `version_id` 时按版本隔离配置解析该版本有效游戏目录）；`backup` 打包 zip（可选排除
+//! `playerdata/` 作为分享包）；`restore` 从 zip 解压恢复到 `saves/{world_name}/`；
+//! `extract_save_seed` 读 level.dat 解析种子（种子地图工具「从存档加载」用）。
 
 use std::fs::File;
 use std::io::{Read, Write};

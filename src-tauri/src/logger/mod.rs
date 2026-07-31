@@ -1,7 +1,5 @@
 //! 日志系统模块
-//!
 //! 将日志写入 storage/logs 目录，同时可选输出到控制台。
-//!
 //! 子模块：
 //! - [`viewer`]：日志文件查看 API（路径查询、列表、读取）
 //! - [`sanitize`]：敏感信息脱敏
@@ -120,7 +118,6 @@ impl Logger {
             timestamp, level_str, rel_path, line, sanitized
         );
 
-        // 写入文件
         if let Some(ref mut file) = self.file {
             let _ = file.write_all(log_line.as_bytes());
             let _ = file.flush();

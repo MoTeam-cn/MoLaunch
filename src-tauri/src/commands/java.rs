@@ -251,15 +251,11 @@ pub async fn check_java_compatible(
 
 /// 下载 Java Runtime（从 Mojang 官方 Java Runtime 索引）
 ///
-/// - `target_major`: 目标 Java 大版本号（如 21、17、8）
-///
-/// 推送 `java-download-progress` 事件，payload 为 `JavaDownloadProgress`：
-/// ```json
-/// { "stage": "fetching|matching|manifest|downloading|verifying|done",
-///   "current": 0, "total": 0, "bytes_downloaded": 0, "bytes_total": 0, "message": "" }
-/// ```
-///
-/// 返回下载的 java.exe 完整路径
+/// - `target_major`：目标 Java 大版本号（如 21、17、8）
+/// - 推送 `java-download-progress` 事件，payload `JavaDownloadProgress`：
+///   `{ stage: fetching|matching|manifest|downloading|verifying|done, current, total,
+///     bytes_downloaded, bytes_total, message }`
+/// - 返回下载的 java.exe 完整路径
 pub async fn download_java(
     target_major: u32,
     app: &AppHandle,

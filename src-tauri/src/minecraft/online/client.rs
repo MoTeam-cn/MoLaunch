@@ -1,9 +1,7 @@
 //! api-server HTTP 客户端封装
-//!
 //! 提供与 MoLaunch API Server 交互的统一入口：
 //! - `/v3/*` 认证接口：注册/登录/登出、JWKS、CSRF、时间校准
 //! - `/v1/*` 业务接口：自动加 ECIES 信封、JWT 携带、CSRF 校验
-//!
 //! 接口参考：`api-server/docs/auth.md`、`api-server/docs/signaling.md`
 
 use super::auth::{LoginRequest, LoginResponse, RefreshRequest, RefreshResponse, RegisterRequest, RegisterResponse};

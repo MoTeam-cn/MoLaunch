@@ -1,18 +1,8 @@
 //! 插件子窗口创建（带域名白名单 + 数量限制）
-//!
-//! - `plugin_create_window`：创建独立 WebviewWindow
-//!
-//! 安全限制：
-//! - manifest 必须声明 `createWindow` 权限 + `window_permissions` 配置
-//! - URL 域名必须在 `window_permissions.allowed_domains` 白名单内（支持 `*.` 通配符前缀）
-//! - 单个插件最多同时存在 5 个窗口
-//! - 窗口 label 使用 `plugin-<id>-<label>` 格式，避免与内置窗口冲突
-//!
-//! 共享类型在 `super::` 中（`WindowPermissions` / `read_plugin_manifest`）。
-//!
-//! 注：原 Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，子模块函数已去掉
-//! `#[tauri::command]` 标注，参数 `AppHandle` 改为 `&AppHandle`，
-//! 由 `utils::plugins_manager::dispatch` 调用。
+//! `plugin_create_window` 创建独立 WebviewWindow。安全限制：manifest 须声明 `createWindow`
+//! 权限 + `window_permissions` 配置；URL 域名须在 allowed_domains 白名单内（支持 `*.` 通配符
+//! 前缀）；单插件最多同时 5 个窗口；窗口 label 用 `plugin-<id>-<label>` 避免与内置窗口冲突。
+//! 已聚合为 `plugins_manager` IPC 入口，由 `utils::plugins_manager::dispatch` 调用。
 
 use super::{read_plugin_manifest, WindowPermissions};
 use crate::error_util::log_err;

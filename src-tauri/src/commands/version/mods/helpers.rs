@@ -1,14 +1,8 @@
 //! Mod 命令共享辅助函数
-//!
-//! 包含：
-//! - get_mods_dir：获取版本的 mods 目录路径（pub(crate)，供 preload 命令复用）
-//!
-//! 注：sanitize_file_name 已迁移到 `crate::utils::path::sanitize_file_name`
-//!
-//! 注：原 mods 模块的 4 个 Tauri 命令文件已聚合为 `version_mods_manager` IPC 入口，
-//! 函数签名从 `&State<'_, AppState>` 改为 `&AppState`；
-//! preload.rs 和 loaders.rs 中现有的 `get_mods_dir(&state, ...)` 调用通过
-//! `State::Deref<Target = AppState>` 的 deref coercion 仍可编译。
+//! `get_mods_dir` 获取版本的 mods 目录路径（pub(crate)，供 preload 命令复用）。
+//! sanitize_file_name 已迁移到 `crate::utils::path::sanitize_file_name`。原 mods 模块
+//! 4 个 Tauri 命令文件已聚合为 `version_mods_manager` IPC 入口，函数签名从 `&State<'_, AppState>`
+//! 改为 `&AppState`；`get_mods_dir(&state, ...)` 通过 `State::Deref<Target = AppState>` 仍可编译。
 
 use crate::state::AppState;
 

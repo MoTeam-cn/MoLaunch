@@ -1,17 +1,7 @@
 //! 自定义布局 URL 加载 + 本地缓存
-//!
-//! - `load_custom_layout`：加载 URL 自定义布局内容，支持本地缓存
-//!
-//! 缓存策略：
-//! - URL 的 sha256 哈希作为缓存文件名（`<sha256>.txt`）
-//! - 缓存目录：`.Molaunch/cache/custom_layout/`
-//! - TTL：24 小时（基于文件修改时间）
-//! - `force_refresh=true` 时强制忽略本地缓存重新下载
-//!
-//! URL 协议校验：仅允许 http/https，拒绝 file://、data: 等。
-//!
-//! 注：原 Tauri 命令已聚合为 `plugins_manager` 一个 IPC 入口，子模块函数已去掉
-//! `#[tauri::command]` 标注，由 `utils::plugins_manager::dispatch` 调用。
+//! `load_custom_layout` 加载 URL 自定义布局内容。缓存：URL 的 sha256 作文件名（`<sha256>.txt`），
+//! 目录 `.Molaunch/cache/custom_layout/`，TTL 24h（基于文件修改时间），`force_refresh=true`
+//! 强制忽略缓存重下。URL 协议校验仅允许 http/https。已聚合为 `plugins_manager` IPC 入口。
 
 use crate::error_util::log_err;
 use crate::{http, log_info, log_warn, utils::cache};

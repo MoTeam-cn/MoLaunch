@@ -1,20 +1,8 @@
 //! Mod 详情预加载命令
-//!
-//! 对接 `minecraft::community::preload` 模块，前端在 `list_mods` 完成后调用本命令，
-//! 后台异步并发从 CF/MR 批量查询每个 mod 的 ResourceProject，通过 Tauri event 推送。
-//!
-//! 列表加载完成后立即启动后台联网补全。
-//!
-//! ## 取消机制
-//!
-//! `preload_mods_detail_cmd` 内部 `tokio::spawn` 后台 task 持续 emit 事件，
-//! 如果前端 ModTab 卸载时 task 仍在跑，emit 会打到已注销的 listener callback
-//! 触发 `Couldn't find callback id xxx` 警告。这里用 `AbortHandle` 全局保存当前 task：
-//! - 新任务启动前 abort 旧任务（避免多个 task 并发 emit）
-//! - 前端 ModTab 卸载时调用 `cancel_preload_mods_detail_cmd` abort 当前 task
-//!
-//! 注：已聚合为 `version_install_manager` IPC 入口，本函数由
-//! `utils::version_install_manager::dispatch` 反序列化参数后调用。
+//! `list_mods` 完成后后台异步并发从 CF/MR 批量查询每个 mod 的 ResourceProject，通过
+//! Tauri event 推送。用 `AbortHandle` 全局保存当前 task：新任务启动前 abort 旧任务
+//! （避免多个 task 并发 emit），前端 ModTab 卸载时调 `cancel_preload_mods_detail_cmd`
+//! abort 当前 task 避免 emit 打到已注销 listener。已聚合为 `version_install_manager` IPC 入口。
 
 use std::sync::{Mutex, OnceLock};
 
@@ -54,15 +42,9 @@ fn abort_current_preload() {
 
 /// 触发 mod 详情预加载
 ///
-/// 前端调用后立即返回（不阻塞），后台异步：
-/// 1. 读取持久化缓存（6h TTL）
-/// 2. 未命中的 mod 计算 MurmurHash2 + SHA1
-/// 3. 并发批量查询 CF + MR
-/// 4. 每查到一个 emit `mods-preload-update` 事件（payload: `{ file_name, project }`）
-///
-/// 前端监听该事件，按 `file_name` 匹配更新对应 mod 的 `project` 字段。
-///
-/// 如果调用时已有预加载 task 在跑，会先 abort 旧 task 再启动新的。
+/// 立即返回不阻塞，后台异步：读缓存(6h TTL) → 未命中算 MurmurHash2+SHA1 →
+/// 并发批量查 CF+MR → 每查到一个 emit `mods-preload-update`（`{ file_name, project }`）。
+/// 前端监听按 `file_name` 匹配更新。已有 task 在跑则先 abort 旧的再启新的。
 pub async fn preload_mods_detail_cmd(
     app: &AppHandle,
     state: &AppState,

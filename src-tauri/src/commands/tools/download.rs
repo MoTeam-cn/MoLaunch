@@ -1,11 +1,8 @@
 //! 外部下载工具（从 `commands/system/download.rs` 迁移）
-//!
-//! 用户输入 URL + 文件名，通过 `DownloadManager` 下载到 `.Molaunch/Download/` 目录。
-//! 复用全局 `download_state` 和 `download_cancel_flag` / `download_pause_flag`，
-//! 前端无需额外修改即可获得暂停 / 取消 / 进度查询能力。
-//!
-//! 与旧版差异：函数不再标注 `#[tauri::command]`，参数改为 typed params，
-//! 返回值统一用 `serde_json::to_value` 包装为 `serde_json::Value`。
+//! 用户输入 URL + 文件名，通过 `DownloadManager` 下载到 `.Molaunch/Download/`。复用全局
+//! `download_state` 和 `download_cancel_flag`/`download_pause_flag`，前端无需额外修改即可
+//! 获得暂停/取消/进度查询。函数不再标 `#[tauri::command]`，参数改 typed params，返回值用
+//! `serde_json::to_value` 包装为 `serde_json::Value`。
 
 use std::path::PathBuf;
 

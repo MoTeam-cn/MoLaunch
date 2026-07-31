@@ -1,14 +1,8 @@
 //! 版本整合包导出模块
-//!
-//! 整合包导出实现，支持：
-//! - 整合包名称/版本号
-//! - ~20 个可勾选导出选项（游戏本体/设置/Mod/资源包/光影包/存档等）
-//! - 动态子选项扫描（资源包/存档/光影包下的具体项目）
-//! - 联网检查（Modrinth hash + CurseForge fingerprint）
-//! - 配置文件保存/读取
-//! - 生成 Modrinth 格式 modrinth.index.json + overrides 打包为 zip
-//!
-//! 不含"打包启动器本体"和"启动器个性化内容"（MoLaunch 无此需求）。
+//! 支持整合包名称/版本号、~20 个可勾选导出选项（游戏本体/设置/Mod/资源包/光影包/存档等）、
+//! 动态子选项扫描、联网检查（Modrinth hash + CurseForge fingerprint）、配置文件保存/读取、
+//! 生成 Modrinth `modrinth.index.json` + overrides 打包 zip。不含「打包启动器本体」和
+//! 「启动器个性化内容」（MoLaunch 无此需求）。
 
 pub mod config;
 pub mod network;

@@ -1,5 +1,4 @@
 //! 版本安装管理统一分发逻辑（version_install_manager 的工具实现）
-//!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，聚合 `download` / `install` /
 //! `loaders` / `preload` 共 12 个 action。`download_version` / `install_merged` /
 //! `preload_mods_detail_cmd` 同时需要 state 和 app；`list_fabric_api_versions` /

@@ -1,15 +1,8 @@
 //! 从 URL 获取文件名
-//!
-//! 流程：
-//! 1. 校验 http/https 协议
-//! 2. 优先发送 HEAD 请求（超时 10 秒），解析 `Content-Disposition` 响应头
-//! 3. 如果 HEAD 不支持或没有 Content-Disposition，发送 GET 请求 with `Range: bytes=0-0`
-//! 4. 解析 `Content-Disposition`：
-//!    - 优先 `filename*=UTF-8''xxx`（RFC 5987，URL 解码）
-//!    - 其次 `filename="xxx"` 或 `filename=xxx`
-//!    - 都没有则从 URL 路径最后一段提取
-//! 5. 获取 `Content-Length` 作为 file_size
-//! 6. 返回 `FetchFilenameResult { filename, file_size }`
+//! 校验 http/https → 优先 HEAD 请求（超时 10s）解析 `Content-Disposition`，HEAD 不支持则
+//! GET with `Range: bytes=0-0`；解析优先 `filename*=UTF-8''xxx`（RFC 5987），其次
+//! `filename="xxx"`，都没有则从 URL 路径最后一段提取；`Content-Length` 作 file_size。
+//! 返回 `FetchFilenameResult { filename, file_size }`。
 
 use std::time::Duration;
 

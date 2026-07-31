@@ -1,12 +1,8 @@
 //! 认证命令模块
-//!
-//! 支持离线 / 微软（Web Auth Code Flow / Device Code Flow）/ authlib-injector
-//! 外置登录（yggdrasil 协议）。流程选择由 Client ID 自动决定：
-//! - 官方 ID（默认）：Web Auth Code Flow + login.live.com 旧版端点
-//! - 自定义 ID：Device Code Flow + login.microsoftonline.com v2.0 端点
-//!
-//! 子模块函数接收 `&AppState` / `&AppHandle`，由 `utils::meta_manager::dispatch`
-//! 反序列化参数后调用，请求体为通用 `utils::dispatcher::ActionRequest`。
+//! 支持离线/微软（Web Auth Code Flow / Device Code Flow）/ authlib-injector 外置登录
+//! （yggdrasil 协议）。流程选择由 Client ID 自动决定：官方 ID（默认）走 Web Auth Code
+//! Flow + login.live.com 旧版端点；自定义 ID 走 Device Code Flow + login.microsoftonline.com v2.0。
+//! 子模块函数收 `&AppState`/`&AppHandle`，由 `utils::meta_manager::dispatch` 反序列化参数后调用。
 
 pub mod account;
 pub mod authlib;

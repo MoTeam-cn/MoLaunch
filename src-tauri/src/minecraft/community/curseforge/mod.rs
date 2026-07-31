@@ -333,16 +333,10 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
 
 /// 批量查询 mod 工程信息，返回 `modId → slug` 映射
 ///
-/// 用于整合包安装时按 `community_filename_format` 重命名 mod 文件：
-/// manifest 提供 project_id 列表 → 调 `POST /v1/mods`（请求体 `{"modIds":[...]}`）
-/// 批量查询 → 拿到每个 mod 的 slug → 查 mcmod 译名 → 应用文件名格式。
-///
-/// CF 官方 API `GET /v1/mods?modIds=...` 对 modIds 参数有数量限制（超 50 个会返回
-/// 空响应，body 为空导致 EOF 解析失败）。改用 `POST /v1/mods` 与 fingerprint_search
-/// 一致，请求体 `{"modIds":[...]}`，与 `POST /v1/mods/files` 同属 CF 官方推荐的
-/// 批量查询接口，支持大批量 ID。仍按 50 个一批分批查询，避免单次请求体过大。
-///
-/// 失败时返回空 map（不阻断下载，只是文件名不应用格式）。
+/// 整合包安装时按 `community_filename_format` 重命名：manifest 的 project_id →
+/// `POST /v1/mods`（`{"modIds":[...]}`）批量查 slug → 查 mcmod 译名 → 应用文件名格式。
+/// 用 POST 而非 GET（GET 对 modIds 数量有限制，超 50 返回空响应致 EOF）；仍按 50 一批分页。
+/// 失败返回空 map（不阻断下载，仅文件名不应用格式）。
 pub async fn batch_get_mod_slugs(mod_ids: &[i64]) -> std::collections::HashMap<i64, String> {
     if mod_ids.is_empty() {
         return std::collections::HashMap::new();

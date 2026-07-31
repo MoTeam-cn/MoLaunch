@@ -1,5 +1,4 @@
 //! 资源包管理
-//!
 //! - `list`：列出 resourcepacks 目录下顶层条目（.zip 文件 / 目录）
 //!   - 默认扫全局 `{game_dir}/resourcepacks/`
 //!   - 传入 `version_id` 时按版本隔离配置解析该版本的有效游戏目录

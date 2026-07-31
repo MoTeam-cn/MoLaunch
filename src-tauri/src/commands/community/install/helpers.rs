@@ -1,8 +1,6 @@
 //! 社区资源下载安装 - 纯工具函数
-//!
 //! 包含文件名格式拼接、安装目录解析、加载器 ID 解析等纯函数。
 //! 这些函数无副作用、无 I/O，便于单元测试与跨子模块复用。
-//!
 //! 注：字节数格式化已迁移到 `crate::utils::format::bytes`。
 
 use crate::minecraft::community::types::ResourceType;
@@ -10,16 +8,9 @@ use std::path::PathBuf;
 
 /// 根据 `community_filename_format` 拼接文件名
 ///
-/// 格式：
-/// - 0: 【译名】原名
-/// - 1: [译名] 原名（默认）
-/// - 2: 译名-原名
-/// - 3: 原名-译名
-/// - 4: 仅原名
-///
-/// 无译名时统一返回原名。扩展名（含 .jar.disabled 等多段后缀）原样保留。
-/// 译名中 Windows 文件名非法字符（< > : " / \ | ? *）会被替换为下划线，
-/// 避免 `std::fs::File::create` 因非法文件名报 os error。
+/// 格式：0=【译名】原名 / 1=[译名] 原名（默认）/ 2=译名-原名 / 3=原名-译名 / 4=仅原名。
+/// 无译名返回原名；扩展名（含 .jar.disabled 等多段后缀）原样保留；译名中 Windows
+/// 非法字符（< > : " / \ | ? *）替换为下划线，避免 `File::create` 报 os error。
 pub(super) fn apply_filename_format(
     original: &str,
     translated: Option<&str>,

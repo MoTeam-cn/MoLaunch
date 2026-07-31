@@ -1,32 +1,8 @@
 //! authlib-injector 外置登录命令（yggdrasil 协议）
-//!
-//! 命令清单：
-//! - `authlib_fetch_server_meta`     获取服务器元数据（登录页展示服务器名/注册链接）
-//! - `authlib_login`                 账号密码登录（返回 Success 或 NeedSelect）
-//! - `authlib_select_profile`        多角色场景下选定 profile 完成登录
-//! - `authlib_refresh`               切换账号时验证/刷新 token（三步降级）
-//! - `get_authlib_accounts`          已保存账号列表
-//! - `remove_authlib_account`        删除指定账号
-//! - `switch_authlib_account`        切换到已保存账号
-//! - `authlib_get_skin_info`         查询外置账号皮肤/披风信息（含 uploadableTextures）
-//! - `authlib_upload_skin`           上传皮肤 PNG（multipart/form-data）
-//! - `authlib_delete_skin`           删除皮肤
-//! - `authlib_upload_cape`           上传披风 PNG
-//! - `authlib_delete_cape`           删除披风
-//!
-//! 设计要点：
-//! - 多角色（available_profiles > 1）：首次登录返回 `NeedSelect`，前端弹窗选择后调用
-//!   `authlib_select_profile` 用 refresh 指定 selected_profile 完成登录。
-//! - 切换已保存账号：调用 `authlib_refresh` 走 validate → refresh → 用密码重登 的三步降级，
-//!   任何一步成功即返回 `LocalAuthResult`，全部失败则返回错误。
-//! - 服务器元数据缓存：前端登录页输入 server_url 后实时拉取，用于显示服务器名和注册链接。
-//! - 皮肤命令统一从 `state.auth_storage.get_authlib_account` 取 access_token，
-//!   调用 `authlib::client` 的 5 个 yggdrasil 皮肤端点。本次实现不处理 token 过期自动刷新，
-//!   如果用户报告 401 后再补 refresh 逻辑（保持最小修改）。
-//!
-//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState`，
-//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
-//! `utils::meta_manager::dispatch` 分发调用。
+//! 提供 fetch_server_meta / login / select_profile / refresh / accounts 列表 / 皮肤披风
+//! CRUD 等命令；多角色首次登录返回 NeedSelect，选定后用 refresh 指定 profile 完成；
+//! 切换已保存账号走 validate→refresh→密码重登 三步降级。皮肤命令统一从 auth_storage 取
+//! access_token 调 yggdrasil 端点，不处理 token 自动刷新（401 时再补，保持最小修改）。
 
 use serde::Serialize;
 

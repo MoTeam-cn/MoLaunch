@@ -1,7 +1,5 @@
 //! 工具模块的统一响应类型定义
-//!
 //! 各子模块的参数 / 响应类型集中声明在此，便于跨模块复用与序列化。
-//!
 //! 注：原 `ToolsRequest` 已替换为通用的 `utils::dispatcher::ActionRequest`，
 //! 与 `meta_manager` 共用同一请求体结构。
 

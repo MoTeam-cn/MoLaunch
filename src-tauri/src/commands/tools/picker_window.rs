@@ -1,36 +1,8 @@
 //! 选择器子窗口模块
-//!
-//! 提供通用的子窗口选择能力：前端指定模板名（+ 可选数据 + 可选 CSP），后端从
-//! resources 读取 HTML 模板并注入数据，创建 Tauri 子窗口渲染。用户点击选项后
-//! 通过 on_navigation 拦截 `picker-result://` 协议导航，将选中值通过 Tauri event
-//! 返回前端。
-//!
-//! 模板由后端控制（放 `resources/templates/`），前端只传模板名，不再传入完整 HTML，
-//! 防止前端注入任意 HTML/JS。
-//!
-//! ## URI scheme
-//!
-//! `picker://localhost/<id>` → 按 picker_id 查找模板名，从 resources 读取模板并注入数据返回
-//! `picker://localhost/<id>/data` → 返回模板对应的实时数据 JSON（供前端定时刷新）
-//! （Windows 上 Tauri 自动转为 `https://picker.localhost/<id>`）
-//!
-//! ## 选择协议
-//!
-//! HTML 中点击项导航到 `picker-result://?value=<value>`，on_navigation 拦截后：
-//! 1. emit `picker-result` 事件（payload: `{ id, value }`）
-//! 2. 标记 picker 已完成（避免窗口销毁时再发 `picker-cancelled`）
-//! 3. 关闭窗口
-//!
-//! ## 取消事件
-//!
-//! 用户直接关窗未选择时，窗口 Destroyed 事件触发：
-//! emit `picker-cancelled` 事件（payload: picker ID）
-//!
-//! ## CSP 策略
-//!
-//! 前端在 `picker-templates.ts` 中为每个模板配置 CSP 字符串，通过 `params.csp`
-//! 传递给后端。后端将 CSP 存入 `PICKER_CSP_STORE`，URI scheme handler 读取后
-//! 注入到 HTTP 响应头 `Content-Security-Policy` 中，限制子窗口可加载的资源范围。
+//! 前端传模板名（+数据+CSP），后端从 resources 读取 HTML 模板注入数据并创建 Tauri
+//! 子窗口渲染。点击选项导航 `picker-result://` 被 on_navigation 拦截 emit `picker-result`
+//! 事件返回前端；关窗未选则 emit `picker-cancelled`。模板由后端控制（放 `resources/templates/`）
+//! 前端只传模板名防注入；`picker://localhost/<id>` 返回模板，`/<id>/data` 返回实时数据 JSON。
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};

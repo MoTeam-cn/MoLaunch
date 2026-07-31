@@ -116,22 +116,10 @@ pub fn generate_config(tunnel: &Tunnel) -> Result<std::path::PathBuf, String> {
     Ok(config_path)
 }
 
-/// 构建 frpc TOML 配置字符串
+/// 构建 frpc TOML 配置字符串（frpc v0.51+ TOML 格式）
 ///
-/// frpc v0.51+ TOML 格式：
-/// ```toml
-/// serverAddr = "x.x.x.x"
-/// serverPort = 7000
-/// auth.token = "xxx"
-/// transport.tls.enable = true
-///
-/// [[proxies]]
-/// name = "tunnel-name"
-/// type = "tcp"
-/// localIP = "127.0.0.1"
-/// localPort = 25565
-/// remotePort = 30001
-/// ```
+/// 全局配置：serverAddr/serverPort/auth.token/transport.tls.enable；
+/// `[[proxies]]` 段：name/type/localIP/localPort/remotePort。
 fn build_frpc_toml(tunnel: &Tunnel) -> String {
     let mut lines = Vec::new();
 

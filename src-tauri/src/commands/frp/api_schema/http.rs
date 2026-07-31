@@ -1,12 +1,7 @@
-//! HTTP 请求构造与发送（含重定向防护）
-//!
-//! 重定向防护策略（设计文档 §7.6.6）：
-//! - 使用 `redirect::Policy::none()` 禁止自动跟随
-//! - 手动校验 Location 头，仅允许与 baseUrl 同域的重定向
-//! - 最多跟随 5 次，防止循环重定向
-//!
-//! 注：此处不使用 `crate::http::get_client()`，因其 redirect policy 不可覆盖，
-//! 无法实现同域白名单校验。改用独立构建的 no-redirect 客户端，保留内置根证书。
+//! HTTP 请求构造与发送（含重定向防护，设计文档 §7.6.6）
+//! 重定向防护：`redirect::Policy::none()` 禁止自动跟随 → 手动校验 Location 头仅允许
+//! 与 baseUrl 同域的重定向 → 最多 5 次防循环。不使用 `crate::http::get_client()`
+//! （其 redirect policy 不可覆盖），改用独立构建的 no-redirect 客户端，保留内置根证书。
 
 use super::helpers::{
     build_url, build_vendor_client, compute_timeout, extract_host, fill_param_template, resolve_url,

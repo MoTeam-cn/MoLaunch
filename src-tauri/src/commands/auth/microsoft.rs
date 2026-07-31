@@ -1,12 +1,7 @@
 //! 微软登录命令
-//!
-//! 两种流程：
-//! - **Web Auth Code Flow**（官方 ID）：浏览器授权 → 拦截回调 code → 换取 token → 完成登录链
-//! - **Device Code Flow**（自定义 ID）：设备码 → 用户浏览器输入 → 轮询 → 完成登录链
-//!
-//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState` / `&AppHandle`，
-//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
-//! `utils::meta_manager::dispatch` 分发调用。
+//! 两种流程：Web Auth Code Flow（官方 ID，浏览器授权→拦截回调 code→换 token→完成登录链）；
+//! Device Code Flow（自定义 ID，设备码→用户浏览器输入→轮询→完成登录链）。
+//! 已聚合为 `meta_manager` IPC 入口，由 `utils::meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;

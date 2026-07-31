@@ -7,21 +7,11 @@ use std::path::Path;
 
 /// 设置游戏语言（写入 options.txt 的 lang 字段）
 ///
-/// ## 参数
-/// - `game_dir`: 游戏根目录（或隔离后的有效游戏目录）
-/// - `version_id`: 版本目录名（仅用于日志展示）
-/// - `mc_version`: 真实 MC 版本号（如 "1.20.1"），用于决定语言代码大小写
-/// - `target_lang`: 目标语言代码（小写形式，如 "zh_cn"、"en_us"）
-///
-/// ## 行为
-/// 1. **options.txt 不存在**：创建文件并写入 `lang:<target>`，不写入其他字段
-/// 2. **文件存在，lang 字段不存在**：补充 lang 字段到文件末尾
-/// 3. **文件存在，lang 已是目标语言**：跳过，不写入
-/// 4. **文件存在，lang 是其他语言且 saves/ 不存在**：覆盖为目标语言（先写 `-` 触发缓存清空，再写目标值）
-/// 5. **文件存在，lang 是其他语言且 saves/ 已存在**：跳过，尊重老用户选择
-///
-/// ## 日志
-/// 每个分支都有 `[Language]` 前缀的日志，便于排查
+/// 参数：`game_dir` 游戏根目录；`version_id` 版本目录名（仅日志）；`mc_version` 真实 MC
+/// 版本号（决定语言代码大小写）；`target_lang` 目标语言代码（小写，如 "zh_cn"）。
+/// 行为：options.txt 不存在则创建只写 lang；lang 不存在则补充；lang 已是目标则跳过；
+/// lang 是其他语言且 saves/ 不存在则覆盖（先写 `-` 清缓存再写目标值），saves/ 已存在
+/// 则跳过尊重老用户选择。每个分支都有 `[Language]` 前缀日志便于排查。
 pub fn set_game_language(
     game_dir: &Path,
     version_id: &str,

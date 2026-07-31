@@ -1,11 +1,7 @@
-//! 微软账号管理命令（列表 / 删除 / 切换）
-//!
-//! `switch_ms_account` 含 token 过期自动刷新逻辑：检测到 `expires_at` 过期时调用
+//! 微软账号管理命令（列表/删除/切换）
+//! `switch_ms_account` 含 token 过期自动刷新：检测 `expires_at` 过期时调
 //! `microsoft::login_with_refresh_token` 静默续期，刷新成功后回写 `auth_storage`。
-//!
-//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState`，
-//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
-//! `utils::meta_manager::dispatch` 分发调用。
+//! 已聚合为 `meta_manager` IPC 入口，由 `utils::meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;

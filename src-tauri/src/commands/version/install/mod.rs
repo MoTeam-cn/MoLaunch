@@ -1,13 +1,7 @@
 //! install_merged：整合安装入口（MC 本体 + 加载器 + Fabric API + 后处理）
-//!
-//! 编排流程：
-//!   1. 下载 MC 本体（版本清单/版本信息/客户端/库文件/资源文件）
-//!   2. 批量安装加载器（stages.rs）
-//!   3. 合并 JSON + 重命名版本目录（post_install.rs）
-//!   4. 保存 setup.ini + 创建隔离目录（setup_persist.rs）
-//!   5. 自动安装 Fabric API（fabric_api.rs）
-//!
-//! 各阶段的详细实现拆分到对应子模块，本文件只做编排。
+//! 编排流程：1.下载 MC 本体 → 2.批量安装加载器（stages.rs）→ 3.合并 JSON+重命名版本目录
+//! （post_install.rs）→ 4.保存 setup.ini+创建隔离目录（setup_persist.rs）→ 5.自动安装
+//! Fabric API（fabric_api.rs）。各阶段详细实现拆分到对应子模块，本文件只做编排。
 
 pub mod cleanup;
 mod fabric_api;

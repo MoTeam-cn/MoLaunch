@@ -283,18 +283,12 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
 
 /// 通过 Slug 列表批量查询 Modrinth 工程（中文搜索专用）
 ///
-/// Modrinth 的 `GET /v2/projects?ids=[...]` 接口接受 project_id，
-/// 但 slug 也可以作为 project_id 的别名传入，从而实现按 slug 批量拉取工程信息。
+/// `GET /v2/projects?ids=[...]` 接受 project_id，slug 可作别名传入实现批量拉取。
+/// 中文搜索：moddata.txt 匹配出 MR slug 后调本函数绕过 MR 搜索 API 中文支持不佳。
 ///
-/// 用于中文搜索：本地 moddata.txt 数据库匹配出中文关键词对应的 MR slug 列表后，
-/// 调本函数批量拉取工程详情，绕过 MR 搜索 API 对中文支持不佳的问题。
-///
-/// # 参数
-/// - `slugs`：Modrinth slug 列表（最多 100 个，超出截断）
-/// - `rtype`：资源类型（用于填充 ResourceProject.resource_type）
-///
-/// # 返回
-/// 工程列表（查询失败返回空 Vec，不阻断搜索）
+/// - `slugs`：slug 列表（最多 100，超出截断）
+/// - `rtype`：资源类型（填充 ResourceProject.resource_type）
+/// - 返回：工程列表（失败返回空 Vec，不阻断搜索）
 pub async fn get_projects_by_slugs(
     slugs: &[String],
     rtype: ResourceType,

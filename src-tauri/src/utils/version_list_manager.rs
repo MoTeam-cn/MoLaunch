@@ -1,5 +1,4 @@
 //! 版本列表/文件夹/管理/个性化命令的统一分发逻辑（version_list_manager 的工具实现）
-//!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，聚合 `version::list` /
 //! `version::folder` / `version::manage` / `version::personalization` 共 19 个 action。
 //! 子模块函数签名改为 `&AppState` / `&AppHandle`，`fix_version_files` 需要

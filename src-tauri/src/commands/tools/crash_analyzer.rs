@@ -1,8 +1,6 @@
 //! 崩溃日志分析
-//!
 //! - `analyze`：对游戏崩溃日志文本做大小写不敏感的模式匹配，识别常见崩溃原因
 //!   （Java 版本 / 缺失 mod / 内存 / 驱动 / Mod 冲突 / 其他），返回结构化的分析条目供前端展示。
-//!
 //! 本模块为纯文本分析，不读取文件系统，不使用 state 参数（签名保持统一）。
 
 use crate::log_info;
@@ -13,15 +11,11 @@ use super::types::{CrashAnalyzeParams, CrashAnalyzeResult, CrashAnalysisItem};
 /// 分析崩溃日志文本，识别常见崩溃模式
 ///
 /// 匹配规则（大小写不敏感）：
-/// - Java 版本不匹配：`UnsupportedClassVersionError` / `Unsupported class file major version`
-///   / `has been compiled by a more recent version`
-/// - 缺失 mod：`NoClassDefFoundError` / `NoSuchMethodError` / `FileNotFoundException` 且路径含 mods
-/// - 内存不足：`OutOfMemoryError` / `OutOfMemory`
-/// - 显卡驱动：`GLFW` / `OpenGL` / `Pixel format` / `driver`
-/// - Mod 冲突：`MixinApplyError` / `Duplicate` / `Conflicting`
-/// - 其他：含 `Exception` / `Error` / `Crash` 的通用条目（仅当未命中上述具体分类时）
-///
-/// 空文本返回空 analyses。
+/// - Java 版本不匹配：`UnsupportedClassVersionError` / `Unsupported class file major version` 等
+/// - 缺失 mod：`NoClassDefFoundError` / `NoSuchMethodError` / `FileNotFoundException`(路径含 mods)
+/// - 内存不足：`OutOfMemoryError`；显卡驱动：`GLFW`/`OpenGL`/`Pixel format`/`driver`
+/// - Mod 冲突：`MixinApplyError`/`Duplicate`/`Conflicting`
+/// - 其他：含 `Exception`/`Error`/`Crash`（仅未命中上述分类时）。空文本返回空。
 pub async fn analyze(
     state: &AppState,
     params: CrashAnalyzeParams,

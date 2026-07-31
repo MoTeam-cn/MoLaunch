@@ -1,5 +1,4 @@
 //! 社区资源下载安装 - CurseForge 整合包处理
-//!
 //! 包含 CF manifest.json 数据结构与 install_cf_mods 安装流程。
 //! install_cf_mods 流程：POST /v1/mods/files 批量查询下载信息 →
 //! 批量查询 project slug（用于 mcmod 译名 + 应用 community_filename_format）→

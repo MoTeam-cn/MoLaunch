@@ -1,12 +1,8 @@
 //! 厂商管理：内置系统默认厂商 + 外部厂商列表 + 启用/禁用 + 路径辅助
-//!
 //! 内置系统默认厂商（`system-default`）的 frpc 首次使用时从 apiServer `/v1/frp/manifest`
-//! 接口获取最新版本下载 URL（见 `binary.rs`）。外部厂商存放于
-//! `<base_dir>/providers/<provider_id>/`，包含 manifest.json 描述
-//! 厂商元信息、frpc 分发方式（bundled/url）和认证配置。
-//! 厂商启用状态持久化到 `<base_dir>/frp/providers.json`。
-//!
-//! 安装/卸载逻辑见 [`super::install`]，frpc 下载逻辑见 [`super::binary`]。
+//! 获取最新版本下载 URL（见 `binary.rs`）。外部厂商存放于 `<base_dir>/providers/<provider_id>/`，
+//! 包含 manifest.json 描述厂商元信息、frpc 分发方式（bundled/url）和认证配置。
+//! 厂商启用状态持久化到 `<base_dir>/frp/providers.json`；安装/卸载见 [`super::install`]，frpc 下载见 [`super::binary`]。
 
 use super::{ensure_dir, providers_root, providers_state_path, validate_provider_id, ProviderInfo, ProviderManifest};
 use crate::log_info;
@@ -194,16 +190,10 @@ pub(super) fn read_provider_manifest(provider_id: &str) -> Result<ProviderManife
 
 /// 列出所有厂商（内置 + 外部）
 ///
-/// 内置系统默认厂商始终返回。外部厂商扫描 `<base_dir>/providers/` 目录，
-/// 读取每个子目录的 manifest.json。manifest 损坏或 id 不匹配的厂商会被跳过。
-///
-/// 系统默认厂商版本号策略：
-/// - 本地已安装（frpc.exe 存在）：从 `frpc_version.txt` 读取真实版本
-/// - 本地未安装：请求 apiServer `GET /v1/frp/manifest`（传 `0.0.0`）获取最新版本号，
-///   失败时回退显示"未安装"
-///
-/// 注：apiServer 校验版本号格式（语义化版本），空字符串会返回 code=1001 错误，
-/// 必须传 `0.0.0` 这种合法格式表示"查询最新版本"。
+/// 内置系统默认厂商始终返回。外部厂商扫描 `<base_dir>/providers/` 读 manifest.json，
+/// 损坏或 id 不匹配的跳过。系统默认厂商版本：已安装读 `frpc_version.txt`；
+/// 未安装请求 apiServer `GET /v1/frp/manifest`（传 `0.0.0`）取最新号，失败回退"未安装"。
+/// 注：apiServer 校验版本格式，空串返回 code=1001，须传 `0.0.0` 表示查最新。
 pub async fn list_providers(state: &AppState) -> Result<Vec<ProviderInfo>, String> {
     let mut providers = Vec::new();
     let state_map = read_providers_state();

@@ -1,10 +1,7 @@
 //! 皮肤与披风管理模块
-//!
-//! 实现说明：
-//! - 皮肤 URL 直接从 profile_json 的 skins[].url 获取（textures.minecraft.net）
-//! - 头像通过下载皮肤 PNG 后由前端 canvas 裁剪 (8,8,8,8) 区域
-//! - 上传/修改皮肤（multipart/form-data）
-//! - 装备/取消披风
+//! 实现说明：皮肤 URL 直接从 profile_json 的 skins[].url 获取（textures.minecraft.net）；
+//! 头像通过下载皮肤 PNG 后由前端 canvas 裁剪 (8,8,8,8) 区域；上传/修改皮肤
+//! （multipart/form-data）；装备/取消披风。
 
 use crate::http;
 use crate::log_info;

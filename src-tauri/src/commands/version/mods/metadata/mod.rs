@@ -1,19 +1,8 @@
 //! Jar 内 Mod 元数据读取流水线
-//!
-//! 版本号识别链：
-//! 1. mcmod.info（Forge 1.12-）
-//! 2. fabric.mod.json（Fabric/Quilt）
-//! 3. META-INF/mods.toml（Forge 1.13+/NeoForge）
-//! 4. META-INF/fml_cache_annotation.json（Forge 1.7-1.12 注解缓存）
-//!
-//! 按顺序累积合并，已有有效值不覆盖。
-//! Version 中 `${file.jarVersion}` 等占位符标记为 "version"，
-//! 最后统一从 MANIFEST.MF 的 Implementation-Version 解析。
-//! 版本号必须包含 "." 或 "-"，否则视为无效。
-//!
-//! 模块结构：
-//! - mod.rs: 主入口 + MetaBuilder 合并器 + finalize/fallback 工具
-//! - sources.rs: 4 个来源的读取函数 + MANIFEST.MF 版本解析
+//! 版本号识别链：mcmod.info（Forge 1.12-）→ fabric.mod.json（Fabric/Quilt）→
+//! META-INF/mods.toml（Forge 1.13+/NeoForge）→ fml_cache_annotation.json（Forge 1.7-1.12
+//! 注解缓存）。按顺序累积合并，已有有效值不覆盖。`${file.jarVersion}` 占位符最后从
+//! MANIFEST.MF Implementation-Version 解析；版本号须含 "." 或 "-"，否则视为无效。
 
 mod sources;
 

@@ -3,14 +3,12 @@
 /// 根据 MC 版本获取所需的最低 Java 版本
 ///
 /// # 规则
-/// | MC 版本      | 最低 Java | 推荐 Java |
-/// |-------------|----------|----------|
-/// | 26+ (新格式) | Java 21  | Java 21  |
-/// | 1.20.5+     | Java 21  | Java 21  |
-/// | 1.18-1.20.4 | Java 17  | Java 17  |
-/// | 1.17        | Java 16  | Java 17  |
-/// | 1.12-1.16   | Java 8   | Java 8   |
-/// | 1.5以下      | Java 8   | Java 8   |
+/// | MC 版本 | 最低 / 推荐 Java |
+/// |--------|----------------|
+/// | 26+ 或 1.20.5+ | Java 21 |
+/// | 1.18-1.20.4 | Java 17 |
+/// | 1.17 | Java 16 / 推荐 17 |
+/// | 1.12-1.16 及以下 | Java 8 |
 pub fn get_required_java_version(mc_version: &str) -> u32 {
     let (min, _max) = get_java_version_range(mc_version, None);
     min.unwrap_or(8)

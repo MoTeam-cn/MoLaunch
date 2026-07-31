@@ -1,10 +1,8 @@
 //! 系统模块统一分发逻辑（system_manager 的工具实现）
-//!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，24 个 system action 在
-//! `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
-//! 非 Result 返回的命令（`is_developer_unlocked` / `get_storage_dirs` /
-//! `get_system_info` / `get_log_path` / `list_log_files` / `list_custom_certs`）
-//! 需在 handler 内用 `serde_json::to_value` 包装。
+//! `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。非 Result 返回的命令
+//! （`is_developer_unlocked`/`get_storage_dirs`/`get_system_info`/`get_log_path`/
+//! `list_log_files`/`list_custom_certs`）需在 handler 内用 `serde_json::to_value` 包装。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;

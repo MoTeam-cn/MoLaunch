@@ -1,18 +1,8 @@
-//! 认证持久化模块
+//! 认证持久化模块（Windows 注册表 `HKCU\Software\MoLaunch`）
 //!
-//! 将认证信息存储到 Windows 注册表：
-//! - 每个字段单独存储为注册表键值（而非单个 JSON 文件）
-//! - 敏感字段（Token、用户名、UUID 等）使用 SDK DES 加密
-//! - 非敏感字段（登录类型）明文存储
-//! - 多账号列表用一个加密的 JSON 字符串存储
-//!
-//! 注册表路径：`HKEY_CURRENT_USER\Software\MoLaunch`
-//!
-//! 按关注点拆分为 4 个子模块：
-//! - `types`      数据结构（StoredMsAccount / StoredOfflineAccount / PersistedAuthState / CurrentUser）
-//! - `registry`   注册表常量 + 低层 reg_key/reg_get/reg_set/reg_delete 自由函数
-//! - `operations` AuthStorage 高层操作（save_ms_login / save_offline_login / token 刷新等 11 个方法）
-//! - `mod.rs`     AuthStorage 结构体 + encrypt/decrypt + reg_set_encrypted/reg_get_decrypted + load/invalidate/save
+//! 每字段单独存为注册表键值：敏感字段（Token/用户名/UUID）用 SDK DES 加密，
+//! 非敏感字段（登录类型）明文；多账号列表用一个加密 JSON 字符串存储。
+//! 子模块：types（数据结构）/ registry（低层 reg_* 自由函数）/ operations（11 个高层方法）。
 
 mod operations;
 mod registry;

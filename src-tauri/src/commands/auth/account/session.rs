@@ -1,12 +1,8 @@
 //! 会话命令：登录状态恢复 + 登出
-//!
-//! `get_login_status` 实现优先级：内存 → 磁盘恢复（含微软 token 静默刷新）。
-//! 启动时前端首次调用以恢复登录态，若微软 token 过期会尝试 `login_with_refresh_token`
-//! 静默续期，失败则回退到磁盘中的旧 token（让后续操作再触发交互式登录）。
-//!
-//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState`，
-//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
-//! `utils::meta_manager::dispatch` 分发调用。
+//! `get_login_status` 优先级：内存 → 磁盘恢复（含微软 token 静默刷新）。启动时前端
+//! 首次调用以恢复登录态，若微软 token 过期会尝试 `login_with_refresh_token` 静默续期，
+//! 失败则回退到磁盘中的旧 token（让后续操作再触发交互式登录）。
+//! 已聚合为 `meta_manager` IPC 入口，由 `utils::meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;

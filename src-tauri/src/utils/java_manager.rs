@@ -1,10 +1,8 @@
 //! Java 管理统一分发逻辑（java_manager 的工具实现）
-//!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，6 个 action：
-//! `detect_java` / `list_java` / `select_java_for_mc` / `get_java_requirements` /
-//! `check_java_compatible` / `download_java`。
-//! `get_java_requirements` / `check_java_compatible` 不需要 state/app；
-//! `download_java` 需要 state（读下载源）和 app（emit `java-download-progress`）。
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，6 个 action：`detect_java`/`list_java`/
+//! `select_java_for_mc`/`get_java_requirements`/`check_java_compatible`/`download_java`。
+//! `get_java_requirements`/`check_java_compatible` 不需 state/app；`download_java` 需 state
+//! （读下载源）和 app（emit `java-download-progress`）。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;

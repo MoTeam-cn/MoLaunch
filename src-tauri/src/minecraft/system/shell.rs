@@ -1,18 +1,8 @@
 //! 跨平台 shell 命令封装
-//!
-//! 统一管理系统级外部命令调用（文件管理器、进程管理、文件权限），
-//! 避免业务代码直接操作 std::process::Command 造成的行为不一致。
-//!
-//! 整合范围：
-//! - 文件管理器交互：open_path / reveal_in_file_manager（原 game_dir.rs 的 explorer/cmd / open / xdg-open）
-//! - 进程管理：kill_process_tree（原 launch.rs 的 taskkill / kill）
-//! - 文件权限：restrict_file_permissions（原 script_export.rs 的 icacls / chmod）
-//!
-//! 所有函数：
-//! - 处理跨平台差异（Windows/macOS/Linux）
-//! - 安全校验（拒绝路径遍历、UNC 路径）
-//! - 统一日志（[Shell] 前缀，调用前后都记录）
-//! - 错误转换为 String（Tauri 命令可直接返回）
+//! 统一管理系统级外部命令调用（文件管理器、进程管理、文件权限），避免业务代码
+//! 直接操作 `std::process::Command`。整合范围：open_path/reveal_in_file_manager、
+//! kill_process_tree、restrict_file_permissions。所有函数处理跨平台差异、安全校验
+//! （拒绝路径遍历/UNC）、统一日志（`[Shell]` 前缀）、错误转 String。
 
 use crate::{log_debug, log_error, log_info};
 
@@ -291,16 +281,9 @@ pub fn restrict_file_permissions(path: &std::path::Path) {
 
 /// 执行指定可执行文件并返回完整输出（同步阻塞）
 ///
-/// 统一封装 `std::process::Command` 调用，提供：
-/// - `[Shell]` 前缀日志（记录 program + args + cwd）
-/// - Windows 下 CREATE_NO_WINDOW 标志（避免弹出控制台窗口）
-/// - 统一错误格式（含 [Shell] 前缀 + 日志）
-///
-/// 适用于：Java 二进制探测（`java -version`）、PreLaunch 命令执行（`cmd /C` / `sh -c`）
-/// 等需要直接调用外部可执行文件的场景。
-///
-/// **不适用**：异步子进程执行（请用 `tokio::process::Command`）、需要权限校验的
-/// 沙箱执行（请参考 `commands::plugins::spawn`）。
+/// 统一封装 `std::process::Command`：`[Shell]` 前缀日志、Windows CREATE_NO_WINDOW、统一错误格式。
+/// 适用于 Java 探测（`java -version`）、PreLaunch（`cmd /C`/`sh -c`）等直接调外部可执行文件。
+/// 不适用：异步子进程（用 `tokio::process::Command`）、权限校验沙箱（见 `commands::plugins::spawn`）。
 pub fn run_executable_output(
     program: &str,
     args: &[String],

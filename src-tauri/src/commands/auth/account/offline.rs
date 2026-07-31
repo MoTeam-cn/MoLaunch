@@ -1,12 +1,8 @@
-//! 离线账号管理命令（列表 / 皮肤设置 / 自定义皮肤上传 / 删除 / 切换）
-//!
+//! 离线账号管理命令（列表/皮肤设置/自定义皮肤上传/删除/切换）
 //! `save_custom_skin` 将用户选择的 PNG 复制到 `<app_data>/custom_skins/<uuid>.png`，
-//! 并把 `custom:<path>|<variant>` 写入离线账号的 skin 字段。包含 PNG 文件头校验和
+//! 并把 `custom:<path>|<variant>` 写入离线账号 skin 字段。包含 PNG 文件头校验和
 //! 1MB 大小限制（比 Mojang 官方 24KB 宽松，因本地使用）。
-//!
-//! 注：原 `#[tauri::command]` 标注已移除，函数改为接收 `&AppState`，
-//! 由 `commands::auth::meta_manager` 统一 IPC 入口通过
-//! `utils::meta_manager::dispatch` 分发调用。
+//! 已聚合为 `meta_manager` IPC 入口，由 `utils::meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;

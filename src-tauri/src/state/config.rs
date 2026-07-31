@@ -108,15 +108,10 @@ impl Default for OnlineConfig {
 
 /// TLS 证书配置
 ///
-/// `trust_mode` 控制信任源组合，`http::build_client` 据此调用 certs 模块加载对应根证书：
-/// - `"builtin"`：仅 webpki-roots（reqwest 内置）
-/// - `"system"`：仅操作系统根证书（rustls-native-certs 加载）
-/// - `"custom"`：仅 certs 目录下的用户自定义 PEM
-/// - `"system+custom"` / `"builtin+custom"`：组合模式
-/// - `"all"`：三种来源全部加载
-///
-/// `IgnoreTls`（开发者模式注册表键）开启时跳过所有证书校验，
-/// 此字段配置的信任源不再生效。
+/// `trust_mode` 控制信任源组合（`http::build_client` 据此加载根证书）：
+/// `builtin`(webpki-roots) / `system`(OS 根证书) / `custom`(certs 目录 PEM)，
+/// 支持 `system+custom`、`builtin+custom` 组合与 `all` 全加载。
+/// `IgnoreTls`（开发者模式注册表键）开启时跳过所有证书校验，此字段不生效。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TlsConfig {
     /// 信任源模式：system / builtin / custom / system+custom / builtin+custom / all

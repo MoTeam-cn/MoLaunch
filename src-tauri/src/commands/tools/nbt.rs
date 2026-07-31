@@ -1,14 +1,7 @@
 //! NBT 数据查看（解析玩家/方块/物品 NBT）
-//!
-//! 使用 `fastnbt` crate（stable 兼容，serde 设计）解析 NBT 二进制格式，
-//! 替代早期手动实现的解析器（约 296 行 → 约 130 行）。fastnbt 经社区验证，
-//! 可靠处理嵌套 TAG_List、空 compound、超大数组等边界情况。
-//!
-//! gzip 解压仍由 `flate2` 负责（NBT 文件如 player .dat / level.dat 通常 gzip 压缩）。
-//!
-//! 支持的标签类型（与 Minecraft NBT 规范一致）：
-//! `TAG_End=0, Byte=1, Short=2, Int=3, Long=4, Float=5, Double=6, Byte_Array=7,
-//!  String=8, List=9, Compound=10, Int_Array=11, Long_Array=12`
+//! 用 `fastnbt` crate（stable 兼容，serde 设计）解析 NBT 二进制格式，替代早期手动解析器
+//! （约 296 行 → 约 130 行），可靠处理嵌套 TAG_List/空 compound/超大数组等边界。
+//! gzip 解压由 `flate2` 负责（player .dat / level.dat 通常 gzip 压缩）。
 
 use std::io::Read;
 

@@ -1,11 +1,8 @@
 //! 社区资源下载安装 - MultiMC 整合包数据结构
-//!
-//! 包含 MMC mmc-pack.json 与 instance.cfg 的反序列化/解析结构。
-//! MMC 整合包不含依赖 mods 列表（mods 已打包在 overrides 的 .minecraft/mods/ 中），
-//! 通过 components[] 数组指定 Minecraft 本体与加载器版本。
-//!
-//! instance.cfg 中的字段（如 PreLaunchCommand/JvmArgs/JoinServerOnLaunch 等）
-//! 会被解析并迁移到版本 setup.ini。
+//! 包含 MMC mmc-pack.json 与 instance.cfg 的反序列化/解析结构。MMC 整合包不含依赖 mods
+//! 列表（mods 已打包在 overrides 的 .minecraft/mods/ 中），通过 components[] 数组指定
+//! Minecraft 本体与加载器版本。instance.cfg 字段（PreLaunchCommand/JvmArgs/JoinServerOnLaunch
+//! 等）会被解析并迁移到版本 setup.ini。
 
 use serde::Deserialize;
 
@@ -35,15 +32,12 @@ pub(super) struct MmcComponent {
 
 /// MMC instance.cfg 解析结果
 ///
-/// instance.cfg 是 INI 格式（key=value），按行解析提取需要的字段。
-///
-/// 字段迁移目标：
-/// - `PreLaunchCommand`（条件 `OverrideCommands=true`）→ `advance_run_cmd`（变量替换）
-/// - `JoinServerOnLaunchAddress`（条件 `JoinServerOnLaunch=true`）→ `server_enter`
+/// instance.cfg 是 INI 格式（key=value），按行解析。字段迁移目标：
+/// - `PreLaunchCommand`(`OverrideCommands=true`) → `advance_run_cmd`（变量替换）
+/// - `JoinServerOnLaunchAddress`(`JoinServerOnLaunch=true`) → `server_enter`
 /// - `IgnoreJavaCompatibility=true` → `advance_ignore_java_warning=true`
-/// - `iconKey`（且对应 .png 存在）→ `logo`（复制图标到版本目录 MoLaunch/Logo.png）
-/// - `JvmArgs`（条件 `OverrideJavaArgs=true`）→ `advance_jvm_args`（覆盖）
-/// - `JvmArgs`（条件 `OverrideJavaArgs=false`）→ `advance_jvm_args`（追加到全局）
+/// - `iconKey`(.png 存在) → `logo`（复制到版本目录 MoLaunch/Logo.png）
+/// - `JvmArgs`(`OverrideJavaArgs=true` 覆盖 / `false` 追加到全局) → `advance_jvm_args`
 #[derive(Debug, Default, Clone)]
 pub(super) struct MmcInstanceCfg {
     /// 启动前命令（已做变量替换）
@@ -133,15 +127,9 @@ pub(super) fn parse_instance_cfg(content: &str) -> MmcInstanceCfg {
 
 /// 替换 MMC PreLaunchCommand 中的变量占位符
 ///
-/// 变量替换逻辑：
-/// - `\"` → `"`
-/// - `$INST_JAVA` → `javaw`（启动时由系统 PATH 解析）
-/// - `$INST_MC_DIR\` 或 `$INST_MC_DIR` → instance_dir 实际路径
-/// - `$INST_DIR\` 或 `$INST_DIR` → instance_dir 实际路径
-/// - `$INST_ID` 或 `$INST_NAME` → 实例名
-///
-/// 启动时直接执行 cmd /C，所以迁移时直接替换为实际路径。
-/// `$INST_JAVA` 替换为 `javaw`（依赖系统 PATH），用户可后续手动调整。
+/// 变量替换：`\"`→`"`；`$INST_JAVA`→`javaw`（启动时系统 PATH 解析）；
+/// `$INST_MC_DIR`/`$INST_DIR`（带或不带 `\`）→ instance_dir 实际路径；
+/// `$INST_ID`/`$INST_NAME` → 实例名。启动直接执行 cmd /C，迁移时替换为实际路径。
 pub(super) fn substitute_pre_launch_vars(cmd: &str, instance_dir: &std::path::Path, instance_name: &str) -> String {
     let instance_path = instance_dir.to_string_lossy().to_string();
     // 反斜杠路径（Windows 习惯）

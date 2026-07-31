@@ -117,17 +117,8 @@ pub struct UserProperty {
 
 /// 服务器根元数据（GET / 响应）
 ///
-/// yggdrasil 标准格式：所有元信息在 `meta` 对象内
-/// ```json
-/// {
-///   "meta": {
-///     "serverName": "LittleSkin",
-///     "implementationName": "...",
-///     "links": { "homepage": "...", "register": "..." }
-///   },
-///   "signaturePublickey": "..."
-/// }
-/// ```
+/// yggdrasil 标准格式：元信息在 `meta` 对象内（serverName/implementationName/links），
+/// 顶层含 `signaturePublickey`。
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ServerMetadata {

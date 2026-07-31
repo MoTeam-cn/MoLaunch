@@ -5,22 +5,12 @@ use std::path::Path;
 use super::LibEntry;
 use crate::minecraft::utils::file_checker::FileChecker;
 
-/// Find missing libraries
+/// 查找缺失库文件（并行检查）
 ///
-/// ## 性能优化
-///
-/// - **并行检查**：使用 `std::thread::scope` 并行检查多个库文件，充分利用多核 CPU
-/// - **快速检查模式**（`quick_check = true`）：只检查文件存在 + 大小匹配，不计算 SHA1
-///   - 用于启动时的文件校验（`fix_version_files` 经 `validate_and_fix_files` 调用）
-///   - 启动时只构建 classpath，不做哈希校验，避免每次启动卡顿
-///   - 文件下载时已经做过完整校验，正常情况下不会损坏
-/// - **完整校验模式**（`quick_check = false`）：计算 SHA1 哈希，确保文件完整性
-///   - 用于版本安装/修复时的严格校验
-///
-/// ## 性能对比（73 个库，约 200MB 总大小）
-///
-/// - 优化前：串行 + 完整哈希校验，约 60 秒
-/// - 优化后（快速检查）：并行 + 仅大小校验，约 0.5 秒
+/// - 并行：`std::thread::scope` 多线程检查
+/// - 快速模式（`quick_check=true`）：仅检查存在+大小，启动时用，避免哈希卡顿
+/// - 完整模式（`quick_check=false`）：计算 SHA1，安装/修复时严格校验
+/// - 性能：73 库 200MB，串行+哈希 60s → 并行+仅大小 0.5s
 pub fn find_missing_libs(libs: &[LibEntry], _game_dir: &Path, quick_check: bool) -> Vec<LibEntry> {
     use std::sync::Mutex;
 

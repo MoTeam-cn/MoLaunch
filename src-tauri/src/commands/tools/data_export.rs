@@ -1,14 +1,7 @@
 //! 启动器数据导出（zip 打包）
-//!
-//! 将启动器的核心数据（配置 / 版本列表 / 账号）打包为 zip 文件，
-//! 便于用户备份或迁移。账号敏感信息会脱敏处理：
-//! - 微软账号：不导出 `expires_at` / `is_expired`（token 状态字段）
-//! - 离线账号：不导出 `skin`（避免大段 base64 占用空间）
-//!
-//! 导出内容按 `ExportLauncherDataParams` 的开关字段控制：
-//! - `include_config`：导出 `config.json`（AppConfig 序列化）
-//! - `include_versions`：导出 `versions.json`（已安装版本列表 + 类型）
-//! - `include_accounts`：导出 `accounts.json`（脱敏后的账号列表）
+//! 将核心数据（配置/版本列表/账号）打包为 zip 便于备份或迁移。账号敏感信息脱敏：微软账号
+//! 不导出 `expires_at`/`is_expired`，离线账号不导出 `skin`（避免大段 base64）。导出内容按
+//! `ExportLauncherDataParams` 开关控制：include_config/include_versions/include_accounts。
 
 use std::io::Write;
 use std::path::PathBuf;

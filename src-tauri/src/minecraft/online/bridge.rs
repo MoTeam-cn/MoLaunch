@@ -228,9 +228,6 @@ impl VirtualLanBridge {
             return;
         }
 
-        // 关闭写通道，触发读写循环退出
-        // 注意：write_tx 是 Sender 的引用，close 需要 drop 所有 Sender
-        // 这里通过 abort 直接停止 task
         self.handle.abort();
         *st = BridgeState::Closed;
     }

@@ -1,5 +1,4 @@
 //! 插件系统命令模块（编排层）
-//!
 //! 外部插件存放于 `<base_dir>/plugins/<plugin_id>/`，每个插件目录包含
 //! manifest.json 和入口 HTML。子模块按职责拆分：install / sandbox / spawn /
 //! window / layout / export / personalization。

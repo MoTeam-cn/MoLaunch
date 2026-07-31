@@ -147,7 +147,6 @@ pub fn run() {
             // 窗口关闭时保存配置
             if let tauri::WindowEvent::CloseRequested { .. } = event {
                 log_info!("Window close requested, saving config...");
-                // 这里需要获取AppState，但由于生命周期限制，我们简化处理
                 log_info!("Config will be saved on exit");
             }
             // 主窗口销毁时重置 DevTools 打开状态

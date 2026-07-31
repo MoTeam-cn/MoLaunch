@@ -1,13 +1,8 @@
-//! HTTP 客户端模块
-//! 统一管理 reqwest 客户端构建，支持代理配置 + IP 协议版本偏好 + TLS 信任源
-//!
-//! 代理热更新：`init_client` 使用 `RwLock<Option<Client>>` 而非 `OnceLock`，
-//! 用户在设置页修改代理或 IP 版本偏好后 `apply_config` 会再次调用 `init_client` 重建客户端，
-//! 无需重启应用即可生效。
-//!
-//! TLS 信任源：`trust_mode` 控制 builtin/system/custom 三种根证书来源的组合。
-//! `ignore_tls=true`（开发者模式注册表键 IgnoreTls）开启时跳过所有证书校验，
-//! 用于联机服务端自签名证书调试等场景。
+//! HTTP 客户端模块：统一管理 reqwest 客户端构建，支持代理 + IP 协议版本偏好 + TLS 信任源
+//! 代理热更新：`init_client` 用 `RwLock<Option<Client>>`，`apply_config` 修改代理/IP 偏好后
+//! 再次调用 `init_client` 重建客户端，无需重启应用即可生效。
+//! TLS 信任源：`trust_mode` 控制 builtin/system/custom 三种根证书来源组合；
+//! `ignore_tls=true`（开发者模式注册表 IgnoreTls）跳过所有证书校验，用于联机自签名证书调试。
 
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
 use std::sync::{OnceLock, RwLock};
@@ -89,17 +84,10 @@ pub fn get_client() -> reqwest::Client {
 
 /// 构建 HTTP 客户端
 ///
-/// `ip_version` 控制 IP 协议偏好：
-/// - `"v4"`: 强制 IPv4（`local_address = 0.0.0.0`，reqwest 仅解析 A 记录）
-/// - `"auto"`: 自动选择（测试 v4/v6 连通性，选稳定的那个）
-/// - `"any"` 或其他: 随意解析（不设置 `local_address`，跟随 DNS 服务器）
-///
-/// `trust_mode` 控制 TLS 信任源组合（仅在 `ignore_tls=false` 时生效）：
-/// - 包含 `builtin` 或为 `all`：启用 reqwest 内置 webpki-roots
-/// - 包含 `system` 或为 `all`：加载操作系统根证书（rustls-native-certs）
-/// - 包含 `custom` 或为 `all`：加载 certs 目录下的用户自定义 PEM
-///
-/// `ignore_tls=true` 时跳过所有证书校验（`danger_accept_invalid_certs(true)`）。
+/// - `ip_version`：`"v4"` 强制 IPv4；`"auto"` 测试连通性自动选；`"any"` 跟随 DNS
+/// - `trust_mode`（`ignore_tls=false` 时生效）：含 `builtin`/`system`/`custom` 或 `all`
+///   分别启用 webpki-roots、OS 根证书、certs 目录自定义 PEM
+/// - `ignore_tls=true`：跳过所有证书校验（`danger_accept_invalid_certs`）
 pub fn build_client(
     proxy_mode: &str,
     proxy_type: &str,

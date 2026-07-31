@@ -1,5 +1,4 @@
 //! 版本启动命令
-//!
 //! 模块结构：
 //! - mod.rs: 共享类型 + 共享 helper + launch_game 编排 + 其他短命令
 //! - build_config.rs: build_launch_config（从全局配置+版本设置+前端入参构建 LaunchConfig）

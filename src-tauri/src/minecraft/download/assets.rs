@@ -180,17 +180,10 @@ pub fn get_asset_index_urls(meta: &AssetIndexMeta, source_mode: DownloadSourceMo
     sources::build_replace_urls(&meta.url, None, sources::MOJANG_REPLACEMENTS, source_mode)
 }
 
-/// 检测缺失的资源文件
-/// Find missing assets
+/// 检测缺失的资源文件（并行检查，与 `find_missing_libs` 一致）
 ///
-/// ## 性能优化（与 `find_missing_libs` 一致）
-///
-/// - **并行检查**：使用 `std::thread::scope` 并行检查多个资源文件
-/// - **快速检查模式**（`quick_check = true`）：只检查文件存在 + 大小匹配，不计算 SHA1
-///   - 用于启动时的文件校验（assets 数量通常几百上千，串行哈希校验会非常慢）
-///   - 启动时不做哈希校验
-/// - **完整校验模式**（`quick_check = false`）：计算 SHA1 哈希，确保文件完整性
-///   - 用于版本安装/修复时的严格校验
+/// - 快速模式（`quick_check=true`）：仅检查存在+大小，启动时用（assets 数量大，串行哈希慢）
+/// - 完整模式（`quick_check=false`）：计算 SHA1，安装/修复时严格校验
 pub fn find_missing_assets(entries: &[AssetEntry], quick_check: bool) -> Vec<AssetEntry> {
     use std::sync::Mutex;
 

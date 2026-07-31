@@ -20,10 +20,8 @@ static SENSITIVE_RE: Lazy<Regex> = Lazy::new(|| {
 
 /// 对日志行进行脱敏
 ///
-/// 将 `token` / `password` / `secret` / `api_key` 等敏感字段的值替换为 `***`，
-/// 保留字段名、分隔符和日志其余结构。支持 TOML / JSON / 通用赋值三种格式。
-///
-/// # 示例
+/// 将 `token`/`password`/`secret`/`api_key` 等敏感字段值替换为 `***`，保留字段名、
+/// 分隔符和其余结构。支持 TOML/JSON/通用赋值三种格式。
 ///
 /// ```
 /// use mo_launch_lib::commands::frp::log_redact::redact_log;

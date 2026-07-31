@@ -1,5 +1,4 @@
 //! Mod 数据类型
-//!
 //! 包含：
 //! - ModInfo：list_mods 命令返回的单个 Mod 信息（前端消费）
 //! - ModMetadata：jar 内 mod 元数据（pub(crate)，供 preload 命令消费）

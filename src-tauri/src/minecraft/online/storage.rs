@@ -1,10 +1,7 @@
 //! 联机设备凭证持久化模块
-//!
-//! 存储路径（v2 迁移至 AppData，跨启动器实例共享设备身份）：
-//! - Windows: `%APPDATA%/.MolaLaunch/online/device.json`
-//! - macOS/Linux: `~/.config/MolaLaunch/online/device.json`
-//!
-//! 旧路径（v1，已废弃）：`<exe_dir>/.Molaunch/online/device.json`，首次启动自动迁移。
+//! 存储路径（v2 迁移至 AppData 跨启动器实例共享设备身份）：Windows
+//! `%APPDATA%/.MolaLaunch/online/device.json`，macOS/Linux `~/.config/MolaLaunch/online/device.json`。
+//! 旧路径（v1 已废弃）`<exe_dir>/.Molaunch/online/device.json` 首次启动自动迁移。
 //! 加密策略：文件整体 JSON 序列化后用 SDK DES 加密；SDK 不可用时降级明文（带 WARN）。
 
 use crate::log_info;

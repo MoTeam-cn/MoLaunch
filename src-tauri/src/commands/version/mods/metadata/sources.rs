@@ -1,10 +1,7 @@
 //! Mod 元数据的 4 个来源读取函数
-//!
-//! 对应 `LocalResourceFile.LoadMetadataFromJar` 的 4 个来源：
-//! 1. mcmod.info（Forge 1.12-）
-//! 2. fabric.mod.json（Fabric/Quilt）
-//! 3. META-INF/mods.toml（Forge 1.13+/NeoForge）
-//! 4. META-INF/fml_cache_annotation.json（Forge 1.7-1.12 注解缓存）
+//! 对应 `LocalResourceFile.LoadMetadataFromJar` 的 4 个来源：1. mcmod.info（Forge 1.12-）；
+//! 2. fabric.mod.json（Fabric/Quilt）；3. META-INF/mods.toml（Forge 1.13+/NeoForge）；
+//! 4. META-INF/fml_cache_annotation.json（Forge 1.7-1.12 注解缓存）。
 
 use std::collections::HashMap;
 use std::io::Read;

@@ -1,12 +1,8 @@
 //! 配置更新核心逻辑
-//!
-//! `apply_config_inner` 三段式分流：
-//! 1. 校验（validate 模块：mirror_url SSRF、download_source / meta_source 枚举）
-//! 2. 加密字段分流（secure 模块：CurseForge / 开发者模式 / IgnoreTls，不进 AppConfig）
-//! 3. 普通字段统一更新（`update_config` 闭包内按域调用 7 个子函数 + 副作用）
-//!
-//! 7 个域子函数：代理 / 下载 / 内存 / 启动器 / 社区 / 启动高级 / TLS。
-//! CurseForge / 开发者模式 / IgnoreTls 不在闭包内（分别走 secure_storage 与注册表）。
+//! `apply_config_inner` 三段式分流：1.校验（validate：mirror_url SSRF、download_source/
+//! meta_source 枚举）→ 2.加密字段分流（secure：CurseForge/开发者模式/IgnoreTls，不进
+//! AppConfig）→ 3.普通字段统一更新（`update_config` 闭包内按域调用 7 个子函数 + 副作用）。
+//! 7 个域子函数：代理/下载/内存/启动器/社区/启动高级/TLS；CurseForge 等不在闭包内（走 secure_storage 与注册表）。
 
 use super::secure;
 use super::types::ConfigPatch;

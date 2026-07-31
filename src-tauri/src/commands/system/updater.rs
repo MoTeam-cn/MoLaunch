@@ -1,14 +1,8 @@
 //! 自动更新命令模块（统一入口，平台内部分流）
-//!
-//! - **Windows 便携版**：自实现下载 + 启动 updater.exe 子进程替换 exe
-//!   （绕过 Windows 文件锁，无需 NSIS installer）
-//! - **macOS / Linux**：转发到 `tauri-plugin-updater` 官方 plugin
-//!   （复用其下载/验签/替换/重启全流程）
-//!
-//! 前端通过 `system_manager` 统一调用 `check_update` / `download_and_install_update`，
-//! 不需要关心平台差异。
-//!
-//! See: docs/updater/design.md §4 Windows 便携版 updater
+//! Windows 便携版：自实现下载 + 启动 updater.exe 子进程替换 exe（绕过 Windows 文件锁，
+//! 无需 NSIS installer）；macOS/Linux：转发到 `tauri-plugin-updater` 官方 plugin（复用其
+//! 下载/验签/替换/重启全流程）。前端通过 `system_manager` 统一调用 `check_update`/
+//! `download_and_install_update`。See: docs/updater/design.md §4 Windows 便携版 updater
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

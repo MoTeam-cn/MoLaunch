@@ -1,8 +1,6 @@
 //! DataChannel 消息协议（阶段三子任务 2，子任务 7 扩展 TurnServers）
-//!
 //! 定义 P2P DataChannel 上传输的二进制消息帧格式，用于虚拟网卡 IP 包转发
 //! 与控制消息（心跳、状态查询）。
-//!
 //! 帧格式：`type(1B) | seq(u32 BE) | length(u16 BE) | payload`，大端序网络字节序。
 //! Control 子类型：Heartbeat/StatusQuery/StatusResponse/HostMcPort/TurnServers。
 
@@ -220,17 +218,9 @@ pub fn parse_host_mc_port_payload(payload: &[u8]) -> Option<u16> {
 
 /// 便捷构造：TurnServers 控制消息
 ///
-/// 房主拉取系统 TURN 服务器后，通过 DataChannel 广播此消息给所有参与者。
-/// payload 为 JSON UTF-8 字节，调用方负责 `serde_json::to_vec(&ice_servers)` 序列化。
-///
-/// JSON 结构示例：
-/// ```json
-/// [{"urls":["turn:turn.example.com:3478"],"username":"foo","credential":"bar"}]
-/// ```
-///
-/// # Panics
-/// 不会 panic。即使 `json_payload` 为空数组也会构造合法消息（参与者收到后
-/// 应跳过空列表，不重建 PC）。
+/// 房主拉取系统 TURN 后经 DataChannel 广播给参与者。`json_payload` 为
+/// `IceServerEntry[]` 的 JSON UTF-8 字节（调用方负责 `serde_json::to_vec`）。
+/// 空数组也构造合法消息（参与者应跳过空列表，不重建 PC），不会 panic。
 pub fn turn_servers_message(seq: u32, json_payload: &[u8]) -> Message {
     Message::Control {
         seq,

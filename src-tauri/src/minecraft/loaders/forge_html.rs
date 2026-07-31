@@ -6,17 +6,8 @@ use crate::utils::version;
 
 /// 解析 Forge 官方 HTML 页面，提取版本列表
 ///
-/// HTML 结构示例：
-/// ```html
-/// <tr>
-///   <td class="download-version">
-///     64.0.11
-///     <i class="promo-latest fa"></i>
-///   </td>
-///   <td class="download-time" title="2026-06-28 13:28:32">2026-06-28</td>
-///   ...
-/// </tr>
-/// ```
+/// 解析 `<tr>` 行：`td.download-version` 取版本号与 promo 图标，
+/// `td.download-time` 取发布时间（title 属性含完整时间）。
 pub fn parse_forge_version_html(html: &str) -> anyhow::Result<Vec<LoaderVersion>> {
     let mut versions = Vec::new();
 

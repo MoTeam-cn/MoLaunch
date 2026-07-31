@@ -1,10 +1,8 @@
 //! 社区资源下载安装 - Modrinth 整合包处理
-//!
-//! 包含 MR modrinth.index.json 数据结构与 install_mr_files 安装流程。
-//! install_mr_files 流程：遍历 files[] 直接下载（path 相对于 instance 目录）→
-//! mods/ 目录下的 jar 文件按 community_filename_format 重命名
-//! （从 downloads URL 提取 project_id → 批量查询拿 slug → 查 mcmod 译名 → 应用格式）。
-//! 非 mods/ 文件（resourcepacks/shaderpacks 等）保留原名（mcmod 数据库只覆盖 mod）。
+//! 包含 MR modrinth.index.json 数据结构与 install_mr_files 安装流程。install_mr_files：
+//! 遍历 files[] 直接下载（path 相对于 instance 目录）→ mods/ 目录下 jar 按
+//! community_filename_format 重命名（从 downloads URL 提取 project_id → 批量查询拿 slug →
+//! 查 mcmod 译名 → 应用格式）。非 mods/ 文件保留原名（mcmod 数据库只覆盖 mod）。
 
 use crate::log_info;
 use crate::state::AppState;

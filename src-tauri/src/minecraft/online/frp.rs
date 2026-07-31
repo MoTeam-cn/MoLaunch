@@ -1,21 +1,8 @@
 //! Frp 公共服务接口客户端
-//!
-//! 对接 api-server `/v1/frp/*` 路由，覆盖两类能力：
-//! - **frpc 二进制分发**：`GET /v1/frp/manifest` 查询最新 frpc 版本与下载 URL
-//! - **公共 frps 服务器**：`GET /v1/frp/servers` 列表 / `POST /v1/frp/allocate` 分配端口
-//!   / `POST /v1/frp/release` 释放 / `POST /v1/frp/keepalive` 续期
-//!
-//! 接口契约参考：
-//! - `api-server/src/controllers/v1/frp.rs`（manifest）
-//! - `api-server/src/controllers/v1/frp_server.rs`（公共服务器）
-//! - `docs/FRP_PUBLIC_SERVER_API_DESIGN.md`
-//!
-//! 安全约束：
-//! - GET 接口（manifest / servers）明文响应，自动携带 JWT，无需 CSRF
-//! - POST 接口（allocate / release / keepalive）请求体走 ECIES 加密信封，
-//!   响应也是加密信封，由 `OnlineClient::call_v1` 统一处理
-//! - 字段命名：apiServer 返回 snake_case，客户端结构体使用 camelCase
-//!   并为每个字段添加 `alias`，以同时支持反序列化（snake_case）与序列化给前端（camelCase）
+//! 对接 api-server `/v1/frp/*`：frpc 二进制分发（manifest）+ 公共 frps 服务器
+//! （servers/allocate/release/keepalive）。GET 明文响应携带 JWT；POST 走 ECIES 加密信封
+//! 由 `OnlineClient::call_v1` 统一处理。字段命名：apiServer 返回 snake_case，客户端结构体用
+//! camelCase + `alias` 同时支持反序列化（snake_case）与序列化给前端（camelCase）。
 
 use serde::{Deserialize, Serialize};
 

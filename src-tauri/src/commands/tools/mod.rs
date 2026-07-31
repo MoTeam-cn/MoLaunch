@@ -1,17 +1,8 @@
 //! 工具模块（统一 IPC 入口）
-//!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，替代原 match 语句。
-//! 25+ 个 tools action 在 `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
-//!
-//! 子模块：download（外部下载）/ filename（文件名获取）/ cleanup（清理垃圾）/ memory（内存优化）
-//! / mod_tools（Mod 依赖检测 + 去重）/ data_export（启动器数据导出）/ crash_analyzer（崩溃日志分析）
-//! / screenshot（截图管理）/ resourcepack（资源包管理）/ version_json（版本 JSON 读写）
-//! / archive（存档管理）/ network（网络延迟 + 服务器状态）/ nbt（NBT 数据查看）
-//! / picker_window（选择器子窗口，通用 HTML 渲染 + on_navigation 选择回调）
-//!
-//! 注：种子地图工具（seedmap）已迁移至前端 WASM 方案，不再走后端 IPC。
-//! cubiomes C 库通过 Emscripten 编译为 WebAssembly，前端 Worker 直接调用，
-//! 后端只通过 `res://` 协议提供 .wasm/.js 文件（见 res_scheme.rs + build.rs）。
+//! 用 `utils::dispatcher::Dispatcher` 注册式分发替代 match 语句，25+ 个 tools action 在
+//! `once_cell::sync::Lazy` 初始化时注册。子模块：download/filename/cleanup/memory/mod_tools/
+//! data_export/crash_analyzer/screenshot/resourcepack/version_json/archive/network/nbt/picker_window。
+//! 种子地图工具已迁移至前端 WASM（cubiomes 编译为 WebAssembly，前端 Worker 直接调用）。
 
 pub mod archive;
 pub mod cleanup;

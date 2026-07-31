@@ -1,5 +1,4 @@
 //! 应用状态管理
-//!
 //! 按关注点拆分为 5 个子模块（app / auth / config / download / launch），
 //! 通过 `pub use` 统一 re-export，保持 `crate::state::X` 路径向后兼容。
 //! 另提供 `resolve_game_dir_from_state` / `resolve_mirror_and_source` 两个 helper

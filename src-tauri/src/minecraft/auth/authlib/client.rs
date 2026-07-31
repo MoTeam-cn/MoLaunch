@@ -1,17 +1,8 @@
 //! yggdrasil HTTP 客户端
-//!
-//! 封装 yggdrasil API 的 4 个端点：
-//! - `POST /authserver/authenticate` 账号密码登录
-//! - `POST /authserver/validate`    校验令牌
-//! - `POST /authserver/refresh`     刷新令牌
-//! - `GET  /`                       服务器元数据
-//!
-//! 服务器地址（server_url）为 yggdrasil API 根，如 `https://littleskin.cn/api/yggdrasil`。
-//! 调用时自动拼接 `/authserver/...` 后缀。
-//!
-//! URL 规范：authlib-injector.jar 下载源常量统一在 `minecraft::sources` 模块定义；
-//! 请求统一走 `crate::http` 模块的 `get_text_with_status` / `post_json_with_status` /
-//! `fetch_bytes` 函数，不在此处直接构造 reqwest 请求。
+//! 封装 4 端点：`POST /authserver/authenticate` 登录、`/validate` 校验、`/refresh` 刷新，
+//! `GET /` 服务器元数据。server_url 为 yggdrasil API 根（如 `https://littleskin.cn/api/yggdrasil`），
+//! 自动拼接 `/authserver/...` 后缀。authlib-injector.jar 下载源常量在 `minecraft::sources`；
+//! 请求统一走 `crate::http` 的 `get_text_with_status`/`post_json_with_status`/`fetch_bytes`。
 
 use super::types::{
     ApiError, AuthResponse, AuthenticateRequest, ProfileInfo, RefreshRequest, ServerMetadata,
@@ -230,25 +221,14 @@ pub struct AuthlibInjectorMeta {
 /// 与 `launch/jvm_args.rs::add_authlib_args` 中常量保持一致。
 const AUTHLIB_INJECTOR_JAR_REL: &str = "launch/authlib-injector.jar";
 
-/// 确保 authlib-injector.jar 已下载到缓存目录
+/// 确保 authlib-injector.jar 已下载到缓存目录（启动游戏前调用，仅当 `auth_info.server_url` 有值时）
 ///
-/// 启动游戏前调用（仅当 `auth_info.server_url` 有值时）。
-///
-/// 流程：
-/// 1. 缓存命中（jar 已存在）→ 直接返回路径，不重复下载
-/// 2. 缓存未命中 → fetch_authlib_injector_meta 获取下载 URL 和 sha256
-/// 3. 下载 jar 二进制 → 校验 sha256 → 写入缓存
-///
-/// 同时（可选）预取服务器元数据：当 `server_url` 有值且对应 host 的元数据未缓存时，
-/// 调用 `fetch_server_metadata` 拉取并 base64 编码后缓存，供
-/// `-Dauthlibinjector.yggdrasil.prefetched` 参数使用。
-///
-/// 失败时不阻塞启动：返回 Err 由调用方决定是否继续（无外置登录也能进游戏，
-/// 只是角色加载/皮肤显示会异常）。
-///
-/// **阶段 5 改造**：下载方式从 `http::fetch_bytes` 改为 `DownloadManager::download_batch`，
-/// 统一走项目下载基础设施（获得限速/URL fallback/进度推送能力）。
-/// sha256 校验保持手动实现（DownloadManager 的 expected_hash 用 sha1，与 authlib 的 sha256 不兼容）。
+/// 流程：缓存命中直接返回 → 未命中则 fetch_authlib_injector_meta 获取 URL 和 sha256 → 下载
+/// 二进制 → 校验 sha256 → 写入缓存。同时可选预取服务器元数据（base64 缓存供
+/// `-Dauthlibinjector.yggdrasil.prefetched` 参数使用）。
+/// 失败时不阻塞启动（返回 Err 由调用方决定，无外置登录也能进游戏，仅角色/皮肤异常）。
+/// 阶段 5 改造：下载从 `http::fetch_bytes` 改为 `DownloadManager::download_batch`（限速/fallback/进度）；
+/// sha256 校验手动实现（DownloadManager 用 sha1，与 authlib 的 sha256 不兼容）。
 pub async fn ensure_authlib_injector_jar(
     server_url: Option<&str>,
     manager: &crate::minecraft::download::DownloadManager,

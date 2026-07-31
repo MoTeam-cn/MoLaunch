@@ -1,11 +1,7 @@
 //! Mod 更新命令（update_mod）
-//!
-//! 阶段 4 新增：封装"下载新版本 → 删旧版本"为原子操作。
-//! 前端 `useModUpdate.ts::installSelected` 从 3 个 IPC（getVersionModsDir +
-//! downloadResourceToPath + deleteMod）降为 1 个 IPC（update_mod）。
-//!
-//! 原子性保证：下载失败时不删旧文件，下载成功才删旧文件。
-//! 进度通过 `DownloadSession` 统一推送，前端下载管理页可见。
+//! 阶段 4 新增：封装"下载新版本 → 删旧版本"为原子操作。前端 `useModUpdate.ts::installSelected`
+//! 从 3 个 IPC（getVersionModsDir + downloadResourceToPath + deleteMod）降为 1 个 IPC（update_mod）。
+//! 原子性保证：下载失败时不删旧文件，下载成功才删旧文件。进度通过 `DownloadSession` 统一推送。
 
 use crate::log_info;
 use crate::minecraft::download::DownloadSession;
@@ -18,16 +14,9 @@ use crate::utils::path::sanitize_file_name;
 
 /// 更新 Mod：下载新版本 + 删除旧版本（原子操作）
 ///
-/// 流程：
-/// 1. 获取 mods 目录
-/// 2. 启动 DownloadSession（分组"Mod 更新"，2 stages：下载新版本 / 替换旧版本）
-/// 3. 下载新版本到 mods 目录（用 cdn_urls 生成多 URL fallback）
-/// 4. 下载失败 → mark_failed，返回错误，旧文件保留
-/// 5. 下载成功 → 删除旧文件（仅当文件名不同），mark_complete
-///
-/// **原子性**：下载失败时不删旧文件，确保用户不会因更新失败而失去原有 mod。
-///
-/// **进度**：通过 DownloadSession 统一推送，前端下载管理页可见（分组"Mod 更新"）。
+/// 流程：取 mods 目录 → DownloadSession（"Mod 更新"，2 stages）→ 用 cdn_urls 多 URL fallback
+/// 下载新版本 → 失败 mark_failed 保留旧文件；成功则删旧文件（仅文件名不同）并 mark_complete。
+/// 原子性：下载失败不删旧文件。进度经 DownloadSession 推送，前端下载管理页可见。
 pub async fn update_mod(
     state: &AppState,
     version_id: String,

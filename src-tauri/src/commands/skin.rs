@@ -1,11 +1,6 @@
 //! 皮肤管理命令
-//!
-//! 提供皮肤/披风管理的子模块函数，供 `skin_manager` dispatcher 调用：
-//! - 获取皮肤/披风信息
-//! - 获取皮肤/披风 PNG 下载 URL（带本地缓存，方案 C）
-//! - 上传皮肤
-//! - 装备/取消披风
-//! - 下载 URL 图片到本地文件
+//! 提供皮肤/披风管理子模块函数供 `skin_manager` dispatcher 调用：获取皮肤/披风信息、
+//! 获取 PNG 下载 URL（带本地缓存，方案 C）、上传皮肤、装备/取消披风、下载 URL 图片到本地。
 
 use crate::error_util::log_err;
 use crate::log_info;

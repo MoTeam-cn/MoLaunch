@@ -1,15 +1,8 @@
 //! Zip 打包 + manifest 生成
-//!
-//! 支持 6 种导出格式（与导入格式对齐）：
-//! - Modrinth: `modrinth.index.json` + `overrides/`
-//! - CurseForge: `manifest.json` + `modlist.html` + `overrides/`
-//! - HMCL: `modpack.json` + `minecraft/`
-//! - MultiMC: `mmc-pack.json` + `instance.cfg` + `.minecraft/`
-//! - MCBBS: `mcbbs.packmeta` + `overrides/`
-//! - Compress: `.minecraft/` 兜底
-//!
-//! 仅 Modrinth/CurseForge 走联网检查（mod_infos 非空），
-//! 其他格式所有文件全部打包到对应 overrides 前缀。
+//! 支持 6 种导出格式（与导入对齐）：Modrinth（`modrinth.index.json`+`overrides/`）、
+//! CurseForge（`manifest.json`+`modlist.html`+`overrides/`）、HMCL（`modpack.json`+`minecraft/`）、
+//! MultiMC（`mmc-pack.json`+`instance.cfg`+`.minecraft/`）、MCBBS（`mcbbs.packmeta`+`overrides/`）、
+//! Compress（`.minecraft/` 兜底）。仅 Modrinth/CurseForge 走联网检查（mod_infos 非空）。
 
 use std::collections::HashMap;
 use std::fs::File;

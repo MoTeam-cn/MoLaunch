@@ -1,15 +1,8 @@
-//! frpc 二进制下载与管理
-//!
-//! 从 `install.rs` 拆分，职责：
-//! - 系统默认厂商 frpc：从 apiServer `/v1/frp/manifest` 接口获取最新版本下载 URL，
-//!   下载 ZIP 并提取 frpc 二进制（替代早期 GitHub Releases 直链下载）
-//! - 外部厂商 frpc：按 `manifest.binary.distribution` 处理
-//!   - bundled：仅校验文件存在（厂商包自带）
-//!   - url：从配置 URL 下载（HTTPS + 域名白名单 + SHA256 校验 + 可选解压）
-//!
-//! 依赖 `provider.rs` 的路径函数、manifest 读取等（`super::provider::*`）。
-//! apiServer 调用复用 `crate::minecraft::online::client::OnlineClient` 与
-//! `crate::utils::online_manager::load_creds_with_auto_refresh`，与信令 action 风格一致。
+//! frpc 二进制下载与管理（从 `install.rs` 拆分）
+//! 系统默认厂商 frpc：从 apiServer `/v1/frp/manifest` 获取最新版本下载 URL，下载 ZIP 提取
+//! frpc 二进制（替代早期 GitHub Releases 直链）。外部厂商 frpc：按 `manifest.binary.distribution`
+//! 处理——bundled 仅校验文件存在；url 从配置 URL 下载（HTTPS + 域名白名单 + SHA256 + 可选解压）。
+//! 依赖 `provider.rs` 路径/manifest 函数；apiServer 调用复用 `OnlineClient` 与 `load_creds_with_auto_refresh`。
 
 use super::provider::{
     frpc_path, get_frpc_path_for_provider, is_external_frpc_ready, is_frpc_ready,
@@ -350,20 +343,11 @@ fn compute_sha256(bytes: &[u8]) -> String {
 
 /// 从 ZIP 字节流提取 frpc 二进制到目标路径
 ///
-/// 跨平台自探测：翻遍 ZIP 所有层级目录，匹配 basename 为 `frpc` / `frpc.exe`
-/// 的非目录条目，按以下优先级选择最终条目：
-/// 1. 当前平台首选名优先（Windows=frpc.exe，macOS/Linux=frpc），
-///    兼容 apiServer 按平台返回 ZIP 的常态；
-/// 2. 路径短优先（顶层目录 > 子目录），避免命中 `*/utils/frpc.exe` 等辅助文件。
-///
-/// 不会提取 LICENSE / frpc.toml / frpc.ini 等附加文件——basename 必须精确等于
-/// `frpc` 或 `frpc.exe`，其他文件名一律跳过。
-///
-/// 兼容多种打包格式：
-/// - GitHub Releases：`frp_<version>_<platform>_<arch>/frpc.exe`
-/// - apiServer 分发：`frp_client_<version>_<platform>_<arch>/frpc.exe`
-/// - 扁平打包：`frpc.exe` 直接位于 ZIP 根
-/// - 任意嵌套层级：`some/deep/dir/frpc.exe`
+/// 跨平台自探测：翻遍 ZIP 所有层级目录，匹配 basename 为 `frpc`/`frpc.exe` 的非目录条目，
+/// 按优先级选择：1.当前平台首选名优先（Windows=frpc.exe，macOS/Linux=frpc）；2.路径短优先
+/// （顶层 > 子目录），避免命中 `*/utils/frpc.exe` 等辅助文件。basename 必须精确等于 `frpc`
+/// 或 `frpc.exe`，其他文件（LICENSE/frpc.toml 等）一律跳过。兼容 GitHub Releases、apiServer
+/// 分发、扁平打包、任意嵌套层级等格式。
 fn extract_frpc_from_zip(zip_bytes: &[u8], target_path: &Path) -> Result<(), String> {
     let cursor = std::io::Cursor::new(&zip_bytes[..]);
     let mut archive = zip::ZipArchive::new(cursor)

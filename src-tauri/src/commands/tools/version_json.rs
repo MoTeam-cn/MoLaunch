@@ -1,8 +1,6 @@
 //! 版本 JSON 读写
-//!
 //! - `read`：读取 `{game_dir}/versions/{version_id}/{version_id}.json`
 //! - `save`：先校验内容为合法 JSON，校验通过后写回文件
-//!
 //! 路径安全：version_id 不允许含 ".." 或路径分隔符，防穿越。
 
 use std::path::Path;

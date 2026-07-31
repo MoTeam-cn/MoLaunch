@@ -1,24 +1,8 @@
 //! Mods 目录文件监听
-//!
-//! 使用 `notify` crate 监听 mods 目录的文件变化，通过 `mods-dir-changed` 事件
-//! 通知前端自动刷新 mod 列表。实现「拖入新 mod 几秒后自动出现在列表中」的体验。
-//!
-//! ## 防抖设计
-//!
-//! 文件写入/复制会触发多次事件（如 `.jar` 下载过程中连续触发多次 Modify 事件），
-//! 使用「静默期」防抖：收到事件后等待 `DEBOUNCE_QUIET_MS` 内无新事件才 emit，
-//! 避免前端在文件还在写入时就开始重新加载导致读到不完整的文件。
-//!
-//! ## 生命周期
-//!
-//! - `watch_mods_dir(version_id)` 启动监听，**替换**之前的 watcher（旧 watcher drop 后自动停止）
-//! - `unwatch_mods_dir` 主动停止监听（ModTab 组件卸载时调用）
-//! - 全局 `Mutex<Option<RecommendedWatcher>>` 持有当前 watcher，保证同一时间只有一个监听
-//! - watcher drop 时 channel 关闭，防抖线程自动退出
-//!
-//! 注：原 2 个独立 Tauri 命令已聚合为 `version_mods_manager` IPC 入口，
-//! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
-//! 由 `utils::version_mods_manager::dispatch` 反序列化参数后调用。
+//! 用 `notify` crate 监听 mods 目录变化，通过 `mods-dir-changed` 事件通知前端自动刷新
+//! mod 列表。文件写入触发多次事件，用「静默期」防抖：`DEBOUNCE_QUIET_MS` 内无新事件才
+//! emit，避免前端读到不完整文件。全局 `Mutex<Option<RecommendedWatcher>>` 持有当前
+//! watcher，新监听替换旧 watcher；已聚合为 `version_mods_manager` IPC 入口由 dispatch 调用。
 
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;

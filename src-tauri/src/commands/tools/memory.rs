@@ -1,28 +1,8 @@
-//! 内存优化（双模式）
-//!
-//! 释放系统占用的物理内存，降低系统资源消耗。提供两种模式：
-//!
-//! ## 优化模式
-//! - **light（轻量）**：仅清空所有进程的工作集。
-//!   调用 `NtSetSystemInformation(SystemMemoryListInformation, MemoryEmptyWorkingSets)`，
-//!   一次系统调用即可清空所有进程工作集，无需遍历进程。
-//!   释放量较小（几十 MB ~ 几百 MB），但响应迅速、几乎无副作用。
-//!
-//! - **strong（强力）**：依次执行 4 个系统内存操作，释放数 GB：
-//!   1. `MemoryFlushModifiedList`：将已修改页面写入磁盘（释放 dirty page）
-//!   2. `MemoryPurgeLowPriorityStandbyList`：清理低优先级待机列表
-//!   3. `MemoryPurgeStandbyList`：清理待机列表（standby list，关键释放源）
-//!   4. `MemoryEmptyWorkingSets`：清空所有进程工作集
-//!
-//!   ⚠️ 强力模式会清空 standby list，可能导致已缓存的应用下次启动变慢。
-//!
-//! ## 平台实现
-//! - **Windows**：通过 `NtSetSystemInformation` + `SystemMemoryListInformation`
-//!   执行系统级内存操作。
-//! - **Linux**：调用 glibc 的 `malloc_trim(0)` 归还堆碎片给 OS。
-//! - **macOS**：调用 `malloc_zone_pressure_relief(NULL, 0)` 释放所有 malloc zone 的空闲内存。
-//!
-//! 内存采样：用 sysinfo 获取系统可用内存（before/after 差值即为释放量）。
+//! 内存优化（双模式）：释放系统物理内存降低资源消耗
+//! - light：`MemoryEmptyWorkingSets` 清空所有进程工作集，响应迅速
+//! - strong：flush modified / purge standby / empty working sets 4 步，释放数 GB；
+//!   ⚠️ 清空 standby 可能导致已缓存应用变慢
+//! 平台：Windows NtSetSystemInformation，Linux malloc_trim，macOS malloc_zone_pressure_relief
 
 use sysinfo::{System, SystemExt};
 

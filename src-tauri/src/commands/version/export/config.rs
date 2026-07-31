@@ -1,23 +1,7 @@
-//! 配置文件保存/读取
+//! 配置文件保存/读取（保存导出选项到 .ini，下次导出时读取恢复勾选状态）
 //!
-//! 保存配置到文件功能：
-//! 用户可以保存当前导出选项（pack_name/pack_version/勾选状态等）到 .ini 文件，
-//! 下次导出时读取该文件恢复勾选状态。
-//!
-//! 配置文件格式（INI 风格）：
-//! ```ini
-//! [General]
-//! packName=MyPack
-//! packVersion=1.0.0
-//! checkHostedAssets=true
-//! modrinthUploadMode=false
-//! packPath=D:\xxx.zip
-//!
-//! [Options]
-//! basic=true
-//! mods=false
-//! resourcepacks=true
-//! ```
+//! INI 风格：[General] packName/packVersion/checkHostedAssets/modrinthUploadMode/
+//! packPath；[Options] basic/mods/resourcepacks 等勾选状态布尔值。
 
 use std::collections::HashMap;
 use std::path::Path;

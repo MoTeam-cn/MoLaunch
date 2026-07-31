@@ -39,18 +39,10 @@ where
 
 /// 统一系统模块 IPC 入口
 ///
-/// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::system_manager::dispatch` 进行 action 分发。
-///
-/// 注册的 action（20 个）：
-/// - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
-///   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
-/// - config（2 个）：`get_config_path` / `save_config_to_file`
-/// - developer（6 个）：`is_developer_unlocked` / `unlock_developer_mode`
-///   / `lock_developer_mode` / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
-/// - about（1 个）：`get_about_data`
-/// - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
-/// - updater（2 个）：`check_update` / `download_and_install_update`
+/// 接收 `ActionRequest { action, params }`，转发到
+/// `crate::utils::system_manager::dispatch` 分发。注册 20 个 action，分组：
+/// game_dir(7) / config(2) / developer(6) / about(1) / logger(3) / updater(2)。
+/// 具体 action 名见 `system_manager::dispatch` 注册表。
 #[tauri::command]
 pub async fn system_manager(
     state: State<'_, AppState>,

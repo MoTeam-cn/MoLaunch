@@ -199,16 +199,9 @@ pub fn aes_gcm_decrypt(key: &[u8; 32], data: &[u8]) -> Result<Vec<u8>, CryptoErr
 
 /// RSA-OAEP-SHA256 加密
 ///
-/// 用于注册时用云端 RSA 公钥加密 content。
-/// 公钥为 PEM SPKI 格式。
-///
-/// 长度限制：RSA-OAEP-SHA256 最大明文 = (模数字节数) - 2*32 - 2
-/// - RSA-2048 (256B 模数): 最大 190 字节
-/// - RSA-3072 (384B 模数): 最大 318 字节
-/// - RSA-4096 (512B 模数): 最大 446 字节
-///
-/// 注册 content JSON 约 209 字节，**RSA-2048 不足以承载**，
-/// api-server 必须使用 RSA-3072 或更高位数。
+/// 注册时用云端 RSA 公钥加密 content（公钥为 PEM SPKI 格式）。
+/// 长度限制：最大明文 = 模数字节数 - 2*32 - 2（RSA-2048=190B / 3072=318B / 4096=446B）。
+/// 注册 content JSON 约 209 字节，RSA-2048 不足以承载，api-server 须用 RSA-3072+。
 pub fn rsa_oaep_encrypt(public_pem: &str, plaintext: &[u8]) -> Result<Vec<u8>, CryptoError> {
     use rsa::pkcs8::DecodePublicKey;
     use rsa::traits::PublicKeyParts;
