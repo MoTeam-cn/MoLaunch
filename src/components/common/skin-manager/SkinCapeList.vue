@@ -95,6 +95,8 @@ watch(() => props.capes, loadIcons, { immediate: true, deep: true })
   <div class="rounded-lg border border-gray-100 p-4 md:col-span-2">
     <div class="mb-3 flex items-center justify-between">
       <div class="text-sm font-medium text-gray-700">披风列表</div>
+      <!-- 保留原生 button：移除披风按钮（px-2 py-1 text-xs + border），
+           Button.vue 的 scoped size 类固定 padding 会破坏紧凑尺寸 -->
       <button
         v-if="activeCape"
         class="rounded-md border border-red-200 px-2 py-1 text-xs text-red-500 transition-colors hover:bg-red-50 disabled:opacity-50"
@@ -103,6 +105,8 @@ watch(() => props.capes, loadIcons, { immediate: true, deep: true })
       >取消当前披风</button>
     </div>
     <div v-if="capes.length > 0" class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4">
+      <!-- 保留原生 button：披风列表项（group flex + border + 选中态），
+           Button.vue 的 scoped size 类与布局不适合网格列表项 -->
       <button
         v-for="cape in capes"
         :key="cape.id"

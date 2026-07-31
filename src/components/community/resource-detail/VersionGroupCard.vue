@@ -81,6 +81,8 @@ function releaseColor(rt: string): string {
     :class="expanded ? 'border-primary-200 bg-primary-50/30' : 'bg-white hover:border-gray-300'"
   >
     <!-- 卡片标题栏（点击折叠/展开） -->
+    <!-- 保留原生 button：折叠头（w-full justify-between + active 状态 + 图标旋转），
+         Button.vue 的 scoped size 类与布局不适合折叠头 -->
     <button
       class="w-full flex items-center justify-between px-3 py-2.5 transition-colors duration-200"
       :class="expanded ? 'bg-primary-50/50 hover:bg-primary-100/50' : 'bg-gray-50 hover:bg-gray-100'"
@@ -167,6 +169,8 @@ function releaseColor(rt: string): string {
             </div>
             <!-- 前置依赖：仅 Mod 且有 dependencies 时展示 -->
             <div v-if="!isModpack && v.dependencies.length > 0" class="mt-1">
+              <!-- 保留原生 button：前置依赖切换（inline text-[11px] + icon + toggle 状态），
+                   Button.vue 的 scoped size 类固定 padding 会破坏紧凑 inline 布局 -->
               <button
                 type="button"
                 class="inline-flex items-center gap-1 text-[11px] text-primary-600 hover:text-primary-700 font-medium transition-colors"

@@ -11,6 +11,7 @@ import {
 } from '@/plugins/permissions'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirmAsync } from '@/utils/modal'
 import {
@@ -124,13 +125,14 @@ async function onRefresh() {
         <span class="text-xs text-gray-500">
           共 {{ sortedPlugins.length }} 个（内置 {{ builtinCount }} · 外部 {{ externalCount }}）· 已启用 {{ enabledCount }} 个
         </span>
-        <button
-          class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        <Button
+          type="ghost"
+          size="mini"
           @click="onRefresh"
         >
-          <ArrowPathIcon class="h-3.5 w-3.5" />
+          <template #icon><ArrowPathIcon class="h-3.5 w-3.5" /></template>
           刷新
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -242,6 +244,8 @@ async function onRefresh() {
                 @update:model-value="onTogglePlugin(manifest.id, $event)"
               />
             </div>
+            <!-- 保留原生 button：卸载按钮（icon+text，自定义 px-2 py-1 text-[11px] text-red-500），
+                 Button.vue 的 scoped size 类固定 padding 会破坏紧凑尺寸 -->
             <button
               v-if="!manifest.builtin"
               class="inline-flex items-center gap-1 rounded px-2 py-1 text-[11px] text-red-500 hover:bg-red-50"

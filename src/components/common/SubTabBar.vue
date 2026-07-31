@@ -35,6 +35,8 @@ function selectTab(id: string) {
     class="flex items-center gap-1 border-b border-gray-200 bg-white px-1"
     :class="sticky ? 'sticky top-0 z-20 shadow-sm' : ''"
   >
+    <!-- 保留原生 button：Tab 切换项（relative 布局 + 底部指示线 + active 状态），
+         Button.vue 的 scoped size 类与布局不适合带指示线的 Tab 组件 -->
     <button
       v-for="tab in tabs"
       :key="tab.id"

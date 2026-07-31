@@ -121,6 +121,8 @@ defineExpose({ loadFolders })
     <!-- 滚动区（对齐 Settings 侧边栏：py-4，按钮自带 px-4） -->
     <div class="flex-1 overflow-y-auto py-4">
       <!-- 文件夹项（对齐 Settings 选中态：右侧 border 高亮 + bg-primary-50 满色 + Heroicons 图标 w-5 h-5 mr-3） -->
+      <!-- 保留原生 button：文件夹列表项（w-full + active 状态 + 图标），
+           Button.vue 的 scoped size 类无法承载列表项布局 -->
       <button
         v-for="folder in folders"
         :key="folder.path"

@@ -36,6 +36,8 @@ function goToDownloads() {
     leave-to-class="opacity-0 scale-50"
   >
     <!-- 有下载任务时显示 -->
+    <!-- 保留原生 button：浮动下载按钮（fixed w-14 h-14 rounded-full），
+         Button.vue 的 scoped size 类固定 height/padding 无法承载圆形浮动按钮 -->
     <button
       v-if="versionStore.downloading"
       :class="['fixed right-6 z-[10001] w-14 h-14 bg-primary-600 rounded-full shadow-lg flex items-center justify-center hover:bg-primary-700 active:scale-95 transition-all group', positionClass]"

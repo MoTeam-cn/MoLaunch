@@ -207,6 +207,8 @@ onMounted(() => loadInstalled())
             class="overflow-hidden rounded-lg border border-gray-300 bg-white"
           >
             <!-- 标题栏（点击展开/折叠，对齐 MoLaunchIntro.vue 样式规范） -->
+            <!-- 保留原生 button：分组折叠头为 w-full justify-between 布局 + 右侧 chevron 图标，
+                 Button.vue 的 svg margin 与居中布局不适合折叠头/列表项布局 -->
             <button
               type="button"
               class="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-gray-50"
@@ -233,6 +235,8 @@ onMounted(() => loadInstalled())
               <div class="overflow-hidden">
                 <ul class="divide-y divide-gray-100 border-t border-gray-100">
                   <li v-for="ver in group.versions" :key="ver.id">
+                    <!-- 保留原生 button：版本列表项（w-full + active 状态 + 左侧色条），
+                         Button.vue 的 scoped size 类无法承载列表项布局 -->
                     <button
                       class="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-gray-50"
                       :class="ver.id === selectedId

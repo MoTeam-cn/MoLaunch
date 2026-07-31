@@ -22,6 +22,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import { formatBytes } from '@/utils/format'
+import Button from '@/components/common/Button.vue'
 
 interface MemoryInfo {
   total: number
@@ -130,14 +131,17 @@ onUnmounted(() => {
     <!-- 标题栏 -->
     <div class="mb-4 flex items-center justify-between">
       <h3 class="text-base font-semibold text-gray-900">系统状态</h3>
-      <button
-        class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+      <Button
+        type="ghost"
+        size="mini"
         :disabled="loading"
         @click="loadAll"
       >
-        <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
+        <template #icon>
+          <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
+        </template>
         刷新
-      </button>
+      </Button>
     </div>
 
     <!-- 加载中 -->
@@ -190,6 +194,8 @@ class="font-medium" :class="{
             <CircleStackIcon class="h-4 w-4 text-primary-500" />
             <span class="text-sm font-medium text-gray-900">缓存占用</span>
           </div>
+          <!-- 保留原生 button：纯图标刷新按钮（px-1.5 py-0.5 + h-3 w-3 图标），
+               Button.vue 最小 mini 尺寸 24px 高度过大，会破坏紧凑行内布局 -->
           <button
             class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-gray-400 hover:bg-gray-100 hover:text-gray-600"
             :disabled="cacheLoading"

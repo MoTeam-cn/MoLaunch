@@ -17,6 +17,7 @@ import { ArrowPathIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
 import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
 import Select from '@/components/common/Select.vue'
 import Button from '@/components/common/Button.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import { readHttpLogs, listHttpLogFiles, type HttpLogEntry } from '@/utils/api/developer'
 import { toastError, toastSuccess } from '@/utils/toast'
 
@@ -166,12 +167,14 @@ async function copyReqId(reqId: string) {
             <td class="px-3 py-1.5 whitespace-nowrap font-mono font-medium" :class="methodColor(entry.method)">
               {{ entry.method }}
             </td>
-            <td
-              class="px-3 py-1.5 text-gray-400 font-mono whitespace-nowrap cursor-pointer hover:text-primary-600 transition-colors"
-              :title="entry.reqId ? '点击复制' : ''"
-              @click="copyReqId(entry.reqId)"
-            >
-              {{ entry.reqId || '-' }}
+            <td class="px-3 py-1.5 text-gray-400 font-mono whitespace-nowrap">
+              <Tooltip v-if="entry.reqId" text="点击复制" position="top">
+                <span
+                  class="cursor-pointer hover:text-primary-600 transition-colors"
+                  @click="copyReqId(entry.reqId)"
+                >{{ entry.reqId }}</span>
+              </Tooltip>
+              <template v-else>-</template>
             </td>
             <td class="px-3 py-1.5 text-gray-700 font-mono whitespace-nowrap">
               {{ entry.path }}

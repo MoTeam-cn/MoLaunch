@@ -56,6 +56,8 @@ function toggle() {
         <p class="text-sm font-medium text-gray-900">{{ label }}</p>
         <p v-if="description" class="text-xs text-gray-500 mt-0.5">{{ description }}</p>
       </div>
+      <!-- 保留原生 button：Toggle 开关（h-6 w-11 rounded-full + 滑块动画），
+           Button.vue 的 scoped size 类与布局不适合开关组件 -->
       <button
         type="button"
         class="relative inline-flex h-6 w-11 flex-none items-center rounded-full transition-colors"

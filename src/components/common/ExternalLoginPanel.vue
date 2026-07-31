@@ -187,6 +187,8 @@ function openRegister() {
         <span class="text-gray-500">
           服务器：<span class="font-medium text-gray-700">{{ serverMeta.server_name }}</span>
         </span>
+        <!-- 保留原生 button：注册链接（text-primary-500 文本链接），
+             Button.vue 的 scoped size 类与样式不适合文本链接场景 -->
         <button
           v-if="serverMeta.register_url"
           type="button"

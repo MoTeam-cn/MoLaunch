@@ -116,6 +116,8 @@ function isInstalled(id: string): boolean {
                 <template #icon><ArrowDownTrayIcon class="w-3.5 h-3.5" /></template>
                 安装
               </Button>
+              <!-- 保留原生 button：卸载按钮（px-2 py-1 text-xs + @click.stop），
+                   Button.vue 的 scoped size 类固定 padding 会破坏紧凑尺寸 -->
               <button
                 v-if="isInstalled(version.id)"
                 class="flex items-center px-2 py-1 bg-red-100 text-red-700 text-xs rounded hover:bg-red-200 transition-colors ml-1"

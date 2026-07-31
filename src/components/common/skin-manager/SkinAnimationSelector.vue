@@ -38,6 +38,8 @@ const animationOptions: { value: AnimationType; label: string; paths: string[] }
         position="top"
         :delay="0"
       >
+        <!-- 保留原生 button：动画选择图标按钮（h-8 w-8 + border + active 状态），
+             Button.vue 的 scoped size 类固定 height/padding 会破坏紧凑网格布局 -->
         <button
           class="flex h-8 w-8 items-center justify-center rounded-md border transition-colors"
           :class="props.modelValue === opt.value

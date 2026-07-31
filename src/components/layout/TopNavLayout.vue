@@ -18,6 +18,7 @@ import { safeCall } from '@/utils/async'
 import { useOnlineStore } from '@/stores/online'
 import { applyPendingUpdate } from '@/utils/updater'
 import { toastError } from '@/utils/toast'
+import Tooltip from '@/components/common/Tooltip.vue'
 const appWindow = getCurrentWebviewWindow()
 const onlineStore = useOnlineStore()
 
@@ -122,34 +123,42 @@ async function handleClose() {
 
         <!-- 导航菜单 -->
         <nav class="flex items-center space-x-1">
-          <button
+          <!-- 保留原生 button：蓝色头部导航项依赖 active 状态切换 + 白色自定义配色，
+               Button.vue 的 type 体系（蓝/灰）不适配头部蓝底场景 -->
+          <Tooltip
             v-for="item in navItems"
             :key="item.path"
-            :disabled="item.cloudDependent && !onlineStore.cloudConnected"
-            :title="item.cloudDependent && !onlineStore.cloudConnected
+            :text="item.cloudDependent && !onlineStore.cloudConnected
               ? '云端连接失败，联机功能暂不可用（可在设置中重试）'
               : ''"
-            class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
-            :class="[
-              isActive(item.path)
-                || (item.hasDblClick && isActive('/apps/downloads'))
-                || (item.path === '/apps/tools' && route.path.startsWith('/apps/tools'))
-                ? 'bg-white/20 text-white'
-                : 'text-white/70 hover:bg-white/10 hover:text-white'
-            ]"
-            @click="item.cloudDependent && !onlineStore.cloudConnected
-              ? null
-              : (item.hasDblClick ? handleDownloadClick() : navigateTo(item.path))"
+            position="bottom"
           >
-            <component :is="item.icon" class="w-4 h-4 mr-1.5" />
-            {{ item.name }}
-          </button>
+            <button
+              :disabled="item.cloudDependent && !onlineStore.cloudConnected"
+              class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              :class="[
+                isActive(item.path)
+                  || (item.hasDblClick && isActive('/apps/downloads'))
+                  || (item.path === '/apps/tools' && route.path.startsWith('/apps/tools'))
+                  ? 'bg-white/20 text-white'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
+              ]"
+              @click="item.cloudDependent && !onlineStore.cloudConnected
+                ? null
+                : (item.hasDblClick ? handleDownloadClick() : navigateTo(item.path))"
+            >
+              <component :is="item.icon" class="w-4 h-4 mr-1.5" />
+              {{ item.name }}
+            </button>
+          </Tooltip>
         </nav>
 
         <!-- 中间拖拽空隙 -->
         <div data-tauri-drag-region class="flex-1 h-full" />
 
         <!-- 右侧：窗口控制 -->
+        <!-- 保留原生 button：窗口控制（最小化/最大化/关闭）需 h-full 撑满 48px 标题栏，
+             Button.vue 的 scoped size 类固定 height 无法被 h-full 覆盖 -->
         <div class="flex items-center h-full">
           <!-- 最小化 -->
           <button

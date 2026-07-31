@@ -53,6 +53,8 @@ function handleClick(option: SegmentedOption) {
 
 <template>
   <div class="flex gap-2">
+    <!-- 保留原生 button：分段切换按钮（border-2 active 状态 + 自定义 px-3 py-1.5 text-xs），
+         Button.vue 的 scoped size 类固定 height/padding 会破坏紧凑分段布局 -->
     <button
       v-for="opt in options"
       :key="String(opt.value)"

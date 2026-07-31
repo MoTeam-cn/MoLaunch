@@ -117,14 +117,17 @@ onMounted(loadCacheStats)
     <div class="flex-1 min-h-0 bg-white rounded-lg border border-gray-300 overflow-hidden flex flex-col">
       <div class="flex flex-none items-center justify-between px-5 pt-5 pb-3">
         <h3 class="text-sm font-semibold text-gray-900">缓存目录明细</h3>
-        <button
-          class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        <Button
+          type="ghost"
+          size="mini"
           :disabled="loading"
           @click="loadCacheStats"
         >
-          <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
+          <template #icon>
+            <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
+          </template>
           刷新
-        </button>
+        </Button>
       </div>
 
       <!-- 加载中 -->

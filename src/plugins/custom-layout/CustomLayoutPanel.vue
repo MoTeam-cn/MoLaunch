@@ -29,6 +29,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import LayoutSectionRenderer from './LayoutSectionRenderer.vue'
+import Button from '@/components/common/Button.vue'
 
 const props = defineProps<{
   /** 布局格式 */
@@ -140,14 +141,17 @@ onMounted(() => {
           />
           <h3 class="text-base font-semibold text-gray-900">{{ schema.title }}</h3>
         </div>
-        <button
-          class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+        <Button
+          type="ghost"
+          size="mini"
           :disabled="refreshing"
           @click="refresh"
         >
-          <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
+          <template #icon>
+            <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
+          </template>
           刷新
-        </button>
+        </Button>
       </div>
 
       <!-- sections（可滚动） -->

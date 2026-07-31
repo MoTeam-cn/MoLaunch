@@ -44,6 +44,8 @@ const hasCompatibleVersion = () => props.dep.suggestedVersion !== null
       : 'border-gray-200 bg-white hover:bg-gray-50'"
   >
     <!-- 复选框 -->
+    <!-- 保留原生 button：自定义复选框（w-5 h-5 + border-2 + checked 状态），
+         Button.vue 的 scoped size 类与布局不适合复选框场景 -->
     <button
       type="button"
       class="w-5 h-5 shrink-0 flex items-center justify-center rounded border-2 transition-colors"

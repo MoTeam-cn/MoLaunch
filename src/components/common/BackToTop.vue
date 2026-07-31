@@ -99,6 +99,8 @@ onUnmounted(() => {
 <template>
   <Tooltip text="返回顶部" position="left">
     <Transition name="back-to-top">
+      <!-- 保留原生 button：回到顶部按钮（back-to-top-btn 自定义样式 + fixed 定位），
+           Button.vue 的 scoped size 类与布局不适合浮动定位按钮 -->
       <button
         v-if="visible"
         class="back-to-top-btn"

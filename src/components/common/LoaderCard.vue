@@ -85,6 +85,8 @@ function clear(e: Event) {
           :class="`bg-${color}-100 text-${color}-700`"
         >
           {{ selected }}
+          <!-- 保留原生 button：清除按钮（p-0.5 -mr-1 rounded-full 微型图标），
+               Button.vue 的 scoped size 类固定 padding 会使图标按钮过宽 -->
           <button
             class="p-0.5 -mr-1 rounded-full transition-colors"
             :class="`hover:bg-${color}-200`"

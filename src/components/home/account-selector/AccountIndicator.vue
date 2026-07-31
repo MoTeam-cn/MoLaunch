@@ -22,6 +22,8 @@ const emit = defineEmits<{ switch: [index: number] }>()
     <div class="text-xs font-medium text-gray-400">账号切换</div>
     <div class="flex items-center gap-1.5">
       <!-- 指示点（可点击切换） -->
+      <!-- 保留原生 button：圆点指示器（h-1.5 w-1.5/4 rounded-full），
+           Button.vue 的 scoped size 类无法承载微型圆点布局，下同 -->
       <Tooltip
         v-for="(card, i) in cards"
         :key="card.uuid"

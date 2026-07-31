@@ -118,6 +118,8 @@ onMounted(async () => {
                 <template #icon><ArrowTopRightOnSquareIcon class="h-3 w-3 text-gray-400" /></template>
               </Button>
               <!-- 展开作者按钮 -->
+              <!-- 保留原生 button：自定义尺寸展开按钮（px-2 py-1 text-[11px] + 图标旋转），
+                   Button.vue 的 scoped size 类固定 padding 会破坏紧凑尺寸 -->
               <button
                 class="flex items-center gap-1 rounded px-2 py-1 text-[11px] text-gray-500 transition-colors hover:bg-gray-100 hover:text-gray-700"
                 :aria-expanded="isItemExpanded(item.name)"

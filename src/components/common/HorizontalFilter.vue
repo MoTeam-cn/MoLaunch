@@ -100,6 +100,8 @@ defineExpose({ checkArrows })
 
 <template>
   <div class="relative flex items-center group">
+    <!-- 保留原生 button：滚动箭头（w-6 h-7 自定义尺寸）+ 筛选切换（data-active 状态），
+         Button.vue 的 scoped size 类固定 height/padding 无法被工具类覆盖，会破坏紧凑布局 -->
     <!-- 左箭头 -->
     <button
       v-if="showLeftArrow"

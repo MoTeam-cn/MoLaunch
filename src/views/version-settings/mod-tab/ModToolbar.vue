@@ -70,6 +70,8 @@ defineEmits<{
 
       <div class="ml-auto flex items-center gap-2">
         <div class="flex flex-shrink-0 items-center gap-1.5 rounded-lg bg-gray-100 p-1">
+          <!-- 保留原生 button：筛选切换（px-3 py-1 text-xs + active 状态），
+               Button.vue 的 scoped size 类固定 height/padding 会破坏紧凑分段布局 -->
           <button
             v-for="opt in filterOptions"
             :key="opt.v"

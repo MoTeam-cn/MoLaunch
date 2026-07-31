@@ -28,6 +28,8 @@ function goToSelect() {
 </script>
 
 <template>
+<!-- 保留原生 button：版本选择器（h-[35px] 自定义尺寸 + justify-between 布局），
+     Button.vue 的 scoped size 类固定 height 无法被工具类覆盖 -->
   <button
     class="flex h-[35px] min-w-0 flex-1 items-center justify-between overflow-hidden rounded-[3px] border border-gray-300 bg-white/80 px-3 text-[13px] text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50"
     @click="goToSelect"

@@ -18,6 +18,7 @@ import {
   ClockIcon,
 } from '@heroicons/vue/24/outline'
 import { formatBytes } from '@/utils/format'
+import Button from '@/components/common/Button.vue'
 
 const cacheStats = ref<CacheStatsResult | null>(null)
 const loading = ref(true)
@@ -84,14 +85,17 @@ onMounted(() => loadStats())
         <CircleStackIcon class="h-5 w-5 text-primary-500" />
         <h3 class="text-base font-semibold text-gray-900">缓存监控</h3>
       </div>
-      <button
-        class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+      <Button
+        type="ghost"
+        size="mini"
         :disabled="refreshing"
         @click="refresh"
       >
-        <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
+        <template #icon>
+          <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
+        </template>
         刷新
-      </button>
+      </Button>
     </div>
 
     <!-- 加载中 -->

@@ -67,6 +67,8 @@ function openChangeUsername() {
   <div class="rounded-lg border border-gray-100 p-4">
     <div class="mb-3 text-sm font-medium text-gray-700">账号管理</div>
     <div class="space-y-2">
+      <!-- 保留原生 button：链接卡片（w-full justify-between + 外链图标），
+           Button.vue 的 scoped size 类与布局不适合列表项卡片，下同 -->
       <button
         class="flex w-full items-center justify-between rounded-md border border-gray-200 px-3 py-2 text-xs text-gray-700 transition-colors hover:bg-gray-50"
         @click="openChangePassword"

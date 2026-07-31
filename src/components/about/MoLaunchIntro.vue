@@ -25,6 +25,8 @@ function toggle() {
 <template>
   <div class="overflow-hidden rounded-lg border border-gray-200 bg-white">
     <!-- 标题栏（点击展开/折叠） -->
+    <!-- 保留原生 button：折叠头（w-full justify-between + 图标旋转 + aria-expanded），
+         Button.vue 的 scoped size 类与布局不适合折叠头 -->
     <button
       class="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-gray-50"
       :aria-expanded="isOpen"

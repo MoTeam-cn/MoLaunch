@@ -37,6 +37,8 @@ const isCustomSelected = computed(() => isCustomSkin(props.selectedLocalSkin))
   <div class="rounded-lg border border-gray-100 p-4">
     <div class="mb-3 text-sm font-medium text-gray-700">选择默认皮肤</div>
     <div class="grid grid-cols-3 gap-2">
+      <!-- 保留原生 button：皮肤列表项（flex-col + border + 选中态），
+           Button.vue 的 scoped size 类与布局不适合网格列表项 -->
       <button
         v-for="skin in availableSkins"
         :key="skin.name"

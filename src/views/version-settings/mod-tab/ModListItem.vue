@@ -143,6 +143,9 @@ function handleClick(e: MouseEvent) {
         ? 'opacity-100'
         : 'opacity-0 group-hover:opacity-100'"
     >
+      <!-- 保留原生 button：纯图标工具栏按钮（@heroicons h-4 w-4 + p-1.5），每个按钮带不同
+           hover 配色（蓝/绿/灰/琥珀/红），Button.vue 的 type 不支持自定义 hover 颜色；
+           且最小 mini 尺寸 padding 0 11px 会使图标按钮过宽，需 @click.stop 阻止冒泡到 li 选中 -->
       <Tooltip :text="detailLoadingFor === mod.file_name ? '正在加载详情...' : '查看详情'" position="top">
         <button
           class="rounded-md p-1.5 transition-colors disabled:cursor-wait"

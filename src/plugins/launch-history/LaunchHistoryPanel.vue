@@ -16,6 +16,7 @@ import {
   XCircleIcon,
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
 
 interface HistoryItem {
   version_id: string
@@ -95,14 +96,17 @@ onUnmounted(() => {
     <!-- 标题栏 -->
     <div class="mb-4 flex items-center justify-between">
       <h3 class="text-base font-semibold text-gray-900">启动历史</h3>
-      <button
-        class="inline-flex items-center gap-1 rounded px-2 py-1 text-xs text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+      <Button
+        type="ghost"
+        size="mini"
         :disabled="loading"
         @click="loadHistory"
       >
-        <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
+        <template #icon>
+          <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
+        </template>
         刷新
-      </button>
+      </Button>
     </div>
 
     <!-- 加载中 -->

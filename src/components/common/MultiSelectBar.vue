@@ -34,6 +34,7 @@ import {
   ArrowTopRightOnSquareIcon,
 } from '@heroicons/vue/24/outline'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Button from '@/components/common/Button.vue'
 
 /** 操作按钮变体样式 */
 type ActionVariant = 'enable' | 'disable' | 'update' | 'delete' | 'default'
@@ -120,48 +121,48 @@ const variantClasses: Record<ActionVariant, string> = {
               :text="action.label"
               position="top"
             >
-              <button
-                class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              <Button type="ghost" size="small"
+                class="px-2.5 py-1.5 text-xs font-medium rounded-md border-0 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 :class="variantClasses[action.variant || 'default']"
                 :disabled="batchProcessing || selectedCount === 0 || action.disabled"
                 @click="emit('action', action.key)"
               >
                 <component :is="action.icon" v-if="action.icon" class="w-3.5 h-3.5" />
                 {{ action.label }}
-              </button>
+              </Button>
             </Tooltip>
             <!-- 分隔线 -->
             <div class="w-px h-5 bg-gray-200 mx-1" />
             <!-- 全选/反选 -->
             <Tooltip :text="isAllSelected ? '取消全选' : '全选'" position="top">
-              <button
-                class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+              <Button type="ghost" size="small"
+                class="px-2.5 py-1.5 text-xs font-medium rounded-md border-0 text-gray-600 hover:bg-gray-100 transition-colors"
                 @click="emit('selectAll')"
               >
                 <Squares2X2Icon class="w-3.5 h-3.5" />
                 {{ isAllSelected ? '取消全选' : '全选' }}
-              </button>
+              </Button>
             </Tooltip>
             <Tooltip text="反选" position="top">
-              <button
-                class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+              <Button type="ghost" size="small"
+                class="px-2.5 py-1.5 text-xs font-medium rounded-md border-0 text-gray-600 hover:bg-gray-100 transition-colors"
                 @click="emit('invertSelection')"
               >
                 <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
                 反选
-              </button>
+              </Button>
             </Tooltip>
             <!-- 分隔线 -->
             <div class="w-px h-5 bg-gray-200 mx-1" />
             <!-- 退出多选 -->
             <Tooltip text="退出多选（ESC）" position="top">
-              <button
-                class="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 transition-colors"
+              <Button type="ghost" size="small"
+                class="px-2.5 py-1.5 text-xs font-medium rounded-md border-0 text-gray-600 hover:bg-gray-100 transition-colors"
                 @click="emit('exit')"
               >
                 <XMarkIcon class="w-3.5 h-3.5" />
                 取消选择
-              </button>
+              </Button>
             </Tooltip>
           </div>
         </div>

@@ -112,6 +112,8 @@ function onRetry() {
               <ArrowPathIcon class="h-5 w-5 text-primary-500" />
               <h3 class="text-base font-semibold text-gray-900">发现新版本</h3>
             </div>
+            <!-- 保留原生 button：图标关闭按钮（XMarkIcon），Button.vue 的 scoped size 类
+                 固定 padding 会使图标按钮过宽 -->
             <button
               v-if="canClose"
               class="text-gray-400 hover:text-gray-600 transition-colors"

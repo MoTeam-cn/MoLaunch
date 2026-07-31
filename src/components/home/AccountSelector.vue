@@ -104,6 +104,8 @@ const {
       />
 
       <!-- 卡片容器（带左右切换按钮） -->
+      <!-- 保留原生 button：左右箭头为图标按钮（p-1 紧凑尺寸），Button.vue 的 scoped
+           size 类固定 padding 0 15px 会使图标按钮过宽 -->
       <div class="flex items-center gap-1">
         <!-- 左箭头 -->
         <button
@@ -145,6 +147,8 @@ const {
 
             <!-- 添加账号卡片 -->
             <div v-if="hasAddCard" class="flex-none" style="width: 100%;">
+              <!-- 保留原生 button：卡片式 CTA 使用 flex-col 列布局 + 虚线边框 + min-height，
+                   Button.vue 为行内 flex 且 svg 有 margin，不适合卡片列布局 -->
               <button
                 class="flex h-full w-full flex-col items-center justify-center rounded-xl border-2 border-dashed border-gray-200 p-4 text-gray-400 transition-all hover:border-primary-400 hover:bg-primary-50/30 hover:text-primary-500"
                 style="min-height: 200px;"

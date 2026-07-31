@@ -38,6 +38,8 @@
           <!-- 崩溃报告文件路径（如果有，可点击打开） -->
           <div v-if="crashInfo?.crash_report_path" class="mb-4">
             <p class="text-[15px] leading-[18px] text-dialog-caption mb-1">崩溃报告文件：</p>
+            <!-- 保留原生 button：文件路径文本链接（break-all 换行 + brand 色系），
+                 Button.vue 的 scoped size 类与样式不适合文本链接场景 -->
             <button
               class="text-[15px] text-brand-2 hover:text-brand-3 hover:underline text-left break-all transition-colors"
               @click="openCrashReport"

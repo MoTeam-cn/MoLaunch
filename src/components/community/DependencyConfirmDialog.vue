@@ -134,6 +134,8 @@ function handleClose() {
                 <div class="text-xs text-gray-500 truncate">主 Mod：{{ mainName }}</div>
               </div>
             </div>
+            <!-- 保留原生 button：图标关闭按钮(w-7 h-7)/文本链接/折叠头均为自定义尺寸或布局，
+                 Button.vue 的 scoped size 类固定 height/padding 无法被工具类覆盖 -->
             <button
               type="button"
               class="w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors shrink-0"

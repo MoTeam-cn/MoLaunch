@@ -119,6 +119,8 @@ async function onCheckUpdate() {
       <div>
         <div class="mb-2 text-[11px] font-semibold uppercase tracking-wide text-gray-400">前端</div>
         <div class="grid grid-cols-2 gap-2">
+          <!-- 保留原生 button：依赖列表项为链接卡片（justify-between + 右侧外链图标），
+               Button.vue 的 svg margin 与居中布局不适合列表项布局，下同 -->
           <button
             v-for="dep in frontendDeps"
             :key="dep.name"

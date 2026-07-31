@@ -125,6 +125,8 @@ async function handleLaunch() {
       <!-- Row 3：版本选择 + 版本设置（左右分栏，高 35px、圆角 3px） -->
       <div class="mb-2.5 flex gap-2">
         <VersionSelector />
+        <!-- 保留原生 button：自定义尺寸版本设置按钮（h-[35px] w-[80px]），
+             Button.vue 的 scoped size 类固定 height 无法被工具类覆盖 -->
         <button
           class="flex h-[35px] w-[80px] flex-none items-center justify-center rounded-[3px] border border-gray-300 bg-white/80 text-[13px] text-gray-600 transition-colors hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50"
           @click="router.push({ path: '/apps/versions/setup', query: versionStore.selectedVersion ? { id: versionStore.selectedVersion } : {} })"
@@ -134,6 +136,8 @@ async function handleLaunch() {
       </div>
 
       <!-- Row 2：启动按钮 + 版本名（LabVersion 叠在按钮内部底部，高 54px、圆角 3px） -->
+      <!-- 保留原生 button：启动按钮为特殊布局（h-[54px] + 内部偏移文字 + 版本名绝对定位），
+           Button.vue 的 scoped size 类与布局无法承载 -->
       <button
         class="relative flex h-[54px] w-full flex-col items-center justify-center overflow-hidden rounded-[3px] text-[13px] font-normal transition-colors"
         :class="launchState.color"

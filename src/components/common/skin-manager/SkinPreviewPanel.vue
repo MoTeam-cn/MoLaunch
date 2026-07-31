@@ -62,6 +62,8 @@ defineEmits<{ save: [] }>()
       </div>
       <!-- 下载当前皮肤按钮 -->
       <Tooltip text="下载当前皮肤 PNG 到本地" position="top" :delay="0">
+        <!-- 保留原生 button：下载图标按钮（h-7 w-7 + border），
+             Button.vue 的 scoped size 类固定 height/padding 会使图标按钮过宽 -->
         <button
           class="flex-none flex h-7 w-7 items-center justify-center rounded border border-gray-200 text-gray-600 transition-colors hover:bg-gray-50 disabled:opacity-40"
           :disabled="!skinUrl"

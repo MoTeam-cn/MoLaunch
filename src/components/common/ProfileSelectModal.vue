@@ -50,6 +50,8 @@ function handleClose() {
           <p class="mb-4 text-sm text-gray-600">检测到此账号有多个角色，请选择要使用的角色：</p>
 
           <!-- 角色列表 -->
+          <!-- 保留原生 button：角色列表项（w-full + 头像 + 名称 + 箭头），
+               Button.vue 的 scoped size 类无法承载列表项布局 -->
           <div class="space-y-2">
             <button
               v-for="profile in profiles"
