@@ -34,6 +34,13 @@ pub struct InstallProviderParams {
     pub source_dir: String,
 }
 
+/// 从 URL 安装厂商参数
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct InstallProviderFromUrlParams {
+    pub url: String,
+}
+
 /// 厂商 ID 参数
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]

@@ -109,6 +109,52 @@ pub async fn install_provider_from_zip(zip_path: String) -> Result<ProviderInfo,
     Ok(build_provider_info(&manifest))
 }
 
+/// 从 URL 下载并安装外部厂商
+///
+/// 下载 ZIP 到临时文件，复用 `install_provider_from_zip` 安装逻辑。
+/// 仅允许 HTTPS URL（用户主动提供，无域名白名单限制）。
+/// 无论安装成功或失败，临时文件都会被清理。
+pub async fn install_provider_from_url(url: String) -> Result<ProviderInfo, String> {
+    if !url.starts_with("https://") {
+        return Err("URL 必须使用 HTTPS".to_string());
+    }
+
+    log_info!("[Frp] 开始从 URL 下载厂商包: {}", url);
+
+    let client = reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::limited(5))
+        .build()
+        .map_err(|e| format!("构造 HTTP 客户端失败: {}", e))?;
+
+    let response = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("下载失败: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("下载失败: HTTP {}", response.status()));
+    }
+
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| format!("读取下载内容失败: {}", e))?;
+
+    let temp_zip = std::env::temp_dir()
+        .join(format!("molaunch-provider-{}.zip", std::process::id()));
+
+    std::fs::write(&temp_zip, &bytes)
+        .map_err(|e| format!("写入临时文件失败: {}", e))?;
+
+    log_info!("[Frp] 厂商包下载完成，大小: {} 字节", bytes.len());
+
+    // 复用 ZIP 安装逻辑（无论成功失败都清理临时文件）
+    let result = install_provider_from_zip(temp_zip.to_string_lossy().to_string()).await;
+    let _ = std::fs::remove_file(&temp_zip);
+    result
+}
+
 /// 卸载外部厂商
 ///
 /// 不允许卸载系统默认厂商。删除目录前用 canonicalize 校验路径不逃逸 providers/ 根。

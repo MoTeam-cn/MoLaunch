@@ -9,6 +9,19 @@
 
 ### 新增
 
+#### FRP 厂商支持从 URL 下载安装
+
+- 背景：厂商安装仅支持「从文件夹」和「从 ZIP」两种本地方式，厂商提供者无法通过一个链接让用户直接下载安装，需手动下载 ZIP 再选择文件
+- 改动（3 后端 + 3 前端）：
+  - **`src-tauri/src/commands/frp/install.rs`**：新增 `install_provider_from_url(url)` 函数。校验 HTTPS → reqwest 下载到临时文件（最多 5 次重定向）→ 复用 `install_provider_from_zip` 安装 → 无论成功失败都清理临时文件
+  - **`src-tauri/src/utils/frp_manager/mod.rs`**：新增 `InstallProviderFromUrlParams { url }` 参数结构体
+  - **`src-tauri/src/utils/frp_manager/provider_actions.rs`**：注册 `install_provider_from_url` action，反序列化参数调用后端函数
+  - **`src/utils/api/frp-manager.ts`**：新增 `INSTALL_PROVIDER_FROM_URL` action 常量 + `installProviderFromUrl(url)` IPC 封装函数
+  - **`src/stores/frp.ts`**：新增 `installProviderFromUrl(url)` store action（loading + toast + 刷新列表），与 `installProviderFromZip` 风格一致
+  - **`src/components/frp/ProviderList.vue`**：顶部操作栏新增「从 URL」按钮（LinkIcon），点击调用 `showPrompt` 弹出输入框让用户粘贴 HTTPS URL，确认后调用 store action
+- 设计决策：复用 `install_provider_from_zip` 全部安装逻辑（含 Zip Slip 防护、manifest 校验、重复检测），URL 下载仅负责获取临时 ZIP 文件；仅限 HTTPS（用户主动提供 URL，无需域名白名单）；临时文件始终清理
+- 验证：`cargo check` + `npx vue-tsc --noEmit` 均通过（exit 0）
+
 #### 教程系统（Markdown 渲染 + picker 子窗口）
 
 - 背景：FRP 厂商开发文档（manifest.json 格式、OAuth2/Device Code/API Key 认证配置）无处查阅，开发者无从下手编写厂商包。需一个内置教程系统承载开发指南与启动器使用基础

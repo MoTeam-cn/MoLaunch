@@ -6,7 +6,7 @@
  * - 内置「系统默认」厂商（不可卸载/禁用），首次使用时提供「下载 frpc」入口
  * - 外部厂商（manifest.toml 安装）：支持启用/禁用切换、卸载
  *
- * 顶部操作栏提供「从文件夹安装」「从 ZIP 安装」两种安装入口。
+ * 顶部操作栏提供「从文件夹安装」「从 ZIP 安装」「从 URL 安装」三种安装入口。
  *
  * 徽章覆盖：
  * - authType：none/oauth2/device_code/api_key
@@ -14,7 +14,7 @@
  */
 import { onMounted, computed } from 'vue'
 import { useFrpStore } from '@/stores/frp'
-import { showConfirm } from '@/utils/modal'
+import { showConfirm, showPrompt } from '@/utils/modal'
 import { toastInfo } from '@/utils/toast'
 import { pickFile, pickDirectory } from '@/utils/fileDialog'
 import Button from '@/components/common/Button.vue'
@@ -28,6 +28,7 @@ import {
   ExclamationCircleIcon,
   FolderOpenIcon,
   ArchiveBoxIcon,
+  LinkIcon,
   TrashIcon,
 } from '@heroicons/vue/24/outline'
 import type { ProviderInfo } from '@/types/frp'
@@ -96,6 +97,19 @@ async function handleInstallFromZip() {
   await store.installProviderFromZip(file)
 }
 
+/** 从 URL 下载并安装厂商 */
+function handleInstallFromUrl() {
+  showPrompt(
+    '从 URL 安装厂商',
+    '请输入厂商 ZIP 包的下载地址（仅支持 HTTPS）',
+    async (url) => {
+      if (!url.trim()) return
+      await store.installProviderFromUrl(url.trim())
+    },
+    { placeholder: 'https://example.com/provider.zip' },
+  )
+}
+
 /** 切换厂商启用/禁用状态 */
 async function handleToggleProvider(providerId: string, enabled: boolean) {
   await store.toggleProvider(providerId, enabled)
@@ -129,6 +143,12 @@ function handleUninstall(p: ProviderInfo) {
           <Button type="outline" size="small" :loading="actionLoading" @click="handleInstallFromZip">
             <template #icon><ArchiveBoxIcon class="w-4 h-4" /></template>
             从 ZIP
+          </Button>
+        </Tooltip>
+        <Tooltip text="从 URL 下载安装厂商">
+          <Button type="outline" size="small" :loading="actionLoading" @click="handleInstallFromUrl">
+            <template #icon><LinkIcon class="w-4 h-4" /></template>
+            从 URL
           </Button>
         </Tooltip>
         <Tooltip text="刷新厂商列表">
@@ -235,7 +255,7 @@ function handleUninstall(p: ProviderInfo) {
     <div v-else-if="!loading" class="flex flex-col items-center justify-center py-16">
       <ServerStackIcon class="w-12 h-12 text-gray-300 mb-3" />
       <p class="text-sm font-medium text-gray-500">暂无厂商</p>
-      <p class="text-xs text-gray-400 mt-1">系统默认厂商将自动显示，或从文件夹/ZIP 安装外部厂商</p>
+      <p class="text-xs text-gray-400 mt-1">系统默认厂商将自动显示，或从文件夹/ZIP/URL 安装外部厂商</p>
     </div>
 
     <!-- 加载中 -->

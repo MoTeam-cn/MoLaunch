@@ -50,6 +50,8 @@ export const FRP_ACTIONS = {
   INSTALL_PROVIDER_FROM_DIR: 'install_provider_from_dir',
   /** 从 ZIP 包安装厂商（sourceDir 复用为 zipPath） */
   INSTALL_PROVIDER_FROM_ZIP: 'install_provider_from_zip',
+  /** 从 URL 下载并安装厂商 */
+  INSTALL_PROVIDER_FROM_URL: 'install_provider_from_url',
   /** 卸载外部厂商 */
   UNINSTALL_PROVIDER: 'uninstall_provider',
   /** 启用厂商（内置厂商不可禁用，调用会被后端拒绝） */
@@ -154,6 +156,11 @@ export function installProviderFromDir(sourceDir: string): Promise<ProviderInfo>
 /** 从 ZIP 包安装厂商（sourceDir 复用为 zipPath） */
 export function installProviderFromZip(zipPath: string): Promise<ProviderInfo> {
   return frpManager<ProviderInfo>(FRP_ACTIONS.INSTALL_PROVIDER_FROM_ZIP, { sourceDir: zipPath })
+}
+
+/** 从 URL 下载并安装厂商（仅支持 HTTPS） */
+export function installProviderFromUrl(url: string): Promise<ProviderInfo> {
+  return frpManager<ProviderInfo>(FRP_ACTIONS.INSTALL_PROVIDER_FROM_URL, { url })
 }
 
 /** 卸载外部厂商 */

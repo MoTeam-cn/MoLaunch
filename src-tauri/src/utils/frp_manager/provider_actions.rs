@@ -5,7 +5,10 @@ use crate::commands::frp;
 use crate::handler;
 use crate::utils::dispatcher::Dispatcher;
 
-use super::{EnsureFrpcParams, InstallProviderParams, ProviderIdParams, RunAuthAdapterParams};
+use super::{
+    EnsureFrpcParams, InstallProviderFromUrlParams, InstallProviderParams, ProviderIdParams,
+    RunAuthAdapterParams,
+};
 
 /// 注册厂商管理相关 action
 pub fn register(d: &mut Dispatcher) {
@@ -43,6 +46,16 @@ pub fn register(d: &mut Dispatcher) {
             let p: InstallProviderParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let r = frp::install::install_provider_from_zip(p.source_dir).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "install_provider_from_url",
+        handler!(_state, _app, params, {
+            let p: InstallProviderFromUrlParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = frp::install::install_provider_from_url(p.url).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

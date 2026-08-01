@@ -33,6 +33,7 @@ import {
   stopTunnel as apiStopTunnel,
   installProviderFromDir as apiInstallFromDir,
   installProviderFromZip as apiInstallFromZip,
+  installProviderFromUrl as apiInstallFromUrl,
   uninstallProvider as apiUninstallProvider,
   enableProvider as apiEnableProvider,
   disableProvider as apiDisableProvider,
@@ -278,6 +279,22 @@ export const useFrpStore = defineStore('frp', () => {
     }
   }
 
+  /** 从 URL 下载并安装厂商（仅支持 HTTPS） */
+  async function installProviderFromUrl(url: string): Promise<boolean> {
+    providerActionLoading.value = true
+    try {
+      await apiInstallFromUrl(url)
+      toastSuccess('厂商安装成功')
+      await loadProviders()
+      return true
+    } catch (e) {
+      toastError('安装厂商失败：' + e)
+      return false
+    } finally {
+      providerActionLoading.value = false
+    }
+  }
+
   /** 卸载外部厂商（内置厂商会被后端拒绝） */
   async function uninstallProvider(providerId: string): Promise<boolean> {
     providerActionLoading.value = true
@@ -376,6 +393,7 @@ export const useFrpStore = defineStore('frp', () => {
     stopTunnel,
     installProviderFromDir,
     installProviderFromZip,
+    installProviderFromUrl,
     uninstallProvider,
     toggleProvider,
     loadLogFiles,
