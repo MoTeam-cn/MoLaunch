@@ -7,6 +7,7 @@
  * - picker(t, d?)   打开 picker 子窗口（选择型返回值，展示型返回 undefined）
  * - pickPort()      打开端口选择器（返回 number | null）
  * - navigate(path)  路由跳转
+ * - reload(force?)  刷新当前页面（force=true 强制无缓存刷新）
  * - tools(action, params?)  调用后端 tools_manager IPC
  * - frp(action, params?)    调用后端 frp_manager IPC
  * - stores()        返回所有 Pinia store 的 $state
@@ -36,6 +37,8 @@ export interface MolaunchDevAPI {
   pickPort(): Promise<number | null>
   /** 路由跳转 */
   navigate(path: string): Promise<unknown>
+  /** 刷新当前页面；force=true 时强制无缓存刷新（URL 追加时间戳绕过 WebView2 缓存） */
+  reload(force?: boolean): Promise<void>
   /** 调用后端 tools_manager IPC */
   tools<T = unknown>(action: string, params?: Record<string, unknown>): Promise<T>
   /** 调用后端 frp_manager IPC */
@@ -74,6 +77,11 @@ MoLaunch Dev API 可用命令：
   molaunch.navigate(path)
       路由跳转（如 '/apps/online'、'/apps/settings'、'/apps/versions'）
 
+  molaunch.reload(force?)
+      刷新当前页面
+      - 无参 / false：普通刷新
+      - true：强制无缓存刷新（URL 追加时间戳后重新加载，绕过 WebView2 本地缓存）
+
   molaunch.tools(action, params?)
       调用后端 tools_manager IPC，返回 Promise
       - action: 子命令（如 'list_open_ports' / 'tcp_check' / 'network_latency_test' / 'server_ping'）
@@ -94,6 +102,8 @@ MoLaunch Dev API 可用命令：
   await molaunch.tools('list_open_ports')
   await molaunch.frp('list_tunnels')
   await molaunch.navigate('/apps/online')
+  await molaunch.reload()
+  await molaunch.reload(true)
   const s = await molaunch.stores(); console.log(s.frp)
 `.trim()
 
@@ -167,6 +177,18 @@ export function setupDevApi(router: Router): void {
     },
     navigate(path) {
       return router.push(path)
+    },
+    async reload(force = false) {
+      const loc = window.location
+      if (!force) {
+        // 普通刷新
+        loc.reload()
+        return
+      }
+      // 强制无缓存：URL 追加时间戳参数后重新导航，URL 变化使浏览器绕过本地缓存重新拉取资源
+      const url = new URL(loc.href)
+      url.searchParams.set('_molaunch_reload', String(Date.now()))
+      loc.href = url.toString()
     },
     async tools(action, params) {
       return invoke('tools_manager', { req: { action, params: params ?? {} } })

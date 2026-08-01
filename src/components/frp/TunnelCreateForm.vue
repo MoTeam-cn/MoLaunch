@@ -52,10 +52,20 @@ const form = reactive({
   allocationId: '',
 })
 
-const providerOptions = computed(() =>
-  props.providers.filter(p => p.enabled && (p.frpcReady || p.builtin))
-    .map(p => ({ label: p.name, value: p.id })),
-)
+/**
+ * 厂商下拉：显示所有已启用厂商（不再按 frpcReady 过滤，未就绪厂商可选但
+ * 表单下方有「frpc 未就绪」警告提示；否则从厂商同步导入的隧道无法在编辑时
+ * 显示对应厂商）。编辑模式下额外确保当前隧道厂商在选项中（即使被禁用）。
+ */
+const providerOptions = computed(() => {
+  const edit = props.editTunnel
+  const list = props.providers.filter(p => p.enabled)
+  if (edit && !list.some(p => p.id === edit.providerId)) {
+    const current = props.providers.find(p => p.id === edit.providerId)
+    if (current) list.push(current)
+  }
+  return list.map(p => ({ label: p.name, value: p.id }))
+})
 const selectedProvider = computed(() => props.providers.find(p => p.id === form.providerId))
 const isOfficial = computed(() => form.mode === 'official')
 const isEdit = computed(() => !!props.editTunnel)
@@ -180,7 +190,7 @@ function handleSubmit() {
 v-if="selectedProvider && !selectedProvider.frpcReady && !selectedProvider.builtin"
          class="mt-1 flex items-center gap-1 text-xs text-amber-600">
         <ExclamationCircleIcon class="w-3.5 h-3.5" />
-        该厂商 frpc 未就绪，启动隧道前请先在「厂商列表」页下载 frpc
+        该厂商 frpc 未就绪，启动隧道前请先在「厂商列表」页确认客户端已就绪
       </p>
     </div>
 

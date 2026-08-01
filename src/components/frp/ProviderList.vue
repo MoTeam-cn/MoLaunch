@@ -4,7 +4,8 @@
  *
  * 展示已安装的 Frp 厂商：
  * - 内置「系统默认」厂商（不可卸载/禁用），首次使用时提供「下载 frpc」入口
- * - 外部厂商（manifest.toml 安装）：支持启用/禁用切换、卸载
+ * - 外部厂商（manifest.toml 安装）：支持启用/禁用切换、卸载；frpc 就绪状态与内置一致展示
+ *   （bundled 需手动将客户端放入厂商 bin 目录，url 安装包自带，未就绪时创建隧道会被过滤）
  *
  * 顶部操作栏提供「从文件夹安装」「从 ZIP 安装」「从 URL 安装」三种安装入口。
  *
@@ -205,7 +206,7 @@ function handleUninstall(p: ProviderInfo) {
             </p>
           </div>
 
-          <!-- 操作区：内置厂商显示 frpc 状态，外部厂商显示启禁 + 卸载 -->
+          <!-- 操作区：frpc 就绪状态 + 内置厂商下载按钮 / 外部厂商启禁 + 卸载 -->
           <div class="shrink-0 flex flex-col items-end gap-1.5">
             <template v-if="provider.builtin">
               <div v-if="provider.frpcReady" class="flex items-center gap-1 text-xs text-green-600">
@@ -228,6 +229,14 @@ function handleUninstall(p: ProviderInfo) {
               </Button>
             </template>
             <template v-else>
+              <div v-if="provider.frpcReady" class="flex items-center gap-1 text-xs text-green-600">
+                <CheckCircleIcon class="w-4 h-4" />
+                <span>frpc 就绪</span>
+              </div>
+              <div v-else class="flex items-center gap-1 text-xs text-amber-600">
+                <ExclamationCircleIcon class="w-4 h-4" />
+                <span>frpc 未就绪</span>
+              </div>
               <Select
                 :model-value="provider.enabled ? 'enabled' : 'disabled'"
                 :options="enableOptions"

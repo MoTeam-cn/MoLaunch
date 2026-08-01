@@ -4,13 +4,16 @@
  *
  * 流程：选择厂商 → 自动检查授权状态 → 未授权引导去认证 → 已授权拉取隧道 → 选择性导入本地
  *
- * 导入时将 RemoteTunnelInfo 映射为 CreateTunnelParams，emit 给父组件（TunnelManager）
- * 调用 store.createTunnel 创建本地隧道。
+ * 导入直接调用 useFrpStore.createTunnel（能拿到成功结果）：
+ * - 本地已存在同名隧道的远程隧道显示「已导入」不可重复导入
+ * - 导入成功才标记为已导入；全部导入成功后自动 emit close 收起面板
+ * - 导入失败不标记、不关闭，错误由 store 的 toast 提示
  */
 import { ref, computed, watch } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import { useFrpStore } from '@/stores/frp'
 import { fetchTunnels, getAuthStatus } from '@/utils/api/frp-manager'
 import { toastError, toastSuccess } from '@/utils/toast'
 import type {
@@ -34,8 +37,10 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'import', params: CreateTunnelParams): void
+  (e: 'close'): void
 }>()
+
+const store = useFrpStore()
 
 // 厂商选择
 const selectedProviderId = ref('')
@@ -43,7 +48,10 @@ const authStatus = ref<AuthStatus | null>(null)
 const authChecking = ref(false)
 const fetching = ref(false)
 const remoteTunnels = ref<RemoteTunnelInfo[]>([])
-const importedIds = ref<Set<string>>(new Set())
+const importingIds = ref<Set<string>>(new Set())
+
+/** 本地已存在的隧道名（导入时按名称匹配判断是否已导入） */
+const localTunnelNames = computed(() => new Set(store.tunnels.map(t => t.name)))
 
 /** 只显示需要认证且已启用的厂商 */
 const authProviders = computed(() =>
@@ -60,7 +68,7 @@ const isAuthenticated = computed(() => authStatus.value?.authenticated === true)
 watch(selectedProviderId, async (id) => {
   authStatus.value = null
   remoteTunnels.value = []
-  importedIds.value.clear()
+  importingIds.value.clear()
   if (!id) return
   authChecking.value = true
   try {
@@ -86,28 +94,38 @@ async function handleFetch() {
   }
 }
 
-/** 将远程隧道映射为本地隧道创建参数并 emit */
-function handleImport(tunnel: RemoteTunnelInfo) {
-  const tunnelType: TunnelType =
-    tunnel.tunnelType === 'tcp' || tunnel.tunnelType === 'udp' ? tunnel.tunnelType : 'tcp'
-  const params: CreateTunnelParams = {
-    name: tunnel.name,
-    providerId: selectedProviderId.value,
-    tunnelType,
-    localIp: tunnel.localHost || '127.0.0.1',
-    localPort: parseInt(tunnel.localPort, 10) || 25565,
-    serverAddr: tunnel.serverHost,
-    serverPort: parseInt(tunnel.serverPort, 10) || 7000,
-    remotePort: parseInt(tunnel.remotePort, 10) || 0,
-    token: tunnel.token || undefined,
-    useTls: false,
-  }
-  emit('import', params)
-  importedIds.value.add(tunnel.id)
+/** 判断远程隧道是否已导入（本地同名 或 本会话已导入） */
+function isImported(tunnel: RemoteTunnelInfo): boolean {
+  return importingIds.value.has(tunnel.id) || localTunnelNames.value.has(tunnel.name)
 }
 
-function isImported(id: string): boolean {
-  return importedIds.value.has(id)
+/** 将远程隧道映射为本地隧道创建参数并导入 */
+async function handleImport(tunnel: RemoteTunnelInfo) {
+  if (importingIds.value.has(tunnel.id)) return
+  importingIds.value.add(tunnel.id)
+  try {
+    const tunnelType: TunnelType =
+      tunnel.tunnelType === 'tcp' || tunnel.tunnelType === 'udp' ? tunnel.tunnelType : 'tcp'
+    const params: CreateTunnelParams = {
+      name: tunnel.name,
+      providerId: selectedProviderId.value,
+      tunnelType,
+      localIp: tunnel.localHost || '127.0.0.1',
+      localPort: parseInt(tunnel.localPort, 10) || 25565,
+      serverAddr: tunnel.serverHost,
+      serverPort: parseInt(tunnel.serverPort, 10) || 7000,
+      remotePort: parseInt(tunnel.remotePort, 10) || 0,
+      token: tunnel.token || undefined,
+      useTls: false,
+    }
+    const ok = await store.createTunnel(params)
+    if (ok && remoteTunnels.value.every(t => isImported(t))) {
+      // 全部导入成功后自动收起面板
+      emit('close')
+    }
+  } finally {
+    importingIds.value.delete(tunnel.id)
+  }
 }
 </script>
 
@@ -196,10 +214,11 @@ function isImported(id: string): boolean {
             </div>
           </div>
           <div class="shrink-0">
-            <Tooltip v-if="!isImported(tunnel.id)" text="导入到本地隧道列表">
+            <Tooltip v-if="!isImported(tunnel)" text="导入到本地隧道列表">
               <Button
                 type="outline"
                 size="mini"
+                :loading="importingIds.has(tunnel.id)"
                 @click="handleImport(tunnel)"
               >
                 <template #icon><CloudArrowDownIcon class="w-3.5 h-3.5" /></template>

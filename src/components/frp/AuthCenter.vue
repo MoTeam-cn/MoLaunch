@@ -189,8 +189,9 @@ onUnmounted(() => {
       >
         <div class="flex items-start gap-3">
           <!-- 厂商图标 -->
-          <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center shrink-0">
-            <ShieldCheckIcon class="w-5 h-5 text-primary-600" />
+          <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center shrink-0 overflow-hidden">
+            <img v-if="provider.icon" :src="provider.icon" :alt="provider.name" class="w-full h-full object-cover" />
+            <ShieldCheckIcon v-else class="w-5 h-5 text-primary-600" />
           </div>
 
           <!-- 厂商信息 + 认证状态 -->

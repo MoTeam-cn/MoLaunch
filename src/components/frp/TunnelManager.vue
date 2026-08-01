@@ -46,12 +46,6 @@ async function handleCreate(params: CreateTunnelParams) {
   if (ok) showForm.value = false
 }
 
-/** 从厂商同步面板导入隧道到本地 */
-async function handleRemoteImport(params: CreateTunnelParams) {
-  const ok = await store.createTunnel(params)
-  if (ok) toastInfo('隧道已导入')
-}
-
 /** 编辑表单展开的隧道 ID */
 const editingTunnelId = ref<string | null>(null)
 const editingTunnel = computed(() =>
@@ -189,7 +183,7 @@ function handleDelete(id: string, name: string) {
       <RemoteTunnelSync
         v-if="showSync"
         :providers="providers"
-        @import="handleRemoteImport"
+        @close="showSync = false"
       />
     </Transition>
 
