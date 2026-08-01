@@ -134,6 +134,22 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     ].join('; '),
   },
 
+  /** 教程渲染页面（亮色主题，通过 res:// 加载 marked.min.js） */
+  'tutorial': {
+    template: 'tutorial',
+    title: '教程',
+    width: 760,
+    height: 600,
+    // 与 markdown 模板相同的 CSP：允许 res:// 加载 marked.min.js
+    csp: [
+      "default-src 'self'",
+      "style-src 'self' 'unsafe-inline'",
+      "script-src 'self' 'unsafe-inline' res:",
+      "img-src 'self' data: blob: https:",
+      "connect-src 'self' picker: res:",
+    ].join('; '),
+  },
+
   /** 二维码展示页面（接收 url/text 生成二维码） */
   'qrcode': {
     template: 'qrcode',

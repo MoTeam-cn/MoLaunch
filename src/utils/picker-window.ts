@@ -264,6 +264,26 @@ export async function openMarkdownWindow(params: {
 }
 
 /**
+ * 打开教程渲染窗口（亮色主题）
+ *
+ * 与 openMarkdownWindow 类似，但使用 tutorial.html 亮色模板，
+ * 样式与前端 Vue 应用一致（白底灰字 + 主色蓝）。
+ *
+ * @param params.title 标题
+ * @param params.content Markdown 文本
+ */
+export async function openTutorialWindow(params: {
+  title: string
+  content: string
+}): Promise<void> {
+  await openDisplayWindow({
+    title: params.title,
+    template: 'tutorial',
+    data: { title: params.title, content: params.content },
+  })
+}
+
+/**
  * 打开二维码展示窗口
  *
  * @param params.text 要生成二维码的文本（URL 或任意字符串）
