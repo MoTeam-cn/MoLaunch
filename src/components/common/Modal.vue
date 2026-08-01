@@ -159,14 +159,14 @@ defineExpose({
     >
       <div
         v-if="visible"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+        class="modal-shell"
         @click.self="handleCancel"
       >
         <div class="absolute inset-0 bg-black/40" />
 
-        <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl">
+        <div class="modal-body max-w-md">
           <!-- 内容 -->
-          <div class="p-6">
+          <div class="modal-scroll p-6">
             <!-- 标题行 -->
             <div class="flex items-center gap-3">
               <component :is="icon" class="w-6 h-6 shrink-0" :class="iconColor" />

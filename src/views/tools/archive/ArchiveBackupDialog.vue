@@ -98,33 +98,36 @@ async function pickBackupOutput() {
 <template>
   <div
     v-if="target"
-    class="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+    class="modal-shell"
     @click.self="emit('close')"
   >
-    <div class="w-96 rounded-lg bg-white shadow-xl border border-gray-200 p-5 space-y-4">
-      <div class="flex items-center gap-2">
-        <ArrowUpTrayIcon class="h-5 w-5 text-gray-700" />
-        <h4 class="text-sm font-semibold text-gray-900">备份存档</h4>
+    <div class="absolute inset-0 bg-black/40" />
+    <div class="modal-body max-w-md mt-2">
+      <div class="modal-scroll p-5 space-y-4">
+        <div class="flex items-center gap-2">
+          <ArrowUpTrayIcon class="h-5 w-5 text-gray-700" />
+          <h4 class="text-sm font-semibold text-gray-900">备份存档</h4>
+        </div>
+        <div class="text-xs text-gray-500">
+          存档名称：<span class="font-medium text-gray-700">{{ target.name }}</span>
+          （{{ formatBytes(target.size) }}）
+        </div>
+        <div>
+          <label class="mb-1 block text-xs font-medium text-gray-700">输出 zip 路径</label>
+          <Input v-model="backupOutputPath" placeholder="输出 zip 完整路径" clearable>
+            <template #append>
+              <FolderOpenIcon
+                class="h-4 w-4 cursor-pointer text-gray-500 hover:text-primary-600 transition-colors"
+                @click="pickBackupOutput"
+              />
+            </template>
+          </Input>
+        </div>
+        <div class="flex items-center gap-2">
+          <Checkbox v-model="backupExcludePlayer">排除玩家数据（导出分享包）</Checkbox>
+        </div>
       </div>
-      <div class="text-xs text-gray-500">
-        存档名称：<span class="font-medium text-gray-700">{{ target.name }}</span>
-        （{{ formatBytes(target.size) }}）
-      </div>
-      <div>
-        <label class="mb-1 block text-xs font-medium text-gray-700">输出 zip 路径</label>
-        <Input v-model="backupOutputPath" placeholder="输出 zip 完整路径" clearable>
-          <template #append>
-            <FolderOpenIcon
-              class="h-4 w-4 cursor-pointer text-gray-500 hover:text-primary-600 transition-colors"
-              @click="pickBackupOutput"
-            />
-          </template>
-        </Input>
-      </div>
-      <div class="flex items-center gap-2">
-        <Checkbox v-model="backupExcludePlayer">排除玩家数据（导出分享包）</Checkbox>
-      </div>
-      <div class="flex justify-end gap-2">
+      <div class="flex justify-end gap-2 px-5 py-3.5 bg-gray-50 rounded-b-lg">
         <Button type="outline" size="small" @click="emit('close')">取消</Button>
         <Button
           type="primary"

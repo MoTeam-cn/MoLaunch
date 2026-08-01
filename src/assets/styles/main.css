@@ -267,6 +267,29 @@
   .badge-error {
     @apply badge bg-red-100 text-red-800;
   }
+
+  /* ============================================================
+   * 弹窗高度限制统一方案（参考 ResourceDetail.vue）
+   * 解决：动态内容弹窗在长列表/多步骤场景下溢出视口
+   * 结构：.modal-shell > .modal-body > (.modal-scroll 内容滚动区)
+   * - .modal-shell：外层定位容器，顶部对齐避免大高度弹窗上下溢出
+   * - .modal-body：弹窗主体，calc(100vh-100px) 整体高度上限 + flex 列布局
+   * - .modal-scroll：内容滚动区，占据剩余空间独立滚动（header/footer 不动）
+   * 调用方需自行指定宽度（max-w-md/max-w-2xl 等）和背景色
+   * 顶部对齐场景额外加 mt-2 微调；垂直居中场景用 flex items-center justify-center
+   * ============================================================ */
+  .modal-shell {
+    @apply fixed inset-0 z-[10000] flex items-start justify-center px-4 pt-14 pb-4;
+  }
+
+  .modal-body {
+    @apply relative w-full bg-white rounded-lg shadow-xl flex flex-col;
+    max-height: calc(100vh - 100px);
+  }
+
+  .modal-scroll {
+    @apply flex-1 overflow-y-auto;
+  }
 }
 
 /* Scrollbar 样式 */

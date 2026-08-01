@@ -121,54 +121,57 @@ function handleCancel() {
     <Transition name="fade">
       <div
         v-if="visible"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="modal-shell"
         @click.self="handleCancel"
       >
-        <div class="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
-          <!-- 标题 -->
-          <div class="mb-4 flex items-center gap-3">
-            <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50">
-              <FolderOpenIcon class="h-5 w-5 text-primary-500" />
+        <div class="absolute inset-0 bg-black/40" />
+        <div class="modal-body max-w-md mt-2">
+          <div class="modal-scroll p-6">
+            <!-- 标题 -->
+            <div class="mb-4 flex items-center gap-3">
+              <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50">
+                <FolderOpenIcon class="h-5 w-5 text-primary-500" />
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900">从存档加载种子</h3>
             </div>
-            <h3 class="text-lg font-semibold text-gray-900">从存档加载种子</h3>
-          </div>
 
-          <!-- 版本选择 -->
-          <div class="mb-4">
-            <label class="mb-1.5 block text-xs font-medium text-gray-700">选择版本</label>
-            <Select
-              v-model="selectedVersionId"
-              :options="versionOptions()"
-              placeholder="选择已安装的版本"
-              class="w-full"
-            />
-            <div v-if="versionsLoading" class="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
-              <ArrowPathIcon class="h-3 w-3 animate-spin" />
-              加载版本列表...
+            <!-- 版本选择 -->
+            <div class="mb-4">
+              <label class="mb-1.5 block text-xs font-medium text-gray-700">选择版本</label>
+              <Select
+                v-model="selectedVersionId"
+                :options="versionOptions()"
+                placeholder="选择已安装的版本"
+                class="w-full"
+              />
+              <div v-if="versionsLoading" class="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
+                <ArrowPathIcon class="h-3 w-3 animate-spin" />
+                加载版本列表...
+              </div>
             </div>
-          </div>
 
-          <!-- 存档选择 -->
-          <div class="mb-5">
-            <label class="mb-1.5 block text-xs font-medium text-gray-700">选择存档</label>
-            <Select
-              v-model="selectedWorld"
-              :options="saveOptions()"
-              :placeholder="selectedVersionId ? '选择该版本的存档' : '请先选择版本'"
-              :disabled="!selectedVersionId || savesLoading"
-              class="w-full"
-            />
-            <div v-if="savesLoading" class="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
-              <ArrowPathIcon class="h-3 w-3 animate-spin" />
-              加载存档列表...
+            <!-- 存档选择 -->
+            <div class="mb-5">
+              <label class="mb-1.5 block text-xs font-medium text-gray-700">选择存档</label>
+              <Select
+                v-model="selectedWorld"
+                :options="saveOptions()"
+                :placeholder="selectedVersionId ? '选择该版本的存档' : '请先选择版本'"
+                :disabled="!selectedVersionId || savesLoading"
+                class="w-full"
+              />
+              <div v-if="savesLoading" class="mt-1.5 flex items-center gap-1 text-xs text-gray-400">
+                <ArrowPathIcon class="h-3 w-3 animate-spin" />
+                加载存档列表...
+              </div>
+              <p v-else-if="selectedVersionId && !savesLoading && saves.length === 0" class="mt-1.5 text-xs text-gray-400">
+                该版本目录下暂无有效存档（需含 level.dat）
+              </p>
             </div>
-            <p v-else-if="selectedVersionId && !savesLoading && saves.length === 0" class="mt-1.5 text-xs text-gray-400">
-              该版本目录下暂无有效存档（需含 level.dat）
-            </p>
           </div>
 
           <!-- 操作按钮 -->
-          <div class="flex justify-end gap-2">
+          <div class="flex justify-end gap-2 px-6 py-3.5 bg-gray-50 rounded-b-lg">
             <Button type="ghost" size="small" @click="handleCancel">取消</Button>
             <Button
               type="primary"

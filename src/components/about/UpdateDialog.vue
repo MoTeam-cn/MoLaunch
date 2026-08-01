@@ -98,14 +98,14 @@ function onRetry() {
     >
       <div
         v-if="visible"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+        class="modal-shell"
         tabindex="0"
         @click.self="onMaskClick"
         @keydown="onKeydown"
       >
         <div class="absolute inset-0 bg-black/40" />
 
-        <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl">
+        <div class="modal-body max-w-md mt-2">
           <!-- 标题栏 -->
           <div class="flex items-center justify-between px-6 pt-5 pb-3">
             <div class="flex items-center gap-2.5">
@@ -124,7 +124,7 @@ function onRetry() {
           </div>
 
           <!-- 内容区 -->
-          <div class="px-6 pb-2">
+          <div class="modal-scroll px-6 pb-2">
             <!-- 检查中 -->
             <div v-if="updateState.status === 'checking'" class="py-6 flex flex-col items-center gap-3">
               <div class="h-7 w-7 animate-spin rounded-full border-[3px] border-primary-200 border-t-primary-500" />

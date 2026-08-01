@@ -85,12 +85,12 @@ watch(() => props.visible, (v) => {
     >
       <div
         v-if="visible"
-        class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+        class="modal-shell"
         @click.self="close"
       >
         <div class="absolute inset-0 bg-black/40" />
 
-        <div class="relative w-full max-w-2xl rounded-lg bg-white shadow-xl">
+        <div class="modal-body max-w-2xl mt-2">
           <!-- 头部 -->
           <div class="flex items-center justify-between border-b border-gray-100 px-5 py-3">
             <h3 class="text-base font-semibold text-gray-900">
@@ -107,7 +107,7 @@ watch(() => props.visible, (v) => {
           </div>
 
           <!-- 内容 -->
-          <div class="max-h-[80vh] overflow-y-auto p-5">
+          <div class="modal-scroll p-5">
             <!-- 离线账号：顶部提示皮肤生效范围 -->
             <AlertV2
               v-if="isOffline"

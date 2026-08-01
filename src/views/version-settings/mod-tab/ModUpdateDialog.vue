@@ -65,11 +65,11 @@ const {
     >
       <div
         v-if="visible && mod"
-        class="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+        class="modal-shell"
         @click.self="$emit('update:visible', false)"
       >
         <div class="absolute inset-0 bg-black/40" />
-        <div class="relative w-full max-w-2xl bg-white rounded-lg shadow-xl flex flex-col max-h-[85vh]">
+        <div class="modal-body max-w-2xl mt-2">
           <!-- 标题栏 -->
           <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200">
             <h3 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
@@ -82,7 +82,7 @@ const {
           </div>
 
           <!-- 内容区 -->
-          <div class="flex-1 overflow-y-auto p-5">
+          <div class="modal-scroll p-5">
             <div class="flex flex-col gap-3">
               <!-- 当前 mod 信息 -->
               <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">

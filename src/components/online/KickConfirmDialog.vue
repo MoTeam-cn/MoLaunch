@@ -48,17 +48,17 @@ function handleConfirm() {
       leave-to-class="opacity-0"
     >
       <div
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
+        class="modal-shell"
         @click.self="emit('close')"
       >
         <div class="absolute inset-0 bg-black/40" />
-        <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl">
+        <div class="modal-body max-w-md mt-2">
           <!-- 标题栏 -->
           <div class="px-5 py-3.5 border-b border-gray-200">
             <h3 class="text-base font-semibold text-gray-900">踢出参与者</h3>
           </div>
           <!-- 内容区 -->
-          <div class="px-5 py-4 space-y-3">
+          <div class="modal-scroll px-5 py-4 space-y-3">
             <p class="text-sm text-gray-600">
               确定踢出
               <code class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{{ devicePk.slice(0, 12) }}...</code>

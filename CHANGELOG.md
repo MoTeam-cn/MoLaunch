@@ -9,6 +9,18 @@
 
 ### 维护
 
+#### 统一前端弹窗高度限制（公共 CSS 工具类）
+
+- 背景：项目中各弹窗高度限制实现不一，部分弹窗内容超长时会撑满甚至溢出视口。参考下载页 Mod 详情弹窗的高度限制方案，提取公共 CSS 工具类统一所有弹窗的布局与滚动行为
+- 改动（1 修改 + 9 弹窗改造）：
+  - **`src/assets/styles/main.css`**：新增三个公共工具类——`.modal-shell`（外层定位容器，顶部对齐避免大高度弹窗上下溢出）、`.modal-body`（弹窗主体，`max-height: calc(100vh - 100px)` 整体上限 + flex 列布局）、`.modal-scroll`（内容滚动区，`flex-1 overflow-y-auto`，header/footer 不随内容滚动）
+  - **`src/components/common/Modal.vue`**：外层容器改用 `.modal-shell`（修复此前 body 已用 `.modal-body`/`.modal-scroll` 但外层 shell 未替换的遗留）
+  - **`src/components/common/ProfileSelectModal.vue`**、**`src/components/common/DeviceCodeModal.vue`**、**`src/components/common/SkinManager.vue`**、**`src/components/about/UpdateDialog.vue`**、**`src/components/online/LobbyJoinConfirmDialog.vue`**：外层/主体/内容区统一替换为 `.modal-shell`/`.modal-body`/`.modal-scroll`，移除各自硬编码的 `max-h-*` 与 `fixed inset-0` 样式
+  - **`src/components/online/KickConfirmDialog.vue`**、**`src/views/tools/archive/ArchiveBackupDialog.vue`**、**`src/views/tools/data/LoadSaveModal.vue`**：同上改造，按钮栏独立为 footer（`bg-gray-50 rounded-b-lg`）不随内容滚动
+  - **`src/views/version-settings/mod-tab/ModUpdateDialog.vue`**：外层改用 `.modal-shell`，主体改用 `.modal-body max-w-2xl`，内容区改用 `.modal-scroll`，移除原 `max-h-[85vh]` + `flex-1 overflow-y-auto` 重复实现
+- 不改造项：`CrashDialog.vue`（自定义深色主题 `bg-dialog-bg`/`text-brand-*`，与 `.modal-body` 的 `bg-white` 冲突，且已有 `max-h-[85vh]` 高度限制）；`App.vue` 还原遮罩与 `DragOverlay.vue` 拖拽遮罩（非弹窗，全屏覆盖层）
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
 #### 统一启动时存储迁移到 `migrations/` 模块
 
 - 背景：项目有多个启动时自动执行的存储迁移逻辑散落在不同模块（`storage/appdata.rs` 的命名迁移与便携式迁移、`minecraft/online/storage.rs::OnlineStorage::load` 的 device.json 旧路径迁移、`storage/mod.rs::migrate_global_dirs` 的 online 残留目录清理）。把所有启动时存储迁移逻辑归到统一的 `migrations/` 目录，像数据库自动迁移那样启动时由 `Storage::init` 调用 `run_all()` 一次性执行

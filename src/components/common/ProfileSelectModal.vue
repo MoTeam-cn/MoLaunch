@@ -35,24 +35,26 @@ function handleClose() {
     <Transition name="fade">
       <div
         v-if="visible"
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+        class="modal-shell"
         @click.self="handleClose"
       >
-        <div class="mx-4 w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+        <div class="absolute inset-0 bg-black/50" />
+
+        <div class="modal-body max-w-md rounded-2xl mt-2">
           <!-- 标题 -->
-          <div class="mb-4 flex items-center gap-3">
+          <div class="px-6 pt-6 pb-4 flex items-center gap-3">
             <svg class="h-6 w-6 text-primary-500" viewBox="0 0 20 20" fill="currentColor">
               <path d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" />
             </svg>
             <h3 class="text-lg font-semibold text-gray-900">选择角色</h3>
           </div>
 
-          <p class="mb-4 text-sm text-gray-600">检测到此账号有多个角色，请选择要使用的角色：</p>
+          <div class="px-6 pb-2 text-sm text-gray-600">检测到此账号有多个角色，请选择要使用的角色：</div>
 
           <!-- 角色列表 -->
           <!-- 保留原生 button：角色列表项（w-full + 头像 + 名称 + 箭头），
                Button.vue 的 scoped size 类无法承载列表项布局 -->
-          <div class="space-y-2">
+          <div class="modal-scroll px-6 py-2 space-y-2">
             <button
               v-for="profile in profiles"
               :key="profile.id"
@@ -75,12 +77,12 @@ function handleClose() {
           </div>
 
           <!-- 底部按钮 -->
-          <div class="mt-4 flex justify-end">
+          <div class="px-6 py-4 flex justify-end">
             <Button type="text" :disabled="loading" @click="handleClose">取消</Button>
           </div>
 
           <!-- 加载遮罩 -->
-          <div v-if="loading" class="mt-3 flex items-center justify-center gap-2 text-sm text-primary-600">
+          <div v-if="loading" class="px-6 pb-4 flex items-center justify-center gap-2 text-sm text-primary-600">
             <div class="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-500" />
             <span>正在完成登录...</span>
           </div>
