@@ -113,38 +113,20 @@
       document.title = DATA.title;
     }
 
-    // 动态加载 marked.min.js（通过 res:// 协议读取后端嵌入资源）
-    // Windows 上 Tauri 把 res:// 转为 https://res.localhost/
-    var resBase = window.location.protocol === 'https:'
-      ? 'https://res.localhost/web-common'
-      : 'res://localhost/web-common';
-    var markedUrl = resBase + '/view/marked.min.js';
-
-    var script = document.createElement('script');
-    script.src = markedUrl;
-    script.onload = function() {
-      try {
-        var markdownText = DATA.content || '';
-        // 使用 marked 解析 markdown
-        if (typeof marked !== 'undefined') {
-          // 配置 marked：启用 GFM、断行
-          if (marked.setOptions) {
-            marked.setOptions({ gfm: true, breaks: true });
-          }
-          contentEl.innerHTML = marked.parse(markdownText);
-        } else {
-          // marked 加载失败，回退为纯文本
-          contentEl.textContent = markdownText;
+    // marked.min.js 已由后端内联注入（避免 res:// 跨源加载问题）
+    try {
+      var markdownText = DATA.content || '';
+      if (typeof marked !== 'undefined') {
+        if (marked.setOptions) {
+          marked.setOptions({ gfm: true, breaks: true });
         }
-      } catch (e) {
-        contentEl.innerHTML = '<p style="color:#ef4444;">渲染失败: ' + e.message + '</p><pre>' + escapeHtml(DATA.content || '') + '</pre>';
+        contentEl.innerHTML = marked.parse(markdownText);
+      } else {
+        contentEl.textContent = markdownText;
       }
-    };
-    script.onerror = function() {
-      // marked.min.js 加载失败，回退为纯文本
-      contentEl.textContent = DATA.content || '渲染失败：无法加载 marked.min.js';
-    };
-    document.head.appendChild(script);
+    } catch (e) {
+      contentEl.innerHTML = '<p style="color:#ef4444;">渲染失败: ' + e.message + '</p><pre>' + escapeHtml(DATA.content || '') + '</pre>';
+    }
 
     function escapeHtml(s) {
       return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

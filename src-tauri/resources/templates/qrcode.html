@@ -85,21 +85,11 @@
       textPreviewEl.textContent = text;
       textPreviewEl.title = text;
 
-      // 动态加载 qrcode.min.js（通过 res:// 协议读取后端嵌入资源）
-      // Windows 上 Tauri 把 res:// 转为 https://res.localhost/
-      var resBase = window.location.protocol === 'https:'
-        ? 'https://res.localhost/web-common'
-        : 'res://localhost/web-common';
-      var qrcodeUrl = resBase + '/view/qrcode.min.js';
-
-      var script = document.createElement('script');
-      script.src = qrcodeUrl;
-      script.onload = function() {
-        try {
-          if (typeof QRCode === 'undefined') {
-            loadingEl.innerHTML = '<div class="error">二维码库加载失败</div>';
-            return;
-          }
+      // qrcode.min.js 已由后端内联注入（避免 res:// 跨源加载问题）
+      try {
+        if (typeof QRCode === 'undefined') {
+          loadingEl.innerHTML = '<div class="error">二维码库加载失败</div>';
+        } else {
           // 清空 loading，创建二维码容器
           loadingEl.style.display = 'none';
           // qrcodejs 会向容器内追加 canvas/table/img，需要清空容器但保留 loading 隐藏
@@ -118,15 +108,11 @@
             colorLight: '#ffffff',
             correctLevel: QRCode.CorrectLevel.H
           });
-        } catch (e) {
-          loadingEl.style.display = 'flex';
-          loadingEl.innerHTML = '<div class="error">二维码生成失败: ' + e.message + '</div>';
         }
-      };
-      script.onerror = function() {
-        loadingEl.innerHTML = '<div class="error">无法加载 qrcode.min.js</div>';
-      };
-      document.head.appendChild(script);
+      } catch (e) {
+        loadingEl.style.display = 'flex';
+        loadingEl.innerHTML = '<div class="error">二维码生成失败: ' + e.message + '</div>';
+      }
     }
   </script>
 </body>

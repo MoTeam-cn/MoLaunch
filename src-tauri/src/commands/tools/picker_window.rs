@@ -253,7 +253,26 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
                 .unwrap_or(serde_json::json!({}))
         };
 
-        let injection = format!("<script>window.__PICKER_DATA__ = {};</script>", data_json);
+        // 注入依赖库（markdown/tutorial 需要 marked.min.js，qrcode 需要 qrcode.min.js）
+        // 直接内联嵌入避免 res:// 跨源加载（picker 子窗口 origin 为 https://picker.localhost/，
+        // res:// 资源在 Windows 上转为 https://res.localhost/，跨源 script 加载受 CSP 限制）
+        let lib_script = match template_name.as_str() {
+            "markdown" | "tutorial" => crate::resources::read_resource_bytes("view/marked.min.js")
+                .ok()
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+                .map(|js| format!("<script>{}</script>", js)),
+            "qrcode" => crate::resources::read_resource_bytes("view/qrcode.min.js")
+                .ok()
+                .and_then(|bytes| String::from_utf8(bytes).ok())
+                .map(|js| format!("<script>{}</script>", js)),
+            _ => None,
+        };
+
+        let mut injection = String::new();
+        if let Some(lib) = &lib_script {
+            injection.push_str(lib);
+        }
+        injection.push_str(&format!("<script>window.__PICKER_DATA__ = {};</script>", data_json));
         let html = template.replace("</body>", &format!("{}</body>", injection));
 
         build_response(
