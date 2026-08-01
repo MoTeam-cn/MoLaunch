@@ -73,7 +73,9 @@ mod tests {
     fn allows_whitelisted_https() {
         assert!(validate_download_url("https://media.forgecdn.net/files/123/456/x.jar").is_ok());
         assert!(validate_download_url("https://edge.forgecdn.net/files/123/456/x.jar").is_ok());
-        assert!(validate_download_url("https://mediafilez.forgecdn.net/files/123/456/x.jar").is_ok());
+        assert!(
+            validate_download_url("https://mediafilez.forgecdn.net/files/123/456/x.jar").is_ok()
+        );
         assert!(validate_download_url("https://cdn.modrinth.com/data/abc.zip").is_ok());
         assert!(validate_download_url("https://modrinth.com/modpack/xyz").is_ok());
         // 子域名通配
@@ -91,9 +93,7 @@ mod tests {
     #[test]
     fn rejects_http_and_userinfo() {
         assert!(validate_download_url("http://media.forgecdn.net/x").is_err());
-        assert!(
-            validate_download_url("https://user:pass@media.forgecdn.net/x").is_err()
-        );
+        assert!(validate_download_url("https://user:pass@media.forgecdn.net/x").is_err());
     }
 
     #[test]

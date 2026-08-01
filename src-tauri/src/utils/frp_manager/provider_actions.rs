@@ -96,8 +96,7 @@ pub fn register(d: &mut Dispatcher) {
         handler!(state, _app, params, {
             let p: ProviderIdParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let (tunnels, account) =
-                frp::api_spec::fetch_tunnels(&state, &p.provider_id).await?;
+            let (tunnels, account) = frp::api_spec::fetch_tunnels(&state, &p.provider_id).await?;
             // 包装为对象返回，前端按 {tunnels, account} 取值
             #[derive(serde::Serialize)]
             #[serde(rename_all = "camelCase")]

@@ -279,13 +279,12 @@ fn parse_callback_path_for_code(
 ///
 /// 字段名按 camelCase 约定：accessToken / refreshToken / expiresIn / errorField / errorDescription
 fn get_extractor<'a>(flow: &'a FlowRequest, key: &str) -> &'a FieldExtractor {
-    static EMPTY: once_cell::sync::Lazy<FieldExtractor> = once_cell::sync::Lazy::new(|| {
-        FieldExtractor {
+    static EMPTY: once_cell::sync::Lazy<FieldExtractor> =
+        once_cell::sync::Lazy::new(|| FieldExtractor {
             from: "body".to_string(),
             path: None,
             name: None,
-        }
-    });
+        });
     flow.response.get(key).unwrap_or(&EMPTY)
 }
 

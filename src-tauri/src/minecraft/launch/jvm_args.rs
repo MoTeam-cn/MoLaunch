@@ -223,7 +223,11 @@ fn add_json_jvm_args(
 
             // classpath 分隔符：Windows 用 `;`，Unix 系（macOS/Linux）用 `:`
             // 原代码硬编码 `;` 会导致 macOS/Linux 上 JVM 无法解析 classpath
-            let classpath_separator = if cfg!(target_os = "windows") { ";" } else { ":" };
+            let classpath_separator = if cfg!(target_os = "windows") {
+                ";"
+            } else {
+                ":"
+            };
             let value = value
                 .replace("${library_directory}", &libraries_dir_str)
                 .replace("${classpath_separator}", classpath_separator)

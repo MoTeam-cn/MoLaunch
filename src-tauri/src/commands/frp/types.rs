@@ -593,21 +593,39 @@ impl<'de> Deserialize<'de> for FieldMapping {
         #[serde(untagged)]
         enum Repr {
             Str(String),
-            Obj { field: Option<String>, split: Option<String>, value: Option<String> },
+            Obj {
+                field: Option<String>,
+                split: Option<String>,
+                value: Option<String>,
+            },
         }
 
         match Repr::deserialize(deserializer)? {
             Repr::Str(s) => {
                 // 模板字符串（以 { 开头，如 {account.token}）→ value；否则 → field
                 if s.starts_with('{') {
-                    Ok(FieldMapping { field: None, split: None, value: Some(s) })
+                    Ok(FieldMapping {
+                        field: None,
+                        split: None,
+                        value: Some(s),
+                    })
                 } else {
-                    Ok(FieldMapping { field: Some(s), split: None, value: None })
+                    Ok(FieldMapping {
+                        field: Some(s),
+                        split: None,
+                        value: None,
+                    })
                 }
             }
-            Repr::Obj { field, split, value } => {
-                Ok(FieldMapping { field, split, value })
-            }
+            Repr::Obj {
+                field,
+                split,
+                value,
+            } => Ok(FieldMapping {
+                field,
+                split,
+                value,
+            }),
         }
     }
 }
@@ -690,7 +708,10 @@ mod tests {
         assert_eq!(fields["id"].split, None);
         assert_eq!(fields["id"].value, None);
 
-        assert_eq!(fields["serverHost"].field.as_deref(), Some("connectAddress"));
+        assert_eq!(
+            fields["serverHost"].field.as_deref(),
+            Some("connectAddress")
+        );
         assert_eq!(fields["serverHost"].split.as_deref(), Some(":"));
         assert_eq!(fields["serverHost"].value, None);
 

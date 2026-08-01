@@ -12,8 +12,8 @@ use super::provider::{
 };
 use crate::state::AppState;
 
-pub use system_default::fetch_latest_frpc_version;
 pub(crate) use external::host_matches;
+pub use system_default::fetch_latest_frpc_version;
 
 /// 下载 frpc 二进制
 ///

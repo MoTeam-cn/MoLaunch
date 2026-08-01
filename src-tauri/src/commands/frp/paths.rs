@@ -23,7 +23,9 @@ pub fn providers_root() -> PathBuf {
     crate::storage::appdata::ensure_appdata_subdir("providers").unwrap_or_else(|e| {
         crate::log_error!("Failed to create providers directory in AppData: {}", e);
         // 降级回便携式目录（极少发生：APPDATA 环境变量缺失）
-        crate::storage::Storage::instance().base_dir().join("providers")
+        crate::storage::Storage::instance()
+            .base_dir()
+            .join("providers")
     })
 }
 
@@ -51,7 +53,9 @@ pub fn auth_file_path(provider_id: &str) -> PathBuf {
                 "Failed to create frp_auth directory in AppData: {}, fallback to portable",
                 e
             );
-            frp_data_dir().join("auth").join(format!("{}.json", provider_id))
+            frp_data_dir()
+                .join("auth")
+                .join(format!("{}.json", provider_id))
         })
 }
 

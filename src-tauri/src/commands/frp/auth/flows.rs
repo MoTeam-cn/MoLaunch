@@ -109,7 +109,9 @@ pub async fn send_flow_request(
         } else {
             // JSON 或其他：直接发送 body
             body_log = Some(body.to_string());
-            request = request.header("Content-Type", content_type).body(body.to_string());
+            request = request
+                .header("Content-Type", content_type)
+                .body(body.to_string());
         }
     }
 
@@ -168,13 +170,12 @@ impl FlowResponse {
             "body" => {
                 let path = extractor.path.as_deref()?;
                 let value: serde_json::Value = serde_json::from_str(&self.body).ok()?;
-                crate::commands::frp::api_spec::jsonpath::extract(&value, path)
-                    .map(|v| match v {
-                        serde_json::Value::String(s) => s,
-                        serde_json::Value::Number(n) => n.to_string(),
-                        serde_json::Value::Bool(b) => b.to_string(),
-                        other => other.to_string(),
-                    })
+                crate::commands::frp::api_spec::jsonpath::extract(&value, path).map(|v| match v {
+                    serde_json::Value::String(s) => s,
+                    serde_json::Value::Number(n) => n.to_string(),
+                    serde_json::Value::Bool(b) => b.to_string(),
+                    other => other.to_string(),
+                })
             }
             "header" => {
                 let name = extractor.name.as_deref()?;
@@ -195,9 +196,7 @@ impl FlowResponse {
     ) -> HashMap<String, String> {
         response_map
             .iter()
-            .filter_map(|(key, extractor)| {
-                self.extract_field(extractor).map(|v| (key.clone(), v))
-            })
+            .filter_map(|(key, extractor)| self.extract_field(extractor).map(|v| (key.clone(), v)))
             .collect()
     }
 }
@@ -207,8 +206,18 @@ fn fill_template(template: &str, ctx: &FlowContext) -> String {
     let mut result = template.to_string();
     // 支持的占位符列表
     let placeholders = [
-        "baseUrl", "clientId", "clientSecret", "redirectUri", "code", "codeVerifier",
-        "refreshToken", "deviceCode", "scope", "apiKey", "publicKey", "requestUuid",
+        "baseUrl",
+        "clientId",
+        "clientSecret",
+        "redirectUri",
+        "code",
+        "codeVerifier",
+        "refreshToken",
+        "deviceCode",
+        "scope",
+        "apiKey",
+        "publicKey",
+        "requestUuid",
     ];
     for ph in &placeholders {
         let pattern = format!("{{{}}}", ph);
@@ -234,9 +243,7 @@ fn fill_body_template(body: &serde_json::Value, ctx: &FlowContext) -> serde_json
         serde_json::Value::Array(arr) => {
             serde_json::Value::Array(arr.iter().map(|v| fill_body_template(v, ctx)).collect())
         }
-        serde_json::Value::String(s) => {
-            serde_json::Value::String(fill_template(s, ctx))
-        }
+        serde_json::Value::String(s) => serde_json::Value::String(fill_template(s, ctx)),
         other => other.clone(),
     }
 }

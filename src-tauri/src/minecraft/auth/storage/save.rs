@@ -147,12 +147,11 @@ impl AuthStorage {
 
         // 确保父目录存在
         if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("创建认证存储目录失败: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("创建认证存储目录失败: {}", e))?;
         }
 
-        let content = serde_json::to_string(&root)
-            .map_err(|e| format!("序列化认证状态失败: {}", e))?;
+        let content =
+            serde_json::to_string(&root).map_err(|e| format!("序列化认证状态失败: {}", e))?;
         std::fs::write(&path, &content).map_err(|e| format!("写入认证文件失败: {}", e))?;
 
         // Unix 下显式设置文件权限为 0o600（仅当前用户可读写），防止其他用户读取 token
@@ -217,12 +216,8 @@ impl AuthStorage {
                             .await?;
                     }
                     if let Some(expires) = user.expires_at {
-                        self.reg_set_encrypted(
-                            &key,
-                            KEY_MS_CURRENT_EXPIRES,
-                            &expires.to_string(),
-                        )
-                        .await?;
+                        self.reg_set_encrypted(&key, KEY_MS_CURRENT_EXPIRES, &expires.to_string())
+                            .await?;
                     }
                     if let Some(ref profile) = user.profile_json {
                         self.reg_set_encrypted(&key, KEY_MS_CURRENT_PROFILE, profile)
@@ -234,33 +229,17 @@ impl AuthStorage {
                         .await?;
                     self.reg_set_encrypted(&key, KEY_AUTHLIB_CURRENT_UUID, &user.uuid)
                         .await?;
-                    self.reg_set_encrypted(
-                        &key,
-                        KEY_AUTHLIB_CURRENT_ACCESS,
-                        &user.access_token,
-                    )
-                    .await?;
-                    self.reg_set_encrypted(
-                        &key,
-                        KEY_AUTHLIB_CURRENT_CLIENT,
-                        &user.client_token,
-                    )
-                    .await?;
-                    if let Some(ref server_url) = user.server_url {
-                        self.reg_set_encrypted(
-                            &key,
-                            KEY_AUTHLIB_CURRENT_SERVER_URL,
-                            server_url,
-                        )
+                    self.reg_set_encrypted(&key, KEY_AUTHLIB_CURRENT_ACCESS, &user.access_token)
                         .await?;
+                    self.reg_set_encrypted(&key, KEY_AUTHLIB_CURRENT_CLIENT, &user.client_token)
+                        .await?;
+                    if let Some(ref server_url) = user.server_url {
+                        self.reg_set_encrypted(&key, KEY_AUTHLIB_CURRENT_SERVER_URL, server_url)
+                            .await?;
                     }
                     if let Some(ref server_name) = user.server_name {
-                        self.reg_set_encrypted(
-                            &key,
-                            KEY_AUTHLIB_CURRENT_SERVER_NAME,
-                            server_name,
-                        )
-                        .await?;
+                        self.reg_set_encrypted(&key, KEY_AUTHLIB_CURRENT_SERVER_NAME, server_name)
+                            .await?;
                     }
                 }
                 _ => {}
@@ -274,8 +253,8 @@ impl AuthStorage {
                 .iter()
                 .map(|a| a.to_storage_json())
                 .collect();
-            let json = serde_json::to_string(&arr)
-                .map_err(|e| format!("序列化账号列表失败: {}", e))?;
+            let json =
+                serde_json::to_string(&arr).map_err(|e| format!("序列化账号列表失败: {}", e))?;
             self.reg_set_encrypted(&key, KEY_MS_ACCOUNTS, &json).await?;
         }
 

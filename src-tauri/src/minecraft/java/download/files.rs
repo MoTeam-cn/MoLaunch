@@ -86,11 +86,7 @@ pub fn find_java_exe(runtime_dir: &Path) -> Result<PathBuf, String> {
                     if let Some(found) = find_recursive(&path, exe_name) {
                         return Some(found);
                     }
-                } else if path
-                    .file_name()
-                    .map(|n| n == exe_name)
-                    .unwrap_or(false)
-                {
+                } else if path.file_name().map(|n| n == exe_name).unwrap_or(false) {
                     return Some(path);
                 }
             }

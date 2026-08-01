@@ -56,11 +56,10 @@ impl AuthStorage {
             return Ok(state);
         }
 
-        let raw = std::fs::read_to_string(&path)
-            .map_err(|e| format!("读取认证文件失败: {}", e))?;
+        let raw = std::fs::read_to_string(&path).map_err(|e| format!("读取认证文件失败: {}", e))?;
 
-        let root: Value = serde_json::from_str(&raw)
-            .map_err(|e| format!("解析认证状态 JSON 失败: {}", e))?;
+        let root: Value =
+            serde_json::from_str(&raw).map_err(|e| format!("解析认证状态 JSON 失败: {}", e))?;
 
         let mut state = PersistedAuthState::default();
 
@@ -161,11 +160,7 @@ impl AuthStorage {
     ///
     /// 字段为 null/缺失或解密失败或反序列化失败时返回空 Vec。
     #[cfg(not(windows))]
-    async fn decrypt_account_list<T>(
-        &self,
-        root: &serde_json::Value,
-        name: &str,
-    ) -> Vec<T>
+    async fn decrypt_account_list<T>(&self, root: &serde_json::Value, name: &str) -> Vec<T>
     where
         T: serde::de::DeserializeOwned,
     {
@@ -323,16 +318,14 @@ impl AuthStorage {
         // 读取离线账号列表
         if let Some(offline_json) = self.reg_get_decrypted(&key, KEY_OFFLINE_ACCOUNTS).await {
             if !offline_json.is_empty() {
-                state.offline_accounts =
-                    serde_json::from_str(&offline_json).unwrap_or_default();
+                state.offline_accounts = serde_json::from_str(&offline_json).unwrap_or_default();
             }
         }
 
         // 读取 authlib 账号列表
         if let Some(authlib_json) = self.reg_get_decrypted(&key, KEY_AUTHLIB_ACCOUNTS).await {
             if !authlib_json.is_empty() {
-                state.authlib_accounts =
-                    serde_json::from_str(&authlib_json).unwrap_or_default();
+                state.authlib_accounts = serde_json::from_str(&authlib_json).unwrap_or_default();
             }
         }
 

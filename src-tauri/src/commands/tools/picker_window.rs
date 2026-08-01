@@ -305,7 +305,10 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         if let Some(lib) = &lib_script {
             injection.push_str(lib);
         }
-        injection.push_str(&format!("<script>window.__PICKER_DATA__ = {};</script>", data_json));
+        injection.push_str(&format!(
+            "<script>window.__PICKER_DATA__ = {};</script>",
+            data_json
+        ));
         let html = template.replace("</body>", &format!("{}</body>", injection));
 
         build_response(

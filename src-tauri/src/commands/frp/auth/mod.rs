@@ -91,13 +91,12 @@ pub struct DeviceCodePollResult {
 /// 字段名按 camelCase 约定：accessToken / refreshToken / expiresIn /
 /// errorField / errorDescription
 fn get_extractor<'a>(flow: &'a FlowRequest, key: &str) -> &'a FieldExtractor {
-    static EMPTY: once_cell::sync::Lazy<FieldExtractor> = once_cell::sync::Lazy::new(|| {
-        FieldExtractor {
+    static EMPTY: once_cell::sync::Lazy<FieldExtractor> =
+        once_cell::sync::Lazy::new(|| FieldExtractor {
             from: "body".to_string(),
             path: None,
             name: None,
-        }
-    });
+        });
     flow.response.get(key).unwrap_or(&EMPTY)
 }
 
@@ -225,7 +224,12 @@ pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), S
         .auth_flows
         .as_ref()
         .and_then(|f| f.oauth2.as_ref())
-        .ok_or_else(|| format!("厂商 {} endpoints.json 缺少 authFlows.oauth2 配置", provider_id))?;
+        .ok_or_else(|| {
+            format!(
+                "厂商 {} endpoints.json 缺少 authFlows.oauth2 配置",
+                provider_id
+            )
+        })?;
     // 优先使用 refresh，缺失时回退到 token（部分厂商用同一端点刷新）
     let refresh_flow: &FlowRequest = oauth2_flow.refresh.as_ref().unwrap_or(&oauth2_flow.token);
 
@@ -261,11 +265,7 @@ pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), S
 
     if !resp.is_success() {
         let err = extract_flow_error(&resp, refresh_flow);
-        crate::log_error!(
-            "[Frp Auth] 刷新 token 失败: HTTP {} - {}",
-            resp.status,
-            err
-        );
+        crate::log_error!("[Frp Auth] 刷新 token 失败: HTTP {} - {}", resp.status, err);
         return Err(format!("刷新 token 失败: {}", err));
     }
 

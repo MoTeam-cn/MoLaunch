@@ -89,11 +89,7 @@ pub(super) async fn start_device_code(
 
     if !resp.is_success() {
         let err = extract_flow_error(&resp, request_flow);
-        log_error!(
-            "[Frp Auth] 请求设备码失败: HTTP {} - {}",
-            resp.status,
-            err
-        );
+        log_error!("[Frp Auth] 请求设备码失败: HTTP {} - {}", resp.status, err);
         return Err(format!("请求设备码失败: {}", err));
     }
 
@@ -220,11 +216,7 @@ pub(super) async fn poll_device_code(
         }
 
         let err = extract_flow_error(&resp, &session.poll_flow);
-        log_error!(
-            "[Frp Auth] 轮询 token 失败: HTTP {} - {}",
-            resp.status,
-            err
-        );
+        log_error!("[Frp Auth] 轮询 token 失败: HTTP {} - {}", resp.status, err);
         return Err(format!("轮询 token 失败: {}", err));
     }
 

@@ -372,10 +372,19 @@ mod tests {
 
     #[test]
     fn host_matches_exact() {
-        assert!(host_matches("frps.acme.example.com", "frps.acme.example.com"));
-        assert!(!host_matches("other.acme.example.com", "frps.acme.example.com"));
+        assert!(host_matches(
+            "frps.acme.example.com",
+            "frps.acme.example.com"
+        ));
+        assert!(!host_matches(
+            "other.acme.example.com",
+            "frps.acme.example.com"
+        ));
         // host:port 项比较时调用方先剥离端口，这里验证纯 host 匹配
-        assert!(!host_matches("frps.acme.example.com:7000", "frps.acme.example.com"));
+        assert!(!host_matches(
+            "frps.acme.example.com:7000",
+            "frps.acme.example.com"
+        ));
     }
 
     #[test]

@@ -239,7 +239,12 @@ mod tests {
     fn test_args_mode() {
         let tunnel = test_tunnel();
         let account = AccountInfo::default();
-        let template = vec!["-u".to_string(), "{token}".to_string(), "-p".to_string(), "{ids}".to_string()];
+        let template = vec![
+            "-u".to_string(),
+            "{token}".to_string(),
+            "-p".to_string(),
+            "{ids}".to_string(),
+        ];
         let result = generate("args", "ini", &template, &tunnel, &account, None).unwrap();
         assert_eq!(result.args, vec!["-u", "secret", "-p", "t1"]);
     }

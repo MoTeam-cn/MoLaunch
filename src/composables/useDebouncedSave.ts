@@ -51,18 +51,16 @@ export function useDebouncedSave(
     // 累积的改动字段
     const dirtyPatch: ConfigPatch = {}
 
-    function clearTimer() {
+    const clearTimer = () => {
       if (timer) {
         clearTimeout(timer)
         timer = null
       }
     }
 
-    function isDirty() {
-      return Object.keys(dirtyPatch).length > 0
-    }
+    const isDirty = () => Object.keys(dirtyPatch).length > 0
 
-    function markDirty(key: keyof ConfigPatch, value: unknown) {
+    const markDirty = (key: keyof ConfigPatch, value: unknown) => {
       ;(dirtyPatch as Record<string, unknown>)[key as string] = value
       clearTimer()
       timer = setTimeout(() => {
@@ -72,7 +70,7 @@ export function useDebouncedSave(
       }, delay)
     }
 
-    function flushSave(): ConfigPatch {
+    const flushSave = (): ConfigPatch => {
       clearTimer()
       if (!isDirty()) return {}
       const patch = { ...dirtyPatch }
@@ -81,7 +79,7 @@ export function useDebouncedSave(
       return patch
     }
 
-    function scheduleSave() {
+    const scheduleSave = () => {
       // markDirty 已经触发了 schedule，这里用于外部主动触发（保留 dirty）
       clearTimer()
       timer = setTimeout(() => {

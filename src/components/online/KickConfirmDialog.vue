@@ -9,7 +9,7 @@
  *
  * 封禁时长语义由 api-server 约定：ban_duration_seconds=0 表示永久。
  */
-import { ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import Button from '@/components/common/Button.vue'
 
 defineProps<{
@@ -32,6 +32,11 @@ const banOptions: BanOption[] = [
 
 const selected = ref<number | null>(null)
 
+const visible = ref(false)
+onMounted(() => {
+  visible.value = true
+})
+
 function handleConfirm() {
   emit('confirm', selected.value)
 }
@@ -48,6 +53,7 @@ function handleConfirm() {
       leave-to-class="opacity-0"
     >
       <div
+        v-if="visible"
         class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
         @click.self="emit('close')"
       >

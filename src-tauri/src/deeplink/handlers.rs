@@ -40,7 +40,10 @@ pub fn register_builtin() {
         };
         match validate_download_url(url) {
             Ok(()) => {
-                log_info!("[Deeplink] install handler: url={}（已通过白名单校验）", url);
+                log_info!(
+                    "[Deeplink] install handler: url={}（已通过白名单校验）",
+                    url
+                );
                 Ok(())
             }
             Err(reason) => {

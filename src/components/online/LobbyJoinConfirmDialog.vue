@@ -8,6 +8,7 @@
  * 无论校验结果如何，「加入房间」按钮始终可用（整合包非强制，用户可先加入再补装）。
  * 一键安装会跳转下载页，组件随后被父组件卸载，无需额外处理。
  */
+import { onMounted, ref } from 'vue'
 import ModpackRequirementCard from './ModpackRequirementCard.vue'
 import Button from '@/components/common/Button.vue'
 import type { LobbyRoomItem } from '@/types/online'
@@ -20,6 +21,11 @@ const emit = defineEmits<{
   close: []
   confirm: []
 }>()
+
+const visible = ref(false)
+onMounted(() => {
+  visible.value = true
+})
 </script>
 
 <template>
@@ -33,6 +39,7 @@ const emit = defineEmits<{
       leave-to-class="opacity-0"
     >
       <div
+        v-if="visible"
         class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
         @click.self="emit('close')"
       >

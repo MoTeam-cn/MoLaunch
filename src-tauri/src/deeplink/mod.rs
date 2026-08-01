@@ -24,6 +24,9 @@ mod request;
 mod router;
 mod security;
 
-pub use protocol::{auto_register, register as register_protocol, status as protocol_status, unregister as unregister_protocol, DeeplinkStatus};
+pub use protocol::{
+    auto_register, register as register_protocol, status as protocol_status,
+    unregister as unregister_protocol, DeeplinkStatus,
+};
 pub use request::{parse, DeeplinkRequest};
 pub use router::{dispatch, init, register, register_sync};

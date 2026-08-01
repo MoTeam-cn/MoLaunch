@@ -97,7 +97,11 @@ fn main_version(version: &str) -> &str {
 /// 例：`Molaunch/1.0.0.10`（Windows x86_64 正式版）
 pub fn user_agent() -> String {
     let version = env!("CARGO_PKG_VERSION");
-    format!("Molaunch/{}.{}", main_version(version), client_type(version))
+    format!(
+        "Molaunch/{}.{}",
+        main_version(version),
+        client_type(version)
+    )
 }
 
 #[cfg(test)]

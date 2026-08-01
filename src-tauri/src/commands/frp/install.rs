@@ -139,11 +139,10 @@ pub async fn install_provider_from_url(url: String) -> Result<ProviderInfo, Stri
         .await
         .map_err(|e| format!("读取下载内容失败: {}", e))?;
 
-    let temp_zip = std::env::temp_dir()
-        .join(format!("molaunch-provider-{}.zip", std::process::id()));
+    let temp_zip =
+        std::env::temp_dir().join(format!("molaunch-provider-{}.zip", std::process::id()));
 
-    std::fs::write(&temp_zip, &bytes)
-        .map_err(|e| format!("写入临时文件失败: {}", e))?;
+    std::fs::write(&temp_zip, &bytes).map_err(|e| format!("写入临时文件失败: {}", e))?;
 
     log_info!("[Frp] 厂商包下载完成，大小: {} 字节", bytes.len());
 

@@ -152,7 +152,14 @@ fn validate_pre_launch_cmd(cmd: &str) -> Result<(), String> {
     // Unix:    eval / exec / source（sh 内置命令，常用于注入链）
     let lower = cmd.to_lowercase();
     for keyword in [
-        "powershell", "curl", "wget", "iex", "invoke-", "eval", "exec", "source",
+        "powershell",
+        "curl",
+        "wget",
+        "iex",
+        "invoke-",
+        "eval",
+        "exec",
+        "source",
     ] {
         if lower.contains(keyword) {
             return Err(format!("suspicious keyword: {}", keyword));

@@ -8,8 +8,8 @@
 //!
 //! 各接口可用 endpoints.*.envelope 覆盖全局 envelope。
 
-use super::jsonpath;
 use super::super::Envelope;
+use super::jsonpath;
 use serde_json::Value;
 
 /// 判断响应是否成功
@@ -62,9 +62,8 @@ pub fn extract_data(
 
     match field {
         Some(path) => {
-            let val = jsonpath::extract(response, path).ok_or_else(|| {
-                format!("响应数据字段 {} 不存在", path)
-            })?;
+            let val = jsonpath::extract(response, path)
+                .ok_or_else(|| format!("响应数据字段 {} 不存在", path))?;
             Ok(Some(val))
         }
         None => Ok(None),
@@ -83,12 +82,8 @@ fn values_equal(actual: &Value, expected: &Value) -> bool {
         (Value::Number(a), Value::Number(b)) => a == b,
         (Value::String(a), Value::String(b)) => a == b,
         (Value::String(a), Value::Bool(b)) => a == "true" && *b || a == "false" && !*b,
-        (Value::String(a), Value::Number(b)) => {
-            a.parse::<f64>().ok() == b.as_f64()
-        }
-        (Value::Number(a), Value::String(b)) => {
-            a.as_f64() == b.parse::<f64>().ok()
-        }
+        (Value::String(a), Value::Number(b)) => a.parse::<f64>().ok() == b.as_f64(),
+        (Value::Number(a), Value::String(b)) => a.as_f64() == b.parse::<f64>().ok(),
         _ => actual == expected,
     }
 }
@@ -98,7 +93,12 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn env(success_field: &str, success_value: Value, error_field: &str, data_field: &str) -> Envelope {
+    fn env(
+        success_field: &str,
+        success_value: Value,
+        error_field: &str,
+        data_field: &str,
+    ) -> Envelope {
         Envelope {
             success_field: Some(success_field.to_string()),
             success_value: Some(success_value),
@@ -126,10 +126,7 @@ mod tests {
         let e = env("$.flag", json!(true), "$.msg", "$.data");
         let resp = json!({ "flag": false, "msg": "未授权" });
         assert!(!is_success(&resp, Some(&e)));
-        assert_eq!(
-            extract_error(&resp, Some(&e)),
-            Some("未授权".to_string())
-        );
+        assert_eq!(extract_error(&resp, Some(&e)), Some("未授权".to_string()));
     }
 
     #[test]

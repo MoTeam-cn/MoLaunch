@@ -22,17 +22,11 @@ pub fn migrate() {
         log_warn!("[Migrations] portable_to_appdata certs 迁移失败: {}", e);
     }
     if let Err(e) = migrate_subdir("providers") {
-        log_warn!(
-            "[Migrations] portable_to_appdata providers 迁移失败: {}",
-            e
-        );
+        log_warn!("[Migrations] portable_to_appdata providers 迁移失败: {}", e);
     }
     // frp 认证 token：旧路径 <exe_dir>/.Molaunch/frp/auth/ → AppData 全局 frp_auth/
     if let Err(e) = migrate_frp_auth() {
-        log_warn!(
-            "[Migrations] portable_to_appdata frp_auth 迁移失败: {}",
-            e
-        );
+        log_warn!("[Migrations] portable_to_appdata frp_auth 迁移失败: {}", e);
     }
 }
 
@@ -105,9 +99,6 @@ fn migrate_dir(portable_dir: &std::path::Path, subdir: &str) -> Result<(), Strin
         );
     }
 
-    log_info!(
-        "[Migrations] portable_to_appdata 目录迁移完成: {}",
-        subdir
-    );
+    log_info!("[Migrations] portable_to_appdata 目录迁移完成: {}", subdir);
     Ok(())
 }

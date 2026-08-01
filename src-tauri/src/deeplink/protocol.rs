@@ -44,7 +44,8 @@ impl DeeplinkStatus {
             registered_exe: None,
             current_exe: current_exe_path(),
             platform_supported: false,
-            message: "当前平台不支持运行时注册 deeplink（macOS 协议由打包 Info.plist 声明）".to_string(),
+            message: "当前平台不支持运行时注册 deeplink（macOS 协议由打包 Info.plist 声明）"
+                .to_string(),
         }
     }
 }
@@ -103,7 +104,9 @@ pub fn status() -> DeeplinkStatus {
 /// - 未注册 → 注册
 pub fn register() -> Result<(), String> {
     if !platform_supported() {
-        return Err("当前平台不支持运行时注册 deeplink（macOS 协议由打包 Info.plist 声明）".to_string());
+        return Err(
+            "当前平台不支持运行时注册 deeplink（macOS 协议由打包 Info.plist 声明）".to_string(),
+        );
     }
 
     #[cfg(windows)]
@@ -313,15 +316,22 @@ fn register_linux() -> Result<(), String> {
         exe,
         PROTOCOL
     );
-    let mut f = std::fs::File::create(&file).map_err(|e| format!("写入 desktop 文件失败: {}", e))?;
+    let mut f =
+        std::fs::File::create(&file).map_err(|e| format!("写入 desktop 文件失败: {}", e))?;
     f.write_all(content.as_bytes())
         .map_err(|e| format!("写入 desktop 文件失败: {}", e))?;
 
     // 注册为默认 handler
     let _ = std::process::Command::new("xdg-mime")
-        .args(["default", &desktop_file_name(), &format!("x-scheme-handler/{}", PROTOCOL)])
+        .args([
+            "default",
+            &desktop_file_name(),
+            &format!("x-scheme-handler/{}", PROTOCOL),
+        ])
         .status();
-    let _ = std::process::Command::new("update-desktop-database").arg(&dir).status();
+    let _ = std::process::Command::new("update-desktop-database")
+        .arg(&dir)
+        .status();
 
     Ok(())
 }

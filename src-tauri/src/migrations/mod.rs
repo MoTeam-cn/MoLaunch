@@ -36,7 +36,10 @@ pub(super) fn dir_is_non_empty(dir: &std::path::Path) -> bool {
 }
 
 /// 递归复制目录
-pub(super) fn copy_dir_recursive(src: &std::path::Path, dst: &std::path::Path) -> Result<(), String> {
+pub(super) fn copy_dir_recursive(
+    src: &std::path::Path,
+    dst: &std::path::Path,
+) -> Result<(), String> {
     if !dst.exists() {
         std::fs::create_dir_all(dst).map_err(|e| format!("创建目录失败: {}", e))?;
     }

@@ -61,17 +61,12 @@ pub struct AccountInfo {
 /// 校验：provider_id 格式 + 文件存在 + JSON 可解析 + baseUrl 为 HTTPS。
 pub fn load_api_spec(provider_id: &str, endpoints_file: &str) -> Result<ApiSpec, String> {
     validate_provider_id(provider_id)?;
-    let path = providers_root()
-        .join(provider_id)
-        .join(endpoints_file);
+    let path = providers_root().join(provider_id).join(endpoints_file);
     if !path.exists() {
-        return Err(format!(
-            "厂商 endpoints.json 不存在: {}",
-            path.display()
-        ));
+        return Err(format!("厂商 endpoints.json 不存在: {}", path.display()));
     }
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("读取 endpoints.json 失败: {}", e))?;
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("读取 endpoints.json 失败: {}", e))?;
     let spec: ApiSpec =
         serde_json::from_str(&content).map_err(|e| format!("解析 endpoints.json 失败: {}", e))?;
 
@@ -111,30 +106,27 @@ pub async fn fetch_tunnels(
         .map_err(|e| format!("获取 device_id 失败: {}", e))?;
 
     // 拉取账号信息（可选，用于获取 account.token 供 fields 映射引用）
-    let account = if let Some(acct_endpoint) = spec
-        .endpoints
-        .as_ref()
-        .and_then(|e| e.account.as_ref())
-    {
-        log_info!(
-            "[Frp] 拉取厂商 {} 账号信息: {} {}",
-            provider_id,
-            acct_endpoint.method,
-            acct_endpoint.path
-        );
-        let resp = http::send_request(
-            &spec.base_url,
-            acct_endpoint,
-            &token,
-            &device_id,
-            provider_id,
-            spec.envelope.as_ref(),
-        )
-        .await?;
-        map_account(&resp, acct_endpoint)?
-    } else {
-        AccountInfo::default()
-    };
+    let account =
+        if let Some(acct_endpoint) = spec.endpoints.as_ref().and_then(|e| e.account.as_ref()) {
+            log_info!(
+                "[Frp] 拉取厂商 {} 账号信息: {} {}",
+                provider_id,
+                acct_endpoint.method,
+                acct_endpoint.path
+            );
+            let resp = http::send_request(
+                &spec.base_url,
+                acct_endpoint,
+                &token,
+                &device_id,
+                provider_id,
+                spec.envelope.as_ref(),
+            )
+            .await?;
+            map_account(&resp, acct_endpoint)?
+        } else {
+            AccountInfo::default()
+        };
 
     // 拉取隧道列表
     let tunnels_endpoint = spec

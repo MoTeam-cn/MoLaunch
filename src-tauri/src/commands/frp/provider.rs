@@ -167,10 +167,7 @@ fn resolve_bundled_path(binary: &super::BinaryConfig) -> Option<String> {
 ///
 /// 按 manifest.authFile 指定的相对路径读取厂商认证交互层配置。
 /// 文件缺失、不可读或解析失败均返回 None（调用方按需报错）。
-pub(super) fn read_auth_file(
-    provider_id: &str,
-    manifest: &ProviderManifest,
-) -> Option<AuthFile> {
+pub(super) fn read_auth_file(provider_id: &str, manifest: &ProviderManifest) -> Option<AuthFile> {
     let auth_file_name = manifest.auth_file.as_ref()?;
     let auth_path = providers_root().join(provider_id).join(auth_file_name);
     let content = std::fs::read_to_string(&auth_path).ok()?;
@@ -208,12 +205,9 @@ pub(super) fn resolve_oauth2_config(
             provider_id
         )
     })?;
-    auth_file.oauth2.ok_or_else(|| {
-        format!(
-            "厂商 {} 的 auth.json 缺少 oauth2 配置",
-            provider_id
-        )
-    })
+    auth_file
+        .oauth2
+        .ok_or_else(|| format!("厂商 {} 的 auth.json 缺少 oauth2 配置", provider_id))
 }
 
 /// 解析厂商的 Device Code 交互配置（从 auth.json 读取）
@@ -227,12 +221,9 @@ pub(super) fn resolve_device_code_config(
             provider_id
         )
     })?;
-    auth_file.device_code.ok_or_else(|| {
-        format!(
-            "厂商 {} 的 auth.json 缺少 device_code 配置",
-            provider_id
-        )
-    })
+    auth_file
+        .device_code
+        .ok_or_else(|| format!("厂商 {} 的 auth.json 缺少 device_code 配置", provider_id))
 }
 
 /// 读取图标文件并转为 base64 data URL

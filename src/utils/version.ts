@@ -38,7 +38,7 @@ function parseChannel(suffix: string): { channel: VersionChannel; num: number } 
   if (!suffix) return { channel: 'stable', num: 0 }
   // 后缀形如 `beta.1` / `alpha.2` / `rc.0` / `canary.3`
   const lower = suffix.toLowerCase()
-  const match = lower.match(/^(beta|alpha|rc|canary)[.\-]?(\d+)?/)
+  const match = lower.match(/^(beta|alpha|rc|canary)[.-]?(\d+)?/)
   if (!match) return { channel: 'stable', num: 0 }
   const channel = match[1] as VersionChannel
   const num = match[2] ? parseInt(match[2], 10) : 0

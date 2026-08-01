@@ -8,8 +8,8 @@
 //! SDK 引用由 [`set_sdk`] 在启动时注入（lib.rs），与 CurseForge
 //! secure_storage 的懒加载注入模式一致；token 过期前自动刷新由调用方负责。
 
-use crate::sdk::SdkInstance;
 use crate::log_warn;
+use crate::sdk::SdkInstance;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};

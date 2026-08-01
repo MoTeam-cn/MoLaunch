@@ -136,19 +136,13 @@ mod tests {
     #[test]
     fn test_extract_simple() {
         let v = json!({ "access_token": "abc123" });
-        assert_eq!(
-            extract(&v, "$.access_token"),
-            Some(json!("abc123"))
-        );
+        assert_eq!(extract(&v, "$.access_token"), Some(json!("abc123")));
     }
 
     #[test]
     fn test_extract_nested() {
         let v = json!({ "data": { "config": "frpc content" } });
-        assert_eq!(
-            extract(&v, "$.data.config"),
-            Some(json!("frpc content"))
-        );
+        assert_eq!(extract(&v, "$.data.config"), Some(json!("frpc content")));
     }
 
     #[test]

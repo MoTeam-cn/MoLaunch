@@ -2,8 +2,8 @@
 //!
 //! 重定向防护：no-redirect 客户端 → 手动校验 Location 仅允许同域 → 最多 5 次防循环。
 
-use super::envelope;
 use super::super::{EndpointDef, Envelope};
+use super::envelope;
 use crate::log_debug;
 use crate::log_error;
 
