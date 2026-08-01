@@ -4,9 +4,9 @@
 //! TLS 信任源：`trust_mode` 控制 builtin/system/custom 三种根证书来源组合；
 //! `ignore_tls=true`（开发者模式注册表 IgnoreTls）跳过所有证书校验，用于联机自签名证书调试。
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+use std::net::{IpAddr, Ipv4Addr};
 use std::sync::{OnceLock, RwLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 /// 全局 HTTP 客户端（可热重建）
 ///
@@ -15,21 +15,14 @@ use std::time::{Duration, Instant};
 /// 拿到当前快照（`reqwest::Client` 内部 `Arc`，clone 廉价）。
 static HTTP_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
 
-/// 编译时生成的 User-Agent 字符串
-/// 格式：`MoLaunch/<os> <version>`（如 `MoLaunch/windows 0.1.0`）
-/// - `<os>` 来自 `std::env::consts::OS`（编译期不可用，运行时取值）
-/// - `<version>` 来自 Cargo.toml 的 `version` 字段（编译期通过 `env!` 注入）
+/// 编译时生成的 User-Agent 字符串（缓存）
+/// 格式：`Molaunch/{主版本}.{clientType}`（如 `Molaunch/1.0.0.10`）
+/// 生成逻辑见 `utils::client_type`：平台码由编译目标推导，渠道码由版本后缀推导
 static USER_AGENT: OnceLock<String> = OnceLock::new();
 
-/// 获取 User-Agent 字符串（运行时拼接 OS + 编译时版本号）
+/// 获取 User-Agent 字符串（统一格式 `Molaunch/{主版本}.{clientType}`，见 utils::client_type）
 fn user_agent() -> &'static str {
-    USER_AGENT.get_or_init(|| {
-        format!(
-            "MoLaunch/{} {}",
-            std::env::consts::OS,
-            env!("CARGO_PKG_VERSION")
-        )
-    })
+    USER_AGENT.get_or_init(crate::utils::client_type::user_agent)
 }
 
 /// 初始化或重建全局 HTTP 客户端
@@ -158,97 +151,27 @@ pub fn build_client(
     builder.build().expect("Failed to build HTTP client")
 }
 
-/// 根据 `ip_version` 策略解析 `local_address`
+/// 根据 `ip_version` 策略解析 `local_address`（客户端级）
 ///
 /// - `"v4"`: 返回 `Some(Ipv4Addr::UNSPECIFIED)`（强制 IPv4）
-/// - `"auto"`: 测试 v4/v6 连通性，选稳定的那个（均不可达时返回 None 兜底）
+/// - `"auto"`: 返回 `None` —— 不固定任何地址族。由 reqwest/hyper 底层的
+///   **Happy Eyeballs** 机制对**目标域名**实时解析 A/AAAA 记录，并发尝试
+///   连接并自动选择先连通的一方（v4/v6 均有则并发择优；单栈域名自然落到
+///   对应地址族）。这比固定测 Cloudflare 更准确：域名可能只在某一地址族
+///   可达，且 Cloudflare 连通 ≠ 目标域名连通
 /// - `"any"` 或其他: 返回 `None`（不设置 `local_address`，跟随 DNS）
 fn resolve_local_address(ip_version: &str) -> Option<IpAddr> {
     match ip_version {
         "v4" => Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
-        "auto" => auto_detect_ip_version(),
-        _ => None, // "any" 或其他：随意解析
+        _ => None, // "auto"（Happy Eyeballs 按目标域名自动选优）/ "any" / 其他
     }
-}
-
-/// 自动检测 IPv4/IPv6 连通性，返回更稳定的协议版本
-///
-/// 通过 TCP 连接 Cloudflare DNS（v4: 1.1.1.1:443 / v6: [2606:4700:4700::1111]:443）
-/// 测试连通性和延迟，选择更优的一方：
-/// - 仅 v4 可达 → 返回 `Some(Ipv4)`
-/// - 仅 v6 可达 → 返回 `Some(Ipv6)`
-/// - 均可达且延迟接近（差异 < 50ms）→ 返回 `None`（让 OS 决定）
-/// - 均可达且一方明显更快 → 返回更快的一方
-/// - 均不可达 → 返回 `None`（兜底，让 OS 尝试）
-fn auto_detect_ip_version() -> Option<IpAddr> {
-    let v4_target: std::net::SocketAddr = "1.1.1.1:443".parse().ok()?;
-    let v6_target: std::net::SocketAddr = "[2606:4700:4700::1111]:443".parse().ok()?;
-
-    let v4_time = test_tcp_connect(v4_target);
-    let v6_time = test_tcp_connect(v6_target);
-
-    match (v4_time, v6_time) {
-        (Some(v4), Some(v6)) => {
-            // 均可达：延迟差异 < 50ms 视为接近，让 OS 决定
-            let diff = v4.abs_diff(v6);
-            if diff < 50 {
-                None
-            } else if v4 < v6 {
-                Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED))
-            } else {
-                Some(IpAddr::V6(Ipv6Addr::UNSPECIFIED))
-            }
-        }
-        (Some(_), None) => Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
-        (None, Some(_)) => Some(IpAddr::V6(Ipv6Addr::UNSPECIFIED)),
-        (None, None) => None,
-    }
-}
-
-/// 测试 TCP 连接连通性，返回连接延迟（毫秒）
-fn test_tcp_connect(target: std::net::SocketAddr) -> Option<u128> {
-    let start = Instant::now();
-    match std::net::TcpStream::connect_timeout(&target, Duration::from_secs(2)) {
-        Ok(_) => Some(start.elapsed().as_millis()),
-        Err(_) => None,
-    }
-}
-
-/// 获取 URL 内容（使用全局客户端）
-pub async fn fetch_url(url: &str) -> anyhow::Result<String> {
-    let client = get_client();
-    let response = client.get(url).send().await?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("HTTP error: {}", response.status()));
-    }
-
-    Ok(response.text().await?)
-}
-
-/// 获取 URL 内容并保存到文件
-pub async fn fetch_url_to_file(url: &str, local_path: &std::path::Path) -> anyhow::Result<String> {
-    let client = get_client();
-    let response = client.get(url).send().await?;
-
-    if !response.status().is_success() {
-        return Err(anyhow::anyhow!("HTTP error: {}", response.status()));
-    }
-
-    let content = response.text().await?;
-
-    if let Some(parent) = local_path.parent() {
-        std::fs::create_dir_all(parent)?;
-    }
-
-    std::fs::write(local_path, &content)?;
-    Ok(content)
 }
 
 /// GET 请求并返回 (HTTP 状态码, 响应体文本)
 ///
-/// 与 `fetch_url` 不同，本函数保留状态码信息，便于调用方按状态码做差异化错误处理
-/// （如 yggdrasil 协议中 204 表示 validate 成功，403 表示 token 失效）。
+/// 核心 GET 原语。与薄包装 [`fetch_url`] 不同，本函数保留状态码信息，
+/// 便于调用方按状态码做差异化错误处理（如 yggdrasil 协议中 204 表示
+/// validate 成功，403 表示 token 失效）。
 ///
 /// 网络错误（无法连接服务器）时返回 Err；HTTP 任意状态码（含 4xx/5xx）均返回 Ok。
 pub async fn get_text_with_status(url: &str) -> anyhow::Result<(u16, String)> {
@@ -259,11 +182,34 @@ pub async fn get_text_with_status(url: &str) -> anyhow::Result<(u16, String)> {
     Ok((status, text))
 }
 
+/// GET 请求并返回响应体文本，HTTP 非 2xx 时返回 Err
+///
+/// [`get_text_with_status`] 的薄包装：多数调用方只需"成功拿文本，失败报错"。
+pub async fn fetch_url(url: &str) -> anyhow::Result<String> {
+    let (status, text) = get_text_with_status(url).await?;
+    if !(200..300).contains(&status) {
+        return Err(anyhow::anyhow!("HTTP error: {}", status));
+    }
+    Ok(text)
+}
+
+/// GET 请求并把响应体保存到文件
+///
+/// [`fetch_url`] 的薄包装：多一步写盘。成功返回响应体文本。
+pub async fn fetch_url_to_file(url: &str, local_path: &std::path::Path) -> anyhow::Result<String> {
+    let content = fetch_url(url).await?;
+    if let Some(parent) = local_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::write(local_path, &content)?;
+    Ok(content)
+}
+
 /// POST JSON 请求并返回 (HTTP 状态码, 响应体文本)
 ///
 /// 统一的 POST JSON 入口，自动设置 `Content-Type: application/json; charset=utf-8`
 /// 和 `Accept-Language: zh-CN` 请求头。
-/// 与 `fetch_url` 不同，本函数保留状态码信息，便于调用方按状态码做差异化错误处理。
+/// 与 [`get_text_with_status`] 一样保留状态码信息，便于调用方按状态码做差异化错误处理。
 ///
 /// 网络错误（无法连接服务器）时返回 Err；HTTP 任意状态码（含 4xx/5xx）均返回 Ok。
 pub async fn post_json_with_status<T: serde::Serialize>(
@@ -281,16 +227,4 @@ pub async fn post_json_with_status<T: serde::Serialize>(
     let status = resp.status().as_u16();
     let text = resp.text().await.unwrap_or_default();
     Ok((status, text))
-}
-
-/// GET 请求并返回二进制内容
-///
-/// 用于下载 jar/图片等二进制资源。HTTP 非 2xx 返回 Err。
-pub async fn fetch_bytes(url: &str) -> anyhow::Result<Vec<u8>> {
-    let client = get_client();
-    let resp = client.get(url).send().await?;
-    if !resp.status().is_success() {
-        return Err(anyhow::anyhow!("HTTP error: {}", resp.status()));
-    }
-    Ok(resp.bytes().await?.to_vec())
 }

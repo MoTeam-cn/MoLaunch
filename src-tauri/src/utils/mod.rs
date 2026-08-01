@@ -8,6 +8,7 @@ pub mod cache_app;
 pub mod cache_cleanup;
 pub mod cache_stats;
 pub mod cache_temp;
+pub mod client_type;
 pub mod community_manager;
 pub mod config_manager;
 pub mod datetime;
