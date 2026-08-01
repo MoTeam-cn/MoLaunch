@@ -9,6 +9,76 @@
 
 ### 新增
 
+#### deeplink 注册/卸载工具 + Windows 便携版（安装版/便携版分离）
+
+- 背景：后续打包策略下 **Windows 同时分发安装版（NSIS）与便携版（绿色版）**，macOS/Linux 维持单一产物。便携版未经过安装程序，无法自动注册 `molaunch://` 协议，需在代码内提供注册/卸载工具函数，并在设置页提供手动入口供用户抉择；CI 同步区分安装版 + 便携版两种产物
+- 后端改动（4 文件）：
+  - **新增 `src-tauri/src/deeplink/protocol.rs`**：跨平台协议注册/卸载/状态工具
+    - `DeeplinkStatus` 结构（serde 序列化，camelCase）：registered / registeredExe / currentExe / platformSupported / message，供前端展示
+    - `status()`：查询协议当前注册状态（含"已注册但指向其他路径"的移动场景提示）
+    - `register()`（幂等）：Windows 写 `HKCU\Software\Classes\molaunch`（URL Protocol + DefaultIcon + shell\open\command，**免管理员权限**）；Linux 写 `~/.local/share/applications/*-handler.desktop` + xdg-mime 关联；macOS 不支持（协议由打包 Info.plist 的 CFBundleURLTypes 声明，`platform_supported` 返回 false）
+    - `unregister()`（幂等）：Windows 删除整个 HKCU 键（键不存在按成功处理）；Linux 删除 desktop 文件
+    - `auto_register()`：启动自动注册——已注册且指向当前 exe → 跳过（安装版场景，不重复写注册表）；已注册但指向旧路径 → 自动重注册（便携版被移动）；未注册 → 注册（便携版首次启动）
+  - **`src-tauri/src/deeplink/mod.rs`**：声明 `mod protocol` + re-export `auto_register / register_protocol / protocol_status / unregister_protocol / DeeplinkStatus`
+  - **`src-tauri/src/deeplink/router.rs`**：`init()` 中原 `#[cfg(debug_assertions)]` 的 dev 动态注册改为 `#[cfg(not(target_os = "macos"))]` 调 `protocol::auto_register()`（生产便携版/开发环境均幂等注册）
+  - **`src-tauri/src/utils/system_manager.rs`**：新增 3 个 action——`get_deeplink_status` / `register_deeplink` / `unregister_deeplink`（注册/卸载后返回最新状态）
+- 前端改动（4 文件）：
+  - **`src/utils/api/system-manager.ts`**：`SYSTEM_ACTIONS` 新增 `GET_DEEPLINK_STATUS` / `REGISTER_DEEPLINK` / `UNREGISTER_DEEPLINK`
+  - **`src/utils/api/developer.ts`**：新增 `DeeplinkStatus` 接口 + `getDeeplinkStatus()` / `registerDeeplink()` / `unregisterDeeplink()` 三个封装
+  - **新增 `src/views/settings/developer/DeepLinkTab.vue`**（128 行）：状态卡片（已注册/未注册徽标 + 说明 + 当前程序路径/注册表登记路径/平台支持）+ 注册协议 / 卸载协议 / 刷新状态 三个按钮
+  - **`src/views/settings/SettingsDeveloper.vue`**：新增 `deeplink` 子页签（LinkIcon，位于「系统信息」后），渲染 DeepLinkTab
+- CI 改动（1 文件）：
+  - **`.github/workflows/release.yml`**：Windows 矩阵 `args: --bundles nsis,portable`（NSIS 安装版 + portable 便携版同时产出）；locate 步骤定位 `*_portable.exe`；新增「Upload portable build (Windows only)」步骤用 `ci-upload.cjs` 以 `bundle_type=portable` 单独上传（与 NSIS 安装版并存，缺失时跳过不失败）；macOS/Linux 维持单一产物
+- 设计决策：
+  - **代码工具函数而非外部脚本**：注册/卸载逻辑内置于 `protocol.rs`，与 deeplink 模块共存，可在应用启动自动调用、也可由设置页触发，用户无需下载额外脚本
+  - **幂等 + 移动场景自愈**：`auto_register` 检测到注册表指向旧路径（便携版被移动/更新路径变化）时自动重注册到当前 exe，避免"点了没反应"；指向当前 exe 则零操作，安装版场景不干扰安装器注册
+  - **HKCU 免管理员**：写用户级注册表（`HKCU\Software\Classes`），无需 UAC 提权，便携版随处可注册
+  - **macOS 明确不支持运行时注册**：协议由 tauri.conf.json 打包写入 Info.plist，前端界面显示"平台不支持"并禁用按钮，避免误导
+  - **Windows 双产物 + portable 独立上传**：安装版由 NSIS 注册协议（updater 主格式），便携版靠应用内工具；portable 产物以独立 `bundle_type` 上传，下载页可区分两种形态
+- 验证：`cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`npx vue-tsc --noEmit` 通过（exit 0）、改动文件 `npx eslint` 通过（exit 0）
+
+#### 统一请求 User-Agent（Molaunch/{主版本}.{clientType}）
+
+- 背景：需要统一的请求 UA 标识客户端平台与渠道，便于后端识别与灰度分流。设计文档见 `docs/client.md`（两位编码：十位平台/架构、个位渠道类型）
+- 改动（3 文件）：
+  - **新增 `src-tauri/src/utils/client_type.rs`**：UA 工具函数
+    - `platform_code()`：平台/架构 → 十位码（1 Windows x86_64 / 2 x86 / 3 ARM64 / 4 macOS x86_64 / 5 ARM64 / 6 Linux x86_64 / 7 ARM64 / 8 Android / 9 iOS），用 `cfg!` 宏编译期推导
+    - `channel_code()`：版本号预发布后缀 → 个位渠道码（无后缀→0 正式 / `-rc`→1 灰度 / `-beta`→2 内测 / `-alpha`/`-dev`→3 开发 / `-nightly`→4 每日 / 未知→3 兜底）
+    - `user_agent()`：`Molaunch/{主版本}.{clientType}`（如 Windows x86_64 正式版 → `Molaunch/1.0.0.10`），版本取 `CARGO_PKG_VERSION` 主版本部分
+    - 3 个单元测试（渠道映射 / 版本清洗 / UA 格式）
+  - **`src-tauri/src/utils/mod.rs`**：声明 `client_type` 模块
+  - **`src-tauri/src/http.rs`**：`user_agent()` 改用 `utils::client_type::user_agent`，UA 从 `MoLaunch/{os} {version}` 改为统一格式
+- 版本映射说明（前后端对齐）：
+  - CI 打 tag（如 `v1.0.0-rc1`）时 Update version 步骤会**同时改写** package.json / Cargo.toml / tauri.conf.json，前端水印（`__APP_VERSION__`）与 Cargo 版本天然一致，无需前端改动
+  - 本地开发 `0.1.0-beta.1` → UA `Molaunch/0.1.0.12`（beta→内测2）；CI `1.0.0-rc1` → `Molaunch/1.0.0.11`（rc→灰度1）；正式 `1.0.0` → `Molaunch/1.0.0.10`（正式0）
+- 验证：`cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`cargo test client_type` 3 个测试通过
+
+#### 深度链接（molaunch:// 协议）+ 可扩展后缀路由
+
+- 背景：为启动器引入 deep link 能力——注册 `molaunch://` 协议，并设计成可扩展组件：业务模块可注册后缀路由（如 `molaunch://run`），后续按需接入
+- 后端改动（5 文件）：
+  - **`src-tauri/Cargo.toml`**：添加 `tauri-plugin-deep-link = "2"`（协议注册/事件）、`tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }`（单实例 + 新实例 URL 转发）、`url = "2"`（URL 解析）
+  - **`src-tauri/tauri.conf.json`**：`plugins.deep-link.desktop.schemes = ["molaunch"]`（Windows/Linux 打包时 NSIS/安装器自动写注册表；macOS 打包时自动生成 Info.plist 的 `CFBundleURLTypes`）
+  - **新增 `src-tauri/src/deeplink/`**（模块，`mod.rs` 仅作入口，业务逻辑拆分到子文件）
+    - `mod.rs`：入口——模块声明 + 公共 API re-export（`register`/`register_sync`/`dispatch`/`init`/`DeeplinkRequest`）
+    - `request.rs`：`DeeplinkRequest` 结构 + `parse()` URL 解析（scheme / host / path / query，URL 解码）
+    - `router.rs`：路由注册表（仿 Dispatcher 注册式模式）+ `dispatch()` 分发 + `init()` 初始化
+    - `handlers.rs`：内置路由 `run`（启动游戏，骨架）/ `install`（安装整合包，**强制白名单校验**）/ `open`（前端页面跳转，骨架）
+    - `security.rs`：下载域名白名单安全校验（仅 https + 白名单域名 + 拒绝 userinfo 注入），含单元测试
+  - **`src-tauri/src/lib.rs`**：注册 single-instance（含聚焦窗口）+ deep-link 插件；setup 钩子调用 `deeplink::init(app.handle())`
+- 前端改动（2 文件）：
+  - **`package.json`**：添加 `@tauri-apps/plugin-deep-link@2`
+  - **新增 `src/utils/deeplink.ts`**：`onDeeplink()`（监听后端事件做 UI 跳转）、`getStartupDeeplink()`（启动唤醒场景）、`parseMolaunchUrl()`（前端侧解析/预览）
+- 设计决策：
+  - **Windows 单实例 + deep-link feature**：OS 点击 `molaunch://` 会以 URL 作为 CLI 参数启动新进程；single-instance 插件保证只有主实例运行，并把新实例的 URL 转发为 `deep-link://new-url` 事件——插件顺序必须 single-instance 在前
+  - **macOS 走系统事件而非 CLI 参数**：macOS 不支持运行时注册协议，scheme 由 `tauri.conf.json` 声明、打包时写入 Info.plist `CFBundleURLTypes`；链接到达通过 `RunEvent::Opened` 直接派发给运行中实例（插件 `.on_event` 已 emit `deep-link://new-url`，冷启动 URL 写入 `get_current`），无需 single-instance 转发，`on_open_url` 订阅统一覆盖
+  - **dev 模式动态注册仅 Windows/Linux**：未安装时 Windows 写 `HKCU\Software\Classes`、Linux 写 desktop 文件，`molaunch://` 可在开发环境点击测试；macOS dev 模式不支持运行时注册（插件返回 UnsupportedPlatform），用 `#[cfg(all(debug_assertions, not(target_os = "macos")))]` 排除
+  - **install 路由强制域名白名单**（安全红线）：`validate_download_url` 校验仅 https + 白名单域名（media.forgecdn.net / edge.forgecdn.net / mediafilez.forgecdn.net / cdn.modrinth.com / modrinth.com / moiu.cn / mocdn.net，子域名通配）+ 拒绝 userinfo 注入，防恶意网站通过 `molaunch://install?url=病毒` 诱导下载；白名单收录需人工审核
+  - **后端 handler 是逻辑入口，前端事件只做 UI**：handler 可访问 AppHandle 调起业务（启动游戏等），前端 `deeplink://new` 事件只负责页面跳转提示
+  - **扩展方式**：新路由只需业务模块内 `deeplink::register("xxx", ...)`，无需改核心文件
+  - **mod.rs 仅作入口**：业务逻辑按职责拆分（request / router / handlers / security），降低单文件复杂度、便于测试与扩展
+- 验证：`cargo check` + `cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`cargo test deeplink` 4 个安全测试通过、`npx vue-tsc --noEmit` 通过（exit 0）、`npx eslint src/utils/deeplink.ts` 通过（exit 0）
+
 #### FRP 厂商接口规范改造（阶段 6：前端隧道同步 + 授权前置检查）
 
 - 背景：阶段 3+5+8 后端已完成 `fetch_tunnels` action（按 endpoints.json 配置从厂商 API 拉取隧道列表 + 账号信息），但前端缺少对应调用入口。本次完成前端全链路：类型定义 → IPC 封装 → 同步组件 → TunnelManager 入口集成，且拉取前强制检查授权状态
@@ -79,6 +149,162 @@
 - 验证：`cargo check` 通过（exit 0）、`npx vue-tsc --noEmit` 通过（exit 0）
 
 ### 修复
+
+#### http.rs 精简：fetch 函数收敛为"2 原语 + 2 薄包装"，删除废弃 fetch_bytes
+
+- 背景：用户反馈 `http.rs` 的请求函数过多过杂（5 个 fetch 函数），很多重复，"一个就行了"
+- 改动（1 文件）：
+  - **`src-tauri/src/http.rs`**：
+    - **核心原语保留 2 个**：`get_text_with_status`（GET + 状态码，鉴权需区分 204/403）、`post_json_with_status`（POST JSON + 状态码）
+    - **薄包装 2 个**：`fetch_url` 改为 `get_text_with_status` 的薄包装（非 2xx 报错）；`fetch_url_to_file` 改为 `fetch_url` 的薄包装（多一步写盘）
+    - **删除废弃的 `fetch_bytes`**（全项目 0 处调用，只剩注释提及）
+  - 效果：请求函数从 5 个减为 4 个，重复请求逻辑消除（`fetch_url` 从 10 行缩到 5 行），每个函数职责单一清晰
+- 设计决策：
+  - **2 个原语是真正独立的**：GET/POST + 保留状态码是鉴权流程（yggdrasil 204/403）的硬需求，不可合并
+  - **薄包装消除重复**：多数调用方只需"成功拿文本 / 失败报错"，薄包装让原语聚焦状态码语义，包装聚焦易用性
+- 验证：`cargo check` + `cargo clippy --all-targets -- -D warnings` 通过（exit 0）；调用方（download/util、authlib、loaders 等 7 文件 14 处）无需改动
+
+#### IP 信任系统：auto 模式按目标域名实时判断 v4/v6，移除固定测 Cloudflare
+
+- 背景：用户反馈系统"IP 信任"的自动检测固定测 Cloudflare 的 IP（1.1.1.1 / 2606:4700:4700::1111），但**Cloudflare 连通 ≠ 目标域名连通**——目标域名可能是单栈（只有 A 或只有 AAAA）、或 Cloudflare 可达但该域名实际不可达，固定测一次就全局定死地址族会出错。需求：按**要请求的域名**实时判断 v4/v6 状态并自动选择
+- 根因：[`src-tauri/src/http.rs`] 的 `resolve_local_address("auto")` 调用 `auto_detect_ip_version()`，启动时对 Cloudflare 两个地址族做 TCP 测速，结果绑定到整个客户端生命周期
+- 改动（1 文件）：
+  - **`src-tauri/src/http.rs`**：
+    - `resolve_local_address("auto")` 改为返回 `None`（不设置 local_address），由 reqwest/hyper 底层 **Happy Eyeballs** 机制对**目标域名**实时解析 A/AAAA 记录、并发尝试连接、自动选择先连通的一方（单栈域名自然落到对应地址族，双栈并发择优）
+    - 删除 `auto_detect_ip_version` / `detect_faster_stack` / `test_tcp_connect`（固定测 Cloudflare 的旧逻辑）
+    - 清理不再使用的 imports（`ToSocketAddrs` / `Instant` / `Ipv6Addr`）
+- 设计决策：
+  - **Happy Eyeballs 就是"按目标域名实时判断"**：连接时对实际要请求的域名做 DNS 解析，v4/v6 并发尝试，先成功者胜出——比"启动时测一次 Cloudflare"更准确、更实时，且天然处理单栈域名
+  - **保留 v4 模式**：用户显式选"IPv4 优先"仍走 `local_address(0.0.0.0)`；"any" 模式本就跟随 DNS 不绑定
+  - **reqwest 限制**：`local_address` 仅支持客户端级（`ClientBuilder`），无请求级 API，故 auto 采用"不绑定 + Happy Eyeballs"而非请求级切换
+- 验证：`cargo check` + `cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`cargo test deeplink` 4 个测试通过
+
+#### 种子地图：修复 require 报错 + 输入框标签被挤换行
+
+- 背景：用户反馈工具页种子地图 ①选择版本/维度时点击报 `ReferenceError: require is not defined` + Vue warn（Unhandled error during component update）；②"种子"标签与输入框被挤到换行，布局空间不够
+- 根因：
+  1. **`useSeedMap.ts` 的 watch 里用了 `require('@/utils/seedmap/structures')`**：项目是 Vite（浏览器 ESM）环境，没有 Node 的 `require`，运行到版本/维度变化时直接抛错，导致组件更新异常（Vue warn 只是表象）
+  2. **`Input.vue` 的 `.input-root` 是 `display:inline-block; width:100%`**：在 flex 布局的控制栏里，根元素 100% 宽会独占整行，把"种子"标签挤到换行；`width="200px"` 只作用于内层 `.input-wrapper`，外层根元素仍撑满
+- 改动（3 文件）：
+  - **`src/views/tools/data/useSeedMap.ts`**：第 474 行 `require(...)` 改为顶部静态 `import { getStructuresForVersion }`，并去掉 filter/map 回调里的显式对象类型标注（`StructureTypeConfig.queryMode` 是 `string | undefined`，原标注 `{ queryMode: string }` 不匹配）
+  - **`src/components/common/Input.vue`**：`width` prop 同时应用到根元素（`:style="{ width }"`），传入固定宽时根元素不再 100% 撑满；不传 width 时行为不变（仍 100%）
+  - **`src/views/tools/data/SeedMap.vue`**：无需改动（控制栏本身布局正确，问题在 Input 组件）
+- 设计决策：
+  - **ESM 静态导入替代运行时 require**：`getStructuresForVersion` 是静态导出函数，直接 import 即可，消除运行时 ReferenceError
+  - **width 双定位**：`.input-root` 收固定宽 + `.input-wrapper` 保持 100%（相对根元素），保证固定宽输入框在 flex 布局中不撑破容器，其他传 width 的场景（ColorPalette 等）同步受益
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）、改动文件 `npx eslint` 通过（0 errors）
+
+#### 联机页刷新后侧边栏分类恢复失效（tunnels 等 FRP tab 丢失）
+
+- 背景：用户反馈联机页选择侧边栏「tunnels」等分类后刷新页面，侧边栏回到「创建房间」，URL `?tab=` 参数无法控制恢复
+- 根因（两层时序/逻辑问题）：
+  1. **`useOnlineNav` 的 `isReady` watch 恢复逻辑不完整**：只恢复了 `create`/`join`/`room_details` 三个 tab，`tunnels`/`providers`/`auth`/`logs`/`lobby`/`device` 等落入 else 分支，而 `activeCategory` 初始为 `device` → 默认跳到「创建房间」
+  2. **NavSidebar 的 onMounted 恢复时机过早**：`useTabPersistence` 在挂载时读 `route.query.tab` 并校验 `isValid`，但此时 `refreshStatus` 异步未完成，`categories` 只含 `[device]`（isReady=false），`isValid('tunnels')` 失败 → 不恢复
+- 改动（1 文件）：
+  - **`src/composables/useOnlineNav.ts`**：
+    - 新增 `VALID_TABS` 集合 + `isValidCategory()`：涵盖全部可恢复分类（device / lobby / create / join / room_details / providers / tunnels / auth / logs）
+    - `isReady` watch 改为权威恢复点：isReady 变 true 时（categories 已就绪）从 URL 完整恢复任意合法 tab；`room_details` 未在房间时回退 `create`
+    - watch 加 `{ immediate: true }`：isReady 初始即 true（本地有缓存状态）时也能立即恢复，不依赖后续变化
+- 设计决策：
+  - **权威恢复点收敛到 useOnlineNav**：NavSidebar 的 onMounted 恢复受 categories 就绪时序制约不可靠，统一由 `useOnlineNav` 在 isReady=true 且 categories 完整时恢复
+  - **合法性白名单**：`tutorial` 是动作项（跳设置页）不写入 URL，故排除；`room_details` 特殊处理（未在房间回退）
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）、`npx eslint` 通过（exit 0）
+
+#### 设备码登录：复制失败则放弃自动打开网页 + 失败文案联动
+
+- 背景：用户反馈 ①若自动复制设备码失败，不应再自动打开授权网页（用户还没拿到码就跳浏览器没意义）；②复制失败时弹窗文案应与 toast 提示一致（目前文案仍写"设备码已复制到剪贴板"）
+- 改动（1 文件）：
+  - **`src/components/common/DeviceCodeModal.vue`**：
+    - `watch(deviceCodeInfo)` 改为 async：先 `await copyToClipboard(user_code)`，**复制失败（返回 false）→ 置 `copyFailed=true` + toast 提示"复制设备码失败，请手动复制"，并 `return` 跳过 2s 自动打开网页**
+    - 新增响应式 `copyFailed` 状态：驱动弹窗文案
+      - 复制成功："授权网页已打开（未打开可点下方按钮），输入以下代码：" + "设备码已复制到剪贴板，可直接粘贴"
+      - 复制失败："请点击下方按钮打开 Microsoft 登录页，并手动复制输入以下代码：" + "复制失败，请手动长按/右键复制设备码"
+    - `copyCode`（手动"重新复制"按钮）改为 async 并反馈：成功 toast "设备码已复制到剪贴板" + 恢复 `copyFailed=false` 文案；失败 toast "复制失败，请手动复制"
+    - 弹窗打开时重置 `copyFailed=false`
+- 设计决策：
+  - **自动打开依赖复制成功**：复制成功 → 2s 后自动打开网页（用户粘贴即可）；复制失败 → 不自动打开，引导用户手动复制/手动打开，避免跳了个空网页
+  - **文案单一数据源**：`copyFailed` 同时驱动 toast 和弹窗内文案，杜绝"toast 说失败、文案说已复制"的矛盾
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）、改动文件 `npx eslint` 通过（exit 0）
+
+#### 设备码登录：去除步骤名展示 + 设备码自动复制文案修正
+
+- 背景：用户反馈 ①既有进度条就不该再显示"获取 XBL Token"等阶段名，两处信息冗余；②设备码弹窗说明文案仍写"请手动点击按钮复制代码并打开网页"，但实际已自动复制到剪贴板，文案过时
+- 改动（1 文件）：
+  - **`src/components/common/DeviceCodeModal.vue`**：
+    - `exchanging`（Token 交换中）阶段：移除 `msLoginStepLabel` 阶段名展示和步骤列表，改为简短文案"正在登录，请稍候..." + 加载图标，下方仅保留进度条（`<StepProgressBar :show-steps="false" />`）
+    - 设备码区域文案：由"点击下方按钮打开 Microsoft 登录页，并输入以下代码：请手动点击按钮复制代码并打开网页"改为"授权网页已打开（未打开可点下方按钮），输入以下代码：设备码已复制到剪贴板，可直接粘贴"
+    - 按钮文案："点击打开 Microsoft 登录页" → "打开 Microsoft 登录页"，"复制设备码" → "重新复制"（自动复制失败时的兜底）
+- 设计决策：
+  - **进度条替代阶段名**：Token 交换过程用户只关心"还有多久"，进度条 + 简短文案足够；`stepIndex` 仍驱动进度条推进，`msLoginStepLabel` 保留在 store（不显示但可复用）
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）、改动文件 `npx eslint` 通过（exit 0）
+
+#### 设备码登录自动复制设备码 + 自动打开授权网页
+
+- 背景：用户反馈设备码登录流程需要手动点击"复制设备码"再手动点"打开登录页"，体验繁琐。希望弹窗出现后自动复制设备码，并自动打开授权网页（弹窗出来后延迟 2s 触发）
+- 改动（1 文件）：
+  - **`src/components/common/DeviceCodeModal.vue`**：
+    - `watch(deviceCodeInfo)` 监听到设备码后：自动 `copyToClipboard(user_code)`（toast 提示"已复制到剪贴板"），并启动 2s 定时器自动调用 `openLoginUrl()`（带 verification_uri 白名单校验，防钓鱼跳转）
+    - 新增 `autoOpened` 标志 + `autoOpenTimer`：防止自动打开与用户手动点击"打开登录页"重复；关闭弹窗/组件卸载时清理未触发的定时器
+    - `openLoginUrl` / `copyCode` / 自动复制调用处补充 `void` 前缀，避免 floating promise
+- 设计决策：
+  - **延迟 2s 自动打开**：给用户先看到设备码和弹窗内容的时间，也避免弹窗刚渲染就弹浏览器
+  - **白名单校验保留**：自动打开同样走 `ALLOWED_URIS` 白名单，不因自动化放宽钓鱼防护
+  - **仅复制官方 user_code**：避免剪贴板嗅探，不复制 verification_uri 等其他内容
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）、改动文件 `npx eslint` 通过（exit 0）
+
+#### 微软登录弹窗：进度条仅限 Token 交换阶段 + 弹窗改回居中样式
+
+- 背景：用户反馈上一版把伪进度条加到了"等待授权中"状态（用户在浏览器输入设备码期间进度条就在走，不合理）；且该弹窗误用了 main.css 的 `modal-shell/modal-body` 顶部对齐 + `max-height` 限高方案（那是给长列表/多步骤弹窗用的，如 UpdateDialog/ModUpdateDialog），微软登录弹窗内容少，应改回居中自适应
+- 改动（2 文件）：
+  - **`src/components/common/DeviceCodeModal.vue`**：
+    - 进度条（`StepProgressBar`）**只保留在 `exchanging`（Token 交换中）阶段**——正是获取 XBL/XSTS/MC Token 等需要等待的步骤，用伪进度让用户心里好受点
+    - 移除 `requesting`（准备登录）、`waiting`（等待授权 Web/DeviceCode）阶段的进度条，恢复为原来的加载图标 + 提示文字
+    - 弹窗从 `modal-shell/modal-body/modal-scroll`（顶部对齐 + `calc(100vh-100px)` 限高）改回自包含居中样式：`fixed inset-0 flex items-center justify-center` + `relative w-full max-w-md bg-white rounded-2xl shadow-xl`，不再依赖 main.css 的全局弹窗方案
+  - **`src/components/common/StepProgressBar.vue`**：新增 `isDone` 判定（`currentIndex >= steps.length - 1` 视为完成），完成态真实进度直接置 100%，修复"5 步流程最多走到 80%，伪进度封顶 95% 永远到不了 100%"的 bug
+- 设计决策：
+  - **伪进度只服务"等待中的处理"**：等待用户授权是用户操作环节，不走进度；只有后端在跑 Token 转换链（等待网络/服务器响应）时才用伪进度缓解焦虑
+  - **弹窗样式自包含**：微软登录弹窗内容简短，不套用全局限高方案，改回居中 + 自适应高度（与 Modal.vue 一致）
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）、改动文件 `npx eslint` 通过（exit 0）
+
+#### 修复内存分配轮询切换页面未停止（usePolling 卸载后启动泄漏）
+
+- 背景：用户反馈设置页面内存分配有时从该页切到其他页面后，内存 IPC 轮询仍持续（devtools 不美观）。根因：`MemoryAllocation` / `MemorySection` 在异步 `onLoad`（`await getSystemMemory`）之后才 `startMemoryPolling()`；若在异步等待期间切走页面，组件已卸载（`usePolling` 的 `onUnmounted` 已执行过），之后 `start()` 才执行，注册的 interval 永远不会被清理 → 泄漏
+- 改动（1 文件）：
+  - **`src/composables/usePolling.ts`**：新增 `unmounted` 标志，`onUnmounted` 时置 true 并 stop；`start()` 若已卸载直接 return，杜绝"卸载后启动的 interval 永不清理"
+- 设计决策：
+  - **不依赖调用方顺序**：修复放在 `usePolling` 内部，对 MemoryAllocation / MemorySection 等所有使用方统一生效，即使异步 onLoad 晚于卸载也能安全忽略
+  - **保留正常卸载清理**：已挂载期间切换页面，onUnmounted 仍正常 stop
+- 验证：改动文件 `npx eslint` 通过（exit 0）、`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### 自定义游戏窗口标题留空时不再改写为空白
+
+- 背景：用户反馈「版本设置 → 自定义游戏窗口标题」留空时，启动游戏后窗口标题被改成了空白。根因：前端留空时保存的是空字符串，启动配置 `window_title = Some("")` 传入 `GameWatcher`，`start_monitoring` 中 `if let Some(ref title)` 匹配空字符串成功，`apply_window_title(pid, "")` 把窗口标题清空
+- 改动（1 文件）：
+  - **`src-tauri/src/minecraft/launch/watcher/mod.rs`**：`start_monitoring` 中启动窗口标题改写前加 `!title.trim().is_empty()` 判断，空值/纯空白不改写（跟随全局设置）；`GameWatcher::new` doc 注释同步补充"空值不改写"
+- 验证：`cargo check` 通过（exit 0）
+
+#### 主页启动进度从轮询改为 Tauri event 推送
+
+- 背景：主页开始游戏后右侧内容区进度条之前靠前端 `setInterval` 每 200ms 调 `get_launch_progress` 轮询，浪费 IPC 且实时性受限。改为后端在启动流水线每步更新进度时直接 emit 事件
+- 改动（2 文件）：
+  - **`src-tauri/src/minecraft/launch/pipeline/execute.rs`**：`update_progress` 末尾通过 `self.config.app_handle` emit `"launch-progress"` 事件，payload 为 `LaunchProgress` 快照（stage / stage_progress / overall_progress / message）；`use tauri::Emitter` 导入
+  - **`src/composables/useLaunchState.ts`**：删除 200ms 轮询（`launchProgressTimer` + `setInterval` + `getLaunchProgress` 调用），改为 `listen('launch-progress')` 事件监听；新增 `LAUNCH_PROGRESS_EVENT` 常量与后端事件名对应；`startProgressListener` / `stopProgressListener` 用 unlisten 函数管理，启动前 await 注册确保不丢早期进度事件
+- 设计决策：
+  - **复用 LaunchConfig.app_handle**：该字段原本用于 Java 自动下载推送进度，现在流水线进度也用它，无需新增状态
+  - **保留 get_launch_progress 命令**：后端命令与前端 API 保留，供其他场景（如恢复状态）使用
+- 验证：`cargo check` + `cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### 联机页取消前端本地 JWT 过期拦截（交给后端自动续期兜底）
+
+- 背景：用户反馈 JWT 过期时联机页面被"拦截"——侧边栏只剩「设备」分类（房间管理/联机大厅隐藏）并强制切回设备页，设备面板显示"登录已过期"登录卡片。但这是**前端基于本地 `token_expired` 的判断**，实际后端有完整的静默续期机制：所有业务 action（信令/房间/FRP/更新器）统一走 `load_creds_with_auto_refresh` 在调用前自动 refresh 续期，前端 `onlineManager` 还有 1003 → refresh → login → register 降级链兜底。前端本地判断过期就拦截页面属于误伤——过期瞬间自动续期即可恢复
+- 改动（3 文件）：
+  - **`src/composables/useOnlineNav.ts`**：`isReady` 由「已注册 + 已登录 + 未过期」放宽为「已注册 + 已登录」，不再把 `token_expired` 当作拦截条件（房间管理/大厅/FRP 分类保持可用）；watch 注释同步更新
+  - **`src/components/online/OnlineDevicePanel.vue`**：`needLogin` 由「已注册 &&（未登录 || 过期）」收紧为「已注册 && 未登录」，JWT 过期不再弹出登录卡片；设备信息卡片中"JWT 过期时间"红色高亮提示保留（仅提示不拦截）
+  - **`src/views/Online.vue`**：顶部状态联动注释同步更新
+- 设计决策：
+  - **信任后端续期链**：后端 `load_creds_with_auto_refresh`（access 过期 → refresh 续期，refresh 也过期才报错）+ 前端 1003 降级链（refresh → login → register）已覆盖所有业务 action，前端无需重复判断 token 过期
+  - **兜底路径**：若静默续期全部失败（业务请求报 1003 且重试链也失败），由各调用方 toast 报错提示用户重新登录，而非整页拦截
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
 
 #### Windows 打开 URL/路径改用 ShellExecuteW（修复 OAuth2 授权链接参数丢失）
 
