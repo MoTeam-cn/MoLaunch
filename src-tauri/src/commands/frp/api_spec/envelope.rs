@@ -109,21 +109,21 @@ mod tests {
 
     #[test]
     fn test_success_bool() {
-        let e = env("flag", json!(true), "msg", "data");
+        let e = env("$.flag", json!(true), "$.msg", "$.data");
         let resp = json!({ "flag": true, "data": {} });
         assert!(is_success(&resp, Some(&e)));
     }
 
     #[test]
     fn test_success_number_string() {
-        let e = env("code", json!(200), "msg", "data");
+        let e = env("$.code", json!(200), "$.msg", "$.data");
         let resp = json!({ "code": "200", "data": {} });
         assert!(is_success(&resp, Some(&e)));
     }
 
     #[test]
     fn test_failure() {
-        let e = env("flag", json!(true), "msg", "data");
+        let e = env("$.flag", json!(true), "$.msg", "$.data");
         let resp = json!({ "flag": false, "msg": "未授权" });
         assert!(!is_success(&resp, Some(&e)));
         assert_eq!(
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     fn test_extract_data() {
-        let e = env("flag", json!(true), "msg", "data");
+        let e = env("$.flag", json!(true), "$.msg", "$.data");
         let resp = json!({ "flag": true, "data": { "id": 1 } });
         let data = extract_data(&resp, Some(&e), None).unwrap();
         assert_eq!(data, Some(json!({ "id": 1 })));

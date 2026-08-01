@@ -15,7 +15,9 @@ pub use search::{search_by_chinese, RewriteResult};
 
 // 测试用：内部符号引入父模块命名空间（测试 `use super::*;` 可访问）
 #[cfg(test)]
-use parsers::{extract_words, parse_slug_part, process_wildcard};
+use parsers::{parse_slug_part, process_wildcard};
+#[cfg(test)]
+use search::extract_words;
 
 #[cfg(test)]
 #[path = "../mcmod_tests.rs"]

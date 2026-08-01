@@ -8,12 +8,13 @@ use regex::Regex;
 /// 敏感字段正则
 ///
 /// 匹配模式（不区分大小写）：TOML `token = "xxx"` / JSON `"token":"xxx"` /
-/// 通用 `token: xxx`。分组：1=字段名（保留），2=分隔符 `=` 或 `:`（保留），
-/// 3=值（带引号或不带引号，替换为 `***`，保留引号风格）。
+/// 通用 `token: xxx`。分组：1=字段名（保留），2=字段名后的可选引号（JSON key
+/// 右引号，保留），3=分隔符 `=` 或 `:`（保留），4=值（带引号或不带引号，
+/// 替换为 `***`，保留引号风格）。
 /// `\b` 确保只匹配完整字段名，不会误匹配 `my_token` 等带前缀的字段。
 static SENSITIVE_RE: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r#"(?i)\b(token|password|secret|api_key|auth_token|access_token|refresh_token)\b["']?(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,};#\]\n]+)"#,
+        r#"(?i)\b(token|password|secret|api_key|auth_token|access_token|refresh_token)\b(["']?)(\s*[:=]\s*)("[^"]*"|'[^']*'|[^\s,};#\]\n]+)"#,
     )
     .expect("敏感字段正则编译失败")
 });
@@ -32,15 +33,16 @@ pub fn redact_log(line: &str) -> String {
     SENSITIVE_RE
         .replace_all(line, |caps: &regex::Captures| {
             let key = &caps[1];
-            let sep = &caps[2];
-            let val = &caps[3];
+            let quote = &caps[2];
+            let sep = &caps[3];
+            let val = &caps[4];
             // 保留引号风格：双引号值 → "***"，单引号值 → '***'，无引号值 → ***
             if val.starts_with('"') {
-                format!("{}{}\"***\"", key, sep)
+                format!("{}{}{}\"***\"", key, quote, sep)
             } else if val.starts_with('\'') {
-                format!("{}{}'***'", key, sep)
+                format!("{}{}{}'***'", key, quote, sep)
             } else {
-                format!("{}{}***", key, sep)
+                format!("{}{}{}***", key, quote, sep)
             }
         })
         .into_owned()

@@ -7,11 +7,13 @@ fn test_is_registered() {
     let empty = DeviceCredentials::default();
     assert!(!empty.is_registered());
 
-    let mut creds = DeviceCredentials::default();
-    creds.device_pk = "uuid".to_string();
-    creds.ed25519_seed_b64u = "seed".to_string();
-    creds.x25519_secret_b64u = "sec".to_string();
-    creds.device_public_key_b64u = "pub".to_string();
+    let creds = DeviceCredentials {
+        device_pk: "uuid".to_string(),
+        ed25519_seed_b64u: "seed".to_string(),
+        x25519_secret_b64u: "sec".to_string(),
+        device_public_key_b64u: "pub".to_string(),
+        ..Default::default()
+    };
     assert!(creds.is_registered());
 }
 

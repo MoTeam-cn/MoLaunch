@@ -63,7 +63,7 @@ fn test_refill_after_time() {
     let granted = limiter.acquire(100);
     // 由于时间精度，granted 应在 40-60 范围内（允许误差）
     assert!(
-        granted >= 40 && granted <= 60,
+        (40..=60).contains(&granted),
         "granted={} 应在 40-60 范围内",
         granted
     );

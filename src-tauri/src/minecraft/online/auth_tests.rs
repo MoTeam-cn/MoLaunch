@@ -20,12 +20,14 @@ fn test_generate_device_id_format() {
 fn test_build_login_request_round_trip() {
     // 模拟设备已注册的状态
     let kp = OnlineKeyPair::generate();
-    let mut creds = DeviceCredentials::default();
-    creds.ed25519_seed_b64u = b64u_encode(&kp.ed25519.seed());
-    creds.x25519_secret_b64u = b64u_encode(&kp.x25519.secret_bytes());
-    creds.device_pk = "test-device-pk".to_string();
-    creds.device_public_key_b64u = kp.x25519.public_b64u(); // 用自己公钥模拟云端公钥（仅测试流程）
-    creds.device_id = "mcsdk-test".to_string();
+    let creds = DeviceCredentials {
+        ed25519_seed_b64u: b64u_encode(&kp.ed25519.seed()),
+        x25519_secret_b64u: b64u_encode(&kp.x25519.secret_bytes()),
+        device_pk: "test-device-pk".to_string(),
+        device_public_key_b64u: kp.x25519.public_b64u(), // 用自己公钥模拟云端公钥（仅测试流程）
+        device_id: "mcsdk-test".to_string(),
+        ..Default::default()
+    };
 
     // 由于云端公钥 = 自己公钥，ECDH 会产生 shared（虽然不真实，但流程可走通）
     let req = build_login_request(&creds);
