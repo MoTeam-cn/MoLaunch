@@ -338,6 +338,33 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
 
+    // deeplink（3 个）：molaunch:// 协议注册状态查询 / 注册 / 卸载
+    // 便携版（未安装）没有安装器自动注册，需在设置页手动触发；
+    // 安装版由 NSIS 安装时注册，此处查询结果应显示"已注册（指向当前程序）"
+    d.register(
+        "get_deeplink_status",
+        handler!(_state, _app, _params, {
+            let r = crate::deeplink::protocol_status();
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "register_deeplink",
+        handler!(_state, _app, _params, {
+            crate::deeplink::register_protocol()?;
+            let r = crate::deeplink::protocol_status();
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "unregister_deeplink",
+        handler!(_state, _app, _params, {
+            crate::deeplink::unregister_protocol()?;
+            let r = crate::deeplink::protocol_status();
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
     // ws（1 个）：获取 WebSocket 服务器端口 + 鉴权 token（前端建 WS 连接用）
     // 返回 {port: u16, token: string}，port=0 表示 WS 服务器尚未启动
     // token 用于客户端建连后首条消息鉴权，防止本机其他进程窃听下载进度

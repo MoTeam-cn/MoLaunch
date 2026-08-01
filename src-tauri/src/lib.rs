@@ -3,6 +3,7 @@
 pub mod certs;
 pub mod commands;
 pub mod config;
+pub mod deeplink;
 pub mod error_util;
 pub mod http;
 pub mod logger;
@@ -85,6 +86,22 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
+        // 单实例插件（带 deep-link feature）：保证只有一个主进程实例；
+        // Windows/Linux 上第二次点击 molaunch:// 链接时，新进程把 URL 作为
+        // CLI 参数交给本回调，再由 deep-link 插件转发为 deep-link://new-url 事件。
+        // 注意：必须注册在 deep-link 插件之前。
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // 新实例启动时，主实例在这里收到 argv（含 deeplink URL）。
+            // deeplink 插件已接管 deep-link://new-url 事件分发，此处仅需聚焦窗口。
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+            log_info!("[SingleInstance] 新实例 argv: {:?}", argv);
+        }))
+        // 深度链接插件（molaunch:// 协议注册与事件解析）
+        .plugin(tauri_plugin_deep_link::init())
         // 自动更新 plugin（检测/下载/校验/启动 NSIS installer 子程序）
         // See: docs/updater/design.md §4.1.4
         .plugin(tauri_plugin_updater::Builder::new().build())
@@ -94,6 +111,15 @@ pub fn run() {
         .setup(|app| {
             // setup 钩子在窗口/webview 创建后、前端加载前调用
             log_info!("[Startup] Tauri setup() hook entered — webview & window created");
+
+            // 初始化深度链接模块（molaunch:// 协议监听 + 内置 handler 注册）
+            // 返回 EventId（Copy 值），监听由插件内部持有，无需托管
+            match deeplink::init(app.handle()) {
+                Ok(_event_id) => {}
+                Err(e) => {
+                    log_error!("[Deeplink] 初始化失败: {}", e);
+                }
+            }
 
             // 启动 WebSocket 服务器（下载进度推送，替代前端轮询）
             // 监听 127.0.0.1:0 随机端口，端口写入 AppState.ws_port 供前端查询

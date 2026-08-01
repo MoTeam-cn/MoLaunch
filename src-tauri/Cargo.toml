@@ -27,6 +27,12 @@ tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-notification = "2"
+# 深度链接（molaunch:// 协议：注册 scheme + 解析 URL + 路由到注册的 handler）
+# Windows/Linux 上 deep link 以 CLI 参数启动新实例，需配合 single-instance 插件的
+# "deep-link" feature 才能把 URL 转发给已运行的主实例（见下方 single-instance 依赖）
+tauri-plugin-deep-link = "2"
+# 单实例插件（带 deep-link feature：新实例启动时把 deeplink URL 转发给主实例）
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
 # 自动更新（客户端检测/下载/校验/启动 NSIS installer 子程序）
 # See: docs/updater/design.md §4.1.1
 tauri-plugin-updater = "2"
@@ -60,6 +66,7 @@ regex = "1"
 anyhow = "1"
 chrono = "0.4"
 urlencoding = "2.1"
+url = "2"
 once_cell = "1"
 base64 = "0.22"
 encoding_rs = "0.8"

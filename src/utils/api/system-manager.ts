@@ -86,6 +86,10 @@ export const SYSTEM_ACTIONS = {
   LIST_CUSTOM_CERTS: 'list_custom_certs',
   ADD_CUSTOM_CERT: 'add_custom_cert',
   REMOVE_CUSTOM_CERT: 'remove_custom_cert',
+  // deeplink（3 个）—— molaunch:// 协议注册状态查询/注册/卸载（便携版用）
+  GET_DEEPLINK_STATUS: 'get_deeplink_status',
+  REGISTER_DEEPLINK: 'register_deeplink',
+  UNREGISTER_DEEPLINK: 'unregister_deeplink',
   // ws（1 个）—— 下载进度推送 WebSocket 端口
   GET_WS_PORT: 'get_ws_port',
 } as const

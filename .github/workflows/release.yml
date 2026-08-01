@@ -123,6 +123,9 @@ jobs:
           tauriScript: npx tauri
           # Windows 优先使用 NSIS 安装包（而非 MSI），与 updater 协议一致
           updaterJsonPreferNsis: true
+          # Windows 同时构建 NSIS 安装版 + portable 便携版（便携版由应用内 deeplink
+          # 工具注册 molaunch:// 协议）；macOS/Linux 维持单一产物（app/appimage）
+          args: ${{ matrix.platform == 'windows' && '--bundles nsis,portable' || '' }}
 
       # ===== 预签名上传 + 注册版本 =====
       # See: docs/updater/design.md §5.2 / §6 MoSign-v2 协议
@@ -140,6 +143,9 @@ jobs:
           case "$PLATFORM" in
             windows)
               SETUP_FILE=$(find "$BUNDLE_DIR/nsis" -name "*-setup.exe" 2>/dev/null | head -1)
+              # 便携版（Windows 专属）：Tauri portable 产物位于 nsis 目录，
+              # 文件名形如 MoLaunch_1.0.0_x64_portable.exe
+              PORTABLE_FILE=$(find "$BUNDLE_DIR/nsis" -name "*_portable.exe" 2>/dev/null | head -1)
               ;;
             macos)
               SETUP_FILE=$(find "$BUNDLE_DIR/macos" -name "*.app.tar.gz" ! -name "*.sig" 2>/dev/null | head -1)
@@ -163,6 +169,16 @@ jobs:
           echo "setup_file=$SETUP_FILE" >> $GITHUB_OUTPUT
           echo "sig_file=$SIG_FILE" >> $GITHUB_OUTPUT
 
+          # Windows 便携版（可选，找到才输出；缺失则跳过上传 portable）
+          if [ -n "$PORTABLE_FILE" ] && [ -f "$PORTABLE_FILE" ]; then
+            PORTABLE_SIG="${PORTABLE_FILE}.sig"
+            echo "portable_file=$PORTABLE_FILE" >> $GITHUB_OUTPUT
+            echo "portable_sig=$PORTABLE_SIG" >> $GITHUB_OUTPUT
+            echo "找到便携版: $PORTABLE_FILE"
+          else
+            echo "未找到 portable 产物（跳过便携版上传）"
+          fi
+
       - name: Upload to S3 and register release
         shell: bash
         env:
@@ -175,6 +191,22 @@ jobs:
             "${{ matrix.bundle_type }}" \
             "${{ steps.locate.outputs.setup_file }}" \
             "${{ steps.locate.outputs.sig_file }}" \
+            "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
+
+      # Windows 便携版单独上传（bundle_type=portable，与 NSIS 安装版并存）
+      - name: Upload portable build (Windows only)
+        if: matrix.platform == 'windows' && steps.locate.outputs.portable_file != ''
+        shell: bash
+        env:
+          MOLAUNCH_ACTION_PUSH_KEY: ${{ secrets.MOLAUNCH_ACTION_PUSH_KEY }}
+        run: |
+          node scripts/ci-upload.cjs \
+            "${{ steps.version.outputs.VERSION }}" \
+            "windows" \
+            "${{ matrix.arch }}" \
+            "portable" \
+            "${{ steps.locate.outputs.portable_file }}" \
+            "${{ steps.locate.outputs.portable_sig }}" \
             "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
 
   # 创建 GitHub Release 页面（仅历史回顾，不作为下载源）

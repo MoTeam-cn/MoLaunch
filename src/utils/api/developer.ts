@@ -186,6 +186,40 @@ export async function listHttpLogFiles(): Promise<string[]> {
   return systemManager<string[]>(SYSTEM_ACTIONS.LIST_HTTP_LOG_FILES)
 }
 
+// ==================== 深链接（deeplink） ====================
+//
+// molaunch:// 协议注册管理。安装版由 NSIS 安装时自动注册；
+// 便携版（未安装）需在此手动注册/卸载。
+
+/** molaunch:// 协议注册状态 */
+export interface DeeplinkStatus {
+  /** 协议当前是否已注册 */
+  registered: boolean
+  /** 注册表中登记的 exe 路径（未注册为 null） */
+  registeredExe: string | null
+  /** 当前运行 exe 路径（获取失败为 null） */
+  currentExe: string | null
+  /** 当前平台是否支持运行时注册/卸载（macOS 不支持） */
+  platformSupported: boolean
+  /** 人类可读说明 */
+  message: string
+}
+
+/** 查询 molaunch:// 协议当前注册状态 */
+export async function getDeeplinkStatus(): Promise<DeeplinkStatus> {
+  return systemManager<DeeplinkStatus>(SYSTEM_ACTIONS.GET_DEEPLINK_STATUS)
+}
+
+/** 注册 molaunch:// 协议（幂等，便携版/开发环境手动触发） */
+export async function registerDeeplink(): Promise<DeeplinkStatus> {
+  return systemManager<DeeplinkStatus>(SYSTEM_ACTIONS.REGISTER_DEEPLINK)
+}
+
+/** 卸载 molaunch:// 协议（幂等，注册后协议链接将提示无应用处理） */
+export async function unregisterDeeplink(): Promise<DeeplinkStatus> {
+  return systemManager<DeeplinkStatus>(SYSTEM_ACTIONS.UNREGISTER_DEEPLINK)
+}
+
 // ==================== TLS 证书管理 ====================
 
 /** 自定义证书信息（list_custom_certs 返回项） */
