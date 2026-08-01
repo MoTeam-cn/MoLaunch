@@ -121,7 +121,8 @@ const variantClasses: Record<ActionVariant, string> = {
               :text="action.label"
               position="top"
             >
-              <Button type="ghost" size="small"
+              <Button
+type="ghost" size="small"
                 class="px-2.5 py-1.5 text-xs font-medium rounded-md border-0 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 :class="variantClasses[action.variant || 'default']"
                 :disabled="batchProcessing || selectedCount === 0 || action.disabled"
@@ -135,7 +136,8 @@ const variantClasses: Record<ActionVariant, string> = {
             <div class="w-px h-5 bg-gray-200 mx-1" />
             <!-- 全选/反选 -->
             <Tooltip :text="isAllSelected ? '取消全选' : '全选'" position="top">
-              <Button type="ghost" size="small"
+              <Button
+type="ghost" size="small"
                 class="px-2.5 py-1.5 text-xs font-medium rounded-md border-0 text-gray-600 hover:bg-gray-100 transition-colors"
                 @click="emit('selectAll')"
               >
@@ -144,7 +146,8 @@ const variantClasses: Record<ActionVariant, string> = {
               </Button>
             </Tooltip>
             <Tooltip text="反选" position="top">
-              <Button type="ghost" size="small"
+              <Button
+type="ghost" size="small"
                 class="px-2.5 py-1.5 text-xs font-medium rounded-md border-0 text-gray-600 hover:bg-gray-100 transition-colors"
                 @click="emit('invertSelection')"
               >
@@ -156,7 +159,8 @@ const variantClasses: Record<ActionVariant, string> = {
             <div class="w-px h-5 bg-gray-200 mx-1" />
             <!-- 退出多选 -->
             <Tooltip text="退出多选（ESC）" position="top">
-              <Button type="ghost" size="small"
+              <Button
+type="ghost" size="small"
                 class="px-2.5 py-1.5 text-xs font-medium rounded-md border-0 text-gray-600 hover:bg-gray-100 transition-colors"
                 @click="emit('exit')"
               >

@@ -50,7 +50,8 @@ async function openTutorial(template: string, title: string) {
     <Card v-for="[category, list] in groupedTutorials" :key="category">
       <template #title>
         <div class="flex items-center gap-2">
-          <component :is="categoryIcon[category as TutorialCategory]"
+          <component
+:is="categoryIcon[category as TutorialCategory]"
             class="h-4 w-4 text-gray-500" />
           <span class="text-sm font-semibold text-gray-800">{{ category }}</span>
         </div>
