@@ -85,27 +85,11 @@ impl AuthStorage {
     /// - Windows: `%APPDATA%/.MolaLaunch/auth.json`
     /// - macOS/Linux: `~/.config/MolaLaunch/auth.json`
     ///
-    /// 与 `minecraft::online::storage::OnlineStorage::appdata_device_path` 保持一致的目录约定。
+    /// 路径解析复用 `crate::storage::appdata::appdata_root`，与 online/device.json、
+    /// certs、providers 等全局共享资源保持一致的目录约定。
     /// 父目录不自动创建（由调用方按需 `create_dir_all`）。环境变量缺失时返回 Err。
     fn storage_path() -> Result<PathBuf, String> {
-        #[cfg(windows)]
-        {
-            let appdata = std::env::var("APPDATA")
-                .map_err(|_| "APPDATA environment variable not set".to_string())?;
-            Ok(PathBuf::from(appdata)
-                .join(".MolaLaunch")
-                .join(AUTH_FILE))
-        }
-
-        #[cfg(not(windows))]
-        {
-            let home = std::env::var("HOME")
-                .map_err(|_| "HOME environment variable not set".to_string())?;
-            Ok(PathBuf::from(home)
-                .join(".config")
-                .join("MolaLaunch")
-                .join(AUTH_FILE))
-        }
+        Ok(crate::storage::appdata::appdata_root()?.join(AUTH_FILE))
     }
 
     // --------------------------------------------------------

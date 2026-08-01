@@ -282,24 +282,11 @@ impl OnlineStorage {
     /// - Windows: `%APPDATA%/.MolaLaunch/online/device.json`
     /// - macOS/Linux: `~/.config/MolaLaunch/online/device.json`
     ///
-    /// 父目录不自动创建（由调用方按需 `create_dir_all`）。环境变量缺失时返回 Err。
+    /// 路径解析复用 `crate::storage::appdata::appdata_subdir`，与 certs/providers/auth 等
+    /// 全局共享资源保持一致的目录约定。父目录不自动创建（由调用方按需 `create_dir_all`）。
+    /// 环境变量缺失时返回 Err。
     fn appdata_device_path() -> Result<PathBuf, String> {
-        #[cfg(windows)]
-        {
-            let appdata = std::env::var("APPDATA")
-                .map_err(|_| "APPDATA environment variable not set".to_string())?;
-            Ok(PathBuf::from(appdata).join(".MolaLaunch").join(DEVICE_FILE))
-        }
-
-        #[cfg(not(windows))]
-        {
-            let home = std::env::var("HOME")
-                .map_err(|_| "HOME environment variable not set".to_string())?;
-            Ok(PathBuf::from(home)
-                .join(".config")
-                .join("MolaLaunch")
-                .join(DEVICE_FILE))
-        }
+        Ok(crate::storage::appdata::appdata_subdir("online")?.join("device.json"))
     }
 
     /// 解析设备凭证旧存储路径（启动器目录下的 `.Molaunch`）
