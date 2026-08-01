@@ -9,6 +9,16 @@
 
 ### 维护
 
+#### 跨平台兼容性 M5/M6/M7 评估结论（保持现状 + 补注释）
+
+- 背景：P0+P1+P2+P3 全部清零后，评估剩余 3 项中低问题（M5/M6/M7），结论为保持现状并补充注释说明设计意图
+- 改动（2 个文件，仅注释）：
+  - **M5 `src-tauri/src/commands/tools/memory.rs`**：Linux/macOS 分支补注释说明 `mode` 参数被有意忽略（light/strong 在 Windows 区分 StandbyList，Unix 无等价概念，强行映射引入伪区分）
+  - **M6 `src-tauri/src/minecraft/image_cache.rs`**：`cache_image_url` 补 doc 注释说明 `cfg(not(windows))` 实际仅覆盖 macOS/Linux（Android 非支持目标），未来支持 Android 时需改显式 `cfg(any(macos, linux))`
+- **M7 `reveal_in_file_manager` Linux 降级**：保持现状不修复。Linux 文件管理器 `--select` 语法碎片化，保守回退打开父目录是合理妥协；改进需引入 dbus `org.freedesktop.FileManager1.ShowItems` 依赖，兼容性不确定
+- 验证：`cargo clippy -- -D warnings` 0 警告
+- 影响范围：无功能改动，仅注释清晰化
+
 #### 修复跨平台兼容性 P3 文档/注释漂移（L1+L2+L4，L3 验证为误报）
 
 - 背景：P0/P1/P2 全部清零后，处理 P3 低优先级文档/注释漂移问题。完整扫描报告见 `docs/CROSS_PLATFORM_COMPATIBILITY.md`
