@@ -195,6 +195,12 @@
 
 ### 修复
 
+#### CI：新增 workflow_dispatch 手动触发入口
+
+- 背景：CI 的 `paths` 过滤不包含 `.github/workflows/**`，仅修改 workflow 文件推送不会自动触发 CI（无法验证上一条 webkit2gtk 4.1 依赖修复）
+- 改动（1 文件 `.github/workflows/ci.yml`）：`on:` 增加 `workflow_dispatch:`——可在 GitHub Actions 页面「Run workflow」按钮手动触发，用于 workflow 自身改动后的验证
+- 说明：手动触发时 `github.event.head_commit.message` 为空，`check-skip` 的 `!c` 匹配失败走 `skip=false`，CI 正常执行全部 job
+
 #### CI：WebKitGTK 依赖版本升级（4.0 → 4.1）修复 javascriptcoregtk 缺失
 
 - 背景：CI 的 `rust-clippy` / `rust-test` job 构建失败，错误为 `javascriptcore-rs-sys` 找不到 `javascriptcoregtk-4.1.pc`。项目是 **Tauri v2**，webview 依赖 webkit2gtk **4.1**（`javascriptcoregtk-4.1`），但 workflow 沿用了 Tauri v1 时代的 `libwebkit2gtk-4.0-dev`（4.0 版），导致 pkg-config 找不到对应库

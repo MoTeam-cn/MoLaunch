@@ -15,6 +15,9 @@ on:
       - 'src-tauri/**'
       - 'package.json'
       - 'Cargo.toml'
+  # 手动触发（Actions 页面 Run workflow 按钮）
+  # ci.yml 本身不在 paths 过滤内，仅修改 workflow 文件不会自动触发 CI，需手动运行
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
