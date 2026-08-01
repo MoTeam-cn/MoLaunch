@@ -3,9 +3,49 @@
 //! 封装 `open_path`/`open_url`/`reveal_in_file_manager`，处理跨平台差异与安全校验
 //! （拒绝路径遍历/UNC）。`validate_path` 为本模块私有辅助。
 
-use crate::{log_error, log_info};
+#[cfg(target_os = "windows")]
+use crate::log_error;
+use crate::log_info;
 
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 use super::shell_err;
+
+/// Windows 专用 Win32 封装（ShellExecuteW）
+///
+/// 用 ShellExecuteW 打开 URL/文件可完全绕过 cmd.exe 的命令解析：
+/// `cmd /c start "" <url>` 会因 URL 中的 `&`（OAuth2 授权链接查询参数分隔符）
+/// 被 cmd 当作命令分隔符，导致 `&` 后面的参数被丢弃并作为命令执行。
+/// ShellExecuteW 直接把目标字符串原样交给系统默认程序，无此问题。
+#[cfg(target_os = "windows")]
+mod win_shell {
+    use std::os::windows::ffi::OsStrExt;
+
+    #[allow(clippy::upper_case_acronyms)]
+    pub(super) type HWND = isize;
+    #[allow(clippy::upper_case_acronyms)]
+    pub(super) type HINSTANCE = isize;
+    pub(super) const SW_SHOWNORMAL: i32 = 1;
+
+    #[link(name = "shell32")]
+    extern "system" {
+        pub(super) fn ShellExecuteW(
+            hwnd: HWND,
+            lp_operation: *const u16,
+            lp_file: *const u16,
+            lp_parameters: *const u16,
+            lp_directory: *const u16,
+            n_show_cmd: i32,
+        ) -> HINSTANCE;
+    }
+
+    /// 将 &str 转为以 null 结尾的 UTF-16 字符串（ShellExecuteW 要求宽字符）
+    pub(super) fn to_wide_null(s: &str) -> Vec<u16> {
+        std::ffi::OsStr::new(s)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect()
+    }
+}
 
 /// 安全校验：拒绝路径遍历（..）和 UNC 路径（防止 SMB 认证泄露）
 fn validate_path(path: &str) -> Result<(), String> {
@@ -23,9 +63,8 @@ fn validate_path(path: &str) -> Result<(), String> {
 
 /// 用系统文件管理器打开文件夹
 ///
-/// - Windows: `cmd /c start "" "<path>"`（不能用 `explorer <path>`：
-///   Rust Command::arg 会给含空格的路径自动加引号，explorer.exe 对带引号的
-///   裸路径解析失败会回退到打开"文档"库。start 命令正确处理带引号路径）
+/// - Windows: `ShellExecuteW` 直接交给系统（绕过 cmd.exe，避免路径中的
+///   `&` 等特殊字符被当作命令分隔符；`start` 命令不支持可靠的引号转义）
 /// - macOS: `open <path>`
 /// - Linux: `xdg-open <path>`
 pub fn open_path(path: &str) -> Result<(), String> {
@@ -34,13 +73,24 @@ pub fn open_path(path: &str) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        std::process::Command::new("cmd")
-            .args(["/c", "start", "", path])
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| shell_err("open_path", e))?;
+        use win_shell::*;
+        let path_wide = to_wide_null(path);
+        let hinst = unsafe {
+            ShellExecuteW(
+                0,
+                std::ptr::null(),
+                path_wide.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        // ShellExecuteW 返回值 <= 32 表示错误（详见 SE_ERR_* 常量）
+        if hinst as isize <= 32 {
+            let msg = format!("ShellExecuteW failed (code: {})", hinst);
+            log_error!("[Shell] open_path: {}", msg);
+            return Err(msg);
+        }
     }
 
     #[cfg(target_os = "macos")]
@@ -65,7 +115,9 @@ pub fn open_path(path: &str) -> Result<(), String> {
 /// 用系统默认浏览器打开 URL
 ///
 /// 仅允许 http/https 协议，防止任意协议跳转（如 file://、javascript:）。
-/// - Windows: `cmd /c start "" "<url>"`
+/// - Windows: `ShellExecuteW`（不能用 `cmd /c start "" <url>`：cmd.exe 会把
+///   URL 查询参数中的 `&` 当作命令分隔符，导致 OAuth2 授权链接的
+///   redirect_uri/response_type/scope/state 等参数被丢弃并作为命令执行）
 /// - macOS: `open <url>`
 /// - Linux: `xdg-open <url>`
 ///
@@ -79,13 +131,24 @@ pub fn open_url(url: &str) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-        std::process::Command::new("cmd")
-            .args(["/c", "start", "", url])
-            .creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .map_err(|e| shell_err("open_url", e))?;
+        use win_shell::*;
+        let url_wide = to_wide_null(url);
+        let hinst = unsafe {
+            ShellExecuteW(
+                0,
+                std::ptr::null(),
+                url_wide.as_ptr(),
+                std::ptr::null(),
+                std::ptr::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        // ShellExecuteW 返回值 <= 32 表示错误（详见 SE_ERR_* 常量）
+        if hinst as isize <= 32 {
+            let msg = format!("ShellExecuteW failed (code: {})", hinst);
+            log_error!("[Shell] open_url: {}", msg);
+            return Err(msg);
+        }
     }
 
     #[cfg(target_os = "macos")]
@@ -123,33 +186,7 @@ pub fn reveal_in_file_manager(path: &str) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
-        use std::os::windows::ffi::OsStrExt;
-
-        #[allow(clippy::upper_case_acronyms)]
-        type HWND = isize;
-        #[allow(clippy::upper_case_acronyms)]
-        type HINSTANCE = isize;
-        const SW_SHOWNORMAL: i32 = 1;
-
-        #[link(name = "shell32")]
-        extern "system" {
-            fn ShellExecuteW(
-                hwnd: HWND,
-                lp_operation: *const u16,
-                lp_file: *const u16,
-                lp_parameters: *const u16,
-                lp_directory: *const u16,
-                n_show_cmd: i32,
-            ) -> HINSTANCE;
-        }
-
-        // 将 &str 转为以 null 结尾的 UTF-16 字符串（ShellExecuteW 要求宽字符）
-        fn to_wide_null(s: &str) -> Vec<u16> {
-            std::ffi::OsStr::new(s)
-                .encode_wide()
-                .chain(std::iter::once(0))
-                .collect()
-        }
+        use win_shell::*;
 
         // explorer.exe 的 /select 语法：/select,"<path>"
         // explorer 用 CommandLineToArgvW 解析参数，识别引号并合并内容
