@@ -2,7 +2,7 @@
  * 启动状态管理 composable
  *
  * 从 stores/version.ts 抽出，封装：
- * - 启动游戏流程（轮询进度、Java 自动下载进度监听）
+ * - 启动游戏流程（Tauri event 进度监听、Java 自动下载进度监听）
  * - 运行中游戏状态（pid、版本 ID）
  * - 游戏退出事件监听
  *
@@ -55,6 +55,9 @@ const STAGE_NAMES: Record<string, string> = {
   'Failed': '失败',
 }
 
+/** 启动进度事件名（与后端 pipeline/execute.rs 的 emit 对应） */
+const LAUNCH_PROGRESS_EVENT = 'launch-progress'
+
 export function useLaunchState() {
   // 启动状态
   const launching = ref(false)
@@ -62,7 +65,7 @@ export function useLaunchState() {
   const runningPid = ref<number | null>(null)
   const runningVersionId = ref<string | null>(null)
   const launchProgress = ref<tauri.LaunchProgress | null>(null)
-  let launchProgressTimer: number | null = null
+  let launchProgressUnlisten: (() => void) | null = null
 
   // Java 自动下载进度（启动时自动下载 Java 用，与版本设置页的独立下载共享事件）
   const javaDownloadProgress = ref<tauri.JavaDownloadProgress | null>(null)
@@ -132,7 +135,7 @@ export function useLaunchState() {
     launchingVersionId.value = params.versionId
     launchProgress.value = null
 
-    startProgressPolling()
+    await startProgressListener()
     await startJavaDownloadListener()
 
     try {
@@ -156,7 +159,7 @@ export function useLaunchState() {
       toastError(e instanceof Error ? e.message : String(e))
       throw e
     } finally {
-      stopProgressPolling()
+      stopProgressListener()
       stopJavaDownloadListener()
       launching.value = false
       launchingVersionId.value = null
@@ -195,26 +198,21 @@ export function useLaunchState() {
     if (pid !== undefined) runningPid.value = pid
   }
 
-  /** 启动进度轮询（每 200ms 拉取一次后端进度） */
-  function startProgressPolling() {
-    stopProgressPolling()
-    launchProgressTimer = window.setInterval(async () => {
-      await safeCall(async () => {
-        const progress = await tauri.getLaunchProgress()
-        if (progress) {
-          launchProgress.value = progress
-          if (progress.stage === 'Finished' || progress.stage === 'Failed') {
-            stopProgressPolling()
-          }
-        }
-      }, 'get launch progress')
-    }, 200)
+  /** 监听启动进度事件（后端 pipeline 每步 update_progress 时 emit，替代 200ms 轮询） */
+  async function startProgressListener() {
+    await stopProgressListener()
+    launchProgressUnlisten = await listen<tauri.LaunchProgress>(
+      LAUNCH_PROGRESS_EVENT,
+      (e) => {
+        launchProgress.value = e.payload
+      },
+    )
   }
 
-  function stopProgressPolling() {
-    if (launchProgressTimer) {
-      clearInterval(launchProgressTimer)
-      launchProgressTimer = null
+  async function stopProgressListener() {
+    if (launchProgressUnlisten) {
+      launchProgressUnlisten()
+      launchProgressUnlisten = null
     }
   }
 

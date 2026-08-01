@@ -3,6 +3,7 @@
 //! 实现 `LaunchPipeline::execute` 主流程与 `update_progress` 进度更新工具方法。
 
 use crate::{log_info, log_warn};
+use tauri::Emitter;
 
 use super::{LaunchError, LaunchPipeline, LaunchResult, LaunchStage};
 
@@ -40,6 +41,12 @@ impl LaunchPipeline {
         progress.stage_progress = stage_progress;
         progress.overall_progress = completed_weight / total_weight;
         progress.message = message.into();
+
+        // 通过 Tauri event 推送进度快照（前端 listen "launch-progress"，替代轮询 get_launch_progress）
+        // app_handle 在 build_launch_config 中注入；None 仅防御性兜底（不应发生）
+        if let Some(app_handle) = self.config.app_handle.as_ref() {
+            let _ = app_handle.emit("launch-progress", &*progress);
+        }
     }
 
     /// 执行启动流程
