@@ -10,7 +10,6 @@ pub mod ini;
 pub mod registry;
 
 use crate::log_info;
-use crate::log_warn;
 use crate::resources;
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -82,41 +81,16 @@ impl Storage {
         Ok(())
     }
 
-    /// 全局共享目录迁移：将设备级资源从便携式 .Molaunch 迁移到 AppData 全局目录
+    /// 全局共享目录迁移：启动时执行所有存储迁移
     ///
-    /// 迁移项：
-    /// - `certs/`：TLS 自定义证书（一台设备信任一次，多启动器共享）
-    /// - `providers/`：外部 frpc 厂商二进制（避免每实例重复下载几十 MB）
+    /// 实际迁移逻辑集中在 `crate::migrations` 模块，按依赖顺序执行：
+    /// 1. AppData 根目录命名统一（.MolaLaunch → .Molaunch）
+    /// 2. certs/providers 便携式 → AppData 全局共享
+    /// 3. online/device.json 旧路径 → AppData + 残留目录清理
     ///
-    /// 清理项：
-    /// - `online/`：v2 已将 device.json 迁至 AppData，残留空目录或遗留文件启动时清理
-    ///
-    /// 迁移失败不阻塞启动（仅记录 WARN，下次启动再次尝试）。
+    /// 任何迁移失败都不阻塞启动（仅记录 WARN，下次启动再次尝试）。
     fn migrate_global_dirs(&self) {
-        // 1. certs 迁移到 AppData
-        if let Err(e) = appdata::migrate_from_portable("certs") {
-            log_warn!("[Storage] certs 目录迁移失败: {}", e);
-        }
-
-        // 2. providers 迁移到 AppData
-        if let Err(e) = appdata::migrate_from_portable("providers") {
-            log_warn!("[Storage] providers 目录迁移失败: {}", e);
-        }
-
-        // 3. 清理 online 残留目录（device.json 已在 v2 迁移到 AppData）
-        let online_dir = self.base_dir.join("online");
-        if online_dir.exists() {
-            log_info!(
-                "[Storage] 清理 online 残留目录: {}",
-                online_dir.display()
-            );
-            if let Err(e) = std::fs::remove_dir_all(&online_dir) {
-                log_warn!(
-                    "[Storage] online 残留目录清理失败（下次启动会再次尝试）: {}",
-                    e
-                );
-            }
-        }
+        crate::migrations::run_all();
     }
 
     pub fn config_path(&self) -> PathBuf {

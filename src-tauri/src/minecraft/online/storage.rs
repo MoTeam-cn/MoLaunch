@@ -1,21 +1,16 @@
 //! 联机设备凭证持久化模块
-//! 存储路径（v2 迁移至 AppData 跨启动器实例共享设备身份）：Windows
-//! `%APPDATA%/.MolaLaunch/online/device.json`，macOS/Linux `~/.config/MolaLaunch/online/device.json`。
-//! 旧路径（v1 已废弃）`<exe_dir>/.Molaunch/online/device.json` 首次启动自动迁移。
+//! 存储路径：Windows `%APPDATA%/.Molaunch/online/device.json`，macOS/Linux `~/.config/Molaunch/online/device.json`。
+//! 旧路径（v1 已废弃）`<exe_dir>/.Molaunch/online/device.json` 启动时由 `migrations::online_legacy` 自动迁移。
 //! 加密策略：文件整体 JSON 序列化后用 SDK DES 加密；SDK 不可用时降级明文（带 WARN）。
 
-use crate::log_info;
 use crate::log_warn;
+use crate::migrations::online_legacy::legacy_device_path;
 use crate::sdk::SdkInstance;
-use crate::storage::Storage;
 use serde::Deserialize;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
-
-/// 设备凭证文件在 AppData 目录下的相对路径
-const DEVICE_FILE: &str = "online/device.json";
 
 /// 持久化的设备凭证
 ///
@@ -135,58 +130,17 @@ impl OnlineStorage {
 
     /// 加载设备凭证
     ///
-    /// 优先从新路径（AppData）加载；若新路径不存在但旧路径存在，自动迁移到新路径后加载。
+    /// 从新路径（AppData）加载；旧路径迁移已由 `crate::migrations::online_legacy`
+    /// 在启动时执行，此处不再检测旧路径。
     ///
     /// 返回 `None` 表示未注册或文件不存在；
     /// 返回 `Err` 表示文件存在但解析/解密失败（数据损坏）。
     pub async fn load(&self) -> Result<Option<DeviceCredentials>, String> {
         let new_path = Self::appdata_device_path()?;
-
-        // 1. 新路径存在 → 直接加载
         if new_path.exists() {
             return self.load_from(&new_path).await;
         }
-
-        // 2. 新路径不存在 → 检查旧路径并迁移
-        let legacy_path = Self::legacy_device_path();
-        if !legacy_path.exists() {
-            return Ok(None);
-        }
-
-        log_info!(
-            "[Online] 检测到旧路径设备凭证，开始迁移: {} → {}",
-            legacy_path.display(),
-            new_path.display()
-        );
-
-        // 3. 读取旧文件原内容（不解密，原样转写到新路径）
-        let raw = std::fs::read_to_string(&legacy_path)
-            .map_err(|e| format!("读取旧路径设备凭证失败: {}", e))?;
-
-        // 4. 写入新路径（确保父目录存在）
-        if let Some(parent) = new_path.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("创建新路径父目录失败: {}", e))?;
-        }
-        if let Err(e) = std::fs::write(&new_path, &raw) {
-            log_warn!(
-                "[Online] 迁移失败（写入新路径失败），回退到旧路径加载: {}",
-                e
-            );
-            return self.load_from(&legacy_path).await;
-        }
-
-        // 5. 删除旧文件
-        if let Err(e) = std::fs::remove_file(&legacy_path) {
-            log_warn!(
-                "[Online] 迁移成功但旧文件删除失败，下次启动会再次尝试迁移: {}",
-                e
-            );
-        }
-
-        log_info!("[Online] 设备凭证迁移完成");
-
-        // 6. 加载新路径
-        self.load_from(&new_path).await
+        Ok(None)
     }
 
     /// 从指定路径加载设备凭证（内部辅助方法）
@@ -245,7 +199,7 @@ impl OnlineStorage {
         }
 
         // 保存成功后清理旧路径文件（如有），避免下次启动重复迁移
-        let legacy_path = Self::legacy_device_path();
+        let legacy_path = legacy_device_path();
         if legacy_path.exists() {
             if let Err(e) = std::fs::remove_file(&legacy_path) {
                 log_warn!("[Online] 清理旧路径文件失败: {}", e);
@@ -267,7 +221,7 @@ impl OnlineStorage {
         }
 
         // 清理旧路径（兼容历史遗留）
-        let legacy_path = Self::legacy_device_path();
+        let legacy_path = legacy_device_path();
         if legacy_path.exists() {
             if let Err(e) = std::fs::remove_file(&legacy_path) {
                 log_warn!("[Online] 清理旧路径文件失败: {}", e);
@@ -279,22 +233,14 @@ impl OnlineStorage {
 
     /// 解析设备凭证新存储路径（AppData 全局位置）
     ///
-    /// - Windows: `%APPDATA%/.MolaLaunch/online/device.json`
-    /// - macOS/Linux: `~/.config/MolaLaunch/online/device.json`
+    /// - Windows: `%APPDATA%/.Molaunch/online/device.json`
+    /// - macOS/Linux: `~/.config/Molaunch/online/device.json`
     ///
     /// 路径解析复用 `crate::storage::appdata::appdata_subdir`，与 certs/providers/auth 等
     /// 全局共享资源保持一致的目录约定。父目录不自动创建（由调用方按需 `create_dir_all`）。
     /// 环境变量缺失时返回 Err。
     fn appdata_device_path() -> Result<PathBuf, String> {
         Ok(crate::storage::appdata::appdata_subdir("online")?.join("device.json"))
-    }
-
-    /// 解析设备凭证旧存储路径（启动器目录下的 `.Molaunch`）
-    ///
-    /// 用于一次性迁移：v1 存储位置为 `<exe_dir>/.Molaunch/online/device.json`，
-    /// v2 迁移到 AppData 后此路径不再使用，但检测到旧文件存在时需迁移。
-    fn legacy_device_path() -> PathBuf {
-        Storage::instance().base_dir().join(DEVICE_FILE)
     }
 }
 

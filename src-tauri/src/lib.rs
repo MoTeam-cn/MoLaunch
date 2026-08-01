@@ -6,6 +6,7 @@ pub mod config;
 pub mod error_util;
 pub mod http;
 pub mod logger;
+pub mod migrations;
 pub mod minecraft;
 pub mod res_scheme;
 pub mod resources;
