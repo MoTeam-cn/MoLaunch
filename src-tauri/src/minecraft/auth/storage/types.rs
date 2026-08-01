@@ -122,7 +122,7 @@ pub struct PersistedAuthState {
 /// 当前登录用户（持久化用）
 ///
 /// 含 `access_token` / `client_token` / `refresh_token` 敏感字段，仅派生 `Deserialize`。
-/// `AuthStorage::save` 逐字段写入注册表；IPC 返回前端用 `LocalAuthResult`（已 `#[serde(skip)]`）。
+/// `AuthStorage::save` 通过 `to_storage_json()` 整体序列化到加密文件；IPC 返回前端用 `LocalAuthResult`（已 `#[serde(skip)]`）。
 #[derive(Debug, Clone, Deserialize)]
 pub struct CurrentUser {
     pub name: String,
@@ -143,4 +143,36 @@ pub struct CurrentUser {
     /// authlib 登录的服务器显示名（仅 authlib 登录有，用于 UI 展示）
     #[serde(default)]
     pub server_name: Option<String>,
+}
+
+impl CurrentUser {
+    /// 构建包含全部字段（含 token）的 JSON，仅供持久化写入加密文件使用
+    pub fn to_storage_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "name": self.name,
+            "uuid": self.uuid,
+            "access_token": self.access_token,
+            "client_token": self.client_token,
+            "login_type": self.login_type,
+            "profile_json": self.profile_json,
+            "refresh_token": self.refresh_token,
+            "expires_at": self.expires_at,
+            "server_url": self.server_url,
+            "server_name": self.server_name,
+        })
+    }
+}
+
+impl PersistedAuthState {
+    /// 构建包含全部字段（含各账号列表的敏感字段）的 JSON，仅供持久化写入加密文件使用
+    ///
+    /// 通过手动构建 JSON 而非派生 `Serialize`，强制编译期阻止 IPC 误用敏感字段。
+    pub fn to_storage_json(&self) -> serde_json::Value {
+        serde_json::json!({
+            "current_user": self.current_user.as_ref().map(|u| u.to_storage_json()),
+            "ms_accounts": self.ms_accounts.iter().map(|a| a.to_storage_json()).collect::<Vec<_>>(),
+            "offline_accounts": self.offline_accounts,
+            "authlib_accounts": self.authlib_accounts.iter().map(|a| a.to_storage_json()).collect::<Vec<_>>(),
+        })
+    }
 }

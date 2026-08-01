@@ -42,6 +42,7 @@ pub(crate) fn reg_set(key: &RegKey, name: &str, value: &str) -> Result<(), Strin
 
 /// 删除注册表值（不存在不算错误）
 #[cfg(windows)]
+#[allow(dead_code)] // auth/storage 改为文件存储后暂无调用方，保留以备 crate 级复用
 pub(crate) fn reg_delete(key: &RegKey, name: &str) -> Result<(), String> {
     match key.delete_value(name) {
         Ok(()) => Ok(()),
