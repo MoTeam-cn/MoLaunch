@@ -152,6 +152,9 @@ pub(super) async fn ensure_system_default_frpc(state: &AppState) -> Result<Strin
     let target_path = frpc_path();
     archive::extract_frpc_from_zip(&zip_bytes, &target_path)?;
 
+    // 提取成功后删除临时 ZIP 文件（注释承诺"提取 frpc 后删除"，原实现遗漏）
+    let _ = std::fs::remove_file(&zip_path);
+
     // 6. 校验文件大小（防止下载截断/损坏）
     let metadata =
         std::fs::metadata(&target_path).map_err(|e| format!("frpc 文件元数据读取失败: {}", e))?;

@@ -93,12 +93,21 @@ pub(super) async fn ensure_external_frpc(
 
     std::fs::write(&target_path, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
 
-    if dl.archive {
+    let result_msg = if dl.archive {
         archive::extract_archive(&target_path, &provider_dir)?;
-    }
+        // 解压成功后删除原始 archive 文件，避免 providers 目录残留冗余 zip
+        let _ = std::fs::remove_file(&target_path);
+        log_info!(
+            "[Frp] 外部厂商 frpc 解压完成，已清理 archive: {}",
+            target_path.display()
+        );
+        format!("frpc 下载并解压完成: {}", provider_dir.display())
+    } else {
+        log_info!("[Frp] 外部厂商 frpc 下载完成: {}", target_path.display());
+        format!("frpc 下载完成: {}", target_path.display())
+    };
 
-    log_info!("[Frp] 外部厂商 frpc 下载完成: {}", target_path.display());
-    Ok(format!("frpc 下载完成: {}", target_path.display()))
+    Ok(result_msg)
 }
 
 /// 校验下载 URL：必须 HTTPS + 域名在白名单中
