@@ -15,4 +15,8 @@ module.exports = {
   rules: {
     'vue/multi-word-component-names': 'off',
   },
+  ignorePatterns: [
+    'src-tauri/resources/view/*.min.js',
+    'src-tauri/resources/wasm/*.js',
+  ],
 }

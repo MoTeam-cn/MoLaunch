@@ -9,6 +9,13 @@
 
 ### 新增
 
+#### CI：Ubuntu 22.04 依赖升级为 Tauri v2 官方组合（修复 rust-clippy job 失败）
+
+- 背景：GitHub Actions `rust-clippy` job（runs-on: ubuntu-22.04）执行 `cargo clippy --all-features -- -D warnings` 失败，根因是 Tauri v2 的 webkit2gtk 传递依赖 `soup3-sys v0.5.0` 构建需要系统库 `libsoup-3.0`，而 ci.yml 仍是 Tauri v1 时代依赖列表（缺少 libsoup-3.0-dev）
+- 改动（2 个 workflow 文件）：`.github/workflows/ci.yml` 的 `rust-clippy` / `build` 两处 Linux 依赖安装步骤、`.github/workflows/release.yml` 的 `build-and-upload` Linux 依赖安装步骤，统一更新为 Tauri v2 官方 Ubuntu 22.04 组合（保守保留 `libwebkit2gtk-4.0-dev`，新增 `libsoup-3.0-dev` 等）：
+  `sudo apt-get install -y libwebkit2gtk-4.0-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev`
+- 验证：仅 workflow 依赖命令改动，无代码逻辑变更；`libsoup-3.0-dev` / `libayatana-appindicator3-dev` / `libxdo-dev` 均在 ubuntu-22.04 官方源可用
+
 #### 开发者存储栏：补充 AppData 全局共享目录展示
 
 - 背景：开发者页「存储」子页签此前只展示便携式目录（.Molaunch）与系统缓存，未展示 AppData 全局共享目录——而 certs 证书、providers frpc 二进制、frp_auth 认证 token、online 联机数据、auth.json 账号认证都存放在 `%APPDATA%/.Molaunch/` 下
@@ -187,6 +194,35 @@
 - 验证：`cargo check` 通过（exit 0）、`npx vue-tsc --noEmit` 通过（exit 0）
 
 ### 修复
+
+#### CI：改为纯检查流水线（移除 Tauri 打包 job），补充前端 typecheck 与 Rust 测试
+
+- 背景：用户要求 CI 只做检查、不要 build 程序。原 `build` job 用 tauri-action 做三平台（Windows/macOS/Linux）完整打包，耗时最长且每次提交都跑；且前端类型检查（vue-tsc）此前只在 build job 中隐含执行，Rust 单测（`*_tests.rs`）从未在 CI 中运行过
+- 改动（1 文件 `.github/workflows/ci.yml`）：
+  - **删除 `build` job**：移除 tauri-action 三平台打包矩阵（不再产构建产物，CI 只做静态/单元检查）
+  - **`frontend-check` 增加 `Type check` 步骤**：`npm run typecheck`（vue-tsc --noEmit），弥补删除 build 后缺失的前端类型检查
+  - **新增 `rust-test` job**：`cargo test --all-features`（ubuntu-22.04，复用与 clippy 相同的 Tauri v2 Linux 依赖安装 + rust-cache），让后端 `dependency_resolver_tests` / `log_redact_tests` / `markdown_table_tests` / `state_tests` / `ini_tests` 等单测进入 CI 防线
+  - 保留：check-skip（!c 跳过）/ frontend-check（lint+typecheck）/ rust-fmt / rust-clippy
+- 效果：CI 从「3 平台打包 + 3 项检查」收敛为「5 项纯检查」，无打包耗时；类型检查与单测纳入 CI 兜底
+- 验证：`npm run typecheck` 通过（exit 0）、`cargo test --all-features` 通过（exit 0，1 passed / 2 ignored）；`--all-features` 仅启用 `custom-protocol`（tauri 配置项），Linux 环境无平台风险
+- 说明：Tauri 实际打包仍由 `release.yml` 承担（打 tag 触发），CI 与发布职责分离
+
+#### CI：Rust 格式检查失败（cargo fmt）——32 个 .rs 文件格式对齐
+
+- 背景：GitHub Actions `rust-fmt` job 执行 `cargo fmt --all -- --check` 失败，输出在 `docs/Error/workflow/ci-fmt.txt`——大量长行未拆分、import 排序、multiline 压缩等与 rustfmt 1.8.0-stable 不一致（多为 frp/deeplink/migrations 模块新代码）
+- 改动：本地 `cargo fmt --all` 格式化 **32 个 .rs 文件**（src-tauri/src/commands/frp/** 17 个、deeplink/** 4 个、migrations/** 2 个、minecraft/** 5 个、其他 4 个），**纯格式改动、零逻辑变更**
+- 验证：`cargo fmt --all -- --check` 通过（exit 0）；`cargo check` / `cargo clippy --all-targets -- -D warnings` 通过（exit 0）
+
+#### CI：前端 lint 失败（eslint）——忽略第三方压缩库 + 修复 5 个真实错误
+
+- 背景：GitHub Actions `frontend-check` job 执行 `npm run lint` 失败，输出在 `docs/Error/workflow/web.txt`：204 problems（195 errors, 9 warnings），其中 157 个来自第三方压缩库被误 lint、29 个来自 Node 脚本 `ci-upload.cjs` 未声明 node 环境、5 个真实代码错误
+- 改动（7 文件）：
+  - **`.eslintrc.cjs`**：新增 `ignorePatterns`——`src-tauri/resources/view/*.min.js`（marked.min.js / qrcode.min.js，第三方生成文件不应 lint）、`src-tauri/resources/wasm/*.js`（cubiomes.js）
+  - **`scripts/ci-upload.cjs`**：文件头加 `/* eslint-env node */`，`require`/`process`/`Buffer` 识别为 Node 全局（保留 lint 覆盖）
+  - **`src/components/online/KickConfirmDialog.vue` / `LobbyJoinConfirmDialog.vue`**：修复 `vue/require-toggle-inside-transition`——transition 根元素补 `v-if="visible"`（新增 visible ref + onMounted 置 true，行为仅新增进入淡入动画，关闭逻辑不变）
+  - **`src/composables/useDebouncedSave.ts`**：修复 `no-inner-declarations`——分支块内 5 个 `function` 声明改为 `const` 箭头函数（作用域与调用顺序不变）
+  - **`src/utils/version.ts`**：修复 `no-useless-escape`——正则 `[.\-]?` → `[.-]?`
+- 验证：`npx eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --ignore-path .gitignore` 通过（exit 0，0 errors / 9 warnings，warnings 为既有 Input/ToggleRow 缺默认 prop 等，不影响 CI）；`npx vue-tsc --noEmit` 通过（exit 0）
 
 #### http.rs 精简：fetch 函数收敛为"2 原语 + 2 薄包装"，删除废弃 fetch_bytes
 

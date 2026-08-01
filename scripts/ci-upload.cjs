@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* eslint-env node */
 /**
  * ci-upload.cjs — 上传 MoLaunch 安装包到 apiServer（MoSign-v2 鉴权）
  *
