@@ -5,7 +5,7 @@ use crate::{log_info, log_warn};
 use super::{LaunchError, LaunchPipeline};
 
 impl LaunchPipeline {
-    /// 执行启动前命令（语法同 Windows cmd，不等待退出，失败仅记录日志）
+    /// 执行启动前命令（Windows: `cmd /C`，Unix: `sh -c`，不等待退出，失败仅记录日志）
     pub(super) async fn run_pre_launch(&self) -> Result<(), LaunchError> {
         let cmd_str = match self.config.pre_launch_cmd.as_ref() {
             Some(s) if !s.is_empty() => s.clone(),
@@ -128,10 +128,16 @@ impl LaunchPipeline {
 /// 检测 PreLaunch 命令字符串中的危险字符/关键词。
 /// 返回 `Err(reason)` 表示检测到危险模式（reason 为具体原因），`Ok(())` 表示未检测到。
 /// 注意：仅用于日志警告，不阻止命令执行（保持向后兼容，用户可能确实需要这些命令）。
+///
+/// 检测向量覆盖 Windows cmd 与 Unix sh 两种执行后端：
+/// - 命令分隔符：`&`、`|`、`;`（cmd 与 sh 均支持）
+/// - 重定向：`>`、`<`
+/// - 命令替换：反引号、`$(`（sh 注入主要向量）
+/// - 危险关键词：Windows 侧（powershell/iex/invoke-）+ Unix 侧（eval/exec/source）
 fn validate_pre_launch_cmd(cmd: &str) -> Result<(), String> {
-    // 命令分隔符：&、&&、|
-    if cmd.contains('&') || cmd.contains('|') {
-        return Err("command separator (& or |)".to_string());
+    // 命令分隔符：&、|、;（cmd 与 sh 均支持，; 是 sh 的标准命令分隔符）
+    if cmd.contains('&') || cmd.contains('|') || cmd.contains(';') {
+        return Err("command separator (&, |, or ;)".to_string());
     }
     // 重定向：>、<
     if cmd.contains('>') || cmd.contains('<') {
@@ -142,8 +148,12 @@ fn validate_pre_launch_cmd(cmd: &str) -> Result<(), String> {
         return Err("command substitution (` or $()".to_string());
     }
     // 常见攻击载荷关键词（不区分大小写）
+    // Windows: powershell / iex / invoke-（PowerShell 注入向量）
+    // Unix:    eval / exec / source（sh 内置命令，常用于注入链）
     let lower = cmd.to_lowercase();
-    for keyword in ["powershell", "curl", "wget", "iex", "invoke-"] {
+    for keyword in [
+        "powershell", "curl", "wget", "iex", "invoke-", "eval", "exec", "source",
+    ] {
         if lower.contains(keyword) {
             return Err(format!("suspicious keyword: {}", keyword));
         }
