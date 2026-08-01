@@ -31,7 +31,8 @@ impl LaunchPipeline {
         // 工作目录使用 effective_game_dir（隔离目录）
         cmd.current_dir(&args.game_dir);
 
-        // APPDATA 也指向隔离目录，某些 Mod 会读取
+        // APPDATA 也指向隔离目录，某些 Mod 会读取（仅 Windows 有此约定）
+        #[cfg(target_os = "windows")]
         cmd.env("appdata", &args.game_dir);
 
         cmd.stdout(std::process::Stdio::piped());
