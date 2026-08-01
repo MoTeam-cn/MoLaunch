@@ -63,6 +63,10 @@ const activeCategory = ref<OnlineCategoryId>('device')
 
 const { isInRoom, categories, badge, activeDesc, activeLabel } = useOnlineNav(activeCategory)
 
+/** FRP 子菜单激活时显示「教程」按钮（厂商/穿透/认证/日志四项需要开发者文档） */
+const FRP_SUB_IDS: ReadonlyArray<OnlineCategoryId> = ['providers', 'tunnels', 'auth', 'logs']
+const showFrpHelp = computed(() => FRP_SUB_IDS.includes(activeCategory.value))
+
 /**
  * 跳转到 Frp 日志页查看指定隧道
  *
@@ -91,6 +95,16 @@ onMounted(() => {
 
 function goSettings() {
   router.push('/apps/settings?tab=online')
+}
+
+/**
+ * 跳转到设置 - 更多 - 教程子页
+ *
+ * FRP 子菜单顶部「教程」按钮调用。通过 `tab=about` 切到「更多」分类，
+ * `subtab=tutorial` 由 SettingsMore.vue 读取后切换到「教程」子页签。
+ */
+function goTutorial() {
+  router.push('/apps/settings?tab=about&subtab=tutorial')
 }
 
 // ============================================================
@@ -150,7 +164,9 @@ const currentProps = computed<Record<string, unknown>>(() => {
           :active-label="activeLabel"
           :active-desc="activeDesc"
           :badge="badge"
+          :show-help="showFrpHelp"
           @go-settings="goSettings"
+          @go-tutorial="goTutorial"
         />
 
         <!-- 内容区（keep-alive 缓存各面板，侧边栏切换时保留状态） -->

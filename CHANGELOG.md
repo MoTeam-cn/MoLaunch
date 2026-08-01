@@ -7,7 +7,43 @@
 
 ## [未发布]
 
+### 新增
+
+#### 教程系统（Markdown 渲染 + picker 子窗口）
+
+- 背景：FRP 厂商开发文档（manifest.json 格式、OAuth2/Device Code/API Key 认证配置）无处查阅，开发者无从下手编写厂商包。需一个内置教程系统承载开发指南与启动器使用基础
+- 改动（5 新增 + 4 修改）：
+  - **新增 `src/tutorials/index.ts`**：教程元数据索引。`TutorialMeta` 接口含 id/title/description/category/content，`TUTORIALS` 数组集中注册所有教程。Markdown 内容通过 Vite `?raw` 后缀导入，新增教程只需在此文件追加一项
+  - **新增 `src/tutorials/launcher-basics.md`**：启动器基础使用教程，覆盖版本安装、账号管理、联机功能入门
+  - **新增 `src/tutorials/frp-provider-guide.md`**：FRP 厂商开发指南，详述 manifest.json 清单格式、认证配置（OAuth2/Device Code/API Key）、网络与进程权限
+  - **新增 `src-tauri/resources/templates/tutorial.html`**：亮色教程渲染模板（与前端 Vue 应用白底灰字 + 主色蓝样式一致）。通过 `res://localhost/web-common/view/marked.min.js` 加载 marked.js 渲染 Markdown，支持 GFM 与换行。复制粘贴右键禁用（标题栏区），内容区可选中文本
+  - **`src/config/picker-templates.ts`**：新增 `tutorial` 模板配置（width=760, height=600），CSP 与 markdown 模板一致（允许 `res:` 加载 marked.min.js）
+  - **`src/utils/picker-window.ts`**：新增 `openTutorialWindow(params)` 便捷函数，使用 `tutorial` 模板打开子窗口
+  - **`src/vite-env.d.ts`**：新增 `declare module '*.md?raw'` 类型声明，支持 Markdown 文件原始内容导入
+  - **`src/views/settings/more/TutorialTab.vue`**：从空占位改为分类展示教程列表（基础 / FRP 开发两组），点击「阅读」调用 `openTutorialWindow` 在 picker 子窗口渲染
+  - **`src/views/settings/SettingsMore.vue`**：教程子页签说明更新；新增 `useRoute` 读取 URL `?subtab=tutorial` query 参数，支持外部页面深链到教程子页签
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### FRP 子菜单「教程」按钮深链跳转
+
+- 背景：教程系统已落地，但 FRP 管理页（厂商列表/穿透管理/认证中心/运行日志）的开发者无法直接发现教程入口，需手动导航到设置-更多-教程
+- 改动（3 修改）：
+  - **`src/views/online/OnlineTopBar.vue`**：新增 `showHelp` prop 与 `goTutorial` emit。当 `showHelp=true` 时在状态徽章与设置按钮之间显示「教程」按钮（BookOpenIcon），点击 emit `goTutorial`
+  - **`src/views/Online.vue`**：新增 `FRP_SUB_IDS` 常量（providers/tunnels/auth/logs）与 `showFrpHelp` computed（activeCategory 在 FRP_SUB_IDS 中时为 true）。新增 `goTutorial()` 跳转 `/apps/settings?tab=about&subtab=tutorial`，并绑定到 OnlineTopBar
+  - **`src/views/settings/SettingsMore.vue`**：`onMounted` 读取 `route.query.subtab`，校验值在 subTabs 列表中后切换 activeSubTab，实现深链直达教程子页签
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
 ### 维护
+
+#### 修复联机设备登录"接口成功但前端报失败"
+
+- 症状：点击联机页面"登录"按钮后，api-server 返回 HTTP 200 + 有效数据，但前端 toast 提示"设备登录失败，请稍后重试"；同时 `auth_status` 查询显示 `logged_in: true`（旧 token 仍有效）
+- 根因：`LoginResponse` / `RegisterResponse` 的 `time` / `req_id` 字段缺少 `#[serde(default)]`（`RefreshResponse` 已有），api-server 返回时若缺失或类型不匹配这两个元数据字段，`serde_json::from_str` 整体失败 → 后端返回 `Err("登录请求失败: JSON 解析失败")` → 前端 toast 报错。但 api-server 已验证登录，旧 token 仍有效，`auth_status` 读本地旧凭证显示已登录
+- 改动（3 文件）：
+  - **`src-tauri/src/minecraft/online/auth/types.rs`**：`LoginResponse` / `RegisterResponse` 的 `time` / `req_id` 加 `#[serde(default)]`，与 `RefreshResponse` 保持一致，容忍服务端省略或类型不匹配这两个非业务字段
+  - **`src/stores/online/authSlice.ts`**：`login()` / `register()` 的 `safeCall` 增加 `onError` 回调，toast 显示后端返回的真实错误信息（如 "登录请求失败: JSON 解析失败: ..."），不再吞掉错误细节
+  - **`src/components/online/OnlineDevicePanel.vue`**：移除 `handleLogin` / `handleRegister` 的通用 "请稍后重试" toast（store 层已显示具体错误，避免重复 toast）
+- 验证：`cargo check` + `npx vue-tsc --noEmit` 均通过（exit 0）
 
 #### 统一前端弹窗高度限制（公共 CSS 工具类）
 
