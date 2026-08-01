@@ -261,24 +261,29 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
                 .unwrap_or(serde_json::json!({}))
         };
 
-        // tutorial-* 模板：使用 base-help.html 作为基础模板包装
-        // tutorial-*.html 为纯内容文件（无 <html>/<head>/<style>），内容注入到 data.content
-        // base-help.html 提供统一样式 + 右侧 TOC 自动生成（复刻 ToolToc.vue 行为）
-        let (template, data_json) = if template_name.starts_with("tutorial-") {
+        // tutorial-* 模板：使用 base-help.html 作为基础模板，通过占位符替换注入内容
+        // 不走 __PICKER_DATA__ 注入路径，直接在后端完成字符串替换形成完整 HTML，
+        // 避免 JS 运行时时序问题（注入脚本与原始脚本的执行顺序导致读取到 undefined）
+        if template_name.starts_with("tutorial-") {
             let content = template; // 原始读取的内容文件（content-only HTML）
             let base = crate::resources::read_resource("templates/base-help.html")
                 .unwrap_or_else(|_| "<html><body>模板不存在</body></html>".to_string());
-            let mut enriched = data_json;
-            if let Some(obj) = enriched.as_object_mut() {
-                obj.insert(
-                    "content".to_string(),
-                    serde_json::Value::String(content),
-                );
-            }
-            (base, enriched)
-        } else {
-            (template, data_json)
-        };
+            // 从 data 中提取 title（open_picker_window 已注入 title 字段）
+            let title = data_json
+                .get("title")
+                .and_then(|v| v.as_str())
+                .unwrap_or("帮助文档");
+            // 占位符替换：形成完整 HTML，无需 JS 运行时注入
+            let html = base
+                .replace("{{__TITLE__}}", title)
+                .replace("{{__CONTENT__}}", &content);
+            return build_response(
+                200,
+                "text/html; charset=utf-8",
+                html.into_bytes(),
+                csp.as_deref(),
+            );
+        }
 
         // 注入依赖库（markdown 模板需要 marked.min.js，qrcode 模板需要 qrcode.min.js）
         // tutorial-* 模板使用 base-help.html 硬编码 HTML，无需注入依赖库

@@ -81,6 +81,15 @@
 - 设计决策：base-help.html 复刻 ToolToc.vue 的右侧 TOC 行为（收起/展开/滚动高亮/点击跳转），不引入新模式；tutorial-*.html 改为纯内容文件，新增教程只需写内容无需复制样式
 - 验证：`cargo check` + `npx vue-tsc --noEmit` 均通过（exit 0）
 
+#### 修复 base-help.html 教程窗口内容未加载（改用后端占位符替换）
+
+- 症状：教程 picker 子窗口显示"无内容"，标题栏加载正常但内容区为空
+- 根因：base-help.html 原始 `<script>` 在解析时立即执行读取 `window.__PICKER_DATA__`，但后端注入脚本 `<script>window.__PICKER_DATA__ = {...};</script>` 追加在原始 `<script>` 之后，执行顺序导致读取时尚为 undefined
+- 改动（2 文件）：
+  - **`src-tauri/resources/templates/base-help.html`**：改用后端占位符替换方案。模板中使用 `{{__TITLE__}}` 和 `{{__CONTENT__}}` 占位符，由后端在响应前完成字符串替换形成完整 HTML。移除所有 `__PICKER_DATA__` 读取逻辑与 DOMContentLoaded 包装，脚本仅保留 TOC 自动生成与交互（内容已在 DOM 中，脚本位于 body 底部可直接执行）
+  - **`src-tauri/src/commands/tools/picker_window.rs`**：tutorial-* 模板改为后端占位符替换路径，读取 base-help.html 后将 `{{__TITLE__}}` 替换为标题、`{{__CONTENT__}}` 替换为教程内容，直接返回完整 HTML，跳过 `__PICKER_DATA__` 注入路径
+- 设计决策：后端占位符替换形成完整 HTML，彻底消除 JS 运行时时序依赖，比 DOMContentLoaded 方案更简洁可靠
+
 #### 修复联机设备登录"接口成功但前端报失败"
 
 - 症状：点击联机页面"登录"按钮后，api-server 返回 HTTP 200 + 有效数据，但前端 toast 提示"设备登录失败，请稍后重试"；同时 `auth_status` 查询显示 `logged_in: true`（旧 token 仍有效）

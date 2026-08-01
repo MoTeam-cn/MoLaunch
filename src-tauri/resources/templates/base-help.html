@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>帮助文档</title>
+  <title>{{__TITLE__}}</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -117,13 +117,13 @@
 </head>
 <body oncontextmenu="return false">
   <div class="titlebar">
-    <div class="title" id="titlebar-text">帮助文档</div>
+    <div class="title" id="titlebar-text">{{__TITLE__}}</div>
   </div>
   <div class="content-wrapper">
-    <div class="content" id="content"></div>
-    <!-- 右侧 TOC 导航（≥ 3 项时显示） -->
-    <div class="toc-nav" id="toc-nav" style="display: none;"
-         onmouseenter="onTocHover(true)" onmouseleave="onTocHover(false)">
+    <!-- 内容由后端占位符替换注入（{{__CONTENT__}}），无需 JS 运行时注入 -->
+    <div class="content" id="content">{{__CONTENT__}}</div>
+    <!-- 右侧 TOC 导航（≥ 3 项时显示，事件由 JS 绑定） -->
+    <div class="toc-nav" id="toc-nav" style="display: none;">
       <div class="toc-container collapsed" id="toc-container"></div>
     </div>
   </div>
@@ -135,25 +135,14 @@
       if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
     });
 
-    var DATA = window.__PICKER_DATA__ || {};
+    // 内容已由后端通过占位符替换注入到 DOM，脚本位于 body 底部，此时 DOM 已就绪
     var scrollContainer = document.getElementById('content');
     var tocNav = document.getElementById('toc-nav');
     var tocContainer = document.getElementById('toc-container');
-    var titlebarText = document.getElementById('titlebar-text');
-
-    // 注入标题
-    if (DATA.title) {
-      titlebarText.textContent = DATA.title;
-      document.title = DATA.title;
-    }
-
-    // 注入内容
-    var contentEl = document.getElementById('content');
-    contentEl.innerHTML = DATA.content || '<p style="color:#9ca3af">无内容</p>';
 
     // ============ TOC 自动生成（扫描 h2 标题） ============
     var tocItems = [];
-    var headings = contentEl.querySelectorAll('h2');
+    var headings = scrollContainer.querySelectorAll('h2');
     headings.forEach(function(h, i) {
       if (!h.id) h.id = 'toc-section-' + (i + 1);
       tocItems.push({ id: h.id, title: h.textContent.trim() });
@@ -161,7 +150,6 @@
 
     var activeId = '';
     var tocHovered = false;
-    var scrollHandler = null;
 
     // 渲染 TOC（≥ 3 项才显示）
     function renderToc() {
@@ -243,7 +231,7 @@
 
     // 滚动高亮（复刻 ToolToc.vue scrollHandler 逻辑）
     function bindScroll() {
-      scrollHandler = function() {
+      var scrollHandler = function() {
         if (tocItems.length === 0) return;
         var containerRect = scrollContainer.getBoundingClientRect();
         var offset = 20;
@@ -285,6 +273,10 @@
       activeId = id;
       updateTocActive();
     }
+
+    // 绑定 TOC 悬停事件
+    tocNav.addEventListener('mouseenter', function() { onTocHover(true); });
+    tocNav.addEventListener('mouseleave', function() { onTocHover(false); });
 
     // 初始化
     renderToc();
