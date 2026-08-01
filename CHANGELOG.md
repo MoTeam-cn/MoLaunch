@@ -9,6 +9,29 @@
 
 ### 维护
 
+#### 修复跨平台兼容性 P2 中等问题（4 项连续修复）
+
+- 背景：P0 阻塞项与 P1 体验项清零后，继续处理 P2 中等问题，覆盖 updater stub 语义、frp 进程组管理、SDK 平台覆盖、注册表 bool 语义模糊。完整扫描报告见 `docs/CROSS_PLATFORM_COMPATIBILITY.md`
+- 改动（4 处修复，7 个文件）：
+  - **M1 `src-tauri/src/commands/system/updater/mod.rs`**：非 Windows stub 明确化
+    - `download_update_to_appdata` 与 `apply_pending_update` 在非 Windows 分支静默 `Ok(false)`，无任何日志提示，调用方无法区分"无更新"与"平台不支持"
+    - 改为：两个 stub 分支均加 `log_info!` 提示"由 tauri-plugin-updater 接管"，并补充 doc 注释说明平台差异与前端应使用的命令
+  - **M2 `src-tauri/src/commands/frp/process/start.rs` + `stop.rs`**：非 Windows 进程组管理
+    - 问题：Windows 通过 Job Object（`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`）实现启动器退出时自动清理 frpc，非 Windows 无对应机制，stop_tunnel 仅靠 `kill_process_tree` 的 ps 递归查询，可能漏掉短命子进程
+    - 改造：start.rs 在 `cmd.spawn()` 前用 `pre_exec(setpgid(0, 0))` 让 frpc 成为新进程组 leader（PGID = frpc PID）；stop.rs 非 Windows 改用 `libc::killpg(pgid, SIGTERM)` 一次性杀整个进程组（含 frpc 派生子进程），ESRCH 不算错误
+    - 新增依赖：`libc = "0.2"` 加入 `[target.'cfg(unix)'.dependencies]`（仅 macOS/Linux 引入，Windows 不受影响）
+    - 语义：SIGTERM 而非 SIGKILL，给 frpc 优雅退出（关闭连接、刷新日志）的机会
+  - **M3 `src-tauri/src/sdk/mod.rs`**：SDK 平台覆盖加 fallback
+    - 问题：`get_sdk_filename()` 用 `#[cfg(target_os = "...")]` 仅覆盖三个组合，未匹配的 Intel Mac / Linux aarch64 / FreeBSD 等平台会编译失败（`#[cfg]` 分支不完整导致函数无返回值）
+    - 改造：精确匹配 `#[cfg(all(target_os, target_arch))]`，并加 `#[cfg(not(any(...)))]` fallback 返回 `"unsupported-platform"`，`check_sdk_library()` 在 `extract_sdk()` 时因嵌入资源不存在返回明确错误，避免编译失败但运行时无法加载
+    - 新增平台支持时需同步：1) 编译 SDK 产物；2) 加入 resources/sdk/；3) 添加对应 `#[cfg]` 分支
+  - **M4 `src-tauri/src/storage/registry.rs` + `developer.rs` + `apply_config/secure.rs`**：`reg_get_bool` 语义模糊
+    - 问题：`reg_get_bool` 在非 Windows 上固定返回 `false`，调用方无法区分"值实际为 false"与"平台不支持读取"
+    - 改造：返回类型 `bool → Option<bool>`，Windows 端键不存在返回 `None`、值为 false 返回 `Some(false)`、值为 true 返回 `Some(true)`；非 Windows stub 返回 `None`（平台不支持）
+    - 调用方（6 处）：developer.rs 3 处 + secure.rs 3 处，全部加 `.unwrap_or(false)` 保持原"键不存在视为 false"语义，但日志/调试时可 `match` 区分"不支持"与"false"
+- 验证：`cargo check` 0 错误，`cargo clippy` 0 警告（Windows 平台；Unix 分支为标准 POSIX 调用，待 macOS/Linux CI 验证）
+- 影响范围：macOS/Linux 上 frpc 子进程清理更可靠（killpg 替代 ps 递归查询）；未支持平台 SDK 加载失败时给出明确错误而非编译失败；注册表 bool 语义清晰，便于后续跨平台扩展
+
 #### 修复跨平台兼容性 P1 体验项：auth/storage 凭据持久化改文件存储（S4+S5）
 
 - 背景：`auth/storage` 系列文件围绕 Windows 注册表设计，非 Windows 平台 `save` 静默 `Ok(())` 不持久化、`load` 返回 `default()` 空状态，导致 macOS/Linux 上登录后重启启动器会丢失所有登录信息。完整扫描报告见 `docs/CROSS_PLATFORM_COMPATIBILITY.md`
