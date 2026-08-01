@@ -114,9 +114,12 @@ pub fn validate_tunnel(params: &CreateTunnelParams) -> Result<(), String> {
 /// 对应设计文档 §7.2 配置校验。两项检查：
 /// 1. 若厂商 `network_permissions.allow_custom_server=false`，`server_addr` 必须在
 ///    `allowed_servers` 白名单内（系统默认厂商无 manifest，允许自定义服务器）。
+///    白名单项支持完整 `host:port` 匹配、host 匹配、以及 `*.example.com` 通配符
+///    （复用 `binary::host_matches`，供平台动态节点厂商如 LoliaFrp 使用）。
 /// 2. 非系统默认厂商禁止连接内网地址（10.0.0.0/8、172.16.0.0/12、192.168.0.0/16、
 ///    127.0.0.0/8），防止 SSRF。系统默认厂商豁免（用户自建 frps 可能位于内网）。
 fn validate_network_permissions(params: &CreateTunnelParams) -> Result<(), String> {
+    use super::binary::host_matches;
     use super::provider::{read_provider_manifest, SYSTEM_DEFAULT_ID};
 
     let is_system_default = params.provider_id == SYSTEM_DEFAULT_ID;
@@ -130,7 +133,7 @@ fn validate_network_permissions(params: &CreateTunnelParams) -> Result<(), Strin
             if !net_perm.allow_custom_server {
                 let server_addr = params.server_addr.trim();
                 let allowed = &net_perm.allowed_servers;
-                // 白名单匹配：完整匹配或 host 部分匹配（允许白名单只写 host 或 host:port）
+                // 白名单匹配：完整匹配、host 匹配、或 `*.domain` 通配符匹配
                 let addr_host = server_addr.split(':').next().unwrap_or(server_addr);
                 let matched = allowed.iter().any(|s| {
                     let s = s.trim();
@@ -138,7 +141,7 @@ fn validate_network_permissions(params: &CreateTunnelParams) -> Result<(), Strin
                         return true;
                     }
                     let s_host = s.split(':').next().unwrap_or(s);
-                    s_host == addr_host
+                    s_host == addr_host || host_matches(addr_host, s_host)
                 });
                 if !matched {
                     return Err(format!(
@@ -204,10 +207,7 @@ pub fn validate_tunnel_update(p: &UpdateTunnelParams) -> Result<(), String> {
     validate_tunnel(&create)
 }
 
-// ============================================================
 // 认证适配器脚本沙箱（§7.5）
-// ============================================================
-
 /// 沙箱化执行厂商认证适配器脚本（§7.5）
 ///
 /// 流程：读取厂商 `process_permissions` → 校验命令在白名单（`spawn::is_command_allowed`）
@@ -353,4 +353,47 @@ pub async fn run_auth_adapter(
         timed_out,
         duration_ms,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::binary::host_matches;
+
+    #[test]
+    fn host_matches_wildcard() {
+        // 通配符：匹配任意子域名
+        assert!(host_matches("jp-4.qwq.fan", "*.qwq.fan"));
+        assert!(host_matches("us-1.qwq.fan", "*.qwq.fan"));
+        // 通配符不匹配裸域名（需至少一层子域名）
+        assert!(!host_matches("qwq.fan", "*.qwq.fan"));
+        // 不匹配其他域名
+        assert!(!host_matches("evil.example.com", "*.qwq.fan"));
+    }
+
+    #[test]
+    fn host_matches_exact() {
+        assert!(host_matches("frps.acme.example.com", "frps.acme.example.com"));
+        assert!(!host_matches("other.acme.example.com", "frps.acme.example.com"));
+        // host:port 项比较时调用方先剥离端口，这里验证纯 host 匹配
+        assert!(!host_matches("frps.acme.example.com:7000", "frps.acme.example.com"));
+    }
+
+    #[test]
+    fn host_matches_whitelist_forms() {
+        // 模拟 validate_network_permissions 的白名单匹配逻辑：
+        // 完整 host:port 匹配、host 匹配、通配符匹配三种形式
+        let server_addr = "jp-4.qwq.fan";
+        let addr_host = server_addr.split(':').next().unwrap_or(server_addr);
+        let allowed = ["*.qwq.fan"];
+
+        let matched = allowed.iter().any(|s| {
+            let s = s.trim();
+            if s == server_addr {
+                return true;
+            }
+            let s_host = s.split(':').next().unwrap_or(s);
+            s_host == addr_host || host_matches(addr_host, s_host)
+        });
+        assert!(matched);
+    }
 }

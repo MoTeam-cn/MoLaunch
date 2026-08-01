@@ -412,7 +412,7 @@
     <tr><th>字段</th><th>说明</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>allowedServers</code></td><td>允许的 frps 服务器地址白名单（域名或 IP[:端口]）</td></tr>
+    <tr><td><code>allowedServers</code></td><td>允许的 frps 服务器地址白名单。每项支持完整 <code>host:port</code>、纯 host，或 <code>*.example.com</code> 通配符（匹配任意子域名，适合平台动态节点厂商，如 <code>["*.qwq.fan"]</code>）</td></tr>
     <tr><td><code>allowCustomServer</code></td><td>是否允许用户自定义服务器（false=仅白名单内的服务器）</td></tr>
   </tbody>
 </table>

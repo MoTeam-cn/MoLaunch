@@ -125,7 +125,10 @@ fn validate_download_url(url: &str, allowed_domains: &[String]) -> Result<(), St
 }
 
 /// 域名白名单匹配，支持 `*.example.com` 一级通配符
-fn host_matches(host: &str, pattern: &str) -> bool {
+///
+/// `pub(crate)`：供 `sandbox::validate_network_permissions` 复用（隧道服务器地址
+/// 白名单同样需要通配符，如 LoliaFrp 平台动态节点 `*.qwq.fan`）。
+pub(crate) fn host_matches(host: &str, pattern: &str) -> bool {
     if let Some(rest) = pattern.strip_prefix("*.") {
         host.ends_with(rest) && host.len() > rest.len()
     } else {
