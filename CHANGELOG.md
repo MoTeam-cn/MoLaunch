@@ -195,6 +195,14 @@
 
 ### 修复
 
+#### CI：WebKitGTK 依赖版本升级（4.0 → 4.1）修复 javascriptcoregtk 缺失
+
+- 背景：CI 的 `rust-clippy` / `rust-test` job 构建失败，错误为 `javascriptcore-rs-sys` 找不到 `javascriptcoregtk-4.1.pc`。项目是 **Tauri v2**，webview 依赖 webkit2gtk **4.1**（`javascriptcoregtk-4.1`），但 workflow 沿用了 Tauri v1 时代的 `libwebkit2gtk-4.0-dev`（4.0 版），导致 pkg-config 找不到对应库
+- 改动（2 文件 3 处）：
+  - **`.github/workflows/ci.yml`**（2 处）：`rust-clippy` job、`rust-test` job 的 Linux 依赖安装命令 `libwebkit2gtk-4.0-dev` → `libwebkit2gtk-4.1-dev`（保留 `libsoup-3.0-dev` / `libayatana-appindicator3-dev` / `librsvg2-dev` 等 Tauri v2 依赖组合）
+  - **`.github/workflows/release.yml`**（1 处）：`build-and-upload` job 的 Linux 依赖同步升级为 4.1（打 tag 打包时同样需要 4.1）
+- 验证：grep 确认 3 处已全部替换，无 4.0 残留；Ubuntu 22.04 (jammy) 官方源提供 `libwebkit2gtk-4.1-dev`，与 Tauri v2 官方 GitHub workflow 示例一致
+
 #### CI：改为纯检查流水线（移除 Tauri 打包 job），补充前端 typecheck 与 Rust 测试
 
 - 背景：用户要求 CI 只做检查、不要 build 程序。原 `build` job 用 tauri-action 做三平台（Windows/macOS/Linux）完整打包，耗时最长且每次提交都跑；且前端类型检查（vue-tsc）此前只在 build job 中隐含执行，Rust 单测（`*_tests.rs`）从未在 CI 中运行过
