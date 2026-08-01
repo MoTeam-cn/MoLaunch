@@ -1,5 +1,5 @@
 //! 厂商管理 action 注册：列表/启禁/安装/卸载、frpc 二进制就绪、
-//! 厂商 API 引擎（fetch_vendor_config）、认证适配器沙箱（run_auth_adapter）。
+//! 厂商 API 引擎（fetch_tunnels）、认证适配器沙箱（run_auth_adapter）。
 
 use crate::commands::frp;
 use crate::handler;
@@ -90,13 +90,25 @@ pub fn register(d: &mut Dispatcher) {
         }),
     );
 
-    // 厂商 API 引擎（阶段三：api-schema.json 解析 + 配置拉取）
+    // 厂商 API 引擎（按 endpoints.json 配置拉取隧道列表 + 账号信息）
     d.register(
-        "fetch_vendor_config",
+        "fetch_tunnels",
         handler!(state, _app, params, {
             let p: ProviderIdParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = frp::api_schema::fetch_vendor_config(&state, &p.provider_id).await?;
+            let (tunnels, account) =
+                frp::api_spec::fetch_tunnels(&state, &p.provider_id).await?;
+            // 包装为对象返回，前端按 {tunnels, account} 取值
+            #[derive(serde::Serialize)]
+            #[serde(rename_all = "camelCase")]
+            struct FetchTunnelsResult<'a> {
+                tunnels: &'a [frp::api_spec::TunnelInfo],
+                account: &'a frp::api_spec::AccountInfo,
+            }
+            let r = FetchTunnelsResult {
+                tunnels: &tunnels,
+                account: &account,
+            };
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

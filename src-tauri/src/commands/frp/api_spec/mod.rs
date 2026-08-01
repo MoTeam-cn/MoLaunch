@@ -15,7 +15,7 @@
 use super::{providers_root, validate_provider_id, ApiSpec};
 use crate::log_info;
 use crate::state::AppState;
-use std::collections::HashMap;
+use serde::Serialize;
 
 pub mod config_gen;
 pub mod envelope;
@@ -30,7 +30,8 @@ pub mod jsonpath;
 ///
 /// 对应 endpoints.json 中 tunnelFields 定义的字段。
 /// fields 模式下启动器按这些字段拼装 frpc 配置。
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TunnelInfo {
     pub id: String,
     pub name: String,
@@ -46,7 +47,8 @@ pub struct TunnelInfo {
 }
 
 /// 账号信息（从厂商 API 响应映射）
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AccountInfo {
     pub id: String,
     pub username: String,
@@ -116,7 +118,7 @@ pub async fn fetch_tunnels(
         .map_err(|e| format!("获取 device_id 失败: {}", e))?;
 
     // 拉取账号信息（可选，用于获取 account.token 供 fields 映射引用）
-    let account = if let Some(ref acct_endpoint) = spec
+    let account = if let Some(acct_endpoint) = spec
         .endpoints
         .as_ref()
         .and_then(|e| e.account.as_ref())
@@ -283,11 +285,11 @@ fn resolve_field(
         .unwrap_or_default();
 
     // 处理 split 拆分（如 connectAddress "host:port" 按冒号拆分）
-    if let Some(ref sep) = m.split {
-        // 需要知道取第几部分 — 通过 field 名推断（serverHost 取 0，serverPort 取 1）
-        // 但 FieldMapping 不包含索引信息，这里按约定：split 时返回完整值
-        // 调用方应在 fields 映射中分别为 serverHost/serverPort 配置 split
-        // 实际拆分在 config_gen 中按需处理
+    // 需要知道取第几部分 — 通过 field 名推断（serverHost 取 0，serverPort 取 1）
+    // 但 FieldMapping 不包含索引信息，这里按约定：split 时返回完整值
+    // 调用方应在 fields 映射中分别为 serverHost/serverPort 配置 split
+    // 实际拆分在 config_gen 中按需处理
+    if m.split.is_some() {
         return raw;
     }
 

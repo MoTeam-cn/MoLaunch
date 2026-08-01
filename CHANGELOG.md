@@ -7,7 +7,44 @@
 
 ## [未发布]
 
-### 新增
+### 修复
+
+#### 简单表单弹窗样式还原（移除误加的高度限制）
+
+- 背景：之前统一弹窗高度限制时，将 `modal-shell`/`modal-body`/`modal-scroll` 三个 CSS 工具类应用到所有弹窗，但输入框、复选框、单选按钮等简单表单弹窗不应使用高度限制（`max-height: calc(100vh - 100px)`）和滚动区，且应垂直居中而非顶部对齐。本次还原这5个弹窗为简单居中布局
+- 改动（5 文件）：
+  - **`src/components/common/Modal.vue`**：通用弹窗（error/warning/info/success/confirm/prompt），含输入框模式，还原为居中显示
+  - **`src/components/online/KickConfirmDialog.vue`**：踢出确认弹窗，含封禁时长单选卡片，还原为居中显示
+  - **`src/components/online/LobbyJoinConfirmDialog.vue`**：加入房间确认弹窗，含整合包校验卡片，还原为居中显示
+  - **`src/views/tools/archive/ArchiveBackupDialog.vue`**：存档备份弹窗，含输入框 + 复选框，还原为居中显示
+  - **`src/views/tools/data/LoadSaveModal.vue`**：从存档加载种子弹窗，含两个 Select 下拉框，还原为居中显示
+- 改动内容：每个弹窗3处类名替换
+  - `modal-shell` → `fixed inset-0 z-[10000] flex items-center justify-center p-4`（`items-start` → `items-center` 居中，`pt-14 pb-4` → `p-4` 四边等距）
+  - `modal-body max-w-xxx mt-2` → `relative w-full max-w-xxx bg-white rounded-lg shadow-xl`（移除 `max-height` 和 `flex flex-col`，去掉 `mt-2`）
+  - `modal-scroll px-x py-x` → `px-x py-x`（移除 `flex-1 overflow-y-auto` 滚动特性，保留 padding）
+- 设计决策：长内容弹窗（如 ResourceDetail、教程、日志查看等）保留 `modal-shell`/`modal-body`/`modal-scroll` 高度限制方案不变；简单表单弹窗直接 inline tailwind 类，不新增 CSS 工具类，避免类名膨胀
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+### 重构
+
+#### FRP 厂商接口规范改造（阶段 3+5+8：auth 重写 + 调用方切换 + 旧模块清理）
+
+- 背景：阶段 1+2 已完成类型定义和 api_spec 引擎，但 auth 模块（oauth2.rs / device_code.rs / refresh_token）仍用硬编码 form 请求 + TokenResponse 反序列化，无法适配 OpenFRP 等非标准厂商。本次完成全量切换：所有认证流程由 flows.rs 引擎按 endpoints.json authFlows 配置驱动，删除旧 api_schema 模块
+- 改动（7 文件）：
+  - **`src-tauri/src/commands/frp/auth/oauth2.rs`**：重写 start_oauth2，删除 `exchange_code_for_token` 硬编码 form 请求 + `TokenResponse` 反序列化。改为加载 endpoints.json `authFlows.oauth2.token` 配置，通过 `flows::send_flow_request` 引擎构造请求，按 `response.accessToken/refreshToken/expiresIn/errorField/errorDescription` FieldExtractor 解析响应。保留 `build_authorize_url`（用户交互层标准 OAuth2 流程）和 `wait_for_callback`（本地 HTTP 服务接收回调）
+  - **`src-tauri/src/commands/frp/auth/device_code.rs`**：重写 start_device_code + poll_device_code，删除 `DeviceCodeResponse` 反序列化和硬编码 form 请求。改为读 `authFlows.device_code.request/poll` 配置，通过 flows 引擎发送请求，按 `deviceCode/userCode/verificationUri/pollInterval/expiresIn/accessToken/refreshToken/errorField` FieldExtractor 解析。DeviceCodeSession 内存会话改存 `poll_flow: FlowRequest` 和 `pending_error: Option<String>` 替代原 `token_url + client_id`，运行时按配置驱动轮询
+  - **`src-tauri/src/commands/frp/auth/mod.rs`**：重写 `refresh_token`，删除硬编码 form 请求 + `TokenResponse` 反序列化。改为读 `authFlows.oauth2.refresh` 配置（缺失时回退到 `oauth2.token`），通过 flows 引擎驱动。删除 `TokenResponse` 内部类型，新增 `get_extractor` 和 `extract_flow_error` 内部辅助函数（与 oauth2.rs/device_code.rs 中同名函数对齐）
+  - **`src-tauri/src/commands/frp/types.rs`**：`OAuth2Config` 和 `DeviceCodeConfig` 新增 `client_secret: Option<String>` 字段（部分厂商需要）
+  - **`src-tauri/src/commands/frp/api_spec/mod.rs`**：`TunnelInfo` 和 `AccountInfo` 加 `Serialize` 派生（供 provider_actions 返回前端）；修复 `if let Some(ref x)` 引用重复警告；移除未使用的 HashMap 导入
+  - **`src-tauri/src/utils/frp_manager/provider_actions.rs`**：`fetch_vendor_config` action 重命名为 `fetch_tunnels`，调用切换到 `frp::api_spec::fetch_tunnels`，返回结构改为 `{tunnels, account}` 对象（前端按 camelCase 取值）
+  - **`src-tauri/src/commands/frp/mod.rs`**：移除 `pub mod api_schema` 声明
+  - 删除：`src-tauri/src/commands/frp/api_schema/` 目录（mod.rs / helpers.rs / http.rs / mapping.rs / tests.rs），共 5 个文件。旧 `api_schema` 模块基于硬编码 api-schema.json，已被 `api_spec` 模块（基于可配置 endpoints.json）完全替代
+- 设计决策：
+  - 占位符统一通过 `flows::FlowContext` 传递（`{clientId} {clientSecret} {redirectUri} {code} {scope} {deviceCode} {refreshToken} {apiKey} {publicKey} {requestUuid}` 等），flows.rs 引擎递归填充 body 模板，form-urlencoded 自动转换为 key=value 对
+  - 响应字段提取支持 `from=body`（JSONPath）和 `from=header`（响应头字段名），覆盖 OpenFRP 的 token 在响应 Header 的非标准场景
+  - `OAuth2Flow.refresh` 缺失时回退到 `OAuth2Flow.token`，适配部分厂商用同一端点刷新的场景
+  - Device Code 会话内存存储 `poll_flow: FlowRequest` 而非 `token_url + client_id`，确保运行时按配置驱动而非硬编码
+- 验证：`cargo check` + `cargo clippy -D warnings` + `npx vue-tsc --noEmit` 均通过（exit 0）
 
 #### FRP 厂商接口规范改造（阶段 1+2：类型定义 + API 引擎）
 

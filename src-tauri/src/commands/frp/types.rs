@@ -250,10 +250,13 @@ pub struct NetworkPermissions {
 pub struct OAuth2Config {
     /// 授权页 URL
     pub authorize_url: String,
-    /// token 交换 URL
+    /// token 交换 URL（兼容旧版 manifest，新设计改由 endpoints.json authFlows.oauth2.token.url 提供）
     pub token_url: String,
     /// 客户端 ID
     pub client_id: String,
+    /// 客户端密钥（可选，部分厂商需要）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<String>,
     /// 权限范围
     #[serde(default)]
     pub scopes: Vec<String>,
@@ -274,6 +277,9 @@ pub struct DeviceCodeConfig {
     pub token_url: String,
     /// 客户端 ID
     pub client_id: String,
+    /// 客户端密钥（可选，部分厂商需要）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client_secret: Option<String>,
     /// 权限范围
     #[serde(default)]
     pub scopes: Vec<String>,

@@ -1,15 +1,18 @@
 //! Frp 厂商认证模块：OAuth2 / Device Code / API Key 三种流程
 //!
 //! token 使用 OS 密钥存储（Windows Credential Manager / macOS Keychain / Linux Secret Service）。
-//! 子模块：storage（密钥存储辅助）/ oauth2 / device_code / api_key。
+//! 子模块：storage（密钥存储辅助）/ oauth2 / device_code / api_key / flows（可配置流程引擎）。
 
+use super::api_spec::load_api_spec;
 use super::provider::{read_provider_manifest, SYSTEM_DEFAULT_ID};
+use super::types::{FieldExtractor, FlowRequest, OAuth2Flow};
 use crate::log_info;
 use crate::state::AppState;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 mod api_key;
 mod device_code;
+mod flows;
 mod oauth2;
 mod storage;
 
@@ -75,20 +78,34 @@ pub struct DeviceCodePollResult {
 }
 
 // ============================================================
-// 内部共享类型
+// 内部辅助（refresh_token 用 flows 引擎提取字段）
 // ============================================================
 
-/// OAuth2 / Device Code token 端点响应
-#[derive(Debug, Deserialize)]
-pub(super) struct TokenResponse {
-    pub access_token: Option<String>,
-    pub refresh_token: Option<String>,
-    pub expires_in: Option<u64>,
-    pub scope: Option<String>,
-    /// 错误字段（Device Code 轮询时使用）
-    pub error: Option<String>,
-    #[allow(dead_code)]
-    pub error_description: Option<String>,
+/// 从 FlowRequest.response 取指定字段的 FieldExtractor
+///
+/// 字段名按 camelCase 约定：accessToken / refreshToken / expiresIn /
+/// errorField / errorDescription
+fn get_extractor<'a>(flow: &'a FlowRequest, key: &str) -> &'a FieldExtractor {
+    static EMPTY: once_cell::sync::Lazy<FieldExtractor> = once_cell::sync::Lazy::new(|| {
+        FieldExtractor {
+            from: "body".to_string(),
+            path: None,
+            name: None,
+        }
+    });
+    flow.response.get(key).unwrap_or(&EMPTY)
+}
+
+/// 从响应中提取错误消息（按 errorField / errorDescription 提取）
+fn extract_flow_error(resp: &flows::FlowResponse, flow: &FlowRequest) -> String {
+    let err = resp.extract_field(get_extractor(flow, "errorField"));
+    let desc = resp.extract_field(get_extractor(flow, "errorDescription"));
+    match (err, desc) {
+        (Some(e), Some(d)) if !e.is_empty() && !d.is_empty() => format!("{}: {}", e, d),
+        (Some(e), _) if !e.is_empty() => e,
+        (Some(e), _) => e,
+        _ => "未知错误".to_string(),
+    }
 }
 
 // ============================================================
@@ -192,54 +209,69 @@ pub async fn poll_device_code(
 /// 刷新 token
 ///
 /// access_token 过期前 5 分钟用 refresh_token 刷新。也可由用户手动触发。
+///
+/// 流程：加载 endpoints.json → 取 authFlows.oauth2.refresh（不存在时回退到 oauth2.token）
+/// → 走 flows 引擎发送请求 → 解析响应并存储新 token。
 pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), String> {
     let manifest = read_provider_manifest(provider_id)?;
-
-    // 获取 tokenUrl + clientId（oauth2 或 device_code）
-    let (token_url, client_id) = if let Some(ref oauth2) = manifest.auth.oauth2 {
-        (oauth2.token_url.clone(), oauth2.client_id.clone())
-    } else if let Some(ref dc) = manifest.auth.device_code {
-        (dc.token_url.clone(), dc.client_id.clone())
-    } else {
-        return Err(format!("厂商 {} 不支持 token 刷新", provider_id));
-    };
+    let endpoints_file = manifest
+        .api
+        .as_ref()
+        .map(|a| a.endpoints_file.as_str())
+        .unwrap_or("api/endpoints.json");
+    let spec = load_api_spec(provider_id, endpoints_file)?;
+    let oauth2_flow: &OAuth2Flow = spec
+        .auth_flows
+        .as_ref()
+        .and_then(|f| f.oauth2.as_ref())
+        .ok_or_else(|| format!("厂商 {} endpoints.json 缺少 authFlows.oauth2 配置", provider_id))?;
+    // 优先使用 refresh，缺失时回退到 token（部分厂商用同一端点刷新）
+    let refresh_flow: &FlowRequest = oauth2_flow.refresh.as_ref().unwrap_or(&oauth2_flow.token);
 
     let refresh_token = storage::load_secret(provider_id, storage::KEY_REFRESH_TOKEN)?
         .ok_or_else(|| format!("厂商 {} 无 refresh_token，请重新认证", provider_id))?;
 
+    // 取 clientId（oauth2 或 device_code）
+    let client_id = if let Some(ref oauth2) = manifest.auth.oauth2 {
+        oauth2.client_id.clone()
+    } else if let Some(ref dc) = manifest.auth.device_code {
+        dc.client_id.clone()
+    } else {
+        return Err(format!("厂商 {} 不支持 token 刷新", provider_id));
+    };
+
     log_info!("[Frp Auth] 刷新 token: provider={}", provider_id);
 
-    let client = crate::http::get_client();
-    let resp = client
-        .post(&token_url)
-        .form(&[
-            ("grant_type", "refresh_token"),
-            ("refresh_token", refresh_token.as_str()),
-            ("client_id", client_id.as_str()),
-        ])
-        .send()
-        .await
-        .map_err(|e| format!("刷新 token 请求失败: {}", e))?;
+    let ctx = flows::FlowContext {
+        client_id,
+        refresh_token: Some(refresh_token),
+        ..Default::default()
+    };
+    let resp = flows::send_flow_request(refresh_flow, &ctx).await?;
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        crate::log_error!("[Frp Auth] 刷新 token 失败: HTTP {} {}", status, body);
-        return Err(format!("刷新 token 失败: HTTP {}", status));
+    if !resp.is_success() {
+        let err = extract_flow_error(&resp, refresh_flow);
+        crate::log_error!(
+            "[Frp Auth] 刷新 token 失败: HTTP {} - {}",
+            resp.status,
+            err
+        );
+        return Err(format!("刷新 token 失败: {}", err));
     }
 
-    let token_resp: TokenResponse = resp
-        .json()
-        .await
-        .map_err(|e| format!("解析刷新响应失败: {}", e))?;
-
-    let access_token = token_resp.access_token.ok_or("刷新响应缺少 access_token")?;
+    let access_token = resp
+        .extract_field(get_extractor(refresh_flow, "accessToken"))
+        .ok_or("刷新响应缺少 accessToken")?;
+    let new_refresh_token = resp.extract_field(get_extractor(refresh_flow, "refreshToken"));
+    let expires_in = resp
+        .extract_field(get_extractor(refresh_flow, "expiresIn"))
+        .and_then(|s| s.parse::<u64>().ok());
 
     storage::store_token_info(
         provider_id,
         &access_token,
-        token_resp.refresh_token.as_deref(),
-        token_resp.expires_in,
+        new_refresh_token.as_deref(),
+        expires_in,
         None, // 刷新不改变 scopes
     )?;
 
@@ -263,10 +295,10 @@ pub async fn revoke_auth(provider_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 读取 access_token（供 api_schema 模块调用厂商 API 时使用）
+/// 读取 access_token（供 api_spec 模块调用厂商 API 时使用）
 ///
 /// 仅读取已存储的 access_token，不检查过期、不自动刷新。
-/// 调用方（api_schema::fetch_vendor_config）应先调用 refresh_token 确保有效。
+/// 调用方（api_spec::fetch_tunnels）应先调用 refresh_token 确保有效。
 pub async fn load_token(provider_id: &str) -> Result<String, String> {
     storage::load_secret(provider_id, storage::KEY_ACCESS_TOKEN)?
         .ok_or_else(|| format!("厂商 {} 未认证，请先完成认证", provider_id))

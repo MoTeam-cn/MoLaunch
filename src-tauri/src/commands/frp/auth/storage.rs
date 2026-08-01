@@ -188,6 +188,7 @@ pub(super) fn generate_state() -> String {
 }
 
 /// 解析 scope 字符串（空格分隔）为 Vec
+#[allow(dead_code)]
 pub(super) fn parse_scopes(scope_str: &str) -> Vec<String> {
     scope_str
         .split_whitespace()

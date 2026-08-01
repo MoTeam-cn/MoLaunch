@@ -1,16 +1,19 @@
 //! Device Code 授权流程
 //!
-//! 流程（参见设计文档 §6.4）：POST deviceCodeUrl 获取设备码，
-//! 前端显示用户码 + 验证链接 + 倒计时，后端按 interval 轮询 tokenUrl。
+//! 流程（参见设计文档 §6.4）：申请设备码 → 前端显示用户码 + 验证链接 + 倒计时 →
+//! 后端按 interval 轮询 token。请求/响应解析由 flows.rs 引擎按
+//! endpoints.json authFlows.device_code.request/poll 配置驱动。
 
+use super::super::api_spec::load_api_spec;
 use super::super::provider::read_provider_manifest;
-use super::storage::{now_secs, parse_scopes, require_device_code_config, store_token_info};
-use super::{DeviceCodePollResult, DeviceCodeResult, TokenResponse};
+use super::super::types::{DeviceCodeFlow, FieldExtractor, FlowRequest};
+use super::flows::{send_flow_request, FlowContext, FlowResponse};
+use super::storage::{now_secs, require_device_code_config, store_token_info};
+use super::{DeviceCodePollResult, DeviceCodeResult};
 use crate::log_error;
 use crate::log_info;
 use crate::state::AppState;
 use once_cell::sync::Lazy;
-use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
@@ -27,8 +30,10 @@ struct DeviceCodeSession {
     /// 轮询间隔（秒，存储供前端查询，poll_device_code 不直接使用）
     #[allow(dead_code)]
     interval: u64,
-    /// tokenUrl（从 manifest 读取，避免轮询时重复读取）
-    token_url: String,
+    /// poll 端点的 FlowRequest（含 url/body/headers/response）
+    poll_flow: FlowRequest,
+    /// pendingError 字符串（如 "authorization_pending"）
+    pending_error: Option<String>,
     /// clientId
     client_id: String,
 }
@@ -55,33 +60,67 @@ pub(super) async fn start_device_code(
     let manifest = read_provider_manifest(provider_id)?;
     let config = require_device_code_config(&manifest.auth, provider_id)?;
 
+    // 加载 endpoints.json 取 authFlows.device_code.request/poll 配置
+    let endpoints_file = manifest
+        .api
+        .as_ref()
+        .map(|a| a.endpoints_file.as_str())
+        .unwrap_or("api/endpoints.json");
+    let spec = load_api_spec(provider_id, endpoints_file)?;
+    let dc_flow: &DeviceCodeFlow = spec
+        .auth_flows
+        .as_ref()
+        .and_then(|f| f.device_code.as_ref())
+        .ok_or_else(|| {
+            format!(
+                "厂商 {} endpoints.json 缺少 authFlows.device_code 配置",
+                provider_id
+            )
+        })?;
+    let request_flow: &FlowRequest = &dc_flow.request;
+    let poll_flow: FlowRequest = dc_flow.poll.clone();
+
     log_info!("[Frp Auth] 启动 Device Code 流程: provider={}", provider_id);
 
-    // 1. 请求设备码
-    let client = crate::http::get_client();
-    let scope_str = config.scopes.join(" ");
-    let resp = client
-        .post(&config.device_code_url)
-        .form(&[
-            ("client_id", config.client_id.as_str()),
-            ("scope", scope_str.as_str()),
-        ])
-        .send()
-        .await
-        .map_err(|e| format!("请求设备码失败: {}", e))?;
+    // 1. 请求设备码（走 flows 引擎）
+    let ctx = FlowContext {
+        client_id: config.client_id.clone(),
+        client_secret: config.client_secret.clone(),
+        scope: Some(config.scopes.join(" ")),
+        ..Default::default()
+    };
+    let resp = send_flow_request(request_flow, &ctx).await?;
 
-    if !resp.status().is_success() {
-        return Err(format!("请求设备码失败: HTTP {}", resp.status()));
+    if !resp.is_success() {
+        let err = extract_flow_error(&resp, request_flow);
+        log_error!(
+            "[Frp Auth] 请求设备码失败: HTTP {} - {}",
+            resp.status,
+            err
+        );
+        return Err(format!("请求设备码失败: {}", err));
     }
 
-    let body: DeviceCodeResponse = resp
-        .json()
-        .await
-        .map_err(|e| format!("解析设备码响应失败: {}", e))?;
+    let device_code = resp
+        .extract_field(get_extractor(request_flow, "deviceCode"))
+        .ok_or("设备码响应缺少 deviceCode")?;
+    let user_code = resp
+        .extract_field(get_extractor(request_flow, "userCode"))
+        .ok_or("设备码响应缺少 userCode")?;
+    let verification_uri = resp
+        .extract_field(get_extractor(request_flow, "verificationUri"))
+        .ok_or("设备码响应缺少 verificationUri")?;
+    let expires_in: u64 = resp
+        .extract_field(get_extractor(request_flow, "expiresIn"))
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(600);
+    let interval: u64 = resp
+        .extract_field(get_extractor(request_flow, "pollInterval"))
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(config.poll_interval);
 
     // 2. 存入内存会话
-    let interval = body.interval.unwrap_or(config.poll_interval);
-    let expires_at = now_secs() + body.expires_in;
+    let expires_at = now_secs() + expires_in;
     {
         let mut sessions = DEVICE_CODE_SESSIONS
             .lock()
@@ -89,10 +128,11 @@ pub(super) async fn start_device_code(
         sessions.insert(
             provider_id.to_string(),
             DeviceCodeSession {
-                device_code: body.device_code.clone(),
+                device_code: device_code.clone(),
                 expires_at,
                 interval,
-                token_url: config.token_url.clone(),
+                poll_flow,
+                pending_error: request_flow.pending_error.clone(),
                 client_id: config.client_id.clone(),
             },
         );
@@ -101,14 +141,14 @@ pub(super) async fn start_device_code(
     log_info!(
         "[Frp Auth] Device Code 已获取: provider={}, user_code={}, expires_in={}s",
         provider_id,
-        body.user_code,
-        body.expires_in
+        user_code,
+        expires_in
     );
 
     Ok(DeviceCodeResult {
-        user_code: body.user_code,
-        verification_uri: body.verification_uri,
-        expires_in: body.expires_in,
+        user_code,
+        verification_uri,
+        expires_in,
         interval,
     })
 }
@@ -141,70 +181,76 @@ pub(super) async fn poll_device_code(
         });
     }
 
-    // 2. 轮询 token
-    let client = crate::http::get_client();
-    let resp = client
-        .post(&session.token_url)
-        .form(&[
-            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-            ("device_code", session.device_code.as_str()),
-            ("client_id", session.client_id.as_str()),
-        ])
-        .send()
-        .await
-        .map_err(|e| format!("轮询 token 失败: {}", e))?;
+    // 2. 轮询 token（走 flows 引擎）
+    let ctx = FlowContext {
+        client_id: session.client_id.clone(),
+        device_code: Some(session.device_code.clone()),
+        ..Default::default()
+    };
+    let resp = send_flow_request(&session.poll_flow, &ctx).await?;
 
-    if !resp.status().is_success() {
-        return Err(format!("轮询 token 失败: HTTP {}", resp.status()));
+    // 3. 处理结果（HTTP 错误或 envelope 错误）
+    if !resp.is_success() {
+        // 检查 errorField 是否为 pending 错误
+        if let Some(err) = resp.extract_field(get_extractor(&session.poll_flow, "errorField")) {
+            let pending = session
+                .pending_error
+                .as_deref()
+                .unwrap_or("authorization_pending");
+            let status = match err.as_str() {
+                e if e == pending => "pending",
+                "expired_token" => {
+                    remove_device_code_session(provider_id);
+                    "expired"
+                }
+                "access_denied" => {
+                    remove_device_code_session(provider_id);
+                    "declined"
+                }
+                "slow_down" => "slow_down",
+                other => {
+                    log_error!("[Frp Auth] 未知 device code 错误: {}", other);
+                    remove_device_code_session(provider_id);
+                    return Err(format!("设备码授权失败: {}", other));
+                }
+            };
+            return Ok(DeviceCodePollResult {
+                status: status.to_string(),
+                expires_at: None,
+                scopes: None,
+            });
+        }
+
+        let err = extract_flow_error(&resp, &session.poll_flow);
+        log_error!(
+            "[Frp Auth] 轮询 token 失败: HTTP {} - {}",
+            resp.status,
+            err
+        );
+        return Err(format!("轮询 token 失败: {}", err));
     }
 
-    let body: TokenResponse = resp
-        .json()
-        .await
-        .map_err(|e| format!("解析轮询响应失败: {}", e))?;
+    // 4. 成功 -> 提取并存储 token
+    let access_token = resp
+        .extract_field(get_extractor(&session.poll_flow, "accessToken"))
+        .ok_or("token 响应缺少 accessToken")?;
+    let refresh_token = resp.extract_field(get_extractor(&session.poll_flow, "refreshToken"));
+    let expires_in = resp
+        .extract_field(get_extractor(&session.poll_flow, "expiresIn"))
+        .and_then(|s| s.parse::<u64>().ok());
+    let expires_at = expires_in.map(|secs| now_secs() + secs);
 
-    // 3. 处理结果
-    if let Some(err) = &body.error {
-        let status = match err.as_str() {
-            "authorization_pending" => "pending",
-            "expired_token" => {
-                remove_device_code_session(provider_id);
-                "expired"
-            }
-            "access_denied" => {
-                remove_device_code_session(provider_id);
-                "declined"
-            }
-            "slow_down" => "slow_down",
-            other => {
-                log_error!("[Frp Auth] 未知 device code 错误: {}", other);
-                remove_device_code_session(provider_id);
-                return Err(format!("设备码授权失败: {}", other));
-            }
-        };
-        return Ok(DeviceCodePollResult {
-            status: status.to_string(),
-            expires_at: None,
-            scopes: None,
-        });
-    }
-
-    // 4. 成功 -> 存储 token
-    let access_token = body.access_token.ok_or("token 响应缺少 access_token")?;
-    let expires_at = body.expires_in.map(|secs| now_secs() + secs);
-    let scopes = body.scope.as_ref().map(|s| parse_scopes(s));
-
-    // 读取 manifest 中的 scopes 作为回退
+    // 读取 manifest 中的 scopes 作为存储值
     let manifest = read_provider_manifest(provider_id)?;
     let config = require_device_code_config(&manifest.auth, provider_id)?;
-    let scopes_for_store = scopes.as_ref().or(Some(&config.scopes));
+    let scopes = config.scopes.clone();
 
     store_token_info(
         provider_id,
         &access_token,
-        body.refresh_token.as_deref(),
-        body.expires_in,
-        scopes_for_store,
+        refresh_token.as_deref(),
+        expires_in,
+        Some(&scopes),
     )?;
     remove_device_code_session(provider_id);
 
@@ -217,22 +263,35 @@ pub(super) async fn poll_device_code(
     Ok(DeviceCodePollResult {
         status: "success".to_string(),
         expires_at,
-        scopes,
+        scopes: Some(scopes),
     })
 }
 
 // ============================================================
-// 内部类型
+// 内部辅助
 // ============================================================
 
-/// Device Code 端点响应
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "snake_case")]
-struct DeviceCodeResponse {
-    device_code: String,
-    user_code: String,
-    verification_uri: String,
-    expires_in: u64,
-    /// 轮询间隔（秒），部分服务端可能不返回
-    interval: Option<u64>,
+/// 从 FlowRequest.response 取指定字段的 FieldExtractor
+///
+/// 字段名按 camelCase 约定：deviceCode / userCode / verificationUri / pollInterval /
+/// expiresIn / accessToken / refreshToken / errorField / errorDescription
+fn get_extractor<'a>(flow: &'a FlowRequest, key: &str) -> &'a FieldExtractor {
+    static EMPTY: Lazy<FieldExtractor> = Lazy::new(|| FieldExtractor {
+        from: "body".to_string(),
+        path: None,
+        name: None,
+    });
+    flow.response.get(key).unwrap_or(&EMPTY)
+}
+
+/// 从响应中提取错误消息（按 errorField / errorDescription 提取）
+fn extract_flow_error(resp: &FlowResponse, flow: &FlowRequest) -> String {
+    let err = resp.extract_field(get_extractor(flow, "errorField"));
+    let desc = resp.extract_field(get_extractor(flow, "errorDescription"));
+    match (err, desc) {
+        (Some(e), Some(d)) if !e.is_empty() && !d.is_empty() => format!("{}: {}", e, d),
+        (Some(e), _) if !e.is_empty() => e,
+        (Some(e), _) => e,
+        _ => "未知错误".to_string(),
+    }
 }

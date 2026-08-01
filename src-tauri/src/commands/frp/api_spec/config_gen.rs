@@ -29,7 +29,7 @@ pub struct GeneratedConfig {
 /// mode=args：生成启动参数（如 -u {token} -p {ids}）
 pub fn generate(
     mode: &str,
-    format: &str,
+    _format: &str,
     args_template: &[String],
     tunnel: &TunnelInfo,
     account: &AccountInfo,
@@ -144,7 +144,7 @@ fn build_ini_config(tunnel: &TunnelInfo, account: &AccountInfo) -> Result<String
             // 未知类型，按 tcp 处理
             let mut s = Vec::new();
             s.push(format!("[{}]", tunnel.name));
-            s.push(format!("type = tcp"));
+            s.push("type = tcp".to_string());
             if !tunnel.local_host.is_empty() {
                 s.push(format!("local_ip = {}", tunnel.local_host));
             }

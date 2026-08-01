@@ -1,6 +1,5 @@
 //! HTTP 请求构造与发送（含重定向防护，设计文档 §7.6.6）
 //!
-//! 复用 api_schema/http.rs 的重定向防护逻辑，适配新的 EndpointDef 类型。
 //! 重定向防护：no-redirect 客户端 → 手动校验 Location 仅允许同域 → 最多 5 次防循环。
 
 use super::envelope;

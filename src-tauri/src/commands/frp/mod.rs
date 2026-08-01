@@ -9,7 +9,6 @@
 //! - `paths`：路径辅助函数与 ID 校验
 //! - `provider`/`install`/`binary`/`tunnel`/`process`/`sandbox`/`auth`/`api_spec`/`log_redact`：业务子模块
 
-pub mod api_schema;
 pub mod api_spec;
 pub mod auth;
 pub mod binary;

@@ -1,13 +1,15 @@
 //! OAuth2 授权流程
 //!
 //! 流程（参见设计文档 §6.3）：本地启动 HTTP 服务监听 redirectPort 接收回调，
-//! 浏览器跳转走 `crate::minecraft::system::shell::open_url`，token 交换在后端完成。
+//! 浏览器跳转走 `crate::minecraft::system::shell::open_url`，
+//! token 交换请求/响应解析由 flows.rs 引擎按 endpoints.json authFlows.oauth2.token 配置驱动。
 
+use super::super::api_spec::load_api_spec;
 use super::super::provider::read_provider_manifest;
-use super::storage::{
-    generate_state, now_secs, parse_scopes, require_oauth2_config, store_token_info,
-};
-use super::{OAuth2Result, TokenResponse};
+use super::super::types::{FieldExtractor, FlowRequest, OAuth2Flow};
+use super::flows::{send_flow_request, FlowContext, FlowResponse};
+use super::storage::{generate_state, now_secs, require_oauth2_config, store_token_info};
+use super::OAuth2Result;
 use crate::log_debug;
 use crate::log_error;
 use crate::log_info;
@@ -21,6 +23,25 @@ pub(super) async fn start_oauth2(
 ) -> Result<OAuth2Result, String> {
     let manifest = read_provider_manifest(provider_id)?;
     let config = require_oauth2_config(&manifest.auth, provider_id)?;
+
+    // 加载 endpoints.json 取 authFlows.oauth2.token 配置
+    let endpoints_file = manifest
+        .api
+        .as_ref()
+        .map(|a| a.endpoints_file.as_str())
+        .unwrap_or("api/endpoints.json");
+    let spec = load_api_spec(provider_id, endpoints_file)?;
+    let oauth2_flow: &OAuth2Flow = spec
+        .auth_flows
+        .as_ref()
+        .and_then(|f| f.oauth2.as_ref())
+        .ok_or_else(|| {
+            format!(
+                "厂商 {} endpoints.json 缺少 authFlows.oauth2 配置",
+                provider_id
+            )
+        })?;
+    let token_flow: &FlowRequest = &oauth2_flow.token;
 
     log_info!("[Frp Auth] 启动 OAuth2 流程: provider={}", provider_id);
 
@@ -58,29 +79,44 @@ pub(super) async fn start_oauth2(
         "OAuth2 授权超时（5 分钟内未完成）".to_string()
     })??;
 
-    // 5. 用 code 换取 token
-    let token_resp = exchange_code_for_token(
-        &config.token_url,
-        &config.client_id,
-        &redirect_uri,
-        &callback.code,
-    )
-    .await?;
+    // 5. 用 code 换取 token（走 flows 引擎）
+    let ctx = FlowContext {
+        client_id: config.client_id.clone(),
+        client_secret: config.client_secret.clone(),
+        redirect_uri: Some(redirect_uri.clone()),
+        code: Some(callback.code),
+        scope: Some(config.scopes.join(" ")),
+        ..Default::default()
+    };
+    let resp = send_flow_request(token_flow, &ctx).await?;
+
+    if !resp.is_success() {
+        let err = extract_flow_error(&resp, token_flow);
+        log_error!(
+            "[Frp Auth] OAuth2 token 交换失败: HTTP {} - {}",
+            resp.status,
+            err
+        );
+        return Err(format!("OAuth2 token 交换失败: {}", err));
+    }
+
+    let access_token = resp
+        .extract_field(get_extractor(token_flow, "accessToken"))
+        .ok_or("OAuth2 响应缺少 access_token")?;
+    let refresh_token = resp.extract_field(get_extractor(token_flow, "refreshToken"));
+    let expires_in = resp
+        .extract_field(get_extractor(token_flow, "expiresIn"))
+        .and_then(|s| s.parse::<u64>().ok());
+    let scopes = config.scopes.clone();
 
     // 6. 存储 token
-    let expires_at = token_resp.expires_in.map(|secs| now_secs() + secs);
-    let scopes = token_resp.scope.as_ref().map(|s| parse_scopes(s));
-    let scopes_for_store = scopes.as_ref().or(Some(&config.scopes));
-    let access_token = token_resp
-        .access_token
-        .as_deref()
-        .ok_or("OAuth2 响应缺少 access_token")?;
+    let expires_at = expires_in.map(|secs| now_secs() + secs);
     store_token_info(
         provider_id,
-        access_token,
-        token_resp.refresh_token.as_deref(),
-        token_resp.expires_in,
-        scopes_for_store,
+        &access_token,
+        refresh_token.as_deref(),
+        expires_in,
+        Some(&scopes),
     )?;
 
     log_info!(
@@ -89,10 +125,13 @@ pub(super) async fn start_oauth2(
         expires_at
     );
 
-    Ok(OAuth2Result { expires_at, scopes })
+    Ok(OAuth2Result {
+        expires_at,
+        scopes: Some(scopes),
+    })
 }
 
-/// 构建 OAuth2 授权 URL
+/// 构建 OAuth2 授权 URL（用户交互层，标准 OAuth2 流程）
 fn build_authorize_url(
     authorize_url: &str,
     client_id: &str,
@@ -173,7 +212,6 @@ fn parse_callback_path(path: &str, expected_state: &str) -> (String, bool) {
         .split('&')
         .filter_map(|kv| {
             let (k, v) = kv.split_once('=')?;
-
             Some((k, v))
         })
         .collect();
@@ -205,7 +243,6 @@ fn parse_callback_path_for_code(
         .split('&')
         .filter_map(|kv| {
             let (k, v) = kv.split_once('=')?;
-
             Some((k, v))
         })
         .collect();
@@ -224,36 +261,30 @@ fn parse_callback_path_for_code(
     })
 }
 
-/// 用 authorization code 换取 token
-async fn exchange_code_for_token(
-    token_url: &str,
-    client_id: &str,
-    redirect_uri: &str,
-    code: &str,
-) -> Result<TokenResponse, String> {
-    let client = crate::http::get_client();
-    let resp = client
-        .post(token_url)
-        .form(&[
-            ("grant_type", "authorization_code"),
-            ("code", code),
-            ("client_id", client_id),
-            ("redirect_uri", redirect_uri),
-        ])
-        .send()
-        .await
-        .map_err(|e| format!("token 交换请求失败: {}", e))?;
+/// 从 FlowRequest.response 取指定字段的 FieldExtractor
+///
+/// 字段名按 camelCase 约定：accessToken / refreshToken / expiresIn / errorField / errorDescription
+fn get_extractor<'a>(flow: &'a FlowRequest, key: &str) -> &'a FieldExtractor {
+    static EMPTY: once_cell::sync::Lazy<FieldExtractor> = once_cell::sync::Lazy::new(|| {
+        FieldExtractor {
+            from: "body".to_string(),
+            path: None,
+            name: None,
+        }
+    });
+    flow.response.get(key).unwrap_or(&EMPTY)
+}
 
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body = resp.text().await.unwrap_or_default();
-        log_error!("[Frp Auth] token 交换失败: HTTP {} {}", status, body);
-        return Err(format!("token 交换失败: HTTP {}", status));
+/// 从响应中提取错误消息（按 errorField / errorDescription 提取）
+fn extract_flow_error(resp: &FlowResponse, flow: &FlowRequest) -> String {
+    let err = resp.extract_field(get_extractor(flow, "errorField"));
+    let desc = resp.extract_field(get_extractor(flow, "errorDescription"));
+    match (err, desc) {
+        (Some(e), Some(d)) if !e.is_empty() && !d.is_empty() => format!("{}: {}", e, d),
+        (Some(e), _) if !e.is_empty() => e,
+        (Some(e), _) => e,
+        _ => "未知错误".to_string(),
     }
-
-    resp.json()
-        .await
-        .map_err(|e| format!("解析 token 响应失败: {}", e))
 }
 
 /// OAuth2 回调解析结果
