@@ -42,13 +42,11 @@ const needLogin = computed(
 )
 
 async function handleRegister() {
-  const ok = await onlineStore.register()
-  if (!ok) toastError('设备注册失败，请稍后重试')
+  await onlineStore.register()
 }
 
 async function handleLogin() {
-  const ok = await onlineStore.login()
-  if (!ok) toastError('设备登录失败，请稍后重试')
+  await onlineStore.login()
 }
 
 // ============ NAT 类型检测 ============

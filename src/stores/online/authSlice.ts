@@ -112,6 +112,7 @@ export function useOnlineAuthSlice() {
         deviceStatus.value = status
       },
       '[Online] register device',
+      (e) => toastError('设备注册失败：' + String(e)),
     )
     loading.value = false
     if (ok !== undefined) {
@@ -130,6 +131,7 @@ export function useOnlineAuthSlice() {
         deviceStatus.value = status
       },
       '[Online] login device',
+      (e) => toastError('设备登录失败：' + String(e)),
     )
     loading.value = false
     if (ok !== undefined) {

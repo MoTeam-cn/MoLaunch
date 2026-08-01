@@ -8,7 +8,9 @@ pub struct RegisterResponse {
     pub code: u32,
     pub data: Option<RegisterData>,
     pub msg: String,
+    #[serde(default)]
     pub time: String,
+    #[serde(default)]
     pub req_id: String,
 }
 
@@ -33,7 +35,9 @@ pub struct LoginResponse {
     pub code: u32,
     pub data: Option<LoginData>,
     pub msg: String,
+    #[serde(default)]
     pub time: String,
+    #[serde(default)]
     pub req_id: String,
 }
 
