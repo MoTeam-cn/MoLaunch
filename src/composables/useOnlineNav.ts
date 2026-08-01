@@ -5,7 +5,11 @@
  * - NavCategory 接口与 OnlineCategoryId 类型
  * - 静态分类配置（device / room / lobby）
  * - isReady / isInRoom / categories / badge / activeDesc / activeLabel 计算
- * - isReady watch：URL `?tab=` 恢复激活项 + JWT 过期切回「设备」
+ * - isReady watch：URL `?tab=` 恢复激活项 + 未就绪（退出登录等）切回「设备」
+ *
+ * 就绪判定只依赖「已注册 + 已登录」，不依赖本地 token 过期时间——
+ * 后端业务 action 统一走 `load_creds_with_auto_refresh` 自动续期 + 前端
+ * onlineManager 1003 降级链，JWT 过期无需前端拦截页面。
  * - isInRoom watch：进入房间自动跳「房间详情」，离开切回「创建房间」
  *
  * 复用项目现有 frpCategory（@/composables/useFrpSidebar），保持与原 Online.vue
@@ -80,6 +84,18 @@ const lobbyCategory: NavCategory = {
   desc: '浏览公开房间列表，搜索整合包房间并一键加入',
 }
 
+/** URL `?tab=` 可恢复的合法分类 ID（device/lobby/顶层 + room/FRP 子项） */
+const VALID_TABS = new Set<OnlineCategoryId>([
+  'device', 'lobby',
+  'create', 'join', 'room_details',
+  'providers', 'tunnels', 'auth', 'logs',
+])
+
+/** tab 是否为可恢复的合法分类（用于 isReady watch 从 URL 恢复激活项） */
+function isValidCategory(tab: string): boolean {
+  return VALID_TABS.has(tab as OnlineCategoryId)
+}
+
 /**
  * 创建 Online 导航状态
  *
@@ -94,8 +110,17 @@ export function useOnlineNav(
 ) {
   const status = computed(() => onlineStore.deviceStatus)
 
+  /**
+   * 联机功能是否就绪（显示房间管理 / 大厅 / FRP 分类）
+   *
+   * 仅判断「已注册 + 已登录」，**不判断 token_expired**：
+   * 后端 `load_creds_with_auto_refresh` 会在业务 action 调用前自动 refresh 续期，
+   * 前端 `onlineManager` 也有 1003 → refresh → login → register 降级链兜底。
+   * 本地 JWT 过期不拦截页面，除非静默续期全部失败（业务请求报 1003 且重试链
+   * 也失败，由各调用方 toast 提示），避免"前端判断过期就隐藏整个联机功能"。
+   */
   const isReady = computed(
-    () => !!status.value && status.value.registered && status.value.logged_in && !status.value.token_expired,
+    () => !!status.value && status.value.registered && status.value.logged_in,
   )
 
   /** 是否在房间中（role=host/guest） */
@@ -168,26 +193,29 @@ export function useOnlineNav(
    * 变 false 时强制切回「设备」（JWT 过期 / 退出登录）。
    *
    * 注意：NavSidebar 自身 onMounted 也会读 route.query.tab，但 categories
-   * 依赖 isReady，refreshStatus 异步完成前 categories 还不含 room 子项，
-   * 故此处需在 isReady 变化时再次校验 URL。
+   * 依赖 isReady，refreshStatus 异步完成前 categories 还不含 room/FRP 子项，
+   * `isValid` 校验失败导致无法恢复。故此处是**权威恢复点**——isReady 变 true
+   * 时 categories 已就绪，完整恢复所有合法 tab。
    */
   watch(isReady, (ready) => {
     if (ready) {
-      const tab = route.query.tab
-      if (tab === 'create' || tab === 'join') {
-        activeCategory.value = tab
-      } else if (tab === 'room_details' && isInRoom.value) {
-        // 仅在房间中时才恢复到房间详情，否则该项 disabled 不可用
-        activeCategory.value = 'room_details'
+      const tab = route.query.tab as string | undefined
+      if (tab && isValidCategory(tab)) {
+        if (tab === 'room_details' && !isInRoom.value) {
+          // 未在房间时「房间详情」disabled，回退到创建房间
+          activeCategory.value = 'create'
+        } else {
+          activeCategory.value = tab as OnlineCategoryId
+        }
       } else if (activeCategory.value === 'device') {
         // 登录成功且 URL 无有效 tab → 默认跳到创建房间
         activeCategory.value = 'create'
       }
     } else if (activeCategory.value !== 'device') {
-      // JWT 过期 / 退出登录 → 切回设备
+      // 未就绪（退出登录 / 认证失败）→ 切回设备；JWT 过期不触发（由后端自动续期）
       activeCategory.value = 'device'
     }
-  })
+  }, { immediate: true })
 
   /**
    * 房间状态变化时自动切换分类

@@ -4,7 +4,7 @@
  *
  * 根据设备认证状态显示：
  * - 未注册：注册引导卡片
- * - 已注册未登录 / JWT 过期：登录卡片
+ * - 已注册未登录：登录卡片（JWT 过期不触发登录卡片，由后端自动续期兜底）
  * - 已注册：设备信息卡片（设备 ID / api-server / 最后登录 / JWT 过期时间）
  * - 网络环境：NAT 类型检测（复用 store 的 detectNat / forceDetectNat，无需 useWebRTC 实例）
  *
@@ -37,8 +37,16 @@ const onlineStore = useOnlineStore()
 
 const status = computed(() => onlineStore.deviceStatus)
 const isUnregistered = computed(() => !status.value || !status.value.registered)
+/**
+ * 是否需要登录卡片：仅「已注册但未登录」时显示。
+ *
+ * 不判断 token_expired：JWT 过期由后端 `load_creds_with_auto_refresh` 自动
+ * refresh 续期 + 前端 onlineManager 1003 降级链兜底，只有静默续期全部失败
+ * （业务请求持续 1003）才需要用户手动重新登录，届时各调用方 toast 提示。
+ * 本地判断 token 过期就拦截页面会误伤——过期瞬间自动续期即可恢复。
+ */
 const needLogin = computed(
-  () => !!status.value && status.value.registered && (!status.value.logged_in || status.value.token_expired),
+  () => !!status.value && status.value.registered && !status.value.logged_in,
 )
 
 async function handleRegister() {
