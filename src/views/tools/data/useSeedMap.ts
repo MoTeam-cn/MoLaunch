@@ -25,6 +25,7 @@ import { WorkerPool } from '@/utils/seedmap/workerPool'
 import { resUrl } from '@/utils/wasm-loader'
 import { formatCoord, copyToClipboard } from '@/utils/seedmap/format'
 import { getBiomeName } from '@/utils/seedmap/biomeNames'
+import { getStructuresForVersion } from '@/utils/seedmap/structures'
 import type { Dimension, WorkerStructure } from '@/utils/seedmap/types'
 
 import OlMap from 'ol/Map'
@@ -471,9 +472,9 @@ export function useSeedMap() {
   // ===== 版本/维度/大型群系变化 =====
   watch([mcVersion, dimension, largeBiomes], () => {
     const available = new Set(
-      require('@/utils/seedmap/structures').getStructuresForVersion(mcVersion.value, dimension.value)
-        .filter((s: { queryMode: string }) => s.queryMode !== 'stronghold')
-        .map((s: { name: string }) => s.name),
+      getStructuresForVersion(mcVersion.value, dimension.value)
+        .filter((s) => s.queryMode !== 'stronghold')
+        .map((s) => s.name),
     )
     const invalid: string[] = []
     for (const name of selectedStructureTypes.value) {

@@ -106,7 +106,8 @@ const sizeClass = computed(() => `input-size-${props.size}`)
 
 <template>
   <!-- 外层包裹：参考 Arco FormItem 的 wrapper-col 结构，承载输入框 + 下方提示文字 -->
-  <span class="input-root">
+  <!-- width prop 同时作用到根元素：避免在 flex 布局中 width:100% 撑满把前置标签挤换行 -->
+  <span class="input-root" :style="width ? { width } : undefined">
     <!-- textarea 模式 -->
     <div
       v-if="textarea"
