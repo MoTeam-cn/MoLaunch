@@ -53,7 +53,57 @@
   - manifest.json 字段表新增 `authFile` 和 `api.endpointsFile` 两个字段说明
 - 设计决策：教程按"概念说明 → 字段表 → 代码示例"三段式组织，每个概念配表格和代码块；OpenFRP 作为非标准厂商示例单独列出关键差异，帮助开发者理解如何适配非标准接口
 
+#### FRP 厂商配置三项修复（多平台 frpc 映射 + logo 加载 + authType 回退）
+
+- 背景：用户测试 LoliaFrp 厂商配置时发现三个问题：(1) 不同 OS/arch 需要不同 frpc 二进制但 manifest 只支持单路径；(2) manifest 声明了 icon 但前端不加载；(3) auth.json 声明了 type=oauth2 但认证中心显示"无需认证"
+- 改动（7 文件）：
+  - **`src-tauri/src/commands/frp/types.rs`**：
+    - `BinaryConfig` 新增 `paths: Option<HashMap<String, String>>` 字段，key 格式 `{os}_{arch}`（如 `windows_amd64`），优先于 `path` 字段
+    - `ProviderInfo` 新增 `icon: Option<String>` 字段（后端填充绝对路径，前端用 convertFileSrc 渲染）
+  - **`src-tauri/src/commands/frp/provider.rs`**：
+    - 新增 `current_platform_key()` 函数：返回当前平台 key（`{os}_{arch}`，arch 映射 x86_64→amd64 / aarch64→arm64 / x86→386）
+    - 新增 `resolve_bundled_path()` 函数：优先从 paths 按当前平台查找，回退到 path
+    - 新增 `resolve_auth_type()` 函数：manifest.auth.auth_type 为 "none" 时回退从 auth.json 的 type 读取，避免厂商在 manifest 和 auth.json 中重复声明
+    - `get_frpc_path_for_provider` 和 `is_external_frpc_ready` 改用 `resolve_bundled_path` 支持多平台
+    - `list_providers` 改用 `resolve_auth_type` + 填充 `icon` 绝对路径
+  - **`src-tauri/src/commands/frp/install.rs`**：`build_provider_info` 改用 `resolve_auth_type` + 填充 `icon`
+  - **`src-tauri/src/commands/frp/auth/mod.rs`**：`get_auth_status` 改用 `resolve_auth_type`
+  - **`src-tauri/tauri.conf.json`**：CSP 的 `img-src` 和 `connect-src` 新增 `https://asset.localhost`；新增 `assetProtocol` 配置（scope 限制为 `$APPDATA/.Molaunch/providers/**`）
+  - **`src/types/frp.ts`**：`ProviderInfo` 新增 `icon?: string`
+  - **`src/components/frp/ProviderList.vue`**：导入 `convertFileSrc`，厂商图标位置条件渲染（有 icon 时 `<img>` 否则 `ServerStackIcon`）
+  - **`src-tauri/resources/templates/tutorial-frp.html`**：bundled 分发方式说明新增 `paths` 多平台映射字段说明和示例
+- 设计决策：
+  - **paths 优先于 path**：`resolve_bundled_path` 先查 paths 当前平台，找不到回退到 path，兼容旧配置
+  - **authType 回退读取**：manifest.auth.auth_type 缺省为 "none"，厂商只需在 auth.json 中声明 type 即可，无需在 manifest 中重复声明
+  - **icon 绝对路径 + convertFileSrc**：后端返回 icon 绝对路径，前端用 Tauri 的 convertFileSrc 转为 webview 可访问 URL，通过 assetProtocol 配置限定 scope 到 providers 目录
+- 验证：`cargo check` 通过（exit 0）、`npx vue-tsc --noEmit` 通过（exit 0）
+
 ### 修复
+
+#### FRP 厂商认证配置读取修复（auth.json 回退 + 测试补齐）
+
+- 背景：测试 LoliaFrp 厂商调用 `start_oauth2` 报「厂商 lolia-frp 的 manifest 缺少 auth.oauth2 配置」。原因：新设计将 OAuth2 交互配置（authorizeUrl/clientId/scopes/redirectPort）存放在 auth.json（`AuthFileOAuth2`），但 `oauth2.rs` 仍从 `manifest.auth.oauth2`（旧 `OAuth2Config`）读取。LoliaFrp 的 manifest 未内嵌 auth 块，因此报错
+- 改动（6 文件）：
+  - **`src-tauri/src/commands/frp/provider.rs`**：
+    - 新增 `read_auth_file()`：按 manifest.authFile 相对路径读取并解析 auth.json，文件缺失/解析失败返回 None
+    - 重构 `resolve_auth_type()`：复用 `read_auth_file`（行为不变）
+    - 新增 `resolve_oauth2_config()` / `resolve_device_code_config()`：从 auth.json 读取 `AuthFileOAuth2` / `AuthFileDeviceCode`，错误消息明确指向 auth.json
+  - **`src-tauri/src/commands/frp/auth/oauth2.rs`**：`require_oauth2_config(&manifest.auth)` 改为 `resolve_oauth2_config(provider_id, &manifest)`，从 auth.json 读取
+  - **`src-tauri/src/commands/frp/auth/device_code.rs`**：两处 `require_device_code_config(&manifest.auth)` 改为 `resolve_device_code_config(provider_id, &manifest)`
+  - **`src-tauri/src/commands/frp/auth/mod.rs`**：`refresh_token` 取 clientId 从 `manifest.auth.oauth2/device_code` 改为按 `resolve_auth_type` 匹配 `resolve_oauth2_config` / `resolve_device_code_config`
+  - **`src-tauri/src/commands/frp/auth/api_key.rs`**：`manifest.auth.auth_type` 判断改为 `resolve_auth_type`（支持 auth.json 声明 type 的厂商）
+  - **`src-tauri/src/commands/frp/auth/storage.rs`**：删除已无调用方的 `require_oauth2_config` / `require_device_code_config` / `require_api_key_config` 及无用 import
+- 设计决策：
+  - **统一从 auth.json 读取交互配置**：manifest.json 只保留 `authFile` 指针和 `auth.type`（缺省 none），OAuth2/Device Code 的交互参数统一收敛到 auth.json，与 endpoints.json（请求/响应规范）职责分离
+  - **resolve_* 系列函数放 provider.rs**：与 `resolve_auth_type` 同处，避免 auth 子模块反向依赖造成循环引用
+  - **不新增 `resolve_api_key_config`**：api_key 的请求头注入规范在 endpoints.json `authFlows.api_key` 中定义，auth.json 的 `api_key` 块当前无读取方，按最小修改原则不新增死代码
+- 顺带修复（clippy/test 全量验证暴露的预存问题）：
+  - **`src-tauri/src/minecraft/community/mcmod/mod.rs`**：测试导入 `extract_words` 从错误的 `parsers` 改为 `search`（重构遗留，修复 `cargo clippy --all-targets` E0432）
+  - **`src-tauri/src/minecraft/download/rate_limiter_tests.rs`**：`granted >= 40 && granted <= 60` 改为 `(40..=60).contains(&granted)`（clippy manual-range-contains）
+  - **`src-tauri/src/minecraft/online/auth_tests.rs` / `storage_tests.rs`**：`Default::default()` + 逐字段赋值改为结构体初始化（clippy field-reassign-with-default）
+  - **`src-tauri/src/commands/frp/log_redact.rs`**：正则 `["']?` 吞掉 JSON key 右引号导致 `{"token:"***"}` 输出残缺，改为捕获组保留引号，修复 `redacts_json_token` 测试
+  - **`src-tauri/src/commands/frp/api_spec/envelope.rs`**：测试中 envelope 字段路径 `"flag"` 改为 `"$.flag"`（jsonpath 要求 `$` 前缀），修复 4 个 envelope 测试
+- 验证：`cargo check` + `cargo clippy --all-targets -D warnings` + `cargo test --lib`（140 通过 0 失败）均通过（exit 0）
 
 #### 简单表单弹窗样式还原（移除误加的高度限制）
 

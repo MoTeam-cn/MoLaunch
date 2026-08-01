@@ -3,7 +3,6 @@
 //! service=`frp:<provider_id>`，username=`access_token` / `refresh_token` /
 //! `expires_at` / `scopes`。token 过期前 5 分钟自动刷新由调用方负责。
 
-use super::super::{ApiKeyConfig, AuthConfig, DeviceCodeConfig, OAuth2Config};
 use crate::log_error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -123,44 +122,6 @@ pub(super) fn load_scopes(provider_id: &str) -> Result<Option<Vec<String>>, Stri
         }
         None => Ok(None),
     }
-}
-
-// ============================================================
-// 配置取值辅助
-// ============================================================
-
-/// 获取 OAuth2Config（不存在则报错）
-pub(super) fn require_oauth2_config<'a>(
-    auth: &'a AuthConfig,
-    provider_id: &str,
-) -> Result<&'a OAuth2Config, String> {
-    auth.oauth2
-        .as_ref()
-        .ok_or_else(|| format!("厂商 {} 的 manifest 缺少 auth.oauth2 配置", provider_id))
-}
-
-/// 获取 DeviceCodeConfig（不存在则报错）
-pub(super) fn require_device_code_config<'a>(
-    auth: &'a AuthConfig,
-    provider_id: &str,
-) -> Result<&'a DeviceCodeConfig, String> {
-    auth.device_code.as_ref().ok_or_else(|| {
-        format!(
-            "厂商 {} 的 manifest 缺少 auth.device_code 配置",
-            provider_id
-        )
-    })
-}
-
-/// 获取 ApiKeyConfig（不存在则报错）
-#[allow(dead_code)]
-pub(super) fn require_api_key_config<'a>(
-    auth: &'a AuthConfig,
-    provider_id: &str,
-) -> Result<&'a ApiKeyConfig, String> {
-    auth.api_key
-        .as_ref()
-        .ok_or_else(|| format!("厂商 {} 的 manifest 缺少 auth.api_key 配置", provider_id))
 }
 
 // ============================================================

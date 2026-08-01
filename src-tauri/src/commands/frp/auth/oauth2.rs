@@ -5,10 +5,10 @@
 //! token 交换请求/响应解析由 flows.rs 引擎按 endpoints.json authFlows.oauth2.token 配置驱动。
 
 use super::super::api_spec::load_api_spec;
-use super::super::provider::read_provider_manifest;
+use super::super::provider::{read_provider_manifest, resolve_oauth2_config};
 use super::super::types::{FieldExtractor, FlowRequest, OAuth2Flow};
 use super::flows::{send_flow_request, FlowContext, FlowResponse};
-use super::storage::{generate_state, now_secs, require_oauth2_config, store_token_info};
+use super::storage::{generate_state, now_secs, store_token_info};
 use super::OAuth2Result;
 use crate::log_debug;
 use crate::log_error;
@@ -22,7 +22,7 @@ pub(super) async fn start_oauth2(
     provider_id: &str,
 ) -> Result<OAuth2Result, String> {
     let manifest = read_provider_manifest(provider_id)?;
-    let config = require_oauth2_config(&manifest.auth, provider_id)?;
+    let config = resolve_oauth2_config(provider_id, &manifest)?;
 
     // 加载 endpoints.json 取 authFlows.oauth2.token 配置
     let endpoints_file = manifest

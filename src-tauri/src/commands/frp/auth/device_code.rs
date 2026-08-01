@@ -5,10 +5,10 @@
 //! endpoints.json authFlows.device_code.request/poll 配置驱动。
 
 use super::super::api_spec::load_api_spec;
-use super::super::provider::read_provider_manifest;
+use super::super::provider::{read_provider_manifest, resolve_device_code_config};
 use super::super::types::{DeviceCodeFlow, FieldExtractor, FlowRequest};
 use super::flows::{send_flow_request, FlowContext, FlowResponse};
-use super::storage::{now_secs, require_device_code_config, store_token_info};
+use super::storage::{now_secs, store_token_info};
 use super::{DeviceCodePollResult, DeviceCodeResult};
 use crate::log_error;
 use crate::log_info;
@@ -58,7 +58,7 @@ pub(super) async fn start_device_code(
     provider_id: &str,
 ) -> Result<DeviceCodeResult, String> {
     let manifest = read_provider_manifest(provider_id)?;
-    let config = require_device_code_config(&manifest.auth, provider_id)?;
+    let config = resolve_device_code_config(provider_id, &manifest)?;
 
     // 加载 endpoints.json 取 authFlows.device_code.request/poll 配置
     let endpoints_file = manifest
@@ -240,9 +240,9 @@ pub(super) async fn poll_device_code(
         .and_then(|s| s.parse::<u64>().ok());
     let expires_at = expires_in.map(|secs| now_secs() + secs);
 
-    // 读取 manifest 中的 scopes 作为存储值
+    // 读取 auth.json 中的 scopes 作为存储值
     let manifest = read_provider_manifest(provider_id)?;
-    let config = require_device_code_config(&manifest.auth, provider_id)?;
+    let config = resolve_device_code_config(provider_id, &manifest)?;
     let scopes = config.scopes.clone();
 
     store_token_info(

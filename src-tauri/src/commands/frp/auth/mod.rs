@@ -4,7 +4,10 @@
 //! 子模块：storage（密钥存储辅助）/ oauth2 / device_code / api_key / flows（可配置流程引擎）。
 
 use super::api_spec::load_api_spec;
-use super::provider::{read_provider_manifest, SYSTEM_DEFAULT_ID};
+use super::provider::{
+    read_provider_manifest, resolve_auth_type, resolve_device_code_config, resolve_oauth2_config,
+    SYSTEM_DEFAULT_ID,
+};
 use super::types::{FieldExtractor, FlowRequest, OAuth2Flow};
 use crate::log_info;
 use crate::state::AppState;
@@ -132,7 +135,7 @@ pub async fn get_auth_status(provider_id: &str) -> Result<AuthStatus, String> {
     }
 
     let manifest = read_provider_manifest(provider_id)?;
-    let auth_type = manifest.auth.auth_type.clone();
+    let auth_type = resolve_auth_type(provider_id, &manifest);
 
     if auth_type == "none" {
         return Ok(AuthStatus {
@@ -231,13 +234,12 @@ pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), S
     let refresh_token = storage::load_secret(provider_id, storage::KEY_REFRESH_TOKEN)?
         .ok_or_else(|| format!("厂商 {} 无 refresh_token，请重新认证", provider_id))?;
 
-    // 取 clientId（oauth2 或 device_code）
-    let client_id = if let Some(ref oauth2) = manifest.auth.oauth2 {
-        oauth2.client_id.clone()
-    } else if let Some(ref dc) = manifest.auth.device_code {
-        dc.client_id.clone()
-    } else {
-        return Err(format!("厂商 {} 不支持 token 刷新", provider_id));
+    // 取 clientId（从 auth.json 按 authType 读取，oauth2 或 device_code 必居其一）
+    let auth_type = resolve_auth_type(provider_id, &manifest);
+    let client_id = match auth_type.as_str() {
+        "oauth2" => resolve_oauth2_config(provider_id, &manifest)?.client_id,
+        "device_code" => resolve_device_code_config(provider_id, &manifest)?.client_id,
+        _ => return Err(format!("厂商 {} 不支持 token 刷新", provider_id)),
     };
 
     log_info!("[Frp Auth] 刷新 token: provider={}", provider_id);
