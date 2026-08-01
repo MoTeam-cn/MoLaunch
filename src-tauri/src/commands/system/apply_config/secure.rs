@@ -19,9 +19,10 @@ pub async fn read_curseforge() -> (bool, Option<String>) {
 /// `ignore_tls` 仅在 `DeveloperUnlocked=true` 且 `DeveloperMode=true` 时才读取 `IgnoreTls` 键，
 /// 确保开发者模式被关闭后 ignore_tls 自动回退为 false。
 pub fn read_developer() -> (bool, bool, bool) {
-    let unlocked = crate::storage::registry::reg_get_bool(KEY_DEV_UNLOCKED);
-    let mode = unlocked && crate::storage::registry::reg_get_bool(KEY_DEV_MODE);
-    let ignore_tls = mode && crate::storage::registry::reg_get_bool(KEY_IGNORE_TLS);
+    let unlocked = crate::storage::registry::reg_get_bool(KEY_DEV_UNLOCKED).unwrap_or(false);
+    let mode = unlocked && crate::storage::registry::reg_get_bool(KEY_DEV_MODE).unwrap_or(false);
+    let ignore_tls =
+        mode && crate::storage::registry::reg_get_bool(KEY_IGNORE_TLS).unwrap_or(false);
     (unlocked, mode, ignore_tls)
 }
 
@@ -48,7 +49,7 @@ pub async fn apply_curseforge(state: &AppState, patch: &ConfigPatch) -> Result<(
 /// 仅在已解锁时可生效（与原 `set_developer_mode` 命令行为一致）。
 pub fn apply_developer_mode(patch: &ConfigPatch) -> Result<(), String> {
     if let Some(enabled) = patch.developer_mode {
-        let unlocked = crate::storage::registry::reg_get_bool(KEY_DEV_UNLOCKED);
+        let unlocked = crate::storage::registry::reg_get_bool(KEY_DEV_UNLOCKED).unwrap_or(false);
         if !unlocked {
             return Err("开发者模式尚未解锁".to_string());
         }
@@ -65,11 +66,11 @@ pub fn apply_developer_mode(patch: &ConfigPatch) -> Result<(), String> {
 /// 关闭开发者模式时此开关也被视为 false（`read_developer` 会联动）。
 pub fn apply_ignore_tls(patch: &ConfigPatch) -> Result<(), String> {
     if let Some(enabled) = patch.ignore_tls {
-        let unlocked = crate::storage::registry::reg_get_bool(KEY_DEV_UNLOCKED);
+        let unlocked = crate::storage::registry::reg_get_bool(KEY_DEV_UNLOCKED).unwrap_or(false);
         if !unlocked {
             return Err("开发者模式尚未解锁".to_string());
         }
-        let mode = crate::storage::registry::reg_get_bool(KEY_DEV_MODE);
+        let mode = crate::storage::registry::reg_get_bool(KEY_DEV_MODE).unwrap_or(false);
         if !mode {
             return Err("开发者模式未开启，无法启用 IgnoreTls".to_string());
         }

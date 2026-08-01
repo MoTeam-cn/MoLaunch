@@ -43,7 +43,7 @@ static DEVTOOLS_OPEN: AtomicBool = AtomicBool::new(false);
 /// 未解锁时返回 false，「高阶配置」页不显示开发者模式开关卡片。
 /// 开关的开启状态由 `get_config` / `apply_config` 统一管理（developerMode 字段）。
 pub fn is_developer_unlocked() -> bool {
-    reg_get_bool(KEY_DEV_UNLOCKED)
+    reg_get_bool(KEY_DEV_UNLOCKED).unwrap_or(false)
 }
 
 /// 解锁开发者模式（写入注册表 `DeveloperUnlocked=true`）
@@ -83,9 +83,9 @@ pub fn lock_developer_mode(app: &AppHandle) -> Result<(), String> {
 /// 与 `DeveloperMode` 两个开关，确保仅开发者模式实际开启时才允许忽略 TLS。
 /// 任何一层关闭均返回 false，避免开发者模式被关闭后 IgnoreTls 仍生效。
 pub fn is_ignore_tls() -> bool {
-    let unlocked = reg_get_bool(KEY_DEV_UNLOCKED);
-    let mode = reg_get_bool(KEY_DEV_MODE);
-    unlocked && mode && reg_get_bool(KEY_IGNORE_TLS)
+    let unlocked = reg_get_bool(KEY_DEV_UNLOCKED).unwrap_or(false);
+    let mode = reg_get_bool(KEY_DEV_MODE).unwrap_or(false);
+    unlocked && mode && reg_get_bool(KEY_IGNORE_TLS).unwrap_or(false)
 }
 
 /// 存储目录信息
@@ -179,7 +179,7 @@ fn require_dev_mode() -> Result<(), String> {
     if !is_developer_unlocked() {
         return Err("开发者模式未解锁".to_string());
     }
-    if !reg_get_bool(KEY_DEV_MODE) {
+    if !reg_get_bool(KEY_DEV_MODE).unwrap_or(false) {
         return Err("开发者模式未开启".to_string());
     }
     Ok(())

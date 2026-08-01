@@ -73,14 +73,19 @@ pub(crate) fn reg_delete(_key: &(), _name: &str) -> Result<(), String> {
 
 /// 读取注册表 bool 值（"true"/"1" 视为 true，其余为 false）
 ///
-/// 不存在时返回 false（而非 None），便于调用方直接判断。
+/// 返回 `Option<bool>` 以显式区分三种状态：
+/// - `Some(true)`：注册表值为 "true" / "1"
+/// - `Some(false)`：注册表值为其他字符串（如 "false" / "0" / "yes" 等）
+/// - `None`：键不存在，或当前平台不支持注册表（macOS / Linux）
+///
+/// 调用方通常用 `.unwrap_or(false)` 保持原"键不存在视为 false"语义；
+/// 需要区分"不支持"与"false"的场景可 `match` 显式处理。
 #[cfg(windows)]
-pub(crate) fn reg_get_bool(name: &str) -> bool {
+pub(crate) fn reg_get_bool(name: &str) -> Option<bool> {
     reg_key()
         .ok()
         .and_then(|k| reg_get(&k, name))
         .map(|v| v == "true" || v == "1")
-        .unwrap_or(false)
 }
 
 /// 写入注册表 bool 值（存储为 "true"/"false" 字符串）
@@ -90,9 +95,13 @@ pub(crate) fn reg_set_bool(name: &str, value: bool) -> Result<(), String> {
     reg_set(&key, name, if value { "true" } else { "false" })
 }
 
+/// 非 Windows 平台 stub：注册表不可用，返回 `None` 表示"平台不支持"。
+///
+/// 与 Windows 端 `None`（键不存在）语义一致，调用方 `.unwrap_or(false)`
+/// 后行为统一为 false，但日志/调试时可区分"平台不支持"与"值实际为 false"。
 #[cfg(not(windows))]
-pub(crate) fn reg_get_bool(_name: &str) -> bool {
-    false
+pub(crate) fn reg_get_bool(_name: &str) -> Option<bool> {
+    None
 }
 
 #[cfg(not(windows))]
