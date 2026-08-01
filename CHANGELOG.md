@@ -9,18 +9,79 @@
 
 ### 维护
 
+#### 统一启动时存储迁移到 `migrations/` 模块
+
+- 背景：项目有多个启动时自动执行的存储迁移逻辑散落在不同模块（`storage/appdata.rs` 的命名迁移与便携式迁移、`minecraft/online/storage.rs::OnlineStorage::load` 的 device.json 旧路径迁移、`storage/mod.rs::migrate_global_dirs` 的 online 残留目录清理）。把所有启动时存储迁移逻辑归到统一的 `migrations/` 目录，像数据库自动迁移那样启动时由 `Storage::init` 调用 `run_all()` 一次性执行
+- 改动（4 新增 + 4 修改）：
+  - **新增 `src-tauri/src/migrations/mod.rs`**：模块入口，提供 `run_all()` 按依赖顺序执行全部迁移（appdata_naming → portable_to_appdata → online_legacy）。`copy_dir_recursive`/`dir_is_non_empty` 迁移专用辅助函数提取为本模块 `pub(super)` 供子模块复用
+  - **新增 `src-tauri/src/migrations/appdata_naming.rs`**：从 `storage/appdata.rs` 迁入 `migrate_legacy_appdata_root()` → `pub fn migrate()`，保留 Windows canonicalize 大小写不敏感比较逻辑
+  - **新增 `src-tauri/src/migrations/portable_to_appdata.rs`**：从 `storage/appdata.rs` 迁入 `migrate_from_portable()` → `pub fn migrate()`，内部对 certs/providers 两个子目录执行便携式→AppData 迁移
+  - **新增 `src-tauri/src/migrations/online_legacy.rs`**：从 `OnlineStorage::load` 提取 device.json 旧路径迁移逻辑 → `pub fn migrate()`，原样转写文件（不涉及 SDK 解密/加密），迁移后清理整个旧 `online/` 目录（合并原 `migrate_global_dirs` 的 online 残留清理）。`legacy_device_path()` 一并迁入为 `pub(crate) fn`，供 `OnlineStorage::save/clear` 复用
+  - **`src-tauri/src/lib.rs`**：新增 `pub mod migrations;`（按字母序插入 logger 与 minecraft 之间）
+  - **`src-tauri/src/storage/mod.rs`**：`migrate_global_dirs()` 简化为仅调用 `crate::migrations::run_all()`，删除内联迁移逻辑与不再使用的 `log_warn` 导入
+  - **`src-tauri/src/storage/appdata.rs`**：删除 `migrate_legacy_appdata_root`/`migrate_from_portable`/`copy_dir_recursive`/`dir_is_non_empty`（已迁入 migrations），仅保留 `appdata_root`/`appdata_subdir`/`ensure_appdata_subdir` 路径解析函数与 `log_info` 导入
+  - **`src-tauri/src/minecraft/online/storage.rs`**：`OnlineStorage::load` 删除 legacy_path 迁移分支（启动时已由 migrations 执行）；`save`/`clear` 的 `Self::legacy_device_path()` 改为调用 `crate::migrations::online_legacy::legacy_device_path()`；删除 `legacy_device_path()` 方法与 `DEVICE_FILE` 常量（已迁入 migrations）
+- 设计决策：
+  - `legacy_device_path()` 迁移到 `migrations/online_legacy.rs` 而非保留在 `online/storage.rs`（"更内聚"方案）：依赖方向为业务→基础设施（migrations），避免 migrations 反向依赖业务模块 `OnlineStorage`，单一真源保证 save/clear 与启动迁移路径口径一致
+  - 辅助函数 `copy_dir_recursive`/`dir_is_non_empty` 放 `migrations/mod.rs` 作为 `pub(super)`，与 `commands/frp/install.rs`、`commands/plugins/install.rs` 各自的本地副本解耦（不跨模块共享）
+  - `online_legacy::migrate` 合并了原 `OnlineStorage::load` 的文件迁移与 `migrate_global_dirs` 的 online 目录清理：device.json 存在则迁移后清理目录，不存在则清理残留目录，迁移失败保留旧目录（数据保护）
+- 已知遗留：`certs.rs` 模块文档注释仍引用 `storage::appdata::migrate_from_portable`（已迁移到 `migrations::portable_to_appdata`），按任务约束未改动业务文件，注释为已知陈旧
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（exit 0，7.16s）
+
+#### 认证存储回归双轨制：Windows 注册表 + 非 Windows 结构化逐字段加密文件
+
+- 背景：上一版（cbaaff1）把认证存储从 Windows 注册表统一改为跨平台整体加密文件存储（整个 `PersistedAuthState` 序列化为 JSON 后用 SDK DES 加密成一个密文字符串写入单文件）。用户不满意：Windows 老用户希望回到注册表逐字段存储，非 Windows 希望文件存储但结构化逐字段加密（而非整体加密一个 JSON 字符串）
+- 改动（4 个文件 + 1 新增 + 1 删除）：
+  - **新增 `src-tauri/src/minecraft/auth/storage/registry.rs`**：从 cbaaff1^ 恢复认证专用注册表键名常量（`KEY_LOGIN_TYPE`/`KEY_MS_CURRENT_*`/`KEY_AUTHLIB_CURRENT_*`/`ALL_KEYS` 等），低层 reg_* 操作复用 `crate::storage::registry`
+  - **`src-tauri/src/minecraft/auth/storage/mod.rs`**：
+    - 新增 `mod registry;`、删除 `mod migrate;`
+    - 删除 `storage_path()` 方法与 `AUTH_FILE` 常量（Windows 用注册表、非 Windows 文件路径在 load/save 内部解析）
+    - 恢复 `reg_get_decrypted`/`reg_set_encrypted` 辅助方法（`#[cfg(windows)]`，内部 inline `use` 避免非 Windows 未使用导入告警）
+    - 保留 `encrypt`/`decrypt`/`invalidate`/`restrict_file_permissions` 不变
+    - 更新模块顶部 doc 注释说明双轨制存储
+  - **`src-tauri/src/minecraft/auth/storage/save.rs`**：双轨制实现
+    - Windows：恢复 cbaaff1^ 注册表实现（`save_to_registry`），先清旧值再逐字段写入，敏感字段 SDK 加密
+    - 非 Windows：新增 `save_to_file`，写入 `%APPDATA%/.Molaunch/auth.json`（macOS/Linux `~/.config/Molaunch/auth.json`）。明文 JSON 结构中 `name`/`uuid`/`access_token`/`client_token` 等敏感字段单独 SDK 加密为字符串值，`login_type` 明文；可空字段（profile_json/refresh_token/expires_at/server_url/server_name）Some 加密 / None 存 null；多账号列表先序列化为 JSON 字符串再 SDK 加密；Unix 设置 0o600 权限；写完刷新缓存
+  - **`src-tauri/src/minecraft/auth/storage/load.rs`**：双轨制实现
+    - Windows：恢复 cbaaff1^ 注册表实现（`load_from_registry`），按 LoginType 分支逐字段 SDK 解密读取
+    - 非 Windows：新增 `load_from_file`，读取 auth.json → `serde_json::Value` → 逐字段 SDK 解密。current_user 统一读取全部字段（与 save 的 uniform 结构对应）；多账号列表 SDK 解密后反序列化；文件不存在返回 default；解析失败返回 Err。新增 `decrypt_field`/`decrypt_opt_field`/`decrypt_account_list` 三个非 Windows 辅助方法消除重复
+    - 保留内存缓存优先逻辑
+  - **删除 `src-tauri/src/minecraft/auth/storage/migrate.rs`**：Windows 用注册表、非 Windows 用文件，无需跨平台迁移
+- 设计决策：
+  - 非 Windows current_user 存储全部字段（uniform 结构），不同于注册表按 login_type 分字段（Legacy/Microsoft/AuthlibInjector 各存不同键）。文件结构稳定，新增字段只需扩 JSON 对象，不破坏旧数据
+  - 非 Windows 加密失败用 `?` 传播错误（与历史注册表行为一致），不再降级明文存储（避免 token 落盘为明文的安全风险）
+  - `operations.rs`/`types.rs` 未修改（高层操作仅依赖 `load`/`save`，与存储细节解耦）
+- 验证：`cargo check` + `cargo clippy -- -D warnings` 均通过（0 警告）
+- 影响范围：Windows 老用户回到注册表存储体验；非 Windows 用户得到结构化加密文件（每个敏感字段独立密文，便于审计与未来字段级迁移）
+
+#### 统一 AppData 目录命名 + wintun.dll 路径复用 appdata 模块
+
+- 背景：排查认证存储问题时发现 AppData 目录命名不一致（`personalization.rs`/`online/storage.rs` 误用 `.MolaLaunch`，便携式目录与 updater last.exe 用 `.Molaunch`），macOS/Linux 区分大小写会变成两个独立目录；同时 `resources.rs::extract_wintun` 独立拼路径而非复用 `appdata::appdata_root`，与 certs/providers/auth 等保持一致目录约定的口径不符
+- 改动（7 个文件）：
+  - **`src-tauri/src/storage/appdata.rs`**：`appdata_root()` 返回值统一为 `.Molaunch`（Windows `%APPDATA%/.Molaunch/`，macOS/Linux `~/.config/Molaunch/`），与便携式目录、updater last.exe 一致。旧路径 `.MolaLaunch` 由 `crate::migrations::appdata_naming` 启动时一次性迁移
+  - **`src-tauri/src/resources.rs`**：`extract_wintun` 复用 `appdata::appdata_root()` 而非独立拼 `APPDATA` 环境变量与 `.MolaLaunch` 字面量，wintun.dll 释放路径从 `.MolaLaunch` 统一为 `.Molaunch`
+  - **`src-tauri/src/commands/plugins/personalization.rs`**：`personalization_path()` 复用 `crate::storage::appdata::appdata_root` 而非内联平台分支拼路径，与 online/auth/certs/providers 等全局共享资源保持一致的目录约定（同时消除 `.MolaLaunch` 误用）
+  - **`src-tauri/src/certs.rs` + `commands/frp/paths.rs` + `minecraft/online/bridge.rs`**：文档注释中的 `.MolaLaunch` 统一更新为 `.Molaunch`
+  - **`src/stores/plugins.ts` + `src/utils/pluginInstaller.ts`**：前端文档注释中的 `.MolaLaunch` 统一更新为 `.Molaunch`（5 处）
+- 命名历史：早期 `personalization.rs` 与 `online/storage.rs` 误用 `.MolaLaunch`（多了一个 La），后续 `auth/storage` 跟随。updater 的 last.exe 一直用 `.Molaunch`。现全部统一为 `.Molaunch`
+- 验证：`cargo check` + `cargo clippy -D warnings` 均通过
+- 影响范围：
+  1. **目录命名统一**：AppData 下不再出现 `.Molaunch` 和 `.MolaLaunch` 两个目录（macOS/Linux 区分大小写会变两个），旧 `.MolaLaunch` 启动时由 `migrations::appdata_naming` 自动迁移到 `.Molaunch`
+  2. **wintun.dll 路径统一**：复用公共 appdata 模块，与 certs/providers/auth 等保持一致
+  3. **personalization 路径复用**：消除内联平台分支，与全局共享资源口径一致
+
 #### 目录存储逻辑调整：certs/providers 迁移到 AppData 全局共享
 
 - 背景：用户发现 `.Molaunch/` 便携式目录下存在 `certs/`、`online/`、`providers/` 三个本应全局共享的目录。这些是设备级资源（一份 TLS 证书、一份 frpc 二进制即可被所有启动器实例复用），但原来每个启动器实例各存一份，浪费磁盘空间且管理混乱
 - 改动（5 个文件）：
-  - **新增 `src-tauri/src/storage/appdata.rs`**：公共 AppData 路径辅助模块，集中管理 `%APPDATA%/.MolaLaunch/`（Windows）/ `~/.config/MolaLaunch/`（macOS/Linux）路径。提供 `appdata_root` / `appdata_subdir` / `ensure_appdata_subdir` / `migrate_from_portable` 四个函数。原本 `OnlineStorage::appdata_device_path` 与 `AuthStorage::storage_path` 各自重复实现同一套平台路径逻辑，现统一抽取到此模块
+  - **新增 `src-tauri/src/storage/appdata.rs`**：公共 AppData 路径辅助模块，集中管理 `%APPDATA%/.Molaunch/`（Windows）/ `~/.config/Molaunch/`（macOS/Linux）路径。提供 `appdata_root` / `appdata_subdir` / `ensure_appdata_subdir` / `migrate_from_portable` 四个函数。原本 `OnlineStorage::appdata_device_path` 与 `AuthStorage::storage_path` 各自重复实现同一套平台路径逻辑，现统一抽取到此模块
   - **`src-tauri/src/storage/mod.rs`**：`Storage::init` 新增 `migrate_global_dirs` 步骤，启动时自动：
     1. `certs` 从便携式迁移到 AppData（用户全局信任一次，多启动器共享）
     2. `providers` 从便携式迁移到 AppData（frpc 二进制全局共享，避免每实例重复下载几十 MB）
     3. 清理 `online` 残留目录（device.json 已在 v2 迁至 AppData，旧目录遗留需清理）
     - 迁移策略：AppData 已有数据则跳过并删除便携式旧目录；便携式目录递归复制到 AppData 后删除原目录；失败不阻塞启动，下次启动再次尝试
-  - **`src-tauri/src/certs.rs`**：`cert_dir()` 改为返回 `%APPDATA%/.MolaLaunch/certs/`，复用 `appdata::ensure_appdata_subdir`；APPDATA 环境变量缺失时降级回便携式目录（极少发生）
-  - **`src-tauri/src/commands/frp/paths.rs`**：`providers_root()` 改为返回 `%APPDATA%/.MolaLaunch/providers/`，同样复用 `appdata::ensure_appdata_subdir`；模块顶部 doc 注释区分便携式路径（frp/tunnels.json 等）与全局共享路径（providers/）
+  - **`src-tauri/src/certs.rs`**：`cert_dir()` 改为返回 `%APPDATA%/.Molaunch/certs/`，复用 `appdata::ensure_appdata_subdir`；APPDATA 环境变量缺失时降级回便携式目录（极少发生）
+  - **`src-tauri/src/commands/frp/paths.rs`**：`providers_root()` 改为返回 `%APPDATA%/.Molaunch/providers/`，同样复用 `appdata::ensure_appdata_subdir`；模块顶部 doc 注释区分便携式路径（frp/tunnels.json 等）与全局共享路径（providers/）
   - **`src-tauri/src/minecraft/online/storage.rs` + `src-tauri/src/minecraft/auth/storage/mod.rs`**：`appdata_device_path` 与 `storage_path` 内部平台分支逻辑替换为复用 `crate::storage::appdata::appdata_root`/`appdata_subdir`，消除重复实现，与 certs/providers 保持一致目录约定
 - 保留便携式：`config.ini`、`instance.ini`、`logs/`、`cache/`、`temp/`、`Download/`、`frp/`（tunnels.json/providers.json/logs/config）仍是当前启动器实例绑定的运行时数据，保持便携式存储
 - 验证：`cargo check` 通过

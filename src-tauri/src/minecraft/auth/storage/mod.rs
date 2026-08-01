@@ -1,15 +1,23 @@
-//! 认证持久化模块（跨平台文件存储）
+//! 认证持久化模块（双轨制存储）
 //!
-//! 存储路径：Windows `%APPDATA%/.MolaLaunch/auth.json`，macOS/Linux `~/.config/MolaLaunch/auth.json`。
-//! 整个 `PersistedAuthState` 序列化为 JSON 后用 SDK DES 加密，写入单文件；Unix 显式设置 0o600 权限。
-//! 子模块：types（数据结构）/ save（文件写入）/ load（文件读取）/ operations（11 个高层方法）。
+//! - **Windows**：注册表 `HKCU\Software\MoLaunch` 逐字段存储。敏感字段（Token/用户名/UUID）
+//!   用 SDK DES 加密后写入独立键值，非敏感字段（登录类型）明文；多账号列表序列化为
+//!   JSON 字符串后整体 SDK 加密写入单键。
+//! - **非 Windows**：JSON 文件 `%APPDATA%/.Molaunch/auth.json`（macOS/Linux 为
+//!   `~/.config/Molaunch/auth.json`）结构化逐字段加密。明文 JSON 结构中每个敏感字段
+//!   单独 SDK 加密为字符串值，非敏感字段（login_type）明文；多账号列表先序列化为 JSON
+//!   字符串再 SDK 加密。Unix 显式设置 0o600 权限保护敏感字段。
 //!
-//! 历史设计：v0.1.0-beta.1 之前使用 Windows 注册表 `HKCU\Software\MoLaunch` 逐字段存储，
-//! 非 Windows 平台为 stub（save 静默 Ok(())、load 返回 default）。现改为跨平台文件存储，
-//! 老用户升级后需要重新登录（beta 阶段允许，未做注册表→文件迁移）。
+//! 子模块：types（数据结构）/ registry（注册表键名常量，仅 Windows 使用）/
+//! operations（11 个高层方法）/ load（读取）/ save（写入）。
+//!
+//! 历史设计：v0.1.0-beta.1 之前 Windows 用注册表、非 Windows 为 stub。
+//! v0.1.0-beta.1 曾改为跨平台整体加密文件存储，现回归双轨制：Windows 恢复注册表，
+//! 非 Windows 改为结构化逐字段加密文件（避免整体加密一个 JSON 字符串）。
 
 mod load;
 mod operations;
+mod registry;
 mod save;
 mod types;
 
@@ -18,7 +26,6 @@ pub use types::{
 };
 
 use crate::sdk::SdkInstance;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
 
@@ -26,18 +33,17 @@ use tokio::sync::Mutex as TokioMutex;
 // 认证存储管理器
 // ============================================================
 
-/// 认证存储文件在 AppData 目录下的相对路径
-const AUTH_FILE: &str = "auth.json";
-
 /// 认证存储管理器
 ///
-/// 使用跨平台文件存储认证信息。整个 `PersistedAuthState` 序列化为 JSON 后用 SDK DES 加密，
-/// 写入单文件（Windows `%APPDATA%/.MolaLaunch/auth.json`，Unix `~/.config/MolaLaunch/auth.json`）。
-/// Unix 显式设置 0o600 权限保护敏感字段。
+/// 双轨制存储：
+/// - Windows：注册表 `HKCU\Software\MoLaunch` 逐字段 SDK 加密存储。
+/// - 非 Windows：JSON 文件结构化逐字段 SDK 加密存储，Unix 设置 0o600 权限。
+///
+/// `load`/`save` 内部按平台分支，`operations` 仅依赖这两个方法，与存储细节解耦。
 pub struct AuthStorage {
     /// SDK 实例引用（用于 DES 加解密）
     sdk: Arc<TokioMutex<Option<SdkInstance>>>,
-    /// 内存缓存（避免每次命令都重新读文件+解密+打日志）
+    /// 内存缓存（避免每次命令都重新读存储+解密+打日志）
     /// save 系列方法会自动刷新此缓存
     cache: TokioMutex<Option<PersistedAuthState>>,
 }
@@ -76,27 +82,40 @@ impl AuthStorage {
         }
     }
 
-    // --------------------------------------------------------
-    // 文件存储路径
-    // --------------------------------------------------------
+    /// 加密并写入注册表（仅 Windows）
+    ///
+    /// 等价于旧版 `reg_set_encrypted`：self.encrypt SDK DES 加密 → reg_set 写入注册表。
+    /// 非 Windows 平台不编译此方法（注册表不可用）。
+    #[cfg(windows)]
+    async fn reg_set_encrypted(
+        &self,
+        key: &winreg::RegKey,
+        name: &str,
+        value: &str,
+    ) -> Result<(), String> {
+        use crate::storage::registry::reg_set;
 
-    /// 解析认证存储文件路径
+        let encrypted = self.encrypt(value).await?;
+        reg_set(key, name, &encrypted)
+    }
+
+    /// 读取并解密注册表（仅 Windows）
     ///
-    /// - Windows: `%APPDATA%/.MolaLaunch/auth.json`
-    /// - macOS/Linux: `~/.config/MolaLaunch/auth.json`
-    ///
-    /// 路径解析复用 `crate::storage::appdata::appdata_root`，与 online/device.json、
-    /// certs、providers 等全局共享资源保持一致的目录约定。
-    /// 父目录不自动创建（由调用方按需 `create_dir_all`）。环境变量缺失时返回 Err。
-    fn storage_path() -> Result<PathBuf, String> {
-        Ok(crate::storage::appdata::appdata_root()?.join(AUTH_FILE))
+    /// 等价于旧版 `reg_get_decrypted`：reg_get 读取明文值 → self.decrypt SDK DES 解密。
+    /// 注册表键不存在或解密失败时返回 None。非 Windows 平台不编译此方法。
+    #[cfg(windows)]
+    async fn reg_get_decrypted(&self, key: &winreg::RegKey, name: &str) -> Option<String> {
+        use crate::storage::registry::reg_get;
+
+        let encrypted = reg_get(key, name)?;
+        self.decrypt(&encrypted).await.ok()
     }
 
     // --------------------------------------------------------
     // 缓存控制
     // --------------------------------------------------------
 
-    /// 清除内存缓存，强制下次 load 从文件重新读取
+    /// 清除内存缓存，强制下次 load 从存储重新读取
     pub async fn invalidate(&self) {
         *self.cache.lock().await = None;
     }
