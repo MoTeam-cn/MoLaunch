@@ -19,9 +19,12 @@ export function usePolling(
   intervalMs: number,
 ) {
   let timer: ReturnType<typeof setInterval> | null = null
+  // 组件卸载后禁止再启动：防止异步 onLoad 完成时（组件已卸载）
+  // 调用 start() 注册的 interval 永远不会被清理（泄漏 IPC 轮询）
+  let unmounted = false
 
   function start() {
-    if (timer) return
+    if (timer || unmounted) return
     timer = setInterval(() => {
       // 异步回调内的错误吞掉（与原 MemorySection.vue 一致：静默失败）
       Promise.resolve(callback()).catch(() => { /* ignore */ })
@@ -35,7 +38,10 @@ export function usePolling(
     }
   }
 
-  onUnmounted(() => stop())
+  onUnmounted(() => {
+    unmounted = true
+    stop()
+  })
 
   return { start, stop }
 }
