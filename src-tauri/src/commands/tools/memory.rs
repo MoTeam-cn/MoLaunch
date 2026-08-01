@@ -159,6 +159,10 @@ fn release_memory(mode: &str) {
     }
 
     // Linux: malloc_trim(0) 归还 glibc 堆碎片给 OS
+    //
+    // mode 参数被有意忽略：light/strong 在 Windows 上区分"是否清空 StandbyList"，
+    // Linux 无等价概念，malloc_trim 只有 pad 参数（0 = 尽可能多归还）。
+    // 强行映射会引入语义不清的伪区分，保持单一行为更诚实。
     #[cfg(target_os = "linux")]
     {
         extern "C" {
@@ -170,6 +174,9 @@ fn release_memory(mode: &str) {
     }
 
     // macOS: malloc_zone_pressure_relief(NULL, 0) 释放所有 malloc zone 空闲内存
+    //
+    // mode 参数被有意忽略：与 Linux 同理，light/strong 无等价映射。
+    // goal=0 已是最大释放量，无需区分强度。
     #[cfg(target_os = "macos")]
     {
         // malloc_zone_pressure_relief 的签名：

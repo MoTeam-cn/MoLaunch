@@ -58,6 +58,14 @@ pub fn cache_abs_path(url: &str) -> PathBuf {
 /// Tauri 2 在 Windows/Android 上将自定义 scheme 映射为 `https://{scheme}.localhost`，
 /// 在 macOS/Linux 上映射为 `{scheme}://localhost`。
 /// 使用 HTTPS 格式确保 Chromium 允许跨源请求（自定义 scheme 原始格式会被 CORS 拦截）。
+///
+/// 平台 URL 格式差异（由 Tauri WebView 内核决定）：
+/// - Windows (WebView2)：`https://cache-image.localhost/{hash}.png`
+/// - macOS / Linux (WebKitGTK)：`cache-image://localhost/{hash}.png`
+///
+/// 注：`cfg(not(target_os = "windows"))` 理论上含 Android，但项目不支持 Android
+/// 构建，实际仅覆盖 macOS / Linux。若未来支持 Android，需验证其 WebView
+/// (Chromium 内核) 应走 `https://` 格式，届时改为显式 `cfg(any(target_os = "macos", target_os = "linux"))`。
 fn cache_image_url(url: &str) -> String {
     let hash = url_hash(url);
     #[cfg(target_os = "windows")]
