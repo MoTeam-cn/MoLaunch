@@ -9,6 +9,32 @@
 
 ### 维护
 
+#### 目录存储逻辑调整：certs/providers 迁移到 AppData 全局共享
+
+- 背景：用户发现 `.Molaunch/` 便携式目录下存在 `certs/`、`online/`、`providers/` 三个本应全局共享的目录。这些是设备级资源（一份 TLS 证书、一份 frpc 二进制即可被所有启动器实例复用），但原来每个启动器实例各存一份，浪费磁盘空间且管理混乱
+- 改动（5 个文件）：
+  - **新增 `src-tauri/src/storage/appdata.rs`**：公共 AppData 路径辅助模块，集中管理 `%APPDATA%/.MolaLaunch/`（Windows）/ `~/.config/MolaLaunch/`（macOS/Linux）路径。提供 `appdata_root` / `appdata_subdir` / `ensure_appdata_subdir` / `migrate_from_portable` 四个函数。原本 `OnlineStorage::appdata_device_path` 与 `AuthStorage::storage_path` 各自重复实现同一套平台路径逻辑，现统一抽取到此模块
+  - **`src-tauri/src/storage/mod.rs`**：`Storage::init` 新增 `migrate_global_dirs` 步骤，启动时自动：
+    1. `certs` 从便携式迁移到 AppData（用户全局信任一次，多启动器共享）
+    2. `providers` 从便携式迁移到 AppData（frpc 二进制全局共享，避免每实例重复下载几十 MB）
+    3. 清理 `online` 残留目录（device.json 已在 v2 迁至 AppData，旧目录遗留需清理）
+    - 迁移策略：AppData 已有数据则跳过并删除便携式旧目录；便携式目录递归复制到 AppData 后删除原目录；失败不阻塞启动，下次启动再次尝试
+  - **`src-tauri/src/certs.rs`**：`cert_dir()` 改为返回 `%APPDATA%/.MolaLaunch/certs/`，复用 `appdata::ensure_appdata_subdir`；APPDATA 环境变量缺失时降级回便携式目录（极少发生）
+  - **`src-tauri/src/commands/frp/paths.rs`**：`providers_root()` 改为返回 `%APPDATA%/.MolaLaunch/providers/`，同样复用 `appdata::ensure_appdata_subdir`；模块顶部 doc 注释区分便携式路径（frp/tunnels.json 等）与全局共享路径（providers/）
+  - **`src-tauri/src/minecraft/online/storage.rs` + `src-tauri/src/minecraft/auth/storage/mod.rs`**：`appdata_device_path` 与 `storage_path` 内部平台分支逻辑替换为复用 `crate::storage::appdata::appdata_root`/`appdata_subdir`，消除重复实现，与 certs/providers 保持一致目录约定
+- 保留便携式：`config.ini`、`instance.ini`、`logs/`、`cache/`、`temp/`、`Download/`、`frp/`（tunnels.json/providers.json/logs/config）仍是当前启动器实例绑定的运行时数据，保持便携式存储
+- 验证：`cargo check` 通过
+- 影响范围：多启动器实例不再重复存储证书和 frpc 二进制；旧用户首次启动新版本自动无缝迁移，数据不丢失；迁移后旧目录被清理，`.Molaunch` 目录更清爽
+
+#### 修复 frpc 下载后 ZIP 文件未清理（2 处）
+
+- 背景：用户发现 `.Molaunch/providers/` 下残留下载的 zip 文件，提取 frpc 后未删除
+- 改动（2 个文件）：
+  - **`src-tauri/src/commands/frp/binary/system_default.rs`**：系统默认厂商 frpc 下载流程，注释承诺"提取 frpc 后删除"但代码遗漏。在 `extract_frpc_from_zip` 成功后加 `std::fs::remove_file(&zip_path)` 清理临时 ZIP
+  - **`src-tauri/src/commands/frp/binary/external.rs`**：外部厂商 frpc 下载流程，`dl.archive == true` 时解压后未删除原始 archive。在 `extract_archive` 成功后加 `std::fs::remove_file(&target_path)` 清理；返回信息区分 archive/非 archive 模式
+- 验证：`cargo clippy -- -D warnings` 0 警告
+- 影响范围：providers 目录不再残留冗余 zip 文件，节省磁盘空间
+
 #### 跨平台兼容性 M5/M6/M7 评估结论（保持现状 + 补注释）
 
 - 背景：P0+P1+P2+P3 全部清零后，评估剩余 3 项中低问题（M5/M6/M7），结论为保持现状并补充注释说明设计意图

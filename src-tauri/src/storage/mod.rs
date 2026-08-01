@@ -2,6 +2,7 @@
 //! All operations on .Molaunch folder must go through this module
 //! Uses INI format for configuration
 
+pub mod appdata;
 pub mod cache;
 pub mod cache_app;
 pub mod cache_temp;
@@ -9,6 +10,7 @@ pub mod ini;
 pub mod registry;
 
 use crate::log_info;
+use crate::log_warn;
 use crate::resources;
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -54,6 +56,11 @@ impl Storage {
         self.ensure_dir("temp")?;
         self.ensure_dir("Download")?;
 
+        // 全局共享目录迁移：certs/providers 从便携式 .Molaunch 迁移到 AppData
+        //（设备级资源，多启动器实例共享，避免每实例重复存储）
+        // online 目录已在 v2 迁移到 AppData（device.json），但旧目录可能残留，启动时清理
+        self.migrate_global_dirs();
+
         self.sync_config()?;
 
         let instance_path = self.instance_path();
@@ -73,6 +80,43 @@ impl Storage {
             log_info!("Created directory: {}", dir.display());
         }
         Ok(())
+    }
+
+    /// 全局共享目录迁移：将设备级资源从便携式 .Molaunch 迁移到 AppData 全局目录
+    ///
+    /// 迁移项：
+    /// - `certs/`：TLS 自定义证书（一台设备信任一次，多启动器共享）
+    /// - `providers/`：外部 frpc 厂商二进制（避免每实例重复下载几十 MB）
+    ///
+    /// 清理项：
+    /// - `online/`：v2 已将 device.json 迁至 AppData，残留空目录或遗留文件启动时清理
+    ///
+    /// 迁移失败不阻塞启动（仅记录 WARN，下次启动再次尝试）。
+    fn migrate_global_dirs(&self) {
+        // 1. certs 迁移到 AppData
+        if let Err(e) = appdata::migrate_from_portable("certs") {
+            log_warn!("[Storage] certs 目录迁移失败: {}", e);
+        }
+
+        // 2. providers 迁移到 AppData
+        if let Err(e) = appdata::migrate_from_portable("providers") {
+            log_warn!("[Storage] providers 目录迁移失败: {}", e);
+        }
+
+        // 3. 清理 online 残留目录（device.json 已在 v2 迁移到 AppData）
+        let online_dir = self.base_dir.join("online");
+        if online_dir.exists() {
+            log_info!(
+                "[Storage] 清理 online 残留目录: {}",
+                online_dir.display()
+            );
+            if let Err(e) = std::fs::remove_dir_all(&online_dir) {
+                log_warn!(
+                    "[Storage] online 残留目录清理失败（下次启动会再次尝试）: {}",
+                    e
+                );
+            }
+        }
     }
 
     pub fn config_path(&self) -> PathBuf {

@@ -1,9 +1,13 @@
 //! TLS 证书管理模块
 //!
 //! 提供自定义/系统根证书加载与 certs 目录管理，信任源模式由 `AppConfig.tls.trust_mode` 控制。
+//!
+//! 存储路径：`%APPDATA%/.MolaLaunch/certs/`（全局共享，跨启动器实例）。
+//! 历史上曾存于便携式 `<exe_dir>/.Molaunch/certs/`，启动时由 `storage::appdata::migrate_from_portable`
+//! 自动迁移到 AppData。
 
 use crate::log_info;
-use crate::storage::Storage;
+use crate::storage::appdata;
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -36,17 +40,16 @@ fn validate_filename(filename: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 证书目录：`%APPDATA%/.Molaunch/certs/`（不存在则创建）
+/// 证书目录：`%APPDATA%/.MolaLaunch/certs/`（全局共享，不存在则创建）
+///
+/// 跨启动器实例共享：一台设备只信任一次自定义根证书，所有 MoLaunch 实例复用同一份。
+/// 旧路径 `<exe_dir>/.Molaunch/certs/` 由 `Storage::init` 启动时自动迁移。
 pub fn cert_dir() -> PathBuf {
-    let dir = Storage::instance().base_dir().join("certs");
-    if !dir.exists() {
-        if let Err(e) = std::fs::create_dir_all(&dir) {
-            crate::log_error!("Failed to create certs directory: {}", e);
-        } else {
-            log_info!("Created certs directory: {}", dir.display());
-        }
-    }
-    dir
+    appdata::ensure_appdata_subdir("certs").unwrap_or_else(|e| {
+        crate::log_error!("Failed to create certs directory in AppData: {}", e);
+        // 降级回便携式目录（极少发生：APPDATA 环境变量缺失）
+        crate::storage::Storage::instance().base_dir().join("certs")
+    })
 }
 
 /// 列出 certs 目录下所有 `.pem` 文件
