@@ -19,14 +19,14 @@ const props = defineProps<{
   storageDirs: StorageDirs | null
 }>()
 
-/** 缓存卡片条目（运行路径缓存 / 临时目录 / 系统临时缓存 / AppData 缓存） */
+/** 缓存卡片条目（运行路径缓存 / 临时目录 / 系统临时缓存 / Minecraft 运行缓存） */
 const cacheEntries = computed<{ label: string; path: string }[]>(() => {
   if (!props.storageDirs) return []
   return [
     { label: '运行路径缓存', path: props.storageDirs.cache },
     { label: '运行路径临时', path: props.storageDirs.temp },
     { label: '系统临时缓存', path: props.storageDirs.cacheTemp },
-    { label: 'AppData 缓存', path: props.storageDirs.cacheApp },
+    { label: 'Minecraft 运行缓存', path: props.storageDirs.cacheApp },
   ]
 })
 
@@ -38,6 +38,19 @@ const storageEntries = computed<{ label: string; path: string; locate?: boolean 
     { label: '配置文件', path: props.storageDirs.config, locate: true },
     { label: '日志目录', path: props.storageDirs.logs },
   ]
+})
+
+/** AppData 全局共享卡片条目（环境变量缺失时路径为空串，过滤跳过） */
+const appdataEntries = computed<{ label: string; path: string; locate?: boolean }[]>(() => {
+  if (!props.storageDirs) return []
+  return [
+    { label: '全局共享根目录', path: props.storageDirs.appdataRoot },
+    { label: 'TLS 证书目录', path: props.storageDirs.appdataCerts },
+    { label: 'frpc 厂商二进制', path: props.storageDirs.appdataProviders },
+    { label: 'FRP 认证 token', path: props.storageDirs.appdataFrpAuth },
+    { label: '联机数据', path: props.storageDirs.appdataOnline },
+    { label: '账号认证文件', path: props.storageDirs.appdataAuthFile, locate: true },
+  ].filter((entry) => entry.path.length > 0)
 })
 
 async function openDir(path: string) {
@@ -99,6 +112,34 @@ async function handleClick(entry: { path: string; locate?: boolean }) {
       <div class="divide-y divide-gray-200">
         <div
           v-for="entry in storageEntries"
+          :key="entry.label"
+          class="px-5 py-3 flex items-center justify-between"
+        >
+          <div>
+            <p class="text-sm text-gray-500">{{ entry.label }}</p>
+            <p class="text-xs text-gray-900 font-mono mt-1 break-all">{{ entry.path }}</p>
+          </div>
+          <Button
+            type="outline"
+            size="small"
+            class="shrink-0 ml-4"
+            @click="handleClick(entry)"
+          >
+            <template #icon>
+              <component :is="entry.locate ? DocumentTextIcon : FolderOpenIcon" class="w-3.5 h-3.5" />
+            </template>
+            {{ entry.locate ? '定位' : '打开' }}
+          </Button>
+        </div>
+      </div>
+    </div>
+
+    <!-- AppData 全局共享 -->
+    <div v-if="appdataEntries.length > 0" class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">AppData 全局共享</h3>
+      <div class="divide-y divide-gray-200">
+        <div
+          v-for="entry in appdataEntries"
           :key="entry.label"
           class="px-5 py-3 flex items-center justify-between"
         >

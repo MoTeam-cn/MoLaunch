@@ -74,6 +74,9 @@ pub fn run() {
     minecraft::community::secure_storage::init_enabled();
     minecraft::community::secure_storage::set_sdk(app_state.sdk.clone());
 
+    // 注入 Frp 认证存储 SDK 引用（token 用 SDK DES 加密后写文件，替代原 keyring）
+    commands::frp::auth::set_sdk(app_state.sdk.clone());
+
     // 启动缓存定期清理任务（启动时立即清理一次，之后每 1h 重复执行）
     // 清理超过 24h 的不重要缓存文件（图片、安装器、预加载、临时安装包等）
     // 不清理 SDK 动态库和 Java Runtime（重要资源）

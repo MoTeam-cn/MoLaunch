@@ -1,7 +1,7 @@
 //! Frp 厂商认证模块：OAuth2 / Device Code / API Key 三种流程
 //!
-//! token 使用 OS 密钥存储（Windows Credential Manager / macOS Keychain / Linux Secret Service）。
-//! 子模块：storage（密钥存储辅助）/ oauth2 / device_code / api_key / flows（可配置流程引擎）。
+//! token 经 SDK 内置 DES 加密后存文件（`<base_dir>/frp/auth/{provider_id}.json`）。
+//! 子模块：storage（加密存储辅助）/ oauth2 / device_code / api_key / flows（可配置流程引擎）。
 
 use super::api_spec::load_api_spec;
 use super::provider::{
@@ -10,14 +10,22 @@ use super::provider::{
 };
 use super::types::{FieldExtractor, FlowRequest, OAuth2Flow};
 use crate::log_info;
+use crate::sdk::SdkInstance;
 use crate::state::AppState;
 use serde::Serialize;
+use std::sync::Arc;
+use tokio::sync::Mutex as TokioMutex;
 
 mod api_key;
 mod device_code;
 mod flows;
 mod oauth2;
 mod storage;
+
+/// 注入 SDK 引用（lib.rs 启动时调用，供 token 加密存储使用）
+pub fn set_sdk(sdk: Arc<TokioMutex<Option<SdkInstance>>>) {
+    storage::set_sdk(sdk);
+}
 
 // 返回类型
 /// 认证状态（get_auth_status 返回）
@@ -137,13 +145,13 @@ pub async fn get_auth_status(provider_id: &str) -> Result<AuthStatus, String> {
         });
     }
 
-    // 检查 access_token 是否存在
-    let access_token = storage::load_secret(provider_id, storage::KEY_ACCESS_TOKEN)?;
-    let authenticated = access_token.is_some();
+    // 检查 access_token 是否存在（SDK DES 解密读取）
+    let record = storage::load_token_record(provider_id).await?;
+    let authenticated = record.is_some();
 
     // 检查是否过期（仅 oauth2 / device_code 有过期时间）
     let expires_at = if matches!(auth_type.as_str(), "oauth2" | "device_code") {
-        storage::load_expires_at(provider_id)?
+        record.as_ref().and_then(|r| r.expires_at)
     } else {
         None
     };
@@ -158,7 +166,7 @@ pub async fn get_auth_status(provider_id: &str) -> Result<AuthStatus, String> {
         false
     };
 
-    let scopes = storage::load_scopes(provider_id)?;
+    let scopes = record.as_ref().and_then(|r| r.scopes.clone());
 
     Ok(AuthStatus {
         provider_id: provider_id.to_string(),
@@ -221,7 +229,9 @@ pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), S
     // 优先使用 refresh，缺失时回退到 token（部分厂商用同一端点刷新）
     let refresh_flow: &FlowRequest = oauth2_flow.refresh.as_ref().unwrap_or(&oauth2_flow.token);
 
-    let refresh_token = storage::load_secret(provider_id, storage::KEY_REFRESH_TOKEN)?
+    let refresh_token = storage::load_token_record(provider_id)
+        .await?
+        .and_then(|r| r.refresh_token)
         .ok_or_else(|| format!("厂商 {} 无 refresh_token，请重新认证", provider_id))?;
 
     // 取 clientId/clientSecret（从 auth.json 按 authType 读取，oauth2 或 device_code 必居其一）
@@ -273,7 +283,8 @@ pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), S
         new_refresh_token.as_deref(),
         expires_in,
         None, // 刷新不改变 scopes
-    )?;
+    )
+    .await?;
 
     log_info!("[Frp Auth] token 刷新成功: provider={}", provider_id);
     Ok(())
@@ -283,11 +294,8 @@ pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), S
 pub async fn revoke_auth(provider_id: &str) -> Result<(), String> {
     log_info!("[Frp Auth] 撤销认证: provider={}", provider_id);
 
-    // 清除 keyring 中的所有密钥
-    storage::delete_secret(provider_id, storage::KEY_ACCESS_TOKEN)?;
-    storage::delete_secret(provider_id, storage::KEY_REFRESH_TOKEN)?;
-    storage::delete_secret(provider_id, storage::KEY_EXPIRES_AT)?;
-    storage::delete_secret(provider_id, storage::KEY_SCOPES)?;
+    // 删除加密 token 文件
+    storage::delete_provider_auth(provider_id).await?;
 
     // 清除 Device Code 会话
     device_code::remove_device_code_session(provider_id);
@@ -300,7 +308,9 @@ pub async fn revoke_auth(provider_id: &str) -> Result<(), String> {
 /// 仅读取已存储的 access_token，不检查过期、不自动刷新。
 /// 调用方（api_spec::fetch_tunnels）应先调用 refresh_token 确保有效。
 pub async fn load_token(provider_id: &str) -> Result<String, String> {
-    storage::load_secret(provider_id, storage::KEY_ACCESS_TOKEN)?
+    storage::load_token_record(provider_id)
+        .await?
+        .map(|r| r.access_token)
         .ok_or_else(|| format!("厂商 {} 未认证，请先完成认证", provider_id))
 }
 

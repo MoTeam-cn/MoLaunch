@@ -1,121 +1,148 @@
-//! keyring 密钥存储辅助 + token 上下文工具
+//! FRP 厂商认证 token 存储：文件 + SDK DES 加密
 //!
-//! service=`frp:<provider_id>`，username=`access_token` / `refresh_token` /
-//! `expires_at` / `scopes`。token 过期前 5 分钟自动刷新由调用方负责。
+//! 替代原 keyring（OS 密钥存储）：token 经 SDK 内置 DES 加密后写入
+//! `%APPDATA%/.Molaunch/frp_auth/{provider_id}.json`（macOS/Linux 为
+//! `~/.config/Molaunch/frp_auth/`），与 frpc 厂商二进制同级，属全局共享
+//! 设备级数据（便携版换目录/更新不丢认证），Unix 下设置 0o600 权限。
+//!
+//! SDK 引用由 [`set_sdk`] 在启动时注入（lib.rs），与 CurseForge
+//! secure_storage 的懒加载注入模式一致；token 过期前自动刷新由调用方负责。
 
-use crate::log_error;
+use crate::sdk::SdkInstance;
+use crate::log_warn;
+use serde::{Deserialize, Serialize};
+use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::Mutex as TokioMutex;
 
-// keyring 密钥存储辅助
-/// 密钥存储的 key 列表
-pub(super) const KEY_ACCESS_TOKEN: &str = "access_token";
-pub(super) const KEY_REFRESH_TOKEN: &str = "refresh_token";
-pub(super) const KEY_EXPIRES_AT: &str = "expires_at";
-pub(super) const KEY_SCOPES: &str = "scopes";
+/// SDK 引用（启动时注入，供 token 加解密）
+static SDK_REF: OnceLock<Arc<TokioMutex<Option<SdkInstance>>>> = OnceLock::new();
 
-/// 构造 keyring Entry
-///
-/// service = `frp:<provider_id>`，username = 具体键名。
-/// keyring 不可用时返回明确错误。
-fn keyring_entry(provider_id: &str, key: &str) -> Result<keyring::Entry, String> {
-    let service = format!("frp:{}", provider_id);
-    keyring::Entry::new(&service, key).map_err(|e| {
-        log_error!(
-            "[Frp Auth] keyring 不可用 (provider={}): {}",
-            provider_id,
-            e
-        );
-        format!("OS 密钥存储不可用: {}", e)
-    })
+/// 注入 SDK 引用（lib.rs 启动时调用）
+pub fn set_sdk(sdk: Arc<TokioMutex<Option<SdkInstance>>>) {
+    let _ = SDK_REF.set(sdk);
 }
 
-/// 存储 token 值到 keyring
-pub(super) fn store_secret(provider_id: &str, key: &str, value: &str) -> Result<(), String> {
-    let entry = keyring_entry(provider_id, key)?;
-    entry.set_password(value).map_err(|e| {
-        log_error!(
-            "[Frp Auth] 存储密钥失败 (provider={}, key={}): {}",
-            provider_id,
-            key,
-            e
-        );
-        format!("存储密钥失败: {}", e)
-    })
+/// 厂商 token 记录（单文件整体存储）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(super) struct TokenRecord {
+    pub access_token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub refresh_token: Option<String>,
+    /// token 过期时间（Unix 秒）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub scopes: Option<Vec<String>>,
 }
 
-/// 读取 token 值（不存在返回 None，keyring 不可用返回 Err）
-pub(super) fn load_secret(provider_id: &str, key: &str) -> Result<Option<String>, String> {
-    let entry = keyring_entry(provider_id, key)?;
-    match entry.get_password() {
-        Ok(v) => Ok(Some(v)),
-        Err(keyring::Error::NoEntry) => Ok(None),
-        Err(e) => {
-            log_error!(
-                "[Frp Auth] 读取密钥失败 (provider={}, key={}): {}",
-                provider_id,
-                key,
-                e
-            );
-            Err(format!("OS 密钥存储不可用: {}", e))
+/// 加密字符串（SDK 内置 DES）
+async fn encrypt(data: &str) -> Result<String, String> {
+    let sdk_arc = SDK_REF
+        .get()
+        .ok_or_else(|| "SDK 未注入，无法加密 token".to_string())?;
+    let sdk = sdk_arc.lock().await;
+    match sdk.as_ref() {
+        Some(sdk) => sdk
+            .encrypt_token(data)
+            .map_err(|e| format!("加密失败: {}", e)),
+        None => Err("SDK 未加载，无法加密 token".to_string()),
+    }
+}
+
+/// 解密字符串（SDK 内置 DES）；SDK 不可用时视为无 token
+async fn decrypt(data: &str) -> Option<String> {
+    let sdk_arc = match SDK_REF.get() {
+        Some(arc) => arc.clone(),
+        None => {
+            log_warn!("[Frp Auth] SDK 未注入，无法解密 token");
+            return None;
+        }
+    };
+    let sdk = sdk_arc.lock().await;
+    match sdk.as_ref() {
+        Some(sdk) => match sdk.decrypt_token(data) {
+            Ok(s) => Some(s),
+            Err(e) => {
+                log_warn!("[Frp Auth] token 解密失败（视为未认证，请重新认证）: {}", e);
+                None
+            }
+        },
+        None => {
+            log_warn!("[Frp Auth] SDK 未加载，无法解密 token");
+            None
         }
     }
 }
 
-/// 删除 token 值（不存在视为成功）
-pub(super) fn delete_secret(provider_id: &str, key: &str) -> Result<(), String> {
-    let entry = keyring_entry(provider_id, key)?;
-    match entry.delete_credential() {
-        Ok(()) => Ok(()),
-        Err(keyring::Error::NoEntry) => Ok(()),
-        Err(e) => Err(format!("删除密钥失败: {}", e)),
-    }
-}
-
-// token 存储辅助（封装 access_token / refresh_token / expires_at / scopes）
-/// 存储完整 token 信息
-pub(super) fn store_token_info(
+/// 存储完整 token 信息（OAuth2 / Device Code 认证成功后调用）
+///
+/// 整份 TokenRecord 序列化后经 SDK DES 加密写入 `{provider_id}.json`。
+/// `expires_in` 为相对秒数，内部换算为绝对过期时间存储。
+pub(super) async fn store_token_info(
     provider_id: &str,
     access_token: &str,
     refresh_token: Option<&str>,
     expires_in: Option<u64>,
     scopes: Option<&Vec<String>>,
 ) -> Result<(), String> {
-    store_secret(provider_id, KEY_ACCESS_TOKEN, access_token)?;
-    if let Some(rt) = refresh_token {
-        store_secret(provider_id, KEY_REFRESH_TOKEN, rt)?;
+    super::super::paths::validate_provider_id(provider_id)?;
+
+    let record = TokenRecord {
+        access_token: access_token.to_string(),
+        refresh_token: refresh_token.map(|s| s.to_string()),
+        expires_at: expires_in.map(|secs| now_secs() + secs),
+        scopes: scopes.cloned(),
+    };
+    let json = serde_json::to_string(&record).map_err(|e| format!("序列化 token 失败: {}", e))?;
+    let encrypted = encrypt(&json).await?;
+
+    let path = super::super::paths::auth_file_path(provider_id);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| format!("创建 auth 目录失败: {}", e))?;
     }
-    if let Some(secs) = expires_in {
-        let expires_at = now_secs() + secs;
-        store_secret(provider_id, KEY_EXPIRES_AT, &expires_at.to_string())?;
+    std::fs::write(&path, &encrypted).map_err(|e| format!("写入 token 文件失败: {}", e))?;
+
+    // Unix 下限制为仅当前用户可读写
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)) {
+            log_warn!("[Frp Auth] 设置 token 文件权限 0o600 失败: {}", e);
+        }
     }
-    if let Some(sc) = scopes {
-        let json = serde_json::to_string(sc).map_err(|e| format!("序列化 scopes 失败: {}", e))?;
-        store_secret(provider_id, KEY_SCOPES, &json)?;
-    }
+
     Ok(())
 }
 
-/// 读取 token 过期时间（Unix 秒）
-pub(super) fn load_expires_at(provider_id: &str) -> Result<Option<u64>, String> {
-    match load_secret(provider_id, KEY_EXPIRES_AT)? {
-        Some(s) => s
-            .parse::<u64>()
-            .map(Some)
-            .map_err(|e| format!("解析过期时间失败: {}", e)),
-        None => Ok(None),
+/// 读取厂商 token 记录（不存在或解密失败返回 None）
+pub(super) async fn load_token_record(provider_id: &str) -> Result<Option<TokenRecord>, String> {
+    super::super::paths::validate_provider_id(provider_id)?;
+
+    let path = super::super::paths::auth_file_path(provider_id);
+    if !path.exists() {
+        return Ok(None);
     }
+    let encrypted =
+        std::fs::read_to_string(&path).map_err(|e| format!("读取 token 文件失败: {}", e))?;
+
+    let Some(json) = decrypt(&encrypted).await else {
+        return Ok(None);
+    };
+    let record: TokenRecord =
+        serde_json::from_str(&json).map_err(|e| format!("解析 token JSON 失败: {}", e))?;
+    Ok(Some(record))
 }
 
-/// 读取权限范围
-pub(super) fn load_scopes(provider_id: &str) -> Result<Option<Vec<String>>, String> {
-    match load_secret(provider_id, KEY_SCOPES)? {
-        Some(s) => {
-            let scopes: Vec<String> =
-                serde_json::from_str(&s).map_err(|e| format!("解析 scopes 失败: {}", e))?;
-            Ok(Some(scopes))
-        }
-        None => Ok(None),
+/// 删除厂商 token 文件（撤销认证，不存在视为成功）
+pub(super) async fn delete_provider_auth(provider_id: &str) -> Result<(), String> {
+    super::super::paths::validate_provider_id(provider_id)?;
+
+    let path = super::super::paths::auth_file_path(provider_id);
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| format!("删除 token 文件失败: {}", e))?;
     }
+    Ok(())
 }
 
 // 通用辅助
@@ -137,13 +164,4 @@ pub(super) fn generate_state() -> String {
         .unwrap_or(0);
     let pid = std::process::id();
     format!("{:x}{:x}", nanos, pid)
-}
-
-/// 解析 scope 字符串（空格分隔）为 Vec
-#[allow(dead_code)]
-pub(super) fn parse_scopes(scope_str: &str) -> Vec<String> {
-    scope_str
-        .split_whitespace()
-        .map(|s| s.to_string())
-        .collect()
 }

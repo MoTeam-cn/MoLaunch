@@ -9,6 +9,44 @@
 
 ### 新增
 
+#### 开发者存储栏：补充 AppData 全局共享目录展示
+
+- 背景：开发者页「存储」子页签此前只展示便携式目录（.Molaunch）与系统缓存，未展示 AppData 全局共享目录——而 certs 证书、providers frpc 二进制、frp_auth 认证 token、online 联机数据、auth.json 账号认证都存放在 `%APPDATA%/.Molaunch/` 下
+- 改动（3 文件）：
+  - **`src-tauri/src/commands/system/developer.rs`**：`StorageDirs` 新增 6 个字段——`appdataRoot`（全局共享根目录）/ `appdataCerts`（TLS 证书）/ `appdataProviders`（frpc 厂商二进制）/ `appdataFrpAuth`（FRP 认证 token）/ `appdataOnline`（联机数据）/ `appdataAuthFile`（账号认证文件）；`get_storage_dirs` 经 `storage::appdata` 模块填充，新增 `appdata_subdir_str` / `appdata_root_str` / `appdata_file_str` 三个辅助函数（APPDATA/HOME 环境变量缺失时返回空串，不 panic）
+  - **`src/utils/api/developer.ts`**：`StorageDirs` 接口同步新增 6 个字段（camelCase）
+  - **`src/views/settings/developer/StorageTab.vue`**：新增「AppData 全局共享」卡片（6 个条目，账号认证文件用「定位」、其余「打开」，空路径条目过滤不显示）；原「AppData 缓存」改名为「Minecraft 运行缓存」（与 AppData 全局共享区分，避免歧义）
+- 设计决策：
+  - **展示不创建目录**：仅 `appdata_subdir`（不 `ensure`），避免打开存储页就产生副作用；空路径过滤保证环境变量缺失时页面正常
+  - **文件 vs 目录按钮区分**：auth.json 是文件用「定位」（revealInExplorer），其余目录用「打开」（openPath），与既有 config 条目一致
+- 验证：`cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`npx vue-tsc --noEmit` 通过（exit 0）、改动文件 `npx eslint` 通过（exit 0）、StorageTab.vue 165 行（<300 约束）
+
+#### Frp 认证存储迁移：keyring → SDK DES 加密文件（AppData 全局共享）
+
+- 背景：FRP 厂商 token 原用 `keyring`（OS 密钥存储）保存，存在 Windows Credential Manager / macOS Keychain / Linux Secret Service。改为复用项目自有的 SDK 内置 DES 动态加密（与 CurseForge api_key / 联机凭证同一套加密），移除第三方 keyring 依赖
+- 存储位置：token 存 **AppData 全局共享目录** `%APPDATA%/.Molaunch/frp_auth/{provider_id}.json`（macOS/Linux 为 `~/.config/Molaunch/frp_auth/`），与 frpc 厂商二进制（providers/）同级 —— 认证 token 属设备级共享数据（跨启动器实例共享，便携版换目录/更新不丢认证），非便携式实例数据
+- 后端改动（9 文件）：
+  - **`src-tauri/src/commands/frp/auth/storage.rs`**（重写）：keyring → AppData `frp_auth/{provider_id}.json` 加密文件
+    - `TokenRecord` 结构（access_token / refresh_token / expires_at / scopes，serde 整体序列化）
+    - 全局 `SDK_REF: OnceLock<Arc<TokioMutex<Option<SdkInstance>>>>` + `set_sdk()` 启动注入（与 CurseForge secure_storage 同一模式，异步锁取 SDK 后调 `encrypt_token` / `decrypt_token`）
+    - `store_token_info`（加密写，`expires_in` 相对秒数换算绝对过期时间；Unix 0o600 权限）/ `load_token_record`（解密读，SDK 不可用或解密失败视为未认证 + log_warn）/ `delete_provider_auth`（删文件，撤销认证）
+    - 保留 `now_secs` / `generate_state` 同步辅助；删除 `KEY_*` 常量与 `store_secret` / `load_secret` / `delete_secret` / `load_expires_at` / `load_scopes` 等 keyring 单字段 API
+  - **`src-tauri/src/commands/frp/paths.rs`**：新增 `auth_file_path(provider_id)`（`ensure_appdata_subdir("frp_auth")`，APPDATA 环境变量缺失时降级回便携式目录）
+  - **`src-tauri/src/commands/frp/auth/mod.rs`**：新增 `pub fn set_sdk(...)` 注入入口；`get_auth_status` / `refresh_token` / `load_token` 改 `load_token_record().await`；`revoke_auth` 改 `delete_provider_auth().await` 单次删除
+  - **`src-tauri/src/commands/frp/auth/oauth2.rs` / `device_code.rs`**：`store_token_info` 调用加 `.await`
+  - **`src-tauri/src/commands/frp/auth/api_key.rs`**：`store_secret` → `store_token_info(...).await`（API Key 作为 access_token 存文件）
+  - **`src-tauri/src/lib.rs`**：启动时 `commands::frp::auth::set_sdk(app_state.sdk.clone())` 注入 SDK 引用
+  - **`src-tauri/src/migrations/portable_to_appdata.rs`**：抽取通用 `migrate_dir()`，新增 `migrate_frp_auth()` —— 旧路径 `{base_dir}/frp/auth/` 启动时自动迁移到 AppData `frp_auth/`（复用既有 certs/providers 迁移策略：AppData 已有数据则删除旧目录、复制失败保留旧目录下次重试）
+  - **`src-tauri/src/migrations/mod.rs`**：迁移项注释补充 frp_auth
+  - **`src-tauri/Cargo.toml`**：移除 `keyring = { version = "3", features = [...] }` 依赖（及其平台后端 features 注释）
+- 设计决策：
+  - **SDK 全局引用注入而非逐函数传 state**：`get_auth_status` / `load_token` 等无 state 参数的公开函数签名不变，仿 secure_storage 用 `OnceLock` 注入，改动面最小且模式一致
+  - **整体 JSON 加密而非逐字段**：单文件一次加密写、一次解密读，天然无并发竞态；`skip_serializing_if` 缺省字段不落盘
+  - **降级策略**：写入时 SDK 不可用 → 返回错误（用户可见提示）；读取时 SDK 不可用 / 解密失败 → 视为未认证并 log_warn（用户重新认证即可，避免启动崩溃）
+  - **AppData 全局共享而非便携式实例目录**：认证 token 与厂商账号绑定（设备级），frpc 厂商二进制也在 AppData（providers/），二者语义一致 —— 便携版换目录/更新版本不丢认证；启动迁移兜底旧路径数据
+  - **不迁移旧 keyring 数据**：token 过期时间短、刷新即可重建，开发阶段无需迁移脚本
+- 验证：`cargo check --lib` 通过（exit 0）、`cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`cargo test --lib` 151/151 通过（exit 0）
+
 #### deeplink 注册/卸载工具 + Windows 便携版（安装版/便携版分离）
 
 - 背景：后续打包策略下 **Windows 同时分发安装版（NSIS）与便携版（绿色版）**，macOS/Linux 维持单一产物。便携版未经过安装程序，无法自动注册 `molaunch://` 协议，需在代码内提供注册/卸载工具函数，并在设置页提供手动入口供用户抉择；CI 同步区分安装版 + 便携版两种产物

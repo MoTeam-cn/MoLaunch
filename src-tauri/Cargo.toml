@@ -101,11 +101,8 @@ pem = "3"
 # Linux/macOS 需 root 或 CAP_NET_ADMIN 权限
 tun-rs = { version = "2", features = ["async_tokio"] }
 
-# Frp 认证体系：OS 密钥存储（Windows Credential Manager / macOS Keychain / Linux Secret Service）
-# 注意：必须显式启用平台后端。keyring 3 的 default features 为空，未启用后端时
-# 在 Windows/macOS 会回退到 mock 实现（纯内存、不持久、每次 Entry::new 独立），
-# 导致 token 写入后读不到（认证成功但状态永远显示未认证，且重启即丢）
-keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
+# Frp 认证体系：token 经 SDK 内置 DES 加密后存文件（`<base_dir>/frp/auth/{provider_id}.json`），
+# 替代原 keyring（OS 密钥存储）。文件随实例数据目录迁移，Unix 下 0o600 权限。
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"

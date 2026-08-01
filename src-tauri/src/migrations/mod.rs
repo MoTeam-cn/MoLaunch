@@ -6,7 +6,7 @@
 //!
 //! 迁移项：
 //! 1. `appdata_naming`：AppData 根目录 .MolaLaunch → .Molaunch 命名统一
-//! 2. `portable_to_appdata`：certs/providers 从便携式 .Molaunch 迁移到 AppData 全局共享
+//! 2. `portable_to_appdata`：certs/providers/frp_auth 从便携式 .Molaunch 迁移到 AppData 全局共享
 //! 3. `online_legacy`：online/device.json 从便携式旧路径迁移到 AppData
 //! 4. `online_cleanup`：清理已迁移的 online 残留目录（由 `online_legacy` 内部完成）
 

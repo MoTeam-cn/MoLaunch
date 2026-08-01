@@ -130,7 +130,8 @@ pub(super) async fn start_oauth2(
         refresh_token.as_deref(),
         expires_in,
         Some(&scopes),
-    )?;
+    )
+    .await?;
 
     log_info!(
         "[Frp Auth] OAuth2 认证成功: provider={}, expires_at={:?}",

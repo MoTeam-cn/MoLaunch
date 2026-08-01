@@ -104,8 +104,20 @@ pub struct StorageDirs {
     pub temp: String,
     /// 系统临时目录缓存（<temp>/MoLaunch/，含 TaskTemp 和 sdk）
     pub cache_temp: String,
-    /// AppData 缓存目录（%APPDATA%/.minecraft/，Java Runtime）
+    /// Minecraft 运行缓存目录（%APPDATA%/.minecraft/，Java Runtime）
     pub cache_app: String,
+    /// AppData 全局共享根目录（%APPDATA%/.Molaunch/，跨实例共享）
+    pub appdata_root: String,
+    /// 全局共享 TLS 证书目录（AppData/certs/）
+    pub appdata_certs: String,
+    /// 全局共享 frpc 厂商二进制目录（AppData/providers/）
+    pub appdata_providers: String,
+    /// 全局共享 FRP 认证 token 目录（AppData/frp_auth/，SDK DES 加密）
+    pub appdata_frp_auth: String,
+    /// 全局共享联机数据目录（AppData/online/）
+    pub appdata_online: String,
+    /// 全局共享账号认证文件（AppData/auth.json）
+    pub appdata_auth_file: String,
 }
 
 /// 获取所有存储目录路径（开发者页展示用）
@@ -119,7 +131,34 @@ pub fn get_storage_dirs() -> StorageDirs {
         temp: storage.temp_dir().to_string_lossy().to_string(),
         cache_temp: cache_temp::dir().to_string_lossy().to_string(),
         cache_app: cache_app::dir().to_string_lossy().to_string(),
+        appdata_root: appdata_root_str(),
+        appdata_certs: appdata_subdir_str("certs"),
+        appdata_providers: appdata_subdir_str("providers"),
+        appdata_frp_auth: appdata_subdir_str("frp_auth"),
+        appdata_online: appdata_subdir_str("online"),
+        appdata_auth_file: appdata_file_str("auth.json"),
     }
+}
+
+/// AppData 全局共享子目录路径（环境变量缺失返回空串，前端跳过空项）
+fn appdata_subdir_str(subdir: &str) -> String {
+    crate::storage::appdata::appdata_subdir(subdir)
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+/// AppData 全局共享根目录路径（环境变量缺失返回空串）
+fn appdata_root_str() -> String {
+    crate::storage::appdata::appdata_root()
+        .map(|p| p.to_string_lossy().to_string())
+        .unwrap_or_default()
+}
+
+/// AppData 全局共享根目录下的文件路径（环境变量缺失返回空串）
+fn appdata_file_str(filename: &str) -> String {
+    crate::storage::appdata::appdata_root()
+        .map(|p| p.join(filename).to_string_lossy().to_string())
+        .unwrap_or_default()
 }
 
 /// 系统信息（开发者页展示用）

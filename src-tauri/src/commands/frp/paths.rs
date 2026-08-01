@@ -3,8 +3,8 @@
 //! 路径分两类：
 //! - **便携式**（基于 `Storage::base_dir()`）：frp/tunnels.json、frp/providers.json、frp/logs、
 //!   frp/config — 当前启动器实例的运行时数据
-//! - **全局共享**（基于 `storage::appdata`）：providers/ 外部 frpc 厂商二进制 — 跨启动器
-//!   实例共享，避免每实例重复下载几十 MB frpc
+//! - **全局共享**（基于 `storage::appdata`）：providers/ 外部 frpc 厂商二进制、frp_auth/ 认证 token —
+//!   设备级数据，跨启动器实例共享（认证 token 与厂商账号绑定，便携版换目录/更新不丢）
 
 use std::path::PathBuf;
 
@@ -35,6 +35,24 @@ pub fn tunnels_path() -> PathBuf {
 /// 厂商启用状态文件（`<base_dir>/frp/providers.json`）
 pub fn providers_state_path() -> PathBuf {
     frp_data_dir().join("providers.json")
+}
+
+/// 厂商认证 token 文件路径（全局共享 `%APPDATA%/.Molaunch/frp_auth/{provider_id}.json`）
+///
+/// 整份 token 记录经 SDK DES 加密后写入。与 frpc 厂商二进制（providers/）一致，
+/// 属设备级共享数据（跨启动器实例共享，便携版换目录/更新不丢认证），
+/// 非便携式实例数据（tunnels.json 等随实例走）。
+/// 环境变量缺失时降级回便携式目录（极少发生）。
+pub fn auth_file_path(provider_id: &str) -> PathBuf {
+    crate::storage::appdata::ensure_appdata_subdir("frp_auth")
+        .map(|dir| dir.join(format!("{}.json", provider_id)))
+        .unwrap_or_else(|e| {
+            crate::log_error!(
+                "Failed to create frp_auth directory in AppData: {}, fallback to portable",
+                e
+            );
+            frp_data_dir().join("auth").join(format!("{}.json", provider_id))
+        })
 }
 
 /// 校验厂商 ID 合法性（kebab-case：小写字母 + 数字 + 连字符，

@@ -249,7 +249,8 @@ pub(super) async fn poll_device_code(
         refresh_token.as_deref(),
         expires_in,
         Some(&scopes),
-    )?;
+    )
+    .await?;
     remove_device_code_session(provider_id);
 
     log_info!(
