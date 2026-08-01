@@ -58,6 +58,10 @@ pub async fn download_and_install(app: &AppHandle, info: UpdateInfo) -> Result<(
 /// 下载完成后不立即替换，等用户退出程序时由 `apply_pending_update` 触发替换。
 ///
 /// 若 last.exe 已存在且版本相同（通过文件大小判断），跳过重复下载。
+///
+/// **平台差异**：Windows 便携版自实现后台预下载（绕过文件锁、支持退出时延迟替换）；
+/// macOS / Linux 由官方 `tauri-plugin-updater` 接管，无后台预下载流程，调用此命令
+/// 仅记录 INFO 日志后返回 `Ok(false)`，前端应通过 `download_and_install_update` 触发更新。
 pub async fn download_update_to_appdata(info: UpdateInfo) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
@@ -66,8 +70,10 @@ pub async fn download_update_to_appdata(info: UpdateInfo) -> Result<bool, String
 
     #[cfg(not(target_os = "windows"))]
     {
-        // macOS/Linux 使用官方 plugin，不需要后台下载
         let _ = info;
+        log_info!(
+            "[Updater] download_update_to_appdata 在 macOS/Linux 上由 tauri-plugin-updater 接管，无后台预下载"
+        );
         Ok(false)
     }
 }
@@ -79,6 +85,10 @@ pub async fn download_update_to_appdata(info: UpdateInfo) -> Result<bool, String
 /// - 不存在：无待安装更新，返回 false（正常退出）
 ///
 /// 前端在窗口 close 事件中调用此命令，返回 true 则让主程序退出由 updater.exe 接管。
+///
+/// **平台差异**：仅 Windows 便携版支持退出时延迟替换；macOS / Linux 由官方 plugin
+/// 在 `download_and_install_update` 内同步完成下载安装，无退出时替换流程，
+/// 调用此命令仅记录 INFO 日志后返回 `Ok(false)`，前端应直接退出主程序。
 pub async fn apply_pending_update(app: &AppHandle) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
@@ -88,6 +98,9 @@ pub async fn apply_pending_update(app: &AppHandle) -> Result<bool, String> {
     #[cfg(not(target_os = "windows"))]
     {
         let _ = app;
+        log_info!(
+            "[Updater] apply_pending_update 在 macOS/Linux 上由 tauri-plugin-updater 接管，无退出时替换"
+        );
         Ok(false)
     }
 }
