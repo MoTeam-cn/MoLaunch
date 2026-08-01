@@ -73,6 +73,7 @@ pub(crate) fn reg_set(_key: &(), _name: &str, _value: &str) -> Result<(), String
 }
 
 #[cfg(not(windows))]
+#[allow(dead_code)]
 pub(crate) fn reg_delete(_key: &(), _name: &str) -> Result<(), String> {
     Err("注册表仅在 Windows 平台可用".to_string())
 }

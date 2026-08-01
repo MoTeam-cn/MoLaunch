@@ -195,6 +195,12 @@
 
 ### 修复
 
+#### CI：补充 reg_delete 非 Windows stub 标记 dead_code（clippy 遗漏项）
+
+- 背景：上一轮修复 27 个 clippy 错误后，`rust-clippy` job 仍报 `reg_delete` never used（`src/storage/registry.rs:76`）。根因：`#[allow(dead_code)]` 只加在 Windows 版本上（该注释原属 Windows 版），`#[cfg(not(windows))]` stub 版本遗漏
+- 改动（1 文件）：`src/storage/registry.rs` 的非 Windows `reg_delete` stub 补 `#[allow(dead_code)]`，与其他 3 个 `reg_*` stub 一致
+- 验证：`cargo clippy --all-targets -- -D warnings` 通过（exit 0）
+
 #### CI：修复 clippy 27 个错误（registry 死代码 + sort_by 优化）
 
 - 背景：CI `rust-clippy` job 报 27 个错误（`docs/Error/workflow/clippy.txt`），两类：
