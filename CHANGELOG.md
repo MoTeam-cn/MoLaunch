@@ -35,6 +35,15 @@
 
 ### 维护
 
+#### 修复 picker 子窗口 CSP 阻止 res:// 资源加载（Windows）
+
+- 症状：教程/Markdown/二维码 picker 子窗口在 Windows 上无法加载 `marked.min.js` / `qrcode.min.js`，页面显示「渲染失败：无法加载 marked.min.js」
+- 根因：Windows 上 Tauri 把 `res://localhost/` 转为 `https://res.localhost/`，但 picker 模板 CSP 的 `script-src` / `connect-src` 仅声明了 `res:` scheme-source，未声明 `https://res.localhost` origin。CSP 中 `res:` 匹配 `res://` 协议的 URL，不匹配 `https://res.localhost/` 的 URL，导致脚本加载被 CSP 阻止
+- 对照：主应用 `tauri.conf.json` 的 CSP 已同时声明 `res: https://res.localhost`（img-src / connect-src），picker 模板 CSP 漏配 `https://res.localhost`
+- 改动（1 文件）：`src/config/picker-templates.ts` 的 markdown / tutorial / qrcode 三个模板 CSP，`script-src` 与 `connect-src` 由 `res:` 改为 `res: https://res.localhost`，与主应用 CSP 口径一致
+- 影响：markdown 模板此前从未被调用（`openMarkdownWindow` 未使用），latent bug 未暴露；tutorial 模板本次新增首次暴露
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
 #### 修复联机设备登录"接口成功但前端报失败"
 
 - 症状：点击联机页面"登录"按钮后，api-server 返回 HTTP 200 + 有效数据，但前端 toast 提示"设备登录失败，请稍后重试"；同时 `auth_status` 查询显示 `logged_in: true`（旧 token 仍有效）

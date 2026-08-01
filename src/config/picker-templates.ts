@@ -125,12 +125,13 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     width: 720,
     height: 560,
     // markdown 模板需要从 res:// 协议加载 marked.min.js
+    // 注意：Windows 上 res:// 转为 https://res.localhost/，CSP 需同时允许 res: 和 https://res.localhost
     csp: [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' res:",
+      "script-src 'self' 'unsafe-inline' res: https://res.localhost",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' picker: res:",
+      "connect-src 'self' picker: res: https://res.localhost",
     ].join('; '),
   },
 
@@ -141,12 +142,13 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     width: 760,
     height: 600,
     // 与 markdown 模板相同的 CSP：允许 res:// 加载 marked.min.js
+    // 注意：Windows 上 res:// 转为 https://res.localhost/，CSP 需同时允许 res: 和 https://res.localhost
     csp: [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' res:",
+      "script-src 'self' 'unsafe-inline' res: https://res.localhost",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' picker: res:",
+      "connect-src 'self' picker: res: https://res.localhost",
     ].join('; '),
   },
 
@@ -157,12 +159,13 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     width: 360,
     height: 420,
     // qrcode 模板通过 res:// 协议加载后端嵌入的 qrcode.min.js，script-src 需要允许 res:
+    // 注意：Windows 上 res:// 转为 https://res.localhost/，CSP 需同时允许 res: 和 https://res.localhost
     csp: [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' res:",
+      "script-src 'self' 'unsafe-inline' res: https://res.localhost",
       "img-src 'self' data: blob:",
-      "connect-src 'self' picker: res:",
+      "connect-src 'self' picker: res: https://res.localhost",
     ].join('; '),
   },
 }
