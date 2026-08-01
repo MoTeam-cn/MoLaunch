@@ -181,7 +181,10 @@ fn add_json_jvm_args(
     version_id: &str,
 ) {
     let libraries_dir = game_dir.join("libraries");
-    let libraries_dir_str = libraries_dir.to_string_lossy().replace('/', "\\");
+    // 保留 PathBuf 原生分隔符：Windows 上是 `\`，Unix 上是 `/`
+    // JVM 在所有平台上都接受原生分隔符，无需强制替换
+    // （原代码 `.replace('/', "\\")` 在 macOS/Linux 上会生成带反斜杠的非法路径）
+    let libraries_dir_str = libraries_dir.to_string_lossy().to_string();
     if let Some(jvm_args_json) = json["arguments"]["jvm"].as_array() {
         for arg in jvm_args_json {
             let (value, rules) = if let Some(s) = arg.as_str() {
@@ -218,9 +221,12 @@ fn add_json_jvm_args(
                 continue;
             }
 
+            // classpath 分隔符：Windows 用 `;`，Unix 系（macOS/Linux）用 `:`
+            // 原代码硬编码 `;` 会导致 macOS/Linux 上 JVM 无法解析 classpath
+            let classpath_separator = if cfg!(target_os = "windows") { ";" } else { ":" };
             let value = value
                 .replace("${library_directory}", &libraries_dir_str)
-                .replace("${classpath_separator}", ";")
+                .replace("${classpath_separator}", classpath_separator)
                 .replace("${version_name}", version_id);
 
             args.push(value);
