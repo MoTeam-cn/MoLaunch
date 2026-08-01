@@ -195,6 +195,17 @@
 
 ### 修复
 
+#### CI：修复最终两个编译错误（dist 目录缺失 + auth/storage log_warn 导入）
+
+- 背景：上轮修复后 CI `rust-clippy` / `rust-test` 仍失败（`docs/Error/workflow/clippy.txt`、`test.txt`），剩 2 个错误：
+  1. **`frontendDist ../dist 不存在`**（lib.rs:205 `tauri::generate_context!`）：`cargo clippy/test --all-features` 启用 `tauri/custom-protocol` feature 后，tauri-build 校验 `frontendDist` 指向的 `../dist` 目录必须存在。本地开发有 `dist/` 所以不报，CI 全新 checkout 没有
+  2. **`auth/storage/mod.rs:125` 找不到 `log_warn` 宏**：`restrict_file_permissions`（`#[cfg(unix)]`）用 `log_warn!` 但该模块未导入（上一轮遗漏）
+- 改动（2 文件）：
+  - **`src-tauri/src/minecraft/auth/storage/mod.rs`**：补 `#[cfg(unix)] use crate::log_warn;`（Unix 编译需要导入；`#[cfg(unix)]` 保证 Windows 编译不产生 unused import）
+  - **`.github/workflows/ci.yml`**：`rust-clippy` / `rust-test` 两个 job 在 cargo 命令前加 `- name: Ensure frontend dist directory` 步骤 `mkdir -p dist`（空目录即满足 tauri-build 存在性校验）
+- 验证：`cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`cargo test --all-features` 通过（exit 0）
+- 说明：本地已确认 `dist/` 存在是本地编译通过、CI 失败的环境差异根因；`mkdir -p dist` 空目录方案已覆盖 CI 场景
+
 #### CI：修复 Linux 平台编译/检测错误（补 SDK 资源 + 6 个代码修复）
 
 - 背景：CI 的 `rust-clippy` / `rust-test` job 在 Ubuntu 上构建失败，`docs/Error/workflow/clippy.txt` 报告 14 个错误，分两类：**资源缺失**（`resources.rs` 用 `include_bytes!` 编译期嵌入 SDK 动态库，但仓库缺 Linux/macOS 版本）和 **代码错误**（Linux 专属路径 + cfg 条件导致的 lint/编译问题，Windows 本地编译看不出来）

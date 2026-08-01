@@ -102,6 +102,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      # generate_context! 宏要求 frontendDist(../dist) 存在（tauri-build 校验）
+      - name: Ensure frontend dist directory
+        run: mkdir -p dist
       - run: cargo clippy --all-features -- -D warnings
         working-directory: src-tauri
 
@@ -123,5 +126,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
+      # generate_context! 宏要求 frontendDist(../dist) 存在（tauri-build 校验）
+      - name: Ensure frontend dist directory
+        run: mkdir -p dist
       - run: cargo test --all-features
         working-directory: src-tauri

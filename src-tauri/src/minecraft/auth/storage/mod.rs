@@ -29,6 +29,9 @@ use crate::sdk::SdkInstance;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
 
+#[cfg(unix)]
+use crate::log_warn;
+
 // 认证存储管理器
 
 /// 认证存储管理器
