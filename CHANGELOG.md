@@ -9,6 +9,24 @@
 
 ### 维护
 
+#### 修复跨平台兼容性 P0 阻塞项（macOS/Linux release 准备）
+
+- 背景：扫描后端 Windows 专有逻辑时发现 4 处 P0 阻塞问题，会导致 macOS/Linux 上游戏无法启动或进程树无法正确清理。完整扫描报告见 `docs/CROSS_PLATFORM_COMPATIBILITY.md`
+- 改动（4 处修复，3 个文件）：
+  - **S1 + S2 `src-tauri/src/minecraft/launch/jvm_args.rs`**：JVM 参数 classpath 分隔符与库目录路径分隔符硬编码 Windows 风格，导致 macOS/Linux 上 JVM 无法解析 classpath 与库路径
+    - 行 184：删除 `.replace('/', "\\")`，保留 `PathBuf` 原生分隔符（Windows `\` / Unix `/`，JVM 全平台均接受原生分隔符）
+    - 行 223：`${classpath_separator}` 替换值由硬编码 `";"` 改为 `if cfg!(target_os = "windows") { ";" } else { ":" }`（Windows `;` / Unix `:`）
+  - **S3 `src-tauri/src/minecraft/java/download/files.rs`**：`find_java_exe` 硬编码 `"java.exe"` 与 `"windows-x64"` 子目录，macOS/Linux 上永远找不到 Java
+    - 可执行文件名：`if cfg!(target_os = "windows") { "java.exe" } else { "java" }`
+    - 候选子目录：Windows `windows-x64` / macOS `mac-os`（Mojang 官方 manifest 命名）/ Linux `linux`
+    - 递归查找兜底 `find_recursive` 改为接收 `exe_name` 参数（原为闭包内硬编码，无法跨平台）
+  - **S6 `src-tauri/src/minecraft/system/shell/exec.rs`**：`kill_process_tree` Unix 分支仅 `kill -9 <pid>`，不杀子进程，与函数名"树"语义不符
+    - 改为 `ps -A -o pid= -o ppid=` 一次性获取所有进程的父子关系（POSIX 标准，Linux/macOS 通用）
+    - 递归收集所有后代 PID（含 pid 自身）后批量 `kill -9`，先杀子进程避免 reparent 到 init
+    - 增加调试日志：`log_debug!` 输出收集到的进程数量
+- 验证：`cargo check` 0 错误，`cargo clippy` 0 警告
+- 影响范围：仅 macOS/Linux 行为变化（修复启动失败与孤儿进程），Windows 行为不变
+
 #### 修正 V3 拆分记录中 4 处文件名错误
 
 - 背景：核对 V3 报告 P1 黄区+边界拆分记录时发现 4 处文件名与实际目录不符（拆分落地时记录有误，代码本身正确）
