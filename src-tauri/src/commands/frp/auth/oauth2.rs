@@ -5,6 +5,7 @@
 //! token 交换请求/响应解析由 flows.rs 引擎按 endpoints.json authFlows.oauth2.token 配置驱动。
 
 use super::super::api_spec::load_api_spec;
+use super::super::log_redact::redact_log;
 use super::super::provider::{read_provider_manifest, resolve_oauth2_config};
 use super::super::types::{FieldExtractor, FlowRequest, OAuth2Flow};
 use super::flows::{send_flow_request, FlowContext, FlowResponse};
@@ -81,6 +82,7 @@ pub(super) async fn start_oauth2(
 
     // 5. 用 code 换取 token（走 flows 引擎）
     let ctx = FlowContext {
+        base_url: Some(spec.base_url.clone()),
         client_id: config.client_id.clone(),
         client_secret: config.client_secret.clone(),
         redirect_uri: Some(redirect_uri.clone()),
@@ -102,7 +104,18 @@ pub(super) async fn start_oauth2(
 
     let access_token = resp
         .extract_field(get_extractor(token_flow, "accessToken"))
-        .ok_or("OAuth2 响应缺少 access_token")?;
+        .ok_or_else(|| {
+            log_error!(
+                "[Frp Auth] OAuth2 响应缺少 access_token: HTTP {} - {}",
+                resp.status,
+                redact_log(&resp.body)
+            );
+            format!(
+                "OAuth2 响应缺少 access_token（HTTP {}，响应: {}）",
+                resp.status,
+                redact_log(&resp.body)
+            )
+        })?;
     let refresh_token = resp.extract_field(get_extractor(token_flow, "refreshToken"));
     let expires_in = resp
         .extract_field(get_extractor(token_flow, "expiresIn"))

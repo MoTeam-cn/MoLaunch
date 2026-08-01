@@ -19,10 +19,7 @@ mod flows;
 mod oauth2;
 mod storage;
 
-// ============================================================
 // 返回类型
-// ============================================================
-
 /// 认证状态（get_auth_status 返回）
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -80,10 +77,7 @@ pub struct DeviceCodePollResult {
     pub scopes: Option<Vec<String>>,
 }
 
-// ============================================================
 // 内部辅助（refresh_token 用 flows 引擎提取字段）
-// ============================================================
-
 /// 从 FlowRequest.response 取指定字段的 FieldExtractor
 ///
 /// 字段名按 camelCase 约定：accessToken / refreshToken / expiresIn /
@@ -110,10 +104,6 @@ fn extract_flow_error(resp: &flows::FlowResponse, flow: &FlowRequest) -> String 
         _ => "未知错误".to_string(),
     }
 }
-
-// ============================================================
-// 公共函数
-// ============================================================
 
 /// 查询指定厂商的认证状态
 ///
@@ -234,18 +224,26 @@ pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), S
     let refresh_token = storage::load_secret(provider_id, storage::KEY_REFRESH_TOKEN)?
         .ok_or_else(|| format!("厂商 {} 无 refresh_token，请重新认证", provider_id))?;
 
-    // 取 clientId（从 auth.json 按 authType 读取，oauth2 或 device_code 必居其一）
+    // 取 clientId/clientSecret（从 auth.json 按 authType 读取，oauth2 或 device_code 必居其一）
     let auth_type = resolve_auth_type(provider_id, &manifest);
-    let client_id = match auth_type.as_str() {
-        "oauth2" => resolve_oauth2_config(provider_id, &manifest)?.client_id,
-        "device_code" => resolve_device_code_config(provider_id, &manifest)?.client_id,
+    let (client_id, client_secret) = match auth_type.as_str() {
+        "oauth2" => {
+            let cfg = resolve_oauth2_config(provider_id, &manifest)?;
+            (cfg.client_id, cfg.client_secret)
+        }
+        "device_code" => {
+            let cfg = resolve_device_code_config(provider_id, &manifest)?;
+            (cfg.client_id, cfg.client_secret)
+        }
         _ => return Err(format!("厂商 {} 不支持 token 刷新", provider_id)),
     };
 
     log_info!("[Frp Auth] 刷新 token: provider={}", provider_id);
 
     let ctx = flows::FlowContext {
+        base_url: Some(spec.base_url.clone()),
         client_id,
+        client_secret,
         refresh_token: Some(refresh_token),
         ..Default::default()
     };

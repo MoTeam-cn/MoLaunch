@@ -17,10 +17,7 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-// ============================================================
 // Device Code 会话存储（内存，进程级）
-// ============================================================
-
 /// Device Code 会话（start_device_code 写入，poll_device_code 读取）
 #[derive(Clone)]
 struct DeviceCodeSession {
@@ -36,6 +33,8 @@ struct DeviceCodeSession {
     pending_error: Option<String>,
     /// clientId
     client_id: String,
+    /// endpoints.json baseUrl（poll flow url 模板 {baseUrl} 需要）
+    base_url: String,
 }
 
 static DEVICE_CODE_SESSIONS: Lazy<Mutex<HashMap<String, DeviceCodeSession>>> =
@@ -47,10 +46,6 @@ pub(super) fn remove_device_code_session(provider_id: &str) {
         sessions.remove(provider_id);
     }
 }
-
-// ============================================================
-// 公共函数
-// ============================================================
 
 /// 启动 Device Code 流程
 pub(super) async fn start_device_code(
@@ -84,6 +79,7 @@ pub(super) async fn start_device_code(
 
     // 1. 请求设备码（走 flows 引擎）
     let ctx = FlowContext {
+        base_url: Some(spec.base_url.clone()),
         client_id: config.client_id.clone(),
         client_secret: config.client_secret.clone(),
         scope: Some(config.scopes.join(" ")),
@@ -134,6 +130,7 @@ pub(super) async fn start_device_code(
                 poll_flow,
                 pending_error: request_flow.pending_error.clone(),
                 client_id: config.client_id.clone(),
+                base_url: spec.base_url.clone(),
             },
         );
     }
@@ -183,6 +180,7 @@ pub(super) async fn poll_device_code(
 
     // 2. 轮询 token（走 flows 引擎）
     let ctx = FlowContext {
+        base_url: Some(session.base_url.clone()),
         client_id: session.client_id.clone(),
         device_code: Some(session.device_code.clone()),
         ..Default::default()
@@ -267,10 +265,7 @@ pub(super) async fn poll_device_code(
     })
 }
 
-// ============================================================
 // 内部辅助
-// ============================================================
-
 /// 从 FlowRequest.response 取指定字段的 FieldExtractor
 ///
 /// 字段名按 camelCase 约定：deviceCode / userCode / verificationUri / pollInterval /

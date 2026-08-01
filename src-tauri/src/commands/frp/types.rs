@@ -6,10 +6,7 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-// ============================================================
 // 隧道相关类型
-// ============================================================
-
 /// 隧道类型
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -71,10 +68,7 @@ pub struct TunnelWithStatus {
     pub pid: Option<u32>,
 }
 
-// ============================================================
 // 厂商信息与清单
-// ============================================================
-
 /// 厂商信息（返回给前端）
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -201,10 +195,7 @@ pub struct DownloadConfig {
     pub archive: bool,
 }
 
-// ============================================================
 // 认证配置
-// ============================================================
-
 /// 认证配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -309,10 +300,7 @@ pub struct ApiKeyConfig {
     pub header_name: String,
 }
 
-// ============================================================
 // 日志文件信息
-// ============================================================
-
 /// 日志文件信息（list_log_files 返回）
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -330,10 +318,7 @@ pub struct LogFileContent {
     pub has_more: bool,
 }
 
-// ============================================================
 // serde 默认值函数
-// ============================================================
-
 /// serde 默认值：bundled
 fn default_distribution() -> String {
     "bundled".to_string()
@@ -349,12 +334,10 @@ fn default_poll_interval() -> u64 {
     5
 }
 
-// ============================================================
 // Open API 接口规范类型（api/endpoints.json 反序列化结构）
 //
 // 设计参考：docs/Frp Test/frp/api/endpoints.json
 // 厂商接口响应结构各不相同，通过此规范将差异全部做成可配置项。
-// ============================================================
 
 /// endpoints.json 顶层结构
 #[derive(Debug, Clone, Deserialize)]
@@ -590,19 +573,43 @@ pub struct ResponseDef {
     pub encoding: Option<String>,
 }
 
-/// 字段映射（字符串=字段名，对象={field, split} 从合并字段拆分）
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
+/// 字段映射（字符串=字段名，模板字符串={account.token} 引用，对象={field, split} 拆分）
+#[derive(Debug, Clone)]
 pub struct FieldMapping {
     /// 厂商字段名
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
     /// 从合并字段拆分的分隔符（如 ":" 从 "host:port" 拆分）
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub split: Option<String>,
     /// 直接字符串值（如 "{account.token}" 取账号信息 token）
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
+}
+
+impl<'de> Deserialize<'de> for FieldMapping {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum Repr {
+            Str(String),
+            Obj { field: Option<String>, split: Option<String>, value: Option<String> },
+        }
+
+        match Repr::deserialize(deserializer)? {
+            Repr::Str(s) => {
+                // 模板字符串（以 { 开头，如 {account.token}）→ value；否则 → field
+                if s.starts_with('{') {
+                    Ok(FieldMapping { field: None, split: None, value: Some(s) })
+                } else {
+                    Ok(FieldMapping { field: Some(s), split: None, value: None })
+                }
+            }
+            Repr::Obj { field, split, value } => {
+                Ok(FieldMapping { field, split, value })
+            }
+        }
+    }
 }
 
 /// serde 默认值：bearer
@@ -610,10 +617,7 @@ fn default_auth_type_bearer() -> String {
     "bearer".to_string()
 }
 
-// ============================================================
 // auth.json 认证交互层类型
-// ============================================================
-
 /// auth.json 结构（认证交互层配置）
 ///
 /// 仅描述用户交互方式（授权页 URL、回调端口等），
@@ -664,4 +668,34 @@ pub struct AuthFileDeviceCode {
 pub struct AuthFileApiKey {
     pub obtain_url: String,
     pub header_name: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn field_mapping_three_forms() {
+        let fields: HashMap<String, FieldMapping> = serde_json::from_str(
+            r#"{
+                "id": "id",
+                "serverHost": { "field": "connectAddress", "split": ":" },
+                "token": "{account.token}"
+            }"#,
+        )
+        .expect("三种形式的 FieldMapping 均能解析");
+
+        assert_eq!(fields["id"].field.as_deref(), Some("id"));
+        assert_eq!(fields["id"].split, None);
+        assert_eq!(fields["id"].value, None);
+
+        assert_eq!(fields["serverHost"].field.as_deref(), Some("connectAddress"));
+        assert_eq!(fields["serverHost"].split.as_deref(), Some(":"));
+        assert_eq!(fields["serverHost"].value, None);
+
+        assert_eq!(fields["token"].value.as_deref(), Some("{account.token}"));
+        assert_eq!(fields["token"].field, None);
+        assert_eq!(fields["token"].split, None);
+    }
 }

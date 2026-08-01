@@ -4,13 +4,14 @@
 //! 替代原硬编码的 OAuth2/Device Code 请求逻辑。
 //!
 //! 支持的占位符（请求体/查询/URL 中替换）：
-//! {clientId} {clientSecret} {redirectUri} {code} {codeVerifier}
+//! {baseUrl} {clientId} {clientSecret} {redirectUri} {code} {codeVerifier}
 //! {refreshToken} {deviceCode} {scope} {apiKey} {publicKey} {requestUuid}
 //!
 //! 响应解析支持：
 //! - from=body + path（JSONPath 从响应体取值）
 //! - from=header + name（从响应头取值）
 
+use super::super::log_redact::redact_log;
 use super::super::types::{FieldExtractor, FlowRequest};
 use crate::log_debug;
 use std::collections::HashMap;
@@ -18,6 +19,7 @@ use std::collections::HashMap;
 /// 占位符上下文（认证流程中所有可用变量）
 #[derive(Debug, Clone, Default)]
 pub struct FlowContext {
+    pub base_url: Option<String>,
     pub client_id: String,
     pub client_secret: Option<String>,
     pub redirect_uri: Option<String>,
@@ -35,6 +37,7 @@ impl FlowContext {
     /// 按占位符名称取值
     fn get(&self, key: &str) -> Option<&str> {
         match key {
+            "baseUrl" | "base_url" => self.base_url.as_deref(),
             "clientId" | "client_id" => Some(&self.client_id),
             "clientSecret" | "client_secret" => self.client_secret.as_deref(),
             "redirectUri" | "redirect_uri" => self.redirect_uri.as_deref(),
@@ -61,13 +64,12 @@ pub async fn send_flow_request(
 ) -> Result<FlowResponse, String> {
     let url = fill_template(&flow.url, ctx);
     let method = flow.method.to_uppercase();
-
-    log_debug!(
-        "[Frp Auth] 认证流程请求: {} {} (contentType={})",
-        method,
-        url,
-        flow.content_type
-    );
+    let content_type = if flow.content_type.is_empty() {
+        "application/json"
+    } else {
+        &flow.content_type
+    };
+    let mut body_log: Option<String> = None;
 
     let client = crate::http::get_client();
     let mut request = match method.as_str() {
@@ -84,11 +86,6 @@ pub async fn send_flow_request(
     // POST body
     if method == "POST" {
         let body = fill_body_template(&flow.body, ctx);
-        let content_type = if flow.content_type.is_empty() {
-            "application/json"
-        } else {
-            &flow.content_type
-        };
 
         if content_type.contains("form-urlencoded") {
             // form-urlencoded：body 为对象，转为 key=value 对
@@ -97,15 +94,32 @@ pub async fn send_flow_request(
                     .iter()
                     .map(|(k, v)| (k.clone(), value_to_string(v)))
                     .collect();
+                body_log = Some(
+                    form_pairs
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("&"),
+                );
                 request = request.form(&form_pairs);
             } else {
+                body_log = Some(body.to_string());
                 request = request.body(body.to_string());
             }
         } else {
             // JSON 或其他：直接发送 body
+            body_log = Some(body.to_string());
             request = request.header("Content-Type", content_type).body(body.to_string());
         }
     }
+
+    log_debug!(
+        "[Frp Auth] 认证流程请求: {} {} (contentType={}, body={})",
+        method,
+        url,
+        content_type,
+        redact_log(body_log.as_deref().unwrap_or(""))
+    );
 
     let response = request
         .send()
@@ -118,6 +132,12 @@ pub async fn send_flow_request(
         .text()
         .await
         .map_err(|e| format!("读取认证流程响应失败: {}", e))?;
+
+    log_debug!(
+        "[Frp Auth] 认证流程响应: HTTP {} - {}",
+        status,
+        redact_log(&body_text)
+    );
 
     Ok(FlowResponse {
         status,
@@ -187,7 +207,7 @@ fn fill_template(template: &str, ctx: &FlowContext) -> String {
     let mut result = template.to_string();
     // 支持的占位符列表
     let placeholders = [
-        "clientId", "clientSecret", "redirectUri", "code", "codeVerifier",
+        "baseUrl", "clientId", "clientSecret", "redirectUri", "code", "codeVerifier",
         "refreshToken", "deviceCode", "scope", "apiKey", "publicKey", "requestUuid",
     ];
     for ph in &placeholders {
@@ -238,12 +258,17 @@ mod tests {
     #[test]
     fn test_fill_template() {
         let ctx = FlowContext {
+            base_url: Some("https://api.example.com/v1".to_string()),
             client_id: "my-client".to_string(),
             code: Some("abc123".to_string()),
             ..Default::default()
         };
         assert_eq!(fill_template("{clientId}", &ctx), "my-client");
         assert_eq!(fill_template("{code}", &ctx), "abc123");
+        assert_eq!(
+            fill_template("{baseUrl}/oauth2/token", &ctx),
+            "https://api.example.com/v1/oauth2/token"
+        );
         assert_eq!(
             fill_template("https://example.com/token?code={code}", &ctx),
             "https://example.com/token?code=abc123"

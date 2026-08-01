@@ -6,10 +6,7 @@
 use crate::log_error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-// ============================================================
 // keyring 密钥存储辅助
-// ============================================================
-
 /// 密钥存储的 key 列表
 pub(super) const KEY_ACCESS_TOKEN: &str = "access_token";
 pub(super) const KEY_REFRESH_TOKEN: &str = "refresh_token";
@@ -74,10 +71,7 @@ pub(super) fn delete_secret(provider_id: &str, key: &str) -> Result<(), String> 
     }
 }
 
-// ============================================================
 // token 存储辅助（封装 access_token / refresh_token / expires_at / scopes）
-// ============================================================
-
 /// 存储完整 token 信息
 pub(super) fn store_token_info(
     provider_id: &str,
@@ -124,10 +118,7 @@ pub(super) fn load_scopes(provider_id: &str) -> Result<Option<Vec<String>>, Stri
     }
 }
 
-// ============================================================
 // 通用辅助
-// ============================================================
-
 /// 当前 Unix 时间戳（秒）
 pub(super) fn now_secs() -> u64 {
     SystemTime::now()
