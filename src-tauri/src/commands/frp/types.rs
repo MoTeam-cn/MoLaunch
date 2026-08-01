@@ -97,6 +97,9 @@ pub struct ProviderInfo {
     /// 厂商主页（可选）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub homepage: Option<String>,
+    /// 厂商图标绝对路径（可选，由后端填充，前端用 convertFileSrc 渲染）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
 }
 
 /// 厂商清单（外部厂商的 manifest.json 反序列化结构）
@@ -171,9 +174,15 @@ pub struct BinaryConfig {
     /// 分发方式：bundled=随厂商包打包 / url=按需下载
     #[serde(default = "default_distribution")]
     pub distribution: String,
-    /// distribution=bundled 时：厂商自带 frpc 相对路径
+    /// distribution=bundled 时：厂商自带 frpc 相对路径（单平台时使用）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
+    /// distribution=bundled 时：按平台映射的 frpc 相对路径（多平台时使用）
+    ///
+    /// key 格式 `{os}_{arch}`，如 `windows_amd64` / `linux_arm64` / `darwin_arm64`。
+    /// 优先于 `path` 字段：若当前平台在 paths 中存在则使用 paths 的值，否则回退到 path。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paths: Option<std::collections::HashMap<String, String>>,
     /// distribution=url 时：下载配置
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download: Option<DownloadConfig>,

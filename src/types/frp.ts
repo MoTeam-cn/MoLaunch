@@ -64,6 +64,8 @@ export interface ProviderInfo {
   /** frpc 分发方式：bundled / url / system */
   distribution: string
   homepage?: string
+  /** 厂商图标绝对路径（后端填充，前端用 convertFileSrc 渲染） */
+  icon?: string
 }
 
 /** 日志文件信息 */

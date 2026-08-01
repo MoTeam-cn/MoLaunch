@@ -352,13 +352,25 @@
 <h2>frpc 二进制分发（binary）</h2>
 
 <h3>bundled：随包打包</h3>
-<p>将 frpc 二进制文件放入厂商文件夹，通过 <code>path</code> 指定相对路径。</p>
+<p>将 frpc 二进制文件放入厂商文件夹，通过 <code>path</code> 指定相对路径。单平台只需 <code>path</code>；多平台时用 <code>paths</code> 按 <code>{os}_{arch}</code> 映射不同二进制（优先于 <code>path</code>）。</p>
 <pre><code>{
   "binary": {
     "distribution": "bundled",
     "path": "bin/frpc.exe"
   }
 }</code></pre>
+<p>多平台示例（key 格式 <code>{os}_{arch}</code>，os=windows/macos/linux，arch=amd64/arm64/386）：</p>
+<pre><code>{
+  "binary": {
+    "distribution": "bundled",
+    "paths": {
+      "windows_amd64": "bin/frpc-windows-amd64.exe",
+      "linux_amd64": "bin/frpc-linux-amd64",
+      "darwin_arm64": "bin/frpc-darwin-arm64"
+    }
+  }
+}</code></pre>
+<blockquote>启动器按当前平台从 <code>paths</code> 查找，找不到时回退到 <code>path</code>，两者都没有则报错。</blockquote>
 
 <h3>url：按需下载</h3>
 <p>用户首次使用时自动下载 frpc，支持 ZIP 压缩包自动解压。</p>
@@ -553,7 +565,92 @@
   <li><strong>合并字段拆分</strong>：<code>connectAddress</code> 按 <code>:</code> 拆分为 serverHost 和 serverPort</li>
   <li><strong>账号 token 引用</strong>：<code>"token": "{account.token}"</code> 从账号信息取 frpc 启动密钥</li>
 </ul>
-<p>完整配置见 <code>docs/Frp Test/frp/providers/openfrp.json</code>。</p>
+<p>完整配置如下：</p>
+<pre><code>{
+  "specVersion": "1.0.0",
+  "baseUrl": "https://api.openfrp.net",
+  "auth": {
+    "headerName": "Authorization",
+    "headerPrefix": "OPENFRP",
+    "headerKeyName": "x-request-public-key"
+  },
+  "authFlows": {
+    "oauth2": {
+      "token": {
+        "method": "POST",
+        "url": "{baseUrl}/oauth2/callback?code={code}",
+        "contentType": "application/json",
+        "body": {},
+        "response": {
+          "accessToken": { "from": "header", "name": "Authorization" },
+          "refreshToken": { "from": "body", "path": "$.data" }
+        }
+      },
+      "refresh": {
+        "method": "POST",
+        "url": "{baseUrl}/oauth2/callback",
+        "contentType": "application/json",
+        "body": {},
+        "response": {
+          "accessToken": { "from": "header", "name": "Authorization" },
+          "refreshToken": { "from": "body", "path": "$.data" }
+        }
+      }
+    },
+    "api_key": {
+      "headerName": "Authorization",
+      "headerValue": "OPENFRP{apiKey}",
+      "queryName": "user"
+    }
+  },
+  "envelope": {
+    "successField": "$.flag",
+    "successValue": true,
+    "errorField": "$.msg",
+    "dataField": "$.data"
+  },
+  "config": {
+    "mode": "args",
+    "format": "ini",
+    "args": ["-u", "{token}", "-p", "{ids}"]
+  },
+  "endpoints": {
+    "account": {
+      "method": "POST",
+      "path": "/frp/api/getUserInfo",
+      "authType": "bearer",
+      "response": {
+        "dataField": "$.data",
+        "fields": { "id": "id", "username": "username", "email": "email", "token": "token" }
+      }
+    },
+    "tunnels": {
+      "list": {
+        "method": "POST",
+        "path": "/frp/api/getUserProxies",
+        "authType": "bearer",
+        "response": {
+          "itemsField": "$.data[*].proxies[*]",
+          "tunnelIdField": "id",
+          "tunnelNameField": "proxyName",
+          "fields": {
+            "id": "id",
+            "name": "proxyName",
+            "type": "proxyType",
+            "status": "status",
+            "serverHost": { "field": "connectAddress", "split": ":" },
+            "serverPort": { "field": "connectAddress", "split": ":" },
+            "token": "{account.token}",
+            "localHost": "localIp",
+            "localPort": "localPort",
+            "remotePort": "remotePort",
+            "customDomain": "domain"
+          }
+        }
+      }
+    }
+  }
+}</code></pre>
 
 <h2>安装方式</h2>
 

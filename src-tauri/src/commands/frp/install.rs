@@ -3,7 +3,8 @@
 //! frpc 二进制下载见 [`super::binary`]，厂商列表/状态/启禁见 [`super::provider`]。
 
 use super::provider::{
-    is_external_frpc_ready, read_providers_state, write_providers_state, SYSTEM_DEFAULT_ID,
+    is_external_frpc_ready, read_icon_as_data_url, read_providers_state, resolve_auth_type,
+    write_providers_state, SYSTEM_DEFAULT_ID,
 };
 use super::{ensure_dir, providers_root, validate_provider_id, ProviderInfo, ProviderManifest};
 use crate::log_info;
@@ -195,6 +196,11 @@ fn build_provider_info(manifest: &ProviderManifest) -> ProviderInfo {
     let state = read_providers_state();
     let frpc_ready = is_external_frpc_ready(&manifest.id, manifest);
     let enabled = state.get(&manifest.id).copied().unwrap_or(true);
+    let auth_type = resolve_auth_type(&manifest.id, manifest);
+    let icon = manifest
+        .icon
+        .as_ref()
+        .and_then(|icon_rel| read_icon_as_data_url(&manifest.id, icon_rel));
     ProviderInfo {
         id: manifest.id.clone(),
         name: manifest.name.clone(),
@@ -202,11 +208,12 @@ fn build_provider_info(manifest: &ProviderManifest) -> ProviderInfo {
         version: manifest.version.clone(),
         author: manifest.author.clone(),
         builtin: false,
-        auth_type: manifest.auth.auth_type.clone(),
+        auth_type,
         frpc_ready,
         enabled,
         distribution: manifest.binary.distribution.clone(),
         homepage: manifest.homepage.clone(),
+        icon,
     }
 }
 
