@@ -36,16 +36,39 @@ pub fn get_runtime_dir(component: &str) -> Result<PathBuf, String> {
     crate::utils::cache_app::runtime_dir(component)
 }
 
-/// 在 runtime 目录中查找 java.exe
+/// 在 runtime 目录中查找 java 可执行文件
+///
+/// 跨平台支持：
+/// - Windows: 查找 `java.exe`，候选子目录 `windows-x64`
+/// - macOS:   查找 `java`，候选子目录 `mac-os`（Mojang 官方 manifest 命名）
+/// - Linux:   查找 `java`，候选子目录 `linux`
+///
+/// 递归查找兜底所有平台通用，覆盖 manifest 路径变化。
 pub fn find_java_exe(runtime_dir: &Path) -> Result<PathBuf, String> {
-    // 常见路径：runtime/{component}/windows-x64/{component}/bin/java.exe
+    // 平台相关的可执行文件名与子目录名
+    let exe_name = if cfg!(target_os = "windows") {
+        "java.exe"
+    } else {
+        "java"
+    };
+    let platform_subdir = if cfg!(target_os = "windows") {
+        "windows-x64"
+    } else if cfg!(target_os = "macos") {
+        "mac-os"
+    } else {
+        "linux"
+    };
+
+    // 常见路径：
+    //   runtime/{component}/bin/{exe_name}
+    //   runtime/{component}/{platform_subdir}/{component}/bin/{exe_name}
     let candidates = [
-        runtime_dir.join("bin").join("java.exe"),
+        runtime_dir.join("bin").join(exe_name),
         runtime_dir
-            .join("windows-x64")
+            .join(platform_subdir)
             .join(runtime_dir.file_name().unwrap_or_default())
             .join("bin")
-            .join("java.exe"),
+            .join(exe_name),
     ];
 
     for c in &candidates {
@@ -54,16 +77,20 @@ pub fn find_java_exe(runtime_dir: &Path) -> Result<PathBuf, String> {
         }
     }
 
-    // 递归查找 java.exe
-    fn find_recursive(dir: &Path) -> Option<PathBuf> {
+    // 递归查找可执行文件（兜底所有平台，覆盖 manifest 路径变化）
+    fn find_recursive(dir: &Path, exe_name: &str) -> Option<PathBuf> {
         if dir.is_dir() {
             for entry in std::fs::read_dir(dir).ok()?.flatten() {
                 let path = entry.path();
                 if path.is_dir() {
-                    if let Some(found) = find_recursive(&path) {
+                    if let Some(found) = find_recursive(&path, exe_name) {
                         return Some(found);
                     }
-                } else if path.file_name().map(|n| n == "java.exe").unwrap_or(false) {
+                } else if path
+                    .file_name()
+                    .map(|n| n == exe_name)
+                    .unwrap_or(false)
+                {
                     return Some(path);
                 }
             }
@@ -71,8 +98,8 @@ pub fn find_java_exe(runtime_dir: &Path) -> Result<PathBuf, String> {
         None
     }
 
-    find_recursive(runtime_dir)
-        .ok_or_else(|| format!("在 {} 中未找到 java.exe", runtime_dir.display()))
+    find_recursive(runtime_dir, exe_name)
+        .ok_or_else(|| format!("在 {} 中未找到 {}", runtime_dir.display(), exe_name))
 }
 
 /// 校验路径穿越：manifest 来自远程，必须确保最终路径仍在 runtime_dir 内
