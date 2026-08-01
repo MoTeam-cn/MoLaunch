@@ -9,6 +9,22 @@
 
 ### 维护
 
+#### 修复跨平台兼容性 P3 文档/注释漂移（L1+L2+L4，L3 验证为误报）
+
+- 背景：P0/P1/P2 全部清零后，处理 P3 低优先级文档/注释漂移问题。完整扫描报告见 `docs/CROSS_PLATFORM_COMPATIBILITY.md`
+- 改动（3 处修复，2 个文件）：
+  - **L1 `src-tauri/src/minecraft/launch/pipeline/pre_launch.rs:8`**：`run_pre_launch` doc 注释"语法同 Windows cmd"与实际实现不符（非 Windows 用 `sh -c`）
+    - 改为：`Windows: \`cmd /C\`，Unix: \`sh -c\`，不等待退出，失败仅记录日志`
+  - **L2 `src-tauri/src/minecraft/launch/pipeline/pre_launch.rs::validate_pre_launch_cmd`**：检测关键词偏 Windows（powershell/iex/invoke-），缺 sh 注入向量
+    - 补充命令分隔符 `;`（sh 标准分隔符，cmd 也支持）
+    - 补充 sh 注入关键词：`eval` / `exec` / `source`（sh 内置命令，常用于注入链）
+    - 补充 doc 注释说明检测向量覆盖 Windows cmd 与 Unix sh 两种后端
+  - **L4 `src-tauri/src/minecraft/launch/pipeline/process_spawn.rs:35`**：`cmd.env("appdata", &args.game_dir)` 在所有平台设置，macOS/Linux 上 appdata 是无意义环境变量
+    - 改为：`#[cfg(target_os = "windows")]` 包裹，仅 Windows 设置（appdata 是 Windows 特有约定，Unix Mod 遵循 XDG）
+- **L3 `process_spawn.rs:40-43` 验证为误报**：报告称未显式 `use std::os::windows::process::CommandExt`，实际 `tokio::process::Command` 在 Windows 上有 inherent `creation_flags` 方法（不通过 std CommandExt trait），`cargo check` 0 错误已验证无需修改
+- 验证：`cargo clippy -- -D warnings` 0 警告
+- 影响范围：PreLaunch 安全检测覆盖 sh 注入向量；非 Windows 不再注入冗余 appdata 环境变量；文档注释与实现一致
+
 #### 修复跨平台兼容性 P2 中等问题（4 项连续修复）
 
 - 背景：P0 阻塞项与 P1 体验项清零后，继续处理 P2 中等问题，覆盖 updater stub 语义、frp 进程组管理、SDK 平台覆盖、注册表 bool 语义模糊。完整扫描报告见 `docs/CROSS_PLATFORM_COMPATIBILITY.md`
