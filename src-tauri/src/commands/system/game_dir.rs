@@ -65,7 +65,7 @@ pub async fn write_text_file(path: String, content: String) -> Result<(), String
 /// 与用户设置页触发的 `apply_config({ gameDir: ... })` 走不同代码路径。
 pub async fn set_game_dir(state: &AppState, game_dir: String) -> Result<(), String> {
     log_info!("Game directory changed to: {}", game_dir);
-    super::update_config(&state, |config| {
+    super::update_config(state, |config| {
         config.game_dir = game_dir;
     })
     .await

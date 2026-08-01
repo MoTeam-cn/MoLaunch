@@ -62,7 +62,7 @@ pub fn set_sdk(sdk: Arc<TokioMutex<Option<SdkInstance>>>) {
 /// 注意：不跨 .await 持有非 Send 的 guard（避免 future 非 Send）
 async fn ensure_api_key_decrypted() {
     // 快速路径：已解密过（读完立即释放 guard）
-    if STATE.get().map_or(false, |s| s.read().unwrap().decrypted) {
+    if STATE.get().is_some_and(|s| s.read().unwrap().decrypted) {
         return;
     }
 

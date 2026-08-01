@@ -178,7 +178,9 @@ pub(crate) fn is_command_allowed(command: &str, allowed: &[String]) -> Result<bo
 pub(crate) fn which_canonical(command: &str) -> Result<PathBuf, String> {
     let path = PathBuf::from(command);
     if path.is_absolute() {
-        return path.canonicalize().map_err(log_err("Failed to canonicalize command path"));
+        return path
+            .canonicalize()
+            .map_err(log_err("Failed to canonicalize command path"));
     }
 
     let path_env = std::env::var("PATH").map_err(|_| "PATH not set".to_string())?;
@@ -196,14 +198,18 @@ pub(crate) fn which_canonical(command: &str) -> Result<PathBuf, String> {
             for ext in &[".exe", ".bat", ".cmd"] {
                 let candidate = dir_path.join(format!("{}{}", command, ext));
                 if candidate.exists() {
-                    return candidate.canonicalize().map_err(log_err("Failed to canonicalize command path"));
+                    return candidate
+                        .canonicalize()
+                        .map_err(log_err("Failed to canonicalize command path"));
                 }
             }
         }
 
         let candidate = dir_path.join(command);
         if candidate.exists() {
-            return candidate.canonicalize().map_err(log_err("Failed to canonicalize command path"));
+            return candidate
+                .canonicalize()
+                .map_err(log_err("Failed to canonicalize command path"));
         }
     }
 

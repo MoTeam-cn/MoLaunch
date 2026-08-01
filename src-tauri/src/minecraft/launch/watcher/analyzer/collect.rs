@@ -42,9 +42,9 @@ pub(super) fn collect_sources(logs: &[LogEntry], game_dir: &Path) -> CollectedSo
     let crash_report = read_latest_crash_report(game_dir);
     let crash_report_text: String = crash_report
         .as_ref()
-        .and_then(|(path, content)| {
+        .map(|(path, content)| {
             crate::log_info!("[CrashAnalyzer] 找到崩溃报告: {}", path.display());
-            Some(content.clone())
+            content.clone()
         })
         .unwrap_or_default();
 
@@ -91,17 +91,16 @@ fn read_latest_crash_report(game_dir: &Path) -> Option<(PathBuf, String)> {
             let path = entry.path();
             // 只看 crash-*.txt 文件
             let name = path.file_name()?.to_string_lossy();
-            if !name.starts_with("crash-") || path.extension().map_or(true, |e| e != "txt") {
+            if !name.starts_with("crash-") || path.extension().is_none_or(|e| e != "txt") {
                 continue;
             }
             if let Ok(meta) = entry.metadata() {
                 if let Ok(modified) = meta.modified() {
                     // 只看 3 分钟内修改过的文件
                     if let Ok(age) = now.duration_since(modified) {
-                        if age.as_secs() < 180 {
-                            if latest.as_ref().map_or(true, |(_, t)| modified > *t) {
-                                latest = Some((path, modified));
-                            }
+                        if age.as_secs() < 180 && latest.as_ref().is_none_or(|(_, t)| modified > *t)
+                        {
+                            latest = Some((path, modified));
                         }
                     }
                 }
@@ -139,10 +138,10 @@ fn read_latest_hs_err(game_dir: &Path) -> String {
                 if let Ok(meta) = entry.metadata() {
                     if let Ok(modified) = meta.modified() {
                         if let Ok(age) = now.duration_since(modified) {
-                            if age.as_secs() < 180 {
-                                if latest.as_ref().map_or(true, |(_, t)| modified > *t) {
-                                    latest = Some((path, modified));
-                                }
+                            if age.as_secs() < 180
+                                && latest.as_ref().is_none_or(|(_, t)| modified > *t)
+                            {
+                                latest = Some((path, modified));
                             }
                         }
                     }

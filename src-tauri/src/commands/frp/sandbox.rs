@@ -5,11 +5,11 @@
 
 use super::provider::{read_provider_manifest, SYSTEM_DEFAULT_ID};
 use super::tunnel::{CreateTunnelParams, UpdateTunnelParams};
-use super::{validate_provider_id, TunnelType, ProcessPermissions};
+use super::{validate_provider_id, ProcessPermissions, TunnelType};
+use crate::commands::frp::providers_root;
 use crate::commands::plugins::spawn::{
     is_command_allowed, truncate_output, ProcessResult, MAX_TIMEOUT_MS,
 };
-use crate::commands::frp::providers_root;
 use std::time::{Duration, Instant};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
@@ -60,10 +60,10 @@ pub fn validate_tunnel(params: &CreateTunnelParams) -> Result<(), String> {
     // 本地 IP 校验（如有）
     if let Some(ref local_ip) = params.local_ip {
         let local_ip = local_ip.trim();
-        if !local_ip.is_empty() {
-            if local_ip.contains('\n') || local_ip.contains('\r') || local_ip.contains('"') {
-                return Err("本地 IP 包含非法字符".to_string());
-            }
+        if !local_ip.is_empty()
+            && (local_ip.contains('\n') || local_ip.contains('\r') || local_ip.contains('"'))
+        {
+            return Err("本地 IP 包含非法字符".to_string());
         }
     }
 
@@ -85,7 +85,11 @@ pub fn validate_tunnel(params: &CreateTunnelParams) -> Result<(), String> {
     // Token 校验（如有）
     if let Some(ref token) = params.token {
         if !token.is_empty() {
-            if token.contains('\n') || token.contains('\r') || token.contains('"') || token.contains('\\') {
+            if token.contains('\n')
+                || token.contains('\r')
+                || token.contains('"')
+                || token.contains('\\')
+            {
                 return Err("Token 包含非法字符".to_string());
             }
             if token.len() > 512 {
@@ -167,10 +171,8 @@ fn is_private_address(addr: &str) -> bool {
     // 优先按 SocketAddr 解析（处理 host:port），再按裸 IP 解析
     let ip = if let Ok(s) = addr.parse::<SocketAddr>() {
         Some(s.ip())
-    } else if let Ok(ip) = addr.parse::<IpAddr>() {
-        Some(ip)
     } else {
-        None
+        addr.parse::<IpAddr>().ok()
     };
     if let Some(ip) = ip {
         return match ip {
@@ -229,13 +231,19 @@ pub async fn run_auth_adapter(
 
     // 3. 读取厂商 manifest 的 process_permissions
     let manifest = read_provider_manifest(provider_id)?;
-    let proc_perms: &ProcessPermissions = manifest
-        .process_permissions
-        .as_ref()
-        .ok_or_else(|| format!("厂商 {} 未配置 processPermissions，禁止执行认证适配器脚本", provider_id))?;
+    let proc_perms: &ProcessPermissions =
+        manifest.process_permissions.as_ref().ok_or_else(|| {
+            format!(
+                "厂商 {} 未配置 processPermissions，禁止执行认证适配器脚本",
+                provider_id
+            )
+        })?;
 
     if proc_perms.allowed_commands.is_empty() {
-        return Err(format!("厂商 {} 的 allowedCommands 白名单为空", provider_id));
+        return Err(format!(
+            "厂商 {} 的 allowedCommands 白名单为空",
+            provider_id
+        ));
     }
 
     // 4. 校验命令在白名单内（复用 spawn::is_command_allowed）
@@ -258,7 +266,10 @@ pub async fn run_auth_adapter(
 
     log_debug!(
         "[Frp Sandbox] 执行认证适配器: provider={}, command={}, args={:?}, timeout={}ms",
-        provider_id, command, args, timeout_ms
+        provider_id,
+        command,
+        args,
+        timeout_ms
     );
 
     // 7. 构建 Command（非 shell 执行，防注入）
@@ -329,7 +340,10 @@ pub async fn run_auth_adapter(
 
     log_debug!(
         "[Frp Sandbox] 认证适配器完成: provider={}, exit_code={:?}, 耗时={}ms, 超时={}",
-        provider_id, exit_code, duration_ms, timed_out
+        provider_id,
+        exit_code,
+        duration_ms,
+        timed_out
     );
 
     Ok(ProcessResult {

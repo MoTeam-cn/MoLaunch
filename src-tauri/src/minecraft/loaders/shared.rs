@@ -115,7 +115,8 @@ pub async fn download_mojang_mappings(
 
     std::fs::create_dir_all(&local_dir)?;
 
-    let urls = sources::build_replace_urls(url, None, sources::MOJANG_REPLACEMENTS, config.source_mode);
+    let urls =
+        sources::build_replace_urls(url, None, sources::MOJANG_REPLACEMENTS, config.source_mode);
 
     let manager = DownloadManager::from_config(config);
     let task = DownloadTask {

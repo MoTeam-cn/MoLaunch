@@ -34,7 +34,7 @@ pub async fn export_launch_script(
     log_info!("Exporting launch script for version: {}", version_id);
     log_warn!("Exporting launch script to: {}", save_path);
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let config = state.config.lock().await;
     let global_isolation_mode = config.isolation_mode;
 
@@ -53,7 +53,7 @@ pub async fn export_launch_script(
         }
         Some("custom") => {
             max_memory = setup.java.max_memory.unwrap_or(config.memory.max);
-            min_memory = setup.java.min_memory.unwrap_or_else(|| max_memory / 2);
+            min_memory = setup.java.min_memory.unwrap_or(max_memory / 2);
         }
         _ => {
             min_memory = config.memory.min;
@@ -77,12 +77,13 @@ pub async fn export_launch_script(
     });
 
     // 解析 Java 路径：优先用户指定 → 否则按 MC 版本自动检测 → 都失败则报错
-    let java_path_buf = resolve_java::resolve_java_path(&game_dir, &version_id, resolved_java.as_deref())
-        .await
-        .map_err(|e| {
-            log_error!("Failed to resolve Java path for script: {}", e);
-            e
-        })?;
+    let java_path_buf =
+        resolve_java::resolve_java_path(&game_dir, &version_id, resolved_java.as_deref())
+            .await
+            .map_err(|e| {
+                log_error!("Failed to resolve Java path for script: {}", e);
+                e
+            })?;
     let java_str = java_path_buf.to_string_lossy().replace('/', "\\");
     log_info!("Script will use Java: {}", java_str);
 

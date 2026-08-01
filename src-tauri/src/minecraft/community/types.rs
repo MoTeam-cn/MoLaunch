@@ -77,6 +77,7 @@ impl ModLoaders {
     pub const QUILT: u32 = 8;
     pub const NEOFORGE: u32 = 16;
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> u32 {
         match s.to_lowercase().as_str() {
             "forge" => Self::FORGE,

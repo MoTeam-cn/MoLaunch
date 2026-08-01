@@ -82,10 +82,7 @@ pub async fn get_config(
 /// - `null` 表示清除（Some(None)）
 /// - 非空字符串表示设置（Some(Some("xxx"))）
 /// - 不存在表示不更新（None）
-pub async fn apply_config(
-    state: &AppState,
-    entries: Vec<ConfigEntry>,
-) -> Result<(), String> {
+pub async fn apply_config(state: &AppState, entries: Vec<ConfigEntry>) -> Result<(), String> {
     // 将扁平数组转为 Map，再反序列化为 ConfigPatch
     let mut map = serde_json::Map::new();
     for entry in entries {

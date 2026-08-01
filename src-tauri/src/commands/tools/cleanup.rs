@@ -7,8 +7,8 @@
 use std::path::{Path, PathBuf};
 
 use crate::log_info;
-use crate::state::AppState;
 use crate::state::resolve_game_dir;
+use crate::state::AppState;
 
 use super::types::{
     CleanupExecuteParams, CleanupExecuteResult, CleanupFailedItem, CleanupItem, CleanupScanResult,
@@ -132,7 +132,8 @@ pub async fn scan(state: &AppState) -> Result<serde_json::Value, String> {
                 // 2b. natives 目录（命名约定：<ver>-natives）
                 let natives_dir = version_path.join(format!("{}-natives", version_name));
                 let natives_display_name = format!("原生库 - {}", version_name);
-                if let Some(item) = scan_directory(&natives_dir, &natives_display_name, "可清理") {
+                if let Some(item) = scan_directory(&natives_dir, &natives_display_name, "可清理")
+                {
                     total_size += item.size;
                     total_files += item.file_count;
                     items.push(item);

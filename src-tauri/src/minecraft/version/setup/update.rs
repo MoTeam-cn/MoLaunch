@@ -14,7 +14,7 @@ impl VersionSetup {
     ) -> std::io::Result<()> {
         let path = Self::file_path(version_dir);
         let mut setup = if path.exists() {
-            Self::load(version_dir)?.unwrap_or_else(|| Self::empty())
+            Self::load(version_dir)?.unwrap_or_else(Self::empty)
         } else {
             Self::empty()
         };

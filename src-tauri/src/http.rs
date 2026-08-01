@@ -190,7 +190,7 @@ fn auto_detect_ip_version() -> Option<IpAddr> {
     match (v4_time, v6_time) {
         (Some(v4), Some(v6)) => {
             // 均可达：延迟差异 < 50ms 视为接近，让 OS 决定
-            let diff = if v4 > v6 { v4 - v6 } else { v6 - v4 };
+            let diff = v4.abs_diff(v6);
             if diff < 50 {
                 None
             } else if v4 < v6 {

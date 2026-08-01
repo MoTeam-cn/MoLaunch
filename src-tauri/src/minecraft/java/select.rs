@@ -37,5 +37,5 @@ pub fn select_best_java(
         b_weight.cmp(&a_weight)
     });
 
-    candidates.first().map(|&java| java)
+    candidates.first().copied()
 }

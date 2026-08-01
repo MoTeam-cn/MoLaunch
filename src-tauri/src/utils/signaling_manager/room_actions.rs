@@ -22,17 +22,19 @@ pub fn register(d: &mut Dispatcher) {
 }
 
 fn register_get_stun(d: &mut Dispatcher) {
-    d.register("room_get_stun", handler!(state, _app, _params, {
-        let creds = super::load_creds(&state).await?;
-        let client = super::make_client(&state).await;
-        log_debug!("[Online] room_get_stun");
-        let result = client.signaling_get_stun(&creds).await
-            .map_err(|e| {
+    d.register(
+        "room_get_stun",
+        handler!(state, _app, _params, {
+            let creds = super::load_creds(&state).await?;
+            let client = super::make_client(&state).await;
+            log_debug!("[Online] room_get_stun");
+            let result = client.signaling_get_stun(&creds).await.map_err(|e| {
                 log_error!("[Online] room_get_stun 失败: {}", e);
                 e.to_string()
             })?;
-        serde_json::to_value(result).map_err(|e| e.to_string())
-    }));
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
 }
 
 fn register_create_room(d: &mut Dispatcher) {
@@ -79,73 +81,94 @@ fn register_create_room(d: &mut Dispatcher) {
 }
 
 fn register_get_room(d: &mut Dispatcher) {
-    d.register("room_get", handler!(state, _app, params, {
-        let p: RoomCodeParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let creds = super::load_creds(&state).await?;
-        let client = super::make_client(&state).await;
-        log_debug!("[Online] room_get: code={}", p.room_code);
-        let result = client.signaling_get_room(&creds, &p.room_code).await
-            .map_err(|e| {
-                log_error!("[Online] room_get 失败: {}", e);
-                e.to_string()
-            })?;
-        serde_json::to_value(result).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "room_get",
+        handler!(state, _app, params, {
+            let p: RoomCodeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let creds = super::load_creds(&state).await?;
+            let client = super::make_client(&state).await;
+            log_debug!("[Online] room_get: code={}", p.room_code);
+            let result = client
+                .signaling_get_room(&creds, &p.room_code)
+                .await
+                .map_err(|e| {
+                    log_error!("[Online] room_get 失败: {}", e);
+                    e.to_string()
+                })?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
 }
 
 fn register_close_room(d: &mut Dispatcher) {
-    d.register("room_close", handler!(state, _app, params, {
-        let p: RoomCodeParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let creds = super::load_creds(&state).await?;
-        let client = super::make_client(&state).await;
-        log_info!("[Online] room_close: code={}", p.room_code);
-        let result = client.signaling_close_room(&creds, &p.room_code).await
-            .map_err(|e| {
-                log_error!("[Online] room_close 失败: {}", e);
-                e.to_string()
-            })?;
-        serde_json::to_value(result).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "room_close",
+        handler!(state, _app, params, {
+            let p: RoomCodeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let creds = super::load_creds(&state).await?;
+            let client = super::make_client(&state).await;
+            log_info!("[Online] room_close: code={}", p.room_code);
+            let result = client
+                .signaling_close_room(&creds, &p.room_code)
+                .await
+                .map_err(|e| {
+                    log_error!("[Online] room_close 失败: {}", e);
+                    e.to_string()
+                })?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
 }
 
 fn register_join_room(d: &mut Dispatcher) {
-    d.register("room_join", handler!(state, _app, params, {
-        let p: JoinRoomParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let creds = super::load_creds(&state).await?;
-        let client = super::make_client(&state).await;
-        log_info!("[Online] room_join: code={}", p.room_code);
-        let result = client.signaling_join_room(&creds, &p.room_code, &p.password).await
-            .map_err(|e| {
-                log_error!("[Online] room_join 失败: {}", e);
-                e.to_string()
-            })?;
-        if let Some(ref data) = result.data {
-            log_info!(
-                "[Online] 加入房间成功: participant_id={}, virtual_ip={}",
-                data.participant_id, data.player_virtual_ip
-            );
-        }
-        serde_json::to_value(result).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "room_join",
+        handler!(state, _app, params, {
+            let p: JoinRoomParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let creds = super::load_creds(&state).await?;
+            let client = super::make_client(&state).await;
+            log_info!("[Online] room_join: code={}", p.room_code);
+            let result = client
+                .signaling_join_room(&creds, &p.room_code, &p.password)
+                .await
+                .map_err(|e| {
+                    log_error!("[Online] room_join 失败: {}", e);
+                    e.to_string()
+                })?;
+            if let Some(ref data) = result.data {
+                log_info!(
+                    "[Online] 加入房间成功: participant_id={}, virtual_ip={}",
+                    data.participant_id,
+                    data.player_virtual_ip
+                );
+            }
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
 }
 
 fn register_keepalive(d: &mut Dispatcher) {
-    d.register("room_keepalive", handler!(state, _app, params, {
-        let p: RoomCodeParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let creds = super::load_creds(&state).await?;
-        let client = super::make_client(&state).await;
-        log_debug!("[Online] room_keepalive: code={}", p.room_code);
-        let result = client.signaling_keepalive(&creds, &p.room_code).await
-            .map_err(|e| {
-                log_error!("[Online] room_keepalive 失败: {}", e);
-                e.to_string()
-            })?;
-        serde_json::to_value(result).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "room_keepalive",
+        handler!(state, _app, params, {
+            let p: RoomCodeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let creds = super::load_creds(&state).await?;
+            let client = super::make_client(&state).await;
+            log_debug!("[Online] room_keepalive: code={}", p.room_code);
+            let result = client
+                .signaling_keepalive(&creds, &p.room_code)
+                .await
+                .map_err(|e| {
+                    log_error!("[Online] room_keepalive 失败: {}", e);
+                    e.to_string()
+                })?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
 }
 
 /// 房主独占接口：拉取服务端 TURN 服务器列表（阶段三子任务 7）
@@ -175,17 +198,22 @@ fn register_get_turn_servers(d: &mut Dispatcher) {
 }
 
 fn register_leave_room(d: &mut Dispatcher) {
-    d.register("room_leave", handler!(state, _app, params, {
-        let p: RoomCodeParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let creds = super::load_creds(&state).await?;
-        let client = super::make_client(&state).await;
-        log_info!("[Online] room_leave: code={}", p.room_code);
-        let result = client.signaling_leave_room(&creds, &p.room_code).await
-            .map_err(|e| {
-                log_error!("[Online] room_leave 失败: {}", e);
-                e.to_string()
-            })?;
-        serde_json::to_value(result).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "room_leave",
+        handler!(state, _app, params, {
+            let p: RoomCodeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let creds = super::load_creds(&state).await?;
+            let client = super::make_client(&state).await;
+            log_info!("[Online] room_leave: code={}", p.room_code);
+            let result = client
+                .signaling_leave_room(&creds, &p.room_code)
+                .await
+                .map_err(|e| {
+                    log_error!("[Online] room_leave 失败: {}", e);
+                    e.to_string()
+                })?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
 }

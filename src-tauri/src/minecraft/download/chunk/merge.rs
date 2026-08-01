@@ -42,10 +42,7 @@ pub(super) fn merge_chunks(
                     );
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        format!(
-                            "part {} 大小不匹配：实际 {}，期望 {}",
-                            i, actual, expected
-                        ),
+                        format!("part {} 大小不匹配：实际 {}，期望 {}", i, actual, expected),
                     ));
                 }
             }

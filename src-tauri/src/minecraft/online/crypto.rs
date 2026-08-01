@@ -23,9 +23,7 @@ pub fn b64u_encode(data: &[u8]) -> String {
 
 /// Base64Url 解码（无填充）
 pub fn b64u_decode(s: &str) -> Result<Vec<u8>, CryptoError> {
-    URL_SAFE_NO_PAD
-        .decode(s)
-        .map_err(|e| CryptoError::Base64Decode(e))
+    URL_SAFE_NO_PAD.decode(s).map_err(CryptoError::Base64Decode)
 }
 
 // ============================== Ed25519 ==============================
@@ -96,8 +94,8 @@ pub struct X25519StaticKeyPair {
 impl X25519StaticKeyPair {
     /// 生成新的 X25519 静态密钥对
     pub fn generate() -> Self {
-        let mut csprng = OsRng;
-        let secret = StaticSecret::random_from_rng(&mut csprng);
+        let csprng = OsRng;
+        let secret = StaticSecret::random_from_rng(csprng);
         let public = X25519PublicKey::from(&secret);
         Self { secret, public }
     }
@@ -153,7 +151,12 @@ pub fn x25519_public_from_b64u(s: &str) -> Result<X25519PublicKey, CryptoError> 
 /// - `salt`：盐值（如 nonce 原始字节）
 /// - `info`：上下文信息（如 "mosign-v1-session-key"）
 /// - `length`：输出长度（默认 32）
-pub fn hkdf_sha256(ikm: &[u8], salt: &[u8], info: &[u8], length: usize) -> Result<Vec<u8>, CryptoError> {
+pub fn hkdf_sha256(
+    ikm: &[u8],
+    salt: &[u8],
+    info: &[u8],
+    length: usize,
+) -> Result<Vec<u8>, CryptoError> {
     let hk = Hkdf::<Sha256>::new(Some(salt), ikm);
     let mut okm = vec![0u8; length];
     hk.expand(info, &mut okm)

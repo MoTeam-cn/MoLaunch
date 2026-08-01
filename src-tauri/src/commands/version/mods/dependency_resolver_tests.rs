@@ -24,9 +24,27 @@ fn make_version(id: &str, gv: &[&str], ml: u32, rt: ReleaseType, date: &str) -> 
 #[test]
 fn test_pick_best_version_prefers_release() {
     let versions = vec![
-        make_version("a", &["1.20.1"], ModLoaders::FORGE, ReleaseType::Alpha, "2023-01-01"),
-        make_version("b", &["1.20.1"], ModLoaders::FORGE, ReleaseType::Release, "2023-06-01"),
-        make_version("c", &["1.20.1"], ModLoaders::FORGE, ReleaseType::Beta, "2023-12-01"),
+        make_version(
+            "a",
+            &["1.20.1"],
+            ModLoaders::FORGE,
+            ReleaseType::Alpha,
+            "2023-01-01",
+        ),
+        make_version(
+            "b",
+            &["1.20.1"],
+            ModLoaders::FORGE,
+            ReleaseType::Release,
+            "2023-06-01",
+        ),
+        make_version(
+            "c",
+            &["1.20.1"],
+            ModLoaders::FORGE,
+            ReleaseType::Beta,
+            "2023-12-01",
+        ),
     ];
     let best = pick_best_version(&versions, "1.20.1", ModLoaders::FORGE);
     assert_eq!(best.unwrap().id, "b");
@@ -35,8 +53,20 @@ fn test_pick_best_version_prefers_release() {
 #[test]
 fn test_pick_best_version_filters_game_version() {
     let versions = vec![
-        make_version("a", &["1.19.2"], ModLoaders::FORGE, ReleaseType::Release, "2023-06-01"),
-        make_version("b", &["1.20.1"], ModLoaders::FORGE, ReleaseType::Release, "2023-06-01"),
+        make_version(
+            "a",
+            &["1.19.2"],
+            ModLoaders::FORGE,
+            ReleaseType::Release,
+            "2023-06-01",
+        ),
+        make_version(
+            "b",
+            &["1.20.1"],
+            ModLoaders::FORGE,
+            ReleaseType::Release,
+            "2023-06-01",
+        ),
     ];
     let best = pick_best_version(&versions, "1.20.1", ModLoaders::FORGE);
     assert_eq!(best.unwrap().id, "b");
@@ -45,8 +75,20 @@ fn test_pick_best_version_filters_game_version() {
 #[test]
 fn test_pick_best_version_filters_loader() {
     let versions = vec![
-        make_version("a", &["1.20.1"], ModLoaders::FABRIC, ReleaseType::Release, "2023-06-01"),
-        make_version("b", &["1.20.1"], ModLoaders::FORGE, ReleaseType::Release, "2023-06-01"),
+        make_version(
+            "a",
+            &["1.20.1"],
+            ModLoaders::FABRIC,
+            ReleaseType::Release,
+            "2023-06-01",
+        ),
+        make_version(
+            "b",
+            &["1.20.1"],
+            ModLoaders::FORGE,
+            ReleaseType::Release,
+            "2023-06-01",
+        ),
     ];
     let best = pick_best_version(&versions, "1.20.1", ModLoaders::FORGE);
     assert_eq!(best.unwrap().id, "b");
@@ -54,9 +96,13 @@ fn test_pick_best_version_filters_loader() {
 
 #[test]
 fn test_pick_best_version_no_compatible() {
-    let versions = vec![
-        make_version("a", &["1.19.2"], ModLoaders::FORGE, ReleaseType::Release, "2023-06-01"),
-    ];
+    let versions = vec![make_version(
+        "a",
+        &["1.19.2"],
+        ModLoaders::FORGE,
+        ReleaseType::Release,
+        "2023-06-01",
+    )];
     let best = pick_best_version(&versions, "1.20.1", ModLoaders::FORGE);
     assert!(best.is_none());
 }

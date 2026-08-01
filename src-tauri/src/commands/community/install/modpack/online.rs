@@ -39,8 +39,7 @@ pub async fn install_modpack(
     // 解析游戏目录、创建 instance_dir（提到 async block 外，便于错误时清理版本目录）
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
-    std::fs::create_dir_all(&instance_dir)
-        .map_err(|e| format!("创建整合包目录失败: {}", e))?;
+    std::fs::create_dir_all(&instance_dir).map_err(|e| format!("创建整合包目录失败: {}", e))?;
 
     let instance_dir_ref = &instance_dir;
     let result: Result<InstallModpackResult, String> = async {
@@ -64,7 +63,7 @@ pub async fn install_modpack(
 
         // 3. Stage 0：下载原始整合包
         let archive_path = instance_dir_ref.join(&req.file_name);
-        download_modpack_archive(&state, &archive_path, &req.download_url, &req.file_name).await?;
+        download_modpack_archive(state, &archive_path, &req.download_url, &req.file_name).await?;
 
         // 4. Stage 1：打开 zip + 检测格式 + 解析 manifest
         {
@@ -72,9 +71,8 @@ pub async fn install_modpack(
             ds.set_stage_status(1, StageStatus::Loading, 0.0);
         }
         // 伪进度 ticker（0→90% @5%/s），解析完成后 stop 并跳 100%
-        let parse_ticker = crate::commands::version::install::loader_helpers::start_parse_ticker(
-            state, 1,
-        );
+        let parse_ticker =
+            crate::commands::version::install::loader_helpers::start_parse_ticker(state, 1);
         let file =
             std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
         let mut archive = zip::ZipArchive::new(file)
@@ -108,7 +106,13 @@ pub async fn install_modpack(
         std::fs::create_dir_all(&mods_dir).map_err(|e| format!("创建 mods 目录失败: {}", e))?;
         let include_optional = req.include_optional.unwrap_or(true);
         shared::download_mods_by_format(
-            state, &info, &mods_dir, instance_dir_ref, 2, include_optional, false,
+            state,
+            &info,
+            &mods_dir,
+            instance_dir_ref,
+            2,
+            include_optional,
+            false,
         )
         .await?;
         {
@@ -140,7 +144,10 @@ pub async fn install_modpack(
                 file_id: file_id.clone(),
                 mc_version: info.game_version.clone(),
                 modpack_version: req.modpack_version.clone(),
-                name: req.name.clone().unwrap_or_else(|| req.instance_name.clone()),
+                name: req
+                    .name
+                    .clone()
+                    .unwrap_or_else(|| req.instance_name.clone()),
                 loader: if info.loader.is_empty() {
                     None
                 } else {

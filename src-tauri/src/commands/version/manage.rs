@@ -19,7 +19,7 @@ pub async fn fix_version_files(
     sanitize_version_id(&version_id)?;
     log_info!("Fixing version files for: {}", version_id);
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let mirror_url = {
         let config = state.config.lock().await;
         config.download.mirror_url.clone()
@@ -90,7 +90,7 @@ pub async fn rename_version(
 
     log_info!("Renaming version: {} -> {}", version_id, new_name);
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
 
     let versions_dir = game_dir.join("versions");
     let old_dir = versions_dir.join(&version_id);
@@ -165,7 +165,7 @@ pub async fn set_selected_version(
     state: &AppState,
     version_id: Option<String>,
 ) -> Result<(), String> {
-    crate::commands::system::update_config(&state, |config| {
+    crate::commands::system::update_config(state, |config| {
         config.selected_version = version_id.clone();
     })
     .await?;

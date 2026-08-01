@@ -42,10 +42,7 @@ pub async fn remove_ms_account(state: &AppState, uuid: String) -> Result<(), Str
 }
 
 /// 切换到已存储的微软账号
-pub async fn switch_ms_account(
-    state: &AppState,
-    uuid: String,
-) -> Result<LocalAuthResult, String> {
+pub async fn switch_ms_account(state: &AppState, uuid: String) -> Result<LocalAuthResult, String> {
     log_info!("Switching to Microsoft account: {}", uuid);
 
     let account = state

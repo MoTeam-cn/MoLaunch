@@ -32,23 +32,25 @@ fn embedded_text(path: &str) -> Option<&'static str> {
             Some(include_str!("../resources/samples/plugin/manifest.json"))
         }
         "samples/plugin/index.html" => Some(include_str!("../resources/samples/plugin/index.html")),
-        "samples/layout/layout-sample.json" => {
-            Some(include_str!("../resources/samples/layout/layout-sample.json"))
-        }
-        "samples/layout/layout-sample.xml" => {
-            Some(include_str!("../resources/samples/layout/layout-sample.xml"))
-        }
-        "samples/layout/layout-sample.html" => {
-            Some(include_str!("../resources/samples/layout/layout-sample.html"))
-        }
+        "samples/layout/layout-sample.json" => Some(include_str!(
+            "../resources/samples/layout/layout-sample.json"
+        )),
+        "samples/layout/layout-sample.xml" => Some(include_str!(
+            "../resources/samples/layout/layout-sample.xml"
+        )),
+        "samples/layout/layout-sample.html" => Some(include_str!(
+            "../resources/samples/layout/layout-sample.html"
+        )),
         // picker 子窗口 HTML 模板（由 picker_window URI scheme handler 读取并注入数据）
-        "templates/port-picker.html" => Some(include_str!("../resources/templates/port-picker.html")),
+        "templates/port-picker.html" => {
+            Some(include_str!("../resources/templates/port-picker.html"))
+        }
         "templates/redirect.html" => Some(include_str!("../resources/templates/redirect.html")),
         "templates/confirm.html" => Some(include_str!("../resources/templates/confirm.html")),
         "templates/info.html" => Some(include_str!("../resources/templates/info.html")),
         "templates/image-viewer.html" => {
             Some(include_str!("../resources/templates/image-viewer.html"))
-        },
+        }
         "templates/markdown.html" => Some(include_str!("../resources/templates/markdown.html")),
         "templates/qrcode.html" => Some(include_str!("../resources/templates/qrcode.html")),
         _ => None,

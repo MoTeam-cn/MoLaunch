@@ -18,7 +18,6 @@ pub async fn version_progress_manager(
     crate::utils::version_progress_manager::dispatch(state, app, req).await
 }
 
-
 /// Get download progress
 pub async fn get_download_progress(state: &AppState) -> Result<DownloadProgressSnapshot, String> {
     let ds = state.download_state.lock().unwrap();

@@ -4,8 +4,8 @@
 //! （其 redirect policy 不可覆盖），改用独立构建的 no-redirect 客户端，保留内置根证书。
 
 use super::helpers::{
-    build_url, build_vendor_client, compute_timeout, extract_host, fill_param_template, resolve_url,
-    truncate,
+    build_url, build_vendor_client, compute_timeout, extract_host, fill_param_template,
+    resolve_url, truncate,
 };
 use super::{ApiEndpoint, ApiSchema, AuthInjection, MAX_REDIRECT_HOPS, MAX_RESPONSE_SIZE};
 use crate::log_debug;
@@ -40,8 +40,8 @@ pub(super) async fn send_api_request(
         })
         .collect();
 
-    let allowed_host = extract_host(&url)
-        .ok_or_else(|| format!("无法解析 API URL 主机: {}", url))?;
+    let allowed_host =
+        extract_host(&url).ok_or_else(|| format!("无法解析 API URL 主机: {}", url))?;
 
     let mut current_url = url;
     let mut current_method = method.clone();
@@ -167,7 +167,10 @@ fn inject_auth_and_params(
                     .body_field
                     .as_ref()
                     .ok_or("auth_injection.location=body 但未提供 body_field")?;
-                body.insert(field.clone(), serde_json::Value::String(auth_value.to_string()));
+                body.insert(
+                    field.clone(),
+                    serde_json::Value::String(auth_value.to_string()),
+                );
             }
             request = request.json(&serde_json::Value::Object(body));
         }
@@ -193,10 +196,7 @@ async fn handle_response(response: reqwest::Response) -> Result<serde_json::Valu
     // 响应大小限制（Content-Length 头预检）
     if let Some(len) = response.content_length() {
         if len as usize > MAX_RESPONSE_SIZE {
-            return Err(format!(
-                "厂商 API 响应过大: {} 字节（限制 1MB）",
-                len
-            ));
+            return Err(format!("厂商 API 响应过大: {} 字节（限制 1MB）", len));
         }
     }
 
@@ -211,8 +211,8 @@ async fn handle_response(response: reqwest::Response) -> Result<serde_json::Valu
         ));
     }
 
-    let value: serde_json::Value = serde_json::from_slice(&body)
-        .map_err(|e| format!("解析厂商 API 响应 JSON 失败: {}", e))?;
+    let value: serde_json::Value =
+        serde_json::from_slice(&body).map_err(|e| format!("解析厂商 API 响应 JSON 失败: {}", e))?;
 
     Ok(value)
 }

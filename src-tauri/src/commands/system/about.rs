@@ -9,7 +9,6 @@ use crate::resources::read_resource;
 use crate::utils::markdown_table::parse_markdown_table;
 use serde::Serialize;
 
-
 /// 特别鸣谢项
 #[derive(Debug, Serialize, Clone)]
 pub struct AcknowledgementItem {
@@ -83,7 +82,6 @@ pub struct AboutData {
     pub licenses: Vec<LicenseItem>,
 }
 
-
 /// 从 HashMap 取字段，缺失返回空字符串
 fn get_field(row: &std::collections::HashMap<String, String>, key: &str) -> String {
     row.get(key).cloned().unwrap_or_default()
@@ -105,7 +103,11 @@ fn parse_authors(raw: &str) -> Vec<Author> {
                 let avatar = avatar.trim().to_string();
                 Author {
                     name,
-                    avatar: if avatar.is_empty() { None } else { Some(avatar) },
+                    avatar: if avatar.is_empty() {
+                        None
+                    } else {
+                        Some(avatar)
+                    },
                 }
             } else {
                 Author {
@@ -117,16 +119,20 @@ fn parse_authors(raw: &str) -> Vec<Author> {
         .collect()
 }
 
-
 /// 一次性返回关于页面所需的全部数据
 ///
 /// 数据源：`resources/about/` 下的 5 个 txt 文件（include_str! 嵌入二进制）
 pub async fn get_about_data() -> Result<AboutData, String> {
-    let ack_text = read_resource("about/acknowledgements.txt").map_err(log_err("Failed to read acknowledgements"))?;
-    let fe_text = read_resource("about/frontend-deps.txt").map_err(log_err("Failed to read frontend dependencies"))?;
-    let fedev_text = read_resource("about/frontend-dev-deps.txt").map_err(log_err("Failed to read frontend dev dependencies"))?;
-    let be_text = read_resource("about/backend-deps.txt").map_err(log_err("Failed to read backend dependencies"))?;
-    let lic_text = read_resource("about/licenses.txt").map_err(log_err("Failed to read licenses"))?;
+    let ack_text = read_resource("about/acknowledgements.txt")
+        .map_err(log_err("Failed to read acknowledgements"))?;
+    let fe_text = read_resource("about/frontend-deps.txt")
+        .map_err(log_err("Failed to read frontend dependencies"))?;
+    let fedev_text = read_resource("about/frontend-dev-deps.txt")
+        .map_err(log_err("Failed to read frontend dev dependencies"))?;
+    let be_text = read_resource("about/backend-deps.txt")
+        .map_err(log_err("Failed to read backend dependencies"))?;
+    let lic_text =
+        read_resource("about/licenses.txt").map_err(log_err("Failed to read licenses"))?;
 
     let acknowledgements = parse_markdown_table(&ack_text)
         .into_iter()

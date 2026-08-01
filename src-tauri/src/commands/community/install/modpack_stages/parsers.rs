@@ -27,7 +27,8 @@ pub(super) fn parse_cf(detected: &DetectedModpack) -> Result<ModpackInfo, String
     for l in &manifest.minecraft.mod_loaders {
         if l.id.starts_with("forge-") && l.id.contains("recommended") {
             return Err(
-                "该整合包版本过老（使用旧版 Forge recommended 格式），请尝试更新版本的整合包".to_string(),
+                "该整合包版本过老（使用旧版 Forge recommended 格式），请尝试更新版本的整合包"
+                    .to_string(),
             );
         }
     }
@@ -61,9 +62,8 @@ pub(super) fn parse_cf(detected: &DetectedModpack) -> Result<ModpackInfo, String
 
 /// 解析 Modrinth modrinth.index.json
 pub(super) fn parse_mr(detected: &DetectedModpack) -> Result<ModpackInfo, String> {
-    let index: MrIndex =
-        serde_json::from_str(detected.index_content.as_deref().unwrap_or(""))
-            .map_err(|e| format!("解析 modrinth.index.json 失败: {}", e))?;
+    let index: MrIndex = serde_json::from_str(detected.index_content.as_deref().unwrap_or(""))
+        .map_err(|e| format!("解析 modrinth.index.json 失败: {}", e))?;
     let gv = index
         .dependencies
         .get("minecraft")
@@ -133,9 +133,8 @@ pub(super) fn parse_hmcl(detected: &DetectedModpack) -> Result<ModpackInfo, Stri
 
 /// 解析 MMC mmc-pack.json
 pub(super) fn parse_mmc(detected: &DetectedModpack) -> Result<ModpackInfo, String> {
-    let pack: MmcPack =
-        serde_json::from_str(detected.mmc_content.as_deref().unwrap_or(""))
-            .map_err(|e| format!("解析 mmc-pack.json 失败: {}", e))?;
+    let pack: MmcPack = serde_json::from_str(detected.mmc_content.as_deref().unwrap_or(""))
+        .map_err(|e| format!("解析 mmc-pack.json 失败: {}", e))?;
     // 从 components 提取 game_version 和 loader
     let mut gv = String::new();
     let mut loader = String::new();
@@ -274,9 +273,10 @@ pub(super) fn parse_mcbbs(detected: &DetectedModpack) -> Result<ModpackInfo, Str
 
 /// LauncherPack：记录内层整合包路径，实际递归安装由 install 流程处理
 pub(super) fn parse_launcher_pack(detected: &DetectedModpack) -> Result<ModpackInfo, String> {
-    let inner_path = detected.launcher_inner_path.clone().ok_or_else(|| {
-        "LauncherPack 检测异常：未记录内层整合包路径".to_string()
-    })?;
+    let inner_path = detected
+        .launcher_inner_path
+        .clone()
+        .ok_or_else(|| "LauncherPack 检测异常：未记录内层整合包路径".to_string())?;
     log_info!(
         "[Community] LauncherPack 整合包: 内层整合包路径={}",
         inner_path

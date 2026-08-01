@@ -15,9 +15,7 @@ pub const RES_ROOT: &str = "web-common";
 
 /// 注册 `res://` 自定义 URI scheme（在 `lib.rs` 中调用）
 pub fn register_res_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
-    builder.register_uri_scheme_protocol(RES_SCHEME, |_ctx, request| {
-        handle_res_request(&request)
-    })
+    builder.register_uri_scheme_protocol(RES_SCHEME, |_ctx, request| handle_res_request(&request))
 }
 
 /// 处理 `res://` 协议请求
@@ -70,11 +68,7 @@ fn handle_res_request(request: &tauri::http::Request<Vec<u8>>) -> Response<Vec<u
                 .unwrap()
         }
         Err(e) => {
-            crate::log_warn!(
-                "[ResScheme] 资源不存在或未注册: {} ({})",
-                resource_path,
-                e
-            );
+            crate::log_warn!("[ResScheme] 资源不存在或未注册: {} ({})", resource_path, e);
             empty_response(404)
         }
     }
@@ -126,10 +120,12 @@ fn map_to_resource_path(url_path: &str) -> Option<String> {
         _ => return None,
     }
     // 拼接剩余部分
-    let remaining: PathBuf = iter.filter_map(|c| match c {
-        Component::Normal(s) => Some(s),
-        _ => None,
-    }).collect();
+    let remaining: PathBuf = iter
+        .filter_map(|c| match c {
+            Component::Normal(s) => Some(s),
+            _ => None,
+        })
+        .collect();
     remaining.to_str().map(|s| s.replace('\\', "/"))
 }
 

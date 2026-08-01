@@ -2,7 +2,7 @@
 //!
 //! `validate_and_fix_files` + `build_arguments`（委托 launch::build_launch_arguments）。
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::log_info;
 
@@ -96,7 +96,7 @@ impl LaunchPipeline {
     /// 构建启动参数
     pub(super) async fn build_arguments(
         &self,
-        java_path: &PathBuf,
+        java_path: &Path,
     ) -> Result<LaunchArguments, LaunchError> {
         // 外置登录（authlib-injector）：确保 authlib-injector.jar 已下载到缓存
         // 仅当 auth_info.server_url 有值时执行。失败不阻塞启动，

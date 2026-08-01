@@ -16,13 +16,10 @@ use super::types::ModInfo;
 /// 判断版本是否可以安装 Mod
 ///
 /// 规则：版本含 Forge/Fabric/NeoForge/LiteLoader，或个性化分类被强制为 "可安装Mod"（display_type=2）
-pub async fn is_version_modable(
-    state: &AppState,
-    version_id: String,
-) -> Result<bool, String> {
+pub async fn is_version_modable(state: &AppState, version_id: String) -> Result<bool, String> {
     sanitize_version_id(&version_id)?;
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
 
     let version_dir = game_dir.join("versions").join(&version_id);
 
@@ -69,14 +66,11 @@ pub async fn is_version_modable(
 /// - 元数据（译名、描述、版本、logo、slug）全部返回空，由 `preload_mods_detail_cmd` 后台异步补全
 /// - 排序规则：只按 `file_name`（含扩展名）字母序升序，**禁用状态不参与排序**
 ///   （按 `ModList.OrderBy(Function(m) m.File.Name)` 的方式）
-pub async fn list_mods(
-    state: &AppState,
-    version_id: String,
-) -> Result<Vec<ModInfo>, String> {
+pub async fn list_mods(state: &AppState, version_id: String) -> Result<Vec<ModInfo>, String> {
     sanitize_version_id(&version_id)?;
     log_info!("Listing mods for version: {}", version_id);
 
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
 
     if !mods_dir.exists() {
         return Ok(Vec::new());

@@ -13,7 +13,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct PluginIdParams {
@@ -85,104 +84,134 @@ struct WritePersonalizationParams {
     data: serde_json::Value,
 }
 
-
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
 
-    d.register("list_external_plugins", handler!(_state, _app, _params, {
-        let r = plugins::sandbox::list_external_plugins().await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "list_external_plugins",
+        handler!(_state, _app, _params, {
+            let r = plugins::sandbox::list_external_plugins().await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("read_external_plugin_file", handler!(_state, _app, params, {
-        let p: ReadExternalPluginFileParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = plugins::sandbox::read_external_plugin_file(p.plugin_id, p.file_path).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "read_external_plugin_file",
+        handler!(_state, _app, params, {
+            let p: ReadExternalPluginFileParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = plugins::sandbox::read_external_plugin_file(p.plugin_id, p.file_path).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("uninstall_external_plugin", handler!(_state, _app, params, {
-        let p: PluginIdParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        plugins::sandbox::uninstall_external_plugin(p.plugin_id).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "uninstall_external_plugin",
+        handler!(_state, _app, params, {
+            let p: PluginIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            plugins::sandbox::uninstall_external_plugin(p.plugin_id).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("install_external_plugin_from_dir", handler!(_state, _app, params, {
-        let p: SourceDirParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = plugins::install::install_external_plugin_from_dir(p.source_dir).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "install_external_plugin_from_dir",
+        handler!(_state, _app, params, {
+            let p: SourceDirParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = plugins::install::install_external_plugin_from_dir(p.source_dir).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("install_external_plugin_from_zip", handler!(_state, _app, params, {
-        let p: ZipPathParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = plugins::install::install_external_plugin_from_zip(p.zip_path).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "install_external_plugin_from_zip",
+        handler!(_state, _app, params, {
+            let p: ZipPathParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = plugins::install::install_external_plugin_from_zip(p.zip_path).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("plugin_spawn_process", handler!(_state, _app, params, {
-        let p: PluginSpawnProcessParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = plugins::spawn::plugin_spawn_process(
-            p.plugin_id,
-            p.command,
-            p.args,
-            p.cwd,
-        )
-        .await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "plugin_spawn_process",
+        handler!(_state, _app, params, {
+            let p: PluginSpawnProcessParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r =
+                plugins::spawn::plugin_spawn_process(p.plugin_id, p.command, p.args, p.cwd).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("plugin_create_window", handler!(_state, app, params, {
-        let p: PluginCreateWindowParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        plugins::window::plugin_create_window(
-            &app,
-            p.plugin_id,
-            p.label,
-            p.url,
-            p.title,
-            p.width,
-            p.height,
-        )
-        .await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "plugin_create_window",
+        handler!(_state, app, params, {
+            let p: PluginCreateWindowParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            plugins::window::plugin_create_window(
+                &app,
+                p.plugin_id,
+                p.label,
+                p.url,
+                p.title,
+                p.width,
+                p.height,
+            )
+            .await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("load_custom_layout", handler!(_state, _app, params, {
-        let p: LoadCustomLayoutParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = plugins::layout::load_custom_layout(p.url, p.force_refresh).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "load_custom_layout",
+        handler!(_state, _app, params, {
+            let p: LoadCustomLayoutParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = plugins::layout::load_custom_layout(p.url, p.force_refresh).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("read_layout_sample", handler!(_state, _app, params, {
-        let p: ReadLayoutSampleParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = plugins::export::read_layout_sample(p.format).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "read_layout_sample",
+        handler!(_state, _app, params, {
+            let p: ReadLayoutSampleParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = plugins::export::read_layout_sample(p.format).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("export_plugin_sample", handler!(_state, _app, params, {
-        let p: ExportPluginSampleParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        plugins::export::export_plugin_sample(p.dest_path, p.as_zip).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "export_plugin_sample",
+        handler!(_state, _app, params, {
+            let p: ExportPluginSampleParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            plugins::export::export_plugin_sample(p.dest_path, p.as_zip).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("read_personalization", handler!(_state, _app, _params, {
-        let r = plugins::personalization::read_personalization().await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "read_personalization",
+        handler!(_state, _app, _params, {
+            let r = plugins::personalization::read_personalization().await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("write_personalization", handler!(_state, _app, params, {
-        let p: WritePersonalizationParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        plugins::personalization::write_personalization(p.data).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "write_personalization",
+        handler!(_state, _app, params, {
+            let p: WritePersonalizationParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            plugins::personalization::write_personalization(p.data).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
     d
 });

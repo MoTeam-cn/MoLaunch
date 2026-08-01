@@ -23,7 +23,10 @@ pub fn save_config(params: &SaveConfigParams) -> Result<(), String> {
     let mut content = String::new();
     content.push_str("[General]\n");
     content.push_str(&format!("packName={}\n", escape_ini(&params.pack_name)));
-    content.push_str(&format!("packVersion={}\n", escape_ini(&params.pack_version)));
+    content.push_str(&format!(
+        "packVersion={}\n",
+        escape_ini(&params.pack_version)
+    ));
     content.push_str(&format!(
         "checkHostedAssets={}\n",
         params.check_hosted_assets
@@ -43,11 +46,7 @@ pub fn save_config(params: &SaveConfigParams) -> Result<(), String> {
         if !opt.visible {
             continue;
         }
-        content.push_str(&format!(
-            "{}={}\n",
-            escape_ini(&opt.id),
-            opt.checked
-        ));
+        content.push_str(&format!("{}={}\n", escape_ini(&opt.id), opt.checked));
     }
 
     std::fs::write(config_path, content)

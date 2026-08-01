@@ -4,15 +4,15 @@
 //! Tauri 命令已聚合为 `version_mods_manager` 一个 IPC 入口通过 `action` 字段分发；子模块
 //! 函数去 `#[tauri::command]` 标注改收 `&AppState`/`&AppHandle`，由 dispatch 反序列化参数后调用。
 
+pub mod dependency_resolver;
 pub(crate) mod helpers;
 pub mod install;
 pub mod list;
-mod metadata;
 pub mod manage;
+mod metadata;
 mod types;
 pub mod update;
 pub mod watcher;
-pub mod dependency_resolver;
 
 use crate::state::AppState;
 use crate::utils::dispatcher::ActionRequest;

@@ -27,10 +27,8 @@ pub(super) fn has_library(json: &serde_json::Value, lib_name: &str) -> bool {
             if let Some(name) = lib["name"].as_str() {
                 if name == lib_name {
                     // 还需通过 rules 校验（平台适配）
-                    let rules: Option<Vec<serde_json::Value>> = lib
-                        .get("rules")
-                        .and_then(|v| v.as_array())
-                        .map(|a| a.clone());
+                    let rules: Option<Vec<serde_json::Value>> =
+                        lib.get("rules").and_then(|v| v.as_array()).cloned();
                     if crate::minecraft::version::libraries::check_rules(&rules) {
                         return true;
                     }

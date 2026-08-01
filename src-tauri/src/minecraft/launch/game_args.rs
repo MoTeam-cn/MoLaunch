@@ -6,6 +6,7 @@ use std::path::Path;
 
 use super::AuthInfo;
 
+#[allow(clippy::too_many_arguments)]
 /// Build game arguments
 ///
 /// `custom_info`：版本独立自定义信息
@@ -46,10 +47,7 @@ pub(super) fn build_game_args(
                         None
                     }
                 });
-                let rules = obj
-                    .get("rules")
-                    .and_then(|r| r.as_array())
-                    .map(|a| a.clone());
+                let rules = obj.get("rules").and_then(|r| r.as_array()).cloned();
                 match value {
                     Some(v) => (v, rules),
                     None => continue,

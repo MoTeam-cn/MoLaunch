@@ -35,7 +35,7 @@ fn test_acquire_empty_bucket() {
 #[test]
 fn test_wait_time_ms_calculation() {
     let limiter = RateLimiter::new(1000); // 1000 bytes/sec
-    // 耗尽令牌（500）
+                                          // 耗尽令牌（500）
     let mut limiter = limiter;
     limiter.acquire(500);
     // 请求 1000 字节，缺 1000，需等待 1000ms
@@ -62,5 +62,9 @@ fn test_refill_after_time() {
     // 50ms 后应补充约 50 字节（1000 bytes/sec * 0.05s = 50）
     let granted = limiter.acquire(100);
     // 由于时间精度，granted 应在 40-60 范围内（允许误差）
-    assert!(granted >= 40 && granted <= 60, "granted={} 应在 40-60 范围内", granted);
+    assert!(
+        granted >= 40 && granted <= 60,
+        "granted={} 应在 40-60 范围内",
+        granted
+    );
 }

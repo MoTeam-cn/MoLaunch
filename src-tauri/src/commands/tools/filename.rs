@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use reqwest::header::{CONTENT_DISPOSITION, CONTENT_LENGTH, RANGE};
 
-use crate::http::get_client;
 use crate::commands::tools::types::{FetchFilenameParams, FetchFilenameResult};
+use crate::http::get_client;
 
 /// 从 URL 获取文件名（与可选的文件大小）
 pub async fn fetch_filename(params: FetchFilenameParams) -> Result<serde_json::Value, String> {
@@ -39,7 +39,11 @@ pub async fn fetch_filename(params: FetchFilenameParams) -> Result<serde_json::V
 
     let (filename, file_size) = match head_result {
         Ok(resp) => {
-            let cd = resp.headers().get(CONTENT_DISPOSITION).and_then(|v| v.to_str().ok()).map(|s| s.to_string());
+            let cd = resp
+                .headers()
+                .get(CONTENT_DISPOSITION)
+                .and_then(|v| v.to_str().ok())
+                .map(|s| s.to_string());
             let len = parse_content_length(resp.headers().get(CONTENT_LENGTH));
             match cd.as_deref() {
                 Some(cd_str) => {
@@ -105,7 +109,7 @@ fn parse_content_length(header: Option<&reqwest::header::HeaderValue>) -> Option
 fn parse_content_disposition(cd: &str) -> Option<String> {
     // 1. 优先 RFC 5987 格式：filename*=UTF-8''xxx（或 charset''xxx）
     //    分号或逗号分隔的多个参数中查找
-    for part in cd.split(|c| c == ';' || c == ',') {
+    for part in cd.split([';', ',']) {
         let part = part.trim();
         if let Some(rest) = part.strip_prefix("filename*") {
             let rest = rest.trim_start_matches(|c: char| c.is_whitespace() || c == '=');
@@ -125,7 +129,7 @@ fn parse_content_disposition(cd: &str) -> Option<String> {
     }
 
     // 2. 普通 filename="xxx" 或 filename=xxx
-    for part in cd.split(|c| c == ';' || c == ',') {
+    for part in cd.split([';', ',']) {
         let part = part.trim();
         if let Some(rest) = part.strip_prefix("filename") {
             let rest = rest.trim_start();
@@ -155,11 +159,7 @@ fn extract_filename_from_url(url: &str) -> String {
     // 去掉 query 和 fragment
     let no_query = url.split(['?', '#']).next().unwrap_or(url);
     // 取路径最后一段
-    let last_segment = no_query
-        .rsplit(['/', '\\'])
-        .next()
-        .unwrap_or("")
-        .trim();
+    let last_segment = no_query.rsplit(['/', '\\']).next().unwrap_or("").trim();
     if last_segment.is_empty() {
         return String::new();
     }

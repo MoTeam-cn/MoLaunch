@@ -33,6 +33,7 @@ pub struct ChunkDownloadResult {
     pub error: Option<String>,
 }
 
+#[allow(clippy::too_many_arguments)]
 /// 分片下载单个文件
 ///
 /// - `file_size` 为 0 时会自动探测（GET + Range:bytes=0-0，通过 Content-Range 拿总大小）

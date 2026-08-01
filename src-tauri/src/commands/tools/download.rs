@@ -40,8 +40,7 @@ pub async fn download_file(
 
     // 解析下载目录：优先使用 config 中的自定义目录，否则用默认 .Molaunch/Download/
     let download_dir = resolve_external_download_dir(state).await;
-    std::fs::create_dir_all(&download_dir)
-        .map_err(|e| format!("创建下载目录失败: {}", e))?;
+    std::fs::create_dir_all(&download_dir).map_err(|e| format!("创建下载目录失败: {}", e))?;
     let save_path: PathBuf = download_dir.join(&file_name);
 
     log_info!(
@@ -184,7 +183,7 @@ pub async fn delete_download(
     }
     std::fs::remove_file(&path).map_err(|e| format!("删除文件失败: {}", e))?;
     log_info!("[ExternalDownload] 已删除: {}", params.file_name);
-    serde_json::to_value(&()).map_err(|e| e.to_string())
+    serde_json::to_value(()).map_err(|e| e.to_string())
 }
 
 /// 判断文件名是否为分片下载的临时分片文件（形如 `xxx.part0` / `xxx.part1` / ... / `xxx.partN`）
@@ -198,6 +197,6 @@ fn is_chunk_part_file(name: &str) -> bool {
         return false;
     };
     let suffix = &name[part_idx + 5..]; // ".part" 之后的部分
-    // 后缀必须全部为数字（如 "0" / "12"），且非空
+                                        // 后缀必须全部为数字（如 "0" / "12"），且非空
     !suffix.is_empty() && suffix.chars().all(|c| c.is_ascii_digit())
 }

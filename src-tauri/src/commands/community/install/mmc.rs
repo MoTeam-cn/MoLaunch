@@ -130,7 +130,11 @@ pub(super) fn parse_instance_cfg(content: &str) -> MmcInstanceCfg {
 /// 变量替换：`\"`→`"`；`$INST_JAVA`→`javaw`（启动时系统 PATH 解析）；
 /// `$INST_MC_DIR`/`$INST_DIR`（带或不带 `\`）→ instance_dir 实际路径；
 /// `$INST_ID`/`$INST_NAME` → 实例名。启动直接执行 cmd /C，迁移时替换为实际路径。
-pub(super) fn substitute_pre_launch_vars(cmd: &str, instance_dir: &std::path::Path, instance_name: &str) -> String {
+pub(super) fn substitute_pre_launch_vars(
+    cmd: &str,
+    instance_dir: &std::path::Path,
+    instance_name: &str,
+) -> String {
     let instance_path = instance_dir.to_string_lossy().to_string();
     // 反斜杠路径（Windows 习惯）
     let instance_path_win = instance_path.replace('/', "\\");

@@ -174,7 +174,10 @@ pub async fn check_mod_dependencies(
         up_to_date.len()
     );
 
-    Ok(DependencyCheckResult { missing, up_to_date })
+    Ok(DependencyCheckResult {
+        missing,
+        up_to_date,
+    })
 }
 
 /// 扫描 mods 目录，读取所有 jar 的 slug 集合
@@ -223,10 +226,7 @@ fn is_project_installed(project: &ResourceProject, installed_slugs: &HashSet<Str
 }
 
 /// 按平台查项目详情
-async fn get_project_by_platform(
-    platform: Platform,
-    id: &str,
-) -> Result<ResourceProject, String> {
+async fn get_project_by_platform(platform: Platform, id: &str) -> Result<ResourceProject, String> {
     match platform {
         Platform::Modrinth => modrinth::get_project(id, ResourceType::Mod).await,
         Platform::CurseForge => curseforge::get_project(id, ResourceType::Mod).await,

@@ -12,6 +12,7 @@ use futures_util::StreamExt;
 use super::super::rate_limiter::RateLimiter;
 use super::super::types::GlobalProgress;
 
+#[allow(clippy::too_many_arguments)]
 /// 从单个 URL 下载（支持限速和动态超时，实时更新进度）
 ///
 /// 超时策略（与 chunk 下载一致，避免大文件被整体超时误杀）：
@@ -76,15 +77,16 @@ pub(super) async fn download_from_url(
 
     // 回滚已增量加到 progress 的字节数和 total_bytes（downloaded>0 或 total_size>0 时才需要）
     // 失败时回滚 total 避免 download_single 的 3 次重试导致 total 翻倍
-    let rollback_progress = move |downloaded: u64, progress: &Option<Arc<StdMutex<GlobalProgress>>>| {
-        if downloaded > 0 || total_size > 0 {
-            if let Some(ref p) = progress {
-                let mut p = p.lock().unwrap();
-                p.downloaded_bytes = p.downloaded_bytes.saturating_sub(downloaded);
-                p.total_bytes = p.total_bytes.saturating_sub(total_size);
+    let rollback_progress =
+        move |downloaded: u64, progress: &Option<Arc<StdMutex<GlobalProgress>>>| {
+            if downloaded > 0 || total_size > 0 {
+                if let Some(ref p) = progress {
+                    let mut p = p.lock().unwrap();
+                    p.downloaded_bytes = p.downloaded_bytes.saturating_sub(downloaded);
+                    p.total_bytes = p.total_bytes.saturating_sub(total_size);
+                }
             }
-        }
-    };
+        };
 
     // body 读取阶段：无数据流动 15s 才报错（与 chunk 下载一致）
     // 这样大文件慢速网络不会被整体超时误杀，只有真断流才会失败
@@ -111,11 +113,9 @@ pub(super) async fn download_from_url(
             }
         }
 
-        let next_chunk = tokio::time::timeout(
-            Duration::from_secs(STREAM_IDLE_TIMEOUT_SECS),
-            stream.next(),
-        )
-        .await;
+        let next_chunk =
+            tokio::time::timeout(Duration::from_secs(STREAM_IDLE_TIMEOUT_SECS), stream.next())
+                .await;
         let chunk = match next_chunk {
             Err(_elapsed) => {
                 rollback_progress(downloaded, &progress);

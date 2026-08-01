@@ -211,7 +211,11 @@ impl AuthStorage {
                     "authlib 登录响应缺少 selected_profile，请先调用 refresh_with_profile 选定角色"
                         .to_string()
                 })?;
-                (resp.access_token.clone(), resp.client_token.clone(), profile)
+                (
+                    resp.access_token.clone(),
+                    resp.client_token.clone(),
+                    profile,
+                )
             }
             LoginOutcome::NeedSelect { .. } => {
                 return Err("需要先选择角色才能保存登录".to_string());
@@ -263,11 +267,7 @@ impl AuthStorage {
     /// 删除指定 authlib 账号
     ///
     /// `server_url` + `uuid` 联合定位账号（同一 UUID 在不同服务器是不同账号）。
-    pub async fn remove_authlib_account(
-        &self,
-        server_url: &str,
-        uuid: &str,
-    ) -> Result<(), String> {
+    pub async fn remove_authlib_account(&self, server_url: &str, uuid: &str) -> Result<(), String> {
         let mut state = self.load().await.unwrap_or_default();
         state
             .authlib_accounts

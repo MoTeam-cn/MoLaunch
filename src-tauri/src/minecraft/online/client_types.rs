@@ -48,8 +48,8 @@ impl JwkKey {
         let e_bytes = b64u_decode(&self.e)?;
         let n = BigUint::from_bytes_be(&n_bytes);
         let e = BigUint::from_bytes_be(&e_bytes);
-        let pub_key = RsaPublicKey::new(n, e)
-            .map_err(|e| ClientError::RsaRebuildFailed(e.to_string()))?;
+        let pub_key =
+            RsaPublicKey::new(n, e).map_err(|e| ClientError::RsaRebuildFailed(e.to_string()))?;
         pub_key
             .to_public_key_pem(rsa::pkcs8::LineEnding::LF)
             .map_err(|e| ClientError::RsaRebuildFailed(e.to_string()))

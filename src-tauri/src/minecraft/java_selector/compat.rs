@@ -48,11 +48,11 @@ pub fn check_java_compatible(
 /// 筛选满足 MinVer/MaxVer 双向约束的 Java 列表
 ///
 /// 返回候选 Java 引用列表（保留原始顺序）。
-pub fn filter_compatible_javas<'a>(
-    java_list: &'a [JavaRuntime],
+pub fn filter_compatible_javas(
+    java_list: &[JavaRuntime],
     min_req: Option<u32>,
     max_req: Option<u32>,
-) -> Vec<&'a JavaRuntime> {
+) -> Vec<&JavaRuntime> {
     java_list
         .iter()
         .filter(|j| {

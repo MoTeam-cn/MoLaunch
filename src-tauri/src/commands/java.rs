@@ -71,7 +71,6 @@ pub async fn java_manager(
     crate::utils::java_manager::dispatch(state, app, req).await
 }
 
-
 /// 检测 Java
 pub async fn detect_java(_state: &AppState) -> Result<JavaRuntimeInfo, String> {
     log_info!("Detecting Java...");

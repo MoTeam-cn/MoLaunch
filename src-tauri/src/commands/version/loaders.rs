@@ -15,7 +15,7 @@ pub async fn list_forge_versions(
     state: &AppState,
     mc_version: String,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(state).await;
 
     let versions = loaders::list_forge_versions(&mc_version, mirror_url.as_deref(), source_mode)
         .await
@@ -42,7 +42,7 @@ pub async fn list_neoforge_versions(
     state: &AppState,
     mc_version: String,
 ) -> Result<Vec<serde_json::Value>, String> {
-    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(state).await;
 
     let versions = loaders::list_neoforge_versions(&mc_version, mirror_url.as_deref(), source_mode)
         .await
@@ -66,7 +66,7 @@ pub async fn list_neoforge_versions(
 
 /// List Fabric versions
 pub async fn list_fabric_versions(state: &AppState) -> Result<serde_json::Value, String> {
-    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(state).await;
 
     let versions = loaders::list_fabric_versions(mirror_url.as_deref(), source_mode)
         .await
@@ -80,7 +80,7 @@ pub async fn list_fabric_versions(state: &AppState) -> Result<serde_json::Value,
 
 /// List OptiFine versions
 pub async fn list_optifine_versions(state: &AppState) -> Result<Vec<serde_json::Value>, String> {
-    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(state).await;
 
     let versions = loaders::list_optifine_versions(mirror_url.as_deref(), source_mode)
         .await
@@ -106,7 +106,7 @@ pub async fn list_liteloader_versions(
     state: &AppState,
     mc_version: String,
 ) -> Result<Vec<String>, String> {
-    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(&state).await;
+    let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(state).await;
 
     let versions =
         loaders::list_liteloader_versions(&mc_version, mirror_url.as_deref(), source_mode)
@@ -161,9 +161,9 @@ pub async fn install_fabric_api_for_version(
 ) -> Result<(), String> {
     use crate::commands::version::mods::helpers::get_mods_dir;
 
-    let config = DownloadManagerConfig::from_state_for_meta(&state).await;
+    let config = DownloadManagerConfig::from_state_for_meta(state).await;
 
-    let mods_dir: std::path::PathBuf = get_mods_dir(&state, &version_id).await?;
+    let mods_dir: std::path::PathBuf = get_mods_dir(state, &version_id).await?;
 
     crate::log_info!(
         "[FabricAPI] 为版本 {} 安装 Fabric API: {}",

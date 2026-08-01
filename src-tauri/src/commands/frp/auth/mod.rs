@@ -171,7 +171,10 @@ pub async fn start_oauth2(state: &AppState, provider_id: &str) -> Result<OAuth2R
 ///
 /// 流程：POST deviceCodeUrl 获取设备码 → 返回用户码 + 验证链接 + 倒计时 →
 /// 将 device_code 存入内存会话（供 poll_device_code 使用）。
-pub async fn start_device_code(state: &AppState, provider_id: &str) -> Result<DeviceCodeResult, String> {
+pub async fn start_device_code(
+    state: &AppState,
+    provider_id: &str,
+) -> Result<DeviceCodeResult, String> {
     device_code::start_device_code(state, provider_id).await
 }
 
@@ -179,7 +182,10 @@ pub async fn start_device_code(state: &AppState, provider_id: &str) -> Result<De
 ///
 /// 前端按 interval 调用，后端用 device_code 向 tokenUrl 发起请求：
 /// pending → 继续轮询；success → 存储 token；expired/declined → 终止；slow_down → 增大间隔。
-pub async fn poll_device_code(state: &AppState, provider_id: &str) -> Result<DeviceCodePollResult, String> {
+pub async fn poll_device_code(
+    state: &AppState,
+    provider_id: &str,
+) -> Result<DeviceCodePollResult, String> {
     device_code::poll_device_code(state, provider_id).await
 }
 

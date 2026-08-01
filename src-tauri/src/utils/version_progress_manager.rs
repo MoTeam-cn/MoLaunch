@@ -12,39 +12,56 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
 
-    d.register("get_download_progress", handler!(state, _app, _params, {
-        let r = progress::get_download_progress(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_download_progress",
+        handler!(state, _app, _params, {
+            let r = progress::get_download_progress(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("is_downloading", handler!(state, _app, _params, {
-        let r = progress::is_downloading(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "is_downloading",
+        handler!(state, _app, _params, {
+            let r = progress::is_downloading(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("reset_download_progress", handler!(state, _app, _params, {
-        progress::reset_download_progress(&state).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "reset_download_progress",
+        handler!(state, _app, _params, {
+            progress::reset_download_progress(&state).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("cancel_download", handler!(state, _app, _params, {
-        progress::cancel_download(&state).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "cancel_download",
+        handler!(state, _app, _params, {
+            progress::cancel_download(&state).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("pause_download", handler!(state, _app, _params, {
-        progress::pause_download(&state).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "pause_download",
+        handler!(state, _app, _params, {
+            progress::pause_download(&state).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("resume_download", handler!(state, _app, _params, {
-        progress::resume_download(&state).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "resume_download",
+        handler!(state, _app, _params, {
+            progress::resume_download(&state).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
     d
 });

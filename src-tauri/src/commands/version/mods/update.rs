@@ -4,8 +4,8 @@
 //! 原子性保证：下载失败时不删旧文件，下载成功才删旧文件。进度通过 `DownloadSession` 统一推送。
 
 use crate::log_info;
-use crate::minecraft::download::DownloadSession;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
+use crate::minecraft::download::DownloadSession;
 use crate::state::AppState;
 
 use super::super::sanitize_version_id;
@@ -38,10 +38,9 @@ pub async fn update_mod(
         download_url
     );
 
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
     if !mods_dir.exists() {
-        std::fs::create_dir_all(&mods_dir)
-            .map_err(|e| format!("创建 mods 目录失败: {}", e))?;
+        std::fs::create_dir_all(&mods_dir).map_err(|e| format!("创建 mods 目录失败: {}", e))?;
     }
 
     let target_path = mods_dir.join(&new_file_name);
@@ -111,7 +110,9 @@ pub async fn update_mod(
     log_info!(
         "[Mods] mod 更新完成: {} ({} bytes)",
         new_file_name,
-        std::fs::metadata(&target_path).map(|m| m.len()).unwrap_or(0)
+        std::fs::metadata(&target_path)
+            .map(|m| m.len())
+            .unwrap_or(0)
     );
 
     Ok(())

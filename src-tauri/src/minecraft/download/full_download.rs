@@ -28,6 +28,9 @@ pub struct VersionDownloadResult {
     pub assets_skipped: usize,
 }
 
+/// 阶段回调类型（stage_index, stage_name）
+type StageCallback = Arc<dyn Fn(usize, &str) + Send + Sync>;
+
 /// 完整版本下载
 ///
 /// 改造：参数收敛为 `state`，内部用 `DownloadManager::from_state` 统一构造，
@@ -40,7 +43,7 @@ pub async fn download_version_full(
     mirror_url: Option<&str>,
     source_mode: DownloadSourceMode,
     progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
-    stage_callback: Option<Arc<dyn Fn(usize, &str) + Send + Sync>>,
+    stage_callback: Option<StageCallback>,
 ) -> anyhow::Result<VersionDownloadResult> {
     let version_dir = game_dir.join("versions").join(version_id);
     std::fs::create_dir_all(&version_dir)?;

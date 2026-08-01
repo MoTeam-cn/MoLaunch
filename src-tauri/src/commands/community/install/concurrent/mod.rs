@@ -97,10 +97,7 @@ pub(super) async fn download_files_concurrent(
 
     if !errors.is_empty() {
         if is_cancelled {
-            log_info!(
-                "[Community] 下载已取消，{} 个文件未完成",
-                errors.len()
-            );
+            log_info!("[Community] 下载已取消，{} 个文件未完成", errors.len());
             return Err("下载已取消".to_string());
         }
         log_info!("[Community] 共 {} 个文件下载失败：", errors.len());

@@ -10,10 +10,7 @@ use crate::minecraft::auth;
 use crate::state::{AppState, LocalAuthResult};
 
 /// 离线登录
-pub async fn login_offline(
-    state: &AppState,
-    username: String,
-) -> Result<LocalAuthResult, String> {
+pub async fn login_offline(state: &AppState, username: String) -> Result<LocalAuthResult, String> {
     log_info!("Offline login attempt for user: {}", username);
 
     if !auth::validate_username(&username) {

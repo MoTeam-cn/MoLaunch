@@ -3,7 +3,7 @@
 //! service=`frp:<provider_id>`，username=`access_token` / `refresh_token` /
 //! `expires_at` / `scopes`。token 过期前 5 分钟自动刷新由调用方负责。
 
-use super::super::{AuthConfig, ApiKeyConfig, DeviceCodeConfig, OAuth2Config};
+use super::super::{ApiKeyConfig, AuthConfig, DeviceCodeConfig, OAuth2Config};
 use crate::log_error;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -24,7 +24,11 @@ pub(super) const KEY_SCOPES: &str = "scopes";
 fn keyring_entry(provider_id: &str, key: &str) -> Result<keyring::Entry, String> {
     let service = format!("frp:{}", provider_id);
     keyring::Entry::new(&service, key).map_err(|e| {
-        log_error!("[Frp Auth] keyring 不可用 (provider={}): {}", provider_id, e);
+        log_error!(
+            "[Frp Auth] keyring 不可用 (provider={}): {}",
+            provider_id,
+            e
+        );
         format!("OS 密钥存储不可用: {}", e)
     })
 }
@@ -33,7 +37,12 @@ fn keyring_entry(provider_id: &str, key: &str) -> Result<keyring::Entry, String>
 pub(super) fn store_secret(provider_id: &str, key: &str, value: &str) -> Result<(), String> {
     let entry = keyring_entry(provider_id, key)?;
     entry.set_password(value).map_err(|e| {
-        log_error!("[Frp Auth] 存储密钥失败 (provider={}, key={}): {}", provider_id, key, e);
+        log_error!(
+            "[Frp Auth] 存储密钥失败 (provider={}, key={}): {}",
+            provider_id,
+            key,
+            e
+        );
         format!("存储密钥失败: {}", e)
     })
 }
@@ -45,7 +54,12 @@ pub(super) fn load_secret(provider_id: &str, key: &str) -> Result<Option<String>
         Ok(v) => Ok(Some(v)),
         Err(keyring::Error::NoEntry) => Ok(None),
         Err(e) => {
-            log_error!("[Frp Auth] 读取密钥失败 (provider={}, key={}): {}", provider_id, key, e);
+            log_error!(
+                "[Frp Auth] 读取密钥失败 (provider={}, key={}): {}",
+                provider_id,
+                key,
+                e
+            );
             Err(format!("OS 密钥存储不可用: {}", e))
         }
     }
@@ -91,7 +105,10 @@ pub(super) fn store_token_info(
 /// 读取 token 过期时间（Unix 秒）
 pub(super) fn load_expires_at(provider_id: &str) -> Result<Option<u64>, String> {
     match load_secret(provider_id, KEY_EXPIRES_AT)? {
-        Some(s) => s.parse::<u64>().map(Some).map_err(|e| format!("解析过期时间失败: {}", e)),
+        Some(s) => s
+            .parse::<u64>()
+            .map(Some)
+            .map_err(|e| format!("解析过期时间失败: {}", e)),
         None => Ok(None),
     }
 }
@@ -113,7 +130,10 @@ pub(super) fn load_scopes(provider_id: &str) -> Result<Option<Vec<String>>, Stri
 // ============================================================
 
 /// 获取 OAuth2Config（不存在则报错）
-pub(super) fn require_oauth2_config<'a>(auth: &'a AuthConfig, provider_id: &str) -> Result<&'a OAuth2Config, String> {
+pub(super) fn require_oauth2_config<'a>(
+    auth: &'a AuthConfig,
+    provider_id: &str,
+) -> Result<&'a OAuth2Config, String> {
     auth.oauth2
         .as_ref()
         .ok_or_else(|| format!("厂商 {} 的 manifest 缺少 auth.oauth2 配置", provider_id))
@@ -124,14 +144,20 @@ pub(super) fn require_device_code_config<'a>(
     auth: &'a AuthConfig,
     provider_id: &str,
 ) -> Result<&'a DeviceCodeConfig, String> {
-    auth.device_code
-        .as_ref()
-        .ok_or_else(|| format!("厂商 {} 的 manifest 缺少 auth.device_code 配置", provider_id))
+    auth.device_code.as_ref().ok_or_else(|| {
+        format!(
+            "厂商 {} 的 manifest 缺少 auth.device_code 配置",
+            provider_id
+        )
+    })
 }
 
 /// 获取 ApiKeyConfig（不存在则报错）
 #[allow(dead_code)]
-pub(super) fn require_api_key_config<'a>(auth: &'a AuthConfig, provider_id: &str) -> Result<&'a ApiKeyConfig, String> {
+pub(super) fn require_api_key_config<'a>(
+    auth: &'a AuthConfig,
+    provider_id: &str,
+) -> Result<&'a ApiKeyConfig, String> {
     auth.api_key
         .as_ref()
         .ok_or_else(|| format!("厂商 {} 的 manifest 缺少 auth.api_key 配置", provider_id))

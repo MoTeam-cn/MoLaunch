@@ -9,6 +9,7 @@ use crate::{log_info, log_warn};
 
 use super::{parse_server_enter, resolve_game_language};
 
+#[allow(clippy::too_many_arguments)]
 /// 构建启动配置
 ///
 /// 从全局配置 + 版本独立设置 + 前端入参解析出完整的 LaunchConfig。
@@ -90,15 +91,16 @@ pub(super) async fn build_launch_config(
     // - setup.java.memory_mode = Some("auto") → 根据系统内存动态计算（版本独立自动）
     // - setup.java.memory_mode = Some("custom") → 使用 setup.java.min_memory/max_memory
     // - None / 空 / 其他 → 回退到全局 config.memory.min/max_memory
-    let (resolved_min_mem, resolved_max_mem) = match setup.java.memory_mode.as_deref().filter(|s| !s.is_empty()) {
-        Some("auto") => crate::minecraft::system::suggest_memory(),
-        Some("custom") => {
-            let max = setup.java.max_memory.unwrap_or(config.memory.max);
-            let min = setup.java.min_memory.unwrap_or_else(|| max / 2);
-            (min, max)
-        }
-        _ => (config.memory.min, config.memory.max),
-    };
+    let (resolved_min_mem, resolved_max_mem) =
+        match setup.java.memory_mode.as_deref().filter(|s| !s.is_empty()) {
+            Some("auto") => crate::minecraft::system::suggest_memory(),
+            Some("custom") => {
+                let max = setup.java.max_memory.unwrap_or(config.memory.max);
+                let min = setup.java.min_memory.unwrap_or(max / 2);
+                (min, max)
+            }
+            _ => (config.memory.min, config.memory.max),
+        };
 
     // 构建认证信息
     let login_type_str = login_type.unwrap_or_else(|| "Legacy".to_string());
@@ -164,8 +166,10 @@ pub(super) async fn build_launch_config(
                                 "Alex" | "Ari" | "Efe" | "Makena" | "Noor" | "Sunny" | "Zuri"
                             )
                         };
-                        let adjusted_uuid =
-                            crate::minecraft::auth::adjust_uuid_for_skin_variant(&auth_info.uuid, slim);
+                        let adjusted_uuid = crate::minecraft::auth::adjust_uuid_for_skin_variant(
+                            &auth_info.uuid,
+                            slim,
+                        );
                         if adjusted_uuid != auth_info.uuid {
                             log_info!(
                                 "离线皮肤 UUID 调整: {} -> {} (skin={}, slim={})",
@@ -249,8 +253,10 @@ pub(super) async fn build_launch_config(
         extra_game_args,
         pre_launch_cmd,
         // 启动高级选项：版本独立覆盖全局（两者都未禁用才启用）
-        disable_jlw: config.launch_advanced.disable_jlw || setup.advanced.disable_jlw.unwrap_or(false),
-        disable_lua: config.launch_advanced.disable_lua || setup.advanced.disable_lua.unwrap_or(false),
+        disable_jlw: config.launch_advanced.disable_jlw
+            || setup.advanced.disable_jlw.unwrap_or(false),
+        disable_lua: config.launch_advanced.disable_lua
+            || setup.advanced.disable_lua.unwrap_or(false),
         // 忽略 Java 兼容性警告（仅版本独立设置，custom 模式下跳过兼容性校验）
         ignore_java_warning: setup.advanced.ignore_java_warning.unwrap_or(false),
         // 关闭文件校验（仅版本独立设置，跳过 libraries/assets/主 jar 文件校验和补全）

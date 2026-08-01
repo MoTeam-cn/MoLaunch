@@ -6,8 +6,8 @@ mod migrate;
 mod parsers;
 
 use crate::log_info;
-use crate::minecraft::download::DownloadSession;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
+use crate::minecraft::download::DownloadSession;
 use crate::state::{AppState, StageStatus};
 use crate::utils::format;
 
@@ -67,7 +67,9 @@ pub(super) async fn download_modpack_archive(
         return Err(msg);
     }
 
-    let archive_size = std::fs::metadata(archive_path).map(|m| m.len()).unwrap_or(0);
+    let archive_size = std::fs::metadata(archive_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
 
     {
         let mut ds = state.download_state.lock().unwrap();
@@ -183,8 +185,7 @@ pub(super) fn copy_external_logo(
     }
 
     let logo_dir = instance_dir.join("MoLaunch");
-    std::fs::create_dir_all(&logo_dir)
-        .map_err(|e| format!("创建 MoLaunch 目录失败: {}", e))?;
+    std::fs::create_dir_all(&logo_dir).map_err(|e| format!("创建 MoLaunch 目录失败: {}", e))?;
     let dest = logo_dir.join("Logo.png");
 
     std::fs::copy(src, &dest)

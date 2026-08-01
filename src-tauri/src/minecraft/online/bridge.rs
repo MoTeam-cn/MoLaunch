@@ -7,9 +7,9 @@
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::{log_debug, log_error, log_info, log_warn};
 use crate::minecraft::online::protocol::{self, Message};
 use crate::minecraft::online::tun::VirtualNet;
+use crate::{log_debug, log_error, log_info, log_warn};
 
 /// 桥接事件名：后端从 TUN 读到包，发给前端通过 DataChannel 发送
 pub const EVENT_TUN_PACKET_OUT: &str = "online://tun-packet-out";
@@ -70,10 +70,7 @@ impl VirtualLanBridge {
                     Some(p)
                 }
                 Err(e) => {
-                    log_warn!(
-                        "[Online] 释放 wintun.dll 失败: {}, 回退到默认 DLL 搜索",
-                        e
-                    );
+                    log_warn!("[Online] 释放 wintun.dll 失败: {}, 回退到默认 DLL 搜索", e);
                     None
                 }
             }
@@ -197,7 +194,11 @@ impl VirtualLanBridge {
                 );
                 Ok(Some(payload))
             }
-            Message::Control { seq, subtype, payload } => {
+            Message::Control {
+                seq,
+                subtype,
+                payload,
+            } => {
                 log_debug!(
                     "[Online] DataChannel 控制消息: seq={}, subtype={:?}, len={}",
                     seq,

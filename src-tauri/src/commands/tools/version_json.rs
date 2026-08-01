@@ -1,6 +1,7 @@
 //! 版本 JSON 读写
 //! - `read`：读取 `{game_dir}/versions/{version_id}/{version_id}.json`
 //! - `save`：先校验内容为合法 JSON，校验通过后写回文件
+//!
 //! 路径安全：version_id 不允许含 ".." 或路径分隔符，防穿越。
 
 use std::path::Path;
@@ -8,8 +9,8 @@ use std::path::Path;
 use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
-use crate::state::AppState;
 use crate::state::resolve_game_dir;
+use crate::state::AppState;
 
 use super::types::{
     VersionJsonReadParams, VersionJsonReadResult, VersionJsonSaveParams, VersionJsonSaveResult,
@@ -48,32 +49,27 @@ pub async fn read(
     log_info!("[VersionJson] 读取: {}", json_path.display());
 
     if !json_path.exists() {
-        log_warn!(
-            "[VersionJson] 文件不存在: {}",
-            json_path.display()
-        );
-        return Err(format!(
-            "版本 JSON 文件不存在: {}",
-            json_path.display()
-        ));
+        log_warn!("[VersionJson] 文件不存在: {}", json_path.display());
+        return Err(format!("版本 JSON 文件不存在: {}", json_path.display()));
     }
 
     let json_path_clone = json_path.clone();
-    let (content, path_str) = tokio::task::spawn_blocking(
-        move || -> Result<(String, String), String> {
-            let content =
-                std::fs::read_to_string(&json_path_clone)
-                    .map_err(|e| format!("读取文件失败: {}", e))?;
+    let (content, path_str) =
+        tokio::task::spawn_blocking(move || -> Result<(String, String), String> {
+            let content = std::fs::read_to_string(&json_path_clone)
+                .map_err(|e| format!("读取文件失败: {}", e))?;
             let path_str = json_path_clone.to_str().unwrap_or("").to_string();
             Ok((content, path_str))
-        },
-    )
-    .await
-    .map_err(log_err("VersionJson 读取任务失败"))??;
+        })
+        .await
+        .map_err(log_err("VersionJson 读取任务失败"))??;
 
     log_info!("[VersionJson] 读取成功: {} 字节", content.len());
 
-    let result = VersionJsonReadResult { content, path: path_str };
+    let result = VersionJsonReadResult {
+        content,
+        path: path_str,
+    };
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
@@ -105,8 +101,7 @@ pub async fn save(
     tokio::task::spawn_blocking(move || -> Result<(), String> {
         // 确保父目录存在
         if let Some(parent) = json_path_clone.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("创建版本目录失败: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("创建版本目录失败: {}", e))?;
         }
         std::fs::write(&json_path_clone, content.as_bytes())
             .map_err(|e| format!("写入文件失败: {}", e))

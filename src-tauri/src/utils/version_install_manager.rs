@@ -13,7 +13,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct VersionIdParams {
@@ -57,108 +56,143 @@ struct InstallFabricApiParams {
     hash: Option<String>,
 }
 
-
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
-    d.register("download_version", handler!(state, app, params, {
-        let p: VersionIdParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        download::download_version(&app, &state, p.version_id).await?;
-        Ok(serde_json::Value::Null)
-    }));
-    d.register("install_merged", handler!(state, app, params, {
-        let p: InstallMergedParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        install::install_merged(
-            &app,
-            &state,
-            p.mc_version,
-            p.forge_version,
-            p.neoforge_version,
-            p.fabric_version,
-            p.optifine_version,
-            p.liteloader_version,
-            p.instance_name,
-        )
-        .await?;
-        Ok(serde_json::Value::Null)
-    }));
-    d.register("list_forge_versions", handler!(state, _app, params, {
-        let p: McVersionParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = loaders::list_forge_versions(&state, p.mc_version).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "download_version",
+        handler!(state, app, params, {
+            let p: VersionIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            download::download_version(&app, &state, p.version_id).await?;
+            Ok(serde_json::Value::Null)
+        }),
+    );
+    d.register(
+        "install_merged",
+        handler!(state, app, params, {
+            let p: InstallMergedParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            install::install_merged(
+                &app,
+                &state,
+                p.mc_version,
+                p.forge_version,
+                p.neoforge_version,
+                p.fabric_version,
+                p.optifine_version,
+                p.liteloader_version,
+                p.instance_name,
+            )
+            .await?;
+            Ok(serde_json::Value::Null)
+        }),
+    );
+    d.register(
+        "list_forge_versions",
+        handler!(state, _app, params, {
+            let p: McVersionParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = loaders::list_forge_versions(&state, p.mc_version).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("list_neoforge_versions", handler!(state, _app, params, {
-        let p: McVersionParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = loaders::list_neoforge_versions(&state, p.mc_version).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "list_neoforge_versions",
+        handler!(state, _app, params, {
+            let p: McVersionParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = loaders::list_neoforge_versions(&state, p.mc_version).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("list_fabric_versions", handler!(state, _app, _params, {
-        let r = loaders::list_fabric_versions(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "list_fabric_versions",
+        handler!(state, _app, _params, {
+            let r = loaders::list_fabric_versions(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("list_optifine_versions", handler!(state, _app, _params, {
-        let r = loaders::list_optifine_versions(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "list_optifine_versions",
+        handler!(state, _app, _params, {
+            let r = loaders::list_optifine_versions(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("list_liteloader_versions", handler!(state, _app, params, {
-        let p: McVersionParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = loaders::list_liteloader_versions(&state, p.mc_version).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "list_liteloader_versions",
+        handler!(state, _app, params, {
+            let p: McVersionParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = loaders::list_liteloader_versions(&state, p.mc_version).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("validate_loaders", handler!(_state, _app, params, {
-        let p: ValidateLoadersParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = loaders::validate_loaders(
-            p.mc_version,
-            p.forge_version,
-            p.neoforge_version,
-            p.fabric_version,
-            p.optifine_version,
-        )
-        .await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "validate_loaders",
+        handler!(_state, _app, params, {
+            let p: ValidateLoadersParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = loaders::validate_loaders(
+                p.mc_version,
+                p.forge_version,
+                p.neoforge_version,
+                p.fabric_version,
+                p.optifine_version,
+            )
+            .await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("list_fabric_api_versions", handler!(_state, _app, params, {
-        let p: McVersionParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = loaders::list_fabric_api_versions(p.mc_version).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "list_fabric_api_versions",
+        handler!(_state, _app, params, {
+            let p: McVersionParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = loaders::list_fabric_api_versions(p.mc_version).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("install_fabric_api_for_version", handler!(state, _app, params, {
-        let p: InstallFabricApiParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        loaders::install_fabric_api_for_version(
-            &state,
-            p.version_id,
-            p.download_url,
-            p.file_name,
-            p.hash,
-        )
-        .await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
-    d.register("preload_mods_detail_cmd", handler!(state, app, params, {
-        let p: VersionIdParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        preload::preload_mods_detail_cmd(&app, &state, p.version_id).await?;
-        Ok(serde_json::Value::Null)
-    }));
+    d.register(
+        "install_fabric_api_for_version",
+        handler!(state, _app, params, {
+            let p: InstallFabricApiParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            loaders::install_fabric_api_for_version(
+                &state,
+                p.version_id,
+                p.download_url,
+                p.file_name,
+                p.hash,
+            )
+            .await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "preload_mods_detail_cmd",
+        handler!(state, app, params, {
+            let p: VersionIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            preload::preload_mods_detail_cmd(&app, &state, p.version_id).await?;
+            Ok(serde_json::Value::Null)
+        }),
+    );
 
-    d.register("cancel_preload_mods_detail_cmd", handler!(_state, _app, _params, {
-        preload::cancel_preload_mods_detail_cmd().await?;
-        Ok(serde_json::Value::Null)
-    }));
+    d.register(
+        "cancel_preload_mods_detail_cmd",
+        handler!(_state, _app, _params, {
+            preload::cancel_preload_mods_detail_cmd().await?;
+            Ok(serde_json::Value::Null)
+        }),
+    );
 
     d
 });

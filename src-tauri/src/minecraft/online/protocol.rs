@@ -70,7 +70,11 @@ pub enum Message {
     /// 数据消息（IP 包）
     Data { seq: u32, payload: Vec<u8> },
     /// 控制消息
-    Control { seq: u32, subtype: ControlSubtype, payload: Vec<u8> },
+    Control {
+        seq: u32,
+        subtype: ControlSubtype,
+        payload: Vec<u8>,
+    },
     /// 错误消息
     Error { seq: u32, message: String },
 }
@@ -87,7 +91,11 @@ pub const MAX_PAYLOAD_LEN: usize = 65535;
 pub fn encode(msg: &Message) -> Vec<u8> {
     let (msg_type, seq, payload): (u8, u32, Vec<u8>) = match msg {
         Message::Data { seq, payload } => (MessageType::Data as u8, *seq, payload.clone()),
-        Message::Control { seq, subtype, payload } => {
+        Message::Control {
+            seq,
+            subtype,
+            payload,
+        } => {
             // Control 消息 payload 前追加 subtype 字节
             let mut full_payload = vec![*subtype as u8];
             full_payload.extend_from_slice(payload);
@@ -115,7 +123,11 @@ pub fn decode(bytes: &[u8]) -> io::Result<Message> {
     if bytes.len() < FRAME_HEADER_LEN {
         return Err(io::Error::new(
             io::ErrorKind::UnexpectedEof,
-            format!("帧头部不完整：期望 {} 字节，实际 {}", FRAME_HEADER_LEN, bytes.len()),
+            format!(
+                "帧头部不完整：期望 {} 字节，实际 {}",
+                FRAME_HEADER_LEN,
+                bytes.len()
+            ),
         ));
     }
 
@@ -163,7 +175,10 @@ pub fn decode(bytes: &[u8]) -> io::Result<Message> {
         }
         MessageType::Error => {
             let message = String::from_utf8(payload).map_err(|e| {
-                io::Error::new(io::ErrorKind::InvalidData, format!("错误消息 UTF-8 解码失败: {}", e))
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("错误消息 UTF-8 解码失败: {}", e),
+                )
             })?;
             Message::Error { seq, message }
         }
@@ -172,17 +187,28 @@ pub fn decode(bytes: &[u8]) -> io::Result<Message> {
 
 /// 便捷构造：数据消息（IP 包）
 pub fn data_message(seq: u32, ip_packet: &[u8]) -> Message {
-    Message::Data { seq, payload: ip_packet.to_vec() }
+    Message::Data {
+        seq,
+        payload: ip_packet.to_vec(),
+    }
 }
 
 /// 便捷构造：心跳控制消息
 pub fn heartbeat_message(seq: u32) -> Message {
-    Message::Control { seq, subtype: ControlSubtype::Heartbeat, payload: vec![] }
+    Message::Control {
+        seq,
+        subtype: ControlSubtype::Heartbeat,
+        payload: vec![],
+    }
 }
 
 /// 便捷构造：状态查询控制消息
 pub fn status_query_message(seq: u32) -> Message {
-    Message::Control { seq, subtype: ControlSubtype::StatusQuery, payload: vec![] }
+    Message::Control {
+        seq,
+        subtype: ControlSubtype::StatusQuery,
+        payload: vec![],
+    }
 }
 
 /// 便捷构造：状态响应控制消息
@@ -231,7 +257,10 @@ pub fn turn_servers_message(seq: u32, json_payload: &[u8]) -> Message {
 
 /// 便捷构造：错误消息
 pub fn error_message(seq: u32, message: &str) -> Message {
-    Message::Error { seq, message: message.to_string() }
+    Message::Error {
+        seq,
+        message: message.to_string(),
+    }
 }
 
 #[cfg(test)]

@@ -165,8 +165,7 @@ impl OnlineStorage {
 
         // 4. 写入新路径（确保父目录存在）
         if let Some(parent) = new_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("创建新路径父目录失败: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("创建新路径父目录失败: {}", e))?;
         }
         if let Err(e) = std::fs::write(&new_path, &raw) {
             log_warn!(
@@ -195,8 +194,7 @@ impl OnlineStorage {
         if !path.exists() {
             return Ok(None);
         }
-        let raw = std::fs::read_to_string(path)
-            .map_err(|e| format!("读取设备凭证失败: {}", e))?;
+        let raw = std::fs::read_to_string(path).map_err(|e| format!("读取设备凭证失败: {}", e))?;
 
         // 尝试解密（SDK 可用时）；SDK 不可用时降级为明文 JSON
         let json = match self.decrypt(&raw).await {
@@ -207,8 +205,8 @@ impl OnlineStorage {
             }
         };
 
-        let creds: DeviceCredentials = serde_json::from_str(&json)
-            .map_err(|e| format!("解析设备凭证 JSON 失败: {}", e))?;
+        let creds: DeviceCredentials =
+            serde_json::from_str(&json).map_err(|e| format!("解析设备凭证 JSON 失败: {}", e))?;
         Ok(Some(creds))
     }
 
@@ -231,17 +229,17 @@ impl OnlineStorage {
 
         let new_path = Self::appdata_device_path()?;
         if let Some(parent) = new_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("创建存储目录失败: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("创建存储目录失败: {}", e))?;
         }
-        std::fs::write(&new_path, &stored)
-            .map_err(|e| format!("写入设备凭证失败: {}", e))?;
+        std::fs::write(&new_path, &stored).map_err(|e| format!("写入设备凭证失败: {}", e))?;
 
         // Unix 下显式设置文件权限为 0o600（仅当前用户可读写），防止其他用户读取私钥/token
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            if let Err(e) = std::fs::set_permissions(&new_path, std::fs::Permissions::from_mode(0o600)) {
+            if let Err(e) =
+                std::fs::set_permissions(&new_path, std::fs::Permissions::from_mode(0o600))
+            {
                 log_warn!("[Online] 设置设备凭证文件权限 0o600 失败: {}", e);
             }
         }
@@ -264,8 +262,7 @@ impl OnlineStorage {
         // 清理新路径
         if let Ok(new_path) = Self::appdata_device_path() {
             if new_path.exists() {
-                std::fs::remove_file(&new_path)
-                    .map_err(|e| format!("删除设备凭证失败: {}", e))?;
+                std::fs::remove_file(&new_path).map_err(|e| format!("删除设备凭证失败: {}", e))?;
             }
         }
 
@@ -298,7 +295,10 @@ impl OnlineStorage {
         {
             let home = std::env::var("HOME")
                 .map_err(|_| "HOME environment variable not set".to_string())?;
-            Ok(PathBuf::from(home).join(".config").join("MolaLaunch").join(DEVICE_FILE))
+            Ok(PathBuf::from(home)
+                .join(".config")
+                .join("MolaLaunch")
+                .join(DEVICE_FILE))
         }
     }
 

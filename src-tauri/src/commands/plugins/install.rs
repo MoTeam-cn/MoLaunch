@@ -29,7 +29,8 @@ pub async fn install_external_plugin_from_dir(source_dir: String) -> Result<Stri
         ));
     }
 
-    let manifest_str = std::fs::read_to_string(&src_manifest_path).map_err(log_err("Failed to read source manifest"))?;
+    let manifest_str = std::fs::read_to_string(&src_manifest_path)
+        .map_err(log_err("Failed to read source manifest"))?;
     let manifest: serde_json::Value =
         serde_json::from_str(&manifest_str).map_err(|e| format!("Invalid manifest.json: {}", e))?;
     let plugin_id = manifest
@@ -218,7 +219,7 @@ fn extract_zip_safely<R: std::io::Read + std::io::Seek>(
     for i in 0..archive.len() {
         let mut file = archive
             .by_index(i)
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         let name = file.name().to_string();
 
         // 跳过非前缀的项

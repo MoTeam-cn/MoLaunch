@@ -4,7 +4,7 @@
 //! 注：字节数格式化已迁移到 `crate::utils::format::bytes`。
 
 use crate::minecraft::community::types::ResourceType;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// 根据 `community_filename_format` 拼接文件名
 ///
@@ -26,8 +26,7 @@ pub(super) fn apply_filename_format(
     let sanitized: String = translated
         .chars()
         .map(|c| {
-            if matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*')
-                || (c as u32) < 32
+            if matches!(c, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*') || (c as u32) < 32
             {
                 '_'
             } else {
@@ -78,7 +77,7 @@ pub(super) fn apply_filename_format(
 
 /// 解析安装目录
 pub(super) fn resolve_install_dir(
-    game_dir: &PathBuf,
+    game_dir: &Path,
     resource_type: ResourceType,
     version_id: Option<&str>,
 ) -> PathBuf {
@@ -89,12 +88,12 @@ pub(super) fn resolve_install_dir(
         } else if !subdir.is_empty() {
             game_dir.join(subdir)
         } else {
-            game_dir.clone()
+            game_dir.to_path_buf()
         }
     } else if !subdir.is_empty() {
         game_dir.join(subdir)
     } else {
-        game_dir.clone()
+        game_dir.to_path_buf()
     }
 }
 
@@ -189,10 +188,7 @@ pub(super) fn validate_instance_name(name: &str) -> Result<(), String> {
             );
         }
         if matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*') {
-            return Err(format!(
-                "整合包实例名不能包含 Windows 非法字符 \"{}\"",
-                c
-            ));
+            return Err(format!("整合包实例名不能包含 Windows 非法字符 \"{}\"", c));
         }
         if (c as u32) < 32 {
             return Err("整合包实例名不能包含控制字符".to_string());
@@ -205,8 +201,8 @@ pub(super) fn validate_instance_name(name: &str) -> Result<(), String> {
     // Windows 保留名（CON / PRN / AUX / NUL / COM1-9 / LPT1-9）
     let upper = name.to_uppercase();
     let reserved = [
-        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
-        "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
+        "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     ];
     if reserved.contains(&upper.as_str()) {
         return Err(format!("整合包实例名不能使用 Windows 保留名 \"{}\"", name));
@@ -226,9 +222,9 @@ pub(super) fn validate_modpack_extension(file_path: &str) -> Result<(), String> 
     };
     match ext {
         "zip" | "mrpack" => Ok(()),
-        "rar" => Err(
-            "MoLaunch 无法处理 rar 格式的压缩包，请解压后重新压缩为 zip 格式再试。".to_string(),
-        ),
+        "rar" => {
+            Err("MoLaunch 无法处理 rar 格式的压缩包，请解压后重新压缩为 zip 格式再试。".to_string())
+        }
         _ => Err(format!(
             "不支持的整合包扩展名 .{}。仅支持 .zip / .mrpack。",
             ext

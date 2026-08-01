@@ -10,8 +10,8 @@ use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
-use crate::state::AppState;
 use crate::state::resolve_game_dir;
+use crate::state::AppState;
 
 use super::types::{
     ScreenshotDeleteParams, ScreenshotDeleteResult, ScreenshotFailedItem, ScreenshotItem,
@@ -39,8 +39,7 @@ async fn resolve_shots_dir(state: &AppState, version_id: Option<&str>) -> PathBu
             let version_type =
                 crate::commands::version::list::detect_version_type_from_dir(&game_dir, vid);
             let mode = IsolationMode::from_u32(isolation_mode);
-            let effective_dir =
-                get_effective_game_dir(&game_dir, vid, mode, version_type);
+            let effective_dir = get_effective_game_dir(&game_dir, vid, mode, version_type);
             effective_dir.join("screenshots")
         }
     }
@@ -68,48 +67,46 @@ pub async fn list(
     }
 
     let shots_dir_clone = shots_dir.clone();
-    let (items, total_size) = tokio::task::spawn_blocking(
-        move || -> (Vec<ScreenshotItem>, u64) {
-            let mut items: Vec<ScreenshotItem> = Vec::new();
-            let mut total_size: u64 = 0;
-            let read = match std::fs::read_dir(&shots_dir_clone) {
-                Ok(r) => r,
-                Err(_) => return (items, total_size),
-            };
-            for entry in read.flatten() {
-                let path = entry.path();
-                if !path.is_file() {
-                    continue;
-                }
-                let meta = match std::fs::metadata(&path) {
-                    Ok(m) => m,
-                    Err(_) => continue,
-                };
-                let size = meta.len();
-                let modified = meta
-                    .modified()
-                    .ok()
-                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let name = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .unwrap_or("")
-                    .to_string();
-                total_size += size;
-                items.push(ScreenshotItem {
-                    path: path_to_string(&path),
-                    name,
-                    size,
-                    modified,
-                });
+    let (items, total_size) = tokio::task::spawn_blocking(move || -> (Vec<ScreenshotItem>, u64) {
+        let mut items: Vec<ScreenshotItem> = Vec::new();
+        let mut total_size: u64 = 0;
+        let read = match std::fs::read_dir(&shots_dir_clone) {
+            Ok(r) => r,
+            Err(_) => return (items, total_size),
+        };
+        for entry in read.flatten() {
+            let path = entry.path();
+            if !path.is_file() {
+                continue;
             }
-            // 按修改时间降序
-            items.sort_by(|a, b| b.modified.cmp(&a.modified));
-            (items, total_size)
-        },
-    )
+            let meta = match std::fs::metadata(&path) {
+                Ok(m) => m,
+                Err(_) => continue,
+            };
+            let size = meta.len();
+            let modified = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs())
+                .unwrap_or(0);
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_string();
+            total_size += size;
+            items.push(ScreenshotItem {
+                path: path_to_string(&path),
+                name,
+                size,
+                modified,
+            });
+        }
+        // 按修改时间降序
+        items.sort_by(|a, b| b.modified.cmp(&a.modified));
+        (items, total_size)
+    })
     .await
     .map_err(log_err("Screenshot 列目录任务失败"))?;
 
@@ -134,8 +131,8 @@ pub async fn delete(
 
     let paths = params.paths;
     let shots_dir_clone = shots_dir.clone();
-    let (deleted_count, freed_bytes, failed) = tokio::task::spawn_blocking(
-        move || -> (u64, u64, Vec<ScreenshotFailedItem>) {
+    let (deleted_count, freed_bytes, failed) =
+        tokio::task::spawn_blocking(move || -> (u64, u64, Vec<ScreenshotFailedItem>) {
             let mut deleted_count: u64 = 0;
             let mut freed_bytes: u64 = 0;
             let mut failed: Vec<ScreenshotFailedItem> = Vec::new();
@@ -198,10 +195,9 @@ pub async fn delete(
                 }
             }
             (deleted_count, freed_bytes, failed)
-        },
-    )
-    .await
-    .map_err(log_err("Screenshot 删除任务失败"))?;
+        })
+        .await
+        .map_err(log_err("Screenshot 删除任务失败"))?;
 
     log_info!(
         "[Screenshot] 删除完成: 成功 {}, 释放 {} 字节, 失败 {}",

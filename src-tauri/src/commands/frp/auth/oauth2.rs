@@ -118,7 +118,11 @@ fn build_authorize_url(
         .collect::<Vec<_>>()
         .join("&");
 
-    let sep = if authorize_url.contains('?') { '&' } else { '?' };
+    let sep = if authorize_url.contains('?') {
+        '&'
+    } else {
+        '?'
+    };
     format!("{}{}{}", authorize_url, sep, query)
 }
 
@@ -168,9 +172,8 @@ fn parse_callback_path(path: &str, expected_state: &str) -> (String, bool) {
     let params: HashMap<&str, &str> = query
         .split('&')
         .filter_map(|kv| {
-            let mut parts = kv.splitn(2, '=');
-            let k = parts.next()?;
-            let v = parts.next()?;
+            let (k, v) = kv.split_once('=')?;
+
             Some((k, v))
         })
         .collect();
@@ -185,29 +188,29 @@ fn parse_callback_path(path: &str, expected_state: &str) -> (String, bool) {
         )
     } else {
         (
-            "<html><body><h2>认证失败</h2><p>state 不匹配或缺少 code 参数</p></body></html>".to_string(),
+            "<html><body><h2>认证失败</h2><p>state 不匹配或缺少 code 参数</p></body></html>"
+                .to_string(),
             false,
         )
     }
 }
 
 /// 从回调路径解析 code（已校验 state 后调用）
-fn parse_callback_path_for_code(path: &str, expected_state: &str) -> Result<OAuth2Callback, String> {
+fn parse_callback_path_for_code(
+    path: &str,
+    expected_state: &str,
+) -> Result<OAuth2Callback, String> {
     let query = path.split('?').nth(1).unwrap_or("");
     let params: HashMap<&str, &str> = query
         .split('&')
         .filter_map(|kv| {
-            let mut parts = kv.splitn(2, '=');
-            let k = parts.next()?;
-            let v = parts.next()?;
+            let (k, v) = kv.split_once('=')?;
+
             Some((k, v))
         })
         .collect();
 
-    let code = params
-        .get("code")
-        .copied()
-        .ok_or("回调缺少 code 参数")?;
+    let code = params.get("code").copied().ok_or("回调缺少 code 参数")?;
     let state = params.get("state").copied().unwrap_or("");
 
     if state != expected_state {

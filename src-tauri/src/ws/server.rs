@@ -18,7 +18,10 @@ const THROTTLE_MS: u64 = 200;
 pub async fn start_server(app: AppHandle, state: AppState) {
     let listener = match TcpListener::bind("127.0.0.1:0").await {
         Ok(l) => {
-            log_info!("WebSocket server listening on ws://{}", l.local_addr().unwrap());
+            log_info!(
+                "WebSocket server listening on ws://{}",
+                l.local_addr().unwrap()
+            );
             l
         }
         Err(e) => {

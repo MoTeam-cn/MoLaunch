@@ -1,6 +1,6 @@
 //! Natives 原生库解压
 
-use std::path::PathBuf;
+use std::path::Path;
 
 use crate::{log_info, log_warn};
 
@@ -47,10 +47,8 @@ impl LaunchPipeline {
             let total = libraries.len();
             for (i, lib) in libraries.iter().enumerate() {
                 // 应用 rules 过滤（平台适配）
-                let rules: Option<Vec<serde_json::Value>> = lib
-                    .get("rules")
-                    .and_then(|v| v.as_array())
-                    .map(|a| a.clone());
+                let rules: Option<Vec<serde_json::Value>> =
+                    lib.get("rules").and_then(|v| v.as_array()).cloned();
                 if !crate::minecraft::version::libraries::check_rules(&rules) {
                     continue;
                 }
@@ -163,15 +161,15 @@ impl LaunchPipeline {
     /// `expected_sha1` 为版本 JSON 中记录的 JAR 文件 SHA1（可选）。
     /// - 若提供：先校验 JAR 文件 SHA1，匹配才解压；不匹配则跳过提取并记录警告。
     /// - 若为 None：记录警告（无法校验），仍按原逻辑解压。
-    /// 每个提取出的 DLL/SO/DYLIB 会计算并记录其 SHA1，便于审计。
+    ///   每个提取出的 DLL/SO/DYLIB 会计算并记录其 SHA1，便于审计。
     async fn extract_native_jar(
         &self,
-        jar_path: &PathBuf,
-        natives_dir: &PathBuf,
+        jar_path: &Path,
+        natives_dir: &Path,
         expected_sha1: Option<&str>,
     ) -> Result<(), LaunchError> {
-        let jar_path = jar_path.clone();
-        let natives_dir = natives_dir.clone();
+        let jar_path = jar_path.to_path_buf();
+        let natives_dir = natives_dir.to_path_buf();
         let expected_sha1 = expected_sha1.map(|s| s.to_string());
 
         tokio::task::spawn_blocking(move || {

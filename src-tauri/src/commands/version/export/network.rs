@@ -13,9 +13,7 @@ use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::community::curseforge;
 use crate::minecraft::community::modrinth;
-use crate::minecraft::community::preload::{
-    compute_curseforge_fingerprint, compute_modrinth_sha1,
-};
+use crate::minecraft::community::preload::{compute_curseforge_fingerprint, compute_modrinth_sha1};
 use crate::minecraft::community::types::FileDownloadInfo;
 
 use super::scan::is_mod_like_file;
@@ -40,10 +38,7 @@ pub async fn check_mod_files_online(
         return Ok(Vec::new());
     }
 
-    log_info!(
-        "[Export] 开始联网检查 {} 个 mod 文件",
-        mod_files.len()
-    );
+    log_info!("[Export] 开始联网检查 {} 个 mod 文件", mod_files.len());
 
     // 2. 计算 hash（同步遍历，hash 计算内部读取文件）
     let mut mr_hashes: Vec<(String, String)> = Vec::new(); // (sha1, relative_path)
@@ -64,10 +59,8 @@ pub async fn check_mod_files_online(
     let mr_sha1_list: Vec<String> = mr_hashes.iter().map(|(h, _)| h.clone()).collect();
     let cf_fp_list: Vec<u32> = cf_hashes.iter().map(|(h, _)| *h).collect();
 
-    let (mr_result, cf_result) = tokio::join!(
-        query_modrinth(mr_sha1_list),
-        query_curseforge(cf_fp_list),
-    );
+    let (mr_result, cf_result) =
+        tokio::join!(query_modrinth(mr_sha1_list), query_curseforge(cf_fp_list),);
 
     // 4. 合并结果：以文件相对路径为键，收集所有下载地址 + hash
     let mut info_map: HashMap<String, ModDownloadInfo> = HashMap::new();
@@ -95,7 +88,10 @@ pub async fn check_mod_files_online(
     // CF 不返回 sha1/sha512，对缺 hash 的条目本地补算
     for info in &mut result {
         if info.sha1.is_empty() || info.sha512.is_empty() {
-            if let Some(f) = mod_files.iter().find(|f| f.relative_path == info.relative_path) {
+            if let Some(f) = mod_files
+                .iter()
+                .find(|f| f.relative_path == info.relative_path)
+            {
                 if info.sha1.is_empty() {
                     if let Ok(h) = compute_modrinth_sha1(&f.abs_path) {
                         info.sha1 = h;
@@ -126,15 +122,17 @@ fn merge_mr_results(
 ) {
     for (sha1, path) in mr_hashes {
         if let Some(info) = mr_map.get(sha1) {
-            let entry = info_map.entry(path.clone()).or_insert_with(|| ModDownloadInfo {
-                relative_path: path.clone(),
-                sha1: String::new(),
-                sha512: String::new(),
-                downloads: Vec::new(),
-                file_size: info.file_size,
-                project_id: None,
-                file_id: None,
-            });
+            let entry = info_map
+                .entry(path.clone())
+                .or_insert_with(|| ModDownloadInfo {
+                    relative_path: path.clone(),
+                    sha1: String::new(),
+                    sha512: String::new(),
+                    downloads: Vec::new(),
+                    file_size: info.file_size,
+                    project_id: None,
+                    file_id: None,
+                });
             // MR 返回的 sha1/sha512 直接使用
             if !info.sha1.is_empty() {
                 entry.sha1 = info.sha1.clone();
@@ -161,15 +159,17 @@ fn merge_cf_results(
 ) {
     for (fp, path) in cf_hashes {
         if let Some(info) = cf_map.get(fp) {
-            let entry = info_map.entry(path.clone()).or_insert_with(|| ModDownloadInfo {
-                relative_path: path.clone(),
-                sha1: String::new(),
-                sha512: String::new(),
-                downloads: Vec::new(),
-                file_size: info.file_size,
-                project_id: info.project_id,
-                file_id: info.file_id,
-            });
+            let entry = info_map
+                .entry(path.clone())
+                .or_insert_with(|| ModDownloadInfo {
+                    relative_path: path.clone(),
+                    sha1: String::new(),
+                    sha512: String::new(),
+                    downloads: Vec::new(),
+                    file_size: info.file_size,
+                    project_id: info.project_id,
+                    file_id: info.file_id,
+                });
             entry.downloads.push(info.download_url.clone());
             // CF 返回 project_id/file_id 直接使用（MR 未设置时也填充，CF 优先级低）
             if entry.project_id.is_none() {
@@ -188,9 +188,7 @@ fn merge_cf_results(
     }
 }
 
-async fn query_modrinth(
-    sha1s: Vec<String>,
-) -> Result<HashMap<String, FileDownloadInfo>, String> {
+async fn query_modrinth(sha1s: Vec<String>) -> Result<HashMap<String, FileDownloadInfo>, String> {
     if sha1s.is_empty() {
         return Ok(HashMap::new());
     }

@@ -12,6 +12,7 @@ use super::game_args::build_game_args;
 use super::jvm_args::build_jvm_args;
 use super::{AuthInfo, LaunchArguments};
 
+#[allow(clippy::too_many_arguments)]
 /// Build launch arguments with isolation support
 pub fn build_launch_arguments(
     game_dir: &Path,
@@ -133,7 +134,8 @@ pub fn build_launch_arguments(
             // 获取真实 MC 版本号（用于决定语言代码大小写）
             // 优先从 setup.ini 读取 OriginalVersion，回退到 version.json 的 inheritsFrom/id
             let mc_version = crate::minecraft::version::setup::detect_version_and_loader(
-                &version_dir, version_id,
+                &version_dir,
+                version_id,
             )
             .0;
             log_info!(

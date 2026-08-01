@@ -151,9 +151,7 @@ async fn refresh_credentials(
 /// - access token 未过期 → 直接返回凭证
 /// - access token 过期 + refresh_token 可用 → 自动续期后返回新凭证
 /// - access token 过期 + refresh_token 也过期 → 返回错误（前端引导重新登录）
-pub async fn load_creds_with_auto_refresh(
-    state: &AppState,
-) -> Result<DeviceCredentials, String> {
+pub async fn load_creds_with_auto_refresh(state: &AppState) -> Result<DeviceCredentials, String> {
     let storage = make_storage(state);
     let creds = storage
         .load()

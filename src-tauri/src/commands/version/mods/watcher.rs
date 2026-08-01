@@ -14,8 +14,8 @@ use crate::error_util::log_err;
 use crate::state::AppState;
 use crate::{log_error, log_info};
 
-use super::helpers::get_mods_dir;
 use super::super::sanitize_version_id;
+use super::helpers::get_mods_dir;
 
 /// 防抖静默期（ms）：收到事件后等待此时长无新事件才 emit
 const DEBOUNCE_QUIET_MS: u64 = 500;
@@ -37,7 +37,7 @@ pub async fn watch_mods_dir(
     version_id: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
 
     if !mods_dir.exists() {
         std::fs::create_dir_all(&mods_dir).map_err(log_err("Failed to create mods directory"))?;

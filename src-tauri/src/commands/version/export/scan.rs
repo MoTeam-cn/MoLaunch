@@ -37,10 +37,7 @@ pub fn collect_export_files(
         return Ok(Vec::new());
     }
 
-    log::debug!(
-        "[Export] 合并后共 {} 条规则（含排除规则）",
-        rules.len()
-    );
+    log::debug!("[Export] 合并后共 {} 条规则（含排除规则）", rules.len());
 
     // 2. 编译规则为 regex
     let compiled = compile_rules(&rules)?;
@@ -113,8 +110,8 @@ fn compile_rules(rules: &[String]) -> Result<Vec<CompiledRule>, String> {
         };
 
         let regex_str = glob_to_regex(&pattern);
-        let regex = Regex::new(&regex_str)
-            .map_err(|e| format!("编译规则失败 '{}': {}", pattern, e))?;
+        let regex =
+            Regex::new(&regex_str).map_err(|e| format!("编译规则失败 '{}': {}", pattern, e))?;
         compiled.push(CompiledRule { regex, is_exclude });
     }
     Ok(compiled)
@@ -194,9 +191,8 @@ fn scan_dir(
     files: &mut Vec<ExportFileInfo>,
     is_root: bool,
 ) -> Result<(), String> {
-    let entries = std::fs::read_dir(current).map_err(|e| {
-        format!("读取目录失败: {} ({})", current.display(), e)
-    })?;
+    let entries = std::fs::read_dir(current)
+        .map_err(|e| format!("读取目录失败: {} ({})", current.display(), e))?;
 
     for entry in entries.flatten() {
         let path = entry.path();

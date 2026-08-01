@@ -57,7 +57,7 @@ pub async fn install_merged(
         optifine_version
     );
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
 
     // 重置取消/暂停信号（确保每次安装都是干净状态）
     state
@@ -120,7 +120,7 @@ pub async fn install_merged(
     }
 
     // 读取下载相关配置
-    let (mirror_url, loader_source_mode) = crate::state::resolve_mirror_and_source(&state).await;
+    let (mirror_url, loader_source_mode) = crate::state::resolve_mirror_and_source(state).await;
     let (max_threads, download_source_mode) = {
         let config = state.config.lock().await;
         (
@@ -236,7 +236,7 @@ pub async fn install_merged(
 
     let loader_errors = if has_any_loader && !cancelled {
         install_all_loaders(
-            &state,
+            state,
             &mc_version,
             &game_dir,
             &forge_version,
@@ -282,7 +282,7 @@ pub async fn install_merged(
 
     // Step 4: 保存 setup.ini + 创建隔离目录
     save_setup_and_create_isolation(
-        &state,
+        state,
         &game_dir,
         &actual_version_id,
         &mc_version,
@@ -293,7 +293,7 @@ pub async fn install_merged(
     // Step 5: 自动安装 Fabric API（仅 Fabric 用户）
     if fabric_version.is_some() {
         auto_install_fabric_api(
-            &state,
+            state,
             &game_dir,
             &mc_version,
             &actual_version_id,

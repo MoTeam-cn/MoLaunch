@@ -35,7 +35,8 @@ pub async fn resolve_mirror_and_source(
 ) {
     let config = state.config.lock().await;
     let mirror_url = config.download.mirror_url.clone();
-    let source_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.meta_source);
+    let source_mode =
+        crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.meta_source);
     drop(config);
     (mirror_url, source_mode)
 }

@@ -11,7 +11,7 @@ pub(crate) async fn get_mods_dir(
     state: &AppState,
     version_id: &str,
 ) -> Result<std::path::PathBuf, String> {
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let global_isolation_mode = state.config.lock().await.isolation_mode;
 
     // 版本独立隔离设置覆盖全局

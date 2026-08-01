@@ -213,9 +213,8 @@ impl DownloadManager {
 
         let mut handles = Vec::new();
         let total_task_count = tasks.len();
-        let mut task_index = 0;
 
-        for task in tasks {
+        for (task_index, task) in tasks.into_iter().enumerate() {
             // 检查取消信号
             if self.is_cancelled() {
                 let remaining = total_task_count - task_index;
@@ -238,8 +237,6 @@ impl DownloadManager {
                 );
                 break;
             }
-
-            task_index += 1;
 
             let sem = semaphore.clone();
             let prog = progress.clone();

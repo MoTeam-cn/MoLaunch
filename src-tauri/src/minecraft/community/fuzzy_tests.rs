@@ -5,7 +5,11 @@ use super::*;
 #[test]
 fn test_search_similarity_exact_match() {
     let score = search_similarity("工业时代2", "工业时代");
-    assert!(score > 0.5, "exact match should have high score, got {}", score);
+    assert!(
+        score > 0.5,
+        "exact match should have high score, got {}",
+        score
+    );
 }
 
 #[test]
@@ -27,7 +31,11 @@ fn test_search_similarity_weighted() {
         SearchSource::new(vec!["industrial craft".to_string()], 0.5),
     ];
     let score = search_similarity_weighted(&sources, "工业时代");
-    assert!(score > 0.3, "weighted match should have decent score, got {}", score);
+    assert!(
+        score > 0.3,
+        "weighted match should have decent score, got {}",
+        score
+    );
 }
 
 #[test]

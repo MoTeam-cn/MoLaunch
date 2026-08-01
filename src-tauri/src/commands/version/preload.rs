@@ -53,7 +53,7 @@ pub async fn preload_mods_detail_cmd(
     sanitize_version_id(&version_id)?;
 
     // 获取 mods 目录
-    let mods_dir: std::path::PathBuf = get_mods_dir(&state, &version_id).await?;
+    let mods_dir: std::path::PathBuf = get_mods_dir(state, &version_id).await?;
     if !mods_dir.exists() {
         return Ok(()); // 没 mods 目录，无需预加载
     }

@@ -2,7 +2,7 @@
 //! - light：`MemoryEmptyWorkingSets` 清空所有进程工作集，响应迅速
 //! - strong：flush modified / purge standby / empty working sets 4 步，释放数 GB；
 //!   ⚠️ 清空 standby 可能导致已缓存应用变慢
-//! 平台：Windows NtSetSystemInformation，Linux malloc_trim，macOS malloc_zone_pressure_relief
+//!   平台：Windows NtSetSystemInformation，Linux malloc_trim，macOS malloc_zone_pressure_relief
 
 use sysinfo::{System, SystemExt};
 
@@ -11,7 +11,11 @@ use crate::log_info;
 
 /// 优化内存：根据 mode 执行轻量或强力内存释放
 pub async fn optimize(params: MemoryOptimizeParams) -> Result<serde_json::Value, String> {
-    let mode = if params.mode == "strong" { "strong" } else { "light" };
+    let mode = if params.mode == "strong" {
+        "strong"
+    } else {
+        "light"
+    };
 
     // 1. 优化前可用内存（字节）
     let before = get_available_memory_bytes();
@@ -73,7 +77,7 @@ mod nt {
     /// SYSTEM_MEMORY_LIST_COMMAND 枚举
     /// https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ne-wdm-_system_memory_list_command
     #[repr(i32)]
-    #[allow(non_camel_case_types)]
+    #[allow(non_camel_case_types, clippy::enum_variant_names)]
     pub enum SystemMemoryListCommand {
         /// 清空所有进程的工作集
         MemoryEmptyWorkingSets = 0,

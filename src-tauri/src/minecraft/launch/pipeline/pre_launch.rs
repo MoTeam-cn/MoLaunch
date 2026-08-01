@@ -30,11 +30,7 @@ impl LaunchPipeline {
 
         let game_dir = self.config.game_dir.clone();
         let result = tokio::task::spawn_blocking(move || {
-            crate::minecraft::system::shell::run_executable_output(
-                program,
-                &args,
-                Some(&game_dir),
-            )
+            crate::minecraft::system::shell::run_executable_output(program, &args, Some(&game_dir))
         })
         .await;
 

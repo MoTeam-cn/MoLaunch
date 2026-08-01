@@ -61,6 +61,7 @@ fn compute_linear_progress(elapsed_secs: f64, segments: &[(f64, f64)]) -> f64 {
     current
 }
 
+#[allow(clippy::too_many_arguments)]
 /// 安装单个加载器的通用辅助函数
 /// 如果阶段已存在（最后一个阶段是加载器安装），则更新它；否则添加新阶段
 pub(crate) async fn install_single_loader(
@@ -77,9 +78,9 @@ pub(crate) async fn install_single_loader(
     // 检查是否已有加载器安装阶段（通过名称判断）
     let has_loader_stage = {
         let ds = state.download_state.lock().unwrap();
-        ds.stages.last().map_or(false, |s| {
-            s.name.contains("安装") || s.name.contains("加载器")
-        })
+        ds.stages
+            .last()
+            .is_some_and(|s| s.name.contains("安装") || s.name.contains("加载器"))
     };
 
     if has_loader_stage {
@@ -212,9 +213,6 @@ pub(crate) fn start_progress_ticker(
 /// 整合包解析阶段的伪进度曲线（供 modpack.rs 调用）
 ///
 /// 0→90% @5%/s，解析完成后 stop 并跳 100%
-pub(crate) fn start_parse_ticker(
-    state: &AppState,
-    stage_index: usize,
-) -> Arc<AtomicBool> {
+pub(crate) fn start_parse_ticker(state: &AppState, stage_index: usize) -> Arc<AtomicBool> {
     start_progress_ticker(state, Some(stage_index), PARSE_TICKER)
 }

@@ -36,7 +36,7 @@ pub enum DownloadStatus {
 }
 
 /// 全局下载进度
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GlobalProgress {
     pub total_files: usize,
     pub completed_files: usize,
@@ -46,19 +46,4 @@ pub struct GlobalProgress {
     pub downloaded_bytes: u64,
     pub current_speed: u64,
     pub is_active: bool,
-}
-
-impl Default for GlobalProgress {
-    fn default() -> Self {
-        Self {
-            total_files: 0,
-            completed_files: 0,
-            failed_files: 0,
-            skipped_files: 0,
-            total_bytes: 0,
-            downloaded_bytes: 0,
-            current_speed: 0,
-            is_active: false,
-        }
-    }
 }

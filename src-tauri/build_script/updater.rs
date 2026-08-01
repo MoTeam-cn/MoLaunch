@@ -87,11 +87,7 @@ pub fn build_updater() {
 
     if let Some(parent) = target.parent() {
         if let Err(e) = std::fs::create_dir_all(parent) {
-            println!(
-                "cargo:warning=创建 {} 失败: {}",
-                parent.display(),
-                e
-            );
+            println!("cargo:warning=创建 {} 失败: {}", parent.display(), e);
             return;
         }
     }
@@ -106,10 +102,7 @@ pub fn build_updater() {
         return;
     }
 
-    let size = target
-        .metadata()
-        .map(|m| m.len())
-        .unwrap_or(0);
+    let size = target.metadata().map(|m| m.len()).unwrap_or(0);
     eprintln!(
         "[build.rs] updater.exe 已生成: {} ({} bytes)",
         target.display(),
@@ -163,10 +156,7 @@ fn needs_rebuild(target: &Path) -> bool {
     if let Ok(entries) = std::fs::read_dir(src_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
-            let is_rust = path
-                .extension()
-                .map(|ext| ext == "rs")
-                .unwrap_or(false);
+            let is_rust = path.extension().map(|ext| ext == "rs").unwrap_or(false);
             if !is_rust {
                 continue;
             }

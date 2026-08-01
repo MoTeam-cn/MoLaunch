@@ -77,23 +77,6 @@ impl IniFile {
         Self { sections }
     }
 
-    /// 转换为字符串
-    pub fn to_string(&self) -> String {
-        let mut result = String::new();
-
-        for section in &self.sections {
-            if !section.name.is_empty() {
-                result.push_str(&format!("[{}]\n", section.name));
-            }
-            for (key, value) in &section.keys {
-                result.push_str(&format!("{}={}\n", key, value));
-            }
-            result.push('\n');
-        }
-
-        result
-    }
-
     /// 获取配置值
     pub fn get(&self, section: &str, key: &str) -> Option<String> {
         for s in &self.sections {
@@ -198,6 +181,21 @@ impl IniFile {
 impl Default for IniFile {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl std::fmt::Display for IniFile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for section in &self.sections {
+            if !section.name.is_empty() {
+                writeln!(f, "[{}]", section.name)?;
+            }
+            for (key, value) in &section.keys {
+                writeln!(f, "{}={}", key, value)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
     }
 }
 

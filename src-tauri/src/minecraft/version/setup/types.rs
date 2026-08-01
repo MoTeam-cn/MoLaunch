@@ -108,6 +108,7 @@ pub struct VersionSetup {
 }
 
 impl VersionSetup {
+    #[allow(clippy::too_many_arguments)]
     /// 创建新的 Setup（安装时调用）
     pub fn new(
         original_version: &str,

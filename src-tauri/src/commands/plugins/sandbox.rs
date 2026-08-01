@@ -73,8 +73,12 @@ pub async fn read_external_plugin_file(
     let target = plugin_dir.join(&file_path);
 
     // canonicalize + starts_with 双重校验防止 `../` 路径遍历
-    let canonical_plugin_dir = plugin_dir.canonicalize().map_err(log_err("Failed to canonicalize plugin directory"))?;
-    let canonical_target = target.canonicalize().map_err(log_err("Failed to canonicalize target file"))?;
+    let canonical_plugin_dir = plugin_dir
+        .canonicalize()
+        .map_err(log_err("Failed to canonicalize plugin directory"))?;
+    let canonical_target = target
+        .canonicalize()
+        .map_err(log_err("Failed to canonicalize target file"))?;
 
     if !canonical_target.starts_with(&canonical_plugin_dir) {
         return Err(format!("Path traversal denied: {}", file_path));
@@ -98,8 +102,12 @@ pub async fn uninstall_external_plugin(plugin_id: String) -> Result<(), String> 
     }
 
     // 二次 canonicalize 校验
-    let canonical_root = plugins_root().canonicalize().map_err(log_err("Failed to canonicalize plugins root"))?;
-    let canonical_dir = plugin_dir.canonicalize().map_err(log_err("Failed to canonicalize plugin directory"))?;
+    let canonical_root = plugins_root()
+        .canonicalize()
+        .map_err(log_err("Failed to canonicalize plugins root"))?;
+    let canonical_dir = plugin_dir
+        .canonicalize()
+        .map_err(log_err("Failed to canonicalize plugin directory"))?;
 
     if !canonical_dir.starts_with(&canonical_root) {
         return Err(format!("Path traversal denied: {}", plugin_id));

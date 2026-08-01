@@ -38,15 +38,16 @@ pub async fn install_local_modpack(
     let archive_path_owned: std::path::PathBuf;
     let _temp_cleanup: Option<std::path::PathBuf>;
     {
-        let pre_file = std::fs::File::open(&archive_path)
-            .map_err(|e| format!("打开整合包失败: {}", e))?;
+        let pre_file =
+            std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
         let mut pre_archive = zip::ZipArchive::new(pre_file)
             .map_err(|e| format!("解析 zip 失败: {}（可能不是有效的整合包）", e))?;
         let pre_detected = concurrent::detect_modpack_format(&mut pre_archive)?;
         if pre_detected.format == ModpackFormat::LauncherPack {
-            let inner_path = pre_detected.launcher_inner_path.as_deref().ok_or_else(|| {
-                "LauncherPack 检测异常：未记录内层整合包路径".to_string()
-            })?;
+            let inner_path = pre_detected
+                .launcher_inner_path
+                .as_deref()
+                .ok_or_else(|| "LauncherPack 检测异常：未记录内层整合包路径".to_string())?;
             log_info!(
                 "[Community] LauncherPack：提取内层整合包 {} 到临时目录后继续安装",
                 inner_path
@@ -54,8 +55,7 @@ pub async fn install_local_modpack(
 
             let game_dir_pre = crate::state::resolve_game_dir_from_state(state).await;
             let temp_dir = game_dir_pre.join(".tmp_launcher_extract");
-            std::fs::create_dir_all(&temp_dir)
-                .map_err(|e| format!("创建临时目录失败: {}", e))?;
+            std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
             let inner_file_name = inner_path
                 .rsplit(['/', '\\'])
                 .next()
@@ -88,8 +88,7 @@ pub async fn install_local_modpack(
     // 解析游戏目录、创建 instance_dir
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
-    std::fs::create_dir_all(&instance_dir)
-        .map_err(|e| format!("创建整合包目录失败: {}", e))?;
+    std::fs::create_dir_all(&instance_dir).map_err(|e| format!("创建整合包目录失败: {}", e))?;
 
     let instance_dir_ref = &instance_dir;
     let result: Result<InstallModpackResult, String> = async {
@@ -115,11 +114,10 @@ pub async fn install_local_modpack(
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_status(0, StageStatus::Loading, 0.0);
         }
-        let parse_ticker = crate::commands::version::install::loader_helpers::start_parse_ticker(
-            state, 0,
-        );
+        let parse_ticker =
+            crate::commands::version::install::loader_helpers::start_parse_ticker(state, 0);
         let file =
-            std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
+            std::fs::File::open(archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
         let mut archive = zip::ZipArchive::new(file)
             .map_err(|e| format!("解析 zip 失败: {}（可能不是有效的整合包）", e))?;
         let detected = concurrent::detect_modpack_format(&mut archive)?;
@@ -160,7 +158,13 @@ pub async fn install_local_modpack(
         std::fs::create_dir_all(&mods_dir).map_err(|e| format!("创建 mods 目录失败: {}", e))?;
         let include_optional = req.include_optional.unwrap_or(true);
         shared::download_mods_by_format(
-            state, &info, &mods_dir, instance_dir_ref, 1, include_optional, true,
+            state,
+            &info,
+            &mods_dir,
+            instance_dir_ref,
+            1,
+            include_optional,
+            true,
         )
         .await?;
         {

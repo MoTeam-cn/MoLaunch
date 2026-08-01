@@ -12,6 +12,7 @@ use super::super::rate_limiter::RateLimiter;
 use super::super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
 use crate::{log_debug, log_warn};
 
+#[allow(clippy::too_many_arguments)]
 /// 下载单个文件（统一逻辑：顺序尝试 URL，超时自动切换，大文件分片下载）
 pub async fn download_single(
     client: &reqwest::Client,
@@ -177,10 +178,7 @@ pub async fn download_single(
                     // 但完整 GET 正常。后续重试直接走单流，避免浪费分片探测时间。
                     if let Some(ref err) = chunk_result.error {
                         if err.contains("404") {
-                            log_debug!(
-                                "[Download] 分片返回 404，禁用分片改走单流: {}",
-                                url
-                            );
+                            log_debug!("[Download] 分片返回 404，禁用分片改走单流: {}", url);
                             chunk_disabled = true;
                         }
                     }

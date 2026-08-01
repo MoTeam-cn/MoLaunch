@@ -13,6 +13,7 @@ use super::AuthInfo;
 /// `add_authlib_args` 同步读取，不存在则跳过注入并打印警告。
 const AUTHLIB_INJECTOR_JAR_REL: &str = "launch/authlib-injector.jar";
 
+#[allow(clippy::too_many_arguments)]
 /// Build JVM arguments
 pub(super) fn build_jvm_args(
     game_dir: &Path,
@@ -110,7 +111,9 @@ fn add_authlib_args(args: &mut Vec<String>, auth_info: &AuthInfo) {
 fn read_prefetched_metadata(server_url: &str) -> Option<String> {
     let host = extract_host(server_url)?;
     let rel = format!("launch/authlib-prefetched-{}.txt", host);
-    crate::utils::cache::read(&rel).ok().filter(|s| !s.is_empty())
+    crate::utils::cache::read(&rel)
+        .ok()
+        .filter(|s| !s.is_empty())
 }
 
 /// 从 server_url 提取 host 部分，用作缓存文件名的安全标识
@@ -198,10 +201,7 @@ fn add_json_jvm_args(
                         None
                     }
                 });
-                let rules = obj
-                    .get("rules")
-                    .and_then(|r| r.as_array())
-                    .map(|a| a.clone());
+                let rules = obj.get("rules").and_then(|r| r.as_array()).cloned();
                 match value {
                     Some(v) => (v, rules),
                     None => continue,
@@ -243,7 +243,7 @@ fn add_jlw_args(
 ) {
     let is_gbk = is_gbk_encoding();
     let game_dir_str = game_dir.to_string_lossy();
-    let is_ascii_only = game_dir_str.chars().all(|c| c.is_ascii());
+    let is_ascii_only = game_dir_str.is_ascii();
     let has_custom_javaagent = extra_jvm_args.iter().any(|a| a.contains("-javaagent"));
 
     let use_jlw = !disable_jlw && !is_gbk && !is_ascii_only && !has_custom_javaagent;

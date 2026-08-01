@@ -18,6 +18,10 @@ mod validate;
 
 pub use self::types::{LaunchConfig, LaunchError, LaunchProgress, LaunchResult, LaunchStage};
 
+/// 子进程句柄类型（外层 Mutex 用于 cancel 时抢占，内层 tokio Mutex 用于 await child）
+type ChildProcessHandle =
+    Arc<Mutex<Option<Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>>>>;
+
 /// 启动流水线
 pub struct LaunchPipeline {
     pub(super) config: LaunchConfig,
@@ -26,8 +30,7 @@ pub struct LaunchPipeline {
     pub(super) current_stage: Arc<Mutex<LaunchStage>>,
     pub(super) cancel_flag: Arc<Mutex<bool>>,
     pub(super) watcher: Arc<Mutex<Option<GameWatcher>>>,
-    pub(super) child_process:
-        Arc<Mutex<Option<Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>>>>,
+    pub(super) child_process: ChildProcessHandle,
 }
 
 impl LaunchPipeline {

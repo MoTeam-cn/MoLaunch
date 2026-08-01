@@ -69,7 +69,7 @@ pub async fn get_version_personalization(
 ) -> Result<VersionPersonalization, String> {
     sanitize_version_id(&version_id)?;
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
 
     let version_dir = game_dir.join("versions").join(&version_id);
     let setup = VersionSetup::load_or_create(&version_dir, &version_id);
@@ -111,7 +111,7 @@ pub async fn update_version_personalization(
     sanitize_version_id(&version_id)?;
     log_info!("Updating personalization for version: {}", version_id);
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
 
     let version_dir = game_dir.join("versions").join(&version_id);
     VersionSetup::update_personalization(&version_dir, &update).map_err(|e| {

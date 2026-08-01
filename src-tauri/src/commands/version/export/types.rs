@@ -14,8 +14,10 @@ use std::path::PathBuf;
 /// - `Compress`：直接打包 .minecraft/
 #[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+#[derive(Default)]
 pub enum ExportFormat {
     /// Modrinth 格式（.mrpack）
+    #[default]
     Modrinth,
     /// CurseForge 格式（manifest.json + overrides/）
     Curseforge,
@@ -27,12 +29,6 @@ pub enum ExportFormat {
     Mcbbs,
     /// 普通压缩包兜底（.minecraft/）
     Compress,
-}
-
-impl Default for ExportFormat {
-    fn default() -> Self {
-        Self::Modrinth
-    }
 }
 
 impl ExportFormat {
@@ -165,7 +161,12 @@ pub struct ExportProgress {
 }
 
 impl ExportProgress {
-    pub fn new(stage: ExportStage, percent: u8, message: impl Into<String>, version_id: impl Into<String>) -> Self {
+    pub fn new(
+        stage: ExportStage,
+        percent: u8,
+        message: impl Into<String>,
+        version_id: impl Into<String>,
+    ) -> Self {
         Self {
             stage,
             percent: percent.min(100),

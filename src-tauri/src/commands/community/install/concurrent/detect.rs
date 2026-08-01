@@ -117,7 +117,7 @@ pub fn detect_modpack_format(
 
     // 第四遍：Compress 兜底，扫描 `.minecraft/` 目录前缀
     let mut minecraft_prefix: Option<String> = None;
-    for &(_, ref name) in &entry_names {
+    for (_, name) in &entry_names {
         if let Some(rest) = name.strip_prefix(".minecraft/") {
             if !rest.is_empty() {
                 minecraft_prefix = Some(".minecraft/".to_string());
@@ -131,12 +131,14 @@ pub fn detect_modpack_format(
             }
         }
         let parts: Vec<&str> = name.split('/').collect();
-        if parts.len() >= 2 && parts[0] != ".minecraft" {
-            if parts.len() >= 3 && parts[1] == ".minecraft" {
-                let prefix = format!("{}/.minecraft/", parts[0]);
-                minecraft_prefix = Some(prefix);
-                break;
-            }
+        if parts.len() >= 2
+            && parts[0] != ".minecraft"
+            && parts.len() >= 3
+            && parts[1] == ".minecraft"
+        {
+            let prefix = format!("{}/.minecraft/", parts[0]);
+            minecraft_prefix = Some(prefix);
+            break;
         }
     }
     if let Some(prefix) = minecraft_prefix {

@@ -58,13 +58,11 @@ fn test_extract_words() {
 #[test]
 fn test_extract_words_filters_stopwords() {
     // 停用词（the/of/mod/forge 等）应被过滤
-    let words = extract_words(
-        "测试 (The Mod of Forge)",
-        Some("the-mod-of-forge"),
-        None,
-    );
+    let words = extract_words("测试 (The Mod of Forge)", Some("the-mod-of-forge"), None);
     assert!(
-        !words.iter().any(|w| w == "the" || w == "mod" || w == "forge"),
+        !words
+            .iter()
+            .any(|w| w == "the" || w == "mod" || w == "forge"),
         "stopwords should be filtered, got {:?}",
         words
     );

@@ -1,0 +1,142 @@
+//! 检查更新：构造 URL、发起请求、解析 manifest、版本比较
+
+use serde_json::Value;
+use tauri::AppHandle;
+
+use super::UpdateInfo;
+use crate::state::AppState;
+
+/// updater endpoint 路径模板（base_url 来自 AppConfig.online.api_server_url）
+///
+/// Windows 自实现检查更新走 v1 raw 端点（携带 JWT 鉴权）；
+/// macOS/Linux 官方 plugin 走 v3 无鉴权端点（tauri.conf.json 配置）。
+pub(super) const UPDATER_PATH: &str =
+    "/v1/updates/manifest/raw?target={{target}}&arch={{arch}}&current_version={{current_version}}";
+
+/// 获取当前平台标识（用于 updater endpoint 的 target 参数）
+///
+/// 服务端仅接受 `windows` / `macos` / `linux`，架构信息由 `arch` 查询参数单独传递。
+fn platform_target() -> &'static str {
+    match std::env::consts::OS {
+        "windows" => "windows",
+        "macos" => "macos",
+        "linux" => "linux",
+        other => other,
+    }
+}
+
+/// 简单 semver 比较：manifest_version > current_version 返回 true
+fn is_version_newer(manifest: &str, current: &str) -> bool {
+    fn parse_semver(s: &str) -> Option<(u64, u64, u64)> {
+        let s = s.trim_start_matches('v');
+        let mut parts = s.split(['.', '-']);
+        let major = parts.next()?.parse().ok()?;
+        let minor = parts.next()?.parse().ok()?;
+        let patch = parts.next()?.parse().ok()?;
+        Some((major, minor, patch))
+    }
+    match (parse_semver(manifest), parse_semver(current)) {
+        (Some(m), Some(c)) => m > c,
+        _ => manifest != current,
+    }
+}
+
+/// 检查更新（所有平台统一入口）
+///
+/// 使用 `crate::http::get_client()` 发起请求（走用户配置的代理），
+/// 手动解析 manifest JSON 并比较版本，不依赖 tauri-plugin-updater 的内部 HTTP 客户端。
+///
+/// **base_url**：从 `AppConfig.online.api_server_url` 读取（继承联机设置），不再硬编码。
+/// **鉴权**：v1 raw 端点需要 JWT，尝试加载设备 JWT 携带 `Authorization: Bearer` 头；
+/// 未注册设备时无 auth 请求（服务端 raw 端点对未鉴权请求返回空 manifest）。
+/// macOS/Linux 下载安装仍转发到官方 plugin（`download_and_install_unix`，走 v3 端点）。
+pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateInfo, String> {
+    let current_version = env!("CARGO_PKG_VERSION");
+    let target = platform_target();
+    let arch = std::env::consts::ARCH;
+
+    // 1. 从配置读取 api_server_url（短锁，立即 clone 释放）
+    let base_url = {
+        let config = state.config.lock().await;
+        config.online.api_server_url.clone()
+    };
+
+    // 2. 构建 URL（base_url + 路径模板替换）
+    let path = UPDATER_PATH
+        .replace("{{target}}", target)
+        .replace("{{arch}}", arch)
+        .replace("{{current_version}}", current_version);
+    let url = format!("{}{}", base_url.trim_end_matches('/'), path);
+
+    // 3. 尝试加载设备 JWT（未注册时忽略，无 auth 请求）
+    let jwt = crate::utils::online_manager::load_creds_with_auto_refresh(state)
+        .await
+        .ok()
+        .map(|creds| creds.device_token);
+
+    log::info!("[Updater] 检查更新: {} (auth: {})", url, jwt.is_some());
+
+    // 4. 构建请求（有 JWT 则携带 Authorization 头）
+    let client = crate::http::get_client();
+    let mut req_builder = client.get(&url);
+    if let Some(ref token) = jwt {
+        req_builder = req_builder.header("Authorization", format!("Bearer {}", token));
+    }
+    let response = req_builder
+        .send()
+        .await
+        .map_err(|e| format!("检查更新失败: {e}"))?;
+
+    // 204/304 = 无更新
+    if response.status() == 204 || response.status() == 304 {
+        log::info!("[Updater] 服务器返回 {}（无可用更新）", response.status());
+        return Ok(UpdateInfo::default());
+    }
+
+    if !response.status().is_success() {
+        return Err(format!("检查更新失败: HTTP {}", response.status()));
+    }
+
+    let json: Value = response
+        .json()
+        .await
+        .map_err(|e| format!("解析更新信息失败: {e}"))?;
+
+    let version = json.get("version").and_then(|v| v.as_str()).unwrap_or("");
+    if version.is_empty() {
+        log::info!("[Updater] manifest 无 version 字段（无可用更新）");
+        return Ok(UpdateInfo::default());
+    }
+
+    // 版本比较：manifest 版本必须大于当前版本才算有更新
+    if !is_version_newer(version, current_version) {
+        log::info!("[Updater] 当前版本 {} 已是最新", current_version);
+        return Ok(UpdateInfo::default());
+    }
+
+    log::info!("[Updater] 发现新版本: {} -> {}", current_version, version);
+
+    Ok(UpdateInfo {
+        available: true,
+        version: version.to_string(),
+        notes: json
+            .get("notes")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        force_update: json
+            .get("force_update")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(false),
+        download_url: json
+            .get("url")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        signature: json
+            .get("signature")
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+    })
+}

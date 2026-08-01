@@ -8,8 +8,8 @@ use super::scan_sub_options;
 
 /// 追加资源包 + 光影包选项（含动态子选项扫描）
 pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suffix: &str) {
-    let has_rp = instance_dir.join("resourcepacks").is_dir()
-        || instance_dir.join("texturepacks").is_dir();
+    let has_rp =
+        instance_dir.join("resourcepacks").is_dir() || instance_dir.join("texturepacks").is_dir();
     opts.push(ExportOption {
         id: "resourcepacks".into(),
         title: "资源包".into(),

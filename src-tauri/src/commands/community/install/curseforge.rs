@@ -93,7 +93,7 @@ pub(super) struct CfModule {
 /// - modules 含 META-INF 或 mcmod.info → mods/（默认 mod）
 /// - modules 含 pack.mcmeta → resourcepacks/
 /// - 其他 → shaderpacks/
-/// 无 modules 字段或判断失败时默认放 mods/。
+///   无 modules 字段或判断失败时默认放 mods/。
 pub(super) async fn install_cf_mods(
     state: &AppState,
     manifest_files: &[CfManifestFile],
@@ -174,11 +174,7 @@ pub(super) async fn install_cf_mods(
             batch.data.len()
         );
         for (fid, pid) in &missing {
-            crate::log_warn!(
-                "[Community]   缺失: file_id={} project_id={:?}",
-                fid,
-                pid
-            );
+            crate::log_warn!("[Community]   缺失: file_id={} project_id={:?}", fid, pid);
         }
 
         return Err(format!(
@@ -195,7 +191,10 @@ pub(super) async fn install_cf_mods(
 
     // 2. 批量查询 mod info 拿 slug（用于查 mcmod 译名 + 应用 community_filename_format）
     //    部分 file 可能缺失 project_id（Option），过滤 None 后仅查询有 project_id 的项
-    let project_ids: Vec<i64> = effective_files.iter().filter_map(|f| f.project_id).collect();
+    let project_ids: Vec<i64> = effective_files
+        .iter()
+        .filter_map(|f| f.project_id)
+        .collect();
     let mod_slug_map =
         crate::minecraft::community::curseforge::batch_get_mod_slugs(&project_ids).await;
 
@@ -206,12 +205,10 @@ pub(super) async fn install_cf_mods(
         std::collections::HashMap::new();
     for mf in &effective_files {
         let Some(fid) = mf.file_id else { continue };
-        let translated = mf
-            .project_id
-            .and_then(|pid| {
-                let slug = mod_slug_map.get(&pid)?;
-                crate::minecraft::community::mcmod::lookup_cf(slug).map(|n| n.to_string())
-            });
+        let translated = mf.project_id.and_then(|pid| {
+            let slug = mod_slug_map.get(&pid)?;
+            crate::minecraft::community::mcmod::lookup_cf(slug).map(|n| n.to_string())
+        });
         file_translated.insert(fid, translated);
     }
 
@@ -242,7 +239,12 @@ pub(super) async fn install_cf_mods(
             filename_format,
         );
         // 按 modules 分流目标目录
-        let target_dir = classify_cf_target_dir(&entry.modules, mods_dir, &resourcepacks_dir, &shaderpacks_dir);
+        let target_dir = classify_cf_target_dir(
+            &entry.modules,
+            mods_dir,
+            &resourcepacks_dir,
+            &shaderpacks_dir,
+        );
         if !target_dir.exists() {
             std::fs::create_dir_all(&target_dir)
                 .map_err(|e| format!("创建 {} 目录失败: {}", target_dir.display(), e))?;
@@ -263,13 +265,8 @@ pub(super) async fn install_cf_mods(
     );
 
     // 6. 并发下载
-    super::concurrent::download_files_concurrent(
-        state,
-        stage_index,
-        &download_list,
-        total_bytes,
-    )
-    .await?;
+    super::concurrent::download_files_concurrent(state, stage_index, &download_list, total_bytes)
+        .await?;
 
     log_info!("[Community] CF mods 下载完成 ({} 个)", download_list.len());
     Ok(())
@@ -280,7 +277,7 @@ pub(super) async fn install_cf_mods(
 /// - modules 含 META-INF 或 mcmod.info → mod（mods/）
 /// - modules 含 pack.mcmeta → resourcepack（resourcepacks/）
 /// - 其他 → shaderpack（shaderpacks/）
-/// 无 modules 字段或 modules 为空时默认 mods/
+///   无 modules 字段或 modules 为空时默认 mods/
 fn classify_cf_target_dir(
     modules: &[CfModule],
     mods_dir: &std::path::Path,

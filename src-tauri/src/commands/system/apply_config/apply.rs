@@ -12,14 +12,11 @@ use crate::log_warn;
 use crate::state::AppState;
 
 /// 配置更新核心逻辑（从扁平参数构建 `ConfigPatch` 后调用）
-pub(crate) async fn apply_config_inner(
-    state: &AppState,
-    patch: ConfigPatch,
-) -> Result<(), String> {
+pub(crate) async fn apply_config_inner(state: &AppState, patch: ConfigPatch) -> Result<(), String> {
     validate::validate_patch(&patch)?;
 
     // 2. 加密字段分流（CurseForge API Key）
-    secure::apply_curseforge(&state, &patch).await?;
+    secure::apply_curseforge(state, &patch).await?;
 
     // 2b. 开发者模式分流（注册表，不进 AppConfig）
     secure::apply_developer_mode(&patch)?;
@@ -36,7 +33,7 @@ pub(crate) async fn apply_config_inner(
     // TLS 变更需闭包外重建 HTTP 客户端（trust_mode + ignore_tls）
     let mut tls_pending: Option<bool> = None;
 
-    super::super::update_config(&state, |config| {
+    super::super::update_config(state, |config| {
         apply_proxy(config, &patch, &mut proxy_pending);
         apply_download(config, &patch);
         apply_memory(config, &patch);
@@ -89,7 +86,6 @@ pub(crate) async fn apply_config_inner(
 
     Ok(())
 }
-
 
 /// 代理域：proxy.mode / proxy.kind / proxy.url / proxy.ip_version
 ///
@@ -310,7 +306,10 @@ fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
         }
     }
     if let Some(ref servers) = patch.online.custom_turn_servers {
-        log_info!("[Config] online_custom_turn_servers count = {}", servers.len());
+        log_info!(
+            "[Config] online_custom_turn_servers count = {}",
+            servers.len()
+        );
         config.online.custom_turn_servers = servers.clone();
     }
 }

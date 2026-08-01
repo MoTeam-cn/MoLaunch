@@ -71,11 +71,16 @@ pub async fn update_tunnel(params: UpdateTunnelParams) -> Result<Tunnel, String>
     let mut tunnels = read_tunnels()?;
 
     // 名称唯一性校验（排除自身）——须在 iter_mut 借用前完成，避免可变/不可变借用冲突
-    if tunnels.iter().any(|t| t.id != params.id && t.name == params.name) {
+    if tunnels
+        .iter()
+        .any(|t| t.id != params.id && t.name == params.name)
+    {
         return Err(format!("隧道名称已存在: {}", params.name));
     }
 
-    let tunnel = tunnels.iter_mut().find(|t| t.id == params.id)
+    let tunnel = tunnels
+        .iter_mut()
+        .find(|t| t.id == params.id)
         .ok_or_else(|| format!("隧道不存在: {}", params.id))?;
 
     tunnel.name = params.name;
@@ -109,8 +114,7 @@ pub fn generate_config(tunnel: &Tunnel) -> Result<std::path::PathBuf, String> {
     let config_path = config_dir.join(format!("{}.toml", tunnel.id));
     let toml = build_frpc_toml(tunnel);
 
-    std::fs::write(&config_path, toml)
-        .map_err(|e| format!("写入 frpc 配置失败: {}", e))?;
+    std::fs::write(&config_path, toml).map_err(|e| format!("写入 frpc 配置失败: {}", e))?;
 
     log_info!("[Frp] frpc 配置已生成: {}", config_path.display());
     Ok(config_path)
@@ -141,9 +145,14 @@ fn build_frpc_toml(tunnel: &Tunnel) -> String {
 
     // 日志配置
     lines.push(String::new()); // 空行分隔
-    lines.push(format!("log.to = \"{}\"", escape_toml_string(
-        &super::frp_logs_dir().join(format!("{}.log", tunnel.id)).to_string_lossy()
-    )));
+    lines.push(format!(
+        "log.to = \"{}\"",
+        escape_toml_string(
+            &super::frp_logs_dir()
+                .join(format!("{}.log", tunnel.id))
+                .to_string_lossy()
+        )
+    ));
     lines.push("log.level = \"info\"".to_string());
     lines.push("log.maxDays = 3".to_string());
 
@@ -151,11 +160,17 @@ fn build_frpc_toml(tunnel: &Tunnel) -> String {
     lines.push(String::new());
     lines.push("[[proxies]]".to_string());
     lines.push(format!("name = \"{}\"", escape_toml_string(&tunnel.name)));
-    lines.push(format!("type = \"{}\"", match tunnel.tunnel_type {
-        TunnelType::Tcp => "tcp",
-        TunnelType::Udp => "udp",
-    }));
-    lines.push(format!("localIP = \"{}\"", escape_toml_string(&tunnel.local_ip)));
+    lines.push(format!(
+        "type = \"{}\"",
+        match tunnel.tunnel_type {
+            TunnelType::Tcp => "tcp",
+            TunnelType::Udp => "udp",
+        }
+    ));
+    lines.push(format!(
+        "localIP = \"{}\"",
+        escape_toml_string(&tunnel.local_ip)
+    ));
     lines.push(format!("localPort = {}", tunnel.local_port));
     lines.push(format!("remotePort = {}", tunnel.remote_port));
 
@@ -177,13 +192,12 @@ fn read_tunnels() -> Result<Vec<Tunnel>, String> {
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("读取隧道配置失败: {}", e))?;
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("读取隧道配置失败: {}", e))?;
     if content.trim().is_empty() {
         return Ok(Vec::new());
     }
-    let tunnels: Vec<Tunnel> = serde_json::from_str(&content)
-        .map_err(|e| format!("解析隧道配置失败: {}", e))?;
+    let tunnels: Vec<Tunnel> =
+        serde_json::from_str(&content).map_err(|e| format!("解析隧道配置失败: {}", e))?;
     Ok(tunnels)
 }
 
@@ -193,10 +207,9 @@ fn write_tunnels(tunnels: &Vec<Tunnel>) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         ensure_dir(parent)?;
     }
-    let content = serde_json::to_string_pretty(tunnels)
-        .map_err(|e| format!("序列化隧道配置失败: {}", e))?;
-    std::fs::write(&path, content)
-        .map_err(|e| format!("写入隧道配置失败: {}", e))?;
+    let content =
+        serde_json::to_string_pretty(tunnels).map_err(|e| format!("序列化隧道配置失败: {}", e))?;
+    std::fs::write(&path, content).map_err(|e| format!("写入隧道配置失败: {}", e))?;
     Ok(())
 }
 

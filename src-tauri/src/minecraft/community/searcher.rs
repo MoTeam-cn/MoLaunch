@@ -63,7 +63,11 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
     } else {
         original_query.clone()
     };
-    let mr_slugs = if has_chinese { rewrite.mr_slugs.clone() } else { Vec::new() };
+    let mr_slugs = if has_chinese {
+        rewrite.mr_slugs.clone()
+    } else {
+        Vec::new()
+    };
 
     let mut cf_fut = None;
     let mut mr_fut = None;

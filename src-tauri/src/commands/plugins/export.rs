@@ -6,8 +6,8 @@
 
 use crate::error_util::log_err;
 use crate::{log_info, resources};
-use std::path::{Path, PathBuf};
 use std::io::Write;
+use std::path::{Path, PathBuf};
 
 /// 从嵌入资源读取示例布局内容
 ///

@@ -43,15 +43,20 @@ fn register_list_lobby_rooms(d: &mut Dispatcher) {
 }
 
 fn register_list_lobby_categories(d: &mut Dispatcher) {
-    d.register("lobby_list_categories", handler!(state, _app, _params, {
-        let creds = super::load_creds(&state).await?;
-        let client = super::make_client(&state).await;
-        log_debug!("[Online] lobby_list_categories");
-        let result = client.signaling_list_lobby_categories(&creds).await
-            .map_err(|e| {
-                log_error!("[Online] lobby_list_categories 失败: {}", e);
-                e.to_string()
-            })?;
-        serde_json::to_value(result).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "lobby_list_categories",
+        handler!(state, _app, _params, {
+            let creds = super::load_creds(&state).await?;
+            let client = super::make_client(&state).await;
+            log_debug!("[Online] lobby_list_categories");
+            let result = client
+                .signaling_list_lobby_categories(&creds)
+                .await
+                .map_err(|e| {
+                    log_error!("[Online] lobby_list_categories 失败: {}", e);
+                    e.to_string()
+                })?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
 }

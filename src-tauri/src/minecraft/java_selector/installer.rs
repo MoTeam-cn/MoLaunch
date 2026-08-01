@@ -100,5 +100,5 @@ pub(super) fn select_best_from_candidates<'a>(
         b_weight.cmp(&a_weight)
     });
 
-    sorted.first().map(|&j| j)
+    sorted.first().copied()
 }

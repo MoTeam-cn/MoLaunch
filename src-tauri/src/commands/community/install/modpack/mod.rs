@@ -67,8 +67,7 @@ pub async fn preview_local_modpack(file_path: String) -> Result<ModpackPreview, 
         return Err(format!("整合包文件不存在: {}", file_path));
     }
 
-    let file =
-        std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
+    let file = std::fs::File::open(&archive_path).map_err(|e| format!("打开整合包失败: {}", e))?;
     let mut archive = zip::ZipArchive::new(file)
         .map_err(|e| format!("解析 zip 失败: {}（可能不是有效的整合包）", e))?;
 

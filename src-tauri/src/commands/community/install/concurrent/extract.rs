@@ -85,9 +85,7 @@ fn extract_overrides_once(
         let name = entry.name().to_string();
 
         // 按前缀列表顺序匹配，命中第一个前缀就去掉
-        let relative = prefixes
-            .iter()
-            .find_map(|p| name.strip_prefix(p.as_str()).map(|r| r));
+        let relative = prefixes.iter().find_map(|p| name.strip_prefix(p.as_str()));
 
         let relative = match relative {
             Some(r) => r,
@@ -115,7 +113,7 @@ fn extract_overrides_once(
         }
 
         // 每 10 个文件更新一次进度
-        if count % 10 == 0 {
+        if count.is_multiple_of(10) {
             let mut ds = state.download_state.lock().unwrap();
             ds.set_stage_bytes(stage_index, count as u64, total as u64);
         }

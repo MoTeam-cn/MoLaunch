@@ -50,7 +50,11 @@ pub struct LobbyModpackSummary {
     #[serde(alias = "modpack_id")]
     pub modpack_id: String,
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none", default, alias = "modpack_version")]
+    #[serde(
+        skip_serializing_if = "Option::is_none",
+        default,
+        alias = "modpack_version"
+    )]
     pub modpack_version: Option<String>,
     /// 来源平台（`curseforge` / `modrinth`）
     pub source: String,
@@ -160,7 +164,11 @@ impl OnlineClient {
         if let Some(ref v) = query.keyword {
             pairs.push(format!("keyword={}", urlencoding::encode(v)));
         }
-        let qs = if pairs.is_empty() { String::new() } else { format!("?{}", pairs.join("&")) };
+        let qs = if pairs.is_empty() {
+            String::new()
+        } else {
+            format!("?{}", pairs.join("&"))
+        };
         let path = format!("/v1/signaling/lobby/rooms{}", qs);
         self.call_v1::<LobbyListResponse>(creds, "GET", &path, None, false)
             .await

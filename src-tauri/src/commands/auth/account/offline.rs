@@ -12,9 +12,7 @@ use crate::state::{AppState, LocalAuthResult};
 use super::OfflineAccountInfo;
 
 /// 获取已存储的离线账号列表
-pub async fn get_offline_accounts(
-    state: &AppState,
-) -> Result<Vec<OfflineAccountInfo>, String> {
+pub async fn get_offline_accounts(state: &AppState) -> Result<Vec<OfflineAccountInfo>, String> {
     log_info!("[Startup][IPC] get_offline_accounts called");
     let persisted = state
         .auth_storage
@@ -101,10 +99,7 @@ pub async fn save_custom_skin(
 }
 
 /// 删除已存储的离线账号
-pub async fn remove_offline_account(
-    state: &AppState,
-    uuid: String,
-) -> Result<(), String> {
+pub async fn remove_offline_account(state: &AppState, uuid: String) -> Result<(), String> {
     log_info!("Removing offline account: {}", uuid);
     state
         .auth_storage

@@ -103,7 +103,10 @@ impl VersionSetup {
 
         let mut content = String::new();
         content.push_str("[info]\n");
-        content.push_str(&format!("OriginalVersion={}\n", setup.loader.original_version));
+        content.push_str(&format!(
+            "OriginalVersion={}\n",
+            setup.loader.original_version
+        ));
         content.push_str(&format!("Type={}\n", setup.loader.version_type.as_str()));
 
         if let Some(ref v) = setup.loader.forge_version {
@@ -196,7 +199,7 @@ impl VersionSetup {
 
         // 读取模板
         let template_content = crate::resources::read_resource("defaults/setup.ini")
-            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
         let template = crate::storage::ini::IniFile::parse(&template_content);
 
         // 读取当前 setup.ini

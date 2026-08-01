@@ -10,8 +10,7 @@ use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
 use tauri::{
-    http::Response, AppHandle, Builder, Emitter, Manager, Runtime, WebviewUrl,
-    WebviewWindowBuilder,
+    http::Response, AppHandle, Builder, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
 };
 
 use super::types::OpenPickerWindowParams;
@@ -97,7 +96,11 @@ pub async fn open_picker_window(
         params.template,
         width,
         height,
-        if params.csp.is_some() { "enabled" } else { "disabled" }
+        if params.csp.is_some() {
+            "enabled"
+        } else {
+            "disabled"
+        }
     );
 
     // 构造 picker:// URL（Tauri v2 在 Windows 上会转为 https://picker.localhost/）
@@ -160,7 +163,7 @@ pub async fn open_picker_window(
 
     // 监听窗口关闭（用户未选择直接关窗）
     window.on_window_event(move |event| {
-        if let tauri::WindowEvent::Destroyed { .. } = event {
+        if let tauri::WindowEvent::Destroyed = event {
             // 检查是否已完成选择，避免重复发取消事件
             let already_completed = PICKER_COMPLETED
                 .lock()
@@ -223,7 +226,12 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         if template_name == "port-picker" && is_data_request {
             let ports = super::network::list_open_ports_sync();
             let json = serde_json::json!({ "ports": ports });
-            return build_response(200, "application/json", serde_json::to_vec(&json).unwrap_or_default(), csp.as_deref());
+            return build_response(
+                200,
+                "application/json",
+                serde_json::to_vec(&json).unwrap_or_default(),
+                csp.as_deref(),
+            );
         }
 
         // 读取模板 HTML（统一从 resources/templates/<name>.html 读取）
@@ -248,12 +256,22 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         let injection = format!("<script>window.__PICKER_DATA__ = {};</script>", data_json);
         let html = template.replace("</body>", &format!("{}</body>", injection));
 
-        build_response(200, "text/html; charset=utf-8", html.into_bytes(), csp.as_deref())
+        build_response(
+            200,
+            "text/html; charset=utf-8",
+            html.into_bytes(),
+            csp.as_deref(),
+        )
     })
 }
 
 /// 构造响应（注入 CSP 响应头）
-fn build_response(status: u16, content_type: &str, body: Vec<u8>, csp: Option<&str>) -> Response<Vec<u8>> {
+fn build_response(
+    status: u16,
+    content_type: &str,
+    body: Vec<u8>,
+    csp: Option<&str>,
+) -> Response<Vec<u8>> {
     let mut builder = Response::builder()
         .status(status)
         .header("Content-Type", content_type)

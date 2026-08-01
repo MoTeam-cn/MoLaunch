@@ -16,9 +16,9 @@ pub fn validate_mirror_url(url: &str) -> Result<(), String> {
     } else {
         url.strip_prefix("http://").unwrap_or(url)
     };
-    let host_part = after_scheme.split('@').last().unwrap_or(after_scheme);
+    let host_part = after_scheme.split('@').next_back().unwrap_or(after_scheme);
     let host_end = host_part
-        .find(|c| c == '/' || c == ':' || c == '?' || c == '#')
+        .find(['/', ':', '?', '#'])
         .unwrap_or(host_part.len());
     let host = &host_part[..host_end];
     let host = host.trim_start_matches('[').trim_end_matches(']');

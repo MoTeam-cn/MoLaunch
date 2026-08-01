@@ -30,7 +30,7 @@ pub async fn list_versions(
             .filter_map(|v| {
                 let version = v["version"].as_str()?;
                 let modified = v["modified"].as_str();
-                let release_time = modified.and_then(|s| crate::utils::datetime::format_utc_to_local(s));
+                let release_time = modified.and_then(crate::utils::datetime::format_utc_to_local);
                 Some(LoaderVersion {
                     version: version.to_string(),
                     is_recommended: v["category"].as_str() == Some("recommended"),

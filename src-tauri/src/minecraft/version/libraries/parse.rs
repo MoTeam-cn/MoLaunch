@@ -94,10 +94,7 @@ pub fn parse_libraries(json: &serde_json::Value, game_dir: &Path) -> Vec<LibEntr
     };
 
     for library in libraries {
-        let rules = library
-            .get("rules")
-            .and_then(|r| r.as_array())
-            .map(|arr| arr.clone());
+        let rules = library.get("rules").and_then(|r| r.as_array()).cloned();
         if !check_rules(&rules) {
             continue;
         }

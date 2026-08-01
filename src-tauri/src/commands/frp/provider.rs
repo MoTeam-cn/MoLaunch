@@ -4,7 +4,10 @@
 //! 包含 manifest.json 描述厂商元信息、frpc 分发方式（bundled/url）和认证配置。
 //! 厂商启用状态持久化到 `<base_dir>/frp/providers.json`；安装/卸载见 [`super::install`]，frpc 下载见 [`super::binary`]。
 
-use super::{ensure_dir, providers_root, providers_state_path, validate_provider_id, ProviderInfo, ProviderManifest};
+use super::{
+    ensure_dir, providers_root, providers_state_path, validate_provider_id, ProviderInfo,
+    ProviderManifest,
+};
 use crate::log_info;
 use crate::state::AppState;
 use std::collections::HashMap;
@@ -53,7 +56,11 @@ pub(super) fn read_frpc_version() -> Option<String> {
     let path = frpc_version_path();
     let v = std::fs::read_to_string(&path).ok()?;
     let v = v.trim().to_string();
-    if v.is_empty() { None } else { Some(v) }
+    if v.is_empty() {
+        None
+    } else {
+        Some(v)
+    }
 }
 
 /// 写入 frpc 版本到元数据文件（下载成功后调用）
@@ -155,8 +162,8 @@ pub(super) fn write_providers_state(state: &HashMap<String, bool>) -> Result<(),
     if let Some(parent) = path.parent() {
         ensure_dir(parent)?;
     }
-    let content = serde_json::to_string_pretty(state)
-        .map_err(|e| format!("序列化厂商状态失败: {}", e))?;
+    let content =
+        serde_json::to_string_pretty(state).map_err(|e| format!("序列化厂商状态失败: {}", e))?;
     std::fs::write(&path, content).map_err(|e| format!("写入厂商状态失败: {}", e))
 }
 
@@ -173,8 +180,8 @@ pub(super) fn read_provider_manifest(provider_id: &str) -> Result<ProviderManife
     }
     let content = std::fs::read_to_string(&manifest_path)
         .map_err(|e| format!("读取 manifest 失败: {}", e))?;
-    let manifest: ProviderManifest = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 manifest 失败: {}", e))?;
+    let manifest: ProviderManifest =
+        serde_json::from_str(&content).map_err(|e| format!("解析 manifest 失败: {}", e))?;
     if manifest.id != provider_id {
         return Err(format!(
             "manifest.id ({}) 与目录名 ({}) 不一致",
@@ -228,8 +235,7 @@ pub async fn list_providers(state: &AppState) -> Result<Vec<ProviderInfo>, Strin
     // 外部：扫描 providers/ 目录
     let root = providers_root();
     if root.exists() {
-        let entries = std::fs::read_dir(&root)
-            .map_err(|e| format!("读取厂商目录失败: {}", e))?;
+        let entries = std::fs::read_dir(&root).map_err(|e| format!("读取厂商目录失败: {}", e))?;
         for entry in entries.flatten() {
             let path = entry.path();
             if !path.is_dir() {

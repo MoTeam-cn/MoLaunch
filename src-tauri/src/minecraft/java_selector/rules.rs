@@ -79,7 +79,7 @@ pub fn get_java_version_range(
         match loader_lower.as_str() {
             "forge" => {
                 // Forge 1.6.1-1.7.2 必须 Java 7
-                if major == 1 && minor >= 6 && minor <= 7 {
+                if major == 1 && (6..=7).contains(&minor) {
                     tighten_min(&mut min, 7);
                     tighten_max(&mut max, 7);
                 }
@@ -88,7 +88,7 @@ pub fn get_java_version_range(
                     tighten_max(&mut max, 8);
                 }
                 // Forge 1.13-1.15: Java 8~15
-                if major == 1 && minor >= 13 && minor <= 15 {
+                if major == 1 && (13..=15).contains(&minor) {
                     tighten_min(&mut min, 8);
                     tighten_max(&mut max, 15);
                 }
@@ -99,7 +99,7 @@ pub fn get_java_version_range(
             }
             "fabric" => {
                 // Fabric 1.15-1.16 最低 Java 8
-                if major == 1 && minor >= 15 && minor <= 16 {
+                if major == 1 && (15..=16).contains(&minor) {
                     tighten_min(&mut min, 8);
                 }
                 // Fabric 1.18+ 最低 Java 17（原版规则已覆盖）
@@ -110,7 +110,7 @@ pub fn get_java_version_range(
                     tighten_max(&mut max, 8);
                 }
                 // OptiFine 1.8-1.11 必须恰好 Java 8
-                if major == 1 && minor >= 8 && minor <= 11 {
+                if major == 1 && (8..=11).contains(&minor) {
                     tighten_min(&mut min, 8);
                     tighten_max(&mut max, 8);
                 }

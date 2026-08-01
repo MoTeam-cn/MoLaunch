@@ -15,7 +15,6 @@ use crate::log_warn;
 use crate::minecraft::online::bridge::VirtualLanBridge;
 use crate::utils::dispatcher::Dispatcher;
 
-
 /// `tun_start` 参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,7 +60,6 @@ pub struct TunForwardResponse {
     pub packet_len: usize,
 }
 
-
 /// 注册全部 TUN 管理 action 到 dispatcher
 pub fn register_tun_actions(d: &mut Dispatcher) {
     register_tun_start(d);
@@ -69,7 +67,6 @@ pub fn register_tun_actions(d: &mut Dispatcher) {
     register_tun_stop(d);
     register_restart_as_admin(d);
 }
-
 
 fn register_tun_start(d: &mut Dispatcher) {
     d.register("tun_start", handler!(state, app, params, {
@@ -133,75 +130,83 @@ fn register_tun_start(d: &mut Dispatcher) {
 }
 
 fn register_tun_forward_to(d: &mut Dispatcher) {
-    d.register("tun_forward_to", handler!(state, _app, params, {
-        let p: TunForwardParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
+    d.register(
+        "tun_forward_to",
+        handler!(state, _app, params, {
+            let p: TunForwardParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
 
-        // base64 解码
-        let raw = base64::engine::general_purpose::STANDARD
-            .decode(&p.message_base64)
-            .map_err(|e| {
-                log_warn!("[Online] tun_forward_to: base64 解码失败: {}", e);
-                format!("base64 解码失败: {}", e)
-            })?;
+            // base64 解码
+            let raw = base64::engine::general_purpose::STANDARD
+                .decode(&p.message_base64)
+                .map_err(|e| {
+                    log_warn!("[Online] tun_forward_to: base64 解码失败: {}", e);
+                    format!("base64 解码失败: {}", e)
+                })?;
 
-        // 取当前 bridge 的 write_tx clone（不持有 Mutex 守卫跨 await，防死锁）
-        let write_tx = {
-            let guard = state.virtual_lan_bridge.lock().await;
-            match guard.as_ref() {
-                Some(b) => b.write_tx_clone(),
-                None => {
-                    log_warn!("[Online] tun_forward_to: bridge 未启动，忽略消息");
-                    return Err("TUN bridge 未启动".to_string());
+            // 取当前 bridge 的 write_tx clone（不持有 Mutex 守卫跨 await，防死锁）
+            let write_tx = {
+                let guard = state.virtual_lan_bridge.lock().await;
+                match guard.as_ref() {
+                    Some(b) => b.write_tx_clone(),
+                    None => {
+                        log_warn!("[Online] tun_forward_to: bridge 未启动，忽略消息");
+                        return Err("TUN bridge 未启动".to_string());
+                    }
                 }
-            }
-        };
-        // guard 已释放，write_tx 是 mpsc::Sender，可安全跨 await
+            };
+            // guard 已释放，write_tx 是 mpsc::Sender，可安全跨 await
 
-        // 同步解码 DataChannel 消息（无需持有 bridge 引用）
-        let decoded = VirtualLanBridge::decode_from_datachannel(&raw)
-            .map_err(|e| {
+            // 同步解码 DataChannel 消息（无需持有 bridge 引用）
+            let decoded = VirtualLanBridge::decode_from_datachannel(&raw).map_err(|e| {
                 log_warn!("[Online] tun_forward_to 解码失败: {}", e);
                 e
             })?;
 
-        let (is_data, packet_len) = match &decoded {
-            Some(packet) => {
-                // 写入 TUN（跨 await，但不持有 Mutex 守卫）
-                if write_tx.send(packet.clone()).await.is_err() {
-                    log_warn!("[Online] tun_forward_to: TUN 写通道已关闭");
-                    return Err("TUN 写通道已关闭".to_string());
+            let (is_data, packet_len) = match &decoded {
+                Some(packet) => {
+                    // 写入 TUN（跨 await，但不持有 Mutex 守卫）
+                    if write_tx.send(packet.clone()).await.is_err() {
+                        log_warn!("[Online] tun_forward_to: TUN 写通道已关闭");
+                        return Err("TUN 写通道已关闭".to_string());
+                    }
+                    (true, packet.len())
                 }
-                (true, packet.len())
-            }
-            None => (false, 0),
-        };
+                None => (false, 0),
+            };
 
-        log_debug!(
-            "[Online] tun_forward_to: is_data={}, len={}",
-            is_data, packet_len
-        );
+            log_debug!(
+                "[Online] tun_forward_to: is_data={}, len={}",
+                is_data,
+                packet_len
+            );
 
-        let resp = TunForwardResponse { is_data, packet_len };
-        serde_json::to_value(resp).map_err(|e| e.to_string())
-    }));
+            let resp = TunForwardResponse {
+                is_data,
+                packet_len,
+            };
+            serde_json::to_value(resp).map_err(|e| e.to_string())
+        }),
+    );
 }
 
 fn register_tun_stop(d: &mut Dispatcher) {
-    d.register("tun_stop", handler!(state, _app, _params, {
-        log_info!("[Online] tun_stop");
+    d.register(
+        "tun_stop",
+        handler!(state, _app, _params, {
+            log_info!("[Online] tun_stop");
 
-        let mut guard = state.virtual_lan_bridge.lock().await;
-        if let Some(bridge) = guard.take() {
-            bridge.stop().await;
-            log_info!("[Online] tun_stop 成功");
-        } else {
-            log_debug!("[Online] tun_stop: bridge 未启动，跳过");
-        }
+            let mut guard = state.virtual_lan_bridge.lock().await;
+            if let Some(bridge) = guard.take() {
+                bridge.stop().await;
+                log_info!("[Online] tun_stop 成功");
+            } else {
+                log_debug!("[Online] tun_stop: bridge 未启动，跳过");
+            }
 
-        serde_json::to_value(serde_json::json!({ "success": true }))
-            .map_err(|e| e.to_string())
-    }));
+            serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
+        }),
+    );
 }
 
 /// `restart_as_admin` action
@@ -212,31 +217,35 @@ fn register_tun_stop(d: &mut Dispatcher) {
 ///   导致无法连接 Vite dev server），返回 `dev_mode` 标记，前端提示用户用管理员权限终端
 ///   运行 `npm run tauri dev`
 fn register_restart_as_admin(d: &mut Dispatcher) {
-    d.register("restart_as_admin", handler!(_state, app, _params, {
-        log_info!("[Online] restart_as_admin: 以管理员权限重启");
+    d.register(
+        "restart_as_admin",
+        handler!(_state, app, _params, {
+            log_info!("[Online] restart_as_admin: 以管理员权限重启");
 
-        // dev 模式：直接返回提示，不重启进程
-        if cfg!(debug_assertions) {
-            log_info!("[Online] restart_as_admin: dev 模式，跳过自动重启，提示用户用管理员终端启动");
-            return serde_json::to_value(serde_json::json!({
-                "success": false,
-                "dev_mode": true,
-                "message": "开发模式下无法自动重启，请用管理员权限的终端运行 npm run tauri dev",
-            }))
+            // dev 模式：直接返回提示，不重启进程
+            if cfg!(debug_assertions) {
+                log_info!(
+                    "[Online] restart_as_admin: dev 模式，跳过自动重启，提示用户用管理员终端启动"
+                );
+                return serde_json::to_value(serde_json::json!({
+                    "success": false,
+                    "dev_mode": true,
+                    "message": "开发模式下无法自动重启，请用管理员权限的终端运行 npm run tauri dev",
+                }))
                 .map_err(|e| e.to_string());
-        }
+            }
 
-        crate::minecraft::system::shell::relaunch_as_admin(&[])?;
+            crate::minecraft::system::shell::relaunch_as_admin(&[])?;
 
-        // 延迟退出当前进程，给前端留时间收到 IPC 响应
-        let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
-            tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-            log_info!("[Online] 退出当前进程（管理员重启）");
-            app_clone.exit(0);
-        });
+            // 延迟退出当前进程，给前端留时间收到 IPC 响应
+            let app_clone = app.clone();
+            tauri::async_runtime::spawn(async move {
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+                log_info!("[Online] 退出当前进程（管理员重启）");
+                app_clone.exit(0);
+            });
 
-        serde_json::to_value(serde_json::json!({ "success": true }))
-            .map_err(|e| e.to_string())
-    }));
+            serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
+        }),
+    );
 }

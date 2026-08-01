@@ -11,9 +11,7 @@ use crate::minecraft::auth::microsoft;
 use crate::state::{AppState, LocalAuthResult};
 
 /// 获取当前登录状态（优先内存，其次磁盘恢复）
-pub async fn get_login_status(
-    state: &AppState,
-) -> Result<Option<LocalAuthResult>, String> {
+pub async fn get_login_status(state: &AppState) -> Result<Option<LocalAuthResult>, String> {
     log_info!("[Startup][IPC] get_login_status called");
     {
         let auth = state.auth.lock().await;

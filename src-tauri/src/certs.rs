@@ -158,17 +158,9 @@ pub fn load_custom_root_certificates() -> Vec<reqwest::Certificate> {
         match std::fs::read(&path) {
             Ok(pem_bytes) => match reqwest::Certificate::from_pem(&pem_bytes) {
                 Ok(cert) => certs.push(cert),
-                Err(e) => crate::log_warn!(
-                    "[Certs] Failed to parse PEM file {}: {}",
-                    filename,
-                    e
-                ),
+                Err(e) => crate::log_warn!("[Certs] Failed to parse PEM file {}: {}", filename, e),
             },
-            Err(e) => crate::log_warn!(
-                "[Certs] Failed to read PEM file {}: {}",
-                filename,
-                e
-            ),
+            Err(e) => crate::log_warn!("[Certs] Failed to read PEM file {}: {}", filename, e),
         }
     }
 
@@ -189,7 +181,9 @@ pub fn load_system_root_certificates() -> Vec<reqwest::Certificate> {
                 let der_bytes: &[u8] = cert.as_ref();
                 match reqwest::Certificate::from_der(der_bytes) {
                     Ok(c) => certs.push(c),
-                    Err(e) => crate::log_debug!("[Certs] Skipped system cert (DER→reqwest fail): {}", e),
+                    Err(e) => {
+                        crate::log_debug!("[Certs] Skipped system cert (DER→reqwest fail): {}", e)
+                    }
                 }
             }
             log_info!("[Certs] Loaded {} system root certificates", certs.len());
@@ -246,7 +240,13 @@ fn parse_pem_meta(pem_bytes: &[u8], fallback_filename: &str) -> (String, String)
     // 这种方式对常见 X.509 证书有效，但不保证所有证书都能匹配
     let der_str: Vec<u8> = der_bytes
         .iter()
-        .map(|&b| if b.is_ascii_graphic() || b == b' ' { b } else { b' ' })
+        .map(|&b| {
+            if b.is_ascii_graphic() || b == b' ' {
+                b
+            } else {
+                b' '
+            }
+        })
         .collect();
     let der_text = String::from_utf8_lossy(&der_str);
 
@@ -261,7 +261,7 @@ fn extract_cn(text: &str, fallback: &str) -> String {
     if let Some(pos) = text.find("CN=") {
         let start = pos + 3;
         let end = text[start..]
-            .find(|c: char| c == ',' || c == '/' || c == '\n')
+            .find([',', '/', '\n'])
             .map(|i| start + i)
             .unwrap_or(text.len());
         let cn = text[start..end].trim();
@@ -280,7 +280,7 @@ fn extract_not_after(text: &str) -> String {
         if let Some(pos) = text.find(marker) {
             let start = pos + marker.len();
             let end = text[start..]
-                .find(|c: char| c == '\n' || c == ',')
+                .find(['\n', ','])
                 .map(|i| start + i)
                 .unwrap_or((start + 24).min(text.len()));
             let value = text[start..end].trim();

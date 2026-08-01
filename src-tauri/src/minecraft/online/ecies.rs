@@ -8,8 +8,8 @@ use serde::{Deserialize, Serialize};
 use x25519_dalek::{EphemeralSecret, PublicKey as X25519PublicKey};
 
 use super::crypto::{
-    aes_gcm_decrypt, aes_gcm_encrypt, b64u_decode, b64u_encode, hkdf_sha256, x25519_public_from_b64u,
-    CryptoError,
+    aes_gcm_decrypt, aes_gcm_encrypt, b64u_decode, b64u_encode, hkdf_sha256,
+    x25519_public_from_b64u, CryptoError,
 };
 
 /// ECIES 信封 info 字符串（与服务端约定，不可修改）
@@ -38,8 +38,8 @@ pub fn seal(plaintext: &[u8], peer_public_b64u: &str) -> Result<SealedEnvelope, 
     let peer_public = x25519_public_from_b64u(peer_public_b64u)?;
 
     // 1. 生成临时 X25519 密钥对
-    let mut csprng = OsRng;
-    let ephemeral_secret = EphemeralSecret::random_from_rng(&mut csprng);
+    let csprng = OsRng;
+    let ephemeral_secret = EphemeralSecret::random_from_rng(csprng);
     let ephemeral_public = X25519PublicKey::from(&ephemeral_secret);
 
     // 2. ECDH 派生共享密钥
@@ -98,14 +98,8 @@ pub fn open(envelope: &Envelope, our_secret_bytes: &[u8; 32]) -> Result<Vec<u8>,
 /// 加密响应 Content-Type 为 application/json，body 是 `{payload, key}` 结构。
 /// 明文错误响应（401/400/500）不是信封，直接解析为 UnifiedResponse。
 pub fn is_envelope(value: &serde_json::Value) -> bool {
-    value
-        .get("payload")
-        .and_then(|v| v.as_str())
-        .is_some()
-        && value
-            .get("key")
-            .and_then(|v| v.as_str())
-            .is_some()
+    value.get("payload").and_then(|v| v.as_str()).is_some()
+        && value.get("key").and_then(|v| v.as_str()).is_some()
 }
 
 #[cfg(test)]

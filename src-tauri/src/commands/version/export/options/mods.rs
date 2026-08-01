@@ -123,7 +123,12 @@ pub(super) fn push(opts: &mut Vec<ExportOption>, instance_dir: &Path, rules_suff
         enabled: true,
         visible: has_file_or_dir(
             instance_dir,
-            &["journeymap/data", "xaero", "XaeroWaypoints", "XaeroWorldMap"],
+            &[
+                "journeymap/data",
+                "xaero",
+                "XaeroWaypoints",
+                "XaeroWorldMap",
+            ],
         ),
     });
 

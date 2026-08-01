@@ -32,7 +32,9 @@ fn test_reorder_urls_mirror_mode() {
     let result = manager.reorder_urls(&urls);
     // Mirror 模式只返回镜像 URL（bmclapi + mocdn）
     assert_eq!(result.len(), 2);
-    assert!(result.iter().all(|u| u.contains("bmclapi") || u.contains("mocdn")));
+    assert!(result
+        .iter()
+        .all(|u| u.contains("bmclapi") || u.contains("mocdn")));
 }
 
 #[test]

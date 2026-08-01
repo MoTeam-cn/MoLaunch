@@ -4,7 +4,9 @@
 //! + 进程启动时间（兼容子进程）三层匹配，命中后用 `SetWindowTextW` 改写标题。
 
 use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
-use windows::Win32::System::Threading::{GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+use windows::Win32::System::Threading::{
+    GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+};
 use windows::Win32::UI::WindowsAndMessaging::{
     EnumWindows, GetClassNameW, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
     SetWindowTextW,

@@ -50,10 +50,8 @@ pub(super) fn build_classpath(game_dir: &Path, json: &serde_json::Value) -> anyh
 
     for lib in &all_libraries {
         // 应用 rules 过滤（平台适配）
-        let rules: Option<Vec<serde_json::Value>> = lib
-            .get("rules")
-            .and_then(|v| v.as_array())
-            .map(|a| a.clone());
+        let rules: Option<Vec<serde_json::Value>> =
+            lib.get("rules").and_then(|v| v.as_array()).cloned();
         if !crate::minecraft::version::libraries::check_rules(&rules) {
             continue;
         }

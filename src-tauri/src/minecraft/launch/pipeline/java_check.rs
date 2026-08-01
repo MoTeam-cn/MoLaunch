@@ -144,8 +144,8 @@ impl LaunchPipeline {
                     crate::minecraft::java_selector::get_recommended_java_version(&mc_version_clone)
                 });
                 // 校验推荐版本落在需求区间内
-                let in_range = min_req.map_or(true, |m| target_major >= m)
-                    && max_req.map_or(true, |m| target_major <= m);
+                let in_range = min_req.is_none_or(|m| target_major >= m)
+                    && max_req.is_none_or(|m| target_major <= m);
                 if !in_range {
                     return Err(LaunchError {
                         stage: LaunchStage::GetJava,

@@ -31,7 +31,8 @@ type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 /// `AppState` 与 `AppHandle` 内部均为 `Arc`，clone 廉价。
 pub type Handler = std::sync::Arc<
     dyn Fn(AppState, AppHandle, serde_json::Value) -> BoxFuture<Result<serde_json::Value, String>>
-        + Send + Sync
+        + Send
+        + Sync
         + 'static,
 >;
 
@@ -58,9 +59,8 @@ impl Dispatcher {
         F: Fn(AppState, AppHandle, serde_json::Value) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<serde_json::Value, String>> + Send + 'static,
     {
-        let wrapped: Handler = std::sync::Arc::new(move |state, app, params| {
-            Box::pin(handler(state, app, params))
-        });
+        let wrapped: Handler =
+            std::sync::Arc::new(move |state, app, params| Box::pin(handler(state, app, params)));
         self.handlers.insert(action, wrapped);
     }
 

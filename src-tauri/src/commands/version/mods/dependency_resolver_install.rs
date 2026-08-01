@@ -10,8 +10,8 @@ use serde::Serialize;
 use super::ResolvedDependency;
 use crate::commands::version::mods::helpers::get_mods_dir;
 use crate::minecraft::community::types::ResourceVersion;
-use crate::minecraft::download::DownloadSession;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
+use crate::minecraft::download::DownloadSession;
 use crate::state::AppState;
 
 /// 安装结果
@@ -50,8 +50,7 @@ pub async fn install_mod_with_dependencies(
         }
     };
     if !mods_dir.exists() {
-        std::fs::create_dir_all(&mods_dir)
-            .map_err(|e| format!("创建 mods 目录失败: {}", e))?;
+        std::fs::create_dir_all(&mods_dir).map_err(|e| format!("创建 mods 目录失败: {}", e))?;
     }
 
     let mut tasks: Vec<DownloadTask> = Vec::new();
@@ -110,12 +109,8 @@ pub async fn install_mod_with_dependencies(
     );
 
     // 启动 DownloadSession（1 个 stage）
-    let session = DownloadSession::start_grouped(
-        state,
-        "Mod 及前置",
-        vec![("下载 Mod 及前置", 100.0)],
-    )
-    .await;
+    let session =
+        DownloadSession::start_grouped(state, "Mod 及前置", vec![("下载 Mod 及前置", 100.0)]).await;
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.version_name = main_version.file_name.clone();

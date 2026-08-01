@@ -61,9 +61,7 @@ impl VirtualNet {
             mtu
         );
 
-        let mut builder = DeviceBuilder::new()
-            .ipv4(ipv4, prefix_len, None)
-            .mtu(mtu);
+        let mut builder = DeviceBuilder::new().ipv4(ipv4, prefix_len, None).mtu(mtu);
 
         // Windows 专属：显式指定 wintun.dll 路径，避免依赖默认 DLL 搜索顺序
         #[cfg(windows)]
@@ -86,7 +84,7 @@ impl VirtualNet {
         let device = builder.build_async()?;
 
         let info = VirtualNetInfo {
-            name: format!("tun-molaunch"),
+            name: "tun-molaunch".to_string(),
             ipv4: ipv4.to_string(),
             prefix_len,
             mtu,

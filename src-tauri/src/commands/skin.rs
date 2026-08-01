@@ -25,7 +25,6 @@ pub async fn skin_manager(
     crate::utils::skin_manager::dispatch(state, app, req).await
 }
 
-
 /// 获取当前账号的皮肤/披风信息（从 profile_json 解析）
 ///
 /// 返回前会对每个 skin/cape 的 url 做缓存处理，填充 cached_url 和 cached 字段：
@@ -93,12 +92,16 @@ pub async fn get_skin_url(
                 .clone()
         } else {
             // 从 ms_accounts 查找
-            let persisted = state.auth_storage.load().await.map_err(log_err("Failed to load auth storage"))?;
+            let persisted = state
+                .auth_storage
+                .load()
+                .await
+                .map_err(log_err("Failed to load auth storage"))?;
             persisted
                 .ms_accounts
                 .iter()
                 .find(|a| &a.uuid == uuid)
-                .and_then(|a| Some(a.profile_json.as_str()))
+                .map(|a| a.profile_json.as_str())
                 .ok_or("No profile data")?
                 .to_string()
         }
@@ -113,7 +116,9 @@ pub async fn get_skin_url(
 
     let remote_url = skin::get_skin_url(&profile_json);
     match remote_url {
-        Some(url) => Ok(Some(image_cache::get_image_url(&url, Some(app.clone())).await)),
+        Some(url) => Ok(Some(
+            image_cache::get_image_url(&url, Some(app.clone())).await,
+        )),
         None => Ok(None),
     }
 }
@@ -137,7 +142,9 @@ pub async fn get_cape_url(
     drop(auth);
 
     match remote_url {
-        Some(url) => Ok(Some(image_cache::get_image_url(&url, Some(app.clone())).await)),
+        Some(url) => Ok(Some(
+            image_cache::get_image_url(&url, Some(app.clone())).await,
+        )),
         None => Ok(None),
     }
 }

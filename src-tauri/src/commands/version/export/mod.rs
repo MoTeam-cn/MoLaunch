@@ -20,7 +20,9 @@ use crate::log_info;
 use crate::state::AppState;
 
 use self::scan::collect_export_files;
-use self::types::{ExportModpackParams, ExportModpackResult, ExportOption, ExportProgress, ExportStage};
+use self::types::{
+    ExportModpackParams, ExportModpackResult, ExportOption, ExportProgress, ExportStage,
+};
 
 /// 导出进度事件名（与前端 listen 的 eventName 一致）
 pub const EXPORT_PROGRESS_EVENT: &str = "export-progress";
@@ -36,13 +38,23 @@ pub async fn get_export_options(
 ) -> Result<Vec<ExportOption>, String> {
     super::sanitize_version_id(&version_id)?;
     let instance_dir = resolve_instance_dir(state, &version_id).await?;
-    log_info!("[Export] 获取导出选项，版本: {}，实例目录: {}", version_id, instance_dir.display());
+    log_info!(
+        "[Export] 获取导出选项，版本: {}，实例目录: {}",
+        version_id,
+        instance_dir.display()
+    );
     let opts = options::build_all_options(&instance_dir);
     Ok(opts)
 }
 
 /// 推送导出进度事件
-fn emit_progress(app: &AppHandle, version_id: &str, stage: ExportStage, percent: u8, message: impl Into<String>) {
+fn emit_progress(
+    app: &AppHandle,
+    version_id: &str,
+    stage: ExportStage,
+    percent: u8,
+    message: impl Into<String>,
+) {
     let payload = ExportProgress::new(stage, percent, message, version_id);
     if let Err(e) = app.emit(EXPORT_PROGRESS_EVENT, payload) {
         log_error!("[Export] 推送进度事件失败: {}", e);
@@ -56,7 +68,13 @@ pub async fn export_modpack(
     params: ExportModpackParams,
 ) -> Result<ExportModpackResult, String> {
     super::sanitize_version_id(&params.version_id)?;
-    emit_progress(app, &params.version_id, ExportStage::Init, 1, "正在定位版本目录...");
+    emit_progress(
+        app,
+        &params.version_id,
+        ExportStage::Init,
+        1,
+        "正在定位版本目录...",
+    );
 
     let instance_dir = resolve_instance_dir(state, &params.version_id).await?;
     log_info!(
@@ -67,7 +85,13 @@ pub async fn export_modpack(
     );
 
     // 1. 收集需要导出的文件（应用规则）— 0-10%
-    emit_progress(app, &params.version_id, ExportStage::Scan, 3, "正在扫描文件...");
+    emit_progress(
+        app,
+        &params.version_id,
+        ExportStage::Scan,
+        3,
+        "正在扫描文件...",
+    );
     let files = collect_export_files(&instance_dir, &params.options)?;
     log_info!("[Export] 文件扫描完成，共 {} 个文件", files.len());
     emit_progress(
@@ -91,10 +115,13 @@ pub async fn export_modpack(
             12,
             "正在联网检查 Mod 下载地址...",
         );
-        let result = network::check_mod_files_online(&app, &files).await;
+        let result = network::check_mod_files_online(app, &files).await;
         match result {
             Ok(infos) => {
-                log_info!("[Export] 联网检查完成，{} 个 mod 获取到下载地址", infos.len());
+                log_info!(
+                    "[Export] 联网检查完成，{} 个 mod 获取到下载地址",
+                    infos.len()
+                );
                 emit_progress(
                     app,
                     &params.version_id,
@@ -125,7 +152,13 @@ pub async fn export_modpack(
         } else {
             log_info!("[Export] 跳过联网检查（用户选择打包资源文件）");
         }
-        emit_progress(app, &params.version_id, ExportStage::Network, 50, "跳过联网检查");
+        emit_progress(
+            app,
+            &params.version_id,
+            ExportStage::Network,
+            50,
+            "跳过联网检查",
+        );
         (files, Vec::new())
     };
 
@@ -144,7 +177,13 @@ pub async fn export_modpack(
     };
 
     // 4. 生成 modrinth.index.json + 打包 zip — 50-95%
-    emit_progress(app, &params.version_id, ExportStage::Zip, 52, "正在打包 zip...");
+    emit_progress(
+        app,
+        &params.version_id,
+        ExportStage::Zip,
+        52,
+        "正在打包 zip...",
+    );
     let summary = instance_dir
         .file_name()
         .and_then(|n| n.to_str())
@@ -162,7 +201,13 @@ pub async fn export_modpack(
     );
 
     if let Err(e) = zip_result {
-        emit_progress(app, &params.version_id, ExportStage::Failed, 0, format!("打包失败: {}", e));
+        emit_progress(
+            app,
+            &params.version_id,
+            ExportStage::Failed,
+            0,
+            format!("打包失败: {}", e),
+        );
         return Err(e);
     }
 
@@ -172,15 +217,16 @@ pub async fn export_modpack(
         &params.version_id,
         ExportStage::Done,
         100,
-        format!("导出完成: {}", pack_path.file_name().and_then(|n| n.to_str()).unwrap_or("")),
+        format!(
+            "导出完成: {}",
+            pack_path.file_name().and_then(|n| n.to_str()).unwrap_or("")
+        ),
     );
 
     Ok(ExportModpackResult {
         success: true,
         file_path: pack_path.to_string_lossy().to_string(),
-        file_size: std::fs::metadata(&pack_path)
-            .map(|m| m.len())
-            .unwrap_or(0),
+        file_size: std::fs::metadata(&pack_path).map(|m| m.len()).unwrap_or(0),
         file_count: files.len(),
         mod_count: mod_infos.len(),
     })
@@ -191,10 +237,7 @@ async fn resolve_instance_dir(state: &AppState, version_id: &str) -> Result<Path
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let instance_dir = game_dir.join("versions").join(version_id);
     if !instance_dir.is_dir() {
-        return Err(format!(
-            "版本目录不存在: {}",
-            instance_dir.display()
-        ));
+        return Err(format!("版本目录不存在: {}", instance_dir.display()));
     }
     Ok(instance_dir)
 }

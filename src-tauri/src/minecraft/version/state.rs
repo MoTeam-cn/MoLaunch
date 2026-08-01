@@ -51,6 +51,7 @@ impl VersionType {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     /// 从字符串解析
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
@@ -245,7 +246,7 @@ fn is_old_version(release_time: &str) -> bool {
     // 使用统一的时间解析工具
     if let Some(dt) = crate::utils::datetime::parse_utc(release_time) {
         let year = dt.year();
-        return year >= 2000 && year < 2013;
+        return (2000..2013).contains(&year);
     }
     false
 }

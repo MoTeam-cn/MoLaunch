@@ -31,7 +31,6 @@ pub async fn sdk_manager(
     crate::utils::sdk_manager::dispatch(state, app, req).await
 }
 
-
 /// 获取当前平台信息
 pub async fn get_platform_info() -> Result<SdkStatus, String> {
     log_info!("[Startup][IPC] get_platform_info called");
@@ -66,7 +65,10 @@ pub async fn get_sdk_version(state: &AppState) -> Result<Option<String>, String>
     log_info!("[Startup][IPC] get_sdk_version called");
     let sdk_guard = state.sdk.lock().await;
     match sdk_guard.as_ref() {
-        Some(sdk) => Ok(Some(sdk.version().map_err(log_err("Failed to get SDK version"))?)),
+        Some(sdk) => Ok(Some(
+            sdk.version()
+                .map_err(log_err("Failed to get SDK version"))?,
+        )),
         None => Ok(None),
     }
 }
@@ -90,9 +92,7 @@ pub async fn get_device_id(state: &AppState) -> Result<String, String> {
 }
 
 /// 检查更新（轻量版）
-pub async fn check_update_lite(
-    state: &AppState,
-) -> Result<crate::sdk::UpdateInfoLite, String> {
+pub async fn check_update_lite(state: &AppState) -> Result<crate::sdk::UpdateInfoLite, String> {
     let sdk_guard = state.sdk.lock().await;
     let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
 

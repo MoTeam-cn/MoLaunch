@@ -38,7 +38,6 @@ pub const KEY_IGNORE_TLS: &str = "IgnoreTls";
 /// - 主窗口销毁时通过 `reset_devtools_state()` 重置为 false
 static DEVTOOLS_OPEN: AtomicBool = AtomicBool::new(false);
 
-
 /// 查询开发者模式是否已解锁（用户在鸣谢法律信息中触发隐藏字段后解锁）
 ///
 /// 未解锁时返回 false，「高阶配置」页不显示开发者模式开关卡片。
@@ -65,7 +64,7 @@ pub fn lock_developer_mode(app: &AppHandle) -> Result<(), String> {
     // 若 DevTools 已打开，先关闭（不强制要求关闭成功，避免 WebView2 异常阻断撤销）
     if DEVTOOLS_OPEN.load(Ordering::SeqCst) {
         if let Some(window) = app.get_webview_window("main") {
-            let _ = window.close_devtools();
+            window.close_devtools();
         }
         DEVTOOLS_OPEN.store(false, Ordering::SeqCst);
     }
@@ -88,7 +87,6 @@ pub fn is_ignore_tls() -> bool {
     let mode = reg_get_bool(KEY_DEV_MODE);
     unlocked && mode && reg_get_bool(KEY_IGNORE_TLS)
 }
-
 
 /// 存储目录信息
 #[derive(Debug, Serialize)]
@@ -165,7 +163,7 @@ pub fn get_system_info() -> SystemInfo {
 ///
 /// 在 `spawn_blocking` 中执行以避免阻塞主线程。
 pub async fn get_cache_stats() -> Result<cache_stats::CacheStatsResult, String> {
-    tauri::async_runtime::spawn_blocking(|| cache_stats::collect_all())
+    tauri::async_runtime::spawn_blocking(cache_stats::collect_all)
         .await
         .map_err(|e| format!("Failed to collect cache stats: {}", e))
 }

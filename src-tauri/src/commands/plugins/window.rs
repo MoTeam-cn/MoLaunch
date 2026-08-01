@@ -95,15 +95,11 @@ pub async fn plugin_create_window(
         builder = builder.resizable(false);
     }
 
-    builder.build().map_err(log_err("Failed to create plugin window"))?;
+    builder
+        .build()
+        .map_err(log_err("Failed to create plugin window"))?;
 
-    log_info!(
-        "插件 {} 创建窗口 {} ({}x{})",
-        plugin_id,
-        window_label,
-        w,
-        h
-    );
+    log_info!("插件 {} 创建窗口 {} ({}x{})", plugin_id, window_label, w, h);
 
     Ok(())
 }
@@ -119,9 +115,7 @@ fn extract_domain(url: &str) -> Option<String> {
         .or_else(|| url.strip_prefix("https://"))?;
 
     // 去掉 path/query/fragment
-    let end = rest
-        .find(|c: char| c == '/' || c == '?' || c == '#')
-        .unwrap_or(rest.len());
+    let end = rest.find(['/', '?', '#']).unwrap_or(rest.len());
     let host = &rest[..end];
 
     // 去掉端口

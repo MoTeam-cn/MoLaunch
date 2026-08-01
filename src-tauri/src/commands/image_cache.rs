@@ -23,7 +23,6 @@ pub async fn image_cache_manager(
     crate::utils::image_cache_manager::dispatch(state, app, req).await
 }
 
-
 /// 获取图片的缓存 URL（通用接口）
 ///
 /// - 缓存命中：返回 `cache-image://{hash}.png` 本地 URL（`cached: true`）

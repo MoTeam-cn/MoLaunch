@@ -13,7 +13,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct GetSkinUrlParams {
@@ -40,52 +39,72 @@ struct DownloadUrlToFileParams {
     path: String,
 }
 
-
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
 
-    d.register("get_skin_cape_info", handler!(state, app, _params, {
-        let r = skin::get_skin_cape_info(&state, &app).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_skin_cape_info",
+        handler!(state, app, _params, {
+            let r = skin::get_skin_cape_info(&state, &app).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("get_skin_url", handler!(state, app, params, {
-        let p: GetSkinUrlParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = skin::get_skin_url(&state, &app, p.uuid).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_skin_url",
+        handler!(state, app, params, {
+            let p: GetSkinUrlParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = skin::get_skin_url(&state, &app, p.uuid).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("get_cape_url", handler!(state, app, _params, {
-        let r = skin::get_cape_url(&state, &app).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_cape_url",
+        handler!(state, app, _params, {
+            let r = skin::get_cape_url(&state, &app).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("upload_skin", handler!(state, _app, params, {
-        let p: UploadSkinParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        skin::upload_skin(&state, p.file_path, p.variant).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "upload_skin",
+        handler!(state, _app, params, {
+            let p: UploadSkinParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            skin::upload_skin(&state, p.file_path, p.variant).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("equip_cape", handler!(state, _app, params, {
-        let p: EquipCapeParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        skin::equip_cape(&state, p.cape_id).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "equip_cape",
+        handler!(state, _app, params, {
+            let p: EquipCapeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            skin::equip_cape(&state, p.cape_id).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("unequip_cape", handler!(state, _app, _params, {
-        skin::unequip_cape(&state).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "unequip_cape",
+        handler!(state, _app, _params, {
+            skin::unequip_cape(&state).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("download_url_to_file", handler!(_state, _app, params, {
-        let p: DownloadUrlToFileParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        skin::download_url_to_file(p.url, p.path).await?;
-        serde_json::to_value(()).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "download_url_to_file",
+        handler!(_state, _app, params, {
+            let p: DownloadUrlToFileParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            skin::download_url_to_file(p.url, p.path).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
     d
 });

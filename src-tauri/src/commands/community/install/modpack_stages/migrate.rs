@@ -17,10 +17,11 @@ pub fn migrate_modpack_config(
 ) -> Result<(), String> {
     use crate::minecraft::version::setup::{PersonalizationUpdate, VersionSetup};
 
-    let mut update = PersonalizationUpdate::default();
-
     // 强制开启版本隔离（所有格式都写）
-    update.indie_type = Some(1);
+    let mut update = PersonalizationUpdate {
+        indie_type: Some(1),
+        ..Default::default()
+    };
 
     match info.format {
         ModpackFormat::Mmc => {
@@ -34,8 +35,11 @@ pub fn migrate_modpack_config(
             // PreLaunchCommand（仅 OverrideCommands=true 时迁移）
             if cfg.override_commands {
                 if let Some(cmd) = &cfg.pre_launch_command {
-                    let replaced =
-                        super::super::mmc::substitute_pre_launch_vars(cmd, instance_dir, instance_name);
+                    let replaced = super::super::mmc::substitute_pre_launch_vars(
+                        cmd,
+                        instance_dir,
+                        instance_name,
+                    );
                     log_info!("[Community] MMC 迁移 PreLaunchCommand: {}", replaced);
                     update.advance_run_cmd = Some(replaced);
                 }

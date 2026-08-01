@@ -40,15 +40,12 @@ pub async fn fetch_version_list(
     let content = sources::fetch_with_fallback(&urls).await?;
     let json: serde_json::Value = serde_json::from_str(&content)?;
 
-    let source_name = if urls
-        .first()
-        .map_or(false, |u: &String| u.contains("bmclapi"))
-    {
+    let source_name = if urls.first().is_some_and(|u: &String| u.contains("bmclapi")) {
         "BMCLAPI"
     } else if mirror_url.is_some()
         && urls
             .first()
-            .map_or(false, |u: &String| u.starts_with(mirror_url.unwrap_or("")))
+            .is_some_and(|u: &String| u.starts_with(mirror_url.unwrap_or("")))
     {
         "Mirror"
     } else {

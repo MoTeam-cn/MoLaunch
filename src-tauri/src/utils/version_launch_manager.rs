@@ -13,7 +13,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-
 /// launch_game 参数（与原 launch_game 命令参数一一对应，字段名 camelCase）
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -44,71 +43,91 @@ struct ExportLaunchScriptParams {
     save_path: String,
 }
 
-
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
 
-    d.register("launch_game", handler!(state, app, params, {
-        let p: LaunchGameParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = launch::launch_game(
-            &state,
-            &app,
-            p.version_id,
-            p.java_path,
-            p.username,
-            p.uuid,
-            p.login_type,
-            p.window_width,
-            p.window_height,
-            p.server_address,
-            p.server_port,
-            p.extra_jvm_args,
-        )
-        .await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "launch_game",
+        handler!(state, app, params, {
+            let p: LaunchGameParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = launch::launch_game(
+                &state,
+                &app,
+                p.version_id,
+                p.java_path,
+                p.username,
+                p.uuid,
+                p.login_type,
+                p.window_width,
+                p.window_height,
+                p.server_address,
+                p.server_port,
+                p.extra_jvm_args,
+            )
+            .await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("get_launch_progress", handler!(state, _app, _params, {
-        let r = launch::get_launch_progress(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_launch_progress",
+        handler!(state, _app, _params, {
+            let r = launch::get_launch_progress(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("cancel_launch", handler!(state, _app, _params, {
-        let r = launch::cancel_launch(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "cancel_launch",
+        handler!(state, _app, _params, {
+            launch::cancel_launch(&state).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("stop_game", handler!(state, _app, _params, {
-        let r = launch::stop_game(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "stop_game",
+        handler!(state, _app, _params, {
+            launch::stop_game(&state).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("get_running_game", handler!(state, _app, _params, {
-        let r = launch::get_running_game(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_running_game",
+        handler!(state, _app, _params, {
+            let r = launch::get_running_game(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("get_launch_history", handler!(state, _app, _params, {
-        let r = launch::get_launch_history(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_launch_history",
+        handler!(state, _app, _params, {
+            let r = launch::get_launch_history(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("export_launch_script", handler!(state, _app, params, {
-        let p: ExportLaunchScriptParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = script_export::export_launch_script(
-            &state,
-            p.version_id,
-            p.username,
-            p.uuid,
-            p.login_type,
-            p.java_path,
-            p.save_path,
-        )
-        .await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "export_launch_script",
+        handler!(state, _app, params, {
+            let p: ExportLaunchScriptParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            script_export::export_launch_script(
+                &state,
+                p.version_id,
+                p.username,
+                p.uuid,
+                p.login_type,
+                p.java_path,
+                p.save_path,
+            )
+            .await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
 
     d
 });

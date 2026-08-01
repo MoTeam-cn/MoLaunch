@@ -2,11 +2,8 @@
 
 use super::super::state::VersionType;
 
-/// 检测加载器类型
-pub(super) fn detect_loaders(
-    json: &serde_json::Value,
-    json_content: &str,
-) -> (
+/// 加载器检测结果元组（version_type / forge / neoforge / fabric / optifine / liteloader / extra）
+type LoaderDetectResult = (
     VersionType,
     Option<String>,
     Option<String>,
@@ -14,7 +11,10 @@ pub(super) fn detect_loaders(
     Option<String>,
     Option<String>,
     Option<String>,
-) {
+);
+
+/// 检测加载器类型
+pub(super) fn detect_loaders(json: &serde_json::Value, json_content: &str) -> LoaderDetectResult {
     let mut state = VersionType::Release;
     let mut forge_version = None;
     let mut neoforge_version = None;

@@ -112,11 +112,9 @@ fn extract_parts(version: &str) -> Vec<String> {
             }
             current.push(c.to_ascii_uppercase());
             is_digit = false;
-        } else if c == '.' || c == ' ' || c == '_' || c == '-' {
-            if !current.is_empty() {
-                parts.push(current.clone());
-                current.clear();
-            }
+        } else if (c == '.' || c == ' ' || c == '_' || c == '-') && !current.is_empty() {
+            parts.push(current.clone());
+            current.clear();
         }
     }
 

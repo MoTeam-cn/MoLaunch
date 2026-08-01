@@ -57,7 +57,7 @@ pub fn detect_java(java_path: &Path) -> Result<JavaRuntime, String> {
     let is_64bit = version_output.contains("64-bit");
 
     // [9] 版本合理性验证
-    if major_version < 5 || major_version > 99 {
+    if !(5..=99).contains(&major_version) {
         return Err(format!("Invalid major version: {}", major_version));
     }
 

@@ -60,9 +60,7 @@ pub(super) fn extract_host(url: &str) -> Option<String> {
     let no_scheme = url
         .strip_prefix("https://")
         .or_else(|| url.strip_prefix("http://"))?;
-    let host_end = no_scheme
-        .find(|c| c == '/' || c == '?' || c == '#')
-        .unwrap_or(no_scheme.len());
+    let host_end = no_scheme.find(['/', '?', '#']).unwrap_or(no_scheme.len());
     let host_with_port = &no_scheme[..host_end];
     let host = host_with_port.split(':').next()?;
     if host.is_empty() {

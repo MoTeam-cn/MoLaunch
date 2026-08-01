@@ -1,12 +1,13 @@
 //! 崩溃日志分析
 //! - `analyze`：对游戏崩溃日志文本做大小写不敏感的模式匹配，识别常见崩溃原因
 //!   （Java 版本 / 缺失 mod / 内存 / 驱动 / Mod 冲突 / 其他），返回结构化的分析条目供前端展示。
+//!
 //! 本模块为纯文本分析，不读取文件系统，不使用 state 参数（签名保持统一）。
 
 use crate::log_info;
 use crate::state::AppState;
 
-use super::types::{CrashAnalyzeParams, CrashAnalyzeResult, CrashAnalysisItem};
+use super::types::{CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult};
 
 /// 分析崩溃日志文本，识别常见崩溃模式
 ///
@@ -30,10 +31,7 @@ pub async fn analyze(
         return serde_json::to_value(&result).map_err(|e| e.to_string());
     }
 
-    log_info!(
-        "[CrashAnalyzer] 开始分析日志，长度 {} 字节",
-        log_text.len()
-    );
+    log_info!("[CrashAnalyzer] 开始分析日志，长度 {} 字节", log_text.len());
 
     let lower = log_text.to_lowercase();
     let lines: Vec<&str> = log_text.lines().collect();
@@ -141,10 +139,7 @@ pub async fn analyze(
         });
     }
 
-    log_info!(
-        "[CrashAnalyzer] 分析完成，识别 {} 条问题",
-        analyses.len()
-    );
+    log_info!("[CrashAnalyzer] 分析完成，识别 {} 条问题", analyses.len());
 
     let result = CrashAnalyzeResult { analyses };
     serde_json::to_value(&result).map_err(|e| e.to_string())

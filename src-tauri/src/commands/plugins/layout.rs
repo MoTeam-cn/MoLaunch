@@ -39,7 +39,8 @@ pub async fn load_custom_layout(
                     if elapsed.as_secs() < TTL_SECONDS {
                         // 命中缓存
                         log_info!("自定义布局命中缓存: {}", url);
-                        return cache::read(&cache_rel).map_err(log_err("Failed to read layout cache"));
+                        return cache::read(&cache_rel)
+                            .map_err(log_err("Failed to read layout cache"));
                     }
                     log_info!("自定义布局缓存已过期: {}", url);
                 }
@@ -57,11 +58,7 @@ pub async fn load_custom_layout(
         log_warn!("写入自定义布局缓存失败: {}", e);
     }
 
-    log_info!(
-        "自定义布局已从 URL 加载: {} ({} 字节)",
-        url,
-        content.len()
-    );
+    log_info!("自定义布局已从 URL 加载: {} ({} 字节)", url, content.len());
 
     Ok(content)
 }

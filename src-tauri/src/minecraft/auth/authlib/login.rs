@@ -56,11 +56,9 @@ pub async fn login_with_cached_token(
 
     // Step 2: refresh
     match client::refresh(server_url, access_token, Some(client_token), None).await {
-        Ok(resp) => {
-            return Ok(classify_response(resp));
-        }
-        Err(e) if e.is_network => return Err(e),
-        Err(e) => return Err(e),
+        Ok(resp) => Ok(classify_response(resp)),
+        Err(e) if e.is_network => Err(e),
+        Err(e) => Err(e),
     }
 }
 
@@ -91,13 +89,7 @@ pub async fn refresh_with_profile(
         id: profile.id.clone(),
         name: profile.name.clone(),
     };
-    client::refresh(
-        server_url,
-        access_token,
-        Some(client_token),
-        Some(selected),
-    )
-    .await
+    client::refresh(server_url, access_token, Some(client_token), Some(selected)).await
 }
 
 /// 分类响应：单角色直接成功，多角色需选择

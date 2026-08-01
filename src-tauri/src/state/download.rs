@@ -53,7 +53,7 @@ impl DownloadStage {
 }
 
 /// 下载状态
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DownloadState {
     pub is_active: bool,
     pub is_complete: bool,
@@ -66,24 +66,6 @@ pub struct DownloadState {
     /// 当前下载的版本名（用于前端显示，刷新页面后恢复）
     #[serde(default)]
     pub version_name: String,
-}
-
-impl Default for DownloadState {
-    fn default() -> Self {
-        Self {
-            is_active: false,
-            is_complete: false,
-            // 空列表：stages 由安装流程通过 reset_stages / append_stages 动态添加
-            // 修复：之前默认填充 5 个阶段，导致 install_merged 的 append_stages 追加后出现重复阶段
-            stages: vec![],
-            current_stage_index: 0,
-            global_speed: 0,
-            global_bytes_downloaded: 0,
-            global_bytes_total: 0,
-            error_code: 0,
-            version_name: String::new(),
-        }
-    }
 }
 
 impl DownloadState {

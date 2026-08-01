@@ -29,7 +29,7 @@ pub async fn toggle_mod(
         enable
     );
 
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
     let src_path = mods_dir.join(&file_name);
 
     if !src_path.exists() {
@@ -87,7 +87,7 @@ pub async fn delete_mod(
     sanitize_file_name(&file_name)?;
     log_info!("Deleting mod {} for version {}", file_name, version_id);
 
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
     let path = mods_dir.join(&file_name);
 
     if !path.exists() {

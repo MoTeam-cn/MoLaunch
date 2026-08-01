@@ -50,13 +50,17 @@ pub(super) struct MrFile {
 /// （如 resourcepacks/）可能尚未创建，canonicalize 会返回 Err 导致误判。
 /// 改为 canonicalize instance_dir 后用 starts_with 做组件级校验，
 /// 安全性由前面的 `..` / 绝对路径拦截保证。
-fn validate_mr_path(path: &str, instance_dir: &std::path::Path) -> Result<std::path::PathBuf, String> {
+fn validate_mr_path(
+    path: &str,
+    instance_dir: &std::path::Path,
+) -> Result<std::path::PathBuf, String> {
     // 拒绝空路径
     if path.is_empty() {
         return Err("文件路径为空".to_string());
     }
     // 拒绝绝对路径（Windows 和 Unix）
-    if path.starts_with('/') || path.starts_with('\\')
+    if path.starts_with('/')
+        || path.starts_with('\\')
         || (path.len() >= 2 && path.as_bytes()[1] == b':')
     {
         return Err(format!("文件路径不能为绝对路径: {}", path));
@@ -220,13 +224,8 @@ pub(super) async fn install_mr_files(
         crate::utils::format::bytes(total_bytes)
     );
 
-    super::concurrent::download_files_concurrent(
-        state,
-        stage_index,
-        &download_list,
-        total_bytes,
-    )
-    .await?;
+    super::concurrent::download_files_concurrent(state, stage_index, &download_list, total_bytes)
+        .await?;
 
     log_info!("[Community] MR 文件下载完成");
     Ok(())

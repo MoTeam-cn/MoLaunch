@@ -19,7 +19,6 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tauri::{AppHandle, State};
 
-
 /// 统一插件系统 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
@@ -129,14 +128,17 @@ pub struct ExternalPluginEntry {
 
 /// 获取外部插件根目录（`<base_dir>/plugins/`）
 fn plugins_root() -> PathBuf {
-    crate::storage::Storage::instance().base_dir().join("plugins")
+    crate::storage::Storage::instance()
+        .base_dir()
+        .join("plugins")
 }
 
 /// 校验插件 ID 合法性（kebab-case，仅允许小写字母、数字、连字符）
 fn is_valid_plugin_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
-        && id.chars()
+        && id
+            .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
         && !id.starts_with('-')
         && !id.ends_with('-')
@@ -154,10 +156,14 @@ fn read_plugin_manifest(plugin_id: &str) -> Result<ExternalPluginManifest, Strin
     let manifest_path = plugin_dir.join("manifest.json");
 
     if !manifest_path.exists() {
-        return Err(format!("Plugin manifest not found: {}", manifest_path.display()));
+        return Err(format!(
+            "Plugin manifest not found: {}",
+            manifest_path.display()
+        ));
     }
 
-    let manifest_str = std::fs::read_to_string(&manifest_path).map_err(log_err("Failed to read plugin manifest"))?;
+    let manifest_str = std::fs::read_to_string(&manifest_path)
+        .map_err(log_err("Failed to read plugin manifest"))?;
     let manifest: ExternalPluginManifest =
         serde_json::from_str(&manifest_str).map_err(|e| format!("Invalid manifest.json: {}", e))?;
 

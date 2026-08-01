@@ -53,7 +53,9 @@ fn test_host_mc_port_roundtrip() {
 
     // 验证 payload 解析
     match decoded {
-        Message::Control { payload, subtype, .. } => {
+        Message::Control {
+            payload, subtype, ..
+        } => {
             assert_eq!(subtype, ControlSubtype::HostMcPort);
             assert_eq!(parse_host_mc_port_payload(&payload), Some(port));
         }
@@ -83,7 +85,9 @@ fn test_turn_servers_roundtrip() {
 
     // 验证 payload 字节与原 JSON 一致
     match decoded {
-        Message::Control { subtype, payload, .. } => {
+        Message::Control {
+            subtype, payload, ..
+        } => {
             assert_eq!(subtype, ControlSubtype::TurnServers);
             assert_eq!(payload.as_slice(), json);
         }

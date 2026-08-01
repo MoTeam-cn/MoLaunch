@@ -15,7 +15,7 @@ use crate::state::AppState;
 use crate::utils::dispatcher::ActionRequest;
 
 pub use detail::{get_mcmod_url, get_project_detail, get_project_versions};
-pub use install::modpack::{install_modpack, install_local_modpack, preview_local_modpack};
+pub use install::modpack::{install_local_modpack, install_modpack, preview_local_modpack};
 pub use install::resource::{
     download_resource, download_resource_to_path, format_download_filename,
     get_resource_install_path, install_resource,

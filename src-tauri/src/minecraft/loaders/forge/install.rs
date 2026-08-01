@@ -3,12 +3,12 @@
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::{log_info, log_warn};
 use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
 use crate::minecraft::launcher_profiles;
 use crate::minecraft::sources;
+use crate::{log_info, log_warn};
 
 use super::super::shared;
 use super::legacy::install_legacy;
@@ -122,7 +122,8 @@ async fn install_modern(
 
     log_info!("[Forge] Using injector for Forge {}", forge_version);
 
-    let (injector_path, wrapper_path) = super::super::forge_installer::extract_embedded_resources()?;
+    let (injector_path, wrapper_path) =
+        super::super::forge_installer::extract_embedded_resources()?;
 
     if let Some(ref cb) = progress_callback {
         cb(40.0);

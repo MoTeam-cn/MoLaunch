@@ -127,16 +127,14 @@ impl LaunchPipeline {
             // 先检查进程是否退出（非阻塞：借用 watch 的已接收值）
             {
                 let mut rx = exit_rx.clone();
-                match tokio::time::timeout(tokio::time::Duration::from_millis(200), rx.changed())
-                    .await
+                if let Ok(Ok(())) =
+                    tokio::time::timeout(tokio::time::Duration::from_millis(200), rx.changed())
+                        .await
                 {
-                    Ok(Ok(())) => {
-                        if let Some(ref info) = *rx.borrow() {
-                            exit_info_caught = Some(info.clone());
-                            break; // 进程已退出，跳出处理
-                        }
+                    if let Some(ref info) = *rx.borrow() {
+                        exit_info_caught = Some(info.clone());
+                        break; // 进程已退出，跳出处理
                     }
-                    _ => {}
                 }
             }
 

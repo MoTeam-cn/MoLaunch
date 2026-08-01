@@ -24,8 +24,8 @@ pub async fn install_provider_from_dir(source_dir: String) -> Result<ProviderInf
     let manifest_path = src.join("manifest.json");
     let content = std::fs::read_to_string(&manifest_path)
         .map_err(|e| format!("读取 manifest.json 失败: {}", e))?;
-    let manifest: ProviderManifest = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 manifest.json 失败: {}", e))?;
+    let manifest: ProviderManifest =
+        serde_json::from_str(&content).map_err(|e| format!("解析 manifest.json 失败: {}", e))?;
 
     validate_provider_id(&manifest.id)?;
     let target_dir = providers_root().join(&manifest.id);
@@ -56,10 +56,8 @@ pub async fn install_provider_from_zip(zip_path: String) -> Result<ProviderInfo,
         return Err(format!("ZIP 文件不存在: {}", zip_path));
     }
 
-    let file = std::fs::File::open(&zip_file)
-        .map_err(|e| format!("打开 ZIP 失败: {}", e))?;
-    let mut archive = zip::ZipArchive::new(file)
-        .map_err(|e| format!("解析 ZIP 失败: {}", e))?;
+    let file = std::fs::File::open(&zip_file).map_err(|e| format!("打开 ZIP 失败: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("解析 ZIP 失败: {}", e))?;
 
     let names: Vec<String> = archive.file_names().map(|s| s.to_string()).collect();
     let prefix = determine_zip_prefix(&names)?;
@@ -103,7 +101,11 @@ pub async fn install_provider_from_zip(zip_path: String) -> Result<ProviderInfo,
         return Err("安装校验失败：manifest.json 不存在".to_string());
     }
 
-    log_info!("[Frp] 厂商已从 ZIP 安装: {} ({})", manifest.name, manifest.id);
+    log_info!(
+        "[Frp] 厂商已从 ZIP 安装: {} ({})",
+        manifest.name,
+        manifest.id
+    );
     Ok(build_provider_info(&manifest))
 }
 
@@ -231,14 +233,12 @@ fn extract_zip_safely<R: std::io::Read + std::io::Seek>(
             continue;
         }
         if rel.ends_with('/') {
-            std::fs::create_dir_all(dst.join(rel))
-                .map_err(|e| format!("创建目录失败: {}", e))?;
+            std::fs::create_dir_all(dst.join(rel)).map_err(|e| format!("创建目录失败: {}", e))?;
             continue;
         }
         let file_path = dst.join(rel);
         if let Some(parent) = file_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("创建父目录失败: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("创建父目录失败: {}", e))?;
             let canonical_parent = parent
                 .canonicalize()
                 .map_err(|e| format!("canonicalize 失败: {}", e))?;
@@ -246,10 +246,9 @@ fn extract_zip_safely<R: std::io::Read + std::io::Seek>(
                 return Err(format!("Zip Slip 检测: {}", rel));
             }
         }
-        let mut out = std::fs::File::create(&file_path)
-            .map_err(|e| format!("创建文件失败: {}", e))?;
-        std::io::copy(&mut file, &mut out)
-            .map_err(|e| format!("写入文件失败: {}", e))?;
+        let mut out =
+            std::fs::File::create(&file_path).map_err(|e| format!("创建文件失败: {}", e))?;
+        std::io::copy(&mut file, &mut out).map_err(|e| format!("写入文件失败: {}", e))?;
     }
     Ok(())
 }

@@ -22,11 +22,7 @@ pub(crate) fn parse_ini(content: &str) -> std::collections::HashMap<String, Stri
 
 /// 从 Maven 坐标提取版本号
 pub(crate) fn extract_maven_version(name: &str, prefix: &str) -> Option<String> {
-    if name.starts_with(prefix) {
-        Some(name[prefix.len()..].to_string())
-    } else {
-        None
-    }
+    name.strip_prefix(prefix).map(|s| s.to_string())
 }
 
 /// 从 setup.ini 读取 `(OriginalVersion, loader-Type)`。

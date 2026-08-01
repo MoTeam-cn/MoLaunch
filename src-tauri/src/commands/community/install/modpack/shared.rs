@@ -24,7 +24,7 @@ pub(super) async fn validate_cf_api_key() -> Result<(), String> {
                 .to_string(),
         );
     }
-    let key_empty = api_key.as_deref().map_or(true, |k| k.is_empty());
+    let key_empty = api_key.as_deref().is_none_or(|k| k.is_empty());
     if key_empty {
         return Err(
             "CurseForge 整合包安装需要 API Key。已在设置中启用但未填写 API Key，请补全后重试，或将下载源切换为「尽量镜像」使用镜像站。"

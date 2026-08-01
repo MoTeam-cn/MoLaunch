@@ -49,10 +49,7 @@ pub async fn set_window_title(pid: u32, title: &str) {
                 Ok(o) => {
                     let stderr = String::from_utf8_lossy(&o.stderr);
                     if !stderr.is_empty() {
-                        crate::log_warn!(
-                            "[Watcher] xdotool set_window 失败: {}",
-                            stderr.trim()
-                        );
+                        crate::log_warn!("[Watcher] xdotool set_window 失败: {}", stderr.trim());
                     }
                 }
                 Err(_) => {}
@@ -82,6 +79,8 @@ pub async fn set_window_title(pid: u32, title: &str) {
     // 两个工具都不可用（可能是 Wayland 环境）
     static WARNED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
     if !WARNED.swap(true, std::sync::atomic::Ordering::Relaxed) {
-        crate::log_warn!("[Watcher] Linux 无法修改窗口标题（可能缺少 xdotool/wmctrl，或运行在 Wayland 环境下）");
+        crate::log_warn!(
+            "[Watcher] Linux 无法修改窗口标题（可能缺少 xdotool/wmctrl，或运行在 Wayland 环境下）"
+        );
     }
 }

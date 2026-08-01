@@ -94,7 +94,10 @@ pub fn run_cleanup() {
 /// 应在 Tauri setup 中调用，任务在 tokio 运行时中异步执行。
 pub fn spawn_cleanup_task() {
     tauri::async_runtime::spawn_blocking(|| {
-        log_info!("[CacheCleanup] 启动定时清理任务（间隔 {}h）", CLEANUP_INTERVAL.as_secs() / 3600);
+        log_info!(
+            "[CacheCleanup] 启动定时清理任务（间隔 {}h）",
+            CLEANUP_INTERVAL.as_secs() / 3600
+        );
         // 启动时立即清理一次
         run_cleanup();
 

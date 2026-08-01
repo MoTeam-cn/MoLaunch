@@ -5,20 +5,20 @@
 
 use std::time::Duration;
 
-#[cfg(windows)]
-mod windows;
-#[cfg(target_os = "macos")]
-mod macos;
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(windows)]
+mod windows;
 
 // 平台分发：根据编译目标选择对应实现
-#[cfg(windows)]
-use windows::{is_window_visible, set_window_title};
-#[cfg(target_os = "macos")]
-use macos::{is_window_visible, set_window_title};
 #[cfg(target_os = "linux")]
 use linux::{is_window_visible, set_window_title};
+#[cfg(target_os = "macos")]
+use macos::{is_window_visible, set_window_title};
+#[cfg(windows)]
+use windows::{is_window_visible, set_window_title};
 
 /// 轮询找到 MC 进程的窗口并改写标题
 ///

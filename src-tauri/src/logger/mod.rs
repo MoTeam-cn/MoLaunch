@@ -30,6 +30,7 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "error" => Self::Error,
@@ -138,7 +139,10 @@ impl Logger {
             // 路径：灰色
             let path_colored = format!("\x1b[90m[{}:{}]\x1b[0m", rel_path, line);
 
-            eprintln!("{} {} {} {}", time_colored, level_colored, path_colored, sanitized);
+            eprintln!(
+                "{} {} {} {}",
+                time_colored, level_colored, path_colored, sanitized
+            );
         }
     }
 

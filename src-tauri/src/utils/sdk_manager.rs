@@ -12,34 +12,48 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
 
-    d.register("get_platform_info", handler!(_state, _app, _params, {
-        let r = sdk::get_platform_info().await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_platform_info",
+        handler!(_state, _app, _params, {
+            let r = sdk::get_platform_info().await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("get_sdk_version", handler!(state, _app, _params, {
-        let r = sdk::get_sdk_version(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_sdk_version",
+        handler!(state, _app, _params, {
+            let r = sdk::get_sdk_version(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("is_sdk_initialized", handler!(state, _app, _params, {
-        let r = sdk::is_sdk_initialized(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "is_sdk_initialized",
+        handler!(state, _app, _params, {
+            let r = sdk::is_sdk_initialized(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("get_device_id", handler!(state, _app, _params, {
-        let r = sdk::get_device_id(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_device_id",
+        handler!(state, _app, _params, {
+            let r = sdk::get_device_id(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("check_update_lite", handler!(state, _app, _params, {
-        let r = sdk::check_update_lite(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "check_update_lite",
+        handler!(state, _app, _params, {
+            let r = sdk::check_update_lite(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
     d
 });

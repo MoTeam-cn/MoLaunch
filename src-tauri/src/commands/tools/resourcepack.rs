@@ -12,8 +12,8 @@ use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
-use crate::state::AppState;
 use crate::state::resolve_game_dir;
+use crate::state::AppState;
 
 use super::types::{
     ResourcePackConvertParams, ResourcePackConvertResult, ResourcePackItem, ResourcePackListParams,
@@ -35,8 +35,7 @@ async fn resolve_packs_dir(state: &AppState, version_id: Option<&str>) -> PathBu
             let version_type =
                 crate::commands::version::list::detect_version_type_from_dir(&game_dir, vid);
             let mode = IsolationMode::from_u32(isolation_mode);
-            let effective_dir =
-                get_effective_game_dir(&game_dir, vid, mode, version_type);
+            let effective_dir = get_effective_game_dir(&game_dir, vid, mode, version_type);
             effective_dir.join("resourcepacks")
         }
     }
@@ -56,9 +55,7 @@ pub async fn list(
             "[ResourcePack] resourcepacks 目录不存在: {}",
             packs_dir.display()
         );
-        let result = ResourcePackListResult {
-            items: Vec::new(),
-        };
+        let result = ResourcePackListResult { items: Vec::new() };
         return serde_json::to_value(&result).map_err(|e| e.to_string());
     }
 
@@ -181,7 +178,7 @@ pub async fn convert(
         (packs_dir.join(stem), "zip_to_folder")
     } else {
         let src_kind = if is_src_dir { "folder" } else { "zip" };
-        return Ok(serde_json::to_value(&ResourcePackConvertResult {
+        return serde_json::to_value(&ResourcePackConvertResult {
             success: false,
             output_path: String::new(),
             message: format!(
@@ -189,17 +186,17 @@ pub async fn convert(
                 src_kind, target_format
             ),
         })
-        .map_err(|e| e.to_string())?);
+        .map_err(|e| e.to_string());
     };
 
     // 目标已存在直接返回失败
     if output_path.exists() {
-        return Ok(serde_json::to_value(&ResourcePackConvertResult {
+        return serde_json::to_value(&ResourcePackConvertResult {
             success: false,
             output_path: path_to_string(&output_path),
             message: format!("目标已存在: {}", output_path.display()),
         })
-        .map_err(|e| e.to_string())?);
+        .map_err(|e| e.to_string());
     }
 
     let output_path_clone = output_path.clone();
@@ -217,12 +214,12 @@ pub async fn convert(
 
     if let Err(e) = convert_result {
         log_warn!("[ResourcePack] 转换失败: {}", e);
-        return Ok(serde_json::to_value(&ResourcePackConvertResult {
+        return serde_json::to_value(&ResourcePackConvertResult {
             success: false,
             output_path: path_to_string(&output_path),
             message: e,
         })
-        .map_err(|e| e.to_string())?);
+        .map_err(|e| e.to_string());
     }
 
     log_info!("[ResourcePack] 转换成功: {}", output_path.display());
@@ -271,8 +268,7 @@ fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
 
 /// 将目录内容打包为 zip（保留相对路径，zip 内使用正斜杠）
 fn zip_directory(src_dir: &Path, output_zip: &Path) -> Result<(), String> {
-    let file =
-        File::create(output_zip).map_err(|e| format!("创建 zip 失败: {}", e))?;
+    let file = File::create(output_zip).map_err(|e| format!("创建 zip 失败: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default();
 
@@ -283,14 +279,11 @@ fn zip_directory(src_dir: &Path, output_zip: &Path) -> Result<(), String> {
         let rel = file_path
             .strip_prefix(src_dir)
             .map_err(|e| format!("路径前缀剥离失败: {}", e))?;
-        let rel_str = rel
-            .to_str()
-            .ok_or("路径包含非 UTF-8 字符")?;
+        let rel_str = rel.to_str().ok_or("路径包含非 UTF-8 字符")?;
         let zip_name = rel_str.replace('\\', "/");
         zip.start_file(&zip_name, options)
             .map_err(|e| format!("写入 zip 条目失败: {}", e))?;
-        let mut f =
-            File::open(&file_path).map_err(|e| format!("打开源文件失败: {}", e))?;
+        let mut f = File::open(&file_path).map_err(|e| format!("打开源文件失败: {}", e))?;
         let mut buf = Vec::new();
         f.read_to_end(&mut buf)
             .map_err(|e| format!("读取源文件失败: {}", e))?;
@@ -306,10 +299,8 @@ fn zip_directory(src_dir: &Path, output_zip: &Path) -> Result<(), String> {
 /// 解压 zip 到目录
 fn unzip_to_dir(src_zip: &Path, output_dir: &Path) -> Result<(), String> {
     let file = File::open(src_zip).map_err(|e| format!("打开 zip 失败: {}", e))?;
-    let mut archive =
-        zip::ZipArchive::new(file).map_err(|e| format!("读取 zip 失败: {}", e))?;
-    std::fs::create_dir_all(output_dir)
-        .map_err(|e| format!("创建输出目录失败: {}", e))?;
+    let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("读取 zip 失败: {}", e))?;
+    std::fs::create_dir_all(output_dir).map_err(|e| format!("创建输出目录失败: {}", e))?;
     archive
         .extract(output_dir)
         .map_err(|e| format!("解压失败: {}", e))?;

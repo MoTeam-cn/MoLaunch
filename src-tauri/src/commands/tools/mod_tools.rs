@@ -11,12 +11,12 @@ use crate::commands::version::mods::read_mod_metadata;
 use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
-use crate::state::AppState;
 use crate::state::resolve_game_dir;
+use crate::state::AppState;
 
 use super::types::{
-    DuplicateMod, DuplicateVersion, MissingDep, ModDedupResult, ModDependencyCheckParams,
-    ModDependencyResult, ModDedupScanParams,
+    DuplicateMod, DuplicateVersion, MissingDep, ModDedupResult, ModDedupScanParams,
+    ModDependencyCheckParams, ModDependencyResult,
 };
 
 /// 内置依赖白名单：这些 mod_id 视为始终存在，不视为缺失依赖
@@ -43,7 +43,7 @@ const BUILTIN_DEPS: &[&str] = &[
 /// 判断 mod_id 是否为内置依赖（无需安装）
 fn is_builtin_dep(id: &str) -> bool {
     let id = id.trim().to_lowercase();
-    BUILTIN_DEPS.iter().any(|b| *b == id.as_str())
+    BUILTIN_DEPS.contains(&id.as_str())
 }
 
 /// 判断文件名是否为 mod 文件（.jar / .litemod，含禁用变体）
@@ -143,10 +143,8 @@ pub async fn mod_dependency_check(
     .map_err(log_err("ModTools 依赖检测任务失败"))?;
 
     // 构建已安装 mod_id 集合
-    let installed_set: std::collections::HashSet<&str> = installed_slugs
-        .iter()
-        .map(|s| s.as_str())
-        .collect();
+    let installed_set: std::collections::HashSet<&str> =
+        installed_slugs.iter().map(|s| s.as_str()).collect();
 
     // 找出缺失依赖
     let mut missing: Vec<MissingDep> = Vec::new();
@@ -226,33 +224,35 @@ pub async fn mod_dedup_scan(
 
     // 在 spawn_blocking 中执行同步 IO
     let mods_dir_clone = mods_dir.clone();
-    let groups = tokio::task::spawn_blocking(move || -> Result<HashMap<String, Vec<DuplicateVersion>>, String> {
-        let files = list_mod_files(&mods_dir_clone);
-        let mut groups: HashMap<String, Vec<DuplicateVersion>> = HashMap::new();
+    let groups = tokio::task::spawn_blocking(
+        move || -> Result<HashMap<String, Vec<DuplicateVersion>>, String> {
+            let files = list_mod_files(&mods_dir_clone);
+            let mut groups: HashMap<String, Vec<DuplicateVersion>> = HashMap::new();
 
-        for (file_name, path) in files {
-            let metadata = read_mod_metadata(&path);
-            let slug = metadata.slug.trim().to_lowercase();
-            if slug.is_empty() {
-                // slug 为空的 mod 不参与去重
-                continue;
+            for (file_name, path) in files {
+                let metadata = read_mod_metadata(&path);
+                let slug = metadata.slug.trim().to_lowercase();
+                if slug.is_empty() {
+                    // slug 为空的 mod 不参与去重
+                    continue;
+                }
+                let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+                let version = if metadata.version.is_empty() {
+                    // 版本号空时回退到文件名
+                    file_name.clone()
+                } else {
+                    metadata.version
+                };
+                groups.entry(slug).or_default().push(DuplicateVersion {
+                    version,
+                    file_name,
+                    file_size,
+                });
             }
-            let file_size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-            let version = if metadata.version.is_empty() {
-                // 版本号空时回退到文件名
-                file_name.clone()
-            } else {
-                metadata.version
-            };
-            groups.entry(slug).or_default().push(DuplicateVersion {
-                version,
-                file_name,
-                file_size,
-            });
-        }
 
-        Ok(groups)
-    })
+            Ok(groups)
+        },
+    )
     .await
     .map_err(log_err("ModTools 去重扫描任务失败"))??;
 
@@ -263,15 +263,15 @@ pub async fn mod_dedup_scan(
         .map(|(mod_id, mut versions)| {
             // 同一 mod 内按 version 排序，便于前端展示
             versions.sort_by(|a, b| a.version.cmp(&b.version));
-            DuplicateMod {
-                mod_id,
-                versions,
-            }
+            DuplicateMod { mod_id, versions }
         })
         .collect();
     duplicates.sort_by(|a, b| a.mod_id.cmp(&b.mod_id));
 
-    log_info!("[ModTools] 去重扫描完成: 发现 {} 个重复 mod", duplicates.len());
+    log_info!(
+        "[ModTools] 去重扫描完成: 发现 {} 个重复 mod",
+        duplicates.len()
+    );
 
     let result = ModDedupResult { duplicates };
     serde_json::to_value(&result).map_err(|e| e.to_string())

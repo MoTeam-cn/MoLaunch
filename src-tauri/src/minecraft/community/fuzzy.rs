@@ -83,11 +83,7 @@ pub fn search_similarity(source: &str, query: &str) -> f64 {
         .chars()
         .filter(|c| *c != ' ')
         .collect();
-    let query_lower: String = query
-        .to_lowercase()
-        .chars()
-        .filter(|c| *c != ' ')
-        .collect();
+    let query_lower: String = query.to_lowercase().chars().filter(|c| *c != ' ').collect();
 
     let source_chars: Vec<char> = source_lower.chars().collect();
     let query_chars: Vec<char> = query_lower.chars().collect();
@@ -223,7 +219,8 @@ pub fn search<'a, T>(
         match (ea.absolute_right, eb.absolute_right) {
             (true, false) => std::cmp::Ordering::Less,
             (false, true) => std::cmp::Ordering::Greater,
-            _ => eb.similarity
+            _ => eb
+                .similarity
                 .partial_cmp(&ea.similarity)
                 .unwrap_or(std::cmp::Ordering::Equal),
         }

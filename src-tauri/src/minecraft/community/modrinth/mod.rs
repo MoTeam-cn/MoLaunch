@@ -200,10 +200,7 @@ pub async fn version_files_search_with_downloads(
                 download_url: file.url.clone(),
                 file_size: file.size.unwrap_or(0),
                 sha1: sha1.clone(),
-                sha512: file
-                    .hashes
-                    .as_ref()
-                    .and_then(|h| h.sha512.clone()),
+                sha512: file.hashes.as_ref().and_then(|h| h.sha512.clone()),
                 // Modrinth 不使用 CF 的 project_id/file_id 概念
                 project_id: None,
                 file_id: None,
@@ -289,10 +286,7 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
 /// - `slugs`：slug 列表（最多 100，超出截断）
 /// - `rtype`：资源类型（填充 ResourceProject.resource_type）
 /// - 返回：工程列表（失败返回空 Vec，不阻断搜索）
-pub async fn get_projects_by_slugs(
-    slugs: &[String],
-    rtype: ResourceType,
-) -> Vec<ResourceProject> {
+pub async fn get_projects_by_slugs(slugs: &[String], rtype: ResourceType) -> Vec<ResourceProject> {
     if slugs.is_empty() {
         return Vec::new();
     }

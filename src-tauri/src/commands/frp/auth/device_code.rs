@@ -4,9 +4,7 @@
 //! 前端显示用户码 + 验证链接 + 倒计时，后端按 interval 轮询 tokenUrl。
 
 use super::super::provider::read_provider_manifest;
-use super::storage::{
-    now_secs, parse_scopes, require_device_code_config, store_token_info,
-};
+use super::storage::{now_secs, parse_scopes, require_device_code_config, store_token_info};
 use super::{DeviceCodePollResult, DeviceCodeResult, TokenResponse};
 use crate::log_error;
 use crate::log_info;
@@ -148,10 +146,7 @@ pub(super) async fn poll_device_code(
     let resp = client
         .post(&session.token_url)
         .form(&[
-            (
-                "grant_type",
-                "urn:ietf:params:oauth:grant-type:device_code",
-            ),
+            ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
             ("device_code", session.device_code.as_str()),
             ("client_id", session.client_id.as_str()),
         ])

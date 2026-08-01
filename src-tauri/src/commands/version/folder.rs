@@ -85,10 +85,7 @@ pub async fn add_mc_folder(
 ///
 /// - 不允许移除最后一个文件夹
 /// - 如果移除的是当前文件夹，自动切换到第一个
-pub async fn remove_mc_folder(
-    state: &AppState,
-    path: String,
-) -> Result<Vec<McFolder>, String> {
+pub async fn remove_mc_folder(state: &AppState, path: String) -> Result<Vec<McFolder>, String> {
     log_info!("Removing MC folder: {}", path);
 
     let mut config = state.config.lock().await;

@@ -41,10 +41,7 @@ fn redacts_api_key_field() {
 
 #[test]
 fn redacts_auth_token_field() {
-    assert_eq!(
-        redact_log(r#"auth_token = "abc""#),
-        r#"auth_token = "***""#
-    );
+    assert_eq!(redact_log(r#"auth_token = "abc""#), r#"auth_token = "***""#);
 }
 
 #[test]

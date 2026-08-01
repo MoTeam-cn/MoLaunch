@@ -7,9 +7,9 @@
 mod build_config;
 mod failure;
 
+use crate::log_info;
 use crate::minecraft::launch::{self, LaunchPipeline};
 use crate::state::{AppState, LaunchHistory};
-use crate::log_info;
 use crate::utils::dispatcher::ActionRequest;
 use std::sync::Arc;
 use tauri::{Emitter, State};
@@ -50,7 +50,10 @@ pub fn parse_server_enter(s: &str) -> (Option<String>, Option<u32>) {
 /// - `game_language="zh_cn"` / `"en_us"` 等 → 直接返回该值
 /// - `game_language="auto"` → 旧配置兼容：跟随启动器 UI 语言（zh-CN → zh_cn，en-US → en_us）
 ///   新版本前端已移除 auto 选项，默认改为 "zh_cn"，此处保留仅为兼容旧配置文件
-pub(super) fn resolve_game_language(game_language: &str, launcher_language: &str) -> Option<String> {
+pub(super) fn resolve_game_language(
+    game_language: &str,
+    launcher_language: &str,
+) -> Option<String> {
     let gl = game_language.trim();
     if gl.is_empty() || gl == "none" {
         return None;
@@ -68,6 +71,7 @@ pub(super) fn resolve_game_language(game_language: &str, launcher_language: &str
     Some(gl.to_string())
 }
 
+#[allow(clippy::too_many_arguments)]
 /// 启动游戏
 ///
 /// 编排层：sanitize → build_launch_config → pipeline.execute → 失败时 handle_launch_failure →
@@ -125,7 +129,14 @@ pub async fn launch_game(
     let result = match pipeline.execute().await {
         Ok(r) => r,
         Err(launch_err) => {
-            return Err(handle_launch_failure(state, app_handle, &pipeline, &version_id, launch_err).await);
+            return Err(handle_launch_failure(
+                state,
+                app_handle,
+                &pipeline,
+                &version_id,
+                launch_err,
+            )
+            .await);
         }
     };
 
@@ -294,7 +305,6 @@ pub async fn get_launch_history(state: &AppState) -> Result<Vec<LaunchHistory>, 
     sorted.shrink_to_fit();
     Ok(sorted)
 }
-
 
 /// 版本启动管理统一 IPC 入口
 ///

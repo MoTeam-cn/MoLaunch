@@ -20,15 +20,15 @@ pub struct ProxyConfig {
 /// 下载配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DownloadConfig {
-    pub source: String,                      // "mirror" | "official" | "smart" — 文件下载源（原 download_source）
-    pub meta_source: String,                 // "mirror" | "official" | "smart" — 版本列表源（原 meta_source）
-    pub max_speed: u64,                      // 原 max_download_speed
-    pub max_threads: u32,                    // 原 max_download_threads
-    pub chunk_count: u32,                    // 原 chunk_count
-    pub mirror_url: Option<String>,          // 原 mirror_url
-    pub mirror_url_meta: Option<String>,     // 原 mirror_url_meta
+    pub source: String, // "mirror" | "official" | "smart" — 文件下载源（原 download_source）
+    pub meta_source: String, // "mirror" | "official" | "smart" — 版本列表源（原 meta_source）
+    pub max_speed: u64, // 原 max_download_speed
+    pub max_threads: u32, // 原 max_download_threads
+    pub chunk_count: u32, // 原 chunk_count
+    pub mirror_url: Option<String>, // 原 mirror_url
+    pub mirror_url_meta: Option<String>, // 原 mirror_url_meta
     pub mirror_url_download: Option<String>, // 原 mirror_url_download
-    pub mirror_mode: u32,                    // 原 mirror_mode
+    pub mirror_mode: u32, // 原 mirror_mode
     /// 是否将 `cdn.modrinth.com` 替换为 `cdn-raw.modrinth.com`（绕过中国大陆 cdn-alt 跳转）
     ///
     /// 默认 false（关闭）。仅在开发者模式解锁后可在「设置 → 开发者模式」中开启。

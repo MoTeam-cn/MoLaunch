@@ -18,14 +18,14 @@ pub async fn read_personalization() -> Result<serde_json::Value, String> {
         return Ok(serde_json::json!({}));
     }
 
-    let content = std::fs::read_to_string(&path).map_err(log_err("Failed to read personalization config"))?;
+    let content =
+        std::fs::read_to_string(&path).map_err(log_err("Failed to read personalization config"))?;
 
     // 解析失败时返回空对象而非错误（容错：损坏的 JSON 不阻塞启动）
-    let value: serde_json::Value = serde_json::from_str(&content)
-        .unwrap_or_else(|e| {
-            crate::log_warn!("个性化配置 JSON 损坏，已忽略: {}", e);
-            serde_json::json!({})
-        });
+    let value: serde_json::Value = serde_json::from_str(&content).unwrap_or_else(|e| {
+        crate::log_warn!("个性化配置 JSON 损坏，已忽略: {}", e);
+        serde_json::json!({})
+    });
 
     Ok(value)
 }
@@ -37,11 +37,13 @@ pub async fn write_personalization(data: serde_json::Value) -> Result<(), String
     let path = personalization_path()?;
 
     // 美化输出（4 空格缩进），便于用户手动查看 / 编辑
-    let content = serde_json::to_string_pretty(&data).map_err(log_err("Failed to serialize personalization config"))?;
+    let content = serde_json::to_string_pretty(&data)
+        .map_err(log_err("Failed to serialize personalization config"))?;
 
     // 确保父目录存在
     if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(log_err("Failed to create personalization directory"))?;
+        std::fs::create_dir_all(parent)
+            .map_err(log_err("Failed to create personalization directory"))?;
     }
 
     std::fs::write(&path, content).map_err(log_err("Failed to write personalization config"))?;
@@ -60,16 +62,18 @@ fn personalization_path() -> Result<PathBuf, String> {
         let appdata = std::env::var("APPDATA")
             .map_err(|_| "APPDATA environment variable not set".to_string())?;
         let dir = PathBuf::from(appdata).join(".MolaLaunch");
-        std::fs::create_dir_all(&dir).map_err(log_err("Failed to create personalization directory"))?;
+        std::fs::create_dir_all(&dir)
+            .map_err(log_err("Failed to create personalization directory"))?;
         Ok(dir.join("personalization.json"))
     }
 
     #[cfg(not(windows))]
     {
-        let home = std::env::var("HOME")
-            .map_err(|_| "HOME environment variable not set".to_string())?;
+        let home =
+            std::env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
         let dir = PathBuf::from(home).join(".config").join("MolaLaunch");
-        std::fs::create_dir_all(&dir).map_err(log_err("Failed to create personalization directory"))?;
+        std::fs::create_dir_all(&dir)
+            .map_err(log_err("Failed to create personalization directory"))?;
         Ok(dir.join("personalization.json"))
     }
 }

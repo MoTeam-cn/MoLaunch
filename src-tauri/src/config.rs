@@ -69,8 +69,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     if let Some(speed) = config.get("Download", "max_speed") {
         app_config.download.max_speed = speed.parse().unwrap_or(app_config.download.max_speed);
     }
-    app_config.download.source =
-        config.get_or("Download", "source", &app_config.download.source);
+    app_config.download.source = config.get_or("Download", "source", &app_config.download.source);
     app_config.download.meta_source =
         config.get_or("Download", "meta_source", &app_config.download.meta_source);
     if let Some(mode) = config.get("Download", "mirror_mode") {
@@ -163,14 +162,10 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     // ExternalDownload
     app_config.external_download_dir = config
         .get("ExternalDownload", "dir")
-        .filter(|s| !s.is_empty())
-        .map(|s| s.clone());
+        .filter(|s| !s.is_empty());
 
     // Version
-    app_config.selected_version = config
-        .get("Version", "selected")
-        .filter(|s| !s.is_empty())
-        .map(|s| s.clone());
+    app_config.selected_version = config.get("Version", "selected").filter(|s| !s.is_empty());
 
     // Online（联机 api-server 地址，未配置时保留默认值）
     if let Some(url) = config.get("Online", "api_server_url") {
@@ -180,8 +175,7 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     }
 
     // TLS（信任源模式，未配置时保留默认 builtin）
-    app_config.tls.trust_mode =
-        config.get_or("TLS", "trust_mode", &app_config.tls.trust_mode);
+    app_config.tls.trust_mode = config.get_or("TLS", "trust_mode", &app_config.tls.trust_mode);
 
     log_info!("Config loaded from storage");
     Ok(Some(app_config))
@@ -283,11 +277,7 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("Proxy", "ip_version", &config.proxy.ip_version);
 
     // Community
-    ini.set(
-        "Community",
-        "source",
-        &config.community.source.to_string(),
-    );
+    ini.set("Community", "source", &config.community.source.to_string());
     ini.set(
         "Community",
         "filename_format",
@@ -357,7 +347,9 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     // TLS（信任源模式持久化，IgnoreTls 走注册表不在此处）
     ini.set("TLS", "trust_mode", &config.tls.trust_mode);
 
-    storage.write_config(&ini).map_err(log_err("Failed to save config"))?;
+    storage
+        .write_config(&ini)
+        .map_err(log_err("Failed to save config"))?;
     log_debug!("Config saved to storage");
     Ok(())
 }

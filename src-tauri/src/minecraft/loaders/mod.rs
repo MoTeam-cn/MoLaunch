@@ -15,8 +15,8 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 use std::sync::Arc;
 
-use crate::minecraft::download::config::DownloadManagerConfig;
 use super::sources::DownloadSourceMode;
+use crate::minecraft::download::config::DownloadManagerConfig;
 
 /// Loader type
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -124,8 +124,13 @@ pub async fn install_loader(
             .await
         }
         LoaderType::OptiFine => {
-            optifine::install(mc_version, loader_version, progress_callback, config.source_mode)
-                .await
+            optifine::install(
+                mc_version,
+                loader_version,
+                progress_callback,
+                config.source_mode,
+            )
+            .await
         }
         LoaderType::LiteLoader => {
             liteloader::install(

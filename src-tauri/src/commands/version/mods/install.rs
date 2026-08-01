@@ -27,7 +27,7 @@ pub async fn install_mod(
 
     log_info!("Installing mod to version {}", version_id);
 
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
 
     // 确保 mods 目录存在
     if !mods_dir.exists() {
@@ -83,7 +83,7 @@ pub async fn install_mod(
 /// 打开版本的 mods 目录（自动创建）
 pub async fn open_mods_dir(state: &AppState, version_id: String) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
 
     if !mods_dir.exists() {
         std::fs::create_dir_all(&mods_dir).map_err(log_err("Failed to create mods directory"))?;
@@ -95,12 +95,9 @@ pub async fn open_mods_dir(state: &AppState, version_id: String) -> Result<(), S
 }
 
 /// 获取版本的 mods 目录路径（不打开，用于前端下载 mod 时指定保存位置）
-pub async fn get_version_mods_dir(
-    state: &AppState,
-    version_id: String,
-) -> Result<String, String> {
+pub async fn get_version_mods_dir(state: &AppState, version_id: String) -> Result<String, String> {
     sanitize_version_id(&version_id)?;
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
     if !mods_dir.exists() {
         std::fs::create_dir_all(&mods_dir).map_err(log_err("Failed to create mods directory"))?;
     }
@@ -115,7 +112,7 @@ pub async fn reveal_mod_file(
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
     sanitize_file_name(&file_name)?;
-    let mods_dir = get_mods_dir(&state, &version_id).await?;
+    let mods_dir = get_mods_dir(state, &version_id).await?;
     let mod_path = mods_dir.join(&file_name);
     if !mod_path.exists() {
         return Err(format!("Mod 文件不存在: {}", file_name));

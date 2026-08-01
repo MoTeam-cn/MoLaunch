@@ -51,7 +51,7 @@ pub(super) fn build_script_content(info: &ScriptLaunchInfo<'_>) -> String {
     script.push_str(&format!("cd /D \"{}\"\n", info.game_dir_display));
     script.push('\n');
     // 启动前命令（advance_run_cmd，语法与 cmd 一致）
-    if let Some(ref cmd) = info.pre_launch_cmd {
+    if let Some(cmd) = info.pre_launch_cmd {
         if !cmd.is_empty() {
             script.push_str("REM 启动前命令\n");
             script.push_str(cmd);

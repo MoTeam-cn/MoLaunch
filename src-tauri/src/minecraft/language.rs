@@ -33,7 +33,10 @@ pub fn set_game_language(
 
     // 如果 options.txt 不存在，创建并写入语言设置
     if !options_path.exists() {
-        log_info!("[Language] options.txt not found, creating with lang={}", required_lang);
+        log_info!(
+            "[Language] options.txt not found, creating with lang={}",
+            required_lang
+        );
         let content = format!("lang:{}\n", required_lang);
         std::fs::write(&options_path, content)
             .map_err(|e| anyhow::anyhow!("Failed to create options.txt: {}", e))?;

@@ -13,7 +13,6 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct SelectJavaForMcParams {
@@ -42,47 +41,64 @@ struct DownloadJavaParams {
     target_major: u32,
 }
 
-
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();
 
-    d.register("detect_java", handler!(state, _app, _params, {
-        let r = java::detect_java(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "detect_java",
+        handler!(state, _app, _params, {
+            let r = java::detect_java(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("list_java", handler!(state, _app, _params, {
-        let r = java::list_java(&state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "list_java",
+        handler!(state, _app, _params, {
+            let r = java::list_java(&state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("select_java_for_mc", handler!(state, _app, params, {
-        let p: SelectJavaForMcParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = java::select_java_for_mc(p.mc_version, p.user_java_path, &state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "select_java_for_mc",
+        handler!(state, _app, params, {
+            let p: SelectJavaForMcParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = java::select_java_for_mc(p.mc_version, p.user_java_path, &state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("get_java_requirements", handler!(_state, _app, params, {
-        let p: GetJavaRequirementsParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = java::get_java_requirements(p.mc_version, p.loader).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "get_java_requirements",
+        handler!(_state, _app, params, {
+            let p: GetJavaRequirementsParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = java::get_java_requirements(p.mc_version, p.loader).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("check_java_compatible", handler!(_state, _app, params, {
-        let p: CheckJavaCompatibleParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = java::check_java_compatible(p.java_path, p.mc_version, p.loader).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "check_java_compatible",
+        handler!(_state, _app, params, {
+            let p: CheckJavaCompatibleParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = java::check_java_compatible(p.java_path, p.mc_version, p.loader).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
-    d.register("download_java", handler!(state, app, params, {
-        let p: DownloadJavaParams = serde_json::from_value(params)
-            .map_err(|e| format!("参数解析失败: {}", e))?;
-        let r = java::download_java(p.target_major, &app, &state).await?;
-        serde_json::to_value(r).map_err(|e| e.to_string())
-    }));
+    d.register(
+        "download_java",
+        handler!(state, app, params, {
+            let p: DownloadJavaParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = java::download_java(p.target_major, &app, &state).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
 
     d
 });

@@ -14,8 +14,8 @@ use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::auth::storage::PersistedAuthState;
 use crate::minecraft::version::scan as version_scan;
-use crate::state::AppState;
 use crate::state::resolve_game_dir;
+use crate::state::AppState;
 
 use super::types::{ExportLauncherDataParams, ExportResult};
 
@@ -74,8 +74,7 @@ pub async fn export_launcher_data(
     // 确保父目录存在
     if let Some(parent) = output_path.parent() {
         if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("创建输出目录失败: {}", e))?;
+            std::fs::create_dir_all(parent).map_err(|e| format!("创建输出目录失败: {}", e))?;
         }
     }
 
@@ -90,8 +89,8 @@ pub async fn export_launcher_data(
     let mut exported_items: Vec<String> = Vec::new();
 
     // 准备 zip 文件
-    let file = std::fs::File::create(&output_path)
-        .map_err(|e| format!("创建输出文件失败: {}", e))?;
+    let file =
+        std::fs::File::create(&output_path).map_err(|e| format!("创建输出文件失败: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default();
 
@@ -206,11 +205,14 @@ async fn export_accounts(state: &AppState) -> Result<ExportedAccounts, String> {
         .await
         .map_err(log_err("加载 auth_storage 失败"))?;
 
-    let current_user = persisted.current_user.as_ref().map(|u| ExportedCurrentUser {
-        name: u.name.clone(),
-        uuid: u.uuid.clone(),
-        login_type: u.login_type.clone(),
-    });
+    let current_user = persisted
+        .current_user
+        .as_ref()
+        .map(|u| ExportedCurrentUser {
+            name: u.name.clone(),
+            uuid: u.uuid.clone(),
+            login_type: u.login_type.clone(),
+        });
 
     let ms_accounts = persisted
         .ms_accounts

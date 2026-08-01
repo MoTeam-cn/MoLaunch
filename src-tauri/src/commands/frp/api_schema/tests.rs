@@ -1,8 +1,6 @@
 //! api_schema 单元测试
 
-use super::helpers::{
-    build_url, compute_timeout, escape_toml_string, extract_host, resolve_url,
-};
+use super::helpers::{build_url, compute_timeout, escape_toml_string, extract_host, resolve_url};
 use super::mapping::{get_json_path, map_response};
 use super::ConfigPayload;
 use std::collections::HashMap;
@@ -67,9 +65,18 @@ fn test_compute_timeout() {
 
 #[test]
 fn test_extract_host() {
-    assert_eq!(extract_host("https://api.example.com/path"), Some("api.example.com".to_string()));
-    assert_eq!(extract_host("https://api.example.com:8080/path"), Some("api.example.com".to_string()));
-    assert_eq!(extract_host("http://localhost:3000"), Some("localhost".to_string()));
+    assert_eq!(
+        extract_host("https://api.example.com/path"),
+        Some("api.example.com".to_string())
+    );
+    assert_eq!(
+        extract_host("https://api.example.com:8080/path"),
+        Some("api.example.com".to_string())
+    );
+    assert_eq!(
+        extract_host("http://localhost:3000"),
+        Some("localhost".to_string())
+    );
     assert_eq!(extract_host("not-a-url"), None);
 }
 
@@ -119,7 +126,9 @@ fn test_map_response_custom_variables() {
 
     let payload = map_response(&response, &mapping).unwrap();
     assert_eq!(
-        payload.custom_variables.and_then(|m| m.get("customVar").cloned()),
+        payload
+            .custom_variables
+            .and_then(|m| m.get("customVar").cloned()),
         Some("hello".to_string())
     );
 }
@@ -157,9 +166,18 @@ subdomain = "{assigned_subdomain}""#;
     let result = template
         .replace("{server_addr}", &escape_toml_string(&payload.server_addr))
         .replace("{server_port}", &payload.server_port.to_string())
-        .replace("{token}", &escape_toml_string(payload.token.as_ref().unwrap()))
-        .replace("{assigned_remote_port}", &payload.assigned_remote_port.unwrap().to_string())
-        .replace("{assigned_subdomain}", &escape_toml_string(payload.assigned_subdomain.as_ref().unwrap()));
+        .replace(
+            "{token}",
+            &escape_toml_string(payload.token.as_ref().unwrap()),
+        )
+        .replace(
+            "{assigned_remote_port}",
+            &payload.assigned_remote_port.unwrap().to_string(),
+        )
+        .replace(
+            "{assigned_subdomain}",
+            &escape_toml_string(payload.assigned_subdomain.as_ref().unwrap()),
+        );
 
     assert!(result.contains("serverAddr = \"frps.example.com\""));
     assert!(result.contains("serverPort = 7000"));

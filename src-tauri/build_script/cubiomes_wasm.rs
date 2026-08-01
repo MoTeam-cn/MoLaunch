@@ -45,7 +45,11 @@ pub fn compile_cubiomes_wasm() {
 
     // 确保输出目录存在
     if let Err(e) = std::fs::create_dir_all(&out_dir) {
-        println!("cargo:warning=Failed to create {}: {}", out_dir.display(), e);
+        println!(
+            "cargo:warning=Failed to create {}: {}",
+            out_dir.display(),
+            e
+        );
         return;
     }
 
@@ -70,8 +74,14 @@ pub fn compile_cubiomes_wasm() {
         // Worker 内通过 Module.HEAPU8.set() 写入 seed 字符串、通过 new Int32Array(Module.HEAPU8.buffer,...)
         // 读取 cubiomes 输出，必须显式导出
         // HEAPF32：读取 mapApproxHeight 输出的 float 高度数组
-        .args(["-s", "EXPORTED_RUNTIME_METHODS=ccall,cwrap,HEAPU8,HEAPU32,HEAP32,HEAPF32"])
-        .args(["-s", &format!("EXPORTED_FUNCTIONS={}", exported_functions())])
+        .args([
+            "-s",
+            "EXPORTED_RUNTIME_METHODS=ccall,cwrap,HEAPU8,HEAPU32,HEAP32,HEAPF32",
+        ])
+        .args([
+            "-s",
+            &format!("EXPORTED_FUNCTIONS={}", exported_functions()),
+        ])
         .arg("-o")
         .arg(&js_out);
 

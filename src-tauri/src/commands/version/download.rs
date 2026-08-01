@@ -1,5 +1,5 @@
 use crate::minecraft::download::{self, types as download_types};
-use crate::state::{AppState, DownloadState, DownloadStage, StageStatus};
+use crate::state::{AppState, DownloadStage, DownloadState, StageStatus};
 use crate::{log_error, log_info};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
@@ -41,7 +41,7 @@ pub async fn download_version(
         ds.version_name = version_id.clone();
     }
 
-    let game_dir = crate::state::resolve_game_dir_from_state(&state).await;
+    let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     // 注意：source_mode 用 config.download.source（文件下载源），保持原行为
     // fetch_version_list / fetch_with_retry 用这个 source_mode 决定元数据获取方式
     let (mirror_url, source_mode) = {

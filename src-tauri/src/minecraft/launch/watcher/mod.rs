@@ -202,10 +202,8 @@ impl GameWatcher {
                                             port
                                         );
                                         if let Some(ref handle) = app_handle {
-                                            let _ = handle.emit(
-                                                ONLINE_MC_PORT_DETECTED_EVENT,
-                                                port,
-                                            );
+                                            let _ =
+                                                handle.emit(ONLINE_MC_PORT_DETECTED_EVENT, port);
                                         }
                                     }
                                 }

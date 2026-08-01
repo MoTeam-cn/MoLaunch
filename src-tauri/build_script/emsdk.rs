@@ -10,10 +10,13 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+/// emsdk 环境变量条目（名称 → 路径）
+type EmccEnv = Vec<(&'static str, PathBuf)>;
+
 /// 查找结果：(emcc 路径, 需要设置的 env vars)
 ///
 /// env vars 仅在通过 emsdk 路径找到 emcc 时返回（用于设置 EM_CACHE 等）
-pub fn find_emcc() -> Option<(PathBuf, Option<Vec<(&'static str, PathBuf)>>)> {
+pub fn find_emcc() -> Option<(PathBuf, Option<EmccEnv>)> {
     // 1. EMSCRIPTEN_ROOT 环境变量（emsdk activate 后会设置）
     if let Ok(root) = std::env::var("EMSCRIPTEN_ROOT") {
         let root = PathBuf::from(root);

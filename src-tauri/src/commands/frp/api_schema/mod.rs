@@ -144,10 +144,10 @@ pub fn load_api_schema(provider_id: &str) -> Result<ApiSchema, String> {
     if !path.exists() {
         return Err(format!("厂商 api-schema.json 不存在: {}", path.display()));
     }
-    let content = std::fs::read_to_string(&path)
-        .map_err(|e| format!("读取 api-schema.json 失败: {}", e))?;
-    let schema: ApiSchema = serde_json::from_str(&content)
-        .map_err(|e| format!("解析 api-schema.json 失败: {}", e))?;
+    let content =
+        std::fs::read_to_string(&path).map_err(|e| format!("读取 api-schema.json 失败: {}", e))?;
+    let schema: ApiSchema =
+        serde_json::from_str(&content).map_err(|e| format!("解析 api-schema.json 失败: {}", e))?;
 
     if schema.version != 1 {
         return Err(format!(
@@ -201,11 +201,14 @@ pub async fn fetch_vendor_config(
     )
     .await?;
 
-    let payload = mapping::map_response(&response, &schema.endpoints.fetch_config.response_mapping)?;
+    let payload =
+        mapping::map_response(&response, &schema.endpoints.fetch_config.response_mapping)?;
 
     log_info!(
         "[Frp] 厂商 {} 配置拉取成功: server={}:{}",
-        provider_id, payload.server_addr, payload.server_port
+        provider_id,
+        payload.server_addr,
+        payload.server_port
     );
 
     Ok(payload)
@@ -228,13 +231,10 @@ pub fn render_config_template(
         .join(provider_id)
         .join("config-template.toml");
     if !template_path.exists() {
-        return Err(format!(
-            "厂商配置模板不存在: {}",
-            template_path.display()
-        ));
+        return Err(format!("厂商配置模板不存在: {}", template_path.display()));
     }
-    let template = std::fs::read_to_string(&template_path)
-        .map_err(|e| format!("读取配置模板失败: {}", e))?;
+    let template =
+        std::fs::read_to_string(&template_path).map_err(|e| format!("读取配置模板失败: {}", e))?;
 
     let mut result = template;
 

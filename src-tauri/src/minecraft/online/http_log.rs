@@ -94,10 +94,7 @@ pub fn read_http_logs(date: Option<&str>, limit: Option<usize>) -> Vec<HttpLogEn
         Err(_) => return Vec::new(),
     };
 
-    let mut entries: Vec<HttpLogEntry> = content
-        .lines()
-        .filter_map(parse_log_line)
-        .collect();
+    let mut entries: Vec<HttpLogEntry> = content.lines().filter_map(parse_log_line).collect();
 
     // 截取最新的 limit 条
     if let Some(n) = limit {

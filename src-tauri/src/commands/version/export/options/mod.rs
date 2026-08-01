@@ -99,15 +99,11 @@ pub(super) fn scan_sub_options(
 
         // 子文件夹
         if accept_folder {
-            let mut subdirs: Vec<_> = entries
-                .into_iter()
-                .filter(|e| e.path().is_dir())
-                .collect();
+            let mut subdirs: Vec<_> = entries.into_iter().filter(|e| e.path().is_dir()).collect();
             subdirs.sort_by_key(|e| {
                 e.metadata()
                     .and_then(|m| m.modified())
                     .ok()
-                    .map(|t| t)
                     .unwrap_or(std::time::SystemTime::UNIX_EPOCH)
             });
             for entry in subdirs.into_iter().rev() {
@@ -178,7 +174,9 @@ pub(super) fn has_licence_file(instance_dir: &Path) -> bool {
 /// 转义 glob 特殊字符（选项规则中的文件名可能含 `[` `]` 等）
 fn escape_glob_chars(s: &str) -> String {
     // 用 `[x]` 包裹特殊字符进行转义
-    s.replace('[', "[[]").replace(']', "[]]").replace('?', "[?]")
+    s.replace('[', "[[]")
+        .replace(']', "[]]")
+        .replace('?', "[?]")
 }
 
 /// 简单时间戳格式化（yyyy/MM/dd HH:mm）

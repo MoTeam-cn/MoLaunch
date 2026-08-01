@@ -129,7 +129,7 @@ pub fn validate_username(username: &str) -> bool {
     let len = chars.len();
 
     // 长度检查：1-16 字符（按 Unicode 字符数计算，非字节数）
-    if len < 1 || len > 16 {
+    if !(1..=16).contains(&len) {
         return false;
     }
 
