@@ -9,6 +9,25 @@
 
 ### 维护
 
+#### 修复跨平台兼容性 P1 体验项：auth/storage 凭据持久化改文件存储（S4+S5）
+
+- 背景：`auth/storage` 系列文件围绕 Windows 注册表设计，非 Windows 平台 `save` 静默 `Ok(())` 不持久化、`load` 返回 `default()` 空状态，导致 macOS/Linux 上登录后重启启动器会丢失所有登录信息。完整扫描报告见 `docs/CROSS_PLATFORM_COMPATIBILITY.md`
+- 改造方案（参考 `minecraft/online/storage.rs` 的跨平台文件存储实现）：保留 SDK DES 加密层，存储介质从注册表改为单文件
+  - 存储路径：Windows `%APPDATA%/.MolaLaunch/auth.json`，macOS/Linux `~/.config/MolaLaunch/auth.json`（与 `online/storage.rs` 目录约定一致）
+  - 序列化策略：整个 `PersistedAuthState` 通过 `to_storage_json()` 手动构建 JSON（避免派生 `Serialize` 误暴露 token 到 IPC）→ SDK DES 加密 → 写入单文件
+  - 权限保护：Unix 显式设置 0o600（仅当前用户可读写），Windows 依赖 NTFS 默认 ACL
+  - 容错：SDK 不可用时降级明文存储（带 WARN）；环境变量缺失/文件不存在返回空状态而非报错
+- 改动（5 文件）：
+  - **`src-tauri/src/minecraft/auth/storage/types.rs`**：新增 `CurrentUser::to_storage_json()` 与 `PersistedAuthState::to_storage_json()` 方法（手动构建 JSON，含全部敏感字段）
+  - **`src-tauri/src/minecraft/auth/storage/mod.rs`**：删除 `reg_set_encrypted`/`reg_get_decrypted`（Windows 专有方法）；新增 `storage_path()` 函数（跨平台路径解析）；新增 `restrict_file_permissions()` Unix 权限辅助函数；删除 `mod registry` 声明
+  - **`src-tauri/src/minecraft/auth/storage/save.rs`**：重写为文件存储（序列化 → 加密 → 写文件 → Unix 设 0o600 → 刷新缓存）
+  - **`src-tauri/src/minecraft/auth/storage/load.rs`**：重写为文件存储（读文件 → 解密 → 反序列化；文件不存在/环境变量缺失返回空状态）
+  - **`src-tauri/src/minecraft/auth/storage/registry.rs`**：删除（键名常量 + `ALL_KEYS` 不再需要）
+  - **`src-tauri/src/storage/registry.rs`**：`reg_delete` 加 `#[allow(dead_code)]`（auth/storage 改文件存储后无调用方，保留以备 crate 级复用）
+- 未做迁移：Windows 老用户升级后需要重新登录（beta 阶段允许，未做注册表→文件一次性迁移）
+- 验证：`cargo check` 0 错误，`cargo clippy` 0 警告
+- 影响范围：所有平台统一行为（macOS/Linux 登录态可持久化；Windows 从注册表迁移到文件，老用户需重新登录一次）
+
 #### 修复跨平台兼容性 P0 阻塞项（macOS/Linux release 准备）
 
 - 背景：扫描后端 Windows 专有逻辑时发现 4 处 P0 阻塞问题，会导致 macOS/Linux 上游戏无法启动或进程树无法正确清理。完整扫描报告见 `docs/CROSS_PLATFORM_COMPATIBILITY.md`
