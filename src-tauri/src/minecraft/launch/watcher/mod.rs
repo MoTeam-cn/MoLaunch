@@ -75,7 +75,8 @@ pub struct GameWatcher {
 impl GameWatcher {
     /// 创建新的监控器
     ///
-    /// `window_title`：自定义窗口标题，非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题
+    /// `window_title`：自定义窗口标题，非空时启动后通过 Win32 SetWindowText 改写游戏窗口标题；
+    /// 空值/空字符串不改写（跟随全局设置）
     /// `app_handle`：Tauri AppHandle，用于在 stdout 检测到 LAN 端口时 emit 事件给联机模块
     pub fn new(
         pid: u32,
@@ -263,12 +264,15 @@ impl GameWatcher {
         }
 
         // 启动窗口标题修改：轮询找到 MC 窗口并改写标题，支持 {date}/{time} 实时替换
+        // 空标题（用户留空"跟随全局设置"）不触发改写，避免把游戏窗口标题改成空白
         if let Some(ref title) = self.window_title {
-            let title = title.clone();
-            let pid = self.pid;
-            tokio::spawn(async move {
-                window_title::apply_window_title(pid, title).await;
-            });
+            if !title.trim().is_empty() {
+                let title = title.clone();
+                let pid = self.pid;
+                tokio::spawn(async move {
+                    window_title::apply_window_title(pid, title).await;
+                });
+            }
         }
 
         // 启动状态检测
