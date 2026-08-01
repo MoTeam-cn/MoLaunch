@@ -9,7 +9,7 @@ import { useRouter } from 'vue-router'
 import { open } from '@tauri-apps/plugin-shell'
 import { useAuthStore } from '@/stores/auth'
 import Button from '@/components/common/Button.vue'
-import { CheckIcon } from '@heroicons/vue/24/solid'
+import StepProgressBar from '@/components/common/StepProgressBar.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 
 const props = defineProps<{ visible: boolean }>()
@@ -69,42 +69,80 @@ function openLoginUrl() {
     return
   }
   uriError.value = ''
-  openBrowser(uri)
+  void openBrowser(uri)
 }
 
 /** 用户主动点击：复制设备码到剪贴板 */
-function copyCode() {
+async function copyCode() {
   if (!authStore.deviceCodeInfo) return
-  copyToClipboard(authStore.deviceCodeInfo.user_code)
+  const ok = await copyToClipboard(authStore.deviceCodeInfo.user_code)
+  if (ok) {
+    copyFailed.value = false
+    toastSuccess('设备码已复制到剪贴板')
+  } else {
+    copyFailed.value = true
+    toastError('复制失败，请手动复制')
+  }
 }
 
 function handleCancel() { authStore.cancelMsLogin(); emit('close') }
 async function handleRetry() { await authStore.startMsLogin() }
 
+// 设备码自动辅助标志：防止自动复制/自动打开与用户手动点击重复
+let autoOpened = false
+let autoOpenTimer: ReturnType<typeof setTimeout> | null = null
+/** 自动复制是否失败：失败则放弃自动打开网页，并提示用户手动复制 */
+const copyFailed = ref(false)
+
 watch(() => props.visible, async (val) => {
-  if (val) { try { await authStore.startMsLogin() } catch { /* handled in store */ } }
+  if (val) {
+    autoOpened = false
+    copyFailed.value = false
+    try { await authStore.startMsLogin() } catch { /* handled in store */ }
+  } else {
+    // 关闭弹窗时取消未触发的自动打开
+    if (autoOpenTimer) { clearTimeout(autoOpenTimer); autoOpenTimer = null }
+  }
 })
 
-watch(() => authStore.deviceCodeInfo, (info) => {
-  // 不再自动复制 user_code 或自动打开 verification_uri
-  // 改为用户主动点击按钮触发，避免剪贴板嗅探与钓鱼跳转
-  if (info) { uriError.value = '' }
+watch(() => authStore.deviceCodeInfo, async (info) => {
+  // 设备码流程：自动复制设备码 + 延迟 2s 自动打开授权网页（带白名单校验）
+  // 避免剪贴板嗅探：只复制官方生成的 user_code，不复制 verification_uri 之外的任何内容
+  if (info) {
+    uriError.value = ''
+    const ok = await copyToClipboard(info.user_code)
+    if (!ok) {
+      // 复制失败：放弃自动打开网页，提示用户手动复制
+      copyFailed.value = true
+      toastError('复制设备码失败，请手动复制')
+      return
+    }
+    copyFailed.value = false
+    autoOpenTimer = setTimeout(() => {
+      if (autoOpened) return
+      autoOpened = true
+      openLoginUrl()
+    }, 2000)
+  }
 })
 
 watch(() => authStore.msLoginStatus, (status) => {
   if (status === 'success') { toastSuccess('登录成功'); emit('success'); router.push('/apps') }
 })
 
-onUnmounted(() => authStore.cancelMsLogin())
+onUnmounted(() => {
+  if (autoOpenTimer) { clearTimeout(autoOpenTimer); autoOpenTimer = null }
+  authStore.cancelMsLogin()
+})
 </script>
 
 <template>
   <Teleport to="body">
     <Transition name="fade">
-      <div v-if="visible" class="modal-shell" @click.self="handleCancel">
+      <div v-if="visible" class="fixed inset-0 z-[10000] flex items-center justify-center p-4" @click.self="handleCancel">
         <div class="absolute inset-0 bg-black/50" />
 
-        <div class="modal-body max-w-md rounded-2xl mt-2">
+        <div class="relative w-full max-w-md bg-white rounded-2xl shadow-xl">
           <!-- 标题 -->
           <div class="px-6 pt-6 pb-4 flex items-center gap-3">
             <svg viewBox="0 0 23 23" class="h-6 w-6">
@@ -116,7 +154,7 @@ onUnmounted(() => authStore.cancelMsLogin())
             <h3 class="text-lg font-semibold text-gray-900">微软账号登录</h3>
           </div>
 
-          <div class="modal-scroll px-6 pb-6">
+          <div class="px-6 pb-6">
             <!-- 请求中 -->
             <div v-if="authStore.msLoginStatus === 'requesting'" class="flex flex-col items-center py-8">
               <div class="h-8 w-8 animate-spin rounded-full border-[3px] border-primary-200 border-t-primary-500" />
@@ -136,15 +174,19 @@ onUnmounted(() => authStore.cancelMsLogin())
               <!-- Device Code Flow: 显示设备码 -->
               <div v-else-if="authStore.deviceCodeInfo" class="space-y-3">
                 <div class="text-center">
-                  <p class="mb-2 text-sm text-gray-600">点击下方按钮打开 Microsoft 登录页，并输入以下代码：</p>
+                  <p class="mb-2 text-sm text-gray-600">
+                    {{ copyFailed ? '请点击下方按钮打开 Microsoft 登录页，并手动复制输入以下代码：' : '授权网页已打开（未打开可点下方按钮），输入以下代码：' }}
+                  </p>
                   <div class="my-3 select-all rounded-lg bg-gray-100 py-3 text-2xl font-bold tracking-widest text-gray-900">
                     {{ authStore.deviceCodeInfo.user_code }}
                   </div>
-                  <p class="text-xs text-gray-400">请手动点击按钮复制代码并打开网页</p>
+                  <p class="text-xs text-gray-400">
+                    {{ copyFailed ? '复制失败，请手动长按/右键复制设备码' : '设备码已复制到剪贴板，可直接粘贴' }}
+                  </p>
                 </div>
                 <div class="flex gap-2">
-                  <Button type="primary" class="flex-1" @click="openLoginUrl">点击打开 Microsoft 登录页</Button>
-                  <Button type="secondary" @click="copyCode">复制设备码</Button>
+                  <Button type="primary" class="flex-1" @click="openLoginUrl">打开 Microsoft 登录页</Button>
+                  <Button type="secondary" @click="copyCode">重新复制</Button>
                 </div>
                 <p v-if="uriError" class="rounded-lg bg-red-50 px-3 py-2 text-xs text-red-700">{{ uriError }}</p>
                 <div class="flex items-center justify-center gap-2 text-sm text-gray-500">
@@ -155,20 +197,14 @@ onUnmounted(() => authStore.cancelMsLogin())
               <Button type="text" long @click="handleCancel">取消登录</Button>
             </div>
 
-            <!-- Token 交换中 -->
+            <!-- Token 交换中（进度条仅在此阶段显示：伪进度让等待 Token 转换/XBL/XSTS 等阶段的用户心里好受点） -->
             <div v-else-if="authStore.msLoginStatus === 'exchanging'" class="space-y-3 py-2">
-              <div class="flex items-center gap-2 text-sm font-medium text-primary-600">
+              <div class="flex items-center gap-2 text-sm text-gray-500">
                 <div class="h-4 w-4 animate-spin rounded-full border-2 border-primary-200 border-t-primary-500" />
-                <span>{{ authStore.msLoginStepLabel || '授权成功，正在交换 Token...' }}</span>
+                <span>正在登录，请稍候...</span>
               </div>
-              <div class="space-y-1.5">
-                <div v-for="(s, idx) in STEPS" :key="s.key" class="flex items-center gap-3 rounded-lg px-3 py-1.5 text-sm transition-colors" :class="{ 'bg-primary-50 text-primary-700': idx === stepIndex, 'text-gray-400': idx > stepIndex, 'text-green-600': idx >= 0 && idx < stepIndex }">
-                  <CheckIcon v-if="idx >= 0 && idx < stepIndex" class="w-4 h-4 text-green-500" />
-                  <span v-else-if="idx === stepIndex" class="h-2 w-2 animate-pulse rounded-full bg-primary-500" />
-                  <span v-else class="h-2 w-2 rounded-full bg-gray-300" />
-                  <span>{{ s.label }}</span>
-                </div>
-              </div>
+              <!-- 公共步骤进度条（伪进度动画，不显示步骤名） -->
+              <StepProgressBar :steps="STEPS" :current-index="stepIndex" :show-steps="false" />
             </div>
 
             <!-- 错误 -->
