@@ -7,7 +7,161 @@
 
 ## [未发布]
 
+### 维护
+
+#### 修正 V3 拆分记录中 4 处文件名错误
+
+- 背景：核对 V3 报告 P1 黄区+边界拆分记录时发现 4 处文件名与实际目录不符（拆分落地时记录有误，代码本身正确）
+- 改动（纯文档纠错，未改任何代码）：
+  - `minecraft/system/shell/`：`reveal.rs` → `perms.rs`、`open_url.rs` → `open.rs`
+  - `commands/tools/archive/`：`common.rs` → `helpers.rs`、补 `seed.rs`
+  - `commands/tools/network/`：`port.rs` → `ports.rs`、`server_ping.rs` → `ping.rs`、`motd.rs` → `tcp.rs`
+  - `commands/version/list/`：`scan.rs`/`filter.rs`/`sort.rs`/`meta.rs` → `detect.rs`/`installed.rs`/`remote.rs`/`modpack.rs`/`info.rs`
+- 红区 6 个拆分记录核对全部正确，未改动
+
+#### 升级 vue-tsc 1.8.27 → 2.2.12 并修复 29 处 Vue 模板类型错误
+
+- 背景：`vue-tsc@1.8.27` 与 Node.js v24 不兼容（`Search string not found: /supportedTSExtensions/`），`npm run typecheck` 无法运行。升级到 2.2.12 后 2.x 严格模式暴露 29 处此前未检出的 Vue SFC 类型错误
+- 升级：`package.json` devDependencies `vue-tsc` ^1.8.27 → ^2.2.12（typescript ^5.3.3 满足 2.x 要求）；`src-tauri/resources/about/frontend-dev-deps.txt` 同步更新版本号
+- 验证：`npm run typecheck` 0 错误
+- 修复（均为类型层/未使用变量清理，未改运行时行为，按错误类型分组）：
+  - **TS6133 未使用变量（8 处，5 文件）**：
+    - `src/components/common/SubTabBar.vue` / `src/views/version-settings/mod-tab/VersionTable.vue`：`defineProps` 返回值未使用，去掉 `const props =` 接收
+    - `src/views/settings/settings-launch/JavaPathSelector.vue`：删除未使用 `import * as tauri`；删除 `#option` slot 解构中未使用的 `selected`
+    - `src/views/Versions.vue`：删除 `useVersionInstallActions()` 解构中未使用的 `loadInstalledVersions`
+    - `src/views/version-settings/ModTab.vue`：删除解构中未使用的 `selectedIds`、`hasSelection`
+    - `src/components/home/AccountSelector.vue`：删除 `useSwipeNavigation` 解构中未使用的 `isAnimating`
+  - **Java 路径选择相关（7 处，4 文件）**：
+    - `src/views/version-settings/setup-tab/JavaCustomMode.vue`：`java_path` → `javaPath`（对齐 `VersionPersonalization` 驼峰字段名，2 处 TS2551）；`handleImportJava` 加 `if (!selectedId.value) return` null 守卫（1 处 TS2345）；`@update:model-value` handler 参数 `string` → `string | number`（对齐 `Select.vue` emit 声明，1 处 TS2322）
+    - `src/views/version-settings/SetupTab.vue` / `src/views/version-settings/setup-tab/JavaModeSelector.vue`：同上，handler 参数 `string` → `string | number`（2 处 TS2322）
+    - `src/views/version-settings/MemorySection.vue`：加 `if (!selectedId.value) return` null 守卫（1 处 TS2345）
+  - **导出/重载/转换/参数数量（8 处，8 文件）**：
+    - `src/components/home/AccountSelector.vue` / `src/components/home/account-selector/AccountIndicator.vue`：`AccountCardData` 改从 `./types` 导入（`AccountCard.vue` 未导出该类型，仅转导）
+    - `src/components/common/skin-manager/SkinPreviewPanel.vue`：`skinUrl` → `skinUrl ?? undefined`（`SkinAvatar` prop 期望 `string | undefined`）
+    - `src/components/common/SkinModel3D.vue`：`loadCape` 拆分 `if (newUrl) loadCape(newUrl) else loadCape(null)` 命中重载
+    - `src/components/community/SearchBar.vue`：动态事件名 `emit(... as any)` 改为 `switch` 分发 + 字面量事件名窄化
+    - `src/plugins/custom-layout/HtmlLayoutPanel.vue`：`window as Record<...>` → `window as unknown as Record<...>`
+    - `src/components/community/DependencyConfirmDialog.vue`：`Button` type `"default"` → `"text"`（项目 Button 不支持 default）
+    - `src/components/common/CrashDialog.vue`：`toastSuccess`/`toastError` 双参合并为单字符串
+  - **App/事件/状态/LayoutSection（6 处，4 文件 + 2 个 .ts 根因）**：
+    - `src/utils/toast.ts`：`setToastRef` 入参 `ToastRef` → `ToastRef | null`（与 `setModalRef`/`setCrashDialogRef` 一致，修复 `App.vue:51`）
+    - `src/composables/useModUpdate.ts`：`emit` 参数改为与 `defineEmits` 一致的重载交集类型（修复 `ModUpdateDialog.vue:53`）
+    - `src/plugins/custom-layout/LayoutSectionRenderer.vue`：html section `:ref` 回调补 `props.section.type === 'html'` 守卫窄化闭包内类型
+    - `src/views/quick-tools/CleanupTool.vue`：移除 `v-if` 窄化域内恒为 false 的 `scanState === 'cleaning'`/`'scanning'` 死比较（状态联合已含全部成员，问题为模板控制流窄化）
+
+#### 验证预存 5 个 tsc 错误已在历次 pass 中修复
+
+- 背景：V3 报告记录 5 个预存 tsc 错误（`htmlShadowRenderer.ts`/`renderHelpers.ts`(3，CustomLayoutPanel 拆分引入) + `crypto.ts`(1，TS 5.7+ ArrayBuffer 严格模式)），需确认当前状态
+- 验证方式：`npx tsc --noEmit`（项目本地 typescript + strict tsconfig，include 覆盖 `src/**/*.ts`）
+- 结果：0 错误，5 个预存错误已在历次 pass 中修复
+- 修复痕迹（已在之前的拆分/重构 pass 中落地，本次未改动代码）：
+  - `src/utils/online/crypto.ts`：`raw as BufferSource` 显式转换（TS 5.7+ ArrayBuffer 严格模式）
+  - `src/plugins/custom-layout/renderHelpers.ts`：`typeof raw !== 'string' && typeof raw !== 'number'` 守卫窄化 `unknown`
+  - `src/plugins/custom-layout/htmlShadowRenderer.ts`：`const script = section.script` 提取局部变量解决闭包内 TS 无法窄化问题
+- 环境备注：此前 `vue-tsc@1.8.27` 与 Node.js v24 不兼容导致无法运行 typecheck，现已升级到 2.2.12（见上条），Vue 模板类型检查已通过 `npm run typecheck` 补验
+
+#### 修复 clippy `map_identity` 冗余 identity 闭包（2 处）
+
+- 背景：clippy 报告 2 处 `.map(|x| x)` 形式的恒等映射，属于无意义闭包调用
+- 改动（删除冗余 `.map(...)`，未改业务逻辑）：
+  - `src-tauri/src/commands/community/install/concurrent/extract.rs`：`find_map(|p| name.strip_prefix(p.as_str()).map(|r| r))` → `find_map(|p| name.strip_prefix(p.as_str()))`
+  - `src-tauri/src/commands/version/export/options/mod.rs`：`sort_by_key` 中 `.ok().map(|t| t)` → `.ok()`
+- 验证：`cargo clippy --lib` 0 警告
+
+#### 修复 clippy `type_complexity` 引入类型别名（3 处）
+
+- 背景：clippy 报告 3 处函数签名类型嵌套过深（`Arc<dyn Fn... + Send + Sync>` / `Arc<Mutex<Option<Arc<tokio::sync::Mutex<Option<Child>>>>>>` / 7 元组返回类型），可读性差
+- 改动（在文件顶部引入 `type` 别名，函数签名替换为别名，未改运行时行为）：
+  - `src-tauri/src/minecraft/download/full_download.rs`：`type StageCallback = Arc<dyn Fn(usize, &str) + Send + Sync>;`
+  - `src-tauri/src/minecraft/launch/pipeline/mod.rs`：`type ChildProcessHandle = Arc<Mutex<Option<Arc<tokio::sync::Mutex<Option<tokio::process::Child>>>>>>;`
+  - `src-tauri/src/minecraft/version/scan/loaders.rs`：`type LoaderDetectResult = (VersionType, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>, Option<String>);`
+- 验证：`cargo clippy --lib` 0 警告
+
+#### 修复 clippy `inherent_to_string` 改为 `Display` trait 实现（1 处）
+
+- 背景：clippy 报告 `IniFile` 自定义 `to_string` 方法会与 `std::string::ToString` trait（由 `Display` 自动派生）冲突，应直接实现 `Display`
+- 改动（删除 inherent `to_string` 方法，改为 `impl std::fmt::Display for IniFile`，输出格式完全一致）：
+  - `src-tauri/src/storage/ini.rs`：`pub fn to_string(&self) -> String` → `impl Display for IniFile { fn fmt(&self, f: &mut Formatter<'_>) -> Result { ... } }`
+- 调用方仍可用 `ini.to_string()`（通过 `Display` 自动派生 `ToString`），无破坏性变更
+- 验证：`cargo clippy --lib` 0 警告
+
+#### 修复 clippy `upper_case_acronyms` 为 Windows API 类型添加 `#[allow]`（2 处）
+
+- 背景：clippy 报告 `HWND`/`HINSTANCE` 类型名含全大写缩写违反命名规范，但这两个是 Windows 系统 API 的标准类型名（来自 Win32），改名会破坏可读性
+- 改动（在 `type` 别名前添加 `#[allow(clippy::upper_case_acronyms)]` 属性，未改类型本身）：
+  - `src-tauri/src/minecraft/system/shell/admin.rs`：`HWND`、`HINSTANCE`
+  - `src-tauri/src/minecraft/system/shell/open.rs`：`HWND`、`HINSTANCE`
+- 验证：`cargo clippy --lib` 0 警告
+
+#### 修复 clippy `should_implement_trait` 为 `from_str` 添加 `#[allow]`（4 处）
+
+- 背景：clippy 报告自定义 `from_str` 方法会与 `std::str::FromStr` trait 方法名冲突。这些 `from_str` 是项目早期为简化枚举解析而写的便利方法（返回枚举而非 `Result`），改为实现 `FromStr` trait 需重构所有调用点（返回 `Result` + `unwrap`），短期不重构
+- 改动（在 `from_str` 方法前添加 `#[allow(clippy::should_implement_trait)]` 属性，未改方法签名/逻辑）：
+  - `src-tauri/src/logger/mod.rs`：`LogLevel::from_str`
+  - `src-tauri/src/minecraft/community/types.rs`：`ModLoaders::from_str`
+  - `src-tauri/src/minecraft/sources/mode.rs`：`DownloadSourceMode::from_str`
+  - `src-tauri/src/minecraft/version/state.rs`：`VersionType::from_str`
+- 验证：`cargo clippy --lib` 0 警告
+
+#### 为 clippy `too_many_arguments` 告警函数添加 `#[allow]` 属性标注
+
+- 背景：clippy 报告 10 个函数参数过多（8-17 个），这些函数多为启动编排/下载/参数构建的核心入口，参数数量由业务需求决定，短期不重构签名
+- 改动（纯属性标注，未修改任何函数体/签名/业务逻辑）：
+  - `src-tauri/src/commands/version/install/loader_helpers.rs`：`install_single_loader`（9 参）
+  - `src-tauri/src/commands/version/launch/build_config.rs`：`build_launch_config`（12 参）
+  - `src-tauri/src/commands/version/launch/mod.rs`：`launch_game`（12 参）
+  - `src-tauri/src/minecraft/download/chunk/mod.rs`：`download_chunked`（9 参）
+  - `src-tauri/src/minecraft/download/downloader/single.rs`：`download_single`（10 参）
+  - `src-tauri/src/minecraft/download/downloader/stream.rs`：`download_from_url`（9 参）
+  - `src-tauri/src/minecraft/launch/arguments.rs`：`build_launch_arguments`（17 参）
+  - `src-tauri/src/minecraft/launch/game_args.rs`：`build_game_args`（12 参）
+  - `src-tauri/src/minecraft/launch/jvm_args.rs`：`build_jvm_args`（11 参）
+  - `src-tauri/src/minecraft/version/setup/types.rs`：`VersionSetup::new`（8 参，impl 块内）
+- 约定：`#[allow]` 统一放在 `///` doc comment 前一行
+- 验证：`cargo check --lib` 通过（14.79s，无错误，仅 2 处预存 `PathBuf` 未使用 import 告警）
+
 ### 重构
+
+#### 拆分超长 Rust 文件（V3 代码质量报告 P1 红区 6 个）
+
+- 背景：V3 报告 P1 红区（>500 行硬约束违规）6 个文件未拆——`minecraft/auth/authlib/client.rs`(639)、`commands/version/export/zip.rs`(612)、`commands/frp/process.rs`(593)、`commands/auth/authlib.rs`(548)、`commands/tools/types.rs`(540)、`minecraft/online/client.rs`(530)。沿用 V3 已有拆分约定（`modpack/`、`signaling/`、`options/` 三种风格：`mod xxx;` + `pub use` 具名/glob re-export + 共享状态留 `mod.rs` 用 `pub(super)` 暴露）
+- 改动（纯重构，仅搬运代码 + 调整 `use` 导入路径，未改任何业务逻辑/公开 API 签名/错误处理/日志内容）：
+  - [src-tauri/src/minecraft/auth/authlib/client/](src-tauri/src/minecraft/auth/authlib/client/)：639 → 7 文件（`mod.rs`/`types.rs`/`meta.rs`/`auth.rs`/`profile.rs`/`skin.rs`/`cape.rs`），按 HTTP 端点域分组；mod.rs 具名 re-export 9 函数 + `AuthlibInjectorMeta`，并额外保留 `authenticate`/`validate`/`refresh`/`YggdrasilError`（`login.rs` 依赖）；`join_url`/`parse_error`/`delete_texture` 共享辅助提升到 mod.rs
+  - [src-tauri/src/commands/version/export/zip/](src-tauri/src/commands/version/export/zip/)：612 → 8 文件（`mod.rs`/`helpers.rs`/`modrinth.rs`/`curseforge.rs`/`hmcl.rs`/`mmc.rs`/`mcbbs.rs`/`compress.rs`），按导出格式分组；`build_modpack_zip` 编排函数留 mod.rs 按格式分发，签名未变
+  - [src-tauri/src/commands/frp/process/](src-tauri/src/commands/frp/process/)：593 → 6 文件（`mod.rs`/`start.rs`/`capture.rs`/`stop.rs`/`status.rs`/`log.rs`），按 frpc 生命周期分组；`FrpcHandle`/`RUNNING` 全局状态提升到 mod.rs 用 `pub(super)` 暴露；6 个公开函数 re-export
+  - [src-tauri/src/commands/auth/authlib/](src-tauri/src/commands/auth/authlib/)：548 → 6 文件（`mod.rs`/`types.rs`/`helpers.rs`/`login.rs`/`account.rs`/`skin.rs`），按登录/账号/皮肤职责分组；mod.rs 具名 re-export 6 函数 + 4 类型（父 `commands/auth/mod.rs` 要求）+ 5 个皮肤命令（`meta_manager` 依赖）
+  - [src-tauri/src/commands/tools/types/](src-tauri/src/commands/tools/types/)：540 → 15 文件，按 tools 子模块一一对应分组（download/archive/network/screenshot/mod_tools/resourcepack/cleanup/version_json/crash_analyzer/nbt/picker_window/data_export/memory/filename + mod.rs）；mod.rs `pub use xxx::*;` glob re-export 63 个 pub struct，保证父 `tools/mod.rs` 的 `use types::*;` 透明兼容
+  - [src-tauri/src/minecraft/online/client/](src-tauri/src/minecraft/online/client/)：530 → 5 文件（`mod.rs`/`time.rs`/`jwks.rs`/`auth.rs`/`request.rs`），按联机 API 域分组；保留 `pub use super::client_types::{BusinessResult, ClientError};` re-export；测试文件 `client_tests.rs` 原地未动，`mod.rs` 末尾 `#[cfg(test)] #[path = "../client_tests.rs"] mod tests;` 修正相对路径指向上一级
+- 所有新文件均 ≤350 行（最大 231 行），头部 `//!` 注释 ≤5 行
+- 验证：`cargo check` 通过（19.22s 无错误无警告）；`cargo fmt` 通过；clippy 经核查本次拆分**未引入任何新告警**（仅 2 处预存告警随纯重构迁移：`zip/mod.rs` 的 `ptr_arg` 来自原 `build_modpack_zip` 签名、`client/meta.rs` 的 `needless_borrow` 来自原 `base64_encode(&json.as_bytes())` 调用，均非本次新增）
+
+#### 拆分超长 Rust 文件（V3 代码质量报告 P1 黄区 + 边界 13 个）
+
+- 背景：V3 报告 P1 剩余 13 个 350-500 行 Rust 文件未拆——黄区 5 个（`system/shell.rs` 494 / `tools/archive.rs` 493 / `frp/binary.rs` 477 / `tools/network.rs` 470 / `community/mcmod.rs` 443）+ 边界 8 个（`online/auth.rs` 429 / `sources.rs` 390 / `version/list.rs` 383 / `updater.rs` 368 / `frp/mod.rs` 363 / `auth/storage/mod.rs` 363 / `apply_config/types.rs` 353 / `curseforge/mod.rs` 351）。沿用红区拆分约定（`mod xxx;` + `pub use` 具名 re-export + 共享状态留 `mod.rs` 用 `pub(super)` 暴露）
+- 改动（纯重构，仅搬运代码 + 调整 `use` 导入路径，未改任何业务逻辑/公开 API 签名/错误处理/日志内容）：
+  - **批 1（黄区 5 + 边界 1，共 6 个）**：
+    - [src-tauri/src/minecraft/system/shell/](src-tauri/src/minecraft/system/shell/)：494 → 子目录（`mod.rs`/`exec.rs`/`window.rs`/`admin.rs`/`open.rs`/`perms.rs`），按 shell 命令职责分组；`shell_err` 共享辅助提升到 mod.rs 用 `pub(super)` 暴露
+    - [src-tauri/src/commands/tools/archive/](src-tauri/src/commands/tools/archive/)：493 → 子目录（`mod.rs`/`list.rs`/`backup.rs`/`restore.rs`/`helpers.rs`/`seed.rs`），按存档操作分组
+    - [src-tauri/src/commands/frp/binary/](src-tauri/src/commands/frp/binary/)：477 → 子目录（`mod.rs`/`system_default.rs`/`external.rs`/`archive.rs`），按厂商类型分组
+    - [src-tauri/src/commands/tools/network/](src-tauri/src/commands/tools/network/)：470 → 子目录（`mod.rs`/`latency.rs`/`ports.rs`/`ping.rs`/`tcp.rs`），按网络工具类型分组
+    - [src-tauri/src/minecraft/community/mcmod/](src-tauri/src/minecraft/community/mcmod/)：443 → 子目录（`mod.rs`/`database.rs`/`lookup.rs`/`parsers.rs`/`search.rs`），按 mcmod 功能分组；测试文件 `mcmod_tests.rs` 路径修正为 `#[path = "../mcmod_tests.rs"]`
+    - [src-tauri/src/commands/version/list/](src-tauri/src/commands/version/list/)：383 → 子目录（`mod.rs`/`detect.rs`/`installed.rs`/`remote.rs`/`modpack.rs`/`info.rs`），按版本列表处理阶段分组
+  - **批 2（边界 5 个）**：
+    - [src-tauri/src/minecraft/online/auth/](src-tauri/src/minecraft/online/auth/)：429 → 子目录（`mod.rs`/`helpers.rs`/`keypair.rs`/`login.rs`/`refresh.rs`/`register.rs`/`types.rs`），按认证协议流程分组；测试文件 `auth_tests.rs` 路径修正为 `#[path = "../auth_tests.rs"]`
+    - [src-tauri/src/minecraft/sources/](src-tauri/src/minecraft/sources/)：390 → 子目录（`mod.rs`/`cdn.rs`/`constants.rs`/`http.rs`/`mode.rs`/`paths.rs`），按镜像源管理职责分组；测试文件 `sources_tests.rs` 路径修正为 `#[path = "../sources_tests.rs"]`
+    - [src-tauri/src/commands/system/updater/](src-tauri/src/commands/system/updater/)：368 → 子目录（`mod.rs`/`check.rs`/`install_windows.rs`/`install_unix.rs`），按平台分流分组；`UpdateInfo` 类型保留 mod.rs，平台分支用 `#[cfg(target_os = "windows")]` 编译期分流
+    - [src-tauri/src/commands/system/apply_config/types/](src-tauri/src/commands/system/apply_config/types/)：353 → 子目录（`mod.rs`/`patch.rs`/`snapshot.rs`），按 ConfigPatch / ConfigSnapshot / build_snapshot 职责分组；mod.rs 保留 `ConfigEntry` + `build_snapshot` 函数
+  - **批 3（边界 3 个，本次完成）**：
+    - [src-tauri/src/commands/frp/](src-tauri/src/commands/frp/)：399 → mod.rs 47 + [types.rs](src-tauri/src/commands/frp/types.rs) 293 + [paths.rs](src-tauri/src/commands/frp/paths.rs) 59；types 集中所有共享数据类型（隧道/厂商清单/认证配置/日志文件），paths 集中路径辅助函数与 ID 校验，mod.rs 保留 `frp_manager` 命令入口 + 子模块声明 + re-export
+    - [src-tauri/src/minecraft/auth/storage/](src-tauri/src/minecraft/auth/storage/)：411 → mod.rs 87 + [load.rs](src-tauri/src/minecraft/auth/storage/load.rs) 176 + [save.rs](src-tauri/src/minecraft/auth/storage/save.rs) 140；`AuthStorage::load` 与 `AuthStorage::save` 两个大方法各拆为独立 impl 块文件，mod.rs 保留 struct 定义 + new + 加解密工具 + invalidate
+    - [src-tauri/src/minecraft/community/curseforge/](src-tauri/src/minecraft/community/curseforge/)：402 → mod.rs 20 + [fingerprint.rs](src-tauri/src/minecraft/community/curseforge/fingerprint.rs) 203 + [search.rs](src-tauri/src/minecraft/community/curseforge/search.rs) 73 + [project.rs](src-tauri/src/minecraft/community/curseforge/project.rs) 93；按 6 个公共 API 函数 + 1 个 helper 的功能域分组（指纹查询 / 搜索 / 工程与版本）
+- 所有新文件均 ≤350 行（最大 293 行），头部 `//!` 注释 ≤5 行
+- 附带修复（apply_config/types 拆分引入的编译错误）：
+  - [src-tauri/src/commands/system/apply_config/types/mod.rs](src-tauri/src/commands/system/apply_config/types/mod.rs)：`build_snapshot` 函数体引用 7 个 Snapshot 子结构体（`ProxySnapshot`/`DownloadSnapshot`/`MemorySnapshot`/`CommunitySnapshot`/`LaunchAdvancedSnapshot`/`OnlineSnapshot`/`TlsSnapshot`）但未导入，补 `use snapshot::{...};`
+- 附带修复（shell 拆分遗留的 unix-only import 未加 cfg 守卫）：
+  - [src-tauri/src/minecraft/system/shell/admin.rs](src-tauri/src/minecraft/system/shell/admin.rs)：`use super::shell_err;` 加 `#[cfg(unix)]` 守卫（仅在 macOS/Linux `relaunch_as_admin` 分支用）
+  - [src-tauri/src/minecraft/system/shell/window.rs](src-tauri/src/minecraft/system/shell/window.rs)：`use crate::log_info;` 与 `use super::shell_err;` 加 `#[cfg(unix)]` 守卫（所有窗口管理函数都是 unix-only）
+- 验证：`cargo check` 通过（无错误无警告）；`cargo fmt` 通过；`cargo clippy --lib --no-deps` 0 错 0 警告（拆分本身未引入任何新告警）
 
 #### 注释规范整改（V3 代码质量报告 P2）
 
