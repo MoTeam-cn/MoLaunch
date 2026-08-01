@@ -1,13 +1,38 @@
 <h1>FRP 厂商开发指南</h1>
-<p>本指南面向想要为 MoLaunch 开发自定义 FRP 穿透厂商的开发者。通过编写 manifest.json 清单文件，你可以定义厂商信息、frpc 二进制分发方式、认证流程和网络/进程安全权限。</p>
+<p>本指南面向想要为 MoLaunch 开发自定义 FRP 穿透厂商的开发者。通过编写三个配置文件，你可以定义厂商信息、frpc 二进制分发方式、认证流程、API 接口响应规范和配置生成方式。</p>
+
+<h2>三文件架构</h2>
+<p>新设计将厂商配置拆分为三层，各司其职：</p>
+<table>
+  <thead>
+    <tr><th>文件</th><th>职责</th><th>必填</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>manifest.json</code></td><td>厂商元信息 + frpc 分发 + 权限白名单 + 指向 auth/endpoints 文件的指针</td><td>是</td></tr>
+    <tr><td><code>auth.json</code></td><td>认证交互层：用户交互方式（授权页 URL、客户端 ID、回调端口等），不含网络请求细节</td><td>否（auth.type=none 时不需要）</td></tr>
+    <tr><td><code>api/endpoints.json</code></td><td>API 规范：认证流程请求/响应解析 + 隧道列表接口 + 响应包裹 + 配置生成模式</td><td>否（auth.type=none 且手动配置隧道时不需要）</td></tr>
+  </tbody>
+</table>
+<blockquote>设计理由：不同厂商的接口响应结构各不相同（成功判断、字段命名、数据位置、配置获取方式均有差异）。将接口响应规范做成可配置项，厂商只需在 endpoints.json 中声明即可，启动器自动适配。</blockquote>
 
 <h2>快速开始</h2>
 <ol>
   <li>创建一个文件夹，命名为你的厂商 ID（如 my-frp-provider）</li>
-  <li>在文件夹根目录创建 manifest.json</li>
+  <li>在文件夹根目录创建 <code>manifest.json</code>（厂商元信息 + binary + permissions）</li>
+  <li>创建 <code>auth.json</code>（认证交互层配置，type=none 时跳过）</li>
+  <li>创建 <code>api/endpoints.json</code>（API 接口规范，type=none 时跳过）</li>
   <li>根据分发方式放置 frpc 二进制文件或配置下载地址</li>
-  <li>在 MoLaunch 的「Frp 管理 → 厂商列表」中点击「从文件夹安装」或「从 ZIP 安装」</li>
+  <li>在 MoLaunch 的「Frp 管理 → 厂商列表」中点击「从文件夹安装」「从 ZIP 安装」或「从 URL 安装」</li>
 </ol>
+<p>文件夹结构示例：</p>
+<pre><code>my-provider/
+├── manifest.json      # 厂商元信息
+├── auth.json          # 认证交互层（可选）
+├── logo.png           # 厂商图标
+├── api/
+│   └── endpoints.json # API 接口规范（可选）
+└── bin/
+    └── frpc.exe       # frpc 二进制（bundled 模式）</code></pre>
 
 <h2>manifest.json 字段说明</h2>
 <p>以下是一个完整的 manifest.json 骨架示例：</p>
@@ -18,13 +43,15 @@
   "version": "1.0.0",
   "author": "作者名称",
   "homepage": "https://example.com",
-  "icon": "icon.png",
+  "icon": "logo.png",
+  "authFile": "auth.json",
+  "api": {
+    "endpointsFile": "api/endpoints.json"
+  },
   "binary": { ... },
-  "auth": { ... },
   "networkPermissions": { ... },
   "processPermissions": { ... }
 }</code></pre>
-<p>字段说明：</p>
 <table>
   <thead>
     <tr><th>字段</th><th>类型</th><th>必填</th><th>说明</th></tr>
@@ -37,12 +64,290 @@
     <tr><td><code>author</code></td><td>string</td><td>是</td><td>作者名称</td></tr>
     <tr><td><code>homepage</code></td><td>string</td><td>否</td><td>厂商主页 URL</td></tr>
     <tr><td><code>icon</code></td><td>string</td><td>否</td><td>图标文件相对路径（建议 128x128 PNG）</td></tr>
+    <tr><td><code>authFile</code></td><td>string</td><td>否</td><td>认证交互层配置文件路径（默认 auth.json）</td></tr>
+    <tr><td><code>api.endpointsFile</code></td><td>string</td><td>否</td><td>API 规范文件路径（默认 api/endpoints.json）</td></tr>
     <tr><td><code>binary</code></td><td>object</td><td>是</td><td>frpc 二进制分发配置</td></tr>
-    <tr><td><code>auth</code></td><td>object</td><td>否</td><td>认证配置（默认 none）</td></tr>
     <tr><td><code>networkPermissions</code></td><td>object</td><td>否</td><td>网络权限白名单</td></tr>
     <tr><td><code>processPermissions</code></td><td>object</td><td>否</td><td>进程权限白名单</td></tr>
   </tbody>
 </table>
+
+<h2>auth.json 认证交互层</h2>
+<p>auth.json 只描述<strong>用户交互方式</strong>，实际的网络请求与响应解析在 endpoints.json 的 <code>authFlows</code> 中定义。按 <code>type</code> 读取对应块，其他块忽略。</p>
+<pre><code>{
+  "type": "oauth2",
+
+  "oauth2": {
+    "authorizeUrl": "https://console.example.com/oauth/authorize",
+    "clientId": "your-client-id",
+    "clientSecret": "optional-client-secret",
+    "scopes": ["tunnel:manage"],
+    "redirectPort": 18365
+  },
+
+  "deviceCode": {
+    "clientId": "your-client-id",
+    "clientSecret": "optional-client-secret",
+    "scopes": ["tunnel:manage"],
+    "pollInterval": 5
+  },
+
+  "apiKey": {
+    "obtainUrl": "https://example.com/dashboard/api-keys",
+    "headerName": "X-API-Key"
+  }
+}</code></pre>
+<table>
+  <thead>
+    <tr><th>type</th><th>字段</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td rowspan="5"><code>oauth2</code></td><td><code>authorizeUrl</code></td><td>授权页 URL（浏览器打开让用户登录授权）</td></tr>
+    <tr><td><code>clientId</code></td><td>OAuth2 客户端 ID</td></tr>
+    <tr><td><code>clientSecret</code></td><td>客户端密钥（可选，部分厂商需要）</td></tr>
+    <tr><td><code>scopes</code></td><td>权限范围列表</td></tr>
+    <tr><td><code>redirectPort</code></td><td>本地回调端口（本地启动 HTTP 服务接收回调）</td></tr>
+    <tr><td rowspan="4"><code>device_code</code></td><td><code>clientId</code></td><td>客户端 ID</td></tr>
+    <tr><td><code>clientSecret</code></td><td>客户端密钥（可选）</td></tr>
+    <tr><td><code>scopes</code></td><td>权限范围列表</td></tr>
+    <tr><td><code>pollInterval</code></td><td>轮询间隔（秒），默认 5</td></tr>
+    <tr><td rowspan="2"><code>api_key</code></td><td><code>obtainUrl</code></td><td>获取 API Key 的页面 URL（前端提供跳转入口）</td></tr>
+    <tr><td><code>headerName</code></td><td>API Key 在请求头中的字段名</td></tr>
+    <tr><td><code>none</code></td><td>—</td><td>无需认证，type=none 时不需要 auth.json</td></tr>
+  </tbody>
+</table>
+
+<h2>endpoints.json API 规范</h2>
+<p>endpoints.json 是新设计的核心文件，定义厂商 API 的所有接口响应规范。启动器按此配置动态构造请求和解析响应，适配不同厂商的接口差异。</p>
+
+<h3>顶层结构</h3>
+<pre><code>{
+  "baseUrl": "https://example.com/api/v1",
+  "auth": { ... },
+  "authFlows": { ... },
+  "envelope": { ... },
+  "config": { ... },
+  "endpoints": { ... },
+  "tunnelFields": { ... }
+}</code></pre>
+
+<h3>baseUrl 与 auth（token 注入）</h3>
+<p><code>baseUrl</code> 是所有 API 请求的基础 URL，<strong>必须使用 HTTPS</strong>。<code>auth</code> 定义认证 token 如何注入到请求中。</p>
+<pre><code>{
+  "baseUrl": "https://api.example.com",
+  "auth": {
+    "headerName": "Authorization",
+    "headerPrefix": "Bearer ",
+    "headerKeyName": "x-request-public-key"
+  }
+}</code></pre>
+<table>
+  <thead>
+    <tr><th>字段</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>headerName</code></td><td>附加 token 的请求头字段名（如 Authorization）</td></tr>
+    <tr><td><code>headerPrefix</code></td><td>token 前缀（如 "Bearer "，OpenFRP 无空格前缀时留空）</td></tr>
+    <tr><td><code>headerKeyName</code></td><td>登录响应中服务器密钥所在的响应头名（解密用，可选）</td></tr>
+  </tbody>
+</table>
+
+<h3>authFlows（认证流程定义）</h3>
+<p>定义认证流程的请求参数和响应解析。即使厂商实现不标准，也可通过自定义请求参数与响应解析适配。</p>
+<p>支持的占位符（请求体/查询/URL 中替换）：<code>{clientId} {clientSecret} {redirectUri} {code} {codeVerifier} {refreshToken} {deviceCode} {scope} {apiKey} {publicKey} {requestUuid}</code></p>
+
+<h4>oauth2 流程</h4>
+<pre><code>"oauth2": {
+  "token": {
+    "method": "POST",
+    "url": "{baseUrl}/oauth/token",
+    "contentType": "application/x-www-form-urlencoded",
+    "body": {
+      "grant_type": "authorization_code",
+      "code": "{code}",
+      "redirect_uri": "{redirectUri}",
+      "client_id": "{clientId}"
+    },
+    "response": {
+      "accessToken": { "from": "body", "path": "$.access_token" },
+      "refreshToken": { "from": "body", "path": "$.refresh_token" },
+      "expiresIn": { "from": "body", "path": "$.expires_in" },
+      "errorField": { "from": "body", "path": "$.error" },
+      "errorDescription": { "from": "body", "path": "$.error_description" }
+    }
+  },
+  "refresh": {
+    "method": "POST",
+    "url": "{baseUrl}/oauth/token",
+    "contentType": "application/x-www-form-urlencoded",
+    "body": {
+      "grant_type": "refresh_token",
+      "refresh_token": "{refreshToken}",
+      "client_id": "{clientId}"
+    },
+    "response": { ... }
+  }
+}</code></pre>
+<blockquote><code>refresh</code> 缺失时回退到 <code>token</code>，适配部分厂商用同一端点刷新的场景。</blockquote>
+
+<h4>device_code 流程</h4>
+<pre><code>"device_code": {
+  "request": {
+    "method": "POST",
+    "url": "{baseUrl}/oauth/device/code",
+    "contentType": "application/x-www-form-urlencoded",
+    "body": { "client_id": "{clientId}", "scope": "{scope}" },
+    "response": {
+      "deviceCode": { "from": "body", "path": "$.device_code" },
+      "userCode": { "from": "body", "path": "$.user_code" },
+      "verificationUri": { "from": "body", "path": "$.verification_uri" },
+      "pollInterval": { "from": "body", "path": "$.interval" },
+      "expiresIn": { "from": "body", "path": "$.expires_in" }
+    }
+  },
+  "poll": {
+    "method": "POST",
+    "url": "{baseUrl}/oauth/token",
+    "contentType": "application/x-www-form-urlencoded",
+    "body": {
+      "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+      "device_code": "{deviceCode}",
+      "client_id": "{clientId}"
+    },
+    "response": {
+      "accessToken": { "from": "body", "path": "$.access_token" },
+      "refreshToken": { "from": "body", "path": "$.refresh_token" },
+      "expiresIn": { "from": "body", "path": "$.expires_in" },
+      "pendingError": "authorization_pending",
+      "errorField": { "from": "body", "path": "$.error" }
+    }
+  }
+}</code></pre>
+<p><code>pendingError</code> 是轮询中的"等待中"错误码（如 authorization_pending），遇到此错误继续轮询而非报错。</p>
+
+<h4>响应字段提取（FieldExtractor）</h4>
+<table>
+  <thead>
+    <tr><th>from</th><th>字段</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>body</code></td><td><code>path</code></td><td>从响应体按 JSONPath 取值（如 $.access_token）</td></tr>
+    <tr><td><code>header</code></td><td><code>name</code></td><td>从响应头取值（如 OpenFRP 的 token 在 Authorization 响应头）</td></tr>
+  </tbody>
+</table>
+
+<h3>envelope（响应包裹解析）</h3>
+<p>厂商 API 响应通常包裹在统一结构中（如 <code>{"flag": true, "msg": "", "data": [...]}</code>）。envelope 定义如何判断成功和提取数据。</p>
+<pre><code>"envelope": {
+  "successField": "$.flag",
+  "successValue": true,
+  "errorField": "$.msg",
+  "dataField": "$.data"
+}</code></pre>
+<table>
+  <thead>
+    <tr><th>字段</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>successField</code></td><td>成功标志字段路径（JSONPath），成功判断时取值与 successValue 比较</td></tr>
+    <tr><td><code>successValue</code></td><td>成功时的值（支持类型宽松匹配：true/"true"/1 均视为成功）</td></tr>
+    <tr><td><code>errorField</code></td><td>错误消息字段路径（失败时提取错误描述）</td></tr>
+    <tr><td><code>dataField</code></td><td>数据字段路径（提取实际数据负载）</td></tr>
+  </tbody>
+</table>
+<blockquote>各接口可用 <code>endpoints.*.envelope</code> 覆盖全局 envelope。</blockquote>
+
+<h3>config（配置生成模式）</h3>
+<p>定义如何从厂商 API 获取或生成 frpc 配置。三种模式：</p>
+<pre><code>"config": {
+  "mode": "fields",
+  "format": "ini",
+  "args": []
+}</code></pre>
+<table>
+  <thead>
+    <tr><th>mode</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>url</code></td><td>厂商接口直接返回 frpc 配置字符串，启动器写盘即可（预留 base64/xor/aes 解码扩展点）</td></tr>
+    <tr><td><code>fields</code></td><td>启动器按 tunnelFields 拼装 ini 配置（从隧道列表接口提取字段）</td></tr>
+    <tr><td><code>args</code></td><td>frpc 以启动参数方式运行（如 OpenFRP <code>-u 密钥 -p 隧道ID</code>），args 为参数模板，支持 {token} {ids} 占位符</td></tr>
+  </tbody>
+</table>
+
+<h3>endpoints（API 端点定义）</h3>
+<p>定义具体的 API 端点：账号信息、隧道列表、隧道详情、配置获取。</p>
+
+<h4>account（账号信息，可选）</h4>
+<p>获取授权账号信息，验证授权是否有效。返回的 <code>token</code> 字段可作为 <code>{account.token}</code> 在隧道字段映射中引用。</p>
+<pre><code>"account": {
+  "method": "POST",
+  "path": "/user/info",
+  "authType": "bearer",
+  "response": {
+    "dataField": "$.data",
+    "fields": {
+      "id": "id",
+      "username": "username",
+      "email": "email",
+      "token": "token"
+    }
+  }
+}</code></pre>
+
+<h4>tunnels.list（隧道列表，必填）</h4>
+<p>获取用户隧道列表。<code>itemsField</code> 支持嵌套展平（如 <code>$.data[*].proxies[*]</code> 从多级数组提取）。</p>
+<pre><code>"tunnels": {
+  "list": {
+    "method": "POST",
+    "path": "/frp/api/getUserProxies",
+    "authType": "bearer",
+    "response": {
+      "itemsField": "$.data[*].proxies[*]",
+      "tunnelIdField": "id",
+      "tunnelNameField": "proxyName",
+      "fields": {
+        "id": "id",
+        "name": "proxyName",
+        "type": "proxyType",
+        "status": "status",
+        "serverHost": { "field": "connectAddress", "split": ":" },
+        "serverPort": { "field": "connectAddress", "split": ":" },
+        "token": "{account.token}",
+        "localHost": "localIp",
+        "localPort": "localPort",
+        "remotePort": "remotePort",
+        "customDomain": "domain"
+      }
+    }
+  }
+}</code></pre>
+
+<h4>字段映射（FieldMapping）</h4>
+<p><code>fields</code> 中的值支持三种形式：</p>
+<table>
+  <thead>
+    <tr><th>形式</th><th>示例</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>字符串</td><td><code>"proxyName"</code></td><td>直接取 item 的该字段值</td></tr>
+    <tr><td>对象 {field, split}</td><td><code>{"field": "connectAddress", "split": ":"}</code></td><td>从合并字段按分隔符拆分（如 "host:port" 拆分为 serverHost 和 serverPort）</td></tr>
+    <tr><td>模板字符串</td><td><code>"{account.token}"</code></td><td>引用账号信息中的字段（需先调用 account 端点）</td></tr>
+  </tbody>
+</table>
+
+<h4>tunnels.config（配置获取，可选）</h4>
+<p>config.mode=url 时使用，厂商接口直接返回 frpc 配置字符串。</p>
+<pre><code>"config": {
+  "method": "GET",
+  "path": "/user/frpc/config",
+  "authType": "bearer",
+  "query": { "tunnel": "{id}" },
+  "response": {
+    "dataField": "$.data.config",
+    "encoding": "text"
+  }
+}</code></pre>
 
 <h2>frpc 二进制分发（binary）</h2>
 
@@ -69,7 +374,6 @@
     }
   }
 }</code></pre>
-<p>字段说明：</p>
 <table>
   <thead>
     <tr><th>字段</th><th>说明</th></tr>
@@ -80,91 +384,6 @@
     <tr><td><code>allowedDomains</code></td><td>允许下载的域名白名单</td></tr>
     <tr><td><code>targetPath</code></td><td>下载后存放的相对路径（archive=true 时为解压后的目标文件）</td></tr>
     <tr><td><code>archive</code></td><td>是否为 ZIP 压缩包（true 时自动解压）</td></tr>
-  </tbody>
-</table>
-
-<h2>认证配置（auth）</h2>
-
-<h3>none：无需认证</h3>
-<p>最简单的认证方式，用户无需任何认证即可使用穿透服务。</p>
-<pre><code>{
-  "auth": {
-    "type": "none"
-  }
-}</code></pre>
-
-<h3>oauth2：OAuth2 授权码流程</h3>
-<p>用户在浏览器中完成授权，本地启动 HTTP 服务接收回调。适用于有 Web 管理后台的厂商。</p>
-<pre><code>{
-  "auth": {
-    "type": "oauth2",
-    "oauth2": {
-      "authorizeUrl": "https://example.com/oauth/authorize",
-      "tokenUrl": "https://example.com/oauth/token",
-      "clientId": "your-client-id",
-      "scopes": ["tunnel:manage"],
-      "redirectPort": 18365
-    }
-  }
-}</code></pre>
-<table>
-  <thead>
-    <tr><th>字段</th><th>说明</th></tr>
-  </thead>
-  <tbody>
-    <tr><td><code>authorizeUrl</code></td><td>授权页 URL（浏览器打开让用户登录授权）</td></tr>
-    <tr><td><code>tokenUrl</code></td><td>Token 交换 URL（后端用授权码换取 access_token）</td></tr>
-    <tr><td><code>clientId</code></td><td>OAuth2 客户端 ID</td></tr>
-    <tr><td><code>scopes</code></td><td>权限范围列表</td></tr>
-    <tr><td><code>redirectPort</code></td><td>本地回调端口（本地启动 HTTP 服务接收回调）</td></tr>
-  </tbody>
-</table>
-
-<h3>device_code：设备码流程</h3>
-<p>用户在另一设备上输入设备码完成认证。适用于无浏览器的设备或 TV 端。</p>
-<pre><code>{
-  "auth": {
-    "type": "device_code",
-    "deviceCode": {
-      "deviceCodeUrl": "https://example.com/oauth/device/code",
-      "tokenUrl": "https://example.com/oauth/token",
-      "clientId": "your-client-id",
-      "scopes": ["tunnel:manage"],
-      "pollInterval": 5
-    }
-  }
-}</code></pre>
-<table>
-  <thead>
-    <tr><th>字段</th><th>说明</th></tr>
-  </thead>
-  <tbody>
-    <tr><td><code>deviceCodeUrl</code></td><td>设备码请求 URL（获取用户码和验证链接）</td></tr>
-    <tr><td><code>tokenUrl</code></td><td>Token 轮询 URL（按间隔轮询直到用户完成认证）</td></tr>
-    <tr><td><code>clientId</code></td><td>客户端 ID</td></tr>
-    <tr><td><code>scopes</code></td><td>权限范围列表</td></tr>
-    <tr><td><code>pollInterval</code></td><td>轮询间隔（秒），默认 5</td></tr>
-  </tbody>
-</table>
-
-<h3>api_key：API Key 手动填入</h3>
-<p>用户手动获取 API Key 填入，存储到系统密钥存储中。适用于简单的 API 认证场景。</p>
-<pre><code>{
-  "auth": {
-    "type": "api_key",
-    "apiKey": {
-      "obtainUrl": "https://example.com/dashboard/api-keys",
-      "headerName": "X-API-Key"
-    }
-  }
-}</code></pre>
-<table>
-  <thead>
-    <tr><th>字段</th><th>说明</th></tr>
-  </thead>
-  <tbody>
-    <tr><td><code>obtainUrl</code></td><td>获取 API Key 的页面 URL（前端提供跳转入口）</td></tr>
-    <tr><td><code>headerName</code></td><td>API Key 在请求头中的字段名</td></tr>
   </tbody>
 </table>
 
@@ -212,8 +431,10 @@
   <li>工作目录限制在厂商目录内</li>
 </ul>
 
-<h2>完整示例</h2>
-<p>以下是一个完整的厂商清单示例，使用 URL 下载 frpc + OAuth2 认证 + 网络白名单：</p>
+<h2>完整示例：标准 OAuth2 厂商</h2>
+<p>以下是一个使用 URL 下载 frpc + OAuth2 认证 + fields 配置生成的完整厂商示例。</p>
+
+<h3>manifest.json</h3>
 <pre><code>{
   "id": "acme-tunnel",
   "name": "ACME 穿透服务",
@@ -222,6 +443,10 @@
   "author": "ACME Inc.",
   "homepage": "https://acme.example.com",
   "icon": "logo.png",
+  "authFile": "auth.json",
+  "api": {
+    "endpointsFile": "api/endpoints.json"
+  },
   "binary": {
     "distribution": "url",
     "download": {
@@ -232,21 +457,103 @@
       "archive": true
     }
   },
-  "auth": {
-    "type": "oauth2",
-    "oauth2": {
-      "authorizeUrl": "https://acme.example.com/oauth/authorize",
-      "tokenUrl": "https://acme.example.com/oauth/token",
-      "clientId": "molaunch-acme-client",
-      "scopes": ["tunnel:manage", "user:read"],
-      "redirectPort": 18365
-    }
-  },
   "networkPermissions": {
     "allowedServers": ["frps.acme.example.com:7000"],
     "allowCustomServer": false
   }
 }</code></pre>
+
+<h3>auth.json</h3>
+<pre><code>{
+  "type": "oauth2",
+  "oauth2": {
+    "authorizeUrl": "https://acme.example.com/oauth/authorize",
+    "clientId": "molaunch-acme-client",
+    "scopes": ["tunnel:manage", "user:read"],
+    "redirectPort": 18365
+  }
+}</code></pre>
+
+<h3>api/endpoints.json</h3>
+<pre><code>{
+  "baseUrl": "https://acme.example.com/api/v1",
+  "auth": {
+    "headerName": "Authorization",
+    "headerPrefix": "Bearer "
+  },
+  "authFlows": {
+    "oauth2": {
+      "token": {
+        "method": "POST",
+        "url": "{baseUrl}/oauth/token",
+        "contentType": "application/x-www-form-urlencoded",
+        "body": {
+          "grant_type": "authorization_code",
+          "code": "{code}",
+          "redirect_uri": "{redirectUri}",
+          "client_id": "{clientId}"
+        },
+        "response": {
+          "accessToken": { "from": "body", "path": "$.access_token" },
+          "refreshToken": { "from": "body", "path": "$.refresh_token" },
+          "expiresIn": { "from": "body", "path": "$.expires_in" },
+          "errorField": { "from": "body", "path": "$.error" }
+        }
+      }
+    }
+  },
+  "envelope": {
+    "successField": "$.flag",
+    "successValue": true,
+    "errorField": "$.msg",
+    "dataField": "$.data"
+  },
+  "config": {
+    "mode": "fields",
+    "format": "ini"
+  },
+  "endpoints": {
+    "account": {
+      "method": "GET",
+      "path": "/user/info",
+      "authType": "bearer",
+      "response": {
+        "dataField": "$.data",
+        "fields": { "id": "id", "username": "name", "email": "email", "token": "api_key" }
+      }
+    },
+    "tunnels": {
+      "list": {
+        "method": "GET",
+        "path": "/tunnels",
+        "authType": "bearer",
+        "response": {
+          "itemsField": "$.data",
+          "fields": {
+            "id": "id", "name": "name", "type": "type", "status": "status",
+            "serverHost": "server_host", "serverPort": "server_port",
+            "token": "{account.token}",
+            "localHost": "local_host", "localPort": "local_port",
+            "remotePort": "remote_port", "customDomain": "domain"
+          }
+        }
+      }
+    }
+  }
+}</code></pre>
+
+<h2>完整示例：OpenFRP（非标准厂商）</h2>
+<p>OpenFRP 是非标准厂商的典型示例：token 在响应 Header、frpc 以启动参数运行、隧道列表嵌套在节点分组中。</p>
+
+<h3>关键差异</h3>
+<ul>
+  <li><strong>token 在响应头</strong>：<code>accessToken</code> 使用 <code>{ "from": "header", "name": "Authorization" }</code> 而非 body</li>
+  <li><strong>frpc 启动参数模式</strong>：<code>config.mode = "args"</code>，参数模板 <code>["-u", "{token}", "-p", "{ids}"]</code></li>
+  <li><strong>隧道列表嵌套</strong>：<code>itemsField = "$.data[*].proxies[*]"</code> 从节点分组中展平提取</li>
+  <li><strong>合并字段拆分</strong>：<code>connectAddress</code> 按 <code>:</code> 拆分为 serverHost 和 serverPort</li>
+  <li><strong>账号 token 引用</strong>：<code>"token": "{account.token}"</code> 从账号信息取 frpc 启动密钥</li>
+</ul>
+<p>完整配置见 <code>docs/Frp Test/frp/providers/openfrp.json</code>。</p>
 
 <h2>安装方式</h2>
 
@@ -258,7 +565,13 @@
 <p>ZIP 结构示例：</p>
 <pre><code>acme-tunnel.zip
 ├── manifest.json
+├── auth.json
 ├── logo.png
+├── api/
+│   └── endpoints.json
 └── bin/
     └── frpc.exe</code></pre>
+
+<h3>从 URL 安装</h3>
+<p>将厂商 ZIP 包托管在 HTTPS 服务器上，通过「从 URL 安装」输入下载地址。启动器自动下载并解压安装。</p>
 <blockquote>安装后厂商文件存放在 AppData 全局目录下，所有 MoLaunch 实例共享。</blockquote>

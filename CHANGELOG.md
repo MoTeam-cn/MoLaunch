@@ -7,6 +7,52 @@
 
 ## [未发布]
 
+### 新增
+
+#### FRP 厂商接口规范改造（阶段 6：前端隧道同步 + 授权前置检查）
+
+- 背景：阶段 3+5+8 后端已完成 `fetch_tunnels` action（按 endpoints.json 配置从厂商 API 拉取隧道列表 + 账号信息），但前端缺少对应调用入口。本次完成前端全链路：类型定义 → IPC 封装 → 同步组件 → TunnelManager 入口集成，且拉取前强制检查授权状态
+- 改动（4 文件）：
+  - **`src/types/frp.ts`**：新增 3 个类型
+    - `RemoteTunnelInfo`：厂商 API 返回的远程隧道信息（id/name/tunnelType/status/serverHost/serverPort/token/localHost/localPort/remotePort/customDomain），字段为字符串型（部分厂商返回带前导 0 的端口）
+    - `RemoteAccountInfo`：厂商 API 返回的账号信息（id/username/email/token）
+    - `FetchTunnelsResult`：`{ tunnels: RemoteTunnelInfo[], account: RemoteAccountInfo }`
+  - **`src/utils/api/frp-manager.ts`**：`FRP_ACTIONS` 新增 `FETCH_TUNNELS = 'fetch_tunnels'`；新增 `fetchTunnels(providerId)` 便捷封装函数，返回 `FetchTunnelsResult`
+  - **`src/components/frp/RemoteTunnelSync.vue`**（新组件，219 行）：从厂商 API 同步隧道的完整交互面板
+    - 厂商选择（Select 组件，只列出 `authType !== 'none' && enabled` 的厂商）
+    - 选中厂商后自动调用 `getAuthStatus` 检查授权状态
+    - 未授权时显示 ShieldExclamationIcon + "厂商未授权" + "请先到认证页面完成授权" 居中提示（icon + text 垂直水平居中）
+    - 已授权时显示绿色"已认证"标记 + "拉取隧道"按钮
+    - 拉取后展示远程隧道列表（名称/类型/状态/服务器地址/本地端口/远程端口/自定义域名）
+    - 每条隧道有"导入"按钮，点击后将 `RemoteTunnelInfo` 映射为 `CreateTunnelParams` emit 给父组件（端口字符串 parseInt 转数字，tunnelType 非 tcp/udp 时回退 tcp）
+    - 导入后标记"已导入"（绿色 CheckCircleIcon），避免重复导入
+  - **`src/components/frp/TunnelManager.vue`**：顶部操作栏新增"从厂商同步"按钮（CloudArrowDownIcon + Tooltip），点击展开 `RemoteTunnelSync` 面板（Transition 动画与其他面板一致）。`handleRemoteImport` 调用 `store.createTunnel` 创建本地隧道，成功后 toast 提示。合并 heroicons import 为单行 + 精简文件头注释控制行数在 300 行内（289 行）
+- 设计决策：
+  - **授权前置检查**：用户选择厂商后自动检查授权状态，未授权时不展示拉取按钮，从源头避免未授权调用 `fetch_tunnels` 导致后端报错
+  - **导入而非自动创建**：远程隧道拉取后只展示，用户手动点击"导入"才创建本地隧道，避免自动创建大量未确认的隧道配置
+  - **字段类型映射**：后端 `TunnelInfo` 字段为 `String`（兼容厂商返回的带前导 0 端口），前端导入时 `parseInt` 转为 `number`（匹配 `CreateTunnelParams` 的 `localPort/serverPort/remotePort: number`）
+  - **RemoteTunnelSync 独立组件**：不内联到 TunnelManager（已 289 行），遵循 300 行约束
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### FRP 厂商接口规范改造（阶段 7：教程文档更新）
+
+- 背景：阶段 1-6 完成了后端类型定义、API 引擎、auth 重写、前端隧道同步，但 tutorial-frp.html 教程仍为旧设计（单 manifest.json 架构），缺少 endpoints.json 规范说明。本次按新设计全面重写教程
+- 改动（1 文件）：
+  - **`src-tauri/resources/templates/tutorial-frp.html`**：从 264 行重写为 578 行，新增内容：
+    - **三文件架构**：manifest.json（元信息+指针）+ auth.json（认证交互层）+ api/endpoints.json（API 规范）三层分离说明
+    - **auth.json 章节**：认证交互层配置（type=oauth2/device_code/api_key/none），字段说明表（authorizeUrl/clientId/clientSecret/scopes/redirectPort 等）
+    - **endpoints.json 章节**（核心新增）：完整 API 规范说明
+      - baseUrl 与 auth（token 注入：headerName/headerPrefix/headerKeyName）
+      - authFlows（认证流程定义）：oauth2（token+refresh）/ device_code（request+poll）/ remote_login / api_key，含占位符列表和 FieldExtractor（from=body/header）说明
+      - envelope（响应包裹解析）：successField/successValue/errorField/dataField
+      - config（配置生成模式）：url/fields/args 三种模式
+      - endpoints（API 端点定义）：account/tunnels.list/tunnels.config，含 itemsField 嵌套展平和 FieldMapping 三种形式（字符串/对象 split/模板 {account.token}）
+    - **完整示例：标准 OAuth2 厂商**：三文件完整配置（manifest.json + auth.json + endpoints.json）
+    - **完整示例：OpenFRP 非标准厂商**：关键差异说明（token 在响应头/frpc 启动参数模式/隧道列表嵌套/合并字段拆分/账号 token 引用）
+    - **从 URL 安装**：新增安装方式说明
+  - manifest.json 字段表新增 `authFile` 和 `api.endpointsFile` 两个字段说明
+- 设计决策：教程按"概念说明 → 字段表 → 代码示例"三段式组织，每个概念配表格和代码块；OpenFRP 作为非标准厂商示例单独列出关键差异，帮助开发者理解如何适配非标准接口
+
 ### 修复
 
 #### 简单表单弹窗样式还原（移除误加的高度限制）

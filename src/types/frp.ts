@@ -255,3 +255,46 @@ export interface SaveApiKeyParams {
   providerId: string
   apiKey: string
 }
+
+// ============================================================
+// 厂商 API 远程隧道（fetch_tunnels 返回）
+// ============================================================
+
+/** 厂商 API 返回的远程隧道信息（对应后端 TunnelInfo） */
+export interface RemoteTunnelInfo {
+  id: string
+  name: string
+  /** 隧道类型（厂商返回的原始字符串，如 tcp/udp/http/https） */
+  tunnelType: string
+  /** 隧道状态（厂商返回的原始字符串） */
+  status: string
+  /** Frp 服务器地址 */
+  serverHost: string
+  /** Frp 服务器端口（字符串，部分厂商返回带前导 0） */
+  serverPort: string
+  /** Frp 服务器鉴权 token */
+  token: string
+  /** 本地 IP */
+  localHost: string
+  /** 本地端口（字符串） */
+  localPort: string
+  /** 远程端口（字符串） */
+  remotePort: string
+  /** 自定义域名（http/https 类型隧道） */
+  customDomain: string
+}
+
+/** 厂商 API 返回的账号信息（对应后端 AccountInfo） */
+export interface RemoteAccountInfo {
+  id: string
+  username: string
+  email: string
+  /** 账号级 token（部分厂商用账号 token 而非隧道级 token） */
+  token: string
+}
+
+/** fetch_tunnels 返回结构 */
+export interface FetchTunnelsResult {
+  tunnels: RemoteTunnelInfo[]
+  account: RemoteAccountInfo
+}

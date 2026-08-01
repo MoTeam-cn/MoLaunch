@@ -14,6 +14,7 @@ import type {
   CreateTunnelParams,
   DeviceCodePollResult,
   DeviceCodeResult,
+  FetchTunnelsResult,
   OAuth2Result,
   UpdateTunnelParams,
   LogFileContent,
@@ -84,6 +85,8 @@ export const FRP_ACTIONS = {
   REVOKE_AUTH: 'revoke_auth',
   /** 保存 API Key */
   SAVE_API_KEY: 'save_api_key',
+  /** 从厂商 API 拉取隧道列表（需先认证） */
+  FETCH_TUNNELS: 'fetch_tunnels',
 } as const
 
 /**
@@ -249,4 +252,14 @@ export function revokeAuth(providerId: string): Promise<void> {
 /** 保存 API Key（auth_type=api_key 的厂商） */
 export function saveApiKey(params: SaveApiKeyParams): Promise<void> {
   return frpManager<void>(FRP_ACTIONS.SAVE_API_KEY, params)
+}
+
+/**
+ * 从厂商 API 拉取隧道列表
+ *
+ * 调用前必须先检查厂商授权状态（getAuthStatus），未授权时引导用户去认证中心。
+ * 返回的隧道列表由厂商 endpoints.json 配置的 envelope/itemsField/fields 映射而来。
+ */
+export function fetchTunnels(providerId: string): Promise<FetchTunnelsResult> {
+  return frpManager<FetchTunnelsResult>(FRP_ACTIONS.FETCH_TUNNELS, { providerId })
 }

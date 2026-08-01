@@ -1,9 +1,7 @@
 <script setup lang="ts">
 /**
- * 穿透管理：隧道列表 + 创建/编辑表单 + 启停/删除/自检操作。
- * 状态同步：监听 frp-tunnel-status 事件自动刷新列表，避免异常退出后仍显示运行中。
- * 创建/编辑表单抽出至 TunnelCreateForm.vue（含模式切换/地址端口并列/2 秒自动检测），
- * 自检面板在 TunnelSelfCheck.vue，跳转日志通过 inject('goToLogs')。
+ * 穿透管理：隧道列表 + 创建/编辑/启停/删除/自检 + 从厂商同步。
+ * 状态同步：监听 frp-tunnel-status 事件自动刷新列表。
  */
 import { ref, computed, onMounted, inject } from 'vue'
 import { useFrpStore } from '@/stores/frp'
@@ -13,20 +11,9 @@ import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import TunnelCreateForm from './TunnelCreateForm.vue'
 import TunnelSelfCheck from './TunnelSelfCheck.vue'
+import RemoteTunnelSync from './RemoteTunnelSync.vue'
 import type { CreateTunnelParams, TunnelWithStatus, UpdateTunnelParams } from '@/types/frp'
-import {
-  ArrowPathIcon,
-  PlusIcon,
-  PlayIcon,
-  StopIcon,
-  TrashIcon,
-  ChevronDownIcon,
-  GlobeAltIcon,
-  ServerIcon,
-  DocumentTextIcon,
-  PencilIcon,
-  ShieldCheckIcon,
-} from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, PlusIcon, PlayIcon, StopIcon, TrashIcon, ChevronDownIcon, GlobeAltIcon, ServerIcon, DocumentTextIcon, PencilIcon, ShieldCheckIcon, CloudArrowDownIcon } from '@heroicons/vue/24/outline'
 
 const store = useFrpStore()
 
@@ -45,6 +32,7 @@ function providerName(id: string): string {
 
 const showForm = ref(false)
 const showSelfCheck = ref(false)
+const showSync = ref(false)
 
 onMounted(() => {
   void store.loadTunnels()
@@ -56,6 +44,12 @@ onMounted(() => {
 async function handleCreate(params: CreateTunnelParams) {
   const ok = await store.createTunnel(params)
   if (ok) showForm.value = false
+}
+
+/** 从厂商同步面板导入隧道到本地 */
+async function handleRemoteImport(params: CreateTunnelParams) {
+  const ok = await store.createTunnel(params)
+  if (ok) toastInfo('隧道已导入')
 }
 
 /** 编辑表单展开的隧道 ID */
@@ -103,6 +97,11 @@ function handleDelete(id: string, name: string) {
         共 {{ tunnels.length }} 条隧道
       </p>
       <div class="flex items-center gap-2">
+        <Tooltip text="从厂商同步">
+          <Button type="ghost" size="small" @click="showSync = !showSync">
+            <template #icon><CloudArrowDownIcon class="w-4 h-4" /></template>
+          </Button>
+        </Tooltip>
         <Tooltip text="隧道自检">
           <Button type="ghost" size="small" @click="showSelfCheck = !showSelfCheck">
             <template #icon><ShieldCheckIcon class="w-4 h-4" /></template>
@@ -177,6 +176,20 @@ function handleDelete(id: string, name: string) {
         :tunnels="tunnels"
         :providers="providers"
         @close="showSelfCheck = false"
+      />
+    </Transition>
+
+    <!-- 从厂商同步面板 -->
+    <Transition
+      enter-active-class="transition-all duration-300 ease-out origin-top"
+      leave-active-class="transition-all duration-200 ease-in origin-top"
+      enter-from-class="opacity-0 scale-y-95 -translate-y-2"
+      leave-to-class="opacity-0 scale-y-95 -translate-y-2"
+    >
+      <RemoteTunnelSync
+        v-if="showSync"
+        :providers="providers"
+        @import="handleRemoteImport"
       />
     </Transition>
 
