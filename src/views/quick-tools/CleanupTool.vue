@@ -158,11 +158,10 @@ function executeCleanup() {
         v-if="scanState === 'idle' || scanState === 'ready'"
         type="outline"
         size="small"
-        :disabled="scanState === 'cleaning'"
         @click="startScan"
       >
         <template #icon>
-          <ArrowPathIcon class="h-3.5 w-3.5" :class="{ 'animate-spin': scanState === 'scanning' }" />
+          <ArrowPathIcon class="h-3.5 w-3.5" />
         </template>
         {{ scanState === 'ready' ? '重新扫描' : '扫描' }}
       </Button>

@@ -108,7 +108,7 @@ onMounted(loadSetup)
               { value: '1', label: '开启' },
               { value: '2', label: '关闭' },
             ]"
-            @update:model-value="(v: string) => handleSaveIndie(Number(v))"
+            @update:model-value="(v: string | number) => handleSaveIndie(Number(v))"
           />
           <Tooltip
             v-if="personalization?.indieType === 1"

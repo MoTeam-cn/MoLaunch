@@ -76,6 +76,7 @@ async function handleSaveMemoryMode(mode: 'inherit' | 'auto' | 'custom') {
 async function flushSaveMemory() {
   if (!selectedId.value || memoryMode.value !== 'custom') return
   await safeCall(async () => {
+    if (!selectedId.value) return
     await tauri.updateVersionPersonalization(selectedId.value, {
       maxMemory: maxMemory.value,
       minMemory: minMemory.value,

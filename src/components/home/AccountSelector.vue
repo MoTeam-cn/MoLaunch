@@ -18,7 +18,8 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import SkinManager from '@/components/common/SkinManager.vue'
-import AccountCard, { type AccountCardData } from './account-selector/AccountCard.vue'
+import AccountCard from './account-selector/AccountCard.vue'
+import type { AccountCardData } from './account-selector/types'
 import AccountIndicator from './account-selector/AccountIndicator.vue'
 import LoginPrompt from './account-selector/LoginPrompt.vue'
 import { useSwipeNavigation } from '@/composables/useSwipeNavigation'
@@ -82,7 +83,7 @@ async function addAccount() {
 
 // 拖动/滚轮导航（onSwitch 回调即 switchTo，switchTo 内部自带 switching 检查）
 const {
-  isDragging, dragMoved, isAnimating, cardTransform,
+  isDragging, dragMoved, cardTransform,
   onPointerDown, onPointerMove, onPointerUp, onWheel,
 } = useSwipeNavigation(totalCards, currentIndex, switchTo)
 </script>

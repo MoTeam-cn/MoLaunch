@@ -175,7 +175,7 @@ watch(personalization, async (p) => {
       <Select
         :model-value="javaMode"
         :options="javaModeOptions"
-        @update:model-value="(v: string) => handleSaveJavaMode(v)"
+        @update:model-value="(v: string | number) => handleSaveJavaMode(String(v))"
       />
     </Tooltip>
 

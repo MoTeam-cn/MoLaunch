@@ -12,7 +12,7 @@
 | --- | --- | --- | --- |
 | Vite | ^5.0.12 | https://vitejs.dev | 下一代前端构建工具 |
 | TypeScript | ^5.3.3 | https://www.typescriptlang.org | JavaScript 超集，类型安全 |
-| vue-tsc | ^1.8.27 | https://github.com/vuejs/language-tools | Vue SFC 类型检查工具 |
+| vue-tsc | ^2.2.12 | https://github.com/vuejs/language-tools | Vue SFC 类型检查工具 |
 | @vitejs/plugin-vue | ^5.0.3 | https://github.com/vitejs/vite-plugin-vue | Vite Vue SFC 编译插件 |
 | Vitest | ^1.2.2 | https://vitest.dev | Vite 原生单元测试框架 |
 | @vue/test-utils | ^2.4.3 | https://test-utils.vuejs.org | Vue 组件单元测试工具 |

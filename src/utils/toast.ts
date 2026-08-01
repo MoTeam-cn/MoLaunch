@@ -20,7 +20,7 @@ function getRef(): ToastRef | null {
   return toastRef
 }
 
-export function setToastRef(ref: ToastRef) {
+export function setToastRef(ref: ToastRef | null) {
   toastRef = ref
 }
 

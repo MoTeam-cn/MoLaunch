@@ -73,7 +73,7 @@ export async function importRoomKey(base64Key: string): Promise<CryptoKey | null
     }
     return await crypto.subtle.importKey(
       'raw',
-      raw,
+      raw as BufferSource,
       { name: 'AES-GCM', length: 256 },
       false,
       ['encrypt', 'decrypt'],

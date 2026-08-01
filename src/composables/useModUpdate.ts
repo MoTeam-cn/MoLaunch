@@ -36,7 +36,7 @@ export function releaseTypeClass(type: string): string {
 
 export function useModUpdate(
   props: UseModUpdateProps,
-  emit: (event: 'installed' | 'update:visible', ...args: any[]) => void,
+  emit: ((event: 'update:visible', val: boolean) => void) & ((event: 'installed') => void),
 ) {
   const versionStore = useVersionStore()
   const { check: checkDeps, missing: missingDeps } = useDependencyCheck()

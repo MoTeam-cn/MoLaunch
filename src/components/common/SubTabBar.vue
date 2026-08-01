@@ -20,7 +20,7 @@ interface Props {
   sticky?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+withDefaults(defineProps<Props>(), {
   sticky: false,
 })
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()

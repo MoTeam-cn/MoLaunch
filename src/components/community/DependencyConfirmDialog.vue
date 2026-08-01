@@ -203,7 +203,7 @@ function handleClose() {
           <!-- 底部操作 -->
           <div class="px-5 py-3 border-t border-gray-100 flex items-center justify-end gap-2">
             <Tooltip v-if="installing" text="安装进行中，请稍候..." position="top">
-              <Button type="default" size="small" disabled>取消</Button>
+              <Button type="text" size="small" disabled>取消</Button>
             </Tooltip>
             <Button v-else type="text" size="small" @click="handleClose">取消</Button>
             <Button

@@ -25,7 +25,7 @@ const { resolveVersionIconWithLogo: resolveVersionIcon } = useVersionSettings()
 
 const {
   installedVersions, installedVersionTypes, installedVersionLogos,
-  loadInstalledVersions, handleRefresh, onInstallRequest,
+  handleRefresh, onInstallRequest,
   handleUninstall, handleOpenGameDir,
 } = useVersionInstallActions()
 

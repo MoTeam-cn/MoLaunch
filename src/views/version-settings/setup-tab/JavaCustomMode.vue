@@ -79,7 +79,7 @@ async function handleSelectJavaFromList(value: string) {
   emit('update:customJavaPath', value)
   try {
     await tauri.updateVersionPersonalization(selectedId.value, { javaPath: value })
-    if (personalization.value) personalization.value.java_path = value
+    if (personalization.value) personalization.value.javaPath = value
     toastSuccess('Java 路径已保存')
   } catch (e) { toastError('保存失败：' + String(e)) }
 }
@@ -93,6 +93,7 @@ async function handleImportJava() {
     ],
   })
   if (!filePath) { toastInfo('已取消导入'); return }
+  if (!selectedId.value) return
   await javaStore.refreshJava()
   const found = javaStore.javaList.find(j => j.executable === filePath)
   if (!found) {
@@ -102,7 +103,7 @@ async function handleImportJava() {
   emit('update:customJavaPath', filePath)
   try {
     await tauri.updateVersionPersonalization(selectedId.value, { javaPath: filePath })
-    if (personalization.value) personalization.value.java_path = filePath
+    if (personalization.value) personalization.value.javaPath = filePath
     toastSuccess('Java 路径已保存')
   } catch (e) { toastError('保存失败：' + String(e)) }
 }
@@ -134,7 +135,7 @@ async function handleRefreshJavaList() {
           :model-value="customJavaPath"
           :options="javaOptionsForCustom"
           placeholder="从已找到的 Java 中选择"
-          @update:model-value="(v: string) => handleSelectJavaFromList(v)"
+          @update:model-value="(v: string | number) => handleSelectJavaFromList(String(v))"
         />
       </Tooltip>
       <Tooltip text="刷新 Java 列表" position="top" :delay="0">

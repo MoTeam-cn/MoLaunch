@@ -9,7 +9,6 @@
  */
 import { ref, computed } from 'vue'
 import { useJavaStore } from '@/stores/java'
-import * as tauri from '@/utils/tauri'
 import { pickFile } from '@/utils/fileDialog'
 import { toastInfo, toastSuccess } from '@/utils/toast'
 import { showError } from '@/utils/modal'
@@ -133,7 +132,7 @@ async function handleManualImportJava() {
       </template>
 
       <!-- 选项：自动项 + 已检测 Java 项 -->
-      <template #option="{ option, selected }">
+      <template #option="{ option }">
         <div v-if="option.value === ''" class="flex items-center min-w-0">
           <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 mr-2 shrink-0">自动</span>
           <span class="text-sm text-gray-700 truncate">启动时自动查找最佳 Java</span>

@@ -108,7 +108,11 @@ function commitSearch() {
 
 /** Select 选项变化时同步更新并立即触发搜索 */
 function selectAndUpdate(field: 'source' | 'modLoader' | 'category', value: number | string) {
-  emit(`update:${field}` as any, value)
+  switch (field) {
+    case 'source': emit('update:source', value as number); break
+    case 'modLoader': emit('update:modLoader', value as number); break
+    case 'category': emit('update:category', value as string); break
+  }
   emit('search')
 }
 </script>

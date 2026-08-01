@@ -105,7 +105,7 @@ function setupMolaunchApi() {
     },
   }
 
-  ;(window as Record<string, unknown>).molaunch = molaunch
+  ;(window as unknown as Record<string, unknown>).molaunch = molaunch
 }
 
 /**
@@ -150,7 +150,9 @@ export function renderHtmlShadow(
   setupMolaunchApi()
 
   // 执行用户脚本
-  if (section.script) {
-    safeCallSync(() => new Function(section.script)(), '[CustomLayout] run html section script')
+  // 注：script 已通过 if 守卫，但 TS 无法在闭包内窄化，提取到局部变量
+  const script = section.script
+  if (script) {
+    safeCallSync(() => new Function(script)(), '[CustomLayout] run html section script')
   }
 }

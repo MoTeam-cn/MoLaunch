@@ -5,7 +5,7 @@
  * - 点击圆点切换到对应卡片
  */
 import Tooltip from '@/components/common/Tooltip.vue'
-import type { AccountCardData } from './AccountCard.vue'
+import type { AccountCardData } from './types'
 
 defineProps<{
   cards: AccountCardData[]

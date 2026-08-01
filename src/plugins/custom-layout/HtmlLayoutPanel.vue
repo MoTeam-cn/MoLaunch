@@ -49,7 +49,7 @@ function setupMolaunchApi() {
     },
   })
 
-  ;(window as Record<string, unknown>).molaunch = proxy
+  ;(window as unknown as Record<string, unknown>).molaunch = proxy
 }
 
 /** 用 shadow DOM 渲染 HTML 内容 */

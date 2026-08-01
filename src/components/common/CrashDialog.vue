@@ -190,9 +190,9 @@ async function exportReport() {
     if (!filePath) return
 
     await writeTextFile(filePath, lines.join('\n'))
-    toastSuccess('导出成功', `错误报告已保存到：${filePath}`)
+    toastSuccess(`导出成功，错误报告已保存到：${filePath}`)
   } catch (e) {
-    toastError('导出失败', String(e))
+    toastError('导出失败：' + String(e))
   }
 }
 

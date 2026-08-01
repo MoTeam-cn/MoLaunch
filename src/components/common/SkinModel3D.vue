@@ -145,7 +145,11 @@ watch(() => props.skinUrl, (newUrl) => {
 
 watch(() => props.capeUrl, (newUrl) => {
   if (!viewer.value) return
-  viewer.value.loadCape(newUrl || null)
+  if (newUrl) {
+    viewer.value.loadCape(newUrl)
+  } else {
+    viewer.value.loadCape(null)
+  }
 })
 
 watch(() => props.variant, (newVariant) => {

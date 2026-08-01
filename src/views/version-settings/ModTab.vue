@@ -42,7 +42,7 @@ const {
   filteredMods, filterOptions,
   detailVisible, detailProject, detailLoadingFor,
   // 多选状态（来自 useMultiSelect）
-  selectedIds, batchProcessing, hasSelection, selectedCount,
+  batchProcessing, selectedCount,
   // 按钮可用性判断
   hasEnabledSelected, hasDisabledSelected, hasUpdatableSelected,
   // Mod 更新对话框

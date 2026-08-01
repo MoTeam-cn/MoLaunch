@@ -53,7 +53,7 @@ defineEmits<{ save: [] }>()
       />
     </div>
     <div class="mt-3 flex items-center gap-3">
-      <SkinAvatar :skin-url="skinUrl" :uuid="uuid" :username="username" :size="40" :overlay="true" :login-type="isMicrosoft ? 'Microsoft' : 'Offline'" />
+      <SkinAvatar :skin-url="skinUrl ?? undefined" :uuid="uuid" :username="username" :size="40" :overlay="true" :login-type="isMicrosoft ? 'Microsoft' : 'Offline'" />
       <div class="flex-1 space-y-1 text-xs text-gray-500">
         <div>用户名：{{ username }}</div>
         <div>皮肤模型：{{ variant === 'slim' ? 'Alex（纤细）' : 'Steve（经典）' }}</div>

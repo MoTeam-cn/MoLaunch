@@ -74,5 +74,8 @@ export function getListEntries(
 export function formatFieldValue(entry: ListEntry, field: ListField): string {
   const raw = entry[field.key]
   if (raw === undefined || raw === null) return '-'
+  // ListEntry 是 Record<string, unknown>，索引返回 unknown；formatValue 内部已用
+  // String(value) / parseFloat 兜底，此处仅做类型窄化通过 tsc 检查
+  if (typeof raw !== 'string' && typeof raw !== 'number') return String(raw)
   return formatValue(raw, field.format)
 }

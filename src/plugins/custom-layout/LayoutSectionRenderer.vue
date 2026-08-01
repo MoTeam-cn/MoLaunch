@@ -134,7 +134,7 @@ const props = defineProps<{
   <!-- 自定义 HTML（shadow DOM 渲染，CSS 隔离 + 内联 JS/CSS 支持） -->
   <div
     v-else-if="props.section.type === 'html'"
-    :ref="(el) => { if (el) renderHtmlShadow(el as HTMLElement, props.section) }"
+    :ref="(el) => { if (el && props.section.type === 'html') renderHtmlShadow(el as HTMLElement, props.section) }"
     :style="{ height: (props.section.height || 200) + 'px' }"
     class="w-full overflow-hidden rounded-md border border-gray-200"
   />

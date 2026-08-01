@@ -10,7 +10,7 @@ import { releaseTypeClass } from '@/composables/useModUpdate'
 import type { ResourceVersion } from '@/types/community'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 
-const props = defineProps<{
+defineProps<{
   versions: ResourceVersion[]
   selectedId: string | null
 }>()
