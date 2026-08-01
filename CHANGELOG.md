@@ -80,6 +80,188 @@
 
 ### 修复
 
+#### Windows 打开 URL/路径改用 ShellExecuteW（修复 OAuth2 授权链接参数丢失）
+
+- 背景：测试 LoliaFrp OAuth2 授权跳转时，浏览器收到的授权链接只有 `client_id`，日志中 URL 完整但多出 `'redirect_uri' 'response_type' 'scope' 'state'`。根因：`open_url` 用 `cmd /c start "" <url>` 打开链接，cmd.exe 把 URL 查询参数中的 `&` 当作命令分隔符，导致后续参数被拆分丢弃并作为命令执行
+- 改动（1 文件）：
+  - **`src-tauri/src/minecraft/system/shell/open.rs`**：新增 `win_shell` 模块（`#[cfg(target_os = "windows")]` 封装 `ShellExecuteW` + `to_wide_null` 辅助），`open_url`/`open_path` 的 Windows 分支从 `cmd /c start` 改为 `ShellExecuteW` 直接交给系统默认程序，URL/路径原样以 UTF-16 传递，彻底绕过 cmd.exe 命令解析；`reveal_in_file_manager` 复用 `win_shell` 模块删除局部重复声明
+- 设计决策：
+  - **ShellExecuteW 绕过 cmd.exe**：ShellExecuteW 把目标字符串原样交给 shell，不经过 cmd.exe 的 `&`/引号解析，URL 中的查询参数不会再被截断
+  - **open_path 一并替换**：文件路径同样可能含 `&` 等特殊字符，统一改用 ShellExecuteW 消除同类隐患，与 open_url 行为一致
+  - **消除重复声明**：`reveal_in_file_manager` 原有局部 `ShellExecuteW` FFI 声明和 `to_wide_null` 与 `win_shell` 模块重复，重构为复用（符合"可复用函数提取到公共模块"约定）
+  - **`log_error`/`shell_err` import 加 `#[cfg]`**：Windows 分支不再使用 `shell_err`（macos/linux 分支仍用），按平台条件导入避免 unused import
+- 验证：`cargo check --lib` + `cargo clippy --all-targets -- -D warnings` + `cargo test --lib`（141 通过 0 失败）均通过（exit 0）
+
+#### 认证流程引擎支持 {baseUrl} 占位符（修复 token 交换 relative URL 报错）
+
+- 背景：用户测试 LoliaFrp OAuth2 授权，授权链接与本地回调均正常，但 token 交换报「认证流程请求失败: builder error: relative URL without a base」。根因：endpoints.json 的 `authFlows.oauth2.token.url` 使用 `{baseUrl}` 占位符（如 `{baseUrl}/oauth2/token`），但 flows.rs 的 `fill_template` 占位符列表不含 `baseUrl`，URL 保持相对路径传给 reqwest 导致解析失败
+- 改动（4 文件）：
+  - **`src-tauri/src/commands/frp/auth/flows.rs`**：`FlowContext` 新增 `base_url: Option<String>` 字段；`get()` 支持 `baseUrl`/`base_url` 占位符；`fill_template` 占位符列表加入 `baseUrl`；模块文档同步；测试新增 `{baseUrl}/oauth2/token` 替换断言
+  - **`src-tauri/src/commands/frp/auth/oauth2.rs`**：`start_oauth2` 构造 `FlowContext` 传入 `base_url: Some(spec.base_url.clone())`
+  - **`src-tauri/src/commands/frp/auth/device_code.rs`**：`DeviceCodeSession` 新增 `base_url: String` 字段；`start_device_code` 请求与 `poll_device_code` 轮询构造 `FlowContext` 均传入 base_url（poll 阶段已不重新加载 spec，baseUrl 存会话复用）
+  - **`src-tauri/src/commands/frp/auth/mod.rs`**：`refresh_token` 构造 `FlowContext` 传入 base_url
+- 设计决策：
+  - **支持 `{baseUrl}` 占位符而非改 endpoints.json**：两个厂商（loliaFrp / Frp Test）的 endpoints.json 均以 `{baseUrl}/...` 声明认证端点，是既定模板规范；在 flows 引擎补上占位符支持可让所有厂商受益，避免在配置文件里重复写完整 URL
+  - **baseUrl 存入 DeviceCodeSession**：`poll_device_code` 轮询阶段不再加载 endpoints.json，baseUrl 在 `start_device_code` 时存入会话，轮询时取出使用
+- 验证：`cargo check --lib` + `cargo clippy --all-targets -- -D warnings` + `cargo test --lib`（141 通过 0 失败）均通过（exit 0）
+
+#### 认证流程请求/响应调试日志（定位 token 解析失败）
+
+- 背景：用户测试 LoliaFrp OAuth2 token 交换报「OAuth2 响应缺少 access_token」，但现有日志只打印请求方法/URL/contentType，不打印请求参数和响应体，无法判断是请求参数错误还是响应结构不匹配
+- 改动（2 文件）：
+  - **`src-tauri/src/commands/frp/auth/flows.rs`**：`send_flow_request` 日志增强
+    - 请求日志追加 body（form-urlencoded 转为 `k=v&k=v` 串，JSON 直接打印）
+    - 新增响应日志：`HTTP {status} - {body}`（读 body 后打印）
+    - 请求/响应日志均经 `log_redact::redact_log` 脱敏，避免 token/secret 明文泄漏
+  - **`src-tauri/src/commands/frp/auth/oauth2.rs`**：`access_token` 提取失败时错误消息附带脱敏后的响应体（`OAuth2 响应缺少 access_token（HTTP {status}，响应: {...}）`），同时 log_error 输出
+- 设计决策：
+  - **日志集中放在 flows 引擎**：所有认证流程（oauth2/device_code/refresh）都经 `send_flow_request`，一处加日志全流程受益，避免各调用方重复埋点
+  - **复用 `log_redact::redact_log`**：响应体可能含 access_token/refresh_token，打印前脱敏，符合日志安全约定
+- 验证：`cargo check --lib` + `cargo clippy --all-targets -- -D warnings` + `cargo test --lib`（141 通过 0 失败）均通过（exit 0）
+
+#### 修复 loliaFrp endpoints.json OAuth2 token 响应提取路径（对齐标准扁平结构）
+
+- 背景：用户测试 LoliaFrp OAuth2 认证，token 交换返回 HTTP 200 且响应为标准 OAuth2 扁平结构 `{"access_token": ..., "refresh_token": ..., "expires_in": ...}`，但程序仍报「OAuth2 响应缺少 access_token」。根因：loliaFrp 的 endpoints.json 中 token/refresh 响应提取路径误用业务接口的包裹格式 `$.data.access_token`/`$.msg`，而 OAuth2 token 接口响应是扁平结构（无 data 包裹，错误字段为 `error`/`error_description`）
+- 改动（1 文件）：
+  - **`docs/loliaFrp/api/endpoints.json`**：`authFlows.oauth2.token` 与 `refresh` 的 response 路径修正：
+    - `$.data.access_token` → `$.access_token`，`$.data.refresh_token` → `$.refresh_token`，`$.data.expires_in` → `$.expires_in`
+    - `errorField` `$.msg` → `$.error`，`errorDescription` `$.msg` → `$.error_description`
+- 排查结论：
+  - **`docs/Frp Test/frp/api/endpoints.json`**（模板）已是标准路径 `$.access_token`/`$.error`/`$.error_description`，无同类问题
+  - **教程文档 `tutorial-frp.html`** 全部示例均为 `$.access_token` 扁平路径，无同类问题
+  - **jsonpath 引擎** `extract(&v, "$.access_token")` 已有 `test_extract_simple` 测试覆盖，代码侧无需改动
+- 验证：配置文件 JSON 语法无误；`cargo check --lib` + `cargo clippy --all-targets -- -D warnings` + `cargo test --lib`（141 通过 0 失败）均通过（exit 0）。注意：本配置位于 git 忽略的 docs/ 目录，需重新安装 lolia-frp 厂商（或手动更新已安装配置）后生效
+
+#### 启用 keyring 平台后端（修复认证成功后状态仍显示未认证）
+
+- 背景：用户测试 LoliaFrp OAuth2 认证，日志显示「OAuth2 认证成功: provider=lolia-frp, expires_at=...」，但 `get_auth_status` 返回 `{"authType":"oauth2","authenticated":false}`，且无 expiresAt/scopes。根因：`Cargo.toml` 中 `keyring = "3"` 未显式启用任何平台后端。keyring 3 的 default features 为空，Windows/macOS 未启用 `windows-native`/`apple-native` 时回退到 **mock 后端**（纯内存、无持久化、每次 `Entry::new` 独立创建空凭证）。因此 token 写入后立即用新 Entry 读取必得 `NoEntry`，且程序重启即丢
+- 改动（1 文件）：
+  - **`src-tauri/Cargo.toml`**：`keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }`，按平台启用 Windows Credential Manager / macOS Keychain / Linux Secret Service 后端（与代码注释声明的设计意图一致）；并补充注释说明为什么必须显式启用
+- 排查依据（已核验 keyring 3.6.3 源码）：
+  - `src/lib.rs` L296-297：`#[cfg(all(target_os = "windows", not(feature = "windows-native")))] pub use mock as default;`
+  - `src/mock.rs`：mock 凭证 "no persistence other than in the entry itself"，每次 Entry::new 独立空凭证 → store 后新 Entry load 必 NoEntry
+  - `src/windows.rs`：windows-native 用 `CredWriteW`/`CredReadW` 写 Windows Credential Manager Generic 凭据（持久化），target name 为 `{user}.{service}`（`access_token.frp:lolia-frp`），service 含冒号合法
+- 验证：`cargo check --lib`（keyring 3.6.3 按 windows-native 重新编译）+ `cargo clippy --all-targets -- -D warnings` + `cargo test --lib`（141 通过 0 失败）均通过（exit 0）
+- 注意：启用后端后需**重新完成一次 OAuth2 认证**，token 才会持久化到 Windows 凭据管理器（旧的 mock token 未持久化，已丢失）
+
+#### 修复刷新 token 401 invalid_client（refresh 请求未携带 client_secret）
+
+- 背景：用户测试 LoliaFrp，认证成功并持久化后，刷新 token 报 `HTTP 401 Unauthorized - invalid_client`。根因：`refresh_token`（`src-tauri/src/commands/frp/auth/mod.rs`）构造 `FlowContext` 时只传了 `client_id`，`client_secret` 为 `None`；而 endpoints.json 的 refresh body 含 `"client_secret": "{clientSecret}"`，占位符无值，请求体留下字面 `{clientSecret}`，Lolia 服务端校验客户端凭据失败返回 invalid_client
+- 改动（1 文件）：
+  - **`src-tauri/src/commands/frp/auth/mod.rs`**：`refresh_token` 按 authType 同时解析 `client_id` 与 `client_secret`（`resolve_oauth2_config`/`resolve_device_code_config` 均返回 `AuthFile*::client_secret: Option<String>`），一并传入 `FlowContext`
+- 排查结论（RFC 6749 §6 刷新 token 要求客户端认证）：
+  - **loliaFrp refresh body** 含 `{clientSecret}` → 必须传 client_secret（本次修复）
+  - **device_code poll body**（Frp Test 模板）只有 `grant_type/device_code/client_id`，不含 `{clientSecret}` → poll 不传 client_secret 无问题（RFC 8628 公开客户端可省略），已核对无需改动
+  - **device_code start 流程** 此前已传 client_secret，无此问题
+- 验证：`cargo check --lib` + `cargo clippy --all-targets -- -D warnings` + `cargo test --lib`（141 通过 0 失败）均通过（exit 0）。注意：需重新编译后端生效；调试日志（flows.rs 请求 body 打印）可直接核对 refresh 请求中 client_secret 是否真实传入（会脱敏显示）
+
+#### 厂商列表显示外部厂商 frpc 就绪状态
+
+- 背景：用户安装的 lolia-frp 厂商在厂商列表不显示 frpc 是否就绪（未在 bin 目录放置客户端），而内置「系统默认」厂商有就绪/未就绪状态显示。根因：`ProviderList.vue` 的模板中 frpc 就绪状态只在 `v-if="provider.builtin"` 分支渲染，外部厂商走 `v-else` 分支只显示启禁 Select + 卸载按钮
+- 改动（2 文件）：
+  - **`src/components/frp/ProviderList.vue`**：外部厂商操作区增加 frpc 就绪状态显示（绿色 CheckCircleIcon「frpc 就绪」/ 黄色 ExclamationCircleIcon「frpc 未就绪」，与内置厂商样式一致）；更新组件注释说明外部厂商 frpc 来源（bundled 手动放入 bin 目录 / url 安装包自带）
+  - **`src/components/frp/TunnelCreateForm.vue`**：未就绪提示文案「请先在厂商列表页下载 frpc」改为「确认客户端已就绪」（外部厂商无下载按钮，原文案误导）
+- 排查依据：后端 `list_providers`/`build_provider_info` 对内外部厂商均返回 `frpc_ready`（`is_external_frpc_ready` 检查 `providers/<id>/bin/...` 是否存在），数据层无问题，纯前端渲染缺失
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### 厂商服务器白名单支持 `*.domain` 通配符
+
+- 背景：用户测试 LoliaFrp，启动/导入隧道报「服务器地址 jp-4.qwq.fan 不在厂商 lolia-frp 的允许列表内」。根因：loliaFrp 是平台型厂商，frps 节点按地区动态分配（`jp-4.qwq.fan` 仅日本 4 号节点，还有 us/hk/sg 等），manifest 配置 `allowCustomServer:false` + 空 `allowedServers` 导致所有服务器被拒；白名单机制本为「托管型」厂商（固定 frps）设计，无法穷举平台动态节点
+- 改动（5 文件）：
+  - **`src-tauri/src/commands/frp/binary/external.rs`**：`host_matches`（原私有，支持 `*.example.com` 一级通配符）提升为 `pub(crate)` 供沙箱复用
+  - **`src-tauri/src/commands/frp/binary/mod.rs`**：`pub(crate) use external::host_matches;` 导出
+  - **`src-tauri/src/commands/frp/sandbox.rs`**：`validate_network_permissions` 白名单匹配新增通配符分支（`s_host == addr_host || host_matches(addr_host, s_host)`），原有完整 `host:port` 匹配、host 匹配行为不变；新增 3 个单元测试（通配符/精确/白名单三种形式）
+  - **`docs/loliaFrp/manifest.json`**：`allowedServers: []` → `["*.qwq.fan"]`（匹配任意子节点域名）
+  - **`src-tauri/resources/templates/tutorial-frp.html`**：`allowedServers` 字段说明补充通配符支持
+- 设计决策：
+  - **复用既有 `host_matches`**：项目已有通配符匹配实现（binary.rs 下载域名白名单用），不重复实现，仅提升可见性后导出
+  - **保持 `allowCustomServer:false`**：仍禁止任意自定义服务器，仅放行官方节点域名 `*.qwq.fan`；内网 SSRF 检查（`is_private_address`）不受影响
+- 验证：`cargo check --lib` + `cargo clippy --all-targets -- -D warnings` + `cargo test --lib`（144 通过 0 失败）均通过（exit 0）
+- 注意：manifest 变更位于 git 忽略的 docs/ 目录，需**重新安装 lolia-frp 厂商**（或手动更新已安装的 `providers/lolia-frp/manifest.json`）后生效
+
+#### 前端体验优化：同步面板自动关闭 + 厂商下拉放开未就绪过滤 + Toast 点击展开
+
+- 背景：用户反馈三点体验问题——① 从厂商同步导入全部隧道后仍需手动点按钮收起面板；② 新建/编辑隧道的厂商下拉看不到已导入的 lolia-frp（其 frpc 未就绪被过滤）；③ 长 toast 消息被单行省略截断，无法查看完整内容
+- 改动（4 文件）：
+  - **`src/components/frp/RemoteTunnelSync.vue`**：新增 `close` 事件；`handleImport` 导入后若所有远程隧道均已导入（`every` 检查 `importedIds`），自动 emit `close`
+  - **`src/components/frp/TunnelManager.vue`**：`<RemoteTunnelSync>` 监听 `@close="showSync = false"` 收起同步面板
+  - **`src/components/frp/TunnelCreateForm.vue`**：`providerOptions` 由「enabled 且 frpcReady 或 builtin」放宽为「enabled」（未就绪厂商可选，表单下方保留「frpc 未就绪」警告提示）；编辑模式下确保当前隧道厂商即使在选项中（被禁用时也并入）
+  - **`src/components/common/Toast.vue`**：`ToastItem` 新增 `expanded` 状态；点击 toast 切换展开/收起；展开时文字 `white-space: normal` + `word-break: break-all` 换行显示完整内容，`max-height` 限制约 4 行（104px）超出可滚动，`.toast-item` 加 `cursor: pointer` 提示可点击
+- 设计决策：
+  - **同步面板自动关闭**：以「是否全部导入」为判断依据（`remoteTunnels.every`），非固定延迟，与用户操作闭环一致；`close` 由子组件通知父组件收起，保持单向数据流
+  - **厂商下拉放开过滤**：原始 `(p.frpcReady || p.builtin)` 过滤导致从厂商同步导入的隧道（厂商未就绪）无法在编辑/新建时选择对应厂商；未就绪安全性由表单既有的警告提示兜底，编辑场景额外保证当前隧道厂商必然可选
+  - **Toast 点击展开**：保持默认单行省略（不挤占空间），交互式展开而非默认全部换行，符合「最小视觉干扰」；高度上限 104px（约 4 行）+ 内滚动防止超大消息撑满屏幕
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### 同步面板导入逻辑修正（识别已导入隧道、失败不关闭）
+
+- 背景：用户测试同步导入时发现——点击导入**已存在**的隧道，面板"没任何提示就自己关闭了"。根因：`handleImport` 同步 `emit('import')` 后立即标记 `importedIds` 并判断 `every` 关闭面板，而父组件 `store.createTunnel` 是异步的——同名隧道创建失败（store 的 toastError）时面板已提前关闭；且面板完全不识别本地已存在的隧道（每次打开 `importedIds` 重置）
+- 改动（2 文件）：
+  - **`src/components/frp/RemoteTunnelSync.vue`**：导入逻辑改为直接调用 `useFrpStore().createTunnel`（不再 emit `import` 给父组件中转）
+    - `isImported(tunnel)` 判断改为「本会话已导入 或 本地已存在同名隧道」（`localTunnelNames` 由 `store.tunnels` 派生），已存在隧道显示「已导入」不可重复导入
+    - `handleImport` 改为 async：导入中按钮显示 loading；**成功才**计入自动关闭判断（`every` 全导入后 emit `close`）；失败不标记不关闭，错误由 store 的 `toastError('创建隧道失败：...')` 提示
+    - 移除 `import` 事件定义
+  - **`src/components/frp/TunnelManager.vue`**：移除 `handleRemoteImport` 及 `@import` 绑定（导入已内聚到子组件）
+- 设计决策：
+  - **导入内聚到子组件**：RemoteTunnelSync 需要「导入是否成功」的结果来决定标记/关闭，而 Vue emit 无返回值，中转父组件无法回传状态；直接调用 store 保持单向数据流且职责清晰
+  - **按名称识别已导入**：远程隧道 id 与本地隧道 id 由导入时重新生成（createTunnel 新建），无稳定对应关系；名称是唯一可靠匹配键（后端已校验隧道名唯一）
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### Dev API 新增 reload 刷新命令（支持强制无缓存刷新）
+
+- 背景：用户调试时无法强制无缓存刷新前端页面，请求在 `window.molaunch` 调试 API 增加刷新命令
+- 改动（1 文件）：
+  - **`src/utils/dev-api.ts`**：新增 `molaunch.reload(force?)` 命令
+    - 无参 / `false`：普通刷新（`location.reload()`）
+    - `true`：强制无缓存刷新——URL 追加时间戳参数 `_molaunch_reload=<Date.now()>` 后重新导航，URL 变化使浏览器绕过本地缓存重新拉取资源（WebView2 对全新 URL 不做缓存命中）
+  - `MolaunchDevAPI` 接口、`HELP_TEXT`、示例区同步更新
+- 设计决策：
+  - **不使用 Tauri v2 Webview 的 reload/navigate**：`@tauri-apps/api/webview` 的 `Webview` 类无 `reload`/`navigate` 方法（为 v1 API），改用浏览器原生 `location` API，无额外依赖
+  - **时间戳参数而非清缓存**：未使用 `clearAllBrowsingData()`（会清 localStorage/sessionStorage，导致登录态/主题色丢失）；时间戳 query 只绕过资源缓存，保留应用状态
+  - **history 路由兼容**：Vue Router 使用 `createWebHistory`，时间戳加在 search 上不影响 pathname 路由匹配，刷新后停留在当前页面
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### Toast 修复点击展开 + 悬停不自动关闭
+
+- 背景：用户反馈两问题——① 点击 toast 不展开省略的长消息；② 鼠标悬停在 toast 上时仍会自动关闭
+- 根因 ①：`.toast-container` 设了 `pointer-events: none`（为避免左下角空白区挡点击），但 `.toast-item` 未恢复 `pointer-events: auto`，导致 click/mouseenter 事件全部穿透无法触发——`toggleExpand` 从未执行
+- 改动（1 文件，`src/components/common/Toast.vue`）：
+  - **点击展开修复**：`.toast-item` 加 `pointer-events: auto`（容器保持 none 不影响空白区穿透）；`.toast-accent` 加 `align-self: stretch` 修复展开态父容器高度 auto 时竖条 `height:100%` 塌陷
+  - **悬停不自动关闭**：`ToastItem` 新增 `timer?` 字段统一管理自动关闭定时器；`@mouseenter` 调 `pauseAutoDismiss`（clearTimeout），`@mouseleave` 调 `resumeAutoDismiss`（重新计时）
+  - **展开暂停关闭**：`toggleExpand` 展开时同时暂停自动关闭（配合悬停可从容阅读完整内容），收起时恢复
+  - `show`/`dismiss`/`shake` 统一改用 `timer` 字段管理，避免重复 `setTimeout` 泄漏
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### Toast 第二轮修复：竖条全高 + 滑出动画 + 移出 2s 关闭
+
+- 背景：用户复测后反馈三点——① 展开后左侧颜色竖条消失；② 消失动画要能"从右往左滑回去"；③ 鼠标移出后希望 2s 自动关闭（而非按文字长度计时）
+- 改动（1 文件，`src/components/common/Toast.vue`）：
+  - **竖条全高**：`.toast-accent` 从 flex 子项改 `position: absolute; left:0; top:0; bottom:0`（父 `.toast-item` 加 `position: relative`），任何高度下都撑满，不再依赖 `height:100%`/`align-self` 的 auto 塌陷问题；`.toast-icon` 左边距 10px→13px 补偿竖条脱流后的对齐
+  - **滑出动画**：`toast-out` 从 `translateX(-60px)` 改为 `translateX(-100%)`（完整向左滑出，与进入方向相反，视觉"从右往左滑回去"），时长 0.25s→0.3s，高度收拢延迟 0.2s→0.25s 错开
+  - **移出 2s 关闭**：`resumeAutoDismiss` 固定 `2000ms` 重新计时（原按 `calcDuration` 文字长度计时）
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### Toast 修复滑出动画不可见（基类样式为隐藏态导致瞬间消失）
+
+- 背景：用户复测发现 toast 消失时**直接消失**，没有任何右滑过渡动画
+- 根因（CSS animation-fill-mode 经典坑）：`.toast-item` 基类样式是隐藏态 `opacity:0; transform:translateX(-80px)`。Toast 正常显示靠 `.toast-enter` 的 `forwards` 填充冻结在可见态；当 `hiding=true` 切换为 `.toast-hiding` 时，`toast-enter` 被移除 → forwards 填充失效 → 元素**瞬间回落基类隐藏态**（不可见），随后 `toast-out` 动画在全程不可见的状态下滑动，肉眼无动画
+- 改动（1 文件，`src/components/common/Toast.vue`）：`.toast-item` 基类改为可见结束态 `opacity:1`（移除 `opacity:0; translateX(-80px)`），初始隐藏态由 `toast-in` 动画的 `0%` 关键帧提供；退出动画 `toast-out` 现在从可见态（translateX(0)/opacity:1）滑到 `translateX(-100%)/opacity:0`，动画可见
+- 验证：`npx vue-tsc --noEmit` 通过（exit 0）
+
+#### FRP 字段映射反序列化 + 认证中心图标修复
+
+- 背景：用户测试 LoliaFrp 厂商认证报「解析 endpoints.json 失败: invalid type: string "id", expected struct FieldMapping」；同时认证中心不加载厂商 logo（都是默认图标）
+- 改动（2 文件）：
+  - **`src-tauri/src/commands/frp/types.rs`**：`FieldMapping` 改为手动实现 `Deserialize`，通过 untagged 枚举支持三种形式：
+    - 字符串（`"id"`）→ `field: Some("id")`（直接取 item 字段）
+    - 模板字符串（`"{account.token}"`）→ `value: Some(...)`（引用账号信息）
+    - 对象（`{"field": "connectAddress", "split": ":"}`）→ 按字段解析
+  - **`src/components/frp/AuthCenter.vue`**：认证中心厂商卡片图标从硬编码 `ShieldCheckIcon` 改为 `provider.icon`（有 icon 显示 `<img>`，无 icon 回退默认图标），与 ProviderList 保持一致
+- 设计决策：
+  - **字符串形式映射到 field**：`FieldMapping` 结构体手动反序列化，字符串默认为厂商字段名；以 `{` 开头视为模板引用 `value`，与 `resolve_field` 的优先级（value → field）匹配
+  - **不新增测试文件**：FieldMapping 反序列化逻辑通过 untagged 枚举天然支持三种形式，与现有 `HashMap<String, FieldMapping>` 字段兼容
+- 验证：`cargo check` + `cargo clippy --all-targets -D warnings` + `cargo test --lib`（140 通过）+ `npx vue-tsc --noEmit` 均通过（exit 0）
+
 #### FRP 厂商认证配置读取修复（auth.json 回退 + 测试补齐）
 
 - 背景：测试 LoliaFrp 厂商调用 `start_oauth2` 报「厂商 lolia-frp 的 manifest 缺少 auth.oauth2 配置」。原因：新设计将 OAuth2 交互配置（authorizeUrl/clientId/scopes/redirectPort）存放在 auth.json（`AuthFileOAuth2`），但 `oauth2.rs` 仍从 `manifest.auth.oauth2`（旧 `OAuth2Config`）读取。LoliaFrp 的 manifest 未内嵌 auth 块，因此报错
@@ -202,6 +384,44 @@
 - 验证：`npx vue-tsc --noEmit` 通过（exit 0）
 
 ### 维护
+
+#### 清理信令/FRP 模块装饰性分隔线注释
+
+- 背景：`minecraft/online` 下 5 个 Rust 文件存在 AI 生成的 `// ====== xxx ======` 装饰性分隔线注释，用户要求清理该风格
+- 改动（5 文件，共 14 处）：
+  - **`src-tauri/src/minecraft/online/frp.rs`**（5 处）：frpc manifest / 公共 frps 服务器 / 分配端口 / 释放续期 / OnlineClient 扩展方法
+  - **`src-tauri/src/minecraft/online/signaling/types.rs`**（3 处）：ICE / STUN / TURN、整合包元数据、房间核心类型
+  - **`src-tauri/src/minecraft/online/signaling/lobby.rs`**（2 处）：大厅类型、OnlineClient 扩展方法
+  - **`src-tauri/src/minecraft/online/signaling/session.rs`**（2 处）：封禁 / Offer 类型、OnlineClient 扩展方法
+  - **`src-tauri/src/minecraft/online/signaling/whitelist.rs`**（2 处）：白名单类型、OnlineClient 扩展方法
+- 设计决策：仅将 `// ===== 标题 =====` 形式的整行分隔线注释改为普通注释 `// 标题`，保留标题文字；不删除任何代码、不改动任何逻辑（`git diff` 验证均为纯注释行变更）
+- 验证：`git diff` 确认 5 文件改动全部为注释行替换，代码零变更；grep 复查目标文件无残留分隔线
+
+#### 清理联机/加密模块装饰性分隔线注释（第二批）
+
+- 背景：续上一批清理，`utils/frp_manager`、`utils/online_manager`、`utils/signaling_manager`、`minecraft/online/crypto.rs` 仍存在 AI 生成的 `// ====== xxx ======` 装饰性分隔线注释，用户要求继续清理该风格
+- 改动（4 文件，共 14 处）：
+  - **`src-tauri/src/utils/frp_manager/mod.rs`**（2 处）：参数结构体、DISPATCHER 注册（两处均为"纯分隔线夹标题"三行结构）
+  - **`src-tauri/src/utils/online_manager/mod.rs`**（3 处）：返回类型、辅助函数（子模块共用）、DISPATCHER 入口
+  - **`src-tauri/src/utils/signaling_manager/mod.rs`**（3 处）：参数结构体、辅助函数（子模块共用）、注册入口
+  - **`src-tauri/src/minecraft/online/crypto.rs`**（6 处）：Ed25519、X25519、HKDF、AES-256-GCM、RSA-OAEP、错误类型
+- 设计决策：仅将 `// ===== 标题 =====` 形式的整行分隔线注释改为普通注释 `// 标题`，保留标题文字；两条纯分隔线夹标题的三行结构压缩为一行标题注释；不删除任何代码、不改动任何逻辑
+- 验证：`cargo check` 通过（exit 0）；grep 复查 4 文件均无 `// ====` 残留
+
+#### 清理装饰性分隔线注释（第三批）
+
+- 背景：续上一批清理，`minecraft/image_cache.rs`、`minecraft/skin.rs`、`commands/system/developer.rs`、`commands/system/updater/install_windows.rs`、`minecraft/community/mcmod/search.rs`、`minecraft/auth/storage/mod.rs`、`minecraft/auth/authlib/types.rs`、`minecraft/auth/authlib/client/profile.rs` 仍存在 AI 生成的 `// ====== xxx ======` 装饰性分隔线注释，用户要求继续清理该风格
+- 改动（8 文件，共 15 处）：
+  - **`src-tauri/src/minecraft/skin.rs`**（4 处）：不使用 sources::fetch_with_fallback 说明、数据结构、披风别名中文映射、核心逻辑
+  - **`src-tauri/src/minecraft/auth/storage/mod.rs`**（3 处）：认证存储管理器、加解密工具、缓存控制
+  - **`src-tauri/src/minecraft/auth/authlib/types.rs`**（3 处）：请求结构、响应结构、角色属性与材质
+  - **`src-tauri/src/minecraft/image_cache.rs`**（1 处）：Tauri URI scheme 注册
+  - **`src-tauri/src/commands/system/developer.rs`**（1 处）：DevTools 控制
+  - **`src-tauri/src/commands/system/updater/install_windows.rs`**（1 处）：后台静默下载 + 退出时替换
+  - **`src-tauri/src/minecraft/community/mcmod/search.rs`**（1 处）：中文搜索本地映射
+  - **`src-tauri/src/minecraft/auth/authlib/client/profile.rs`**（1 处）：yggdrasil 皮肤管理端点
+- 设计决策：仅将 `// ===== 标题 =====` 形式的整行分隔线注释改为普通注释 `// 标题`，保留标题文字；两条纯分隔线夹标题的三行结构压缩为一行标题注释；不删除任何代码、不改动任何逻辑（`git diff` 验证均为纯注释行变更）
+- 验证：`cargo check` 通过（exit 0）；grep 复查 8 文件均无分隔线残留
 
 #### 修复 picker 子窗口无法加载 marked.min.js / qrcode.min.js
 
