@@ -15,6 +15,7 @@ import {
   ArrowPathIcon,
   ShieldCheckIcon,
   DocumentTextIcon,
+  BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 
 /** NavCategory 类型（与 Online.vue 内部定义一致） */
@@ -57,6 +58,12 @@ export const frpCategory: NavCategory = {
       label: '运行日志',
       icon: DocumentTextIcon,
       desc: '查看 frpc 实时输出与历史日志',
+    },
+    {
+      id: 'tutorial',
+      label: '教程帮助',
+      icon: BookOpenIcon,
+      desc: '查看 FRP 厂商开发指南与启动器基础教程',
     },
   ],
 }

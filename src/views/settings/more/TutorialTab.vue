@@ -2,11 +2,11 @@
 /**
  * 教程子页签
  *
- * 展示教程列表（按分类分组），点击「阅读」调用 openTutorialWindow
- * 在 picker 子窗口中用 marked.min.js 渲染 Markdown 内容。
+ * 展示教程列表（按分类分组），点击「阅读」打开 picker 子窗口加载
+ * 硬编码 HTML 教程模板（无需 marked.min.js 渲染）。
  *
- * 教程内容存储在 src/tutorials/*.md，通过 Vite ?raw 导入。
- * 新增教程只需在 src/tutorials/index.ts 中注册。
+ * 教程内容存储在 src-tauri/resources/templates/tutorial-*.html，
+ * 通过 picker 模板机制直接加载。
  */
 import { computed } from 'vue'
 import {
@@ -18,7 +18,7 @@ import {
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import { TUTORIALS, type TutorialCategory } from '@/tutorials'
-import { openTutorialWindow } from '@/utils/picker-window'
+import { openDisplayWindow } from '@/utils/picker-window'
 
 /** 分类图标映射 */
 const categoryIcon: Record<TutorialCategory, typeof BookOpenIcon> = {
@@ -39,9 +39,9 @@ const groupedTutorials = computed(() => {
   return Object.entries(groups).filter(([, list]) => list.length > 0)
 })
 
-/** 打开教程 */
-async function openTutorial(title: string, content: string) {
-  await openTutorialWindow({ title, content })
+/** 打开教程（通过 picker 子窗口加载硬编码 HTML 模板） */
+async function openTutorial(template: string, title: string) {
+  await openDisplayWindow({ title, template, data: {} })
 }
 </script>
 
@@ -73,7 +73,7 @@ async function openTutorial(title: string, content: string) {
             type="outline"
             size="small"
             class="shrink-0"
-            @click="openTutorial(tutorial.title, tutorial.content)"
+            @click="openTutorial(tutorial.template, tutorial.title)"
           >
             阅读
             <template #icon><ArrowRightIcon class="h-3.5 w-3.5" /></template>

@@ -48,6 +48,27 @@
 - 设计决策：选择后端内联注入而非修 CSP，因为内联注入彻底消除跨源依赖，不依赖平台特定的 URL 转换行为，且 marked.min.js（~40KB）内联开销可忽略
 - 验证：`cargo check --manifest-path src-tauri/Cargo.toml` + `npx vue-tsc --noEmit` 均通过（exit 0）
 
+#### 教程系统改用硬编码 HTML 模板 + 教程入口移至 FRP 侧边栏
+
+- 背景：后端内联注入 marked.min.js 方案在 picker 子窗口中仍不稳定（Windows res:// 跨源行为平台差异），用户反馈"还是不行"。同时教程入口放在 OnlineTopBar 按钮上不够直观，用户难以发现
+- 改动（6 修改 + 3 删除 + 2 新增）：
+  - **新增 `src-tauri/resources/templates/tutorial-basics.html`**：硬编码 HTML 启动器基础教程（无需 marked.min.js 渲染），样式与前端 Vue 应用一致
+  - **新增 `src-tauri/resources/templates/tutorial-frp.html`**：硬编码 HTML FRP 厂商开发指南（同上）
+  - **删除 `src-tauri/resources/templates/tutorial.html`**：旧的 Markdown 渲染模板，已被硬编码 HTML 模板替代
+  - **删除 `src/tutorials/launcher-basics.md`**：Markdown 源文件，内容已迁移到 HTML 模板
+  - **删除 `src/tutorials/frp-provider-guide.md`**：同上
+  - **`src-tauri/src/resources.rs`**：注册 `tutorial-basics.html` / `tutorial-frp.html`，移除旧 `tutorial.html`
+  - **`src-tauri/src/commands/tools/picker_window.rs`**：依赖库注入逻辑仅保留 markdown/qrcode 模板，tutorial-basics/tutorial-frp 硬编码 HTML 无需注入
+  - **`src/config/picker-templates.ts`**：移除旧 `tutorial` 模板配置，新增 `tutorial-basics` / `tutorial-frp` 模板配置（CSP 使用 BASE_CSP，无需 res:）
+  - **`src/tutorials/index.ts`**：`TutorialMeta` 接口 `content` 字段改为 `template` 字段（对应 picker 模板名），TUTORIALS 数组使用 `template: 'tutorial-basics'` / `'tutorial-frp'`
+  - **`src/views/settings/more/TutorialTab.vue`**：点击「阅读」改为调用 `openDisplayWindow({ template, title })` 加载硬编码 HTML 模板
+  - **`src/utils/picker-window.ts`**：移除 `openTutorialWindow` 便捷函数（已不再使用）
+  - **`src/composables/useFrpSidebar.ts`**：FRP 侧边栏子菜单新增「教程帮助」子项（BookOpenIcon），点击跳转设置-教程页
+  - **`src/views/Online.vue`**：移除 `showFrpHelp` computed 和 `FRP_SUB_IDS`，改用 `handleCategoryChange` 拦截 `tutorial` 动作项调用 `goTutorial()` 跳转；NavSidebar 从 `v-model` 改为 `:model-value` + `@update:model-value` 显式绑定
+  - **`src/views/online/OnlineTopBar.vue`**：移除 `showHelp` prop、`goTutorial` emit、教程按钮（BookOpenIcon）和 BookOpenIcon 导入，恢复为纯标题栏 + 状态徽章 + 设置按钮
+- 设计决策：放弃 Markdown 渲染方案改为硬编码 HTML，消除所有跨源加载依赖；教程入口从顶栏按钮移到 FRP 侧边栏子菜单，与 FRP 功能内聚，用户在 FRP 管理页面可直接发现教程
+- 验证：`cargo check` + `npx vue-tsc --noEmit` 均通过（exit 0）
+
 #### 修复联机设备登录"接口成功但前端报失败"
 
 - 症状：点击联机页面"登录"按钮后，api-server 返回 HTTP 200 + 有效数据，但前端 toast 提示"设备登录失败，请稍后重试"；同时 `auth_status` 查询显示 `logged_in: true`（旧 token 仍有效）

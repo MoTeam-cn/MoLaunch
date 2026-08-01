@@ -135,21 +135,22 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     ].join('; '),
   },
 
-  /** 教程渲染页面（亮色主题，通过 res:// 加载 marked.min.js） */
-  'tutorial': {
-    template: 'tutorial',
-    title: '教程',
+  /** 教程：MoLaunch 使用基础（硬编码 HTML，无需依赖库） */
+  'tutorial-basics': {
+    template: 'tutorial-basics',
+    title: 'MoLaunch 使用基础',
     width: 760,
     height: 600,
-    // 与 markdown 模板相同的 CSP：允许 res:// 加载 marked.min.js
-    // 注意：Windows 上 res:// 转为 https://res.localhost/，CSP 需同时允许 res: 和 https://res.localhost
-    csp: [
-      "default-src 'self'",
-      "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' res: https://res.localhost",
-      "img-src 'self' data: blob: https:",
-      "connect-src 'self' picker: res: https://res.localhost",
-    ].join('; '),
+    csp: BASE_CSP,
+  },
+
+  /** 教程：FRP 厂商开发指南（硬编码 HTML，无需依赖库） */
+  'tutorial-frp': {
+    template: 'tutorial-frp',
+    title: 'FRP 厂商开发指南',
+    width: 760,
+    height: 600,
+    csp: BASE_CSP,
   },
 
   /** 二维码展示页面（接收 url/text 生成二维码） */

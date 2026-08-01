@@ -37,10 +37,10 @@ export interface NavCategory {
   disabled?: boolean
 }
 
-/** Online 页激活分类 ID 联合类型 */
+/** Online 页激活分类 ID 联合类型（tutorial 为侧边栏动作项，不会真正成为激活态） */
 export type OnlineCategoryId =
   | 'device' | 'lobby' | 'create' | 'join'
-  | 'room_details' | 'providers' | 'tunnels' | 'auth' | 'logs'
+  | 'room_details' | 'providers' | 'tunnels' | 'auth' | 'logs' | 'tutorial'
 
 /** 设备分类（始终可用） */
 const deviceCategory: NavCategory = {

@@ -52,7 +52,12 @@ fn embedded_text(path: &str) -> Option<&'static str> {
             Some(include_str!("../resources/templates/image-viewer.html"))
         }
         "templates/markdown.html" => Some(include_str!("../resources/templates/markdown.html")),
-        "templates/tutorial.html" => Some(include_str!("../resources/templates/tutorial.html")),
+        "templates/tutorial-basics.html" => {
+            Some(include_str!("../resources/templates/tutorial-basics.html"))
+        }
+        "templates/tutorial-frp.html" => {
+            Some(include_str!("../resources/templates/tutorial-frp.html"))
+        }
         "templates/qrcode.html" => Some(include_str!("../resources/templates/qrcode.html")),
         _ => None,
     }
