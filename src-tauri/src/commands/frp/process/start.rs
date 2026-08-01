@@ -4,7 +4,6 @@ use crate::commands::frp::provider;
 use crate::commands::frp::tunnel;
 use crate::commands::frp::{ensure_dir, frp_logs_dir};
 use crate::log_info;
-use crate::log_warn;
 use crate::state::AppState;
 use tauri::{AppHandle, Emitter};
 
@@ -85,7 +84,6 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
     // 对应 Windows 端的 Job Object 进程隔离（设计文档 §7.3）。
     #[cfg(unix)]
     unsafe {
-        use std::os::unix::process::CommandExt;
         cmd.pre_exec(|| {
             if libc::setpgid(0, 0) != 0 {
                 return Err(std::io::Error::last_os_error());
@@ -105,6 +103,7 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
     // taskkill /T /F 兜底清理）。
     #[cfg(target_os = "windows")]
     {
+        use crate::log_warn;
         if let Err(e) = assign_process_to_job_object(pid) {
             log_warn!("[Frp] 关联 Job Object 失败 ({}): {}", tunnel.id, e);
         }

@@ -13,6 +13,9 @@ mod install_windows;
 use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
+#[cfg(not(target_os = "windows"))]
+use crate::log_info;
+
 pub use check::check_update;
 
 /// 更新信息（check_update 返回，download_and_install_update 接收）

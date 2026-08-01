@@ -195,6 +195,22 @@
 
 ### 修复
 
+#### CI：修复 Linux 平台编译/检测错误（补 SDK 资源 + 6 个代码修复）
+
+- 背景：CI 的 `rust-clippy` / `rust-test` job 在 Ubuntu 上构建失败，`docs/Error/workflow/clippy.txt` 报告 14 个错误，分两类：**资源缺失**（`resources.rs` 用 `include_bytes!` 编译期嵌入 SDK 动态库，但仓库缺 Linux/macOS 版本）和 **代码错误**（Linux 专属路径 + cfg 条件导致的 lint/编译问题，Windows 本地编译看不出来）
+- 资源修复（4 文件，`src-tauri/resources/sdk/`）：
+  - **新增** `run_sdk_lib-linux-x86_64.so`、`run_sdk_lib-darwin-aarch64.dylib`（macOS 版按 [resources.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/src/resources.rs#L93-L96) 引用名 `darwin-aarch64` 重命名，Intel Mac `macos-x86_64.dylib` 未被引用删除避免误导）
+  - **更新** `run_sdk_lib-windows-x86_64.dll`；至此 3 个被 `include_bytes!` 引用的平台文件全部就位
+- 代码修复（6 文件）：
+  - **`src/commands/system/updater/mod.rs`**：补 `use crate::log_info;` 并加 `#[cfg(not(target_os = "windows"))]`（`log_info!` 只在非 Windows 分支使用，Linux 需要导入、Windows 无条件导入会 unused import——平台差异双解决）
+  - **`src/commands/system/updater/install_unix.rs`**：`download_and_install(|_| {})` → `download_and_install(|_, _| {}, || {})`，适配 tauri-plugin-updater v2.10.1 的 2 参数签名（进度闭包 2 参数 + 完成闭包）
+  - **`src/minecraft/system/shell/exec.rs`**：`kill_process_tree` 重构为两个自包含 cfg 块（Windows 块内含 taskkill 错误检查；Unix 块内完整处理 ps+kill 错误），消除不可达代码（E0593 前 return 后通用检查）与类型推断失败（E0282，原跨 cfg 的 `let output` 类型无法统一）
+  - **`src/minecraft/online/tun.rs`**：`use crate::{log_debug,...}` 拆分（`log_debug!` 只在 Windows 块用，下沉进 `#[cfg(windows)]` 块）；`let mut builder` 改 shadow 绑定 + if-else 表达式消除 unused mut（Windows 需重绑定、Linux 不需要）
+  - **`src/minecraft/system/shell/admin.rs`**：`use crate::{log_error, log_info}` 拆分（`log_error!` 只在 Windows `relaunch_as_admin` 用，下沉进 Windows 块）
+  - **`src/commands/frp/process/start.rs`**：删除顶层 `use crate::log_warn;`（移入 Windows Job Object 块内）；删除 `#[cfg(unix)]` 块内 `use std::os::unix::process::CommandExt;`（tokio `pre_exec` 固有方法，无需 trait import）
+- 验证：`cargo check --lib` 通过（exit 0）、`cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`cargo test --all-features` 通过（exit 0，1 passed / 2 ignored）
+- 说明：资源修复已本地验证 include_bytes 全部匹配；代码修复按 cfg 语义逐平台推演，Windows 功能不受影响
+
 #### 升级 netstat2 0.9.1 → 0.11.2：修复 Linux 新版 libc 编译失败（CI rust-clippy / rust-test）
 
 - 背景：CI 的 `rust-clippy` / `rust-test` job 构建失败，`netstat2 v0.9.1` 编译时报 `tcp_info` 结构体字段错误。根因：netstat2 0.9.1 发布于 2020 年，Linux 实现直接访问 libc `tcp_info.state` 字段；新版 libc（0.3.x）将字段重命名为 `tcpi_state` 且类型改为 `__be16`，旧 crate 未固定 libc 版本上限导致解析到新版 libc 后编译失败（本项目因 Frp 端口占用检测 [ports.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/src/commands/tools/network/ports.rs) 直接依赖 netstat2）

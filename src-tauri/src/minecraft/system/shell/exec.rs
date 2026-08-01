@@ -46,13 +46,23 @@ pub fn kill_process_tree(pid: u32) -> Result<(), String> {
     log_info!("[Shell] kill_process_tree: pid={}", pid);
 
     #[cfg(target_os = "windows")]
-    let output = std::process::Command::new("taskkill")
-        .args(["/PID", &pid.to_string(), "/T", "/F"])
-        .output()
-        .map_err(|e| shell_err("kill_process_tree", e))?;
+    {
+        let output = std::process::Command::new("taskkill")
+            .args(["/PID", &pid.to_string(), "/T", "/F"])
+            .output()
+            .map_err(|e| shell_err("kill_process_tree", e))?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let msg = format!("kill process {} failed: {}", pid, stderr.trim());
+            log_error!("[Shell] {}", msg);
+            return Err(msg);
+        }
+        Ok(())
+    }
 
     #[cfg(not(target_os = "windows"))]
-    let output = {
+    {
         // 用 ps 一次性获取所有进程的 pid 与 ppid，构建 parent -> children 映射
         // `ps -A -o pid= -o ppid=` 是 POSIX 标准写法（`=` 去表头），Linux/macOS 通用
         let ps_output = std::process::Command::new("ps")
@@ -129,14 +139,6 @@ pub fn kill_process_tree(pid: u32) -> Result<(), String> {
             errs.join("; ")
         );
         log_error!("[Shell] {}", msg);
-        return Err(msg);
-    };
-
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let msg = format!("kill process {} failed: {}", pid, stderr.trim());
-        log_error!("[Shell] {}", msg);
-        return Err(msg);
+        Err(msg)
     }
-    Ok(())
 }

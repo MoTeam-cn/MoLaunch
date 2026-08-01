@@ -16,7 +16,7 @@ pub(super) async fn download_and_install_unix(app: &AppHandle) -> Result<(), Str
 
     if let Some(update) = update {
         update
-            .download_and_install(|_| {})
+            .download_and_install(|_, _| {}, || {})
             .await
             .map_err(|e| format!("下载安装失败: {e}"))?;
         app.restart();

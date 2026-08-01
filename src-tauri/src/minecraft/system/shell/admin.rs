@@ -3,7 +3,7 @@
 //! `is_admin` 检测当前进程是否以管理员权限运行；
 //! `relaunch_as_admin` 以管理员权限重新启动当前程序。
 
-use crate::{log_error, log_info};
+use crate::log_info;
 
 #[cfg(unix)]
 use super::shell_err;
@@ -75,6 +75,7 @@ pub fn relaunch_as_admin(args: &[String]) -> Result<(), String> {
 
     #[cfg(target_os = "windows")]
     {
+        use crate::log_error;
         use std::os::windows::ffi::OsStrExt;
 
         #[allow(clippy::upper_case_acronyms)]

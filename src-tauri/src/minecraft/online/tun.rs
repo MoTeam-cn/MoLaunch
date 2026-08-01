@@ -9,7 +9,7 @@ use std::path::Path;
 use tun_rs::{AsyncDevice, DeviceBuilder};
 
 // 项目日志宏（logger.rs 中定义）
-use crate::{log_debug, log_info, log_warn};
+use crate::{log_info, log_warn};
 
 /// 虚拟网卡接口元信息
 #[derive(Debug, Clone)]
@@ -61,19 +61,22 @@ impl VirtualNet {
             mtu
         );
 
-        let mut builder = DeviceBuilder::new().ipv4(ipv4, prefix_len, None).mtu(mtu);
+        let builder = DeviceBuilder::new().ipv4(ipv4, prefix_len, None).mtu(mtu);
 
         // Windows 专属：显式指定 wintun.dll 路径，避免依赖默认 DLL 搜索顺序
         #[cfg(windows)]
-        {
+        let builder = {
+            use crate::log_debug;
             if let Some(path) = wintun_dll_path {
                 let path_str = path.to_string_lossy().into_owned();
                 log_debug!("[Online] 使用 wintun.dll 路径: {}", path_str);
-                builder = builder.with(|b| {
+                builder.with(|b| {
                     b.wintun_file(path_str.clone());
-                });
+                })
+            } else {
+                builder
             }
-        }
+        };
 
         // 非 Windows 平台忽略 wintun_dll_path 参数
         #[cfg(not(windows))]
