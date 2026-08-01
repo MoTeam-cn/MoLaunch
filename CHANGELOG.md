@@ -195,6 +195,15 @@
 
 ### 修复
 
+#### 升级 netstat2 0.9.1 → 0.11.2：修复 Linux 新版 libc 编译失败（CI rust-clippy / rust-test）
+
+- 背景：CI 的 `rust-clippy` / `rust-test` job 构建失败，`netstat2 v0.9.1` 编译时报 `tcp_info` 结构体字段错误。根因：netstat2 0.9.1 发布于 2020 年，Linux 实现直接访问 libc `tcp_info.state` 字段；新版 libc（0.3.x）将字段重命名为 `tcpi_state` 且类型改为 `__be16`，旧 crate 未固定 libc 版本上限导致解析到新版 libc 后编译失败（本项目因 Frp 端口占用检测 [ports.rs](file:///c:/Users/XiaoMo/Desktop/MoLaunch/src-tauri/src/commands/tools/network/ports.rs) 直接依赖 netstat2）
+- 改动（2 文件）：
+  - **`src-tauri/Cargo.toml`**：`netstat2 = "0.9"` → `"0.11"`（0.11.2 为 2025-08 最新版，已修复 libc 兼容）
+  - **`src-tauri/Cargo.lock`**：netstat2 0.9.1 → 0.11.2（新增 bindgen/netlink-packet-* 等 Linux 构建依赖）
+- API 兼容性：`get_sockets_info` / `AddressFamilyFlags` / `ProtocolFlags` / `SocketInfo` / `TcpState` 等稳定 API 在 0.11 未破坏，ports.rs 代码零改动
+- 验证：`cargo check --lib` 通过（exit 0）、`cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`cargo test --all-features` 通过（exit 0）
+
 #### CI：新增 workflow_dispatch 手动触发入口
 
 - 背景：CI 的 `paths` 过滤不包含 `.github/workflows/**`，仅修改 workflow 文件推送不会自动触发 CI（无法验证上一条 webkit2gtk 4.1 依赖修复）

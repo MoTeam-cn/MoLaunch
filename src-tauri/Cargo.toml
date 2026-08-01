@@ -55,7 +55,8 @@ tokio-tungstenite = "0.21"
 rustls-native-certs = "0.6"
 sysinfo = "0.29"
 # 枚举本机网络连接（列出监听端口，供 Frp 内网端口选择）
-netstat2 = "0.9"
+# 0.11+ 修复了 Linux 新版 libc（tcp_info 字段 tcpi_state）编译兼容问题
+netstat2 = "0.11"
 sha1 = "0.10"
 sha2 = "0.10"
 md5 = "0.7"
