@@ -58,6 +58,9 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         "templates/tutorial-frp.html" => {
             Some(include_str!("../resources/templates/tutorial-frp.html"))
         }
+        "templates/base-help.html" => {
+            Some(include_str!("../resources/templates/base-help.html"))
+        }
         "templates/qrcode.html" => Some(include_str!("../resources/templates/qrcode.html")),
         _ => None,
     }

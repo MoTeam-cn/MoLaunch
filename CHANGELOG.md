@@ -69,6 +69,18 @@
 - 设计决策：放弃 Markdown 渲染方案改为硬编码 HTML，消除所有跨源加载依赖；教程入口从顶栏按钮移到 FRP 侧边栏子菜单，与 FRP 功能内聚，用户在 FRP 管理页面可直接发现教程
 - 验证：`cargo check` + `npx vue-tsc --noEmit` 均通过（exit 0）
 
+#### 教程模板 base-help.html 基础模板 + 右侧 TOC 导航
+
+- 背景：tutorial-basics.html 和 tutorial-frp.html 各自重复约 70 行相同样式代码，新增教程需复制粘贴样式；同时缺少目录导航，长文档（如 FRP 开发指南 8 个章节）需手动滚动定位
+- 改动（1 新增 + 2 重写 + 2 修改）：
+  - **新增 `src-tauri/resources/templates/base-help.html`**：帮助文档基础模板。提供统一样式（标题栏 + 内容区 + 代码/表格/引用块等）+ 右侧 TOC 导航（复刻 ToolToc.vue 行为：≥3 项自动显示、收起灰色短横线、hover 展开标题、滚动高亮当前项、点击 smooth 跳转预留 20px 偏移）。从 `__PICKER_DATA__.title` 读取标题栏文字，从 `__PICKER_DATA__.content` 读取内容 HTML 并注入，扫描 h2 标题自动生成 TOC
+  - **重写 `src-tauri/resources/templates/tutorial-basics.html`**：从完整 HTML 改为纯内容文件（仅 h1/h2/p/ul/ol 等内容标签，无 `<html>`/`<head>`/`<style>`/`<script>`），样式由 base-help.html 提供
+  - **重写 `src-tauri/resources/templates/tutorial-frp.html`**：同上，纯内容文件
+  - **`src-tauri/src/commands/tools/picker_window.rs`**：`open_picker_window` 存储数据时注入 `title` 字段（base-help 从 data.title 读取标题栏文字）；URI scheme handler 对 `tutorial-*` 模板读取 base-help.html 作为实际模板，将原始内容文件注入 `data.content`
+  - **`src-tauri/src/resources.rs`**：注册 `templates/base-help.html`
+- 设计决策：base-help.html 复刻 ToolToc.vue 的右侧 TOC 行为（收起/展开/滚动高亮/点击跳转），不引入新模式；tutorial-*.html 改为纯内容文件，新增教程只需写内容无需复制样式
+- 验证：`cargo check` + `npx vue-tsc --noEmit` 均通过（exit 0）
+
 #### 修复联机设备登录"接口成功但前端报失败"
 
 - 症状：点击联机页面"登录"按钮后，api-server 返回 HTTP 200 + 有效数据，但前端 toast 提示"设备登录失败，请稍后重试"；同时 `auth_status` 查询显示 `logged_in: true`（旧 token 仍有效）

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>帮助文档</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #ffffff; color: #1f2937;
+      height: 100vh; display: flex; flex-direction: column;
+      user-select: none;
+    }
+    .titlebar {
+      display: flex; align-items: center; padding: 12px 24px;
+      background: #f9fafb; border-bottom: 1px solid #e5e7eb;
+      flex-shrink: 0;
+    }
+    .title {
+      font-size: 15px; font-weight: 600; color: #111827;
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    /* 内容区：relative 定位，供右侧 TOC 悬浮 */
+    .content-wrapper {
+      flex: 1; position: relative; overflow: hidden;
+    }
+    .content {
+      height: 100%; overflow-y: auto; padding: 24px 32px;
+      font-size: 14px; line-height: 1.7; color: #1f2937;
+      user-select: text;
+    }
+    .content h1, .content h2, .content h3, .content h4, .content h5, .content h6 {
+      margin: 20px 0 12px; font-weight: 600; line-height: 1.3; color: #111827;
+      scroll-margin-top: 20px;
+    }
+    .content h1 { font-size: 24px; padding-bottom: 8px; border-bottom: 1px solid #e5e7eb; }
+    .content h2 { font-size: 20px; }
+    .content h3 { font-size: 17px; }
+    .content h4 { font-size: 15px; }
+    .content p { margin: 8px 0; }
+    .content ul, .content ol { margin: 8px 0; padding-left: 24px; }
+    .content li { margin: 4px 0; }
+    .content code {
+      background: #f3f4f6; padding: 2px 6px; border-radius: 3px;
+      font-family: 'Cascadia Code', 'Consolas', monospace; font-size: 13px;
+      color: #db2777;
+    }
+    .content pre {
+      background: #f9fafb; padding: 12px 16px; border-radius: 6px;
+      overflow-x: auto; margin: 12px 0; border: 1px solid #e5e7eb;
+    }
+    .content pre code {
+      background: transparent; padding: 0; color: #1f2937;
+      font-size: 13px; line-height: 1.5;
+    }
+    .content blockquote {
+      border-left: 3px solid #165dff; padding-left: 16px;
+      margin: 12px 0; color: #6b7280; background: #f9fafb;
+      padding: 8px 16px; border-radius: 0 4px 4px 0;
+    }
+    .content a { color: #165dff; text-decoration: none; }
+    .content a:hover { text-decoration: underline; }
+    .content table { border-collapse: collapse; margin: 12px 0; width: 100%; }
+    .content th, .content td { border: 1px solid #e5e7eb; padding: 8px 12px; text-align: left; }
+    .content th { background: #f3f4f6; font-weight: 600; color: #111827; }
+    .content img { max-width: 100%; border-radius: 4px; }
+    .content hr { border: none; border-top: 1px solid #e5e7eb; margin: 20px 0; }
+    .content strong { font-weight: 600; color: #111827; }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+    /* ============ 右侧 TOC 导航（复刻 ToolToc.vue） ============ */
+    .toc-nav {
+      position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+      z-index: 10;
+    }
+    .toc-container {
+      display: flex; flex-direction: column; gap: 4px;
+      border-radius: 8px; transition: all 0.2s ease-out;
+    }
+    /* 收起态：窄条透明背景 */
+    .toc-container.collapsed {
+      background: transparent; padding: 2px; width: 16px;
+    }
+    /* 展开态：带背景的卡片 */
+    .toc-container.expanded {
+      background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(4px);
+      box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+      border: 1px solid #f3f4f6; padding: 6px; width: 128px;
+    }
+    .toc-item {
+      display: flex; align-items: center; border-radius: 6px;
+      cursor: pointer; outline: none; transition: background-color 0.15s, color 0.15s;
+    }
+    /* 收起态：居中显示短横线 */
+    .toc-item.collapsed { padding: 4px 0; justify-content: center; }
+    /* 展开态：带 padding 显示标题 */
+    .toc-item.expanded { padding: 6px 8px; }
+    .toc-dash {
+      display: block; border-radius: 9999px; transition: all 0.2s;
+    }
+    .toc-dash.inactive { width: 8px; height: 4px; background: #d1d5db; }
+    .toc-dash.active { width: 12px; height: 4px; background: #165dff; }
+    .toc-text {
+      font-size: 12px; font-weight: 500; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; transition: opacity 0.2s;
+    }
+    /* 展开态颜色 */
+    .toc-item.expanded.active { background: #eff6ff; }
+    .toc-item.expanded.active .toc-text { color: #1d4ed8; }
+    .toc-item.expanded.inactive .toc-text { color: #4b5563; }
+    .toc-item.expanded.inactive:hover { background: #f9fafb; }
+  </style>
+</head>
+<body oncontextmenu="return false">
+  <div class="titlebar">
+    <div class="title" id="titlebar-text">帮助文档</div>
+  </div>
+  <div class="content-wrapper">
+    <div class="content" id="content"></div>
+    <!-- 右侧 TOC 导航（≥ 3 项时显示） -->
+    <div class="toc-nav" id="toc-nav" style="display: none;"
+         onmouseenter="onTocHover(true)" onmouseleave="onTocHover(false)">
+      <div class="toc-container collapsed" id="toc-container"></div>
+    </div>
+  </div>
+  <script>
+    // 禁用 DevTools 快捷键
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'F12') { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.shiftKey && ['I', 'J', 'C'].includes(e.key.toUpperCase())) { e.preventDefault(); return false; }
+      if (e.ctrlKey && e.key === 'u') { e.preventDefault(); return false; }
+    });
+
+    var DATA = window.__PICKER_DATA__ || {};
+    var scrollContainer = document.getElementById('content');
+    var tocNav = document.getElementById('toc-nav');
+    var tocContainer = document.getElementById('toc-container');
+    var titlebarText = document.getElementById('titlebar-text');
+
+    // 注入标题
+    if (DATA.title) {
+      titlebarText.textContent = DATA.title;
+      document.title = DATA.title;
+    }
+
+    // 注入内容
+    var contentEl = document.getElementById('content');
+    contentEl.innerHTML = DATA.content || '<p style="color:#9ca3af">无内容</p>';
+
+    // ============ TOC 自动生成（扫描 h2 标题） ============
+    var tocItems = [];
+    var headings = contentEl.querySelectorAll('h2');
+    headings.forEach(function(h, i) {
+      if (!h.id) h.id = 'toc-section-' + (i + 1);
+      tocItems.push({ id: h.id, title: h.textContent.trim() });
+    });
+
+    var activeId = '';
+    var tocHovered = false;
+    var scrollHandler = null;
+
+    // 渲染 TOC（≥ 3 项才显示）
+    function renderToc() {
+      if (tocItems.length < 3) {
+        tocNav.style.display = 'none';
+        return;
+      }
+      tocNav.style.display = '';
+      tocContainer.innerHTML = '';
+      tocItems.forEach(function(item) {
+        var div = document.createElement('div');
+        div.className = 'toc-item collapsed';
+        div.setAttribute('role', 'button');
+        div.setAttribute('tabindex', '0');
+        div.dataset.id = item.id;
+        div.onclick = function() { jumpTo(item.id); };
+        div.onkeydown = function(e) { if (e.key === 'Enter') jumpTo(item.id); };
+
+        // 收起态：短横线
+        var dash = document.createElement('span');
+        dash.className = 'toc-dash inactive';
+        div.appendChild(dash);
+
+        // 展开态：标题文字（display:none 切换）
+        var text = document.createElement('span');
+        text.className = 'toc-text';
+        text.textContent = item.title;
+        text.style.display = 'none';
+        div.appendChild(text);
+
+        tocContainer.appendChild(div);
+      });
+      updateTocActive();
+    }
+
+    // 切换收起/展开态
+    function onTocHover(hovered) {
+      tocHovered = hovered;
+      tocContainer.className = 'toc-container ' + (hovered ? 'expanded' : 'collapsed');
+      var items = tocContainer.querySelectorAll('.toc-item');
+      items.forEach(function(el) {
+        el.className = 'toc-item ' + (hovered ? 'expanded' : 'collapsed');
+        var dash = el.querySelector('.toc-dash');
+        var text = el.querySelector('.toc-text');
+        var isActive = el.dataset.id === activeId;
+        // 收起态：显示短横线，隐藏文字
+        if (!hovered) {
+          dash.style.display = '';
+          text.style.display = 'none';
+          el.classList.add(isActive ? 'active' : 'inactive');
+          el.classList.remove(isActive ? 'inactive' : 'active');
+          dash.className = 'toc-dash ' + (isActive ? 'active' : 'inactive');
+        } else {
+          // 展开态：隐藏短横线，显示文字
+          dash.style.display = 'none';
+          text.style.display = '';
+          el.classList.add(isActive ? 'active' : 'inactive');
+          el.classList.remove(isActive ? 'inactive' : 'active');
+        }
+      });
+    }
+
+    // 更新当前高亮项
+    function updateTocActive() {
+      var items = tocContainer.querySelectorAll('.toc-item');
+      items.forEach(function(el) {
+        var isActive = el.dataset.id === activeId;
+        var dash = el.querySelector('.toc-dash');
+        var text = el.querySelector('.toc-text');
+        el.classList.remove('active', 'inactive');
+        el.classList.add(isActive ? 'active' : 'inactive');
+        if (!tocHovered) {
+          dash.className = 'toc-dash ' + (isActive ? 'active' : 'inactive');
+        } else {
+          text.style.color = isActive ? '#1d4ed8' : '#4b5563';
+        }
+      });
+    }
+
+    // 滚动高亮（复刻 ToolToc.vue scrollHandler 逻辑）
+    function bindScroll() {
+      scrollHandler = function() {
+        if (tocItems.length === 0) return;
+        var containerRect = scrollContainer.getBoundingClientRect();
+        var offset = 20;
+        var closest = null;
+        for (var i = 0; i < tocItems.length; i++) {
+          var el = document.getElementById(tocItems[i].id);
+          if (!el) continue;
+          var rect = el.getBoundingClientRect();
+          var dist = rect.top - containerRect.top - offset;
+          if (!closest) {
+            closest = { id: tocItems[i].id, dist: dist };
+          } else if (dist >= 0 && dist < Math.abs(closest.dist)) {
+            closest = { id: tocItems[i].id, dist: dist };
+          } else if (dist < 0 && closest.dist < 0 && dist > closest.dist) {
+            closest = { id: tocItems[i].id, dist: dist };
+          }
+        }
+        if (closest) {
+          activeId = closest.id;
+          updateTocActive();
+        }
+      };
+      scrollContainer.addEventListener('scroll', scrollHandler, { passive: true });
+      scrollHandler();
+    }
+
+    // 点击跳转（复刻 ToolToc.vue jumpTo 逻辑）
+    function jumpTo(id) {
+      var target = document.getElementById(id);
+      if (!target) return;
+      var containerRect = scrollContainer.getBoundingClientRect();
+      var targetRect = target.getBoundingClientRect();
+      var offset = 20;
+      var delta = targetRect.top - containerRect.top - offset;
+      scrollContainer.scrollTo({
+        top: scrollContainer.scrollTop + delta,
+        behavior: 'smooth',
+      });
+      activeId = id;
+      updateTocActive();
+    }
+
+    // 初始化
+    renderToc();
+    bindScroll();
+  </script>
+</body>
+</html>

@@ -68,11 +68,19 @@ pub async fn open_picker_window(
     }
 
     // 存储前端传入的 data（redirect 等模板通过 window.__PICKER_DATA__ 读取）
+    // 同时注入窗口标题（base-help 等模板从 data.title 读取标题栏文字）
     {
         let mut data_store = PICKER_DATA_STORE
             .lock()
             .map_err(|e| format!("Data store lock error: {}", e))?;
-        data_store.insert(picker_id.clone(), params.data);
+        let mut enriched = params.data;
+        if let Some(obj) = enriched.as_object_mut() {
+            obj.insert(
+                "title".to_string(),
+                serde_json::Value::String(params.title.clone()),
+            );
+        }
+        data_store.insert(picker_id.clone(), enriched);
     }
 
     // 存储前端传入的 CSP（URI scheme handler 注入到响应头）
@@ -253,8 +261,27 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
                 .unwrap_or(serde_json::json!({}))
         };
 
+        // tutorial-* 模板：使用 base-help.html 作为基础模板包装
+        // tutorial-*.html 为纯内容文件（无 <html>/<head>/<style>），内容注入到 data.content
+        // base-help.html 提供统一样式 + 右侧 TOC 自动生成（复刻 ToolToc.vue 行为）
+        let (template, data_json) = if template_name.starts_with("tutorial-") {
+            let content = template; // 原始读取的内容文件（content-only HTML）
+            let base = crate::resources::read_resource("templates/base-help.html")
+                .unwrap_or_else(|_| "<html><body>模板不存在</body></html>".to_string());
+            let mut enriched = data_json;
+            if let Some(obj) = enriched.as_object_mut() {
+                obj.insert(
+                    "content".to_string(),
+                    serde_json::Value::String(content),
+                );
+            }
+            (base, enriched)
+        } else {
+            (template, data_json)
+        };
+
         // 注入依赖库（markdown 模板需要 marked.min.js，qrcode 模板需要 qrcode.min.js）
-        // tutorial-basics/tutorial-frp 模板内容已硬编码，无需注入依赖库
+        // tutorial-* 模板使用 base-help.html 硬编码 HTML，无需注入依赖库
         // 直接内联嵌入避免 res:// 跨源加载（picker 子窗口 origin 为 https://picker.localhost/，
         // res:// 资源在 Windows 上转为 https://res.localhost/，跨源 script 加载受 CSP 限制）
         let lib_script = match template_name.as_str() {
