@@ -109,6 +109,11 @@ windows = { version = "0.58", features = [
     "Win32_UI_Shell",
 ] }
 
+# Unix 平台（macOS / Linux）依赖
+# libc: setpgid / killpg 用于 frpc 进程组管理（对应 Windows Job Object）
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [features]
 custom-protocol = ["tauri/custom-protocol"]
 

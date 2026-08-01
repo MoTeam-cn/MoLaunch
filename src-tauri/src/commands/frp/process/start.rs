@@ -79,6 +79,21 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
 
+    // Unix: pre_exec 调用 setpgid(0, 0) 让 frpc 成为新进程组 leader，
+    // stop_tunnel 可通过 killpg(pid, SIGTERM) 一次性杀整个进程组
+    // （含 frpc 自身派生的子进程），避免 ps 递归查询漏掉短命子进程。
+    // 对应 Windows 端的 Job Object 进程隔离（设计文档 §7.3）。
+    #[cfg(unix)]
+    unsafe {
+        use std::os::unix::process::CommandExt;
+        cmd.pre_exec(|| {
+            if libc::setpgid(0, 0) != 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+
     let mut child = cmd.spawn().map_err(|e| format!("启动 frpc 失败: {}", e))?;
 
     let pid = child
