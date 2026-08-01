@@ -33,18 +33,18 @@ const emit = defineEmits<{
       leave-to-class="opacity-0"
     >
       <div
-        class="modal-shell"
+        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
         @click.self="emit('close')"
       >
         <div class="absolute inset-0 bg-black/40" />
-        <div class="modal-body max-w-lg mt-2">
+        <div class="relative w-full max-w-lg bg-white rounded-lg shadow-xl">
           <!-- 标题栏 -->
           <div class="flex items-center px-5 py-3.5 border-b border-gray-200">
             <h3 class="text-base font-semibold text-gray-900">加入房间确认</h3>
           </div>
 
           <!-- 内容区 -->
-          <div class="modal-scroll px-5 py-4 space-y-3">
+          <div class="px-5 py-4 space-y-3">
             <p class="text-sm text-gray-600">
               房间
               <code class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{{ room.roomCode }}</code>

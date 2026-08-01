@@ -98,12 +98,12 @@ async function pickBackupOutput() {
 <template>
   <div
     v-if="target"
-    class="modal-shell"
+    class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
     @click.self="emit('close')"
   >
     <div class="absolute inset-0 bg-black/40" />
-    <div class="modal-body max-w-md mt-2">
-      <div class="modal-scroll p-5 space-y-4">
+    <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl">
+      <div class="p-5 space-y-4">
         <div class="flex items-center gap-2">
           <ArrowUpTrayIcon class="h-5 w-5 text-gray-700" />
           <h4 class="text-sm font-semibold text-gray-900">备份存档</h4>

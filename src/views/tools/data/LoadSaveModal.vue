@@ -121,12 +121,12 @@ function handleCancel() {
     <Transition name="fade">
       <div
         v-if="visible"
-        class="modal-shell"
+        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
         @click.self="handleCancel"
       >
         <div class="absolute inset-0 bg-black/40" />
-        <div class="modal-body max-w-md mt-2">
-          <div class="modal-scroll p-6">
+        <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl">
+          <div class="p-6">
             <!-- 标题 -->
             <div class="mb-4 flex items-center gap-3">
               <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-50">
