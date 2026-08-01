@@ -2,7 +2,7 @@
 //!
 //! 提供自定义/系统根证书加载与 certs 目录管理，信任源模式由 `AppConfig.tls.trust_mode` 控制。
 //!
-//! 存储路径：`%APPDATA%/.MolaLaunch/certs/`（全局共享，跨启动器实例）。
+//! 存储路径：`%APPDATA%/.Molaunch/certs/`（全局共享，跨启动器实例）。
 //! 历史上曾存于便携式 `<exe_dir>/.Molaunch/certs/`，启动时由 `storage::appdata::migrate_from_portable`
 //! 自动迁移到 AppData。
 
@@ -40,7 +40,7 @@ fn validate_filename(filename: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 证书目录：`%APPDATA%/.MolaLaunch/certs/`（全局共享，不存在则创建）
+/// 证书目录：`%APPDATA%/.Molaunch/certs/`（全局共享，不存在则创建）
 ///
 /// 跨启动器实例共享：一台设备只信任一次自定义根证书，所有 MoLaunch 实例复用同一份。
 /// 旧路径 `<exe_dir>/.Molaunch/certs/` 由 `Storage::init` 启动时自动迁移。

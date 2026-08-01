@@ -15,7 +15,7 @@ pub fn frp_data_dir() -> PathBuf {
     crate::storage::Storage::instance().base_dir().join("frp")
 }
 
-/// 厂商根目录（全局共享 `%APPDATA%/.MolaLaunch/providers/`）
+/// 厂商根目录（全局共享 `%APPDATA%/.Molaunch/providers/`）
 ///
 /// 外部 frpc 厂商二进制是设备级资源，跨启动器实例共享，避免每实例重复下载。
 /// 旧路径 `<exe_dir>/.Molaunch/providers/` 由 `Storage::init` 启动时自动迁移。

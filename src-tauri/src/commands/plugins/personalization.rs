@@ -1,4 +1,4 @@
-//! 个性化配置读写（%APPDATA%/.MolaLaunch/personalization.json）
+//! 个性化配置读写（%APPDATA%/.Molaunch/personalization.json）
 //!
 //! 将个性化配置（插件启用状态 / 主页模式 / 自定义布局配置）存储到 AppData
 //! 而非游戏目录，确保不同 game_dir 的启动器实例加载同一份配置。
@@ -55,25 +55,10 @@ pub async fn write_personalization(data: serde_json::Value) -> Result<(), String
 
 /// 解析个性化配置文件路径
 ///
-/// 自动创建父目录。
+/// 复用 `crate::storage::appdata::appdata_root`，与 online/auth/certs/providers 等
+/// 全局共享资源保持一致的目录约定（`%APPDATA%/.Molaunch/`）。自动创建父目录。
 fn personalization_path() -> Result<PathBuf, String> {
-    #[cfg(windows)]
-    {
-        let appdata = std::env::var("APPDATA")
-            .map_err(|_| "APPDATA environment variable not set".to_string())?;
-        let dir = PathBuf::from(appdata).join(".MolaLaunch");
-        std::fs::create_dir_all(&dir)
-            .map_err(log_err("Failed to create personalization directory"))?;
-        Ok(dir.join("personalization.json"))
-    }
-
-    #[cfg(not(windows))]
-    {
-        let home =
-            std::env::var("HOME").map_err(|_| "HOME environment variable not set".to_string())?;
-        let dir = PathBuf::from(home).join(".config").join("MolaLaunch");
-        std::fs::create_dir_all(&dir)
-            .map_err(log_err("Failed to create personalization directory"))?;
-        Ok(dir.join("personalization.json"))
-    }
+    let dir = crate::storage::appdata::appdata_root()?;
+    std::fs::create_dir_all(&dir).map_err(log_err("Failed to create personalization directory"))?;
+    Ok(dir.join("personalization.json"))
 }

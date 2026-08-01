@@ -3,7 +3,7 @@
  *
  * - 内置插件清单：从 `src/plugins/index.ts` 静态加载
  * - 外部插件清单：通过 `loadExternalPlugins()` 异步扫描后端 `<base_dir>/plugins/`
- * - 插件启用状态 / 主页模式 / 自定义布局配置：统一存储在 `%APPDATA%/.MolaLaunch/personalization.json`
+ * - 插件启用状态 / 主页模式 / 自定义布局配置：统一存储在 `%APPDATA%/.Molaunch/personalization.json`
  *   作为全系统共享存储，独立于游戏目录，确保不同 game_dir 的启动器实例加载同一份配置
  *
  * 纯函数和数据结构已抽离到 `@/utils/pluginInstaller`：
@@ -100,7 +100,7 @@ export const usePluginStore = defineStore('plugins', () => {
   }
 
   /**
-   * 将当前状态持久化到后端 AppData（`%APPDATA%/.MolaLaunch/personalization.json`）
+   * 将当前状态持久化到后端 AppData（`%APPDATA%/.Molaunch/personalization.json`）
    *
    * 全量覆盖写入，简单可靠。所有状态变更（启用/禁用插件、切换主页模式、更新布局配置）
    * 都调用此函数统一持久化，确保跨游戏目录共享。
@@ -181,7 +181,7 @@ export const usePluginStore = defineStore('plugins', () => {
   /**
    * 从后端 AppData 同步个性化配置（启动后异步调用一次）
    *
-   * 从 `%APPDATA%/.MolaLaunch/personalization.json` 读取全部配置：
+   * 从 `%APPDATA%/.Molaunch/personalization.json` 读取全部配置：
    * - enabledMap：插件启用状态
    * - homePanelMode：主页右侧内容区模式
    * - customLayoutConfig：自定义布局配置

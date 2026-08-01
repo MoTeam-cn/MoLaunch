@@ -100,7 +100,7 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "wasm/cubiomes.js" => Some(include_bytes!("../resources/wasm/cubiomes.js")),
         // wintun.dll（Windows 联机模块 TUN 接口驱动，按 target_arch 嵌入对应架构版本）
         // 来源：https://www.wintun.net/（WireGuard 项目，已签名）
-        // 运行时由 `extract_wintun` 释放到 %APPDATA%/.MolaLaunch/wintun.dll
+        // 运行时由 `extract_wintun` 释放到 %APPDATA%/.Molaunch/wintun.dll
         // 注册统一逻辑路径 `wintun/wintun.dll`，编译时按架构选择不同物理文件
         #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
         "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/amd64/wintun.dll")),
@@ -270,14 +270,12 @@ pub fn extract_updater() -> anyhow::Result<std::path::PathBuf> {
 /// 启动失败；放全局位置而非启动器目录，支持多实例共享同一份驱动。
 ///
 /// 编译时 `embedded_bytes` 按 `target_arch` 选择对应架构的 dll 嵌入（amd64/arm64/x86/arm），
-/// 运行时统一释放到 `%APPDATA%/.MolaLaunch/wintun.dll`。复用 `extract_resource`
+/// 运行时统一释放到 `%APPDATA%/.Molaunch/wintun.dll`。复用 `extract_resource`
 /// 的 sha256 校验机制。调用方为 `minecraft::online::bridge::VirtualLanBridge::start`。
 #[cfg(target_os = "windows")]
 pub fn extract_wintun() -> anyhow::Result<std::path::PathBuf> {
-    let appdata = std::env::var("APPDATA")
-        .map_err(|_| anyhow::anyhow!("APPDATA environment variable not set"))?;
-    let target_path = std::path::PathBuf::from(appdata)
-        .join(".MolaLaunch")
+    let target_path = crate::storage::appdata::appdata_root()
+        .map_err(|e| anyhow::anyhow!(e))?
         .join("wintun.dll");
 
     extract_resource("wintun/wintun.dll", &target_path)?;

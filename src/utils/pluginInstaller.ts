@@ -89,7 +89,7 @@ export function externalManifestToPluginManifest(
  * 从后端 AppData 读取个性化配置
  *
  * 包装 pluginsManager(READ_PERSONALIZATION)，返回 Partial 类型供调用方合并默认值。
- * 文件位置：%APPDATA%/.MolaLaunch/personalization.json
+ * 文件位置：%APPDATA%/.Molaunch/personalization.json
  */
 export async function loadPersonalizationData(): Promise<Partial<PersonalizationData>> {
   return await pluginsManager<Partial<PersonalizationData>>(PLUGINS_ACTIONS.READ_PERSONALIZATION)
@@ -99,7 +99,7 @@ export async function loadPersonalizationData(): Promise<Partial<Personalization
  * 将个性化配置持久化到后端 AppData
  *
  * 包装 pluginsManager(WRITE_PERSONALIZATION)，全量覆盖写入。
- * 文件位置：%APPDATA%/.MolaLaunch/personalization.json
+ * 文件位置：%APPDATA%/.Molaunch/personalization.json
  */
 export async function savePersonalizationData(data: PersonalizationData): Promise<void> {
   await pluginsManager<void>(PLUGINS_ACTIONS.WRITE_PERSONALIZATION, { data })

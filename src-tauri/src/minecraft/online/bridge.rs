@@ -61,7 +61,7 @@ impl VirtualLanBridge {
         );
 
         // Windows 专属：从 AppData 释放并加载 wintun.dll
-        // （编译时 include_bytes! 嵌入二进制，运行时释放到 %APPDATA%/.MolaLaunch/wintun.dll）
+        // （编译时 include_bytes! 嵌入二进制，运行时释放到 %APPDATA%/.Molaunch/wintun.dll）
         #[cfg(windows)]
         let wintun_path: Option<std::path::PathBuf> = {
             match crate::resources::extract_wintun() {
