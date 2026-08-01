@@ -8,7 +8,7 @@ use super::types::{ListAnswersResponse, ListParticipantsResponse};
 use crate::minecraft::online::client::{BusinessResult, ClientError, OnlineClient};
 use crate::minecraft::online::storage::DeviceCredentials;
 
-// ============================== 封禁 / Offer 类型 ==============================
+// 封禁 / Offer 类型
 
 /// 房间封禁记录（对应 api-server `RoomBan`）
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -61,7 +61,7 @@ pub struct ParticipantOfferResponse {
     pub ice_candidates: Vec<String>,
 }
 
-// ============================== OnlineClient 扩展方法 ==============================
+// OnlineClient 扩展方法
 
 impl OnlineClient {
     /// 提交 SDP Answer（POST /v1/signaling/rooms/{code}/answer）

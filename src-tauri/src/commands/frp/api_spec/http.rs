@@ -204,10 +204,7 @@ async fn handle_response(response: reqwest::Response) -> Result<serde_json::Valu
     Ok(value)
 }
 
-// ============================================================
 // URL 辅助函数
-// ============================================================
-
 /// 拼接 baseUrl + path
 fn build_url(base_url: &str, path: &str) -> Result<String, String> {
     if path.is_empty() {

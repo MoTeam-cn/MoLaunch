@@ -269,9 +269,7 @@ pub fn clear_all() -> anyhow::Result<()> {
     cache::clear_dir(IMAGE_CACHE_DIR)
 }
 
-// ============================================================================
 // Tauri URI scheme 注册
-// ============================================================================
 
 /// 在 Tauri Builder 上注册 `cache-image` 自定义 URI scheme 协议
 ///

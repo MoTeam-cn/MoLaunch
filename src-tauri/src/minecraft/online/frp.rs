@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use super::client::{BusinessResult, ClientError, OnlineClient};
 use super::storage::DeviceCredentials;
 
-// ============================== frpc manifest（GET /v1/frp/manifest） ==============================
+// frpc manifest（GET /v1/frp/manifest）
 
 /// frpc 版本清单查询参数
 ///
@@ -56,7 +56,7 @@ pub struct FrpManifest {
     pub rollout_pct: u32,
 }
 
-// ============================== 公共 frps 服务器（GET /v1/frp/servers） ==============================
+// 公共 frps 服务器（GET /v1/frp/servers）
 
 /// 公共 frps 服务器信息
 ///
@@ -91,7 +91,7 @@ pub struct PublicFrpServer {
     pub tls_enabled: bool,
 }
 
-// ============================== 分配端口（POST /v1/frp/allocate） ==============================
+// 分配端口（POST /v1/frp/allocate）
 
 /// 分配端口请求（加密信封内明文）
 ///
@@ -138,7 +138,7 @@ pub struct AllocateServerInfo {
     pub tls_enabled: bool,
 }
 
-// ============================== 释放 / 续期（POST /v1/frp/release|keepalive） ==============================
+// 释放 / 续期（POST /v1/frp/release|keepalive）
 
 /// 释放分配请求（加密信封内明文）
 #[derive(Debug, Clone, Serialize)]
@@ -152,7 +152,7 @@ pub struct KeepaliveRequest {
     pub allocation_id: String,
 }
 
-// ============================== OnlineClient 扩展方法 ==============================
+// OnlineClient 扩展方法
 
 impl OnlineClient {
     /// 查询 frpc 更新（GET /v1/frp/manifest）

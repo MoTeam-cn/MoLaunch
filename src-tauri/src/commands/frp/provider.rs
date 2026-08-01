@@ -16,10 +16,7 @@ use std::path::PathBuf;
 /// 系统默认厂商 ID
 pub const SYSTEM_DEFAULT_ID: &str = "system-default";
 
-// ============================================================
 // 路径辅助
-// ============================================================
-
 /// 系统默认厂商目录（`<base_dir>/providers/system-default/`）
 pub(super) fn system_default_dir() -> PathBuf {
     providers_root().join(SYSTEM_DEFAULT_ID)
@@ -261,10 +258,7 @@ pub(super) fn read_icon_as_data_url(provider_id: &str, icon_rel: &str) -> Option
     Some(format!("data:{};base64,{}", mime, b64))
 }
 
-// ============================================================
 // 厂商启用状态持久化
-// ============================================================
-
 /// 读取厂商启用状态（`<base_dir>/frp/providers.json`）
 ///
 /// 文件不存在或损坏时返回空 HashMap（所有外部厂商默认启用）。
@@ -294,10 +288,7 @@ pub(super) fn write_providers_state(state: &HashMap<String, bool>) -> Result<(),
     std::fs::write(&path, content).map_err(|e| format!("写入厂商状态失败: {}", e))
 }
 
-// ============================================================
 // 厂商清单读取
-// ============================================================
-
 /// 读取外部厂商的 manifest.json
 pub(super) fn read_provider_manifest(provider_id: &str) -> Result<ProviderManifest, String> {
     validate_provider_id(provider_id)?;
@@ -318,10 +309,7 @@ pub(super) fn read_provider_manifest(provider_id: &str) -> Result<ProviderManife
     Ok(manifest)
 }
 
-// ============================================================
 // 厂商列表
-// ============================================================
-
 /// 列出所有厂商（内置 + 外部）
 ///
 /// 内置系统默认厂商始终返回。外部厂商扫描 `<base_dir>/providers/` 读 manifest.json，
@@ -424,10 +412,7 @@ pub async fn list_providers(state: &AppState) -> Result<Vec<ProviderInfo>, Strin
     Ok(providers)
 }
 
-// ============================================================
 // 启用 / 禁用
-// ============================================================
-
 /// 启用厂商
 pub async fn enable_provider(provider_id: String) -> Result<(), String> {
     let mut state = read_providers_state();

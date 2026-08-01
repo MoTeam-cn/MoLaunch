@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::minecraft::online::client::{BusinessResult, ClientError, OnlineClient};
 use crate::minecraft::online::storage::DeviceCredentials;
 
-// ============================== 大厅类型 ==============================
+// 大厅类型
 
 /// 大厅房间列表查询参数
 ///
@@ -129,7 +129,7 @@ pub struct LobbyCategoriesResponse {
     pub categories: Vec<LobbyCategory>,
 }
 
-// ============================== OnlineClient 扩展方法 ==============================
+// OnlineClient 扩展方法
 
 impl OnlineClient {
     /// 查询大厅公开房间列表（GET /v1/signaling/lobby/rooms）

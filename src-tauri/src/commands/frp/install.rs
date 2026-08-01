@@ -10,10 +10,7 @@ use super::{ensure_dir, providers_root, validate_provider_id, ProviderInfo, Prov
 use crate::log_info;
 use std::path::{Path, PathBuf};
 
-// ============================================================
 // 安装 / 卸载
-// ============================================================
-
 /// 从文件夹安装外部厂商
 ///
 /// 源目录必须包含 manifest.json。安装后校验 manifest.json 存在。
@@ -187,10 +184,7 @@ pub async fn uninstall_provider(provider_id: String) -> Result<(), String> {
     Ok(())
 }
 
-// ============================================================
 // 内部辅助
-// ============================================================
-
 /// 从 manifest + 启用状态构建 ProviderInfo
 fn build_provider_info(manifest: &ProviderManifest) -> ProviderInfo {
     let state = read_providers_state();

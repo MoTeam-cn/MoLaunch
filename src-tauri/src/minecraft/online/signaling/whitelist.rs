@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::minecraft::online::client::{BusinessResult, ClientError, OnlineClient};
 use crate::minecraft::online::storage::DeviceCredentials;
 
-// ============================== 白名单类型 ==============================
+// 白名单类型
 
 /// 白名单条目（房主查询/管理用）
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -51,7 +51,7 @@ pub struct SetWhitelistEnabledRequest {
     pub enabled: bool,
 }
 
-// ============================== OnlineClient 扩展方法 ==============================
+// OnlineClient 扩展方法
 
 impl OnlineClient {
     /// 查询房间白名单（GET /v1/signaling/rooms/{code}/whitelist，仅房主）

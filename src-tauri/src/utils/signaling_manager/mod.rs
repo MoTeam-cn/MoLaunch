@@ -16,7 +16,7 @@ use crate::minecraft::online::signaling::{IceServerEntry, ModpackMeta};
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 
-// ============================== 参数结构体 ==============================
+// 参数结构体
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -208,7 +208,7 @@ pub struct LobbyListParams {
     pub keyword: Option<String>,
 }
 
-// ============================== 辅助函数（子模块共用） ==============================
+// 辅助函数（子模块共用）
 
 /// 加载设备凭证（需已注册）
 ///
@@ -229,7 +229,7 @@ async fn make_client(state: &AppState) -> OnlineClient {
     OnlineClient::new(&base_url)
 }
 
-// ============================== 注册入口 ==============================
+// 注册入口
 
 /// 注册全部信令 action 到 dispatcher
 pub fn register_signaling_actions(d: &mut Dispatcher) {

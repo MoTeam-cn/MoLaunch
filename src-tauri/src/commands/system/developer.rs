@@ -168,7 +168,7 @@ pub async fn get_cache_stats() -> Result<cache_stats::CacheStatsResult, String> 
         .map_err(|e| format!("Failed to collect cache stats: {}", e))
 }
 
-// ==================== DevTools 控制 ====================
+// DevTools 控制
 //
 // 安全约束：所有 devtools 控制函数均要求 DeveloperUnlocked=true && DeveloperMode=true
 // 双层校验，确保普通用户即使绕过前端按钮直接调 IPC 也无法打开 devtools。

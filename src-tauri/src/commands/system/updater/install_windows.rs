@@ -75,7 +75,7 @@ pub(super) async fn download_and_install_windows(
     Ok(())
 }
 
-// ===== 后台静默下载 + 退出时替换（Windows 便携版自动更新） =====
+// 后台静默下载 + 退出时替换（Windows 便携版自动更新）
 //
 // 流程：
 // 1. 前端定时（10 分钟）调用 check_update，发现新版本后调用 download_update_to_appdata

@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-// ===== 请求结构 =====
+// 请求结构
 
 /// `/authserver/authenticate` 请求体
 ///
@@ -72,7 +72,7 @@ pub struct ProfileId {
     pub name: String,
 }
 
-// ===== 响应结构 =====
+// 响应结构
 
 /// `/authserver/authenticate` 与 `/authserver/refresh` 共用响应体
 ///
@@ -181,11 +181,9 @@ impl ApiError {
     }
 }
 
-// ============================================================
 // 角色属性与材质（GET /sessionserver/session/minecraft/profile/{uuid}）
 //
 // 参考 yggdrasil-api-analysis.md 3.2 节与 4.3.1 节。
-// ============================================================
 
 /// 角色属性（properties 数组元素）
 ///

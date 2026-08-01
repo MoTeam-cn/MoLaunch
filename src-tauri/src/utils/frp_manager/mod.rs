@@ -15,9 +15,7 @@ use tauri::AppHandle;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-// ============================================================
 // 参数结构体
-// ============================================================
 
 /// ensure_frpc 参数（provider_id 可选，默认系统默认厂商）
 #[derive(Debug, serde::Deserialize, Default)]
@@ -92,9 +90,7 @@ pub struct RunAuthAdapterParams {
     pub args: Vec<String>,
 }
 
-// ============================================================
 // DISPATCHER 注册（按类别委托到子模块）
-// ============================================================
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();

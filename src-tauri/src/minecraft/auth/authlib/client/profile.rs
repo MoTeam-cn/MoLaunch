@@ -4,13 +4,11 @@ use super::types::YggdrasilError;
 use super::{join_url, parse_error};
 use crate::minecraft::auth::authlib::types::{ProfileInfo, SkinCapeInfo, TexturesPayload};
 
-// ============================================================
 // yggdrasil 皮肤管理端点（参考 yggdrasil-api-analysis.md 4.3 / 4.4 节）
 //
 // 与认证端点不同，皮肤上传/删除需要 `Authorization: Bearer {accessToken}`
 // 和 multipart/form-data，因此不能复用 `crate::http::post_json_with_status`，
 // 但仍通过 `crate::http::get_client()` 复用全局 reqwest 客户端（统一 UA / 代理）。
-// ============================================================
 
 /// GET /sessionserver/session/minecraft/profile/{uuid} 查询角色属性
 ///

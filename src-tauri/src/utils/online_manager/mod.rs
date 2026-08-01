@@ -22,7 +22,7 @@ use crate::minecraft::online::storage::{DeviceCredentials, OnlineStorage};
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-// ============================== 返回类型 ==============================
+// 返回类型
 
 /// 设备状态返回
 ///
@@ -64,7 +64,7 @@ pub struct AuthInitResult {
     pub error: Option<String>,
 }
 
-// ============================== 辅助函数（子模块共用） ==============================
+// 辅助函数（子模块共用）
 
 /// 从 AppState 配置中读取 api_server_url
 async fn read_api_server_url(state: &AppState) -> String {
@@ -225,7 +225,7 @@ async fn login_fresh(state: &AppState) -> Result<DeviceCredentials, String> {
     Ok(updated)
 }
 
-// ============================== DISPATCHER 入口 ==============================
+// DISPATCHER 入口
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();

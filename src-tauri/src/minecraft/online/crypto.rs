@@ -26,7 +26,7 @@ pub fn b64u_decode(s: &str) -> Result<Vec<u8>, CryptoError> {
     URL_SAFE_NO_PAD.decode(s).map_err(CryptoError::Base64Decode)
 }
 
-// ============================== Ed25519 ==============================
+// Ed25519
 
 /// Ed25519 密钥对（私钥 + 公钥）
 pub struct Ed25519KeyPair {
@@ -83,7 +83,7 @@ impl Ed25519KeyPair {
     }
 }
 
-// ============================== X25519 ==============================
+// X25519
 
 /// X25519 静态密钥对（用于持久化的设备 X25519 私钥）
 pub struct X25519StaticKeyPair {
@@ -142,7 +142,7 @@ pub fn x25519_public_from_b64u(s: &str) -> Result<X25519PublicKey, CryptoError> 
     Ok(X25519PublicKey::from(arr))
 }
 
-// ============================== HKDF ==============================
+// HKDF
 
 /// HKDF-SHA256 密钥派生
 ///
@@ -164,7 +164,7 @@ pub fn hkdf_sha256(
     Ok(okm)
 }
 
-// ============================== AES-256-GCM ==============================
+// AES-256-GCM
 
 /// AES-256-GCM 加密
 ///
@@ -198,7 +198,7 @@ pub fn aes_gcm_decrypt(key: &[u8; 32], data: &[u8]) -> Result<Vec<u8>, CryptoErr
         .map_err(|_| CryptoError::AesGcmDecryptFailed)
 }
 
-// ============================== RSA-OAEP ==============================
+// RSA-OAEP
 
 /// RSA-OAEP-SHA256 加密
 ///
@@ -243,7 +243,7 @@ pub fn rsa_oaep_encrypt(public_pem: &str, plaintext: &[u8]) -> Result<Vec<u8>, C
         })
 }
 
-// ============================== 错误类型 ==============================
+// 错误类型
 
 #[derive(Debug, thiserror::Error)]
 pub enum CryptoError {

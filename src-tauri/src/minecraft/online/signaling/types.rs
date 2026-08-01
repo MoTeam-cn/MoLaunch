@@ -4,7 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
-// ============================== ICE / STUN / TURN ==============================
+// ICE / STUN / TURN
 
 /// ICE 服务器条目（对应浏览器 `RTCIceServer` 接口）
 ///
@@ -64,7 +64,7 @@ pub struct TurnServersResponse {
     pub load_threshold: u32,
 }
 
-// ============================== 整合包元数据 ==============================
+// 整合包元数据
 
 /// 整合包元数据（联机大厅阶段 3 新增）
 ///
@@ -108,7 +108,7 @@ pub struct ModpackMeta {
     pub manifest_hash: Option<String>,
 }
 
-// ============================== 房间核心类型 ==============================
+// 房间核心类型
 
 /// 创建房间请求
 #[derive(Debug, Clone, Serialize)]

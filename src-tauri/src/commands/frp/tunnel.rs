@@ -182,10 +182,7 @@ fn escape_toml_string(s: &str) -> String {
     s.replace('\\', "\\\\").replace('"', "\\\"")
 }
 
-// ============================================================
 // 持久化
-// ============================================================
-
 /// 读取 tunnels.json
 fn read_tunnels() -> Result<Vec<Tunnel>, String> {
     let path = tunnels_path();
@@ -245,10 +242,7 @@ fn now_ms() -> u64 {
         .unwrap_or(0)
 }
 
-// ============================================================
 // 参数结构体
-// ============================================================
-
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateTunnelParams {

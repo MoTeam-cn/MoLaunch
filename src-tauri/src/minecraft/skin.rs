@@ -8,9 +8,7 @@ use crate::log_info;
 use crate::log_warn;
 use serde::{Deserialize, Serialize};
 
-// ─────────────────────────────────────────────────────────────
 // 关于不使用 sources::fetch_with_fallback 的说明
-// ─────────────────────────────────────────────────────────────
 // 本模块的所有 HTTP 请求目标为 Mojang 官方 API：
 //   - textures.minecraft.net（皮肤/披风 PNG 二进制）
 //   - api.minecraftservices.com（profile / skins / capes）
@@ -27,9 +25,7 @@ const CAPE_ACTIVE_URL: &str = "https://api.minecraftservices.com/minecraft/profi
 /// Minecraft profile 端点（用于上传/装备后刷新本地缓存的 profile_json）
 const MC_PROFILE_URL: &str = "https://api.minecraftservices.com/minecraft/profile";
 
-// ============================================================
 // 数据结构
-// ============================================================
 
 /// 皮肤信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,9 +70,7 @@ pub struct SkinCapeInfo {
     pub capes: Vec<CapeInfo>,
 }
 
-// ============================================================
 // 披风别名中文映射
-// ============================================================
 
 fn cape_display_name(alias: &str) -> String {
     let map = [
@@ -118,9 +112,7 @@ fn cape_display_name(alias: &str) -> String {
     alias.to_string()
 }
 
-// ============================================================
 // 核心逻辑
-// ============================================================
 
 /// 从 profile_json 解析皮肤/披风信息
 pub fn parse_skin_cape_info(profile_json: &str) -> Result<SkinCapeInfo, String> {
