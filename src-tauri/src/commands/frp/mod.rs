@@ -5,11 +5,12 @@
 //! 所有子模块函数由 `utils::frp_manager::dispatch` 统一反序列化参数后调用。
 //!
 //! 模块结构：
-//! - `types`：共享数据类型（隧道/厂商清单/认证配置/日志文件）
+//! - `types`：共享数据类型（隧道/厂商清单/认证配置/API 规范/日志文件）
 //! - `paths`：路径辅助函数与 ID 校验
-//! - `provider`/`install`/`binary`/`tunnel`/`process`/`sandbox`/`auth`/`api_schema`/`log_redact`：业务子模块
+//! - `provider`/`install`/`binary`/`tunnel`/`process`/`sandbox`/`auth`/`api_spec`/`log_redact`：业务子模块
 
 pub mod api_schema;
+pub mod api_spec;
 pub mod auth;
 pub mod binary;
 pub mod install;
@@ -31,9 +32,12 @@ pub use paths::{
     tunnels_path, validate_provider_id,
 };
 pub use types::{
-    ApiKeyConfig, AuthConfig, BinaryConfig, DeviceCodeConfig, DownloadConfig, LogFileContent,
-    LogFileInfo, NetworkPermissions, OAuth2Config, ProcessPermissions, ProviderInfo,
-    ProviderManifest, Tunnel, TunnelStatus, TunnelType, TunnelWithStatus,
+    ApiKeyConfig, ApiRef, ApiSpec, AuthConfig, AuthFile, AuthFileApiKey, AuthFileDeviceCode,
+    AuthFileOAuth2, AuthFlows, AuthHeader, BinaryConfig, ConfigMode, DeviceCodeConfig,
+    DownloadConfig, EndpointDef, EndpointsDef, Envelope, FieldExtractor, FieldMapping,
+    FlowRequest, LogFileContent, LogFileInfo, NetworkPermissions, OAuth2Config,
+    ProcessPermissions, ProviderInfo, ProviderManifest, RemoteLoginFlow, ResponseDef, Tunnel,
+    TunnelStatus, TunnelType, TunnelWithStatus, TunnelsDef,
 };
 
 /// 统一 Frp 管理 IPC 入口

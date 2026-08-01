@@ -9,6 +9,28 @@
 
 ### 新增
 
+#### FRP 厂商接口规范改造（阶段 1+2：类型定义 + API 引擎）
+
+- 背景：各厂商接口响应结构各不相同（成功判断、字段命名、数据位置、配置获取方式均有差异）。原 `api_schema` 模块使用固定结构解析，无法适配非标准厂商（如 OpenFRP）。新设计将接口响应解析全部做成可配置项，厂商只需在 `endpoints.json` 中声明即可
+- 改动（6 文件）：
+  - **`src-tauri/src/commands/frp/types.rs`**：新增 18 个类型定义，覆盖 endpoints.json 全部可配置项
+    - `ApiSpec`（顶层结构）/ `AuthHeader`（token 注入）/ `AuthFlows`（认证流程集合）
+    - `OAuth2Flow` / `DeviceCodeFlow` / `ApiKeyFlow` / `RemoteLoginFlow`（四种认证流程）
+    - `FlowRequest`（流程请求定义 + 响应字段提取规则）/ `FieldExtractor`（body/header 取值）
+    - `Envelope`（响应包裹解析：successField/successValue/errorField/dataField）
+    - `ConfigMode`（三种配置模式：url/fields/args）/ `EndpointsDef` / `EndpointDef` / `TunnelsDef`
+    - `ResponseDef`（itemsField/itemsField/tunnelIdField/fields/encoding）/ `FieldMapping`（field/split/value）
+    - `AuthFile` / `AuthFileOAuth2` / `AuthFileDeviceCode` / `AuthFileApiKey`（认证交互层）
+    - `ProviderManifest` 新增 `auth_file` 和 `api.endpoints_file` 字段
+  - **`src-tauri/src/commands/frp/api_spec/mod.rs`**（新模块）：API 引擎主模块，`load_api_spec` 加载 endpoints.json + `fetch_tunnels` 拉取隧道列表 + 账号信息映射 + 隧道列表映射（含 `{account.token}` 占位符解析）
+  - **`src-tauri/src/commands/frp/api_spec/jsonpath.rs`**（新模块）：JSONPath 解析，支持 `$.a.b` 嵌套字段 + `$.data[*].proxies[*]` 多级数组展平，含 5 个单元测试
+  - **`src-tauri/src/commands/frp/api_spec/envelope.rs`**（新模块）：响应包裹解析，envelope 成功判断（支持类型宽松匹配）+ 错误消息提取 + 数据字段提取，含 4 个单元测试
+  - **`src-tauri/src/commands/frp/api_spec/http.rs`**（新模块）：HTTP 请求发送，复用 api_schema 重定向防护逻辑，适配新 EndpointDef 类型，集成 envelope 成功校验
+  - **`src-tauri/src/commands/frp/api_spec/config_gen.rs`**（新模块）：配置生成，三种模式实现：url 直写（预留 base64/xor/aes 解码扩展点）/ fields 拼 ini / args 启动参数，含 3 个单元测试
+  - **`src-tauri/src/commands/frp/mod.rs`**：注册 `api_spec` 模块，re-export 新类型
+- 设计决策：新模块与旧 `api_schema` 并存，避免一次性全量替换导致编译中断。后续阶段将重写 auth 模块、更新调用方、删除旧模块
+- 验证：`cargo check` 通过（exit 0），含 12 个新增单元测试
+
 #### FRP 厂商支持从 URL 下载安装
 
 - 背景：厂商安装仅支持「从文件夹」和「从 ZIP」两种本地方式，厂商提供者无法通过一个链接让用户直接下载安装，需手动下载 ZIP 再选择文件
