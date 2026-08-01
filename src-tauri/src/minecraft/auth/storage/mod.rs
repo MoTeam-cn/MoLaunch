@@ -17,6 +17,7 @@
 
 mod load;
 mod operations;
+#[cfg(windows)]
 mod registry;
 mod save;
 mod types;

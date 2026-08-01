@@ -104,7 +104,7 @@ pub async fn list(
             });
         }
         // 按修改时间降序
-        items.sort_by(|a, b| b.modified.cmp(&a.modified));
+        items.sort_by_key(|b| std::cmp::Reverse(b.modified));
         (items, total_size)
     })
     .await

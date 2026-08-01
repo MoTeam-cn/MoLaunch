@@ -165,7 +165,7 @@ pub async fn list_downloads(state: &AppState) -> Result<serde_json::Value, Strin
     }
 
     // 按修改时间倒序排列（最新在前）
-    entries.sort_by(|a, b| b.modified.cmp(&a.modified));
+    entries.sort_by_key(|b| std::cmp::Reverse(b.modified));
     serde_json::to_value(&entries).map_err(|e| e.to_string())
 }
 

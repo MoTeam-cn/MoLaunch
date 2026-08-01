@@ -12,6 +12,7 @@ use winreg::enums::*;
 use winreg::RegKey;
 
 /// 注册表子键路径（所有 MoLaunch 数据均存于此键下）
+#[cfg(windows)]
 pub(crate) const REG_SUBKEY: &str = "Software\\MoLaunch";
 
 /// 打开或创建注册表子键
@@ -51,17 +52,22 @@ pub(crate) fn reg_delete(key: &RegKey, name: &str) -> Result<(), String> {
     }
 }
 
+// 非 Windows stub：注册表不可用，函数签名与 Windows 版一致以保持调用方编译通过。
+// 平台一致性 stub 在非 Windows 平台无调用方，允许 dead code。
 #[cfg(not(windows))]
+#[allow(dead_code)]
 pub(crate) fn reg_key() -> Result<(), String> {
     Err("注册表仅在 Windows 平台可用".to_string())
 }
 
 #[cfg(not(windows))]
+#[allow(dead_code)]
 pub(crate) fn reg_get(_key: &(), _name: &str) -> Option<String> {
     None
 }
 
 #[cfg(not(windows))]
+#[allow(dead_code)]
 pub(crate) fn reg_set(_key: &(), _name: &str, _value: &str) -> Result<(), String> {
     Err("注册表仅在 Windows 平台可用".to_string())
 }

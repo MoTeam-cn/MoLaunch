@@ -130,7 +130,7 @@ pub async fn list_mods(state: &AppState, version_id: String) -> Result<Vec<ModIn
 
     // 只按 file_name（含扩展名）字母序升序，禁用状态不参与排序
     // （ModList.OrderBy(Function(m) m.File.Name)）
-    mods.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+    mods.sort_by_key(|a| a.file_name.to_lowercase());
 
     log_info!("Found {} mods for version {}", mods.len(), version_id);
     Ok(mods)

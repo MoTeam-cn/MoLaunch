@@ -39,7 +39,7 @@ pub async fn list_log_files() -> Result<Vec<LogFileInfo>, String> {
         });
     }
     // 按修改时间倒序
-    files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+    files.sort_by_key(|b| std::cmp::Reverse(b.modified_at));
     Ok(files)
 }
 

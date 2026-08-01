@@ -195,6 +195,20 @@
 
 ### 修复
 
+#### CI：修复 clippy 27 个错误（registry 死代码 + sort_by 优化）
+
+- 背景：CI `rust-clippy` job 报 27 个错误（`docs/Error/workflow/clippy.txt`），两类：
+  1. **dead-code（23 个）**：`minecraft/auth/storage/registry.rs` 的 20 个 `KEY_*` 注册表键名常量、`storage/registry.rs` 的 `REG_SUBKEY` 与 3 个 `reg_*` 非 Windows stub 函数在 Linux 编译时无调用方。根因：这些常量/函数只在 Windows 注册表路径使用，但未加 `#[cfg(windows)]` 或未对 stub 标记 `#[allow(dead_code)]`（Windows 本地编译有调用方，Linux 编译暴露）
+  2. **unnecessary-sort-by（4 个）**：`frp/process/log.rs`、`tools/download.rs`、`tools/screenshot.rs` 的降序排序和 `version/mods/list.rs` 的升序排序，clippy 建议 `sort_by_key` + `Reverse`
+- 改动（6 文件）：
+  - **`src/minecraft/auth/storage/registry.rs`**：20 个 `KEY_*` 常量全部加 `#[cfg(windows)]`（`ALL_KEYS` 原本已有）
+  - **`src/minecraft/auth/storage/mod.rs`**：`mod registry;` 加 `#[cfg(windows)]`（与常量 cfg 一致，Linux 不编译空模块）
+  - **`src/storage/registry.rs`**：`REG_SUBKEY` 加 `#[cfg(windows)]`；`reg_key`/`reg_get`/`reg_set` 的 `#[cfg(not(windows))]` stub 加 `#[allow(dead_code)]`（与既有 `reg_delete` stub 一致）
+  - **`src/commands/frp/process/log.rs`** / **`src/commands/tools/download.rs`** / **`src/commands/tools/screenshot.rs`**：`sort_by(|a,b| b.x.cmp(&a.x))` → `sort_by_key(|b| Reverse(b.x))`
+  - **`src/commands/version/mods/list.rs`**：`sort_by(|a,b| a.fn.cmp(&b.fn))` → `sort_by_key(|a| a.fn)`
+- 验证：`cargo clippy --all-targets -- -D warnings` 通过（exit 0）、`cargo test --all-features` 通过（exit 0，1 passed / 2 ignored）
+- 说明：dead-code 为 Linux 平台专属（Windows 有调用方），已按 cfg 语义修复；本地无法交叉编译 Linux（缺 x86_64-linux-gnu-gcc），通过逐项核对 clippy.txt 报错点 + Windows 编译验证
+
 #### CI：修复最终两个编译错误（dist 目录缺失 + auth/storage log_warn 导入）
 
 - 背景：上轮修复后 CI `rust-clippy` / `rust-test` 仍失败（`docs/Error/workflow/clippy.txt`、`test.txt`），剩 2 个错误：
