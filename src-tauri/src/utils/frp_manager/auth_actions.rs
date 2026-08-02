@@ -12,10 +12,10 @@ use super::{ProviderIdParams, SaveApiKeyParams};
 pub fn register(d: &mut Dispatcher) {
     d.register(
         "get_auth_status",
-        handler!(_state, _app, params, {
+        handler!(state, _app, params, {
             let p: ProviderIdParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = frp::auth::get_auth_status(&p.provider_id).await?;
+            let r = frp::auth::get_auth_status(&state, &p.provider_id).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

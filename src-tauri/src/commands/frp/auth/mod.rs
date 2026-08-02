@@ -43,6 +43,14 @@ pub struct AuthStatus {
     /// 权限范围
     #[serde(skip_serializing_if = "Option::is_none")]
     pub scopes: Option<Vec<String>>,
+    /// 续期中：token 已过期但存在 refresh_token，正在静默续期
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub refreshing: bool,
+}
+
+/// serde 辅助：bool 默认值
+fn is_false(b: &bool) -> bool {
+    !*b
 }
 
 /// OAuth2 流程结果（start_oauth2 返回）
@@ -116,10 +124,11 @@ fn extract_flow_error(resp: &flows::FlowResponse, flow: &FlowRequest) -> String 
 ///
 /// - auth_type=none：始终 authenticated=true
 /// - auth_type=oauth2/device_code：检查 access_token 是否存在且未过期
+///   - 已过期且存在 refresh_token → 自动续期（成功则 authenticated=true，失败则 refreshing=true）
 /// - auth_type=api_key：检查 access_token（即 API Key）是否存在
 ///
 /// expires_at 即使已过期也会返回，前端据此区分「即将过期」/「已过期」。
-pub async fn get_auth_status(provider_id: &str) -> Result<AuthStatus, String> {
+pub async fn get_auth_status(state: &AppState, provider_id: &str) -> Result<AuthStatus, String> {
     // 系统默认厂商无需认证
     if provider_id == SYSTEM_DEFAULT_ID {
         return Ok(AuthStatus {
@@ -128,6 +137,7 @@ pub async fn get_auth_status(provider_id: &str) -> Result<AuthStatus, String> {
             auth_type: "none".to_string(),
             expires_at: None,
             scopes: None,
+            refreshing: false,
         });
     }
 
@@ -141,6 +151,7 @@ pub async fn get_auth_status(provider_id: &str) -> Result<AuthStatus, String> {
             auth_type,
             expires_at: None,
             scopes: None,
+            refreshing: false,
         });
     }
 
@@ -156,16 +167,60 @@ pub async fn get_auth_status(provider_id: &str) -> Result<AuthStatus, String> {
     };
 
     // token 存在但已过期 -> authenticated=false
-    let authenticated = if authenticated {
+    let (authenticated, refreshing) = if authenticated {
         match expires_at {
-            Some(exp) => exp > storage::now_secs(),
-            None => true, // api_key 无过期时间
+            Some(exp) if exp <= storage::now_secs() => {
+                // 已过期：有 refresh_token 则尝试静默续期
+                let has_refresh = record
+                    .as_ref()
+                    .and_then(|r| r.refresh_token.as_ref())
+                    .is_some();
+                if has_refresh {
+                    match refresh_token(state, provider_id).await {
+                        Ok(()) => {
+                            crate::log_info!(
+                                "[Frp Auth] get_auth_status 自动续期成功: provider={}",
+                                provider_id
+                            );
+                            (true, false)
+                        }
+                        Err(e) => {
+                            crate::log_warn!(
+                                "[Frp Auth] get_auth_status 自动续期失败: provider={} - {}",
+                                provider_id,
+                                e
+                            );
+                            (false, true)
+                        }
+                    }
+                } else {
+                    (false, false)
+                }
+            }
+            Some(exp) => (exp > storage::now_secs(), false),
+            None => (true, false), // api_key 无过期时间
         }
     } else {
-        false
+        (false, false)
     };
 
-    let scopes = record.as_ref().and_then(|r| r.scopes.clone());
+    // 续期成功后重新读取记录，返回新 token 的过期时间（避免前端显示旧的过期时间）
+    let (expires_at, scopes) = if authenticated {
+        let new_record = storage::load_token_record(provider_id).await?;
+        match new_record {
+            Some(r) => {
+                let exp = if matches!(auth_type.as_str(), "oauth2" | "device_code") {
+                    r.expires_at
+                } else {
+                    None
+                };
+                (exp, r.scopes.clone())
+            }
+            None => (expires_at, record.as_ref().and_then(|r| r.scopes.clone())),
+        }
+    } else {
+        (expires_at, record.as_ref().and_then(|r| r.scopes.clone()))
+    };
 
     Ok(AuthStatus {
         provider_id: provider_id.to_string(),
@@ -173,6 +228,7 @@ pub async fn get_auth_status(provider_id: &str) -> Result<AuthStatus, String> {
         auth_type,
         expires_at,
         scopes,
+        refreshing,
     })
 }
 
@@ -306,12 +362,54 @@ pub async fn revoke_auth(provider_id: &str) -> Result<(), String> {
 /// 读取 access_token（供 api_spec 模块调用厂商 API 时使用）
 ///
 /// 仅读取已存储的 access_token，不检查过期、不自动刷新。
-/// 调用方（api_spec::fetch_tunnels）应先调用 refresh_token 确保有效。
+/// 调用方（api_spec::fetch_tunnels）应先调用 [`ensure_valid_token`] 确保有效。
 pub async fn load_token(provider_id: &str) -> Result<String, String> {
     storage::load_token_record(provider_id)
         .await?
         .map(|r| r.access_token)
         .ok_or_else(|| format!("厂商 {} 未认证，请先完成认证", provider_id))
+}
+
+/// 确保厂商 token 有效（过期时自动刷新）
+///
+/// 供调用厂商 API 前统一使用：
+/// 1. 无 token 记录 → 返回未认证错误（调用方提示用户先认证）
+/// 2. token 未过期 → 直接返回
+/// 3. token 已过期且存在 refresh_token → 自动调用 [`refresh_token`] 刷新后返回新 token
+/// 4. token 已过期但无 refresh_token（api_key / 厂商未下发）→ 返回过期错误
+///
+/// 由 `get_auth_status` 与 `fetch_tunnels` 共用，保证「认证中心」与
+/// 「拉取隧道列表」两条链路都能自动续期。
+pub async fn ensure_valid_token(state: &AppState, provider_id: &str) -> Result<String, String> {
+    let record = storage::load_token_record(provider_id).await?;
+    let Some(record) = record else {
+        return Err(format!("厂商 {} 未认证，请先完成认证", provider_id));
+    };
+
+    // token 未过期 → 直接返回
+    let valid = match record.expires_at {
+        Some(exp) => exp > storage::now_secs(),
+        None => true, // api_key / 无过期时间字段
+    };
+    if valid {
+        return Ok(record.access_token);
+    }
+
+    // 已过期：有 refresh_token 则自动续期
+    if record.refresh_token.is_some() {
+        crate::log_info!(
+            "[Frp Auth] token 已过期，自动续期: provider={}",
+            provider_id
+        );
+        refresh_token(state, provider_id).await?;
+        return load_token(provider_id).await;
+    }
+
+    // 已过期且无 refresh_token → 无法续期
+    Err(format!(
+        "厂商 {} token 已过期且无 refresh_token，请重新认证",
+        provider_id
+    ))
 }
 
 /// 保存 API Key（auth_type=api_key 时由前端调用）

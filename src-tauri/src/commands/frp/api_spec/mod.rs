@@ -83,8 +83,11 @@ pub fn load_api_spec(provider_id: &str, endpoints_file: &str) -> Result<ApiSpec,
 
 /// 认证后调用厂商 API 拉取隧道列表
 ///
-/// 流程：加载 spec → 加载 access_token → 调用 tunnels.list 端点 →
+/// 流程：加载 spec → 确保 token 有效（过期自动续期）→ 调用 tunnels.list 端点 →
 /// 按 envelope 判成功 → 按 itemsField + fields 映射为 TunnelInfo 列表。
+///
+/// 自动续期：`ensure_valid_token` 在 token 过期且存在 refresh_token 时静默刷新；
+/// 若请求仍返回 HTTP 401（token 被厂商主动吊销/刷新失败），则再次刷新并重试一次。
 pub async fn fetch_tunnels(
     state: &AppState,
     provider_id: &str,
@@ -97,9 +100,9 @@ pub async fn fetch_tunnels(
         .unwrap_or("api/endpoints.json");
     let spec = load_api_spec(provider_id, endpoints_file)?;
 
-    let token = crate::commands::frp::auth::load_token(provider_id)
+    let token = crate::commands::frp::auth::ensure_valid_token(state, provider_id)
         .await
-        .map_err(|e| format!("加载厂商 {} 的 access_token 失败: {}", provider_id, e))?;
+        .map_err(|e| format!("厂商 {} token 校验失败: {}", provider_id, e))?;
 
     let device_id = crate::commands::sdk::get_device_id(state)
         .await
@@ -143,7 +146,7 @@ pub async fn fetch_tunnels(
         tunnels_endpoint.path
     );
 
-    let resp = http::send_request(
+    let resp = match http::send_request(
         &spec.base_url,
         tunnels_endpoint,
         &token,
@@ -151,7 +154,31 @@ pub async fn fetch_tunnels(
         provider_id,
         spec.envelope.as_ref(),
     )
-    .await?;
+    .await
+    {
+        Ok(resp) => resp,
+        // HTTP 401：token 失效（可能被厂商吊销或已过期刷新失败），自动刷新后重试一次
+        Err(e) if is_unauthorized_err(&e) => {
+            log_info!(
+                "[Frp] 厂商 {} 隧道列表返回 401，刷新 token 后重试",
+                provider_id
+            );
+            crate::commands::frp::auth::refresh_token(state, provider_id).await?;
+            let new_token = crate::commands::frp::auth::ensure_valid_token(state, provider_id)
+                .await
+                .map_err(|e| format!("厂商 {} token 校验失败: {}", provider_id, e))?;
+            http::send_request(
+                &spec.base_url,
+                tunnels_endpoint,
+                &new_token,
+                &device_id,
+                provider_id,
+                spec.envelope.as_ref(),
+            )
+            .await?
+        }
+        Err(e) => return Err(e),
+    };
 
     let tunnels = map_tunnels(&resp, tunnels_endpoint, &account)?;
 
@@ -162,6 +189,11 @@ pub async fn fetch_tunnels(
     );
 
     Ok((tunnels, account))
+}
+
+/// 判断错误是否由 HTTP 401 引起（厂商 token 失效）
+fn is_unauthorized_err(e: &str) -> bool {
+    e.contains("HTTP 401") || e.contains("HTTP 403")
 }
 
 /// 按 ResponseDef.fields 映射账号信息

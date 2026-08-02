@@ -12,6 +12,10 @@ use crate::state::{AppState, LocalAuthResult};
 use super::MsAccountInfo;
 
 /// 获取已存储的微软账号列表
+///
+/// token 过期时自动静默续期：检测 `expires_at` 过期后调 `login_with_refresh_token`
+/// 刷新，成功则回写 `auth_storage` 并返回未过期状态；刷新失败（refresh_token 失效等）
+/// 返回 `refreshing=true`，前端据此展示「续期中」而非「已过期」。
 pub async fn get_ms_accounts(state: &AppState) -> Result<Vec<MsAccountInfo>, String> {
     log_info!("[Startup][IPC] get_ms_accounts called");
     let persisted = state
@@ -19,16 +23,51 @@ pub async fn get_ms_accounts(state: &AppState) -> Result<Vec<MsAccountInfo>, Str
         .load()
         .await
         .map_err(log_err("Failed to load auth storage"))?;
-    Ok(persisted
-        .ms_accounts
-        .iter()
-        .map(|a| MsAccountInfo {
+
+    let mut result = Vec::with_capacity(persisted.ms_accounts.len());
+    for a in &persisted.ms_accounts {
+        let mut is_expired = microsoft::is_token_expired(a.expires_at);
+        let mut refreshing = false;
+        let mut expires_at = a.expires_at;
+
+        if is_expired && !a.refresh_token.is_empty() {
+            log_info!(
+                "Token expired for MS account {}, refreshing...",
+                a.username
+            );
+            match microsoft::login_with_refresh_token(&a.refresh_token, |_| {}).await {
+                Ok(r) => {
+                    if let Err(e) = state
+                        .auth_storage
+                        .update_ms_token(&a.uuid, &r.access_token, &r.refresh_token, r.expires_at)
+                        .await
+                    {
+                        log_warn!("Failed to update persisted token: {}", e);
+                    }
+                    is_expired = false;
+                    expires_at = r.expires_at;
+                }
+                Err(e) => {
+                    log_warn!(
+                        "Auto-refresh failed for MS account {}: {}",
+                        a.username,
+                        e
+                    );
+                    refreshing = true;
+                }
+            }
+        }
+
+        result.push(MsAccountInfo {
             username: a.username.clone(),
             uuid: a.uuid.clone(),
-            expires_at: a.expires_at,
-            is_expired: microsoft::is_token_expired(a.expires_at),
-        })
-        .collect())
+            expires_at,
+            is_expired,
+            refreshing,
+        });
+    }
+
+    Ok(result)
 }
 
 /// 删除已存储的微软账号

@@ -4,6 +4,8 @@ export interface AccountCardData {
   username: string
   loginType: string  // '正版' | '离线' | '外置'
   isExpired?: boolean
+  /** 续期中：token 已过期且静默续期失败，显示「续期中」而非「已过期」 */
+  refreshing?: boolean
   isActive?: boolean
   /** authlib 外置登录的服务器显示名（仅外置账号有值，用作副标题） */
   serverName?: string

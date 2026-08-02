@@ -37,6 +37,7 @@ export function useAccountCards() {
         username: acc.username,
         loginType: '正版',
         isExpired: acc.is_expired,
+        refreshing: acc.refreshing,
         isActive: acc.uuid === currentUuid,
       })
     }

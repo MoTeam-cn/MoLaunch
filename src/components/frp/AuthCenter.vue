@@ -43,6 +43,10 @@ function authBadge(authType: string): { cls: string; text: string } | null {
 /** 认证状态信息（文案 + 颜色） */
 function statusInfo(status?: AuthStatus): { text: string; cls: string } {
   if (!status || status.authType === 'none') return { text: '—', cls: 'text-gray-400' }
+  // 续期中：token 已过期但存在 refresh_token，后端正在/刚尝试静默续期
+  if (!status.authenticated && status.refreshing) {
+    return { text: '续期中', cls: 'text-blue-600' }
+  }
   if (!status.authenticated) {
     if (status.expiresAt) return { text: '已过期', cls: 'text-red-600' }
     return { text: '未认证', cls: 'text-gray-500' }

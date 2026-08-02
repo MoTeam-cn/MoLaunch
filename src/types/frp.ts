@@ -217,6 +217,8 @@ export interface AuthStatus {
   expiresAt?: number
   /** 权限范围 */
   scopes?: string[]
+  /** 续期中：token 已过期但存在 refresh_token，正在/刚尝试静默续期（失败时 authenticated=false 且 refreshing=true） */
+  refreshing?: boolean
 }
 
 /** OAuth2 流程结果（start_oauth2 返回） */

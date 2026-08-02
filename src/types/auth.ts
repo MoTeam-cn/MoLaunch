@@ -40,6 +40,8 @@ export interface MsAccountInfo {
   uuid: string
   expires_at: number
   is_expired: boolean
+  /** 续期中：token 已过期且静默续期失败（refresh_token 失效等），前端据此显示「续期中」而非「已过期」 */
+  refreshing?: boolean
 }
 
 /** 已存储的离线账号 */

@@ -70,6 +70,7 @@ const avatarLoginType = computed(() => {
       <div class="mt-1 flex items-center justify-center gap-1.5 text-xs">
         <span :class="card.isActive ? 'text-primary-500' : 'text-gray-400'">{{ card.loginType }}</span>
         <span v-if="card.isActive" class="rounded-full bg-primary-100 px-2 py-0.5 text-primary-600">当前</span>
+        <span v-else-if="card.refreshing" class="rounded-full bg-blue-100 px-2 py-0.5 text-blue-600">续期中</span>
         <span v-else-if="card.isExpired" class="rounded-full bg-yellow-100 px-2 py-0.5 text-yellow-600">过期</span>
         <span v-else class="text-gray-300">点击切换</span>
       </div>
