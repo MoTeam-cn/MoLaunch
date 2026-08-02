@@ -17,7 +17,7 @@
  *   bundle_type    安装包类型：nsis | app | appimage | deb | rpm | dmg | msi | portable
  *   package_path   本地安装包路径（如 *-setup.exe / *.app.tar.gz / *.AppImage）
  *   sig_path       签名文件路径（.sig，tauri signer 输出的 base64 签名）
- *   release_url    GitHub Release URL（传 tag 页面 URL 时，api-server 会自动替换为 CDN 公网对象 URL）
+ *   release_url    GitHub Release URL（传 tag 页面 URL 时，脚本自动转为含实际文件名的下载直链）
  *   release_notes  可选，更新日志（Markdown，随版本注册上报，启动器「检查更新」对话框展示）
  *
  * 环境变量：
@@ -141,6 +141,18 @@ function httpRequest(targetUrl, options, body) {
     if (body) req.write(body);
     req.end();
   });
+}
+
+// ===== GitHub Release URL 直链化 =====
+
+// 将 GitHub Release tag 页面 URL（.../releases/tag/{tag}）转换为实际文件下载直链
+// （.../releases/download/{tag}/{filename}），使 release_url 可直接追踪到 release 的
+// 下载地址；非 GitHub tag URL（管理员自定义地址等）保持原样。
+function toReleaseDownloadUrl(releaseUrl, filename) {
+  if (!releaseUrl || !filename) return releaseUrl;
+  const m = releaseUrl.match(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/releases\/tag\/(.+)$/);
+  if (!m) return releaseUrl;
+  return `https://github.com/${m[1]}/releases/download/${m[2]}/${filename}`;
 }
 
 // ===== S3 上传辅助 =====
@@ -337,7 +349,7 @@ async function main() {
     file_size: FILE_SIZE,
     file_hash: FILE_HASH,
     release_notes: RELEASE_NOTES,
-    release_url: RELEASE_URL,
+    release_url: toReleaseDownloadUrl(RELEASE_URL, PACKAGE_FILENAME),
     rollout_pct: 100,
     force_update: false,
     min_version: '',
