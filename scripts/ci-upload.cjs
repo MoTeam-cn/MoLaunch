@@ -11,7 +11,7 @@
  *   node ci-upload.cjs <version> <platform> <arch> <bundle_type> <package_path> <sig_path> <release_url> [release_notes]
  *
  * 参数：
- *   version        语义化版本号（如 0.2.0）
+ *   version        语义化版本号（如 0.2.0 / 0.3.1-rc1）
  *   platform       平台：windows | macos | linux
  *   arch           架构：x86_64 | aarch64 | i686 | armv7
  *   bundle_type    安装包类型：nsis | app | appimage | deb | rpm | dmg | msi | portable
@@ -23,6 +23,9 @@
  * 环境变量：
  *   MOLAUNCH_ACTION_PUSH_KEY  MoSign-v2 签名密钥（必填）
  *   API_BASE_URL              apiServer 基础 URL（默认 https://api.molaunch.moiu.cn）
+ *
+ * 渠道（channel）自动推导：由 version 预发布后缀判定（与前端 version.ts 一致）——
+ * 无后缀→stable / -rc→rc / -beta→beta / -alpha、-dev→alpha / -canary、-nightly→canary。
  *
  * 流程：
  *   1. 读取 .sig 文件获取签名 base64
@@ -72,6 +75,27 @@ const PACKAGE_PATH = args[4];
 const SIG_PATH = args[5];
 const RELEASE_URL = args[6];
 const RELEASE_NOTES = args[7] || '';
+
+// ===== 渠道推导 =====
+// 由语义化版本预发布后缀推导发布渠道，与前端 src/utils/version.ts 的
+// VersionChannel 枚举保持一致：
+//   - 无后缀           → stable（正式版）
+//   - -rc             → rc（灰度版，Release Candidate）
+//   - -beta           → beta（内测版）
+//   - -alpha / -dev   → alpha（开发版）
+//   - -canary / -nightly → canary（金丝雀版，每日构建）
+//   - 未知后缀         → alpha（防御性兜底）
+function resolveChannel(version) {
+  const suffix = (version.split('-')[1] || '').replace(/[\d.]+$/, '').toLowerCase();
+  if (!suffix) return 'stable';
+  if (suffix.startsWith('rc')) return 'rc';
+  if (suffix.startsWith('beta')) return 'beta';
+  if (suffix.startsWith('alpha') || suffix.startsWith('dev')) return 'alpha';
+  if (suffix.startsWith('canary') || suffix.startsWith('nightly')) return 'canary';
+  return 'alpha';
+}
+const CHANNEL = resolveChannel(VERSION);
+console.log(`渠道推导: version=${VERSION} -> channel=${CHANNEL}`);
 
 const API_BASE_URL = process.env.API_BASE_URL || 'https://api.molaunch.moiu.cn';
 const PUSH_KEY = process.env.MOLAUNCH_ACTION_PUSH_KEY;
@@ -328,7 +352,7 @@ async function main() {
   const releasePath = '/v3/ci/releases';
   const releaseBody = Buffer.from(JSON.stringify({
     version: VERSION,
-    channel: 'stable',
+    channel: CHANNEL,
     platform: PLATFORM,
     arch: ARCH,
     bundle_type: BUNDLE_TYPE,

@@ -353,6 +353,22 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
+      # 根据 tag 是否含预发布标识（-rc / -alpha / -beta / -preview / -test 等）判定 prerelease。
+      # 含这些标识的版本发布为「预发布」（GitHub Release 标记 Prerelease），
+      # 否则发布为正式版（latest）。
+      - name: Check if prerelease
+        id: prerelease
+        run: |
+          VERSION="${{ steps.get_version.outputs.VERSION }}"
+          case "$VERSION" in
+            *-alpha*|*-beta*|*-rc*|*-preview*|*-test*|*-snapshot*)
+              echo "IS_PRERELEASE=true" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "IS_PRERELEASE=false" >> $GITHUB_OUTPUT
+              ;;
+          esac
+
       - name: Get previous tag
         id: prev_tag
         run: |
@@ -404,6 +420,6 @@ jobs:
             artifacts/linux/*.AppImage
             artifacts/linux/*.sig
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.prerelease.outputs.IS_PRERELEASE }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
