@@ -179,28 +179,35 @@ jobs:
               ;;
           esac
 
-          if [ -z "$SETUP_FILE" ] || [ ! -f "$SETUP_FILE" ]; then
-            echo "::error::未找到安装包文件 (platform=$PLATFORM)"
-            exit 1
+          # macOS/Linux 安装包推云端，要求存在且带签名；
+          # Windows 仅便携版推云端，setup 安装版只附加 GitHub Release，不要求 .sig
+          if [ "$PLATFORM" != "windows" ]; then
+            if [ -z "$SETUP_FILE" ] || [ ! -f "$SETUP_FILE" ]; then
+              echo "::error::未找到安装包文件 (platform=$PLATFORM)"
+              exit 1
+            fi
+            SIG_FILE="${SETUP_FILE}.sig"
+            if [ ! -f "$SIG_FILE" ]; then
+              echo "::error::签名文件不存在: $SIG_FILE"
+              exit 1
+            fi
+            echo "setup_file=$SETUP_FILE" >> $GITHUB_OUTPUT
+            echo "sig_file=$SIG_FILE" >> $GITHUB_OUTPUT
           fi
 
-          SIG_FILE="${SETUP_FILE}.sig"
-          if [ ! -f "$SIG_FILE" ]; then
-            echo "::error::签名文件不存在: $SIG_FILE"
-            exit 1
-          fi
-
-          echo "setup_file=$SETUP_FILE" >> $GITHUB_OUTPUT
-          echo "sig_file=$SIG_FILE" >> $GITHUB_OUTPUT
-
-          # Windows 便携版（可选，找到才输出；缺失则跳过上传 portable）
-          if [ -n "$PORTABLE_FILE" ] && [ -f "$PORTABLE_FILE" ]; then
+          # Windows 便携版：云端唯一 Windows 产物，必须存在且带签名
+          if [ "$PLATFORM" == "windows" ]; then
+            if [ -z "$PORTABLE_FILE" ] || [ ! -f "$PORTABLE_FILE" ]; then
+              echo "::error::便携版产物不存在: $PORTABLE_FILE"
+              exit 1
+            fi
             PORTABLE_SIG="${PORTABLE_FILE}.sig"
+            if [ ! -f "$PORTABLE_SIG" ]; then
+              echo "::error::便携版签名不存在: $PORTABLE_SIG"
+              exit 1
+            fi
             echo "portable_file=$PORTABLE_FILE" >> $GITHUB_OUTPUT
             echo "portable_sig=$PORTABLE_SIG" >> $GITHUB_OUTPUT
-            echo "找到便携版: $PORTABLE_FILE"
-          else
-            echo "未找到 portable 产物（跳过便携版上传）"
           fi
 
       # Windows 便携版才推送云端（S3 + 注册）；setup 安装版不推存储，仅附加到 GitHub Release
@@ -237,7 +244,8 @@ jobs:
             "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
 
       # Windows setup 安装版不推送云端（S3），仅作为 workflow artifact 传递，
-      # 由 release job 附加到 GitHub Release（供用户手动下载安装）
+      # 由 release job 附加到 GitHub Release（供用户手动下载安装）。
+      # 不要求 .sig：Windows 更新走便携版 + 自研 updater.exe，setup 签名无用途。
       - name: Upload setup as workflow artifact (Windows only)
         if: matrix.platform == 'windows'
         uses: actions/upload-artifact@v4
@@ -245,7 +253,6 @@ jobs:
           name: windows-setup
           path: |
             src-tauri/target/release/bundle/nsis/*-setup.exe
-            src-tauri/target/release/bundle/nsis/*-setup.exe.sig
           if-no-files-found: error
 
   # 创建 GitHub Release 页面（历史回顾 + 承载 Windows setup 安装版下载）
@@ -311,7 +318,6 @@ jobs:
             See [CHANGELOG.md](CHANGELOG.md) for details.
           files: |
             **/*-setup.exe
-            **/*-setup.exe.sig
           draft: false
           prerelease: false
         env:

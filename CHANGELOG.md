@@ -195,6 +195,18 @@
 
 ### 修复
 
+#### CI：Windows 不再强依赖 setup 签名（便携版为云端唯一 Windows 产物）
+
+- 背景：Windows 更新走自研流程（`check_update` → 下载云端 portable.exe + `.sig` → updater.exe 替换），`tauri-plugin-updater` 在 Windows 不参与；产品方案为 **Windows 只使用便携版**，安装版（setup）仅手动下载。但 release.yml 的 `Locate installer and signature` 步骤对所有平台硬性要求 setup.exe 及其 `.sig`，Windows job 因 `MoLaunch_0.3.0_x64-setup.exe.sig` 缺失报错退出
+- 改动（2 文件）：
+  - **`.github/workflows/release.yml`**：
+    - `Locate installer and signature` 改为平台差异化：macOS/Linux 仍要求安装包 + `.sig`（推云端）；Windows 改为要求便携版 + `.sig`（云端唯一产物），setup 不要求 `.sig`（仅附加 GitHub Release）
+    - `Upload setup as workflow artifact` 仅上传 `*-setup.exe`（去掉 `.sig`）
+    - `release` job 的 `files` 仅附加 `**/*-setup.exe`（去掉 `.sig`）
+  - **`CHANGELOG.md`**：记录本次调整
+- 设计决策：Windows setup 的 `.sig` 仅供 tauri 官方 updater 协议使用，便携版方案不需要，故不再作为 CI 硬性要求
+- 验证：`js-yaml` 解析 release.yml 通过；locate 平台分支与 setup artifact / release files 内容核对无误
+
 #### CI：macOS/Linux 打包缺 updater 签名（.sig 未生成）+ macOS deeplink dead_code
 
 - 背景：v0.3.0 release CI 中 macOS/Linux job 在 `Locate installer and signature` 步骤报 `签名文件不存在`（macOS: `MoLaunch.app.tar.gz.sig`，Linux: `MoLaunch_0.3.0_amd64.AppImage.sig`）；macOS 另报 `constant PROTOCOL is never used` 警告
