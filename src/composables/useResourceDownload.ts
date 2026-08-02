@@ -1,11 +1,12 @@
 /**
  * 资源详情页下载 + 前置 Mod 检查 composable
  *
- * 从 ResourceDetail.vue 抽出，负责：
- * - 普通下载流程（选目录 → 下载到指定路径）
- * - 前置 Mod 依赖检查（check_mod_dependencies）
- * - 前置确认弹窗状态管理
- * - 前置项目详情懒加载缓存（VersionGroupCard 展开时触发）
+ * 从 ResourceDetail.vue 抽出，负责普通下载、前置 Mod 依赖检查、
+ * 前置确认弹窗状态与前置详情懒加载缓存。
+ *
+ * 状态与交互拆分为两个职责切片：
+ * - useDownloadProgress：下载中标志 + 下载阶段状态与迁移 helper
+ * - useDependencyConfirm：前置确认弹窗状态 + 确认/取消交互（复用 useDependencyCheck）
  *
  * # 复用约定
  * - 前置检查/安装复用 useDependencyCheck composable
@@ -15,22 +16,22 @@
  *
  * # 响应式说明
  * - 直接接收 ResourceDetail 的 props（Vue 3 reactive proxy），composable 内部
- *   通过 options.xxx 访问以拿到最新值。不要在调用方解构 props 后再传入，
- *   否则原始值会丢失响应式（用户切换资源时 composable 仍看到旧 project）。
+ *   通过 options.xxx 访问以拿到最新值，避免解构后丢失响应式。
  */
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import type { ResourceProject, ResourceVersion, ResolvedDependency } from '@/types/community'
+import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { getProjectDetail, downloadResourceToPath, formatDownloadFilename } from '@/utils/api/community'
 import { getVersionLoaderInfo } from '@/utils/api/version'
 import { getVersionGameVersion, getVersionModsDir } from '@/utils/api/personalization'
 import { useVersionStore } from '@/stores/version'
-import { pickSavePath, pickDirectory } from '@/utils/fileDialog'
+import { pickSavePath } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showModal } from '@/utils/modal'
-import { isCancelledError } from '@/utils/async'
 import { loaderToFlag } from '@/utils/mod-display'
 import { useDependencyCheck } from '@/composables/useDependencyCheck'
+import { useDownloadProgress } from './useResourceDownload/useDownloadProgress'
+import { useDependencyConfirm } from './useResourceDownload/useDependencyConfirm'
 
 export interface UseResourceDownloadOptions {
   /** 资源项目（props.project，reactive） */
@@ -48,24 +49,23 @@ export interface UseResourceDownloadOptions {
 export function useResourceDownload(options: UseResourceDownloadOptions) {
   const versionStore = useVersionStore()
 
-  // 下载中标志（值=正在下载的 version_id，null=空闲）
-  const downloading = ref<string | null>(null)
-  // 下载阶段（按钮文字分阶段显示）
-  // idle=空闲 / requesting=请求中（前置检查/准备）/ waiting=等待用户确认前置 / downloading=下载中
-  const downloadStage = ref<'idle' | 'requesting' | 'waiting' | 'downloading'>('idle')
+  // 下载进度状态（downloading / downloadStage）与迁移 helper
+  const progress = useDownloadProgress()
+  // 前置 Mod 检查/安装（复用 useDependencyCheck composable）
+  const deps = useDependencyCheck()
+  // 前置确认弹窗状态与交互
+  const confirm = useDependencyConfirm({
+    project: options.project,
+    versionStore,
+    progress,
+    resetDeps: deps.reset,
+    installDeps: deps.install,
+  })
 
-  // 前置确认弹窗状态
-  const showDependencyDialog = ref(false)
-  // 暂存待安装的主 Mod（弹窗确认后用于 install 调用）
-  const pendingMainVersion = ref<ResourceVersion | null>(null)
-  // 暂存前置检查解析出的上下文（versionId/gameVersion/modsDir/modLoader）
-  // Community 场景下 versionId 为空，modsDir 为 undefined；版本管理场景下均有值
-  const pendingContext = ref<{
-    versionId: string
-    gameVersion: string
-    modsDir: string | undefined
-    modLoader: number
-  } | null>(null)
+  // 前置项目详情缓存（key=version_id），VersionGroupCard 展开前置列表时懒加载
+  const depsMap = ref<Map<string, ResourceProject[]>>(new Map())
+  // 正在加载前置的 version_id 集合
+  const depsLoadingSet = ref<Set<string>>(new Set())
 
   /**
    * 从 game_versions 数组中推断真实游戏版本（过滤加载器名称）
@@ -77,22 +77,6 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
     const loaderNames = ['Forge', 'Fabric', 'Quilt', 'NeoForge', 'LiteLoader', 'Rift']
     return gameVersions.find(gv => !loaderNames.includes(gv)) || ''
   }
-
-  // 前置项目详情缓存（key=version_id），VersionGroupCard 展开前置列表时懒加载
-  const depsMap = ref<Map<string, ResourceProject[]>>(new Map())
-  // 正在加载前置的 version_id 集合
-  const depsLoadingSet = ref<Set<string>>(new Set())
-
-  // 前置 Mod 检查
-  const {
-    checking: depsChecking,
-    installing: depsInstalling,
-    missing: depsMissing,
-    upToDate: depsUpToDate,
-    check: checkDeps,
-    install: installDeps,
-    reset: resetDeps,
-  } = useDependencyCheck()
 
   /**
    * 懒加载查询版本的前置项目详情
@@ -141,9 +125,7 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
   async function handleDownload(v: ResourceVersion) {
     if (!options.project) return
     // 立即设 loading，防止用户在检查依赖期间重复点击
-    downloading.value = v.id
-    // 进入请求阶段（前置检查或直接下载准备）
-    downloadStage.value = 'requesting'
+    progress.startDownload(v.id)
 
     try {
       const finalFileName = await formatDownloadFilename(v.file_name, options.project.translated_name)
@@ -178,7 +160,7 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
       }
 
       // 实际下载阶段
-      downloadStage.value = 'downloading'
+      progress.toDownloading()
       const savePath = await pickSavePath({
         title: '选择保存位置',
         defaultPath: options.modsDir ? `${options.modsDir}/${finalFileName}` : finalFileName,
@@ -210,9 +192,8 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
       }
     } finally {
       // 仅在未进入前置弹窗时清空 loading
-      if (!showDependencyDialog.value) {
-        downloading.value = null
-        downloadStage.value = 'idle'
+      if (!confirm.showDependencyDialog.value) {
+        progress.resetDownload()
       }
     }
   }
@@ -266,7 +247,7 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
       return false
     }
 
-    pendingContext.value = { versionId, gameVersion, modsDir, modLoader }
+    confirm.pendingContext.value = { versionId, gameVersion, modsDir, modLoader }
 
     console.debug(
       '[ResourceDetail] 前置检查：mod=%s platform=%s 依赖数=%d game=%s loader=%d',
@@ -274,7 +255,7 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
     )
 
     try {
-      const hasMissing = await checkDeps({
+      const hasMissing = await deps.check({
         versionId: versionId || undefined,
         modsDir,
         platform: options.project.platform,
@@ -284,13 +265,10 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
       })
       console.debug(
         '[ResourceDetail] 前置检查完成：缺失=%d 已满足=%d',
-        depsMissing.value.length, depsUpToDate.value.length,
+        deps.missing.value.length, deps.upToDate.value.length,
       )
       if (hasMissing) {
-        pendingMainVersion.value = v
-        showDependencyDialog.value = true
-        // 进入等待阶段：等用户在弹窗确认
-        downloadStage.value = 'waiting'
+        confirm.openDependencyDialog(v)
         return true
       }
     } catch (e: any) {
@@ -302,112 +280,20 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
     return false
   }
 
-  /**
-   * 用户在 DependencyConfirmDialog 点击"确认安装"后回调
-   *
-   * - 版本管理场景（有 versionId）：直接 install，下载到版本 mods 目录
-   * - Community 场景（无 versionId）：先选保存文件夹，install 时传 targetDir
-   *
-   * 调用 install_mod_with_dependencies IPC，后端启动 DownloadSession 并发下载主 Mod + 勾选前置。
-   * 进度通过 WS 推送到下载管理页。
-   */
-  async function handleDependencyConfirm(selectedDeps: ResolvedDependency[]) {
-    const main = pendingMainVersion.value
-    const ctx = pendingContext.value
-    if (!main || !ctx || !options.project) return
-
-    showDependencyDialog.value = false
-
-    // Community 场景（无 versionId）：先选保存文件夹
-    let targetDir: string | undefined
-    if (!ctx.versionId) {
-      const dir = await pickDirectory({
-        title: '选择保存文件夹（主 Mod + 前置将下载到此目录）',
-      })
-      if (!dir) {
-        // 用户取消，清空 loading 和状态
-        downloading.value = null
-        pendingMainVersion.value = null
-        pendingContext.value = null
-        resetDeps()
-        return
-      }
-      targetDir = dir
-    }
-
-    downloading.value = main.id
-    // 进入下载阶段
-    downloadStage.value = 'downloading'
-    versionStore.startDownload(main.file_name)
-    const totalFiles = 1 + selectedDeps.length
-    toastInfo(`开始下载: ${main.file_name}（含 ${selectedDeps.length} 个前置，共 ${totalFiles} 个文件）`)
-
-    try {
-      const result = await installDeps({
-        versionId: ctx.versionId || undefined,
-        targetDir,
-        mainVersion: main,
-        deps: selectedDeps,
-      })
-      if (result.failedCount > 0) {
-        // 部分失败：toast 警告，但仍由 WS 推送 mark_complete 触发退出
-        toastInfo(`安装完成：成功 ${result.installedCount} / ${totalFiles}，失败 ${result.failedCount}`)
-      } else {
-        toastSuccess(`安装完成：共 ${result.installedCount} 个文件`)
-      }
-      // 兜底：WS 可能因时序未收到 is_complete，IPC 返回成功后直接 finishDownload
-      // 若 WS 已 finishDownload（downloading=false），此处无副作用（finishDownload 幂等）
-      if (versionStore.downloading) {
-        versionStore.finishDownload()
-      }
-    } catch (e: any) {
-      const msg = e?.message || String(e)
-      if (isCancelledError(e)) {
-        toastInfo('下载已取消')
-        versionStore.finishDownload()
-        return
-      }
-      showModal({
-        type: 'error',
-        title: '安装失败',
-        message: msg,
-        onConfirm: () => {
-          versionStore.finishDownload()
-        },
-      })
-    } finally {
-      downloading.value = null
-      downloadStage.value = 'idle'
-      pendingMainVersion.value = null
-      pendingContext.value = null
-      resetDeps()
-    }
-  }
-
-  /** 用户在 DependencyConfirmDialog 点击取消（不下载） */
-  function handleDependencyClose() {
-    showDependencyDialog.value = false
-    downloading.value = null
-    downloadStage.value = 'idle'
-    pendingMainVersion.value = null
-    pendingContext.value = null
-    resetDeps()
-  }
-
   return {
-    downloading,
-    downloadStage,
-    showDependencyDialog,
-    pendingMainVersion,
+    downloading: progress.downloading,
+    downloadStage: progress.downloadStage,
+    showDependencyDialog: confirm.showDependencyDialog,
+    pendingMainVersion: confirm.pendingMainVersion,
     depsMap,
     depsLoadingSet,
-    depsChecking,
-    depsInstalling,
-    depsMissing,
-    depsUpToDate,
+    depsChecking: deps.checking,
+    depsInstalling: deps.installing,
+    depsMissing: deps.missing,
+    depsUpToDate: deps.upToDate,
     handleDownload,
-    handleDependencyConfirm,
-    handleDependencyClose,
+    handleDependencyConfirm: confirm.handleDependencyConfirm,
+    handleDependencyClose: confirm.handleDependencyClose,
     handleLoadDeps,
   }
 }

@@ -1,4 +1,4 @@
-use super::*;
+use crate::commands::frp::types::FieldMapping;
 use std::collections::HashMap;
 
 #[test]

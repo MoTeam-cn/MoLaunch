@@ -1,0 +1,234 @@
+/**
+ * 房主轮询切片（从 useRoomHost.ts 抽取）
+ *
+ * 负责三路信令轮询（参与者 5s / Answer 5s / 保活 30s）、
+ * 自动为 status='joined' && !hostOfferReady 的参与者生成 per-participant Offer、
+ * 30s 防刷屏 toast、TURN 服务器拉取与广播，以及定时器启停。
+ *
+ * 生命周期（onMounted/onUnmounted/watch）由主文件 useRoomHost.ts 负责，
+ * 本切片仅提供纯函数与定时器控制，便于按职责拆分与复用。
+ */
+import { ref } from 'vue'
+import { useOnlineStore } from '@/stores/online'
+import type { useWebRTCMesh } from '@/composables/useWebRTCMesh'
+import type { useVirtualLan } from '@/composables/useVirtualLan'
+import { listAnswers, uploadParticipantOffer } from '@/utils/api/online-manager'
+import { buildIceServers, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
+import type { IceServerEntry, PendingAnswer } from '@/types/online'
+import { toastError } from '@/utils/toast'
+import { encodeTurnServers } from '@/utils/online/protocol'
+
+/** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
+const POLL_ERROR_TOAST_INTERVAL = 30_000
+
+export function useRoomHostPolling(
+  store: ReturnType<typeof useOnlineStore>,
+  hostMesh: ReturnType<typeof useWebRTCMesh>,
+  lan: ReturnType<typeof useVirtualLan>,
+) {
+  /** 待确认 Answer 列表（pollAnswers 5s 刷新） */
+  const pendingAnswers = ref<PendingAnswer[]>([])
+  /** 正在轮询参与者（防重入） */
+  const polling = ref(false)
+  /** 正在为参与者生成 Offer 的集合，防止重复生成（key=participantId） */
+  const offerGenerating = ref<Set<string>>(new Set())
+  /** 轮询失败 toast 防刷屏：记录上次 toast 时间 */
+  const lastAnswerErrorToastAt = ref(0)
+  const lastOfferErrorToastAt = ref(0)
+
+  /** 30s 防刷屏 toast：避免轮询连续失败时刷屏 */
+  function maybeToastAnswerError(msg: string) {
+    const now = Date.now()
+    if (now - lastAnswerErrorToastAt.value < POLL_ERROR_TOAST_INTERVAL) return
+    lastAnswerErrorToastAt.value = now
+    toastError(msg)
+  }
+  function maybeToastOfferError(msg: string) {
+    const now = Date.now()
+    if (now - lastOfferErrorToastAt.value < POLL_ERROR_TOAST_INTERVAL) return
+    lastOfferErrorToastAt.value = now
+    toastError(msg)
+  }
+
+  /**
+   * 为单个参与者生成 SDP Offer 并上传到后端
+   *
+   * 流程：hostMesh.createOfferFor → 绑定 onMessage → uploadParticipantOffer
+   * 失败时 toast 提示但不阻塞其他参与者。
+   */
+  async function generateOfferForParticipant(participantId: string) {
+    if (offerGenerating.value.has(participantId)) return
+    offerGenerating.value.add(participantId)
+    try {
+      // 阶段三子任务 7：优先使用 iceServers（含 STUN + 用户自定义 TURN + 系统 TURN）
+      // 旧房间 iceServers 为空时回退到 stunServers 并转为 IceServerEntry[]
+      const iceServers: IceServerEntry[] = store.roomState.iceServers.length > 0
+        ? store.roomState.iceServers
+        : stunUrlsToIceServers(store.roomState.stunServers)
+      const { sdp, iceCandidates } = await hostMesh.createOfferFor(participantId, iceServers)
+
+      // 绑定 DataChannel.onMessage：参与者发来的包 → 转发到后端 TUN
+      // setupDataChannelHandlers 仅更新传入字段，不影响 createOfferFor 默认绑定的 onOpen/onClose
+      hostMesh.setDataChannelHandlers(participantId, {
+        onMessage: (raw) => {
+          void lan.forwardToTun(raw)
+        },
+      })
+
+      const result = await uploadParticipantOffer(
+        store.roomState.roomCode,
+        participantId,
+        sdp,
+        iceCandidates,
+      )
+      if (result.code !== 1) {
+        throw new Error(result.msg || '上传 SDP Offer 失败')
+      }
+    } catch (e) {
+      console.warn(`[Online] 为参与者 ${participantId} 生成 Offer 失败:`, e)
+      maybeToastOfferError(
+        `生成 SDP Offer 失败：${e instanceof Error ? e.message : String(e)}`,
+      )
+      // 生成失败时清理 PC，避免下次轮询跳过
+      hostMesh.closeParticipant(participantId)
+    } finally {
+      offerGenerating.value.delete(participantId)
+    }
+  }
+
+  /**
+   * 扫描参与者列表，为 status='joined' && !hostOfferReady 的参与者生成 Offer
+   *
+   * 由 pollParticipants 调用，每次刷新参与者列表后触发。
+   */
+  async function scanAndGenerateOffers() {
+    const roomCode = store.roomState.roomCode
+    if (!roomCode || store.roomState.role !== 'host') return
+    const needOffer = store.roomState.participants.filter(
+      (p) => p.status === 'joined' && !p.hostOfferReady,
+    )
+    // 并发生成（每个参与者独立 PC，互不干扰）
+    await Promise.all(needOffer.map((p) => generateOfferForParticipant(p.participantId)))
+  }
+
+  /** 轮询参与者列表 + 触发 Offer 生成 */
+  async function pollParticipants() {
+    if (store.roomState.role !== 'host' || !store.roomState.roomCode || polling.value) return
+    polling.value = true
+    try {
+      await store.refreshParticipants()
+      await scanAndGenerateOffers()
+    } catch (e) {
+      console.warn('[Online] pollParticipants 异常:', e)
+    } finally {
+      polling.value = false
+    }
+  }
+
+  /** 轮询待确认 Answer */
+  async function pollAnswers() {
+    if (store.roomState.role !== 'host' || !store.roomState.roomCode) return
+    try {
+      const result = await listAnswers(store.roomState.roomCode)
+      if (result.code === 1 && result.data) {
+        pendingAnswers.value = result.data.answers ?? []
+        lastAnswerErrorToastAt.value = 0
+      } else {
+        console.warn(
+          `[Online] pollAnswers 业务失败: code=${result.code}, msg=${result.msg}, req_id=${result.req_id}`,
+        )
+        maybeToastAnswerError(`获取待确认 Answer 失败：${result.msg}`)
+      }
+    } catch (e) {
+      console.warn('[Online] pollAnswers 异常:', e)
+      maybeToastAnswerError(
+        `获取待确认 Answer 异常：${e instanceof Error ? e.message : String(e)}`,
+      )
+    }
+  }
+
+  /** 房主保活 */
+  async function doKeepalive() {
+    try {
+      await store.keepalive()
+    } catch (e) {
+      console.warn('[Online] keepalive 失败:', e)
+    }
+  }
+
+  /**
+   * 拉取系统 TURN 服务器并广播给已联通参与者（阶段三子任务 7 阶段 F）
+   *
+   * 流程：
+   * 1. 调 `store.fetchTurnServers`（房主独占接口）拉取经服务端负载过滤的可用 TURN
+   * 2. 与 STUN + 用户自定义 TURN 合并为统一 iceServers
+   * 3. 更新本地 `store.roomState.iceServers`（影响后续 `generateOfferForParticipant`）
+   * 4. 通过 `encodeTurnServers` 编码 + `hostMesh.broadcastPacket` 下发
+   *
+   * 失败仅 warn，不阻塞主流程（系统 TURN 不可用时降级为 STUN + 用户自定义 TURN）。
+   * 房间刚创建时参与者尚未联通，broadcastPacket 返回 0 属正常；后续参与者 PC 建立后
+   * 由房主手动重新触发或下次轮询时通过其他机制获取（当前实现仅 onMounted 触发一次）。
+   */
+  async function fetchAndBroadcastTurnServers() {
+    if (store.roomState.role !== 'host' || !store.roomState.roomCode) return
+    try {
+      const turnResp = await store.fetchTurnServers()
+      const systemTurn: IceServerEntry[] = turnResp?.servers ?? []
+      const merged = buildIceServers({
+        stunServers: store.roomState.stunServers,
+        customTurnServers: store.customTurnServers,
+        systemTurnServers: systemTurn,
+      })
+      if (merged.length === 0) {
+        console.info('[Online] 房主无可用 ICE 服务器，跳过 TURN 广播')
+        return
+      }
+      // 更新本地 iceServers，影响后续 generateOfferForParticipant
+      store.roomState.iceServers = merged
+      // 阶段三子任务 8：broadcastPacket 异步加密后发送，sent 计数仅用于日志
+      void hostMesh.broadcastPacket(encodeTurnServers(turnSeq++, merged)).then((sent) => {
+        console.info(
+          `[Online] 房主已广播 ICE 服务器列表：${systemTurn.length} 系统 TURN + ${store.customTurnServers.length} 自定义 TURN，已发送给 ${sent} 个参与者`,
+        )
+      }).catch((e) => console.warn('[Online] 广播 ICE 服务器列表失败:', e))
+    } catch (e) {
+      console.warn('[Online] 拉取/广播 TURN 服务器失败:', e)
+    }
+  }
+
+  // 定时器句柄
+  let answerTimer: ReturnType<typeof setInterval> | null = null
+  let keepaliveTimer: ReturnType<typeof setInterval> | null = null
+  let participantsTimer: ReturnType<typeof setInterval> | null = null
+  /** TurnServers 控制消息的本地 seq 计数器（与 HostMcPort/TUN 数据包 seq 独立） */
+  let turnSeq = 0
+
+  /** 启动三路信令轮询定时器（参与者 5s / Answer 5s / 保活 30s） */
+  function startTimers() {
+    if (participantsTimer) clearInterval(participantsTimer)
+    if (answerTimer) clearInterval(answerTimer)
+    if (keepaliveTimer) clearInterval(keepaliveTimer)
+    participantsTimer = setInterval(() => void pollParticipants(), 5000)
+    answerTimer = setInterval(() => void pollAnswers(), 5000)
+    // 30s 保活：服务端 keepalive_timeout=120s，2 个周期未上报即判定失联
+    keepaliveTimer = setInterval(() => void doKeepalive(), 30 * 1000)
+  }
+
+  /** 停止所有轮询定时器（云端断开或组件卸载时调用，避免持续失败刷屏） */
+  function stopTimers() {
+    if (participantsTimer) { clearInterval(participantsTimer); participantsTimer = null }
+    if (answerTimer) { clearInterval(answerTimer); answerTimer = null }
+    if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null }
+  }
+
+  return {
+    pendingAnswers,
+    offerGenerating,
+    pollParticipants,
+    pollAnswers,
+    doKeepalive,
+    startTimers,
+    stopTimers,
+    fetchAndBroadcastTurnServers,
+  }
+}

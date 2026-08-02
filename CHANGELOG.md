@@ -49,6 +49,22 @@
   - 关键约束保留：useVirtualLan（onGlobalEvent 永不 unlisten）、useGlobalTauriEvent（unlisten 竞态消除）、useWebRTC/useWebRTCMesh（无 trickle ICE、AES-GCM）
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）
 
+### 架构
+
+#### 大文件拆分（审计阶段二批6，docs/fix-debug/04-file-line-limits.md P1+P1 提级）
+
+- 背景：项目规范要求单文件 ≤300 行（Vue 组件为硬性约束）；审计定位 9 个 P1 文件（>=400 行）与 5 个超限 Vue 组件
+- 前端拆分（14 文件）：
+  - `utils/seedmap/generatorWorker.ts`（752 行）拆为 `wasm-bindings.ts`（WASM 绑定/内存安全/init）+ `tile-render.ts`（biome 上色/地形阴影）+ `structure-search.ts`（结构查找）+ 主文件（消息队列与分发）；WASM 单例经 `wasm` 引用对象共享
+  - `views/tools/data/useSeedMap.ts`（546 行）拆为 `useSeedMap/map-events.ts`（事件处理）+ `useSeedMap/map-init.ts`（地图初始化）+ 主文件（299 行）
+  - `composables/useRoomHost.ts`（432→149）拆 `useRoomHost/`（轮询/动作切片）；`useResourceDownload.ts`（413→299）拆 `useResourceDownload/`（进度/依赖确认切片）；`stores/frp.ts`（403→35）拆 `providerSlice/tunnelSlice/logsSlice`；`useSkinOperations.ts`（363→146）拆 `useSkinState/useSkinActions`
+  - 5 个 Vue 组件提级拆分：CreateRoomForm（→useCreateRoomForm）、CustomLayoutSection（→useCustomLayout）、SeedMap（→SeedMapControls/SeedMapSidebar）、AuthCenter（→useFrpAuthCenter）、TunnelManager（→TunnelList）
+- 后端拆分（13 文件）：
+  - `commands/frp/types.rs`（722→模块聚合）拆为 `types/tunnel.rs`/`types/provider.rs`/`types/auth.rs`/`types/api_spec.rs` + `types/mod.rs` re-export（对外 `types::xxx` 路径不变）
+  - `commands/frp/provider.rs`（426）拆 `provider_system.rs`/`provider_external.rs`；`auth/mod.rs`（420）拆 `auth/handlers.rs`；`sandbox.rs`（408）拆 `sandbox/validate.rs`/`sandbox/adapter.rs`（`#[path]` 测试声明同步调整）
+- 设计决策：全部保持对外 API/消息契约/序列化结构不变；前端优先 composable 提取（状态与模板强耦合场景）、子组件承接模板片段（双向绑定用 defineModel）；后端保持 `pub use` re-export 路径兼容
+- 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）、`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
+
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs
