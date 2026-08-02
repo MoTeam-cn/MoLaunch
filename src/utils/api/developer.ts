@@ -24,6 +24,7 @@
  */
 
 import { SYSTEM_ACTIONS, systemManager } from './system-manager'
+import { refreshConfig } from './config'
 
 // ==================== 解锁 ====================
 
@@ -34,7 +35,11 @@ export async function isDeveloperUnlocked(): Promise<boolean> {
 
 /** 解锁开发者模式（由 CreditsTab.vue 法律信息中的隐藏字段触发） */
 export async function unlockDeveloperMode(): Promise<void> {
-  return systemManager<void>(SYSTEM_ACTIONS.UNLOCK_DEVELOPER_MODE)
+  await systemManager<void>(SYSTEM_ACTIONS.UNLOCK_DEVELOPER_MODE)
+  // 解锁改写了注册表 DeveloperUnlocked，而 get_config 快照有全局缓存；
+  // 清空缓存确保「进阶设置」页 DevModeToggle 重新读取到解锁状态
+  // （否则缓存仍是旧值 developerUnlocked=false，开关卡片不显示）。
+  refreshConfig()
 }
 
 /**
@@ -47,7 +52,9 @@ export async function unlockDeveloperMode(): Promise<void> {
  * 更新侧边菜单显隐。
  */
 export async function lockDeveloperMode(): Promise<void> {
-  return systemManager<void>(SYSTEM_ACTIONS.LOCK_DEVELOPER_MODE)
+  await systemManager<void>(SYSTEM_ACTIONS.LOCK_DEVELOPER_MODE)
+  // 撤销改写了注册表三个键，同样清空配置缓存，保证下次读取拿到最新状态。
+  refreshConfig()
 }
 
 // ==================== 存储目录 ====================
