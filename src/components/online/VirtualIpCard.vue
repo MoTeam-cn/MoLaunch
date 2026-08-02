@@ -9,21 +9,16 @@
 import { WifiIcon, ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { copyToClipboard } from '@/utils/clipboard'
 
 defineProps<{
   ip: string
   label: string
 }>()
 
-async function copyIp(text: string, label: string) {
+async function copyIp(text: string) {
   if (!text) return
-  try {
-    await navigator.clipboard.writeText(text)
-    toastSuccess(`已复制${label}: ${text}`)
-  } catch {
-    toastError('复制失败')
-  }
+  await copyToClipboard(text, { toast: true })
 }
 </script>
 
@@ -36,7 +31,7 @@ async function copyIp(text: string, label: string) {
     <div class="flex items-center gap-1">
       <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ ip }}</code>
       <Tooltip :text="`复制${label}`">
-        <Button type="ghost" size="mini" @click="copyIp(ip, label)">
+        <Button type="ghost" size="mini" @click="copyIp(ip)">
           <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
         </Button>
       </Tooltip>

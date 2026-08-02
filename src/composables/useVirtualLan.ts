@@ -2,7 +2,7 @@
  * 虚拟网卡桥接 composable（阶段三子任务 5：数据分发打通）
  *
  * 房主与加入方共用此 composable，封装：
- * - `start(selfVirtualIp, subnet)`：解析 CIDR → 调用 `tunStart` → 订阅 `online://tun-packet-out` 事件
+ * - `start(selfVirtualIp, subnet)`：解析 CIDR → 调用 `tunStart`（`online://tun-packet-out` 事件监听由 `onGlobalEvent` 在构造时注册）
  * - `onTunPacket` 回调：TUN 读到 IP 包时触发（房主调 `hostMesh.broadcastPacket`，加入方调 `dataChannel.send`）
  * - `forwardToTun(raw)`：将 DataChannel 收到的二进制消息转发到后端 TUN（base64 编码后 invoke `tun_forward_to`）
  * - `stop()`：停止桥接，销毁 TUN 接口
@@ -27,8 +27,8 @@
  *
  * # 设计约束
  *
- * - 监听器在 `start` 时注册，`stop` / `onUnmounted` 时清理（避免泄漏）
- * - 竞态保护：`listen` 是异步的，await 期间组件卸载时立即 unlisten 新拿到的句柄
+ * - 事件监听走 `onGlobalEvent` 全局单例 listener（后台 TUN 数据流持续推送，永不 unlisten），
+ *   handler 在组件卸载时自动移除，`running` 守卫保证仅桥接运行中才分发数据
  * - `forwardToTun` 失败不抛错（避免 DataChannel.onmessage 回调链断掉），仅打 warn
  *
  * @example 房主侧使用
@@ -39,7 +39,7 @@
  */
 
 import { onUnmounted, ref, shallowRef } from 'vue'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'
 import {
   tunStart,
   tunForwardTo,
@@ -98,15 +98,20 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
   /** 最近一次错误（启动失败时填充，null 表示无错误） */
   const lastError = ref<string | null>(null)
 
-  let unlisten: UnlistenFn | null = null
-  let isMounted = true
+  // 全局单例 Tauri listener：后台 TUN 数据流持续推送，永不 unlisten（避免 Tauri 2.x unlisten 竞态）
+  // handler 在组件卸载时由 onGlobalEvent 自动移除，running 守卫保证仅桥接运行中才分发数据
+  onGlobalEvent<TunPacketPayload>(EVENT_TUN_PACKET_OUT, (payload) => {
+    if (!running.value) return
+    // number[] → ArrayBuffer
+    const bytes = new Uint8Array(payload)
+    options.onTunPacket(bytes.buffer)
+  })
 
   /**
    * 启动 TUN 桥接
    *
    * 1. 若已在运行，先停止（防止泄漏）
-   * 2. 注册 `online://tun-packet-out` 事件监听器
-   * 3. 调用后端 `tun_start` 创建 TUN 接口 + 启动读写循环
+   * 2. 调用后端 `tun_start` 创建 TUN 接口 + 启动读写循环
    *
    * @param selfVirtualIp 自己的虚拟 IP（如 `10.244.1.1`）
    * @param subnet 子网 CIDR（如 `10.244.1.0/24`，仅用于解析前缀长度）
@@ -119,25 +124,6 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
     // 若已运行，先停止
     if (running.value) {
       await stop()
-    }
-
-    // 注册事件监听器（如未注册）
-    if (!unlisten) {
-      const unlistenFn = await listen<TunPacketPayload>(
-        EVENT_TUN_PACKET_OUT,
-        (event) => {
-          if (!isMounted || !running.value) return
-          // number[] → ArrayBuffer
-          const bytes = new Uint8Array(event.payload)
-          options.onTunPacket(bytes.buffer)
-        },
-      )
-      // await 期间组件已卸载：立即 unlisten 刚拿到的句柄，避免泄漏
-      if (!isMounted) {
-        unlistenFn()
-        throw new Error('组件已卸载，TUN 桥接启动取消')
-      }
-      unlisten = unlistenFn
     }
 
     // 解析子网前缀长度
@@ -198,17 +184,10 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
    * 停止 TUN 桥接（幂等）
    *
    * 1. 调用后端 `tun_stop` 销毁 TUN 接口
-   * 2. 取消事件监听器
+   * （事件 handler 由 onGlobalEvent 管理，无需手动移除）
    */
   async function stop(): Promise<void> {
-    if (!running.value) {
-      // 即使 running 为 false，也清理可能残留的监听器
-      if (unlisten) {
-        unlisten()
-        unlisten = null
-      }
-      return
-    }
+    if (!running.value) return
 
     try {
       await tunStop()
@@ -217,16 +196,11 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
     } finally {
       running.value = false
       interfaceInfo.value = null
-      if (unlisten) {
-        unlisten()
-        unlisten = null
-      }
     }
   }
 
   onUnmounted(() => {
-    isMounted = false
-    // unlisten 由 stop() 内部统一清理（stop 会处理 running=true/false 两种分支）
+    // 事件 handler 由 onGlobalEvent 的 onUnmounted 自动移除；此处仅停止后端 TUN 接口
     // 后端 stop 不阻塞卸载（异步触发即可）
     void stop()
   })

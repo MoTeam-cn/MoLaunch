@@ -29,7 +29,7 @@ import ParticipantList from './ParticipantList.vue'
 import BannedList from './BannedList.vue'
 import KickConfirmDialog from './KickConfirmDialog.vue'
 import WhitelistEditor from './WhitelistEditor.vue'
-import { toastSuccess, toastError } from '@/utils/toast'
+import { copyToClipboard } from '@/utils/clipboard'
 import {
   XCircleIcon,
   UsersIcon,
@@ -108,16 +108,11 @@ function participantStateText(participantId: string): string {
   return hostMesh.getConnState(participantId) ?? 'unknown'
 }
 
-/** 复制虚拟 IP 到剪贴板（复用项目惯例 navigator.clipboard.writeText） */
+/** 复制虚拟 IP 到剪贴板 */
 async function copyVirtualIp() {
   const ip = room.value.selfVirtualIp
   if (!ip) return
-  try {
-    await navigator.clipboard.writeText(ip)
-    toastSuccess(`已复制: ${ip}`)
-  } catch {
-    toastError('复制失败')
-  }
+  await copyToClipboard(ip, { toast: true })
 }
 
 /**

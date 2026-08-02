@@ -13,6 +13,7 @@ import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { ArrowPathIcon, LockOpenIcon } from '@heroicons/vue/24/outline'
 import type { RoomBan } from '@/types/online'
+import { formatTimestamp } from '@/utils/format'
 
 const props = defineProps<{
   bans: RoomBan[]
@@ -84,7 +85,7 @@ const isEmpty = computed(() => props.bans.length === 0)
               {{ formatRemaining(ban) }}
             </span>
             <span class="text-[10px] text-gray-400">
-              封禁于 {{ new Date(ban.createdAt * 1000).toLocaleString('zh-CN', { hour12: false }) }}
+              封禁于 {{ formatTimestamp(ban.createdAt) }}
             </span>
           </div>
         </div>

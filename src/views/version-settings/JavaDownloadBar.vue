@@ -4,8 +4,8 @@
  * 当 javaReqs 存在且需要下载时显示"下载 Java X"按钮，点击后从 Mojang 官方 Runtime 索引下载
  * 下载完成后 emit('downloaded', javaPath)，由父组件刷新 Java 列表并选中
  */
-import { ref, onMounted, onUnmounted, computed } from 'vue'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { ref, onMounted, computed } from 'vue'
+import { useTauriEvent } from '@/composables/useTauriEvent'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
@@ -16,7 +16,11 @@ const emit = defineEmits<{ downloaded: [javaPath: string] }>()
 
 const downloading = ref(false)
 const progress = ref<JavaDownloadProgress | null>(null)
-let unlisten: UnlistenFn | null = null
+
+const { start } = useTauriEvent<JavaDownloadProgress>(
+  tauri.JAVA_DOWNLOAD_PROGRESS_EVENT,
+  (payload) => { progress.value = payload },
+)
 
 /** 要下载的 Java 大版本号 */
 const targetMajor = computed(() => {
@@ -49,15 +53,8 @@ async function handleDownload() {
   }
 }
 
-onMounted(async () => {
-  unlisten = await listen<JavaDownloadProgress>(
-    tauri.JAVA_DOWNLOAD_PROGRESS_EVENT,
-    (e) => { progress.value = e.payload },
-  )
-})
-
-onUnmounted(() => {
-  if (unlisten) { unlisten(); unlisten = null }
+onMounted(() => {
+  start()
 })
 </script>
 

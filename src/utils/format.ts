@@ -73,13 +73,17 @@ export function formatDate(dateStr: string): string {
 }
 
 /**
- * 格式化 Unix 时间戳（秒）为 YYYY-MM-DD HH:mm:ss（本地时区）
+ * 格式化 Unix 时间戳（秒）为 YYYY-MM-DD HH:mm[:ss]（本地时区）
  *
  * 用于展示登录时间、JWT 过期时间等场景。无效或非正数返回 '-'。
+ * options.withSeconds === false 时省略秒（HH:mm），默认含秒，不影响既有调用方。
  */
-export function formatTimestamp(unixSeconds: number): string {
+export function formatTimestamp(unixSeconds: number, options?: { withSeconds?: boolean }): string {
   if (!Number.isFinite(unixSeconds) || unixSeconds <= 0) return '-'
   const d = new Date(unixSeconds * 1000)
   const pad = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  const time = options?.withSeconds === false
+    ? `${pad(d.getHours())}:${pad(d.getMinutes())}`
+    : `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${time}`
 }

@@ -12,7 +12,8 @@ import { ref, watch } from 'vue'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
 import type { ResourceProject } from '@/types/community'
 import { getMcmodUrl } from '@/utils/api/community'
-import { toastSuccess, toastError, toastInfo, toastWarning } from '@/utils/toast'
+import { toastSuccess, toastInfo, toastWarning } from '@/utils/toast'
+import { copyToClipboard } from '@/utils/clipboard'
 import { formatDownloads } from '@/utils/format'
 import {
   XMarkIcon,
@@ -64,12 +65,7 @@ async function openWebsite() {
 async function copyName() {
   const name = props.project.translated_name || props.project.raw_name || ''
   if (!name) return
-  try {
-    await navigator.clipboard.writeText(name)
-    toastSuccess('已复制: ' + name)
-  } catch {
-    toastError('复制失败')
-  }
+  await copyToClipboard(name, { toast: true })
 }
 </script>
 

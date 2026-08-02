@@ -27,7 +27,7 @@ import { archiveList, getDownloadDir } from '@/utils/api/tools'
 import type { ArchiveItem } from '@/utils/api/tools'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 import { getConfigMap } from '@/utils/api/config'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatTimestamp } from '@/utils/format'
 import ArchiveBackupDialog from './ArchiveBackupDialog.vue'
 import ArchiveRestorePanel from './ArchiveRestorePanel.vue'
 
@@ -48,10 +48,6 @@ const versionOptions = computed(() => [
   { label: '全局（不隔离）', value: '' },
   ...installedVersions.value.map((v) => ({ label: v.id, value: v.id })),
 ])
-
-function formatDate(unixSec: number): string {
-  return new Date(unixSec * 1000).toLocaleString('zh-CN', { hour12: false })
-}
 
 async function loadList() {
   loading.value = true
@@ -147,7 +143,7 @@ onMounted(async () => {
                 >有效</span>
                 <ExclamationCircleIcon v-else class="h-3.5 w-3.5 text-amber-400" />
               </div>
-              <div class="text-xs text-gray-400">{{ formatDate(item.modified) }}</div>
+              <div class="text-xs text-gray-400">{{ formatTimestamp(item.modified) }}</div>
             </div>
           </Tooltip>
           <span class="flex-none text-xs text-gray-500">{{ formatBytes(item.size) }}</span>

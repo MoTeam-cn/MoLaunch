@@ -11,6 +11,7 @@ import { useAuthStore } from '@/stores/auth'
 import Button from '@/components/common/Button.vue'
 import StepProgressBar from '@/components/common/StepProgressBar.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
+import { copyToClipboard } from '@/utils/clipboard'
 
 const props = defineProps<{ visible: boolean }>()
 const emit = defineEmits<{ (e: 'close'): void; (e: 'success'): void }>()
@@ -43,17 +44,6 @@ const ALLOWED_URIS = [
 ]
 // 打开登录页失败/被拦截时的提示信息
 const uriError = ref('')
-
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text)
-    toastSuccess('设备码已复制到剪贴板')
-    return true
-  } catch {
-    toastError('复制失败，请手动复制')
-    return false
-  }
-}
 
 async function openBrowser(url: string) {
   try { await open(url) } catch { toastError('打开浏览器失败，请手动访问该链接') }
@@ -118,6 +108,7 @@ watch(() => authStore.deviceCodeInfo, async (info) => {
       return
     }
     copyFailed.value = false
+    toastSuccess('设备码已复制到剪贴板')
     autoOpenTimer = setTimeout(() => {
       if (autoOpened) return
       autoOpened = true

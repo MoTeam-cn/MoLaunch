@@ -13,8 +13,8 @@
  * - 状态使用 ref 暴露给模板，handler 内部处理 toast/modal
  * - 选项列表原地修改 checked 字段，避免重新渲染整个树
  */
-import { ref, computed, onMounted, onUnmounted, type ComputedRef } from 'vue'
-import { listen, type UnlistenFn } from '@tauri-apps/api/event'
+import { ref, computed, onMounted, type ComputedRef } from 'vue'
+import { useTauriEvent } from '@/composables/useTauriEvent'
 import {
   getExportOptions,
   exportModpack,
@@ -90,29 +90,13 @@ export function useExportTab(options: UseExportTabOptions) {
     return visibleOptions.value.filter(o => o.parent === parentId)
   }
 
-  /** 进度事件 unlisten 句柄 */
-  let progressUnlisten: UnlistenFn | null = null
-
-  /** 启动进度事件监听（在 onMounted 中调用） */
-  async function startProgressListener() {
-    if (progressUnlisten) return
-    progressUnlisten = await listen<ExportProgress>(EXPORT_PROGRESS_EVENT, (event) => {
-      const payload = event.payload
-      // 只接受当前选中版本的事件（避免切换版本时残留旧事件）
-      if (payload.versionId !== selectedId.value) return
-      exportStage.value = payload.stage
-      exportProgress.value = payload.percent
-      exportMessage.value = payload.message
-    })
-  }
-
-  /** 停止进度事件监听（在 onUnmounted 中调用） */
-  function stopProgressListener() {
-    if (progressUnlisten) {
-      progressUnlisten()
-      progressUnlisten = null
-    }
-  }
+  const { start } = useTauriEvent<ExportProgress>(EXPORT_PROGRESS_EVENT, (payload) => {
+    // 只接受当前选中版本的事件（避免切换版本时残留旧事件）
+    if (payload.versionId !== selectedId.value) return
+    exportStage.value = payload.stage
+    exportProgress.value = payload.percent
+    exportMessage.value = payload.message
+  })
 
   /** 重置进度状态（导出开始前/结束后调用） */
   function resetProgress() {
@@ -266,11 +250,7 @@ export function useExportTab(options: UseExportTabOptions) {
   }
 
   onMounted(() => {
-    startProgressListener()
-  })
-
-  onUnmounted(() => {
-    stopProgressListener()
+    start()
   })
 
   return {

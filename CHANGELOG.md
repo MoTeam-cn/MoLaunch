@@ -28,6 +28,18 @@
   - `minecraft/version/state.rs`：`VersionType::from_str` 补充 `old_alpha`/`old_beta` 别名映射（原 detect.rs 依赖此映射，复用后保持行为等价）；`state_tests.rs` 新增别名测试
 - 验证：`cargo check`、`cargo test --lib` 通过（151+1 passed / 0 failed）、`cargo clippy` 零警告
 
+#### 前端复用重构（审计 P1，docs/fix-debug/05-utils-reuse.md）
+
+- 背景：审计发现前端 4 处局部 `toLocaleString` 时间戳格式化、4 处手写 listen/unlisten 样板、9+ 处散落 `navigator.clipboard` 均与既有工具重复
+- 改动：
+  - `utils/format.ts`：`formatTimestamp` 新增可选 `options.withSeconds` 参数（默认行为不变），展示格式差异通过参数解决，禁止调用方手拼
+  - `views/Versions.vue`、`views/tools/archive/ArchiveManager.vue`、`views/tools/data/ScreenshotManager.vue`、`components/online/BannedList.vue`：删除局部 `formatDate`/`toLocaleString`，改用 `formatTimestamp`
+  - `composables/useCommunityDownload.ts`、`composables/useExportTab.ts`、`views/version-settings/JavaDownloadBar.vue`：手写 listen/unlisten 样板改用 `useTauriEvent`
+  - `composables/useVirtualLan.ts`：后台 TUN 数据流监听改用 `onGlobalEvent`（全局单例，永不 unlisten，消除竞态）
+  - 新增 `utils/clipboard.ts`（统一剪贴板，支持可选 toast）；`utils/seedmap/format.ts` 的 `copyToClipboard` 提升为 re-export；替换 9 处散落 `navigator.clipboard` 调用（HttpLogViewer/VirtualIpCard/RoomHostPanel/RoomGuestPanel/DeviceCodeModal/Modal/ResourceDetailHeader 等）
+- 设计决策：优先复用既有工具；`useVirtualLan` 的 TUN 数据流属后台持续推送，选 `onGlobalEvent` 而非 `useTauriEvent`；`DeviceCodeModal` 保留返回值驱动复制失败状态的语义
+- 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）
+
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs

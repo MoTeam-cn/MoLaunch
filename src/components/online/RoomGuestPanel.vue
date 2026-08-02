@@ -24,7 +24,8 @@ import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { showConfirm } from '@/utils/modal'
-import { toastError, toastSuccess } from '@/utils/toast'
+import { toastError } from '@/utils/toast'
+import { copyToClipboard } from '@/utils/clipboard'
 import { decode, CONTROL_SUBTYPE, parseHostMcPortPayload, decodeTurnServersPayload } from '@/utils/online/protocol'
 import { importRoomKey } from '@/utils/online/crypto'
 import {
@@ -167,15 +168,10 @@ function handleLeaveRoom() {
   )
 }
 
-/** 复制文本到剪贴板（复用项目惯例 navigator.clipboard.writeText） */
-async function copyText(text: string, label: string) {
+/** 复制文本到剪贴板 */
+async function copyText(text: string) {
   if (!text) return
-  try {
-    await navigator.clipboard.writeText(text)
-    toastSuccess(`已复制${label}: ${text}`)
-  } catch {
-    toastError('复制失败')
-  }
+  await copyToClipboard(text, { toast: true })
 }
 
 onMounted(() => {
@@ -269,7 +265,7 @@ onMounted(() => {
                   type="ghost"
                   size="mini"
                   :disabled="!room.hostVirtualIp"
-                  @click="copyText(room.hostVirtualIp, '房主虚拟 IP')"
+                  @click="copyText(room.hostVirtualIp)"
                 >
                   <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
                 </Button>

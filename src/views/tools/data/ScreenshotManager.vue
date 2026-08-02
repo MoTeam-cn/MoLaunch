@@ -23,7 +23,7 @@ import { screenshotList, screenshotDelete } from '@/utils/api/tools'
 import type { ScreenshotItem } from '@/utils/api/tools'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 import { getConfigMap } from '@/utils/api/config'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatTimestamp } from '@/utils/format'
 
 const items = ref<ScreenshotItem[]>([])
 const totalSize = ref(0)
@@ -41,10 +41,6 @@ const versionOptions = computed(() => [
 ])
 
 const hasSelection = computed(() => selectedPaths.value.size > 0)
-
-function formatDate(unixSec: number): string {
-  return new Date(unixSec * 1000).toLocaleString('zh-CN', { hour12: false })
-}
 
 async function loadList() {
   loading.value = true
@@ -210,7 +206,7 @@ onMounted(async () => {
           <Tooltip :text="item.path" position="top" :delay="200" block>
             <div class="flex-1 min-w-0">
               <div class="truncate text-sm font-medium text-gray-900">{{ item.name }}</div>
-              <div class="text-xs text-gray-400">{{ formatDate(item.modified) }}</div>
+              <div class="text-xs text-gray-400">{{ formatTimestamp(item.modified) }}</div>
             </div>
           </Tooltip>
           <span class="flex-none text-xs text-gray-500">{{ formatBytes(item.size) }}</span>

@@ -4,6 +4,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { showError } from '@/utils/modal'
+import { formatTimestamp } from '@/utils/format'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
 import LoaderSelect from './LoaderSelect.vue'
@@ -66,11 +67,6 @@ function getVersionIcon(id: string, type: string): string {
   const actualType = installedVersionTypes.value[id] || type
   const normalized = (actualType === 'old_beta' || actualType === 'old_alpha') ? 'old' : actualType
   return resolveIconByType(normalized)
-}
-
-function formatDate(ts: number): string {
-  if (!ts) return '未知'
-  return new Date(ts * 1000).toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
 const latestVersions = computed(() => {
@@ -184,7 +180,7 @@ onMounted(async () => {
                 v-for="(section, idx) in sections" :id="section.id" :key="section.id"
                 :label="section.label" :icon="section.icon" :versions="section.versions"
                 :installed-ids="installedVersions" :downloading="versionStore.downloading"
-                :default-expanded="idx === 0" :format-date="formatDate"
+                :default-expanded="idx === 0" :format-date="(ts: number) => (ts ? formatTimestamp(ts, { withSeconds: false }) : '未知')"
                 :get-version-icon="getVersionIcon"
                 @download="selectedVersion = $event" @uninstall="handleUninstall"
               />

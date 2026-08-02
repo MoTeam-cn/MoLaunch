@@ -20,6 +20,7 @@ import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { readHttpLogs, listHttpLogFiles, type HttpLogEntry } from '@/utils/api/developer'
 import { toastError, toastSuccess } from '@/utils/toast'
+import { copyToClipboard } from '@/utils/clipboard'
 
 const loading = ref(false)
 const entries = ref<HttpLogEntry[]>([])
@@ -115,12 +116,7 @@ async function onFileChange(value: string) {
 /** 点击 req_id 复制到剪贴板 */
 async function copyReqId(reqId: string) {
   if (!reqId) return
-  try {
-    await navigator.clipboard.writeText(reqId)
-    toastSuccess(`已复制：${reqId}`)
-  } catch {
-    toastError('复制失败')
-  }
+  await copyToClipboard(reqId, { toast: true })
 }
 </script>
 

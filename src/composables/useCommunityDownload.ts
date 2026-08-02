@@ -3,8 +3,8 @@
  * 监听后端 community-download-progress 事件
  * 参考 useDownloadPolling 的模式，但用事件推送而非轮询
  */
-import { ref, onUnmounted } from 'vue'
-import { listen } from '@tauri-apps/api/event'
+import { ref } from 'vue'
+import { useTauriEvent } from '@/composables/useTauriEvent'
 
 export interface CommunityDownloadProgress {
   fileName: string
@@ -19,32 +19,20 @@ export function useCommunityDownload() {
   const downloading = ref(false)
   const progress = ref<CommunityDownloadProgress | null>(null)
 
-  let unlisten: (() => void) | null = null
-
-  async function startListener() {
-    if (unlisten) return
-    unlisten = await listen<CommunityDownloadProgress>(
-      'community-download-progress',
-      (event) => {
-        progress.value = event.payload
-        if (event.payload.completed || event.payload.error) {
-          downloading.value = false
-        }
-      },
-    )
-  }
-
-  function stopListener() {
-    if (unlisten) {
-      unlisten()
-      unlisten = null
-    }
-  }
+  const { start, stop } = useTauriEvent<CommunityDownloadProgress>(
+    'community-download-progress',
+    (payload) => {
+      progress.value = payload
+      if (payload.completed || payload.error) {
+        downloading.value = false
+      }
+    },
+  )
 
   function startDownload() {
     downloading.value = true
     progress.value = null
-    startListener()
+    start()
   }
 
   function stopDownload() {
@@ -52,7 +40,13 @@ export function useCommunityDownload() {
     progress.value = null
   }
 
-  onUnmounted(() => stopListener())
-
-  return { downloading, progress, startDownload, stopDownload, startListener, stopListener }
+  return {
+    downloading,
+    progress,
+    startDownload,
+    stopDownload,
+    // 兼容旧调用方：startListener/stopListener 指向 useTauriEvent 的 start/stop
+    startListener: start,
+    stopListener: stop,
+  }
 }
