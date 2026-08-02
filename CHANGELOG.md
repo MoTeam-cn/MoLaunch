@@ -195,6 +195,18 @@
 
 ### 修复
 
+#### CI：macOS/Linux 打包缺 updater 签名（.sig 未生成）+ macOS deeplink dead_code
+
+- 背景：v0.3.0 release CI 中 macOS/Linux job 在 `Locate installer and signature` 步骤报 `签名文件不存在`（macOS: `MoLaunch.app.tar.gz.sig`，Linux: `MoLaunch_0.3.0_amd64.AppImage.sig`）；macOS 另报 `constant PROTOCOL is never used` 警告
+- 根因（2 个独立问题）：
+  1. **tauri.conf.json 缺 `bundle.createUpdaterArtifacts`**。Tauri v2 官方文档要求该字段显式设为 `true`，打包器才会创建 updater 产物并生成 `.sig` 签名文件。当前缺失（默认不生成），导致三平台均无 `.sig`（Windows setup 同样受影响，仅便携版因 CI 手动 `tauri signer sign` 有签名）
+  2. **`src/deeplink/protocol.rs` 的 `PROTOCOL` 常量无 cfg**：仅在 Windows（注册表）/Linux（desktop 文件）的 cfg 函数中使用，macOS 上编译时未使用 → dead_code 警告
+- 改动（3 文件）：
+  - **`src-tauri/tauri.conf.json`**：`bundle` 增加 `"createUpdaterArtifacts": true`（CLI 构建时对 NSIS/deb/rpm/AppImage/macOS .app 生成 `.sig` 签名）
+  - **`src-tauri/src/deeplink/protocol.rs`**：`const PROTOCOL` 加 `#[cfg(any(windows, target_os = "linux"))]`（macOS 协议由 Info.plist 声明，无需运行时注册常量）
+  - **`CHANGELOG.md`**：记录本次修复
+- 验证：`node -e JSON.parse` 解析 tauri.conf.json 通过（createUpdaterArtifacts=true）；`cargo fmt --check` 与 `cargo check` 通过（exit 0）；PROTOCOL 全部引用点均在 cfg 函数内核对无误
+
 #### CI：Windows 产物分发调整（便携版推云端，setup 仅附加 GitHub Release）
 
 - 背景：上一轮将便携版与 setup 都上传云端，实际需求是 **Windows 便携版才推送云端（S3 + 注册），setup 安装版不推送存储，仅附加到 GitHub Release**（供用户手动下载安装）

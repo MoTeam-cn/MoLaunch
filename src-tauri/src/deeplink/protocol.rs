@@ -19,6 +19,10 @@
 use serde::Serialize;
 
 /// 协议名（不含 `://`）
+///
+/// 仅 Windows（注册表）/ Linux（desktop 文件）运行时注册使用；
+/// macOS 协议由打包 Info.plist 的 CFBundleURLTypes 声明，无需运行时注册。
+#[cfg(any(windows, target_os = "linux"))]
 const PROTOCOL: &str = "molaunch";
 
 /// deeplink 注册状态（返回给前端）
