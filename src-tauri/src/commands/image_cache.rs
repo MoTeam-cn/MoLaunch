@@ -3,6 +3,8 @@
 //! 将任意远程图片 URL 转为缓存 URL（方案 C：混合缓存）。
 //! 适用于皮肤、披风、头像、缩略图等所有需要缓存的远程图片场景。
 
+mod manager;
+
 use crate::error_util::log_err;
 use crate::minecraft::image_cache::{self, CachedImage};
 use crate::state::AppState;
@@ -12,7 +14,7 @@ use tauri::{AppHandle, State};
 /// 统一图片缓存 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::image_cache_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn image_cache_manager(
     state: State<'_, AppState>,
@@ -20,7 +22,7 @@ pub async fn image_cache_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::image_cache_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }
 
 /// 获取图片的缓存 URL（通用接口）

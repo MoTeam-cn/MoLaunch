@@ -1,4 +1,4 @@
-//! 插件模块统一分发逻辑（plugins_manager 的工具实现）
+//! 插件模块统一分发逻辑（plugins 域 manager 模块）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，12 个 action 覆盖插件安装/卸载、
 //! 子进程执行、子窗口创建、布局加载、个性化读写。所有 action 不需要 `AppState`；
@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::plugins;
+use super::{export, install, layout, personalization, sandbox, spawn, window};
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
@@ -90,7 +90,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "list_external_plugins",
         handler!(_state, _app, _params, {
-            let r = plugins::sandbox::list_external_plugins().await?;
+            let r = sandbox::list_external_plugins().await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -100,7 +100,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: ReadExternalPluginFileParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = plugins::sandbox::read_external_plugin_file(p.plugin_id, p.file_path).await?;
+            let r = sandbox::read_external_plugin_file(p.plugin_id, p.file_path).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -110,7 +110,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: PluginIdParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            plugins::sandbox::uninstall_external_plugin(p.plugin_id).await?;
+            sandbox::uninstall_external_plugin(p.plugin_id).await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );
@@ -120,7 +120,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: SourceDirParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = plugins::install::install_external_plugin_from_dir(p.source_dir).await?;
+            let r = install::install_external_plugin_from_dir(p.source_dir).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -130,7 +130,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: ZipPathParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = plugins::install::install_external_plugin_from_zip(p.zip_path).await?;
+            let r = install::install_external_plugin_from_zip(p.zip_path).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -140,8 +140,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: PluginSpawnProcessParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r =
-                plugins::spawn::plugin_spawn_process(p.plugin_id, p.command, p.args, p.cwd).await?;
+            let r = spawn::plugin_spawn_process(p.plugin_id, p.command, p.args, p.cwd).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -151,7 +150,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, app, params, {
             let p: PluginCreateWindowParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            plugins::window::plugin_create_window(
+            window::plugin_create_window(
                 &app,
                 p.plugin_id,
                 p.label,
@@ -170,7 +169,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: LoadCustomLayoutParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = plugins::layout::load_custom_layout(p.url, p.force_refresh).await?;
+            let r = layout::load_custom_layout(p.url, p.force_refresh).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -180,7 +179,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: ReadLayoutSampleParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = plugins::export::read_layout_sample(p.format).await?;
+            let r = export::read_layout_sample(p.format).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -190,7 +189,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: ExportPluginSampleParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            plugins::export::export_plugin_sample(p.dest_path, p.as_zip).await?;
+            export::export_plugin_sample(p.dest_path, p.as_zip).await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );
@@ -198,7 +197,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "read_personalization",
         handler!(_state, _app, _params, {
-            let r = plugins::personalization::read_personalization().await?;
+            let r = personalization::read_personalization().await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -208,7 +207,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: WritePersonalizationParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            plugins::personalization::write_personalization(p.data).await?;
+            personalization::write_personalization(p.data).await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );

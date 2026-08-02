@@ -1,17 +1,18 @@
-//! 版本启动相关命令的统一分发逻辑（version_launch_manager 的工具实现）
+//! 版本启动统一分发逻辑（version_launch_manager 的命令层实现）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，聚合 `version::launch`（6 个）+
-//! `version::script_export`（1 个）共 7 个 action。子模块函数签名改为 `&AppState` /
-//! `&AppHandle`，`launch_game` 需要 `AppHandle`（emit `game-exited` 事件）。
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，7 个 action 覆盖
+//! 启动 / 进度 / 停止 / 运行中实例 / 历史 / 取消 / 导出启动脚本。
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::version::{launch, script_export};
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
+
+use super::{cancel_launch, get_launch_history, get_launch_progress, get_running_game, launch_game, stop_game};
+use super::super::script_export;
 
 /// launch_game 参数（与原 launch_game 命令参数一一对应，字段名 camelCase）
 #[derive(Debug, Deserialize)]
@@ -51,7 +52,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, app, params, {
             let p: LaunchGameParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = launch::launch_game(
+            let r = launch_game(
                 &state,
                 &app,
                 p.version_id,
@@ -73,7 +74,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "get_launch_progress",
         handler!(state, _app, _params, {
-            let r = launch::get_launch_progress(&state).await?;
+            let r = get_launch_progress(&state).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -81,7 +82,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "cancel_launch",
         handler!(state, _app, _params, {
-            launch::cancel_launch(&state).await?;
+            cancel_launch(&state).await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );
@@ -89,7 +90,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "stop_game",
         handler!(state, _app, _params, {
-            launch::stop_game(&state).await?;
+            stop_game(&state).await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );
@@ -97,7 +98,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "get_running_game",
         handler!(state, _app, _params, {
-            let r = launch::get_running_game(&state).await?;
+            let r = get_running_game(&state).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -105,7 +106,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "get_launch_history",
         handler!(state, _app, _params, {
-            let r = launch::get_launch_history(&state).await?;
+            let r = get_launch_history(&state).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

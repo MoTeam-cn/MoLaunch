@@ -1,4 +1,4 @@
-//! 系统模块统一分发逻辑（system_manager 的工具实现）
+//! 系统模块统一分发逻辑（system 域 manager）
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，24 个 system action 在
 //! `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。非 Result 返回的命令
 //! （`is_developer_unlocked`/`get_storage_dirs`/`get_system_info`/`get_log_path`/
@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::system::{
+use super::{
     about::get_about_data,
     config::{get_config_path, save_config_to_file},
     developer::{

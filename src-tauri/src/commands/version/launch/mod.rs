@@ -1,11 +1,13 @@
 //! 版本启动命令
 //! 模块结构：
-//! - mod.rs: 共享类型 + 共享 helper + launch_game 编排 + 其他短命令
+//! - mod.rs: 共享类型 + 共享 helper + launch_game 编排 + 其他短命令 + version_launch_manager 转发入口
+//! - manager.rs: `utils::dispatcher::Dispatcher` 注册式分发（7 个 action 的注册表）
 //! - build_config.rs: build_launch_config（从全局配置+版本设置+前端入参构建 LaunchConfig）
 //! - failure.rs: handle_launch_failure（启动失败崩溃分析+事件通知+状态清理）
 
 mod build_config;
 mod failure;
+mod manager;
 
 use crate::log_info;
 use crate::minecraft::launch::{self, LaunchPipeline};
@@ -81,7 +83,7 @@ pub(super) fn resolve_game_language(
 /// 前端只传 username 和 uuid，避免 token 在 IPC 请求体中明文传输
 ///
 /// 注：原为独立 `#[tauri::command]`，已聚合为 `version_launch_manager` IPC 入口，
-/// 由 `utils::version_launch_manager::dispatch` 反序列化参数后调用。
+/// 由 `manager::dispatch` 反序列化参数后调用。
 pub async fn launch_game(
     state: &AppState,
     app_handle: &tauri::AppHandle,
@@ -309,7 +311,7 @@ pub async fn get_launch_history(state: &AppState) -> Result<Vec<LaunchHistory>, 
 /// 版本启动管理统一 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::version_launch_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 /// 原 7 个独立 Tauri 命令（6 个 launch + 1 个 script_export）均通过此入口聚合调用。
 #[tauri::command]
 pub async fn version_launch_manager(
@@ -318,5 +320,5 @@ pub async fn version_launch_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::version_launch_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }

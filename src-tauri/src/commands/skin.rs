@@ -1,6 +1,8 @@
 //! 皮肤管理命令
-//! 提供皮肤/披风管理子模块函数供 `skin_manager` dispatcher 调用：获取皮肤/披风信息、
+//! 提供皮肤/披风管理子模块函数供 `manager::dispatch` dispatcher 调用：获取皮肤/披风信息、
 //! 获取 PNG 下载 URL（带本地缓存，方案 C）、上传皮肤、装备/取消披风、下载 URL 图片到本地。
+
+mod manager;
 
 use crate::error_util::log_err;
 use crate::log_info;
@@ -14,7 +16,7 @@ use tauri::{AppHandle, State};
 /// 统一皮肤管理 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::skin_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn skin_manager(
     state: State<'_, AppState>,
@@ -22,7 +24,7 @@ pub async fn skin_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::skin_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }
 
 /// 获取当前账号的皮肤/披风信息（从 profile_json 解析）

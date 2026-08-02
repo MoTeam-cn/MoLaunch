@@ -31,7 +31,7 @@ use super::list::detect_version_type_from_dir;
 /// Merged install (MC + loader)
 ///
 /// 注：已聚合为 `version_install_manager` IPC 入口，本函数由
-/// `utils::version_install_manager::dispatch` 反序列化参数后调用。
+/// `install_manager::dispatch` 反序列化参数后调用。
 #[allow(clippy::too_many_arguments)]
 pub async fn install_merged(
     app: &AppHandle,

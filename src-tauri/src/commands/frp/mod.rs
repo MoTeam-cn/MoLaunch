@@ -1,10 +1,11 @@
-//! Frp 内网穿透命令模块（编排层，子模块由 `utils::frp_manager::dispatch` 统一调用）
+//! Frp 内网穿透命令模块（编排层，子模块由 `manager::dispatch` 统一调用）
 
 pub mod api_spec;
 pub mod auth;
 pub mod binary;
 pub mod install;
 pub mod log_redact;
+pub mod manager;
 pub mod paths;
 pub mod process;
 pub mod provider;
@@ -34,7 +35,7 @@ pub use types::{
 /// 统一 Frp 管理 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::frp_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn frp_manager(
     state: State<'_, AppState>,
@@ -42,5 +43,5 @@ pub async fn frp_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::frp_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }

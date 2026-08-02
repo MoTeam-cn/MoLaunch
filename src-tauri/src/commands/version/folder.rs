@@ -2,7 +2,7 @@
 //!
 //! 多文件夹管理：list/add（自动去重）/remove/switch/rename。原 5 个独立 Tauri 命令
 //! 已聚合为 `version_list_manager` IPC 入口，通过 `action` 字段分发；函数去
-//! `#[tauri::command]` 标注，由 `utils::version_list_manager::dispatch` 反序列化参数后调用。
+//! `#[tauri::command]` 标注，由 `list_manager::dispatch` 反序列化参数后调用。
 
 use crate::config::save_config;
 use crate::state::{AppState, McFolder};

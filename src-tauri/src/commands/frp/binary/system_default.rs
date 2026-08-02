@@ -31,7 +31,7 @@ pub(super) async fn ensure_system_default_frpc(state: &AppState) -> Result<Strin
     ensure_dir(&dir)?;
 
     // 1. 加载设备凭证 + 创建 OnlineClient
-    let creds = crate::utils::online_manager::load_creds_with_auto_refresh(state)
+    let creds = crate::commands::online::manager::load_creds_with_auto_refresh(state)
         .await
         .map_err(|e| format!("加载设备凭证失败: {}", e))?;
     let base_url = {
@@ -181,7 +181,7 @@ pub(super) async fn ensure_system_default_frpc(state: &AppState) -> Result<Strin
 ///
 /// 失败时返回 Err，调用方回退显示"未安装"。
 pub async fn fetch_latest_frpc_version(state: &AppState) -> Result<String, String> {
-    let creds = crate::utils::online_manager::load_creds_with_auto_refresh(state)
+    let creds = crate::commands::online::manager::load_creds_with_auto_refresh(state)
         .await
         .map_err(|e| format!("加载设备凭证失败: {}", e))?;
     let base_url = {

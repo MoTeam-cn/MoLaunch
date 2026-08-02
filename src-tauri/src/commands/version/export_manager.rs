@@ -1,4 +1,4 @@
-//! 版本导出命令统一分发逻辑（version_export_manager 的工具实现）
+//! 版本导出命令统一分发逻辑（version_export_manager 的命令层实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，4 个 action：
 //! `get_export_options` / `export_modpack` / `save_export_config` / `load_export_config`。
@@ -7,13 +7,12 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::version::export::types::{
-    ExportModpackParams, LoadConfigResult, SaveConfigParams,
-};
-use crate::commands::version::export::{config, export_modpack, get_export_options};
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
+
+use super::export::types::{ExportModpackParams, LoadConfigResult, SaveConfigParams};
+use super::export::{config, export_modpack, get_export_options};
 
 /// get_export_options 参数
 #[derive(Debug, Deserialize)]

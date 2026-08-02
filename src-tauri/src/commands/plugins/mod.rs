@@ -2,11 +2,12 @@
 //! 外部插件存放于 `<base_dir>/plugins/<plugin_id>/`，每个插件目录包含
 //! manifest.json 和入口 HTML。子模块按职责拆分：install / sandbox / spawn /
 //! window / layout / export / personalization。
-//! 所有子模块函数由 `utils::plugins_manager::dispatch` 统一反序列化参数后调用。
+//! 所有子模块函数由 `manager::dispatch` 统一反序列化参数后调用。
 
 pub mod export;
 pub mod install;
 pub mod layout;
+pub(crate) mod manager;
 pub mod personalization;
 pub mod sandbox;
 pub mod spawn;
@@ -22,7 +23,7 @@ use tauri::{AppHandle, State};
 /// 统一插件系统 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::plugins_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn plugins_manager(
     state: State<'_, AppState>,
@@ -30,7 +31,7 @@ pub async fn plugins_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::plugins_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }
 
 /// 子进程权限配置（manifest.json 的 processPermissions 字段）

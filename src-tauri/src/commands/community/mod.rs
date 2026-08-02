@@ -1,11 +1,12 @@
 //! 社区资源命令模块
 //!
 //! 提供搜索、详情、安装三大类功能。子模块函数接收 `&AppState` / `&AppHandle`，
-//! 由 `utils::community_manager::dispatch` 反序列化参数后调用。
+//! 由 `manager::dispatch` 反序列化参数后调用。
 
 pub mod community_config;
 pub mod detail;
 pub mod install;
+pub mod manager;
 pub mod search;
 pub mod secure_config;
 
@@ -25,7 +26,7 @@ pub use search::{get_category_tags, search_resources};
 /// 统一社区资源 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::community_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn community_manager(
     state: State<'_, AppState>,
@@ -33,5 +34,5 @@ pub async fn community_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::community_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }

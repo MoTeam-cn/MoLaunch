@@ -1,5 +1,7 @@
 //! Java 管理命令
 
+mod manager;
+
 use crate::log_info;
 use crate::minecraft::java;
 use crate::minecraft::java_selector;
@@ -60,7 +62,7 @@ pub struct JavaCompatResult {
 /// 统一 Java 管理 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::java_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn java_manager(
     state: State<'_, AppState>,
@@ -68,7 +70,7 @@ pub async fn java_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::java_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }
 
 /// 检测 Java

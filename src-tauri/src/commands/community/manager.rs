@@ -1,4 +1,4 @@
-//! 社区资源模块统一分发逻辑（community_manager 的工具实现）
+//! 社区资源模块统一分发逻辑（community_manager 的命令层实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，13 个 action 覆盖 search / detail /
 //! install（resource / modpack）。search / detail / preview_local_modpack 不需要 state；
@@ -8,11 +8,12 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::community;
 use crate::handler;
 use crate::minecraft::community::types::{Platform, ResourceType};
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
+
+use super::{detail, install, search};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,9 +68,9 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "search_resources",
         handler!(_state, _app, params, {
-            let req: community::search::SearchRequest =
+            let req: search::SearchRequest =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::search::search_resources(req).await?;
+            let r = search::search_resources(req).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -78,16 +79,16 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: ResourceTypeParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::search::get_category_tags(p.resource_type).await?;
+            let r = search::get_category_tags(p.resource_type).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
     d.register(
         "get_project_detail",
         handler!(_state, _app, params, {
-            let req: community::detail::DetailRequest =
+            let req: detail::DetailRequest =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::detail::get_project_detail(req).await?;
+            let r = detail::get_project_detail(req).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -96,7 +97,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: ProjectVersionsParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::detail::get_project_versions(p.platform, p.project_id).await?;
+            let r = detail::get_project_versions(p.platform, p.project_id).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -105,16 +106,16 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: McmodUrlParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::detail::get_mcmod_url(p.platform, p.slug).await?;
+            let r = detail::get_mcmod_url(p.platform, p.slug).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
     d.register(
         "download_resource",
         handler!(state, _app, params, {
-            let req: community::install::DownloadRequest =
+            let req: install::DownloadRequest =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::install::resource::download_resource(&state, req).await?;
+            let r = install::resource::download_resource(&state, req).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -123,7 +124,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, app, params, {
             let p: DownloadToPathParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::install::resource::download_resource_to_path(
+            let r = install::resource::download_resource_to_path(
                 &state,
                 &app,
                 p.url,
@@ -139,21 +140,17 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, _app, params, {
             let p: FormatFilenameParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::install::resource::format_download_filename(
-                &state,
-                p.file_name,
-                p.translated_name,
-            )
-            .await?;
+            let r = install::resource::format_download_filename(&state, p.file_name, p.translated_name)
+                .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
     d.register(
         "install_resource",
         handler!(state, _app, params, {
-            let req: community::install::DownloadRequest =
+            let req: install::DownloadRequest =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::install::resource::install_resource(&state, req).await?;
+            let r = install::resource::install_resource(&state, req).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -162,7 +159,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, _app, params, {
             let p: ResourceInstallPathParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::install::resource::get_resource_install_path(
+            let r = install::resource::get_resource_install_path(
                 &state,
                 p.resource_type,
                 p.version_id,
@@ -174,18 +171,18 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "install_modpack",
         handler!(state, _app, params, {
-            let req: community::install::InstallModpackRequest =
+            let req: install::InstallModpackRequest =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::install::modpack::install_modpack(&state, req).await?;
+            let r = install::modpack::install_modpack(&state, req).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
     d.register(
         "install_local_modpack",
         handler!(state, _app, params, {
-            let req: community::install::InstallLocalModpackRequest =
+            let req: install::InstallLocalModpackRequest =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::install::modpack::install_local_modpack(&state, req).await?;
+            let r = install::modpack::install_local_modpack(&state, req).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -194,7 +191,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: FilePathParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = community::install::modpack::preview_local_modpack(p.file_path).await?;
+            let r = install::modpack::preview_local_modpack(p.file_path).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

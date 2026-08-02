@@ -1,6 +1,8 @@
 //! SDK 管理命令（lite 版本）
 //! `ActionRequest` 与 `meta_manager` / `tools_manager` / `image_cache_manager` 共用同一请求体结构。
 
+mod manager;
+
 use crate::error_util::log_err;
 use crate::log_error;
 use crate::log_info;
@@ -20,7 +22,7 @@ pub struct SdkStatus {
 /// 统一 SDK IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::sdk_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn sdk_manager(
     state: State<'_, AppState>,
@@ -28,7 +30,7 @@ pub async fn sdk_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::sdk_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }
 
 /// 获取当前平台信息

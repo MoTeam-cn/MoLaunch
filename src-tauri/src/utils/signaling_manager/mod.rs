@@ -217,7 +217,7 @@ pub struct LobbyListParams {
 async fn load_creds(
     state: &AppState,
 ) -> Result<crate::minecraft::online::storage::DeviceCredentials, String> {
-    crate::utils::online_manager::load_creds_with_auto_refresh(state).await
+    crate::commands::online::manager::load_creds_with_auto_refresh(state).await
 }
 
 /// 创建 OnlineClient

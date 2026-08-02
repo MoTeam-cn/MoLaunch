@@ -2,7 +2,7 @@
 //!
 //! Shell 命令（打开文件夹、选中文件等）走 `crate::minecraft::system::shell`；
 //! 文件 / 文件夹选择对话框走前端 `@tauri-apps/plugin-dialog`。
-//! 子模块函数由 `utils::system_manager::dispatch` 反序列化参数后调用。
+//! 子模块函数由 `manager::dispatch` 反序列化参数后调用。
 
 use crate::log_info;
 use crate::state::AppState;

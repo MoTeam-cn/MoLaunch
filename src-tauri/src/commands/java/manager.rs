@@ -1,4 +1,4 @@
-//! Java 管理统一分发逻辑（java_manager 的工具实现）
+//! Java 管理统一分发逻辑（java 域 manager 模块）
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，6 个 action：`detect_java`/`list_java`/
 //! `select_java_for_mc`/`get_java_requirements`/`check_java_compatible`/`download_java`。
 //! `get_java_requirements`/`check_java_compatible` 不需 state/app；`download_java` 需 state
@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::java;
+use super::*;
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
@@ -47,7 +47,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "detect_java",
         handler!(state, _app, _params, {
-            let r = java::detect_java(&state).await?;
+            let r = detect_java(&state).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -55,7 +55,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "list_java",
         handler!(state, _app, _params, {
-            let r = java::list_java(&state).await?;
+            let r = list_java(&state).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -65,7 +65,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, _app, params, {
             let p: SelectJavaForMcParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = java::select_java_for_mc(p.mc_version, p.user_java_path, &state).await?;
+            let r = select_java_for_mc(p.mc_version, p.user_java_path, &state).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -75,7 +75,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: GetJavaRequirementsParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = java::get_java_requirements(p.mc_version, p.loader).await?;
+            let r = get_java_requirements(p.mc_version, p.loader).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -85,7 +85,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: CheckJavaCompatibleParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = java::check_java_compatible(p.java_path, p.mc_version, p.loader).await?;
+            let r = check_java_compatible(p.java_path, p.mc_version, p.loader).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -95,7 +95,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, app, params, {
             let p: DownloadJavaParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = java::download_java(p.target_major, &app, &state).await?;
+            let r = download_java(p.target_major, &app, &state).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

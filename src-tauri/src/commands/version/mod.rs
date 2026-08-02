@@ -2,10 +2,13 @@
 
 pub mod download;
 pub mod export;
+pub mod export_manager;
 pub mod folder;
 pub mod install;
+pub mod install_manager;
 pub mod launch;
 pub mod list;
+pub mod list_manager;
 pub mod loaders;
 pub mod manage;
 pub mod mods;
@@ -36,7 +39,7 @@ pub use script_export::export_launch_script;
 /// 版本列表/文件夹/管理/个性化统一 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::version_list_manager::dispatch` 进行 action 分发。
+/// `list_manager::dispatch` 进行 action 分发。
 /// 原 17 个独立 Tauri 命令（6 list + 5 folder + 4 manage + 2 personalization）
 /// 均通过此入口聚合调用。
 #[tauri::command]
@@ -46,16 +49,16 @@ pub async fn version_list_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::version_list_manager::dispatch(state, app, req).await
+    list_manager::dispatch(state, app, req).await
 }
 
 /// 统一版本安装管理 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::version_install_manager::dispatch` 进行 action 分发。
+/// `install_manager::dispatch` 进行 action 分发。
 ///
 /// 聚合的 11 个 action 来自 download / install / loaders / preload 四个子模块，
-/// 详见 `utils::version_install_manager` 模块文档。
+/// 详见 `install_manager` 模块文档。
 #[tauri::command]
 pub async fn version_install_manager(
     state: State<'_, AppState>,
@@ -63,13 +66,13 @@ pub async fn version_install_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::version_install_manager::dispatch(state, app, req).await
+    install_manager::dispatch(state, app, req).await
 }
 
 /// 统一版本导出管理 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::version_export_manager::dispatch` 进行 action 分发。
+/// `export_manager::dispatch` 进行 action 分发。
 ///
 /// 聚合 4 个 action：get_export_options / export_modpack /
 /// save_export_config / load_export_config。
@@ -80,7 +83,7 @@ pub async fn version_export_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::version_export_manager::dispatch(state, app, req).await
+    export_manager::dispatch(state, app, req).await
 }
 
 /// 校验版本 ID / 实例名，防止路径遍历

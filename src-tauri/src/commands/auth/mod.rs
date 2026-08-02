@@ -2,10 +2,11 @@
 //! 支持离线/微软（Web Auth Code Flow / Device Code Flow）/ authlib-injector 外置登录
 //! （yggdrasil 协议）。流程选择由 Client ID 自动决定：官方 ID（默认）走 Web Auth Code
 //! Flow + login.live.com 旧版端点；自定义 ID 走 Device Code Flow + login.microsoftonline.com v2.0。
-//! 子模块函数收 `&AppState`/`&AppHandle`，由 `utils::meta_manager::dispatch` 反序列化参数后调用。
+//! 子模块函数收 `&AppState`/`&AppHandle`，由 `meta_manager::dispatch` 反序列化参数后调用。
 
 pub mod account;
 pub mod authlib;
+pub(crate) mod meta_manager;
 pub mod microsoft;
 pub mod offline;
 
@@ -16,7 +17,7 @@ use tauri::{AppHandle, State};
 /// 统一认证 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::meta_manager::dispatch` 进行 action 分发。
+/// `meta_manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn meta_manager(
     state: State<'_, AppState>,
@@ -24,7 +25,7 @@ pub async fn meta_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::meta_manager::dispatch(state, app, req).await
+    meta_manager::dispatch(state, app, req).await
 }
 
 // 重导出所有子模块函数（pub use 仅供普通 Rust 代码调用，

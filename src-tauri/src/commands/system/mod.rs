@@ -3,9 +3,11 @@
 pub mod about;
 pub mod apply_config;
 pub mod config;
+pub mod config_manager;
 pub mod developer;
 mod game;
 pub mod game_dir;
+pub(crate) mod manager;
 mod proxy;
 pub mod updater;
 
@@ -39,9 +41,9 @@ where
 /// 统一系统模块 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }`，转发到
-/// `crate::utils::system_manager::dispatch` 分发。注册 20 个 action，分组：
+/// `manager::dispatch` 分发。注册 20 个 action，分组：
 /// game_dir(7) / config(2) / developer(6) / about(1) / logger(3) / updater(2)。
-/// 具体 action 名见 `system_manager::dispatch` 注册表。
+/// 具体 action 名见 `manager::dispatch` 注册表。
 #[tauri::command]
 pub async fn system_manager(
     state: State<'_, AppState>,
@@ -49,5 +51,5 @@ pub async fn system_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::system_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }

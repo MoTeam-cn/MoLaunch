@@ -1,4 +1,4 @@
-//! 认证模块统一分发逻辑（meta_manager 的工具实现）
+//! 认证模块统一分发逻辑（auth 域 meta_manager 模块）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，28 个 auth action 覆盖
 //! offline / microsoft / authlib 登录及账号管理、会话通用操作。
@@ -8,8 +8,9 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::auth::{
-    account::ms, account::offline, account::session, authlib, microsoft, offline as auth_offline,
+use super::{
+    account::{ms, offline, session},
+    authlib, microsoft, offline as auth_offline,
 };
 use crate::handler;
 use crate::minecraft::auth::authlib::Profile;

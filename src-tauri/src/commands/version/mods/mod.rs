@@ -9,6 +9,7 @@ pub(crate) mod helpers;
 pub mod install;
 pub mod list;
 pub mod manage;
+mod manager;
 mod metadata;
 mod types;
 pub mod update;
@@ -21,7 +22,7 @@ use tauri::{AppHandle, State};
 /// 统一版本 Mod 管理 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::version_mods_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn version_mods_manager(
     state: State<'_, AppState>,
@@ -29,7 +30,7 @@ pub async fn version_mods_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::version_mods_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }
 
 // 对外暴露类型和辅助函数（保持向后兼容路径）

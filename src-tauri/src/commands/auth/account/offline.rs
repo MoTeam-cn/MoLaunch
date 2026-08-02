@@ -2,7 +2,7 @@
 //! `save_custom_skin` 将用户选择的 PNG 复制到 `<app_data>/custom_skins/<uuid>.png`，
 //! 并把 `custom:<path>|<variant>` 写入离线账号 skin 字段。包含 PNG 文件头校验和
 //! 1MB 大小限制（比 Mojang 官方 24KB 宽松，因本地使用）。
-//! 已聚合为 `meta_manager` IPC 入口，由 `utils::meta_manager::dispatch` 分发调用。
+//! 已聚合为 `meta_manager` IPC 入口，由 `meta_manager::dispatch` 分发调用。
 
 use crate::error_util::log_err;
 use crate::log_info;

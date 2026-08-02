@@ -1,4 +1,4 @@
-//! 版本 Mod 管理统一分发逻辑（version_mods_manager 的工具实现）
+//! 版本 Mod 管理统一分发逻辑（version_mods_manager 的实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，11 个 version::mods action 在
 //! `once_cell::sync::Lazy` 初始化时注册到 DISPATCHER。
@@ -8,11 +8,11 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::version::mods::dependency_resolver::{
+use super::dependency_resolver::{
     check_mod_dependencies, install_mod_with_dependencies, DependencyCheckResult, InstallResult,
     ResolvedDependency,
 };
-use crate::commands::version::mods::{install, list, manage, update, watcher};
+use super::{install, list, manage, update, watcher};
 use crate::handler;
 use crate::minecraft::community::types::{Platform, ResourceVersion};
 use crate::state::AppState;

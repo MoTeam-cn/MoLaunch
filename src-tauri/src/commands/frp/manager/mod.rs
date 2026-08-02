@@ -1,4 +1,4 @@
-//! Frp 模块统一分发逻辑（frp_manager 的工具实现）
+//! Frp 模块统一分发逻辑（frp_manager 的命令层实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，覆盖厂商/隧道/进程/日志/
 //! 认证/厂商 API 引擎/认证适配器沙箱/公共 frps 服务器等 action。

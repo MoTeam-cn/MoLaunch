@@ -1,4 +1,4 @@
-//! 版本安装管理统一分发逻辑（version_install_manager 的工具实现）
+//! 版本安装管理统一分发逻辑（version_install_manager 的命令层实现）
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，聚合 `download` / `install` /
 //! `loaders` / `preload` 共 12 个 action。`download_version` / `install_merged` /
 //! `preload_mods_detail_cmd` 同时需要 state 和 app；`list_fabric_api_versions` /
@@ -8,10 +8,11 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::version::{download, install, loaders, preload};
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
+
+use super::{download, install, loaders, preload};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

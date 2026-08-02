@@ -20,7 +20,7 @@ use super::sanitize_version_id;
 /// 前端只传 username 和 uuid，避免 token 在 IPC 请求体中明文传输
 ///
 /// 注：原为独立 `#[tauri::command]`，已聚合为 `version_launch_manager` IPC 入口，
-/// 由 `utils::version_launch_manager::dispatch` 反序列化参数后调用。
+/// 由 `super::super::launch::manager::dispatch` 反序列化参数后调用。
 pub async fn export_launch_script(
     state: &AppState,
     version_id: String,

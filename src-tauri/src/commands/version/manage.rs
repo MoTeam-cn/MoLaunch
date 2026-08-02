@@ -2,7 +2,7 @@
 //!
 //! 注：原 4 个独立 Tauri 命令已聚合为 `version_list_manager` IPC 入口，
 //! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
-//! 由 `utils::version_list_manager::dispatch` 反序列化参数后调用。
+//! 由 `list_manager::dispatch` 反序列化参数后调用。
 
 use crate::state::AppState;
 use crate::{log_error, log_info};

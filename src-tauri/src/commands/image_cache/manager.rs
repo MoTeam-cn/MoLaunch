@@ -1,4 +1,4 @@
-//! 通用图片缓存统一分发逻辑（image_cache_manager 的工具实现）
+//! 通用图片缓存统一分发逻辑（image_cache 域 manager 模块）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，3 个 action：
 //! `get_cached_image_url` / `invalidate_cached_image` / `clear_image_cache`。
@@ -8,7 +8,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::image_cache;
+use super::*;
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
@@ -27,7 +27,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, app, params, {
             let p: UrlParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = image_cache::get_cached_image_url(p.url, &app).await?;
+            let r = get_cached_image_url(p.url, &app).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -37,7 +37,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: UrlParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            image_cache::invalidate_cached_image(p.url)?;
+            invalidate_cached_image(p.url)?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );
@@ -45,7 +45,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     d.register(
         "clear_image_cache",
         handler!(_state, _app, _params, {
-            image_cache::clear_image_cache()?;
+            clear_image_cache()?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );

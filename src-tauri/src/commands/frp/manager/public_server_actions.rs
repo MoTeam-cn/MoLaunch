@@ -17,7 +17,7 @@ use super::{AllocatePublicServerParams, AllocationIdParams};
 
 /// 加载设备凭证（需已注册），access token 过期时自动 refresh
 async fn load_creds(state: &AppState) -> Result<DeviceCredentials, String> {
-    crate::utils::online_manager::load_creds_with_auto_refresh(state).await
+    crate::commands::online::manager::load_creds_with_auto_refresh(state).await
 }
 
 /// 创建 OnlineClient（读取配置中的 api_server_url）

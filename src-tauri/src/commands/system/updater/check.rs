@@ -69,7 +69,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     let url = format!("{}{}", base_url.trim_end_matches('/'), path);
 
     // 3. 尝试加载设备 JWT（未注册时忽略，无 auth 请求）
-    let jwt = crate::utils::online_manager::load_creds_with_auto_refresh(state)
+    let jwt = crate::commands::online::manager::load_creds_with_auto_refresh(state)
         .await
         .ok()
         .map(|creds| creds.device_token);

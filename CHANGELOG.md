@@ -65,6 +65,28 @@
 - 设计决策：全部保持对外 API/消息契约/序列化结构不变；前端优先 composable 提取（状态与模板强耦合场景）、子组件承接模板片段（双向绑定用 defineModel）；后端保持 `pub use` re-export 路径兼容
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）、`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
+#### SDK DES 加解密统一（审计 A1，docs/fix-debug/03-backend-architecture.md）
+
+- 背景：审计发现 SDK DES 加解密「锁取 → encrypt/decrypt_token → 错误映射」样板被复制 4 份（frp/auth/storage.rs、minecraft/community/secure_storage.rs、minecraft/auth/storage/mod.rs、minecraft/online/storage.rs），且错误语义不一致（前两者失败视为无数据返回 None，后两者返回 Result）
+- 改动：
+  - 新增 `utils/sdk_crypto.rs`：`encrypt_with_sdk` / `decrypt_with_sdk`（Result 语义，供 auth/online）/ `decrypt_with_sdk_optional`（失败 log_warn + None，供 frp/community）；统一错误消息带调用方上下文
+  - 4 个调用方改用公共 helper，删除各自复制实现（约 72 行）
+- 设计决策：保留两种语义变体而非强行统一为一种，避免改变各调用方现有容错行为（最小修改）；helper 放 utils 层（纯 SDK 操作，无业务依赖）
+- 验证：`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
+
+#### 分发注册表迁移至 commands 域（审计 B1/B2，docs/fix-debug/03-backend-architecture.md）
+
+- 背景：审计发现 `utils/*_manager.rs`（17 个分发注册表）反向依赖 `commands` 业务层，与 `commands::* → utils::dispatcher` 形成双向耦合；tools 域分发器位置与其余域不一致
+- 改动（17 域迁移，注册表内容一字未改）：
+  - A 组（system/config/meta/skin/image_cache/java/sdk/plugins 8 域）：manager 物理移动至对应 commands 域（如 `utils/system_manager.rs` → `commands/system/manager.rs`），commands mod.rs 加 `pub(crate) mod manager;` 转发改 `manager::dispatch`
+  - B 组（community/frp/online/version_list/install/export/progress/launch 8 域）：同步迁移；`online_manager` 拆为 `commands/online/manager/`，`load_creds_with_auto_refresh` 引用方（4 处）改 `commands::online::manager::...`；`version/progress.rs` 单文件转子目录 `progress/`（mod.rs + manager.rs）
+  - 补迁 `utils/version_mods_manager.rs` → `commands/version/mods/manager.rs`（11 个 action 注册表），引用注释同步更新
+  - `utils/mod.rs` 删除全部 17 个 `pub mod *_manager;` 声明，仅保留纯工具模块（cache/dispatcher/format/fs/path/sdk_crypto/signaling/tun/version 等）
+  - tools 域确认无需迁移（`tools_manager` 本体本就在 `commands/tools/mod.rs`）
+  - 为 `DeviceStatus.device_pk` 补 `#[allow(dead_code)]`（`#[serde(skip)]` 设计安全字段，仅供后端内部逻辑使用）
+- 设计决策：采用「物理移动 + 相对导入 + mod.rs 转发」而非拆分重构，注册表逻辑零改动，行为完全等价；utils 层自此不再引用任何 commands 业务符号
+- 验证：`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
+
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs

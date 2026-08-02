@@ -1,4 +1,4 @@
-//! 联机模块统一分发逻辑（online_manager 的工具实现）
+//! 联机模块统一分发逻辑（online_manager 的命令层实现）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，覆盖认证、房间、信令、WebRTC、
 //! 虚拟网卡、端口探测等 action；TUN 桥接 action 由 `tun_manager` 注册。
@@ -36,6 +36,7 @@ pub struct DeviceStatus {
     pub logged_in: bool,
     pub token_expired: bool,
     #[serde(skip)]
+    #[allow(dead_code)]
     pub device_pk: String,
     pub device_id: String,
     pub token_expires_at: u64,

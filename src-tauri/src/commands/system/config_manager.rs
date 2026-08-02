@@ -1,4 +1,4 @@
-//! 配置管理统一分发逻辑（config_manager 的工具实现）
+//! 配置管理统一分发逻辑（system 域 config_manager 模块）
 //!
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，2 个 action：
 //! `get_config` / `apply_config`。两个命令均不需要 `AppHandle`。
@@ -7,7 +7,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::system::apply_config::{apply_config, get_config, ConfigEntry};
+use super::apply_config::{apply_config, get_config, ConfigEntry};
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};

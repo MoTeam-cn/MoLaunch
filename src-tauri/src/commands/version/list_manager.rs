@@ -1,4 +1,4 @@
-//! 版本列表/文件夹/管理/个性化命令的统一分发逻辑（version_list_manager 的工具实现）
+//! 版本列表/文件夹/管理/个性化命令的统一分发逻辑（version_list_manager 的命令层实现）
 //! 使用 `utils::dispatcher::Dispatcher` 注册式分发，聚合 `version::list` /
 //! `version::folder` / `version::manage` / `version::personalization` 共 19 个 action。
 //! 子模块函数签名改为 `&AppState` / `&AppHandle`，`fix_version_files` 需要
@@ -8,11 +8,12 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use crate::commands::version::{folder, list, manage, personalization};
 use crate::handler;
 use crate::minecraft::version::setup::PersonalizationUpdate;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
+
+use super::{folder, list, manage, personalization};
 
 /// 仅需 versionId 的 action 参数（uninstall_version / get_version_effective_dir
 /// / get_version_game_version / get_version_personalization 共 4 个）

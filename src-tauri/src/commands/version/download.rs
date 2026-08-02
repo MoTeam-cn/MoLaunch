@@ -10,7 +10,7 @@ use super::types::DownloadStageSnapshot;
 /// Download version
 ///
 /// 注：已聚合为 `version_install_manager` IPC 入口，本函数由
-/// `utils::version_install_manager::dispatch` 反序列化参数后调用。
+/// `install_manager::dispatch` 反序列化参数后调用。
 pub async fn download_version(
     app: &AppHandle,
     state: &AppState,

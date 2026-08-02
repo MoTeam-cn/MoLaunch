@@ -1,3 +1,5 @@
+mod manager;
+
 use crate::state::{AppState, DownloadState, StageStatus};
 use tauri::{AppHandle, State};
 
@@ -7,7 +9,7 @@ use crate::utils::dispatcher::ActionRequest;
 /// 统一下载进度 IPC 入口
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `crate::utils::version_progress_manager::dispatch` 进行 action 分发。
+/// `manager::dispatch` 进行 action 分发。
 #[tauri::command]
 pub async fn version_progress_manager(
     state: State<'_, AppState>,
@@ -15,7 +17,7 @@ pub async fn version_progress_manager(
     req: ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
-    crate::utils::version_progress_manager::dispatch(state, app, req).await
+    manager::dispatch(state, app, req).await
 }
 
 /// Get download progress
