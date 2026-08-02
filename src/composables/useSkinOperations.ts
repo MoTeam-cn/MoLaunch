@@ -1,42 +1,8 @@
 /**
  * 皮肤/披风操作 composable（从 SkinManager.vue 抽出）
  *
- * 封装 SkinManager 弹窗的全部业务逻辑（三分流：微软 / 外置 / 离线）：
- * - 加载皮肤/披风信息（loadInfo）：
- *   - 微软账号：从后端拉取 profile_json（含 skins / capes 列表）
- *   - 外置账号（yggdrasil）：调用 authlibGetSkinInfo，按 uploadableTextures 决定可上传项
- *   - 离线账号：使用本地默认皮肤或自定义皮肤
- * - 上传皮肤：
- *   - 微软账号：uploadSkin（Mojang API）
- *   - 外置账号：authlibUploadSkin（yggdrasil PUT /api/user/profile/{uuid}/skin）
- *   - 离线账号：saveCustomSkin（保存到本地 app data）
- * - 装备/取消披风（仅微软）：onEquipCape / onUnequipCape
- * - 上传/删除披风（仅外置）：onUploadAuthlibCape / onDeleteAuthlibCape
- * - 通用刷新流程（runWithRefresh）：执行 → 提示 → 重新加载 + 触发头像刷新
- * - 离线账号本地皮肤选择（onSelectLocalSkin）
- * - 下载当前皮肤到本地（saveSkinToLocal）
- * - image-cache 事件监听（onImageCached）：远程图片下载完成后自动替换为本地缓存 URL
- *
- * 设计原则：
- * - 接收所需的 computed 作为参数（uuid / username / loginType 等，来自 authStore）
- * - 返回状态 ref/computed 和 handler 函数
- * - 仅引入 toast，未引入 modal；遵循 toast.ts 推荐用法，使用 `toastSuccess`/`toastError` 前缀
- *
- * 使用方式：
- * ```ts
- * const uuid = computed(() => authStore.currentUser?.uuid ?? '')
- * const username = computed(() => authStore.currentUser?.name ?? '')
- * const loginType = computed(() => authStore.currentUser?.login_type ?? '')
- * const serverUrl = computed(() => authStore.currentUser?.server_url ?? '')
- * const {
- *   info, loading, uploading, skinUrl, capeUrl, variant, selectedLocalSkin,
- *   activeCape, activeSkin, authlibInfo, canUploadSkin, canUploadCape,
- *   loadInfo, pickAndUpload, onEquipCape, onUnequipCape,
- *   onSelectLocalSkin, onUploadCustomSkin, saveSkinToLocal,
- *   onUploadAuthlibCape, onDeleteAuthlibCape, onDeleteAuthlibSkin,
- *   isMicrosoft, isAuthlib, isOffline,
- * } = useSkinOperations({ uuid, username, loginType, serverUrl })
- * ```
+ * 按登录方式三分流（微软 / 外置 / 离线）封装加载、上传、披风装备、通用刷新
+ * 与本地缓存替换等全部弹窗业务逻辑；接收 computed 作为参数，仅用 toast，不引入 modal。
  */
 import { ref, computed, type ComputedRef } from 'vue'
 import {

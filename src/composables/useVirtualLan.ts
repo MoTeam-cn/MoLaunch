@@ -1,41 +1,9 @@
 /**
- * 虚拟网卡桥接 composable（阶段三子任务 5：数据分发打通）
+ * 虚拟网卡桥接 composable
  *
- * 房主与加入方共用此 composable，封装：
- * - `start(selfVirtualIp, subnet)`：解析 CIDR → 调用 `tunStart`（`online://tun-packet-out` 事件监听由 `onGlobalEvent` 在构造时注册）
- * - `onTunPacket` 回调：TUN 读到 IP 包时触发（房主调 `hostMesh.broadcastPacket`，加入方调 `dataChannel.send`）
- * - `forwardToTun(raw)`：将 DataChannel 收到的二进制消息转发到后端 TUN（base64 编码后 invoke `tun_forward_to`）
- * - `stop()`：停止桥接，销毁 TUN 接口
- *
- * # 数据流
- *
- * ```text
- * 后端 TUN 读包                     前端 DataChannel
- *   │                                  │
- *   │ 1. TUN.recv → IP 包              │
- *   │ 2. protocol::encode → 帧         │
- *   │ 3. emit(EVENT_TUN_PACKET_OUT)    │
- *   │ ─────────────────────────────>   │ 4. listen → onTunPacket 回调
- *   │                                  │ 5. hostMesh.broadcastPacket(raw) 或 dataChannel.send(raw)
- *   │                                  │
- *   │                                  │ 6. DataChannel.onmessage → ArrayBuffer
- *   │ <─────────────────────────────   │ 7. forwardToTun(raw) → base64 → invoke `tun_forward_to`
- *   │ 8. base64 decode → 帧            │
- *   │ 9. protocol::decode → IP 包      │
- *   │ 10. TUN.send → 写入接口          │
- * ```
- *
- * # 设计约束
- *
- * - 事件监听走 `onGlobalEvent` 全局单例 listener（后台 TUN 数据流持续推送，永不 unlisten），
- *   handler 在组件卸载时自动移除，`running` 守卫保证仅桥接运行中才分发数据
- * - `forwardToTun` 失败不抛错（避免 DataChannel.onmessage 回调链断掉），仅打 warn
- *
- * @example 房主侧使用
- * const lan = useVirtualLan({
- *   onTunPacket: (raw) => hostMesh.broadcastPacket(raw),
- * })
- * await lan.start(room.selfVirtualIp, room.subnet)
+ * 封装 start（CIDR→tunStart）/ onTunPacket 回调 / forwardToTun / stop。
+ * 事件监听走 onGlobalEvent 全局单例 listener（后台 TUN 持续推送，永不 unlisten），
+ * handler 组件卸载时自动移除；forwardToTun 失败仅 warn 不抛错（避免回调链断掉）。
  */
 
 import { onUnmounted, ref, shallowRef } from 'vue'

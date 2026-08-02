@@ -1,31 +1,10 @@
 /**
  * 种子地图生成 Worker
  *
- * 基于上游 cubiomes（fork: https://github.com/MoTeam-cn/cubiomes，支持 MC_26_2）。
- *
- * API：
- * - 工厂函数名：createCubiomesModule（Emscripten 标准 MODULARIZE）
- * - 群系+高度：_cubiomes_gen_biomes_with_height（cubiomes_wrapper.c）
- * - 结构查找：_cubiomes_get_structure_pos（region 遍历）
- * - 出生点：_cubiomes_estimate_spawn
- * - 要塞：_cubiomes_find_strongholds（多座要塞迭代，上限 128）
- * - 史莱姆区块：_cubiomes_is_slime_chunk（按 chunk 逐个判断）
- * - 峡谷系列：_cubiomes_find_ravines（checkCanyonStart + carveCanyon for mega）
- * - 下界化石：_cubiomes_find_nether_fossils（soul_sand_valley 中心启发式）
- * - 化石系列：_cubiomes_find_fossils（desert/swamp/mangrove 中心启发式；diamond 额外要求 deep_dark）
- *
- * 渲染：
- * - biome IDs → BIOME_COLORS 上色 → rgba
- * - height floats → applyTerrainShading（hillshade + terrace + contour）
- * - createImageBitmap → 主线程
- *
- * 架构要点：
- * 1. 消息串行化：所有消息进入单一队列，避免并发 WASM 内存操作
- * 2. WASM 加载：new Function + instantiateWasm 回调预实例化（避免 res:// fetch 问题）
- * 3. HEAPU8 安全访问：每次 WASM 调用后重新读取（内存增长可能 detach 旧视图）
- *
- * WASM 来源：src-tauri/resources/wasm/cubiomes.{js,wasm}（build.rs 自动编译）
- * 前端通过 res:// 协议加载（src/utils/wasm-loader.ts + src-tauri/src/res_scheme.rs）
+ * 基于上游 cubiomes（MoTeam-cn fork，支持 MC_26_2），WASM 位于
+ * src-tauri/resources/wasm/cubiomes.{js,wasm}（build.rs 编译，res:// 加载）。
+ * 架构要点：消息串行化（单队列防并发 WASM 内存操作）、new Function + instantiateWasm 预实例化、
+ * 每次 WASM 调用后重读 HEAPU8（内存增长可能 detach 旧视图，见 ensureHeap）。
  */
 import { BIOME_COLORS, DEFAULT_COLOR } from './constants'
 import { getStructuresByDimension } from './structures'
@@ -170,6 +149,21 @@ async function handleMessage(msg: MainToWorkerMsg) {
 
 // ===== Init：加载 WASM =====
 
+/**
+ * 加载并初始化 cubiomes WASM（工厂函数 createCubiomesModule，Emscripten MODULARIZE）
+ *
+ * 渲染管线：biome IDs → BIOME_COLORS 上色 → rgba；height floats → applyTerrainShading → createImageBitmap。
+ * 可用 WASM API（cubiomes_wrapper.c）：
+ * - _cubiomes_gen_biomes_with_height：群系+高度
+ * - _cubiomes_get_structure_pos：结构查找（region 遍历）
+ * - _cubiomes_estimate_spawn：出生点
+ * - _cubiomes_find_strongholds：多座要塞迭代（上限 128）
+ * - _cubiomes_is_slime_chunk：史莱姆区块（按 chunk 逐个判断）
+ * - _cubiomes_find_ravines：峡谷系列（mega 需 carveCanyon 验证规模）
+ * - _cubiomes_find_nether_fossils / _cubiomes_find_fossils：化石启发式
+ *
+ * @param msg InitMsg 含 wasmJsUrl / wasmUrl（res:// 地址）
+ */
 async function handleInit(msg: InitMsg) {
   if (Module) {
     moduleReady = true

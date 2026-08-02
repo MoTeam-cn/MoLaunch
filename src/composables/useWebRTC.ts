@@ -1,30 +1,9 @@
 /**
- * WebRTC composable（加入方专用，阶段三子任务 5 mesh 拓扑，子任务 7 ICE/TURN 重构，子任务 8 加密）
+ * WebRTC composable（加入方专用）
  *
- * 房主侧多 PC 管理见 `useWebRTCMesh.ts`。本 composable 仅负责加入方单 PC：
- * - 轮询房主为自己生成的 SDP Offer（mesh 拓扑，房主 per-participant Offer）
- * - 设置远端 Offer → 创建 Answer → 收集 ICE → 提交 Answer
- * - 连接状态追踪 + DataChannel 接收（房主创建，加入方 ondatachannel 接收）
- * - NAT 类型检测（创建临时 PeerConnection，复用 utils/online/nat-type）
- *
- * 设计约束：
- * - 不实现 trickle ICE，等待 iceGatheringState === 'complete' 后一次性返回所有 candidate
- *   （后端 `signaling_*` 接口约定 ice_candidates 为数组，非流式）
- * - 复用 `utils/online/webrtc-helpers.ts` 的底层函数，避免与 useWebRTCMesh 重复实现
- * - onUnmounted 自动 close PeerConnection，避免泄漏
- *
- * 阶段三子任务 7：所有 PC 构造方法接受 `IceServerEntry[]`（含 STUN + TURN 凭据），
- * 取代旧的 `stunServers: string[]`。NAT 检测仍接受 `string[]`（仅用 STUN 探测）。
- *
- * 阶段三子任务 8：`setRoomKey(key)` 注入 AES-GCM 密钥后，`setDataChannelHandlers`
- * 绑定的 `onMessage` 自动先解密再回调。密钥为 null 时透传原始帧（兼容未启用加密的服务器）。
- *
- * @example 加入房间
- * const webrtc = useWebRTC()
- * const { sdp, iceCandidates } = await webrtc.fetchOfferAndAnswer(
- *   roomCode, participantId, iceServers,
- * )
- * await submitAnswer(roomCode, participantId, sdp, iceCandidates)
+ * 单 PC 流程：轮询房主 Offer → 设远端 → 建 Answer → 收集 ICE → 提交；
+ * NAT 检测复用 utils/online/nat-type。无 trickle ICE（candidate 一次性返回）；
+ * setRoomKey 注入 AES-GCM 后 onMessage 自动先解密再回调，null 时透传。
  */
 
 import { onUnmounted, ref, shallowRef } from 'vue'

@@ -1,41 +1,35 @@
 /**
- * DataChannel 消息协议（与后端 `src-tauri/src/minecraft/online/protocol.rs` 一一对应）
+ * DataChannel 消息协议（与后端 src-tauri/src/minecraft/online/protocol.rs 一一对应）
  *
- * 二进制帧格式（大端序）：
- * ```
- * +--------+--------+--------+--------+--------+--------+--------+-----------+
- * | type   |    seq (u32 BE)    |    length (u16 BE)  | payload             |
- * | 1 byte |       4 bytes      |       2 bytes       | N bytes             |
- * +--------+--------+--------+--------+--------+--------+--------+-----------+
- * ```
- *
- * - type=0x01 Data：IP 包
- * - type=0x02 Control：控制消息（payload 首字节为 subtype）
- *   - subtype=0x01 Heartbeat
- *   - subtype=0x02 StatusQuery
- *   - subtype=0x03 StatusResponse
- *   - subtype=0x04 HostMcPort（payload 为 2 字节大端序 u16 端口）
- *   - subtype=0x05 TurnServers（payload 为 JSON UTF-8 字节，结构 IceServerEntry[]）
- * - type=0x03 Error：UTF-8 错误描述
- *
- * 用途：
- * - 前端 DataChannel.onMessage 收到 ArrayBuffer 后，用 `decode` 解析消息类型
- * - 房主侧检测到 MC 局域网端口后，用 `encodeHostMcPort` 编码并广播给所有参与者
- * - 加入方侧解码后，若为 HostMcPort 控制消息，更新本地 store.roomState.hostMcPort
- * - 房主拉取系统 TURN 服务器后，用 `encodeTurnServers` 编码并广播给所有参与者
- * - 加入方侧解码后，若为 TurnServers 控制消息，重建 PeerConnection 以应用新 ICE 配置
+ * 二进制帧：type(1B) + seq(u32 BE) + length(u16 BE) + payload(N)；
+ * 消息类型 / 控制子类型 / 编解码函数见 MESSAGE_TYPE、CONTROL_SUBTYPE 与 encode / decode。
  */
 
 import type { IceServerEntry } from '@/types/online'
 
-/** 消息类型枚举值（与后端 MessageType 一致） */
+/**
+ * 消息类型枚举值（与后端 MessageType 一致）
+ *
+ * 二进制帧（大端序）：type(1B) + seq(u32 BE) + length(u16 BE) + payload(N)；
+ * - 0x01 Data：IP 包（payload 为原始帧）
+ * - 0x02 Control：控制消息（payload 首字节为 subtype，见 CONTROL_SUBTYPE）
+ * - 0x03 Error：UTF-8 错误描述
+ */
 export const MESSAGE_TYPE = {
   DATA: 0x01,
   CONTROL: 0x02,
   ERROR: 0x03,
 } as const
 
-/** 控制消息子类型枚举值（与后端 ControlSubtype 一致） */
+/**
+ * 控制消息子类型枚举值（与后端 ControlSubtype 一致）
+ *
+ * - 0x01 Heartbeat
+ * - 0x02 StatusQuery
+ * - 0x03 StatusResponse
+ * - 0x04 HostMcPort：payload 为 2 字节大端序 u16 端口（房主广播 MC 局域网端口）
+ * - 0x05 TurnServers：payload 为 JSON UTF-8 字节（结构 IceServerEntry[]，加入方用于重建 PC 应用新 ICE）
+ */
 export const CONTROL_SUBTYPE = {
   HEARTBEAT: 0x01,
   STATUS_QUERY: 0x02,

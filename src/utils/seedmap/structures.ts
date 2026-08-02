@@ -1,30 +1,27 @@
 /**
  * cubiomes 结构类型配置 + 版本/维度过滤
  *
- * cubiomes finders.h 的 StructureType 枚举值与维度、Java 版引入版本等元数据。
- * 用于 Worker 内 findStructures 遍历可视范围内的 region 查找结构，
- * 以及前端按 MC 版本 + 维度动态过滤可选结构列表。
- *
- * 枚举值来源：src-tauri/cubiomes/finders.h:14-44
- * 版本值来源：src-tauri/cubiomes/biomes.h MCVersion 枚举（与 useSeedMap.ts 的 SEEDMAP_MC_VERSIONS 对齐）
- *
- * queryMode 说明（参考 docs/Map/prompt-structures.md §结构定义）：
- * - 'region'     常规区域结构，由 cubiomes_get_structure_pos 按 regionSize 遍历 region 查找
- * - 'mineshaft'  废弃矿井，cubiomes getStructurePos 内部已统一处理（按 chunk 而非 region），
- *                后端无需特殊分支，前端语义保留以便未来切换到 getMineshafts 批量 API
- * - 'stronghold' 要塞，由 cubiomes_find_strongholds 走 specials 流程统一返回多座
- * - 'slime'      史莱姆区块，cubiomes isSlimeChunk 按 chunk 逐个判断（id=-3 文档约定特殊值，
- *                不影响 cubiomes 调用），handleFindStructures 内遍历可视范围 chunk
- * - 'ravine' / 'mega_ravine' / 'underwater_ravine' / 'mega_underwater_ravine'
- *                峡谷系列，cubiomes checkCanyonStart 原生精确（mega 需 carveCanyon 验证规模）
- * - 'nether_fossil'  下界化石，biome 检查启发式（soul_sand_valley 中心标记）
- * - 'fossil' / 'fossil_diamond'
- *                    化石，biome 检查启发式（desert/swamp/mangrove 中心标记；
- *                    diamond 额外要求深层 deep_dark）
+ * 提供 StructureType 枚举值（finders.h）与各 queryMode 查找语义元数据，
+ * 供 Worker 内 findStructures 遍历与前端按 MC 版本/维度过滤结构列表；
+ * queryMode 各模式说明见 StructureQueryMode 类型注释。
  */
 import type { Dimension } from './types'
 
-/** 结构查找模式 */
+/**
+ * 结构查找模式（各模式的查找语义，供 Worker 内 findStructures 分发）
+ *
+ * - 'region'：常规区域结构，cubiomes_get_structure_pos 按 regionSize 遍历 region 查找
+ * - 'mineshaft'：废弃矿井，getStructurePos 内部已统一按 chunk 处理，语义保留供未来切换到批量 API
+ * - 'stronghold'：要塞，cubiomes_find_strongholds 走 specials 流程统一返回多座
+ * - 'slime'：史莱姆区块，isSlimeChunk 按 chunk 逐个判断（id=-3 为文档约定特殊值，不影响 cubiomes 调用）
+ * - 'ravine' / 'mega_ravine' / 'underwater_ravine' / 'mega_underwater_ravine'：
+ *   峡谷系列，checkCanyonStart 原生精确（mega 需 carveCanyon 验证规模）
+ * - 'nether_fossil'：下界化石，biome 检查启发式（soul_sand_valley 中心标记）
+ * - 'fossil' / 'fossil_diamond'：化石，biome 检查启发式（desert/swamp/mangrove 中心标记；diamond 额外要求 deep_dark）
+ *
+ * 枚举值来源：src-tauri/cubiomes/finders.h:14-44；版本值来源：biomes.h MCVersion 枚举
+ * （与 useSeedMap.ts 的 SEEDMAP_MC_VERSIONS 对齐）。
+ */
 export type StructureQueryMode =
   | 'region'
   | 'mineshaft'

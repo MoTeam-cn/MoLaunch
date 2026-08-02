@@ -1,30 +1,9 @@
 /**
  * Mod 详情预加载事件监听
  *
- * 后台加载完成后通过事件刷新 UI 的模式：
- * 后端 `preload_mods_detail_cmd` 命令在后台并发：
- *   1. 读 JAR 元数据（slug / 描述 / 版本 / logo / 译名）
- *   2. 批量查询 CF/MR 工程详情
- * 每完成一个就 emit `mods-preload-update` 事件，前端通过本 composable 监听并更新对应 mod。
- *
- * 全部完成后 emit `mods-preload-done` 事件，前端据此设置 `isPreloadDone = true`。
- * `handleShowInfo` 在 slug 为空时判断此标志：若预加载已完成则立即走本地信息弹窗，不等待。
- *
- * 事件可能分两次 emit：
- * - 元数据先到（slug/description/version/translated_name 字段非 null）
- * - project 后到（project 字段非 null，同时 cached_logo_url 一起到）
- * 也可能一次性 emit（缓存命中时所有字段一起到）。
- *
- * 使用全局单例 listener（`onGlobalEvent`），避免 Tauri 2.x `unlisten` 竞态
- * 导致的 "Couldn't find callback id xxx" 警告。组件卸载时 handler 自动从 Set 移除，
- * Tauri listener 永不 unlisten。
- *
- * 使用方式：
- * ```ts
- * const { isPreloadDone } = useModsPreload(mods)
- * // 事件监听在构造时自动注册，无需手动 startListener
- * // 组件卸载时 handler 自动移除
- * ```
+ * 后端后台并发预加载，每完成一个 emit `mods-preload-update`，全部完成 emit
+ * `mods-preload-done`；事件可能两次到达（元数据先、project 后）或一次性到达。
+ * 使用 onGlobalEvent 全局单例 listener（永不 unlisten），卸载时自动移除 handler。
  */
 
 import { ref, type Ref } from 'vue'

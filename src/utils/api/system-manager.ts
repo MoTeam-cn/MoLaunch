@@ -1,26 +1,9 @@
 /**
  * 系统模块统一 API 入口
  *
- * 后端 `system_manager` IPC 命令通过 `action` 字段分发到不同子模块
- * （参照 `meta_manager` / `image_cache_manager` / `config_manager` 模式）。
- *
- * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
- * 故前端 params 对象的字段名一律使用 camelCase。
- *
- * 注册的 action（29 个）：
- * - game_dir（7 个）：`open_game_dir` / `open_path` / `reveal_in_explorer`
- *   / `get_game_dir` / `write_text_file` / `get_system_memory` / `set_game_dir`
- * - config（2 个）：`get_config_path` / `save_config_to_file`
- * - developer（6 个）：`is_developer_unlocked` / `unlock_developer_mode`
- *   / `lock_developer_mode` / `get_storage_dirs` / `get_system_info` / `get_cache_stats`
- * - devtools（3 个）：`open_devtools` / `close_devtools` / `is_devtools_open`
- *   （开发者模式解锁且开启时可调出 WebView2 DevTools）
- * - about（1 个）：`get_about_data`
- * - logger（3 个）：`get_log_path` / `list_log_files` / `read_log_file`
- * - http_log（2 个）：`read_http_logs` / `list_http_log_files`
- * - updater（2 个）：`check_update` / `download_and_install_update`
- * - certs（3 个）：`list_custom_certs` / `add_custom_cert` / `remove_custom_cert`
- * - ws（1 个）：`get_ws_port`（下载进度推送 WS 端口）
+ * 后端 system_manager IPC 通过 action 字段分发；字段名一律 camelCase
+ * （后端 Params 使用 #[serde(rename_all = "camelCase")]）。
+ * 全部 action 见 SYSTEM_ACTIONS 常量（与后端 DISPATCHER 一一对应）。
  */
 
 import { invoke } from '@tauri-apps/api/core'

@@ -1,35 +1,9 @@
 /**
- * WebRTC mesh composable（房主专用，阶段三子任务 5，子任务 7 ICE/TURN 重构，子任务 8 加密）
+ * WebRTC mesh composable（房主专用）
  *
- * 房主为每个新加入的参与者维护独立 PeerConnection + DataChannel，
- * 实现 1-N 的虚拟局域网数据分发：
- * - `createOfferFor(participantId, iceServers)`：为新参与者创建 PC + DataChannel + Offer
- * - `setRemoteAnswer(participantId, sdp, ice)`：收到该参与者 Answer 后设置远端
- * - `broadcastPacket(raw)`：向所有已连接 DataChannel 广播二进制包（TUN 下行）
- * - `sendToParticipant(participantId, raw)`：向单个参与者发送
- * - `closeParticipant(participantId)`：踢出/离开时关闭对应 PC
- * - `close()`：房间关闭时统一释放
- *
- * 设计约束：
- * - 复用 `utils/online/webrtc-helpers.ts`，与加入方侧 `useWebRTC.ts` 共享底层
- * - 不实现 trickle ICE，等待 iceGatheringState === 'complete' 后一次性返回所有 candidate
- * - 连接状态以 `Map<participantId, WebRtcConnectionState>` 形式响应式暴露
- * - onUnmounted 自动 close 所有 PC，避免泄漏
- *
- * 阶段三子任务 7：`createOfferFor` 接受 `IceServerEntry[]`（含 STUN + TURN 凭据），
- * 取代旧的 `stunServers: string[]`。房主侧 ICE 服务器列表由 `useRoomHost` 从
- * `store.roomState.iceServers` 透传，包含 STUN + 用户自定义 TURN + 系统 TURN。
- *
- * 阶段三子任务 8：`setRoomKey(key)` 注入 AES-GCM 密钥后，`broadcastPacket` /
- * `sendToParticipant` 自动加密原始帧，`setDataChannelHandlers` 绑定的 `onMessage`
- * 自动先解密再回调。密钥为 null 时透传原始帧（兼容未启用加密的服务器）。
- *
- * @example 房主为参与者生成 Offer
- * const mesh = useWebRTCMesh()
- * const { sdp, iceCandidates } = await mesh.createOfferFor(participantId, iceServers)
- * await uploadParticipantOffer(roomCode, participantId, sdp, iceCandidates)
- * // 参与者提交 Answer 后：
- * await mesh.setRemoteAnswer(participantId, answerSdp, answerIce)
+ * 为每个参与者维护独立 PeerConnection + DataChannel，实现 1-N 虚拟局域网分发；
+ * 复用 utils/online/webrtc-helpers.ts。无 trickle ICE（等 iceGatheringState==='complete'
+ * 一次性返回 candidate）；setRoomKey 注入 AES-GCM 后广播自动加密，null 时透传。
  */
 
 import { onUnmounted, reactive, shallowRef } from 'vue'

@@ -1,27 +1,9 @@
 /**
  * 版本下载/安装/卸载操作 composable（从 Versions.vue 抽出）
  *
- * 封装 Versions 下载页的全部业务逻辑：
- * - 加载已安装版本列表（含类型与 logo 映射）
- * - 刷新版本列表
- * - 安装请求（合并加载器版本，后台执行）
- * - 下载/卸载版本
- * - 打开游戏目录
- *
- * 设计原则：
- * - 不接收参数：versionStore 由 composable 内部获取（与原 Versions.vue 一致）
- * - 返回状态 ref 和 handler 函数
- * - handler 内部的 toast/modal 调用保持原 Versions.vue 行为不变
- * - 同时引入了 toast 和 modal，toast 函数使用 `toastXxx` 前缀，`showError`/`showConfirm` 从 modal 导入
- *
- * 使用方式：
- * ```ts
- * const {
- *   installedVersions, installedVersionTypes, installedVersionLogos,
- *   loadInstalledVersions, handleRefresh, onInstallRequest,
- *   handleDownload, handleUninstall, handleOpenGameDir,
- * } = useVersionInstallActions()
- * ```
+ * 封装已安装版本列表加载/刷新、安装请求（合并加载器版本，后台执行）、
+ * 下载/卸载与打开游戏目录；不接收参数（versionStore 内部获取），
+ * 返回状态 ref 与 handler，toast/modal 行为与原页面一致。
  */
 import { ref } from 'vue'
 import { useVersionStore } from '@/stores/version'

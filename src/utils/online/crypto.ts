@@ -1,45 +1,9 @@
 /**
- * DataChannel 帧加密（阶段三子任务 8 安全加强）
+ * DataChannel 帧加密（AES-GCM）
  *
- * 房主创建房间 / 加入方加入房间时由后端下发 32 字节 AES-256 密钥（Base64Url 编码），
- * 前端在 DataChannel 收发前对完整协议帧（含头部）做 AES-GCM 加解密。
- *
- * # 帧格式
- *
- * 加密后的帧布局：
- * ```
- * +----------------+---------------------------+
- * | IV (12 bytes)  | ciphertext + tag (N+16)   |
- * +----------------+---------------------------+
- * ```
- *
- * - IV：每次加密随机生成 12 字节，明文发送（AES-GCM 标准做法）
- * - ciphertext + tag：AES-GCM 输出（包含 16 字节认证标签）
- *
- * # 密钥来源
- *
- * 后端 `rooms.room_key` 字段（Base64Url 无填充编码的 32 字节 AES-256 密钥）。
- * 空字符串表示服务器未启用加密（兼容旧服务器），此时 `importRoomKey` 返回 null，
- * 调用方应跳过加解密，直接透传原始帧。
- *
- * # 性能
- *
- * Web Crypto API（`crypto.subtle`）基于原生实现，单帧加解密耗时通常 < 0.1ms。
- * 协议帧典型大小 1500 字节（IP 包 + 7 字节帧头），加密后约 1535 字节，
- * 远低于 DataChannel 16KB 单消息上限。
- *
- * @example 房主侧使用
- * const key = await importRoomKey(store.roomState.roomKey)
- * hostMesh.setRoomKey(key)
- *
- * @example 手动加解密
- * const key = await importRoomKey(base64Key)
- * if (key) {
- *   const encrypted = await encryptFrame(plaintext, key)
- *   // ... send encrypted via DataChannel
- *   const decrypted = await decryptFrame(encrypted, key)
- *   if (decrypted) decode(decrypted)
- * }
+ * 后端下发 Base64Url 编码的 32 字节 AES-256 密钥（rooms.room_key），
+ * 前端对完整协议帧做 AES-GCM 加解密：加密帧 = IV(12B) + ciphertext+tag(N+16B)。
+ * 空密钥表示服务器未启用加密，importRoomKey 返回 null，调用方应直接透传原始帧。
  */
 
 /** AES-GCM IV 长度（12 字节，NIST 推荐值） */
@@ -89,6 +53,8 @@ export async function importRoomKey(base64Key: string): Promise<CryptoKey | null
  *
  * 生成随机 12 字节 IV → AES-GCM 加密 → 返回 `IV || ciphertext+tag`。
  * 同一明文每次加密结果不同（IV 随机），保证语义安全。
+ * Web Crypto API 基于原生实现，单帧耗时通常 < 0.1ms；协议帧典型 1500 字节，
+ * 加密后约 1535 字节，远低于 DataChannel 16KB 单消息上限。
  *
  * @param plaintext 原始协议帧（含头部）
  * @param key AES-GCM 密钥

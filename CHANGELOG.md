@@ -40,6 +40,15 @@
 - 设计决策：优先复用既有工具；`useVirtualLan` 的 TUN 数据流属后台持续推送，选 `onGlobalEvent` 而非 `useTauriEvent`；`DeviceCodeModal` 保留返回值驱动复制失败状态的语义
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）
 
+#### 前端头部注释精简（审计 P1，docs/fix-debug/06-frontend-header-comments.md）
+
+- 背景：项目规范要求前端 ts 文件头部注释最多 8 行（许可证例外）；审计扫描发现 131 个文件超限，其中 20 个头部 ≥24 行为 P1（另 111 个 9~23 行为 P2 待后续处理）
+- 改动（20 文件，删约 510 行注释）：
+  - 头部精简至 ≤8 行一句话职责；删除重构背景/变更历史/ASCII 数据流图/JSON-XML 样例/协议格式文档
+  - 7 个文件的重要设计信息迁移到函数/类型级 `/** */` 注释（信息无丢失）：crypto.ts（帧性能）、parser.ts（JSON/XML 样例）、generatorWorker.ts（WASM API 清单）、terrainShading.ts（渲染算法）、protocol.ts（帧布局与子类型）、structures.ts（queryMode 语义）、developer.ts（解锁触发链）
+  - 关键约束保留：useVirtualLan（onGlobalEvent 永不 unlisten）、useGlobalTauriEvent（unlisten 竞态消除）、useWebRTC/useWebRTCMesh（无 trickle ICE、AES-GCM）
+- 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）
+
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs

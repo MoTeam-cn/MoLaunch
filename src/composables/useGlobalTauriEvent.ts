@@ -1,26 +1,10 @@
 /**
  * 全局单例 Tauri 事件监听
  *
- * 解决 Tauri 2.x `unlisten` 的固有竞态：
- * `_unlisten` 先同步删除前端 callback，再异步通知 Rust 删除 listener，
- * 期间 Rust 仍在 emit 事件 → 触发 "Couldn't find callback id xxx" 警告。
- *
- * 本 composable 为每个事件名维护一个全局单例 Tauri listener（永不 unlisten），
- * 组件通过 `onGlobalEvent` 注册 handler，`onUnmounted` 自动从 Set 中移除 handler，
- * 完全绕开 Tauri 的 callback 删除竞态。
- *
- * 适用：后台异步任务 emit 的事件（image-cached、mods-preload-update、mods-dir-changed 等），
- * 这些事件的 Rust emit 时机不受前端组件生命周期控制。
- *
- * 不适用：需要精确控制 Rust listener 生命周期的场景（如一次性事件）。
- *
- * @example
- * ```ts
- * onGlobalEvent<MyPayload>('my-event', (payload) => {
- *   console.log('收到:', payload)
- * })
- * // 组件卸载时 handler 自动移除，Tauri listener 保留
- * ```
+ * 解决 Tauri 2.x unlisten 竞态（_unlisten 先删前端 callback 再异步通知 Rust，
+ * 期间 Rust 仍 emit 导致 "Couldn't find callback id xxx" 警告）：
+ * 每个事件名维护全局单例 listener 且永不 unlisten，组件经 onGlobalEvent 注册 handler，
+ * 卸载时自动从 Set 移除；适用后台异步事件，不适用需精确控制生命周期的一次性事件。
  */
 import { onUnmounted } from 'vue'
 import { listen, type UnlistenFn } from '@tauri-apps/api/event'

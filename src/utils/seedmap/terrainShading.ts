@@ -1,29 +1,8 @@
 /**
  * 地形阴影渲染（hillshade + terrace + contour）
  *
- * 参考 prompt-frontend.md 的 applyTerrainShading 实现，适配项目坐标系。
- *
- * 光源方向：左上 (azimuth=315°, altitude=30°)
- * - LX=-0.8660254, LY=-0.5, LZ=0.5
- *
- * 渲染效果：
- * 1. Hillshade：根据高度差计算坡度，模拟光照（intensity = 0.55 + 0.45 * max(0, N·L)）
- * 2. Terrace 台阶线：
- *    - isEngraved 模式（scale=1 && pxPerBlock>=2）：方块边界高度突变处画强暗线
- *    - Graded 模式（其他情况）：柔和边界，高度差>2 时按梯度加深
- * 3. Contour：等高线（可选，每 10 格一条，高度差 <0.3 时提亮 40）
- *
- * 性能：纯 JS 双层循环，64×64 tile 约 4096 像素，单 tile <1ms。
- * 在 Worker 内调用，不阻塞主线程。
- *
- * @param rgba         RGBA 图像数据（imgW × imgH × 4），原地修改
- * @param imgW         图像宽度（像素）
- * @param imgH         图像高度（像素）
- * @param heights      高度数组（hw × hh，float，方块单位，来自 cubiomes mapApproxHeight）
- * @param hsx          height 数组宽度（= hw）
- * @param hsz          height 数组高度（= hh）
- * @param heightCellPx 每个 height cell 的像素尺寸（= imgW / hsx）
- * @param options      渲染选项
+ * 纯 JS 双层循环，在 Worker 内调用不阻塞主线程；
+ * 光源方向与渲染算法详见 applyTerrainShading 的函数文档。
  */
 export interface TerrainShadingOptions {
   /** cubiomes scale（1=精细, 4=粗采样, 16=区块级） */
@@ -36,6 +15,27 @@ export interface TerrainShadingOptions {
   ymax?: number
 }
 
+/**
+ * 对 RGBA 图像原地应用地形阴影（hillshade + terrace + contour）
+ *
+ * 光源方向：左上 (azimuth=315°, altitude=30°)，LX=-0.8660254, LY=-0.5, LZ=0.5。
+ * 渲染效果：
+ * 1. Hillshade：根据高度差计算坡度，intensity = 0.55 + 0.45 * max(0, N·L)
+ * 2. Terrace：isEngraved 模式（scale=1 && pxPerBlock>=2）方块边界高度突变处画强暗线；
+ *    Graded 模式（其他情况）柔和边界，高度差>2 时按梯度加深
+ * 3. Contour：等高线（可选，每 10 格一条，高度差 <0.3 时提亮 40）
+ *
+ * 性能：纯 JS 双层循环，64×64 tile 约 4096 像素，单 tile <1ms；在 Worker 内调用不阻塞主线程。
+ *
+ * @param rgba         RGBA 图像数据（imgW × imgH × 4），原地修改
+ * @param imgW         图像宽度（像素）
+ * @param imgH         图像高度（像素）
+ * @param heights      高度数组（hw × hh，float，方块单位，来自 cubiomes mapApproxHeight）
+ * @param hsx          height 数组宽度（= hw）
+ * @param hsz          height 数组高度（= hh）
+ * @param heightCellPx 每个 height cell 的像素尺寸（= imgW / hsx）
+ * @param options      渲染选项
+ */
 export function applyTerrainShading(
   rgba: Uint8ClampedArray,
   imgW: number,

@@ -1,27 +1,9 @@
 /**
  * 下载进度 WebSocket 流（替代 useDownloadPolling 的轮询方案）
  *
- * 工作原理：
- * - 监听 `versionStore.downloading` 状态变化
- * - true 时通过 `getWsPort` IPC 获取 WS 端口 + 鉴权 token，建立 WebSocket 连接
- * - 连接建立后客户端发送 `{"type":"auth","token":"<token>"}` 鉴权
- * - 后端校验通过后返回 `{"type":"auth_ok"}` 并开始推送 snapshot
- * - 后端在 progress_callback / stage_callback / cancel / pause / resume 时
- *   通过 broadcast channel 推送 snapshot，WS 服务器以 200ms 节流转发给前端
- * - `onmessage` 解析 JSON → 更新 versionStore（与原轮询逻辑一致）
- * - false 时关闭 WS 连接
- *
- * 初始状态恢复：
- * - 页面刷新后进入 Downloads.vue 时，先调用 `getDownloadProgress()` 一次性获取当前状态
- * - `initDownloadStream` 会自动建立 WS 连接接收后续更新
- *
- * 断线重连：
- * - `onclose` 时如果 `versionStore.downloading` 仍为 true，3 秒后自动重连
- *
- * 安全：
- * - WS 端口绑定 127.0.0.1，仅本机可访问
- * - token 通过 IPC（Tauri 内部通道）获取，不经过网络
- * - 后端 3 秒内未收到正确 token 则关闭连接，防止本机其他进程窃听
+ * 监听 versionStore.downloading：true 时经 getWsPort 建 WS 连接并发 auth 鉴权，
+ * 后端 200ms 节流推送 snapshot 更新 versionStore；false 时关闭。
+ * 断线且仍在下载则 3 秒重连；WS 绑定 127.0.0.1，token 走 IPC 不经网络。
  */
 
 import { watch } from 'vue'

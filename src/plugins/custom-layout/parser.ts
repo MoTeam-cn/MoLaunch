@@ -1,37 +1,8 @@
 /**
  * 自定义布局解析器
  *
- * 支持 JSON 和 XML 两种格式，解析后统一转为 LayoutSchema。
- *
- * JSON 格式：
- * ```json
- * {
- *   "title": "我的面板",
- *   "icon": "chart-bar",
- *   "sections": [
- *     { "type": "stat-grid", "columns": 3, "items": [...] },
- *     { "type": "list", "title": "明细", "source": "cache.entries", "fields": [...] },
- *     { "type": "html", "content": "<h1>Hello</h1>", "script": "console.log('hi')", "style": "h1{color:red}", "height": 240 }
- *   ]
- * }
- * ```
- *
- * XML 格式：
- * ```xml
- * <panel title="我的面板" icon="chart-bar">
- *   <stat-grid columns="3">
- *     <item label="总占用" value="{{cache.totalSize}}" format="bytes" />
- *   </stat-grid>
- *   <list title="明细" source="cache.entries">
- *     <field key="name" label="名称" />
- *   </list>
- *   <html height="240">
- *     <content><![CDATA[ <h1>Hello</h1> ]]></content>
- *     <style>h1 { color: red; }</style>
- *     <script>console.log('hi')</script>
- *   </html>
- * </panel>
- * ```
+ * 支持 JSON 与 XML 两种格式，解析后统一转为 LayoutSchema；
+ * 输入非法时返回 { schema: null, error }（见 ParseResult）。
  */
 
 import type { LayoutSchema, LayoutSection, StatItem, ListField, ValueFormat, ParseResult } from './types'
@@ -50,6 +21,12 @@ const VALID_VARIANTS = new Set(['default', 'muted', 'warning'])
 
 /**
  * 解析 JSON 布局
+ *
+ * 格式示例：{ "title": "我的面板", "icon": "chart-bar", "sections": [
+ *   { "type": "stat-grid", "columns": 3, "items": [...] },
+ *   { "type": "list", "title": "明细", "source": "cache.entries", "fields": [...] },
+ *   { "type": "html", "content": "<h1>Hello</h1>", "script": "console.log('hi')", "style": "h1{color:red}", "height": 240 } ] }
+ * 合法 section 类型见 VALID_SECTION_TYPES，值格式见 VALID_FORMATS。
  *
  * @param content JSON 字符串
  * @returns 解析结果（schema 或 error）
@@ -102,6 +79,11 @@ export function parseJsonLayout(content: string): ParseResult {
  * 解析 XML 布局
  *
  * 使用浏览器内置 DOMParser 解析 XML，转为与 JSON 相同的 LayoutSchema。
+ * 格式示例：<panel title="我的面板" icon="chart-bar">
+ *   <stat-grid columns="3"><item label="总占用" value="{{cache.totalSize}}" format="bytes" /></stat-grid>
+ *   <list title="明细" source="cache.entries"><field key="name" label="名称" /></list>
+ *   <html height="240"><content><![CDATA[ <h1>Hello</h1> ]]></content></html>
+ * </panel>
  *
  * @param content XML 字符串
  * @returns 解析结果（schema 或 error）

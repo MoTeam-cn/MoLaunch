@@ -1,26 +1,9 @@
 /**
  * 选择器子窗口工具
  *
- * 通过后端 open_picker_window action 创建 Tauri 子窗口，由后端按 template
- * 名称加载 resources 中的 HTML 模板并注入 data，用户在子窗口中点击选项后
- * 通过 picker-result 事件返回选中值。
- *
- * ## 两类窗口
- *
- * - **选择型**（openPickerWindow）：用户必须点击选项，通过 picker-result 返回值；
- *   用户关窗视为取消，reject。适用：port-picker、confirm。
- * - **展示型**（openDisplayWindow）：纯展示内容，用户关窗即结束，resolve；
- *   不需要 picker-result。适用：redirect、info、image-viewer、markdown、qrcode。
- *
- * ## CSP 传递
- *
- * 各模板的 CSP 在 `picker-templates.ts` 中配置，便捷函数自动从配置中读取
- * 并通过 params.csp 传给后端，后端注入到 picker:// 响应头中。
- *
- * 用法：
- *   const value = await openPickerWindow({ template: 'port-picker', title: '选择端口' })
- *   const ok = await openConfirmWindow({ message: '确认删除？' })
- *   await openMarkdownWindow({ content: '# Hello' })
+ * 通过后端 open_picker_window 创建 Tauri 子窗口（后端按模板名加载 HTML 并注入 data）。
+ * 两类窗口：选择型（openPickerWindow，必须点击选项，关窗视为取消 reject）与
+ * 展示型（openDisplayWindow，关窗即 resolve）；CSP 由 picker-templates.ts 配置并传递。
  */
 
 import { invoke } from '@tauri-apps/api/core'
