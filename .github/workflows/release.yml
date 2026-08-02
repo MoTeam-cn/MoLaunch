@@ -147,13 +147,9 @@ jobs:
           # Windows 优先使用 NSIS 安装包（而非 MSI），与 updater 协议一致
           updaterJsonPreferNsis: true
           # Windows 构建 NSIS 安装版；macOS/Linux 维持单一产物（app/appimage）。
-          # 注意：Tauri v2 的 --bundles 在 Windows 仅支持 msi/nsis（无 portable 目标），
-          # 便携版由下方 "Create portable build" 步骤复制 release 单文件并签名。
           args: ${{ matrix.platform == 'windows' && '--bundles nsis' || '' }}
 
       # ===== Windows 便携版 =====
-      # Tauri v2 无 portable 打包目标，便携版 = 复制 release 单文件 exe 并签名，
-      # 命名遵循 locate 步骤的 *_portable.exe 约定，复用下方预签名上传逻辑。
       - name: Create portable build (Windows only)
         if: matrix.platform == 'windows'
         shell: bash
@@ -175,11 +171,7 @@ jobs:
           ls -la "$PORTABLE_FILE" "${PORTABLE_FILE}.sig"
 
       # ===== 预签名上传 + 注册版本 =====
-      # See: docs/updater/design.md §5.2 / §6 MoSign-v2 协议
       # CI 不接触 S3 凭证，通过 /v3/ci/presign-upload 获取 PUT presigned URL 直传。
-      # GitHub Secrets 仅保留 MOLAUNCH_ACTION_PUSH_KEY 一个（MoSign-v2 签名密钥）。
-      # 签名/上传/注册全部由 scripts/ci-upload.cjs 纯 Node.js 完成，消除 shell/Node
-      # 数据传递导致的签名不一致问题（JSON.stringify 生成 body Buffer，签名和请求共用）。
 
       - name: Locate installer and signature
         id: locate
@@ -305,6 +297,18 @@ jobs:
             ${{ steps.locate.outputs.sig_file }}
           if-no-files-found: error
 
+      # Windows 便携版（*_portable.exe + .sig）作为 workflow artifact 传递，
+      # 由 release job 附加到 GitHub Release（除 S3 外，提供手动下载入口）。
+      - name: Upload portable as workflow artifact (Windows only)
+        if: matrix.platform == 'windows' && steps.locate.outputs.portable_file != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-portable
+          path: |
+            ${{ steps.locate.outputs.portable_file }}
+            ${{ steps.locate.outputs.portable_sig }}
+          if-no-files-found: error
+
   # 创建 GitHub Release 页面（历史回顾 + 承载 Windows setup / macOS / Linux 安装包下载）
   release:
     name: Create GitHub Release (history)
@@ -332,6 +336,12 @@ jobs:
         with:
           name: linux-package
           path: artifacts/linux
+
+      - name: Download Windows portable artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-portable
+          path: artifacts/windows
 
       - name: List artifacts
         shell: bash
@@ -376,7 +386,7 @@ jobs:
 
             ### Downloads
             - **Windows 安装版（setup）**：本页 Assets 中 `*-setup.exe`，需手动下载安装。
-            - **Windows 便携版（推荐）**：已上传至 S3 存储桶，客户端可通过启动器「检查更新」自动获取。
+            - **Windows 便携版**：本页 Assets 中 `*_portable.exe`（含 `.sig` 签名），也可通过「检查更新」自动获取。
             - **macOS**：本页 Assets 中 `*.app.tar.gz`（含 `.sig` 签名），也可通过「检查更新」自动获取。
             - **Linux**：本页 Assets 中 `*.AppImage`（含 `.sig` 签名），也可通过「检查更新」自动获取。
 
@@ -387,6 +397,8 @@ jobs:
             See [CHANGELOG.md](CHANGELOG.md) for details.
           files: |
             artifacts/windows/*-setup.exe
+            artifacts/windows/*_portable.exe
+            artifacts/windows/*.sig
             artifacts/macos/*.app.tar.gz
             artifacts/macos/*.sig
             artifacts/linux/*.AppImage
