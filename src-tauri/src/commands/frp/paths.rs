@@ -83,12 +83,3 @@ pub fn frp_logs_dir() -> PathBuf {
 pub fn frp_config_dir() -> PathBuf {
     frp_data_dir().join("config")
 }
-
-/// 确保目录存在
-pub fn ensure_dir(path: &std::path::Path) -> Result<(), String> {
-    if !path.exists() {
-        std::fs::create_dir_all(path)
-            .map_err(|e| format!("创建目录失败 {}: {}", path.display(), e))?;
-    }
-    Ok(())
-}

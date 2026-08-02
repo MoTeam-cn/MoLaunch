@@ -22,6 +22,13 @@ fn test_version_type_str_roundtrip() {
 }
 
 #[test]
+fn test_version_type_old_aliases() {
+    assert_eq!(VersionType::from_str("old_alpha"), VersionType::Old);
+    assert_eq!(VersionType::from_str("old_beta"), VersionType::Old);
+    assert_eq!(VersionType::from_str("OLD_ALPHA"), VersionType::Old);
+}
+
+#[test]
 fn test_is_release() {
     assert!(VersionType::Release.is_release());
     assert!(VersionType::Forge.is_release());

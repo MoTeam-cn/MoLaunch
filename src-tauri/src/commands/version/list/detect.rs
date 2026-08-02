@@ -41,28 +41,12 @@ pub fn detect_version_type_from_dir(game_dir: &std::path::Path, version_id: &str
     }
 
     // 2. 从 setup.ini 读取（仅当JSON检测为Release时）
-    let setup_path = version_dir.join("setup.ini");
-    if setup_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&setup_path) {
-            for line in content.lines() {
-                if let Some(value) = line.strip_prefix("Type=") {
-                    let type_str = value.trim().to_lowercase();
-                    // 忽略 "release"，继续检测
-                    if type_str != "release" {
-                        return match type_str.as_str() {
-                            "forge" => VersionType::Forge,
-                            "neoforge" => VersionType::NeoForge,
-                            "fabric" => VersionType::Fabric,
-                            "quilt" => VersionType::Quilt,
-                            "optifine" => VersionType::OptiFine,
-                            "liteloader" => VersionType::LiteLoader,
-                            "snapshot" => VersionType::Snapshot,
-                            "old" | "old_alpha" | "old_beta" => VersionType::Old,
-                            _ => VersionType::Release,
-                        };
-                    }
-                }
-            }
+    //    复用 VersionSetup::load 解析 Type= 到 loader.version_type
+    if let Ok(Some(setup)) = VersionSetup::load(&version_dir) {
+        match setup.loader.version_type {
+            // release / unknown 视为无有效加载器信息，继续后续检测
+            VersionType::Release | VersionType::Unknown => {}
+            t => return t,
         }
     }
 

@@ -85,13 +85,8 @@ pub async fn version_export_manager(
 
 /// 校验版本 ID / 实例名，防止路径遍历
 pub fn sanitize_version_id(id: &str) -> Result<(), String> {
-    if id.is_empty()
-        || id.contains('/')
-        || id.contains('\\')
-        || id.contains("..")
-        || id.contains('\0')
-        || id.contains(':')
-    {
+    crate::utils::path::sanitize_file_name(id)?;
+    if id.contains(':') {
         return Err(format!("Invalid version id: {}", id));
     }
     // 额外用 components 验证只含 Normal 分量

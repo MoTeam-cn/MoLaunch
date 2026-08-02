@@ -17,6 +17,17 @@
 - 设计决策：复用既有全局工具而非保留局部副本，符合「可复用函数必须提取到单独 TypeScript 文件」项目约定
 - 验证：`npx vite build` 通过（exit 0）
 
+#### 后端复用重构（审计 A2-A5，docs/fix-debug/03-backend-architecture.md）
+
+- 背景：审计发现 frp/paths.rs 本地 ensure_dir、version/mod.rs sanitize_version_id、offline.rs PNG 校验、detect.rs setup.ini 手写解析均与 utils/已有工具重复
+- 改动：
+  - `commands/frp/paths.rs` + `commands/frp/mod.rs`（A2）：删除本地 `ensure_dir`，re-export 改为 `utils::fs::ensure_dir`
+  - `commands/version/mod.rs`（A3）：`sanitize_version_id` 复用 `utils::path::sanitize_file_name`，保留 `:` 与 components 增量校验
+  - `commands/auth/account/offline.rs` + `commands/auth/authlib/helpers.rs`（A4）：`save_custom_skin` 改为调用 `read_png_file`（可见性 `pub(super)`→`pub`，helpers 模块 `pub(crate)`）
+  - `commands/version/list/detect.rs`（A5）：setup.ini `Type=` 手写解析改为复用 `VersionSetup::load`，`Release`/`Unknown` 继续降级检测
+  - `minecraft/version/state.rs`：`VersionType::from_str` 补充 `old_alpha`/`old_beta` 别名映射（原 detect.rs 依赖此映射，复用后保持行为等价）；`state_tests.rs` 新增别名测试
+- 验证：`cargo check`、`cargo test --lib` 通过（151+1 passed / 0 failed）、`cargo clippy` 零警告
+
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs

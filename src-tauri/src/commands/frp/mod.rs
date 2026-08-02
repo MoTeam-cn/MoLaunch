@@ -17,9 +17,10 @@ use crate::utils::dispatcher::ActionRequest;
 use tauri::{AppHandle, State};
 
 // 共享类型与路径函数 re-export（外部调用方通过 `crate::commands::frp::Tunnel` 等访问）
+pub use crate::utils::fs::ensure_dir;
 pub use paths::{
-    ensure_dir, frp_config_dir, frp_data_dir, frp_logs_dir, providers_root, providers_state_path,
-    tunnels_path, validate_provider_id,
+    frp_config_dir, frp_data_dir, frp_logs_dir, providers_root, providers_state_path, tunnels_path,
+    validate_provider_id,
 };
 pub use types::{
     ApiKeyConfig, ApiRef, ApiSpec, AuthConfig, AuthFile, AuthFileApiKey, AuthFileDeviceCode,

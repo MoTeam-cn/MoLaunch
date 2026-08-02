@@ -6,7 +6,7 @@
 //! 切换已保存账号走 validate→refresh→密码重登 三步降级。
 
 mod account;
-mod helpers;
+pub(crate) mod helpers;
 mod login;
 mod skin;
 mod types;

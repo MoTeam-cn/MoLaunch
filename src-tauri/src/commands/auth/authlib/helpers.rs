@@ -29,7 +29,10 @@ pub(super) async fn load_account_or_err(
 ///
 /// 在 `spawn_blocking` 中执行 `std::fs::read`，避免阻塞异步运行时
 /// （与微软 `upload_skin` 命令的处理方式一致）。
-pub(super) async fn read_png_file(file_path: &str) -> Result<Vec<u8>, String> {
+///
+/// 同时被 `commands::auth::account::offline::save_custom_skin` 复用，统一本地皮肤
+/// 上传的 PNG 校验。
+pub async fn read_png_file(file_path: &str) -> Result<Vec<u8>, String> {
     let path = file_path.to_string();
     tokio::task::spawn_blocking(move || {
         let bytes = std::fs::read(&path).map_err(|e| format!("读取皮肤文件失败: {}", e))?;

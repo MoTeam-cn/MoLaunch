@@ -58,7 +58,7 @@ impl VersionType {
             "release" => Self::Release,
             "snapshot" => Self::Snapshot,
             "fool" => Self::Fool,
-            "old" => Self::Old,
+            "old" | "old_alpha" | "old_beta" => Self::Old,
             "forge" => Self::Forge,
             "neoforge" => Self::NeoForge,
             "fabric" => Self::Fabric,

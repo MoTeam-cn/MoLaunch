@@ -10,6 +10,7 @@ use crate::minecraft::auth::storage::StoredOfflineAccount;
 use crate::state::{AppState, LocalAuthResult};
 
 use super::OfflineAccountInfo;
+use super::super::authlib::helpers::read_png_file;
 
 /// 获取已存储的离线账号列表
 pub async fn get_offline_accounts(state: &AppState) -> Result<Vec<OfflineAccountInfo>, String> {
@@ -56,18 +57,8 @@ pub async fn save_custom_skin(
 ) -> Result<String, String> {
     let variant = variant.unwrap_or_else(|| "classic".to_string());
 
-    // 读取源文件
-    let png_data = std::fs::read(&file_path).map_err(|e| format!("读取皮肤文件失败: {}", e))?;
-
-    // 验证 PNG 文件头
-    if png_data.len() < 8 || png_data[0..5] != [0x89, 0x50, 0x4E, 0x47, 0x0D] {
-        return Err("文件不是有效的 PNG 格式".to_string());
-    }
-
-    // 验证文件大小（< 1MB，比 Mojang 的 24KB 宽松，因为是本地使用）
-    if png_data.len() > 1024 * 1024 {
-        return Err("皮肤文件过大（超过 1MB）".to_string());
-    }
+    // 读取源文件并校验（PNG 文件头 + 1MB 大小限制，复用 authlib 的 read_png_file）
+    let png_data = read_png_file(&file_path).await?;
 
     // 保存到 app data 目录
     let skin_dir = crate::storage::Storage::instance()
