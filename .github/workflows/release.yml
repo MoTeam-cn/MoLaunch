@@ -280,7 +280,32 @@ jobs:
             src-tauri/target/release/bundle/nsis/*-setup.exe
           if-no-files-found: error
 
-  # 创建 GitHub Release 页面（历史回顾 + 承载 Windows setup 安装版下载）
+      # macOS 安装包（app.tar.gz + .sig）作为 workflow artifact 传递，
+      # 由 release job 附加到 GitHub Release（除 S3 外，提供手动下载入口）。
+      # .sig 一并附加：macOS 更新走 updater 协议，用户可校验签名。
+      - name: Upload macos package as workflow artifact (macOS only)
+        if: matrix.platform == 'macos'
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-package
+          path: |
+            ${{ steps.locate.outputs.setup_file }}
+            ${{ steps.locate.outputs.sig_file }}
+          if-no-files-found: error
+
+      # Linux 安装包（AppImage + .sig）作为 workflow artifact 传递，
+      # 由 release job 附加到 GitHub Release（除 S3 外，提供手动下载入口）。
+      - name: Upload linux package as workflow artifact (Linux only)
+        if: matrix.platform == 'linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-package
+          path: |
+            ${{ steps.locate.outputs.setup_file }}
+            ${{ steps.locate.outputs.sig_file }}
+          if-no-files-found: error
+
+  # 创建 GitHub Release 页面（历史回顾 + 承载 Windows setup / macOS / Linux 安装包下载）
   release:
     name: Create GitHub Release (history)
     needs: build-and-upload
@@ -294,6 +319,25 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: windows-setup
+          path: artifacts/windows
+
+      - name: Download macOS package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-package
+          path: artifacts/macos
+
+      - name: Download Linux package artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-package
+          path: artifacts/linux
+
+      - name: List artifacts
+        shell: bash
+        run: |
+          find artifacts -type f | sort
+          echo "FILE_COUNT=$(find artifacts -type f | wc -l)" >> $GITHUB_OUTPUT
 
       - name: Get version from tag
         id: get_version
@@ -331,10 +375,10 @@ jobs:
             ## MoLaunch ${{ steps.get_version.outputs.VERSION }}
 
             ### Downloads
-            - **Windows 便携版（推荐）**：已上传至 S3 存储桶，客户端可通过启动器「检查更新」自动获取。
             - **Windows 安装版（setup）**：本页 Assets 中 `*-setup.exe`，需手动下载安装。
-            - macOS / Linux 安装包已上传至 S3 存储桶，客户端可通过「检查更新」自动获取。
-            本页面同时承载发布历史回顾与变更记录。
+            - **Windows 便携版（推荐）**：已上传至 S3 存储桶，客户端可通过启动器「检查更新」自动获取。
+            - **macOS**：本页 Assets 中 `*.app.tar.gz`（含 `.sig` 签名），也可通过「检查更新」自动获取。
+            - **Linux**：本页 Assets 中 `*.AppImage`（含 `.sig` 签名），也可通过「检查更新」自动获取。
 
             ### Commits
             ${{ steps.changelog.outputs.LOG }}
@@ -342,30 +386,12 @@ jobs:
             ---
             See [CHANGELOG.md](CHANGELOG.md) for details.
           files: |
-            **/*-setup.exe
+            artifacts/windows/*-setup.exe
+            artifacts/macos/*.app.tar.gz
+            artifacts/macos/*.sig
+            artifacts/linux/*.AppImage
+            artifacts/linux/*.sig
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-# 说明：
-# 1. Tauri 代码签名：在 GitHub Settings > Secrets and variables > Actions > Repository secrets 配置：
-#    - TAURI_SIGNING_PRIVATE_KEY           用于签名的私钥（通过 `tauri signer generate` 生成）
-#    - TAURI_SIGNING_PRIVATE_KEY_PASSWORD  生成私钥时设置的密码
-#
-# 2. S3 直传 + api-server 版本注册（MoSign-v2 鉴权，仅需 1 个 Secret）：
-#    - MOLAUNCH_ACTION_PUSH_KEY            CI 推送专用密钥（生成：openssl rand -hex 32）
-#                                         对应 api-server 配置项 ci.action_push_key
-#                                         用途：MoSign-v2 HMAC 签名（/v3/ci/releases、/v3/ci/presign-upload）
-#    S3 凭证（access_key_id / secret_access_key / region / bucket / endpoint）仅由 api-server 持有，
-#    CI 通过 POST /v3/ci/presign-upload 换取 PUT presigned URL 后直接上传文件到 S3，
-#    全程不接触 S3 凭证，无需在 GitHub Secrets 单独配置。
-#
-# 3. 上传/签名/注册逻辑由 scripts/ci-upload.cjs 纯 Node.js 实现：
-#    - JSON.stringify() 生成 body Buffer，签名和 HTTP 请求共用同一 Buffer，消除签名不一致
-#    - 无 heredoc / curl / openssl / shell 变量展开，行为确定
-#    - 支持 S3 307 临时重定向
-#
-# 4. 安装包上传路径规范：s3://{bucket}/updater/v{version}/{platform}/{filename}
-#    platform 取值：windows / macos / linux（与数据库 app_releases.platform 一致）
-#    客户端查询 /v1/updates/manifest 时由 api-server 动态生成 GET presigned URL（1h 有效）
