@@ -9,13 +9,13 @@
 
 ### 新增
 
-#### CI：release_notes 上报 + release_url 指向 GitHub 下载直链 + S3 分片上传（>50MB）
+#### CI：release_notes 上报 + release_url 指向 GitHub Release 页面 + S3 分片上传（>50MB）
 
-- 背景：CI 上报 api-server 时此前不携带本次更新内容（`release_notes`），且 `release_url` 只指向 GitHub Release tag 页面、缺少实际文件名，无法直接追踪到 release 下载地址；大文件（>50MB）单次 PUT 直传存在超时/连接中断风险
+- 背景：CI 上报 api-server 时此前不携带本次更新内容（`release_notes`）；`release_url` 的设计初衷即指向 GitHub Release 页面（tag 地址），不做任何替换/直链化，后续可人工跳转查看该版本发布页；大文件（>50MB）单次 PUT 直传存在超时/连接中断风险
 - 改动：
   - **`.github/workflows/release.yml`**：`build-and-upload` job 的 checkout 改为 `fetch-depth: 0`（获取全量历史与 tag），新增「Generate release notes from commits」步骤（与 release job 同款逻辑：上一 tag → HEAD 的提交记录，无上一 tag 时取最近 50 条），通过 `GITHUB_ENV` 写入 `RELEASE_NOTES`；两个 ci-upload.cjs 调用追加第 8 个参数 `"$RELEASE_NOTES"`，随版本注册上报本次更新日志（启动器「检查更新」对话框展示）
   - **`api-server`**（详见 api-server/CHANGELOG.md）：`/v3/ci/presign-upload` 与 `/v3/ci/frp/presign-upload` 支持 `sizes` 字段并按 50MB 阈值返回分片上传凭证；新增 `/v3/ci/complete-upload` 完成分片合并（updater 与 frp 共用）
-  - **`scripts/ci-upload.cjs`**：预签名请求携带 `sizes`；按服务端返回的 `multipart` 字段自动分流——分片上传按序 PUT 各分片（收集 ETag）后回传 `upload_id` + 分片列表完成合并，小文件与 .sig 保持单次 PUT；注册版本时将 GitHub tag 页面 URL 转为下载直链 `.../releases/download/{tag}/{filename}`（附实际文件名），非 GitHub URL 保持原样，服务端不做替换
+  - **`scripts/ci-upload.cjs`**：预签名请求携带 `sizes`；按服务端返回的 `multipart` 字段自动分流——分片上传按序 PUT 各分片（收集 ETag）后回传 `upload_id` + 分片列表完成合并，小文件与 .sig 保持单次 PUT；`release_url` 原样上报（GitHub Release tag 页面 URL，不做下载直链转换）
 - 验证：api-server `cargo check` 通过（exit 0，无警告）；`node --check scripts/ci-upload.cjs` 通过（exit 0）
 
 #### CI：Ubuntu 22.04 依赖升级为 Tauri v2 官方组合（修复 rust-clippy job 失败）
