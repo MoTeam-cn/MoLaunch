@@ -17,8 +17,8 @@
  *   bundle_type    安装包类型：nsis | app | appimage | deb | rpm | dmg | msi | portable
  *   package_path   本地安装包路径（如 *-setup.exe / *.app.tar.gz / *.AppImage）
  *   sig_path       签名文件路径（.sig，tauri signer 输出的 base64 签名）
- *   release_url    GitHub Release 页面 URL
- *   release_notes  可选，更新日志（Markdown）
+ *   release_url    GitHub Release URL（传 tag 页面 URL 时，api-server 会自动替换为 CDN 公网对象 URL）
+ *   release_notes  可选，更新日志（Markdown，随版本注册上报，启动器「检查更新」对话框展示）
  *
  * 环境变量：
  *   MOLAUNCH_ACTION_PUSH_KEY  MoSign-v2 签名密钥（必填）
@@ -27,9 +27,12 @@
  * 流程：
  *   1. 读取 .sig 文件获取签名 base64
  *   2. 计算安装包大小和 SHA256
- *   3. POST /v3/ci/presign-upload 获取 S3 PUT presigned URL（安装包 + .sig）
- *   4. PUT 直传安装包和 .sig 到 S3
- *   5. POST /v3/ci/releases 注册版本到 apiServer
+ *   3. POST /v3/ci/presign-upload 获取 S3 预签名上传 URL（安装包 + .sig，携带 sizes 供服务端判断分片）
+ *   4. 上传到 S3：
+ *      - 小文件（< 50MB）：单次 PUT 直传
+ *      - 大文件（>= 50MB）：分片上传（按分片 PUT 直传，收集各分片 ETag）
+ *   5. 若走了分片上传，POST /v3/ci/complete-upload 完成合并
+ *   6. POST /v3/ci/releases 注册版本到 apiServer
  *
  * See: api-server/src/utils/mosign_v2.rs（签名协议）
  *      api-server/src/controllers/v3/ci.rs（presign_upload + create_release）
@@ -140,6 +143,103 @@ function httpRequest(targetUrl, options, body) {
   });
 }
 
+// ===== S3 上传辅助 =====
+
+// 单次 PUT 上传（小文件）
+function uploadSingle(item, buffer, label) {
+  return httpRequest(item.upload_url, { method: 'PUT', headers: {} }, buffer).then((resp) => {
+    if (resp.status < 200 || resp.status >= 300) {
+      const err = new Error(`${label} S3 上传失败 (HTTP ${resp.status}): ${resp.body.toString().slice(0, 500)}`);
+      err.code = 'UPLOAD_FAILED';
+      throw err;
+    }
+    return resp;
+  });
+}
+
+// 分片上传（大文件）：按 part_number 顺序 PUT 各分片，收集 ETag
+async function uploadMultipart(item, buffer, label) {
+  const { upload_id, part_size, parts } = item.multipart;
+  console.log(`${label}分片上传开始: ${parts.length} 片 x ${part_size} 字节 (upload_id=${upload_id})`);
+  const uploadedParts = [];
+  for (const part of parts) {
+    const start = (part.part_number - 1) * part_size;
+    const end = Math.min(start + part_size, buffer.length);
+    const chunk = buffer.subarray(start, end);
+    const resp = await httpRequest(part.upload_url, { method: 'PUT', headers: {} }, chunk);
+    if (resp.status < 200 || resp.status >= 300) {
+      const err = new Error(`${label} 分片 ${part.part_number} 上传失败 (HTTP ${resp.status}): ${resp.body.toString().slice(0, 500)}`);
+      err.code = 'UPLOAD_FAILED';
+      throw err;
+    }
+    const etag = resp.headers.etag;
+    if (!etag) {
+      const err = new Error(`${label} 分片 ${part.part_number} 响应缺少 ETag`);
+      err.code = 'UPLOAD_FAILED';
+      throw err;
+    }
+    uploadedParts.push({ part_number: part.part_number, etag });
+    console.log(`  分片 ${part.part_number}/${parts.length} 完成 (${chunk.length} bytes)`);
+  }
+  return uploadedParts;
+}
+
+// 完成分片上传：回传 upload_id + 分片 ETag 列表，由服务端合并
+async function completeMultipartUpload(item, parts) {
+  const completePath = '/v3/ci/complete-upload';
+  const completeBody = Buffer.from(JSON.stringify({
+    upload_id: item.multipart.upload_id,
+    download_key: item.download_key,
+    parts,
+  }));
+  const completeSign = signRequest('POST', completePath, completeBody);
+  console.log('完成分片上传（CompleteMultipartUpload）...');
+
+  const resp = await httpRequest(`${API_BASE_URL}${completePath}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-MoSign-Version': 'MoSign-v2',
+      'X-MoSign-Timestamp': completeSign.timestamp,
+      'X-MoSign-Nonce': completeSign.nonce,
+      'X-MoSign-Signature': completeSign.signature,
+    },
+  }, completeBody);
+
+  let data;
+  try {
+    data = JSON.parse(resp.body.toString());
+  } catch (e) {
+    const err = new Error(`完成分片响应非 JSON（HTTP ${resp.status}）: ${resp.body.toString().slice(0, 500)}`);
+    err.code = 'UPLOAD_FAILED';
+    throw err;
+  }
+
+  if (data.code !== 1) {
+    const err = new Error(`完成分片失败 (code=${data.code}): ${data.msg || ''}\n完整响应：${resp.body.toString()}`);
+    err.code = 'UPLOAD_FAILED';
+    throw err;
+  }
+  console.log('分片上传完成');
+}
+
+// 通用上传入口：根据服务端返回的 multipart 字段自动选择分片 / 单次 PUT
+async function uploadToS3(item, buffer, label) {
+  if (item.multipart && item.multipart.parts && item.multipart.parts.length > 0) {
+    const parts = await uploadMultipart(item, buffer, label);
+    await completeMultipartUpload(item, parts);
+    return;
+  }
+  if (!item.upload_url) {
+    const err = new Error(`${label} 预签名响应缺少 upload_url 且无分片凭证`);
+    err.code = 'UPLOAD_FAILED';
+    throw err;
+  }
+  console.log(`上传${label}: -> S3`);
+  await uploadSingle(item, buffer, label);
+  console.log(`${label}上传完成`);
+}
+
 // ===== 主流程 =====
 async function main() {
   const PACKAGE_FILENAME = path.basename(PACKAGE_PATH);
@@ -154,12 +254,14 @@ async function main() {
 
   console.log(`::group::上传 ${PLATFORM}/${ARCH} ${BUNDLE_TYPE} (${PACKAGE_FILENAME}, ${FILE_SIZE} bytes)`);
 
-  // ===== Step 1: 获取 S3 预签名 PUT URL（安装包 + .sig 两个文件） =====
+  // ===== Step 1: 获取 S3 预签名上传 URL（安装包 + .sig 两个文件） =====
   const presignPath = '/v3/ci/presign-upload';
   const presignBody = Buffer.from(JSON.stringify({
     version: VERSION,
     platform: PLATFORM,
     filenames: [PACKAGE_FILENAME, SIG_FILENAME],
+    // 各文件字节大小（与 filenames 对齐），服务端据此判断是否走分片上传
+    sizes: [FILE_SIZE, sigBuffer.length],
   }));
 
   const presignSign = signRequest('POST', presignPath, presignBody);
@@ -214,32 +316,12 @@ async function main() {
   console.log(`  安装包 download_key: ${pkgUpload.download_key}`);
   console.log(`  签名文件 download_key: ${sigUpload.download_key}`);
 
-  // ===== Step 2: 上传安装包到 S3 =====
-  console.log(`上传安装包: ${PACKAGE_PATH} -> S3`);
-  const pkgResp = await httpRequest(pkgUpload.upload_url, {
-    method: 'PUT',
-    headers: {},
-  }, packageBuffer);
+  // ===== Step 2: 上传安装包到 S3（大文件走分片上传，小文件单次 PUT） =====
+  await uploadToS3(pkgUpload, packageBuffer, '安装包');
 
-  if (pkgResp.status < 200 || pkgResp.status >= 300) {
-    console.error(`::error::安装包 S3 上传失败 (HTTP ${pkgResp.status})`);
-    console.error(pkgResp.body.toString().slice(0, 500));
-    process.exit(1);
-  }
-  console.log('安装包上传完成');
-
-  // ===== Step 3: 上传签名文件到 S3 =====
+  // ===== Step 3: 上传签名文件到 S3（.sig 很小，始终单次 PUT） =====
   console.log(`上传签名文件: ${SIG_PATH} -> S3`);
-  const sigResp = await httpRequest(sigUpload.upload_url, {
-    method: 'PUT',
-    headers: {},
-  }, sigBuffer);
-
-  if (sigResp.status < 200 || sigResp.status >= 300) {
-    console.error(`::error::签名文件 S3 上传失败 (HTTP ${sigResp.status})`);
-    console.error(sigResp.body.toString().slice(0, 500));
-    process.exit(1);
-  }
+  await uploadSingle(sigUpload, sigBuffer, '签名文件');
   console.log('签名文件上传完成');
 
   // ===== Step 4: 注册版本到 apiServer =====

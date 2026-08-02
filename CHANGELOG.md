@@ -9,6 +9,15 @@
 
 ### 新增
 
+#### CI：release_notes 上报 + release_url 指向实际文件 + S3 分片上传（>50MB）
+
+- 背景：CI 上报 api-server 时此前不携带本次更新内容（`release_notes`），且 `release_url` 只指向 GitHub Release tag 页面而非实际文件；大文件（>50MB）单次 PUT 直传存在超时/连接中断风险
+- 改动：
+  - **`.github/workflows/release.yml`**：`build-and-upload` job 的 checkout 改为 `fetch-depth: 0`（获取全量历史与 tag），新增「Generate release notes from commits」步骤（与 release job 同款逻辑：上一 tag → HEAD 的提交记录，无上一 tag 时取最近 50 条），通过 `GITHUB_ENV` 写入 `RELEASE_NOTES`；两个 ci-upload.cjs 调用追加第 8 个参数 `"$RELEASE_NOTES"`，随版本注册上报本次更新日志（启动器「检查更新」对话框展示）
+  - **`api-server`**（详见 api-server/CHANGELOG.md）：`/v3/ci/presign-upload` 与 `/v3/ci/frp/presign-upload` 支持 `sizes` 字段并按 50MB 阈值返回分片上传凭证；新增 `/v3/ci/complete-upload` 完成分片合并；注册版本时 `release_url` 为 GitHub tag 页面 URL（或空）且 S3 启用时自动替换为 CDN 公网对象 URL（`{public_base_url}/{bucket}/{key}`），指向实际上传的文件
+  - **`scripts/ci-upload.cjs`**：预签名请求携带 `sizes`；按服务端返回的 `multipart` 字段自动分流——分片上传按序 PUT 各分片（收集 ETag）后回传 `upload_id` + 分片列表完成合并，小文件与 .sig 保持单次 PUT
+- 验证：api-server `cargo check` 通过（exit 0，无警告）；`node --check scripts/ci-upload.cjs` 通过（exit 0）
+
 #### CI：Ubuntu 22.04 依赖升级为 Tauri v2 官方组合（修复 rust-clippy job 失败）
 
 - 背景：GitHub Actions `rust-clippy` job（runs-on: ubuntu-22.04）执行 `cargo clippy --all-features -- -D warnings` 失败，根因是 Tauri v2 的 webkit2gtk 传递依赖 `soup3-sys v0.5.0` 构建需要系统库 `libsoup-3.0`，而 ci.yml 仍是 Tauri v1 时代依赖列表（缺少 libsoup-3.0-dev）
