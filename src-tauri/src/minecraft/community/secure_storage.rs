@@ -74,19 +74,7 @@ async fn ensure_api_key_decrypted() {
     let api_key = match encrypted_key {
         Some(ref enc) if !enc.is_empty() => match SDK_REF.get() {
             Some(sdk_arc) => {
-                let sdk = sdk_arc.lock().await;
-                match sdk.as_ref() {
-                    Some(sdk) => sdk
-                        .decrypt_token(enc)
-                        .map_err(|e| {
-                            crate::log_warn!("[Community] CF api_key 解密失败: {}", e);
-                        })
-                        .ok(),
-                    None => {
-                        crate::log_warn!("[Community] SDK 未加载，CF api_key 无法解密");
-                        None
-                    }
-                }
+                crate::utils::sdk_crypto::decrypt_with_sdk_optional(sdk_arc, enc, "CF api_key").await
             }
             None => {
                 crate::log_warn!("[Community] SDK 未注入，CF api_key 无法解密");
@@ -164,13 +152,7 @@ pub async fn save(
     let stored_key = if api_key.is_empty() {
         String::new()
     } else {
-        let sdk = sdk_arc.lock().await;
-        match sdk.as_ref() {
-            Some(sdk) => sdk
-                .encrypt_token(api_key)
-                .map_err(|e| format!("加密失败: {}", e))?,
-            None => return Err("SDK 未加载，无法加密 API Key".to_string()),
-        }
+        crate::utils::sdk_crypto::encrypt_with_sdk(&sdk_arc, api_key, "CF API Key").await?
     };
     storage
         .set_config(SECTION, KEY_API_KEY, &stored_key)

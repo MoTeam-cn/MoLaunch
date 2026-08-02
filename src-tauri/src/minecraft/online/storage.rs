@@ -108,24 +108,12 @@ impl OnlineStorage {
 
     /// 加密字符串（SDK DES）
     async fn encrypt(&self, data: &str) -> Result<String, String> {
-        let sdk = self.sdk.lock().await;
-        match sdk.as_ref() {
-            Some(sdk) => sdk
-                .encrypt_token(data)
-                .map_err(|e| format!("加密失败: {}", e)),
-            None => Err("SDK 未加载，无法加密联机设备凭证".to_string()),
-        }
+        crate::utils::sdk_crypto::encrypt_with_sdk(&self.sdk, data, "联机设备凭证").await
     }
 
     /// 解密字符串（SDK DES）
     async fn decrypt(&self, data: &str) -> Result<String, String> {
-        let sdk = self.sdk.lock().await;
-        match sdk.as_ref() {
-            Some(sdk) => sdk
-                .decrypt_token(data)
-                .map_err(|e| format!("解密失败: {}", e)),
-            None => Err("SDK 未加载，无法解密联机设备凭证".to_string()),
-        }
+        crate::utils::sdk_crypto::decrypt_with_sdk(&self.sdk, data, "联机设备凭证").await
     }
 
     /// 加载设备凭证

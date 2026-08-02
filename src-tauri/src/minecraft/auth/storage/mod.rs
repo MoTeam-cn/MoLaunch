@@ -47,24 +47,12 @@ impl AuthStorage {
 
     /// 加密数据（使用 SDK 内置的 DES 加密）
     async fn encrypt(&self, data: &str) -> Result<String, String> {
-        let sdk = self.sdk.lock().await;
-        match sdk.as_ref() {
-            Some(sdk) => sdk
-                .encrypt_token(data)
-                .map_err(|e| format!("加密失败: {}", e)),
-            None => Err("SDK 未加载，无法加密认证数据".to_string()),
-        }
+        crate::utils::sdk_crypto::encrypt_with_sdk(&self.sdk, data, "认证数据").await
     }
 
     /// 解密数据（使用 SDK 内置的 DES 解密）
     async fn decrypt(&self, data: &str) -> Result<String, String> {
-        let sdk = self.sdk.lock().await;
-        match sdk.as_ref() {
-            Some(sdk) => sdk
-                .decrypt_token(data)
-                .map_err(|e| format!("解密失败: {}", e)),
-            None => Err("SDK 未加载，无法解密认证数据".to_string()),
-        }
+        crate::utils::sdk_crypto::decrypt_with_sdk(&self.sdk, data, "认证数据").await
     }
 
     /// 加密并写入注册表（仅 Windows）

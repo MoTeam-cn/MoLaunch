@@ -1,11 +1,11 @@
 //! FRP 厂商认证 token 存储：文件 + SDK DES 加密（全局共享设备级数据）
 
-use crate::log_warn;
-use crate::sdk::SdkInstance;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex as TokioMutex;
+
+use crate::sdk::SdkInstance;
 
 /// SDK 引用（启动时注入，供 token 加解密）
 static SDK_REF: OnceLock<Arc<TokioMutex<Option<SdkInstance>>>> = OnceLock::new();
@@ -33,13 +33,7 @@ async fn encrypt(data: &str) -> Result<String, String> {
     let sdk_arc = SDK_REF
         .get()
         .ok_or_else(|| "SDK 未注入，无法加密 token".to_string())?;
-    let sdk = sdk_arc.lock().await;
-    match sdk.as_ref() {
-        Some(sdk) => sdk
-            .encrypt_token(data)
-            .map_err(|e| format!("加密失败: {}", e)),
-        None => Err("SDK 未加载，无法加密 token".to_string()),
-    }
+    crate::utils::sdk_crypto::encrypt_with_sdk(sdk_arc, data, "FRP token").await
 }
 
 /// 解密字符串（SDK 内置 DES）；SDK 不可用时视为无 token
@@ -47,24 +41,11 @@ async fn decrypt(data: &str) -> Option<String> {
     let sdk_arc = match SDK_REF.get() {
         Some(arc) => arc.clone(),
         None => {
-            log_warn!("[Frp Auth] SDK 未注入，无法解密 token");
+            crate::log_warn!("[Frp Auth] SDK 未注入，无法解密 token");
             return None;
         }
     };
-    let sdk = sdk_arc.lock().await;
-    match sdk.as_ref() {
-        Some(sdk) => match sdk.decrypt_token(data) {
-            Ok(s) => Some(s),
-            Err(e) => {
-                log_warn!("[Frp Auth] token 解密失败（视为未认证，请重新认证）: {}", e);
-                None
-            }
-        },
-        None => {
-            log_warn!("[Frp Auth] SDK 未加载，无法解密 token");
-            None
-        }
-    }
+    crate::utils::sdk_crypto::decrypt_with_sdk_optional(&sdk_arc, data, "FRP token").await
 }
 
 /// 存储完整 token 信息（OAuth2 / Device Code 认证成功后调用）
