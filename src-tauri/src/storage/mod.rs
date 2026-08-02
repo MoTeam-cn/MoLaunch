@@ -218,9 +218,19 @@ impl Storage {
     }
 
     pub fn write_config(&self, config: &ini::IniFile) -> anyhow::Result<()> {
-        // 原子写入：先写 .tmp 再 rename，避免崩溃导致配置文件半写状态
+        // 原子写入：先写 .tmp 再 rename，避免崩溃导致配置文件半写状态。
+        // tmp 文件名含自增序号，防止多个 apply_config 并发写入时共用同一
+        // tmp 文件导致 rename 找不到源文件（os error 2）。
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static TMP_SEQ: AtomicU64 = AtomicU64::new(0);
+        let seq = TMP_SEQ.fetch_add(1, Ordering::Relaxed);
+
         let target = self.config_path();
-        let tmp = target.with_extension("ini.tmp");
+        // config.ini -> config.ini.tmp{seq}
+        let mut tmp = target.as_os_str().to_owned();
+        tmp.push(format!(".tmp{}", seq));
+        let tmp = std::path::PathBuf::from(tmp);
+
         std::fs::write(&tmp, config.to_string())?;
         #[cfg(unix)]
         {

@@ -106,9 +106,17 @@ export function useConfigPage(options: UseConfigPageOptions = {}): UseConfigPage
     void reload()
   })
 
+  // markDirty 内置 loaded 守卫：
+  // onLoad 赋值时 loaded 仍为 false，此时 watch 触发不应标记 dirty，否则
+  // 切换页面（组件卸载触发 flushSave）时会发出无意义的 apply_config。
+  function guardedMarkDirty(key: keyof ConfigPatch, value: unknown): void {
+    if (!loaded.value) return
+    markDirty(key, value)
+  }
+
   return {
     loaded,
-    markDirty,
+    markDirty: guardedMarkDirty,
     flushSave,
     scheduleSave,
     isDirty,
