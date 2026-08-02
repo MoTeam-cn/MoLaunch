@@ -1,12 +1,4 @@
-//! 内置深度链接 handler
-//!
-//! 在 `deeplink::init()` 时注册。每个 handler 对应一个 `molaunch://<host>` 后缀路由：
-//! - `run`：启动游戏（`molaunch://run?version=<id>`）
-//! - `install`：安装整合包（`molaunch://install?url=<包下载地址>`，**强制域名白名单校验**）
-//! - `open`：前端路由跳转（`molaunch://open?page=<页面>`，具体跳转由前端监听处理）
-//!
-//! 新增业务路由的推荐方式：业务模块自身调用 `deeplink::register("xxx", handler)`，
-//! 不必修改本文件——本文件只收录与 deeplink 核心关联最紧的通用路由。
+//! 内置深度链接 handler（`molaunch://run` / `install` / `open` 后缀路由）
 
 use super::router::register_sync;
 use super::security::validate_download_url;

@@ -1,12 +1,4 @@
-//! FRP 厂商认证 token 存储：文件 + SDK DES 加密
-//!
-//! 替代原 keyring（OS 密钥存储）：token 经 SDK 内置 DES 加密后写入
-//! `%APPDATA%/.Molaunch/frp_auth/{provider_id}.json`（macOS/Linux 为
-//! `~/.config/Molaunch/frp_auth/`），与 frpc 厂商二进制同级，属全局共享
-//! 设备级数据（便携版换目录/更新不丢认证），Unix 下设置 0o600 权限。
-//!
-//! SDK 引用由 [`set_sdk`] 在启动时注入（lib.rs），与 CurseForge
-//! secure_storage 的懒加载注入模式一致；token 过期前自动刷新由调用方负责。
+//! FRP 厂商认证 token 存储：文件 + SDK DES 加密（全局共享设备级数据）
 
 use crate::log_warn;
 use crate::sdk::SdkInstance;

@@ -1,19 +1,4 @@
-//! 认证持久化模块（双轨制存储）
-//!
-//! - **Windows**：注册表 `HKCU\Software\MoLaunch` 逐字段存储。敏感字段（Token/用户名/UUID）
-//!   用 SDK DES 加密后写入独立键值，非敏感字段（登录类型）明文；多账号列表序列化为
-//!   JSON 字符串后整体 SDK 加密写入单键。
-//! - **非 Windows**：JSON 文件 `%APPDATA%/.Molaunch/auth.json`（macOS/Linux 为
-//!   `~/.config/Molaunch/auth.json`）结构化逐字段加密。明文 JSON 结构中每个敏感字段
-//!   单独 SDK 加密为字符串值，非敏感字段（login_type）明文；多账号列表先序列化为 JSON
-//!   字符串再 SDK 加密。Unix 显式设置 0o600 权限保护敏感字段。
-//!
-//! 子模块：types（数据结构）/ registry（注册表键名常量，仅 Windows 使用）/
-//! operations（11 个高层方法）/ load（读取）/ save（写入）。
-//!
-//! 历史设计：v0.1.0-beta.1 之前 Windows 用注册表、非 Windows 为 stub。
-//! v0.1.0-beta.1 曾改为跨平台整体加密文件存储，现回归双轨制：Windows 恢复注册表，
-//! 非 Windows 改为结构化逐字段加密文件（避免整体加密一个 JSON 字符串）。
+//! 认证持久化模块：Windows 注册表 / 非 Windows JSON 文件双轨制存储（敏感字段 SDK 加密）
 
 mod load;
 mod operations;

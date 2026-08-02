@@ -1,13 +1,4 @@
-//! 便携式目录 → AppData 全局共享目录迁移
-//!
-//! 将设备级资源（certs/providers/frp_auth）从便携式 `<exe_dir>/.Molaunch/<subdir>` 迁移到
-//! AppData 全局目录 `%APPDATA%/.Molaunch/<subdir>`，实现多启动器实例共享。
-//!
-//! 迁移策略：
-//! 1. AppData 子目录已存在且非空 → 跳过（用户已有全局数据，删除便携式旧目录）
-//! 2. 便携式子目录不存在 → 跳过
-//! 3. 便携式子目录存在 → 递归复制到 AppData，成功后删除便携式旧目录
-//! 4. 复制失败 → 保留便携式目录，记录 WARN（下次启动再次尝试）
+//! 便携式目录 → AppData 全局共享目录迁移（certs/providers/frp_auth 多实例共享）
 
 use crate::log_info;
 use crate::log_warn;

@@ -1,10 +1,4 @@
-//! `AuthStorage::save` 实现（双轨制）
-//!
-//! - **Windows**：将 `PersistedAuthState` 全部字段逐字段写入注册表（敏感字段先 SDK 加密）。
-//!   先清除所有旧值，再写入新值，确保数据一致；写完后刷新内存缓存。
-//! - **非 Windows**：将 `PersistedAuthState` 写入 JSON 文件（结构化逐字段加密）。
-//!   明文 JSON 结构中每个敏感字段单独 SDK 加密为字符串值，非敏感字段（login_type）明文；
-//!   多账号列表先序列化为 JSON 字符串再 SDK 加密。Unix 显式设置 0o600 权限；写完后刷新缓存。
+//! `AuthStorage::save` 实现：注册表 / JSON 文件双轨制写入（敏感字段 SDK 加密，写后刷新缓存）
 
 use super::types::PersistedAuthState;
 use super::AuthStorage;

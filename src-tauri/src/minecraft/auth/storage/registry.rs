@@ -1,10 +1,4 @@
-//! 认证专用注册表键名常量
-//!
-//! 注册表低层操作（reg_key/reg_get/reg_set/reg_delete）已提升至
-//! `crate::storage::registry` 模块供 crate 级共享。本文件仅保留认证专用键名常量。
-//!
-//! 全部键名仅在 Windows 注册表存储路径使用，非 Windows 平台整体剔除，
-//! 避免 Linux/macOS 编译时产生 dead code。
+//! 认证专用注册表键名常量（仅 Windows 使用）
 
 /// 所有微软账号列表 JSON（加密）
 #[cfg(windows)]

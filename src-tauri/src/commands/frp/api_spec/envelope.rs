@@ -1,12 +1,6 @@
 //! 响应包裹解析（envelope）
 //!
-//! 不同厂商成功判断方式不同（如 `{flag:true, msg}` 或 `{success:true, message}`），
-//! 通过 envelope 配置统一解析：
-//! - successField + successValue：成功判断
-//! - errorField：失败时错误消息
-//! - dataField：数据位置
-//!
-//! 各接口可用 endpoints.*.envelope 覆盖全局 envelope。
+//! 按成功字段、错误字段与数据字段配置，统一解析不同厂商的响应格式。
 
 use super::super::Envelope;
 use super::jsonpath;
@@ -89,51 +83,5 @@ fn values_equal(actual: &Value, expected: &Value) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    fn env(
-        success_field: &str,
-        success_value: Value,
-        error_field: &str,
-        data_field: &str,
-    ) -> Envelope {
-        Envelope {
-            success_field: Some(success_field.to_string()),
-            success_value: Some(success_value),
-            error_field: Some(error_field.to_string()),
-            data_field: Some(data_field.to_string()),
-        }
-    }
-
-    #[test]
-    fn test_success_bool() {
-        let e = env("$.flag", json!(true), "$.msg", "$.data");
-        let resp = json!({ "flag": true, "data": {} });
-        assert!(is_success(&resp, Some(&e)));
-    }
-
-    #[test]
-    fn test_success_number_string() {
-        let e = env("$.code", json!(200), "$.msg", "$.data");
-        let resp = json!({ "code": "200", "data": {} });
-        assert!(is_success(&resp, Some(&e)));
-    }
-
-    #[test]
-    fn test_failure() {
-        let e = env("$.flag", json!(true), "$.msg", "$.data");
-        let resp = json!({ "flag": false, "msg": "未授权" });
-        assert!(!is_success(&resp, Some(&e)));
-        assert_eq!(extract_error(&resp, Some(&e)), Some("未授权".to_string()));
-    }
-
-    #[test]
-    fn test_extract_data() {
-        let e = env("$.flag", json!(true), "$.msg", "$.data");
-        let resp = json!({ "flag": true, "data": { "id": 1 } });
-        let data = extract_data(&resp, Some(&e), None).unwrap();
-        assert_eq!(data, Some(json!({ "id": 1 })));
-    }
-}
+#[path = "envelope_tests.rs"]
+mod tests;

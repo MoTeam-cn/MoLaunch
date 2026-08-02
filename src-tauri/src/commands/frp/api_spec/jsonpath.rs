@@ -1,13 +1,6 @@
 //! JSONPath 解析与提取
 //!
-//! 支持的语法（覆盖 endpoints.json 所有用例）：
-//! - `$.field` — 从根对象取字段
-//! - `$.a.b.c` — 嵌套字段
-//! - `$.data[*]` — 数组展平（取出数组所有元素）
-//! - `$.data[*].proxies[*]` — 多级数组展平
-//! - `$.data.config` — 嵌套字段取值
-//!
-//! 不支持过滤器、切片等复杂 JSONPath 语法（厂商规范不需要）。
+//! 支持字段访问与数组展平（`[*]`），用于从厂商接口响应中取值。
 
 use serde_json::Value;
 
@@ -129,47 +122,5 @@ fn traverse_array(value: &Value, segments: &[PathSegment], results: &mut Vec<Val
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-
-    #[test]
-    fn test_extract_simple() {
-        let v = json!({ "access_token": "abc123" });
-        assert_eq!(extract(&v, "$.access_token"), Some(json!("abc123")));
-    }
-
-    #[test]
-    fn test_extract_nested() {
-        let v = json!({ "data": { "config": "frpc content" } });
-        assert_eq!(extract(&v, "$.data.config"), Some(json!("frpc content")));
-    }
-
-    #[test]
-    fn test_extract_array_flat() {
-        let v = json!({ "data": [{ "id": 1 }, { "id": 2 }] });
-        let arr = extract_array(&v, "$.data[*]").unwrap();
-        assert_eq!(arr.len(), 2);
-        assert_eq!(arr[0]["id"], 1);
-    }
-
-    #[test]
-    fn test_extract_array_nested() {
-        let v = json!({
-            "data": [
-                { "proxies": [{ "id": "a" }, { "id": "b" }] },
-                { "proxies": [{ "id": "c" }] }
-            ]
-        });
-        let arr = extract_array(&v, "$.data[*].proxies[*]").unwrap();
-        assert_eq!(arr.len(), 3);
-        assert_eq!(arr[0]["id"], "a");
-        assert_eq!(arr[2]["id"], "c");
-    }
-
-    #[test]
-    fn test_extract_missing() {
-        let v = json!({ "a": 1 });
-        assert_eq!(extract(&v, "$.b"), None);
-    }
-}
+#[path = "jsonpath_tests.rs"]
+mod tests;

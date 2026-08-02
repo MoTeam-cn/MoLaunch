@@ -1,16 +1,4 @@
-//! 厂商 Open API 引擎：endpoints.json 解析 + API 调用 + 配置生成
-//!
-//! 设计参考：docs/Frp Test/frp/api/endpoints.json
-//!
-//! 厂商接口响应结构各不相同（成功判断、字段命名、数据位置、配置获取方式均有差异）。
-//! 本模块将这些差异全部做成可配置项，厂商只需在 endpoints.json 中声明接口与响应解析，
-//! 启动器即可正确调用并生成 frpc 配置。
-//!
-//! 子模块：
-//! - `jsonpath`：JSONPath 解析（支持 `$.a.b` 和 `$.data[*].items[*]` 展平）
-//! - `envelope`：响应包裹解析（成功判断 + 数据提取 + 错误消息）
-//! - `http`：HTTP 请求发送（含重定向防护 + token 注入）
-//! - `config_gen`：frpc 配置生成（url 直写 / fields 拼装 / args 启动参数）
+//! 厂商 Open API 引擎：endpoints.json 解析 + API 调用 + frpc 配置生成
 
 use super::{providers_root, validate_provider_id, ApiSpec};
 use crate::log_info;

@@ -1,9 +1,4 @@
-//! 深度链接路由注册表与分发
-//!
-//! 仿照 `utils::dispatcher::Dispatcher` 的注册式模式：
-//! - [`register`] / [`register_sync`]：注册一个**后缀路由**（如 `molaunch://run`）
-//! - [`dispatch`]：URL 到达时按 host 段查表并分发
-//! - [`init`]：模块初始化（内置 handler 注册 + 全局监听挂载），在 lib.rs setup 中调用
+//! 深度链接路由注册表与分发（注册式后缀路由，仿 `utils::dispatcher::Dispatcher`）
 
 use std::collections::HashMap;
 use std::future::Future;

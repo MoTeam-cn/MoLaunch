@@ -1,23 +1,7 @@
 //! 客户端标识（ClientType / UA）工具
 //!
-//! 生成统一的请求 User-Agent，格式：`Molaunch/{主版本}.{clientType}`，
-//! 如 `Molaunch/1.0.0.10`。
-//!
-//! clientType 为两位数字编码（对应 docs/client.md 设计）：
-//! - **十位** = 平台/架构（1 Windows x86_64 / 2 Windows x86 / 3 Windows ARM64 /
-//!   4 macOS x86_64 / 5 macOS ARM64 / 6 Linux x86_64 / 7 Linux ARM64 /
-//!   8 Android ARM64 / 9 iOS ARM64）
-//! - **个位** = 渠道类型（0 正式 / 1 灰度 / 2 内测 / 3 开发 / 4 每日 / 5 企业 / 9 测试）
-//!
-//! 版本号取 `CARGO_PKG_VERSION` 的**主版本部分**（去掉预发布后缀如 `-beta.1`/`-rc1`），
-//! 渠道码由预发布后缀推导（见 [`channel_code`]）。因此：
-//! - 本地开发 `0.1.0-beta.1` → `Molaunch/0.1.0.12`（beta → 内测 2）
-//! - CI 打 tag `v1.0.0-rc1` → 版本文件改写为 `1.0.0-rc1` → `Molaunch/1.0.0.11`（rc → 灰度 1）
-//! - 正式发布 `1.0.0` → `Molaunch/1.0.0.10`（正式 0）
-//!
-//! 前后端版本对齐：CI 的 Update version 步骤会同时改写 package.json / Cargo.toml /
-//! tauri.conf.json，前端水印（`__APP_VERSION__`）与 Cargo 版本天然一致；UA 在 Rust 端
-//! 独立生成，互不干扰。
+//! 生成统一请求 User-Agent（`Molaunch/{主版本}.{clientType}`），
+//! clientType 由平台编码与预发布后缀渠道码推导。
 
 /// 预发布后缀 → 渠道码（clientType 个位）
 ///
@@ -105,41 +89,5 @@ pub fn user_agent() -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn channel_mapping() {
-        assert_eq!(channel_code("1.0.0"), 0);
-        assert_eq!(channel_code("1.0.0-rc1"), 1);
-        assert_eq!(channel_code("1.0.0-rc.1"), 1);
-        assert_eq!(channel_code("0.1.0-beta.1"), 2);
-        assert_eq!(channel_code("0.1.0-alpha.2"), 3);
-        assert_eq!(channel_code("0.1.0-dev"), 3);
-        assert_eq!(channel_code("0.2.0-nightly.5"), 4);
-        // 未知后缀 → 开发版兜底
-        assert_eq!(channel_code("0.1.0-foo"), 3);
-    }
-
-    #[test]
-    fn main_version_strips_suffix() {
-        assert_eq!(main_version("1.0.0"), "1.0.0");
-        assert_eq!(main_version("1.0.0-rc1"), "1.0.0");
-        assert_eq!(main_version("0.1.0-beta.1"), "0.1.0");
-    }
-
-    #[test]
-    fn ua_format() {
-        let ua = user_agent();
-        // 格式：Molaunch/{x.y.z}.{clientType}
-        assert!(ua.starts_with("Molaunch/"), "UA: {}", ua);
-        let body = &ua["Molaunch/".len()..];
-        // 版本.两位编码
-        let parts: Vec<&str> = body.split('.').collect();
-        assert_eq!(parts.len(), 4, "UA body: {}", body);
-        // 最后一位是两位编码
-        assert_eq!(parts[3].len(), 2, "UA clientType: {}", parts[3]);
-        // 版本部分不含预发布后缀
-        assert!(!body.contains('-'), "UA body: {}", body);
-    }
-}
+#[path = "client_type_tests.rs"]
+mod tests;

@@ -1,10 +1,4 @@
 //! online/device.json 旧路径（便携式）→ AppData 迁移
-//!
-//! v1 设备凭证存储于便携式 `<exe_dir>/.Molaunch/online/device.json`，
-//! v2 迁移到 AppData 全局位置 `%APPDATA%/.Molaunch/online/device.json`。
-//! 启动时检测旧路径存在则原样转写（不涉及 SDK 解密/加密），迁移后清理整个旧 `online/` 目录。
-//!
-//! `legacy_device_path()` 由 `OnlineStorage::save/clear` 复用，确保旧路径残留清理口径一致。
 
 use std::path::Path;
 use std::path::PathBuf;

@@ -1,20 +1,4 @@
-//! 协议注册 / 卸载 / 状态查询工具（跨平台）
-//!
-//! 解决**便携版**（绿色版）未经过安装程序、无法自动注册 `molaunch://` 协议的问题。
-//! 安装版由 NSIS/安装器在安装时注册；便携版在应用启动时调用 [`auto_register`] 注册，
-//! 或由用户在设置页手动触发 [`register`] / [`unregister`]。
-//!
-//! ## 平台行为
-//! - **Windows**：写 `HKCU\Software\Classes\molaunch` 注册表
-//!   （URL Protocol / DefaultIcon / shell\open\command），免管理员权限
-//! - **Linux**：写 `~/.local/share/applications/{bin}-handler.desktop` + `xdg-mime` 关联
-//! - **macOS**：不支持运行时注册（协议由打包时 Info.plist 的 CFBundleURLTypes 声明），
-//!   [`platform_supported`] 返回 false
-//!
-//! ## 幂等性
-//! [`register`] 幂等：已注册且指向当前 exe 时直接返回成功；
-//! 已注册但指向旧路径（便携版被移动）时自动重注册到新路径。
-//! [`status`] 返回结构化状态供前端展示。
+//! 深度链接协议注册 / 卸载 / 状态查询工具（跨平台，供便携版运行时注册协议）
 
 use serde::Serialize;
 

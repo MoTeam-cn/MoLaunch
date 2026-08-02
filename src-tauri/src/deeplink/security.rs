@@ -1,12 +1,7 @@
 //! 深度链接安全校验
 //!
-//! 防止恶意网站通过 `molaunch://install?url=<恶意地址>` 诱导启动器下载任意 URL
-//! （钓鱼 / 病毒下发）。校验规则：
-//! 1. scheme 必须为 `https`
-//! 2. 域名必须在 [`ALLOWED_DOWNLOAD_HOSTS`] 白名单内（含子域名）
-//! 3. 禁止 URL 内嵌 userinfo（`user:pass@host`，常见迷惑手法）
-//!
-//! 白名单只收录可信任的整合包/Mod 下载源，新增来源需人工审核后加入。
+//! 校验下载 URL 是否为可信 https 来源（白名单域名 + 禁止 userinfo 注入），
+//! 防止恶意网页诱导启动器下载任意地址。
 
 use url::Url;
 
@@ -66,39 +61,5 @@ fn is_host_allowed(host: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn allows_whitelisted_https() {
-        assert!(validate_download_url("https://media.forgecdn.net/files/123/456/x.jar").is_ok());
-        assert!(validate_download_url("https://edge.forgecdn.net/files/123/456/x.jar").is_ok());
-        assert!(
-            validate_download_url("https://mediafilez.forgecdn.net/files/123/456/x.jar").is_ok()
-        );
-        assert!(validate_download_url("https://cdn.modrinth.com/data/abc.zip").is_ok());
-        assert!(validate_download_url("https://modrinth.com/modpack/xyz").is_ok());
-        // 子域名通配
-        assert!(validate_download_url("https://download.moiu.cn/packs/x.zip").is_ok());
-        assert!(validate_download_url("https://api.molaunch.moiu.cn/x").is_ok());
-    }
-
-    #[test]
-    fn rejects_non_whitelisted_hosts() {
-        assert!(validate_download_url("https://evil.com/virus.exe").is_err());
-        // 白名单域名的伪造后缀（mocdn.net 与 evilmocdn.net 需区分）
-        assert!(validate_download_url("https://evilmocdn.net/x").is_err());
-    }
-
-    #[test]
-    fn rejects_http_and_userinfo() {
-        assert!(validate_download_url("http://media.forgecdn.net/x").is_err());
-        assert!(validate_download_url("https://user:pass@media.forgecdn.net/x").is_err());
-    }
-
-    #[test]
-    fn rejects_malformed_url() {
-        assert!(validate_download_url("not a url").is_err());
-        assert!(validate_download_url("ftp://media.forgecdn.net/x").is_err());
-    }
-}
+#[path = "security_tests.rs"]
+mod tests;

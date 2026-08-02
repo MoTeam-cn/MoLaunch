@@ -1,11 +1,4 @@
-//! `AuthStorage::load` 实现（双轨制）
-//!
-//! - **Windows**：从注册表 `HKCU\Software\MoLaunch` 逐字段读取认证状态（敏感字段 SDK 解密）。
-//! - **非 Windows**：从 JSON 文件 `%APPDATA%/.Molaunch/auth.json`（macOS/Linux 为
-//!   `~/.config/Molaunch/auth.json`）读取，逐字段 SDK 解密敏感字段。
-//!
-//! 优先返回内存缓存，避免每次命令都重新读存储+解密+打日志。
-//! `save` 方法会自动刷新缓存；如需强制从存储读取，调用 `invalidate` 后再 load。
+//! `AuthStorage::load` 实现：注册表 / JSON 文件双轨制读取（优先返回内存缓存）
 
 use crate::log_info;
 

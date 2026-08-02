@@ -17,6 +17,20 @@
 - 设计决策：复用既有全局工具而非保留局部副本，符合「可复用函数必须提取到单独 TypeScript 文件」项目约定
 - 验证：`npx vite build` 通过（exit 0）
 
+### 重构
+
+#### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs
+
+- 背景：项目规范要求测试代码必须放到同目录 xxx_test.rs；审计（docs/fix-debug/01）发现 deeplink/security.rs、utils/client_type.rs、commands/frp/{types,sandbox,auth/flows,api_spec/{jsonpath,envelope,config_gen}}.rs 共 8 个文件以内联 `#[cfg(test)] mod tests { ... }` 携带 25 个测试函数（约 350 行），与其余 27 个文件的外部测试文件模式不一致
+- 改动（16 文件）：8 个主文件删除内联测试块，改为 `#[cfg(test)] #[path = "xxx_tests.rs"] mod tests;`；同目录新增 8 个 `xxx_tests.rs` 测试文件（纯移动，业务逻辑零改动）
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（exit 0）；`cargo test --manifest-path src-tauri/Cargo.toml --lib` 全部通过（151 passed / 0 failed，25 个用例无丢失）
+
+#### 后端：头部注释精简（27 个文件，>5 行 → ≤5 行）
+
+- 背景：项目注释规范要求文件头部注释 ≤5 行（版权声明除外），审计（docs/fix-debug/02）扫描发现 27 个 .rs 文件超限（最长 20 行）
+- 改动：精简 27 个文件头部 `//!` 模块注释至 ≤5 行；删除子模块罗列/历史背景/路径枚举/迁移策略清单等冗余；协议级内容保留在函数级 `///` 文档注释中
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（exit 0，零警告）
+
 ## [0.3.0] - 2026-08-02
 
 ### 新增

@@ -1,16 +1,4 @@
 //! AppData 根目录命名统一迁移：`.MolaLaunch` → `.Molaunch`
-//!
-//! 历史命名不一致：早期 `personalization.rs`/`online/storage.rs`/`auth/storage` 误用
-//! `.MolaLaunch`（多了一个 La），现统一为 `.Molaunch`。
-//!
-//! 迁移策略：
-//! 1. 旧路径不存在 → 跳过
-//! 2. 新路径已存在且非空 → 跳过（用户已有新路径数据，仅删除旧路径）
-//! 3. 旧路径存在且新路径为空 → 递归复制旧路径内容到新路径，复制成功后删除旧路径
-//! 4. 复制失败 → 保留旧路径，记录 WARN（下次启动再次尝试）
-//!
-//! Windows 文件系统不区分大小写，`.Molaunch` 与 `.MolaLaunch` 实为同一目录，
-//! 迁移主要影响 macOS/Linux。Windows 上通过 canonicalize 比较检测同目录后 no-op。
 
 use std::path::PathBuf;
 

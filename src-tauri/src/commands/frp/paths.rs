@@ -1,10 +1,4 @@
-//! Frp 路径辅助函数：数据根目录、厂商根目录、隧道/状态文件、ID 校验
-//!
-//! 路径分两类：
-//! - **便携式**（基于 `Storage::base_dir()`）：frp/tunnels.json、frp/providers.json、frp/logs、
-//!   frp/config — 当前启动器实例的运行时数据
-//! - **全局共享**（基于 `storage::appdata`）：providers/ 外部 frpc 厂商二进制、frp_auth/ 认证 token —
-//!   设备级数据，跨启动器实例共享（认证 token 与厂商账号绑定，便携版换目录/更新不丢）
+//! Frp 路径辅助函数：数据根目录、厂商根目录、隧道/状态文件与 ID 校验
 
 use std::path::PathBuf;
 

@@ -1,15 +1,6 @@
 //! 可配置认证流程引擎
 //!
-//! 按 endpoints.json 的 authFlows 配置构造 HTTP 请求并解析响应，
-//! 替代原硬编码的 OAuth2/Device Code 请求逻辑。
-//!
-//! 支持的占位符（请求体/查询/URL 中替换）：
-//! {baseUrl} {clientId} {clientSecret} {redirectUri} {code} {codeVerifier}
-//! {refreshToken} {deviceCode} {scope} {apiKey} {publicKey} {requestUuid}
-//!
-//! 响应解析支持：
-//! - from=body + path（JSONPath 从响应体取值）
-//! - from=header + name（从响应头取值）
+//! 按 endpoints.json 的 authFlows 配置构造 HTTP 请求并解析响应。
 
 use super::super::log_redact::redact_log;
 use super::super::types::{FieldExtractor, FlowRequest};
@@ -259,44 +250,5 @@ fn value_to_string(v: &serde_json::Value) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_fill_template() {
-        let ctx = FlowContext {
-            base_url: Some("https://api.example.com/v1".to_string()),
-            client_id: "my-client".to_string(),
-            code: Some("abc123".to_string()),
-            ..Default::default()
-        };
-        assert_eq!(fill_template("{clientId}", &ctx), "my-client");
-        assert_eq!(fill_template("{code}", &ctx), "abc123");
-        assert_eq!(
-            fill_template("{baseUrl}/oauth2/token", &ctx),
-            "https://api.example.com/v1/oauth2/token"
-        );
-        assert_eq!(
-            fill_template("https://example.com/token?code={code}", &ctx),
-            "https://example.com/token?code=abc123"
-        );
-    }
-
-    #[test]
-    fn test_fill_body_template() {
-        let ctx = FlowContext {
-            client_id: "my-client".to_string(),
-            code: Some("abc".to_string()),
-            ..Default::default()
-        };
-        let body = serde_json::json!({
-            "grant_type": "authorization_code",
-            "code": "{code}",
-            "client_id": "{clientId}"
-        });
-        let filled = fill_body_template(&body, &ctx);
-        assert_eq!(filled["code"], "abc");
-        assert_eq!(filled["client_id"], "my-client");
-        assert_eq!(filled["grant_type"], "authorization_code");
-    }
-}
+#[path = "flows_tests.rs"]
+mod tests;
