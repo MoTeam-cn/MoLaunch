@@ -195,6 +195,22 @@
 
 ### 修复
 
+#### CI：Windows 产物分发调整（便携版推云端，setup 仅附加 GitHub Release）
+
+- 背景：上一轮将便携版与 setup 都上传云端，实际需求是 **Windows 便携版才推送云端（S3 + 注册），setup 安装版不推送存储，仅附加到 GitHub Release**（供用户手动下载安装）
+- 改动（2 文件）：
+  - **`.github/workflows/release.yml`**：
+    - `Upload to S3 and register release` 步骤加 `if: matrix.platform != 'windows'`——Windows setup（nsis）不再上传 S3、不再注册版本；macOS/Linux 保持原逻辑推云端（其产物是唯一更新格式）
+    - Windows 便携版上传步骤保留（`bundle_type=portable`，云端 Windows 唯一产物）
+    - 新增 `Upload setup as workflow artifact (Windows only)`：将 `bundle/nsis/*-setup.exe` 及 `.sig` 上传为 workflow artifact
+    - `release` job 新增 `Download Windows setup artifact` 步骤，`softprops/action-gh-release@v1` 增加 `files: **/*-setup.exe` + `.sig`，将 Windows setup 附加到 GitHub Release Assets
+    - Release 页面 Downloads 文案更新（区分便携版/安装版/macOS/Linux）
+  - **`CHANGELOG.md`**：记录本次调整
+- 设计决策：
+  - **云端只保留便携版**：客户端「检查更新」协议与便携版/安装版共用，便携版作为 Windows 自动更新主格式；setup 安装版仅面向手动安装用户
+  - **artifact 传递**：release job 与 build job 分离，通过 `actions/upload-artifact@v4` / `download-artifact@v4` 跨 job 传递 setup 文件
+- 验证：本地 `js-yaml` 解析 release.yml 通过（jobs: build-and-upload, release；release.files 含 `**/*-setup.exe` 与 `.sig`）
+
 #### CI：修复 Windows 构建失败（tauri --bundles 不支持 portable 目标）
 
 - 背景：release.yml Windows job 在 `Build Tauri` 步骤报 `error: invalid value 'portable' for '--bundles [<BUNDLES>...]' [possible values: msi, nsis]`，v0.3.0 发布构建失败。根因：**Tauri v2 的 `--bundles` 参数在 Windows 平台仅支持 `msi / nsis`**，官方不存在 `portable` 打包目标（tauri-bundler `PackageType` 枚举、CLI `--help` 均无此值），`--bundles nsis,portable` 为无效写法

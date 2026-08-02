@@ -203,7 +203,10 @@ jobs:
             echo "未找到 portable 产物（跳过便携版上传）"
           fi
 
+      # Windows 便携版才推送云端（S3 + 注册）；setup 安装版不推存储，仅附加到 GitHub Release
+      # （由 release job 下载 workflow artifact 后附加，见下方 release job）
       - name: Upload to S3 and register release
+        if: matrix.platform != 'windows'
         shell: bash
         env:
           MOLAUNCH_ACTION_PUSH_KEY: ${{ secrets.MOLAUNCH_ACTION_PUSH_KEY }}
@@ -217,7 +220,7 @@ jobs:
             "${{ steps.locate.outputs.sig_file }}" \
             "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
 
-      # Windows 便携版单独上传（bundle_type=portable，与 NSIS 安装版并存）
+      # Windows 便携版单独上传（bundle_type=portable，云端仅此一份 Windows 产物）
       - name: Upload portable build (Windows only)
         if: matrix.platform == 'windows' && steps.locate.outputs.portable_file != ''
         shell: bash
@@ -233,7 +236,19 @@ jobs:
             "${{ steps.locate.outputs.portable_sig }}" \
             "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}"
 
-  # 创建 GitHub Release 页面（仅历史回顾，不作为下载源）
+      # Windows setup 安装版不推送云端（S3），仅作为 workflow artifact 传递，
+      # 由 release job 附加到 GitHub Release（供用户手动下载安装）
+      - name: Upload setup as workflow artifact (Windows only)
+        if: matrix.platform == 'windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-setup
+          path: |
+            src-tauri/target/release/bundle/nsis/*-setup.exe
+            src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+          if-no-files-found: error
+
+  # 创建 GitHub Release 页面（历史回顾 + 承载 Windows setup 安装版下载）
   release:
     name: Create GitHub Release (history)
     needs: build-and-upload
@@ -242,6 +257,11 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Download Windows setup artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-setup
 
       - name: Get version from tag
         id: get_version
@@ -279,14 +299,19 @@ jobs:
             ## MoLaunch ${{ steps.get_version.outputs.VERSION }}
 
             ### Downloads
-            安装包已上传至 S3 存储桶，客户端可通过启动器「检查更新」自动获取。
-            本页面仅用于发布历史回顾与变更记录。
+            - **Windows 便携版（推荐）**：已上传至 S3 存储桶，客户端可通过启动器「检查更新」自动获取。
+            - **Windows 安装版（setup）**：本页 Assets 中 `*-setup.exe`，需手动下载安装。
+            - macOS / Linux 安装包已上传至 S3 存储桶，客户端可通过「检查更新」自动获取。
+            本页面同时承载发布历史回顾与变更记录。
 
             ### Commits
             ${{ steps.changelog.outputs.LOG }}
 
             ---
             See [CHANGELOG.md](CHANGELOG.md) for details.
+          files: |
+            **/*-setup.exe
+            **/*-setup.exe.sig
           draft: false
           prerelease: false
         env:
