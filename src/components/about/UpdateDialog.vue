@@ -23,6 +23,7 @@ import {
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import { formatBytes } from '@/utils/format'
 import {
   updateState,
   checkForUpdate,
@@ -50,14 +51,6 @@ const progressPct = computed(() => {
 /** 人类可读的下载大小（如 "12.3 MB / 45.6 MB"） */
 const downloadedText = computed(() => formatBytes(updateState.downloaded))
 const totalText = computed(() => (updateState.total > 0 ? formatBytes(updateState.total) : '未知'))
-
-function formatBytes(bytes: number): string {
-  if (bytes <= 0) return '0 B'
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  if (bytes < 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-  return `${(bytes / 1024 / 1024 / 1024).toFixed(2)} GB`
-}
 
 /** 点击遮罩（仅 canClose 时生效） */
 function onMaskClick() {

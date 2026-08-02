@@ -5,6 +5,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 并且本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 修复
+
+#### 复用全局 formatBytes：消除 UpdateDialog 局部实现遮蔽
+
+- 背景：审计（docs/fix-debug/05-utils-reuse.md P0）发现 `UpdateDialog.vue` 组件内定义的局部 `formatBytes` 遮蔽了 `utils/format.ts` 全局实现，且展示口径不一致（局部用 1 位小数，全局默认 2 位小数）
+- 改动：
+  - `src/components/about/UpdateDialog.vue`：删除局部 `formatBytes`，新增 `import { formatBytes } from '@/utils/format'`，下载大小文案统一走全局实现
+- 设计决策：复用既有全局工具而非保留局部副本，符合「可复用函数必须提取到单独 TypeScript 文件」项目约定
+- 验证：`npx vite build` 通过（exit 0）
+
 ## [0.3.0] - 2026-08-02
 
 ### 新增
