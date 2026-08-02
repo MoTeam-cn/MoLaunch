@@ -123,9 +123,33 @@ jobs:
           tauriScript: npx tauri
           # Windows 优先使用 NSIS 安装包（而非 MSI），与 updater 协议一致
           updaterJsonPreferNsis: true
-          # Windows 同时构建 NSIS 安装版 + portable 便携版（便携版由应用内 deeplink
-          # 工具注册 molaunch:// 协议）；macOS/Linux 维持单一产物（app/appimage）
-          args: ${{ matrix.platform == 'windows' && '--bundles nsis,portable' || '' }}
+          # Windows 构建 NSIS 安装版；macOS/Linux 维持单一产物（app/appimage）。
+          # 注意：Tauri v2 的 --bundles 在 Windows 仅支持 msi/nsis（无 portable 目标），
+          # 便携版由下方 "Create portable build" 步骤复制 release 单文件并签名。
+          args: ${{ matrix.platform == 'windows' && '--bundles nsis' || '' }}
+
+      # ===== Windows 便携版 =====
+      # Tauri v2 无 portable 打包目标，便携版 = 复制 release 单文件 exe 并签名，
+      # 命名遵循 locate 步骤的 *_portable.exe 约定，复用下方预签名上传逻辑。
+      - name: Create portable build (Windows only)
+        if: matrix.platform == 'windows'
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          VERSION="${{ steps.version.outputs.VERSION }}"
+          BUNDLE_DIR="src-tauri/target/release/bundle/nsis"
+          MAIN_BIN="src-tauri/target/release/MoLaunch.exe"
+          PORTABLE_FILE="${BUNDLE_DIR}/MoLaunch_${VERSION}_x64_portable.exe"
+          if [ ! -f "$MAIN_BIN" ]; then
+            echo "::error::release 主程序不存在: $MAIN_BIN"
+            exit 1
+          fi
+          cp "$MAIN_BIN" "$PORTABLE_FILE"
+          npx tauri signer sign "$PORTABLE_FILE"
+          echo "[CI] 便携版已生成:"
+          ls -la "$PORTABLE_FILE" "${PORTABLE_FILE}.sig"
 
       # ===== 预签名上传 + 注册版本 =====
       # See: docs/updater/design.md §5.2 / §6 MoSign-v2 协议
@@ -143,7 +167,7 @@ jobs:
           case "$PLATFORM" in
             windows)
               SETUP_FILE=$(find "$BUNDLE_DIR/nsis" -name "*-setup.exe" 2>/dev/null | head -1)
-              # 便携版（Windows 专属）：Tauri portable 产物位于 nsis 目录，
+              # 便携版（Windows 专属）：由 "Create portable build" 步骤复制到 nsis 目录，
               # 文件名形如 MoLaunch_1.0.0_x64_portable.exe
               PORTABLE_FILE=$(find "$BUNDLE_DIR/nsis" -name "*_portable.exe" 2>/dev/null | head -1)
               ;;

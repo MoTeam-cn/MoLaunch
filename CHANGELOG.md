@@ -195,6 +195,17 @@
 
 ### 修复
 
+#### CI：修复 Windows 构建失败（tauri --bundles 不支持 portable 目标）
+
+- 背景：release.yml Windows job 在 `Build Tauri` 步骤报 `error: invalid value 'portable' for '--bundles [<BUNDLES>...]' [possible values: msi, nsis]`，v0.3.0 发布构建失败。根因：**Tauri v2 的 `--bundles` 参数在 Windows 平台仅支持 `msi / nsis`**，官方不存在 `portable` 打包目标（tauri-bundler `PackageType` 枚举、CLI `--help` 均无此值），`--bundles nsis,portable` 为无效写法
+- 改动（2 文件）：
+  - **`.github/workflows/release.yml`**：Windows job 的 `args` 由 `--bundles nsis,portable` 改为 `--bundles nsis`（修复报错，产物与 `bundle_type: nsis`、updater 协议一致）；新增 `Create portable build (Windows only)` 步骤——将 `src-tauri/target/release/MoLaunch.exe` 单文件复制为 `bundle/nsis/MoLaunch_{version}_x64_portable.exe`，并用 `npx tauri signer sign` 生成配套 `.sig`，命名沿用 locate 步骤 `*_portable.exe` 约定，预签名上传/版本注册逻辑零改动复用
+  - **`CHANGELOG.md`**：记录本次修复
+- 设计决策：
+  - **便携版 = release 单文件 exe**：Tauri v2 无原生 portable 目标，便携版直接复制构建产物单文件（WebView2 依赖系统运行时，Win10/11 预装），满足"复制即用"诉求
+  - **签名复用 updater 密钥**：便携版 `.sig` 与 NSIS 安装包共用 `TAURI_SIGNING_PRIVATE_KEY`，客户端下载校验一致；`ci-upload.cjs` 无需改动
+- 验证：本地 `npx tauri build --help` 确认 Windows 平台 `--bundles` 仅 `msi, nsis`；`npx tauri signer sign --help` 确认 `TAURI_SIGNING_PRIVATE_KEY` 环境变量用法与 `<FILE>.sig` 输出
+
 #### CI：补充 reg_delete 非 Windows stub 标记 dead_code（clippy 遗漏项）
 
 - 背景：上一轮修复 27 个 clippy 错误后，`rust-clippy` job 仍报 `reg_delete` never used（`src/storage/registry.rs:76`）。根因：`#[allow(dead_code)]` 只加在 Windows 版本上（该注释原属 Windows 版），`#[cfg(not(windows))]` stub 版本遗漏
