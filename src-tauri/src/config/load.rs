@@ -30,6 +30,8 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.language = config.get_or("General", "language", &app_config.language);
     app_config.game_language = config.get_or("General", "game_language", &app_config.game_language);
     app_config.primary_color = config.get_or("General", "primary_color", &app_config.primary_color);
+    app_config.close_behavior =
+        config.get_or("General", "close_behavior", &app_config.close_behavior);
 
     // Folders（Minecraft 文件夹列表）
     if let Some(list_json) = config.get("Folders", "list") {

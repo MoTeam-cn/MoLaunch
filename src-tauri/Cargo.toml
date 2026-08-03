@@ -22,7 +22,7 @@ tauri-build = { version = "2", features = [] }
 # 通过设置页按钮调出 devtools 用于排查问题，故 release 也需开启）
 # 安全约束：open_devtools() 后端 action 内部校验 is_developer_unlocked() &&
 # is_developer_mode()，普通用户无法触发
-tauri = { version = "2", features = ["devtools"] }
+tauri = { version = "2", features = ["devtools", "tray-icon", "image-ico"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
@@ -33,9 +33,6 @@ tauri-plugin-notification = "2"
 tauri-plugin-deep-link = "2"
 # 单实例插件（带 deep-link feature：新实例启动时把 deeplink URL 转发给主实例）
 tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
-# 自动更新（客户端检测/下载/校验/启动 NSIS installer 子程序）
-# See: docs/updater/design.md §4.1.1
-tauri-plugin-updater = "2"
 # 重启主进程（更新文件替换完成后调用 relaunch）
 tauri-plugin-process = "2"
 serde = { version = "1.0", features = ["derive"] }
@@ -121,6 +118,13 @@ windows = { version = "0.58", features = [
 # libc: setpgid / killpg 用于 frpc 进程组管理（对应 Windows Job Object）
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
+
+# 非 Windows 平台（macOS / Linux）依赖
+# 自动更新官方 plugin：Windows 便携版走自实现 updater（updater.exe 替换 + 退出时延迟安装，
+# 见 commands/system/updater/install_windows.rs），官方 plugin 仅 macOS/Linux 使用
+# （见 commands/system/updater/install_unix.rs 转发），故按平台条件引入，Windows 不链接
+[target.'cfg(not(target_os = "windows"))'.dependencies]
+tauri-plugin-updater = "2"
 
 [features]
 custom-protocol = ["tauri/custom-protocol"]

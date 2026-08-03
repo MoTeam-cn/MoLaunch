@@ -45,6 +45,8 @@ export interface ConfigSnapshot {
   gameLanguage: string
   /** 主题主色 HEX（如 "#165dff"），驱动 primary-* 色阶 */
   primaryColor: string
+  /** 关闭主窗口时的行为："ask"（每次询问）/ "tray"（保留托盘）/ "exit"（直接退出） */
+  closeBehavior: string
   // 社区资源
   communitySource: number
   communityFilenameFormat: number
@@ -110,6 +112,8 @@ export interface ConfigPatch {
   gameLanguage?: string
   /** 主题主色 HEX（如 "#165dff"） */
   primaryColor?: string
+  /** 关闭主窗口时的行为："ask"（每次询问）/ "tray"（保留托盘）/ "exit"（直接退出） */
+  closeBehavior?: string
   // 社区资源（INI 明文）
   communitySource?: number                                 // 0/1/2
   communityFilenameFormat?: number                         // 0-4

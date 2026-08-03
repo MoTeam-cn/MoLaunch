@@ -99,6 +99,8 @@ pub struct ConfigPatch {
     pub game_language: Option<String>,
     /// 主题主色 HEX（如 "#165dff"），前端注入 CSS 变量驱动 primary-* 色阶
     pub primary_color: Option<String>,
+    /// 关闭主窗口时的行为："ask"（每次询问）/ "tray"（保留托盘）/ "exit"（直接退出）
+    pub close_behavior: Option<String>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     pub selected_version: Option<Option<String>>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"

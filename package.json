@@ -21,6 +21,8 @@
     "@tauri-apps/plugin-process": "^2.0.0",
     "@tauri-apps/plugin-shell": "^2.3.5",
     "@tauri-apps/plugin-updater": "^2.0.0",
+    "dompurify": "^3.4.12",
+    "marked": "^18.0.7",
     "ol": "^10.9.0",
     "pinia": "^2.1.7",
     "skinview3d": "^3.4.2",

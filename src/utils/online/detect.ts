@@ -48,6 +48,9 @@ export function detectNatType(candidates: string[]): NatDetectionResult {
   const hostCandidates: string[] = []
   const srflxCandidates: { address: string; port: number }[] = []
 
+  console.log(
+    `[NAT] 收集到 ${candidates.length} 个 candidate，开始推断 NAT 类型`,
+  )
   for (const c of candidates) {
     const type = parseCandidateType(c)
     if (!type) continue
@@ -65,6 +68,9 @@ export function detectNatType(candidates: string[]): NatDetectionResult {
       }
     }
   }
+  console.log(
+    `[NAT] host=${hostCandidates.length} 个, srflx=${srflxCandidates.length} 个 (${srflxCandidates.map((c) => `${c.address}:${c.port}`).join(', ') || '无'})`,
+  )
 
   let type: NatType
   let publicIp: string | undefined
@@ -133,6 +139,8 @@ export function detectNatTypeWithStun(
     const candidates: string[] = []
     let settled = false
 
+    console.log(`[NAT] 开始检测：使用 ${stunServers.length} 个 STUN 服务器: ${stunServers.join(', ')}，超时 ${timeoutMs}ms`)
+
     const pc = new RTCPeerConnection({
       iceServers: stunServers.map((url) => ({ urls: url })),
     })
@@ -146,6 +154,7 @@ export function detectNatTypeWithStun(
         /* ignore */
       }
       if (error) {
+        console.log(`[NAT] 检测结束（异常）: type=${type}, error=${error}`)
         resolve({
           type,
           durationMs: Math.round(performance.now() - start),
@@ -154,17 +163,20 @@ export function detectNatTypeWithStun(
       } else {
         // 复用 detectNatType 的解析逻辑
         const result = detectNatType(candidates)
+        console.log(`[NAT] 检测完成: type=${result.type}, 耗时 ${result.durationMs}ms`)
         resolve(result)
       }
     }
 
     // 超时兜底
     const timer = setTimeout(() => {
+      console.log(`[NAT] 超时触发（${timeoutMs}ms），已收集 ${candidates.length} 个 candidate`)
       if (candidates.length === 0) {
         finish('Unknown', `ICE 收集超时（${timeoutMs}ms 内无 candidate）`)
       } else {
         // 用已有 candidate 推断
         const result = detectNatType(candidates)
+        console.log(`[NAT] 超时后按已有 candidate 推断: type=${result.type}`)
         settled = true
         try {
           pc.close()
@@ -185,16 +197,19 @@ export function detectNatTypeWithStun(
     pc.onicecandidate = (event) => {
       if (event.candidate && event.candidate.candidate) {
         candidates.push(event.candidate.candidate)
+        console.log(`[NAT] ICE candidate #${candidates.length}: ${event.candidate.candidate}`)
       }
     }
 
     pc.onicegatheringstatechange = () => {
+      console.log(`[NAT] ICE gathering 状态: ${pc.iceGatheringState}（已收集 ${candidates.length} 个 candidate）`)
       if (pc.iceGatheringState === 'complete') {
         clearTimeout(timer)
         if (candidates.length === 0) {
           finish('Unknown', 'ICE 收集完成但未获取任何 candidate')
         } else {
           const result = detectNatType(candidates)
+          console.log(`[NAT] 收集完成，推断结果: type=${result.type}`)
           settled = true
           try {
             pc.close()
@@ -207,7 +222,10 @@ export function detectNatTypeWithStun(
     }
 
     pc.createOffer()
-      .then((offer) => pc.setLocalDescription(offer))
+      .then((offer) => {
+        console.log('[NAT] createOffer 成功，调用 setLocalDescription 触发 ICE 收集')
+        return pc.setLocalDescription(offer)
+      })
       .catch((e) => {
         clearTimeout(timer)
         finish('Unknown', `createOffer/setLocalDescription 失败: ${String(e)}`)

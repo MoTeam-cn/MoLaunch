@@ -14,10 +14,12 @@ pub mod resources;
 pub mod sdk;
 pub mod state;
 pub mod storage;
+pub mod tray;
 pub mod utils;
 pub mod ws;
 
 use state::AppState;
+use tauri::Emitter;
 use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -105,12 +107,16 @@ pub fn run() {
         }))
         // 深度链接插件（molaunch:// 协议注册与事件解析）
         .plugin(tauri_plugin_deep_link::init())
-        // 自动更新 plugin（检测/下载/校验/启动 NSIS installer 子程序）
-        // See: docs/updater/design.md §4.1.4
-        .plugin(tauri_plugin_updater::Builder::new().build())
         // 重启主进程 plugin（更新文件替换完成后调用 relaunch）
         .plugin(tauri_plugin_process::init())
-        .manage(app_state)
+        .manage(app_state);
+
+    // 自动更新官方 plugin：仅 macOS/Linux 使用（Windows 便携版走自实现 updater，
+    // 见 commands/system/updater/install_windows.rs，官方 plugin 不链接）
+    #[cfg(not(target_os = "windows"))]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+
+    let builder = builder
         .setup(|app| {
             // setup 钩子在窗口/webview 创建后、前端加载前调用
             log_info!("[Startup] Tauri setup() hook entered — webview & window created");
@@ -131,6 +137,11 @@ pub fn run() {
             tauri::async_runtime::spawn(async move {
                 ws::start_server(app_handle, state).await;
             });
+
+            // 创建系统托盘（右键菜单：打开主页面 / 检查更新 / 退出）
+            if let Err(e) = tray::setup_tray(app.handle()) {
+                log_error!("[Tray] 托盘创建失败: {}", e);
+            }
 
             Ok(())
         })
@@ -172,12 +183,45 @@ pub fn run() {
             commands::online::online_manager,
             // Frp 内网穿透命令（8 个 action，厂商/隧道/进程管理，已聚合为 frp_manager 单一入口）
             commands::frp::frp_manager,
+            // 托盘退出命令（前端完成联机退房等清理后调用，后端再统一清理 frpc/TUN 后退出）
+            tray::request_exit,
         ])
-        .on_window_event(|_window, event| {
-            // 窗口关闭时保存配置
-            if let tauri::WindowEvent::CloseRequested { .. } = event {
-                log_info!("Window close requested, saving config...");
-                log_info!("Config will be saved on exit");
+        .on_window_event(|window, event| {
+            // 仅拦截主窗口的关闭请求；picker:// 等子窗口关闭时直接放行（正常销毁）
+            if window.label() != "main" {
+                return;
+            }
+            // 拦截关闭请求，按 close_behavior 分流：
+            // - tray：隐藏窗口（保留托盘运行）
+            // - exit：直接执行退出清理 + 退出进程
+            // - ask：通知前端弹出"直接退出 / 保留托盘"选择框
+            // 该钩子覆盖 Alt+F4 / 任务栏关闭等绕过前端 handleClose 的路径，
+            // 补齐此前关闭流程的清理缺口（frpc 残留 / TUN 未停止 / 跳过配置保存）。
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let app = window.app_handle();
+                let behavior = {
+                    let state = app.state::<AppState>();
+                    let config = state.config.blocking_lock();
+                    config.close_behavior.clone()
+                };
+                match behavior.as_str() {
+                    "tray" => {
+                        // 保留托盘：隐藏主界面，进程 / 全局 keepalive 定时器继续运行
+                        let _ = window.hide();
+                        log_info!("[Window] 关闭请求：关闭到托盘");
+                    }
+                    "exit" => {
+                        log_info!("[Window] 关闭请求：直接退出");
+                        tray::cleanup_and_exit(app);
+                    }
+                    _ => {
+                        // 每次询问：通知前端弹出选择框
+                        log_info!("[Window] 关闭请求：通知前端弹出退出选择框");
+                        let _ = app.emit("window-close-requested", ());
+                    }
+                }
+                return;
             }
             // 主窗口销毁时重置 DevTools 打开状态
             // WebView2 不提供查询 API，后端用 AtomicBool 维护状态；

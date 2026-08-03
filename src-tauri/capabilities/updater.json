@@ -1,0 +1,15 @@
+{
+  "identifier": "updater",
+  "description": "非 Windows 平台官方更新插件的权限（Windows 便携版走自实现 updater，不编译官方 plugin）",
+  "local": true,
+  "windows": [
+    "main"
+  ],
+  "platforms": [
+    "linux",
+    "macOS"
+  ],
+  "permissions": [
+    "updater:default"
+  ]
+}

@@ -96,6 +96,11 @@ impl Default for TlsSnapshot {
     }
 }
 
+/// 关闭主窗口时的默认行为（每次询问）
+fn default_close_behavior_str() -> String {
+    "ask".to_string()
+}
+
 /// 配置快照：返回所有配置字段的当前值
 ///
 /// 用于前端一次性读取全部配置，取代此前分散的 14 个 get_* 命令。
@@ -117,6 +122,9 @@ pub struct ConfigSnapshot {
     pub game_language: String,
     /// 主题主色 HEX（如 "#165dff"）
     pub primary_color: String,
+    /// 关闭主窗口时的行为："ask"（每次询问）/ "tray"（保留托盘）/ "exit"（直接退出）
+    #[serde(default = "default_close_behavior_str")]
+    pub close_behavior: String,
     pub selected_version: Option<String>,
     // 外部下载工具
     pub external_download_dir: Option<String>,

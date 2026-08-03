@@ -6,6 +6,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
+import { invoke } from '@tauri-apps/api/core'
 import {
   HomeIcon,
   Cog6ToothIcon,
@@ -16,9 +17,12 @@ import {
 import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
 import { useOnlineStore } from '@/stores/online'
-import { applyPendingUpdate } from '@/utils/updater'
+import { applyPendingUpdate, checkForUpdate } from '@/utils/updater'
+import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastError } from '@/utils/toast'
 import Tooltip from '@/components/common/Tooltip.vue'
+import ExitConfirmDialog from './ExitConfirmDialog.vue'
+import { useTauriEvent } from '@/composables/useTauriEvent'
 const appWindow = getCurrentWebviewWindow()
 const onlineStore = useOnlineStore()
 
@@ -26,20 +30,6 @@ const router = useRouter()
 const route = useRoute()
 const isMaximized = ref(false)
 const unlistenResized = ref<(() => void) | null>(null)
-
-onMounted(async () => {
-  isMaximized.value = await appWindow.isMaximized()
-  unlistenResized.value = await appWindow.onResized(async () => {
-    isMaximized.value = await appWindow.isMaximized()
-  })
-})
-
-onUnmounted(() => {
-  if (unlistenResized.value) {
-    unlistenResized.value()
-    unlistenResized.value = null
-  }
-})
 
 const navItems = [
   { name: '首页', path: '/apps', icon: HomeIcon },
@@ -83,7 +73,41 @@ function handleDownloadClick() {
   lastClickTime = now
 }
 
+// 退出选择弹框（close_behavior === 'ask' 时显示）
+const showExitDialog = ref(false)
+// 退出防重入：托盘退出事件与关闭按钮可能并发触发 doExit
+const exiting = ref(false)
+
+/**
+ * 关闭主窗口入口（右上角关闭按钮 / 后端 Alt+F4 等关闭请求统一走这里）
+ *
+ * 按持久化的 closeBehavior 分流：
+ * - ask：弹出"直接退出 / 保留托盘"选择框
+ * - tray：隐藏主界面（进程 / 全局 keepalive 定时器继续运行）
+ * - exit：执行退出清理后退出
+ */
 async function handleClose() {
+  if (exiting.value) return
+  const cfg = await safeCall(() => getConfigMap(), 'read config before close')
+  const behavior = cfg?.closeBehavior ?? 'ask'
+  if (behavior === 'ask') {
+    showExitDialog.value = true
+    return
+  }
+  if (behavior === 'tray') {
+    await appWindow.hide().catch(() => toastError('隐藏主界面失败，请重试'))
+    return
+  }
+  await doExit()
+}
+
+/**
+ * 直接退出：前端完成配置保存 / 联机退房 / 待安装更新等清理，
+ * 再通知后端统一清理 frpc 隧道与 TUN 虚拟网卡后退出进程。
+ */
+async function doExit() {
+  if (exiting.value) return
+  exiting.value = true
   // 关闭窗口前先保存配置
   await safeCall(() => tauri.saveConfigToFile(), 'save config before close')
   // 联机状态清理：根据角色通知服务端退出房间，避免僵尸房间/参与者记录
@@ -103,8 +127,56 @@ async function handleClose() {
   // Windows 便携版：退出前检查是否有待安装更新（appdata/last.exe）
   // 有则启动 updater.exe 替换主 exe，退出后 updater 接管，下次启动即为新版本
   await applyPendingUpdate().catch(() => false)
-  await appWindow.close()
+  // 前端清理完成，交由后端统一清理 frpc/TUN 后退出（覆盖 Alt+F4 等绕过路径）
+  await invoke('request_exit').catch((e) => {
+    console.error('[Exit] request_exit failed:', e)
+    window.close()
+  })
 }
+
+/** 退出选择框确认：可选"记住本次选择"，下次关闭直接生效 */
+async function onExitConfirm({ action, remember }: { action: 'exit' | 'tray'; remember: boolean }) {
+  if (remember) {
+    await safeCall(
+      () => applyConfig({ closeBehavior: action }),
+      'save close behavior',
+      () => toastError('保存关闭偏好失败'),
+    )
+  }
+  showExitDialog.value = false
+  if (action === 'exit') {
+    await doExit()
+  } else {
+    await appWindow.hide().catch(() => toastError('隐藏主界面失败，请重试'))
+  }
+}
+
+// 后端关闭请求（Alt+F4 / 任务栏关闭，ask 模式下由后端转发到前端弹框）
+const closeReqEvent = useTauriEvent('window-close-requested', () => {
+  void handleClose()
+})
+// 托盘"检查更新"：复用现有检查更新流程
+const trayCheckEvent = useTauriEvent('tray-check-update', () => {
+  void checkForUpdate()
+})
+
+onMounted(async () => {
+  closeReqEvent.start()
+  trayCheckEvent.start()
+  isMaximized.value = await appWindow.isMaximized()
+  unlistenResized.value = await appWindow.onResized(async () => {
+    isMaximized.value = await appWindow.isMaximized()
+  })
+})
+
+onUnmounted(() => {
+  if (unlistenResized.value) {
+    unlistenResized.value()
+    unlistenResized.value = null
+  }
+  closeReqEvent.stop()
+  trayCheckEvent.stop()
+})
 </script>
 
 <template>
@@ -201,5 +273,8 @@ async function handleClose() {
     <main class="flex-1 overflow-hidden p-2 bg-primary-100/30">
       <slot />
     </main>
+
+    <!-- 退出选择弹框（close_behavior === 'ask' 时弹出） -->
+    <ExitConfirmDialog v-model="showExitDialog" @confirm="onExitConfirm" />
   </div>
 </template>

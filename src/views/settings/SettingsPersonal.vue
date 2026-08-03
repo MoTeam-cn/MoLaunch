@@ -27,6 +27,21 @@ const { loaded: gameLanguageLoaded, markDirty: markGameLanguageDirty } = useConf
 watch(gameLanguage, (newLang) => {
   if (gameLanguageLoaded.value) markGameLanguageDirty('gameLanguage', String(newLang))
 })
+
+// 关闭主界面行为（ask 每次询问 / tray 保留托盘 / exit 直接退出）
+const closeBehavior = ref('ask')
+
+const { loaded: closeBehaviorLoaded, markDirty: markCloseBehaviorDirty } = useConfigPage({
+  delay: 500,
+  errorLabel: 'save close behavior',
+  onLoad: (cfg) => {
+    closeBehavior.value = cfg.closeBehavior || 'ask'
+  },
+})
+
+watch(closeBehavior, (val) => {
+  if (closeBehaviorLoaded.value) markCloseBehaviorDirty('closeBehavior', String(val))
+})
 </script>
 
 <template>
@@ -36,6 +51,33 @@ watch(gameLanguage, (newLang) => {
 
     <!-- 主页 -->
     <HomePanelModeSection />
+
+    <!-- 主界面 -->
+    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">主界面</h3>
+      <div class="divide-y divide-gray-200">
+        <!-- 关闭主界面时 -->
+        <div class="px-5 py-4">
+          <div class="flex items-center justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-gray-900">关闭主界面时</p>
+              <p class="text-xs text-gray-500 mt-0.5">选择"保留托盘"后关闭主界面仍会在系统托盘运行；可在托盘菜单中退出</p>
+            </div>
+            <div class="flex-none w-40">
+              <Select
+                :model-value="closeBehavior"
+                :options="[
+                  { label: '每次询问', value: 'ask' },
+                  { label: '保留托盘', value: 'tray' },
+                  { label: '直接退出', value: 'exit' },
+                ]"
+                @update:model-value="closeBehavior = String($event)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 游戏 -->
     <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">

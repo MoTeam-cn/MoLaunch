@@ -17,6 +17,7 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set("General", "language", &config.language);
     ini.set("General", "game_language", &config.game_language);
     ini.set("General", "primary_color", &config.primary_color);
+    ini.set("General", "close_behavior", &config.close_behavior);
     ini.set(
         "General",
         "isolation_mode",

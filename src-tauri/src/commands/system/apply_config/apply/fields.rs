@@ -153,6 +153,10 @@ pub(super) fn apply_launcher(
         log_info!("[Config] primary_color = {}", color);
         config.primary_color = color.clone();
     }
+    if let Some(ref behavior) = patch.close_behavior {
+        log_info!("[Config] close_behavior = {}", behavior);
+        config.close_behavior = behavior.clone();
+    }
 }
 
 /// 社区资源域：community.source / filename_format / mod_local_name_style / ignore_quilt

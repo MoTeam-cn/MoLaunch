@@ -24,6 +24,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import { formatBytes } from '@/utils/format'
+import { renderMarkdown, handleMarkdownLinkClick } from '@/utils/markdown'
 import {
   updateState,
   checkForUpdate,
@@ -33,6 +34,9 @@ import {
 
 /** 是否显示弹窗（仅当 showDialog=true 时渲染） */
 const visible = computed(() => updateState.showDialog)
+
+/** 更新日志：Markdown 渲染为已消毒的 HTML（云端内容经 DOMPurify 防 XSS） */
+const notesHtml = computed(() => (updateState.notes ? renderMarkdown(updateState.notes) : ''))
 
 /** 是否允许关闭（强制更新 / 下载中 / 安装中 时禁止） */
 const canClose = computed(
@@ -137,8 +141,9 @@ function onRetry() {
                 </span>
               </div>
               <div v-if="updateState.notes" class="rounded-md bg-gray-50 p-3 max-h-44 overflow-y-auto">
-                <p class="text-xs text-gray-600 leading-relaxed whitespace-pre-line">{{ updateState.notes }}</p>
-              </div>
+                  <!-- eslint-disable-next-line vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒；链接点击由 handleMarkdownLinkClick 走系统浏览器 -->
+                  <div class="markdown-body text-xs text-gray-600 leading-relaxed" @click="handleMarkdownLinkClick" v-html="notesHtml" />
+                </div>
               <p v-if="updateState.forceUpdate" class="text-xs text-red-500">
                 此版本为重要更新，需要立即安装后才能继续使用。
               </p>
@@ -234,3 +239,55 @@ function onRetry() {
     </transition>
   </teleport>
 </template>
+
+<style scoped>
+/* 更新日志 Markdown 内容样式（作用于 v-html 渲染的节点） */
+.markdown-body :deep(p) {
+  margin: 0 0 0.375rem;
+}
+.markdown-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+.markdown-body :deep(h1),
+.markdown-body :deep(h2),
+.markdown-body :deep(h3),
+.markdown-body :deep(h4) {
+  margin: 0.5rem 0 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1d2129;
+}
+.markdown-body :deep(ul),
+.markdown-body :deep(ol) {
+  margin: 0.125rem 0 0.375rem;
+  padding-left: 1.125rem;
+  list-style: disc;
+}
+.markdown-body :deep(ol) {
+  list-style: decimal;
+}
+.markdown-body :deep(li) {
+  margin: 0.125rem 0;
+}
+.markdown-body :deep(code) {
+  padding: 0.0625rem 0.25rem;
+  border-radius: 0.25rem;
+  background-color: #e5e6eb;
+  font-family: inherit;
+}
+.markdown-body :deep(pre) {
+  margin: 0.375rem 0;
+  padding: 0.5rem 0.625rem;
+  overflow-x: auto;
+  border-radius: 0.375rem;
+  background-color: #f2f3f5;
+}
+.markdown-body :deep(pre code) {
+  padding: 0;
+  background-color: transparent;
+}
+.markdown-body :deep(a) {
+  color: var(--color-primary-500);
+  text-decoration: underline;
+}
+</style>

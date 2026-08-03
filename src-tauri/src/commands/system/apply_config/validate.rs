@@ -62,5 +62,10 @@ pub fn validate_patch(patch: &ConfigPatch) -> Result<(), String> {
             return Err(format!("无效的 meta_source: {}", s));
         }
     }
+    if let Some(ref b) = patch.close_behavior {
+        if !matches!(b.as_str(), "ask" | "tray" | "exit") {
+            return Err(format!("无效的 close_behavior: {}", b));
+        }
+    }
     Ok(())
 }

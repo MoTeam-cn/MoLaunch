@@ -11,11 +11,14 @@ use super::exchange;
 use crate::log_debug;
 use crate::log_error;
 use crate::log_info;
+use crate::log_warn;
 use crate::state::AppState;
+use tauri::Manager;
 
 /// 启动 OAuth2 授权流程
 pub async fn start_oauth2(
     _state: &AppState,
+    app: &tauri::AppHandle,
     provider_id: &str,
 ) -> Result<OAuth2Result, String> {
     let manifest = read_provider_manifest(provider_id)?;
@@ -75,6 +78,17 @@ pub async fn start_oauth2(
         log_error!("[Frp Auth] OAuth2 回调超时: provider={}", provider_id);
         "OAuth2 授权超时（5 分钟内未完成）".to_string()
     })??;
+
+    // 4.1 回调已收到：浏览器此刻停留在授权页面，启动器窗口可能被盖住，
+    // 自动将主窗口置顶并聚焦，方便用户直接看到认证结果
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
+        let _ = window.show();
+        let _ = window.set_focus();
+        log_info!("[Frp Auth] OAuth2 回调已收到，启动器窗口置于最前");
+    } else {
+        log_warn!("[Frp Auth] 未找到主窗口（main），无法前置窗口");
+    }
 
     // 5. 用 code 换取 token（走 flows 引擎）
     let ctx = FlowContext {

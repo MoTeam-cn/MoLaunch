@@ -126,6 +126,11 @@ fn default_trust_mode() -> String {
     "builtin".to_string()
 }
 
+/// 关闭主窗口时的默认行为（每次询问）
+fn default_close_behavior() -> String {
+    "ask".to_string()
+}
+
 impl Default for TlsConfig {
     fn default() -> Self {
         TlsConfig {
@@ -158,6 +163,13 @@ pub struct AppConfig {
     // 外部下载工具
     /// 外部下载工具的自定义保存目录（None 或空则用默认 .Molaunch/Download/）
     pub external_download_dir: Option<String>,
+    /// 关闭主窗口时的行为
+    ///
+    /// - `"ask"`：每次点击关闭时弹出选择框（默认）
+    /// - `"tray"`：保留托盘关闭主界面（最小化到系统托盘）
+    /// - `"exit"`：直接退出
+    #[serde(default = "default_close_behavior")]
+    pub close_behavior: String,
 
     // 分组
     pub proxy: ProxyConfig,
@@ -195,6 +207,7 @@ impl Default for AppConfig {
             primary_color: "#165dff".to_string(),
             selected_version: None,
             external_download_dir: None,
+            close_behavior: default_close_behavior(),
             proxy: ProxyConfig {
                 mode: "none".to_string(),
                 kind: "http".to_string(),

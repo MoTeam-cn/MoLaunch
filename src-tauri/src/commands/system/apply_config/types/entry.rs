@@ -40,6 +40,7 @@ pub fn build_snapshot(
         log_level: config.log_level,
         game_language: config.game_language.clone(),
         primary_color: config.primary_color.clone(),
+        close_behavior: config.close_behavior.clone(),
         selected_version: config.selected_version.clone(),
         external_download_dir: config.external_download_dir.clone(),
         java_path,

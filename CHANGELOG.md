@@ -7,7 +7,121 @@
 
 ## [未发布]
 
+### 新增
+
+#### 系统托盘：打开主页面 / 检查更新 / 退出
+
+- 背景：此前关闭只能通过前端 X 按钮走 `handleClose`，缺少常驻托盘入口，无法在不退出进程的前提下收起主界面
+- 改动：
+  - `src-tauri/Cargo.toml`：tauri 启用 `tray-icon`（+`image-ico`）feature
+  - `src-tauri/src/tray.rs`（新增）：托盘右键菜单三项——打开主页面（`unminimize`+`show`+`set_focus`）/ 检查更新（emit `tray-check-update`，前端复用 `checkForUpdate`）/ 退出（`cleanup_and_exit`）；左键单击托盘图标同样打开主界面；图标复用 `Images/icon.ico`
+  - `src-tauri/src/lib.rs`：`setup` 中创建托盘；注册 `tray::request_exit` 命令
+  - `src/components/layout/TopNavLayout.vue`：`useTauriEvent` 监听 `tray-check-update` 触发检查更新
+- 验证：`cargo check/clippy` 通过
+
+#### 关闭主界面退出选择框，行为可持久化 + 设置页可改
+
+- 背景：点击关闭时希望让用户选择"直接退出 / 保留托盘关闭主界面"，可勾选"下次不再提醒"记住本次选择，且可在设置页修改
+- 改动：
+  - 配置新增 `close_behavior`（`ask` 每次询问 / `tray` 保留托盘 / `exit` 直接退出，默认 `ask`）：`AppConfig` + `save/load` + `ConfigPatch/ConfigSnapshot/fields/validate` + 前端 `ConfigPatch`
+  - `src/components/layout/ExitConfirmDialog.vue`：两项选择 + "下次不再提醒，记住本次选择"复选框；勾选后通过 `applyConfig({ closeBehavior })` 持久化
+  - `src/components/layout/TopNavLayout.vue`：`handleClose` 按 `close_behavior` 分流——ask 弹框 / tray 隐藏窗口 / exit 直接退出
+  - `src/views/settings/SettingsPersonal.vue`：新增「主界面 → 关闭主界面时」下拉（每次询问 / 保留托盘 / 直接退出）
+  - `src-tauri/resources/defaults/config.ini`：`[General]` 补充 `close_behavior`（默认 `ask`）与注释，保证通过 `sync_config` 的 `merge_missing_from` 自动合并进老用户已存在的配置文件
+- 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
+
+#### 托盘退出弹确认框 + 更新日志 Markdown 渲染 + 退出框样式优化
+
+- 背景：托盘右键"退出"此前直接触发退出，不走确认框；且主窗口处于隐藏/托盘状态时弹窗可能不可见；更新日志以纯文本 `whitespace-pre-line` 展示，无法呈现 Markdown 结构；退出确认框内容（左下复选框 + 右下按钮）在小宽度下会换行
+- 改动：
+  - `src-tauri/src/tray.rs`：托盘「退出」先 `open_main_window`（show + set_focus）保证主界面在最前，再 emit `tray-request-exit`
+  - `src/components/layout/TopNavLayout.vue`：`tray-request-exit` 监听改走 `handleClose()`（与 X 按钮一致按 `close_behavior` 分流，`ask` 时弹出选择框）
+  - `package.json` + `src/utils/markdown.ts`（新增）：引入 `marked`（渲染）+ `dompurify`（消毒），封装 `renderMarkdown`，解决云端更新日志的 XSS 风险
+  - `src/components/about/UpdateDialog.vue`：更新日志 `notes` 由纯文本改为 `renderMarkdown` 渲染的 HTML（`v-html` + 作用域样式），支持标题/列表/代码块/链接
+  - `src/components/layout/ExitConfirmDialog.vue`：标题与正文加 `whitespace-nowrap` 防换行、正文改 `text-gray-500`，底部复选框与按钮文案收窄并加 `flex-none`，避免挤压换行
+- 验证：`cargo check/clippy`、`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
+
+#### 更新日志 Markdown 链接禁止页面内跳转，改走系统浏览器
+
+- 背景：更新日志渲染的 GitHub commit 等外链在 webview 内直接导航，导致跳出 SPA 页面且无法返回
+- 改动：
+  - `src/utils/markdown.ts`：自定义 marked renderer 为 http(s) 链接注入 `target="_blank" rel="noopener noreferrer"`；新增 `handleMarkdownLinkClick` 事件委托——拦截 `a[href]` 点击，`preventDefault` + 通过 `@tauri-apps/plugin-shell` 的 `open` 调用系统默认浏览器打开，从渲染层与交互层双重禁止页面内跳转
+  - `src/components/about/UpdateDialog.vue`：更新日志容器绑定 `handleMarkdownLinkClick`
+- 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
+
+#### 更新日志链接点击走系统浏览器并加 toast 提示
+
+- 背景：Markdown 外链点击虽已改走系统浏览器，但无任何反馈，用户不知道发生了什么
+- 改动：
+  - `src/utils/markdown.ts`：`handleMarkdownLinkClick` 调用 `open` 成功后 `toastInfo('已在系统浏览器中打开')`，失败时 `toastError('打开外部链接失败')`
+- 验证：`vue-tsc --noEmit`、`eslint` 通过
+
+#### NAT 类型检测流程控制台日志
+
+- 背景：联机设备侧边栏的端口/NAT 类型检测（STUN 探测）流程不透明，需要观察各阶段以便排查
+- 改动：
+  - `src/utils/online/detect.ts`：`detectNatTypeWithStun`/`detectNatType` 增加 `[NAT]` 前缀控制台日志——使用的 STUN 服务器列表、每个 ICE candidate（含地址:端口）、gathering 状态流转、超时兜底、推断结果与耗时
+- 验证：`vue-tsc --noEmit`、`eslint` 通过
+
+#### frp 厂商 OAuth2 回调后自动将启动器窗口置于最前
+
+- 背景：用户点击厂商授权页后浏览器跳回本地回调端口，但启动器窗口被浏览器盖住，用户看不到认证结果
+- 改动：
+  - `src-tauri/src/commands/frp/auth/oauth2/flow.rs`：`start_oauth2` 新增 `app: &tauri::AppHandle` 参数，收到回调后（token 交换前）`unminimize + show + set_focus` 将主窗口置顶聚焦
+  - `src-tauri/src/commands/frp/manager/auth_actions.rs`：`start_oauth2` action 由 `_app` 改 `app` 传入 AppHandle
+- 验证：`cargo check/clippy` 通过
+
 ### 修复
+
+#### 托盘「退出」改为直接退出，不弹确认框
+
+- 背景：托盘退出此前转交前端走 `handleClose()`，`ask` 模式下会弹出确认框，与"托盘退出即退出"的预期不符
+- 改动：
+  - `src-tauri/src/tray.rs`：「退出」菜单直接调用 `cleanup_and_exit(app)`（统一清理 frpc 隧道 / TUN 虚拟网卡 / 保存配置后退出），不再 emit `tray-request-exit`
+  - `src/components/layout/TopNavLayout.vue`：移除已无触发方的 `tray-request-exit` 监听
+- 验证：`cargo check/clippy`、`vue-tsc --noEmit`、`eslint` 通过
+
+### 修复
+
+#### 关闭 picker 子窗口误触发主进程退出确认
+
+- 背景：关闭 picker:// 选择器子窗口（如端口选择弹窗）的按钮时，错误地触发了主进程的退出确认（`window-close-requested` 弹窗）
+- 根因：`on_window_event` 的 `CloseRequested` 拦截未区分窗口，对所有窗口（含 picker 子窗口）都执行 `prevent_close` + 按 `close_behavior` 分流，子窗口关闭被误当作主窗口关闭
+- 改动：
+  - `src-tauri/src/lib.rs`：`on_window_event` 开头增加 `if window.label() != "main" { return; }`，关闭拦截与 DevTools 状态重置仅作用于主窗口，picker 等子窗口关闭直接放行
+- 验证：`cargo check/clippy` 通过
+
+### 修复
+
+#### 选择"保留托盘"主界面不关闭：capabilities 缺 window hide 权限
+
+- 背景：退出确认框选"保留托盘"后主界面窗口不隐藏（"直接退出"正常，因走 `request_exit` 命令不依赖窗口权限）
+- 根因：Tauri 2 中 `core:window:default` 不包含 `hide`，而 `capabilities/migrated.json` 未声明 `core:window:allow-hide`，前端 `appWindow.hide()` 被后端拒绝
+- 改动：
+  - `src-tauri/capabilities/migrated.json`：补 `core:window:allow-hide`
+  - `src/components/layout/TopNavLayout.vue`：`handleClose`/`onExitConfirm` 的 `hide()` 加 `.catch` 失败兜底 toast
+- 验证：`vue-tsc --noEmit`、`eslint` 通过
+
+#### Windows 构建不再引入官方 updater plugin（条件编译）
+
+- 背景：自动更新为双轨实现——Windows 便携版走自实现 updater（`install_windows.rs`，updater.exe 替换 + 退出延迟安装），官方 `tauri-plugin-updater` 仅 macOS/Linux 使用（`install_unix.rs` 转发），此前 Windows 也一并编译链接官方 plugin，白白增大体积
+- 改动：
+  - `src-tauri/Cargo.toml`：`tauri-plugin-updater` 从 `[dependencies]` 移到 `[target.'cfg(not(target_os = "windows"))'.dependencies]`
+  - `src-tauri/src/lib.rs`：`.plugin(tauri_plugin_updater::Builder::new().build())` 包 `#[cfg(not(target_os = "windows"))]`
+  - `src-tauri/capabilities/updater.json`（新增）：`updater:default` 权限独立成文件并 `platforms: ["linux","macOS"]`；`capabilities/migrated.json` 移除 `updater:default`（Windows 上该权限不存在会致 tauri-build 失败）
+- 验证：`cargo check/clippy`（Windows 目标）通过
+
+### 修复
+
+#### 关闭路径清理缺口：Alt+F4 绕过 handleClose / frpc 残留 / TUN 未显式停止
+
+- 背景：此前退出清理（保存配置 / 联机退房 / applyPendingUpdate）只在前端 X 按钮的 `handleClose` 内执行，Alt+F4、任务栏关闭等会绕过它；且在退出时 frpc 隧道进程、TUN 虚拟网卡也没有显式清理，可能残留 frpc.exe、TUN 网卡
+- 改动：
+  - `src-tauri/src/lib.rs`：`on_window_event` 的 `CloseRequested` 由"仅打日志"改为 `api.prevent_close()` 拦截，并按 `close_behavior` 分流——tray 隐藏窗口 / exit 执行退出清理 / ask 向后端 emit `window-close-requested` 转交前端弹框；该钩子覆盖 Alt+F4 等绕过前端的关闭路径
+  - `src-tauri/src/tray.rs`：`cleanup_and_exit` 统一清理——遍历 frpc 进程表停所有隧道、`virtual_lan_bridge.take().stop()` 停止 TUN、`save_config` 保存配置，再 `app.exit(0)`
+  - `src-tauri/src/commands/frp/process/mod.rs`：新增 `stop_all_tunnels`（迭代全局 `RUNNING` 表逐个 `stop_tunnel`）
+  - 前端 `request_exit` 命令调用点位于 `doExit` 末尾，保证先保存配置/联机退房/待安装更新，再由后端兜底清理
+- 验证：`cargo check/clippy` 通过
 
 #### 联机房间切页被销毁：保活提升为全局 store 定时器，脱离页面生命周期
 
