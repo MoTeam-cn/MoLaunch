@@ -103,7 +103,7 @@ pub async fn install_modpack(
             ds.set_stage_status(2, StageStatus::Loading, 0.0);
         }
         let mods_dir = instance_dir_ref.join("mods");
-        std::fs::create_dir_all(&mods_dir).map_err(|e| format!("创建 mods 目录失败: {}", e))?;
+        crate::utils::fs::ensure_dir(&mods_dir)?;
         let include_optional = req.include_optional.unwrap_or(true);
         shared::download_mods_by_format(
             state,

@@ -82,7 +82,7 @@ pub(super) async fn ensure_external_frpc(
         .map_err(|e| format!("读取下载内容失败: {}", e))?;
 
     if let Some(ref expected_sha) = dl.sha256 {
-        let actual = compute_sha256(&bytes);
+        let actual = crate::utils::hash::sha256_hex(&bytes);
         if actual != *expected_sha {
             return Err(format!(
                 "SHA256 校验失败：期望 {}，实际 {}",
@@ -134,12 +134,4 @@ pub(crate) fn host_matches(host: &str, pattern: &str) -> bool {
     } else {
         host == pattern
     }
-}
-
-/// 计算 SHA256（十六进制小写）
-fn compute_sha256(bytes: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(bytes);
-    hex::encode(hasher.finalize())
 }

@@ -21,7 +21,7 @@ fn validate_version_id(version_id: &str) -> Result<(), String> {
     if version_id.is_empty() {
         return Err("version_id 不能为空".to_string());
     }
-    if version_id.contains("..") {
+    if !crate::utils::path::is_safe_relative_path(version_id) {
         return Err("version_id 不允许包含 \"..\"".to_string());
     }
     if version_id.contains('/') || version_id.contains('\\') {
@@ -56,8 +56,7 @@ pub async fn read(
     let json_path_clone = json_path.clone();
     let (content, path_str) =
         tokio::task::spawn_blocking(move || -> Result<(String, String), String> {
-            let content = std::fs::read_to_string(&json_path_clone)
-                .map_err(|e| format!("读取文件失败: {}", e))?;
+            let content = crate::utils::fs::read_to_string(&json_path_clone)?;
             let path_str = json_path_clone.to_str().unwrap_or("").to_string();
             Ok((content, path_str))
         })
@@ -101,7 +100,7 @@ pub async fn save(
     tokio::task::spawn_blocking(move || -> Result<(), String> {
         // 确保父目录存在
         if let Some(parent) = json_path_clone.parent() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("创建版本目录失败: {}", e))?;
+            crate::utils::fs::ensure_dir(parent)?;
         }
         std::fs::write(&json_path_clone, content.as_bytes())
             .map_err(|e| format!("写入文件失败: {}", e))

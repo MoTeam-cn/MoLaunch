@@ -26,7 +26,7 @@ pub async fn extract_save_seed(
     params: ExtractSaveSeedParams,
 ) -> Result<serde_json::Value, String> {
     if params.world_name.is_empty()
-        || params.world_name.contains("..")
+        || !crate::utils::path::is_safe_relative_path(&params.world_name)
         || params.world_name.contains('/')
         || params.world_name.contains('\\')
     {

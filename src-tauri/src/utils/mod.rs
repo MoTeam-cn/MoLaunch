@@ -13,6 +13,7 @@ pub mod datetime;
 pub mod dispatcher;
 pub mod format;
 pub mod fs;
+pub mod hash;
 pub mod markdown_table;
 pub mod path;
 pub mod sdk_crypto;

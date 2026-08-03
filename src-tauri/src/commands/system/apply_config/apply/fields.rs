@@ -1,96 +1,14 @@
-//! 配置更新核心逻辑
-//! `apply_config_inner` 三段式分流：1.校验（validate：mirror_url SSRF、download_source/
-//! meta_source 枚举）→ 2.加密字段分流（secure：CurseForge/开发者模式/IgnoreTls，不进
-//! AppConfig）→ 3.普通字段统一更新（`update_config` 闭包内按域调用 7 个子函数 + 副作用）。
-//! 7 个域子函数：代理/下载/内存/启动器/社区/启动高级/TLS；CurseForge 等不在闭包内（走 secure_storage 与注册表）。
+//! 配置更新 9 个域子函数（在 `update_config` 闭包内被 `apply_config_inner` 调用）
 
-use super::secure;
-use super::types::ConfigPatch;
-use super::validate;
+use super::super::secure;
+use super::super::types::ConfigPatch;
 use crate::log_info;
 use crate::log_warn;
-use crate::state::AppState;
-
-/// 配置更新核心逻辑（从扁平参数构建 `ConfigPatch` 后调用）
-pub(crate) async fn apply_config_inner(state: &AppState, patch: ConfigPatch) -> Result<(), String> {
-    validate::validate_patch(&patch)?;
-
-    // 2. 加密字段分流（CurseForge API Key）
-    secure::apply_curseforge(state, &patch).await?;
-
-    // 2b. 开发者模式分流（注册表，不进 AppConfig）
-    secure::apply_developer_mode(&patch)?;
-
-    // 2c. IgnoreTls 分流（注册表，仅开发者模式可开启）
-    secure::apply_ignore_tls(&patch)?;
-    // 2d. Java path 分流（INI [Java] path 独立存储，不进 AppConfig）
-    apply_java(&patch)?;
-    // log_level 变更需闭包外立即生效，用 Option 收集待应用的值（避免跨 await 持有锁）
-    let mut log_level_pending: Option<u32> = None;
-    // 代理变更需闭包外重建 HTTP 客户端（同 log_level 模式，避免跨 await 持有锁）
-    // 四元组：(mode, kind, url, ip_version)
-    let mut proxy_pending: Option<(String, String, String, String)> = None;
-    // TLS 变更需闭包外重建 HTTP 客户端（trust_mode + ignore_tls）
-    let mut tls_pending: Option<bool> = None;
-
-    super::super::update_config(state, |config| {
-        apply_proxy(config, &patch, &mut proxy_pending);
-        apply_download(config, &patch);
-        apply_memory(config, &patch);
-        apply_launcher(config, &patch, &mut log_level_pending);
-        apply_community(config, &patch);
-        apply_launch_advanced(config, &patch);
-        apply_external_download(config, &patch);
-        apply_online(config, &patch);
-        apply_tls(config, &patch, &mut tls_pending);
-    })
-    .await?;
-
-    // 副作用阶段（闭包外执行）
-    // log_level 变更需要立即生效（参考此前 set_config_value 的特例补丁）
-    if let Some(level) = log_level_pending {
-        let log_level = match level {
-            0 | 1 => crate::logger::LogLevel::Error,
-            2 => crate::logger::LogLevel::Warn,
-            3 => crate::logger::LogLevel::Info,
-            4 => crate::logger::LogLevel::Debug,
-            5 => crate::logger::LogLevel::Trace,
-            _ => crate::logger::LogLevel::Info,
-        };
-        crate::logger::set_level(log_level);
-    }
-
-    // 代理或 TLS 变更需重建 HTTP 客户端（热更新，无需重启应用）
-    if proxy_pending.is_some() || tls_pending.is_some() {
-        // 锁定读取最新配置（包含刚更新的 proxy + tls 字段）
-        let config = state.config.lock().await;
-        let (mode, kind, url, ip_version, trust_mode) = (
-            config.proxy.mode.clone(),
-            config.proxy.kind.clone(),
-            config.proxy.url.clone(),
-            config.proxy.ip_version.clone(),
-            config.tls.trust_mode.clone(),
-        );
-        drop(config);
-        // ignore_tls 走注册表，开发者模式关闭时自动为 false
-        let ignore_tls = crate::commands::system::developer::is_ignore_tls();
-        crate::http::init_client(&mode, &kind, &url, &ip_version, &trust_mode, ignore_tls);
-        log_info!(
-            "[Config] HTTP client rebuilt (proxy: {}, ip_version: {}, trust_mode: {}, ignore_tls: {})",
-            mode,
-            ip_version,
-            trust_mode,
-            ignore_tls
-        );
-    }
-
-    Ok(())
-}
 
 /// 代理域：proxy.mode / proxy.kind / proxy.url / proxy.ip_version
 ///
 /// 任一字段变更即收集完整四元组到 `proxy_pending`，供闭包外重建 HTTP 客户端。
-fn apply_proxy(
+pub(super) fn apply_proxy(
     config: &mut crate::state::AppConfig,
     patch: &ConfigPatch,
     proxy_pending: &mut Option<(String, String, String, String)>,
@@ -127,7 +45,7 @@ fn apply_proxy(
 }
 
 /// 下载域：download.source / meta_source / max_speed / max_threads / chunk_count / mirror_url
-fn apply_download(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+pub(super) fn apply_download(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(ref source) = patch.download.source {
         log_info!("[Config] download_source = {}", source);
         let bmclapi = crate::minecraft::sources::BMCLAPI_BASE;
@@ -184,7 +102,7 @@ fn apply_download(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
 }
 
 /// 内存域：memory.mode（auto 联动清零）/ memory.min / memory.max
-fn apply_memory(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+pub(super) fn apply_memory(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(ref mode) = patch.memory.mode {
         log_info!("[Config] memory_mode = {}", mode);
         config.memory.mode = mode.clone();
@@ -205,7 +123,7 @@ fn apply_memory(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
 }
 
 /// 启动器域：game_dir / isolation_mode / log_level（收集待应用值）/ selected_version / game_language / primary_color
-fn apply_launcher(
+pub(super) fn apply_launcher(
     config: &mut crate::state::AppConfig,
     patch: &ConfigPatch,
     log_level_pending: &mut Option<u32>,
@@ -238,7 +156,7 @@ fn apply_launcher(
 }
 
 /// 社区资源域：community.source / filename_format / mod_local_name_style / ignore_quilt
-fn apply_community(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+pub(super) fn apply_community(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(source) = patch.community.source {
         log_info!("[Config] community_source = {}", source);
         config.community.source = source;
@@ -258,7 +176,7 @@ fn apply_community(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
 }
 
 /// 启动高级选项域：launch_advanced.disable_jlw / disable_lua / use_dedicated_gpu
-fn apply_launch_advanced(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+pub(super) fn apply_launch_advanced(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(v) = patch.launch_advanced.disable_jlw {
         log_info!("[Config] launch_disable_jlw = {}", v);
         config.launch_advanced.disable_jlw = v;
@@ -279,7 +197,7 @@ fn apply_launch_advanced(config: &mut crate::state::AppConfig, patch: &ConfigPat
 /// - `None`：不更新（保持原值）
 /// - `Some(None)`：清空（回退到默认 .Molaunch/Download/）
 /// - `Some(Some(dir))`：设置为指定目录
-fn apply_external_download(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+pub(super) fn apply_external_download(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(ref dir_opt) = patch.external_download_dir {
         log_info!("[Config] external_download_dir = {:?}", dir_opt);
         config.external_download_dir = dir_opt.clone();
@@ -292,7 +210,7 @@ fn apply_external_download(config: &mut crate::state::AppConfig, patch: &ConfigP
 ///   **开发者模式校验**：仅在开发者模式已开启时允许更新（防止用户误改 + config.ini 直改保护）；
 ///   关闭状态下静默忽略，不写入 config.ini，不报错（与 ignore_tls 关闭联动语义一致）。
 /// - `custom_turn_servers`：`Some` 即更新（含空数组，表示清空所有自定义 TURN）
-fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+pub(super) fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(ref url) = patch.online.api_server_url {
         if !url.is_empty() {
             // 开发者模式校验：未开启时静默忽略，保护 config.ini 不被写入
@@ -318,7 +236,7 @@ fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
 ///
 /// `trust_mode` 变更收集到 `tls_pending`，供闭包外重建 HTTP 客户端。
 /// `ignore_tls` 不在此处（走注册表，由 `secure::apply_ignore_tls` 处理）。
-fn apply_tls(
+pub(super) fn apply_tls(
     config: &mut crate::state::AppConfig,
     patch: &ConfigPatch,
     tls_pending: &mut Option<bool>,
@@ -328,18 +246,4 @@ fn apply_tls(
         config.tls.trust_mode = mode.clone();
         *tls_pending = Some(true);
     }
-}
-
-/// Java 路径域：写 INI [Java] path（不进 AppConfig，保留独立存储设计）
-///
-/// 与 `secure::apply_*` 同属"非 AppConfig 分流"，不进 AppConfig 内存态，故不在 `update_config` 闭包内。
-fn apply_java(patch: &ConfigPatch) -> Result<(), String> {
-    if let Some(ref path) = patch.java_path {
-        let storage = crate::storage::Storage::instance();
-        storage
-            .set_config("Java", "path", path)
-            .map_err(|e| format!("写入 Java path 失败: {}", e))?;
-        log_info!("[Config] java_path = {}", path);
-    }
-    Ok(())
 }

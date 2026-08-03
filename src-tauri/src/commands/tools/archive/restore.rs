@@ -45,7 +45,7 @@ pub async fn restore(
     };
 
     // 路径安全：world_name 不允许为空、含 ".."
-    if world_name.is_empty() || world_name.contains("..") {
+    if world_name.is_empty() || !crate::utils::path::is_safe_relative_path(&world_name) {
         log_warn!("[Archive] 非法 world_name: {:?}", world_name);
         let result = ArchiveRestoreResult {
             success: false,

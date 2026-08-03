@@ -61,7 +61,7 @@ pub fn read_log_file(filename: String) -> Result<String, String> {
     if filename.is_empty()
         || filename.contains('/')
         || filename.contains('\\')
-        || filename.contains("..")
+        || !crate::utils::path::is_safe_relative_path(&filename)
         || !filename.ends_with(".log")
     {
         return Err(format!("非法日志文件名: {}", filename));

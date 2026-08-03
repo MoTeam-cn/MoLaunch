@@ -24,7 +24,7 @@ pub async fn backup(
 
     // 路径安全：world_name 不允许为空、含 ".." 或路径分隔符
     if params.world_name.is_empty()
-        || params.world_name.contains("..")
+        || !crate::utils::path::is_safe_relative_path(&params.world_name)
         || params.world_name.contains('/')
         || params.world_name.contains('\\')
     {

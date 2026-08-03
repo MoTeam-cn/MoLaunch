@@ -65,7 +65,10 @@ pub async fn read_external_plugin_file(
     }
 
     // 禁止绝对路径 / 显式相对路径前缀
-    if file_path.starts_with('/') || file_path.starts_with('\\') || file_path.contains("..") {
+    if file_path.starts_with('/')
+        || file_path.starts_with('\\')
+        || !crate::utils::path::is_safe_relative_path(&file_path)
+    {
         return Err(format!("Invalid file path: {}", file_path));
     }
 

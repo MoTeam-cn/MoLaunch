@@ -24,6 +24,10 @@ pub struct CustomCertInfo {
 }
 
 /// 校验证书文件名：仅允许字母数字下划线连字符和点，防止路径遍历
+///
+/// 白名单变体：只放行 ASCII 字母数字 `_-.`，比 `utils::path::sanitize_file_name`
+/// 的「黑名单拒绝 `/` `\\` `..` `\0`」更严格（连空格、`&`、`()` 等也拒绝）。
+/// 二者目标一致（防路径遍历），此处按证书域需求采用更严的白名单。
 fn validate_filename(filename: &str) -> Result<(), String> {
     if filename.is_empty() {
         return Err("证书文件名不能为空".to_string());

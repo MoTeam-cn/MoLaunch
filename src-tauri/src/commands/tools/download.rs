@@ -40,7 +40,7 @@ pub async fn download_file(
 
     // 解析下载目录：优先使用 config 中的自定义目录，否则用默认 .Molaunch/Download/
     let download_dir = resolve_external_download_dir(state).await;
-    std::fs::create_dir_all(&download_dir).map_err(|e| format!("创建下载目录失败: {}", e))?;
+    crate::utils::fs::ensure_dir(&download_dir)?;
     let save_path: PathBuf = download_dir.join(&file_name);
 
     log_info!(

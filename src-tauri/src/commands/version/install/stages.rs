@@ -1,12 +1,16 @@
 //! 加载器批量安装（install_merged 的加载器安装阶段）
 //!
 //! 遍历 5 种加载器（Forge/NeoForge/Fabric/OptiFine/LiteLoader），
-//! 逐个调用 `install_single_loader`，收集错误。
+//! Forge/NeoForge/Fabric 分支由独立子模块实现，OptiFine/LiteLoader 内联，
+//! 逐个安装并收集错误。
 
 use crate::minecraft::loaders;
 use crate::state::AppState;
 
+use super::fabric::install_fabric;
+use super::forge::install_forge;
 use super::loader_helpers::install_single_loader;
+use super::neoforge::install_neoforge;
 
 /// 批量安装所有选中的加载器，返回错误列表（空 = 全部成功）
 #[allow(clippy::too_many_arguments)]
@@ -27,13 +31,11 @@ pub(crate) async fn install_all_loaders(
 
     // Forge
     if let Some(forge_ver) = forge_version {
-        if let Err(e) = install_single_loader(
+        if let Err(e) = install_forge(
             state,
-            loaders::LoaderType::Forge,
-            "Forge",
-            forge_ver,
             mc_version,
             game_dir,
+            forge_ver,
             mirror_url,
             max_threads,
             source_mode,
@@ -46,13 +48,11 @@ pub(crate) async fn install_all_loaders(
 
     // NeoForge
     if let Some(neoforge_ver) = neoforge_version {
-        if let Err(e) = install_single_loader(
+        if let Err(e) = install_neoforge(
             state,
-            loaders::LoaderType::NeoForge,
-            "NeoForge",
-            neoforge_ver,
             mc_version,
             game_dir,
+            neoforge_ver,
             mirror_url,
             max_threads,
             source_mode,
@@ -64,14 +64,12 @@ pub(crate) async fn install_all_loaders(
     }
 
     // Fabric
-    if let Some(ref fabric_ver) = fabric_version {
-        if let Err(e) = install_single_loader(
+    if let Some(fabric_ver) = fabric_version {
+        if let Err(e) = install_fabric(
             state,
-            loaders::LoaderType::Fabric,
-            "Fabric",
-            fabric_ver,
             mc_version,
             game_dir,
+            fabric_ver,
             mirror_url,
             max_threads,
             source_mode,

@@ -1,135 +1,21 @@
 //! 各格式整合包 manifest 解析（CF / MR / HMCL / MMC / MCBBS / LauncherPack / Compress）
+//! 按格式拆分子模块：curseforge / modrinth / hmcl；其余格式（mmc/mcbbs/
+//! launcher_pack/compress）解析函数保留在本文件。
+
+mod curseforge;
+mod hmcl;
+mod modrinth;
+
+pub(super) use curseforge::parse_cf;
+pub(super) use hmcl::parse_hmcl;
+pub(super) use modrinth::parse_mr;
 
 use crate::log_info;
 
 use super::super::concurrent::DetectedModpack;
-use super::super::curseforge::CfManifest;
-use super::super::helpers::{parse_cf_loader_id, parse_mr_loader};
-use super::super::hmcl::HmclManifest;
 use super::super::mcbbs::McbbsManifest;
 use super::super::mmc::MmcPack;
-use super::super::modrinth::MrIndex;
 use super::super::types::{ModpackFormat, ModpackInfo};
-
-/// 解析 CurseForge manifest.json
-pub(super) fn parse_cf(detected: &DetectedModpack) -> Result<ModpackInfo, String> {
-    let manifest: CfManifest =
-        serde_json::from_str(detected.manifest_content.as_deref().unwrap_or(""))
-            .map_err(|e| format!("解析 manifest.json 失败: {}", e))?;
-    let gv = manifest.minecraft.version.clone();
-    // Quilt 加载器检测：id 以 "quilt-" 开头直接报错
-    for l in &manifest.minecraft.mod_loaders {
-        if l.id.starts_with("quilt-") || l.id.starts_with("quilt_") {
-            return Err("CurseForge 整合包要求 Quilt 加载器，MoLaunch 暂不支持 Quilt".to_string());
-        }
-    }
-    // Forge recommended 字段检测：旧版整合包格式，直接报错提示版本过老
-    for l in &manifest.minecraft.mod_loaders {
-        if l.id.starts_with("forge-") && l.id.contains("recommended") {
-            return Err(
-                "该整合包版本过老（使用旧版 Forge recommended 格式），请尝试更新版本的整合包"
-                    .to_string(),
-            );
-        }
-    }
-    let (loader, ver) = manifest
-        .minecraft
-        .mod_loaders
-        .iter()
-        .find(|l| l.primary)
-        .or_else(|| manifest.minecraft.mod_loaders.first())
-        .map(|l| parse_cf_loader_id(&l.id))
-        .unwrap_or((String::new(), String::new()));
-    let count = manifest.files.len();
-    let cf_overrides_name = manifest.overrides.clone();
-    Ok(ModpackInfo {
-        format: ModpackFormat::Curseforge,
-        game_version: gv,
-        loader,
-        loader_version: ver,
-        mod_files_count: count,
-        archive_base_folder: detected.archive_base_folder.clone(),
-        cf_overrides_name,
-        cf_manifest: Some(manifest),
-        mr_index: None,
-        hmcl_manifest: None,
-        mmc_pack: None,
-        mmc_cfg_content: None,
-        mcbbs_manifest: None,
-        launcher_inner_path: None,
-    })
-}
-
-/// 解析 Modrinth modrinth.index.json
-pub(super) fn parse_mr(detected: &DetectedModpack) -> Result<ModpackInfo, String> {
-    let index: MrIndex = serde_json::from_str(detected.index_content.as_deref().unwrap_or(""))
-        .map_err(|e| format!("解析 modrinth.index.json 失败: {}", e))?;
-    let gv = index
-        .dependencies
-        .get("minecraft")
-        .cloned()
-        .unwrap_or_default();
-    // Quilt 加载器检测：dependencies 含 quilt-loader 直接报错
-    if index.dependencies.contains_key("quilt-loader") {
-        return Err("Modrinth 整合包要求 Quilt 加载器，MoLaunch 暂不支持 Quilt".to_string());
-    }
-    let (loader, ver) = ["fabric-loader", "forge", "neoforge"]
-        .iter()
-        .find_map(|key| {
-            index.dependencies.get(*key).map(|v| {
-                let (ln, vv) = parse_mr_loader(key, v);
-                (ln.to_string(), vv)
-            })
-        })
-        .unwrap_or((String::new(), String::new()));
-    let count = index.files.len();
-    Ok(ModpackInfo {
-        format: ModpackFormat::Modrinth,
-        game_version: gv,
-        loader,
-        loader_version: ver,
-        mod_files_count: count,
-        archive_base_folder: detected.archive_base_folder.clone(),
-        cf_overrides_name: None,
-        cf_manifest: None,
-        mr_index: Some(index),
-        hmcl_manifest: None,
-        mmc_pack: None,
-        mmc_cfg_content: None,
-        mcbbs_manifest: None,
-        launcher_inner_path: None,
-    })
-}
-
-/// 解析 HMCL modpack.json
-pub(super) fn parse_hmcl(detected: &DetectedModpack) -> Result<ModpackInfo, String> {
-    let manifest: HmclManifest =
-        serde_json::from_str(detected.hmcl_content.as_deref().unwrap_or(""))
-            .map_err(|e| format!("解析 modpack.json 失败: {}", e))?;
-    let gv = manifest.game_version.clone();
-    // HMCL 整合包不指定加载器版本，仅含游戏版本；加载器信息（如有）打包在 overrides 中
-    log_info!(
-        "[Community] HMCL 整合包: game={} name={}",
-        gv,
-        manifest.name
-    );
-    Ok(ModpackInfo {
-        format: ModpackFormat::Hmcl,
-        game_version: gv,
-        loader: String::new(),
-        loader_version: String::new(),
-        mod_files_count: 0,
-        archive_base_folder: detected.archive_base_folder.clone(),
-        cf_overrides_name: None,
-        cf_manifest: None,
-        mr_index: None,
-        hmcl_manifest: Some(manifest),
-        mmc_pack: None,
-        mmc_cfg_content: None,
-        mcbbs_manifest: None,
-        launcher_inner_path: None,
-    })
-}
 
 /// 解析 MMC mmc-pack.json
 pub(super) fn parse_mmc(detected: &DetectedModpack) -> Result<ModpackInfo, String> {

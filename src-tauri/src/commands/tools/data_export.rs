@@ -74,7 +74,7 @@ pub async fn export_launcher_data(
     // 确保父目录存在
     if let Some(parent) = output_path.parent() {
         if !parent.as_os_str().is_empty() {
-            std::fs::create_dir_all(parent).map_err(|e| format!("创建输出目录失败: {}", e))?;
+            crate::utils::fs::ensure_dir(parent)?;
         }
     }
 

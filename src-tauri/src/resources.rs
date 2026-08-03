@@ -4,7 +4,6 @@
 //! hash 不匹配时写入，避免每次启动重复写盘。取代原基于 env!("CARGO_MANIFEST_DIR") 拼路径的实现（打包后路径不存在，发布版 bug）。
 
 use crate::{log_info, log_warn};
-use sha2::{Digest, Sha256};
 use std::path::Path;
 
 /// 嵌入的文本资源内容
@@ -170,14 +169,6 @@ pub fn read_resource_bytes(relative_path: &str) -> anyhow::Result<Vec<u8>> {
     }
 }
 
-/// 计算数据的 sha256 十六进制摘要
-fn sha256_hex(data: &[u8]) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    let result = hasher.finalize();
-    result.iter().map(|b| format!("{:02x}", b)).collect()
-}
-
 /// 释放二进制资源到目标路径（带 sha256 校验）
 ///
 /// 只在目标文件不存在或 sha256 不匹配时写入。
@@ -186,7 +177,7 @@ fn sha256_hex(data: &[u8]) -> String {
 /// 释放成功后会在同目录写一个 `{name}.sha256` 校验文件，用于下次启动比对。
 pub fn extract_resource(resource_path: &str, target_path: &Path) -> anyhow::Result<()> {
     let content = read_resource_bytes(resource_path)?;
-    let expected_hash = sha256_hex(&content);
+    let expected_hash = crate::utils::hash::sha256_hex(&content);
 
     if let Some(parent) = target_path.parent() {
         std::fs::create_dir_all(parent)?;

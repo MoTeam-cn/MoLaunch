@@ -2,22 +2,21 @@
 //! 前端传模板名（+数据+CSP），后端从 resources 读取 HTML 模板注入数据并创建 Tauri
 //! 子窗口渲染。点击选项导航 `picker-result://` 被 on_navigation 拦截 emit `picker-result`
 //! 事件返回前端；关窗未选则 emit `picker-cancelled`。模板由后端控制（放 `resources/templates/`）
-//! 前端只传模板名防注入；`picker://localhost/<id>` 返回模板，`/<id>/data` 返回实时数据 JSON。
+//! 前端只传模板名防注入；URI scheme 处理见 `scheme` 子模块。
+
+mod scheme;
 
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
 use once_cell::sync::Lazy;
-use tauri::{
-    http::Response, AppHandle, Builder, Emitter, Manager, Runtime, WebviewUrl, WebviewWindowBuilder,
-};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 use super::types::OpenPickerWindowParams;
 use crate::log_info;
 
-/// picker URI scheme 名称
-const PICKER_SCHEME: &str = "picker";
+pub use scheme::register_picker_scheme;
 
 /// 全局模板存储（picker_id → template_name）
 ///
@@ -200,157 +199,4 @@ fn cleanup_picker_stores(picker_id: &str) {
     if let Ok(mut csp_store) = PICKER_CSP_STORE.lock() {
         csp_store.remove(picker_id);
     }
-}
-
-/// 注册 picker:// URI scheme（在 lib.rs 中调用）
-///
-/// 通用化模板读取：根据模板名从 resources 读取 `templates/<name>.html`，
-/// 注入数据后返回。port-picker 模板对 `/data` 请求特殊处理，返回实时端口列表。
-///
-/// URL 格式可能为：
-///   - `picker://localhost/picker-123-0`（macOS/Linux）
-///   - `https://picker.localhost/picker-123-0`（Windows）
-///   - `.../picker-123-0/data`（实时数据请求）
-pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
-    builder.register_uri_scheme_protocol(PICKER_SCHEME, |_ctx, request| {
-        let uri = request.uri().to_string();
-        let is_data_request = uri.contains("/data");
-        let picker_id = extract_picker_id(&uri);
-
-        // 查找模板名
-        let template_name = PICKER_TEMPLATES
-            .lock()
-            .ok()
-            .and_then(|store| store.get(picker_id).cloned())
-            .unwrap_or_default();
-
-        // 查找 CSP
-        let csp = PICKER_CSP_STORE
-            .lock()
-            .ok()
-            .and_then(|store| store.get(picker_id).cloned());
-
-        // port-picker 模板：/data 请求返回实时端口列表
-        if template_name == "port-picker" && is_data_request {
-            let ports = super::network::list_open_ports_sync();
-            let json = serde_json::json!({ "ports": ports });
-            return build_response(
-                200,
-                "application/json",
-                serde_json::to_vec(&json).unwrap_or_default(),
-                csp.as_deref(),
-            );
-        }
-
-        // 读取模板 HTML（统一从 resources/templates/<name>.html 读取）
-        let template_path = format!("templates/{}.html", template_name);
-        let template = crate::resources::read_resource(&template_path)
-            .unwrap_or_else(|_| "<html><body>模板不存在</body></html>".to_string());
-
-        // 注入数据：
-        // - port-picker：注入实时端口列表
-        // - 其他模板：注入前端传入的 data
-        let data_json = if template_name == "port-picker" {
-            let ports = super::network::list_open_ports_sync();
-            serde_json::json!({ "ports": ports })
-        } else {
-            PICKER_DATA_STORE
-                .lock()
-                .ok()
-                .and_then(|store| store.get(picker_id).cloned())
-                .unwrap_or(serde_json::json!({}))
-        };
-
-        // tutorial-* 模板：使用 base-help.html 作为基础模板，通过占位符替换注入内容
-        // 不走 __PICKER_DATA__ 注入路径，直接在后端完成字符串替换形成完整 HTML，
-        // 避免 JS 运行时时序问题（注入脚本与原始脚本的执行顺序导致读取到 undefined）
-        if template_name.starts_with("tutorial-") {
-            let content = template; // 原始读取的内容文件（content-only HTML）
-            let base = crate::resources::read_resource("templates/base-help.html")
-                .unwrap_or_else(|_| "<html><body>模板不存在</body></html>".to_string());
-            // 从 data 中提取 title（open_picker_window 已注入 title 字段）
-            let title = data_json
-                .get("title")
-                .and_then(|v| v.as_str())
-                .unwrap_or("帮助文档");
-            // 占位符替换：形成完整 HTML，无需 JS 运行时注入
-            let html = base
-                .replace("{{__TITLE__}}", title)
-                .replace("{{__CONTENT__}}", &content);
-            return build_response(
-                200,
-                "text/html; charset=utf-8",
-                html.into_bytes(),
-                csp.as_deref(),
-            );
-        }
-
-        // 注入依赖库（markdown 模板需要 marked.min.js，qrcode 模板需要 qrcode.min.js）
-        // tutorial-* 模板使用 base-help.html 硬编码 HTML，无需注入依赖库
-        // 直接内联嵌入避免 res:// 跨源加载（picker 子窗口 origin 为 https://picker.localhost/，
-        // res:// 资源在 Windows 上转为 https://res.localhost/，跨源 script 加载受 CSP 限制）
-        let lib_script = match template_name.as_str() {
-            "markdown" => crate::resources::read_resource_bytes("view/marked.min.js")
-                .ok()
-                .and_then(|bytes| String::from_utf8(bytes).ok())
-                .map(|js| format!("<script>{}</script>", js)),
-            "qrcode" => crate::resources::read_resource_bytes("view/qrcode.min.js")
-                .ok()
-                .and_then(|bytes| String::from_utf8(bytes).ok())
-                .map(|js| format!("<script>{}</script>", js)),
-            _ => None,
-        };
-
-        let mut injection = String::new();
-        if let Some(lib) = &lib_script {
-            injection.push_str(lib);
-        }
-        injection.push_str(&format!(
-            "<script>window.__PICKER_DATA__ = {};</script>",
-            data_json
-        ));
-        let html = template.replace("</body>", &format!("{}</body>", injection));
-
-        build_response(
-            200,
-            "text/html; charset=utf-8",
-            html.into_bytes(),
-            csp.as_deref(),
-        )
-    })
-}
-
-/// 构造响应（注入 CSP 响应头）
-fn build_response(
-    status: u16,
-    content_type: &str,
-    body: Vec<u8>,
-    csp: Option<&str>,
-) -> Response<Vec<u8>> {
-    let mut builder = Response::builder()
-        .status(status)
-        .header("Content-Type", content_type)
-        .header("Access-Control-Allow-Origin", "*");
-
-    if let Some(csp_str) = csp {
-        builder = builder.header("Content-Security-Policy", csp_str);
-    }
-
-    builder.body(body).unwrap()
-}
-
-/// 从 URI 中提取 picker_id
-///
-/// 查找以 `picker-` 开头的路径段作为 picker_id（跳过 `data` 等其他段）。
-/// - `picker://localhost/picker-123-0` → `picker-123-0`
-/// - `https://picker.localhost/picker-123-0/data` → `picker-123-0`
-fn extract_picker_id(uri: &str) -> &str {
-    let after_scheme = uri.split("://").nth(1).unwrap_or("");
-    for segment in after_scheme.split('/') {
-        let segment = segment.split('?').next().unwrap_or("");
-        if segment.starts_with("picker-") {
-            return segment;
-        }
-    }
-    ""
 }

@@ -1,8 +1,4 @@
-//! 资源包管理
-//! - `list`：列出 resourcepacks 目录下顶层条目（.zip 文件 / 目录）
-//!   - 默认扫全局 `{game_dir}/resourcepacks/`
-//!   - 传入 `version_id` 时按版本隔离配置解析该版本的有效游戏目录
-//! - `convert`：在 zip 与 folder 格式之间转换（folder → 打包为同名 .zip；zip → 解压为同名目录）
+//! 资源包格式转换（convert）
 
 use std::fs::File;
 use std::io::{Read, Write};
@@ -11,100 +7,10 @@ use std::path::{Path, PathBuf};
 use crate::error_util::log_err;
 use crate::log_info;
 use crate::log_warn;
-use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
-use crate::state::resolve_game_dir;
 use crate::state::AppState;
 
-use super::types::{
-    ResourcePackConvertParams, ResourcePackConvertResult, ResourcePackItem, ResourcePackListParams,
-    ResourcePackListResult,
-};
-
-/// 解析资源包目录（同 screenshot::resolve_shots_dir 的语义）
-async fn resolve_packs_dir(state: &AppState, version_id: Option<&str>) -> PathBuf {
-    let game_dir = {
-        let config = state.config.lock().await;
-        resolve_game_dir(&config.game_dir)
-    };
-    match version_id {
-        None => game_dir.join("resourcepacks"),
-        Some(vid) => {
-            let global_mode = state.config.lock().await.isolation_mode;
-            let isolation_mode =
-                crate::commands::version::list::resolve_isolation_mode(&game_dir, vid, global_mode);
-            let version_type =
-                crate::commands::version::list::detect_version_type_from_dir(&game_dir, vid);
-            let mode = IsolationMode::from_u32(isolation_mode);
-            let effective_dir = get_effective_game_dir(&game_dir, vid, mode, version_type);
-            effective_dir.join("resourcepacks")
-        }
-    }
-}
-
-/// 列出 resourcepacks 目录下顶层条目（.zip 文件 → zip；目录 → folder）
-pub async fn list(
-    state: &AppState,
-    params: ResourcePackListParams,
-) -> Result<serde_json::Value, String> {
-    let packs_dir = resolve_packs_dir(state, params.version_id.as_deref()).await;
-
-    log_info!("[ResourcePack] 列目录: {}", packs_dir.display());
-
-    if !packs_dir.exists() {
-        log_warn!(
-            "[ResourcePack] resourcepacks 目录不存在: {}",
-            packs_dir.display()
-        );
-        let result = ResourcePackListResult { items: Vec::new() };
-        return serde_json::to_value(&result).map_err(|e| e.to_string());
-    }
-
-    let packs_dir_clone = packs_dir.clone();
-    let items = tokio::task::spawn_blocking(move || -> Vec<ResourcePackItem> {
-        let mut items: Vec<ResourcePackItem> = Vec::new();
-        let read = match std::fs::read_dir(&packs_dir_clone) {
-            Ok(r) => r,
-            Err(_) => return items,
-        };
-        for entry in read.flatten() {
-            let path = entry.path();
-            let name = match path.file_name().and_then(|n| n.to_str()) {
-                Some(n) => n.to_string(),
-                None => continue,
-            };
-            if path.is_file() {
-                if !name.to_lowercase().ends_with(".zip") {
-                    continue;
-                }
-                let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-                items.push(ResourcePackItem {
-                    name,
-                    path: path_to_string(&path),
-                    format: "zip".to_string(),
-                    size,
-                });
-            } else if path.is_dir() {
-                let size = dir_total_size(&path);
-                items.push(ResourcePackItem {
-                    name,
-                    path: path_to_string(&path),
-                    format: "folder".to_string(),
-                    size,
-                });
-            }
-        }
-        // 按名称排序，保证输出稳定
-        items.sort_by(|a, b| a.name.cmp(&b.name));
-        items
-    })
-    .await
-    .map_err(log_err("ResourcePack 列目录任务失败"))?;
-
-    log_info!("[ResourcePack] 列出 {} 个资源包", items.len());
-
-    let result = ResourcePackListResult { items };
-    serde_json::to_value(&result).map_err(|e| e.to_string())
-}
+use super::{resolve_packs_dir, path_to_string};
+use super::super::types::{ResourcePackConvertParams, ResourcePackConvertResult};
 
 /// 转换资源包格式（folder ↔ zip）
 ///
@@ -232,24 +138,6 @@ pub async fn convert(
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
-/// 递归计算目录总字节数
-fn dir_total_size(dir: &Path) -> u64 {
-    let mut total: u64 = 0;
-    let read = match std::fs::read_dir(dir) {
-        Ok(r) => r,
-        Err(_) => return 0,
-    };
-    for entry in read.flatten() {
-        let path = entry.path();
-        if path.is_file() {
-            total += std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
-        } else if path.is_dir() {
-            total += dir_total_size(&path);
-        }
-    }
-    total
-}
-
 /// 递归收集目录下所有文件路径
 fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
     let read = match std::fs::read_dir(dir) {
@@ -305,9 +193,4 @@ fn unzip_to_dir(src_zip: &Path, output_dir: &Path) -> Result<(), String> {
         .extract(output_dir)
         .map_err(|e| format!("解压失败: {}", e))?;
     Ok(())
-}
-
-/// 将路径转为字符串（UTF-8，丢失非 UTF-8 字符）
-fn path_to_string(path: &Path) -> String {
-    path.to_str().unwrap_or("").to_string()
 }

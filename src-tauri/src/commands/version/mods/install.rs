@@ -21,7 +21,7 @@ pub async fn install_mod(
     sanitize_version_id(&version_id)?;
 
     // 安全校验：源路径不能包含 ..
-    if source_path.contains("..") {
+    if !crate::utils::path::is_safe_relative_path(&source_path) {
         return Err("源路径不能包含 ..".to_string());
     }
 

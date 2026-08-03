@@ -55,7 +55,7 @@ pub async fn install_local_modpack(
 
             let game_dir_pre = crate::state::resolve_game_dir_from_state(state).await;
             let temp_dir = game_dir_pre.join(".tmp_launcher_extract");
-            std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {}", e))?;
+            crate::utils::fs::ensure_dir(&temp_dir)?;
             let inner_file_name = inner_path
                 .rsplit(['/', '\\'])
                 .next()
