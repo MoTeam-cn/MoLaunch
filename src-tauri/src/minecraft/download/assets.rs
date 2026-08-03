@@ -120,7 +120,7 @@ pub fn parse_asset_index(index_json: &serde_json::Value, game_dir: &Path) -> Vec
         let size = object["size"].as_i64().unwrap_or(0);
 
         // 路径遍历防护：拒绝含 ".." 的 source_path
-        if source_path.contains("..") {
+        if !crate::utils::path::is_safe_relative_path(source_path) {
             crate::log_warn!(
                 "[Assets] Skip path traversal in source_path: {}",
                 source_path

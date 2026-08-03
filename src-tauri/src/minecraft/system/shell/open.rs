@@ -49,7 +49,7 @@ mod win_shell {
 
 /// 安全校验：拒绝路径遍历（..）和 UNC 路径（防止 SMB 认证泄露）
 fn validate_path(path: &str) -> Result<(), String> {
-    if path.contains("..") {
+    if !crate::utils::path::is_safe_relative_path(path) {
         return Err("路径不能包含 ..".to_string());
     }
     if path.starts_with("\\\\") || path.starts_with("//") {

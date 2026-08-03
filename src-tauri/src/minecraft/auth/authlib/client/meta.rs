@@ -134,7 +134,7 @@ pub async fn ensure_authlib_injector_jar(
     let bytes = tokio::fs::read(&target_path)
         .await
         .map_err(|e| format!("读取下载的 authlib-injector.jar 失败: {}", e))?;
-    let actual_sha = sha256_hex(&bytes);
+    let actual_sha = crate::utils::hash::sha256_hex(&bytes);
     if actual_sha != meta.sha256 {
         // 校验失败：删除损坏的文件
         let _ = std::fs::remove_file(&target_path);
@@ -194,18 +194,6 @@ async fn prefetch_metadata_if_missing(server_url: &str) {
             );
         }
     }
-}
-
-/// 计算数据的 sha256 十六进制摘要
-///
-/// 与 `resources.rs::sha256_hex` 实现等价，此处 inline 避免跨模块 pub 化
-/// （sha256_hex 仅 4 行，pub 化会污染 resources 模块 API）
-fn sha256_hex(data: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(data);
-    let result = hasher.finalize();
-    result.iter().map(|b| format!("{:02x}", b)).collect()
 }
 
 /// base64 标准编码（不含换行）

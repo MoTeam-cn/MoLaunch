@@ -1,10 +1,9 @@
-//! Java 搜索模块
+//! 平台扫描
+//!
+//! 环境变量 / 全磁盘 / 用户目录 / 启动器目录 / runtime / 额外路径的候选路径收集。
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-
-use super::detect::detect_java;
-use super::JavaRuntime;
 
 /// 搜索关键词（共67个）
 const SEARCH_KEYWORDS: &[&str] = &[
@@ -66,47 +65,8 @@ const SEARCH_KEYWORDS: &[&str] = &[
     "1.",
 ];
 
-/// 搜索系统中的Java
-pub fn search_java() -> Vec<JavaRuntime> {
-    search_java_with_paths(&[])
-}
-
-/// 带额外搜索路径的 Java 搜索
-///
-/// `extra_paths` 用于追加搜索根目录（如游戏目录、APPDATA 等），会全遍历搜索。
-pub fn search_java_with_paths(extra_paths: &[PathBuf]) -> Vec<JavaRuntime> {
-    crate::log_separator!("Java Search");
-    crate::log_debug!("[Java] Starting Java search...");
-
-    // 1. 收集候选路径（环境变量 / 全磁盘 / 用户目录 / 启动器目录 / runtime / 额外路径）
-    let java_candidates = collect_java_candidates(extra_paths);
-
-    crate::log_debug!(
-        "[Java] Found {} candidates, verifying...",
-        java_candidates.len()
-    );
-
-    // 2. 验证所有候选Java
-    let mut java_list = verify_java_candidates(&java_candidates);
-
-    // 3. 排序：大版本优先，其次 64 位优先
-    java_list.sort_by(|a, b| {
-        b.major_version
-            .cmp(&a.major_version)
-            .then(b.is_64bit.cmp(&a.is_64bit))
-    });
-
-    crate::log_debug!(
-        "[Java] Search completed, found {} valid Java installations",
-        java_list.len()
-    );
-    crate::log_separator!("Java Search End");
-
-    java_list
-}
-
 /// 候选路径收集器：维护去重后的候选列表
-struct CandidateCollector {
+pub(super) struct CandidateCollector {
     candidates: Vec<PathBuf>,
     seen_paths: HashSet<String>,
 }
@@ -134,7 +94,7 @@ impl CandidateCollector {
 }
 
 /// 执行全部搜索步骤，返回去重后的候选 Java 可执行文件路径列表
-fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
+pub(super) fn collect_java_candidates(extra_paths: &[PathBuf]) -> Vec<PathBuf> {
     let mut collector = CandidateCollector::new();
 
     // Step 1: 环境变量扫描
@@ -225,23 +185,6 @@ fn collect_from_env(collector: &mut CandidateCollector) {
     }
 }
 
-/// 验证候选 Java 路径列表，返回成功检测的 JavaRuntime 列表
-fn verify_java_candidates(candidates: &[PathBuf]) -> Vec<JavaRuntime> {
-    let mut java_list = Vec::new();
-    for path in candidates {
-        match detect_java(path) {
-            Ok(java) => {
-                crate::log_debug!("[Java] Valid: {} ({})", java.version, java.path_folder);
-                java_list.push(java);
-            }
-            Err(e) => {
-                crate::log_debug!("[Java] Invalid {}: {}", path.display(), e);
-            }
-        }
-    }
-    java_list
-}
-
 /// 递归搜索文件夹
 fn search_folder_recursive(dir: &Path, collector: &mut CandidateCollector, is_full_search: bool) {
     if !dir.exists() || !dir.is_dir() {
@@ -281,11 +224,11 @@ fn search_folder_recursive(dir: &Path, collector: &mut CandidateCollector, is_fu
             .to_lowercase();
 
         // 判断是否需要递归搜索
-        let should_search = is_full_search ||
-            dir_name == "users" ||
-            dir_name.parse::<f64>().is_ok() ||  // 数字开头
-            dir_name == "bin" ||
-            SEARCH_KEYWORDS.iter().any(|kw| dir_name.contains(kw));
+        let should_search = is_full_search
+            || dir_name == "users"
+            || dir_name.parse::<f64>().is_ok() // 数字开头
+            || dir_name == "bin"
+            || SEARCH_KEYWORDS.iter().any(|kw| dir_name.contains(kw));
 
         if should_search {
             search_folder_recursive(&path, collector, false);

@@ -107,7 +107,7 @@ fn validate_path_traversal(
     local_path: &Path,
     runtime_dir: &Path,
 ) -> Result<(), String> {
-    if path_str.contains("..") {
+    if !crate::utils::path::is_safe_relative_path(path_str) {
         return Err(format!(
             "Path traversal detected in manifest path: {}",
             path_str

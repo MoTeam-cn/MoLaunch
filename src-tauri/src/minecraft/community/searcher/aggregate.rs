@@ -1,11 +1,10 @@
-//! 双平台搜索调度器
-//! 并行调用 CurseForge 和 Modrinth，合并结果、去重、排序
-//! 中文搜索：检测到查询包含中文时，先用本地 moddata.txt 数据库模糊匹配，
-//! 把中文关键词重写为英文 Slug/单词后再调平台 API，并对 Modrinth 走 Slug 直查，
-//! 绕过两大平台对中文搜索支持不佳的问题。
+//! 多源搜索聚合
+//!
+//! 并行调用 CurseForge / Modrinth / 中文 Slug 直查，超时隔离并合并结果；排序去重见 sort.rs。
 
-use super::mcmod;
-use super::types::{ResourceProject, SearchParams, SearchResult};
+use super::sort::{dedup, sort_projects};
+use super::super::mcmod;
+use super::super::types::{ResourceProject, SearchParams, SearchResult};
 
 /// 每页结果数
 pub const PAGE_SIZE: u32 = 40;
@@ -75,7 +74,7 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
 
     // 根据来源筛选决定调用哪些平台
     if source == 0 || source == 1 {
-        cf_fut = Some(super::curseforge::search(
+        cf_fut = Some(super::super::curseforge::search(
             &cf_query,
             rtype,
             game_version,
@@ -85,7 +84,7 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
         ));
     }
     if source == 0 || source == 2 {
-        mr_fut = Some(super::modrinth::search(
+        mr_fut = Some(super::super::modrinth::search(
             &mr_query,
             rtype,
             game_version,
@@ -95,7 +94,7 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
         ));
         // 中文搜索且有 MR Slug 直查列表：并行批量拉取工程详情
         if !mr_slugs.is_empty() {
-            mr_slug_fut = Some(super::modrinth::get_projects_by_slugs(&mr_slugs, rtype));
+            mr_slug_fut = Some(super::super::modrinth::get_projects_by_slugs(&mr_slugs, rtype));
         }
     }
 
@@ -202,101 +201,4 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
         page: params.page,
         page_size: PAGE_SIZE,
     })
-}
-
-/// 跨平台去重
-fn dedup(projects: Vec<ResourceProject>) -> Vec<ResourceProject> {
-    let mut result: Vec<ResourceProject> = Vec::new();
-    for p in projects {
-        let mut is_dup = false;
-        for existing in &result {
-            if is_like(&p, existing) {
-                is_dup = true;
-                break;
-            }
-        }
-        if !is_dup {
-            result.push(p);
-        }
-    }
-    result
-}
-
-/// 判断两个工程是否相同（跨平台）
-fn is_like(a: &ResourceProject, b: &ResourceProject) -> bool {
-    if a.platform == b.platform {
-        return false;
-    }
-    // 提取字母数字部分比较
-    let a_name = alnum_only(&a.raw_name);
-    let b_name = alnum_only(&b.raw_name);
-    if a_name.is_empty() || b_name.is_empty() {
-        return false;
-    }
-    // 名称相似度（完全匹配或包含关系）
-    if a_name == b_name || a_name.contains(&b_name) || b_name.contains(&a_name) {
-        return true;
-    }
-    // slug 匹配
-    if !a.slug.is_empty() && a.slug == b.slug {
-        return true;
-    }
-    false
-}
-
-fn alnum_only(s: &str) -> String {
-    s.chars()
-        .filter(|c| c.is_alphanumeric())
-        .collect::<String>()
-        .to_lowercase()
-}
-
-/// 排序
-fn sort_projects(
-    mut projects: Vec<ResourceProject>,
-    has_query: bool,
-    rtype: super::types::ResourceType,
-) -> Vec<ResourceProject> {
-    projects.sort_by(|a, b| {
-        let sa = score(a, has_query, rtype);
-        let sb = score(b, has_query, rtype);
-        sb.partial_cmp(&sa).unwrap_or(std::cmp::Ordering::Equal)
-    });
-    projects
-}
-
-/// 计算排序分
-fn score(p: &ResourceProject, has_query: bool, rtype: super::types::ResourceType) -> f64 {
-    // 下载量权重（log10，10亿时为1.0）
-    let dl_mult = get_download_count_mult(p.platform, rtype);
-    let dl_score = (p.download_count as f64 * dl_mult).max(1.0).log10() / 9.0;
-
-    if has_query {
-        // 有搜索词：下载量权重 + 名称匹配度
-        let name_score = 0.5; // 简化处理，实际可计算相似度
-        name_score + dl_score
-    } else {
-        // 无搜索词：按下载量排序
-        dl_score
-    }
-}
-
-/// 平台下载量权重
-fn get_download_count_mult(
-    platform: super::types::Platform,
-    rtype: super::types::ResourceType,
-) -> f64 {
-    use super::types::{Platform, ResourceType};
-    match (rtype, platform) {
-        (ResourceType::Mod, Platform::CurseForge) => 1.0,
-        (ResourceType::Mod, Platform::Modrinth) => 5.0,
-        (ResourceType::ModPack, Platform::CurseForge) => 1.0,
-        (ResourceType::ModPack, Platform::Modrinth) => 5.0,
-        (ResourceType::DataPack, Platform::CurseForge) => 10.0,
-        (ResourceType::DataPack, Platform::Modrinth) => 1.0,
-        (ResourceType::ResourcePack, Platform::CurseForge) => 1.0,
-        (ResourceType::ResourcePack, Platform::Modrinth) => 4.0,
-        (ResourceType::Shader, Platform::CurseForge) => 1.0,
-        (ResourceType::Shader, Platform::Modrinth) => 4.0,
-    }
 }
