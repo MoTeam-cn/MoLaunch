@@ -208,27 +208,27 @@ export function useRoomHostPolling(
 
   // 定时器句柄
   let answerTimer: ReturnType<typeof setInterval> | null = null
-  let keepaliveTimer: ReturnType<typeof setInterval> | null = null
   let participantsTimer: ReturnType<typeof setInterval> | null = null
   /** TurnServers 控制消息的本地 seq 计数器（与 HostMcPort/TUN 数据包 seq 独立） */
   let turnSeq = 0
 
-  /** 启动三路信令轮询定时器（参与者 5s / Answer 5s / 保活 30s） */
+  /**
+   * 启动两路信令轮询定时器（参与者 5s / Answer 5s）
+   *
+   * 注：保活(30s)已由 store 层全局定时器承担（src/stores/online.ts GLOBAL_KEEPALIVE_INTERVAL），
+   * 切页不停止；此处 doKeepalive 仅保留给「断连恢复补发」使用，避免重复上报。
+   */
   function startTimers() {
     if (participantsTimer) clearInterval(participantsTimer)
     if (answerTimer) clearInterval(answerTimer)
-    if (keepaliveTimer) clearInterval(keepaliveTimer)
     participantsTimer = setInterval(() => void pollParticipants(), 5000)
     answerTimer = setInterval(() => void pollAnswers(), 5000)
-    // 30s 保活：服务端 keepalive_timeout=120s，2 个周期未上报即判定失联
-    keepaliveTimer = setInterval(() => void doKeepalive(), 30 * 1000)
   }
 
   /** 停止所有轮询定时器（云端断开或组件卸载时调用，避免持续失败刷屏） */
   function stopTimers() {
     if (participantsTimer) { clearInterval(participantsTimer); participantsTimer = null }
     if (answerTimer) { clearInterval(answerTimer); answerTimer = null }
-    if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null }
   }
 
   return {

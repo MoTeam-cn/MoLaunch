@@ -9,6 +9,16 @@
 
 ### 修复
 
+#### 联机房间切页被销毁：保活提升为全局 store 定时器，脱离页面生命周期
+
+- 背景：keepalive 定时器绑定在 RoomHostPanel 的 useRoomHost 上，从联机页切到其他页面（如设置页）会导致 Online.vue 卸载 → `stopTimers()` 停止 30s 保活，离开超过服务端 `keepalive_timeout`(120s) 后房间被判失联销毁；切回时因 store 中 role 仍为 host、activeCategory 是组件内 ref 默认回 create，出现"侧边栏高亮创建、内容区却显示房间详情"的错位
+- 改动：
+  - `src/stores/online.ts`：新增全局保活定时器（`GLOBAL_KEEPALIVE_INTERVAL=30s`），在 store 层运行，不依赖任何组件生命周期；role='host' 才上报，捕获 `RoomClosedError` 时 `resetRoomState` + toast
+  - `src/composables/useRoomHost/useRoomHostPolling.ts`：`startTimers` 移除保活定时器（全局已承担），保留 `doKeepalive` 供断连恢复补发；`stopTimers` 同步清理
+  - `src/composables/useRoomHost.ts`：`onRoomClosed` 回调瘦身为组件侧清理（stopTimers/lan.stop/hostMesh.close/setRoomKey(null)），`resetRoomState` + toast 交由全局保活统一处理，避免双弹窗
+  - `src/composables/useOnlineNav.ts`：`isReady` watch 中若已进入房间则房间详情优先（覆盖重挂载时 role 保留但 activeCategory 默认 create 的错位）
+- 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 全部通过
+
 #### 联机房间失联被销毁：keepalive 失败可感知 + 房间关闭主动退出 + 断连自动补发
 
 - 背景：房主 keepalive 业务失败被静默吞掉（`result.code !== 1` 直接 `return null`），用户看起来"一直在保活"，实际服务端超过 `keepalive_timeout`(120s) 未收到有效上报即判定失联关房（本次 V8MY2S 房间命中失联条件：仅创建后一次 keepalive 成功，之后无上报，23:36 被清理，23:39 的请求才报"房间已关闭"）

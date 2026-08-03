@@ -187,6 +187,11 @@ export function useOnlineNav(
    */
   watch(isReady, (ready) => {
     if (ready) {
+      // 已进入房间时，无论 URL tab 如何，房间详情始终优先（角色由 store 保留）
+      if (isInRoom.value) {
+        activeCategory.value = 'room_details'
+        return
+      }
       const tab = route.query.tab as string | undefined
       if (tab && isValidCategory(tab)) {
         if (tab === 'room_details' && !isInRoom.value) {

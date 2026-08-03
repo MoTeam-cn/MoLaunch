@@ -33,15 +33,14 @@ export function useRoomHost(options: {
   // 切片组装：轮询切片提供 pendingAnswers/offerGenerating 及轮询函数，
   // 动作切片依赖轮询切片的 pendingAnswers 引用，保持两切片状态同步
   const polling = useRoomHostPolling(store, hostMesh, lan, {
-    onRoomClosed: (msg) => {
+    onRoomClosed: () => {
       // 服务端已关闭/销毁房间（keepalive 返回 1001）：
-      // 停止轮询、清理连接与 TUN，重置本地房间状态并提示用户
+      // 组件侧仅负责清理连接与 TUN（hostMesh/lan 为组件持有，store 无法释放）；
+      // store 层全局保活定时器已负责 resetRoomState + toast（见 stores/online.ts）
       stopTimers()
       void lan.stop()
       hostMesh.close()
       hostMesh.setRoomKey(null)
-      store.resetRoomState()
-      toastError(`房间已关闭：${msg}`)
     },
   })
   const actions = useRoomHostActions(store, hostMesh, lan, polling.pendingAnswers)
