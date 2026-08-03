@@ -44,6 +44,18 @@ export interface RoomActionDeps {
   systemTurnServers: Ref<TurnServersResponse | null>
 }
 
+/**
+ * 房间已被服务端关闭/销毁（keepalive 等接口返回 code=1001）
+ *
+ * 轮询层捕获后应提示用户并主动退出房间状态，避免无意义持续上报。
+ */
+export class RoomClosedError extends Error {
+  constructor(message: string) {
+    super(message)
+    this.name = 'RoomClosedError'
+  }
+}
+
 export function useRoomActionsSlice(deps: RoomActionDeps) {
   const { roomState, roomLoading, roomCreateStep, stunServers, customTurnServers, systemTurnServers } = deps
 
@@ -264,7 +276,14 @@ export function useRoomActionsSlice(deps: RoomActionDeps) {
   async function keepalive(): Promise<{ expiresAt: number; serverTime: number } | null> {
     if (roomState.value.role !== 'host' || !roomState.value.roomCode) return null
     const result = await keepaliveRoom(roomState.value.roomCode)
-    if (result.code !== 1 || !result.data) return null
+    if (result.code !== 1 || !result.data) {
+      // 业务失败不再静默：code=1001「房间已关闭」时抛出可识别错误，
+      // 由轮询层捕获后提示用户并主动退出房间（见 useRoomHostPolling.doKeepalive）
+      if (result.code === 1001) {
+        throw new RoomClosedError(result.msg || '房间已关闭')
+      }
+      throw new Error(result.msg || '保活失败')
+    }
     roomState.value.expiresAt = result.data.expiresAt
     return result.data
   }

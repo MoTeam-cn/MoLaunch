@@ -9,6 +9,15 @@
 
 ### 修复
 
+#### 联机房间失联被销毁：keepalive 失败可感知 + 房间关闭主动退出 + 断连自动补发
+
+- 背景：房主 keepalive 业务失败被静默吞掉（`result.code !== 1` 直接 `return null`），用户看起来"一直在保活"，实际服务端超过 `keepalive_timeout`(120s) 未收到有效上报即判定失联关房（本次 V8MY2S 房间命中失联条件：仅创建后一次 keepalive 成功，之后无上报，23:36 被清理，23:39 的请求才报"房间已关闭"）
+- 改动：
+  - `src/stores/online/roomActions.ts`：`keepalive()` 不再静默返回 null——`code=1001` 抛出 `RoomClosedError`，其余业务失败抛出普通 Error
+  - `src/composables/useRoomHost/useRoomHostPolling.ts`：`doKeepalive` 捕获 `RoomClosedError` 后停止轮询并触发 `onRoomClosed` 回调；新增 `RoomHostPollingOptions` 注入
+  - `src/composables/useRoomHost.ts`：注入 `onRoomClosed`（停止轮询、`lan.stop`、`hostMesh.close` + `setRoomKey(null)`、`store.resetRoomState`、toast 提示）；`cloudConnected` 由断开恢复为连接时，除 `startTimers()` 外立即补发一次 doKeepalive/pollParticipants/pollAnswers，避免在 120s 窗口内漏报被判失联
+- 验证：`vue-tsc --noEmit` 通过、`eslint` 通过
+
 #### 联机房间详情列表显隐优化 + BackToTop 去 tooltip
 
 - 背景：上一轮将参与者列表改为恒渲染（空态提示），本次按反馈恢复「有参与者才显示」的 if 守卫，并补充入场动画；封禁列表、白名单列表同步做显隐治理；右下角全局返回顶部按钮去掉 tooltip

@@ -32,7 +32,18 @@ export function useRoomHost(options: {
 
   // 切片组装：轮询切片提供 pendingAnswers/offerGenerating 及轮询函数，
   // 动作切片依赖轮询切片的 pendingAnswers 引用，保持两切片状态同步
-  const polling = useRoomHostPolling(store, hostMesh, lan)
+  const polling = useRoomHostPolling(store, hostMesh, lan, {
+    onRoomClosed: (msg) => {
+      // 服务端已关闭/销毁房间（keepalive 返回 1001）：
+      // 停止轮询、清理连接与 TUN，重置本地房间状态并提示用户
+      stopTimers()
+      void lan.stop()
+      hostMesh.close()
+      hostMesh.setRoomKey(null)
+      store.resetRoomState()
+      toastError(`房间已关闭：${msg}`)
+    },
+  })
   const actions = useRoomHostActions(store, hostMesh, lan, polling.pendingAnswers)
   const {
     pendingAnswers,
@@ -106,6 +117,11 @@ export function useRoomHost(options: {
   watch(() => store.cloudConnected, (connected) => {
     if (connected) {
       startTimers()
+      // 断连恢复自动补发：网络恢复后立即上报一次保活/参与者/Answer，
+      // 避免在 keepalive_timeout(120s) 窗口内因漏报被服务端判定失联关房
+      void doKeepalive()
+      void pollParticipants()
+      void pollAnswers()
     } else {
       stopTimers()
     }

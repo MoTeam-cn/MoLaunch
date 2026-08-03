@@ -6,6 +6,7 @@
  */
 import { ref } from 'vue'
 import { useOnlineStore } from '@/stores/online'
+import { RoomClosedError } from '@/stores/online/roomActions'
 import type { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import type { useVirtualLan } from '@/composables/useVirtualLan'
 import { listAnswers, uploadParticipantOffer } from '@/utils/api/online-manager'
@@ -17,10 +18,16 @@ import { encodeTurnServers } from '@/utils/online/protocol'
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
 
+export interface RoomHostPollingOptions {
+  /** 房间被服务端关闭（keepalive 返回 1001）时回调，由主文件清理连接并退出房间 */
+  onRoomClosed?: (msg: string) => void
+}
+
 export function useRoomHostPolling(
   store: ReturnType<typeof useOnlineStore>,
   hostMesh: ReturnType<typeof useWebRTCMesh>,
   lan: ReturnType<typeof useVirtualLan>,
+  options: RoomHostPollingOptions = {},
 ) {
   /** 待确认 Answer 列表（pollAnswers 5s 刷新） */
   const pendingAnswers = ref<PendingAnswer[]>([])
@@ -148,6 +155,13 @@ export function useRoomHostPolling(
     try {
       await store.keepalive()
     } catch (e) {
+      // 房间已被服务端关闭/销毁（code=1001）：停止轮询并通知主文件清理退出，
+      // 避免无意义地持续上报并让用户感知房间已失效
+      if (e instanceof RoomClosedError) {
+        stopTimers()
+        options.onRoomClosed?.(e.message)
+        return
+      }
       console.warn('[Online] keepalive 失败:', e)
     }
   }
