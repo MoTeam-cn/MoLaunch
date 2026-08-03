@@ -24,15 +24,16 @@ const emit = defineEmits<{
 
 <template>
   <Card title="参与者">
-    <div v-if="participants.length === 0" class="py-8 flex flex-col items-center justify-center gap-2 text-gray-400">
-      <UsersIcon class="w-8 h-8" />
-      <span class="text-xs">暂无参与者加入</span>
-    </div>
-    <div v-else class="divide-y divide-gray-100">
+    <TransitionGroup
+      v-if="participants.length > 0"
+      tag="div"
+      name="participant"
+      class="divide-y divide-gray-100"
+    >
       <div
         v-for="p in participants"
         :key="p.participantId"
-        class="px-1 py-2.5 flex items-center justify-between"
+        class="participant-item px-1 py-2.5 flex items-center justify-between"
       >
         <div>
           <div class="text-xs font-medium text-gray-900">{{ p.devicePk.slice(0, 12) }}...</div>
@@ -46,6 +47,30 @@ const emit = defineEmits<{
           </Button>
         </Tooltip>
       </div>
+    </TransitionGroup>
+    <div v-else class="py-8 flex flex-col items-center justify-center gap-2 text-gray-400">
+      <UsersIcon class="w-8 h-8" />
+      <span class="text-xs">暂无参与者加入</span>
     </div>
   </Card>
 </template>
+
+<style scoped>
+.participant-enter-active {
+  transition: all 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.participant-leave-active {
+  transition: all 0.25s ease-in;
+}
+.participant-move {
+  transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.participant-enter-from {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+.participant-leave-to {
+  opacity: 0;
+  transform: translateX(16px);
+}
+</style>

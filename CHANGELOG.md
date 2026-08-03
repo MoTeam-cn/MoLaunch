@@ -9,6 +9,16 @@
 
 ### 修复
 
+#### 联机房间详情列表显隐优化 + BackToTop 去 tooltip
+
+- 背景：上一轮将参与者列表改为恒渲染（空态提示），本次按反馈恢复「有参与者才显示」的 if 守卫，并补充入场动画；封禁列表、白名单列表同步做显隐治理；右下角全局返回顶部按钮去掉 tooltip
+- 改动：
+  - `src/components/online/RoomHostPanel.vue`：`ParticipantList` 恢复 `v-if="room.participants.length > 0"`，`BannedList` 增加 `v-if="bannedList.length > 0"`，两者外层包 `<Transition>`（淡入 + 上移，500ms ease-out），有人加入时平滑出现
+  - `src/components/online/ParticipantList.vue`：条目改用 `<TransitionGroup>` + `participant` 过渡（enter 淡入下移 400ms cubic-bezier、leave 右移淡出、move 平滑重排），踢出/加入不再僵硬
+  - `src/components/online/WhitelistEditor.vue`：未启用时仅显示「启用白名单」开关与说明；启用后才显示添加输入框；白名单列表仅在「启用且已有条目」时出现，空状态仅在启用时展示
+  - `src/components/common/BackToTop.vue`：移除外层 `Tooltip`（返回顶部按钮上滑功能），保留按钮涟漪/光晕/滑入动画
+- 验证：`vue-tsc --noEmit` 通过、`eslint` 通过、Vue 文件均 ≤300 行
+
 #### FRP 厂商隧道导入端口固定 7000 与 TCP 检测参数类型错误
 
 - 背景：联机房间详情不显示参与者列表（participants 为空时列表区整块隐藏）；FRP 从厂商同步隧道时服务端端口被固定写成 7000；隧道创建表单 TCP 检测报 `参数解析失败: invalid type: string "17000", expected u16`

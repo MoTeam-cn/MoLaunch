@@ -231,19 +231,39 @@ const nearPlayerLimit = computed(
       @confirm="handleConfirm"
     />
 
-    <ParticipantList
-      :participants="room.participants"
-      :conn-state-text="participantStateText"
-      @kick="onKick"
-    />
+    <Transition
+      enter-active-class="transition ease-out duration-500"
+      enter-from-class="opacity-0 translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-2"
+    >
+      <ParticipantList
+        v-if="room.participants.length > 0"
+        :participants="room.participants"
+        :conn-state-text="participantStateText"
+        @kick="onKick"
+      />
+    </Transition>
 
-    <!-- 封禁列表 + 解封操作（阶段 6.2，仅房主） -->
-    <BannedList
-      :bans="bannedList"
-      :server-time="banServerTime"
-      @unban="handleUnban"
-      @refresh="refreshBans"
-    />
+    <!-- 封禁列表 + 解封操作（阶段 6.2，仅房主，有封禁记录时显示） -->
+    <Transition
+      enter-active-class="transition ease-out duration-500"
+      enter-from-class="opacity-0 translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition ease-in duration-200"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 -translate-y-2"
+    >
+      <BannedList
+        v-if="bannedList.length > 0"
+        :bans="bannedList"
+        :server-time="banServerTime"
+        @unban="handleUnban"
+        @refresh="refreshBans"
+      />
+    </Transition>
 
     <!-- 踢出确认弹窗（选择封禁时长） -->
     <KickConfirmDialog

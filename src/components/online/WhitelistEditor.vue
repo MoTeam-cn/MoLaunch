@@ -237,8 +237,8 @@ onMounted(() => {
       <span>白名单为空：启用后<b>拒绝所有人加入</b>（仅房主可进入）。请在下方添加设备 ID，或关闭白名单</span>
     </div>
 
-    <!-- 添加输入框 -->
-    <div class="flex items-center gap-2">
+    <!-- 添加输入框（启用后才显示） -->
+    <div v-if="isEnabled" class="flex items-center gap-2">
       <Input
         v-model="currentInput"
         placeholder="设备 ID（如 xxxx-xxxx-xxxx-xxxx）"
@@ -259,8 +259,8 @@ onMounted(() => {
       </Tooltip>
     </div>
 
-    <!-- 白名单列表 -->
-    <div v-if="displayEntries.length > 0" class="space-y-1.5">
+    <!-- 白名单列表（启用且已有条目时出现） -->
+    <div v-if="isEnabled && displayEntries.length > 0" class="space-y-1.5">
       <div class="text-xs font-medium text-gray-600 flex items-center gap-1.5">
         <UserPlusIcon class="w-3.5 h-3.5" />
         <span>已添加 {{ displayEntries.length }} 个设备</span>
@@ -287,9 +287,9 @@ onMounted(() => {
       </div>
     </div>
 
-    <!-- 空状态提示（icon + text 垂直水平居中） -->
+    <!-- 空状态提示（启用但未添加任何设备时，icon + text 垂直水平居中） -->
     <div
-      v-else
+      v-else-if="isEnabled"
       class="py-6 flex flex-col items-center justify-center gap-2 text-gray-400"
     >
       <UserPlusIcon class="w-6 h-6" />
