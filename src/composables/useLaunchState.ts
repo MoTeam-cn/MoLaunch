@@ -1,13 +1,8 @@
 /**
- * 启动状态管理 composable
+ * 启动状态管理 composable（从 stores/version.ts 抽出）
  *
- * 从 stores/version.ts 抽出，封装：
- * - 启动游戏流程（Tauri event 进度监听、Java 自动下载进度监听）
- * - 运行中游戏状态（pid、版本 ID）
- * - 游戏退出事件监听
- *
- * 与版本列表本身解耦：调用 launchGame 时直接传 launchGameParams，
- * 不依赖 versions 数组（验证由调用方负责）。
+ * 封装启动游戏流程（进度 + Java 自动下载监听）、运行中状态（pid / 版本 ID）与游戏退出事件监听；
+ * 与版本列表解耦，验证由调用方负责。
  */
 
 import { ref, computed } from 'vue'

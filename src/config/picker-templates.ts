@@ -1,25 +1,8 @@
 /**
  * Picker 子窗口模板配置
  *
- * 集中管理各 picker 模板的默认参数、白名单规则和 CSP 策略。
- * 修改白名单、CSP 或默认尺寸只需改此文件，不需动逻辑代码。
- *
- * ## 白名单规则
- *
- * - 精确匹配：'example.com' 匹配 hostname === 'example.com'
- * - 通配符前缀：'*.example.com' 匹配 example.com 的所有子域名
- *
- * ## CSP 策略
- *
- * 每个模板可配置 `csp` 字段（Content-Security-Policy），通过 IPC 传递给后端，
- * 后端在创建 picker:// 响应时注入到 HTTP 响应头中。CSP 用于限制子窗口内可加载
- * 的资源范围，防止模板被注入恶意资源。
- *
- * CSP 中的协议来源说明：
- * - 'self'：当前 picker:// 页面自身
- * - picker:：允许 picker:// 协议（用于 fetch /data 等同协议请求）
- * - res:：允许 res:// 协议（用于加载后端嵌入资源，如 marked.min.js）
- * - data: / blob:：允许 data/blob URL（图片、二维码等）
+ * 集中管理各 picker 模板的默认参数、白名单规则与 CSP 策略；CSP 经 IPC 传给后端注入 picker:// 响应头，
+ * 协议来源支持 'self' / picker: / res: / data: / blob:；域名白名单精确匹配 hostname，'*.example.com' 为子域通配。
  */
 
 /** 模板配置 */

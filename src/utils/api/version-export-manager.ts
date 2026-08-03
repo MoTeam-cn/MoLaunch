@@ -1,12 +1,8 @@
 /**
  * 版本导出管理统一 API 入口
- *
- * 后端 `version_export_manager` IPC 命令通过 `action` 字段分发到不同子模块
- * （get_export_options / export_modpack / save_export_config / load_export_config 共 4 个 action），
- * 参照 `version_launch_manager` 等其他 manager 模式。
- *
- * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
- * 故前端 params 对象的字段名一律使用 camelCase。
+ * `version_export_manager` IPC 经 `action` 分发（get_export_options / export_modpack /
+ * save_export_config / load_export_config 共 4 个 action）。
+ * params 字段名一律 camelCase。
  */
 
 import { invoke } from '@tauri-apps/api/core'

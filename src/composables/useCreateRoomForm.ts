@@ -1,13 +1,8 @@
 /**
  * 创建房间表单 composable
  *
- * 从 components/online/CreateRoomForm.vue 抽离（保持主文件 ≤ 300 行约束）：
- * - 表单状态（基础字段 / 整合包元数据 / 白名单）
- * - 已安装版本列表加载 + 选中后异步解析 MC 版本 / 加载器信息
- * - 提交校验（版本 / 端口 / 人数）与创建房间流程（stun → create 两步）
- * - 高级设置状态徽章（整合包关联 / 白名单启用联动）
- *
- * 返回全部模板所需状态与动作，主文件仅保留模板 + 组装。
+ * 表单状态、版本列表加载与解析、提交校验与创建流程（stun → create 两步）、高级设置徽章；
+ * 返回全部模板所需状态与动作，主文件仅保留模板与组装。
  */
 import { ref, computed, onMounted } from 'vue'
 import { useOnlineStore } from '@/stores/online'

@@ -1,13 +1,7 @@
 /**
- * 皮肤/披风操作状态切片（从 useSkinOperations.ts 抽取）
+ * 皮肤/披风操作状态切片（useSkinOperations 拆分）
  *
- * 负责全部状态声明与派生计算：
- * - 登录类型派生布尔值（isMicrosoft / isAuthlib / isOffline）
- * - 皮肤/披风信息、URL、变体、本地皮肤等响应式状态
- * - 当前装备披风/皮肤、上传权限等 computed
- * - image-cached 事件监听（后端下载完成后自动刷新远程 URL 为本地缓存 URL）
- *
- * 无业务动作；上传/披风/选择/删除等交互由 useSkinActions.ts 负责。
+ * 状态声明与派生 computed（登录类型 / 装备状态 / 上传权限）+ image-cached 事件监听；无业务动作。
  */
 
 import { ref, computed, type ComputedRef, type Ref } from 'vue'

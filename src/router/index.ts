@@ -1,14 +1,7 @@
 /**
  * 路由配置
  *
- * 路径结构：
- * - /login          登录页（无需认证）
- * - /app            首页
- * - /app/versions   版本列表（含社区资源搜索侧栏）
- * - /app/versions/select   选择下载版本
- * - /app/versions/setup    版本设置
- * - /app/settings   全局设置
- * - /apps/downloads  下载管理
+ * 业务页面均挂载在 /apps 下并要求登录（meta.requiresAuth），/login 为免认证入口，/ 重定向到 /apps。
  */
 
 import { createRouter, createWebHistory } from 'vue-router'

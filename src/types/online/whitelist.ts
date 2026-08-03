@@ -1,11 +1,8 @@
 /**
- * 联机功能类型定义 - 房主白名单域
+ * 联机功能类型定义 - 房主白名单域（阶段三子任务 8 安全加强）
  *
- * 阶段三子任务 8 安全加强。
- *
- * 对应后端 `minecraft::online::signaling::WhitelistEntry` / `WhitelistResponse`。
- * 房主可启用白名单后指定允许加入的设备（按 `device_id` 友好标识），
- * 启用且白名单为空 = 拒绝所有人加入（仅房主可进入）。
+ * 对应后端 signaling::WhitelistEntry / WhitelistResponse；启用后仅白名单内设备可加入，
+ * 空白名单 = 拒绝所有人加入（仅房主可进入）。
  */
 
 /** 白名单条目（房主查询/管理用） */

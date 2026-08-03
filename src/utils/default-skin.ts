@@ -1,11 +1,8 @@
 /**
  * 默认皮肤工具
  *
- * 离线账号使用 src/assets/Skins 目录下的官方默认皮肤：
- * Alex, Ari, Efe, Kai, Makena, Noor, Steve, Sunny, Zuri
- *
- * 皮肤选择持久化到注册表（通过后端 set_offline_skin 命令），
- * 前端用内存 Map 缓存，启动时从后端同步。
+ * 离线账号使用 src/assets/Skins 下的官方默认皮肤（Alex/Ari/Efe/Kai/Makena/Noor/Steve/Sunny/Zuri），
+ * 选择经后端 set_offline_skin 持久化到注册表，前端内存 Map 缓存并在启动时同步。
  */
 
 import { ref } from 'vue'

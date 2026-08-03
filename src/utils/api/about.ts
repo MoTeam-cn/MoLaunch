@@ -1,11 +1,8 @@
 /**
  * 关于页面数据 API
  *
- * 从后端 `get_about_data` 命令获取关于页面所需的全部数据
- * （特别鸣谢、技术栈、许可声明），数据源为 `src-tauri/resources/about/` 下的
- * markdown 表格格式 txt 文件，由后端 `utils::markdown_table` 模块解析。
- *
- * 注：底层已聚合为 `system_manager` 单一 IPC 入口，通过 `action` 字段分发。
+ * 从 system_manager（get_about_data）获取特别鸣谢/技术栈/许可声明，
+ * 数据源为 src-tauri/resources/about/ 下的 markdown 表格 txt（后端 markdown_table 解析）。
  */
 
 import { SYSTEM_ACTIONS, systemManager } from './system-manager'

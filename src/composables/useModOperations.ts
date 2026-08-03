@@ -1,18 +1,8 @@
 /**
  * Mod 管理操作 composable（编排层）
  *
- * 本文件为编排层，将原 useModOperations 的职责拆分为三个子 composable：
- * - useModList：列表加载 / 过滤 / 单个 Mod 操作 / 预加载 / 详情查询 / 版本上下文 / 文件监听
- * - useModBatchOps：多选状态 + 批量启用/禁用 / 删除
- * - useModUpdateDialog：更新对话框状态 + 打开/批量更新/安装完成回调
- *
- * 本文件仅负责组合三个子 composable，对外保持原有 API 不变。
- *
- * 设计原则：
- * - 接收所需的 ref/computed 作为参数（selectedId / isModable / modLocalNameStyle）
- * - 返回 handler 函数和状态
- * - handler 内部的 toast/modal 调用保持原 ModTab.vue 行为不变
- * - 模板中的事件绑定保持不变
+ * 组合 useModList / useModBatchOps / useModUpdateDialog 三个子 composable，
+ * 接收所需 ref/computed/store 作为参数，对外保持原 API 与模板事件绑定不变。
  */
 import { type Ref, type ComputedRef } from 'vue'
 import { useModList } from './useModList'

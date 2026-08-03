@@ -1,20 +1,12 @@
 /**
  * 联机功能类型定义 - 整合包元数据域
  *
- * 联机大厅阶段 3/4 新增。房主创建房间时关联本地已安装整合包，
- * 加入方拉取房间详情后据此判断是否需要一键安装。
+ * 房主创建房间时关联本地已安装整合包，加入方据此判断是否需要一键安装。
  */
 
 /**
  * 整合包元数据（联机大厅阶段 3 新增）
- *
- * 房主创建房间时关联本地已安装整合包，上报给 api-server。
- * 加入方拉取房间详情后据此判断是否需要一键安装。
- *
- * **安全设计**：不包含 `downloadUrl` 字段。加入方通过现有 `getProjectVersions`
- * IPC 反查平台 API 获取下载链接，避免 api-server 成为 URL 分发中心。
- *
- * 对应后端 `minecraft::online::signaling::ModpackMeta`。
+ * 安全设计：不含 downloadUrl，加入方经 getProjectVersions IPC 反查平台 API 获取下载链接，避免 api-server 成为 URL 分发中心。
  */
 export interface ModpackMeta {
   /** 来源平台（`curseforge` / `modrinth`） */

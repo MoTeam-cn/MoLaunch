@@ -1,17 +1,7 @@
 /**
- * 侧边栏 tab 选中态 URL 持久化
+ * 侧边栏 tab 选中态 URL 持久化（NavSidebar / DownloadSidebar 共用）
  *
- * 机制（抽取自 NavSidebar.vue 原内联实现）：
- * - onMounted：从 route.query.tab 读取，若有效且与当前值不同则通过 onChange 通知调用方恢复
- * - watch：当前值变化时 router.replace 写入 URL（不产生历史记录，保留其他 query 参数）
- *
- * # 复用方
- * - NavSidebar.vue：扁平分类 + children 子菜单（isValid 需递归 children）
- * - DownloadSidebar.vue：top + community 两组分类（isValid 检查两组列表）
- *
- * # 为什么抽 composable
- * 两处侧边栏需要相同的 URL 同步逻辑，原 NavSidebar 内联实现无法被 DownloadSidebar 复用。
- * 抽出后 NavSidebar 改用本 composable（逻辑等价），DownloadSidebar 新增同能力，避免重复代码。
+ * onMounted 从 ?tab= 恢复（isValid 校验），变化时 router.replace 同步 URL（不产生历史记录）。
  */
 import { watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'

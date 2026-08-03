@@ -1,17 +1,8 @@
 /**
  * 配置管理模块统一 API 入口
  *
- * 后端 `config_manager` IPC 命令通过 `action` 字段分发到不同子模块
- * （参照 `meta_manager` / `image_cache_manager` / `java_manager` 模式）。
- *
- * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
- * 故前端 params 对象的字段名一律使用 camelCase。
- *
- * 注册的 action（2 个）：
- * - `get_config`：读取配置（扁平化数组）
- * - `apply_config`：统一配置更新
- *
- * 注：`get_config_path` / `save_config_to_file` 不在本次聚合范围，仍走独立 invoke。
+ * 后端 config_manager IPC 按 action 分发（get_config / apply_config）；
+ * params 字段一律 camelCase。get_config_path / save_config_to_file 仍走独立 invoke。
  */
 
 import { invoke } from '@tauri-apps/api/core'

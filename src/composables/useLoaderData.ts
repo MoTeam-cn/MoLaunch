@@ -1,13 +1,7 @@
 /**
  * 加载器版本数据 composable
  *
- * 负责：
- * - 从后端获取 5 种加载器（Forge/NeoForge/Fabric/OptiFine/LiteLoader）的版本列表
- * - 缓存到 versionStore（避免重复请求）
- * - 提供 computed 版本项列表（供 LoaderCard 组件直接使用）
- *
- * 用法：
- *   const { forgeItems, loadingForge, fetchAll, ... } = useLoaderData(mcVersion, showFlags)
+ * 获取 5 种加载器版本列表并缓存到 versionStore，提供 computed 版本项列表供 LoaderCard 使用。
  */
 import { ref, computed, type Ref, type ComputedRef } from 'vue'
 import * as tauri from '@/utils/tauri'

@@ -1,16 +1,7 @@
 /**
- * 轮询 composable
+ * 轮询 composable：封装 setInterval/clearInterval 样板
  *
- * 统一封装 `setInterval`/`clearInterval` 样板：onUnmounted 自动清理、防止重复启动。
- *
- * 参考 `MemorySection.vue`、`SettingsLaunch.vue`、`useDownloadPolling.ts` 的模式提取。
- *
- * @example
- * // 每 1 秒拉取系统内存
- * const { start, stop } = usePolling(async () => {
- *   memory.value = await tauri.getSystemMemory()
- * }, 1000)
- * onMounted(() => start())
+ * onUnmounted 自动清理；组件卸载后禁止再启动，避免异步回调注册的 interval 泄漏。
  */
 import { onUnmounted } from 'vue'
 

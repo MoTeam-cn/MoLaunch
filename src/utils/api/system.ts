@@ -1,12 +1,6 @@
 /**
  * 系统操作、目录选择、下载进度查询 API
- *
- * 全局配置读写（getConfig/applyConfig/refreshConfig 等）已拆分到 `./config.ts`。
- *
- * 注：9 个原 Tauri 命令（open_game_dir / open_path / reveal_in_explorer
- * / get_game_dir / write_text_file / get_system_memory / set_game_dir
- * / get_config_path / save_config_to_file）已聚合为 `system_manager` 单一 IPC 入口，
- * 通过 `action` 字段分发。
+ * 全局配置读写已拆分至 `./config.ts`；9 个原 Tauri 命令聚合为 `system_manager` 单一 IPC 入口（经 `action` 分发）。
  */
 
 import type { RawDownloadProgress } from '@/types/download'

@@ -1,21 +1,6 @@
 /**
- * 自定义布局数据源
- *
- * 提供布局渲染所需的实时数据，通过 pluginSdk 获取。
- *
- * 支持的数据源路径：
- * - cache.totalSize：缓存总大小（字节）
- * - cache.totalFiles：缓存总文件数
- * - cache.cleanableSize：可自动清理大小（字节）
- * - cache.entries：缓存条目列表（含 name / fileCount / totalSize / ttlHours / path / category / subDir）
- * - system.totalMemory：系统总内存（字节）
- * - system.usedMemory：已用内存（字节）
- * - system.availableMemory：可用内存（字节）
- * - system.usagePercent：内存使用率（0-100）
- * - versions.count：已安装版本数
- * - versions.list：已安装版本列表（含 id / version_type / logo）
- * - history.count：启动历史记录数
- * - history.recent：最近启动记录（含 version_id / username / launch_time / pid / exit_code）
+ * 自定义布局数据源：提供布局渲染所需的实时数据，通过 pluginSdk 获取。
+ * 支持的数据源路径清单见 loadDataContext()。
  */
 
 import { pluginSdk } from '@/plugins/sdk'

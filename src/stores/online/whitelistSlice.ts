@@ -1,12 +1,8 @@
 /**
  * 联机 store 白名单切片（阶段三子任务 8 安全加强）
  *
- * 从 stores/online.ts 房间切片进一步抽取的白名单 state + actions。
- * 4 个方法对应 4 个后端 action：list / add / remove / setEnabled。
- * 仅房主可调用，加入方无权管理白名单。
- * 启用白名单且条目为空 = 拒绝所有人加入（仅房主可进入）。
- *
- * 依赖房间切片的 roomState 引用（检查 role/roomCode，同步 whitelistEnabled）。
+ * 4 个方法对应后端 list/add/remove/setEnabled，仅房主可调用；空白名单 = 拒绝所有人加入。
+ * 依赖房间切片 roomState 引用（校验 role/roomCode，同步 whitelistEnabled）。
  */
 
 import type { Ref } from 'vue'

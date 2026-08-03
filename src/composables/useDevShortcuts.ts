@@ -1,20 +1,8 @@
 /**
- * 开发者页面独占快捷键 composable
+ * 开发者页面独占快捷键 composable（仅 SettingsDeveloper.vue 挂载）
  *
- * 设计目标：
- * - 仅在 SettingsDeveloper.vue 内 onMounted 时绑定，onUnmounted 自动解绑
- * - 在 capture 阶段调用 `stopImmediatePropagation` 抢先消费事件，绕过
- *   `useDevToolsGuard` 的全局防护
- *
- * 当前绑定快捷键：
- * - Ctrl/Cmd + Shift + D：切换 DevTools 打开/关闭
- * - Alt + 1~6：切换开发者页面子页签
- *   （1=实验性 / 2=DevTools / 3=证书 / 4=日志 / 5=存储 / 6=系统信息）
- *
- * 安全约束：
- * - 切换 DevTools 仍需后端 `require_dev_mode()` 校验通过，普通用户即使
- *   误入开发者页面也无法触发（侧边菜单在未开启开发者模式时不显示）
- * - 快捷键仅在该页面组件存活时生效，离开页面自动失效
+ * capture 阶段 stopImmediatePropagation 抢占事件流，绕过 useDevToolsGuard 全局防护；
+ * Ctrl/Cmd+Shift+D 切换 DevTools、Alt+1~6 切换子页签。DevTools 切换仍需后端 require_dev_mode() 校验。
  */
 
 import { onMounted, onUnmounted } from 'vue'

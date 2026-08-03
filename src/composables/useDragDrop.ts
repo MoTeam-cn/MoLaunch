@@ -1,22 +1,9 @@
 /**
- * 全局文件拖拽安装 composable（聚合入口）
+ * 全局文件拖拽安装 composable（聚合入口，App.vue 挂载）
  *
- * 在 App.vue 根组件调用 `useDragDrop()` 注册 Tauri v2 `onDragDropEvent`，
- * 根据文件扩展名路由到不同处理逻辑：
- *
- * - `.zip` / `.mrpack` → 整合包安装（弹窗输入实例名 → installLocalModpack → installMerged）
- * - `.jar` / `.litemod` / `.disabled` / `.old` → Mod 安装（弹窗选择目标版本 → installMod）
- * - `.rar` → 拒绝并提示用户解压后重新压缩为 zip
- * - 其他 → 提示无法识别
- *
- * 拖拽进入时通过 `dragState` 暴露 enter/over/leave 状态，驱动 DragOverlay 全局遮蔽层。
- *
- * 按职责拆分到 `./useDragDrop/` 子文件，本文件仅做 re-export 以保持
- * `@/composables/useDragDrop` 路径对调用方完全兼容：
- * - `state.ts`：拖拽状态、扩展名常量、路径工具函数、classifyDrag、hideOverlay
- * - `handlers.ts`：文件类型分发与安装处理（handleFileDrop / handleModpackDrop / handleModDrop 等）
- *
- * `useDragDrop()` 生命周期函数因依赖 Vue onMounted/onUnmounted，保留在主文件。
+ * 注册 Tauri onDragDropEvent 并按扩展名路由：zip/mrpack→整合包、jar 等→Mod、
+ * rar→拒绝解压提示、其他→无法识别；dragState 驱动全局 DragOverlay。
+ * 逻辑拆分至 useDragDrop/ 子文件，本文件 re-export 并保留生命周期函数。
  */
 
 import { onMounted, onUnmounted } from 'vue'

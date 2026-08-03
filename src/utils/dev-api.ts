@@ -1,24 +1,8 @@
 /**
  * 调试 API（仅 dev 模式可用）
  *
- * 挂载到 `window.molaunch`，提供调试入口便于在 DevTools Console 中测试：
- * - help()          打印所有可用命令
- * - templates()     列出所有可用 picker 模板名
- * - picker(t, d?)   打开 picker 子窗口（选择型返回值，展示型返回 undefined）
- * - pickPort()      打开端口选择器（返回 number | null）
- * - navigate(path)  路由跳转
- * - reload(force?)  刷新当前页面（force=true 强制无缓存刷新）
- * - tools(action, params?)  调用后端 tools_manager IPC
- * - frp(action, params?)    调用后端 frp_manager IPC
- * - stores()        返回所有 Pinia store 的 $state
- *
- * 用法：在 DevTools Console 输入 `molaunch.help()` 查看帮助
- *
- * 设计说明：
- * - 仅在 `import.meta.env.DEV` 时挂载，生产构建中不存在此 API，避免体积与安全风险
- * - 通过 `Object.defineProperty` 设置 writable:false 防止被覆盖
- * - 所有 Pinia store 通过动态 import 加载，不影响首屏 bundle 体积
- * - picker 子命令复用 `utils/picker-window.ts` 既有便捷函数，避免重复实现
+ * 挂载到 window.molaunch，供 DevTools Console 调用（molaunch.help() 查看命令列表）；
+ * 仅 import.meta.env.DEV 时挂载，store 动态 import 不影响首屏体积。
  */
 import { invoke } from '@tauri-apps/api/core'
 import type { Router } from 'vue-router'

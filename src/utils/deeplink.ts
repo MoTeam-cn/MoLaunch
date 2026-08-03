@@ -1,13 +1,8 @@
 /**
  * 深度链接（molaunch:// 协议）前端封装
  *
- * 后端 deeplink 模块（src-tauri/src/deeplink）解析 URL 后：
- * 1. 按 host 段路由到注册的 handler（后端逻辑，如启动游戏）
- * 2. emit `deeplink://new` 事件，携带结构化结果给前端
- *
- * 前端通过本模块统一监听：
- * - `onDeeplink`：实时监听（应用运行期间点击 molaunch:// 链接）
- * - `getCurrent`：应用启动时由 deeplink 唤醒的场景（配合插件 getCurrent）
+ * 后端 deeplink 模块按 host 路由后 emit `deeplink://new` 事件；
+ * onDeeplink 实时监听，getCurrent 用于应用启动被唤醒的场景。
  */
 import { listen } from '@tauri-apps/api/event'
 import { getCurrent } from '@tauri-apps/plugin-deep-link'

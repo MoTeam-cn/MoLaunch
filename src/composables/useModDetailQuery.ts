@@ -1,12 +1,8 @@
 /**
- * Mod 详情查询 composable（从 ModTab.vue 抽出）
+ * Mod 详情查询 composable：详情按钮三级 fallback
  *
- * 封装详情按钮的三级 fallback 逻辑：
- * 1. 零延迟路径：mod.project 已被预加载填充 → 直接弹 ResourceDetail
- * 2. 并发 fallback：预加载未完成或失败 → 并发请求 CF + MR（Promise.any）
- * 3. 本地信息：无 slug 或两个平台都查不到 → 弹本地信息弹窗 + 百科搜索
- *
- * 同时封装「前往百科」按钮逻辑（mcmod.cn 直链 → 搜索页回退）。
+ * 1. project 已预加载 → 直接弹窗 2. 并发请求 CF+MR（Promise.any）3. 本地信息弹窗；
+ * 另封装「前往百科」按钮（mcmod 直链 → 搜索页回退）。
  */
 import { ref, type Ref } from 'vue'
 import { getProjectDetail, getMcmodUrl } from '@/utils/api/community'

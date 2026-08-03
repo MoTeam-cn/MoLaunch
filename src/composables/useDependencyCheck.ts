@@ -1,12 +1,8 @@
 /**
  * 前置 Mod 依赖检查与安装 composable
  *
- * 封装 check_mod_dependencies 和 install_mod_with_dependencies 两个 IPC 调用，
- * 提供状态管理（checking / installing / missing / upToDate）。
- *
- * 调用方：
- * - ResourceDetail.vue：下载前检查，弹窗确认后一键安装主 mod + 勾选前置
- * - useModUpdate.ts：更新前检查（阶段 4 集成）
+ * 封装 check_mod_dependencies / install_mod_with_dependencies 两个 IPC，
+ * 提供 checking / installing / missing / upToDate 状态管理。
  */
 import { ref } from 'vue'
 import { versionModsManager, VERSION_MODS_ACTIONS } from '@/utils/api/version-mods-manager'

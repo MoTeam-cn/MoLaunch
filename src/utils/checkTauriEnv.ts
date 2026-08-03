@@ -1,11 +1,8 @@
 /**
  * Tauri 环境检测
  *
- * 浏览器直接打开 dev server 时，@tauri-apps/api 的 getCurrentWindow() 会抛
- * "Cannot read properties of undefined (reading 'metadata')"，导致 TopNavLayout
- * setup 阶段崩溃。此处最早拦截，渲染友好提示并阻止 Vue app 挂载。
- *
- * Tauri 2 在 WebView 中会注入 window.__TAURI_INTERNALS__，浏览器环境无此对象。
+ * 浏览器打开 dev server 时 @tauri-apps/api 会抛错导致 Vue 挂载崩溃；
+ * 通过 Tauri 2 WebView 注入的 window.__TAURI_INTERNALS__ 判环境，最早拦截并渲染友好提示。
  */
 
 /** 检测当前是否运行在 Tauri WebView 环境中 */

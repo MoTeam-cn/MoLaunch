@@ -1,12 +1,9 @@
 /**
  * 种子地图 WorkerPool 消息协议与参数类型
  *
- * 主线程 → Worker：init / prepare_seed / generate / find_structures / obsolete / dispose
- * Worker → 主线程：init_complete / seed_prepared / tile_result / structure_result / error
- *
- * 设计参考 minecraftsearch.com 逆向分析（docs/Map/map.md），
- * 简化为单 Worker 内嵌 WASM（不共享 WebAssembly.Module），
- * Worker 间无状态同步，主线程通过 seedEpoch 协调。
+ * 主→Worker：init / prepare_seed / generate / find_structures / obsolete / dispose；
+ * Worker→主：init_complete / seed_prepared / tile_result / structure_result / error。
+ * 参考 minecraftsearch.com（docs/Map/map.md）：单 Worker 内嵌 WASM，主线程以 seedEpoch 协调。
  */
 
 /** MC 版本（与 cubiomes MC_* 常量对应） */

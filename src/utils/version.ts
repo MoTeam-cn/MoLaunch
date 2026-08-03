@@ -1,16 +1,6 @@
 /**
- * 应用版本号解析工具
- *
- * vite.config.ts 通过 `define` 注入 `__APP_VERSION__` 全局常量（取自 package.json 的 version）。
- * 本模块负责解析版本号后缀，判断当前是否为测试版（beta / alpha / rc / canary 等）。
- *
- * 判断规则：
- * - 形如 `0.1.0`（无后缀）→ 正式版
- * - 形如 `0.1.0-beta.1` / `0.1.0-alpha.2` / `0.1.0-rc.0` / `0.1.0-canary.3` → 测试版
- *
- * 使用场景：
- * - 测试版水印：仅在测试版构建中渲染全屏水印（含设备 ID 追踪）
- * - 防泄漏：测试版仅限内部测试，水印便于追溯泄漏源
+ * 应用版本号解析：解析 `__APP_VERSION__`（vite `define` 注入）及后缀，判断是否为测试版。
+ * 无后缀 → stable；形如 `0.1.0-beta.1` → 测试版。测试版用于水印渲染与防泄漏追踪。
  */
 
 /** 测试版后缀类型（未识别后缀归为 Stable） */
@@ -49,7 +39,7 @@ function parseChannel(suffix: string): { channel: VersionChannel; num: number } 
  * 解析版本号字符串
  *
  * 支持标准 semver（`MAJOR.MINOR.PATCH`）及带后缀（`MAJOR.MINOR.PATCH-CHANNEL.NUM`）。
- * 解析失败时返回 channel=stable 的兜底信息，不抛异常。
+ * 无后缀 → stable 正式版；beta/alpha/rc/canary 后缀 → 测试版。解析失败返回 channel=stable 兜底，不抛异常。
  */
 export function parseVersion(version: string): VersionInfo {
   const raw = version || '0.0.0'

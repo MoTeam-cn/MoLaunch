@@ -1,10 +1,7 @@
 /**
- * 联机 API - 大厅浏览（联机大厅阶段 5）
+ * 联机 API - 大厅浏览
  *
- * 2 个 action 与后端 `utils::signaling_manager` 注册一一对应：
- * - `lobby_list_rooms`：分页查询公开房间列表，支持加载器/版本/关键词过滤
- * - `lobby_list_categories`：查询大厅分类列表（MVP 阶段仅 `global`）
- *
+ * 2 个 action：lobby_list_rooms（分页公开房间）+ lobby_list_categories（分类，MVP 仅 global）。
  * 列表接口不返回 SDP/ICE/room_key 等敏感字段，加入方需走完整 join 流程。
  */
 

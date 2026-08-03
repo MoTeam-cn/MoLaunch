@@ -1,14 +1,8 @@
 /**
- * 皮肤/披风操作 composable（从 SkinManager.vue 抽出）
+ * 皮肤/披风操作 composable（按登录方式三分流：微软 / 外置 / 离线）
  *
- * 按登录方式三分流（微软 / 外置 / 离线）封装加载、上传、披风装备、通用刷新
- * 与本地缓存替换等全部弹窗业务逻辑；接收 computed 作为参数，仅用 toast，不引入 modal。
- *
- * 拆分为两个职责切片，本文件负责信息加载（loadInfo）与切片组装：
- * - useSkinState：状态声明 + 派生 computed（登录类型 / 装备状态 / 上传权限）+ image-cached 监听
- * - useSkinActions：上传/披风/删除/选择本地皮肤等交互动作 + runWithRefresh 通用刷新
- *
- * 对外 useSkinOperations() 返回结构保持不变，调用方（SkinManager.vue）无需改动。
+ * 拆为两个切片：useSkinState（状态）/ useSkinActions（交互），本文件负责 loadInfo 与组装；
+ * 仅用 toast，不引入 modal。
  */
 import type { ComputedRef } from 'vue'
 import { getSkinCapeInfo, getSkinUrl, getCapeUrl } from '@/utils/tauri'

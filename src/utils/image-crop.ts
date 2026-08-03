@@ -1,7 +1,6 @@
 /**
  * 图片加载与裁剪工具
- *
- * 提供通用的 Image 加载 + canvas 裁剪功能，供 cape-icon.ts、SkinAvatar.vue 等复用。
+ * 提供通用 Image 加载 + canvas 裁剪，供 cape-icon.ts、SkinAvatar.vue 等复用。
  * 统一 crossOrigin、imageSmoothingEnabled=false（保持像素风格）、toDataURL 输出。
  */
 

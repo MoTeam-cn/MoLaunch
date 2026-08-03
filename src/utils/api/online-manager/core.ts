@@ -1,20 +1,8 @@
 /**
- * 联机功能统一 API - 核心入口
+ * 联机功能统一 API - 核心入口（`online_manager` IPC 经 `action` 分发）
  *
- * 后端 `online_manager` IPC 命令通过 `action` 字段分发到不同子模块
- * （参照 `community_manager` / `meta_manager` 模式）。
- *
- * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
- * 故前端 params 对象的字段名一律使用 camelCase。
- *
- * 各 action 类别的便捷封装按域拆分到同目录其他文件：
- * - `auth.ts`：设备认证（status/register/login/logout/clear/init/refresh）
- * - `room.ts`：房间信令（stun/create/get/close/join/submit/list/confirm/keepalive/leave/kick/ban/participants）
- * - `turn.ts`：TURN 中继（房主独占）
- * - `mesh.ts`：mesh 拓扑参与者级 SDP Offer
- * - `tun.ts`：TUN 桥接 + 管理员重启
- * - `whitelist.ts`：房主白名单管理
- * - `lobby.ts`：大厅浏览
+ * params 字段名一律 camelCase（后端 `#[serde(rename_all = "camelCase")]`）。
+ * 各 action 便捷封装拆分至同目录：auth / room / turn / mesh / tun / whitelist / lobby。
  */
 
 import { invoke } from '@tauri-apps/api/core'

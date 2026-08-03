@@ -1,12 +1,8 @@
 /**
- * 联机功能类型定义 - TUN 桥接域
+ * 联机功能类型定义 - TUN 桥接域（阶段三子任务 5：数据分发打通）
  *
- * 阶段三子任务 5：数据分发打通。
- *
- * 后端 `utils::tun_manager` 注册 3 个 IPC action，前端通过 `onlineManager` 调用：
- * - `tun_start`：创建 TUN 接口 + 启动读写循环 + emit `online://tun-packet-out` 事件
- * - `tun_forward_to`：前端 DataChannel 收到消息后调用，base64 编码传入，后端解码并写入 TUN
- * - `tun_stop`：停止桥接，销毁 TUN 接口
+ * 后端 tun_manager 注册 tun_start（建接口 + 读写循环 + emit tun-packet-out）、
+ * tun_forward_to（base64 编码写入 TUN）、tun_stop（销毁接口）三个 action。
  */
 
 /** `tun_start` 参数 */

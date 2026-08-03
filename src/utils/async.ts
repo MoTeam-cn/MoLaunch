@@ -1,8 +1,6 @@
 /**
  * 异步工具函数
- *
- * 提供 `safeCall` 高阶函数，统一处理 try/catch + console.error 样板，
- * 消除项目中 55+ 处重复的错误吞没模式。
+ * 提供 `safeCall` 高阶函数，统一 try/catch + console.error 错误处理。
  */
 
 /**

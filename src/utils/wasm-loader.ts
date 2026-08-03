@@ -1,18 +1,7 @@
 /**
- * WASM 加载工具服务
- *
- * 通过 Tauri 的 `res://` 协议加载后端嵌入的 WASM 文件。
- * 协议格式：res://web-common/{type}/{file}
- *   - Windows: https://res.localhost/web-common/{type}/{file}
- *   - macOS/Linux: res://localhost/web-common/{type}/{file}
- *
- * 用法：
- *   import { loadWasm, wasmUrl } from '@/utils/wasm-loader'
- *   const module = await loadWasm('cubiomes.wasm')
- *   // 或仅获取 URL 给 Worker 内部 fetch
- *   const url = wasmUrl('cubiomes.wasm')
- *
- * 后端对应：src-tauri/src/res_scheme.rs（register_res_scheme）
+ * WASM 加载工具：经 Tauri `res://` 协议加载后端嵌入的 WASM 文件。
+ * 协议格式 web-common/{type}/{file}（Windows: https://res.localhost，macOS/Linux: res://localhost）。
+ * 提供 loadWasm() 加载 + wasmUrl() 获取 URL 供 Worker fetch。后端对应 src-tauri/src/res_scheme.rs。
  */
 
 /** res 协议的 scheme 名（与后端 res_scheme.rs 的 RES_SCHEME 一致） */
@@ -38,6 +27,8 @@ function isHttpsSchemePlatform(): boolean {
 
 /**
  * 获取 res:// 协议在当前平台的完整 URL 前缀
+ *
+ * Tauri v2 + useHttpsScheme=true：Windows/Android → https://res.localhost/，macOS/Linux → res://localhost/。
  */
 function getResBaseUrl(): string {
   if (isHttpsSchemePlatform()) {

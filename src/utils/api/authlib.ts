@@ -1,24 +1,8 @@
 /**
  * authlib-injector 外置登录（yggdrasil 协议）API 封装
  *
- * 对应后端 `commands::auth::authlib` 模块的 11 个命令（已聚合为 `meta_manager` IPC 入口）：
- * - `authlib_fetch_server_meta`：获取 yggdrasil 服务器元数据（服务器名/注册链接）
- * - `authlib_login`：账号密码登录，返回单角色成功或多角色待选
- * - `authlib_select_profile`：多角色场景下选定 profile 完成登录
- * - `switch_authlib_account`：切换到已保存的 authlib 账号（三步降级）
- * - `get_authlib_accounts`：获取已保存的 authlib 账号列表
- * - `remove_authlib_account`：删除指定 authlib 账号
- * - `authlib_get_skin_info`：查询外置账号皮肤/披风信息（含 uploadableTextures）
- * - `authlib_upload_skin`：上传皮肤 PNG（multipart，由后端构造）
- * - `authlib_delete_skin`：删除皮肤
- * - `authlib_upload_cape`：上传披风 PNG
- * - `authlib_delete_cape`：删除披风
- *
- * 字段名约定：
- * - 请求参数（params）使用 camelCase（后端 Params 结构体使用
- *   `#[serde(rename_all = "camelCase")]` 反序列化）。
- * - 响应数据使用 snake_case（后端 Serialize derive 默认按字段名输出，
- *   与 `AuthlibAccountInfo` / `AuthlibSkinCapeInfo` 等类型一致）。
+ * 对应后端 commands::auth::authlib 的 11 个命令（经 meta_manager 聚合分发）；
+ * 请求参数 camelCase、响应数据 snake_case，具体命令见各函数注释。
  */
 
 import { metaManager, META_ACTIONS } from '@/utils/api/meta-manager'

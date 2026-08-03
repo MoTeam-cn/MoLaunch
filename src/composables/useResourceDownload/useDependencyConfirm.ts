@@ -1,16 +1,8 @@
 /**
- * 前置依赖确认弹窗切片（从 useResourceDownload.ts 抽取）
+ * 前置依赖确认弹窗切片（useResourceDownload 拆分）
  *
- * 负责前置确认弹窗状态（showDependencyDialog / pendingMainVersion / pendingContext）
- * 与弹窗交互：
- * - openDependencyDialog：进入弹窗等待阶段（stage=waiting，保持下载 loading）
- * - handleDependencyConfirm：确认后走 install_mod_with_dependencies（选目录 → 安装）
- * - handleDependencyClose：取消（清空状态并复位下载进度）
- *
- * 依赖注入：
- * - progress（UseDownloadProgress）：下载进度 ref 与迁移 helper，弹窗等待期间保持 loading
- * - resetDeps / installDeps：复用 useDependencyCheck composable，不重复实现
- * - project：options.project（reactive），用于主 Mod 判空
+ * 维护弹窗状态（showDependencyDialog / pendingMainVersion / pendingContext）与确认/取消交互；
+ * resetDeps/installDeps 复用 useDependencyCheck，弹窗等待期间保持 downloading loading。
  */
 import { ref } from 'vue'
 import type {

@@ -1,11 +1,6 @@
 /**
  * 下载进度模块统一 API 入口
- *
- * 后端 `version_progress_manager` IPC 命令通过 `action` 字段分发到不同子模块
- * （参照 `image_cache_manager` / `meta_manager` 模式）。
- *
- * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
- * 故前端 params 对象的字段名一律使用 camelCase。本模块 6 个 action 均无参数。
+ * `version_progress_manager` IPC 经 `action` 分发；params 字段名 camelCase，6 个 action 均无参数。
  */
 
 import { invoke } from '@tauri-apps/api/core'

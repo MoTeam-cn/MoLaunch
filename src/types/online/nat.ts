@@ -1,20 +1,12 @@
 /**
  * 联机功能类型定义 - NAT 检测域
- *
- * 用于联机前预判 P2P 可行性，参考 RFC 3489 / STUN RFC 5389 的 NAT 分类。
+ * 用于联机前预判 P2P 可行性，NAT 分类参考 RFC 3489 / STUN RFC 5389。
  */
 
 /**
- * NAT 类型枚举
- *
- * 参考 RFC 3489 / STUN RFC 5389 的 NAT 分类：
- * - `Open`：公网 IP，无 NAT（罕见）
- * - `FullCone`：全锥 NAT，任意外部主机可访问映射端口（联机最佳）
- * - `RestrictedCone`：限制锥 NAT，仅允许联系过的外部 IP（联机可用）
- * - `PortRestrictedCone`：端口限制锥 NAT，仅允许联系过的外部 IP:Port（联机可用，但兼容性较差）
- * - `Symmetric`：对称 NAT，每个目标分配独立端口（无 STUN 中转无法 P2P）
- * - `Blocked`：UDP 被阻断（无法 P2P）
- * - `Unknown`：检测失败或浏览器不支持
+ * NAT 类型枚举（参考 RFC 3489 / STUN RFC 5389）
+ * Open 公网无 NAT；FullCone 全锥（联机最佳）；RestrictedCone 限制锥；PortRestrictedCone 端口限制锥（兼容性较差）；
+ * Symmetric 无 STUN 中转无法 P2P；Blocked UDP 阻断；Unknown 检测失败。
  */
 export type NatType =
   | 'Open'

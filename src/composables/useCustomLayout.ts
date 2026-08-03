@@ -1,12 +1,8 @@
 /**
  * 自定义布局配置 composable
  *
- * 从 views/settings/personal/CustomLayoutSection.vue 抽离（保持主文件 ≤ 300 行约束）：
- * - 布局格式 / 来源配置读写（防抖同步到 pluginStore）
- * - 内联编辑器 draft + 防抖同步 / 填入示例模板 / 导出示例文件
- * - URL 模式输入防抖同步 + 刷新缓存
- *
- * 返回全部模板所需状态与动作，主文件仅保留设置区组装。
+ * 布局格式/来源配置读写（防抖同步 pluginStore）、内联编辑器 draft、URL 输入防抖与缓存刷新；
+ * 返回全部模板所需状态与动作。
  */
 import { ref, computed, onMounted } from 'vue'
 import { usePluginStore } from '@/stores/plugins'

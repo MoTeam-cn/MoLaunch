@@ -1,13 +1,8 @@
 /**
  * 联机 API - 设备认证便捷封装
  *
- * 阶段一注册的 6 个认证 action + 启动静默认证 + 手动刷新 token。
- * - `auth_status`：查询当前设备状态（不发网络请求）
- * - `auth_get_server_time`：获取服务器时间（测试连通性 + 校准时间）
- * - `auth_register`：注册新设备（生成密钥对 + 上报公钥 + 获取 JWT）
- * - `auth_login`：登录设备（用本地密钥签名换取新 JWT）
- * - `auth_logout`：登出设备（撤销 JWT，保留密钥）
- * - `auth_clear`：清除设备凭证（注销设备，删除本地密钥）
+ * 提供 auth_status / auth_get_server_time / auth_register / auth_login / auth_logout /
+ * auth_clear 6 个 action + 启动静默认证 + 手动刷新 token。
  */
 
 import type { AuthInitResult, DeviceStatus, ServerTimeInfo } from '@/types/online'

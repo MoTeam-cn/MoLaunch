@@ -1,22 +1,8 @@
 /**
  * 资源详情页下载 + 前置 Mod 检查 composable
  *
- * 从 ResourceDetail.vue 抽出，负责普通下载、前置 Mod 依赖检查、
- * 前置确认弹窗状态与前置详情懒加载缓存。
- *
- * 状态与交互拆分为两个职责切片：
- * - useDownloadProgress：下载中标志 + 下载阶段状态与迁移 helper
- * - useDependencyConfirm：前置确认弹窗状态 + 确认/取消交互（复用 useDependencyCheck）
- *
- * # 复用约定
- * - 前置检查/安装复用 useDependencyCheck composable
- * - 项目详情查询复用 getProjectDetail API
- * - 文件名格式化复用 formatDownloadFilename
- * - 保存路径选择复用 pickSavePath
- *
- * # 响应式说明
- * - 直接接收 ResourceDetail 的 props（Vue 3 reactive proxy），composable 内部
- *   通过 options.xxx 访问以拿到最新值，避免解构后丢失响应式。
+ * 拆为两个切片：useDownloadProgress（下载状态）/ useDependencyConfirm（前置确认弹窗），
+ * 前置检查复用 useDependencyCheck。入参为 props（reactive proxy），经 options.xxx 访问拿最新值。
  */
 import { ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'

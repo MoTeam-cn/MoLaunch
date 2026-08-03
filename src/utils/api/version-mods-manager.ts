@@ -1,11 +1,6 @@
 /**
  * 版本 Mod 管理模块统一 API 入口
- *
- * 后端 `version_mods_manager` IPC 命令通过 `action` 字段分发到不同子模块
- * （参照 `image_cache_manager` / `meta_manager` / `version_progress_manager` 模式）。
- *
- * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
- * 故前端 params 对象的字段名一律使用 camelCase（如 `versionId` / `fileName` / `sourcePath`）。
+ * `version_mods_manager` IPC 经 `action` 分发；params 字段名一律 camelCase。
  */
 
 import { invoke } from '@tauri-apps/api/core'

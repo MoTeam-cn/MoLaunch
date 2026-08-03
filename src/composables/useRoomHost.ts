@@ -1,24 +1,9 @@
 /**
- * 房主房间运营 composable（阶段三 mesh 拓扑）
+ * 房主房间运营 composable（阶段三 mesh 拓扑）：切片组装 + 生命周期
  *
- * 从 RoomHostPanel.vue 抽出，封装房主侧全部业务逻辑，拆分为两个职责切片：
- * - useRoomHostPolling：三路信令轮询（5s 参与者 + 5s Answer + 30s 保活）、
- *   自动 Offer 生成、30s 防刷屏 toast、TURN 广播与定时器启停
- * - useRoomHostActions：确认/拒绝 Answer、踢出（可选封禁）、封禁列表、解封、关闭房间
- *
- * 本文件负责切片组装与生命周期（onMounted 初始轮询 + 事件监听 + onUnmounted 清理），
- * 对外 useRoomHost() 返回结构保持不变，调用方（RoomHostPanel.vue）无需改动。
- *
- * # 职责边界
- *
- * - 本 composable 只负责业务逻辑，不渲染 UI
- * - 调用方（RoomHostPanel.vue）负责注入 hostMesh 与 lan 实例，并通过 computed 暴露 UI 状态
- * - onMounted 自动启动 timer + lan.start，onUnmounted 自动清理 timer（lan.stop 由 useVirtualLan 自身处理）
- *
- * @example
- * const hostMesh = inject('hostMesh') as ReturnType<typeof useWebRTCMesh>
- * const lan = useVirtualLan({ onTunPacket: (raw) => hostMesh.broadcastPacket(raw) })
- * const { pendingAnswers, handleConfirm, handleKick, handleCloseRoom } = useRoomHost({ hostMesh, lan })
+ * - useRoomHostPolling：三路信令轮询 / 自动 Offer / TURN 广播 / 定时器启停
+ * - useRoomHostActions：确认/拒绝 Answer / 踢出封禁 / 解封 / 关闭房间
+ * 只负责业务逻辑不渲染 UI；onMounted 启动轮询与事件监听，onUnmounted 清理。
  */
 
 import { watch, onMounted, onUnmounted } from 'vue'

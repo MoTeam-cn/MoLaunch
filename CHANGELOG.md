@@ -87,6 +87,32 @@
 - 设计决策：采用「物理移动 + 相对导入 + mod.rs 转发」而非拆分重构，注册表逻辑零改动，行为完全等价；utils 层自此不再引用任何 commands 业务符号
 - 验证：`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
+#### 阶段三批9：行数治理 51 个文件拆分至 ≤300（前端 13 / 后端 32，docs/04-file-line-limits.md）
+
+- 背景：批 6 已拆分 P1 档（>=400 行），本批收敛全部 300-399 档超限文件，落实「单文件 ≤300 行」规范
+- 前端拆分（13 文件）：`useModList`（383→261）、`stores/plugins`（381→98）、`stores/online/roomSlice`（358→切片）、`useWebRTCMesh`（317→65）、`useDragDrop/handlers`（341→246）、`useExternalDownload`（303→112/source+task）、`sdk.ts`（302→域拆分 config/version/system/process/window/events）、`custom-layout/parser`（→json/xml/schema）、`seedmap/structure-search`（→chunk-finder/find-structures/find-specials）、`online/nat-type`（→detect/format）、`updater`（→check/install/state）、`personalization`（→域分组）、`types/frp`（→tunnel/provider/auth）；主文件 re-export 保持对外路径不变
+- 后端拆分（28 文件 + version/install 收尾）：
+  - minecraft 域：`skin.rs`→`skin/{avatar,cape,upload}`、`auth/storage/operations.rs`→`operations/{authlib,ms}`、（`load.rs`→分平台分支）、`launch/watcher`（mod.rs 完成 + 拆 process/scheduler）、`watcher/analyzer/crit1`（→collect/rules）、`community/modrinth`（→http/search/version_files）、`community/searcher`（→aggregate/sort）、`download/manager`（→mod+state）、`image_cache`（→store/download/cleanup）、`java/search`（→mod/platform/version）、`version/libraries/parse`（→mod/path/rules）、`launch/jvm_args`（→mod/build/rules）、`launch/skin_resourcepack`（→mod/generate/install）、`online/signaling/types`（→ice/room/session）
+  - commands 域：`system/manager`（→mod+config/game_dir/developer/updater）、`auth/meta_manager`（→mod+offline/microsoft/authlib）、`commands/skin`（→mod+list/upload/cape）、`tools/picker_window`（→mod+scheme）、`apply_config/apply`（→mod+fields）、`tools/cleanup`（→mod+fs）、`modpack_stages/parsers`（→curseforge/modrinth/hmcl）、`version/launch`（→mod+build/spawn）、`concurrent/detect`（→collect/rules）、`tools/resourcepack`（→list/convert）、`frp/api_spec`（→registry/executor）、`frp/auth/oauth2`（→mod/exchange）、`deeplink/protocol`（→windows/linux）、`config.rs`（→load/save）、`storage/mod.rs`（→paths/fs）；`version/install/mod.rs` 拆分半成品修复并压至 238 行
+  - 全部保持对外 API/消息契约/序列化结构不变，`pub use` re-export 路径兼容；`#[path]`/`#[cfg]` 测试声明与平台门控同步调整
+- 设计决策：纯类型/纯 RESP 文件（signaling/types、types/frp.ts）按域拆且给出收益说明；平台分支（windows/linux）独立文件消除死代码告警；主文件转目录手工聚合不低于风险
+- 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）、`cargo check`（exit 0 无新告警）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
+
+#### 前端头部注释 P2 档精简（审计批 8，docs/06-frontend-header-comments.md）
+
+- 背景：项目规范要求前端 ts 文件头部注释 ≤8 行；前一阶段已清 P1 档（>=24 行），本批收敛 9~23 行档的 P2 剩余文件
+- 改动：composables 系 24 个、stores/types/plugins/router/tutorials/config 系 22 个、utils/api/online/seedmap/useSeedMap 系 30 个共约 76 个文件头部注释精简至 ≤8 行（净删约 460 行）；`useTauriEvent` 等竞态防护约束、`useWatermarkData` 屏印缓存等关键设计信息保留在头部或迁移至函数/类型级 `/** */` 注释，`element-icons.ts` MIT 许可证头部豁免
+- 验证：`npx vue-tsc --noEmit`（exit 0）
+
+#### 复用与架构收尾（审计批10，docs/05-utils-reuse.md 与 docs/03-backend-architecture.md）
+- 背景：05 报告 P2 项——sha256 摘要实现复制 3 份、contains("..") 路径防御内联 7+ 处、utils::fs 公共工具不足
+- 改动：
+  - 新增 `utils/hash.rs::sha256_hex(&[u8])->String`，统一 `resources.rs` / `authlib/client/meta.rs` / `frp/binary/external.rs` 三处等价实现（入参与输出语义完全一致；hkdf_sha256 与数据字段未动）
+  - `utils/path.rs` 新增 `is_safe_relative_path`：统一为 Path::components 段级 ParentDir 校验，替换 10 处内联 `contains("..")`（viewer/plugins_sandbox/version_json/version_mods_install/archive 三件/args/assets/shell_open/java_files）；`sanitize_file_name` 文件名净化语义与路径安全语义差异加注释标注（语义优化：`foo..bar` 类字面量片段放行，无穿越风险的真实 `..` 段仍全拒）
+  - `utils::fs` 收敛 6 处低风险 create_dir_all/read_to_string（tools/download、tools/data_export、tools/version_json、community/modpack 安装系），消除冗余 map_err 包装
+  - `certs.rs::validate_filename` 白名单语义与 `sanitize_file_name` 黑名单差异函数级注释文档化；plugin:fs 前端仅 1 处调用不抽象（调用方数量 <2）
+- 验证：`cargo check`（exit 0 无新告警）、`cargo test --lib`（152 passed）
+
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs

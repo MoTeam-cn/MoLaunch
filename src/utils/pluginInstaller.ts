@@ -1,18 +1,8 @@
 /**
- * 插件安装与个性化配置辅助模块（从 stores/plugins.ts 拆出）
+ * 插件安装与个性化配置辅助模块（纯函数，不依赖 Pinia store 状态）
  *
- * 提供纯函数和数据结构定义，不依赖 Pinia store 状态：
- * - PersonalizationData 接口 + DEFAULT_CUSTOM_LAYOUT 默认值
- * - externalManifestToPluginManifest：外部插件清单 → 内置 PluginManifest 转换
- * - loadPersonalizationData / savePersonalizationData：后端读写封装
- * - fetchCustomLayoutContent：URL 自定义布局内容获取
- * - isValidHomePanelMode：homePanelMode 字符串校验
- *
- * 拆分目的：把与 store 状态无关的纯逻辑从 stores/plugins.ts 移出，
- * 让 store 文件聚焦于状态管理与生命周期编排。
- *
- * 注：底层 `read_personalization` / `write_personalization` / `load_custom_layout`
- * 已聚合为 `plugins_manager` 单一 IPC 入口，通过 `action` 字段分发。
+ * 提供 PersonalizationData 结构、外部清单转换、个性化配置读写与自定义布局获取；
+ * 底层经 plugins_manager 单一 IPC 按 action 分发。
  */
 import { markRaw, h, defineComponent } from 'vue'
 import type {

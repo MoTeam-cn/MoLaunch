@@ -1,17 +1,9 @@
 /**
  * 防抖保存 composable
  *
- * 两种用法：
- *
- * 1. 简单模式：`useDebouncedSave(flushFn)` - 只做时间防抖，不追踪字段
- * 2. 字段追踪模式：`useDebouncedSave.patch()` - 自动追踪改变的字段，flush 时只传改变的字段
- *
- * 字段追踪模式解决的核心问题：
- * 用户只改了一项，但旧实现会把整个对象都传过去 apply，造成后端无意义的覆盖写入。
- * 新模式用 `markDirty(key, value)` 标记改变的字段，防抖触发后只把改过的字段传给后端。
- *
- * 即使跨组件累积：用户在侧栏 A 改了字段 X，切到侧栏 B 改了字段 Y，
- * 只要两个侧栏共用同一个 patchSaver（或累积到同一份 patch），flush 时只会传 X 和 Y。
+ * 两种用法：简单模式 useDebouncedSave(flushFn) 只做时间防抖；
+ * patch 模式 useDebouncedSave.patch() 自动追踪 markDirty 字段，flush 时只传改过的字段，
+ * 避免整对象 apply 造成后端无意义覆盖（跨组件可累积到同一份 patch）。
  */
 import { onScopeDispose } from 'vue'
 import type { ConfigPatch } from '@/utils/api/config'

@@ -1,12 +1,8 @@
 /**
- * 房主交互动作切片（从 useRoomHost.ts 抽取）
+ * 房主交互动作切片（useRoomHost 拆分）
  *
- * 负责确认/拒绝 Answer、踢出参与者（可选封禁）、刷新封禁列表、解封、关闭房间，
- * 以及封禁列表状态（bannedList / banServerTime）。
- *
- * 依赖注入：
- * - pendingAnswers 由轮询切片（useRoomHostPolling）创建，handleConfirm 需要移出
- *   已处理的 Answer；通过参数传入 Ref 引用保持两切片状态同步。
+ * 确认/拒绝 Answer、踢出（可选封禁）、封禁列表、解封、关闭房间；
+ * pendingAnswers 由轮询切片创建，经参数传入保持状态同步。
  */
 import type { Ref } from 'vue'
 import { ref } from 'vue'

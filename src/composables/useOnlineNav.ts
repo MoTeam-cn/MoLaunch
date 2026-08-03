@@ -1,20 +1,8 @@
 /**
  * Online 联机页导航分类与状态联动 composable
  *
- * 从 Online.vue 抽离（保持主文件 ≤ 300 行约束）：
- * - NavCategory 接口与 OnlineCategoryId 类型
- * - 静态分类配置（device / room / lobby）
- * - isReady / isInRoom / categories / badge / activeDesc / activeLabel 计算
- * - isReady watch：URL `?tab=` 恢复激活项 + 未就绪（退出登录等）切回「设备」
- *
- * 就绪判定只依赖「已注册 + 已登录」，不依赖本地 token 过期时间——
- * 后端业务 action 统一走 `load_creds_with_auto_refresh` 自动续期 + 前端
- * onlineManager 1003 降级链，JWT 过期无需前端拦截页面。
- * - isInRoom watch：进入房间自动跳「房间详情」，离开切回「创建房间」
- *
- * 复用项目现有 frpCategory（@/composables/useFrpSidebar），保持与原 Online.vue
- * 的 categories 末位追加逻辑一致。NavCategory 接口与 useFrpSidebar 内部定义同形，
- * 此处导出便于主文件 / NavSidebar 类型标注。
+ * 就绪判定仅依赖「已注册 + 已登录」（不判断本地 token 过期，由后端自动续期）；
+ * isReady watch 从 URL ?tab= 恢复激活项，isInRoom watch 进出房间自动切换分类。
  */
 
 import { computed, watch, type Ref, type Component } from 'vue'

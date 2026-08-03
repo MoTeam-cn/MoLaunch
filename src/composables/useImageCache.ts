@@ -1,25 +1,8 @@
 /**
  * 图片缓存事件监听 composable
  *
- * 监听后端 `image-cached` 事件，当远程图片下载完成缓存到本地后通知调用方。
- *
- * 基于 `onGlobalEvent` 封装（全局单例 listener），避免 Tauri 2.x unlisten 竞态
- * 导致的 "Couldn't find callback id xxx" 警告。
- *
- * 背景：`image_cache::spawn_download` 是独立的 `tokio::spawn` 任务，不受
- * `cancelPreloadModsDetail` 控制。当 ModTab 卸载后，已 spawn 的图片下载任务
- * 仍在运行并 emit `image-cached`。传统 `listen`/`unlisten` 模式下，前端
- * callback 已被同步删除，Rust listener 尚未异步注销 → 触发警告。
- * 全局单例 listener 永不 unlisten，彻底消除该竞态。
- *
- * @example
- * ```ts
- * onImageCached((remoteUrl, localUrl) => {
- *   if (skinUrl.value === remoteUrl) {
- *     skinUrl.value = localUrl
- *   }
- * })
- * ```
+ * 监听后端 image-cached 事件；基于 onGlobalEvent 全局单例 listener（永不 unlisten），
+ * 避免图片下载任务在组件卸载后仍 emit 导致 Tauri 2.x "Couldn't find callback id" 竞态警告。
  */
 
 import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'

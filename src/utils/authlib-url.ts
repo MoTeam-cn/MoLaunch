@@ -1,23 +1,8 @@
 /**
  * yggdrasil 服务器 URL 规范化工具
  *
- * 用户在登录页输入的服务器地址可能是多种形式：
- *   - `littleskin.cn`
- *   - `https://littleskin.cn`
- *   - `https://littleskin.cn/api/yggdrasil`
- *   - `littleskin.cn/api/yggdrasil`
- *   - 带尾部斜杠 `littleskin.cn/`
- *   - 皮肤站页面地址 `https://littleskin.cn/user` / `https://littleskin.cn/index`
- *
- * 本工具按以下规则自动补全为后端可识别的 yggdrasil API 根地址：
- *   1. 去除首尾空白和首尾斜杠
- *   2. 若无协议头（http:// 或 https://），自动补 https://
- *   3. 若路径以 /api/yggdrasil 结尾，直接使用
- *   4. 若路径为空或为皮肤站页面路径（/user、/index、/register、/login 等），
- *      去掉原路径，替换为 /api/yggdrasil
- *   5. 其它非标准路径保留用户输入（可能是自建服务器）
- *
- * 与 PCL2 行为一致：用户只需输入域名或皮肤站任意页面地址，自动识别并补全 API 路径。
+ * 将域名/皮肤站页面地址自动补全为后端可识别的 yggdrasil API 根地址（与 PCL2 行为一致），
+ * 详细规则见 normalizeAuthlibServerUrl。
  */
 
 /** yggdrasil 协议约定的标准 API 路径后缀 */

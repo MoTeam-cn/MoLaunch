@@ -1,15 +1,8 @@
 /**
  * Mod 多选批量操作 composable（从 useModOperations 拆出）
  *
- * 负责：
- * - 通用多选状态（基于 useMultiSelect）
- * - 批量启用/禁用
- * - 批量删除
- * - 按钮可用性判断（hasEnabled/hasDisabled/hasUpdatable）
- *
- * 不负责：
- * - 列表加载和单个 Mod 操作（见 useModList）
- * - 更新对话框（见 useModUpdateDialog，但批量更新入口在那里，依赖本模块的 selectedIds）
+ * 基于 useMultiSelect 管理多选状态，提供批量启用/禁用、批量删除与按钮可用性判断；
+ * 列表加载见 useModList，更新对话框见 useModUpdateDialog。
  */
 import { computed, type ComputedRef, type Ref } from 'vue'
 import * as tauri from '@/utils/tauri'

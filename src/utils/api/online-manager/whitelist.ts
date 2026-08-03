@@ -1,14 +1,8 @@
 /**
- * 联机 API - 房主白名单管理（阶段三子任务 8 安全加强）
+ * 联机 API - 房主白名单管理
  *
- * 4 个 action 与后端 `utils::signaling_manager` 注册一一对应：
- * - `room_list_whitelist`：查询当前房间的白名单启用状态 + 条目列表
- * - `room_add_whitelist`：按 `device_id` 友好标识添加白名单条目
- * - `room_remove_whitelist`：按 `device_id` 移除白名单条目
- * - `room_set_whitelist_enabled`：动态开关白名单（不影响条目数据）
- *
- * 仅房主可调用，加入方无权管理白名单。
- * 启用白名单且条目为空时，拒绝所有人加入（仅房主可进入，便于私密联机）。
+ * list / add / remove / set_enabled 4 个 action 仅房主可调用；
+ * 启用白名单且条目为空时拒绝所有人加入（便于私密联机）。
  */
 
 import type { BusinessResult, WhitelistResponse } from '@/types/online'

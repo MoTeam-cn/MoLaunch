@@ -1,13 +1,8 @@
 /**
- * 皮肤/披风操作交互切片（从 useSkinOperations.ts 抽取）
+ * 皮肤/披风操作交互切片（useSkinOperations 拆分）
  *
- * 负责上传/披风/删除/选择本地皮肤等全部交互动作（三分流：微软 / 外置 / 离线），
- * 以及上传装备后的通用刷新流程（runWithRefresh：执行 → 提示 → 重新加载 + 触发头像刷新）。
- *
- * 依赖注入：
- * - state（UseSkinState）：皮肤状态切片创建的全部响应式状态与派生 computed
- * - loadInfo：主文件（useSkinOperations.ts）提供的信息加载函数，runWithRefresh 复用
- * - uuid / username / serverUrl：来自 authStore.currentUser 的 computed
+ * 三分流上传/披风/删除/选择本地皮肤，runWithRefresh 执行 → 提示 → 重新加载；
+ * state/loadInfo 由主文件注入。
  */
 
 import type { ComputedRef } from 'vue'

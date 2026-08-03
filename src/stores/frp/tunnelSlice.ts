@@ -1,13 +1,8 @@
 /**
  * Frp store 隧道切片（阶段三）
  *
- * 从 stores/frp.ts 抽取的隧道相关 state + actions，按 Pinia setup store 的
- * composable 切片模式组织，返回独立的隧道 state 与 actions，由主 store 解构合并。
- *
- * 切片内部闭环：
- * - 隧道状态同步：监听 `frp-tunnel-status` Tauri event，frpc 进程退出时
- *   自动刷新 tunnels 列表（静默），并记录 lastTunnelStatus 供 TunnelManager 显示提示
- * - 增删改启动停止后统一 loadTunnels 刷新列表
+ * 监听 frp-tunnel-status 事件，frpc 退出时静默刷新隧道列表并记录 lastTunnelStatus；
+ * 增删改启停后统一 loadTunnels 刷新列表。
  */
 
 import { ref } from 'vue'

@@ -1,16 +1,8 @@
 /**
- * 种子地图配置常量 + MC 版本映射
+ * 种子地图配置常量 + MC 版本映射（从 useSeedMap.ts 抽取，无闭包依赖）
  *
- * 从 useSeedMap.ts 抽取的纯常量与版本映射函数，无闭包依赖。
- * 包含：
- * - Zoom level 配置（MIN_ZOOM / MAX_ZOOM / TILE_SIZE / RESOLUTIONS / EXTENT）
- * - MC 版本列表（SEEDMAP_MC_VERSIONS）与版本映射函数（mapMcVersionToCubiomes）
- *
- * zoom 体系（与原站对齐）：
- * - OL zoom 0~10（共 11 级）
- * - RESOLUTIONS = [256,128,64,32,16,8,4,2,1,0.5,0.25]（方块/像素）
- * - tile 64×64 像素，每 tile 覆盖方块 = 64 × resolution
- * - cubiomes scale ∈ {1,4,16,64,256}，每级 zoom 取 ≤ bpp 的最大 scale 生成 biome
+ * Zoom 体系（与原站对齐）：0~10（11 级），RESOLUTIONS=[256..0.25]；tile 64×64px；
+ * cubiomes scale ∈ {1,4,16,64,256}，每级取 ≤bpp 的最大 scale 生成 biome。
  */
 
 // ===== Zoom level 配置（与原站对齐） =====

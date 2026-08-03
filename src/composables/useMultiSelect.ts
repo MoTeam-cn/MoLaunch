@@ -1,25 +1,8 @@
 /**
  * 通用多选 composable
  *
- * 多选交互：
- * - 点击列表项切换选中状态（非长按）
- * - Shift+点击 范围选择
- * - 滑动拖拽选择可后续扩展
- * - ESC 清空选中
- * - 当 selectedCount > 0 时，外部组件显示 MultiSelectBar
- *
- * 设计原则：
- * - 只管理选中状态，不涉及业务逻辑（启用/禁用/删除等由调用方实现）
- * - 泛型 T 支持任意列表项类型
- * - 通过 getId 函数提取唯一标识
- *
- * 使用方式：
- * ```ts
- * const { selectedIds, selectedCount, hasSelection, toggle, selectAll, ... } = useMultiSelect({
- *   items: filteredList,
- *   getId: (item) => item.id,
- * })
- * ```
+ * 点击切换 / Shift 范围选择 / ESC 清空，selectedCount > 0 时外部显示 MultiSelectBar。
+ * 只管理选中状态不涉及业务逻辑（由调用方实现）；泛型 T + getId 提取唯一标识。
  */
 import { ref, computed, unref, type Ref, type ComputedRef, type ToRef } from 'vue'
 

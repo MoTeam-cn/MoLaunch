@@ -1,15 +1,8 @@
 /**
  * Mod 更新对话框状态 composable（从 useModOperations 拆出）
  *
- * 负责：
- * - 更新对话框可见状态 + 目标 Mod
- * - 单个 Mod 打开更新对话框（openUpdateDialog）
- * - 批量更新入口（batchUpdate）：从选中项找第一个可更新的 Mod 打开对话框
- * - 安装完成后的回调（onModUpdated）：刷新列表 + 清理选中状态
- *
- * 不负责：
- * - 列表加载（见 useModList）
- * - 多选状态（见 useModBatchOps，但批量更新依赖其 selectedIds 和 getSelectedItems）
+ * 管理可见状态/目标 Mod、单个与批量打开更新对话框、安装完成回调；
+ * 列表加载与多选分别复用 useModList / useModBatchOps。
  */
 import { ref, type Ref } from 'vue'
 import { toastError } from '@/utils/toast'

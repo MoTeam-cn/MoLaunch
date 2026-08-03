@@ -1,15 +1,7 @@
 /**
- * 搜索历史 composable
+ * 搜索历史 composable：localStorage 持久化（molaunch-search-history）
  *
- * - localStorage 持久化（key: molaunch-search-history）
- * - 保留最近 5 条，去重，最新在前
- * - add(term)：添加一条搜索记录（空字符串跳过）
- * - 复用 stores/settings.ts 的 safeCallSync 范式包装 localStorage 读写
- *
- * 使用：
- *   const { history, add } = useSearchHistory()
- *   add('JEI')        // 记录搜索词
- *   history.value     // ['JEI', ...]
+ * 保留最近 5 条、去重、最新在前；读写复用 safeCallSync 范式。
  */
 import { ref } from 'vue'
 import { safeCallSync } from '@/utils/async'

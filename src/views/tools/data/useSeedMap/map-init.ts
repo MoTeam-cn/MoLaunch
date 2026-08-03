@@ -1,13 +1,8 @@
 /**
- * 种子地图 OL Map 与图层初始化
+ * 种子地图 OL Map 与图层初始化（从 useSeedMap.ts 抽取）
  *
- * 从 useSeedMap.ts 抽取的地图/图层/控件/交互初始化逻辑，通过工厂函数接收
- * tile loader、popup 容器与结构高亮 Feature 引用，避免直接依赖闭包。
- *
- * 包含：
- * - 自定义 'mc' 投影（1 单位 = 1 方块，extent ±3e7）
- * - 群系 DataTile 图层 / 结构 Vector 图层 / 出生点 / 要塞 / 点击标记图层
- * - OL Map 实例、View、Overlay、交互（拖拽/缩放/惯性）
+ * 通过工厂函数接收 tile loader、popup 与结构高亮 Feature，避免依赖闭包。
+ * 负责 'mc' 投影、群系 DataTile / 结构 Vector 图层，以及 Map/View/Overlay/交互。
  */
 
 import OlMap from 'ol/Map'

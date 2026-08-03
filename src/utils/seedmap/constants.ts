@@ -1,13 +1,8 @@
 /**
- * 种子地图常量与样式定义（OpenLayers 版）
+ * 种子地图常量与样式（OpenLayers 版）
  *
- * 包含：
- * - 群系 ID → RGB 调色板（与 cubiomes util.c initBiomeColors 一致）
- * - 结构类型 → 图标元数据（形状 + 颜色 + 中文标签）
- * - OL Style 工厂：根据结构类型生成 OpenLayers 样式（不同形状区分类型）
- *
- * 从 SeedMap.vue 拆出，避免 Vue 组件超 300 行。
- * 不再包含 canvas draw 函数——OL 内置渲染，无需手写。
+ * 群系调色板、结构图标元数据与 OL Style 工厂；从 SeedMap.vue 拆出以控制行数。
+ * 由 OL 内置渲染，不再包含手写 canvas draw 函数。
  */
 import Style from 'ol/style/Style'
 import Circle from 'ol/style/Circle'

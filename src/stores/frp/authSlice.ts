@@ -1,14 +1,8 @@
 /**
  * Frp store 认证切片（阶段三）
  *
- * 从 stores/frp.ts 抽取的认证相关 state + actions，按 Pinia setup store 的
- * composable 切片模式组织：接收核心 store 的 providers 引用作为依赖，
- * 返回独立的认证 state 与 actions，由主 store 解构合并到返回对象中。
- *
- * 切片内部闭环：
- * - setAuthActionLoading / refreshAuthStatus 为切片私有 helper，供其他 auth action 复用
- * - 所有认证 action 直接调用 @/utils/api/frp-manager 的 IPC 封装
- * - 仅 loadAuthStatuses 依赖外部 providers 列表（迭代判断 authType !== 'none'）
+ * 接收主 store 的 providers 引用作为依赖（仅 loadAuthStatuses 迭代判断 authType !== 'none'），
+ * 其余认证 action 自持并直接调用 frp-manager IPC 封装，由主 store 解构合并。
  */
 
 import type { Ref } from 'vue'

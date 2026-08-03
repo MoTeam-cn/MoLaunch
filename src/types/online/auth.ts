@@ -1,15 +1,12 @@
 /**
  * 联机功能类型定义 - 设备认证域
  *
- * 与后端 `minecraft::online` 模块及 `utils::online_manager` 中注册的 action 对应。
- * 字段命名采用 camelCase（后端 `#[serde(rename_all = "camelCase")]` 或显式 `rename`）。
+ * 与后端 minecraft::online / utils::online_manager 注册的 action 对应；字段命名 camelCase。
  */
 
 /**
  * 设备认证状态
- *
- * 对应后端 `utils::online_manager::DeviceStatus`。
- * 不发起网络请求，仅读本地凭证 + 配置中的 api_server_url。
+ * 不发起网络请求，仅读本地凭证 + api_server_url。对应后端 utils::online_manager::DeviceStatus。
  */
 export interface DeviceStatus {
   /** 是否已注册（device_pk + 三组密钥齐全） */

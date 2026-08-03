@@ -1,24 +1,8 @@
 /**
- * 全局快捷键防护 composable
+ * 全局快捷键防护 composable（App.vue 挂载，全局生效）
  *
- * 设计目标：
- * - 全局禁用所有可能触发浏览器/系统级动作的快捷键（F 键、Ctrl/Cmd+字母、
- *   Ctrl/Cmd+Shift+字母、Alt+字母），仅保留文本编辑必要的快捷键
- *   （Ctrl+C/V/X/Z/Y/A）以不影响输入框/文本域使用
- * - 拦截右键菜单（防「检查元素」）
- * - 拦截拖拽新窗口打开
- *
- * 开发者页面独占快捷键：
- * - 由 `useDevShortcuts` composable 在 SettingsDeveloper.vue 内挂载
- * - 使用「capture 阶段 + stopImmediatePropagation」抢占事件流，绕过本全局防护
- * - 仅在该页面组件 onMounted 时绑定，onUnmounted 自动解绑
- *
- * 安全约束：
- * - 这些只是「提升门槛」的初级防护，无法阻止已开启 devtools 的开发者操作 DOM
- * - 真正的防护在后端：devtools 调用 require_dev_mode() 校验
- * - 水印组件本身使用 pointer-events: none + 不可见隐写字段，DOM 移除不影响追溯
- *
- * 在 App.vue 中调用 `useDevToolsGuard()` 即可全局生效。
+ * 禁用 F 键 / Ctrl+字母 / Ctrl+Shift+字母 / Alt+字母（保留 Ctrl+C/V/X/Z/Y/A 编辑键），
+ * 拦截右键菜单与拖拽开窗；仅「提升门槛」的初级防护，真正的开发者模式校验在后端 require_dev_mode()。
  */
 
 import { onMounted, onUnmounted } from 'vue'

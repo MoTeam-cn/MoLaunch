@@ -1,11 +1,8 @@
 /**
- * 联机功能类型定义 - 大厅浏览域
+ * 联机功能类型定义 - 大厅浏览域（联机大厅阶段 5）
  *
- * 联机大厅阶段 5。
- *
- * 对应后端 `minecraft::online::signaling::Lobby*` 类型。
- * 大厅列表接口不返回 SDP/ICE/room_key 等敏感字段，
- * 加入方需调用 `POST /v1/signaling/rooms/{code}/join` 走完整加入流程。
+ * 对应后端 signaling::Lobby* 类型；列表接口不返回 SDP/ICE/room_key 等敏感字段，
+ * 加入方需调 POST /v1/signaling/rooms/{code}/join 走完整加入流程。
  */
 
 /** 大厅房间列表查询参数 */

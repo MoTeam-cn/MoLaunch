@@ -1,15 +1,9 @@
 /**
- * 种子地图 WorkerPool 调度层
+ * 种子地图 WorkerPool 调度层（复刻 minecraftsearch.com，docs/Map/map.md §4.1）
  *
- * 复刻 minecraftsearch.com 的 WorkerPool 架构（docs/Map/map.md §4.1）：
- * - 多 Worker 并行处理 tile 生成与结构查找
- * - prepareSeed 广播给所有 Worker，等所有 Worker 确认后才返回
- * - 任务通过 jobId 关联 Promise，主线程无需关心 Worker 选择
- * - Worker 数量：clamp(4, floor(0.75 * hardwareConcurrency), 16)，低配降级到 2
- *
- * 与原站的差异：
- * - 不共享 WebAssembly.Module（每个 Worker 独立实例化，简化实现）
- * - 不维护 seedEpoch 缓存（cubiomes_wrapper.c 每次 setupGenerator，无需预热）
+ * 多 Worker 并行生成 tile / 查找结构；prepareSeed 广播给全部 Worker 确认后才返回；
+ * 任务经 jobId 关联 Promise。Worker 数 = clamp(4, 0.75*hardwareConcurrency, 16)，低配降到 2。
+ * 与原站差异：每 Worker 独立实例化 WASM（不共享 Module），且无 seedEpoch 缓存。
  */
 import type {
   GenerateTileParams, FindStructuresParams, SpecialsParams, SpecialsResult,

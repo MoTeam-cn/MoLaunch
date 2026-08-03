@@ -1,23 +1,9 @@
 /**
  * 资源详情页整合包安装 composable
  *
- * 从 ResourceDetail.vue 抽出，负责：
- * - 弹窗询问整合包安装名称
- * - 调用 installModpack（下载原始包 + 解析 + 依赖 mods + overrides）
- * - 调用 installMerged（安装 MC 本体 + 加载器）
- * - 进度走 download_state，复用 DownloadPanel
- *
- * # 复用约定
- * - 与 useModpackInstall.ts（联机大厅一键安装）流程一致，但入参为
- *   ResourceProject + ResourceVersion（无需反查版本列表），且共享
- *   useResourceDownload 的 downloading 状态，故独立封装。
- * - installModpack / installMerged / showModal / versionStore 调用约定
- *   与 useDragDrop.runModpackInstall / useModpackInstall.install 保持一致。
- *
- * # 响应式说明
- * - 直接接收 ResourceDetail 的 props（Vue 3 reactive proxy），composable 内部
- *   通过 options.project 访问以拿到最新值。不要在调用方解构 props 后再传入，
- *   否则用户切换资源时 composable 仍看到旧 project。
+ * 弹窗询问安装名称 → installModpack（下载/解析/依赖 mods/overrides）→ installMerged（MC 本体 + 加载器）。
+ * 共享 useResourceDownload 的 downloading 状态；入参为 props（reactive proxy），
+ * 内部经 options.project 访问拿最新值，不得解构后传入。
  */
 import type { Ref } from 'vue'
 import type { ResourceProject, ResourceVersion } from '@/types/community'

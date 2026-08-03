@@ -1,14 +1,7 @@
 /**
  * 自定义布局 Schema 类型定义
  *
- * JSON 和 XML 格式解析后统一转为此结构，复用同一套渲染组件。
- *
- * 支持的 section 类型：
- * - stat-grid：统计网格（卡片形式展示多个指标）
- * - list：数据列表（从数据源加载条目并按字段渲染）
- * - progress：进度条
- * - text：文本块
- * - divider：分割线
+ * JSON 与 XML 格式解析后统一转为此结构，复用同一套渲染组件；支持的 section 类型见 LayoutSection 联合。
  */
 
 /** 值格式化方式 */

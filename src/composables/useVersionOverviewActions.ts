@@ -1,18 +1,8 @@
 /**
- * 版本概览操作 composable（从 OverviewTab.vue 抽出）
+ * 版本概览操作 composable
  *
- * 封装 OverviewTab 子页的全部业务逻辑：
- * - 打开文件夹（version/saves/mods/resourcepacks/shaderpacks）
- * - 修改版本描述 / 重命名版本
- * - 收藏/取消收藏
- * - 切换分类 / 切换图标
- * - 导出启动脚本 / 补全文件 / 删除版本
- *
- * 设计原则：
- * - 接收所需的 ref/computed/store 作为参数（selectedId / personalization / loadPersonalization / refreshEffectiveDir / router / authStore / javaStore）
- * - 返回 handler 函数和 fixing 状态
- * - handler 内部的 toast/modal 调用保持原 OverviewTab.vue 行为不变
- * - 模板中的事件绑定保持不变
+ * 封装打开文件夹/描述/重命名/收藏/分类/图标/导出脚本/补全/删除等操作；
+ * 所需 ref/computed/store 由参数注入，handler 内 toast/modal 行为与原实现保持一致。
  */
 import { ref, nextTick, type ComputedRef, type Ref } from 'vue'
 import type { Router } from 'vue-router'

@@ -1,11 +1,7 @@
 /**
- * Frp 侧边栏分类定义
+ * Frp 侧边栏分类定义 composable（从 Online.vue 抽离，避免主文件超 300 行）
  *
- * 从 Online.vue 抽离 frp 分类逻辑，避免 Online.vue 超 300 行约束。
- * 返回 frpCategory 常量，供 Online.vue 的 categories computed 追加。
- *
- * 阶段二追加「认证中心」（占位）和「运行日志」子项。
- * 认证中心在阶段三完整实现，阶段二可点击但仅显示"开发中"占位 UI。
+ * 返回 frpCategory 常量供 Online.vue 的 categories computed 追加；含「认证中心」「运行日志」子项。
  */
 
 import type { Component } from 'vue'

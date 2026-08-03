@@ -1,11 +1,7 @@
 /**
- * 主页时钟卡片 composable
+ * 主页时钟卡片 composable（从 HomeClockCard.vue 抽离）
  *
- * 从 HomeClockCard.vue 抽离，封装：
- * - 时钟状态（当前时间 + 每秒更新定时器）
- * - 轮播信息卡片加载（内存/版本/启动历史/缓存）+ 自动翻页
- *
- * 调用方仅需解构返回值即可在模板中使用。
+ * 封装时钟状态（当前时间 + 每秒更新定时器）+ 轮播信息卡片加载（内存/版本/启动历史/缓存）与自动翻页。
  */
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import * as tauri from '@/utils/tauri'

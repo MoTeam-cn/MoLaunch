@@ -1,15 +1,8 @@
 /**
- * 内存可视化 composable - 封装系统内存轮询 + 内存可视化计算属性
+ * 内存可视化 composable：系统内存 1s 轮询 + 6 个可视化 computed + 自动分配
  *
- * 消除 SettingsLaunch.vue 与 MemorySection.vue 之间逐字相同的内存可视化逻辑：
- * - systemMemory ref
- * - usePolling(getSystemMemory, 1000) 1 秒轮询
- * - 6 个 computed: totalMemoryMB / usedMemoryMB / gameMemoryMB / otherMemoryMB / usedPercent / gamePercent
- * - applyAutoMemory() 函数：按可用内存的 75% 自动分配游戏内存（上限 8GB，下限 512MB）
- *
- * @example
- * const { totalMemoryMB, usedMemoryMB, gameMemoryMB, otherMemoryMB, usedPercent, gamePercent, applyAutoMemory } = useMemoryVisualizer(maxMemory, minMemory)
- * onMounted(() => startMemoryPolling())
+ * applyAutoMemory 按可用内存 75% 分配（上限 8GB，下限 512MB）；
+ * 消除 SettingsLaunch.vue 与 MemorySection.vue 的重复逻辑。
  */
 import { ref, computed } from 'vue'
 import type { Ref, ComputedRef } from 'vue'

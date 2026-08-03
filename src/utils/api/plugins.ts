@@ -1,14 +1,8 @@
 /**
  * 外部插件 API 封装
  *
- * 与后端 commands/plugins/mod.rs 对应：
- * - listExternalPlugins()：扫描 `<base_dir>/plugins/` 下的外部插件
- * - readExternalPluginFile()：读取插件文件内容（路径限制在插件目录内）
- * - installExternalPluginFromDir()：从源目录安装插件
- * - installExternalPluginFromZip()：从 ZIP 字节数组安装插件
- * - uninstallExternalPlugin()：卸载插件（删除目录）
- *
- * 注：底层已聚合为 `plugins_manager` 单一 IPC 入口，通过 `action` 字段分发。
+ * 对应后端 commands/plugins/mod.rs：扫描/读取/安装（目录或 ZIP）/卸载外部插件，
+ * 底层经 plugins_manager 单一 IPC 按 action 分发。
  */
 
 import { PLUGINS_ACTIONS, pluginsManager } from './plugins-manager'

@@ -1,12 +1,7 @@
 /**
  * 版本启动管理统一 API 入口
- *
- * 后端 `version_launch_manager` IPC 命令通过 `action` 字段分发到不同子模块
- * （launch + script_export 共 7 个 action），参照 `meta_manager` / `tools_manager` /
- * `image_cache_manager` 模式。
- *
- * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
- * 故前端 params 对象的字段名一律使用 camelCase。
+ * `version_launch_manager` IPC 经 `action` 分发（launch + script_export 共 7 个 action）。
+ * params 字段名一律 camelCase（后端 `#[serde(rename_all = "camelCase")]`）。
  */
 
 import { invoke } from '@tauri-apps/api/core'

@@ -1,13 +1,8 @@
 /**
  * Frp store 厂商切片（阶段三）
  *
- * 从 stores/frp.ts 抽取的厂商相关 state + actions，按 Pinia setup store 的
- * composable 切片模式组织，返回独立的厂商 state 与 actions，由主 store 解构合并。
- *
- * 切片内部闭环：
- * - 所有厂商 action 直接调用 @/utils/api/frp-manager 的 IPC 封装
- * - 安装/卸载/启禁后统一 loadProviders 刷新列表，保证 providers 与后端一致
- * - providers 引用对外暴露，供 authSlice（useFrpAuthSlice）迭代判断认证类型
+ * 所有厂商 action 直接调用 frp-manager IPC 封装；安装/卸载/启禁后统一 loadProviders 刷新；
+ * providers 引用对外暴露，供 authSlice 迭代判断认证类型。
  */
 
 import { ref } from 'vue'

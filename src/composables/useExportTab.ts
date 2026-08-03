@@ -1,17 +1,8 @@
 /**
  * 版本导出 Tab composable
  *
- * 封装 ExportTab 子页的全部业务逻辑：
- * - 加载导出选项（getExportOptions）
- * - 保存/读取 .ini 配置（saveExportConfig / loadExportConfig）
- * - 切换选项勾选状态（含必选项禁用、子选项联动）
- * - 执行整合包导出（exportModpack）
- * - 监听 export-progress 事件，维护导出进度状态（供悬浮按钮展示）
- *
- * 设计原则：
- * - 接收 selectedId（ComputedRef）作为参数，与 useVersionOverviewActions 一致
- * - 状态使用 ref 暴露给模板，handler 内部处理 toast/modal
- * - 选项列表原地修改 checked 字段，避免重新渲染整个树
+ * 封装导出选项加载、ini 配置读写、勾选联动、整合包导出与 export-progress 进度监听；
+ * 选项列表原地修改 checked 字段，避免重新渲染整个树。
  */
 import { ref, computed, onMounted, type ComputedRef } from 'vue'
 import { useTauriEvent } from '@/composables/useTauriEvent'

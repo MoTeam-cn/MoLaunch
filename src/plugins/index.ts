@@ -1,11 +1,6 @@
 /**
- * 插件注册中心
- *
- * 所有内置插件在此处注册。启动器启动时会从此处加载插件清单。
- *
- * 未来扩展点：
- * - 支持从 `src-tauri/resources/plugins/` 目录动态加载外部插件
- * - 外部插件需通过沙箱（iframe 或 Web Worker）隔离执行
+ * 插件注册中心：所有内置插件在此处注册，启动器启动时从此处加载插件清单。
+ * 未来扩展点：从 `src-tauri/resources/plugins/` 动态加载外部插件，需经沙箱隔离执行。
  */
 
 import type { PluginManifest } from '@/types/plugin'

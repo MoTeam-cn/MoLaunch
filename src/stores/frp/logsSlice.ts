@@ -1,12 +1,7 @@
 /**
  * Frp store 日志切片（阶段三）
  *
- * 从 stores/frp.ts 抽取的日志相关 state + actions，按 Pinia setup store 的
- * composable 切片模式组织，返回独立的日志 state 与 actions，由主 store 解构合并。
- *
- * 切片内部闭环：
- * - 日志页状态（logs 实时事件 + 历史读取合并）自持，无跨切片依赖
- * - 读取失败时清空日志与 hasMore，保证 UI 不显示过期数据
+ * 日志状态（实时事件 + 历史读取合并）自持，无跨切片依赖；读取失败时清空日志与 hasMore。
  */
 
 import { ref } from 'vue'

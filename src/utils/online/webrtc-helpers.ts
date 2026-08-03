@@ -1,17 +1,8 @@
 /**
- * WebRTC 共享工具（阶段三子任务 5 抽取，子任务 7 扩展 ICE/TURN，子任务 8 加密包装）
+ * WebRTC 共用底层工具（房主 `useWebRTCMesh.ts` 与加入方 `useWebRTC.ts` 复用）：
+ * 创建连接、ICE 收集、DataChannel、解密包装与 ICE 服务器构造。
  *
- * 房主侧 `useWebRTCMesh.ts` 与加入方侧 `useWebRTC.ts` 共用的底层函数：
- * - `createPeerConnection`：构造 RTCPeerConnection（接受 `IceServerEntry[]`，含 STUN + TURN 凭据）
- * - `collectIceCandidates`：等待 ICE 收集完成（非 trickle 模式，一次性返回全部 candidate）
- * - `createDataChannel`：在指定 PC 上创建 DataChannel
- * - `setupDataChannelHandlers`：统一绑定 onopen/onmessage/onerror/onclose
- * - `wrapHandlersWithDecrypt`：将业务 onMessage 包装为「先解密再回调」（子任务 8 加密）
- * - `stunUrlsToIceServers` / `resolveIceServers` / `buildIceServers`：ICE 服务器列表构造与回退
- *
- * 设计约束：
- * - 不持有任何响应式状态，纯函数便于复用与单测
- * - 不引入业务概念（participantId 等），由上层 composable 维护映射
+ * 约束：不持有响应式状态（纯函数，便于单测）；不引入业务概念（participantId 等）。
  */
 
 import { type ShallowRef } from 'vue'

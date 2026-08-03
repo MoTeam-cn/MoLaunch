@@ -1,16 +1,9 @@
 /**
  * Frp 管理 Pinia store
  *
- * 管理厂商列表、隧道列表、frpc 二进制状态。
- * 与 stores/online.ts 风格一致：state 用 ref，actions 直接调用 IPC API。
- *
- * 按职责拆分为独立切片（Pinia setup store 的 composable 切片模式），主文件仅组合：
- * - frp/providerSlice.ts（useFrpProviderSlice）：厂商列表 / frpc / 安装卸载启禁
- * - frp/tunnelSlice.ts（useFrpTunnelSlice）：隧道列表 / 状态同步 / 增删改启停
- * - frp/logsSlice.ts（useFrpLogsSlice）：日志行 / 日志文件 / 读取清空
- * - frp/authSlice.ts（useFrpAuthSlice）：认证状态与动作（依赖 providerSlice.providers）
- *
- * 主文件通过对象展开合并各切片，保持 useFrpStore() 对调用方完全兼容。
+ * 管理厂商列表、隧道列表、frpc 二进制状态；state 用 ref，actions 直接调用 IPC API。
+ * 按职责拆为 provider/tunnel/logs/auth 四个切片（composable 切片模式），
+ * 主文件经对象展开合并各切片，保持 useFrpStore() 对调用方完全兼容。
  */
 
 import { defineStore } from 'pinia'

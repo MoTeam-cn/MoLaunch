@@ -1,17 +1,8 @@
 /**
  * Frp 隧道自检逻辑
  *
- * 对每条隧道执行 4 项检查：配置完整性 / Frp 服务器可达性 / 本地端口监听 / frpc 就绪。
- *
- * 复用现有能力：
- * - `tcpCheck`（@/utils/api/tools）：TCP 三次握手连通性检测，3 秒超时由后端控制
- * - `listOpenPorts`（@/utils/api/tools）：一次性枚举本机所有监听端口，避免每条隧道重复调用
- * - `TunnelWithStatus` / `ProviderInfo`（@/types/frp）：与后端类型一一对应
- *
- * 设计要点：
- * - `listOpenPorts()` 仅调用一次，结果在所有隧道间共享
- * - 各隧道的 `tcpCheck` 通过 `Promise.allSettled` 并发执行，避免串行等待
- * - 单条隧道检查内部已捕获 `tcpCheck` 异常，`allSettled` 兜底防止意外 rejection
+ * 对每条隧道执行 4 项检查：配置完整性 / Frp 服务器可达性 / 本地端口监听 / frpc 就绪；
+ * listOpenPorts 仅调用一次结果共享，各隧道 tcpCheck 经 Promise.allSettled 并发执行。
  */
 import { tcpCheck, listOpenPorts, type OpenPortInfo } from '@/utils/api/tools'
 import type { TunnelWithStatus, ProviderInfo } from '@/types/frp'

@@ -1,15 +1,8 @@
 /**
- * Fabric API 版本信息查询
+ * Fabric API 版本信息查询 composable（LoaderSelect 页展示用）
  *
- * 用于 LoaderSelect 页面展示"将自动安装哪个 Fabric API 版本"。
- * 后端在 install_merged 时已自动安装最新版，此处仅做信息展示。
- *
- * 使用方式：
- *   const mcVersionRef = computed(() => props.mcVersion)
- *   const { fabricApiState, fabricApiLatest, fabricApiError, retry } = useFabricApi(mcVersionRef, selectedFabric)
- *
- * 选择 Fabric Loader（selected 非 null）后自动触发查询；
- * 出错时调用 retry() 可重置状态并重新查询。
+ * 后端 install_merged 时已自动安装最新版，此处仅信息展示；选择 Fabric Loader 后自动触发，
+ * 出错时 retry() 重置状态并重新查询。
  */
 import { ref, watch, type Ref } from 'vue'
 import { listFabricApiVersions, type FabricApiVersion } from '@/utils/api/loader'

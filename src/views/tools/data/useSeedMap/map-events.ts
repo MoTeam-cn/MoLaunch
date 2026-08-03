@@ -1,11 +1,7 @@
 /**
- * 种子地图事件处理
- *
- * 从 useSeedMap.ts 抽取的地图事件处理逻辑（pointermove / singleclick 几何命中检测、
- * 坐标显示、hover 高亮、moveend 结构刷新调度、悬停群系名查询）。
- * 通过工厂函数接收响应式状态 refs、可变实例 getter 与回调，避免直接依赖闭包。
- *
- * 返回 dispose 函数，用于清理内部定时器（onBeforeUnmount 调用）。
+ * 种子地图事件处理（pointermove / singleclick 几何命中、坐标显示、hover 高亮、
+ * moveend 结构刷新调度、悬停群系名查询）。工厂函数接收 refs/getter/回调，避免依赖闭包。
+ * 返回 dispose() 供 onBeforeUnmount 清理内部定时器。
  */
 
 import type { Ref } from 'vue'

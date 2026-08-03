@@ -1,14 +1,8 @@
 /**
  * 全局配置 API（统一读写入口 + 全局缓存）
  *
- * 重构后所有配置更新统一走 `applyConfig(patch)`，仅传需要改的字段。
- * 此前分散的 17 个 set_* 函数已移除，由 ConfigPatch 的对应字段取代。
- *
- * 从 system.ts 拆分而来：系统操作/下载进度查询仍保留在 system.ts。
- *
- * 注：底层 `get_config` / `apply_config` 2 个命令已聚合为 `config_manager`
- * 单一 IPC 入口，通过 `action` 字段分发。
- * `get_config_path` / `save_config_to_file` 仍走独立 invoke（不在聚合范围）。
+ * 配置更新统一走 applyConfig(patch)（由 ConfigPatch 取代历史 set_* 函数）；
+ * 底层经 config_manager 聚合分发，get_config_path / save_config_to_file 仍走独立 invoke。
  */
 
 import { CONFIG_ACTIONS, configManager } from './config-manager'

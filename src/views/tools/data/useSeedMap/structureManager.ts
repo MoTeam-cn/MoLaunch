@@ -1,15 +1,8 @@
 /**
- * 种子地图结构管理
+ * 种子地图结构管理（从 useSeedMap.ts 抽取）
  *
- * 从 useSeedMap.ts 抽取的结构加载、渲染与筛选逻辑。通过工厂函数接收
- * composable 的响应式状态与可变实例 getter，避免直接依赖闭包。
- *
- * 包含：
- * - refreshStructures：按可视范围调 WorkerPool.findStructures
- * - refreshSpecials：调 WorkerPool.getSpecials 获取出生点/多座要塞
- * - renderStructures：根据筛选条件渲染 Feature 到 structSource
- * - structureListForVersion：按 MC 版本 + 维度动态过滤可选结构（computed）
- * - toggleStructureType / isStructureSelected：结构筛选状态
+ * 通过工厂函数接收 composable 响应式状态与可变实例 getter，避免直接依赖闭包。
+ * 负责结构/出生点/要塞的加载、渲染与筛选（详见各导出函数）。
  */
 
 import { computed, type Ref } from 'vue'

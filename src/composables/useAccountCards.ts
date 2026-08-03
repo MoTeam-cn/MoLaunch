@@ -1,12 +1,7 @@
 /**
- * 账号卡片列表 composable
+ * 账号卡片列表 composable（从 AccountSelector.vue 抽离）
  *
- * 从 AccountSelector.vue 抽离，封装：
- * - 从 authStore 构建账号卡片列表（微软 + 离线，顺序稳定）
- * - 当前索引管理 + 边界检查 + 定位到活跃账号
- * - 切换/删除/登出账号
- * - 首次加载拉取账号列表
- *
+ * 封装卡片列表构建（顺序稳定）、当前索引管理 + 边界检查、切换/删除/登出账号与首次加载拉取。
  * 调用方仅需解构返回值即可在模板中使用。
  */
 import { ref, computed, watch, onMounted } from 'vue'

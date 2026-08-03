@@ -1,14 +1,8 @@
 /**
  * 教程元数据索引
  *
- * 教程内容以硬编码 HTML 存放在 src-tauri/resources/templates/ 目录，
- * 通过 picker 子窗口直接加载（无需 marked.min.js 渲染）。
- *
- * 新增教程只需：
- * 1. 在 src-tauri/resources/templates/ 创建 tutorial-xxx.html
- * 2. 在 src-tauri/src/resources.rs 的 embedded_text 注册
- * 3. 在 src/config/picker-templates.ts 注册模板配置
- * 4. 在此文件追加 TutorialMeta 项
+ * 教程内容为硬编码 HTML（src-tauri/resources/templates/），经 picker 子窗口直接加载（无需 marked 渲染）。
+ * 新增教程：创建 tutorial-xxx.html → resources.rs 注册 embedded_text → picker-templates.ts 注册模板 → 本文件追加条目。
  */
 
 export type TutorialCategory = '基础' | 'FRP 开发'

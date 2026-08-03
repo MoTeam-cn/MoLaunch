@@ -1,13 +1,9 @@
 /**
- * 种子地图组合式逻辑（OpenLayers + WASM Worker 版）
+ * 种子地图组合式逻辑（OpenLayers + WASM Worker）
  *
- * 架构：自定义 'mc' 投影（1 单位=1 方块，extent ±3e7）；群系 DataTile 图层
- * （WorkerPool.generateTile 生成 ImageBitmap，OL 按 (z,x,y) 缓存）；
- * 结构/出生点/要塞 Vector 图层；OL 内置交互 + pointermove/singleclick 命中检测。
- *
- * 按职责拆分到 `./useSeedMap/` 子文件：config.ts / tileLoader.ts /
- * structureManager.ts / map-init.ts（Map 与图层初始化）/ map-events.ts（事件处理）。
- * 本文件保留 initMap 调度、loadSeed、watch 与生命周期。
+ * 自定义 'mc' 投影（1 单位=1 方块，extent ±3e7）；群系 DataTile + 结构/出生点/要塞
+ * Vector 图层；OL 内置交互 + pointermove/singleclick 命中检测。
+ * 职责拆分至 ./useSeedMap/（tileLoader / structureManager / map-init / map-events / config）。
  */
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { toastError, toastSuccess } from '@/utils/toast'

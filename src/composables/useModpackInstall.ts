@@ -1,21 +1,9 @@
 /**
- * 整合包一键安装流程（联机大厅阶段 4 新增）
+ * 整合包一键安装流程 composable（联机大厅）
  *
- * 加入方在房间详情或大厅浏览页点击「一键安装」时调用。流程：
- * 1. 平台字符串映射（`curseforge` → `CurseForge` / `modrinth` → `Modrinth`）
- * 2. 弹窗询问安装名称（默认整合包名）
- * 3. 跳转下载页 → versionStore.startDownload 占位
- * 4. getProjectVersions 反查平台版本列表
- * 5. 按 fileId 匹配定位 ResourceVersion
- * 6. installModpack（下载 + 解析 + 依赖 mods + overrides）
- * 7. installMerged（安装 MC 本体 + 加载器）
- * 8. 失败时 showModal + finishDownload，遵循项目统一流程
- *
- * # 复用约定
- * - 与 `useDragDrop.runModpackInstall` / `ResourceDetail.handleInstallModpack` 共享
- *   installMerged / showModal / versionStore 调用约定，但入参为平台元数据
- *   （无本地文件路径或资源详情页上下文），故独立封装。
- * - 阶段 5 大厅浏览页卡片「加入并安装」可复用此 composable。
+ * 平台映射 → 弹窗询问安装名称 → 反查平台版本列表 → installModpack → installMerged，
+ * 失败走 showModal + finishDownload；与 useDragDrop / ResourceDetail 共享安装调用约定，
+ * 但入参为平台元数据（无本地文件路径），故独立封装。
  */
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'

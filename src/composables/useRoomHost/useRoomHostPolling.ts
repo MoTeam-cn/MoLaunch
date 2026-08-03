@@ -1,12 +1,8 @@
 /**
- * 房主轮询切片（从 useRoomHost.ts 抽取）
+ * 房主轮询切片（useRoomHost 拆分）
  *
- * 负责三路信令轮询（参与者 5s / Answer 5s / 保活 30s）、
- * 自动为 status='joined' && !hostOfferReady 的参与者生成 per-participant Offer、
- * 30s 防刷屏 toast、TURN 服务器拉取与广播，以及定时器启停。
- *
- * 生命周期（onMounted/onUnmounted/watch）由主文件 useRoomHost.ts 负责，
- * 本切片仅提供纯函数与定时器控制，便于按职责拆分与复用。
+ * 三路信令轮询（参与者/Answer 5s、保活 30s）、自动 Offer 生成、TURN 广播、
+ * 30s 防刷屏 toast 与定时器启停；生命周期由主文件 useRoomHost.ts 负责。
  */
 import { ref } from 'vue'
 import { useOnlineStore } from '@/stores/online'

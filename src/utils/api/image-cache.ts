@@ -1,13 +1,8 @@
 /**
  * 通用图片缓存 API
  *
- * 将任意远程图片 URL 转为缓存 URL（方案 C：混合缓存）。
- * 适用于皮肤、披风、头像、缩略图等所有需要缓存的远程图片场景。
- *
- * - 缓存命中：返回 cache-image:// 本地 URL（cached: true），零网络请求
- * - 缓存未命中：返回原始远程 URL（cached: false），后端异步下载，完成后 emit 'image-cached' 事件
- *
- * 注：底层已聚合为 `image_cache_manager` 单一 IPC 入口，通过 `action` 字段分发。
+ * 将远程图片 URL 转为缓存 URL：命中返回 cache-image:// 本地 URL（cached: true），
+ * 未命中返回原 URL（cached: false）由后端异步下载后 emit 'image-cached'。
  */
 
 import { IMAGE_CACHE_ACTIONS, imageCacheManager } from './image-cache-manager'

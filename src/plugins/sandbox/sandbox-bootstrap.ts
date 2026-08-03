@@ -1,17 +1,9 @@
 /**
  * 沙箱桥接 SDK 注入脚本
  *
- * 此脚本会被注入到外部插件 iframe 的 HTML 末尾，为插件提供全局 `window.molaunch` 对象。
- * 通过 postMessage 与父窗口通信，所有 SDK 调用都转发到父级 pluginSdk 执行。
- *
- * 通信协议：
- * - 子 → 父：{ type: 'request', id: string, method: string, args: unknown[] }
- * - 父 → 子：{ type: 'response', id: string, result?: unknown, error?: string }
- * - 父 → 子：{ type: 'event', name: string, payload?: unknown }
- *
- * 安全设计：
- * - iframe 使用 `sandbox="allow-scripts"`（无 allow-same-origin），无法访问父窗口 DOM / cookie / localStorage
- * - 父级根据 manifest.permissions 白名单决定是否执行请求的方法
+ * 注入到外部插件 iframe 末尾，提供全局 window.molaunch 对象，经 postMessage 转发到父级 pluginSdk。
+ * 协议：子→父 request{id,method,args}；父→子 response{id,result?,error?} / event{name,payload?}。
+ * 安全：iframe sandbox="allow-scripts"（无 allow-same-origin），父级按 manifest.permissions 白名单鉴权。
  */
 
 /** 注入到 iframe 内的引导脚本（字符串形式，运行于插件 iframe 上下文） */

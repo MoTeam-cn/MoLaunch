@@ -1,11 +1,8 @@
 /**
  * 设置状态管理
  *
- * - layoutMode / language：纯前端 localStorage
- * - theme：原本的浅色/深色/跟随系统字段，当前版本未实际生效，保留字段以便未来接入
- * - primaryColor：主题主色 HEX（默认 "#165dff" Arco 蓝），通过 applyPrimaryColor() 注入 CSS 变量
- *   全项目所有 `primary-*` Tailwind 类与 `var(--color-primary-*)` 都会跟随此值变化
- *   存储双轨制：前端 localStorage（首屏前同步读取避免闪烁）+ 后端 INI（跨设备同步）
+ * layoutMode/language 纯前端 localStorage；theme 字段保留但未生效；
+ * primaryColor 经 applyPrimaryColor() 注入 CSS 变量（影响全部 primary-* 类），localStorage + 后端 INI 双轨存储。
  */
 
 import { defineStore } from 'pinia'

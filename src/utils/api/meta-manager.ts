@@ -1,12 +1,8 @@
 /**
  * 认证模块统一 API 入口
  *
- * 后端 `meta_manager` IPC 命令通过 `action` 字段分发到不同子模块（参照 `tools_manager` 模式）。
- * 本文件仅提供通用入口和 action 常量，具体业务函数仍由 `auth.ts` / `authlib.ts` 封装，
- * 这样业务调用点保持类型安全且字段名一致。
- *
- * 字段名约定：后端 Params 结构体使用 `#[serde(rename_all = "camelCase")]`，
- * 故前端 params 对象的字段名一律使用 camelCase（如 `serverUrl` / `filePath` / `deviceCode`）。
+ * 后端 meta_manager IPC 按 action 分发；本文件仅提供入口与 action 常量，
+ * 业务函数由 auth.ts / authlib.ts 封装。params 字段一律 camelCase。
  */
 
 import { invoke } from '@tauri-apps/api/core'

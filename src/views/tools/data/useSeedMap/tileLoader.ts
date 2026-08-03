@@ -1,14 +1,8 @@
 /**
- * 种子地图 tile 加载器
+ * 种子地图群系 tile 加载器（从 useSeedMap.ts 抽取，工厂函数接收状态 getter）
  *
- * 从 useSeedMap.ts 抽取的群系 tile 加载逻辑。通过工厂函数接收当前种子/版本等
- * 状态的 getter，避免直接依赖 composable 闭包。
- *
- * 坐标系约定（与 generatorWorker.ts 对齐）：
- * - OL TileGrid 用 top-left origin = [-EXTENT_HALF, +EXTENT_HALF]
- * - tile y=0 在屏幕顶部 = 投影 max Y = MC max Z（本项目约定 +Z=北方）
- * - startBlockZ 取 tile 的 min Z（南方边缘），由 worker 翻转 Z 轴后渲染
- * - blockX/blockZ 始终是 **方块坐标**；worker 内部负责 block → scale 坐标转换
+ * 坐标约定（与 generatorWorker.ts 对齐）：OL TileGrid 用 top-left origin =[-EXTENT_HALF, +EXTENT_HALF]，
+ * tile y=0 在顶部（+Z=北方），blockX/blockZ 均为方块坐标，worker 负责翻转 Z 轴与 block→scale 转换。
  */
 
 import { toastError } from '@/utils/toast'

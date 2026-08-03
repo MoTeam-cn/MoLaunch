@@ -1,51 +1,25 @@
 /**
  * 全局文件拖拽 - 文件类型分发与安装处理
  *
- * 根据文件扩展名路由到不同处理逻辑：
- * - `.zip` / `.mrpack` → 整合包安装（弹窗输入实例名 → installLocalModpack → installMerged）
- * - `.jar` / `.litemod` / `.disabled` / `.old` → Mod 安装（弹窗选择目标版本 → installMod）
- * - `.rar` → 拒绝并提示用户解压后重新压缩为 zip
- * - 其他 → 提示无法识别
+ * 根据扩展名路由：`.zip`/`.mrpack` → 整合包、`.jar`/`.litemod`/`.disabled`/`.old` → Mod、
+ * `.rar` → 拒绝并提示解压、其他 → 提示无法识别。
+ * 安装执行流水线在 helpers.ts（formatToLabel / runModpackInstall）。
  */
-
-import router from '@/router'
-import { installLocalModpack, previewLocalModpack } from '@/utils/api/community'
+import { previewLocalModpack } from '@/utils/api/community'
 import { installMod } from '@/utils/api/personalization'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
-import { installMerged } from '@/utils/api/loader'
 import { showError, showInfo, showModal, showPrompt } from '@/utils/modal'
-import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
-import { isCancelledError } from '@/utils/async'
-import { useVersionStore } from '@/stores/version'
-import type { InstallModpackResult, ModpackPreview } from '@/types/community'
+import { toastError, toastSuccess } from '@/utils/toast'
+import type { ModpackPreview } from '@/types/community'
 import {
   MODPACK_EXTENSIONS,
   MOD_EXTENSIONS,
   getExtension,
   getFileNameWithoutExt,
 } from './state'
+import { formatToLabel, runModpackInstall } from './helpers'
 
-/** ModpackFormat 枚举转中文标签 */
-function formatToLabel(format: ModpackPreview['format']): string {
-  switch (format) {
-    case 'curseforge':
-      return 'CurseForge'
-    case 'modrinth':
-      return 'Modrinth'
-    case 'hmcl':
-      return 'HMCL'
-    case 'mmc':
-      return 'MultiMC'
-    case 'mcbbs':
-      return 'MCBBS'
-    case 'launcherpack':
-      return '带启动器整合包'
-    case 'compress':
-      return '普通压缩包'
-    default:
-      return '未知'
-  }
-}
+export { formatToLabel, runModpackInstall } from './helpers'
 
 /**
  * 处理整合包拖拽：预览整合包 → 弹窗输入实例名 → 询问可选 Mod → installLocalModpack → installMerged
@@ -56,7 +30,6 @@ function formatToLabel(format: ModpackPreview['format']): string {
  * - HMCL/MMC/MCBBS: 无可选概念，直接安装
  *
  * 进度通过 download_state 推送，前端 DownloadPanel 自动展示。
- * 完成后跳转到下载页轮询 install_merged 进度。
  */
 export async function handleModpackDrop(filePath: string): Promise<void> {
   // 1. 预览整合包：获取格式 + 可选 Mod 列表
@@ -120,74 +93,6 @@ export async function handleModpackDrop(filePath: string): Promise<void> {
     },
     { defaultValue: defaultName, placeholder: '请输入实例名' },
   )
-}
-
-/** 执行整合包安装流程（install_local_modpack → install_merged） */
-export async function runModpackInstall(
-  filePath: string,
-  instanceName: string,
-  includeOptional?: boolean,
-): Promise<void> {
-  const versionStore = useVersionStore()
-  // 跳转到下载页，让用户看到进度
-  router.push({ name: 'downloads' })
-
-  let result: InstallModpackResult
-  try {
-    result = await installLocalModpack({ filePath, instanceName, includeOptional })
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
-    if (isCancelledError(err)) {
-      toastInfo('下载已取消')
-      versionStore.finishDownload()
-      return
-    }
-    // 真实失败：后端已 mark_failed 重置 is_active，前端需 finishDownload 让 Downloads.vue watch 触发 router.back()
-    // 用 showModal 支持确认回调，用户点击确定后才退出下载页，避免弹窗一闪而过
-    showModal({
-      type: 'error',
-      title: '整合包安装失败',
-      message: msg,
-      onConfirm: () => {
-        versionStore.finishDownload()
-      },
-    })
-    return
-  }
-
-  // 整合包专属部分完成，紧接着调用 install_merged 安装游戏本体
-  toastSuccess(`整合包解析完成，开始安装 MC ${result.gameVersion}...`)
-
-  try {
-    await installMerged(
-      result.gameVersion,
-      result.loader === 'forge' ? result.loaderVersion : undefined,
-      result.loader === 'neoforge' ? result.loaderVersion : undefined,
-      result.loader === 'fabric' ? result.loaderVersion : undefined,
-      result.loader === 'optifine' ? result.loaderVersion : undefined,
-      undefined,
-      instanceName,
-    )
-    toastSuccess(`整合包 ${instanceName} 安装完成`)
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
-    // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
-    if (isCancelledError(err)) {
-      toastInfo('下载已取消')
-      versionStore.finishDownload()
-      return
-    }
-    // 同上：后端已 mark_failed，前端用 showModal + onConfirm 让用户点击确定后退出下载页
-    showModal({
-      type: 'error',
-      title: '游戏本体安装失败',
-      message: `整合包已解压，但游戏本体安装失败：${msg}`,
-      onConfirm: () => {
-        versionStore.finishDownload()
-      },
-    })
-  }
 }
 
 /**

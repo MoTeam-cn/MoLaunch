@@ -1,12 +1,8 @@
 /**
- * HTML section shadow DOM 渲染器
+ * HTML section shadow DOM 渲染器（从 CustomLayoutPanel.vue 提取）
  *
- * 从 CustomLayoutPanel.vue 提取，负责将 html 类型的 section 渲染到 shadow DOM 中：
- * - CSS 隔离：shadow root 内的样式不影响主页面，主页面的样式也不泄漏到 shadow 内
- * - JS 执行：用户脚本通过 new Function 在主窗口上下文执行，可直接调用 window.molaunch SDK
- * - 无 iframe：消除 sandbox="allow-scripts allow-same-origin" 安全警告
- *
- * window.molaunch API 桥接前端 toast / modal 组件，懒加载且全局只初始化一次。
+ * CSS 隔离（shadow root 内样式互不影响）；JS 经 new Function 在主窗口上下文执行（可直接调 window.molaunch SDK）；
+ * 无 iframe 消除 sandbox 安全警告；molaunch API 桥接 toast/modal，懒加载且仅初始化一次。
  */
 import { toastInfo, toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { showInfo, showConfirm, showPrompt } from '@/utils/modal'
