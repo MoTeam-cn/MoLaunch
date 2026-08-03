@@ -111,6 +111,7 @@
   - `utils/path.rs` 新增 `is_safe_relative_path`：统一为 Path::components 段级 ParentDir 校验，替换 10 处内联 `contains("..")`（viewer/plugins_sandbox/version_json/version_mods_install/archive 三件/args/assets/shell_open/java_files）；`sanitize_file_name` 文件名净化语义与路径安全语义差异加注释标注（语义优化：`foo..bar` 类字面量片段放行，无穿越风险的真实 `..` 段仍全拒）
   - `utils::fs` 收敛 6 处低风险 create_dir_all/read_to_string（tools/download、tools/data_export、tools/version_json、community/modpack 安装系），消除冗余 map_err 包装
   - `certs.rs::validate_filename` 白名单语义与 `sanitize_file_name` 黑名单差异函数级注释文档化；plugin:fs 前端仅 1 处调用不抽象（调用方数量 <2）
+  - 收尾两个 300-399 档遗漏文件：`certs.rs`（304 行，转为 `certs/` 目录并从 mod.rs 拆出 `pem.rs` PEM 解析）、`commands/frp/types/api_spec.rs`（303 行，转为 `api_spec/` 目录拆 `models`/`field_mapping`）；演进后前后端全量扫描零超限
 - 验证：`cargo check`（exit 0 无新告警）、`cargo test --lib`（152 passed）
 
 ### 重构

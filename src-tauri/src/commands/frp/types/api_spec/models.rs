@@ -1,10 +1,12 @@
-//! Open API 接口规范类型（api/endpoints.json 反序列化结构）
+//! Open API 接口规范模型（endpoints.json 反序列化结构）
 //!
-//! 设计参考：docs/Frp Test/frp/api/endpoints.json
+//! 设计参考：docs/Frp Test/frp/api/endpoints.json。
 //! 厂商接口响应结构各不相同，通过此规范将差异全部做成可配置项。
 
 use serde::Deserialize;
 use std::collections::HashMap;
+
+use super::field_mapping::FieldMapping;
 
 /// serde 默认值：配置格式 ini
 fn default_config_format() -> String {
@@ -48,7 +50,6 @@ pub struct AuthHeader {
     /// 请求头字段名（如 "Authorization"）
     pub header_name: String,
     /// 值前缀（如 "Bearer "，无空格时留空）
-    #[serde(default)]
     pub header_prefix: String,
     /// 登录响应中服务器密钥所在响应头名（解密用，可选）
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -243,61 +244,4 @@ pub struct ResponseDef {
     /// 响应编码（text/json），config 端点用 text 取原始字符串
     #[serde(skip_serializing_if = "Option::is_none")]
     pub encoding: Option<String>,
-}
-
-/// 字段映射（字符串=字段名，模板字符串={account.token} 引用，对象={field, split} 拆分）
-#[derive(Debug, Clone)]
-pub struct FieldMapping {
-    /// 厂商字段名
-    pub field: Option<String>,
-    /// 从合并字段拆分的分隔符（如 ":" 从 "host:port" 拆分）
-    pub split: Option<String>,
-    /// 直接字符串值（如 "{account.token}" 取账号信息 token）
-    pub value: Option<String>,
-}
-
-impl<'de> Deserialize<'de> for FieldMapping {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum Repr {
-            Str(String),
-            Obj {
-                field: Option<String>,
-                split: Option<String>,
-                value: Option<String>,
-            },
-        }
-
-        match Repr::deserialize(deserializer)? {
-            Repr::Str(s) => {
-                // 模板字符串（以 { 开头，如 {account.token}）→ value；否则 → field
-                if s.starts_with('{') {
-                    Ok(FieldMapping {
-                        field: None,
-                        split: None,
-                        value: Some(s),
-                    })
-                } else {
-                    Ok(FieldMapping {
-                        field: Some(s),
-                        split: None,
-                        value: None,
-                    })
-                }
-            }
-            Repr::Obj {
-                field,
-                split,
-                value,
-            } => Ok(FieldMapping {
-                field,
-                split,
-                value,
-            }),
-        }
-    }
 }
