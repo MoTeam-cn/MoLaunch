@@ -150,7 +150,7 @@ impl AuthStorage {
 
         // Unix 下显式设置文件权限为 0o600（仅当前用户可读写），防止其他用户读取 token
         #[cfg(unix)]
-        super::restrict_file_permissions(&path);
+        restrict_file_permissions(&path);
 
         // 更新内存缓存
         *self.cache.lock().await = Some(state.clone());
@@ -277,5 +277,16 @@ impl AuthStorage {
         *self.cache.lock().await = Some(state.clone());
 
         Ok(())
+    }
+}
+
+/// Unix 下显式设置文件权限为 0o600（仅当前用户可读写），防止其他用户读取 token
+///
+/// Windows 依赖 NTFS 默认 ACL（继承父目录权限，通常已足够），无需显式设置。
+#[cfg(unix)]
+fn restrict_file_permissions(path: &std::path::Path) {
+    use std::os::unix::fs::PermissionsExt;
+    if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
+        crate::log_warn!("[Auth] 设置认证文件权限 0o600 失败: {}", e);
     }
 }

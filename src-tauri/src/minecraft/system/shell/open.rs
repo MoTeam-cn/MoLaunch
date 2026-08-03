@@ -8,7 +8,7 @@ use crate::log_error;
 use crate::log_info;
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-use super::shell_err;
+use super::exec::shell_err;
 
 /// Windows 专用 Win32 封装（ShellExecuteW）
 ///

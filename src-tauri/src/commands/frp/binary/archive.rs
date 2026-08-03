@@ -5,7 +5,17 @@ use std::path::Path;
 
 use crate::log_info;
 
-use super::frpc_filename;
+/// frpc 二进制文件名（含扩展名）
+fn frpc_filename() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        "frpc.exe".to_string()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        "frpc".to_string()
+    }
+}
 
 /// 从 ZIP 字节流提取 frpc 二进制到目标路径
 ///

@@ -8,7 +8,7 @@ use super::storage::store_token_info;
 use crate::log_info;
 
 /// 保存 API Key（auth_type=api_key 时由前端调用）
-pub(super) async fn save_api_key(provider_id: &str, api_key: &str) -> Result<(), String> {
+pub async fn save_api_key(provider_id: &str, api_key: &str) -> Result<(), String> {
     let manifest = read_provider_manifest(provider_id)?;
     if resolve_auth_type(provider_id, &manifest) != "api_key" {
         return Err(format!("厂商 {} 不使用 API Key 认证", provider_id));

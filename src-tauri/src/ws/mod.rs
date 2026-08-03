@@ -6,13 +6,4 @@
 mod auth;
 mod server;
 
-use crate::state::AppState;
-
-pub use server::start_server;
-
-/// 向所有 WS 连接广播进度 snapshot
-///
-/// 在 progress_callback / stage_callback / cancel / pause / resume 中调用。
-pub fn broadcast_progress(state: &AppState, snapshot: serde_json::Value) {
-    let _ = state.progress_tx.send(snapshot);
-}
+pub use server::{broadcast_progress, start_server};

@@ -3,42 +3,14 @@
 //!   - 默认扫全局 `{game_dir}/resourcepacks/`
 //!   - 传入 `version_id` 时按版本隔离配置解析该版本的有效游戏目录
 //! - `convert`：在 zip 与 folder 格式之间转换（folder → 打包为同名 .zip；zip → 解压为同名目录）
-//! 子模块：list（列目录）/ convert（格式转换）
+//!   子模块：list（列目录）/ convert（格式转换）
 
 mod convert;
+mod helpers;
 mod list;
-
-use std::path::PathBuf;
-
-use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
-use crate::state::resolve_game_dir;
-use crate::state::AppState;
 
 pub use convert::convert;
 pub use list::list;
 
-/// 解析资源包目录（同 screenshot::resolve_shots_dir 的语义）
-async fn resolve_packs_dir(state: &AppState, version_id: Option<&str>) -> PathBuf {
-    let game_dir = {
-        let config = state.config.lock().await;
-        resolve_game_dir(&config.game_dir)
-    };
-    match version_id {
-        None => game_dir.join("resourcepacks"),
-        Some(vid) => {
-            let global_mode = state.config.lock().await.isolation_mode;
-            let isolation_mode =
-                crate::commands::version::list::resolve_isolation_mode(&game_dir, vid, global_mode);
-            let version_type =
-                crate::commands::version::list::detect_version_type_from_dir(&game_dir, vid);
-            let mode = IsolationMode::from_u32(isolation_mode);
-            let effective_dir = get_effective_game_dir(&game_dir, vid, mode, version_type);
-            effective_dir.join("resourcepacks")
-        }
-    }
-}
-
-/// 将路径转为字符串（UTF-8，丢失非 UTF-8 字符）
-fn path_to_string(path: &std::path::Path) -> String {
-    path.to_str().unwrap_or("").to_string()
-}
+// 私有 use：保持子模块 `use super::{resolve_packs_dir, path_to_string};` 引用可用
+use helpers::{path_to_string, resolve_packs_dir};

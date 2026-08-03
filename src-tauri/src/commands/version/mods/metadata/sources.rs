@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::io::Read;
 
-use super::MetaBuilder;
+use super::builder::MetaBuilder;
 
 /// 合并 mcmod.info（Forge 1.12-）
 ///

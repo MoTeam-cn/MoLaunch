@@ -249,6 +249,31 @@ fn value_to_string(v: &serde_json::Value) -> String {
     }
 }
 
+/// 从 FlowRequest.response 取指定字段的 FieldExtractor
+///
+/// 字段名按 camelCase 约定：accessToken / refreshToken / expiresIn /
+/// errorField / errorDescription
+pub(super) fn get_extractor<'a>(flow: &'a FlowRequest, key: &str) -> &'a FieldExtractor {
+    static EMPTY: once_cell::sync::Lazy<FieldExtractor> =
+        once_cell::sync::Lazy::new(|| FieldExtractor {
+            from: "body".to_string(),
+            path: None,
+            name: None,
+        });
+    flow.response.get(key).unwrap_or(&EMPTY)
+}
+
+/// 从响应中提取错误消息（按 errorField / errorDescription 提取）
+pub(super) fn extract_flow_error(resp: &FlowResponse, flow: &FlowRequest) -> String {
+    let err = resp.extract_field(get_extractor(flow, "errorField"));
+    let desc = resp.extract_field(get_extractor(flow, "errorDescription"));
+    match (err, desc) {
+        (Some(e), Some(d)) if !e.is_empty() && !d.is_empty() => format!("{}: {}", e, d),
+        (Some(e), _) => e,
+        _ => "未知错误".to_string(),
+    }
+}
+
 #[cfg(test)]
 #[path = "flows_tests.rs"]
 mod tests;

@@ -67,3 +67,20 @@ pub fn detect_version_type_from_dir(game_dir: &std::path::Path, version_id: &str
 
     VersionType::Release
 }
+
+/// Convert VersionType to string
+pub fn version_type_to_string(version_type: &VersionType) -> String {
+    match version_type {
+        VersionType::Release => "release".to_string(),
+        VersionType::Snapshot => "snapshot".to_string(),
+        VersionType::Old => "old".to_string(),
+        VersionType::Fool => "fool".to_string(),
+        VersionType::Forge => "forge".to_string(),
+        VersionType::NeoForge => "neoforge".to_string(),
+        VersionType::Fabric => "fabric".to_string(),
+        VersionType::Quilt => "quilt".to_string(),
+        VersionType::OptiFine => "optifine".to_string(),
+        VersionType::LiteLoader => "liteloader".to_string(),
+        VersionType::Unknown => "unknown".to_string(),
+    }
+}

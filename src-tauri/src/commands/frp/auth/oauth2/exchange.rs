@@ -2,7 +2,10 @@
 
 use std::collections::HashMap;
 
-use super::OAuth2Callback;
+/// OAuth2 回调解析结果
+pub(super) struct OAuth2Callback {
+    pub(super) code: String,
+}
 
 /// 构建 OAuth2 授权 URL（用户交互层，标准 OAuth2 流程）
 pub(super) fn build_authorize_url(

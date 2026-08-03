@@ -15,24 +15,6 @@ mod types;
 pub mod update;
 pub mod watcher;
 
-use crate::state::AppState;
-use crate::utils::dispatcher::ActionRequest;
-use tauri::{AppHandle, State};
-
-/// 统一版本 Mod 管理 IPC 入口
-///
-/// 接收 `ActionRequest { action, params }` 请求体，转发到
-/// `manager::dispatch` 进行 action 分发。
-#[tauri::command]
-pub async fn version_mods_manager(
-    state: State<'_, AppState>,
-    app: AppHandle,
-    req: ActionRequest,
-) -> Result<serde_json::Value, String> {
-    let state = state.inner().clone();
-    manager::dispatch(state, app, req).await
-}
-
 // 对外暴露类型和辅助函数（保持向后兼容路径）
 // 注意：ModMetadata 在 metadata.rs 中是私有 use 引入的（use super::types::ModMetadata），
 // 故必须从 types 直接重导出，不能走 metadata 中转
@@ -40,3 +22,19 @@ pub(crate) use helpers::get_mods_dir;
 pub(crate) use metadata::read_mod_metadata;
 pub use types::ModInfo;
 pub(crate) use types::ModMetadata;
+
+/// 统一版本 Mod 管理 IPC 入口
+///
+/// 接收 `ActionRequest { action, params }` 请求体，转发到
+/// `manager::dispatch` 进行 action 分发。
+/// 注：该函数为 Tauri `generate_handler!` 所需的命令注册点，必须定义在本模块
+/// （`#[tauri::command]` 生成的 `__cmd__*` 宏仅在本模块作用域可见，无法经 `pub use` 重导出）。
+#[tauri::command]
+pub async fn version_mods_manager(
+    state: tauri::State<'_, crate::state::AppState>,
+    app: tauri::AppHandle,
+    req: crate::utils::dispatcher::ActionRequest,
+) -> Result<serde_json::Value, String> {
+    let state = state.inner().clone();
+    manager::dispatch(state, app, req).await
+}

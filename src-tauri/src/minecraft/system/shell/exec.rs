@@ -5,7 +5,12 @@
 
 use crate::{log_debug, log_error, log_info};
 
-use super::shell_err;
+/// 统一格式化 shell 命令错误（含 [Shell] 前缀 + 日志）
+pub(crate) fn shell_err(op: &str, e: std::io::Error) -> String {
+    let msg = format!("{} failed: {}", op, e);
+    log_error!("[Shell] {}", msg);
+    msg
+}
 
 /// 执行指定可执行文件并返回完整输出（同步阻塞）
 ///

@@ -114,6 +114,18 @@
   - 收尾两个 300-399 档遗漏文件：`certs.rs`（304 行，转为 `certs/` 目录并从 mod.rs 拆出 `pem.rs` PEM 解析）、`commands/frp/types/api_spec.rs`（303 行，转为 `api_spec/` 目录拆 `models`/`field_mapping`）；演进后前后端全量扫描零超限
 - 验证：`cargo check`（exit 0 无新告警）、`cargo test --lib`（152 passed）
 
+#### Mod 入口净化：mod.rs 只保留「模块声明 + re-export」（docs/07-modrs-entry-only.md）
+
+- 背景：审计批07 要求「凡是 mod.rs 入口文件有逻辑代码的必须脱离出来，只能作为入口文件」。全库 110 个 mod.rs 中 38 个纯入口合规、72 个含逻辑（A 类 = 目录已有子模块但入口夹带实现，B 类 = 单文件模块豁免）
+- 改动（分 5 批收敛 59 项）：
+  - 07-1 commands 域：tools/system/online/frp/auth/community/version/skin/plugins 各 manager 的 DISPATCHER 注册 + IPC 函数移入新建 dispatcher.rs，mod.rs 收敛为纯 re-export；删除 7 个纯转发 dispatcher.rs
+  - 07-2 minecraft 域：launch/system/auth/community/download/image_cache/java/loaders/version 的 fn/impl/struct 移入对应子模块（新建 types.rs/manager.rs/entry.rs/pipeline.rs 等 36 个文件），mod.rs 仅入口；测试模块随逻辑迁移（`#[path]` 调整）
+  - 07-3 frp 子域 + 顶层：ws/state/logger/storage/sdk/migrations/certs/signaling_manager/deeplink 逻辑移入 server.rs/core.rs/manager.rs/library.rs/router.rs 等
+  - 07-4 version 域补充：export/install/script_export/zip/updater/apply_config 逻辑移入 api.rs/flow.rs/export.rs
+  - 07-5 剩余：cleanup/picker_window/modpack_stages/archive/resourcepack/online auth/client/pipeline 逻辑移入子文件 + 2 处 clippy `module_inception` 修复（pipeline/runner、client/core）
+- 关键约束（实证）：`#[tauri::command]` 函数无法移入子模块再 pub use 重导出（generate_handler 的 `__cmd__*` 宏仅模块内文本可见），命令转发函数保留在 mod.rs 并注释原因；E0364 可见性越界（重导出项可见性不得超过待导出项）；`mod linux/macos/windows;` 声明需 `#[cfg]` 门控（修复 window_title 缺门控导致的 Windows 编译失败）；`#[macro_export]` 宏移子模块需 `$crate::` 绝对路径
+- 验证：`cargo check`（exit 0 无告警）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
+
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs

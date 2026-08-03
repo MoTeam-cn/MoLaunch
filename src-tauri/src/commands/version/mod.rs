@@ -15,12 +15,9 @@ pub mod mods;
 pub mod personalization;
 pub mod preload;
 pub mod progress;
+pub mod sanitize;
 pub mod script_export;
 pub mod types;
-
-use crate::state::AppState;
-use crate::utils::dispatcher::ActionRequest;
-use tauri::{AppHandle, State};
 
 // Re-export types
 pub use types::{DownloadProgressSnapshot, DownloadStageSnapshot, VersionInfo, VersionListResult};
@@ -35,6 +32,7 @@ pub use personalization::{
     get_version_personalization, update_version_personalization, VersionPersonalization,
 };
 pub use script_export::export_launch_script;
+pub use sanitize::{sanitize_mc_version, sanitize_version_id};
 
 /// 版本列表/文件夹/管理/个性化统一 IPC 入口
 ///
@@ -42,11 +40,13 @@ pub use script_export::export_launch_script;
 /// `list_manager::dispatch` 进行 action 分发。
 /// 原 17 个独立 Tauri 命令（6 list + 5 folder + 4 manage + 2 personalization）
 /// 均通过此入口聚合调用。
+/// 注：该函数为 Tauri `generate_handler!` 所需的命令注册点，必须定义在本模块
+/// （`#[tauri::command]` 生成的 `__cmd__*` 宏仅在本模块作用域可见，无法经 `pub use` 重导出）。
 #[tauri::command]
 pub async fn version_list_manager(
-    state: State<'_, AppState>,
-    app: AppHandle,
-    req: ActionRequest,
+    state: tauri::State<'_, crate::state::AppState>,
+    app: tauri::AppHandle,
+    req: crate::utils::dispatcher::ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
     list_manager::dispatch(state, app, req).await
@@ -56,14 +56,13 @@ pub async fn version_list_manager(
 ///
 /// 接收 `ActionRequest { action, params }` 请求体，转发到
 /// `install_manager::dispatch` 进行 action 分发。
-///
-/// 聚合的 11 个 action 来自 download / install / loaders / preload 四个子模块，
-/// 详见 `install_manager` 模块文档。
+/// 注：该函数为 Tauri `generate_handler!` 所需的命令注册点，必须定义在本模块
+/// （`#[tauri::command]` 生成的 `__cmd__*` 宏仅在本模块作用域可见，无法经 `pub use` 重导出）。
 #[tauri::command]
 pub async fn version_install_manager(
-    state: State<'_, AppState>,
-    app: AppHandle,
-    req: ActionRequest,
+    state: tauri::State<'_, crate::state::AppState>,
+    app: tauri::AppHandle,
+    req: crate::utils::dispatcher::ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
     install_manager::dispatch(state, app, req).await
@@ -76,33 +75,14 @@ pub async fn version_install_manager(
 ///
 /// 聚合 4 个 action：get_export_options / export_modpack /
 /// save_export_config / load_export_config。
+/// 注：该函数为 Tauri `generate_handler!` 所需的命令注册点，必须定义在本模块
+/// （`#[tauri::command]` 生成的 `__cmd__*` 宏仅在本模块作用域可见，无法经 `pub use` 重导出）。
 #[tauri::command]
 pub async fn version_export_manager(
-    state: State<'_, AppState>,
-    app: AppHandle,
-    req: ActionRequest,
+    state: tauri::State<'_, crate::state::AppState>,
+    app: tauri::AppHandle,
+    req: crate::utils::dispatcher::ActionRequest,
 ) -> Result<serde_json::Value, String> {
     let state = state.inner().clone();
     export_manager::dispatch(state, app, req).await
-}
-
-/// 校验版本 ID / 实例名，防止路径遍历
-pub fn sanitize_version_id(id: &str) -> Result<(), String> {
-    crate::utils::path::sanitize_file_name(id)?;
-    if id.contains(':') {
-        return Err(format!("Invalid version id: {}", id));
-    }
-    // 额外用 components 验证只含 Normal 分量
-    let path = std::path::Path::new(id);
-    for comp in path.components() {
-        if !matches!(comp, std::path::Component::Normal(_)) {
-            return Err(format!("Invalid version id: {}", id));
-        }
-    }
-    Ok(())
-}
-
-/// 校验 MC 版本号（与 version_id 同样规则）
-pub fn sanitize_mc_version(v: &str) -> Result<(), String> {
-    sanitize_version_id(v)
 }

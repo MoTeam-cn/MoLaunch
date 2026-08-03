@@ -7,7 +7,7 @@
 use crate::log_info;
 
 #[cfg(unix)]
-use super::shell_err;
+use super::exec::shell_err;
 
 /// macOS：运行 AppleScript（osascript -e <script>）
 ///

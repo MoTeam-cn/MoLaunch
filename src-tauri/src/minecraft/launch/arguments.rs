@@ -174,3 +174,45 @@ pub fn build_launch_arguments(
         auth_info: auth_info.clone(),
     })
 }
+
+/// 敏感参数名列表（小写匹配）
+const SENSITIVE_ARG_NAMES: &[&str] = &[
+    "--accesstoken",
+    "--uuid",
+    "--session",
+    "--clienttoken",
+    "--password",
+    "--refreshtoken",
+];
+
+/// 对启动参数列表进行脱敏，用于日志打印
+///
+/// 识别 `--accessToken <token>` 这类敏感参数，将其值替换为 `***`。
+/// 参数名本身保留（方便调试），仅值脱敏。
+pub(crate) fn sanitize_args_for_log(args: &[String]) -> Vec<String> {
+    let mut result = Vec::with_capacity(args.len());
+    let mut skip_next = false;
+
+    for (i, arg) in args.iter().enumerate() {
+        if skip_next {
+            // 上一个参数是敏感参数，这个是它的值，脱敏
+            result.push("***".to_string());
+            skip_next = false;
+            continue;
+        }
+
+        let lower = arg.to_lowercase();
+        if SENSITIVE_ARG_NAMES.contains(&lower.as_str()) {
+            // 敏感参数名，保留，但下一个参数（值）需要脱敏
+            result.push(arg.clone());
+            // 检查下一个参数是否存在且不是另一个参数（不以 -- 开头）
+            if i + 1 < args.len() && !args[i + 1].starts_with("--") {
+                skip_next = true;
+            }
+        } else {
+            result.push(arg.clone());
+        }
+    }
+
+    result
+}

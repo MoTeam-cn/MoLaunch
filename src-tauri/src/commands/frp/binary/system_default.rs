@@ -6,7 +6,7 @@ use super::super::ensure_dir;
 use super::super::provider::{
     frpc_path, is_frpc_ready, read_frpc_version, system_default_dir, write_frpc_version,
 };
-use super::{api_server_platform_arch, archive};
+use super::archive;
 use crate::log_info;
 use crate::minecraft::online::client::OnlineClient;
 use crate::minecraft::online::frp::{FrpManifest, FrpManifestQuery};
@@ -214,4 +214,34 @@ pub async fn fetch_latest_frpc_version(state: &AppState) -> Result<String, Strin
         .data
         .map(|m| m.version)
         .ok_or_else(|| "apiServer 未返回版本信息".to_string())
+}
+
+/// apiServer 端期望的平台/架构字符串（用于 `/v1/frp/manifest` 查询参数）
+///
+/// - 平台：`windows` / `macos` / `linux`
+/// - 架构：`x86_64` / `aarch64` / `i686` / `armv7`
+fn api_server_platform_arch() -> Result<(&'static str, &'static str), String> {
+    let platform = if cfg!(target_os = "windows") {
+        "windows"
+    } else if cfg!(target_os = "macos") {
+        "macos"
+    } else if cfg!(target_os = "linux") {
+        "linux"
+    } else {
+        return Err("不支持的操作系统".to_string());
+    };
+
+    let arch = if cfg!(target_arch = "x86_64") {
+        "x86_64"
+    } else if cfg!(target_arch = "x86") {
+        "i686"
+    } else if cfg!(target_arch = "aarch64") {
+        "aarch64"
+    } else if cfg!(target_arch = "arm") {
+        "armv7"
+    } else {
+        return Err("不支持的 CPU 架构".to_string());
+    };
+
+    Ok((platform, arch))
 }

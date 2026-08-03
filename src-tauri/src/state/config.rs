@@ -1,7 +1,10 @@
-//! 应用配置（AppConfig + McFolder + 路径解析）
+//! 应用配置（AppConfig + McFolder + 路径解析 + AppState 提取 helper）
 
 use crate::minecraft::online::signaling::IceServerEntry;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
+use super::app::AppState;
 
 /// 代理配置
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -263,4 +266,27 @@ pub fn resolve_game_dir(game_dir: &str) -> std::path::PathBuf {
     }
     // 兜底：当前工作目录
     std::env::current_dir().unwrap_or_default().join(game_dir)
+}
+
+/// 从 AppState 提取 game_dir（消除 lock/resolve/drop 三行套件）
+pub async fn resolve_game_dir_from_state(state: &AppState) -> PathBuf {
+    let config = state.config.lock().await;
+    let game_dir = resolve_game_dir(&config.game_dir);
+    drop(config);
+    game_dir
+}
+
+/// 从 AppState 提取 mirror_url 和 source_mode（消除 lock/clone/from_str/drop 四行套件）
+pub async fn resolve_mirror_and_source(
+    state: &AppState,
+) -> (
+    Option<String>,
+    crate::minecraft::sources::DownloadSourceMode,
+) {
+    let config = state.config.lock().await;
+    let mirror_url = config.download.mirror_url.clone();
+    let source_mode =
+        crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.meta_source);
+    drop(config);
+    (mirror_url, source_mode)
 }

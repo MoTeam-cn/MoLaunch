@@ -21,12 +21,3 @@ pub use window::run_osascript;
 pub use window::{
     ps_pid_exists, wmctrl_list, wmctrl_rename, xdotool_search_pid, xdotool_set_window_name,
 };
-
-use crate::log_error;
-
-/// 统一格式化 shell 命令错误（含 [Shell] 前缀 + 日志）
-pub(super) fn shell_err(op: &str, e: std::io::Error) -> String {
-    let msg = format!("{} failed: {}", op, e);
-    log_error!("[Shell] {}", msg);
-    msg
-}

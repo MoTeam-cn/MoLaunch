@@ -5,7 +5,7 @@ use crate::log_warn;
 use crate::storage::appdata::appdata_subdir;
 use crate::storage::Storage;
 
-use super::{copy_dir_recursive, dir_is_non_empty};
+use super::common::{copy_dir_recursive, dir_is_non_empty};
 
 /// 执行 certs / providers / frp_auth 的便携式 → AppData 迁移
 pub fn migrate() {

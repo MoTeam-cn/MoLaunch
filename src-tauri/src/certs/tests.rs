@@ -1,6 +1,6 @@
 //! certs 单元测试
 
-use super::*;
+use super::manage::validate_filename;
 
 #[test]
 fn test_validate_filename_valid() {

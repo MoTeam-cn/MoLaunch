@@ -51,6 +51,13 @@ pub async fn start_server(app: AppHandle, state: AppState) {
     }
 }
 
+/// 向所有 WS 连接广播进度 snapshot
+///
+/// 在 progress_callback / stage_callback / cancel / pause / resume 中调用。
+pub fn broadcast_progress(state: &AppState, snapshot: serde_json::Value) {
+    let _ = state.progress_tx.send(snapshot);
+}
+
 /// 处理单个连接：鉴权 → 推送初始 snapshot → 200ms 节流推送后续进度
 async fn handle_connection(
     ws_stream: tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>,

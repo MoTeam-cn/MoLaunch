@@ -16,18 +16,12 @@ pub use login::{build_login_request, finalize_credentials_with_login};
 pub use refresh::{build_refresh_request, finalize_credentials_with_refresh};
 pub use register::{build_register_request, finalize_credentials_with_register};
 pub use types::{
-    LoginData, LoginRequest, LoginResponse, RefreshData, RefreshRequest, RefreshResponse,
-    RegisterData, RegisterRequest, RegisterResponse,
+    LoginData, LoginRequest, LoginResponse, PROTOCOL_VERSION, RefreshData, RefreshRequest,
+    RefreshResponse, REFRESH_TOKEN_TTL_SECS, RegisterData, RegisterRequest, RegisterResponse,
 };
 
-/// 协议版本
-pub const PROTOCOL_VERSION: &str = "MoSign-v1";
-
-/// HKDF info for session key（与服务端约定）
-const SESSION_KEY_INFO: &[u8] = b"mosign-v1-session-key";
-
-/// refresh_token 有效期（30 天，秒）
-pub const REFRESH_TOKEN_TTL_SECS: u64 = 30 * 24 * 3600;
+// 私有 use：让 login/refresh 子模块的 `super::SESSION_KEY_INFO` 保持可用
+use types::SESSION_KEY_INFO;
 
 // 测试用：跨模块符号引入父模块命名空间（测试 `use super::*;` 可访问）
 #[cfg(test)]

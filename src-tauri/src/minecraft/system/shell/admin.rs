@@ -6,7 +6,7 @@
 use crate::log_info;
 
 #[cfg(unix)]
-use super::shell_err;
+use super::exec::shell_err;
 
 /// 检查当前进程是否以管理员权限运行
 ///

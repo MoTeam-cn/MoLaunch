@@ -140,3 +140,12 @@ pub struct LoginRequest {
     pub content: String,
     pub timestamp: u64,
 }
+
+/// 协议版本
+pub const PROTOCOL_VERSION: &str = "MoSign-v1";
+
+/// HKDF info for session key（与服务端约定）
+pub(super) const SESSION_KEY_INFO: &[u8] = b"mosign-v1-session-key";
+
+/// refresh_token 有效期（30 天，秒）
+pub const REFRESH_TOKEN_TTL_SECS: u64 = 30 * 24 * 3600;

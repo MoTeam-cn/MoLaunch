@@ -6,8 +6,8 @@
 
 use super::super::api_spec::load_api_spec;
 use super::super::provider::{read_provider_manifest, resolve_device_code_config};
-use super::super::types::{DeviceCodeFlow, FieldExtractor, FlowRequest};
-use super::flows::{send_flow_request, FlowContext, FlowResponse};
+use super::super::types::{DeviceCodeFlow, FlowRequest};
+use super::flows::{extract_flow_error, get_extractor, send_flow_request, FlowContext};
 use super::storage::{now_secs, store_token_info};
 use super::{DeviceCodePollResult, DeviceCodeResult};
 use crate::log_error;
@@ -48,7 +48,7 @@ pub(super) fn remove_device_code_session(provider_id: &str) {
 }
 
 /// 启动 Device Code 流程
-pub(super) async fn start_device_code(
+pub async fn start_device_code(
     _state: &AppState,
     provider_id: &str,
 ) -> Result<DeviceCodeResult, String> {
@@ -147,7 +147,7 @@ pub(super) async fn start_device_code(
 }
 
 /// 轮询 Device Code token
-pub(super) async fn poll_device_code(
+pub async fn poll_device_code(
     _state: &AppState,
     provider_id: &str,
 ) -> Result<DeviceCodePollResult, String> {
@@ -256,30 +256,4 @@ pub(super) async fn poll_device_code(
         expires_at,
         scopes: Some(scopes),
     })
-}
-
-// 内部辅助
-/// 从 FlowRequest.response 取指定字段的 FieldExtractor
-///
-/// 字段名按 camelCase 约定：deviceCode / userCode / verificationUri / pollInterval /
-/// expiresIn / accessToken / refreshToken / errorField / errorDescription
-fn get_extractor<'a>(flow: &'a FlowRequest, key: &str) -> &'a FieldExtractor {
-    static EMPTY: Lazy<FieldExtractor> = Lazy::new(|| FieldExtractor {
-        from: "body".to_string(),
-        path: None,
-        name: None,
-    });
-    flow.response.get(key).unwrap_or(&EMPTY)
-}
-
-/// 从响应中提取错误消息（按 errorField / errorDescription 提取）
-fn extract_flow_error(resp: &FlowResponse, flow: &FlowRequest) -> String {
-    let err = resp.extract_field(get_extractor(flow, "errorField"));
-    let desc = resp.extract_field(get_extractor(flow, "errorDescription"));
-    match (err, desc) {
-        (Some(e), Some(d)) if !e.is_empty() && !d.is_empty() => format!("{}: {}", e, d),
-        (Some(e), _) if !e.is_empty() => e,
-        (Some(e), _) => e,
-        _ => "未知错误".to_string(),
-    }
 }

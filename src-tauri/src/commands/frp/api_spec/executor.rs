@@ -1,9 +1,43 @@
-//! API 请求执行（fetch_tunnels + 响应字段映射）
+//! API 请求执行（fetch_tunnels + 响应字段映射 + 统一隧道/账号 DTO）
 
-use crate::commands::frp::api_spec::{envelope, http, jsonpath, AccountInfo, TunnelInfo};
+use serde::Serialize;
+
+use crate::commands::frp::api_spec::{envelope, http, jsonpath};
 use crate::commands::frp::{EndpointDef, FieldMapping};
 use crate::log_info;
 use crate::state::AppState;
+
+// 统一隧道数据（API 响应映射后的标准格式）
+
+/// 隧道信息（从厂商 API 响应映射后的统一格式）
+///
+/// 对应 endpoints.json 中 tunnelFields 定义的字段。
+/// fields 模式下启动器按这些字段拼装 frpc 配置。
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TunnelInfo {
+    pub id: String,
+    pub name: String,
+    pub tunnel_type: String,
+    pub status: String,
+    pub server_host: String,
+    pub server_port: String,
+    pub token: String,
+    pub local_host: String,
+    pub local_port: String,
+    pub remote_port: String,
+    pub custom_domain: String,
+}
+
+/// 账号信息（从厂商 API 响应映射）
+#[derive(Debug, Clone, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AccountInfo {
+    pub id: String,
+    pub username: String,
+    pub email: String,
+    pub token: String,
+}
 
 /// 认证后调用厂商 API 拉取隧道列表
 ///

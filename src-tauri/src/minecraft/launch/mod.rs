@@ -2,8 +2,6 @@
 //!
 //! 提供启动参数构建、进程启动/监控、版本隔离；子模块见 pipeline/watcher/arguments 等。
 
-use serde::{Deserialize, Serialize};
-
 pub mod pipeline;
 pub mod watcher;
 
@@ -13,6 +11,7 @@ mod embedded;
 mod game_args;
 mod jvm_args;
 pub mod skin_resourcepack;
+mod types;
 
 // Re-export pipeline types
 pub use pipeline::{
@@ -25,92 +24,11 @@ pub use watcher::{CrashCategory, CrashInfo, ExitInfo, GameState, GameWatcher, Lo
 // Re-export main entry
 pub use arguments::build_launch_arguments;
 
-/// Launch arguments
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct LaunchArguments {
-    pub jvm_args: Vec<String>,
-    pub game_args: Vec<String>,
-    pub main_class: String,
-    pub classpath: String,
-    pub version_id: String,
-    pub game_dir: String,
-    pub assets_dir: String,
-    pub asset_index: String,
-    pub auth_info: AuthInfo,
-}
+// Re-export launch types
+pub use types::{AuthInfo, LaunchArguments};
 
-/// Auth info
-///
-/// 注意：手动实现 Debug，access_token 和 client_token 脱敏为 "***"，
-/// 避免误用 {:?} 打印时泄露 token 到日志文件
-#[derive(Clone, Serialize, Deserialize)]
-pub struct AuthInfo {
-    pub username: String,
-    pub uuid: String,
-    pub access_token: String,
-    pub client_token: String,
-    pub login_type: String,
-    /// authlib 登录的 yggdrasil API 根地址（仅 AuthlibInjector 登录时有值）
-    /// 启动游戏时用于构建 -javaagent:authlib-injector.jar 和
-    /// -Dauthlibinjector.yggdrasil.prefetched 参数
-    #[serde(default)]
-    pub server_url: Option<String>,
-}
-
-impl std::fmt::Debug for AuthInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("AuthInfo")
-            .field("username", &self.username)
-            .field("uuid", &self.uuid)
-            .field("access_token", &"***")
-            .field("client_token", &"***")
-            .field("login_type", &self.login_type)
-            .field("server_url", &self.server_url)
-            .finish()
-    }
-}
-
-/// 敏感参数名列表（小写匹配）
-const SENSITIVE_ARG_NAMES: &[&str] = &[
-    "--accesstoken",
-    "--uuid",
-    "--session",
-    "--clienttoken",
-    "--password",
-    "--refreshtoken",
-];
-
-/// 对启动参数列表进行脱敏，用于日志打印
-///
-/// 识别 `--accessToken <token>` 这类敏感参数，将其值替换为 `***`。
-/// 参数名本身保留（方便调试），仅值脱敏。
-pub(crate) fn sanitize_args_for_log(args: &[String]) -> Vec<String> {
-    let mut result = Vec::with_capacity(args.len());
-    let mut skip_next = false;
-
-    for (i, arg) in args.iter().enumerate() {
-        if skip_next {
-            // 上一个参数是敏感参数，这个是它的值，脱敏
-            result.push("***".to_string());
-            skip_next = false;
-            continue;
-        }
-
-        let lower = arg.to_lowercase();
-        if SENSITIVE_ARG_NAMES.contains(&lower.as_str()) {
-            // 敏感参数名，保留，但下一个参数（值）需要脱敏
-            result.push(arg.clone());
-            // 检查下一个参数是否存在且不是另一个参数（不以 -- 开头）
-            if i + 1 < args.len() && !args[i + 1].starts_with("--") {
-                skip_next = true;
-            }
-        } else {
-            result.push(arg.clone());
-        }
-    }
-
-    result
-}
+// Re-export args sanitize helper
+pub(crate) use arguments::sanitize_args_for_log;
 
 #[cfg(test)]
 #[path = "mod_tests.rs"]

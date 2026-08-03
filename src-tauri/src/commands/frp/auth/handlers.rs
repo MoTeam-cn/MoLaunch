@@ -5,9 +5,8 @@ use super::super::provider::{
     read_provider_manifest, resolve_auth_type, resolve_device_code_config, resolve_oauth2_config,
     SYSTEM_DEFAULT_ID,
 };
-use super::{
-    device_code, flows, storage, extract_flow_error, get_extractor, AuthStatus,
-};
+use super::flows::{extract_flow_error, get_extractor};
+use super::{device_code, flows, storage, AuthStatus};
 use crate::state::AppState;
 
 /// 查询指定厂商的认证状态

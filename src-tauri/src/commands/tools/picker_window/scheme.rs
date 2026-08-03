@@ -3,7 +3,7 @@
 use tauri::http::Response;
 use tauri::{Builder, Runtime};
 
-use super::{PICKER_CSP_STORE, PICKER_DATA_STORE, PICKER_TEMPLATES};
+use super::window::{PICKER_CSP_STORE, PICKER_DATA_STORE, PICKER_TEMPLATES};
 
 /// picker URI scheme 名称
 const PICKER_SCHEME: &str = "picker";

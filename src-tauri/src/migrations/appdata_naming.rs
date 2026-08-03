@@ -6,7 +6,7 @@ use crate::log_info;
 use crate::log_warn;
 use crate::storage::appdata::appdata_root;
 
-use super::{copy_dir_recursive, dir_is_non_empty};
+use super::common::{copy_dir_recursive, dir_is_non_empty};
 
 /// 一次性迁移旧 AppData 根目录 `.MolaLaunch` → `.Molaunch`
 pub fn migrate() {
