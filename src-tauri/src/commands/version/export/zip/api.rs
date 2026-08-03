@@ -41,7 +41,9 @@ pub fn build_modpack_zip(
             pack_path,
             app,
         ),
-        ExportFormat::Hmcl => super::hmcl::build_hmcl_zip(instance_dir, files, params, pack_path, app),
+        ExportFormat::Hmcl => {
+            super::hmcl::build_hmcl_zip(instance_dir, files, params, pack_path, app)
+        }
         ExportFormat::Mmc => super::mmc::build_mmc_zip(instance_dir, files, params, pack_path, app),
         ExportFormat::Mcbbs => {
             super::mcbbs::build_mcbbs_zip(instance_dir, files, params, pack_path, app)

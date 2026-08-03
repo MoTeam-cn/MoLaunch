@@ -140,8 +140,9 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, _app, params, {
             let p: FormatFilenameParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = install::resource::format_download_filename(&state, p.file_name, p.translated_name)
-                .await?;
+            let r =
+                install::resource::format_download_filename(&state, p.file_name, p.translated_name)
+                    .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -159,12 +160,9 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, _app, params, {
             let p: ResourceInstallPathParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = install::resource::get_resource_install_path(
-                &state,
-                p.resource_type,
-                p.version_id,
-            )
-            .await?;
+            let r =
+                install::resource::get_resource_install_path(&state, p.resource_type, p.version_id)
+                    .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

@@ -15,7 +15,9 @@ mod types;
 pub mod window;
 
 pub(crate) use helpers::{is_valid_plugin_id, plugins_root, read_plugin_manifest};
-pub use types::{ExternalPluginEntry, ExternalPluginManifest, ProcessPermissions, WindowPermissions};
+pub use types::{
+    ExternalPluginEntry, ExternalPluginManifest, ProcessPermissions, WindowPermissions,
+};
 
 /// 统一插件系统 IPC 入口
 ///

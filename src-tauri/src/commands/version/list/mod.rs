@@ -10,6 +10,7 @@ mod installed;
 mod modpack;
 mod remote;
 
+pub(super) use detect::version_type_to_string;
 pub use detect::{detect_version_type_from_dir, resolve_isolation_mode};
 pub use info::{get_version_effective_dir, get_version_game_version, get_version_loader_info};
 pub use installed::{
@@ -18,4 +19,3 @@ pub use installed::{
 };
 pub use modpack::{check_local_modpack, read_local_modpack_meta, CheckLocalModpackResult};
 pub use remote::list_versions;
-pub(super) use detect::version_type_to_string;

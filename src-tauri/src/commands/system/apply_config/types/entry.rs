@@ -3,11 +3,11 @@
 //! `ConfigEntry` 为扁平化 key-value 对；`build_snapshot` 从 `AppConfig` 构建全量快照。
 //! 补丁与快照结构定义见 `patch` / `snapshot`。
 
-use serde::{Deserialize, Serialize};
 use super::snapshot::{
     CommunitySnapshot, ConfigSnapshot, DownloadSnapshot, LaunchAdvancedSnapshot, MemorySnapshot,
     OnlineSnapshot, ProxySnapshot, TlsSnapshot,
 };
+use serde::{Deserialize, Serialize};
 
 /// 配置项：扁平化 key-value 对
 ///

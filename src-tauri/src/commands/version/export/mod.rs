@@ -12,4 +12,4 @@ pub mod scan;
 pub mod types;
 pub mod zip;
 
-pub use api::{EXPORT_PROGRESS_EVENT, export_modpack, get_export_options};
+pub use api::{export_modpack, get_export_options, EXPORT_PROGRESS_EVENT};

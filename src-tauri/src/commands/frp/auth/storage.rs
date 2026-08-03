@@ -79,6 +79,7 @@ pub(super) async fn store_token_info(
     // Unix 下限制为仅当前用户可读写
     #[cfg(unix)]
     {
+        use crate::log_warn;
         use std::os::unix::fs::PermissionsExt;
         if let Err(e) = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)) {
             log_warn!("[Frp Auth] 设置 token 文件权限 0o600 失败: {}", e);

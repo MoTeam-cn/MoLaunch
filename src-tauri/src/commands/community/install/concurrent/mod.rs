@@ -8,4 +8,4 @@ mod run;
 
 pub(super) use detect::detect_modpack_format;
 pub(super) use extract::{build_overrides_prefixes, extract_overrides};
-pub(super) use run::{DetectedModpack, download_files_concurrent};
+pub(super) use run::{download_files_concurrent, DetectedModpack};

@@ -4,8 +4,8 @@ use crate::{log_info, log_warn};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-use super::loaders;
 use super::super::state::VersionType;
+use super::loaders;
 
 /// 版本信息
 #[derive(Debug, Clone, Serialize, Deserialize)]

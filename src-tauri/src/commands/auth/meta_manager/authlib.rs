@@ -96,7 +96,10 @@ pub(super) fn register(d: &mut Dispatcher) {
             let p: AuthlibLoginParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let r = crate::commands::auth::authlib::authlib_login(
-                &state, p.server_url, p.username, p.password,
+                &state,
+                p.server_url,
+                p.username,
+                p.password,
             )
             .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
@@ -107,7 +110,8 @@ pub(super) fn register(d: &mut Dispatcher) {
         handler!(state, _app, params, {
             let p: AuthlibSelectProfileParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = crate::commands::auth::authlib::authlib_select_profile(&state, p.profile).await?;
+            let r =
+                crate::commands::auth::authlib::authlib_select_profile(&state, p.profile).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -117,7 +121,9 @@ pub(super) fn register(d: &mut Dispatcher) {
             let p: SwitchAuthlibAccountParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let r = crate::commands::auth::authlib::switch_authlib_account(
-                &state, p.server_url, p.uuid,
+                &state,
+                p.server_url,
+                p.uuid,
             )
             .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
@@ -145,8 +151,9 @@ pub(super) fn register(d: &mut Dispatcher) {
         handler!(state, _app, params, {
             let p: AuthlibSkinInfoParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = crate::commands::auth::authlib::authlib_get_skin_info(&state, p.server_url, p.uuid)
-                .await?;
+            let r =
+                crate::commands::auth::authlib::authlib_get_skin_info(&state, p.server_url, p.uuid)
+                    .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -156,7 +163,11 @@ pub(super) fn register(d: &mut Dispatcher) {
             let p: AuthlibUploadSkinParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             crate::commands::auth::authlib::authlib_upload_skin(
-                &state, p.server_url, p.uuid, p.file_path, p.model,
+                &state,
+                p.server_url,
+                p.uuid,
+                p.file_path,
+                p.model,
             )
             .await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
@@ -178,7 +189,10 @@ pub(super) fn register(d: &mut Dispatcher) {
             let p: AuthlibUploadCapeParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             crate::commands::auth::authlib::authlib_upload_cape(
-                &state, p.server_url, p.uuid, p.file_path,
+                &state,
+                p.server_url,
+                p.uuid,
+                p.file_path,
             )
             .await?;
             serde_json::to_value(()).map_err(|e| e.to_string())

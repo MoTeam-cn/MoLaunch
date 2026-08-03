@@ -2,8 +2,8 @@
 
 use crate::log_info;
 
-use super::super::DetectedModpack;
 use super::super::super::types::ModpackFormat;
+use super::super::DetectedModpack;
 use super::rules::try_detect_at_root;
 
 /// 检测整合包格式

@@ -3,12 +3,7 @@
 use super::*;
 use serde_json::json;
 
-fn env(
-    success_field: &str,
-    success_value: Value,
-    error_field: &str,
-    data_field: &str,
-) -> Envelope {
+fn env(success_field: &str, success_value: Value, error_field: &str, data_field: &str) -> Envelope {
     Envelope {
         success_field: Some(success_field.to_string()),
         success_value: Some(success_value),

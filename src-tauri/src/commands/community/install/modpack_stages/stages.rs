@@ -6,9 +6,9 @@ use crate::minecraft::download::DownloadSession;
 use crate::state::{AppState, StageStatus};
 use crate::utils::format;
 
-use super::parsers;
 use super::super::concurrent::DetectedModpack;
 use super::super::types::{ModpackFormat, ModpackInfo, OptionalModInfo};
+use super::parsers;
 
 /// Stage 0：下载原始整合包到 instance 目录
 ///

@@ -2,9 +2,9 @@
 //!
 //! 并行调用 CurseForge / Modrinth / 中文 Slug 直查，超时隔离并合并结果；排序去重见 sort.rs。
 
-use super::sort::{dedup, sort_projects};
 use super::super::mcmod;
 use super::super::types::{ResourceProject, SearchParams, SearchResult};
+use super::sort::{dedup, sort_projects};
 
 /// 每页结果数
 pub const PAGE_SIZE: u32 = 40;
@@ -94,7 +94,9 @@ pub async fn search(params: SearchParams) -> Result<SearchResult, String> {
         ));
         // 中文搜索且有 MR Slug 直查列表：并行批量拉取工程详情
         if !mr_slugs.is_empty() {
-            mr_slug_fut = Some(super::super::modrinth::get_projects_by_slugs(&mr_slugs, rtype));
+            mr_slug_fut = Some(super::super::modrinth::get_projects_by_slugs(
+                &mr_slugs, rtype,
+            ));
         }
     }
 

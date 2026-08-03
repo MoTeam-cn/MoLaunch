@@ -3,11 +3,11 @@
 //! frpc 分发方式（bundled/url）和认证配置。安装/卸载见 [`super::super::install`]，
 //! frpc 下载见 [`super::super::binary`]。
 
-use super::provider_system::resolve_bundled_path;
 use super::super::{
     ensure_dir, providers_root, providers_state_path, validate_provider_id, AuthFile,
     AuthFileDeviceCode, AuthFileOAuth2, ProviderManifest,
 };
+use super::provider_system::resolve_bundled_path;
 use std::collections::HashMap;
 
 /// 读取外部厂商的 auth.json

@@ -4,8 +4,8 @@ use std::io::Read;
 
 use crate::log_info;
 
-use super::super::DetectedModpack;
 use super::super::super::types::ModpackFormat;
+use super::super::DetectedModpack;
 
 /// 尝试在指定 base_folder 下识别关键文件
 ///

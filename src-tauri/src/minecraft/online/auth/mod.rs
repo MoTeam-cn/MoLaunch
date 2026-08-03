@@ -16,8 +16,8 @@ pub use login::{build_login_request, finalize_credentials_with_login};
 pub use refresh::{build_refresh_request, finalize_credentials_with_refresh};
 pub use register::{build_register_request, finalize_credentials_with_register};
 pub use types::{
-    LoginData, LoginRequest, LoginResponse, PROTOCOL_VERSION, RefreshData, RefreshRequest,
-    RefreshResponse, REFRESH_TOKEN_TTL_SECS, RegisterData, RegisterRequest, RegisterResponse,
+    LoginData, LoginRequest, LoginResponse, RefreshData, RefreshRequest, RefreshResponse,
+    RegisterData, RegisterRequest, RegisterResponse, PROTOCOL_VERSION, REFRESH_TOKEN_TTL_SECS,
 };
 
 // 私有 use：让 login/refresh 子模块的 `super::SESSION_KEY_INFO` 保持可用

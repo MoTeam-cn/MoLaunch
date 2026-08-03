@@ -19,13 +19,10 @@ pub fn setup_tray(app: &AppHandle) -> tauri::Result<()> {
     let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&open, &check, &quit])?;
 
-    let icon = app
-        .default_window_icon()
-        .cloned()
-        .unwrap_or_else(|| {
-            tauri::image::Image::from_bytes(include_bytes!("../Images/icon.ico"))
-                .expect("failed to load tray icon")
-        });
+    let icon = app.default_window_icon().cloned().unwrap_or_else(|| {
+        tauri::image::Image::from_bytes(include_bytes!("../Images/icon.ico"))
+            .expect("failed to load tray icon")
+    });
 
     TrayIconBuilder::with_id("main")
         .icon(icon)

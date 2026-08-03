@@ -79,7 +79,10 @@ pub(crate) async fn make_client(state: &AppState) -> OnlineClient {
 }
 
 /// 从凭证构造 DeviceStatus（消除各 action 重复构造逻辑）
-pub(crate) fn build_device_status(creds: &DeviceCredentials, api_server_url: String) -> DeviceStatus {
+pub(crate) fn build_device_status(
+    creds: &DeviceCredentials,
+    api_server_url: String,
+) -> DeviceStatus {
     DeviceStatus {
         registered: creds.is_registered(),
         logged_in: !creds.device_token.is_empty(),

@@ -29,7 +29,8 @@ pub(super) fn register(d: &mut Dispatcher) {
         handler!(_state, _app, params, {
             let p: crate::commands::system::updater::UpdateInfo =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let downloaded = crate::commands::system::updater::download_update_to_appdata(p).await?;
+            let downloaded =
+                crate::commands::system::updater::download_update_to_appdata(p).await?;
             serde_json::to_value(downloaded).map_err(|e| e.to_string())
         }),
     );

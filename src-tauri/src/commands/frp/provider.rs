@@ -23,8 +23,8 @@ pub(super) use provider_external::{
     resolve_auth_type, resolve_device_code_config, resolve_oauth2_config, write_providers_state,
 };
 pub(super) use provider_system::{
-    SYSTEM_DEFAULT_ID, current_platform_key, frpc_path, is_frpc_ready, read_frpc_version,
-    system_default_dir, write_frpc_version,
+    current_platform_key, frpc_path, is_frpc_ready, read_frpc_version, system_default_dir,
+    write_frpc_version, SYSTEM_DEFAULT_ID,
 };
 
 /// 获取指定厂商的 frpc 二进制路径
@@ -81,12 +81,10 @@ pub async fn list_providers(state: &AppState) -> Result<Vec<ProviderInfo>, Strin
     let version = if frpc_ready {
         read_frpc_version().unwrap_or_else(|| "未知".to_string())
     } else {
-        fetch_latest_frpc_version(state)
-            .await
-            .unwrap_or_else(|e| {
-                log_info!("[Frp] 获取最新 frpc 版本失败，回退显示'未安装': {}", e);
-                "未安装".to_string()
-            })
+        fetch_latest_frpc_version(state).await.unwrap_or_else(|e| {
+            log_info!("[Frp] 获取最新 frpc 版本失败，回退显示'未安装': {}", e);
+            "未安装".to_string()
+        })
     };
     providers.push(ProviderInfo {
         id: SYSTEM_DEFAULT_ID.to_string(),

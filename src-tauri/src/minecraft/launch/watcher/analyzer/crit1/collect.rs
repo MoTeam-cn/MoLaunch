@@ -2,9 +2,9 @@
 //!
 //! 按 log_crash → log_mc → log_hs 顺序收集各来源文本并尝试匹配；规则表见 rules.rs。
 
-use super::rules::{analyze_crash_report, analyze_hs_err};
 use super::super::super::types::{CrashCategory, CrashInfo};
 use super::super::util::{extract_mod_from_keyword, make_crash_info};
+use super::rules::{analyze_crash_report, analyze_hs_err};
 use std::path::Path;
 
 /// 第一级高优先级精准匹配

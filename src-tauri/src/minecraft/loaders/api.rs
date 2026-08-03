@@ -4,8 +4,8 @@ use std::path::Path;
 use std::sync::Arc;
 
 use super::types::{LoaderType, LoaderVersion};
-use crate::minecraft::sources::DownloadSourceMode;
 use crate::minecraft::download::config::DownloadManagerConfig;
+use crate::minecraft::sources::DownloadSourceMode;
 
 /// List Forge versions
 pub async fn list_forge_versions(

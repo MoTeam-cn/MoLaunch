@@ -2,14 +2,14 @@
 //! 平台实现按 cfg 拆分为 windows.rs（HKCU 注册表）与 linux.rs（desktop 文件），
 //! 平台无关编排逻辑在 router.rs。
 
-#[cfg(windows)]
-mod windows;
 #[cfg(target_os = "linux")]
 mod linux;
+#[cfg(windows)]
+mod windows;
 
 mod router;
 
+use router::current_exe_path;
 #[cfg(any(windows, target_os = "linux"))]
 use router::PROTOCOL;
-use router::current_exe_path;
 pub use router::{auto_register, register, status, unregister, DeeplinkStatus};

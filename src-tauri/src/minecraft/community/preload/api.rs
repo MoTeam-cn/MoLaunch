@@ -4,10 +4,10 @@ use std::time::Instant;
 
 use tauri::{AppHandle, Emitter};
 
+use super::super::common::fmt_elapsed;
 use super::cache::{load_file_cache, save_file_cache};
 use super::jar_metadata::read_jar_metadata_and_hash;
 use super::online_query::query_and_merge;
-use super::super::common::fmt_elapsed;
 use super::types::{PreloadModInput, PreloadUpdate};
 use crate::minecraft::image_cache;
 

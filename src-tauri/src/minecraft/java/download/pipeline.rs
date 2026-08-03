@@ -36,12 +36,13 @@ pub async fn download_java_runtime(
 
     // 阶段 2：匹配 component
     progress::emit(app, "matching", 0, 1, 0, 0, "正在匹配 Java 版本...");
-    let (component, entry) = r#match::match_component(&all_json, target_major).ok_or_else(|| {
-        format!(
-            "未找到适配 Java {} 的 Mojang Runtime（platform: windows-x64）",
-            target_major
-        )
-    })?;
+    let (component, entry) =
+        r#match::match_component(&all_json, target_major).ok_or_else(|| {
+            format!(
+                "未找到适配 Java {} 的 Mojang Runtime（platform: windows-x64）",
+                target_major
+            )
+        })?;
     log_info!(
         "[JavaDownload] Matched component: {} (version: {})",
         component,

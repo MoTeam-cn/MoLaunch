@@ -6,8 +6,8 @@
 mod constants;
 mod fetch;
 mod files;
-mod pipeline;
 mod r#match;
+mod pipeline;
 mod progress;
 mod types;
 mod verify;

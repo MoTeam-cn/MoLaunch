@@ -44,9 +44,8 @@ pub(super) fn register(d: &mut Dispatcher) {
         handler!(state, app, params, {
             let p: MsLoginWebExchangeParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r =
-                crate::commands::auth::microsoft::ms_login_web_exchange(&app, &state, p.code)
-                    .await?;
+            let r = crate::commands::auth::microsoft::ms_login_web_exchange(&app, &state, p.code)
+                .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

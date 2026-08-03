@@ -4,10 +4,10 @@ mod auth_actions;
 mod auth_register_login;
 mod dispatcher;
 
-pub use dispatcher::{
-    dispatch, load_creds_with_auto_refresh, AuthInitResult, DeviceStatus, ServerTimeInfo,
-};
 pub(crate) use dispatcher::{
     build_device_status, login_fresh, make_client, make_storage, read_api_server_url,
     refresh_credentials,
+};
+pub use dispatcher::{
+    dispatch, load_creds_with_auto_refresh, AuthInitResult, DeviceStatus, ServerTimeInfo,
 };

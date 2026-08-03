@@ -14,9 +14,7 @@ mod types;
 
 pub use api_key::save_api_key;
 pub use device_code::{poll_device_code, start_device_code};
-pub use handlers::{
-    ensure_valid_token, get_auth_status, load_token, refresh_token, revoke_auth,
-};
+pub use handlers::{ensure_valid_token, get_auth_status, load_token, refresh_token, revoke_auth};
 pub use oauth2::start_oauth2;
 pub use storage::set_sdk;
 pub use types::{AuthStatus, DeviceCodePollResult, DeviceCodeResult, OAuth2Result};

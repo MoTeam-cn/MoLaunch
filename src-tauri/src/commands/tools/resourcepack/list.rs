@@ -5,8 +5,8 @@ use crate::log_info;
 use crate::log_warn;
 use crate::state::AppState;
 
-use super::{resolve_packs_dir, path_to_string};
 use super::super::types::{ResourcePackItem, ResourcePackListParams, ResourcePackListResult};
+use super::{path_to_string, resolve_packs_dir};
 
 /// 列出 resourcepacks 目录下顶层条目（.zip 文件 → zip；目录 → folder）
 pub async fn list(

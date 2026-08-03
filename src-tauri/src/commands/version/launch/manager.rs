@@ -11,8 +11,11 @@ use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
-use super::{cancel_launch, get_launch_history, get_launch_progress, get_running_game, launch_game, stop_game};
 use super::super::script_export;
+use super::{
+    cancel_launch, get_launch_history, get_launch_progress, get_running_game, launch_game,
+    stop_game,
+};
 
 /// launch_game 参数（与原 launch_game 命令参数一一对应，字段名 camelCase）
 #[derive(Debug, Deserialize)]

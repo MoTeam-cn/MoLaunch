@@ -64,9 +64,8 @@ pub(super) fn register(d: &mut Dispatcher) {
         handler!(state, _app, params, {
             let p: UuidParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r =
-                crate::commands::auth::account::offline::switch_offline_account(&state, p.uuid)
-                    .await?;
+            let r = crate::commands::auth::account::offline::switch_offline_account(&state, p.uuid)
+                .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -86,7 +85,10 @@ pub(super) fn register(d: &mut Dispatcher) {
             let p: SaveCustomSkinParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let r = crate::commands::auth::account::offline::save_custom_skin(
-                &state, p.uuid, p.file_path, p.variant,
+                &state,
+                p.uuid,
+                p.file_path,
+                p.variant,
             )
             .await?;
             serde_json::to_value(r).map_err(|e| e.to_string())

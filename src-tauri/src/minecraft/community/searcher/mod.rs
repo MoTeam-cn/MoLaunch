@@ -5,5 +5,5 @@
 mod aggregate;
 mod sort;
 
-pub use aggregate::PAGE_SIZE;
 pub use aggregate::search;
+pub use aggregate::PAGE_SIZE;

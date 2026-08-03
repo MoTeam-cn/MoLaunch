@@ -7,7 +7,11 @@ use super::super::types::CleanupItem;
 /// 递归扫描目录：累计所有文件大小与文件数
 ///
 /// 不存在返回 None；存在但为空目录返回 size=0 / file_count=0 的 CleanupItem。
-pub(super) fn scan_directory(dir: &Path, display_name: &str, category: &str) -> Option<CleanupItem> {
+pub(super) fn scan_directory(
+    dir: &Path,
+    display_name: &str,
+    category: &str,
+) -> Option<CleanupItem> {
     if !dir.exists() {
         return None;
     }

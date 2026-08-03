@@ -74,7 +74,8 @@ async fn ensure_api_key_decrypted() {
     let api_key = match encrypted_key {
         Some(ref enc) if !enc.is_empty() => match SDK_REF.get() {
             Some(sdk_arc) => {
-                crate::utils::sdk_crypto::decrypt_with_sdk_optional(sdk_arc, enc, "CF api_key").await
+                crate::utils::sdk_crypto::decrypt_with_sdk_optional(sdk_arc, enc, "CF api_key")
+                    .await
             }
             None => {
                 crate::log_warn!("[Community] SDK 未注入，CF api_key 无法解密");

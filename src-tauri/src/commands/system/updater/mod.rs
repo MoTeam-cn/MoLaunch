@@ -10,5 +10,5 @@ mod install_unix;
 #[cfg(target_os = "windows")]
 mod install_windows;
 
-pub use api::{UpdateInfo, apply_pending_update, download_and_install, download_update_to_appdata};
+pub use api::{apply_pending_update, download_and_install, download_update_to_appdata, UpdateInfo};
 pub use check::check_update;

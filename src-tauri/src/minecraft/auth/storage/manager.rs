@@ -65,7 +65,11 @@ impl AuthStorage {
     /// 等价于旧版 `reg_get_decrypted`：reg_get 读取明文值 → self.decrypt SDK DES 解密。
     /// 注册表键不存在或解密失败时返回 None。非 Windows 平台不编译此方法。
     #[cfg(windows)]
-    pub(super) async fn reg_get_decrypted(&self, key: &winreg::RegKey, name: &str) -> Option<String> {
+    pub(super) async fn reg_get_decrypted(
+        &self,
+        key: &winreg::RegKey,
+        name: &str,
+    ) -> Option<String> {
         use crate::storage::registry::reg_get;
 
         let encrypted = reg_get(key, name)?;

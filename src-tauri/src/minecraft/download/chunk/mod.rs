@@ -10,4 +10,4 @@ pub mod probe;
 // 对外保持 `super::chunk::supports_range` 调用路径稳定
 pub use probe::supports_range;
 
-pub use api::{ChunkDownloadResult, download_chunked};
+pub use api::{download_chunked, ChunkDownloadResult};

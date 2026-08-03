@@ -31,10 +31,7 @@ pub async fn get_ms_accounts(state: &AppState) -> Result<Vec<MsAccountInfo>, Str
         let mut expires_at = a.expires_at;
 
         if is_expired && !a.refresh_token.is_empty() {
-            log_info!(
-                "Token expired for MS account {}, refreshing...",
-                a.username
-            );
+            log_info!("Token expired for MS account {}, refreshing...", a.username);
             match microsoft::login_with_refresh_token(&a.refresh_token, |_| {}).await {
                 Ok(r) => {
                     if let Err(e) = state
@@ -48,11 +45,7 @@ pub async fn get_ms_accounts(state: &AppState) -> Result<Vec<MsAccountInfo>, Str
                     expires_at = r.expires_at;
                 }
                 Err(e) => {
-                    log_warn!(
-                        "Auto-refresh failed for MS account {}: {}",
-                        a.username,
-                        e
-                    );
+                    log_warn!("Auto-refresh failed for MS account {}: {}", a.username, e);
                     refreshing = true;
                 }
             }

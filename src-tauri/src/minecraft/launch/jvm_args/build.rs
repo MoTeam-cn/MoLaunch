@@ -2,9 +2,9 @@
 //!
 //! authlib/lua/json_jvm/jlw 各段参数构造。
 
-use super::rules::is_gbk_encoding;
 use super::super::embedded::{has_library, resolve_embedded_jar};
 use super::super::AuthInfo;
+use super::rules::is_gbk_encoding;
 use std::path::Path;
 
 /// authlib-injector.jar 在缓存目录的相对路径

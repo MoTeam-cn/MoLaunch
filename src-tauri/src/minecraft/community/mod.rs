@@ -14,8 +14,8 @@ pub mod tags;
 pub mod types;
 pub mod version_extract;
 
+pub use config::{get_ignore_quilt, get_source_pref};
 pub use searcher::search;
 pub use types::{
     Platform, ResourceProject, ResourceType, ResourceVersion, SearchParams, SearchResult,
 };
-pub use config::{get_ignore_quilt, get_source_pref};

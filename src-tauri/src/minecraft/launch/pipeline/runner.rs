@@ -70,9 +70,7 @@ impl LaunchPipeline {
     }
 
     /// 获取退出通知接收器
-    pub async fn exit_receiver(
-        &self,
-    ) -> Option<tokio::sync::watch::Receiver<Option<ExitInfo>>> {
+    pub async fn exit_receiver(&self) -> Option<tokio::sync::watch::Receiver<Option<ExitInfo>>> {
         let watcher_guard = self.watcher.lock().await;
         watcher_guard.as_ref().map(|w| w.exit_receiver())
     }

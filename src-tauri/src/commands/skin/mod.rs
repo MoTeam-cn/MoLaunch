@@ -14,9 +14,9 @@ mod manager;
 mod upload;
 
 pub use cape::*;
+pub use dispatcher::download_url_to_file;
 pub use list::*;
 pub use upload::*;
-pub use dispatcher::download_url_to_file;
 
 /// 统一皮肤管理 IPC 入口
 ///

@@ -31,8 +31,8 @@ pub use manage::{fix_version_files, get_selected_version, rename_version, set_se
 pub use personalization::{
     get_version_personalization, update_version_personalization, VersionPersonalization,
 };
-pub use script_export::export_launch_script;
 pub use sanitize::{sanitize_mc_version, sanitize_version_id};
+pub use script_export::export_launch_script;
 
 /// 版本列表/文件夹/管理/个性化统一 IPC 入口
 ///

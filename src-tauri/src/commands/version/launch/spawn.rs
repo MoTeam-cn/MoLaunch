@@ -4,7 +4,7 @@ use crate::log_info;
 use crate::minecraft::launch::{self, LaunchPipeline};
 use crate::state::{AppState, LaunchHistory};
 use std::sync::Arc;
-use tauri::{Emitter, AppHandle};
+use tauri::{AppHandle, Emitter};
 
 use super::GameExitEvent;
 

@@ -8,6 +8,6 @@ mod entry;
 mod patch;
 mod snapshot;
 
-pub use entry::{ConfigEntry, build_snapshot};
+pub use entry::{build_snapshot, ConfigEntry};
 pub use patch::ConfigPatch;
 pub use snapshot::ConfigSnapshot;

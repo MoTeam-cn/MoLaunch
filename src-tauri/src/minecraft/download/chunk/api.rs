@@ -9,11 +9,11 @@ use tokio::sync::Mutex;
 use crate::utils::format;
 use crate::{log_debug, log_warn};
 
+use super::super::rate_limiter::RateLimiter;
+use super::super::types::{DownloadStatus, GlobalProgress};
 use super::download::download_chunk;
 use super::merge::merge_chunks;
 use super::probe::probe_file_size;
-use super::super::rate_limiter::RateLimiter;
-use super::super::types::{DownloadStatus, GlobalProgress};
 
 /// 分片下载结果
 pub struct ChunkDownloadResult {

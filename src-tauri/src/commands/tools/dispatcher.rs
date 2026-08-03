@@ -4,14 +4,14 @@
 use once_cell::sync::Lazy;
 use tauri::AppHandle;
 
-use crate::handler;
-use crate::state::AppState;
-use crate::utils::dispatcher::{ActionRequest, Dispatcher};
+use super::types::*;
 use super::{
     archive, cleanup, crash_analyzer, data_export, download, filename, memory, mod_tools, nbt,
     network, picker_window, resourcepack, screenshot, version_json,
 };
-use super::types::*;
+use crate::handler;
+use crate::state::AppState;
+use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     let mut d = Dispatcher::new();

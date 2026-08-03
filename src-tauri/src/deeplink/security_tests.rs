@@ -6,9 +6,7 @@ use super::*;
 fn allows_whitelisted_https() {
     assert!(validate_download_url("https://media.forgecdn.net/files/123/456/x.jar").is_ok());
     assert!(validate_download_url("https://edge.forgecdn.net/files/123/456/x.jar").is_ok());
-    assert!(
-        validate_download_url("https://mediafilez.forgecdn.net/files/123/456/x.jar").is_ok()
-    );
+    assert!(validate_download_url("https://mediafilez.forgecdn.net/files/123/456/x.jar").is_ok());
     assert!(validate_download_url("https://cdn.modrinth.com/data/abc.zip").is_ok());
     assert!(validate_download_url("https://modrinth.com/modpack/xyz").is_ok());
     // 子域名通配
