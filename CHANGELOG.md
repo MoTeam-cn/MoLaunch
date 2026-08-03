@@ -9,6 +9,19 @@
 
 ### 修复
 
+#### FRP 厂商隧道导入端口固定 7000 与 TCP 检测参数类型错误
+
+- 背景：联机房间详情不显示参与者列表（participants 为空时列表区整块隐藏）；FRP 从厂商同步隧道时服务端端口被固定写成 7000；隧道创建表单 TCP 检测报 `参数解析失败: invalid type: string "17000", expected u16`
+- 改动：
+  - `src/components/online/RoomHostPanel.vue`：`ParticipantList` 移除 `v-if="participants.length > 0"` 守卫，空时也渲染列表区
+  - `src/components/online/ParticipantList.vue`：空列表时显示「暂无参与者加入」空状态（icon + text 垂直水平居中，符合空状态规范）
+  - `src/components/online/RoomHostPanel.vue` / `RoomGuestPanel.vue`：「剩余时间」增加 Tooltip 说明房间保留时间机制（超时无人加入自动清退；正常游玩自动续期保留）
+  - `src-tauri/src/commands/frp/api_spec/executor.rs`：`resolve_field` 真正实现 `split` 拆分（此前仅占位直接返回原始值），`map_tunnels` 中 `serverHost` 取拆分后第 0 段、`serverPort` 取第 1 段；`get_field` 调用同步补 `None`
+  - `src/components/frp/RemoteTunnelSync.vue`：导入端口改用 `Number()` 解析并去掉 `|| 7000` 兜底，服务端端口无效时中止导入并 toast 提示
+  - `src/components/frp/TunnelCreateForm.vue`：TCP 检测端口 `Number(form.serverPort)` 强转（Input 组件会把数值字符串化，此前字符串 `"17000"` 无法反序列化为 `u16`）
+- 根因：`resolve_field` 的 split 分支从未拆分 `host:port`，前端 `parseInt("节点域名:17000")` 为 `NaN` 被 `|| 7000` 兜底掩盖；Input 组件 `String(val)` 化导致端口以字符串传给后端 `u16` 参数
+- 验证：`cargo check` 通过、`cargo test` 152 passed、`vue-tsc --noEmit` 通过
+
 #### 复用全局 formatBytes：消除 UpdateDialog 局部实现遮蔽
 
 - 背景：审计（docs/fix-debug/05-utils-reuse.md P0）发现 `UpdateDialog.vue` 组件内定义的局部 `formatBytes` 遮蔽了 `utils/format.ts` 全局实现，且展示口径不一致（局部用 1 位小数，全局默认 2 位小数）

@@ -8,7 +8,7 @@
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
-import { XCircleIcon } from '@heroicons/vue/24/outline'
+import { UsersIcon, XCircleIcon } from '@heroicons/vue/24/outline'
 import type { ParticipantInfo } from '@/types/online'
 
 defineProps<{
@@ -24,7 +24,11 @@ const emit = defineEmits<{
 
 <template>
   <Card title="参与者">
-    <div class="divide-y divide-gray-100">
+    <div v-if="participants.length === 0" class="py-8 flex flex-col items-center justify-center gap-2 text-gray-400">
+      <UsersIcon class="w-8 h-8" />
+      <span class="text-xs">暂无参与者加入</span>
+    </div>
+    <div v-else class="divide-y divide-gray-100">
       <div
         v-for="p in participants"
         :key="p.participantId"

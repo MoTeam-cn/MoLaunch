@@ -121,8 +121,8 @@ function scheduleCheck() {
 
 async function runCheck() {
   const host = form.serverAddr.trim()
-  const port = form.serverPort
-  if (!host || !port) return
+  const port = Number(form.serverPort)
+  if (!host || !Number.isInteger(port) || port <= 0) return
   const seq = ++checkSeq
   checkState.value = 'checking'
   try {

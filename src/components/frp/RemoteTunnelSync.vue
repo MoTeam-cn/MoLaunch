@@ -106,15 +106,22 @@ async function handleImport(tunnel: RemoteTunnelInfo) {
   try {
     const tunnelType: TunnelType =
       tunnel.tunnelType === 'tcp' || tunnel.tunnelType === 'udp' ? tunnel.tunnelType : 'tcp'
+    const localPort = Number(tunnel.localPort)
+    const serverPort = Number(tunnel.serverPort)
+    const remotePort = Number(tunnel.remotePort)
+    if (!Number.isInteger(serverPort) || serverPort <= 0) {
+      toastError(`隧道「${tunnel.name}」未解析到有效的服务端端口号，已取消导入`)
+      return
+    }
     const params: CreateTunnelParams = {
       name: tunnel.name,
       providerId: selectedProviderId.value,
       tunnelType,
       localIp: tunnel.localHost || '127.0.0.1',
-      localPort: parseInt(tunnel.localPort, 10) || 25565,
+      localPort: Number.isInteger(localPort) && localPort > 0 ? localPort : 25565,
       serverAddr: tunnel.serverHost,
-      serverPort: parseInt(tunnel.serverPort, 10) || 7000,
-      remotePort: parseInt(tunnel.remotePort, 10) || 0,
+      serverPort,
+      remotePort: Number.isInteger(remotePort) && remotePort > 0 ? remotePort : 0,
       token: tunnel.token || undefined,
       useTls: false,
     }

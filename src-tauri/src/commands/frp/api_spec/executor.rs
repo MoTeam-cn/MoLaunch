@@ -203,17 +203,17 @@ fn map_tunnels(
         .map(|item| {
             let item_ref = &item;
             TunnelInfo {
-                id: resolve_field(item_ref, fields.get("id"), account),
-                name: resolve_field(item_ref, fields.get("name"), account),
-                tunnel_type: resolve_field(item_ref, fields.get("type"), account),
-                status: resolve_field(item_ref, fields.get("status"), account),
-                server_host: resolve_field(item_ref, fields.get("serverHost"), account),
-                server_port: resolve_field(item_ref, fields.get("serverPort"), account),
-                token: resolve_field(item_ref, fields.get("token"), account),
-                local_host: resolve_field(item_ref, fields.get("localHost"), account),
-                local_port: resolve_field(item_ref, fields.get("localPort"), account),
-                remote_port: resolve_field(item_ref, fields.get("remotePort"), account),
-                custom_domain: resolve_field(item_ref, fields.get("customDomain"), account),
+                id: resolve_field(item_ref, fields.get("id"), account, None),
+                name: resolve_field(item_ref, fields.get("name"), account, None),
+                tunnel_type: resolve_field(item_ref, fields.get("type"), account, None),
+                status: resolve_field(item_ref, fields.get("status"), account, None),
+                server_host: resolve_field(item_ref, fields.get("serverHost"), account, Some(0)),
+                server_port: resolve_field(item_ref, fields.get("serverPort"), account, Some(1)),
+                token: resolve_field(item_ref, fields.get("token"), account, None),
+                local_host: resolve_field(item_ref, fields.get("localHost"), account, None),
+                local_port: resolve_field(item_ref, fields.get("localPort"), account, None),
+                remote_port: resolve_field(item_ref, fields.get("remotePort"), account, None),
+                custom_domain: resolve_field(item_ref, fields.get("customDomain"), account, None),
             }
         })
         .collect();
@@ -224,16 +224,20 @@ fn map_tunnels(
 /// 从 JSON 对象按字段名取字符串值
 fn get_field(value: &serde_json::Value, mapping: Option<&FieldMapping>) -> String {
     match mapping {
-        Some(m) => resolve_field(value, Some(m), &AccountInfo::default()),
+        Some(m) => resolve_field(value, Some(m), &AccountInfo::default(), None),
         None => String::new(),
     }
 }
 
 /// 解析字段映射（支持直接字段名、split 拆分、{account.token} 引用）
+///
+/// `split_index`：当映射配置了 split 分隔符时，取拆分后第几段
+/// （如 connectAddress "host:port" 拆分后 serverHost 取第 0 段、serverPort 取第 1 段）。
 fn resolve_field(
     item: &serde_json::Value,
     mapping: Option<&FieldMapping>,
     account: &AccountInfo,
+    split_index: Option<usize>,
 ) -> String {
     let Some(m) = mapping else {
         return String::new();
@@ -260,11 +264,14 @@ fn resolve_field(
         .unwrap_or_default();
 
     // 处理 split 拆分（如 connectAddress "host:port" 按冒号拆分）
-    // 需要知道取第几部分 — 通过 field 名推断（serverHost 取 0，serverPort 取 1）
-    // 但 FieldMapping 不包含索引信息，这里按约定：split 时返回完整值
-    // 调用方应在 fields 映射中分别为 serverHost/serverPort 配置 split
-    // 实际拆分在 config_gen 中按需处理
-    if m.split.is_some() {
+    // 配置了 split 时按 split_index 取对应段；未配置 split 或取不到时返回完整值
+    if let Some(ref sep) = m.split {
+        if let Some(idx) = split_index {
+            let parts: Vec<&str> = raw.split(sep).collect();
+            if let Some(part) = parts.get(idx) {
+                return part.trim().to_string();
+            }
+        }
         return raw;
     }
 

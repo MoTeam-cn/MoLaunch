@@ -223,7 +223,9 @@ onMounted(() => {
         <div class="px-1 py-3 flex items-center justify-between">
           <div class="flex items-center gap-2 text-sm text-gray-600">
             <ClockIcon class="w-4 h-4 text-gray-400" />
-            <span>剩余时间</span>
+            <Tooltip text="房间保留时间：若在此时间内无新玩家加入，房间将自动清退；正常游玩中的房间会自动续期保留，无需担心">
+              <span>剩余时间</span>
+            </Tooltip>
           </div>
           <span class="text-xs" :class="remainingSeconds < 300 ? 'text-red-600' : 'text-gray-900'">
             {{ remainingText }}
