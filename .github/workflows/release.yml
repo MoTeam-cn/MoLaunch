@@ -142,6 +142,11 @@ jobs:
           # 启用签名（tauri-action 检测到此环境变量后自动对安装包签名，生成 .sig 文件）
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # 微软登录 Client ID（编译期注入，见 src-tauri/src/minecraft/auth/microsoft/config.rs 的
+          # option_env!("MOLAUNCH_MS_CLIENT_ID")）。配置后走 v2.0 端点 + Device Code Flow；
+          # 留空时使用 Minecraft 官方 ID + 旧版端点。
+          # GitHub Secrets 配置名：MOLAUNCH_MS_CLIENT_ID
+          MOLAUNCH_MS_CLIENT_ID: ${{ secrets.MOLAUNCH_MS_CLIENT_ID }}
         with:
           tauriScript: npx tauri
           # Windows 优先使用 NSIS 安装包（而非 MSI），与 updater 协议一致
