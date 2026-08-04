@@ -28,6 +28,22 @@ export interface Tunnel {
   token?: string
   /** 是否启用 TLS */
   useTls: boolean
+  /** 厂商远端隧道自增 ID（从厂商 API 导入时记录；本地自建隧道为空） */
+  remoteTunnelId?: string
+  /** 厂商远端隧道真实 name（config 接口查询、frpc 代理 name 用） */
+  remoteTunnelName?: string
+  /** 厂商 config 接口返回的完整配置，导入时持久化 */
+  rawConfig?: string
+  /** 带宽限制（如 "4MB"），写入 [proxies.transport] bandwidthLimit */
+  bandwidthLimit?: string
+  /** 带宽限制模式（如 "server"），写入 [proxies.transport] bandwidthLimitMode */
+  bandwidthLimitMode?: string
+  /** Proxy 传输加密 */
+  proxyUseEncryption?: boolean
+  /** Proxy 传输压缩 */
+  proxyUseCompression?: boolean
+  /** Proxy 协议版本 */
+  proxyProtocolVersion?: string
   /** 创建时间（Unix 毫秒） */
   createdAt: number
 }
@@ -90,6 +106,18 @@ export interface CreateTunnelParams {
   remotePort: number
   token?: string
   useTls?: boolean
+  /** 标记为厂商同步导入请求；手动创建不要设置 */
+  imported?: boolean
+  /** 厂商远端隧道自增 ID（从厂商 API 导入时传入） */
+  remoteTunnelId?: string
+  /** 厂商远端隧道真实 name（config 接口查询、frpc 代理 name 用） */
+  remoteTunnelName?: string
+  /** 厂商 config 接口返回的完整配置 */
+  rawConfig?: string
+  /** 带宽限制（如 "4MB"），写入 proxies.transport.bandwidthLimit */
+  bandwidthLimit?: string
+  /** 带宽限制模式（如 "server"），写入 [proxies.transport] bandwidthLimitMode */
+  bandwidthLimitMode?: string
 }
 
 /** 更新隧道参数（编辑隧道配置） */
@@ -105,4 +133,9 @@ export interface UpdateTunnelParams {
   remotePort: number
   token?: string
   useTls?: boolean
+  bandwidthLimit?: string
+  bandwidthLimitMode?: string
+  proxyUseEncryption?: boolean
+  proxyUseCompression?: boolean
+  proxyProtocolVersion?: string
 }

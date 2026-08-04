@@ -31,6 +31,7 @@ import {
   ArchiveBoxIcon,
   LinkIcon,
   TrashIcon,
+  ArrowUpTrayIcon,
 } from '@heroicons/vue/24/outline'
 import type { ProviderInfo } from '@/types/frp'
 
@@ -125,6 +126,16 @@ function handleUninstall(p: ProviderInfo) {
       await store.uninstallProvider(p.id)
     },
   )
+}
+
+/** 更新外部厂商：直接选择 ZIP 包，复用安装流程（版本变化才执行增量更新） */
+async function handleUpdate(p: ProviderInfo) {
+  const file = await pickFile({
+    title: `选择「${p.name}」更新 ZIP 包`,
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+  })
+  if (!file) return
+  await store.installProviderFromZip(file)
 }
 </script>
 
@@ -244,17 +255,30 @@ function handleUninstall(p: ProviderInfo) {
                 custom-option
                 @update:model-value="(v: string | number) => handleToggleProvider(provider.id, v === 'enabled')"
               />
-              <Tooltip text="卸载厂商">
-                <Button
-                  type="ghost"
-                  size="mini"
-                  :loading="actionLoading"
-                  @click="handleUninstall(provider)"
-                >
-                  <template #icon><TrashIcon class="w-3.5 h-3.5" /></template>
-                  卸载
-                </Button>
-              </Tooltip>
+              <div class="flex items-center gap-1">
+                <Tooltip text="更新厂商（ZIP 包或文件夹，版本变化才更新）">
+                  <Button
+                    type="ghost"
+                    size="mini"
+                    :loading="actionLoading"
+                    @click="handleUpdate(provider)"
+                  >
+                    <template #icon><ArrowUpTrayIcon class="w-3.5 h-3.5" /></template>
+                    更新
+                  </Button>
+                </Tooltip>
+                <Tooltip text="卸载厂商">
+                  <Button
+                    type="ghost"
+                    size="mini"
+                    :loading="actionLoading"
+                    @click="handleUninstall(provider)"
+                  >
+                    <template #icon><TrashIcon class="w-3.5 h-3.5" /></template>
+                    卸载
+                  </Button>
+                </Tooltip>
+              </div>
             </template>
           </div>
         </div>

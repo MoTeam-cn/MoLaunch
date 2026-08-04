@@ -6,10 +6,13 @@
 import { computed } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import { copyToClipboard } from '@/utils/clipboard'
+import { buildTunnelLink } from '@/utils/frp-tunnel-link'
 import type { ProviderInfo, TunnelWithStatus } from '@/types/frp'
 import {
   ArrowPathIcon, PlayIcon, StopIcon, TrashIcon,
   GlobeAltIcon, ServerIcon, DocumentTextIcon, PencilIcon,
+  LinkIcon,
 } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{
@@ -32,6 +35,12 @@ const providerName = computed(() => {
   const map = new Map(props.providers.map(p => [p.id, p.name]))
   return (id: string): string => map.get(id) ?? id
 })
+
+/** 组装隧道访问链接并复制（serverAddr:remotePort） */
+async function handleCopyLink(tunnel: TunnelWithStatus) {
+  const link = buildTunnelLink(tunnel.serverAddr, tunnel.remotePort, tunnel.tunnelType)
+  await copyToClipboard(link, { toast: true })
+}
 </script>
 
 <template>
@@ -115,6 +124,15 @@ const providerName = computed(() => {
               @click="emit('edit', tunnel)"
             >
               <template #icon><PencilIcon class="w-3.5 h-3.5" /></template>
+            </Button>
+          </Tooltip>
+          <Tooltip text="复制访问链接">
+            <Button
+              type="ghost"
+              size="mini"
+              @click="handleCopyLink(tunnel)"
+            >
+              <template #icon><LinkIcon class="w-3.5 h-3.5" /></template>
             </Button>
           </Tooltip>
           <Tooltip text="查看日志">

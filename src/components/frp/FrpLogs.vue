@@ -20,7 +20,9 @@ import { useTauriEvent } from '@/composables/useTauriEvent'
 import { parseLogLines, logLineClass, type LogLine } from '@/utils/log-display'
 import { translateLogLine } from '@/utils/frp-log-translate'
 import { diagnoseLogs, diagnoseBadgeClass, type DiagnoseResult } from '@/utils/frp-log-diagnose'
+import { extractTunnelLink } from '@/utils/frp-tunnel-link'
 import { toastInfo } from '@/utils/toast'
+import { copyToClipboard } from '@/utils/clipboard'
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -37,6 +39,7 @@ import {
   QuestionMarkCircleIcon,
   ExclamationTriangleIcon,
   ChevronDownIcon,
+  LinkIcon,
 } from '@heroicons/vue/24/outline'
 import type { FrpcLogEvent, FrpTunnelStatusEvent } from '@/types/frp'
 
@@ -116,9 +119,21 @@ async function handleRefresh() {
   toastInfo('日志已刷新')
 }
 
-function handleClear() {
-  store.clearLogs()
-  toastInfo('日志已清空')
+async function handleClear() {
+  await store.clearLogFile(store.selectedLogTunnelId)
+  toastInfo('日志文件已清空')
+}
+
+/** 从当前日志中截取厂商输出的访问链接（无则返回空） */
+const extractedLink = computed(() => extractTunnelLink(store.logs))
+
+/** 复制截取到的访问链接 */
+async function handleCopyLink() {
+  if (!extractedLink.value) {
+    toastInfo('日志中未发现访问链接')
+    return
+  }
+  await copyToClipboard(extractedLink.value, { toast: true })
 }
 
 /** 单行日志显示文本：开启翻译时追加中文释义 */
@@ -142,6 +157,11 @@ onMounted(() => {
         <Select v-model="store.selectedLogTunnelId" :options="tunnelOptions" />
       </div>
       <div class="flex items-center gap-2 ml-auto">
+        <Tooltip text="复制访问链接（从日志中截取厂商输出地址）">
+          <Button type="ghost" size="small" :disabled="!extractedLink" @click="handleCopyLink">
+            <template #icon><LinkIcon class="w-4 h-4" /></template>
+          </Button>
+        </Tooltip>
         <Tooltip text="中文翻译（在行尾追加释义）">
           <Button
             type="ghost"
@@ -157,7 +177,7 @@ onMounted(() => {
             <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
           </Button>
         </Tooltip>
-        <Tooltip text="清空当前显示">
+        <Tooltip text="清空日志文件内容（当前筛选隧道；全部隧道时清空全部）">
           <Button type="ghost" size="small" @click="handleClear">
             <template #icon><TrashIcon class="w-4 h-4" /></template>
           </Button>
@@ -258,9 +278,15 @@ onMounted(() => {
 
     <!-- 状态栏 -->
     <div class="mt-2 flex items-center justify-between text-xs text-gray-500">
-      <span>
+      <span class="flex items-center gap-2 flex-wrap">
         {{ store.selectedLogTunnelId ? '隧道：' + store.selectedLogTunnelId : '全部隧道' }}
-        <span v-if="translateEnabled" class="ml-2 text-primary-600">已开启翻译</span>
+        <template v-if="extractedLink">
+          <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-primary-50 text-primary-700">
+            <LinkIcon class="w-3 h-3" />
+            {{ extractedLink }}
+          </span>
+        </template>
+        <span v-if="translateEnabled" class="text-primary-600">已开启翻译</span>
       </span>
       <span>
         共 {{ filteredLogs.length }} 行{{ store.logsHasMore ? '（仍有更早历史日志）' : '' }}

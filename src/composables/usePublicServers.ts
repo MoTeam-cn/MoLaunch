@@ -10,6 +10,20 @@ import { listPublicServers, allocatePublicServer } from '@/utils/api/frp-manager
 import { toastError } from '@/utils/toast'
 import type { PublicFrpServer, TunnelType } from '@/types/frp'
 
+/** external 公共服务器不由 api-server 分配端口，客户端为 frpc 生成临时端口。 */
+function pickExternalRemotePort(): number {
+  const min = 10_000
+  const max = 60_000
+  const range = max - min + 1
+  const cryptoApi = globalThis.crypto
+  if (cryptoApi?.getRandomValues) {
+    const values = new Uint32Array(1)
+    cryptoApi.getRandomValues(values)
+    return min + (values[0] % range)
+  }
+  return min + Math.floor(Math.random() * range)
+}
+
 /** composable 需要读写的表单字段子集 */
 interface PublicServerFormTarget {
   tunnelType: TunnelType
@@ -54,7 +68,8 @@ export function usePublicServers(form: PublicServerFormTarget) {
       const resp = await allocatePublicServer({ serverId: String(id), tunnelType: form.tunnelType })
       form.serverAddr = resp.server.serverAddr
       form.serverPort = resp.server.serverPort
-      form.remotePort = resp.remotePort
+      const allocatedRemotePort = resp.remotePort > 0 ? resp.remotePort : pickExternalRemotePort()
+      form.remotePort = allocatedRemotePort
       form.token = resp.frpToken
       form.useTls = resp.server.tlsEnabled
       form.allocationId = resp.allocationId

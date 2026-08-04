@@ -4,7 +4,7 @@
  * 自备模式 TCP 连通性检测；本机端口按钮拉取监听端口
  * 公共服务器逻辑抽至 usePublicServers composable
  */
-import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
 import Input from '@/components/common/Input.vue'
@@ -13,13 +13,21 @@ import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { tcpCheck } from '@/utils/api/tools'
 import { usePublicServers } from '@/composables/usePublicServers'
-import { toastError } from '@/utils/toast'
+import { toastError, toastInfo } from '@/utils/toast'
+import { pickFile } from '@/utils/fileDialog'
+import { importFrpcConfig } from '@/utils/api/frp-manager'
 import { openPickerWindow } from '@/utils/picker-window'
-import type { CreateTunnelParams, ProviderInfo, Tunnel, TunnelType, UpdateTunnelParams } from '@/types/frp'
-import { ExclamationCircleIcon, CheckCircleIcon, XCircleIcon, ArrowPathIcon, ServerStackIcon } from '@heroicons/vue/24/outline'
+import type { CreateTunnelParams, Tunnel, TunnelType, UpdateTunnelParams } from '@/types/frp'
+import {
+  AdjustmentsHorizontalIcon,
+  ArrowPathIcon,
+  CheckCircleIcon,
+  ChevronDownIcon,
+  ServerStackIcon,
+  XCircleIcon,
+} from '@heroicons/vue/24/outline'
 
 const props = defineProps<{
-  providers: ProviderInfo[]
   actionLoading: boolean
   editTunnel?: Tunnel
 }>()
@@ -38,6 +46,7 @@ const typeOptions = [{ label: 'TCP', value: 'tcp' }, { label: 'UDP', value: 'udp
 
 const form = reactive({
   name: '',
+  // 手动创建统一使用系统自带 frpc；厂商隧道只能通过同步导入。
   providerId: 'system-default',
   mode: 'self' as TunnelMode,
   tunnelType: 'tcp' as TunnelType,
@@ -48,6 +57,12 @@ const form = reactive({
   remotePort: 30000,
   token: '',
   useTls: false,
+  bandwidthLimit: '',
+  bandwidthLimitMode: 'server',
+  proxyUseEncryption: false,
+  proxyUseCompression: false,
+  proxyProtocolVersion: 'v1',
+  advancedOpen: false,
   publicServerId: '',
   allocationId: '',
 })
@@ -57,16 +72,6 @@ const form = reactive({
  * 表单下方有「frpc 未就绪」警告提示；否则从厂商同步导入的隧道无法在编辑时
  * 显示对应厂商）。编辑模式下额外确保当前隧道厂商在选项中（即使被禁用）。
  */
-const providerOptions = computed(() => {
-  const edit = props.editTunnel
-  const list = props.providers.filter(p => p.enabled)
-  if (edit && !list.some(p => p.id === edit.providerId)) {
-    const current = props.providers.find(p => p.id === edit.providerId)
-    if (current) list.push(current)
-  }
-  return list.map(p => ({ label: p.name, value: p.id }))
-})
-const selectedProvider = computed(() => props.providers.find(p => p.id === form.providerId))
 const isOfficial = computed(() => form.mode === 'official')
 const isEdit = computed(() => !!props.editTunnel)
 
@@ -155,12 +160,48 @@ onMounted(() => {
     form.tunnelType = t.tunnelType; form.localIp = t.localIp; form.localPort = t.localPort
     form.serverAddr = t.serverAddr; form.serverPort = t.serverPort; form.remotePort = t.remotePort
     form.token = t.token ?? ''; form.useTls = t.useTls
+    form.bandwidthLimit = t.bandwidthLimit ?? ''
+    form.bandwidthLimitMode = t.bandwidthLimitMode ?? 'server'
+    form.proxyUseEncryption = t.proxyUseEncryption ?? false
+    form.proxyUseCompression = t.proxyUseCompression ?? false
+    form.proxyProtocolVersion = t.proxyProtocolVersion ?? 'v1'
+    form.advancedOpen = !!t.bandwidthLimit || t.useTls
   }
 })
 
 onUnmounted(() => {
   if (debounceTimer) clearTimeout(debounceTimer)
 })
+
+async function handleImportConfig() {
+  const path = await pickFile({
+    title: '导入 frpc 配置文件',
+    filters: [{ name: 'frpc TOML', extensions: ['toml', 'conf'] }],
+  })
+  if (!path) return
+  try {
+    const imported = await importFrpcConfig(path)
+    form.providerId = 'system-default'
+    if (imported.name) form.name = imported.name
+    if (imported.tunnelType) form.tunnelType = imported.tunnelType
+    if (imported.localIp) form.localIp = imported.localIp
+    if (imported.localPort) form.localPort = imported.localPort
+    if (imported.serverAddr) form.serverAddr = imported.serverAddr
+    if (imported.serverPort) form.serverPort = imported.serverPort
+    if (imported.remotePort) form.remotePort = imported.remotePort
+    if (imported.token) form.token = imported.token
+    if (imported.bandwidthLimit) form.bandwidthLimit = imported.bandwidthLimit
+    if (imported.bandwidthLimitMode) form.bandwidthLimitMode = imported.bandwidthLimitMode
+    if (imported.proxyUseEncryption !== undefined) form.proxyUseEncryption = imported.proxyUseEncryption
+    if (imported.proxyUseCompression !== undefined) form.proxyUseCompression = imported.proxyUseCompression
+    if (imported.proxyProtocolVersion) form.proxyProtocolVersion = imported.proxyProtocolVersion
+    form.useTls = imported.useTls
+    form.advancedOpen = true
+    toastInfo('配置已安全解析，请检查字段后再创建')
+  } catch (e) {
+    toastError('导入配置失败：' + (e instanceof Error ? e.message : String(e)))
+  }
+}
 
 function handleSubmit() {
   if (!form.name.trim()) return
@@ -174,6 +215,11 @@ function handleSubmit() {
     serverPort: form.serverPort,
     remotePort: form.remotePort,
     token: form.token.trim() || undefined,
+    bandwidthLimit: form.bandwidthLimit.trim() || undefined,
+    bandwidthLimitMode: form.bandwidthLimit.trim() ? form.bandwidthLimitMode : undefined,
+    proxyUseEncryption: form.proxyUseEncryption,
+    proxyUseCompression: form.proxyUseCompression,
+    proxyProtocolVersion: form.proxyProtocolVersion,
     useTls: form.useTls,
   }
   if (isEdit.value && props.editTunnel) emit('update', { id: props.editTunnel.id, ...payload })
@@ -182,18 +228,7 @@ function handleSubmit() {
 </script>
 
 <template>
-  <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 shadow-sm">
-    <div>
-      <label class="block text-xs font-medium text-gray-700 mb-1">厂商</label>
-      <Select v-model="form.providerId" :options="providerOptions" />
-      <p
-v-if="selectedProvider && !selectedProvider.frpcReady && !selectedProvider.builtin"
-         class="mt-1 flex items-center gap-1 text-xs text-amber-600">
-        <ExclamationCircleIcon class="w-3.5 h-3.5" />
-        该厂商 frpc 未就绪，启动隧道前请先在「厂商列表」页确认客户端已就绪
-      </p>
-    </div>
-
+  <div class="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
     <div v-if="!isEdit">
       <label class="block text-xs font-medium text-gray-700 mb-1">服务器模式</label>
       <Select v-model="form.mode" :options="modeOptions" />
@@ -202,10 +237,12 @@ v-if="selectedProvider && !selectedProvider.frpcReady && !selectedProvider.built
     <div v-if="isOfficial">
       <label class="block text-xs font-medium text-gray-700 mb-1">公共服务器</label>
       <Select
-v-model="form.publicServerId" :options="publicServerOptions"
-              :disabled="publicServersLoading || allocating"
-              :placeholder="publicServersLoading ? '加载中...' : '选择服务器'"
-              @update:model-value="handlePublicServerChange" />
+        v-model="form.publicServerId"
+        :options="publicServerOptions"
+        :disabled="publicServersLoading || allocating"
+        :placeholder="publicServersLoading ? '加载中...' : '选择服务器'"
+        @update:model-value="handlePublicServerChange"
+      />
       <p v-if="allocating" class="mt-1 flex items-center gap-1 text-xs text-primary-600">
         <ArrowPathIcon class="w-3.5 h-3.5 animate-spin" />
         正在分配端口与 Token...
@@ -232,7 +269,7 @@ v-model="form.publicServerId" :options="publicServerOptions"
         <label class="block text-xs font-medium text-gray-700 mb-1">本地端口</label>
         <div class="flex items-center gap-2">
           <Input v-model="form.localPort" type="number" placeholder="25565" class="flex-1" />
-          <Tooltip text="本机开放端口">
+          <Tooltip text="选择本机端口">
             <Button type="outline" :loading="portSelecting" @click="handleSelectPort">
               <template #icon><ServerStackIcon class="w-4 h-4" /></template>
             </Button>
@@ -248,9 +285,10 @@ v-model="form.publicServerId" :options="publicServerOptions"
         <Input v-model="form.serverPort" type="number" placeholder="7000" :readonly="isOfficial" />
       </InputGroup>
       <p
-v-if="checkHint" class="mt-1 flex items-center gap-1 text-xs"
-         :class="checkHint.type === 'success' ? 'text-green-600'
-           : checkHint.type === 'error' ? 'text-red-500' : 'text-gray-500'">
+        v-if="checkHint"
+        class="mt-1 flex items-center gap-1 text-xs"
+        :class="checkHint.type === 'success' ? 'text-green-600' : checkHint.type === 'error' ? 'text-red-500' : 'text-gray-500'"
+      >
         <CheckCircleIcon v-if="checkHint.type === 'success'" class="w-3.5 h-3.5" />
         <XCircleIcon v-else-if="checkHint.type === 'error'" class="w-3.5 h-3.5" />
         <ArrowPathIcon v-else class="w-3.5 h-3.5 animate-spin" />
@@ -269,16 +307,72 @@ v-if="checkHint" class="mt-1 flex items-center gap-1 text-xs"
       </div>
     </div>
 
-    <div class="flex items-center gap-2">
-      <Checkbox v-model="form.useTls" :disabled="isOfficial">启用 TLS 加密</Checkbox>
+    <div class="border-t border-dashed border-gray-200 pt-2">
+      <button
+        type="button"
+        class="flex w-full items-center gap-3 py-2 text-left text-xs text-gray-500 transition-colors hover:text-gray-800"
+        @click="form.advancedOpen = !form.advancedOpen"
+      >
+        <AdjustmentsHorizontalIcon class="h-4 w-4 text-gray-400" />
+        <span class="flex-1">高级设置</span>
+        <ChevronDownIcon class="h-4 w-4 transition-transform" :class="form.advancedOpen ? 'rotate-180' : ''" />
+      </button>
+      <Transition
+        enter-active-class="transition-all duration-200 ease-out"
+        leave-active-class="transition-all duration-150 ease-in"
+        enter-from-class="max-h-0 opacity-0 -translate-y-1"
+        enter-to-class="max-h-64 opacity-100 translate-y-0"
+        leave-from-class="max-h-64 opacity-100 translate-y-0"
+        leave-to-class="max-h-0 opacity-0 -translate-y-1"
+      >
+        <div v-if="form.advancedOpen" class="ml-7 max-h-64 space-y-3 overflow-hidden pb-2 pt-1">
+          <div class="flex items-center gap-2">
+            <span class="w-24 shrink-0 text-xs text-gray-500">带宽限制</span>
+            <Input v-model="form.bandwidthLimit" placeholder="例如 4MB" />
+            <Select
+              v-model="form.bandwidthLimitMode"
+              :options="[
+                { label: '服务端', value: 'server' },
+                { label: '客户端', value: 'client' },
+              ]"
+              class="w-28 shrink-0"
+            />
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="w-24 shrink-0 text-xs text-gray-500">Proxy 传输</span>
+            <Checkbox v-model="form.proxyUseEncryption">加密</Checkbox>
+            <Checkbox v-model="form.proxyUseCompression">压缩</Checkbox>
+            <Select
+              v-model="form.proxyProtocolVersion"
+              :options="[
+                { label: 'v1', value: 'v1' },
+                { label: 'v2', value: 'v2' },
+              ]"
+              class="w-24 shrink-0"
+            />
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="w-24 shrink-0 text-xs text-gray-500">连接加密</span>
+            <Checkbox v-model="form.useTls" :disabled="isOfficial">启用传输层 TLS</Checkbox>
+          </div>
+        </div>
+      </Transition>
     </div>
 
-    <div class="flex justify-end gap-2 pt-1">
-      <Button type="outline" size="small" @click="emit('cancel')">取消</Button>
+    <div class="flex items-center justify-between border-t border-dashed border-gray-200 py-3">
+      <span class="text-xs text-gray-400">从标准 frpc 配置快速填充</span>
+      <Button type="outline" size="small" @click="handleImportConfig">导入配置</Button>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-2">
+      <Button type="ghost" size="small" @click="emit('cancel')">取消</Button>
       <Button
-type="primary" size="small" :loading="actionLoading"
-              :disabled="!form.name.trim() || !form.serverAddr.trim() || (isOfficial && !form.allocationId)"
-              @click="handleSubmit">
+        type="primary"
+        size="small"
+        :loading="actionLoading"
+        :disabled="!form.name.trim() || !form.serverAddr.trim() || (isOfficial && !form.allocationId)"
+        @click="handleSubmit"
+      >
         {{ isEdit ? '保存' : '创建' }}
       </Button>
     </div>

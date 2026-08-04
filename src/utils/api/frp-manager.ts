@@ -17,6 +17,7 @@ import type {
   FetchTunnelsResult,
   OAuth2Result,
   UpdateTunnelParams,
+  ImportedFrpcConfig,
   LogFileContent,
   LogFileInfo,
   ProviderInfo,
@@ -41,6 +42,8 @@ export const FRP_ACTIONS = {
   UPDATE_TUNNEL: 'update_tunnel',
   /** 删除隧道 */
   DELETE_TUNNEL: 'delete_tunnel',
+  /** 安全导入 frpc 配置文件 */
+  IMPORT_FRPC_CONFIG: 'import_frpc_config',
   /** 启动隧道 */
   START_TUNNEL: 'start_tunnel',
   /** 停止隧道 */
@@ -63,6 +66,8 @@ export const FRP_ACTIONS = {
   LIST_LOG_FILES: 'list_log_files',
   /** 读取指定隧道的日志文件内容 */
   READ_LOG_FILE: 'read_log_file',
+  /** 清空指定隧道日志文件内容（保留文件） */
+  CLEAR_LOG_FILE: 'clear_log_file',
   /** 列出可用的公共 frps 服务器（GET /v1/frp/servers） */
   LIST_PUBLIC_SERVERS: 'list_public_servers',
   /** 分配端口 + per-user token（POST /v1/frp/allocate） */
@@ -87,6 +92,8 @@ export const FRP_ACTIONS = {
   SAVE_API_KEY: 'save_api_key',
   /** 从厂商 API 拉取隧道列表（需先认证） */
   FETCH_TUNNELS: 'fetch_tunnels',
+  /** 检测拖拽包类型（frp 厂商包 / 整合包 / 未知） */
+  DETECT_PACKAGE_TYPE: 'detect_package_type',
 } as const
 
 /**
@@ -134,6 +141,10 @@ export function updateTunnel(params: UpdateTunnelParams): Promise<Tunnel> {
 /** 删除隧道 */
 export function deleteTunnel(id: string): Promise<void> {
   return frpManager(FRP_ACTIONS.DELETE_TUNNEL, { id })
+}
+
+export function importFrpcConfig(path: string): Promise<ImportedFrpcConfig> {
+  return frpManager(FRP_ACTIONS.IMPORT_FRPC_CONFIG, { path })
 }
 
 /** 启动隧道 */
@@ -189,6 +200,11 @@ export function listLogFiles(): Promise<LogFileInfo[]> {
 /** 读取指定隧道的日志文件内容 */
 export function readLogFile(tunnelId: string, maxLines?: number): Promise<LogFileContent> {
   return frpManager<LogFileContent>(FRP_ACTIONS.READ_LOG_FILE, { tunnelId, maxLines })
+}
+
+/** 清空指定隧道的日志文件内容（tunnelId 为空时清空全部；保留日志文件本身） */
+export function clearLogFile(tunnelId: string): Promise<void> {
+  return frpManager<void>(FRP_ACTIONS.CLEAR_LOG_FILE, { tunnelId })
 }
 
 // ============================================================
@@ -262,4 +278,32 @@ export function saveApiKey(params: SaveApiKeyParams): Promise<void> {
  */
 export function fetchTunnels(providerId: string): Promise<FetchTunnelsResult> {
   return frpManager<FetchTunnelsResult>(FRP_ACTIONS.FETCH_TUNNELS, { providerId })
+}
+
+// ============================================================
+// 拖拽包类型检测（frp 厂商包 / 整合包 / 未知）
+// ============================================================
+
+/** 拖拽包类型 */
+export type PackageType = 'frp_provider' | 'modpack' | 'unknown'
+
+/** 包类型检测结果（来自后端 detect_package_type） */
+export interface DetectPackageResult {
+  type: PackageType
+  /** frp 厂商包：manifest 中的 id */
+  providerId?: string
+  /** frp 厂商包：manifest 中的 name */
+  providerName?: string
+}
+
+/**
+ * 检测拖拽包类型
+ *
+ * 后端解析 zip 内容特征：
+ * - frp 厂商包：manifest.json 含 id + binary/api
+ * - 整合包：addons（MCBBS）或 files+minecraft（CurseForge）等
+ * - 其余：unknown
+ */
+export function detectPackageType(path: string): Promise<DetectPackageResult> {
+  return frpManager<DetectPackageResult>(FRP_ACTIONS.DETECT_PACKAGE_TYPE, { path })
 }

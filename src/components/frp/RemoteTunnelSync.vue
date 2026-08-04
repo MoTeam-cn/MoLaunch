@@ -50,9 +50,6 @@ const fetching = ref(false)
 const remoteTunnels = ref<RemoteTunnelInfo[]>([])
 const importingIds = ref<Set<string>>(new Set())
 
-/** 本地已存在的隧道名（导入时按名称匹配判断是否已导入） */
-const localTunnelNames = computed(() => new Set(store.tunnels.map(t => t.name)))
-
 /** 只显示需要认证且已启用的厂商 */
 const authProviders = computed(() =>
   props.providers.filter((p) => p.authType !== 'none' && p.enabled),
@@ -94,9 +91,17 @@ async function handleFetch() {
   }
 }
 
-/** 判断远程隧道是否已导入（本地同名 或 本会话已导入） */
+/** 判断远程隧道是否已导入：按厂商自增 id 匹配本地隧道的 remoteTunnelId（已知）或按名字兜底 */
 function isImported(tunnel: RemoteTunnelInfo): boolean {
-  return importingIds.value.has(tunnel.id) || localTunnelNames.value.has(tunnel.name)
+  if (importingIds.value.has(tunnel.id)) return true
+  return store.tunnels.some(
+    (t) => t.remoteTunnelId === tunnel.id || (!t.remoteTunnelId && t.name === tunnel.name),
+  )
+}
+
+/** 隧道显示名：优先用厂商的 remark（用户可读名字），为空时回退 name（真实隧道 id） */
+function displayName(tunnel: RemoteTunnelInfo): string {
+  return tunnel.remark || tunnel.name
 }
 
 /** 将远程隧道映射为本地隧道创建参数并导入 */
@@ -110,20 +115,30 @@ async function handleImport(tunnel: RemoteTunnelInfo) {
     const serverPort = Number(tunnel.serverPort)
     const remotePort = Number(tunnel.remotePort)
     if (!Number.isInteger(serverPort) || serverPort <= 0) {
-      toastError(`隧道「${tunnel.name}」未解析到有效的服务端端口号，已取消导入`)
+      toastError(`隧道「${displayName(tunnel)}」未解析到有效的服务端端口号，已取消导入`)
       return
     }
+    if (tunnelType === 'tcp' || tunnelType === 'udp') {
+      if (!Number.isInteger(remotePort) || remotePort <= 0) {
+        toastError(`隧道「${displayName(tunnel)}」未解析到远程端口（remotePort），已取消导入`)
+        return
+      }
+    }
     const params: CreateTunnelParams = {
-      name: tunnel.name,
+      name: displayName(tunnel),
       providerId: selectedProviderId.value,
       tunnelType,
       localIp: tunnel.localHost || '127.0.0.1',
       localPort: Number.isInteger(localPort) && localPort > 0 ? localPort : 25565,
       serverAddr: tunnel.serverHost,
       serverPort,
-      remotePort: Number.isInteger(remotePort) && remotePort > 0 ? remotePort : 0,
+      remotePort,
       token: tunnel.token || undefined,
       useTls: false,
+      remoteTunnelId: tunnel.id,
+      remoteTunnelName: tunnel.name,
+      imported: true,
+      rawConfig: tunnel.rawConfig,
     }
     const ok = await store.createTunnel(params)
     if (ok && remoteTunnels.value.every(t => isImported(t))) {
@@ -199,7 +214,7 @@ async function handleImport(tunnel: RemoteTunnelInfo) {
         <div class="flex items-start justify-between gap-2">
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="text-sm font-medium text-gray-900">{{ tunnel.name }}</span>
+              <span class="text-sm font-medium text-gray-900">{{ displayName(tunnel) }}</span>
               <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700 uppercase">
                 {{ tunnel.tunnelType }}
               </span>

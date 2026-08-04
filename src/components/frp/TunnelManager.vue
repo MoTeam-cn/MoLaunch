@@ -4,7 +4,7 @@
  * 状态同步：监听 frp-tunnel-status 事件自动刷新列表。
  * 列表卡片已拆至 TunnelList.vue，本文件保留操作栏与面板组装。
  */
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
 import { useFrpStore } from '@/stores/frp'
 import { showConfirm } from '@/utils/modal'
 import { toastWarning, toastInfo } from '@/utils/toast'
@@ -36,7 +36,18 @@ onMounted(() => {
   void store.loadProviders()
   // 启动隧道状态事件监听器（store 内部防重复注册）
   store.startTunnelStatusListener()
+  // 拖拽安装/更新 frp 厂商包后刷新厂商列表
+  window.addEventListener('frp:providers-changed', handleProvidersChanged)
 })
+
+onUnmounted(() => {
+  window.removeEventListener('frp:providers-changed', handleProvidersChanged)
+})
+
+function handleProvidersChanged(): void {
+  void store.loadProviders()
+  void store.loadTunnels()
+}
 
 async function handleCreate(params: CreateTunnelParams) {
   const ok = await store.createTunnel(params)
@@ -131,7 +142,6 @@ function handleDelete(id: string, name: string) {
     >
       <TunnelCreateForm
         v-if="showForm"
-        :providers="providers"
         :action-loading="actionLoading"
         @create="handleCreate"
         @cancel="showForm = false"
@@ -147,7 +157,6 @@ function handleDelete(id: string, name: string) {
     >
       <TunnelCreateForm
         v-if="editingTunnel"
-        :providers="providers"
         :action-loading="actionLoading"
         :edit-tunnel="editingTunnel"
         @update="handleUpdate"
