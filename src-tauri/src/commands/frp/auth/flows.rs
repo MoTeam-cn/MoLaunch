@@ -222,12 +222,23 @@ fn fill_template(template: &str, ctx: &FlowContext) -> String {
 }
 
 /// 填充 body 模板（递归处理 Object/Array/String）
+///
+/// Object 中填充后仍残留未解析占位符（`{xxx}`）的字段会被删除：
+/// 用于 PKCE 等场景——endpoints.json 声明 `client_secret: "{clientSecret}"`，
+/// 而当前上下文无 client_secret 时该字段自动省略，而非发送字面量占位符。
 fn fill_body_template(body: &serde_json::Value, ctx: &FlowContext) -> serde_json::Value {
     match body {
         serde_json::Value::Object(map) => {
             let mut new_map = serde_json::Map::new();
             for (k, v) in map {
-                new_map.insert(k.clone(), fill_body_template(v, ctx));
+                let filled = fill_body_template(v, ctx);
+                // 填充后仍含未解析占位符的字段删除（如无 client_secret 时的 {clientSecret}）
+                if let serde_json::Value::String(s) = &filled {
+                    if s.contains('{') && s.contains('}') {
+                        continue;
+                    }
+                }
+                new_map.insert(k.clone(), filled);
             }
             serde_json::Value::Object(new_map)
         }

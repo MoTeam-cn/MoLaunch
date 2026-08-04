@@ -8,6 +8,7 @@ use super::super::{
     AuthFileDeviceCode, AuthFileOAuth2, ProviderManifest,
 };
 use super::provider_system::resolve_bundled_path;
+use super::resolve_download_config;
 use std::collections::HashMap;
 
 /// 读取外部厂商的 auth.json
@@ -110,7 +111,8 @@ pub(crate) fn is_external_frpc_ready(provider_id: &str, manifest: &ProviderManif
         }
         "url" => {
             if let Some(ref dl) = manifest.binary.download {
-                dir.join(&dl.target_path).exists()
+                let (_, target_path) = resolve_download_config(dl);
+                dir.join(target_path).exists()
             } else {
                 false
             }

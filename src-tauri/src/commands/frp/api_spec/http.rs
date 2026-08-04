@@ -18,13 +18,22 @@ const DEFAULT_TIMEOUT_MS: u64 = 10_000;
 
 /// 构造并发送厂商 API 请求（含重定向防护 + envelope 成功校验）
 ///
+/// - `tunnel_id`：当前隧道自增 ID，用于填充 query 中的 `{id}`/`{tunnel}` 模板。
+/// - `tunnel_name`：当前隧道 name（真实隧道标识），填充 `{tunnelName}` 模板
+///   （如 config 端点 `query: {"tunnel": "{tunnelName}"}`）。
+///
+/// 列表/账号类端点两者传空字符串。
+///
 /// 返回解析后的 JSON 响应。若 envelope 判断失败则返回错误。
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn send_request(
     base_url: &str,
     endpoint: &EndpointDef,
     token: &str,
     device_id: &str,
     provider_id: &str,
+    tunnel_id: &str,
+    tunnel_name: &str,
     global_envelope: Option<&Envelope>,
 ) -> Result<serde_json::Value, String> {
     let url = build_url(base_url, &endpoint.path)?;
@@ -55,6 +64,8 @@ pub(super) async fn send_request(
                 &current_method,
                 device_id,
                 provider_id,
+                tunnel_id,
+                tunnel_name,
             )?;
         } else {
             // 重定向请求：仅重新注入 header 类 token
@@ -129,6 +140,7 @@ fn build_auth_value(token: &str) -> String {
 }
 
 /// 注入认证 token 和请求参数
+#[allow(clippy::too_many_arguments)]
 fn inject_auth_and_params(
     mut request: reqwest::RequestBuilder,
     auth_value: &str,
@@ -136,6 +148,8 @@ fn inject_auth_and_params(
     method: &str,
     device_id: &str,
     provider_id: &str,
+    tunnel_id: &str,
+    tunnel_name: &str,
 ) -> Result<reqwest::RequestBuilder, String> {
     // token 注入到 Authorization header
     request = request.header("Authorization", auth_value);
@@ -144,14 +158,14 @@ fn inject_auth_and_params(
     match method {
         "GET" => {
             for (k, v) in query {
-                let filled = fill_template(v, device_id, provider_id);
+                let filled = fill_template(v, device_id, provider_id, tunnel_id, tunnel_name);
                 request = request.query(&[(k.as_str(), filled.as_str())]);
             }
         }
         "POST" => {
             // POST 时 query 仍作为 query string（部分厂商 POST 也用 query）
             for (k, v) in query {
-                let filled = fill_template(v, device_id, provider_id);
+                let filled = fill_template(v, device_id, provider_id, tunnel_id, tunnel_name);
                 request = request.query(&[(k.as_str(), filled.as_str())]);
             }
         }
@@ -162,10 +176,23 @@ fn inject_auth_and_params(
 }
 
 /// 填充参数模板中的上下文占位符
-fn fill_template(template: &str, device_id: &str, provider_id: &str) -> String {
+///
+/// 支持：`{device_id}`、`{provider_id}`、`{id}`/`{tunnel}`（隧道自增 ID）、
+/// `{tunnelName}`（隧道 name，真实隧道标识）。
+#[allow(clippy::too_many_arguments)]
+fn fill_template(
+    template: &str,
+    device_id: &str,
+    provider_id: &str,
+    tunnel_id: &str,
+    tunnel_name: &str,
+) -> String {
     template
         .replace("{device_id}", device_id)
         .replace("{provider_id}", provider_id)
+        .replace("{tunnelName}", tunnel_name)
+        .replace("{tunnel}", tunnel_id)
+        .replace("{id}", tunnel_id)
 }
 
 /// 处理 HTTP 响应：状态码校验 + 大小限制 + JSON 解析
@@ -173,7 +200,14 @@ async fn handle_response(response: reqwest::Response) -> Result<serde_json::Valu
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
-        log_error!("[Frp] 厂商 API 请求失败: HTTP {}", status);
+        // 非 2xx 不一定是致命错误：厂商 API 回填/探测类请求（config、detail）失败
+        // 是预期内路径，调用方会自行决定是否报告，这里仅 debug 级记录完整信息，
+        // 避免把"某厂商某端点预期失败"刷成 ERROR 误导排查。
+        log_debug!(
+            "[Frp] 厂商 API 非 2xx 响应: HTTP {} - {}",
+            status,
+            truncate(&body, 500)
+        );
         return Err(format!(
             "厂商 API 请求失败: HTTP {} - {}",
             status,
@@ -222,14 +256,16 @@ fn build_url(base_url: &str, path: &str) -> Result<String, String> {
     Ok(format!("{}{}", base, p))
 }
 
-/// 构建厂商 API 专用 HTTP 客户端（no-redirect + 内置根证书）
+/// 构建厂商 API 专用 HTTP 客户端（no-redirect + 复用全局代理/IP/TLS 信任源配置）
+///
+/// 复用 `crate::http` 的统一管线：User-Agent、代理、IP 协议版本偏好、
+/// TLS 信任源（trust_mode / ignore_tls 开发者模式）与全局客户端一致；
+/// 仅重定向策略设为 none，由上层手动校验 Location 域名白名单（设计文档 §7.6.6）。
 fn build_vendor_client() -> Result<reqwest::Client, String> {
-    reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(std::time::Duration::from_millis(DEFAULT_TIMEOUT_MS))
-        .tls_built_in_root_certs(true)
-        .build()
-        .map_err(|e| format!("构建 HTTP 客户端失败: {}", e))
+    Ok(crate::http::build_client_with_redirect(
+        reqwest::redirect::Policy::none(),
+        Some(DEFAULT_TIMEOUT_MS),
+    ))
 }
 
 /// 从 URL 提取主机名（小写，不含端口）
@@ -272,5 +308,51 @@ fn truncate(s: &str, max: usize) -> String {
         s.to_string()
     } else {
         format!("{}...", &s[..max])
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_fill_template_supports_tunnel_id() {
+        // config 端点 query.tunnel = {id} / {tunnel} 应替换为当前隧道 ID
+        let filled = fill_template("{tunnel}", "device-1", "lolia-frp", "16977", "");
+        assert_eq!(filled, "16977");
+
+        let filled = fill_template("{id}", "device-1", "lolia-frp", "4722", "");
+        assert_eq!(filled, "4722");
+    }
+
+    #[test]
+    fn test_fill_template_supports_tunnel_name() {
+        // Lolia 等厂商 config 端点 query.tunnel = {tunnelName}，填隧道 name（真实标识）
+        let filled = fill_template(
+            "{tunnelName}",
+            "device-1",
+            "lolia-frp",
+            "16977",
+            "my-tunnel",
+        );
+        assert_eq!(filled, "my-tunnel");
+    }
+
+    #[test]
+    fn test_fill_template_context_placeholders() {
+        let filled = fill_template(
+            "{device_id}-{provider_id}",
+            "dev-abc",
+            "my-provider",
+            "tunnel-x",
+            "name-y",
+        );
+        assert_eq!(filled, "dev-abc-my-provider");
+    }
+
+    #[test]
+    fn test_fill_template_no_placeholders() {
+        let filled = fill_template("page=1&limit=100", "d", "p", "t", "n");
+        assert_eq!(filled, "page=1&limit=100");
     }
 }

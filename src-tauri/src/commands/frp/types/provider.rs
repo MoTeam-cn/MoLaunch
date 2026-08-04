@@ -62,6 +62,9 @@ pub struct ProviderManifest {
     pub api: Option<ApiRef>,
     /// frpc 二进制配置
     pub binary: BinaryConfig,
+    /// 配置文件要求（无 config 端点时用于手工生成；有 config 端点时仅作说明）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_requirements: Option<ConfigRequirements>,
     /// 认证方式（默认 none）
     #[serde(default)]
     pub auth: AuthConfig,
@@ -76,6 +79,33 @@ pub struct ProviderManifest {
     /// 最大 5 分钟，stdout/stderr 各截断到 1MB，工作目录限制在厂商目录内。
     #[serde(skip_serializing_if = "Option::is_none")]
     pub process_permissions: Option<ProcessPermissions>,
+}
+
+/// 厂商配置文件要求。
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigRequirements {
+    #[serde(default)]
+    pub fields: Vec<ConfigRequiredField>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigRequiredField {
+    pub path: String,
+    pub source: ConfigFieldSource,
+    pub format: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ConfigFieldSource {
+    pub endpoint: String,
+    pub field: String,
+    pub unit: String,
+    pub target_unit: String,
 }
 
 /// API 规范引用（manifest.api 字段）
@@ -108,6 +138,14 @@ pub struct BinaryConfig {
     /// 分发方式：bundled=随厂商包打包 / url=按需下载
     #[serde(default = "default_distribution")]
     pub distribution: String,
+    /// frpc 版本号（manifest 中注明，如 "0.51.3"）
+    ///
+    /// 作为 frpc 更新的唯一判断依据：无论 bundled 还是 url，
+    /// 启动器将该版本写入厂商目录 `frpc_version.txt`，后续
+    /// `ensure_frpc` 比对「manifest.frpc_version vs 记录值」，
+    /// 不一致才执行更新（重新下载/替换 frpc），一致则保持不动。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frpc_version: Option<String>,
     /// distribution=bundled 时：厂商自带 frpc 相对路径（单平台时使用）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<String>,
@@ -120,13 +158,55 @@ pub struct BinaryConfig {
     /// distribution=url 时：下载配置
     #[serde(skip_serializing_if = "Option::is_none")]
     pub download: Option<DownloadConfig>,
+    /// frpc 启动方式声明（通用机制，适配厂商魔改 frpc）
+    ///
+    /// `mode=config`（默认）：`<frpc> -c <config.toml>` 启动，走启动器生成的配置文件。
+    /// `mode=command`：厂商 frpc 不接受标准配置文件，改用命令参数直连
+    /// （如 Lolia 的 `-t <tunnelId>:<token>`）。此时 `command` 为命令行模板，
+    /// 支持占位符：
+    /// - `{frpc}`：frpc 二进制绝对路径
+    /// - `{tunnelId}`：远程隧道自增 ID（厂商隧道列表的 id，如 Lolia 的 `16977`）
+    /// - `{token}`：隧道鉴权 token
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub launch: Option<LaunchConfig>,
+}
+
+/// frpc 启动方式配置（binary.launch 字段）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LaunchConfig {
+    /// 启动模式：config（默认，-c 配置文件）/ command（命令模板直连）
+    #[serde(default = "default_launch_mode")]
+    pub mode: String,
+    /// mode=command 时的命令行模板（不含 frpc 路径，用 {frpc} 占位，
+    /// 需在各参数前补占位符，如 `{frpc} -t {tunnelName}:{token}`）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+}
+
+/// 默认启动模式：config
+fn default_launch_mode() -> String {
+    "config".to_string()
 }
 
 /// URL 下载配置（distribution=url 时使用）
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadConfig {
+    /// 默认下载 URL（回退）
     pub url: String,
+    /// 按平台映射的下载 URL（key 格式 `{os}_{arch}`，如 `windows_amd64`）
+    ///
+    /// 优先于 `url`：若当前平台在 urls 中存在则使用 urls 的值，否则回退到 url。
+    /// 适配"同一厂商不同架构 frpc 用不同下载地址"的场景（如 GitHub Releases 按平台分发的二进制）。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub urls: Option<std::collections::HashMap<String, String>>,
+    /// 按平台映射的下载目标相对路径（key 格式同 urls）
+    ///
+    /// 若当前平台在 target_paths 中存在则优先使用，否则回退到 target_path。
+    /// 适配"不同平台文件名不同（如 .exe / 无后缀）"的场景。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_paths: Option<std::collections::HashMap<String, String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sha256: Option<String>,
     pub allowed_domains: Vec<String>,

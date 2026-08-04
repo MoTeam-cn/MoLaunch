@@ -3,6 +3,8 @@
 pub mod api_spec;
 pub mod auth;
 pub mod binary;
+pub mod detect;
+pub mod frpc_config;
 pub mod install;
 pub mod log_redact;
 pub mod manager;
@@ -19,6 +21,7 @@ pub use paths::{
     frp_config_dir, frp_data_dir, frp_logs_dir, providers_root, providers_state_path, tunnels_path,
     validate_provider_id,
 };
+pub(crate) use provider::{frpc_platform_skip, resolve_download_config};
 pub use types::{
     ApiKeyConfig, ApiRef, ApiSpec, AuthConfig, AuthFile, AuthFileApiKey, AuthFileDeviceCode,
     AuthFileOAuth2, AuthFlows, AuthHeader, BinaryConfig, ConfigMode, DeviceCodeConfig,

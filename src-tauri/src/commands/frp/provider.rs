@@ -22,9 +22,10 @@ pub(super) use provider_external::{
     is_external_frpc_ready, read_icon_as_data_url, read_provider_manifest, read_providers_state,
     resolve_auth_type, resolve_device_code_config, resolve_oauth2_config, write_providers_state,
 };
-pub(super) use provider_system::{
-    current_platform_key, frpc_path, is_frpc_ready, read_frpc_version, system_default_dir,
-    write_frpc_version, SYSTEM_DEFAULT_ID,
+pub(crate) use provider_system::{
+    current_platform_key, frpc_path, frpc_platform_skip, is_frpc_ready, read_frpc_version,
+    read_provider_frpc_version, resolve_download_config, system_default_dir, write_frpc_version,
+    write_provider_frpc_version, SYSTEM_DEFAULT_ID,
 };
 
 /// 获取指定厂商的 frpc 二进制路径
@@ -55,7 +56,8 @@ pub fn get_frpc_path_for_provider(provider_id: &str) -> Result<PathBuf, String> 
                 .binary
                 .download
                 .ok_or_else(|| format!("厂商 {} 的 manifest 缺少 binary.download", provider_id))?;
-            Ok(dir.join(dl.target_path))
+            let (_, target_path) = resolve_download_config(&dl);
+            Ok(dir.join(target_path))
         }
         other => Err(format!(
             "厂商 {} 使用不支持的分发方式: {}",

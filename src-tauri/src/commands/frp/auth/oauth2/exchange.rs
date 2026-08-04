@@ -8,15 +8,19 @@ pub(super) struct OAuth2Callback {
 }
 
 /// 构建 OAuth2 授权 URL（用户交互层，标准 OAuth2 流程）
+///
+/// `code_challenge`/`code_challenge_method`：启用 PKCE 时传入（S256），
+/// 授权服务器据此校验后续 token 交换中的 code_verifier。
 pub(super) fn build_authorize_url(
     authorize_url: &str,
     client_id: &str,
     redirect_uri: &str,
     scopes: &[String],
     state: &str,
+    code_challenge: Option<(&str, &str)>,
 ) -> String {
     let scope_str = scopes.join(" ");
-    let params: Vec<(String, String)> = vec![
+    let mut params: Vec<(String, String)> = vec![
         ("client_id", client_id),
         ("redirect_uri", redirect_uri),
         ("response_type", "code"),
@@ -26,6 +30,11 @@ pub(super) fn build_authorize_url(
     .into_iter()
     .map(|(k, v)| (k.to_string(), v.to_string()))
     .collect();
+
+    if let Some((challenge, method)) = code_challenge {
+        params.push(("code_challenge".to_string(), challenge.to_string()));
+        params.push(("code_challenge_method".to_string(), method.to_string()));
+    }
 
     let query: String = params
         .iter()

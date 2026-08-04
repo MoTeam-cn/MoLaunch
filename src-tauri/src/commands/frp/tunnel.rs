@@ -3,8 +3,9 @@
 //! 隧道配置持久化到 `<base_dir>/frp/tunnels.json`。
 //! 启动隧道时生成 TOML 配置文件到 `<base_dir>/frp/config/<tunnel_id>.toml`。
 
-use super::{ensure_dir, frp_config_dir, tunnels_path, Tunnel, TunnelType};
+use super::{ensure_dir, frp_config_dir, frp_logs_dir, tunnels_path, Tunnel, TunnelType};
 use crate::log_info;
+use serde::{Deserialize, Deserializer};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// 列出所有隧道
@@ -34,6 +35,14 @@ pub async fn create_tunnel(params: CreateTunnelParams) -> Result<Tunnel, String>
         remote_port: params.remote_port,
         token: params.token,
         use_tls: params.use_tls.unwrap_or(false),
+        remote_tunnel_id: params.remote_tunnel_id,
+        remote_tunnel_name: params.remote_tunnel_name,
+        raw_config: params.raw_config,
+        bandwidth_limit: params.bandwidth_limit,
+        bandwidth_limit_mode: params.bandwidth_limit_mode,
+        proxy_use_encryption: params.proxy_use_encryption,
+        proxy_use_compression: params.proxy_use_compression,
+        proxy_protocol_version: params.proxy_protocol_version,
         created_at: now_ms(),
     };
 
@@ -59,7 +68,13 @@ pub async fn delete_tunnel(id: String) -> Result<(), String> {
         std::fs::remove_file(&config_path).ok();
     }
 
-    log_info!("[Frp] 隧道已删除: {}", id);
+    // 清理日志文件（隧道已删除，残留日志无意义且占存储）
+    let log_path = frp_logs_dir().join(format!("{}.log", id));
+    if log_path.exists() {
+        std::fs::remove_file(&log_path).ok();
+    }
+
+    log_info!("[Frp] 隧道已删除: {} (含配置与日志文件)", id);
     Ok(())
 }
 
@@ -93,6 +108,11 @@ pub async fn update_tunnel(params: UpdateTunnelParams) -> Result<Tunnel, String>
     tunnel.remote_port = params.remote_port;
     tunnel.token = params.token;
     tunnel.use_tls = params.use_tls.unwrap_or(false);
+    tunnel.bandwidth_limit = params.bandwidth_limit;
+    tunnel.bandwidth_limit_mode = params.bandwidth_limit_mode;
+    tunnel.proxy_use_encryption = params.proxy_use_encryption;
+    tunnel.proxy_use_compression = params.proxy_use_compression;
+    tunnel.proxy_protocol_version = params.proxy_protocol_version;
 
     let updated = tunnel.clone();
     write_tunnels(&tunnels)?;
@@ -107,6 +127,8 @@ pub async fn update_tunnel(params: UpdateTunnelParams) -> Result<Tunnel, String>
 /// 生成 frpc TOML 配置文件
 ///
 /// 写入 `<base_dir>/frp/config/<tunnel_id>.toml`，返回文件路径。
+/// 统一使用与厂商 config 接口返回相同的原版格式：
+/// `serverAddr/serverPort/user` + `[metadatas] token` + `[[proxies]]`。
 pub fn generate_config(tunnel: &Tunnel) -> Result<std::path::PathBuf, String> {
     let config_dir = frp_config_dir();
     ensure_dir(&config_dir)?;
@@ -120,66 +142,43 @@ pub fn generate_config(tunnel: &Tunnel) -> Result<std::path::PathBuf, String> {
     Ok(config_path)
 }
 
-/// 构建 frpc TOML 配置字符串（frpc v0.51+ TOML 格式）
+/// 构建 frpc TOML 配置字符串
 ///
-/// 全局配置：serverAddr/serverPort/auth.token/transport.tls.enable；
-/// `[[proxies]]` 段：name/type/localIP/localPort/remotePort。
+/// 复用 `frpc_config` 工具生成与厂商 config 接口返回同构的 TOML：
+/// 顶层 `serverAddr/serverPort/user`、`[metadatas] token`、`[[proxies]]`。
+/// `user` 取隧道 name（frp 中标识账户归属，兼容部分厂商要求）。
 fn build_frpc_toml(tunnel: &Tunnel) -> String {
-    let mut lines = Vec::new();
+    use super::frpc_config::{build_frpc_toml, Proxy, ServerConn};
 
-    // 服务端连接配置
-    lines.push(format!("serverAddr = \"{}\"", tunnel.server_addr));
-    lines.push(format!("serverPort = {}", tunnel.server_port));
-
-    // 鉴权 token
-    if let Some(ref token) = tunnel.token {
-        if !token.is_empty() {
-            lines.push(format!("auth.token = \"{}\"", escape_toml_string(token)));
-        }
-    }
-
-    // TLS
-    if tunnel.use_tls {
-        lines.push("transport.tls.enable = true".to_string());
-    }
-
-    // 日志配置
-    lines.push(String::new()); // 空行分隔
-    lines.push(format!(
-        "log.to = \"{}\"",
-        escape_toml_string(
-            &super::frp_logs_dir()
-                .join(format!("{}.log", tunnel.id))
-                .to_string_lossy()
-        )
-    ));
-    lines.push("log.level = \"info\"".to_string());
-    lines.push("log.maxDays = 3".to_string());
-
-    // 代理配置
-    lines.push(String::new());
-    lines.push("[[proxies]]".to_string());
-    lines.push(format!("name = \"{}\"", escape_toml_string(&tunnel.name)));
-    lines.push(format!(
-        "type = \"{}\"",
-        match tunnel.tunnel_type {
-            TunnelType::Tcp => "tcp",
-            TunnelType::Udp => "udp",
-        }
-    ));
-    lines.push(format!(
-        "localIP = \"{}\"",
-        escape_toml_string(&tunnel.local_ip)
-    ));
-    lines.push(format!("localPort = {}", tunnel.local_port));
-    lines.push(format!("remotePort = {}", tunnel.remote_port));
-
-    lines.join("\n") + "\n"
-}
-
-/// TOML 字符串转义（处理引号和反斜杠）
-fn escape_toml_string(s: &str) -> String {
-    s.replace('\\', "\\\\").replace('"', "\\\"")
+    let conn = ServerConn {
+        server_addr: tunnel.server_addr.clone(),
+        server_port: tunnel.server_port,
+        user: Some(tunnel.name.clone()),
+        token: tunnel.token.clone(),
+        use_tls: tunnel.use_tls,
+    };
+    let proxy = Proxy {
+        // 厂商隧道用真实隧道 name（config 接口查询、服务端识别均用该值），
+        // 本地自建隧道回退用隧道 name
+        name: tunnel
+            .remote_tunnel_name
+            .clone()
+            .unwrap_or_else(|| tunnel.name.clone()),
+        proxy_type: match tunnel.tunnel_type {
+            TunnelType::Tcp => "tcp".to_string(),
+            TunnelType::Udp => "udp".to_string(),
+        },
+        local_ip: tunnel.local_ip.clone(),
+        local_port: tunnel.local_port,
+        remote_port: tunnel.remote_port,
+        custom_domains: None,
+        bandwidth_limit: tunnel.bandwidth_limit.clone(),
+        bandwidth_limit_mode: tunnel.bandwidth_limit_mode.clone(),
+        use_encryption: tunnel.proxy_use_encryption,
+        use_compression: tunnel.proxy_use_compression,
+        protocol_version: tunnel.proxy_protocol_version.clone(),
+    };
+    build_frpc_toml(&conn, &[proxy])
 }
 
 // 持久化
@@ -250,12 +249,177 @@ pub struct CreateTunnelParams {
     pub provider_id: String,
     pub tunnel_type: TunnelType,
     pub local_ip: Option<String>,
+    #[serde(deserialize_with = "deserialize_u16_flexible")]
     pub local_port: u16,
     pub server_addr: String,
+    #[serde(deserialize_with = "deserialize_u16_flexible")]
     pub server_port: u16,
+    #[serde(deserialize_with = "deserialize_u16_flexible")]
     pub remote_port: u16,
     pub token: Option<String>,
     pub use_tls: Option<bool>,
+    /// 是否为厂商同步导入请求。仅允许存在远程隧道标识时使用。
+    #[serde(default)]
+    pub imported: bool,
+    /// 厂商远端隧道自增 ID（从厂商 API 导入时传入，用于同步面板判断已导入）
+    #[serde(default)]
+    pub remote_tunnel_id: Option<String>,
+    /// 厂商远端隧道真实 name（config 接口查询、frpc 代理 name 用）
+    #[serde(default)]
+    pub remote_tunnel_name: Option<String>,
+    /// 厂商 config 接口返回的完整配置
+    #[serde(default)]
+    pub raw_config: Option<String>,
+    /// 带宽限制（如 "4MB"），写入 `[proxies.transport] bandwidthLimit`
+    #[serde(default)]
+    pub bandwidth_limit: Option<String>,
+    /// 带宽限制模式（如 "server"），写入 `[proxies.transport] bandwidthLimitMode`
+    #[serde(default)]
+    pub bandwidth_limit_mode: Option<String>,
+    #[serde(default)]
+    pub proxy_use_encryption: Option<bool>,
+    #[serde(default)]
+    pub proxy_use_compression: Option<bool>,
+    #[serde(default)]
+    pub proxy_protocol_version: Option<String>,
+}
+
+/// 兼容前端 number 输入控件提交的数字或数字字符串，并由 u16 负责范围限制。
+fn deserialize_u16_flexible<'de, D>(deserializer: D) -> Result<u16, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Number(number) => number
+            .as_u64()
+            .and_then(|v| u16::try_from(v).ok())
+            .ok_or_else(|| serde::de::Error::custom("必须是 0-65535 的整数")),
+        serde_json::Value::String(text) => text
+            .trim()
+            .parse::<u16>()
+            .map_err(|_| serde::de::Error::custom("必须是 0-65535 的整数")),
+        _ => Err(serde::de::Error::custom("必须是数字或数字字符串")),
+    }
+}
+
+/// 安全导入 frpc TOML 配置：只提取受支持字段，不透传任意配置。
+pub fn import_frpc_config(path: String) -> Result<ImportedFrpcConfig, String> {
+    let extension = std::path::Path::new(&path)
+        .extension()
+        .and_then(|v| v.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    if extension != "toml" && extension != "conf" {
+        return Err("仅支持 .toml 或 .conf 配置文件".to_string());
+    }
+    let metadata = std::fs::metadata(&path).map_err(|e| format!("读取配置文件失败: {}", e))?;
+    if metadata.len() > 1024 * 1024 {
+        return Err("配置文件超过 1 MB，已拒绝导入".to_string());
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| format!("读取配置文件失败: {}", e))?;
+    if content.contains('\0') {
+        return Err("配置文件包含非法字符".to_string());
+    }
+
+    let mut section = String::new();
+    let mut result = ImportedFrpcConfig::default();
+    for raw_line in content.lines() {
+        let line = raw_line.split('#').next().unwrap_or("").trim();
+        if line.is_empty() {
+            continue;
+        }
+        if line.starts_with("[[") && line.ends_with("]]" ) {
+            section = line[2..line.len() - 2].trim().to_string();
+            if section != "proxies" {
+                return Err(format!("不支持的配置段: {}", section));
+            }
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            section = line[1..line.len() - 1].trim().to_string();
+            if section != "auth" && section != "metadatas" && section != "proxies.transport" && section != "transport.tls" {
+                return Err(format!("不支持的配置段: {}", section));
+            }
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            return Err("配置存在无法解析的行".to_string());
+        };
+        let key = key.trim();
+        let value = value.trim();
+        match (section.as_str(), key) {
+            ("", "serverAddr") => result.server_addr = Some(parse_toml_string(value)?),
+            ("", "serverPort") => result.server_port = Some(parse_toml_u16(value, "serverPort")?),
+            ("", "user") => result.user = Some(parse_toml_string(value)?),
+            ("auth", "token") => result.token = Some(parse_toml_string(value)?),
+            ("metadatas", "token") => result.token = Some(parse_toml_string(value)?),
+            ("proxies", "name") => result.name = Some(parse_toml_string(value)?),
+            ("proxies", "type") => result.tunnel_type = Some(parse_tunnel_type(&parse_toml_string(value)?)?),
+            ("proxies", "localIP") => result.local_ip = Some(parse_toml_string(value)?),
+            ("proxies", "localPort") => result.local_port = Some(parse_toml_u16(value, "localPort")?),
+            ("proxies", "remotePort") => result.remote_port = Some(parse_toml_u16(value, "remotePort")?),
+            ("proxies.transport", "bandwidthLimit") => result.bandwidth_limit = Some(parse_toml_string(value)?),
+            ("proxies.transport", "bandwidthLimitMode") => result.bandwidth_limit_mode = Some(parse_toml_string(value)?),
+            ("proxies.transport", "useEncryption") => result.proxy_use_encryption = Some(parse_toml_bool(value, "useEncryption")?),
+            ("proxies.transport", "useCompression") => result.proxy_use_compression = Some(parse_toml_bool(value, "useCompression")?),
+            ("proxies.transport", "protocolVersion") => result.proxy_protocol_version = Some(parse_toml_string(value)?),
+            ("transport.tls", "enable") => result.use_tls = parse_toml_bool(value, "transport.tls.enable")?,
+            _ => return Err(format!("配置字段不在允许列表: {}.{}", section, key)),
+        }
+    }
+    if result.server_addr.is_none() || result.server_port.is_none() || result.local_port.is_none() || result.remote_port.is_none() {
+        return Err("配置缺少必要字段：serverAddr/serverPort/localPort/remotePort".to_string());
+    }
+    Ok(result)
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportedFrpcConfig {
+    pub server_addr: Option<String>,
+    pub server_port: Option<u16>,
+    pub user: Option<String>,
+    pub token: Option<String>,
+    pub name: Option<String>,
+    pub tunnel_type: Option<TunnelType>,
+    pub local_ip: Option<String>,
+    pub local_port: Option<u16>,
+    pub remote_port: Option<u16>,
+    pub use_tls: bool,
+    pub bandwidth_limit: Option<String>,
+    pub bandwidth_limit_mode: Option<String>,
+    pub proxy_use_encryption: Option<bool>,
+    pub proxy_use_compression: Option<bool>,
+    pub proxy_protocol_version: Option<String>,
+}
+
+fn parse_toml_string(value: &str) -> Result<String, String> {
+    let value = value.trim();
+    if value.len() < 2 || !((value.starts_with('\'') && value.ends_with('\'')) || (value.starts_with('"') && value.ends_with('"'))) {
+        return Err("仅支持单行 TOML 字符串".to_string());
+    }
+    let inner = &value[1..value.len() - 1];
+    if inner.contains('\n') || inner.contains('\r') {
+        return Err("字符串包含换行".to_string());
+    }
+    Ok(inner.replace("\\'", "'").replace("\\\"", "\""))
+}
+
+fn parse_toml_u16(value: &str, key: &str) -> Result<u16, String> {
+    value.trim().parse().map_err(|_| format!("{} 必须是有效端口", key))
+}
+
+fn parse_toml_bool(value: &str, key: &str) -> Result<bool, String> {
+    value.trim().parse().map_err(|_| format!("{} 必须是布尔值", key))
+}
+
+fn parse_tunnel_type(value: &str) -> Result<TunnelType, String> {
+    match value {
+        "tcp" => Ok(TunnelType::Tcp),
+        "udp" => Ok(TunnelType::Udp),
+        _ => Err("仅支持 tcp/udp 配置".to_string()),
+    }
 }
 
 #[derive(Debug, serde::Deserialize)]
@@ -278,4 +442,16 @@ pub struct UpdateTunnelParams {
     pub remote_port: u16,
     pub token: Option<String>,
     pub use_tls: Option<bool>,
+    /// 带宽限制（如 "4MB"），写入 `[proxies.transport] bandwidthLimit`
+    #[serde(default)]
+    pub bandwidth_limit: Option<String>,
+    /// 带宽限制模式（如 "server"），写入 `[proxies.transport] bandwidthLimitMode`
+    #[serde(default)]
+    pub bandwidth_limit_mode: Option<String>,
+    #[serde(default)]
+    pub proxy_use_encryption: Option<bool>,
+    #[serde(default)]
+    pub proxy_use_compression: Option<bool>,
+    #[serde(default)]
+    pub proxy_protocol_version: Option<String>,
 }

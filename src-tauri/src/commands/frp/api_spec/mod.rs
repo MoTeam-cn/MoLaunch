@@ -10,5 +10,5 @@ pub mod envelope;
 pub mod http;
 pub mod jsonpath;
 
-pub use executor::{fetch_tunnels, AccountInfo, TunnelInfo};
+pub use executor::{fetch_raw_tunnel_config, fetch_tunnels, AccountInfo, TunnelInfo};
 pub use registry::load_api_spec;

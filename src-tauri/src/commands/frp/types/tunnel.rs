@@ -47,6 +47,32 @@ pub struct Tunnel {
     /// 是否启用 TLS
     #[serde(default)]
     pub use_tls: bool,
+    /// 厂商远端隧道自增 ID（从厂商 API 导入时记录，用于同步面板判断已导入；本地自建隧道为空）
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_tunnel_id: Option<String>,
+    /// 厂商远端隧道真实 name（真实隧道标识，非自增 id）。
+    /// config 接口查询用该值（如 Lolia `/user/frpc/config?tunnel=<name>`），
+    /// 生成 frpc 配置的 `[[proxies]] name` 也用该值。从厂商 API 导入时记录。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_tunnel_name: Option<String>,
+    /// 厂商 config 接口返回的完整配置，导入时原样保存，启动时直接复用。
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raw_config: Option<String>,
+    /// 带宽限制（如 "4MB"），写入 `[proxies.transport] bandwidthLimit`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bandwidth_limit: Option<String>,
+    /// 带宽限制模式（如 "server"），写入 `[proxies.transport] bandwidthLimitMode`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bandwidth_limit_mode: Option<String>,
+    /// Proxy 传输加密
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_use_encryption: Option<bool>,
+    /// Proxy 传输压缩
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_use_compression: Option<bool>,
+    /// Proxy 协议版本
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proxy_protocol_version: Option<String>,
     /// 创建时间（Unix 毫秒）
     pub created_at: u64,
 }

@@ -3,6 +3,7 @@
 use std::time::UNIX_EPOCH;
 
 use crate::commands::frp::{frp_logs_dir, LogFileContent, LogFileInfo};
+use crate::log_info;
 
 /// 列出所有日志文件
 ///
@@ -41,6 +42,42 @@ pub async fn list_log_files() -> Result<Vec<LogFileInfo>, String> {
     // 按修改时间倒序
     files.sort_by_key(|b| std::cmp::Reverse(b.modified_at));
     Ok(files)
+}
+
+/// 清空指定隧道的日志文件内容（保留文件，不清除磁盘路径）
+///
+/// `tunnel_id` 为空时清空所有日志文件。文件不存在时静默成功。
+/// 与前端「清空当前显示」的区别：本函数直接删除文件内容，
+/// 重启隧道 / 刷新后会真正看到日志已清空。
+pub async fn clear_log_file(tunnel_id: String) -> Result<(), String> {
+    let logs_dir = frp_logs_dir();
+    if !logs_dir.exists() {
+        return Ok(());
+    }
+
+    if tunnel_id.trim().is_empty() {
+        // 清空所有日志文件
+        let mut cleared = 0usize;
+        for entry in std::fs::read_dir(&logs_dir).map_err(|e| e.to_string())? {
+            let entry = entry.map_err(|e| e.to_string())?;
+            let path = entry.path();
+            if path.extension().and_then(|e| e.to_str()) != Some("log") {
+                continue;
+            }
+            std::fs::write(&path, "")
+                .map_err(|e| format!("清空日志失败 {}: {}", path.display(), e))?;
+            cleared += 1;
+        }
+        log_info!("[Frp] 已清空 {} 个日志文件", cleared);
+        return Ok(());
+    }
+
+    let path = logs_dir.join(format!("{}.log", tunnel_id));
+    if path.exists() {
+        std::fs::write(&path, "").map_err(|e| format!("清空日志失败 {}: {}", path.display(), e))?;
+        log_info!("[Frp] 已清空日志文件: {}", path.display());
+    }
+    Ok(())
 }
 
 /// 读取日志文件内容（尾部 maxLines 行）

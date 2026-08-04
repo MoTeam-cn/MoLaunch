@@ -55,9 +55,12 @@ pub struct OAuth2Config {
     pub token_url: String,
     /// 客户端 ID
     pub client_id: String,
-    /// 客户端密钥（可选，部分厂商需要）
+    /// 客户端密钥（可选，部分厂商需要；启用 PKCE 时无需填写）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_secret: Option<String>,
+    /// 使用 PKCE（RFC 7636）公开客户端模式，本地生成 code_verifier 安全换 token
+    #[serde(default)]
+    pub pkce: bool,
     /// 权限范围
     #[serde(default)]
     pub scopes: Vec<String>,
@@ -128,6 +131,10 @@ pub struct AuthFileOAuth2 {
     pub client_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub client_secret: Option<String>,
+    /// 使用 PKCE（RFC 7636）公开客户端模式：本地生成 code_verifier，
+    /// 无需 client_secret 也可安全换 token（默认 false）
+    #[serde(default)]
+    pub pkce: bool,
     #[serde(default)]
     pub scopes: Vec<String>,
     pub redirect_port: u16,

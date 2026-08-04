@@ -90,10 +90,10 @@ pub(super) async fn capture_stream(
                     }),
                 );
 
-                // 批量写入（每 50 行或达到一定大小写一次）
-                if lines.len() >= 50 {
-                    flush_log(&log_path, &mut lines, tunnel_id);
-                }
+                // 立即写盘并 flush：确保 read_log_file 能实时读到，
+                // 避免前端刷新/重开页面时日志为空（历史问题：等满 50 行才写，
+                // 且写盘不 flush，导致"非要等报错才能加载出来"）
+                flush_log(&log_path, &mut lines, tunnel_id);
             }
             Err(e) => {
                 log_warn!("[Frp] 读取 {} 日志失败 ({}): {}", source, tunnel_id, e);
@@ -122,7 +122,7 @@ fn infer_log_level(source: &str, line: &str) -> &'static str {
     }
 }
 
-/// 批量写入日志文件（追加模式）
+/// 批量写入日志文件（追加模式，写入后立即 flush 确保实时落到磁盘）
 fn flush_log(log_path: &std::path::Path, lines: &mut Vec<String>, tunnel_id: &str) {
     if lines.is_empty() {
         return;
@@ -139,8 +139,19 @@ fn flush_log(log_path: &std::path::Path, lines: &mut Vec<String>, tunnel_id: &st
             return;
         }
     };
+    let mut ok = true;
     for line in lines.drain(..) {
-        let _ = file.write_all(line.as_bytes());
+        if file.write_all(line.as_bytes()).is_err() {
+            ok = false;
+            break;
+        }
+    }
+    // 必须 flush：否则内容滞留在用户态/内核缓冲，read_log_file 读文件会为空，
+    // 只有进程退出（close）时才落盘，导致日志"非要等报错/退出才能加载出来"
+    if ok {
+        let _ = file.flush();
+    } else {
+        lines.clear();
     }
 }
 

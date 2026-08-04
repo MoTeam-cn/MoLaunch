@@ -45,6 +45,22 @@ pub async fn start_oauth2(
 
     log_info!("[Frp Auth] 启动 OAuth2 流程: provider={}", provider_id);
 
+    // PKCE（RFC 7636）：公开客户端模式，本地生成一次性 code_verifier。
+    // 启用 PKCE 时忽略 client_secret（不发送到服务器），换 token 回传 verifier 校验。
+    let code_verifier = if config.pkce {
+        let verifier = super::super::pkce::generate_code_verifier();
+        log_info!(
+            "[Frp Auth] 使用 PKCE 认证（公开客户端，无 client_secret）: provider={}",
+            provider_id
+        );
+        Some(verifier)
+    } else {
+        None
+    };
+    let code_challenge = code_verifier
+        .as_ref()
+        .map(|v| super::super::pkce::code_challenge_s256(v));
+
     // 1. 启动本地 HTTP 服务接收 callback
     let bind_addr = format!("127.0.0.1:{}", config.redirect_port);
     let listener = tokio::net::TcpListener::bind(&bind_addr)
@@ -56,12 +72,14 @@ pub async fn start_oauth2(
 
     // 2. 生成 state（CSRF 防护）并构建授权 URL
     let state = generate_state();
+    let challenge_pair = code_challenge.as_ref().map(|c| (c.as_str(), "S256"));
     let authorize_url = exchange::build_authorize_url(
         &config.authorize_url,
         &config.client_id,
         &redirect_uri,
         &config.scopes,
         &state,
+        challenge_pair,
     );
 
     // 3. 打开浏览器（走 shell 模块）
@@ -91,12 +109,19 @@ pub async fn start_oauth2(
     }
 
     // 5. 用 code 换取 token（走 flows 引擎）
+    // PKCE 模式下 client_secret 不参与交换，仅传 code_verifier
+    let client_secret = if config.pkce {
+        None
+    } else {
+        config.client_secret.clone()
+    };
     let ctx = FlowContext {
         base_url: Some(spec.base_url.clone()),
         client_id: config.client_id.clone(),
-        client_secret: config.client_secret.clone(),
+        client_secret,
         redirect_uri: Some(redirect_uri.clone()),
         code: Some(callback.code),
+        code_verifier,
         scope: Some(config.scopes.join(" ")),
         ..Default::default()
     };

@@ -3,12 +3,79 @@
 use crate::commands::frp::provider;
 use crate::commands::frp::tunnel;
 use crate::commands::frp::{ensure_dir, frp_logs_dir};
+use crate::log_debug;
 use crate::log_info;
 use crate::state::AppState;
 use tauri::{AppHandle, Emitter};
 
 use super::capture::capture_stream;
 use super::{FrpcHandle, RUNNING};
+
+/// 生成启动用 frpc 配置文件（优先厂商原版，回退本地生成）
+///
+/// 流程：
+/// 1. 若隧道厂商配置了 `tunnels.config` 端点（config.mode=url），调用厂商 API
+///    拉取原版 frpc 配置，叠加逆向字段（`[proxies.transport]` 带宽限制等）
+///    后直接写盘。
+/// 2. 无 config 端点 / 拉取失败时，回退本地 `tunnel::generate_config`
+///    生成 v1.x 格式 TOML。
+///
+/// 返回配置文件路径。
+async fn prepare_config(
+    state: &AppState,
+    tunnel: &crate::commands::frp::Tunnel,
+) -> Result<std::path::PathBuf, String> {
+    let config_dir = crate::commands::frp::frp_config_dir();
+    ensure_dir(&config_dir)?;
+    let config_path = config_dir.join(format!("{}.toml", tunnel.id));
+
+    // 导入隧道优先直接复用 config 接口返回的完整原文，不能重新拼装或覆盖。
+    if let Some(raw) = tunnel.raw_config.as_deref().filter(|v| !v.trim().is_empty()) {
+        std::fs::write(&config_path, raw)
+            .map_err(|e| format!("写入厂商原版 frpc 配置失败: {}", e))?;
+        log_info!("[Frp] 直接复用已保存的厂商原版配置: {}", config_path.display());
+        return Ok(config_path);
+    }
+
+    // 系统默认 frpc 没有厂商 manifest：直接生成本地配置；只有外部厂商才读取 manifest。
+    if tunnel.provider_id == crate::commands::frp::provider::SYSTEM_DEFAULT_ID {
+        tunnel::generate_config(tunnel)?;
+        return Ok(config_path);
+    }
+
+    // 旧数据没有 rawConfig：有 config 端点时启动前拉取一次；没有端点才允许本地生成。
+    let manifest = crate::commands::frp::provider::read_provider_manifest(&tunnel.provider_id)?;
+    let endpoints_file = manifest.api.as_ref()
+        .map(|a| a.endpoints_file.as_str())
+        .unwrap_or("api/endpoints.json");
+    let spec = crate::commands::frp::api_spec::load_api_spec(&tunnel.provider_id, endpoints_file)?;
+    let has_config_endpoint = spec.endpoints.as_ref()
+        .and_then(|e| e.tunnels.as_ref())
+        .and_then(|t| t.config.as_ref())
+        .is_some();
+    if !has_config_endpoint {
+        tunnel::generate_config(tunnel)?;
+        return Ok(config_path);
+    }
+
+    let remote_name = tunnel
+        .remote_tunnel_name
+        .as_deref()
+        .unwrap_or(&tunnel.name);
+    let raw = crate::commands::frp::api_spec::fetch_raw_tunnel_config(
+        state,
+        &tunnel.provider_id,
+        &tunnel.id,
+        remote_name,
+    )
+    .await
+    .map_err(|e| format!("厂商 config 接口获取失败，已停止启动（不会回退本地配置）: {}", e))?;
+
+    std::fs::write(&config_path, raw)
+        .map_err(|e| format!("写入厂商原版 frpc 配置失败: {}", e))?;
+    log_info!("[Frp] 使用厂商 config 接口原样配置启动: {}", config_path.display());
+    Ok(config_path)
+}
 
 /// 启动隧道
 ///
@@ -19,7 +86,6 @@ use super::{FrpcHandle, RUNNING};
 /// 5. spawn monitor task 监听进程退出，推送 frp-tunnel-status event
 /// 6. 记录到全局进程表
 pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Result<(), String> {
-    // 检查是否已在运行
     {
         let running = RUNNING.lock().await;
         if running.contains_key(&id) {
@@ -41,7 +107,20 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
         return Err(format!("frpc 二进制不存在: {}", frpc_path.display()));
     }
 
-    let config_path = tunnel::generate_config(&tunnel)?;
+    // 判断是否 command 直连模式（厂商魔改 frpc，无需配置文件）
+    let launch_mode = crate::commands::frp::provider::read_provider_manifest(
+        &tunnel.provider_id,
+    )
+    .ok()
+    .and_then(|m| m.binary.launch)
+    .filter(|l| l.mode.eq_ignore_ascii_case("command"));
+
+    // config 模式才生成配置文件；command 模式直接走命令参数
+    let config_path = if launch_mode.is_none() {
+        Some(prepare_config(state, &tunnel).await?)
+    } else {
+        None
+    };
 
     // 准备日志文件
     let logs_dir = frp_logs_dir();
@@ -55,21 +134,106 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
         tunnel.name,
         tunnel.id,
         frpc_path.display(),
-        config_path.display()
+        config_path
+            .as_ref()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|| "命令直连模式".to_string())
     );
 
     // 启动 frpc 子进程
+    // 按厂商 manifest 的 binary.launch 决定启动方式（通用机制）：
+    // - mode=config（默认）：<frpc> -c <config.toml>
+    // - mode=command：厂商魔改 frpc 用命令参数直连（如 Lolia `-t <tunnelId>:<token>`），
+    //   command 模板支持 {frpc}/{tunnelId}/{token} 占位符
     let mut cmd = tokio::process::Command::new(&frpc_path);
-    cmd.arg("-c").arg(&config_path);
+    if let Some(launch) = launch_mode {
+        // command 直连模式：解析模板生成参数（不做 shell 拼接，防注入）
+        // {tunnelId} = 远程隧道自增 ID（如 Lolia 的 -t 16977:<token>）
+        let remote_id = tunnel
+            .remote_tunnel_id
+            .as_deref()
+            .unwrap_or(&tunnel.id);
+        let token = tunnel.token.as_deref().unwrap_or("");
+        let command = launch.command.as_deref().unwrap_or("").to_string();
+        let resolved = command
+            .replace("{frpc}", &frpc_path.to_string_lossy())
+            .replace("{tunnelId}", remote_id)
+            .replace("{token}", token);
+        log_info!(
+            "[Frp] 使用厂商命令模式启动: {}",
+            resolved
+        );
+        let mut parts = resolved.split_whitespace();
+        // 第一个 token 应为 {frpc} 替换后的二进制路径，跳过（Command::new 已指定）
+        let _ = parts.next();
+        for arg in parts {
+            cmd.arg(arg);
+        }
+    } else {
+        // 默认 config 模式
+        cmd.arg("-c").arg(config_path.as_ref().unwrap());
+    }
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::piped());
     cmd.stdin(std::process::Stdio::null());
 
-    // 清空环境变量，仅保留 PATH（防止敏感环境变量泄露给 frpc 子进程）
-    // 对应设计文档 §7.3 进程隔离
-    let path_env = std::env::var("PATH").unwrap_or_default();
+    // 清空环境变量，仅保留必要项（防止敏感环境变量泄露给 frpc 子进程）
+    // 对应设计文档 §7.3 进程隔离。
+    // 保留项：
+    // - PATH：frpc 运行必需
+    // - 系统代理变量（HTTP_PROXY/HTTPS_PROXY/ALL_PROXY/NO_PROXY 及小写形式）：
+    //   frpc 的 DNS 解析 / 网络连接依赖代理环境，清掉后域名解析会失败
+    //   （如 `lookup xxx: getaddrinfow: A non-recoverable error`）
+    // - Windows 基础变量（SystemRoot/SystemDrive/TEMP/TMP/ComSpec/WINDIR/USERPROFILE）：
+    //   部分子系统依赖，清掉可能导致 getaddrinfow 等系统调用诡异失败
+    let keep_keys = [
+        "PATH",
+        "HTTP_PROXY",
+        "HTTPS_PROXY",
+        "ALL_PROXY",
+        "NO_PROXY",
+        "http_proxy",
+        "https_proxy",
+        "all_proxy",
+        "no_proxy",
+        "SystemRoot",
+        "SystemDrive",
+        "SYSTEMROOT",
+        "WINDIR",
+        "TEMP",
+        "TMP",
+        "ComSpec",
+        "USERPROFILE",
+    ];
+    let mut kept_envs: Vec<(String, String)> = Vec::new();
+    for key in keep_keys.iter() {
+        if let Ok(val) = std::env::var(key) {
+            kept_envs.push((key.to_string(), val));
+        }
+    }
     cmd.env_clear();
-    cmd.env("PATH", path_env);
+    for (k, v) in kept_envs.iter() {
+        cmd.env(k, v);
+    }
+    // 排障日志：打印实际传给 frpc 的环境变量名（代理值脱敏，防止泄露）
+    let env_desc: Vec<String> = kept_envs
+        .iter()
+        .map(|(k, v)| {
+            let is_proxy = k.contains("PROXY") || k.contains("proxy");
+            let shown = if is_proxy && !v.is_empty() {
+                "<已设置，值已脱敏>".to_string()
+            } else if is_proxy {
+                "<未设置>".to_string()
+            } else {
+                v.clone()
+            };
+            format!("{}={}", k, shown)
+        })
+        .collect();
+    log_debug!(
+        "[Frp] 传给 frpc 的环境变量: {}",
+        env_desc.join("; ")
+    );
 
     // Windows: CREATE_NO_WINDOW，不弹出控制台窗口
     #[cfg(target_os = "windows")]

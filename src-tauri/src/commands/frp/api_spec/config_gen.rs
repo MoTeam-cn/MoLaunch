@@ -28,15 +28,20 @@ pub fn generate(
     tunnel: &TunnelInfo,
     account: &AccountInfo,
     raw_config: Option<&str>,
+    encoding: Option<&str>,
 ) -> Result<GeneratedConfig, String> {
     match mode {
         "url" => {
-            // url 模式：直写厂商返回的配置（预留解码扩展点）
+            // url 模式：直写厂商返回的配置（按 encoding 解码，如 base64）
             let raw = raw_config.ok_or_else(|| {
                 "config.mode=url 但未提供配置内容（config 端点未调用或返回空）".to_string()
             })?;
-            let content = decode_config(raw)?;
-            log_info!("[Frp] 配置生成: mode=url, 长度={}", content.len());
+            let content = decode_config(raw, encoding)?;
+            log_info!(
+                "[Frp] 配置生成: mode=url, encoding={:?}, 长度={}",
+                encoding,
+                content.len()
+            );
             Ok(GeneratedConfig {
                 content: Some(content),
                 args: Vec::new(),
@@ -185,16 +190,29 @@ fn build_args(
     Ok(result)
 }
 
-/// 解码配置内容（预留扩展点）
+/// 解码配置内容（支持 base64）
 ///
-/// 当前直接返回原始文本。后续可按 decoding 配置扩展：
-/// - base64：Base64 解码
-/// - xor：XOR 解密（需密钥）
-/// - aes：AES 解密（需密钥）
-fn decode_config(raw: &str) -> Result<String, String> {
-    // 当前直接返回原始文本
-    // TODO: 按 decoding 配置扩展解码逻辑
-    Ok(raw.to_string())
+/// `encoding` 取值：
+/// - text：直接返回原始文本
+/// - base64：Base64 解码后返回文本
+///
+/// Lolia 等厂商的 config 接口返回 base64 编码的 frpc 配置（`data.config`），
+/// 需解码后才能得到可写盘的配置内容。
+pub fn decode_config(raw: &str, encoding: Option<&str>) -> Result<String, String> {
+    match encoding {
+        Some("base64") => decode_base64(raw),
+        _ => Ok(raw.to_string()),
+    }
+}
+
+/// Base64 解码（标准 RFC 4648，容忍空白字符）
+fn decode_base64(raw: &str) -> Result<String, String> {
+    let cleaned: String = raw.chars().filter(|c| !c.is_whitespace()).collect();
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(&cleaned)
+        .map_err(|e| format!("Base64 解码失败: {}", e))?;
+    String::from_utf8(bytes).map_err(|e| format!("Base64 解码结果非 UTF-8: {}", e))
 }
 
 #[cfg(test)]

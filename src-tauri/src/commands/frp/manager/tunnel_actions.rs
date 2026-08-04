@@ -23,6 +23,9 @@ pub fn register(d: &mut Dispatcher) {
         handler!(_state, _app, params, {
             let p: CreateTunnelParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            if p.provider_id != "system-default" && !(p.imported && p.remote_tunnel_id.is_some()) {
+                return Err("手动创建隧道只能使用系统自带 frpc；厂商隧道请通过同步导入".to_string());
+            }
             frp::sandbox::validate_tunnel(&p)?;
             let r = frp::tunnel::create_tunnel(p).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
@@ -48,6 +51,15 @@ pub fn register(d: &mut Dispatcher) {
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             frp::sandbox::validate_tunnel_update(&p)?;
             let r = frp::tunnel::update_tunnel(p).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "import_frpc_config",
+        handler!(_state, _app, params, {
+            let path = params.get("path").and_then(|v| v.as_str()).ok_or("缺少配置文件路径")?;
+            let r = frp::tunnel::import_frpc_config(path.to_string())?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
@@ -99,6 +111,16 @@ pub fn register(d: &mut Dispatcher) {
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let r = frp::process::read_log_file(p.tunnel_id, p.max_lines).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "clear_log_file",
+        handler!(_state, _app, params, {
+            let p: ReadLogParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            frp::process::clear_log_file(p.tunnel_id).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );
 }

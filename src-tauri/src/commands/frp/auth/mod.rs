@@ -9,6 +9,7 @@ mod device_code;
 mod flows;
 mod handlers;
 mod oauth2;
+mod pkce;
 mod storage;
 mod types;
 

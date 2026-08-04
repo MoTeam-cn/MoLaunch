@@ -158,7 +158,9 @@ pub async fn refresh_token(_state: &AppState, provider_id: &str) -> Result<(), S
     let (client_id, client_secret) = match auth_type.as_str() {
         "oauth2" => {
             let cfg = resolve_oauth2_config(provider_id, &manifest)?;
-            (cfg.client_id, cfg.client_secret)
+            // PKCE 公开客户端：refresh 同样不携带 client_secret
+            let secret = if cfg.pkce { None } else { cfg.client_secret };
+            (cfg.client_id, secret)
         }
         "device_code" => {
             let cfg = resolve_device_code_config(provider_id, &manifest)?;

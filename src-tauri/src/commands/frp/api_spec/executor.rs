@@ -18,6 +18,8 @@ use crate::state::AppState;
 pub struct TunnelInfo {
     pub id: String,
     pub name: String,
+    /// 隧道显示名（厂商返回的 remark 等，用户可读的名字；name 多为真实隧道 id）
+    pub remark: String,
     pub tunnel_type: String,
     pub status: String,
     pub server_host: String,
@@ -27,6 +29,10 @@ pub struct TunnelInfo {
     pub local_port: String,
     pub remote_port: String,
     pub custom_domain: String,
+    /// 厂商 config 端点返回的完整 frpc 配置（已解码），导入时原样持久化。
+    pub raw_config: Option<String>,
+    /// 厂商 detail/list 等接口返回的原始数据，用于声明式配置字段映射。
+    pub source_data: serde_json::Value,
 }
 
 /// 账号信息（从厂商 API 响应映射）
@@ -81,6 +87,8 @@ pub async fn fetch_tunnels(
                 &token,
                 &device_id,
                 provider_id,
+                "",
+                "",
                 spec.envelope.as_ref(),
             )
             .await?;
@@ -110,6 +118,8 @@ pub async fn fetch_tunnels(
         &token,
         &device_id,
         provider_id,
+        "",
+        "",
         spec.envelope.as_ref(),
     )
     .await
@@ -131,6 +141,8 @@ pub async fn fetch_tunnels(
                 &new_token,
                 &device_id,
                 provider_id,
+                "",
+                "",
                 spec.envelope.as_ref(),
             )
             .await?
@@ -138,7 +150,113 @@ pub async fn fetch_tunnels(
         Err(e) => return Err(e),
     };
 
-    let tunnels = map_tunnels(&resp, tunnels_endpoint, &account)?;
+    let mut tunnels = map_tunnels(&resp, tunnels_endpoint, &account)?;
+
+    // 隧道详情/配置回填：部分厂商的列表/详情接口不含完整字段
+    // （frps 连接端口 server_port、远端端口 remote_port 等，如 Lolia 的
+    // frps 端口只在 config 接口返回的配置里），需调用 detail/config 端点补全。
+    // 优先 config 端点（frpc 配置中含 serverAddr/serverPort/remotePort），
+    // 其次 detail 端点。
+    if let Some(tunnels_def) = spec.endpoints.as_ref().and_then(|e| e.tunnels.as_ref()) {
+        let config_endpoint = tunnels_def.config.as_ref();
+        let detail_endpoint = tunnels_def.detail.as_ref();
+        for t in tunnels.iter_mut() {
+            // 即使列表字段完整，只要有 config 端点也要获取完整原文并持久化。
+            // detail 端点仅在仍有字段缺失时调用。
+            if let Some(cfg_ep) = config_endpoint {
+                match fetch_tunnel_config(
+                    &spec.base_url,
+                    cfg_ep,
+                    &t.id,
+                    &t.name,
+                    &token,
+                    &device_id,
+                    provider_id,
+                    spec.envelope.as_ref(),
+                )
+                .await
+                {
+                    Ok(cfg) => {
+                        let (addr, port, remote) = parse_config_fields(&cfg);
+                        t.raw_config = Some(cfg);
+                        if t.server_host.is_empty() {
+                            if let Some(addr) = addr { t.server_host = addr; }
+                        }
+                        if t.server_port.is_empty() {
+                            if let Some(port) = port { t.server_port = port; }
+                        }
+                        if t.remote_port.is_empty() {
+                            if let Some(remote) = remote { t.remote_port = remote; }
+                        }
+                    }
+                    Err(e) => {
+                        log_info!("[Frp] 厂商 {} config 端点获取失败，继续使用字段映射: {}", provider_id, e);
+                    }
+                }
+            }
+
+            // detail 端点回填其余缺失字段（server_host/server_port/remote_port 等）
+            if let Some(detail_ep) = detail_endpoint {
+                let still_missing = t.remote_port.is_empty()
+                    || t.server_host.is_empty()
+                    || t.server_port.is_empty()
+                    || t.token.is_empty()
+                    || t.local_port.is_empty();
+                if !still_missing {
+                    continue;
+                }
+                if let Some(detail_item) = fetch_tunnel_detail(
+                    &spec.base_url,
+                    detail_ep,
+                    t,
+                    &token,
+                    &device_id,
+                    provider_id,
+                    spec.envelope.as_ref(),
+                )
+                .await
+                {
+                    let detail_fields = &detail_ep.response.fields;
+                    if t.remote_port.is_empty() {
+                        t.remote_port = resolve_field(
+                            &detail_item,
+                            detail_fields.get("remotePort"),
+                            &account,
+                            None,
+                        );
+                    }
+                    if t.server_host.is_empty() {
+                        t.server_host = resolve_field(
+                            &detail_item,
+                            detail_fields.get("serverHost"),
+                            &account,
+                            Some(0),
+                        );
+                    }
+                    if t.server_port.is_empty() {
+                        t.server_port = resolve_field(
+                            &detail_item,
+                            detail_fields.get("serverPort"),
+                            &account,
+                            Some(1),
+                        );
+                    }
+                    if t.token.is_empty() {
+                        t.token =
+                            resolve_field(&detail_item, detail_fields.get("token"), &account, None);
+                    }
+                    if t.local_port.is_empty() {
+                        t.local_port = resolve_field(
+                            &detail_item,
+                            detail_fields.get("localPort"),
+                            &account,
+                            None,
+                        );
+                    }
+                }
+            }
+        }
+    }
 
     log_info!(
         "[Frp] 厂商 {} 隧道列表拉取成功: {} 条",
@@ -152,6 +270,211 @@ pub async fn fetch_tunnels(
 /// 判断错误是否由 HTTP 401 引起（厂商 token 失效）
 fn is_unauthorized_err(e: &str) -> bool {
     e.contains("HTTP 401") || e.contains("HTTP 403")
+}
+
+/// 调用厂商 config 端点获取 frpc 配置字符串（已按 encoding 解码）
+///
+/// 流程：发送 config 端点请求 → 按 dataField 提取配置字段 → 按 encoding
+/// 解码（text 原样 / base64 解码）。失败返回 Err（调用方忽略，回填兜底）。
+#[allow(clippy::too_many_arguments)]
+async fn fetch_tunnel_config(
+    base_url: &str,
+    endpoint: &EndpointDef,
+    tunnel_id: &str,
+    tunnel_name: &str,
+    token: &str,
+    device_id: &str,
+    provider_id: &str,
+    global_envelope: Option<&crate::commands::frp::Envelope>,
+) -> Result<String, String> {
+    let resp = http::send_request(
+        base_url,
+        endpoint,
+        token,
+        device_id,
+        provider_id,
+        tunnel_id,
+        tunnel_name,
+        global_envelope,
+    )
+    .await?;
+
+    let raw = envelope::extract_data(
+        &resp,
+        endpoint.envelope.as_ref(),
+        endpoint.response.data_field.as_deref(),
+    )?
+    .ok_or_else(|| "config 端点响应缺少 dataField".to_string())?;
+
+    let raw_str = match raw {
+        serde_json::Value::String(s) => s,
+        other => other.to_string(),
+    };
+
+    let encoding = endpoint.response.encoding.as_deref();
+    let decoded = super::config_gen::decode_config(&raw_str, encoding)?;
+    log_info!(
+        "[Frp] 厂商 {} config 端点已获取配置（encoding={:?}，长度={}）",
+        provider_id,
+        encoding,
+        decoded.len()
+    );
+    Ok(decoded)
+}
+
+/// 拉取厂商 config 端点返回的原版 frpc 配置（启动隧道前调用）
+///
+/// 供 `process::start_tunnel` 使用：厂商配置了 `tunnels.config` 端点时，
+/// 优先用其返回的原版配置启动（叠加逆向字段），而非本地拼装。
+/// 未配置 config 端点或拉取失败时返回 Err，调用方回退本地生成。
+pub async fn fetch_raw_tunnel_config(
+    state: &crate::state::AppState,
+    provider_id: &str,
+    tunnel_id: &str,
+    tunnel_name: &str,
+) -> Result<String, String> {
+    let manifest = crate::commands::frp::provider::read_provider_manifest(provider_id)?;
+    let endpoints_file = manifest
+        .api
+        .as_ref()
+        .map(|a| a.endpoints_file.as_str())
+        .unwrap_or("api/endpoints.json");
+    let spec = super::load_api_spec(provider_id, endpoints_file)?;
+
+    let config_endpoint = spec
+        .endpoints
+        .as_ref()
+        .and_then(|e| e.tunnels.as_ref())
+        .and_then(|t| t.config.as_ref())
+        .ok_or_else(|| format!("厂商 {} 未配置 config 端点", provider_id))?;
+
+    let token = crate::commands::frp::auth::ensure_valid_token(state, provider_id)
+        .await
+        .map_err(|e| format!("厂商 {} token 校验失败: {}", provider_id, e))?;
+    let device_id = crate::commands::sdk::get_device_id(state)
+        .await
+        .map_err(|e| format!("获取 device_id 失败: {}", e))?;
+
+    fetch_tunnel_config(
+        &spec.base_url,
+        config_endpoint,
+        tunnel_id,
+        tunnel_name,
+        &token,
+        &device_id,
+        provider_id,
+        spec.envelope.as_ref(),
+    )
+    .await
+}
+
+/// 调用厂商 detail 端点获取单个隧道详情（返回原始 JSON 项）
+///
+/// pathParams 替换隧道字段（如 {tunnelId} → t.id）。失败返回 None（调用方兜底）。
+async fn fetch_tunnel_detail(
+    base_url: &str,
+    endpoint: &EndpointDef,
+    tunnel: &TunnelInfo,
+    token: &str,
+    device_id: &str,
+    provider_id: &str,
+    global_envelope: Option<&crate::commands::frp::Envelope>,
+) -> Option<serde_json::Value> {
+    // 构造带路径参数的端点副本
+    let mut ep = endpoint.clone();
+    let mut path = ep.path.clone();
+    for (placeholder, field) in &ep.path_params {
+        let value = match field.as_str() {
+            "id" => &tunnel.id,
+            "name" => &tunnel.name,
+            _ => continue,
+        };
+        path = path.replace(&format!("{{{}}}", placeholder), value);
+    }
+    ep.path = path;
+
+    match http::send_request(
+        base_url,
+        &ep,
+        token,
+        device_id,
+        provider_id,
+        &tunnel.id,
+        &tunnel.name,
+        global_envelope,
+    )
+    .await
+    {
+        Ok(resp) => {
+            let data = envelope::extract_data(
+                &resp,
+                ep.envelope.as_ref(),
+                ep.response.data_field.as_deref(),
+            )
+            .ok()
+            .flatten();
+            log_info!(
+                "[Frp] 厂商 {} detail 端点已获取隧道 {}",
+                provider_id,
+                tunnel.id
+            );
+            Some(data.unwrap_or(resp))
+        }
+        Err(e) => {
+            log_info!(
+                "[Frp] 厂商 {} detail 端点获取失败（忽略，继续用列表字段）: {}",
+                provider_id,
+                e
+            );
+            None
+        }
+    }
+}
+
+/// 从 frpc 配置文本解析服务器连接与远端端口字段
+///
+/// 返回 `(server_addr, server_port, remote_port)`，支持两种格式：
+///
+/// - TOML（frpc v0.51+）：`serverAddr = 'hk-6.qwq.fan'`、`serverPort = 17000`、`remotePort = 30919`
+/// - INI（旧版 frpc）：`server_addr = ...`、`server_port = ...`、`remote_port = ...`
+///
+/// 取第一个匹配的字段值；未匹配返回 None。
+fn parse_config_fields(config: &str) -> (Option<String>, Option<String>, Option<String>) {
+    let mut server_addr = None;
+    let mut server_port = None;
+    let mut remote_port = None;
+
+    for line in config.lines() {
+        let line = line.trim();
+        if line.is_empty() || line.starts_with('#') || line.starts_with('[') {
+            continue;
+        }
+        let Some(eq) = line.find('=') else {
+            continue;
+        };
+        let key = line[..eq].trim();
+        let value = line[eq + 1..].trim().trim_matches('"').trim_matches('\'');
+        match key {
+            "serverAddr" | "server_addr" => {
+                if server_addr.is_none() && !value.is_empty() {
+                    server_addr = Some(value.to_string());
+                }
+            }
+            "serverPort" | "server_port" => {
+                if server_port.is_none() && value.parse::<u16>().is_ok() {
+                    server_port = Some(value.to_string());
+                }
+            }
+            "remotePort" | "remote_port" => {
+                if remote_port.is_none() && value.parse::<u16>().is_ok() {
+                    remote_port = Some(value.to_string());
+                }
+            }
+            _ => {}
+        }
+    }
+
+    (server_addr, server_port, remote_port)
 }
 
 /// 按 ResponseDef.fields 映射账号信息
@@ -205,6 +528,7 @@ fn map_tunnels(
             TunnelInfo {
                 id: resolve_field(item_ref, fields.get("id"), account, None),
                 name: resolve_field(item_ref, fields.get("name"), account, None),
+                remark: resolve_field(item_ref, fields.get("remark"), account, None),
                 tunnel_type: resolve_field(item_ref, fields.get("type"), account, None),
                 status: resolve_field(item_ref, fields.get("status"), account, None),
                 server_host: resolve_field(item_ref, fields.get("serverHost"), account, Some(0)),
@@ -214,6 +538,8 @@ fn map_tunnels(
                 local_port: resolve_field(item_ref, fields.get("localPort"), account, None),
                 remote_port: resolve_field(item_ref, fields.get("remotePort"), account, None),
                 custom_domain: resolve_field(item_ref, fields.get("customDomain"), account, None),
+                raw_config: None,
+                source_data: item,
             }
         })
         .collect();

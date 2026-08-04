@@ -1,15 +1,19 @@
 //! 外部厂商 frpc 下载（distribution=url）：HTTPS + 域名白名单 + SHA256 校验 + 可选解压。
 //! 重定向手动校验域名（防重定向到非白名单域名）；解压走 `archive::extract_archive`（Zip Slip 防护）。
 
-use super::super::{ensure_dir, providers_root, ProviderManifest};
+use super::super::{
+    ensure_dir, frpc_platform_skip, providers_root, resolve_download_config, ProviderManifest,
+};
 use super::archive;
 use crate::log_info;
+use std::path::Path;
 
 /// 外部厂商 frpc 下载（distribution=url）
 ///
 /// 校验 URL HTTPS + 域名白名单 + SHA256（如有）。
 /// 下载完成后若 archive=true，则解压到厂商目录。
-pub(super) async fn ensure_external_frpc(
+/// 按当前平台选择下载 URL 与目标路径（urls/target_paths 平台映射，回退 url/target_path）。
+pub(crate) async fn ensure_external_frpc(
     provider_id: &str,
     manifest: &ProviderManifest,
 ) -> Result<String, String> {
@@ -19,24 +23,29 @@ pub(super) async fn ensure_external_frpc(
         .as_ref()
         .ok_or_else(|| format!("厂商 {} 缺少 binary.download 配置", provider_id))?;
 
-    validate_download_url(&dl.url, &dl.allowed_domains)?;
+    // 解析当前平台的下载 URL 与目标相对路径
+    let (download_url, target_rel) = resolve_download_config(dl);
+    validate_download_url(&download_url, &dl.allowed_domains)?;
 
     let provider_dir = providers_root().join(provider_id);
-    let target_path = provider_dir.join(&dl.target_path);
+    let target_path = provider_dir.join(&target_rel);
     if let Some(parent) = target_path.parent() {
         ensure_dir(parent)?;
     }
 
-    log_info!("[Frp] 开始下载外部厂商 frpc: {} ({})", provider_id, dl.url);
+    log_info!(
+        "[Frp] 开始下载外部厂商 frpc: {} ({})",
+        provider_id,
+        download_url
+    );
 
     // 构造禁止自动重定向的 client，手动校验重定向域名（防止重定向到非白名单域名）
-    // 对应设计文档 §7.7 frpc 二进制下载安全
-    let client = reqwest::Client::builder()
-        .redirect(reqwest::redirect::Policy::none())
-        .build()
-        .map_err(|e| format!("构造 HTTP 客户端失败: {}", e))?;
+    // 对应设计文档 §7.7 frpc 二进制下载安全。
+    // 复用 crate::http 统一管线（代理 / IP 版本 / TLS 信任源 / User-Agent 与全局一致）。
+    let client =
+        crate::http::build_client_with_redirect(reqwest::redirect::Policy::none(), Some(60_000));
 
-    let mut current_url = dl.url.clone();
+    let mut current_url = download_url.clone();
     let mut redirects = 0u32;
     const MAX_REDIRECTS: u32 = 5;
     let response = loop {
@@ -97,6 +106,15 @@ pub(super) async fn ensure_external_frpc(
         archive::extract_archive(&target_path, &provider_dir)?;
         // 解压成功后删除原始 archive 文件，避免 providers 目录残留冗余 zip
         let _ = std::fs::remove_file(&target_path);
+        // 平台过滤：删除其他平台的 frpc，只保留当前平台对应的二进制
+        let (skip, _) = frpc_platform_skip(&manifest.binary);
+        if !skip.is_empty() {
+            let removed = remove_skipped_frpc(&provider_dir, &skip);
+            log_info!(
+                "[Frp] 外部厂商 frpc 平台过滤：清理 {} 个其他平台二进制",
+                removed
+            );
+        }
         log_info!(
             "[Frp] 外部厂商 frpc 解压完成，已清理 archive: {}",
             target_path.display()
@@ -108,6 +126,18 @@ pub(super) async fn ensure_external_frpc(
     };
 
     Ok(result_msg)
+}
+
+/// 删除厂商目录下其他平台的 frpc 文件（相对路径命中跳过集），返回删除数量
+fn remove_skipped_frpc(provider_dir: &Path, skip: &std::collections::HashSet<String>) -> u32 {
+    let mut removed = 0u32;
+    for rel in skip {
+        let p = provider_dir.join(rel);
+        if p.is_file() && std::fs::remove_file(&p).is_ok() {
+            removed += 1;
+        }
+    }
+    removed
 }
 
 /// 校验下载 URL：必须 HTTPS + 域名在白名单中

@@ -11,7 +11,7 @@ mod stop;
 
 use crate::log_info;
 use crate::log_warn;
-pub use log::{list_log_files, read_log_file};
+pub use log::{clear_log_file, list_log_files, read_log_file};
 pub use start::start_tunnel;
 use state::{FrpcHandle, RUNNING};
 pub use status::{get_tunnel_status, list_tunnels_with_status};

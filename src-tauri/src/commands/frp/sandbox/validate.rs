@@ -191,6 +191,15 @@ pub fn validate_tunnel_update(p: &UpdateTunnelParams) -> Result<(), String> {
         remote_port: p.remote_port,
         token: p.token.clone(),
         use_tls: p.use_tls,
+        imported: false,
+        remote_tunnel_id: None,
+        remote_tunnel_name: None,
+        raw_config: None,
+        bandwidth_limit: p.bandwidth_limit.clone(),
+        bandwidth_limit_mode: p.bandwidth_limit_mode.clone(),
+        proxy_use_encryption: p.proxy_use_encryption,
+        proxy_use_compression: p.proxy_use_compression,
+        proxy_protocol_version: p.proxy_protocol_version.clone(),
     };
     validate_tunnel(&create)
 }

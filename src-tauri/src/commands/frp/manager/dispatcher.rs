@@ -83,6 +83,14 @@ pub struct RunAuthAdapterParams {
     pub args: Vec<String>,
 }
 
+/// 拖拽包类型检测参数
+#[derive(Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DetectPackageParams {
+    /// 文件/文件夹路径（ZIP 或目录）
+    pub path: String,
+}
+
 // DISPATCHER 注册（按类别委托到子模块）
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
