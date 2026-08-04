@@ -223,12 +223,15 @@ mod tests {
             custom_domains: None,
             bandwidth_limit: Some("4MB".to_string()),
             bandwidth_limit_mode: Some("server".to_string()),
+            use_encryption: None,
+            use_compression: None,
+            protocol_version: None,
         }];
         let toml = build_frpc_toml(&conn, &proxies);
         assert!(toml.contains("serverAddr = 'hk-6.qwq.fan'"));
         assert!(toml.contains("serverPort = 17000"));
         assert!(toml.contains("user = '60'"));
-        assert!(toml.contains("[metadatas]"));
+        assert!(toml.contains("[auth]"));
         assert!(toml.contains("token = 'va3xljq0469rzujuwzapt1fdmkoiiu32'"));
         assert!(toml.contains("[[proxies]]"));
         assert!(toml.contains("name = 'my-tunnel'"));
@@ -259,10 +262,13 @@ mod tests {
             custom_domains: None,
             bandwidth_limit: None,
             bandwidth_limit_mode: None,
+            use_encryption: None,
+            use_compression: None,
+            protocol_version: None,
         }];
         let toml = build_frpc_toml(&conn, &proxies);
         assert!(toml.contains("serverAddr = '1.2.3.4'"));
-        assert!(!toml.contains("[metadatas]"));
+        assert!(!toml.contains("[auth]"));
         assert!(!toml.contains("[proxies.transport]"));
         assert!(!toml.contains("user ="));
     }

@@ -329,7 +329,7 @@ pub fn import_frpc_config(path: String) -> Result<ImportedFrpcConfig, String> {
         if line.is_empty() {
             continue;
         }
-        if line.starts_with("[[") && line.ends_with("]]" ) {
+        if line.starts_with("[[") && line.ends_with("]]") {
             section = line[2..line.len() - 2].trim().to_string();
             if section != "proxies" {
                 return Err(format!("不支持的配置段: {}", section));
@@ -338,7 +338,11 @@ pub fn import_frpc_config(path: String) -> Result<ImportedFrpcConfig, String> {
         }
         if line.starts_with('[') && line.ends_with(']') {
             section = line[1..line.len() - 1].trim().to_string();
-            if section != "auth" && section != "metadatas" && section != "proxies.transport" && section != "transport.tls" {
+            if section != "auth"
+                && section != "metadatas"
+                && section != "proxies.transport"
+                && section != "transport.tls"
+            {
                 return Err(format!("不支持的配置段: {}", section));
             }
             continue;
@@ -355,20 +359,42 @@ pub fn import_frpc_config(path: String) -> Result<ImportedFrpcConfig, String> {
             ("auth", "token") => result.token = Some(parse_toml_string(value)?),
             ("metadatas", "token") => result.token = Some(parse_toml_string(value)?),
             ("proxies", "name") => result.name = Some(parse_toml_string(value)?),
-            ("proxies", "type") => result.tunnel_type = Some(parse_tunnel_type(&parse_toml_string(value)?)?),
+            ("proxies", "type") => {
+                result.tunnel_type = Some(parse_tunnel_type(&parse_toml_string(value)?)?)
+            }
             ("proxies", "localIP") => result.local_ip = Some(parse_toml_string(value)?),
-            ("proxies", "localPort") => result.local_port = Some(parse_toml_u16(value, "localPort")?),
-            ("proxies", "remotePort") => result.remote_port = Some(parse_toml_u16(value, "remotePort")?),
-            ("proxies.transport", "bandwidthLimit") => result.bandwidth_limit = Some(parse_toml_string(value)?),
-            ("proxies.transport", "bandwidthLimitMode") => result.bandwidth_limit_mode = Some(parse_toml_string(value)?),
-            ("proxies.transport", "useEncryption") => result.proxy_use_encryption = Some(parse_toml_bool(value, "useEncryption")?),
-            ("proxies.transport", "useCompression") => result.proxy_use_compression = Some(parse_toml_bool(value, "useCompression")?),
-            ("proxies.transport", "protocolVersion") => result.proxy_protocol_version = Some(parse_toml_string(value)?),
-            ("transport.tls", "enable") => result.use_tls = parse_toml_bool(value, "transport.tls.enable")?,
+            ("proxies", "localPort") => {
+                result.local_port = Some(parse_toml_u16(value, "localPort")?)
+            }
+            ("proxies", "remotePort") => {
+                result.remote_port = Some(parse_toml_u16(value, "remotePort")?)
+            }
+            ("proxies.transport", "bandwidthLimit") => {
+                result.bandwidth_limit = Some(parse_toml_string(value)?)
+            }
+            ("proxies.transport", "bandwidthLimitMode") => {
+                result.bandwidth_limit_mode = Some(parse_toml_string(value)?)
+            }
+            ("proxies.transport", "useEncryption") => {
+                result.proxy_use_encryption = Some(parse_toml_bool(value, "useEncryption")?)
+            }
+            ("proxies.transport", "useCompression") => {
+                result.proxy_use_compression = Some(parse_toml_bool(value, "useCompression")?)
+            }
+            ("proxies.transport", "protocolVersion") => {
+                result.proxy_protocol_version = Some(parse_toml_string(value)?)
+            }
+            ("transport.tls", "enable") => {
+                result.use_tls = parse_toml_bool(value, "transport.tls.enable")?
+            }
             _ => return Err(format!("配置字段不在允许列表: {}.{}", section, key)),
         }
     }
-    if result.server_addr.is_none() || result.server_port.is_none() || result.local_port.is_none() || result.remote_port.is_none() {
+    if result.server_addr.is_none()
+        || result.server_port.is_none()
+        || result.local_port.is_none()
+        || result.remote_port.is_none()
+    {
         return Err("配置缺少必要字段：serverAddr/serverPort/localPort/remotePort".to_string());
     }
     Ok(result)
@@ -396,7 +422,10 @@ pub struct ImportedFrpcConfig {
 
 fn parse_toml_string(value: &str) -> Result<String, String> {
     let value = value.trim();
-    if value.len() < 2 || !((value.starts_with('\'') && value.ends_with('\'')) || (value.starts_with('"') && value.ends_with('"'))) {
+    if value.len() < 2
+        || !((value.starts_with('\'') && value.ends_with('\''))
+            || (value.starts_with('"') && value.ends_with('"')))
+    {
         return Err("仅支持单行 TOML 字符串".to_string());
     }
     let inner = &value[1..value.len() - 1];
@@ -407,11 +436,17 @@ fn parse_toml_string(value: &str) -> Result<String, String> {
 }
 
 fn parse_toml_u16(value: &str, key: &str) -> Result<u16, String> {
-    value.trim().parse().map_err(|_| format!("{} 必须是有效端口", key))
+    value
+        .trim()
+        .parse()
+        .map_err(|_| format!("{} 必须是有效端口", key))
 }
 
 fn parse_toml_bool(value: &str, key: &str) -> Result<bool, String> {
-    value.trim().parse().map_err(|_| format!("{} 必须是布尔值", key))
+    value
+        .trim()
+        .parse()
+        .map_err(|_| format!("{} 必须是布尔值", key))
 }
 
 fn parse_tunnel_type(value: &str) -> Result<TunnelType, String> {

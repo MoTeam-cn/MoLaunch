@@ -221,6 +221,7 @@ mod tests {
                 ),
             ])),
             download: None,
+            launch: None,
         }
     }
 
@@ -241,6 +242,7 @@ mod tests {
             path: Some("frpc.exe".to_string()),
             paths: None,
             download: None,
+            launch: None,
         };
         let (skip, current) = frpc_platform_skip(&binary);
         assert!(skip.is_empty());

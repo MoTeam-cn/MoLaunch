@@ -58,7 +58,10 @@ pub fn register(d: &mut Dispatcher) {
     d.register(
         "import_frpc_config",
         handler!(_state, _app, params, {
-            let path = params.get("path").and_then(|v| v.as_str()).ok_or("缺少配置文件路径")?;
+            let path = params
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or("缺少配置文件路径")?;
             let r = frp::tunnel::import_frpc_config(path.to_string())?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),

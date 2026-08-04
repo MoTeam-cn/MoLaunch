@@ -180,17 +180,27 @@ pub async fn fetch_tunnels(
                         let (addr, port, remote) = parse_config_fields(&cfg);
                         t.raw_config = Some(cfg);
                         if t.server_host.is_empty() {
-                            if let Some(addr) = addr { t.server_host = addr; }
+                            if let Some(addr) = addr {
+                                t.server_host = addr;
+                            }
                         }
                         if t.server_port.is_empty() {
-                            if let Some(port) = port { t.server_port = port; }
+                            if let Some(port) = port {
+                                t.server_port = port;
+                            }
                         }
                         if t.remote_port.is_empty() {
-                            if let Some(remote) = remote { t.remote_port = remote; }
+                            if let Some(remote) = remote {
+                                t.remote_port = remote;
+                            }
                         }
                     }
                     Err(e) => {
-                        log_info!("[Frp] 厂商 {} config 端点获取失败，继续使用字段映射: {}", provider_id, e);
+                        log_info!(
+                            "[Frp] 厂商 {} config 端点获取失败，继续使用字段映射: {}",
+                            provider_id,
+                            e
+                        );
                     }
                 }
             }

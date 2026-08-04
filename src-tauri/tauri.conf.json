@@ -13,7 +13,9 @@
       "resources/*"
     ],
     "icon": [
-      "Images/icon.ico"
+      "Images/icon.ico",
+      "Images/icon.png",
+      "Images/icon.icns"
     ]
   },
   "productName": "MoLaunch",

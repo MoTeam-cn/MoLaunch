@@ -30,10 +30,17 @@ async fn prepare_config(
     let config_path = config_dir.join(format!("{}.toml", tunnel.id));
 
     // 导入隧道优先直接复用 config 接口返回的完整原文，不能重新拼装或覆盖。
-    if let Some(raw) = tunnel.raw_config.as_deref().filter(|v| !v.trim().is_empty()) {
+    if let Some(raw) = tunnel
+        .raw_config
+        .as_deref()
+        .filter(|v| !v.trim().is_empty())
+    {
         std::fs::write(&config_path, raw)
             .map_err(|e| format!("写入厂商原版 frpc 配置失败: {}", e))?;
-        log_info!("[Frp] 直接复用已保存的厂商原版配置: {}", config_path.display());
+        log_info!(
+            "[Frp] 直接复用已保存的厂商原版配置: {}",
+            config_path.display()
+        );
         return Ok(config_path);
     }
 
@@ -45,11 +52,15 @@ async fn prepare_config(
 
     // 旧数据没有 rawConfig：有 config 端点时启动前拉取一次；没有端点才允许本地生成。
     let manifest = crate::commands::frp::provider::read_provider_manifest(&tunnel.provider_id)?;
-    let endpoints_file = manifest.api.as_ref()
+    let endpoints_file = manifest
+        .api
+        .as_ref()
         .map(|a| a.endpoints_file.as_str())
         .unwrap_or("api/endpoints.json");
     let spec = crate::commands::frp::api_spec::load_api_spec(&tunnel.provider_id, endpoints_file)?;
-    let has_config_endpoint = spec.endpoints.as_ref()
+    let has_config_endpoint = spec
+        .endpoints
+        .as_ref()
         .and_then(|e| e.tunnels.as_ref())
         .and_then(|t| t.config.as_ref())
         .is_some();
@@ -58,10 +69,7 @@ async fn prepare_config(
         return Ok(config_path);
     }
 
-    let remote_name = tunnel
-        .remote_tunnel_name
-        .as_deref()
-        .unwrap_or(&tunnel.name);
+    let remote_name = tunnel.remote_tunnel_name.as_deref().unwrap_or(&tunnel.name);
     let raw = crate::commands::frp::api_spec::fetch_raw_tunnel_config(
         state,
         &tunnel.provider_id,
@@ -69,11 +77,18 @@ async fn prepare_config(
         remote_name,
     )
     .await
-    .map_err(|e| format!("厂商 config 接口获取失败，已停止启动（不会回退本地配置）: {}", e))?;
+    .map_err(|e| {
+        format!(
+            "厂商 config 接口获取失败，已停止启动（不会回退本地配置）: {}",
+            e
+        )
+    })?;
 
-    std::fs::write(&config_path, raw)
-        .map_err(|e| format!("写入厂商原版 frpc 配置失败: {}", e))?;
-    log_info!("[Frp] 使用厂商 config 接口原样配置启动: {}", config_path.display());
+    std::fs::write(&config_path, raw).map_err(|e| format!("写入厂商原版 frpc 配置失败: {}", e))?;
+    log_info!(
+        "[Frp] 使用厂商 config 接口原样配置启动: {}",
+        config_path.display()
+    );
     Ok(config_path)
 }
 
@@ -108,12 +123,10 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
     }
 
     // 判断是否 command 直连模式（厂商魔改 frpc，无需配置文件）
-    let launch_mode = crate::commands::frp::provider::read_provider_manifest(
-        &tunnel.provider_id,
-    )
-    .ok()
-    .and_then(|m| m.binary.launch)
-    .filter(|l| l.mode.eq_ignore_ascii_case("command"));
+    let launch_mode = crate::commands::frp::provider::read_provider_manifest(&tunnel.provider_id)
+        .ok()
+        .and_then(|m| m.binary.launch)
+        .filter(|l| l.mode.eq_ignore_ascii_case("command"));
 
     // config 模式才生成配置文件；command 模式直接走命令参数
     let config_path = if launch_mode.is_none() {
@@ -149,20 +162,14 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
     if let Some(launch) = launch_mode {
         // command 直连模式：解析模板生成参数（不做 shell 拼接，防注入）
         // {tunnelId} = 远程隧道自增 ID（如 Lolia 的 -t 16977:<token>）
-        let remote_id = tunnel
-            .remote_tunnel_id
-            .as_deref()
-            .unwrap_or(&tunnel.id);
+        let remote_id = tunnel.remote_tunnel_id.as_deref().unwrap_or(&tunnel.id);
         let token = tunnel.token.as_deref().unwrap_or("");
         let command = launch.command.as_deref().unwrap_or("").to_string();
         let resolved = command
             .replace("{frpc}", &frpc_path.to_string_lossy())
             .replace("{tunnelId}", remote_id)
             .replace("{token}", token);
-        log_info!(
-            "[Frp] 使用厂商命令模式启动: {}",
-            resolved
-        );
+        log_info!("[Frp] 使用厂商命令模式启动: {}", resolved);
         let mut parts = resolved.split_whitespace();
         // 第一个 token 应为 {frpc} 替换后的二进制路径，跳过（Command::new 已指定）
         let _ = parts.next();
@@ -230,10 +237,7 @@ pub async fn start_tunnel(state: &AppState, id: String, app: AppHandle) -> Resul
             format!("{}={}", k, shown)
         })
         .collect();
-    log_debug!(
-        "[Frp] 传给 frpc 的环境变量: {}",
-        env_desc.join("; ")
-    );
+    log_debug!("[Frp] 传给 frpc 的环境变量: {}", env_desc.join("; "));
 
     // Windows: CREATE_NO_WINDOW，不弹出控制台窗口
     #[cfg(target_os = "windows")]
