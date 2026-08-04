@@ -475,10 +475,10 @@ fn parse_config_fields(config: &str) -> (Option<String>, Option<String>, Option<
                     server_port = Some(value.to_string());
                 }
             }
-            "remotePort" | "remote_port" => {
-                if remote_port.is_none() && value.parse::<u16>().is_ok() {
-                    remote_port = Some(value.to_string());
-                }
+            "remotePort" | "remote_port"
+                if remote_port.is_none() && value.parse::<u16>().is_ok() =>
+            {
+                remote_port = Some(value.to_string());
             }
             _ => {}
         }

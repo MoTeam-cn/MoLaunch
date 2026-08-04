@@ -228,10 +228,16 @@ mod tests {
     #[test]
     fn test_bundled_skip_other_platforms() {
         let (skip, current) = frpc_platform_skip(&bundled());
-        assert_eq!(current.as_deref(), Some("bin/LoliaFrp-windows-amd64.exe"));
+        let current_name = current.as_deref().expect("当前平台应有路径映射");
+        assert_eq!(
+            current_name,
+            resolve_bundled_path(&bundled())
+                .as_deref()
+                .expect("当前平台应有路径映射")
+        );
         assert_eq!(skip.len(), 2);
         // 当前平台的路径不在跳过集中
-        assert!(!skip.contains("bin/LoliaFrp-windows-amd64.exe"));
+        assert!(!skip.contains(current_name));
     }
 
     #[test]
