@@ -9,6 +9,14 @@
 
 ### 新增
 
+#### FRP 后端内联测试拆分为独立测试文件
+
+- 背景：`detect.rs`、`frpc_config.rs`、`provider_system.rs`、`auth/pkce.rs`、`api_spec/http.rs` 等在源码文件末尾内联了 `#[cfg(test)] mod tests { ... }`，与项目"测试独立成文件"的约定不符
+- 改动：
+  - 上述 5 个文件改为 `#[cfg(test)] #[path = "xxx_tests.rs"] mod tests;` 引用方式
+  - 新增独立测试文件：`detect_tests.rs`、`frpc_config_tests.rs`、`provider_system_tests.rs`、`auth/pkce_tests.rs`、`api_spec/http_tests.rs`
+- 验证：`cargo test --all-features` 177 个测试全部通过
+
 #### 系统托盘：打开主页面 / 检查更新 / 退出
 
 - 背景：此前关闭只能通过前端 X 按钮走 `handleClose`，缺少常驻托盘入口，无法在不退出进程的前提下收起主界面
