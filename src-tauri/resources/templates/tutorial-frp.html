@@ -74,13 +74,14 @@
 
 <h2>auth.json 认证交互层</h2>
 <p>auth.json 只描述<strong>用户交互方式</strong>，实际的网络请求与响应解析在 endpoints.json 的 <code>authFlows</code> 中定义。按 <code>type</code> 读取对应块，其他块忽略。</p>
+<p><strong>安全建议：</strong>桌面应用属公开客户端，<strong>不要</strong>把 OAuth2 <code>clientSecret</code> 打进厂商包（任何用户都能提取）。优先启用 <code>pkce: true</code>（RFC 7636）：本地生成一次性 <code>code_verifier</code> 换 token，授权请求附 S256 摘要，无 secret 也防中间人窃取授权码。启用 PKCE 后省略 <code>clientSecret</code>，token 交换时自动附 <code>code_verifier</code> 并跳过 <code>client_secret</code> 字段。</p>
 <pre><code>{
   "type": "oauth2",
 
   "oauth2": {
     "authorizeUrl": "https://console.example.com/oauth/authorize",
     "clientId": "your-client-id",
-    "clientSecret": "optional-client-secret",
+    "pkce": true,
     "scopes": ["tunnel:manage"],
     "redirectPort": 18365
   },
@@ -102,9 +103,10 @@
     <tr><th>type</th><th>字段</th><th>说明</th></tr>
   </thead>
   <tbody>
-    <tr><td rowspan="5"><code>oauth2</code></td><td><code>authorizeUrl</code></td><td>授权页 URL（浏览器打开让用户登录授权）</td></tr>
+    <tr><td rowspan="6"><code>oauth2</code></td><td><code>authorizeUrl</code></td><td>授权页 URL（浏览器打开让用户登录授权）</td></tr>
     <tr><td><code>clientId</code></td><td>OAuth2 客户端 ID</td></tr>
-    <tr><td><code>clientSecret</code></td><td>客户端密钥（可选，部分厂商需要）</td></tr>
+    <tr><td><code>pkce</code></td><td>是否使用 PKCE 公开客户端模式（推荐 true，此时勿配置 clientSecret）</td></tr>
+    <tr><td><code>clientSecret</code></td><td>客户端密钥（可选；pkce=true 时忽略）</td></tr>
     <tr><td><code>scopes</code></td><td>权限范围列表</td></tr>
     <tr><td><code>redirectPort</code></td><td>本地回调端口（本地启动 HTTP 服务接收回调）</td></tr>
     <tr><td rowspan="4"><code>device_code</code></td><td><code>clientId</code></td><td>客户端 ID</td></tr>
@@ -154,7 +156,7 @@
 
 <h3>authFlows（认证流程定义）</h3>
 <p>定义认证流程的请求参数和响应解析。即使厂商实现不标准，也可通过自定义请求参数与响应解析适配。</p>
-<p>支持的占位符（请求体/查询/URL 中替换）：<code>{clientId} {clientSecret} {redirectUri} {code} {codeVerifier} {refreshToken} {deviceCode} {scope} {apiKey} {publicKey} {requestUuid}</code></p>
+<p>支持的占位符（请求体/查询/URL 中替换）：<code>{clientId} {clientSecret} {redirectUri} {code} {codeVerifier} {refreshToken} {deviceCode} {scope} {apiKey} {publicKey} {requestUuid} {deviceId} {providerId} {id} {tunnel} {tunnelName}</code></p>
 
 <h4>oauth2 流程</h4>
 <pre><code>"oauth2": {
@@ -269,7 +271,7 @@
     <tr><th>mode</th><th>说明</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>url</code></td><td>厂商接口直接返回 frpc 配置字符串，启动器写盘即可（预留 base64/xor/aes 解码扩展点）</td></tr>
+    <tr><td><code>url</code></td><td>厂商接口直接返回 frpc 配置字符串，启动器写盘即可（<code>encoding: base64</code> 时自动 base64 解码，如 Lolia）</td></tr>
     <tr><td><code>fields</code></td><td>启动器按 tunnelFields 拼装 ini 配置（从隧道列表接口提取字段）</td></tr>
     <tr><td><code>args</code></td><td>frpc 以启动参数方式运行（如 OpenFRP <code>-u 密钥 -p 隧道ID</code>），args 为参数模板，支持 {token} {ids} 占位符</td></tr>
   </tbody>
@@ -337,19 +339,63 @@
 </table>
 
 <h4>tunnels.config（配置获取，可选）</h4>
-<p>config.mode=url 时使用，厂商接口直接返回 frpc 配置字符串。</p>
+<p>config.mode=url 时使用，厂商接口直接返回 frpc 配置字符串。列表/详情接口缺失 <code>server_port</code>（frps 连接端口）、<code>remote_port</code> 等字段时，启动器也会自动调用本端点回填。</p>
+<p><strong>query 参数注意事项：</strong>config 接口常要求按隧道标识查询，而厂商数据里自增 <code>id</code> 不一定是对外查询键（如 Lolia 的 <code>name</code> 才是真实隧道 id）。使用 <code>{tunnelName}</code> 占位符传入隧道 <code>name</code>，或 <code>{id}</code>/<code>{tunnel}</code> 传入自增 id，按厂商接口实际要求选择。</p>
 <pre><code>"config": {
   "method": "GET",
   "path": "/user/frpc/config",
   "authType": "bearer",
-  "query": { "tunnel": "{id}" },
+  "query": { "tunnel": "{tunnelName}" },
   "response": {
     "dataField": "$.data.config",
-    "encoding": "text"
+    "encoding": "base64"
   }
 }</code></pre>
+<table>
+  <thead>
+    <tr><th>字段</th><th>取值</th><th>说明</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>dataField</code></td><td>JSONPath</td><td>配置字符串在响应中的位置（如 <code>$.data.config</code>）</td></tr>
+    <tr><td><code>encoding</code></td><td><code>text</code> / <code>base64</code></td><td>配置内容编码。<code>text</code> 直接返回；<code>base64</code> 自动解码（Lolia 等厂商返回 base64 编码的 frpc 配置）</td></tr>
+  </tbody>
+</table>
+<blockquote>回填机制：列表/详情响应未返回 <code>server_port</code>（frps 连接端口）或 <code>remote_port</code> 时，启动器对每条隧道调用本端点，解码配置后解析 <code>serverAddr</code>/<code>serverPort</code>/<code>remotePort</code> 字段回填，保证隧道导入后能正常连接 frps 并启动。</blockquote>
+
+<h4>tunnels.detail（隧道详情，可选）</h4>
+<p>列表未返回完整字段（server_host/server_port/remote_port/token 等）时启用，按隧道 ID/名称回填缺失字段。</p>
+<pre><code>"detail": {
+  "method": "GET",
+  "path": "/user/tunnel/{tunnelId}",
+  "authType": "bearer",
+  "pathParams": { "tunnelId": "id" },
+  "response": {
+    "dataField": "$.data",
+    "fields": {
+      "id": "id",
+      "name": "name",
+      "type": "type",
+      "status": "status",
+      "serverHost": "server_host",
+      "serverPort": "server_port",
+      "token": "tunnel_token",
+      "localHost": "local_host",
+      "localPort": "local_port",
+      "remotePort": "remote_port",
+      "customDomain": "custom_domain"
+    }
+  }
+}</code></pre>
+<p><code>pathParams</code> 用 <code>{placeholder}</code> 形式，值来自隧道字段（<code>id</code> / <code>name</code>）。优先级：列表字段优先，detail 仅回填列表缺失项；server_port / remote_port 若仍缺失，则走 config 端点从 frpc 配置解析（部分厂商的 frps 连接端口只在 config 返回的 frpc 配置中）。</p>
 
 <h2>frpc 二进制分发（binary）</h2>
+
+<p><code>binary.frpcVersion</code> 注明该厂商使用的 frpc 版本号（如 <code>"0.51.3"</code>），是 frpc 更新的<b>唯一判断依据</b>：启动器将版本写入厂商目录 <code>frpc_version.txt</code>，后续比对 manifest 声明的版本——一致则视为就绪（不重复下载/替换），不一致才执行更新（url 重下 / bundled 提示重装厂商包）。未填写时退化为"仅检查文件是否存在"。</p>
+<pre><code>"binary": {
+  "distribution": "bundled",       // 或 "url"
+  "frpcVersion": "0.51.3",         // 厂商使用的 frpc 版本号
+  ...
+}</code></pre>
 
 <h3>bundled：随包打包</h3>
 <p>将 frpc 二进制文件放入厂商文件夹，通过 <code>path</code> 指定相对路径。单平台只需 <code>path</code>；多平台时用 <code>paths</code> 按 <code>{os}_{arch}</code> 映射不同二进制（优先于 <code>path</code>）。</p>
@@ -373,15 +419,21 @@
 <blockquote>启动器按当前平台从 <code>paths</code> 查找，找不到时回退到 <code>path</code>，两者都没有则报错。</blockquote>
 
 <h3>url：按需下载</h3>
-<p>用户首次使用时自动下载 frpc，支持 ZIP 压缩包自动解压。</p>
+<p>用户首次使用（或 frpc 版本变化）时自动下载 frpc，支持 ZIP 压缩包自动解压。</p>
 <pre><code>{
   "binary": {
     "distribution": "url",
+    "frpcVersion": "0.51.3",
     "download": {
       "url": "https://example.com/frpc-windows.zip",
+      "urls": {
+        "windows_amd64": "https://example.com/frpc-windows-amd64.zip",
+        "linux_amd64": "https://example.com/frpc-linux-amd64.zip"
+      },
       "sha256": "可选校验值",
       "allowedDomains": ["example.com"],
       "targetPath": "frpc.exe",
+      "targetPaths": { "windows_amd64": "frpc.exe" },
       "archive": true
     }
   }
@@ -391,10 +443,12 @@
     <tr><th>字段</th><th>说明</th></tr>
   </thead>
   <tbody>
-    <tr><td><code>url</code></td><td>下载地址</td></tr>
+    <tr><td><code>url</code></td><td>下载地址（未命中 <code>urls</code> 当前平台时回退到此值）</td></tr>
+    <tr><td><code>urls</code></td><td>可选，按 <code>{os}_{arch}</code> 映射不同平台的下载地址，优先于 <code>url</code>（适配 GitHub Releases 等按平台分发的场景）</td></tr>
     <tr><td><code>sha256</code></td><td>可选，文件 SHA256 校验值</td></tr>
     <tr><td><code>allowedDomains</code></td><td>允许下载的域名白名单</td></tr>
     <tr><td><code>targetPath</code></td><td>下载后存放的相对路径（archive=true 时为解压后的目标文件）</td></tr>
+    <tr><td><code>targetPaths</code></td><td>可选，按平台映射的存放路径（如 Windows 用 <code>frpc.exe</code>，其他平台无后缀），优先于 <code>targetPath</code></td></tr>
     <tr><td><code>archive</code></td><td>是否为 ZIP 压缩包（true 时自动解压）</td></tr>
   </tbody>
 </table>

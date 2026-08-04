@@ -19,8 +19,8 @@ export interface DragDropState {
   active: boolean
   /** 当前拖拽提示文案（如 "松开以安装整合包"） */
   hint: string
-  /** 拖拽类型分类：modpack / mod / multi-mod / unknown */
-  kind: 'modpack' | 'mod' | 'multi-mod' | 'unknown'
+  /** 拖拽类型分类：modpack / mod / multi-mod / frp-provider / unknown */
+  kind: 'modpack' | 'mod' | 'multi-mod' | 'frp-provider' | 'unknown'
 }
 
 /** 模块级单例状态：同一时刻只可能有一个拖拽会话，全局共享 */
@@ -64,6 +64,10 @@ export function classifyDrag(paths: string[]): { kind: DragDropState['kind']; hi
   }
   if (paths.length === 1) {
     const ext = getExtension(paths[0])
+    if (ext === 'zip') {
+      // zip 可能是整合包也可能是 frp 厂商包，需在 drop 时读取内容判断
+      return { kind: 'unknown', hint: '松开以分析包类型' }
+    }
     if (MODPACK_EXTENSIONS.includes(ext)) {
       return { kind: 'modpack', hint: '松开以安装整合包' }
     }

@@ -9,6 +9,7 @@ import type { LogFileInfo } from '@/types/frp'
 import {
   listLogFiles as apiListLogFiles,
   readLogFile as apiReadLogFile,
+  clearLogFile as apiClearLogFile,
 } from '@/utils/api/frp-manager'
 import { toastError } from '@/utils/toast'
 
@@ -56,6 +57,19 @@ export function useFrpLogsSlice() {
     logsHasMore.value = false
   }
 
+  /** 清空后端日志文件内容（tunnelId 为空时清空全部），并同步清空前端显示 */
+  async function clearLogFile(tunnelId: string): Promise<void> {
+    try {
+      await apiClearLogFile(tunnelId)
+      logs.value = []
+      logsHasMore.value = false
+      // 刷新日志文件列表（大小清零）
+      await loadLogFiles()
+    } catch (e) {
+      toastError('清空日志失败：' + e)
+    }
+  }
+
   return {
     // state
     logs,
@@ -67,5 +81,6 @@ export function useFrpLogsSlice() {
     loadLogFiles,
     readLogs,
     clearLogs,
+    clearLogFile,
   }
 }

@@ -33,6 +33,21 @@ interface DiagnoseRule {
  * 诊断规则表（按优先级从高到低排序，更具体的规则在前）
  */
 const RULES: DiagnoseRule[] = [
+  // 正常启动（运行中）——优先级最高：日志含"成功启动隧道"等标志且无错误
+  {
+    category: 'normal',
+    keywords: ['成功启动隧道'],
+    title: '正常运行',
+    detail: 'frpc 已成功启动隧道并连接到 Frp 服务器，当前运行正常。',
+    suggestion: '无需处理。可通过日志中提示的访问地址访问你的服务。',
+  },
+  {
+    category: 'normal',
+    keywords: ['start proxy success'],
+    title: '正常运行',
+    detail: 'frpc 已成功启动隧道并连接到 Frp 服务器，当前运行正常。',
+    suggestion: '无需处理。可通过日志中提示的访问地址访问你的服务。',
+  },
   // 网络层
   {
     category: 'network',

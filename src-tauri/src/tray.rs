@@ -107,7 +107,18 @@ pub fn cleanup_and_exit(app: &AppHandle) {
             }
         }
 
-        log_info!("[Exit] 清理完成，退出进程");
+        log_info!("[Exit] 清理完成，销毁 WebView2 窗口后退出进程");
+
+        // 先销毁所有窗口（含 WebView2），并等待其内部异步清理完成，再退出进程。
+        // 直接 app.exit(0) 会在 WebView2 的 Chromium 窗口（Chrome_WidgetWin_0 类）
+        // 尚未完成 teardown 时强制退出，触发
+        // "Failed to unregister class Chrome_WidgetWin_0. Error = 1412" 竞态报错。
+        // destroy() 走强制销毁路径，不触发 on_window_event 的 CloseRequested 拦截。
+        for (_, window) in app.webview_windows() {
+            let _ = window.destroy();
+        }
+        // 给 WebView2 一段内部清理时间，避免 Chromium 注销窗口类时与进程退出竞争
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
         app.exit(0);
     });
 }

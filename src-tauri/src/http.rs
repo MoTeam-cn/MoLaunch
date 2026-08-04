@@ -75,6 +75,20 @@ pub fn get_client() -> reqwest::Client {
         .expect("Failed to build default HTTP client")
 }
 
+/// HTTP 客户端构建参数（含可选重定向策略）
+///
+/// 由 [`build_client`] 与 [`build_client_with_redirect`] 填充，供内部统一构建。
+pub struct ClientBuildParams<'a> {
+    pub proxy_mode: &'a str,
+    pub proxy_type: &'a str,
+    pub proxy_url: &'a str,
+    pub ip_version: &'a str,
+    pub timeout: Duration,
+    pub trust_mode: &'a str,
+    pub ignore_tls: bool,
+    pub redirect: Option<reqwest::redirect::Policy>,
+}
+
 /// 构建 HTTP 客户端
 ///
 /// - `ip_version`：`"v4"` 强制 IPv4；`"auto"` 测试连通性自动选；`"any"` 跟随 DNS
@@ -90,25 +104,93 @@ pub fn build_client(
     trust_mode: &str,
     ignore_tls: bool,
 ) -> reqwest::Client {
+    build_client_inner(ClientBuildParams {
+        proxy_mode,
+        proxy_type,
+        proxy_url,
+        ip_version,
+        timeout,
+        trust_mode,
+        ignore_tls,
+        redirect: None,
+    })
+}
+
+/// 基于当前配置构建带自定义重定向策略的 HTTP 客户端
+///
+/// 从 `config::load_config()` 读取当前代理 / IP 版本 / TLS 信任源配置，
+/// 复用全局客户端同款管线（User-Agent / 代理 / TLS 信任源 / ignore_tls 开发者模式）。
+/// 供需要自定义重定向语义的模块使用（如 frp 厂商 API 的 no-redirect + 域名白名单）。
+///
+/// - `redirect`：重定向策略，如 `Policy::none()` / `Policy::limited(n)`
+/// - `timeout_ms`：请求超时毫秒数，None 使用全局默认 30s
+pub fn build_client_with_redirect(
+    redirect: reqwest::redirect::Policy,
+    timeout_ms: Option<u64>,
+) -> reqwest::Client {
+    let config = crate::config::load_config().ok().flatten();
+    let (mode, kind, url, ip_version, trust_mode) = config
+        .as_ref()
+        .map(|c| {
+            (
+                c.proxy.mode.clone(),
+                c.proxy.kind.clone(),
+                c.proxy.url.clone(),
+                c.proxy.ip_version.clone(),
+                c.tls.trust_mode.clone(),
+            )
+        })
+        .unwrap_or_else(|| {
+            (
+                "none".to_string(),
+                "http".to_string(),
+                String::new(),
+                "auto".to_string(),
+                "builtin".to_string(),
+            )
+        });
+    // ignore_tls 走注册表（开发者模式 IgnoreTls），与全局客户端一致
+    let ignore_tls = crate::commands::system::developer::is_ignore_tls();
+    let timeout = timeout_ms
+        .map(Duration::from_millis)
+        .unwrap_or(Duration::from_secs(30));
+    build_client_inner(ClientBuildParams {
+        proxy_mode: &mode,
+        proxy_type: &kind,
+        proxy_url: &url,
+        ip_version: &ip_version,
+        timeout,
+        trust_mode: &trust_mode,
+        ignore_tls,
+        redirect: Some(redirect),
+    })
+}
+
+/// 按参数构建 HTTP 客户端（内部统一实现）
+fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
     let mut builder = reqwest::Client::builder()
-        .timeout(timeout)
+        .timeout(params.timeout)
         .user_agent(user_agent());
 
+    if let Some(policy) = params.redirect {
+        builder = builder.redirect(policy);
+    }
+
     // IP 协议版本偏好
-    let local_addr = resolve_local_address(ip_version);
+    let local_addr = resolve_local_address(params.ip_version);
     if let Some(addr) = local_addr {
         builder = builder.local_address(addr);
     }
 
     // TLS 信任源配置
-    if ignore_tls {
+    if params.ignore_tls {
         // 开发者模式：跳过所有证书校验（仅用于自签名证书调试）
         builder = builder.danger_accept_invalid_certs(true);
     } else {
         // 解析信任源模式（支持组合，如 "system+custom"）
-        let use_builtin = trust_mode.contains("builtin") || trust_mode == "all";
-        let use_system = trust_mode.contains("system") || trust_mode == "all";
-        let use_custom = trust_mode.contains("custom") || trust_mode == "all";
+        let use_builtin = params.trust_mode.contains("builtin") || params.trust_mode == "all";
+        let use_system = params.trust_mode.contains("system") || params.trust_mode == "all";
+        let use_custom = params.trust_mode.contains("custom") || params.trust_mode == "all";
 
         // 关闭默认的内置根证书，改由下方精确控制
         // （reqwest rustls-tls 后端默认加载 webpki-roots，需显式关闭后按需开启）
@@ -126,16 +208,16 @@ pub fn build_client(
         }
     }
 
-    match proxy_mode {
+    match params.proxy_mode {
         "system" => {
             // reqwest 默认使用系统代理，无需额外配置
         }
         "custom" => {
-            if !proxy_url.is_empty() {
-                let full_url = match proxy_type {
-                    "socks5" => format!("socks5://{}", proxy_url),
-                    "https" => format!("https://{}", proxy_url),
-                    _ => format!("http://{}", proxy_url),
+            if !params.proxy_url.is_empty() {
+                let full_url = match params.proxy_type {
+                    "socks5" => format!("socks5://{}", params.proxy_url),
+                    "https" => format!("https://{}", params.proxy_url),
+                    _ => format!("http://{}", params.proxy_url),
                 };
                 if let Ok(proxy) = reqwest::Proxy::all(&full_url) {
                     builder = builder.proxy(proxy);

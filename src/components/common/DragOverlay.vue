@@ -46,6 +46,13 @@ const kindConfig = {
     borderColor: 'border-emerald-300',
     bgColor: 'bg-emerald-50',
   },
+  'frp-provider': {
+    icon: CubeIcon,
+    title: '安装 Frp 厂商包',
+    iconColor: 'text-indigo-500',
+    borderColor: 'border-indigo-300',
+    bgColor: 'bg-indigo-50',
+  },
   unknown: {
     icon: ExclamationCircleIcon,
     title: '不支持的文件',

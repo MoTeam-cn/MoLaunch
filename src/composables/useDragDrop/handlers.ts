@@ -8,7 +8,11 @@
 import { previewLocalModpack } from '@/utils/api/community'
 import { installMod } from '@/utils/api/personalization'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
-import { showError, showInfo, showModal, showPrompt } from '@/utils/modal'
+import {
+  detectPackageType,
+  installProviderFromZip,
+} from '@/utils/api/frp-manager'
+import { showConfirmAsync, showError, showInfo, showModal, showPrompt } from '@/utils/modal'
 import { toastError, toastSuccess } from '@/utils/toast'
 import type { ModpackPreview } from '@/types/community'
 import {
@@ -20,6 +24,38 @@ import {
 import { formatToLabel, runModpackInstall } from './helpers'
 
 export { formatToLabel, runModpackInstall } from './helpers'
+
+/** 安装完成后的全局刷新通知（Frp 页面监听并重载厂商列表） */
+function notifyProvidersChanged(): void {
+  window.dispatchEvent(new CustomEvent('frp:providers-changed'))
+}
+
+/**
+ * 处理 frp 厂商包拖拽：确认后安装，复用存量增量更新逻辑
+ *
+ * 若该厂商已安装且包版本号变化，后端 install_provider_from_zip 自动执行
+ * 增量更新（同版本返回"已是最新版本"）。
+ */
+export async function handleFrpProviderDrop(
+  filePath: string,
+  providerName?: string,
+): Promise<void> {
+  const label = providerName ? `「${providerName}」` : ''
+  const confirmed = await showConfirmAsync(
+    '安装 Frp 厂商包',
+    `检测到 ${label}frp 厂商包，是否安装？\n\n若该厂商已安装且包版本更新，将自动执行增量更新（仅替换变更文件，保留 frpc 与认证数据）。`,
+  )
+  if (!confirmed) return
+
+  try {
+    await installProviderFromZip(filePath)
+    toastSuccess('厂商安装/更新成功')
+    notifyProvidersChanged()
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    showError('厂商安装失败', msg)
+  }
+}
 
 /**
  * 处理整合包拖拽：预览整合包 → 弹窗输入实例名 → 询问可选 Mod → installLocalModpack → installMerged
@@ -228,7 +264,28 @@ export async function handleFileDrop(paths: string[]): Promise<void> {
   const filePath = paths[0]
   const ext = getExtension(filePath)
 
-  if (MODPACK_EXTENSIONS.includes(ext)) {
+  if (ext === 'zip') {
+    // zip 可能是整合包也可能是 frp 厂商包：先读内容特征判断，再路由
+    let type: 'frp_provider' | 'modpack' | 'unknown' = 'unknown'
+    let providerName: string | undefined
+    try {
+      const res = await detectPackageType(filePath)
+      type = res.type
+      providerName = res.providerName
+    } catch {
+      // 检测失败时不阻塞，按无法识别处理
+    }
+    if (type === 'frp_provider') {
+      await handleFrpProviderDrop(filePath, providerName)
+    } else if (type === 'modpack') {
+      await handleModpackDrop(filePath)
+    } else {
+      showError(
+        '无法识别压缩包',
+        `无法识别该 zip 包的类型。支持：整合包（.zip/.mrpack）、Frp 厂商包（含 manifest.json 且具备 frp 特征字段）。`,
+      )
+    }
+  } else if (MODPACK_EXTENSIONS.includes(ext)) {
     await handleModpackDrop(filePath)
   } else if (MOD_EXTENSIONS.includes(ext)) {
     await handleModDrop(filePath)
