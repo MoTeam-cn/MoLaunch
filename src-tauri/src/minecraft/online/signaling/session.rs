@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::api_paths;
 use super::types::{ListAnswersResponse, ListParticipantsResponse};
 use crate::minecraft::online::client::{BusinessResult, ClientError, OnlineClient};
 use crate::minecraft::online::storage::DeviceCredentials;
@@ -73,7 +74,7 @@ impl OnlineClient {
         sdp_answer: &str,
         ice_candidates: &[String],
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/answer", room_code);
+        let path = api_paths::SIGNALING_ROOM_ANSWER.replace("{room_code}", room_code);
         let body = serde_json::json!({
             "participant_id": participant_id,
             "sdp_answer": sdp_answer,
@@ -89,7 +90,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<ListAnswersResponse>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/answers", room_code);
+        let path = api_paths::SIGNALING_ROOM_ANSWERS.replace("{room_code}", room_code);
         self.call_v1::<ListAnswersResponse>(creds, "GET", &path, None, false)
             .await
     }
@@ -102,7 +103,7 @@ impl OnlineClient {
         participant_id: &str,
         accepted: bool,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/confirm", room_code);
+        let path = api_paths::SIGNALING_ROOM_CONFIRM.replace("{room_code}", room_code);
         let body = serde_json::json!({
             "participant_id": participant_id,
             "accepted": accepted,
@@ -119,7 +120,7 @@ impl OnlineClient {
         participant_id: &str,
         ban_duration_seconds: Option<u64>,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/kick", room_code);
+        let path = api_paths::SIGNALING_ROOM_KICK.replace("{room_code}", room_code);
         let body = serde_json::json!({
             "participant_id": participant_id,
             "ban_duration_seconds": ban_duration_seconds,
@@ -135,7 +136,7 @@ impl OnlineClient {
         room_code: &str,
         device_pk: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/unban", room_code);
+        let path = api_paths::SIGNALING_ROOM_UNBAN.replace("{room_code}", room_code);
         let body = serde_json::json!({ "device_pk": device_pk });
         self.call_v1::<serde_json::Value>(creds, "POST", &path, Some(&body), true)
             .await
@@ -150,7 +151,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<ListBansResponse>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/bans", room_code);
+        let path = api_paths::SIGNALING_ROOM_BANS.replace("{room_code}", room_code);
         self.call_v1::<ListBansResponse>(creds, "GET", &path, None, false)
             .await
     }
@@ -161,7 +162,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<ListParticipantsResponse>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/participants", room_code);
+        let path = api_paths::SIGNALING_ROOM_PARTICIPANTS.replace("{room_code}", room_code);
         self.call_v1::<ListParticipantsResponse>(creds, "GET", &path, None, false)
             .await
     }
@@ -177,10 +178,9 @@ impl OnlineClient {
         participant_id: &str,
         req: &UploadParticipantOfferRequest,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!(
-            "/v1/signaling/rooms/{}/participants/{}/offer",
-            room_code, participant_id
-        );
+        let path = api_paths::SIGNALING_ROOM_PARTICIPANT_OFFER
+            .replace("{room_code}", room_code)
+            .replace("{participant_id}", participant_id);
         let body = serde_json::to_value(req)?;
         self.call_v1::<serde_json::Value>(creds, "PUT", &path, Some(&body), true)
             .await
@@ -195,10 +195,9 @@ impl OnlineClient {
         room_code: &str,
         participant_id: &str,
     ) -> Result<BusinessResult<ParticipantOfferResponse>, ClientError> {
-        let path = format!(
-            "/v1/signaling/rooms/{}/participants/{}/offer",
-            room_code, participant_id
-        );
+        let path = api_paths::SIGNALING_ROOM_PARTICIPANT_OFFER
+            .replace("{room_code}", room_code)
+            .replace("{participant_id}", participant_id);
         self.call_v1::<ParticipantOfferResponse>(creds, "GET", &path, None, false)
             .await
     }

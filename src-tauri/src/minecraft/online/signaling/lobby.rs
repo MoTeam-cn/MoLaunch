@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::api_paths;
 use crate::minecraft::online::client::{BusinessResult, ClientError, OnlineClient};
 use crate::minecraft::online::storage::DeviceCredentials;
 
@@ -169,7 +170,7 @@ impl OnlineClient {
         } else {
             format!("?{}", pairs.join("&"))
         };
-        let path = format!("/v1/signaling/lobby/rooms{}", qs);
+        let path = format!("{}{}", api_paths::SIGNALING_LOBBY_ROOMS, qs);
         self.call_v1::<LobbyListResponse>(creds, "GET", &path, None, false)
             .await
     }
@@ -184,7 +185,7 @@ impl OnlineClient {
         self.call_v1::<LobbyCategoriesResponse>(
             creds,
             "GET",
-            "/v1/signaling/lobby/categories",
+            api_paths::SIGNALING_LOBBY_CATEGORIES,
             None,
             false,
         )

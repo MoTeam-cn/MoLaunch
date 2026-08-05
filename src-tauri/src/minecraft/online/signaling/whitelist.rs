@@ -4,6 +4,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::api_paths;
 use crate::minecraft::online::client::{BusinessResult, ClientError, OnlineClient};
 use crate::minecraft::online::storage::DeviceCredentials;
 
@@ -62,7 +63,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<WhitelistResponse>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/whitelist", room_code);
+        let path = api_paths::SIGNALING_ROOM_WHITELIST.replace("{room_code}", room_code);
         self.call_v1::<WhitelistResponse>(creds, "GET", &path, None, false)
             .await
     }
@@ -77,7 +78,7 @@ impl OnlineClient {
         room_code: &str,
         device_id: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/whitelist", room_code);
+        let path = api_paths::SIGNALING_ROOM_WHITELIST.replace("{room_code}", room_code);
         let body = serde_json::json!({ "device_id": device_id });
         self.call_v1::<serde_json::Value>(creds, "POST", &path, Some(&body), true)
             .await
@@ -93,11 +94,10 @@ impl OnlineClient {
         room_code: &str,
         device_id: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!(
-            "/v1/signaling/rooms/{}/whitelist?device_id={}",
-            room_code,
-            urlencoding::encode(device_id)
-        );
+        let encoded_device_id = urlencoding::encode(device_id);
+        let path = api_paths::SIGNALING_ROOM_WHITELIST_REMOVE
+            .replace("{room_code}", room_code)
+            .replace("{device_id}", encoded_device_id.as_ref());
         self.call_v1::<serde_json::Value>(creds, "DELETE", &path, None, true)
             .await
     }
@@ -112,7 +112,7 @@ impl OnlineClient {
         room_code: &str,
         enabled: bool,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/whitelist/enabled", room_code);
+        let path = api_paths::SIGNALING_ROOM_WHITELIST_ENABLED.replace("{room_code}", room_code);
         let body = serde_json::json!({ "enabled": enabled });
         // PATCH 方法需要加密信封
         self.call_v1::<serde_json::Value>(creds, "PATCH", &path, Some(&body), true)

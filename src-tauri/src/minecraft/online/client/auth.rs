@@ -1,5 +1,6 @@
 //! 认证接口：注册/登录/登出/刷新（POST /v3/auth/*）
 
+use crate::api_paths;
 use crate::http::get_client;
 use crate::minecraft::online::auth::{
     LoginRequest, LoginResponse, RefreshRequest, RefreshResponse, RegisterRequest, RegisterResponse,
@@ -12,7 +13,7 @@ use super::OnlineClient;
 impl OnlineClient {
     /// 注册设备（POST /v3/auth/register）
     pub async fn register(&self, req: &RegisterRequest) -> Result<RegisterResponse, ClientError> {
-        let url = format!("{}/v3/auth/register", self.base_url);
+        let url = format!("{}{}", self.base_url, api_paths::AUTH_REGISTER);
         crate::log_info!(
             "[Online] POST {} (deviceid={}, content_len={}B)",
             url,
@@ -29,12 +30,13 @@ impl OnlineClient {
         let body = resp.text().await?;
         http_log::log_http_request(
             "POST",
-            "/v3/auth/register",
+            api_paths::AUTH_REGISTER,
             status,
             &http_log::extract_req_id(&body),
         );
         crate::log_info!(
-            "[Online] /v3/auth/register 响应 status={}, body_len={}",
+            "[Online] {} 响应 status={}, body_len={}",
+            api_paths::AUTH_REGISTER,
             status,
             body.len()
         );
@@ -59,7 +61,7 @@ impl OnlineClient {
 
     /// 登录设备（POST /v3/auth/login）
     pub async fn login(&self, req: &LoginRequest) -> Result<LoginResponse, ClientError> {
-        let url = format!("{}/v3/auth/login", self.base_url);
+        let url = format!("{}{}", self.base_url, api_paths::AUTH_LOGIN);
         crate::log_info!(
             "[Online] POST {} (device_pk={}, content_len={}B)",
             url,
@@ -76,12 +78,13 @@ impl OnlineClient {
         let body = resp.text().await?;
         http_log::log_http_request(
             "POST",
-            "/v3/auth/login",
+            api_paths::AUTH_LOGIN,
             status,
             &http_log::extract_req_id(&body),
         );
         crate::log_info!(
-            "[Online] /v3/auth/login 响应 status={}, body_len={}",
+            "[Online] {} 响应 status={}, body_len={}",
+            api_paths::AUTH_LOGIN,
             status,
             body.len()
         );
@@ -106,7 +109,7 @@ impl OnlineClient {
 
     /// 登出（POST /v3/auth/logout）
     pub async fn logout(&self, jwt: &str) -> Result<(), ClientError> {
-        let url = format!("{}/v3/auth/logout", self.base_url);
+        let url = format!("{}{}", self.base_url, api_paths::AUTH_LOGOUT);
         crate::log_info!("[Online] POST {}", url);
         let resp = get_client()
             .post(&url)
@@ -117,12 +120,13 @@ impl OnlineClient {
         let body = resp.text().await?;
         http_log::log_http_request(
             "POST",
-            "/v3/auth/logout",
+            api_paths::AUTH_LOGOUT,
             status,
             &http_log::extract_req_id(&body),
         );
         crate::log_info!(
-            "[Online] /v3/auth/logout 响应 status={}, body_len={}",
+            "[Online] {} 响应 status={}, body_len={}",
+            api_paths::AUTH_LOGOUT,
             status,
             body.len()
         );
@@ -139,7 +143,7 @@ impl OnlineClient {
     /// HMAC-SHA256 签名。`refresh_token` 放在加密的 content 内，明文不出现在请求体。
     /// 服务端会轮换 refresh_token（旧 refresh_token 用后失效）。
     pub async fn refresh(&self, req: &RefreshRequest) -> Result<RefreshResponse, ClientError> {
-        let url = format!("{}/v3/auth/refresh", self.base_url);
+        let url = format!("{}{}", self.base_url, api_paths::AUTH_REFRESH);
         crate::log_info!(
             "[Online] POST {} (device_pk={}, content_len={})",
             url,
@@ -156,12 +160,13 @@ impl OnlineClient {
         let body = resp.text().await?;
         http_log::log_http_request(
             "POST",
-            "/v3/auth/refresh",
+            api_paths::AUTH_REFRESH,
             status,
             &http_log::extract_req_id(&body),
         );
         crate::log_info!(
-            "[Online] /v3/auth/refresh 响应 status={}, body_len={}",
+            "[Online] {} 响应 status={}, body_len={}",
+            api_paths::AUTH_REFRESH,
             status,
             body.len()
         );

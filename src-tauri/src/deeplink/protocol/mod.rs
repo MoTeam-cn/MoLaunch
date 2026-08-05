@@ -9,7 +9,6 @@ mod windows;
 
 mod router;
 
-use router::current_exe_path;
 #[cfg(any(windows, target_os = "linux"))]
-use router::PROTOCOL;
+use router::{current_exe_path, PROTOCOL};
 pub use router::{auto_register, register, status, unregister, DeeplinkStatus};

@@ -1,5 +1,6 @@
 //! 房间生命周期接口：STUN 拉取、创建/查询/关闭/加入/退出、保活、TURN 拉取。
 
+use crate::api_paths;
 use super::types::{
     CreateRoomRequest, CreateRoomResponse, JoinRoomResponse, KeepaliveResponse, RoomInfoResponse,
     StunServersResponse, TurnServersResponse,
@@ -13,7 +14,7 @@ impl OnlineClient {
         &self,
         creds: &DeviceCredentials,
     ) -> Result<BusinessResult<StunServersResponse>, ClientError> {
-        self.call_v1::<StunServersResponse>(creds, "GET", "/v1/signaling/stun", None, false)
+        self.call_v1::<StunServersResponse>(creds, "GET", api_paths::SIGNALING_STUN, None, false)
             .await
     }
 
@@ -24,8 +25,14 @@ impl OnlineClient {
         req: &CreateRoomRequest,
     ) -> Result<BusinessResult<CreateRoomResponse>, ClientError> {
         let body = serde_json::to_value(req)?;
-        self.call_v1::<CreateRoomResponse>(creds, "POST", "/v1/signaling/rooms", Some(&body), true)
-            .await
+        self.call_v1::<CreateRoomResponse>(
+            creds,
+            "POST",
+            api_paths::SIGNALING_ROOMS,
+            Some(&body),
+            true,
+        )
+        .await
     }
 
     /// 查询房间公开信息（GET /v1/signaling/rooms/{code}）
@@ -34,7 +41,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<RoomInfoResponse>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}", room_code);
+        let path = api_paths::SIGNALING_ROOM.replace("{room_code}", room_code);
         self.call_v1::<RoomInfoResponse>(creds, "GET", &path, None, false)
             .await
     }
@@ -45,7 +52,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}", room_code);
+        let path = api_paths::SIGNALING_ROOM.replace("{room_code}", room_code);
         self.call_v1::<serde_json::Value>(creds, "DELETE", &path, None, true)
             .await
     }
@@ -57,7 +64,7 @@ impl OnlineClient {
         room_code: &str,
         password: &str,
     ) -> Result<BusinessResult<JoinRoomResponse>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/join", room_code);
+        let path = api_paths::SIGNALING_ROOM_JOIN.replace("{room_code}", room_code);
         let body = serde_json::json!({ "password": password });
         self.call_v1::<JoinRoomResponse>(creds, "POST", &path, Some(&body), true)
             .await
@@ -69,7 +76,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<KeepaliveResponse>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/keepalive", room_code);
+        let path = api_paths::SIGNALING_ROOM_KEEPALIVE.replace("{room_code}", room_code);
         self.call_v1::<KeepaliveResponse>(creds, "POST", &path, None, true)
             .await
     }
@@ -83,7 +90,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<TurnServersResponse>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/turn", room_code);
+        let path = api_paths::SIGNALING_ROOM_TURN.replace("{room_code}", room_code);
         self.call_v1::<TurnServersResponse>(creds, "GET", &path, None, false)
             .await
     }
@@ -94,7 +101,7 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         room_code: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let path = format!("/v1/signaling/rooms/{}/participants/me", room_code);
+        let path = api_paths::SIGNALING_ROOM_PARTICIPANTS_ME.replace("{room_code}", room_code);
         self.call_v1::<serde_json::Value>(creds, "DELETE", &path, None, true)
             .await
     }

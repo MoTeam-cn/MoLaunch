@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::api_paths;
 use super::client::{BusinessResult, ClientError, OnlineClient};
 use super::storage::DeviceCredentials;
 
@@ -166,13 +167,15 @@ impl OnlineClient {
         creds: &DeviceCredentials,
         query: &FrpManifestQuery,
     ) -> Result<BusinessResult<FrpManifest>, ClientError> {
-        let path = format!(
-            "/v1/frp/manifest?component={}&target={}&arch={}&current_version={}",
-            urlencoding::encode(&query.component),
-            urlencoding::encode(&query.target),
-            urlencoding::encode(&query.arch),
-            urlencoding::encode(&query.current_version),
-        );
+        let encoded_component = urlencoding::encode(&query.component);
+        let encoded_target = urlencoding::encode(&query.target);
+        let encoded_arch = urlencoding::encode(&query.arch);
+        let encoded_version = urlencoding::encode(&query.current_version);
+        let path = api_paths::FRP_MANIFEST
+            .replace("{component}", encoded_component.as_ref())
+            .replace("{target}", encoded_target.as_ref())
+            .replace("{arch}", encoded_arch.as_ref())
+            .replace("{current_version}", encoded_version.as_ref());
         self.call_v1::<FrpManifest>(creds, "GET", &path, None, false)
             .await
     }
@@ -184,7 +187,7 @@ impl OnlineClient {
         &self,
         creds: &DeviceCredentials,
     ) -> Result<BusinessResult<Vec<PublicFrpServer>>, ClientError> {
-        self.call_v1::<Vec<PublicFrpServer>>(creds, "GET", "/v1/frp/servers", None, false)
+        self.call_v1::<Vec<PublicFrpServer>>(creds, "GET", api_paths::FRP_SERVERS, None, false)
             .await
     }
 
@@ -199,7 +202,7 @@ impl OnlineClient {
         req: &AllocateRequest,
     ) -> Result<BusinessResult<AllocateResponse>, ClientError> {
         let body = serde_json::to_value(req)?;
-        self.call_v1::<AllocateResponse>(creds, "POST", "/v1/frp/allocate", Some(&body), true)
+        self.call_v1::<AllocateResponse>(creds, "POST", api_paths::FRP_ALLOCATE, Some(&body), true)
             .await
     }
 
@@ -212,7 +215,7 @@ impl OnlineClient {
         allocation_id: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
         let body = serde_json::json!({ "allocation_id": allocation_id });
-        self.call_v1::<serde_json::Value>(creds, "POST", "/v1/frp/release", Some(&body), true)
+        self.call_v1::<serde_json::Value>(creds, "POST", api_paths::FRP_RELEASE, Some(&body), true)
             .await
     }
 
@@ -225,7 +228,7 @@ impl OnlineClient {
         allocation_id: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
         let body = serde_json::json!({ "allocation_id": allocation_id });
-        self.call_v1::<serde_json::Value>(creds, "POST", "/v1/frp/keepalive", Some(&body), true)
+        self.call_v1::<serde_json::Value>(creds, "POST", api_paths::FRP_KEEPALIVE, Some(&body), true)
             .await
     }
 }

@@ -1,5 +1,6 @@
 //! MoLaunch 库入口
 
+pub mod api_paths;
 pub mod certs;
 pub mod commands;
 pub mod config;

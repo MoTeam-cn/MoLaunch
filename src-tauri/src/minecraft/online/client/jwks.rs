@@ -1,5 +1,6 @@
 //! JWKS / CSRF 接口：JWKS 拉取、RSA 公钥提取、CSRF Token 获取。
 
+use crate::api_paths;
 use crate::http::get_client;
 use crate::minecraft::online::client_types::{ClientError, CsrfResponse, JwkKey, JwksResponse};
 use crate::minecraft::online::crypto::b64u_decode;
@@ -12,19 +13,20 @@ impl OnlineClient {
     ///
     /// 仅模块内调用（`verify_jwt` 阶段二实现），不对外暴露。
     async fn get_jwks(&self) -> Result<Vec<JwkKey>, ClientError> {
-        let url = format!("{}/v3/.well-known/jwks.json", self.base_url);
+        let url = format!("{}{}", self.base_url, api_paths::JWKS_JSON);
         crate::log_debug!("[Online] GET {}", url);
         let resp = get_client().get(&url).send().await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
         http_log::log_http_request(
             "GET",
-            "/v3/.well-known/jwks.json",
+            api_paths::JWKS_JSON,
             status,
             &http_log::extract_req_id(&body),
         );
         crate::log_debug!(
-            "[Online] /v3/.well-known/jwks.json 响应 status={}, body_len={}",
+            "[Online] {} 响应 status={}, body_len={}",
+            api_paths::JWKS_JSON,
             status,
             body.len()
         );
@@ -74,7 +76,7 @@ impl OnlineClient {
     ///
     /// 调用 /v1 非幂等接口（POST/DELETE）前需先获取。
     pub async fn get_csrf_token(&self, jwt: &str) -> Result<String, ClientError> {
-        let url = format!("{}/v3/csrf/token", self.base_url);
+        let url = format!("{}{}", self.base_url, api_paths::CSRF_TOKEN);
         let resp = get_client()
             .get(&url)
             .header("Authorization", format!("Bearer {}", jwt))
@@ -84,7 +86,7 @@ impl OnlineClient {
         let body = resp.text().await?;
         http_log::log_http_request(
             "GET",
-            "/v3/csrf/token",
+            api_paths::CSRF_TOKEN,
             status,
             &http_log::extract_req_id(&body),
         );
