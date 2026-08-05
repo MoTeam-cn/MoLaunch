@@ -1,11 +1,131 @@
-# 更新日志
+## [0.3.3-rc1] - 2026-08-05
 
-本项目的所有重要更改都将记录在此文件中。
 
-格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
-并且本项目遵循 [语义化版本控制](https://semver.org/lang/zh-CN/)。
+### 修复
 
-## [未发布]
+#### Tag 组件预设色 purge 丢失 + 全局缺 import 补齐
+
+- 背景：① `Tag.vue` 的 `colorClass` 实为动态拼接 `` `tag-${props.color}` ``（注释声称用静态映射但代码未改），导致 `main.css` 中 `@layer components` 的 `.tag-red`/`.tag-arcoblue`/`.tag-orange` 等预设色类因只出现在动态拼接里被 Tailwind purge，全部 Tag 只剩无背景的基础样式 → 更新日志时间线等处的标签变白、丢失语义色；② 全局替换时 10 个文件模板已用 `<Tag>` 但漏加 import，未注册组件被当作原生 `<tag>` 元素渲染（无样式直接显示文字），造成「点击展开」等文字冲突
+- 改动：
+  - `src/components/common/Tag.vue`：`colorClass` 改为 switch 静态映射（同 Button.vue 的 typeClass 模式，返回 `tag-red`/`tag-green` 等完整字面量类名，Tailwind 可静态扫描）；新增 `primary` 预设色（类型 + PRESET_COLORS + colorClass case）
+  - `src/assets/styles/main.css`：新增 `.tag-primary`（`color: var(--color-primary-500)` + `rgb(var(--color-primary-rgb-500)/0.1)` 浅底，跟随项目主题色换肤）
+  - 补齐 10 个文件缺失的 `import Tag from '@/components/common/Tag.vue'`：`MoLaunchIntro`、`JavaPathSelector`、`ArchiveManager`、`DataExporter`、`ModDedupScanner`、`CreateRoomForm`、`UpdateDialog`、`JavaManager`、`FabricApiInfoCard`、`ModpackSelector`
+  - `ReleaseTimeline.vue`：最新版本号与「最新」标签改用 `primary`（跟随主题色），「测试版」通道标签由 `orange` 改 `gold`（黄色）
+- 验证：`vue-tsc --noEmit`（0 error）、`npx eslint src`（0 error；9 个既有 warning）
+
+
+### 新增
+
+#### 全项目自绘 badge/tag/chip 样式统一替换为 Tag 组件
+
+- 背景：此前多组件各自内联 `rounded-full/rounded + px-* py-* + text-xs/[10px]/[11px] + bg-*-100 text-*-700` 重复实现标签样式，色彩不统一、脱离 Arco 风格（组件复用约定要求用自定义组件而非原生 HTML/badge 样式）
+- 改动：将 30 个文件中**纯展示型**标签统一替换为 `@/components/common/Tag.vue`（`size="small"`，色板按语义映射 Arco 预设色），并移除对应内联标签 class
+  - 类别/来源标签：`ModpackRequirementCard`、`ModpackSelector`、`CreateRoomForm`、`LobbyRoomCard`、`CleanupGroupList`、`OverviewTab`、`ExternalDownload`、`RemoteTunnelSync`
+  - 版本/通道标签：`VersionSection`（正式版/已安装）、`VersionGroupCard`（releaseColor 改为返回预设色名）、`JavaManager`、`JavaPathSelector`、`ModDedupScanner`、`LoaderCard`（版本标签与 `ver.tags` 动态色映射）、`ReleaseTimeline`（时间线版本号 vX.Y.Z → arcoblue/gray 预设、"最新"→arcoblue、测试版通道→orange）
+  - 状态信息标签：`ArchiveManager`（有效）、`DataExporter`（文件大小）、`MemoryOptimizer`（强力/轻量）、`FabricApiInfoCard`（将自动安装）、`UpdateDialog`（强制更新）
+  - 计数徽章：`VersionSelect`、`DownloadedFileList`、`ExportOptions`（必选）
+  - 其他：`AboutTab`（版本号）、`ModListItem`（mod 版本）、`ResourcePackConverter`（ZIP/文件夹）、`NbtTreeNode`（tagColor 改为返回预设色名）、`DependencyItem`（platformLabel）、`SettingsCache`（TTL/分类）、`MoLaunchIntro`/`SeedMapIntro`（点击展开）
+  - 既有 `.badge-*`/`.tag-*` 通用类与含图标/Tooltip/交互/语义状态徽章（`OnlineTopBar`、`AccountCard`、`RoomGuestPanel`、`OnlineDevicePanel`、`DeepLinkTab`、`PluginListSection`、`ModToolbar`、`PermissionTableSection`、`CrashAnalyzer`、`LaunchPanel` 等）按规则保留
+- 验证：`vue-tsc --noEmit`（0 error）、`npx eslint src`（0 error 0 warning，仅既有 9 warning）
+
+
+### 新增
+
+#### Tag 组件：复刻 Arco Design Vue Tag（替代自绘前缀 tag）
+
+- 背景：更新日志时间线中提交前缀 tag（`fix:`/`feat:` 等）此前为自绘样式（粗大圆角块 + 自定色），视觉粗糙、与整体 Arco 风格不协调
+- 改动：
+  - 新增 `src/components/common/Tag.vue`：参考 Button.vue 的复刻方式，从 Arco Design Vue 提取 Tag 组件（顶部含 MoTeam 版权声明与 MIT 许可说明）——内置 13 种预设色（red/orangered/orange/gold/lime/green/cyan/blue/arcoblue/purple/pinkpurple/magenta/gray，浅色底 + 深色字，色板取自 Arco 官方 1 号/6 号）、3 种尺寸（small 20px / medium 24px / large 28px）、可关闭按钮（closable + close 事件）、icon 槽位；支持自定义 hex/rgb 颜色（背景即色值，白字，与 Arco 行为一致）；颜色类名用静态映射避免 Tailwind purge（同 Button.vue 注释说明）
+  - `src/assets/styles/main.css`：`@layer components` 新增 `.tag` 基础样式 + `.tag-size-*` 尺寸 + 13 色预设（浅底深字）+ `.tag-icon`/`.tag-close-btn`/`.tag-close-icon`
+  - `src/components/about/ReleaseTimeline.vue`：提交前缀改用 `<Tag size="small" :color="...">`（feat→green / fix→red / docs→blue / refactor→purple / perf→orange / chore→gray / style→cyan / test→magenta / build→arcoblue / ci→gold / 其他→gray），删除原 `.commit-tag` 与 `.tag-*` scoped 样式，保留 commit-item 布局对齐（:deep(.tag) flex:none）
+- 验证：`vue-tsc --noEmit`、`eslint`（0 error 0 warning）通过
+
+
+### 新增
+
+#### 更新日志时间线增强：版本通道标签 + 提交前缀 tag + 弹窗拉长
+
+- 背景：时间线展示的更新日志中，① 无法直观区分正式版/测试版；② 提交条目 `fix(xxx): xxx` 这类 conventional commits 前缀语义无标注；③ 弹窗宽度 `max-w-md`（28rem）偏窄、日志区 `max-h-44`（11rem）高度受限，多版本日志展示不完整
+- 改动（`src/components/about/ReleaseTimeline.vue`）：
+  - **版本通道识别**：复用 `utils/version.ts` 的 `parseVersion` 判断 stable/rc/beta/alpha/canary，非 stable 版本在版本徽章旁展示琥珀色"测试版"标签（正式版不展示）
+  - **提交前缀识别**：按 `- prefix(scope): 内容`（conventional commits）正则切分条目，feat/fix/docs/refactor/perf/chore/style/test/build/ci 各渲染语义化彩色 tag（如"新功能/修复/文档/重构"），tag 徽章位于**内容前面**，正文自动剥离 `fix:` 等前缀；tag 前保留项目符号圆点，维持 markdown 列表视觉；未收录前缀用灰色"其他"；无前缀的普通列表项原样保留
+  - **省略细粒度 scope 条目**：命中 `skin/watcher/modrinth/searcher/download/image_cache/java/parse/jvm_args/skin_resourcepack/signaling` 作用域的提交条目直接省略，避免拉长行宽；识别到 `!c` 标记（跳过 CI 等）的条目默认忽略
+  - **左侧竖线贯穿到底**：移除"最后一项竖线不延伸"规则，改为最后一项增加底部留白，竖线完整延伸到最底部
+  - **版本节点可折叠（带动画）**：新增通用组件 `src/components/common/Collapse.vue`（`grid-template-rows 0fr→1fr` 平滑高度过渡，无需测量高度，与 MoLaunchIntro/CollapsibleCard/CleanupGroupList 折叠方案一致）；时间线点击版本标题折叠/展开该版本日志——**默认全部展开，折叠仅作用于当前点击的版本**，不影响其他节点；chevron 箭头带 300ms 旋转动画；支持键盘（Enter/空格）操作与 focus 样式
+  - **弹窗尺寸与滚动区域**（`src/components/about/UpdateDialog.vue`）：宽度 `max-w-md` → `max-w-xl`（28rem→36rem）；"发现新版本"分支改为独立 flex 容器——**最新版本行固定**，仅下方日志区域按 `min-h-0 flex-1 overflow-y-auto` 独立滚动（其余状态仍用 modal-scroll 整体滚动）
+- 验证：`vue-tsc --noEmit`、`eslint`（0 error 0 warning）通过；解析逻辑用例单测通过（5 通道识别 + 9 前缀/scope/`!c` 识别 + 1 多版本合并切分）
+
+
+### 新增
+
+#### 更新日志时间线组件：`ReleaseTimeline.vue` 分版本分段渲染
+
+- 背景：api-server 返回的 `notes` 为「当前版本 → 最新版本」多版本合并 Markdown（每段以 `## MoLaunch <version>` 开头，最新在前），此前在更新弹窗中整段 `v-html` 渲染，版本边界不清晰、阅读体验差
+- 改动：
+  - 新增 `src/components/about/ReleaseTimeline.vue`：按版本标题（`##`~`####` + 可选 `MoLaunch` 前缀 + 可选 `v` + 语义化版本号）切分为独立节点，左侧竖线 + 圆点（最新节点高亮 + "最新"标签）串联成时间线，每节点渲染对应版本的 Markdown 正文；无法识别版本标题时（历史单段数据）退化为整段 Markdown 渲染
+  - `src/components/about/UpdateDialog.vue`：更新日志区域改用 `<ReleaseTimeline :notes="updateState.notes" />`，移除原 `notesHtml` computed、`renderMarkdown`/`handleMarkdownLinkClick` import 与 `.markdown-body` scoped 样式（已随组件迁移）
+  - 链接点击仍走 `handleMarkdownLinkClick` 系统浏览器策略，XSS 防护（DOMPurify）不降级
+- 验证：`vue-tsc --noEmit`、`eslint`（0 error 0 warning）通过；解析逻辑 5 个用例单测通过（CI 多版本格式 / v 前缀 + rc 后缀 / 三级标题变体 / 无标题退化 / 空串）
+
+
+### 修复
+
+#### updater.exe 签名校验与 Tauri 官方插件对齐（minisign 格式）
+
+- 背景：`src-tauri/updater/src/verify.rs` 此前自研校验存在三处根因问题：① 硬编码公钥 `RWQ...696F` 是从 `tauri.conf.json` 复制损坏的（真正公钥行为 `RWQ...EvIO...696E`，原值 65 位非法 base64 无法解码）；② 自假设「公钥 34 字节取 `[2..]`、签名 66 字节取 `[2..]`」偏移错误，且缺少 key_id 匹配与全局签名校验；③ prehashed 用 SHA-512，而 minisign 标准是 BLAKE2b-512 —— 导致 Windows 自研更新校验从未真正工作
+- 另：`scripts/ci-upload.cjs` 注册版本时把 `.sig` 内容去除换行/空白后存储，破坏 minisign 4 行格式，Tauri 官方插件（macOS/Linux）同样无法解析
+- 改动：
+  - `src-tauri/updater/Cargo.toml`：移除 `ed25519-dalek`、`sha2`，新增 `minisign-verify = "0.2"`（与 tauri-plugin-updater 同款，零依赖）
+  - `src-tauri/updater/src/verify.rs`：重写为 `minisign_verify` 实现（`PublicKey::decode` + `Signature::decode` + `verify(bin, sig, allow_legacy=true)`），公钥常量 `PUBKEY_B64` 与 `tauri.conf.json` 的 `plugins.updater.pubkey` 逐字符一致（同一份 `dW` 开头 base64，更换密钥时两处同步即可）
+  - `scripts/ci-upload.cjs`：`.sig` 内容原样存储（保留 4 行换行，`SIGNATURE_B64` 改名 `SIGNATURE`），不再去除空白
+- 验证：updater `cargo check --offline` 通过（minisign-verify v0.2.5 锁定）；ci-upload.cjs `node --check` 通过；DB `signature TEXT` 无长度限制
+- 注意：数据库中已有的历史 release 记录 signature 仍是旧拼接格式（无法解析），需重新发布或用管理后台更新 signature 后才可校验通过
+
+
+### 新增
+
+#### 收编 apiServer 接口路径：新增 `src-tauri/src/api_paths.rs` 统一集中定义
+
+- 背景：启动器所有请求云端 apiServer 的 HTTP 路径此前散布在 9 个文件（认证/JWKS/时间、FRP、Signaling 房间/会话/白名单/大厅、更新检查）中硬编码，路径变更需逐处修改、易遗漏
+- 改动：
+  - 新增 `src-tauri/src/api_paths.rs`：集中定义全部 `/v1/*`、`/v3/*` 路径常量（静态路径直接引用；带参路径用 `{room_code}`/`{participant_id}` 等命名占位符，调用方 `.replace()` 填充；updater 的 `{{target}}` 风格模板保持一致）
+  - `lib.rs` 注册 `pub mod api_paths`
+  - 改造 9 个文件引用常量：`client/auth.rs`、`client/jwks.rs`、`client/time.rs`、`online/frp.rs`、`signaling/room_api.rs`、`signaling/session.rs`、`signaling/whitelist.rs`、`signaling/lobby.rs`、`commands/system/updater/check.rs`（删除原 `UPDATER_PATH` 局部常量）
+  - 日志路径（`http_log::log_http_request` / log_info 的路径字段）同步改用常量，保证请求与日志单一来源
+- 验证：`cargo check`、`cargo clippy`（无告警）、`cargo test`（181 passed）通过
+
+
+### 新增
+
+#### 更新下载：macOS/Linux 显示真实进度 + 升级日志全量合并 + raw 端点统一响应
+
+- 背景：① macOS/Linux 点击「立即更新」时 `install_unix.rs` 以空闭包调用官方 plugin 的 `download_and_install`，前端看不到下载进度；② v1 raw manifest 端点仍以 Tauri plugin 裸 JSON 格式返回且参数错误返回裸状态码，与既有 UnifiedResponse 约定不一致；③ 更新日志仅返回最新一条 `release_notes`，跨版本升级时用户看不到中间版本改动
+- 改动：
+  - `src-tauri/src/commands/system/updater/install_unix.rs`：`download_and_install` 的 `on_chunk` 闭包累计已下载字节，节流（每 256KB 或下载完成）经 `app.emit("update-download-progress", { downloaded, total })` 推送进度
+  - `src-tauri/src/commands/system/updater/check.rs`：解析改为先解包 UnifiedResponse `{ code, msg, data }`（`code != 1` 视为无更新），字段从 `data` 内读取
+  - `src/components/about/UpdateDialog.vue`：`onGlobalEvent` 监听 `update-download-progress`，仅 downloading 状态写入 `updateState.downloaded/total`（total>0 显示真实百分比，total=0 保持 indeterminate）
+  - `api-server`：`GET /v1/updates/manifest/raw` 去掉 Tauri 裸 JSON 兼容逻辑，改走与 `/manifest` 一致的 `UnifiedResponse` 包装；删除 `TauriManifest` 结构
+  - `api-server/repositories/updates.rs`：新增 `find_releases_after_version`（按 `published_at DESC` 拉取平台/架构/通道全部上架版本）
+  - `api-server/services/updates.rs`：`check_for_update` 查询当前版本之后至最新版本的全部版本，按语义化版本降序合并 `release_notes`（`## MoLaunch <version>` 分段拼接，空日志跳过），供前端一次渲染一路更新日志；版本过滤在 service 层用 semver，避免 SQL 字符串比较对 `0.10.0`/`0.9.0` 误判
+- 验证：
+  - api-server：`cargo check --all-features`、`cargo test` 通过；clippy 无新增告警
+  - client（Windows 目标）：`cargo check`、`cargo clippy` 通过；macOS/Linux 的 `install_unix.rs` 因本机无交叉编译器由 CI 验证
+  - 前端：`vue-tsc --noEmit`、`eslint` 通过
+
+
+### 修复
+
+#### Windows 退出时静默更新失效：last.sig 签名未缓存导致 updater 参数解析失败
+
+- 背景：后台预下载链路（定时 `download_update_to_appdata` → 退出时 `apply_pending_update`）启动 updater.exe 时只传了 `--old-exe` / `--new-exe` / `--pid`，漏传 updater 参数解析要求的必填 `--signature`，导致 updater.exe 以退出码 1 失败，退出时自动替换实际不生效（立即更新路径不受影响）
+- 改动（`src-tauri/src/commands/system/updater/install_windows.rs`）：
+  - 新增 `last_signature_path()`：`%APPDATA%/.Molaunch/last.sig`（与 `last_exe_path()` 对称）
+  - `download_update_to_appdata_impl`：下载 last.exe 后把 `UpdateInfo.signature` 同步写入 last.sig（写失败回滚 last.exe 保证配对一致性）；签名缺失时直接报错，避免下载无法替换的无效文件
+  - `apply_pending_update_impl`：读出 last.sig 并作为 `--signature` 传给 updater.exe；last.exe 存在但 last.sig 缺失/为空时视为预下载不完整，清理两个文件后返回 false，等下次定时检查重新下载
+- 验证：`cargo check` / `cargo clippy --all-features` 通过（零警告）
+
+## [0.3.2] - 2026-08-05
+
 
 ### 新增
 
@@ -22,6 +142,9 @@
   - 前端：新增 `src/composables/external-settings.ts`（localStorage 持久化）；`download.ts` 的 `downloadFile` 支持 `DownloadFileSettings` 传参；`ExternalDownload.vue` 新增「工具原理」说明区与「高级设置」折叠面板（自定义 UA / 并发线程数 / 单文件分片数 / 限速 MB/s / 恢复默认）
 - 验证：`cargo test --all-features` 181 个测试全部通过；`vue-tsc`、`eslint`、`vite build` 通过
 
+
+### 新增
+
 #### FRP 后端内联测试拆分为独立测试文件
 
 - 背景：`detect.rs`、`frpc_config.rs`、`provider_system.rs`、`auth/pkce.rs`、`api_spec/http.rs` 等在源码文件末尾内联了 `#[cfg(test)] mod tests { ... }`，与项目"测试独立成文件"的约定不符
@@ -29,6 +152,9 @@
   - 上述 5 个文件改为 `#[cfg(test)] #[path = "xxx_tests.rs"] mod tests;` 引用方式
   - 新增独立测试文件：`detect_tests.rs`、`frpc_config_tests.rs`、`provider_system_tests.rs`、`auth/pkce_tests.rs`、`api_spec/http_tests.rs`
 - 验证：`cargo test --all-features` 177 个测试全部通过
+
+
+### 新增
 
 #### 系统托盘：打开主页面 / 检查更新 / 退出
 
@@ -39,6 +165,9 @@
   - `src-tauri/src/lib.rs`：`setup` 中创建托盘；注册 `tray::request_exit` 命令
   - `src/components/layout/TopNavLayout.vue`：`useTauriEvent` 监听 `tray-check-update` 触发检查更新
 - 验证：`cargo check/clippy` 通过
+
+
+### 新增
 
 #### 关闭主界面退出选择框，行为可持久化 + 设置页可改
 
@@ -51,6 +180,9 @@
   - `src-tauri/resources/defaults/config.ini`：`[General]` 补充 `close_behavior`（默认 `ask`）与注释，保证通过 `sync_config` 的 `merge_missing_from` 自动合并进老用户已存在的配置文件
 - 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
 
+
+### 新增
+
 #### 托盘退出弹确认框 + 更新日志 Markdown 渲染 + 退出框样式优化
 
 - 背景：托盘右键"退出"此前直接触发退出，不走确认框；且主窗口处于隐藏/托盘状态时弹窗可能不可见；更新日志以纯文本 `whitespace-pre-line` 展示，无法呈现 Markdown 结构；退出确认框内容（左下复选框 + 右下按钮）在小宽度下会换行
@@ -62,6 +194,9 @@
   - `src/components/layout/ExitConfirmDialog.vue`：标题与正文加 `whitespace-nowrap` 防换行、正文改 `text-gray-500`，底部复选框与按钮文案收窄并加 `flex-none`，避免挤压换行
 - 验证：`cargo check/clippy`、`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
 
+
+### 新增
+
 #### 更新日志 Markdown 链接禁止页面内跳转，改走系统浏览器
 
 - 背景：更新日志渲染的 GitHub commit 等外链在 webview 内直接导航，导致跳出 SPA 页面且无法返回
@@ -70,12 +205,18 @@
   - `src/components/about/UpdateDialog.vue`：更新日志容器绑定 `handleMarkdownLinkClick`
 - 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过，Vue 文件均 ≤300 行
 
+
+### 新增
+
 #### 更新日志链接点击走系统浏览器并加 toast 提示
 
 - 背景：Markdown 外链点击虽已改走系统浏览器，但无任何反馈，用户不知道发生了什么
 - 改动：
   - `src/utils/markdown.ts`：`handleMarkdownLinkClick` 调用 `open` 成功后 `toastInfo('已在系统浏览器中打开')`，失败时 `toastError('打开外部链接失败')`
 - 验证：`vue-tsc --noEmit`、`eslint` 通过
+
+
+### 新增
 
 #### NAT 类型检测流程控制台日志
 
@@ -84,6 +225,9 @@
   - `src/utils/online/detect.ts`：`detectNatTypeWithStun`/`detectNatType` 增加 `[NAT]` 前缀控制台日志——使用的 STUN 服务器列表、每个 ICE candidate（含地址:端口）、gathering 状态流转、超时兜底、推断结果与耗时
 - 验证：`vue-tsc --noEmit`、`eslint` 通过
 
+
+### 新增
+
 #### frp 厂商 OAuth2 回调后自动将启动器窗口置于最前
 
 - 背景：用户点击厂商授权页后浏览器跳回本地回调端口，但启动器窗口被浏览器盖住，用户看不到认证结果
@@ -91,6 +235,7 @@
   - `src-tauri/src/commands/frp/auth/oauth2/flow.rs`：`start_oauth2` 新增 `app: &tauri::AppHandle` 参数，收到回调后（token 交换前）`unminimize + show + set_focus` 将主窗口置顶聚焦
   - `src-tauri/src/commands/frp/manager/auth_actions.rs`：`start_oauth2` action 由 `_app` 改 `app` 传入 AppHandle
 - 验证：`cargo check/clippy` 通过
+
 
 ### 修复
 
@@ -103,6 +248,9 @@
   - `src-tauri/src/commands/frp/log_redact_tests.rs`：补充 ANSI 清洗用例
 - 验证：`cargo test --all-features` 181 个测试全部通过
 
+
+### 修复
+
 #### 隧道启停加载状态按隧道 ID 区分
 
 - 背景：点击某条隧道「启动」，其他隧道的启动/停止按钮也进入加载态，缺少按隧道区分的判断
@@ -112,11 +260,17 @@
   - `src/components/frp/TunnelList.vue`：按钮加载态改为仅当 `actionLoading && actionTunnelId === tunnel.id` 时展示
 - 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过
 
+
+### 修复
+
 #### SeedMap 组件 v-model 属性名还原为 kebab-case
 
 - 背景：`SeedMap.vue` 中 `SeedMapControls` / `SeedMapSidebar` 的 `v-model:userX` 等 camelCase 写法与 Vue 组件 props 定义不符，还原为 kebab-case（`v-model:user-x` 等）
 - 改动：`src/views/tools/data/SeedMap.vue` 的 `v-model` 属性统一还原为 kebab-case
 - 验证：`vue-tsc --noEmit` 通过
+
+
+### 修复
 
 #### 托盘「退出」改为直接退出，不弹确认框
 
@@ -125,6 +279,7 @@
   - `src-tauri/src/tray.rs`：「退出」菜单直接调用 `cleanup_and_exit(app)`（统一清理 frpc 隧道 / TUN 虚拟网卡 / 保存配置后退出），不再 emit `tray-request-exit`
   - `src/components/layout/TopNavLayout.vue`：移除已无触发方的 `tray-request-exit` 监听
 - 验证：`cargo check/clippy`、`vue-tsc --noEmit`、`eslint` 通过
+
 
 ### 修复
 
@@ -135,6 +290,7 @@
 - 改动：
   - `src-tauri/src/lib.rs`：`on_window_event` 开头增加 `if window.label() != "main" { return; }`，关闭拦截与 DevTools 状态重置仅作用于主窗口，picker 等子窗口关闭直接放行
 - 验证：`cargo check/clippy` 通过
+
 
 ### 修复
 
@@ -147,6 +303,9 @@
   - `src/components/layout/TopNavLayout.vue`：`handleClose`/`onExitConfirm` 的 `hide()` 加 `.catch` 失败兜底 toast
 - 验证：`vue-tsc --noEmit`、`eslint` 通过
 
+
+### 修复
+
 #### Windows 构建不再引入官方 updater plugin（条件编译）
 
 - 背景：自动更新为双轨实现——Windows 便携版走自实现 updater（`install_windows.rs`，updater.exe 替换 + 退出延迟安装），官方 `tauri-plugin-updater` 仅 macOS/Linux 使用（`install_unix.rs` 转发），此前 Windows 也一并编译链接官方 plugin，白白增大体积
@@ -155,6 +314,7 @@
   - `src-tauri/src/lib.rs`：`.plugin(tauri_plugin_updater::Builder::new().build())` 包 `#[cfg(not(target_os = "windows"))]`
   - `src-tauri/capabilities/updater.json`（新增）：`updater:default` 权限独立成文件并 `platforms: ["linux","macOS"]`；`capabilities/migrated.json` 移除 `updater:default`（Windows 上该权限不存在会致 tauri-build 失败）
 - 验证：`cargo check/clippy`（Windows 目标）通过
+
 
 ### 修复
 
@@ -168,6 +328,9 @@
   - 前端 `request_exit` 命令调用点位于 `doExit` 末尾，保证先保存配置/联机退房/待安装更新，再由后端兜底清理
 - 验证：`cargo check/clippy` 通过
 
+
+### 修复
+
 #### 联机房间切页被销毁：保活提升为全局 store 定时器，脱离页面生命周期
 
 - 背景：keepalive 定时器绑定在 RoomHostPanel 的 useRoomHost 上，从联机页切到其他页面（如设置页）会导致 Online.vue 卸载 → `stopTimers()` 停止 30s 保活，离开超过服务端 `keepalive_timeout`(120s) 后房间被判失联销毁；切回时因 store 中 role 仍为 host、activeCategory 是组件内 ref 默认回 create，出现"侧边栏高亮创建、内容区却显示房间详情"的错位
@@ -178,6 +341,9 @@
   - `src/composables/useOnlineNav.ts`：`isReady` watch 中若已进入房间则房间详情优先（覆盖重挂载时 role 保留但 activeCategory 默认 create 的错位）
 - 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 全部通过
 
+
+### 修复
+
 #### 联机房间失联被销毁：keepalive 失败可感知 + 房间关闭主动退出 + 断连自动补发
 
 - 背景：房主 keepalive 业务失败被静默吞掉（`result.code !== 1` 直接 `return null`），用户看起来"一直在保活"，实际服务端超过 `keepalive_timeout`(120s) 未收到有效上报即判定失联关房（本次 V8MY2S 房间命中失联条件：仅创建后一次 keepalive 成功，之后无上报，23:36 被清理，23:39 的请求才报"房间已关闭"）
@@ -186,6 +352,9 @@
   - `src/composables/useRoomHost/useRoomHostPolling.ts`：`doKeepalive` 捕获 `RoomClosedError` 后停止轮询并触发 `onRoomClosed` 回调；新增 `RoomHostPollingOptions` 注入
   - `src/composables/useRoomHost.ts`：注入 `onRoomClosed`（停止轮询、`lan.stop`、`hostMesh.close` + `setRoomKey(null)`、`store.resetRoomState`、toast 提示）；`cloudConnected` 由断开恢复为连接时，除 `startTimers()` 外立即补发一次 doKeepalive/pollParticipants/pollAnswers，避免在 120s 窗口内漏报被判失联
 - 验证：`vue-tsc --noEmit` 通过、`eslint` 通过
+
+
+### 修复
 
 #### 联机房间详情列表显隐优化 + BackToTop 去 tooltip
 
@@ -196,6 +365,9 @@
   - `src/components/online/WhitelistEditor.vue`：未启用时仅显示「启用白名单」开关与说明；启用后才显示添加输入框；白名单列表仅在「启用且已有条目」时出现，空状态仅在启用时展示
   - `src/components/common/BackToTop.vue`：移除外层 `Tooltip`（返回顶部按钮上滑功能），保留按钮涟漪/光晕/滑入动画
 - 验证：`vue-tsc --noEmit` 通过、`eslint` 通过、Vue 文件均 ≤300 行
+
+
+### 修复
 
 #### FRP 厂商隧道导入端口固定 7000 与 TCP 检测参数类型错误
 
@@ -210,6 +382,9 @@
 - 根因：`resolve_field` 的 split 分支从未拆分 `host:port`，前端 `parseInt("节点域名:17000")` 为 `NaN` 被 `|| 7000` 兜底掩盖；Input 组件 `String(val)` 化导致端口以字符串传给后端 `u16` 参数
 - 验证：`cargo check` 通过、`cargo test` 152 passed、`vue-tsc --noEmit` 通过
 
+
+### 修复
+
 #### 复用全局 formatBytes：消除 UpdateDialog 局部实现遮蔽
 
 - 背景：审计（docs/fix-debug/05-utils-reuse.md P0）发现 `UpdateDialog.vue` 组件内定义的局部 `formatBytes` 遮蔽了 `utils/format.ts` 全局实现，且展示口径不一致（局部用 1 位小数，全局默认 2 位小数）
@@ -217,6 +392,9 @@
   - `src/components/about/UpdateDialog.vue`：删除局部 `formatBytes`，新增 `import { formatBytes } from '@/utils/format'`，下载大小文案统一走全局实现
 - 设计决策：复用既有全局工具而非保留局部副本，符合「可复用函数必须提取到单独 TypeScript 文件」项目约定
 - 验证：`npx vite build` 通过（exit 0）
+
+
+### 修复
 
 #### 后端复用重构（审计 A2-A5，docs/fix-debug/03-backend-architecture.md）
 
@@ -228,6 +406,9 @@
   - `commands/version/list/detect.rs`（A5）：setup.ini `Type=` 手写解析改为复用 `VersionSetup::load`，`Release`/`Unknown` 继续降级检测
   - `minecraft/version/state.rs`：`VersionType::from_str` 补充 `old_alpha`/`old_beta` 别名映射（原 detect.rs 依赖此映射，复用后保持行为等价）；`state_tests.rs` 新增别名测试
 - 验证：`cargo check`、`cargo test --lib` 通过（151+1 passed / 0 failed）、`cargo clippy` 零警告
+
+
+### 修复
 
 #### 前端复用重构（审计 P1，docs/fix-debug/05-utils-reuse.md）
 
@@ -241,6 +422,9 @@
 - 设计决策：优先复用既有工具；`useVirtualLan` 的 TUN 数据流属后台持续推送，选 `onGlobalEvent` 而非 `useTauriEvent`；`DeviceCodeModal` 保留返回值驱动复制失败状态的语义
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）
 
+
+### 修复
+
 #### 前端头部注释精简（审计 P1，docs/fix-debug/06-frontend-header-comments.md）
 
 - 背景：项目规范要求前端 ts 文件头部注释最多 8 行（许可证例外）；审计扫描发现 131 个文件超限，其中 20 个头部 ≥24 行为 P1（另 111 个 9~23 行为 P2 待后续处理）
@@ -249,6 +433,7 @@
   - 7 个文件的重要设计信息迁移到函数/类型级 `/** */` 注释（信息无丢失）：crypto.ts（帧性能）、parser.ts（JSON/XML 样例）、generatorWorker.ts（WASM API 清单）、terrainShading.ts（渲染算法）、protocol.ts（帧布局与子类型）、structures.ts（queryMode 语义）、developer.ts（解锁触发链）
   - 关键约束保留：useVirtualLan（onGlobalEvent 永不 unlisten）、useGlobalTauriEvent（unlisten 竞态消除）、useWebRTC/useWebRTCMesh（无 trickle ICE、AES-GCM）
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）
+
 
 ### 架构
 
@@ -266,6 +451,9 @@
 - 设计决策：全部保持对外 API/消息契约/序列化结构不变；前端优先 composable 提取（状态与模板强耦合场景）、子组件承接模板片段（双向绑定用 defineModel）；后端保持 `pub use` re-export 路径兼容
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）、`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
+
+### 架构
+
 #### SDK DES 加解密统一（审计 A1，docs/fix-debug/03-backend-architecture.md）
 
 - 背景：审计发现 SDK DES 加解密「锁取 → encrypt/decrypt_token → 错误映射」样板被复制 4 份（frp/auth/storage.rs、minecraft/community/secure_storage.rs、minecraft/auth/storage/mod.rs、minecraft/online/storage.rs），且错误语义不一致（前两者失败视为无数据返回 None，后两者返回 Result）
@@ -274,6 +462,9 @@
   - 4 个调用方改用公共 helper，删除各自复制实现（约 72 行）
 - 设计决策：保留两种语义变体而非强行统一为一种，避免改变各调用方现有容错行为（最小修改）；helper 放 utils 层（纯 SDK 操作，无业务依赖）
 - 验证：`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
+
+
+### 架构
 
 #### 分发注册表迁移至 commands 域（审计 B1/B2，docs/fix-debug/03-backend-architecture.md）
 
@@ -288,6 +479,9 @@
 - 设计决策：采用「物理移动 + 相对导入 + mod.rs 转发」而非拆分重构，注册表逻辑零改动，行为完全等价；utils 层自此不再引用任何 commands 业务符号
 - 验证：`cargo check`（exit 0）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
+
+### 架构
+
 #### 阶段三批9：行数治理 51 个文件拆分至 ≤300（前端 13 / 后端 32，docs/04-file-line-limits.md）
 
 - 背景：批 6 已拆分 P1 档（>=400 行），本批收敛全部 300-399 档超限文件，落实「单文件 ≤300 行」规范
@@ -299,13 +493,20 @@
 - 设计决策：纯类型/纯 RESP 文件（signaling/types、types/frp.ts）按域拆且给出收益说明；平台分支（windows/linux）独立文件消除死代码告警；主文件转目录手工聚合不低于风险
 - 验证：`npx vue-tsc --noEmit`（exit 0）、`npx vite build`（exit 0）、`cargo check`（exit 0 无新告警）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
+
+### 架构
+
 #### 前端头部注释 P2 档精简（审计批 8，docs/06-frontend-header-comments.md）
 
 - 背景：项目规范要求前端 ts 文件头部注释 ≤8 行；前一阶段已清 P1 档（>=24 行），本批收敛 9~23 行档的 P2 剩余文件
 - 改动：composables 系 24 个、stores/types/plugins/router/tutorials/config 系 22 个、utils/api/online/seedmap/useSeedMap 系 30 个共约 76 个文件头部注释精简至 ≤8 行（净删约 460 行）；`useTauriEvent` 等竞态防护约束、`useWatermarkData` 屏印缓存等关键设计信息保留在头部或迁移至函数/类型级 `/** */` 注释，`element-icons.ts` MIT 许可证头部豁免
 - 验证：`npx vue-tsc --noEmit`（exit 0）
 
+
+### 架构
+
 #### 复用与架构收尾（审计批10，docs/05-utils-reuse.md 与 docs/03-backend-architecture.md）
+
 - 背景：05 报告 P2 项——sha256 摘要实现复制 3 份、contains("..") 路径防御内联 7+ 处、utils::fs 公共工具不足
 - 改动：
   - 新增 `utils/hash.rs::sha256_hex(&[u8])->String`，统一 `resources.rs` / `authlib/client/meta.rs` / `frp/binary/external.rs` 三处等价实现（入参与输出语义完全一致；hkdf_sha256 与数据字段未动）
@@ -314,6 +515,9 @@
   - `certs.rs::validate_filename` 白名单语义与 `sanitize_file_name` 黑名单差异函数级注释文档化；plugin:fs 前端仅 1 处调用不抽象（调用方数量 <2）
   - 收尾两个 300-399 档遗漏文件：`certs.rs`（304 行，转为 `certs/` 目录并从 mod.rs 拆出 `pem.rs` PEM 解析）、`commands/frp/types/api_spec.rs`（303 行，转为 `api_spec/` 目录拆 `models`/`field_mapping`）；演进后前后端全量扫描零超限
 - 验证：`cargo check`（exit 0 无新告警）、`cargo test --lib`（152 passed）
+
+
+### 架构
 
 #### Mod 入口净化：mod.rs 只保留「模块声明 + re-export」（docs/07-modrs-entry-only.md）
 
@@ -327,6 +531,7 @@
 - 关键约束（实证）：`#[tauri::command]` 函数无法移入子模块再 pub use 重导出（generate_handler 的 `__cmd__*` 宏仅模块内文本可见），命令转发函数保留在 mod.rs 并注释原因；E0364 可见性越界（重导出项可见性不得超过待导出项）；`mod linux/macos/windows;` 声明需 `#[cfg]` 门控（修复 window_title 缺门控导致的 Windows 编译失败）；`#[macro_export]` 宏移子模块需 `$crate::` 绝对路径
 - 验证：`cargo check`（exit 0 无告警）、`cargo test --lib`（152 passed / 0 failed）、`cargo clippy --lib`（零警告）
 
+
 ### 重构
 
 #### 后端测试代码拆分：8 个文件内联 mod tests 迁移至 xxx_tests.rs
@@ -334,6 +539,9 @@
 - 背景：项目规范要求测试代码必须放到同目录 xxx_test.rs；审计（docs/fix-debug/01）发现 deeplink/security.rs、utils/client_type.rs、commands/frp/{types,sandbox,auth/flows,api_spec/{jsonpath,envelope,config_gen}}.rs 共 8 个文件以内联 `#[cfg(test)] mod tests { ... }` 携带 25 个测试函数（约 350 行），与其余 27 个文件的外部测试文件模式不一致
 - 改动（16 文件）：8 个主文件删除内联测试块，改为 `#[cfg(test)] #[path = "xxx_tests.rs"] mod tests;`；同目录新增 8 个 `xxx_tests.rs` 测试文件（纯移动，业务逻辑零改动）
 - 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（exit 0）；`cargo test --manifest-path src-tauri/Cargo.toml --lib` 全部通过（151 passed / 0 failed，25 个用例无丢失）
+
+
+### 重构
 
 #### 后端：头部注释精简（27 个文件，>5 行 → ≤5 行）
 
@@ -9530,4 +9738,4 @@
 
 ---
 
-*本文档最后更新于 2026-07-21*
+*本文档最后更新于 2026-08-05*
