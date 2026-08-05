@@ -9,6 +9,19 @@
 
 ### 新增
 
+#### 外部下载工具：工具原理说明 + 高级设置
+
+- 背景：外部下载工具此前只有 URL + 文件名输入，缺少品牌下载器的进阶能力（自定义 UA / 并发线程 / 分片 / 限速），也无法向用户说明其工作原理
+- 改动：
+  - `src-tauri/src/commands/tools/types/download.rs`：`DownloadFileParams` 新增可选字段 `user_agent` / `max_threads` / `chunk_count` / `max_speed`
+  - `src-tauri/src/http.rs`：新增 `build_client_with_user_agent()`，支持自定义 UA 构建请求客户端（保留代理 / TLS 配置）
+  - `src-tauri/src/minecraft/download/config.rs`：`DownloadManagerConfig` 新增 `user_agent` 字段与 `apply_overrides()`（按任务覆盖线程数 / 分片数 / 限速 / UA，`None` 保持原值）
+  - `src-tauri/src/minecraft/download/manager/core.rs`：`from_config` 在配置含自定义 UA 时构建对应客户端
+  - `src-tauri/src/minecraft/download/session.rs`：新增 `start_grouped_with_manager()`，支持注入自定义 manager
+  - `src-tauri/src/commands/tools/download.rs`：`download_file` 读取高级设置 → `apply_overrides` → 注入 manager 下载
+  - 前端：新增 `src/composables/external-settings.ts`（localStorage 持久化）；`download.ts` 的 `downloadFile` 支持 `DownloadFileSettings` 传参；`ExternalDownload.vue` 新增「工具原理」说明区与「高级设置」折叠面板（自定义 UA / 并发线程数 / 单文件分片数 / 限速 MB/s / 恢复默认）
+- 验证：`cargo test --all-features` 181 个测试全部通过；`vue-tsc`、`eslint`、`vite build` 通过
+
 #### FRP 后端内联测试拆分为独立测试文件
 
 - 背景：`detect.rs`、`frpc_config.rs`、`provider_system.rs`、`auth/pkce.rs`、`api_spec/http.rs` 等在源码文件末尾内联了 `#[cfg(test)] mod tests { ... }`，与项目"测试独立成文件"的约定不符
@@ -80,6 +93,30 @@
 - 验证：`cargo check/clippy` 通过
 
 ### 修复
+
+#### FRP 日志 ANSI 转义序列乱码清理
+
+- 背景：frpc 输出带颜色控制符（如 `ESC[1;34m`、`ESC[0m`），前端日志区直接显示为 `[1;34m` 乱码
+- 改动：
+  - `src-tauri/src/commands/frp/log_redact.rs`：新增 `strip_ansi_sequences()`，用 CSI 正则（`\x1b\[[0-9;?]*[ -/]*[@-~]`）移除颜色/光标控制序列
+  - `src-tauri/src/commands/frp/process/capture.rs`：`capture_stream` 在脱敏前先清洗 ANSI 序列
+  - `src-tauri/src/commands/frp/log_redact_tests.rs`：补充 ANSI 清洗用例
+- 验证：`cargo test --all-features` 181 个测试全部通过
+
+#### 隧道启停加载状态按隧道 ID 区分
+
+- 背景：点击某条隧道「启动」，其他隧道的启动/停止按钮也进入加载态，缺少按隧道区分的判断
+- 改动：
+  - `src/stores/frp/tunnelSlice.ts`：新增 `tunnelActionTunnelId`，启停时记录对应隧道 ID，finally 清空
+  - `src/components/frp/TunnelManager.vue`：向列表透传 `actionTunnelId`
+  - `src/components/frp/TunnelList.vue`：按钮加载态改为仅当 `actionLoading && actionTunnelId === tunnel.id` 时展示
+- 验证：`vue-tsc --noEmit`、`eslint`、`vite build` 通过
+
+#### SeedMap 组件 v-model 属性名还原为 kebab-case
+
+- 背景：`SeedMap.vue` 中 `SeedMapControls` / `SeedMapSidebar` 的 `v-model:userX` 等 camelCase 写法与 Vue 组件 props 定义不符，还原为 kebab-case（`v-model:user-x` 等）
+- 改动：`src/views/tools/data/SeedMap.vue` 的 `v-model` 属性统一还原为 kebab-case
+- 验证：`vue-tsc --noEmit` 通过
 
 #### 托盘「退出」改为直接退出，不弹确认框
 
