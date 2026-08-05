@@ -6,6 +6,7 @@ import Input from '@/components/common/Input.vue'
 import Select from '@/components/common/Select.vue'
 import DevModeToggle from '@/components/settings/DevModeToggle.vue'
 import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
+import SettingsAi from '@/views/settings/SettingsAi.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
 import {
@@ -288,6 +289,9 @@ watch(logLevel, (v) => markDirty('logLevel', v))
         </div>
       </div>
     </div>
+
+    <!-- 本地 AI 服务配置 -->
+    <SettingsAi />
 
     <!-- 社区资源配置卡片 -->
     <CommunityConfigCard />

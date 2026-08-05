@@ -40,3 +40,15 @@ pub fn speed(bytes_per_sec: u64) -> String {
 pub fn speed_with(bytes_per_sec: u64, decimals: usize) -> String {
     format!("{}/s", bytes_with(bytes_per_sec, decimals))
 }
+
+/// 按字符数截断文本（安全处理中文等多字节字符）
+///
+/// 超出 `max` 字符时截断并追加省略号；否则原样返回。
+pub fn truncate_chars(s: &str, max: usize) -> String {
+    if s.chars().count() <= max {
+        s.to_string()
+    } else {
+        let cut: String = s.chars().take(max).collect();
+        format!("{}…", cut)
+    }
+}

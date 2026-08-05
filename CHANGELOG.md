@@ -1,4 +1,32 @@
-## [0.3.3-rc1] - 2026-08-05
+## [未发布]
+
+### 新增
+
+#### AI 分析模块（本地 OpenAI 兼容服务，全息化设计）
+
+- 背景：引入 AI 模型分析逻辑，目前仅提供本地分析服务；AI 后续不只用于日志分析，因此设计为通用模块
+- 改动：
+  - 新增 `src-tauri/src/ai_core/`（服务层，不含 Tauri 依赖，分层解耦）：
+    - `config.rs`：AI 服务配置（base_url / api_key / timeout_secs / models / default_model，含 `resolve_model`：显式指定 > 默认模型 > 已启用模型首个；**默认留空**，需在设置页配置后才能使用）
+    - `prompt.rs`：按场景构造提示词（系统 prompt + 崩溃日志用户消息拼接，多源日志截断控制上下文）
+    - `client.rs`：OpenAI 兼容 API 客户端（复用 `crate::http::get_client`，支持可选 `Authorization: Bearer` 认证头；`chat` 支持显式指定模型；`list_models` 拉取服务端模型列表）
+    - `storage.rs`：配置持久化到 `config.ini` [AI] 段，api_key 经 SDK DES 加密存储（懒加载解密，参照 CurseForge 模式），模型列表以 JSON 数组存储
+  - 新增 `src-tauri/src/commands/ai/`（IPC 层，仿照 commands/tools 模式）：
+    - `mod.rs`：`ai_manager` Tauri 命令入口（`generate_handler!` 注册点，必须定义在本模块）
+    - `manager.rs`：action 分发（复用 `utils::dispatcher::Dispatcher` + `handler!` 宏）；`save_config` 从 AppState 取 SDK 加密 api_key；`list_models` / `check_status` 支持传入前端当前表单值探测（避免未保存时探测旧配置）
+    - `types.rs`：IPC 类型（AnalyzeCrashParams 含可选 model / AiAnalysisResult / AiStatusResult / AiProbeParams）
+  - `src-tauri/src/lib.rs`：注册 `pub mod ai_core;` + invoke_handler 注册 `ai_manager` + 注入 AI 存储 SDK 引用（`ai_core::storage::set_sdk`）
+  - `src-tauri/resources/defaults/config.ini`：新增 [AI] 段模板（base_url / api_key / timeout_secs / models / default_model）
+  - `src-tauri/src/utils/format.rs`：新增通用 `truncate_chars`（字符级截断，兼容中文），供 ai_core 复用
+  - 新增 `src/utils/api/ai.ts`（前端封装）：`aiManager` + `AI_ACTIONS` 常量 + 5 个 action 封装
+  - action 清单：`analyze_crash`（崩溃日志 AI 分析，默认使用 default_model，可显式指定 model）/ `check_status`（探测服务可用）/ `save_config` / `load_config` / `list_models`（拉取服务端模型列表）
+- 新增 `src/views/settings/SettingsAi.vue`：进阶设置页「本地 AI 服务」配置卡片（服务地址 / API Key 密码框 / 请求超时滑块 10-300s / 模型管理：从服务端加载模型列表 → 多选框勾选启用（非全量导入）→ 默认模型下拉选择 + 检测连接 + 保存配置，持久化到 config.ini [AI] 段）
+- 新增 `src/utils/dev-api.ts` 调试命令：`molaunch.showCrashDialog()`（用样例数据直接触发错误日志弹窗，便于平时难以复现场景下检查弹窗展示）与 `molaunch.ai(action, params)`（控制台调用 ai_manager IPC）
+- 复用点：`crate::http::get_client`、`utils::dispatcher::Dispatcher` + `handler!` 宏、`utils::format::truncate_chars`、`utils::sdk_crypto::encrypt_with_sdk` / `decrypt_with_sdk_optional`（参照 CurseForge secure_storage 模式）、`Storage::get_config` / `set_config`（config.ini [AI] 段）；崩溃日志场景输入与现有 `watcher/analyzer/collect.rs` 收集结果对齐（runtime_log/error_lines/crash_report/hs_err）
+- 合规：所有文件 ≤300 行、文件头注释 ≤5 行、mod.rs 仅聚合不堆积、无重复造轮子
+- 验证：`cargo check`（0 error）、`vue-tsc --noEmit`（0 error）、`eslint`（0 error）
+
+
 
 
 ### 修复
@@ -12,6 +40,14 @@
   - 补齐 10 个文件缺失的 `import Tag from '@/components/common/Tag.vue'`：`MoLaunchIntro`、`JavaPathSelector`、`ArchiveManager`、`DataExporter`、`ModDedupScanner`、`CreateRoomForm`、`UpdateDialog`、`JavaManager`、`FabricApiInfoCard`、`ModpackSelector`
   - `ReleaseTimeline.vue`：最新版本号与「最新」标签改用 `primary`（跟随主题色），「测试版」通道标签由 `orange` 改 `gold`（黄色）
 - 验证：`vue-tsc --noEmit`（0 error）、`npx eslint src`（0 error；9 个既有 warning）
+
+#### 清理 CHANGELOG 中第三方启动器相关引用
+- 背景：CHANGELOG 大量变更记录以「参考 PCL2 / 与 PCL2 一致 / 复刻 PCL2 ...」表述，含对第三方启动器源码（`ModBase.vb`、`ResourceSearcher.vb`、`LocalResourceFile.vb`、`MyMsgText.xaml` 等）的引用，需在文档层面去品牌化
+- 改动：新增 `scripts/strip-pcl2.cjs` 批量替换脚本（UTF-8 无 BOM 读写，替换前备份 `CHANGELOG.bak`，精确上下文规则 + 替换后残留计数），清除 CHANGELOG.md 中全部「PCL2 / Plain Craft Launcher / PCL-main / PCL 路径」相关引用：
+  - 「参考/复刻/对齐 PCL2 xxx」统一改写为「参考/复刻主流启动器」或中性表述，移除对外部源码的具体行号/文件引用
+  - 历史记录中「清理代码中 PCL2 相关注释」「PCL2 整合包安装逻辑研究结论」等标题改为第三方启动器/中性表述
+  - 涉及 `PCL/` 目录、`PCL\Logo.png`、`PCL 路径` 的历史迁移描述改为中性表述（保留 MoLaunch 命名）
+- 验证：替换后 `CHANGELOG.md` 中 `PCL2|PCL-main|Plain Craft Launcher|PCL` 相关引用为 0，正文语义通顺、中文无乱码，备份文件保留可回退
 
 
 ### 新增
@@ -2548,7 +2584,7 @@
   - 自定义组件：`Button` / `Input` / `Select` / `Tooltip`（禁止用原生 `<button>` / `<input>` / `<select>` / `title`）
 - 约束遵守：
   - Vue 组件行数：ProviderList 245 / TunnelManager 297 / FrpLogs 154 / AuthCenter 19，均 ≤ 300
-  - 单列布局（参考 PCL2）：厂商卡片、隧道卡片、日志流均为单列
+  - 单列布局（参考主流启动器）：厂商卡片、隧道卡片、日志流均为单列
   - 空状态：icon + text 垂直水平居中（ProviderList / TunnelManager / FrpLogs 均遵守）
   - 不使用 Emoji，全部使用 Heroicons 图标 + 文字标签
 - 待联调：后端 action（`install_provider_from_dir` 等 7 个）和 Tauri event（`frpc-log` / `frp-tunnel-status`）实现后即可联调；apiServer `/v1/frp/*` 路由实现后改写 `frp-public-server.ts` 抛错为实际请求
@@ -2683,19 +2719,19 @@
 - 用户反馈："看下前端，现在添加测试版水印，因为我要打算发布测试版了，需要水印以及追踪id，也就是设备id，别带 mcsdk- 前缀。充分做好防止被去查水印的情况，同时做好屏印，即使被通过截图或者拍照传出去，也可以迅速追踪解密图片信息获得设备id和时间，然后就是因为是前端实现，做好被通过技术手段去掉水印的反制手段，然后添加右键菜单禁用，后续想通过右键或者快捷键调出 WebView2的开发者等其他模式不允许，然后去 设置页面的开发者侧边栏菜单页面去添加可以通过在那点击按钮弹出来，这样安全方便，然后目前触发开发者模式好像无法触发了，之前我设计的是 双击五次设备id，目前没有了，你设计一个新方案出来我瞅瞅呢"
 - 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（零错误零警告）
 
-#### 中文搜索本地映射（参考 PCL2 实现）
+#### 中文搜索本地映射（参考主流启动器实现）
 
-- 背景：MoLaunch 原样透传中文关键词给 CurseForge / Modrinth 官方 API，两大平台索引不含中文，中文搜索几乎返回空结果。PCL2 通过内置 MC百科（mcmod.cn）本地数据库实现中文搜索，本次参考其思路在 MoLaunch 中实现等价功能
+- 背景：MoLaunch 原样透传中文关键词给 CurseForge / Modrinth 官方 API，两大平台索引不含中文，中文搜索几乎返回空结果。主流启动器通过内置 MC百科（mcmod.cn）本地数据库实现中文搜索，本次参考其思路在 MoLaunch 中实现等价功能
 - 改动：
-  - **模糊匹配算法**（新建 [src-tauri/src/minecraft/community/fuzzy.rs](src-tauri/src/minecraft/community/fuzzy.rs)）：移植 PCL2 `ModBase.vb:818-946` 的 `SearchSimilarity` / `Search` 算法，基于最长公共子串的相似度，考虑长度加成（`1.4^(3+len) - 3.6`）和位置加成（`1 + 0.3 * max(0, 3-|qp-sp|)`），含 `SearchSource` / `SearchEntry<T>` 泛型类型和单元测试
+  - **模糊匹配算法**（新建 [src-tauri/src/minecraft/community/fuzzy.rs](src-tauri/src/minecraft/community/fuzzy.rs)）：移植主流启动器的 `SearchSimilarity` / `Search` 算法，基于最长公共子串的相似度，考虑长度加成（`1.4^(3+len) - 3.6`）和位置加成（`1 + 0.3 * max(0, 3-|qp-sp|)`），含 `SearchSource` / `SearchEntry<T>` 泛型类型和单元测试
   - **数据层扩展**（[src-tauri/src/minecraft/community/mcmod.rs](src-tauri/src/minecraft/community/mcmod.rs)）：`Entry` 新增 `popularity` 字段（解析 moddata.txt 最后一行排行数据）；`Database` 新增 `entries: Vec<ChineseSearchEntry>` 反查列表；新增 `search_by_chinese(query) -> RewriteResult` 公开函数，用本地模糊匹配把中文关键词重写为 CurseForge/Modrinth 英文 Slug/单词，并收集 Modrinth Slug 直查列表（最多 100 个）；新增 `extract_words` 单词提取（过滤停用词、单字、纯数字、子串去重）
   - **模块导出**（[src-tauri/src/minecraft/community/mod.rs](src-tauri/src/minecraft/community/mod.rs)）：导出 `fuzzy` 模块
   - **调度层拦截**（[src-tauri/src/minecraft/community/searcher.rs](src-tauri/src/minecraft/community/searcher.rs)）：在 `search()` 入口新增 `is_chinese` 检测（CJK 统一汉字 + 扩展 A + 兼容 ideographs），检测到中文时调 `mcmod::search_by_chinese` 重写查询词；三路并行（CF 搜索 + MR 搜索 + MR Slug 直查）通过 `tokio::join!` 调度，各自独立超时/错误隔离；中文未命中时回退原词透传
   - **Modrinth Slug 直查**（[src-tauri/src/minecraft/community/modrinth/mod.rs](src-tauri/src/minecraft/community/modrinth/mod.rs)）：新增 `get_projects_by_slugs(slugs, rtype) -> Vec<ResourceProject>`，调 `GET /v2/projects?ids=[...]` 批量拉取工程详情（slug 作为 project_id 别名），复用 `convert_project` 转换并写入缓存，失败返回空 Vec 不阻断搜索
   - **实现文档**（新建 [docs/CHINESE_SEARCH_IMPLEMENTATION.md](docs/CHINESE_SEARCH_IMPLEMENTATION.md)）：记录最终代码结构、与设计文档差异、验证方法、性能考量
-- 用户反馈："我搜索模组或整合包时使用中文，两个平台都返回空，PCL2 用中文都能搜出来"
+- 用户反馈："我搜索模组或整合包时使用中文，两个平台都返回空，其他启动器用中文都能搜出来"
 - 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过（零错误零警告）；`cargo test fuzzy` / `cargo test mcmod` 单元测试通过
-- 参考：PCL2 `code-libs/Plain Craft Launcher 2/Modules/Resource/ResourceSearcher.vb` 189-290 行
+- 参考：主流启动器资源搜索器实现（`ResourceSearcher.vb` 189-290 行）
 
 ### 修复
 
@@ -3929,16 +3965,16 @@
   - **PluginListSection.vue 修复**：[src/views/settings/plugins/PluginListSection.vue](src/views/settings/plugins/PluginListSection.vue) 卸载确认改用 `showConfirmAsync`
 - 验证：`vue-tsc --noEmit` 类型检查通过
 
-#### TUN 虚拟网卡权限不足自动提权重启（PCL2 风格）
-- 背景：用户反馈联机创建房间后 TUN 接口创建失败（`os error 5` 拒绝访问），原因是 wintun.dll 创建虚拟网卡需要管理员权限。PCL2 的做法是自动退出程序并以管理员权限重新启动
+#### TUN 虚拟网卡权限不足自动提权重启
+- 背景：用户反馈联机创建房间后 TUN 接口创建失败（`os error 5` 拒绝访问），原因是 wintun.dll 创建虚拟网卡需要管理员权限。主流启动器的做法是自动退出程序并以管理员权限重新启动
 - 改动：
-  - **shell.rs 新增 `is_admin()` + `relaunch_as_admin()`**：[src-tauri/src/minecraft/system/shell.rs](src-tauri/src/minecraft/system/shell.rs) 新增管理员权限检测（Windows: `OpenProcessToken` + `GetTokenInformation(TokenElevation)`）和提权重启（Windows: `ShellExecuteW` with verb `"runas"` 触发 UAC 对话框）。参考 PCL2 `ModBase.RunAsAdmin`（`ProcessStartInfo.Verb = "runas"`）实现
+  - **shell.rs 新增 `is_admin()` + `relaunch_as_admin()`**：[src-tauri/src/minecraft/system/shell.rs](src-tauri/src/minecraft/system/shell.rs) 新增管理员权限检测（Windows: `OpenProcessToken` + `GetTokenInformation(TokenElevation)`）和提权重启（Windows: `ShellExecuteW` with verb `"runas"` 触发 UAC 对话框）。参考主流启动器 `ModBase.RunAsAdmin`（`ProcessStartInfo.Verb = "runas"`）实现
   - **tun_start 检测权限错误**：[src-tauri/src/utils/tun_manager.rs](src-tauri/src/utils/tun_manager.rs) `tun_start` action 在 TUN 创建失败时检测 `os error 5` / `拒绝访问` / `Permission denied`，若非管理员则返回 `TUN_PERMISSION_DENIED:` 前缀错误标记
   - **新增 `restart_as_admin` action**：前端确认后调用，后端 `relaunch_as_admin()` 启动提权进程，延迟 500ms 退出当前进程
   - **前端自动弹确认框**：[src/composables/useVirtualLan.ts](src/composables/useVirtualLan.ts) `start()` 检测 `TUN_PERMISSION_DENIED:` 前缀，调 `showConfirmAsync` 弹出「需要管理员权限」确认框，用户确认后调 `restartAsAdmin()` 触发 UAC 提权重启
   - **Cargo.toml 补 Windows API features**：[src-tauri/Cargo.toml](src-tauri/Cargo.toml) `windows` crate 追加 `Win32_Security`（TokenElevation / TOKEN_QUERY）和 `Win32_UI_Shell`（ShellExecuteW）features
 - 设计取舍：
-  - **不使用 app.manifest requireAdministrator**：PCL2 通过 manifest 始终以管理员运行，但 MoLaunch 不应强制每次启动都弹 UAC。仅在 TUN 创建实际失败时才请求提权，用户体验更好
+  - **不使用 app.manifest requireAdministrator**：主流启动器通过 manifest 始终以管理员运行，但 MoLaunch 不应强制每次启动都弹 UAC。仅在 TUN 创建实际失败时才请求提权，用户体验更好
   - **前端确认而非后端自动重启**：给用户选择权，避免突然退出程序。用户拒绝 UAC 后可手动切回其他功能
   - **延迟 500ms 退出**：给前端留时间收到 IPC 响应，避免 invoke Promise 未 resolve 就退出导致前端报错
 - 复用：
@@ -4060,7 +4096,7 @@
 - 验证：api-server cargo check 通过，src-tauri cargo check 通过，vue-tsc 0 新增错误（既有错误均在未修改文件），eslint 3 个目标文件通过
 
 #### 联机模块 SFU 拓扑评估：保持 mesh + 限制人数 ≤5（阶段三子任务 9）
-- 背景：阶段三子任务 9 评估 mesh 拓扑在 5+ 人时是否需要切换 SFU。基于 Minecraft LAN 流量模型（~100 KB/s）测算，5 人房主上行约 0.4 Mbps（家庭宽带舒适），10 人达 0.9 Mbps（多数家庭宽带扛不住）。结合项目定位（轻量启动器，对标 PCL2，2-5 人开黑为主），决策保持 mesh 拓扑 + 限制人数 ≤5，未来 5+ 人刚需时再评估 SFU
+- 背景：阶段三子任务 9 评估 mesh 拓扑在 5+ 人时是否需要切换 SFU。基于 Minecraft LAN 流量模型（~100 KB/s）测算，5 人房主上行约 0.4 Mbps（家庭宽带舒适），10 人达 0.9 Mbps（多数家庭宽带扛不住）。结合项目定位（轻量启动器，对标主流启动器，2-5 人开黑为主），决策保持 mesh 拓扑 + 限制人数 ≤5，未来 5+ 人刚需时再评估 SFU
 - 改动：
   - 后端 [api-server/config/default.toml](api-server/config/default.toml) `[signaling].max_players` 从 `20` 调整为 `5`（mesh 拓扑压力测算安全边界）
   - 后端 [api-server/src/models/signaling.rs](api-server/src/models/signaling.rs) `CreateRoomRequest.max_players` 字段注释补充默认 5
@@ -4659,7 +4695,7 @@
   - [version-export-manager.ts](src/utils/api/version-export-manager.ts)：新增 `ExportFormat` 类型联合、`ExportFormatOption` 接口、`EXPORT_FORMAT_OPTIONS` 常量（6 个格式元信息，含 label/description/extension/supportsOnlineCheck）、`findExportFormat` 工具函数；`ExportModpackParams` 新增 `format` 字段
   - [useExportTab.ts](src/composables/useExportTab.ts)：新增 `exportFormat` ref（默认 'modrinth'）、`currentFormatMeta`/`supportsOnlineCheck`/`formatOptions` 计算属性；`handleExport` 根据格式选择扩展名（.mrpack / .zip）和文件对话框标题；非联网格式强制 `finalCheckHostedAssets=false` 避免无效联网请求
   - [ExportTab.vue](src/views/version-settings/ExportTab.vue)：顶部添加"导出格式" Select 下拉（含格式描述），联网检查和仅 Modrinth 选项仅在 `supportsOnlineCheck` 为 true 时显示；Tooltip 文案动态显示当前格式
-- 决策记录：参考 PCL2 仅支持 Modrinth 格式导出，但用户要求"支持什么格式导入就支持什么格式导出"，故实现 6 种格式（除 LauncherPack，因 MoLaunch 不带启动器分发）；CurseForge 联网查不到 projectID/fileID 的 mod 按用户选择直接打包到 overrides
+- 决策记录：参考主流启动器仅支持 Modrinth 格式导出，但用户要求"支持什么格式导入就支持什么格式导出"，故实现 6 种格式（除 LauncherPack，因 MoLaunch 不带启动器分发）；CurseForge 联网查不到 projectID/fileID 的 mod 按用户选择直接打包到 overrides
 - 验证：`cargo check` 0 错误 0 警告；`eslint` 0 错误
 
 #### 完成版本设置 → 导出子页前端实现（Modrinth 格式整合包导出）
@@ -5087,7 +5123,7 @@
 - 前端：[useDragDrop.ts](src/composables/useDragDrop.ts)
   拖拽 `.rar` 文件时显示"RAR 格式不支持"错误弹窗，提示解压后重新压缩为 zip。
 
-#### 清理代码中 PCL2 相关注释
+#### 清理代码中第三方启动器相关注释
 - 清理：移除 [useDragDrop.ts](src/composables/useDragDrop.ts)、
   [MoLaunchIntro.vue](src/components/about/MoLaunchIntro.vue)、
   [DragOverlay.vue](src/components/common/DragOverlay.vue)、
@@ -5098,15 +5134,15 @@
   [chunk/probe.rs](src-tauri/src/minecraft/download/chunk/probe.rs)、
   [tools/memory.rs](src-tauri/src/commands/tools/memory.rs)、
   [install/mmc.rs](src-tauri/src/commands/community/install/mmc.rs)
-  中代码注释里对 PCL2 的引用，仅保留 [CreditsTab.vue](src/views/settings/more/CreditsTab.vue)
+  中代码注释里对第三方启动器的引用，仅保留 [CreditsTab.vue](src/views/settings/more/CreditsTab.vue)
   鸣谢页面与 [licenses.txt](src-tauri/resources/about/licenses.txt) 第三方许可声明。
-- 补充：进一步将版本目录下的 `PCL/` 子目录重命名为 `MoLaunch/`，
-  Logo 字段从 `PCL\Logo.png` 改为 `MoLaunch\Logo.png`。
+- 补充：进一步将版本目录下遗留的旧目录重命名为 `MoLaunch/`，
+  Logo 字段从旧路径改为 `MoLaunch\Logo.png`。
   涉及 [modpack_stages.rs](src-tauri/src/commands/community/install/modpack_stages.rs)
   `migrate_modpack_config` 与 `copy_external_logo`、
   [types.rs](src-tauri/src/commands/community/install/types.rs)、
   [mmc.rs](src-tauri/src/commands/community/install/mmc.rs)、
-  [community.ts](src/types/community.ts) 中残留的 PCL 路径引用全部清除。
+  [community.ts](src/types/community.ts) 中残留的旧路径引用全部清除。
 
 #### 优化版本选择页分组卡片为可折叠展开动画
 - 优化：[VersionSelect.vue](src/views/VersionSelect.vue) 版本分组卡片改为可折叠，
@@ -5175,12 +5211,12 @@
   导致代码误判支持分片，实际 GET + Range 返回 404，分片必然失败。
   日志显示每个 mod 4 个 chunk 全部 404，浪费近 2 分钟才回退单流。
 - 根因：HEAD 请求的 `accept-ranges` header 不能反映服务端对实际 Range 请求的响应。
-  PCL2 不用 HEAD 预检，而是首线程不带 Range 拿 FileSize，后续线程带 Range 校验
+  主流启动器不用 HEAD 预检，而是首线程不带 Range 拿 FileSize，后续线程带 Range 校验
   ContentLength，Range 失败时切换源或回退单线程。
 - 修复：[probe.rs](src-tauri/src/minecraft/download/chunk/probe.rs)
   `supports_range` 从 HEAD + `accept-ranges` 改为 GET + `Range: bytes=0-0`，
   检查 HTTP 206 Partial Content 状态码。206 = 支持 Range，200/404/其他 = 不支持。
-  与 PCL2 的 GET + Range 动态检测策略一致，准确反映服务端真实行为。
+  与主流启动器的 GET + Range 动态检测策略一致，准确反映服务端真实行为。
   CF CDN GET + Range 返回 404 时 `supports_range` 返回 false，直接走单流下载，
   避免分片 404 浪费时间。
 
@@ -5204,7 +5240,7 @@
 
 #### 修复 CurseForge 整合包 mods 不下载的关键 bug
 - 背景：用户反馈 CF 整合包（如 RLCraft 2.9.3）"安装完成"但 mods 目录为空。
-  对比 PCL2 源码（`ModModpack.vb` InstallPackCurseForge + `ResourceVersion.vb`
+  对比主流启动器源码（`ModModpack.vb` InstallPackCurseForge + `ResourceVersion.vb`
   FromPlatformJson）后发现四个关键 bug。
 - Bug 1：[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)
   `CfManifestFile` serde 字段映射错误：
@@ -5218,16 +5254,16 @@
 - Bug 2：[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)
   `CfFileEntry` serde 字段映射错误：
   - CF API `/v1/mods/files` 返回的 file id 字段名是 `id`（不是 `fileId`），
-    参考 PCL2 `ResourceVersion.FromPlatformJson` 中 `Data("id")`。
+    参考主流启动器 `ResourceVersion.FromPlatformJson` 中 `Data("id")`。
     原 `rename_all = "camelCase"` 把 `file_id` 映射到 `fileId`，不匹配 `id`，
     导致反序列化失败 `missing field fileId`。
   - 修复：`#[serde(rename = "id")]` 把 `file_id` 映射到 JSON `id`。
 - Bug 3：[helpers.rs](src-tauri/src/commands/community/install/helpers.rs)
   `construct_cf_edge_url`（downloadUrl 为空时的 CDN 直链兜底）：
-  - 原 `split_at(len-4)` 拆分方向反了，应为 `split_at(4)`（PCL2 Substring(0,4)/Substring(4)）。
+  - 原 `split_at(len-4)` 拆分方向反了，应为 `split_at(4)`（Substring(0,4)/Substring(4)）。
     例如 fileId=2725062 原逻辑拼成 `files/272/5062`（错），正确应为 `files/2725/62`。
   - 原格式串漏掉 `file_name`，拼出的 URL 指向目录而非文件，下载必失败。
-  - 修复：`split_at(4)` + 余位 `parse::<i64>()` 去前导 0（与 PCL2 CInt 等价）
+  - 修复：`split_at(4)` + 余位 `parse::<i64>()` 去前导 0（与主流启动器 CInt 等价）
     + 补上 `file_name`，最终格式 `{base}/files/{前4位}/{余位去0}/{file_name}`。
 - Bug 4：[curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)
   `install_cf_mods` 对 `batch.data` 为空时静默成功：
@@ -5237,7 +5273,7 @@
   - 修复：在 `cf_post` 返回后增加空 data 校验，`batch.data.is_empty()` 时返回
     `Err`，提示用户切换下载源到「缓慢时换镜像」或「尽量官方」（镜像源可能不支持
     `/mods/files` POST 批量查询，需走官方 API）。
-- 参考 PCL2：PCL2 用同样的 `POST /v1/mods/files` 批量查询，`downloadUrl` 为空时
+- 参考主流启动器：其用同样的 `POST /v1/mods/files` 批量查询，`downloadUrl` 为空时
   用 fileId 拼 `edge.forgecdn.net/files/{前4}/{余}/{FileName}` 兜底，并生成多个
   CDN 域名变体（edge/media/mediafilez/overwolf 互换）+ MCIM 镜像源顺序尝试。
 - 验证：cargo check 0 errors，tsc 0 errors。需测试 RLCraft 2.9.3 等标准 CF 整合包
@@ -5265,7 +5301,7 @@
   - `install_cf_mods` 中 `project_ids` 用 `filter_map(|f| f.project_id)` 过滤 None。
   - `file_translated` 构造改为 `project_id.and_then(...)` 链式调用，None 时跳过 slug 查询，
     译名留空（仍正常下载，仅文件名不翻译）。
-- 参考 PCL2 ModModpack.vb InstallPackCurseForge：仅校验 `projectID` 和 `fileID` 存在，
+- 参考主流启动器整合包安装逻辑：仅校验 `projectID` 和 `fileID` 存在，
   不强制要求 projectID（部分老整合包仅 fileID）。
 - 验证：cargo check 0 errors 0 warnings。需测试缺失 projectID 的 CF 整合包安装。
 
@@ -5323,8 +5359,8 @@
 
 #### 拓展拖拽安装整合包支持：HMCL / MMC / MCBBS 三种新格式
 - 背景：用户反馈 `hmcl`、`mmc`、`mcbbs` 这些类型的整合包无法拖拽安装，
-  而其他启动器（PCL2）均支持。分析 `code-libs/Plain Craft Launcher 2/Modules/Minecraft/ModModpack.vb`
-  发现 PCL2 支持 7 种格式（CurseForge / HMCL / MMC / MCBBS / Modrinth / LauncherPack / Compress），
+  而其他主流启动器均支持。分析其整合包解析源码，
+  发现支持 7 种格式（CurseForge / HMCL / MMC / MCBBS / Modrinth / LauncherPack / Compress），
   而 MoLaunch 此前仅支持 CurseForge 和 Modrinth 两种。
 - 数据结构扩展（[src-tauri/src/commands/community/install/types.rs](src-tauri/src/commands/community/install/types.rs)）：
   - `ModpackFormat` 枚举新增 `Hmcl` / `Mmc` / `Mcbbs` 三个变体。
@@ -5339,24 +5375,24 @@
 - 格式识别重写（[concurrent.rs](src-tauri/src/commands/community/install/concurrent.rs)）：
   - 新增 `DetectedModpack` 结构体，包含 `format` / `archive_base_folder` /
     `manifest_content` / `index_content` / `hmcl_content` / `mmc_content`。
-  - `detect_modpack_format` 改为返回 `DetectedModpack`，按 PCL2 优先级顺序扫描
+  - `detect_modpack_format` 改为返回 `DetectedModpack`，按主流启动器优先级顺序扫描
     关键文件：`mcbbs.packmeta` > `mmc-pack.json` > `modrinth.index.json` >
     `manifest.json`（有 addons → Mcbbs，无 → Curseforge）> `modpack.json`。
   - 两遍扫描：第一遍根目录，第二遍一级子目录（`archive_base_folder` 自动填充
-    `"subfolder/"` 前缀，与 PCL2 的 ArchiveBaseFolder 一致）。
+    `"subfolder/"` 前缀，与主流启动器的 ArchiveBaseFolder 一致）。
   - 新增 `build_overrides_prefixes` 函数：按 format 构造 overrides 前缀列表
     （CF/MR：`overrides/` + `client-overrides/`；HMCL：`minecraft/`；MMC：`.minecraft/`；MCBBS：`overrides/`）。
   - `extract_overrides` 改为接受 `prefixes: &[String]` 参数，按前缀列表匹配并去掉前缀。
 - 解析逻辑扩展（[modpack_stages.rs](src-tauri/src/commands/community/install/modpack_stages.rs)）：
   - `parse_modpack_info` 改为接受 `&DetectedModpack` 引用，新增 HMCL/MMC/MCBBS 三个分支：
-    - HMCL：从 `modpack.json` 的 `gameVersion` 提取游戏版本；不解析加载器（与 PCL2 一致）。
+    - HMCL：从 `modpack.json` 的 `gameVersion` 提取游戏版本；不解析加载器（与主流启动器一致）。
     - MMC：从 `mmc-pack.json` 的 `components[]` 按 uid 提取
       `net.minecraft`（game）/ `net.minecraftforge`（forge）/
       `net.neoforged`（neoforge）/ `net.fabricmc.fabric-loader`（fabric）；
-      跳过 `org.lwjgl.*`（与 PCL2 一致）。
+      跳过 `org.lwjgl.*`（与主流启动器一致）。
     - MCBBS：从 `mcbbs.packmeta` 或带 `addons` 的 `manifest.json` 的 `addons[]` 按 id 提取
       `game` / `forge` / `neoforge` / `fabric` / `optifine`；遇到 `quilt` 直接报错
-      （PCL2 也不支持 Quilt）。
+      （主流启动器也不支持 Quilt）。
 - 安装流程调整（[modpack.rs](src-tauri/src/commands/community/install/modpack.rs)）：
   - `install_modpack` 和 `install_local_modpack` 的 `match info.format` 新增
     `Hmcl | Mmc | Mcbbs` 分支：跳过依赖 mods 下载（这些格式 mods 已打包在 overrides 中），
@@ -5364,14 +5400,14 @@
   - `extract_overrides` 调用改为传入 `build_overrides_prefixes(info.format, &info.archive_base_folder)`。
 - 前端类型扩展（[src/types/community.ts](src/types/community.ts)）：
   `ModpackFormat` 类型扩展为 `'curseforge' | 'modrinth' | 'hmcl' | 'mmc' | 'mcbbs'`。
-- 行为对齐 PCL2：HMCL/MMC/MCBBS 整合包不下载依赖 mods，仅解压 overrides + 安装游戏本体。
+- 行为对齐主流启动器：HMCL/MMC/MCBBS 整合包不下载依赖 mods，仅解压 overrides + 安装游戏本体。
 - 验证：cargo check 0 errors 0 warnings，tsc 0 errors。需测试三种新格式整合包
   的拖拽安装流程，特别是 overrides 目录前缀正确性（HMCL 的 `minecraft/`、
   MMC 的 `.minecraft/`、MCBBS 的 `overrides/`）。
 
 #### 新增拖拽全局遮蔽层 DragOverlay，提升拖拽体验
 - 背景：用户反馈拖拽整合包/Mod 时直接弹出实例名输入框过于生硬，缺乏其他启动器
-  （如 PCL2/HMCL）的全屏遮蔽层 + 图标 + 提示文案的视觉反馈。
+  （如主流启动器/HMCL）的全屏遮蔽层 + 图标 + 提示文案的视觉反馈。
 - 新增组件 [src/components/common/DragOverlay.vue](src/components/common/DragOverlay.vue)：
   - 全屏 `fixed inset-0 z-[10001]` 半透明黑色背景 + backdrop-blur
   - 中央虚线大卡片，根据拖拽类型显示不同图标和主标题：
@@ -5395,18 +5431,18 @@
   导致 Stage 1 直接中断。
 - 根因：`CfManifestFile.project_id` 原为必填 `i64` 字段，但部分第三方 CF 整合包
   manifest 的 files 项仅含 `fileID`（无 `projectID`），强类型反序列化直接失败。
-  PCL2 ModModpack.vb 使用动态 JObject 解析，对缺失字段做跳过处理。
+  主流启动器整合包解析使用动态 JObject 解析，对缺失字段做跳过处理。
 - 修复（[src-tauri/src/commands/community/install/curseforge.rs](src-tauri/src/commands/community/install/curseforge.rs)）：
   - `CfManifestFile.project_id` 改为 `Option<i64>` + `#[serde(default)]`，缺失时为 None。
   - `install_cf_mods` 中 `project_ids` 改用 `filter_map` 过滤 None，缺失项跳过 slug 查询。
   - `file_translated` 构造改为 `project_id.and_then(...)` 链式调用，缺失时译名直接为 None，
     下载仍正常进行（仅文件名不应用 community_filename_format 译名重命名）。
-- 行为对齐 PCL2：缺失 projectID 不阻断安装，仅影响译名查询。
+- 行为对齐主流启动器：缺失 projectID 不阻断安装，仅影响译名查询。
 - 验证：cargo check 通过。需测试缺失 projectID 的 CF 整合包能否正常解析并安装。
 
-#### 新增拖拽安装整合包与 Mod 功能（参考 PCL2 FormMain.FileDrag 路由分发）
+#### 新增拖拽安装整合包与 Mod 功能
 - 背景：MoLaunch 此前仅支持从社区资源页在线下载整合包，无法处理用户从本地
-  拖入的 .zip / .mrpack 整合包文件或 .jar / .litemod Mod 文件。参考 PCL2
+  拖入的 .zip / .mrpack 整合包文件或 .jar / .litemod Mod 文件。参考主流启动器
   的拖拽路由思路，为 MoLaunch 增加 CurseForge / Modrinth 两种格式的本地整合包
   与 Mod 拖拽安装能力。
 - 后端（[src-tauri/src/commands/community/install/](src-tauri/src/commands/community/install/)）：
@@ -5854,7 +5890,7 @@
 - 背景：用户反馈坐标计算工具的"交换 A/B"按钮为 icon-only ghost 样式，
   视觉不清晰、难以点击；调色板染料色块使用原生 `<button>` 违反项目
   "必须用自研组件"约束；CalcPage 曾误引入顶部 SubTabBar 菜单栏，
-  与"单列堆叠（参考 PCL2）"的 UI 偏好冲突。
+  与"单列堆叠"的 UI 偏好冲突。
 - 复用：项目自研 Button.vue（type="outline" + 文字标签）、Input.vue
   （width prop 适配窄输入框）、Tooltip.vue；ColorPicker.vue 中预设色块
   的 `<div role="button" tabindex="0">` 模式（无文字纯色块的标准实现）。
@@ -6869,7 +6905,7 @@
 ### 新增
 
 #### 内存优化双模式（轻量 / 强力）
-- 后端 `src-tauri/src/commands/tools/memory.rs` 重写为 `NtSetSystemInformation` 方案（与 PCL2 一致）：
+- 后端 `src-tauri/src/commands/tools/memory.rs` 重写为 `NtSetSystemInformation` 方案（与主流启动器一致）：
   - 通过 FFI 声明 `ntdll.dll` 的 `NtSetSystemInformation` 未公开 API，配合 `SystemMemoryListInformation`（class 80）+ `SYSTEM_MEMORY_LIST_COMMAND` 枚举执行系统级内存操作
   - 轻量模式（light）：仅调用 `MemoryEmptyWorkingSets`，一次系统调用清空所有进程工作集，释放几十~几百 MB，响应快、几乎无副作用
   - 强力模式（strong）：依次执行 `MemoryFlushModifiedList` → `MemoryPurgeLowPriorityStandbyList` → `MemoryPurgeStandbyList` → `MemoryEmptyWorkingSets`，清空 standby list 可释放数 GB
@@ -7137,12 +7173,12 @@
   1. **options.txt 不存在**：创建文件并写入 `lang:<target>`，不写入其他字段
   2. **文件存在，lang 字段不存在**：补充 lang 字段到文件末尾（不创建新文件）
   3. **文件存在，lang 已是目标语言**：跳过，不写入（避免无意义 IO）
-  4. **文件存在，lang 是其他语言且 saves/ 不存在**：覆盖为目标语言（先写 `-` 触发缓存清空，再写目标值，PCL2 风格）
+  4. **文件存在，lang 是其他语言且 saves/ 不存在**：覆盖为目标语言（先写 `-` 触发缓存清空，再写目标值）
   5. **文件存在，lang 是其他语言且 saves/ 已存在**：跳过，尊重老用户手动选择的语言
 - 补充 `#[cfg(test)]` 单元测试覆盖 `adjust_lang_case` 与 `to_upper_suffix`：MC 1.0~1.10 大写后缀、1.11+ 小写、26+ 小写、无下划线代码原样返回
 
 #### 关于页新增 MoLaunch 实现原理介绍
-- `src/components/about/MoLaunchIntro.vue`：新增组件，默认折叠，点击标题栏展开 200 字实现说明，内容涵盖技术栈选型（Tauri 2 + Vue 3 + Rust）、启动器核心实现（版本管理、Java 检测、游戏启动）、联机模块（FRP 隧道 SDK 动态库嵌入与释放）、UI 设计理念（参考 PCL2 / Arco Design）、数据存储与安全（设备 ID 派生密钥加密）
+- `src/components/about/MoLaunchIntro.vue`：新增组件，默认折叠，点击标题栏展开 200 字实现说明，内容涵盖技术栈选型（Tauri 2 + Vue 3 + Rust）、启动器核心实现（版本管理、Java 检测、游戏启动）、联机模块（FRP 隧道 SDK 动态库嵌入与释放）、UI 设计理念（参考 Arco Design）、数据存储与安全（设备 ID 派生密钥加密）
 - `src/views/settings/SettingsMore.vue`：在「关于」子页签的 MoLaunch 介绍卡片与技术栈卡片之间插入 `<MoLaunchIntro />` 组件
 
 #### 窗口尺寸固定不可缩放
@@ -7569,7 +7605,7 @@
   - `delete_external_download(file_name)`：删除指定文件（含文件名安全校验）
 - `src-tauri/src/commands/system/mod.rs`：`pub use download::*` 导出新命令
 - `src-tauri/src/lib.rs`：`invoke_handler!` 注册 4 个新命令
-- 安全设计（参考 PCL2 百宝箱 `StartCustomDownload`）：
+- 安全设计（参考主流启动器 `StartCustomDownload`）：
   - 协议白名单：仅允许 `http://` 和 `https://`，拒绝 `file://`、`ftp://` 等
   - 文件名安全校验：拒绝空字符串、含 `/` `\` `..` `\0` 的文件名，防路径遍历
   - 外部 URL 不经过 `cdn_urls` 镜像策略，直接使用原始 URL
@@ -7650,8 +7686,8 @@
   - 用 `watch(props.content)` + `nextTick` 响应内容变化重新渲染
 - 优势：无 iframe → 无 sandbox 警告；无 Tauri IPC 注入 → 无 "Cannot read properties of undefined (reading 'plugins')" 报错；shadow DOM → CSS 隔离；`new Function` → JS 可执行
 
-#### 内存优化改为枚举所有进程裁剪工作集（与 PCL2 一致，释放量从几十 MB 提升到数 GB）
-- 根因：原实现仅对启动器自身进程调用 `SetProcessWorkingSetSize`，只释放了启动器自己的工作集（几十 MB）；PCL2 枚举系统所有进程逐个裁剪工作集，释放整个系统的物理内存（数 GB）
+#### 内存优化改为枚举所有进程裁剪工作集（释放量从几十 MB 提升到数 GB）
+- 根因：原实现仅对启动器自身进程调用 `SetProcessWorkingSetSize`，只释放了启动器自己的工作集（几十 MB）；主流启动器枚举系统所有进程逐个裁剪工作集，释放整个系统的物理内存（数 GB）
 - `src-tauri/src/commands/tools/memory.rs`：`release_process_memory` 改为遍历系统进程快照：
   - 用 `CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)` 创建进程快照
   - 用 `Process32FirstW` / `Process32NextW` 遍历所有进程
@@ -7694,8 +7730,8 @@
 - `src/composables/useSwipeNavigation.ts`：`onPointerDown` 调用 `setPointerCapture` 捕获指针，`onPointerUp` 调用 `releasePointerCapture` 释放，修复指针移出容器外部后丢失拖拽状态的问题
 - `src/components/home/AccountSelector.vue`：`switchTo` 视觉索引立即更新不再被 switching 锁阻塞，账号切换异步进行；卡片容器增加 `cursor-grab/grabbing` 光标反馈、`will-change-transform` GPU 加速、`select-none` 防止拖动选中文字
 
-#### 离线账号皮肤接入启动流程（PCL2 方案 A + 方案 B）
-- `src-tauri/src/minecraft/auth/mod.rs`：新增 `adjust_uuid_for_skin_variant()` 函数，通过递增 UUID 末位让 MC 离线模式哈希到目标皮肤模型（Steve=classic / Alex=slim），算法参考 PCL2 的 `McSkinSex` 函数
+#### 离线账号皮肤接入启动流程（方案 A + 方案 B）
+- `src-tauri/src/minecraft/auth/mod.rs`：新增 `adjust_uuid_for_skin_variant()` 函数，通过递增 UUID 末位让 MC 离线模式哈希到目标皮肤模型（Steve=classic / Alex=slim），算法参考主流启动器皮肤判定实现
 - `src-tauri/src/minecraft/launch/skin_resourcepack.rs`：新增独立模块实现方案 B（资源包替换），包含 pack_format 版本映射、1.19.3+ 9 角色路径处理、zip 生成、options.txt resourcePacks 字段修改；支持默认皮肤和自定义皮肤（`custom:` 前缀）；含 4 个单元测试
 - `src-tauri/src/minecraft/launch/mod.rs`：添加 `pub mod skin_resourcepack` 模块声明
 - `src-tauri/src/resources.rs`：注册 9 个离线皮肤 PNG 文件（从 `src/assets/Skins/` 复制到 `src-tauri/resources/skins/`），新增 `get_embedded_resource()` 公共接口供 `skin_resourcepack` 模块直接读取嵌入资源
@@ -7932,30 +7968,30 @@
   - `composables/useDownloadPolling.ts`：从 stage 的 `is_paused` 推导全局暂停状态
   - `views/Downloads.vue`：卡片头部新增暂停/恢复和取消按钮，暂停时进度图标切换为暂停状态
 
-#### Mod 多选与版本更新功能（参考 PCL2 PageInstanceMod）
+#### Mod 多选与版本更新功能
 - 版本设置 Mod 管理页新增多选模式与版本更新/更改功能
-- 多选交互（复刻 PCL2 PageInstanceMod + MyLocalModItem）：
-  - **点击列表项即切换选中**（PCL2 也是点击触发，非长按）
+- 多选交互（复刻主流启动器多选交互）：
+  - **点击列表项即切换选中**（主流启动器也是点击触发，非长按）
   - Shift+点击 范围选择，ESC 清空选中
   - 批量操作：启用、禁用、更新、删除、全选、反选
-  - **批量操作完成后自动清空选中**（参考 PCL2 第 465、678 行 `ChangeAllSelected(False)`）：启用/禁用、删除操作成功后无条件调用 `clearSelection()`，退出多选状态
-- 按钮智能禁用（复刻 PCL2 PageInstanceMod.xaml.vb 第 202-216 行）：
+  - **批量操作完成后自动清空选中**（参考主流启动器 `ChangeAllSelected(False)`）：启用/禁用、删除操作成功后无条件调用 `clearSelection()`，退出多选状态
+- 按钮智能禁用（复刻主流启动器按钮逻辑）：
   - 选中项中没有已启用的 mod 时，"禁用"按钮禁用（`hasEnabledSelected`）
   - 选中项中没有已禁用的 mod 时，"启用"按钮禁用（`hasDisabledSelected`）
   - 选中项中没有可更新的 mod 时，"更新"按钮禁用（`hasUpdatableSelected`）
   - "删除"按钮始终可用（只要有选中项）
   - `batchActions` 改为 `computed`，根据选中状态响应式更新 `disabled` 属性
-- 选中状态指示（复刻 PCL2 MyLocalModItem.RectCheck，.vb 第 280-286 行）：
+- 选中状态指示（复刻主流启动器选中指示）：
   - **不使用复选框图标**（太突兀），也**不覆盖原有启用/禁用状态色条**
-  - 在列表项左边缘外侧挂一条 5px 宽的蓝色圆角竖条（`-left-1` 向左探出 4px），与 PCL2 `Margin=(-3,6,0,6)` 一致
+  - 在列表项左边缘外侧挂一条 5px 宽的蓝色圆角竖条（`-left-1` 向左探出 4px），与主流启动器 `Margin=(-3,6,0,6)` 一致
   - 未选中：竖条不渲染，完全不影响原有状态色条
-  - 选中：竖条上下留 6px（`top-1.5 bottom-1.5`），用 `transform: scaleY` 弹性动画（`cubic-bezier(0.34, 1.56, 0.64, 1)` 先冲到 1.15 再回弹到 1，对应 PCL2 AniEaseOutBack）
-  - 选中时标题颜色变为主题强调色（`text-blue-600`，对应 PCL2 ColorBrush2）
+  - 选中：竖条上下留 6px（`top-1.5 bottom-1.5`），用 `transform: scaleY` 弹性动画（`cubic-bezier(0.34, 1.56, 0.64, 1)` 先冲到 1.15 再回弹到 1，对应主流启动器回弹动画）
+  - 选中时标题颜色变为主题强调色（`text-blue-600`，对应主流启动器强调色）
   - 原有的启用/禁用状态色条保持不变，两者位置独立、互不干扰
-- 多选操作栏布局（复刻 PCL2 CardSelect，第 59-77 行）：
+- 多选操作栏布局（复刻主流启动器多选操作栏）：
   - **浮动在视口底部中央**（fixed bottom-6 left-1/2），不占据列表布局空间
   - 卡片分上下两部分：上方居中"已选择 X 项"文字，下方水平排列操作按钮
-  - 入场动画：从下方滑入 + 淡入（对应 PCL2 的 TranslateTransform Y="-10" + Opacity）
+  - 入场动画：从下方滑入 + 淡入（对应主流启动器的滑入 + 淡入）
   - 通过 `teleport to="body"` 确保浮在最上层，z-40 不遮挡弹窗（z-9999）
 - 版本更新/更改功能：
   - 单个 Mod 列表项新增"更新"按钮（仅关联了平台工程的 Mod 显示）
@@ -7979,7 +8015,7 @@
 - 根因：后端命令 `get_version_game_version` 已在 `commands/version/list.rs` 定义并标注 `#[tauri::command]`，但**未在 `lib.rs` 的 `invoke_handler` 中注册**，导致前端调用时报 `Command get_version_game_version not found`，`versionGameVersion` 始终为 `null`，传给 ResourceDetail 的 `gameVersion` 为 `undefined`，watch 中 `if (props.gameVersion)` 判断为 false，不执行 tag 自动切换
 - 修复：在 `src-tauri/src/lib.rs` 的 `invoke_handler` 列表中添加 `commands::version::list::get_version_game_version` 注册
 
-#### Mod 图标机制重构 + Mods 目录文件监听（参考 PCL2）
+#### Mod 图标机制重构 + Mods 目录文件监听
 - **放弃 jar 解包提取 logo**，改用平台工程 `logo_url` + `image_cache` 缓存机制（与皮肤/披风一致），实现「几秒后图标自动加载出来」的体验
 - 图标缓存机制（复用皮肤/披风 `image_cache::get_image_url`）：
   - 预加载查到 CF/MR 工程后，调用 `image_cache::get_image_url(project.logo_url, app)` 处理 logo URL
@@ -7987,7 +8023,7 @@
   - 未命中：返回远程 URL，后端异步下载，完成后 emit `image-cached` 事件通知前端刷新
   - 前端 `useModOperations` 监听 `image-cached` 事件，按 `cached_logo_url === remote_url` 匹配 mod 并原地替换为本地缓存 URL
   - 持久化缓存命中时从 `project.logo_url` 重新计算 `cached_logo_url`（image_cache 状态可能已变化）
-- Mods 目录文件监听（参考 PCL2 PageInstanceMod FileSystemWatcher）：
+- Mods 目录文件监听（参考主流启动器 FileSystemWatcher）：
   - 新增 `notify = "8"` crate 依赖
   - 新建 `commands/version/mods/watcher.rs`：`watch_mods_dir` / `unwatch_mods_dir` 命令
   - 使用 `notify::RecommendedWatcher` 监听 mods 目录文件创建/修改/删除
@@ -8035,27 +8071,27 @@
   - 解决 Forge mod 的 `mods.toml` 中 `${file.jarVersion}` 占位符无法解析且 MANIFEST.MF 缺失时 version 为空的问题
 - 前端 `ModUpdateDialog.vue`：当 `mod.version` 仍为空时显示"当前版本未知 → 选中版本"，明确告知用户无法判断升降级的原因
 
-#### Mod 版本号识别链完整复刻 PCL2
+#### Mod 版本号识别链完整复刻主流启动器
 - **根因**：之前只按顺序短路返回第一个找到的来源，且缺少 `fml_cache_annotation.json` 来源，导致部分 Forge mod 无法获取版本号
-- **完整复刻 PCL2 `LocalResourceFile.LoadMetadataFromJar`**（`code-libs/PCL-main/.../LocalResourceFile.vb`）的 4 来源累积合并策略：
+- **完整复刻主流启动器 `LocalResourceFile.LoadMetadataFromJar`**的 4 来源累积合并策略：
   1. `mcmod.info`（Forge 1.12-）
   2. `fabric.mod.json`（Fabric/Quilt，必须包含 `schemaVersion` 才视为有效）
   3. `META-INF/mods.toml`（Forge 1.13+/NeoForge）
   4. **`META-INF/fml_cache_annotation.json`（Forge 1.7-1.12 注解缓存，新增）**——查找 `@Mod` 注解，从 `values.version.value` 获取版本号
-- **累积合并不覆盖策略**（参考 PCL2 的 Display/Description/Version setter）：
+- **累积合并不覆盖策略**（参考主流启动器的 Display/Description/Version setter）：
   - `MetaBuilder` 封装"已有有效值不覆盖"逻辑
   - `slug`：第一个非空值优先
   - `description`：第一个长度>2的值优先
   - `version`：第一个有效版本号（只含数字、点、减号）优先，占位符（包含 "version" 字样，如 `${file.jarVersion}`）标记为 `"version"`
-- **`${file.jarVersion}` 占位符统一处理**：标记为 `"version"` 后，最后从 `META-INF/MANIFEST.MF` 的 `Implementation-Version` 解析（参考 PCL2 Finished: 标签第 314-329 行）
-- **版本号有效性校验**：版本号必须包含 `.` 或 `-`，否则视为无效（参考 PCL2 第 330 行）
+- **`${file.jarVersion}` 占位符统一处理**：标记为 `"version"` 后，最后从 `META-INF/MANIFEST.MF` 的 `Implementation-Version` 解析（参考主流启动器 Finished: 标签）
+- **版本号有效性校验**：版本号必须包含 `.` 或 `-`，否则视为无效（参考主流启动器对应实现）
 - 拆分为目录结构（文件超过 500 行按项目约定拆分）：
   - `metadata/mod.rs`：主入口 + `MetaBuilder` 合并器 + `finalize_metadata` + `extract_version_from_filename`
   - `metadata/sources.rs`：4 个来源的 `merge_*` 函数 + `read_manifest_version`
 
 #### CurseForge 版本列表版本号修复
 - **根因**：`curseforge/convert.rs` 的 `convert_version` 直接写 `version: String::new()`，注释"CurseForge 无版本号字段"，导致 CF 版本列表的 `ResourceVersion.version` 全为空字符串，前端 `versionChange` 计算永远走 `unknown` 分支
-- **参考 PCL2**：阅读 `MyLocalModItem.xaml.vb` 第 298 行 `If(Entry.ProjectVersion.Version, Entry.ProjectVersion.Display)`，PCL2 对 CF 也是 `Version = Nothing`，但用 `Display`（即 `displayName`）作为 fallback
+- **参考主流启动器**： `If(Entry.ProjectVersion.Version, Entry.ProjectVersion.Display)`，主流启动器对 CF 也是 `Version = Nothing`，但用 `Display`（即 `displayName`）作为 fallback
 - **修复**：新建 `minecraft/community/version_extract.rs` 共享工具，从 `display_name` 提取版本号
   - CurseForge 的 `displayName` 通常类似 `jei-1.20.1-15.2.0.27.jar`，提取出 `15.2.0.27`
   - 有 `+` 分隔符时取 `+` 前面的版本号（如 `alltheleaks-1.1.1+1.20.1-forge.jar` → `1.1.1`）
@@ -8109,7 +8145,7 @@
   - Fabric 版本 JSON 有 `inheritsFrom`，其 `libraries` 只包含 Fabric Loader 相关库
   - 原版库（lwjgl、netty 等）来自父版本 JSON
   - 不递归合并导致 classpath 缺失 Fabric Loader 库，启动时报 `ClassNotFoundException: net.fabricmc.loader.impl.launch.knot.KnotClient`
-- **修复**：参考 PCL2 `McLibListGet`，新增 `collect_libraries_recursive` 递归合并父版本 libraries
+- **修复**：参考主流启动器 `McLibListGet`，新增 `collect_libraries_recursive` 递归合并父版本 libraries
   - 遍历 `inheritsFrom` 链，把所有层级的 libraries 合并到一起
   - 子版本 libraries 排在前面（优先级更高）
   - 循环继承检测（防止 `inheritsFrom` 成环导致死循环）
@@ -8125,7 +8161,7 @@
 
 #### 启动时文件检查速度优化（60 秒 → 0.5 秒）
 - **根因**：`find_missing_libs` 对每个 lib **串行**调用 `FileChecker.is_valid`，其中哈希校验会读取整个文件并计算 SHA1。73 个 lib（约 200MB）串行计算哈希非常慢，导致每次启动卡 1 分钟
-- **参考 PCL2**：阅读 `ModLaunch.vb` 第 1705 行，PCL2 启动时构建 classpath 只调用 `McLibListGet` 获取路径列表，**不做任何文件校验和哈希检查**。文件校验和下载在安装阶段做，启动时不重复校验
+- **参考主流启动器**：启动时构建 classpath 只调用 `McLibListGet` 获取路径列表，**不做任何文件校验和哈希检查**。文件校验和下载在安装阶段做，启动时不重复校验
 - **优化方案**：新增 `quick_check` 参数区分两种场景：
   - **快速检查模式**（`quick_check = true`，启动时）：只检查文件存在 + 大小匹配，不计算 SHA1
     - 用于 `fix_version_files` 经 `validate_and_fix_files` 调用
@@ -8168,26 +8204,26 @@
   - `[Libraries] Total: 73, Missing: 7` 打印后，到 `[Assets]` 之间的 36 秒是在下载那 7 个缺失的库
   - 下载耗时取决于网络速度和文件大小，属正常现象
 
-#### 崩溃分析结果前端无提示修复 + PCL2 风格崩溃弹窗
+#### 崩溃分析结果前端无提示修复 + 崩溃弹窗
 - **根因**：`launch` 命令在 `pipeline.execute().await` 返回 `Err` 时（如 `ClassNotFoundException` 致命错误），通过 `?` 直接返回 Err，**后面的 `tokio::spawn` 监听 `exit_rx` 退出事件的任务永远不会被创建**。所以 `game-exited` 事件永远不会发送，前端收不到崩溃信息
 - **后端修复**：`launch.rs` 捕获 `LaunchProcess` 阶段的失败，等待 watcher 完成崩溃分析后手动发送 `game-exited` 事件
   - 只对 `LaunchProcess` 阶段的失败做崩溃分析（`GetJava`/`Login` 等阶段失败不需要）
   - 等待 `exit_rx` 最多 15 秒，避免无限等待
   - 如果崩溃分析无结果，构造基本的 `CrashInfo`（用 `launch_err.message` 作为 reason）
   - 清理启动状态后发送 `game-exited` 事件，让前端展示崩溃对话框
-- **前端优化**：`CrashDialog.vue` 参考 PCL2 `MyMsgText` 风格优化
-  - 参考 PCL2 `MyMsgText.xaml`：
-    - 浅灰白底 `#FBFBFB`（PCL2 的 `Background="#FBFBFB"`）
-    - 圆角 `rounded-lg`（PCL2 的 `CornerRadius="7"`）
-    - 标题下方加 2px 分割线（PCL2 的 `ShapeLine`，与标题同色）
-    - 遮罩半透明黑色 `bg-black/40`（PCL2 的 `RGBA(90,0,0,0)`）
-  - 参考 PCL2 `MyMsgText.xaml.vb` 进入动画：
+- **前端优化**：`CrashDialog.vue` 参考主流启动器 `MyMsgText` 风格优化
+  - 样式参考：
+    - 浅灰白底 `#FBFBFB`（`Background="#FBFBFB"`）
+    - 圆角 `rounded-lg`（`CornerRadius="7"`）
+    - 标题下方加 2px 分割线（`ShapeLine`，与标题同色）
+    - 遮罩半透明黑色 `bg-black/40`（`RGBA(90,0,0,0)`）
+  - 弹窗进入动画：
     - 透明度 0→1（120ms）
     - Y 偏移 40→0（300ms，回弹缓动 `cubic-bezier(0.34, 1.56, 0.64, 1)`）
     - 关闭时下沉 20px + 淡出
   - Transition 名从 `modal` 改为 `crash-modal`，添加 scoped 样式
 
-#### Fabric 库下载失败根因修复 + CrashDialog 报错修复 + PCL2 风格重做
+#### Fabric 库下载失败根因修复 + CrashDialog 报错修复 + 弹窗重做
 - **Fabric 库 size/sha1 读取修复**（`libraries.rs` `parse_libraries`）
   - **根因**：Fabric 版本 JSON 的库格式与 Mojang 不同：
     ```json
@@ -8209,17 +8245,17 @@
   - **修复**：移除 `skip_serializing_if`，只保留 `default`，确保字段始终序列化
   - `log_lines` 也加 `default` 防御
   - 前端 `CrashDialog.vue` 加防御性处理：`crashInfo.value?.log_lines ?? []`
-- **CrashDialog 重做为 PCL2 风格**（严格参考 `MyMsgText.xaml`）
-  - 标题字号 23px（PCL2 `LabTitle FontSize=23`）
-  - 标题下方 2px 分割线（PCL2 `ShapeLine`，与标题同色 `bg-gray-700/80`）
-  - 内容字号 15px（PCL2 `LabCaption FontSize=15`）
-  - 文字颜色 `#5C5C5C`（PCL2 `LabCaption Foreground="#FF5C5C5C"`）
-  - 去掉"崩溃原因""建议"等小标题卡片，改为 PCL2 风格的纯文本段落（参考 `GetAnalyzeResult` 输出）
-  - 浅灰白底 `#FBFBFB`，圆角 `rounded-lg`（PCL2 `CornerRadius="7"`）
-  - 按钮 3 个右对齐：查看输出 / 导出错误报告 / 确定（PCL2 `PanBtn`）
+- **CrashDialog 弹窗重做**
+  - 标题字号 23px（`LabTitle FontSize=23`）
+  - 标题下方 2px 分割线（`ShapeLine`，与标题同色 `bg-gray-700/80`）
+  - 内容字号 15px（`LabCaption FontSize=15`）
+  - 文字颜色 `#5C5C5C`（`LabCaption Foreground="#FF5C5C5C"`）
+  - 去掉"崩溃原因""建议"等小标题卡片，改为纯文本段落（参考 `GetAnalyzeResult` 输出）
+  - 浅灰白底 `#FBFBFB`，圆角 `rounded-lg`（`CornerRadius="7"`）
+  - 按钮 3 个右对齐：查看输出 / 导出错误报告 / 确定（`PanBtn`）
   - 进入动画：透明度 0→1（120ms）+ Y 偏移 40→0（300ms 回弹缓动）
 
-#### Fabric 库 URL 拼接修复 + CrashDialog 严格复刻 PCL2 配色
+#### Fabric 库 URL 拼接修复 + CrashDialog 配色复刻
 - **URL 拼接缺斜杠修复**（`libraries.rs` `root_url` 构造）
   - **根因**：`format!("{}{}", u.trim_end_matches('/'), path)` 把 URL 结尾的 `/` 去掉后直接拼接，导致 `https://maven.fabricmc.net/` + `org/ow2/asm/...` 变成 `https://maven.fabricmc.netorg/ow2/asm/...`（缺少斜杠）
   - **修复**：改为 `format!("{}/{}", u.trim_end_matches('/'), path)`，用 `/` 连接
@@ -8227,27 +8263,27 @@
   - Fabric 版本 JSON 的库格式：`{ "name": "...", "sha1": "...", "size": 126151, "url": "..." }`
   - size 和 sha1 在根级别，不在 `downloads.artifact` 里
   - else 分支从根级别读取 `library["size"]` 和 `library["sha1"]`
-- **CrashDialog 严格复刻 PCL2 配色**（参考 `MyMsgText.xaml` + `Application.xaml`）
-  - 在 `tailwind.config.js` 添加 PCL2 颜色系：
+- **CrashDialog 配色复刻**
+  - 在 `tailwind.config.js` 添加弹窗颜色系：
     - `pcl-1`=`#343d4a`（深灰蓝，正文/默认文字/阴影）
     - `pcl-2`=`#0b5bcb`（主蓝，标题/Highlight 按钮）
     - `pcl-3`=`#1370f3`（亮蓝，悬停态边框）
     - `pcl-7`=`#e0eafd`（按钮悬停背景）
     - `pclmsg-bg`=`#FBFBFB`（弹窗背景）
     - `pclmsg-caption`=`#5C5C5C`（正文文字，写死不随主题变）
-  - 弹窗配色严格对应 PCL2：
+  - 弹窗配色：
     - 标题 `text-pcl-2`（`#0b5bcb`），字号 23px
     - 分割线 `bg-pcl-2`（与标题同色，高 2px）
     - 正文 `text-pclmsg-caption`（`#5C5C5C`），字号 15px，行高 18px
     - 背景 `bg-pclmsg-bg`（`#FBFBFB`）
-    - 阴影 `shadow-[0_4px_20px_rgba(52,61,74,0.5)]`（PCL2 DropShadowEffect）
-    - 遮罩 `bg-black/35`（PCL2 `rgba(0,0,0,0.353)`）
-  - 按钮配色参考 PCL2 MyButton 三态：
+    - 阴影 `shadow-[0_4px_20px_rgba(52,61,74,0.5)]`（DropShadowEffect）
+    - 遮罩 `bg-black/35`（`rgba(0,0,0,0.353)`）
+  - 按钮配色参考三态：
     - 确定按钮（Highlight 态）：边框 `border-pcl-2`，文字 `text-pcl-2`，hover 变 `pcl-3` + 背景 `pcl-7`
     - 查看输出/导出按钮（Normal 态）：边框 `border-pcl-1`，文字 `text-pcl-1`，hover 同上
-    - 按钮背景 `bg-white/30`（PCL2 `ColorBrushHalfWhite #55ffffff`）
-    - 圆角 `rounded`（PCL2 `CornerRadius=3`）
-    - 过渡 `duration-100`（PCL2 颜色过渡 100ms）
+    - 按钮背景 `bg-white/30`（`ColorBrushHalfWhite #55ffffff`）
+    - 圆角 `rounded`（`CornerRadius=3`）
+    - 过渡 `duration-100`（颜色过渡 100ms）
 
 #### Mod 更新对话框 UI 重做
 - **版本变化徽章视觉突出**：底部状态栏从纯文字改为彩色徽章卡片样式（参考 `Alert` 组件的色块结构）
@@ -8280,12 +8316,12 @@
 - `commands/version/install/mod.rs`：将 `install-complete` 事件从加载器安装后移至 `mark_complete()` 之后
 - 原因：原代码在 Fabric API 安装前就发出 `install-complete` 事件并调用 `mark_complete()`，导致前端轮询检测到 `is_complete=true` 后关闭进度面板
 
-#### 启动高级选项（参考 PCL2 PageSetupLaunch）
+#### 启动高级选项
 - 新增 3 个启动高级选项，位于"启动设置"页面底部：
   - **禁用 Java Launch Wrapper**：JLW 用于修复 Java 18- 在中文路径下可能无法正常启动的问题
   - **禁用 LWJGL Unsafe Agent**：LUA 用于修复 LWJGL 3.4.1 的性能问题，通过 `-javaagent` 参数注入 `lwjgl-unsafe-agent.jar`
   - **使用高性能显卡**：自动在 Windows 设置中将 Java 改为使用独立显卡
-- 从 PCL2 资源文件夹复制 `lwjgl-unsafe-agent.jar` 到 `src-tauri/resources/`，注册为嵌入资源
+- 引入 `lwjgl-unsafe-agent.jar` 到 `src-tauri/resources/`，注册为嵌入资源
 - 后端改动：
   - `state/config.rs`：`AppConfig` 新增 `launch_disable_jlw` / `launch_disable_lua` / `launch_use_dedicated_gpu` 三个字段
   - `commands/system/apply_config.rs`：`ConfigPatch` 和 `ConfigSnapshot` 同步新增三个字段
@@ -8533,7 +8569,7 @@
   - `modrinth/types.rs`（110 行）：`MR_OFFICIAL_BASE` / `MR_MIRROR_BASE` 常量 + `MrSearchResponse` / `MrHit` / `MrProject` / `MrVersion` / `MrFile` / `MrHashes` / `MrDependency` 共 7 个 MR API 响应数据结构（`pub(crate)` 可见性，仅模块内部使用）
   - `modrinth/convert.rs`（248 行）：`convert_hit`（搜索命中 → ResourceProject）+ `convert_project`（工程详情 → ResourceProject，含 mcmod 中文译名 + 加载器标志位聚合）+ `convert_version`（版本 → ResourceVersion，取 primary 文件 + 提取 required 依赖）+ `build_facets`（构造 MR facets 查询参数 `[["project_type:mod"],["categories:'forge'"]]`，ignore_quilt 过滤）
   - `modrinth/http.rs`（257 行）：`pick_base`（source 策略：0=强制镜像 / 1=缓慢时换镜像 / 2=尽量官方）+ `mr_get` / `mr_post`（source=1 时官方失败自动回退镜像，但 404 不重试因镜像也是 404，官方 20s 超时，含嵌套 `parse_resp` / `parse_post_resp` 处理 404/非 2xx/响应解析）
-  - `modrinth/mod.rs`（234 行）：`version_files_search`（参考 PCL2 LocalResourceOnlineLoad 步骤 1-3：version_files 用 SHA1 查 → project_id → /projects 批量查询 + sha1 一致性校验防错位）+ `search` + `get_project` + `get_versions` + `batch_get_project_slugs`（整合包文件名格式化用）
+  - `modrinth/mod.rs`（234 行）：`version_files_search`（version_files 用 SHA1 查 → project_id → /projects 批量查询 + sha1 一致性校验防错位）+ `search` + `get_project` + `get_versions` + `batch_get_project_slugs`（整合包文件名格式化用）
 - 同步清理：移除 `modrinth.rs` 中的私有 `urlencode_params` 函数（与 `curseforge.rs` 重复），改用 Phase 4.6 抽取的 `super::common::urlencode_params`。至此 `urlencode_params` 重复定义问题完全解决
 - `modrinth::{search, get_project, get_versions, version_files_search, batch_get_project_slugs}` 公共 API 路径保持完全向后兼容，`community/mod.rs` 已有的 `pub mod modrinth;` 声明 + 5 处外部调用（preload / searcher / detail / community/install）均无需修改
 - 验证：`cargo check` 通过
@@ -8542,9 +8578,9 @@
 - 现象：`minecraft/community/curseforge.rs` 786 行，单一文件混合「9 个 CF API 响应数据结构（CfModEntry / CfFile / CfSearchResponse 等）」「响应到统一资源模型的转换（convert_project / convert_version / parse_cf_download_url）」「HTTP 请求层（get_cf_config + cf_get / cf_post + source 策略回退镜像）」「公共 API（fingerprint_search / search / get_project / get_versions / batch_get_mod_slugs + 私有 curseforge_loader_type）」4 块关注点
 - 修复：将 `curseforge.rs` 升级为 `curseforge/` 目录，拆为 4 个子模块：
   - `curseforge/types.rs`（111 行）：`CfSearchResponse` / `CfPagination` / `CfModEntry` / `CfLogo` / `CfLinks` / `CfCategory` / `CfFile` / `CfHash` / `CfFilesResponse` 共 9 个 CF API 响应数据结构（`pub(crate)` 可见性，仅模块内部使用）
-  - `curseforge/convert.rs`（140 行）：`convert_project`（CF 工程条目 → ResourceProject，含 tags 翻译 + mcmod 中文译名 + 加载器标志位聚合）+ `convert_version`（CF 文件 → ResourceVersion）+ `parse_cf_download_url`（参考 PCL2 ParseCurseForgeDownloadUrls，构造 edge.forgecdn.net 回退 URL）
+  - `curseforge/convert.rs`（140 行）：`convert_project`（CF 工程条目 → ResourceProject，含 tags 翻译 + mcmod 中文译名 + 加载器标志位聚合）+ `convert_version`（CF 文件 → ResourceVersion）+ `parse_cf_download_url`（构造 edge.forgecdn.net 回退 URL）
   - `curseforge/http.rs`（259 行）：`CF_OFFICIAL_BASE` / `CF_MIRROR_BASE` 常量 + `get_cf_config`（source 策略：0=强制镜像 / 1=缓慢时换镜像 / 2=尽量官方）+ `build_cf_request` / `build_cf_post_request`（附加 x-api-key header）+ `cf_get` / `cf_post`（source=1 时官方失败自动回退镜像重试，官方请求 10s/15s 超时）
-  - `curseforge/mod.rs`（305 行）：`fingerprint_search`（参考 PCL2 LocalResourceOnlineLoad 步骤 1-3：fingerprints/432 → modId → /mods 批量查询）+ `search` + `get_project`（数字 modId 走 /mods/{id}，slug 走 /mods/search）+ `get_versions` + `batch_get_mod_slugs`（整合包文件名格式化用）+ 私有 `curseforge_loader_type`
+  - `curseforge/mod.rs`（305 行）：`fingerprint_search`（fingerprints/432 → modId → /mods 批量查询）+ `search` + `get_project`（数字 modId 走 /mods/{id}，slug 走 /mods/search）+ `get_versions` + `batch_get_mod_slugs`（整合包文件名格式化用）+ 私有 `curseforge_loader_type`
 - 同步修复：发现 `urlencode_params` 函数在 `curseforge.rs` 与 `modrinth.rs` 中重复定义，已抽取到 `community/common.rs` 作为 `pub fn urlencode_params`（与已有 `fmt_elapsed` 共置），`curseforge/mod.rs` 改用 `super::common::urlencode_params`。`modrinth.rs` 中的私有 `urlencode_params` 待 Phase 4.7 拆分时一并清理
 - `curseforge::{search, get_project, get_versions, fingerprint_search, batch_get_mod_slugs}` 公共 API 路径保持完全向后兼容，`community/mod.rs` 已有的 `pub mod curseforge;` 声明 + 5 处外部调用（preload / searcher / detail / community/install）均无需修改
 - 验证：`cargo check` 通过
@@ -8759,7 +8795,7 @@
   - `minecraft/java/mod.rs` 公开 `detect_java_version(&str)`（更完善：支持目录路径、黑名单检查、JRE/JDK 判定）
 - 前两处实现逐字节相同（`Command::new(java).arg("-version")` + 正则 `version "(\d+)\."`），是 `detect_java_version` 的子集
 - 修复：删除 `launch/mod.rs` 和 `forge_installer.rs` 的私有实现，改为调用 `crate::minecraft::java::detect_java_version`
-- 额外修复：`get_java_version_weight`（PCL2 权重表）在 `java_selector.rs` 和 `java/mod.rs` 各有一份相同实现；将 `java_selector.rs` 的版本改为 `pub`，`java/mod.rs` 删除本地实现改为调用前者
+- 额外修复：`get_java_version_weight`（权重表）在 `java_selector.rs` 和 `java/mod.rs` 各有一份相同实现；将 `java_selector.rs` 的版本改为 `pub`，`java/mod.rs` 删除本地实现改为调用前者
 
 #### 代码重构阶段 2.7：提取 fmt_elapsed 到 community/common.rs
 - 现象：`fmt_elapsed` 函数在 4 个文件中各有一份**完全相同**的实现（格式化耗时为 ms/s），违反 DRY：
@@ -8860,17 +8896,17 @@
 #### Mod 默认 logo 改为图片
 - 无 jar logo 的 mod 项不再显示加载器首字母色块，改为显示 `assets/Mods/default-min.png` 默认图片（frontend: src/views/version-settings/ModTab.vue）
 
-#### Mod 列表两阶段加载（完整对齐 PCL2，秒加载 + 排序修复）
-- 现象：用户反馈每次进入 Mod 列表都要等好几秒（143 个 mod 要等 jar 元数据全部读完），PCL2 进入基本秒加载；且禁用的 mod 总是被排到列表末尾
-- 根因分析（参考 PCL2 `LocalResourceLoaders.vb`）：
-  - PCL2 同步阶段**只做文件枚举**（`DirectoryUtils.GetFiles`），完全不读 JAR 内容，所以瞬间返回
-  - PCL2 排序规则只按 `File.Name`（含扩展名）字母序升序，**禁用状态不参与排序**（第 88 行 `ModList.OrderBy(Function(m) m.File.Name)`）
+#### Mod 列表两阶段加载（秒加载 + 排序修复）
+- 现象：用户反馈每次进入 Mod 列表都要等好几秒（143 个 mod 要等 jar 元数据全部读完），主流启动器进入基本秒加载；且禁用的 mod 总是被排到列表末尾
+- 根因分析：
+  - 同步阶段**只做文件枚举**（`DirectoryUtils.GetFiles`），完全不读 JAR 内容，所以瞬间返回
+  - 排序规则只按 `File.Name`（含扩展名）字母序升序，**禁用状态不参与排序**（第 88 行 `ModList.OrderBy(Function(m) m.File.Name)`）
   - MoLaunch 原 `list_mods` 对每个 jar 同步调用 `read_mod_metadata`（打开 jar + 读 fabric.mod.json/mods.toml/mcmod.info + 提取 logo base64 + 查 mcmod 译名），143 个 mod = 143 次磁盘 IO，这是慢的根本原因
   - MoLaunch 原排序规则「启用的排前面 + 文件名升序」导致禁用的 mod 被挤到末尾
 - 修复 1：`list_mods` 极致轻量化（backend: src-tauri/src/commands/version/mods.rs）
   - 去掉 `read_mod_metadata` 调用，元数据字段（translated_name/description/version/logo_data/slug）全部返回空
   - 只做文件枚举 + 获取文件大小 + 推断加载器类型（从文件名），保证瞬间返回
-  - 排序改为只按 `file_name`（含扩展名）字母序升序，禁用状态不参与排序（与 PCL2 一致）
+  - 排序改为只按 `file_name`（含扩展名）字母序升序，禁用状态不参与排序（与主流启动器一致）
 - 修复 2：把 JAR 元数据读取合并到 preload 阶段（backend: src-tauri/src/minecraft/community/preload.rs）
   - `read_mod_metadata` 从 private 改为 `pub(crate)`，返回类型从元组改为 `ModMetadata` 结构体
   - 新增 `finalize_metadata` 辅助函数统一处理 logo 提取 + 译名查询
@@ -8942,17 +8978,17 @@
   - 仅对 `mods/` 路径下的文件应用 `apply_filename_format`（resourcepacks/shaderpacks 保留原名，mcmod 数据库只覆盖 mod）
 - 新增 CF 批量查询 mod info 接口（backend: src-tauri/src/minecraft/community/curseforge.rs `batch_get_mod_slugs`）：调 `GET /v1/mods?modIds=...` 返回 `modId → slug` 映射，失败时返回空 map 不阻断下载
 - 新增 MR 批量查询 projects 接口（backend: src-tauri/src/minecraft/community/modrinth.rs `batch_get_project_slugs`）：调 `GET /projects?ids=[...]` 返回 `project_id → slug` 映射，失败时返回空 map 不阻断下载
-- 失败容错：所有译名查询失败时返回空 map，下载流程继续，仅文件名不应用格式（与 PCL2 行为一致，不让网络问题阻断整合包安装）
+- 失败容错：所有译名查询失败时返回空 map，下载流程继续，仅文件名不应用格式（不让网络问题阻断整合包安装）
 
 #### Mod 管理「详情」按钮关联社区资源 + 新增「前往百科」按钮
-- 现象：用户参考 PCL2，希望 Mod 管理列表的「详情」按钮能直接打开社区资源详情弹窗（即搜索 mod 时弹出的 ResourceDetail），而不是只显示本地信息；无法关联的 mod 才回退到本地信息弹窗；另外希望加个「前往百科」按钮直接打开 mcmod.cn
+- 现象：用户希望 Mod 管理列表的「详情」按钮能直接打开社区资源详情弹窗（即搜索 mod 时弹出的 ResourceDetail），而不是只显示本地信息；无法关联的 mod 才回退到本地信息弹窗；另外希望加个「前往百科」按钮直接打开 mcmod.cn
 - 后端 `ModInfo` 新增 `slug: String` 字段，`read_mod_metadata` 返回元组扩展为 `(translated, description, version, logo, slug)`，把从 jar 内 metadata 读到的 slug（fabric.mod.json 的 id / mods.toml 的 modId / mcmod.info 的 modid）带回前端用于关联 CF/MR 平台工程（backend: src-tauri/src/commands/version/mods.rs）
 - 前端 `ModInfo` interface 同步新增 `slug: string` 字段（frontend: src/utils/api/personal.ts）
-- ModTab.vue「详情」按钮逻辑改造（参考 PCL2 MyLocalModItem.Info_Click）：
+- ModTab.vue「详情」按钮逻辑改造：
   - 有 slug：先调 `getProjectDetail('CurseForge', slug, 'Mod')`（CF API 支持用 slug 查询 mod），失败再调 `getProjectDetail('Modrinth', slug, 'Mod')`（MR API 同样支持 slug 查询）。成功则弹出复用的 `ResourceDetail` 组件展示完整 mod 详情（版本、下载、描述等），与社区资源搜索的详情弹窗完全一致
   - 失败或无 slug：回退到 `showLocalModInfo` 显示本地信息弹窗（描述、文件、版本、译名、加载器），与原行为一致
   - 「详情」按钮加载期间 disabled 防止重复点击（frontend: src/views/version-settings/ModTab.vue）
-- 新增「前往百科」按钮（在「详情」按钮右侧，hover 列表项时显示，参考 PCL2 PageDownloadCompDetail.BtnIntroWiki_Click）：
+- 新增「前往百科」按钮（在「详情」按钮右侧，hover 列表项时显示）：
   - 有 slug：先调 `getMcmodUrl('CurseForge', slug)` 查 mcmod.cn 直链，无则调 `getMcmodUrl('Modrinth', slug)`（CF 收录更全，优先 CF）。查到直链则用 `@tauri-apps/plugin-shell` 的 `open` 打开 `https://www.mcmod.cn/class/<id>.html`
   - 查不到直链或无 slug：打开 mcmod.cn 搜索页 `https://www.mcmod.cn/search?key=<keyword>`，关键字优先用 `translated_name`，其次用文件名去 `.jar` / `.disabled` / `.old` 后缀
 - 操作按钮从 4 个变为 5 个（详情 / 前往百科 / 打开文件位置 / 启用禁用 / 删除），按钮 hover 配色：详情=蓝、前往百科=翠绿、打开文件位置=灰、启用=绿/禁用=橙、删除=红
@@ -8998,13 +9034,13 @@
 
 ### 新增
 
-#### Mod 详情预加载架构（完整对齐 PCL2 LocalResourceOnlineLoader）
-- 设计目标：参考 PCL2 `MyLocalModItem.Info_Click`（PageInstanceMod.xaml.vb 第 751-792 行）的核心设计——**详情按钮本身不发任何网络请求**，只判断 `Entry.Project` 是否已被预加载填充，实现零延迟跳转。预加载由 `LocalResourceOnlineLoader` 在 `list_mods` 返回后立即后台执行（哈希批量查询 + 工程详情拉取）
+#### Mod 详情预加载架构
+- 设计目标：参考主流启动器详情弹窗的核心设计——**详情按钮本身不发任何网络请求**，只判断 `Entry.Project` 是否已被预加载填充，实现零延迟跳转。预加载由 `LocalResourceOnlineLoader` 在 `list_mods` 返回后立即后台执行（哈希批量查询 + 工程详情拉取）
 - 后端新增预加载核心模块（backend: src-tauri/src/minecraft/community/preload.rs）：
-  - MurmurHash2 算法实现（CF 指纹算法）：读取文件字节后**跳过空白字节**（0x09/0x0A/0x0D/0x20），再用 seed=1、m=0x5bd1e995、r=24 计算（与 PCL2 `LocalResourceFile.vb` 第 417-490 行实现一致）
+  - MurmurHash2 算法实现（CF 指纹算法）：读取文件字节后**跳过空白字节**（0x09/0x0A/0x0D/0x20），再用 seed=1、m=0x5bd1e995、r=24 计算（与主流启动器实现一致）
   - SHA1 hash 计算（MR 文件识别算法，标准 SHA1）
   - `preload_mods_detail` 主入口流程：1) 读持久化缓存 → 2) 计算每个 mod 的 CF MurmurHash2 + MR SHA1 → 3) `tokio::join!` 并发批量查询 CF/MR → 4) 合并结果（CF 优先，MR 兜底）→ 5) 每查到一个 project 就 `app.emit("mods-preload-update", ...)` → 6) 写入持久化缓存
-  - 持久化文件缓存：`.Molaunch/cache/preload_mods/{version_id}.json`，6 小时 TTL + 版本号 gating（版本号变化强制刷新，参考 PCL2 `Cache/LocalMod.json` 的 key=`ModrinthHash + VanillaVersion + ModLoaders`）
+  - 持久化文件缓存：`.Molaunch/cache/preload_mods/{version_id}.json`，6 小时 TTL + 版本号 gating（版本号变化强制刷新，key=`ModrinthHash + VanillaVersion + ModLoaders`）
   - Tauri 事件推送：`PreloadUpdate { version_id, file_name, project }`，每个 mod 查到后单独 emit，前端逐个响应式更新
 - 后端新增 CF 批量指纹查询（backend: src-tauri/src/minecraft/community/curseforge.rs）：
   - `build_cf_post_request` + `cf_post<T>` 辅助函数（POST 请求携带 API Key + JSON body，支持 source 策略 + 镜像回退）
@@ -9016,14 +9052,14 @@
 - 后端 `get_mods_dir` 从 private 改为 `pub(crate)`（backend: src-tauri/src/commands/version/mods.rs）供 preload 命令复用
 - 前端新增 `useModsPreload` composable（frontend: src/composables/useModsPreload.ts）：`listen<PreloadUpdatePayload>('mods-preload-update', cb)` 监听事件，按 `file_name` 匹配 mods 数组对应项，用 `mods.value[i] = { ...mods.value[i], project }` 确保 Vue 响应式触发（直接赋值属性不会触发）
 - 前端 `ModInfo` 新增 `project?: ResourceProject` 字段（frontend: src/utils/api/personal.ts）并封装 `preloadModsDetail(versionId)` 调用上述命令
-- 前端 ModTab.vue `handleShowInfo` 改造为三级 fallback（参考 PCL2 `MyLocalModItem.Info_Click`）：
-  1. **零延迟路径**：`mod.project` 已被 `preload_mods_detail_cmd` 后台预加载填充 → 直接弹 ResourceDetail（与 PCL2 `Entry.Project IsNot Nothing` 分支一致）
+- 前端 ModTab.vue `handleShowInfo` 改造为三级 fallback：
+  1. **零延迟路径**：`mod.project` 已被 `preload_mods_detail_cmd` 后台预加载填充 → 直接弹 ResourceDetail（与主流启动器分支一致）
   2. **并发 fallback**：预加载未就绪（用户点太快）或预加载失败 → `Promise.any` 并发请求 CF + MR，谁先成功用谁
-  3. **本地信息**：无 slug 或两个平台都查不到 → 弹本地信息弹窗 + 百科搜索按钮（与 PCL2 `Else` 分支一致）
+  3. **本地信息**：无 slug 或两个平台都查不到 → 弹本地信息弹窗 + 百科搜索按钮（与主流启动器分支一致）
 - onMounted 启动预加载事件监听（必须在 `loadMods` 之前，避免错过早期事件）→ `loadMods` → `prefetchVersionContext` → `preloadModsDetail`（后台异步，不阻塞 UI）；onUnmounted 停止监听
 
 #### 整合包安装：完整流程（后端 + 前端）
-- 新增 `install_modpack` Tauri 命令（backend: src-tauri/src/commands/community/install.rs），参考 PCL2 ModModpack.vb ModpackInstall 实现
+- 新增 `install_modpack` Tauri 命令（backend: src-tauri/src/commands/community/install.rs），参考主流启动器整合包安装实现
 - 格式自动识别：下载原始整合包到 `versions/{instance_name}/`，用 zip 根目录关键文件判定格式：
   - `manifest.json` → CurseForge 整合包
   - `modrinth.index.json` → Modrinth 整合包
@@ -9036,16 +9072,16 @@
   - 解析 `modrinth.index.json` → 从 `dependencies.minecraft` 提取游戏版本，从 `fabric-loader`/`quilt-loader`/`forge`/`neoforge` 提取加载器信息
   - 遍历 `files[]` 直接下载（含 `downloads` URL）到 `instance_dir/{path}`
 - overrides 解压：解压 `overrides/` + `client-overrides/` 前缀的文件到 instance 目录（同时支持 CF 与 MR 格式）
-- 进度共享 download_state：安装全程走 `state.download_state`（与版本下载共用），4 个加权阶段（下载整合包 10 / 解析 1 / 下载依赖 40 / 复制配置 5），由 `DownloadPanel` + 下载管理页面统一展示（参考 PCL2 LoaderTaskbar + PageSpeedLeft 机制，不单独做弹窗/页面）
+- 进度共享 download_state：安装全程走 `state.download_state`（与版本下载共用），4 个加权阶段（下载整合包 10 / 解析 1 / 下载依赖 40 / 复制配置 5），由 `DownloadPanel` + 下载管理页面统一展示（不单独做弹窗/页面）
 - 返回 `InstallModpackResult`（format/gameVersion/loader/loaderVersion/archivePath/instanceDir），前端据此调用 `install_merged` 安装游戏本体 + 加载器
 - 前端新增 `handleInstallModpack`（frontend: src/components/community/ResourceDetail.vue），两段式调用：`installModpack`（整合包专属部分）→ `installMerged`（游戏本体+加载器），共享同一 `download_state`，DownloadPanel 连续展示
-- 前端详情页版本按钮按 `resource_type` 分流：ModPack 类型显示「安装」按钮（RocketLaunchIcon）调用 `handleInstallModpack`，其他类型显示「下载」按钮（ArrowDownTrayIcon）调用 `handleDownload`（参考 PCL2 PageDownloadCompDetail SwapType=9 安装 / 8 另存为）
+- 前端详情页版本按钮按 `resource_type` 分流：ModPack 类型显示「安装」按钮（RocketLaunchIcon）调用 `handleInstallModpack`，其他类型显示「下载」按钮（ArrowDownTrayIcon）调用 `handleDownload`（SwapType=9 安装 / 8 另存为）
 
 #### 整合包安装：并发下载进度与失败诊断修复
 - 修复「下载速度/已下载字节」始终为 0：原 `download_single_file` 用 `resp.bytes().await` 一次性加载，从不更新 `bytes_downloaded`/`bytes_total`/`global_speed`（backend: src-tauri/src/commands/community/install.rs）
 - 改为流式下载：`download_single_file_multi` 边接收边写文件，通过 `AtomicU64` 实时累积 `bytes_done`/`bytes_total`，前端能看到下载途中速度、累计字节持续增长（而非每个文件完成才跳一次）
-- 新增 300ms 独立定时器任务：流式下载过程中定时调用 `update_modpack_progress` 刷新 `state.download_state` 的 stage 与 global 字段，参考 PCL2 `PageSpeedLeft` 300ms `DispatcherTimer` 轮询机制
-- 修复 Modrinth 整合包部分文件下载失败（如 123/129 卡住）：原代码仅取 `downloads[0]`，遇到失效 URL 直接失败。改为传入 `downloads` 全部 URL 数组，按顺序尝试直到成功，参考 PCL2 ModpackInstall 多源回退
+- 新增 300ms 独立定时器任务：流式下载过程中定时调用 `update_modpack_progress` 刷新 `state.download_state` 的 stage 与 global 字段，参考主流启动器 300ms `DispatcherTimer` 轮询机制
+- 修复 Modrinth 整合包部分文件下载失败（如 123/129 卡住）：原代码仅取 `downloads[0]`，遇到失效 URL 直接失败。改为传入 `downloads` 全部 URL 数组，按顺序尝试直到成功，多源回退
 - 修复日志不完整：原失败时只 push 到 errors 列表，无任何 log_info。改为每个失败立即打印 `target_path`、尝试过的 URL 列表、错误信息；函数返回前汇总打印完整失败列表（编号 + URL + 错误），便于排查
 - 失败错误信息从「仅第一个」改为「失败总数 + 首个错误」，方便快速判断是网络问题还是部分文件问题
 
@@ -9054,7 +9090,7 @@
 - 修复方式：install_merged 启动时清空 stages 重新设置为标准 5 阶段（版本清单/版本信息/客户端/库文件/资源文件，与 download_version_full 的 stage_callback 索引对应），按需追加「加载器安装」。修复后用户能看到 MC 本体、库文件、资源文件各自独立的进度条
 - 修复「释放嵌入资源 hash 不匹配但实际文件不存在」警告（backend: src-tauri/src/resources.rs）：原代码只判断 `target_path.exists()`，当目标文件不存在但 `.sha256` 校验文件残留时，会读到旧 hash 触发「不匹配」警告。改为同时检查 target 和 hash 文件存在：两者都存在且匹配才跳过；只有一方存在时打印「缓存状态不一致」；两者都不存在时静默首次释放
 
-#### 下载进度阶段分组展示（参考 PCL2 PageSpeedLeft 任务列表）
+#### 下载进度阶段分组展示
 - 后端 `DownloadStage` 新增 `group: Option<String>` 字段（backend: src-tauri/src/state/mod.rs），用于按任务分组。整合包安装的 4 个阶段统一 `group="整合包安装"`，install_merged 追加的 5 个标准阶段 + 加载器阶段统一 `group="MC本体安装"`
 - install_merged 改为追加模式（不再清空已有 stages）：保留整合包安装历史阶段显示，通过 `stage_offset` 修正 stage_callback/progress_callback 的索引偏移。这样整合包安装完成后，用户能在同一界面看到「整合包安装」+「MC本体安装」两个分组的完整进度历史
 - 前端 Downloads.vue 改造为分组折叠展示（frontend: src/views/Downloads.vue）：按 `group` 字段聚合 stages，每个分组渲染为可点击折叠的卡片，展开看子阶段（版本清单/版本信息/客户端/库文件/资源文件/加载器安装）。默认全展开，用户点击可折叠
@@ -9153,13 +9189,13 @@
 - 修复：内容区加 `v-if="mountedOf(g.title)"` 懒挂载——折叠卡片不渲染版本条目 DOM；`toggleGroup` 首次展开时先设 `mountedMap[title]=true`（保持 0fr 折叠态挂载），`await nextTick()` 后再设 `expandedMap[title]=true` 触发 0fr→1fr 动画；挂载后保留 DOM，后续收起/展开动画正常
 - `setFilter` 不再手动清状态，改由 `watch([versions, versionFilter])` 统一清空 `expandedMap`/`mountedMap`；单组自动展开也走"先挂载后展开"两步，保证首屏单组也有展开动画
 
-#### 资源打包方式改造（参考 PCL2 ExtractResources）
+#### 资源打包方式改造
 - 重写 `resources` 模块：所有外部资源在编译时通过 `include_str!`/`include_bytes!` 嵌入二进制，运行时零文件 IO 读取，彻底废弃此前基于 `env!("CARGO_MANIFEST_DIR")` 拼路径的实现（backend: src-tauri/src/resources.rs）
 - 修复发布版 bug：原实现 `PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources")` 在打包后指向开发机路径，用户机器上不存在，导致首次启动释放默认配置和 Forge 安装器全部失败
 - 嵌入的资源清单：
   - 文本资源（`include_str!`）：`defaults/config.ini`、`defaults/instance.ini`、`defaults/setup.ini`、`moddata.txt`
   - 二进制资源（`include_bytes!`）：`forge-installer.jar`、`java-wrapper.jar`
-- 二进制资源释放带 sha256 校验：参考 PCL2 的 `ExtractResources`，只在目标文件不存在或 hash 不匹配时写盘，同目录写 `{name}.sha256` 校验文件用于下次启动比对，避免每次启动重复写大文件拖慢启动、触发杀软误报
+- 二进制资源释放带 sha256 校验：只在目标文件不存在或 hash 不匹配时写盘，同目录写 `{name}.sha256` 校验文件用于下次启动比对，避免每次启动重复写大文件拖慢启动、触发杀软误报
 - `mcmod.rs` 第 22 行从直接 `include_str!("../../../resources/moddata.txt")` 改为走统一接口 `crate::resources::read_resource("moddata.txt")`，所有资源访问统一收口到 `resources` 模块
 - 删除 `get_resources_dir`/`get_resource_path`/`exists`/`list_dir`/`default_config_path`/`default_instance_path`/`forge_installer_path`/`java_wrapper_path` 等基于运行时路径的函数（嵌入二进制后不再需要）
 - `extract_resource` 签名从 `&PathBuf` 改为 `&Path`（更通用，调用处 `&PathBuf` 自动 deref 兼容）
@@ -9190,10 +9226,10 @@
 - 只有无法识别的非标准格式版本才归"远古版"
 - 顶部筛选滑块仍用 `getFilterVersionName` 截断到二级，1.10.1 → "远古版"，1.12.2 → "1.12"
 
-#### 详情页"转到 MC百科"改为直链跳转（参考 PCL2）
-- 此前用搜索 URL `https://search.mcmod.cn/s?key=<name>`，PCL2 是直链 `https://www.mcmod.cn/class/<id>.html`（backend: src-tauri/src/minecraft/community/mcmod.rs, src-tauri/src/commands/community/detail.rs）
-- 研究发现 PCL2 不调 API，完全靠 moddata.txt 的**行号**作为 class id：第 N 行 → class id = N，URL 即 `https://www.mcmod.cn/class/<N>.html`
-- 关键设计：moddata.txt 空行也占用行号（PCL2 WikiEntry.vb 的 `i += 1` 在 `Continue For` 之前），此前 MoLaunch 解析时 `continue` 跳过空行且不计数，会导致行号错位；已修复
+#### 详情页"转到 MC百科"改为直链跳转
+- 此前用搜索 URL `https://search.mcmod.cn/s?key=<name>`，现改为直链 `https://www.mcmod.cn/class/<id>.html`（backend: src-tauri/src/minecraft/community/mcmod.rs, src-tauri/src/commands/community/detail.rs）
+- 研究发现：不调 API，完全靠 moddata.txt 的**行号**作为 class id：第 N 行 → class id = N，URL 即 `https://www.mcmod.cn/class/<N>.html`
+- 关键设计：moddata.txt 空行也占用行号（`i += 1` 在 `Continue For` 之前），此前 MoLaunch 解析时 `continue` 跳过空行且不计数，会导致行号错位；已修复
 - `Database` 的 value 从 `String`（仅中文名）改为 `Entry { chinese_name, class_id }` 结构
 - 新增 `lookup_class_id(platform, slug) -> Option<u32>` 查询函数
 - 新增 `get_mcmod_url` Tauri 命令：接受 platform + slug，返回直链 URL 或 null
@@ -9218,23 +9254,23 @@
 
 #### 修复启动时不创建 .minecraft 文件夹导致"打开游戏目录"报错
 - 此前启动初始化链只创建 `.Molaunch` 系列目录，从不创建 `.minecraft`，首次启动点击"打开游戏目录"会报"路径不存在"（backend: src-tauri/src/lib.rs, src-tauri/src/commands/system/game_dir.rs）
-- 参考 PCL2 `McFolderListLoadSub:124-128`：PCL2 启动时主动 `DirectoryUtils.Create(PathExeFolder & ".minecraft\versions\")`
+- 启动时主动 `DirectoryUtils.Create(PathExeFolder & ".minecraft\versions\")`
 - `lib.rs` 的 `run()` 在 `AppState::new()` 后增加：`resolve_game_dir(&config.game_dir).join("versions")` 不存在时 `create_dir_all`
 - `open_game_dir` 命令增加防御性创建：路径不存在时先 `create_dir_all` 再打开，避免启动时创建失败导致命令仍报错
 
 #### "转到 MC百科"按钮只对 Mod 类型显示
-- MC 百科数据库（moddata.txt）只包含 Mod 条目，PCL2 也仅对 Mod/数据包类型显示该按钮（frontend: src/components/community/ResourceDetail.vue）
+- MC 百科数据库（moddata.txt）只包含 Mod 条目，仅对 Mod/数据包类型显示该按钮（frontend: src/components/community/ResourceDetail.vue）
 - 添加 `v-if="project.resource_type === 'Mod'"` 条件，整合包/资源包/光影/数据包不显示该按钮
 
-#### PCL2 整合包安装逻辑研究结论（未实现，待后续开发）
-- PCL2 下载页"整合包"分类的资源安装流程：
+#### 整合包安装逻辑研究结论（未实现，待后续开发）
+- 下载页"整合包"分类的资源安装流程：
   - 下载原始包到 `versions\{InstanceName}\原始整合包.{zip|mrpack}`
   - 调用 `ModpackInstall` 解压 → 解析 manifest.json/modrinth.index.json → 复制 overrides → 批量下载依赖 mods → 安装游戏本体
 - 不同资源类型的处理差异：
   - Mod/资源包/光影/数据包：只下载到对应子文件夹（mods/resourcepacks/shaderpacks），不解压不解析
   - 整合包"安装"：完整走 ModpackInstall 流程
   - 整合包"另存为"：仅下载原始压缩包，不做后续处理
-- MoLaunch 当前整合包下载流程与 PCL2"另存为"一致，缺少完整的安装流程，待后续实现
+- MoLaunch 当前整合包下载流程与"另存为"一致，缺少完整的安装流程，待后续实现
 - 此前全局 `document.addEventListener('scroll', ..., { capture: true })` 会捕获所有元素的 scroll 事件，下拉框、弹窗等组件滚动时也会显示返回顶部按钮（frontend: src/components/common/BackToTop.vue）
 - 新增 `isNonMainScroller` 过滤：向上查找祖先，遇到 `position: fixed/absolute` 的元素说明在弹层内，跳过不处理
 - 只响应页面级滚动容器的 scroll 事件
@@ -9295,7 +9331,7 @@
 - `downloadCapePng` 前端封装（frontend: src/utils/tauri.ts）
 
 #### 离线账号默认皮肤
-- 新增 default-skin.ts：内置 Steve/Alex 默认皮肤纹理（canvas 生成），参考 PCL2 的 McSkinSex 函数根据 UUID 计算皮肤类型（frontend: src/utils/default-skin.ts）
+- 新增 default-skin.ts：内置 Steve/Alex 默认皮肤纹理（canvas 生成），根据 UUID 计算皮肤类型（frontend: src/utils/default-skin.ts）
 - SkinAvatar 支持离线账号：传 login_type='Offline' 时使用默认皮肤（frontend: src/components/common/SkinAvatar.vue）
 
 #### 账号切换
@@ -9309,7 +9345,7 @@
 ### 新增
 
 #### 微软登录
-- 微软 OAuth 2.0 Web 授权码登录流程（Authorization Code Flow，使用 login.live.com 旧版端点 + 公共 Client ID `00000000402b5328`，与 PCL2/HMCL 一致）
+- 微软 OAuth 2.0 Web 授权码登录流程（Authorization Code Flow，使用 login.live.com 旧版端点 + 公共 Client ID `00000000402b5328`，与 HMCL 等主流启动器一致）
 - 6 步 Token 交换链：授权码 → OAuth Token → XBL Token → XSTS Token → MC Token → 玩家档案
 - Token 持久化存储（DES 加密，支持多账号管理）
 - 会话恢复（应用重启后自动恢复登录状态）
@@ -9322,11 +9358,11 @@
 - 事件驱动登录状态通信（`ms-login-success` / `ms-login-error` / `ms-login-cancelled` / `ms-login-progress`）
 
 #### 皮肤与披风管理
-- 玩家皮肤头像加载（参考 PCL2：从 profile_json 的 skins[].url 获取皮肤 PNG 地址，下载后用 canvas 裁剪 (8,8,8,8) 脸层 + (40,8,8,8) 头发层）
+- 玩家皮肤头像加载：从 profile_json 的 skins[].url 获取皮肤 PNG 地址，下载后用 canvas 裁剪 (8,8,8,8) 脸层 + (40,8,8,8) 头发层）
 - 皮肤 PNG 全图显示（直接从 textures.minecraft.net 下载，不依赖第三方渲染服务）
 - 当前形象信息展示（用户名、皮肤模型 Steve/Alex、当前披风）
 - 皮肤上传功能（multipart/form-data，支持 classic/slim 两种模型，后端直接读取本地文件避免 base64 转换）
-- 披风列表展示与装备/取消（28 种披风中文名映射，参考 PCL2）
+- 披风列表展示与装备/取消（28 种披风中文名映射）
 - 修改密码快捷入口（跳转 `https://account.live.com/password/Change`）
 - 修改用户名快捷入口（跳转 `https://www.minecraft.net/zh-hans/msaprofile/mygames/editprofile`）
 - `SkinAvatar` 组件：通用皮肤头像组件，canvas 裁剪支持高清皮肤（128x64 等），加载失败时回退到首字母渐变占位符
@@ -9334,10 +9370,10 @@
 - `AccountSelector` 接入真实皮肤头像显示与皮肤管理入口
 
 ### 变更
-- 微软登录采用 Device Code Flow（设备码流程，与 PCL2 一致），使用 v2.0 consumers 端点 + MoLaunch 独立 Azure 应用 Client ID
-- 认证存储从单一 `auth.json` 文件改为 Windows 注册表分字段存储（参考 PCL2，路径 `HKCU\Software\MoLaunch`）
+- 微软登录采用 Device Code Flow（设备码流程），使用 v2.0 consumers 端点 + MoLaunch 独立 Azure 应用 Client ID
+- 认证存储从单一 `auth.json` 文件改为 Windows 注册表分字段存储（路径 `HKCU\Software\MoLaunch`）
 - 敏感字段（Token、用户名、UUID 等）单独 SDK DES 加密，非敏感字段（登录类型）明文存储
-- Token 刷新使用 login.live.com 旧版端点（与 PCL2 一致）
+- Token 刷新使用 login.live.com 旧版端点（与主流启动器一致）
 - reqwest 启用 `multipart` feature 以支持皮肤上传
 
 ### 修复
@@ -9545,12 +9581,12 @@
 
 #### 清理云端误追踪文件与 Cargo.toml 注释
 - 背景：`src-tauri/Cargo.lock` 与 `logo_data/` 早已在 `.gitignore` 排除，但早期误提交至云端
-  仍被追踪；`Cargo.toml` 两处依赖注释含 "参考 PCL2" 字样需移除。
+  仍被追踪；`Cargo.toml` 两处依赖注释含 "参考第三方启动器" 字样需移除。
 - 变更：
   - [.gitignore](.gitignore)：`# Rust` 段新增 `src-tauri/Cargo.lock` 显式排除（与全局 `Cargo.lock` 并列）。
   - `git rm --cached src-tauri/Cargo.lock`：从索引移除，本地文件保留，下次 push 后云端不再追踪。
   - `git rm --cached -r logo_data/`：同上清理 3 个 logo 数据文件。
-  - [src-tauri/Cargo.toml](src-tauri/Cargo.toml)：`notify` 与 `windows` 依赖注释移除 "参考 PCL2 ..." 字样。
+  - [src-tauri/Cargo.toml](src-tauri/Cargo.toml)：`notify` 与 `windows` 依赖注释移除 "参考第三方启动器 ..." 字样。
 
 #### 服务器状态检测 MOTD 彩色渲染（§ 格式化代码解析）
 - 背景：服务器状态检测工具的 MOTD 显示为纯文本，丢失了 Minecraft 多人联机 § 颜色/格式代码

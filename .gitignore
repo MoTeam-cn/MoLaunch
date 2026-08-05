@@ -74,6 +74,9 @@ node_modules
 # Tools
 /tools
 
+# 文件备份（批量替换前生成的临时备份，不入库）
+/CHANGELOG.bak
+
 # API Server
 /api-server
 

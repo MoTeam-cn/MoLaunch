@@ -8,6 +8,7 @@ import { invoke } from '@tauri-apps/api/core'
 import type { Router } from 'vue-router'
 import { openPickerWindow, openDisplayWindow } from '@/utils/picker-window'
 import { PICKER_TEMPLATES } from '@/config/picker-templates'
+import { showCrashDialog, type CrashInfo } from '@/utils/crashDialog'
 
 /** 调试 API 接口 */
 export interface MolaunchDevAPI {
@@ -27,6 +28,10 @@ export interface MolaunchDevAPI {
   tools<T = unknown>(action: string, params?: Record<string, unknown>): Promise<T>
   /** 调用后端 frp_manager IPC */
   frp<T = unknown>(action: string, params?: Record<string, unknown>): Promise<T>
+  /** 调用后端 ai_manager IPC */
+  ai<T = unknown>(action: string, params?: Record<string, unknown>): Promise<T>
+  /** 触发崩溃弹窗（演示用；正常情况下游戏崩溃后自动弹出，平时难以复现） */
+  showCrashDialog(): void
   /** 返回所有 Pinia store 的 $state */
   stores(): Promise<Record<string, unknown>>
 }
@@ -76,6 +81,14 @@ MoLaunch Dev API 可用命令：
       - action: 子命令（如 'list_tunnels' / 'list_providers' / 'start_tunnel' / 'list_public_servers'）
       - params: 子命令参数对象
 
+  molaunch.ai(action, params?)
+      调用后端 ai_manager IPC，返回 Promise
+      - action: 子命令（如 'analyze_crash' / 'check_status' / 'save_config' / 'load_config'）
+      - params: 子命令参数对象
+
+  molaunch.showCrashDialog()
+      触发错误日志弹窗（演示用样例数据；游戏崩溃后会自动弹出，本文用于检查展示）
+
   molaunch.stores()
       返回所有 Pinia store 的 $state（Promise<Record<string, unknown>>）
 
@@ -85,6 +98,8 @@ MoLaunch Dev API 可用命令：
   await molaunch.picker('qrcode', { text: 'https://molaunch.moiu.cn' })
   await molaunch.tools('list_open_ports')
   await molaunch.frp('list_tunnels')
+  await molaunch.ai('check_status')
+  await molaunch.showCrashDialog()
   await molaunch.navigate('/apps/online')
   await molaunch.reload()
   await molaunch.reload(true)
@@ -179,6 +194,30 @@ export function setupDevApi(router: Router): void {
     },
     async frp(action, params) {
       return invoke('frp_manager', { req: { action, params: params ?? {} } })
+    },
+    async ai(action, params) {
+      return invoke('ai_manager', { req: { action, params: params ?? {} } })
+    },
+    showCrashDialog() {
+      const sample: CrashInfo = {
+        reason: '无法加载主类：net.minecraft.client.main.Main',
+        category: 'Java',
+        log_lines: [
+          'Error: A JNI error has occurred, please check your installation and try again',
+          'Exception in thread "main" java.lang.NoClassDefFoundError: net/minecraft/client/main/Main',
+          'Caused by: java.lang.ClassNotFoundException: net.minecraft.client.main.Main',
+        ],
+        suggestion:
+          '游戏主类加载失败，通常由 Java 版本不匹配或版本文件损坏导致。\n建议：1. 更换 Java 版本（1.8.x）；2. 重新安装该版本；3. 检查版本 JSON 中主类配置。',
+        problematic_mod: null,
+        crash_report_path: 'C:\\Users\\Test\\.minecraft\\crash-reports\\crash-2026-08-05_12.30.00-server.txt',
+        log_tail: [
+          '[12:30:00] [main/INFO]: Loading Minecraft 1.8.9 with Fabric Loader 0.16.5',
+          '[12:30:00] [main/INFO]: Loading 12 mods: fabricloader, fabric-api, ...',
+          '[12:30:01] [main/ERROR]: Failed to start the minecraft server',
+        ],
+      }
+      showCrashDialog(sample)
     },
     stores: loadAllStores,
   }

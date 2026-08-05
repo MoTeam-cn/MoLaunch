@@ -1,6 +1,7 @@
 //! MoLaunch 库入口
 
 pub mod api_paths;
+pub mod ai_core;
 pub mod certs;
 pub mod commands;
 pub mod config;
@@ -79,6 +80,9 @@ pub fn run() {
 
     // 注入 Frp 认证存储 SDK 引用（token 用 SDK DES 加密后写文件，替代原 keyring）
     commands::frp::auth::set_sdk(app_state.sdk.clone());
+
+    // 注入 AI 配置存储 SDK 引用（api_key 用 SDK DES 加密后写 config.ini [AI] 段）
+    ai_core::storage::set_sdk(app_state.sdk.clone());
 
     // 启动缓存定期清理任务（启动时立即清理一次，之后每 1h 重复执行）
     // 清理超过 24h 的不重要缓存文件（图片、安装器、预加载、临时安装包等）
@@ -180,6 +184,8 @@ pub fn run() {
             commands::plugins::plugins_manager,
             // 外部下载工具命令（25 个 action，已聚合为 tools_manager 单一入口）
             commands::tools::tools_manager,
+            // AI 分析命令（本地 OpenAI 兼容 API，action：analyze_crash/check_status/save_config/load_config）
+            commands::ai::ai_manager,
             // 联机功能命令（6 个 action，阶段一认证相关，已聚合为 online_manager 单一入口）
             commands::online::online_manager,
             // Frp 内网穿透命令（8 个 action，厂商/隧道/进程管理，已聚合为 frp_manager 单一入口）
