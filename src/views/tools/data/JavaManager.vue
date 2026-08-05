@@ -19,6 +19,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Tag from '@/components/common/Tag.vue'
 import { useJavaStore } from '@/stores/java'
 import { toastSuccess, toastInfo, toastError } from '@/utils/toast'
 
@@ -112,9 +113,7 @@ async function refresh() {
             </Tooltip>
             <div class="text-xs text-gray-400">版本 {{ j.version }}</div>
           </div>
-          <span class="flex-none rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
-            Java {{ j.major_version }}
-          </span>
+          <Tag size="small" color="blue" class="flex-none">Java {{ j.major_version }}</Tag>
         </div>
 
         <!-- 空状态 -->

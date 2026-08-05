@@ -14,6 +14,7 @@
  */
 import { ref } from 'vue'
 import { ChevronDownIcon, BeakerIcon } from '@heroicons/vue/24/outline'
+import Tag from '@/components/common/Tag.vue'
 
 const isOpen = ref(false)
 
@@ -35,7 +36,7 @@ function toggle() {
       <div class="flex items-center gap-2">
         <BeakerIcon class="h-4 w-4 text-primary-500" />
         <span class="text-sm font-semibold text-gray-800">MoLaunch 实现原理</span>
-        <span class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500">点击展开</span>
+        <Tag size="small" color="gray">点击展开</Tag>
       </div>
       <ChevronDownIcon
         class="h-4 w-4 flex-none text-gray-400 transition-transform duration-300 ease-in-out"

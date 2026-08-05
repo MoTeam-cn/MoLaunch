@@ -6,6 +6,7 @@ import type { ExternalDownloadEntry } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
 import { DocumentIcon, ExclamationCircleIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 defineProps<{
@@ -31,9 +32,7 @@ function formatTime(unix: number): string {
   <section class="rounded-lg border border-gray-300 bg-white">
     <div class="flex items-center justify-between px-5 pt-5 pb-3">
       <h3 class="text-sm font-semibold text-gray-900">已下载文件</h3>
-      <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-        {{ files.length }}
-      </span>
+      <Tag size="small" color="gray">{{ files.length }}</Tag>
     </div>
 
     <!-- 空状态 -->

@@ -23,8 +23,10 @@ import {
   XMarkIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
+import ReleaseTimeline from '@/components/about/ReleaseTimeline.vue'
+import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'
 import { formatBytes } from '@/utils/format'
-import { renderMarkdown, handleMarkdownLinkClick } from '@/utils/markdown'
 import {
   updateState,
   checkForUpdate,
@@ -35,8 +37,18 @@ import {
 /** 是否显示弹窗（仅当 showDialog=true 时渲染） */
 const visible = computed(() => updateState.showDialog)
 
-/** 更新日志：Markdown 渲染为已消毒的 HTML（云端内容经 DOMPurify 防 XSS） */
-const notesHtml = computed(() => (updateState.notes ? renderMarkdown(updateState.notes) : ''))
+/**
+ * 监听 macOS/Linux 更新下载进度（Rust install_unix.rs 经 Tauri 事件推送）
+ *
+ * 仅在 downloading 状态写入真实 downloaded/total：
+ * - total>0 时进度条显示真实百分比
+ * - total=0 时保持 indeterminate 动画（后端尚未获得 Content-Length）
+ */
+onGlobalEvent<{ downloaded: number; total: number }>('update-download-progress', (payload) => {
+  if (updateState.status !== 'downloading') return
+  if (typeof payload?.downloaded === 'number') updateState.downloaded = payload.downloaded
+  if (typeof payload?.total === 'number') updateState.total = payload.total
+})
 
 /** 是否允许关闭（强制更新 / 下载中 / 安装中 时禁止） */
 const canClose = computed(
@@ -102,7 +114,7 @@ function onRetry() {
       >
         <div class="absolute inset-0 bg-black/40" />
 
-        <div class="modal-body max-w-md mt-2">
+        <div class="modal-body max-w-xl mt-2">
           <!-- 标题栏 -->
           <div class="flex items-center justify-between px-6 pt-5 pb-3">
             <div class="flex items-center gap-2.5">
@@ -120,33 +132,36 @@ function onRetry() {
             </button>
           </div>
 
-          <!-- 内容区 -->
-          <div class="modal-scroll px-6 pb-2">
+          <!-- 发现新版本：最新版本行固定，仅下方日志区滚动 -->
+          <div
+            v-if="updateState.status === 'available'"
+            class="flex flex-1 flex-col min-h-0 px-6 pb-2"
+          >
+            <div class="flex items-center gap-2 text-sm py-2">
+              <span class="text-gray-500">最新版本：</span>
+              <span class="font-semibold text-primary-600">v{{ updateState.version }}</span>
+              <span
+                v-if="updateState.forceUpdate"
+                class="ml-1"
+              >
+                <Tag size="small" color="red">强制更新</Tag>
+              </span>
+            </div>
+            <!-- 更新日志：时间线组件负责分段渲染；仅此区域独立滚动 -->
+            <div v-if="updateState.notes" class="min-h-0 flex-1 overflow-y-auto rounded-md bg-gray-50 p-3">
+              <ReleaseTimeline :notes="updateState.notes" />
+            </div>
+            <p v-if="updateState.forceUpdate" class="text-xs text-red-500 pt-2">
+              此版本为重要更新，需要立即安装后才能继续使用。
+            </p>
+          </div>
+
+          <!-- 其他状态：整体滚动 -->
+          <div v-else class="modal-scroll px-6 pb-2">
             <!-- 检查中 -->
             <div v-if="updateState.status === 'checking'" class="py-6 flex flex-col items-center gap-3">
               <div class="h-7 w-7 animate-spin rounded-full border-[3px] border-primary-200 border-t-primary-500" />
               <p class="text-sm text-gray-500">正在检查更新...</p>
-            </div>
-
-            <!-- 发现新版本 -->
-            <div v-else-if="updateState.status === 'available'" class="space-y-3">
-              <div class="flex items-center gap-2 text-sm">
-                <span class="text-gray-500">最新版本：</span>
-                <span class="font-semibold text-primary-600">v{{ updateState.version }}</span>
-                <span
-                  v-if="updateState.forceUpdate"
-                  class="ml-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-medium text-red-600"
-                >
-                  强制更新
-                </span>
-              </div>
-              <div v-if="updateState.notes" class="rounded-md bg-gray-50 p-3 max-h-44 overflow-y-auto">
-                  <!-- eslint-disable-next-line vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒；链接点击由 handleMarkdownLinkClick 走系统浏览器 -->
-                  <div class="markdown-body text-xs text-gray-600 leading-relaxed" @click="handleMarkdownLinkClick" v-html="notesHtml" />
-                </div>
-              <p v-if="updateState.forceUpdate" class="text-xs text-red-500">
-                此版本为重要更新，需要立即安装后才能继续使用。
-              </p>
             </div>
 
             <!-- 下载中 -->
@@ -239,55 +254,3 @@ function onRetry() {
     </transition>
   </teleport>
 </template>
-
-<style scoped>
-/* 更新日志 Markdown 内容样式（作用于 v-html 渲染的节点） */
-.markdown-body :deep(p) {
-  margin: 0 0 0.375rem;
-}
-.markdown-body :deep(p:last-child) {
-  margin-bottom: 0;
-}
-.markdown-body :deep(h1),
-.markdown-body :deep(h2),
-.markdown-body :deep(h3),
-.markdown-body :deep(h4) {
-  margin: 0.5rem 0 0.25rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #1d2129;
-}
-.markdown-body :deep(ul),
-.markdown-body :deep(ol) {
-  margin: 0.125rem 0 0.375rem;
-  padding-left: 1.125rem;
-  list-style: disc;
-}
-.markdown-body :deep(ol) {
-  list-style: decimal;
-}
-.markdown-body :deep(li) {
-  margin: 0.125rem 0;
-}
-.markdown-body :deep(code) {
-  padding: 0.0625rem 0.25rem;
-  border-radius: 0.25rem;
-  background-color: #e5e6eb;
-  font-family: inherit;
-}
-.markdown-body :deep(pre) {
-  margin: 0.375rem 0;
-  padding: 0.5rem 0.625rem;
-  overflow-x: auto;
-  border-radius: 0.375rem;
-  background-color: #f2f3f5;
-}
-.markdown-body :deep(pre code) {
-  padding: 0;
-  background-color: transparent;
-}
-.markdown-body :deep(a) {
-  color: var(--color-primary-500);
-  text-decoration: underline;
-}
-</style>

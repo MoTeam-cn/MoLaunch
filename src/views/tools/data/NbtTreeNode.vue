@@ -7,6 +7,7 @@
  */
 import { computed } from 'vue'
 import { ChevronRightIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
+import Tag from '@/components/common/Tag.vue'
 import type { NbtNode } from '@/utils/api/tools'
 
 const props = defineProps<{
@@ -29,19 +30,19 @@ function toggle() {
 
 function tagColor(tagType: string): string {
   switch (tagType) {
-    case 'compound': return 'bg-blue-100 text-blue-700'
-    case 'list': return 'bg-purple-100 text-purple-700'
-    case 'string': return 'bg-green-100 text-green-700'
+    case 'compound': return 'blue'
+    case 'list': return 'purple'
+    case 'string': return 'green'
     case 'int':
     case 'short':
     case 'long':
-    case 'byte': return 'bg-orange-100 text-orange-700'
+    case 'byte': return 'orange'
     case 'float':
-    case 'double': return 'bg-cyan-100 text-cyan-700'
+    case 'double': return 'cyan'
     case 'byte_array':
     case 'int_array':
-    case 'long_array': return 'bg-gray-100 text-gray-700'
-    default: return 'bg-gray-100 text-gray-600'
+    case 'long_array': return 'gray'
+    default: return 'gray'
   }
 }
 
@@ -66,10 +67,11 @@ function formatValue(node: NbtNode): string {
       <ChevronDownIcon v-if="isContainer && isExpanded" class="h-3.5 w-3.5 flex-none text-gray-400" />
       <ChevronRightIcon v-else-if="isContainer" class="h-3.5 w-3.5 flex-none text-gray-400" />
       <span v-else class="inline-block w-3.5 flex-none" />
-      <span
-        class="rounded px-1 py-0.5 text-xs font-medium flex-none"
-        :class="tagColor(node.tag_type)"
-      >{{ node.tag_type }}</span>
+      <Tag
+        size="small"
+        class="flex-none"
+        :color="tagColor(node.tag_type)"
+      >{{ node.tag_type }}</Tag>
       <span v-if="node.name" class="text-sm text-gray-800 font-medium">{{ node.name }}</span>
       <span v-else class="text-sm text-gray-400 italic">(unnamed)</span>
       <span

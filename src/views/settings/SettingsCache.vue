@@ -13,6 +13,7 @@ import { toastError, toastSuccess } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
 import Button from '@/components/common/Button.vue'
 import Alert from '@/components/common/Alert.vue'
+import Tag from '@/components/common/Tag.vue'
 import {
   FolderOpenIcon,
   ArrowPathIcon,
@@ -155,19 +156,13 @@ onMounted(loadCacheStats)
             <div class="flex flex-wrap items-center gap-2">
               <p class="text-sm text-gray-900">{{ entry.name }}</p>
               <!-- TTL 标识 -->
-              <span
-                class="inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-medium"
-                :class="entry.ttlHours
-                  ? 'bg-yellow-50 text-yellow-700'
-                  : 'bg-gray-100 text-gray-500'"
+              <Tag
+                size="small"
+                :color="entry.ttlHours ? 'gold' : 'gray'"
               >
                 {{ entry.ttlHours ? `${entry.ttlHours}h 自动清理` : '不清理' }}
-              </span>
-              <span
-                class="inline-flex items-center rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500"
-              >
-                {{ entry.category }}
-              </span>
+              </Tag>
+              <Tag size="small" color="gray">{{ entry.category }}</Tag>
             </div>
             <p class="text-xs text-gray-500 mt-1">
               {{ entry.fileCount }} 个文件 · {{ formatBytes(entry.totalSize) }}

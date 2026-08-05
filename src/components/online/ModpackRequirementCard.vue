@@ -19,6 +19,7 @@ import { useModpackInstall } from '@/composables/useModpackInstall'
 import { formatBytes } from '@/utils/format'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Tag from '@/components/common/Tag.vue'
 import type { ModpackMeta } from '@/types/online'
 import {
   CheckCircleIcon,
@@ -129,9 +130,7 @@ onMounted(() => {
     <div class="px-4 py-3 space-y-2">
       <div class="flex items-center gap-2">
         <span class="text-sm font-medium text-gray-900 truncate">{{ modpack.name }}</span>
-        <span class="px-1.5 py-0.5 text-xs rounded bg-primary-100 text-primary-700 shrink-0">
-          {{ sourceLabel }}
-        </span>
+        <Tag size="small" color="arcoblue" class="shrink-0">{{ sourceLabel }}</Tag>
       </div>
       <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
         <span v-if="modpack.modpackVersion">版本: {{ modpack.modpackVersion }}</span>

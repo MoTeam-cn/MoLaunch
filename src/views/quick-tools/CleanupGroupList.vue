@@ -17,6 +17,7 @@ import {
   CubeIcon,
 } from '@heroicons/vue/24/outline'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Tag from '@/components/common/Tag.vue'
 import type { CleanupItem } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
 
@@ -169,16 +170,12 @@ function itemDisplayName(displayName: string): string {
                   <span class="text-sm font-medium text-gray-900">
                     {{ itemDisplayName(item.display_name) }}
                   </span>
-                  <span
-                    class="rounded-full px-1.5 py-0.5 text-xs font-medium"
-                    :class="
-                      item.category === '可选'
-                        ? 'bg-yellow-100 text-yellow-700'
-                        : 'bg-blue-100 text-blue-700'
-                    "
+                  <Tag
+                    size="small"
+                    :color="item.category === '可选' ? 'gold' : 'arcoblue'"
                   >
                     {{ item.category }}
-                  </span>
+                  </Tag>
                 </div>
                 <!-- 路径：用 Tooltip 组件展示完整路径，避免原生 title -->
                 <!-- block prop 让 trigger 撑满父容器宽度，内部 truncate 才能在 flex 布局下生效 -->

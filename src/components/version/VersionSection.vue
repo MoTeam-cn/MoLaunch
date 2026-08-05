@@ -6,6 +6,7 @@
 import { ref, type Component } from 'vue'
 import { ChevronRightIcon, TrashIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
 
 interface VersionItem {
   id: string
@@ -86,27 +87,28 @@ function isInstalled(id: string): boolean {
               <div>
                 <div class="flex items-center">
                   <span class="text-sm text-gray-900">{{ version.description || version.id }}</span>
-                  <span
+                  <Tag
                     v-if="version.tag"
-                    class="ml-2 text-xs px-1.5 py-0.5 rounded-full"
-                    :class="version.tag === '正式版'
-                      ? 'bg-green-100 text-green-800'
-                      : 'bg-yellow-100 text-yellow-800'"
+                    size="small"
+                    class="ml-2"
+                    :color="version.tag === '正式版' ? 'green' : 'gold'"
                   >
                     {{ version.tag }}
-                  </span>
+                  </Tag>
                 </div>
                 <span class="text-xs text-gray-500">{{ formatDate(version.release_time) }}</span>
               </div>
             </div>
 
             <div class="flex items-center">
-              <span
+              <Tag
                 v-if="isInstalled(version.id)"
-                class="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-800 mr-2"
+                size="small"
+                color="green"
+                class="mr-2"
               >
                 已安装
-              </span>
+              </Tag>
               <Button
                 type="primary"
                 size="small"

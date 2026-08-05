@@ -186,6 +186,142 @@
   }
 
   /* ============================================================
+   * 标签样式（复刻 Arco Design Tag）
+   * 默认（无预设色）：灰底深字（fill-2 / text-1）
+   * 预设色：浅色底 + 深色字（Arco 色板 1 号 / 6 号）
+   * 尺寸：small 20px / medium 24px / large 28px，border-radius 2px
+   * ============================================================ */
+  .tag {
+    display: inline-flex;
+    align-items: center;
+    box-sizing: border-box;
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    white-space: nowrap;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    color: #1d2129;
+    background-color: #f2f3f5;
+    border-color: #f2f3f5;
+    user-select: none;
+    transition: all 0.1s cubic-bezier(0, 0, 1, 1);
+  }
+  .tag-size-small {
+    height: 20px;
+    padding: 0 6px;
+    font-size: 12px;
+  }
+  .tag-size-medium {
+    height: 24px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+  .tag-size-large {
+    height: 28px;
+    padding: 0 10px;
+    font-size: 14px;
+  }
+
+  /* 预设颜色：浅色底 + 深色字（Arco 色板 1 号 / 6 号） */
+  .tag-red {
+    color: #f53f3f;
+    background-color: #ffece8;
+    border-color: #ffece8;
+  }
+  .tag-orangered {
+    color: #ff7d00;
+    background-color: #fff3e8;
+    border-color: #fff3e8;
+  }
+  .tag-orange {
+    color: #ff9a2e;
+    background-color: #fff7e8;
+    border-color: #fff7e8;
+  }
+  .tag-gold {
+    color: #f7ba1e;
+    background-color: #fffce8;
+    border-color: #fffce8;
+  }
+  .tag-lime {
+    color: #9fdb1d;
+    background-color: #fcffe8;
+    border-color: #fcffe8;
+  }
+  .tag-green {
+    color: #00b42a;
+    background-color: #e8ffea;
+    border-color: #e8ffea;
+  }
+  .tag-cyan {
+    color: #14c9c9;
+    background-color: #e8fffb;
+    border-color: #e8fffb;
+  }
+  .tag-blue {
+    color: #3491fa;
+    background-color: #e8f3ff;
+    border-color: #e8f3ff;
+  }
+  .tag-arcoblue {
+    color: #165dff;
+    background-color: #e8f3ff;
+    border-color: #e8f3ff;
+  }
+  .tag-purple {
+    color: #722ed1;
+    background-color: #f5e8ff;
+    border-color: #f5e8ff;
+  }
+  .tag-pinkpurple {
+    color: #d91ad9;
+    background-color: #ffe8fb;
+    border-color: #ffe8fb;
+  }
+  .tag-magenta {
+    color: #f5319d;
+    background-color: #ffe8f1;
+    border-color: #ffe8f1;
+  }
+  .tag-gray {
+    color: #86909c;
+    background-color: #f2f3f5;
+    border-color: #f2f3f5;
+  }
+
+  /* primary：跟随项目主题色（浅色底 + 主题色字，换肤时自动变化） */
+  .tag-primary {
+    color: var(--color-primary-500);
+    background-color: rgb(var(--color-primary-rgb-500) / 0.1);
+    border-color: transparent;
+  }
+
+  /* 图标与关闭按钮 */
+  .tag-icon {
+    display: inline-flex;
+    margin-right: 4px;
+  }
+  .tag-close-btn {
+    display: inline-flex;
+    align-items: center;
+    margin-left: 4px;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.6;
+    transition: opacity 0.1s cubic-bezier(0, 0, 1, 1);
+  }
+  .tag-close-btn:hover {
+    opacity: 1;
+  }
+  .tag-close-icon {
+    width: 10px;
+    height: 10px;
+  }
+
+  /* ============================================================
    * 输入框样式
    * height: 32px, padding 0 12px, font-size 14px, border-radius 2px
    * default bg #f2f3f5 border transparent

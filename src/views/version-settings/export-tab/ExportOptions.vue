@@ -12,6 +12,7 @@
  */
 import { computed } from 'vue'
 import Checkbox from '@/components/common/Checkbox.vue'
+import Tag from '@/components/common/Tag.vue'
 import type { ExportOption } from '@/utils/api/version-export-manager'
 
 interface Props {
@@ -62,10 +63,11 @@ function getChildren(parentId: string): ExportOption[] {
         <div class="min-w-0 flex-1">
           <div class="flex items-center gap-1.5">
             <span class="text-sm text-gray-800">{{ opt.title }}</span>
-            <span
+            <Tag
               v-if="!opt.enabled"
-              class="rounded bg-gray-100 px-1.5 py-0.5 text-[10px] text-gray-500"
-            >必选</span>
+              size="small"
+              color="gray"
+            >必选</Tag>
           </div>
           <div v-if="opt.description" class="mt-0.5 text-xs text-gray-400">{{ opt.description }}</div>
         </div>

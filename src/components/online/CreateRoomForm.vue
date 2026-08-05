@@ -5,6 +5,7 @@ import Card from '@/components/common/Card.vue'
 import Input from '@/components/common/Input.vue'
 import Select from '@/components/common/Select.vue'
 import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
+import Tag from '@/components/common/Tag.vue'
 import WhitelistEditor from './WhitelistEditor.vue'
 import ModpackSelector from './ModpackSelector.vue'
 import { PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
@@ -123,12 +124,12 @@ const {
       <template #title>
         <div class="flex items-center gap-2">
           <span>高级设置</span>
-          <span
-            class="px-1.5 py-0.5 text-xs rounded"
-            :class="advancedBadgeActive ? 'bg-primary-100 text-primary-700' : 'bg-gray-100 text-gray-500'"
+          <Tag
+            size="small"
+            :color="advancedBadgeActive ? 'arcoblue' : 'gray'"
           >
             {{ advancedBadge }}
-          </span>
+          </Tag>
         </div>
       </template>
       <div class="space-y-3">

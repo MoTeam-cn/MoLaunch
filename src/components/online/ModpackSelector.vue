@@ -17,6 +17,7 @@ import { readLocalModpackMeta } from '@/utils/api/version'
 import { formatBytes } from '@/utils/format'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
+import Tag from '@/components/common/Tag.vue'
 import type { ModpackMeta, ModpackMetaFile } from '@/types/online'
 import {
   CubeIcon,
@@ -169,11 +170,7 @@ watch(
       <div class="flex items-center gap-2">
         <CubeIcon class="w-4 h-4 text-primary-600 shrink-0" />
         <span class="text-sm font-medium text-gray-900 truncate">{{ localMeta.name }}</span>
-        <span
-          class="px-1.5 py-0.5 text-xs rounded bg-primary-100 text-primary-700 shrink-0"
-        >
-          {{ sourceLabel }}
-        </span>
+        <Tag size="small" color="arcoblue" class="shrink-0">{{ sourceLabel }}</Tag>
       </div>
       <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 pl-6">
         <span v-if="localMeta.modpackVersion">版本: {{ localMeta.modpackVersion }}</span>

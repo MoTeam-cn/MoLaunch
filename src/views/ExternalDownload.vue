@@ -23,6 +23,7 @@ import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
+import Tag from '@/components/common/Tag.vue'
 import { useExternalDownload } from '@/composables/useExternalDownload'
 import DownloadedFileList from './external-download/DownloadedFileList.vue'
 
@@ -233,18 +234,22 @@ const {
               {{ downloadDir || '.Molaunch/Download/' }}
             </span>
           </Tooltip>
-          <span
+          <Tag
             v-if="isCustomDir"
-            class="flex-none rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700"
+            size="small"
+            color="arcoblue"
+            class="flex-none"
           >
             自定义
-          </span>
-          <span
+          </Tag>
+          <Tag
             v-else
-            class="flex-none rounded-full bg-gray-200 px-2 py-0.5 text-xs font-medium text-gray-500"
+            size="small"
+            color="gray"
+            class="flex-none"
           >
             默认
-          </span>
+          </Tag>
         </div>
 
         <!-- 操作按钮 -->

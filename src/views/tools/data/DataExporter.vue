@@ -19,6 +19,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
 import Input from '@/components/common/Input.vue'
+import Tag from '@/components/common/Tag.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { exportLauncherData, getDownloadDir } from '@/utils/api/tools'
 import type { ExportResult } from '@/utils/api/tools'
@@ -156,9 +157,7 @@ async function pickOutput() {
           <CheckCircleIcon class="h-5 w-5 flex-none text-green-500" />
           <div class="flex-1">
             <span class="text-sm font-medium text-green-800">导出成功</span>
-            <span class="ml-2 rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
-              {{ formatBytes(result.file_size) }}
-            </span>
+            <Tag size="small" color="green" class="ml-2">{{ formatBytes(result.file_size) }}</Tag>
           </div>
         </div>
         <div class="mt-1.5 pl-8 text-xs text-green-600">

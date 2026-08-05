@@ -21,6 +21,7 @@ import {
   Squares2X2Icon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
 import DependencyInlineList from './DependencyInlineList.vue'
 
 defineProps<{
@@ -69,9 +70,9 @@ function loaderNames(flags: number): string[] {
 }
 
 function releaseColor(rt: string): string {
-  if (rt === 'Release') return 'bg-green-100 text-green-700'
-  if (rt === 'Beta') return 'bg-yellow-100 text-yellow-700'
-  return 'bg-gray-100 text-gray-600'
+  if (rt === 'Release') return 'green'
+  if (rt === 'Beta') return 'gold'
+  return 'gray'
 }
 </script>
 
@@ -135,7 +136,7 @@ function releaseColor(rt: string): string {
             <div class="flex items-center gap-2">
               <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-1.5">
-                  <span class="px-1 py-0.5 rounded text-[9px] font-medium" :class="releaseColor(v.release_type)">{{ v.release_type }}</span>
+                  <Tag size="small" :color="releaseColor(v.release_type)">{{ v.release_type }}</Tag>
                   <span class="text-sm text-gray-900 truncate">{{ v.display || v.file_name }}</span>
                 </div>
                 <div class="flex items-center gap-2 mt-0.5 text-[11px] text-gray-400">

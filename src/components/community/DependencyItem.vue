@@ -8,6 +8,7 @@
 import type { ResolvedDependency } from '@/types/community'
 import Tooltip from '@/components/common/Tooltip.vue'
 import CachedImage from '@/components/common/CachedImage.vue'
+import Tag from '@/components/common/Tag.vue'
 import {
   CheckCircleIcon,
   ExclamationCircleIcon,
@@ -75,7 +76,7 @@ const hasCompatibleVersion = () => props.dep.suggestedVersion !== null
     <div class="flex-1 min-w-0">
       <div class="flex items-center gap-1.5">
         <span class="text-sm font-medium text-gray-900 truncate">{{ projectName() }}</span>
-        <span class="text-[10px] px-1 py-0.5 rounded bg-gray-100 text-gray-500 shrink-0">{{ platformLabel() }}</span>
+        <Tag size="small" color="gray" class="shrink-0">{{ platformLabel() }}</Tag>
         <Tooltip v-if="depthLabel()" :text="depthLabel()" position="top">
           <span class="text-[10px] px-1 py-0.5 rounded bg-amber-100 text-amber-600 shrink-0">{{ depthLabel() }}</span>
         </Tooltip>

@@ -21,6 +21,7 @@
  * - 按钮使用 @click.stop 避免触发选中
  */
 import Tooltip from '@/components/common/Tooltip.vue'
+import Tag from '@/components/common/Tag.vue'
 import { formatBytes } from '@/utils/format'
 import { modTitle, modSubtitle, loaderVisual } from '@/utils/mod-display'
 // Mod 默认 logo（无 jar 内 logo 时使用）
@@ -113,10 +114,12 @@ function handleClick(e: MouseEvent) {
         >
           {{ modTitle(mod, modLocalNameStyle) }}
         </span>
-        <span
+        <Tag
           v-if="mod.version"
-          class="flex-none rounded bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-500"
-        >{{ mod.version }}</span>
+          size="small"
+          color="gray"
+          class="flex-none"
+        >{{ mod.version }}</Tag>
         <span
           v-if="modSubtitle(mod, modLocalNameStyle) && modSubtitle(mod, modLocalNameStyle) !== modTitle(mod, modLocalNameStyle)"
           class="truncate text-xs text-gray-400"

@@ -5,6 +5,7 @@
 import { computed, ref } from 'vue'
 import Card from '@/components/common/Card.vue'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
 import MoLaunchIntro from '@/components/about/MoLaunchIntro.vue'
 import { openLink } from '@/utils/aboutLogos'
 import { checkForUpdate } from '@/utils/updater'
@@ -51,9 +52,7 @@ async function onCheckUpdate() {
       <div class="flex items-center gap-3">
         <img :src="logoMoLaunch" alt="MoLaunch" class="h-8 w-8" />
         <span class="text-base font-bold text-gray-900">MoLaunch</span>
-        <span class="rounded-full bg-primary-100 px-2 py-0.5 text-[11px] font-medium text-primary-700">
-          v{{ appVersion }}
-        </span>
+        <Tag size="small" color="arcoblue">v{{ appVersion }}</Tag>
       </div>
     </template>
     <template #extra>

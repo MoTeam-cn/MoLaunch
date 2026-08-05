@@ -14,6 +14,7 @@ import { toastInfo, toastSuccess } from '@/utils/toast'
 import { showError } from '@/utils/modal'
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
+import Tag from '@/components/common/Tag.vue'
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
 import { safeCall } from '@/utils/async'
 
@@ -117,14 +118,13 @@ async function handleManualImportJava() {
       <!-- 触发器：版本徽章 + 路径 -->
       <template #selected>
         <div class="flex items-center min-w-0 gap-2">
-          <span
-            class="text-xs px-1.5 py-0.5 rounded shrink-0"
-            :class="javaStore.javaPath
-              ? 'bg-primary-100 text-primary-700'
-              : 'bg-gray-100 text-gray-600'"
+          <Tag
+            size="small"
+            class="shrink-0"
+            :color="javaStore.javaPath ? 'arcoblue' : 'gray'"
           >
             {{ javaStore.javaPath ? `Java ${currentMajorVersion ?? '?'}` : '自动' }}
-          </span>
+          </Tag>
           <span class="text-sm text-gray-900 truncate">
             {{ javaStore.javaPath || '启动时自动查找最佳 Java' }}
           </span>
@@ -134,13 +134,11 @@ async function handleManualImportJava() {
       <!-- 选项：自动项 + 已检测 Java 项 -->
       <template #option="{ option }">
         <div v-if="option.value === ''" class="flex items-center min-w-0">
-          <span class="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 mr-2 shrink-0">自动</span>
+          <Tag size="small" color="gray" class="mr-2 shrink-0">自动</Tag>
           <span class="text-sm text-gray-700 truncate">启动时自动查找最佳 Java</span>
         </div>
         <div v-else class="flex items-center min-w-0 w-full">
-          <span class="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 mr-2 shrink-0">
-            {{ option.majorVersion }}
-          </span>
+          <Tag size="small" color="blue" class="mr-2 shrink-0">{{ option.majorVersion }}</Tag>
           <div class="min-w-0 flex-1">
             <div class="text-sm text-gray-900 truncate">{{ option.value }}</div>
             <div class="text-xs text-gray-500 truncate">{{ option.version }}</div>

@@ -19,6 +19,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Select from '@/components/common/Select.vue'
+import Tag from '@/components/common/Tag.vue'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { resourcepackList, resourcepackConvert } from '@/utils/api/tools'
@@ -149,12 +150,13 @@ onMounted(async () => {
               <div class="text-xs text-gray-400">{{ formatBytes(item.size) }}</div>
             </div>
           </Tooltip>
-          <span
-            class="flex-none rounded-full px-2 py-0.5 text-xs font-medium"
-            :class="item.format === 'zip' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'"
+          <Tag
+            size="small"
+            class="flex-none"
+            :color="item.format === 'zip' ? 'blue' : 'purple'"
           >
             {{ item.format === 'zip' ? 'ZIP' : '文件夹' }}
-          </span>
+          </Tag>
           <Button
             type="outline"
             size="small"

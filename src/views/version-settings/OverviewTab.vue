@@ -9,6 +9,7 @@ import { useJavaStore } from '@/stores/java'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useVersionOverviewActions } from '@/composables/useVersionOverviewActions'
 
@@ -43,9 +44,7 @@ const {
         <div class="min-w-0 flex-1">
           <div class="truncate text-xl font-semibold text-gray-900">{{ selectedId }}</div>
           <div class="mt-1 flex flex-wrap items-center gap-2">
-            <span class="inline-block rounded-full bg-primary-50 px-2.5 py-0.5 text-xs font-medium text-primary-600">
-              {{ currentMeta.label }}
-            </span>
+            <Tag size="small" color="arcoblue">{{ currentMeta.label }}</Tag>
             <span v-if="personalization?.originalVersion" class="text-xs text-gray-400">
               原版 {{ personalization.originalVersion }}
             </span>

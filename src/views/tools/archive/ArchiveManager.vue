@@ -22,6 +22,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Select from '@/components/common/Select.vue'
+import Tag from '@/components/common/Tag.vue'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { archiveList, getDownloadDir } from '@/utils/api/tools'
 import type { ArchiveItem } from '@/utils/api/tools'
@@ -139,8 +140,7 @@ onMounted(async () => {
                 <span class="truncate text-sm font-medium text-gray-900">{{ item.name }}</span>
                 <span
                   v-if="item.has_level_dat"
-                  class="rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700"
-                >有效</span>
+                ><Tag size="small" color="green">有效</Tag></span>
                 <ExclamationCircleIcon v-else class="h-3.5 w-3.5 text-amber-400" />
               </div>
               <div class="text-xs text-gray-400">{{ formatTimestamp(item.modified) }}</div>

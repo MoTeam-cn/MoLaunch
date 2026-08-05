@@ -13,6 +13,7 @@ import { ref, computed, watch } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Tag from '@/components/common/Tag.vue'
 import { useFrpStore } from '@/stores/frp'
 import { fetchTunnels, getAuthStatus } from '@/utils/api/frp-manager'
 import { toastError, toastSuccess } from '@/utils/toast'
@@ -215,12 +216,8 @@ async function handleImport(tunnel: RemoteTunnelInfo) {
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
               <span class="text-sm font-medium text-gray-900">{{ displayName(tunnel) }}</span>
-              <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary-50 text-primary-700 uppercase">
-                {{ tunnel.tunnelType }}
-              </span>
-              <span v-if="tunnel.status" class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-gray-50 text-gray-500">
-                {{ tunnel.status }}
-              </span>
+              <Tag size="small" color="arcoblue" class="uppercase">{{ tunnel.tunnelType }}</Tag>
+              <Tag v-if="tunnel.status" size="small" color="gray">{{ tunnel.status }}</Tag>
             </div>
             <div class="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
               <span v-if="tunnel.serverHost" class="flex items-center gap-1">

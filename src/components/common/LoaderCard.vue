@@ -6,6 +6,7 @@
 
 import { ref, watch } from 'vue'
 import { XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
+import Tag from '@/components/common/Tag.vue'
 
 interface VersionItem {
   key: string
@@ -131,32 +132,30 @@ function clear(e: Event) {
               @click="select(ver.key)"
             >
               <div class="flex items-center gap-2">
-                <span
-                  class="text-sm px-2 py-0.5 rounded-full"
-                  :class="selected === ver.key
-                    ? `bg-${color}-100 text-${color}-800 font-medium`
-                    : 'bg-gray-100 text-gray-700'"
+                <Tag
+                  size="small"
+                  :color="selected === ver.key ? color : 'gray'"
                 >
                   {{ ver.label }}
-                </span>
+                </Tag>
                 <span
                   v-if="ver.description"
                   class="text-xs text-gray-500"
                 >
                   {{ ver.description }}
                 </span>
-                <span
+                <Tag
                   v-for="tag in ver.tags"
                   :key="tag"
-                  class="text-xs px-1.5 py-0.5 rounded font-medium"
-                  :class="tag === '推荐' || tag === '稳定版' || tag === '最新版'
-                    ? 'bg-green-100 text-green-700'
+                  size="small"
+                  :color="tag === '推荐' || tag === '稳定版' || tag === '最新版'
+                    ? 'green'
                     : tag === '测试版' || tag === '预览版'
-                    ? 'bg-yellow-100 text-yellow-700'
-                    : 'bg-gray-100 text-gray-600'"
+                    ? 'gold'
+                    : 'gray'"
                 >
                   {{ tag }}
-                </span>
+                </Tag>
               </div>
               <CheckIcon v-if="selected === ver.key" class="w-4 h-4 shrink-0" :class="`text-${color}-500`" />
             </div>

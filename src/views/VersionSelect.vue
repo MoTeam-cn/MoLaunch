@@ -16,6 +16,7 @@ import * as tauri from '@/utils/tauri'
 import grassIcon from '@/assets/blocks/Grass.png'
 import { inferVersionType, typeMetaMap, type VersionTypeMeta } from '@/composables/useVersionMeta'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
 import FolderSidebar from './version-select/FolderSidebar.vue'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import {
@@ -218,9 +219,7 @@ onMounted(() => loadInstalled())
               <div class="flex items-center gap-2.5">
                 <img :src="group.icon" class="h-5 w-5 rounded-sm" alt="">
                 <span class="text-sm font-semibold text-gray-900">{{ group.title }}</span>
-                <span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-500">
-                  {{ group.versions.length }}
-                </span>
+                <Tag size="small" color="gray">{{ group.versions.length }}</Tag>
               </div>
               <ChevronDownIcon
                 class="h-4 w-4 flex-none text-gray-400 transition-transform duration-300 ease-in-out"

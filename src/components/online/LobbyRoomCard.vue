@@ -8,6 +8,7 @@
 import { computed } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Tag from '@/components/common/Tag.vue'
 import { formatBytes } from '@/utils/format'
 import type { LobbyRoomItem } from '@/types/online'
 import {
@@ -67,9 +68,7 @@ function handleJoin() {
       <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" :class="statusColor">
         {{ statusLabel }}
       </span>
-      <span v-if="loaderLabel" class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-primary-50 text-primary-700">
-        {{ loaderLabel }}
-      </span>
+      <Tag v-if="loaderLabel" size="small" color="arcoblue">{{ loaderLabel }}</Tag>
       <span v-if="room.hostMcVersion" class="text-xs text-gray-500">MC {{ room.hostMcVersion }}</span>
       <Tooltip v-if="room.hasPassword" text="需要密码">
         <LockClosedIcon class="w-3.5 h-3.5 text-yellow-600" />

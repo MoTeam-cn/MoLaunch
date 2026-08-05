@@ -16,6 +16,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Tag from '@/components/common/Tag.vue'
 import { toastSuccess, toastWarning, toastError } from '@/utils/toast'
 import { modDedupScan } from '@/utils/api/tools'
 import type { ModDedupResult } from '@/utils/api/tools'
@@ -117,9 +118,7 @@ async function runScan() {
                 :key="v.file_name"
                 class="flex items-center gap-3 px-3 py-2"
               >
-                <span class="flex-none rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
-                  {{ v.version }}
-                </span>
+                <Tag size="small" color="blue" class="flex-none">{{ v.version }}</Tag>
                 <Tooltip :text="v.file_name" position="top" :delay="200" block>
                   <span class="flex-1 min-w-0 truncate text-sm text-gray-700">{{ v.file_name }}</span>
                 </Tooltip>

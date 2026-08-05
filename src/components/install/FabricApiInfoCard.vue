@@ -10,6 +10,7 @@
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
 import Alert from '@/components/common/Alert.vue'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { formatBytes, formatDate } from '@/utils/format'
 import type { FabricApiVersion } from '@/utils/api/loader'
@@ -34,9 +35,7 @@ defineEmits<{ retry: [] }>()
       <div class="flex items-center gap-2 min-w-0">
         <img :src="fabricIcon" class="w-4 h-4 rounded shrink-0 opacity-80" />
         <span class="text-sm font-medium text-gray-900 shrink-0">Fabric API</span>
-        <span class="text-xs px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
-          将自动安装
-        </span>
+        <Tag size="small" color="blue">将自动安装</Tag>
       </div>
       <Button
         v-if="state === 'error'"

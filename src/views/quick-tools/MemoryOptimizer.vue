@@ -13,6 +13,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Tag from '@/components/common/Tag.vue'
 import AlertV2 from '@/components/common/AlertV2.vue'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirmAsync } from '@/utils/modal'
@@ -116,9 +117,7 @@ async function optimizeMemory() {
             <span class="text-sm font-medium text-green-800">
               已释放 {{ formatBytes(memResult.freed_bytes) }}
             </span>
-            <span class="ml-2 rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
-              {{ memResult.mode === 'strong' ? '强力' : '轻量' }}模式
-            </span>
+            <Tag size="small" color="green" class="ml-2">{{ memResult.mode === 'strong' ? '强力' : '轻量' }}模式</Tag>
           </div>
         </div>
         <div class="mt-1.5 pl-8 text-xs text-green-600">
