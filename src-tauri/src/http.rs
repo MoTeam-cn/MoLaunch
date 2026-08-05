@@ -87,6 +87,8 @@ pub struct ClientBuildParams<'a> {
     pub trust_mode: &'a str,
     pub ignore_tls: bool,
     pub redirect: Option<reqwest::redirect::Policy>,
+    /// 自定义 User-Agent（None 使用默认 UA）
+    pub user_agent: Option<&'a str>,
 }
 
 /// 构建 HTTP 客户端
@@ -113,6 +115,7 @@ pub fn build_client(
         trust_mode,
         ignore_tls,
         redirect: None,
+        user_agent: None,
     })
 }
 
@@ -163,14 +166,63 @@ pub fn build_client_with_redirect(
         trust_mode: &trust_mode,
         ignore_tls,
         redirect: Some(redirect),
+        user_agent: None,
+    })
+}
+
+/// 基于当前配置构建带自定义 User-Agent 的 HTTP 客户端
+///
+/// 复用全局客户端同款管线（代理 / IP 版本 / TLS 信任源 / ignore_tls），
+/// 仅覆盖 User-Agent。供外部下载等需要伪装 UA 的场景使用。
+pub fn build_client_with_user_agent(user_agent: &str, timeout_ms: Option<u64>) -> reqwest::Client {
+    let config = crate::config::load_config().ok().flatten();
+    let (mode, kind, url, ip_version, trust_mode) = config
+        .as_ref()
+        .map(|c| {
+            (
+                c.proxy.mode.clone(),
+                c.proxy.kind.clone(),
+                c.proxy.url.clone(),
+                c.proxy.ip_version.clone(),
+                c.tls.trust_mode.clone(),
+            )
+        })
+        .unwrap_or_else(|| {
+            (
+                "none".to_string(),
+                "http".to_string(),
+                String::new(),
+                "auto".to_string(),
+                "builtin".to_string(),
+            )
+        });
+    // ignore_tls 走注册表（开发者模式 IgnoreTls），与全局客户端一致
+    let ignore_tls = crate::commands::system::developer::is_ignore_tls();
+    let timeout = timeout_ms
+        .map(Duration::from_millis)
+        .unwrap_or(Duration::from_secs(30));
+    build_client_inner(ClientBuildParams {
+        proxy_mode: &mode,
+        proxy_type: &kind,
+        proxy_url: &url,
+        ip_version: &ip_version,
+        timeout,
+        trust_mode: &trust_mode,
+        ignore_tls,
+        redirect: None,
+        user_agent: Some(user_agent),
     })
 }
 
 /// 按参数构建 HTTP 客户端（内部统一实现）
 fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
+    let user_agent: String = params
+        .user_agent
+        .map(str::to_string)
+        .unwrap_or_else(|| user_agent().to_string());
     let mut builder = reqwest::Client::builder()
         .timeout(params.timeout)
-        .user_agent(user_agent());
+        .user_agent(user_agent);
 
     if let Some(policy) = params.redirect {
         builder = builder.redirect(policy);

@@ -16,10 +16,13 @@ import {
   PauseIcon,
   PlayIcon,
   XMarkIcon,
+  InformationCircleIcon,
+  Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
 import { useExternalDownload } from '@/composables/useExternalDownload'
 import DownloadedFileList from './external-download/DownloadedFileList.vue'
 
@@ -45,6 +48,11 @@ const {
   cancelDownloadTask,
   files,
   deleteFile,
+  userAgent,
+  maxThreads,
+  chunkCount,
+  maxSpeedMB,
+  resetSettings,
 } = useExternalDownload()
 </script>
 
@@ -59,7 +67,7 @@ const {
           <label class="mb-1.5 block text-xs font-medium text-gray-700">下载地址</label>
           <Input
             v-model="url"
-            placeholder="https://example.com/file.zip"
+            placeholder="请输入下载链接"
             :disabled="downloading"
           />
         </div>
@@ -73,7 +81,7 @@ const {
           <div class="relative">
             <Input
               v-model="fileName"
-              placeholder="file.zip"
+              placeholder="自动获取文件名"
               :disabled="downloading || isFetchingFilename"
               @input="onFileNameInput"
             />
@@ -141,6 +149,77 @@ const {
 
     <!-- 已下载文件列表 -->
     <DownloadedFileList :files="files" @delete="deleteFile" />
+
+    <!-- 工具原理说明 -->
+    <section class="rounded-lg border border-gray-300 bg-white">
+      <h3 class="flex items-center gap-1.5 px-5 pt-5 pb-3 text-sm font-semibold text-gray-900">
+        <InformationCircleIcon class="h-4 w-4 text-primary-500" />
+        工具原理
+      </h3>
+      <div class="px-5 pb-5 space-y-2 text-xs leading-relaxed text-gray-600">
+        <p>
+          本工具将下载地址发送给启动器内置下载引擎：后端通过
+          <code class="rounded bg-gray-100 px-1 py-0.5 text-gray-800">DownloadManager</code>
+          发起请求，把文件以多线程分片方式下载到下载目录，并接入全局下载进度（可在下载管理页查看）。
+        </p>
+        <p>
+          支持<b class="text-gray-700">断点续传</b>（暂停/恢复）与<b class="text-gray-700">多线程分片</b>：
+          大文件会按分片数拆成多段并行下载，完成后自动合并，显著提升速度。
+        </p>
+        <p>
+          部分资源站会对请求方做校验（限速 / 防盗链），此时可展开<b class="text-gray-700">高级设置</b>
+          自定义 User-Agent、调整线程数与分片数，或设置全局限速，从而兼容更多站点。
+        </p>
+      </div>
+    </section>
+
+    <!-- 高级设置 -->
+    <CollapsibleCard>
+      <template #title>
+        <span class="flex items-center gap-1.5">
+          <Cog6ToothIcon class="h-4 w-4 text-gray-500" />
+          高级设置
+        </span>
+      </template>
+      <div class="space-y-4">
+        <div>
+          <label class="mb-1.5 block text-xs font-medium text-gray-700">自定义 User-Agent</label>
+          <Input
+            v-model="userAgent"
+            placeholder="留空使用默认 UA（如 Mozilla/5.0 ...）"
+            :disabled="downloading"
+          />
+          <p class="mt-1 text-xs text-gray-400">部分资源站按 UA 识别下载客户端，留空自动使用启动器默认 UA。</p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="mb-1.5 block text-xs font-medium text-gray-700">并发线程数</label>
+            <Input v-model.number="maxThreads" type="number" min="0" max="64" placeholder="跟随全局" :disabled="downloading" />
+            <p class="mt-1 text-xs text-gray-400">0 = 使用全局配置</p>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs font-medium text-gray-700">单文件分片数</label>
+            <Input v-model.number="chunkCount" type="number" min="0" max="32" placeholder="跟随全局" :disabled="downloading" />
+            <p class="mt-1 text-xs text-gray-400">0/1 = 单流下载</p>
+          </div>
+          <div>
+            <label class="mb-1.5 block text-xs font-medium text-gray-700">限速（MB/s）</label>
+            <Input v-model.number="maxSpeedMB" type="number" min="0" max="1024" placeholder="不限速" :disabled="downloading" />
+            <p class="mt-1 text-xs text-gray-400">0 = 不限速</p>
+          </div>
+        </div>
+
+        <div class="flex justify-end">
+          <Button type="ghost" size="small" @click="resetSettings">
+            <template #icon>
+              <ArrowPathIcon class="h-3.5 w-3.5" />
+            </template>
+            恢复默认
+          </Button>
+        </div>
+      </div>
+    </CollapsibleCard>
 
     <!-- 下载目录设置区 -->
     <section class="rounded-lg border border-gray-300 bg-white">

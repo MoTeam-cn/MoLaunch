@@ -9,6 +9,7 @@ import { toastError, toastInfo } from '@/utils/toast'
 import { showModal } from '@/utils/modal'
 import { isCancelledError } from '@/utils/async'
 import { downloadFile } from '@/utils/api/tools'
+import { useExternalSettings } from './external-settings'
 import { useExternalSource } from './external-source'
 import { useExternalTask } from './external-task'
 
@@ -16,6 +17,7 @@ export function useExternalDownload() {
   const versionStore = useVersionStore()
   const source = useExternalSource()
   const task = useExternalTask()
+  const settings = useExternalSettings()
 
   const currentFileName = computed(() => versionStore.downloadingVersion ?? source.fileName.value)
 
@@ -44,7 +46,7 @@ export function useExternalDownload() {
     versionStore.startDownload(nameVal)
     toastInfo(`开始下载: ${nameVal}`)
 
-    downloadFile(urlVal, nameVal)
+    downloadFile(urlVal, nameVal, settings.toDownloadSettings())
       .then(async () => {
         await source.refreshFiles()
         source.url.value = ''
@@ -108,5 +110,11 @@ export function useExternalDownload() {
     // 文件列表
     files: source.files,
     deleteFile: source.deleteFile,
+    // 高级设置
+    userAgent: settings.userAgent,
+    maxThreads: settings.maxThreads,
+    chunkCount: settings.chunkCount,
+    maxSpeedMB: settings.maxSpeedMB,
+    resetSettings: settings.resetSettings,
   }
 }

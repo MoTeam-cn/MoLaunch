@@ -51,12 +51,18 @@ impl DownloadManager {
 
     /// 从 DownloadManagerConfig 构造（统一参数来源，避免硬编码）
     pub fn from_config(config: &DownloadManagerConfig) -> Self {
-        Self::new(
+        let client = match config.user_agent.as_deref() {
+            Some(ua) if !ua.is_empty() => crate::http::build_client_with_user_agent(ua, None),
+            _ => crate::http::get_client(),
+        };
+        let mut manager = Self::new(
             config.max_threads,
             config.chunk_count,
             config.speed_limit,
             config.source_mode,
-        )
+        );
+        manager.client = client;
+        manager
     }
 
     /// 从 AppState 提取下载配置并构造（统一收敛 3 处重复的 lock/extract/drop）

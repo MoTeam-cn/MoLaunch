@@ -7,6 +7,7 @@
 use std::path::PathBuf;
 
 use crate::log_info;
+use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::download::DownloadSession;
 use crate::state::AppState;
 use crate::storage::Storage;
@@ -21,6 +22,7 @@ use super::types::{
 /// - 校验 http/https 协议
 /// - 校验文件名安全性
 /// - 复用 DownloadSession（支持进度 / 暂停 / 取消），进度写入 download_state（分组"外部下载"）
+/// - 支持按任务覆盖：自定义 UA / 线程数 / 分片数 / 限速（对应高级设置）
 /// - 返回保存路径与文件大小
 pub async fn download_file(
     state: &AppState,
@@ -49,8 +51,25 @@ pub async fn download_file(
         save_path.display()
     );
 
+    // 构造下载管理器：从全局配置读取默认值，再按任务覆盖高级设置
+    let mut manager_config = DownloadManagerConfig::from_state(state).await;
+    manager_config.apply_overrides(
+        params.max_threads,
+        params.chunk_count,
+        params.max_speed,
+        params.user_agent,
+    );
+    let manager =
+        crate::minecraft::download::manager::DownloadManager::from_config(&manager_config);
+
     // 启动 DownloadSession：统一 reset_stages + flag 重置 + manager 构造
-    let session = DownloadSession::start_grouped(state, "外部下载", vec![(&file_name, 1.0)]).await;
+    let session = DownloadSession::start_grouped_with_manager(
+        state,
+        "外部下载",
+        vec![(&file_name, 1.0)],
+        manager,
+    )
+    .await;
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.version_name = file_name.clone();

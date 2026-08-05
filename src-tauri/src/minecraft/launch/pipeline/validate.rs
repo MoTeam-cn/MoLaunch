@@ -23,6 +23,7 @@ impl LaunchPipeline {
             source_mode: crate::minecraft::sources::DownloadSourceMode::from_str(
                 &self.config.download_source,
             ),
+            user_agent: None,
         };
         crate::minecraft::download::manager::DownloadManager::from_config(&download_config)
     }

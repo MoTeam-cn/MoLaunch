@@ -35,6 +35,20 @@ impl DownloadSession {
         group_name: &str,
         stages: Vec<(&str, f64)>,
     ) -> Self {
+        let manager = DownloadManager::from_state(state).await;
+        Self::start_grouped_with_manager(state, group_name, stages, manager).await
+    }
+
+    /// 启动一个分组下载会话（使用外部传入的 `DownloadManager`）
+    ///
+    /// 与 [`start_grouped`] 相同，但允许调用方传入自定义构造的 manager
+    /// （如外部下载工具按任务覆盖 UA / 线程数 / 分片数 / 限速）。
+    pub async fn start_grouped_with_manager(
+        state: &AppState,
+        group_name: &str,
+        stages: Vec<(&str, f64)>,
+        manager: DownloadManager,
+    ) -> Self {
         // 1. 注册 stages
         {
             let stages: Vec<DownloadStage> = stages
@@ -53,9 +67,8 @@ impl DownloadSession {
             .download_pause_flag
             .store(false, std::sync::atomic::Ordering::Relaxed);
 
-        // 3. 构造 manager 并接入 flag
-        let manager = DownloadManager::from_state(state)
-            .await
+        // 3. 接入 flag
+        let manager = manager
             .with_cancel_flag(state.download_cancel_flag.clone())
             .with_pause_flag(state.download_pause_flag.clone());
 

@@ -7,7 +7,7 @@ use crate::state::AppState;
 
 /// DownloadManager 构造配置
 ///
-/// 仅包含 DownloadManager::new 所需的 4 个字段，不含 mirror_url / meta_source 等
+/// 仅包含 DownloadManager::new 所需的字段，不含 mirror_url / meta_source 等
 /// 其他下载配置（那些由调用方自行从 config 读取）。
 pub struct DownloadManagerConfig {
     /// 文件级并发数（同时下载多少个文件，由 Semaphore 控制）
@@ -18,6 +18,8 @@ pub struct DownloadManagerConfig {
     pub speed_limit: u64,
     /// 下载源模式（Official / Mirror / Smart）
     pub source_mode: DownloadSourceMode,
+    /// 自定义 User-Agent（None 使用默认 UA）
+    pub user_agent: Option<String>,
 }
 
 impl DownloadManagerConfig {
@@ -34,6 +36,7 @@ impl DownloadManagerConfig {
             chunk_count: config.download.chunk_count.max(1) as usize,
             speed_limit: config.download.max_speed,
             source_mode: DownloadSourceMode::from_str(&config.download.source),
+            user_agent: None,
         }
     }
 
@@ -51,6 +54,38 @@ impl DownloadManagerConfig {
             chunk_count: config.download.chunk_count.max(1) as usize,
             speed_limit: config.download.max_speed,
             source_mode: DownloadSourceMode::from_str(&config.download.meta_source),
+            user_agent: None,
+        }
+    }
+
+    /// 应用外部下载的可选覆盖参数（线程数 / 分片数 / 限速 / UA）
+    ///
+    /// 仅覆盖 `Some` 的字段，`None` 保持原有值。供外部下载工具按任务级覆盖全局配置。
+    pub fn apply_overrides(
+        &mut self,
+        max_threads: Option<u32>,
+        chunk_count: Option<u32>,
+        max_speed: Option<u64>,
+        user_agent: Option<String>,
+    ) {
+        if let Some(v) = max_threads {
+            if v > 0 {
+                self.max_threads = v as usize;
+            }
+        }
+        if let Some(v) = chunk_count {
+            self.chunk_count = v.max(1) as usize;
+        }
+        if let Some(v) = max_speed {
+            self.speed_limit = v;
+        }
+        if let Some(ua) = user_agent {
+            let trimmed = ua.trim().to_string();
+            self.user_agent = if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed)
+            };
         }
     }
 }
