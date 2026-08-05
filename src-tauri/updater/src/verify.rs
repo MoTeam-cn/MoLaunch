@@ -1,59 +1,41 @@
+//! 更新包签名校验（minisign 格式，与 tauri-plugin-updater 完全一致）
+//!
+//! 使用与 Tauri 官方 updater 插件同款的 `minisign-verify` crate：
+//! - 公钥：与 `src-tauri/tauri.conf.json` 的 `plugins.updater.pubkey` 保持同一份
+//!   （`dW` 开头完整 base64，解码后为两行 minisign.pub 文本）。更换签名密钥时，
+//!   同步更新 tauri.conf.json 与本文件即可。
+//! - 签名：标准 minisign `.sig` 文件内容（4 行：untrusted comment / 签名行 /
+//!   trusted comment / 全局签名行），由 CI 的 `tauri signer` / `tauri-action` 生成。
+//! - 校验：key_id 匹配 -> prehashed 用 BLAKE2b-512 摘要 -> Ed25519 验证签名
+//!   与全局签名（签名 + trusted comment）。
+
 use base64::engine::{general_purpose, Engine as _};
-use ed25519_dalek::{Signature, VerifyingKey};
-use sha2::{Digest, Sha512};
+use minisign_verify::{PublicKey, Signature};
 use std::fs;
 use std::path::Path;
 
-// 从 tauri.conf.json plugins.updater.pubkey 提取的公钥第二行（base64）
-// 解码后前 2 字节是算法标识（Ed25519），后 32 字节是真正的公钥
-const PUBKEY_B64: &str = "RWQXIJ9FRypYEviIOjdYFmBE/87ea7Uf8/EaE7AjaxXNhaU7XSYU/696F";
+/// 与 tauri.conf.json `plugins.updater.pubkey` 完全一致（`dW` 开头完整 base64）
+const PUBKEY_B64: &str = "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDEyNTgyQTQ3NDU5RjIwMTcKUldRWElKOUZSeXBZRXZJT2pkWUZtQkUvODdlYTdVZjgvRWFFN0FqYXhYTmhhVTdYU1lVLzY5NkUK";
 
 pub fn verify_minisign(new_exe: &Path, signature: &str) -> Result<(), String> {
-    let pubkey_full = general_purpose::STANDARD
+    // 1. 解码公钥：dW 开头 base64 -> minisign.pub 两行文本
+    let pubkey_b64 = general_purpose::STANDARD
         .decode(PUBKEY_B64)
         .map_err(|e| format!("公钥 base64 解码失败: {e}"))?;
-    if pubkey_full.len() != 34 {
-        return Err(format!("公钥长度错误: {}", pubkey_full.len()));
-    }
-    let pubkey_bytes: [u8; 32] = pubkey_full[2..]
-        .try_into()
-        .map_err(|_| "公钥切片失败".to_string())?;
+    let pubkey_text = std::str::from_utf8(&pubkey_b64)
+        .map_err(|e| format!("公钥文本非 UTF-8: {e}"))?;
+    let public_key = PublicKey::decode(pubkey_text)
+        .map_err(|e| format!("公钥解析失败: {e}"))?;
 
-    let sig_b64 = extract_signature_line(signature)?;
-    let sig_bytes = general_purpose::STANDARD
-        .decode(&sig_b64)
-        .map_err(|e| format!("签名 base64 解码失败: {e}"))?;
-    if sig_bytes.len() != 66 {
-        return Err(format!("签名长度错误: {}", sig_bytes.len()));
-    }
-    let ed25519_sig: [u8; 64] = sig_bytes[2..]
-        .try_into()
-        .map_err(|_| "签名切片失败".to_string())?;
+    // 2. 解析签名（标准 minisign .sig 内容，4 行格式）
+    let parsed_sig = Signature::decode(signature)
+        .map_err(|e| format!("签名解析失败（需标准 minisign .sig 内容）: {e}"))?;
 
+    // 3. 读取文件并校验（allow_legacy=true，与 Tauri 插件一致）
     let exe_bytes = fs::read(new_exe).map_err(|e| format!("读取新 exe 失败: {e}"))?;
-    let mut hasher = Sha512::new();
-    hasher.update(&exe_bytes);
-
-    let pubkey = VerifyingKey::from_bytes(&pubkey_bytes)
-        .map_err(|e| format!("公钥无效: {e}"))?;
-    let sig = Signature::from_bytes(&ed25519_sig);
-    pubkey
-        .verify_prehashed(hasher, None, &sig)
+    public_key
+        .verify(&exe_bytes, &parsed_sig, true)
         .map_err(|e| format!("签名验证失败: {e}"))?;
 
     Ok(())
-}
-
-fn extract_signature_line(signature: &str) -> Result<String, String> {
-    for line in signature.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty()
-            || trimmed.starts_with("untrusted comment:")
-            || trimmed.starts_with("trusted comment:")
-        {
-            continue;
-        }
-        return Ok(trimmed.to_string());
-    }
-    Err("signature 中未找到签名行".into())
 }

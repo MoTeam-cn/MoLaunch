@@ -93,6 +93,18 @@ pub(super) fn last_exe_path() -> Result<std::path::PathBuf, String> {
         .join("last.exe"))
 }
 
+/// 获取 last.sig 路径（%APPDATA%/.Molaunch/last.sig，与 last.exe 配对的签名缓存）
+///
+/// 后台预下载时随 last.exe 一起写入，退出时由 `apply_pending_update_impl`
+/// 读出并作为 `--signature` 传给 updater.exe 做验签（updater 参数解析要求必填）。
+#[cfg(target_os = "windows")]
+pub(super) fn last_signature_path() -> Result<std::path::PathBuf, String> {
+    let appdata = std::env::var("APPDATA").map_err(|_| "APPDATA 环境变量未设置".to_string())?;
+    Ok(std::path::PathBuf::from(appdata)
+        .join(".Molaunch")
+        .join("last.sig"))
+}
+
 /// 后台静默下载新版本到 `%APPDATA%/.Molaunch/last.exe`
 ///
 /// 前端定时检查发现新版本后调用此命令，将安装包下载到 appdata。
@@ -103,6 +115,9 @@ pub(super) fn last_exe_path() -> Result<std::path::PathBuf, String> {
 pub(super) async fn download_update_to_appdata_impl(info: UpdateInfo) -> Result<bool, String> {
     if info.download_url.is_empty() {
         return Err("下载 URL 为空".into());
+    }
+    if info.signature.is_empty() {
+        return Err("更新签名缺失，无法后台预下载".into());
     }
 
     let last_exe = last_exe_path()?;
@@ -130,6 +145,14 @@ pub(super) async fn download_update_to_appdata_impl(info: UpdateInfo) -> Result<
 
     std::fs::write(&last_exe, &bytes).map_err(|e| format!("写入 last.exe 失败: {e}"))?;
 
+    // 签名随 last.exe 一起缓存（last.sig），退出时 apply_pending_update 读出传给 updater.exe
+    // 写失败时回滚 last.exe，保证 last.exe/last.sig 配对一致性
+    let last_sig = last_signature_path()?;
+    if let Err(e) = std::fs::write(&last_sig, info.signature.as_bytes()) {
+        let _ = std::fs::remove_file(&last_exe);
+        return Err(format!("写入 last.sig 失败: {e}"));
+    }
+
     log::info!(
         "[Updater] 后台下载完成: {} ({} bytes)",
         last_exe.display(),
@@ -154,6 +177,19 @@ pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, 
         return Ok(false);
     }
 
+    // last.exe 必须与 last.sig 配对：签名缺失/为空说明预下载不完整（旧版本残留或下载中断），
+    // 清理待安装文件返回 false，等下次定时检查重新下载
+    let last_sig = last_signature_path()?;
+    let signature = match std::fs::read_to_string(&last_sig) {
+        Ok(s) if !s.trim().is_empty() => s.trim().to_string(),
+        _ => {
+            log::warn!("[Updater] last.sig 缺失或为空，清理不完整的待安装更新");
+            let _ = std::fs::remove_file(&last_exe);
+            let _ = std::fs::remove_file(&last_sig);
+            return Ok(false);
+        }
+    };
+
     // 释放 updater.exe
     let updater_path =
         crate::resources::extract_updater().map_err(|e| format!("释放 updater.exe 失败: {e}"))?;
@@ -175,6 +211,8 @@ pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, 
         .arg(&last_exe)
         .arg("--pid")
         .arg(pid.to_string())
+        .arg("--signature")
+        .arg(&signature)
         .spawn()
         .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
 

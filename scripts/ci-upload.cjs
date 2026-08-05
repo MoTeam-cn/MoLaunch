@@ -273,8 +273,10 @@ async function main() {
 
   const FILE_SIZE = packageBuffer.length;
   const FILE_HASH = `sha256:${crypto.createHash('sha256').update(packageBuffer).digest('hex')}`;
-  // .sig 文件内容即为 base64 签名字符串（tauri signer 输出格式），去除换行和空白
-  const SIGNATURE_B64 = sigBuffer.toString('utf8').replace(/[\r\n\s]/g, '');
+  // .sig 文件内容为标准 minisign 4 行格式（tauri signer / tauri-action 输出）。
+  // 原样存储（保留换行），启动器 updater（src-tauri/updater，minisign_verify）
+  // 与 tauri-plugin-updater 才能正确解析；不要去除换行/空白。
+  const SIGNATURE = sigBuffer.toString('utf8');
 
   console.log(`::group::上传 ${PLATFORM}/${ARCH} ${BUNDLE_TYPE} (${PACKAGE_FILENAME}, ${FILE_SIZE} bytes)`);
 
@@ -357,7 +359,7 @@ async function main() {
     arch: ARCH,
     bundle_type: BUNDLE_TYPE,
     download_url: pkgUpload.download_key,
-    signature: SIGNATURE_B64,
+    signature: SIGNATURE,
     file_size: FILE_SIZE,
     file_hash: FILE_HASH,
     release_notes: RELEASE_NOTES,

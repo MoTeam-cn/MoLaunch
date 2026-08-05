@@ -4,14 +4,8 @@ use serde_json::Value;
 use tauri::AppHandle;
 
 use super::UpdateInfo;
+use crate::api_paths::UPDATES_MANIFEST_RAW;
 use crate::state::AppState;
-
-/// updater endpoint 路径模板（base_url 来自 AppConfig.online.api_server_url）
-///
-/// Windows 自实现检查更新走 v1 raw 端点（携带 JWT 鉴权）；
-/// macOS/Linux 官方 plugin 走 v3 无鉴权端点（tauri.conf.json 配置）。
-pub(super) const UPDATER_PATH: &str =
-    "/v1/updates/manifest/raw?target={{target}}&arch={{arch}}&current_version={{current_version}}";
 
 /// 获取当前平台标识（用于 updater endpoint 的 target 参数）
 ///
@@ -61,8 +55,8 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         config.online.api_server_url.clone()
     };
 
-    // 2. 构建 URL（base_url + 路径模板替换）
-    let path = UPDATER_PATH
+    // 2. 构建 URL（base_url + 路径模板替换，模板见 crate::api_paths::UPDATES_MANIFEST_RAW）
+    let path = UPDATES_MANIFEST_RAW
         .replace("{{target}}", target)
         .replace("{{arch}}", arch)
         .replace("{{current_version}}", current_version);
@@ -102,7 +96,18 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
         .await
         .map_err(|e| format!("解析更新信息失败: {e}"))?;
 
-    let version = json.get("version").and_then(|v| v.as_str()).unwrap_or("");
+    // UnifiedResponse 包装：{ code, msg, data }（v1 raw/manifest 端点统一格式）
+    let code = json.get("code").and_then(|v| v.as_i64()).unwrap_or(0);
+    if code != 1 {
+        log::info!("[Updater] 服务器返回 code={}（无可用更新）", code);
+        return Ok(UpdateInfo::default());
+    }
+    let data = json.get("data");
+
+    let version = data
+        .and_then(|d| d.get("version"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("");
     if version.is_empty() {
         log::info!("[Updater] manifest 无 version 字段（无可用更新）");
         return Ok(UpdateInfo::default());
@@ -119,22 +124,22 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     Ok(UpdateInfo {
         available: true,
         version: version.to_string(),
-        notes: json
-            .get("notes")
+        notes: data
+            .and_then(|d| d.get("notes"))
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
-        force_update: json
-            .get("force_update")
+        force_update: data
+            .and_then(|d| d.get("force_update"))
             .and_then(|v| v.as_bool())
             .unwrap_or(false),
-        download_url: json
-            .get("url")
+        download_url: data
+            .and_then(|d| d.get("url"))
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),
-        signature: json
-            .get("signature")
+        signature: data
+            .and_then(|d| d.get("signature"))
             .and_then(|v| v.as_str())
             .unwrap_or("")
             .to_string(),

@@ -15,9 +15,10 @@ windows = { version = "0.58", features = [
     "Win32_System_Threading",
     "Win32_Storage_FileSystem",
 ] }
-ed25519-dalek = { version = "2", features = ["digest"] }
+# 与 tauri-plugin-updater 同款的 minisign 签名验证库（零依赖）
+minisign-verify = "0.2"
+# 解码 tauri.conf.json 的 dW 开头公钥（base64 -> minisign.pub 两行文本）
 base64 = "0.22"
-sha2 = "0.10"
 
 [build-dependencies]
 winres = "0.1"
