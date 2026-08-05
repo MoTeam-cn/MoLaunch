@@ -31,6 +31,8 @@ export function useFrpTunnelSlice() {
   const tunnelsLoading = ref(false)
   /** 隧道操作中（创建/删除/启动/停止） */
   const tunnelActionLoading = ref(false)
+  /** 正在启动/停止的隧道 ID（为空表示非启停操作，用于按钮按隧道区分加载态） */
+  const tunnelActionTunnelId = ref<string | null>(null)
   /** 最近一次隧道状态变更事件（用于 TunnelManager 显示异常退出提示） */
   const lastTunnelStatus = ref<FrpTunnelStatusEvent | null>(null)
   /** 隧道状态事件监听器是否已启动（避免重复注册） */
@@ -99,6 +101,7 @@ export function useFrpTunnelSlice() {
       return false
     } finally {
       tunnelActionLoading.value = false
+      tunnelActionTunnelId.value = null
     }
   }
 
@@ -115,6 +118,7 @@ export function useFrpTunnelSlice() {
       return false
     } finally {
       tunnelActionLoading.value = false
+      tunnelActionTunnelId.value = null
     }
   }
 
@@ -131,12 +135,14 @@ export function useFrpTunnelSlice() {
       return false
     } finally {
       tunnelActionLoading.value = false
+      tunnelActionTunnelId.value = null
     }
   }
 
   /** 启动隧道 */
   async function startTunnel(id: string): Promise<boolean> {
     tunnelActionLoading.value = true
+    tunnelActionTunnelId.value = id
     try {
       await apiStartTunnel(id)
       toastSuccess('隧道已启动')
@@ -147,12 +153,14 @@ export function useFrpTunnelSlice() {
       return false
     } finally {
       tunnelActionLoading.value = false
+      tunnelActionTunnelId.value = null
     }
   }
 
   /** 停止隧道 */
   async function stopTunnel(id: string): Promise<boolean> {
     tunnelActionLoading.value = true
+    tunnelActionTunnelId.value = id
     try {
       await apiStopTunnel(id)
       toastSuccess('隧道已停止')
@@ -163,6 +171,7 @@ export function useFrpTunnelSlice() {
       return false
     } finally {
       tunnelActionLoading.value = false
+      tunnelActionTunnelId.value = null
     }
   }
 
@@ -171,6 +180,7 @@ export function useFrpTunnelSlice() {
     tunnels,
     tunnelsLoading,
     tunnelActionLoading,
+    tunnelActionTunnelId,
     lastTunnelStatus,
     // actions
     loadTunnels,

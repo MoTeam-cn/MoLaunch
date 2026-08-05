@@ -121,13 +121,13 @@ function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldNam
 
         <!-- 地图叠加控件（悬浮提示 / 坐标面板 / 缩放 / 加载遮罩） -->
         <SeedMapControls
-          v-model:userX="userX"
-          v-model:userZ="userZ"
-          v-model:yCoord="yCoord"
-          v-model:doContour="doContour"
-          v-model:ymaxLimit="ymaxLimit"
-          v-model:largeBiomes="largeBiomes"
-          v-model:showCoordPanel="showCoordPanel"
+          v-model:user-x="userX"
+          v-model:user-z="userZ"
+          v-model:y-coord="yCoord"
+          v-model:do-contour="doContour"
+          v-model:ymax-limit="ymaxLimit"
+          v-model:large-biomes="largeBiomes"
+          v-model:show-coord-panel="showCoordPanel"
           :mouse-block="mouseBlock"
           :mouse-biome-name="mouseBiomeName"
           :hover-struct="hoverStruct"
@@ -145,9 +145,9 @@ function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldNam
 
       <!-- 结构筛选栏 -->
       <SeedMapSidebar
-        v-model:showSpawn="showSpawn"
-        v-model:showStronghold="showStronghold"
-        v-model:showNonViable="showNonViable"
+        v-model:show-spawn="showSpawn"
+        v-model:show-stronghold="showStronghold"
+        v-model:show-non-viable="showNonViable"
         :dimension="dimension"
         :structure-list-for-version="structureListForVersion"
         :is-structure-selected="isStructureSelected"

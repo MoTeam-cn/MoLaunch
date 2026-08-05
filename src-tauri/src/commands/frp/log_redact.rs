@@ -5,6 +5,13 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
 
+/// ANSI 转义序列正则（CSI：ESC + `[...` + 终止字节）
+///
+/// 覆盖 frpc 输出常见的颜色/样式序列（如 `ESC[1;34m`、`ESC[0m`），以及
+/// 光标移动等控制序列。终止字节覆盖 0x40-0x7E 标准范围。
+static ANSI_CSI_RE: Lazy<Regex> =
+    Lazy::new(|| Regex::new("\x1b\\[[0-9;?]*[ -/]*[@-~]").expect("ANSI 转义序列正则编译失败"));
+
 /// 敏感字段正则
 ///
 /// 匹配模式（不区分大小写）：TOML `token = "xxx"` / JSON `"token":"xxx"` /
@@ -46,6 +53,14 @@ pub fn redact_log(line: &str) -> String {
             }
         })
         .into_owned()
+}
+
+/// 清洗日志行中的 ANSI 转义序列
+///
+/// 移除 frpc 输出的颜色/样式控制序列（`ESC[1;34m`、`ESC[0m` 等），
+/// 保留其余可见文本。适用于日志展示/落盘前清洗。
+pub fn strip_ansi_sequences(line: &str) -> String {
+    ANSI_CSI_RE.replace_all(line, "").into_owned()
 }
 
 #[cfg(test)]

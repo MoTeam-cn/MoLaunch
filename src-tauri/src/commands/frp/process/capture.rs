@@ -41,8 +41,10 @@ pub(super) async fn capture_stream(
                 if raw.is_empty() {
                     continue;
                 }
+                // 清洗 ANSI 转义序列（frpc 颜色控制字符，避免乱码）
+                let raw = log_redact::strip_ansi_sequences(raw);
                 // 日志脱敏：将 token / 密码等敏感值替换为 ***
-                let line = log_redact::redact_log(raw);
+                let line = log_redact::redact_log(&raw);
 
                 // 1MB 截断检查：超过上限后写入截断提示并停止捕获该流
                 let line_len = line.len();

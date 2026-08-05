@@ -19,6 +19,7 @@ const props = defineProps<{
   tunnels: TunnelWithStatus[]
   loading: boolean
   actionLoading: boolean
+  actionTunnelId: string | null
   providers: ProviderInfo[]
 }>()
 
@@ -30,7 +31,10 @@ const emit = defineEmits<{
   delete: [id: string, name: string]
 }>()
 
-/** 厂商名查找（隧道卡片展示用） */
+/** 某隧道的启停按钮是否处于加载态（仅当前操作中的隧道显示） */
+function isTunnelActionLoading(tunnelId: string): boolean {
+  return props.actionLoading && props.actionTunnelId === tunnelId
+}
 const providerName = computed(() => {
   const map = new Map(props.providers.map(p => [p.id, p.name]))
   return (id: string): string => map.get(id) ?? id
@@ -101,7 +105,7 @@ async function handleCopyLink(tunnel: TunnelWithStatus) {
             v-if="tunnel.status === 'stopped'"
             type="primary"
             size="mini"
-            :loading="actionLoading"
+            :loading="isTunnelActionLoading(tunnel.id)"
             @click="emit('start', tunnel.id)"
           >
             <template #icon><PlayIcon class="w-3.5 h-3.5" /></template>
@@ -111,7 +115,7 @@ async function handleCopyLink(tunnel: TunnelWithStatus) {
             v-else
             type="outline"
             size="mini"
-            :loading="actionLoading"
+            :loading="isTunnelActionLoading(tunnel.id)"
             @click="emit('stop', tunnel.id)"
           >
             <template #icon><StopIcon class="w-3.5 h-3.5" /></template>

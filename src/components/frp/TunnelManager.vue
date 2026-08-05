@@ -25,6 +25,7 @@ const goToLogs = inject<(tunnelId: string) => void>('goToLogs', () => {})
 const tunnels = computed(() => store.tunnels)
 const loading = computed(() => store.tunnelsLoading)
 const actionLoading = computed(() => store.tunnelActionLoading)
+const actionTunnelId = computed(() => store.tunnelActionTunnelId)
 const providers = computed(() => store.providers)
 
 const showForm = ref(false)
@@ -198,6 +199,7 @@ function handleDelete(id: string, name: string) {
       :tunnels="tunnels"
       :loading="loading"
       :action-loading="actionLoading"
+      :action-tunnel-id="actionTunnelId"
       :providers="providers"
       @start="handleStart"
       @stop="handleStop"

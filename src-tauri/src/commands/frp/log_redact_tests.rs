@@ -1,6 +1,6 @@
 //! log_redact 单元测试
 
-use super::redact_log;
+use super::{redact_log, strip_ansi_sequences};
 
 #[test]
 fn redacts_toml_quoted_token() {
@@ -90,4 +90,34 @@ fn empty_line_unchanged() {
 fn line_without_sensitive_data_unchanged() {
     let line = "[INFO] frpc started on port 7000";
     assert_eq!(redact_log(line), line);
+}
+
+#[test]
+fn strips_color_codes() {
+    let line = "\x1b[1;34m2026-08-05 [I] start frpc service\x1b[0m";
+    assert_eq!(
+        strip_ansi_sequences(line),
+        "2026-08-05 [I] start frpc service"
+    );
+}
+
+#[test]
+fn strips_reset_and_color_sequences_in_between() {
+    let line = "\x1b[0m\x1b[1;34m2026-08-05 [I] login to server success\x1b[0m";
+    assert_eq!(
+        strip_ansi_sequences(line),
+        "2026-08-05 [I] login to server success"
+    );
+}
+
+#[test]
+fn strips_cursor_movement_sequences() {
+    let line = "\x1b[2K\x1b[1Gprogress line";
+    assert_eq!(strip_ansi_sequences(line), "progress line");
+}
+
+#[test]
+fn plain_line_unchanged() {
+    let line = "11:55PM INFO <client/service.go:308> 尝试连接到服务器";
+    assert_eq!(strip_ansi_sequences(line), line);
 }
