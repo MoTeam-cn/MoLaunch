@@ -190,6 +190,12 @@
 
 ### 修复
 
+- AI 提问工具注释缺失 + 前端抽屉自适应展示修复（本轮）：
+  - 后端 `tools.rs` 的 `ask_user` 工具 `options` schema 原只声明 `items: {"type": "string"}`，模型输出对象格式会被拒绝，导致「即使提示带注释也没有注释」；现改为 `oneOf` 同时接受纯字符串与 `{"label", "description"}` 对象（`required: ["label"]` + `additionalProperties: false`），模型可正式输出带 `description` 的选项
+  - 提示词 `resources/prompts/chat.md` 第 4 条补充：每个候选选项推荐附带 `description` 注释（说明含义/适用场景），仅在含义显而易见才可省略
+  - 前端新增可复用组件 `OverflowText.vue`（自适应省略：单行 `truncate` / 多行 `line-clamp`，`ResizeObserver` 监听容器尺寸变化如抽屉展开后自动重测，仅真实溢出时才显示 Tooltip 完整内容，未溢出不打扰）；`AskUserDialog.vue` 问题（3 行）、选项标签（1 行）、选项注释（2 行）均改用该组件
+  - `AskUserDialog.vue` 选项容器由 `<button>` 改为 `<div role="button" tabindex="0">` + 键盘事件（原 button 内嵌 Tooltip 的 div trigger 违反 HTML 嵌套规范会被隐式闭合导致布局错乱）；后端 `ask.rs` 本就兼容字符串/对象两种选项并透传前端，前端 `AskUserOption` 类型已含 `description`，无需改动
+
 - 整合包实例加载器信息缺失修复（本轮）：整合包/普通版本安装的 `install_merged`（`flow.rs`）在写 `setup.ini` 时未把已持有的加载器版本传下去——`save_setup_and_create_isolation` 调 `VersionSetup::new` 时 6 个版本参数全部为 `None`（注释写"从目录或 JSON 提取"但未兑现），导致所有经此安装的版本 setup.ini 只有 `Type/OriginalVersion`、缺 `ForgeVersion` 等 `XxxVersion` 键，`get_version_loader_info` 的加载器版本恒为空（RLCraft / SkyFactory 4 / 最小的机械动力 / Zombie Invade 100 Days 均受影响）。修复分三块：① `setup_persist.rs`/`flow.rs` 安装时把 forge/neoforge/fabric/optifine/liteloader 版本写入 setup.ini；② `load.rs` `load_or_create` 新增 `backfill_loader_versions` 自愈逻辑——对已有但缺 `XxxVersion` 的 setup.ini 从版本 JSON 的 libraries 回填并持久化（不覆盖 OriginalVersion/Type/个性化），`get_version_loader_info` 改走 `load_or_create`；③ 保底仍回退 `modpack.meta.json`（在线整合包含权威版本），`get_version_game_version` 在 JSON 提取失败时先回退 setup.ini `OriginalVersion` 再回退 meta。四个实例均可返回 MC 版本与加载器版本
 
 - 整合包在线安装后残留 zip 修复（本轮）：`install_modpack`（`online.rs`）安装成功后未删除下载的原始整合包 zip，`InstallModpackResult.archive_path` 虽返回给前端但全前端无消费点，导致 zip 永久残留在 `versions/<实例名>/` 目录（如 `versions/RLCraft/RLCraft.zip`）。现于安装成功后在 async 块外删除该 zip（此时文件句柄已释放，避免 Windows 占用删除失败），删除失败仅告警不阻断结果，并将 `archive_path` 置空避免返回已不存在的路径；本地拖拽安装 `install_local_modpack` 不动用户原始文件，维持原逻辑

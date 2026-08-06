@@ -182,7 +182,24 @@ pub fn tool_definitions() -> Vec<ToolDef> {
                 "type": "object",
                 "properties": {
                     "question": {"type": "string", "description": "需要向用户确认的问题"},
-                    "options": {"type": "array", "items": {"type": "string"}, "description": "候选答案（最多 6 个），可省略让用户自由输入"}
+                    "options": {
+                        "type": "array",
+                        "description": "候选答案（最多 6 个）。推荐使用对象格式 {\"label\": \"选项文本\", \"description\": \"该选项的说明/注释，帮助用户理解与选择\"}；也可用纯字符串，可省略让用户自由输入",
+                        "items": {
+                            "oneOf": [
+                                {"type": "string"},
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "label": {"type": "string", "description": "选项显示文本"},
+                                        "description": {"type": "string", "description": "该选项的说明/注释，简要解释选项含义，帮助用户理解后选择"}
+                                    },
+                                    "required": ["label"],
+                                    "additionalProperties": false
+                                }
+                            ]
+                        }
+                    }
                 },
                 "required": ["question"],
                 "additionalProperties": false

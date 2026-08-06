@@ -12,6 +12,7 @@ import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import Drawer from '@/components/common/Drawer.vue'
+import OverflowText from '@/components/common/OverflowText.vue'
 import type { AskUserOption } from '@/utils/api/experimental'
 
 const props = defineProps<{
@@ -68,29 +69,38 @@ function onVisibleChange(v: boolean) {
     popup-container="#app-content"
     @update:visible="onVisibleChange"
   >
-    <div class="whitespace-pre-line text-sm leading-relaxed font-medium text-gray-900">
-      {{ question }}
-    </div>
+    <OverflowText
+      class="text-sm leading-relaxed font-medium text-gray-900"
+      :text="question"
+      :lines="3"
+    />
 
     <div v-if="options.length > 0" class="mt-3 space-y-2">
-      <button
+      <div
         v-for="(opt, i) in options"
         :key="opt.label"
-        class="flex w-full items-start gap-2.5 rounded-lg border-2 px-3 py-2 text-left transition-colors"
+        role="button"
+        tabindex="0"
+        class="flex w-full cursor-pointer items-start gap-2.5 rounded-lg border-2 px-3 py-2 text-left transition-colors"
         :class="selectedIndex === i ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'"
         @click="toggleOption(i)"
+        @keydown.enter="toggleOption(i)"
+        @keydown.space.prevent="toggleOption(i)"
       >
         <CheckCircleIcon
           class="mt-0.5 h-5 w-5 shrink-0 transition-colors"
           :class="selectedIndex === i ? 'text-primary-500' : 'text-gray-300'"
         />
         <span class="min-w-0 flex-1">
-          <span class="block text-sm font-medium text-gray-900">{{ opt.label }}</span>
-          <span v-if="opt.description" class="mt-0.5 block text-xs leading-relaxed text-gray-500">
-            {{ opt.description }}
-          </span>
+          <OverflowText :text="opt.label" :lines="1" class="text-sm font-medium text-gray-900" />
+          <OverflowText
+            v-if="opt.description"
+            :text="opt.description"
+            :lines="2"
+            class="mt-0.5 text-xs leading-relaxed text-gray-500"
+          />
         </span>
-      </button>
+      </div>
     </div>
 
     <template #footer>
