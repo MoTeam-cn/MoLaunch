@@ -47,6 +47,8 @@ export interface ConfigSnapshot {
   primaryColor: string
   /** 关闭主窗口时的行为："ask"（每次询问）/ "tray"（保留托盘）/ "exit"（直接退出） */
   closeBehavior: string
+  /** 实验性功能开关（开启后顶部导航显示「实验性」入口并初始化 SQLite 聊天存储） */
+  experimentalEnabled: boolean
   // 社区资源
   communitySource: number
   communityFilenameFormat: number
@@ -114,6 +116,8 @@ export interface ConfigPatch {
   primaryColor?: string
   /** 关闭主窗口时的行为："ask"（每次询问）/ "tray"（保留托盘）/ "exit"（直接退出） */
   closeBehavior?: string
+  /** 实验性功能开关（开启后显示「实验性」入口并惰性初始化 SQLite 聊天存储） */
+  experimentalEnabled?: boolean
   // 社区资源（INI 明文）
   communitySource?: number                                 // 0/1/2
   communityFilenameFormat?: number                         // 0-4
