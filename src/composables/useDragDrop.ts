@@ -40,10 +40,11 @@ export function useDragDrop(): () => void {
         switch (payload.type) {
           case 'enter': {
             const paths = payload.paths ?? []
-            const { kind, hint } = classifyDrag(paths)
+            const { kind, hint, status } = classifyDrag(paths)
             dragState.active = true
             dragState.kind = kind
             dragState.hint = hint
+            dragState.status = status
             return
           }
           case 'over':

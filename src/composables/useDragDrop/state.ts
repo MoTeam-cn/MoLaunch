@@ -21,6 +21,8 @@ export interface DragDropState {
   hint: string
   /** 拖拽类型分类：modpack / mod / multi-mod / frp-provider / unknown */
   kind: 'modpack' | 'mod' | 'multi-mod' | 'frp-provider' | 'unknown'
+  /** 拖拽检测结果：可拖入 / 待分析 / 不支持（驱动 DragOverlay 虚线边框颜色：绿 / 黄 / 红） */
+  status: 'accept' | 'pending' | 'reject'
 }
 
 /** 模块级单例状态：同一时刻只可能有一个拖拽会话，全局共享 */
@@ -28,6 +30,7 @@ export const dragState = reactive<DragDropState>({
   active: false,
   hint: '',
   kind: 'unknown',
+  status: 'pending',
 })
 
 /** 暴露给 DragOverlay 的只读状态 */
@@ -57,35 +60,39 @@ export function getFileNameWithoutExt(path: string): string {
   return dot > 0 ? name.slice(0, dot) : name
 }
 
-/** 根据 paths 预判拖拽类型与提示文案（enter 时调用） */
-export function classifyDrag(paths: string[]): { kind: DragDropState['kind']; hint: string } {
+/** 根据 paths 预判拖拽类型、检测结果与提示文案（enter 时调用） */
+export function classifyDrag(paths: string[]): {
+  kind: DragDropState['kind']
+  status: DragDropState['status']
+  hint: string
+} {
   if (paths.length === 0) {
-    return { kind: 'unknown', hint: '正在拖入文件...' }
+    return { kind: 'unknown', status: 'pending', hint: '正在拖入文件...' }
   }
   if (paths.length === 1) {
     const ext = getExtension(paths[0])
     if (ext === 'zip') {
       // zip 可能是整合包也可能是 frp 厂商包，需在 drop 时读取内容判断
-      return { kind: 'unknown', hint: '松开以分析包类型' }
+      return { kind: 'unknown', status: 'pending', hint: '松开以分析包类型' }
     }
     if (MODPACK_EXTENSIONS.includes(ext)) {
-      return { kind: 'modpack', hint: '松开以安装整合包' }
+      return { kind: 'modpack', status: 'accept', hint: '松开以安装整合包' }
     }
     if (MOD_EXTENSIONS.includes(ext)) {
-      return { kind: 'mod', hint: '松开以安装 Mod' }
+      return { kind: 'mod', status: 'accept', hint: '松开以安装 Mod' }
     }
     if (ext === 'rar') {
-      return { kind: 'unknown', hint: '不支持 rar 格式，请使用 zip' }
+      return { kind: 'unknown', status: 'reject', hint: '不支持 rar 格式，请使用 zip' }
     }
-    return { kind: 'unknown', hint: '不支持的文件类型' }
+    return { kind: 'unknown', status: 'reject', hint: '不支持的文件类型' }
   }
   // 多文件：必须全部为 Mod
   for (const p of paths) {
     if (!MOD_EXTENSIONS.includes(getExtension(p))) {
-      return { kind: 'unknown', hint: '多文件仅支持 .jar/.litemod Mod' }
+      return { kind: 'unknown', status: 'reject', hint: '多文件仅支持 .jar/.litemod Mod' }
     }
   }
-  return { kind: 'multi-mod', hint: `松开以安装 ${paths.length} 个 Mod` }
+  return { kind: 'multi-mod', status: 'accept', hint: `松开以安装 ${paths.length} 个 Mod` }
 }
 
 /** 隐藏遮蔽层 */
@@ -93,6 +100,7 @@ export function hideOverlay(): void {
   dragState.active = false
   dragState.hint = ''
   dragState.kind = 'unknown'
+  dragState.status = 'pending'
 }
 
 // 暴露给 App.vue 使用的工具函数（便于测试）

@@ -132,6 +132,9 @@ async function initApp() {
           <component :is="Component" :key="route.path" />
         </transition>
       </router-view>
+      <!-- 全局拖拽遮蔽层：挂载在 nav 下方的内容容器内（absolute 铺满），
+           物理上不覆盖顶部 nav，顶部虚线不会穿到 nav 区域 -->
+      <DragOverlay />
     </div>
   </TopNavLayout>
   <Teleport to="body">
@@ -142,7 +145,6 @@ async function initApp() {
   <CrashDialog ref="crashDialogRef" />
   <Toast ref="toastRef" />
   <UpdateDialog />
-  <DragOverlay />
   <!-- 测试版水印：仅在测试版构建（package.json version 含 beta/alpha/rc/canary 后缀）时渲染 -->
   <Watermark />
   <!-- 会话恢复期间的加载遮罩 -->
