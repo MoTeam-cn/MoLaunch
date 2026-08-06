@@ -84,7 +84,8 @@ pub const SIGNALING_ROOM_WHITELIST: &str = "/v1/signaling/rooms/{room_code}/whit
 pub const SIGNALING_ROOM_WHITELIST_REMOVE: &str =
     "/v1/signaling/rooms/{room_code}/whitelist?device_id={device_id}";
 /// 白名单启用状态（PATCH）
-pub const SIGNALING_ROOM_WHITELIST_ENABLED: &str = "/v1/signaling/rooms/{room_code}/whitelist/enabled";
+pub const SIGNALING_ROOM_WHITELIST_ENABLED: &str =
+    "/v1/signaling/rooms/{room_code}/whitelist/enabled";
 /// 大厅房间列表（GET，query 字符串由调用方拼接在常量之后）
 pub const SIGNALING_LOBBY_ROOMS: &str = "/v1/signaling/lobby/rooms";
 /// 大厅分类列表（GET）

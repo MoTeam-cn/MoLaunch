@@ -4,8 +4,8 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::api_paths;
 use super::types::{ListAnswersResponse, ListParticipantsResponse};
+use crate::api_paths;
 use crate::minecraft::online::client::{BusinessResult, ClientError, OnlineClient};
 use crate::minecraft::online::storage::DeviceCredentials;
 

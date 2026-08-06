@@ -6,9 +6,9 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::api_paths;
 use super::client::{BusinessResult, ClientError, OnlineClient};
 use super::storage::DeviceCredentials;
+use crate::api_paths;
 
 // frpc manifest（GET /v1/frp/manifest）
 
@@ -228,7 +228,13 @@ impl OnlineClient {
         allocation_id: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
         let body = serde_json::json!({ "allocation_id": allocation_id });
-        self.call_v1::<serde_json::Value>(creds, "POST", api_paths::FRP_KEEPALIVE, Some(&body), true)
-            .await
+        self.call_v1::<serde_json::Value>(
+            creds,
+            "POST",
+            api_paths::FRP_KEEPALIVE,
+            Some(&body),
+            true,
+        )
+        .await
     }
 }

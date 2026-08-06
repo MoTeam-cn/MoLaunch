@@ -15,7 +15,12 @@ impl OnlineClient {
         let resp = get_client().get(&url).send().await?;
         let status = resp.status().as_u16();
         let body = resp.text().await?;
-        http_log::log_http_request("GET", api_paths::TIME, status, &http_log::extract_req_id(&body));
+        http_log::log_http_request(
+            "GET",
+            api_paths::TIME,
+            status,
+            &http_log::extract_req_id(&body),
+        );
         crate::log_debug!(
             "[Online] {} 响应 status={}, body_len={}",
             api_paths::TIME,

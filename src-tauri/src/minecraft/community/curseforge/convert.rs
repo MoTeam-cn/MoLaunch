@@ -125,9 +125,7 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
     let dependencies: Vec<String> = file
         .dependencies
         .iter()
-        .filter(|d| {
-            d.relation_type == 3 && !CF_EXCLUDED_DEPENDENCY_IDS.contains(&d.mod_id)
-        })
+        .filter(|d| d.relation_type == 3 && !CF_EXCLUDED_DEPENDENCY_IDS.contains(&d.mod_id))
         .map(|d| d.mod_id.to_string())
         .collect();
 

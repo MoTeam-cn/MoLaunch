@@ -22,7 +22,11 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
     ini.set(
         "Experimental",
         "enabled",
-        if config.experimental_enabled { "true" } else { "false" },
+        if config.experimental_enabled {
+            "true"
+        } else {
+            "false"
+        },
     );
     ini.set(
         "General",

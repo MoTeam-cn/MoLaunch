@@ -2,10 +2,10 @@
 //!
 //! 职责：
 //! 1. **声明式 schema 迁移**：调用方以 [`TableDef`]（表名 + 建表 SQL + 可迁移列 + 保留列）描述表结构，
-//!    [`mount`] 建表（`CREATE TABLE IF NOT EXISTS`）后自动对比 `PRAGMA table_info`：
+//!    [`mount`] 建表（`CREATE TABLE IF NOT EXISTS`）后自动对比 `PRAGMA table_info`，
+//!    后续调整 schema 只需修改表定义，重新挂载即自动迁移，无需手写迁移分支：
 //!    - 声明了但表里缺失的列 → `ALTER TABLE ADD COLUMN`（补全）
 //!    - 表里存在但声明未保留的列 → `DROP COLUMN`（去除）
-//!    后续调整 schema 只需修改表定义，重新挂载即自动迁移，无需手写迁移分支。
 //! 2. **全局连接维护**：进程内仅挂载一次连接（[`mount`]），之后通过 [`with_conn`] 复用，
 //!    业务层不再按需打开连接。
 //! 3. **通用表访问（[`Table`]）**：SQL 语句生成全部集中在本模块，业务层通过
@@ -80,10 +80,7 @@ pub fn with_conn<T>(f: impl FnOnce(&Connection) -> Result<T, String>) -> Result<
     let db = GLOBAL_DB
         .get()
         .ok_or_else(|| "数据库未挂载，请先初始化".to_string())?;
-    let conn = db
-        .conn
-        .lock()
-        .map_err(|_| "数据库连接被占用".to_string())?;
+    let conn = db.conn.lock().map_err(|_| "数据库连接被占用".to_string())?;
     f(&conn)
 }
 
@@ -132,11 +129,15 @@ fn migrate_table(conn: &Connection, table: &TableDef) -> Result<(), String> {
         .collect();
     for name in existing {
         if !retained.contains(&name) {
-            match conn.execute_batch(&format!("ALTER TABLE {} DROP COLUMN {};", table.name, name))
-            {
+            match conn.execute_batch(&format!("ALTER TABLE {} DROP COLUMN {};", table.name, name)) {
                 Ok(_) => log_debug!("[sqlite] 表 {} 已删列 {}", table.name, name),
                 Err(e) => {
-                    log_debug!("[sqlite] 表 {} 删列 {} 失败（忽略）: {}", table.name, name, e)
+                    log_debug!(
+                        "[sqlite] 表 {} 删列 {} 失败（忽略）: {}",
+                        table.name,
+                        name,
+                        e
+                    )
                 }
             }
         }
@@ -155,7 +156,10 @@ fn existing_columns(conn: &Connection, table: &str) -> Result<HashSet<String>, S
         .map_err(|e| format!("检查表结构失败: {}", e))?;
     let mut set = HashSet::new();
     for col in cols {
-        set.insert(col.map_err(|e| format!("读取表结构失败: {}", e))?.to_ascii_lowercase());
+        set.insert(
+            col.map_err(|e| format!("读取表结构失败: {}", e))?
+                .to_ascii_lowercase(),
+        );
     }
     Ok(set)
 }
@@ -174,17 +178,29 @@ pub struct Cond<'a> {
 impl<'a> Cond<'a> {
     /// 等值条件：`column = value`
     pub fn eq(column: &'a str, value: Value) -> Self {
-        Self { column, op: "=", value }
+        Self {
+            column,
+            op: "=",
+            value,
+        }
     }
 
     /// 大于条件：`column > value`
     pub fn gt(column: &'a str, value: Value) -> Self {
-        Self { column, op: ">", value }
+        Self {
+            column,
+            op: ">",
+            value,
+        }
     }
 
     /// 小于条件：`column < value`
     pub fn lt(column: &'a str, value: Value) -> Self {
-        Self { column, op: "<", value }
+        Self {
+            column,
+            op: "<",
+            value,
+        }
     }
 }
 
@@ -272,9 +288,7 @@ impl Table {
     ) -> Result<Vec<T>, String> {
         let sql = self.build_select("SELECT", Some(columns), conds, order_by, limit);
         let values: Vec<Value> = conds.iter().map(|c| c.value.clone()).collect();
-        let mut stmt = conn
-            .prepare(&sql)
-            .map_err(|e| format!("查询失败: {}", e))?;
+        let mut stmt = conn.prepare(&sql).map_err(|e| format!("查询失败: {}", e))?;
         let rows = stmt
             .query_map(params_from_iter(values), mapper)
             .map_err(|e| format!("查询失败: {}", e))?;
