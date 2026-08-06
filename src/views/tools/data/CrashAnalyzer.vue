@@ -14,9 +14,12 @@ import {
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
+import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { crashAnalyze } from '@/utils/api/tools'
 import type { CrashAnalyzeResult } from '@/utils/api/tools'
+
+const emit = defineEmits<{ 'ai-followup': [logText: string] }>()
 
 const logText = ref('')
 const loading = ref(false)
@@ -123,6 +126,18 @@ function clearAll() {
             <div v-if="item.suggestion" class="mt-1.5 text-xs text-green-600">
               建议：{{ item.suggestion }}
             </div>
+          </div>
+
+          <!-- 流水线第二步入口：把本地检索到的范围交给 AI 深度分析 -->
+          <div class="mt-3 flex items-center gap-2 rounded-lg bg-primary-50/60 px-3 py-2.5">
+            <SparklesIcon class="h-4 w-4 shrink-0 text-primary-500" />
+            <span class="min-w-0 flex-1 text-xs text-gray-600">
+              已定位问题范围，下一步由 AI 引擎深入分析具体原因与修复方案。
+            </span>
+            <Button type="primary" size="small" @click="emit('ai-followup', logText)">
+              <template #icon><SparklesIcon class="h-4 w-4" /></template>
+              用 AI 深度分析
+            </Button>
           </div>
         </div>
       </div>

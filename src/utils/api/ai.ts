@@ -1,15 +1,18 @@
 /**
- * AI 分析模块 API（本地 OpenAI 兼容服务）
+ * AI 模块 API（本地 OpenAI 兼容服务）
  *
- * 对应后端 `ai_manager` IPC 命令，通过 `action` 字段分发到不同子模块。
+ * 对应后端 `experimental_manager` IPC 命令（AI action 已并入实验性统一分发，
+ * 不再使用独立的 ai_manager），通过 `action` 字段分发到不同子模块。
  * 服务为本地 OpenAI 兼容 API（如 Ollama / LM Studio），不依赖云端。
+ *
+ * 注意：需先开启「设置 → 进阶设置 → 实验性功能」，否则后端返回错误。
  */
 
 import { invoke } from '@tauri-apps/api/core'
 
-/** 调用 ai_manager IPC */
+/** 调用 experimental_manager IPC（AI action） */
 export async function aiManager<T = unknown>(action: string, params?: unknown): Promise<T> {
-  return invoke<T>('ai_manager', { req: { action, params: params ?? null } })
+  return invoke<T>('experimental_manager', { req: { action, params: params ?? null } })
 }
 
 /** 所有可用的 action 名称（与后端 commands::ai::manager 注册一致） */
@@ -29,18 +32,24 @@ export const AI_ACTIONS = {
 /** action 名称类型 */
 export type AiAction = typeof AI_ACTIONS[keyof typeof AI_ACTIONS]
 
-/** AI 服务配置（与后端 AiConfig 对应） */
+/** AI 服务配置（与后端 AiConfig 对应，字段为 camelCase） */
 export interface AiConfig {
   /** 服务地址，如 http://127.0.0.1:11434/v1 */
-  base_url: string
+  baseUrl: string
   /** API Key（明文，后端保存时经 SDK DES 加密写入 config.ini） */
-  api_key: string
+  apiKey: string
   /** 超时秒数 */
-  timeout_secs: number
+  timeoutSecs: number
+  /** 上下文窗口 token 上限（输入侧，超限自动压缩上下文） */
+  maxInputTokens?: number
+  /** 单次回复最大输出 token（作为 max_tokens 下发） */
+  maxOutputTokens?: number
   /** 已启用（导入）的模型列表 */
   models: string[]
   /** 默认模型名 */
-  default_model: string
+  defaultModel: string
+  /** 模型图标样式：color（彩色）/ mono（黑白），见 utils/model-icon-mode.ts */
+  iconColorMode?: string
 }
 
 /** 崩溃日志 AI 分析参数（与后端 AnalyzeCrashParams 对应） */
@@ -57,34 +66,34 @@ export interface AnalyzeCrashParams {
   model?: string
 }
 
-/** AI 分析结果（与后端 AiAnalysisResult 对应） */
+/** AI 分析结果（与后端 AiAnalysisResult 对应，字段为 camelCase） */
 export interface AiAnalysisResult {
   /** 模型回复（Markdown） */
   content: string
   /** 使用的模型名 */
   model: string
   /** 耗时毫秒 */
-  elapsed_ms: number
+  elapsedMs: number
 }
 
-/** 连接状态（与后端 AiStatusResult 对应） */
+/** 连接状态（与后端 AiStatusResult 对应，字段为 camelCase） */
 export interface AiStatusResult {
   /** 是否可用 */
   available: boolean
   /** 服务地址 */
-  base_url: string
+  baseUrl: string
   /** 默认模型名 */
   model: string
 }
 
-/** 服务探测参数（前端表单当前值，避免未保存时探测旧配置） */
+/** 服务探测参数（前端表单当前值，避免未保存时探测旧配置；字段为 camelCase） */
 export interface AiProbeParams {
   /** 服务地址 */
-  base_url: string
+  baseUrl: string
   /** API Key */
-  api_key: string
+  apiKey: string
   /** 超时秒数 */
-  timeout_secs: number
+  timeoutSecs: number
 }
 
 /** 崩溃日志 AI 分析 */

@@ -67,6 +67,12 @@ const router = createRouter({
       component: () => import('@/views/Online.vue'),
       meta: { requiresAuth: true },
     },
+    {
+      path: '/apps/experimental',
+      name: 'experimental',
+      component: () => import('@/views/Experimental.vue'),
+      meta: { requiresAuth: true },
+    },
   ],
 })
 

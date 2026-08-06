@@ -1,0 +1,196 @@
+<script setup lang="ts">
+/**
+ * AI 聊天头部：会话标题、模型选择、思考设置（图标 + 悬浮窗）、清空按钮
+ */
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
+import { TrashIcon, AdjustmentsHorizontalIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
+import Select from '@/components/common/Select.vue'
+import Checkbox from '@/components/common/Checkbox.vue'
+import Slider from '@/components/common/Slider.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
+import ModelIcon from '@/components/common/ModelIcon.vue'
+
+const props = defineProps<{
+  title: string
+  activeId: number
+  loading: boolean
+  models: string[]
+  currentModel: string
+  /** 是否启用模型思考模式 */
+  enableReasoning: boolean
+  /** 思考程度（low/medium/high，对应滑块 0/50/100） */
+  reasoningLevel: string
+}>()
+
+const emit = defineEmits<{
+  'update:currentModel': [model: string]
+  'update:enableReasoning': [value: boolean]
+  'update:reasoningLevel': [value: string]
+  clear: []
+}>()
+
+const modelOptions = (models: string[]) => models.map((m) => ({ label: m, value: m }))
+
+/** 思考程度 ↔ 滑块值（0/50/100）双向映射 */
+const LEVEL_VALUE: Record<string, number> = { low: 0, medium: 50, high: 100 }
+const VALUE_LEVEL: Record<number, string> = { 0: 'low', 50: 'medium', 100: 'high' }
+const THINK_MARKS = [
+  { value: 0, label: '低' },
+  { value: 50, label: '中' },
+  { value: 100, label: '高' },
+]
+const reasoningValue = computed({
+  get: () => LEVEL_VALUE[props.reasoningLevel] ?? 50,
+  set: (v: number) => emit('update:reasoningLevel', VALUE_LEVEL[v] ?? 'medium'),
+})
+
+const reasoningLevelLabel = computed(() => {
+  const label = THINK_MARKS.find((m) => m.value === LEVEL_VALUE[props.reasoningLevel])
+  return label ? `档位：${label.label}` : '档位：中'
+})
+
+// ---- 思考设置悬浮窗（非全局弹窗：锚定设置图标下方，点击外部关闭） ----
+const settingsOpen = ref(false)
+const settingsBtnRef = ref<HTMLElement | null>(null)
+const settingsPanelRef = ref<HTMLElement | null>(null)
+const settingsPos = ref({ top: 0, left: 0 })
+
+function toggleSettings() {
+  if (settingsOpen.value) {
+    settingsOpen.value = false
+    return
+  }
+  if (settingsBtnRef.value) {
+    const r = settingsBtnRef.value.getBoundingClientRect()
+    settingsPos.value = { top: r.bottom + 8, left: Math.max(8, r.right - 256) }
+  }
+  settingsOpen.value = true
+}
+
+function onDocClick(e: MouseEvent) {
+  if (!settingsOpen.value) return
+  const t = e.target as HTMLElement
+  if (settingsBtnRef.value?.contains(t) || settingsPanelRef.value?.contains(t)) return
+  settingsOpen.value = false
+}
+
+onMounted(() => document.addEventListener('click', onDocClick))
+onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
+</script>
+
+<template>
+  <div class="flex items-center gap-2 border-b border-gray-200 px-4 py-2.5">
+    <h3 class="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900">{{ title || 'AI 聊天' }}</h3>
+    <Tag v-if="activeId" color="primary" size="small">Agent 模式</Tag>
+
+    <!-- 模型选择（品牌图标识别见 ModelIcon） -->
+    <Select
+      v-if="models.length > 0"
+      :model-value="currentModel"
+      :options="modelOptions(models)"
+      size="small"
+      class="w-60"
+      @update:model-value="emit('update:currentModel', String($event))"
+    >
+      <template #selected="{ label }">
+        <span class="flex items-center gap-1.5">
+          <ModelIcon :model="label" class="h-4 w-4" />
+          <span class="truncate">{{ label }}</span>
+        </span>
+      </template>
+      <template #option="{ option, selected }">
+        <span class="flex w-full items-center gap-1.5">
+          <ModelIcon :model="option.label" class="h-4 w-4" />
+          <span class="select-option-content min-w-0 flex-1 truncate">{{ option.label }}</span>
+          <svg v-if="selected" viewBox="0 0 1024 1024" fill="currentColor" class="h-3.5 w-3.5 shrink-0 text-primary-500">
+            <path d="M912 192c-12.8 0-25.6 4.266667-34.133333 12.8L384 699.2 234.666667 548.266667c-17.066667-17.066667-46.933333-17.066667-64 0-17.066667 17.066667-17.066667 46.933333 0 64l179.2 179.2c8.533333 8.533333 21.333333 12.8 34.133333 12.8s25.6-4.266667 34.133333-12.8l520.533334-520.533334c17.066667-17.066667 17.066667-46.933333 0-64-8.533333-8.533333-21.333333-12.8-34.133334-12.8z" />
+          </svg>
+        </span>
+      </template>
+    </Select>
+
+    <!-- 思考设置：图标入口（开启时 primary 高亮） -->
+    <Tooltip :text="enableReasoning ? '思考设置' : '思考设置（已关闭）'">
+      <button
+        ref="settingsBtnRef"
+        type="button"
+        class="rounded-md p-1.5 transition-colors"
+        :class="enableReasoning ? 'text-primary-500 hover:bg-primary-50' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'"
+        @click="toggleSettings"
+      >
+        <AdjustmentsHorizontalIcon class="h-4 w-4" />
+      </button>
+    </Tooltip>
+
+    <Button v-if="activeId" type="ghost" size="mini" :disabled="loading" @click="emit('clear')">
+      <template #icon><TrashIcon class="h-3.5 w-3.5" /></template>
+      清空
+    </Button>
+  </div>
+
+  <!-- 思考设置悬浮窗（非全局弹窗：锚定图标下方，质感对齐项目弹窗：渐变强调条 + 图标标题 + 关闭） -->
+  <teleport to="body">
+    <transition
+      enter-active-class="transition ease-out duration-[180ms]"
+      enter-from-class="opacity-0 translate-y-2"
+      enter-to-class="opacity-100 translate-y-0"
+      leave-active-class="transition ease-in duration-150"
+      leave-from-class="opacity-100 translate-y-0"
+      leave-to-class="opacity-0 translate-y-2"
+    >
+      <div
+        v-if="settingsOpen"
+        ref="settingsPanelRef"
+        class="fixed z-[10000] w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
+        role="dialog"
+        aria-label="思考设置"
+        :style="{ top: settingsPos.top + 'px', left: settingsPos.left + 'px' }"
+      >
+        <div class="bg-gradient-to-r from-primary-500 to-primary-400 px-4 py-2.5">
+          <div class="flex items-center gap-2">
+            <AdjustmentsHorizontalIcon class="h-4 w-4 shrink-0 text-white" />
+            <h4 class="min-w-0 flex-1 truncate text-sm font-semibold text-white">思考设置</h4>
+            <button
+              class="shrink-0 rounded-md p-1 text-white/80 transition-colors hover:bg-gray-100 hover:text-gray-600"
+              title="关闭"
+              @click="settingsOpen = false"
+            >
+              <XMarkIcon class="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
+        <div class="space-y-4 px-4 py-4">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-gray-600">思考模式</span>
+            <Checkbox
+              :model-value="enableReasoning"
+              @update:model-value="emit('update:enableReasoning', $event)"
+            >开启</Checkbox>
+          </div>
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-medium text-gray-600">思考程度</span>
+              <span class="text-xs text-gray-400">{{ reasoningLevelLabel }}</span>
+            </div>
+            <Slider
+              v-model="reasoningValue"
+              :min="0"
+              :max="100"
+              :step="50"
+              :marks="THINK_MARKS"
+              :disabled="!enableReasoning"
+              :meteor="enableReasoning"
+              class="w-full"
+            />
+            <p class="text-[11px] leading-relaxed text-gray-400">
+              开启后请求将携带 reasoning_effort，数值越高模型思考越深入、耗时更长。
+            </p>
+          </div>
+        </div>
+      </div>
+    </transition>
+  </teleport>
+</template>

@@ -28,7 +28,7 @@ export interface MolaunchDevAPI {
   tools<T = unknown>(action: string, params?: Record<string, unknown>): Promise<T>
   /** 调用后端 frp_manager IPC */
   frp<T = unknown>(action: string, params?: Record<string, unknown>): Promise<T>
-  /** 调用后端 ai_manager IPC */
+  /** 调用后端 experimental_manager IPC（AI action 已并入实验性分发） */
   ai<T = unknown>(action: string, params?: Record<string, unknown>): Promise<T>
   /** 触发崩溃弹窗（演示用；正常情况下游戏崩溃后自动弹出，平时难以复现） */
   showCrashDialog(): void
@@ -82,7 +82,7 @@ MoLaunch Dev API 可用命令：
       - params: 子命令参数对象
 
   molaunch.ai(action, params?)
-      调用后端 ai_manager IPC，返回 Promise
+      调用后端 experimental_manager IPC（AI action 已并入实验性分发），返回 Promise
       - action: 子命令（如 'analyze_crash' / 'check_status' / 'save_config' / 'load_config'）
       - params: 子命令参数对象
 
@@ -196,7 +196,7 @@ export function setupDevApi(router: Router): void {
       return invoke('frp_manager', { req: { action, params: params ?? {} } })
     },
     async ai(action, params) {
-      return invoke('ai_manager', { req: { action, params: params ?? {} } })
+      return invoke('experimental_manager', { req: { action, params: params ?? {} } })
     },
     showCrashDialog() {
       const sample: CrashInfo = {

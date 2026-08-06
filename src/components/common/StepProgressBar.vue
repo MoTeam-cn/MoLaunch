@@ -28,8 +28,10 @@ const props = withDefaults(
     showPercent?: boolean
     /** 是否显示步骤列表（默认 true） */
     showSteps?: boolean
+    /** 是否叠加扫光层（默认 false，不影响微软登录等现有使用方；样式由 main.css 的 .progress-sweep 提供） */
+    sweep?: boolean
   }>(),
-  { currentIndex: -1, showPercent: true, showSteps: true },
+  { currentIndex: -1, showPercent: true, showSteps: true, sweep: false },
 )
 
 const currentIndex = computed(() => props.currentIndex)
@@ -99,6 +101,8 @@ onUnmounted(stopFakeProgress)
           class="absolute top-0 h-full w-1/3 bg-white/40 blur-sm"
           :style="{ left: fakePercent + '%' }"
         />
+        <!-- 扫光层（sweep=true 时叠加；动画由 main.css 的 .progress-sweep 定义） -->
+        <div v-if="sweep" class="progress-sweep" />
       </div>
       <span v-if="showPercent" class="w-10 shrink-0 text-right text-xs font-semibold tabular-nums text-primary-600">
         {{ Math.round(fakePercent) }}%

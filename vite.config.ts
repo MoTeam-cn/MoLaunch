@@ -72,6 +72,10 @@ export default defineConfig({
           const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
           if (ext === 'css') return 'assets/css/[name]-[hash].[ext]'
           if (['js', 'mjs', 'cjs'].includes(ext)) return 'assets/js/[name]-[hash].[ext]'
+          // @lobehub/icons-static-svg 品牌图标统一输出到 assets/@lobehub/ 目录，便于识别与管理
+          if (assetInfo.originalFileNames?.some((f) => f.includes('@lobehub/icons-static-svg'))) {
+            return 'assets/@lobehub/[name]-[hash].[ext]'
+          }
           return 'assets/[name]-[hash].[ext]'
         },
         manualChunks(id) {

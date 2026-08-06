@@ -3,7 +3,7 @@
  * 顶部导航布局组件
  */
 
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
@@ -13,6 +13,7 @@ import {
   CubeIcon,
   WrenchScrewdriverIcon,
   UserGroupIcon,
+  BeakerIcon,
 } from '@heroicons/vue/24/outline'
 import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
@@ -23,6 +24,7 @@ import { toastError } from '@/utils/toast'
 import Tooltip from '@/components/common/Tooltip.vue'
 import ExitConfirmDialog from './ExitConfirmDialog.vue'
 import { useTauriEvent } from '@/composables/useTauriEvent'
+import { useExperimental } from '@/composables/useExperimental'
 const appWindow = getCurrentWebviewWindow()
 const onlineStore = useOnlineStore()
 
@@ -38,6 +40,23 @@ const navItems = [
   { name: '工具', path: '/apps/tools', icon: WrenchScrewdriverIcon },
   { name: '设置', path: '/apps/settings', icon: Cog6ToothIcon },
 ]
+
+// 实验性功能开关：开启后才在导航显示「实验性」入口（默认隐藏）
+// 开关位于「设置 → 进阶设置」，由 useExperimental 统一读取与监听切换事件
+const { enabled: experimentalEnabled } = useExperimental()
+const visibleNavItems = computed(() => {
+  const items = navItems.filter((i) => i.path !== '/apps/experimental')
+  if (experimentalEnabled.value) {
+    const idx = items.findIndex((i) => i.path === '/apps/settings')
+    const entry = { name: '实验性', path: '/apps/experimental', icon: BeakerIcon }
+    if (idx >= 0) {
+      items.splice(idx, 0, entry)
+    } else {
+      items.push(entry)
+    }
+  }
+  return items
+})
 
 // 双击计时器
 let lastClickTime = 0
@@ -198,7 +217,7 @@ onUnmounted(() => {
           <!-- 保留原生 button：蓝色头部导航项依赖 active 状态切换 + 白色自定义配色，
                Button.vue 的 type 体系（蓝/灰）不适配头部蓝底场景 -->
           <Tooltip
-            v-for="item in navItems"
+            v-for="item in visibleNavItems"
             :key="item.path"
             :text="item.cloudDependent && !onlineStore.cloudConnected
               ? '云端连接失败，联机功能暂不可用（可在设置中重试）'
@@ -212,6 +231,7 @@ onUnmounted(() => {
                 isActive(item.path)
                   || (item.hasDblClick && isActive('/apps/downloads'))
                   || (item.path === '/apps/tools' && route.path.startsWith('/apps/tools'))
+                  || (item.path === '/apps/experimental' && route.path.startsWith('/apps/experimental'))
                   ? 'bg-white/20 text-white'
                   : 'text-white/70 hover:bg-white/10 hover:text-white'
               ]"

@@ -16,12 +16,16 @@ import {
 } from '@/utils/api/ai'
 import { safeCall } from '@/utils/async'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
+import { setIconColorMode } from '@/utils/model-icon-mode'
 
 const baseUrl = ref('')
 const apiKey = ref('')
 const timeoutSecs = ref(60)
+const maxInputTokens = ref(184000)
+const maxOutputTokens = ref(16000)
 const enabledModels = ref<string[]>([])
 const defaultModel = ref('')
+const iconColorMode = ref<'color' | 'mono'>('color')
 const remoteModels = ref<string[]>([])
 const loading = ref(false)
 const loadingModels = ref(false)
@@ -34,14 +38,21 @@ onMounted(async () => {
   loading.value = true
   const cfg = await safeCall(() => aiLoadConfig(), 'load ai config', () => toastError('加载 AI 配置失败'))
   if (cfg) {
-    baseUrl.value = cfg.base_url
-    apiKey.value = cfg.api_key
-    timeoutSecs.value = cfg.timeout_secs
+    baseUrl.value = cfg.baseUrl
+    apiKey.value = cfg.apiKey
+    timeoutSecs.value = cfg.timeoutSecs
+    maxInputTokens.value = cfg.maxInputTokens ?? 184000
+    maxOutputTokens.value = cfg.maxOutputTokens ?? 16000
     enabledModels.value = cfg.models ?? []
-    defaultModel.value = cfg.default_model
+    defaultModel.value = cfg.defaultModel
+    iconColorMode.value = cfg.iconColorMode === 'mono' ? 'mono' : 'color'
     loaded = true
   }
   loading.value = false
+  // 进入页面自动从服务端拉取模型列表（无需手动点击「加载模型」）
+  if (baseUrl.value.trim()) {
+    await handleLoadModels()
+  }
 })
 
 onUnmounted(async () => {
@@ -53,6 +64,12 @@ onUnmounted(async () => {
 const defaultOptions = computed(() =>
   enabledModels.value.map((m) => ({ label: m, value: m })),
 )
+
+/** 模型图标样式选项 */
+const iconModeOptions = [
+  { label: '彩色', value: 'color' },
+  { label: '黑白', value: 'mono' },
+]
 
 function isEnabled(model: string): boolean {
   return enabledModels.value.includes(model)
@@ -75,9 +92,9 @@ function toggleModel(model: string): void {
 
 function probeParams(): AiProbeParams {
   return {
-    base_url: baseUrl.value.trim(),
-    api_key: apiKey.value,
-    timeout_secs: timeoutSecs.value,
+    baseUrl: baseUrl.value.trim(),
+    apiKey: apiKey.value,
+    timeoutSecs: timeoutSecs.value,
   }
 }
 
@@ -86,14 +103,22 @@ async function save(): Promise<void> {
     defaultModel.value = enabledModels.value[0]
   }
   const cfg: AiConfig = {
-    base_url: baseUrl.value.trim(),
-    api_key: apiKey.value,
-    timeout_secs: timeoutSecs.value,
+    baseUrl: baseUrl.value.trim(),
+    apiKey: apiKey.value,
+    timeoutSecs: timeoutSecs.value,
+    maxInputTokens: maxInputTokens.value,
+    maxOutputTokens: maxOutputTokens.value,
     models: enabledModels.value,
-    default_model: defaultModel.value,
+    defaultModel: defaultModel.value,
+    iconColorMode: iconColorMode.value,
   }
+  // aiSaveConfig 返回 Promise<void>，成功时 safeCall 结果为 undefined，须用 !== undefined 判断
   const ok = await safeCall(() => aiSaveConfig(cfg), 'save ai config', () => toastError('保存 AI 配置失败'))
-  if (ok) toastSuccess('AI 配置已保存')
+  if (ok !== undefined) {
+    // 保存后立即同步全局图标显示模式（聊天页/头部无需重新加载即可生效）
+    setIconColorMode(iconColorMode.value)
+    toastSuccess('AI 配置已保存')
+  }
 }
 
 async function handleSave(): Promise<void> {
@@ -199,6 +224,44 @@ async function handleCheck(): Promise<void> {
             <span class="text-xs text-gray-400">300</span>
           </div>
           <p class="text-xs text-gray-500 mt-1.5">模型分析耗时可较长，默认 60 秒</p>
+        </div>
+
+        <!-- Token 限制 -->
+        <div class="px-5 py-4">
+          <p class="text-sm font-medium text-gray-900 mb-3">上下文窗口（Token）</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">输入上限（窗口）</label>
+              <Input
+                v-model.number="maxInputTokens"
+                type="number"
+                min="2000"
+                max="1000000"
+                placeholder="184000"
+                hint="接近此上限时自动压缩历史上下文"
+              />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-500 mb-1.5">单次回复上限（输出）</label>
+              <Input
+                v-model.number="maxOutputTokens"
+                type="number"
+                min="256"
+                max="128000"
+                placeholder="16000"
+                hint="请求时作为 max_tokens 下发"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- 模型图标样式 -->
+        <div class="px-5 py-4">
+          <p class="text-sm font-medium text-gray-900 mb-2">模型图标</p>
+          <Select v-model="iconColorMode" :options="iconModeOptions" />
+          <p class="text-xs text-gray-500 mt-1.5">
+            彩色为品牌官方配色；黑白为单色图标。未识别的模型统一使用 HuggingFace 图标。
+          </p>
         </div>
 
         <!-- 模型管理 -->

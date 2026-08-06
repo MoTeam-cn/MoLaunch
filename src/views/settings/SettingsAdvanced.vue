@@ -6,7 +6,7 @@ import Input from '@/components/common/Input.vue'
 import Select from '@/components/common/Select.vue'
 import DevModeToggle from '@/components/settings/DevModeToggle.vue'
 import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
-import SettingsAi from '@/views/settings/SettingsAi.vue'
+import ExperimentalToggle from '@/components/settings/ExperimentalToggle.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
 import {
@@ -290,8 +290,8 @@ watch(logLevel, (v) => markDirty('logLevel', v))
       </div>
     </div>
 
-    <!-- 本地 AI 服务配置 -->
-    <SettingsAi />
+    <!-- 实验性功能开关（默认关闭；开启后导航显示「实验性」入口并惰性初始化 SQLite 聊天库） -->
+    <ExperimentalToggle />
 
     <!-- 社区资源配置卡片 -->
     <CommunityConfigCard />
