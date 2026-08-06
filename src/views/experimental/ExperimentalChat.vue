@@ -8,7 +8,7 @@
  * - 弹窗：AskUserDialog（工具 ask_user 提问）、VersionPickerDialog（版本隔离开关下先选版本）
  */
 import { computed, ref, watch } from 'vue'
-import { ArrowPathIcon, CommandLineIcon, PaperAirplaneIcon, PaperClipIcon, PauseIcon, Squares2X2Icon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
+import { CommandLineIcon, PaperAirplaneIcon, PaperClipIcon, PauseIcon, Squares2X2Icon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import { useAiChat } from '@/composables/useAiChat'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
@@ -25,12 +25,6 @@ import { markdownToPlainText } from '@/utils/markdown'
 const c = useAiChat()
 
 const listRef = ref<HTMLElement | null>(null)
-
-/** 工作状态提示条：ask_user 问题摘要（≤20 字） */
-const askQuestionSummary = computed(() => {
-  const q = (c.askUser.value.question ?? '').trim()
-  return q.length > 20 ? q.slice(0, 20) + '…' : q
-})
 
 /** 滚动监听：用户上滑离开底部时置位（自动滚动尊重用户意图） */
 function onScroll() {
@@ -76,7 +70,7 @@ watch(
 </script>
 
 <template>
-  <div class="flex h-full min-h-0">
+  <div class="relative flex h-full min-h-0">
     <ChatConversationList
       :conversations="c.conversations.value"
       :active-id="c.activeId.value"
@@ -151,19 +145,18 @@ watch(
                   :message="c.streamingMsg.value"
                   :model="c.currentModel.value || null"
                   :busy="c.loading.value"
+                  :waiting="
+                    c.loading.value &&
+                    !!c.streamingMsg.value &&
+                    (c.waitingAsk.value || c.toolCalls.value.length > 0)
+                  "
                   :live-speed="c.chatSpeed.value"
                   :live-completion="c.lastUsage.value?.completionTokens"
                 />
               </div>
 
-              <!-- 工作状态提示条：ask_user 等待 / 工具间隙等待 -->
-              <div
-                v-if="c.waitingNext.value || c.waitingAsk.value"
-                class="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-3 py-1 text-xs text-gray-500"
-              >
-                <ArrowPathIcon class="h-3.5 w-3.5 animate-spin" />
-                <span>{{ c.waitingNext.value ? '正在进行下一步…' : '等待你的回答：' + askQuestionSummary }}</span>
-              </div>
+              <!-- 工作状态提示：waitingAsk 由 AskUserDialog 抽屉表达；工具调用过渡期由
+                AI 回复框内部的空内容兜底（ChatMessageItem 的「正在进行下一步…」）承担 -->
             </div>
           </Transition>
         </div>

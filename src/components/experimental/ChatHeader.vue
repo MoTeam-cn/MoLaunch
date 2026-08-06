@@ -1,15 +1,16 @@
 <script setup lang="ts">
 /**
- * AI 聊天头部：会话标题、模型选择、思考设置（图标 + 悬浮窗）、清空按钮
+ * AI 聊天头部：会话标题、模型选择、思考设置（图标 + 右侧抽屉）、清空按钮
  */
-import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
-import { TrashIcon, AdjustmentsHorizontalIcon, XMarkIcon } from '@heroicons/vue/24/outline'
+import { computed, ref } from 'vue'
+import { TrashIcon, AdjustmentsHorizontalIcon } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Tag from '@/components/common/Tag.vue'
 import Select from '@/components/common/Select.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
 import Slider from '@/components/common/Slider.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Drawer from '@/components/common/Drawer.vue'
 import ModelIcon from '@/components/common/ModelIcon.vue'
 
 const props = defineProps<{
@@ -51,33 +52,8 @@ const reasoningLevelLabel = computed(() => {
   return label ? `档位：${label.label}` : '档位：中'
 })
 
-// ---- 思考设置悬浮窗（非全局弹窗：锚定设置图标下方，点击外部关闭） ----
+// ---- 思考设置抽屉（右侧 Drawer，遮罩点击 / X / ESC 关闭） ----
 const settingsOpen = ref(false)
-const settingsBtnRef = ref<HTMLElement | null>(null)
-const settingsPanelRef = ref<HTMLElement | null>(null)
-const settingsPos = ref({ top: 0, left: 0 })
-
-function toggleSettings() {
-  if (settingsOpen.value) {
-    settingsOpen.value = false
-    return
-  }
-  if (settingsBtnRef.value) {
-    const r = settingsBtnRef.value.getBoundingClientRect()
-    settingsPos.value = { top: r.bottom + 8, left: Math.max(8, r.right - 256) }
-  }
-  settingsOpen.value = true
-}
-
-function onDocClick(e: MouseEvent) {
-  if (!settingsOpen.value) return
-  const t = e.target as HTMLElement
-  if (settingsBtnRef.value?.contains(t) || settingsPanelRef.value?.contains(t)) return
-  settingsOpen.value = false
-}
-
-onMounted(() => document.addEventListener('click', onDocClick))
-onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
 </script>
 
 <template>
@@ -111,86 +87,58 @@ onBeforeUnmount(() => document.removeEventListener('click', onDocClick))
       </template>
     </Select>
 
-    <!-- 思考设置：图标入口（开启时 primary 高亮） -->
+    <!-- 思考设置：图标入口（开启时 primary 高亮）+ 右侧 Drawer 抽屉（遮罩点击 / X / ESC 关闭） -->
     <Tooltip :text="enableReasoning ? '思考设置' : '思考设置（已关闭）'">
       <button
-        ref="settingsBtnRef"
         type="button"
         class="rounded-md p-1.5 transition-colors"
         :class="enableReasoning ? 'text-primary-500 hover:bg-primary-50' : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'"
-        @click="toggleSettings"
+        @click="settingsOpen = !settingsOpen"
       >
         <AdjustmentsHorizontalIcon class="h-4 w-4" />
       </button>
     </Tooltip>
+
+    <Drawer
+      v-model:visible="settingsOpen"
+      placement="right"
+      :width="320"
+      title="思考设置"
+      render-in-place
+      popup-container="#app-content"
+    >
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-medium text-gray-600">思考模式</span>
+          <Checkbox
+            :model-value="enableReasoning"
+            @update:model-value="emit('update:enableReasoning', $event)"
+          >开启</Checkbox>
+        </div>
+        <div class="space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-medium text-gray-600">思考程度</span>
+            <span class="text-xs text-gray-400">{{ reasoningLevelLabel }}</span>
+          </div>
+          <Slider
+            v-model="reasoningValue"
+            :min="0"
+            :max="100"
+            :snap="[0, 50, 100]"
+            :disabled="!enableReasoning"
+            :meteor="enableReasoning"
+            class="w-full"
+          />
+          <p class="text-[11px] leading-relaxed text-gray-400">
+            开启后请求将携带 reasoning_effort，数值越高模型思考越深入、耗时更长。
+          </p>
+        </div>
+      </div>
+    </Drawer>
 
     <Button v-if="activeId" type="ghost" size="mini" :disabled="loading" @click="emit('clear')">
       <template #icon><TrashIcon class="h-3.5 w-3.5" /></template>
       清空
     </Button>
   </div>
-
-  <!-- 思考设置悬浮窗（非全局弹窗：锚定图标下方，质感对齐项目弹窗：渐变强调条 + 图标标题 + 关闭） -->
-  <teleport to="body">
-    <transition
-      enter-active-class="transition ease-out duration-[180ms]"
-      enter-from-class="opacity-0 translate-y-2"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition ease-in duration-150"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 translate-y-2"
-    >
-      <div
-        v-if="settingsOpen"
-        ref="settingsPanelRef"
-        class="fixed z-[10000] w-72 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-lg"
-        role="dialog"
-        aria-label="思考设置"
-        :style="{ top: settingsPos.top + 'px', left: settingsPos.left + 'px' }"
-      >
-        <div class="bg-gradient-to-r from-primary-500 to-primary-400 px-4 py-2.5">
-          <div class="flex items-center gap-2">
-            <AdjustmentsHorizontalIcon class="h-4 w-4 shrink-0 text-white" />
-            <h4 class="min-w-0 flex-1 truncate text-sm font-semibold text-white">思考设置</h4>
-            <button
-              class="shrink-0 rounded-md p-1 text-white/80 transition-colors hover:bg-gray-100 hover:text-gray-600"
-              title="关闭"
-              @click="settingsOpen = false"
-            >
-              <XMarkIcon class="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        <div class="space-y-4 px-4 py-4">
-          <div class="flex items-center justify-between">
-            <span class="text-xs font-medium text-gray-600">思考模式</span>
-            <Checkbox
-              :model-value="enableReasoning"
-              @update:model-value="emit('update:enableReasoning', $event)"
-            >开启</Checkbox>
-          </div>
-          <div class="space-y-1.5">
-            <div class="flex items-center justify-between">
-              <span class="text-xs font-medium text-gray-600">思考程度</span>
-              <span class="text-xs text-gray-400">{{ reasoningLevelLabel }}</span>
-            </div>
-            <Slider
-              v-model="reasoningValue"
-              :min="0"
-              :max="100"
-              :step="50"
-              :marks="THINK_MARKS"
-              :disabled="!enableReasoning"
-              :meteor="enableReasoning"
-              class="w-full"
-            />
-            <p class="text-[11px] leading-relaxed text-gray-400">
-              开启后请求将携带 reasoning_effort，数值越高模型思考越深入、耗时更长。
-            </p>
-          </div>
-        </div>
-      </div>
-    </transition>
-  </teleport>
 </template>

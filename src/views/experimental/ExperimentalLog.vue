@@ -2,42 +2,39 @@
 /**
  * 实验性 - 日志分析
  *
- * 两级流水线：本地规则引擎先检索定位问题范围 → 交由 AI 引擎深度分析原因与修复方案。
- * - 第一级：CrashAnalyzer（本地引擎，粘贴日志 → 识别常见崩溃模式条目）
- * - 第二级：AiLogAnalyzer（AI 深度分析，接收本地初检后的日志文本自动发起，后端注入预检范围）
+ * 两级流水线（单一日志输入）：
+ * - 第一级：CrashAnalyzer 本地引擎——页面唯一的日志输入框，粘贴日志识别常见崩溃模式。
+ *   识别出具体问题 → 展示本地结果，可点「用 AI 深度分析」深入；
+ *   本地无法定位具体问题 → 自动转交 AI。
+ * - 第二级：AiLogAnalyzer AI 弹窗——不包含输入框，收到本地初检后的日志文本自动打开
+ *   弹窗并发起 AI 深度分析（后端 localAnalyze=true 只把命中关键词前后 ±15 行上下文发给 AI）。
  */
 import { ref } from 'vue'
-import { InformationCircleIcon } from '@heroicons/vue/24/outline'
+import AlertV2 from '@/components/common/AlertV2.vue'
 import CrashAnalyzer from '@/views/tools/data/CrashAnalyzer.vue'
 import AiLogAnalyzer from '@/components/experimental/AiLogAnalyzer.vue'
 
-/** 本地引擎初检完成后传回给 AI 分析器的日志文本 */
+/** 本地引擎初检完成后传回给 AI 面板的日志文本 */
 const aiLogText = ref<string | undefined>(undefined)
 
 function onLocalFollowup(text: string) {
-  // 传新引用触发 AiLogAnalyzer 的 watch
+  // 先置空再在下一帧赋值：即使两次日志内容相同也能触发 AiLogAnalyzer 的 watch
   aiLogText.value = undefined
   requestAnimationFrame(() => {
     aiLogText.value = text
   })
 }
-
-function onAiConsumed() {
-  aiLogText.value = undefined
-}
 </script>
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-start gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
-      <InformationCircleIcon class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" />
-      <p class="text-xs leading-relaxed text-gray-600">
-        流程：先由<b>本地规则引擎</b>检索日志问题范围，再交由<b>AI 引擎</b>深入分析具体原因与修复方案（日志过长时只会把初检范围发给 AI）。
-      </p>
-    </div>
+    <AlertV2
+      type="info"
+      message="在下方输入框中粘贴日志，本地引擎会先检索问题范围；本地无法定位具体问题时，将自动弹出 AI 深度分析弹窗（只发送问题关键词附近上下文，日志全文不会上传）。"
+    />
 
     <CrashAnalyzer @ai-followup="onLocalFollowup" />
 
-    <AiLogAnalyzer :external-log-text="aiLogText" @consumed="onAiConsumed" />
+    <AiLogAnalyzer :external-log-text="aiLogText" />
   </div>
 </template>

@@ -34,6 +34,8 @@ const props = defineProps<{
   liveSpeed?: number
   /** 流式占位消息实时展示的输出 token（completion，来自 done 事件） */
   liveCompletion?: number
+  /** 工具调用 / 提问等长耗时场景：空正文兜底切换为「正在进行下一步…」，区别于初始等待的「正在思考如何回答…」 */
+  waiting?: boolean
 }>()
 
 /** 回复该消息的模型：优先消息自身记录（切换全局模型后仍固定），否则用当前模型兜底 */
@@ -174,7 +176,8 @@ function saveEdit() {
         />
         <div v-else-if="!message.reasoningContent" class="flex items-center gap-1.5 text-gray-400">
           <span class="stream-caret" />
-          <span>正在思考</span>
+          <!-- 初始等待（无正文/思考/工具）显示「正在思考如何回答…」；工具调用/提问过渡期显示「正在进行下一步…」 -->
+          <span>{{ waiting ? '正在进行下一步…' : '正在思考如何回答…' }}</span>
         </div>
         <span v-if="message.streaming && message.content" class="stream-caret text-primary-500" />
         <!-- 右下角：token 统计（模型 id 左侧）+ 回复该消息的模型（仅最终正文存在时显示） -->

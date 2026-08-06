@@ -34,6 +34,7 @@ export const EXPERIMENTAL_ACTIONS = {
   EDIT_MESSAGE: 'edit_message',
   REPLY_ASK_USER: 'reply_ask_user',
   CANCEL_CHAT: 'cancel_chat',
+  CANCEL_LOG_ANALYZE: 'cancel_log_analyze',
   LIST_INSTALLED_VERSIONS: 'list_installed_versions',
   AI_ANALYZE_LOG: 'ai_analyze_log',
 } as const
@@ -322,11 +323,17 @@ export interface AiAnalyzeLogParams {
 export interface AiAnalyzeStreamEvent {
   /** 结论内容增量（流式） */
   delta?: string
+  /** 思考日志增量（思考模型，如 R1；不自带换行，前端追加展示） */
+  reasoning?: string
   /** 环节进度（1~5，来自模型输出的【STEP:N/5】标记） */
   step?: number
   /** 分析完成（携带剔除标记后的全文） */
   done?: boolean
   content?: string
+  /** 失败兜底（后端流式异常/超时等），携带错误信息 */
+  error?: string
+  /** 弹窗关闭触发的取消（后端收到 cancel_log_analyze 后推送） */
+  cancelled?: boolean
 }
 
 /** AI 日志分析（流式：增量与环节进度通过 ai-analyze-stream 事件推送） */

@@ -87,15 +87,6 @@ export function useAiChat() {
   const versionPicker = ref({ visible: false, versions: [] as string[] })
   const pendingAttachKind = ref('')
 
-  /** 工具间隙等待中：正在流式但无正文/思考内容/工具执行（ask_user 等长等待场景） */
-  const waitingNext = computed(
-    () =>
-      loading.value &&
-      !!streamingMsg.value &&
-      !streamingMsg.value.content &&
-      !streamingMsg.value.reasoningContent &&
-      toolCalls.value.length === 0,
-  )
   /** 模型正在等待用户回答（ask_user 弹窗可见） */
   const waitingAsk = computed(() => askUser.value.visible)
 
@@ -479,15 +470,16 @@ export function useAiChat() {
     if (ev.toolCall) {
       const tc = ev.toolCall
       const idx = tc.index ?? tc.name
-      const isFirstRunning = tc.status === 'running' && toolCalls.value.length === 0
       const existing = toolCalls.value.find((t) => t.index === idx)
       if (tc.status === 'running') {
-        if (isFirstRunning) {
-          // 首个工具开始调用：清空此前流式输出的过渡语句（如「我来读取…」），
-          // 该过渡文本已随 running 事件的 preContent 交给工具链展示
-          if (streamingMsg.value) streamingMsg.value.content = ''
-          deltaQueue = ''
+        // 模型切入工具调用时暂停输出：清空此前的过渡正文与思考内容（正文已随 running 的
+        // preContent 交给工具链展示，思考在此已转为工具动作），令回复框回到空正文态，
+        // 由「正在进行下一步…」兜底覆盖工具执行及随后 SSE 文本流出前的过渡期，避免静默卡顿
+        if (streamingMsg.value) {
+          streamingMsg.value.content = ''
+          streamingMsg.value.reasoningContent = ''
         }
+        deltaQueue = ''
         if (existing) {
           if (tc.arguments !== undefined) existing.arguments = tc.arguments
           if (tc.preContent !== undefined) existing.preContent = tc.preContent
@@ -600,7 +592,6 @@ export function useAiChat() {
     inputText,
     enableReasoning,
     reasoningLevel,
-    waitingNext,
     waitingAsk,
     scrolledUp,
     setScrolledUp,
