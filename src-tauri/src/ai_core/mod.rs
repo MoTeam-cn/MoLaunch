@@ -8,7 +8,10 @@ pub mod config;
 pub mod prompt;
 pub mod storage;
 
-pub use client::{chat, list_models};
+pub use client::{
+    chat, chat_completions, chat_completions_stream, estimate_tokens, list_models, ChatResult,
+    ChatTurn, StreamCallbacks, StreamToolDelta, StreamUsage, ToolCall, ToolDef,
+};
 pub use config::AiConfig;
 pub use prompt::PromptKind;
 pub use storage::{load as load_config, load_async as load_config_async, save as save_config};

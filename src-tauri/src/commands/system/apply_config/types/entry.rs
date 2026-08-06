@@ -41,6 +41,7 @@ pub fn build_snapshot(
         game_language: config.game_language.clone(),
         primary_color: config.primary_color.clone(),
         close_behavior: config.close_behavior.clone(),
+        experimental_enabled: config.experimental_enabled,
         selected_version: config.selected_version.clone(),
         external_download_dir: config.external_download_dir.clone(),
         java_path,

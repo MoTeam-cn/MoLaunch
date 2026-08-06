@@ -38,6 +38,7 @@ pub(crate) async fn apply_config_inner(state: &AppState, patch: ConfigPatch) -> 
         fields::apply_download(config, &patch);
         fields::apply_memory(config, &patch);
         fields::apply_launcher(config, &patch, &mut log_level_pending);
+        fields::apply_experimental(config, &patch);
         fields::apply_community(config, &patch);
         fields::apply_launch_advanced(config, &patch);
         fields::apply_external_download(config, &patch);

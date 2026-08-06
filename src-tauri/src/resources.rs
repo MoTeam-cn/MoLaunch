@@ -30,6 +30,12 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         "samples/plugin/manifest.json" => {
             Some(include_str!("../resources/samples/plugin/manifest.json"))
         }
+        // AI 提示词模板（由 ai_core::prompt 读取；改文案后重新编译即可）
+        "prompts/chat.md" => Some(include_str!("../resources/prompts/chat.md")),
+        "prompts/title.md" => Some(include_str!("../resources/prompts/title.md")),
+        "prompts/summarize.md" => Some(include_str!("../resources/prompts/summarize.md")),
+        "prompts/crash_log.md" => Some(include_str!("../resources/prompts/crash_log.md")),
+        "prompts/log_analysis.md" => Some(include_str!("../resources/prompts/log_analysis.md")),
         "samples/plugin/index.html" => Some(include_str!("../resources/samples/plugin/index.html")),
         "samples/layout/layout-sample.json" => Some(include_str!(
             "../resources/samples/layout/layout-sample.json"
@@ -73,7 +79,10 @@ fn embedded_text(path: &str) -> Option<&'static str> {
 fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
     match path {
         "forge-installer.jar" => Some(include_bytes!("../resources/forge-installer.jar")),
+        // java-wrapper.jar：第三方开源项目 Java Launch Wrapper（MIT，https://github.com/00ll00/java_launch_wrapper），
+        // 用于规避 JDK-8272352（非 ASCII 路径命令行参数乱码）启动问题
         "java-wrapper.jar" => Some(include_bytes!("../resources/java-wrapper.jar")),
+        // lwjgl-unsafe-agent.jar：第三方开源项目 lwjgl-unsafe-agent（Apache-2.0，https://github.com/HMCL-dev/lwjgl-unsafe-agent）
         "lwjgl-unsafe-agent.jar" => Some(include_bytes!("../resources/lwjgl-unsafe-agent.jar")),
         // 离线皮肤 PNG（9 个默认角色）
         "skins/Steve.png" => Some(include_bytes!("../resources/skins/Steve.png")),

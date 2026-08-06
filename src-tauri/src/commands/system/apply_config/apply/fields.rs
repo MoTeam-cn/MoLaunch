@@ -159,6 +159,22 @@ pub(super) fn apply_launcher(
     }
 }
 
+/// 实验性功能域：experimental_enabled
+///
+/// 首次开启时惰性初始化 SQLite 聊天存储（建库建表，幂等）；
+/// 关闭时仅隐藏入口，不删除已有数据，避免误操作丢失聊天记录。
+pub(super) fn apply_experimental(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
+    if let Some(enabled) = patch.experimental_enabled {
+        log_info!("[Config] experimental_enabled = {}", enabled);
+        if enabled && !config.experimental_enabled {
+            if let Err(e) = crate::commands::experimental::db::ensure_initialized() {
+                log_warn!("[Experimental] 初始化聊天存储失败: {}", e);
+            }
+        }
+        config.experimental_enabled = enabled;
+    }
+}
+
 /// 社区资源域：community.source / filename_format / mod_local_name_style / ignore_quilt
 pub(super) fn apply_community(config: &mut crate::state::AppConfig, patch: &ConfigPatch) {
     if let Some(source) = patch.community.source {

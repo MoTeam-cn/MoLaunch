@@ -18,6 +18,30 @@ pub struct AiConfig {
     /// 默认模型名
     #[serde(default)]
     pub default_model: String,
+    /// 上下文窗口 token 上限（输入侧），超限时触发上下文压缩
+    #[serde(default = "default_max_input_tokens")]
+    pub max_input_tokens: u32,
+    /// 单次回复最大输出 token
+    #[serde(default = "default_max_output_tokens")]
+    pub max_output_tokens: u32,
+    /// 模型图标样式：`color`（官方彩色）/ `mono`（黑白单色）
+    #[serde(default = "default_icon_color_mode")]
+    pub icon_color_mode: String,
+}
+
+/// 默认输入 token 上限（对齐主流长上下文模型）
+const fn default_max_input_tokens() -> u32 {
+    184_000
+}
+
+/// 默认输出 token 上限
+const fn default_max_output_tokens() -> u32 {
+    16_000
+}
+
+/// 默认图标样式：彩色
+fn default_icon_color_mode() -> String {
+    "color".to_string()
 }
 
 impl AiConfig {
@@ -42,6 +66,9 @@ impl Default for AiConfig {
             timeout_secs: 60,
             models: Vec::new(),
             default_model: String::new(),
+            max_input_tokens: default_max_input_tokens(),
+            max_output_tokens: default_max_output_tokens(),
+            icon_color_mode: default_icon_color_mode(),
         }
     }
 }

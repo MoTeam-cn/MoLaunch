@@ -9,7 +9,7 @@ use crate::state::AppState;
 
 use super::types::{CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult};
 
-/// 分析崩溃日志文本，识别常见崩溃模式
+/// 分析崩溃日志文本，识别常见崩溃模式（纯文本、无状态，供命令与 AI 工具复用）
 ///
 /// 匹配规则（大小写不敏感）：
 /// - Java 版本不匹配：`UnsupportedClassVersionError` / `Unsupported class file major version` 等
@@ -17,25 +17,14 @@ use super::types::{CrashAnalysisItem, CrashAnalyzeParams, CrashAnalyzeResult};
 /// - 内存不足：`OutOfMemoryError`；显卡驱动：`GLFW`/`OpenGL`/`Pixel format`/`driver`
 /// - Mod 冲突：`MixinApplyError`/`Duplicate`/`Conflicting`
 /// - 其他：含 `Exception`/`Error`/`Crash`（仅未命中上述分类时）。空文本返回空。
-pub async fn analyze(
-    state: &AppState,
-    params: CrashAnalyzeParams,
-) -> Result<serde_json::Value, String> {
-    let _ = state; // 纯文本分析，不使用 state
-    let log_text = params.log_text;
-
+pub fn analyze_log_text(log_text: &str) -> Vec<CrashAnalysisItem> {
+    let mut analyses: Vec<CrashAnalysisItem> = Vec::new();
     if log_text.trim().is_empty() {
-        let result = CrashAnalyzeResult {
-            analyses: Vec::new(),
-        };
-        return serde_json::to_value(&result).map_err(|e| e.to_string());
+        return analyses;
     }
-
-    log_info!("[CrashAnalyzer] 开始分析日志，长度 {} 字节", log_text.len());
 
     let lower = log_text.to_lowercase();
     let lines: Vec<&str> = log_text.lines().collect();
-    let mut analyses: Vec<CrashAnalysisItem> = Vec::new();
 
     // 1. Java 版本不匹配
     if lower.contains("unsupported class file major version")
@@ -141,7 +130,19 @@ pub async fn analyze(
 
     log_info!("[CrashAnalyzer] 分析完成，识别 {} 条问题", analyses.len());
 
-    let result = CrashAnalyzeResult { analyses };
+    analyses
+}
+
+/// 崩溃日志分析命令入口（包装纯函数，返回 JSON）
+pub async fn analyze(
+    state: &AppState,
+    params: CrashAnalyzeParams,
+) -> Result<serde_json::Value, String> {
+    let _ = state; // 纯文本分析，不使用 state
+    log_info!("[CrashAnalyzer] 开始分析日志，长度 {} 字节", params.log_text.len());
+    let result = CrashAnalyzeResult {
+        analyses: analyze_log_text(&params.log_text),
+    };
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 

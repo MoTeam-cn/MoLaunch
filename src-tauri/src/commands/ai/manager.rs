@@ -1,91 +1,21 @@
-//! AI action 分发（复用 `utils::dispatcher::Dispatcher` + `handler!` 宏）
-//! action：`analyze_crash` / `check_status` / `save_config` / `load_config` / `list_models`。
-//! 配置持久化于 config.ini [AI] 段（api_key 经 SDK DES 加密），服务为本地 OpenAI 兼容 API。
-
-use once_cell::sync::Lazy;
-use serde_json::Value;
-use tauri::AppHandle;
+//! AI 实现库（分析 / 状态查询）
+//!
+//! 自「实验性」功能上线后，AI 的 IPC action（analyze_crash / check_status /
+//! save_config / load_config / list_models）已并入
+//! `commands::experimental::manager` 的统一分发，本模块不再提供独立
+//! Tauri 命令入口，仅保留被复用的纯实现函数。
+//!
+//! 配置持久化于 config.ini [AI] 段（api_key 经 SDK DES 加密），
+//! 服务为本地 OpenAI 兼容 API。
 
 use super::types::{AiAnalysisResult, AiProbeParams, AiStatusResult, AnalyzeCrashParams};
 use crate::ai_core;
-use crate::handler;
-use crate::state::AppState;
-use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 use crate::{log_info, log_warn};
 
-static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
-    let mut d = Dispatcher::new();
-
-    d.register(
-        "analyze_crash",
-        handler!(_state, _app, params, {
-            let p: AnalyzeCrashParams =
-                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            analyze_crash(p).await
-        }),
-    );
-
-    d.register(
-        "check_status",
-        handler!(_state, _app, params, {
-            let probe = if params.is_null() {
-                None
-            } else {
-                Some(serde_json::from_value::<AiProbeParams>(params).map_err(|e| format!("参数解析失败: {}", e))?)
-            };
-            check_status(probe).await
-        }),
-    );
-
-    d.register(
-        "save_config",
-        handler!(state, _app, params, {
-            let cfg: ai_core::AiConfig = serde_json::from_value(params)
-                .map_err(|e| format!("配置解析失败: {}", e))?;
-            ai_core::save_config(&state.sdk, &cfg).await?;
-            serde_json::to_value(()).map_err(|e| e.to_string())
-        }),
-    );
-
-    d.register(
-        "load_config",
-        handler!(_state, _app, _params, {
-            let cfg = ai_core::load_config_async().await;
-            serde_json::to_value(cfg).map_err(|e| e.to_string())
-        }),
-    );
-
-    d.register(
-        "list_models",
-        handler!(_state, _app, params, {
-            let p: AiProbeParams =
-                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let config = ai_core::AiConfig {
-                base_url: p.base_url,
-                api_key: p.api_key,
-                timeout_secs: p.timeout_secs,
-                models: Vec::new(),
-                default_model: String::new(),
-            };
-            let models = ai_core::list_models(&config).await.map_err(|e| e.to_string())?;
-            serde_json::to_value(models).map_err(|e| e.to_string())
-        }),
-    );
-
-    d
-});
-
-/// action 分发入口（由 `super::ai_manager` 调用）
-pub async fn dispatch(
-    state: AppState,
-    app: AppHandle,
-    req: ActionRequest,
-) -> Result<Value, String> {
-    DISPATCHER.dispatch(state, app, req).await
-}
-
 /// 分析崩溃日志（本地 AI）
-async fn analyze_crash(params: AnalyzeCrashParams) -> Result<Value, String> {
+///
+/// 被 `commands::experimental` 的 `analyze_crash` action 调用。
+pub(crate) async fn analyze_crash(params: AnalyzeCrashParams) -> Result<serde_json::Value, String> {
     let config = ai_core::load_config_async().await;
     if config.base_url.is_empty() {
         return Err("未配置 AI 服务地址".to_string());
@@ -122,7 +52,12 @@ async fn analyze_crash(params: AnalyzeCrashParams) -> Result<Value, String> {
 }
 
 /// 检测本地 AI 服务是否可用
-async fn check_status(probe: Option<AiProbeParams>) -> Result<Value, String> {
+///
+/// 被 `commands::experimental` 的 `check_status` action 调用；
+/// 传入 `Some(probe)` 时使用表单当前值探测，否则读取已保存配置。
+pub(crate) async fn check_status(
+    probe: Option<AiProbeParams>,
+) -> Result<serde_json::Value, String> {
     let config = if let Some(p) = probe {
         ai_core::AiConfig {
             base_url: p.base_url,
@@ -130,6 +65,9 @@ async fn check_status(probe: Option<AiProbeParams>) -> Result<Value, String> {
             timeout_secs: p.timeout_secs,
             models: Vec::new(),
             default_model: String::new(),
+            max_input_tokens: 184_000,
+            max_output_tokens: 16_000,
+            icon_color_mode: "color".to_string(),
         }
     } else {
         ai_core::load_config_async().await

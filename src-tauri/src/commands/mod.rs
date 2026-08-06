@@ -3,6 +3,7 @@
 pub mod ai;
 pub mod auth;
 pub mod community;
+pub mod experimental;
 pub mod frp;
 pub mod image_cache;
 pub mod java;

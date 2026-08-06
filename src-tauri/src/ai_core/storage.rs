@@ -23,6 +23,12 @@ const KEY_TIMEOUT: &str = "timeout_secs";
 const KEY_MODELS: &str = "models";
 /// INI key：默认模型名
 const KEY_DEFAULT_MODEL: &str = "default_model";
+/// INI key：上下文窗口 token 上限
+const KEY_MAX_INPUT_TOKENS: &str = "max_input_tokens";
+/// INI key：单次回复最大输出 token
+const KEY_MAX_OUTPUT_TOKENS: &str = "max_output_tokens";
+/// INI key：模型图标样式（color / mono）
+const KEY_ICON_COLOR_MODE: &str = "icon_color_mode";
 
 /// api_key 解密缓存状态
 struct ApiKeyCache {
@@ -100,6 +106,18 @@ pub fn load() -> AiConfig {
         default_model: storage
             .get_config(SECTION, KEY_DEFAULT_MODEL)
             .unwrap_or_default(),
+        max_input_tokens: storage
+            .get_config(SECTION, KEY_MAX_INPUT_TOKENS)
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(184_000),
+        max_output_tokens: storage
+            .get_config(SECTION, KEY_MAX_OUTPUT_TOKENS)
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(16_000),
+        icon_color_mode: storage
+            .get_config(SECTION, KEY_ICON_COLOR_MODE)
+            .filter(|v| v == "color" || v == "mono")
+            .unwrap_or_else(|| "color".to_string()),
     }
 }
 
@@ -130,6 +148,15 @@ pub async fn save(
     storage
         .set_config(SECTION, KEY_DEFAULT_MODEL, &config.default_model)
         .map_err(|e| format!("保存 AI 默认模型失败: {}", e))?;
+    storage
+        .set_config(SECTION, KEY_MAX_INPUT_TOKENS, &config.max_input_tokens.to_string())
+        .map_err(|e| format!("保存 AI 上下文窗口配置失败: {}", e))?;
+    storage
+        .set_config(SECTION, KEY_MAX_OUTPUT_TOKENS, &config.max_output_tokens.to_string())
+        .map_err(|e| format!("保存 AI 输出上限配置失败: {}", e))?;
+    storage
+        .set_config(SECTION, KEY_ICON_COLOR_MODE, &config.icon_color_mode)
+        .map_err(|e| format!("保存 AI 图标样式配置失败: {}", e))?;
 
     // api_key 加密后写入（空串表示清空）
     let stored_key = if config.api_key.is_empty() {

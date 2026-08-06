@@ -32,6 +32,9 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
     app_config.primary_color = config.get_or("General", "primary_color", &app_config.primary_color);
     app_config.close_behavior =
         config.get_or("General", "close_behavior", &app_config.close_behavior);
+    // 实验性功能开关（[Experimental] enabled；未配置时保持默认 false）
+    app_config.experimental_enabled =
+        config.get("Experimental", "enabled").as_deref() == Some("true");
 
     // Folders（Minecraft 文件夹列表）
     if let Some(list_json) = config.get("Folders", "list") {

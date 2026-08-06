@@ -37,6 +37,8 @@ pub struct AppState {
     pub download_cancel_flag: Arc<std::sync::atomic::AtomicBool>,
     /// 下载暂停信号（设置为 true 时，新任务不再开始，已进行的任务完成当前文件后等待）
     pub download_pause_flag: Arc<std::sync::atomic::AtomicBool>,
+    /// 聊天流式回复取消信号（设置为 true 时，正在进行的 AI 回复尽快中断）
+    pub chat_cancel_flag: Arc<std::sync::atomic::AtomicBool>,
     /// authlib 多角色登录的待处理上下文
     ///
     /// `authlib_login` 返回 `NeedSelect` 时暂存，前端选定 profile 后
@@ -113,6 +115,7 @@ impl AppState {
             launch_pipeline: Arc::new(TokioMutex::new(None)),
             download_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             download_pause_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            chat_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             authlib_pending: Arc::new(TokioMutex::new(None)),
             virtual_lan_bridge: Arc::new(TokioMutex::new(None)),
             progress_tx: Arc::new(progress_tx),

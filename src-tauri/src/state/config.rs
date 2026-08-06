@@ -170,6 +170,13 @@ pub struct AppConfig {
     /// - `"exit"`：直接退出
     #[serde(default = "default_close_behavior")]
     pub close_behavior: String,
+    /// 实验性功能开关（默认 false）
+    ///
+    /// 开启后顶部导航显示「实验性」入口（AI 聊天 / 日志分析 / AI 设置），
+    /// 并惰性初始化 SQLite 聊天存储（`.Molaunch/experimental/chat.db`）；
+    /// 未开启时该功能不可见且不创建任何数据库文件，避免无关用户的资源开销。
+    #[serde(default)]
+    pub experimental_enabled: bool,
 
     // 分组
     pub proxy: ProxyConfig,
@@ -208,6 +215,7 @@ impl Default for AppConfig {
             selected_version: None,
             external_download_dir: None,
             close_behavior: default_close_behavior(),
+            experimental_enabled: false,
             proxy: ProxyConfig {
                 mode: "none".to_string(),
                 kind: "http".to_string(),

@@ -75,6 +75,9 @@ flate2 = "1"
 fastnbt = "2"
 # 文件系统监听（用于 mods 目录自动刷新）
 notify = "8"
+# SQLite（实验性功能聊天记录存储；bundled=静态编译 SQLite，运行时无需动态库）
+# 惰性初始化：仅在用户开启实验性功能时才创建数据库文件并与建表
+rusqlite = { version = "0.31", features = ["bundled"] }
 
 # 联机功能加密依赖（MoSign-v1 协议 + ECIES 加密信封）
 # Ed25519 签名（设备身份与注册签名）

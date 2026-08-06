@@ -125,6 +125,8 @@ pub struct ConfigSnapshot {
     /// 关闭主窗口时的行为："ask"（每次询问）/ "tray"（保留托盘）/ "exit"（直接退出）
     #[serde(default = "default_close_behavior_str")]
     pub close_behavior: String,
+    /// 实验性功能开关（开启后显示「实验性」入口并初始化 SQLite 聊天存储，默认 false）
+    pub experimental_enabled: bool,
     pub selected_version: Option<String>,
     // 外部下载工具
     pub external_download_dir: Option<String>,

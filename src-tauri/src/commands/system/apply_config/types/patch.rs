@@ -101,6 +101,8 @@ pub struct ConfigPatch {
     pub primary_color: Option<String>,
     /// 关闭主窗口时的行为："ask"（每次询问）/ "tray"（保留托盘）/ "exit"（直接退出）
     pub close_behavior: Option<String>,
+    /// 实验性功能开关（开启后显示「实验性」入口，并惰性初始化 SQLite 聊天存储）
+    pub experimental_enabled: Option<bool>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空"
     pub selected_version: Option<Option<String>>,
     /// 双层 Option：外层 Some 表示"要更新此字段"，内层 None 表示"清空（回退默认目录）"
