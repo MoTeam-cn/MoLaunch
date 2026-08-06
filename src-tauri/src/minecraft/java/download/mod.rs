@@ -12,6 +12,9 @@ mod progress;
 mod types;
 mod verify;
 
+#[cfg(test)]
+mod match_test;
+
 pub use constants::JAVA_DOWNLOAD_PROGRESS_EVENT;
 pub use pipeline::download_java_runtime;
 pub use progress::JavaDownloadProgress;

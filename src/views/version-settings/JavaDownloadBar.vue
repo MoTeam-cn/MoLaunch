@@ -1,17 +1,21 @@
 <script setup lang="ts">
 /**
- * Java 下载按钮 + 进度条
- * 当 javaReqs 存在且需要下载时显示"下载 Java X"按钮，点击后从 Mojang 官方 Runtime 索引下载
- * 下载完成后 emit('downloaded', javaPath)，由父组件刷新 Java 列表并选中
+ * Java 下载按钮 + 进度条（可复用）
+ *
+ * 由父组件通过 `targetMajor` 指定要下载的 Java 大版本号（如 21/17/8），组件负责：
+ * 展示"下载 Java X"按钮、订阅 `java-download-progress` 进度事件、渲染进度条。
+ * 下载完成后 emit('downloaded', javaPath)，由父组件刷新列表。
+ *
+ * 供「Java 环境检测」与「Java 下载器」复用；仅当 targetMajor 有效时才渲染。
  */
 import { ref, onMounted, computed } from 'vue'
 import { useTauriEvent } from '@/composables/useTauriEvent'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError } from '@/utils/toast'
 import Button from '@/components/common/Button.vue'
-import type { JavaRequirements, JavaDownloadProgress } from '@/types/java'
+import type { JavaDownloadProgress } from '@/types/java'
 
-const props = defineProps<{ javaReqs: JavaRequirements | null }>()
+const props = defineProps<{ targetMajor: number | null }>()
 const emit = defineEmits<{ downloaded: [javaPath: string] }>()
 
 const downloading = ref(false)
@@ -22,11 +26,8 @@ const { start } = useTauriEvent<JavaDownloadProgress>(
   (payload) => { progress.value = payload },
 )
 
-/** 要下载的 Java 大版本号 */
-const targetMajor = computed(() => {
-  if (!props.javaReqs) return 0
-  return props.javaReqs.recommended_java_version || props.javaReqs.min_java_version || 0
-})
+/** 有效目标 Java 大版本号（0/异常值不参与下载） */
+const targetMajor = computed(() => (props.targetMajor && props.targetMajor > 0 ? props.targetMajor : null))
 
 /** 进度百分比（0~100） */
 const progressPercent = computed(() => {
@@ -59,7 +60,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div v-if="javaReqs && targetMajor" class="space-y-1.5">
+  <div v-if="targetMajor" class="space-y-1.5">
     <!-- 下载按钮（不在下载中时显示） -->
     <Button
       v-if="!downloading"
