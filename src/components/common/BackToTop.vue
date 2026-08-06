@@ -4,7 +4,9 @@
  * 蓝色主题 + 涟漪动画 + 平滑出现
  *
  * 显示策略：
- * - 仅响应位于主内容区 <main> 内的滚动容器，过滤弹窗 / 下拉框等浮层
+ * - 仅响应位于主内容区 <main> 内的外部滚动容器，过滤弹窗 / 下拉框等浮层
+ * - 标记 `data-inner-scroll` 的内部滚动容器（如 AI 聊天消息列表）不触发，
+ *   避免全局右下角按钮遮挡页面内操作（如发送按钮）
  * - 迟滞阈值：未显示时需 scrollTop > 700 才出现；已显示时仅在 scrollTop ≤ 一屏高度时隐藏
  *   （避免在临界点反复闪烁）
  * - 路由切换时重置状态，防止旧按钮残留到新页面
@@ -31,8 +33,11 @@ function onScroll(e: Event) {
   if (!el || !(el instanceof Element)) return
   if (!('scrollTop' in el) || !('scrollHeight' in el)) return
 
-  // 仅响应主内容区内的滚动容器，过滤 Teleport 弹层 / 下拉框等
+  // 仅响应主内容区内的外部滚动容器，过滤 Teleport 弹层 / 下拉框等
   if (!el.closest('main')) return
+
+  // 跳过标记为内部滚动的容器（如 AI 聊天消息列表），避免遮挡页面内操作
+  if (el.closest('[data-inner-scroll]')) return
 
   const clientHeight = el.clientHeight
   const scrollTop = el.scrollTop
@@ -73,11 +78,12 @@ function refreshAfterRouteChange() {
   }, 450)
 }
 
-/** 在主内容区内查找已发生滚动的容器（用于路由切换后恢复按钮显示状态） */
+/** 在主内容区内查找已发生滚动的外部容器（用于路由切换后恢复按钮显示状态） */
 function findScrolledContainer(root: Element): Element | null {
   const candidates = root.querySelectorAll('*')
   for (let i = 0; i < candidates.length; i++) {
     const node = candidates[i]
+    if (node.closest('[data-inner-scroll]')) continue
     if (node.scrollTop > 0 && node.clientHeight < node.scrollHeight) {
       return node
     }

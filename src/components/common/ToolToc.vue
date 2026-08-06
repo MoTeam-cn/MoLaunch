@@ -6,7 +6,11 @@
  * hover 整个 TOC 区：展开为带标题的方格条（宽度 + 透明度动画）。
  * 当前可见项（滚动高亮）使用主题色。
  * 点击跳转：在滚动容器内手动计算 scrollTop，预留顶部标题栏偏移，避免被遮住。
- * 工具数 < 3 时不显示。
+ * 条目数 < minItems 时不显示。
+ *
+ * 扫描时机：除 refreshKey 变化外，通过 MutationObserver 监听容器内
+ * `[data-toc-card]` 的新增/移除/标题变更自动重扫（覆盖会话切换/删除等
+ * 带过渡动画的 DOM 变动，避免在旧内容淡出期间扫到残留节点）。
  */
 
 import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
@@ -23,6 +27,8 @@ const props = defineProps<{
   containerSelector?: string
   /** 跳转时顶部预留偏移（避免被标题栏遮住），单位 px */
   scrollOffset?: number
+  /** 最少条目数，低于则不显示（默认 3） */
+  minItems?: number
 }>()
 
 const items = ref<TocItem[]>([])
@@ -30,6 +36,45 @@ const activeId = ref('')
 const hovered = ref(false)
 const scrollContainer = ref<HTMLElement | null>(null)
 let scrollHandler: (() => void) | null = null
+let observer: MutationObserver | null = null
+
+/** 判断一批节点中是否包含 TOC 卡片（自身带 data-toc-card 或后代包含） */
+function nodesContainTocCard(nodes: NodeList): boolean {
+  for (const n of nodes) {
+    if (!(n instanceof Element)) continue
+    if (n.hasAttribute('data-toc-card') || n.querySelector('[data-toc-card]')) return true
+  }
+  return false
+}
+
+/** 监听容器内 TOC 卡片的增删/标题变更，自动重扫（不依赖 refreshKey 的时序） */
+function observeContainer() {
+  observer?.disconnect()
+  observer = null
+  const container = scrollContainer.value
+  if (!container) return
+  observer = new MutationObserver((mutations) => {
+    let dirty = false
+    for (const m of mutations) {
+      // attributeFilter 已限定 data-toc-card / data-toc-title，命中即需重扫
+      if (m.type === 'attributes') {
+        dirty = true
+        break
+      }
+      if (nodesContainTocCard(m.addedNodes) || nodesContainTocCard(m.removedNodes)) {
+        dirty = true
+        break
+      }
+    }
+    if (dirty) refresh()
+  })
+  observer.observe(container, {
+    childList: true,
+    subtree: true,
+    attributes: true,
+    attributeFilter: ['data-toc-card', 'data-toc-title'],
+  })
+}
 
 /** 扫描滚动容器内的 [data-toc-card] 元素，构建 TOC 列表 */
 function scanItems() {
@@ -110,6 +155,7 @@ function refresh() {
       setTimeout(() => {
         scanItems()
         bindScroll()
+        observeContainer()
       }, 0)
     })
   })
@@ -126,13 +172,15 @@ watch(
 
 onBeforeUnmount(() => {
   unbindScroll()
+  observer?.disconnect()
+  observer = null
 })
 </script>
 
 <template>
-  <!-- 工具数 ≥ 3 时才显示。absolute 悬浮，不占布局空间，不影响滚动条位置 -->
+  <!-- 条目数达标时才显示。absolute 悬浮，不占布局空间，不影响滚动条位置 -->
   <div
-    v-if="items.length >= 3"
+    v-if="items.length >= (props.minItems ?? 3)"
     class="absolute right-4 top-1/2 -translate-y-1/2 z-10"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"

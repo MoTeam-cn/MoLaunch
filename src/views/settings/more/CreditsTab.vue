@@ -109,6 +109,9 @@ onMounted(async () => {
           <!-- Logo（圆形，放大到 14x14 让方形 logo 白边不突兀） -->
           <div class="flex h-14 w-14 flex-none items-center justify-center rounded-full bg-white overflow-hidden ring-1 ring-gray-100">
             <img v-if="resolveLogo(item.logo)" :src="resolveLogo(item.logo)" :alt="item.name" class="h-full w-full object-cover" />
+            <span v-else class="flex h-full w-full items-center justify-center bg-primary-100 text-sm font-medium text-primary-700">
+              {{ item.name.charAt(0) }}
+            </span>
           </div>
 
           <div class="min-w-0 flex-1">
@@ -221,10 +224,8 @@ onMounted(async () => {
         <div class="mt-1 space-y-2 text-[12px] leading-relaxed text-gray-500">
           <p>
             <span class="font-medium text-gray-600">关于 PCL2：</span>
-            本启动器基于 Tauri v2 框架开发，前端采用 Vue3，后端采用 Rust。
-            开发过程中参考了 Plain Craft Launcher 2 (PCL2) 的部分设计逻辑与交互理念，
-            后端逻辑均为 Rust 原创实现，不存在直接复制 PCL2 源代码的情况，但在功能逻辑与交互设计上可能存在相似之处，在此特别声明并致谢。
-            PCL2 采用<a href="#" class="text-primary-500 hover:text-primary-600" @click.prevent="openLink('https://shimo.im/docs/rGrd8pY8xWkt6ryW')"> 《PCL 分发有限许可》</a>，详情参阅其许可文档。
+            本启动器为独立第三方创作，与 Plain Craft Launcher 2 (PCL2) 无任何隶属或关联关系。
+            PCL2 采用<a href="#" class="text-primary-500 hover:text-primary-600" @click.prevent="openLink('https://shimo.im/docs/rGrd8pY8xWkt6ryW')">《PCL 分发有限许可》</a>，详情参阅其许可文档。
           </p>
           <p>
             <span class="font-medium text-gray-600">关于 Arco Design：</span>

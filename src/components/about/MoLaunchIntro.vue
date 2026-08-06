@@ -55,14 +55,17 @@ function toggle() {
             <span class="font-semibold text-gray-800">MoLaunch</span> 基于
             <span class="font-medium text-primary-600">Tauri 2</span> 框架构建，前端使用
             <span class="font-medium text-primary-600">Vue 3 + TypeScript + Tailwind CSS</span>，
-            后端使用 <span class="font-medium text-primary-600">Rust</span> 实现。启动器通过 Rust
-            原生调用系统进程启动 Minecraft，解析版本 JSON 并自动下载缺失依赖（client JAR、
-            libraries、assets、模组加载器）。Java 检测模块扫描注册表、环境变量与本地磁盘，
-            按版本号自动匹配最优运行时。联机功能内置 FRP 隧道客户端，通过 SDK 动态库
-            （Windows dll / macOS dylib / Linux so，编译时嵌入二进制并释放到临时目录加载）
-            创建隧道，无需用户手动配置端口映射。账号系统支持离线登录与微软登录，
-            凭据通过设备 ID 派生密钥加密后存储在本地。UI 设计采用单列布局与
-            Arco Design 的紧凑组件风格，自研 Select / Button / Tooltip 等组件以保持视觉一致性。
+            后端使用 <span class="font-medium text-primary-600">Rust</span>，前后端通过 IPC 通信。
+            启动游戏时，后端解析版本清单，按需从官方源或 BMCLAPI、MoCDN 等镜像下载
+            client JAR、libraries 与 assets，并补齐模组加载器；随后扫描注册表、环境变量
+            与磁盘定位 Java，按兼容性匹配最优运行时，组装 JVM 参数后创建游戏进程并持续监控。
+            针对中文路径等环境，内置 Java Launch Wrapper 规避 JVM 参数乱码；针对
+            LWJGL 3.4.1，按需注入 lwjgl-unsafe-agent 修复性能问题。游戏异常退出时，
+            崩溃分析器结合日志、崩溃报告与 hs_err 文件提取证据，给出排查建议。此外，
+            联机模块内置 FRP 隧道，免去端口映射直连；账号支持离线与微软登录，凭据加密
+            存于本地；整合包支持 CurseForge、Modrinth、MCBBS 等格式一键安装，并提供
+            多版本隔离，各版本的游戏数据互不干扰；缺失的 Java 运行时可由启动器自动下载
+            安装。UI 采用单列布局与自研组件，风格统一。
           </p>
         </div>
       </div>

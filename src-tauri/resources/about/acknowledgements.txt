@@ -18,3 +18,4 @@
 | Cubiomes | https://github.com/Cubitect/cubiomes | Minecraft Java 版群系与结构生成算法库（C），种子地图工具的核心算法来源。本项目使用 MoTeam-cn/cubiomes 分支，原生支持 MC 1.7~26.2 | Cubitect.png | Cubitect:Cubitect.png |
 | OpenLayers | https://openlayers.org | 高性能开源地图渲染引擎，种子地图工具的瓦片渲染、矢量图层与交互基础 | openlayers.png | OpenLayers Contributors |
 | MoCDN | https://www.mocdn.net | 提供 CurseForge 和 Modrinth 的文件下载加速服务 | mocdn-logo.png | MoTeam:MoTeam.png |
+| Plain Craft Launcher 2 (PCL2) | https://github.com/Meloong-Git/PCL | 知名的 Minecraft Java 版启动器。本启动器在早期开发阶段受到了 PCL2 的启发，在此特别致谢 | PCL2.ico | 龙腾猫跃:LTCatt.jpg |

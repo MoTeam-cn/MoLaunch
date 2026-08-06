@@ -8,7 +8,7 @@
       <div class="crash-dialog relative bg-dialog-bg rounded-lg shadow-[0_4px_20px_rgba(52,61,74,0.5)] w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
         <!-- 标题区 + 分割线 -->
         <div class="px-7 pt-6 pb-3">
-          <h2 class="text-[23px] font-normal text-brand-2 leading-tight">Minecraft 出现错误</h2>
+          <h2 class="text-[23px] font-normal text-brand-2 leading-tight">游戏运行出错</h2>
           <!-- 分割线 -->
           <div class="mt-3 h-0.5 bg-brand-2 rounded-full"></div>
         </div>
@@ -97,7 +97,7 @@
             size="small"
             @click="openCrashReport"
           >
-            查看输出
+            查看报告
           </Button>
           <!-- 导出错误报告按钮（Normal 态） -->
           <Button
@@ -105,7 +105,7 @@
             size="small"
             @click="exportReport"
           >
-            导出错误报告
+            导出报告
           </Button>
           <!-- 确定按钮（Highlight 态：主蓝边框 #0b5bcb，hover 亮蓝） -->
           <Button
@@ -113,7 +113,7 @@
             size="small"
             @click="handleClose"
           >
-            确定
+            关闭
           </Button>
         </div>
       </div>
@@ -216,7 +216,7 @@ defineExpose({ show })
   transform: translateY(40px);
   opacity: 0;
 }
-/* 关闭动画（MyMsgText.xaml.vb 第 53-70 行）：
+/* 关闭动画：
    - 下沉 20px + 旋转 6° + 淡出 */
 .crash-modal-leave-active {
   transition: opacity 0.15s ease;

@@ -43,6 +43,8 @@
 | notify | Copyright (c) notify-rs developers | CC0-1.0 / Artistic-2.0 | https://docs.rs/notify | https://github.com/notify-rs/notify/blob/main/LICENSE-CC0 |
 | sysinfo | Copyright (c) 2015 Guillaume Gomez | MIT License | https://docs.rs/sysinfo | https://github.com/GuillaumeGomez/sysinfo/blob/master/LICENSE |
 | Plain Craft Launcher 2 (PCL2) | Copyright © 成都瓜皮龙科技有限公司（龙腾猫跃）2016. All Rights Reserved. | PCL 分发有限许可（自定义许可） | https://github.com/Meloong-Git/PCL | https://github.com/Meloong-Git/PCL/blob/main/LICENCE |
+| Java Launch Wrapper | Copyright (c) 00ll00 | MIT License | https://github.com/00ll00/java_launch_wrapper | https://github.com/00ll00/java_launch_wrapper/blob/master/LICENCE |
+| lwjgl-unsafe-agent | Copyright (c) Glavo | Apache License 2.0 | https://github.com/HMCL-dev/lwjgl-unsafe-agent | https://github.com/HMCL-dev/lwjgl-unsafe-agent/blob/main/LICENSE |
 | marked | Copyright (c) 2014-2018, Christopher Jeffrey | MIT License | https://github.com/markedjs/marked | https://github.com/markedjs/marked/blob/master/LICENSE |
 | qrcodejs | Copyright (c) 2012 davidshimjs | MIT License | https://github.com/davidshimjs/qrcodejs | https://github.com/davidshimjs/qrcodejs/blob/master/LICENSE |
 | tokio-tungstenite | Copyright (c) 2017 Daniel Abramov | MIT License | https://docs.rs/tokio-tungstenite | https://github.com/snapview/tokio-tungstenite/blob/master/LICENSE |
