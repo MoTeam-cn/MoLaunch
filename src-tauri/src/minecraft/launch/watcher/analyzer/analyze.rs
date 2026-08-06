@@ -3,12 +3,12 @@
 //! 流程：Collect（收集各源文本）→ Detect（多路检测器并行提取证据）→ Score（置信度聚合）→ 兜底。
 //! 规则以声明式数据表承载（rules.rs），检测器与评分器解耦，与早期"顺序短路 if 链"形态无关。
 
+use super::super::types::{CrashCategory, CrashInfo, LogEntry};
 use super::detector::{
     CaughtExceptionDetector, ClassNotFoundDetector, Detector, Evidence, KeywordDetector,
     ShortOutputDetector,
 };
 use super::detector_stack::StackDetector;
-use super::super::types::{CrashCategory, CrashInfo, LogEntry};
 use std::path::Path;
 
 /// 分析崩溃（主入口）
@@ -131,7 +131,10 @@ mod tests {
     fn detects_unrecognized_option() {
         let logs = [
             log(LogLevel::Error, "Unrecognized option: -Xfoo"),
-            log(LogLevel::Error, "Error: Could not create the Java Virtual Machine"),
+            log(
+                LogLevel::Error,
+                "Error: Could not create the Java Virtual Machine",
+            ),
         ];
         let info = run(&logs, test_dir()).unwrap();
         assert_eq!(info.category, CrashCategory::Java);
@@ -140,7 +143,10 @@ mod tests {
 
     #[test]
     fn detects_out_of_memory() {
-        let logs = [log(LogLevel::Error, "java.lang.OutOfMemoryError: Java heap space")];
+        let logs = [log(
+            LogLevel::Error,
+            "java.lang.OutOfMemoryError: Java heap space",
+        )];
         let info = run(&logs, test_dir()).unwrap();
         assert_eq!(info.category, CrashCategory::Memory);
     }

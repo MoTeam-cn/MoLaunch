@@ -172,10 +172,7 @@ impl Detector for ShortOutputDetector {
 
     fn detect(&self, sources: &CollectedSources) -> Vec<Evidence> {
         let log = &sources.runtime_log;
-        if !log.is_empty()
-            && log.len() < 100
-            && !log.contains("at net.")
-            && !log.contains("INFO]")
+        if !log.is_empty() && log.len() < 100 && !log.contains("at net.") && !log.contains("INFO]")
         {
             vec![Evidence {
                 confidence: 0.50,

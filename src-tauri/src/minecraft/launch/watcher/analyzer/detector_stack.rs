@@ -33,7 +33,9 @@ impl Detector for StackDetector {
         // 崩溃报告：取 System Details 之前的部分
         if !sources.crash_report_text.is_empty() {
             if let Some(details_end) = sources.crash_report_text.find("System Details") {
-                keywords.extend(extract_stack_keywords(&sources.crash_report_text[..details_end]));
+                keywords.extend(extract_stack_keywords(
+                    &sources.crash_report_text[..details_end],
+                ));
             }
         }
 
@@ -45,7 +47,8 @@ impl Detector for StackDetector {
         // hs_err：取 THREAD 段（Registers: 之前）
         if !sources.hs_err_text.is_empty() {
             if let Some(thread_start) = sources.hs_err_text.find("T H R E A D") {
-                let thread_section = if let Some(reg_start) = sources.hs_err_text[thread_start..].find("Registers:")
+                let thread_section = if let Some(reg_start) =
+                    sources.hs_err_text[thread_start..].find("Registers:")
                 {
                     &sources.hs_err_text[thread_start..thread_start + reg_start]
                 } else {

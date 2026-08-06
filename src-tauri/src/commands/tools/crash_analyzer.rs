@@ -139,7 +139,10 @@ pub async fn analyze(
     params: CrashAnalyzeParams,
 ) -> Result<serde_json::Value, String> {
     let _ = state; // 纯文本分析，不使用 state
-    log_info!("[CrashAnalyzer] 开始分析日志，长度 {} 字节", params.log_text.len());
+    log_info!(
+        "[CrashAnalyzer] 开始分析日志，长度 {} 字节",
+        params.log_text.len()
+    );
     let result = CrashAnalyzeResult {
         analyses: analyze_log_text(&params.log_text),
     };
@@ -167,6 +170,37 @@ fn find_relevant_line(lines: &[&str], needle: &str) -> String {
         }
     }
     String::new()
+}
+
+/// 在日志中定位首个命中关键词（大小写不敏感）的行，返回该行及其前后各 `context` 行的
+/// 上下文窗口（含行号标注），供 AI 分析使用。
+///
+/// - 命中：返回 `(起始行号, 窗口文本)`；行号从 1 起。
+/// - 未命中：返回 `(None, "")`。
+pub fn locate_keyword_context(
+    log_text: &str,
+    keyword: &str,
+    context: usize,
+) -> (Option<usize>, String) {
+    let lines: Vec<&str> = log_text.lines().collect();
+    let needle_l = keyword.to_lowercase();
+    let mut hit_line: Option<usize> = None;
+    for (i, line) in lines.iter().enumerate() {
+        if !line.trim().is_empty() && line.to_lowercase().contains(&needle_l) {
+            hit_line = Some(i);
+            break;
+        }
+    }
+    let Some(idx) = hit_line else {
+        return (None, String::new());
+    };
+    let start = idx.saturating_sub(context);
+    let end = (idx + context).min(lines.len().saturating_sub(1));
+    let mut out = String::new();
+    for (i, line) in lines.iter().enumerate().take(end + 1).skip(start) {
+        out.push_str(&format!("{:>6}| {}\n", i + 1, line));
+    }
+    (Some(idx + 1), out)
 }
 
 /// 将字符串按字符数截断，超长时追加省略号

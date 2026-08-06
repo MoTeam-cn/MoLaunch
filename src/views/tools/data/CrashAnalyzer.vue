@@ -51,10 +51,14 @@ async function runAnalyze() {
   result.value = null
   try {
     result.value = await crashAnalyze(logText.value)
-    if (result.value.analyses.length === 0) {
-      toastInfo('未识别到已知崩溃模式，请检查日志或手动排查')
+    const items = result.value.analyses
+    // 本地引擎没有识别到具体问题（无条目，或仅有 other/info 通用条目）：
+    // 只提示用户可点「用 AI 深度分析」按钮深入——不自动弹窗，AI 分析完全由用户主动触发。
+    const hasSpecific = items.some((it) => it.category !== 'other' && it.severity !== 'info')
+    if (items.length === 0 || !hasSpecific) {
+      toastInfo('本地引擎未识别出具体问题，可点击「用 AI 深度分析」进一步诊断')
     } else {
-      toastSuccess('分析完成，识别出 ' + result.value.analyses.length + ' 个可能原因')
+      toastSuccess('分析完成，识别出 ' + items.length + ' 个可能原因')
     }
   } catch (e) {
     toastError(`分析失败: ${e instanceof Error ? e.message : String(e)}`)
