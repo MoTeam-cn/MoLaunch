@@ -4,13 +4,13 @@
 //! `load_config_async()` 重新读取），HTTP 传输复用 `crate::http` 全局客户端
 //! （代理/IP/TLS 变更后由 `apply_config` 重建），修改配置无需重启应用。
 
-use crate::ai_core::config::AiConfig;
-use crate::ai_core::prompt::{system_prompt, PromptKind};
 use super::transport::{authorized_builder, send_with_timeout};
 use super::types::{
     ChatCompletionsRequest, ChatCompletionsResponse, ChatMessage, ChatRequest, ChatResponse,
     ChatResult, ChatTurn, ModelsResponse, ToolCall, ToolDef,
 };
+use crate::ai_core::config::AiConfig;
+use crate::ai_core::prompt::{system_prompt, PromptKind};
 
 /// 调用 OpenAI 兼容服务（单轮，无工具），返回模型回复
 ///
@@ -81,7 +81,9 @@ pub async fn list_models(config: &AiConfig) -> anyhow::Result<Vec<String>> {
 
     let url = format!("{}/models", config.base_url.trim_end_matches('/'));
     let (status, text) = send_with_timeout(config.timeout_secs, async {
-        let resp = authorized_builder(config, reqwest::Method::GET, url).send().await?;
+        let resp = authorized_builder(config, reqwest::Method::GET, url)
+            .send()
+            .await?;
         let status = resp.status().as_u16();
         let text = resp.text().await.unwrap_or_default();
         Ok::<(u16, String), anyhow::Error>((status, text))

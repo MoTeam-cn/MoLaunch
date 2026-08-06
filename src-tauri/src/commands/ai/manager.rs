@@ -34,12 +34,17 @@ pub(crate) async fn analyze_crash(params: AnalyzeCrashParams) -> Result<serde_js
 
     let started = std::time::Instant::now();
     log_info!("[AI] 开始本地 AI 分析（model={}）", model);
-    let content = ai_core::chat(&config, ai_core::PromptKind::CrashLog, user_content, Some(&model))
-        .await
-        .map_err(|e| {
-            log_warn!("[AI] 分析失败: {}", e);
-            e.to_string()
-        })?;
+    let content = ai_core::chat(
+        &config,
+        ai_core::PromptKind::CrashLog,
+        user_content,
+        Some(&model),
+    )
+    .await
+    .map_err(|e| {
+        log_warn!("[AI] 分析失败: {}", e);
+        e.to_string()
+    })?;
     let elapsed_ms = started.elapsed().as_millis() as u64;
     log_info!("[AI] 分析完成，耗时 {}ms", elapsed_ms);
 

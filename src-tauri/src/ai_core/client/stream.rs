@@ -4,17 +4,19 @@
 //! 即时回调（打字机效果），调用方负责累积文本与聚合工具调用增量。
 //! 返回该轮完成的 [`ChatResult`]（含完整 tool_calls）。
 
-use crate::ai_core::config::AiConfig;
-use super::transport::{authorized_builder, send_stream_with_timeout};
+use super::transport::{authorized_stream_builder, send_stream_with_timeout};
 use super::types::{
     ChatCompletionsRequest, ChatResult, ChatTurn, StreamCallbacks, StreamToolDelta, StreamUsage,
     ToolCall, ToolCallFunction, ToolDef,
 };
+use crate::ai_core::config::AiConfig;
 use std::sync::atomic::Ordering;
 
 /// 取消信号检查（未提供取消信号时视为未取消）
 fn is_cancelled(cancelled: Option<&std::sync::atomic::AtomicBool>) -> bool {
-    cancelled.map(|f| f.load(Ordering::Relaxed)).unwrap_or(false)
+    cancelled
+        .map(|f| f.load(Ordering::Relaxed))
+        .unwrap_or(false)
 }
 
 pub async fn chat_completions_stream(
@@ -50,8 +52,11 @@ pub async fn chat_completions_stream(
         reasoning_effort: reasoning_effort.map(|s| s.to_string()),
     };
 
-    let (_status, mut stream) = send_stream_with_timeout(config.timeout_secs, async {
-        let resp = authorized_builder(config, reqwest::Method::POST, url)
+    // 响应头（首字节）等待超时：思考型模型首 token 可能数十秒~数分钟，这里按
+    // 配置超时与 180s 下限取较大值，避免还在思考就被误杀；正文读取无整体超时。
+    let header_timeout = config.timeout_secs.max(180);
+    let (_status, mut stream) = send_stream_with_timeout(header_timeout, async {
+        let resp = authorized_stream_builder(config, reqwest::Method::POST, url)
             .header("Content-Type", "application/json; charset=utf-8")
             .json(&req)
             .send()
@@ -82,129 +87,126 @@ pub async fn chat_completions_stream(
     let mut buf = String::new();
 
     // 单行处理：返回 Some(result) 表示流已结束（[DONE] / finish_reason），None 表示继续
-    let handle_line =
-        |line: &str,
-         content: &mut String,
-         reasoning_content: &mut String,
-         tool_calls: &mut Vec<ToolCall>,
-         usage: &mut StreamUsage| -> Option<ChatResult> {
-            let line = line.trim();
-            if !line.starts_with("data:") {
-                return None;
-            }
-            let data = line[5..].trim();
-            if data == "[DONE]" {
-                (callbacks.on_done)(usage);
-                return Some(finish_result(content, reasoning_content, tool_calls, true));
-            }
-            let parsed: serde_json::Value = match serde_json::from_str(data) {
-                Ok(v) => v,
-                Err(_) => return None,
-            };
-            let Some(choice) = parsed
-                .get("choices")
-                .and_then(|c| c.as_array())
-                .and_then(|c| c.first())
-            else {
-                return None;
-            };
-
-            // 流末 usage（部分服务在 final chunk 携带）
-            if let Some(u) = parsed.get("usage") {
-                *usage = StreamUsage {
-                    prompt_tokens: u.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                    completion_tokens: u
-                        .get("completion_tokens")
-                        .and_then(|v| v.as_u64())
-                        .unwrap_or(0),
-                    total_tokens: u.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
-                };
-            }
-
-            let finish = choice.get("finish_reason").and_then(|v| v.as_str());
-
-            // 内容增量
-            if let Some(delta) = choice
-                .get("delta")
-                .and_then(|d| d.get("content"))
-                .and_then(|v| v.as_str())
-            {
-                if !delta.is_empty() {
-                    content.push_str(delta);
-                    (callbacks.on_delta)(delta);
-                }
-            }
-
-            // 思考内容增量（思考模型，如 DeepSeek-R1；走 `delta.reasoning_content`）
-            if let Some(delta) = choice
-                .get("delta")
-                .and_then(|d| d.get("reasoning_content"))
-                .and_then(|v| v.as_str())
-            {
-                if !delta.is_empty() {
-                    reasoning_content.push_str(delta);
-                    (callbacks.on_reasoning_delta)(delta);
-                }
-            }
-
-            // 工具调用增量（按 index 聚合）
-            if let Some(calls) = choice
-                .get("delta")
-                .and_then(|d| d.get("tool_calls"))
-                .and_then(|v| v.as_array())
-            {
-                for c in calls {
-                    let index = c.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
-                    let id = c.get("id").and_then(|v| v.as_str()).map(String::from);
-                    let name = c
-                        .get("function")
-                        .and_then(|f| f.get("name"))
-                        .and_then(|v| v.as_str())
-                        .map(String::from);
-                    let arguments = c
-                        .get("function")
-                        .and_then(|f| f.get("arguments"))
-                        .and_then(|v| v.as_str())
-                        .unwrap_or_default()
-                        .to_string();
-
-                    // 追加/新建对应 index 的工具调用
-                    while tool_calls.len() <= index {
-                        tool_calls.push(ToolCall {
-                            id: String::new(),
-                            ty: "function".to_string(),
-                            function: ToolCallFunction {
-                                name: String::new(),
-                                arguments: String::new(),
-                            },
-                        });
-                    }
-                    let target = &mut tool_calls[index];
-                    if let Some(id) = id {
-                        target.id = id;
-                    }
-                    if let Some(name) = name {
-                        target.function.name = name;
-                    }
-                    target.function.arguments.push_str(&arguments);
-                    if !arguments.is_empty() {
-                        (callbacks.on_tool_delta)(&StreamToolDelta {
-                            index,
-                            id: None,
-                            name: None,
-                            arguments,
-                        });
-                    }
-                }
-            }
-
-            if finish == Some("tool_calls") || finish == Some("stop") {
-                super::chat::finalize_tool_calls(tool_calls);
-                (callbacks.on_done)(usage);
-                return Some(finish_result(content, reasoning_content, tool_calls, true));
-            }
-            None
+    let handle_line = |line: &str,
+                       content: &mut String,
+                       reasoning_content: &mut String,
+                       tool_calls: &mut Vec<ToolCall>,
+                       usage: &mut StreamUsage|
+     -> Option<ChatResult> {
+        let line = line.trim();
+        if !line.starts_with("data:") {
+            return None;
+        }
+        let data = line[5..].trim();
+        if data == "[DONE]" {
+            (callbacks.on_done)(usage);
+            return Some(finish_result(content, reasoning_content, tool_calls, true));
+        }
+        let parsed: serde_json::Value = match serde_json::from_str(data) {
+            Ok(v) => v,
+            Err(_) => return None,
         };
+        let choice = parsed
+            .get("choices")
+            .and_then(|c| c.as_array())
+            .and_then(|c| c.first())?;
+
+        // 流末 usage（部分服务在 final chunk 携带）
+        if let Some(u) = parsed.get("usage") {
+            *usage = StreamUsage {
+                prompt_tokens: u.get("prompt_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+                completion_tokens: u
+                    .get("completion_tokens")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0),
+                total_tokens: u.get("total_tokens").and_then(|v| v.as_u64()).unwrap_or(0),
+            };
+        }
+
+        let finish = choice.get("finish_reason").and_then(|v| v.as_str());
+
+        // 内容增量
+        if let Some(delta) = choice
+            .get("delta")
+            .and_then(|d| d.get("content"))
+            .and_then(|v| v.as_str())
+        {
+            if !delta.is_empty() {
+                content.push_str(delta);
+                (callbacks.on_delta)(delta);
+            }
+        }
+
+        // 思考内容增量（思考模型，如 DeepSeek-R1；走 `delta.reasoning_content`）
+        if let Some(delta) = choice
+            .get("delta")
+            .and_then(|d| d.get("reasoning_content"))
+            .and_then(|v| v.as_str())
+        {
+            if !delta.is_empty() {
+                reasoning_content.push_str(delta);
+                (callbacks.on_reasoning_delta)(delta);
+            }
+        }
+
+        // 工具调用增量（按 index 聚合）
+        if let Some(calls) = choice
+            .get("delta")
+            .and_then(|d| d.get("tool_calls"))
+            .and_then(|v| v.as_array())
+        {
+            for c in calls {
+                let index = c.get("index").and_then(|v| v.as_u64()).unwrap_or(0) as usize;
+                let id = c.get("id").and_then(|v| v.as_str()).map(String::from);
+                let name = c
+                    .get("function")
+                    .and_then(|f| f.get("name"))
+                    .and_then(|v| v.as_str())
+                    .map(String::from);
+                let arguments = c
+                    .get("function")
+                    .and_then(|f| f.get("arguments"))
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+
+                // 追加/新建对应 index 的工具调用
+                while tool_calls.len() <= index {
+                    tool_calls.push(ToolCall {
+                        id: String::new(),
+                        ty: "function".to_string(),
+                        function: ToolCallFunction {
+                            name: String::new(),
+                            arguments: String::new(),
+                        },
+                    });
+                }
+                let target = &mut tool_calls[index];
+                if let Some(id) = id {
+                    target.id = id;
+                }
+                if let Some(name) = name {
+                    target.function.name = name;
+                }
+                target.function.arguments.push_str(&arguments);
+                if !arguments.is_empty() {
+                    (callbacks.on_tool_delta)(&StreamToolDelta {
+                        index,
+                        id: None,
+                        name: None,
+                        arguments,
+                    });
+                }
+            }
+        }
+
+        if finish == Some("tool_calls") || finish == Some("stop") {
+            super::chat::finalize_tool_calls(tool_calls);
+            (callbacks.on_done)(usage);
+            return Some(finish_result(content, reasoning_content, tool_calls, true));
+        }
+        None
+    };
 
     'stream: while let Some(chunk) = stream.chunk().await? {
         // 流式过程中检测到取消信号：立即中断，返回已生成的部分内容（丢弃不完整的工具调用）
@@ -215,9 +217,13 @@ pub async fn chat_completions_stream(
         while let Some(nl) = buf.find('\n') {
             let line = buf[..nl].to_string();
             buf.drain(..=nl);
-            if let Some(result) =
-                handle_line(&line, &mut content, &mut reasoning_content, &mut tool_calls, &mut usage)
-            {
+            if let Some(result) = handle_line(
+                &line,
+                &mut content,
+                &mut reasoning_content,
+                &mut tool_calls,
+                &mut usage,
+            ) {
                 return Ok(result);
             }
         }
@@ -225,9 +231,13 @@ pub async fn chat_completions_stream(
 
     // 流自然结束：处理缓冲中残留的最后一行（无换行尾）
     if !buf.trim().is_empty() {
-        if let Some(result) =
-            handle_line(&buf, &mut content, &mut reasoning_content, &mut tool_calls, &mut usage)
-        {
+        if let Some(result) = handle_line(
+            &buf,
+            &mut content,
+            &mut reasoning_content,
+            &mut tool_calls,
+            &mut usage,
+        ) {
             return Ok(result);
         }
     }

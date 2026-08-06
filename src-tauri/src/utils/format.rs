@@ -52,3 +52,33 @@ pub fn truncate_chars(s: &str, max: usize) -> String {
         format!("{}…", cut)
     }
 }
+
+/// 截取文本的指定行范围（从 1 起，含首尾），超长时按字符数截断
+///
+/// 参数无效或起始行超出总行数时返回带行数的说明文本（供工具结果直接展示）。
+pub fn read_line_range(
+    content: &str,
+    start: i64,
+    end: i64,
+    max_chars: usize,
+) -> Result<String, String> {
+    if start < 1 || end < start {
+        return Err(format!(
+            "行范围参数无效: startLine={} endLine={}（需 start>=1 且 end>=start）",
+            start, end
+        ));
+    }
+    let all: Vec<&str> = content.lines().collect();
+    if start as usize > all.len() {
+        return Ok(format!(
+            "（日志共 {} 行，起始行 {} 超出范围）",
+            all.len(),
+            start
+        ));
+    }
+    let end_u = (end as usize).min(all.len());
+    let lines = &all[(start as usize - 1)..end_u];
+    let joined = lines.join("\n");
+    let trimmed = truncate_chars(&joined, max_chars);
+    Ok(format!("（共 {} 行）\n{}", lines.len(), trimmed))
+}

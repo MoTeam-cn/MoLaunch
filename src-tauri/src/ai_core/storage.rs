@@ -51,7 +51,10 @@ pub fn set_sdk(sdk: Arc<TokioMutex<Option<SdkInstance>>>) {
 
 /// 懒加载解密 api_key 并缓存（首次 async 请求时调用）
 async fn ensure_api_key_decrypted() {
-    if API_KEY_CACHE.get().is_some_and(|s| s.read().unwrap().decrypted) {
+    if API_KEY_CACHE
+        .get()
+        .is_some_and(|s| s.read().unwrap().decrypted)
+    {
         return;
     }
 
@@ -62,8 +65,12 @@ async fn ensure_api_key_decrypted() {
     } else {
         match SDK_REF.get() {
             Some(sdk_arc) => {
-                crate::utils::sdk_crypto::decrypt_with_sdk_optional(sdk_arc, &encrypted, "AI api_key")
-                    .await
+                crate::utils::sdk_crypto::decrypt_with_sdk_optional(
+                    sdk_arc,
+                    &encrypted,
+                    "AI api_key",
+                )
+                .await
             }
             None => {
                 crate::log_warn!("[AI] SDK 未注入，api_key 无法解密");
@@ -93,7 +100,9 @@ pub fn load() -> AiConfig {
         .unwrap_or_default();
     let storage = Storage::instance();
     AiConfig {
-        base_url: storage.get_config(SECTION, KEY_BASE_URL).unwrap_or_default(),
+        base_url: storage
+            .get_config(SECTION, KEY_BASE_URL)
+            .unwrap_or_default(),
         api_key: cached_key,
         timeout_secs: storage
             .get_config(SECTION, KEY_TIMEOUT)
@@ -149,10 +158,18 @@ pub async fn save(
         .set_config(SECTION, KEY_DEFAULT_MODEL, &config.default_model)
         .map_err(|e| format!("保存 AI 默认模型失败: {}", e))?;
     storage
-        .set_config(SECTION, KEY_MAX_INPUT_TOKENS, &config.max_input_tokens.to_string())
+        .set_config(
+            SECTION,
+            KEY_MAX_INPUT_TOKENS,
+            &config.max_input_tokens.to_string(),
+        )
         .map_err(|e| format!("保存 AI 上下文窗口配置失败: {}", e))?;
     storage
-        .set_config(SECTION, KEY_MAX_OUTPUT_TOKENS, &config.max_output_tokens.to_string())
+        .set_config(
+            SECTION,
+            KEY_MAX_OUTPUT_TOKENS,
+            &config.max_output_tokens.to_string(),
+        )
         .map_err(|e| format!("保存 AI 输出上限配置失败: {}", e))?;
     storage
         .set_config(SECTION, KEY_ICON_COLOR_MODE, &config.icon_color_mode)
@@ -185,8 +202,16 @@ pub async fn save(
 
     crate::log_info!(
         "[AI] 配置已保存: base_url={}, api_key={}, models={}, default_model={}",
-        if config.base_url.is_empty() { "(空)" } else { "已配置" },
-        if config.api_key.is_empty() { "未配置" } else { "已更新" },
+        if config.base_url.is_empty() {
+            "(空)"
+        } else {
+            "已配置"
+        },
+        if config.api_key.is_empty() {
+            "未配置"
+        } else {
+            "已更新"
+        },
         config.models.len(),
         if config.default_model.is_empty() {
             "(未设置)"

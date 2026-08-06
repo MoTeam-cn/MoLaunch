@@ -36,6 +36,9 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         "prompts/summarize.md" => Some(include_str!("../resources/prompts/summarize.md")),
         "prompts/crash_log.md" => Some(include_str!("../resources/prompts/crash_log.md")),
         "prompts/log_analysis.md" => Some(include_str!("../resources/prompts/log_analysis.md")),
+        "prompts/log_analyze_steps.md" => {
+            Some(include_str!("../resources/prompts/log_analyze_steps.md"))
+        }
         "samples/plugin/index.html" => Some(include_str!("../resources/samples/plugin/index.html")),
         "samples/layout/layout-sample.json" => Some(include_str!(
             "../resources/samples/layout/layout-sample.json"

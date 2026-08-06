@@ -78,6 +78,20 @@ pub struct ChatTurn {
     pub name: Option<String>,
 }
 
+impl ChatTurn {
+    /// 构造普通文本 turn（无工具/推理/名称字段），供上下文构建与压缩重塑器复用
+    pub fn plain(role: impl Into<String>, content: impl Into<String>) -> Self {
+        ChatTurn {
+            role: role.into(),
+            content: Some(content.into()),
+            reasoning_content: None,
+            tool_calls: None,
+            tool_call_id: None,
+            name: None,
+        }
+    }
+}
+
 /// 工具定义（随请求下发，模型可据此发起 tool_calls）
 #[derive(Debug, Clone, Serialize)]
 pub struct ToolDef {

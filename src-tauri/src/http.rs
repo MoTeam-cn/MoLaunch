@@ -75,6 +75,34 @@ pub fn get_client() -> reqwest::Client {
         .expect("Failed to build default HTTP client")
 }
 
+/// 构建流式专用 HTTP 客户端（SSE 长时间读取，无整体超时）
+///
+/// 复用全局客户端同款管线（代理 / IP 版本 / TLS 信任源 / ignore_tls），
+/// 仅将客户端级超时置为 `None`——流式响应（如思考型 AI 模型）可能持续数分钟，
+/// 全局 30s 客户端超时会误杀仍在思考的请求。连接/首字节等待由调用方的
+/// 请求级超时（tokio timeout）另行控制。
+pub fn build_stream_client(
+    proxy_mode: &str,
+    proxy_type: &str,
+    proxy_url: &str,
+    ip_version: &str,
+    trust_mode: &str,
+    ignore_tls: bool,
+) -> reqwest::Client {
+    build_client_inner(ClientBuildParams {
+        proxy_mode,
+        proxy_type,
+        proxy_url,
+        ip_version,
+        timeout: Duration::from_secs(0), // 占位：no_timeout=true 时不使用
+        trust_mode,
+        ignore_tls,
+        redirect: None,
+        user_agent: None,
+        no_timeout: true,
+    })
+}
+
 /// HTTP 客户端构建参数（含可选重定向策略）
 ///
 /// 由 [`build_client`] 与 [`build_client_with_redirect`] 填充，供内部统一构建。
@@ -89,6 +117,8 @@ pub struct ClientBuildParams<'a> {
     pub redirect: Option<reqwest::redirect::Policy>,
     /// 自定义 User-Agent（None 使用默认 UA）
     pub user_agent: Option<&'a str>,
+    /// 流式专用：true 时不设置客户端级整体超时（timeout(None)）
+    pub no_timeout: bool,
 }
 
 /// 构建 HTTP 客户端
@@ -116,6 +146,7 @@ pub fn build_client(
         ignore_tls,
         redirect: None,
         user_agent: None,
+        no_timeout: false,
     })
 }
 
@@ -167,6 +198,7 @@ pub fn build_client_with_redirect(
         ignore_tls,
         redirect: Some(redirect),
         user_agent: None,
+        no_timeout: false,
     })
 }
 
@@ -211,6 +243,7 @@ pub fn build_client_with_user_agent(user_agent: &str, timeout_ms: Option<u64>) -
         ignore_tls,
         redirect: None,
         user_agent: Some(user_agent),
+        no_timeout: false,
     })
 }
 
@@ -220,9 +253,12 @@ fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
         .user_agent
         .map(str::to_string)
         .unwrap_or_else(|| user_agent().to_string());
-    let mut builder = reqwest::Client::builder()
-        .timeout(params.timeout)
-        .user_agent(user_agent);
+    let mut builder = reqwest::Client::builder().user_agent(user_agent);
+    // 流式专用：不调用 .timeout()（reqwest 默认无整体超时），由外层请求级超时控制；
+    // 其余场景沿用 params.timeout
+    if !params.no_timeout {
+        builder = builder.timeout(params.timeout);
+    }
 
     if let Some(policy) = params.redirect {
         builder = builder.redirect(policy);

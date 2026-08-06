@@ -74,14 +74,20 @@ fn fallback_prompt(kind: &PromptKind) -> String {
         }
         PromptKind::LogAnalysis => {
             "你是 Minecraft 日志分析专家，请分析用户提供的日志，定位问题并给出解决建议。\
-             使用 Markdown 输出，不要使用 Emoji 表情。".to_string()
+             使用 Markdown 输出，不要使用 Emoji 表情。"
+                .to_string()
         }
         PromptKind::LogAnalyzeSteps => {
             "你是 Minecraft 日志分析专家，擅长从游戏日志、崩溃报告、启动器日志中定位问题。\
+             你的用户是普通玩家而非技术人员，他们需要的是「怎么修」，不是技术分析。\
              请按 5 个环节依次分析：读取整理日志、环境依赖检查、异常链定位、根因判断、修复建议。\
              每完成一个环节，先独占一行输出环节标记 【STEP:序号/5】，再输出该环节的简要分析；\
-             全部完成后输出完整 Markdown 结论，包含「问题定位」与「解决建议」分节。\
-             禁止使用 Emoji 表情，不要臆造不存在的错误。".to_string()
+             思考过程必须使用英文以节省 token，输出给玩家的内容使用中文。\
+             全部完成后输出完整 Markdown 结论，必须包含「问题定位」与「如何修复」分节；\
+             面向普通玩家通俗易懂，必须给出具体可执行的修复步骤；\
+             如果问题玩家无法自行修复，必须说明建议向社区或他人反馈并附上反馈所需信息。\
+             禁止使用 Emoji 表情，不要臆造不存在的错误。"
+                .to_string()
         }
     }
 }
@@ -95,10 +101,16 @@ pub fn crash_user_prompt(
 ) -> String {
     let mut parts = Vec::new();
     if !crash_report.is_empty() {
-        parts.push(format!("【崩溃报告】\n{}", truncate_chars(crash_report, 6000)));
+        parts.push(format!(
+            "【崩溃报告】\n{}",
+            truncate_chars(crash_report, 6000)
+        ));
     }
     if !hs_err.is_empty() {
-        parts.push(format!("【JVM 崩溃日志】\n{}", truncate_chars(hs_err, 4000)));
+        parts.push(format!(
+            "【JVM 崩溃日志】\n{}",
+            truncate_chars(hs_err, 4000)
+        ));
     }
     let errs = error_lines.join("\n");
     if !errs.is_empty() {
