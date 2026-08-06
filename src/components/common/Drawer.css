@@ -1,0 +1,195 @@
+/* ============================================================
+ * Drawer 抽屉样式
+ * 结构：.drawer-root（fixed 全屏） > .drawer-mask + .drawer-panel
+ * 按 placement 决定面板贴边方向
+ * ============================================================ */
+
+.drawer-root {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+}
+
+/* 就地渲染：不 teleport 到 body，absolute 铺满最近定位祖先（nav 下方内容区） */
+.drawer-root--absolute {
+  position: absolute;
+}
+
+/* 无遮罩时整个容器不拦截点击，仅面板自身可交互（pointer-events 复位到面板） */
+.drawer-root--maskless {
+  pointer-events: none;
+}
+.drawer-root--maskless .drawer-panel {
+  pointer-events: auto;
+}
+
+/* 遮罩 */
+.drawer-mask {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+}
+
+/* 面板：绝对定位，按方向贴边，flex 列布局 */
+.drawer-panel {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background-color: #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  line-height: 1.5715;
+  overflow: hidden;
+}
+
+.drawer-placement-left .drawer-panel {
+  top: 0;
+  bottom: 0;
+  left: 0;
+}
+.drawer-placement-right .drawer-panel {
+  top: 0;
+  bottom: 0;
+  right: 0;
+}
+.drawer-placement-top .drawer-panel {
+  top: 0;
+  left: 0;
+  right: 0;
+}
+.drawer-placement-bottom .drawer-panel {
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+/* 头部 */
+.drawer-header {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid #e5e6eb;
+}
+.drawer-title {
+  flex: 1;
+  min-width: 0;
+  margin-right: 8px;
+  color: #1d2129;
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drawer-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #4e5969;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.1s cubic-bezier(0, 0, 1, 1);
+}
+.drawer-close:hover {
+  background-color: #f2f3f5;
+}
+.drawer-close-icon {
+  width: 16px;
+  height: 16px;
+}
+
+/* 内容 */
+.drawer-body {
+  flex: 1;
+  box-sizing: border-box;
+  padding: 16px;
+  overflow: auto;
+  color: #1d2129;
+}
+
+/* 底部 */
+.drawer-footer {
+  flex-shrink: 0;
+  box-sizing: border-box;
+  padding: 12px 16px;
+  text-align: right;
+  border-top: 1px solid #e5e6eb;
+}
+
+/* ============================================================
+ * 遮罩淡入淡出
+ * ============================================================ */
+.drawer-fade-enter-from,
+.drawer-fade-leave-to {
+  opacity: 0;
+}
+.drawer-fade-enter-active,
+.drawer-fade-leave-active {
+  transition: opacity 0.25s ease;
+}
+
+/* ============================================================
+ * 各方向滑入滑出
+ * ============================================================ */
+.drawer-slide-left-enter-from,
+.drawer-slide-left-leave-to {
+  transform: translateX(-100%);
+}
+.drawer-slide-left-enter-to,
+.drawer-slide-left-leave-from {
+  transform: translateX(0);
+}
+.drawer-slide-left-enter-active,
+.drawer-slide-left-leave-active {
+  transition: transform 0.25s ease;
+}
+
+.drawer-slide-right-enter-from,
+.drawer-slide-right-leave-to {
+  transform: translateX(100%);
+}
+.drawer-slide-right-enter-to,
+.drawer-slide-right-leave-from {
+  transform: translateX(0);
+}
+.drawer-slide-right-enter-active,
+.drawer-slide-right-leave-active {
+  transition: transform 0.25s ease;
+}
+
+.drawer-slide-top-enter-from,
+.drawer-slide-top-leave-to {
+  transform: translateY(-100%);
+}
+.drawer-slide-top-enter-to,
+.drawer-slide-top-leave-from {
+  transform: translateY(0);
+}
+.drawer-slide-top-enter-active,
+.drawer-slide-top-leave-active {
+  transition: transform 0.25s ease;
+}
+
+.drawer-slide-bottom-enter-from,
+.drawer-slide-bottom-leave-to {
+  transform: translateY(100%);
+}
+.drawer-slide-bottom-enter-to,
+.drawer-slide-bottom-leave-from {
+  transform: translateY(0);
+}
+.drawer-slide-bottom-enter-active,
+.drawer-slide-bottom-leave-active {
+  transition: transform 0.25s ease;
+}

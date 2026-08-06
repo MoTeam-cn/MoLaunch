@@ -202,7 +202,8 @@ onUnmounted(() => {
   <div class="flex flex-col h-screen overflow-hidden">
     <!-- 顶部栏：蓝色背景 -->
     <!-- z-[10002] 确保所有弹窗（Modal z-10000 / Toast z-10001 / Tooltip z-9999）均无法遮蔽顶部 nav -->
-    <header class="shrink-0 bg-primary-600 select-none relative z-[10002]">
+    <!-- id="app-nav"：全局标记。全屏组件若需避开导航栏，请挂载到 #app-content（见 Drawer render-in-place） -->
+    <header id="app-nav" class="shrink-0 bg-primary-600 select-none relative z-[10002]">
       <div class="h-12 flex items-center">
         <!-- 左侧拖拽区域 -->
         <div data-tauri-drag-region class="flex items-center pl-4 pr-2 h-full">

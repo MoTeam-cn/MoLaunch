@@ -557,10 +557,12 @@
 }
 .markdown-body .md-icon {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: 1em;
   height: 1em;
   margin: 0 0.125em;
-  vertical-align: -0.2em;
+  vertical-align: middle;
 }
 .markdown-body .md-icon svg {
   width: 100%;

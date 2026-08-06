@@ -98,7 +98,7 @@ function updateDropdownPosition() {
       minWidth: `${rect.width}px`,
       width: 'max-content',
       maxWidth: `${viewportW - rect.left - 8}px`,
-      zIndex: '9999',
+      zIndex: '10010',
       transformOrigin: 'top',
     }
   } else {
@@ -110,7 +110,7 @@ function updateDropdownPosition() {
       minWidth: `${rect.width}px`,
       width: 'max-content',
       maxWidth: `${viewportW - rect.left - 8}px`,
-      zIndex: '9999',
+      zIndex: '10010',
       transformOrigin: 'bottom',
     }
   }

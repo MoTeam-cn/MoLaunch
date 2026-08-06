@@ -119,7 +119,7 @@ async function initApp() {
       position: absolute 相对于此容器而非 main（main 有 p-2 padding）。
       h-full 继承 main 的高度（main 是 flex-1 子项，有确定高度）。
     -->
-    <div class="relative h-full">
+    <div id="app-content" class="relative h-full">
       <router-view v-slot="{ Component, route }">
         <!--
           不使用 mode="out-in"：Vue 3 transition 在 mode="out-in" 下，联机页

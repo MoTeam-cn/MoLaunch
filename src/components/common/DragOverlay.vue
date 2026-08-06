@@ -9,11 +9,13 @@
  * - 拖入 enter 时显示，leave/drop 时隐藏
  * - 极简风格：四周虚线边框（颜色即检测结果：浅绿=可拖入 / 浅黄=待分析 / 红=不支持）
  *   + 居中上传图标与提示文案
- * - 以 absolute 定位铺满所在容器（挂载在 App.vue 内容容器 `div.relative.h-full` 内，
+ * - 以 absolute 定位铺满所在容器（挂载在 App.vue 内容容器 `#app-content` 内，
  *   即 nav 下方的内容区），物理上不覆盖顶部 nav，顶部虚线不会穿到 nav 区域
  * - 背景模糊加强，遮蔽罩下方内容不可见；pointer-events-none 不拦截拖放事件
  *
- * 用法：在 App.vue 内容容器内渲染 <DragOverlay />，组件内部自管理显隐。
+ * 用法：在 App.vue 的 `#app-content` 内容容器内渲染 <DragOverlay />，组件内部自管理显隐。
+ * 挂载规范与 Drawer 的 render-in-place 一致（同一内容容器 absolute 铺满），
+ * 全屏/全局组件统一用 `#app-content` 作为避开最高层级 nav 的挂载点。
  */
 
 import { computed } from 'vue'
