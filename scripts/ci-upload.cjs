@@ -24,8 +24,10 @@
  *   MOLAUNCH_ACTION_PUSH_KEY  MoSign-v2 签名密钥（必填）
  *   API_BASE_URL              apiServer 基础 URL（默认 https://api.molaunch.moiu.cn）
  *
- * 渠道（channel）自动推导：由 version 预发布后缀判定（与前端 version.ts 一致）——
- * 无后缀→stable / -rc→rc / -beta→beta / -alpha、-dev→alpha / -canary、-nightly→canary。
+ * 渠道（channel）自动推导：由 version 预发布后缀判定，并把结果收敛到服务端合法取值——
+ * 服务端（api-server/src/services/updates.rs 的 VALID_CHANNELS）仅接受 stable / beta / alpha，
+ * 因此 rc 归入 beta 灰度通道、canary/nightly/dev/未知 归入 alpha：
+ *   无后缀→stable / -rc→beta / -beta→beta / -alpha、-dev→alpha / -canary、-nightly、未知→alpha。
  *
  * 流程：
  *   1. 读取 .sig 文件获取签名 base64
@@ -77,21 +79,20 @@ const RELEASE_URL = args[6];
 const RELEASE_NOTES = args[7] || '';
 
 // ===== 渠道推导 =====
-// 由语义化版本预发布后缀推导发布渠道，与前端 src/utils/version.ts 的
-// VersionChannel 枚举保持一致：
+// 由语义化版本预发布后缀推导发布渠道，并把结果收敛到服务端合法取值（仅 stable/beta/alpha）：
 //   - 无后缀           → stable（正式版）
-//   - -rc             → rc（灰度版，Release Candidate）
+//   - -rc             → beta（Release Candidate，归入 beta 灰度通道）
 //   - -beta           → beta（内测版）
 //   - -alpha / -dev   → alpha（开发版）
-//   - -canary / -nightly → canary（金丝雀版，每日构建）
+//   - -canary / -nightly → alpha（金丝雀/每日构建，归入 alpha 通道）
 //   - 未知后缀         → alpha（防御性兜底）
 function resolveChannel(version) {
   const suffix = (version.split('-')[1] || '').replace(/[\d.]+$/, '').toLowerCase();
   if (!suffix) return 'stable';
-  if (suffix.startsWith('rc')) return 'rc';
+  if (suffix.startsWith('rc')) return 'beta';
   if (suffix.startsWith('beta')) return 'beta';
   if (suffix.startsWith('alpha') || suffix.startsWith('dev')) return 'alpha';
-  if (suffix.startsWith('canary') || suffix.startsWith('nightly')) return 'canary';
+  if (suffix.startsWith('canary') || suffix.startsWith('nightly')) return 'alpha';
   return 'alpha';
 }
 const CHANNEL = resolveChannel(VERSION);
