@@ -2,6 +2,30 @@
 
 ### 新增
 
+- 工具页「Java 管理」重构为三个独立区块（`JavaPage.vue` 拆分，均带 `data-toc-card` 目录锚点；区块顺序：Java 下载器 → 已安装版本 Java 环境检测 → Java 运行时列表）：
+  - **Java 运行时列表**（`JavaManager.vue`）：移除版本选择交互（Java 切换统一收敛到「设置 → 启动设置」），改为纯展示列表 + 重新检测，并用 `AlertV2` 说明定位，避免与设置页职责重复
+  - **已安装版本 Java 环境检测**（新增 `JavaEnvCheck.vue`）：逐版本调用 `getVersionGameVersion`/`getVersionLoaderInfo` 解析 MC 版本与加载器 → `getJavaRequirements` 查询需求（min/max/recommended）→ 复用 `isJavaCompatible` 判断系统已装 Java 是否满足；不满足时显示一键预下载按钮（复用 `JavaDownloadBar`，目标版本取 recommended || min），下载后自动刷新重新校验
+  - **Java 下载器**（新增 `JavaDownloader.vue`）：预设固定为 Mojang 官方 Runtime 可下载的三档（21/17/8）+「自定义」档（自定义作为快速选择里的一个选项，选中后才显示输入框，输入框宽度自适应不限制；复用 `isJavaMajorValid` 校验 1~2 位纯数字、8~26 区间、无特殊符号，上限参考 Adoptium 最新可用版本 26）；下载源固定为 Mojang 官方 Java Runtime（piston-meta / piston-data，可随镜像设置走 BMCLAPI）并在界面注明；下载目录强制固定为 `%APPDATA%\.minecraft\runtime\`，用 `AlertV2` 说明原因（与官方启动器一致、跨游戏目录共享、不受版本隔离影响）；「下载 Java X」按钮置于「目标版本」同行右侧；非官方版本（11/16/18/20/22~26 等自定义版本）提示官方 Runtime 可能未提供；`api/java.ts` 新增 Java 版本元数据常量（`MIN_JAVA_MAJOR`/`MAX_JAVA_MAJOR`/`LTS_JAVA_MAJORS` 及 `isLtsJavaMajor`，参考 Adoptium 版本分布）
+  - `JavaDownloadBar.vue` 重构为按 `targetMajor` 驱动（原 `javaReqs` prop 改为 `targetMajor`，下载目标由父组件指定），供环境检测与下载器两处复用；`api/java.ts` 新增可复用纯函数 `describeJavaRequirement`（需求描述）/ `isJavaMajorValid`（版本号校验）/ `hasOfficialRuntime`（官方档判断）
+
+- 新增公共组件 `Trigger.vue`（弹出触发器）与 `Drawer.vue`（抽屉），参考 Arco Design Vue 的定位/箭头、滑入遮罩设计思路，**API 为项目自定义精简版**（沿用 `Button`/`Input` 移植约定：头部 MIT 来源注释 + 样式分离到同目录 `Trigger.css` / `Drawer.css`）：
+  - `Trigger.vue`：4 种触发方式（hover 可延迟 / click / focus / contextMenu）、12 向弹出位置（top/tl/tr、bottom/bl/br、left/lt/lb、right/rt/rb）、可选箭头（`showArrow`，随触发元素中心对齐）、`hoverStay` 移入弹层保持显示、Teleport 到 `popupContainer`（默认 body）+ fixed 定位 + 视口边界钳制；受控 `v-model:visible` / 非受控 `defaultVisible` 双模式；点击外部关闭复用 `@/utils/click-outside`；`#content` 插槽外观由调用方 `contentClass` 控制
+  - `Drawer.vue`：4 个滑出方向（left/right/top/bottom）、`width`/`height`、`closable`/`mask`/`maskClosable`/`escToClose`、`header`/`title`/`footer` 插槽、关闭动画结束后卸载节点；受控 `v-model:visible` / 非受控 `defaultVisible` 双模式
+- AI 聊天浮层统一接入新 `Drawer` 组件（右侧抽屉，替代手写 `getBoundingClientRect` 定位 + teleport 悬浮卡片）：
+  - `ChatHeader.vue` 思考设置：图标入口改为切换右侧抽屉（遮罩点击 / X / ESC 关闭），删除手写悬浮窗定位与 document 点击外部关闭监听，关闭按钮原生 `title` 换为 `Tooltip` 组件
+  - `AskUserDialog.vue` AI 提问：右下角悬浮卡片改为右侧抽屉（`width=400`），问题/选项置于内容区、自定义输入 + 取消/提交放入 `#footer` 插槽，X / ESC / 点击遮罩关闭统一视为取消提问
+- 抽屉与滑块细节修复：抽屉右上角 X 关闭按钮加大（28px / 图标 16px）更醒目；思考设置抽屉恢复遮罩（点击左侧遮罩关闭）；`Slider.vue` 档位标签（低/中/高）下移留出 8px 间距、标签层 `pointer-events: none` 不再拦截滑块拖动，首尾标签改用 0% / -100% 位移避免溢出滑块外；思考程度滑块在抽屉中不再叠加 marks 文字（档位由右侧文本标签展示）
+
+- 抽屉定位修复（本轮）：`Drawer.vue` 新增 `render-in-place` 就地渲染模式（Teleport `disabled` + `absolute` 铺满最近定位祖先），思考设置抽屉与 AI 提问抽屉启用后只出现在 nav 下方内容区（与 `DragOverlay` 同策略），抽屉右上角 X 关闭按钮不再被最高层级 nav（`z-[10002]`）遮挡；同时移除思考程度滑块上叠加的 `:marks` 低/中/高文字（不再与滑条挤在一起变形，档位改由右侧文本标签展示）
+  - 挂载方式系统性改造：`App.vue` 内容容器打上全局挂载点标记 `id="app-content"`（nav 下方，与 `DragOverlay` 同挂载位置），`TopNavLayout.vue` 顶部 nav 打上 `id="app-nav"` 标记；`Drawer.vue` 的就地渲染模式支持 `popup-container` 指定该内容容器，抽屉 teleport 进 `#app-content` 内 `absolute` 铺满，从布局上物理避开 nav（不再依赖页面链上的 relative）；未来所有全屏/全局挂载组件均可复用 `#app-content` 挂载点避免被最高层级 nav 遮挡
+  - 修复抽屉打开无动画（关闭有动画）：根因是 `v-if` 位于 `<transition>` 外层，每次打开时 transition 为全新挂载、其子元素属于初始渲染，Vue 默认不触发进入动画；遮罩与面板两个 transition 均补充 `appear`，打开时遮罩淡入 + 面板滑入，与关闭动画对称
+
+- 滑块拖动平滑化：`Slider.vue` 新增 `snap` 吸附档位能力（拖动中 step 内部强制 1、thumb 连续平滑跟随，松手时吸附到最近档位再提交），思考程度滑块由三档跳跃改为平滑拖动后吸附到 低/中/高；`DragOverlay.vue` 挂载注释统一引用 `#app-content` 挂载点规范
+
+- 聊天框修正：`#md-icon`（markdown 图标映射）改为 `vertical-align: middle` + `align-items/justify-content: center` 垂直居中，修复图标偏文字下方不对齐；移除消息列表下方的独立工作状态提示条（「正在进行下一步…/等待你的回答」），等待提问由 AskUserDialog 抽屉承载，工具间隙等空内容状态由 AI 回复框内部兜底承担（ChatMessageItem 无内容时显示「正在进行下一步…」）
+- 等待提示兜底（本批）：`ChatMessageItem` 空正文兜底按阶段切换文案——刚发送等待模型应答显示「正在思考如何回答…」，工具调用/提问过渡期（`ExperimentalChat` 在 `waitingAsk` 或 `toolCalls` 激活时传入 `:waiting`）显示「正在进行下一步…」；正文输出后不再显示任何等待提示（仅保留流式光标），消除工具调用或提问等待期间明显的静默卡顿感
+- 工具过渡期兜底修复（根因）：`useAiChat.ts` 工具调用 `running` 事件原仅清空 `streamingMsg.content`、残留旧 `reasoningContent`，而空正文兜底条件依赖 `!reasoningContent`，导致工具执行完成、SSE 文本流出前的过渡期回复框既不显示正文也不显示提示；现每次工具切入时一并清空思考内容，使回复框回到空正文态、由「正在进行下一步…」兜底覆盖整个过渡期，待新思考流输出后思考区块自动接管、提示消失；同时移除正文后追加提示逻辑与失去消费者的 `waitingNext` 状态
+
 #### 实验性功能（AI 聊天 / Agent 工具 / 日志分析，默认关闭）
 
 - 背景：将 AI 相关能力与日志分析迁入独立的「实验性」入口，默认不暴露；用户需在「设置 → 进阶设置」手动开启后才显示入口并初始化本地 SQLite 聊天存储，避免为未启用用户带来资源开销
@@ -122,7 +146,64 @@
   - 进度条流星效果（本轮调整）：`.progress-sweep` 由白色慢扫光带改为 **Codex 风格紫色流星**——头部亮紫（`#c4b5fd`）渐隐到透明尾巴 + 紫色光晕（双层 box-shadow），2s 线性从左到右往复扫过（token 进度条与日志分析进度条同步生效）
   - 日志分析两级流水线（本轮）：`ExperimentalLog` 移除「本地 / AI」二选一切换，改为**两级流水线**——第一级 `CrashAnalyzer`（本地规则引擎初检，粘贴日志 → 识别问题范围条目），结果区新增「用 AI 深度分析」按钮（emit `ai-followup`）；第二级 `AiLogAnalyzer`（接收本地初检后传回的日志文本自动发起分析，`externalLogText` prop + `consumed` 事件，后端 `localAnalyze=true` 注入预检范围，避免超长全文直发模型）；`ai_analyze_log` 后端新增 `local_analyze` 参数，用 `analyze_log_text` 预检后把「本地初检结果摘要 + 截断原文」作为用户上下文注入
   - AI 工具本地预检与行范围（本轮）：`crash_analyzer.rs` 提取纯函数 `analyze_log_text`（无 state，供命令与 AI 工具复用）；agent 工具增强——`read_game_logs` / `read_crash_report` 新增 `startLine` / `endLine`（按行范围精确定位，从 1 起）与 `localAnalyze`（true 时本地引擎先初检返回问题范围摘要，省 token）；新增 `analyze_crash_log` 工具（读最新崩溃报告 → 本地预检 → 返回分类/级别/关键行/建议范围摘要）与 `read_log_lines` 工具（读 logs/latest.log 指定行段）——AI 拿到预检范围后若发现缺关键日志，可自行调用行范围工具补读上下文
-- 验证：`cargo check`（0 error）、`vue-tsc --noEmit`（0 error）、`eslint`（0 error，warning 为既有 v-html 提示）、`vite build`（0 error，`dist/assets/@lobehub/` 54 个 mono 图标）
+  - 修复提示词模板未注入（本轮）：`resources.rs` 的 `embedded_text` 遗漏登记 `prompts/log_analyze_steps.md`，导致 `ai_analyze_log` 读取模板失败、静默回退内置兜底；已登记补上
+  - 日志分析两级流水线单输入（本轮）：日志页只保留本地引擎**一个输入框**——本地引擎识别出具体问题（非 other/info 类）直接展示结果；**无法定位具体问题时自动转交 AI**（`crash_analyzer.rs` 新增 `locate_keyword_context` 定位首个命中行并截取**前后各 15 行**带行号上下文，只把这段范围发给 AI，不再直发全文）；AiLogAnalyzer 在流水线模式下隐藏自己的输入框（`hasExternal`），仅保留模型下拉与结论展示
+  - 日志分析交互重设计（本轮）：`AiLogAnalyzer` 重构为纯 **AI 深度分析结果面板**——彻底移除日志输入框（`Input`/`logText`/`hasExternal` 逻辑删除），只保留模型下拉 + 环节进度条 + 流式 Markdown 结论；`ExperimentalLog` 成为流水线协调者——页面唯一输入框在 `CrashAnalyzer` 本地引擎，本地无结果自动转 AI（emit `ai-followup` → AI 面板自动分析），本地有结果时点「用 AI 深度分析」转交；AI 面板空态不再显示「开始分析」大按钮（等待自动分析），仅在有结论时提供「重新分析」/「清空」；重复分析用「先置空再下一帧赋值」保证相同日志也能触发 watch
+  - 修复流式请求超时误杀思考型模型（本轮）：根因是 `http.rs` 全局客户端自带 30s 客户端级超时，对 SSE 流式请求同样生效——思考型模型（R1 等）首 token 数十秒~数分钟，请求未返回第一个字节即被 `operation timed out` 中断。修复：`http.rs` 新增 `build_stream_client`（同管线但 `timeout` 置为无整体超时），`transport.rs` 新增 `authorized_stream_builder`，`stream.rs` 的流式请求改用该客户端，并把首字节等待超时放宽到 `max(config.timeout_secs, 180)`——正文读取不再受客户端级超时约束
+  - AI 日志分析思考流与失败兜底（本轮）：后端 `ai_analyze_log` 的 `on_reasoning_delta` 由空实现改为向前端推送 `{ reasoning: delta }`（思考过程流透传），流式异常时推送 `{ error: msg }` 事件；前端 `AiAnalyzeStreamEvent` 新增 `reasoning`/`error` 字段，`AiLogAnalyzer` 在分析中展示「思考过程」区块（限高 `max-h-40` + 内部滚动 + 自动滚底），收到 `error` 即停止分析并 toast 报错——不再出现"进度条卡 25% 无反馈"
+  - 阅读工具关键词搜索（本轮）：`read_game_logs` / `read_crash_report` / `read_log_lines` 新增 `keyword` 参数——按关键词定位首个命中行，返回其前后各 15 行上下文（带行号）；AI 拿到初检范围后若需更多上下文，可自行按关键词检索或指定行范围补读
+  - 本地预检定位复用 detail（本轮）：修复「本地引擎识别到通用错误（other/info 类）却仍把全文发给 AI」——本地识别到的 other/info 条目其 `detail` 就是问题消息原文（如 `java.lang.Error: ServerHangWatchdog detected...`），`pick_log_keyword` 优先从 `detail`/`title` 提取特征词元（大写开头的类名/组件名，跳过 Exception/Error/Throwable 宽泛词），用该关键词在原文定位问题行，只把**前后各 15 行上下文**交给 AI，绝不回退发全文；仅当本地完全没识别到任何条目时才回退全文截断。前端 `CrashAnalyzer` 同步改为：本地无条目**或全部为 other/info**（无具体分类）时自动转交 AI 深度分析
+  - AI 深度分析弹窗化 + 思考日志折叠（本轮）：`AiLogAnalyzer` 由页内卡片改为**弹窗形式**——复用 main.css 高度限制方案（`.modal-shell` 顶部对齐 + `.modal-body` `calc(100vh-100px)` 上限 + `.modal-scroll` 内容滚动区），标题栏带关闭按钮、ESC/遮罩可关闭；本地引擎转交 AI 时自动打开弹窗并发起分析。**深度思考日志默认收起**（折叠头「思考过程」+ 旋转箭头），点击展开查看（限高 `max-h-60` 内部滚动，展开时自动滚底）；结论完成后仍可展开回看思考过程。`ExperimentalLog` 页面顶部提示由自绘图标块改为 **AlertV2**（灰底 info 风格）
+  - AI 深度分析弹窗重设计（本轮）：弹窗完全参考**更新日志弹窗（UpdateDialog）**的设计语言——`.modal-shell` 内嵌 `absolute inset-0 bg-black/40` 遮罩、`.modal-body max-w-xl mt-2` 顶部对齐、标题栏 `px-6 pt-5 pb-3`（SparklesIcon + text-base 标题 + XMarkIcon 关闭）、内容区 `.modal-scroll px-6 pb-2` 限高滚动、**固定底部按钮栏 `bg-gray-50 rounded-b-lg`**（关闭/重新分析）
+  - 阶段指示重设计（本轮）：新增 `AnalyzeStageBar` 组件（与 Input/Button 同设计语言——灰底无边框 + 圆角 + text-xs）——**思考阶段只显示「深度思考中…」灰底不可用状态（脉冲点），绝不显示阶段/伪进度**；只有正文输出收到【STEP:N/5】标记（`step` 事件）时才显示当前环节（primary 蓝标签 + 已完成绿勾）；删除 StepProgressBar 的百分比/伪进度爬升展示，不再有"思考过程中显示 25% 卡住"的误导
+  - 弹窗手动触发 + 关闭取消 SSE（本轮）：本地引擎初检完成转交 AI 时**不再默认弹窗**——只暂存待分析文本，页面底部出现「用 AI 深度分析」按钮，**点击后才打开弹窗**并执行；**关闭弹窗时若分析仍在进行，自动调用后端 `cancel_log_analyze` 停止 SSE 流**（后端 `AppState` 新增 `analyze_cancel_flag`，`ai_analyze_log` 将其传给 `chat_completions_stream` 的 cancelled 参数，被取消时优先推送 `{ cancelled: true }` 事件而非报错）；前端 `AiAnalyzeStreamEvent` 新增 `cancelled` 字段，收到后静默停止流式状态
+  - 移除重复 AI 入口按钮 + toast 文案修正（本轮）：移除 `AiLogAnalyzer` 页面底部的外层「用 AI 深度分析」触发按钮（唯一入口保留在 `CrashAnalyzer` 本地结果区内），点击本地结果区的入口按钮才打开弹窗并执行；`CrashAnalyzer` 的 toast 文案由「已转交 AI 深度分析」改为「可点击『用 AI 深度分析』进一步诊断」，不再暗示已自动转交
+  - 弹窗二次确认 + 结论正文限高（本轮）：点击「用 AI 深度分析」打开弹窗后**不自动开始分析**——弹窗内显示模型选择 + 「开始分析」按钮，用户确认模型后手动点击才发起（空状态文案改为「确认模型后点击『开始分析』启动 AI 深度分析」）；**分析结论正文容器限高 `max-h-72` + `overflow-auto`**（左右上下双向滚动，不拉长弹窗整体高度），思考日志同步改为双向滚动，均复用深度思考的容器内滑动模式
+  - 修复 Select 下拉被弹窗遮挡（本轮）：根因是层级（z-index）冲突——`.modal-shell` 弹窗为 `z-[10000]`，Select 下拉面板 inline `zIndex: 9999`，比弹窗低导致下拉被盖住（`teleport to body` 无法解决层级问题）。已将 `Select.vue` 下拉面板 z-index 从 9999 提升到 **10010**，弹窗内模型选择下拉可正常展开
+  - 思考阶段动态省略号（本轮）：`AnalyzeStageBar` 思考阶段的文案由静态「深度思考中…」改为「**正在思考如何判断问题**」+ 动态省略号动画——`setInterval` 每 400ms 递增点数量（0→1→2→3 循环，约 1.2s 一轮），省略号从前到后有规律地增长；进入正文输出阶段自动停止动画，重新分析回到思考阶段自动恢复
+  - 提示词面向玩家优化 + 通用错误发完整日志（本轮）：`log_analyze_steps.md` 重写——明确受众是**普通玩家**（不是技术人员），输出必须含「问题定位」「如何修复」分节并给出**具体可执行的修复步骤**；玩家无法自行修复时（服务端核心 bug 等）必须明确提示「建议向社区或他人反馈」并附上反馈所需信息；**思考过程强制使用英文**节省 token（输出给玩家的正文仍为中文）。同时修复：本地引擎识别到**不确定的通用错误**（如 ServerHangWatchdog）时，不再只发问题行 ±15 行上下文——改为**发送完整日志**给 AI 判断（片段可能漏关键信息导致误判），并附带本地引擎识别的疑似信息标题；删除不再使用的 `pick_log_keyword` / `extract_feature_token` 函数
+  - 实验性后端模块化重构（本轮，规范约束：>350 行必须重构、≤300 行可接受、文件头注释 5 行内、函数注释 3 行内、优先复用公共函数）：
+    - `db.rs`（597 行）→ `db/` 目录：`mod.rs`（schema 声明 `CHAT_TABLES` + 惰性初始化 + 迁移 + 公共 re-export）/ `conversations.rs` / `messages.rs` / `tool_calls.rs`，全部数据访问仍经 `utils/sqlite` 的 `Table` 语义接口，零 SQL
+    - `agent.rs`（678 行）→ `agent/` 目录：`mod.rs`（`AgentContext` + `tool_definitions()` + `execute_tool()` + `collect_context()`）/ `logs.rs` / `crash.rs` / `info.rs` / `ask.rs`（`ASK_USER_QUEUE` 等待队列与 `reply_ask_user` 回填）
+    - `manager.rs`（1232 行）→ `manager/` 目录：`mod.rs`（公共辅助 `ensure_enabled` / `build_context` / `build_config_summary`）/ `dispatcher.rs`（`DISPATCHER` 注册表 + `dispatch` 入口）/ `chat.rs`（chat_send / regenerate_reply / edit_message / reply_ask_user）/ `context.rs`（resolve_chat_model / build_turns / estimate_context_usage / compress_context）/ `tool_loop.rs`（run_tool_loop 多轮工具循环 + parse_tool_arguments）/ `analyze.rs`（ai_analyze_log 5 环节流式 + process_analyze_line）/ `emit.rs`（emit_chat_done / emit_chat_status / generate_title）；`regenerate_reply`/`edit_message` 的模型解析抽为 `resolve_model_override` 共用，消除三入口内联重复
+    - 公共能力收敛到 `utils/`：新增 `utils/fs.rs`（`ensure_dir` / `read_to_string` / `tail_lines` / `read_tail` / `newest_file`）与 `utils/format.rs` 的 `read_line_range`（带行号），`agent` 三读文件工具、日志分析页、启动器日志读取统一复用，不再各自实现
+    - **mod.rs 入口化（本轮）**：落实「mod.rs 只能作为入口文件，逻辑不得写入」规范，三个目录的 mod.rs 仅保留模块声明与 re-export——
+      - `agent/mod.rs`：`AgentContext` + 工具定义/执行/上下文收集 + 版本 helper（`effective_dir`/`require_version`/`version_arg`/`installed_version_ids`）整体迁至 `agent/tools.rs`（可见性 `pub(super)` 保持模块内私有），mod.rs 只留 `pub use`
+      - `db/mod.rs`：`CHAT_TABLES` schema/表句柄/`now`/路径声明迁至 `db/schema.rs`；`ensure_initialized`/`migrate_legacy_db`/行映射/`touch_conversation_with` 迁至 `db/init.rs`；`conversations.rs`/`messages.rs`/`tool_calls.rs` 导入路径同步改为 `super::schema::`/`super::init::`
+      - `manager/mod.rs`：`ensure_enabled`/`build_context`/`build_config_summary`/`HISTORY_LIMIT` 迁至 `manager/common.rs`，dispatcher/chat 引用同步更新
+      - 复核结果：全部 6 个 mod.rs（`ai_core` 2 个 + `experimental` 4 个）均为纯入口；全部 rs 文件 ≤330 行；`ai_core`/`experimental` 无内嵌测试（项目既有测试均为同目录 `xxx_test.rs` 规范，此处无需迁移）
+    - 拆分后各文件 ≤350 行（最大 `manager/chat.rs` 330 行）；`cargo check` 0 error；既有 clippy 警告（`stream.rs` let-else / `add_message` 12 参数 / `sqlite.rs` doc 列表缩进）均位于拆分前代码，不在本次改动范围
+  - 会话压缩管线重设计（本轮，对齐 `docs/Agent_Compression.md`，方案 A：L1+L3 核心管线）：
+    - 废弃旧 `compress_context`（丢最旧消息）与三入口内联压缩逻辑，新增 `manager/compression/` 子模块——`mod.rs`（纯入口）/ `trigger.rs`（触发判定：Token 使用率 ≥80% / 消息条数 ≥50 / 单条工具输出 >20K / 30s 防抖）/ `l1.rs`（工具输出文本截断：头 2500 + 尾 2000 字符）/ `l3.rs`（复用 `summarize.md` AI 语义摘要，失败静默降级为 L1+丢最旧）/ `rebuild.rs`（重塑器：摘要 system → 边界标记 → 最近 15 条原始消息，含工具轮次注入）/ `pipeline.rs`（总控 `compact_if_needed`）
+    - 摘要持久化：新增独立表 `conversation_summaries`（主键 `conversation_id`，`db/summaries.rs` 删后插 upsert），删除会话时同步清理持久化摘要与防抖记录（`clear_cooldown`），避免内存/数据残留
+    - 工具轮次注入统一化：历史工具调用以文本块追加到对应 assistant 消息后（规避 OpenAI 兼容服务对「assistant(tool_calls) 后必须紧跟 tool 消息」的严格配对），压缩与未压缩两条路径共用 `rebuild::inject_tool_blocks`（按枚举索引注入，消除 O(n²) 定位）
+    - 三入口（chat_send / regenerate_reply / edit_message）统一接入 `common::build_chat_turns`（拉取工具记录 → `compact_if_needed` → 压缩时 emit 状态提示），消除三处重复逻辑；触发判定仅统计历史窗口内消息绑定的工具记录（窗口外旧记录不误触发）
+    - `summarize.md` 重写对齐文档保真度要求（保留工具调用/任务目标/约束、第三人称、≤400 字、中文、无 Emoji）
+    - 新增 `l1_test.rs` 同目录单测（`truncate_text` / `compact_records` / `estimate_tool_calls_size` 共 5 例）；全部压缩子模块 ≤160 行、mod.rs 纯入口；`cargo check` 0 error，clippy 无新增警告（既有 3 处位于拆分前代码）
+    - 压缩管线文档对齐增量优化（本轮）：
+      - `trigger::evaluate` 移除内联的字符估算 fallback（与 `context::estimate_context_usage` 同口径重复），统一复用后者（真实 usage 优先、无 usage 退化估算），消除双份估算实现与参数传递
+      - `ChatTurn` 新增公共工厂 `ChatTurn::plain(role, content)`（`ai_core/client/types.rs`），`manager/context.rs` 的 `build_turns` 与 `compression/rebuild.rs`（原私有 `plain_turn`）两处复用，消除重复手写构造
+      - L1 微压缩按内容形态增强（对齐文档 §4.1）：JSON 结构 >1000 节点时仅保留顶层 Key（嵌套对象 → `{...}`、数组 → `[... N 项 ...]`、长字符串截断）；代码/日志 >2000 行时保留首尾各 20 行、中间替换省略标记；其余超长文本维持字符头尾保留（头 2500 + 尾 2000）
+      - pipeline 新增 L1 后达标检查（对齐文档 §8）：L1 压缩后估算占用已低于触发阈值时跳过 L3，避免无谓的 LLM 摘要调用；未达标才走 L3，失败仍降级 L1+丢最旧
+      - 新增 `trigger_test.rs` / `rebuild_test.rs` 同目录单测与 `test_support.rs` 公共夹具（消息/工具记录构造），`l1_test.rs` 补充行级截断与 JSON 精简用例，压缩模块单测全量通过；`cargo check` 0 error，clippy 0 警告
+  - 验证：`cargo check`（0 error）、`vue-tsc --noEmit`（0 error）、`eslint`（0 error，warning 为既有 v-html 提示）、`vite build`（0 error，`dist/assets/@lobehub/` 54 个 mono 图标）
+
+### 修复
+
+- 整合包实例加载器信息缺失修复（本轮）：整合包/普通版本安装的 `install_merged`（`flow.rs`）在写 `setup.ini` 时未把已持有的加载器版本传下去——`save_setup_and_create_isolation` 调 `VersionSetup::new` 时 6 个版本参数全部为 `None`（注释写"从目录或 JSON 提取"但未兑现），导致所有经此安装的版本 setup.ini 只有 `Type/OriginalVersion`、缺 `ForgeVersion` 等 `XxxVersion` 键，`get_version_loader_info` 的加载器版本恒为空（RLCraft / SkyFactory 4 / 最小的机械动力 / Zombie Invade 100 Days 均受影响）。修复分三块：① `setup_persist.rs`/`flow.rs` 安装时把 forge/neoforge/fabric/optifine/liteloader 版本写入 setup.ini；② `load.rs` `load_or_create` 新增 `backfill_loader_versions` 自愈逻辑——对已有但缺 `XxxVersion` 的 setup.ini 从版本 JSON 的 libraries 回填并持久化（不覆盖 OriginalVersion/Type/个性化），`get_version_loader_info` 改走 `load_or_create`；③ 保底仍回退 `modpack.meta.json`（在线整合包含权威版本），`get_version_game_version` 在 JSON 提取失败时先回退 setup.ini `OriginalVersion` 再回退 meta。四个实例均可返回 MC 版本与加载器版本
+
+- 整合包在线安装后残留 zip 修复（本轮）：`install_modpack`（`online.rs`）安装成功后未删除下载的原始整合包 zip，`InstallModpackResult.archive_path` 虽返回给前端但全前端无消费点，导致 zip 永久残留在 `versions/<实例名>/` 目录（如 `versions/RLCraft/RLCraft.zip`）。现于安装成功后在 async 块外删除该 zip（此时文件句柄已释放，避免 Windows 占用删除失败），删除失败仅告警不阻断结果，并将 `archive_path` 置空避免返回已不存在的路径；本地拖拽安装 `install_local_modpack` 不动用户原始文件，维持原逻辑
+
+- CI 发布流程通道解析修复（本轮）：`scripts/ci-upload.cjs` 的渠道推导收敛到服务端合法取值——服务端 `VALID_CHANNELS` 仅接受 `stable / beta / alpha`，原实现把 `-rc` 推导为 `rc`、`-canary/-nightly` 推导为 `canary`，导致 `-rc1` 类 tag 触发 release 时「版本注册失败 (code=1001)：通道取值非法（仅 stable / beta / alpha）」。现 `-rc→beta`（Release Candidate 归入 beta 灰度通道）、`-canary/-nightly/dev/未知→alpha`，与 `docs/updater/design.md` 三通道约束一致；同步更新脚本头部与函数注释
+
+- Java 运行时下载匹配修复（本轮，对齐 `docs/java-runtime-download-bugs-and-fix.md`）：
+  - 【致命】Java 8 下载必然失败：组件 key 由 `java-runtime-legacy`（官方不存在）修正为 `jre-legacy`，并移除 `version.name.starts_with("8.")` 的失效模糊匹配（legacy 版本名为 `8u51-...`，不是 `8.` 开头）
+  - 【错配】21→`java-runtime-gamma`、17→`java-runtime-alpha` 修正为 21→`java-runtime-delta`、17→`java-runtime-gamma`（对齐官方 all.json 真值：`java-runtime-alpha` 实为 Java 16）
+  - 【平台硬编码】`match.rs` 不再固定 `windows-x64` / `windows-arm64`，改为按编译期 `target_os + target_arch` 推导（windows/mac/linux × x64/arm64/x86/i686），无法匹配时返回清晰错误而非默认回退 Windows
+  - 【死代码】移除数字 key 精确匹配（`"21"/"17"/"8"` 在官方 all.json 中不存在）；移除依赖 HashMap 遍历顺序的 version.name 模糊匹配，改为显式映射表（8→`jre-legacy`、16→`java-runtime-alpha`、17→`java-runtime-gamma`、21→`java-runtime-delta`、25→`java-runtime-epsilon`）
+  - `match_component` 返回 `Result` 携带清晰错误（未知 target / 缺平台节点 / 缺组件 / 解析失败），`pipeline.rs` 不再拼接硬编码 `platform: windows-x64` 文案
+  - 新增 `download/match_test.rs` 同目录单测（5 例）：映射表对齐官方、未知 target 返回 None、端到端匹配 8/16/17/21/25、错误路径（未知 target / 缺平台 / 缺组件）；`cargo test --lib` 211 例全绿
+  - 前端下载入口补全：`OFFICIAL_JAVA_MAJORS` 与工具页 `JavaDownloader` 预设档由 21/17/8 三档补全为官方 all.json 实际提供的五档（25/21/17/16/8），下载源说明与头部注释同步更新；后端 `download_java` 链路（`java_manager` → `commands/java.rs` → `download_java_runtime`）本就无 target 白名单，修复 `match.rs` 后 Java 16/25 均可正常下载
 
 ### 新增
 
