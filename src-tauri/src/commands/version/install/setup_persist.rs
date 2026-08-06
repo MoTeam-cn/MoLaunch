@@ -9,25 +9,31 @@ use crate::state::AppState;
 use crate::{log_info, log_warn};
 
 /// 保存 setup.ini + 创建隔离目录
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn save_setup_and_create_isolation(
     state: &AppState,
     game_dir: &std::path::Path,
     actual_version_id: &str,
     mc_version: &str,
     version_type: VersionType,
+    forge_version: Option<&str>,
+    neoforge_version: Option<&str>,
+    fabric_version: Option<&str>,
+    optifine_version: Option<&str>,
+    liteloader_version: Option<&str>,
 ) {
     let version_dir = game_dir.join("versions").join(actual_version_id);
 
-    // 保存 setup.ini
+    // 保存 setup.ini（type 同时写入加载器对应版本，便于后续版本信息查询）
     let setup = VersionSetup::new(
         mc_version,
         version_type,
-        None, // Forge 版本号从目录名或 JSON 中提取
-        None,
-        None,
-        None,
-        None,
-        None,
+        forge_version,
+        neoforge_version,
+        fabric_version,
+        None, // quilt 版本未从 install_merged 传入
+        optifine_version,
+        liteloader_version,
     );
     if let Err(e) = setup.save(&version_dir) {
         log_warn!("[Merged] 保存 setup.ini 失败: {}", e);

@@ -1,6 +1,7 @@
 //! 版本元信息查询（有效目录 / 游戏版本号 / 加载器信息）
 
 use crate::minecraft::isolation::{self, IsolationMode};
+use crate::minecraft::version::modpack_meta::ModpackMetaFile;
 use crate::minecraft::version::scan as version_scan;
 use crate::minecraft::version::setup::VersionSetup;
 use crate::minecraft::version::state::VersionType;
@@ -41,6 +42,9 @@ pub async fn get_version_effective_dir(
 /// 3. downloads.client.url 正则匹配
 /// 4. JSON 的 `jar` 字段
 /// 5. JSON 的 `id` 字段正则匹配
+///
+/// JSON 缺失或以上策略均无法提取时，回退读取 `modpack.meta.json` 的 `mc_version`
+///（整合包安装时写入的权威版本），两者皆无时返回 `None`。
 pub async fn get_version_game_version(
     state: &AppState,
     version_id: String,
@@ -51,16 +55,28 @@ pub async fn get_version_game_version(
 
     let version_dir = game_dir.join("versions").join(&version_id);
     let json_path = version_dir.join(format!("{}.json", version_id));
-    if !json_path.exists() {
-        return Ok(None);
+    if json_path.exists() {
+        let content = std::fs::read_to_string(&json_path)
+            .map_err(|e| format!("Failed to read version JSON: {}", e))?;
+        let json: serde_json::Value = serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse version JSON: {}", e))?;
+        if let Some(mc) = version_scan::extract_original_version(&json, &content) {
+            return Ok(Some(mc));
+        }
     }
 
-    let content = std::fs::read_to_string(&json_path)
-        .map_err(|e| format!("Failed to read version JSON: {}", e))?;
-    let json: serde_json::Value = serde_json::from_str(&content)
-        .map_err(|e| format!("Failed to parse version JSON: {}", e))?;
-
-    Ok(version_scan::extract_original_version(&json, &content))
+    // 版本 JSON 缺失，或提取不到 MC 版本时（旧版整合包 JSON 的 id 为非数字名、无 inheritsFrom），
+    // 回退 setup.ini 的 OriginalVersion（所有安装方式通用）；再回退 modpack.meta.json（整合包安装写入的权威）
+    if let Ok(Some(setup)) = VersionSetup::load(&version_dir) {
+        let v = &setup.loader.original_version;
+        if !v.is_empty() && v != "unknown" {
+            return Ok(Some(v.clone()));
+        }
+    }
+    Ok(ModpackMetaFile::load(&version_dir)
+        .map_err(|e| format!("Failed to read modpack.meta.json: {}", e))?
+        .filter(|m| !m.mc_version.is_empty())
+        .map(|m| m.mc_version))
 }
 
 /// 获取版本加载器信息（加载器类型 + 加载器版本号）
@@ -72,7 +88,8 @@ pub async fn get_version_game_version(
 /// - `loader_type`：`forge` / `fabric` / `neoforge` / `quilt` / `optifine` / `liteloader` / `release` / `snapshot` / `old` / `unknown`
 /// - `loader_version`：对应加载器的版本号（如 `47.2.0`），无加载器时为空字符串
 ///
-/// setup.ini 不存在时返回 `("release", "")`（兜底为原版）。
+/// setup.ini 缺失或缺少加载器版本时，`load_or_create` 会从版本 JSON 的 libraries 回填并持久化；
+/// 仍无法给出版本时再回退 `modpack.meta.json`（在线整合包更准确），再仍缺则返回空版本号。
 pub async fn get_version_loader_info(
     state: &AppState,
     version_id: String,
@@ -82,33 +99,26 @@ pub async fn get_version_loader_info(
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let version_dir = game_dir.join("versions").join(&version_id);
 
-    // 优先读 setup.ini
-    if let Some(setup) =
-        VersionSetup::load(&version_dir).map_err(|e| format!("Failed to read setup.ini: {}", e))?
-    {
-        let loader_type = version_type_to_string(&setup.loader.version_type);
-        let loader_version = match setup.loader.version_type {
-            VersionType::Forge => setup.loader.forge_version.clone().unwrap_or_default(),
-            VersionType::NeoForge => setup.loader.neoforge_version.clone().unwrap_or_default(),
-            VersionType::Fabric => setup.loader.fabric_version.clone().unwrap_or_default(),
-            VersionType::Quilt => setup.loader.quilt_version.clone().unwrap_or_default(),
-            VersionType::OptiFine => setup.loader.optifine_version.clone().unwrap_or_default(),
-            VersionType::LiteLoader => setup.loader.liteloader_version.clone().unwrap_or_default(),
-            _ => String::new(),
-        };
-        return Ok((loader_type, loader_version));
-    }
+    // 优先读 setup.ini（load_or_create 会对缺失的加载器版本做 JSON 回填并持久化）
+    let setup = VersionSetup::load_or_create(&version_dir, &version_id);
+    let loader_type = version_type_to_string(&setup.loader.version_type);
+    let loader_version = match setup.loader.version_type {
+        VersionType::Forge => setup.loader.forge_version.clone().unwrap_or_default(),
+        VersionType::NeoForge => setup.loader.neoforge_version.clone().unwrap_or_default(),
+        VersionType::Fabric => setup.loader.fabric_version.clone().unwrap_or_default(),
+        VersionType::Quilt => setup.loader.quilt_version.clone().unwrap_or_default(),
+        VersionType::OptiFine => setup.loader.optifine_version.clone().unwrap_or_default(),
+        VersionType::LiteLoader => setup.loader.liteloader_version.clone().unwrap_or_default(),
+        _ => String::new(),
+    };
 
-    // setup.ini 不存在：从版本 JSON 检测类型，但无法获取加载器版本号
-    let json_path = version_dir.join(format!("{}.json", version_id));
-    if json_path.exists() {
-        if let Ok(content) = std::fs::read_to_string(&json_path) {
-            if let Ok(json) = serde_json::from_str::<serde_json::Value>(&content) {
-                let detected = VersionType::detect_from_json(&version_id, &json);
-                return Ok((version_type_to_string(&detected), String::new()));
+    // 保底：setup 无法给出加载器版本时，回退整合包元数据 modpack.meta.json（在线整合包更准确）
+    if loader_version.is_empty() {
+        if let Ok(Some(meta)) = ModpackMetaFile::load(&version_dir) {
+            if let Some(lt) = meta.loader {
+                return Ok((lt, meta.loader_version.unwrap_or_default()));
             }
         }
     }
-
-    Ok(("release".to_string(), String::new()))
+    Ok((loader_type, loader_version))
 }

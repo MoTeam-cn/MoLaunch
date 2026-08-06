@@ -192,6 +192,11 @@ pub async fn install_merged(
         &actual_version_id,
         &mc_version,
         version_type,
+        forge_version.as_deref(),
+        neoforge_version.as_deref(),
+        fabric_version.as_deref(),
+        optifine_version.as_deref(),
+        liteloader_version.as_deref(),
     )
     .await;
 

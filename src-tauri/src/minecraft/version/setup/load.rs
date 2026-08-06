@@ -91,10 +91,11 @@ impl VersionSetup {
             if Self::ensure_complete(version_dir).unwrap_or(false) {
                 // 补全后重新加载，返回完整数据
                 if let Ok(Some(refreshed)) = Self::load(version_dir) {
-                    return refreshed;
+                    return Self::backfill_loader_versions(refreshed, version_dir, version_id);
                 }
             }
-            return setup;
+            // 旧安装兼容：setup.ini 已存在但缺少加载器版本字段时，从版本 JSON 回填并持久化
+            return Self::backfill_loader_versions(setup, version_dir, version_id);
         }
         let setup = Self::from_version_json(version_dir, version_id).unwrap_or_else(|| Self {
             loader: LoaderInfo {
@@ -112,6 +113,55 @@ impl VersionSetup {
             advanced: AdvancedConfig::default(),
         });
         let _ = setup.save(version_dir);
+        setup
+    }
+
+    /// 回填缺失的加载器版本：早期 install_merged 写入的 setup.ini 只含 Type/OriginalVersion，
+    /// 导致加载器版本查询为空。此处从版本 JSON 的 libraries 提取缺失的 XxxVersion 并持久化，
+    /// 仅在有实际补全时写入，不动原有 OriginalVersion/Type/个性化字段。
+    fn backfill_loader_versions(mut setup: Self, version_dir: &Path, version_id: &str) -> Self {
+        let has_missing = setup.loader.forge_version.is_none()
+            || setup.loader.neoforge_version.is_none()
+            || setup.loader.fabric_version.is_none()
+            || setup.loader.quilt_version.is_none()
+            || setup.loader.optifine_version.is_none()
+            || setup.loader.liteloader_version.is_none();
+        if !has_missing {
+            return setup;
+        }
+        let derived = match Self::from_version_json(version_dir, version_id) {
+            Some(d) => d,
+            None => return setup,
+        };
+        let mut changed = false;
+        if setup.loader.forge_version.is_none() && derived.loader.forge_version.is_some() {
+            setup.loader.forge_version = derived.loader.forge_version;
+            changed = true;
+        }
+        if setup.loader.neoforge_version.is_none() && derived.loader.neoforge_version.is_some() {
+            setup.loader.neoforge_version = derived.loader.neoforge_version;
+            changed = true;
+        }
+        if setup.loader.fabric_version.is_none() && derived.loader.fabric_version.is_some() {
+            setup.loader.fabric_version = derived.loader.fabric_version;
+            changed = true;
+        }
+        if setup.loader.quilt_version.is_none() && derived.loader.quilt_version.is_some() {
+            setup.loader.quilt_version = derived.loader.quilt_version;
+            changed = true;
+        }
+        if setup.loader.optifine_version.is_none() && derived.loader.optifine_version.is_some() {
+            setup.loader.optifine_version = derived.loader.optifine_version;
+            changed = true;
+        }
+        if setup.loader.liteloader_version.is_none() && derived.loader.liteloader_version.is_some()
+        {
+            setup.loader.liteloader_version = derived.loader.liteloader_version;
+            changed = true;
+        }
+        if changed {
+            let _ = setup.save(version_dir);
+        }
         setup
     }
 

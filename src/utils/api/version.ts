@@ -108,7 +108,8 @@ export async function getVersionEffectiveDir(versionId: string): Promise<string>
  *   `liteloader` / `release` / `snapshot` / `old` / `unknown`
  * - `loaderVersion`：对应加载器的版本号（如 `47.3.0`），无加载器时为空字符串
  *
- * setup.ini 不存在时返回 `{ loaderType: 'release', loaderVersion: '' }`（兜底为原版）。
+ * 读取优先级：`setup.ini` → `modpack.meta.json`（整合包，含 loader + loader_version）→
+ * 版本 JSON 检测（仅 loaderType）；均无则兜底为原版 `{ loaderType: 'release', loaderVersion: '' }`。
  */
 export async function getVersionLoaderInfo(
   versionId: string,
