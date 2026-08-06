@@ -7,6 +7,9 @@ use super::super::types::{ResourceProject, SearchParams, SearchResult};
 use super::sort::{dedup, sort_projects};
 
 /// 每页结果数
+///
+/// 取自各平台 API 的每页上限取值：CurseForge 搜索 API 单页最多 50 条、
+/// Modrinth 最多 100 条。取 40 为兼容两平台的保守值，避免任一平台因超限报错。
 pub const PAGE_SIZE: u32 = 40;
 
 /// 单平台搜索超时（秒），防止单个慢平台拖慢整体

@@ -7,16 +7,30 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 
-/// 固定的占位 ID
-const AUTH_ACCOUNT_ID: &str = "00000111112222233333444445555566";
-const AUTH_PROFILE_ID: &str = "66666555554444433333222221111100";
-const DEFAULT_CLIENT_TOKEN: &str = "23323323323323323323323323323333";
+/// 运行时生成的占位 ID（每次启动随机生成，避免硬编码固定值）
+///
+/// `launcher_profiles.json` 中的内部标识只需满足格式与唯一性，无固定值约定，
+/// 因此使用随机生成的十六进制串，与具体启动器实现解耦。
+use once_cell::sync::Lazy;
+use rand::RngCore;
+
+fn random_hex_id(len: usize) -> String {
+    let mut bytes = vec![0u8; len / 2];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    bytes.iter().map(|b| format!("{:02x}", b)).collect()
+}
+
+/// 认证数据库账号 ID
+static AUTH_ACCOUNT_ID: Lazy<String> = Lazy::new(|| random_hex_id(32));
+/// 认证数据库档案 ID
+static AUTH_PROFILE_ID: Lazy<String> = Lazy::new(|| random_hex_id(32));
+/// 默认客户端令牌
+static DEFAULT_CLIENT_TOKEN: Lazy<String> = Lazy::new(|| random_hex_id(32));
 
 /// 登录类型
 #[derive(Debug, Clone, PartialEq)]
 pub enum LoginType {
     Legacy,    // 离线
-    Nide,      // 统一通行证
     Auth,      // Authlib-Injector
     Microsoft, // 正版微软
 }
@@ -116,7 +130,7 @@ impl LauncherProfiles {
         LauncherProfiles {
             profiles,
             selected_profile: "MoLaunch".to_string(),
-            client_token: DEFAULT_CLIENT_TOKEN.to_string(),
+            client_token: DEFAULT_CLIENT_TOKEN.clone(),
             authentication_database: None,
             selected_user: None,
         }
@@ -185,7 +199,7 @@ impl LauncherProfiles {
         // 构建认证数据库
         let mut auth_profiles = HashMap::new();
         auth_profiles.insert(
-            AUTH_PROFILE_ID.to_string(),
+            AUTH_PROFILE_ID.clone(),
             AuthProfile {
                 display_name: login_result.name.clone(),
                 legacy: None,
@@ -194,7 +208,7 @@ impl LauncherProfiles {
 
         let mut auth_db = HashMap::new();
         auth_db.insert(
-            AUTH_ACCOUNT_ID.to_string(),
+            AUTH_ACCOUNT_ID.clone(),
             AuthAccount {
                 username: login_result.name.replace('"', "-"),
                 profiles: auth_profiles,
@@ -205,8 +219,8 @@ impl LauncherProfiles {
         self.authentication_database = Some(auth_db.clone());
         self.client_token = login_result.client_token.clone();
         self.selected_user = Some(SelectedUser {
-            account: AUTH_ACCOUNT_ID.to_string(),
-            profile: AUTH_PROFILE_ID.to_string(),
+            account: AUTH_ACCOUNT_ID.clone(),
+            profile: AUTH_PROFILE_ID.clone(),
         });
 
         // 保存（带重试逻辑）
@@ -223,8 +237,8 @@ impl LauncherProfiles {
                 self.authentication_database = Some(auth_db);
                 self.client_token = login_result.client_token.clone();
                 self.selected_user = Some(SelectedUser {
-                    account: AUTH_ACCOUNT_ID.to_string(),
-                    profile: AUTH_PROFILE_ID.to_string(),
+                    account: AUTH_ACCOUNT_ID.clone(),
+                    profile: AUTH_PROFILE_ID.clone(),
                 });
                 self.save(mc_folder)?;
                 Ok(())

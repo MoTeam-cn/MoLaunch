@@ -7,6 +7,12 @@ use super::super::types::{
 };
 use super::types::{CfFile, CfModEntry};
 
+/// CurseForge 依赖排除列表（平台基础库 ID）
+///
+/// Fabric API（306612）与 Quilt API（634179）通常作为平台基础库由加载器自动加载，
+/// 无需在版本详情中重复提示用户安装，故从 required 依赖列表中排除。
+const CF_EXCLUDED_DEPENDENCY_IDS: [i64; 2] = [306612, 634179];
+
 /// 将 CurseForge 工程条目转换为统一 ResourceProject
 pub(crate) fn convert_project(entry: &CfModEntry, rtype: ResourceType) -> ResourceProject {
     let mod_loaders = entry
@@ -115,12 +121,13 @@ pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
     let version =
         crate::minecraft::community::version_extract::extract_version_from_name(&file.display_name);
 
-    // 提取 required 依赖（relationType=3），排除 Fabric API（306612）和 Quilt API（634179）
-    // 这两个 API 通常作为平台基础库自动加载，无需重复提示用户安装
+    // 提取 required 依赖（relationType=3），排除平台基础库（见 CF_EXCLUDED_DEPENDENCY_IDS）
     let dependencies: Vec<String> = file
         .dependencies
         .iter()
-        .filter(|d| d.relation_type == 3 && d.mod_id != 306612 && d.mod_id != 634179)
+        .filter(|d| {
+            d.relation_type == 3 && !CF_EXCLUDED_DEPENDENCY_IDS.contains(&d.mod_id)
+        })
         .map(|d| d.mod_id.to_string())
         .collect();
 

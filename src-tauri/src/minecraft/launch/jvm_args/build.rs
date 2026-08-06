@@ -88,6 +88,11 @@ fn extract_host(server_url: &str) -> Option<String> {
 
 /// LUA（LWJGL Unsafe Agent）
 /// 仅当库列表包含 org.lwjgl:lwjgl:3.4.1 且未禁用时注入
+///
+/// 来源：`lwjgl-unsafe-agent.jar` 为第三方开源项目 lwjgl-unsafe-agent
+/// （https://github.com/HMCL-dev/lwjgl-unsafe-agent，Apache-2.0，作者 Glavo）。
+/// 该项目通过 javaagent 修改 LWJGL 3.4.1 的字节码以修复其 FFM API 内联不佳导致的性能问题，
+/// 本项目以外部依赖方式引入，许可证声明见 `src-tauri/resources/about/licenses.txt`。
 pub(super) fn add_lua_args(args: &mut Vec<String>, json: &serde_json::Value, disable_lua: bool) {
     let use_lua = !disable_lua && has_library(json, "org.lwjgl:lwjgl:3.4.1");
     if use_lua {
@@ -172,8 +177,13 @@ pub(super) fn add_json_jvm_args(
 /// - 仅当未禁用、非 GBK 编码、路径非纯 ASCII 时触发（仅在该环境下才会触发 JDK-8272352 Bug）
 /// - 若用户自定义参数含 -javaagent 则禁用 JLW（冲突会导致崩溃）
 /// - Java 9+ 添加 --add-exports cpw.mods.bootstraplauncher
-/// - 添加 -Doolloo.jlw.tmpdir={pure_directory}（不以 \ 结尾）
+/// - 添加 -Doolloo.jlw.tmpdir={pure_directory}（不以 \ 结尾，属性名由二进制内部约定）
 /// - 末尾添加 -jar java-wrapper.jar（作为 JVM 入口，接收原 mainClass 作为参数）
+///
+/// 来源：嵌入的 `java-wrapper.jar` 为第三方开源项目 Java Launch Wrapper
+/// （https://github.com/00ll00/java_launch_wrapper，MIT License，包名 oolloo.jlw）。
+/// 该工具用于规避 JDK-8272352（非 ASCII 路径下 JVM 命令行参数乱码）导致的启动失败，
+/// 本项目以外部依赖方式引入，许可证声明见 `src-tauri/resources/about/licenses.txt`。
 pub(super) fn add_jlw_args(
     args: &mut Vec<String>,
     game_dir: &Path,

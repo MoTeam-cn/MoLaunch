@@ -11,13 +11,15 @@ pub(crate) fn parse_cf(detected: &DetectedModpack) -> Result<ModpackInfo, String
         serde_json::from_str(detected.manifest_content.as_deref().unwrap_or(""))
             .map_err(|e| format!("解析 manifest.json 失败: {}", e))?;
     let gv = manifest.minecraft.version.clone();
-    // Quilt 加载器检测：id 以 "quilt-" 开头直接报错
+    // Quilt 加载器特判：本项目暂不支持 Quilt 加载器（功能性决策，非格式限制），
+    // 整合包要求 Quilt 时直接拒绝安装
     for l in &manifest.minecraft.mod_loaders {
         if l.id.starts_with("quilt-") || l.id.starts_with("quilt_") {
             return Err("CurseForge 整合包要求 Quilt 加载器，MoLaunch 暂不支持 Quilt".to_string());
         }
     }
-    // Forge recommended 字段检测：旧版整合包格式，直接报错提示版本过老
+    // Forge recommended 特判：旧版整合包以 `forge-<mc>-recommended` 声明加载器，
+    // 因缺少具体版本号无法安装，属本项目对过老格式的兼容策略，直接拒绝并提示
     for l in &manifest.minecraft.mod_loaders {
         if l.id.starts_with("forge-") && l.id.contains("recommended") {
             return Err(

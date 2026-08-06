@@ -69,6 +69,8 @@ pub fn run_forge_installer(
     }
 
     // 使用 JavaWrapper 绕过路径问题
+    // 注：wrapper 为第三方开源项目（https://github.com/00ll00/java_launch_wrapper，MIT），
+    // 属性名 -Doolloo.jlw.tmpdir 由其内部约定，不可单独修改。许可证声明见 resources/about/licenses.txt。
     let use_wrapper = mc_dir.chars().any(|c| !c.is_ascii() || c == ' ');
 
     if use_wrapper {

@@ -14,7 +14,8 @@ pub(crate) fn parse_mr(detected: &DetectedModpack) -> Result<ModpackInfo, String
         .get("minecraft")
         .cloned()
         .unwrap_or_default();
-    // Quilt 加载器检测：dependencies 含 quilt-loader 直接报错
+    // Quilt 加载器特判：本项目暂不支持 Quilt 加载器（功能性决策，非格式限制），
+    // 整合包要求 Quilt 时直接拒绝安装
     if index.dependencies.contains_key("quilt-loader") {
         return Err("Modrinth 整合包要求 Quilt 加载器，MoLaunch 暂不支持 Quilt".to_string());
     }

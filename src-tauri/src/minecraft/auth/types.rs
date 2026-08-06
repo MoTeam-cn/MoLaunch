@@ -11,8 +11,6 @@ pub enum LoginType {
     Legacy,
     /// 微软正版
     Microsoft,
-    /// 第三方服务器（统一通行证）
-    Nide,
     /// Authlib-Injector
     AuthlibInjector,
 }

@@ -74,9 +74,6 @@ pub async fn fingerprint_search(
 
     // 步骤 2：收集所有 modId，构建 fingerprint → modId 映射
     //
-    //   Dim ProjectId = Project("id").ToString                         ' modId
-    //   Dim Hash As UInteger = Project("file")("fileFingerprint")     ' 指纹
-    //
     // CF 返回的 exactMatches 中，每条的 `id` 是 modId，`file.fileFingerprint` 是
     // 本地文件的 MurmurHash2 指纹（与请求时传入的指纹一致），用它反查本地文件。
     let mut fp_to_modid: std::collections::HashMap<u32, i64> = std::collections::HashMap::new();

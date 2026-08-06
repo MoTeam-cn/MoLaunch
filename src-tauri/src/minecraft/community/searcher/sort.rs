@@ -66,33 +66,43 @@ pub(super) fn sort_projects(
 }
 
 /// 计算排序分
+///
+/// 排序分由「归一化下载量」构成：
+/// - 下载量先乘以平台/类型加权系数（补偿不同平台间的生态体量差异），再取对数归一化；
+/// - 有搜索词时叠加固定的名称匹配加分（当前为简化实现）。
 fn score(p: &ResourceProject, has_query: bool, rtype: ResourceType) -> f64 {
-    // 下载量权重（log10，10亿时为1.0）
-    let dl_mult = get_download_count_mult(p.platform, rtype);
+    let dl_mult = platform_weight(p.platform, rtype);
     let dl_score = (p.download_count as f64 * dl_mult).max(1.0).log10() / 9.0;
 
     if has_query {
-        // 有搜索词：下载量权重 + 名称匹配度
-        let name_score = 0.5; // 简化处理，实际可计算相似度
+        let name_score = 0.5;
         name_score + dl_score
     } else {
-        // 无搜索词：按下载量排序
         dl_score
     }
 }
 
-/// 平台下载量权重
-fn get_download_count_mult(platform: Platform, rtype: ResourceType) -> f64 {
+/// 平台/类型加权系数
+///
+/// 设计依据：不同平台的「下载量」量纲差异较大（例如 Modrinth 以单项目独立计数、
+/// CurseForge 聚合多文件下载），直接比较原始数值会系统性偏向某一平台。
+/// 此处按项目类型对平台间的量纲差异做粗略补偿，数值为本项目自定，可随运营数据调整。
+fn platform_weight(platform: Platform, rtype: ResourceType) -> f64 {
+    use ResourceType::*;
     match (rtype, platform) {
-        (ResourceType::Mod, Platform::CurseForge) => 1.0,
-        (ResourceType::Mod, Platform::Modrinth) => 5.0,
-        (ResourceType::ModPack, Platform::CurseForge) => 1.0,
-        (ResourceType::ModPack, Platform::Modrinth) => 5.0,
-        (ResourceType::DataPack, Platform::CurseForge) => 10.0,
-        (ResourceType::DataPack, Platform::Modrinth) => 1.0,
-        (ResourceType::ResourcePack, Platform::CurseForge) => 1.0,
-        (ResourceType::ResourcePack, Platform::Modrinth) => 4.0,
-        (ResourceType::Shader, Platform::CurseForge) => 1.0,
-        (ResourceType::Shader, Platform::Modrinth) => 4.0,
+        // Mod：Modrinth 下载量以项目维度统计，与 CurseForge 文件维度存在量级差
+        (Mod, Platform::CurseForge) => 1.0,
+        (Mod, Platform::Modrinth) => 3.0,
+        // 整合包：两平台量纲接近，轻微偏向 Modrinth
+        (ModPack, Platform::CurseForge) => 2.0,
+        (ModPack, Platform::Modrinth) => 3.0,
+        // 数据包：CurseForge 数据包下载量远高于 Modrinth
+        (DataPack, Platform::CurseForge) => 6.0,
+        (DataPack, Platform::Modrinth) => 1.0,
+        // 资源包 / 光影：Modrinth 生态更活跃，相应加权
+        (ResourcePack, Platform::CurseForge) => 1.0,
+        (ResourcePack, Platform::Modrinth) => 3.0,
+        (Shader, Platform::CurseForge) => 1.0,
+        (Shader, Platform::Modrinth) => 3.0,
     }
 }
