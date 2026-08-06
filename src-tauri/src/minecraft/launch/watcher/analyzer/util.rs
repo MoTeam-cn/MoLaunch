@@ -1,8 +1,5 @@
 //! 工具函数
 
-use super::super::types::{CrashCategory, CrashInfo};
-use std::path::Path;
-
 /// 从日志文本中提取 "Caught exception from {ModName}" 格式的 Mod 名称
 pub(super) fn extract_mod_from_keyword(text: &str, prefix: &str) -> Option<String> {
     let text_l = text.to_lowercase();
@@ -36,23 +33,4 @@ pub(super) fn truncate_head_tail(content: &str, head: usize, tail: usize) -> Str
         result.push('\n');
     }
     result
-}
-
-/// 构造 CrashInfo 的快捷函数
-pub(super) fn make_crash_info(
-    reason: &str,
-    category: CrashCategory,
-    suggestion: &str,
-    error_lines: &[String],
-    crash_report_path: Option<&Path>,
-) -> CrashInfo {
-    CrashInfo {
-        reason: reason.to_string(),
-        category,
-        log_lines: error_lines.to_vec(),
-        suggestion: suggestion.to_string(),
-        problematic_mod: None,
-        crash_report_path: crash_report_path.map(|p| p.to_string_lossy().to_string()),
-        log_tail: Vec::new(),
-    }
 }

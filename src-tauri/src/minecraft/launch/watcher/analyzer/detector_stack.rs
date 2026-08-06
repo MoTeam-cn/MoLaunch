@@ -1,66 +1,76 @@
-//! 第二级堆栈分析
+//! 堆栈证据检测器
 //!
-//! 从崩溃报告/运行时日志/hs_err 堆栈中提取关键字，过滤后推断可能的 Mod 名称。
+//! 从崩溃报告 / 运行时日志 / hs_err 的堆栈中提取关键字，过滤后推断可能的 Mod 名称。
+//! 作为独立 Detector 参与并行检测，仅在存在 Mod 加载器时产出证据。
 
-use super::super::types::{CrashCategory, CrashInfo};
-use std::path::Path;
+use super::super::types::CrashCategory;
+use super::collect::CollectedSources;
+use super::detector::{Detector, Evidence};
+use super::rules::SourceKind;
 
-/// 第二级堆栈分析
-pub(super) fn analyze_stack(
-    log_mc: &str,
-    log_crash: &str,
-    log_hs: &str,
-    error_lines: &[String],
-    crash_report_path: Option<&Path>,
-) -> Option<CrashInfo> {
-    // 从各源提取堆栈关键字
-    let mut keywords = Vec::new();
+/// 堆栈检测器：启发式提取堆栈中可能属于 Mod 的关键字
+pub struct StackDetector;
 
-    // 从崩溃报告提取
-    if !log_crash.is_empty() {
-        if let Some(details_end) = log_crash.find("System Details") {
-            keywords.extend(extract_stack_keywords(&log_crash[..details_end]));
+impl Detector for StackDetector {
+    fn name(&self) -> &'static str {
+        "stack"
+    }
+
+    fn detect(&self, sources: &CollectedSources) -> Vec<Evidence> {
+        // 仅当运行时日志存在 Mod 加载器痕迹时才进行堆栈分析
+        let has_mod_loader = sources.runtime_log.contains("orge")
+            || sources.runtime_log.contains("abric")
+            || sources.runtime_log.contains("uilt")
+            || sources.runtime_log.contains("iteloader")
+            || sources.runtime_log.contains("ModLauncher")
+            || sources.runtime_log.contains("fmlloader");
+        if !has_mod_loader {
+            return Vec::new();
         }
-    }
 
-    // 从运行时日志的 FATAL 行提取
-    if !log_mc.is_empty() {
-        keywords.extend(extract_stack_keywords(log_mc));
-    }
+        let mut keywords = Vec::new();
 
-    // 从 hs_err 的 THREAD 段提取
-    if !log_hs.is_empty() {
-        if let Some(thread_start) = log_hs.find("T H R E A D") {
-            let thread_section = if let Some(reg_start) = log_hs[thread_start..].find("Registers:")
-            {
-                &log_hs[thread_start..thread_start + reg_start]
-            } else {
-                &log_hs[thread_start..]
-            };
-            keywords.extend(extract_stack_keywords(thread_section));
+        // 崩溃报告：取 System Details 之前的部分
+        if !sources.crash_report_text.is_empty() {
+            if let Some(details_end) = sources.crash_report_text.find("System Details") {
+                keywords.extend(extract_stack_keywords(&sources.crash_report_text[..details_end]));
+            }
         }
-    }
 
-    if keywords.is_empty() {
-        return None;
-    }
+        // 运行时日志
+        if !sources.runtime_log.is_empty() {
+            keywords.extend(extract_stack_keywords(&sources.runtime_log));
+        }
 
-    // 过滤并提取 Mod 名称
-    let mod_names = analyze_mod_name(&keywords);
-    if let Some(ref names) = mod_names {
-        let names_str = names.join(", ");
-        return Some(CrashInfo {
-            reason: format!("堆栈分析发现可能的 Mod: {}", names_str),
-            category: CrashCategory::Mod,
-            log_lines: error_lines.to_vec(),
-            suggestion: format!("以下 Mod 可能导致了游戏崩溃：{}\n你可以尝试依次禁用上述 Mod，然后观察游戏是否还会崩溃。", names_str),
-            problematic_mod: Some(names_str),
-            crash_report_path: crash_report_path.map(|p| p.to_string_lossy().to_string()),
-            log_tail: Vec::new(),
-        });
-    }
+        // hs_err：取 THREAD 段（Registers: 之前）
+        if !sources.hs_err_text.is_empty() {
+            if let Some(thread_start) = sources.hs_err_text.find("T H R E A D") {
+                let thread_section = if let Some(reg_start) = sources.hs_err_text[thread_start..].find("Registers:")
+                {
+                    &sources.hs_err_text[thread_start..thread_start + reg_start]
+                } else {
+                    &sources.hs_err_text[thread_start..]
+                };
+                keywords.extend(extract_stack_keywords(thread_section));
+            }
+        }
 
-    None
+        let mod_names = analyze_mod_name(&keywords);
+        mod_names.map_or_else(Vec::new, |names| {
+            let names_str = names.join(", ");
+            vec![Evidence {
+                confidence: 0.80,
+                category: CrashCategory::Mod,
+                source: SourceKind::RuntimeLog,
+                reason: format!("堆栈分析发现可能的 Mod: {}", names_str),
+                suggestion: format!(
+                    "崩溃堆栈中出现了以下 Mod 的相关代码：{}\n可以尝试逐个禁用这些 Mod，观察游戏能否恢复正常。",
+                    names_str
+                ),
+                extracted_mod: Some(names_str),
+            }]
+        })
+    }
 }
 
 /// 从堆栈文本提取关键字
@@ -72,7 +82,6 @@ fn extract_stack_keywords(text: &str) -> Vec<String> {
         "sun.",
         "com.sun.",
         "jdk.",
-        "oolloo.",
         "org.lwjgl",
         "net.minecraftforge",
         "paulscode.sound",
@@ -162,21 +171,16 @@ fn extract_stack_keywords(text: &str) -> Vec<String> {
 
 /// 从关键字列表分析 Mod 名称
 fn analyze_mod_name(keywords: &[String]) -> Option<Vec<String>> {
-    if keywords.is_empty() {
+    if keywords.is_empty() || keywords.len() > 10 {
+        // 无关键字或关键词过多（可能匹配出错）时放弃
         return None;
     }
-    if keywords.len() > 10 {
-        // 关键词过多，可能是匹配出错
-        return None;
-    }
-    let unique: Vec<String> = {
-        let mut seen = std::collections::HashSet::new();
-        keywords
-            .iter()
-            .filter(|k| seen.insert((*k).clone()))
-            .cloned()
-            .collect()
-    };
+    let mut seen = std::collections::HashSet::new();
+    let unique: Vec<String> = keywords
+        .iter()
+        .filter(|k| seen.insert((*k).clone()))
+        .cloned()
+        .collect();
     if unique.is_empty() {
         None
     } else {
