@@ -2,6 +2,163 @@
 
 ### 新增
 
+#### 实验性功能（AI 聊天 / Agent 工具 / 日志分析，默认关闭）
+
+- 背景：将 AI 相关能力与日志分析迁入独立的「实验性」入口，默认不暴露；用户需在「设置 → 进阶设置」手动开启后才显示入口并初始化本地 SQLite 聊天存储，避免为未启用用户带来资源开销
+- 本批前端修复：进入 AI 聊天且没有历史会话时自动创建首个会话；直接输入并发送无需先点击「新建对话」；统一会话/消息 API 字段为 camelCase（`conversationId` / `createdAt` / `toolCallsLog`），修复 `missing field conversationId`；Enter 发送增加 IME 组合输入保护（`isComposing` / `keyCode=229`），避免中文输入法被误触发
+- AI 并入实验性统一分发（本批修复）：
+  - 原独立 `commands::ai::ai_manager` Tauri 命令已移除，5 个 AI action（analyze_crash / check_status / save_config / load_config / list_models）全部并入 `experimental_manager` 分发，且统一受 `experimental_enabled` 开关保护（未开启时返回错误）
+  - `commands/ai/manager.rs` 改为纯实现库（`analyze_crash` / `check_status` 为 `pub(crate)` 复用函数），`commands/ai/mod.rs` 不再声明 Tauri 命令
+  - `src/utils/api/ai.ts` 的 `aiManager` 改指向 `experimental_manager`；`src/utils/dev-api.ts` 的 `molaunch.ai` 同步指向
+  - 修复 `missing field baseUrl` 参数解析错误：后端 `AiConfig` / `AiProbeParams` / `AiStatusResult` 为 camelCase，前端 `ai.ts` 接口与 `SettingsAi.vue` 表单原为 snake_case 导致反序列化失败；现已统一为 camelCase（`baseUrl` / `apiKey` / `timeoutSecs` / `defaultModel`）
+  - `ExperimentalLog.vue`：顶部自定义 amber 提示改为项目 `AlertV2` 组件；移除 `max-w-3xl` 限宽，崩溃日志分析框占满内容区，消除右侧大面积空白
+- 开关与配置链路：
+  - `AppConfig` 新增 `experimental_enabled` 字段（默认 `false`），INI 键 `[Experimental] enabled`
+  - 贯通 `load.rs` / `save.rs` / `ConfigSnapshot` / `ConfigPatch` / `build_snapshot` / `apply/fields.rs`（`apply_experimental`）/ `flow.rs`，前端 `ConfigSnapshot` / `ConfigPatch` 同步新增 `experimentalEnabled`
+  - 首次开启时惰性调用 `commands::experimental::db::ensure_initialized()` 创建 `experimental/chat.db` 并建表（幂等）；关闭仅隐藏入口，不删除数据
+- 顶部导航与页面：
+  - `TopNavLayout.vue`：新增条件渲染的「实验性」入口（`BeakerIcon`），默认隐藏，开启后显示在「设置」之前
+  - 新增共享组合式函数 `src/composables/useExperimental.ts`：统一读取配置与监听 `experimental-mode-changed` 事件，供导航、页面守卫与设置开关复用
+  - 新增 `src/components/settings/ExperimentalToggle.vue`：进阶设置中的自包含开关卡片（仿 DevModeToggle 模式）
+  - 新增路由 `/apps/experimental` 与 `src/views/Experimental.vue`（子导航：AI 聊天 / 日志分析 / AI 设置；未开启时展示守卫空状态）
+- 后端命令模块 `src-tauri/src/commands/experimental/`（经 `experimental_manager` IPC 注册）：
+  - `db.rs`：SQLite 惰性初始化与会话/消息 CRUD（`rusqlite` 0.31 bundled 静态编译，运行时无需动态库）
+  - `types.rs`：会话/消息/聊天入参出参类型
+  - `manager.rs`：action 分发（create/list/delete/rename conversation、list/clear messages、chat_send、collect_context），全部 action 先校验 `experimental_enabled`
+  - `agent.rs`：Agent 工具集（只读诊断工具：启动器信息 / 游戏日志 tail / 最新崩溃报告 / Mod 列表 / 启动器日志），结果截断防超长；启动器日志经既有脱敏函数处理后再交给模型
+  - `ai_core/client.rs`：新增多轮 `chat_completions`（含 `tools` 下发与 `tool_calls` 回传）、`ChatTurn` / `ToolDef` / `ToolCall` 类型；`ai_core/mod.rs` 补导出
+  - `ai_core/prompt.rs`：新增 `PromptKind::Chat` 助手提示词（引导优先使用工具取真实数据）
+  - 聊天流程：保存用户消息 → 携带最近 20 条历史 + 工具定义请求 → 模型发起工具调用时循环执行（上限 4 轮）→ 保存助手回复；首条消息自动生成会话标题
+  - 手动附加上下文兜底：`collect_context` 收集启动器/游戏日志/崩溃报告/Mod/启动器日志，拼入输入框后随消息发送（模型不支持工具调用时可用）
+- 迁移：
+  - `SettingsAdvanced.vue`：移除内嵌的 `<SettingsAi />`，AI 服务配置迁入实验性页「AI 设置」分类（复用 `SettingsAi.vue`）
+  - `DiagnosticPage.vue`：移除「崩溃日志分析」卡片（`CrashAnalyzer`），迁入实验性页「日志分析」分类（仅本页可用）
+  - 自动崩溃规则弹窗（`CrashDialog` 触发链路）按用户确认保留，不迁移
+- 依赖：`src-tauri/Cargo.toml` 新增 `rusqlite = { version = "0.31", features = ["bundled"] }`；前端新增 `@lobehub/icons`（仅提取品牌 Mono 图标 path 数据，不直接引入 React 组件）
+- AI 聊天前端重构（本批）：
+  - `ExperimentalChat.vue` 由 545 行拆分为精简外壳（≤300 行），逻辑全部提取至 `src/composables/useAiChat.ts`，UI 拆分为 `ChatConversationList` / `ChatHeader` / `ChatMessageItem` / `AskUserDialog` / `VersionPickerDialog`
+  - 消息操作栏：hover 默认隐藏，支持删除（后端配对级联）、重新生成（AI 消息）、复制（点击后选择「渲染后文本」或「Markdown 原文」）、编辑（仅最后一条用户消息，保存后自动重新生成）
+  - 模型选择下拉框带品牌图标：`@lobehub/icons` 57 个品牌 Mono path 数据（`utils/lobe-model-icons.ts`）、模型名→品牌正则识别（`utils/model-icon.ts`）、`ModelIcon.vue` 渲染（未识别兜底 CpuChip）
+  - Markdown 行内图标占位符 `[:icon:名称]`：`utils/md-icons.ts`（heroicons 24/outline path 数据 + 别名）、`markdown.ts` 新增 marked inline 扩展（仅消息正文生效）；新增 `markdownToPlainText` 供复制渲染后文本
+  - 上下文窗口进度条：`utils/tokens.ts` 与后端一致的 token 估算（CJK≈1/字符，其余≈字符/4），≥70% 黄、≥90% 红；显示预估用量与后端校准 usage
+  - 流式渲染：`ai-chat-stream` 事件逐 token 追加 + 闪烁光标；`ai-ask-user` 事件弹窗提问；`conversation-title-updated` 更新会话标题
+  - 版本隔离感知：手动附加上下文与版本选择弹窗走 `list_installed_versions` + `VersionPickerDialog`，无版本时直接收集
+  - 修复旧库 schema 缺失：`CREATE TABLE IF NOT EXISTS` 不会为已存在的 `messages` 表补列，导致 `no such column: pair_id`（查询/删除消息失败）；新增 `migrate_schema`（`PRAGMA table_info` 检查 + `ALTER TABLE ADD COLUMN` 补 `pair_id`/`version_id`），旧库升级后自动补齐
+  - SQLite 架构重构（SQL 收敛 + 连接生命周期）：
+    - 新增公共工具 `src-tauri/src/utils/sqlite.rs`：声明式 schema 迁移（`TableDef` 建表 SQL + 可迁移列 + 保留列，挂载时自动 `ADD COLUMN` 补全 / `DROP COLUMN` 去除）+ 全局连接维护（`mount` 幂等挂载、`with_conn` 加锁复用）+ 通用表访问（`Table`/`Cond`：insert/update_by_id/delete_where/query/query_first/count，SQL 生成全部集中于此）
+    - `db.rs` 仅保留表结构声明（`CHAT_TABLES`）与数据访问函数，全部经 `Table` 语义接口调用（表 + 列 + 条件），不再出现任何 SQL 语句；移除每次操作重新 `open()` 连接的逻辑（改为全局连接）；配对删除等操作合并到同一连接内执行，避免嵌套加锁死锁
+    - 业务层 `manager.rs` 零 SQL（配对回填改用 `db::set_message_pair_id`）；全项目 SQL 操作仅存在于 `utils/sqlite.rs` 一处
+    - 连接生命周期：启动时读取 `experimental_enabled`，已启用则在启动流程挂载聊天库（连接由系统维护）；运行中开启时由 `apply_config` 挂载；未启用不挂载、不再每次请求检查
+    - 聊天库就绪日志由 `log_info` 降为 `log_debug`，避免每次进入页面刷屏
+  - 修复前端 void 返回误判：`safeCall` 包装 `Promise<void>`（Rust `()` 序列化为 `null`）后，`if (res)` / `if (!ok)` 会把成功判为失败，导致「删除会话失败 / 清空失败 / 提交回答失败」误提示；统一改为 `res !== undefined` / `ok === undefined` 判断（`useAiChat.ts` 删除会话/清空/删除消息/提交回答 4 处）
+  - 修复新建会话重复创建：`newConversation` 内两次调用 `ensureConversation()`，无会话时点击一次创建两个会话；改为点击恰好创建一个新会话并切换（有/无会话行为一致）
+  - UI 调整：token 进度条移至输入区按钮行右侧；发送按钮改为图标并置于输入框右下角（textarea 底部留白）；消息操作栏改为绝对定位（不再占用布局高度）；模型选择框加宽至 `w-60` 展示完整模型名
+  - AI 客户端模块化（`ai_core/client.rs` → `client/` 目录 5 模块：`types`/`transport`/`tokens`/`chat`/`stream`）：复用公共 `http.rs` 全局 reqwest 客户端（`apply_config` 重建后对代理/IP/TLS 生效），AI 配置每次调用重新读取实现热重载；4 处错误响应移除 `truncate_chars` 截断改为完整打印，修复「警告日志只打印一半」问题
+  - 技能调用消息内联展示（openclaw 风格）：后端 toolCall 事件携带全局序号 `index`（`r{轮次}-{序号}`）/`arguments`/`output`；对话流内联渲染技能调用条目（新组件 `ToolCallEntry`：执行中旋转图标 / 完成绿色对勾），点击展开详情面板查看入参与执行输出并支持复制；移除底部工具执行状态条
+  - 修复工具调用后二次请求非流式：前端新增分帧打字机（`deltaQueue` + 16ms 帧 / 12 字符步长，`pushDelta`/`flushStreaming`），`streamingMsg` 独立占位消息渲染于技能条目之后，`done` 后刷新数据库内容；`onUnmounted` 清理定时器
+  - 会话列表高度优化（`ChatConversationList`）：删除图标改为绝对定位（hover 显示不再拉长行高），行高略增 `py-2.5`
+  - 全局返回顶部按钮（`BackToTop`）只响应外部容器：新增 `data-inner-scroll` 标记过滤，AI 聊天消息列表等内部滚动容器不再触发右下角返回按钮（此前会遮挡输入区发送按钮）；路由切换后的滚动位置恢复检测同步跳过内部容器
+  - 修复日志工具只打印一半：`agent.rs` 的 `read_tail` / `read_launcher_logs` 原实现「先按字符截断、再取末尾行」，因 `truncate_chars` 保留的是行首，最终拿到的是日志**中间一段**；改为「先取末尾 N 行、再截断字符」，AI 读取游戏/启动器日志现在能看到真正的最新内容
+  - 修复工具调用前的回复文本丢失与非流式：后端将 `chat_send` / `regenerate_reply` / `edit_message` 三处重复的工具循环统一抽取为 `run_tool_loop`（`manager.rs`），回复文本跨轮累积（原实现每轮覆盖，工具轮之前的文本丢失）、工具调用状态统一推送（原 regenerate/edit 不推送）、`done` 事件仅在全部轮次结束后推送一次并携带 usage 合计（原实现每轮流结束都推送，前端提前清空流式状态导致第二轮一次性渲染）；前端流式占位消息、工具调用条目与持久化消息在工具轮次间不再中断
+  - 复制菜单交互补齐：`ChatMessageItem` 复制方式弹窗接入公共 `click-outside.ts`（`onClickOutside` + `onEscape`），点击菜单外部或按 ESC 即可关闭，无需必须选择一项
+  - AI 工具链改为消息列表内、AI 回复消息框上方展示：极简收起条（默认收起），展开后以虚线时间线串联各工具调用（样式参考更新日志 ReleaseTimeline），每个节点展示工具名/状态（执行中/完成），点击展开入参与执行输出、支持复制；`done` 后工具链保留展示，由发送/重新生成/编辑/切换会话时统一清空
+  - AI 工具链持久化入库（SQLite `tool_calls` 表）：工具调用记录随 AI 回复消息落库（新增 `list_tool_calls` IPC），前端按消息 id 分组加载，每条 AI 回复消息上方独立展示其工具链——刷新页面/重启应用后工具链仍保留，不再只存在于当前内存；删除消息/编辑重生成/清空/删除会话时级联清理对应工具链
+  - 会话切换动画：消息区域切换会话时旧内容淡出、新内容淡入（`Transition` + 会话 id key），会话列表项新建/删除/切换时平滑移动与淡入淡出（`TransitionGroup` 增删/补位过渡）
+  - AI 工具链展开动画：时间线整体淡入下滑、工具节点逐个入场（右侧移入）、节点详情展开淡入下滑，展开/收起不再生硬
+  - 复制弹窗改版：消息复制由下拉菜单改为独立弹窗 `CopyMessageDialog`，使用项目统一组件风格——Input 只读文本域预览渲染后纯文本、AlertV2 提示复制格式、Button（outline/primary）选择复制「Markdown 原文」或「渲染后文本」，点击遮罩外部或 ESC 关闭
+  - 最终消息只显示最后输出：后端 `run_tool_loop` 的 `reply` 改为保留最后一轮文本（工具前的过渡语句如「我来读取…」不再混入最终消息），前端在首个工具开始调用时清空已流式显示的过渡文本；工具调用过程由消息上方的工具链完整呈现
+  - 修复上下文按钮报「未知上下文类型」：崩溃日志/游戏日志按钮的 kind 与后端 `collect_context` 匹配项统一（`crash_report` / `game_logs`），选择游戏版本后不再报错
+  - 输出摘要标签（不额外消耗一次请求）：`AiConfig` 新增 `summary_tags` 开关（「AI 设置」新增配置项）；开启后聊天系统提示词要求模型在最终回复末尾自带 ≤15 字内容标签（`【TAG:xxx】`），后端 `extract_summary_tag` 剥离后存入 `messages` 表新增 `summary_tag` 列；前端对话目录概览（TOC）悬浮于消息区右侧（复用 `ToolToc`，新增 `minItems` 配置），展示各条 AI 回复的摘要标签，点击快捷跳转对应消息
+  - 思考模型（如 DeepSeek-R1）思维链支持：`stream.rs` 解析 `delta.reasoning_content` 并通过 `reasoning` 事件流式推送；`ChatTurn` / `ChatResult` 新增 `reasoning_content`；涉及工具调用的轮次完整回传 `reasoning_content`（官方要求，否则 400）；前端 AI 消息内新增可折叠「深度思考」区块（流式生成时自动展开，完成后可折叠），思考内容随消息持久化到 `messages` 表新增 `reasoning_content` 列
+  - 工具链展示调用前模型输出：`run_tool_loop` 将每轮模型调用工具前的过渡文本保存为 `pre_content`（`tool_calls` 表新增列），工具 `running` 事件携带 `preContent` 实时展示，持久化后刷新/重启仍保留
+  - 修复对话目录 TOC 残留：`ToolToc` 除 `refreshKey` 外新增 `MutationObserver` 监听容器内 `[data-toc-card]` 的新增/移除/标题变更自动重扫——此前删除/切换会话时重扫发生在 `out-in` 淡出动画期间（旧卡片尚未移除），过渡结束后无再次扫描导致 TOC 残留旧条目；现在删除/切换/清空/流式完成后均实时同步（发送消息本就有 `refreshKey` 触发，不受影响）
+  - 模型图标改用官方 `@lobehub/icons-static-svg` 静态映射库：删除 `utils/lobe-model-icons.ts`（57 品牌 path 数据），新增 `utils/model-brand-icons.ts`（54 品牌静态 import 官方 SVG，统一使用单色 mono 变体——纯 `currentColor` 填充、无渐变/defs，避免 WebView 中 `<img>` 渲染渐变失效显示为实心黑块），`ModelIcon.vue` 由 svg path 渲染改为 `<img :src>`；品牌识别修正：GLM 系列改用智谱现行品牌 `Zhipu`（`zhipu.svg`，替代旧版 ChatGLM 图标）、Qwen 使用官方单色 `qwen.svg`；`vite.config.ts` 的 `assetFileNames` 将 `@lobehub/icons-static-svg` 资源统一输出到 `dist/assets/@lobehub/` 目录；依赖由 `@lobehub/icons`（path 数据）改为 `@lobehub/icons-static-svg`
+  - 品牌识别规则扩展（`model-icon.ts`）：修正 `qwen3.6-*`（`\bqwen[\d.-]*`）、`hy3/hy3-preview`（腾讯混元 `\bhy[-\d]`）、`nana-banana`（Google nano-banana 代号 → Gemini）；新增 `ling-*`（蚂蚁百灵 → Bailian）、`mimo/xiaomi`（小米 → XiaomiMiMo）、`laguna`（Poolside）；`MiniCPM` 与 `north-*` 因 lobehub 无专属官方图标，按用户指定复用 `HuggingFace.Color` 多色图标（硬编码色、非渐变，渲染无兼容问题）
+  - 对话目录（TOC）改用用户消息内容：`data-toc-card` 由 AI 回复消息改挂用户消息，标题取用户消息纯文本前 15 字，点击仍跳转对应消息——据此移除 `summary_tags` 全链路（后端 `AiConfig.summary_tags` / INI key / `chat_system_prompt` 摘要指令 / `extract_summary_tag` / `messages.summary_tag` 列由声明式迁移自动删除；前端「输出摘要标签」设置开关 / `summaryTags` 字段 / 消息内标签展示块），会话目录不再依赖模型生成摘要
+  - 深度思考完成后自动折叠：`ChatMessageItem` 的「深度思考」区块流式生成时自动展开，`streaming` 结束（false）时自动折叠；历史消息默认折叠，可点击手动展开
+  - 模型图标双模式（彩色 / 黑白）：`AiConfig` 新增 `icon_color_mode`（默认彩色，AI 设置页新增「模型图标」下拉），全局响应式 `utils/model-icon-mode.ts` 保存后即时生效；`model-brand-icons.ts` 重建为双变体映射库（mono 经 `?url` 打包到 `dist/assets/@lobehub/` 以 `<img>` 渲染；color 经 `?raw` 内联注入——部分品牌彩色图含 SVG 渐变，`<img>` 渲染会失效显示黑块，故彩色必须真实 DOM 渲染）；无官方彩色变体的品牌（anthropic/grok/xiaomimimo/midjourney/openai/groq/lmstudio/ollama/cursor）彩色模式自动退回单色；未识别到品牌的模型统一兜底 HuggingFace 图标（移除 MiniCPM/north 的单独映射，兜底行为一致）
+  - 对话渲染容错（`markdown.ts` 预处理，仅非代码块区域）：① 修复模型把整张表格挤在一行导致 GFM 表格错乱——按分隔单元格重建为多行表格；② 修复 `** xxx **` 星号内侧带空格导致加粗不生效——收紧为 `**xxx**`；围栏代码块内容原样保留
+  - 修复工具参数解析误报：`ask_user` 曾出现入参含 `question` 仍报「缺少 question 参数」——模型输出的 `arguments` 非严格 JSON（带换行/夹杂文本）时 `from_str` 直接失败；新增 `parse_tool_arguments` 逐级容错（直接解析 → 截取首个 `{` 至末个 `}` 再解析 → 字符串结果二次解析防双重编码），所有工具调用共用
+  - 消息固定展示回复模型：`messages` 表新增 `model` 列（声明式迁移自动加列），AI 回复入库时记录实际调用模型；前端 `ChatMessageItem` 图标与模型名优先取 `message.model`（切换右上角全局模型后历史消息图标不再随之变化），流式消息创建时即记录当前模型；消息 hover 操作栏新增发出/回复时间显示（`formatTimestamp`，本地消息时间统一为 Unix 秒与后端一致）
+  - 消息信息展示改版（tag 化）：模型名由图标下方小字改为消息气泡右下角灰色 tag（`model` 优先消息记录、兜底当前模型）；AI 消息 hover 时间移到操作栏按钮右侧（用户消息仍在按钮左侧）；未识别模型的兜底 HuggingFace 图标保持不变；模型 tag 仅在最终正文存在时显示（纯思考/纯工具调用消息不显示，避免空正文下标签突兀）
+  - 重新生成「第 N 次重试」标识：`messages` 表新增 `retry_count` 列（声明式迁移自动加列，默认 1），重新生成回复时读取旧回复序号 +1 写入；AI 消息气泡右上角以 amber tag 显示「第 N 次重试」（序号 >1 时），流式占位消息在重新生成时即带正确序号
+  - 修复 Kimi 图标彩色模式不可见：`kimi-color.svg` 主体为 `fill="#fff"` 白色（浅色气泡背景上看不清），从彩色映射中移除，彩色模式下回退单色渲染
+  - 会话列表支持图标折叠：`ChatConversationList` 头部新增收起/展开图标按钮（双左箭头收起为窄条、双右箭头恢复），收起后仅保留窄条节省消息内容区空间，折叠状态本地保持
+  - 聊天页原生 tooltip 全面替换为项目 `Tooltip.vue` 组件：`ChatMessageItem` 消息操作栏 4 个按钮（删除/重新生成/复制/编辑）、`ChatConversationList` 删除会话与折叠按钮、`ExperimentalChat` 上下文进度条与发送按钮；`ChatHeader`/`AskUserDialog`/`ToolCallEntry`/`CopyMessageDialog`/`VersionPickerDialog` 经扫描确认无原生 `title`（`ChatHeader` 标题、TOC `data-toc-title`、`VersionPickerDialog` 弹窗标题均为 props/数据属性，非 tooltip）
+  - Markdown 行内图标兼容 `[::名称]` 双冒号格式：`markdown.ts` inline 扩展正则同时匹配 `[:icon:名称]` 与 `[::名称]`（如 `[::game]`），均映射 `utils/md-icons.ts` 同名图标渲染为行内 SVG；同步更新 `resources/prompts/chat.md` 图标占位符说明并新增「自我介绍」段（首次交互/询问身份时输出 `[::game] 你好，我是 MoLaunch 启动器的智能助手，专门帮助你处理与 Minecraft 相关的各种问题。`）
+  - 流式回复可打断：`AppState` 新增 `chat_cancel_flag`（AtomicBool 取消信号），`chat_completions_stream` 新增 `cancelled` 参数——请求发出前与流式循环内均检查，检测到取消立即中断并返回已生成部分内容（丢弃不完整的工具调用）；`manager.rs` 新增 `cancel_chat` action 置位信号，`chat_send`/`regenerate_reply`/`edit_message` 发起前重置；前端发送按钮在模型回复期间切换为暂停图标（`PauseIcon`），点击调用 `experimentalCancelChat`，已生成部分保留入库，取消后空回复显示「（已停止生成）」
+  - 全局拖拽遮蔽层极简重写：`DragOverlay.vue` 移除按拖拽类型区分的彩色卡片，改为全屏半透明蒙层 + 四周白色虚线边框 + 居中上传图标与提示文案（`pointer-events-none` 不拦截拖放事件）
+  - 全局拖拽遮蔽层二次修复（本轮）：`dragState` 新增 `status` 字段（`accept`/`pending`/`reject`，由 `classifyDrag` 设置），虚线边框颜色作为检测指示：可拖入浅绿（`emerald-300`）/ 待分析（zip、空路径）浅黄（`yellow-300`）/ 确定不支持（rar、未知类型、含非 Mod 多文件）红（`red-400`）；背景由 `bg-black/25` 加强为 `bg-black/45 + backdrop-blur-md`，遮蔽罩下方内容不可透见
+  - 全局拖拽遮蔽层定位修正（本轮）：不再使用 `fixed inset-0 + z-index 压层级` 的方式，改为将 `<DragOverlay />` 挂载到 App.vue 内容容器 `div.relative.h-full`（nav 下方）内，组件内部 `absolute inset-0 z-50` 铺满所在容器——从布局上物理限制在内容区，顶部虚线不再穿到 nav 区域；`App.vue` 顶层挂载点移除，DragOverlay 组件去掉 Teleport
+  - 聊天图标占位符收敛：`resources/prompts/chat.md` 新增固定图标映射表（game/mod/server/check/warn/error/info/download/tip/search 共 10 个，均为 `md-icons.ts` 既有图标），明确「只能从表中选择、严禁自创名称、正文外禁止使用」；「自我介绍」段原文移除反引号包裹（模型会连同反引号一起输出导致渲染成代码块、`[::game]` 显示为字面文本），改为直接书写占位符
+  - 图标渲染改「引入」而非硬编码：`md-icons.ts` 移除手工转录的 SVG path 数据，改为从 `@heroicons/vue/24/outline` import 各图标组件建立映射，新增 `mdIconComponent(name)` 返回组件、`mountMdIcons(root)` 把 v-html 中的 `.md-icon[data-md-icon]` 占位符替换为 heroicons Vue 组件；`markdown.ts` inline 扩展渲染器改为输出占位符，`ChatMessageItem` 在内容更新后调用 `mountMdIcons`（遵守「必须通过引入使用图标组件、不在 ts 硬编码」的组件规则）
+  - 图标渲染修复（本轮）：`markdown.ts` inline 扩展全面兼容模型输出的各种占位符变体——`[::名称]` 双冒号、`[:icon:名称]`、`[:名称]` 单冒号、`[名称]` 无冒号，均替换为图标；**仅当名称命中已知图标表时才替换**（普通文本如 `[注]`、markdown 链接 `[text](url)` 经负向前瞻排除、行内代码/代码块不生效），未知名一律原文保留；占位符改由 class 携带名称（`md-icon-名称`）而非 data 属性，避免被 DOMPurify 剥离；`ChatMessageItem` 由「watch content + nextTick」改为 **MutationObserver 监听 markdown 容器**，初始渲染（历史消息）、流式追加、消息替换均会挂载图标，已挂载的跳过
+  - 图标渲染兜底（本轮）：模型实际输出常漏写闭合括号（如 `[::game 你好...`），原正则要求 `]` 闭合导致整体未识别、占位符原样显示。tokenizer 改为**闭合括号可选**（`\]?`），前缀 `[:icon:`/`[::`/`[:` 均可选；负向前瞻 `(?!\]?\()` 放在 `\]?` 之前并用 `\]?\(` 断言，防止正则回溯破坏 `[game](url)` 形式链接（链接文本为图标名时仍保持链接）。实测 18 用例全通过：各种格式闭合/漏写均正确渲染图标，未知名、中文、行内代码、链接不受影响。同步强化 `chat.md` 自我介绍为「必须一字不差原样输出」
+  - 提示词节省 token：`resources/prompts/chat.md` 新增规则——思考内容（reasoning_content）、工具调用说明、分析推理、中间草稿一律使用英文编写，仅最终面向用户的回复正文使用中文；图标格式强调必须使用 `[::名称]` 双冒号格式（不能省略冒号）
+  - 生成统计显示：`useAiChat` 记录本次回复开始时间，done 事件按 `totalTokens / 耗时` 计算生成速度 `chatSpeed`（t/s）；`ExperimentalChat` 输入区上下文进度条旁显示 `xxxx t · xx t/s`（`formatTokens` 过千转 k，如 `1.2k t · 45 t/s`），仅在有 usage 数据时显示
+  - 修复流式输出丢字符（本轮，抓包实证）：用户抓包确认后端 SSE 原始流完整（`[::game]`、`MoLaunch`、「问题」均在），但前端最终显示缺 `]`、丢「Mo」与「问题」。根因锁定 `ai_core/client/stream.rs` 的流式循环：`stream.chunk()` 返回任意字节块，SSE 的 `data:` 行可能被 chunk 边界**切断**——被切断的不完整 JSON `from_str` 解析失败被 `continue` 丢弃，而紧随其后的续行因无 `data:` 前缀被整体跳过，导致丢字符与丢词。重写为**主缓冲 + 按 `\n` 切完整行**处理（`handle_line` 闭包统一解析单行、尾部残留留待下 chunk），流自然结束处理残留行、取消时返回不完整调用；`[DONE]`/finish 均走统一返回路径
+  - token/耗时口径重构（本轮）：`messages` 表新增 `prompt_tokens`/`completion_tokens`/`total_tokens`/`duration_ms` 四列（声明式迁移自动加列）；`MessageItem` 新增对应字段。token 全部采用**后端流式 usage 累计**（`run_tool_loop` 各轮 `on_done` 累积，含全部工具调用轮次的 prompt+completion，不再用前端估算）；`duration_ms` 为**总生成耗时**（从首个请求发出到全部工具轮次结束，含工具调用与 ask_user 等待，与中转站口径一致）；三入口（chat_send/regenerate_reply/edit_message）用户消息零值落库、AI 消息写入真实 usage 与耗时，`done` 事件携带 `durationMs`
+  - 生成统计移至消息框（本轮）：`ChatMessageItem` AI 消息气泡右下角模型 id 左侧新增 token 统计 tag（显示**输出 token**，单位用全额 `token`，如 `133 token · 33 t/s`，过千转 k，tabular-nums；速度 = 输出 token ÷ 总耗时，与中转站口径一致）；优先读历史持久化字段（`completionTokens` + `durationMs`），流式占位消息经 `liveSpeed`/`liveCompletion` props 用 done 事件实时值；`ExperimentalChat` 输入区原统计显示移除
+  - 链接二次确认（本轮）：`markdown.ts` 的 `handleMarkdownLinkClick` 拦截外部链接后先 `showConfirmAsync` 弹确认框（展示目标 URL），确认后才经 Tauri shell 打开系统浏览器，防止 AI 输出夹带外链被误点
+  - AI 提问工具重做（本轮）：`ask_user` 选项由纯字符串扩展为 `{label, description?}`（后端 `agent.rs` 归一化：兼容纯字符串与对象，最多 6 项）；`AiAskUserEvent`/`AskUserOption` 类型同步；前端 `AskUserDialog.vue` 由全屏遮挡弹窗改为**右下角悬浮卡片**（非阻断式，不遮挡全局、可继续操作页面其他区域），选项以按钮列表展示、备注文字置于选项下方，保留自定义答案输入
+  - 会话列表拖拽与 hover 展开（本轮）：`ChatConversationList` 支持**拖动右侧手柄自由调宽**（160~360px，宽度持久化 localStorage，拖拽时禁用文本选择）；收起为窄条后**鼠标移入自动展开、移出自动收起**（`mouseenter`/`mouseleave` 控制 hover 态，宽度过渡平滑）；标题正常省略（`truncate`），悬停经 `Tooltip` 展示完整标题（class 透传 `min-w-0 flex-1` 保持省略生效）；`ChatHeader` 顶部会话标题改为 `flex-1` 自适应最宽并省略（原固定 `max-w-40`）
+  - 重试 tag 与「深度思考」同行（本轮）：`ChatMessageItem` 顶部元信息行合并为同一行 flex 布局——左侧「深度思考」切换按钮、右侧「第 N 次重试」amber tag（`ml-auto` 靠右）；无思考内容时 tag 单独显示，避免「第 N 次重试」独占一行
+  - 深度思考收起间距修正（本轮）：虚线边框区块改为仅展开时渲染（`v-if="message.reasoningContent && thinkingOpen"`）——收起时不再残留空的 `border-b + pb` 区块把按钮行与正文撑远；顶部元信息行与虚线间距统一收紧为 `mb-1.5`，虚线只作展开时思考内容与正文的分隔
+  - 上下文进度条改真实 usage 口径（本轮）：`tokenEstimate` 不再用纯字符估算（原实现只统计各消息 `content`，不含思考内容/系统提示词/工具定义/工具调用轮次，数值远低于真实输入）；改为**取最新一条 AI 消息的 `promptTokens`（usage，即最近一次请求实际发送给模型的完整输入 token，含全部上下文开销）**，其后未回复的用户消息补估算，无 usage 时（新会话/旧数据）退化为前端估算并计入 `reasoningContent`——进度条反映真实上下文窗口占用
+  - 会话压缩同口径校准（本轮）：后端 `compress_context` 不再按字符估算触发（与前端同因，会压缩过晚导致请求超长被服务拒绝）；新增 `estimate_context_usage`（与前端 `tokenEstimate` 口径一致：最新 AI 消息的 `prompt_tokens` + 其后消息估算，无 usage 退化为全量估算并计入思考内容），三个入口（chat_send / regenerate_reply / edit_message）压缩判断均以该真实占用为基准
+  - 上下文进度条展示优化（本轮）：`formatTokens` 整数千位显示 `184k`（原 `184.0k`）；进度条加宽（`w-24`→`w-28`）并显示 `已用 / 上限` 双值（如 `1.9k / 184k`，tabular-nums 等宽），tooltip 补充百分比（`上下文已用 X / Y token（Z%）`）
+  - AI 设置页交互补全（本轮）：进入页面**自动从服务端拉取模型列表**（配置了服务地址时，无需手动点击「加载模型」）；修复保存无提示——`aiSaveConfig` 返回 `Promise<void>`，safeCall 成功后结果为 `undefined`，原 `if (ok)` 恒为 false 导致「保存配置」成功也不弹 toast，改用 `ok !== undefined` 判断后正常提示「AI 配置已保存」
+  - 重试/编辑无实时流输出修复（本轮）：done 事件到达时若打字机队列（`deltaQueue`）尚未消费完，不再立即 `flushStreaming` 清空队列，而是置 `donePending` 标记、等 `typeNextFrame` 把队列逐字消费完后再统一收尾（清占位 + `refreshMessages`）——此前短回复 + 密集流下 delta 与 done 同批到达时队列被清空、正文只能靠刷新一次性渲染（表现为「点击重试等全部响应完才一口气输出」）；同时 `flushStreaming` 统一重置 `donePending` 防状态残留
+  - 流式消息图标不挂载修复（本轮）：`ChatMessageItem` 的 MutationObserver 改为在 `content` 首次非空后再绑定（`watch content + flush: 'post'` 兜底），流式占位消息挂载时内容为空、markdown 容器尚未渲染，此前 observer 未绑定导致流式追加的 `[::名称]` 图标占位符不替换（重试后正文图标缺失）
+- AI 聊天增强 v2（`docs/AI_CHAT_ENHANCEMENT_V2_DESIGN.md`，本批）：
+  - 思考模式控制：后端 `ChatCompletionsRequest` 新增 `reasoning_effort`（low/medium/high）透传（`stream.rs`/`chat.rs` 请求构造同步补齐）；`run_tool_loop` 与 `chat_send`/`regenerate_reply`/`edit_message` 三处 IPC 透传 `reasoningEffort`；前端新增公共组件 `Slider.vue`（原生 range 封装 + primary 配色 + 档位 marks），`ChatHeader` 新增「思考开关」（`Checkbox`）+ 思考程度滑块（低/中/高，开关关闭时滑块禁用），`useAiChat` 新增 `enableReasoning`/`reasoningLevel`，三个 API 调用按开关状态传参
+  - 工作状态提示条：`useAiChat` 新增 `waitingNext`（loading 且占位无正文/无思考/无工具 →「正在进行下一步…」）与 `waitingAsk`（ask_user 提问中 →「等待你的回答：…」），`ExperimentalChat` 消息区底部以 spinner + 文案胶囊展示——解决 ask_user 最长 120s 等待期间"卡住没动弹"的感知问题
+  - 工具链实时展开：`ToolCallEntry` 新增 `autoExpand` prop，流式区（进行中）自动展开实时看各工具 running→done，完成（streamingMsg 清空）自然收起，与深度思考交互一致
+  - 自动滚动优化：`useAiChat` 维护 `scrolledUp` 状态（滚动容器 `scroll` 差值 >64px 视为用户上滑），内容变化仅在未上滑时自动滚底；发送/重试/编辑/切换会话重置；不再打断用户上滑
+  - 日志分析 AI 模式：后端新增 `ai_analyze_log` IPC 与独立事件 `ai-analyze-stream`（delta 逐行推送 / `【STEP:N/5】` 标记 → step 事件 / done 携带全文）；新增提示词模板 `resources/prompts/log_analyze_steps.md`（`PromptKind::LogAnalyzeSteps`，5 环节输出要求）；前端新建 `AiLogAnalyzer.vue`（模型下拉 + 日志粘贴 + 复用 `StepProgressBar` 5 环节进度 + 流式 Markdown 结论 + `mountMdIcons` 图标），`ExperimentalLog.vue` 顶部 `SegmentedButtons` 切换「本地检测引擎 / AI 分析」
+  - AskUserDialog 重新设计：primary 渐变头部 + 「需要你的确认」标题 + 关闭 X；选项改为「点选 + 底部提交」卡片（选中态 primary 边框/背景 + CheckCircleIcon，label + description 灰字备注）；底部自定义答案 `Input` + 取消/提交 `Button`（无选择且无输入时禁用）；进入动画 opacity + translate-y
+  - 进度条扫光动画：`main.css` 新增 `@keyframes progress-sweep` 与 `.progress-sweep`（2.5s 从左到右慢扫渐变光带）；token 进度条与 `StepProgressBar`（`sweep` prop，默认关闭不影响既有使用方）叠加扫光层
+  - 思考设置改为悬浮窗（本轮调整）：`ChatHeader` 不再内联摆放思考开关 + 滑块，改为**设置图标（AdjustmentsHorizontalIcon，开启时 primary 高亮）+ 锚定悬浮窗**——点击图标在图标下方弹出「思考设置」小卡片（非全局 Modal，`teleport to body` + fixed 定位 + 点击外部/内部关闭），内为「思考模式」Checkbox 与「思考程度」Slider（低/中/高，关闭时禁用）；沿用现有 `enableReasoning` / `reasoningLevel` props/emits，接口不变
+  - 进度条流星效果（本轮调整）：`.progress-sweep` 由白色慢扫光带改为 **Codex 风格紫色流星**——头部亮紫（`#c4b5fd`）渐隐到透明尾巴 + 紫色光晕（双层 box-shadow），2s 线性从左到右往复扫过（token 进度条与日志分析进度条同步生效）
+  - 日志分析两级流水线（本轮）：`ExperimentalLog` 移除「本地 / AI」二选一切换，改为**两级流水线**——第一级 `CrashAnalyzer`（本地规则引擎初检，粘贴日志 → 识别问题范围条目），结果区新增「用 AI 深度分析」按钮（emit `ai-followup`）；第二级 `AiLogAnalyzer`（接收本地初检后传回的日志文本自动发起分析，`externalLogText` prop + `consumed` 事件，后端 `localAnalyze=true` 注入预检范围，避免超长全文直发模型）；`ai_analyze_log` 后端新增 `local_analyze` 参数，用 `analyze_log_text` 预检后把「本地初检结果摘要 + 截断原文」作为用户上下文注入
+  - AI 工具本地预检与行范围（本轮）：`crash_analyzer.rs` 提取纯函数 `analyze_log_text`（无 state，供命令与 AI 工具复用）；agent 工具增强——`read_game_logs` / `read_crash_report` 新增 `startLine` / `endLine`（按行范围精确定位，从 1 起）与 `localAnalyze`（true 时本地引擎先初检返回问题范围摘要，省 token）；新增 `analyze_crash_log` 工具（读最新崩溃报告 → 本地预检 → 返回分类/级别/关键行/建议范围摘要）与 `read_log_lines` 工具（读 logs/latest.log 指定行段）——AI 拿到预检范围后若发现缺关键日志，可自行调用行范围工具补读上下文
+- 验证：`cargo check`（0 error）、`vue-tsc --noEmit`（0 error）、`eslint`（0 error，warning 为既有 v-html 提示）、`vite build`（0 error，`dist/assets/@lobehub/` 54 个 mono 图标）
+
+### 新增
+
+- `src/components/about/MoLaunchIntro.vue`：重写「MoLaunch 实现原理」文案（约 300 字），补充多版本隔离与 Java 自动下载能力说明，精简联机/账号细节
+
+### 合规
+
+#### PCL2 许可合规重构（重度使用 5 条义务落实）
+
+- 背景：依据 `docs/PCL2_LICENSE_COMPLIANCE.md`（2026-08-05 全项目分域复刻审计），本项目开发初期参考并移植了 PCL2 部分代码/数据/文案，依《PCL 分发有限许可》与《PCL 存储库合理使用指南》判定为「重度使用」，需落实 5 条义务并消除逐字复刻证据
+- 改动：
+  - `src-tauri/src/minecraft/launcher_profiles.rs`：魔数常量改为 `rand` 运行时随机生成（`AUTH_ACCOUNT_ID` Lazy 静态，`random_hex_id`），删除 `LoginType::Nide` 变体（对应 §6.3 处置）
+  - `src-tauri/src/minecraft/auth/types.rs`：同步删除 `Nide` 变体
+  - 崩溃分析器架构重写（对应 §5/§6.2，全项目最高风险项）：
+    - 原「crit1 → stack → crit3」三级顺序短路结构已废弃，重构为「Collect → Detect → Score」：多路独立检测器并行提取证据（`detector.rs` / `detector_stack.rs`），评分器按置信度聚合产出结论（`scorer.rs`）
+    - 规则改为声明式数据表（`rules.rs` 的 `KEYWORD_RULES`），与检测逻辑解耦；新增规则只需追加条目，无需改动流程代码
+    - 原 `crit1/`、`crit3.rs`、`stack.rs` 已删除；`CrashInfo` / `CrashCategory` 与 `scheduler.rs` 调用点、`analyze_crash` 签名保持不变
+    - 识别率等价：规则关键字集合与原逻辑逐项对照覆盖（运行时日志 13 条 + 崩溃报告 4 条 + hs_err 5 条 + 宽松规则 7 条 + 堆栈提取），行为差异仅在多证据并列时改为"置信度高者胜"（如崩溃报告含 F3+C 手动崩溃时按证据可信度择优），中文文案沿用批 2 原创版
+    - 注：§5.1 建议的 `rules.toml` 未采用——项目无 `toml` crate 依赖，为避免新增依赖，规则表以 Rust 声明式常量承载（同为"规则即数据"形态）
+  - `src/components/common/CrashDialog.vue`：标题改为「游戏启动阶段出错」，三按钮改为「查看报告 / 导出报告 / 关闭」，移除 MyMsgText 注释引用（对应 §6.6）
+  - `src-tauri/src/minecraft/community/curseforge/fingerprint.rs`：清除 VB 伪代码注释，改为自述步骤
+  - `src-tauri/src/minecraft/community/searcher/sort.rs`：排序权重表与 `score` 逻辑改为平台量纲补偿自定策略（对应 §6.4）
+  - `src-tauri/src/minecraft/launch/jvm_args/build.rs`、`loaders/forge_installer.rs`、`resources.rs`：JLW/LUA/JavaWrapper 相关代码补充来源注释，改为指向第三方开源项目官方仓库（Java Launch Wrapper：MIT，https://github.com/00ll00/java_launch_wrapper；lwjgl-unsafe-agent：Apache-2.0，https://github.com/HMCL-dev/lwjgl-unsafe-agent），属性名与二进制内部契约对齐
+  - `src-tauri/resources/about/licenses.txt`：新增 Java Launch Wrapper（MIT）与 lwjgl-unsafe-agent（Apache-2.0）两条第三方开源许可声明
+  - 删除 `docs/JLW_LUA_REFACTOR_PLAN.md`：两个 jar 均为有官方仓库的独立开源项目，作为第三方依赖引入即可，无需自研替换
+  - `src-tauri/src/commands/version/mods/metadata/sources.rs`：移除注释中对 PCL `LocalResourceFile.LoadMetadataFromJar` 的方法名引用，改为「依据各加载器官方文件格式规范」
+  - `src-tauri/src/minecraft/community/curseforge/convert.rs`：CF 依赖排除 ID（306612/634179）提取为具名常量 `CF_EXCLUDED_DEPENDENCY_IDS`
+  - `src-tauri/src/minecraft/community/searcher/aggregate.rs`：`PAGE_SIZE=40` 补充取值依据注释（CF 单页上限 50 / Modrinth 100，取保守值）
+  - `src-tauri/src/commands/community/install/modpack_stages/parsers/curseforge.rs`、`modrinth.rs`：Quilt 排除与 Forge recommended 特判补充「本项目功能性决策」理由注释
+  - `src-tauri/resources/about/acknowledgements.txt`：特别鸣谢新增 Plain Craft Launcher 2 (PCL2) 条目（置于 MoCDN 之后），表达开发初期的启发致谢；logo 使用 `PCL2.ico`，作者头像使用 `LTCatt.jpg`（均位于 `src/assets/AboutIcon/`）
+  - `src/views/settings/more/CreditsTab.vue`：「关于 PCL2」段落改为中性简述（保留独立第三方声明与许可链接），致谢移入鸣谢列表；logo 缺省时新增首字占位
+- 复用点：`rand` crate（Cargo.toml 已有依赖）、`once_cell::sync::Lazy`（已有）
+- 验证：`cargo check`（0 error）、`vue-tsc --noEmit`（0 error）、`eslint`（0 error）
+
+### 新增
+
 #### AI 分析模块（本地 OpenAI 兼容服务，全息化设计）
 
 - 背景：引入 AI 模型分析逻辑，目前仅提供本地分析服务；AI 后续不只用于日志分析，因此设计为通用模块
