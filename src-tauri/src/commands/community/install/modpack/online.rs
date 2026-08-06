@@ -41,6 +41,8 @@ pub async fn install_modpack(
     let instance_dir = game_dir.join("versions").join(&req.instance_name);
     std::fs::create_dir_all(&instance_dir).map_err(|e| format!("创建整合包目录失败: {}", e))?;
 
+    // zip 下载目标（提到 async block 外，便于安装成功后删除）
+    let archive_path = instance_dir.join(&req.file_name);
     let instance_dir_ref = &instance_dir;
     let result: Result<InstallModpackResult, String> = async {
         // 2. 重置 download_state，设置整合包专用 stages
@@ -62,7 +64,6 @@ pub async fn install_modpack(
             .store(false, std::sync::atomic::Ordering::Relaxed);
 
         // 3. Stage 0：下载原始整合包
-        let archive_path = instance_dir_ref.join(&req.file_name);
         download_modpack_archive(state, &archive_path, &req.download_url, &req.file_name).await?;
 
         // 4. Stage 1：打开 zip + 检测格式 + 解析 manifest
@@ -195,11 +196,28 @@ pub async fn install_modpack(
     .await;
 
     // 错误时重置 download_state + 清理版本目录（带 saves/versions 保护）
-    if let Err(e) = result {
-        let mut ds = state.download_state.lock().unwrap();
-        ds.mark_failed(0);
-        super::super::helpers::cleanup_version_dir_on_failure(&instance_dir);
-        return Err(e);
-    }
+    let result = match result {
+        Err(e) => {
+            let mut ds = state.download_state.lock().unwrap();
+            ds.mark_failed(0);
+            super::super::helpers::cleanup_version_dir_on_failure(&instance_dir);
+            return Err(e);
+        }
+        Ok(mut ok) => {
+            // 整合包安装成功后删除下载的原始 zip（本程序落地的临时文件，避免残留在实例目录）。
+            // 此处 async block 已结束、zip 文件句柄已释放，避免 Windows 上因文件占用删除失败。
+            match std::fs::remove_file(&archive_path) {
+                Ok(()) => log_info!("[Community] 已删除整合包 zip: {}", archive_path.display()),
+                Err(e) => crate::log_warn!(
+                    "[Community] 删除整合包 zip 失败（不影响安装结果）: {} ({})",
+                    archive_path.display(),
+                    e
+                ),
+            }
+            // 文件已删除，archive_path 不再指向有效路径，清空避免误导调用方
+            ok.archive_path = String::new();
+            Ok(ok)
+        }
+    };
     result
 }
