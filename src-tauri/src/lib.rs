@@ -14,6 +14,7 @@ pub mod minecraft;
 pub mod res_scheme;
 pub mod resources;
 pub mod sdk;
+pub mod splash;
 pub mod state;
 pub mod storage;
 pub mod tray;
@@ -203,6 +204,8 @@ pub fn run() {
             commands::frp::frp_manager,
             // 托盘退出命令（前端完成联机退房等清理后调用，后端再统一清理 frpc/TUN 后退出）
             tray::request_exit,
+            // 开屏动画命令（前端 Vue 就绪 / 开屏动画播完后调用，关闭开屏窗口并显示主窗口）
+            splash::frontend_ready,
         ])
         .on_window_event(|window, event| {
             // 仅拦截主窗口的关闭请求；picker:// 等子窗口关闭时直接放行（正常销毁）
