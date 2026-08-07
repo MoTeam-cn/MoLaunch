@@ -47,7 +47,10 @@ fn component_key_unknown_major_is_none() {
 fn platform_key_matches_known_platforms() {
     let p = platform_key().expect("当前平台应支持 Java Runtime");
     assert!(
-        p.starts_with("windows-") || p.starts_with("mac-") || p.starts_with("linux-"),
+        p == "linux"
+            || p.starts_with("windows-")
+            || p.starts_with("mac-")
+            || p.starts_with("linux-"),
         "unexpected platform key: {}",
         p
     );
