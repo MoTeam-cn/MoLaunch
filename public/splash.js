@@ -37,21 +37,17 @@ document.addEventListener('DOMContentLoaded', () => {
     type()
   }, 1700)
 
-  // 进度条
+  // 进度条：动画最多走到 92%（留一小块余量），真正就绪时才补满
   setTimeout(() => {
-    const total = 2400, step = 30
+    const total = 2400, step = 30, MAX = 92
     let p = 0
     const tick = () => {
       p += step
-      const prog = Math.min((p / total) * 100, 100)
+      const prog = Math.min((p / total) * MAX, MAX)
       fill.style.width = prog + '%'
-      const idx = Math.min(Math.floor((prog / 100) * STATUS.length), STATUS.length - 1)
+      const idx = Math.min(Math.floor((prog / MAX) * (STATUS.length - 1)), STATUS.length - 2)
       status.textContent = STATUS[idx]
-      if (p < total) setTimeout(tick, step)
-      else {
-        status.textContent = '就绪'
-        status.classList.add('done')
-      }
+      if (prog < MAX) setTimeout(tick, step)
     }
     tick()
   }, 1900)
@@ -59,8 +55,16 @@ document.addEventListener('DOMContentLoaded', () => {
   // 副标语
   setTimeout(() => sub.classList.add('show'), 3200)
 
-  // Tauri 兜底：动画播完仍未收到前端就绪信号时，通知后端切换到主窗口
+  // 就绪补满：仅在真正切换窗口前调用，避免进度虚满后仍等待
+  const finish = () => {
+    fill.style.width = '100%'
+    status.textContent = '就绪'
+    status.classList.add('done')
+  }
+
+  // Tauri 兜底：动画播完仍未收到前端就绪信号时，补满进度并通知后端切换到主窗口
   setTimeout(async () => {
+    finish()
     try {
       const { invoke } = window.__TAURI?.core
       if (invoke) await invoke('frontend_ready')
