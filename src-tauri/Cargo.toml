@@ -22,7 +22,7 @@ tauri-build = { version = "2", features = [] }
 # 通过设置页按钮调出 devtools 用于排查问题，故 release 也需开启）
 # 安全约束：open_devtools() 后端 action 内部校验 is_developer_unlocked() &&
 # is_developer_mode()，普通用户无法触发
-tauri = { version = "2", features = ["devtools", "tray-icon", "image-ico"] }
+tauri = { version = "2", features = ["devtools", "tray-icon", "image-ico", "macos-private-api"] }
 tauri-plugin-shell = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
