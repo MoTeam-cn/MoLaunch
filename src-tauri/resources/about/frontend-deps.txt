@@ -18,10 +18,13 @@
 | Tauri Plugin Dialog | ^2.7.2 | https://v2.tauri.app/plugin/dialog/ | Tauri 对话框插件（文件/消息弹窗） |
 | Tauri Plugin Process | ^2.0.0 | https://v2.tauri.app/plugin/process/ | Tauri 进程管理插件（重启应用） |
 | Tauri Plugin Updater | ^2.0.0 | https://v2.tauri.app/plugin/updater/ | Tauri 自动更新插件 |
-| Heroicons Vue | ^2.2.0 | https://heroicons.com | Tailwind CSS 图标库 |
-| Tailwind CSS | ^3.4.1 | https://tailwindcss.com | 原子化 CSS 框架 |
+| Tauri Plugin Deep Link | ^2.4.9 | https://v2.tauri.app/plugin/deep-link/ | Tauri 深度链接插件 |
+| @heroicons/vue | ^2.2.0 | https://heroicons.com | Tailwind CSS 图标库 |
+| @lobehub/icons | ^5.15.0 | https://github.com/lobehub/lobe-icons | LobeHub React 图标组件 |
+| @lobehub/icons-static-svg | ^1.94.0 | https://github.com/lobehub/lobe-icons | LobeHub 静态 SVG 图标 |
+| dompurify | ^3.4.12 | https://github.com/cure53/DOMPurify | HTML 内容净化库 |
 | skinview3d | ^3.4.2 | https://github.com/bs-community/skinview3d | 3D 皮肤预览引擎 |
 | Vue Virtual Scroller | ^3.0.4 | https://github.com/Akryum/vue-virtual-scroller | 虚拟滚动列表 |
 | OpenLayers | ^10.9.0 | https://openlayers.org | 地图渲染引擎（种子地图瓦片/矢量图层/交互） |
-| marked | — | https://github.com/markedjs/marked | Markdown 解析库（嵌入资源，picker 子窗口 markdown 模板通过 res:// 协议加载 view/marked.min.js） |
+| marked | ^18.0.7 | https://github.com/markedjs/marked | Markdown 解析库（嵌入资源，picker 子窗口 markdown 模板通过 res:// 协议加载 view/marked.min.js） |
 | qrcodejs | — | https://github.com/davidshimjs/qrcodejs | 二维码生成库（嵌入资源，picker 子窗口 qrcode 模板通过 res:// 协议加载 view/qrcode.min.js，DOM 渲染离线可用） |

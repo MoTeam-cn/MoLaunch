@@ -11,7 +11,15 @@
 | name | version | url | desc |
 | --- | --- | --- | --- |
 | Tauri 2 | 2 | https://v2.tauri.app | 跨平台桌面应用框架 |
-| Tauri Plugins | 2 | https://v2.tauri.app | 官方插件集（shell/dialog/fs/notification/updater/process） |
+| tauri-build | 2 | https://docs.rs/tauri-build | Tauri 构建脚本支持 |
+| Tauri Plugin Shell | 2 | https://v2.tauri.app/plugin/shell/ | 官方 Shell 插件 |
+| Tauri Plugin Dialog | 2 | https://v2.tauri.app/plugin/dialog/ | 官方对话框插件 |
+| Tauri Plugin FS | 2 | https://v2.tauri.app/plugin/file-system/ | 官方文件系统插件 |
+| Tauri Plugin Notification | 2 | https://v2.tauri.app/plugin/notification/ | 官方通知插件 |
+| Tauri Plugin Deep Link | 2 | https://v2.tauri.app/plugin/deep-link/ | 官方深度链接插件 |
+| Tauri Plugin Single Instance | 2 | https://v2.tauri.app/plugin/single-instance/ | 官方单实例插件 |
+| Tauri Plugin Process | 2 | https://v2.tauri.app/plugin/process/ | 官方进程管理插件 |
+| Tauri Plugin Updater | 2 | https://v2.tauri.app/plugin/updater/ | 官方自动更新插件（非 Windows） |
 | Tokio | 1.35 | https://tokio.rs | Rust 异步运行时 |
 | Reqwest | 0.11 | https://docs.rs/reqwest | HTTP 客户端（rustls-tls） |
 | tokio-tungstenite | 0.21 | https://docs.rs/tokio-tungstenite | WebSocket 服务器（下载进度推送） |
@@ -29,12 +37,15 @@
 | fastnbt | 2 | https://docs.rs/fastnbt | NBT 数据解析（存档 level.dat 等） |
 | notify | 8 | https://docs.rs/notify | 文件系统监听（mods 目录刷新） |
 | sysinfo | 0.29 | https://docs.rs/sysinfo | 系统信息收集（进程/内存） |
-| netstat2 | 0.9 | https://docs.rs/netstat2 | 本机网络连接枚举（Frp 内网端口选择） |
-| sha1 / sha2 / md5 | — | https://docs.rs/sha2 | 哈希校验 |
+| netstat2 | 0.11 | https://docs.rs/netstat2 | 本机网络连接枚举（Frp 内网端口选择） |
+| sha1 | 0.10 | https://docs.rs/sha1 | SHA-1 哈希 |
+| sha2 | 0.10 | https://docs.rs/sha2 | SHA-2 哈希 |
+| md5 | 0.7 | https://docs.rs/md-5 | MD5 哈希 |
 | hex | 0.4 | https://docs.rs/hex | 十六进制编解码 |
 | base64 | 0.22 | https://docs.rs/base64 | Base64 编解码 |
 | encoding_rs | 0.8 | https://docs.rs/encoding_rs | 字符编码转换 |
 | urlencoding | 2.1 | https://docs.rs/urlencoding | URL 编码 |
+| url | 2 | https://docs.rs/url | URL 解析 |
 | regex | 1 | https://docs.rs/regex | 正则表达式 |
 | chrono | 0.4 | https://docs.rs/chrono | 日期时间处理 |
 | futures-util | 0.3 | https://docs.rs/futures-util | 异步工具（join_all 等） |
@@ -49,3 +60,5 @@
 | tun-rs | 2 | https://docs.rs/tun-rs | 虚拟网卡 TUN 接口管理（联机功能） |
 | windows | 0.58 | https://docs.rs/windows | Windows API 绑定（窗口标题修改） |
 | winreg | 0.52 | https://docs.rs/winreg | Windows 注册表读写（仅 Windows） |
+| libc | 0.2 | https://docs.rs/libc | Unix 进程组管理（仅 Unix） |
+| rusqlite | 0.31 | https://docs.rs/rusqlite | SQLite 数据库访问 |

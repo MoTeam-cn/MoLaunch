@@ -15,55 +15,96 @@
 | Vue 3 | Copyright (c) 2014-present Yuxi (Evan) You | MIT License | https://vuejs.org | https://opensource.org/licenses/MIT |
 | Vue Router | Copyright (c) 2014-present Evan You | MIT License | https://router.vuejs.org | https://opensource.org/licenses/MIT |
 | Pinia | Copyright (c) 2019 Eduardo San Martin Morote | MIT License | https://pinia.vuejs.org | https://opensource.org/licenses/MIT |
-| Tauri 2 | Copyright (c) 2019-2024 Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://v2.tauri.app | https://github.com/tauri-apps/tauri/blob/dev/LICENSE |
+| Tauri 2 | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://v2.tauri.app | https://github.com/tauri-apps/tauri/blob/dev/LICENSE |
+| @tauri-apps/api | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/tauri | https://github.com/tauri-apps/tauri/blob/dev/LICENSE |
+| @tauri-apps/plugin-deep-link | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| @tauri-apps/plugin-dialog | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| @tauri-apps/plugin-process | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| @tauri-apps/plugin-shell | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| @tauri-apps/plugin-updater | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| tauri-build | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://docs.rs/tauri-build | https://github.com/tauri-apps/tauri/blob/dev/LICENSE |
+| tauri-plugin-shell | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| tauri-plugin-dialog | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| tauri-plugin-fs | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| tauri-plugin-notification | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| tauri-plugin-deep-link | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| tauri-plugin-single-instance | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| tauri-plugin-process | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| tauri-plugin-updater | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/plugins-workspace | https://github.com/tauri-apps/plugins-workspace/blob/v2/LICENSE |
+| @tauri-apps/cli | Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://github.com/tauri-apps/tauri | https://github.com/tauri-apps/tauri/blob/dev/LICENSE |
 | Heroicons | Copyright (c) 2020 Refactoring UI Inc. | MIT License | https://heroicons.com | https://github.com/tailwindlabs/heroicons/blob/master/LICENSE |
+| @lobehub/icons | LobeHub | MIT License | https://github.com/lobehub/lobe-icons | https://github.com/lobehub/lobe-icons/blob/main/LICENSE |
+| @lobehub/icons-static-svg | LobeHub | MIT License | https://github.com/lobehub/lobe-icons | https://github.com/lobehub/lobe-icons/blob/main/LICENSE |
+| DOMPurify | Cure53 | MPL-2.0 / Apache-2.0 | https://github.com/cure53/DOMPurify | https://github.com/cure53/DOMPurify/blob/main/LICENSE |
 | Tailwind CSS | Copyright (c) Adam Wathan | MIT License | https://tailwindcss.com | https://github.com/tailwindlabs/tailwindcss/blob/master/LICENSE |
 | skinview3d | Copyright (c) 2021 bs-community | MIT License | https://github.com/bs-community/skinview3d | https://github.com/bs-community/skinview3d/blob/master/LICENSE |
 | Vue Virtual Scroller | Copyright (c) 2018 Guillaume Chau | MIT License | https://github.com/Akryum/vue-virtual-scroller | https://github.com/Akryum/vue-virtual-scroller/blob/master/LICENSE |
-| OpenLayers | Copyright (c) 2005-present OpenLayers Contributors. All rights reserved. | BSD-2-Clause | https://openlayers.org | https://github.com/openlayers/openlayers/blob/main/LICENSE.md |
-| Cubiomes | Copyright (c) 2019-2024 Cubitect | MIT License | https://github.com/Cubitect/cubiomes | https://github.com/Cubitect/cubiomes/blob/master/LICENSE |
-| McSDK | Copyright (c) 2026 MoTeam | Apache License 2.0（自有项目，无需强制遵守） | https://github.com/MoTeam-cn/Mc_SDK | https://github.com/MoTeam-cn/Mc_SDK/blob/main/LICENSE |
-| Cubiomes (xpple fork) | Copyright (c) 2019-2024 Cubitect, xpple | MIT License | https://github.com/MoTeam-cn/cubiomes | https://github.com/MoTeam-cn/cubiomes/blob/master/LICENSE |
-| Vite | Copyright (c) 2019-present Evan You & Vite Contributors | MIT License | https://vitejs.dev | https://github.com/vitejs/vite/blob/main/LICENSE |
-| TypeScript | Copyright (c) Microsoft Corporation | Apache License 2.0 | https://www.typescriptlang.org | https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt |
-| Vue Language Tools (vue-tsc) | Copyright (c) 2021-present Johnson Chu | MIT License | https://github.com/vuejs/language-tools | https://github.com/vuejs/language-tools/blob/master/LICENSE |
-| @vue/test-utils | Copyright (c) 2021-present Eduardo San Martin Morote | MIT License | https://test-utils.vuejs.org | https://github.com/vuejs/test-utils/blob/main/LICENSE |
-| Vitest | Copyright (c) 2021-Present Anthony Fu | MIT License | https://vitest.dev | https://github.com/vitest-dev/vitest/blob/main/LICENSE |
-| ESLint | Copyright (c) OpenJS Foundation and other contributors | MIT License | https://eslint.org | https://github.com/eslint/eslint/blob/main/LICENSE |
-| Prettier | Copyright (c) James Long and contributors | MIT License | https://prettier.io | https://github.com/prettier/prettier/blob/main/LICENSE |
-| PostCSS | Copyright (c) Andrey Sitnik and contributors | MIT License | https://postcss.org | https://github.com/postcss/postcss/blob/main/LICENSE |
-| Autoprefixer | Copyright (c) Andrey Sitnik and contributors | MIT License | https://github.com/postcss/autoprefixer | https://github.com/postcss/autoprefixer/blob/main/LICENSE |
-| Arco Design Vue | Copyright (c) 2019 Arco Design | MIT License | https://arco.design | https://github.com/arco-design/arco-design-vue/blob/main/LICENSE |
-| Element Plus Icons | Copyright (c) 2021-present Element Plus Team | MIT License | https://github.com/element-plus/element-plus-icons | https://github.com/element-plus/element-plus-icons/blob/main/LICENSE |
-| Tokio | Copyright (c) 2024 Tokio Contributors | MIT License | https://tokio.rs | https://github.com/tokio-rs/tokio/blob/master/LICENSE |
-| Reqwest | Copyright (c) 2016-present Sean McArthur | MIT / Apache-2.0 | https://docs.rs/reqwest | https://github.com/seanmonstar/reqwest/blob/master/LICENSE-MIT |
-| Serde | Copyright (c) 2014-2024 The Serde Developers | MIT / Apache-2.0 | https://serde.rs | https://github.com/serde-rs/serde/blob/master/LICENSE-MIT |
-| libloading | Copyright (c) 2015 Simonas Kazlauskas | ISC License | https://docs.rs/libloading | https://github.com/nickel-org/libloading/blob/master/LICENSE-ISC |
-| zip (Rust) | Copyright (c) 2014 Mathijs van de Nes | MIT License | https://docs.rs/zip | https://github.com/zip-rs/zip2/blob/master/LICENSE |
-| notify | Copyright (c) notify-rs developers | CC0-1.0 / Artistic-2.0 | https://docs.rs/notify | https://github.com/notify-rs/notify/blob/main/LICENSE-CC0 |
-| sysinfo | Copyright (c) 2015 Guillaume Gomez | MIT License | https://docs.rs/sysinfo | https://github.com/GuillaumeGomez/sysinfo/blob/master/LICENSE |
-| Plain Craft Launcher 2 (PCL2) | Copyright © 成都瓜皮龙科技有限公司（龙腾猫跃）2016. All Rights Reserved. | PCL 分发有限许可（自定义许可） | https://github.com/Meloong-Git/PCL | https://github.com/Meloong-Git/PCL/blob/main/LICENCE |
-| Java Launch Wrapper | Copyright (c) 00ll00 | MIT License | https://github.com/00ll00/java_launch_wrapper | https://github.com/00ll00/java_launch_wrapper/blob/master/LICENCE |
-| lwjgl-unsafe-agent | Copyright (c) Glavo | Apache License 2.0 | https://github.com/HMCL-dev/lwjgl-unsafe-agent | https://github.com/HMCL-dev/lwjgl-unsafe-agent/blob/main/LICENSE |
-| marked | Copyright (c) 2014-2018, Christopher Jeffrey | MIT License | https://github.com/markedjs/marked | https://github.com/markedjs/marked/blob/master/LICENSE |
+| OpenLayers | OpenLayers Contributors | BSD-2-Clause | https://openlayers.org | https://github.com/openlayers/openlayers/blob/main/LICENSE.md |
+| marked | Marked contributors | MIT License | https://github.com/markedjs/marked | https://github.com/markedjs/marked/blob/master/LICENSE.md |
 | qrcodejs | Copyright (c) 2012 davidshimjs | MIT License | https://github.com/davidshimjs/qrcodejs | https://github.com/davidshimjs/qrcodejs/blob/master/LICENSE |
-| tokio-tungstenite | Copyright (c) 2017 Daniel Abramov | MIT License | https://docs.rs/tokio-tungstenite | https://github.com/snapview/tokio-tungstenite/blob/master/LICENSE |
-| netstat2 | Copyright (c) 2021 ivxvm | MIT License | https://docs.rs/netstat2 | https://github.com/ivxvm/netstat2-rs/blob/master/LICENSE |
-| flate2 | Copyright (c) 2014 Alex Crichton | MIT / Apache-2.0 | https://docs.rs/flate2 | https://github.com/rust-lang/flate2-rs/blob/main/LICENSE-MIT |
-| fastnbt | Copyright (c) 2020 Tom O'Callaghan | MIT / Apache-2.0 | https://docs.rs/fastnbt | https://github.com/owengage/fastnbt/blob/main/LICENSE-MIT |
-| anyhow | Copyright (c) 2019-present David Tolnay | MIT / Apache-2.0 | https://docs.rs/anyhow | https://github.com/dtolnay/anyhow/blob/master/LICENSE-MIT |
-| thiserror | Copyright (c) 2019-present David Tolnay | MIT / Apache-2.0 | https://docs.rs/thiserror | https://github.com/dtolnay/thiserror/blob/master/LICENSE-MIT |
-| Ed25519-Dalek | Copyright (c) 2017 isis agora lovecruft | BSD-3-Clause | https://docs.rs/ed25519-dalek | https://github.com/dalek-cryptography/ed25519-dalek/blob/main/LICENSE |
-| X25519-Dalek | Copyright (c) 2017 isis agora lovecruft | BSD-3-Clause | https://docs.rs/x25519-dalek | https://github.com/dalek-cryptography/x25519-dalek/blob/main/LICENSE |
-| hkdf | Copyright (c) 2017 Artyom Pavlov | MIT / Apache-2.0 | https://docs.rs/hkdf | https://github.com/RustCrypto/KDFs/blob/master/LICENSE |
-| hmac | Copyright (c) 2017 Artyom Pavlov | MIT / Apache-2.0 | https://docs.rs/hmac | https://github.com/RustCrypto/MACs/blob/master/LICENSE |
-| aes-gcm | Copyright (c) 2018 Artyom Pavlov | MIT / Apache-2.0 | https://docs.rs/aes-gcm | https://github.com/RustCrypto/AEADs/blob/master/LICENSE |
-| rsa | Copyright (c) 2016-2017 RustCrypto Developers | MIT / Apache-2.0 | https://docs.rs/rsa | https://github.com/RustCrypto/RSA/blob/master/LICENSE |
-| rand | Copyright (c) 2018 The Rand Project Developers | MIT / Apache-2.0 | https://docs.rs/rand | https://github.com/rust-random/rand/blob/master/LICENSE-MIT |
-| pem | Copyright (c) 2017 Jonathan Creekmore | MIT License | https://docs.rs/pem | https://github.com/jcreekmore/pem-rs/blob/master/LICENSE |
-| tun-rs | Copyright (c) 2024 xmh0511 | MIT License | https://docs.rs/tun-rs | https://github.com/xmh0511/tun-rs/blob/master/LICENSE |
-| winreg | Copyright (c) 2015 Igor Aleksanov | MIT License | https://docs.rs/winreg | https://github.com/gentoo90/winreg-rs/blob/master/LICENSE |
-| rustls-native-certs | Copyright (c) 2017 Joseph Birr-Pixton | Apache-2.0 / ISC | https://docs.rs/rustls-native-certs | https://github.com/rustls/rustls-native-certs/blob/main/LICENSE |
-| once_cell | Copyright (c) 2018 The Rust Project Developers | MIT / Apache-2.0 | https://docs.rs/once_cell | https://github.com/matklad/once_cell/blob/master/LICENSE-MIT |
-| serde_json | Copyright (c) 2014-2024 The Serde Developers | MIT / Apache-2.0 | https://docs.rs/serde_json | https://github.com/serde-rs/json/blob/master/LICENSE-MIT |
-| @tauri-apps/cli | Copyright (c) 2019-2024 Tauri Programme within The Commons Conservancy | MIT / Apache-2.0 | https://v2.tauri.app | https://github.com/tauri-apps/tauri/blob/dev/LICENSE |
+| Vite | Evan You and Vite Contributors | MIT License | https://vitejs.dev | https://github.com/vitejs/vite/blob/main/LICENSE |
+| TypeScript | Microsoft | Apache-2.0 | https://www.typescriptlang.org | https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt |
+| Vue Language Tools (vue-tsc) | Vue Language Tools contributors | MIT License | https://github.com/vuejs/language-tools | https://github.com/vuejs/language-tools/blob/master/LICENSE |
+| @vitejs/plugin-vue | Vite Contributors | MIT License | https://github.com/vitejs/vite-plugin-vue | https://github.com/vitejs/vite-plugin-vue/blob/main/LICENSE |
+| @rushstack/eslint-patch | Microsoft | MIT License | https://github.com/microsoft/rushstack | https://github.com/microsoft/rushstack/blob/main/LICENSE |
+| @types/node | DefinitelyTyped contributors | MIT License | https://github.com/DefinitelyTyped/DefinitelyTyped | https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/LICENSE |
+| @vue/eslint-config-prettier | Vue.js contributors | MIT License | https://github.com/vuejs/eslint-config-prettier | https://github.com/vuejs/eslint-config-prettier/blob/master/LICENSE |
+| @vue/eslint-config-typescript | Vue.js contributors | MIT License | https://github.com/vuejs/eslint-config-typescript | https://github.com/vuejs/eslint-config-typescript/blob/master/LICENSE |
+| @vue/tsconfig | Vue.js contributors | MIT License | https://github.com/vuejs/tsconfig | https://github.com/vuejs/tsconfig/blob/main/LICENSE |
+| @vue/test-utils | Vue.js contributors | MIT License | https://test-utils.vuejs.org | https://github.com/vuejs/test-utils/blob/main/LICENSE |
+| Vitest | Vitest contributors | MIT License | https://vitest.dev | https://github.com/vitest-dev/vitest/blob/main/LICENSE |
+| ESLint | OpenJS Foundation and contributors | MIT License | https://eslint.org | https://github.com/eslint/eslint/blob/main/LICENSE |
+| eslint-plugin-vue | eslint-plugin-vue contributors | MIT License | https://github.com/vuejs/eslint-plugin-vue | https://github.com/vuejs/eslint-plugin-vue/blob/master/LICENSE |
+| Prettier | Prettier contributors | MIT License | https://prettier.io | https://github.com/prettier/prettier/blob/main/LICENSE |
+| PostCSS | PostCSS contributors | MIT License | https://postcss.org | https://github.com/postcss/postcss/blob/main/LICENSE |
+| Autoprefixer | PostCSS contributors | MIT License | https://github.com/postcss/autoprefixer | https://github.com/postcss/autoprefixer/blob/main/LICENSE |
+| Arco Design Vue | Copyright (c) 2019 Arco Design | MIT License | https://arco.design | https://github.com/arco-design/arco-design-vue/blob/main/LICENSE |
+| Element Plus Icons | Element Plus Team | MIT License | https://github.com/element-plus/element-plus-icons | https://github.com/element-plus/element-plus-icons/blob/main/LICENSE |
+| Cubiomes | Copyright (c) 2019-2024 Cubitect | MIT License | https://github.com/Cubitect/cubiomes | https://github.com/Cubitect/cubiomes/blob/master/LICENSE |
+| McSDK | MoTeam | Apache-2.0 | https://github.com/MoTeam-cn/Mc_SDK | https://github.com/MoTeam-cn/Mc_SDK/blob/main/LICENSE |
+| Cubiomes (xpple fork) | Cubitect, xpple | MIT License | https://github.com/MoTeam-cn/cubiomes | https://github.com/MoTeam-cn/cubiomes/blob/master/LICENSE |
+| Plain Craft Launcher 2 (PCL2) | 成都瓜皮龙科技有限公司（龙腾猫跃） | PCL 分发有限许可（自定义许可） | https://github.com/Meloong-Git/PCL | https://github.com/Meloong-Git/PCL/blob/main/LICENCE |
+| Java Launch Wrapper | 00ll00 | MIT License | https://github.com/00ll00/java_launch_wrapper | https://github.com/00ll00/java_launch_wrapper/blob/master/LICENCE |
+| lwjgl-unsafe-agent | Glavo | Apache-2.0 | https://github.com/HMCL-dev/lwjgl-unsafe-agent | https://github.com/HMCL-dev/lwjgl-unsafe-agent/blob/main/LICENSE |
+| Tokio | Tokio Contributors | MIT License | https://tokio.rs | https://github.com/tokio-rs/tokio/blob/master/LICENSE |
+| Reqwest | Sean McArthur | MIT / Apache-2.0 | https://docs.rs/reqwest | https://github.com/seanmonstar/reqwest/blob/master/LICENSE-MIT |
+| tokio-tungstenite | tokio-tungstenite contributors | MIT License | https://docs.rs/tokio-tungstenite | https://github.com/snapview/tokio-tungstenite/blob/master/LICENSE |
+| rustls-native-certs | rustls-native-certs contributors | Apache-2.0 / ISC / MIT | https://docs.rs/rustls-native-certs | https://github.com/ctz/rustls-native-certs/blob/main/LICENSE |
+| Serde | The Serde Developers | MIT / Apache-2.0 | https://serde.rs | https://github.com/serde-rs/serde/blob/master/LICENSE-MIT |
+| serde_json | The Serde Developers | MIT / Apache-2.0 | https://docs.rs/serde_json | https://github.com/serde-rs/json/blob/master/LICENSE-MIT |
+| anyhow | David Tolnay | MIT / Apache-2.0 | https://docs.rs/anyhow | https://github.com/dtolnay/anyhow/blob/master/LICENSE-MIT |
+| thiserror | David Tolnay | MIT / Apache-2.0 | https://docs.rs/thiserror | https://github.com/dtolnay/thiserror/blob/master/LICENSE-MIT |
+| log | Rust log contributors | MIT / Apache-2.0 | https://docs.rs/log | https://github.com/rust-lang/log/blob/master/LICENSE-MIT |
+| env_logger | Rust CLI contributors | MIT / Apache-2.0 | https://docs.rs/env_logger | https://github.com/rust-cli/env_logger/blob/main/LICENSE-MIT |
+| once_cell | Rust Project Developers | MIT / Apache-2.0 | https://docs.rs/once_cell | https://github.com/matklad/once_cell/blob/master/LICENSE-MIT |
+| libloading | nagisa/rust_libloading contributors | ISC | https://github.com/nagisa/rust_libloading | https://github.com/nagisa/rust_libloading/blob/master/LICENSE |
+| zip (Rust) | zip-rs contributors | MIT License | https://docs.rs/zip | https://github.com/zip-rs/zip2/blob/master/LICENSE |
+| notify | notify-rs developers | CC0-1.0 | https://docs.rs/notify | https://github.com/notify-rs/notify/blob/main/LICENSE-CC0 |
+| sysinfo | Guillaume Gomez and contributors | MIT License | https://docs.rs/sysinfo | https://github.com/GuillaumeGomez/sysinfo/blob/master/LICENSE |
+| netstat2 | netstat2 contributors | MIT / Apache-2.0 | https://docs.rs/netstat2 | https://github.com/ohadravid/netstat2-rs/blob/master/LICENSE |
+| sha1 | RustCrypto Developers | MIT / Apache-2.0 | https://docs.rs/sha1 | https://github.com/RustCrypto/hashes/blob/master/LICENSE-MIT |
+| sha2 | RustCrypto Developers | MIT / Apache-2.0 | https://docs.rs/sha2 | https://github.com/RustCrypto/hashes/blob/master/LICENSE-MIT |
+| md5 | md5 contributors | Apache-2.0 / MIT | https://docs.rs/md-5 | https://github.com/stainless-steel/md5/blob/master/LICENSE |
+| hex | hex contributors | MIT / Apache-2.0 | https://docs.rs/hex | https://github.com/KokaKiwi/rust-hex/blob/master/LICENSE-MIT |
+| base64 | base64 contributors | MIT / Apache-2.0 | https://docs.rs/base64 | https://github.com/marshallpierce/rust-base64/blob/master/LICENSE-MIT |
+| urlencoding | kornelski | MIT License | https://docs.rs/urlencoding | https://github.com/kornelski/rust_urlencoding/blob/master/LICENSE |
+| encoding_rs | encoding_rs contributors | (Apache-2.0 OR MIT) AND BSD-3-Clause | https://docs.rs/encoding_rs | https://github.com/hsivonen/encoding_rs/blob/master/LICENSE |
+| url | rust-url contributors | MIT / Apache-2.0 | https://docs.rs/url | https://github.com/servo/rust-url/blob/master/LICENSE-MIT |
+| regex | regex contributors | MIT / Apache-2.0 | https://docs.rs/regex | https://github.com/rust-lang/regex/blob/master/LICENSE-MIT |
+| chrono | Chrono contributors | MIT / Apache-2.0 | https://docs.rs/chrono | https://github.com/chronotope/chrono/blob/main/LICENSE |
+| futures-util | futures-rs contributors | MIT / Apache-2.0 | https://docs.rs/futures-util | https://github.com/rust-lang/futures-rs/blob/master/LICENSE-MIT |
+| flate2 | flate2 contributors | MIT / Apache-2.0 | https://docs.rs/flate2 | https://github.com/rust-lang/flate2-rs/blob/main/LICENSE-MIT |
+| fastnbt | Owen Gage | MIT / Apache-2.0 | https://docs.rs/fastnbt | https://github.com/owengage/fastnbt/blob/main/LICENSE-MIT |
+| Ed25519-Dalek | Dalek Cryptography contributors | BSD-3-Clause | https://docs.rs/ed25519-dalek | https://github.com/dalek-cryptography/ed25519-dalek/blob/main/LICENSE |
+| X25519-Dalek | Dalek Cryptography contributors | BSD-3-Clause | https://docs.rs/x25519-dalek | https://github.com/dalek-cryptography/curve25519-dalek/blob/main/LICENSE |
+| hkdf | RustCrypto Developers | MIT / Apache-2.0 | https://docs.rs/hkdf | https://github.com/RustCrypto/KDFs/blob/master/LICENSE |
+| hmac | RustCrypto Developers | MIT / Apache-2.0 | https://docs.rs/hmac | https://github.com/RustCrypto/MACs/blob/master/LICENSE |
+| aes-gcm | RustCrypto Developers | MIT / Apache-2.0 | https://docs.rs/aes-gcm | https://github.com/RustCrypto/AEADs/blob/master/LICENSE |
+| rsa | RustCrypto Developers | MIT / Apache-2.0 | https://docs.rs/rsa | https://github.com/RustCrypto/RSA/blob/master/LICENSE |
+| rand | Rand Project Developers | MIT / Apache-2.0 | https://docs.rs/rand | https://github.com/rust-random/rand/blob/master/LICENSE-MIT |
+| pem | pem-rs contributors | MIT License | https://docs.rs/pem | https://github.com/jcreekmore/pem-rs/blob/master/LICENSE |
+| tun-rs | tun-rs contributors | Apache-2.0 | https://docs.rs/tun-rs | https://github.com/tun-rs/tun-rs/blob/master/LICENSE |
+| rusqlite | rusqlite contributors | MIT License | https://docs.rs/rusqlite | https://github.com/rusqlite/rusqlite/blob/master/LICENSE |
+| windows | Microsoft | MIT / Apache-2.0 | https://docs.rs/windows | https://github.com/microsoft/windows-rs/blob/master/license-mit |
+| winreg | winreg contributors | MIT License | https://docs.rs/winreg | https://github.com/gentoo90/winreg-rs/blob/master/LICENSE |
+| libc | libc contributors | MIT / Apache-2.0 | https://docs.rs/libc | https://github.com/rust-lang/libc/blob/master/LICENSE-MIT |

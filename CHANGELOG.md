@@ -1,6 +1,57 @@
 ## [未发布]
 
+- 依赖与版权清单审计：根据 `package.json`、`Cargo.toml` 及本地包元数据补齐前端运行时/开发工具链和 Rust build/条件依赖；修正 `marked`、`netstat2` 版本及 `notify`、`tun-rs`、`md5`、`rustls-native-certs` 等许可证记录，补充缺失的直接依赖与版权来源。
+
+### 重构：将崩溃分析模块的 2 个内联测试块迁移至 `analyze_tests.rs` / `detector_tests.rs`，并统一 `layout.rs`、`modpack_meta.rs` 复用 `utils::hash::sha256_hex`；前端新增 `formatDateTime`，统一 5 处日期时间格式化调用，保持原有本地时区与无效值兜底行为。
+- 后端头部注释治理：精简 20 个 Rust 文件的冗余模块头注释至 5 行以内，移除子模块罗列、历史背景、协议示例和实现细节；未修改业务逻辑。
+- 验证：各批次均执行 `cargo check --manifest-path src-tauri/Cargo.toml` 与 `git diff --check`，通过。
+
+- 前端 TypeScript 头部注释治理：精简 `click-outside.ts`、图标、FRP 链接、Markdown 及 API 文件共 7 个文件，均控制在 8 行以内；未修改业务逻辑。
+- 验证：各批次均执行 `npx vite build` 与 `git diff --check`，通过。
+
+- 超长文件拆分：`useAiChat.ts` 从 632 行拆为状态组装、消息、流式处理和类型模块；`commands/frp/api_spec/executor.rs` 从 624 行拆为请求、DTO 映射和执行编排模块，保持既有导出与调用链。
+- 验证：`npx vue-tsc --noEmit`、`npx vite build`、`cargo check --manifest-path src-tauri/Cargo.toml`、`cargo test --manifest-path src-tauri/Cargo.toml`（212 passed）及 `git diff --check` 均通过。
+
+- 文件拆分：`ReleaseTimeline.vue` 拆出版本说明解析与单版本条目组件；`TunnelCreateForm.vue` 拆出 `useTunnelCreateForm` 表单逻辑；FRP `install.rs` 拆出文件安装、ZIP 安全解压与卸载模块，保持调用链和行为不变。
+- 验证：相关批次执行 `npx vite build`、`npx vue-tsc --noEmit`、`cargo check --manifest-path src-tauri/Cargo.toml`、`cargo test --manifest-path src-tauri/Cargo.toml`（212 passed）及 `git diff --check`，均通过。
+
+- 文件拆分：FRP `tunnel.rs` 拆出参数、CRUD/持久化、配置生成与导入；`process/start.rs` 拆出准备、启动、监控模块；AI 设置页拆出端点、上下文和模型设置子组件，保持 API 与调用行为不变。
+- 验证：相关批次执行 `cargo check`、`cargo test`（212 passed + 1 文档测试）、`npx vite build`、`npx vue-tsc --noEmit` 与 `git diff --check`，均通过。
+
+- 文件拆分：后端 `http.rs` 拆出客户端构建与 TLS；实验聊天 `chat.rs` 拆出发送/重试/编辑/提问流程；崩溃分析 `rules.rs` 拆出规则类型与静态规则表，保持公开 API 和行为不变。
+- 验证：相关批次执行 `cargo check`、`cargo test`（212 passed + 1 文档测试）及 `git diff --check`，均通过。
+
+- 文件拆分：联机房间动作拆分为 CRUD/刷新/参与者模块；FRP 前端 API 拆为 core/provider/tunnel/auth/public-server 域；拖拽处理器拆出文件分发逻辑，保持现有导出和行为。
+- 验证：相关批次执行 `npx vite build`、`npx vue-tsc --noEmit` 与 `git diff --check`，均通过。
+
+- 文件拆分：导航配置、AI 日志分析、SQLite 连接/迁移/表访问、FRP API HTTP 传输/重定向、应用配置模型/默认值/路径/helper 分别模块化；保留公开 API、配置链路与安全行为。
+- 验证：相关批次执行前端构建/类型检查、`cargo check`、`cargo test`（212 passed + 文档测试）、`cargo fmt`（配置模块）及 `git diff --check`，均通过。
+
+- 文件拆分收尾：实验性 API 按 action 域拆分；Agent 工具拆为注册表与执行器，当前审计范围内前端/后端超 300 行文件已完成收敛，保持 action、tool schema 和调用 API 不变。
+- 验证：相关批次执行 `npx vite build`、`npx vue-tsc --noEmit`、`cargo check`、`cargo test`（212 passed）及 `git diff --check`，均通过。
+
+- 复杂度治理：拆分下载重试/校验、启动配置、启动监控、AI SSE 流式聚合、版本 JSON 查找/复制重试职责；保持下载进度回滚、启动参数、流式顺序和安装重试行为。
+- 验证：相关批次执行 `cargo fmt`、`cargo check`、`cargo test`（212 passed + 文档测试）及 `git diff --check`，均通过。
+
+- 架构与复杂度治理：online 信令/TUN 业务分发从 `utils` 迁入 `commands/online/manager`，解除反向依赖；同时完成下载、启动、AI 流式和版本加载等高复杂度函数拆分。
+- 当前复扫：前端/后端超 300 行文件均已清零；Rust 头部注释超 5 行、TypeScript 头部注释超 8 行均已清零（`element-icons.ts` MIT 许可证按约定豁免）。
+- 验证：相关批次执行 `cargo fmt`、`cargo check`、`cargo test`、`npx vite build`、`npx vue-tsc --noEmit` 与 `git diff --check`，均通过。
+
+- 最终验证：全量复扫确认前端/后端超过 300 行文件均为 0；`npx vite build`、`npx vue-tsc --noEmit`、`cargo check --manifest-path src-tauri/Cargo.toml`、`cargo test` 与 `git diff --check` 均通过。Rust 仍有既有 `prepare_turns` dead_code 警告，不影响构建；前端仅有既有 chunk 体积警告。
+
+- 清理实验聊天模块未使用的 `prepare_turns` 函数及其无效导入，消除 Rust `dead_code` 编译警告；未改变实际聊天调用链。
+
+- 修复 AI 工具调用后提前结束：当工具执行成功但模型下一轮返回空正文时，允许基于已回填的工具结果重试一次最终回答，并记录告警日志；避免工具调用成功后直接结束聊天。
+
 ### 新增
+
+- 背景：将账号 DTO/serde 辅助函数与 FRP 全隧道停止逻辑从聚合入口归位到已有职责模块，避免 `mod.rs` 混入业务实现。
+- 改动：`commands/auth/account/mod.rs` 改为复用 `info.rs` 导出类型；`commands/frp/process/mod.rs` 将 `stop_all_tunnels` 迁移至 `stop.rs`；Tauri 转发函数保留技术例外。
+- 验证：`cargo check --manifest-path src-tauri/Cargo.toml` 通过。
+
+### 新增
+
+- 完成 `src-tauri/src` 全部 117 个 `mod.rs` 入口职责审计：102 个纯入口、15 个 A 类聚合入口夹带逻辑、0 个 B 类单文件模块；审计报告写入 `docs/fix-debug/07-modrs-entry-only.md`，本次未修改 Rust 源码。
 
 - 工具页「Java 管理」重构为三个独立区块（`JavaPage.vue` 拆分，均带 `data-toc-card` 目录锚点；区块顺序：Java 下载器 → 已安装版本 Java 环境检测 → Java 运行时列表）：
   - **Java 运行时列表**（`JavaManager.vue`）：移除版本选择交互（Java 切换统一收敛到「设置 → 启动设置」），改为纯展示列表 + 重新检测，并用 `AlertV2` 说明定位，避免与设置页职责重复
