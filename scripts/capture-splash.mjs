@@ -13,7 +13,7 @@ const url = 'file://' + join(root, 'public', 'splash.html').replaceAll('\\', '/'
 const W = 640
 const H = 180
 const FPS = 30
-const DURATION_MS = 4600
+const DURATION_MS = 5000
 
 // 门闩：拦截 splash.js 的 DOMContentLoaded 监听器，页面加载期间动画不会启动，
 // 待页面就绪后手动 __unlock()，确保录制从动画起点（t=0）开始，不丢开头帧。

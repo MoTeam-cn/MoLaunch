@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/splash.gif" alt="MoLaunch 开屏动画" width="640" />
+  <img src="images/splash.gif" alt="MoLaunch 开屏动画" width="800" />
 </p>
 
 # MoLaunch
