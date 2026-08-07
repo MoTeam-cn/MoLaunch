@@ -1,10 +1,4 @@
 //! authlib-injector 外置登录命令（yggdrasil 协议）
-//!
-//! 子模块：types（公开类型）/ login（登录与选角）/ account（账号管理 CRUD/切换）
-//! / skin（皮肤披风）/ helpers（共享辅助：账号加载、PNG 校验）。
-//! 多角色首次登录返回 NeedSelect，选定后用 refresh 指定 profile 完成；
-//! 切换已保存账号走 validate→refresh→密码重登 三步降级。
-
 mod account;
 pub(crate) mod helpers;
 mod login;

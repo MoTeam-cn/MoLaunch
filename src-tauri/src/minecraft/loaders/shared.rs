@@ -142,6 +142,78 @@ pub async fn download_mojang_mappings(
     Ok(())
 }
 
+/// Find generated version JSON files in installer output.
+fn find_generated_version_jsons(
+    versions_dir: &Path,
+    mc_version: &str,
+    loader_keyword: &str,
+) -> Vec<(PathBuf, PathBuf)> {
+    let mut generated_files = Vec::new();
+    let Ok(entries) = std::fs::read_dir(versions_dir) else {
+        return generated_files;
+    };
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+
+        let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
+        if !dir_name.contains(loader_keyword) || !dir_name.contains(mc_version) {
+            continue;
+        }
+
+        let Some(json_file) = std::fs::read_dir(&path).ok().and_then(|entries| {
+            entries
+                .filter_map(|entry| entry.ok())
+                .find(|entry| entry.path().extension().is_some_and(|ext| ext == "json"))
+        }) else {
+            continue;
+        };
+
+        generated_files.push((path, json_file.path()));
+    }
+
+    generated_files
+}
+
+/// Copy a generated version JSON, retrying to handle file locking.
+fn copy_generated_version_json_with_retries(
+    source_json: &Path,
+    target_json: &Path,
+    source_dir: &Path,
+    loader_keyword: &str,
+) -> bool {
+    for retry in 0..3 {
+        match std::fs::copy(source_json, target_json) {
+            Ok(_) => {
+                log_info!(
+                    "[{}] Copied version JSON from {}",
+                    loader_keyword,
+                    source_dir.display()
+                );
+                return true;
+            }
+            Err(e) => {
+                if retry < 2 {
+                    log_warn!(
+                        "[{}] Copy failed (retry {}): {}",
+                        loader_keyword,
+                        retry + 1,
+                        e
+                    );
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                } else {
+                    log_error!("[{}] Copy failed after retries: {}", loader_keyword, e);
+                }
+            }
+        }
+    }
+
+    false
+}
+
 /// Copy generated version JSON from installer output
 pub fn copy_generated_version_json(
     game_dir: &Path,
@@ -150,64 +222,19 @@ pub fn copy_generated_version_json(
     loader_keyword: &str,
 ) {
     let versions_dir = game_dir.join("versions");
-    if let Ok(entries) = std::fs::read_dir(&versions_dir) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.is_dir() {
-                let dir_name = path.file_name().unwrap_or_default().to_string_lossy();
-                if dir_name.contains(loader_keyword) && dir_name.contains(mc_version) {
-                    let json_files: Vec<_> = std::fs::read_dir(&path)
-                        .ok()
-                        .map(|e| {
-                            e.filter_map(|e| e.ok())
-                                .filter(|e| {
-                                    e.path()
-                                        .extension()
-                                        .map(|ext| ext == "json")
-                                        .unwrap_or(false)
-                                })
-                                .collect()
-                        })
-                        .unwrap_or_default();
+    let generated_files = find_generated_version_jsons(&versions_dir, mc_version, loader_keyword);
+    let version_dir = game_dir.join("versions").join(version_id);
+    let target_json = version_dir.join(format!("{}.json", version_id));
 
-                    if let Some(json_file) = json_files.first() {
-                        let version_dir = game_dir.join("versions").join(version_id);
-                        std::fs::create_dir_all(&version_dir).ok();
-                        let target_json = version_dir.join(format!("{}.json", version_id));
-
-                        // Retry copy to handle file locking
-                        for retry in 0..3 {
-                            match std::fs::copy(json_file.path(), &target_json) {
-                                Ok(_) => {
-                                    log_info!(
-                                        "[{}] Copied version JSON from {}",
-                                        loader_keyword,
-                                        path.display()
-                                    );
-                                    return;
-                                }
-                                Err(e) => {
-                                    if retry < 2 {
-                                        log_warn!(
-                                            "[{}] Copy failed (retry {}): {}",
-                                            loader_keyword,
-                                            retry + 1,
-                                            e
-                                        );
-                                        std::thread::sleep(std::time::Duration::from_millis(500));
-                                    } else {
-                                        log_error!(
-                                            "[{}] Copy failed after retries: {}",
-                                            loader_keyword,
-                                            e
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    for (source_dir, source_json) in generated_files {
+        std::fs::create_dir_all(&version_dir).ok();
+        if copy_generated_version_json_with_retries(
+            &source_json,
+            &target_json,
+            &source_dir,
+            loader_keyword,
+        ) {
+            return;
         }
     }
 }

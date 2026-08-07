@@ -1,9 +1,5 @@
-//! Java 组件匹配测试（同目录测试文件，`cargo test match` 运行）
-//!
-//! 覆盖 docs/java-runtime-download-bugs-and-fix.md 的修复清单：
-//! - target=8 匹配 `jre-legacy`（回归：修复 `java-runtime-legacy` 错写）
-//! - 16/17/21/25 分别匹配 alpha/gamma/delta/epsilon（修复 21→gamma、17→alpha 错配）
-//! - 未知 target / 缺平台节点 / 缺组件时返回清晰错误
+//! Java Runtime 组件匹配回归测试。
+//! 覆盖组件映射、平台匹配及缺失数据时的错误处理。
 
 use serde_json::{json, Value};
 

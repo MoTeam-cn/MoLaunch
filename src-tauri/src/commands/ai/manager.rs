@@ -1,12 +1,5 @@
-//! AI 实现库（分析 / 状态查询）
-//!
-//! 自「实验性」功能上线后，AI 的 IPC action（analyze_crash / check_status /
-//! save_config / load_config / list_models）已并入
-//! `commands::experimental::manager` 的统一分发，本模块不再提供独立
-//! Tauri 命令入口，仅保留被复用的纯实现函数。
-//!
-//! 配置持久化于 config.ini [AI] 段（api_key 经 SDK DES 加密），
-//! 服务为本地 OpenAI 兼容 API。
+//! AI 分析与状态查询的纯实现函数。
+//! IPC action 由实验性命令统一分发，配置与服务能力由 `crate::ai_core` 提供。
 
 use super::types::{AiAnalysisResult, AiProbeParams, AiStatusResult, AnalyzeCrashParams};
 use crate::ai_core;

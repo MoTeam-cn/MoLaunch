@@ -1,9 +1,4 @@
 //! 实验性功能 SQLite 存储（连接由系统维护）
-//!
-//! - 数据库位置：`Storage::base_dir()/chat.db`（`.Molaunch/chat.db`）。
-//! - 子模块：`schema`（表结构声明与表句柄）/ `init`（挂载与行映射）/
-//!   `conversations` / `messages` / `tool_calls`（数据访问）。
-//! - 建表与自动迁移由 `crate::utils::sqlite` 公共工具负责，本模块无裸 SQL。
 
 mod conversations;
 mod init;

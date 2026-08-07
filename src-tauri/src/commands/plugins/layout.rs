@@ -5,7 +5,6 @@
 
 use crate::error_util::log_err;
 use crate::{http, log_info, log_warn, utils::cache};
-use sha2::{Digest, Sha256};
 
 /// 缓存 TTL（24 小时）
 const TTL_SECONDS: u64 = 24 * 60 * 60;
@@ -65,8 +64,5 @@ pub async fn load_custom_layout(
 
 /// 计算 URL 的 sha256 十六进制哈希
 fn hash_url(url: &str) -> String {
-    let mut hasher = Sha256::new();
-    hasher.update(url.as_bytes());
-    let result = hasher.finalize();
-    result.iter().map(|b| format!("{:02x}", b)).collect()
+    crate::utils::hash::sha256_hex(url.as_bytes())
 }

@@ -1,30 +1,5 @@
-//! frpc TOML 配置生成工具（frp 0.x 原版格式）
-//!
-//! 参考原版 frp 配置（如 Lolia 等厂商 config 接口返回格式）：
-//!
-//! ```toml
-//! serverAddr = 'hk-6.qwq.fan'
-//! serverPort = 17000
-//! user = '60'
-//!
-//! [auth]
-//! token = 'va3xljq0469rzujuwzapt1fdmkoiiu32'
-//!
-//! [[proxies]]
-//! name = 'deffb45553f74606b2380db8b868facf'
-//! type = 'tcp'
-//! localIP = '127.0.0.1'
-//! localPort = 3000
-//! remotePort = 30919
-//!
-//! [proxies.transport]
-//! bandwidthLimit = '4MB'
-//! bandwidthLimitMode = 'server'
-//! ```
-//!
-//! 启动器本地自建隧道 / 无 config 端点时用本工具生成同构配置；
-//! 有 config 端点时优先使用厂商返回的原版配置（见 `executor` 拉取链路），
-//! 本工具负责为原版配置叠加逆向防封字段（metadatas/transport 等）。
+//! frpc TOML 配置生成与厂商配置字段叠加工具。
+//! 负责生成连接、鉴权、代理及传输配置，并补充缺失的传输字段。
 
 /// frpc 全局连接配置（顶层字段）
 #[derive(Debug, Clone, Default)]

@@ -4,6 +4,7 @@
 
 mod analyzer;
 mod log_parser;
+mod log_reader;
 mod process;
 mod scheduler;
 mod types;

@@ -1,9 +1,5 @@
-//! Java 版本与 Mojang component 匹配
-//!
-//! 平台 key 由编译期 target_os / target_arch 推导（不再硬编码 Windows）；
-//! 组件 key 使用显式映射表对齐官方 all.json 真值（ground truth 见
-//! `docs/java-runtime-download-bugs-and-fix.md`），不依赖 version.name 模糊匹配与
-//! HashMap 遍历顺序。
+//! 根据 Java 大版本和当前平台匹配 Mojang Runtime 组件。
+//! 使用显式组件映射与平台键，缺失或不支持时返回清晰错误。
 
 use serde_json::Value;
 

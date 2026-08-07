@@ -2,13 +2,18 @@
 //! 子模块：registry（规格加载）/ executor（请求执行 + 统一隧道/账号 DTO）/
 //! config_gen / envelope / http / jsonpath
 
+mod dto;
 mod executor;
+mod redirect;
 mod registry;
+mod request;
+mod transport;
 
 pub mod config_gen;
 pub mod envelope;
 pub mod http;
 pub mod jsonpath;
 
-pub use executor::{fetch_raw_tunnel_config, fetch_tunnels, AccountInfo, TunnelInfo};
+pub use executor::{fetch_tunnels, AccountInfo, TunnelInfo};
 pub use registry::load_api_spec;
+pub use request::fetch_raw_tunnel_config;

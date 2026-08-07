@@ -1,9 +1,5 @@
-//! 系统托盘：托盘图标 + 右键菜单（打开主页面 / 检查更新 / 退出）+ 退出统一清理
-//!
-//! 关闭缺口修复的落点：
-//! - `CloseRequested` 被 `on_window_event` 拦截后按 `close_behavior` 分流（hide / exit / 通知前端弹框）
-//! - `cleanup_and_exit` 在真正退出时统一清理 frpc 隧道与 TUN 虚拟网卡，
-//!   避免 Alt+F4 / 托盘退出绕过前端 handleClose 导致的进程残留
+//! 系统托盘：提供主界面打开、更新检查、退出菜单及统一退出清理。
+//! 窗口关闭与托盘退出最终复用后端清理流程。
 
 use crate::log_info;
 use crate::log_warn;

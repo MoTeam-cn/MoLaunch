@@ -2,14 +2,14 @@
 //!
 //! 负责 stdout/stderr 读取、加载进度检测、联机端口事件与退出/崩溃分析调度。
 
-use super::log_parser::{detect_load_progress, parse_log_line};
+use super::log_parser::detect_load_progress;
+use super::log_reader::read_logs;
 use super::process::GameWatcher;
 use super::types::{ExitInfo, GameState};
-use crate::{log_info, log_warn};
+use crate::log_info;
 use regex::Regex;
 use std::sync::{Arc, OnceLock};
 use tauri::Emitter;
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::Mutex;
 
 /// 联机模块 MC 局域网端口检测事件名
@@ -61,72 +61,42 @@ impl GameWatcher {
             let app_handle = self.app_handle.clone();
 
             tokio::spawn(async move {
-                let mut reader = BufReader::new(stdout);
-                let mut buf: Vec<u8> = Vec::with_capacity(1024);
-
-                loop {
-                    buf.clear();
-                    match reader.read_until(b'\n', &mut buf).await {
-                        Ok(0) => break, // 流正常关闭
-                        Ok(_) => {
-                            // 去掉末尾换行符
-                            if buf.last() == Some(&b'\n') {
-                                buf.pop();
-                                if buf.last() == Some(&b'\r') {
-                                    buf.pop();
-                                }
+                read_logs(stdout, "stdout", log_buffer, max_lines, |line| {
+                    let state = state.clone();
+                    let load_progress = load_progress.clone();
+                    let app_handle = app_handle.clone();
+                    async move {
+                        let new_progress = detect_load_progress(&line);
+                        {
+                            let mut current = load_progress.write().await;
+                            if new_progress > *current {
+                                *current = new_progress;
                             }
-                            // Java 在 Windows 上默认按 GBK 输出，可能不是合法 UTF-8
-                            // 用 lossy 转换避免读取中断
-                            let line = String::from_utf8_lossy(&buf).to_string();
-                            let entry = parse_log_line(&line, "stdout");
+                        }
 
-                            // 检测加载进度
-                            let new_progress = detect_load_progress(&line);
-                            {
-                                let mut current = load_progress.write().await;
-                                if new_progress > *current {
-                                    *current = new_progress;
-                                }
+                        {
+                            let mut state_guard = state.write().await;
+                            if *state_guard == GameState::Starting {
+                                *state_guard = GameState::Loading;
                             }
+                        }
 
-                            // 检测是否开始加载
-                            {
-                                let mut state_guard = state.write().await;
-                                if *state_guard == GameState::Starting {
-                                    *state_guard = GameState::Loading;
-                                }
-                            }
-
-                            // 联机模块：检测 MC 开放局域网端口，命中后 emit 事件给前端
-                            if let Some(caps) = lan_port_regex().captures(&line) {
-                                if let Some(port_str) = caps.get(1) {
-                                    if let Ok(port) = port_str.as_str().parse::<u16>() {
-                                        log_info!(
-                                            "[Watcher] 检测到 MC 局域网端口: {}（联机模块自动捕获）",
-                                            port
-                                        );
-                                        if let Some(ref handle) = app_handle {
-                                            let _ =
-                                                handle.emit(ONLINE_MC_PORT_DETECTED_EVENT, port);
-                                        }
+                        if let Some(caps) = lan_port_regex().captures(&line) {
+                            if let Some(port_str) = caps.get(1) {
+                                if let Ok(port) = port_str.as_str().parse::<u16>() {
+                                    log_info!(
+                                        "[Watcher] 检测到 MC 局域网端口: {}（联机模块自动捕获）",
+                                        port
+                                    );
+                                    if let Some(ref handle) = app_handle {
+                                        let _ = handle.emit(ONLINE_MC_PORT_DETECTED_EVENT, port);
                                     }
                                 }
                             }
-
-                            // 添加到缓冲区
-                            let mut buffer = log_buffer.lock().await;
-                            buffer.push_back(entry);
-                            if buffer.len() > max_lines {
-                                buffer.pop_front();
-                            }
-                        }
-                        Err(e) => {
-                            log_warn!("[Watcher] stdout 读取异常: {}", e);
-                            break;
                         }
                     }
-                }
+                })
+                .await;
             });
         }
 
@@ -136,34 +106,7 @@ impl GameWatcher {
             let max_lines = self.max_log_lines;
 
             tokio::spawn(async move {
-                let mut reader = BufReader::new(stderr);
-                let mut buf: Vec<u8> = Vec::with_capacity(1024);
-
-                loop {
-                    buf.clear();
-                    match reader.read_until(b'\n', &mut buf).await {
-                        Ok(0) => break, // 流正常关闭
-                        Ok(_) => {
-                            if buf.last() == Some(&b'\n') {
-                                buf.pop();
-                                if buf.last() == Some(&b'\r') {
-                                    buf.pop();
-                                }
-                            }
-                            let line = String::from_utf8_lossy(&buf).to_string();
-                            let entry = parse_log_line(&line, "stderr");
-                            let mut buffer = log_buffer.lock().await;
-                            buffer.push_back(entry);
-                            if buffer.len() > max_lines {
-                                buffer.pop_front();
-                            }
-                        }
-                        Err(e) => {
-                            log_warn!("[Watcher] stderr 读取异常: {}", e);
-                            break;
-                        }
-                    }
-                }
+                read_logs(stderr, "stderr", log_buffer, max_lines, |_| async {}).await;
             });
         }
 

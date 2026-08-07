@@ -105,14 +105,5 @@ impl ModpackMetaFile {
 ///
 /// 用于加入方校验本地是否已安装同款整合包。
 pub fn compute_manifest_hash(content: &[u8]) -> String {
-    use sha2::{Digest, Sha256};
-    let mut hasher = Sha256::new();
-    hasher.update(content);
-    let result = hasher.finalize();
-    // 转为十六进制小写字符串（64 字符）
-    let mut hex = String::with_capacity(64);
-    for byte in result.iter() {
-        hex.push_str(&format!("{:02x}", byte));
-    }
-    hex
+    crate::utils::hash::sha256_hex(content)
 }

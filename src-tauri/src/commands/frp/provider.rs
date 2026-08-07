@@ -1,10 +1,4 @@
-//! 厂商管理：内置系统默认厂商 + 外部厂商列表 + 启用/禁用 + 路径辅助
-//! 内置系统默认厂商（`system-default`）的 frpc 首次使用时从 apiServer `/v1/frp/manifest`
-//! 获取最新版本下载 URL（见 `binary.rs`）。外部厂商存放于 `<base_dir>/providers/<provider_id>/`，
-//! 包含 manifest.json 描述厂商元信息、frpc 分发方式（bundled/url）和认证配置。
-//! 厂商启用状态持久化到 `<base_dir>/frp/providers.json`；安装/卸载见 [`super::install`]，frpc 下载见 [`super::binary`]。
-//! 子模块：provider_system（内置厂商与 frpc 路径辅助）/ provider_external（外部厂商数据读写）。
-
+//! 厂商管理：内置与外部厂商的配置、状态及路径辅助
 // 子模块（平级文件，`#[path]` 指向 provider.rs 同级目录）
 #[path = "provider_external.rs"]
 mod provider_external;

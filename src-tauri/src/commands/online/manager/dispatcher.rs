@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 use serde::Serialize;
 use tauri::AppHandle;
 
-use super::{auth_actions, auth_register_login};
+use super::{auth_actions, auth_register_login, signaling_manager, tun};
 use crate::log_error;
 use crate::log_info;
 use crate::minecraft::online::auth::{
@@ -231,9 +231,9 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     auth_actions::register(&mut d);
     auth_register_login::register(&mut d);
     // 由 signaling_manager 模块统一注册
-    crate::utils::signaling_manager::register_signaling_actions(&mut d);
+    signaling_manager::register_signaling_actions(&mut d);
     // 由 tun_manager 模块统一注册，提供 tun_start / tun_forward_to / tun_stop 三个 action
-    crate::utils::tun_manager::register_tun_actions(&mut d);
+    tun::register_tun_actions(&mut d);
 
     d
 });

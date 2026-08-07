@@ -3,18 +3,12 @@
 //! 重定向防护：no-redirect 客户端 → 手动校验 Location 仅允许同域 → 最多 5 次防循环。
 
 use super::super::{EndpointDef, Envelope};
-use super::envelope;
+use super::{envelope, redirect, transport};
 use crate::log_debug;
 use crate::log_error;
 
 /// 最大响应体大小（1MB）
 const MAX_RESPONSE_SIZE: usize = 1024 * 1024;
-
-/// 最大重定向次数
-const MAX_REDIRECT_HOPS: usize = 5;
-
-/// 默认请求超时（毫秒）
-const DEFAULT_TIMEOUT_MS: u64 = 10_000;
 
 /// 构造并发送厂商 API 请求（含重定向防护 + envelope 成功校验）
 ///
@@ -36,13 +30,12 @@ pub(super) async fn send_request(
     tunnel_name: &str,
     global_envelope: Option<&Envelope>,
 ) -> Result<serde_json::Value, String> {
-    let url = build_url(base_url, &endpoint.path)?;
-    let client = build_vendor_client()?;
+    let url = transport::build_url(base_url, &endpoint.path)?;
+    let client = transport::build_vendor_client()?;
     let method = endpoint.method.to_uppercase();
     let auth_value = build_auth_value(token);
 
-    let allowed_host =
-        extract_host(&url).ok_or_else(|| format!("无法解析 API URL 主机: {}", url))?;
+    let allowed_host = redirect::allowed_host(&url)?;
 
     let mut current_url = url;
     let mut current_method = method.clone();
@@ -97,38 +90,7 @@ pub(super) async fn send_request(
             return Ok(value);
         }
 
-        // 处理重定向
-        hops += 1;
-        if hops > MAX_REDIRECT_HOPS {
-            return Err(format!(
-                "厂商 API 重定向次数过多（超过 {} 次）",
-                MAX_REDIRECT_HOPS
-            ));
-        }
-
-        let location = response
-            .headers()
-            .get(reqwest::header::LOCATION)
-            .and_then(|v| v.to_str().ok())
-            .ok_or_else(|| {
-                format!(
-                    "厂商 API 返回重定向但无 Location 头: HTTP {}",
-                    response.status()
-                )
-            })?;
-
-        let next_url = resolve_url(&current_url, location)?;
-        let next_host = extract_host(&next_url)
-            .ok_or_else(|| format!("无法解析重定向 URL 主机: {}", next_url))?;
-
-        if next_host != allowed_host {
-            return Err(format!(
-                "厂商 API 重定向到非白名单域名: {}（仅允许 {}）",
-                next_host, allowed_host
-            ));
-        }
-
-        log_debug!("[Frp] 厂商 API 重定向: {} -> {}", current_url, next_url);
+        let next_url = redirect::next_url(&current_url, &response, &allowed_host, &mut hops)?;
         current_url = next_url;
         current_method = "GET".to_string();
     }
@@ -236,70 +198,6 @@ async fn handle_response(response: reqwest::Response) -> Result<serde_json::Valu
         serde_json::from_slice(&body).map_err(|e| format!("解析厂商 API 响应 JSON 失败: {}", e))?;
 
     Ok(value)
-}
-
-// URL 辅助函数
-/// 拼接 baseUrl + path
-fn build_url(base_url: &str, path: &str) -> Result<String, String> {
-    if path.is_empty() {
-        return Ok(base_url.trim_end_matches('/').to_string());
-    }
-    if path.starts_with("http://") || path.starts_with("https://") {
-        return Ok(path.to_string());
-    }
-    let base = base_url.trim_end_matches('/');
-    let p = if path.starts_with('/') {
-        path.to_string()
-    } else {
-        format!("/{}", path)
-    };
-    Ok(format!("{}{}", base, p))
-}
-
-/// 构建厂商 API 专用 HTTP 客户端（no-redirect + 复用全局代理/IP/TLS 信任源配置）
-///
-/// 复用 `crate::http` 的统一管线：User-Agent、代理、IP 协议版本偏好、
-/// TLS 信任源（trust_mode / ignore_tls 开发者模式）与全局客户端一致；
-/// 仅重定向策略设为 none，由上层手动校验 Location 域名白名单（设计文档 §7.6.6）。
-fn build_vendor_client() -> Result<reqwest::Client, String> {
-    Ok(crate::http::build_client_with_redirect(
-        reqwest::redirect::Policy::none(),
-        Some(DEFAULT_TIMEOUT_MS),
-    ))
-}
-
-/// 从 URL 提取主机名（小写，不含端口）
-fn extract_host(url: &str) -> Option<String> {
-    let no_scheme = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("http://"))?;
-    let host_end = no_scheme.find(['/', '?', '#']).unwrap_or(no_scheme.len());
-    let host_with_port = &no_scheme[..host_end];
-    let host = host_with_port.split(':').next()?;
-    if host.is_empty() {
-        None
-    } else {
-        Some(host.to_lowercase())
-    }
-}
-
-/// 解析相对 Location 为绝对 URL
-fn resolve_url(base: &str, location: &str) -> Result<String, String> {
-    if location.starts_with("http://") || location.starts_with("https://") {
-        return Ok(location.to_string());
-    }
-    let (scheme, no_scheme) = base
-        .strip_prefix("https://")
-        .map(|rest| ("https", rest))
-        .or_else(|| base.strip_prefix("http://").map(|rest| ("http", rest)))
-        .ok_or_else(|| format!("无效的基准 URL: {}", base))?;
-    let host_end = no_scheme.find('/').unwrap_or(no_scheme.len());
-    let host = &no_scheme[..host_end];
-    if location.starts_with('/') {
-        Ok(format!("{}://{}{}", scheme, host, location))
-    } else {
-        Ok(format!("{}://{}/{}", scheme, host, location))
-    }
 }
 
 /// 截断字符串到指定长度

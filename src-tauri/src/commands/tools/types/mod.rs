@@ -1,10 +1,5 @@
-//! 工具模块的统一类型定义
-//!
-//! 按 `commands/tools/` 子模块一一对应分组：
-//! download/filename/cleanup/memory/mod_tools/data_export/crash_analyzer/screenshot/
-//! resourcepack/version_json/archive/network/nbt/picker_window。
-//! 注：原 `ToolsRequest` 已替换为通用的 `utils::dispatcher::ActionRequest`，
-//! 与 `meta_manager` 共用同一请求体结构。
+//! 工具模块的统一类型定义与导出。
+//! 各工具子模块在此集中声明并复用数据结构。
 
 mod archive;
 mod cleanup;

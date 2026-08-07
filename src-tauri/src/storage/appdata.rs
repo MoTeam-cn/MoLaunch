@@ -1,15 +1,5 @@
-//! AppData 全局共享目录辅助模块
-//!
-//! 集中管理跨启动器实例共享的全局存储路径：
-//! - Windows: `%APPDATA%/.Molaunch/`
-//! - macOS/Linux: `~/.config/Molaunch/`
-//!
-//! 与 `<exe_dir>/.Molaunch/`（便携式、每实例独立）相对，本模块目录下的资源
-//! 在同一用户的所有 MoLaunch 启动器实例间共享（如 TLS 证书、frpc 二进制、设备凭证等）。
-//!
-//! 命名历史：早期 `personalization.rs` 与 `online/storage.rs` 误用 `.MolaLaunch`（多了一个 La），
-//! 后续 `auth/storage` 跟随。现统一为 `.Molaunch`（与便携式目录、updater last.exe 一致）。
-//! 旧路径 `%APPDATA%/.MolaLaunch/` 由 `crate::migrations::appdata_naming` 启动时一次性迁移。
+//! AppData 全局共享目录辅助模块。
+//! 管理跨启动器实例共享的路径；便携式目录仍由各实例独立使用。
 
 use std::path::PathBuf;
 

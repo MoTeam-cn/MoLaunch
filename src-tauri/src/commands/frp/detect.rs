@@ -1,10 +1,4 @@
-//! 拖拽包类型检测：区分 frp 厂商包 / Minecraft 整合包 / 未知
-//!
-//! 拖入 .zip 时无法仅凭扩展名区分（整合包与厂商包都是 zip，甚至整合包也有
-//! manifest.json），需读取 zip 内容特征判断：
-//! - frp 厂商包：根 manifest.json 含 `id` + `binary`（或 `api`）字段
-//! - 整合包：MCBBS（addons）、CurseForge（files+minecraft）、modrinth.index.json 等
-//! - 其余无法识别
+//! 拖拽包类型检测：根据目录或 ZIP 内容特征区分 Frp 厂商包、Minecraft 整合包与未知类型。
 
 use serde::{Deserialize, Serialize};
 use std::path::Path;

@@ -9,6 +9,23 @@ use crate::log_warn;
 
 use super::RUNNING;
 
+/// 停止所有运行中的 frpc 隧道（应用退出前统一清理，避免残留 frpc.exe）
+pub async fn stop_all_tunnels() {
+    let ids: Vec<String> = {
+        let running = RUNNING.lock().await;
+        running.keys().cloned().collect()
+    };
+    if ids.is_empty() {
+        return;
+    }
+    log_info!("[Frp] 应用退出，停止 {} 个运行中的隧道", ids.len());
+    for id in ids {
+        if let Err(e) = stop_tunnel(id).await {
+            log_warn!("[Frp] 退出清理隧道失败: {}", e);
+        }
+    }
+}
+
 /// 停止隧道
 ///
 /// 1. 从全局进程表取出 stop_tx 并 drop（通知 monitor task）
