@@ -69,6 +69,7 @@ pub(super) async fn run_tool_loop(
     let mut reasoning = String::new();
     let mut tool_log: Vec<String> = Vec::new();
     let mut tool_records: Vec<ToolCallRecord> = Vec::new();
+    let mut empty_followup_retried = false;
     let usage_cell = std::sync::Arc::new(std::sync::Mutex::new(StreamUsage::default()));
 
     let app_delta = app.clone();
@@ -128,6 +129,17 @@ pub(super) async fn run_tool_loop(
             }
         }
         if result.tool_calls.is_empty() {
+            let empty_reply = result
+                .content
+                .as_deref()
+                .map(str::trim)
+                .map(|content| content.is_empty())
+                .unwrap_or(true);
+            if empty_reply && !tool_records.is_empty() && !empty_followup_retried {
+                empty_followup_retried = true;
+                log_warn!("[Experimental] 工具执行后模型返回空回复，重试一次最终回答");
+                continue;
+            }
             break;
         }
 
