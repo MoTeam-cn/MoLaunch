@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="images/logo.svg" alt="MoLaunch" width="200" />
+</p>
+
 # MoLaunch
 
 现代化、跨平台的 Minecraft Java 版启动器。
