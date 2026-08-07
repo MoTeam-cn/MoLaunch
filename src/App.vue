@@ -27,6 +27,7 @@ import { setBuyHintDialogRef } from '@/utils/buyHint'
 import { setStarHintDialogRef } from '@/utils/starHint'
 import { setUserAgreementDialogRef, maybeRequireUserAgreement } from '@/utils/userAgreement'
 import { setToastRef } from '@/utils/toast'
+import { notifyFrontendReady } from '@/utils/splash'
 import { initAutoCheck } from '@/utils/updater'
 import { initDownloadStream } from '@/composables/useDownloadStream'
 import { useDragDrop } from '@/composables/useDragDrop'
@@ -60,6 +61,8 @@ onMounted(() => {
   setUserAgreementDialogRef(userAgreementDialogRef.value)
   setToastRef(toastRef.value)
   initDownloadStream()
+  // 前端已挂载：至少展示 SPLASH_MIN_MS 后关闭开屏窗口、显示主窗口
+  notifyFrontendReady()
   // 启动自动更新检查（启动后 5s + 每 6 小时；dev 模式自动跳过）
   initAutoCheck()
   initApp()
