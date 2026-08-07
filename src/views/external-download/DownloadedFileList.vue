@@ -3,7 +3,7 @@
  * 已下载文件列表（icon + 文件名 + 大小/时间 + 删除按钮）
  */
 import type { ExternalDownloadEntry } from '@/utils/api/tools'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatDateTime } from '@/utils/format'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Button from '@/components/common/Button.vue'
 import Tag from '@/components/common/Tag.vue'
@@ -19,12 +19,7 @@ const emit = defineEmits<{
 
 function formatTime(unix: number): string {
   if (!unix) return ''
-  const d = new Date(unix * 1000)
-  const month = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  const hours = String(d.getHours()).padStart(2, '0')
-  const mins = String(d.getMinutes()).padStart(2, '0')
-  return `${month}-${day} ${hours}:${mins}`
+  return formatDateTime(unix * 1000, { withYear: false, invalidValue: '' })
 }
 </script>
 

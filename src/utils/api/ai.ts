@@ -1,11 +1,6 @@
 /**
- * AI 模块 API（本地 OpenAI 兼容服务）
- *
- * 对应后端 `experimental_manager` IPC 命令（AI action 已并入实验性统一分发，
- * 不再使用独立的 ai_manager），通过 `action` 字段分发到不同子模块。
- * 服务为本地 OpenAI 兼容 API（如 Ollama / LM Studio），不依赖云端。
- *
- * 注意：需先开启「设置 → 进阶设置 → 实验性功能」，否则后端返回错误。
+ * AI API：通过 experimental_manager IPC 调用本地 OpenAI 兼容服务。
+ * 支持 AI 配置、服务状态、模型列表和崩溃日志分析；使用前需开启实验性功能。
  */
 
 import { invoke } from '@tauri-apps/api/core'

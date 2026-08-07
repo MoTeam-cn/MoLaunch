@@ -1,15 +1,6 @@
 /**
- * 模型品牌 → 官方 SVG 图标映射库（双模式）
- *
- * 图标资源来自 @lobehub/icons-static-svg（官方品牌 SVG 集合），两种变体：
- * - mono：`<brand>.svg`（fill="currentColor"，渲染为黑白单色），经 `?url` 静态打包，
- *   输出到 assets/@lobehub/ 目录（见 vite.config.ts assetFileNames），以 `<img>` 渲染；
- * - color：`<brand>-color.svg`（官方彩色，部分含 SVG 渐变），经 `?raw` 内联注入，
- *   以真实 DOM 渲染（`<img>` 渲染 SVG 时渐变会失效，故彩色必须内联）。
- *
- * 品牌 key 与 model-icon.ts 中 BRAND_RULES 的品牌名保持一致。
- * 个别品牌无官方彩色变体（anthropic / grok / xiaomimimo / midjourney / openai /
- * groq / lmstudio / ollama / cursor），彩色模式下由 ModelIcon 自动退回单色渲染。
+ * 模型品牌官方 SVG 图标映射库，提供单色 URL 与彩色内联源码两种变体。
+ * 品牌 key 与 model-icon.ts 中 BRAND_RULES 保持一致；无彩色变体时由调用方回退单色。
  */
 import commandaUrl from '@lobehub/icons-static-svg/icons/commanda.svg?url'
 import glmvUrl from '@lobehub/icons-static-svg/icons/glmv.svg?url'

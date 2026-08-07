@@ -17,6 +17,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
+import { formatDateTime } from '@/utils/format'
 
 interface HistoryItem {
   version_id: string
@@ -44,17 +45,7 @@ async function loadHistory() {
 
 /** 格式化时间：RFC3339 → "MM-DD HH:mm" */
 function formatTime(rfc3339: string): string {
-  try {
-    const d = new Date(rfc3339)
-    if (isNaN(d.getTime())) return rfc3339
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    const hh = String(d.getHours()).padStart(2, '0')
-    const mi = String(d.getMinutes()).padStart(2, '0')
-    return `${mm}-${dd} ${hh}:${mi}`
-  } catch {
-    return rfc3339
-  }
+  return formatDateTime(rfc3339, { withYear: false, invalidValue: rfc3339 })
 }
 
 /** 退出状态文案与样式 */

@@ -4,7 +4,7 @@
  */
 
 import { pluginSdk } from '@/plugins/sdk'
-import { formatBytes } from '@/utils/format'
+import { formatBytes, formatDateTime } from '@/utils/format'
 
 /** 数据源上下文（扁平化的键值对，供 {{key}} 插值） */
 export interface DataContext {
@@ -140,7 +140,7 @@ export function formatValue(value: string | number, format?: string): string {
       if (isNaN(num)) return String(value)
       return `${num.toFixed(1)}%`
     case 'datetime':
-      return formatDateTime(value)
+      return formatDateTimeValue(value)
     case 'text':
     default:
       return String(value)
@@ -154,17 +154,7 @@ export function formatValue(value: string | number, format?: string): string {
  * 与 `LaunchHistoryPanel.vue` 的 `formatTime` 保持一致的风格。
  * 解析失败时原样返回，避免误导用户。
  */
-function formatDateTime(value: string | number): string {
+function formatDateTimeValue(value: string | number): string {
   const str = String(value)
-  try {
-    const d = new Date(str)
-    if (isNaN(d.getTime())) return str
-    const mm = String(d.getMonth() + 1).padStart(2, '0')
-    const dd = String(d.getDate()).padStart(2, '0')
-    const hh = String(d.getHours()).padStart(2, '0')
-    const mi = String(d.getMinutes()).padStart(2, '0')
-    return `${mm}-${dd} ${hh}:${mi}`
-  } catch {
-    return str
-  }
+  return formatDateTime(str, { withYear: false, invalidValue: str })
 }

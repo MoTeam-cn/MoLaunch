@@ -9,21 +9,16 @@ import { previewLocalModpack } from '@/utils/api/community'
 import { installMod } from '@/utils/api/personalization'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 import {
-  detectPackageType,
   installProviderFromZip,
 } from '@/utils/api/frp-manager'
 import { showConfirmAsync, showError, showInfo, showModal, showPrompt } from '@/utils/modal'
 import { toastError, toastSuccess } from '@/utils/toast'
 import type { ModpackPreview } from '@/types/community'
-import {
-  MODPACK_EXTENSIONS,
-  MOD_EXTENSIONS,
-  getExtension,
-  getFileNameWithoutExt,
-} from './state'
+import { getFileNameWithoutExt } from './state'
 import { formatToLabel, runModpackInstall } from './helpers'
 
 export { formatToLabel, runModpackInstall } from './helpers'
+export { handleFileDrop } from './file-dispatch'
 
 /** 安装完成后的全局刷新通知（Frp 页面监听并重载厂商列表） */
 function notifyProvidersChanged(): void {
@@ -179,7 +174,6 @@ export async function handleModDrop(filePath: string): Promise<void> {
     { defaultValue: '1', placeholder: `1~${versions.length}` },
   )
 }
-
 /** 处理多个 Mod 文件拖拽：弹窗选择版本后批量安装 */
 export async function handleMultiModDrop(paths: string[]): Promise<void> {
   let versions: InstalledVersionInfo[] = []
@@ -232,72 +226,4 @@ export async function handleMultiModDrop(paths: string[]): Promise<void> {
     },
     { defaultValue: '1', placeholder: `1~${versions.length}` },
   )
-}
-
-/**
- * 处理单文件拖拽（路由分发）
- *
- * - 多文件拖拽：必须全部为 jar/litemod/disabled/old，否则提示一次只拖一个
- * - 单文件拖拽：按扩展名路由
- */
-export async function handleFileDrop(paths: string[]): Promise<void> {
-  if (paths.length === 0) return
-
-  // 多文件拖拽：必须全部为 Mod 文件
-  if (paths.length > 1) {
-    for (const p of paths) {
-      const ext = getExtension(p)
-      if (!MOD_EXTENSIONS.includes(ext)) {
-        showError(
-          '多文件拖拽限制',
-          '一次只能拖入一个文件，或多个 .jar / .litemod / .disabled / .old Mod 文件。',
-        )
-        return
-      }
-    }
-    // 多个 Mod 文件逐个安装到同一版本
-    await handleMultiModDrop(paths)
-    return
-  }
-
-  // 单文件拖拽：按扩展名路由
-  const filePath = paths[0]
-  const ext = getExtension(filePath)
-
-  if (ext === 'zip') {
-    // zip 可能是整合包也可能是 frp 厂商包：先读内容特征判断，再路由
-    let type: 'frp_provider' | 'modpack' | 'unknown' = 'unknown'
-    let providerName: string | undefined
-    try {
-      const res = await detectPackageType(filePath)
-      type = res.type
-      providerName = res.providerName
-    } catch {
-      // 检测失败时不阻塞，按无法识别处理
-    }
-    if (type === 'frp_provider') {
-      await handleFrpProviderDrop(filePath, providerName)
-    } else if (type === 'modpack') {
-      await handleModpackDrop(filePath)
-    } else {
-      showError(
-        '无法识别压缩包',
-        `无法识别该 zip 包的类型。支持：整合包（.zip/.mrpack）、Frp 厂商包（含 manifest.json 且具备 frp 特征字段）。`,
-      )
-    }
-  } else if (MODPACK_EXTENSIONS.includes(ext)) {
-    await handleModpackDrop(filePath)
-  } else if (MOD_EXTENSIONS.includes(ext)) {
-    await handleModDrop(filePath)
-  } else if (ext === 'rar') {
-    showError(
-      'RAR 格式不支持',
-      'MoLaunch 无法处理 rar 格式的压缩包，请解压后重新压缩为 zip 格式再试。',
-    )
-  } else {
-    showError(
-      '无法识别的文件',
-      `不支持的文件扩展名 .${ext}。支持的类型：整合包（.zip/.mrpack）、Mod（.jar/.litemod）。`,
-    )
-  }
 }

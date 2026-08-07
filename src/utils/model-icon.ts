@@ -1,13 +1,6 @@
 /**
- * 大模型名称识别 → 品牌
- *
- * 根据模型名推断其所属品牌（如 `deepseek-r1:14b` → DeepSeek、`qwen2.5:32b` → Qwen），
- * 品牌对应的官方 SVG 图标 URL 来自 `@lobehub/icons-static-svg`（见 model-brand-icons.ts）。
- *
- * 识别策略：
- * - 规则按品牌先具体后通用排序，第一个命中即返回（品牌优先生效）；
- * - 提供商前缀（如 `ollama/qwen2.5`、`openrouter/gpt-4o`）不会覆盖模型品牌本身；
- * - 无法识别时返回 null，由调用方展示兜底图标。
+ * 根据模型名称识别品牌，并提供对应的单色 URL 与彩色 SVG 源码。
+ * 规则按优先级匹配；无法识别时返回 null，由调用方显示兜底图标。
  */
 import { BRAND_ICON_COLOR_RAW, BRAND_ICON_MONO_URLS } from '@/utils/model-brand-icons'
 

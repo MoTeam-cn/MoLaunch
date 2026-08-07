@@ -8,6 +8,7 @@ import { computed, ref, onMounted } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
 import { stripMcsdkPrefix } from '@/utils/online/device-id'
 import { getVersionInfo, getBuildFingerprint } from '@/utils/version'
+import { formatDateTime } from '@/utils/format'
 
 /**
  * 简易字符串哈希（djb2 变体）
@@ -54,11 +55,7 @@ export function useWatermarkData() {
     const versionPart = getVersionInfo().raw
     screenHash.value = hashString(`${devicePart}|${versionPart}|${hourBucket}`)
     // 时间标签精确到分钟（用于水印文字展示，攻击者无法通过分钟定位设备）
-    timeLabel.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`
-  }
-
-  function pad(n: number): string {
-    return n.toString().padStart(2, '0')
+    timeLabel.value = formatDateTime(now)
   }
 
   onMounted(async () => {

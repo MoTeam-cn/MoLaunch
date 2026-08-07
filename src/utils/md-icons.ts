@@ -1,13 +1,4 @@
-/**
- * Markdown 行内图标（`[::名称]` / `[:icon:名称]` 占位符）
- *
- * 提示词约定（resources/prompts/chat.md）：模型仅可在面向用户的正文中使用
- * `[::名称]` 占位符，名称只能从映射表（game/mod/server/check/warn/error/info/
- * download/tip/search 等）中选择，渲染时替换为图标。
- *
- * 图标通过引入项目已有依赖 `@heroicons/vue` 的 24px outline 组件实现，
- * 不在此硬编码任何 SVG path 数据。
- */
+/** Markdown 图标占位符解析与挂载：将已知名称替换为 Heroicons Vue 组件。 */
 
 import type { Component } from 'vue'
 import { h, render } from 'vue'

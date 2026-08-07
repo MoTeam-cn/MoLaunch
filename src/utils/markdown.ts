@@ -1,12 +1,6 @@
 /**
- * Markdown 渲染工具
- *
- * 统一封装 `marked`（Markdown → HTML）与 `dompurify`（HTML 消毒）。
- * - 更新日志等来自云端的内容必须经 DOMPurify 消毒，防 XSS。
- * - 复用点统一走此模块，避免各组件重复引入两个库、各自配置。
- *
- * 链接策略：禁止在 webview 内跳转到外部网页（会脱离 SPA 页面且无法返回），
- * 所有 Markdown 连接一律通过 Tauri shell 插件调用系统默认浏览器打开。
+ * Markdown 渲染与消毒工具：统一使用 marked 与 DOMPurify，并处理外部链接。
+ * 支持 Markdown 图标占位符、模型输出容错，以及通过系统浏览器打开外部链接。
  */
 import { marked } from 'marked'
 import DOMPurify from 'dompurify'

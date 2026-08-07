@@ -7,14 +7,6 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
-import {
-  HomeIcon,
-  Cog6ToothIcon,
-  CubeIcon,
-  WrenchScrewdriverIcon,
-  UserGroupIcon,
-  BeakerIcon,
-} from '@heroicons/vue/24/outline'
 import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
 import { useOnlineStore } from '@/stores/online'
@@ -23,36 +15,26 @@ import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastError } from '@/utils/toast'
 import Tooltip from '@/components/common/Tooltip.vue'
 import ExitConfirmDialog from './ExitConfirmDialog.vue'
+import { topNavItems, experimentalNavItem } from './topNavItems'
 import { useTauriEvent } from '@/composables/useTauriEvent'
 import { useExperimental } from '@/composables/useExperimental'
 const appWindow = getCurrentWebviewWindow()
 const onlineStore = useOnlineStore()
+const { enabled: experimentalEnabled } = useExperimental()
 
 const router = useRouter()
 const route = useRoute()
 const isMaximized = ref(false)
 const unlistenResized = ref<(() => void) | null>(null)
 
-const navItems = [
-  { name: '首页', path: '/apps', icon: HomeIcon },
-  { name: '下载', path: '/apps/versions', icon: CubeIcon, hasDblClick: true },
-  { name: '联机', path: '/apps/online', icon: UserGroupIcon, cloudDependent: true },
-  { name: '工具', path: '/apps/tools', icon: WrenchScrewdriverIcon },
-  { name: '设置', path: '/apps/settings', icon: Cog6ToothIcon },
-]
-
-// 实验性功能开关：开启后才在导航显示「实验性」入口（默认隐藏）
-// 开关位于「设置 → 进阶设置」，由 useExperimental 统一读取与监听切换事件
-const { enabled: experimentalEnabled } = useExperimental()
 const visibleNavItems = computed(() => {
-  const items = navItems.filter((i) => i.path !== '/apps/experimental')
+  const items = topNavItems.filter((i) => i.path !== experimentalNavItem.path)
   if (experimentalEnabled.value) {
     const idx = items.findIndex((i) => i.path === '/apps/settings')
-    const entry = { name: '实验性', path: '/apps/experimental', icon: BeakerIcon }
     if (idx >= 0) {
-      items.splice(idx, 0, entry)
+      items.splice(idx, 0, experimentalNavItem)
     } else {
-      items.push(entry)
+      items.push(experimentalNavItem)
     }
   }
   return items

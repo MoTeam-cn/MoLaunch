@@ -11,6 +11,7 @@ import { readLayoutSample } from '@/utils/api/plugins'
 import { pickSavePath } from '@/utils/fileDialog'
 import { toastInfo, toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
+import { formatDateTime } from '@/utils/format'
 
 /** 自定义布局配置 composable（格式 / 来源 / 内联编辑器 / URL 加载 / 示例导出） */
 export function useCustomLayout() {
@@ -113,8 +114,7 @@ export function useCustomLayout() {
   /** 缓存时间格式化 */
   const cachedTimeText = computed(() => {
     if (!customConfig.value.cachedAt) return '未缓存'
-    const d = new Date(customConfig.value.cachedAt)
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+    return formatDateTime(customConfig.value.cachedAt, { invalidValue: '未缓存' })
   })
 
   /** 根据当前格式从后端读取示例布局并导出 */

@@ -72,6 +72,30 @@ export function formatDate(dateStr: string): string {
   return dateStr.includes('T') ? dateStr.split('T')[0] : dateStr
 }
 
+export interface FormatDateTimeOptions {
+  /** 是否包含年份，默认包含 */
+  withYear?: boolean
+  /** 日期无效时返回的内容，默认返回 '-' */
+  invalidValue?: string
+}
+
+/**
+ * 格式化日期时间为 YYYY-MM-DD HH:mm 或 MM-DD HH:mm（本地时区）
+ *
+ * 支持 Date、日期字符串和毫秒时间戳。无效日期返回 invalidValue。
+ */
+export function formatDateTime(
+  value: Date | string | number,
+  options?: FormatDateTimeOptions,
+): string {
+  const d = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(d.getTime())) return options?.invalidValue ?? '-'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const date = `${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+  const time = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  return options?.withYear === false ? `${date} ${time}` : `${d.getFullYear()}-${date} ${time}`
+}
+
 /**
  * 格式化 Unix 时间戳（秒）为 YYYY-MM-DD HH:mm[:ss]（本地时区）
  *

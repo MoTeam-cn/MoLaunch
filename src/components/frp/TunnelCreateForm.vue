@@ -1,23 +1,14 @@
 <script setup lang="ts">
-/**
- * 隧道创建/编辑表单：创建支持模式切换，编辑固定 self 模式
- * 自备模式 TCP 连通性检测；本机端口按钮拉取监听端口
- * 公共服务器逻辑抽至 usePublicServers composable
- */
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+/** 隧道创建/编辑表单：模板保留，状态与交互逻辑由 composable 管理。 */
+import { toRef } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
 import Input from '@/components/common/Input.vue'
 import InputGroup from '@/components/common/InputGroup.vue'
 import Select from '@/components/common/Select.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
-import { tcpCheck } from '@/utils/api/tools'
-import { usePublicServers } from '@/composables/usePublicServers'
-import { toastError, toastInfo } from '@/utils/toast'
-import { pickFile } from '@/utils/fileDialog'
-import { importFrpcConfig } from '@/utils/api/frp-manager'
-import { openPickerWindow } from '@/utils/picker-window'
-import type { CreateTunnelParams, Tunnel, TunnelType, UpdateTunnelParams } from '@/types/frp'
+import { useTunnelCreateForm, modeOptions, typeOptions, bandwidthLimitModeOptions, proxyProtocolVersionOptions } from '@/composables/useTunnelCreateForm'
+import type { CreateTunnelParams, Tunnel, UpdateTunnelParams } from '@/types/frp'
 import {
   AdjustmentsHorizontalIcon,
   ArrowPathIcon,
@@ -37,194 +28,15 @@ const emit = defineEmits<{
   cancel: []
 }>()
 
-type TunnelMode = 'self' | 'official'
-const modeOptions = [
-  { label: '用户自备服务器', value: 'self' },
-  { label: '官方公共服务器', value: 'official' },
-]
-const typeOptions = [{ label: 'TCP', value: 'tcp' }, { label: 'UDP', value: 'udp' }]
-
-const form = reactive({
-  name: '',
-  // 手动创建统一使用系统自带 frpc；厂商隧道只能通过同步导入。
-  providerId: 'system-default',
-  mode: 'self' as TunnelMode,
-  tunnelType: 'tcp' as TunnelType,
-  localIp: '127.0.0.1',
-  localPort: 25565,
-  serverAddr: '',
-  serverPort: 7000,
-  remotePort: 30000,
-  token: '',
-  useTls: false,
-  bandwidthLimit: '',
-  bandwidthLimitMode: 'server',
-  proxyUseEncryption: false,
-  proxyUseCompression: false,
-  proxyProtocolVersion: 'v1',
-  advancedOpen: false,
-  publicServerId: '',
-  allocationId: '',
-})
-
-/**
- * 厂商下拉：显示所有已启用厂商（不再按 frpcReady 过滤，未就绪厂商可选但
- * 表单下方有「frpc 未就绪」警告提示；否则从厂商同步导入的隧道无法在编辑时
- * 显示对应厂商）。编辑模式下额外确保当前隧道厂商在选项中（即使被禁用）。
- */
-const isOfficial = computed(() => form.mode === 'official')
-const isEdit = computed(() => !!props.editTunnel)
-
-// 公共服务器（官方模式）—— 逻辑抽至 usePublicServers composable
-const { publicServersLoading, allocating, publicServerOptions, loadPublicServers, handlePublicServerChange } = usePublicServers(form)
-
-watch(() => form.mode, (m) => {
-  if (m === 'official') void loadPublicServers()
-  else { form.publicServerId = ''; form.allocationId = '' }
-})
-
-// 本机开放端口选择（子窗口模式）
-const portSelecting = ref(false)
-
-async function handleSelectPort() {
-  if (portSelecting.value) return
-  portSelecting.value = true
-  try {
-    const value = await openPickerWindow({
-      title: '选择本机端口',
-      template: 'port-picker',
-      data: {},
-      width: 400,
-      height: 500,
-    })
-    form.localPort = Number(value)
-  } catch (e) {
-    // 用户取消时静默处理（取消不报 toast）
-    if (!(e instanceof Error && e.message.includes('取消'))) {
-      toastError('选择端口失败：' + e)
-    }
-  } finally {
-    portSelecting.value = false
-  }
-}
-
-// 连通性自动检测（自备模式，2 秒防抖）
-type CheckState = 'idle' | 'checking' | 'ok' | 'fail'
-const checkState = ref<CheckState>('idle')
-const checkLatency = ref(0)
-const checkError = ref('')
-let debounceTimer: ReturnType<typeof setTimeout> | null = null
-let checkSeq = 0
-
-function scheduleCheck() {
-  if (isOfficial.value) return
-  if (debounceTimer) clearTimeout(debounceTimer)
-  checkState.value = 'idle'
-  if (!form.serverAddr.trim() || !form.serverPort) return
-  debounceTimer = setTimeout(runCheck, 2000)
-}
-
-async function runCheck() {
-  const host = form.serverAddr.trim()
-  const port = Number(form.serverPort)
-  if (!host || !Number.isInteger(port) || port <= 0) return
-  const seq = ++checkSeq
-  checkState.value = 'checking'
-  try {
-    const r = await tcpCheck(host, port)
-    if (seq !== checkSeq) return
-    if (r.reachable) { checkState.value = 'ok'; checkLatency.value = r.latency_ms; checkError.value = '' }
-    else { checkState.value = 'fail'; checkError.value = r.error }
-  } catch (e) {
-    if (seq !== checkSeq) return
-    checkState.value = 'fail'; checkError.value = String(e)
-  }
-}
-
-watch(() => [form.serverAddr, form.serverPort], scheduleCheck)
-
-const checkHint = computed(() => {
-  switch (checkState.value) {
-    case 'checking': return { text: '检测中...', type: 'default' as const }
-    case 'ok': return { text: `可连接（${checkLatency.value}ms）`, type: 'success' as const }
-    case 'fail': return { text: `不可连接：${checkError.value}`, type: 'error' as const }
-    default: return null
-  }
-})
-
-// 生命周期 + 提交
-onMounted(() => {
-  if (props.editTunnel) {
-    const t = props.editTunnel
-    form.name = t.name; form.providerId = t.providerId; form.mode = 'self'
-    form.tunnelType = t.tunnelType; form.localIp = t.localIp; form.localPort = t.localPort
-    form.serverAddr = t.serverAddr; form.serverPort = t.serverPort; form.remotePort = t.remotePort
-    form.token = t.token ?? ''; form.useTls = t.useTls
-    form.bandwidthLimit = t.bandwidthLimit ?? ''
-    form.bandwidthLimitMode = t.bandwidthLimitMode ?? 'server'
-    form.proxyUseEncryption = t.proxyUseEncryption ?? false
-    form.proxyUseCompression = t.proxyUseCompression ?? false
-    form.proxyProtocolVersion = t.proxyProtocolVersion ?? 'v1'
-    form.advancedOpen = !!t.bandwidthLimit || t.useTls
-  }
-})
-
-onUnmounted(() => {
-  if (debounceTimer) clearTimeout(debounceTimer)
-})
-
-async function handleImportConfig() {
-  const path = await pickFile({
-    title: '导入 frpc 配置文件',
-    filters: [{ name: 'frpc TOML', extensions: ['toml', 'conf'] }],
-  })
-  if (!path) return
-  try {
-    const imported = await importFrpcConfig(path)
-    form.providerId = 'system-default'
-    if (imported.name) form.name = imported.name
-    if (imported.tunnelType) form.tunnelType = imported.tunnelType
-    if (imported.localIp) form.localIp = imported.localIp
-    if (imported.localPort) form.localPort = imported.localPort
-    if (imported.serverAddr) form.serverAddr = imported.serverAddr
-    if (imported.serverPort) form.serverPort = imported.serverPort
-    if (imported.remotePort) form.remotePort = imported.remotePort
-    if (imported.token) form.token = imported.token
-    if (imported.bandwidthLimit) form.bandwidthLimit = imported.bandwidthLimit
-    if (imported.bandwidthLimitMode) form.bandwidthLimitMode = imported.bandwidthLimitMode
-    if (imported.proxyUseEncryption !== undefined) form.proxyUseEncryption = imported.proxyUseEncryption
-    if (imported.proxyUseCompression !== undefined) form.proxyUseCompression = imported.proxyUseCompression
-    if (imported.proxyProtocolVersion) form.proxyProtocolVersion = imported.proxyProtocolVersion
-    form.useTls = imported.useTls
-    form.advancedOpen = true
-    toastInfo('配置已安全解析，请检查字段后再创建')
-  } catch (e) {
-    toastError('导入配置失败：' + (e instanceof Error ? e.message : String(e)))
-  }
-}
-
-function handleSubmit() {
-  if (!form.name.trim()) return
-  const payload = {
-    name: form.name.trim(),
-    providerId: form.providerId,
-    tunnelType: form.tunnelType,
-    localIp: form.localIp || '127.0.0.1',
-    localPort: form.localPort,
-    serverAddr: form.serverAddr.trim(),
-    serverPort: form.serverPort,
-    remotePort: form.remotePort,
-    token: form.token.trim() || undefined,
-    bandwidthLimit: form.bandwidthLimit.trim() || undefined,
-    bandwidthLimitMode: form.bandwidthLimit.trim() ? form.bandwidthLimitMode : undefined,
-    proxyUseEncryption: form.proxyUseEncryption,
-    proxyUseCompression: form.proxyUseCompression,
-    proxyProtocolVersion: form.proxyProtocolVersion,
-    useTls: form.useTls,
-  }
-  if (isEdit.value && props.editTunnel) emit('update', { id: props.editTunnel.id, ...payload })
-  else emit('create', payload)
-}
+const {
+  form, isEdit, isOfficial, publicServersLoading, allocating, publicServerOptions,
+  handlePublicServerChange, portSelecting, handleSelectPort, checkHint,
+  handleImportConfig, handleSubmit,
+} = useTunnelCreateForm(
+  toRef(props, 'editTunnel'),
+  params => emit('create', params),
+  params => emit('update', params),
+)
 </script>
 
 <template>
@@ -331,10 +143,7 @@ function handleSubmit() {
             <Input v-model="form.bandwidthLimit" placeholder="例如 4MB" />
             <Select
               v-model="form.bandwidthLimitMode"
-              :options="[
-                { label: '服务端', value: 'server' },
-                { label: '客户端', value: 'client' },
-              ]"
+              :options="bandwidthLimitModeOptions"
               class="w-28 shrink-0"
             />
           </div>
@@ -344,10 +153,7 @@ function handleSubmit() {
             <Checkbox v-model="form.proxyUseCompression">压缩</Checkbox>
             <Select
               v-model="form.proxyProtocolVersion"
-              :options="[
-                { label: 'v1', value: 'v1' },
-                { label: 'v2', value: 'v2' },
-              ]"
+              :options="proxyProtocolVersionOptions"
               class="w-24 shrink-0"
             />
           </div>

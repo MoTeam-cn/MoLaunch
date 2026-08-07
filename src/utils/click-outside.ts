@@ -1,18 +1,4 @@
-/**
- * 点击外部关闭弹层 / 下拉菜单的公共工具
- *
- * 项目内 Select / ColorPicker 原各自内联实现 document click 监听，现提取为
- * 统一封装，避免重复。用法：
- *
- * ```ts
- * const rootRef = ref<HTMLElement | null>(null)
- * onClickOutside(rootRef, () => (menuOpen.value = false))
- * ```
- *
- * @param elRef 容器 ref，点击其内部（含子元素）不触发回调
- * @param handler 外部点击回调
- * @param extraRefs 额外视为"内部"的容器 ref（如 Teleport 到 body 的弹层）
- */
+/** 点击外部或按 ESC 关闭弹层 / 下拉菜单的公共工具。 */
 import { onMounted, onUnmounted, type Ref } from 'vue'
 
 export function onClickOutside(
