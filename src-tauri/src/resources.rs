@@ -26,6 +26,9 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         }
         "about/backend-deps.txt" => Some(include_str!("../resources/about/backend-deps.txt")),
         "about/licenses.txt" => Some(include_str!("../resources/about/licenses.txt")),
+        // 项目许可协议全文（由 build.rs 从项目根目录 LICENSE 自动同步的副本，编译期嵌入二进制，
+        // 供「设置 - 更多 - 许可协议」子页签展示；根 LICENSE 变更后重新构建即自动更新）
+        "LICENSE.txt" => Some(include_str!("../resources/LICENSE.txt")),
         // 示例文件（供开发者测试调试，前端导出时通过 IPC 读取）
         "samples/plugin/manifest.json" => {
             Some(include_str!("../resources/samples/plugin/manifest.json"))

@@ -77,6 +77,18 @@ export interface ConfigSnapshot {
   tlsTrustMode: string
   /** 是否忽略 TLS 证书校验（开发者模式注册表键，仅开发者模式开启时生效） */
   ignoreTls: boolean
+  // 正版购买提示（系统存储：Windows 注册表 / 其他系统全局共用文件）
+  /** 游戏启动成功次数（正版购买提示计数） */
+  launchCount: number
+  /** 是否已永久忽略正版购买提示 */
+  hintBuy: boolean
+  /** 是否已永久忽略"去 GitHub 点 Star"提示 */
+  hintStar: boolean
+  // 用户协议（系统存储：全局首次启动门禁）
+  /** 是否已同意《用户协议》 */
+  userAgreed: boolean
+  /** 已同意的《用户协议》版本号（0 表示从未同意） */
+  userAgreedVersion: number
 }
 
 /**
@@ -149,6 +161,18 @@ export interface ConfigPatch {
   tlsTrustMode?: string
   /** 是否忽略 TLS 证书校验（仅开发者模式开启时可生效） */
   ignoreTls?: boolean
+  // 正版购买提示（系统存储，后端内部分流到 Windows 注册表 / 其他系统全局共用文件）
+  /** 游戏启动成功次数（正版购买提示计数） */
+  launchCount?: number
+  /** 是否永久忽略正版购买提示 */
+  hintBuy?: boolean
+  /** 是否永久忽略"去 GitHub 点 Star"提示 */
+  hintStar?: boolean
+  // 用户协议（系统存储：全局首次启动门禁）
+  /** 是否已同意《用户协议》 */
+  userAgreed?: boolean
+  /** 已同意的《用户协议》版本号 */
+  userAgreedVersion?: number
 }
 
 // ==================== 配置缓存与读写（带全局缓存）====================

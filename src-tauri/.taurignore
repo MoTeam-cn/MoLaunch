@@ -1,0 +1,5 @@
+# Tauri dev 文件监听忽略规则（gitignore 语法，路径相对本文件所在目录）
+# tauri-cli 仅在发现 .taurignore 时才会构建监听过滤规则（同时加载内置忽略 node_modules/、target/ 等）；
+# 否则 src-tauri/updater/target 的构建产物（如 invoked.timestamp）会被递归监听，
+# 与 build.rs 的 updater 自动构建形成"重建-触发-重建"死循环。
+updater/target/

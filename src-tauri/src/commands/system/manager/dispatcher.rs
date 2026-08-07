@@ -59,6 +59,14 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
 
+    d.register(
+        "get_project_license",
+        handler!(_state, _app, _params, {
+            let r = crate::commands::system::about::get_project_license().await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
     // get_log_path / list_log_files 返回非 Result（String / Vec<String>），
     // handler 内用 Ok(to_value(r)?) 包装。read_log_file 返回 Result<String>。
     d.register(

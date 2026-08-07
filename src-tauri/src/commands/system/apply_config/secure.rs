@@ -80,3 +80,80 @@ pub fn apply_ignore_tls(patch: &ConfigPatch) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// 系统存储键名：游戏累计启动成功次数
+pub const KEY_LAUNCH_COUNT: &str = "LaunchCount";
+/// 系统存储键名：是否永久忽略正版购买提示
+pub const KEY_HINT_BUY: &str = "HintBuy";
+/// 系统存储键名：是否永久忽略"去 GitHub 点 Star"提示
+pub const KEY_HINT_STAR: &str = "HintStar";
+/// 系统存储键名：是否已同意《用户协议》（全局首次启动门禁）
+pub const KEY_USER_AGREED: &str = "UserAgreed";
+/// 系统存储键名：用户已同意的《用户协议》版本号
+pub const KEY_USER_AGREED_VERSION: &str = "UserAgreedVersion";
+
+/// 读取提示状态（系统存储）：(启动次数, 是否忽略购买提示, 是否忽略 Star 提示)
+///
+/// 走统一系统存储：Windows 注册表 `HKCU\Software\MoLaunch`；macOS/Linux 全局共用文件
+/// `~/.config/Molaunch/system.json`（与其他注册表字段同文件，目录缺失自动创建）。
+pub fn read_hint() -> (u32, bool, bool) {
+    let launch_count = crate::storage::registry::reg_key()
+        .ok()
+        .and_then(|key| crate::storage::registry::reg_get(&key, KEY_LAUNCH_COUNT))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    let hint_buy = crate::storage::registry::reg_get_bool(KEY_HINT_BUY).unwrap_or(false);
+    let hint_star = crate::storage::registry::reg_get_bool(KEY_HINT_STAR).unwrap_or(false);
+    (launch_count, hint_buy, hint_star)
+}
+
+/// 应用提示字段（系统存储，不进 AppConfig）
+pub fn apply_hint(patch: &ConfigPatch) -> Result<(), String> {
+    if let Some(count) = patch.launch_count {
+        log_info!("[Config] launch_count = {}", count);
+        let key = crate::storage::registry::reg_key()?;
+        crate::storage::registry::reg_set(&key, KEY_LAUNCH_COUNT, &count.to_string())
+            .map_err(|e| format!("写入系统存储失败: {}", e))?;
+    }
+    if let Some(hint) = patch.hint_buy {
+        log_info!("[Config] hint_buy = {}", hint);
+        crate::storage::registry::reg_set_bool(KEY_HINT_BUY, hint)
+            .map_err(|e| format!("写入系统存储失败: {}", e))?;
+    }
+    if let Some(star) = patch.hint_star {
+        log_info!("[Config] hint_star = {}", star);
+        crate::storage::registry::reg_set_bool(KEY_HINT_STAR, star)
+            .map_err(|e| format!("写入系统存储失败: {}", e))?;
+    }
+    Ok(())
+}
+
+/// 读取《用户协议》同意状态（系统存储）：(是否已同意, 已同意版本号)
+///
+/// 走统一系统存储：Windows 注册表 `HKCU\Software\MoLaunch`；macOS/Linux 全局共用文件
+/// `~/.config/Molaunch/system.json`。版本号用于协议内容更新后重新要求用户同意。
+pub fn read_user_agreed() -> (bool, u32) {
+    let agreed = crate::storage::registry::reg_get_bool(KEY_USER_AGREED).unwrap_or(false);
+    let version = crate::storage::registry::reg_key()
+        .ok()
+        .and_then(|key| crate::storage::registry::reg_get(&key, KEY_USER_AGREED_VERSION))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
+    (agreed, version)
+}
+
+/// 应用《用户协议》同意状态（系统存储，不进 AppConfig）
+pub fn apply_user_agreed(patch: &ConfigPatch) -> Result<(), String> {
+    if let Some(agreed) = patch.user_agreed {
+        log_info!("[Config] user_agreed = {}", agreed);
+        crate::storage::registry::reg_set_bool(KEY_USER_AGREED, agreed)
+            .map_err(|e| format!("写入系统存储失败: {}", e))?;
+    }
+    if let Some(version) = patch.user_agreed_version {
+        log_info!("[Config] user_agreed_version = {}", version);
+        let key = crate::storage::registry::reg_key()?;
+        crate::storage::registry::reg_set(&key, KEY_USER_AGREED_VERSION, &version.to_string())
+            .map_err(|e| format!("写入系统存储失败: {}", e))?;
+    }
+    Ok(())
+}

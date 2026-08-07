@@ -78,3 +78,13 @@ export interface AboutData {
 export async function getAboutData(): Promise<AboutData> {
   return systemManager<AboutData>(SYSTEM_ACTIONS.GET_ABOUT_DATA)
 }
+
+/**
+ * 拉取项目许可协议全文
+ *
+ * 协议文本由 build.rs 从项目根目录 LICENSE 自动同步副本后嵌入后端二进制，
+ * 经 IPC 返回，供「设置 - 更多 - 许可协议」页签展示。
+ */
+export async function getProjectLicense(): Promise<string> {
+  return systemManager<string>(SYSTEM_ACTIONS.GET_PROJECT_LICENSE)
+}

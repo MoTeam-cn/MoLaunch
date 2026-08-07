@@ -14,7 +14,6 @@
  *
  * 拆分（保持主文件 ≤ 300 行约束）：
  * - useOnlineNav：导航分类配置 + categories/badge/activeDesc/activeLabel + watch 联动
- * - CloudDisconnectedMask：云端未连接空状态遮罩
  * - OnlineTopBar：顶部标题栏 + 状态徽章 + 设置按钮
  * - useFrpSidebar：FRP 侧边栏子菜单（含「教程帮助」动作项，点击跳转设置-教程页）
  */
@@ -32,9 +31,11 @@ import ProviderList from '@/components/frp/ProviderList.vue'
 import TunnelManager from '@/components/frp/TunnelManager.vue'
 import FrpLogs from '@/components/frp/FrpLogs.vue'
 import AuthCenter from '@/components/frp/AuthCenter.vue'
-import CloudDisconnectedMask from '@/views/online/CloudDisconnectedMask.vue'
 import OnlineTopBar from '@/views/online/OnlineTopBar.vue'
+import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
 import { useOnlineNav, type OnlineCategoryId } from '@/composables/useOnlineNav'
+import { hasAgreedToday } from '@/utils/disclaimer'
+import { showWarning } from '@/utils/modal'
 
 /**
  * WebRTC 实例提升到页面级（房间挂起改造）
@@ -62,7 +63,22 @@ const onlineStore = useOnlineStore()
 /** 当前激活分类（device / lobby / create / join / room_details / providers / tunnels / auth / logs） */
 const activeCategory = ref<OnlineCategoryId>('device')
 
-const { isInRoom, categories, badge, activeDesc, activeLabel } = useOnlineNav(activeCategory)
+/** 使用协议抽屉：当日未同意过协议时进入联机页弹出（同意后存 localStorage，次日重新提醒） */
+const disclaimerVisible = ref(!hasAgreedToday('online'))
+
+const { categories, badge, activeDesc, activeLabel } = useOnlineNav(activeCategory)
+
+/** 当前分类中处于封禁态（云端离线）的 id → 名称 映射，用于点击时弹窗告知原因 */
+const sealedCategories = computed<Record<string, string>>(() => {
+  const map: Record<string, string> = {}
+  for (const cat of categories.value) {
+    if (cat.sealed) map[cat.id] = cat.label
+    for (const child of cat.children ?? []) {
+      if (child.sealed) map[child.id] = child.label
+    }
+  }
+  return map
+})
 
 /**
  * 跳转到 Frp 日志页查看指定隧道
@@ -107,12 +123,22 @@ function goTutorial() {
 /**
  * 侧边栏分类切换处理器
  *
- * 'tutorial' 是动作项（跳转到设置-教程页），不切换 activeCategory，
- * 避免 URL 持久化写入无效 tab 值；其余分类直接赋值。
+ * 'tutorial' 是动作项（跳转到设置-教程页），不切换 activeCategory；
+ * 封禁态分类（云端离线时的房间/大厅）点击后弹窗告知原因，不切换；
+ * 其余分类直接赋值。
  */
 function handleCategoryChange(id: string): void {
   if (id === 'tutorial') {
     goTutorial()
+    return
+  }
+  const sealedLabel = sealedCategories.value[id]
+  if (sealedLabel) {
+    showWarning(
+      '功能已封存',
+      `「${sealedLabel}」需要连接云端服务，当前云端连接失败，暂不可用。`,
+      onlineStore.cloudError ?? undefined,
+    )
     return
   }
   activeCategory.value = id as OnlineCategoryId
@@ -155,16 +181,11 @@ const currentProps = computed<Record<string, unknown>>(() => {
     外层 div 保持 h-full 以继承父容器高度。
   -->
   <div class="h-full">
-    <!-- 云端连接失败且未在房间：整页空状态遮罩（阻止通过 URL 直接访问绕过 TopNavLayout 禁用） -->
-    <!-- 已在房间时不遮罩，保留 P2P 连接，云端 API 失败由各调用方 toast 兜底 -->
-    <!-- initializing 期间不显示遮罩：避免启动过程中 initAuth 未完成时闪现"云端连接失败" -->
-    <CloudDisconnectedMask
-      v-if="!onlineStore.cloudConnected && !onlineStore.initializing && !isInRoom"
-      :cloud-error="onlineStore.cloudError || ''"
-      @go-settings="goSettings"
-    />
-
-    <div v-else class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
+    <!--
+      云端离线时不再整页遮罩：页面可进入，房间管理/联机大厅由 useOnlineNav 置为封禁态
+      （灰色 + 锁图标，点击弹窗告知原因）；FRP（第三方隧道）不依赖 MoLaunch 云端仍可用。
+    -->
+    <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
       <!-- 左侧分类菜单（支持子菜单展开动画） -->
       <NavSidebar :model-value="activeCategory" :categories="categories" @update:model-value="handleCategoryChange" />
 
@@ -186,5 +207,8 @@ const currentProps = computed<Record<string, unknown>>(() => {
         </div>
       </div>
     </div>
+
+    <!-- 使用协议抽屉（当日未同意时展示；teleport 到 #app-content，位置不影响单根约束） -->
+    <DisclaimerDialog v-model:visible="disclaimerVisible" kind="online" />
   </div>
 </template>

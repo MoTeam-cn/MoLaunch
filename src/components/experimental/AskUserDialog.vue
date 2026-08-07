@@ -67,6 +67,7 @@ function onVisibleChange(v: boolean) {
     title="需要你的确认"
     render-in-place
     popup-container="#app-content"
+    unmount-on-close
     @update:visible="onVisibleChange"
   >
     <OverflowText

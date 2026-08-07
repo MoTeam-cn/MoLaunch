@@ -140,4 +140,17 @@ pub struct ConfigPatch {
     /// 是否忽略 TLS 证书校验（开发者模式注册表键，仅在 developer_mode 开启时可生效）
     #[serde(rename = "ignoreTls")]
     pub ignore_tls: Option<bool>,
+
+    // 正版购买提示（系统存储：Windows 注册表 / 其他系统全局共用文件，不进 AppConfig）
+    /// 游戏启动成功次数（正版购买提示计数）
+    pub launch_count: Option<u32>,
+    /// 是否永久忽略正版购买提示
+    pub hint_buy: Option<bool>,
+    /// 是否永久忽略"去 GitHub 点 Star"提示
+    pub hint_star: Option<bool>,
+    // 用户协议（系统存储：全局首次启动门禁，不进 AppConfig）
+    /// 是否已同意《用户协议》
+    pub user_agreed: Option<bool>,
+    /// 已同意的《用户协议》版本号
+    pub user_agreed_version: Option<u32>,
 }

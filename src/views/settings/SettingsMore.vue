@@ -2,10 +2,11 @@
 /**
  * 设置 - 更多页面（薄编排层）
  *
- * 顶部子菜单分为：关于 / 系统信息 / 鸣谢 / 教程，四个子页签已拆分到 ./more/ 目录：
+ * 顶部子菜单分为：关于 / 系统信息 / 鸣谢 / 许可协议 / 教程，子页签已拆分到 ./more/ 目录：
  * - 关于：MoLaunch 介绍、官网链接、技术栈 → AboutTab
  * - 系统信息：应用版本、开发者模式解锁、SDK 信息 → SystemInfoTab
  * - 鸣谢：BMCLAPI / mcmod / MCIM API + 法律信息 + 许可与版权声明 → CreditsTab
+ * - 许可协议：项目 LICENSE 全文备份（build.rs 同步 + include_str! 嵌入二进制）→ LicenseTab
  * - 教程：启动器基础 + FRP 厂商开发指南（picker 子窗口渲染 Markdown）→ TutorialTab
  *
  * 数据来源：所有结构化数据通过后端 `get_about_data` IPC 命令加载，
@@ -22,11 +23,13 @@ import {
   InformationCircleIcon,
   CpuChipIcon,
   HeartIcon,
+  ScaleIcon,
   BookOpenIcon,
 } from '@heroicons/vue/24/outline'
 import AboutTab from './more/AboutTab.vue'
 import SystemInfoTab from './more/SystemInfoTab.vue'
 import CreditsTab from './more/CreditsTab.vue'
+import LicenseTab from './more/LicenseTab.vue'
 import TutorialTab from './more/TutorialTab.vue'
 
 // ── 子页签 ──
@@ -34,6 +37,7 @@ const subTabs = [
   { id: 'about', label: '关于', icon: InformationCircleIcon },
   { id: 'system', label: '系统信息', icon: CpuChipIcon },
   { id: 'credits', label: '鸣谢', icon: HeartIcon },
+  { id: 'license', label: '许可协议', icon: ScaleIcon },
   { id: 'tutorial', label: '教程', icon: BookOpenIcon },
 ]
 const activeSubTab = ref('about')
@@ -88,6 +92,7 @@ onMounted(() => {
         :loading="loading"
         :load-error="loadError"
       />
+      <LicenseTab v-else-if="activeSubTab === 'license'" />
       <TutorialTab v-else-if="activeSubTab === 'tutorial'" />
     </div>
   </div>

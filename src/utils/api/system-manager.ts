@@ -50,8 +50,9 @@ export const SYSTEM_ACTIONS = {
   OPEN_DEVTOOLS: 'open_devtools',
   CLOSE_DEVTOOLS: 'close_devtools',
   IS_DEVTOOLS_OPEN: 'is_devtools_open',
-  // about（1 个）
+  // about（2 个）
   GET_ABOUT_DATA: 'get_about_data',
+  GET_PROJECT_LICENSE: 'get_project_license',
   // logger（3 个）
   GET_LOG_PATH: 'get_log_path',
   LIST_LOG_FILES: 'list_log_files',

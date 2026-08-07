@@ -205,7 +205,8 @@ onMounted(async () => {
         </div>
         <p class="mt-1 text-[12px] leading-relaxed text-gray-500">
           Copyright &copy; 2026 <span @click="onCopyrightFieldClick">MoTeam</span>. All Rights Reserved.<br>
-          本软件为开源软件，遵循 MIT 许可协议发布，源代码托管于 GitHub。
+          本软件为非商业开源项目，遵循《MoLaunch 分发有限许可证》发布；二次开发版本必须公开完整源代码并明确标注第三方来源。<br>
+          许可证全文见项目根目录 LICENSE。
         </p>
       </div>
 

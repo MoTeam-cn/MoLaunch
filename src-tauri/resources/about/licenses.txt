@@ -12,6 +12,7 @@
 
 | name | copyright | license | sourceUrl | licenseUrl |
 | --- | --- | --- | --- | --- |
+| MoLaunch 自有代码与原创资源 | Copyright (c) 2026 MoTeam | MoLaunch 分发有限许可证（禁止商业使用；二次开发必须公开源代码） | https://github.com/MoTeam-cn/MoLaunch | https://github.com/MoTeam-cn/MoLaunch/blob/main/LICENSE |
 | Vue 3 | Copyright (c) 2014-present Yuxi (Evan) You | MIT License | https://vuejs.org | https://opensource.org/licenses/MIT |
 | Vue Router | Copyright (c) 2014-present Evan You | MIT License | https://router.vuejs.org | https://opensource.org/licenses/MIT |
 | Pinia | Copyright (c) 2019 Eduardo San Martin Morote | MIT License | https://pinia.vuejs.org | https://opensource.org/licenses/MIT |

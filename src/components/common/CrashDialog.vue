@@ -1,143 +1,183 @@
 <template>
-  <Transition name="crash-modal">
-    <div v-if="visible" class="fixed inset-0 z-[9999] flex items-center justify-center p-6">
-      <!-- 遮罩（崩溃弹窗是普通蓝色主题不是警告） -->
-      <div class="absolute inset-0 bg-black/35" @click="handleClose" />
+  <Drawer
+    :visible="visible"
+    placement="right"
+    :width="560"
+    render-in-place
+    popup-container="#app-content"
+    :undo-ms="3000"
+    @update:visible="visible = $event"
+  >
+    <template #title>
+      <div class="flex items-center gap-1.5">
+        <ExclamationTriangleIcon class="h-4 w-4 text-amber-500" />
+        <span>游戏运行出错</span>
+      </div>
+    </template>
 
-      <!-- 弹窗主体 -->
-      <div class="crash-dialog relative bg-dialog-bg rounded-lg shadow-[0_4px_20px_rgba(52,61,74,0.5)] w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-        <!-- 标题区 + 分割线 -->
-        <div class="px-7 pt-6 pb-3">
-          <h2 class="text-[23px] font-normal text-brand-2 leading-tight">游戏运行出错</h2>
-          <!-- 分割线 -->
-          <div class="mt-3 h-0.5 bg-brand-2 rounded-full"></div>
-        </div>
+    <!-- 崩溃原因概要：按类别着色，左侧色条区分 -->
+    <div class="rounded-md border-l-4 py-3 pl-3.5 pr-3" :class="bannerClass">
+      <Tag :color="categoryTagColor" size="small">{{ categoryLabel }}</Tag>
+      <p class="mt-2 text-sm font-medium leading-relaxed break-all text-gray-900">{{ reason }}</p>
+      <p
+        v-if="problematicMod"
+        class="mt-2 flex items-start gap-1 text-xs leading-relaxed text-gray-500"
+      >
+        <span class="shrink-0 font-medium">相关 Mod：</span>
+        <span class="break-all">{{ problematicMod }}</span>
+      </p>
+    </div>
 
-        <!-- 内容区 -->
-        <div class="flex-1 overflow-y-auto px-7 py-4">
-          <!-- 崩溃原因段落 -->
-          <p class="text-[15px] leading-[18px] text-dialog-caption mb-4">
-            游戏已异常退出，以下是崩溃分析结果：
-          </p>
-
-          <!-- 原因详情（加粗，深色文字） -->
-          <p class="text-[15px] leading-[18px] text-brand-1 font-medium mb-2">
-            {{ crashInfo?.reason || '未知原因' }}
-          </p>
-
-          <!-- 相关 Mod（如果有） -->
-          <p v-if="crashInfo?.problematic_mod" class="text-[15px] leading-[18px] text-dialog-caption mb-4">
-            相关 Mod：{{ crashInfo.problematic_mod }}
-          </p>
-
-          <!-- 建议（纯文本段落） -->
-          <p class="text-[15px] leading-[18px] text-dialog-caption whitespace-pre-line mb-4">
-            {{ crashInfo?.suggestion || '' }}
-          </p>
-
-          <!-- 崩溃报告文件路径（如果有，可点击打开） -->
-          <div v-if="crashInfo?.crash_report_path" class="mb-4">
-            <p class="text-[15px] leading-[18px] text-dialog-caption mb-1">崩溃报告文件：</p>
-            <!-- 保留原生 button：文件路径文本链接（break-all 换行 + brand 色系），
-                 Button.vue 的 scoped size 类与样式不适合文本链接场景 -->
-            <button
-              class="text-[15px] text-brand-2 hover:text-brand-3 hover:underline text-left break-all transition-colors"
-              @click="openCrashReport"
-            >
-              {{ crashInfo.crash_report_path }}
-            </button>
-          </div>
-
-          <!-- 日志详情（可折叠） -->
-          <div v-if="hasLogDetails" class="border-t border-gray-200 pt-3 mt-4">
-            <Button
-              type="text"
-              size="small"
-              @click="showDetails = !showDetails"
-            >
-              <template #icon>
-                <svg
-                  class="h-4 w-4 transition-transform"
-                  :class="{ 'rotate-90': showDetails }"
-                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
-                >
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-                </svg>
-              </template>
-              查看日志详情
-            </Button>
-
-            <div v-if="showDetails" class="mt-3 space-y-3">
-              <!-- 错误日志 -->
-              <div v-if="errorLines.length > 0">
-                <p class="text-[13px] text-dialog-caption mb-1">错误日志（{{ errorLines.length }} 行）</p>
-                <div class="bg-gray-900 rounded-md p-3 max-h-48 overflow-y-auto">
-                  <pre class="text-xs text-red-300 whitespace-pre-wrap break-all font-mono">{{ errorLines.join('\n') }}</pre>
-                </div>
-              </div>
-
-              <!-- 游戏日志尾部 -->
-              <div v-if="logTail.length > 0">
-                <p class="text-[13px] text-dialog-caption mb-1">游戏日志尾部（{{ logTail.length }} 行）</p>
-                <div class="bg-gray-900 rounded-md p-3 max-h-48 overflow-y-auto">
-                  <pre class="text-xs text-gray-300 whitespace-pre-wrap break-all font-mono">{{ logTail.join('\n') }}</pre>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 按钮栏（右对齐，3 个按钮） -->
-        <!-- 按钮配色：Highlight=#0b5bcb, Normal=#343d4a, hover=#1370f3+bg#e0eafd -->
-        <div class="flex items-center justify-end gap-3 px-7 py-4 border-t border-gray-200 bg-gray-50">
-          <!-- 查看输出按钮（Normal 态：深灰蓝边框，hover 亮蓝） -->
-          <Button
-            v-if="crashInfo?.crash_report_path"
-            type="outline"
-            size="small"
-            @click="openCrashReport"
+    <!-- 解决方案 -->
+    <div v-if="suggestion" class="mt-5">
+      <p class="mb-1.5 text-xs font-medium text-gray-500">解决方案</p>
+      <div class="flex items-start gap-2.5 rounded-md border border-primary-100 bg-primary-50 px-3 py-2.5">
+        <LightBulbIcon class="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
+        <div class="min-w-0 flex-1 space-y-1.5">
+          <p
+            v-for="(line, index) in suggestionLines"
+            :key="index"
+            class="text-sm leading-relaxed text-gray-700"
           >
-            查看报告
-          </Button>
-          <!-- 导出错误报告按钮（Normal 态） -->
-          <Button
-            type="outline"
-            size="small"
-            @click="exportReport"
-          >
-            导出报告
-          </Button>
-          <!-- 确定按钮（Highlight 态：主蓝边框 #0b5bcb，hover 亮蓝） -->
-          <Button
-            type="primary"
-            size="small"
-            @click="handleClose"
-          >
-            关闭
-          </Button>
+            {{ line }}
+          </p>
         </div>
       </div>
     </div>
-  </Transition>
+
+    <!-- 崩溃报告文件 -->
+    <div v-if="crashReportPath" class="mt-5">
+      <p class="mb-1.5 text-xs font-medium text-gray-500">崩溃报告</p>
+      <div class="flex items-center gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2">
+        <DocumentTextIcon class="h-4 w-4 shrink-0 text-gray-400" />
+        <span class="min-w-0 flex-1 truncate font-mono text-xs text-gray-600">{{ crashReportPath }}</span>
+        <Button type="text" size="mini" @click="openCrashReport">打开</Button>
+      </div>
+    </div>
+
+    <!-- 日志详情（可折叠） -->
+    <div v-if="hasLogDetails" class="mt-5">
+      <Button type="text" size="mini" @click="showDetails = !showDetails">
+        <template #icon>
+          <ChevronRightIcon
+            class="h-3.5 w-3.5 transition-transform"
+            :class="{ 'rotate-90': showDetails }"
+          />
+        </template>
+        查看日志详情（{{ logLineCount }} 行）
+      </Button>
+
+      <Collapse :open="showDetails">
+        <div class="mt-2.5 space-y-3">
+          <div v-if="errorLines.length > 0">
+            <p class="mb-1.5 text-xs text-gray-400">错误日志（{{ errorLines.length }} 行）</p>
+            <pre class="max-h-52 overflow-y-auto rounded-lg bg-gray-900 p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-red-300">{{ errorLines.join('\n') }}</pre>
+          </div>
+          <div v-if="logTail.length > 0">
+            <p class="mb-1.5 text-xs text-gray-400">游戏日志尾部（{{ logTail.length }} 行）</p>
+            <pre class="max-h-52 overflow-y-auto rounded-lg bg-gray-900 p-3 font-mono text-xs leading-5 whitespace-pre-wrap break-all text-gray-300">{{ logTail.join('\n') }}</pre>
+          </div>
+        </div>
+      </Collapse>
+    </div>
+
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <Button v-if="crashReportPath" type="outline" size="small" @click="openCrashReport">
+          查看报告
+        </Button>
+        <Button type="ghost" size="small" @click="exportReport">导出报告</Button>
+        <Button type="primary" size="small" @click="visible = false">关闭</Button>
+      </div>
+    </template>
+  </Drawer>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { open } from '@tauri-apps/plugin-shell'
-import { toastSuccess, toastError } from '@/utils/toast'
-import { pickSavePath } from '@/utils/fileDialog'
-import { writeTextFile } from '@/utils/api/system'
-import type { CrashInfo } from '@/utils/crashDialog'
+import { computed, ref } from 'vue'
+import {
+  ChevronRightIcon,
+  DocumentTextIcon,
+  ExclamationTriangleIcon,
+  LightBulbIcon,
+} from '@heroicons/vue/24/outline'
+import Drawer from '@/components/common/Drawer.vue'
 import Button from '@/components/common/Button.vue'
+import Tag from '@/components/common/Tag.vue'
+import Collapse from '@/components/common/Collapse.vue'
+import { pickSavePath } from '@/utils/fileDialog'
+import { openPath, writeTextFile } from '@/utils/api/system'
+import { toastError, toastSuccess } from '@/utils/toast'
+import type { CrashCategory, CrashInfo } from '@/types/version'
+
+/** 崩溃类别展示元数据：标签文案、Tag 颜色、原因横幅的左侧色条与底色 */
+interface CategoryMeta {
+  label: string
+  tagColor: string
+  bannerClass: string
+}
+
+const CATEGORY_META: Record<CrashCategory, CategoryMeta> = {
+  Java: { label: 'Java 环境', tagColor: 'blue', bannerClass: 'border-blue-400 bg-blue-50' },
+  Memory: { label: '内存不足', tagColor: 'red', bannerClass: 'border-red-400 bg-red-50' },
+  Graphics: { label: '显卡 / 渲染', tagColor: 'purple', bannerClass: 'border-purple-400 bg-purple-50' },
+  Mod: { label: 'Mod 冲突', tagColor: 'orangered', bannerClass: 'border-orange-400 bg-orange-50' },
+  Forge: { label: 'Forge', tagColor: 'orange', bannerClass: 'border-orange-400 bg-orange-50' },
+  Fabric: { label: 'Fabric', tagColor: 'gold', bannerClass: 'border-yellow-400 bg-yellow-50' },
+  OptiFine: { label: 'OptiFine', tagColor: 'green', bannerClass: 'border-green-400 bg-green-50' },
+  ResourcePack: { label: '资源包', tagColor: 'cyan', bannerClass: 'border-cyan-400 bg-cyan-50' },
+  Shader: { label: '光影', tagColor: 'cyan', bannerClass: 'border-cyan-400 bg-cyan-50' },
+  Unknown: { label: '未知原因', tagColor: 'gray', bannerClass: 'border-gray-300 bg-gray-50' },
+}
 
 const visible = ref(false)
 const showDetails = ref(false)
 const crashInfo = ref<CrashInfo | null>(null)
 
-// 防御性处理：crashInfo 可能为 null 或字段 undefined
-const errorLines = computed<string[]>(() => crashInfo.value?.log_lines ?? [])
-const logTail = computed<string[]>(() => crashInfo.value?.log_tail ?? [])
-const hasLogDetails = computed(() => errorLines.value.length > 0 || logTail.value.length > 0)
+/** 未展示崩溃数据时的兜底值 */
+const EMPTY_CRASH: CrashInfo = {
+  reason: '',
+  category: 'Unknown',
+  log_lines: [],
+  suggestion: '',
+  problematic_mod: null,
+  log_tail: [],
+}
+
+/** 最近一次崩溃数据（未展示时使用兜底值，避免 null 解构） */
+const lastCrash = computed(() => crashInfo.value ?? EMPTY_CRASH)
+
+const errorLines = computed(() => lastCrash.value.log_lines ?? [])
+const logTail = computed(() => lastCrash.value.log_tail ?? [])
+const logLineCount = computed(() => errorLines.value.length + logTail.value.length)
+const hasLogDetails = computed(() => logLineCount.value > 0)
+const reason = computed(() => lastCrash.value.reason || '未知原因')
+const suggestion = computed(() => lastCrash.value.suggestion?.trim() ?? '')
+
+/**
+ * 建议文本拆分为多行展示：
+ * 规则引擎建议以 \n 分行；AI 长文本常把「建议：N.」多条方案挤在同一行，
+ * 这里依次按 换行 / 「。建议：」/「建议：N.」编号 /「；」拆分，保证每条方案独立成行。
+ */
+const suggestionLines = computed(() => {
+  const text = suggestion.value
+  if (!text) return []
+  return text
+    .replace(/。\s*建议[:：]/g, '。\n建议：')
+    .replace(/(建议[:：])\s*(\d+[.、．])/g, '$1\n$2')
+    .split('\n')
+    .flatMap((line) => line.split('；'))
+    .map((line) => line.trim())
+    .filter(Boolean)
+})
+const problematicMod = computed(() => lastCrash.value.problematic_mod ?? null)
+const crashReportPath = computed(() => lastCrash.value.crash_report_path ?? null)
+
+const category = computed<CrashCategory>(() => lastCrash.value.category ?? 'Unknown')
+const categoryMeta = computed(() => CATEGORY_META[category.value] ?? CATEGORY_META.Unknown)
+const categoryLabel = computed(() => categoryMeta.value.label)
+const categoryTagColor = computed(() => categoryMeta.value.tagColor)
+const bannerClass = computed(() => categoryMeta.value.bannerClass)
 
 function show(info: CrashInfo) {
   crashInfo.value = info
@@ -145,87 +185,44 @@ function show(info: CrashInfo) {
   visible.value = true
 }
 
-function handleClose() {
-  visible.value = false
-}
-
+/** 打开崩溃报告文件（复用系统 shell 模块） */
 async function openCrashReport() {
-  if (!crashInfo.value?.crash_report_path) return
+  if (!crashReportPath.value) return
   try {
-    await open(crashInfo.value.crash_report_path)
+    await openPath(crashReportPath.value)
   } catch (e) {
     toastError('打开文件失败：' + String(e))
   }
 }
 
+/** 导出错误报告到本地文件 */
 async function exportReport() {
-  if (!crashInfo.value) return
+  const path = await pickSavePath({ defaultPath: 'error-report.txt' })
+  if (!path) return
   try {
-    const info = crashInfo.value
-    const lines: string[] = [
-      '===== MoLaunch 崩溃报告 =====',
-      `时间: ${new Date().toLocaleString()}`,
-      `崩溃原因: ${info.reason}`,
-      `类别: ${info.category}`,
-      '',
-      '--- 建议 ---',
-      info.suggestion,
-      '',
-    ]
-    if (info.problematic_mod) {
-      lines.push(`--- 相关 Mod ---`, info.problematic_mod, '')
-    }
-    if (info.log_lines && info.log_lines.length > 0) {
-      lines.push('--- 错误日志 ---', ...info.log_lines, '')
-    }
-    if (info.log_tail && info.log_tail.length > 0) {
-      lines.push('--- 游戏日志尾部 ---', ...info.log_tail, '')
-    }
-
-    const filePath = await pickSavePath({
-      title: '选择保存位置',
-      defaultPath: `crash-report-${Date.now()}.txt`,
-      filters: [{ name: '文本文件', extensions: ['txt'] }],
-    })
-    if (!filePath) return
-
-    await writeTextFile(filePath, lines.join('\n'))
-    toastSuccess(`导出成功，错误报告已保存到：${filePath}`)
+    await writeTextFile(path, buildReportContent())
+    toastSuccess('错误报告已导出')
   } catch (e) {
     toastError('导出失败：' + String(e))
   }
 }
 
+/** 组装错误报告文本（日志 + 崩溃信息） */
+function buildReportContent(): string {
+  const c = lastCrash.value
+  const lines = [
+    '==== MoLaunch 错误报告 ====',
+    '',
+    `类别：${category.value}`,
+    `原因：${c.reason ?? ''}`,
+    c.problematic_mod ? `相关 Mod：${c.problematic_mod}` : '',
+    '\n== 错误日志 ==',
+    ...(c.log_lines ?? []),
+    '\n== 游戏日志尾部 ==',
+    ...(c.log_tail ?? []),
+  ]
+  return lines.filter(Boolean).join('\n')
+}
+
 defineExpose({ show })
 </script>
-
-<style scoped>
-/* 进入动画：
-   - 背景遮罩：透明 → rgba(0,0,0,0.353)
-   - 弹窗：透明度 0→1（120ms），Y 偏移 40→0（300ms，回弹缓动 OutBack） */
-.crash-modal-enter-active {
-  transition: opacity 0.2s ease;
-}
-.crash-modal-enter-active .crash-dialog {
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.15s ease;
-}
-.crash-modal-enter-from {
-  opacity: 0;
-}
-.crash-modal-enter-from .crash-dialog {
-  transform: translateY(40px);
-  opacity: 0;
-}
-/* 关闭动画：
-   - 下沉 20px + 旋转 6° + 淡出 */
-.crash-modal-leave-active {
-  transition: opacity 0.15s ease;
-}
-.crash-modal-leave-to {
-  opacity: 0;
-}
-.crash-modal-leave-to .crash-dialog {
-  transform: translateY(20px);
-  opacity: 0;
-}
-</style>

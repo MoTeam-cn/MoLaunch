@@ -36,6 +36,8 @@ import DiagnosticPage from './tools/diagnostic/DiagnosticPage.vue'
 import GameResourcePage from './tools/game-resource/GameResourcePage.vue'
 import SeedMapPage from './tools/seedmap/SeedMapPage.vue'
 import ToolToc from '@/components/common/ToolToc.vue'
+import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
+import { hasAgreedToday } from '@/utils/disclaimer'
 
 interface ToolCategory {
   id: string
@@ -108,6 +110,10 @@ const categories: ToolCategory[] = [
 ]
 
 const activeCategory = ref<string>('quick-tools')
+
+/** 使用协议抽屉：当日未同意过工具协议时弹出（同意后存 localStorage，次日重新提醒） */
+const disclaimerVisible = ref(!hasAgreedToday('tools'))
+
 // 分类切换时递增，触发 ToolToc 重新扫描（含 NavSidebar 从 URL query.tab 恢复时）
 const tocRefreshKey = ref(0)
 
@@ -153,5 +159,8 @@ const activeDesc = () =>
         <ToolToc :refresh-key="tocRefreshKey" :scroll-offset="20" />
       </div>
     </div>
+
+    <!-- 使用协议抽屉（当日未同意时展示；teleport 到 #app-content，位置不影响单根约束） -->
+    <DisclaimerDialog v-model:visible="disclaimerVisible" kind="tools" />
   </div>
 </template>

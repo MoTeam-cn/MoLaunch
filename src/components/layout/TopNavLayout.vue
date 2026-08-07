@@ -203,13 +203,12 @@ onUnmounted(() => {
             v-for="item in visibleNavItems"
             :key="item.path"
             :text="item.cloudDependent && !onlineStore.cloudConnected
-              ? '云端连接失败，联机功能暂不可用（可在设置中重试）'
+              ? '云端连接失败：房间管理/联机大厅/设备信息已封存，FRP 仍可使用'
               : ''"
             position="bottom"
           >
             <button
-              :disabled="item.cloudDependent && !onlineStore.cloudConnected"
-              class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+              class="flex items-center px-4 py-1.5 rounded-md text-sm font-medium transition-colors"
               :class="[
                 isActive(item.path)
                   || (item.hasDblClick && isActive('/apps/downloads'))
@@ -218,9 +217,7 @@ onUnmounted(() => {
                   ? 'bg-white/20 text-white'
                   : 'text-white/70 hover:bg-white/10 hover:text-white'
               ]"
-              @click="item.cloudDependent && !onlineStore.cloudConnected
-                ? null
-                : (item.hasDblClick ? handleDownloadClick() : navigateTo(item.path))"
+              @click="item.hasDblClick ? handleDownloadClick() : navigateTo(item.path)"
             >
               <component :is="item.icon" class="w-4 h-4 mr-1.5" />
               {{ item.name }}

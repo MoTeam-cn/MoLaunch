@@ -25,6 +25,10 @@ pub async fn get_config(
     let (dev_unlocked, dev_mode, ignore_tls) = secure::read_developer();
     // 读取 Java 路径（INI [Java] path 独立存储，不进 AppConfig）
     let java_path = crate::storage::Storage::instance().get_config("Java", "path");
+    // 读取正版购买提示（系统存储：Windows 注册表 / 其他系统全局共用文件）
+    let (launch_count, hint_buy, hint_star) = secure::read_hint();
+    // 读取《用户协议》同意状态（系统存储：全局首次启动门禁）
+    let (user_agreed, user_agreed_version) = secure::read_user_agreed();
 
     // 构建全量快照（持有 config 锁的最短时间）
     let snapshot = {
@@ -37,6 +41,11 @@ pub async fn get_config(
             dev_mode,
             ignore_tls,
             java_path,
+            launch_count,
+            hint_buy,
+            hint_star,
+            user_agreed,
+            user_agreed_version,
         )
     };
 

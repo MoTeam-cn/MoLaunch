@@ -1,4 +1,33 @@
-## [未发布]
+## [0.3.5-rc1] - 2026-08-07
+
+- 新增正版购买提示：启动成功次数计数 + 永久忽略标记统一存入系统存储（改造 `storage/registry.rs` 为跨平台 KV：Windows 走注册表 `HKCU\Software\MoLaunch`，macOS/Linux 走全局共用文件 `~/.config/Molaunch/system.json` 且目录缺失自动创建即"有保底"）——非 Windows 上所有"注册表字段"（开发者模式、IgnoreTls、正版提示计数/忽略标记）收敛到同一个文件，避免逐功能建文件紊乱；计数与忽略标记经 `get_config`/`apply_config` 以 `launchCount`/`hintBuy` 暴露（分流到 `secure.rs`，不进 AppConfig）。前端启动成功后自增计数，命中阈值（对齐 PCL2 `ModLaunch.vb` 正版提示：3/8/15/30/50/70/90/110/130/180/220/280/330/380/450/550/660/750/880/950/1100/1300/1500/1700/1900）且非微软账号、中文系统时弹出「正版购买建议」（新增 `BuyHintDialog.vue`，与崩溃弹窗同构的右侧 Drawer 抽屉：计数横幅 + 购买理由 + 权益列表，底部「前往购买」打开官网并永久忽略、「暂不考虑」仅关闭）；dev-api 新增 `molaunch.setLaunchCount(n)` / `molaunch.showBuyHint()` 测试命令。
+- 新增「去 GitHub 点 Star」提示（参照 PCL2 `ModLaunch.vb` 赞助弹窗，目标改为项目仓库而非爱发电）：与购买提示共用同一 `launchCount` 计数，独立阈值（对齐 PCL2 赞助：10/20/40/60/80/100/120/150/200/250/300/350/400/500/600/700/800/900/1000/1200/1400/1600/1800/2000）与独立忽略标记 `hintStar`（新增系统存储键 `HintStar`，`read_hint` 返回三元组，`ConfigPatch`/`ConfigSnapshot` 同步扩展）；启动成功后由统一入口 `maybeTriggerLaunchHints` 自增一次并分别检查两个提示，避免计数重复自增。新增 `StarHintDialog.vue`（右侧 Drawer 抽屉：「你已通过 MoLaunch 启动游戏 n 次」+ 恳请支持，「去点 Star」打开仓库并永久忽略、「暂不考虑」仅关闭）；`starHint.ts` 预留 apiServer 配置下发：`StarHintRemoteConfig` 结构（开关/阈值/仓库地址/标题/正文/按钮文案）+ `fetchRemoteStarHintConfig` 当前返回 null 用本地默认，后续 apiServer 就绪直接实现该函数即可覆盖，无需改动触发链路。dev-api 新增 `molaunch.showStarHint()` 测试命令。
+- 抽屉组件优化：`Drawer.vue` 新增可选关闭反悔期（`undoMs` 默认 0 即关闭，由调用方按需传入毫秒数开启，如崩溃弹窗传 3000）——面板滑出后节点保留、对应边缘露出可点击的恢复小 tab（跟随主题色 `--color-primary-*`，带滑入/收出位移动画与剩余秒数倒计时气泡「还有 x 秒后关闭」，先播完 tab 消失动画再真正卸载），点击立即重新展开、超时后真正卸载；配合 `unmountOnClose` 则关闭即卸载（`AskUserDialog.vue` 取消提问语义保持 `unmount-on-close`，避免恢复空抽屉）。
+- 崩溃弹窗优化：解决方案多行展示增强——AI 生成的「建议：1. xxx；2. xxx」编号列表按「。建议：」/「建议：N.」编号/「；」多级拆分，每条方案独立成行，不再与「建议：」挤在同一行。
+- 提示抽屉整合：`BuyHintDialog.vue` / `StarHintDialog.vue` 合并为统一的 `HintDialog.vue` 单抽屉——两个提示（正版购买 / 点 Star）共用同一个右侧 Drawer，同时触发（如 dev-api 依次调用 `molaunch.showBuyHint()` + `molaunch.showStarHint()`）时不再叠加渲染两个抽屉，而是标题栏出现分段切换器（复用项目 `SegmentedButtons.vue`），内容区横向滑动切换两页（`translateX` 0.3s 动画）；各页均保留「你已通过 MoLaunch 启动游戏 n 次」计数横幅；`buyHint.ts` / `starHint.ts` 的实例接口相应改为 `showBuy` / `showStar`，`App.vue` 改为挂载单个 `HintDialog` 并注册给两处 ref。
+- 分段按钮组件复用化：`SegmentedButtons.vue` 改为基于项目 `Button.vue` 渲染（不再手写原生 `<button>`），选中态通过 Tailwind utilities 层类名覆盖（优先于 components 层 `.btn-*`），API 与外观保持不变。
+- 使用协议与免责声明：新增 `DisclaimerDialog.vue`（右侧 Drawer 抽屉，按 `kind` 区分联机 / 实验性功能 / 工具三份协议）——通用声明（本启动器及作者不承担使用后果）+ 联机说明（房间管理仅经 MoLaunch 服务器，不涉及流量中转与内容传播；经国内外 TURN 服务器获取网络类型并使用 P2P 创建虚拟 TUN 网络；FRP 隧道由第三方提供、每家厂商各有其用户协议需用户遵守）+ 实验性说明（AI 对话发送至自行配置的模型端点、数据外发风险自担）+ 工具说明（本地为主、外部下载/网络工具请求第三方）+ 合规提醒；`Online.vue` / `Experimental.vue` / `Tools.vue` 进入时展示，改为「每日一弹」——点击「我已知悉并同意」后写入 localStorage，当天不再弹出（次日重新提醒），记录逻辑收敛在 `utils/disclaimer.ts` 的 `hasAgreedToday` / `markAgreedToday`。
+- drawer 强制关闭：协议抽屉设置 `closable=false` / `mask-closable=false` / `esc-to-close=false`，必须点击按钮才能关闭，规避用户未确认而绕过协议。
+- 联机页面可进入 + 云端离线封禁：`TopNavLayout` 导航「联机」不再因云端不可达而置灰禁用，始终可点击进入；云端离线时由 `useOnlineNav` 将「房间管理」「联机大厅」置为封禁态（`NavSidebar` 新增 `sealed`，灰色 + 锁图标，点击仍触发 `@click`），`Online.vue` 拦截点击弹窗告知原因（复用 `showWarning`，展示 cloudError）；设备页注册 / 登录 / 设备信息卡片叠加新组件 `SealedOverlay` 封条遮罩（点击弹窗告知原因），NAT 检测（第三方 TURN/STUN）仍可用；已加入房间时（P2P 仍工作）保留「房间详情」，云端断开自动切回「设备」；状态徽章新增「云端离线」。删除废弃的 `CloudDisconnectedMask.vue`。
+- 协议抽屉交互补全：`DisclaimerDialog.vue` 点击「我已知悉并同意」后追加 success toast「已确认使用协议，今日不再提醒」；跳往其他页面时若抽屉仍开着（未确认）追加 warning toast「已放弃确认使用协议，下次进入将再次提醒」（`onBeforeRouteLeave` 守卫，联机 / 实验性 / 工具三处共用同一组件即同时生效）。
+- 许可协议展示优化（`LicenseTab.vue` 重写）：标题栏不吸顶常驻、正文随外层设置容器统一滚动（撤回 sticky + 内层独立滚动方案），GitHub 原文外链置于标题栏右侧；正文不引入 markdown（CommonMark 加粗受 flanking 规则限制，`**“许可方”**` 等引号加粗会原样渲染），改为极简渲染器——先 HTML 转义防注入，再对短引号内容（产品名 / 法律术语，≤20 字符）直接转 `<strong>` 加粗 + `letter-spacing` 字距（scoped `:deep` 限定作用域），段落按空行拆分为 `<p>`、段内换行保留 `<br />`，长引号保留原文；底部说明补充「本许可证只携带此版本构建时的许可证，不排除后续版本更迭许可证更新的情况，具体以仓库许可证版本为主」。
+- 新增《用户协议》全局门禁（首次启动须同意后才能使用，参照 PCL2 首启协议）：前端 `utils/userAgreement.ts` 自设计简短协议内容（引言 + 账号/软件/隐私/变更四要点）并预留 apiServer 远端下发（`fetchRemoteUserAgreementConfig` 当前返回 null，后续就绪即覆盖本地默认、触发链路无需改动）；完整条款外链服务条款 `https://molaunch.moiu.cn/terms-of-service.html` 与隐私政策 `https://molaunch.moiu.cn/privacy-policy.html`。同意状态持久化到系统存储（新增 `UserAgreed` / `UserAgreedVersion` 键，Windows 注册表 / 其他系统全局共用文件，与 `launchCount`/`hintBuy`/`hintStar` 同分流），经 `get_config`/`apply_config` 以 `userAgreed`/`userAgreedVersion` 暴露；协议内容有实质更新时自增 `USER_AGREEMENT_VERSION`（当前 1），已同意版本低于当前版本即重新要求同意。新增 `UserAgreementDialog.vue`（强制弹窗：无关闭按钮 / 无遮罩点击 / 无 Esc，Teleport 到 body 以 `z-[10050]` 覆盖启动加载遮罩与普通弹窗，同意按钮「同意并继续」，正文含引言 + 要点列表 + 条款外链，失败态可重试）；`App.vue` 启动 `initApp` 开头触发 `maybeRequireUserAgreement()` 门禁检查（fire-and-forget + 失败静默忽略，不阻塞其余初始化）；dev-api 新增 `molaunch.showUserAgreement()` / `molaunch.resetUserAgreement()` 测试命令。
+- 联机大厅刷新按钮靠右：`LobbyBrowser.vue` 搜索栏中刷新按钮（Tooltip 包裹的图标按钮）加 `ml-auto`，与搜索框 / 加载器筛选拉开到行尾对齐。
+- 设置 - 更多新增「许可协议」子页签：`SettingsMore.vue` 顶部子菜单在「鸣谢」与「教程」间插入 `license` 项（复用 `ScaleIcon`），新增 `more/LicenseTab.vue` 展示项目许可协议全文（加载 / 失败 / 正文三段式，正文 `whitespace-pre-wrap` 排版 + GitHub 原文外链）。
+- 许可协议「副本引用」设计：项目根目录 `LICENSE` 为唯一权威副本 → `build.rs` 新增 `sync_license()`，每次构建自动将其同步到 `src-tauri/resources/LICENSE.txt`（内容无变化不写盘避免无意义重编译，根 LICENSE 变更经 `rerun-if-changed` 触发重新构建）→ `resources.rs` 在 `embedded_text` 注册 `"LICENSE.txt"`（include_str! 编译期嵌入二进制，确保每次打包都包含最新协议）→ 新增 `get_project_license` IPC 命令（`commands/system/about.rs` + `system/manager/dispatcher.rs`），前端经 `about.ts` 的 `getProjectLicense` 读取展示。同时提交 `resources/LICENSE.txt` 现网快照，保证资源目录自包含。
+- 《用户协议》弹窗交互补全（`UserAgreementDialog.vue`）：弹窗改横向长方形比例（`max-w-3xl` + 内容区 `max-h-[min(56vh,26rem)]`，贴合启动器长条窗口）；底部新增已读确认 `Checkbox`「我已阅读并同意本《用户协议》」（未勾选时禁用「同意并继续」按钮，每次打开重置未勾选状态）；《服务条款》/《隐私政策》外链按钮回归正文原位置，与灰色「需同意后方可继续使用」提示文案置于同一行、按钮在文案左侧（整体靠右 `justify-end`、底部对齐 `items-end` 不与文案垂直居中、文案 `whitespace-nowrap` 不换行），标题栏还原为「标题 + 版本」不被挤动，底部保持单行「已读勾选 + 取消/同意」布局；新增「取消」挽留功能——点取消先进入二次确认态（「确定要退出 MoLaunch 吗？」+「返回上一步」/红字「确定退出」），确认后才 `invoke('request_exit')` 退出程序（后端清理 frpc/TUN 后退出进程，不经 closeBehavior 关闭询问 / 托盘分流）；通过在弹窗遮罩上挂 `data-tauri-drag-region`（与 TopNavLayout 顶部拖拽区同机制）修复弹窗弹出后无法拖动窗口的问题。
+- 验证：`npx vue-tsc --noEmit`、`npx eslint`（改动文件）、`cargo check --manifest-path src-tauri/Cargo.toml` 均通过。
+
+## [0.3.4] - 2026-08-07
+
+- 修复 dev 重建死循环：新增 `src-tauri/.taurignore`，排除嵌套 Cargo 项目 `updater/target/`，避免其构建产物被 tauri dev 监听后与 `build.rs` 的 updater 自动构建互相触发无限"Rebuilding application"。
+- 验证：已对照 tauri-cli v2.11.4 源码确认 `.taurignore` 的加载与过滤链路（`build_ignore_matcher` 仅在发现 `.taurignore` 时构建过滤规则）；需重启 `npm run tauri dev` 生效。
+
+- 崩溃分析弹窗重构：`CrashDialog.vue` 由 PCL2 模拟样式重写为右侧 `Drawer` 抽屉布局（复用项目抽屉组件，与 AI 提问抽屉同构）。内容分区设计：按崩溃类别着色的原因横幅（左侧色条 + Tag）、主色信息框的解决方案、崩溃报告文件行（等宽路径 + 打开）、可折叠日志详情（深色代码块与日志查看器一致）；替换插件 shell 直连为统一 `openPath`；`CrashCategory`/`CrashInfo` 类型收敛至 `src/types/version.ts`（补齐后端 10 种分类，消除 3 处重复定义）。
+- 验证：`npx vue-tsc --noEmit`、`npx vite build`、`npx eslint`（改动文件）均通过。
+
+- 崩溃弹窗体验优化：解决方案支持多行展示——规则引擎建议以换行分行、AI 长文本按「。建议：」「；」拆分，保证每条方案独立成行；日志详情展开改动画折叠，复用 `Collapse.vue`（grid-rows 0fr→1fr 平滑高度动画），替代原布尔显隐切换。
+- 验证：`npx vue-tsc --noEmit`、`npx eslint`（`CrashDialog.vue`）均通过。
 
 - 依赖与版权清单审计：根据 `package.json`、`Cargo.toml` 及本地包元数据补齐前端运行时/开发工具链和 Rust build/条件依赖；修正 `marked`、`netstat2` 版本及 `notify`、`tun-rs`、`md5`、`rustls-native-certs` 等许可证记录，补充缺失的直接依赖与版权来源。
 
@@ -42,6 +71,10 @@
 - 清理实验聊天模块未使用的 `prepare_turns` 函数及其无效导入，消除 Rust `dead_code` 编译警告；未改变实际聊天调用链。
 
 - 修复 AI 工具调用后提前结束：当工具执行成功但模型下一轮返回空正文时，允许基于已回填的工具结果重试一次最终回答，并记录告警日志；避免工具调用成功后直接结束聊天。
+
+- 许可证重新设计：新增根目录 `LICENSE`，采用 MoLaunch 分发有限许可证，禁止项目及二次开发版本商业使用，要求二次开发公开完整源代码、明确第三方来源并遵守名称限制；同步 README、关于页和第三方版权清单，明确自有代码与第三方依赖的许可证边界。
+
+- 许可证路径与 README 标准化：后端主 crate 和 updater crate 各自使用本目录 `LICENSE`，移除 Cargo 元数据中的 `../` 路径；README 重写为标准化产品文档，并明确第三方项目版权与许可证均记录于 `src-tauri/resources/about/licenses.txt`。
 
 ### 新增
 

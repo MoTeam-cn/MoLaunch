@@ -14,10 +14,12 @@ import {
   ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
 import NavSidebar from '@/components/common/NavSidebar.vue'
+import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
 import ExperimentalChat from './experimental/ExperimentalChat.vue'
 import ExperimentalLog from './experimental/ExperimentalLog.vue'
 import SettingsAi from './settings/SettingsAi.vue'
 import { useExperimental } from '@/composables/useExperimental'
+import { hasAgreedToday } from '@/utils/disclaimer'
 
 const categories = [
   { id: 'chat', label: 'AI 聊天', icon: ChatBubbleLeftRightIcon, desc: '与 AI 对话，支持工具自动分析日志与崩溃' },
@@ -29,6 +31,9 @@ const activeCategory = ref('chat')
 const { enabled } = useExperimental()
 const guarded = computed(() => enabled.value)
 const activeDesc = () => categories.find((c) => c.id === activeCategory.value)?.desc ?? ''
+
+// 使用协议抽屉：当日未同意过协议时进入实验性页弹出（同意后存 localStorage，次日重新提醒）
+const disclaimerVisible = ref(!hasAgreedToday('experimental'))
 </script>
 
 <template>
@@ -62,5 +67,8 @@ const activeDesc = () => categories.find((c) => c.id === activeCategory.value)?.
         </div>
       </div>
     </div>
+
+    <!-- 使用协议抽屉（本会话首次进入时展示；teleport 到 #app-content，位置不影响单根约束） -->
+    <DisclaimerDialog v-model:visible="disclaimerVisible" kind="experimental" />
   </div>
 </template>

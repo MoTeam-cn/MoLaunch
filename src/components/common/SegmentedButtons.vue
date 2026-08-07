@@ -2,8 +2,8 @@
 /**
  * 分段按钮组
  *
- * 整合 SettingsAdvanced.vue / SettingsDownload.vue / MemorySection.vue 等中重复的
- * `<div class="flex gap-2"><button :class="active ? ... : ..."/></div>` 模式。
+ * 复用项目 Button 组件渲染分段切换；选中态通过 Tailwind utilities 层类名覆盖
+ * （utilities 优先级高于 components 层 .btn-*，故 hover/active 表现确定）。
  *
  * 支持两种使用方式：
  * 1. v-model 绑定（直接赋值）
@@ -17,6 +17,7 @@
  * ]" />
  */
 import { computed } from 'vue'
+import Button from '@/components/common/Button.vue'
 
 export interface SegmentedOption<T = string> {
   label: string
@@ -53,14 +54,13 @@ function handleClick(option: SegmentedOption) {
 
 <template>
   <div class="flex gap-2">
-    <!-- 保留原生 button：分段切换按钮（border-2 active 状态 + 自定义 px-3 py-1.5 text-xs），
-         Button.vue 的 scoped size 类固定 height/padding 会破坏紧凑分段布局 -->
-    <button
+    <Button
       v-for="opt in options"
       :key="String(opt.value)"
-      type="button"
+      type="ghost"
+      size="mini"
       :disabled="opt.disabled"
-      class="px-3 py-1.5 text-xs font-medium rounded-lg border-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      class="rounded-md disabled:opacity-50"
       :class="[
         currentValue === opt.value
           ? 'border-primary-500 bg-primary-50 text-primary-700'
@@ -68,6 +68,6 @@ function handleClick(option: SegmentedOption) {
         buttonClass,
       ]"
       @click="handleClick(opt)"
-    >{{ opt.label }}</button>
+    >{{ opt.label }}</Button>
   </div>
 </template>

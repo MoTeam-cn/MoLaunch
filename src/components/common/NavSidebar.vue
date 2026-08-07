@@ -20,7 +20,7 @@
  * 向后兼容：categories 项的 children 字段可选，未传时行为与原版一致（无子菜单）
  */
 import { ref, watch, computed, type Component } from 'vue'
-import { ChevronDownIcon } from '@heroicons/vue/24/outline'
+import { LockClosedIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
 import { useTabPersistence } from '@/composables/useTabPersistence'
 
 interface NavCategory {
@@ -32,6 +32,8 @@ interface NavCategory {
   children?: NavCategory[]
   /** 可选禁用态：灰色不可点击，用于「房间详情」等需要前置条件的菜单项 */
   disabled?: boolean
+  /** 可选封禁态：灰色置灰但点击仍 emit，由父组件拦截弹窗提示原因（区别于 disabled：disabled 完全不响应点击） */
+  sealed?: boolean
 }
 
 const props = defineProps<{
@@ -69,9 +71,13 @@ function toggleExpand(id: string) {
   expandedMap.value = { ...expandedMap.value, [id]: !expandedMap.value[id] }
 }
 
-/** 父项点击：disabled 不响应；有 children 则 toggle 展开，无 children 则 emit id */
+/** 父项点击：disabled 不响应；sealed 封禁交给父组件拦截提示（不展开子菜单）；有 children 则 toggle 展开，无 children 则 emit id */
 function handleClick(cat: NavCategory) {
   if (cat.disabled) return
+  if (cat.sealed) {
+    emit('update:modelValue', cat.id)
+    return
+  }
   if (cat.children && cat.children.length > 0) {
     toggleExpand(cat.id)
   } else {
@@ -100,12 +106,12 @@ watch(() => props.modelValue, (val) => {
 useTabPersistence(
   () => props.modelValue,
   (tab) => {
-    // 校验 tab 是否在 categories 中（含 children）且未禁用
+    // 校验 tab 是否在 categories 中（含 children）且未禁用/未封禁
     for (const cat of props.categories) {
-      if (cat.id === tab && !cat.disabled) return true
+      if (cat.id === tab && !cat.disabled && !cat.sealed) return true
       if (cat.children) {
         for (const child of cat.children) {
-          if (child.id === tab && !child.disabled) return true
+          if (child.id === tab && !child.disabled && !child.sealed) return true
         }
       }
     }
@@ -126,7 +132,7 @@ useTabPersistence(
           type="button"
           class="w-full flex items-center px-4 py-2.5 text-sm font-medium transition-colors"
           :class="[
-            cat.disabled
+            cat.disabled || cat.sealed
               ? 'text-gray-300 cursor-not-allowed'
               : isParentActive(cat)
                 ? 'bg-primary-50 text-primary-700 border-r-2 border-primary-500 cursor-pointer'
@@ -136,9 +142,10 @@ useTabPersistence(
         >
           <component :is="cat.icon" class="w-5 h-5 mr-3 shrink-0" />
           <span class="flex-1 text-left">{{ cat.label }}</span>
-          <!-- 展开图标（仅有 children 时显示，带旋转动画） -->
+          <!-- 展开图标（仅有 children 且非封禁时显示，带旋转动画）；封禁项显示锁图标 -->
+          <LockClosedIcon v-if="cat.sealed" class="w-4 h-4 text-gray-300 shrink-0" />
           <ChevronDownIcon
-            v-if="cat.children && cat.children.length > 0"
+            v-else-if="cat.children && cat.children.length > 0"
             class="w-4 h-4 text-gray-400 transition-transform duration-200"
             :class="isExpanded(cat.id) ? 'rotate-180' : ''"
           />
@@ -157,16 +164,17 @@ useTabPersistence(
               type="button"
               class="w-full flex items-center pl-11 pr-4 py-2 text-sm transition-colors"
               :class="[
-                child.disabled
+                child.disabled || child.sealed
                   ? 'text-gray-300 cursor-not-allowed'
                   : modelValue === child.id
                     ? 'text-primary-700 bg-primary-50/50 font-medium cursor-pointer'
                     : 'text-gray-600 hover:bg-gray-50 cursor-pointer',
               ]"
-              @click="!child.disabled && emit('update:modelValue', child.id)"
+              @click="child.disabled ? null : emit('update:modelValue', child.id)"
             >
               <component :is="child.icon" class="w-4 h-4 mr-2.5 shrink-0" />
               {{ child.label }}
+              <LockClosedIcon v-if="child.sealed" class="w-3.5 h-3.5 ml-auto text-gray-300 shrink-0" />
             </button>
           </div>
         </div>

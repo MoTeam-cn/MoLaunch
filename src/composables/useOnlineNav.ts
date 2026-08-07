@@ -27,6 +27,8 @@ export interface NavCategory {
   children?: NavCategory[]
   /** 禁用态：未满足前置条件时灰色不可点击（如未在房间时的「房间详情」） */
   disabled?: boolean
+  /** 封禁态：云端离线时灰色置灰但点击仍会触发，由 Online.vue 拦截弹窗告知原因 */
+  sealed?: boolean
 }
 
 /** Online 页激活分类 ID 联合类型（tutorial 为侧边栏动作项，不会真正成为激活态） */
@@ -125,11 +127,29 @@ export function useOnlineNav(
 
   /** 实际渲染的分类列表
    *
+   * 云端离线（cloudConnected=false 且初始化已完成）时：
+   * - 「房间管理」「联机大厅」封禁置灰（可点击但由 Online.vue 拦截弹窗告知原因）
+   * - 已在房间中（P2P 仍工作）时保留「房间详情」，创建/加入按在房规则禁用
+   * - FRP（第三方隧道）不依赖 MoLaunch 云端，仍可用
+   *
    * 子项 disabled 规则：
    * - 未在房间：「创建房间」「加入房间」可用，「房间详情」灰色
    * - 在房间中：「创建房间」「加入房间」灰色（必须先退出房间），「房间详情」可用
    */
   const categories = computed<NavCategory[]>(() => {
+    const offline = !onlineStore.cloudConnected && !onlineStore.initializing
+    if (offline) {
+      const inRoom = isInRoom.value
+      const children: NavCategory[] = inRoom
+        ? [...roomCategory.children!.map((c) => ({ ...c, disabled: true, sealed: false })), roomDetailsChild.value]
+        : roomCategory.children!.map((c) => ({ ...c, sealed: true, disabled: false }))
+      return [
+        deviceCategory,
+        { ...lobbyCategory, sealed: true },
+        { ...roomCategory, children, sealed: !inRoom },
+        frpCategory,
+      ]
+    }
     if (!isReady.value) return [deviceCategory]
     const inRoom = isInRoom.value
     const children: NavCategory[] = [
@@ -143,6 +163,9 @@ export function useOnlineNav(
 
   /** 状态徽章文案与颜色 */
   const badge = computed(() => {
+    if (!onlineStore.cloudConnected && !onlineStore.initializing) {
+      return { text: '云端离线', dotClass: 'bg-red-400', wrapClass: 'bg-red-50 text-red-600' }
+    }
     if (isReady.value) return { text: '已就绪', dotClass: 'bg-green-500', wrapClass: 'bg-green-50 text-green-700' }
     const isUnregistered = !status.value || !status.value.registered
     if (isUnregistered) return { text: '未注册', dotClass: 'bg-gray-400', wrapClass: 'bg-gray-100 text-gray-600' }
@@ -186,6 +209,11 @@ export function useOnlineNav(
    * 时 categories 已就绪，完整恢复所有合法 tab。
    */
   watch(isReady, (ready) => {
+    // 云端离线：强制停留「设备」，避免自动切到被封禁的分类
+    if (!onlineStore.cloudConnected) {
+      if (activeCategory.value !== 'device') activeCategory.value = 'device'
+      return
+    }
     if (ready) {
       // 已进入房间时，无论 URL tab 如何，房间详情始终优先（角色由 store 保留）
       if (isInRoom.value) {
@@ -225,6 +253,19 @@ export function useOnlineNav(
       activeCategory.value = 'create'
     }
   })
+
+  /**
+   * 云端连接状态变化：断开时若停留在被封禁的分类（房间/大厅）强制切回「设备」，
+   * 避免内容区仍渲染 RoomManager/Lobby 而侧边栏已封禁的不一致状态
+   */
+  watch(
+    () => onlineStore.cloudConnected,
+    (connected) => {
+      if (!connected && !onlineStore.initializing && activeCategory.value !== 'device') {
+        activeCategory.value = 'device'
+      }
+    },
+  )
 
   return {
     status,

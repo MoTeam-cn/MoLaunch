@@ -32,6 +32,11 @@ pub fn build_snapshot(
     dev_mode: bool,
     ignore_tls: bool,
     java_path: Option<String>,
+    launch_count: u32,
+    hint_buy: bool,
+    hint_star: bool,
+    user_agreed: bool,
+    user_agreed_version: u32,
 ) -> ConfigSnapshot {
     ConfigSnapshot {
         // 通用字段
@@ -92,5 +97,12 @@ pub fn build_snapshot(
         curseforge_api_key: cf_api_key.unwrap_or_default(),
         developer_unlocked: dev_unlocked,
         developer_mode: dev_mode,
+        // 正版购买提示（系统存储）
+        launch_count,
+        hint_buy,
+        hint_star,
+        // 用户协议（系统存储）
+        user_agreed,
+        user_agreed_version,
     }
 }

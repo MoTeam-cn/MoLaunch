@@ -19,3 +19,27 @@ export interface VersionList {
 
 /** 加载器类型 */
 export type LoaderType = 'vanilla' | 'forge' | 'fabric' | 'neoforge' | 'optifine' | 'liteloader'
+
+/** 崩溃类别（与后端 CrashCategory 枚举对应） */
+export type CrashCategory =
+  | 'Java'
+  | 'Mod'
+  | 'Graphics'
+  | 'Memory'
+  | 'Forge'
+  | 'Fabric'
+  | 'OptiFine'
+  | 'ResourcePack'
+  | 'Shader'
+  | 'Unknown'
+
+/** 崩溃详情（与后端 CrashInfo 结构对应） */
+export interface CrashInfo {
+  reason: string
+  category: CrashCategory
+  log_lines: string[]
+  suggestion: string
+  problematic_mod: string | null
+  crash_report_path?: string
+  log_tail: string[]
+}

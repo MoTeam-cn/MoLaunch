@@ -17,6 +17,7 @@ import { useOnlineStore } from '@/stores/online'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import SealedOverlay from '@/components/common/SealedOverlay.vue'
 import {
   UserPlusIcon,
   ArrowRightOnRectangleIcon,
@@ -32,8 +33,21 @@ import { formatTimestamp } from '@/utils/format'
 import { NAT_TYPE_META, getNatFeasibilityColorClass } from '@/utils/online/nat-type'
 import { stripMcsdkPrefix } from '@/utils/online/device-id'
 import { toastSuccess, toastError } from '@/utils/toast'
+import { showWarning } from '@/utils/modal'
 
 const onlineStore = useOnlineStore()
+
+/** 云端离线：注册/登录/设备信息均依赖云端，显示封条遮罩；NAT 检测（第三方 TURN/STUN）仍可用 */
+const offline = computed(() => !onlineStore.cloudConnected && !onlineStore.initializing)
+
+/** 点击封条弹窗告知原因（封存的云端功能因连接失败暂不可用） */
+function showSealedReason(label: string) {
+  showWarning(
+    '功能已封存',
+    `「${label}」需要连接云端服务，当前云端连接失败，暂不可用。`,
+    onlineStore.cloudError ?? undefined,
+  )
+}
 
 const status = computed(() => onlineStore.deviceStatus)
 const isUnregistered = computed(() => !status.value || !status.value.registered)
@@ -88,42 +102,56 @@ async function handleDetectNat() {
       </div>
     </div>
 
-    <!-- 未注册：注册引导 -->
+    <!-- 未注册：注册引导（云端离线时封存） -->
     <Card v-else-if="isUnregistered" title="注册设备">
-      <div class="py-6 flex flex-col items-center text-center">
-        <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50">
-          <UserPlusIcon class="h-7 w-7 text-primary-600" />
+      <div class="relative">
+        <SealedOverlay
+          v-if="offline"
+          :reason="onlineStore.cloudError || ''"
+          @request="showSealedReason('注册设备')"
+        />
+        <div class="py-6 flex flex-col items-center text-center">
+          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50">
+            <UserPlusIcon class="h-7 w-7 text-primary-600" />
+          </div>
+          <div class="mb-2 text-sm font-semibold text-gray-700">注册联机设备</div>
+          <p class="mb-5 text-xs text-gray-500 max-w-md">
+            注册将为你的设备生成唯一的密钥对，用于联机服务的身份验证。
+            密钥保存在本地，不会上传到云端。
+          </p>
+          <Button type="primary" :loading="onlineStore.loading" @click="handleRegister">
+            <template #icon><UserPlusIcon class="w-4 h-4" /></template>
+            立即注册
+          </Button>
         </div>
-        <div class="mb-2 text-sm font-semibold text-gray-700">注册联机设备</div>
-        <p class="mb-5 text-xs text-gray-500 max-w-md">
-          注册将为你的设备生成唯一的密钥对，用于联机服务的身份验证。
-          密钥保存在本地，不会上传到云端。
-        </p>
-        <Button type="primary" :loading="onlineStore.loading" @click="handleRegister">
-          <template #icon><UserPlusIcon class="w-4 h-4" /></template>
-          立即注册
-        </Button>
       </div>
     </Card>
 
-    <!-- 已注册未登录：登录卡片 -->
+    <!-- 已注册未登录：登录卡片（云端离线时封存） -->
     <Card v-else-if="needLogin" title="设备登录">
-      <div class="py-6 flex flex-col items-center text-center">
-        <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-50">
-          <ArrowRightOnRectangleIcon class="h-7 w-7 text-yellow-600" />
+      <div class="relative">
+        <SealedOverlay
+          v-if="offline"
+          :reason="onlineStore.cloudError || ''"
+          @request="showSealedReason('设备登录')"
+        />
+        <div class="py-6 flex flex-col items-center text-center">
+          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-yellow-50">
+            <ArrowRightOnRectangleIcon class="h-7 w-7 text-yellow-600" />
+          </div>
+          <div class="mb-2 text-sm font-semibold text-gray-700">
+            {{ status?.token_expired ? '登录已过期' : '设备未登录' }}
+          </div>
+          <p class="mb-5 text-xs text-gray-500 max-w-md">
+            {{ status?.token_expired
+              ? 'JWT 已过期，需要重新登录以继续使用联机功能。'
+              : '设备已注册但未登录，点击下方按钮登录以获取访问凭证。' }}
+          </p>
+          <Button type="primary" :loading="onlineStore.loading" @click="handleLogin">
+            <template #icon><ArrowRightOnRectangleIcon class="w-4 h-4" /></template>
+            登录设备
+          </Button>
         </div>
-        <div class="mb-2 text-sm font-semibold text-gray-700">
-          {{ status?.token_expired ? '登录已过期' : '设备未登录' }}
-        </div>
-        <p class="mb-5 text-xs text-gray-500 max-w-md">
-          {{ status?.token_expired
-            ? 'JWT 已过期，需要重新登录以继续使用联机功能。'
-            : '设备已注册但未登录，点击下方按钮登录以获取访问凭证。' }}
-        </p>
-        <Button type="primary" :loading="onlineStore.loading" @click="handleLogin">
-          <template #icon><ArrowRightOnRectangleIcon class="w-4 h-4" /></template>
-          登录设备
-        </Button>
       </div>
     </Card>
 
@@ -161,42 +189,49 @@ async function handleDetectNat() {
       </div>
     </Card>
 
-    <!-- 设备信息（已注册时显示） -->
+    <!-- 设备信息（已注册时显示；云端离线时封存） -->
     <Card v-if="status?.registered" title="设备信息">
-      <div class="divide-y divide-gray-100">
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <UserCircleIcon class="w-4 h-4 text-gray-400" />
-            <span>设备 ID</span>
+      <div class="relative">
+        <SealedOverlay
+          v-if="offline"
+          :reason="onlineStore.cloudError || ''"
+          @request="showSealedReason('设备信息')"
+        />
+        <div class="divide-y divide-gray-100">
+          <div class="px-1 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <UserCircleIcon class="w-4 h-4 text-gray-400" />
+              <span>设备 ID</span>
+            </div>
+            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ status.device_id ? stripMcsdkPrefix(status.device_id) : '-' }}</code>
           </div>
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ status.device_id ? stripMcsdkPrefix(status.device_id) : '-' }}</code>
-        </div>
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <GlobeAltIcon class="w-4 h-4 text-gray-400" />
-            <span>api-server</span>
+          <div class="px-1 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <GlobeAltIcon class="w-4 h-4 text-gray-400" />
+              <span>api-server</span>
+            </div>
+            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded max-w-[260px] truncate">
+              {{ status.api_server_url || '-' }}
+            </code>
           </div>
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded max-w-[260px] truncate">
-            {{ status.api_server_url || '-' }}
-          </code>
-        </div>
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <ClockIcon class="w-4 h-4 text-gray-400" />
-            <span>最后登录</span>
+          <div class="px-1 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <ClockIcon class="w-4 h-4 text-gray-400" />
+              <span>最后登录</span>
+            </div>
+            <span class="text-xs text-gray-900">
+              {{ status.last_login_at ? formatTimestamp(status.last_login_at) : '从未登录' }}
+            </span>
           </div>
-          <span class="text-xs text-gray-900">
-            {{ status.last_login_at ? formatTimestamp(status.last_login_at) : '从未登录' }}
-          </span>
-        </div>
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <KeyIcon class="w-4 h-4 text-gray-400" />
-            <span>JWT 过期时间</span>
+          <div class="px-1 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-2 text-sm text-gray-600">
+              <KeyIcon class="w-4 h-4 text-gray-400" />
+              <span>JWT 过期时间</span>
+            </div>
+            <span class="text-xs" :class="status.token_expired ? 'text-red-600' : 'text-gray-900'">
+              {{ status.token_expires_at ? formatTimestamp(status.token_expires_at) : '-' }}
+            </span>
           </div>
-          <span class="text-xs" :class="status.token_expired ? 'text-red-600' : 'text-gray-900'">
-            {{ status.token_expires_at ? formatTimestamp(status.token_expires_at) : '-' }}
-          </span>
         </div>
       </div>
     </Card>

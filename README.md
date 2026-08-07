@@ -1,286 +1,181 @@
-# MoLaunch - 现代化 Minecraft 启动器
+# MoLaunch
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+现代化、跨平台的 Minecraft Java 版启动器。
+
+[![License](https://img.shields.io/badge/License-MoLaunch%20Limited%20Distribution%20License-red.svg)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)](https://github.com/MoTeam-cn/MoLaunch)
-[![Tauri](https://img.shields.io/badge/Tauri-2-orange.svg)](https://tauri.app/)
+[![Tauri](https://img.shields.io/badge/Tauri-2-orange.svg)](https://v2.tauri.app/)
 
-一个使用 **Tauri 2 + Vue 3 + TypeScript + Rust** 构建的现代化 Minecraft 启动器。后端采用纯 Rust 实现的 `minecraft` 模块，覆盖认证、下载、启动、版本管理、社区资源等完整能力，无任何 C FFI 依赖。
+> MoLaunch 是独立的第三方 Minecraft 启动器项目，不是 Mojang 或 Microsoft 的官方产品，也未获其批准或与其建立关联。
 
-- 仓库地址：<https://github.com/MoTeam-cn/MoLaunch>
-- 当前版本：0.1.0
-- License：MIT
+## 项目简介
 
-## 特性
+MoLaunch 使用 Tauri 2、Vue 3、TypeScript 和 Rust 构建，面向希望在一个桌面应用中管理 Minecraft Java 版实例、Java 环境、模组和联机功能的用户。
 
-- **跨平台**：基于 Tauri 2，支持 Windows、macOS、Linux
-- **现代化 UI**：Vue 3 + Tailwind CSS + @heroicons/vue，自研组件体系，支持主题定制
-- **高性能**：纯 Rust 后端 + tokio 异步架构，启动快速、内存占用低
-- **3D 皮肤预览**：集成 skinview3d，支持皮肤/披风实时预览
-- **纯 Rust 实现**：所有 Minecraft 业务逻辑（认证、下载、启动、加载器等）均由 Rust 原生编写
-- **虚拟滚动**：使用 vue-virtual-scroller 处理大型列表（版本、资源）的性能
+项目重点关注：
+
+- 跨平台桌面体验
+- 原生 Rust 后端与异步任务处理
+- 可维护的版本、下载和启动流程
+- 清晰的第三方依赖版权与许可证说明
+
+## 主要功能
+
+- **账户与认证**：离线账户、Microsoft 设备码登录、令牌存储与刷新
+- **版本管理**：原版、Forge、Fabric、NeoForge、OptiFine 等版本和加载器
+- **实例启动**：Java 检测、启动参数、内存配置、进程监控与崩溃分析
+- **资源管理**：Mod、整合包、社区资源搜索与安装
+- **下载管理**：并发下载、分片下载、断点续传、暂停、取消与校验
+- **Java 管理**：本机 Java 扫描、版本匹配和运行时下载
+- **皮肤管理**：皮肤、披风及 3D 预览
+- **联机功能**：房间、信令、虚拟网络和 FRP 隧道管理
+- **开发者能力**：日志查看、实验性 AI 辅助和 SDK 扩展能力
 
 ## 技术栈
 
 ### 前端
 
-- **框架**：Vue 3 + TypeScript
-- **构建工具**：Vite
-- **状态管理**：Pinia
-- **路由**：Vue Router
-- **UI 组件**：Tailwind CSS + @heroicons/vue（自研组件库）
-- **3D 皮肤预览**：skinview3d
-- **虚拟滚动**：vue-virtual-scroller
+- Vue 3
+- TypeScript
+- Vite
+- Pinia
+- Vue Router
+- Tailwind CSS
+- Tauri JavaScript API
 
 ### 后端
 
-- **框架**：Tauri 2
-- **语言**：Rust（edition 2021）
-- **异步运行时**：tokio
-- **HTTP 客户端**：reqwest
-- **序列化**：serde / serde_json
-- **压缩/解压**：zip
-- **哈希校验**：sha1 / sha2 / md5
-- **系统信息**：sysinfo
-- **动态库加载**：libloading
-- **其他**：notify（文件监听）、windows / winreg（Windows 平台能力）
+- Rust 2021
+- Tauri 2
+- Tokio
+- Reqwest
+- Serde / serde_json
+- SQLite / rusqlite
+- ZIP、NBT、哈希和文件系统工具链
 
-## 功能模块
+完整依赖、版本、来源及许可证信息请查看：
 
-| 模块 | 功能 |
-|------|------|
-| **认证系统** | 离线登录、微软 OAuth 设备码登录、Token 加密存储 |
-| **版本管理** | 原版 / Forge / Fabric / NeoForge / OptiFine 下载安装、多实例、版本独立设置 |
-| **社区资源** | CurseForge / Modrinth 搜索下载、整合包安装、MC 百科直链 |
-| **Java 管理** | 全磁盘扫描、自动检测、手动选择、自动下载 |
-| **皮肤管理** | 上传 / 预览 / 3D 模型（skinview3d）、披风设置 |
-| **下载管理** | 分片下载、断点续传、限速、进度跟踪 |
-| **启动管理** | 参数构建、进程监控、窗口标题改写、崩溃分析 |
-| **系统设置** | 启动参数、内存分配、下载配置、开发者工具（日志查看） |
+- [前端运行时依赖](./src-tauri/resources/about/frontend-deps.txt)
+- [前端开发依赖](./src-tauri/resources/about/frontend-dev-deps.txt)
+- [后端依赖](./src-tauri/resources/about/backend-deps.txt)
+- [第三方版权与许可证清单](./src-tauri/resources/about/licenses.txt)
 
-### 认证系统
+项目引用、安装或随附的第三方项目库、字体、图标、运行时和其他资源，其版权声明、许可证类型、来源链接及许可证链接均已记录在 `src-tauri/resources/about/licenses.txt`。该文件也会随应用资源分发，并在应用的“设置 → 更多 → 鸣谢 → 许可与版权声明”中展示。
 
-- 离线模式登录
-- 微软 OAuth 2.0 设备码登录
-- Token 加密存储与自动刷新
-
-### 版本管理
-
-- 原版 / Forge / Fabric / NeoForge / OptiFine / LiteLoader 加载器支持
-- 一键下载安装
-- 多版本切换与独立目录管理
-- 版本独立设置（Java、内存、启动参数、Mod 管理）
-
-### 社区资源
-
-- CurseForge / Modrinth 双源搜索
-- Mod 与整合包安装
-- 依赖解析与并发下载
-- MC 百科直链获取
-
-### Java 管理
-
-- 全磁盘自动扫描
-- 多版本自动检测与匹配
-- 手动选择与自定义路径
-- 自动下载安装
-
-### 皮肤管理
-
-- 皮肤上传与本地选择
-- 3D 模型实时预览（skinview3d）
-- 披风管理
-
-### 下载管理
-
-- 分片并行下载
-- 断点续传
-- 下载限速与速率控制
-- 任务分组与进度统计
-
-### 启动管理
-
-- JVM / 游戏参数自动构建
-- 进程监控与日志解析
-- 游戏窗口标题改写（Windows）
-- 崩溃日志分析与提示
-
-## 快速开始
-
-### 环境要求
-
-- **Node.js**：>= 18
-- **Rust**：>= 1.75（edition 2021）
-- **系统依赖**：[Tauri 2 系统依赖](https://tauri.app/start/prerequisites/)
-
-### 安装
+## 获取项目
 
 ```bash
-# 克隆项目
 git clone https://github.com/MoTeam-cn/MoLaunch.git
 cd MoLaunch
+```
 
-# 安装前端依赖
-npm install
+## 环境要求
 
-# 安装后端依赖（首次构建会自动拉取 crate）
+- Node.js 18 或更高版本
+- Rust stable，支持 Rust 2021 edition
+- Tauri 2 所需的系统依赖
+
+详细系统依赖请参考 [Tauri 官方文档](https://v2.tauri.app/start/prerequisites/)。
+
+## 安装依赖
+
+安装前端依赖：
+
+```bash
+npm ci
+```
+
+安装后端依赖并检查项目：
+
+```bash
 cd src-tauri
-cargo build
+cargo check
 cd ..
 ```
 
-### 开发
+## 开发
+
+启动 Tauri 开发环境：
 
 ```bash
-# 启动开发服务器（同时启动前端与 Tauri 后端）
 npm run tauri dev
 ```
 
-### 构建
+仅启动前端开发服务器：
 
 ```bash
-# 构建发布版本
+npm run dev
+```
+
+## 构建
+
+构建前端：
+
+```bash
+npm run build
+```
+
+构建桌面应用：
+
+```bash
 npm run tauri build
+```
+
+## 质量检查与测试
+
+```bash
+npm run lint
+npm run typecheck
+npm run test
+```
+
+```bash
+cd src-tauri
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all-features
 ```
 
 ## 项目结构
 
-### 前端 (`src/`)
-
-```
-src/
-├── assets/          # 静态资源（styles/main.css, Skins/, Mods/, blocks/, logo.svg）
-├── components/
-│   ├── common/      # 通用组件（Button, Input, Select, Modal, Toast, Tooltip, CrashDialog,
-│   │                # DeviceCodeModal, DownloadPanel, LoaderCard, SegmentedButtons, Alert,
-│   │                # BackToTop, MultiSelectBar, SkinManager, SkinAvatar, SkinModel3D）
-│   ├── community/   # 社区资源（SearchBar, ResourceCard, ResourceDetail, Pagination,
-│   │                # CommunityConfigCard, resource-detail/）
-│   ├── downloads/   # 下载管理（TaskGroupCard）
-│   ├── home/        # 首页（LaunchPanel, VersionSelector, LaunchLog, AccountSelector）
-│   ├── install/     # 安装（FabricApiInfoCard）
-│   ├── layout/      # 布局（TopNavLayout）
-│   ├── settings/    # 设置（DevModeToggle, LogViewer, ToggleRow）
-│   ├── version/     # 版本（InstalledList, VersionSection）
-│   └── version-settings/  # 版本设置（AdvanceFieldsPanel）
-├── composables/     # 组合式函数（约 20 个，useAuth, useDownloadPolling,
-│                    # useLaunchState, useVersionSettings 等）
-├── router/          # 路由
-├── stores/          # Pinia 状态（auth, java, sdk, settings, version）
-├── types/           # TypeScript 类型定义
-├── utils/
-│   ├── api/         # API 封装（auth, community, config, developer, image-cache,
-│   │                # java, launch, loader, personalization, sdk, skin, system, version）
-│   └── *.ts         # 工具函数（async, cape-icon, crashDialog, default-skin, format,
-│                    # image-crop, log-display, mod-display, modal, system-display,
-│                    # tauri, toast, version）
-├── views/
-│   ├── Community.vue, Downloads.vue, Home.vue, Login.vue, Settings.vue,
-│   ├── VersionSelect.vue, VersionSettings.vue, Versions.vue, LoaderSelect.vue
-│   ├── downloads/        # DownloadSidebar, DownloadStatsPanel
-│   ├── settings/         # SettingsLaunch, SettingsDownload, SettingsDeveloper,
-│   │                     # SettingsAdvanced, SettingsOther, SettingsPersonal
-│   ├── version-select/   # FolderSidebar
-│   └── version-settings/ # ModTab, OverviewTab, SetupTab, JavaDownloadBar, MemorySection
-├── App.vue
-└── main.ts
+```text
+MoLaunch/
+├── src/                         # Vue、TypeScript 前端
+├── src-tauri/src/               # Rust 后端与 Tauri 命令
+├── src-tauri/resources/         # 内嵌资源和第三方许可清单
+├── src-tauri/LICENSE            # 后端 crate 使用的许可证副本
+├── src-tauri/updater/           # 独立更新器 crate
+├── src-tauri/updater/LICENSE    # 更新器 crate 使用的许可证副本
+├── LICENSE                      # 项目根许可证
+├── package.json                 # 前端脚本与依赖
+└── src-tauri/Cargo.toml         # Rust crate 配置
 ```
 
-### 后端 (`src-tauri/src/`)
+## 许可证与使用限制
 
-```
-src-tauri/src/
-├── commands/          # Tauri 命令层（前端调用入口）
-│   ├── auth/          # 认证（account, microsoft, offline）
-│   ├── community/     # 社区资源（search, detail, install/, community_config, secure_config）
-│   ├── system/        # 系统（apply_config/, config, developer, download, game, game_dir, proxy）
-│   ├── version/       # 版本（install/, mods/, download, folder, launch, list, loaders,
-│   │                  # manage, personalization, preload, progress, script_export）
-│   ├── image_cache.rs, java.rs, sdk.rs, skin.rs
-├── minecraft/         # 核心业务模块（纯 Rust 实现，非 FFI）
-│   ├── auth/          # 认证（microsoft/, storage/）
-│   ├── community/     # 社区（curseforge/, modrinth/, preload/, cache, common, mcmod,
-│   │                  # searcher, secure_storage, tags, version_extract）
-│   ├── download/      # 下载（chunk/, assets, downloader, full_download, manager,
-│   │                  # rate_limiter, stages）
-│   ├── java/          # Java（detect, search, select, download/）
-│   ├── java_selector/ # Java 选择器（compat, installer, rules, select, weight）
-│   ├── launch/        # 启动（pipeline/, watcher/, arguments, classpath, embedded,
-│   │                  # game_args, jvm_args）
-│   ├── loaders/       # 加载器（fabric, forge, neoforge, optifine, liteloader,
-│   │                  # forge_installer, fabric_api, forge_html, shared, utils）
-│   ├── system/        # 系统调用（shell）
-│   ├── utils/         # 工具（file_checker, maven）
-│   ├── version/       # 版本管理（setup/, json_merge, libraries, scan, state）
-│   ├── fools.rs, image_cache.rs, isolation.rs, language.rs,
-│   └── launcher_profiles.rs, skin.rs, sources.rs
-├── sdk/               # SDK 兼容层（ffi_types, instance, types）
-├── state/             # 应用状态（app, auth, config, download, launch）
-├── storage/           # 存储（cache, ini, registry）
-├── config.rs, error_util.rs, http.rs, lib.rs, logger.rs, main.rs, resources.rs
-```
+MoLaunch 自有代码和原创资源遵循 [MoLaunch 分发有限许可证](./LICENSE)。该许可证的核心要求包括：
 
-## 开发指南
+- 禁止将 MoLaunch 或其二次开发版本作为商业产品使用或收费主体
+- 二次开发必须公开完整源代码
+- 二次开发版本必须明确声明其为第三方版本，与 MoTeam 官方版本无关
+- 二次开发版本不得使用容易使公众误认为官方发布的名称
+- 不得移除版权、许可证、商标和免责声明
 
-### 代码规范
+第三方依赖、内嵌资源和引用项目不适用 MoLaunch 自有许可证，必须遵守其各自的原始许可证。具体信息请以 [`src-tauri/resources/about/licenses.txt`](./src-tauri/resources/about/licenses.txt) 及对应上游项目的许可证文件为准。
 
-- 前端：ESLint + Prettier
-- 后端：Clippy + rustfmt
+如需商业授权、品牌授权或其他例外许可，请联系 MoTeam 并取得书面授权。
 
-```bash
-# 前端代码检查（自动修复）
-npm run lint
+## 商标与免责声明
 
-# 前端类型检查
-npm run typecheck
+MoLaunch、MoTeam 及相关标识属于其权利人。Minecraft 是 Mojang Synergies AB 的商标。MoLaunch 不隶属于 Mojang、Microsoft 或其他相关权利人。
 
-# 后端代码检查
-cd src-tauri && cargo clippy -- -D warnings
+本项目按“现状”提供。在适用法律允许的最大范围内，MoTeam 不对软件的适用性、连续可用性、无错误性、数据安全、第三方服务或因使用软件造成的损失承担责任。
 
-# 后端代码格式化
-cd src-tauri && cargo fmt
-```
+## 贡献与反馈
 
-### 测试
+欢迎通过 GitHub 提交 Issue、讨论和改进建议。提交代码或资源前，请确认其来源、版权和许可证允许将其纳入本项目，并确保不会违反本项目许可证或第三方许可证。
 
-```bash
-# 前端测试
-npm run test
-
-# 后端测试
-cd src-tauri && cargo test
-```
-
-### 提交规范
-
-遵循 [Conventional Commits](https://www.conventionalcommits.org/)：
-
-```
-<type>(<scope>): <subject>
-
-feat(auth): 添加微软 OAuth 登录
-fix(download): 修复断点续传失败
-docs: 更新 README
-```
-
-## 文档
-
-- [开发蓝图](DEVELOPMENT_BLUEPRINT.md) - 详细的技术设计
-- [开发规范](DEVELOPMENT_GUIDELINES.md) - 代码规范和流程
-- [AI Agent 规范](AI_AGENT_GUIDELINES.md) - AI Agent 开发约束
-- [更新日志](CHANGELOG.md) - 版本变更记录
-
-## 许可证
-
-MIT License
-
-## 致谢
-
-- [Tauri](https://tauri.app/) - 桌面应用框架
-- [Vue.js](https://vuejs.org/) - 前端框架
-- [Tailwind CSS](https://tailwindcss.com/) - CSS 框架
-- [@heroicons/vue](https://github.com/tailwindlabs/heroicons) - 图标组件库
-- [skinview3d](https://github.com/bs-community/skinview3d) - Minecraft 3D 皮肤预览
-
----
-
-*本文档最后更新于 2026-07-20*
+- 仓库：https://github.com/MoTeam-cn/MoLaunch
+- 问题反馈：https://github.com/MoTeam-cn/MoLaunch/issues
+- 许可证：[LICENSE](./LICENSE)
+- 第三方版权清单：[licenses.txt](./src-tauri/resources/about/licenses.txt)

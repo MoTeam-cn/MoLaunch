@@ -3,7 +3,7 @@ name = "molaunch-updater"
 version = "0.1.0"
 description = "MoLaunch Windows 便携版更新器（独立子进程）"
 edition = "2021"
-license = "MIT"
+license-file = "LICENSE"
 
 [[bin]]
 name = "molaunch_updater"

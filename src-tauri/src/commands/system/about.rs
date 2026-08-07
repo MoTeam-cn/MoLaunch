@@ -181,3 +181,11 @@ fn parse_dependency_table(text: &str) -> Vec<DependencyItem> {
         })
         .collect()
 }
+
+/// 获取项目许可协议全文
+///
+/// 数据源：`resources/LICENSE.txt`（由 build.rs 从项目根目录 LICENSE 自动同步的副本，
+/// 编译时 include_str! 嵌入二进制）。返回协议全文文本，供「设置 - 更多 - 许可协议」展示。
+pub async fn get_project_license() -> Result<String, String> {
+    read_resource("LICENSE.txt").map_err(log_err("Failed to read project license"))
+}

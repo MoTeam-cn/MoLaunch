@@ -3,7 +3,7 @@ name = "mo-launch"
 version = "0.1.0"
 description = "Modern Minecraft Launcher"
 authors = ["MoTeam"]
-license = "MIT"
+license-file = "LICENSE"
 repository = "https://github.com/MoTeam-cn/MoLaunch"
 edition = "2021"
 

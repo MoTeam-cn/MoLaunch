@@ -182,7 +182,7 @@ onMounted(() => {
         <template #prefix><MagnifyingGlassIcon class="w-4 h-4 text-gray-400" /></template>
       </Input>
       <Select v-model="loader" :options="loaderOptions" style="width: 180px" @update:model-value="onLoaderChange" />
-      <Tooltip text="刷新列表">
+      <Tooltip text="刷新列表" class="ml-auto">
         <Button type="ghost" size="small" :loading="loading" @click="handleManualRefresh">
           <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
         </Button>

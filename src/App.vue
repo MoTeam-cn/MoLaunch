@@ -11,6 +11,8 @@ import DownloadPanel from '@/components/common/DownloadPanel.vue'
 import DragOverlay from '@/components/common/DragOverlay.vue'
 import Modal from '@/components/common/Modal.vue'
 import CrashDialog from '@/components/common/CrashDialog.vue'
+import HintDialog from '@/components/common/HintDialog.vue'
+import UserAgreementDialog from '@/components/common/UserAgreementDialog.vue'
 import Toast from '@/components/common/Toast.vue'
 import UpdateDialog from '@/components/about/UpdateDialog.vue'
 import Watermark from '@/components/common/Watermark.vue'
@@ -21,6 +23,9 @@ import { useSettingsStore } from '@/stores/settings'
 import { useOnlineStore } from '@/stores/online'
 import { setModalRef, showError } from '@/utils/modal'
 import { setCrashDialogRef } from '@/utils/crashDialog'
+import { setBuyHintDialogRef } from '@/utils/buyHint'
+import { setStarHintDialogRef } from '@/utils/starHint'
+import { setUserAgreementDialogRef, maybeRequireUserAgreement } from '@/utils/userAgreement'
 import { setToastRef } from '@/utils/toast'
 import { initAutoCheck } from '@/utils/updater'
 import { initDownloadStream } from '@/composables/useDownloadStream'
@@ -34,6 +39,8 @@ const settingsStore = useSettingsStore()
 const onlineStore = useOnlineStore()
 const modalRef = ref<InstanceType<typeof Modal> | null>(null)
 const crashDialogRef = ref<InstanceType<typeof CrashDialog> | null>(null)
+const hintDialogRef = ref<InstanceType<typeof HintDialog> | null>(null)
+const userAgreementDialogRef = ref<InstanceType<typeof UserAgreementDialog> | null>(null)
 const toastRef = ref<InstanceType<typeof Toast> | null>(null)
 // 会话恢复期间的加载遮罩，避免未恢复登录态就触发其他页面 invoke
 const isRestoring = ref(true)
@@ -48,6 +55,9 @@ onMounted(() => {
   console.log('[Startup][Frontend] App.vue onMounted @', new Date().toISOString())
   setModalRef(modalRef.value)
   setCrashDialogRef(crashDialogRef.value)
+  setBuyHintDialogRef(hintDialogRef.value)
+  setStarHintDialogRef(hintDialogRef.value)
+  setUserAgreementDialogRef(userAgreementDialogRef.value)
   setToastRef(toastRef.value)
   initDownloadStream()
   // 启动自动更新检查（启动后 5s + 每 6 小时；dev 模式自动跳过）
@@ -57,6 +67,9 @@ onMounted(() => {
 
 async function initApp() {
   console.log('[Startup][Frontend] initApp start @', new Date().toISOString())
+  // 全局《用户协议》门禁：首次启动需同意后才能使用（fire-and-forget，弹窗以高 z-index 覆盖加载遮罩，不影响后续初始化）
+  void maybeRequireUserAgreement()
+  console.log('[Startup][Frontend] maybeRequireUserAgreement fired')
   // Java 搜索不依赖 SDK/认证，提前并行启动（后端 list_java 是耗时操作）
   const javaPromise = javaStore.detectJava()
   console.log('[Startup][Frontend] javaStore.detectJava fired (background)')
@@ -143,6 +156,8 @@ async function initApp() {
   </Teleport>
   <Modal ref="modalRef" />
   <CrashDialog ref="crashDialogRef" />
+  <HintDialog ref="hintDialogRef" />
+  <UserAgreementDialog ref="userAgreementDialogRef" />
   <Toast ref="toastRef" />
   <UpdateDialog />
   <!-- 测试版水印：仅在测试版构建（package.json version 含 beta/alpha/rc/canary 后缀）时渲染 -->

@@ -10,22 +10,10 @@ import { listen } from '@tauri-apps/api/event'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { showCrashDialog } from '@/utils/crashDialog'
+import { maybeTriggerLaunchHints } from '@/utils/buyHint'
 import { safeCall } from '@/utils/async'
 import { useOnlineStore } from '@/stores/online'
-
-/** 崩溃类别（与后端 CrashCategory 枚举对应） */
-type CrashCategory = 'Java' | 'Memory' | 'Graphics' | 'Mod' | 'Forge' | 'Fabric' | 'OptiFine' | 'Unknown'
-
-/** 崩溃详情（与后端 CrashInfo 结构对应） */
-interface CrashInfo {
-  reason: string
-  category: CrashCategory
-  log_lines: string[]
-  suggestion: string
-  problematic_mod: string | null
-  crash_report_path?: string
-  log_tail: string[]
-}
+import type { CrashInfo } from '@/types/version'
 
 /** 游戏退出事件 payload */
 interface GameExitEvent {
@@ -148,6 +136,8 @@ export function useLaunchState() {
       runningPid.value = pid
       runningVersionId.value = params.versionId
       toastSuccess(`游戏已启动（PID: ${pid}）`)
+      // 启动成功：自增计数并检查正版购买 / 点 Star 提示（非阻塞，不影响启动）
+      void maybeTriggerLaunchHints()
       return pid
     } catch (e) {
       console.error('Failed to launch game:', e)

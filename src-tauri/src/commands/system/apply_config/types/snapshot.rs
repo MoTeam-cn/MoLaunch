@@ -156,4 +156,18 @@ pub struct ConfigSnapshot {
     // 开发者模式（从注册表读）
     pub developer_unlocked: bool,
     pub developer_mode: bool,
+    // 正版购买提示（从系统存储读：Windows 注册表 / 其他系统全局共用文件）
+    #[serde(default)]
+    pub launch_count: u32,
+    #[serde(default)]
+    pub hint_buy: bool,
+    #[serde(default)]
+    pub hint_star: bool,
+    // 用户协议（系统存储：Windows 注册表 / 其他系统全局共用文件，全局首次启动门禁）
+    /// 是否已同意《用户协议》
+    #[serde(default)]
+    pub user_agreed: bool,
+    /// 已同意的《用户协议》版本号（0 表示从未同意）
+    #[serde(default)]
+    pub user_agreed_version: u32,
 }

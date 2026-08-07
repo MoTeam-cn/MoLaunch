@@ -23,7 +23,11 @@ pub(crate) async fn apply_config_inner(state: &AppState, patch: ConfigPatch) -> 
 
     // 2c. IgnoreTls 分流（注册表，仅开发者模式可开启）
     secure::apply_ignore_tls(&patch)?;
-    // 2d. Java path 分流（INI [Java] path 独立存储，不进 AppConfig）
+    // 2d. 正版购买提示分流（系统存储：Windows 注册表 / 其他系统全局共用文件，不进 AppConfig）
+    secure::apply_hint(&patch)?;
+    // 2d2. 用户协议分流（系统存储：全局首次启动门禁，不进 AppConfig）
+    secure::apply_user_agreed(&patch)?;
+    // 2e. Java path 分流（INI [Java] path 独立存储，不进 AppConfig）
     apply_java(&patch)?;
     // log_level 变更需闭包外立即生效，用 Option 收集待应用的值（避免跨 await 持有锁）
     let mut log_level_pending: Option<u32> = None;

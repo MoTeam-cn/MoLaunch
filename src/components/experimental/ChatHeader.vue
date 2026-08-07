@@ -133,6 +133,14 @@ const settingsOpen = ref(false)
             开启后请求将携带 reasoning_effort，数值越高模型思考越深入、耗时更长。
           </p>
         </div>
+
+        <!-- 免责声明：AI 内容由用户配置的模型端点生成，数据外发风险由用户自行承担 -->
+        <div class="rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5">
+          <p class="text-[11px] font-medium text-gray-600">免责声明</p>
+          <p class="mt-0.5 text-[11px] leading-relaxed text-gray-500">
+            AI 回复由您自行配置的模型端点生成，MoLaunch 不参与内容生成与审核；请勿输入违法、敏感信息，数据外发与隐私风险请自行评估。
+          </p>
+        </div>
       </div>
     </Drawer>
 

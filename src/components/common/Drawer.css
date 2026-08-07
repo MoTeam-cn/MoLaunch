@@ -128,6 +128,150 @@
 }
 
 /* ============================================================
+ * 关闭反悔期：面板滑出后边缘保留可点击的小 tab（带剩余秒数气泡）
+ * root 处于反悔期时不拦截点击，仅 tab 自身可交互
+ * ============================================================ */
+.drawer-root--undo {
+  pointer-events: none;
+}
+
+.drawer-undo {
+  position: absolute;
+  z-index: 1001;
+  pointer-events: none;
+}
+
+.drawer-undo-tab {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  color: #ffffff;
+  background-color: var(--color-primary-500, #165dff);
+  border: none;
+  box-shadow: 0 2px 10px rgb(var(--color-primary-rgb-500, 22 93 255) / 0.4);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.drawer-undo-tab:hover {
+  background-color: var(--color-primary-600, #0e42d2);
+}
+.drawer-undo-tab:active {
+  background-color: var(--color-primary-700, #0a3aae);
+}
+.drawer-undo-tab-icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* wrapper 定位（各方向贴边、margin 居中；transform 留给进出场动画） */
+.drawer-undo--right {
+  top: 50%;
+  right: 0;
+  margin-top: -29px;
+  width: 34px;
+  height: 58px;
+}
+.drawer-undo--right .drawer-undo-tab {
+  border-radius: 6px 0 0 6px;
+}
+.drawer-undo--left {
+  top: 50%;
+  left: 0;
+  margin-top: -29px;
+  width: 34px;
+  height: 58px;
+}
+.drawer-undo--left .drawer-undo-tab {
+  border-radius: 0 6px 6px 0;
+}
+.drawer-undo--top {
+  left: 50%;
+  top: 0;
+  margin-left: -29px;
+  width: 58px;
+  height: 34px;
+}
+.drawer-undo--top .drawer-undo-tab {
+  border-radius: 0 0 6px 6px;
+}
+.drawer-undo--bottom {
+  left: 50%;
+  bottom: 0;
+  margin-left: -29px;
+  width: 58px;
+  height: 34px;
+}
+.drawer-undo--bottom .drawer-undo-tab {
+  border-radius: 6px 6px 0 0;
+}
+
+/* 剩余秒数气泡（朝内容一侧展开） */
+.drawer-undo-bubble {
+  position: absolute;
+  white-space: nowrap;
+  padding: 5px 10px;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--color-primary-700, #0a3aae);
+  background-color: #ffffff;
+  border: 1px solid var(--color-primary-200, #ccd9ff);
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.drawer-undo--right .drawer-undo-bubble {
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+.drawer-undo--left .drawer-undo-bubble {
+  left: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%);
+}
+.drawer-undo--top .drawer-undo-bubble {
+  top: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+.drawer-undo--bottom .drawer-undo-bubble {
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* 进出动画（作用于 wrapper，气泡随之滑入/收出） */
+.drawer-undo-enter-from,
+.drawer-undo-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
+}
+.drawer-undo--right.drawer-undo-enter-from,
+.drawer-undo--right.drawer-undo-leave-to {
+  transform: translateX(20px) scale(0.85);
+}
+.drawer-undo--left.drawer-undo-enter-from,
+.drawer-undo--left.drawer-undo-leave-to {
+  transform: translateX(-20px) scale(0.85);
+}
+.drawer-undo--top.drawer-undo-enter-from,
+.drawer-undo--top.drawer-undo-leave-to {
+  transform: translateY(-20px) scale(0.85);
+}
+.drawer-undo--bottom.drawer-undo-enter-from,
+.drawer-undo--bottom.drawer-undo-leave-to {
+  transform: translateY(20px) scale(0.85);
+}
+.drawer-undo-enter-active,
+.drawer-undo-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+/* ============================================================
  * 遮罩淡入淡出
  * ============================================================ */
 .drawer-fade-enter-from,

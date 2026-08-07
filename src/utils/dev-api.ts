@@ -9,6 +9,10 @@ import type { Router } from 'vue-router'
 import { openPickerWindow, openDisplayWindow } from '@/utils/picker-window'
 import { PICKER_TEMPLATES } from '@/config/picker-templates'
 import { showCrashDialog, type CrashInfo } from '@/utils/crashDialog'
+import { showBuyHintDialog } from '@/utils/buyHint'
+import { showStarHintDialog } from '@/utils/starHint'
+import { resetUserAgreement, showUserAgreementDialog, USER_AGREEMENT_VERSION } from '@/utils/userAgreement'
+import { applyConfig } from '@/utils/api/config'
 
 /** 调试 API 接口 */
 export interface MolaunchDevAPI {
@@ -32,6 +36,16 @@ export interface MolaunchDevAPI {
   ai<T = unknown>(action: string, params?: Record<string, unknown>): Promise<T>
   /** 触发崩溃弹窗（演示用；正常情况下游戏崩溃后自动弹出，平时难以复现） */
   showCrashDialog(): void
+  /** 设置游戏启动成功次数（正版购买提示计数，测试用） */
+  setLaunchCount(count: number): Promise<void>
+  /** 直接弹出「正版购买建议」弹窗（测试用；正常逻辑在启动成功且命中阈值时自动触发） */
+  showBuyHint(): void
+  /** 直接弹出「支持 MoLaunch」点 Star 弹窗（测试用；与 showBuyHint 共用同一抽屉，同时触发时标题栏可切换） */
+  showStarHint(): void
+  /** 直接弹出《用户协议》弹窗（测试用；正常逻辑在首次启动未同意时自动触发） */
+  showUserAgreement(): void
+  /** 清空《用户协议》同意记录（测试用；下次启动将重新要求同意） */
+  resetUserAgreement(): Promise<void>
   /** 返回所有 Pinia store 的 $state */
   stores(): Promise<Record<string, unknown>>
 }
@@ -89,6 +103,23 @@ MoLaunch Dev API 可用命令：
   molaunch.showCrashDialog()
       触发错误日志弹窗（演示用样例数据；游戏崩溃后会自动弹出，本文用于检查展示）
 
+  molaunch.setLaunchCount(count)
+      设置游戏启动成功次数（写入系统存储：Windows 注册表 / 其他系统全局共用文件）
+      - count: 目标次数（如 3 / 8 / 15 / 30，命中阈值下次启动成功即弹窗）
+
+  molaunch.showBuyHint()
+      直接弹出「正版购买建议」弹窗（绕过阈值/账号/语言条件，仅测试弹窗 UI）
+
+  molaunch.showStarHint()
+      直接弹出「支持 MoLaunch」点 Star 弹窗（绕过阈值/语言条件，仅测试弹窗 UI）
+      两个弹窗共用同一抽屉：先调用哪个就显示哪页，同时触发时标题栏出现分段切换器可换页查看
+
+  molaunch.showUserAgreement()
+      直接弹出《用户协议》弹窗（绕过门禁条件，仅测试弹窗 UI）
+
+  molaunch.resetUserAgreement()
+      清空《用户协议》同意记录（写入 userAgreed=false / version=0，下次启动重新要求同意）
+
   molaunch.stores()
       返回所有 Pinia store 的 $state（Promise<Record<string, unknown>>）
 
@@ -100,6 +131,8 @@ MoLaunch Dev API 可用命令：
   await molaunch.frp('list_tunnels')
   await molaunch.ai('check_status')
   await molaunch.showCrashDialog()
+  await molaunch.setLaunchCount(3)
+  molaunch.showBuyHint()
   await molaunch.navigate('/apps/online')
   await molaunch.reload()
   await molaunch.reload(true)
@@ -218,6 +251,21 @@ export function setupDevApi(router: Router): void {
         ],
       }
       showCrashDialog(sample)
+    },
+    async setLaunchCount(count) {
+      await applyConfig({ launchCount: count })
+    },
+    showBuyHint() {
+      showBuyHintDialog()
+    },
+    showStarHint() {
+      showStarHintDialog()
+    },
+    showUserAgreement() {
+      showUserAgreementDialog(USER_AGREEMENT_VERSION)
+    },
+    async resetUserAgreement() {
+      await resetUserAgreement()
     },
     stores: loadAllStores,
   }

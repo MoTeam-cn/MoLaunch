@@ -1,26 +1,14 @@
 /**
  * 崩溃弹窗服务
  *
- * - 弹窗标题："Minecraft 出现错误"
- * - 展示崩溃原因、建议
- * - 按钮：确定 / 查看输出 / 导出错误报告
+ * - 右侧 Drawer 抽屉展示崩溃原因、建议、崩溃报告与日志详情
+ * - 按钮：查看报告 / 导出报告 / 关闭
  */
 
 import { ref } from 'vue'
+import type { CrashInfo } from '@/types/version'
 
-/** 崩溃类别 */
-export type CrashCategory = 'Java' | 'Memory' | 'Graphics' | 'Mod' | 'Forge' | 'Fabric' | 'OptiFine' | 'Unknown'
-
-/** 崩溃详情 */
-export interface CrashInfo {
-  reason: string
-  category: CrashCategory
-  log_lines: string[]
-  suggestion: string
-  problematic_mod: string | null
-  crash_report_path?: string
-  log_tail: string[]
-}
+export type { CrashCategory, CrashInfo } from '@/types/version'
 
 /** CrashDialog 组件实例对外暴露的接口 */
 export interface CrashDialogInstance {

@@ -24,8 +24,8 @@
  *   <template #footer><Button @click="visible = false">关闭</Button></template>
  * </Drawer>
  */
-import { ref, computed, watch } from 'vue'
-import { XMarkIcon } from '@heroicons/vue/24/outline'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
+import { ArrowUturnLeftIcon, XMarkIcon } from '@heroicons/vue/24/outline'
 import { onEscape } from '@/utils/click-outside'
 
 interface Props {
@@ -53,6 +53,8 @@ interface Props {
   footer?: boolean
   /** 关闭后是否卸载节点 */
   unmountOnClose?: boolean
+  /** 关闭反悔期（毫秒）：默认关闭；由调用方按需传入（如 5000）后，面板滑出会保留节点、边缘显示可恢复 tab，期间点击可重新打开，超时后真正卸载；配合 unmountOnClose 则关闭即卸载 */
+  undoMs?: number
   /** 就地渲染：不 teleport 到 body，absolute 铺满最近定位祖先（nav 下方内容区） */
   renderInPlace?: boolean
   /** 挂载容器（选择器或元素），默认 body；render-in-place 时建议传内容区容器（如 #app-content） */
@@ -71,6 +73,7 @@ const props = withDefaults(defineProps<Props>(), {
   escToClose: true,
   footer: false,
   unmountOnClose: false,
+  undoMs: 0,
   popupContainer: 'body',
 })
 
@@ -83,8 +86,77 @@ const emit = defineEmits<{
 
 const localVisible = ref(props.defaultVisible)
 const visible = computed(() => props.visible ?? localVisible.value)
-/** 保持节点存活以播放关闭动画（关闭动画结束才卸载） */
+/** 保持节点存活以播放关闭动画（关闭 / 反悔期结束才卸载） */
 const mounted = ref(visible.value)
+/** 是否处于关闭反悔期（面板已滑出、边缘显示可恢复 tab） */
+const undoVisible = ref(false)
+/** 反悔期剩余秒数（用于气泡倒计时展示） */
+const undoSeconds = ref(0)
+let undoTimer: ReturnType<typeof setTimeout> | null = null
+let undoCountdown: ReturnType<typeof setInterval> | null = null
+
+function clearUndoTimer() {
+  if (undoTimer) {
+    clearTimeout(undoTimer)
+    undoTimer = null
+  }
+  if (undoCountdown) {
+    clearInterval(undoCountdown)
+    undoCountdown = null
+  }
+}
+onBeforeUnmount(clearUndoTimer)
+
+/** 关闭后是否进入反悔期（unmountOnClose 或关闭恢复期设为 0 时直接卸载） */
+function canUndo() {
+  return !props.unmountOnClose && props.undoMs > 0
+}
+
+/** 面板滑出动画结束：进入反悔期，倒计时结束后真正卸载 */
+function startUndo() {
+  const totalMs = props.undoMs
+  const startedAt = Date.now()
+  const remaining = () => Math.max(0, Math.ceil((totalMs - (Date.now() - startedAt)) / 1000))
+  undoSeconds.value = remaining()
+  undoVisible.value = true
+  clearUndoTimer()
+  undoTimer = setTimeout(() => {
+    undoTimer = null
+    finishClose()
+  }, totalMs)
+  undoCountdown = setInterval(() => {
+    undoSeconds.value = remaining()
+  }, 1000)
+}
+
+/** 真正关闭：若恢复 tab 正在显示，先播完其消失动画再卸载，否则直接卸载 */
+function finishClose() {
+  if (undoVisible.value) {
+    undoVisible.value = false
+    return
+  }
+  finalizeClose()
+}
+
+/** 恢复 tab 消失动画结束：未重新打开时才真正卸载 */
+function onUndoTabLeave() {
+  if (!visible.value) finalizeClose()
+}
+
+/** 卸载节点并广播 close */
+function finalizeClose() {
+  mounted.value = false
+  emit('close')
+}
+
+/** 点击反悔 tab：立即重新打开，取消卸载倒计时 */
+function reopen() {
+  clearUndoTimer()
+  undoVisible.value = false
+  localVisible.value = true
+  emit('update:visible', true)
+  emit('visibleChange', true)
+}
 
 function close() {
   if (!visible.value) return
@@ -97,16 +169,23 @@ function close() {
 function onEnter() {
   if (visible.value) emit('open')
 }
-/** 面板滑出动画结束（此时必然不可见），卸载节点 */
+
+/** 面板滑出动画结束（此时必然不可见）：进入反悔期或直接卸载 */
 function onLeave() {
-  if (!visible.value) {
-    mounted.value = false
-    emit('close')
+  if (visible.value) return
+  if (canUndo()) {
+    startUndo()
+  } else {
+    finishClose()
   }
 }
 
 watch(visible, (v) => {
-  if (v) mounted.value = true
+  if (v) {
+    clearUndoTimer()
+    undoVisible.value = false
+    mounted.value = true
+  }
 })
 
 onEscape(() => {
@@ -144,6 +223,7 @@ const panelStyle = computed(() => {
         `drawer-placement-${placement}`,
         { 'drawer-root--maskless': !mask },
         { 'drawer-root--absolute': isInPlace },
+        { 'drawer-root--undo': undoVisible },
       ]"
     >
       <transition name="drawer-fade" appear>
@@ -178,6 +258,20 @@ const panelStyle = computed(() => {
           <div v-if="$slots.footer || footer" class="drawer-footer">
             <slot name="footer" />
           </div>
+        </div>
+      </transition>
+
+      <!-- 关闭反悔期：面板滑出后边缘保留的小 tab（带剩余秒数气泡），点击可重新打开 -->
+      <transition name="drawer-undo" @after-leave="onUndoTabLeave">
+        <div v-if="undoVisible" class="drawer-undo" :class="`drawer-undo--${placement}`">
+          <span class="drawer-undo-bubble">还有 {{ undoSeconds }} 秒后关闭</span>
+          <button
+            class="drawer-undo-tab"
+            aria-label="重新打开"
+            @click="reopen"
+          >
+            <ArrowUturnLeftIcon class="drawer-undo-tab-icon" />
+          </button>
         </div>
       </transition>
     </div>
