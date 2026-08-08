@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 版本同步工作流（`.github/workflows/version-sync.yml`）的版本文件更新逻辑抽离到 [scripts/sync-version.cjs](scripts/sync-version.cjs)（Node.js 脚本，不再在 workflow 中堆叠 `node -p` / `npm version` / `grep` / `sed` bash）：`Update version files` 步骤改为一行 `node scripts/sync-version.cjs "$VERSION"`；脚本以 JSON 解析 + 2 空格缩进写回 `package.json` / `package-lock.json`（含 `packages[""]` 根条目，等价于原 `npm version` 行为），`src-tauri/tauri.conf.json` 采用定点字符串替换避免重排原格式，`src-tauri/Cargo.toml` 与 README.md shields.io 版本徽章（版本内 `-` 双写 `--` 转义）正则替换；文件无差异时不写盘，`git-auto-commit` 自动跳过行为不变。
+
 - 版本同步工作流（`.github/workflows/version-sync.yml`）新增 README.md 版本徽章同步：打 `v*` 标签 / 手动指定版本时，按 shields.io 规则（路径中 `-` 为分隔符，版本内 `-` 需双写 `--` 转义）自动更新顶部 Version 徽章，并纳入自动提交范围。
 
 - 修复 GitHub CodeQL 代码扫描告警：`.github/workflows/ci.yml` 全部 5 个 job 显式声明 `permissions: contents: read`（最小权限，消除 "Workflow does not contain permissions"）；`crypto_tests.rs` / `pow_test.rs` 中测试用固定盐/输入更名 `fixed_input` 并注明为确定性测试向量（消除 "Hard-coded cryptographic value" 误报，测试数据非真实密钥）。

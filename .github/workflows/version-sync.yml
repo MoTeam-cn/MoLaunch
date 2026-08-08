@@ -4,10 +4,12 @@ name: Version Sync
 #
 # 推送 v* 标签（或手动指定版本号）时，逐文件检查仓库内的版本号文件，
 # 仅对尚未同步到目标版本的字段执行更新，避免打 tag 后忘记更新版本号导致漂移：
-#   - package.json / package-lock.json（npm version 一并更新两份清单）
+#   - package.json / package-lock.json
 #   - src-tauri/Cargo.toml
 #   - src-tauri/tauri.conf.json
 #   - README.md（版本徽章，shields.io 路径中 "-" 为分隔符，版本内 "-" 需双写 "--" 转义）
+#
+# 更新逻辑抽离到 scripts/sync-version.cjs（Node.js），本步仅保留一行 node 调用
 #
 # 有字段被更新时提交（提交信息带 !c 跳过 CI）；即使全部已一致，
 # 也会继续调用 release.yml（workflow_call 方式）激活发布流程，发布版本号由本工作流传入。
@@ -65,30 +67,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ steps.version.outputs.VERSION }}
-        run: |
-          set -e
-
-          # package.json + package-lock.json（npm version 会同步更新两份清单）
-          current="$(node -p "require('./package.json').version")"
-          if [ "$current" != "$VERSION" ]; then
-            npm version "$VERSION" --no-git-tag-version
-          fi
-
-          # src-tauri/Cargo.toml
-          if ! grep -q "^version = \"${VERSION}\"$" src-tauri/Cargo.toml; then
-            sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" src-tauri/Cargo.toml
-          fi
-
-          # src-tauri/tauri.conf.json
-          if ! grep -q "\"version\": \"${VERSION}\"" src-tauri/tauri.conf.json; then
-            sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" src-tauri/tauri.conf.json
-          fi
-
-          # README.md 版本徽章：匹配 shields.io version-* -blue.svg，替换版本段
-          if grep -q "img.shields.io/badge/version-" README.md; then
-            BADGE_VERSION="${VERSION//-/--}"
-            sed -i "s|\(img.shields.io/badge/version-\).*\(-blue.svg\)|\1${BADGE_VERSION}\2|" README.md
-          fi
+        run: node scripts/sync-version.cjs "$VERSION"
 
       # 有字段被更新时自动提交并推送（默认提交者 github-actions[bot]）；
       # 全部已一致时该 action 自动跳过，不产生提交
