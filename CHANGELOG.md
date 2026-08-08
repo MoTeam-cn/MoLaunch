@@ -4,6 +4,8 @@
 
 ## [0.3.5-rc1] - 2026-08-09
 
+- `src-tauri/updater/README.md` 相关链接移除指向 `docs/updater/design.md` 的入口（`docs/` 为本地内部文档目录，已通过 `.gitignore` 排除、不提交云端，README 不再暴露内部文档路径）。
+
 - 修复 `version-sync.yml` 调用发布工作流的方式：原在 step 级 `uses: ./.github/workflows/release.yml` 触发报错（GitHub 只在 job 级支持调用可复用工作流，step 级 `uses` 仅接受含 `action.yml` 的本地 action 目录）；改为独立的 `release` job（`uses` + `needs: sync`，版本号经 `sync.outputs.version` 传递，`secrets: inherit` 继承签名私钥等密钥）。
 
 - 打包元信息统一为全称：`package.json` / `package-lock.json` 的 `name` 由 `mo-launch` 改为 `molaunch`（与 tauri.conf.json 的 `identifier`（`com.moteam.molaunch`）与 deep-link scheme 保持一致），`package.json` 补充 `copyright` 字段（`Copyright © 2026 MoTeam. All rights reserved.`，与 LICENSE / `bundle.copyright` 一致）。

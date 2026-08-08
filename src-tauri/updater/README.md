@@ -132,6 +132,5 @@ cargo build --release
 ## 相关链接
 
 - 主仓库：https://github.com/MoTeam-cn/MoLaunch
-- 设计文档：[docs/updater/design.md](../../docs/updater/design.md)
 - 更新日志：[CHANGELOG.md](../../CHANGELOG.md)
 - 许可证：[LICENSE](./LICENSE)
