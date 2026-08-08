@@ -2,6 +2,8 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [0.3.5-rc1] - 2026-08-09
+
 - [src-tauri/updater/README.md](src-tauri/updater/README.md) 按主仓库 README 风格重写为完整组件文档：新增居中标题 + 徽章栏（Rust / Windows / minisign / License）、`[!IMPORTANT]` 定位说明（子 crate 非完整启动器）、mermaid 工作流程图（等待退出 → 验签 → 替换 → 重启全流程及各退出码分支）、功能特性章节（进程等待 / 签名校验 / 文件替换 / 重启新版本）；并修正原文与实现不符的描述——验签依赖实为 `minisign-verify`（BLAKE2b-512 prehash + Ed25519，与 tauri-plugin-updater 同款）而非 ed25519-dalek + SHA-512，退出码顺序按 `main.rs` 实际执行顺序（参数 1 / 超时 2 / 替换 3 / 启动 4 / 验签 5）排列表述，集成方式对齐真实链路（`resources.rs::extract_updater` 释放 + `install_windows.rs` 经 `apply_pending_update` 启动子进程 + `last.exe`/`last.sig` 缓存）。
 
 - 版本同步工作流（`.github/workflows/version-sync.yml`）的版本文件更新逻辑抽离到 [scripts/sync-version.cjs](scripts/sync-version.cjs)（Node.js 脚本，不再在 workflow 中堆叠 `node -p` / `npm version` / `grep` / `sed` bash）：`Update version files` 步骤改为一行 `node scripts/sync-version.cjs "$VERSION"`；脚本以 JSON 解析 + 2 空格缩进写回 `package.json` / `package-lock.json`（含 `packages[""]` 根条目，等价于原 `npm version` 行为），`src-tauri/tauri.conf.json` 采用定点字符串替换避免重排原格式，`src-tauri/Cargo.toml` 与 README.md shields.io 版本徽章（版本内 `-` 双写 `--` 转义）正则替换；文件无差异时不写盘，`git-auto-commit` 自动跳过行为不变。
@@ -36,8 +38,6 @@
 - 新增版本号同步工作流（`.github/workflows/version-sync.yml`）：推送 `v*` 标签或手动指定版本号时，逐文件检查 `package.json` / `package-lock.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json`，仅更新未同步到目标版本的字段并提交（提交信息带 `!c`）；全部一致时不产生提交。同步完成后调用 `release.yml` 激活发布流程，发布版本号由本工作流传入。
 - 发布工作流（`.github/workflows/release.yml`）改由 `workflow_call` + 手动触发：不再直接监听 tag 推送，版本号改为从调用方输入读取，release 创建时显式指定 `tag_name`，避免 `github.ref` 不再是 tag 导致的问题；同时移除构建期「更新版本号」步骤（版本号统一由版本同步工作流保证）。
 - 自动同步工作流的自动提交改用 `stefanzweifel/git-auto-commit-action`：默认使用官方 `github-actions[bot]` 提交者，无差异时自动跳过提交，不再手动执行 `git config` / commit / push。
-
-## [0.3.5-rc1] - 2026-08-09
 
 - 弹窗统一抽屉化：删除居中的 `Modal.vue` 全局弹窗，新增 `MessageDrawer.vue`（复用公共 `Drawer.vue` 右侧抽屉，`render-in-place` 挂载到 `#app-content`，宽度 520）承载全部错误 / 警告 / 信息 / 成功提示 + 确认 + 输入框模式——`defineExpose` 对外接口与旧 Modal 完全一致，`utils/modal.ts` 及全站 95 处调用方零改动，启动「云端连接失败」等提示全部改为右滑抽屉；内置**消息队列**：同时触发多条（如并行任务连续失败）时排队依次展示，当前一条关闭（关闭按钮 / 遮罩 / ESC / 确认 / 取消）动画结束后自动滑出下一条，保证任何一条提示都不丢失；`KickConfirmDialog.vue`（踢出确认，选封禁时长）/ `LobbyJoinConfirmDialog.vue`（加入房间确认，内嵌整合包校验卡片）同步由居中 teleport 弹窗重构为右侧抽屉。保留居中模态的有：`UserAgreementDialog`（强制协议门禁）、`ExitConfirmDialog`（退出确认）、`DependencyConfirmDialog`（嵌套于 ResourceDetail 全屏详情之上，层级需高于 Drawer 固定 z-1000）、`CopyMessageDialog` / `VersionPickerDialog`（工具浮层）、Toast（轻提示非弹窗）。验证：`npx vue-tsc --noEmit`、ESLint（改动文件）通过。
 - dev-api 新增抽屉消息测试命令（仅 dev 模式）：`molaunch.showError(title?, message?, details?)` / `showWarning` / `showInfo` / `showSuccess`（省略参数时使用样例数据，直接触发对应类型的右滑消息抽屉）、`molaunch.showConfirm(title?, message?)`（返回 `Promise<boolean>`）、`molaunch.showPrompt(title?, message?, defaultValue?)`（返回 `Promise<string | null>`，取消返回 null）、`molaunch.demoMessages()`（一次触发错误 / 警告 / 信息 / 成功 4 条，验证消息队列依次展示不丢失）；`help()` 文案与示例同步更新。
