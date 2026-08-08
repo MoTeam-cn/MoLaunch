@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 版本同步工作流（`.github/workflows/version-sync.yml`）新增 README.md 版本徽章同步：打 `v*` 标签 / 手动指定版本时，按 shields.io 规则（路径中 `-` 为分隔符，版本内 `-` 需双写 `--` 转义）自动更新顶部 Version 徽章，并纳入自动提交范围。
+
 - 修复 GitHub CodeQL 代码扫描告警：`.github/workflows/ci.yml` 全部 5 个 job 显式声明 `permissions: contents: read`（最小权限，消除 "Workflow does not contain permissions"）；`crypto_tests.rs` / `pow_test.rs` 中测试用固定盐/输入更名 `fixed_input` 并注明为确定性测试向量（消除 "Hard-coded cryptographic value" 误报，测试数据非真实密钥）。
 
 - 发布构建提速 + Windows 便携版命名调整：`src-tauri/Cargo.toml` 发布 profile 由 `lto = true` + `codegen-units = 1`（fat LTO，CI 编译/链接最慢组合）改为 `lto = "thin"`，显著缩短全量构建时间，产物大小与性能影响极小（`opt-level = "s"` + `strip` 仍保证体积）；Windows 便携版产物更名 `MoLaunch_<version>_x64.exe`（去掉 `_portable` 后缀，与 `-setup` 安装版天然区分），release.yml 中便携版定位 glob（`*.exe` 排除 `*-setup.exe`）与 Release 附件 glob（`*_x64.exe`）同步调整，客户端 / 云端无硬编码文件名、不受影响。
