@@ -1,7 +1,8 @@
 {
-  "name": "mo-launch",
+  "name": "molaunch",
   "private": true,
   "version": "0.3.5-rc1",
+  "copyright": "Copyright © 2026 MoTeam. All rights reserved.",
   "type": "module",
   "scripts": {
     "dev": "vite",
