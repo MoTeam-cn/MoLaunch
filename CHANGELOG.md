@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- [src-tauri/updater/README.md](src-tauri/updater/README.md) 按主仓库 README 风格重写为完整组件文档：新增居中标题 + 徽章栏（Rust / Windows / minisign / License）、`[!IMPORTANT]` 定位说明（子 crate 非完整启动器）、mermaid 工作流程图（等待退出 → 验签 → 替换 → 重启全流程及各退出码分支）、功能特性章节（进程等待 / 签名校验 / 文件替换 / 重启新版本）；并修正原文与实现不符的描述——验签依赖实为 `minisign-verify`（BLAKE2b-512 prehash + Ed25519，与 tauri-plugin-updater 同款）而非 ed25519-dalek + SHA-512，退出码顺序按 `main.rs` 实际执行顺序（参数 1 / 超时 2 / 替换 3 / 启动 4 / 验签 5）排列表述，集成方式对齐真实链路（`resources.rs::extract_updater` 释放 + `install_windows.rs` 经 `apply_pending_update` 启动子进程 + `last.exe`/`last.sig` 缓存）。
+
 - 版本同步工作流（`.github/workflows/version-sync.yml`）的版本文件更新逻辑抽离到 [scripts/sync-version.cjs](scripts/sync-version.cjs)（Node.js 脚本，不再在 workflow 中堆叠 `node -p` / `npm version` / `grep` / `sed` bash）：`Update version files` 步骤改为一行 `node scripts/sync-version.cjs "$VERSION"`；脚本以 JSON 解析 + 2 空格缩进写回 `package.json` / `package-lock.json`（含 `packages[""]` 根条目，等价于原 `npm version` 行为），`src-tauri/tauri.conf.json` 采用定点字符串替换避免重排原格式，`src-tauri/Cargo.toml` 与 README.md shields.io 版本徽章（版本内 `-` 双写 `--` 转义）正则替换；文件无差异时不写盘，`git-auto-commit` 自动跳过行为不变。
 
 - 版本同步工作流（`.github/workflows/version-sync.yml`）新增 README.md 版本徽章同步：打 `v*` 标签 / 手动指定版本时，按 shields.io 规则（路径中 `-` 为分隔符，版本内 `-` 需双写 `--` 转义）自动更新顶部 Version 徽章，并纳入自动提交范围。
