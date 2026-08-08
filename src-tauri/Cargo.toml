@@ -134,7 +134,8 @@ custom-protocol = ["tauri/custom-protocol"]
 
 [profile.release]
 panic = "abort"
-codegen-units = 1
-lto = true
+# thin LTO：相比 fat LTO + codegen-units=1 大幅缩短 CI 编译/链接耗时，
+# 产物体积与性能影响极小（opt-level = "s" + strip 仍保证体积）
+lto = "thin"
 opt-level = "s"
 strip = true

@@ -162,7 +162,7 @@ jobs:
           VERSION="${{ steps.version.outputs.VERSION }}"
           BUNDLE_DIR="src-tauri/target/release/bundle/nsis"
           MAIN_BIN="src-tauri/target/release/MoLaunch.exe"
-          PORTABLE_FILE="${BUNDLE_DIR}/MoLaunch_${VERSION}_x64_portable.exe"
+          PORTABLE_FILE="${BUNDLE_DIR}/MoLaunch_${VERSION}_x64.exe"
           if [ ! -f "$MAIN_BIN" ]; then
             echo "::error::release 主程序不存在: $MAIN_BIN"
             exit 1
@@ -185,8 +185,8 @@ jobs:
             windows)
               SETUP_FILE=$(find "$BUNDLE_DIR/nsis" -name "*-setup.exe" 2>/dev/null | head -1)
               # 便携版（Windows 专属）：由 "Create portable build" 步骤复制到 nsis 目录，
-              # 文件名形如 MoLaunch_1.0.0_x64_portable.exe
-              PORTABLE_FILE=$(find "$BUNDLE_DIR/nsis" -name "*_portable.exe" 2>/dev/null | head -1)
+              # 文件名形如 MoLaunch_1.0.0_x64.exe（不带 -setup / _portable 后缀，与安装版区分）
+              PORTABLE_FILE=$(find "$BUNDLE_DIR/nsis" -name "*.exe" ! -name "*-setup.exe" 2>/dev/null | head -1)
               ;;
             macos)
               SETUP_FILE=$(find "$BUNDLE_DIR/macos" -name "*.app.tar.gz" ! -name "*.sig" 2>/dev/null | head -1)
@@ -299,7 +299,7 @@ jobs:
             ${{ steps.locate.outputs.sig_file }}
           if-no-files-found: error
 
-      # Windows 便携版（*_portable.exe + .sig）作为 workflow artifact 传递，
+      # Windows 便携版（MoLaunch_<ver>_x64.exe + .sig）作为 workflow artifact 传递，
       # 由 release job 附加到 GitHub Release（除 S3 外，提供手动下载入口）。
       - name: Upload portable as workflow artifact (Windows only)
         if: matrix.platform == 'windows' && steps.locate.outputs.portable_file != ''
@@ -416,7 +416,7 @@ jobs:
             See [CHANGELOG.md](CHANGELOG.md) for details.
           files: |
             artifacts/windows/*-setup.exe
-            artifacts/windows/*_portable.exe
+            artifacts/windows/*_x64.exe
             artifacts/windows/*.sig
             artifacts/macos/*.app.tar.gz
             artifacts/macos/*.sig
