@@ -23,7 +23,7 @@ interface ModalOptions {
   onConfirmInput?: (value: string) => void
 }
 
-/** Modal 组件实例对外暴露的接口（与 Modal.vue defineExpose 对应） */
+/** MessageDrawer 组件实例对外暴露的接口（与 MessageDrawer.vue defineExpose 对应） */
 export interface ModalInstance {
   show: (opts: ModalOptions) => void
   error: (title: string, message: string, details?: string) => void

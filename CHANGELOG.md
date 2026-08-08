@@ -1,5 +1,11 @@
 ## [Unreleased]
 
+- 新增「今日人品」便捷工具（[src/views/quick-tools/LuckyTool.vue](src/views/quick-tools/LuckyTool.vue) + 纯前端算法 [src/utils/lucky.ts](src/utils/lucky.ts)，移植自 `docs/fix-bug/runk.js`）：基于本机设备 ID（经 `sdk_manager` 获取）与日期哈希生成 0-100 每日幸运值，同一设备当天固定、跨天自动重置；展示幸运值大数字、等级标签、评语与进度条，设备 ID 打码显示。
+- 开屏窗口支持鼠标拖拽移动：`public/splash.html` 的 `<body>` 挂载 `data-tauri-drag-region`（与主窗口 `TopNavLayout` 顶部拖拽区 / 用户协议弹窗遮罩同一机制），解决无边框（`decorations: false`）开屏窗口无法拖动的问题；`docs/Run-html/run.html` 设计稿同步该属性。
+- 工具页新增「趣味工具」分类：`Tools.vue` 侧边栏在「外部下载」与「便捷工具」之间插入 `fun-tools` 新一级菜单（`FaceSmileIcon` 图标），并设为进入工具页的默认分类；「今日人品」`LuckyTool.vue` 由 `QuickTools.vue` 便捷工具列表迁移至该分类独立渲染（`v-else-if="activeCategory === 'fun-tools'"`），`ToolToc` 侧边目录同步生效。
+- 全局返回顶部按钮白名单（`data-inner-scroll`）：为 17 处 main 内嵌次级滚动容器打标，滚动它们不再误触发全局「返回顶部」按钮——公共组件 `NavSidebar`（设置/工具/联机等页面共用左侧分类）、`LaunchPanel`（首页账号区）、`ChatConversationList`（AI 会话栏）、`LoaderCard`、`WhitelistEditor`、`HttpLogViewer`、`LogViewer`、`FrpLogs`，页面级 `DownloadSidebar` / `FolderSidebar` 侧栏、`CleanupTool` 文件树、`JavaManager` / `ResourcePackConverter` / `ScreenshotManager` / `NbtViewer` / `ArchiveManager` 限高列表、`AiModelSettings` 模型列表；另在 `Drawer.vue` 根节点单点标记，一次性覆盖全部挂载到 `#app-content` 的右侧抽屉（更新/崩溃/消息/提示/协议等）内嵌滚动，避免右下角按钮遮挡抽屉内操作。
+- 启动时展示「本次更新日志」弹窗（对齐 PCL2 做法）：`App.vue` 初始化完成后比较 localStorage 记录的上次运行版本与当前版本，仅当版本升高时弹出一次 `UpdateLogDialog` 抽屉（右侧 560px，复用 `ReleaseTimeline` 渲染 `CHANGELOG.md` 全文，底部含「完整更新日志」外链到 GitHub Releases）；弹窗前先写入当前版本保证只弹一次，「全新安装（无记录）/ 同版本 / 版本回退」均不弹。
+
 - 新增许可证同步工作流（`.github/workflows/license-sync.yml`）：根目录 `LICENSE` 作为唯一权威副本，向 main 推送更新或手动触发时，自动同步至 `src-tauri/LICENSE`、`src-tauri/updater/LICENSE`、`src-tauri/resources/LICENSE.txt` 并提交（提交信息带 `!c` 跳过 CI）；无差异时不提交，副本文件变化不会再次触发。
 - 新增版本号同步工作流（`.github/workflows/version-sync.yml`）：推送 `v*` 标签或手动指定版本号时，逐文件检查 `package.json` / `package-lock.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json`，仅更新未同步到目标版本的字段并提交（提交信息带 `!c`）；全部一致时不产生提交。同步完成后调用 `release.yml` 激活发布流程，发布版本号由本工作流传入。
 - 发布工作流（`.github/workflows/release.yml`）改由 `workflow_call` + 手动触发：不再直接监听 tag 推送，版本号改为从调用方输入读取，release 创建时显式指定 `tag_name`，避免 `github.ref` 不再是 tag 导致的问题；同时移除构建期「更新版本号」步骤（版本号统一由版本同步工作流保证）。

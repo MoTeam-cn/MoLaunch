@@ -10,6 +10,8 @@
  * 封禁时长语义由 api-server 约定：ban_duration_seconds=0 表示永久。
  */
 import { onMounted, ref } from 'vue'
+import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import Drawer from '@/components/common/Drawer.vue'
 import Button from '@/components/common/Button.vue'
 
 defineProps<{
@@ -37,66 +39,64 @@ onMounted(() => {
   visible.value = true
 })
 
+/** 关闭（取消按钮 / 遮罩 / ESC 统一走此路径，通知父组件卸载） */
+function handleClose() {
+  visible.value = false
+  emit('close')
+}
+
 function handleConfirm() {
   emit('confirm', selected.value)
 }
 </script>
 
 <template>
-  <teleport to="body">
-    <transition
-      enter-active-class="transition ease-out duration-150"
-      enter-from-class="opacity-0"
-      enter-to-class="opacity-100"
-      leave-active-class="transition ease-in duration-100"
-      leave-from-class="opacity-100"
-      leave-to-class="opacity-0"
-    >
-      <div
-        v-if="visible"
-        class="fixed inset-0 z-[10000] flex items-center justify-center p-4"
-        @click.self="emit('close')"
-      >
-        <div class="absolute inset-0 bg-black/40" />
-        <div class="relative w-full max-w-md bg-white rounded-lg shadow-xl">
-          <!-- 标题栏 -->
-          <div class="px-5 py-3.5 border-b border-gray-200">
-            <h3 class="text-base font-semibold text-gray-900">踢出参与者</h3>
-          </div>
-          <!-- 内容区 -->
-          <div class="px-5 py-4 space-y-3">
-            <p class="text-sm text-gray-600">
-              确定踢出
-              <code class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{{ devicePk.slice(0, 12) }}...</code>
-              <span v-if="virtualIp" class="text-gray-500">（{{ virtualIp }}）</span>？
-            </p>
-            <div class="space-y-2">
-              <div class="text-xs text-gray-500">封禁时长</div>
-              <div class="grid grid-cols-2 gap-2">
-                <div
-                  v-for="opt in banOptions"
-                  :key="String(opt.value)"
-                  role="radio"
-                  :aria-checked="selected === opt.value"
-                  class="px-3 py-2 text-sm rounded border transition-colors cursor-pointer"
-                  :class="selected === opt.value
-                    ? 'border-primary-500 bg-primary-50 text-primary-700'
-                    : 'border-gray-200 hover:border-gray-300 text-gray-700'"
-                  @click="selected = opt.value"
-                >
-                  <div class="font-medium">{{ opt.label }}</div>
-                  <div class="text-xs text-gray-400 mt-0.5">{{ opt.desc }}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <!-- 底部按钮栏 -->
-          <div class="flex justify-end gap-2 px-5 py-3.5 bg-gray-50 rounded-b-lg">
-            <Button type="ghost" size="small" @click="emit('close')">取消</Button>
-            <Button type="primary" size="small" @click="handleConfirm">确认踢出</Button>
-          </div>
+  <Drawer
+    :visible="visible"
+    placement="right"
+    :width="460"
+    render-in-place
+    popup-container="#app-content"
+    @update:visible="handleClose"
+  >
+    <template #title>
+      <div class="flex items-center gap-1.5">
+        <ExclamationTriangleIcon class="h-4 w-4 text-amber-500" />
+        <span>踢出参与者</span>
+      </div>
+    </template>
+
+    <p class="text-sm text-gray-600">
+      确定踢出
+      <code class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{{ devicePk.slice(0, 12) }}...</code>
+      <span v-if="virtualIp" class="text-gray-500">（{{ virtualIp }}）</span>？
+    </p>
+
+    <div class="mt-4 space-y-2">
+      <div class="text-xs text-gray-500">封禁时长</div>
+      <div class="grid grid-cols-2 gap-2">
+        <div
+          v-for="opt in banOptions"
+          :key="String(opt.value)"
+          role="radio"
+          :aria-checked="selected === opt.value"
+          class="px-3 py-2 text-sm rounded border transition-colors cursor-pointer"
+          :class="selected === opt.value
+            ? 'border-primary-500 bg-primary-50 text-primary-700'
+            : 'border-gray-200 hover:border-gray-300 text-gray-700'"
+          @click="selected = opt.value"
+        >
+          <div class="font-medium">{{ opt.label }}</div>
+          <div class="text-xs text-gray-400 mt-0.5">{{ opt.desc }}</div>
         </div>
       </div>
-    </transition>
-  </teleport>
+    </div>
+
+    <template #footer>
+      <div class="flex justify-end gap-2">
+        <Button type="ghost" size="small" @click="handleClose">取消</Button>
+        <Button type="primary" size="small" @click="handleConfirm">确认踢出</Button>
+      </div>
+    </template>
+  </Drawer>
 </template>

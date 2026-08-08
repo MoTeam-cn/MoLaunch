@@ -9,12 +9,13 @@ import TopNavLayout from '@/components/layout/TopNavLayout.vue'
 import BackToTop from '@/components/common/BackToTop.vue'
 import DownloadPanel from '@/components/common/DownloadPanel.vue'
 import DragOverlay from '@/components/common/DragOverlay.vue'
-import Modal from '@/components/common/Modal.vue'
+import MessageDrawer from '@/components/common/MessageDrawer.vue'
 import CrashDialog from '@/components/common/CrashDialog.vue'
 import HintDialog from '@/components/common/HintDialog.vue'
 import UserAgreementDialog from '@/components/common/UserAgreementDialog.vue'
 import Toast from '@/components/common/Toast.vue'
 import UpdateDialog from '@/components/about/UpdateDialog.vue'
+import UpdateLogDialog from '@/components/about/UpdateLogDialog.vue'
 import Watermark from '@/components/common/Watermark.vue'
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
@@ -29,6 +30,7 @@ import { setUserAgreementDialogRef, maybeRequireUserAgreement } from '@/utils/us
 import { setToastRef } from '@/utils/toast'
 import { notifyFrontendReady } from '@/utils/splash'
 import { initAutoCheck } from '@/utils/updater'
+import { maybeShowUpdateLog } from '@/utils/updateLog'
 import { initDownloadStream } from '@/composables/useDownloadStream'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
@@ -38,7 +40,7 @@ const authStore = useAuthStore()
 const javaStore = useJavaStore()
 const settingsStore = useSettingsStore()
 const onlineStore = useOnlineStore()
-const modalRef = ref<InstanceType<typeof Modal> | null>(null)
+const modalRef = ref<InstanceType<typeof MessageDrawer> | null>(null)
 const crashDialogRef = ref<InstanceType<typeof CrashDialog> | null>(null)
 const hintDialogRef = ref<InstanceType<typeof HintDialog> | null>(null)
 const userAgreementDialogRef = ref<InstanceType<typeof UserAgreementDialog> | null>(null)
@@ -124,6 +126,8 @@ async function initApp() {
 
   // 等待 Java 搜索完成（不阻塞 UI 和路由修正）
   await javaPromise
+  // 启动「本次更新日志」弹窗：版本升级后展示一次（无记录/回退/同版本不弹）
+  maybeShowUpdateLog()
   console.log('[Startup][Frontend] initApp fully done @', new Date().toISOString())
 }
 </script>
@@ -157,12 +161,13 @@ async function initApp() {
     <BackToTop />
     <DownloadPanel />
   </Teleport>
-  <Modal ref="modalRef" />
+  <MessageDrawer ref="modalRef" />
   <CrashDialog ref="crashDialogRef" />
   <HintDialog ref="hintDialogRef" />
   <UserAgreementDialog ref="userAgreementDialogRef" />
   <Toast ref="toastRef" />
   <UpdateDialog />
+  <UpdateLogDialog />
   <!-- 测试版水印：仅在测试版构建（package.json version 含 beta/alpha/rc/canary 后缀）时渲染 -->
   <Watermark />
   <!-- 会话恢复期间的加载遮罩 -->

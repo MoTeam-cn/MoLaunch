@@ -144,7 +144,7 @@ async function copyReqId(reqId: string) {
     </div>
 
     <!-- 表格 -->
-    <div class="overflow-x-auto max-h-96 overflow-y-auto">
+    <div data-inner-scroll class="overflow-x-auto max-h-96 overflow-y-auto">
       <table v-if="entries.length > 0" class="w-full text-xs">
         <thead class="sticky top-0 bg-gray-100 text-gray-600">
           <tr>

@@ -250,6 +250,7 @@ onMounted(() => {
 
     <!-- 日志流 -->
     <div
+      data-inner-scroll
       class="flex-1 mt-3 rounded-lg border border-gray-700 bg-gray-900 overflow-auto"
       style="max-height: 60vh;"
     >

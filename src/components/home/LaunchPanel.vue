@@ -116,7 +116,7 @@ async function handleLaunch() {
     </div>
 
     <!-- 中部：账号卡片区域（弹性填充，垂直居中） -->
-    <div class="flex flex-1 items-center justify-center overflow-y-auto px-4 py-2">
+    <div data-inner-scroll class="flex flex-1 items-center justify-center overflow-y-auto px-4 py-2">
       <AccountSelector />
     </div>
 

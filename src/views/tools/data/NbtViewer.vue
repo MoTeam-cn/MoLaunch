@@ -108,7 +108,7 @@ async function pickNbtFile() {
       </div>
 
       <!-- 树形展示 -->
-      <div v-if="root" class="max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 p-3">
+      <div v-if="root" data-inner-scroll class="max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 p-3">
         <NbtTreeNode
           :node="root"
           :path="''"

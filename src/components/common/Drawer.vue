@@ -218,6 +218,7 @@ const panelStyle = computed(() => {
     <div
       v-if="visible || mounted"
       v-show="visible || mounted"
+      data-inner-scroll
       class="drawer-root"
       :class="[
         `drawer-placement-${placement}`,

@@ -188,7 +188,7 @@ function executeCleanup() {
       <!-- 扫描结果：文件树分组展示（委托给 CleanupGroupList） -->
       <div
         v-else-if="scanState === 'ready' && scanItems.length > 0"
-        class="max-h-[400px] overflow-y-auto pr-1"
+        data-inner-scroll class="max-h-[400px] overflow-y-auto pr-1"
       >
         <CleanupGroupList
           :items="scanItems"

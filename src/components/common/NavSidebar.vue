@@ -123,7 +123,7 @@ useTabPersistence(
 
 <template>
   <aside class="w-48 bg-white border-r border-gray-200 flex flex-col shrink-0">
-    <div class="flex-1 overflow-y-auto py-4">
+    <div data-inner-scroll class="flex-1 overflow-y-auto py-4">
       <div v-for="cat in categories" :key="cat.id">
         <!-- 保留原生 button：导航菜单项（w-full 布局 + active 状态 + 图标 + 展开箭头），
              Button.vue 的 scoped size 类固定 height/padding 无法承载列表项布局 -->

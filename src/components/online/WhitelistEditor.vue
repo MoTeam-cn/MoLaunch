@@ -265,7 +265,7 @@ onMounted(() => {
         <UserPlusIcon class="w-3.5 h-3.5" />
         <span>已添加 {{ displayEntries.length }} 个设备</span>
       </div>
-      <div class="space-y-1 max-h-40 overflow-y-auto">
+      <div data-inner-scroll class="space-y-1 max-h-40 overflow-y-auto">
         <div
           v-for="entry in displayEntries"
           :key="entry.raw"

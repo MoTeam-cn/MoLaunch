@@ -32,7 +32,7 @@ const emit = defineEmits<{
       从服务端加载模型列表后，勾选需要启用的模型；未勾选的模型不会被使用。
     </p>
 
-    <div v-if="remoteModels.length > 0" class="border border-gray-200 rounded-md max-h-44 overflow-y-auto p-1.5 space-y-0.5 mb-3">
+    <div v-if="remoteModels.length > 0" data-inner-scroll class="border border-gray-200 rounded-md max-h-44 overflow-y-auto p-1.5 space-y-0.5 mb-3">
       <label
         v-for="model in remoteModels"
         :key="model"

@@ -56,7 +56,7 @@ async function refresh() {
       />
 
       <!-- Java 列表（限制高度，超出滚动） -->
-      <div class="max-h-[320px] overflow-y-auto space-y-2">
+      <div data-inner-scroll class="max-h-[320px] overflow-y-auto space-y-2">
         <div
           v-for="j in javaStore.javaList"
           :key="j.executable"

@@ -189,7 +189,7 @@ onMounted(async () => {
       </div>
 
       <!-- 截图列表 -->
-      <div v-if="items.length > 0" class="max-h-[400px] overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
+      <div v-if="items.length > 0" data-inner-scroll class="max-h-[400px] overflow-y-auto rounded-lg border border-gray-200 divide-y divide-gray-100">
         <div
           v-for="item in items"
           :key="item.path"

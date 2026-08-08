@@ -13,6 +13,14 @@ import { showBuyHintDialog } from '@/utils/buyHint'
 import { showStarHintDialog } from '@/utils/starHint'
 import { resetUserAgreement, showUserAgreementDialog, USER_AGREEMENT_VERSION } from '@/utils/userAgreement'
 import { applyConfig } from '@/utils/api/config'
+import {
+  showConfirmAsync,
+  showError as showErrorMessage,
+  showInfo as showInfoMessage,
+  showPrompt as showPromptMessage,
+  showSuccess as showSuccessMessage,
+  showWarning as showWarningMessage,
+} from '@/utils/modal'
 
 /** 调试 API 接口 */
 export interface MolaunchDevAPI {
@@ -48,6 +56,20 @@ export interface MolaunchDevAPI {
   resetUserAgreement(): Promise<void>
   /** 返回所有 Pinia store 的 $state */
   stores(): Promise<Record<string, unknown>>
+  /** 弹出错误消息抽屉（测试用；与 warning/info/success 共用同一队列，同时触发时依次展示不丢失） */
+  showError(title?: string, message?: string, details?: string): void
+  /** 弹出警告消息抽屉（测试用） */
+  showWarning(title?: string, message?: string, details?: string): void
+  /** 弹出信息消息抽屉（测试用） */
+  showInfo(title?: string, message?: string, details?: string): void
+  /** 弹出成功消息抽屉（测试用） */
+  showSuccess(title?: string, message?: string, details?: string): void
+  /** 弹出确认抽屉，返回 Promise<boolean>：true=确认 / false=取消（测试用） */
+  showConfirm(title?: string, message?: string): Promise<boolean>
+  /** 弹出输入框抽屉，返回 Promise<string | null>：取消返回 null（测试用） */
+  showPrompt(title?: string, message?: string, defaultValue?: string): Promise<string | null>
+  /** 一次触发错误 / 警告 / 信息 / 成功 4 条消息，验证消息队列依次展示不丢失（测试用） */
+  demoMessages(): void
 }
 
 /** 全局 Window 类型扩展，使 `window.molaunch` 在 TypeScript 中可识别 */
@@ -123,6 +145,28 @@ MoLaunch Dev API 可用命令：
   molaunch.stores()
       返回所有 Pinia store 的 $state（Promise<Record<string, unknown>>）
 
+  molaunch.showError(title?, message?, details?)
+      弹出错误消息抽屉（测试用；省略参数时使用样例数据）
+      与 showWarning / showInfo / showSuccess 共用同一抽屉队列，同时触发时依次展示、不丢任何一条
+
+  molaunch.showWarning(title?, message?, details?)
+      弹出警告消息抽屉（测试用）
+
+  molaunch.showInfo(title?, message?, details?)
+      弹出信息消息抽屉（测试用）
+
+  molaunch.showSuccess(title?, message?, details?)
+      弹出成功消息抽屉（测试用）
+
+  molaunch.showConfirm(title?, message?)
+      弹出确认抽屉，返回 Promise<boolean>：true=确认 / false=取消（测试用）
+
+  molaunch.showPrompt(title?, message?, defaultValue?)
+      弹出输入框抽屉，返回 Promise<string | null>：取消返回 null（测试用）
+
+  molaunch.demoMessages()
+      一次触发错误 / 警告 / 信息 / 成功 4 条消息，验证消息队列依次展示不丢失（测试用）
+
 示例：
   await molaunch.pickPort()
   await molaunch.picker('confirm', { message: '测试弹窗' })
@@ -137,6 +181,10 @@ MoLaunch Dev API 可用命令：
   await molaunch.reload()
   await molaunch.reload(true)
   const s = await molaunch.stores(); console.log(s.frp)
+  molaunch.showError()
+  const ok = await molaunch.showConfirm('确认删除', '确定要删除吗？')
+  const nickname = await molaunch.showPrompt('输入昵称', '请输入你的游戏昵称')
+  molaunch.demoMessages()
 `.trim()
 
 /** 动态加载所有 Pinia store 并返回 $state 映射 */
@@ -268,6 +316,44 @@ export function setupDevApi(router: Router): void {
       await resetUserAgreement()
     },
     stores: loadAllStores,
+    showError(
+      title = '云端连接失败',
+      message = '与云端 API 连接失败，联机功能可能不可用。',
+      details = '原因：网络超时\n可在「设置 → 联机」页尝试重新连接。',
+    ) {
+      showErrorMessage(title, message, details)
+    },
+    showWarning(
+      title = 'Java 版本不受支持',
+      message = '该版本要求 Java 8，当前检测到 Java 21。',
+      details = '建议：在「版本设置 → Java」中为该版本指定 Java 8。',
+    ) {
+      showWarningMessage(title, message, details)
+    },
+    showInfo(title = '下载任务完成', message = '已成功下载 3 个文件。') {
+      showInfoMessage(title, message)
+    },
+    showSuccess(title = '启动成功', message = '游戏已正常退出。') {
+      showSuccessMessage(title, message)
+    },
+    showConfirm(title = '确认删除', message = '确定要删除版本「1.21.4 Fabric」吗？该操作不可恢复。') {
+      return showConfirmAsync(title, message)
+    },
+    showPrompt(title = '输入昵称', message = '请输入你的游戏昵称：', defaultValue = '') {
+      return new Promise((resolve) => {
+        showPromptMessage(title, message, (value) => resolve(value), {
+          defaultValue,
+          onCancel: () => resolve(null),
+        })
+      })
+    },
+    demoMessages() {
+      console.log('[molaunch.demoMessages] 一次触发 4 条消息，验证抽屉消息队列依次展示、不丢任何一条')
+      showErrorMessage('云端连接失败', '与云端 API 连接失败，联机功能可能不可用。', '原因：网络超时\n可在「设置 → 联机」页尝试重新连接。')
+      showWarningMessage('Java 版本不受支持', '该版本要求 Java 8，当前检测到 Java 21。', '建议：在「版本设置 → Java」中为该版本指定 Java 8。')
+      showInfoMessage('下载任务完成', '已成功下载 3 个文件。')
+      showSuccessMessage('启动成功', '游戏已正常退出。')
+    },
   }
 
   Object.defineProperty(window, 'molaunch', {

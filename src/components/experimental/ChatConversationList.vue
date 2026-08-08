@@ -149,7 +149,7 @@ onBeforeUnmount(() => {
           </Tooltip>
         </div>
       </div>
-      <div class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div data-inner-scroll class="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
         <!-- TransitionGroup：新建/删除/切换会话时列表项平滑移动与淡入淡出 -->
         <TransitionGroup name="conv" tag="div" class="relative space-y-0.5">
           <div

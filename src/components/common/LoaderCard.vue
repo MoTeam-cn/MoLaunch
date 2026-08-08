@@ -118,7 +118,7 @@ function clear(e: Event) {
       <div class="overflow-hidden min-h-0">
         <div class="border-t border-gray-200">
           <!-- 版本列表 -->
-          <div class="max-h-48 overflow-y-auto p-3 space-y-1.5">
+          <div data-inner-scroll class="max-h-48 overflow-y-auto p-3 space-y-1.5">
             <div
               v-for="ver in versions"
               :key="ver.key"

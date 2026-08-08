@@ -155,7 +155,7 @@ const logLines = computed<LogLine[]>(() => {
         </span>
       </div>
       <div class="bg-gray-900 rounded-lg p-3 log-viewer">
-        <div v-if="logLines.length > 0" class="log-list">
+        <div v-if="logLines.length > 0" data-inner-scroll class="log-list">
           <div
             v-for="item in logLines"
             :key="item.no"

@@ -7,13 +7,14 @@
  * - 右侧内容区 v-if 切换子组件
  *
  * 分类（每分组 ≤ 3 个工具，重要/高频工具单独一栏）：
- * 外部下载 / 便捷工具 / 存档管理 / Mod 工具 / 网络工具 / 计算工具
+ * 外部下载 / 趣味工具 / 便捷工具 / 存档管理 / Mod 工具 / 网络工具 / 计算工具
  * / Java 管理 / 诊断工具 / 游戏资源 / 种子地图
  */
 
 import { ref, nextTick, watch } from 'vue'
 import {
   ArrowDownTrayIcon,
+  FaceSmileIcon,
   WrenchScrewdriverIcon,
   ArchiveBoxIcon,
   PuzzlePieceIcon,
@@ -26,6 +27,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import NavSidebar from '@/components/common/NavSidebar.vue'
 import ExternalDownload from './ExternalDownload.vue'
+import LuckyTool from './quick-tools/LuckyTool.vue'
 import QuickTools from './QuickTools.vue'
 import ArchivePage from './tools/archive/ArchivePage.vue'
 import ModToolsPage from './tools/mod-tools/ModToolsPage.vue'
@@ -52,6 +54,12 @@ const categories: ToolCategory[] = [
     label: '外部下载',
     icon: ArrowDownTrayIcon,
     desc: '通过 URL 下载任意文件，支持自定义目录、暂停、取消和进度展示',
+  },
+  {
+    id: 'fun-tools',
+    label: '趣味工具',
+    icon: FaceSmileIcon,
+    desc: '今日人品、每日运势等趣味小工具',
   },
   {
     id: 'quick-tools',
@@ -109,7 +117,7 @@ const categories: ToolCategory[] = [
   },
 ]
 
-const activeCategory = ref<string>('quick-tools')
+const activeCategory = ref<string>('fun-tools')
 
 /** 使用协议抽屉：当日未同意过工具协议时弹出（同意后存 localStorage，次日重新提醒） */
 const disclaimerVisible = ref(!hasAgreedToday('tools'))
@@ -145,6 +153,7 @@ const activeDesc = () =>
       <div class="flex-1 relative overflow-hidden">
         <div class="h-full overflow-y-auto p-6 tools-scroll-container">
           <ExternalDownload v-if="activeCategory === 'external-download'" />
+          <LuckyTool v-else-if="activeCategory === 'fun-tools'" />
           <QuickTools v-else-if="activeCategory === 'quick-tools'" />
           <ArchivePage v-else-if="activeCategory === 'archive'" />
           <ModToolsPage v-else-if="activeCategory === 'mod-tools'" />
