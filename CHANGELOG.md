@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+- 修复 Release 工作流提交区间与协作者头像生成（.github/workflows/release.yml + [scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：
+  - 提交区间：`release` job 的 checkout 由默认分支改为检出发布 tag（`ref: v${{ inputs.version }}`），`build-and-upload` 的 release_notes 区间同样改用 `v$VERSION` tag 锚定（`git rev-parse "${VERSION_TAG}^{commit}"`）——此前 `git describe HEAD^` 会把本次发布 tag 自身当作上一个 tag，导致 `git log v0.3.5-rc1..HEAD` 只取到 tag 之后的零星提交（本应 35 条却只剩 3 条）。
+  - 协作者头像：baseSha 改由 `git rev-list -n 1 <tag>` 解析——原 `git rev-parse <tag>` 对 annotated tag 返回 tag 对象 sha（非 commit sha），compare API 直接 404，头像静默回退为 `git shortlog` 文本；作者集合改从 `git log` 的 author email 构建（API 成功时用 GitHub 账号头像 + 链接补充，失败时按邮箱生成 gravatar 头像兜底，修复空 login 生成 `https://github.com/` 坏链接）。
+
 ## [0.3.5-rc1] - 2026-08-09
 
 - `src-tauri/updater/README.md` 相关链接移除指向 `docs/updater/design.md` 的入口（`docs/` 为本地内部文档目录，已通过 `.gitignore` 排除、不提交云端，README 不再暴露内部文档路径）。

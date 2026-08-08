@@ -55,25 +55,27 @@ function classify() {
   return buckets;
 }
 
-function shortlog() {
-  const range = PREV_TAG ? `${PREV_TAG}..HEAD` : 'HEAD';
-  const limit = PREV_TAG ? '' : ' | head -20';
-  return run(`git shortlog -sn --no-merges ${range}${limit}`);
-}
-
 async function contributors() {
-  if (!shortlog()) return '';
   const headSha = run('git rev-parse HEAD');
   let baseSha;
-  if (PREV_TAG) {
-    try {
-      baseSha = run(`git rev-parse ${PREV_TAG}`);
-    } catch {
-      baseSha = run('git rev-list --max-parents=0 HEAD');
-    }
-  } else {
+  try {
+    baseSha = PREV_TAG
+      ? run(`git rev-list -n 1 ${PREV_TAG}`)
+      : run('git rev-list --max-parents=0 HEAD');
+  } catch {
     baseSha = run('git rev-list --max-parents=0 HEAD');
   }
+  const range = PREV_TAG ? `${PREV_TAG}..HEAD` : 'HEAD';
+  const authors = new Map();
+  for (const line of run(`git log ${range} --no-merges --format=%an%x09%ae`).split('\n')) {
+    if (!line.trim()) continue;
+    const [name, email] = line.split('\t');
+    const key = (email || name).trim().toLowerCase();
+    if (!authors.has(key)) {
+      authors.set(key, { name: name.trim(), email: (email || '').trim(), login: '', avatar: '' });
+    }
+  }
+  if (!authors.size) return '';
   let commits = [];
   try {
     const url = `https://api.github.com/repos/${REPO}/compare/${baseSha}...${headSha}`;
@@ -81,34 +83,24 @@ async function contributors() {
       headers: { Accept: 'application/vnd.github+json', ...(TOKEN && { Authorization: `Bearer ${TOKEN}` }) },
     });
     if (res.ok) commits = (await res.json()).commits || [];
-  } catch {
-    // API 不可用时回退到 shortlog 文本列表
+    else console.warn(`[generate-release-content] compare API ${res.status} ${res.statusText}, 头像回退到 gravatar`);
+  } catch (e) {
+    console.warn(`[generate-release-content] compare API 调用失败，头像回退到 gravatar: ${e.message}`);
   }
-  if (!commits.length) {
-    return shortlog()
-      .split('\n')
-      .map((l) => `- ${l}`)
-      .join('\n');
-  }
-  const seen = new Map();
   for (const c of commits) {
     const gitAuthor = (c.commit || {}).author || {};
     const email = (gitAuthor.email || '').trim().toLowerCase();
-    const name = gitAuthor.name || 'anonymous';
-    const ghAuthor = c.author || {};
-    const login = ghAuthor.login || (!email ? name : '');
-    if (seen.has(login)) continue;
-    let avatar = ghAuthor.avatar_url || '';
-    if (!avatar && email) {
-      const digest = crypto.createHash('md5').update(email).digest('hex');
-      avatar = `https://www.gravatar.com/avatar/${digest}?d=identicon&s=96`;
-    }
-    seen.set(login, { avatar, name, login });
+    const entry = email ? authors.get(email) : null;
+    if (!entry || !c.author) continue;
+    if (c.author.login) entry.login = c.author.login;
+    if (c.author.avatar_url) entry.avatar = c.author.avatar_url;
   }
-  return [...seen.values()]
-    .map(({ avatar, name, login }) => {
-      const img = `<img src="${avatar}" width="40" height="40" style="border-radius:50%" alt="${name}" />`;
-      return login.startsWith('@') || login === name ? img : `[${img}](https://github.com/${login})`;
+  return [...authors.values()]
+    .map(({ name, email, login, avatar }) => {
+      const src = avatar ||
+        `https://www.gravatar.com/avatar/${crypto.createHash('md5').update(email).digest('hex')}?d=identicon&s=96`;
+      const img = `<img src="${src}" width="40" height="40" style="border-radius:50%" alt="${name}" />`;
+      return login ? `[${img}](https://github.com/${login})` : img;
     })
     .join('\n\n');
 }

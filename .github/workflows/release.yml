@@ -74,12 +74,14 @@ jobs:
       - name: Generate release notes from commits
         shell: bash
         run: |
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          VERSION_TAG="v${{ steps.version.outputs.VERSION }}"
+          CUR_SHA=$(git rev-parse "${VERSION_TAG}^{commit}" 2>/dev/null || git rev-parse HEAD)
+          PREV_TAG=$(git describe --tags --abbrev=0 "${CUR_SHA}^" 2>/dev/null || echo "")
           REPO_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           if [ -z "$PREV_TAG" ]; then
-            LOG=$(git log --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))" | head -50)
+            LOG=$(git log --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))" "$CUR_SHA" | head -50)
           else
-            LOG=$(git log ${PREV_TAG}..HEAD --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))")
+            LOG=$(git log "${PREV_TAG}..${CUR_SHA}" --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))")
           fi
           {
             echo "RELEASE_NOTES<<EOF"
@@ -320,8 +322,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          # workflow_call 触发时 checkout 默认分支（与构建 job 一致）
-          ref: ${{ github.event.repository.default_branch }}
+          # 检出发布 tag 对应的提交：提交区间、协作者统计、compare API 均以上一个 tag 为基准
+          ref: v${{ inputs.version }}
 
       - name: Download Windows setup artifact
         uses: actions/download-artifact@v4
