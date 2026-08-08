@@ -7,39 +7,92 @@ use crate::minecraft::online::auth::{
 };
 use crate::minecraft::online::client_types::ClientError;
 use crate::minecraft::online::http_log;
+use crate::minecraft::online::pow::{parse_challenge, solve_challenge};
 
 use super::OnlineClient;
 
 impl OnlineClient {
+    /// 发送 auth 类 POST 请求，自动处理服务端的 PoW challenge 重试
+    ///
+    /// 服务端对待鉴权路由（register/login/refresh）下发 `401 + code:1007`
+    /// challenge；客户端求解后按服务端下发的 `header_name` 字段动态构造
+    /// 请求头重试一次。重试前置校验 challenge 的 `path` 与当前请求路径一致，
+    /// 防止误把其他接口的 challenge 用在当前请求上。求解超时或失败时
+    /// 直接返回原始 401 响应体，交由调用方按 HTTP 异常处理。
+    ///
+    /// 返回 `(status, body)`，供调用方解析业务响应。
+    async fn send_post_with_pow<T: serde::Serialize>(
+        path_label: &str,
+        url: &str,
+        req: &T,
+    ) -> Result<(u16, String), ClientError> {
+        let mut pow_proof: Option<(String, String)> = None;
+        loop {
+            let mut builder = get_client()
+                .post(url)
+                .header("Content-Type", "application/json")
+                .json(req);
+            if let Some((header_name, proof)) = &pow_proof {
+                builder = builder.header(header_name, proof);
+            }
+            let resp = builder.send().await?;
+            let status = resp.status().as_u16();
+            let body = resp.text().await?;
+            http_log::log_http_request(
+                "POST",
+                path_label,
+                status,
+                &http_log::extract_req_id(&body),
+            );
+            crate::log_info!(
+                "[Online] {} 响应 status={}, body_len={}",
+                path_label,
+                status,
+                body.len()
+            );
+
+            if status == 401 && pow_proof.is_none() {
+                if let Some(challenge) = parse_challenge(&body) {
+                    if challenge.path == path_label {
+                        if let Some(salt) = challenge.salt_bytes() {
+                            if let Some(nonce) =
+                                solve_challenge(&salt, challenge.difficulty).await
+                            {
+                                crate::log_info!(
+                                    "[Online] {} PoW 求解成功（difficulty={}, nonce={}）",
+                                    path_label,
+                                    challenge.difficulty,
+                                    nonce
+                                );
+                                pow_proof = Some((
+                                    challenge.header_name.clone(),
+                                    format!("{}:{}", challenge.challenge_id, nonce),
+                                ));
+                                continue;
+                            }
+                        }
+                    }
+                }
+                crate::log_warn!(
+                    "[Online] {} PoW 求解失败/放弃，按原始 401 处理",
+                    path_label
+                );
+            }
+            return Ok((status, body));
+        }
+    }
+
     /// 注册设备（POST /v3/auth/register）
     pub async fn register(&self, req: &RegisterRequest) -> Result<RegisterResponse, ClientError> {
         let url = format!("{}{}", self.base_url, api_paths::AUTH_REGISTER);
         crate::log_info!(
             "[Online] POST {} (deviceid={}, content_len={}B)",
-            url,
+            api_paths::AUTH_REGISTER,
             req.deviceid,
             req.content.len()
         );
-        let resp = get_client()
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(req)
-            .send()
-            .await?;
-        let status = resp.status().as_u16();
-        let body = resp.text().await?;
-        http_log::log_http_request(
-            "POST",
-            api_paths::AUTH_REGISTER,
-            status,
-            &http_log::extract_req_id(&body),
-        );
-        crate::log_info!(
-            "[Online] {} 响应 status={}, body_len={}",
-            api_paths::AUTH_REGISTER,
-            status,
-            body.len()
-        );
+        let (status, body) =
+            Self::send_post_with_pow(api_paths::AUTH_REGISTER, &url, req).await?;
         if status != 200 && status != 400 {
             crate::log_error!("[Online] 注册 HTTP 异常: status={}, body={}", status, body);
             return Err(ClientError::HttpStatus { status, body });
@@ -64,30 +117,12 @@ impl OnlineClient {
         let url = format!("{}{}", self.base_url, api_paths::AUTH_LOGIN);
         crate::log_info!(
             "[Online] POST {} (device_pk={}, content_len={}B)",
-            url,
+            api_paths::AUTH_LOGIN,
             req.device_pk,
             req.content.len()
         );
-        let resp = get_client()
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(req)
-            .send()
-            .await?;
-        let status = resp.status().as_u16();
-        let body = resp.text().await?;
-        http_log::log_http_request(
-            "POST",
-            api_paths::AUTH_LOGIN,
-            status,
-            &http_log::extract_req_id(&body),
-        );
-        crate::log_info!(
-            "[Online] {} 响应 status={}, body_len={}",
-            api_paths::AUTH_LOGIN,
-            status,
-            body.len()
-        );
+        let (status, body) =
+            Self::send_post_with_pow(api_paths::AUTH_LOGIN, &url, req).await?;
         if status != 200 && status != 400 {
             crate::log_error!("[Online] 登录 HTTP 异常: status={}, body={}", status, body);
             return Err(ClientError::HttpStatus { status, body });
@@ -108,6 +143,8 @@ impl OnlineClient {
     }
 
     /// 登出（POST /v3/auth/logout）
+    ///
+    /// 登出不参与 PoW（服务端未配置该路径），保持原逻辑直接发送。
     pub async fn logout(&self, jwt: &str) -> Result<(), ClientError> {
         let url = format!("{}{}", self.base_url, api_paths::AUTH_LOGOUT);
         crate::log_info!("[Online] POST {}", url);
@@ -146,30 +183,12 @@ impl OnlineClient {
         let url = format!("{}{}", self.base_url, api_paths::AUTH_REFRESH);
         crate::log_info!(
             "[Online] POST {} (device_pk={}, content_len={})",
-            url,
+            api_paths::AUTH_REFRESH,
             req.device_pk,
             req.content.len()
         );
-        let resp = get_client()
-            .post(&url)
-            .header("Content-Type", "application/json")
-            .json(req)
-            .send()
-            .await?;
-        let status = resp.status().as_u16();
-        let body = resp.text().await?;
-        http_log::log_http_request(
-            "POST",
-            api_paths::AUTH_REFRESH,
-            status,
-            &http_log::extract_req_id(&body),
-        );
-        crate::log_info!(
-            "[Online] {} 响应 status={}, body_len={}",
-            api_paths::AUTH_REFRESH,
-            status,
-            body.len()
-        );
+        let (status, body) =
+            Self::send_post_with_pow(api_paths::AUTH_REFRESH, &url, req).await?;
         if status != 200 && status != 400 && status != 401 {
             crate::log_error!(
                 "[Online] refresh HTTP 异常: status={}, body={}",
