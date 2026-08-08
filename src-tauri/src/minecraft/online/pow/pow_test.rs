@@ -37,11 +37,12 @@ fn test_parse_challenge_rejects_other_codes() {
 
 #[test]
 fn test_solve_sync_matches_difficulty() {
-    let salt = b"test-salt";
+    // 固定测试输入（PoW 求解需确定性结果，非真实密钥）
+    let fixed_input = b"test-salt";
     let difficulty = 8; // 期望 ~256 次尝试，耗时可控
-    let nonce = solve_sync(salt, difficulty).expect("solved");
+    let nonce = solve_sync(fixed_input, difficulty).expect("solved");
     let mut hasher = Sha256::new();
-    hasher.update(salt);
+    hasher.update(fixed_input);
     hasher.update(nonce.to_le_bytes());
     let digest = hasher.finalize();
     assert!(leading_zero_bits(&digest) >= difficulty);

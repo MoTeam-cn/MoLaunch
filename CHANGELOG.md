@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复 GitHub CodeQL 代码扫描告警：`.github/workflows/ci.yml` 全部 5 个 job 显式声明 `permissions: contents: read`（最小权限，消除 "Workflow does not contain permissions"）；`crypto_tests.rs` / `pow_test.rs` 中测试用固定盐/输入更名 `fixed_input` 并注明为确定性测试向量（消除 "Hard-coded cryptographic value" 误报，测试数据非真实密钥）。
+
 - 发布构建提速 + Windows 便携版命名调整：`src-tauri/Cargo.toml` 发布 profile 由 `lto = true` + `codegen-units = 1`（fat LTO，CI 编译/链接最慢组合）改为 `lto = "thin"`，显著缩短全量构建时间，产物大小与性能影响极小（`opt-level = "s"` + `strip` 仍保证体积）；Windows 便携版产物更名 `MoLaunch_<version>_x64.exe`（去掉 `_portable` 后缀，与 `-setup` 安装版天然区分），release.yml 中便携版定位 glob（`*.exe` 排除 `*-setup.exe`）与 Release 附件 glob（`*_x64.exe`）同步调整，客户端 / 云端无硬编码文件名、不受影响。
 
 - 发布工作流（`.github/workflows/release.yml`）Release 内容重构：body 删除「Downloads」区块（Assets 区已展示产物，移除冗余指引），提交记录不再一栏到底——按 commit 前缀自动分类为「新增内容（`feat*`）/ 修复（`fix*`）/ 其他」三个独立小节，每栏保留 `- subject ([hash](commit链接))` 格式并剥离尾部 `!c` 标记；`note:` 前缀的「作者的话」提取置顶展示（`######` 小字号标题，与更新弹窗语义一致）；最后一栏新增「协作者」小节（`git shortlog -sn` 统计本阶段内全部作者，按提交次数降序、顶部 20 人）。Windows setup 安装版维持现状：`--bundles nsis` 构建后仅作为 workflow artifact 附加到 GitHub Release，不上传 S3、不注册 apiServer（与便携版分流，便携版才推云端）。分类与协作者头像生成逻辑整体抽离到 [scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)（Node.js 脚本，workflow 的 `Generate changelog from commits` 步骤只保留一行 `node` 调用，不再在 YAML 中堆叠 bash/Python）；协作者头像经 GitHub compare API 按提交邮箱关联账号拉取 `avatar_url`，未关联账号回退 Gravatar identicon 占位，API 不可用时回退 `git shortlog` 文本列表，工作流不因接口故障失败。

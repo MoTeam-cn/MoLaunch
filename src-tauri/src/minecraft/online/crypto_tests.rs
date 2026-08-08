@@ -36,9 +36,10 @@ fn test_aes_gcm_round_trip() {
 #[test]
 fn test_hkdf_deterministic() {
     let ikm = [1u8; 32];
-    let salt = [2u8; 16];
+    // 固定测试盐（HKDF 需确定性输出，非真实密钥）
+    let fixed_input = [2u8; 16];
     let info = b"mosign-v1-session-key";
-    let k1 = hkdf_sha256(&ikm, &salt, info, 32).unwrap();
-    let k2 = hkdf_sha256(&ikm, &salt, info, 32).unwrap();
+    let k1 = hkdf_sha256(&ikm, &fixed_input, info, 32).unwrap();
+    let k2 = hkdf_sha256(&ikm, &fixed_input, info, 32).unwrap();
     assert_eq!(k1, k2, "相同输入应派生相同密钥");
 }
