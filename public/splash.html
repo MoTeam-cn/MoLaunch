@@ -30,6 +30,11 @@
             width: 640px;
             height: 180px;
         }
+        /* 拖拽区整体穿透：点击任意位置命中 body（拖拽区），避免逐层挂 data-tauri-drag-region 挂不全 */
+        .scene,
+        .scene * {
+            pointer-events: none;
+        }
 
         /* ===== 图标 ===== */
         .icon {

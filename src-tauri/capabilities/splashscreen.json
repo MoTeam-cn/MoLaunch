@@ -1,0 +1,11 @@
+{
+  "identifier": "splashscreen",
+  "description": "permissions for the splashscreen window",
+  "local": true,
+  "windows": [
+    "splashscreen"
+  ],
+  "permissions": [
+    "core:window:allow-start-dragging"
+  ]
+}

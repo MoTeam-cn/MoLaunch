@@ -70,4 +70,20 @@ document.addEventListener('DOMContentLoaded', () => {
       if (invoke) await invoke('frontend_ready')
     } catch (_) { /* 浏览器预览 */ }
   }, 4600)
+
+  // 窗口拖拽：整个页面即拖拽区。捕获阶段拦截（先于 Tauri 注入脚本执行并阻止其重复触发），
+  // 调用失败时把原因写入状态栏，便于定位（无边框 + transparent 窗口拖拽）
+  document.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return
+    const tauri = window.__TAURI_INTERNALS__
+    if (!tauri?.invoke) {
+      if (status) status.textContent = '拖拽不可用: 无 Tauri 通道'
+      return
+    }
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    tauri.invoke('plugin:window|start_dragging').catch((err) => {
+      if (status) status.textContent = `拖拽错误: ${err}`
+    })
+  }, true)
 })
