@@ -1,0 +1,50 @@
+name: License Sync
+
+# 许可证同步工作流
+#
+# 根目录 LICENSE 是项目许可协议的唯一权威副本，其余副本文件均由本工作流自动同步：
+#   - src-tauri/LICENSE（主 crate 副本）
+#   - src-tauri/updater/LICENSE（更新器 crate 副本）
+#   - src-tauri/resources/LICENSE.txt（构建期嵌入二进制的副本，build.rs 也会同步一次）
+#
+# 后续只需更新根目录 LICENSE 并推送到 main，本工作流会自动覆盖上述副本并提交
+# （提交信息带 !c，跳过 CI 检查，与仓库提交约定一致）。
+# 仅当副本内容与根 LICENSE 有差异时才会提交；副本文件自身变化不会重新触发本工作流。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'LICENSE'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: license-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync License
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      - name: Sync license copies
+        shell: bash
+        run: |
+          cp LICENSE src-tauri/LICENSE
+          cp LICENSE src-tauri/updater/LICENSE
+          cp LICENSE src-tauri/resources/LICENSE.txt
+
+      # 有差异时自动提交并推送（默认提交者 github-actions[bot]）；
+      # 无差异时该 action 自动跳过，不产生空提交
+      - name: Auto commit changes
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: 'chore(license): 同步根 LICENSE 到各副本文件 !c'
+          file_pattern: src-tauri/LICENSE src-tauri/updater/LICENSE src-tauri/resources/LICENSE.txt

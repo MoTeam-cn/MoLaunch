@@ -1,9 +1,25 @@
+# 发布工作流
+#
+# 不再由 tag 直接触发：版本同步工作流（version-sync.yml）在推送 v* 标签后
+# 先确保仓库内版本号文件与标签一致，再通过 workflow_call 激活本工作流，
+# 版本号由调用方传入（inputs.version，不带 v 前缀）。
+# 同时也支持在 Actions 页面手动指定版本号运行。
+
 name: Release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
+    inputs:
+      version:
+        description: '发布版本号（不带 v 前缀，例如 0.3.6）'
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '发布版本号（不带 v 前缀，例如 0.3.6）'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -45,11 +61,13 @@ jobs:
         with:
           # 全量历史：生成 release_notes（提交记录）与读取上一 tag 需要
           fetch-depth: 0
+          # workflow_call 触发时 checkout 默认分支，构建版本同步工作流提交后的代码
+          ref: ${{ github.event.repository.default_branch }}
 
-      - name: Extract version from tag
+      - name: Extract version
         id: version
         shell: bash
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
 
       # 生成本次更新日志（release_notes），随版本注册一并上报 api-server，
       # 供启动器「检查更新」对话框展示本次更新内容。
@@ -96,27 +114,6 @@ jobs:
           workspaces: |
             src-tauri
             src-tauri/updater
-
-      - name: Update version
-        shell: bash
-        run: |
-          VERSION="${{ steps.version.outputs.VERSION }}"
-          # Update package.json
-          npm version $VERSION --no-git-tag-version
-          # Update Cargo.toml
-          cd src-tauri
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
-          else
-            sed -i "s/^version = \".*\"/version = \"$VERSION\"/" Cargo.toml
-          fi
-          # Update tauri.conf.json
-          cd ..
-          if [[ "$RUNNER_OS" == "macOS" ]]; then
-            sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
-          else
-            sed -i "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" src-tauri/tauri.conf.json
-          fi
 
       # ===== Windows 便携版 updater.exe 预构建 =====
       # updater 是独立 Cargo 项目，主程序通过 include_bytes! 嵌入其编译产物。
@@ -323,6 +320,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          # workflow_call 触发时 checkout 默认分支（与构建 job 一致）
+          ref: ${{ github.event.repository.default_branch }}
 
       - name: Download Windows setup artifact
         uses: actions/download-artifact@v4
@@ -354,9 +353,9 @@ jobs:
           find artifacts -type f | sort
           echo "FILE_COUNT=$(find artifacts -type f | wc -l)" >> $GITHUB_OUTPUT
 
-      - name: Get version from tag
+      - name: Get version
         id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${{ inputs.version }}" >> $GITHUB_OUTPUT
 
       # 根据 tag 是否含预发布标识（-rc / -alpha / -beta / -preview / -test 等）判定 prerelease。
       # 含这些标识的版本发布为「预发布」（GitHub Release 标记 Prerelease），
@@ -401,6 +400,8 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
+          # workflow_call 触发时 GITHUB_REF 非 tag，必须显式指定 release 对应的 tag
+          tag_name: v${{ steps.get_version.outputs.VERSION }}
           name: MoLaunch ${{ steps.get_version.outputs.VERSION }}
           body: |
             ## MoLaunch ${{ steps.get_version.outputs.VERSION }}

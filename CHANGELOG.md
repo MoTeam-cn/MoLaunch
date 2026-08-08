@@ -1,5 +1,15 @@
+## [Unreleased]
+
+- 新增许可证同步工作流（`.github/workflows/license-sync.yml`）：根目录 `LICENSE` 作为唯一权威副本，向 main 推送更新或手动触发时，自动同步至 `src-tauri/LICENSE`、`src-tauri/updater/LICENSE`、`src-tauri/resources/LICENSE.txt` 并提交（提交信息带 `!c` 跳过 CI）；无差异时不提交，副本文件变化不会再次触发。
+- 新增版本号同步工作流（`.github/workflows/version-sync.yml`）：推送 `v*` 标签或手动指定版本号时，逐文件检查 `package.json` / `package-lock.json` / `src-tauri/Cargo.toml` / `src-tauri/tauri.conf.json`，仅更新未同步到目标版本的字段并提交（提交信息带 `!c`）；全部一致时不产生提交。同步完成后调用 `release.yml` 激活发布流程，发布版本号由本工作流传入。
+- 发布工作流（`.github/workflows/release.yml`）改由 `workflow_call` + 手动触发：不再直接监听 tag 推送，版本号改为从调用方输入读取，release 创建时显式指定 `tag_name`，避免 `github.ref` 不再是 tag 导致的问题；同时移除构建期「更新版本号」步骤（版本号统一由版本同步工作流保证）。
+- 自动同步工作流的自动提交改用 `stefanzweifel/git-auto-commit-action`：默认使用官方 `github-actions[bot]` 提交者，无差异时自动跳过提交，不再手动执行 `git config` / commit / push。
+
 ## [0.3.5-rc1] - 2026-08-07
 
+- 弹窗统一抽屉化：删除居中的 `Modal.vue` 全局弹窗，新增 `MessageDrawer.vue`（复用公共 `Drawer.vue` 右侧抽屉，`render-in-place` 挂载到 `#app-content`，宽度 520）承载全部错误 / 警告 / 信息 / 成功提示 + 确认 + 输入框模式——`defineExpose` 对外接口与旧 Modal 完全一致，`utils/modal.ts` 及全站 95 处调用方零改动，启动「云端连接失败」等提示全部改为右滑抽屉；内置**消息队列**：同时触发多条（如并行任务连续失败）时排队依次展示，当前一条关闭（关闭按钮 / 遮罩 / ESC / 确认 / 取消）动画结束后自动滑出下一条，保证任何一条提示都不丢失；`KickConfirmDialog.vue`（踢出确认，选封禁时长）/ `LobbyJoinConfirmDialog.vue`（加入房间确认，内嵌整合包校验卡片）同步由居中 teleport 弹窗重构为右侧抽屉。保留居中模态的有：`UserAgreementDialog`（强制协议门禁）、`ExitConfirmDialog`（退出确认）、`DependencyConfirmDialog`（嵌套于 ResourceDetail 全屏详情之上，层级需高于 Drawer 固定 z-1000）、`CopyMessageDialog` / `VersionPickerDialog`（工具浮层）、Toast（轻提示非弹窗）。验证：`npx vue-tsc --noEmit`、ESLint（改动文件）通过。
+- dev-api 新增抽屉消息测试命令（仅 dev 模式）：`molaunch.showError(title?, message?, details?)` / `showWarning` / `showInfo` / `showSuccess`（省略参数时使用样例数据，直接触发对应类型的右滑消息抽屉）、`molaunch.showConfirm(title?, message?)`（返回 `Promise<boolean>`）、`molaunch.showPrompt(title?, message?, defaultValue?)`（返回 `Promise<string | null>`，取消返回 null）、`molaunch.demoMessages()`（一次触发错误 / 警告 / 信息 / 成功 4 条，验证消息队列依次展示不丢失）；`help()` 文案与示例同步更新。
+- 消息抽屉交互优化：详情区「查看详情」按钮常驻（文案固定不切换）且为可展开/收起开关——点击切换详情显隐，ChevronDown 图标随状态旋转 180°（`transition-transform duration-300`），展开使用 `grid-rows-[0fr/1fr]` 高度过渡动画（复用项目 MoLaunchIntro / VersionSelect 同款折叠模式）；多条消息排队时在**抽屉底部左侧**显示灰色小字「还有 x 个待看」（随队列实时递减，仅剩 1 条时消失），不再使用全局窗口角标。验证：`npx vue-tsc --noEmit`、ESLint 通过。
 - 开屏动画 GIF 与录制脚本：`scripts/capture-splash.mjs` 借助 Puppeteer 逐帧录制 splashscreen 动画（门闩机制确保从动画起点开始捕获，录制时长 5000ms 完整覆盖进度条补满，共 94 帧），Pillow 合成 640×180 两份：`images/splash-loop.gif`（无限循环播放，总时长约 4.7s）与 `images/splash.gif`（播放一遍后在「就绪」完成画面停留 10s，不再跳回开头，供 README 展示）；README 顶部品牌展示由静态 logo 更换为 `images/splash.gif`，居中展示宽度 800，开头即可预览启动器开屏动画。
 - `CachedImage.vue` 加载中状态改为动态 spinner：组件引入相对定位包裹层承载 attrs（class），img 未加载完成时 `opacity-0` + 内置 `animate-spin` 旋转图标（主色，SVG 圆环写法），加载完成过渡显示真实图片；失败或无 `src` 时仍渲染 fallback 插槽。默认占位图标由静态 CubeIcon 变为加载中动画，覆盖 4 处使用方（ResourceCard / ResourceDetailHeader / DependencyItem / DependencyInlineList）。验证：`npx vue-tsc --noEmit`、ESLint 均通过。
 - 修复缓存图片首屏显示占位图标问题（`CachedImage.vue`）：远程图加载失败触发 fallback 后，即使后端异步缓存完成并 emit `image-cached` 事件，`failed` 标记也未重置，导致占位图标不消失、需切页重新挂载才恢复；现于 `onImageCached` 匹配到当前 pending URL 并切换本地缓存 URL 时同步重置 `failed = false`，缓存就绪后占位图立即恢复为真实图片。

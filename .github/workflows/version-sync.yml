@@ -1,0 +1,98 @@
+name: Version Sync
+
+# 版本号同步工作流
+#
+# 推送 v* 标签（或手动指定版本号）时，逐文件检查仓库内的版本号文件，
+# 仅对尚未同步到目标版本的字段执行更新，避免打 tag 后忘记更新版本号导致漂移：
+#   - package.json / package-lock.json（npm version 一并更新两份清单）
+#   - src-tauri/Cargo.toml
+#   - src-tauri/tauri.conf.json
+#
+# 有字段被更新时提交（提交信息带 !c 跳过 CI）；即使全部已一致，
+# 也会继续调用 release.yml（workflow_call 方式）激活发布流程，发布版本号由本工作流传入。
+# release.yml 不再由 tag 直接触发。
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '目标版本号（例如 0.3.6）；留空时使用仓库最新 v* 标签'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Sync Version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Resolve target version
+        id: version
+        shell: bash
+        run: |
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            VERSION="${GITHUB_REF#refs/tags/}"
+          else
+            VERSION="$(git describe --tags --abbrev=0)"
+          fi
+          VERSION="${VERSION#v}"
+          if [ -z "$VERSION" ]; then
+            echo "::error::无法确定目标版本号"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "target version: $VERSION"
+
+      - name: Update version files
+        shell: bash
+        env:
+          VERSION: ${{ steps.version.outputs.VERSION }}
+        run: |
+          set -e
+
+          # package.json + package-lock.json（npm version 会同步更新两份清单）
+          current="$(node -p "require('./package.json').version")"
+          if [ "$current" != "$VERSION" ]; then
+            npm version "$VERSION" --no-git-tag-version
+          fi
+
+          # src-tauri/Cargo.toml
+          if ! grep -q "^version = \"${VERSION}\"$" src-tauri/Cargo.toml; then
+            sed -i "s/^version = \".*\"/version = \"${VERSION}\"/" src-tauri/Cargo.toml
+          fi
+
+          # src-tauri/tauri.conf.json
+          if ! grep -q "\"version\": \"${VERSION}\"" src-tauri/tauri.conf.json; then
+            sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" src-tauri/tauri.conf.json
+          fi
+
+      # 有字段被更新时自动提交并推送（默认提交者 github-actions[bot]）；
+      # 全部已一致时该 action 自动跳过，不产生提交
+      - name: Auto commit changes
+        uses: stefanzweifel/git-auto-commit-action@v6
+        with:
+          commit_message: 'chore(version): 同步版本号至 ${{ steps.version.outputs.VERSION }} !c'
+          file_pattern: package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json
+
+      # 无论版本文件是否被更新，都要激活发布工作流；版本号由本工作流解析后传入
+      - name: Trigger release workflow
+        uses: ./.github/workflows/release.yml
+        with:
+          version: ${{ steps.version.outputs.VERSION }}
