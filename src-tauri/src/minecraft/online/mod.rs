@@ -12,6 +12,7 @@ pub mod crypto;
 pub mod ecies;
 pub mod frp;
 pub mod http_log;
+pub mod pow;
 pub mod protocol;
 pub mod signaling;
 pub mod storage;
