@@ -19,7 +19,11 @@
 [![GitHub last commit](https://img.shields.io/github/last-commit/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/commits)
 [![GitHub contributors](https://img.shields.io/github/contributors/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
 
+> [!CAUTION]
 > MoLaunch 是独立的第三方 Minecraft 启动器项目，不是 Mojang 或 Microsoft 的官方产品，也未获其批准或与其建立关联。
+
+> [!IMPORTANT]
+> 本项目为个人独立开发，为了图省事，不少地方是用 AI 辅助（Vibe Coding）写的，效果可能不尽如人意，还请大家多包涵。
 
 ## 简介
 
@@ -132,6 +136,10 @@ MoLaunch 是一款 Minecraft Java 版启动器，提供下载、安装、启动�
 - 崩溃分析（规则引擎 + AI 建议）
 - 自动更新（stable / beta / alpha 通道）
 - 日志脱敏、全局 CSP、用户协议门禁
+
+### 与 MoLaunch 云端
+
+启动器的注册、登录、刷新凭证等操作都会和 MoLaunch 云端（api-server）对接，云端在这些接口前加了一道轻量的 PoW 验证，先让你随手算一道哈希题才放行，防止有人拿脚本疯狂刷接口。正常使用几乎无感，登录等操作也就几十毫秒；真正会被这道题拦下的，只有批量刷接口的那批人。
 
 ## 技术架构
 
@@ -269,6 +277,7 @@ Minecraft 是 Mojang Synergies AB 的商标。MoLaunch 不隶属于 Mojang、Mic
 
 完整第三方许可与版权清单见 [licenses.txt](./src-tauri/resources/about/licenses.txt)。
 
+> [!NOTE]
 > MoLaunch 为独立第三方创作，与 PCL2 无隶属或关联关系；PCL2 采用《PCL 分发有限许可》，详情参阅其[许可文档](https://shimo.im/docs/rGrd8pY8xWkt6ryW)。
 
 ## 相关链接
