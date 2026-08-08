@@ -380,20 +380,84 @@ jobs:
           echo "PREV_TAG=$PREV_TAG" >> $GITHUB_OUTPUT
           echo "Previous tag: $PREV_TAG"
 
+      # 生成分类 changelog：note 前缀的提交作为「作者的话」置顶（小字号），
+      # 其余按 feat / fix 前缀归入「新增内容 / 修复」，剩余归「其他」；
+      # 协作者取自 git shortlog（提交次数降序），仅统计本阶段内的作者。
       - name: Generate changelog from commits
         id: changelog
+        shell: bash
         run: |
           PREV_TAG="${{ steps.prev_tag.outputs.PREV_TAG }}"
           REPO_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
           if [ -z "$PREV_TAG" ]; then
-            LOG=$(git log --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))" | head -50)
+            LOG_RAW=$(git log --no-merges --format="%s%x09%h%x09%H" | head -50)
           else
-            LOG=$(git log ${PREV_TAG}..HEAD --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))")
+            LOG_RAW=$(git log ${PREV_TAG}..HEAD --no-merges --format="%s%x09%h%x09%H")
+          fi
+
+          NOTES=""
+          FEATURES=""
+          FIXES=""
+          OTHERS=""
+          while IFS=$'\t' read -r SUBJECT SHORT FULL; do
+            [ -z "$SUBJECT" ] && continue
+            case "$SUBJECT" in
+              note:*)
+                NOTE=${SUBJECT#note: }
+                NOTE=${NOTE% !c}
+                NOTES="${NOTES}- ${NOTE}"$'\n'
+                ;;
+              feat:*|feat\(*)
+                FEATURES="${FEATURES}- ${SUBJECT% !c} ([${SHORT}](${REPO_URL}/commit/${FULL}))"$'\n'
+                ;;
+              fix:*|fix\(*)
+                FIXES="${FIXES}- ${SUBJECT% !c} ([${SHORT}](${REPO_URL}/commit/${FULL}))"$'\n'
+                ;;
+              *)
+                OTHERS="${OTHERS}- ${SUBJECT% !c} ([${SHORT}](${REPO_URL}/commit/${FULL}))"$'\n'
+                ;;
+            esac
+          done <<< "$LOG_RAW"
+
+          if [ -z "$PREV_TAG" ]; then
+            SHORTLOG=$(git shortlog -sn --no-merges HEAD | head -20)
+          else
+            SHORTLOG=$(git shortlog -sn --no-merges ${PREV_TAG}..HEAD | head -20)
+          fi
+
+          if [ -n "$NOTES" ]; then
+            NOTES=$(printf '###### 作者的话\n%s' "$NOTES")
+          fi
+          if [ -n "$FEATURES" ]; then
+            FEATURES=$(printf '### 新增内容\n%s' "$FEATURES")
+          fi
+          if [ -n "$FIXES" ]; then
+            FIXES=$(printf '### 修复\n%s' "$FIXES")
+          fi
+          if [ -n "$OTHERS" ]; then
+            OTHERS=$(printf '### 其他\n%s' "$OTHERS")
+          fi
+          CONTRIBUTORS=""
+          if [ -n "$SHORTLOG" ]; then
+            LIST=$(printf '%s\n' "$SHORTLOG" | sed -E 's/^[[:space:]]*[0-9]+[[:space:]]+/- /')
+            CONTRIBUTORS=$(printf '### 协作者\n\n感谢以下协作者对本阶段的贡献：\n\n%s' "$LIST")
           fi
 
           {
-            echo "LOG<<EOF"
-            echo "$LOG"
+            echo "NOTES<<EOF"
+            echo "$NOTES"
+            echo "EOF"
+            echo "FEATURES<<EOF"
+            echo "$FEATURES"
+            echo "EOF"
+            echo "FIXES<<EOF"
+            echo "$FIXES"
+            echo "EOF"
+            echo "OTHERS<<EOF"
+            echo "$OTHERS"
+            echo "EOF"
+            echo "CONTRIBUTORS<<EOF"
+            echo "$CONTRIBUTORS"
             echo "EOF"
           } >> $GITHUB_OUTPUT
 
@@ -406,14 +470,15 @@ jobs:
           body: |
             ## MoLaunch ${{ steps.get_version.outputs.VERSION }}
 
-            ### Downloads
-            - **Windows 安装版（setup）**：本页 Assets 中 `*-setup.exe`，需手动下载安装。
-            - **Windows 便携版**：本页 Assets 中 `*_portable.exe`（含 `.sig` 签名），也可通过「检查更新」自动获取。
-            - **macOS**：本页 Assets 中 `*.app.tar.gz`（含 `.sig` 签名），也可通过「检查更新」自动获取。
-            - **Linux**：本页 Assets 中 `*.AppImage`（含 `.sig` 签名），也可通过「检查更新」自动获取。
+            ${{ steps.changelog.outputs.NOTES }}
 
-            ### Commits
-            ${{ steps.changelog.outputs.LOG }}
+            ${{ steps.changelog.outputs.FEATURES }}
+
+            ${{ steps.changelog.outputs.FIXES }}
+
+            ${{ steps.changelog.outputs.OTHERS }}
+
+            ${{ steps.changelog.outputs.CONTRIBUTORS }}
 
             ---
             See [CHANGELOG.md](CHANGELOG.md) for details.

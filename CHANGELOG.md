@@ -1,5 +1,7 @@
 ## [Unreleased]
 
+- 发布工作流（`.github/workflows/release.yml`）Release 内容重构：body 删除「Downloads」区块（Assets 区已展示产物，移除冗余指引），提交记录不再一栏到底——按 commit 前缀自动分类为「新增内容（`feat*`）/ 修复（`fix*`）/ 其他」三个独立小节，每栏保留 `- subject ([hash](commit链接))` 格式并剥离尾部 `!c` 标记；`note:` 前缀的「作者的话」提取置顶展示（`######` 小字号标题，与更新弹窗语义一致）；最后一栏新增「协作者」小节（`git shortlog -sn` 统计本阶段内全部作者，按提交次数降序、顶部 20 人）。Windows setup 安装版维持现状：`--bundles nsis` 构建后仅作为 workflow artifact 附加到 GitHub Release，不上传 S3、不注册 apiServer（与便携版分流，便携版才推云端）。
+
 - 重写三份开发文档以匹配当前系统架构：`AI_AGENT_GUIDELINES.md`（新增「当前架构要点」章节：仓库结构、配置读写 / shell / resources / 下载源 / 进度回滚 / 组件复用 / 日志颜色 / 行数 / 测试位置等硬约束，以及「作者的话」多 note 约定）、`DEVELOPMENT_GUIDELINES.md`（技术栈与 scope 更新、补充更新日志多 note 约定、api-server 联动约定、后端测试文件拆分规范、命令速查增加 api-server 检查）、`DEVELOPMENT_BLUEPRINT.md`（目录结构、前端三大管理器域、后端模块总览、安全策略、新增第八章 MoLaunch 云端 api-server 架构）。并在两份规范中补充「作者的话」落地用法：`note:` 提交用 `git commit --allow-empty` 创建（零文件变更），且必须在打版本 tag 之前提交（插件按 tag 区间提取，tag 之后会落到下个版本）。
 
 - 更新日志弹窗支持「作者的话」（多条）：约定 commit message 以 `note:` 开头即作者寄语（如 `note: 感谢大家的支持`），vite 构建插件 `updateLogPlugin` 将版本区间内**全部** `note:` commit 按顺序提取为数组，经虚拟模块 `virtual:update-log` 独立下发 `notes` 字段（不再混入 commit 列表，`ReleaseTimeline` 逻辑不变）；`UpdateLogDialog` 顶部按顺序渲染多条引用气泡样式的作者寄语区块（`ChatBubbleOvalLeftIcon` + Markdown 渲染，链接复用 `handleMarkdownLinkClick` 打开，无 note 时整块不渲染，完全向后兼容）。
