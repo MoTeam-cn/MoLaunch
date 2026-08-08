@@ -3,24 +3,25 @@
 /**
  * generate-release-content.cjs — 生成 GitHub Release 分类内容
  *
- * 用法：node generate-release-content.cjs <prev_tag> <repo_url> <repo>
- * 环境变量：GITHUB_TOKEN 调 compare API 拉取头像；GITHUB_OUTPUT 存在则写入，否则打印 stdout
+ * 用法：node generate-release-content.cjs <prev_tag> <repo_url> <repo> [head_sha]
+ * 环境变量：GITHUB_TOKEN 调 compare API 拉取协作者 @ 提及；GITHUB_OUTPUT 存在则写入，否则打印 stdout
  * 输出块：NOTES（作者的话）/ FEATURES / FIXES / OTHERS / CONTRIBUTORS
  */
 'use strict';
 
 const { execSync } = require('child_process');
-const crypto = require('crypto');
 const fs = require('fs');
 
 const args = process.argv.slice(2);
 if (args.length < 3) {
-  console.error('Usage: node generate-release-content.cjs <prev_tag> <repo_url> <repo>');
+  console.error('Usage: node generate-release-content.cjs <prev_tag> <repo_url> <repo> [head_sha]');
   process.exit(1);
 }
 const PREV_TAG = args[0];
 const REPO_URL = args[1];
 const REPO = args[2];
+const HEAD_SHA = args[3] || '';
+const headRef = () => HEAD_SHA || 'HEAD';
 const TOKEN = process.env.GITHUB_TOKEN || '';
 const OUTPUT_FILE = process.env.GITHUB_OUTPUT || '';
 
@@ -30,7 +31,7 @@ const run = (cmd) =>
 const stripCi = (s) => (s.endsWith(' !c') ? s.slice(0, -3) : s);
 
 function gitLog() {
-  const range = PREV_TAG ? `${PREV_TAG}..HEAD` : 'HEAD';
+  const range = PREV_TAG ? `${PREV_TAG}..${headRef()}` : headRef();
   const limit = PREV_TAG ? '' : ' | head -50';
   const out = run(`git log ${range} --no-merges --format=%s%x09%h%x09%H${limit}`);
   return out ? out.split('\n') : [];
@@ -56,23 +57,23 @@ function classify() {
 }
 
 async function contributors() {
-  const headSha = run('git rev-parse HEAD');
+  const headSha = run(`git rev-parse ${headRef()}`);
   let baseSha;
   try {
     baseSha = PREV_TAG
       ? run(`git rev-list -n 1 ${PREV_TAG}`)
-      : run('git rev-list --max-parents=0 HEAD');
+      : run(`git rev-list --max-parents=0 ${headRef()}`);
   } catch {
-    baseSha = run('git rev-list --max-parents=0 HEAD');
+    baseSha = run(`git rev-list --max-parents=0 ${headRef()}`);
   }
-  const range = PREV_TAG ? `${PREV_TAG}..HEAD` : 'HEAD';
+  const range = PREV_TAG ? `${PREV_TAG}..${headRef()}` : headRef();
   const authors = new Map();
   for (const line of run(`git log ${range} --no-merges --format=%an%x09%ae`).split('\n')) {
     if (!line.trim()) continue;
     const [name, email] = line.split('\t');
     const key = (email || name).trim().toLowerCase();
     if (!authors.has(key)) {
-      authors.set(key, { name: name.trim(), email: (email || '').trim(), login: '', avatar: '' });
+      authors.set(key, { name: name.trim(), login: '' });
     }
   }
   if (!authors.size) return '';
@@ -83,9 +84,9 @@ async function contributors() {
       headers: { Accept: 'application/vnd.github+json', ...(TOKEN && { Authorization: `Bearer ${TOKEN}` }) },
     });
     if (res.ok) commits = (await res.json()).commits || [];
-    else console.warn(`[generate-release-content] compare API ${res.status} ${res.statusText}, 头像回退到 gravatar`);
+    else console.warn(`[generate-release-content] compare API ${res.status} ${res.statusText}，无法解析 GitHub 登录名`);
   } catch (e) {
-    console.warn(`[generate-release-content] compare API 调用失败，头像回退到 gravatar: ${e.message}`);
+    console.warn(`[generate-release-content] compare API 调用失败，无法解析 GitHub 登录名: ${e.message}`);
   }
   for (const c of commits) {
     const gitAuthor = (c.commit || {}).author || {};
@@ -93,16 +94,10 @@ async function contributors() {
     const entry = email ? authors.get(email) : null;
     if (!entry || !c.author) continue;
     if (c.author.login) entry.login = c.author.login;
-    if (c.author.avatar_url) entry.avatar = c.author.avatar_url;
   }
   return [...authors.values()]
-    .map(({ name, email, login, avatar }) => {
-      const src = avatar ||
-        `https://www.gravatar.com/avatar/${crypto.createHash('md5').update(email).digest('hex')}?d=identicon&s=96`;
-      const img = `<img src="${src}" width="40" height="40" style="border-radius:50%" alt="${name}" />`;
-      return login ? `[${img}](https://github.com/${login})` : img;
-    })
-    .join('\n\n');
+    .map(({ name, login }) => (login ? `@${login}` : name))
+    .join('、');
 }
 
 async function main() {

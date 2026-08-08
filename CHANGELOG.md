@@ -6,7 +6,7 @@
 
 - 修复 Release 工作流提交区间与协作者头像生成（.github/workflows/release.yml + [scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：
   - 提交区间：`release` job 的 checkout 由默认分支改为检出发布 tag（`ref: v${{ inputs.version }}`），`build-and-upload` 的 release_notes 区间同样改用 `v$VERSION` tag 锚定（`git rev-parse "${VERSION_TAG}^{commit}"`）——此前 `git describe HEAD^` 会把本次发布 tag 自身当作上一个 tag，导致 `git log v0.3.5-rc1..HEAD` 只取到 tag 之后的零星提交（本应 35 条却只剩 3 条）。
-  - 协作者头像：baseSha 改由 `git rev-list -n 1 <tag>` 解析——原 `git rev-parse <tag>` 对 annotated tag 返回 tag 对象 sha（非 commit sha），compare API 直接 404，头像静默回退为 `git shortlog` 文本；作者集合改从 `git log` 的 author email 构建（API 成功时用 GitHub 账号头像 + 链接补充，失败时按邮箱生成 gravatar 头像兜底，修复空 login 生成 `https://github.com/` 坏链接）。
+  - 协作者头像：baseSha 改由 `git rev-list -n 1 <tag>` 解析——原 `git rev-parse <tag>` 对 annotated tag 返回 tag 对象 sha（非 commit sha），compare API 直接 404，头像静默回退为 `git shortlog` 文本；作者集合改从 `git log` 的 author email 构建，经 compare API 匹配 GitHub 登录名，输出 `@login` 提及（GitHub 原生渲染圆形头像，不再使用会被正文 HTML sanitizer 剥离 style 导致方块头像的 `<img>`，也不再依赖 gravatar 兜底）；脚本新增可选参数 `head_sha` 由 workflow 显式传入当前检出提交，避免脚本内解析 HEAD 的歧义。
 
 ## [0.3.5-rc1] - 2026-08-09
 
