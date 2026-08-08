@@ -8,6 +8,8 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "MoTeam",
+    "copyright": "Copyright © 2026 MoTeam. All rights reserved.",
     "createUpdaterArtifacts": true,
     "resources": [
       "resources/*"
