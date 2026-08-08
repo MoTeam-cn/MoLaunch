@@ -37,6 +37,8 @@ jobs:
   sync:
     name: Sync Version
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,8 +79,12 @@ jobs:
           commit_message: 'chore(version): 同步版本号至 ${{ steps.version.outputs.VERSION }} !c'
           file_pattern: package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md
 
-      # 无论版本文件是否被更新，都要激活发布工作流；版本号由本工作流解析后传入
-      - name: Trigger release workflow
-        uses: ./.github/workflows/release.yml
-        with:
-          version: ${{ steps.version.outputs.VERSION }}
+  # 无论版本文件是否被更新，都要激活发布工作流；版本号由 sync job 解析后传入。
+  # 可复用工作流必须在 job 级通过 uses 调用（step 级 uses 只接受本地 action 目录）。
+  release:
+    name: Trigger Release
+    needs: sync
+    uses: ./.github/workflows/release.yml
+    with:
+      version: ${{ needs.sync.outputs.version }}
+    secrets: inherit

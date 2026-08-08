@@ -4,6 +4,8 @@
 
 ## [0.3.5-rc1] - 2026-08-09
 
+- 修复 `version-sync.yml` 调用发布工作流的方式：原在 step 级 `uses: ./.github/workflows/release.yml` 触发报错（GitHub 只在 job 级支持调用可复用工作流，step 级 `uses` 仅接受含 `action.yml` 的本地 action 目录）；改为独立的 `release` job（`uses` + `needs: sync`，版本号经 `sync.outputs.version` 传递，`secrets: inherit` 继承签名私钥等密钥）。
+
 - 打包元信息统一为全称：`package.json` / `package-lock.json` 的 `name` 由 `mo-launch` 改为 `molaunch`（与 tauri.conf.json 的 `identifier`（`com.moteam.molaunch`）与 deep-link scheme 保持一致），`package.json` 补充 `copyright` 字段（`Copyright © 2026 MoTeam. All rights reserved.`，与 LICENSE / `bundle.copyright` 一致）。
 
 - [src-tauri/updater/README.md](src-tauri/updater/README.md) 按主仓库 README 风格重写为完整组件文档：新增居中标题 + 徽章栏（Rust / Windows / minisign / License）、`[!IMPORTANT]` 定位说明（子 crate 非完整启动器）、mermaid 工作流程图（等待退出 → 验签 → 替换 → 重启全流程及各退出码分支）、功能特性章节（进程等待 / 签名校验 / 文件替换 / 重启新版本）；并修正原文与实现不符的描述——验签依赖实为 `minisign-verify`（BLAKE2b-512 prehash + Ed25519，与 tauri-plugin-updater 同款）而非 ed25519-dalek + SHA-512，退出码顺序按 `main.rs` 实际执行顺序（参数 1 / 超时 2 / 替换 3 / 启动 4 / 验签 5）排列表述，集成方式对齐真实链路（`resources.rs::extract_updater` 释放 + `install_windows.rs` 经 `apply_pending_update` 启动子进程 + `last.exe`/`last.sig` 缓存）。
