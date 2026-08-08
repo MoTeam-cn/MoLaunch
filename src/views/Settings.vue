@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import SettingsLaunch from './settings/SettingsLaunch.vue'
 import SettingsDownload from './settings/SettingsDownload.vue'
 import SettingsPersonal from './settings/SettingsPersonal.vue'
@@ -10,7 +10,9 @@ import SettingsDeveloper from './settings/SettingsDeveloper.vue'
 import SettingsMore from './settings/SettingsMore.vue'
 import SettingsOnline from './settings/SettingsOnline.vue'
 import NavSidebar from '@/components/common/NavSidebar.vue'
+import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
 import { getConfigMap } from '@/utils/api/config'
+import { hasAgreedToday } from '@/utils/disclaimer'
 import {
   RocketLaunchIcon,
   PaintBrushIcon,
@@ -59,6 +61,18 @@ const categories = computed(() => {
 })
 
 const activeDesc = () => categories.value.find(c => c.id === activeCategory.value)?.desc ?? ''
+
+/** 开发者选项声明抽屉：进入开发者分类且当日未同意时弹出（同意后当日不再提醒） */
+const disclaimerVisible = ref(false)
+watch(
+  activeCategory,
+  (val) => {
+    if (val === 'developer') {
+      disclaimerVisible.value = !hasAgreedToday('developer')
+    }
+  },
+  { immediate: true },
+)
 
 // 监听「进阶设置」页开发者模式开关变化，实时更新侧边菜单
 // （DevModeToggle.vue 切换开关时派发 'developer-mode-changed' 自定义事件）
@@ -118,5 +132,8 @@ onUnmounted(() => {
         <SettingsDeveloper v-else-if="activeCategory === 'developer'" />
       </div>
     </div>
+
+    <!-- 开发者选项使用协议与免责声明（进入开发者分类当日未同意时弹出） -->
+    <DisclaimerDialog v-model:visible="disclaimerVisible" kind="developer" />
   </div>
 </template>

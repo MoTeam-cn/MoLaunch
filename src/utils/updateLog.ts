@@ -4,9 +4,12 @@
  * 对齐 PCL2 的做法：启动时比较 localStorage 记录的上次运行版本与当前版本，
  * 仅当版本升高时弹出一次更新日志，弹窗前先写入当前版本（防弹窗期间崩溃重复弹出）。
  * 全新安装（无记录）不弹；版本回退（如测试版退回正式版）不弹。
+ *
+ * 日志内容由 vite.config.ts 的 updateLogPlugin 在构建时读取 CHANGELOG.md，
+ * 仅内联当前版本对应的段落（`virtual:update-log`），不打包整份 Markdown。
  */
 import { ref } from 'vue'
-import changelogMd from '../../CHANGELOG.md?raw'
+import updateLogContent, { version as updateLogVersion } from 'virtual:update-log'
 import { compareVersion, getVersionInfo } from '@/utils/version'
 
 /** localStorage 键：上次运行（已展示过更新日志）的版本号 */
@@ -56,9 +59,28 @@ export function maybeShowUpdateLog(): void {
   updateLogVisible.value = true
 }
 
-/** 更新日志内容（CHANGELOG.md 原文，构建时经 vite ?raw 内联） */
+/** 更新日志内容（vite 构建时从 CHANGELOG.md 提取的当前版本段落） */
 export function getChangelogContent(): string {
-  return changelogMd
+  return updateLogContent
+}
+
+/** 更新日志对应的版本号（与内容同源，可能回退到最新发布版本） */
+export function getChangelogVersion(): string {
+  return updateLogVersion
+}
+
+/** 直接弹出更新日志弹窗（dev-api 测试用） */
+export function showUpdateLog(): void {
+  updateLogVisible.value = true
+}
+
+/** 清空更新日志已读记录（dev-api 测试用：下次启动将重新弹出） */
+export function resetUpdateLogRecord(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY)
+  } catch {
+    // 静默忽略
+  }
 }
 
 /** 手动关闭弹窗 */

@@ -11,6 +11,7 @@ import { PICKER_TEMPLATES } from '@/config/picker-templates'
 import { showCrashDialog, type CrashInfo } from '@/utils/crashDialog'
 import { showBuyHintDialog } from '@/utils/buyHint'
 import { showStarHintDialog } from '@/utils/starHint'
+import { resetUpdateLogRecord, showUpdateLog } from '@/utils/updateLog'
 import { resetUserAgreement, showUserAgreementDialog, USER_AGREEMENT_VERSION } from '@/utils/userAgreement'
 import { applyConfig } from '@/utils/api/config'
 import {
@@ -50,6 +51,10 @@ export interface MolaunchDevAPI {
   showBuyHint(): void
   /** 直接弹出「支持 MoLaunch」点 Star 弹窗（测试用；与 showBuyHint 共用同一抽屉，同时触发时标题栏可切换） */
   showStarHint(): void
+  /** 直接弹出「本次更新日志」弹窗（测试用；正常逻辑在版本升级后的首次启动自动触发） */
+  showUpdateLog(): void
+  /** 清空「本次更新日志」已读记录（测试用；下次启动将重新弹出） */
+  resetUpdateLog(): void
   /** 直接弹出《用户协议》弹窗（测试用；正常逻辑在首次启动未同意时自动触发） */
   showUserAgreement(): void
   /** 清空《用户协议》同意记录（测试用；下次启动将重新要求同意） */
@@ -136,6 +141,12 @@ MoLaunch Dev API 可用命令：
       直接弹出「支持 MoLaunch」点 Star 弹窗（绕过阈值/语言条件，仅测试弹窗 UI）
       两个弹窗共用同一抽屉：先调用哪个就显示哪页，同时触发时标题栏出现分段切换器可换页查看
 
+  molaunch.showUpdateLog()
+      直接弹出「本次更新日志」弹窗（绕过版本对比条件，仅测试弹窗 UI）
+
+  molaunch.resetUpdateLog()
+      清空更新日志已读记录（下次启动将重新弹出）
+
   molaunch.showUserAgreement()
       直接弹出《用户协议》弹窗（绕过门禁条件，仅测试弹窗 UI）
 
@@ -177,6 +188,7 @@ MoLaunch Dev API 可用命令：
   await molaunch.showCrashDialog()
   await molaunch.setLaunchCount(3)
   molaunch.showBuyHint()
+  molaunch.showUpdateLog()
   await molaunch.navigate('/apps/online')
   await molaunch.reload()
   await molaunch.reload(true)
@@ -308,6 +320,12 @@ export function setupDevApi(router: Router): void {
     },
     showStarHint() {
       showStarHintDialog()
+    },
+    showUpdateLog() {
+      showUpdateLog()
+    },
+    resetUpdateLog() {
+      resetUpdateLogRecord()
     },
     showUserAgreement() {
       showUserAgreementDialog(USER_AGREEMENT_VERSION)

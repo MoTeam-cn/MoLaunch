@@ -3,8 +3,8 @@
  * 更新日志弹窗（启动时展示）
  *
  * 对齐 PCL2 的做法：应用升级到新版本后，启动时自动展示一次本次更新日志。
- * 触发与去重逻辑见 utils/updateLog.ts；内容复用 CHANGELOG.md，
- * 时间线渲染复用 ReleaseTimeline（整段 Markdown 模式，含全部版本章节）。
+ * 触发与去重逻辑见 utils/updateLog.ts；内容为 vite 构建时从 CHANGELOG.md
+ * 提取的当前版本段落（虚拟模块 virtual:update-log），时间线渲染复用 ReleaseTimeline。
  */
 import { computed } from 'vue'
 import { ArrowTopRightOnSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline'
@@ -15,13 +15,13 @@ import {
   UPDATE_LOG_GITHUB_URL,
   closeUpdateLog,
   getChangelogContent,
+  getChangelogVersion,
   updateLogVisible,
 } from '@/utils/updateLog'
 import { openLink } from '@/utils/aboutLogos'
-import { getVersionInfo } from '@/utils/version'
 
 const visible = computed(() => updateLogVisible.value)
-const version = getVersionInfo().raw
+const version = getChangelogVersion()
 
 function onVisibleChange(v: boolean) {
   if (!v) closeUpdateLog()

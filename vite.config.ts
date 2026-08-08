@@ -1,11 +1,67 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'path'
 import pkg from './package.json'
 
+/**
+ * 基于 git 生成「本次更新」日志
+ *
+ * 仓库用 tag 管理版本（tag 名即版本号，如 v0.3.4）：内容取「上一 tag → 最新 tag」
+ * 之间的全部 commit message（剥离 CI 跳过标记 !c），生成 Markdown 供 ReleaseTimeline 渲染；
+ * 无 tag 时回退到最近 20 条 commit。git 不可用时返回空内容。
+ */
+function gitUpdateLog(): { version: string; content: string } {
+  const run = (args: string[]): string[] => {
+    try {
+      return execFileSync('git', args, { encoding: 'utf8' })
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean)
+    } catch {
+      return []
+    }
+  }
+  const tags = run(['tag', '--sort=-v:refname'])
+  let logs: string[] = []
+  let version = pkg.version
+  if (tags.length === 0) {
+    logs = run(['log', '-20', '--pretty=format:%s'])
+  } else {
+    const latest = tags[0]
+    const prev = tags[1] ?? null
+    logs = run(['log', prev ? `${prev}..${latest}` : latest, '--pretty=format:%s'])
+    version = latest.replace(/^v/, '')
+  }
+  const subjects = logs.map((s) => s.replace(/\s*!c\s*$/i, '').trim()).filter(Boolean)
+  if (subjects.length === 0) return { version, content: '' }
+  return {
+    version,
+    content: [`## MoLaunch ${version}`, ...subjects.map((s) => `- ${s}`)].join('\n'),
+  }
+}
+
+/**
+ * 虚拟模块 `virtual:update-log`：构建时读取 git 提交历史生成「本次更新」日志。
+ * 避免引入 CHANGELOG 依赖，也不把完整历史打进前端包，仅内联上一版本到当前版本的 commit 列表。
+ */
+function updateLogPlugin(): Plugin {
+  return {
+    name: 'molaunch:update-log',
+    resolveId(id) {
+      if (id === 'virtual:update-log') return '\0molaunch:update-log'
+    },
+    load(id) {
+      if (id !== '\0molaunch:update-log') return
+      const { version, content } = gitUpdateLog()
+      return `export const version = ${JSON.stringify(version)}\nexport default ${JSON.stringify(content)}`
+    },
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), updateLogPlugin()],
   define: {
     // 注入应用版本号（来自 package.json），供「其他」页版本号展示与开发者模式解锁使用
     __APP_VERSION__: JSON.stringify(pkg.version),

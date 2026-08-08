@@ -1,13 +1,13 @@
 /**
  * 使用协议 / 免责声明抽屉展示控制（按自然日，存 localStorage）
  *
- * 进入联机 / 实验性功能 / 工具页时，若当天未同意过则弹出「使用协议与免责声明」抽屉；
+ * 进入联机 / 实验性功能 / 工具 / 开发者选项页时，若当天未同意过则弹出「使用协议与免责声明」抽屉；
  * 用户点击「我已知悉并同意」后记录当天日期，当天再次进入不再弹出（次日重新提醒）。
  *
  * localStorage 不可用（如隐私模式 / 配额满）时静默降级：仅当天可重复弹出，不影响功能。
  */
 
-export type DisclaimerKind = 'online' | 'experimental' | 'tools'
+export type DisclaimerKind = 'online' | 'experimental' | 'tools' | 'developer'
 
 /** 存储键：{ [kind]: 'YYYY-MM-DD' } */
 const STORAGE_KEY = 'molaunch.disclaimerAgreed'

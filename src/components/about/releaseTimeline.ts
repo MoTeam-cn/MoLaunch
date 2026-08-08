@@ -22,7 +22,7 @@ const SKIP_SCOPES = new Set([
   'skin', 'watcher', 'modrinth', 'searcher', 'download', 'image_cache',
   'java', 'parse', 'jvm_args', 'skin_resourcepack', 'signaling',
 ])
-const SKIP_MARK_RE = /!c/i
+const SKIP_MARK_RE = /\s*!c\s*/gi
 
 export const CHANNEL_LABELS: Record<Exclude<VersionChannel, 'stable'>, string> = {
   rc: '测试版', beta: '测试版', alpha: '测试版', canary: '测试版',
@@ -43,8 +43,8 @@ export function prefixStyle(prefix: string): { label: string; color: string } {
 function parseItems(content: string): CommitItem[] {
   const items: CommitItem[] = []
   for (const line of content.split('\n')) {
-    const trimmed = line.trim()
-    if (!trimmed || SKIP_MARK_RE.test(trimmed)) continue
+    const trimmed = line.replace(SKIP_MARK_RE, '').trim()
+    if (!trimmed) continue
     const match = trimmed.match(/^[-*]\s+(?:(\w+)(?:\(([^)]*)\))?:\s+)(.*)$/)
     if (match) {
       const prefix = match[1]

@@ -46,6 +46,16 @@
         </div>
       </div>
 
+      <!-- 开发者选项说明 -->
+      <div v-else-if="kind === 'developer'">
+        <p class="mb-1.5 text-xs font-medium text-gray-500">开发者选项说明</p>
+        <div class="space-y-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-2.5 text-xs leading-relaxed text-gray-600">
+          <p>开发者选项面向开发与排障场景（日志查看、证书设置、DevTools、深链接注册等），普通玩家无需开启，请勿随意修改其中配置。</p>
+          <p>忽略 TLS 证书校验、自定义证书信任源等操作会改变本启动器的网络安全策略，可能暴露于中间人攻击等风险，请在充分了解后果后使用。</p>
+          <p>开发者模式下产生的行为与结果由您自行承担，本启动器及作者不对因修改开发者选项所引发的任何直接或间接后果承担责任。</p>
+        </div>
+      </div>
+
       <!-- 实验性功能说明 -->
       <div v-else>
         <p class="mb-1.5 text-xs font-medium text-gray-500">实验性功能说明</p>
@@ -84,7 +94,7 @@ import { toastSuccess, toastWarning } from '@/utils/toast'
 const props = defineProps<{
   /** 是否显示 */
   visible: boolean
-  /** 协议类型：online（联机）/ experimental（实验性功能）/ tools（工具） */
+  /** 协议类型：online（联机）/ experimental（实验性功能）/ tools（工具）/ developer（开发者选项） */
   kind: DisclaimerKind
 }>()
 
