@@ -13,6 +13,8 @@ declare const __APP_VERSION__: string
 // 仅内联 CHANGELOG.md 中当前版本对应的段落，避免整份 Markdown 打进前端包）
 declare module 'virtual:update-log' {
   export const version: string
+  /** 作者的话列表（vite 构建时从版本区间内 `note:` 前缀的 commit 提取，可为空数组） */
+  export const notes: string[]
   const content: string
   export default content
 }

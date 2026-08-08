@@ -10,8 +10,11 @@ import pkg from './package.json'
  * 仓库用 tag 管理版本（tag 名即版本号，如 v0.3.4）：内容取「上一 tag → 最新 tag」
  * 之间的全部 commit message（剥离 CI 跳过标记 !c），生成 Markdown 供 ReleaseTimeline 渲染；
  * 无 tag 时回退到最近 20 条 commit。git 不可用时返回空内容。
+ *
+ * 作者的话：约定 commit message 以 `note:` 开头（如 `note: 感谢大家的支持`）为作者寄语，
+ * 版本区间内全部 `note:` commit 按顺序提取为数组，供更新弹窗顶部展示，不混入 commit 列表。
  */
-function gitUpdateLog(): { version: string; content: string } {
+function gitUpdateLog(): { version: string; content: string; notes: string[] } {
   const run = (args: string[]): string[] => {
     try {
       return execFileSync('git', args, { encoding: 'utf8' })
@@ -34,10 +37,16 @@ function gitUpdateLog(): { version: string; content: string } {
     version = latest.replace(/^v/, '')
   }
   const subjects = logs.map((s) => s.replace(/\s*!c\s*$/i, '').trim()).filter(Boolean)
-  if (subjects.length === 0) return { version, content: '' }
+  const noteRe = /^note:\s*/i
+  const notes = subjects
+    .filter((s) => noteRe.test(s))
+    .map((s) => s.replace(noteRe, '').trim())
+  const commits = subjects.filter((s) => !noteRe.test(s))
+  if (commits.length === 0 && notes.length === 0) return { version, content: '', notes: [] }
   return {
     version,
-    content: [`## MoLaunch ${version}`, ...subjects.map((s) => `- ${s}`)].join('\n'),
+    notes,
+    content: [`## MoLaunch ${version}`, ...commits.map((s) => `- ${s}`)].join('\n'),
   }
 }
 
@@ -53,8 +62,10 @@ function updateLogPlugin(): Plugin {
     },
     load(id) {
       if (id !== '\0molaunch:update-log') return
-      const { version, content } = gitUpdateLog()
-      return `export const version = ${JSON.stringify(version)}\nexport default ${JSON.stringify(content)}`
+      const { version, content, notes } = gitUpdateLog()
+      return `export const version = ${JSON.stringify(
+        version,
+      )}\nexport const notes = ${JSON.stringify(notes)}\nexport default ${JSON.stringify(content)}`
     },
   }
 }

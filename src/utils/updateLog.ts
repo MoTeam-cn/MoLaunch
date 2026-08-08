@@ -9,7 +9,10 @@
  * 仅内联当前版本对应的段落（`virtual:update-log`），不打包整份 Markdown。
  */
 import { ref } from 'vue'
-import updateLogContent, { version as updateLogVersion } from 'virtual:update-log'
+import updateLogContent, {
+  version as updateLogVersion,
+  notes as updateLogNotes,
+} from 'virtual:update-log'
 import { compareVersion, getVersionInfo } from '@/utils/version'
 
 /** localStorage 键：上次运行（已展示过更新日志）的版本号 */
@@ -67,6 +70,11 @@ export function getChangelogContent(): string {
 /** 更新日志对应的版本号（与内容同源，可能回退到最新发布版本） */
 export function getChangelogVersion(): string {
   return updateLogVersion
+}
+
+/** 作者的话列表（vite 构建时从 git 提交中提取 `note:` 前缀的 commit，可为空数组） */
+export function getChangelogNotes(): string[] {
+  return updateLogNotes
 }
 
 /** 直接弹出更新日志弹窗（dev-api 测试用） */
