@@ -1,6 +1,10 @@
+# Changelog
+
+本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
+
 ## [Unreleased]
 
-- 发布工作流（`.github/workflows/release.yml`）Release 内容重构：body 删除「Downloads」区块（Assets 区已展示产物，移除冗余指引），提交记录不再一栏到底——按 commit 前缀自动分类为「新增内容（`feat*`）/ 修复（`fix*`）/ 其他」三个独立小节，每栏保留 `- subject ([hash](commit链接))` 格式并剥离尾部 `!c` 标记；`note:` 前缀的「作者的话」提取置顶展示（`######` 小字号标题，与更新弹窗语义一致）；最后一栏新增「协作者」小节（`git shortlog -sn` 统计本阶段内全部作者，按提交次数降序、顶部 20 人）。Windows setup 安装版维持现状：`--bundles nsis` 构建后仅作为 workflow artifact 附加到 GitHub Release，不上传 S3、不注册 apiServer（与便携版分流，便携版才推云端）。
+- 发布工作流（`.github/workflows/release.yml`）Release 内容重构：body 删除「Downloads」区块（Assets 区已展示产物，移除冗余指引），提交记录不再一栏到底——按 commit 前缀自动分类为「新增内容（`feat*`）/ 修复（`fix*`）/ 其他」三个独立小节，每栏保留 `- subject ([hash](commit链接))` 格式并剥离尾部 `!c` 标记；`note:` 前缀的「作者的话」提取置顶展示（`######` 小字号标题，与更新弹窗语义一致）；最后一栏新增「协作者」小节（`git shortlog -sn` 统计本阶段内全部作者，按提交次数降序、顶部 20 人）。Windows setup 安装版维持现状：`--bundles nsis` 构建后仅作为 workflow artifact 附加到 GitHub Release，不上传 S3、不注册 apiServer（与便携版分流，便携版才推云端）。分类与协作者头像生成逻辑整体抽离到 [scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)（Node.js 脚本，workflow 的 `Generate changelog from commits` 步骤只保留一行 `node` 调用，不再在 YAML 中堆叠 bash/Python）；协作者头像经 GitHub compare API 按提交邮箱关联账号拉取 `avatar_url`，未关联账号回退 Gravatar identicon 占位，API 不可用时回退 `git shortlog` 文本列表，工作流不因接口故障失败。
 
 - 重写三份开发文档以匹配当前系统架构：`AI_AGENT_GUIDELINES.md`（新增「当前架构要点」章节：仓库结构、配置读写 / shell / resources / 下载源 / 进度回滚 / 组件复用 / 日志颜色 / 行数 / 测试位置等硬约束，以及「作者的话」多 note 约定）、`DEVELOPMENT_GUIDELINES.md`（技术栈与 scope 更新、补充更新日志多 note 约定、api-server 联动约定、后端测试文件拆分规范、命令速查增加 api-server 检查）、`DEVELOPMENT_BLUEPRINT.md`（目录结构、前端三大管理器域、后端模块总览、安全策略、新增第八章 MoLaunch 云端 api-server 架构）。并在两份规范中补充「作者的话」落地用法：`note:` 提交用 `git commit --allow-empty` 创建（零文件变更），且必须在打版本 tag 之前提交（插件按 tag 区间提取，tag 之后会落到下个版本）。
 
