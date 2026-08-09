@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-- 普通重启记住上次页面（[relaunchSnapshot.ts](src/utils/relaunchSnapshot.ts) 新增 `saveLastPage`/`readLastPage`，[App.vue](src/App.vue) 路由 `afterEach` 记录 + 启动恢复）：打开设置页等任意业务页后正常关闭再启动，自动回到上次打开的页面；UAC 提权重启仍走加密快照恢复页面 + 房间会话。
+- 普通重启记住上次页面（[relaunchSnapshot.ts](src/utils/relaunchSnapshot.ts) 新增 `saveLastPage`/`readLastPage`，[App.vue](src/App.vue) 路由 `afterEach` 记录 + 启动恢复）：**默认关闭**，可在「设置 → 个性化 → 启动」开启，开启后打开设置页等任意业务页再重启，自动回到上次打开的页面；UAC 提权重启仍走加密快照恢复页面 + 房间会话。
 
 - 重启快照统一改为 SDK 加密存储（[relaunchSnapshot.ts](src/utils/relaunchSnapshot.ts) 新增，替代 [relaunchRestore.ts](src/utils/relaunchRestore.ts) + [roomSnapshot.ts](src/utils/roomSnapshot.ts)；后端新增 [relaunch.rs](src-tauri/src/commands/relaunch.rs) 命令，复用 `sdk_crypto` 加解密封装）：重启前将"当前页面 + 在线房间会话（含房间密码 / roomKey）"经 SDK AES-256-CBC 加密后写入 localStorage，新实例启动后解密恢复页面跳转与房间自动重连；修复 CodeQL 明文存储敏感信息告警，升级前遗留的旧版明文快照键启动时自动清理。
 

@@ -8,9 +8,13 @@
  */
 import { ref, watch } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
+import { useSettingsStore } from '@/stores/settings'
 import Select from '@/components/common/Select.vue'
+import ToggleRow from '@/components/settings/ToggleRow.vue'
 import AppearanceSection from './personal/AppearanceSection.vue'
 import HomePanelModeSection from './personal/HomePanelModeSection.vue'
+
+const settingsStore = useSettingsStore()
 
 // 游戏默认语言（后端配置，写入 options.txt 的 lang 字段）
 const gameLanguage = ref('zh_cn')
@@ -76,6 +80,20 @@ watch(closeBehavior, (val) => {
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 启动 -->
+    <div class="bg-white rounded-lg border border-gray-300 overflow-hidden">
+      <h3 class="text-sm font-semibold text-gray-900 px-5 pt-5 pb-3">启动</h3>
+      <div class="divide-y divide-gray-200">
+        <ToggleRow
+          :model-value="settingsStore.rememberLastPage"
+          label="记住上次打开的页面"
+          description="启动时自动回到上次打开的页面（如设置页）；默认关闭，不记录浏览位置"
+          :hover="false"
+          @update:model-value="settingsStore.setRememberLastPage($event)"
+        />
       </div>
     </div>
 

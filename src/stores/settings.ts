@@ -23,6 +23,8 @@ export const useSettingsStore = defineStore('settings', () => {
   const theme = ref<Theme>('system')
   const language = ref<Language>('zh-CN')
   const primaryColor = ref<string>(DEFAULT_PRIMARY_COLOR)
+  /** 记住上次打开的页面（默认关闭，设置 → 个性化开启后普通重启恢复上次页面） */
+  const rememberLastPage = ref(false)
   /** 后端配置是否已加载完成（首次 IPC 拉取后置 true） */
   const backendSynced = ref(false)
 
@@ -36,6 +38,9 @@ export const useSettingsStore = defineStore('settings', () => {
         if (parsed.language) language.value = parsed.language
         if (typeof parsed.primaryColor === 'string' && parsed.primaryColor) {
           primaryColor.value = parsed.primaryColor
+        }
+        if (typeof parsed.rememberLastPage === 'boolean') {
+          rememberLastPage.value = parsed.rememberLastPage
         }
       }
     }, 'load settings')
@@ -71,12 +76,18 @@ export const useSettingsStore = defineStore('settings', () => {
         theme: theme.value,
         language: language.value,
         primaryColor: primaryColor.value,
+        rememberLastPage: rememberLastPage.value,
       }))
     }, 'save settings')
   }
 
   function setLayoutMode(mode: LayoutMode) {
     layoutMode.value = mode
+    saveSettings()
+  }
+
+  function setRememberLastPage(enabled: boolean) {
+    rememberLastPage.value = enabled
     saveSettings()
   }
 
@@ -113,11 +124,13 @@ export const useSettingsStore = defineStore('settings', () => {
     theme,
     language,
     primaryColor,
+    rememberLastPage,
     backendSynced,
     setLayoutMode,
     setTheme,
     setLanguage,
     setPrimaryColor,
+    setRememberLastPage,
     loadSettings,
     saveSettings,
     syncPrimaryColorFromBackend,

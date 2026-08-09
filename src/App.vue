@@ -73,17 +73,19 @@ onMounted(() => {
   notifyFrontendReady()
   // 启动自动更新检查（启动后 5s + 每 6 小时；dev 模式自动跳过）
   initAutoCheck()
-  // 每次导航后记录页面，供普通重启后回到上次打开的页面
+  // 每次导航后记录页面（仅在设置开启"记住上次打开的页面"时）
   router.afterEach((to) => {
-    saveLastPage(to.fullPath)
+    if (settingsStore.rememberLastPage) {
+      saveLastPage(to.fullPath)
+    }
   })
   initApp()
 })
 
 async function initApp() {
   console.log('[Startup][Frontend] initApp start @', new Date().toISOString())
-  // 捕获上次打开的页面（须在启动期初始路由导航覆盖 localStorage 前读取）
-  const lastPage = readLastPage()
+  // 捕获上次打开的页面（须在启动期初始路由导航覆盖 localStorage 前读取；仅在设置开启时）
+  const lastPage = settingsStore.rememberLastPage ? readLastPage() : null
   // 全局《用户协议》门禁：首次启动需同意后才能使用（fire-and-forget，弹窗以高 z-index 覆盖加载遮罩，不影响后续初始化）
   void maybeRequireUserAgreement()
   console.log('[Startup][Frontend] maybeRequireUserAgreement fired')
