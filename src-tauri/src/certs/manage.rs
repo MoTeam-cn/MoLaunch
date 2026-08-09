@@ -226,24 +226,21 @@ pub fn load_custom_root_certificates() -> Vec<reqwest::Certificate> {
 pub fn load_system_root_certificates() -> Vec<reqwest::Certificate> {
     let mut certs = Vec::new();
 
-    match rustls_native_certs::load_native_certs() {
-        Ok(raw_certs) => {
-            for cert in raw_certs {
-                // rustls-native-certs 0.6 返回 rustls::Certificate（内含 Vec<u8> DER 字节）
-                let der_bytes: &[u8] = cert.as_ref();
-                match reqwest::Certificate::from_der(der_bytes) {
-                    Ok(c) => certs.push(c),
-                    Err(e) => {
-                        crate::log_debug!("[Certs] Skipped system cert (DER→reqwest fail): {}", e)
-                    }
-                }
+    let result = rustls_native_certs::load_native_certs();
+    for cert in result.certs {
+        // rustls-native-certs 0.8 返回 rustls_pki_types::CertificateDer（内含 Vec<u8> DER 字节）
+        let der_bytes: &[u8] = cert.as_ref();
+        match reqwest::Certificate::from_der(der_bytes) {
+            Ok(c) => certs.push(c),
+            Err(e) => {
+                crate::log_debug!("[Certs] Skipped system cert (DER→reqwest fail): {}", e)
             }
-            log_info!("[Certs] Loaded {} system root certificates", certs.len());
-        }
-        Err(e) => {
-            crate::log_warn!("[Certs] Failed to load system root certs: {}", e);
         }
     }
+    for err in &result.errors {
+        crate::log_warn!("[Certs] Failed to load system cert: {}", err);
+    }
+    log_info!("[Certs] Loaded {} system root certificates", certs.len());
 
     certs
 }

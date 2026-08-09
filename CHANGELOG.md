@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 升级 Rust HTTP/TLS 依赖修复 cargo audit 漏洞（[Cargo.toml](src-tauri/Cargo.toml) + [manage.rs](src-tauri/src/certs/manage.rs) + 新增 [.cargo/audit.toml](.cargo/audit.toml)）：`reqwest` 0.11→0.12、`rustls-native-certs` 0.6→0.8，统一到 rustls 0.23，`rustls-webpki` 0.101.7（3 个 RUSTSEC-2026-0098/0099/0104）与 `rustls-pemfile` 1.0.4 移出依赖树；`load_system_root_certificates` 适配 `CertificateResult`（`CertificateDer`→`reqwest::Certificate`）；`rsa` 0.9.10 上游无补丁（RUSTSEC-2023-0071，Marvin Attack 仅影响私钥操作，项目只用公钥 OAEP 加密不可达）在 audit.toml 中 ignore 并注明理由；GTK3/glib 等 19 项警告均为 Tauri Linux 传递依赖，不阻塞 CI。
+
 - CI 升级 GitHub Actions 运行时到 Node 24（[ci.yml](.github/workflows/ci.yml) + [release.yml](.github/workflows/release.yml) + [version-sync.yml](.github/workflows/version-sync.yml) + [license-sync.yml](.github/workflows/license-sync.yml)）：`checkout` v4→v5、`setup-node` v4→v5、`upload-artifact`/`download-artifact` v4→v5、`action-gh-release` v1→v2、`git-auto-commit-action` v6→v7，消除 "Node.js 20 is deprecated ... forced to run on Node.js 24" 警告；`rust-cache` v2.9.2 与 `tauri-action` v0 本身已是 node24，无需变更。
 
 - CI 修复（[ci.yml](.github/workflows/ci.yml) + [release.yml](.github/workflows/release.yml)）：Node 18 → 22（`@vitejs/plugin-vue@6` 的 `getHash` 使用 Node 21.7+ 的 `crypto.hash`，Node 18 下前端构建报 `crypto.hash is not a function`）；cargo 安全审计 action 由已失效的 `rustsec/rustsec-action` 更换为官方维护的 [actions-rust-lang/audit](https://github.com/actions-rust-lang/audit)@v1（`file` 指向 `src-tauri/Cargo.lock`，不自动创建 issue）。

@@ -1,0 +1,6 @@
+# cargo audit 忽略项
+# RUSTSEC-2023-0071 (Marvin Attack)：rsa crate 私钥操作的定时侧信道，
+# 项目仅用 RsaPublicKey 做 RSA-OAEP 公钥加密（minecraft/online/crypto.rs），
+# 从不加载私钥，攻击面不可达；上游暂无补丁（Patched: n/a）。
+[advisories]
+ignore = ["RUSTSEC-2023-0071"]
