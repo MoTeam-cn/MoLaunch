@@ -102,6 +102,8 @@ impl VirtualLanBridge {
             let mut buf = vec![0u8; 65535];
             // 协议帧 seq 计数器：task 内部维护，外部无需读取
             let mut seq: u32 = 0;
+            // 入站越界帧丢弃计数：首次与每 100 帧记录一次告警，避免刷屏
+            let mut dropped: u32 = 0;
             log_info!("[Online] TUN 读写循环启动: {}", info.name);
 
             loop {
@@ -133,7 +135,19 @@ impl VirtualLanBridge {
                     write_result = write_rx.recv() => {
                         match write_result {
                             Some(packet) => {
-                                if let Err(e) = device.send(&packet).await {
+                                // 入站防御：写入前校验 src/dst 属虚拟子网，越界即丢弃
+                                if let Some(reason) =
+                                    validate_inbound_frame(&packet, &info.ipv4, info.prefix_len)
+                                {
+                                    dropped = dropped.wrapping_add(1);
+                                    if dropped == 1 || dropped % 100 == 0 {
+                                        log_warn!(
+                                            "[Online] 丢弃越界 DataChannel 帧: {}, 累计 {}",
+                                            reason,
+                                            dropped
+                                        );
+                                    }
+                                } else if let Err(e) = device.send(&packet).await {
                                     log_warn!("[Online] TUN 写入失败: {}", e);
                                 }
                             }
@@ -245,6 +259,40 @@ impl Drop for VirtualLanBridge {
         self.handle.abort();
         log_debug!("[Online] VirtualLanBridge drop");
     }
+}
+
+/// 入站帧防御校验：IPv4 帧要求 src/dst 均属虚拟子网，越界返回丢弃原因；
+/// 无法解析的帧（非 IPv4、长度不足等）返回 None 按现状放行
+fn validate_inbound_frame(packet: &[u8], subnet: &str, prefix_len: u8) -> Option<&'static str> {
+    if packet.len() < 20 || packet[0] >> 4 != 4 {
+        return None;
+    }
+    let ihl = usize::from(packet[0] & 0x0f) * 4;
+    if ihl < 20 || packet.len() < ihl {
+        return None;
+    }
+    let src = [packet[12], packet[13], packet[14], packet[15]];
+    let dst = [packet[16], packet[17], packet[18], packet[19]];
+    if !ipv4_in_subnet(src, subnet, prefix_len) {
+        return Some("源地址越界");
+    }
+    if !ipv4_in_subnet(dst, subnet, prefix_len) {
+        return Some("目标地址越界");
+    }
+    None
+}
+
+/// 判断 IPv4 地址是否属于 subnet/prefix_len 子网；subnet 解析失败时放行
+fn ipv4_in_subnet(ip: [u8; 4], subnet: &str, prefix_len: u8) -> bool {
+    let Ok(base) = subnet.parse::<std::net::Ipv4Addr>() else {
+        return true;
+    };
+    let mask = match prefix_len {
+        0 => 0,
+        32 => u32::MAX,
+        n => u32::MAX << (32 - n),
+    };
+    u32::from_be_bytes(ip) & mask == u32::from(base) & mask
 }
 
 #[cfg(test)]

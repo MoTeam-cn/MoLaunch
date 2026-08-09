@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+- TUN 入站帧校验（[bridge.rs](src-tauri/src/minecraft/online/bridge.rs)）：DataChannel → TUN 写入前校验 IPv4 帧源/目标地址均属于虚拟子网（复用 `VirtualNetInfo` 的 IP 与前缀，零新增状态），越界帧丢弃并计数式告警；非 IPv4/无法解析帧默认放行，不破坏现有联机流程；目标组播帧如后续需要可在校验中加白名单。
+
+- 加固 ECIES/PoW/SSE 健壮性（[ecies.rs](src-tauri/src/minecraft/online/ecies.rs) + [pow.rs](src-tauri/src/minecraft/online/pow.rs) + [sse.rs](src-tauri/src/ai_core/client/sse.rs)）：ECIES 解密拒绝全零临时公钥与全零共享密钥（覆盖 X25519 低阶点）；PoW difficulty 钳制上限 32 防服务端放大 DoS；SSE 缓冲新增单行 1MB / 累计 4MB 上限，超限丢弃该行并计数。
+
 - 依赖升级修复已知 CVE（[Cargo.toml](src-tauri/Cargo.toml) + [package.json](package.json) + [package-lock.json](package-lock.json)）：
   - Rust：`zip` 2→4（4.6.1）、`rusqlite` 0.31→0.40（bundled，libsqlite3-sys 至 0.38），读取/写入/查询 API 无破坏性变化、调用点零改动（zip-slip 防护走既有 `utils::path::ensure_safe_relative_path` 不受影响）；`cargo check` 与 `cargo test --lib`（225 passed）通过。
   - 前端：`vite` 5→6.4.3（修复 GHSA-v6wh-96g9-6wx3 / GHSA-fx2h-pf6j-xcff）、`@vitejs/plugin-vue` 5→6.0.8、`vitest` 1→3.2.7（vite-node 3.2.4）、`@vue/eslint-config-typescript` 12→13（typescript-eslint 依赖升级，minimatch 至 9.0.9 消除 ReDoS 链）；`npm audit --audit-level=high` 归零，typecheck / build / lint 通过。
