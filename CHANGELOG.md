@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+- 依赖升级修复已知 CVE（[Cargo.toml](src-tauri/Cargo.toml) + [package.json](package.json) + [package-lock.json](package-lock.json)）：
+  - Rust：`zip` 2→4（4.6.1）、`rusqlite` 0.31→0.40（bundled，libsqlite3-sys 至 0.38），读取/写入/查询 API 无破坏性变化、调用点零改动（zip-slip 防护走既有 `utils::path::ensure_safe_relative_path` 不受影响）；`cargo check` 与 `cargo test --lib`（225 passed）通过。
+  - 前端：`vite` 5→6.4.3（修复 GHSA-v6wh-96g9-6wx3 / GHSA-fx2h-pf6j-xcff）、`@vitejs/plugin-vue` 5→6.0.8、`vitest` 1→3.2.7（vite-node 3.2.4）、`@vue/eslint-config-typescript` 12→13（typescript-eslint 依赖升级，minimatch 至 9.0.9 消除 ReDoS 链）；`npm audit --audit-level=high` 归零，typecheck / build / lint 通过。
+
 - CI 新增依赖漏洞扫描（[.github/workflows/ci.yml](.github/workflows/ci.yml)）：frontend-check 末尾追加 `npm audit --audit-level=high`，rust-clippy 末尾追加 `rustsec/rustsec-action`（lockfile 指向 src-tauri/Cargo.lock），权限保持 `contents: read` 不变。
 
 - 修复插件自定义布局 SSRF/内网探测（[net.rs](src-tauri/src/utils/net.rs) 新增 + [layout.rs](src-tauri/src/commands/plugins/layout.rs) + [validate.rs](src-tauri/src/commands/frp/sandbox/validate.rs)）：内网地址判定抽为公共函数 `utils::net::is_private_address`（v4 私网/回环、v6 回环、localhost，含 host:port），frp 校验复用同一实现；`load_custom_layout` 请求前解析 URL host 并拦截内网地址，插件布局不再能探测 `127.0.0.1:*` / `192.168.*` 等内网端点。
