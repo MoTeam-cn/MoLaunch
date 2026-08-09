@@ -52,19 +52,35 @@ pub(super) async fn spawn_frpc(
     if let Some(launch) = launch_mode {
         let remote_id = tunnel.remote_tunnel_id.as_deref().unwrap_or(&tunnel.id);
         let token = tunnel.token.as_deref().unwrap_or("");
-        let resolved = launch
+        if !token.is_empty()
+            && (token.starts_with('-')
+                || token.chars().any(|c| c.is_whitespace())
+                || token.contains(',')
+                || token.contains('='))
+        {
+            return Err("Token 非法，已拒绝启动隧道".to_string());
+        }
+        let template = launch
             .command
             .as_deref()
             .unwrap_or("")
             .to_string()
             .replace("{frpc}", &frpc_path.to_string_lossy())
-            .replace("{tunnelId}", remote_id)
-            .replace("{token}", token);
-        log_info!("[Frp] 使用厂商命令模式启动: {}", resolved);
-        let mut parts = resolved.split_whitespace();
-        let _ = parts.next();
-        for arg in parts {
+            .replace("{tunnelId}", remote_id);
+        log_info!("[Frp] 使用厂商命令模式启动: {}", template);
+        let mut segs = template.split("{token}");
+        let mut head_parts = segs.next().unwrap_or("").split_whitespace();
+        let _ = head_parts.next();
+        for arg in head_parts {
             cmd.arg(arg);
+        }
+        if template.contains("{token}") && !token.is_empty() {
+            cmd.arg(token);
+        }
+        for seg in segs {
+            for arg in seg.split_whitespace() {
+                cmd.arg(arg);
+            }
         }
     } else {
         cmd.arg("-c").arg(config_path.as_ref().unwrap());

@@ -189,7 +189,7 @@ pub fn read_resource_bytes(relative_path: &str) -> anyhow::Result<Vec<u8>> {
 /// 只在目标文件不存在或 sha256 不匹配时写入。
 /// 这样每次启动不会因为重复写大文件而拖慢，也避免杀软误报频繁触发。
 ///
-/// 释放成功后会在同目录写一个 `{name}.sha256` 校验文件，用于下次启动比对。
+/// 释放成功后会在同目录写一个 `{name}.sha256` 记录 hash（仅提示用，命中判断基于目标本体）。
 pub fn extract_resource(resource_path: &str, target_path: &Path) -> anyhow::Result<()> {
     let content = read_resource_bytes(resource_path)?;
     let expected_hash = crate::utils::hash::sha256_hex(&content);
@@ -198,38 +198,32 @@ pub fn extract_resource(resource_path: &str, target_path: &Path) -> anyhow::Resu
         std::fs::create_dir_all(parent)?;
     }
 
-    // 校验文件路径：与目标同目录，后缀 .sha256
+    // 校验文件路径：与目标同目录，后缀 .sha256（仅作提示用，不参与信任判断）
     let hash_path = target_path.with_extension("sha256");
 
-    // 命中缓存：文件存在 + 校验文件存在 + hash 一致 → 跳过写入
-    // 注意：必须同时检查 target 和 hash 文件存在，否则会出现
-    // "目标文件不存在但 hash 文件残留"时读到旧 hash 触发"不匹配"警告的情况
-    let target_exists = target_path.exists();
-    let hash_exists = hash_path.exists();
-    if target_exists && hash_exists {
-        let cached_hash = std::fs::read_to_string(&hash_path).unwrap_or_default();
-        if cached_hash.trim() == expected_hash {
-            return Ok(());
+    // 命中缓存：目标文件存在且本体字节 hash 与期望一致才跳过写入
+    // .sha256 文本可被伪造，信任判断必须基于目标文件本体
+    let mut cached = false;
+    if target_path.exists() {
+        match std::fs::read(target_path) {
+            Ok(bytes) if crate::utils::hash::sha256_hex(&bytes) == expected_hash => cached = true,
+            Ok(_) => {
+                log_warn!("资源 {} 的目标文件 hash 不匹配（期望 {}），重新释放", resource_path, expected_hash);
+            }
+            Err(e) => {
+                log_warn!("资源 {} 读取失败: {}，重新释放", resource_path, e);
+            }
         }
-        log_warn!(
-            "资源 {} 的缓存文件 hash 不匹配（期望 {}，实际 {}），重新释放",
-            resource_path,
-            expected_hash,
-            cached_hash.trim()
-        );
-    } else if target_exists != hash_exists {
-        // 文件和 hash 文件只存在一个：状态不一致，需要重新释放
-        log_warn!(
-            "资源 {} 的缓存状态不一致（target={}, hash={}），重新释放",
-            resource_path,
-            target_exists,
-            hash_exists
-        );
     }
-    // 两者都不存在：首次释放，不打印警告
+
+    if cached {
+        return Ok(());
+    }
 
     std::fs::write(target_path, &content)?;
     std::fs::write(&hash_path, &expected_hash)?;
+    // 限制目标文件权限（尽力而为），降低恶意替换/篡改面
+    crate::minecraft::system::shell::restrict_file_permissions(target_path);
     log_info!(
         "释放嵌入资源: {} -> {} (sha256={})",
         resource_path,

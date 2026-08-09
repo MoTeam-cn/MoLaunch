@@ -96,6 +96,9 @@ fn extract_overrides_once(
             continue;
         }
 
+        crate::utils::path::ensure_safe_relative_path(&relative)
+            .map_err(|e| format!("overrides 条目路径非法: {} ({})", name, e))?;
+
         let target = instance_dir.join(relative);
         if let Some(parent) = target.parent() {
             if !parent.exists() {

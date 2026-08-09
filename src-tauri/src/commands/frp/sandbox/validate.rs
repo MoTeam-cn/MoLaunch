@@ -76,11 +76,16 @@ pub fn validate_tunnel(params: &CreateTunnelParams) -> Result<(), String> {
     // Token 校验（如有）
     if let Some(ref token) = params.token {
         if !token.is_empty() {
-            if token.contains('\n')
-                || token.contains('\r')
-                || token.contains('"')
-                || token.contains('\\')
-            {
+            if token.starts_with('-') {
+                return Err("Token 不能以 - 开头".to_string());
+            }
+            if token.chars().any(|c| c.is_whitespace()) {
+                return Err("Token 不能包含空白字符".to_string());
+            }
+            if token.contains(',') || token.contains('=') {
+                return Err("Token 不能包含 , 或 =".to_string());
+            }
+            if token.contains('"') || token.contains('\\') {
                 return Err("Token 包含非法字符".to_string());
             }
             if token.len() > 512 {

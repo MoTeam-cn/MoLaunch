@@ -29,3 +29,45 @@ pub fn is_safe_relative_path(path: &str) -> bool {
         .components()
         .any(|c| matches!(c, std::path::Component::ParentDir))
 }
+
+/// 校验相对路径安全（防路径穿越与绝对路径逃逸）
+///
+/// 复用段级 `is_safe_relative_path` 检查 ParentDir，并额外拒绝空字符串、空字节、
+/// `/`/`\` 开头与 Windows 盘符开头的绝对路径。校验通过返回原路径，否则返回错误描述。
+pub fn ensure_safe_relative_path(path: &str) -> Result<String, String> {
+    if path.is_empty()
+        || path.contains('\0')
+        || path.starts_with('/')
+        || path.starts_with('\\')
+        || starts_with_drive_letter(path)
+        || !is_safe_relative_path(path)
+    {
+        return Err(format!("非法相对路径: {}", path));
+    }
+    Ok(path.to_string())
+}
+
+/// 判断是否以 Windows 盘符开头（如 `C:`、`c:\`）
+fn starts_with_drive_letter(path: &str) -> bool {
+    let b = path.as_bytes();
+    b.len() >= 2 && b[0].is_ascii_alphabetic() && b[1] == b':'
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn ensure_safe_relative_path_rejects_unsafe() {
+        for p in ["../x", "..", "/abs", "\\abs", "C:\\abs", "c:/abs", "a/../b", "", "a\0b"] {
+            assert!(ensure_safe_relative_path(p).is_err(), "应拒绝: {:?}", p);
+        }
+    }
+
+    #[test]
+    fn ensure_safe_relative_path_accepts_normal() {
+        for p in ["mods/x.jar", "a/b", "mods\\x.jar"] {
+            assert_eq!(ensure_safe_relative_path(p).as_deref(), Ok(p), "应通过: {:?}", p);
+        }
+    }
+}

@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+- 修复整合包 overrides 解压路径穿越（Zip Slip）（[extract.rs](src-tauri/src/commands/community/install/concurrent/extract.rs) + [path.rs](src-tauri/src/utils/path.rs)）：新增公共校验 `ensure_safe_relative_path`（段级 `ParentDir` 检查 + 拒绝空串/空字节/绝对路径/盘符前缀），`extract_overrides_once` 解压前逐条目校验，恶意 zip 内 `overrides/../../..` 条目不再能逃出 instance 目录写任意文件；附内联单测。
+
+- 修复可执行资源释放的缓存信任缺陷（DLL 劫持）（[resources.rs](src-tauri/src/resources.rs)）：`extract_resource` 命中缓存改为重算目标文件本体 sha256 与期望值比对（不再信任可伪造的同目录 `.sha256` 文本），不一致即重新覆盖写入；写入后追加 `restrict_file_permissions` 收紧权限（Windows icacls / Unix 0600）。SDK DLL、updater.exe、wintun.dll 等全部资源释放点随之受益。
+
+- 修复 frpc 命令直连模式 token 参数注入（[spawn.rs](src-tauri/src/commands/frp/process/spawn.rs) + [validate.rs](src-tauri/src/commands/frp/sandbox/validate.rs)）：`{token}` 不再经 `split_whitespace` 拆词，改为整体单一参数传入；token 校验追加拒绝前导 `-`、空白字符与 `,`/`=`，spawn 前另做同规则防御校验（纵深，覆盖升级前遗留的旧数据），并顺带避免 token 落入启动日志。
+
 - 日志脱敏覆盖面扩展（[sanitize.rs](src-tauri/src/logger/sanitize.rs) + [sanitize_tests.rs](src-tauri/src/logger/sanitize_tests.rs)）：JSON 敏感字段集新增 `password`/`passwd`/`secret`/`api_key`/`apikey`/`client_secret`/`authorization`，新增 `Authorization: Bearer` 头与 URL query（token/key/api_key/apikey/signature/sig）脱敏，JWT 每段长度阈值由 10 降至 8。
 
 - 修复 CI 三项检查失败（[.github/workflows/ci.yml](.github/workflows/ci.yml)）：
