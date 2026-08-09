@@ -30,7 +30,7 @@
     "pinia": "^2.1.7",
     "skinview3d": "^3.4.2",
     "vue": "^3.4.15",
-    "vue-router": "^4.2.5",
+    "vue-router": "^5.2.0",
     "vue-virtual-scroller": "^3.0.4"
   },
   "devDependencies": {
