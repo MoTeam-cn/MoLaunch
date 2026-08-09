@@ -5,6 +5,7 @@
 
 use crate::error_util::log_err;
 use crate::{http, log_info, log_warn, utils::cache};
+use url::Url;
 
 /// 缓存 TTL（24 小时）
 const TTL_SECONDS: u64 = 24 * 60 * 60;
@@ -20,6 +21,13 @@ pub async fn load_custom_layout(
     // 1. URL 协议校验
     if !url.starts_with("http://") && !url.starts_with("https://") {
         return Err(format!("URL must be http/https: {}", url));
+    }
+
+    // 1.1 内网地址拦截（SSRF 防护）
+    let parsed = Url::parse(&url).map_err(|e| format!("无效 URL: {}", e))?;
+    let host = parsed.host_str().ok_or_else(|| format!("无效 URL: {}", url))?;
+    if crate::utils::net::is_private_address(host) {
+        return Err("拒绝内网地址".to_string());
     }
 
     // 2. 计算缓存文件名（sha256 哈希）

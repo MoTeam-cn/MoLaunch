@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复插件自定义布局 SSRF/内网探测（[net.rs](src-tauri/src/utils/net.rs) 新增 + [layout.rs](src-tauri/src/commands/plugins/layout.rs) + [validate.rs](src-tauri/src/commands/frp/sandbox/validate.rs)）：内网地址判定抽为公共函数 `utils::net::is_private_address`（v4 私网/回环、v6 回环、localhost，含 host:port），frp 校验复用同一实现；`load_custom_layout` 请求前解析 URL host 并拦截内网地址，插件布局不再能探测 `127.0.0.1:*` / `192.168.*` 等内网端点。
+
 - 本地凭证存储加密升级（[sdk_crypto.rs](src-tauri/src/utils/sdk_crypto.rs) + [Cargo.toml](src-tauri/Cargo.toml) + [online storage.rs](src-tauri/src/minecraft/online/storage.rs) + [auth manager.rs](src-tauri/src/minecraft/auth/storage/manager.rs) + [frp storage.rs](src-tauri/src/commands/frp/auth/storage.rs) + [secure_storage.rs](src-tauri/src/minecraft/community/secure_storage.rs) + [ai storage.rs](src-tauri/src/ai_core/storage.rs)）：新增文件级强加密原语 `encrypt_file_securely`/`decrypt_file_securely`（AES-256-GCM + 随机 12B nonce，输出 `v2:base64(...)`），32 字节随机主密钥存 `AppData/master.key`（Windows 用 DPAPI 保护，非 Windows 0600 权限）；联机 device.json / MC 账号 / FRP token / CurseForge / AI api_key 统一改用新封装，SDK DES 仅回退解密旧数据；删除联机存储 SDK 不可用时的明文降级分支，加密/解密失败直接返回错误。
 
 - 修复 picker 子窗口 XSS 风险（[scheme.rs](src-tauri/src/commands/tools/picker_window/scheme.rs) + [markdown.html](src-tauri/resources/templates/markdown.html) + [picker-templates.ts](src/config/picker-templates.ts) + [resources.rs](src-tauri/src/resources.rs)）：`__PICKER_DATA__` 注入前将 `</script` / `<!--` 转为 JSON 合法转义（`<\/script` / `<\!--`）防脚本标签逃逸；markdown 渲染改为 `DOMPurify.sanitize(marked.parse(...))` 消毒（新增 dompurify.min.js 内联注入，所有库共用注入路径一并受益），try/catch 兜底分支同样消毒；CSP 因依赖库无 nonce 内联注入必须保留 'unsafe-inline'，已注明风险由数据转义 + DOMPurify 收敛。

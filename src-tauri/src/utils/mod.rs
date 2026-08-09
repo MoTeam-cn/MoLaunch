@@ -15,6 +15,7 @@ pub mod format;
 pub mod fs;
 pub mod hash;
 pub mod markdown_table;
+pub mod net;
 pub mod path;
 pub mod sdk_crypto;
 pub mod sqlite;
