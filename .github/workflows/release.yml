@@ -270,7 +270,7 @@ jobs:
       # 不要求 .sig：Windows 更新走便携版 + 自研 updater.exe，setup 签名无用途。
       - name: Upload setup as workflow artifact (Windows only)
         if: matrix.platform == 'windows'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: windows-setup
           path: |
@@ -282,7 +282,7 @@ jobs:
       # .sig 一并附加：macOS 更新走 updater 协议，用户可校验签名。
       - name: Upload macos package as workflow artifact (macOS only)
         if: matrix.platform == 'macos'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: macos-package
           path: |
@@ -294,7 +294,7 @@ jobs:
       # 由 release job 附加到 GitHub Release（除 S3 外，提供手动下载入口）。
       - name: Upload linux package as workflow artifact (Linux only)
         if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: linux-package
           path: |
@@ -306,7 +306,7 @@ jobs:
       # 由 release job 附加到 GitHub Release（除 S3 外，提供手动下载入口）。
       - name: Upload portable as workflow artifact (Windows only)
         if: matrix.platform == 'windows' && steps.locate.outputs.portable_file != ''
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: windows-portable
           path: |
@@ -327,25 +327,25 @@ jobs:
           ref: v${{ inputs.version }}
 
       - name: Download Windows setup artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: windows-setup
           path: artifacts/windows
 
       - name: Download macOS package artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: macos-package
           path: artifacts/macos
 
       - name: Download Linux package artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: linux-package
           path: artifacts/linux
 
       - name: Download Windows portable artifact
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: windows-portable
           path: artifacts/windows
@@ -398,7 +398,7 @@ jobs:
             "$(git rev-parse HEAD)"
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           # workflow_call 触发时 GITHUB_REF 非 tag，必须显式指定 release 对应的 tag
           tag_name: v${{ steps.get_version.outputs.VERSION }}
