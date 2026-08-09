@@ -102,30 +102,41 @@ pub fn run() {
 
     log_info!("[Startup] Pre-builder setup done, constructing Tauri Builder...");
 
+    // 管理员提权重启标记：提权后的新进程以 --restart-as-admin 参数启动，
+    // 此时跳过单实例插件注册（见下方），否则新进程会被当成"第二实例"直接退出
+    let is_admin_relaunch = std::env::args().any(|a| a == "--restart-as-admin");
+
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
-        // 单实例插件（带 deep-link feature）：保证只有一个主进程实例；
-        // Windows/Linux 上第二次点击 molaunch:// 链接时，新进程把 URL 作为
-        // CLI 参数交给本回调，再由 deep-link 插件转发为 deep-link://new-url 事件。
-        // 注意：必须注册在 deep-link 插件之前。
-        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            // 新实例启动时，主实例在这里收到 argv（含 deeplink URL）。
-            // deeplink 插件已接管 deep-link://new-url 事件分发，此处仅需聚焦窗口。
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.show();
-                let _ = window.set_focus();
-            }
-            log_info!("[SingleInstance] 新实例 argv: {:?}", argv);
-        }))
-        // 深度链接插件（molaunch:// 协议注册与事件解析）
-        .plugin(tauri_plugin_deep_link::init())
-        // 重启主进程 plugin（更新文件替换完成后调用 relaunch）
         .plugin(tauri_plugin_process::init())
         .manage(app_state);
+
+    // 单实例插件（带 deep-link feature）：保证只有一个主进程实例；
+    // Windows/Linux 上第二次点击 molaunch:// 链接时，新进程把 URL 作为
+    // CLI 参数交给本回调，再由 deep-link 插件转发为 deep-link://new-url 事件。
+    // 注意：必须注册在 deep-link 插件之前。
+    // 管理员提权重启时跳过：新进程（管理员）必须能独立接管成为主实例，
+    // 否则会被单实例插件识别为"第二实例"强制退出，导致 UAC 确认后程序不重启。
+    let builder = if is_admin_relaunch {
+        log_info!("[SingleInstance] 管理员重启模式：跳过单实例插件，允许新实例接管");
+        builder.plugin(tauri_plugin_deep_link::init())
+    } else {
+        builder
+            .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+                // 新实例启动时，主实例在这里收到 argv（含 deeplink URL）。
+                // deeplink 插件已接管 deep-link://new-url 事件分发，此处仅需聚焦窗口。
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.unminimize();
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+                log_info!("[SingleInstance] 新实例 argv: {:?}", argv);
+            }))
+            .plugin(tauri_plugin_deep_link::init())
+    };
 
     // 自动更新官方 plugin：仅 macOS/Linux 使用（Windows 便携版走自实现 updater，
     // 见 commands/system/updater/install_windows.rs，官方 plugin 不链接）
