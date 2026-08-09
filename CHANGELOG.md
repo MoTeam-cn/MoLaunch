@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复插件子进程执行安全缺陷（[spawn.rs](src-tauri/src/commands/plugins/spawn.rs)）：构建 Command 时 `env_clear()` 并仅注入白名单变量（PATH / 代理 / SystemRoot / TEMP / ComSpec / USERPROFILE 等）防敏感环境变量泄漏；stdout/stderr 改用 `take(MAX_OUTPUT_BYTES+1)` 有界读取防无界内存消耗；实现每插件并发计数（`max_concurrent`，默认 1 上限 5，正常退出与超时 kill 均释放计数）。
+
 - 收缩 IgnoreTls 作用域（[tls.rs](src-tauri/src/http/tls.rs) + [client.rs](src-tauri/src/http/client.rs) + [http.rs](src-tauri/src/http.rs) + [developer.rs](src-tauri/src/commands/system/developer.rs)）：新增 `ignore_tls_allowed(host)`，仅当 IgnoreTls 开启且目标为 localhost/127.0.0.1/::1 时才允许跳过证书校验；现有通用 HTTP 客户端不绑定 base_url、无法低成本获知目标 host，保守起见一律不再调用 `danger_accept_invalid_certs`，联机认证/下载等链路不再受 IgnoreTls 全局绕过；开关开启时启动日志输出一次性 WARNING 提示；默认配置（IgnoreTls 关闭）行为不变。
 
 - 修复整合包 overrides 解压路径穿越（Zip Slip）（[extract.rs](src-tauri/src/commands/community/install/concurrent/extract.rs) + [path.rs](src-tauri/src/utils/path.rs)）：新增公共校验 `ensure_safe_relative_path`（段级 `ParentDir` 检查 + 拒绝空串/空字节/绝对路径/盘符前缀），`extract_overrides_once` 解压前逐条目校验，恶意 zip 内 `overrides/../../..` 条目不再能逃出 instance 目录写任意文件；附内联单测。

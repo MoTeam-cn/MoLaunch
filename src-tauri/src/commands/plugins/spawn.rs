@@ -2,13 +2,16 @@
 //! `plugin_spawn_process` 执行子进程命令。安全限制：command 必须在 manifest
 //! processPermissions.allowedCommands 白名单内（canonicalize 后匹配，支持绝对路径或 PATH
 //! 查找）；非 shell 执行（`tokio::process::Command`）防注入；超时默认 30s 最大 5min
-//! （`tokio::time::timeout` 包 `child.wait()`，超时 `child.kill()`）；stdout/stderr 异步读取各截断 1MB。已聚合为 `plugins_manager` IPC 入口。
+//! （`tokio::time::timeout` 包 `child.wait()`，超时 `child.kill()`）；env 白名单过滤防敏感变量泄漏；
+//! 每插件并发上限 `max_concurrent`（默认 1，最大 5）；stdout/stderr 有界读取各截断 1MB。已聚合为 `plugins_manager` IPC 入口。
 
 use super::read_plugin_manifest;
 use crate::error_util::log_err;
 use crate::log_info;
 use serde::Serialize;
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 use tokio::io::AsyncReadExt;
 use tokio::process::Command;
@@ -17,6 +20,79 @@ use tokio::process::Command;
 pub(crate) const MAX_OUTPUT_BYTES: usize = 1024 * 1024;
 /// 超时上限（5 分钟）
 pub(crate) const MAX_TIMEOUT_MS: u64 = 300_000;
+
+/// 子进程环境白名单：仅放行运行必需变量，防止代理凭据等敏感值泄漏
+const ENV_WHITELIST: &[&str] = &[
+    "PATH",
+    "HTTP_PROXY",
+    "HTTPS_PROXY",
+    "ALL_PROXY",
+    "NO_PROXY",
+    "http_proxy",
+    "https_proxy",
+    "all_proxy",
+    "no_proxy",
+    "SystemRoot",
+    "SystemDrive",
+    "SYSTEMROOT",
+    "WINDIR",
+    "TEMP",
+    "TMP",
+    "ComSpec",
+    "USERPROFILE",
+];
+
+/// 每插件进行中的子进程数（plugin_id -> 数量）
+static ACTIVE_PROCESSES: OnceLock<Mutex<HashMap<String, usize>>> = OnceLock::new();
+
+/// 并发计数守卫：Drop 时自动释放计数（正常退出与超时 kill 均生效）
+struct ProcessCountGuard {
+    plugin_id: String,
+}
+
+impl Drop for ProcessCountGuard {
+    fn drop(&mut self) {
+        if let Some(map) = ACTIVE_PROCESSES.get() {
+            if let Ok(mut map) = map.lock() {
+                if let Some(count) = map.get_mut(&self.plugin_id) {
+                    *count -= 1;
+                    if *count == 0 {
+                        map.remove(&self.plugin_id);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 申请并发槽位：超限报错，成功则计数 +1 并返回守卫
+fn acquire_process_slot(plugin_id: &str, max_concurrent: usize) -> Result<ProcessCountGuard, String> {
+    let map = ACTIVE_PROCESSES.get_or_init(Default::default);
+    let mut map = map
+        .lock()
+        .map_err(|_| "process count lock poisoned".to_string())?;
+    let count = map.get(plugin_id).copied().unwrap_or(0);
+    if count >= max_concurrent {
+        return Err(format!(
+            "Plugin {} reached max concurrent processes ({})",
+            plugin_id, max_concurrent
+        ));
+    }
+    map.insert(plugin_id.to_string(), count + 1);
+    Ok(ProcessCountGuard {
+        plugin_id: plugin_id.to_string(),
+    })
+}
+
+/// 清空环境并注入白名单变量
+fn apply_env_sandbox(cmd: &mut Command) {
+    cmd.env_clear();
+    for key in ENV_WHITELIST {
+        if let Ok(val) = std::env::var(key) {
+            cmd.env(key, val);
+        }
+    }
+}
 
 /// 子进程执行结果
 #[derive(Debug, Serialize)]
@@ -68,7 +144,11 @@ pub async fn plugin_spawn_process(
     let timeout_ms = proc_perms.timeout_ms.min(MAX_TIMEOUT_MS);
     let timeout = Duration::from_millis(timeout_ms);
 
-    // 6. 构建 Command（非 shell 执行，防注入）
+    // 6. 并发计数（max_concurrent 默认 1，上限 5）
+    let max_concurrent = proc_perms.max_concurrent.clamp(1, 5) as usize;
+    let _slot = acquire_process_slot(&plugin_id, max_concurrent)?;
+
+    // 7. 构建 Command（非 shell 执行，防注入）
     let mut cmd = Command::new(&command);
     cmd.args(&args);
     if let Some(cwd) = cwd {
@@ -78,6 +158,8 @@ pub async fn plugin_spawn_process(
     cmd.stderr(std::process::Stdio::piped());
     // 阻止继承 stdin / 父环境
     cmd.stdin(std::process::Stdio::null());
+    // 仅放行白名单环境变量，防止敏感值泄漏
+    apply_env_sandbox(&mut cmd);
 
     let start = Instant::now();
 
@@ -88,11 +170,15 @@ pub async fn plugin_spawn_process(
     let stdout_handle = child.stdout.take();
     let stderr_handle = child.stderr.take();
 
-    // 7. 并行读取 stdout/stderr（独立 task）
+    // 8. 并行读取 stdout/stderr（独立 task，有界读取）
     let stdout_task = tokio::spawn(async move {
-        if let Some(mut stdout) = stdout_handle {
+        if let Some(stdout) = stdout_handle {
             let mut buf = Vec::new();
-            stdout.read_to_end(&mut buf).await.ok();
+            stdout
+                .take((MAX_OUTPUT_BYTES + 1) as u64)
+                .read_to_end(&mut buf)
+                .await
+                .ok();
             buf
         } else {
             Vec::new()
@@ -100,16 +186,20 @@ pub async fn plugin_spawn_process(
     });
 
     let stderr_task = tokio::spawn(async move {
-        if let Some(mut stderr) = stderr_handle {
+        if let Some(stderr) = stderr_handle {
             let mut buf = Vec::new();
-            stderr.read_to_end(&mut buf).await.ok();
+            stderr
+                .take((MAX_OUTPUT_BYTES + 1) as u64)
+                .read_to_end(&mut buf)
+                .await
+                .ok();
             buf
         } else {
             Vec::new()
         }
     });
 
-    // 8. 超时包裹 child.wait()
+    // 9. 超时包裹 child.wait()
     let (exit_code, timed_out) = match tokio::time::timeout(timeout, child.wait()).await {
         Ok(Ok(status)) => (status.code(), false),
         Ok(Err(e)) => {
