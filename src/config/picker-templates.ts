@@ -26,7 +26,8 @@ export interface PickerTemplateConfig {
  *
  * - default-src 'self'：默认只允许同源资源
  * - style-src 'unsafe-inline'：允许内联样式（模板中的 <style>）
- * - script-src 'unsafe-inline'：允许内联脚本（模板中的 <script>）
+ * - script-src 'unsafe-inline'：模板内联脚本 + scheme.rs 内联注入的依赖库（marked/DOMPurify/qrcode）均无 nonce，必须保留；
+ *   数据注入已在后端做 </script> 逃逸，markdown 渲染经 DOMPurify 消毒兜底，XSS 风险由注入侧收敛
  * - img-src 'self' data: blob:：允许同源图片 + data/blob URL
  * - connect-src 'self' picker:：允许同源 + picker:// 协议的 fetch（如 /data 请求）
  * - font-src 'self' data:：允许同源字体 + data URL
@@ -107,8 +108,8 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     title: '文档',
     width: 720,
     height: 560,
-    // markdown 模板需要从 res:// 协议加载 marked.min.js
-    // 注意：Windows 上 res:// 转为 https://res.localhost/，CSP 需同时允许 res: 和 https://res.localhost
+    // marked/dompurify 由 scheme.rs 内联注入，需保留 'unsafe-inline'；
+    // 保留 res: 兼容模板内其他 res:// 资源引用（Windows 上转为 https://res.localhost/）
     csp: [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline'",
@@ -142,8 +143,8 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     title: '二维码',
     width: 360,
     height: 420,
-    // qrcode 模板通过 res:// 协议加载后端嵌入的 qrcode.min.js，script-src 需要允许 res:
-    // 注意：Windows 上 res:// 转为 https://res.localhost/，CSP 需同时允许 res: 和 https://res.localhost
+    // qrcode.min.js 由 scheme.rs 内联注入，需保留 'unsafe-inline'；
+    // 保留 res: 兼容模板内其他 res:// 资源引用（Windows 上转为 https://res.localhost/）
     csp: [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline'",

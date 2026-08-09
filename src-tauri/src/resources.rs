@@ -139,6 +139,10 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         // 来源：https://github.com/davidshimjs/qrcodejs
         // 用于 picker 子窗口的 qrcode.html 模板生成二维码（DOM 渲染，离线可用）
         "view/qrcode.min.js" => Some(include_bytes!("../resources/view/qrcode.min.js")),
+        // dompurify.min.js（HTML 消毒库，picker markdown 模板渲染前消毒 marked 输出防 XSS）
+        // 来源：https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js
+        // 由 scheme.rs 内联注入，用于 picker 子窗口的 markdown.html 模板
+        "view/dompurify.min.js" => Some(include_bytes!("../resources/view/dompurify.min.js")),
         // updater.exe（Windows 便携版更新器，独立子进程）
         // 来源：src-tauri/updater/ 独立 Cargo 项目构建产物
         // 运行时由 `extract_updater` 释放到 %APPDATA%/.Molaunch/updater/updater.exe

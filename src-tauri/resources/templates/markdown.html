@@ -118,12 +118,13 @@
         if (marked.setOptions) {
           marked.setOptions({ gfm: true, breaks: true });
         }
-        contentEl.innerHTML = marked.parse(markdownText);
+        contentEl.innerHTML = DOMPurify.sanitize(marked.parse(markdownText));
       } else {
         contentEl.textContent = markdownText;
       }
     } catch (e) {
-      contentEl.innerHTML = '<p style="color:#f38ba8;">渲染失败: ' + e.message + '</p><pre>' + escapeHtml(DATA.content || '') + '</pre>';
+      var errHtml = '<p style="color:#f38ba8;">渲染失败: ' + escapeHtml(e.message) + '</p><pre>' + escapeHtml(DATA.content || '') + '</pre>';
+      contentEl.innerHTML = (typeof DOMPurify !== 'undefined') ? DOMPurify.sanitize(errHtml) : errHtml;
     }
 
     function escapeHtml(s) {

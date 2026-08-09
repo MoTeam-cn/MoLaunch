@@ -91,21 +91,21 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
             );
         }
 
-        // 注入依赖库（markdown 模板需要 marked.min.js，qrcode 模板需要 qrcode.min.js）
+        // 注入依赖库（markdown 模板需要 marked/dompurify，qrcode 模板需要 qrcode）
         // tutorial-* 模板使用 base-help.html 硬编码 HTML，无需注入依赖库
         // 直接内联嵌入避免 res:// 跨源加载（picker 子窗口 origin 为 https://picker.localhost/，
         // res:// 资源在 Windows 上转为 https://res.localhost/，跨源 script 加载受 CSP 限制）
         let lib_script = match template_name.as_str() {
-            "markdown" => crate::resources::read_resource_bytes("view/marked.min.js")
-                .ok()
-                .and_then(|bytes| String::from_utf8(bytes).ok())
-                .map(|js| format!("<script>{}</script>", js)),
-            "qrcode" => crate::resources::read_resource_bytes("view/qrcode.min.js")
-                .ok()
-                .and_then(|bytes| String::from_utf8(bytes).ok())
-                .map(|js| format!("<script>{}</script>", js)),
+            "markdown" => inject_libs(&["view/marked.min.js", "view/dompurify.min.js"]),
+            "qrcode" => inject_libs(&["view/qrcode.min.js"]),
             _ => None,
         };
+
+        // 防 </script> 逃逸：闭合标签转为 JSON 合法转义（JS 解析后还原，HTML 解析器不再视为闭合）
+        let data_json_safe = serde_json::to_string(&data_json)
+            .unwrap_or_else(|_| "{}".to_string())
+            .replace("</script", "<\\/script")
+            .replace("<!--", "<\\!--");
 
         let mut injection = String::new();
         if let Some(lib) = &lib_script {
@@ -113,7 +113,7 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         }
         injection.push_str(&format!(
             "<script>window.__PICKER_DATA__ = {};</script>",
-            data_json
+            data_json_safe
         ));
         let html = template.replace("</body>", &format!("{}</body>", injection));
 
@@ -124,6 +124,20 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
             csp.as_deref(),
         )
     })
+}
+
+/// 读取多个 JS 库并内联为 <script> 串
+fn inject_libs(paths: &[&str]) -> Option<String> {
+    let mut html = String::new();
+    for path in paths {
+        if let Some(js) = crate::resources::read_resource_bytes(path)
+            .ok()
+            .and_then(|bytes| String::from_utf8(bytes).ok())
+        {
+            html.push_str(&format!("<script>{}</script>", js));
+        }
+    }
+    (!html.is_empty()).then_some(html)
 }
 
 /// 构造响应（注入 CSP 响应头）
