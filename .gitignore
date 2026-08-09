@@ -63,9 +63,7 @@ node_modules
 /docs
 /debug-docs
 
-# 内部开发文档（不纳入版本控制，云端不同步）
-/DEVELOPMENT_GUIDELINES.md
-/DEVELOPMENT_BLUEPRINT.md
+# AI 协作行为约束（内部文档，不纳入版本控制，云端不同步）
 /AI_AGENT_GUIDELINES.md
 
 # Cahce
