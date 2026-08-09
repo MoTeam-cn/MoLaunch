@@ -4,17 +4,19 @@
 
 ## [Unreleased]
 
+## [0.3.5-rc3] - 2026-08-10
+
 - 修复 Release 内容生成（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：条目格式改为短哈希反引号前置 + 提取 `feat(scope):` 括号内 scope 加粗渲染（`**scope**: 描述`），commit by 署名改为 `[@login](url)` 纯文字链接；协作者头像改经 [images.weserv.nl](https://images.weserv.nl/) `mask=circle` 烘焙圆形 PNG 渲染——GitHub 正文 HTML sanitizer 会剥离 `<img>` 的 style/class（`border-radius` 圆角失效导致方块头像），圆角烘焙进图片本体可绕过清洗；移除 `href="#"` 空链接与 `@gravatar` 裸文字回退，仅当邮箱与登录名均缺失时才回退名字文字。
 
 - SDK 移除 updater FFI（[instance.rs](src-tauri/src/sdk/instance.rs) + [ffi_types.rs](src-tauri/src/sdk/ffi_types.rs) + [types.rs](src-tauri/src/sdk/types.rs) + [sdk.rs](src-tauri/src/commands/sdk.rs) + [manager.rs](src-tauri/src/commands/sdk/manager.rs) + [sdk-manager.ts](src/utils/api/sdk-manager.ts)）：新 SDK 已删除 `mc_update_check_lite` / `mc_update_free_info_lite` 导出，旧绑定将其视为必需符号导致整个 SDK lite 加载失败（`Failed to get mc_update_check_lite: GetProcAddress failed`）；移除 `FFIUpdateInfoLite`/`UpdateInfoLite` 结构、`update_check_lite()` 方法、`check_update_lite` 命令与前端 `CHECK_UPDATE_LITE` action 后 SDK 恢复加载；更新检测改由主包 tauri-plugin-updater 自研链路承担，不再依赖 SDK。
-
-## [0.3.5-rc2] - 2026-08-10
 
 - 消除 release 工作流 Node 20 弃用警告（[release.yml](.github/workflows/release.yml)）：`upload-artifact` v5→v6、`download-artifact` v5→v8、`action-gh-release` v2→v3，全部运行在 node24 运行时；`tauri-action` v0 与 `rust-cache` v2 本身已是 node24，无需变更。
 
 - cargo audit 剩余告警处理（[.cargo/audit.toml](.cargo/audit.toml)）：`rustls-pemfile`（RUSTSEC-2025-0134）已随依赖升级消除；其余 18 项告警逐一验证为上游锁定传递依赖（gtk-rs GTK3 系列 10 项 + glib 0.18.5 unsound 依赖 libappindicator 0.9.0→gtk 0.18；paste 1.0.15 经 tun-rs→netlink-packet-utils；proc-macro-error 1.0.4 经 glib-macros；unic-* 5 项经 tauri-utils→urlpattern 0.3.0），均无升级路径，已在 audit.toml 中按 advisory ID ignore 并逐条注明理由与移除条件。
 
 - 升级 Rust HTTP/TLS 依赖修复 cargo audit 漏洞（[Cargo.toml](src-tauri/Cargo.toml) + [manage.rs](src-tauri/src/certs/manage.rs) + 新增 [.cargo/audit.toml](.cargo/audit.toml)）：`reqwest` 0.11→0.12、`rustls-native-certs` 0.6→0.8，统一到 rustls 0.23，`rustls-webpki` 0.101.7（3 个 RUSTSEC-2026-0098/0099/0104）与 `rustls-pemfile` 1.0.4 移出依赖树；`load_system_root_certificates` 适配 `CertificateResult`（`CertificateDer`→`reqwest::Certificate`）；`rsa` 0.9.10 上游无补丁（RUSTSEC-2023-0071，Marvin Attack 仅影响私钥操作，项目只用公钥 OAEP 加密不可达）在 audit.toml 中 ignore 并注明理由；GTK3/glib 等 19 项警告均为 Tauri Linux 传递依赖，不阻塞 CI。
+
+## [0.3.5-rc2] - 2026-08-10
 
 - CI 升级 GitHub Actions 运行时到 Node 24（[ci.yml](.github/workflows/ci.yml) + [release.yml](.github/workflows/release.yml) + [version-sync.yml](.github/workflows/version-sync.yml) + [license-sync.yml](.github/workflows/license-sync.yml)）：`checkout` v4→v5、`setup-node` v4→v5、`upload-artifact`/`download-artifact` v4→v5、`action-gh-release` v1→v2、`git-auto-commit-action` v6→v7，消除 "Node.js 20 is deprecated ... forced to run on Node.js 24" 警告；`rust-cache` v2.9.2 与 `tauri-action` v0 本身已是 node24，无需变更。
 
