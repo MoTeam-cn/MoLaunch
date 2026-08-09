@@ -50,3 +50,29 @@ pub fn restrict_file_permissions(path: &std::path::Path) {
         let _ = path;
     }
 }
+
+/// 尽力限制目录权限为当前用户（防止其他进程写入信任锚等敏感目录）
+///
+/// - Windows: icacls 对目录同样生效，复用 `restrict_file_permissions`
+/// - Unix: `chmod 700`（目录需执行位才能列出，不能用文件的 600）
+pub fn restrict_dir_permissions(path: &std::path::Path) {
+    log_info!("[Shell] restrict_dir_permissions: {}", path.display());
+
+    #[cfg(target_os = "windows")]
+    {
+        restrict_file_permissions(path);
+    }
+
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)) {
+            log_error!("[Shell] chmod 700 failed: {}", e);
+        }
+    }
+
+    #[cfg(not(any(target_os = "windows", unix)))]
+    {
+        let _ = path;
+    }
+}

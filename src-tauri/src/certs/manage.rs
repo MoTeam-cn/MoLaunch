@@ -45,11 +45,14 @@ pub(super) fn validate_filename(filename: &str) -> Result<(), String> {
 /// 跨启动器实例共享：一台设备只信任一次自定义根证书，所有 MoLaunch 实例复用同一份。
 /// 旧路径 `<exe_dir>/.Molaunch/certs/` 由 `Storage::init` 启动时自动迁移。
 pub fn cert_dir() -> PathBuf {
-    appdata::ensure_appdata_subdir("certs").unwrap_or_else(|e| {
+    let dir = appdata::ensure_appdata_subdir("certs").unwrap_or_else(|e| {
         crate::log_error!("Failed to create certs directory in AppData: {}", e);
         // 降级回便携式目录（极少发生：APPDATA 环境变量缺失）
         crate::storage::Storage::instance().base_dir().join("certs")
-    })
+    });
+    // 收紧信任锚目录权限，防止同机其他进程写入
+    crate::minecraft::system::shell::restrict_dir_permissions(&dir);
+    dir
 }
 
 /// 列出 certs 目录下所有 `.pem` 文件
@@ -91,6 +94,49 @@ pub fn list_custom_certs() -> Vec<CustomCertInfo> {
     result
 }
 
+/// 校验 PEM 为有效期内 CA 根证书（BasicConstraints CA:TRUE），失败含 Subject CN
+fn validate_ca_cert(pem_bytes: &[u8]) -> Result<(), String> {
+    let (_, pem) =
+        x509_parser::pem::parse_x509_pem(pem_bytes).map_err(|e| format!("PEM 格式无效: {}", e))?;
+    let cert = pem.parse_x509().map_err(|e| format!("X.509 解析失败: {}", e))?;
+
+    let cn = cert
+        .subject()
+        .iter_common_name()
+        .next()
+        .and_then(|c| c.as_str().ok())
+        .unwrap_or("<unknown>");
+
+    let is_ca = cert
+        .basic_constraints()
+        .map_err(|e| format!("解析 BasicConstraints 扩展失败: {}", e))?
+        .map(|bc| bc.value.ca)
+        .unwrap_or(false);
+    if !is_ca {
+        return Err(format!(
+            "证书不是 CA 根证书（BasicConstraints CA 必须为 TRUE），Subject CN: {}",
+            cn
+        ));
+    }
+
+    let now = x509_parser::time::ASN1Time::now();
+    let validity = cert.validity();
+    if validity.not_before > now {
+        return Err(format!(
+            "证书尚未生效（Subject CN: {}，not_before: {}）",
+            cn, validity.not_before
+        ));
+    }
+    if validity.not_after < now {
+        return Err(format!(
+            "证书已过期（Subject CN: {}，not_after: {}）",
+            cn, validity.not_after
+        ));
+    }
+
+    Ok(())
+}
+
 /// 添加自定义证书：从源路径读取 PEM 文件，复制到 certs 目录
 ///
 /// - 源文件名作为目标文件名（保留 `.pem` 后缀）
@@ -118,8 +164,9 @@ pub fn add_custom_cert(src_path: &str) -> Result<(), String> {
         return Err(format!("证书文件已存在: {}", filename));
     }
 
-    // 读取并校验 PEM 格式（reqwest::Certificate::from_pem 验证）
+    // 读取并校验 PEM 格式与 CA 属性（有效期、BasicConstraints）
     let pem_bytes = std::fs::read(src).map_err(|e| format!("读取源文件失败: {}", e))?;
+    validate_ca_cert(&pem_bytes)?;
     reqwest::Certificate::from_pem(&pem_bytes).map_err(|e| format!("PEM 格式无效: {}", e))?;
 
     std::fs::write(&dest, &pem_bytes).map_err(|e| format!("写入证书文件失败: {}", e))?;

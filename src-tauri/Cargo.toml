@@ -47,6 +47,8 @@ reqwest = { version = "0.11", default-features = false, features = ["json", "str
 # 注：v0.6.x 对应 rustls 0.21（与 reqwest 0.11 rustls-tls feature 匹配）；
 #     v0.7.x 对应 rustls 0.22+，不兼容 reqwest 0.11
 rustls-native-certs = "0.6"
+# 证书内容校验（CA 属性/有效期），自定义根证书准入判断
+x509-parser = "0.17"
 sysinfo = "0.29"
 # 枚举本机网络连接（列出监听端口，供 Frp 内网端口选择）
 # 0.11+ 修复了 Linux 新版 libc（tcp_info 字段 tcpi_state）编译兼容问题

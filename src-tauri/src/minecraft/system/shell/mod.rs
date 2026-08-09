@@ -12,7 +12,7 @@ mod window;
 pub use admin::{is_admin, relaunch_as_admin};
 pub use exec::{kill_process_tree, run_executable_output};
 pub use open::{open_path, open_url, reveal_in_file_manager};
-pub use perms::restrict_file_permissions;
+pub use perms::{restrict_dir_permissions, restrict_file_permissions};
 
 #[cfg(target_os = "macos")]
 pub use window::run_osascript;
