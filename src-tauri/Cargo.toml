@@ -105,7 +105,7 @@ tun-rs = { version = "2", features = ["async_tokio"] }
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
 # Win32 API（用于游戏窗口标题修改）
-windows = { version = "0.58", features = [
+windows = { version = "0.62", features = [
     "Win32_Foundation",
     "Win32_UI_WindowsAndMessaging",
     "Win32_System_Threading",
