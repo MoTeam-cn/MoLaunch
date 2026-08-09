@@ -9,14 +9,14 @@
 
 #[cfg(windows)]
 use crate::error_util::log_err;
-#[cfg(windows)]
-use winreg::enums::*;
-#[cfg(windows)]
-use winreg::RegKey;
 #[cfg(not(windows))]
 use std::collections::HashMap;
 #[cfg(not(windows))]
 use std::path::PathBuf;
+#[cfg(windows)]
+use winreg::enums::*;
+#[cfg(windows)]
+use winreg::RegKey;
 
 /// 注册表子键路径（所有 MoLaunch 数据均存于此键下）
 #[cfg(windows)]
@@ -87,8 +87,8 @@ fn write_all(map: &HashMap<String, String>) -> Result<(), String> {
     if let Some(dir) = path.parent() {
         std::fs::create_dir_all(dir).map_err(|e| format!("创建系统存储目录失败: {}", e))?;
     }
-    let json = serde_json::to_string_pretty(map)
-        .map_err(|e| format!("序列化系统存储失败: {}", e))?;
+    let json =
+        serde_json::to_string_pretty(map).map_err(|e| format!("序列化系统存储失败: {}", e))?;
     std::fs::write(&path, json).map_err(|e| format!("写入系统存储失败: {}", e))?;
     Ok(())
 }

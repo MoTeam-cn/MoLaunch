@@ -24,6 +24,7 @@ pub struct ConfigEntry {
 /// CurseForge / 开发者模式 / IgnoreTls 字段由调用方提前读取（分别在 secure_storage 缓存与
 /// 注册表中），其余字段从 `AppConfig` 镜像。集中在此处避免散落在命令实现里，
 /// 也使 `get_config` 命令体保持简短。
+#[allow(clippy::too_many_arguments)]
 pub fn build_snapshot(
     config: &crate::state::AppConfig,
     cf_enabled: bool,

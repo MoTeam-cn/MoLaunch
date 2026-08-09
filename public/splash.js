@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setTimeout(async () => {
     finish()
     try {
-      const { invoke } = window.__TAURI?.core
+      const invoke = window.__TAURI?.core?.invoke
       if (invoke) await invoke('frontend_ready')
     } catch (_) { /* 浏览器预览 */ }
   }, 4600)

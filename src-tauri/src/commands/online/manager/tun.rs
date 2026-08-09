@@ -237,7 +237,9 @@ fn register_restart_as_admin(d: &mut Dispatcher) {
 
             // 传 --restart-as-admin 标记：新实例据此跳过单实例插件，
             // 否则会被识别为"第二实例"直接退出，导致 UAC 确认后程序不重启
-            crate::minecraft::system::shell::relaunch_as_admin(&["--restart-as-admin".to_string()])?;
+            crate::minecraft::system::shell::relaunch_as_admin(
+                &["--restart-as-admin".to_string()],
+            )?;
 
             // 延迟退出当前进程，给前端留时间收到 IPC 响应
             let app_clone = app.clone();

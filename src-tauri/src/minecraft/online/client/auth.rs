@@ -55,8 +55,7 @@ impl OnlineClient {
                 if let Some(challenge) = parse_challenge(&body) {
                     if challenge.path == path_label {
                         if let Some(salt) = challenge.salt_bytes() {
-                            if let Some(nonce) =
-                                solve_challenge(&salt, challenge.difficulty).await
+                            if let Some(nonce) = solve_challenge(&salt, challenge.difficulty).await
                             {
                                 crate::log_info!(
                                     "[Online] {} PoW 求解成功（difficulty={}, nonce={}）",
@@ -73,10 +72,7 @@ impl OnlineClient {
                         }
                     }
                 }
-                crate::log_warn!(
-                    "[Online] {} PoW 求解失败/放弃，按原始 401 处理",
-                    path_label
-                );
+                crate::log_warn!("[Online] {} PoW 求解失败/放弃，按原始 401 处理", path_label);
             }
             return Ok((status, body));
         }
@@ -91,8 +87,7 @@ impl OnlineClient {
             req.deviceid,
             req.content.len()
         );
-        let (status, body) =
-            Self::send_post_with_pow(api_paths::AUTH_REGISTER, &url, req).await?;
+        let (status, body) = Self::send_post_with_pow(api_paths::AUTH_REGISTER, &url, req).await?;
         if status != 200 && status != 400 {
             crate::log_error!("[Online] 注册 HTTP 异常: status={}, body={}", status, body);
             return Err(ClientError::HttpStatus { status, body });
@@ -121,8 +116,7 @@ impl OnlineClient {
             req.device_pk,
             req.content.len()
         );
-        let (status, body) =
-            Self::send_post_with_pow(api_paths::AUTH_LOGIN, &url, req).await?;
+        let (status, body) = Self::send_post_with_pow(api_paths::AUTH_LOGIN, &url, req).await?;
         if status != 200 && status != 400 {
             crate::log_error!("[Online] 登录 HTTP 异常: status={}, body={}", status, body);
             return Err(ClientError::HttpStatus { status, body });
@@ -187,8 +181,7 @@ impl OnlineClient {
             req.device_pk,
             req.content.len()
         );
-        let (status, body) =
-            Self::send_post_with_pow(api_paths::AUTH_REFRESH, &url, req).await?;
+        let (status, body) = Self::send_post_with_pow(api_paths::AUTH_REFRESH, &url, req).await?;
         if status != 200 && status != 400 && status != 401 {
             crate::log_error!(
                 "[Online] refresh HTTP 异常: status={}, body={}",

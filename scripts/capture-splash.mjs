@@ -1,3 +1,4 @@
+/* eslint-env node */
 import { createRequire } from 'node:module'
 import { mkdir, rm } from 'node:fs/promises'
 import { join, dirname } from 'node:path'

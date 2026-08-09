@@ -41,7 +41,9 @@ fn sync_license() {
     let src = Path::new(manifest_dir).join("../LICENSE");
     // 规范化路径（去掉 ../ 段），保证 fs::read 与 rerun-if-changed 使用同一绝对路径
     let src = src.canonicalize().unwrap_or(src);
-    let dst = Path::new(manifest_dir).join("resources").join("LICENSE.txt");
+    let dst = Path::new(manifest_dir)
+        .join("resources")
+        .join("LICENSE.txt");
     if let Ok(content) = std::fs::read(&src) {
         let changed = std::fs::read(&dst).map(|c| c != content).unwrap_or(true);
         if changed {

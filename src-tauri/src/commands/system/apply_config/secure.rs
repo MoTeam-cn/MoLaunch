@@ -111,9 +111,12 @@ pub fn read_hint() -> (u32, bool, bool) {
 pub fn apply_hint(patch: &ConfigPatch) -> Result<(), String> {
     if let Some(count) = patch.launch_count {
         log_info!("[Config] launch_count = {}", count);
-        let key = crate::storage::registry::reg_key()?;
-        crate::storage::registry::reg_set(&key, KEY_LAUNCH_COUNT, &count.to_string())
-            .map_err(|e| format!("写入系统存储失败: {}", e))?;
+        crate::storage::registry::reg_set(
+            &crate::storage::registry::reg_key()?,
+            KEY_LAUNCH_COUNT,
+            &count.to_string(),
+        )
+        .map_err(|e| format!("写入系统存储失败: {}", e))?;
     }
     if let Some(hint) = patch.hint_buy {
         log_info!("[Config] hint_buy = {}", hint);
@@ -151,9 +154,12 @@ pub fn apply_user_agreed(patch: &ConfigPatch) -> Result<(), String> {
     }
     if let Some(version) = patch.user_agreed_version {
         log_info!("[Config] user_agreed_version = {}", version);
-        let key = crate::storage::registry::reg_key()?;
-        crate::storage::registry::reg_set(&key, KEY_USER_AGREED_VERSION, &version.to_string())
-            .map_err(|e| format!("写入系统存储失败: {}", e))?;
+        crate::storage::registry::reg_set(
+            &crate::storage::registry::reg_key()?,
+            KEY_USER_AGREED_VERSION,
+            &version.to_string(),
+        )
+        .map_err(|e| format!("写入系统存储失败: {}", e))?;
     }
     Ok(())
 }

@@ -6,8 +6,8 @@
 //! 实现 3 秒超时，整体在 `spawn_blocking` 中执行，不阻塞 runtime。
 
 use sha2::{Digest, Sha256};
-use std::sync::mpsc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
 /// PoW 请求头字段名默认值（与服务端 `pow_guard` 一致）
@@ -93,8 +93,9 @@ pub async fn solve_challenge(salt: &[u8], difficulty: u32) -> Option<u64> {
 
 /// 同步求解（在后台线程池中执行）
 fn solve_sync(salt: &[u8], difficulty: u32) -> Option<u64> {
-    let thread_count =
-        std::thread::available_parallelism().map(|n| n.get()).unwrap_or(4) as u64;
+    let thread_count = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(4) as u64;
     let thread_count = thread_count.clamp(1, MAX_SOLVE_THREADS);
 
     let stop = AtomicBool::new(false);
@@ -107,21 +108,19 @@ fn solve_sync(salt: &[u8], difficulty: u32) -> Option<u64> {
             let stop = &stop;
             let counter = &counter;
             let salt = salt.to_vec();
-            scope.spawn(move || {
-                loop {
-                    if stop.load(Ordering::Relaxed) {
-                        return;
-                    }
-                    let nonce = counter.fetch_add(1, Ordering::Relaxed);
-                    let mut hasher = Sha256::new();
-                    hasher.update(&salt);
-                    hasher.update(nonce.to_le_bytes());
-                    let digest = hasher.finalize();
-                    if leading_zero_bits(&digest) >= difficulty {
-                        stop.store(true, Ordering::Relaxed);
-                        let _ = tx.send(nonce);
-                        return;
-                    }
+            scope.spawn(move || loop {
+                if stop.load(Ordering::Relaxed) {
+                    return;
+                }
+                let nonce = counter.fetch_add(1, Ordering::Relaxed);
+                let mut hasher = Sha256::new();
+                hasher.update(&salt);
+                hasher.update(nonce.to_le_bytes());
+                let digest = hasher.finalize();
+                if leading_zero_bits(&digest) >= difficulty {
+                    stop.store(true, Ordering::Relaxed);
+                    let _ = tx.send(nonce);
+                    return;
                 }
             });
         }

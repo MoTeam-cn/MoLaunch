@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+- 修复 CI 三项检查失败（[.github/workflows/ci.yml](.github/workflows/ci.yml)）：
+  - Rust 格式（`cargo fmt --all`）：[build.rs](src-tauri/build.rs)、[tun.rs](src-tauri/src/commands/online/manager/tun.rs)、[auth.rs](src-tauri/src/minecraft/online/client/auth.rs)、[pow.rs](src-tauri/src/minecraft/online/pow.rs)、[registry.rs](src-tauri/src/storage/registry.rs) 按 rustfmt 重排（长链换行、use 排序、闭包折叠）。
+  - Clippy：`apply_config/secure.rs` 的 `apply_hint`（launch_count）与 `apply_user_agreed`（版本号）原 `let key = reg_key()?` 在非 Windows 下绑定 unit 值触发 `let_unit_value`，改为内联 `reg_set(&reg_key()?, ...)`；`apply_config/types/entry.rs` 的 `build_snapshot` 12 参数触发 `too_many_arguments`，按仓库既有惯例加 `#[allow(clippy::too_many_arguments)]`。
+  - ESLint：`public/splash.js` 在 `window.__TAURI?.core` 上直接解构触发 `no-unsafe-optional-chaining`（短路返回 undefined 时抛 TypeError），改为 `window.__TAURI?.core?.invoke` 安全取值；`scripts/capture-splash.mjs` 使用 `process` 触发 `no-undef`，首行声明 `/* eslint-env node */`。
+
 - Release 内容为每条提交追加 requarks 风格署名（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：`classify` 的 `git log` 输出新增 author email/name，作者数据改为 `fetchAuthors()` 统一从 git + compare API 构建并复用（`classify` 与协作者区块共用）；署名命中 GitHub 登录名时渲染 `*(commit by [@login](url))*`（GitHub 原生渲染头像），邮箱查不到 GitHub 账号时用 Gravatar 小头像（20px `<img>` + md5 邮箱 identicon）兜底，比 requarks 的纯文本 `@login` 覆盖更全。
 
 - Release 分类结构参考 requarks/changelog-action 细化（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs) + [.github/workflows/release.yml](.github/workflows/release.yml)）：
