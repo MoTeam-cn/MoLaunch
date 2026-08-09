@@ -98,7 +98,9 @@ pub fn list_custom_certs() -> Vec<CustomCertInfo> {
 fn validate_ca_cert(pem_bytes: &[u8]) -> Result<(), String> {
     let (_, pem) =
         x509_parser::pem::parse_x509_pem(pem_bytes).map_err(|e| format!("PEM 格式无效: {}", e))?;
-    let cert = pem.parse_x509().map_err(|e| format!("X.509 解析失败: {}", e))?;
+    let cert = pem
+        .parse_x509()
+        .map_err(|e| format!("X.509 解析失败: {}", e))?;
 
     let cn = cert
         .subject()

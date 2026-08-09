@@ -140,7 +140,7 @@ impl VirtualLanBridge {
                                     validate_inbound_frame(&packet, &info.ipv4, info.prefix_len)
                                 {
                                     dropped = dropped.wrapping_add(1);
-                                    if dropped == 1 || dropped % 100 == 0 {
+                                    if dropped == 1 || dropped.is_multiple_of(100) {
                                         log_warn!(
                                             "[Online] 丢弃越界 DataChannel 帧: {}, 累计 {}",
                                             reason,

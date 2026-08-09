@@ -212,7 +212,11 @@ pub fn extract_resource(resource_path: &str, target_path: &Path) -> anyhow::Resu
         match std::fs::read(target_path) {
             Ok(bytes) if crate::utils::hash::sha256_hex(&bytes) == expected_hash => cached = true,
             Ok(_) => {
-                log_warn!("资源 {} 的目标文件 hash 不匹配（期望 {}），重新释放", resource_path, expected_hash);
+                log_warn!(
+                    "资源 {} 的目标文件 hash 不匹配（期望 {}），重新释放",
+                    resource_path,
+                    expected_hash
+                );
             }
             Err(e) => {
                 log_warn!("资源 {} 读取失败: {}，重新释放", resource_path, e);

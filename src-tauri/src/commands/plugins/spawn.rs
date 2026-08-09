@@ -66,7 +66,10 @@ impl Drop for ProcessCountGuard {
 }
 
 /// 申请并发槽位：超限报错，成功则计数 +1 并返回守卫
-fn acquire_process_slot(plugin_id: &str, max_concurrent: usize) -> Result<ProcessCountGuard, String> {
+fn acquire_process_slot(
+    plugin_id: &str,
+    max_concurrent: usize,
+) -> Result<ProcessCountGuard, String> {
     let map = ACTIVE_PROCESSES.get_or_init(Default::default);
     let mut map = map
         .lock()

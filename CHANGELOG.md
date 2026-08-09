@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 代码风格清理（cargo fmt 与 clippy）：对安全修复引入的代码执行 rustfmt 格式化（certs/manage.rs、plugins/layout.rs、plugins/spawn.rs、resources.rs、utils/path.rs），修复 `needless_borrow`（extract.rs）与 `manual_is_multiple_of`（bridge.rs）两处 clippy 告警；`cargo clippy --all-features -D warnings` 与 `cargo fmt --check` 现已零告警通过（对齐 CI 门禁）。
+
 - 自定义根证书校验加固（[manage.rs](src-tauri/src/certs/manage.rs) + [perms.rs](src-tauri/src/minecraft/system/shell/perms.rs) + [Cargo.toml](src-tauri/Cargo.toml)）：`add_custom_cert` 写盘前用 `x509-parser` 校验 BasicConstraints `CA:TRUE` 与有效期（区分未生效/已过期，错误携带主题 CN），叶子证书/任意 PEM 不再能被加入信任链；`cert_dir` 每次返回前收紧目录权限（Windows icacls 当前用户 / Unix 0700，新增公共 `restrict_dir_permissions`，可自愈旧版本宽权限目录）。
 
 - TUN 入站帧校验（[bridge.rs](src-tauri/src/minecraft/online/bridge.rs)）：DataChannel → TUN 写入前校验 IPv4 帧源/目标地址均属于虚拟子网（复用 `VirtualNetInfo` 的 IP 与前缀，零新增状态），越界帧丢弃并计数式告警；非 IPv4/无法解析帧默认放行，不破坏现有联机流程；目标组播帧如后续需要可在校验中加白名单。

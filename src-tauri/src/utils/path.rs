@@ -59,7 +59,9 @@ mod tests {
 
     #[test]
     fn ensure_safe_relative_path_rejects_unsafe() {
-        for p in ["../x", "..", "/abs", "\\abs", "C:\\abs", "c:/abs", "a/../b", "", "a\0b"] {
+        for p in [
+            "../x", "..", "/abs", "\\abs", "C:\\abs", "c:/abs", "a/../b", "", "a\0b",
+        ] {
             assert!(ensure_safe_relative_path(p).is_err(), "应拒绝: {:?}", p);
         }
     }
@@ -67,7 +69,12 @@ mod tests {
     #[test]
     fn ensure_safe_relative_path_accepts_normal() {
         for p in ["mods/x.jar", "a/b", "mods\\x.jar"] {
-            assert_eq!(ensure_safe_relative_path(p).as_deref(), Ok(p), "应通过: {:?}", p);
+            assert_eq!(
+                ensure_safe_relative_path(p).as_deref(),
+                Ok(p),
+                "应通过: {:?}",
+                p
+            );
         }
     }
 }

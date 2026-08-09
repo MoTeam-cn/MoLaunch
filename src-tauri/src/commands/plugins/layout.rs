@@ -25,7 +25,9 @@ pub async fn load_custom_layout(
 
     // 1.1 内网地址拦截（SSRF 防护）
     let parsed = Url::parse(&url).map_err(|e| format!("无效 URL: {}", e))?;
-    let host = parsed.host_str().ok_or_else(|| format!("无效 URL: {}", url))?;
+    let host = parsed
+        .host_str()
+        .ok_or_else(|| format!("无效 URL: {}", url))?;
     if crate::utils::net::is_private_address(host) {
         return Err("拒绝内网地址".to_string());
     }
