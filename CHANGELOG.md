@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- cargo audit 剩余告警处理（[.cargo/audit.toml](.cargo/audit.toml)）：`rustls-pemfile`（RUSTSEC-2025-0134）已随依赖升级消除；其余 18 项告警逐一验证为上游锁定传递依赖（gtk-rs GTK3 系列 10 项 + glib 0.18.5 unsound 依赖 libappindicator 0.9.0→gtk 0.18；paste 1.0.15 经 tun-rs→netlink-packet-utils；proc-macro-error 1.0.4 经 glib-macros；unic-* 5 项经 tauri-utils→urlpattern 0.3.0），均无升级路径，已在 audit.toml 中按 advisory ID ignore 并逐条注明理由与移除条件。
+
 - 升级 Rust HTTP/TLS 依赖修复 cargo audit 漏洞（[Cargo.toml](src-tauri/Cargo.toml) + [manage.rs](src-tauri/src/certs/manage.rs) + 新增 [.cargo/audit.toml](.cargo/audit.toml)）：`reqwest` 0.11→0.12、`rustls-native-certs` 0.6→0.8，统一到 rustls 0.23，`rustls-webpki` 0.101.7（3 个 RUSTSEC-2026-0098/0099/0104）与 `rustls-pemfile` 1.0.4 移出依赖树；`load_system_root_certificates` 适配 `CertificateResult`（`CertificateDer`→`reqwest::Certificate`）；`rsa` 0.9.10 上游无补丁（RUSTSEC-2023-0071，Marvin Attack 仅影响私钥操作，项目只用公钥 OAEP 加密不可达）在 audit.toml 中 ignore 并注明理由；GTK3/glib 等 19 项警告均为 Tauri Linux 传递依赖，不阻塞 CI。
 
 - CI 升级 GitHub Actions 运行时到 Node 24（[ci.yml](.github/workflows/ci.yml) + [release.yml](.github/workflows/release.yml) + [version-sync.yml](.github/workflows/version-sync.yml) + [license-sync.yml](.github/workflows/license-sync.yml)）：`checkout` v4→v5、`setup-node` v4→v5、`upload-artifact`/`download-artifact` v4→v5、`action-gh-release` v1→v2、`git-auto-commit-action` v6→v7，消除 "Node.js 20 is deprecated ... forced to run on Node.js 24" 警告；`rust-cache` v2.9.2 与 `tauri-action` v0 本身已是 node24，无需变更。

@@ -1,6 +1,42 @@
-# cargo audit 忽略项
-# RUSTSEC-2023-0071 (Marvin Attack)：rsa crate 私钥操作的定时侧信道，
-# 项目仅用 RsaPublicKey 做 RSA-OAEP 公钥加密（minecraft/online/crypto.rs），
-# 从不加载私钥，攻击面不可达；上游暂无补丁（Patched: n/a）。
+# cargo audit 忽略项（均为已验证无法通过依赖升级消除的告警）
+# 若上游发布修复版本并解除锁定，请移除对应 ignore 并重新验证：
+# - gtk-rs 系列（RUSTSEC-2024-0411~0420、0429）：Tauri 升级 GTK4/glib>=0.20 后移除
+# - paste（2024-0436）：netlink-packet-utils 换用替代 crate 后移除
+# - proc-macro-error（2024-0370）：glib-macros 升级消除依赖后移除
+# - unic-*（2025-0075/0080/0081/0098/0100）：urlpattern 升级后移除
+# - rsa（2023-0071）：上游发布修复版本后移除
+
+# RUSTSEC-2023-0071 rsa 0.9.10（Marvin Attack）：项目仅用 RsaPublicKey 做公钥
+# OAEP 加密（minecraft/online/crypto.rs），从不加载私钥，攻击面不可达；Patched n/a。
+# RUSTSEC-2024-0411~0420 gtk-rs GTK3 10 个（atk/atk-sys/gdk/gdk-sys/gdkwayland-sys/
+# gdkx11/gdkx11-sys/gtk/gtk-sys/gtk3-macros，均 0.18.2）：Tauri 2 Linux 托盘依赖
+# libappindicator 0.9.0 -> gtk 0.18 锁定，无更新版本。
+# RUSTSEC-2024-0429 glib 0.18.5 unsound（VariantStrIter）：修复需 glib>=0.20，
+# gtk 0.18 锁定 glib 0.18，属上游 gtk-rs 链，无法单独升级。
+# RUSTSEC-2024-0436 paste 1.0.15：tun-rs -> netlink-packet-utils 0.5.2 引入，
+# 已是最新（0.6.x 标记 deprecated 不可升）。
+# RUSTSEC-2024-0370 proc-macro-error 1.0.4：glib-macros 引入，无维护、无更新版本。
+# RUSTSEC-2025-0075/0080/0081/0098/0100 unic-* 0.9.0（char-property/char-range/common/
+# ucd-ident/ucd-version）：tauri-utils 2.9.3 锁定 urlpattern 0.3.0 引入，均无更新版本。
 [advisories]
-ignore = ["RUSTSEC-2023-0071"]
+ignore = [
+    "RUSTSEC-2023-0071",
+    "RUSTSEC-2024-0411",
+    "RUSTSEC-2024-0412",
+    "RUSTSEC-2024-0413",
+    "RUSTSEC-2024-0414",
+    "RUSTSEC-2024-0415",
+    "RUSTSEC-2024-0416",
+    "RUSTSEC-2024-0417",
+    "RUSTSEC-2024-0418",
+    "RUSTSEC-2024-0419",
+    "RUSTSEC-2024-0420",
+    "RUSTSEC-2024-0429",
+    "RUSTSEC-2024-0436",
+    "RUSTSEC-2024-0370",
+    "RUSTSEC-2025-0075",
+    "RUSTSEC-2025-0080",
+    "RUSTSEC-2025-0081",
+    "RUSTSEC-2025-0098",
+    "RUSTSEC-2025-0100",
+]
