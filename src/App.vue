@@ -32,6 +32,7 @@ import { notifyFrontendReady } from '@/utils/splash'
 import { initAutoCheck } from '@/utils/updater'
 import { maybeShowUpdateLog } from '@/utils/updateLog'
 import { consumeRelaunchRestore } from '@/utils/relaunchRestore'
+import { consumeRoomSnapshot, setReconnectPassword } from '@/utils/roomSnapshot'
 import { initDownloadStream } from '@/composables/useDownloadStream'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
@@ -99,6 +100,17 @@ async function initApp() {
 
   // 登录态已恢复，关闭加载遮罩
   isRestoring.value = false
+
+  // 恢复管理员提权重启前的房间会话（若存在快照）
+  // 房主：roomState 恢复后 RoomHostPanel 挂载会自动重建 TUN 与 Offer 轮询
+  // 加入方：roomState 恢复 + 转存重连密码，RoomGuestPanel 挂载后自动重连
+  const snapshot = consumeRoomSnapshot()
+  if (snapshot && snapshot.state.role) {
+    Object.assign(onlineStore.roomState, snapshot.state)
+    if (snapshot.state.role === 'guest') {
+      setReconnectPassword(snapshot.password)
+    }
+  }
 
   // 恢复管理员提权重启前的页面（若保存过且路径合法、已登录）
   // 放在"修正路由"之前，避免恢复路径被 /login 兜底逻辑覆盖

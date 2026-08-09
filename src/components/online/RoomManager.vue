@@ -32,6 +32,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { submitAnswer } from '@/utils/api/online-manager'
 import { resolveIceServers } from '@/utils/online/webrtc-helpers'
+import { rememberJoinPassword } from '@/utils/roomSnapshot'
 import { toastError } from '@/utils/toast'
 
 defineProps<{
@@ -75,6 +76,8 @@ async function handleJoinRoom() {
   }
   try {
     const joinResp = await store.guestJoinRoom(code, joinForm.value.password)
+    // 记住加入密码：提权重启后自动重连同一房间需要重新 join
+    rememberJoinPassword(joinForm.value.password)
     // mesh 拓扑：房主为本参与者单独生成 Offer，需要轮询拉取
     // 阶段三子任务 7：优先使用 joinResp.iceServers（含 TURN 凭据），旧房间回退到 stunServers
     const iceServers = resolveIceServers(joinResp.iceServers, joinResp.stunServers)

@@ -6,6 +6,7 @@
 
 - 修复管理员提权重启不生效（UAC 确认后程序不重启）：`commands/online/manager/tun.rs` 提权启动改为携带 `--restart-as-admin` 参数，`src-tauri/src/lib.rs` 启动时检测该参数则跳过 `single-instance` 插件注册——此前新进程会被单实例插件识别为"第二实例"强制退出（旧进程 500ms 后才退出），导致 UAC 弹出但最终没有任何实例存活。
 - 提权重启后恢复原页面：`useVirtualLan` 确认提权前将当前路由写入 `utils/relaunchRestore.ts`（localStorage），`App.vue` 会话恢复完成后校验路径合法性并 `router.replace` 跳回原页面（含 `?tab=` 页签），不再落回主页；未登录或路径非法时静默忽略。
+- 提权重启后自动恢复房间会话（联机）：确认提权前将 roomState 快照（房间码/虚拟 IP/ICE/DataChannel 密钥/加入密码）写入 `utils/roomSnapshot.ts`，`App.vue` 启动时恢复——房主侧 RoomHostPanel 挂载后自动重建 TUN 并轮询为新参与者重新生成 Offer；加入方侧 `composables/useRoomReconnect.ts` 自动重新加入同一房间（新 participant_id 触发房主重新生成 Offer）并重建 WebRTC，UAC 被拒绝时清除恢复标记避免误恢复。
 
 - 修复 Release 工作流提交区间与协作者头像生成（.github/workflows/release.yml + [scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：
   - 提交区间：`release` job 的 checkout 由默认分支改为检出发布 tag（`ref: v${{ inputs.version }}`），`build-and-upload` 的 release_notes 区间同样改用 `v$VERSION` tag 锚定（`git rev-parse "${VERSION_TAG}^{commit}"`）——此前 `git describe HEAD^` 会把本次发布 tag 自身当作上一个 tag，导致 `git log v0.3.5-rc1..HEAD` 只取到 tag 之后的零星提交（本应 35 条却只剩 3 条）。

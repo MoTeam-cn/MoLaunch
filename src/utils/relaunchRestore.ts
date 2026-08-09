@@ -17,3 +17,8 @@ export function consumeRelaunchRestore(): string | null {
   if (saved) localStorage.removeItem(RELAUNCH_RESTORE_KEY)
   return saved
 }
+
+/** 清除恢复路径（UAC 被用户拒绝时调用，避免下次正常启动误恢复） */
+export function clearRelaunchRestore(): void {
+  localStorage.removeItem(RELAUNCH_RESTORE_KEY)
+}

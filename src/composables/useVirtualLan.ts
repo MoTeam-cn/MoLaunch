@@ -21,7 +21,9 @@ import {
   type TunStartResponse,
 } from '@/types/online'
 import { showConfirmAsync, showInfo } from '@/utils/modal'
-import { saveRelaunchRestore } from '@/utils/relaunchRestore'
+import { saveRelaunchRestore, clearRelaunchRestore } from '@/utils/relaunchRestore'
+import { useOnlineStore } from '@/stores/online'
+import { saveRoomSnapshot, clearRoomSnapshot } from '@/utils/roomSnapshot'
 
 /** useVirtualLan 选项 */
 export interface UseVirtualLanOptions {
@@ -60,6 +62,7 @@ export function parsePrefixLen(subnet: string): number {
  * `onTunPacket` 回调由调用方注入，决定 TUN 读到的包如何分发到 DataChannel。
  */
 export function useVirtualLan(options: UseVirtualLanOptions) {
+  const store = useOnlineStore()
   /** 桥接是否运行中 */
   const running = ref(false)
   /** TUN 接口信息（start 成功后填充） */
@@ -112,12 +115,20 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
         const prompt = msg.split(':').slice(1).join(':')
         const confirmed = await showConfirmAsync('需要管理员权限', prompt)
         if (confirmed) {
-          // 提权重启前保存当前页面，新实例启动后跳回原处（不落回主页）
+          // 提权重启前保存当前页面与房间快照，新实例启动后恢复房间会话
+          if (store.roomState.role) {
+            saveRoomSnapshot({ ...store.roomState })
+          }
           saveRelaunchRestore(window.location.pathname + window.location.search)
           // 触发 UAC 提权重启，后端延迟 500ms 退出当前进程
           // dev 模式下后端不重启，返回 dev_mode 标记，此处展示提示
-          const result = await restartAsAdmin()
-          if (result.dev_mode) {
+          const result = await restartAsAdmin().catch(() => {
+            // UAC 被用户拒绝等：清除恢复标记，避免下次正常启动误恢复
+            clearRoomSnapshot()
+            clearRelaunchRestore()
+            return null
+          })
+          if (result && result.dev_mode) {
             showInfo('开发模式提示', result.message ?? '请用管理员权限终端运行 npm run tauri dev')
           }
         }

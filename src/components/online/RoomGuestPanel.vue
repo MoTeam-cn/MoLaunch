@@ -20,6 +20,7 @@ import { computed, inject, onMounted, watch } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
 import { useVirtualLan } from '@/composables/useVirtualLan'
+import { useGuestReconnect } from '@/composables/useRoomReconnect'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -40,6 +41,8 @@ import ModpackRequirementCard from './ModpackRequirementCard.vue'
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
+// 管理员提权重启恢复：存在待重连密码时挂载后自动重连（重建 WebRTC 与房间会话）
+useGuestReconnect(guestWebrtc)
 
 /**
  * TUN 桥接：TUN 读到包 → 通过 DataChannel 发给房主
