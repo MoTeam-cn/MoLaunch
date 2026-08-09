@@ -269,7 +269,7 @@ jobs:
       # 不要求 .sig：Windows 更新走便携版 + 自研 updater.exe，setup 签名无用途。
       - name: Upload setup as workflow artifact (Windows only)
         if: matrix.platform == 'windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-setup
           path: |
@@ -281,7 +281,7 @@ jobs:
       # .sig 一并附加：macOS 更新走 updater 协议，用户可校验签名。
       - name: Upload macos package as workflow artifact (macOS only)
         if: matrix.platform == 'macos'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-package
           path: |
@@ -293,7 +293,7 @@ jobs:
       # 由 release job 附加到 GitHub Release（除 S3 外，提供手动下载入口）。
       - name: Upload linux package as workflow artifact (Linux only)
         if: matrix.platform == 'linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-package
           path: |
@@ -305,7 +305,7 @@ jobs:
       # 由 release job 附加到 GitHub Release（除 S3 外，提供手动下载入口）。
       - name: Upload portable as workflow artifact (Windows only)
         if: matrix.platform == 'windows' && steps.locate.outputs.portable_file != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-portable
           path: |
