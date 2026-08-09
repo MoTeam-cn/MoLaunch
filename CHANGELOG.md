@@ -4,7 +4,9 @@
 
 ## [Unreleased]
 
-- README 新增繁体中文（README_ZH-HANT.md）、英文（README_EN.md）、日文（README_JA.md）三种语言版本，并在主 README 加入语言切换栏。
+- 修复 Release 协作者区块仍显示纯文字而非头像（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：协作者渲染由 `@login` 提及（release 正文不渲染 @ 头像）改为 `<img>` 标签 + `width/height` 属性（避用会被 HTML sanitizer 剥离的 style），头像来源优先级为 compare API 的 `avatar_url` → GitHub 账号头像 URL（`avatars.githubusercontent.com/u/...`）→ Gravatar identicon（按 author email 的 md5 兜底，未关联 GitHub 账号的提交者如 `MoLaunch Bot <bot@moteam.top>` 也能显示确定性头像）；仅当邮箱与登录名均缺失时才回退名字文字。
+
+- README 新增繁体中文（README_ZH-HANT.md）、英文（README_EN.md）、日文（README_JA.md）三种语言版本，并在 README 加入语言切换栏。
 
 - 新增 `CONTRIBUTING.md` 贡献指南，并补充 `.github` 配置：Issue 模板选择器（config.yml）与依赖自动更新（dependabot：npm / cargo / GitHub Actions，每周检查）。
 

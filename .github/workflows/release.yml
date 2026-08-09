@@ -382,7 +382,7 @@ jobs:
           echo "PREV_TAG=$PREV_TAG" >> $GITHUB_OUTPUT
           echo "Previous tag: $PREV_TAG"
 
-      # 生成分类 changelog（作者的话 / 新增 / 修复 / 其他 / 协作者 @ 提及），
+      # 生成分类 changelog（作者的话 / 新增 / 修复 / 其他 / 协作者头像），
       # 逻辑在 scripts/generate-release-content.cjs，避免在 workflow 内堆叠脚本。
       - name: Generate changelog from commits
         id: changelog

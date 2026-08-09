@@ -4,13 +4,14 @@
  * generate-release-content.cjs — 生成 GitHub Release 分类内容
  *
  * 用法：node generate-release-content.cjs <prev_tag> <repo_url> <repo> [head_sha]
- * 环境变量：GITHUB_TOKEN 调 compare API 拉取协作者 @ 提及；GITHUB_OUTPUT 存在则写入，否则打印 stdout
+ * 环境变量：GITHUB_TOKEN 调 compare API 拉取协作者头像；GITHUB_OUTPUT 存在则写入，否则打印 stdout
  * 输出块：NOTES（作者的话）/ FEATURES / FIXES / OTHERS / CONTRIBUTORS
  */
 'use strict';
 
 const { execSync } = require('child_process');
 const fs = require('fs');
+const crypto = require('crypto');
 
 const args = process.argv.slice(2);
 if (args.length < 3) {
@@ -73,7 +74,7 @@ async function contributors() {
     const [name, email] = line.split('\t');
     const key = (email || name).trim().toLowerCase();
     if (!authors.has(key)) {
-      authors.set(key, { name: name.trim(), login: '' });
+      authors.set(key, { name: name.trim(), email: (email || '').trim(), login: '', avatarUrl: '' });
     }
   }
   if (!authors.size) return '';
@@ -94,10 +95,23 @@ async function contributors() {
     const entry = email ? authors.get(email) : null;
     if (!entry || !c.author) continue;
     if (c.author.login) entry.login = c.author.login;
+    if (c.author.avatar_url) entry.avatarUrl = c.author.avatar_url;
   }
-  return [...authors.values()]
-    .map(({ name, login }) => (login ? `@${login}` : name))
-    .join('、');
+  const avatar = (p) => {
+    const { name, email, login, avatarUrl } = p;
+    const label = login ? `@${login}` : name;
+    let src = avatarUrl;
+    if (!src && login) src = `https://avatars.githubusercontent.com/${login}?s=64`;
+    if (!src && email) {
+      const hash = crypto.createHash('md5').update(email.toLowerCase()).digest('hex');
+      src = `https://www.gravatar.com/avatar/${hash}?s=64&d=identicon`;
+    }
+    if (!src) return name;
+    const href = login ? `https://github.com/${login}` : '#';
+    const srcAttr = /\bs=\d+/.test(src) ? src : `${src}${src.includes('?') ? '&' : '?'}s=64`;
+    return `<a href="${href}" title="${label}"><img src="${srcAttr}" width="48" height="48" alt="${label}" /></a>`;
+  };
+  return [...authors.values()].map(avatar).join(' ');
 }
 
 async function main() {
