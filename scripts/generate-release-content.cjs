@@ -75,13 +75,8 @@ function classify(authors) {
     const key = (email || '').trim().toLowerCase();
     if (!key) return '';
     const p = authors.get(key);
-    const src = avatarSrc(p || { name, email: key });
-    if (!src) return '';
-    const label = p && p.login ? `@${p.login}` : name;
-    const img = `<img src="${avatarImg(src, 20)}" width="20" height="20" alt="${esc(label)}" />`;
-    return p && p.login
-      ? `*(commit by <a href="https://github.com/${p.login}">${img}</a> ${esc(label)})*`
-      : `*(commit by ${img} ${esc(label)})*`;
+    if (p && p.login) return `*(commit by [@${p.login}](https://github.com/${p.login}))*`;
+    return `*(commit by ${esc(name)})*`;
   };
   let breakingShas = new Set();
   try {
@@ -101,12 +96,14 @@ function classify(authors) {
       buckets.NOTES.push(`- ${stripCi(note)}`);
       continue;
     }
-    const entry = `- ${stripCi(subject)} ([${short}](${REPO_URL}/commit/${full})) ${byline(email, authorName)}`;
+    const m = subject.match(reSubject);
+    const type = m ? m[1].toLowerCase() : '';
+    const scope = m && m[2] ? `**${m[2]}**: ` : '';
+    const cleanSubject = m ? m[4] : subject;
+    const entry = `- [\`${short}\`](${REPO_URL}/commit/${full}) - ${scope}${stripCi(cleanSubject)} ${byline(email, authorName)}`;
     const bangIdx = subject.indexOf('!');
     const isBreaking = breakingShas.has(full) || (bangIdx > 0 && /![\s:]/.test(subject.slice(bangIdx, bangIdx + 2)));
     if (isBreaking) buckets.BREAKING.push(entry);
-    const m = subject.match(reSubject);
-    const type = m ? m[1].toLowerCase() : '';
     const group = TYPE_GROUPS.find((g) => g.types.includes(type));
     if (!group) {
       if (!others.has('### 其他')) others.set('### 其他', []);

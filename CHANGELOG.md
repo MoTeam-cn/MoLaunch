@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-- 修复 Release 内容生成（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：Contributors 与 commit by 署名头像改经 [images.weserv.nl](https://images.weserv.nl/) `mask=circle` 烘焙圆形 PNG 渲染——GitHub 正文 HTML sanitizer 会剥离 `<img>` 的 style/class（`border-radius` 圆角失效导致方块头像），圆角烘焙进图片本体可绕过清洗；移除 `href="#"` 空链接与 `@gravatar` 裸文字回退，仅当邮箱与登录名均缺失时才回退名字文字。
+- 修复 Release 内容生成（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：条目格式改为短哈希反引号前置 + 提取 `feat(scope):` 括号内 scope 加粗渲染（`**scope**: 描述`），commit by 署名改为 `[@login](url)` 纯文字链接；协作者头像改经 [images.weserv.nl](https://images.weserv.nl/) `mask=circle` 烘焙圆形 PNG 渲染——GitHub 正文 HTML sanitizer 会剥离 `<img>` 的 style/class（`border-radius` 圆角失效导致方块头像），圆角烘焙进图片本体可绕过清洗；移除 `href="#"` 空链接与 `@gravatar` 裸文字回退，仅当邮箱与登录名均缺失时才回退名字文字。
 
 - SDK 移除 updater FFI（[instance.rs](src-tauri/src/sdk/instance.rs) + [ffi_types.rs](src-tauri/src/sdk/ffi_types.rs) + [types.rs](src-tauri/src/sdk/types.rs) + [sdk.rs](src-tauri/src/commands/sdk.rs) + [manager.rs](src-tauri/src/commands/sdk/manager.rs) + [sdk-manager.ts](src/utils/api/sdk-manager.ts)）：新 SDK 已删除 `mc_update_check_lite` / `mc_update_free_info_lite` 导出，旧绑定将其视为必需符号导致整个 SDK lite 加载失败（`Failed to get mc_update_check_lite: GetProcAddress failed`）；移除 `FFIUpdateInfoLite`/`UpdateInfoLite` 结构、`update_check_lite()` 方法、`check_update_lite` 命令与前端 `CHECK_UPDATE_LITE` action 后 SDK 恢复加载；更新检测改由主包 tauri-plugin-updater 自研链路承担，不再依赖 SDK。
 
