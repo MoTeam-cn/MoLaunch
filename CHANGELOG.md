@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 日志脱敏覆盖面扩展（[sanitize.rs](src-tauri/src/logger/sanitize.rs) + [sanitize_tests.rs](src-tauri/src/logger/sanitize_tests.rs)）：JSON 敏感字段集新增 `password`/`passwd`/`secret`/`api_key`/`apikey`/`client_secret`/`authorization`，新增 `Authorization: Bearer` 头与 URL query（token/key/api_key/apikey/signature/sig）脱敏，JWT 每段长度阈值由 10 降至 8。
+
 - 修复 CI 三项检查失败（[.github/workflows/ci.yml](.github/workflows/ci.yml)）：
   - Rust 格式（`cargo fmt --all`）：[build.rs](src-tauri/build.rs)、[tun.rs](src-tauri/src/commands/online/manager/tun.rs)、[auth.rs](src-tauri/src/minecraft/online/client/auth.rs)、[pow.rs](src-tauri/src/minecraft/online/pow.rs)、[registry.rs](src-tauri/src/storage/registry.rs) 按 rustfmt 重排（长链换行、use 排序、闭包折叠）。
   - Clippy：`apply_config/secure.rs` 的 `apply_hint`（launch_count）与 `apply_user_agreed`（版本号）原 `let key = reg_key()?` 在非 Windows 下绑定 unit 值触发 `let_unit_value`，改为内联 `reg_set(&reg_key()?, ...)`；`apply_config/types/entry.rs` 的 `build_snapshot` 12 参数触发 `too_many_arguments`，按仓库既有惯例加 `#[allow(clippy::too_many_arguments)]`。

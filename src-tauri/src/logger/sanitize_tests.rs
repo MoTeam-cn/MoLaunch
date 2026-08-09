@@ -42,3 +42,39 @@ fn test_sanitize_preserves_texture_url_with_hex_hash() {
     let result = sanitize_sensitive_info(input);
     assert_eq!(input, result, "texture URL hash should not be sanitized");
 }
+
+#[test]
+fn test_sanitize_password_field() {
+    let input = r#"Login request: {"password":"hunter2secret","user":"alice"}"#;
+    let result = sanitize_sensitive_info(input);
+    assert!(result.contains(r#""password":"***""#));
+    assert!(!result.contains("hunter2secret"));
+    // 非敏感字段不应被脱敏
+    assert!(result.contains("alice"));
+}
+
+#[test]
+fn test_sanitize_auth_bearer_header() {
+    let input = "request headers: Authorization: Bearer ghp_abcdefghij";
+    let result = sanitize_sensitive_info(input);
+    assert!(result.contains("Authorization: Bearer ***"));
+    assert!(!result.contains("ghp_abcdefghij"));
+}
+
+#[test]
+fn test_sanitize_url_query_token() {
+    let input = "http://example.com/api?token=abc123&x=1";
+    let result = sanitize_sensitive_info(input);
+    assert!(result.contains("?token=***"));
+    assert!(!result.contains("abc123"));
+    // 非敏感参数应保留
+    assert!(result.contains("&x=1"));
+}
+
+#[test]
+fn test_sanitize_api_key_field() {
+    let input = r#"Config: {"api_key":"sk-abcdefgh","name":"server"}"#;
+    let result = sanitize_sensitive_info(input);
+    assert!(result.contains(r#""api_key":"***""#));
+    assert!(!result.contains("sk-abcdefgh"));
+}
