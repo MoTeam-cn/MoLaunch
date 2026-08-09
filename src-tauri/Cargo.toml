@@ -78,7 +78,7 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 
 # 联机功能加密依赖（MoSign-v1 协议 + ECIES 加密信封）
 # Ed25519 签名（设备身份与注册签名）
-ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8"] }
+ed25519-dalek = { version = "3", features = ["rand_core", "pkcs8"] }
 # X25519 ECDH 密钥协商（登录会话密钥派生 + ECIES 信封）
 x25519-dalek = { version = "2", features = ["static_secrets"] }
 # HKDF-SHA256 密钥派生（mosign-v1-session-key / mosign-v1-ecies-envelope）
