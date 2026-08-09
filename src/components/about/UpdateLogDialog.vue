@@ -68,8 +68,8 @@ function onOpenFullLog() {
         <ChatBubbleOvalLeftIcon class="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
         <div
           class="markdown-body min-w-0 flex-1 text-xs leading-relaxed text-gray-700"
-          v-html="renderMarkdown(note)"
           @click="handleMarkdownLinkClick"
+          v-html="renderMarkdown(note)"
         />
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto rounded-md bg-gray-50 p-3">

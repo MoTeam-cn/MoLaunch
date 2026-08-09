@@ -21,6 +21,7 @@ import {
   type TunStartResponse,
 } from '@/types/online'
 import { showConfirmAsync, showInfo } from '@/utils/modal'
+import { saveRelaunchRestore } from '@/utils/relaunchRestore'
 
 /** useVirtualLan 选项 */
 export interface UseVirtualLanOptions {
@@ -111,6 +112,8 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
         const prompt = msg.split(':').slice(1).join(':')
         const confirmed = await showConfirmAsync('需要管理员权限', prompt)
         if (confirmed) {
+          // 提权重启前保存当前页面，新实例启动后跳回原处（不落回主页）
+          saveRelaunchRestore(window.location.pathname + window.location.search)
           // 触发 UAC 提权重启，后端延迟 500ms 退出当前进程
           // dev 模式下后端不重启，返回 dev_mode 标记，此处展示提示
           const result = await restartAsAdmin()

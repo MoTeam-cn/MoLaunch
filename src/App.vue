@@ -31,6 +31,7 @@ import { setToastRef } from '@/utils/toast'
 import { notifyFrontendReady } from '@/utils/splash'
 import { initAutoCheck } from '@/utils/updater'
 import { maybeShowUpdateLog } from '@/utils/updateLog'
+import { consumeRelaunchRestore } from '@/utils/relaunchRestore'
 import { initDownloadStream } from '@/composables/useDownloadStream'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
@@ -98,6 +99,18 @@ async function initApp() {
 
   // 登录态已恢复，关闭加载遮罩
   isRestoring.value = false
+
+  // 恢复管理员提权重启前的页面（若保存过且路径合法、已登录）
+  // 放在"修正路由"之前，避免恢复路径被 /login 兜底逻辑覆盖
+  const savedPath = consumeRelaunchRestore()
+  if (
+    savedPath &&
+    authStore.isLoggedIn &&
+    savedPath.startsWith('/apps') &&
+    router.resolve(savedPath).matched.length > 0
+  ) {
+    await router.replace(savedPath)
+  }
 
   // 联机云端初始化（静默注册/登录/刷新 token）
   // 失败不阻塞主流程，仅弹窗提示并禁用联机功能
