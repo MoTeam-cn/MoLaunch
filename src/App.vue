@@ -31,7 +31,12 @@ import { setToastRef } from '@/utils/toast'
 import { notifyFrontendReady } from '@/utils/splash'
 import { initAutoCheck } from '@/utils/updater'
 import { maybeShowUpdateLog } from '@/utils/updateLog'
-import { consumeRelaunchSnapshot, setReconnectPassword } from '@/utils/relaunchSnapshot'
+import {
+  consumeRelaunchSnapshot,
+  setReconnectPassword,
+  saveLastPage,
+  readLastPage,
+} from '@/utils/relaunchSnapshot'
 import { initDownloadStream } from '@/composables/useDownloadStream'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
@@ -68,11 +73,17 @@ onMounted(() => {
   notifyFrontendReady()
   // 启动自动更新检查（启动后 5s + 每 6 小时；dev 模式自动跳过）
   initAutoCheck()
+  // 每次导航后记录页面，供普通重启后回到上次打开的页面
+  router.afterEach((to) => {
+    saveLastPage(to.fullPath)
+  })
   initApp()
 })
 
 async function initApp() {
   console.log('[Startup][Frontend] initApp start @', new Date().toISOString())
+  // 捕获上次打开的页面（须在启动期初始路由导航覆盖 localStorage 前读取）
+  const lastPage = readLastPage()
   // 全局《用户协议》门禁：首次启动需同意后才能使用（fire-and-forget，弹窗以高 z-index 覆盖加载遮罩，不影响后续初始化）
   void maybeRequireUserAgreement()
   console.log('[Startup][Frontend] maybeRequireUserAgreement fired')
@@ -111,17 +122,11 @@ async function initApp() {
         setReconnectPassword(snapshot.password)
       }
     }
-    // 恢复快照保存时的页面（若路径合法、已登录）
-    // 放在"修正路由"之前，避免恢复路径被 /login 兜底逻辑覆盖
-    const savedPath = snapshot.path
-    if (
-      savedPath &&
-      authStore.isLoggedIn &&
-      savedPath.startsWith('/apps') &&
-      router.resolve(savedPath).matched.length > 0
-    ) {
-      await router.replace(savedPath)
-    }
+    // UAC 提权重启：恢复快照中的页面（含房间会话）
+    await restorePage(snapshot.path)
+  } else {
+    // 普通重启：回到上次打开的页面（设置页等任意业务页）
+    await restorePage(lastPage ?? '')
   }
 
   // 联机云端初始化（静默注册/登录/刷新 token）
@@ -154,6 +159,18 @@ async function initApp() {
   // 启动「本次更新日志」弹窗：版本升级后展示一次（无记录/回退/同版本不弹）
   maybeShowUpdateLog()
   console.log('[Startup][Frontend] initApp fully done @', new Date().toISOString())
+}
+
+/** 校验并跳回保存的页面（仅业务页、已登录且路径有效时恢复；置于"修正路由"之前，避免被 /login 兜底覆盖） */
+async function restorePage(savedPath: string): Promise<void> {
+  if (
+    savedPath &&
+    authStore.isLoggedIn &&
+    savedPath.startsWith('/apps') &&
+    router.resolve(savedPath).matched.length > 0
+  ) {
+    await router.replace(savedPath)
+  }
 }
 </script>
 

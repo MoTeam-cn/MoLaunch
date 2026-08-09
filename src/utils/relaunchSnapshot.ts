@@ -12,6 +12,8 @@ import { invoke } from '@tauri-apps/api/core'
 const SNAPSHOT_KEY = 'molaunch-relaunch-snapshot'
 // 旧版明文快照键（升级前遗留，读取时清理，防明文密码残留）
 const LEGACY_KEYS = ['molaunch-room-snapshot', 'molaunch-relaunch-restore']
+// 普通重启"记住上次页面"：明文路径（非敏感信息），每次导航后更新，启动时恢复
+const LAST_PAGE_KEY = 'molaunch-last-page'
 
 /** 快照载荷：页面路径 + 在线房间会话（可选）+ guest 房间密码 */
 export interface RelaunchSnapshotPayload {
@@ -89,4 +91,24 @@ export async function consumeRelaunchSnapshot(): Promise<RelaunchSnapshotPayload
 export function clearRelaunchSnapshot(): void {
   localStorage.removeItem(SNAPSHOT_KEY)
   reconnectPassword = null
+}
+
+/** 记录当前页面路径（供普通重启后回到上次打开的页面；忽略入口/登录页） */
+export function saveLastPage(path: string): void {
+  if (!path || path === '/' || path === '/login') return
+  try {
+    localStorage.setItem(LAST_PAGE_KEY, path)
+  } catch (e) {
+    console.warn('[Relaunch] 保存上次页面失败:', e)
+  }
+}
+
+/** 读取上次打开的页面路径（启动恢复用；不消费，后续导航持续覆盖） */
+export function readLastPage(): string | null {
+  try {
+    return localStorage.getItem(LAST_PAGE_KEY)
+  } catch (e) {
+    console.warn('[Relaunch] 读取上次页面失败:', e)
+    return null
+  }
 }

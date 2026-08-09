@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 普通重启记住上次页面（[relaunchSnapshot.ts](src/utils/relaunchSnapshot.ts) 新增 `saveLastPage`/`readLastPage`，[App.vue](src/App.vue) 路由 `afterEach` 记录 + 启动恢复）：打开设置页等任意业务页后正常关闭再启动，自动回到上次打开的页面；UAC 提权重启仍走加密快照恢复页面 + 房间会话。
+
 - 重启快照统一改为 SDK 加密存储（[relaunchSnapshot.ts](src/utils/relaunchSnapshot.ts) 新增，替代 [relaunchRestore.ts](src/utils/relaunchRestore.ts) + [roomSnapshot.ts](src/utils/roomSnapshot.ts)；后端新增 [relaunch.rs](src-tauri/src/commands/relaunch.rs) 命令，复用 `sdk_crypto` 加解密封装）：重启前将"当前页面 + 在线房间会话（含房间密码 / roomKey）"经 SDK AES-256-CBC 加密后写入 localStorage，新实例启动后解密恢复页面跳转与房间自动重连；修复 CodeQL 明文存储敏感信息告警，升级前遗留的旧版明文快照键启动时自动清理。
 
 - 加密方案彻底依赖 SDK AES-256-CBC（[sdk_crypto.rs](src-tauri/src/utils/sdk_crypto.rs) + [crypto_v3.rs](src-tauri/src/migrations/crypto_v3.rs) + [instance.rs](src-tauri/src/sdk/instance.rs) + [ffi_types.rs](src-tauri/src/sdk/ffi_types.rs)）：删除自实现文件级加密（master.key / DPAPI / AES-256-GCM / `v2:` 前缀）全部路径，加解密完全由 SDK `mc_encrypt_token` / `mc_decrypt_token` 承担（AES-256-CBC 写入，解密自动兼容旧 DES，协议见 [token-encryption.md](docs/token-encryption.md)）；启动迁移改用 SDK 0.6.0 新增 `mc_decrypt_token_ex` 检测算法版本（1=DES 旧密文，2=AES 当前），仅将存量 DES(v1) 数据（认证注册表/auth.json、联机 device.json、FRP token、CurseForge/AI api_key）重加密为 AES(v2)，v2 数据直接跳过，完成写 `crypto_v3.done` 标记，失败不阻塞启动且保持原样。
