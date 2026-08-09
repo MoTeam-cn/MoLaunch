@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- CI 升级 GitHub Actions 运行时到 Node 24（[ci.yml](.github/workflows/ci.yml) + [release.yml](.github/workflows/release.yml) + [version-sync.yml](.github/workflows/version-sync.yml) + [license-sync.yml](.github/workflows/license-sync.yml)）：`checkout` v4→v5、`setup-node` v4→v5、`upload-artifact`/`download-artifact` v4→v5、`action-gh-release` v1→v2、`git-auto-commit-action` v6→v7，消除 "Node.js 20 is deprecated ... forced to run on Node.js 24" 警告；`rust-cache` v2.9.2 与 `tauri-action` v0 本身已是 node24，无需变更。
+
 - CI 修复（[ci.yml](.github/workflows/ci.yml) + [release.yml](.github/workflows/release.yml)）：Node 18 → 22（`@vitejs/plugin-vue@6` 的 `getHash` 使用 Node 21.7+ 的 `crypto.hash`，Node 18 下前端构建报 `crypto.hash is not a function`）；cargo 安全审计 action 由已失效的 `rustsec/rustsec-action` 更换为官方维护的 [actions-rust-lang/audit](https://github.com/actions-rust-lang/audit)@v1（`file` 指向 `src-tauri/Cargo.lock`，不自动创建 issue）。
 
 - 普通重启记住上次页面（[relaunchSnapshot.ts](src/utils/relaunchSnapshot.ts) 新增 `saveLastPage`/`readLastPage`，[App.vue](src/App.vue) 路由 `afterEach` 记录 + 启动恢复）：**默认关闭**，可在「设置 → 个性化 → 启动」开启，开启后打开设置页等任意业务页再重启，自动回到上次打开的页面；UAC 提权重启仍走加密快照恢复页面 + 房间会话。
