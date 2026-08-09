@@ -92,14 +92,3 @@ pub async fn get_device_id(state: &AppState) -> Result<String, String> {
         e.to_string()
     })
 }
-
-/// 检查更新（轻量版）
-pub async fn check_update_lite(state: &AppState) -> Result<crate::sdk::UpdateInfoLite, String> {
-    let sdk_guard = state.sdk.lock().await;
-    let sdk = sdk_guard.as_ref().ok_or("SDK not loaded")?;
-
-    sdk.update_check_lite().map_err(|e| {
-        log_error!("Failed to check update: {}", e);
-        e.to_string()
-    })
-}

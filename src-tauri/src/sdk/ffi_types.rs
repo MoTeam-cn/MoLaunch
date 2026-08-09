@@ -19,19 +19,6 @@ pub struct ErrorInfo {
     pub details: *const std::ffi::c_char,
 }
 
-/// 轻量更新信息结构体
-#[repr(C)]
-#[derive(Debug)]
-pub struct FFIUpdateInfoLite {
-    pub current_version: *mut std::ffi::c_char,
-    pub latest_version: *mut std::ffi::c_char,
-    pub update_available: i32,
-    pub download_url: *mut std::ffi::c_char,
-    pub sha256: *mut std::ffi::c_char,
-    pub size: u64,
-    pub changelog: *mut std::ffi::c_char,
-}
-
 // FFI 函数类型定义（lite 版本）
 pub type McSdkVersion = unsafe extern "C" fn() -> *const std::ffi::c_char;
 pub type McSdkLastError = unsafe extern "C" fn() -> *const ErrorInfo;
@@ -44,5 +31,3 @@ pub type McEncryptToken = unsafe extern "C" fn(*const std::ffi::c_char) -> *mut 
 pub type McDecryptToken = unsafe extern "C" fn(*const std::ffi::c_char) -> *mut std::ffi::c_char;
 pub type McDecryptTokenEx =
     unsafe extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_int) -> *mut std::ffi::c_char;
-pub type McUpdateCheckLite = unsafe extern "C" fn(*mut FFIUpdateInfoLite) -> i32;
-pub type McUpdateFreeInfoLite = unsafe extern "C" fn(*mut FFIUpdateInfoLite);

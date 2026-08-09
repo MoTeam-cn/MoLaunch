@@ -1,8 +1,8 @@
 //! SDK 模块统一分发逻辑（sdk 域 manager 模块）
 //!
-//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，5 个 action 均无参数：
+//! 使用 `utils::dispatcher::Dispatcher` 注册式分发，4 个 action 均无参数：
 //! `get_platform_info`（不需要 state）/ `get_sdk_version` / `is_sdk_initialized` /
-//! `get_device_id` / `check_update_lite`（后 4 个需 `&state` 访问 `state.sdk` 锁）。
+//! `get_device_id`（后 3 个需 `&state` 访问 `state.sdk` 锁）。
 
 use once_cell::sync::Lazy;
 use tauri::AppHandle;
@@ -43,14 +43,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         "get_device_id",
         handler!(state, _app, _params, {
             let r = get_device_id(&state).await?;
-            serde_json::to_value(r).map_err(|e| e.to_string())
-        }),
-    );
-
-    d.register(
-        "check_update_lite",
-        handler!(state, _app, _params, {
-            let r = check_update_lite(&state).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

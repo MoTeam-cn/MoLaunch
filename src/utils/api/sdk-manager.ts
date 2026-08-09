@@ -28,7 +28,6 @@ export const SDK_ACTIONS = {
   GET_SDK_VERSION: 'get_sdk_version',
   IS_SDK_INITIALIZED: 'is_sdk_initialized',
   GET_DEVICE_ID: 'get_device_id',
-  CHECK_UPDATE_LITE: 'check_update_lite',
 } as const
 
 /** action 名称类型 */

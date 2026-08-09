@@ -1,5 +1,5 @@
 //! SDK lite 版本绑定
-//! 只绑定 12 个基础函数（decrypt_token_ex 为可选符号，旧库自动降级）
+//! 只绑定 10 个基础函数（decrypt_token_ex 为可选符号，旧库自动降级）
 
 use super::ffi_types::*;
 use super::types::*;
@@ -18,8 +18,6 @@ pub struct SdkFunctions {
     pub encrypt_token: McEncryptToken,
     pub decrypt_token: McDecryptToken,
     pub decrypt_token_ex: Option<McDecryptTokenEx>,
-    pub update_check_lite: McUpdateCheckLite,
-    pub update_free_info_lite: McUpdateFreeInfoLite,
 }
 
 /// SDK 实例（lite 版本不需要 handle）
@@ -76,12 +74,6 @@ impl SdkInstance {
                     SdkError::LoadFailed(format!("Failed to get mc_decrypt_token: {}", e))
                 })?,
                 decrypt_token_ex: lib.get(b"mc_decrypt_token_ex").ok().map(|sym| *sym),
-                update_check_lite: *lib.get(b"mc_update_check_lite").map_err(|e| {
-                    SdkError::LoadFailed(format!("Failed to get mc_update_check_lite: {}", e))
-                })?,
-                update_free_info_lite: *lib.get(b"mc_update_free_info_lite").map_err(|e| {
-                    SdkError::LoadFailed(format!("Failed to get mc_update_free_info_lite: {}", e))
-                })?,
             }
         };
 
@@ -190,33 +182,6 @@ impl SdkInstance {
             .to_string();
         unsafe { (self.functions.free_string)(result) };
         Ok((decrypted, version))
-    }
-
-    /// 检查更新（轻量版，无需 handle）
-    pub fn update_check_lite(&self) -> Result<UpdateInfoLite, SdkError> {
-        let mut info = FFIUpdateInfoLite {
-            current_version: std::ptr::null_mut(),
-            latest_version: std::ptr::null_mut(),
-            update_available: 0,
-            download_url: std::ptr::null_mut(),
-            sha256: std::ptr::null_mut(),
-            size: 0,
-            changelog: std::ptr::null_mut(),
-        };
-
-        let code = unsafe { (self.functions.update_check_lite)(&mut info) };
-        if code != 0 {
-            // 错误分支也需释放可能已分配的 FFI 内存
-            unsafe { (self.functions.update_free_info_lite)(&mut info) };
-            return Err(SdkError::FfiFailed(code));
-        }
-
-        let result = UpdateInfoLite::from_ffi(&info);
-
-        // 释放 FFI 内存
-        unsafe { (self.functions.update_free_info_lite)(&mut info) };
-
-        Ok(result)
     }
 
     /// 获取最后错误信息
