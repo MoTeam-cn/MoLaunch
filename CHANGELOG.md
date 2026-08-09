@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- README 新增繁体中文（README_ZH-HANT.md）、英文（README_EN.md）、日文（README_JA.md）三种语言版本，并在主 README 加入语言切换栏。
+
 - 新增 `CONTRIBUTING.md` 贡献指南，并补充 `.github` 配置：Issue 模板选择器（config.yml）与依赖自动更新（dependabot：npm / cargo / GitHub Actions，每周检查）。
 
 - 开发文档 `DEVELOPMENT_GUIDELINES.md`（开发规范）与 `DEVELOPMENT_BLUEPRINT.md`（架构蓝图）纳入版本控制（此前为 git 排除的内部文档）。

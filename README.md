@@ -4,6 +4,8 @@
 
 # MoLaunch
 
+[简体中文](./README.md) · [繁體中文](./README_ZH-HANT.md) · [English](./README_EN.md) · [日本語](./README_JA.md)
+
 现代化、跨平台的 Minecraft Java 版启动器。
 
 [![License](https://img.shields.io/badge/License-MoLaunch%20Limited%20Distribution%20License-red.svg)](./LICENSE)
