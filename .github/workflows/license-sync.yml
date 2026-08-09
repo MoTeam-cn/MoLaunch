@@ -44,7 +44,7 @@ jobs:
       # 有差异时自动提交并推送（默认提交者 github-actions[bot]）；
       # 无差异时该 action 自动跳过，不产生空提交
       - name: Auto commit changes
-        uses: stefanzweifel/git-auto-commit-action@v6
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'chore(license): 同步根 LICENSE 到各副本文件 !c'
           file_pattern: src-tauri/LICENSE src-tauri/updater/LICENSE src-tauri/resources/LICENSE.txt

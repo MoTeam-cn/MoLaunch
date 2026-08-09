@@ -74,7 +74,7 @@ jobs:
       # 有字段被更新时自动提交并推送（默认提交者 github-actions[bot]）；
       # 全部已一致时该 action 自动跳过，不产生提交
       - name: Auto commit changes
-        uses: stefanzweifel/git-auto-commit-action@v6
+        uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'chore(version): 同步版本号至 ${{ steps.version.outputs.VERSION }} !c'
           file_pattern: package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md
