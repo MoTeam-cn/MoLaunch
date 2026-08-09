@@ -77,11 +77,25 @@ pub fn open(envelope: &Envelope, our_secret_bytes: &[u8; 32]) -> Result<Vec<u8>,
     }
     let mut pub_arr = [0u8; 32];
     pub_arr.copy_from_slice(&ephemeral_public_bytes);
+    // 全零公钥拒绝
+    if pub_arr == [0u8; 32] {
+        return Err(CryptoError::InvalidKeyLength {
+            expected: 32,
+            actual: 0,
+        });
+    }
     let ephemeral_public = X25519PublicKey::from(pub_arr);
 
     // 2. 用本地静态私钥做 ECDH
     let our_secret = x25519_dalek::StaticSecret::from(*our_secret_bytes);
     let shared = our_secret.diffie_hellman(&ephemeral_public).to_bytes();
+    // 小阶点共享密钥全零：拒绝
+    if shared == [0u8; 32] {
+        return Err(CryptoError::InvalidKeyLength {
+            expected: 32,
+            actual: 0,
+        });
+    }
 
     // 3. HKDF 派生 AES 密钥
     let aes_key_bytes = hkdf_sha256(&shared, &[], ECIES_INFO, 32)?;

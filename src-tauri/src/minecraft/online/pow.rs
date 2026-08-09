@@ -22,6 +22,9 @@ const SOLVE_TIMEOUT: Duration = Duration::from_secs(3);
 /// 求解线程数上限（避免把小机拖垮）
 const MAX_SOLVE_THREADS: u64 = 8;
 
+/// 求解难度上限：防恶意服务端下发超高难度放大客户端 DoS
+const MAX_DIFFICULTY: u32 = 32;
+
 /// 服务端下发的 challenge（对应 `pow_guard` 响应体 `data` 字段）
 #[derive(Debug, Clone, serde::Deserialize)]
 pub struct PowChallenge {
@@ -84,6 +87,8 @@ pub async fn solve_challenge(salt: &[u8], difficulty: u32) -> Option<u64> {
     if difficulty == 0 {
         return Some(0);
     }
+    // 难度钳制上限，防恶意服务端放大 DoS
+    let difficulty = difficulty.min(MAX_DIFFICULTY);
     let salt = salt.to_vec();
     tokio::task::spawn_blocking(move || solve_sync(&salt, difficulty))
         .await
