@@ -1,7 +1,7 @@
 {
   "name": "molaunch",
   "private": true,
-  "version": "0.3.5-rc2",
+  "version": "0.3.5-rc3",
   "copyright": "Copyright © 2026 MoTeam. All rights reserved.",
   "type": "module",
   "scripts": {
