@@ -206,6 +206,8 @@ pub fn run() {
             commands::community::community_manager,
             // 插件系统命令（12 个 action，已聚合为 plugins_manager 单一入口）
             commands::plugins::plugins_manager,
+            // 重启快照命令（2 个 action：encrypt/decrypt，重启前加密保存会话快照）
+            commands::relaunch::relaunch_snapshot,
             // 外部下载工具命令（25 个 action，已聚合为 tools_manager 单一入口）
             commands::tools::tools_manager,
             // 实验性功能命令（聊天记录存储 SQLite / Agent 对话 / AI 分析，

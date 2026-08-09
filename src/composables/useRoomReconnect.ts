@@ -11,7 +11,7 @@ import { useOnlineStore } from '@/stores/online'
 import type { useWebRTC } from '@/composables/useWebRTC'
 import { joinRoom, leaveRoom, submitAnswer } from '@/utils/api/online-manager'
 import { resolveIceServers } from '@/utils/online/webrtc-helpers'
-import { consumeReconnectPassword } from '@/utils/roomSnapshot'
+import { consumeReconnectPassword } from '@/utils/relaunchSnapshot'
 import { toastError, toastSuccess } from '@/utils/toast'
 
 /** 加入方房间重连主体（RoomGuestPanel 挂载后由 useGuestReconnect 触发） */

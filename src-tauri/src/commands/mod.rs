@@ -9,6 +9,7 @@ pub mod image_cache;
 pub mod java;
 pub mod online;
 pub mod plugins;
+pub mod relaunch;
 pub mod sdk;
 pub mod skin;
 pub mod system;

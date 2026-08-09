@@ -32,7 +32,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { submitAnswer } from '@/utils/api/online-manager'
 import { resolveIceServers } from '@/utils/online/webrtc-helpers'
-import { rememberJoinPassword } from '@/utils/roomSnapshot'
+import { rememberJoinPassword } from '@/utils/relaunchSnapshot'
 import { toastError } from '@/utils/toast'
 
 defineProps<{
