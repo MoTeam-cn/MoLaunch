@@ -84,7 +84,7 @@ x25519-dalek = { version = "2", features = ["static_secrets"] }
 # HKDF-SHA256 密钥派生（mosign-v1-session-key / mosign-v1-ecies-envelope）
 hkdf = "0.12"
 # HMAC-SHA256（登录签名，密钥为 ECDH 派生的 session_key）
-hmac = "0.12"
+hmac = "0.13"
 # AES-256-GCM（登录 content 加密 + ECIES 信封 payload 加密）
 aes-gcm = "0.10"
 # RSA-OAEP（注册时 content 加密，需内置云端 RSA 公钥）
