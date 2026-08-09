@@ -161,6 +161,12 @@ pub fn run() {
             let state = app.state::<AppState>().inner().clone();
             let _ = state.app_handle.set(app.handle().clone());
 
+            // 加密迁移：升级后首次启动将存量 v2/DES 数据重加密为 SDK AES（后台执行，不阻塞 UI）
+            let migrate_sdk = state.sdk.clone();
+            tauri::async_runtime::spawn(async move {
+                migrations::crypto_v3::migrate(&migrate_sdk).await;
+            });
+
             // 创建系统托盘（右键菜单：打开主页面 / 检查更新 / 退出）
             if let Err(e) = tray::setup_tray(app.handle()) {
                 log_error!("[Tray] 托盘创建失败: {}", e);

@@ -4,7 +4,7 @@ mod load;
 mod manager;
 mod operations;
 #[cfg(windows)]
-mod registry;
+pub(crate) mod registry;
 mod save;
 mod types;
 
