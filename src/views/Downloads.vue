@@ -26,7 +26,7 @@ const checking = ref(true)
 
 // 进入页面时恢复下载状态
 // 首次进入时延迟重试检查（给后端异步启动下载任务的时间，避免双击下载按钮进入页面就被赶回去）
-// WS 流由 App.vue 的 initDownloadStream 全局管理，这里只负责初始状态恢复
+// 下载进度事件流由 App.vue 的 initDownloadStream 全局管理，这里只负责初始状态恢复
 onMounted(async () => {
   const maxRetries = 6 // 最多重试 6 次，每次 500ms，共 3 秒
   for (let attempt = 0; attempt < maxRetries; attempt++) {

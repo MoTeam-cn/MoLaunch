@@ -60,7 +60,6 @@ pub async fn download_version(
     // 统一进度回调：sync_stage_from_progress 替代手工累加
     // 删除 accumulated_bytes/accumulated_total/speed_window：DownloadManager 内部 timer 已计算 current_speed
     let state_for_progress = state_clone.clone();
-    let progress_tx_for_cb = state.progress_tx.clone();
     let pause_flag_for_cb = state.download_pause_flag.clone();
     let progress_callback = Arc::new(move |progress: download_types::GlobalProgress| {
         {
@@ -80,16 +79,14 @@ pub async fn download_version(
         let is_paused = pause_flag_for_cb.load(std::sync::atomic::Ordering::Relaxed);
         let snapshot = build_snapshot(&ds, &version_id_clone, is_paused);
         drop(ds);
-        // 双路推送：Tauri 事件（兼容旧 listen）+ WS 广播（前端 devtools 可见）
+        // Tauri plugin event 推送进度（前端监听 download-progress）
         let _ = app_clone.emit("download-progress", &snapshot);
-        let _ = progress_tx_for_cb.send(snapshot);
     });
 
     // Stage callback：统一用 set_current_stage 切换阶段（与 install_merged 行为一致）
     let state_for_stage = state_clone.clone();
     let app_for_stage = app.clone();
     let vid_for_stage = version_id.clone();
-    let progress_tx_for_stage = state.progress_tx.clone();
     let pause_flag_for_stage = state.download_pause_flag.clone();
     let stage_callback = Arc::new(move |stage_index: usize, _stage_name: &str| {
         let mut ds = state_for_stage.lock().unwrap();
@@ -98,7 +95,6 @@ pub async fn download_version(
         let snapshot = build_snapshot(&ds, &vid_for_stage, is_paused);
         drop(ds);
         let _ = app_for_stage.emit("download-progress", &snapshot);
-        let _ = progress_tx_for_stage.send(snapshot);
     });
 
     // Full download flow
@@ -134,11 +130,12 @@ pub async fn download_version(
         ds.mark_complete();
     }
 
-    // 广播最终完成状态（WS 推送 is_complete=true，前端据此触发 finishDownload）
+    // 广播最终完成状态（emit is_complete=true，前端据此触发 finishDownload）
     {
         let ds = state.download_state.lock().unwrap();
         let snapshot = build_snapshot(&ds, &version_id, false);
-        let _ = state.progress_tx.send(snapshot);
+        drop(ds);
+        let _ = app.emit("download-progress", &snapshot);
     }
 
     let _ = app.emit(
@@ -157,10 +154,10 @@ pub async fn download_version(
     Ok(())
 }
 
-/// 构造当前 download_state snapshot 并广播到 WS
+/// 构造当前 download_state snapshot 并广播到前端
 ///
-/// 供各下载路径的 progress_callback 调用，确保 WS 推送覆盖所有下载路径
-/// （MC 本体 / 整合包安装 / 资源下载）。调用方只需传入 `&AppState`。
+/// 供各下载路径的 progress_callback 调用，确保进度推送覆盖所有下载路径
+/// （MC 本体 / 整合包安装 / 资源下载 / 暂停恢复取消）。调用方只需传入 `&AppState`。
 pub fn broadcast_current(state: &AppState) {
     let ds = state.download_state.lock().unwrap();
     let is_paused = state
@@ -169,7 +166,10 @@ pub fn broadcast_current(state: &AppState) {
     let version_name = ds.version_name.clone();
     let snapshot = build_snapshot(&ds, &version_name, is_paused);
     drop(ds);
-    let _ = state.progress_tx.send(snapshot);
+    // AppHandle 在 Tauri setup 钩子注入，此处无需调用方持有
+    if let Some(app) = state.app_handle.get() {
+        let _ = app.emit("download-progress", &snapshot);
+    }
 }
 
 pub fn build_snapshot(ds: &DownloadState, version_id: &str, is_paused: bool) -> serde_json::Value {

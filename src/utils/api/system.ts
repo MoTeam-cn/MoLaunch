@@ -97,18 +97,3 @@ export async function pauseDownload(): Promise<void> {
 export async function resumeDownload(): Promise<void> {
   return versionProgressManager<void>(VERSION_PROGRESS_ACTIONS.RESUME_DOWNLOAD)
 }
-
-// ==================== WebSocket 端口查询 ====================
-
-/** getWsPort 返回的端口 + 鉴权 token */
-export interface WsPortInfo {
-  /** WS 服务器端口，0 表示尚未启动 */
-  port: number
-  /** 鉴权 token，客户端建连后首条消息需携带 */
-  token: string
-}
-
-/** 获取下载进度推送 WebSocket 端口 + 鉴权 token */
-export async function getWsPort(): Promise<WsPortInfo> {
-  return systemManager<WsPortInfo>(SYSTEM_ACTIONS.GET_WS_PORT)
-}

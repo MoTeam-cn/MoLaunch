@@ -74,8 +74,6 @@ export const SYSTEM_ACTIONS = {
   GET_DEEPLINK_STATUS: 'get_deeplink_status',
   REGISTER_DEEPLINK: 'register_deeplink',
   UNREGISTER_DEEPLINK: 'unregister_deeplink',
-  // ws（1 个）—— 下载进度推送 WebSocket 端口
-  GET_WS_PORT: 'get_ws_port',
 } as const
 
 /** action 名称类型 */

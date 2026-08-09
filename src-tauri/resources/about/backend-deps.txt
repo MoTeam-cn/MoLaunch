@@ -22,7 +22,6 @@
 | Tauri Plugin Updater | 2 | https://v2.tauri.app/plugin/updater/ | 官方自动更新插件（非 Windows） |
 | Tokio | 1.35 | https://tokio.rs | Rust 异步运行时 |
 | Reqwest | 0.11 | https://docs.rs/reqwest | HTTP 客户端（rustls-tls） |
-| tokio-tungstenite | 0.21 | https://docs.rs/tokio-tungstenite | WebSocket 服务器（下载进度推送） |
 | rustls-native-certs | 0.6 | https://docs.rs/rustls-native-certs | 操作系统信任根证书加载 |
 | Serde | 1.0 | https://serde.rs | 序列化/反序列化框架 |
 | serde_json | 1.0 | https://docs.rs/serde_json | JSON 序列化 |

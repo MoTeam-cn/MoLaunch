@@ -69,7 +69,6 @@
 | lwjgl-unsafe-agent | Glavo | Apache-2.0 | https://github.com/HMCL-dev/lwjgl-unsafe-agent | https://github.com/HMCL-dev/lwjgl-unsafe-agent/blob/main/LICENSE |
 | Tokio | Tokio Contributors | MIT License | https://tokio.rs | https://github.com/tokio-rs/tokio/blob/master/LICENSE |
 | Reqwest | Sean McArthur | MIT / Apache-2.0 | https://docs.rs/reqwest | https://github.com/seanmonstar/reqwest/blob/master/LICENSE-MIT |
-| tokio-tungstenite | tokio-tungstenite contributors | MIT License | https://docs.rs/tokio-tungstenite | https://github.com/snapview/tokio-tungstenite/blob/master/LICENSE |
 | rustls-native-certs | rustls-native-certs contributors | Apache-2.0 / ISC / MIT | https://docs.rs/rustls-native-certs | https://github.com/ctz/rustls-native-certs/blob/main/LICENSE |
 | Serde | The Serde Developers | MIT / Apache-2.0 | https://serde.rs | https://github.com/serde-rs/serde/blob/master/LICENSE-MIT |
 | serde_json | The Serde Developers | MIT / Apache-2.0 | https://docs.rs/serde_json | https://github.com/serde-rs/json/blob/master/LICENSE-MIT |

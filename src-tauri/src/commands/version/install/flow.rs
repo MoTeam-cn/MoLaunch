@@ -217,11 +217,12 @@ pub async fn install_merged(
         let mut ds = state.download_state.lock().unwrap();
         ds.mark_complete();
     }
-    // 广播最终完成状态（WS 推送 is_complete=true，前端据此触发 finishDownload）
+    // 广播最终完成状态（emit is_complete=true，前端据此触发 finishDownload）
     {
         let ds = state.download_state.lock().unwrap();
         let snapshot = super::super::download::build_snapshot(&ds, &ds.version_name, false);
-        let _ = state.progress_tx.send(snapshot);
+        drop(ds);
+        let _ = app.emit("download-progress", &snapshot);
     }
     let _ = app.emit(
         "install-merged-progress",

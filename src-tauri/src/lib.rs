@@ -19,7 +19,6 @@ pub mod state;
 pub mod storage;
 pub mod tray;
 pub mod utils;
-pub mod ws;
 
 use state::AppState;
 use tauri::Emitter;
@@ -157,13 +156,10 @@ pub fn run() {
                 }
             }
 
-            // 启动 WebSocket 服务器（下载进度推送，替代前端轮询）
-            // 监听 127.0.0.1:0 随机端口，端口写入 AppState.ws_port 供前端查询
-            let app_handle = app.handle().clone();
+            // 注入 AppHandle 到 AppState：下载进度等后台任务通过 emit 推送事件
+            // （此前由 WS 服务器广播，改回 Tauri plugin event 后统一走 emit）
             let state = app.state::<AppState>().inner().clone();
-            tauri::async_runtime::spawn(async move {
-                ws::start_server(app_handle, state).await;
-            });
+            let _ = state.app_handle.set(app.handle().clone());
 
             // 创建系统托盘（右键菜单：打开主页面 / 检查更新 / 退出）
             if let Err(e) = tray::setup_tray(app.handle()) {

@@ -166,21 +166,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
 
-    // ws（1 个）：获取 WebSocket 服务器端口 + 鉴权 token（前端建 WS 连接用）
-    // 返回 {port: u16, token: string}，port=0 表示 WS 服务器尚未启动
-    // token 用于客户端建连后首条消息鉴权，防止本机其他进程窃听下载进度
-    d.register(
-        "get_ws_port",
-        handler!(state, _app, _params, {
-            let port = state.ws_port.get().copied().unwrap_or(0u16);
-            let token = state.ws_token.get().cloned().unwrap_or_default();
-            Ok(serde_json::json!({
-                "port": port,
-                "token": token,
-            }))
-        }),
-    );
-
     d
 });
 
