@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 收缩 IgnoreTls 作用域（[tls.rs](src-tauri/src/http/tls.rs) + [client.rs](src-tauri/src/http/client.rs) + [http.rs](src-tauri/src/http.rs) + [developer.rs](src-tauri/src/commands/system/developer.rs)）：新增 `ignore_tls_allowed(host)`，仅当 IgnoreTls 开启且目标为 localhost/127.0.0.1/::1 时才允许跳过证书校验；现有通用 HTTP 客户端不绑定 base_url、无法低成本获知目标 host，保守起见一律不再调用 `danger_accept_invalid_certs`，联机认证/下载等链路不再受 IgnoreTls 全局绕过；开关开启时启动日志输出一次性 WARNING 提示；默认配置（IgnoreTls 关闭）行为不变。
+
 - 修复整合包 overrides 解压路径穿越（Zip Slip）（[extract.rs](src-tauri/src/commands/community/install/concurrent/extract.rs) + [path.rs](src-tauri/src/utils/path.rs)）：新增公共校验 `ensure_safe_relative_path`（段级 `ParentDir` 检查 + 拒绝空串/空字节/绝对路径/盘符前缀），`extract_overrides_once` 解压前逐条目校验，恶意 zip 内 `overrides/../../..` 条目不再能逃出 instance 目录写任意文件；附内联单测。
 
 - 修复可执行资源释放的缓存信任缺陷（DLL 劫持）（[resources.rs](src-tauri/src/resources.rs)）：`extract_resource` 命中缓存改为重算目标文件本体 sha256 与期望值比对（不再信任可伪造的同目录 `.sha256` 文本），不一致即重新覆盖写入；写入后追加 `restrict_file_permissions` 收紧权限（Windows icacls / Unix 0600）。SDK DLL、updater.exe、wintun.dll 等全部资源释放点随之受益。

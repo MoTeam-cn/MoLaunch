@@ -7,6 +7,7 @@ pub use client::{
     build_client, build_client_with_redirect, build_client_with_user_agent, build_stream_client,
     ClientBuildParams,
 };
+pub use tls::ignore_tls_allowed;
 
 use std::sync::{OnceLock, RwLock};
 use std::time::Duration;

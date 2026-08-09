@@ -145,7 +145,8 @@ fn build_client_inner(params: ClientBuildParams<'_>) -> reqwest::Client {
     if let Some(addr) = resolve_local_address(params.ip_version) {
         builder = builder.local_address(addr);
     }
-    builder = tls::configure(builder, params.trust_mode, params.ignore_tls);
+    // 通用客户端不绑定 base_url，无法低成本获知目标 host，保守禁用 IgnoreTls
+    builder = tls::configure(builder, params.trust_mode, None);
     builder = configure_proxy(
         builder,
         params.proxy_mode,

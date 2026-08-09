@@ -5,6 +5,7 @@
 //! `HKCU\Software\MoLaunch` 下 DeveloperUnlocked/DeveloperMode；DevTools 状态用 `AtomicBool` 维护。
 
 use crate::log_info;
+use crate::log_warn;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
 use crate::storage::registry::{reg_get_bool, reg_set_bool};
 use crate::storage::Storage;
@@ -77,6 +78,9 @@ pub fn lock_developer_mode(app: &AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// IgnoreTls 生效告警是否已输出（避免每次构建客户端重复刷日志）
+static IGNORE_TLS_WARNED: AtomicBool = AtomicBool::new(false);
+
 /// 查询是否忽略 TLS 证书校验（仅在开发者模式已开启时返回 true）
 ///
 /// 与 `is_developer_unlocked` 不同，本函数同时校验 `DeveloperUnlocked`
@@ -85,7 +89,11 @@ pub fn lock_developer_mode(app: &AppHandle) -> Result<(), String> {
 pub fn is_ignore_tls() -> bool {
     let unlocked = reg_get_bool(KEY_DEV_UNLOCKED).unwrap_or(false);
     let mode = reg_get_bool(KEY_DEV_MODE).unwrap_or(false);
-    unlocked && mode && reg_get_bool(KEY_IGNORE_TLS).unwrap_or(false)
+    let enabled = unlocked && mode && reg_get_bool(KEY_IGNORE_TLS).unwrap_or(false);
+    if enabled && !IGNORE_TLS_WARNED.swap(true, Ordering::SeqCst) {
+        log_warn!("[Developer] 已启用 IgnoreTls，仅对 localhost/127.0.0.1 生效");
+    }
+    enabled
 }
 
 /// 存储目录信息
