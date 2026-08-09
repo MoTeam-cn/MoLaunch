@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+- 修复 Release 内容生成（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：Contributors 与 commit by 署名头像改经 [images.weserv.nl](https://images.weserv.nl/) `mask=circle` 烘焙圆形 PNG 渲染——GitHub 正文 HTML sanitizer 会剥离 `<img>` 的 style/class（`border-radius` 圆角失效导致方块头像），圆角烘焙进图片本体可绕过清洗；移除 `href="#"` 空链接与 `@gravatar` 裸文字回退，仅当邮箱与登录名均缺失时才回退名字文字。
+
+- SDK 移除 updater FFI（[instance.rs](src-tauri/src/sdk/instance.rs) + [ffi_types.rs](src-tauri/src/sdk/ffi_types.rs) + [types.rs](src-tauri/src/sdk/types.rs) + [sdk.rs](src-tauri/src/commands/sdk.rs) + [manager.rs](src-tauri/src/commands/sdk/manager.rs) + [sdk-manager.ts](src/utils/api/sdk-manager.ts)）：新 SDK 已删除 `mc_update_check_lite` / `mc_update_free_info_lite` 导出，旧绑定将其视为必需符号导致整个 SDK lite 加载失败（`Failed to get mc_update_check_lite: GetProcAddress failed`）；移除 `FFIUpdateInfoLite`/`UpdateInfoLite` 结构、`update_check_lite()` 方法、`check_update_lite` 命令与前端 `CHECK_UPDATE_LITE` action 后 SDK 恢复加载；更新检测改由主包 tauri-plugin-updater 自研链路承担，不再依赖 SDK。
+
+## [0.3.5-rc2] - 2026-08-10
+
 - 消除 release 工作流 Node 20 弃用警告（[release.yml](.github/workflows/release.yml)）：`upload-artifact` v5→v6、`download-artifact` v5→v8、`action-gh-release` v2→v3，全部运行在 node24 运行时；`tauri-action` v0 与 `rust-cache` v2 本身已是 node24，无需变更。
 
 - cargo audit 剩余告警处理（[.cargo/audit.toml](.cargo/audit.toml)）：`rustls-pemfile`（RUSTSEC-2025-0134）已随依赖升级消除；其余 18 项告警逐一验证为上游锁定传递依赖（gtk-rs GTK3 系列 10 项 + glib 0.18.5 unsound 依赖 libappindicator 0.9.0→gtk 0.18；paste 1.0.15 经 tun-rs→netlink-packet-utils；proc-macro-error 1.0.4 经 glib-macros；unic-* 5 项经 tauri-utils→urlpattern 0.3.0），均无升级路径，已在 audit.toml 中按 advisory ID ignore 并逐条注明理由与移除条件。
