@@ -5,7 +5,7 @@
  *
  * 用法：node generate-release-content.cjs <prev_tag> <repo_url> <repo> [head_sha]
  * 环境变量：GITHUB_TOKEN 调 compare API 拉取协作者头像；GITHUB_OUTPUT 存在则写入，否则打印 stdout
- * 输出块：NOTES（作者的话）/ FEATURES / FIXES / OTHERS / CONTRIBUTORS
+ * 输出块：NOTES（作者的话）/ BREAKING（破坏性变更，置顶）/ FEATURES / FIXES / OTHERS（按类型分组）/ CONTRIBUTORS
  */
 'use strict';
 
@@ -38,22 +38,61 @@ function gitLog() {
   return out ? out.split('\n') : [];
 }
 
+const reSubject = /^([a-z]+)(?:\(([^)]+)\))?(!?[a-z]*):\s?(.*)$/i;
+
+const TYPE_GROUPS = [
+  { types: ['feat', 'feature'], key: 'FEATURES', header: '### 新增内容' },
+  { types: ['fix', 'bugfix'], key: 'FIXES', header: '### 修复' },
+  { types: ['perf'], key: 'OTHERS', header: '### 性能优化' },
+  { types: ['refactor'], key: 'OTHERS', header: '### 重构' },
+  { types: ['test', 'tests'], key: 'OTHERS', header: '### 测试' },
+  { types: ['build', 'ci'], key: 'OTHERS', header: '### 构建系统' },
+  { types: ['doc', 'docs'], key: 'OTHERS', header: '### 文档' },
+  { types: ['style'], key: 'OTHERS', header: '### 代码风格' },
+  { types: ['chore'], key: 'OTHERS', header: '### 杂项' }
+];
+
 function classify() {
-  const buckets = { NOTES: [], FEATURES: [], FIXES: [], OTHERS: [] };
+  const buckets = { NOTES: [], BREAKING: [], FEATURES: [], FIXES: [], OTHERS: [] };
+  const others = new Map();
+  let breakingShas = new Set();
+  try {
+    const range = PREV_TAG ? `${PREV_TAG}..${headRef()}` : headRef();
+    breakingShas = new Set(
+      run(`git log ${range} --no-merges --grep=BREAKING -i --format=%H`)
+        .split('\n').map((s) => s.trim()).filter(Boolean)
+    );
+  } catch (e) {
+    console.warn(`[generate-release-content] BREAKING CHANGE 检测失败: ${e.message}`);
+  }
   for (const line of gitLog()) {
     if (!line.trim()) continue;
     const [subject, short, full] = line.split('\t');
     if (subject.startsWith('note:')) {
       const note = subject.startsWith('note: ') ? subject.slice(6) : subject;
       buckets.NOTES.push(`- ${stripCi(note)}`);
-    } else if (subject.startsWith('feat:') || subject.startsWith('feat(')) {
-      buckets.FEATURES.push(`- ${stripCi(subject)} ([${short}](${REPO_URL}/commit/${full}))`);
-    } else if (subject.startsWith('fix:') || subject.startsWith('fix(')) {
-      buckets.FIXES.push(`- ${stripCi(subject)} ([${short}](${REPO_URL}/commit/${full}))`);
+      continue;
+    }
+    const entry = `- ${stripCi(subject)} ([${short}](${REPO_URL}/commit/${full}))`;
+    const bangIdx = subject.indexOf('!');
+    const isBreaking = breakingShas.has(full) || (bangIdx > 0 && /![\s:]/.test(subject.slice(bangIdx, bangIdx + 2)));
+    if (isBreaking) buckets.BREAKING.push(entry);
+    const m = subject.match(reSubject);
+    const type = m ? m[1].toLowerCase() : '';
+    const group = TYPE_GROUPS.find((g) => g.types.includes(type));
+    if (!group) {
+      if (!others.has('### 其他')) others.set('### 其他', []);
+      others.get('### 其他').push(entry);
+    } else if (group.key === 'FEATURES') {
+      buckets.FEATURES.push(entry);
+    } else if (group.key === 'FIXES') {
+      buckets.FIXES.push(entry);
     } else {
-      buckets.OTHERS.push(`- ${stripCi(subject)} ([${short}](${REPO_URL}/commit/${full}))`);
+      if (!others.has(group.header)) others.set(group.header, []);
+      others.get(group.header).push(entry);
     }
   }
+  for (const [header, entries] of others) buckets.OTHERS.push(`${header}\n${entries.join('\n')}`);
   return buckets;
 }
 
@@ -118,13 +157,14 @@ async function main() {
   const b = classify();
   const blocks = {};
   blocks.NOTES = b.NOTES.join('\n');
+  blocks.BREAKING = b.BREAKING.join('\n');
   blocks.FEATURES = b.FEATURES.join('\n');
   blocks.FIXES = b.FIXES.join('\n');
   blocks.OTHERS = b.OTHERS.join('\n');
   if (blocks.NOTES) blocks.NOTES = `###### 作者的话\n${blocks.NOTES}`;
+  if (blocks.BREAKING) blocks.BREAKING = `### 破坏性变更\n${blocks.BREAKING}`;
   if (blocks.FEATURES) blocks.FEATURES = `### 新增内容\n${blocks.FEATURES}`;
   if (blocks.FIXES) blocks.FIXES = `### 修复\n${blocks.FIXES}`;
-  if (blocks.OTHERS) blocks.OTHERS = `### 其他\n${blocks.OTHERS}`;
   const list = await contributors();
   blocks.CONTRIBUTORS = list
     ? `### 协作者\n\n感谢以下协作者对本阶段的贡献：\n\n${list}`

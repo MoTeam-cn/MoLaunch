@@ -407,6 +407,8 @@ jobs:
 
             ${{ steps.changelog.outputs.NOTES }}
 
+            ${{ steps.changelog.outputs.BREAKING }}
+
             ${{ steps.changelog.outputs.FEATURES }}
 
             ${{ steps.changelog.outputs.FIXES }}
