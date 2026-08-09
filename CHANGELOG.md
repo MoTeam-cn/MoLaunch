@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-- 加密方案升级至 SDK AES-256-CBC（[sdk_crypto.rs](src-tauri/src/utils/sdk_crypto.rs) + [crypto_v3.rs](src-tauri/src/migrations/crypto_v3.rs) 新增 + [registry.rs](src-tauri/src/minecraft/auth/storage/registry.rs) + [lib.rs](src-tauri/src/lib.rs)）：新写入统一走 SDK `mc_encrypt_token`（AES-256-CBC，密钥由 SDK 按盐+设备 ID 派生，协议见 [token-encryption.md](docs/token-encryption.md)），移除自实现 AES-256-GCM 写入路径；解密改为 SDK 优先（内部自动 AES→DES 回退）、失败回退旧 v2 文件级解密（master.key 改只读，不再自动创建）；新增启动时一次性加密迁移，升级后首次启动后台将存量 v2/DES 数据（认证注册表/auth.json、联机 device.json、FRP token、CurseForge/AI api_key）统一重加密为 SDK AES，完成写 `crypto_v3.done` 标记，失败不阻塞启动且保持原样。
+- 加密方案彻底依赖 SDK AES-256-CBC（[sdk_crypto.rs](src-tauri/src/utils/sdk_crypto.rs) + [crypto_v3.rs](src-tauri/src/migrations/crypto_v3.rs) + [instance.rs](src-tauri/src/sdk/instance.rs) + [ffi_types.rs](src-tauri/src/sdk/ffi_types.rs)）：删除自实现文件级加密（master.key / DPAPI / AES-256-GCM / `v2:` 前缀）全部路径，加解密完全由 SDK `mc_encrypt_token` / `mc_decrypt_token` 承担（AES-256-CBC 写入，解密自动兼容旧 DES，协议见 [token-encryption.md](docs/token-encryption.md)）；启动迁移改用 SDK 0.6.0 新增 `mc_decrypt_token_ex` 检测算法版本（1=DES 旧密文，2=AES 当前），仅将存量 DES(v1) 数据（认证注册表/auth.json、联机 device.json、FRP token、CurseForge/AI api_key）重加密为 AES(v2)，v2 数据直接跳过，完成写 `crypto_v3.done` 标记，失败不阻塞启动且保持原样。
 
 - 前端 lint 告警清零（[.eslintrc.cjs](.eslintrc.cjs) + 8 个组件文件）：`@typescript-eslint/no-unused-vars` 配置下划线忽略参数与 rest 解构兄弟字段；`Input.vue` 的 `maxlength`（默认 -1 不限制）、`ToggleRow.vue` 的 `description`/`tooltipText` 补默认值；6 处 `v-html` 点位加 eslint-disable 注释并注明安全兜底（renderMarkdown 的 DOMPurify 消毒 / MOTD 转义白名单 / 静态图标资源），`npm run lint` 现已零告警通过。
 

@@ -1,5 +1,5 @@
 //! SDK lite 版本绑定
-//! 只绑定 11 个基础函数
+//! 只绑定 12 个基础函数（decrypt_token_ex 为可选符号，旧库自动降级）
 
 use super::ffi_types::*;
 use super::types::*;
@@ -17,6 +17,7 @@ pub struct SdkFunctions {
     pub get_system_memory: McGetSystemMemory,
     pub encrypt_token: McEncryptToken,
     pub decrypt_token: McDecryptToken,
+    pub decrypt_token_ex: Option<McDecryptTokenEx>,
     pub update_check_lite: McUpdateCheckLite,
     pub update_free_info_lite: McUpdateFreeInfoLite,
 }
@@ -74,6 +75,7 @@ impl SdkInstance {
                 decrypt_token: *lib.get(b"mc_decrypt_token").map_err(|e| {
                     SdkError::LoadFailed(format!("Failed to get mc_decrypt_token: {}", e))
                 })?,
+                decrypt_token_ex: lib.get(b"mc_decrypt_token_ex").ok().map(|sym| *sym),
                 update_check_lite: *lib.get(b"mc_update_check_lite").map_err(|e| {
                     SdkError::LoadFailed(format!("Failed to get mc_update_check_lite: {}", e))
                 })?,
@@ -168,6 +170,26 @@ impl SdkInstance {
         unsafe { (self.functions.free_string)(result) };
 
         Ok(decrypted)
+    }
+
+    /// 解密 Token 并返回算法版本（1=DES(v1) 旧密文，2=AES(v2) 当前）
+    pub fn decrypt_token_with_version(&self, encrypted: &str) -> Result<(String, i32), SdkError> {
+        let decrypt_ex = self
+            .functions
+            .decrypt_token_ex
+            .ok_or_else(|| SdkError::LoadFailed("SDK 未导出 mc_decrypt_token_ex".to_string()))?;
+        let encrypted_cstr = std::ffi::CString::new(encrypted)
+            .map_err(|e| SdkError::InvalidParameter(e.to_string()))?;
+        let mut version: i32 = 0;
+        let result = unsafe { decrypt_ex(encrypted_cstr.as_ptr(), &mut version) };
+        if result.is_null() {
+            return Err(SdkError::NullPointer);
+        }
+        let decrypted = unsafe { std::ffi::CStr::from_ptr(result) }
+            .to_string_lossy()
+            .to_string();
+        unsafe { (self.functions.free_string)(result) };
+        Ok((decrypted, version))
     }
 
     /// 检查更新（轻量版，无需 handle）

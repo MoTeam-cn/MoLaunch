@@ -1,7 +1,7 @@
 //! 联机设备凭证持久化模块
 //! 存储路径：Windows `%APPDATA%/.Molaunch/online/device.json`，macOS/Linux `~/.config/Molaunch/online/device.json`。
 //! 旧路径（v1 已废弃）`<exe_dir>/.Molaunch/online/device.json` 启动时由 `migrations::online_legacy` 自动迁移。
-//! 加密策略：文件整体 JSON 序列化后用文件级强加密（AES-256-GCM，v2: 前缀）；旧 SDK DES 数据解密时自动回退。
+//! 加密策略：文件整体 JSON 序列化后用 SDK 加密（AES-256-CBC），解密自动兼容旧 DES。
 
 use crate::log_warn;
 use crate::migrations::online_legacy::legacy_device_path;
@@ -95,7 +95,7 @@ impl DeviceCredentials {
 
 /// 联机设备凭证存储
 ///
-/// 与 `minecraft::auth::storage::AuthStorage` 平级，使用相同的文件级强加密机制，
+/// 与 `minecraft::auth::storage::AuthStorage` 平级，使用相同的 SDK 加密机制，
 /// 但存储位置不同（文件 vs 注册表），避免与 MC 账号数据混淆。
 pub struct OnlineStorage {
     sdk: Arc<TokioMutex<Option<SdkInstance>>>,
@@ -106,14 +106,14 @@ impl OnlineStorage {
         Self { sdk }
     }
 
-    /// 加密字符串（文件级 AES-256-GCM）
+    /// 加密字符串（SDK AES-256-CBC）
     async fn encrypt(&self, data: &str) -> Result<String, String> {
-        crate::utils::sdk_crypto::encrypt_with_secure_sdk(&self.sdk, data, "联机设备凭证").await
+        crate::utils::sdk_crypto::encrypt_with_sdk(&self.sdk, data, "联机设备凭证").await
     }
 
-    /// 解密字符串（优先文件级，回退 SDK DES）
+    /// 解密字符串（SDK 解密，自动兼容旧 DES）
     async fn decrypt(&self, data: &str) -> Result<String, String> {
-        crate::utils::sdk_crypto::decrypt_with_secure_sdk(&self.sdk, data, "联机设备凭证").await
+        crate::utils::sdk_crypto::decrypt_with_sdk(&self.sdk, data, "联机设备凭证").await
     }
 
     /// 加载设备凭证

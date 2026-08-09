@@ -1,7 +1,8 @@
-//! 加密格式迁移：存量 v2 文件级 / SDK DES 数据统一重加密为 SDK AES-256-CBC。
+//! 加密格式迁移：存量 SDK DES(v1) 数据重加密为 AES(v2)。
 //!
-//! 升级后首次启动执行一次（后台，不阻塞 UI）；完成后写标记文件，后续启动跳过。
-//! 解密失败的条目保持原样（解密链仍兼容旧格式），不会破坏已有数据。
+//! 通过 `mc_decrypt_token_ex` 检测算法版本（1=DES 旧密文，2=AES 当前），
+//! 仅 v1 数据解密后重加密为 v2；v2 / 无法解密条目保持原样。
+//! 升级后首次启动执行一次（后台，不阻塞 UI），完成后写标记文件。
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -14,16 +15,20 @@ use crate::sdk::SdkInstance;
 /// 迁移完成标记文件名（AppData 根目录）
 const DONE_MARK: &str = "crypto_v3.done";
 
-/// 将单条加密值迁移为 SDK AES 格式；无法解密（明文/损坏）返回 None（保持原样）
+/// 将单条加密值迁移为 SDK AES 格式；仅 DES(v1) 旧密文重加密，其余（v2/明文/损坏）保持原样
 async fn migrate_value(
     sdk_arc: &Arc<TokioMutex<Option<SdkInstance>>>,
     value: &str,
     ctx: &str,
 ) -> Option<String> {
-    let plain = match crate::utils::sdk_crypto::decrypt_with_sdk(sdk_arc, value, ctx).await {
-        Ok(p) => p,
-        Err(_) => crate::utils::sdk_crypto::decrypt_file_securely(value).ok()?,
-    };
+    let (plain, version) =
+        match crate::utils::sdk_crypto::decrypt_with_sdk_version(sdk_arc, value, ctx).await {
+            Ok(r) => r,
+            Err(_) => return None,
+        };
+    if version != 1 {
+        return None;
+    }
     match crate::utils::sdk_crypto::encrypt_with_sdk(sdk_arc, &plain, ctx).await {
         Ok(enc) => Some(enc),
         Err(e) => {
@@ -245,7 +250,7 @@ pub async fn migrate(sdk_arc: &Arc<TokioMutex<Option<SdkInstance>>>) {
         return;
     }
 
-    log_info!("[CryptoV3] 开始迁移加密数据（v2/DES → SDK AES-256-CBC）");
+    log_info!("[CryptoV3] 开始迁移加密数据（DES v1 → SDK AES v2）");
 
     #[cfg(windows)]
     migrate_registry_auth(sdk_arc).await;

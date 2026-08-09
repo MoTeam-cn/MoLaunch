@@ -161,7 +161,7 @@ pub fn run() {
             let state = app.state::<AppState>().inner().clone();
             let _ = state.app_handle.set(app.handle().clone());
 
-            // 加密迁移：升级后首次启动将存量 v2/DES 数据重加密为 SDK AES（后台执行，不阻塞 UI）
+            // 加密迁移：升级后首次启动将存量 DES(v1) 数据重加密为 SDK AES(v2)（后台执行，不阻塞 UI）
             let migrate_sdk = state.sdk.clone();
             tauri::async_runtime::spawn(async move {
                 migrations::crypto_v3::migrate(&migrate_sdk).await;

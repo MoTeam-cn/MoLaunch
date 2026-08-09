@@ -42,5 +42,7 @@ pub type McGetDeviceId = unsafe extern "C" fn() -> *mut std::ffi::c_char;
 pub type McGetSystemMemory = unsafe extern "C" fn(*mut FFISystemMemory) -> i32;
 pub type McEncryptToken = unsafe extern "C" fn(*const std::ffi::c_char) -> *mut std::ffi::c_char;
 pub type McDecryptToken = unsafe extern "C" fn(*const std::ffi::c_char) -> *mut std::ffi::c_char;
+pub type McDecryptTokenEx =
+    unsafe extern "C" fn(*const std::ffi::c_char, *mut std::ffi::c_int) -> *mut std::ffi::c_char;
 pub type McUpdateCheckLite = unsafe extern "C" fn(*mut FFIUpdateInfoLite) -> i32;
 pub type McUpdateFreeInfoLite = unsafe extern "C" fn(*mut FFIUpdateInfoLite);

@@ -104,9 +104,13 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "sdk/run_sdk_lib-windows-x86_64.dll" => Some(include_bytes!(
             "../resources/sdk/run_sdk_lib-windows-x86_64.dll"
         )),
-        #[cfg(target_os = "macos")]
-        "sdk/run_sdk_lib-darwin-aarch64.dylib" => Some(include_bytes!(
-            "../resources/sdk/run_sdk_lib-darwin-aarch64.dylib"
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        "sdk/run_sdk_lib-macos-aarch64.dylib" => Some(include_bytes!(
+            "../resources/sdk/run_sdk_lib-macos-aarch64.dylib"
+        )),
+        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+        "sdk/run_sdk_lib-macos-x86_64.dylib" => Some(include_bytes!(
+            "../resources/sdk/run_sdk_lib-macos-x86_64.dylib"
         )),
         #[cfg(target_os = "linux")]
         "sdk/run_sdk_lib-linux-x86_64.so" => Some(include_bytes!(
