@@ -1,0 +1,4 @@
+contact_links:
+  - name: 搜索已有问题
+    url: https://github.com/MoTeam-cn/MoLaunch/issues?q=
+    about: 提交新 Issue 前，请先搜索是否已存在相同问题，避免重复反馈。

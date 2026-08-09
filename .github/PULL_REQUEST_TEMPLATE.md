@@ -1,6 +1,6 @@
 ## 变更说明
 
-请简洁说明本次改动的内容与动机，遵循仓库提交规范（见 `DEVELOPMENT_GUIDELINES.md` 第二节）：
+请简洁说明本次改动的内容与动机，遵循仓库提交规范（见 [CONTRIBUTING.md](/CONTRIBUTING.md) 与 `DEVELOPMENT_GUIDELINES.md` 第二节）：
 
 - 变更类型 + 影响范围：`type(scope): 描述`
 - 提交信息需带 `!c` 标记（跳过 CI 重复构建）

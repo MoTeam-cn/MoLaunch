@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 新增 `CONTRIBUTING.md` 贡献指南，并补充 `.github` 配置：Issue 模板选择器（config.yml）与依赖自动更新（dependabot：npm / cargo / GitHub Actions，每周检查）。
+
 - 开发文档 `DEVELOPMENT_GUIDELINES.md`（开发规范）与 `DEVELOPMENT_BLUEPRINT.md`（架构蓝图）纳入版本控制（此前为 git 排除的内部文档）。
 
 - 新增 GitHub Issue / PR 预设模板（`.github/ISSUE_TEMPLATE/`）：Bug 报告、功能建议、使用提问三个 Issue 模板（参考 reqable-app 结构），以及 `PULL_REQUEST_TEMPLATE.md`（含仓库提交规范 `type(scope): 描述 + !c`、CHANGELOG 同步与本地验证 checklist）。
