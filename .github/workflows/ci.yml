@@ -29,7 +29,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  NODE_VERSION: '18'
+  # Node 22：@vitejs/plugin-vue@6 的 getHash 使用 crypto.hash（Node 21.7+ 才有），Node 18 下前端构建失败
+  NODE_VERSION: '22'
 
 jobs:
   # 检查是否跳过 CI
@@ -131,9 +132,11 @@ jobs:
         working-directory: src-tauri
 
       - name: Security audit (cargo)
-        uses: rustsec/rustsec-action@master
+        uses: actions-rust-lang/audit@v1
         with:
-          lockfile: src-tauri/Cargo.lock
+          file: src-tauri/Cargo.lock
+          # 与原 rustsec-action 行为一致：仅 CI 报告，不自动创建 issue
+          createIssues: false
 
   # Rust 测试
   rust-test:

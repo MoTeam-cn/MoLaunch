@@ -23,7 +23,8 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  NODE_VERSION: '18'
+  # Node 22：@vitejs/plugin-vue@6 的 getHash 使用 crypto.hash（Node 21.7+ 才有），Node 18 下前端构建失败
+  NODE_VERSION: '22'
 
 permissions:
   contents: write
