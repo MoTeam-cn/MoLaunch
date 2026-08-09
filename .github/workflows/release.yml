@@ -135,7 +135,7 @@ jobs:
           ls -la src-tauri/resources/updater/updater.exe
 
       - name: Build Tauri
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # 启用签名（tauri-action 检测到此环境变量后自动对安装包签名，生成 .sig 文件）
