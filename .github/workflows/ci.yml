@@ -83,6 +83,9 @@ jobs:
       - name: Type check
         run: npm run typecheck
 
+      - name: Security audit (npm)
+        run: npm audit --audit-level=high
+
   # Rust 格式检查
   rust-fmt:
     name: Rust Format
@@ -126,6 +129,11 @@ jobs:
         run: mkdir -p dist
       - run: cargo clippy --all-features -- -D warnings
         working-directory: src-tauri
+
+      - name: Security audit (cargo)
+        uses: rustsec/rustsec-action@master
+        with:
+          lockfile: src-tauri/Cargo.lock
 
   # Rust 测试
   rust-test:
