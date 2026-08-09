@@ -36,7 +36,8 @@ const renderColor = computed(
 
 <template>
   <span class="inline-flex items-center justify-center shrink-0" aria-hidden="true">
-    <span v-if="renderColor" class="model-icon-raw w-full h-full" v-html="colorRaw" />
+    <!-- eslint-disable-next-line vue/no-v-html -- colorRaw 为静态品牌图标资源，无用户输入 -->
+      <span v-if="renderColor" class="model-icon-raw w-full h-full" v-html="colorRaw" />
     <img v-else :src="monoUrl" alt="" class="w-full h-full object-contain" />
   </span>
 </template>

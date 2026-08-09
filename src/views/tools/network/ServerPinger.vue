@@ -118,11 +118,13 @@ function latencyColor(ms: number): string {
                 class="h-12 w-12 flex-none rounded"
               />
               <div class="flex-1 min-w-0">
+                <!-- eslint-disable vue/no-v-html -- parseMcMotd 先 HTML 转义再按 COLOR_MAP 白名单拼色值 -->
                 <div
                   v-if="motdColored && result.motd_raw"
                   class="text-sm whitespace-pre-wrap break-words leading-relaxed"
                   v-html="parseMcMotd(result.motd_raw)"
                 />
+                <!-- eslint-enable vue/no-v-html -->
                 <div v-else class="text-sm text-gray-800 whitespace-pre-wrap break-words leading-relaxed">
                   {{ result.motd || '（无 MOTD）' }}
                 </div>

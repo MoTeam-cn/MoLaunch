@@ -149,6 +149,7 @@ async function runAnalyze(text?: string) {
             <div v-if="conclusion" class="pt-2">
               <div class="mb-1.5 text-xs font-medium text-gray-500">分析结论</div>
               <div class="max-h-72 overflow-auto rounded-md bg-gray-50">
+                <!-- eslint-disable-next-line vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒 -->
                 <div ref="resultRef" class="markdown-body px-3 py-2.5 text-sm leading-relaxed text-gray-700" v-html="renderMarkdown(conclusion)" />
               </div>
             </div>

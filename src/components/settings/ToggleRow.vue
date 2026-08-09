@@ -28,6 +28,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  description: '',
+  tooltipText: '',
   position: 'top',
   delay: 0,
   hover: true,

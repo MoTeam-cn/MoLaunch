@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 前端 lint 告警清零（[.eslintrc.cjs](.eslintrc.cjs) + 8 个组件文件）：`@typescript-eslint/no-unused-vars` 配置下划线忽略参数与 rest 解构兄弟字段；`Input.vue` 的 `maxlength`（默认 -1 不限制）、`ToggleRow.vue` 的 `description`/`tooltipText` 补默认值；6 处 `v-html` 点位加 eslint-disable 注释并注明安全兜底（renderMarkdown 的 DOMPurify 消毒 / MOTD 转义白名单 / 静态图标资源），`npm run lint` 现已零告警通过。
+
 - 代码风格清理（cargo fmt 与 clippy）：对安全修复引入的代码执行 rustfmt 格式化（certs/manage.rs、plugins/layout.rs、plugins/spawn.rs、resources.rs、utils/path.rs），修复 `needless_borrow`（extract.rs）与 `manual_is_multiple_of`（bridge.rs）两处 clippy 告警；`cargo clippy --all-features -D warnings` 与 `cargo fmt --check` 现已零告警通过（对齐 CI 门禁）。
 
 - 自定义根证书校验加固（[manage.rs](src-tauri/src/certs/manage.rs) + [perms.rs](src-tauri/src/minecraft/system/shell/perms.rs) + [Cargo.toml](src-tauri/Cargo.toml)）：`add_custom_cert` 写盘前用 `x509-parser` 校验 BasicConstraints `CA:TRUE` 与有效期（区分未生效/已过期，错误携带主题 CN），叶子证书/任意 PEM 不再能被加入信任链；`cert_dir` 每次返回前收紧目录权限（Windows icacls 当前用户 / Unix 0700，新增公共 `restrict_dir_permissions`，可自愈旧版本宽权限目录）。

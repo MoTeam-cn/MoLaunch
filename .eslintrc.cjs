@@ -14,6 +14,11 @@ module.exports = {
   },
   rules: {
     'vue/multi-word-component-names': 'off',
+    // 下划线前缀参数/变量表示"有意忽略"，rest 解构中忽略的兄弟字段不视为未使用
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      { argsIgnorePattern: '^_', ignoreRestSiblings: true },
+    ],
   },
   ignorePatterns: [
     'src-tauri/resources/view/*.min.js',

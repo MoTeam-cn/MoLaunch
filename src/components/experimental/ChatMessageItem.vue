@@ -167,6 +167,7 @@ function saveEdit() {
             class="max-h-64 overflow-y-auto rounded bg-gray-100/90 px-2.5 py-2 text-xs leading-relaxed whitespace-pre-wrap break-words text-gray-600"
           >{{ message.reasoningContent }}</div>
         </div>
+        <!-- eslint-disable vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒 -->
         <div
           v-if="message.content"
           ref="markdownBodyRef"
@@ -174,6 +175,7 @@ function saveEdit() {
           @click="handleMarkdownLinkClick"
           v-html="renderMarkdown(message.content)"
         />
+        <!-- eslint-enable vue/no-v-html -->
         <div v-else-if="!message.reasoningContent" class="flex items-center gap-1.5 text-gray-400">
           <span class="stream-caret" />
           <!-- 初始等待（无正文/思考/工具）显示「正在思考如何回答…」；工具调用/提问过渡期显示「正在进行下一步…」 -->

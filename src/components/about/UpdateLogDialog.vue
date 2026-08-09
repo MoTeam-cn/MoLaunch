@@ -66,11 +66,13 @@ function onOpenFullLog() {
         class="mb-2 flex gap-2 rounded-md border border-primary-200 bg-primary-50 px-3 py-2.5"
       >
         <ChatBubbleOvalLeftIcon class="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
+        <!-- eslint-disable vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒 -->
         <div
           class="markdown-body min-w-0 flex-1 text-xs leading-relaxed text-gray-700"
           @click="handleMarkdownLinkClick"
           v-html="renderMarkdown(note)"
         />
+        <!-- eslint-enable vue/no-v-html -->
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto rounded-md bg-gray-50 p-3">
         <ReleaseTimeline :notes="getChangelogContent()" />

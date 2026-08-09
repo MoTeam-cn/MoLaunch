@@ -25,13 +25,14 @@ function toggleCollapsed(index: number): void {
 <template>
   <div v-if="segments.length">
     <!-- 无版本标题：退化为整段 Markdown 渲染（历史单段数据） -->
-    <!-- eslint-disable-next-line vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒；链接点击由 handleMarkdownLinkClick 走系统浏览器 -->
+    <!-- eslint-disable vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒；链接点击由 handleMarkdownLinkClick 走系统浏览器 -->
     <div
       v-if="!hasVersioned"
       class="markdown-body text-xs text-gray-600 leading-relaxed"
       @click="handleMarkdownLinkClick"
       v-html="segments[0].html"
     />
+    <!-- eslint-enable vue/no-v-html -->
 
     <!-- 时间线：左侧竖线串起各版本节点 -->
     <ol v-else class="release-timeline">

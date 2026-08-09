@@ -57,6 +57,7 @@ const props = withDefaults(defineProps<Props>(), {
   disabled: false,
   readonly: false,
   clearable: false,
+  maxlength: -1,
   size: 'default',
   textarea: false,
   rows: 3,
