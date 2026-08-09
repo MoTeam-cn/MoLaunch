@@ -326,25 +326,25 @@ jobs:
           ref: v${{ inputs.version }}
 
       - name: Download Windows setup artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-setup
           path: artifacts/windows
 
       - name: Download macOS package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: macos-package
           path: artifacts/macos
 
       - name: Download Linux package artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-package
           path: artifacts/linux
 
       - name: Download Windows portable artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-portable
           path: artifacts/windows
