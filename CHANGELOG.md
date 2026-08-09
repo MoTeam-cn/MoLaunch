@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 新增 GitHub Issue / PR 预设模板（`.github/ISSUE_TEMPLATE/`）：Bug 报告、功能建议、使用提问三个 Issue 模板（参考 reqable-app 结构），以及 `PULL_REQUEST_TEMPLATE.md`（含仓库提交规范 `type(scope): 描述 + !c`、CHANGELOG 同步与本地验证 checklist）。
+
 - 下载管理进度推送由自建 WebSocket 改回 Tauri plugin event（emit）方案：删除 `src-tauri/src/ws/` 模块（server/auth/mod）与 `tokio-tungstenite` 依赖，`AppState` 移除 `progress_tx`/`ws_port`/`ws_token`（新增 `app_handle` 于 setup 注入），`get_ws_port` IPC 与前端 `getWsPort` 工具移除；后端所有进度/阶段/完成/暂停/恢复/取消推送统一走 `app.emit("download-progress")`（含整合包安装、资源下载等 `broadcast_current` 全部路径），前端 `useDownloadStream.ts` 从「getWsPort 建连 + auth 鉴权 + 3 秒重连」改为订阅 `download-progress` 事件（模块级单例监听，无需按下载状态建连断开），初始状态恢复链路（`isDownloading` + `getDownloadProgress` IPC）保留。
 
 - 修复管理员提权重启不生效（UAC 确认后程序不重启）：`commands/online/manager/tun.rs` 提权启动改为携带 `--restart-as-admin` 参数，`src-tauri/src/lib.rs` 启动时检测该参数则跳过 `single-instance` 插件注册——此前新进程会被单实例插件识别为"第二实例"强制退出（旧进程 500ms 后才退出），导致 UAC 弹出但最终没有任何实例存活。
