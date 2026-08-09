@@ -32,6 +32,21 @@ const stripCi = (s) => (s.endsWith(' !c') ? s.slice(0, -3) : s);
 const esc = (s) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+const avatarSrc = (p) => {
+  if (p.avatarUrl) return p.avatarUrl.split('?')[0];
+  if (p.login) return `https://avatars.githubusercontent.com/${p.login}`;
+  if (p.email) {
+    const hash = crypto.createHash('md5').update(p.email.trim().toLowerCase()).digest('hex');
+    return `https://www.gravatar.com/avatar/${hash}?d=identicon`;
+  }
+  return '';
+};
+
+const avatarImg = (src, size) => {
+  const origin = encodeURIComponent(src.replace(/^https?:\/\//, ''));
+  return `https://images.weserv.nl/?url=${origin}&w=${size}&h=${size}&fit=cover&mask=circle`;
+};
+
 function gitLog() {
   const range = PREV_TAG ? `${PREV_TAG}..${headRef()}` : headRef();
   const limit = PREV_TAG ? '' : ' | head -50';
@@ -58,12 +73,15 @@ function classify(authors) {
   const others = new Map();
   const byline = (email, name) => {
     const key = (email || '').trim().toLowerCase();
-    const p = key ? authors.get(key) : null;
-    if (p && p.login) return `*(commit by [@${p.login}](https://github.com/${p.login}))*`;
     if (!key) return '';
-    const hash = crypto.createHash('md5').update(key).digest('hex');
-    const src = `https://www.gravatar.com/avatar/${hash}?s=20&d=identicon`;
-    return `*(commit by <img src="${src}" width="20" height="20" alt="${esc(name)}" /> ${esc(name)})*`;
+    const p = authors.get(key);
+    const src = avatarSrc(p || { name, email: key });
+    if (!src) return '';
+    const label = p && p.login ? `@${p.login}` : name;
+    const img = `<img src="${avatarImg(src, 20)}" width="20" height="20" alt="${esc(label)}" />`;
+    return p && p.login
+      ? `*(commit by <a href="https://github.com/${p.login}">${img}</a> ${esc(label)})*`
+      : `*(commit by ${img} ${esc(label)})*`;
   };
   let breakingShas = new Set();
   try {
@@ -152,20 +170,13 @@ async function fetchAuthors() {
 function contributorsBlock(authors) {
   if (!authors.size) return '';
   const avatar = (p) => {
-    const { name, email, login, avatarUrl } = p;
-    const label = login ? `@${login}` : name;
-    let src = avatarUrl;
-    if (!src && login) src = `https://avatars.githubusercontent.com/${login}?s=64`;
-    if (!src && email) {
-      const hash = crypto.createHash('md5').update(email.toLowerCase()).digest('hex');
-      src = `https://www.gravatar.com/avatar/${hash}?s=64&d=identicon`;
-    }
-    if (!src) return name;
-    const href = login ? `https://github.com/${login}` : '#';
-    const srcAttr = /\bs=\d+/.test(src) ? src : `${src}${src.includes('?') ? '&' : '?'}s=64`;
-    return `<a href="${href}" title="${label}"><img src="${srcAttr}" width="48" height="48" alt="${label}" /></a>`;
+    const src = avatarSrc(p);
+    if (!src) return '';
+    const label = p.login ? `@${p.login}` : p.name;
+    const img = `<img src="${avatarImg(src, 48)}" width="48" height="48" alt="${esc(label)}" />`;
+    return p.login ? `<a href="https://github.com/${p.login}">${img}</a>` : img;
   };
-  return [...authors.values()].map(avatar).join(' ');
+  return [...authors.values()].map(avatar).filter(Boolean).join(' ');
 }
 
 async function main() {
