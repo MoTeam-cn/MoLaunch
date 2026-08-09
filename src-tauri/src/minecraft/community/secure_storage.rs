@@ -1,6 +1,6 @@
 //! CurseForge API Key 加密存储（INI + 懒加载）
 //!
-//! enabled 明文存 INI；api_key 用 SDK DES 加密后存 INI。
+//! enabled 明文存 INI；api_key 用文件级强加密（AES-256-GCM）后存 INI。
 //! 懒加载：不在启动时解密，避免触发杀软启发式；首次 CF 请求时于异步上下文解密并缓存。
 
 use crate::error_util::log_err;
@@ -13,7 +13,7 @@ use tokio::sync::Mutex as TokioMutex;
 const SECTION: &str = "CurseForge";
 /// INI key：启用开关（明文）
 const KEY_ENABLED: &str = "enabled";
-/// INI key：API Key（DES 加密后字符串）
+/// INI key：API Key（文件级强加密后字符串）
 const KEY_API_KEY: &str = "api_key";
 
 /// 内存状态
@@ -153,7 +153,7 @@ pub async fn save(
     let stored_key = if api_key.is_empty() {
         String::new()
     } else {
-        crate::utils::sdk_crypto::encrypt_with_sdk(&sdk_arc, api_key, "CF API Key").await?
+        crate::utils::sdk_crypto::encrypt_with_secure_sdk(&sdk_arc, api_key, "CF API Key").await?
     };
     storage
         .set_config(SECTION, KEY_API_KEY, &stored_key)

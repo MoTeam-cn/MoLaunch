@@ -1,6 +1,6 @@
-//! AI 配置持久化（config.ini [AI] 段 + SDK DES 加密 api_key）
+//! AI 配置持久化（config.ini [AI] 段 + 文件级强加密 api_key）
 //!
-//! api_key 用 SDK DES 加密后存 INI，其余字段明文。懒加载：不在启动时解密，
+//! api_key 用文件级强加密（AES-256-GCM）后存 INI，其余字段明文。懒加载：不在启动时解密，
 //! 避免触发杀软启发式；首次 async 请求时解密并缓存（参照 CurseForge 模式）。
 
 use std::sync::{Arc, OnceLock, RwLock};
@@ -15,7 +15,7 @@ use crate::storage::Storage;
 const SECTION: &str = "AI";
 /// INI key：服务地址（明文）
 const KEY_BASE_URL: &str = "base_url";
-/// INI key：API Key（DES 加密后字符串）
+/// INI key：API Key（文件级强加密后字符串）
 const KEY_API_KEY: &str = "api_key";
 /// INI key：超时秒数（明文）
 const KEY_TIMEOUT: &str = "timeout_secs";
@@ -136,7 +136,7 @@ pub async fn load_async() -> AiConfig {
     load()
 }
 
-/// 保存配置到 INI（api_key 经 SDK DES 加密）并更新内存缓存
+/// 保存配置到 INI（api_key 经文件级强加密）并更新内存缓存
 pub async fn save(
     sdk_arc: &Arc<TokioMutex<Option<SdkInstance>>>,
     config: &AiConfig,
@@ -179,7 +179,8 @@ pub async fn save(
     let stored_key = if config.api_key.is_empty() {
         String::new()
     } else {
-        crate::utils::sdk_crypto::encrypt_with_sdk(sdk_arc, &config.api_key, "AI API Key").await?
+        crate::utils::sdk_crypto::encrypt_with_secure_sdk(sdk_arc, &config.api_key, "AI API Key")
+            .await?
     };
     storage
         .set_config(SECTION, KEY_API_KEY, &stored_key)

@@ -1,4 +1,4 @@
-//! FRP 厂商认证 token 存储：文件 + SDK DES 加密（全局共享设备级数据）
+//! FRP 厂商认证 token 存储：文件 + 文件级强加密（全局共享设备级数据）
 
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, OnceLock};
@@ -28,15 +28,15 @@ pub(super) struct TokenRecord {
     pub scopes: Option<Vec<String>>,
 }
 
-/// 加密字符串（SDK 内置 DES）
+/// 加密字符串（文件级 AES-256-GCM）
 async fn encrypt(data: &str) -> Result<String, String> {
     let sdk_arc = SDK_REF
         .get()
         .ok_or_else(|| "SDK 未注入，无法加密 token".to_string())?;
-    crate::utils::sdk_crypto::encrypt_with_sdk(sdk_arc, data, "FRP token").await
+    crate::utils::sdk_crypto::encrypt_with_secure_sdk(sdk_arc, data, "FRP token").await
 }
 
-/// 解密字符串（SDK 内置 DES）；SDK 不可用时视为无 token
+/// 解密字符串（优先文件级，回退 SDK DES）；失败时视为无 token
 async fn decrypt(data: &str) -> Option<String> {
     let sdk_arc = match SDK_REF.get() {
         Some(arc) => arc.clone(),
@@ -50,7 +50,7 @@ async fn decrypt(data: &str) -> Option<String> {
 
 /// 存储完整 token 信息（OAuth2 / Device Code 认证成功后调用）
 ///
-/// 整份 TokenRecord 序列化后经 SDK DES 加密写入 `{provider_id}.json`。
+/// 整份 TokenRecord 序列化后经文件级强加密写入 `{provider_id}.json`。
 /// `expires_in` 为相对秒数，内部换算为绝对过期时间存储。
 pub(super) async fn store_token_info(
     provider_id: &str,
