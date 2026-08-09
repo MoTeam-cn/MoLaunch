@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- Release 内容为每条提交追加 requarks 风格署名（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：`classify` 的 `git log` 输出新增 author email/name，作者数据改为 `fetchAuthors()` 统一从 git + compare API 构建并复用（`classify` 与协作者区块共用）；署名命中 GitHub 登录名时渲染 `*(commit by [@login](url))*`（GitHub 原生渲染头像），邮箱查不到 GitHub 账号时用 Gravatar 小头像（20px `<img>` + md5 邮箱 identicon）兜底，比 requarks 的纯文本 `@login` 覆盖更全。
+
 - Release 分类结构参考 requarks/changelog-action 细化（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs) + [.github/workflows/release.yml](.github/workflows/release.yml)）：
   - 「其他」不再一锅端，按常规提交类型细分为独立小节：性能优化 / 重构 / 测试 / 构建系统 / 文档 / 代码风格 / 杂项 / 其他（各小节 `###` 标题，无提交则不渲染）；
   - 新增「破坏性变更」小节置顶：conventional `type!: / type(scope)!:` 写法或 message 含 `BREAKING CHANGE` 的提交归入（`!c` 为 CI 跳过标记，不会误判），release body 在 NOTES 之后、FEATURES 之前渲染；

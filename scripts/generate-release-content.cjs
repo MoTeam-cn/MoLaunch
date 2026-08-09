@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 /* eslint-env node */
 /**
- * generate-release-content.cjs — 生成 GitHub Release 分类内容
- *
+ * 生成 GitHub Release 分类内容
  * 用法：node generate-release-content.cjs <prev_tag> <repo_url> <repo> [head_sha]
- * 环境变量：GITHUB_TOKEN 调 compare API 拉取协作者头像；GITHUB_OUTPUT 存在则写入，否则打印 stdout
- * 输出块：NOTES（作者的话）/ BREAKING（破坏性变更，置顶）/ FEATURES / FIXES / OTHERS（按类型分组）/ CONTRIBUTORS
+ * 环境变量：GITHUB_TOKEN 调 compare API 拉取协作者头像；GITHUB_OUTPUT 存在则写入 stdout
  */
 'use strict';
 
@@ -31,10 +29,13 @@ const run = (cmd) =>
 
 const stripCi = (s) => (s.endsWith(' !c') ? s.slice(0, -3) : s);
 
+const esc = (s) =>
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
 function gitLog() {
   const range = PREV_TAG ? `${PREV_TAG}..${headRef()}` : headRef();
   const limit = PREV_TAG ? '' : ' | head -50';
-  const out = run(`git log ${range} --no-merges --format=%s%x09%h%x09%H${limit}`);
+  const out = run(`git log ${range} --no-merges --format=%s%x09%h%x09%H%x09%ae%x09%an${limit}`);
   return out ? out.split('\n') : [];
 }
 
@@ -52,9 +53,18 @@ const TYPE_GROUPS = [
   { types: ['chore'], key: 'OTHERS', header: '### 杂项' }
 ];
 
-function classify() {
+function classify(authors) {
   const buckets = { NOTES: [], BREAKING: [], FEATURES: [], FIXES: [], OTHERS: [] };
   const others = new Map();
+  const byline = (email, name) => {
+    const key = (email || '').trim().toLowerCase();
+    const p = key ? authors.get(key) : null;
+    if (p && p.login) return `*(commit by [@${p.login}](https://github.com/${p.login}))*`;
+    if (!key) return '';
+    const hash = crypto.createHash('md5').update(key).digest('hex');
+    const src = `https://www.gravatar.com/avatar/${hash}?s=20&d=identicon`;
+    return `*(commit by <img src="${src}" width="20" height="20" alt="${esc(name)}" /> ${esc(name)})*`;
+  };
   let breakingShas = new Set();
   try {
     const range = PREV_TAG ? `${PREV_TAG}..${headRef()}` : headRef();
@@ -67,13 +77,13 @@ function classify() {
   }
   for (const line of gitLog()) {
     if (!line.trim()) continue;
-    const [subject, short, full] = line.split('\t');
+    const [subject, short, full, email, authorName] = line.split('\t');
     if (subject.startsWith('note:')) {
       const note = subject.startsWith('note: ') ? subject.slice(6) : subject;
       buckets.NOTES.push(`- ${stripCi(note)}`);
       continue;
     }
-    const entry = `- ${stripCi(subject)} ([${short}](${REPO_URL}/commit/${full}))`;
+    const entry = `- ${stripCi(subject)} ([${short}](${REPO_URL}/commit/${full})) ${byline(email, authorName)}`;
     const bangIdx = subject.indexOf('!');
     const isBreaking = breakingShas.has(full) || (bangIdx > 0 && /![\s:]/.test(subject.slice(bangIdx, bangIdx + 2)));
     if (isBreaking) buckets.BREAKING.push(entry);
@@ -96,7 +106,7 @@ function classify() {
   return buckets;
 }
 
-async function contributors() {
+async function fetchAuthors() {
   const headSha = run(`git rev-parse ${headRef()}`);
   let baseSha;
   try {
@@ -116,7 +126,7 @@ async function contributors() {
       authors.set(key, { name: name.trim(), email: (email || '').trim(), login: '', avatarUrl: '' });
     }
   }
-  if (!authors.size) return '';
+  if (!authors.size) return authors;
   let commits = [];
   try {
     const url = `https://api.github.com/repos/${REPO}/compare/${baseSha}...${headSha}`;
@@ -136,6 +146,11 @@ async function contributors() {
     if (c.author.login) entry.login = c.author.login;
     if (c.author.avatar_url) entry.avatarUrl = c.author.avatar_url;
   }
+  return authors;
+}
+
+function contributorsBlock(authors) {
+  if (!authors.size) return '';
   const avatar = (p) => {
     const { name, email, login, avatarUrl } = p;
     const label = login ? `@${login}` : name;
@@ -154,7 +169,8 @@ async function contributors() {
 }
 
 async function main() {
-  const b = classify();
+  const authors = await fetchAuthors();
+  const b = classify(authors);
   const blocks = {};
   blocks.NOTES = b.NOTES.join('\n');
   blocks.BREAKING = b.BREAKING.join('\n');
@@ -165,7 +181,7 @@ async function main() {
   if (blocks.BREAKING) blocks.BREAKING = `### 破坏性变更\n${blocks.BREAKING}`;
   if (blocks.FEATURES) blocks.FEATURES = `### 新增内容\n${blocks.FEATURES}`;
   if (blocks.FIXES) blocks.FIXES = `### 修复\n${blocks.FIXES}`;
-  const list = await contributors();
+  const list = contributorsBlock(authors);
   blocks.CONTRIBUTORS = list
     ? `### 协作者\n\n感谢以下协作者对本阶段的贡献：\n\n${list}`
     : '';
