@@ -1,6 +1,6 @@
 [package]
 name = "mo-launch"
-version = "0.3.5-rc5"
+version = "0.3.5-rc6"
 description = "Modern Minecraft Launcher"
 authors = ["MoTeam"]
 license-file = "LICENSE"
