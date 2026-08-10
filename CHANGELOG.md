@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复 README GitHub 徽章自定义图标不生效（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：stars/forks 徽章追加的自定义白色星形/分支 SVG 图标此前不可见——`github/*` 徽章未指定 `style` 时默认 social 样式，近白背景忽略 `color` 使白色图标隐形；现为全部 5 个徽章（stars/forks/issues/last-commit/contributors）补充 `style=flat`，stars/forks 另设 `labelColor=165dff`，图标于蓝色标签上以白色渲染，徽章整体蓝底统一。
+
 - README 精简并新增贡献者（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：四种语言同步移除「技术架构 / 项目结构 / 环境要求 / 开发与构建（含质量检查命令）」章节，文档聚焦产品特性；在「鸣谢」与「相关链接」之间新增「贡献者」章节，接入 contrib.rocks 本项目（MoTeam-cn/MoLaunch）贡献者头像墙。
 
 - 创建房间交互优化（[CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：「高级设置」入口按钮仅在实际启用（关联整合包/开启白名单）时显示状态徽章，未启用时不再显示「未启用」灰标，按钮更清爽；创建房间进度（STUN → 创建两步指示器）由按钮下方的内联区块改为右侧抽屉，点击「创建房间」自动弹出、创建完成/失败自动收起（无遮罩、无手动关闭按钮，由进度状态驱动开合）。
