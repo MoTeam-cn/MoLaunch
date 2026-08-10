@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /** 创建房间表单：MC 版本 Select 下拉 + 高级设置（白名单/整合包关联，置于抽屉内） */
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Input from '@/components/common/Input.vue'
@@ -33,6 +33,15 @@ const {
 
 /** 高级设置抽屉开关（详情页仅保留入口按钮） */
 const advancedDrawerOpen = ref(false)
+
+/** 创建进度抽屉开关：提交创建时自动弹出，完成/失败自动收起 */
+const createProgressOpen = ref(false)
+watch(
+  () => store.roomCreateStep,
+  (step) => {
+    createProgressOpen.value = step !== null
+  },
+)
 </script>
 
 <template>
@@ -99,13 +108,13 @@ const advancedDrawerOpen = ref(false)
             <p class="text-xs text-gray-500">{{ publicRoomHint }}</p>
           </div>
         </div>
-        <!-- 高级设置入口（内容置于抽屉内，详情页仅保留按钮） -->
+        <!-- 高级设置入口（内容置于抽屉内，详情页仅保留按钮；未启用时不显示状态徽章） -->
         <div class="pt-2">
           <Button type="outline" long @click="advancedDrawerOpen = true">
             <template #icon><Cog8ToothIcon class="w-4 h-4" /></template>
             <span class="flex items-center justify-center gap-1">
               高级设置
-              <Tag size="small" :color="advancedBadgeActive ? 'arcoblue' : 'gray'">
+              <Tag v-if="advancedBadgeActive" size="small" color="arcoblue">
                 {{ advancedBadge }}
               </Tag>
             </span>
@@ -117,20 +126,6 @@ const advancedDrawerOpen = ref(false)
             <template #icon><PlusIcon class="w-4 h-4" /></template>
             创建房间
           </Button>
-          <!-- 创建进度反馈：两步指示器 -->
-          <div v-if="store.roomCreateStep" class="mt-2 space-y-1.5 px-3 py-2.5 bg-primary-50/50 rounded-lg border border-primary-100">
-            <div
-              v-for="(step, idx) in createSteps"
-              :key="step.key"
-              class="flex items-center gap-2 text-xs transition-colors"
-              :class="idx === currentStepIndex ? 'text-primary-700 font-medium' : idx < currentStepIndex ? 'text-green-600' : 'text-gray-400'"
-            >
-              <ArrowPathIcon v-if="idx === currentStepIndex" class="w-3.5 h-3.5 animate-spin" />
-              <CheckCircleIcon v-else-if="idx < currentStepIndex" class="w-3.5 h-3.5" />
-              <span v-else class="w-3.5 h-3.5 rounded-full border border-current opacity-40" />
-              <span>{{ step.label }}</span>
-            </div>
-          </div>
         </div>
       </div>
     </Card>
@@ -154,6 +149,32 @@ const advancedDrawerOpen = ref(false)
         <div class="border-t border-gray-100 pt-3">
           <div class="text-xs text-gray-500 mb-2">白名单管理：启用后仅白名单内设备可加入房间</div>
           <WhitelistEditor v-model="whitelistForm" mode="create" />
+        </div>
+      </div>
+    </Drawer>
+
+    <!-- 创建进度抽屉：提交创建时自动弹出，完成/失败自动收起 -->
+    <Drawer
+      v-model:visible="createProgressOpen"
+      title="正在创建房间"
+      placement="right"
+      :width="320"
+      :mask="false"
+      :closable="false"
+      render-in-place
+      popup-container="#app-content"
+    >
+      <div class="space-y-1.5 py-2">
+        <div
+          v-for="(step, idx) in createSteps"
+          :key="step.key"
+          class="flex items-center gap-2 text-xs transition-colors"
+          :class="idx === currentStepIndex ? 'text-primary-700 font-medium' : idx < currentStepIndex ? 'text-green-600' : 'text-gray-400'"
+        >
+          <ArrowPathIcon v-if="idx === currentStepIndex" class="w-3.5 h-3.5 animate-spin" />
+          <CheckCircleIcon v-else-if="idx < currentStepIndex" class="w-3.5 h-3.5" />
+          <span v-else class="w-3.5 h-3.5 rounded-full border border-current opacity-40" />
+          <span>{{ step.label }}</span>
         </div>
       </div>
     </Drawer>
