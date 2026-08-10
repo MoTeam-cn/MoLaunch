@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- README 精简并新增贡献者（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：四种语言同步移除「技术架构 / 项目结构 / 环境要求 / 开发与构建（含质量检查命令）」章节，文档聚焦产品特性；在「鸣谢」与「相关链接」之间新增「贡献者」章节，接入 contrib.rocks 本项目（MoTeam-cn/MoLaunch）贡献者头像墙。
+
 - 创建房间交互优化（[CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：「高级设置」入口按钮仅在实际启用（关联整合包/开启白名单）时显示状态徽章，未启用时不再显示「未启用」灰标，按钮更清爽；创建房间进度（STUN → 创建两步指示器）由按钮下方的内联区块改为右侧抽屉，点击「创建房间」自动弹出、创建完成/失败自动收起（无遮罩、无手动关闭按钮，由进度状态驱动开合）。
 
 - 联机房间详情抽屉化（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) + [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) + [PendingAnswerList.vue](src/components/online/PendingAnswerList.vue) + [ParticipantList.vue](src/components/online/ParticipantList.vue) + [BannedList.vue](src/components/online/BannedList.vue)）：房主面板「待确认加入申请 / 参与者 / 封禁列表」由页面内直接展示改为右侧抽屉，详情页仅保留「房间管理」按钮卡（按钮带红色 Tag 待办数与参与者/封禁数量徽标），封禁抽屉标题内置刷新按钮；创建房间「高级设置」（整合包关联 + 白名单管理）由可折叠卡片改为抽屉，表单页仅留「高级设置」入口按钮并保留启用状态徽章；三个列表组件去 Card 壳适配抽屉容器，待确认/封禁列表新增空状态（icon + text 垂直水平居中）。

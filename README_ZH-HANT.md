@@ -15,8 +15,8 @@
 [![Rust](https://img.shields.io/badge/Rust-2021-dea584.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/MoTeam-cn/MoLaunch)
 
-[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/forks)
+[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNOCAuMjVhLjc1Ljc1IDAgMCAxIC42NzMuNDE4bDEuODgyIDMuODE1IDQuMjEuNjEyYS43NS43NSAwIDAgMSAuNDE2IDEuMjc5bC0zLjA0NiAyLjk3LjcxOSA0LjE5MmEuNzUxLjc1MSAwIDAgMS0xLjA4OC43OTFMOCAxMi4zNDdsLTMuNzY2IDEuOThhLjc1Ljc1IDAgMCAxLTEuMDg4LS43OWwuNzItNC4xOTRMLjgxOCA2LjM3NGEuNzUuNzUgMCAwIDEgLjQxNi0xLjI4bDQuMjEtLjYxMUw3LjMyNy42NjhBLjc1Ljc1IDAgMCAxIDggLjI1WiIvPjwvc3ZnPg==&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNNSA1LjM3MnYuODc4YzAgLjQxNC4zMzYuNzUuNzUuNzVoNC41YS43NS43NSAwIDAgMCAuNzUtLjc1di0uODc4YTIuMjUgMi4yNSAwIDEgMSAxLjUgMHYuODc4YTIuMjUgMi4yNSAwIDAgMS0yLjI1IDIuMjVoLTEuNXYyLjEyOGEyLjI1MSAyLjI1MSAwIDEgMS0xLjUgMFY4LjVoLTEuNUEyLjI1IDIuMjUgMCAwIDEgMy41IDYuMjV2LS44NzhhMi4yNSAyLjI1IDAgMSAxIDEuNSAwWk01IDMuMjVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFptNi43NS43NWEuNzUuNzUgMCAxIDAgMC0xLjUuNzUuNzUgMCAwIDAgMCAxLjVabS0zIDguNzVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFoiLz48L3N2Zz4=&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/forks)
 [![GitHub issues](https://img.shields.io/github/issues/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/commits)
 [![GitHub contributors](https://img.shields.io/github/contributors/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
@@ -143,107 +143,6 @@ MoLaunch 是一款 Minecraft Java 版啟動器，提供下載、安裝、啟動�
 
 啟動器的註冊、登入、重新整理憑證等操作都會與 MoLaunch 雲端（api-server）對接，雲端在這些介面前加了一道輕量 PoW 驗證，先讓你隨手算一道雜湊題才放行，防止有人用腳本狂刷介面。正常使用幾乎無感，登入等操作也就幾十毫秒；真正會被這道題攔下的，只有批次刷介面的那些人。
 
-## 技術架構
-
-MoLaunch 採用 Tauri 2 雙進程架構：前端為 Vue 3 單頁應用程式，後端為 Rust 原生程序，兩者透過型別化 IPC 通訊；重活（下載、解壓、啟動、組網）全部下沉到 Rust，前端保持輕量。
-
-```mermaid
-graph TD
-    subgraph Frontend["前端 · Vue 3 + TypeScript"]
-        UI["頁面與元件層<br/>首頁 / 版本 / 資源 / 聯機 / 工具 / 設定 / 實驗性"]
-        STORE["狀態層 · Pinia"]
-        LOGIC["邏輯層 · composables"]
-        API["IPC 封裝 · utils/api"]
-    end
-
-    subgraph Bridge["Tauri 2 IPC"]
-        CMD["Rust 命令層 · commands<br/>auth / version / java / skin / frp / online / community / plugins / experimental / tools"]
-    end
-
-    subgraph Backend["後端 · Rust 2021"]
-        MC["minecraft 核心<br/>啟動 · 下載 · 載入器 · 鏡像源"]
-        NET["聯機與網路<br/>房間信令 · P2P 虛擬區域網路 · FRP · WebSocket"]
-        AI["ai_core<br/>SSE 串流 · Agent 工具 · token 估算 · 上下文壓縮"]
-        STOR["storage<br/>跨平台設定 · SQLite · 快取 · 登錄表"]
-        WASM["cubiomes WASM<br/>世界結構生成"]
-        UPD["獨立更新器 crate"]
-    end
-
-    UI --> STORE --> LOGIC --> API
-    API <--> CMD
-    CMD --> MC
-    CMD --> NET
-    CMD --> AI
-    CMD --> STOR
-    CMD --> WASM
-    CMD --> UPD
-    MC --> STOR
-    NET --> STOR
-```
-
-### 前端
-
-Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind CSS。自研統一元件庫（Button / Input / Select / Drawer / Modal / Tooltip / Slider 等），單欄版式風格；複雜業務邏輯全部收斂到 composables 與 stores，元件保持輕量。
-
-其中 **Button / Input / Select / Drawer / Slider** 等核心元件參考了 [Arco Design Vue](https://github.com/arco-design/arco-design-vue)：提取其元件原始碼並複刻改寫為 Vue SFC + Tailwind 形式，以獲得一致的視覺體驗與互動品質，涉及複刻的檔案頂部均已新增 Arco Design MIT 許可證要求的版權聲明註解。圖示以 [Heroicons](https://github.com/tailwindlabs/heroicons) 為主，並按需復用 [Element Plus Icons](https://github.com/element-plus/element-plus-icons) 的 SVG 資料（集中寫入 `src/utils/element-icons.ts`，未引入執行期依賴）。詳見設定頁「關於 · 鳴謝」版權聲明及下方「鳴謝」。
-
-### 後端
-
-Rust 2021 + Tokio 非同步執行環境。核心能力依領域拆分：
-
-- **minecraft**：版本清單解析、多源下載、載入器安裝、JVM 參數組裝、程序監控
-- **online**：房間信令、WebRTC 組網（虛擬 TUN）、FRP 隧道管理
-- **ai_core**：OpenAI 相容用戶端，SSE 串流、多輪工具呼叫、上下文自動壓縮
-- **storage**：Windows 登錄表 + 跨平台檔案雙後端設定存放、SQLite 內建編譯
-- **cubiomes**：Minecraft 世界生成 C 函式庫，編譯為 WASM 供結構定址工具呼叫
-- **updater**：獨立更新器 crate，支援分通道發布與簽章驗證（實為複刻 Tauri plugin 的 updater，因 Windows 需要安裝、而本軟體為免安裝（便攜版）性質，故自行實作了一套無感更新套件）
-
-### 專案結構
-
-```text
-MoLaunch/
-├── src/                    # 前端（Vue 3 + TypeScript）
-│   ├── components/         #   公共元件庫與業務元件
-│   ├── composables/        #   組合式邏輯
-│   ├── stores/             #   Pinia 狀態
-│   ├── utils/api/          #   Tauri IPC 封裝
-│   ├── views/              #   頁面（home / versions / online / tools / settings / experimental）
-│   └── plugins/            #   外掛 SDK 與沙箱
-├── src-tauri/              # 後端（Rust + Tauri 2）
-│   ├── src/commands/       #   IPC 指令模組
-│   ├── src/minecraft/      #   啟動 / 下載 / 載入器 / 鏡像源
-│   ├── src/state/          #   應用程式狀態（config / launch / download）
-│   ├── src/storage/        #   跨平台儲存與 SQLite
-│   ├── cubiomes/           #   世界結構生成 C 函式庫（WASM）
-│   ├── resources/          #   內嵌資源與第三持方授權清單
-│   └── updater/            #   獨立更新器
-├── public/                 # 靜態資源（開場動畫頁）
-├── docs/                   # 設計與審計文件
-├── CHANGELOG.md
-└── LICENSE
-```
-
-## 環境要求
-
-- Node.js 18+ 與 npm
-- Rust stable（2021 edition）
-- Tauri 2 系統依賴（詳見 [Tauri 官方文件](https://v2.tauri.app/start/prerequisites/)）
-
-## 開發與建置
-
-```bash
-npm ci
-npm run tauri dev      # 開發偵錯
-npm run tauri build    # 打包桌面應用程式
-```
-
-品質檢查：
-
-```bash
-npm run lint && npm run typecheck && npm run test
-cd src-tauri && cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-features
-```
-
 ## 授權許可
 
 MoLaunch 自有程式碼與原創資源遵循 [MoLaunch 分發有限許可](./LICENSE)，核心要求：
@@ -281,6 +180,12 @@ Minecraft 為 Mojang Synergies AB 的商標。MoLaunch 不隸屬於 Mojang、Mic
 
 > [!NOTE]
 > MoLaunch 為獨立第三方創作，與 PCL2 無隸屬或關聯；PCL2 採用《PCL 分發有限許可》，詳情參閱其[授權文件](https://shimo.im/docs/rGrd8pY8xWkt6ryW)。
+
+## 貢獻者
+
+感謝所有為 MoLaunch 貢獻過程式碼、文件與建議的開發者。
+
+[![Contributors](https://contrib.rocks/image?repo=MoTeam-cn/MoLaunch)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
 
 ## 相關連結
 

@@ -15,8 +15,8 @@
 [![Rust](https://img.shields.io/badge/Rust-2021-dea584.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/MoTeam-cn/MoLaunch)
 
-[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/forks)
+[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNOCAuMjVhLjc1Ljc1IDAgMCAxIC42NzMuNDE4bDEuODgyIDMuODE1IDQuMjEuNjEyYS43NS43NSAwIDAgMSAuNDE2IDEuMjc5bC0zLjA0NiAyLjk3LjcxOSA0LjE5MmEuNzUxLjc1MSAwIDAgMS0xLjA4OC43OTFMOCAxMi4zNDdsLTMuNzY2IDEuOThhLjc1Ljc1IDAgMCAxLTEuMDg4LS43OWwuNzItNC4xOTRMLjgxOCA2LjM3NGEuNzUuNzUgMCAwIDEgLjQxNi0xLjI4bDQuMjEtLjYxMUw3LjMyNy42NjhBLjc1Ljc1IDAgMCAxIDggLjI1WiIvPjwvc3ZnPg==&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNNSA1LjM3MnYuODc4YzAgLjQxNC4zMzYuNzUuNzUuNzVoNC41YS43NS43NSAwIDAgMCAuNzUtLjc1di0uODc4YTIuMjUgMi4yNSAwIDEgMSAxLjUgMHYuODc4YTIuMjUgMi4yNSAwIDAgMS0yLjI1IDIuMjVoLTEuNXYyLjEyOGEyLjI1MSAyLjI1MSAwIDEgMS0xLjUgMFY4LjVoLTEuNUEyLjI1IDIuMjUgMCAwIDEgMy41IDYuMjV2LS44NzhhMi4yNSAyLjI1IDAgMSAxIDEuNSAwWk01IDMuMjVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFptNi43NS43NWEuNzUuNzUgMCAxIDAgMC0xLjUuNzUuNzUgMCAwIDAgMCAxLjVabS0zIDguNzVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFoiLz48L3N2Zz4=&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/forks)
 [![GitHub issues](https://img.shields.io/github/issues/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/commits)
 [![GitHub contributors](https://img.shields.io/github/contributors/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
@@ -143,107 +143,6 @@ MoLaunch は、ダウンロード・インストール・起動・オンライ�
 
 登録・ログイン・認証情報のリフレッシュなどの操作は MoLaunch クラウド（api-server）と連携します。クラウドはこれらの API の前に軽量な Proof-of-Work（PoW）認証を挟み、1 問のハッシュ問題を解いてからリクエストを通過させます。これによりスクリプトを使った大量APIアクセスを防いでいます。通常の利用ではほぼ無感覚—ログインなどは数十ミリ秒で完了します。実際にこの検証でブロックされるのは、大量に API を叩く人だけです。
 
-## 技術アーキテクチャ
-
-MoLaunch は Tauri 2 の二プロセス構成を採用しています。フロントエンドは Vue 3 のシングルページアプリケーション、バックエンドはネイティブな Rust プロセスで、型付けされた IPC で通信します。ダウンロード、解凍、起動、ネットワーク構築などの重い処理はすべて Rust 側に集約し、フロントエンドを軽量に保ちます。
-
-```mermaid
-graph TD
-    subgraph Frontend["フロントエンド · Vue 3 + TypeScript"]
-        UI["画面・コンポーネント層<br/>ホーム / バージョン / リソース / オンライン / ツール / 設定 / 実験"]
-        STORE["状態層 · Pinia"]
-        LOGIC["ロジック層 · composables"]
-        API["IPC カプセル化 · utils/api"]
-    end
-
-    subgraph Bridge["Tauri 2 IPC"]
-        CMD["Rust コマンド層 · commands<br/>auth / version / java / skin / frp / online / community / plugins / experimental / tools"]
-    end
-
-    subgraph Backend["バックエンド · Rust 2021"]
-        MC["minecraft コア<br/>起動 · ダウンロード · ローダー · ミラー配信源"]
-        NET["オンライン・ネットワーク<br/>ルームシグナリング · P2P 仮想LAN · FRP · WebSocket"]
-        AI["ai_core<br/>SSE ストリーミング · Agent ツール · トークン推定 · コンテキスト圧縮"]
-        STOR["storage<br/>クロスプラットフォーム設定 · SQLite · キャッシュ · レジストリ"]
-        WASM["cubiomes WASM<br/>ワールド構造生成"]
-        UPD["独立したアップデーター crate"]
-    end
-
-    UI --> STORE --> LOGIC --> API
-    API <--> CMD
-    CMD --> MC
-    CMD --> NET
-    CMD --> AI
-    CMD --> STOR
-    CMD --> WASM
-    CMD --> UPD
-    MC --> STOR
-    NET --> STOR
-```
-
-### フロントエンド
-
-Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind CSS。自前の統一コンポーネントライブラリ（Button / Input / Select / Drawer / Modal / Tooltip / Slider など）を備えたシングルカラム型のレイアウト。複雑なビジネスロジックは composable と store に集約し、コンポーネントを軽量に保ちます。
-
-**Button / Input / Select / Drawer / Slider** などのコアコンポーネントは [Arco Design Vue](https://github.com/arco-design/arco-design-vue) を参考にしています。そのコンポーネントのソースコードを抽出し、Vue SFC + Tailwind 形式に書き換えて複製しています。複製したファイルの先頭には、Arco Design MIT ライセンスで要求される著作権表示を付けています。アイコンは主に [Heroicons](https://github.com/tailwindlabs/heroicons) を使用し、[Element Plus Icons](https://github.com/element-plus/element-plus-icons) からは SVG パスデータを必要に応じて流用しています（`src/utils/element-icons.ts` に集約し、実行時依存は導入していません）。詳しくは設定画面の「バージョン情報・謝辞」の著作権表示と以下の「謝辞」を参照してください。
-
-### バックエンド
-
-Rust 2021 + Tokio 非同期ランタイム。中核機能はドメインごとに分割しています：
-
-- **minecraft**：バージョンマニフェスト解析、マルチソースダウンロード、ローダーインストール、JVM 引数組み立て、プロセス監視
-- **online**: ルームシグナリング、WebRTC ネットワーキング（仮想 TUN）、FRP トンネル管理
-- **ai_core**: OpenAI 互換クライアント。SSE ストリーミング、マルチターンツールコーリング、コンテキスト自動圧縮
-- **storage**: Windows レジストリ + クロスプラットフォームファイルの二重バックエンド設定保存と SQLite 組込み
-- **cubiomes**: Minecraft ワールド生成 C ライブラリ。構造座標探査ツールに使うため WASM にコンパイル
-- **updater**: 独立したアップデーター crate。チャンネル別リリースと署名検証に対応（実は Tauri plugin のアップデーターを書き直したもの。Windows ではインストーラが必要になる一方、本ソフトはポータブル版のため、シームレスな更新ツールキットを独自実装しています）
-
-### プロジェクト構造
-
-```text
-MoLaunch/
-├── src/                    # フロントエンド（Vue 3 + TypeScript）
-│   ├── components/         #   共通コンポーネントライブラリと業務コンポーネント
-│   ├── composables/        #   ロジック再利用
-│   ├── stores/             #   Pinia 状態管理
-│   ├── utils/api/          #   Tauri IPC カプセル化
-│   ├── views/              #   ページ（home / versions / online / tools / settings / experimental）
-│   └── plugins/            #   プラグイン SDK とサンドボックス
-├── src-tauri/              # バックエンド（Rust + Tauri 2）
-│   ├── src/commands/       #   IPC コマンドモジュール
-│   ├── src/minecraft/      #   起動 / ダウンロード / ローダー / ミラー配信源
-│   ├── src/state/          #   アプリ状態（config / launch / download）
-│   ├── src/storage/        #   クロスプラットフォーム保存と SQLite
-│   ├── cubiomes/           #   ワールド生成 C ライブラリ（WASM）
-│   ├── resources/          #   同梱リソースとサードパーティライセンス一覧
-│   └── updater/            #   スタンドアロンアップデーター
-├── public/                 # 静的リソース（スプラッシュアニメーション画面）
-├── docs/                   # 設計・監査ドキュメント
-├── CHANGELOG.md
-└── LICENSE
-```
-
-## 実行環境
-
-- Node.js 18+ と npm
-- Rust stable（2021 edition）
-- Tauri 2 のシステム依存関係（詳細は [Tauri 公式ドキュメント](https://v2.tauri.app/start/prerequisites/)）
-
-## 開発とビルド
-
-```bash
-npm ci
-npm run tauri dev      # 開発デバッグ
-npm run tauri build    # デスクトップアプリのパッケージング
-```
-
-品質チェック：
-
-```bash
-npm run lint && npm run typecheck && npm run test
-cd src-tauri && cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-features
-```
-
 ## ライセンス
 
 MoLaunch 独自のコードとオリジナルリソースは [MoLaunch 配布ライセンス（有限許諾）](./LICENSE) に従います。主な要件：
@@ -281,6 +180,12 @@ Minecraft は Mojang Synergies AB の商標です。MoLaunch は Mojang、Micros
 
 > [!NOTE]
 > MoLaunch は、PCL2 とは一切関係のない独立したサードパーティ製のソフトウェアです。PCL2 は「PCL 配布ライセンス」の条件で配布されており、詳細はその[ライセンス文書](https://shimo.im/docs/rGrd8pY8xWkt6ryW)をご覧ください。
+
+## 貢献者
+
+MoLaunch にコード・ドキュメント・提案を提供してくださったすべての開発者に感謝します。
+
+[![Contributors](https://contrib.rocks/image?repo=MoTeam-cn/MoLaunch)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
 
 ## 関連リンク
 

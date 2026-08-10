@@ -15,8 +15,8 @@ A modern, cross-platform Minecraft Java Edition launcher.
 [![Rust](https://img.shields.io/badge/Rust-2021-dea584.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/MoTeam-cn/MoLaunch)
 
-[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/forks)
+[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNOCAuMjVhLjc1Ljc1IDAgMCAxIC42NzMuNDE4bDEuODgyIDMuODE1IDQuMjEuNjEyYS43NS43NSAwIDAgMSAuNDE2IDEuMjc5bC0zLjA0NiAyLjk3LjcxOSA0LjE5MmEuNzUxLjc1MSAwIDAgMS0xLjA4OC43OTFMOCAxMi4zNDdsLTMuNzY2IDEuOThhLjc1Ljc1IDAgMCAxLTEuMDg4LS43OWwuNzItNC4xOTRMLjgxOCA2LjM3NGEuNzUuNzUgMCAwIDEgLjQxNi0xLjI4bDQuMjEtLjYxMUw3LjMyNy42NjhBLjc1Ljc1IDAgMCAxIDggLjI1WiIvPjwvc3ZnPg==&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNNSA1LjM3MnYuODc4YzAgLjQxNC4zMzYuNzUuNzUuNzVoNC41YS43NS43NSAwIDAgMCAuNzUtLjc1di0uODc4YTIuMjUgMi4yNSAwIDEgMSAxLjUgMHYuODc4YTIuMjUgMi4yNSAwIDAgMS0yLjI1IDIuMjVoLTEuNXYyLjEyOGEyLjI1MSAyLjI1MSAwIDEgMS0xLjUgMFY4LjVoLTEuNUEyLjI1IDIuMjUgMCAwIDEgMy41IDYuMjV2LS44NzhhMi4yNSAyLjI1IDAgMSAxIDEuNSAwWk01IDMuMjVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFptNi43NS43NWEuNzUuNzUgMCAxIDAgMC0xLjUuNzUuNzUgMCAwIDAgMCAxLjVabS0zIDguNzVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFoiLz48L3N2Zz4=&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/forks)
 [![GitHub issues](https://img.shields.io/github/issues/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/commits)
 [![GitHub contributors](https://img.shields.io/github/contributors/MoTeam-cn/MoLaunch?logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
@@ -143,107 +143,6 @@ This repository contains the open-source code of MoLaunch. You can use the prebu
 
 Registration, login, and credential-refresh operations are handled through the MoLaunch Cloud (api-server). The cloud places a lightweight Proof-of-Work check in front of these endpoints: you solve a small hash puzzle before the request goes through, preventing scripted mass abuse of the API. Normal usage is barely noticeable—login and similar operations take only tens of milliseconds. The only ones actually blocked by this puzzle are bulk API abusers.
 
-## Technical Architecture
-
-MoLaunch uses a Tauri 2 two-process architecture: the frontend is a Vue 3 single-page application and the backend is a native Rust process, communicating through typed IPC. All heavy lifting (downloading, extraction, launching, networking) is offloaded to Rust, keeping the frontend lightweight.
-
-```mermaid
-graph TD
-    subgraph Frontend["Frontend · Vue 3 + TypeScript"]
-        UI["Pages & Components<br/>Home / Versions / Resources / Online / Tools / Settings / Experimental"]
-        STORE["State · Pinia"]
-        LOGIC["Logic · composables"]
-        API["IPC Wrappers · utils/api"]
-    end
-
-    subgraph Bridge["Tauri 2 IPC"]
-        CMD["Rust Commands · commands<br/>auth / version / java / skin / frp / online / community / plugins / experimental / tools"]
-    end
-
-    subgraph Backend["Backend · Rust 2021"]
-        MC["minecraft core<br/>launch · download · loaders · sources (mirrors)"]
-        NET["Multiplayer & Network<br/>Room signaling · P2P Virtual LAN · FRP · WebSocket"]
-        AI["ai_core<br/>SSE streaming · Agent tools · token estimation · context compression"]
-        STOR["storage<br/>Cross-platform config · SQLite · Cache · Registry"]
-        WASM["cubiomes WASM<br/>World structure generation"]
-        UPD["Standalone updater crate"]
-    end
-
-    UI --> STORE --> LOGIC --> API
-    API <--> CMD
-    CMD --> MC
-    CMD --> NET
-    CMD --> AI
-    CMD --> STOR
-    CMD --> WASM
-    CMD --> UPD
-    MC --> STOR
-    NET --> STOR
-```
-
-### Frontend
-
-Vue 3 + TypeScript + Vite + Pinia + Vue Router + Tailwind CSS. Features a self-built unified component library (Button / Input / Select / Drawer / Modal / Tooltip / Slider, etc.) with a single-column layout style. Complex business logic is consolidated into composables and stores, keeping components lightweight.
-
-The core components—**Button / Input / Select / Drawer / Slider**, among others—draw inspiration from [Arco Design Vue](https://github.com/arco-design/arco-design-vue): their component source code was extracted and reimplemented as Vue SFC + Tailwind to achieve a consistent visual experience and interaction quality. The copyright notices required by the Arco Design MIT license are included at the top of every reimplemented file. Icons are primarily from [Heroicons](https://github.com/tailwindlabs/heroicons), with SVG path data reused on demand from [Element Plus Icons](https://github.com/element-plus/element-plus-icons) (consolidated in `src/utils/element-icons.ts`; no runtime dependency is introduced). See the "About · Acknowledgments" section in Settings and the Acknowledgments below.
-
-### Backend
-
-Rust 2021 + Tokio async runtime. Core capabilities are split by domain:
-
-- **minecraft**: version manifest parsing, multi-source downloads, loader installation, JVM argument assembly, process monitoring
-- **online**: room signaling, WebRTC networking (virtual TUN), FRP tunnel management
-- **ai_core**: OpenAI-compatible client with SSE streaming, multi-turn tool calling, automatic context compression
-- **storage**: dual-backend configuration storage (Windows registry + cross-platform files), SQLite compiled in
-- **cubiomes**: Minecraft world generation C library, compiled to WASM for the structure-locator tool
-- **updater**: standalone updater crate supporting channel-based releases and signature verification (essentially a reimplementation of the Tauri updater plugin: since Windows normally requires an installer while this software is portable by nature, it implements its own seamless update toolkit)
-
-### Project Structure
-
-```text
-MoLaunch/
-├── src/                    # Frontend (Vue 3 + TypeScript)
-│   ├── components/         #   Shared component library & business components
-│   ├── composables/        #   Composable logic
-│   ├── stores/             #   Pinia state
-│   ├── utils/api/          #   Tauri IPC wrappers
-│   ├── views/              #   Pages (home / versions / online / tools / settings / experimental)
-│   └── plugins/            #   Plugin SDK & sandbox
-├── src-tauri/              # Backend (Rust + Tauri 2)
-│   ├── src/commands/       #   IPC command modules
-│   ├── src/minecraft/      #   Launch / download / loaders / mirror sources
-│   ├── src/state/          #   App state (config / launch / download)
-│   ├── src/storage/        #   Cross-platform storage & SQLite
-│   ├── cubiomes/           #   World generation C library (WASM)
-│   ├── resources/          #   Bundled resources & third-party licenses
-│   └── updater/            #   Standalone updater
-├── public/                 # Static assets (splash animation page)
-├── docs/                   # Design & audit documents
-├── CHANGELOG.md
-└── LICENSE
-```
-
-## Requirements
-
-- Node.js 18+ and npm
-- Rust stable (2021 edition)
-- Tauri 2 system dependencies (see the [Tauri documentation](https://v2.tauri.app/start/prerequisites/))
-
-## Development & Build
-
-```bash
-npm ci
-npm run tauri dev      # Development & debugging
-npm run tauri build    # Package desktop app
-```
-
-Quality checks:
-
-```bash
-npm run lint && npm run typecheck && npm run test
-cd src-tauri && cargo fmt --all -- --check && cargo clippy --all-targets --all-features -- -D warnings && cargo test --all-features
-```
-
 ## License
 
 MoLaunch's own code and original assets are governed by the [MoLaunch Limited Distribution License](./LICENSE), whose core requirements are:
@@ -281,6 +180,12 @@ See [licenses.txt](./src-tauri/resources/about/licenses.txt) for the complete li
 
 > [!NOTE]
 > MoLaunch is an independent third-party creation with no affiliation to PCL2. PCL2 is distributed under the PCL Limited Distribution License; see its [license document](https://shimo.im/docs/rGrd8pY8xWkt6ryW) for details.
+
+## Contributors
+
+Thanks to all the developers who have contributed code, documentation, and suggestions to MoLaunch.
+
+[![Contributors](https://contrib.rocks/image?repo=MoTeam-cn/MoLaunch)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
 
 ## Links
 
