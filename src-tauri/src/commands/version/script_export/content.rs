@@ -155,7 +155,11 @@ fn build_sh_content(info: &ScriptLaunchInfo<'_>) -> String {
 
 /// 写入脚本文件：Windows 用 GBK 编码（中文 Windows cmd 默认按 ANSI/GBK 解析批处理文件），
 /// macOS/Linux 用 UTF-8 并添加执行权限
-pub(super) fn write_script_file(script: &str, save_path: &str, is_windows: bool) -> Result<(), String> {
+pub(super) fn write_script_file(
+    script: &str,
+    save_path: &str,
+    is_windows: bool,
+) -> Result<(), String> {
     if is_windows {
         // 若用 UTF-8 写入，中文字节会被错误拆分成命令，导致 "xxx 不是内部或外部命令" 错误
         let (bytes, _, had_errors) = encoding_rs::GBK.encode(script);

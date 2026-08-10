@@ -89,8 +89,8 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(state, _app, params, {
             let p: TogglePackParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = manage::toggle_pack(&state, p.version_id, p.file_name, p.enable, p.kind)
-                .await?;
+            let r =
+                manage::toggle_pack(&state, p.version_id, p.file_name, p.enable, p.kind).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

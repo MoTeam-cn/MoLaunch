@@ -75,7 +75,11 @@ pub(crate) fn load_file_cache(
 }
 
 /// 写入持久化缓存
-pub(crate) fn save_file_cache(cache_dir: &str, version_id: &str, mods: &HashMap<String, CachedMod>) {
+pub(crate) fn save_file_cache(
+    cache_dir: &str,
+    version_id: &str,
+    mods: &HashMap<String, CachedMod>,
+) {
     let entry = CacheEntry {
         version: PRELOAD_CACHE_VERSION,
         cache_time: chrono::Utc::now().timestamp(),

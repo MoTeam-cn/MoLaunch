@@ -38,7 +38,12 @@ pub(crate) async fn resolve_effective_game_dir(
     let version_type =
         crate::commands::version::list::detect_version_type_from_dir(&game_dir, version_id);
     let mode = IsolationMode::from_u32(isolation_mode);
-    Ok(get_effective_game_dir(&game_dir, version_id, mode, version_type))
+    Ok(get_effective_game_dir(
+        &game_dir,
+        version_id,
+        mode,
+        version_type,
+    ))
 }
 
 /// 解析版本隔离目录下的内容子目录（mods / resourcepacks / shaderpacks）
@@ -47,7 +52,9 @@ pub(crate) async fn resolve_version_subdir(
     version_id: &str,
     subdir: &str,
 ) -> Result<PathBuf, String> {
-    Ok(resolve_effective_game_dir(state, version_id).await?.join(subdir))
+    Ok(resolve_effective_game_dir(state, version_id)
+        .await?
+        .join(subdir))
 }
 
 /// 去除启停后缀，得到启用时的文件名
@@ -128,7 +135,7 @@ pub(crate) fn list_entries(
             size,
         });
     }
-    entries.sort_by(|a, b| a.file_name.to_lowercase().cmp(&b.file_name.to_lowercase()));
+    entries.sort_by_key(|a| a.file_name.to_lowercase());
     Ok(entries)
 }
 
@@ -303,25 +310,28 @@ pub(crate) async fn watch_dir(
     if !dir.exists() {
         std::fs::create_dir_all(&dir).map_err(|e| format!("创建目录失败: {}", e))?;
     }
-    log_info!("[PackWatcher] 开始监听: {} -> {}", dir.display(), event_name);
+    log_info!(
+        "[PackWatcher] 开始监听: {} -> {}",
+        dir.display(),
+        event_name
+    );
     let (tx, rx) = std::sync::mpsc::channel::<()>();
-    let mut watcher =
-        notify::recommended_watcher(move |res: Result<notify::Event, _>| {
-            if let Ok(event) = res {
-                if matches!(
-                    event.kind,
-                    notify::EventKind::Create(_)
-                        | notify::EventKind::Modify(_)
-                        | notify::EventKind::Remove(_)
-                ) {
-                    let _ = tx.send(());
-                }
+    let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, _>| {
+        if let Ok(event) = res {
+            if matches!(
+                event.kind,
+                notify::EventKind::Create(_)
+                    | notify::EventKind::Modify(_)
+                    | notify::EventKind::Remove(_)
+            ) {
+                let _ = tx.send(());
             }
-        })
-        .map_err(|e| {
-            log_error!("[PackWatcher] 创建 watcher 失败: {}", e);
-            e.to_string()
-        })?;
+        }
+    })
+    .map_err(|e| {
+        log_error!("[PackWatcher] 创建 watcher 失败: {}", e);
+        e.to_string()
+    })?;
     watcher
         .watch(&dir, notify::RecursiveMode::NonRecursive)
         .map_err(|e| {

@@ -31,7 +31,11 @@ pub async fn export_launch_script(
     let is_windows = cfg!(target_os = "windows");
     log_info!(
         "Exporting {} launch script for version: {}",
-        if is_windows { "Windows (.bat)" } else { "Unix (.sh)" },
+        if is_windows {
+            "Windows (.bat)"
+        } else {
+            "Unix (.sh)"
+        },
         version_id
     );
 

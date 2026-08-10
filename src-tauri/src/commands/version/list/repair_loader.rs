@@ -64,21 +64,29 @@ fn emit_phase(
     repaired: bool,
     message: &str,
 ) {
-    emit_repair_progress(app, &RepairProgress {
-        version_id,
-        phase,
-        progress,
-        damaged,
-        repaired,
-        loader_type: health.loader_type.as_deref(),
-        loader_version: &health.loader_version,
-        mc_version: &health.mc_version,
-        message,
-    });
+    emit_repair_progress(
+        app,
+        &RepairProgress {
+            version_id,
+            phase,
+            progress,
+            damaged,
+            repaired,
+            loader_type: health.loader_type.as_deref(),
+            loader_version: &health.loader_version,
+            mc_version: &health.mc_version,
+            message,
+        },
+    );
 }
 
 /// 构建 IPC 最终返回结果（与 RepairLoaderResult 前端类型对应）
-fn build_result(health: &LoaderHealth, damaged: bool, repaired: bool, message: &str) -> serde_json::Value {
+fn build_result(
+    health: &LoaderHealth,
+    damaged: bool,
+    repaired: bool,
+    message: &str,
+) -> serde_json::Value {
     serde_json::json!({
         "loaderType": health.loader_type.as_deref(),
         "loaderVersion": health.loader_version,
@@ -115,11 +123,7 @@ fn find_loader_lib(json: &serde_json::Value, pattern: &str) -> Option<String> {
 }
 
 /// 计算加载器库在磁盘上的路径（优先 downloads.artifact.path，兜底 maven 坐标）
-fn json_lib_local_path(
-    json: &serde_json::Value,
-    name: &str,
-    game_dir: &Path,
-) -> PathBuf {
+fn json_lib_local_path(json: &serde_json::Value, name: &str, game_dir: &Path) -> PathBuf {
     json["libraries"]
         .as_array()
         .and_then(|libs| libs.iter().find(|l| l["name"].as_str() == Some(name)))
@@ -178,8 +182,7 @@ pub async fn detect_loader_damage(
         }
         Some(name) => {
             let path = json_lib_local_path(&json, &name, &game_dir);
-            let file_ok =
-                path.exists() && path.metadata().map(|m| m.len() > 0).unwrap_or(false);
+            let file_ok = path.exists() && path.metadata().map(|m| m.len() > 0).unwrap_or(false);
             if !file_ok {
                 healthy = false;
                 reason = format!("{} 库文件缺失或为空: {}", loader_type_str, path.display());
@@ -208,7 +211,11 @@ fn loader_display_name(loader_type: &LoaderType) -> &'static str {
 }
 
 /// 重装后加载器安装器生成的版本目录名
-fn fresh_loader_dir_name(loader_type: &LoaderType, mc_version: &str, loader_version: &str) -> String {
+fn fresh_loader_dir_name(
+    loader_type: &LoaderType,
+    mc_version: &str,
+    loader_version: &str,
+) -> String {
     match loader_type {
         LoaderType::Forge => format!("{}-forge-{}", mc_version, loader_version),
         LoaderType::NeoForge => format!("{}-neoforge-{}", mc_version, loader_version),
@@ -233,17 +240,20 @@ pub async fn repair_version_loader(
     let health = match detect_loader_damage(state, version_id).await {
         Ok(h) => h,
         Err(e) => {
-            emit_repair_progress(app, &RepairProgress {
-                version_id,
-                phase: "error",
-                progress: 100,
-                damaged: false,
-                repaired: false,
-                loader_type: None,
-                loader_version: "",
-                mc_version: "",
-                message: &e,
-            });
+            emit_repair_progress(
+                app,
+                &RepairProgress {
+                    version_id,
+                    phase: "error",
+                    progress: 100,
+                    damaged: false,
+                    repaired: false,
+                    loader_type: None,
+                    loader_version: "",
+                    mc_version: "",
+                    message: &e,
+                },
+            );
             return Err(e);
         }
     };
@@ -315,19 +325,25 @@ pub async fn repair_version_loader(
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
             let progress = {
                 let ds = poll_state.download_state.lock().unwrap();
-                ds.stages.last().map(|s| (s.progress * 100.0) as u8).unwrap_or(0)
+                ds.stages
+                    .last()
+                    .map(|s| (s.progress * 100.0) as u8)
+                    .unwrap_or(0)
             };
-            emit_repair_progress(&poll_app, &RepairProgress {
-                version_id: &poll_version,
-                phase: "installing",
-                progress,
-                damaged: true,
-                repaired: false,
-                loader_type: poll_loader_type.as_deref(),
-                loader_version: &poll_loader_version,
-                mc_version: &poll_mc_version,
-                message: "正在重新安装加载器...",
-            });
+            emit_repair_progress(
+                &poll_app,
+                &RepairProgress {
+                    version_id: &poll_version,
+                    phase: "installing",
+                    progress,
+                    damaged: true,
+                    repaired: false,
+                    loader_type: poll_loader_type.as_deref(),
+                    loader_version: &poll_loader_version,
+                    mc_version: &poll_mc_version,
+                    message: "正在重新安装加载器...",
+                },
+            );
         }
     });
 
@@ -340,7 +356,8 @@ pub async fn repair_version_loader(
         .and_then(|c| serde_json::from_str::<serde_json::Value>(&c).ok());
 
     // 重装后加载器安装器生成的版本目录（在移动 loader_type 前确定）
-    let fresh_name = fresh_loader_dir_name(&loader_type, &health.mc_version, &health.loader_version);
+    let fresh_name =
+        fresh_loader_dir_name(&loader_type, &health.mc_version, &health.loader_version);
     let fresh_dir = game_dir.join("versions").join(&fresh_name);
 
     let (mirror_url, source_mode) = crate::state::resolve_mirror_and_source(state).await;
@@ -447,11 +464,12 @@ fn merge_loader_json_into(
     let fresh_json_path = fresh_dir.join(format!("{}.json", fresh_dir_name));
     let fresh_content = std::fs::read_to_string(&fresh_json_path)
         .map_err(|e| format!("读取加载器 JSON 失败: {}", e))?;
-    let fresh_json: serde_json::Value = serde_json::from_str(&fresh_content)
-        .map_err(|e| format!("解析加载器 JSON 失败: {}", e))?;
+    let fresh_json: serde_json::Value =
+        serde_json::from_str(&fresh_content).map_err(|e| format!("解析加载器 JSON 失败: {}", e))?;
 
     // 尝试解析继承链（原版目录存在时），失败则保留加载器 JSON 原样
-    let fresh_merged = merge_version_json(&fresh_json, game_dir).unwrap_or_else(|_| fresh_json.clone());
+    let fresh_merged =
+        merge_version_json(&fresh_json, game_dir).unwrap_or_else(|_| fresh_json.clone());
 
     let mut target = existing.clone();
 
@@ -479,7 +497,10 @@ fn merge_loader_json_into(
 
 /// minecraftArguments：按空格 token 去重合并
 fn merge_minecraft_args(target: &mut serde_json::Value, fresh: &serde_json::Value) {
-    let base = target["minecraftArguments"].as_str().unwrap_or("").to_string();
+    let base = target["minecraftArguments"]
+        .as_str()
+        .unwrap_or("")
+        .to_string();
     let Some(other) = fresh["minecraftArguments"].as_str() else {
         return;
     };

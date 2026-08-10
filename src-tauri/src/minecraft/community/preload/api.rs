@@ -104,14 +104,10 @@ async fn preload_detail(
                     file_name: file_name.clone(),
                     // packs 无元数据字段，保持 None 防止前端覆盖
                     slug: scope.read_jar_metadata.then(|| cm.slug.clone()),
-                    description: scope
-                        .read_jar_metadata
-                        .then(|| cm.description.clone()),
+                    description: scope.read_jar_metadata.then(|| cm.description.clone()),
                     version: scope.read_jar_metadata.then(|| cm.version.clone()),
                     cached_logo_url,
-                    translated_name: scope
-                        .read_jar_metadata
-                        .then(|| cm.translated_name.clone()),
+                    translated_name: scope.read_jar_metadata.then(|| cm.translated_name.clone()),
                     project: cm.project.clone(),
                 },
             );

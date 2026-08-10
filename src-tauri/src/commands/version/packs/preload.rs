@@ -13,8 +13,8 @@ use crate::minecraft::community::preload::{preload_packs_detail, PreloadModInput
 use crate::minecraft::community::types::ResourceType;
 use crate::state::AppState;
 
-use super::helpers::resolve_packs_dir;
 use super::super::sanitize_version_id;
+use super::helpers::resolve_packs_dir;
 use super::types::PackKind;
 
 /// 全局当前预加载 task 的 AbortHandle（同一时间只有一个 packs 预加载 task）

@@ -2,10 +2,22 @@ use super::*;
 
 #[test]
 fn loader_lib_pattern_covers_main_loaders() {
-    assert_eq!(loader_lib_pattern(&VersionType::Forge), Some("net.minecraftforge"));
-    assert_eq!(loader_lib_pattern(&VersionType::NeoForge), Some("net.neoforged"));
-    assert_eq!(loader_lib_pattern(&VersionType::Fabric), Some("net.fabricmc:fabric-loader"));
-    assert_eq!(loader_lib_pattern(&VersionType::LiteLoader), Some("com.mumfrey:liteloader"));
+    assert_eq!(
+        loader_lib_pattern(&VersionType::Forge),
+        Some("net.minecraftforge")
+    );
+    assert_eq!(
+        loader_lib_pattern(&VersionType::NeoForge),
+        Some("net.neoforged")
+    );
+    assert_eq!(
+        loader_lib_pattern(&VersionType::Fabric),
+        Some("net.fabricmc:fabric-loader")
+    );
+    assert_eq!(
+        loader_lib_pattern(&VersionType::LiteLoader),
+        Some("com.mumfrey:liteloader")
+    );
     assert_eq!(loader_lib_pattern(&VersionType::Release), None);
     assert_eq!(loader_lib_pattern(&VersionType::Unknown), None);
 }
@@ -23,7 +35,10 @@ fn find_loader_lib_matches_pattern() {
         Some("net.minecraftforge:forge:1.12.2-14.23.5.2860".to_string())
     );
     assert_eq!(find_loader_lib(&json, "com.mumfrey:liteloader"), None);
-    assert_eq!(find_loader_lib(&serde_json::json!({"libraries": null}), "x"), None);
+    assert_eq!(
+        find_loader_lib(&serde_json::json!({"libraries": null}), "x"),
+        None
+    );
 }
 
 #[test]
@@ -35,7 +50,11 @@ fn json_lib_local_path_prefers_artifact_path() {
         }]
     });
     let game_dir = Path::new("/tmp/mc");
-    let p = json_lib_local_path(&json, "net.minecraftforge:forge:1.12.2-14.23.5.2860", game_dir);
+    let p = json_lib_local_path(
+        &json,
+        "net.minecraftforge:forge:1.12.2-14.23.5.2860",
+        game_dir,
+    );
     assert!(p.ends_with("net/minecraftforge/forge/custom.jar"));
 }
 
@@ -193,15 +212,16 @@ fn merge_loader_json_into_writes_merged_result() {
     let result = merge_loader_json_into(&base, "MyPack", &existing, &fresh_dir);
     assert!(result.is_ok(), "merge failed: {:?}", result.err());
 
-    let saved: serde_json::Value = serde_json::from_str(
-        &std::fs::read_to_string(version_dir.join("MyPack.json")).unwrap(),
-    )
-    .unwrap();
+    let saved: serde_json::Value =
+        serde_json::from_str(&std::fs::read_to_string(version_dir.join("MyPack.json")).unwrap())
+            .unwrap();
     assert_eq!(saved["id"], "MyPack");
     assert!(saved.get("inheritsFrom").is_none());
     let libs = saved["libraries"].as_array().unwrap();
     assert_eq!(libs.len(), 2);
-    assert!(libs.iter().any(|l| l["name"] == "net.minecraftforge:forge:1.12.2-14.23.5.2860"));
+    assert!(libs
+        .iter()
+        .any(|l| l["name"] == "net.minecraftforge:forge:1.12.2-14.23.5.2860"));
     let args = saved["minecraftArguments"].as_str().unwrap();
     assert!(args.contains("--a") && args.contains("--c"));
 

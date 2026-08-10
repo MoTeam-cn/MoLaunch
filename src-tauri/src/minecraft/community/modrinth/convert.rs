@@ -156,7 +156,8 @@ pub(crate) fn convert_version(v: &MrVersion, rtype: ResourceType) -> ResourceVer
 
     // 整合包 game_versions 缺失时从 version name 兜底提取 MC 版本号
     if rtype == ResourceType::ModPack && game_versions.is_empty() {
-        let mc = crate::minecraft::community::version_extract::extract_mc_version_from_name(&v.name);
+        let mc =
+            crate::minecraft::community::version_extract::extract_mc_version_from_name(&v.name);
         if !mc.is_empty() {
             game_versions.push(mc);
         }

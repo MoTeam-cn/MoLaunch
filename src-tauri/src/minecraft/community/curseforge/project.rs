@@ -56,8 +56,11 @@ pub async fn get_versions(
     let path = format!("/mods/{}/files?pageSize=10000", project_id);
 
     let resp: CfFilesResponse = cf_get(&path).await?;
-    let versions: Vec<ResourceVersion> =
-        resp.data.iter().map(|f| convert_version(f, rtype)).collect();
+    let versions: Vec<ResourceVersion> = resp
+        .data
+        .iter()
+        .map(|f| convert_version(f, rtype))
+        .collect();
     super::super::cache::set_versions("CF", project_id, &versions);
     Ok(versions)
 }

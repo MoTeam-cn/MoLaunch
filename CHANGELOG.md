@@ -4,6 +4,7 @@
 
 ## [0.3.5-rc5] - 2026-08-10
 
+- Rust 后端全库执行 `cargo fmt` 统一格式，并修复 clippy `unnecessary_sort_by` 告警（[pack_common.rs](src-tauri/src/commands/version/pack_common.rs) 按小写文件名排序改用 `sort_by_key`）。
 - 构建配置（[vite.config.ts](vite.config.ts)）：新增 `vendor-markdown` chunk 分割（marked + dompurify，AI 聊天与更新日志共用）；精简过时注释并删除已不存在的 arco-design 说明，chunk 命名清理改为链式调用。
 - 联机页面创建房间表单、加入房间表单、房主/加入方面板（房间详情）顶部新增两条 `AlertV2` 提示：「P2P联机对房主的网络质量要求较高，如遇连接不上可尝试更换房主」与「如遇到违法违规房间，请及时向我们举报」（[CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) / [RoomManager.vue](src/components/online/RoomManager.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）。
 - 实验性 AI 聊天每条 AI 回复底部左侧新增「由AI生成的内容，注意甄别」声明（[ChatMessageItem.vue](src/components/experimental/ChatMessageItem.vue)），与右侧 token 统计 / 模型信息同行展示，正文生成期间即显示。

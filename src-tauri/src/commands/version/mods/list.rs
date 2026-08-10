@@ -4,10 +4,10 @@
 //! 通过请求体的 `action` 字段分发。本模块函数已去掉 `#[tauri::command]` 标注，
 //! 由 `manager::dispatch` 反序列化参数后调用。
 
+use crate::log_info;
 use crate::minecraft::version::setup::VersionSetup;
 use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
-use crate::log_info;
 
 use super::super::pack_common;
 use super::super::sanitize_version_id;

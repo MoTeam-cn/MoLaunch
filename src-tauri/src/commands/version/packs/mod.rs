@@ -2,12 +2,12 @@
 //! 子模块：types/helpers/icon/watcher/list/manage/install/update/preload，共用 `pack_common` 公共抽象。
 //! 13 个 action 已聚合为 `version_packs_manager` 一个 IPC 入口通过 `action` 字段分发。
 
-pub mod install;
-pub mod list;
 mod helpers;
 mod icon;
-mod manager;
+pub mod install;
+pub mod list;
 pub mod manage;
+mod manager;
 mod preload;
 mod types;
 pub mod update;
