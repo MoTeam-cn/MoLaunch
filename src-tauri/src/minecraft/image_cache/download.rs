@@ -118,7 +118,7 @@ async fn download_image(remote_url: &str) -> anyhow::Result<()> {
     let rel = cache_rel_path(remote_url);
     cache::write_bytes(&rel, &bytes)?;
 
-    crate::log_info!("[ImageCache] 已缓存: {} ({} 字节)", remote_url, bytes.len());
+    crate::log_debug!("[ImageCache] 已缓存: {} ({} 字节)", remote_url, bytes.len());
 
     Ok(())
 }

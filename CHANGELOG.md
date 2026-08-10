@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 
+- 图片缓存日志降级为 debug（[download.rs](src-tauri/src/minecraft/image_cache/download.rs)）：`[ImageCache] 已缓存` 由 INFO 改为 debug 级别，避免每个图片缓存都刷屏 INFO 日志。
 - 资源包/光影列表 UI 对齐 Mod（[PackTab.vue](src/views/version-settings/PackTab.vue) + [PackListItem.vue](src/views/version-settings/pack-tab/PackListItem.vue)）：列表外层新增 `p-6` 内边距与圆角白卡片容器（含边框阴影），不再铺满难看；列表项内边距加宽（`px-4 py-3`），图标改为平台 logo → 包内图标 → 保底图三级优先，标题行显示平台工程名。
 - 资源包/光影详情与更新联动（[usePackList.ts](src/composables/usePackList.ts) + [usePackOperations.ts](src/composables/usePackOperations.ts) + [PackUpdateDialog.vue](src/views/version-settings/pack-tab/PackUpdateDialog.vue)）：新增详情按钮，点击后按「project 已就绪 → 等待预加载 → 本地信息」三级 fallback 弹窗，复用社区 [ResourceDetail.vue](src/components/community/ResourceDetail.vue)（CurseForge / Modrinth 版本列表联动）；匹配到平台工程的包额外显示「更新/更改版本」按钮，复用 mod-tab 的 VersionTable 弹出版本列表安装新版本。
 - 预加载参数化复用 Mod 链路（[preload](src-tauri/src/minecraft/community/preload/) + [packs/preload.rs](src-tauri/src/commands/version/packs/preload.rs)）：`PreloadScope`（事件前缀 / 资源类型 / 缓存目录 / 是否读 JAR）把 mods 专用预加载泛化为 packs 共用，zip 包仅按 hash 匹配 CF/MR 工程（不读 JAR 元数据）；缓存按 `preload_mods` / `preload_resourcepack` / `preload_shader` 分目录，前端 `usePacksPreload` 合并 `packs-preload-update` 事件，`AbortHandle` 管理预加载 task，切换/卸载时取消。
