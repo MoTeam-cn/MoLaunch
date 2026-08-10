@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- stars/forks 徽章样式统一（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：由 `for-the-badge` 深色大徽章改回 `style=flat` + 蓝色 `165dff`，与 issues/last-commit/contributors 右侧徽章协调；保留自定义金色星星 / 白色分支图标。
+
 - 修复 CI 的 clippy/fmt 失败（[lib.rs](src-tauri/src/lib.rs)）：`is_internal_navigation` 的 `map_or(false, ...)` 改为 `is_some_and`（clippy `unnecessary_map_or`），并按 rustfmt 规范重排；本地 `cargo fmt --check` 与 `cargo clippy --all-targets -- -D warnings` 均已通过。
 
 - README 徽章与功能特性改版（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：stars 徽章改用金色星星、forks 沿用白色分支，两者切换为 `for-the-badge` 样式（深色标签 + 金色高亮，`logoSize=auto`）；「功能特性」由数十行多子章节精简为 6 条要点 + 结尾一句云端 PoW 说明；贡献者章节追加 Repobeats 仓库活跃度统计图。
