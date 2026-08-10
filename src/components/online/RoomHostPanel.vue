@@ -20,6 +20,7 @@ import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Drawer from '@/components/common/Drawer.vue'
 import Tag from '@/components/common/Tag.vue'
+import AlertV2 from '@/components/common/AlertV2.vue'
 import PendingAnswerList from './PendingAnswerList.vue'
 import ParticipantList from './ParticipantList.vue'
 import BannedList from './BannedList.vue'
@@ -132,6 +133,8 @@ const nearPlayerLimit = computed(
 
 <template>
   <div class="space-y-4">
+    <AlertV2 type="info" message="P2P联机对房主的网络质量要求较高，如遇连接不上可尝试更换房主" />
+    <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
     <Card title="房间信息">
       <div class="divide-y divide-gray-100">
         <div class="px-1 py-3 flex items-center justify-between">

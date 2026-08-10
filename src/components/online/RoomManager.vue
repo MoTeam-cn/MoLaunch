@@ -24,6 +24,7 @@ import type { useWebRTC } from '@/composables/useWebRTC'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Input from '@/components/common/Input.vue'
+import AlertV2 from '@/components/common/AlertV2.vue'
 import RoomHostPanel from './RoomHostPanel.vue'
 import RoomGuestPanel from './RoomGuestPanel.vue'
 import CreateRoomForm from './CreateRoomForm.vue'
@@ -113,7 +114,10 @@ async function handleJoinRoom() {
     <CreateRoomForm v-else-if="mode === 'create'" />
 
     <!-- 加入房间表单（mode=join 且未在房间） -->
-    <Card v-else title="加入房间">
+    <div v-else class="space-y-4">
+      <AlertV2 type="info" message="P2P联机对房主的网络质量要求较高，如遇连接不上可尝试更换房主" />
+      <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
+      <Card title="加入房间">
       <div class="space-y-4 py-1">
         <div class="flex items-start gap-3">
           <label class="w-24 text-xs text-gray-600 pt-2 shrink-0">房间码</label>
@@ -136,6 +140,7 @@ async function handleJoinRoom() {
           </Button>
         </div>
       </div>
-    </Card>
+      </Card>
+    </div>
   </div>
 </template>

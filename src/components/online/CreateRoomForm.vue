@@ -7,6 +7,7 @@ import Input from '@/components/common/Input.vue'
 import Select from '@/components/common/Select.vue'
 import Drawer from '@/components/common/Drawer.vue'
 import Tag from '@/components/common/Tag.vue'
+import AlertV2 from '@/components/common/AlertV2.vue'
 import WhitelistEditor from './WhitelistEditor.vue'
 import ModpackSelector from './ModpackSelector.vue'
 import { Cog8ToothIcon, PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
@@ -46,6 +47,8 @@ watch(
 
 <template>
   <div class="space-y-4">
+    <AlertV2 type="info" message="P2P联机对房主的网络质量要求较高，如遇连接不上可尝试更换房主" />
+    <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
     <!-- 基础信息卡片 -->
     <Card title="创建房间">
       <div class="space-y-4 py-1">
