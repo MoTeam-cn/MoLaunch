@@ -82,11 +82,12 @@ pub async fn download_cape_png(cape_url: &str) -> Result<Vec<u8>, String> {
     crate::log_info!("[Skin] 下载披风: {}", cape_url);
 
     let client = http::get_client();
-    let response = client
-        .get(cape_url)
-        .send()
-        .await
-        .map_err(|e| format!("download cape request error: {}", e))?;
+    let response = client.get(cape_url).send().await.map_err(|e| {
+        format!(
+            "download cape request error: {}",
+            crate::http::request_error_msg(&e)
+        )
+    })?;
 
     let status = response.status();
     if !status.is_success() {
@@ -118,7 +119,12 @@ pub async fn equip_cape(access_token: &str, cape_id: &str) -> Result<(), String>
         .json(&body)
         .send()
         .await
-        .map_err(|e| format!("equip cape request error: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "equip cape request error: {}",
+                crate::http::request_error_msg(&e)
+            )
+        })?;
 
     let status = response.status();
     let body_text = response.text().await.unwrap_or_default();
@@ -143,7 +149,12 @@ pub async fn unequip_cape(access_token: &str) -> Result<(), String> {
         .header("Authorization", format!("Bearer {}", access_token))
         .send()
         .await
-        .map_err(|e| format!("unequip cape request error: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "unequip cape request error: {}",
+                crate::http::request_error_msg(&e)
+            )
+        })?;
 
     let status = response.status();
     let body_text = response.text().await.unwrap_or_default();

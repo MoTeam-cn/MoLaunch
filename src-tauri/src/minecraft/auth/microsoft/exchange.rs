@@ -48,7 +48,11 @@ async fn exchange_xbl_token(oauth_token: &str) -> Result<XblTokenResponse, Micro
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("xbl request error: {}", e)).with_step("xbl")
+            MicrosoftLoginError::new(format!(
+                "xbl request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("xbl")
         })?;
     let status = resp.status();
     let body_text = resp.text().await.unwrap_or_default();
@@ -81,7 +85,11 @@ async fn exchange_xsts_token(xbl_token: &str) -> Result<(String, String), Micros
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("xsts request error: {}", e)).with_step("xsts")
+            MicrosoftLoginError::new(format!(
+                "xsts request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("xsts")
         })?;
     let status = resp.status();
     let body_text = resp.text().await.unwrap_or_default();
@@ -139,7 +147,11 @@ async fn exchange_mc_token(
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("mc_token request error: {}", e)).with_step("mc_token")
+            MicrosoftLoginError::new(format!(
+                "mc_token request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("mc_token")
         })?;
     let status = resp.status();
     let body_text = resp.text().await.unwrap_or_default();
@@ -166,8 +178,11 @@ async fn check_entitlements(mc_token: &str) -> Result<bool, MicrosoftLoginError>
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("entitlements request error: {}", e))
-                .with_step("entitlements")
+            MicrosoftLoginError::new(format!(
+                "entitlements request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("entitlements")
         })?;
     let status = resp.status();
     let body_text = resp.text().await.unwrap_or_default();
@@ -204,7 +219,11 @@ async fn fetch_profile(mc_token: &str) -> Result<MinecraftProfile, MicrosoftLogi
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("profile request error: {}", e)).with_step("profile")
+            MicrosoftLoginError::new(format!(
+                "profile request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("profile")
         })?;
     let status = resp.status();
     let body_text = resp.text().await.unwrap_or_default();

@@ -74,7 +74,10 @@ pub(crate) async fn cf_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
             }),
             Ok(Err(e)) => {
                 crate::log_warn!("[Community] CF 请求失败: {} ({:?})", url, e);
-                Err(format!("CurseForge 请求失败: {}", e))
+                Err(format!(
+                    "CurseForge 请求失败: {}",
+                    crate::http::request_error_msg(&e)
+                ))
             }
             Err(_) => {
                 crate::log_warn!(
@@ -99,7 +102,10 @@ pub(crate) async fn cf_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
             .await
             .map_err(|e| {
                 crate::log_warn!("[Community] CF 请求失败: {} ({:?})", url, e);
-                format!("CurseForge 请求失败: {}", e)
+                format!(
+                    "CurseForge 请求失败: {}",
+                    crate::http::request_error_msg(&e)
+                )
             })?
             .json::<T>()
             .await
@@ -122,7 +128,10 @@ pub(crate) async fn cf_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                 let req = build_cf_request(&mirror_url, None);
                 let resp = req.send().await.map_err(|e| {
                     crate::log_warn!("[Community] CF 镜像请求失败: {} ({:?})", mirror_url, e);
-                    format!("CurseForge 镜像请求失败: {}", e)
+                    format!(
+                        "CurseForge 镜像请求失败: {}",
+                        crate::http::request_error_msg(&e)
+                    )
                 })?;
                 let value: T = resp.json().await.map_err(|e| {
                     crate::log_warn!("[Community] CF 镜像响应解析失败: {} ({})", mirror_url, e);
@@ -211,7 +220,10 @@ pub(crate) async fn cf_post<T: serde::de::DeserializeOwned>(
             }),
             Ok(Err(e)) => {
                 crate::log_warn!("[Community] CF POST 请求失败: {} ({:?})", url, e);
-                Err(format!("CurseForge 请求失败: {}", e))
+                Err(format!(
+                    "CurseForge 请求失败: {}",
+                    crate::http::request_error_msg(&e)
+                ))
             }
             Err(_) => {
                 crate::log_warn!(
@@ -235,7 +247,10 @@ pub(crate) async fn cf_post<T: serde::de::DeserializeOwned>(
             .await
             .map_err(|e| {
                 crate::log_warn!("[Community] CF POST 请求失败: {} ({:?})", url, e);
-                format!("CurseForge 请求失败: {}", e)
+                format!(
+                    "CurseForge 请求失败: {}",
+                    crate::http::request_error_msg(&e)
+                )
             })?
             .json::<T>()
             .await
@@ -262,7 +277,10 @@ pub(crate) async fn cf_post<T: serde::de::DeserializeOwned>(
                 let req = build_cf_post_request(&mirror_url, None, body);
                 let resp = req.send().await.map_err(|e| {
                     crate::log_warn!("[Community] CF POST 镜像请求失败: {} ({:?})", mirror_url, e);
-                    format!("CurseForge 镜像请求失败: {}", e)
+                    format!(
+                        "CurseForge 镜像请求失败: {}",
+                        crate::http::request_error_msg(&e)
+                    )
                 })?;
                 let value: T = resp.json().await.map_err(|e| {
                     crate::log_warn!(

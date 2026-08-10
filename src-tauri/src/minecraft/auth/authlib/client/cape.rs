@@ -36,7 +36,7 @@ pub async fn upload_cape(
         .await
         .map_err(|e| YggdrasilError {
             status: 0,
-            message: format!("上传披风请求失败: {}", e),
+            message: format!("上传披风请求失败: {}", crate::http::request_error_msg(&e)),
             is_network: true,
         })?;
 

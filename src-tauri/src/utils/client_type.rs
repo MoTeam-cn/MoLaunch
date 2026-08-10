@@ -69,6 +69,17 @@ pub fn client_type(version: &str) -> u8 {
     platform_code() * 10 + channel_code(version)
 }
 
+/// 预发布后缀 → 更新通道（`alpha` / `beta` / `stable`）
+///
+/// 供更新检查接口的 `channel` 参数使用；rc/beta 视为 beta 分支，alpha/dev 等视为 alpha 分支。
+pub fn channel_name(version: &str) -> &'static str {
+    match channel_code(version) {
+        0 => "stable",
+        1 | 2 => "beta",
+        _ => "alpha",
+    }
+}
+
 /// 提取主版本号（去掉预发布后缀）
 ///
 /// `0.1.0-beta.1` → `0.1.0`；`1.0.0-rc1` → `1.0.0`；`1.0.0` → `1.0.0`

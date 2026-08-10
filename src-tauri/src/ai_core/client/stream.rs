@@ -49,7 +49,8 @@ pub async fn chat_completions_stream(
             .header("Content-Type", "application/json; charset=utf-8")
             .json(&req)
             .send()
-            .await?;
+            .await
+            .map_err(|e| anyhow::anyhow!(crate::http::request_error_msg(&e)))?;
         let status = resp.status().as_u16();
         if !(200..300).contains(&status) {
             let text = resp.text().await.unwrap_or_default();

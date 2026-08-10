@@ -43,8 +43,11 @@ pub async fn exchange_auth_code(code: &str) -> Result<OAuthTokenResponse, Micros
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("auth_code request error: {}", e))
-                .with_step("auth_code")
+            MicrosoftLoginError::new(format!(
+                "auth_code request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("auth_code")
         })?;
 
     let body_text = response.text().await.unwrap_or_default();
@@ -85,8 +88,11 @@ pub async fn request_device_code() -> Result<DeviceCodeResponse, MicrosoftLoginE
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("device_code request error: {}", e))
-                .with_step("device_code")
+            MicrosoftLoginError::new(format!(
+                "device_code request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("device_code")
         })?;
 
     let status = response.status();
@@ -135,7 +141,11 @@ pub async fn poll_device_code(
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("poll request error: {}", e)).with_step("poll")
+            MicrosoftLoginError::new(format!(
+                "poll request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("poll")
         })?;
 
     let status = response.status();
@@ -202,7 +212,11 @@ pub async fn refresh_oauth_token(
         .send()
         .await
         .map_err(|e| {
-            MicrosoftLoginError::new(format!("refresh request error: {}", e)).with_step("refresh")
+            MicrosoftLoginError::new(format!(
+                "refresh request error: {}",
+                crate::http::request_error_msg(&e)
+            ))
+            .with_step("refresh")
         })?;
 
     let body_text = response.text().await.unwrap_or_default();

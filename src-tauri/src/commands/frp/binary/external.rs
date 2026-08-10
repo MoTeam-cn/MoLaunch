@@ -53,7 +53,7 @@ pub(crate) async fn ensure_external_frpc(
             .get(&current_url)
             .send()
             .await
-            .map_err(|e| format!("下载失败: {}", e))?;
+            .map_err(|e| format!("下载失败: {}", crate::http::request_error_msg(&e)))?;
 
         // 3xx 重定向：手动校验 Location 域名是否在白名单内
         if resp.status().is_redirection() {

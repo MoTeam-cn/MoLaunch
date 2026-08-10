@@ -72,7 +72,10 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                 Ok(Ok(resp)) => parse_resp::<T>(resp, &url).await,
                 Ok(Err(e)) => {
                     crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
-                    Err(format!("Modrinth 请求失败: {}", e))
+                    Err(format!(
+                        "Modrinth 请求失败: {}",
+                        crate::http::request_error_msg(&e)
+                    ))
                 }
                 Err(_) => {
                     crate::log_warn!(
@@ -93,7 +96,7 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                 .await
                 .map_err(|e| {
                     crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
-                    format!("Modrinth 请求失败: {}", e)
+                    format!("Modrinth 请求失败: {}", crate::http::request_error_msg(&e))
                 })?;
             parse_resp::<T>(resp, &url).await
         }
@@ -105,7 +108,7 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
             .await
             .map_err(|e| {
                 crate::log_warn!("[Community] MR 请求失败: {} ({:?})", url, e);
-                format!("Modrinth 请求失败: {}", e)
+                format!("Modrinth 请求失败: {}", crate::http::request_error_msg(&e))
             })?;
         parse_resp::<T>(resp, &url).await
     };
@@ -128,7 +131,10 @@ pub(crate) async fn mr_get<T: serde::de::DeserializeOwned>(path: &str) -> Result
                     .await
                     .map_err(|e| {
                         crate::log_warn!("[Community] MR 镜像请求失败: {} ({:?})", mirror_url, e);
-                        format!("Modrinth 镜像请求失败: {}", e)
+                        format!(
+                            "Modrinth 镜像请求失败: {}",
+                            crate::http::request_error_msg(&e)
+                        )
                     })?;
                 let value: T = parse_resp::<T>(resp, &mirror_url).await?;
                 crate::log_info!(
@@ -194,7 +200,10 @@ pub(crate) async fn mr_post<T: serde::de::DeserializeOwned>(
             Ok(Ok(resp)) => parse_post_resp::<T>(resp, &url).await,
             Ok(Err(e)) => {
                 crate::log_warn!("[Community] MR POST 请求失败: {} ({:?})", url, e);
-                Err(format!("Modrinth 请求失败: {}", e))
+                Err(format!(
+                    "Modrinth 请求失败: {}",
+                    crate::http::request_error_msg(&e)
+                ))
             }
             Err(_) => {
                 crate::log_warn!(
@@ -217,7 +226,7 @@ pub(crate) async fn mr_post<T: serde::de::DeserializeOwned>(
             .await
             .map_err(|e| {
                 crate::log_warn!("[Community] MR POST 请求失败: {} ({:?})", url, e);
-                format!("Modrinth 请求失败: {}", e)
+                format!("Modrinth 请求失败: {}", crate::http::request_error_msg(&e))
             })?;
         parse_post_resp::<T>(resp, &url).await
     };
@@ -248,7 +257,10 @@ pub(crate) async fn mr_post<T: serde::de::DeserializeOwned>(
                             mirror_url,
                             e
                         );
-                        format!("Modrinth 镜像请求失败: {}", e)
+                        format!(
+                            "Modrinth 镜像请求失败: {}",
+                            crate::http::request_error_msg(&e)
+                        )
                     })?;
                 let value: T = parse_post_resp::<T>(resp, &mirror_url).await?;
                 crate::log_info!(

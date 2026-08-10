@@ -39,7 +39,10 @@ pub(super) async fn download_from_url(
     .await
     .map_err(|_| -> Box<dyn std::error::Error + Send + Sync> {
         format!("连接超时（{}s）", timeout.as_secs()).into()
-    })??;
+    })?
+    .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+        crate::http::request_error_msg(&e).into()
+    })?;
 
     if !response.status().is_success() {
         return Err(format!("HTTP 错误：{}", response.status()).into());

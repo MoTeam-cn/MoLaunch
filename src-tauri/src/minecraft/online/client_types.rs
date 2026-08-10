@@ -109,8 +109,11 @@ pub struct BusinessResult<T> {
 /// 客户端错误
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
+    #[error("检测到中间人攻击，已自动断开链接")]
+    Mitm,
+
     #[error("网络请求失败: {0}")]
-    Network(#[from] reqwest::Error),
+    Network(reqwest::Error),
 
     #[error("HTTP {status}: {body}")]
     HttpStatus { status: u16, body: String },
@@ -144,4 +147,14 @@ pub enum ClientError {
 
     #[error("响应不是 ECIES 加密信封（明文响应）: {0}")]
     NotEnvelope(String),
+}
+
+impl From<reqwest::Error> for ClientError {
+    fn from(e: reqwest::Error) -> Self {
+        if crate::http::is_tls_cert_error(&e) {
+            ClientError::Mitm
+        } else {
+            ClientError::Network(e)
+        }
+    }
 }

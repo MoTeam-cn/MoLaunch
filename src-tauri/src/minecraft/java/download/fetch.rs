@@ -20,7 +20,7 @@ pub async fn fetch_text_with_fallback(
                 Err(e) => last_err = format!("读取失败: {}", e),
             },
             Ok(resp) => last_err = format!("HTTP {}", resp.status()),
-            Err(e) => last_err = format!("请求失败: {}", e),
+            Err(e) => last_err = format!("请求失败: {}", crate::http::request_error_msg(&e)),
         }
     }
     Err(format!("所有源均失败: {}", last_err))

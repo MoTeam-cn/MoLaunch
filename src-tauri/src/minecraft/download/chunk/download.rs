@@ -93,7 +93,10 @@ pub(super) async fn download_chunk(
         .header("Range", &range_header)
         .timeout(Duration::from_secs(86400))
         .send()
-        .await?;
+        .await
+        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+            crate::http::request_error_msg(&e).into()
+        })?;
 
     if !response.status().is_success() && response.status().as_u16() != 206 {
         return Err(format!("HTTP 错误：{}", response.status()).into());

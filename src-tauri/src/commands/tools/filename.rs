@@ -64,7 +64,7 @@ pub async fn fetch_filename(params: FetchFilenameParams) -> Result<serde_json::V
                 .timeout(Duration::from_secs(10))
                 .send()
                 .await
-                .map_err(|e| format!("请求失败: {}", e))?;
+                .map_err(|e| format!("请求失败: {}", crate::http::request_error_msg(&e)))?;
 
             let cd = resp
                 .headers()

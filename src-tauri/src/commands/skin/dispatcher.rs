@@ -41,11 +41,12 @@ pub async fn download_url_to_file(url: String, path: String) -> Result<(), Strin
 
     // 普通 HTTP URL：用 reqwest 下载
     let client = crate::http::get_client();
-    let response = client
-        .get(&url)
-        .send()
-        .await
-        .map_err(|e| format!("download request error: {}", e))?;
+    let response = client.get(&url).send().await.map_err(|e| {
+        format!(
+            "download request error: {}",
+            crate::http::request_error_msg(&e)
+        )
+    })?;
 
     let status = response.status();
     if !status.is_success() {

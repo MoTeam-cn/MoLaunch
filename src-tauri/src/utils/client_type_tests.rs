@@ -16,6 +16,15 @@ fn channel_mapping() {
 }
 
 #[test]
+fn channel_name_mapping() {
+    assert_eq!(channel_name("0.3.5"), "stable");
+    assert_eq!(channel_name("0.3.5-rc5"), "beta");
+    assert_eq!(channel_name("0.3.5-beta.2"), "beta");
+    assert_eq!(channel_name("0.3.5-alpha.1"), "alpha");
+    assert_eq!(channel_name("0.3.5-dev"), "alpha");
+}
+
+#[test]
 fn main_version_strips_suffix() {
     assert_eq!(main_version("1.0.0"), "1.0.0");
     assert_eq!(main_version("1.0.0-rc1"), "1.0.0");

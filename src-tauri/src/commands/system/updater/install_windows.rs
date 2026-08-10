@@ -29,7 +29,7 @@ pub(super) async fn download_and_install_windows(
         .get(&info.download_url)
         .send()
         .await
-        .map_err(|e| format!("下载请求失败: {e}"))?;
+        .map_err(|e| format!("下载请求失败: {}", crate::http::request_error_msg(&e)))?;
     let bytes = response
         .bytes()
         .await
@@ -137,7 +137,7 @@ pub(super) async fn download_update_to_appdata_impl(info: UpdateInfo) -> Result<
         .get(&info.download_url)
         .send()
         .await
-        .map_err(|e| format!("下载请求失败: {e}"))?;
+        .map_err(|e| format!("下载请求失败: {}", crate::http::request_error_msg(&e)))?;
     let bytes = response
         .bytes()
         .await

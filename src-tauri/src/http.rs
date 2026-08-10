@@ -65,11 +65,34 @@ pub fn get_client() -> reqwest::Client {
         .expect("Failed to build default HTTP client")
 }
 
+/// 错误链中是否包含 TLS 证书校验失败（抓包代理/中间人场景）
+pub fn is_tls_cert_error(e: &(dyn std::error::Error + 'static)) -> bool {
+    std::iter::successors(Some(e), |err| err.source()).any(|err| {
+        let msg = err.to_string().to_ascii_lowercase();
+        msg.contains("certificate")
+            || msg.contains("unknownissuer")
+            || msg.contains("tls handshake")
+    })
+}
+
+/// 格式化请求错误：TLS 证书校验失败时提示中间人攻击
+pub fn request_error_msg(e: &reqwest::Error) -> String {
+    if is_tls_cert_error(e) {
+        "检测到中间人攻击，已自动断开链接".to_string()
+    } else {
+        e.to_string()
+    }
+}
+
 /// GET 请求并返回 (HTTP 状态码, 响应体文本)。
 ///
 /// 网络错误返回 Err；HTTP 任意状态码均返回 Ok。
 pub async fn get_text_with_status(url: &str) -> anyhow::Result<(u16, String)> {
-    let resp = get_client().get(url).send().await?;
+    let resp = get_client()
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| anyhow::anyhow!(request_error_msg(&e)))?;
     let status = resp.status().as_u16();
     let text = resp.text().await.unwrap_or_default();
     Ok((status, text))
@@ -105,8 +128,13 @@ pub async fn post_json_with_status<T: serde::Serialize>(
         .header("Accept-Language", "zh-CN")
         .json(body)
         .send()
-        .await?;
+        .await
+        .map_err(|e| anyhow::anyhow!(request_error_msg(&e)))?;
     let status = resp.status().as_u16();
     let text = resp.text().await.unwrap_or_default();
     Ok((status, text))
 }
+
+#[cfg(test)]
+#[path = "http_test.rs"]
+mod http_test;

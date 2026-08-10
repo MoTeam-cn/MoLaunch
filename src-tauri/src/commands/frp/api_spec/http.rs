@@ -65,10 +65,12 @@ pub(super) async fn send_request(
             request = request.header("Authorization", &auth_value);
         }
 
-        let response = request
-            .send()
-            .await
-            .map_err(|e| format!("厂商 API 请求发送失败: {}", e))?;
+        let response = request.send().await.map_err(|e| {
+            format!(
+                "厂商 API 请求发送失败: {}",
+                crate::http::request_error_msg(&e)
+            )
+        })?;
 
         if !response.status().is_redirection() {
             let value = handle_response(response).await?;

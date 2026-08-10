@@ -253,7 +253,9 @@ pub async fn download_all_files(
                         download_err = format!("HTTP {}", resp.status());
                     }
                 }
-                Err(e) => download_err = format!("请求失败: {}", e),
+                Err(e) => {
+                    download_err = format!("请求失败: {}", crate::http::request_error_msg(&e))
+                }
             }
         }
 

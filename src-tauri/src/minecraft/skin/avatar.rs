@@ -112,11 +112,12 @@ pub async fn download_skin_png(skin_url: &str) -> Result<Vec<u8>, String> {
     log_info!("[Skin] 下载皮肤: {}", skin_url);
 
     let client = http::get_client();
-    let response = client
-        .get(skin_url)
-        .send()
-        .await
-        .map_err(|e| format!("download skin request error: {}", e))?;
+    let response = client.get(skin_url).send().await.map_err(|e| {
+        format!(
+            "download skin request error: {}",
+            crate::http::request_error_msg(&e)
+        )
+    })?;
 
     let status = response.status();
     if !status.is_success() {

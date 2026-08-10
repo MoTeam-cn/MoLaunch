@@ -48,7 +48,8 @@ pub async fn chat(
             .header("Content-Type", "application/json; charset=utf-8")
             .json(&req)
             .send()
-            .await?;
+            .await
+            .map_err(|e| anyhow::anyhow!(crate::http::request_error_msg(&e)))?;
         let status = resp.status().as_u16();
         let text = resp.text().await.unwrap_or_default();
         Ok::<(u16, String), anyhow::Error>((status, text))
@@ -83,7 +84,8 @@ pub async fn list_models(config: &AiConfig) -> anyhow::Result<Vec<String>> {
     let (status, text) = send_with_timeout(config.timeout_secs, async {
         let resp = authorized_builder(config, reqwest::Method::GET, url)
             .send()
-            .await?;
+            .await
+            .map_err(|e| anyhow::anyhow!(crate::http::request_error_msg(&e)))?;
         let status = resp.status().as_u16();
         let text = resp.text().await.unwrap_or_default();
         Ok::<(u16, String), anyhow::Error>((status, text))
@@ -133,7 +135,8 @@ pub async fn chat_completions(
             .header("Content-Type", "application/json; charset=utf-8")
             .json(&req)
             .send()
-            .await?;
+            .await
+            .map_err(|e| anyhow::anyhow!(crate::http::request_error_msg(&e)))?;
         let status = resp.status().as_u16();
         let text = resp.text().await.unwrap_or_default();
         Ok::<(u16, String), anyhow::Error>((status, text))

@@ -2,6 +2,11 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+- 更新检查接口新增 `channel` 参数（[api_paths.rs](src-tauri/src/api_paths.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs)）：按当前版本后缀自动推导分支（[client_type.rs](src-tauri/src/utils/client_type.rs) 新增 `channel_name`，rc/beta 归 beta、alpha/dev 归 alpha），预发布版本可正确查询对应分支更新。
+- 全部 HTTP 请求统一接入中间人检测（[http.rs](src-tauri/src/http.rs) 新增 `is_tls_cert_error`/`request_error_msg`）：更新检查、FRP、皮肤、联机、AI、Microsoft 登录、authlib 皮肤站、CurseForge/Modrinth、游戏下载等请求在 TLS 证书校验失败时统一返回「检测到中间人攻击，已自动断开链接」，不再暴露原始证书错误。
+
 ## [0.3.5-rc5] - 2026-08-10
 
 - Rust 后端全库执行 `cargo fmt` 统一格式，并修复 clippy `unnecessary_sort_by` 告警（[pack_common.rs](src-tauri/src/commands/version/pack_common.rs) 按小写文件名排序改用 `sort_by_key`）。

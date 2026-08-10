@@ -35,7 +35,7 @@ pub async fn install_provider_from_url(url: String) -> Result<ProviderInfo, Stri
         .get(&url)
         .send()
         .await
-        .map_err(|e| format!("下载失败: {}", e))?;
+        .map_err(|e| format!("下载失败: {}", crate::http::request_error_msg(&e)))?;
     if !response.status().is_success() {
         return Err(format!("下载失败: HTTP {}", response.status()));
     }

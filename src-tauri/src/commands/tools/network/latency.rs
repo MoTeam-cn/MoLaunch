@@ -54,7 +54,7 @@ pub async fn latency_test(
                         url,
                         latency_ms: None,
                         status_code: 0,
-                        error: e.to_string(),
+                        error: crate::http::request_error_msg(&e),
                     },
                 }
             }

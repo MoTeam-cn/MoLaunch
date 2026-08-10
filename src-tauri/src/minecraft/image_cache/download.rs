@@ -96,11 +96,12 @@ fn spawn_download(remote_url: String, app: AppHandle) {
 /// 下载图片并写入缓存
 async fn download_image(remote_url: &str) -> anyhow::Result<()> {
     let client = get_client();
-    let response = client
-        .get(remote_url)
-        .send()
-        .await
-        .map_err(|e| anyhow::anyhow!("download image failed: {}", e))?;
+    let response = client.get(remote_url).send().await.map_err(|e| {
+        anyhow::anyhow!(
+            "download image failed: {}",
+            crate::http::request_error_msg(&e)
+        )
+    })?;
 
     if !response.status().is_success() {
         return Err(anyhow::anyhow!(

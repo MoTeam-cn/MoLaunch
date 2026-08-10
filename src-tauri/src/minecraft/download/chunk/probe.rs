@@ -25,30 +25,44 @@ pub async fn supports_range(client: &reqwest::Client, url: &str) -> bool {
             // 404 = 文件不存在或对 Range 请求返回 404（CF CDN 就是这种行为）
             resp.status().as_u16() == 206
         }
-        Err(_) => false,
+        Err(e) => {
+            log_debug!(
+                "[Chunk] Range 支持探测失败: {}",
+                crate::http::request_error_msg(&e)
+            );
+            false
+        }
     }
 }
 
 /// 探测远程文件大小（GET + Range:bytes=0-0，通过 Content-Range 拿总大小）
 pub async fn probe_file_size(client: &reqwest::Client, url: &str) -> u64 {
-    if let Ok(resp) = client
+    match client
         .get(url)
         .header("Range", "bytes=0-0")
         .timeout(Duration::from_secs(15))
         .send()
         .await
     {
-        if resp.status().is_success() {
-            if let Some(cr) = resp.headers().get("content-range") {
-                if let Ok(s) = cr.to_str() {
-                    if let Some(total) = s.rsplit('/').next() {
-                        if let Ok(n) = total.parse::<u64>() {
-                            log_debug!("[Chunk] 探测文件大小: {} ({})", format::bytes(n), url);
-                            return n;
+        Ok(resp) => {
+            if resp.status().is_success() {
+                if let Some(cr) = resp.headers().get("content-range") {
+                    if let Ok(s) = cr.to_str() {
+                        if let Some(total) = s.rsplit('/').next() {
+                            if let Ok(n) = total.parse::<u64>() {
+                                log_debug!("[Chunk] 探测文件大小: {} ({})", format::bytes(n), url);
+                                return n;
+                            }
                         }
                     }
                 }
             }
+        }
+        Err(e) => {
+            log_debug!(
+                "[Chunk] 文件大小探测失败: {}",
+                crate::http::request_error_msg(&e)
+            );
         }
     }
     0

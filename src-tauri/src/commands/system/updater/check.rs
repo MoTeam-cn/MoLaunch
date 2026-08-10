@@ -56,10 +56,13 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     };
 
     // 2. 构建 URL（base_url + 路径模板替换，模板见 crate::api_paths::UPDATES_MANIFEST_RAW）
+    // channel 由当前版本后缀自动推导（alpha/beta/stable），预发布版本查询对应分支
+    let channel = crate::utils::client_type::channel_name(current_version);
     let path = UPDATES_MANIFEST_RAW
         .replace("{{target}}", target)
         .replace("{{arch}}", arch)
-        .replace("{{current_version}}", current_version);
+        .replace("{{current_version}}", current_version)
+        .replace("{{channel}}", channel);
     let url = format!("{}{}", base_url.trim_end_matches('/'), path);
 
     // 3. 尝试加载设备 JWT（未注册时忽略，无 auth 请求）
@@ -76,10 +79,13 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     if let Some(ref token) = jwt {
         req_builder = req_builder.header("Authorization", format!("Bearer {}", token));
     }
-    let response = req_builder
-        .send()
-        .await
-        .map_err(|e| format!("检查更新失败: {e}"))?;
+    let response = req_builder.send().await.map_err(|e| {
+        if crate::http::is_tls_cert_error(&e) {
+            "检测到中间人攻击，已自动断开链接".to_string()
+        } else {
+            format!("检查更新失败: {e}")
+        }
+    })?;
 
     // 204/304 = 无更新
     if response.status() == 204 || response.status() == 304 {

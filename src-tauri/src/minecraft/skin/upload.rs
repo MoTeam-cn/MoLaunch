@@ -45,7 +45,12 @@ pub async fn upload_skin(
         .multipart(form)
         .send()
         .await
-        .map_err(|e| format!("upload request error: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "upload request error: {}",
+                crate::http::request_error_msg(&e)
+            )
+        })?;
 
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
@@ -71,7 +76,12 @@ pub async fn fetch_profile(access_token: &str) -> Result<String, String> {
         .header("Authorization", format!("Bearer {}", access_token))
         .send()
         .await
-        .map_err(|e| format!("profile request error: {}", e))?;
+        .map_err(|e| {
+            format!(
+                "profile request error: {}",
+                crate::http::request_error_msg(&e)
+            )
+        })?;
 
     let status = response.status();
     let body_text = response.text().await.unwrap_or_default();

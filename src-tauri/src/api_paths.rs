@@ -20,9 +20,8 @@ pub const TIME: &str = "/v3/time";
 
 // ===== v1 更新 =====
 
-/// 更新清单（GET，`{{target}}/{{arch}}/{{current_version}}` 由调用方替换）
-pub const UPDATES_MANIFEST_RAW: &str =
-    "/v1/updates/manifest/raw?target={{target}}&arch={{arch}}&current_version={{current_version}}";
+/// 更新清单（GET，`{{target}}/{{arch}}/{{current_version}}/{{channel}}` 由调用方替换）
+pub const UPDATES_MANIFEST_RAW: &str = "/v1/updates/manifest/raw?target={{target}}&arch={{arch}}&current_version={{current_version}}&channel={{channel}}";
 
 // ===== v1 FRP =====
 

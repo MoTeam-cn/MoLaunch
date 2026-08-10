@@ -63,7 +63,7 @@ pub async fn fetch_with_fallback(urls: &[String]) -> anyhow::Result<String> {
             }
             Err(e) => {
                 log_debug!("[Sources] 请求失败 {}: {} ({})", url, e, fmt_elapsed(start));
-                last_err = format!("{}: {}", url, e);
+                last_err = format!("{}: {}", url, crate::http::request_error_msg(&e));
             }
         }
     }

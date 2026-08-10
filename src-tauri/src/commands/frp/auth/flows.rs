@@ -117,7 +117,7 @@ pub async fn send_flow_request(
     let response = request
         .send()
         .await
-        .map_err(|e| format!("认证流程请求失败: {}", e))?;
+        .map_err(|e| format!("认证流程请求失败: {}", crate::http::request_error_msg(&e)))?;
 
     let status = response.status();
     let headers = response.headers().clone();
