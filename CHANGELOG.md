@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复下载总大小虚高（[stream.rs](src-tauri/src/minecraft/download/downloader/stream.rs)）：单流下载回填 `total_bytes` 由「无条件按 content_length 累加」改为「仅 `expected_size=0`（大小未知）时回填」，已知大小文件已在 `download_batch` 初始化时按 `expected_size` 求和计入，此前会被二次累加导致「已下载/总大小（累计）」随下载过程持续增长、完成时显示总量远超实际；失败回滚条件同步对齐，避免 3 次重试间 total 翻倍。
+
 ## [0.3.5-rc3] - 2026-08-10
 
 - 修复 Release 内容生成（[scripts/generate-release-content.cjs](scripts/generate-release-content.cjs)）：条目格式改为短哈希反引号前置 + 提取 `feat(scope):` 括号内 scope 加粗渲染（`**scope**: 描述`），commit by 署名改为 `[@login](url)` 纯文字链接；协作者头像改经 [images.weserv.nl](https://images.weserv.nl/) `mask=circle` 烘焙圆形 PNG 渲染——GitHub 正文 HTML sanitizer 会剥离 `<img>` 的 style/class（`border-radius` 圆角失效导致方块头像），圆角烘焙进图片本体可绕过清洗；移除 `href="#"` 空链接与 `@gravatar` 裸文字回退，仅当邮箱与登录名均缺失时才回退名字文字。
