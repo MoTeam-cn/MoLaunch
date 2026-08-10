@@ -41,8 +41,8 @@ pub(crate) async fn query_and_merge(
         .collect();
 
     let (cf_result, mr_result) = tokio::join!(
-        fingerprint_search(cf_fingerprints, scope.resource_type.clone()),
-        version_files_search(mr_sha1s, scope.resource_type.clone()),
+        fingerprint_search(cf_fingerprints, scope.resource_type),
+        version_files_search(mr_sha1s, scope.resource_type),
     );
 
     let mut cache_map: HashMap<String, CachedMod> = HashMap::new();
