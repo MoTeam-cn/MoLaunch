@@ -6,6 +6,20 @@
  */
 
 document.addEventListener('DOMContentLoaded', () => {
+  // 禁止右键菜单、快捷键与拖拽：splash 页仅作展示，不应响应任何交互。
+  // 拦截 F1~F12 与所有 Ctrl/Cmd/Alt 组合键（刷新、DevTools、关窗、复制粘贴等），
+  // 与主窗口 useDevToolsGuard 同一防护思路；splash 无输入框，无需保留编辑键。
+  const guard = (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+  document.addEventListener('contextmenu', guard, true)
+  document.addEventListener('dragstart', guard, true)
+  document.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase()
+    if (/^f([1-9]|1[0-2])$/.test(key) || e.ctrlKey || e.metaKey || e.altKey) guard(e)
+  }, true)
+
   const icon = document.getElementById('icon')
   const content = document.getElementById('content')
   const text = document.getElementById('text')
