@@ -103,8 +103,8 @@ pub async fn export_launch_script(
     let extra_game_args = split_args(&setup.advanced.game_args);
 
     // 构建认证信息
-    // 安全修复：导出脚本时不使用真实 token（game_args 已脱敏为 ***）
-    // 后端从 auth_storage 获取 token 仅用于构建参数结构，实际 token 不会写入脚本
+    // 从 auth_storage 获取当前用户的真实 token，写入脚本后可直接启动；
+    // 安全提示已写入脚本头部，文件权限限制为当前用户
     let (real_access_token, real_client_token, real_server_url) = {
         match state.auth_storage.load().await {
             Ok(auth_state) => {

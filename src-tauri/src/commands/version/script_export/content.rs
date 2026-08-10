@@ -23,7 +23,7 @@ pub(super) fn build_script_content(info: &ScriptLaunchInfo<'_>) -> String {
     // 切换控制台代码页到 GBK（936），与本文件编码一致，避免中文乱码
     // 较新的中文 Windows 11 可能默认 codepage 为 65001（UTF-8），会导致 GBK 编码的中文显示乱码
     script.push_str("chcp 936 >nul\n");
-    script.push_str("@REM [!] 警告：此文件包含 Minecraft 访问令牌，请勿分享或上传到公共平台\n");
+    script.push_str("@REM [!] 警告：此文件包含启动必需的真实 Minecraft 访问令牌与 UUID，请勿分享或上传到公共平台，失效后请重新导出\n");
     script.push_str(&format!("title MoLaunch - {}\n", info.version_id));
     script.push('\n');
     // 版权信息头
@@ -59,20 +59,14 @@ pub(super) fn build_script_content(info: &ScriptLaunchInfo<'_>) -> String {
         }
     }
     // Java 启动命令（使用绝对路径，不依赖系统 PATH）
-    // 安全修复：对 game_args 中的敏感参数值脱敏，避免 access_token 明文写入 .bat 文件
-    // 用户需手动填入 token，或在脚本中使用环境变量
-    let sanitized_game_args = crate::minecraft::launch::sanitize_args_for_log(info.game_args);
-    let has_redacted = sanitized_game_args.iter().any(|a| a == "***");
-    if has_redacted {
-        script.push_str("REM [!] 警告：以下参数中的 accessToken / uuid 等敏感信息已脱敏为 ***\n");
-        script.push_str("REM [!] 请手动替换 *** 为你的实际 token，或通过环境变量传入\n");
-    }
+    // 注意：game_args 中包含真实 access_token / uuid，脚本可直接启动；
+    // 文件权限已限制为当前用户，且文件头部有分享警告，勿手动脱敏
     script.push_str(&format!(
         "\"{}\" {} {} {}\n",
         info.java_str,
         info.jvm_args.join(" "),
         info.main_class,
-        sanitized_game_args.join(" ")
+        info.game_args.join(" ")
     ));
     script.push('\n');
     // 退出提示

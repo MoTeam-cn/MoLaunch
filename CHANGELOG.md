@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 
+- 修复导出的启动脚本 access_token / uuid 被脱敏导致无法启动（[content.rs](src-tauri/src/commands/version/script_export/content.rs) + [export.rs](src-tauri/src/commands/version/script_export/export.rs)）：脚本直接写入真实的 `--accessToken` / `--uuid`（文件权限限制为当前用户），移除「已脱敏为 *** 请手动替换」逻辑，文件头部保留并加强警告提示（含启动必需 token，勿分享，失效后重新导出）。
 - 修复概览页「光影文件夹」快捷方式误显示（[useVersionSettings.ts](src/composables/useVersionSettings.ts) + [OverviewTab.vue](src/views/version-settings/OverviewTab.vue)）：此前沿用 `isModable`（有 Mod 加载器即显示），改为复用后端 `is_packs_available` 对 Shader 检查 OptiFine/Iris（与光影管理页 PackTab 同一逻辑），无光影加载器时隐藏入口，切换版本自动重新检查。
 - 图片缓存日志降级为 debug（[download.rs](src-tauri/src/minecraft/image_cache/download.rs)）：`[ImageCache] 已缓存` 由 INFO 改为 debug 级别，避免每个图片缓存都刷屏 INFO 日志。
 - 资源包/光影列表 UI 对齐 Mod（[PackTab.vue](src/views/version-settings/PackTab.vue) + [PackListItem.vue](src/views/version-settings/pack-tab/PackListItem.vue)）：列表外层新增 `p-6` 内边距与圆角白卡片容器（含边框阴影），不再铺满难看；列表项内边距加宽（`px-4 py-3`），图标改为平台 logo → 包内图标 → 保底图三级优先，标题行显示平台工程名。
