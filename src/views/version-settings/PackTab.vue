@@ -6,6 +6,7 @@
  * 子组件位于 pack-tab/（PackToolbar / PackListItem / PackEmptyState）。
  */
 import { computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { usePackOperations } from '@/composables/usePackOperations'
 import PackListItem from './pack-tab/PackListItem.vue'
@@ -15,6 +16,7 @@ import type { PackKind } from '@/utils/tauri'
 
 const props = defineProps<{ kind: PackKind }>()
 
+const router = useRouter()
 const { selectedId } = useVersionSettings()
 const kindRef = computed(() => props.kind)
 
@@ -41,11 +43,20 @@ const {
 
     <div class="flex-1 overflow-y-auto">
       <PackEmptyState
-        v-if="(!available && !checking) || packsLoading"
-        :variant="packsLoading && packs.length === 0 ? 'loading' : 'empty'"
+        v-if="packsLoading && packs.length === 0"
+        variant="loading"
         :count="0"
         :kind="kind"
         @install="handleInstall"
+      />
+      <PackEmptyState
+        v-else-if="!available && !checking"
+        variant="not-modable"
+        :count="0"
+        :kind="kind"
+        @install="handleInstall"
+        @go-download="router.push('/apps/downloads')"
+        @go-select="router.push('/apps/versions/select')"
       />
       <PackEmptyState
         v-else-if="filteredPacks.length === 0"

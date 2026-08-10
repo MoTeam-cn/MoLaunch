@@ -62,7 +62,7 @@ defineEmits<{
   </div>
 
   <!-- 空列表 / 无匹配 -->
-  <div v-else class="flex h-full min-h-[400px] items-center justify-center">
+  <div v-else class="flex h-full items-center justify-center">
     <div class="flex flex-col items-center text-center">
       <div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gray-100">
         <PuzzlePieceIcon class="h-8 w-8 text-gray-300" />
