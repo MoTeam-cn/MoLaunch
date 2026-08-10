@@ -25,6 +25,22 @@ export async function fixVersionFiles(versionId: string): Promise<void> {
   return versionListManager<void>(VERSION_LIST_ACTIONS.FIX_VERSION_FILES, { versionId })
 }
 
+/** 加载器健康检测结果（与后端 LoaderHealth 对应，键名 camelCase） */
+export interface DetectLoaderResult {
+  loaderType: string | null
+  loaderVersion: string
+  mcVersion: string
+  healthy: boolean
+  reason: string
+}
+
+/**
+ * 检测 Forge/Fabric/LiteLoader 是否损坏（仅扫描，不执行重装）
+ */
+export async function detectLoaderDamage(versionId: string): Promise<DetectLoaderResult> {
+  return versionListManager<DetectLoaderResult>(VERSION_LIST_ACTIONS.DETECT_LOADER_DAMAGE, { versionId })
+}
+
 /** 加载器检测/重装结果 */
 export interface RepairLoaderResult {
   loaderType: string | null

@@ -18,8 +18,9 @@ use tauri::{AppHandle, Emitter};
 use super::super::sanitize_version_id;
 use super::{get_version_game_version, version_type_to_string};
 
-/// 加载器健康检测结果
+/// 加载器健康检测结果（经 `detect_loader_damage` IPC 返回，键名 camelCase 与前端约定一致）
 #[derive(Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct LoaderHealth {
     pub loader_type: Option<String>,
     pub loader_version: String,
@@ -219,27 +220,16 @@ fn fresh_loader_dir_name(loader_type: &LoaderType, mc_version: &str, loader_vers
 
 /// 检测并自动重装损坏的加载器
 ///
-/// 执行过程中按 `scanning → installing → merging → done/error` 阶段通过
-/// `repair-loader-progress` 事件推送进度；`installing` 阶段复用
-/// `install_single_loader` 内部的伪进度 ticker（写 download_state），此处轮询
-/// 最后一个 stage 的进度并转发到本事件，避免重复实现进度逻辑。
+/// 扫描阶段由独立 `detect_loader_damage` IPC 完成（前端先调用并询问用户），
+/// 本函数仅在确认重装后执行，从 `installing` 阶段开始推送进度；`installing`
+/// 阶段复用 `install_single_loader` 内部的伪进度 ticker（写 download_state），
+/// 此处轮询最后一个 stage 的进度并转发到本事件，避免重复实现进度逻辑。
 pub async fn repair_version_loader(
     state: &AppState,
     app: &AppHandle,
     version_id: &str,
 ) -> Result<serde_json::Value, String> {
-    // 阶段 1：扫描
-    emit_repair_progress(app, &RepairProgress {
-        version_id,
-        phase: "scanning",
-        progress: 0,
-        damaged: false,
-        repaired: false,
-        loader_type: None,
-        loader_version: "",
-        mc_version: "",
-        message: "正在扫描加载器...",
-    });
+    // 重新检测以获取最新健康信息（不再推送 scanning 事件，扫描由前端独立发起）
     let health = match detect_loader_damage(state, version_id).await {
         Ok(h) => h,
         Err(e) => {
@@ -257,17 +247,6 @@ pub async fn repair_version_loader(
             return Err(e);
         }
     };
-    let damaged = !health.healthy;
-    emit_phase(
-        app,
-        version_id,
-        &health,
-        "scanning",
-        100,
-        damaged,
-        false,
-        if damaged { "检测到加载器损坏" } else { "扫描完成，加载器无损坏" },
-    );
 
     if health.loader_type.is_none() {
         let msg = "该版本未安装加载器";

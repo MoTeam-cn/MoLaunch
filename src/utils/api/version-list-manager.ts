@@ -44,6 +44,7 @@ export const VERSION_LIST_ACTIONS = {
   RENAME_MC_FOLDER: 'rename_mc_folder',
   // manage.rs（4 个）
   FIX_VERSION_FILES: 'fix_version_files',
+  DETECT_LOADER_DAMAGE: 'detect_loader_damage',
   REPAIR_VERSION_LOADER: 'repair_version_loader',
   RENAME_VERSION: 'rename_version',
   GET_SELECTED_VERSION: 'get_selected_version',

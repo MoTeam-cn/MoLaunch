@@ -234,6 +234,16 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     );
 
     d.register(
+        "detect_loader_damage",
+        handler!(state, _app, params, {
+            let p: VersionIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = list::detect_loader_damage(&state, &p.version_id).await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
         "repair_version_loader",
         handler!(state, app, params, {
             let p: VersionIdParams =

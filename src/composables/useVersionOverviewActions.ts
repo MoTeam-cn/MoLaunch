@@ -176,22 +176,13 @@ export function useVersionOverviewActions(options: UseVersionOverviewActionsOpti
     })
   }
 
-  /** 加载器检测/重装进行中（按钮禁用 + 抽屉展示进度） */
-  const repairing = ref(false)
   /** 加载器检测/重装进度抽屉开关 */
   const repairDrawerOpen = ref(false)
 
-  async function handleRepairLoader() {
+  /** 打开加载器检测抽屉（扫描、询问、重装流程由抽屉内部驱动） */
+  function handleRepairLoader() {
     if (!selectedId.value) return
     repairDrawerOpen.value = true
-    // 已在进行中时仅重新打开抽屉展示进度，不重复触发
-    if (repairing.value) return
-    repairing.value = true
-    try {
-      // 进度由后端 emit `repair-loader-progress` 事件驱动抽屉展示，此处等待最终结果兜底
-      await tauri.repairVersionLoader(selectedId.value!)
-    } catch (e) { toastError('检测/重装失败：' + String(e)) }
-    finally { repairing.value = false }
   }
 
   function handleDelete() {
@@ -207,7 +198,6 @@ export function useVersionOverviewActions(options: UseVersionOverviewActionsOpti
 
   return {
     fixing,
-    repairing,
     repairDrawerOpen,
     openFolder,
     handleEditDesc,

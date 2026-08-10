@@ -26,7 +26,7 @@ const {
 } = useVersionSettings()
 
 const {
-  fixing, repairing, repairDrawerOpen, openFolder,
+  fixing, repairDrawerOpen, openFolder,
   handleEditDesc, handleRename, handleToggleStar,
   handleChangeDisplayType, handleChangeLogo,
   handleExportScript, handleFixFiles, handleRepairLoader, handleDelete,
@@ -168,10 +168,10 @@ const {
             {{ fixing ? '补全中...' : '补全文件' }}
           </Button>
         </Tooltip>
-        <Tooltip text="检测 Forge/Fabric/LiteLoader 是否损坏，若损坏将自动重新安装。" position="top">
-          <Button type="outline" :loading="repairing" :disabled="repairing" @click="handleRepairLoader">
+        <Tooltip text="检测 Forge/Fabric/LiteLoader 是否损坏，若损坏将询问是否重新安装。" position="top">
+          <Button type="outline" @click="handleRepairLoader">
             <template #icon><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a1 1 0 011 1v2a1 1 0 01-.832.988l-4.52.648a1 1 0 01-.746-.207l-1.319-1.1a5 5 0 00-5.166 0l-1.319 1.1a1 1 0 01-.746.207l-4.52-.648A1 1 0 010 13v-2a1 1 0 011-1h.388a3 3 0 001.032-5.8l.62-.62A2 2 0 014.243 3h2.514a2 2 0 011.202.42l.62.62a3 3 0 001.032 5.8H10v.25A4.75 4.75 0 005.25 15H4a1 1 0 100 2h1.25A6.75 6.75 0 0012 10.25V10h.38a3 3 0 001.032-5.8l.62-.62A2 2 0 0115.243 3h2.514a2 2 0 011.202.42l.62.62A3 3 0 0019.388 10H18z" clip-rule="evenodd" /></svg></template>
-            {{ repairing ? '重装中...' : '检测并重装加载器' }}
+            检测并重装加载器
           </Button>
         </Tooltip>
         <Button type="outline" @click="handleDelete">

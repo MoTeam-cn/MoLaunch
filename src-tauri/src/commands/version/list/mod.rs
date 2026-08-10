@@ -20,4 +20,4 @@ pub use installed::{
 };
 pub use modpack::{check_local_modpack, read_local_modpack_meta, CheckLocalModpackResult};
 pub use remote::list_versions;
-pub use repair_loader::repair_version_loader;
+pub use repair_loader::{detect_loader_damage, repair_version_loader};
