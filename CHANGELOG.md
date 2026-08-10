@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复 Legacy Forge（1.12.2 及以下）安装时 maven 库 0 个文件解压（[legacy.rs](src-tauri/src/minecraft/loaders/forge/legacy.rs)）：Zip Slip 防护改用 `utils::path::ensure_safe_relative_path` 段级校验（复用 assets 下载同一工具），不再依赖 `canonicalize`——Windows 上已存在的 `libraries` 基目录 `canonicalize` 返回 `\\?\` 前缀，而尚未解压的目标降级为普通路径，`starts_with` 必然失败导致全部 maven 条目被误判跳过，Forge 库缺失无法启动。
+- 修复 CI clippy 失败（[online_query.rs](src-tauri/src/minecraft/community/preload/online_query.rs)）：`resource_type` 为 `Copy` 类型，去掉 `tokio::join!` 中多余的 `.clone()`（clippy `clone_on_copy`）。
 - 修复版本选择页空状态「下载游戏」跳错页面（[VersionSelect.vue](src/views/VersionSelect.vue)）：此前跳转到下载管理页（`/apps/downloads`），改为进入下载页（`/apps/versions`，原版/社区资源安装）。
 - Native 库日志降级为 debug（[natives.rs](src-tauri/src/minecraft/launch/pipeline/natives.rs)）：`[Natives] Processing/Extracting/Extracted/JAR SHA1 verified` 逐文件日志由 INFO 改为 debug 级别（SHA1 不匹配等警告仍为 warn），避免启动时刷屏。
 - 启动脚本导出支持 macOS / Linux（[script_export](src-tauri/src/commands/version/script_export/) + [useVersionOverviewActions.ts](src/composables/useVersionOverviewActions.ts)）：此前仅生成 Windows .bat，现按当前系统自动切换格式——Windows 生成 .bat（GBK + CRLF + icacls 权限限制），macOS/Linux 生成 .sh（UTF-8 + shebang + chmod 700 可执行权限）；文件对话框默认名与过滤扩展名同步跟随系统；保存路径缺扩展名时后端自动补齐；.sh 脚本同样写入真实 access_token / uuid 可直接启动，含敏感信息警告。
