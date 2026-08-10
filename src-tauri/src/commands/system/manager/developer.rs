@@ -50,6 +50,23 @@ pub(super) fn register(d: &mut Dispatcher) {
         }),
     );
 
+    // 更新检测分支覆盖（2 个）：set 需开发者模式已开启（函数内 require_dev_mode 校验）
+    d.register(
+        "get_update_branch",
+        handler!(_state, _app, _params, {
+            let r = crate::commands::system::developer::get_update_branch();
+            serde_json::to_value(r).map_err(|e| e.to_string())
+        }),
+    );
+    d.register(
+        "set_update_branch",
+        handler!(_state, _app, _params, {
+            let branch = _params.get("branch").and_then(|v| v.as_str()).unwrap_or("");
+            crate::commands::system::developer::set_update_branch(branch)?;
+            Ok(serde_json::Value::Null)
+        }),
+    );
+
     // devtools 控制（3 个）：要求开发者模式已解锁且已开启，普通用户无法触发
     d.register(
         "open_devtools",

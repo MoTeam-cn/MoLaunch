@@ -56,13 +56,20 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
     };
 
     // 2. 构建 URL（base_url + 路径模板替换，模板见 crate::api_paths::UPDATES_MANIFEST_RAW）
-    // channel 由当前版本后缀自动推导（alpha/beta/stable），预发布版本查询对应分支
-    let channel = crate::utils::client_type::channel_name(current_version);
+    // channel 由当前版本后缀自动推导（alpha/beta/stable）；开发者模式可覆盖分支用于调试
+    let channel = {
+        let branch = crate::commands::system::developer::get_update_branch();
+        if branch == "auto" {
+            crate::utils::client_type::channel_name(current_version).to_string()
+        } else {
+            branch
+        }
+    };
     let path = UPDATES_MANIFEST_RAW
         .replace("{{target}}", target)
         .replace("{{arch}}", arch)
         .replace("{{current_version}}", current_version)
-        .replace("{{channel}}", channel);
+        .replace("{{channel}}", &channel);
     let url = format!("{}{}", base_url.trim_end_matches('/'), path);
 
     // 3. 尝试加载设备 JWT（未注册时忽略，无 auth 请求）

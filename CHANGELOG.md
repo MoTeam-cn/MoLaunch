@@ -6,6 +6,7 @@
 
 - 更新检查接口新增 `channel` 参数（[api_paths.rs](src-tauri/src/api_paths.rs) / [check.rs](src-tauri/src/commands/system/updater/check.rs)）：按当前版本后缀自动推导分支（[client_type.rs](src-tauri/src/utils/client_type.rs) 新增 `channel_name`，rc/beta 归 beta、alpha/dev 归 alpha），预发布版本可正确查询对应分支更新。
 - 全部 HTTP 请求统一接入中间人检测（[http.rs](src-tauri/src/http.rs) 新增 `is_tls_cert_error`/`request_error_msg`）：更新检查、FRP、皮肤、联机、AI、Microsoft 登录、authlib 皮肤站、CurseForge/Modrinth、游戏下载、URL 文件名探测等请求在 TLS 证书校验失败时统一返回「检测到中间人攻击，已自动断开链接」，不再暴露原始证书错误。
+- 开发者模式「实验性功能」新增「更新检测分支」切换（[ExperimentalTab.vue](src/views/settings/developer/ExperimentalTab.vue) / [developer.rs](src-tauri/src/commands/system/developer.rs) 新增 `get_update_branch`/`set_update_branch`）：可手动选择更新检查使用的发布分支（跟随版本/stable/beta/alpha），覆盖 [check.rs](src-tauri/src/commands/system/updater/check.rs) 请求更新清单时的 `channel` 参数，用于跨分支更新检测调试；撤销开发者模式时自动恢复「跟随版本」。
 
 ## [0.3.5-rc5] - 2026-08-10
 

@@ -38,13 +38,16 @@ export const SYSTEM_ACTIONS = {
   // config（2 个）
   GET_CONFIG_PATH: 'get_config_path',
   SAVE_CONFIG_TO_FILE: 'save_config_to_file',
-  // developer（6 个）
+  // developer（8 个）
   IS_DEVELOPER_UNLOCKED: 'is_developer_unlocked',
   UNLOCK_DEVELOPER_MODE: 'unlock_developer_mode',
   LOCK_DEVELOPER_MODE: 'lock_developer_mode',
   GET_STORAGE_DIRS: 'get_storage_dirs',
   GET_SYSTEM_INFO: 'get_system_info',
   GET_CACHE_STATS: 'get_cache_stats',
+  // 更新检测分支覆盖（set 需开发者模式已开启，后端 require_dev_mode 校验）
+  GET_UPDATE_BRANCH: 'get_update_branch',
+  SET_UPDATE_BRANCH: 'set_update_branch',
   // devtools（3 个）—— 调出/关闭/查询 WebView2 开发者工具
   // 后端 require_dev_mode() 校验 DeveloperUnlocked && DeveloperMode，普通用户无法触发
   OPEN_DEVTOOLS: 'open_devtools',

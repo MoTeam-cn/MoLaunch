@@ -110,6 +110,24 @@ export async function getSystemInfo(): Promise<SystemInfo> {
   return systemManager<SystemInfo>(SYSTEM_ACTIONS.GET_SYSTEM_INFO)
 }
 
+// ==================== 更新检测分支 ====================
+//
+// 覆盖更新检查请求携带的 channel 参数，用于跨分支更新检测调试。
+// set 需开发者模式已开启（后端 require_dev_mode 校验）。
+
+/** 更新检测分支值（'auto' 表示跟随版本后缀自动推导） */
+export type UpdateBranch = 'auto' | 'stable' | 'beta' | 'alpha'
+
+/** 获取更新检测分支覆盖 */
+export async function getUpdateBranch(): Promise<UpdateBranch> {
+  return systemManager<UpdateBranch>(SYSTEM_ACTIONS.GET_UPDATE_BRANCH)
+}
+
+/** 设置更新检测分支覆盖（影响检查更新时的 channel 参数） */
+export async function setUpdateBranch(branch: UpdateBranch): Promise<void> {
+  return systemManager<void>(SYSTEM_ACTIONS.SET_UPDATE_BRANCH, { branch })
+}
+
 // ==================== 缓存统计 ====================
 
 /** 单个缓存子目录的统计信息 */

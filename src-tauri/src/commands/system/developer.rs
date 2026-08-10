@@ -7,7 +7,7 @@
 use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::system::{get_os_type, get_system_arch, get_system_memory};
-use crate::storage::registry::{reg_get_bool, reg_set_bool};
+use crate::storage::registry::{reg_get_bool, reg_get_str, reg_set_bool, reg_set_str};
 use crate::storage::Storage;
 use crate::utils::cache;
 use crate::utils::cache_app;
@@ -28,6 +28,12 @@ pub const KEY_DEV_MODE: &str = "DeveloperMode";
 /// 开启后 `http::build_client` 会调用 `danger_accept_invalid_certs(true)`，
 /// 跳过所有证书校验，用于联机服务端自签名证书调试等场景。
 pub const KEY_IGNORE_TLS: &str = "IgnoreTls";
+
+/// 注册表键名：更新检测分支覆盖（auto/stable/beta/alpha，auto=跟随版本推导）
+pub const KEY_UPDATE_BRANCH: &str = "UpdateBranch";
+
+/// 更新检测分支合法取值
+const UPDATE_BRANCHES: [&str; 4] = ["auto", "stable", "beta", "alpha"];
 
 /// DevTools 打开状态（全局原子标志）
 ///
@@ -73,6 +79,7 @@ pub fn lock_developer_mode(app: &AppHandle) -> Result<(), String> {
     //       最后清 DeveloperUnlocked。任一步失败均向上抛错，保证状态一致。
     reg_set_bool(KEY_DEV_MODE, false)?;
     reg_set_bool(KEY_IGNORE_TLS, false)?;
+    reg_set_str(KEY_UPDATE_BRANCH, "auto")?;
     reg_set_bool(KEY_DEV_UNLOCKED, false)?;
     log_info!("[Developer] 开发者模式已撤销解锁");
     Ok(())
@@ -94,6 +101,26 @@ pub fn is_ignore_tls() -> bool {
         log_warn!("[Developer] 已启用 IgnoreTls，仅对 localhost/127.0.0.1 生效");
     }
     enabled
+}
+
+/// 读取更新检测分支覆盖（`auto` 表示跟随版本后缀自动推导）
+pub fn get_update_branch() -> String {
+    reg_get_str(KEY_UPDATE_BRANCH)
+        .filter(|b| UPDATE_BRANCHES.contains(&b.as_str()))
+        .unwrap_or_else(|| "auto".to_string())
+}
+
+/// 设置更新检测分支覆盖（需开发者模式已开启）
+///
+/// 取值 `auto`（跟随版本推导）/ `stable` / `beta` / `alpha`，
+/// 影响更新检查请求携带的 `channel` 参数，用于跨分支更新检测调试。
+pub fn set_update_branch(branch: &str) -> Result<(), String> {
+    require_dev_mode()?;
+    let branch = branch.trim().to_lowercase();
+    if !UPDATE_BRANCHES.contains(&branch.as_str()) {
+        return Err(format!("不支持的更新分支: {}", branch));
+    }
+    reg_set_str(KEY_UPDATE_BRANCH, &branch)
 }
 
 /// 存储目录信息

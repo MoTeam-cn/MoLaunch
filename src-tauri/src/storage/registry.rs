@@ -148,6 +148,19 @@ pub(crate) fn reg_set_bool(name: &str, value: bool) -> Result<(), String> {
     reg_set(&key, name, if value { "true" } else { "false" })
 }
 
+/// 读取注册表字符串值（键不存在返回 None）
+#[cfg(windows)]
+pub(crate) fn reg_get_str(name: &str) -> Option<String> {
+    reg_key().ok().and_then(|k| reg_get(&k, name))
+}
+
+/// 写入注册表字符串值
+#[cfg(windows)]
+pub(crate) fn reg_set_str(name: &str, value: &str) -> Result<(), String> {
+    let key = reg_key()?;
+    reg_set(&key, name, value)
+}
+
 /// 非 Windows：读取 bool 值（统一 JSON 文件，与注册表"true"/"1"语义一致）
 #[cfg(not(windows))]
 pub(crate) fn reg_get_bool(name: &str) -> Option<bool> {
@@ -158,4 +171,16 @@ pub(crate) fn reg_get_bool(name: &str) -> Option<bool> {
 #[cfg(not(windows))]
 pub(crate) fn reg_set_bool(name: &str, value: bool) -> Result<(), String> {
     reg_set(&(), name, if value { "true" } else { "false" })
+}
+
+/// 非 Windows：读取字符串值（统一 JSON 文件）
+#[cfg(not(windows))]
+pub(crate) fn reg_get_str(name: &str) -> Option<String> {
+    reg_get(&(), name)
+}
+
+/// 非 Windows：写入字符串值
+#[cfg(not(windows))]
+pub(crate) fn reg_set_str(name: &str, value: &str) -> Result<(), String> {
+    reg_set(&(), name, value)
 }
