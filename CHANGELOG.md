@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- stars/forks 徽章配色调整（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：移除 `labelColor=165dff`，标签区恢复默认深色，仅数值区为蓝色 `165dff`，与右侧 issues 等徽章外观一致；保留自定义金色星星 / 白色分支图标。
+
 - 修复文本框滚动误触发返回顶部按钮（[Input.vue](src/components/common/Input.vue)）：textarea 模式内部滚动此前会被全局 scroll 监听捕获（BackToTop 按钮误弹出），现复用 `data-inner-scroll` 白名单标记（BackToTop 已在滚动监听与容器检测中统一过滤），文本域内部滚动不再触发全局返回顶部按钮。
 
 - stars/forks 徽章样式统一（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：由 `for-the-badge` 深色大徽章改回 `style=flat` + 蓝色 `165dff`，与 issues/last-commit/contributors 右侧徽章协调；保留自定义金色星星 / 白色分支图标。
