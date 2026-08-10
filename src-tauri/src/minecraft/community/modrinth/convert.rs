@@ -140,19 +140,27 @@ pub(crate) fn convert_project(p: &MrProject, rtype: ResourceType) -> ResourcePro
 }
 
 /// 将 Modrinth version 转换为统一 ResourceVersion
-pub(crate) fn convert_version(v: &MrVersion) -> ResourceVersion {
+pub(crate) fn convert_version(v: &MrVersion, rtype: ResourceType) -> ResourceVersion {
     let mod_loaders = v
         .loaders
         .iter()
         .map(|l| ModLoaders::from_str(l))
         .fold(0u32, |a, b| a | b);
 
-    let game_versions: Vec<String> = v
+    let mut game_versions: Vec<String> = v
         .game_versions
         .iter()
         .filter(|gv| gv.contains('.') || gv.contains("w"))
         .cloned()
         .collect();
+
+    // 整合包 game_versions 缺失时从 version name 兜底提取 MC 版本号
+    if rtype == ResourceType::ModPack && game_versions.is_empty() {
+        let mc = crate::minecraft::community::version_extract::extract_mc_version_from_name(&v.name);
+        if !mc.is_empty() {
+            game_versions.push(mc);
+        }
+    }
 
     // 取 primary 文件，没有则取第一个
     let file = v

@@ -43,7 +43,10 @@ pub async fn get_project(project_id: &str, rtype: ResourceType) -> Result<Resour
 }
 
 /// 获取工程版本列表
-pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, String> {
+pub async fn get_versions(
+    project_id: &str,
+    rtype: ResourceType,
+) -> Result<Vec<ResourceVersion>, String> {
     // 检查缓存
     if let Some(cached) = super::super::cache::get_versions("CF", project_id) {
         crate::log_info!("[Community] CF 版本列表命中缓存: {}", project_id);
@@ -53,7 +56,8 @@ pub async fn get_versions(project_id: &str) -> Result<Vec<ResourceVersion>, Stri
     let path = format!("/mods/{}/files?pageSize=10000", project_id);
 
     let resp: CfFilesResponse = cf_get(&path).await?;
-    let versions: Vec<ResourceVersion> = resp.data.iter().map(convert_version).collect();
+    let versions: Vec<ResourceVersion> =
+        resp.data.iter().map(|f| convert_version(f, rtype)).collect();
     super::super::cache::set_versions("CF", project_id, &versions);
     Ok(versions)
 }

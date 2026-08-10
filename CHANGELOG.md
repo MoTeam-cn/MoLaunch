@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 
+- 修复整合包详情弹窗中部分版本识别不出 MC 版本（[convert.rs](src-tauri/src/minecraft/community/curseforge/convert.rs) / [convert.rs](src-tauri/src/minecraft/community/modrinth/convert.rs)）：CurseForge 老整合包文件 `game_versions` 常为空或仅有无点值（如 `Minecraft 1.12`）被过滤掉，现对 ModPack 在版本列表为空时从文件名/显示名兜底提取 MC 版本（如 `RLCraft 1.12.2 - Beta v2.8.1.zip` → `1.12.2`，新增 [version_extract.rs](src-tauri/src/minecraft/community/version_extract.rs) 的 `extract_mc_version_from_name`）；版本列表链路透传 `resource_type` 以区分 Mod/整合包。
 - 修复 Legacy Forge（1.12.2 及以下）安装时 maven 库 0 个文件解压（[legacy.rs](src-tauri/src/minecraft/loaders/forge/legacy.rs)）：Zip Slip 防护改用 `utils::path::ensure_safe_relative_path` 段级校验（复用 assets 下载同一工具），不再依赖 `canonicalize`——Windows 上已存在的 `libraries` 基目录 `canonicalize` 返回 `\\?\` 前缀，而尚未解压的目标降级为普通路径，`starts_with` 必然失败导致全部 maven 条目被误判跳过，Forge 库缺失无法启动。
 - 修复 CI clippy 失败（[online_query.rs](src-tauri/src/minecraft/community/preload/online_query.rs)）：`resource_type` 为 `Copy` 类型，去掉 `tokio::join!` 中多余的 `.clone()`（clippy `clone_on_copy`）。
 - 修复版本选择页空状态「下载游戏」跳错页面（[VersionSelect.vue](src/views/VersionSelect.vue)）：此前跳转到下载管理页（`/apps/downloads`），改为进入下载页（`/apps/versions`，原版/社区资源安装）。

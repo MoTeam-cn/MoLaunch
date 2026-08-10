@@ -26,6 +26,7 @@ struct ResourceTypeParams {
 struct ProjectVersionsParams {
     platform: Platform,
     project_id: String,
+    resource_type: ResourceType,
 }
 
 #[derive(Debug, Deserialize)]
@@ -97,7 +98,7 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         handler!(_state, _app, params, {
             let p: ProjectVersionsParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = detail::get_project_versions(p.platform, p.project_id).await?;
+            let r = detail::get_project_versions(p.platform, p.project_id, p.resource_type).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

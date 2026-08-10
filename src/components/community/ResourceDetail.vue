@@ -69,7 +69,7 @@ watch(
     setFilter('')
     start(p.platform === 'CurseForge' ? 1 : p.platform === 'Modrinth' ? 2 : 0)
     try {
-      versions.value = await getProjectVersions(p.platform, p.id)
+      versions.value = await getProjectVersions(p.platform, p.id, p.resource_type)
       finish()
       // 整合包来自 ModTab 时自动选中对应版本筛选
       if (props.gameVersion) {

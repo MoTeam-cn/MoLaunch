@@ -93,19 +93,30 @@ pub(crate) fn convert_project(entry: &CfModEntry, rtype: ResourceType) -> Resour
 /// CurseForge API 不直接提供 mod 版本号字段（`Version = Nothing`），
 /// 用 `Display`（即 `displayName`）作为 fallback 进行版本对比。
 /// 这里从 `display_name` 提取版本号，提取失败则用 `display_name` 本身。
-pub(crate) fn convert_version(file: &CfFile) -> ResourceVersion {
+pub(crate) fn convert_version(file: &CfFile, rtype: ResourceType) -> ResourceVersion {
     let mod_loaders = file
         .game_versions
         .iter()
         .map(|v| ModLoaders::from_str(v))
         .fold(0u32, |a, b| a | b);
 
-    let game_versions = file
+    let mut game_versions: Vec<String> = file
         .game_versions
         .iter()
         .filter(|v| v.contains('.') || v.contains("w"))
         .cloned()
         .collect();
+
+    // 整合包老文件的 game_versions 经常缺失（或只有 "Minecraft 1.12" 这类无点值被过滤掉），
+    // 此时从 display_name 兜底提取 MC 版本号（如 "RLCraft 1.12.2 - Beta v2.8.1.zip" → 1.12.2）
+    if rtype == ResourceType::ModPack && game_versions.is_empty() {
+        let mc = crate::minecraft::community::version_extract::extract_mc_version_from_name(
+            &file.display_name,
+        );
+        if !mc.is_empty() {
+            game_versions.push(mc);
+        }
+    }
 
     let hash = file
         .hashes

@@ -72,7 +72,7 @@ export function useModpackInstall() {
 
     try {
       // 2. 反查平台版本列表
-      const versions = await getProjectVersions(platform, modpack.projectId)
+      const versions = await getProjectVersions(platform, modpack.projectId, 'ModPack')
       const target = findVersionByFileId(versions, modpack.fileId)
       if (!target) {
         throw new Error(

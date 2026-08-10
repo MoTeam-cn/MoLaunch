@@ -104,7 +104,7 @@ export function useModUpdate(
     versions.value = []
 
     try {
-      const result = await getProjectVersions(platform.value, props.mod.project.id)
+      const result = await getProjectVersions(platform.value, props.mod.project.id, props.mod.project.resource_type)
       versions.value = result
 
       // 自动用当前整合包的 MC 版本和加载器过滤（用户不可切换）

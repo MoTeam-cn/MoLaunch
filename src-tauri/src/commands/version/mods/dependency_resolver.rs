@@ -239,8 +239,8 @@ async fn get_versions_by_platform(
     id: &str,
 ) -> Result<Vec<ResourceVersion>, String> {
     match platform {
-        Platform::Modrinth => modrinth::get_versions(id).await,
-        Platform::CurseForge => curseforge::get_versions(id).await,
+        Platform::Modrinth => modrinth::get_versions(id, ResourceType::Mod).await,
+        Platform::CurseForge => curseforge::get_versions(id, ResourceType::Mod).await,
     }
 }
 

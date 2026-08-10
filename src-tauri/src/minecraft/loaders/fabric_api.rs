@@ -6,7 +6,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use crate::minecraft::community::modrinth;
-use crate::minecraft::community::types::ResourceVersion;
+use crate::minecraft::community::types::{ResourceType, ResourceVersion};
 use crate::minecraft::download::config::DownloadManagerConfig;
 use crate::minecraft::download::manager::DownloadManager;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
@@ -46,7 +46,7 @@ pub struct FabricApiVersion {
 pub async fn list_versions(mc_version: &str) -> Result<Vec<FabricApiVersion>, String> {
     crate::log_info!("[FabricAPI] 查询兼容 MC {} 的 Fabric API 版本", mc_version);
 
-    let versions = modrinth::get_versions(FABRIC_API_PROJECT_ID).await?;
+    let versions = modrinth::get_versions(FABRIC_API_PROJECT_ID, ResourceType::Mod).await?;
 
     let mut compatible: Vec<FabricApiVersion> = versions
         .iter()

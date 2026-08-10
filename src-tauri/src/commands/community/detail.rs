@@ -28,10 +28,11 @@ pub async fn get_project_detail(req: DetailRequest) -> Result<ResourceProject, S
 pub async fn get_project_versions(
     platform: Platform,
     project_id: String,
+    resource_type: ResourceType,
 ) -> Result<Vec<ResourceVersion>, String> {
     match platform {
-        Platform::CurseForge => curseforge::get_versions(&project_id).await,
-        Platform::Modrinth => modrinth::get_versions(&project_id).await,
+        Platform::CurseForge => curseforge::get_versions(&project_id, resource_type).await,
+        Platform::Modrinth => modrinth::get_versions(&project_id, resource_type).await,
     }
 }
 

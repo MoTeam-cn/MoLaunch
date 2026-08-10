@@ -51,10 +51,12 @@ export async function getProjectDetail(
 export async function getProjectVersions(
   platform: Platform,
   projectId: string,
+  resourceType: ResourceType,
 ): Promise<ResourceVersion[]> {
   return communityManager<ResourceVersion[]>(COMMUNITY_ACTIONS.GET_PROJECT_VERSIONS, {
     platform,
     projectId,
+    resourceType,
   })
 }
 

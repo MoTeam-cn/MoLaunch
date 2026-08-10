@@ -69,7 +69,7 @@ export function usePackUpdate(
     versions.value = []
 
     try {
-      const result = await getProjectVersions(platform.value, props.pack.project.id)
+      const result = await getProjectVersions(platform.value, props.pack.project.id, props.pack.project.resource_type)
       versions.value = result
 
       if (props.mcVersion) {
