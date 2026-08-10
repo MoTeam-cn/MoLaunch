@@ -20,8 +20,7 @@ import {
   ArrowDownIcon,
 } from '@heroicons/vue/24/outline'
 import VersionTable from './VersionTable.vue'
-// Mod 默认 logo（无平台工程 logo 时使用）
-import defaultModLogo from '@/assets/Mods/default-min.png'
+import { defaultAsset } from '@/utils/assets'
 
 interface Props {
   visible: boolean
@@ -87,10 +86,10 @@ const {
               <!-- 当前 mod 信息 -->
               <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <img
-                  :src="mod.cached_logo_url || defaultModLogo"
+                  :src="mod.cached_logo_url || defaultAsset(true)"
                   class="w-10 h-10 rounded-lg object-cover"
                   alt=""
-                  @error="(e) => { (e.target as HTMLImageElement).src = defaultModLogo }"
+                  @error="(e) => { (e.target as HTMLImageElement).src = defaultAsset(true) }"
                 >
                 <div class="flex-1 min-w-0">
                   <div class="text-sm font-medium text-gray-800 truncate">{{ mod.project?.raw_name || mod.file_name }}</div>

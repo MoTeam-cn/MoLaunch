@@ -24,8 +24,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import Tag from '@/components/common/Tag.vue'
 import { formatBytes } from '@/utils/format'
 import { modTitle, modSubtitle, loaderVisual } from '@/utils/mod-display'
-// Mod 默认 logo（无 jar 内 logo 时使用）
-import defaultModLogo from '@/assets/Mods/default-min.png'
+import { defaultAsset } from '@/utils/assets'
 import {
   PauseIcon,
   PlayIcon,
@@ -88,11 +87,11 @@ function handleClick(e: MouseEvent) {
     <!-- 图标：使用平台工程 logo_url 经 image_cache 缓存后的 URL，无 logo 用默认图（不再用字母色块） -->
     <div class="relative flex-none">
       <img
-        :src="mod.cached_logo_url || defaultModLogo"
-        class="h-9 w-9 rounded-lg object-cover"
+        :src="mod.cached_logo_url || defaultAsset(true)"
+        class="h-[34px] w-[34px] flex-none rounded-lg object-cover transition-transform duration-300 group-hover:scale-105"
         :class="{ 'opacity-50 grayscale': !mod.is_enabled }"
-        alt=""
-        @error="(e) => { (e.target as HTMLImageElement).src = defaultModLogo }"
+        :alt="mod.file_name"
+        @error="(e) => { (e.target as HTMLImageElement).src = defaultAsset(true) }"
       >
       <!-- 禁用角标 -->
       <div

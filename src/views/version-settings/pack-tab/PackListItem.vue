@@ -10,7 +10,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import Tag from '@/components/common/Tag.vue'
 import { formatBytes } from '@/utils/format'
 import { usePackIcon } from '@/composables/usePackIcon'
-import defaultPackLogo from '@/assets/Mods/default.png'
+import { defaultAsset } from '@/utils/assets'
 import {
   PauseIcon,
   PlayIcon,
@@ -48,11 +48,11 @@ const { iconUrl } = usePackIcon(selectedIdRef, kindRef, fileNameRef)
     <!-- 图标：包内图片优先，无则保底图 -->
     <div class="relative flex-none">
       <img
-        :src="iconUrl || defaultPackLogo"
+        :src="iconUrl || defaultAsset()"
         class="h-9 w-9 rounded-lg object-cover"
         :class="{ 'opacity-50 grayscale': !pack.is_enabled }"
         alt=""
-        @error="(e) => { (e.target as HTMLImageElement).src = defaultPackLogo }"
+        @error="(e) => { (e.target as HTMLImageElement).src = defaultAsset() }"
       >
       <!-- 禁用角标 -->
       <div
