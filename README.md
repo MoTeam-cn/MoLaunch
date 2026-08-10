@@ -15,8 +15,8 @@
 [![Rust](https://img.shields.io/badge/Rust-2021-dea584.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/MoTeam-cn/MoLaunch)
 
-[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?style=flat&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNOCAuMjVhLjc1Ljc1IDAgMCAxIC42NzMuNDE4bDEuODgyIDMuODE1IDQuMjEuNjEyYS43NS43NSAwIDAgMSAuNDE2IDEuMjc5bC0zLjA0NiAyLjk3LjcxOSA0LjE5MmEuNzUxLjc1MSAwIDAgMS0xLjA4OC43OTFMOCAxMi4zNDdsLTMuNzY2IDEuOThhLjc1Ljc1IDAgMCAxLTEuMDg4LS43OWwuNzItNC4xOTRMLjgxOCA2LjM3NGEuNzUuNzUgMCAwIDEgLjQxNi0xLjI4bDQuMjEtLjYxMUw3LjMyNy42NjhBLjc1Ljc1IDAgMCAxIDggLjI1WiIvPjwvc3ZnPg==&labelColor=165dff&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?style=flat&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNNSA1LjM3MnYuODc4YzAgLjQxNC4zMzYuNzUuNzUuNzVoNC41YS43NS43NSAwIDAgMCAuNzUtLjc1di0uODc4YTIuMjUgMi4yNSAwIDEgMSAxLjUgMHYuODc4YTIuMjUgMi4yNSAwIDAgMS0yLjI1IDIuMjVoLTEuNXYyLjEyOGEyLjI1MSAyLjI1MSAwIDEgMS0xLjUgMFY4LjVoLTEuNUEyLjI1IDIuMjUgMCAwIDEgMy41IDYuMjV2LS44NzhhMi4yNSAyLjI1IDAgMSAxIDEuNSAwWk01IDMuMjVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFptNi43NS43NWEuNzUuNzUgMCAxIDAgMC0xLjUuNzUuNzUgMCAwIDAgMCAxLjVabS0zIDguNzVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFoiLz48L3N2Zz4=&labelColor=165dff&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/forks)
+[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHBhdGggZD0iTTggLjI1YS43NS43NSAwIDAgMSAuNjczLjQxOGwxLjg4MiAzLjgxNSA0LjIxLjYxMmEuNzUuNzUgMCAwIDEgLjQxNiAxLjI3OWwtMy4wNDYgMi45Ny43MTkgNC4xOTJhLjc1MS43NTEgMCAwIDEtMS4wODguNzkxTDggMTIuMzQ3bC0zLjc2NiAxLjk4YS43NS43NSAwIDAgMS0xLjA4OC0uNzlsLjcyLTQuMTk0TC44MTggNi4zNzRhLjc1Ljc1IDAgMCAxIC40MTYtMS4yOGw0LjIxLS42MTFMNy4zMjcuNjY4QS43NS43NSAwIDAgMSA4IC4yNVoiIGZpbGw9IiNlYWM1NGYiLz48L3N2Zz4=&logoSize=auto&label=stars&labelColor=444444&color=eac54f)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNNSA1LjM3MnYuODc4YzAgLjQxNC4zMzYuNzUuNzUuNzVoNC41YS43NS43NSAwIDAgMCAuNzUtLjc1di0uODc4YTIuMjUgMi4yNSAwIDEgMSAxLjUgMHYuODc4YTIuMjUgMi4yNSAwIDAgMS0yLjI1IDIuMjVoLTEuNXYyLjEyOGEyLjI1MSAyLjI1MSAwIDEgMS0xLjUgMFY4LjVoLTEuNUEyLjI1IDIuMjUgMCAwIDEgMy41IDYuMjV2LS44NzhhMi4yNSAyLjI1IDAgMSAxIDEuNSAwWk01IDMuMjVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFptNi43NS43NWEuNzUuNzUgMCAxIDAgMC0xLjUuNzUuNzUgMCAwIDAgMCAxLjVabS0zIDguNzVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFoiLz48L3N2Zz4=&logoSize=auto&label=forks&labelColor=444444&color=eac54f)](https://github.com/MoTeam-cn/MoLaunch/forks)
 [![GitHub issues](https://img.shields.io/github/issues/MoTeam-cn/MoLaunch?style=flat&logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/MoTeam-cn/MoLaunch?style=flat&logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/commits)
 [![GitHub contributors](https://img.shields.io/github/contributors/MoTeam-cn/MoLaunch?style=flat&logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
@@ -88,60 +88,16 @@ MoLaunch 是一款 Minecraft Java 版启动器，提供下载、安装、启动�
 
 ## 功能特性
 
-### 版本管理
+MoLaunch 覆盖 Minecraft 启动全流程，开箱即用：
 
-- 支持原版、Forge、Fabric、NeoForge、OptiFine、LiteLoader 加载器
-- CurseForge / Modrinth 整合包安装，自动补齐加载器与依赖
-- 多版本隔离，各实例独立存放
-- Java 自动检测：按版本校验运行时需求，缺失时预下载（Mojang 官方 Runtime）
+- **版本管理** — 原版 / Forge / Fabric / NeoForge / OptiFine 等加载器，多版本隔离
+- **下载安装** — Mod、资源包、整合包一键安装（CurseForge / Modrinth），断点续传 + 国内镜像加速
+- **账户与皮肤** — 微软账户登录、皮肤 / 披风管理与 3D 预览
+- **联机** — 房间大厅、WebRTC P2P 虚拟局域网、FRP 隧道免端口映射
+- **实用工具** — 种子地图、NBT 编辑、存档备份、Mod 依赖检查等
+- **AI 助手（实验性）** — 对话式分析游戏日志与崩溃原因
 
-### 下载
-
-- Mod / 资源包 / 整合包搜索与安装，数据源支持 CurseForge、Modrinth 与 BMCLAPI 镜像
-- 分片并发下载、断点续传、暂停与校验
-- 国内镜像加速（BMCLAPI / MoCDN）
-
-### 账户
-
-- 微软 OAuth 设备码登录、离线账户
-- 凭据本地加密存储，自动刷新
-
-### 皮肤
-
-- 皮肤 / 披风管理
-- 3D 实时预览（skinview3d）
-
-### 联机
-
-- 联机大厅、房间管理，邀请码 / 黑名单
-- WebRTC P2P 虚拟局域网（虚拟 TUN 网卡）
-- FRP 隧道，多厂商接入，免端口映射
-
-### 工具
-
-- 种子地图：输入种子定位要塞、海底神殿等世界结构（cubiomes WASM）
-- NBT 编辑、存档备份 / 还原、Mod 依赖检查、服务器延迟测试、Java 运行时检测等
-
-### AI 助手（实验性）
-
-- 对话式助手，可读取游戏日志、崩溃报告、Mod 列表
-- 日志与崩溃分析：本地规则引擎初检 + AI 深度分析
-- 支持 OpenAI 兼容端点（含 DeepSeek R1 等思考模型）
-
-### 插件
-
-- 插件 SDK 与沙箱：自定义布局、系统监控、启动历史等，权限可配置
-
-### 其他
-
-- 开屏启动动画（双窗口 splashscreen）
-- 崩溃分析（规则引擎 + AI 建议）
-- 自动更新（stable / beta / alpha 通道）
-- 日志脱敏、全局 CSP、用户协议门禁
-
-### 与 MoLaunch 云端
-
-启动器的注册、登录、刷新凭证等操作都会和 MoLaunch 云端（api-server）对接，云端在这些接口前加了一道轻量的 PoW 验证，先让你随手算一道哈希题才放行，防止有人拿脚本疯狂刷接口。正常使用几乎无感，登录等操作也就几十毫秒；真正会被这道题拦下的，只有批量刷接口的那批人。
+登录等云端操作对接 MoLaunch 云端，接口前带轻量 PoW 验证防脚本刷接口，正常使用无感。
 
 ## 许可证
 
@@ -186,6 +142,8 @@ Minecraft 是 Mojang Synergies AB 的商标。MoLaunch 不隶属于 Mojang、Mic
 感谢所有为 MoLaunch 贡献过代码、文档与建议的开发者。
 
 [![Contributors](https://contrib.rocks/image?repo=MoTeam-cn/MoLaunch)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
+
+![Alt](https://repobeats.axiom.co/api/embed/8769aee202d5829171ef89b4ffa1e9907fab4d7a.svg "Repobeats analytics image")
 
 ## 相关链接
 

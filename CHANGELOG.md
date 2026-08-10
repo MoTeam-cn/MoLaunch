@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- README 徽章与功能特性改版（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：stars 徽章改用金色星星、forks 沿用白色分支，两者切换为 `for-the-badge` 样式（深色标签 + 金色高亮，`logoSize=auto`）；「功能特性」由数十行多子章节精简为 6 条要点 + 结尾一句云端 PoW 说明；贡献者章节追加 Repobeats 仓库活跃度统计图。
+
 - 新增全局外部链接导航守卫（[App.vue](src/App.vue) + [useExternalLinkGuard.ts](src/composables/useExternalLinkGuard.ts) + [lib.rs](src-tauri/src/lib.rs)）：禁止 webview 内直接跳转外部网站——此前 AI 日志分析等页面输出 GitHub 链接，点击会直接跳走、页面被困在应用内无法关闭。前端 App.vue 挂载全局点击拦截（复用 `handleMarkdownLinkClick`，二次确认后经 shell 插件在系统浏览器打开）；后端新增 `on_navigation` 导航守卫插件兜底拦截 JS 程序化导航，仅放行内部 URL（内置协议 + localhost/*.localhost）。
 
 - 修复 README GitHub 徽章自定义图标不生效（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：stars/forks 徽章追加的自定义白色星形/分支 SVG 图标此前不可见——`github/*` 徽章未指定 `style` 时默认 social 样式，近白背景忽略 `color` 使白色图标隐形；现为全部 5 个徽章（stars/forks/issues/last-commit/contributors）补充 `style=flat`，stars/forks 另设 `labelColor=165dff`，图标于蓝色标签上以白色渲染，徽章整体蓝底统一。

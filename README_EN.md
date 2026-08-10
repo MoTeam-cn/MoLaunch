@@ -15,8 +15,8 @@ A modern, cross-platform Minecraft Java Edition launcher.
 [![Rust](https://img.shields.io/badge/Rust-2021-dea584.svg)](https://www.rust-lang.org/)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey.svg)](https://github.com/MoTeam-cn/MoLaunch)
 
-[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?style=flat&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNOCAuMjVhLjc1Ljc1IDAgMCAxIC42NzMuNDE4bDEuODgyIDMuODE1IDQuMjEuNjEyYS43NS43NSAwIDAgMSAuNDE2IDEuMjc5bC0zLjA0NiAyLjk3LjcxOSA0LjE5MmEuNzUxLjc1MSAwIDAgMS0xLjA4OC43OTFMOCAxMi4zNDdsLTMuNzY2IDEuOThhLjc1Ljc1IDAgMCAxLTEuMDg4LS43OWwuNzItNC4xOTRMLjgxOCA2LjM3NGEuNzUuNzUgMCAwIDEgLjQxNi0xLjI4bDQuMjEtLjYxMUw3LjMyNy42NjhBLjc1Ljc1IDAgMCAxIDggLjI1WiIvPjwvc3ZnPg==&labelColor=165dff&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?style=flat&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNNSA1LjM3MnYuODc4YzAgLjQxNC4zMzYuNzUuNzUuNzVoNC41YS43NS43NSAwIDAgMCAuNzUtLjc1di0uODc4YTIuMjUgMi4yNSAwIDEgMSAxLjUgMHYuODc4YTIuMjUgMi4yNSAwIDAgMS0yLjI1IDIuMjVoLTEuNXYyLjEyOGEyLjI1MSAyLjI1MSAwIDEgMS0xLjUgMFY4LjVoLTEuNUEyLjI1IDIuMjUgMCAwIDEgMy41IDYuMjV2LS44NzhhMi4yNSAyLjI1IDAgMSAxIDEuNSAwWk01IDMuMjVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFptNi43NS43NWEuNzUuNzUgMCAxIDAgMC0xLjUuNzUuNzUgMCAwIDAgMCAxLjVabS0zIDguNzVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFoiLz48L3N2Zz4=&labelColor=165dff&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/forks)
+[![GitHub stars](https://img.shields.io/github/stars/MoTeam-cn/MoLaunch?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZlcnNpb249IjEiIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiI+PHBhdGggZD0iTTggLjI1YS43NS43NSAwIDAgMSAuNjczLjQxOGwxLjg4MiAzLjgxNSA0LjIxLjYxMmEuNzUuNzUgMCAwIDEgLjQxNiAxLjI3OWwtMy4wNDYgMi45Ny43MTkgNC4xOTJhLjc1MS43NTEgMCAwIDEtMS4wODguNzkxTDggMTIuMzQ3bC0zLjc2NiAxLjk4YS43NS43NSAwIDAgMS0xLjA4OC0uNzlsLjcyLTQuMTk0TC44MTggNi4zNzRhLjc1Ljc1IDAgMCAxIC40MTYtMS4yOGw0LjIxLS42MTFMNy4zMjcuNjY4QS43NS43NSAwIDAgMSA4IC4yNVoiIGZpbGw9IiNlYWM1NGYiLz48L3N2Zz4=&logoSize=auto&label=stars&labelColor=444444&color=eac54f)](https://github.com/MoTeam-cn/MoLaunch/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/MoTeam-cn/MoLaunch?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxNiIgdmlld0JveD0iMCAwIDE2IDE2IiBmaWxsPSIjZmZmZmZmIj48cGF0aCBkPSJNNSA1LjM3MnYuODc4YzAgLjQxNC4zMzYuNzUuNzUuNzVoNC41YS43NS43NSAwIDAgMCAuNzUtLjc1di0uODc4YTIuMjUgMi4yNSAwIDEgMSAxLjUgMHYuODc4YTIuMjUgMi4yNSAwIDAgMS0yLjI1IDIuMjVoLTEuNXYyLjEyOGEyLjI1MSAyLjI1MSAwIDEgMS0xLjUgMFY4LjVoLTEuNUEyLjI1IDIuMjUgMCAwIDEgMy41IDYuMjV2LS44NzhhMi4yNSAyLjI1IDAgMSAxIDEuNSAwWk01IDMuMjVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFptNi43NS43NWEuNzUuNzUgMCAxIDAgMC0xLjUuNzUuNzUgMCAwIDAgMCAxLjVabS0zIDguNzVhLjc1Ljc1IDAgMSAwLTEuNSAwIC43NS43NSAwIDAgMCAxLjUgMFoiLz48L3N2Zz4=&logoSize=auto&label=forks&labelColor=444444&color=eac54f)](https://github.com/MoTeam-cn/MoLaunch/forks)
 [![GitHub issues](https://img.shields.io/github/issues/MoTeam-cn/MoLaunch?style=flat&logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/issues)
 [![GitHub last commit](https://img.shields.io/github/last-commit/MoTeam-cn/MoLaunch?style=flat&logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/commits)
 [![GitHub contributors](https://img.shields.io/github/contributors/MoTeam-cn/MoLaunch?style=flat&logo=github&logoColor=white&color=165dff)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
@@ -88,60 +88,16 @@ This repository contains the open-source code of MoLaunch. You can use the prebu
 
 ## Features
 
-### Version Management
+MoLaunch covers the entire Minecraft launching workflow, ready to use out of the box:
 
-- Support for Vanilla, Forge, Fabric, NeoForge, OptiFine, and LiteLoader loaders
-- CurseForge / Modrinth modpack installation with automatic loader and dependency resolution
-- Multi-version isolation; each instance is stored independently
-- Automatic Java detection: validates runtime requirements per version and pre-downloads the official Mojang Runtime when missing
+- **Version Management** — Vanilla / Forge / Fabric / NeoForge / OptiFine loaders, with multi-version isolation
+- **Downloads & Installation** — One-click install for Mods, Resource Packs, and Modpacks (CurseForge / Modrinth), with resumable downloads and mirror acceleration in China
+- **Accounts & Skins** — Microsoft account login, skin / cape management, and 3D preview
+- **Online Multiplayer** — Room lobby, WebRTC P2P virtual LAN, FRP tunnels without port forwarding
+- **Utilities** — Seed map, NBT editor, world backup, Mod dependency checks, and more
+- **AI Assistant (Experimental)** — Conversational analysis of game logs and crash causes
 
-### Downloads
-
-- Search and install Mods / Resource Packs / Modpacks from CurseForge, Modrinth, and the BMCLAPI mirror
-- Chunked parallel downloads with resume support, pause, and verification
-- China mirror acceleration (BMCLAPI / MoCDN)
-
-### Accounts
-
-- Microsoft OAuth device-code login, offline accounts
-- Credentials stored encrypted locally with automatic refresh
-
-### Skins
-
-- Skin / cape management
-- Real-time 3D preview (skinview3d)
-
-### Online Multiplayer
-
-- Online lobby and room management with invite codes / blacklist
-- WebRTC P2P virtual LAN (virtual TUN adapter)
-- FRP tunnels with multi-provider support—no port forwarding needed
-
-### Tools
-
-- Seed Map: enter a seed to locate strongholds, ocean monuments, and other world structures (cubiomes WASM)
-- NBT editing, world backup / restore, Mod dependency checks, server latency testing, Java runtime detection, and more
-
-### AI Assistant (Experimental)
-
-- Conversational assistant that can read game logs, crash reports, and mod lists
-- Log & crash analysis: local rule-engine pre-check + in-depth AI analysis
-- Supports OpenAI-compatible endpoints (including reasoning models such as DeepSeek R1)
-
-### Plugins
-
-- Plugin SDK with sandbox: custom layouts, system monitoring, launch history, and more, with configurable permissions
-
-### Other
-
-- Splash startup animation (dual-window splashscreen)
-- Crash analysis (rule engine + AI suggestions)
-- Automatic updates (stable / beta / alpha channels)
-- Log desensitization, global CSP, and user agreement gating
-
-### MoLaunch Cloud
-
-Registration, login, and credential-refresh operations are handled through the MoLaunch Cloud (api-server). The cloud places a lightweight Proof-of-Work check in front of these endpoints: you solve a small hash puzzle before the request goes through, preventing scripted mass abuse of the API. Normal usage is barely noticeable—login and similar operations take only tens of milliseconds. The only ones actually blocked by this puzzle are bulk API abusers.
+Cloud operations such as login are handled through the MoLaunch Cloud, which adds a lightweight PoW check in front of its APIs to deter scripted abuse—invisible during normal use.
 
 ## License
 
@@ -186,6 +142,8 @@ See [licenses.txt](./src-tauri/resources/about/licenses.txt) for the complete li
 Thanks to all the developers who have contributed code, documentation, and suggestions to MoLaunch.
 
 [![Contributors](https://contrib.rocks/image?repo=MoTeam-cn/MoLaunch)](https://github.com/MoTeam-cn/MoLaunch/graphs/contributors)
+
+![Alt](https://repobeats.axiom.co/api/embed/8769aee202d5829171ef89b4ffa1e9907fab4d7a.svg "Repobeats analytics image")
 
 ## Links
 
