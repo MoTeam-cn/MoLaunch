@@ -9,3 +9,12 @@ import { ref } from 'vue'
 
 /** BackToTop 按钮当前是否可见（BackToTop 写入，DownloadPanel 读取） */
 export const backToTopVisible = ref(false)
+
+/**
+ * BackToTop 是否允许显示（页面白名单开关）
+ *
+ * 页内视图切换（非路由切换）不会触发 BackToTop 的路由重置逻辑，
+ * 残留按钮会遮挡新视图右下角操作（如 LoaderSelect 的「开始安装」）。
+ * 需要隐藏的视图在展开时置 false、收起/离开页面时恢复 true。
+ */
+export const backToTopEnabled = ref(true)

@@ -15,7 +15,7 @@
 import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowUpIcon } from '@heroicons/vue/24/solid'
-import { backToTopVisible } from '@/composables/useFloatingButtonState'
+import { backToTopVisible, backToTopEnabled } from '@/composables/useFloatingButtonState'
 
 const visible = ref(false)
 const isHover = ref(false)
@@ -28,10 +28,29 @@ const SHOW_THRESHOLD = 400
 // 同步可见状态到共享 ref，供 DownloadPanel 调整位置
 watch(visible, (v) => { backToTopVisible.value = v })
 
+// 页内视图白名单：展开操作页（如 LoaderSelect）时禁用，避免残留按钮遮挡右下角操作
+watch(backToTopEnabled, (enabled) => {
+  if (!enabled) {
+    visible.value = false
+    activeEl = null
+    return
+  }
+  // 恢复启用后延迟至过渡结束，重新检测当前滚动容器是否已越过阈值
+  setTimeout(() => {
+    const main = document.querySelector('main')
+    if (!main) return
+    const scroller = findScrolledContainer(main)
+    if (scroller) onScroll({ target: scroller } as unknown as Event)
+  }, 450)
+})
+
 function onScroll(e: Event) {
   const el = e.target as Element | null
   if (!el || !(el instanceof Element)) return
   if (!('scrollTop' in el) || !('scrollHeight' in el)) return
+
+  // 页内白名单禁用时不响应滚动
+  if (!backToTopEnabled.value) return
 
   // 仅响应主内容区内的外部滚动容器，过滤 Teleport 弹层 / 下拉框等
   if (!el.closest('main')) return

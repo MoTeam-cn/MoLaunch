@@ -8,6 +8,8 @@
 
 - 加入方房间状态监控（[onlineSession.ts](src/composables/online/onlineSession.ts)）：加入方每 30s 请求云端房间信息，房主关闭/房间过期/被服务端清理（code=1002）时自动感知并清理会话退出，不再出现房主关房后加入方无感知；DataChannel 控制消息（房主 MC 端口 / TURN 服务器下发）与数据包转发 TUN 也改为全局绑定，切页不丢失。
 
+- 修复下载页展开「选择加载器」后全局返回顶部按钮残留（[BackToTop.vue](src/components/common/BackToTop.vue)、[useFloatingButtonState.ts](src/composables/useFloatingButtonState.ts)、[Versions.vue](src/views/Versions.vue)）：LoaderSelect 是页内视图切换（非路由切换），BackToTop 的可见状态不会被路由钩子重置，残留按钮会遮挡右下角「开始安装」；新增 `backToTopEnabled` 白名单开关（全局可复用），LoaderSelect 展开时禁用 BackToTop（隐藏并停止响应滚动），收起/切换分类/离开页面时自动恢复并重新检测滚动位置。
+
 - 加入方 P2P 断线自动重连（[onlineSession.ts](src/composables/online/onlineSession.ts)）：WebRTC 网络抖动先由 ICE 自行恢复；`disconnected` 超过 5s 未恢复或直接 `failed` 时自动走服务端信令重建（leaveRoom → joinRoom 新 participant_id，房主轮询自动为新参与者重新生成 Offer，完成重新协商），失败按 3s/6s/12s 退避重试至多 3 次，连接恢复自动清零计数；[reconnectAsGuest](src/composables/useRoomReconnect.ts) 同步增强：重连前 close 旧 PC（避免 failed 态复用）、重新注入加密密钥、服务端按房间递增分配虚拟 IP 导致重新 join 必然换 IP 时重启 TUN 接口（顺带修复管理员提权重启后虚拟网卡 IP 与服务端不同步的问题）；房主轮询（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)）自动清理已离开/被拒绝参与者的残留 PeerConnection，防止重连产生的旧 participant 连接泄漏。
 
 - 修复下载总大小虚高（[stream.rs](src-tauri/src/minecraft/download/downloader/stream.rs)）：单流下载回填 `total_bytes` 由「无条件按 content_length 累加」改为「仅 `expected_size=0`（大小未知）时回填」，已知大小文件已在 `download_batch` 初始化时按 `expected_size` 求和计入，此前会被二次累加导致「已下载/总大小（累计）」随下载过程持续增长、完成时显示总量远超实际；失败回滚条件同步对齐，避免 3 次重试间 total 翻倍。

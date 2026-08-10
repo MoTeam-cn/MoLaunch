@@ -1,8 +1,9 @@
 <script setup lang="ts">
 /** 下载页面 */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
+import { backToTopEnabled } from '@/composables/useFloatingButtonState'
 import { showError } from '@/utils/modal'
 import { formatTimestamp } from '@/utils/format'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -102,6 +103,15 @@ function handleSelectCategory(category: string) {
   activeCategory.value = category
   selectedVersion.value = null
 }
+
+// 展开选择加载器页时禁用全局返回顶部按钮（避免残留遮挡右下角「开始安装」）
+watch(selectedVersion, (v) => {
+  backToTopEnabled.value = !v
+})
+
+onUnmounted(() => {
+  backToTopEnabled.value = true
+})
 
 onMounted(async () => {
   // 有缓存就不显示 loading
