@@ -122,6 +122,7 @@ const sizeClass = computed(() => `input-size-${props.size}`)
         :disabled="disabled"
         :readonly="readonly"
         :maxlength="maxlength"
+        data-inner-scroll
         class="textarea-inner"
         :style="{ resize }"
         @input="onInput"
