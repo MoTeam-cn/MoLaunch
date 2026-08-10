@@ -182,12 +182,15 @@ function saveEdit() {
           <span>{{ waiting ? '正在进行下一步…' : '正在思考如何回答…' }}</span>
         </div>
         <span v-if="message.streaming && message.content" class="stream-caret text-primary-500" />
-        <!-- 右下角：token 统计（模型 id 左侧）+ 回复该消息的模型（仅最终正文存在时显示） -->
-        <div v-if="(displayModel && message.content) || tokenStats" class="mt-1.5 flex items-center justify-end gap-1.5">
-          <span v-if="tokenStats" class="rounded bg-gray-200/90 px-1.5 py-0.5 text-[10px] leading-none whitespace-nowrap text-gray-500 tabular-nums">
-            {{ formatTokens(tokenStats.completion) }} token<span v-if="tokenStats.speed > 0"> · {{ formatTokens(tokenStats.speed) }} t/s</span>
-          </span>
-          <span v-if="displayModel && message.content" class="rounded bg-gray-200/90 px-1.5 py-0.5 text-[10px] leading-none text-gray-500">{{ displayModel }}</span>
+        <!-- 底部：AI 内容声明（左）+ token 统计 / 模型（右） -->
+        <div v-if="message.content" class="mt-1.5 flex items-center justify-between gap-1.5">
+          <span class="min-w-0 truncate text-[10px] leading-none text-gray-400">由AI生成的内容，注意甄别</span>
+          <div class="flex shrink-0 items-center gap-1.5">
+            <span v-if="tokenStats" class="rounded bg-gray-200/90 px-1.5 py-0.5 text-[10px] leading-none whitespace-nowrap text-gray-500 tabular-nums">
+              {{ formatTokens(tokenStats.completion) }} token<span v-if="tokenStats.speed > 0"> · {{ formatTokens(tokenStats.speed) }} t/s</span>
+            </span>
+            <span v-if="displayModel && message.content" class="rounded bg-gray-200/90 px-1.5 py-0.5 text-[10px] leading-none text-gray-500">{{ displayModel }}</span>
+          </div>
         </div>
       </div>
     </div>
