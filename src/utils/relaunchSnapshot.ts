@@ -35,6 +35,11 @@ export function rememberJoinPassword(password: string): void {
   pendingJoinPassword = password
 }
 
+/** 读取当前房间密码（P2P 自动重连用；不消费） */
+export function peekJoinPassword(): string {
+  return pendingJoinPassword || reconnectPassword || ''
+}
+
 /** 恢复快照时转存 guest 重连密码（供 RoomGuestPanel 挂载后自动重连） */
 export function setReconnectPassword(password: string): void {
   reconnectPassword = password

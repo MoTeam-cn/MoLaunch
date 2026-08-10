@@ -16,8 +16,10 @@ import { useWebRTC } from '@/composables/useWebRTC'
 import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import { useVirtualLan } from '@/composables/useVirtualLan'
 import { useRoomHost } from '@/composables/useRoomHost'
+import { reconnectAsGuest } from '@/composables/useRoomReconnect'
 import { getRoomInfo } from '@/utils/api/online-manager'
 import { importRoomKey } from '@/utils/online/crypto'
+import { peekJoinPassword } from '@/utils/relaunchSnapshot'
 import {
   decode,
   CONTROL_SUBTYPE,
@@ -121,6 +123,85 @@ function createSession(): OnlineSession {
     }
   }
 
+  // 加入方 P2P 断线自动重连
+  // 网络抖动先让 ICE 自行恢复（disconnected → connected）；disconnected 超时未恢复
+  // 或直接 failed 时走服务端信令重建（leaveRoom → joinRoom，房主自动生成新 Offer），
+  // 保留 ICE 固有恢复能力的同时提供确定性兜底。
+  const GUEST_RECONNECT_ATTEMPTS = 3
+  const RECONNECT_BACKOFF_MS = [3_000, 6_000, 12_000]
+  const DISCONNECT_RECOVERY_DELAY_MS = 5_000
+  let reconnectAttempts = 0
+  let reconnecting = false
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  let disconnectedRecoveryTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearReconnectTimers() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer)
+      reconnectTimer = null
+    }
+    if (disconnectedRecoveryTimer) {
+      clearTimeout(disconnectedRecoveryTimer)
+      disconnectedRecoveryTimer = null
+    }
+  }
+
+  function scheduleGuestReconnect(delay: number) {
+    if (reconnectTimer) return
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null
+      void attemptGuestReconnect()
+    }, delay)
+  }
+
+  async function attemptGuestReconnect() {
+    if (reconnecting) return
+    const st = store.roomState
+    if (st.role !== 'guest' || !st.roomCode) return
+    if (reconnectAttempts >= GUEST_RECONNECT_ATTEMPTS) {
+      toastError(`P2P 连接自动重连失败，已停止重试（房间 ${st.roomCode}）`)
+      return
+    }
+    reconnectAttempts++
+    reconnecting = true
+    try {
+      const ok = await reconnectAsGuest(guestWebrtc, peekJoinPassword(), lan)
+      if (ok) reconnectAttempts = 0
+      else {
+        const backoff =
+          RECONNECT_BACKOFF_MS[Math.min(reconnectAttempts - 1, RECONNECT_BACKOFF_MS.length - 1)]
+        scheduleGuestReconnect(backoff)
+      }
+    } finally {
+      reconnecting = false
+    }
+  }
+
+  watch(() => guestWebrtc.connectionState.value, (state) => {
+    if (store.roomState.role !== 'guest' || !store.roomState.roomCode) return
+    if (state === 'connected') {
+      reconnectAttempts = 0
+      clearReconnectTimers()
+      return
+    }
+    if (state === 'failed') {
+      if (disconnectedRecoveryTimer) {
+        clearTimeout(disconnectedRecoveryTimer)
+        disconnectedRecoveryTimer = null
+      }
+      void attemptGuestReconnect()
+      return
+    }
+    if (state === 'disconnected') {
+      if (disconnectedRecoveryTimer) return
+      disconnectedRecoveryTimer = setTimeout(() => {
+        disconnectedRecoveryTimer = null
+        const cur = guestWebrtc.connectionState.value
+        if (cur === 'failed' || cur === 'disconnected') void attemptGuestReconnect()
+      }, DISCONNECT_RECOVERY_DELAY_MS)
+    }
+  })
+
   // 加入方 DataChannel 全局绑定：控制消息（MC 端口/TURN）+ 数据包转发 TUN
   watch(
     () => guestWebrtc.dataChannel.value,
@@ -167,6 +248,8 @@ function createSession(): OnlineSession {
   /** 房间失效统一清理（房主 keepalive 关房 / 加入方监控发现关闭） */
   function handleRoomClosed(msg: string) {
     stopGuestMonitor()
+    reconnectAttempts = 0
+    clearReconnectTimers()
     hostOps.stop()
     void lan.stop()
     guestWebrtc.close()
@@ -180,6 +263,8 @@ function createSession(): OnlineSession {
 
   /** 加入方退出房间（退出按钮） */
   async function guestLeaveAndCleanup() {
+    reconnectAttempts = 0
+    clearReconnectTimers()
     await lan.stop()
     guestWebrtc.close()
     await store.guestLeaveRoom()
@@ -204,6 +289,8 @@ function createSession(): OnlineSession {
       startGuestSession()
     } else {
       stopGuestMonitor()
+      reconnectAttempts = 0
+      clearReconnectTimers()
       hostOps.stop()
       void lan.stop()
       guestWebrtc.close()

@@ -36,11 +36,11 @@ import ModpackRequirementCard from './ModpackRequirementCard.vue'
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
-// 管理员提权重启恢复：存在待重连密码时挂载后自动重连（重建 WebRTC 与房间会话）
-useGuestReconnect(guestWebrtc)
 
 /** 全局联机会话：退出房间清理 / TUN / 密钥注入均由会话统一管理 */
 const session = getOnlineSession()
+// 管理员提权重启恢复：存在待重连密码时挂载后自动重连（重建 WebRTC 与房间会话，TUN 同步重启）
+useGuestReconnect(guestWebrtc, session.lan)
 
 const room = computed(() => store.roomState)
 const connState = guestWebrtc.connectionState

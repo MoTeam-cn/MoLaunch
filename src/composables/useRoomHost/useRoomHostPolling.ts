@@ -120,6 +120,15 @@ export function useRoomHostPolling(
     polling.value = true
     try {
       await store.refreshParticipants()
+      // 清理已离开/被拒绝参与者的残留 PC（加入方断线自动重连重新 join 后旧 participant_id 也在此列）
+      const activeIds = new Set(
+        store.roomState.participants
+          .filter((p) => p.status === 'joined' || p.status === 'answered' || p.status === 'confirmed')
+          .map((p) => p.participantId),
+      )
+      for (const id of Array.from(hostMesh.connectionStates.keys())) {
+        if (!activeIds.has(id)) void hostMesh.closeParticipant(id)
+      }
       await scanAndGenerateOffers()
     } catch (e) {
       console.warn('[Online] pollParticipants 异常:', e)
