@@ -34,7 +34,7 @@ fn is_internal_navigation(url: &tauri::Url) -> bool {
         "tauri" | "res" | "cache-image" | "picker" | "picker-result" | "molaunch" => true,
         "http" | "https" => url
             .host_str()
-            .map_or(false, |host| host == "localhost" || host.ends_with(".localhost")),
+            .is_some_and(|host| host == "localhost" || host.ends_with(".localhost")),
         _ => false,
     }
 }
