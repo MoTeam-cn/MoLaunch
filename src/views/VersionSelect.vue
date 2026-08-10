@@ -124,8 +124,9 @@ function selectVersion(id: string) {
   router.push('/apps')
 }
 
+/** 空状态"下载游戏"按钮：进入下载页面（原版/社区资源安装），而非下载管理 */
 function goToDownloads() {
-  router.push('/apps/downloads')
+  router.push('/apps/versions')
 }
 
 function goBack() {
