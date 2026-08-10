@@ -234,6 +234,15 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     );
 
     d.register(
+        "repair_version_loader",
+        handler!(state, app, params, {
+            let p: VersionIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            list::repair_version_loader(&state, &app, &p.version_id).await
+        }),
+    );
+
+    d.register(
         "rename_version",
         handler!(state, _app, params, {
             let p: RenameVersionParams =

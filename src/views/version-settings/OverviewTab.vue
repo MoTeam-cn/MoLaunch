@@ -12,6 +12,7 @@ import Button from '@/components/common/Button.vue'
 import Tag from '@/components/common/Tag.vue'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useVersionOverviewActions } from '@/composables/useVersionOverviewActions'
+import RepairLoaderDrawer from './repair-loader/RepairLoaderDrawer.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -25,10 +26,10 @@ const {
 } = useVersionSettings()
 
 const {
-  fixing, openFolder,
+  fixing, repairing, repairDrawerOpen, openFolder,
   handleEditDesc, handleRename, handleToggleStar,
   handleChangeDisplayType, handleChangeLogo,
-  handleExportScript, handleFixFiles, handleDelete,
+  handleExportScript, handleFixFiles, handleRepairLoader, handleDelete,
 } = useVersionOverviewActions({
   selectedId, personalization, loadPersonalization, refreshEffectiveDir,
   router, authStore, javaStore,
@@ -167,6 +168,12 @@ const {
             {{ fixing ? '补全中...' : '补全文件' }}
           </Button>
         </Tooltip>
+        <Tooltip text="检测 Forge/Fabric/LiteLoader 是否损坏，若损坏将自动重新安装。" position="top">
+          <Button type="outline" :loading="repairing" :disabled="repairing" @click="handleRepairLoader">
+            <template #icon><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a1 1 0 011 1v2a1 1 0 01-.832.988l-4.52.648a1 1 0 01-.746-.207l-1.319-1.1a5 5 0 00-5.166 0l-1.319 1.1a1 1 0 01-.746.207l-4.52-.648A1 1 0 010 13v-2a1 1 0 011-1h.388a3 3 0 001.032-5.8l.62-.62A2 2 0 014.243 3h2.514a2 2 0 011.202.42l.62.62a3 3 0 001.032 5.8H10v.25A4.75 4.75 0 005.25 15H4a1 1 0 100 2h1.25A6.75 6.75 0 0012 10.25V10h.38a3 3 0 001.032-5.8l.62-.62A2 2 0 0115.243 3h2.514a2 2 0 011.202.42l.62.62A3 3 0 0019.388 10H18z" clip-rule="evenodd" /></svg></template>
+            {{ repairing ? '重装中...' : '检测并重装加载器' }}
+          </Button>
+        </Tooltip>
         <Button type="outline" @click="handleDelete">
           <template #icon><svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg></template>
           删除版本
@@ -174,4 +181,6 @@ const {
       </div>
     </section>
   </div>
+
+  <RepairLoaderDrawer v-if="selectedId" v-model:visible="repairDrawerOpen" :version-id="selectedId" />
 </template>

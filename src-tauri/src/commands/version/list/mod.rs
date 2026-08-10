@@ -9,6 +9,7 @@ mod info;
 mod installed;
 mod modpack;
 mod remote;
+mod repair_loader;
 
 pub(super) use detect::version_type_to_string;
 pub use detect::{detect_version_type_from_dir, resolve_isolation_mode};
@@ -19,3 +20,4 @@ pub use installed::{
 };
 pub use modpack::{check_local_modpack, read_local_modpack_meta, CheckLocalModpackResult};
 pub use remote::list_versions;
+pub use repair_loader::repair_version_loader;
