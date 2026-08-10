@@ -1,14 +1,15 @@
 <script setup lang="ts">
-/** 创建房间表单：MC 版本 Select 下拉 + 高级设置（白名单/整合包关联） */
+/** 创建房间表单：MC 版本 Select 下拉 + 高级设置（白名单/整合包关联，置于抽屉内） */
+import { ref } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Input from '@/components/common/Input.vue'
 import Select from '@/components/common/Select.vue'
-import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
+import Drawer from '@/components/common/Drawer.vue'
 import Tag from '@/components/common/Tag.vue'
 import WhitelistEditor from './WhitelistEditor.vue'
 import ModpackSelector from './ModpackSelector.vue'
-import { PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { Cog8ToothIcon, PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useCreateRoomForm } from '@/composables/useCreateRoomForm'
 
 const {
@@ -29,6 +30,9 @@ const {
   currentStepIndex,
   handleCreateRoom,
 } = useCreateRoomForm()
+
+/** 高级设置抽屉开关（详情页仅保留入口按钮） */
+const advancedDrawerOpen = ref(false)
 </script>
 
 <template>
@@ -95,8 +99,20 @@ const {
             <p class="text-xs text-gray-500">{{ publicRoomHint }}</p>
           </div>
         </div>
-        <!-- 创建按钮 -->
+        <!-- 高级设置入口（内容置于抽屉内，详情页仅保留按钮） -->
         <div class="pt-2">
+          <Button type="outline" long @click="advancedDrawerOpen = true">
+            <template #icon><Cog8ToothIcon class="w-4 h-4" /></template>
+            <span class="flex items-center justify-center gap-1">
+              高级设置
+              <Tag size="small" :color="advancedBadgeActive ? 'arcoblue' : 'gray'">
+                {{ advancedBadge }}
+              </Tag>
+            </span>
+          </Button>
+        </div>
+        <!-- 创建按钮 -->
+        <div class="pt-1">
           <Button type="primary" long :loading="store.roomLoading" @click="handleCreateRoom">
             <template #icon><PlusIcon class="w-4 h-4" /></template>
             创建房间
@@ -119,19 +135,15 @@ const {
       </div>
     </Card>
 
-    <!-- 高级设置：白名单（默认收起，点击展开） -->
-    <CollapsibleCard :default-open="false">
-      <template #title>
-        <div class="flex items-center gap-2">
-          <span>高级设置</span>
-          <Tag
-            size="small"
-            :color="advancedBadgeActive ? 'arcoblue' : 'gray'"
-          >
-            {{ advancedBadge }}
-          </Tag>
-        </div>
-      </template>
+    <!-- 高级设置抽屉：整合包关联 + 白名单管理 -->
+    <Drawer
+      v-model:visible="advancedDrawerOpen"
+      title="高级设置"
+      placement="right"
+      :width="420"
+      render-in-place
+      popup-container="#app-content"
+    >
       <div class="space-y-3">
         <!-- 整合包关联（联机大厅阶段 3） -->
         <ModpackSelector
@@ -144,6 +156,6 @@ const {
           <WhitelistEditor v-model="whitelistForm" mode="create" />
         </div>
       </div>
-    </CollapsibleCard>
+    </Drawer>
   </div>
 </template>

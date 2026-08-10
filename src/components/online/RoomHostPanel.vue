@@ -18,6 +18,8 @@ import { getOnlineSession } from '@/composables/online/onlineSession'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import Drawer from '@/components/common/Drawer.vue'
+import Tag from '@/components/common/Tag.vue'
 import PendingAnswerList from './PendingAnswerList.vue'
 import ParticipantList from './ParticipantList.vue'
 import BannedList from './BannedList.vue'
@@ -34,6 +36,7 @@ import {
   InformationCircleIcon,
   ShieldCheckIcon,
   ExclamationTriangleIcon,
+  ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -55,6 +58,11 @@ const room = computed(() => store.roomState)
 
 /** 踢出确认弹窗状态（null=关闭，有值=正在选择封禁时长） */
 const kickTarget = ref<{ participantId: string; devicePk: string; virtualIp?: string } | null>(null)
+
+/** 列表抽屉开关：待确认申请 / 参与者 / 封禁列表（详情页仅保留入口按钮） */
+const pendingDrawerOpen = ref(false)
+const participantDrawerOpen = ref(false)
+const banDrawerOpen = ref(false)
 
 function onKick(participantId: string, devicePk: string) {
   const p = room.value.participants.find((x) => x.participantId === participantId)
@@ -212,45 +220,81 @@ const nearPlayerLimit = computed(
       <WhitelistEditor mode="runtime" :room-code="room.roomCode" />
     </Card>
 
-    <PendingAnswerList
-      v-if="pendingAnswers.length > 0"
-      :answers="pendingAnswers"
-      @confirm="handleConfirm"
-    />
+    <!-- 列表抽屉入口：详情页仅保留按钮，待确认申请 / 参与者 / 封禁列表全部收进抽屉 -->
+    <Card title="房间管理">
+      <div class="grid grid-cols-3 gap-2">
+        <Button type="outline" size="small" @click="pendingDrawerOpen = true">
+          <template #icon><ClockIcon class="w-3.5 h-3.5" /></template>
+          <span class="flex items-center gap-1">
+            加入申请
+            <Tag v-if="pendingAnswers.length > 0" size="small" color="red">{{ pendingAnswers.length }}</Tag>
+          </span>
+        </Button>
+        <Button type="outline" size="small" @click="participantDrawerOpen = true">
+          <template #icon><UsersIcon class="w-3.5 h-3.5" /></template>
+          <span class="flex items-center gap-1">
+            参与者
+            <Tag size="small">{{ room.participants.length }}</Tag>
+          </span>
+        </Button>
+        <Button type="outline" size="small" @click="banDrawerOpen = true">
+          <template #icon><ShieldCheckIcon class="w-3.5 h-3.5" /></template>
+          <span class="flex items-center gap-1">
+            封禁
+            <Tag size="small">{{ bannedList.length }}</Tag>
+          </span>
+        </Button>
+      </div>
+    </Card>
 
-    <Transition
-      enter-active-class="transition ease-out duration-500"
-      enter-from-class="opacity-0 translate-y-2"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 -translate-y-2"
+    <!-- 待确认加入申请抽屉 -->
+    <Drawer
+      v-model:visible="pendingDrawerOpen"
+      title="待确认加入请求"
+      placement="right"
+      :width="420"
+      render-in-place
+      popup-container="#app-content"
+    >
+      <PendingAnswerList :answers="pendingAnswers" @confirm="handleConfirm" />
+    </Drawer>
+
+    <!-- 参与者列表抽屉 -->
+    <Drawer
+      v-model:visible="participantDrawerOpen"
+      title="参与者列表"
+      placement="right"
+      :width="420"
+      render-in-place
+      popup-container="#app-content"
     >
       <ParticipantList
-        v-if="room.participants.length > 0"
         :participants="room.participants"
         :conn-state-text="participantStateText"
         @kick="onKick"
       />
-    </Transition>
+    </Drawer>
 
-    <!-- 封禁列表 + 解封操作（阶段 6.2，仅房主，有封禁记录时显示） -->
-    <Transition
-      enter-active-class="transition ease-out duration-500"
-      enter-from-class="opacity-0 translate-y-2"
-      enter-to-class="opacity-100 translate-y-0"
-      leave-active-class="transition ease-in duration-200"
-      leave-from-class="opacity-100 translate-y-0"
-      leave-to-class="opacity-0 -translate-y-2"
+    <!-- 封禁列表抽屉 -->
+    <Drawer
+      v-model:visible="banDrawerOpen"
+      placement="right"
+      :width="420"
+      render-in-place
+      popup-container="#app-content"
     >
-      <BannedList
-        v-if="bannedList.length > 0"
-        :bans="bannedList"
-        :server-time="banServerTime"
-        @unban="handleUnban"
-        @refresh="refreshBans"
-      />
-    </Transition>
+      <template #title>
+        <div class="flex items-center gap-1">
+          <span>封禁列表</span>
+          <Tooltip text="刷新封禁列表">
+            <Button type="ghost" size="mini" @click="refreshBans">
+              <template #icon><ArrowPathIcon class="w-3.5 h-3.5" /></template>
+            </Button>
+          </Tooltip>
+        </div>
+      </template>
+      <BannedList :bans="bannedList" :server-time="banServerTime" @unban="handleUnban" />
+    </Drawer>
 
     <!-- 踢出确认弹窗（选择封禁时长） -->
     <KickConfirmDialog

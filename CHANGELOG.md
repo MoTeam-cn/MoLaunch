@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 联机房间详情抽屉化（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) + [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) + [PendingAnswerList.vue](src/components/online/PendingAnswerList.vue) + [ParticipantList.vue](src/components/online/ParticipantList.vue) + [BannedList.vue](src/components/online/BannedList.vue)）：房主面板「待确认加入申请 / 参与者 / 封禁列表」由页面内直接展示改为右侧抽屉，详情页仅保留「房间管理」按钮卡（按钮带红色 Tag 待办数与参与者/封禁数量徽标），封禁抽屉标题内置刷新按钮；创建房间「高级设置」（整合包关联 + 白名单管理）由可折叠卡片改为抽屉，表单页仅留「高级设置」入口按钮并保留启用状态徽章；三个列表组件去 Card 壳适配抽屉容器，待确认/封禁列表新增空状态（icon + text 垂直水平居中）。
+
 - 联机会话全局化（新增 [onlineSession.ts](src/composables/online/onlineSession.ts)，[App.vue](src/App.vue) 启动时挂载）：WebRTC 多 PC/单 PC、TUN 虚拟网卡、房主三路信令轮询从页面/面板组件生命周期提升为应用级全局单例，离开联机页（路由切走）不再触发 onUnmounted 清理，P2P 连接与虚拟网卡保持不断，返回联机页直接恢复；`useWebRTC`/`useWebRTCMesh`/`useVirtualLan`/`useRoomHost`/`useGlobalTauriEvent` 新增 `autoClose`/`autoStop`/`autoLifecycle`/`autoRemove` 选项由会话显式管理生命周期（默认仍自动清理，不破坏既有调用方）。
 
 - 加入方房间状态监控（[onlineSession.ts](src/composables/online/onlineSession.ts)）：加入方每 30s 请求云端房间信息，房主关闭/房间过期/被服务端清理（code=1002）时自动感知并清理会话退出，不再出现房主关房后加入方无感知；DataChannel 控制消息（房主 MC 端口 / TURN 服务器下发）与数据包转发 TUN 也改为全局绑定，切页不丢失。
