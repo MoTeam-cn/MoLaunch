@@ -3,6 +3,7 @@
  * 参数统一携带 `kind`（resourcepack / shader），字段名 camelCase。
  */
 
+import type { ResourceProject } from '@/types/community'
 import { VERSION_PACKS_ACTIONS, versionPacksManager } from '@/utils/api/version-packs-manager'
 
 /** 内容类型：资源包 / 光影 */
@@ -15,6 +16,10 @@ export interface PackInfo {
   is_enabled: boolean
   is_folder: boolean
   size: number
+  /** 包内图标缓存 URL（getPackIcon 提取，或预加载填充的 platform logo） */
+  cached_logo_url?: string
+  /** 预加载到的平台工程详情（由 `preload_packs_detail_cmd` 后台批量查询填充） */
+  project?: ResourceProject | null
 }
 
 /** kind + versionId 参数 */
@@ -118,4 +123,38 @@ export async function watchPacksDir(versionId: string, kind: PackKind): Promise<
 /** 停止监听内容目录变化 */
 export async function unwatchPacksDir(): Promise<void> {
   await versionPacksManager(VERSION_PACKS_ACTIONS.UNWATCH_PACKS_DIR)
+}
+
+/**
+ * 原子化更新资源包/光影（下载新版本 + 删旧版本）
+ *
+ * 下载失败时不删旧文件，确保用户不会因更新失败失去原有包。
+ * 进度通过 DownloadSession 统一推送，前端下载管理页可见。
+ */
+export async function updatePack(
+  versionId: string,
+  oldFileName: string,
+  downloadUrl: string,
+  newFileName: string,
+  expectedSize: number,
+  kind: PackKind,
+): Promise<void> {
+  await versionPacksManager(VERSION_PACKS_ACTIONS.UPDATE_PACK, {
+    kind,
+    versionId,
+    oldFileName,
+    downloadUrl,
+    newFileName,
+    expectedSize,
+  })
+}
+
+/** 触发资源包/光影详情预加载（后台从 CF/MR 批量查询工程详情） */
+export async function preloadPacksDetail(versionId: string, kind: PackKind): Promise<void> {
+  await versionPacksManager(VERSION_PACKS_ACTIONS.PRELOAD_PACKS_DETAIL, { kind, versionId })
+}
+
+/** 取消当前预加载任务（PackTab 组件卸载时调用） */
+export async function cancelPreloadPacksDetail(): Promise<void> {
+  await versionPacksManager(VERSION_PACKS_ACTIONS.CANCEL_PRELOAD_PACKS_DETAIL)
 }

@@ -3,7 +3,22 @@
 use serde::Serialize;
 
 use crate::commands::version::mods::ModMetadata;
-use crate::minecraft::community::types::ResourceProject;
+use crate::minecraft::community::types::{ResourceProject, ResourceType};
+
+/// 预加载范围配置（mods / packs 共用）
+///
+/// 区分事件前缀、CF/MR 查询的资源类型、持久化缓存子目录，以及是否读取 JAR 元数据。
+#[derive(Clone)]
+pub(crate) struct PreloadScope {
+    /// 事件前缀（如 mods / packs），事件名为 `{prefix}-preload-update` / `{prefix}-preload-done`
+    pub event_prefix: &'static str,
+    /// CF/MR 查询的资源类型
+    pub resource_type: ResourceType,
+    /// 持久化缓存子目录（如 preload_mods / preload_resourcepack / preload_shader）
+    pub cache_dir: &'static str,
+    /// 是否读取 JAR 元数据（mods 特有；packs 为 zip 无元数据）
+    pub read_jar_metadata: bool,
+}
 
 /// 单条预加载结果（推送给前端的事件 payload）
 ///

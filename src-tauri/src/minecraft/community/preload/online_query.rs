@@ -8,10 +8,9 @@ use std::collections::HashMap;
 use tauri::{AppHandle, Emitter};
 
 use super::cache::CachedMod;
-use super::types::{HashedMod, PreloadUpdate};
+use super::types::{HashedMod, PreloadScope, PreloadUpdate};
 use crate::minecraft::community::curseforge::fingerprint_search;
 use crate::minecraft::community::modrinth::version_files_search;
-use crate::minecraft::community::types::ResourceType;
 use crate::minecraft::image_cache;
 
 /// 在线批量查询的统计结果（供 mod.rs 写最终日志）
@@ -27,7 +26,11 @@ pub(crate) struct QueryStats {
 /// 并发批量查询 CF + MR，合并结果并 emit project 事件
 ///
 /// CF 优先（CF 收录更全），CF 没有再用 MR。返回写入缓存用的 `cache_map`。
-pub(crate) async fn query_and_merge(app: &AppHandle, hashed_mods: &[HashedMod]) -> QueryStats {
+pub(crate) async fn query_and_merge(
+    app: &AppHandle,
+    scope: &PreloadScope,
+    hashed_mods: &[HashedMod],
+) -> QueryStats {
     let cf_fingerprints: Vec<u32> = hashed_mods
         .iter()
         .filter_map(|m| m.cf_fingerprint)
@@ -38,8 +41,8 @@ pub(crate) async fn query_and_merge(app: &AppHandle, hashed_mods: &[HashedMod]) 
         .collect();
 
     let (cf_result, mr_result) = tokio::join!(
-        fingerprint_search(cf_fingerprints, ResourceType::Mod),
-        version_files_search(mr_sha1s, ResourceType::Mod),
+        fingerprint_search(cf_fingerprints, scope.resource_type.clone()),
+        version_files_search(mr_sha1s, scope.resource_type.clone()),
     );
 
     let mut cache_map: HashMap<String, CachedMod> = HashMap::new();
@@ -79,7 +82,7 @@ pub(crate) async fn query_and_merge(app: &AppHandle, hashed_mods: &[HashedMod]) 
                         _ => None,
                     };
                     let _ = app.emit(
-                        "mods-preload-update",
+                        format!("{}-preload-update", scope.event_prefix).as_str(),
                         PreloadUpdate {
                             file_name: m.file_name.clone(),
                             slug: None,
@@ -120,7 +123,7 @@ pub(crate) async fn query_and_merge(app: &AppHandle, hashed_mods: &[HashedMod]) 
                         _ => None,
                     };
                     let _ = app.emit(
-                        "mods-preload-update",
+                        format!("{}-preload-update", scope.event_prefix).as_str(),
                         PreloadUpdate {
                             file_name: m.file_name.clone(),
                             slug: None,

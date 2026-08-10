@@ -36,6 +36,9 @@ export const VERSION_PACKS_ACTIONS = {
   GET_PACK_ICON: 'get_pack_icon',
   // update.rs（1 个）
   UPDATE_PACK: 'update_pack',
+  // preload.rs（2 个）
+  PRELOAD_PACKS_DETAIL: 'preload_packs_detail',
+  CANCEL_PRELOAD_PACKS_DETAIL: 'cancel_preload_packs_detail',
   // watcher.rs（2 个）
   WATCH_PACKS_DIR: 'watch_packs_dir',
   UNWATCH_PACKS_DIR: 'unwatch_packs_dir',

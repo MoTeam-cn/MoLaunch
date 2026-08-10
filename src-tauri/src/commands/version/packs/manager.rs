@@ -6,7 +6,7 @@ use once_cell::sync::Lazy;
 use serde::Deserialize;
 use tauri::AppHandle;
 
-use super::{install, list, manage, update, watcher};
+use super::{install, list, manage, preload, update, watcher};
 use crate::handler;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
@@ -178,6 +178,24 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         "unwatch_packs_dir",
         handler!(_state, _app, _params, {
             watcher::unwatch_packs_dir().await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "preload_packs_detail",
+        handler!(state, app, params, {
+            let p: KindVersionIdParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            preload::preload_packs_detail_cmd(&app, &state, p.version_id, p.kind).await?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "cancel_preload_packs_detail",
+        handler!(_state, _app, _params, {
+            preload::cancel_preload_packs_detail_cmd().await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
         }),
     );

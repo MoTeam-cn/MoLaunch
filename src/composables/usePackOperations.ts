@@ -1,11 +1,13 @@
 /**
  * 资源包/光影管理操作 composable（编排层）
  *
- * 聚合 usePackList + 单项操作 handlers（启停/删除/安装/打开目录/定位文件）。
+ * 聚合 usePackList + 单项操作 handlers（启停/删除/安装/打开目录/定位文件）
+ * + 详情弹窗桥接（usePackDetailQuery）+ 更新/更改版本对话框状态。
  */
 
-import { type ComputedRef, type Ref } from 'vue'
+import { type ComputedRef, type Ref, ref } from 'vue'
 import { usePackList } from './usePackList'
+import { usePackDetailQuery } from './usePackDetailQuery'
 import { pickFile } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
@@ -22,6 +24,33 @@ interface UsePackOperationsOptions {
 export function usePackOperations(options: UsePackOperationsOptions) {
   const { selectedId, kind } = options
   const list = usePackList(options)
+
+  // 详情弹窗（关联 CF/MR 平台工程时展示，无 project 则本地信息弹窗）
+  const { detailVisible, detailProject, detailLoadingFor, handleShowInfo } = usePackDetailQuery()
+
+  // 更新/更改版本对话框状态
+  const updatePackFor = ref<PackInfo | null>(null)
+  const updateVisible = ref(false)
+
+  function openUpdateDialog(pack: PackInfo) {
+    updatePackFor.value = pack
+    updateVisible.value = true
+  }
+
+  /** 详情按钮事件桥接：把 packs / isPreloadDone refs 转发给 composable */
+  function onShowInfo(pack: PackInfo) {
+    handleShowInfo(pack, list.packs, list.isPreloadDone)
+  }
+
+  /** 更新安装完成：静默重载列表 + 重新触发预加载（为新版本重新查询平台工程） */
+  async function onPackUpdated() {
+    await list.loadPacks(true)
+    if (selectedId.value) {
+      tauri.preloadPacksDetail(selectedId.value, kind.value).catch(e => {
+        console.debug('[PackTab] 更新后预加载启动失败:', e)
+      })
+    }
+  }
 
   /**
    * 启用/禁用 Pack（原地更新字段，不重载列表）
@@ -91,6 +120,9 @@ export function usePackOperations(options: UsePackOperationsOptions) {
 
   return {
     ...list,
+    detailVisible, detailProject, detailLoadingFor,
+    updatePackFor, updateVisible,
+    openUpdateDialog, onShowInfo, onPackUpdated,
     handleToggle, handleDelete, handleInstall, handleOpenDir, handleOpenFile,
   }
 }
