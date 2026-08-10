@@ -3,7 +3,6 @@
 //! 生成 zip 后写入 options.txt 启用/停用资源包。
 
 use crate::log_info;
-use crate::utils::version::parse_number as parse_version_number;
 use std::path::Path;
 
 use super::generate::{create_skin_pack, get_pack_format, get_texture_paths};
@@ -11,101 +10,26 @@ use super::generate::{create_skin_pack, get_pack_format, get_texture_paths};
 /// 资源包文件名（固定，用于 options.txt 中的引用）
 const SKIN_PACK_NAME: &str = "MoLaunch Skin.zip";
 
-/// 在 options.txt 中启用资源包
-///
-/// MC 1.13+ 使用 `resourcePacks:["file/MoLaunch Skin.zip"]` 格式，
-/// 1.6-1.12 使用 `resourcePacks:["MoLaunch Skin.zip"]` 格式。
+/// 在 options.txt 中启用资源包（MC 1.13+ 使用 `file/` 前缀）
 fn enable_resource_pack_in_options(game_dir: &Path, mc_version: &str) {
-    let options_path = game_dir.join("options.txt");
-    let v = parse_version_number(mc_version);
-    let major = v.first().copied().unwrap_or(0);
-    let minor = v.get(1).copied().unwrap_or(0);
-    let use_file_prefix = major > 1 || (major == 1 && minor >= 13);
-
-    let pack_ref = if use_file_prefix {
-        format!("file/{}", SKIN_PACK_NAME)
-    } else {
-        SKIN_PACK_NAME.to_string()
-    };
-
-    let desired_entry = format!("\"{}\"", pack_ref);
-    let desired_line = format!("resourcePacks:[{}]", desired_entry);
-
-    if !options_path.exists() {
-        let _ = std::fs::write(&options_path, &desired_line);
-        return;
-    }
-
-    let content = std::fs::read_to_string(&options_path).unwrap_or_default();
-    let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-
-    let mut found = false;
-    for line in lines.iter_mut() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("resourcePacks:") {
-            if trimmed.contains(SKIN_PACK_NAME) {
-                // 已包含我们的资源包，无需修改
-                found = true;
-                break;
-            }
-            // 在已有的数组中添加我们的资源包
-            // 格式: resourcePacks:["xxx","yyy"] → resourcePacks:["xxx","yyy","file/MoLaunch Skin.zip"]
-            if let Some(close) = trimmed.rfind(']') {
-                let insert_pos = line.len() - (trimmed.len() - close);
-                let before = &line[..insert_pos];
-                let after = &line[insert_pos..];
-                // 判断数组是否为空
-                let array_content = &trimmed[trimmed.find('[').unwrap_or(0) + 1..close];
-                if array_content.trim().is_empty() {
-                    *line = format!(
-                        "{}[{}]{}",
-                        &line[..line.find('[').unwrap_or(0)],
-                        desired_entry,
-                        after
-                    );
-                } else {
-                    *line = format!("{},{}{}", before, desired_entry, after);
-                }
-                found = true;
-                break;
-            }
-        }
-    }
-
-    if !found {
-        lines.push(desired_line);
-    }
-
-    let new_content = lines.join("\n");
-    let _ = std::fs::write(&options_path, new_content);
+    let _ = crate::minecraft::resourcepack_options::set_resource_pack_enabled(
+        game_dir,
+        SKIN_PACK_NAME,
+        false,
+        true,
+        mc_version,
+    );
 }
 
 /// 从 options.txt 中移除资源包
 fn disable_resource_pack_in_options(game_dir: &Path) {
-    let options_path = game_dir.join("options.txt");
-    if !options_path.exists() {
-        return;
-    }
-
-    let content = std::fs::read_to_string(&options_path).unwrap_or_default();
-    let mut lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
-
-    for line in lines.iter_mut() {
-        let trimmed = line.trim();
-        if trimmed.starts_with("resourcePacks:") && trimmed.contains(SKIN_PACK_NAME) {
-            // 移除我们的资源包引用
-            // 简化处理：如果数组中只有我们的资源包，改为空数组
-            let cleaned = trimmed.replace(&format!("\"file/{}\"", SKIN_PACK_NAME), "");
-            let cleaned = cleaned.replace(&format!("\"{}\"", SKIN_PACK_NAME), "");
-            // 清理多余的逗号
-            let cleaned = cleaned.replace("[,", "[").replace(",]", "]");
-            *line = cleaned;
-            break;
-        }
-    }
-
-    let new_content = lines.join("\n");
-    let _ = std::fs::write(&options_path, new_content);
+    let _ = crate::minecraft::resourcepack_options::set_resource_pack_enabled(
+        game_dir,
+        SKIN_PACK_NAME,
+        false,
+        false,
+        "1.13",
+    );
 }
 
 /// 应用离线皮肤资源包

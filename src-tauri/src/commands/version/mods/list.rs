@@ -7,8 +7,9 @@
 use crate::minecraft::version::setup::VersionSetup;
 use crate::minecraft::version::state::VersionType;
 use crate::state::AppState;
-use crate::{log_error, log_info};
+use crate::log_info;
 
+use super::super::pack_common;
 use super::super::sanitize_version_id;
 use super::helpers::get_mods_dir;
 use super::types::ModInfo;
@@ -71,66 +72,26 @@ pub async fn list_mods(state: &AppState, version_id: String) -> Result<Vec<ModIn
     log_info!("Listing mods for version: {}", version_id);
 
     let mods_dir = get_mods_dir(state, &version_id).await?;
+    let entries = pack_common::list_entries(&mods_dir, &["jar", "litemod"], false)?;
 
-    if !mods_dir.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut mods = Vec::new();
-    let entries = std::fs::read_dir(&mods_dir).map_err(|e| {
-        log_error!("Failed to read mods dir: {}", e);
-        e.to_string()
-    })?;
-
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
-        let file_name = match path.file_name().and_then(|n| n.to_str()) {
-            Some(n) => n.to_string(),
-            None => continue,
-        };
-        let lower = file_name.to_lowercase();
-
-        // 只处理 jar/litemod 及其禁用变体
-        let is_mod = lower.ends_with(".jar")
-            || lower.ends_with(".litemod")
-            || lower.ends_with(".jar.disabled")
-            || lower.ends_with(".jar.old")
-            || lower.ends_with(".litemod.disabled")
-            || lower.ends_with(".litemod.old");
-        if !is_mod {
-            continue;
-        }
-
-        let is_enabled = !(lower.ends_with(".disabled") || lower.ends_with(".old"));
-        let enabled_name = file_name
-            .trim_end_matches(".disabled")
-            .trim_end_matches(".old")
-            .to_string();
-
-        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-
-        let loader_type = infer_loader_type(&file_name);
-
-        // 同步阶段不读 JAR 内容！元数据字段全部返回空，由 preload 阶段异步补全
-        mods.push(ModInfo {
-            file_name,
-            enabled_name,
-            is_enabled,
-            size,
-            loader_type,
-            translated_name: String::new(),
-            description: String::new(),
-            version: String::new(),
-            slug: String::new(),
-        });
-    }
-
-    // 只按 file_name（含扩展名）字母序升序，禁用状态不参与排序
-    // （ModList.OrderBy(Function(m) m.File.Name)）
-    mods.sort_by_key(|a| a.file_name.to_lowercase());
+    // 同步阶段不读 JAR 内容！元数据字段全部返回空，由 preload 阶段异步补全
+    let mods: Vec<ModInfo> = entries
+        .into_iter()
+        .map(|e| {
+            let loader_type = infer_loader_type(&e.enabled_name);
+            ModInfo {
+                file_name: e.file_name,
+                enabled_name: e.enabled_name,
+                is_enabled: e.is_enabled,
+                size: e.size,
+                loader_type,
+                translated_name: String::new(),
+                description: String::new(),
+                version: String::new(),
+                slug: String::new(),
+            }
+        })
+        .collect();
 
     log_info!("Found {} mods for version {}", mods.len(), version_id);
     Ok(mods)

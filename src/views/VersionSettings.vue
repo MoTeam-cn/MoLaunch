@@ -2,7 +2,7 @@
 /**
  * 版本设置页（主容器）
  *
- * 左侧导航：概览 / 设置 / Mod 管理 / 导出
+ * 左侧导航：概览 / 设置 / Mod 管理 / 资源包 / 光影 / 导出
  * 右侧根据当前分类渲染对应子组件
  * 共享状态通过 useVersionSettings composable 单例管理
  */
@@ -12,6 +12,8 @@ import {
   Squares2X2Icon,
   Cog6ToothIcon,
   PuzzlePieceIcon,
+  PaintBrushIcon,
+  SparklesIcon,
   ArrowUpTrayIcon,
 } from '@heroicons/vue/24/outline'
 import { useVersionStore } from '@/stores/version'
@@ -21,6 +23,7 @@ import NavSidebar from '@/components/common/NavSidebar.vue'
 import OverviewTab from './version-settings/OverviewTab.vue'
 import SetupTab from './version-settings/SetupTab.vue'
 import ModTab from './version-settings/ModTab.vue'
+import PackTab from './version-settings/PackTab.vue'
 import ExportTab from './version-settings/ExportTab.vue'
 
 const router = useRouter()
@@ -34,6 +37,8 @@ const categories = [
   { id: 'overview', label: '概览', icon: Squares2X2Icon, desc: '版本信息、文件夹快捷方式、高级管理' },
   { id: 'setup', label: '设置', icon: Cog6ToothIcon, desc: '版本独立的 Java、内存、窗口等启动参数' },
   { id: 'mod', label: 'Mod 管理', icon: PuzzlePieceIcon, desc: '管理当前版本的 Mod' },
+  { id: 'resourcepack', label: '资源包', icon: PaintBrushIcon, desc: '管理当前版本的资源包' },
+  { id: 'shader', label: '光影', icon: SparklesIcon, desc: '管理当前版本的光影' },
   { id: 'export', label: '导出', icon: ArrowUpTrayIcon, desc: '导出整合包或版本' },
 ]
 
@@ -126,15 +131,18 @@ onMounted(async () => {
           <p class="mt-1 text-xs text-gray-500">{{ currentCategory()?.desc }}</p>
         </div>
 
-        <!-- Mod 管理页 / 导出页由各自组件自管布局（固定工具栏/底栏 + 内部滚动），
+        <!-- Mod 管理 / 资源包 / 光影 / 导出页由各自组件自管布局（固定工具栏/底栏 + 内部滚动），
              其他 tab 共用外层滚动容器 -->
         <div
           class="flex-1 overflow-hidden"
-          :class="(activeCategory === 'mod' || activeCategory === 'export') ? 'flex flex-col' : 'overflow-y-auto p-6'"
+          :class="(activeCategory === 'mod' || activeCategory === 'resourcepack'
+            || activeCategory === 'shader' || activeCategory === 'export') ? 'flex flex-col' : 'overflow-y-auto p-6'"
         >
           <OverviewTab v-if="activeCategory === 'overview'" />
           <SetupTab v-else-if="activeCategory === 'setup'" />
           <ModTab v-else-if="activeCategory === 'mod'" />
+          <PackTab v-else-if="activeCategory === 'resourcepack'" kind="resourcepack" />
+          <PackTab v-else-if="activeCategory === 'shader'" kind="shader" />
           <ExportTab v-else-if="activeCategory === 'export'" />
         </div>
       </div>

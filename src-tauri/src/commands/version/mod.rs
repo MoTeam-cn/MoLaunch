@@ -12,6 +12,8 @@ pub mod list_manager;
 pub mod loaders;
 pub mod manage;
 pub mod mods;
+pub mod pack_common;
+pub mod packs;
 pub mod personalization;
 pub mod preload;
 pub mod progress;

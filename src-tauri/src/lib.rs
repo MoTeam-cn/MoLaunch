@@ -218,6 +218,8 @@ pub fn run() {
             commands::version::version_install_manager,
             // - version_mods_manager：mods 下 list/manage/install/update/watcher（11 个 action）
             commands::version::mods::version_mods_manager,
+            // - version_packs_manager：资源包/光影 list/manage/install/update/watcher（11 个 action）
+            commands::version::packs::version_packs_manager,
             // - version_progress_manager：下载进度与控制（6 个 action）
             commands::version::progress::version_progress_manager,
             // - version_launch_manager：launch + script_export（7 个 action）

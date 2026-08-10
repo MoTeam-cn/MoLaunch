@@ -4,6 +4,9 @@
 
 ## [Unreleased]
 
+- 新增版本「资源包 / 光影」管理（[packs](src-tauri/src/commands/version/packs/) + [PackTab.vue](src/views/version-settings/PackTab.vue)）：版本设置新增资源包 / 光影两个子页，支持安装、启停、删除、刷新、打开目录、定位文件，启停与删除会同步写 options.txt（资源包 `resourcePacks` 数组 / 光影 `shaderPack` 键），游戏内与启动器侧状态一致；图标优先取包内 pack.png / icon.png / preview.png（限量读取防 zip 炸弹），无则用保底图。
+- 提取 pack_common 公共抽象层（[pack_common.rs](src-tauri/src/commands/version/pack_common.rs)）：目录解析、列表枚举、启停重命名、删除、安装、原子更新（DownloadSession）、notify 目录监听均上收为公共函数，mods 链路（list/manage/install/update/watcher/helpers）与 packs 模块共用，不再复制粘贴；options.txt 读写同步提取为 `minecraft/resourcepack_options.rs`，离线皮肤模块同步改为复用。
+
 ## [0.3.5-rc4] - 2026-08-10
 
 - release 工作流 S3 上传自动重试（[ci-upload.cjs](scripts/ci-upload.cjs)）：上传安装包 / 签名文件到 S3 时，遇 Cloudflare 回源源站错误（HTTP 520~527、530，如 522）或网络错误自动重试，指数退避（1s/2s/4s 封顶 8s）最多 3 次；403 等鉴权错误不重试，分片上传各分片同样生效；`httpRequest` 同步精简注释。

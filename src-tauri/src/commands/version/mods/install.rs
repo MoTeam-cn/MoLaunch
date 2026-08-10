@@ -8,6 +8,7 @@ use crate::error_util::log_err;
 use crate::state::AppState;
 use crate::{log_error, log_info};
 
+use super::super::pack_common;
 use super::super::sanitize_version_id;
 use super::helpers::get_mods_dir;
 use crate::utils::path::sanitize_file_name;
@@ -19,64 +20,15 @@ pub async fn install_mod(
     source_path: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
-
-    // 安全校验：源路径不能包含 ..
-    if !crate::utils::path::is_safe_relative_path(&source_path) {
-        return Err("源路径不能包含 ..".to_string());
-    }
-
     log_info!("Installing mod to version {}", version_id);
 
     let mods_dir = get_mods_dir(state, &version_id).await?;
-
-    // 确保 mods 目录存在
-    if !mods_dir.exists() {
-        std::fs::create_dir_all(&mods_dir).map_err(|e| {
-            log_error!("Failed to create mods dir: {}", e);
-            e.to_string()
+    let clean_name = pack_common::install_entry(&mods_dir, &source_path, &["jar", "litemod"])
+        .map_err(|e| {
+            log_error!("Failed to install mod: {}", e);
+            e
         })?;
-    }
-
-    let src = std::path::Path::new(&source_path);
-    if !src.is_absolute() {
-        return Err("源路径必须是绝对路径".to_string());
-    }
-    if !src.exists() {
-        return Err(format!("源文件不存在: {}", source_path));
-    }
-
-    // 提取文件名，去除 .disabled / .old 后缀
-    let original_name = src
-        .file_name()
-        .and_then(|n| n.to_str())
-        .ok_or("无法获取文件名")?
-        .to_string();
-    let clean_name = original_name
-        .trim_end_matches(".disabled")
-        .trim_end_matches(".old")
-        .to_string();
-
-    // 校验为 Mod 文件
-    let lower = clean_name.to_lowercase();
-    if !(lower.ends_with(".jar") || lower.ends_with(".litemod")) {
-        return Err("仅支持 .jar 或 .litemod 格式的 Mod 文件".to_string());
-    }
-
-    let dst = mods_dir.join(&clean_name);
-
-    // 若目标已存在，跳过（避免覆盖）
-    if dst.exists() {
-        return Err(format!("Mods 目录已存在同名文件: {}", clean_name));
-    }
-
-    log_info!("Installing mod from {} to {}", source_path, dst.display());
-
-    std::fs::copy(src, &dst).map_err(|e| {
-        log_error!("Failed to copy mod: {}", e);
-        e.to_string()
-    })?;
-
-    log_info!("Mod installed: {} -> {}", source_path, clean_name);
+    log_info!("Mod installed: {}", clean_name);
     Ok(())
 }
 

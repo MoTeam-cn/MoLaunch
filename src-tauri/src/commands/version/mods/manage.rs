@@ -7,6 +7,7 @@
 use crate::state::AppState;
 use crate::{log_error, log_info};
 
+use super::super::pack_common;
 use super::super::sanitize_version_id;
 use super::helpers::get_mods_dir;
 use crate::utils::path::sanitize_file_name;
@@ -30,51 +31,10 @@ pub async fn toggle_mod(
     );
 
     let mods_dir = get_mods_dir(state, &version_id).await?;
-    let src_path = mods_dir.join(&file_name);
-
-    if !src_path.exists() {
-        return Err(format!("Mod 文件不存在: {}", file_name));
-    }
-
-    let lower = file_name.to_lowercase();
-    let is_currently_enabled = !(lower.ends_with(".disabled") || lower.ends_with(".old"));
-
-    // 状态已一致，无需操作
-    if is_currently_enabled == enable {
-        return Ok(file_name);
-    }
-
-    // 计算目标文件名
-    let new_name = if enable {
-        // 启用：去掉 .disabled 或 .old 后缀
-        file_name
-            .trim_end_matches(".disabled")
-            .trim_end_matches(".old")
-            .to_string()
-    } else {
-        // 禁用：优先使用 .disabled，若 .disabled 已存在则用 .old
-        let disabled_name = format!("{}.disabled", file_name);
-        if !mods_dir.join(&disabled_name).exists() {
-            disabled_name
-        } else {
-            format!("{}.old", file_name)
-        }
-    };
-
-    let dst_path = mods_dir.join(&new_name);
-
-    // 目标已存在（同名文件冲突）
-    if dst_path.exists() && dst_path != src_path {
-        return Err(format!("目标文件已存在: {}", new_name));
-    }
-
-    std::fs::rename(&src_path, &dst_path).map_err(|e| {
+    pack_common::toggle_entry(&mods_dir, &file_name, enable).map_err(|e| {
         log_error!("Failed to toggle mod: {}", e);
-        e.to_string()
-    })?;
-
-    log_info!("Mod renamed: {} -> {}", file_name, new_name);
-    Ok(new_name)
+        e
+    })
 }
 
 /// 删除 Mod 文件
@@ -88,17 +48,8 @@ pub async fn delete_mod(
     log_info!("Deleting mod {} for version {}", file_name, version_id);
 
     let mods_dir = get_mods_dir(state, &version_id).await?;
-    let path = mods_dir.join(&file_name);
-
-    if !path.exists() {
-        return Err(format!("Mod 文件不存在: {}", file_name));
-    }
-
-    std::fs::remove_file(&path).map_err(|e| {
+    pack_common::delete_entry(&mods_dir, &file_name).map_err(|e| {
         log_error!("Failed to delete mod: {}", e);
-        e.to_string()
-    })?;
-
-    log_info!("Mod deleted: {}", file_name);
-    Ok(())
+        e
+    })
 }
