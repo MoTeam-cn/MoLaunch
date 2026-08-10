@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- release 工作流 S3 上传自动重试（[ci-upload.cjs](scripts/ci-upload.cjs)）：上传安装包 / 签名文件到 S3 时，遇 Cloudflare 回源源站错误（HTTP 520~527、530，如 522）或网络错误自动重试，指数退避（1s/2s/4s 封顶 8s）最多 3 次；403 等鉴权错误不重试，分片上传各分片同样生效；`httpRequest` 同步精简注释。
+
 - stars/forks 徽章配色调整（[README.md](README.md) + [README_EN.md](README_EN.md) + [README_ZH-HANT.md](README_ZH-HANT.md) + [README_JA.md](README_JA.md)）：移除 `labelColor=165dff`，标签区恢复默认深色，仅数值区为蓝色 `165dff`，与右侧 issues 等徽章外观一致；保留自定义金色星星 / 白色分支图标。
 
 - 修复文本框滚动误触发返回顶部按钮（[Input.vue](src/components/common/Input.vue)）：textarea 模式内部滚动此前会被全局 scroll 监听捕获（BackToTop 按钮误弹出），现复用 `data-inner-scroll` 白名单标记（BackToTop 已在滚动监听与容器检测中统一过滤），文本域内部滚动不再触发全局返回顶部按钮。

@@ -1,47 +1,9 @@
 #!/usr/bin/env node
 /* eslint-env node */
 /**
- * ci-upload.cjs — 上传 MoLaunch 安装包到 apiServer（MoSign-v2 鉴权）
- *
- * 纯 Node.js 实现，消除 shell/Node 数据传递导致的签名不一致问题：
- * - JSON.stringify() 生成 body Buffer，签名和 HTTP 请求使用同一个 Buffer
- * - 无 heredoc / curl / openssl / shell 变量展开，行为确定
- *
- * 用法：
- *   node ci-upload.cjs <version> <platform> <arch> <bundle_type> <package_path> <sig_path> <release_url> [release_notes]
- *
- * 参数：
- *   version        语义化版本号（如 0.2.0 / 0.3.1-rc1）
- *   platform       平台：windows | macos | linux
- *   arch           架构：x86_64 | aarch64 | i686 | armv7
- *   bundle_type    安装包类型：nsis | app | appimage | deb | rpm | dmg | msi | portable
- *   package_path   本地安装包路径（如 *-setup.exe / *.app.tar.gz / *.AppImage）
- *   sig_path       签名文件路径（.sig，tauri signer 输出的 base64 签名）
- *   release_url    GitHub Release tag 页面 URL（如 .../releases/tag/v0.3.0，注册版本时原样上报）
- *   release_notes  可选，更新日志（Markdown，随版本注册上报，启动器「检查更新」对话框展示）
- *
- * 环境变量：
- *   MOLAUNCH_ACTION_PUSH_KEY  MoSign-v2 签名密钥（必填）
- *   API_BASE_URL              apiServer 基础 URL（默认 https://api.molaunch.moiu.cn）
- *
- * 渠道（channel）自动推导：由 version 预发布后缀判定，并把结果收敛到服务端合法取值——
- * 服务端（api-server/src/services/updates.rs 的 VALID_CHANNELS）仅接受 stable / beta / alpha，
- * 因此 rc 归入 beta 灰度通道、canary/nightly/dev/未知 归入 alpha：
- *   无后缀→stable / -rc→beta / -beta→beta / -alpha、-dev→alpha / -canary、-nightly、未知→alpha。
- *
- * 流程：
- *   1. 读取 .sig 文件获取签名 base64
- *   2. 计算安装包大小和 SHA256
- *   3. POST /v3/ci/presign-upload 获取 S3 预签名上传 URL（安装包 + .sig，携带 sizes 供服务端判断分片）
- *   4. 上传到 S3：
- *      - 小文件（< 50MB）：单次 PUT 直传
- *      - 大文件（>= 50MB）：分片上传（按分片 PUT 直传，收集各分片 ETag）
- *   5. 若走了分片上传，POST /v3/ci/complete-upload 完成合并
- *   6. POST /v3/ci/releases 注册版本到 apiServer
- *
- * See: api-server/src/utils/mosign_v2.rs（签名协议）
- *      api-server/src/controllers/v3/ci.rs（presign_upload + create_release）
- *      api-server/src/models/updates.rs（CreateReleaseRequest 字段定义）
+ * ci-upload.cjs — 上传安装包到 apiServer（MoSign-v2 鉴权，纯 Node 实现）
+ * 用法: node ci-upload.cjs <version> <platform> <arch> <bundle_type> <package_path> <sig_path> <release_url> [release_notes]
+ * 环境变量: MOLAUNCH_ACTION_PUSH_KEY（必填）/ API_BASE_URL（默认 https://api.molaunch.moiu.cn）
  */
 
 'use strict';
@@ -79,13 +41,7 @@ const RELEASE_URL = args[6];
 const RELEASE_NOTES = args[7] || '';
 
 // ===== 渠道推导 =====
-// 由语义化版本预发布后缀推导发布渠道，并把结果收敛到服务端合法取值（仅 stable/beta/alpha）：
-//   - 无后缀           → stable（正式版）
-//   - -rc             → beta（Release Candidate，归入 beta 灰度通道）
-//   - -beta           → beta（内测版）
-//   - -alpha / -dev   → alpha（开发版）
-//   - -canary / -nightly → alpha（金丝雀/每日构建，归入 alpha 通道）
-//   - 未知后缀         → alpha（防御性兜底）
+// 无后缀→stable；rc/beta→beta；alpha/dev/canary/nightly/未知→alpha（收敛到服务端合法取值）
 function resolveChannel(version) {
   const suffix = (version.split('-')[1] || '').replace(/[\d.]+$/, '').toLowerCase();
   if (!suffix) return 'stable';
@@ -114,8 +70,6 @@ if (!fs.existsSync(SIG_PATH)) {
   console.error(`::error::签名文件不存在: ${SIG_PATH}`);
   process.exit(1);
 }
-
-// 参数校验
 if (!['windows', 'macos', 'linux'].includes(PLATFORM)) {
   console.error(`::error::platform 非法（仅 windows / macos / linux）: ${PLATFORM}`);
   process.exit(1);
@@ -150,9 +104,9 @@ function httpRequest(targetUrl, options, body) {
     if (body) headers['Content-Length'] = Buffer.byteLength(body);
 
     const req = lib.request(u, { method: options.method, headers }, (res) => {
-      // 处理 3xx 重定向（S3 可能返回 307 临时重定向）
+      // 3xx 重定向（S3 307）
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        res.resume(); // 丢弃当前响应体
+        res.resume();
         httpRequest(res.headers.location, options, body).then(resolve, reject);
         return;
       }
@@ -162,7 +116,10 @@ function httpRequest(targetUrl, options, body) {
         resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks) });
       });
     });
-    req.on('error', reject);
+    req.on('error', (err) => {
+      err.networkError = true;
+      reject(err);
+    });
     if (body) req.write(body);
     req.end();
   });
@@ -170,16 +127,33 @@ function httpRequest(targetUrl, options, body) {
 
 // ===== S3 上传辅助 =====
 
-// 单次 PUT 上传（小文件）
-function uploadSingle(item, buffer, label) {
-  return httpRequest(item.upload_url, { method: 'PUT', headers: {} }, buffer).then((resp) => {
-    if (resp.status < 200 || resp.status >= 300) {
+// Cloudflare 回源源站错误码（520~527、530）自动重试，403 等鉴权错误不重试
+const RETRYABLE_STATUS = new Set([520, 521, 522, 523, 524, 525, 526, 527, 530]);
+const MAX_RETRIES = 3;
+
+async function s3PutWithRetry(uploadUrl, buffer, label) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const resp = await httpRequest(uploadUrl, { method: 'PUT', headers: {} }, buffer);
+      if (resp.status >= 200 && resp.status < 300) return resp;
       const err = new Error(`${label} S3 上传失败 (HTTP ${resp.status}): ${resp.body.toString().slice(0, 500)}`);
       err.code = 'UPLOAD_FAILED';
+      err.httpStatus = resp.status;
       throw err;
+    } catch (err) {
+      const retryable = err.code === 'UPLOAD_FAILED' && RETRYABLE_STATUS.has(err.httpStatus)
+        || err.networkError;
+      if (!retryable || attempt > MAX_RETRIES) throw err;
+      const delay = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      console.log(`::warning::${label} 上传失败 (${err.httpStatus ? `HTTP ${err.httpStatus}` : err.code})，${delay}ms 后第 ${attempt} 次重试（共最多 ${MAX_RETRIES} 次）...`);
+      await new Promise((r) => setTimeout(r, delay));
     }
-    return resp;
-  });
+  }
+}
+
+// 单次 PUT 上传（小文件）
+function uploadSingle(item, buffer, label) {
+  return s3PutWithRetry(item.upload_url, buffer, label);
 }
 
 // 分片上传（大文件）：按 part_number 顺序 PUT 各分片，收集 ETag
@@ -191,12 +165,7 @@ async function uploadMultipart(item, buffer, label) {
     const start = (part.part_number - 1) * part_size;
     const end = Math.min(start + part_size, buffer.length);
     const chunk = buffer.subarray(start, end);
-    const resp = await httpRequest(part.upload_url, { method: 'PUT', headers: {} }, chunk);
-    if (resp.status < 200 || resp.status >= 300) {
-      const err = new Error(`${label} 分片 ${part.part_number} 上传失败 (HTTP ${resp.status}): ${resp.body.toString().slice(0, 500)}`);
-      err.code = 'UPLOAD_FAILED';
-      throw err;
-    }
+    const resp = await s3PutWithRetry(part.upload_url, chunk, `${label} 分片 ${part.part_number}`);
     const etag = resp.headers.etag;
     if (!etag) {
       const err = new Error(`${label} 分片 ${part.part_number} 响应缺少 ETag`);
@@ -209,7 +178,7 @@ async function uploadMultipart(item, buffer, label) {
   return uploadedParts;
 }
 
-// 完成分片上传：回传 upload_id + 分片 ETag 列表，由服务端合并
+// 回传 upload_id + 分片 ETag 列表，由服务端合并
 async function completeMultipartUpload(item, parts) {
   const completePath = '/v3/ci/complete-upload';
   const completeBody = Buffer.from(JSON.stringify({
@@ -248,7 +217,7 @@ async function completeMultipartUpload(item, parts) {
   console.log('分片上传完成');
 }
 
-// 通用上传入口：根据服务端返回的 multipart 字段自动选择分片 / 单次 PUT
+// 有 multipart 凭证走分片，否则单次 PUT
 async function uploadToS3(item, buffer, label) {
   if (item.multipart && item.multipart.parts && item.multipart.parts.length > 0) {
     const parts = await uploadMultipart(item, buffer, label);
@@ -274,9 +243,7 @@ async function main() {
 
   const FILE_SIZE = packageBuffer.length;
   const FILE_HASH = `sha256:${crypto.createHash('sha256').update(packageBuffer).digest('hex')}`;
-  // .sig 文件内容为标准 minisign 4 行格式（tauri signer / tauri-action 输出）。
-  // 原样存储（保留换行），启动器 updater（src-tauri/updater，minisign_verify）
-  // 与 tauri-plugin-updater 才能正确解析；不要去除换行/空白。
+  // .sig 为 minisign 4 行格式，原样保留换行（tauri-plugin-updater 解析依赖）
   const SIGNATURE = sigBuffer.toString('utf8');
 
   console.log(`::group::上传 ${PLATFORM}/${ARCH} ${BUNDLE_TYPE} (${PACKAGE_FILENAME}, ${FILE_SIZE} bytes)`);
@@ -287,7 +254,7 @@ async function main() {
     version: VERSION,
     platform: PLATFORM,
     filenames: [PACKAGE_FILENAME, SIG_FILENAME],
-    // 各文件字节大小（与 filenames 对齐），服务端据此判断是否走分片上传
+    // 与 filenames 对齐，服务端据此判断是否分片
     sizes: [FILE_SIZE, sigBuffer.length],
   }));
 
