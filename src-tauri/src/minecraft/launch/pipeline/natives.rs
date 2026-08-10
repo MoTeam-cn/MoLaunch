@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-use crate::{log_info, log_warn};
+use crate::{log_debug, log_warn};
 
 use super::{LaunchError, LaunchPipeline, LaunchStage};
 
@@ -88,7 +88,7 @@ impl LaunchPipeline {
                                 let jar_path = self.config.game_dir.join("libraries").join(path);
                                 if jar_path.exists() {
                                     let jar_sha1 = artifact["sha1"].as_str();
-                                    log_info!(
+                                    log_debug!(
                                         "[Natives] Processing native JAR: {} (expected sha1: {:?})",
                                         jar_path.display(),
                                         jar_sha1
@@ -131,7 +131,7 @@ impl LaunchPipeline {
                                 let jar_path = self.config.game_dir.join("libraries").join(path);
                                 if jar_path.exists() {
                                     let jar_sha1 = lib["downloads"]["artifact"]["sha1"].as_str();
-                                    log_info!(
+                                    log_debug!(
                                         "[Natives] Processing native JAR: {} (expected sha1: {:?})",
                                         jar_path.display(),
                                         jar_sha1
@@ -184,7 +184,7 @@ impl LaunchPipeline {
                 };
                 let actual = crate::minecraft::utils::file_checker::compute_sha1_hex(&jar_bytes);
                 if actual.eq_ignore_ascii_case(expected) {
-                    log_info!(
+                    log_debug!(
                         "[Natives] JAR SHA1 verified: {} (sha1={})",
                         jar_path.display(),
                         actual
@@ -205,7 +205,7 @@ impl LaunchPipeline {
                 );
             }
 
-            log_info!(
+            log_debug!(
                 "[Natives] Extracting native JAR: {}",
                 jar_path.display()
             );
@@ -242,7 +242,7 @@ impl LaunchPipeline {
                     std::fs::write(&out_path, &buffer)
                         .map_err(|e| format!("写入文件失败: {}", e))?;
 
-                    log_info!(
+                    log_debug!(
                         "[Natives] Extracted: {} (size={}, sha1={})",
                         out_path.display(),
                         buffer.len(),
