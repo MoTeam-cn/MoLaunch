@@ -41,6 +41,7 @@ import { initDownloadStream } from '@/composables/useDownloadStream'
 import { initOnlineSession } from '@/composables/online/onlineSession'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
+import { useExternalLinkGuard } from '@/composables/useExternalLinkGuard'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
@@ -60,6 +61,8 @@ useDragDrop()
 // 全局 DevTools 防护：禁用右键菜单 + 拦截 F12/Ctrl+Shift+I 等 devtools 快捷键
 // 后端 open_devtools action 仍可在开发者模式开启时调出，普通用户无法绕过
 useDevToolsGuard()
+// 全局外部链接拦截：webview 内禁止直接跳转外部网站，统一走系统浏览器
+useExternalLinkGuard()
 
 onMounted(() => {
   console.log('[Startup][Frontend] App.vue onMounted @', new Date().toISOString())

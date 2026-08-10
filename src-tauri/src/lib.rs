@@ -24,6 +24,21 @@ use state::AppState;
 use tauri::Emitter;
 use tauri::Manager;
 
+/// 判定 webview 导航是否为本应用内部 URL。
+/// 仅放行：内置协议（tauri/res/cache-image/picker/picker-result/molaunch）与
+/// http(s) 下 localhost 及 *.localhost 主机（开发服务器、生产 tauri.localhost、
+/// Windows 上自定义协议映射的 https://{scheme}.localhost）。
+/// 其余一律拦截，防止外部站点在 webview 内直接加载（页面会困在应用内无法关闭）。
+fn is_internal_navigation(url: &tauri::Url) -> bool {
+    match url.scheme() {
+        "tauri" | "res" | "cache-image" | "picker" | "picker-result" | "molaunch" => true,
+        "http" | "https" => url
+            .host_str()
+            .map_or(false, |host| host == "localhost" || host.ends_with(".localhost")),
+        _ => false,
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // 初始化日志系统（统一使用自定义 logger，不使用 env_logger）
@@ -111,6 +126,19 @@ pub fn run() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
+        // 导航守卫：禁止 webview 内直接跳转外部站点（外部链接统一由前端走 shell
+        // 插件在系统浏览器打开）。兜底拦截 JS 程序化导航与漏网链接，仅放行内部 URL。
+        .plugin(
+            tauri::plugin::Builder::<tauri::Wry, ()>::new("webview-nav-guard")
+                .on_navigation(|_webview, url| {
+                    let allowed = is_internal_navigation(url);
+                    if !allowed {
+                        log_info!("[Webview] 拦截外部导航: {}", url);
+                    }
+                    allowed
+                })
+                .build(),
+        )
         .manage(app_state);
 
     // 单实例插件（带 deep-link feature）：保证只有一个主进程实例；
