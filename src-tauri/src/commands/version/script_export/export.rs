@@ -27,8 +27,13 @@ pub async fn export_launch_script(
     save_path: String,
 ) -> Result<(), String> {
     sanitize_version_id(&version_id)?;
-    log_info!("Exporting launch script for version: {}", version_id);
-    log_warn!("Exporting launch script to: {}", save_path);
+    // 按当前系统选择脚本格式（Windows .bat / macOS、Linux .sh）
+    let is_windows = cfg!(target_os = "windows");
+    log_info!(
+        "Exporting {} launch script for version: {}",
+        if is_windows { "Windows (.bat)" } else { "Unix (.sh)" },
+        version_id
+    );
 
     let game_dir = crate::state::resolve_game_dir_from_state(state).await;
     let config = state.config.lock().await;
@@ -80,7 +85,7 @@ pub async fn export_launch_script(
                 log_error!("Failed to resolve Java path for script: {}", e);
                 e
             })?;
-    let java_str = java_path_buf.to_string_lossy().replace('/', "\\");
+    let java_str = java_path_buf.to_string_lossy().to_string();
     log_info!("Script will use Java: {}", java_str);
 
     // 服务器：从版本独立 server_enter 解析（"IP:Port" 格式）
@@ -196,8 +201,22 @@ pub async fn export_launch_script(
         e.to_string()
     })?;
 
-    // 生成 .bat 脚本内容 + 写入文件
-    let game_dir_display = launch_args.game_dir.replace('/', "\\");
+    // 生成启动脚本内容 + 写入文件
+    // 补充扩展名：部分系统（如 Linux）文件对话框可能不自动追加，确保脚本格式正确
+    let save_path = if is_windows {
+        if save_path.to_ascii_lowercase().ends_with(".bat") {
+            save_path
+        } else {
+            format!("{}.bat", save_path)
+        }
+    } else if save_path.ends_with(".sh") {
+        save_path
+    } else {
+        format!("{}.sh", save_path)
+    };
+    log_warn!("Exporting launch script to: {}", save_path);
+
+    let game_dir_display = launch_args.game_dir.clone();
     let script_info = super::content::ScriptLaunchInfo {
         version_id: &version_id,
         username: &username,
@@ -208,8 +227,8 @@ pub async fn export_launch_script(
         game_args: &launch_args.game_args,
         pre_launch_cmd: setup.advanced.run_cmd.as_ref(),
     };
-    let script = super::content::build_script_content(&script_info);
-    super::content::write_script_file(&script, &save_path)?;
+    let script = super::content::build_script_content(&script_info, is_windows);
+    super::content::write_script_file(&script, &save_path, is_windows)?;
 
     log_info!("Launch script exported to: {}", save_path);
     Ok(())

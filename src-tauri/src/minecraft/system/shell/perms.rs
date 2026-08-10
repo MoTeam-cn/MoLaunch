@@ -76,3 +76,19 @@ pub fn restrict_dir_permissions(path: &std::path::Path) {
         let _ = path;
     }
 }
+
+/// 尽力为启动脚本添加执行权限（Unix: `chmod 700`；Windows 无此概念，空操作）
+pub fn make_executable(path: &std::path::Path) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700)) {
+            log_error!("[Shell] chmod 700 failed: {}", e);
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        let _ = path;
+    }
+}

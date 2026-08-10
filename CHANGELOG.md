@@ -4,6 +4,7 @@
 
 ## [Unreleased]
 
+- 启动脚本导出支持 macOS / Linux（[script_export](src-tauri/src/commands/version/script_export/) + [useVersionOverviewActions.ts](src/composables/useVersionOverviewActions.ts)）：此前仅生成 Windows .bat，现按当前系统自动切换格式——Windows 生成 .bat（GBK + CRLF + icacls 权限限制），macOS/Linux 生成 .sh（UTF-8 + shebang + chmod 700 可执行权限）；文件对话框默认名与过滤扩展名同步跟随系统；保存路径缺扩展名时后端自动补齐；.sh 脚本同样写入真实 access_token / uuid 可直接启动，含敏感信息警告。
 - 修复导出的启动脚本 access_token / uuid 被脱敏导致无法启动（[content.rs](src-tauri/src/commands/version/script_export/content.rs) + [export.rs](src-tauri/src/commands/version/script_export/export.rs)）：脚本直接写入真实的 `--accessToken` / `--uuid`（文件权限限制为当前用户），移除「已脱敏为 *** 请手动替换」逻辑，文件头部保留并加强警告提示（含启动必需 token，勿分享，失效后重新导出）。
 - 修复概览页「光影文件夹」快捷方式误显示（[useVersionSettings.ts](src/composables/useVersionSettings.ts) + [OverviewTab.vue](src/views/version-settings/OverviewTab.vue)）：此前沿用 `isModable`（有 Mod 加载器即显示），改为复用后端 `is_packs_available` 对 Shader 检查 OptiFine/Iris（与光影管理页 PackTab 同一逻辑），无光影加载器时隐藏入口，切换版本自动重新检查。
 - 图片缓存日志降级为 debug（[download.rs](src-tauri/src/minecraft/image_cache/download.rs)）：`[ImageCache] 已缓存` 由 INFO 改为 debug 级别，避免每个图片缓存都刷屏 INFO 日志。

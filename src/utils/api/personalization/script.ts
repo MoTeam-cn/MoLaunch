@@ -1,9 +1,10 @@
 import { VERSION_LAUNCH_ACTIONS, versionLaunchManager } from '../version-launch-manager'
 
 /**
- * 导出启动脚本（.bat，使用绝对路径 Java + 版权信息）
+ * 导出启动脚本（Windows 生成 .bat / macOS、Linux 生成 .sh，使用绝对路径 Java + 版权信息）
  *
- * 安全修复：移除 accessToken 参数，后端根据 uuid 自行从 auth_storage 获取 token
+ * 后端根据当前系统选择脚本格式与编码（.bat 用 GBK + CRLF，.sh 用 UTF-8 + 执行权限），
+ * access_token 由后端根据 uuid 自行从 auth_storage 获取并写入脚本（脚本可直接启动）。
  *
  * @param javaPath 用户指定的 Java 路径（可选，为空时后端按 MC 版本自动检测）
  *

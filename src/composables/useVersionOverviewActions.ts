@@ -143,11 +143,18 @@ export function useVersionOverviewActions(options: UseVersionOverviewActionsOpti
     if (!authStore.isLoggedIn) return toastWarning('请先登录账号')
     const user = authStore.currentUser!
     try {
-      const savePath = await pickSavePath({
-        title: '选择脚本保存位置',
-        defaultPath: `Run_${selectedId.value}.bat`,
-        filters: [{ name: '批处理文件', extensions: ['bat'] }],
-      })
+      // 按当前系统选择脚本格式（与后端 build_script_content 按 cfg(target_os) 判断保持一致）
+      let isWindows = false
+      try {
+        isWindows = (await tauri.getSystemInfo()).os === 'windows'
+      } catch {
+        isWindows = navigator.platform.startsWith('Win')
+      }
+      const defaultName = isWindows ? `Run_${selectedId.value}.bat` : `Run_${selectedId.value}.sh`
+      const filters = isWindows
+        ? [{ name: '批处理文件', extensions: ['bat'] }]
+        : [{ name: 'Shell 脚本', extensions: ['sh'] }]
+      const savePath = await pickSavePath({ title: '选择脚本保存位置', defaultPath: defaultName, filters })
       if (!savePath) { toastInfo('已取消导出'); return }
       await tauri.exportLaunchScript(selectedId.value, user.name, user.uuid, user.login_type, javaStore.javaPath || null, savePath)
       toastSuccess('启动脚本已导出')
