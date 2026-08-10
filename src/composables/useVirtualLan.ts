@@ -36,6 +36,12 @@ export interface UseVirtualLanOptions {
    * @param raw 后端 emit 的协议帧字节（ArrayBuffer 形式）
    */
   onTunPacket: (raw: ArrayBuffer) => void
+  /**
+   * 组件卸载时自动 stop（默认 true）
+   *
+   * 全局联机会话传 `false`：桥接常驻应用生命周期，stop 由会话显式管理。
+   */
+  autoStop?: boolean
 }
 
 /**
@@ -61,6 +67,7 @@ export function parsePrefixLen(subnet: string): number {
  * `onTunPacket` 回调由调用方注入，决定 TUN 读到的包如何分发到 DataChannel。
  */
 export function useVirtualLan(options: UseVirtualLanOptions) {
+  const autoStop = options.autoStop ?? true
   const store = useOnlineStore()
   /** 桥接是否运行中 */
   const running = ref(false)
@@ -70,13 +77,18 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
   const lastError = ref<string | null>(null)
 
   // 全局单例 Tauri listener：后台 TUN 数据流持续推送，永不 unlisten（避免 Tauri 2.x unlisten 竞态）
-  // handler 在组件卸载时由 onGlobalEvent 自动移除，running 守卫保证仅桥接运行中才分发数据
-  onGlobalEvent<TunPacketPayload>(EVENT_TUN_PACKET_OUT, (payload) => {
-    if (!running.value) return
-    // number[] → ArrayBuffer
-    const bytes = new Uint8Array(payload)
-    options.onTunPacket(bytes.buffer)
-  })
+  // handler 在组件卸载时由 onGlobalEvent 自动移除（全局会话传 autoRemove:false 永久驻留），
+  // running 守卫保证仅桥接运行中才分发数据
+  onGlobalEvent<TunPacketPayload>(
+    EVENT_TUN_PACKET_OUT,
+    (payload) => {
+      if (!running.value) return
+      // number[] → ArrayBuffer
+      const bytes = new Uint8Array(payload)
+      options.onTunPacket(bytes.buffer)
+    },
+    { autoRemove: !autoStop },
+  )
 
   /**
    * 启动 TUN 桥接
@@ -179,11 +191,13 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
     }
   }
 
-  onUnmounted(() => {
-    // 事件 handler 由 onGlobalEvent 的 onUnmounted 自动移除；此处仅停止后端 TUN 接口
-    // 后端 stop 不阻塞卸载（异步触发即可）
-    void stop()
-  })
+  if (autoStop) {
+    onUnmounted(() => {
+      // 事件 handler 由 onGlobalEvent 的 onUnmounted 自动移除；此处仅停止后端 TUN 接口
+      // 后端 stop 不阻塞卸载（异步触发即可）
+      void stop()
+    })
+  }
 
   return {
     // 状态

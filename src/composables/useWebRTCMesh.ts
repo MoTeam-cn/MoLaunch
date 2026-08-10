@@ -15,8 +15,10 @@ export type { SdpResult } from './useWebRTCMesh/mesh-peer'
  *
  * 内部维护 `Map<participantId, ParticipantConn>`，所有操作按 participantId 索引。
  * 连接状态通过 `reactive(Map)` 暴露给 UI 层。
+ * 全局联机会话传 `autoClose: false`（常驻应用生命周期，不随组件卸载关闭）。
  */
-export function useWebRTCMesh() {
+export function useWebRTCMesh(options?: { autoClose?: boolean }) {
+  const autoClose = options?.autoClose ?? true
   /**
    * DataChannel 加密密钥（阶段三子任务 8）
    *
@@ -42,8 +44,10 @@ export function useWebRTCMesh() {
   const peer = useMeshPeer({ roomKey })
   const crypto = useMeshCrypto({ roomKey, conns: peer.conns, channelOpen: peer.channelOpen })
 
-  // 组件卸载时自动关闭所有 PC，避免泄漏
-  onUnmounted(() => peer.close())
+  // 组件卸载时自动关闭所有 PC，避免泄漏（全局会话关闭由会话显式管理）
+  if (autoClose) {
+    onUnmounted(() => peer.close())
+  }
 
   return {
     // 状态

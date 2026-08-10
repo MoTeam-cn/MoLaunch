@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+- 联机会话全局化（新增 [onlineSession.ts](src/composables/online/onlineSession.ts)，[App.vue](src/App.vue) 启动时挂载）：WebRTC 多 PC/单 PC、TUN 虚拟网卡、房主三路信令轮询从页面/面板组件生命周期提升为应用级全局单例，离开联机页（路由切走）不再触发 onUnmounted 清理，P2P 连接与虚拟网卡保持不断，返回联机页直接恢复；`useWebRTC`/`useWebRTCMesh`/`useVirtualLan`/`useRoomHost`/`useGlobalTauriEvent` 新增 `autoClose`/`autoStop`/`autoLifecycle`/`autoRemove` 选项由会话显式管理生命周期（默认仍自动清理，不破坏既有调用方）。
+
+- 加入方房间状态监控（[onlineSession.ts](src/composables/online/onlineSession.ts)）：加入方每 30s 请求云端房间信息，房主关闭/房间过期/被服务端清理（code=1002）时自动感知并清理会话退出，不再出现房主关房后加入方无感知；DataChannel 控制消息（房主 MC 端口 / TURN 服务器下发）与数据包转发 TUN 也改为全局绑定，切页不丢失。
+
 - 修复下载总大小虚高（[stream.rs](src-tauri/src/minecraft/download/downloader/stream.rs)）：单流下载回填 `total_bytes` 由「无条件按 content_length 累加」改为「仅 `expected_size=0`（大小未知）时回填」，已知大小文件已在 `download_batch` 初始化时按 `expected_size` 求和计入，此前会被二次累加导致「已下载/总大小（累计）」随下载过程持续增长、完成时显示总量远超实际；失败回滚条件同步对齐，避免 3 次重试间 total 翻倍。
 
 ## [0.3.5-rc3] - 2026-08-10

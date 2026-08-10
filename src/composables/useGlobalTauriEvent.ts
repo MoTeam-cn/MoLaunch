@@ -44,16 +44,25 @@ function ensureListener<T>(eventName: string): void {
  * 底层使用单例 Tauri listener，永不 unlisten，避免 Tauri 2.x 的 callback 删除竞态。
  * handler 仅从本地 Set 中增删，不影响 Tauri listener 生命周期。
  *
- * 必须在 Vue 组件 setup 阶段调用（内部使用 `onUnmounted`）。
+ * 必须在 Vue 组件 setup 阶段调用（内部使用 `onUnmounted`），
+ * 或传 `autoRemove: false` 在组件上下文之外调用（handler 永久驻留，如全局联机会话）。
  *
  * @param eventName Tauri 事件名
  * @param handler 事件处理函数
+ * @param options.autoRemove 组件卸载时自动移除 handler（默认 true）
  */
-export function onGlobalEvent<T>(eventName: string, handler: Handler<T>): void {
+export function onGlobalEvent<T>(
+  eventName: string,
+  handler: Handler<T>,
+  options?: { autoRemove?: boolean },
+): void {
+  const autoRemove = options?.autoRemove ?? true
   ensureListener<T>(eventName)
   const set = handlerSets.get(eventName)!
   set.add(handler as Handler<unknown>)
-  onUnmounted(() => {
-    set.delete(handler as Handler<unknown>)
-  })
+  if (autoRemove) {
+    onUnmounted(() => {
+      set.delete(handler as Handler<unknown>)
+    })
+  }
 }

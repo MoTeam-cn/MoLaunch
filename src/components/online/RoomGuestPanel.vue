@@ -8,27 +8,22 @@
  * - MC 版本匹配提示（如房主版本与自己不同时提示）
  * - 退出房间按钮
  *
- * 加入方无需轮询 answers（房主会主动 confirm），
- * 仅在房间状态异常时由用户主动退出。
- *
- * 数据分发（阶段三子任务 5）：
- * - `useVirtualLan` 启动后端 TUN 桥接 → `onTunPacket` 回调通过 `guestWebrtc.dataChannel.send(raw)` 发给房主
- * - watch `guestWebrtc.dataChannel`：DataChannel 就绪后绑定 `onMessage` → `lan.forwardToTun` 转发到 TUN
+ * 数据分发由全局联机会话 onlineSession 统一管理（TUN 桥接 / DataChannel 绑定 /
+ * 密钥注入 / 房间状态监控均常驻应用生命周期，离开联机页不断连）。
+ * 加入方无需轮询 answers（房主会主动 confirm），仅房间状态异常时主动退出。
  */
 
-import { computed, inject, onMounted, watch } from 'vue'
+import { computed, inject, onMounted } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
-import { useVirtualLan } from '@/composables/useVirtualLan'
 import { useGuestReconnect } from '@/composables/useRoomReconnect'
+import { getOnlineSession } from '@/composables/online/onlineSession'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { showConfirm } from '@/utils/modal'
 import { toastError } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'
-import { decode, CONTROL_SUBTYPE, parseHostMcPortPayload, decodeTurnServersPayload } from '@/utils/online/protocol'
-import { importRoomKey } from '@/utils/online/crypto'
 import {
   XCircleIcon,
   ClockIcon,
@@ -44,94 +39,8 @@ const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
 // 管理员提权重启恢复：存在待重连密码时挂载后自动重连（重建 WebRTC 与房间会话）
 useGuestReconnect(guestWebrtc)
 
-/**
- * TUN 桥接：TUN 读到包 → 通过 DataChannel 发给房主
- *
- * 阶段三子任务 8：使用 `guestWebrtc.sendPacket` 走加密通道（若 roomKey 已注入），
- * 不再直接调 `channel.send`。DataChannel 未就绪时 sendPacket 内部静默返回 false。
- */
-const lan = useVirtualLan({
-  onTunPacket: (raw) => {
-    void guestWebrtc.sendPacket(raw)
-  },
-})
-
-/**
- * 监听 DataChannel 就绪，绑定 onMessage：
- * - Control + HostMcPort：更新本地 store.roomState.hostMcPort（房主开放 LAN 后广播）
- * - Control + TurnServers：更新本地 ICE 配置并尝试 setConfiguration（阶段三子任务 7 阶段 G）
- * - Data（IP 包）：转发到后端 TUN 接口
- * - 其他消息：静默丢弃（不支持的控制子类型或损坏帧）
- *
- * `useWebRTC` 在 `pc.ondatachannel` 触发时填充 `dataChannel.value`，
- * 此处 watch 在 dataChannel 变化时重新绑定 handler。
- *
- * # TURN 服务器更新策略
- *
- * 房主拉取系统 TURN 后通过 DataChannel 广播给所有参与者。加入方收到后：
- * 1. 更新 `store.roomState.iceServers`（影响后续 PC 重建时的 ICE 配置）
- * 2. 调用 `pc.setConfiguration` 更新当前 PC 配置（已建立连接需 ICE restart 完全生效，
- *    此处仅更新配置，不主动触发 restart，避免中断现有连接）
- * 3. 若 PC 尚未建立（negotiating 中），下次 `ensurePeerConnection` 会使用新配置
- *
- * 不主动重建 PC 的原因：
- * - mesh 拓扑下房主为每个参与者生成 Offer，加入方无法单方面触发重新协商
- * - 强制 close + 重新 fetchOfferAndAnswer 需要房主配合重新生成 Offer，链路过长
- * - 当前 TURN 通常在房间初期下发，PC 已建立时 STUN/TURN 已完成 ICE 收集
- */
-watch(
-  () => guestWebrtc.dataChannel.value,
-  (channel) => {
-    if (!channel) return
-    guestWebrtc.setDataChannelHandlers({
-      onMessage: (raw) => {
-        const msg = decode(raw)
-        if (!msg) return
-        if (msg.kind === 'control' && msg.subtype === CONTROL_SUBTYPE.HOST_MC_PORT) {
-          const port = parseHostMcPortPayload(msg.payload)
-          if (port !== null && port > 0) {
-            store.roomState.hostMcPort = port
-            console.info(`[Online] 加入方收到房主 MC 端口: ${port}`)
-          }
-          return
-        }
-        if (msg.kind === 'control' && msg.subtype === CONTROL_SUBTYPE.TURN_SERVERS) {
-          const turnServers = decodeTurnServersPayload(msg.payload)
-          if (!turnServers || turnServers.length === 0) {
-            console.info('[Online] 加入方收到房主广播的空 ICE 列表，忽略')
-            return
-          }
-          // 更新本地 ICE 服务器配置（影响后续 PC 重建）
-          store.roomState.iceServers = turnServers
-          // 尝试更新当前 PC 配置（已建立连接需 ICE restart 完全生效）
-          const currentPc = guestWebrtc.pc.value
-          if (currentPc) {
-            try {
-              currentPc.setConfiguration({
-                iceServers: turnServers.map((entry) => {
-                  const server: RTCIceServer = { urls: entry.urls }
-                  if (entry.username) server.username = entry.username
-                  if (entry.credential) server.credential = entry.credential
-                  return server
-                }),
-                iceTransportPolicy: 'all',
-              })
-              console.info('[Online] 加入方已更新 PeerConnection ICE 配置（需 ICE restart 完全生效）')
-            } catch (e) {
-              console.warn('[Online] 加入方更新 PC 配置失败:', e)
-            }
-          }
-          console.info(`[Online] 加入方收到房主广播的 ICE 服务器列表：${turnServers.length} 条`)
-          return
-        }
-        if (msg.kind === 'data') {
-          void lan.forwardToTun(raw)
-        }
-      },
-    })
-  },
-  { immediate: true },
-)
+/** 全局联机会话：退出房间清理 / TUN / 密钥注入均由会话统一管理 */
+const session = getOnlineSession()
 
 const room = computed(() => store.roomState)
 const connState = guestWebrtc.connectionState
@@ -158,10 +67,7 @@ function handleLeaveRoom() {
     '退出后将断开与房主的 P2P 连接。确定退出？',
     async () => {
       try {
-        // 先停止 TUN 桥接，再关 PC，最后调后端退出
-        await lan.stop()
-        guestWebrtc.close()
-        await store.guestLeaveRoom()
+        await session.guestLeaveAndCleanup()
       } catch (e) {
         toastError(`退出失败：${e instanceof Error ? e.message : String(e)}`)
         // 即使后端调用失败也清空本地状态
@@ -178,19 +84,8 @@ async function copyText(text: string) {
 }
 
 onMounted(() => {
-  // 加入方拉取一次房间信息同步元数据
+  // 加入方拉取一次房间信息同步元数据（TUN/密钥/房间状态监控由全局会话管理）
   void store.refreshRoomInfo()
-
-  // 阶段三子任务 8：注入 DataChannel 加密密钥（空字符串表示未启用加密，importRoomKey 返回 null）
-  void importRoomKey(store.roomState.roomKey)
-    .then((key) => guestWebrtc.setRoomKey(key))
-    .catch((e) => console.warn('[Online] 加入方加密密钥导入失败:', e))
-
-  // 启动 TUN 桥接：进入面板即创建 TUN 接口，开始读包 → dataChannel.send
-  // 失败仅 toast（如 wintun.dll 缺失 / 无管理员权限），不阻塞信令流程
-  void lan.start(store.roomState.selfVirtualIp, store.roomState.subnet).catch((e) => {
-    toastError(`虚拟网卡启动失败：${e instanceof Error ? e.message : String(e)}`)
-  })
 })
 </script>
 

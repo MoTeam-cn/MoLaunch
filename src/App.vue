@@ -38,6 +38,7 @@ import {
   readLastPage,
 } from '@/utils/relaunchSnapshot'
 import { initDownloadStream } from '@/composables/useDownloadStream'
+import { initOnlineSession } from '@/composables/online/onlineSession'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
 
@@ -69,6 +70,9 @@ onMounted(() => {
   setUserAgreementDialogRef(userAgreementDialogRef.value)
   setToastRef(toastRef.value)
   initDownloadStream()
+  // 联机会话全局挂载：WebRTC/TUN/信令轮询常驻应用生命周期，切页不断连
+  // 必须在 consumeRelaunchSnapshot 之前，快照恢复 roomState.role 时 watch 已注册才能驱动会话启停
+  initOnlineSession()
   // 前端已挂载：至少展示 SPLASH_MIN_MS 后关闭开屏窗口、显示主窗口
   notifyFrontendReady()
   // 启动自动更新检查（启动后 5s + 每 6 小时；dev 模式自动跳过）

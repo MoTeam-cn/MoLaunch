@@ -37,8 +37,10 @@ const DEFAULT_POLL_TIMEOUT_MS = 30_000
  *
  * 内部维护单一 PeerConnection，生命周期由 composable 管理。
  * 调用 `fetchOfferAndAnswer` 完成 SDP 协商；调用 `close` 主动释放。
+ * 全局联机会话传 `autoClose: false`（常驻应用生命周期，不随组件卸载关闭）。
  */
-export function useWebRTC() {
+export function useWebRTC(options?: { autoClose?: boolean }) {
+  const autoClose = options?.autoClose ?? true
   /** 当前 PeerConnection（shallowRef 避免深度响应式开销） */
   const pc = shallowRef<RTCPeerConnection | null>(null)
   /** 连接状态 */
@@ -275,7 +277,9 @@ export function useWebRTC() {
   }
 
   // 组件卸载时自动关闭，避免 PeerConnection 泄漏
-  onUnmounted(() => close())
+  if (autoClose) {
+    onUnmounted(() => close())
+  }
 
   return {
     // 状态

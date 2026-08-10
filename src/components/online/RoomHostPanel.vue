@@ -4,23 +4,17 @@
  *
  * 显示房间信息 + 待确认 Answer 列表 + 参与者列表 + P2P 状态 + 关闭按钮。
  *
- * 业务逻辑全部委托给 `useRoomHost` composable：
- * - 信令轮询（参与者 / Answer / 保活）
- * - 自动为 status='joined' && !hostOfferReady 的参与者生成 per-participant Offer
- * - 确认/拒绝 Answer、踢出参与者、关闭房间
- *
- * WebRTC 实例通过 inject 从父级 RoomManager 获取（hostMesh，多 PC 管理器）。
- *
- * 数据分发（阶段三子任务 5）：
- * - `useVirtualLan` 启动后端 TUN 桥接 → `onTunPacket` 回调调 `hostMesh.broadcastPacket` 下发所有参与者
- * - 每个新参与者的 DataChannel 在 `createOfferFor` 后绑定 `onMessage` → `lan.forwardToTun` 转发到 TUN
+ * 业务逻辑（信令轮询 / 自动 Offer / 确认 Answer / 踢出封禁 / 关闭房间）由
+ * 全局联机会话 onlineSession 持有（App 级初始化，切页不断连），此处仅消费状态：
+ * - pendingAnswers / bannedList / handleConfirm / handleKick 等来自会话
+ * - WebRTC 实例通过 inject 获取（hostMesh，多 PC 管理器）
+ * - TUN 桥接与数据分发由会话统一管理（onTunPacket 按角色路由）
  */
 
 import { ref, computed, inject } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
-import { useVirtualLan } from '@/composables/useVirtualLan'
-import { useRoomHost } from '@/composables/useRoomHost'
+import { getOnlineSession } from '@/composables/online/onlineSession'
 import Button from '@/components/common/Button.vue'
 import Card from '@/components/common/Card.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
@@ -45,14 +39,7 @@ import {
 const store = useOnlineStore()
 const hostMesh = inject('hostMesh') as ReturnType<typeof useWebRTCMesh>
 
-/** TUN 桥接：TUN 读到包 → 广播给所有已联通参与者（阶段三子任务 8：异步加密后发送） */
-const lan = useVirtualLan({
-  onTunPacket: (raw) => {
-    void hostMesh.broadcastPacket(raw)
-  },
-})
-
-/** 房主业务逻辑（轮询 + Offer 生成 + 交互处理 + timer 管理） */
+/** 房主业务逻辑来自全局联机会话（轮询/Offer/交互处理/TUN 均常驻应用生命周期） */
 const {
   pendingAnswers,
   bannedList,
@@ -62,7 +49,7 @@ const {
   handleUnban,
   refreshBans,
   handleCloseRoom,
-} = useRoomHost({ hostMesh, lan })
+} = getOnlineSession()
 
 const room = computed(() => store.roomState)
 

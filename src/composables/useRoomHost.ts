@@ -3,7 +3,8 @@
  *
  * - useRoomHostPolling：三路信令轮询 / 自动 Offer / TURN 广播 / 定时器启停
  * - useRoomHostActions：确认/拒绝 Answer / 踢出封禁 / 解封 / 关闭房间
- * 只负责业务逻辑不渲染 UI；onMounted 启动轮询与事件监听，onUnmounted 清理。
+ * 只负责业务逻辑不渲染 UI；默认 onMounted 启动轮询与事件监听，onUnmounted 清理；
+ * 全局联机会话传 `autoLifecycle: false`，由会话显式调用 `start` / `stop`。
  */
 
 import { watch, onMounted, onUnmounted } from 'vue'
@@ -22,18 +23,22 @@ import { useRoomHostActions } from './useRoomHost/useRoomHostActions'
  *
  * @param options.hostMesh 房主多 PC 管理器（由 RoomManager.vue 通过 provide/inject 注入）
  * @param options.lan 虚拟网卡桥接实例（由 RoomHostPanel.vue 创建并传入）
+ * @param options.autoLifecycle 是否自动挂载/卸载生命周期（默认 true；全局会话传 false）
+ * @param options.onRoomClosed 房间被服务端关闭时回调（全局会话用于统一清理）
  */
 export function useRoomHost(options: {
   hostMesh: ReturnType<typeof useWebRTCMesh>
   lan: ReturnType<typeof useVirtualLan>
+  autoLifecycle?: boolean
+  onRoomClosed?: (msg: string) => void
 }) {
-  const { hostMesh, lan } = options
+  const { hostMesh, lan, autoLifecycle = true, onRoomClosed } = options
   const store = useOnlineStore()
 
   // 切片组装：轮询切片提供 pendingAnswers/offerGenerating 及轮询函数，
   // 动作切片依赖轮询切片的 pendingAnswers 引用，保持两切片状态同步
   const polling = useRoomHostPolling(store, hostMesh, lan, {
-    onRoomClosed: () => {
+    onRoomClosed: (msg) => {
       // 服务端已关闭/销毁房间（keepalive 返回 1001）：
       // 组件侧仅负责清理连接与 TUN（hostMesh/lan 为组件持有，store 无法释放）；
       // store 层全局保活定时器已负责 resetRoomState + toast（见 stores/online.ts）
@@ -41,6 +46,7 @@ export function useRoomHost(options: {
       void lan.stop()
       hostMesh.close()
       hostMesh.setRoomKey(null)
+      onRoomClosed?.(msg)
     },
   })
   const actions = useRoomHostActions(store, hostMesh, lan, polling.pendingAnswers)
@@ -70,7 +76,12 @@ export function useRoomHost(options: {
   /** HostMcPort 控制消息的本地 seq 计数器（与 TUN 数据包 seq 独立，避免混淆） */
   let mcPortSeq = 0
 
-  onMounted(() => {
+  /**
+   * 启动房主运营（轮询 + 密钥注入 + TUN + TURN 广播 + MC 端口监听）
+   *
+   * 全局会话在进入房间（role=host）时调用；组件默认在 onMounted 调用。
+   */
+  function start() {
     void pollParticipants()
     void pollAnswers()
     void doKeepalive()
@@ -110,7 +121,21 @@ export function useRoomHost(options: {
     }).then((unlisten) => {
       mcPortUnlisten = unlisten
     }).catch((e) => console.warn('[Online] 注册 MC 端口检测事件监听失败:', e))
-  })
+  }
+
+  /** 停止房主运营（停轮询 + 移除 MC 端口监听），幂等 */
+  function stop() {
+    stopTimers()
+    if (mcPortUnlisten) {
+      mcPortUnlisten()
+      mcPortUnlisten = null
+    }
+  }
+
+  if (autoLifecycle) {
+    onMounted(start)
+    onUnmounted(stop)
+  }
 
   // 云端连接状态变化时暂停/恢复轮询（避免云端断开后持续失败刷屏）
   watch(() => store.cloudConnected, (connected) => {
@@ -126,15 +151,6 @@ export function useRoomHost(options: {
     }
   })
 
-  onUnmounted(() => {
-    stopTimers()
-    if (mcPortUnlisten) {
-      mcPortUnlisten()
-      mcPortUnlisten = null
-    }
-    // lan.stop 由 useVirtualLan 的 onUnmounted 自动处理
-  })
-
   return {
     pendingAnswers,
     offerGenerating,
@@ -145,5 +161,7 @@ export function useRoomHost(options: {
     handleUnban,
     refreshBans,
     handleCloseRoom,
+    start,
+    stop,
   }
 }
