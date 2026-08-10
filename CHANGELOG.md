@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复版本设置资源包/光影页不可用状态仍显示顶部工具栏（[PackTab.vue](src/views/version-settings/PackTab.vue)）：对齐 mods 列表处理，未安装所需程序（如光影无 OptiFine/Iris 加载器）时 `not-modable` 空状态整体覆盖页面，顶部「从文件安装/打开文件夹/刷新」及筛选、搜索等操作功能一并隐藏，不再可点击。
+
 ## [0.3.5-rc6] - 2026-08-11
 
 > 此版本仅修复小部分功能，可选更新。

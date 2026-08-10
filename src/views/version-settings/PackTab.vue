@@ -37,57 +37,60 @@ const {
 
 <template>
   <div class="flex h-full flex-col">
-    <PackToolbar
-      v-model:pack-filter="packFilter"
-      v-model:pack-search="packSearch"
-      :packs-loading="packsLoading"
-      :filter-options="filterOptions"
+    <PackEmptyState
+      v-if="!available && !checking"
+      variant="not-modable"
+      :count="0"
       :kind="kind"
       @install="handleInstall"
-      @open-dir="handleOpenDir"
-      @refresh="loadPacks"
+      @go-download="router.push('/apps/downloads')"
+      @go-select="router.push('/apps/versions/select')"
     />
 
-    <div class="flex-1 overflow-y-auto p-6">
-      <PackEmptyState
-        v-if="packsLoading && packs.length === 0"
-        variant="loading"
-        :count="0"
+    <div v-else class="flex h-full flex-col">
+      <PackToolbar
+        v-model:pack-filter="packFilter"
+        v-model:pack-search="packSearch"
+        :packs-loading="packsLoading"
+        :filter-options="filterOptions"
         :kind="kind"
         @install="handleInstall"
+        @open-dir="handleOpenDir"
+        @refresh="loadPacks"
       />
-      <PackEmptyState
-        v-else-if="!available && !checking"
-        variant="not-modable"
-        :count="0"
-        :kind="kind"
-        @install="handleInstall"
-        @go-download="router.push('/apps/downloads')"
-        @go-select="router.push('/apps/versions/select')"
-      />
-      <PackEmptyState
-        v-else-if="filteredPacks.length === 0"
-        :variant="packs.length === 0 ? 'empty' : 'no-match'"
-        :count="packs.length"
-        :kind="kind"
-        @install="handleInstall"
-      />
-      <div v-else class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-        <ul class="divide-y divide-gray-100">
-          <PackListItem
-            v-for="pack in filteredPacks"
-            :key="pack.file_name"
-            :pack="pack"
-            :selected-id="selectedId"
-            :kind="kind"
-            :detail-loading-for="detailLoadingFor"
-            @toggle="handleToggle"
-            @delete="handleDelete"
-            @open-file="handleOpenFile"
-            @show-info="onShowInfo"
-            @update="openUpdateDialog"
-          />
-        </ul>
+
+      <div class="flex-1 overflow-y-auto p-6">
+        <PackEmptyState
+          v-if="packsLoading && packs.length === 0"
+          variant="loading"
+          :count="0"
+          :kind="kind"
+          @install="handleInstall"
+        />
+        <PackEmptyState
+          v-else-if="filteredPacks.length === 0"
+          :variant="packs.length === 0 ? 'empty' : 'no-match'"
+          :count="packs.length"
+          :kind="kind"
+          @install="handleInstall"
+        />
+        <div v-else class="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <ul class="divide-y divide-gray-100">
+            <PackListItem
+              v-for="pack in filteredPacks"
+              :key="pack.file_name"
+              :pack="pack"
+              :selected-id="selectedId"
+              :kind="kind"
+              :detail-loading-for="detailLoadingFor"
+              @toggle="handleToggle"
+              @delete="handleDelete"
+              @open-file="handleOpenFile"
+              @show-info="onShowInfo"
+              @update="openUpdateDialog"
+            />
+          </ul>
+        </div>
       </div>
     </div>
 
