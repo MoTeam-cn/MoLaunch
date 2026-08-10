@@ -33,7 +33,7 @@ pub async fn fetch_filename(params: FetchFilenameParams) -> Result<serde_json::V
         client
             .execute(req)
             .await
-            .map_err(|e| format!("HEAD 请求失败: {}", e))
+            .map_err(|e| format!("HEAD 请求失败: {}", crate::http::request_error_msg(&e)))
     }
     .await;
 
