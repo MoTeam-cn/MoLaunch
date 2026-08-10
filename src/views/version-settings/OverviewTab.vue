@@ -21,7 +21,7 @@ const {
   versionFolder, savesFolder, modsFolder, resourcepacksFolder, shaderpacksFolder,
   currentLogoIcon, currentLogo, currentMeta,
   iconOptions, displayTypeOptions,
-  isModable, loadPersonalization, refreshEffectiveDir,
+  isModable, shaderAvailable, loadPersonalization, refreshEffectiveDir,
 } = useVersionSettings()
 
 const {
@@ -141,7 +141,7 @@ const {
             { label: '存档文件夹', path: savesFolder, show: true },
             { label: 'Mod 文件夹', path: modsFolder, show: isModable },
             { label: '材质包文件夹', path: resourcepacksFolder, show: true },
-            { label: '光影文件夹', path: shaderpacksFolder, show: isModable },
+            { label: '光影文件夹', path: shaderpacksFolder, show: shaderAvailable },
           ]"
           v-show="f.show"
           :key="f.label"

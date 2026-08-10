@@ -5,7 +5,7 @@
  * 子 Tab 组件直接复用同一份状态，避免 props 透传。
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import * as tauri from '@/utils/tauri'
 import { inferVersionType, typeMetaMap } from '@/composables/useVersionMeta'
@@ -114,6 +114,28 @@ const isModable = computed(() => {
   return ['forge', 'neoforge', 'fabric', 'optifine', 'liteloader'].includes(inferVersionType(selectedId.value, undefined, backendType))
 })
 
+/** 当前版本是否支持光影（后端检查 OptiFine/Iris，与光影管理页 PackTab 逻辑一致） */
+const shaderAvailable = ref(true)
+
+/** 检查当前版本的光影可用性（is_packs_available 对 Shader 检查 OptiFine/Iris） */
+async function checkShaderAvailable() {
+  if (!selectedId.value) {
+    shaderAvailable.value = false
+    return
+  }
+  try {
+    shaderAvailable.value = await tauri.isPacksAvailable(selectedId.value, 'shader')
+  } catch {
+    shaderAvailable.value = true
+  }
+}
+
+// 切换版本时重新检查光影可用性
+watch(selectedId, (val) => {
+  if (val) checkShaderAvailable()
+  else shaderAvailable.value = false
+})
+
 /** 加载个性化数据 */
 async function loadPersonalization() {
   if (!selectedId.value) {
@@ -138,6 +160,7 @@ async function initContext() {
     if (selectedId.value) {
       effectiveDir.value = await tauri.getVersionEffectiveDir(selectedId.value)
       await loadPersonalization()
+      checkShaderAvailable()
     }
   }, 'init version context')
 }
@@ -182,6 +205,7 @@ export function useVersionSettings() {
     currentLogo,
     currentLogoIcon,
     isModable,
+    shaderAvailable,
     inferVersionType,
     resolveVersionIconWithLogo,
     loadPersonalization,
