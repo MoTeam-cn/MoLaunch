@@ -2,7 +2,7 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [0.3.5-rc5] - 2026-08-10
 
 - 联机页面创建房间表单、加入房间表单、房主/加入方面板（房间详情）顶部新增两条 `AlertV2` 提示：「P2P联机对房主的网络质量要求较高，如遇连接不上可尝试更换房主」与「如遇到违法违规房间，请及时向我们举报」（[CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) / [RoomManager.vue](src/components/online/RoomManager.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）。
 - 实验性 AI 聊天每条 AI 回复底部左侧新增「由AI生成的内容，注意甄别」声明（[ChatMessageItem.vue](src/components/experimental/ChatMessageItem.vue)），与右侧 token 统计 / 模型信息同行展示，正文生成期间即显示。
