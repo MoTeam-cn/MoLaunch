@@ -233,14 +233,14 @@ flowchart LR
 
 **PoW 机制（核心）**：纯内存不落库，challenge 由 `DashMap` 保存；`salt` 每次 CSPRNG 随机、`difficulty` 按接口分级（注册 20 最高 / 登录 16 / 刷新 14），`ttl` 过期、一次性；生成/校验均不占用数据库。响应体通过 `PowerChallengeResponse` DTO 下发，路径强绑定防跨接口复用。兼容旧客户端（无 `header_name` 时回退默认头名）。设计方案见 `api-server/docs/pow.md`。
 
-**发布流程**：修改代码必须同时更新 `api-server/CHANGELOG.md`；版本 tag 独立（如 `v0.1.x-rc`），提交信息带 `!c`；云服务动作（构建）触发时通过 CI 自动打包部署。客户端升级时与启动器相互配合。
+**发布流程**：修改代码必须同时更新 `api-server/CHANGELOG.md`；版本 tag 独立（如 `v0.1.x-rc`），提交信息默认不带 `!c`；云服务动作（构建）触发时通过 CI 自动打包部署。客户端升级时与启动器相互配合。
 
 ---
 
 ## 附录：AI 协作速查
 
 - 动手前阅读 `DEVELOPMENT_BLUEPRINT.md` 建立整体认知，`DEVELOPMENT_GUIDELINES.md` 提供风格与过关要求，`AI_AGENT_GUIDELINES.md` 提供行为约束
-- 所有修改必须同步 `CHANGELOG.md`；提交带 `!c`；每完成一批同性质修改拆一个 commit
+- 所有修改必须同步 `CHANGELOG.md`；提交默认不带 `!c`；每完成一批同性质修改拆一个 commit
 - 复用既有组件、函数、Hook、IPC 命令；不重复造轮子
 - 最小验证：每步修改跑对应 typecheck / lint / clippy / test
 

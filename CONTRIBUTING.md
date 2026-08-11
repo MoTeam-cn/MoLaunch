@@ -27,24 +27,24 @@
    ```
 
 3. 同步更新 `CHANGELOG.md`（追加到 `[Unreleased]` 区）
-4. 提交信息遵循规范并带 `!c` 标记（详见下方速查）
+4. 提交信息遵循规范（默认不带 `!c`，详见下方速查）
 
 ## Git 提交规范（速查）
 
-格式：`<type>(<scope>): <subject> !c`
+格式：`<type>(<scope>): <subject>`
 
 | type | 用途 | 示例 |
 |------|------|------|
-| feat | 新功能 | `feat(auth): 实现登录流程 !c` |
-| fix | 修复 Bug | `fix(download): 修复断点续传异常 !c` |
-| refactor | 重构 | `refactor(state): 提取状态访问 helper !c` |
-| docs | 文档 | `docs: 更新开发规范 !c` |
-| ci | CI 配置 | `ci: 更新构建流程 !c` |
-| chore | 构建 / 工具 / 依赖 | `chore: 更新依赖版本 !c` |
+| feat | 新功能 | `feat(auth): 实现登录流程` |
+| fix | 修复 Bug | `fix(download): 修复断点续传异常` |
+| refactor | 重构 | `refactor(state): 提取状态访问 helper` |
+| docs | 文档 | `docs: 更新开发规范` |
+| ci | CI 配置 | `ci: 更新构建流程` |
+| chore | 构建 / 工具 / 依赖 | `chore: 更新依赖版本` |
 
 要点：
 
-- **末尾必须带 `!c`**：CI 检测到该标记会跳过推送触发的构建，避免重复占用资源
+- **默认不带 `!c`**：`!c` 仅在需要跳过本次推送触发的 CI 构建时附加
 - **泛化描述**：禁止出现敏感引用或第三方项目代号（如 PCL2、pcl 等），使用通用技术术语
 - `note:` 前缀的提交表示「作者的话」，会展示在更新日志弹窗顶部（详见开发规范 2.5 节）
 

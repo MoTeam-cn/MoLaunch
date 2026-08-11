@@ -143,7 +143,7 @@ export function useExample() {
 - 更新弹窗 `UpdateLogDialog` 顶部可展示多条「作者的话」
 - **commit message 以 `note:` 开头**即为作者寄语（如 `note: 感谢大家的支持`），同一版本区间内全部 `note:` 提交按顺序展示
 - 数据来源：vite 构建时 `updateLogPlugin`（vite.config.ts）从 git 提交提取，虚拟模块 `virtual:update-log` 导出 `notes: string[]`；前端经 `getChangelogNotes()` 读取
-- `note:` 提交同样需带 `!c`，且不会出现在 commit 列表中（`ReleaseTimeline` 不渲染）
+- `note:` 提交默认同样不带 `!c`，且不会出现在 commit 列表中（`ReleaseTimeline` 不渲染）
 - 无 note 时弹窗不渲染该区块，向后兼容
 
 ### 1.2 后端（Rust + Tauri 2）
@@ -357,7 +357,7 @@ toastInfo('提示信息')
 ### 2.1 提交信息格式
 
 ```
-<type>(<scope>): <subject> !c
+<type>(<scope>): <subject>
 
 <body>
 
@@ -402,19 +402,19 @@ toastInfo('提示信息')
 | plugins | 插件 SDK |
 | tools | 工具模块 |
 
-### 2.4 `!c` 后缀（跳过 CI）
+### 2.4 `!c` 后缀（可选，跳过 CI）
 
-【必须】提交信息末尾必须包含 `!c` 标记。CI 流水线检测 commit message 是否包含 `!c` 子串，包含则跳过本次推送触发的 CI，避免重复占用构建资源。
+提交信息默认不带 `!c` 标记。CI 流水线检测 commit message 是否包含 `!c` 子串，包含则跳过本次推送触发的 CI，避免重复占用构建资源；仅在需要跳过本次推送触发的构建时附加。
 
 ### 2.5 `note:` 前缀（作者的话）
 
 - commit message 以 `note:` 开头表示「作者的话」，会被 `updateLogPlugin` 提取进更新日志弹窗顶部（支持多条）
-- `note:` 提交同样需要带 `!c`（如 `note: 感谢大家的支持 !c`）
-- `note:` 提交不需要任何文件变动，使用空提交创建：`git commit --allow-empty -m "note: 感谢大家的支持 !c"`
+- `note:` 提交默认同样不带 `!c`（如 `note: 感谢大家的支持`）
+- `note:` 提交不需要任何文件变动，使用空提交创建：`git commit --allow-empty -m "note: 感谢大家的支持"`
 - 【发布顺序】`note:` 提交必须在**打版本 tag 之前**执行——插件按「上一 tag → 最新 tag」区间提取，tag 之后再提交的 note 会落到下一个版本区间
 
 ```bash
-git commit --allow-empty -m "note: 感谢大家的支持 !c"
+git commit --allow-empty -m "note: 感谢大家的支持"
 # ... 其他发版提交完成后 ...
 git tag v0.3.5-rc1
 git push origin main --tags
@@ -430,7 +430,7 @@ git push origin main --tags
 ### 2.7 完整示例
 
 ```
-feat(version): 实现版本下载功能 !c
+feat(version): 实现版本下载功能
 
 - 支持版本列表获取
 - 支持版本下载与进度显示
@@ -438,7 +438,7 @@ feat(version): 实现版本下载功能 !c
 ```
 
 ```
-fix(auth): 修复登录超时问题 !c
+fix(auth): 修复登录超时问题
 
 - 增加轮询超时时间
 - 优化错误提示信息
@@ -687,10 +687,10 @@ npm run tauri build          # 构建发布版本
 
 # ---------- Git 提交 ----------
 git add -A
-git commit -m "feat(version): 实现版本下载功能 !c"
+git commit -m "feat(version): 实现版本下载功能"
 git push origin main
 ```
 
 ---
 
-*本文档最后更新于 2026-08-08*
+*本文档最后更新于 2026-08-11*

@@ -3,11 +3,11 @@
 请简洁说明本次改动的内容与动机，遵循仓库提交规范（见 [CONTRIBUTING.md](/CONTRIBUTING.md) 与 `DEVELOPMENT_GUIDELINES.md` 第二节）：
 
 - 变更类型 + 影响范围：`type(scope): 描述`
-- 提交信息需带 `!c` 标记（跳过 CI 重复构建）
+- 提交信息默认不带 `!c` 标记（仅在需要跳过 CI 构建时附加）
 - 提交信息使用泛化技术描述，禁止第三方项目代号
 
 ```text
-例如：fix(launch): 修复 1.21 加载器兼容性问题 !c
+例如：fix(launch): 修复 1.21 加载器兼容性问题
 ```
 
 ## 改动清单
