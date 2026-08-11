@@ -19,18 +19,76 @@ fn platform_target() -> &'static str {
     }
 }
 
-/// 简单 semver 比较：manifest_version > current_version 返回 true
+/// 语义化版本比较：manifest_version 高于 current_version 返回 true
+/// 支持 pre-release 段（rc/beta/alpha 等），如 0.3.5-rc7 > 0.3.5-rc6
 fn is_version_newer(manifest: &str, current: &str) -> bool {
-    fn parse_semver(s: &str) -> Option<(u64, u64, u64)> {
+    use std::cmp::Ordering;
+
+    /// pre-release 标识符段：纯数字按数值，字母段按前缀+数字尾比较
+    enum PrePart {
+        Num(u64),
+        Word(String, Option<u64>),
+    }
+
+    impl PrePart {
+        fn new(s: &str) -> Self {
+            if let Ok(n) = s.parse() {
+                return Self::Num(n);
+            }
+            let digits_at = s.trim_end_matches(|c: char| c.is_ascii_digit()).len();
+            Self::Word(s[..digits_at].to_string(), s[digits_at..].parse().ok())
+        }
+
+        fn cmp(&self, other: &Self) -> Ordering {
+            match (self, other) {
+                (Self::Num(a), Self::Num(b)) => a.cmp(b),
+                (Self::Num(_), Self::Word(..)) => Ordering::Less,
+                (Self::Word(..), Self::Num(_)) => Ordering::Greater,
+                (Self::Word(a, an), Self::Word(b, bn)) => a.cmp(b).then_with(|| an.cmp(bn)),
+            }
+        }
+    }
+
+    fn parse(s: &str) -> Option<(u64, u64, u64, Vec<PrePart>)> {
         let s = s.trim_start_matches('v');
-        let mut parts = s.split(['.', '-']);
+        let (core, pre) = s.split_once('-').map_or((s, ""), |(c, p)| (c, p));
+        let mut parts = core.split('.');
         let major = parts.next()?.parse().ok()?;
         let minor = parts.next()?.parse().ok()?;
         let patch = parts.next()?.parse().ok()?;
-        Some((major, minor, patch))
+        let pre = if pre.is_empty() {
+            Vec::new()
+        } else {
+            pre.split('.').map(PrePart::new).collect()
+        };
+        Some((major, minor, patch, pre))
     }
-    match (parse_semver(manifest), parse_semver(current)) {
-        (Some(m), Some(c)) => m > c,
+
+    fn cmp_pre(a: &[PrePart], b: &[PrePart]) -> Ordering {
+        for (x, y) in a.iter().zip(b) {
+            let o = x.cmp(y);
+            if o != Ordering::Equal {
+                return o;
+            }
+        }
+        a.len().cmp(&b.len())
+    }
+
+    match (parse(manifest), parse(current)) {
+        (Some(m), Some(c)) => {
+            let ord = m.0.cmp(&c.0).then(m.1.cmp(&c.1)).then(m.2.cmp(&c.2));
+            let ord = if ord == Ordering::Equal {
+                match (m.3.is_empty(), c.3.is_empty()) {
+                    (true, true) => Ordering::Equal,
+                    (true, false) => Ordering::Greater,
+                    (false, true) => Ordering::Less,
+                    (false, false) => cmp_pre(&m.3, &c.3),
+                }
+            } else {
+                ord
+            };
+            ord == Ordering::Greater
+        }
         _ => manifest != current,
     }
 }
@@ -158,3 +216,7 @@ pub async fn check_update(state: &AppState, _app: &AppHandle) -> Result<UpdateIn
             .to_string(),
     })
 }
+
+#[cfg(test)]
+#[path = "check_test.rs"]
+mod tests;
