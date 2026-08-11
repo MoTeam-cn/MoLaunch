@@ -13,7 +13,7 @@
  * 加入方无需轮询 answers（房主会主动 confirm），仅房间状态异常时主动退出。
  */
 
-import { computed, inject, onMounted } from 'vue'
+import { computed, inject, onMounted, ref } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
 import { useGuestReconnect } from '@/composables/useRoomReconnect'
@@ -31,12 +31,17 @@ import {
   ServerStackIcon,
   ExclamationTriangleIcon,
   ClipboardDocumentIcon,
+  Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 import VirtualIpCard from './VirtualIpCard.vue'
 import ModpackRequirementCard from './ModpackRequirementCard.vue'
+import RoomToolsDrawer from './RoomToolsDrawer.vue'
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
+
+/** 房间工具抽屉开关（检查 MC 服务 / 网络连通性 / 端口自动检测） */
+const toolsDrawerOpen = ref(false)
 
 /** 全局联机会话：退出房间清理 / TUN / 密钥注入均由会话统一管理 */
 const session = getOnlineSession()
@@ -209,12 +214,19 @@ onMounted(() => {
       />
     </Card>
 
-    <!-- 退出房间按钮 -->
-    <div class="pt-2">
-      <Button type="outline" long :loading="store.roomLoading" @click="handleLeaveRoom">
+    <!-- 房间工具 + 退出房间按钮 -->
+    <div class="grid grid-cols-2 gap-2 pt-2">
+      <Button type="outline" @click="toolsDrawerOpen = true">
+        <template #icon><Cog6ToothIcon class="w-4 h-4" /></template>
+        房间工具
+      </Button>
+      <Button type="outline" :loading="store.roomLoading" @click="handleLeaveRoom">
         <template #icon><XCircleIcon class="w-4 h-4" /></template>
         退出房间
       </Button>
     </div>
+
+    <!-- 房间工具抽屉：检查 MC 服务 / 网络连通性 / 端口自动检测 -->
+    <RoomToolsDrawer v-model:visible="toolsDrawerOpen" />
   </div>
 </template>

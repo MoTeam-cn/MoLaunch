@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 房间详情新增「工具」抽屉（[RoomToolsDrawer.vue](src/components/online/RoomToolsDrawer.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：房主侧与「加入申请/参与者/封禁」同行、加入方侧与「退出房间」同行，点击弹出抽屉提供三个工具——①检查 MC 服务：复用工具中心 `serverPing`（SLP 1.7+），房主测本机 127.0.0.1、加入方测房主虚拟 IP（走 TUN 桥接），展示 MOTD/在线人数/版本/延迟；②检查网络连通性（仅加入方可见）：复用 `tcpCheck` 对房主虚拟 IP:MC 端口做 TCP 握手，验证 P2P + 虚拟网卡链路；③端口自动检测（[lan_probe.rs](src-tauri/src/commands/online/manager/lan_probe.rs) 新增 `lan_port_probe` action + [lan_probe_test.rs](src-tauri/src/commands/online/manager/lan_probe_test.rs)）：绑定 UDP 4445 并加入多播组 224.0.2.60，监听 MC 局域网发现广播解析 `[AD]port[/AD]`（与多人游戏发现房间同源）——房主可得服务器实际开放端口，加入方可得本地伪装代理端口（即多人游戏界面显示的端口）。
+
 - MC 多人游戏界面直接发现房主房间（局域网伪装，[lan_fake.rs](src-tauri/src/commands/online/manager/lan_fake.rs) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：加入方进入房间且 TUN 就绪后，本地起 TCP 转发代理（端口自动分配）并按 MC 1.12+ 局域网发现协议周期广播 `[MOTD]...[/MOTD][AD]port[/AD]`，本机 MC 客户端在「多人游戏」界面直接看到房主房间，点击进入经代理转发到房主虚拟 IP:MC 端口（走 TUN 桥接），无需手动输入地址；退出房间/停 TUN 自动停止伪装。
 - 房主 TUN 数据包按目标虚拟 IP 定向转发（[tunRouting.ts](src/utils/online/tunRouting.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts)）：房主将 TUN 读出的 IP 包解析目标地址并映射到对应参与者的 DataChannel 单播，替代原无差别广播，房主上行带宽由「每包 ×N」降为「每包 ×1」，消除人数上升时的广播冗余；无法识别目标（非 IPv4/未知地址）时自动回退广播，兼容性不变。
 - 端口捕获测试迁移至独立测试文件（[scheduler_test.rs](src-tauri/src/minecraft/launch/watcher/scheduler_test.rs)）：`scheduler.rs` 内嵌 `#[cfg(test)] mod tests` 移除，按项目规范迁移为同目录 `scheduler_test.rs`（`#[path]` 引入），`parse_lan_port` 正则可测性不变。

@@ -27,12 +27,14 @@ import BannedList from './BannedList.vue'
 import KickConfirmDialog from './KickConfirmDialog.vue'
 import WhitelistEditor from './WhitelistEditor.vue'
 import HostRoomInfoCard from './HostRoomInfoCard.vue'
+import RoomToolsDrawer from './RoomToolsDrawer.vue'
 import {
   XCircleIcon,
   UsersIcon,
   ClockIcon,
   ShieldCheckIcon,
   ArrowPathIcon,
+  Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -59,6 +61,8 @@ const kickTarget = ref<{ participantId: string; devicePk: string; virtualIp?: st
 const pendingDrawerOpen = ref(false)
 const participantDrawerOpen = ref(false)
 const banDrawerOpen = ref(false)
+/** 房间工具抽屉开关（检查 MC 服务 / 网络连通性 / 端口自动检测） */
+const toolsDrawerOpen = ref(false)
 
 function onKick(participantId: string, devicePk: string) {
   const p = room.value.participants.find((x) => x.participantId === participantId)
@@ -124,7 +128,7 @@ function participantStateText(participantId: string): string {
 
     <!-- 列表抽屉入口：详情页仅保留按钮，待确认申请 / 参与者 / 封禁列表全部收进抽屉 -->
     <Card title="房间管理">
-      <div class="grid grid-cols-3 gap-2">
+      <div class="grid grid-cols-4 gap-2">
         <Button type="outline" size="small" @click="pendingDrawerOpen = true">
           <template #icon><ClockIcon class="w-3.5 h-3.5" /></template>
           <span class="flex items-center gap-1">
@@ -145,8 +149,15 @@ function participantStateText(participantId: string): string {
             <Tag size="small">{{ bannedList.length }}</Tag>
           </span>
         </Button>
+        <Button type="outline" size="small" @click="toolsDrawerOpen = true">
+          <template #icon><Cog6ToothIcon class="w-3.5 h-3.5" /></template>
+          <span>工具</span>
+        </Button>
       </div>
     </Card>
+
+    <!-- 房间工具抽屉：检查 MC 服务 / 网络连通性 / 端口自动检测 -->
+    <RoomToolsDrawer v-model:visible="toolsDrawerOpen" />
 
     <!-- 待确认加入申请抽屉 -->
     <Drawer

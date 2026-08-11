@@ -55,3 +55,20 @@ export interface LanFakeStartResponse {
   /** 实际监听的本地端口（MC 客户端将连接本机该端口） */
   port: number
 }
+
+/** `lan_port_probe` 参数 */
+export interface LanPortProbeParams {
+  /** 监听时长（毫秒），默认 6000 */
+  timeoutMs?: number
+}
+
+/** `lan_port_probe` 返回 */
+export interface LanPortProbeResponse {
+  success: boolean
+  /** 解析出的 MC 局域网端口（0 = 未检测到） */
+  port: number
+  /** 广播中的 MOTD 文本 */
+  motd: string
+  /** 失败原因（成功时为空） */
+  error: string
+}

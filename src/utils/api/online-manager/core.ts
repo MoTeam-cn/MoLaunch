@@ -110,6 +110,8 @@ export const ONLINE_ACTIONS = {
   TUN_STOP: 'tun_stop',
   LAN_FAKE_SERVER_START: 'lan_fake_server_start',
   LAN_FAKE_SERVER_STOP: 'lan_fake_server_stop',
+  // MC 局域网端口探测：监听发现广播解析 [AD]port[/AD]
+  LAN_PORT_PROBE: 'lan_port_probe',
   // TUN 权限不足时以管理员权限重启
   RESTART_AS_ADMIN: 'restart_as_admin',
   // 房主白名单管理（阶段三子任务 8 安全加强）

@@ -7,7 +7,15 @@
  * - 前端 DataChannel.onmessage → ArrayBuffer → base64 → invoke `tun_forward_to` → 写入 TUN
  */
 
-import type { LanFakeStartParams, LanFakeStartResponse, TunForwardResponse, TunStartParams, TunStartResponse } from '@/types/online'
+import type {
+  LanFakeStartParams,
+  LanFakeStartResponse,
+  LanPortProbeParams,
+  LanPortProbeResponse,
+  TunForwardResponse,
+  TunStartParams,
+  TunStartResponse,
+} from '@/types/online'
 import { ONLINE_ACTIONS, onlineManager } from './core'
 
 /**
@@ -77,6 +85,19 @@ export function lanFakeServerStart(
 /** 停止 MC 局域网服务器伪装（幂等） */
 export function lanFakeServerStop(): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.LAN_FAKE_SERVER_STOP)
+}
+
+/**
+ * 监听 MC 局域网发现广播并解析端口（与多人游戏发现房间同源）
+ *
+ * 后端绑定 UDP 4445 并加入多播组 224.0.2.60，等待 MC 服务器周期广播的
+ * `[AD]port[/AD]`。房主可探测本机服务器实际端口；加入方可探测本地伪装代理端口。
+ *
+ * @param params 监听时长（毫秒），默认 6000
+ * @returns 检测到的端口与广播 MOTD；超时未检测到时 success=false
+ */
+export function lanPortProbe(params: LanPortProbeParams): Promise<LanPortProbeResponse> {
+  return onlineManager<LanPortProbeResponse>(ONLINE_ACTIONS.LAN_PORT_PROBE, params)
 }
 
 /**

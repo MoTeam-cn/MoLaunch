@@ -4,6 +4,7 @@ mod auth_actions;
 mod auth_register_login;
 mod dispatcher;
 mod lan_fake;
+mod lan_probe;
 mod signaling_manager;
 mod tun;
 
