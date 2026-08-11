@@ -2,7 +2,7 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [0.3.5-rc7] - 2026-08-11
 
 - TURN 中转闭环（[api-server](api-server) [signaling.rs](api-server/src/models/signaling.rs) / [rooms.rs](api-server/src/services/signaling/rooms.rs) / [offers.rs](api-server/src/services/signaling/offers.rs) + [roomRefreshActions.ts](src/stores/online/roomRefreshActions.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts)）：①修复多人房间 TURN 中转不可用——凭证 HMAC 绑定调用者 IP+设备，房主广播的凭证对参与者无效，加入方改为加入时用自己的凭证自拉 `/turn`（`guestPullTurnServers`），与房主广播（无 regionCode）合并去重后建链；②`IceServerEntry` 服务端下发节点 `name`/`region`/`regionCode`，新增 [transport-info.ts](src/utils/online/transport-info.ts) `detectTransportInfo` 通过 `getStats` 选中 candidate-pair 的 localCandidate 类型判定实际走直连还是中继，联机面板常驻状态行（[ConnectionTransportStatus.vue](src/components/online/ConnectionTransportStatus.vue)）显示「P2P 直连」或「TURN 中转 + 节点国旗/名称」，国旗用 country-flag-icons 渲染真实 SVG（regionCode 经 hasFlag 校验）；③P2P 断线自动 ICE restart——房主侧监听各参与者 connectionState，failed/长时间 disconnected 自动 `restartIce()` 重发新 Offer（冷却+限次，重启前已确认的参与者重答自动放行不再弹确认框），加入方侧启动新 Offer 监控（断线快速轮询/正常慢速轮询）发现 ice-ufrag 变化即轻量重答，超时未恢复回退原有全量重建；④服务端 `upload_participant_offer`/`submit_answer` 状态校验放宽到 joined/answered/confirmed 以支持重协商；⑤TURN 未启用时仍回退云端 `stun_servers`（`resolveIceServers` 兜底不变）。
 
