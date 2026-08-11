@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 端口捕获测试迁移至独立测试文件（[scheduler_test.rs](src-tauri/src/minecraft/launch/watcher/scheduler_test.rs)）：`scheduler.rs` 内嵌 `#[cfg(test)] mod tests` 移除，按项目规范迁移为同目录 `scheduler_test.rs`（`#[path]` 引入），`parse_lan_port` 正则可测性不变。
+- 修复 TUN 提权重启时误报「虚拟网卡启动失败」（[useVirtualLan.ts](src/composables/useVirtualLan.ts)）：用户确认以管理员权限重启后，不再向调用方抛原始 `TUN_PERMISSION_DENIED` 权限错误（重启前 500ms 内会误弹失败 toast），改为提示「正在以管理员权限重启，重启后自动恢复虚拟网卡」；UAC 被拒或重启失败时仍保留原错误提示。
 - MC 局域网端口自动捕获重构（[scheduler.rs](src-tauri/src/minecraft/launch/watcher/scheduler.rs) / [log_reader.rs](src-tauri/src/minecraft/launch/watcher/log_reader.rs)）：启动器已知游戏 Java 进程 PID，新增按 PID 轮询该进程监听的非回环 TCP 端口（netstat2，连续两次确认后上报），MC 开放局域网即自动识别端口，不再依赖日志格式与 stdout 可用性；日志正则修正覆盖各版本实测格式（`Started on 4053` / `Local game hosted on port 49152` / `Published server on ip:port`），`logs/latest.log` 兜底保留；双信号共用去重上报入口，避免重复 emit。
 - 房主 MC 端口支持手动指定（[HostMcPortEditor.vue](src/components/online/HostMcPortEditor.vue) / [HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue) / [useRoomHost.ts](src/composables/useRoomHost.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts)）：自动捕获不可靠时房主可手动编辑端口，手动值为最高可信度——设置后自动捕获结果不再覆盖（`hostMcPortManual` 标记），立即经 `HOST_MC_PORT` 控制消息广播给所有参与者；可一键「恢复自动」。
 - 联机申请/成员操作按钮由图标改为文字（[PendingAnswerList.vue](src/components/online/PendingAnswerList.vue) / [ParticipantList.vue](src/components/online/ParticipantList.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue)）：加入申请「接受/拒绝」、参与者「踢出」、房主「封禁」按钮不再使用 heroicons 图标，直接显示文字标签，语义更明确。

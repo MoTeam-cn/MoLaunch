@@ -140,6 +140,10 @@ export function useVirtualLan(options: UseVirtualLanOptions) {
           })
           if (result && result.dev_mode) {
             showInfo('开发模式提示', result.message ?? '请用管理员权限终端运行 npm run tauri dev')
+          } else if (result) {
+            // 已确认提权重启：应用即将以管理员重启，避免向调用方抛原始权限错误
+            // 误导用户（后面 500ms 内会退出进程，重启后快照恢复自动重建 TUN）
+            throw new Error('正在以管理员权限重启，重启后自动恢复虚拟网卡')
           }
         }
         lastError.value = msg
