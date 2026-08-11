@@ -55,13 +55,15 @@ export function useRoomCrudActions(
         stunServers: stun,
         customTurnServers: customTurnServers.value,
       })
+      // ice_servers 仅存 TURN，STUN 由 stun_servers 列承载（读取侧统一回退）
+      const turnOnlyIceServers = [...customTurnServers.value]
       const result = await createRoom({
         sdpOffer,
         iceCandidates,
         maxPlayers,
         password,
         stunServers: stun,
-        iceServers,
+        iceServers: turnOnlyIceServers,
         hostMcVersion,
         hostMcPort,
         hostLoader: hostLoader || undefined,
