@@ -1,6 +1,6 @@
 ---
 name: 功能建议
-description: 提出一个新功能或现有功能的改进建议
+about: 提出一个新功能或现有功能的改进建议
 title: "[feature] "
 labels: ["enhancement"]
 ---

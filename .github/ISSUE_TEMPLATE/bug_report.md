@@ -1,6 +1,6 @@
 ---
 name: Bug 报告
-description: 提交一个 Bug，帮助我们定位并修复
+about: 提交一个 Bug，帮助我们定位并修复
 title: "[bug] "
 labels: bug
 ---

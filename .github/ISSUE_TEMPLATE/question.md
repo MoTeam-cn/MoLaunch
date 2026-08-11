@@ -1,6 +1,6 @@
 ---
 name: 使用提问
-description: 对启动器的使用或配置有疑问
+about: 对启动器的使用或配置有疑问
 title: "[question] "
 labels: ["question"]
 ---
