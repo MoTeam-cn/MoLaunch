@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+- MC 局域网端口自动捕获重构（[scheduler.rs](src-tauri/src/minecraft/launch/watcher/scheduler.rs) / [log_reader.rs](src-tauri/src/minecraft/launch/watcher/log_reader.rs)）：启动器已知游戏 Java 进程 PID，新增按 PID 轮询该进程监听的非回环 TCP 端口（netstat2，连续两次确认后上报），MC 开放局域网即自动识别端口，不再依赖日志格式与 stdout 可用性；日志正则修正覆盖各版本实测格式（`Started on 4053` / `Local game hosted on port 49152` / `Published server on ip:port`），`logs/latest.log` 兜底保留；双信号共用去重上报入口，避免重复 emit。
+- 房主 MC 端口支持手动指定（[HostMcPortEditor.vue](src/components/online/HostMcPortEditor.vue) / [HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue) / [useRoomHost.ts](src/composables/useRoomHost.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts)）：自动捕获不可靠时房主可手动编辑端口，手动值为最高可信度——设置后自动捕获结果不再覆盖（`hostMcPortManual` 标记），立即经 `HOST_MC_PORT` 控制消息广播给所有参与者；可一键「恢复自动」。
+- 联机申请/成员操作按钮由图标改为文字（[PendingAnswerList.vue](src/components/online/PendingAnswerList.vue) / [ParticipantList.vue](src/components/online/ParticipantList.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue)）：加入申请「接受/拒绝」、参与者「踢出」、房主「封禁」按钮不再使用 heroicons 图标，直接显示文字标签，语义更明确。
+
 - P2P 联机轮询改为自适应退避（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)）：房主参与者/Answer 轮询在稳态下（无待生成 Offer 的参与者、无待确认申请）由 2s 退避到 10s，活跃时自动恢复 2s，空闲时云端压力降低约 5 倍；`setInterval` 改为 `setTimeout` 链式调度天然防重入，`stopTimers` 后不会因进行中的请求重新拉起定时器；轮询参与者发现新加入者时联动刷新一次 Answer 申请，申请呈现不受退避影响。
 - 联机面板提示统一复用 `AlertV2` 组件（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [WhitelistEditor.vue](src/components/online/WhitelistEditor.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：接近人数上限预警、P2P 已联通指引、白名单为空警告、连接失败提示替换原先手写 CSS 提示块，样式与既有提示保持一致。
 - 启动按钮图标统一为 heroicons（[LaunchPanel.vue](src/components/home/LaunchPanel.vue)）：播放/停止/加载中三个手写内联 SVG 替换为 `PlayIcon` / `StopIcon` / `ArrowPathIcon`，与全站图标体系一致。

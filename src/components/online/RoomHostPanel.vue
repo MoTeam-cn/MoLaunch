@@ -26,14 +26,11 @@ import ParticipantList from './ParticipantList.vue'
 import BannedList from './BannedList.vue'
 import KickConfirmDialog from './KickConfirmDialog.vue'
 import WhitelistEditor from './WhitelistEditor.vue'
-import { copyToClipboard } from '@/utils/clipboard'
+import HostRoomInfoCard from './HostRoomInfoCard.vue'
 import {
   XCircleIcon,
   UsersIcon,
   ClockIcon,
-  ServerStackIcon,
-  WifiIcon,
-  ClipboardDocumentIcon,
   ShieldCheckIcon,
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
@@ -84,115 +81,21 @@ const confirmedCount = computed(
   () => store.roomState.participants.filter((p) => p.status === 'confirmed').length,
 )
 
-const remainingSeconds = computed(() => {
-  if (!room.value.expiresAt) return 0
-  return Math.max(0, room.value.expiresAt - Math.floor(Date.now() / 1000))
-})
-
-const remainingText = computed(() => {
-  const s = remainingSeconds.value
-  if (s <= 0) return '已过期'
-  const h = Math.floor(s / 3600)
-  const m = Math.floor((s % 3600) / 60)
-  return h > 0 ? `${h}小时${m}分钟` : `${m}分钟`
-})
+/** P2P 已联通操作指引（AlertV2 纯文本 message） */
+const connectedHintMessage =
+  '已联通，请在 Minecraft 内按 Esc → 「开放给局域网」开关。开放后启动器会自动捕获端口并广播给所有参与者，加入方在「多人游戏 → 直接连接」输入你的虚拟 IP 即可加入'
 
 /** 获取参与者连接状态文本（用于 UI 显示） */
 function participantStateText(participantId: string): string {
   return hostMesh.getConnState(participantId) ?? 'unknown'
 }
-
-/** 复制虚拟 IP 到剪贴板 */
-async function copyVirtualIp() {
-  const ip = room.value.selfVirtualIp
-  if (!ip) return
-  await copyToClipboard(ip, { toast: true })
-}
-
-/**
- * 当前总人数（含房主）
- */
-const totalPlayers = computed(() => room.value.participants.length + 1)
-
-/**
- * 是否接近人数上限（阶段三子任务 9 mesh 拓扑预警）
- *
- * 当总人数 >= maxPlayers - 1 时（即还差 1 人就满），显示橙色预警条，
- * 提示房主继续邀请可能导致上行带宽不足。
- * maxPlayers <= 2 时不预警（2 人房间本就最小单位）。
- */
-const nearPlayerLimit = computed(
-  () =>
-    room.value.maxPlayers > 2 &&
-    totalPlayers.value >= room.value.maxPlayers - 1 &&
-    room.value.participants.length > 0,
-)
-
-/** 接近人数上限预警文案（AlertV2 纯文本 message） */
-const nearPlayerLimitMessage = computed(
-  () =>
-    `接近人数上限（${totalPlayers.value}/${room.value.maxPlayers}），mesh 拓扑下房主上行带宽随人数线性增长，继续邀请可能出现卡顿，建议改用专业服务器`,
-)
-
-/** P2P 已联通操作指引（AlertV2 纯文本 message） */
-const connectedHintMessage =
-  '已联通，请在 Minecraft 内按 Esc → 「开放给局域网」开关。开放后启动器会自动捕获端口并广播给所有参与者，加入方在「多人游戏 → 直接连接」输入你的虚拟 IP 即可加入'
 </script>
 
 <template>
   <div class="space-y-4">
     <AlertV2 type="info" message="P2P联机对房主的网络质量要求较高，如遇连接不上可尝试更换房主" />
     <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
-    <Card title="房间信息">
-      <div class="divide-y divide-gray-100">
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <ServerStackIcon class="w-4 h-4 text-gray-400" /><span>房间码</span>
-          </div>
-          <code class="text-base font-semibold text-primary-600 tracking-wider bg-primary-50 px-3 py-1 rounded">
-            {{ room.roomCode }}
-          </code>
-        </div>
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <WifiIcon class="w-4 h-4 text-gray-400" /><span>虚拟 IP</span>
-          </div>
-          <div class="flex items-center gap-1">
-            <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ room.selfVirtualIp }}</code>
-            <Tooltip text="复制虚拟 IP">
-              <Button type="ghost" size="mini" @click="copyVirtualIp">
-                <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
-              </Button>
-            </Tooltip>
-          </div>
-        </div>
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <ServerStackIcon class="w-4 h-4 text-gray-400" /><span>MC 版本 / 端口</span>
-          </div>
-          <span class="text-xs text-gray-900">{{ room.hostMcVersion || '-' }} : {{ room.hostMcPort || '-' }}</span>
-        </div>
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <ClockIcon class="w-4 h-4 text-gray-400" />
-            <Tooltip text="房间保留时间：若在此时间内无新玩家加入，房间将自动清退；正常游玩中的房间会自动续期保留，无需担心">
-              <span>剩余时间</span>
-            </Tooltip>
-          </div>
-          <span class="text-xs" :class="remainingSeconds < 300 ? 'text-red-600' : 'text-gray-900'">
-            {{ remainingText }}
-          </span>
-        </div>
-        <div class="px-1 py-3 flex items-center justify-between">
-          <div class="flex items-center gap-2 text-sm text-gray-600">
-            <UsersIcon class="w-4 h-4 text-gray-400" /><span>人数</span>
-          </div>
-          <span class="text-xs text-gray-900">{{ totalPlayers }} / {{ room.maxPlayers }}</span>
-        </div>
-      </div>
-      <!-- 阶段三子任务 9：接近人数上限时显示 mesh 拓扑带宽预警 -->
-      <AlertV2 v-if="nearPlayerLimit" type="warning" :message="nearPlayerLimitMessage" />
-    </Card>
+    <HostRoomInfoCard />
 
     <Card title="P2P 连接">
       <div class="py-2 space-y-2">
@@ -237,7 +140,6 @@ const connectedHintMessage =
           </span>
         </Button>
         <Button type="outline" size="small" @click="banDrawerOpen = true">
-          <template #icon><ShieldCheckIcon class="w-3.5 h-3.5" /></template>
           <span class="flex items-center gap-1">
             封禁
             <Tag size="small">{{ bannedList.length }}</Tag>

@@ -7,8 +7,7 @@
  */
 import { computed } from 'vue'
 import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import { CheckCircleIcon, XCircleIcon, ClockIcon } from '@heroicons/vue/24/outline'
+import { ClockIcon } from '@heroicons/vue/24/outline'
 import { formatTimestamp } from '@/utils/format'
 import type { PendingAnswer } from '@/types/online'
 
@@ -47,16 +46,8 @@ const isEmpty = computed(() => props.answers.length === 0)
           <div class="text-xs text-gray-500">虚拟 IP: {{ ans.playerVirtualIp }}</div>
         </div>
         <div class="flex items-center gap-1">
-          <Tooltip text="接受连接">
-            <Button type="primary" size="mini" @click="emit('confirm', ans, true)">
-              <template #icon><CheckCircleIcon class="w-3.5 h-3.5" /></template>
-            </Button>
-          </Tooltip>
-          <Tooltip text="拒绝连接">
-            <Button type="ghost" size="mini" @click="emit('confirm', ans, false)">
-              <template #icon><XCircleIcon class="w-3.5 h-3.5" /></template>
-            </Button>
-          </Tooltip>
+          <Button type="primary" size="mini" @click="emit('confirm', ans, true)">接受</Button>
+          <Button type="ghost" size="mini" @click="emit('confirm', ans, false)">拒绝</Button>
         </div>
       </div>
       <div class="text-xs text-gray-400">加入时间: {{ formatTimestamp(ans.joinedAt) }}</div>

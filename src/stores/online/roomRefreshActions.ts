@@ -27,7 +27,8 @@ export function useRoomRefreshActions(deps: RoomRefreshDeps) {
     roomState.value.maxPlayers = info.maxPlayers
     roomState.value.expiresAt = info.expiresAt
     roomState.value.hostMcVersion = info.hostMcVersion
-    roomState.value.hostMcPort = info.hostMcPort
+    // hostMcPort 以房主实时检测为准（GameWatcher 捕获后经 HOST_MC_PORT 控制消息下发），
+    // 服务端元数据为创建时初始值，不做覆盖，避免拉取竞态覆盖掉实时广播的端口
     roomState.value.whitelistEnabled = info.whitelistEnabled ?? false
     roomState.value.hostModpack = info.modpack
     if (roomState.value.role === 'guest') {

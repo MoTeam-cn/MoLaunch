@@ -78,8 +78,8 @@ export function useRoomCrudActions(
         role: 'host', roomCode: data.roomCode, hostVirtualIp: data.hostVirtualIp,
         selfVirtualIp: data.hostVirtualIp, subnet: data.subnet, maxPlayers,
         expiresAt: data.expiresAt, stunServers: stun, iceServers, hostMcVersion,
-        hostMcPort, participants: [], participantId: null, whitelistEnabled,
-        roomKey: data.roomKey ?? '', hostModpack: modpack,
+        hostMcPort, hostMcPortManual: false, participants: [], participantId: null,
+        whitelistEnabled, roomKey: data.roomKey ?? '', hostModpack: modpack,
       }
       toastSuccess(`房间已创建：${data.roomCode}`)
       return data
@@ -111,8 +111,9 @@ export function useRoomCrudActions(
         role: 'guest', roomCode, hostVirtualIp: '', selfVirtualIp: data.playerVirtualIp,
         subnet: data.subnet, maxPlayers: 0, expiresAt: 0,
         stunServers: data.stunServers ?? [], iceServers: resolveIceServers(data.iceServers, data.stunServers),
-        hostMcVersion: '', hostMcPort: 0, participants: [], participantId: data.participantId,
-        whitelistEnabled: false, roomKey: data.roomKey ?? '', hostModpack: undefined,
+        hostMcVersion: '', hostMcPort: 0, hostMcPortManual: false, participants: [],
+        participantId: data.participantId, whitelistEnabled: false, roomKey: data.roomKey ?? '',
+        hostModpack: undefined,
       }
       await refreshRoomInfo()
       toastSuccess(`已加入房间：${roomCode}`)

@@ -47,6 +47,10 @@ export interface OnlineSession {
   handleUnban: ReturnType<typeof useRoomHost>['handleUnban']
   refreshBans: ReturnType<typeof useRoomHost>['refreshBans']
   handleCloseRoom: ReturnType<typeof useRoomHost>['handleCloseRoom']
+  /** 房主手动指定 MC 端口（最高可信度，自动捕获不再覆盖） */
+  setManualMcPort: ReturnType<typeof useRoomHost>['setManualMcPort']
+  /** 清除手动端口标记，恢复自动捕获更新 */
+  clearManualMcPort: ReturnType<typeof useRoomHost>['clearManualMcPort']
   /** 加入方退出房间（停 TUN + 关 P2P + 云端退出） */
   guestLeaveAndCleanup: () => Promise<void>
 }
@@ -319,6 +323,8 @@ function createSession(): OnlineSession {
     handleUnban: hostOps.handleUnban,
     refreshBans: hostOps.refreshBans,
     handleCloseRoom: hostOps.handleCloseRoom,
+    setManualMcPort: hostOps.setManualMcPort,
+    clearManualMcPort: hostOps.clearManualMcPort,
     guestLeaveAndCleanup,
   }
 }

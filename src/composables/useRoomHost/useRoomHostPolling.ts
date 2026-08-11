@@ -13,7 +13,7 @@ import { listAnswers, uploadParticipantOffer } from '@/utils/api/online-manager'
 import { buildIceServers, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
 import type { IceServerEntry, PendingAnswer } from '@/types/online'
 import { toastError } from '@/utils/toast'
-import { encodeHostVirtualIp, encodeTurnServers } from '@/utils/online/protocol'
+import { encodeHostMcPort, encodeHostVirtualIp, encodeTurnServers } from '@/utils/online/protocol'
 
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
@@ -74,7 +74,8 @@ export function useRoomHostPolling(
       const iceServers: IceServerEntry[] = store.roomState.iceServers.length > 0
         ? store.roomState.iceServers
         : stunUrlsToIceServers(store.roomState.stunServers)
-      // 通道建立后向该参与者广播房主虚拟 IP（加入方连接界面显示用）
+      // 通道建立后向该参与者广播房主虚拟 IP 与当前 MC 端口（加入方连接界面显示用；
+      // 端口在参与者连上后才捕获时也能立即同步，避免首轮广播错过的时序问题）
       const hostIp = store.roomState.selfVirtualIp
       const { sdp, iceCandidates } = await hostMesh.createOfferFor(
         participantId,
@@ -85,6 +86,13 @@ export function useRoomHostPolling(
                 participantId,
                 encodeHostVirtualIp(hostIpSeq++, hostIp),
               )
+              const hostPort = store.roomState.hostMcPort
+              if (hostPort > 0) {
+                void hostMesh.sendToParticipant(
+                  participantId,
+                  encodeHostMcPort(mcPortSeq++, hostPort),
+                )
+              }
             }
           : undefined,
       )
@@ -252,6 +260,8 @@ export function useRoomHostPolling(
   let turnSeq = 0
   /** HostVirtualIp 控制消息的本地 seq 计数器 */
   let hostIpSeq = 0
+  /** HostMcPort 控制消息的本地 seq 计数器 */
+  let mcPortSeq = 0
 
   /** 存在待生成 Offer 的参与者时保持活跃间隔，否则退避到空闲间隔 */
   function scheduleParticipantsNext() {

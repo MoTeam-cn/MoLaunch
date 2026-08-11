@@ -3,34 +3,107 @@
 //! 负责 stdout/stderr 读取、加载进度检测、联机端口事件与退出/崩溃分析调度。
 
 use super::log_parser::detect_load_progress;
-use super::log_reader::read_logs;
+use super::log_reader::{read_logs, tail_latest_log};
 use super::process::GameWatcher;
 use super::types::{ExitInfo, GameState};
 use crate::log_info;
 use regex::Regex;
+use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::{Arc, OnceLock};
 use tauri::Emitter;
 use tokio::sync::Mutex;
 
 /// 联机模块 MC 局域网端口检测事件名
 ///
-/// GameWatcher 在 stdout 检测到 "Local game hosted on port XXXXX" 或
-/// "Started LAN game on port XXXXX" 时，通过此事件通知前端联机模块。
-/// payload 为 u16 端口号。
+/// GameWatcher 从游戏进程日志（stdout/latest.log）或进程监听端口检测到
+/// MC 局域网端口时，通过此事件通知前端联机模块。payload 为 u16 端口号。
 pub const ONLINE_MC_PORT_DETECTED_EVENT: &str = "online://mc-port-detected";
 
-/// MC 开放局域网时 stdout 输出的端口正则
+/// MC 开放局域网时日志中的端口正则
 ///
-/// 匹配 MC 标准日志格式：
-/// - "Local game hosted on port 49152"（单人开放 LAN）
-/// - "Started LAN game on port 49152"（部分版本）
+/// 覆盖各版本实际输出格式：
+/// - "Started on 4053"（1.8-1.12，1.12.2 实测确认）
+/// - "Local game hosted on port 49152"（更早版本）
+/// - "Published server on 192.168.1.100:49152" / "Started serving on ..."（1.13+）
 static LAN_PORT_RE: OnceLock<Regex> = OnceLock::new();
 
 fn lan_port_regex() -> &'static Regex {
     LAN_PORT_RE.get_or_init(|| {
-        Regex::new(r"(?:Local game hosted|Started LAN game) on port (\d{1,5})")
-            .expect("LAN port regex 编译失败")
+        Regex::new(
+            r"(?:Started on|Local game hosted on port) (\d{1,5})|(?:Published server|Started serving) on .*:(\d{1,5})",
+        )
+        .expect("LAN port regex 编译失败")
     })
+}
+
+/// 从日志行解析 MC 局域网端口（无匹配返回 None）
+fn parse_lan_port(line: &str) -> Option<u16> {
+    let caps = lan_port_regex().captures(line)?;
+    caps.get(1)
+        .or_else(|| caps.get(2))
+        .and_then(|m| m.as_str().parse::<u16>().ok())
+        .filter(|&p| p > 0)
+}
+
+/// 统一上报 MC 局域网端口（日志 / 监听端口轮询双信号共用）
+///
+/// last_port 记录最近已上报端口，双信号下避免重复 emit。
+async fn report_lan_port(port: u16, app_handle: &Option<tauri::AppHandle>, last_port: &AtomicU16) {
+    if port == 0 {
+        return;
+    }
+    if last_port.swap(port, Ordering::Relaxed) == port {
+        return;
+    }
+    log_info!(
+        "[Watcher] 检测到 MC 局域网端口: {}（联机模块自动捕获）",
+        port
+    );
+    if let Some(ref handle) = app_handle {
+        let _ = handle.emit(ONLINE_MC_PORT_DETECTED_EVENT, port);
+    }
+}
+
+/// stdout/latest.log 每行统一入口：匹配 MC 局域网端口则上报
+async fn emit_lan_port_if_matched(
+    line: &str,
+    app_handle: &Option<tauri::AppHandle>,
+    last_port: &AtomicU16,
+) {
+    if let Some(port) = parse_lan_port(line) {
+        report_lan_port(port, app_handle, last_port).await;
+    }
+}
+
+/// 枚举指定进程监听的 TCP 端口（排除回环地址）
+///
+/// 基于 netstat2 直接读取系统套接字表，不依赖游戏日志格式与 stdout 可用性；
+/// MC 开放局域网后由 Java 进程监听一个非回环 TCP 端口，据此自动识别上报。
+fn listening_tcp_ports(pid: u32) -> Vec<u16> {
+    let af_flags = netstat2::AddressFamilyFlags::all();
+    let proto_flags = netstat2::ProtocolFlags::TCP;
+    let Ok(sockets) = netstat2::get_sockets_info(af_flags, proto_flags) else {
+        return Vec::new();
+    };
+    let mut ports = Vec::new();
+    for sock in sockets {
+        if !sock.associated_pids.contains(&pid) {
+            continue;
+        }
+        if let netstat2::ProtocolSocketInfo::Tcp(tcp) = sock.protocol_socket_info {
+            if tcp.state != netstat2::TcpState::Listen {
+                continue;
+            }
+            // 回环监听多为 JVM 内部服务（RMI 等），排除以降低误报
+            if tcp.local_addr.is_loopback() {
+                continue;
+            }
+            ports.push(tcp.local_port);
+        }
+    }
+    ports.sort_unstable();
+    ports.dedup();
+    ports
 }
 
 impl GameWatcher {
@@ -41,6 +114,10 @@ impl GameWatcher {
     ) -> Arc<Mutex<Option<tokio::process::Child>>> {
         let child_handle = Arc::new(Mutex::new(Some(child)));
         let child_clone = child_handle.clone();
+
+        // 双来源端口检测共享状态：最近上报端口（去重）与进程退出标记（latest.log 兜底任务退出用）
+        let last_port = Arc::new(AtomicU16::new(0));
+        let process_exited = Arc::new(AtomicBool::new(false));
 
         // 获取stdout和stderr
         let (stdout, stderr) = {
@@ -59,12 +136,15 @@ impl GameWatcher {
             let load_progress = self.load_progress.clone();
             let max_lines = self.max_log_lines;
             let app_handle = self.app_handle.clone();
+            let last_port_clone = last_port.clone();
+            let exited = process_exited.clone();
 
             tokio::spawn(async move {
-                read_logs(stdout, "stdout", log_buffer, max_lines, |line| {
+                read_logs(stdout, "stdout", log_buffer, max_lines, move |line| {
                     let state = state.clone();
                     let load_progress = load_progress.clone();
                     let app_handle = app_handle.clone();
+                    let last_port = last_port_clone.clone();
                     async move {
                         let new_progress = detect_load_progress(&line);
                         {
@@ -81,24 +161,54 @@ impl GameWatcher {
                             }
                         }
 
-                        if let Some(caps) = lan_port_regex().captures(&line) {
-                            if let Some(port_str) = caps.get(1) {
-                                if let Ok(port) = port_str.as_str().parse::<u16>() {
-                                    log_info!(
-                                        "[Watcher] 检测到 MC 局域网端口: {}（联机模块自动捕获）",
-                                        port
-                                    );
-                                    if let Some(ref handle) = app_handle {
-                                        let _ = handle.emit(ONLINE_MC_PORT_DETECTED_EVENT, port);
-                                    }
-                                }
-                            }
-                        }
+                        emit_lan_port_if_matched(&line, &app_handle, &last_port).await;
                     }
                 })
                 .await;
+                exited.store(true, Ordering::Relaxed);
             });
         }
+
+        // 兜底：增量监控 logs/latest.log（MC File appender 保证写入），stdout 无日志时仍能捕获端口
+        let log_path = self.game_dir.join("logs").join("latest.log");
+        let exited = process_exited.clone();
+        let app_handle = self.app_handle.clone();
+        let last_port_clone = last_port.clone();
+        tokio::spawn(async move {
+            tail_latest_log(log_path, exited, move |line| {
+                let app_handle = app_handle.clone();
+                let last_port = last_port_clone.clone();
+                async move {
+                    emit_lan_port_if_matched(&line, &app_handle, &last_port).await;
+                }
+            })
+            .await;
+        });
+
+        // 端口增强：轮询游戏进程监听端口（不依赖日志格式与 stdout）
+        // MC 开放局域网即出现新的非回环监听端口，连续两次轮询确认后上报
+        let pid = self.pid;
+        let exited = process_exited.clone();
+        let app_handle = self.app_handle.clone();
+        let last_port_clone = last_port.clone();
+        tokio::spawn(async move {
+            let mut seen: std::collections::HashMap<u16, u32> = std::collections::HashMap::new();
+            loop {
+                if exited.load(Ordering::Relaxed) {
+                    break;
+                }
+                let current = listening_tcp_ports(pid);
+                for &port in &current {
+                    let count = seen.entry(port).or_insert(0);
+                    *count += 1;
+                    if *count == 2 {
+                        report_lan_port(port, &app_handle, &last_port_clone).await;
+                    }
+                }
+                seen.retain(|port, _| current.contains(port));
+                tokio::time::sleep(std::time::Duration::from_millis(1_000)).await;
+            }
+        });
 
         // 读取stderr
         if let Some(stderr) = stderr {
@@ -131,6 +241,7 @@ impl GameWatcher {
         let version_id = self.version_id.clone();
         let game_dir = self.game_dir.clone();
         let manual_stop = self.manual_stop.clone();
+        let process_exited_clone = process_exited.clone();
 
         tokio::spawn(async move {
             // 等待进程结束
@@ -142,6 +253,7 @@ impl GameWatcher {
                     None
                 }
             };
+            process_exited_clone.store(true, Ordering::Relaxed);
 
             let exit_code = exit_code.unwrap_or(-1);
             let logs = {
@@ -207,5 +319,46 @@ impl GameWatcher {
         });
 
         child_handle
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_lan_port;
+
+    #[test]
+    fn parse_lan_port_matches_common_formats() {
+        // 1.12.2 等旧版实测格式
+        assert_eq!(
+            parse_lan_port("[16:34:49] [Client thread/INFO]: Started on 4053"),
+            Some(4053)
+        );
+        // 更早版本
+        assert_eq!(
+            parse_lan_port("[Server thread/INFO]: Local game hosted on port 49152"),
+            Some(49152)
+        );
+        // 1.13+ 带 IP 的格式
+        assert_eq!(
+            parse_lan_port("[Server thread/INFO]: Published server on 192.168.1.100:49152"),
+            Some(49152)
+        );
+        assert_eq!(
+            parse_lan_port("[Server thread/INFO]: Started serving on 192.168.1.100:25565"),
+            Some(25565)
+        );
+    }
+
+    #[test]
+    fn parse_lan_port_ignores_unrelated_lines() {
+        assert_eq!(
+            parse_lan_port(r#"[Server thread/INFO]: Preparing level "world""#),
+            None
+        );
+        assert_eq!(
+            parse_lan_port("[Client thread/INFO]: Started on world gen"),
+            None
+        );
+        assert_eq!(parse_lan_port(""), None);
     }
 }

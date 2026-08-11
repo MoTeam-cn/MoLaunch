@@ -111,6 +111,8 @@ export function useRoomHost(options: {
     void listen<number>('online://mc-port-detected', (event) => {
       const port = event.payload
       if (!port || port <= 0) return
+      // 手动指定端口为最高可信度，自动捕获结果不再覆盖
+      if (store.roomState.hostMcPortManual) return
       store.roomState.hostMcPort = port
       // 阶段三子任务 8：broadcastPacket 异步加密后发送，sent 计数仅用于日志
       void hostMesh.broadcastPacket(encodeHostMcPort(mcPortSeq++, port)).then((sent) => {
@@ -130,6 +132,28 @@ export function useRoomHost(options: {
       mcPortUnlisten()
       mcPortUnlisten = null
     }
+  }
+
+  /**
+   * 房主手动指定 MC 端口（最高可信度）
+   *
+   * 自动捕获（日志/监听端口）失败或不可靠时由用户直接指定；
+   * 设置后自动捕获结果不再覆盖，并立即广播给所有已联通参与者。
+   */
+  function setManualMcPort(port: number) {
+    if (store.roomState.role !== 'host') return
+    if (!Number.isInteger(port) || port <= 0 || port > 65535) return
+    store.roomState.hostMcPort = port
+    store.roomState.hostMcPortManual = true
+    void hostMesh.broadcastPacket(encodeHostMcPort(mcPortSeq++, port)).then((sent) => {
+      console.info(`[Online] 房主手动设置 MC 端口: ${port}，已广播给 ${sent} 个参与者`)
+    }).catch((e) => console.warn('[Online] 广播手动 MC 端口失败:', e))
+  }
+
+  /** 清除手动端口标记，恢复自动捕获更新 */
+  function clearManualMcPort() {
+    if (store.roomState.role !== 'host') return
+    store.roomState.hostMcPortManual = false
   }
 
   if (autoLifecycle) {
@@ -161,6 +185,8 @@ export function useRoomHost(options: {
     handleUnban,
     refreshBans,
     handleCloseRoom,
+    setManualMcPort,
+    clearManualMcPort,
     start,
     stop,
   }

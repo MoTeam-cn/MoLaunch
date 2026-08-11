@@ -6,8 +6,7 @@
  * 接收参与者列表与连接状态查询函数，渲染为列表，每条提供踢出按钮。
  */
 import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import { UsersIcon, XCircleIcon } from '@heroicons/vue/24/outline'
+import { UsersIcon } from '@heroicons/vue/24/outline'
 import type { ParticipantInfo } from '@/types/online'
 
 defineProps<{
@@ -39,11 +38,7 @@ const emit = defineEmits<{
           {{ p.virtualIp }} · {{ p.status }} · {{ connStateText(p.participantId) }}
         </div>
       </div>
-      <Tooltip text="踢出">
-        <Button type="ghost" size="mini" @click="emit('kick', p.participantId, p.devicePk)">
-          <template #icon><XCircleIcon class="w-3.5 h-3.5" /></template>
-        </Button>
-      </Tooltip>
+      <Button type="ghost" size="mini" @click="emit('kick', p.participantId, p.devicePk)">踢出</Button>
     </div>
   </TransitionGroup>
   <div v-else class="py-8 flex flex-col items-center justify-center gap-2 text-gray-400">

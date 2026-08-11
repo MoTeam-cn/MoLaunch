@@ -57,6 +57,13 @@ export interface RoomState {
   hostMcVersion: string
   /** 房主 MC 端口 */
   hostMcPort: number
+  /**
+   * 房主是否手动指定 MC 端口（最高可信度）
+   *
+   * `true` 时以手动值为准，忽略自动捕获（日志/监听端口）更新；
+   * 手动值经 HOST_MC_PORT 控制消息广播给参与者。
+   */
+  hostMcPortManual: boolean
   /** 当前参与者列表（房主维护） */
   participants: ParticipantInfo[]
   /** 加入方的 participant_id */
@@ -100,6 +107,7 @@ export function emptyRoom(): RoomState {
     iceServers: [],
     hostMcVersion: '',
     hostMcPort: 0,
+    hostMcPortManual: false,
     participants: [],
     participantId: null,
     whitelistEnabled: false,
