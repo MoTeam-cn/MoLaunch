@@ -27,36 +27,36 @@ export const EXTENT = [-EXTENT_HALF, -EXTENT_HALF, EXTENT_HALF, EXTENT_HALF]
 export const STRUCT_MIN_ZOOM = 4
 
 /**
- * MC 版本列表（与 cubiomes MC_* 枚举值映射；见 cubiomes/biomes.h:5-46）
+ * MC 版本列表（value = cubiomes MCVersion 枚举，见 cubiomes/biomes.h:5-46）
  *
  * 版本支持说明：
  * - 使用 fork 仓库 https://github.com/MoTeam-cn/cubiomes，原生支持 MC_26_2 (=34)
- * - 枚举值（biomes.h）：
- *   MC_1_21_WD=28 (1.21.4), MC_1_21_5=29, MC_1_21_6=30, MC_1_21_9=31,
- *   MC_1_21_11=32 (=MC_1_21), MC_26_1=33, MC_26_2=34 (=MC_NEWEST)
+ * - 枚举值（biomes.h）：MC_1_7=10, MC_1_8=11, ..., MC_1_12=15, MC_1_13=16,
+ *   MC_1_16=20, MC_1_18=22, MC_1_19_2=23, MC_1_20=25, MC_1_21_1=26,
+ *   MC_1_21_WD=28 (1.21.4), MC_1_21_9=31, MC_26_1=33, MC_26_2=34 (=MC_NEWEST)
  * - 1.21.9/1.21.11 共用 31（cubiomes 未单独定义 1.21.11 枚举，1.21.9=31 已涵盖）
  */
 export const SEEDMAP_MC_VERSIONS = [
   // Latest（fork cubiomes 原生支持 MC_26_2）
-  { label: '26.2', value: 28 },
-  { label: '26.1', value: 27 },
-  { label: '1.21.9', value: 25 },
-  { label: '1.21.6', value: 24 },
-  { label: '1.21.5', value: 23 },
-  { label: '1.21.4', value: 22 },
-  { label: '1.21.3', value: 21 },
-  { label: '1.21.1', value: 20 },
-  { label: '1.20', value: 19 },
-  { label: '1.19.4', value: 18 },
-  { label: '1.19.2', value: 17 },
-  { label: '1.18', value: 16 },
+  { label: '26.2', value: 34 }, // MC_26_2 = MC_NEWEST
+  { label: '26.1', value: 33 }, // MC_26_1
+  { label: '1.21.9', value: 31 }, // MC_1_21_9
+  { label: '1.21.6', value: 30 }, // MC_1_21_6
+  { label: '1.21.5', value: 29 }, // MC_1_21_5
+  { label: '1.21.4', value: 28 }, // MC_1_21_WD
+  { label: '1.21.3', value: 27 }, // MC_1_21_3
+  { label: '1.21.1', value: 26 }, // MC_1_21_1
+  { label: '1.20', value: 25 },   // MC_1_20
+  { label: '1.19.4', value: 24 }, // MC_1_19_4
+  { label: '1.19.2', value: 23 }, // MC_1_19_2
+  { label: '1.18', value: 22 },   // MC_1_18
   // Old
-  { label: '1.17', value: 15 }, { label: '1.16', value: 14 },
-  { label: '1.15', value: 12 }, { label: '1.14', value: 11 },
-  { label: '1.13', value: 10 }, { label: '1.12', value: 9 },
-  { label: '1.11', value: 8 }, { label: '1.10', value: 7 },
-  { label: '1.9', value: 6 }, { label: '1.8', value: 5 },
-  { label: '1.7', value: 4 },
+  { label: '1.17', value: 21 }, { label: '1.16', value: 20 }, // MC_1_17 / MC_1_16
+  { label: '1.15', value: 18 }, { label: '1.14', value: 17 }, // MC_1_15 / MC_1_14
+  { label: '1.13', value: 16 }, { label: '1.12', value: 15 }, // MC_1_13 / MC_1_12
+  { label: '1.11', value: 14 }, { label: '1.10', value: 13 }, // MC_1_11 / MC_1_10
+  { label: '1.9', value: 12 }, { label: '1.8', value: 11 },   // MC_1_9 / MC_1_8
+  { label: '1.7', value: 10 },                                 // MC_1_7
 ] as const
 
 /**

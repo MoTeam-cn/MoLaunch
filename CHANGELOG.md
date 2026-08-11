@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+- 种子地图「从存档加载」弹窗改为项目通用抽屉形式（[LoadSaveDrawer.vue](src/views/tools/data/LoadSaveDrawer.vue) / [SeedMap.vue](src/views/tools/data/SeedMap.vue)）：原 [LoadSaveModal.vue](src/views/tools/data/LoadSaveModal.vue) 为自定义居中 Modal，现重写为复用 `components/common/Drawer.vue` 的右侧抽屉（`placement=right` + `render-in-place` + `popup-container=#app-content`），交互与房间工具抽屉等保持一致，删除旧 Modal 组件。
+
+- 修复「本次更新日志」弹窗首次运行死锁（[updateLog.ts](src/utils/updateLog.ts)）：原逻辑在 localStorage 无记录（全新安装/从未弹过窗）时直接跳过且不写入，导致 key 永不落盘、后续升级永远检测不到版本变化。现改为首次运行仅记录当前版本（不弹窗），升级时才能正常对比弹窗。
+
+- 修复种子地图版本 ≤1.12 时结构筛选块全部消失（[config.ts](src/views/tools/data/useSeedMap/config.ts) / [useSeedMap.ts](src/views/tools/data/useSeedMap.ts) / [LoadSaveDrawer.vue](src/views/tools/data/LoadSaveDrawer.vue)）：`SEEDMAP_MC_VERSIONS` 的 value 原为紧凑编号（1.7→4、1.12→9、1.13→10、26.2→28），与 cubiomes 真实 `MCVersion` 枚举（`MC_1_7=10`、`MC_1_12=15`、`MC_1_13=16`、`MC_26_2=34`）错位，`getStructuresForVersion` 用紧凑编号与 `javaSinceValue`（真实枚举）比较导致 1.12 及以下所有结构（Village=10 等）被过滤。现 value 全部改为真实 cubiomes 枚举，前端筛选与 WASM 地图渲染/结构查找统一基于正确版本枚举，默认版本与「从存档加载」兜底值同步修正为 34。
+
 - FRP 官方公共服务器创建隧道移除分配接口调用（[public-server.ts](src/utils/api/frp-manager/public-server.ts) / [usePublicServers.ts](src/composables/usePublicServers.ts) / [frp.rs](src-tauri/src/minecraft/online/frp.rs) / [public_server_actions.rs](src-tauri/src/commands/frp/manager/public_server_actions.rs)）：api-server 已移除 `POST /v1/frp/allocate|release|keepalive` 下发链路，`GET /v1/frp/servers` 列表直接返回完整连接信息（公共 token / 地址 / 端口 / TLS）。前端选择公共服务器后从列表项直接回填表单（远程端口客户端随机生成），不再请求云端分配 token 与端口；Rust 侧同步删除 `allocate_public_server` / `release_public_server` / `keepalive_public_server` 三个 IPC action、`PublicFrpServer` 精简为列表接口实际返回的 7 个字段（移除 `serverType` / `onlineUsers` / `maxUsers` / `loadPercent` / `allocatable`），避免反序列化因缺失字段失败。
 
 ## [0.3.5-rc7] - 2026-08-11

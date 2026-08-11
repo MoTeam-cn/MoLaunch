@@ -32,7 +32,7 @@ import { createMapEvents } from './useSeedMap/map-events'
 export function useSeedMap() {
   // ===== 控件状态 =====
   const seedInput = ref<string>('')
-  const mcVersion = ref<number>(28)  // 默认最新版（26.2 = cubiomes MC_26_2 = MC_NEWEST = 28）
+  const mcVersion = ref<number>(34)  // 默认最新版（26.2 = cubiomes MC_26_2 = MC_NEWEST = 34）
   const dimension = ref<Dimension>(0)
   const largeBiomes = ref<boolean>(false)
   const userX = ref<string>('')
