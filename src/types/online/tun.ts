@@ -38,3 +38,20 @@ export const EVENT_TUN_PACKET_OUT = 'online://tun-packet-out'
 
 /** TUN 数据包事件 payload（后端 emit 的 `Vec<u8>` 协议帧，Tauri 序列化为 number[]） */
 export type TunPacketPayload = number[]
+
+/** `lan_fake_server_start` 参数 */
+export interface LanFakeStartParams {
+  /** 多人游戏界面显示的服务器名称（MOTD） */
+  motd: string
+  /** 转发目标 IP（房主虚拟 IP，走 TUN 路由） */
+  targetIp: string
+  /** 转发目标端口（房主 MC 局域网端口） */
+  targetPort: number
+}
+
+/** `lan_fake_server_start` 返回 */
+export interface LanFakeStartResponse {
+  success: boolean
+  /** 实际监听的本地端口（MC 客户端将连接本机该端口） */
+  port: number
+}

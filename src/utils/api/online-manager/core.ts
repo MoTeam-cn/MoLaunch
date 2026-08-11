@@ -108,6 +108,8 @@ export const ONLINE_ACTIONS = {
   TUN_START: 'tun_start',
   TUN_FORWARD_TO: 'tun_forward_to',
   TUN_STOP: 'tun_stop',
+  LAN_FAKE_SERVER_START: 'lan_fake_server_start',
+  LAN_FAKE_SERVER_STOP: 'lan_fake_server_stop',
   // TUN 权限不足时以管理员权限重启
   RESTART_AS_ADMIN: 'restart_as_admin',
   // 房主白名单管理（阶段三子任务 8 安全加强）

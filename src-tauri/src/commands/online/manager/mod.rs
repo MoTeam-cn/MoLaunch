@@ -3,6 +3,7 @@
 mod auth_actions;
 mod auth_register_login;
 mod dispatcher;
+mod lan_fake;
 mod signaling_manager;
 mod tun;
 
@@ -13,3 +14,4 @@ pub(crate) use dispatcher::{
 pub use dispatcher::{
     dispatch, load_creds_with_auto_refresh, AuthInitResult, DeviceStatus, ServerTimeInfo,
 };
+pub use lan_fake::LanFakeServer;

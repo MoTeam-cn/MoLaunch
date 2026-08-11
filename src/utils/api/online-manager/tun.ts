@@ -7,7 +7,7 @@
  * - 前端 DataChannel.onmessage → ArrayBuffer → base64 → invoke `tun_forward_to` → 写入 TUN
  */
 
-import type { TunForwardResponse, TunStartParams, TunStartResponse } from '@/types/online'
+import type { LanFakeStartParams, LanFakeStartResponse, TunForwardResponse, TunStartParams, TunStartResponse } from '@/types/online'
 import { ONLINE_ACTIONS, onlineManager } from './core'
 
 /**
@@ -57,6 +57,26 @@ export function tunForwardTo(
 /** 停止 TUN 桥接，销毁 TUN 接口（幂等） */
 export function tunStop(): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.TUN_STOP)
+}
+
+/**
+ * 启动 MC 局域网服务器伪装（加入方调用）
+ *
+ * 加入方本地起 TCP 转发代理 + 周期 UDP 广播，本机 MC 客户端在多人游戏界面
+ * 即可直接发现房主房间，点击进入时经代理转发到房主虚拟 IP:MC 端口（走 TUN）。
+ *
+ * @param params 伪装名称与转发目标（房主虚拟 IP:房主 MC 端口）
+ * @returns 实际监听的本地端口
+ */
+export function lanFakeServerStart(
+  params: LanFakeStartParams,
+): Promise<LanFakeStartResponse> {
+  return onlineManager<LanFakeStartResponse>(ONLINE_ACTIONS.LAN_FAKE_SERVER_START, params)
+}
+
+/** 停止 MC 局域网服务器伪装（幂等） */
+export function lanFakeServerStop(): Promise<{ success: boolean }> {
+  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.LAN_FAKE_SERVER_STOP)
 }
 
 /**

@@ -178,22 +178,27 @@ onMounted(() => {
         <div class="flex items-start gap-1.5">
           <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <div class="flex-1">
-            <div>连接已建立，请在 Minecraft 中「多人游戏 → 直接连接」输入房主虚拟 IP 加入</div>
-            <div class="mt-1 flex items-center gap-1.5">
-              <code class="bg-white px-1.5 py-0.5 rounded text-green-800 border border-green-200">
-                {{ room.hostVirtualIp || '（等待房主广播）' }}
-              </code>
-              <Tooltip text="复制房主虚拟 IP">
-                <Button
-                  type="ghost"
-                  size="mini"
-                  :disabled="!room.hostVirtualIp"
-                  @click="copyText(room.hostVirtualIp)"
-                >
-                  <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
-                </Button>
-              </Tooltip>
-            </div>
+            <template v-if="session.lanFakeActive">
+              <div>局域网伪装已启用，打开 Minecraft「多人游戏」界面即可看到房主房间，点击进入即可</div>
+            </template>
+            <template v-else>
+              <div>连接已建立，请在 Minecraft 中「多人游戏 → 直接连接」输入房主虚拟 IP 加入</div>
+              <div class="mt-1 flex items-center gap-1.5">
+                <code class="bg-white px-1.5 py-0.5 rounded text-green-800 border border-green-200">
+                  {{ room.hostVirtualIp || '（等待房主广播）' }}
+                </code>
+                <Tooltip text="复制房主虚拟 IP">
+                  <Button
+                    type="ghost"
+                    size="mini"
+                    :disabled="!room.hostVirtualIp"
+                    @click="copyText(room.hostVirtualIp)"
+                  >
+                    <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
+                  </Button>
+                </Tooltip>
+              </div>
+            </template>
           </div>
         </div>
       </div>

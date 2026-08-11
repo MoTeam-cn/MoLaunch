@@ -10,14 +10,15 @@
  * - watch roomState.role 驱动会话启停（进房自动启动，退房自动清理）
  * - 加入方 30s 房间状态监控：房主关闭/房间过期/被服务端清理时自动感知并退出
  */
-import { watch } from 'vue'
+import { ref, watch, type Ref } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
 import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import { useVirtualLan } from '@/composables/useVirtualLan'
 import { useRoomHost } from '@/composables/useRoomHost'
 import { reconnectAsGuest } from '@/composables/useRoomReconnect'
-import { getRoomInfo } from '@/utils/api/online-manager'
+import { getRoomInfo, lanFakeServerStart, lanFakeServerStop } from '@/utils/api/online-manager'
+import { resolveTunParticipantId } from '@/utils/online/tunRouting'
 import { importRoomKey } from '@/utils/online/crypto'
 import { peekJoinPassword } from '@/utils/relaunchSnapshot'
 import {
@@ -53,6 +54,10 @@ export interface OnlineSession {
   clearManualMcPort: ReturnType<typeof useRoomHost>['clearManualMcPort']
   /** 加入方退出房间（停 TUN + 关 P2P + 云端退出） */
   guestLeaveAndCleanup: () => Promise<void>
+  /** 局域网伪装是否启用（加入方本地伪装 LAN 服务器） */
+  lanFakeActive: Ref<boolean>
+  /** 局域网伪装本地监听端口（0 表示未启用） */
+  lanFakePort: Ref<number>
 }
 
 let session: OnlineSession | null = null
@@ -83,7 +88,15 @@ function createSession(): OnlineSession {
     // TUN 读到 IP 包 → 按当前角色路由到对应发送通道
     onTunPacket: (raw) => {
       if (store.roomState.role === 'host') {
-        void hostMesh.broadcastPacket(raw)
+        // 优先按目标虚拟 IP 定向单播（消除广播冗余），未命中目标回退广播
+        const targetId = resolveTunParticipantId(raw, store.roomState.participants)
+        if (targetId) {
+          void hostMesh.sendToParticipant(targetId, raw).then((ok) => {
+            if (!ok) void hostMesh.broadcastPacket(raw)
+          })
+        } else {
+          void hostMesh.broadcastPacket(raw)
+        }
       } else {
         void guestWebrtc.sendPacket(raw)
       }
@@ -255,12 +268,74 @@ function createSession(): OnlineSession {
     { immediate: true },
   )
 
+  // 加入方 MC 局域网伪装：本地伪装 LAN 服务器，本机 MC 多人游戏界面直接发现房主房间
+  const lanFakePort = ref(0)
+  const lanFakeActive = ref(false)
+  let fakeSeq = 0
+  let fakeKey = ''
+
+  async function stopLanFake() {
+    if (!lanFakeActive.value) return
+    lanFakeActive.value = false
+    lanFakePort.value = 0
+    try {
+      await lanFakeServerStop()
+    } catch (e) {
+      console.warn('[Online] 局域网伪装停止失败:', e)
+    }
+  }
+
+  async function syncLanFake() {
+    const st = store.roomState
+    const active =
+      st.role === 'guest' && lan.running.value && st.hostMcPort > 0 && !!st.hostVirtualIp
+    if (!active) {
+      await stopLanFake()
+      return
+    }
+    const key = `${st.hostVirtualIp}:${st.hostMcPort}`
+    if (lanFakeActive.value && fakeKey === key) return
+    await stopLanFake()
+    const seq = ++fakeSeq
+    try {
+      const res = await lanFakeServerStart({
+        motd: st.roomCode ? `MoLaunch 联机 ${st.roomCode}` : 'MoLaunch 联机',
+        targetIp: st.hostVirtualIp!,
+        targetPort: st.hostMcPort,
+      })
+      // 期间被再次触发（停止/重启）则丢弃本次结果
+      if (seq !== fakeSeq) {
+        void lanFakeServerStop().catch(() => {})
+        return
+      }
+      lanFakeActive.value = true
+      fakeKey = key
+      lanFakePort.value = res.port
+    } catch (e) {
+      console.warn('[Online] 局域网伪装启动失败:', e)
+    }
+  }
+
+  watch(
+    () =>
+      [
+        store.roomState.role,
+        store.roomState.hostMcPort,
+        store.roomState.hostVirtualIp,
+        lan.running.value,
+      ] as const,
+    () => {
+      void syncLanFake()
+    },
+  )
+
   /** 房间失效统一清理（房主 keepalive 关房 / 加入方监控发现关闭） */
   function handleRoomClosed(msg: string) {
     stopGuestMonitor()
     reconnectAttempts = 0
     clearReconnectTimers()
     hostOps.stop()
+    void stopLanFake()
     void lan.stop()
     guestWebrtc.close()
     hostMesh.close()
@@ -275,6 +350,7 @@ function createSession(): OnlineSession {
   async function guestLeaveAndCleanup() {
     reconnectAttempts = 0
     clearReconnectTimers()
+    await stopLanFake()
     await lan.stop()
     guestWebrtc.close()
     await store.guestLeaveRoom()
@@ -326,5 +402,7 @@ function createSession(): OnlineSession {
     setManualMcPort: hostOps.setManualMcPort,
     clearManualMcPort: hostOps.clearManualMcPort,
     guestLeaveAndCleanup,
+    lanFakeActive,
+    lanFakePort,
   }
 }

@@ -45,6 +45,11 @@ pub struct AppState {
     /// 房主与加入方共用同一实例，每次进入房间时 `tun_start` 创建并替换，
     /// `tun_stop` 关闭并置 None。同一时间仅允许一个桥接实例。
     pub virtual_lan_bridge: Arc<TokioMutex<Option<VirtualLanBridge>>>,
+    /// MC 局域网服务器伪装（加入方本地伪装 LAN 服务器，多人游戏界面直接发现房主房间）
+    ///
+    /// 加入方进入房间且 TUN 就绪后由 `lan_fake_server_start` 创建并替换，
+    /// 退出房间/停 TUN 时 `lan_fake_server_stop` 关闭并置 None。
+    pub lan_fake_server: Arc<TokioMutex<Option<crate::commands::online::manager::LanFakeServer>>>,
     /// 应用句柄（Tauri setup 钩子中注入）
     ///
     /// 供后台任务/进度回调向前端 emit 事件（如 `download-progress`）。
@@ -103,6 +108,7 @@ impl AppState {
             analyze_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             authlib_pending: Arc::new(TokioMutex::new(None)),
             virtual_lan_bridge: Arc::new(TokioMutex::new(None)),
+            lan_fake_server: Arc::new(TokioMutex::new(None)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
         }
     }
