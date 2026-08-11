@@ -9,6 +9,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ShieldCheckIcon, ServerStackIcon, UserIcon } from '@heroicons/vue/24/outline'
+import { ArrowPathIcon, PlayIcon, StopIcon } from '@heroicons/vue/24/solid'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
 import { toastError, toastWarning, toastSuccess, toastInfo } from '@/utils/toast'
@@ -146,16 +147,9 @@ async function handleLaunch() {
       >
         <!-- 主文字区（向上偏移以给底部 LabVersion 留出 13px 间距） -->
         <span class="flex items-center gap-2" style="margin-top: -18px;">
-          <svg v-if="launchState.spin" class="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-            <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25" />
-            <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
-          </svg>
-          <svg v-else-if="versionStore.runningPid" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <rect x="6" y="6" width="12" height="12" rx="2" />
-          </svg>
-          <svg v-else class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M8 5v14l11-7z" />
-          </svg>
+          <ArrowPathIcon v-if="launchState.spin" class="h-5 w-5 animate-spin" />
+          <StopIcon v-else-if="versionStore.runningPid" class="h-5 w-5" />
+          <PlayIcon v-else class="h-5 w-5" />
           <span>{{ launchState.text }}</span>
         </span>
         <!-- 当前版本名（按钮内部底部，11px、灰色、底部 10px） -->

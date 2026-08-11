@@ -197,10 +197,11 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      <div v-else-if="connState === 'failed'" class="mt-2 p-2 bg-red-50 rounded text-xs text-red-700">
-        <ExclamationTriangleIcon class="w-3.5 h-3.5 inline mr-1" />
-        连接失败，可能是 NAT 兼容性问题。请检查网络环境后重试
-      </div>
+      <AlertV2
+        v-else-if="connState === 'failed'"
+        type="error"
+        message="连接失败，可能是 NAT 兼容性问题。请检查网络环境后重试"
+      />
     </Card>
 
     <!-- 退出房间按钮 -->

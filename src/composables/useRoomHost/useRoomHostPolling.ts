@@ -17,6 +17,10 @@ import { encodeHostVirtualIp, encodeTurnServers } from '@/utils/online/protocol'
 
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
+/** 轮询活跃间隔：存在待处理 Offer/Answer 时（ms） */
+const POLL_ACTIVE_INTERVAL_MS = 2_000
+/** 轮询空闲退避间隔：无待处理项时降低云端压力（ms） */
+const POLL_IDLE_INTERVAL_MS = 10_000
 
 export interface RoomHostPollingOptions {
   /** 房间被服务端关闭（keepalive 返回 1001）时回调，由主文件清理连接并退出房间 */
@@ -33,6 +37,8 @@ export function useRoomHostPolling(
   const pendingAnswers = ref<PendingAnswer[]>([])
   /** 正在轮询参与者（防重入） */
   const polling = ref(false)
+  /** 正在轮询 Answer（防重入） */
+  const answering = ref(false)
   /** 正在为参与者生成 Offer 的集合，防止重复生成（key=participantId） */
   const offerGenerating = ref<Set<string>>(new Set())
   /** 轮询失败 toast 防刷屏：记录上次 toast 时间 */
@@ -143,16 +149,22 @@ export function useRoomHostPolling(
         if (!activeIds.has(id)) void hostMesh.closeParticipant(id)
       }
       await scanAndGenerateOffers()
+      // 发现新参与者时联动刷新 Answer（新申请随 join 提交，及时呈现给房主）
+      if (store.roomState.participants.some((p) => p.status === 'joined')) {
+        void pollAnswers()
+      }
     } catch (e) {
       console.warn('[Online] pollParticipants 异常:', e)
     } finally {
       polling.value = false
+      scheduleParticipantsNext()
     }
   }
 
   /** 轮询待确认 Answer */
   async function pollAnswers() {
-    if (store.roomState.role !== 'host' || !store.roomState.roomCode) return
+    if (store.roomState.role !== 'host' || !store.roomState.roomCode || answering.value) return
+    answering.value = true
     try {
       const result = await listAnswers(store.roomState.roomCode)
       if (result.code === 1 && result.data) {
@@ -169,6 +181,9 @@ export function useRoomHostPolling(
       maybeToastAnswerError(
         `获取待确认 Answer 异常：${e instanceof Error ? e.message : String(e)}`,
       )
+    } finally {
+      answering.value = false
+      scheduleAnswersNext()
     }
   }
 
@@ -228,31 +243,56 @@ export function useRoomHostPolling(
     }
   }
 
-  // 定时器句柄
-  let answerTimer: ReturnType<typeof setInterval> | null = null
-  let participantsTimer: ReturnType<typeof setInterval> | null = null
+  // 定时器句柄（setTimeout 链式调度：稳态退避，活跃保持高频）
+  let answerTimer: ReturnType<typeof setTimeout> | null = null
+  let participantsTimer: ReturnType<typeof setTimeout> | null = null
+  /** 调度开关：stopTimers 置 false，防止进行中的请求完成后重新拉起定时器 */
+  let timersActive = false
   /** TurnServers 控制消息的本地 seq 计数器（与 HostMcPort/TUN 数据包 seq 独立） */
   let turnSeq = 0
   /** HostVirtualIp 控制消息的本地 seq 计数器 */
   let hostIpSeq = 0
 
+  /** 存在待生成 Offer 的参与者时保持活跃间隔，否则退避到空闲间隔 */
+  function scheduleParticipantsNext() {
+    if (!timersActive) return
+    if (participantsTimer) clearTimeout(participantsTimer)
+    const hasPendingOffer = store.roomState.participants.some(
+      (p) => p.status === 'joined' && !p.hostOfferReady,
+    )
+    participantsTimer = setTimeout(
+      () => void pollParticipants(),
+      hasPendingOffer ? POLL_ACTIVE_INTERVAL_MS : POLL_IDLE_INTERVAL_MS,
+    )
+  }
+
+  /** 存在待确认申请时保持活跃间隔，否则退避到空闲间隔 */
+  function scheduleAnswersNext() {
+    if (!timersActive) return
+    if (answerTimer) clearTimeout(answerTimer)
+    answerTimer = setTimeout(
+      () => void pollAnswers(),
+      pendingAnswers.value.length > 0 ? POLL_ACTIVE_INTERVAL_MS : POLL_IDLE_INTERVAL_MS,
+    )
+  }
+
   /**
-   * 启动两路信令轮询定时器（参与者 2s / Answer 2s）
+   * 启动两路信令轮询（参与者/Answer 活跃 2s、空闲退避 10s）
    *
    * 注：保活(30s)已由 store 层全局定时器承担（src/stores/online.ts GLOBAL_KEEPALIVE_INTERVAL），
    * 切页不停止；此处 doKeepalive 仅保留给「断连恢复补发」使用，避免重复上报。
    */
   function startTimers() {
-    if (participantsTimer) clearInterval(participantsTimer)
-    if (answerTimer) clearInterval(answerTimer)
-    participantsTimer = setInterval(() => void pollParticipants(), 2000)
-    answerTimer = setInterval(() => void pollAnswers(), 2000)
+    timersActive = true
+    scheduleParticipantsNext()
+    scheduleAnswersNext()
   }
 
   /** 停止所有轮询定时器（云端断开或组件卸载时调用，避免持续失败刷屏） */
   function stopTimers() {
-    if (participantsTimer) { clearInterval(participantsTimer); participantsTimer = null }
-    if (answerTimer) { clearInterval(answerTimer); answerTimer = null }
+    timersActive = false
+    if (participantsTimer) { clearTimeout(participantsTimer); participantsTimer = null }
+    if (answerTimer) { clearTimeout(answerTimer); answerTimer = null }
   }
 
   return {

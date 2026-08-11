@@ -34,9 +34,7 @@ import {
   ServerStackIcon,
   WifiIcon,
   ClipboardDocumentIcon,
-  InformationCircleIcon,
   ShieldCheckIcon,
-  ExclamationTriangleIcon,
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 
@@ -129,6 +127,16 @@ const nearPlayerLimit = computed(
     totalPlayers.value >= room.value.maxPlayers - 1 &&
     room.value.participants.length > 0,
 )
+
+/** 接近人数上限预警文案（AlertV2 纯文本 message） */
+const nearPlayerLimitMessage = computed(
+  () =>
+    `接近人数上限（${totalPlayers.value}/${room.value.maxPlayers}），mesh 拓扑下房主上行带宽随人数线性增长，继续邀请可能出现卡顿，建议改用专业服务器`,
+)
+
+/** P2P 已联通操作指引（AlertV2 纯文本 message） */
+const connectedHintMessage =
+  '已联通，请在 Minecraft 内按 Esc → 「开放给局域网」开关。开放后启动器会自动捕获端口并广播给所有参与者，加入方在「多人游戏 → 直接连接」输入你的虚拟 IP 即可加入'
 </script>
 
 <template>
@@ -183,13 +191,7 @@ const nearPlayerLimit = computed(
         </div>
       </div>
       <!-- 阶段三子任务 9：接近人数上限时显示 mesh 拓扑带宽预警 -->
-      <div
-        v-if="nearPlayerLimit"
-        class="mt-2 px-2 py-2 bg-amber-50 rounded text-xs text-amber-700 flex gap-1.5 items-start"
-      >
-        <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
-        <span>接近人数上限（{{ totalPlayers }}/{{ room.maxPlayers }}），mesh 拓扑下房主上行带宽随人数线性增长，继续邀请可能出现卡顿，建议改用专业服务器</span>
-      </div>
+      <AlertV2 v-if="nearPlayerLimit" type="warning" :message="nearPlayerLimitMessage" />
     </Card>
 
     <Card title="P2P 连接">
@@ -202,13 +204,7 @@ const nearPlayerLimit = computed(
           <span class="text-xs text-gray-500">总参与者数</span>
           <span class="text-xs text-gray-900">{{ room.participants.length }}</span>
         </div>
-        <div
-          v-if="connectedCount > 0"
-          class="mt-2 p-2 bg-blue-50 rounded text-xs text-blue-700 flex gap-1.5 items-start"
-        >
-          <InformationCircleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
-          <span>已联通，请在 Minecraft 内按 Esc → 「开放给局域网」开关。开放后启动器会自动捕获端口并广播给所有参与者，加入方在「多人游戏 → 直接连接」输入你的虚拟 IP 即可加入</span>
-        </div>
+        <AlertV2 v-if="connectedCount > 0" type="info" :message="connectedHintMessage" />
       </div>
     </Card>
 

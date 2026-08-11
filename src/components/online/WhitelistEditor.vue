@@ -23,11 +23,11 @@ import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
+import AlertV2 from '@/components/common/AlertV2.vue'
 import {
   PlusIcon,
   TrashIcon,
   ShieldCheckIcon,
-  ShieldExclamationIcon,
   UserPlusIcon,
 } from '@heroicons/vue/24/outline'
 import { toastError } from '@/utils/toast'
@@ -229,13 +229,11 @@ onMounted(() => {
     </div>
 
     <!-- 启用且为空的警告 -->
-    <div
+    <AlertV2
       v-if="showEmptyWarning"
-      class="p-2 bg-yellow-50 rounded text-xs text-yellow-700 flex gap-1.5 items-start"
-    >
-      <ShieldExclamationIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
-      <span>白名单为空：启用后<b>拒绝所有人加入</b>（仅房主可进入）。请在下方添加设备 ID，或关闭白名单</span>
-    </div>
+      type="warning"
+      message="白名单为空：启用后拒绝所有人加入（仅房主可进入）。请在下方添加设备 ID，或关闭白名单"
+    />
 
     <!-- 添加输入框（启用后才显示） -->
     <div v-if="isEnabled" class="flex items-center gap-2">

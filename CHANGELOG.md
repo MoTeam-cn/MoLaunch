@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+- P2P 联机轮询改为自适应退避（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)）：房主参与者/Answer 轮询在稳态下（无待生成 Offer 的参与者、无待确认申请）由 2s 退避到 10s，活跃时自动恢复 2s，空闲时云端压力降低约 5 倍；`setInterval` 改为 `setTimeout` 链式调度天然防重入，`stopTimers` 后不会因进行中的请求重新拉起定时器；轮询参与者发现新加入者时联动刷新一次 Answer 申请，申请呈现不受退避影响。
+- 联机面板提示统一复用 `AlertV2` 组件（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [WhitelistEditor.vue](src/components/online/WhitelistEditor.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：接近人数上限预警、P2P 已联通指引、白名单为空警告、连接失败提示替换原先手写 CSS 提示块，样式与既有提示保持一致。
+- 启动按钮图标统一为 heroicons（[LaunchPanel.vue](src/components/home/LaunchPanel.vue)）：播放/停止/加载中三个手写内联 SVG 替换为 `PlayIcon` / `StopIcon` / `ArrowPathIcon`，与全站图标体系一致。
+
 - 修复 P2P 联机加入方 WebRTC 状态异常显示 closed（[useWebRTC.ts](src/composables/useWebRTC.ts)）：`close()` 原先无条件将连接状态置为 closed，即使从未建立过 PeerConnection；应用启动时全局会话以空角色调用 `guestWebrtc.close()` 会让状态从启动起就显示 closed。现仅在确实存在连接时才置 closed，且新建 PeerConnection 时重置状态为 `new`，避免复用实例残留上一次会话的 closed。
 - P2P 联机握手提速：房主参与者/Answer 轮询间隔由 5s 收紧到 2s（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)），加入方 SDP Offer 轮询间隔由 2s 收紧到 1s（[useWebRTC.ts](src/composables/useWebRTC.ts)），从加入房间到房主看到「加入申请」的整体等待明显缩短。
 - 修复加入方连接建立后房主虚拟 IP 一直显示「等待房主广播」（[protocol.ts](src/utils/online/protocol.ts) / [mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [protocol.rs](src-tauri/src/minecraft/online/protocol.rs)）：新增 `HOST_VIRTUAL_IP` 控制消息（subtype 0x06），房主在参与者的 DataChannel 建立后向该参与者广播自己的虚拟 IP，加入方收到后回填并显示，无需再干等。
