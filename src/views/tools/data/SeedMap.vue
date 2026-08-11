@@ -20,7 +20,7 @@ import Tooltip from '@/components/common/Tooltip.vue'
 import AlertV2 from '@/components/common/AlertV2.vue'
 import StructPopup from './StructPopup.vue'
 import SeedMapIntro from './SeedMapIntro.vue'
-import LoadSaveModal from './LoadSaveModal.vue'
+import LoadSaveDrawer from './LoadSaveDrawer.vue'
 import SeedMapControls from './SeedMapControls.vue'
 import SeedMapSidebar from './SeedMapSidebar.vue'
 import { useSeedMap } from './useSeedMap'
@@ -41,13 +41,13 @@ const {
   toggleStructureType, isStructureSelected,
 } = useSeedMap()
 
-// 从存档加载弹窗
-const showLoadSaveModal = ref(false)
+// 从存档加载抽屉
+const showLoadSaveDrawer = ref(false)
 
 function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldName: string }) {
   seedInput.value = payload.seed
   mcVersion.value = payload.mcVersion
-  showLoadSaveModal.value = false
+  showLoadSaveDrawer.value = false
   loadSeed()
   toastSuccess(`已从存档「${payload.worldName}」加载种子`)
 }
@@ -77,7 +77,7 @@ function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldNam
       </div>
       <div class="ml-auto flex items-center gap-2">
         <Tooltip text="从本地存档加载种子" position="top" :delay="200">
-          <Button type="outline" size="small" @click="showLoadSaveModal = true">
+          <Button type="outline" size="small" @click="showLoadSaveDrawer = true">
             <template #icon><FolderOpenIcon class="h-4 w-4" /></template>
             从存档
           </Button>
@@ -164,10 +164,9 @@ function handleLoadFromSave(payload: { seed: string; mcVersion: number; worldNam
       <SeedMapIntro />
     </div>
 
-    <!-- 从存档加载弹窗 -->
-    <LoadSaveModal
-      :visible="showLoadSaveModal"
-      @close="showLoadSaveModal = false"
+    <!-- 从存档加载抽屉 -->
+    <LoadSaveDrawer
+      v-model:visible="showLoadSaveDrawer"
       @load="handleLoadFromSave"
     />
   </section>
