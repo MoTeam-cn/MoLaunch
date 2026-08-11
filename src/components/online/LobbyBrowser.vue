@@ -16,7 +16,6 @@ import { ref, computed, onMounted, inject } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
 import { listLobbyRooms } from '@/utils/api/online-manager'
-import { resolveIceServers } from '@/utils/online/webrtc-helpers'
 import { showPrompt } from '@/utils/modal'
 import { toastError, toastInfo } from '@/utils/toast'
 import Input from '@/components/common/Input.vue'
@@ -154,7 +153,9 @@ async function doJoin(roomCode: string, password: string) {
   joiningCode.value = roomCode
   try {
     const joinResp = await store.guestJoinRoom(roomCode, password)
-    const iceServers = resolveIceServers(joinResp.iceServers, joinResp.stunServers)
+    // 参与者自拉系统 TURN（凭据绑定自身 IP/device，P2P 打洞失败时走中继），
+    // 未启用 TURN 时返回云端 ice_servers / stunServers 兜底
+    const iceServers = await store.guestPullTurnServers()
     await guestWebrtc.fetchOfferAndAnswer(roomCode, joinResp.participantId, iceServers)
     // 加入成功后 store.roomState.role='guest'，Online.vue watch(isInRoom) 自动跳转房间详情
   } catch (e) {

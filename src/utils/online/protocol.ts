@@ -183,6 +183,9 @@ export function decodeTurnServersPayload(payload: Uint8Array): IceServerEntry[] 
       const entry: IceServerEntry = { urls: item.urls as string[] }
       if (typeof item.username === 'string') entry.username = item.username
       if (typeof item.credential === 'string') entry.credential = item.credential
+      if (typeof item.name === 'string') entry.name = item.name
+      if (typeof item.region === 'string') entry.region = item.region
+      if (typeof item.regionCode === 'string') entry.regionCode = item.regionCode
       result.push(entry)
     }
     return result

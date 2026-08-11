@@ -44,6 +44,12 @@ export interface IceServerEntry {
   username?: string
   /** TURN 凭据（STUN 时缺省） */
   credential?: string
+  /** TURN 节点名称（如「华东 1 号」，仅 TURN 填充，用于展示） */
+  name?: string
+  /** 区域标识（如 `cn-east`，仅 TURN 填充） */
+  region?: string
+  /** 区域国旗代码（ISO 3166 alpha-2，如 `cn`，前端映射国旗） */
+  regionCode?: string
 }
 
 /**

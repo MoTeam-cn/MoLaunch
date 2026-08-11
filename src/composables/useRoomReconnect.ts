@@ -14,7 +14,6 @@ import type { useWebRTC } from '@/composables/useWebRTC'
 import type { useVirtualLan } from '@/composables/useVirtualLan'
 import { joinRoom, leaveRoom, submitAnswer } from '@/utils/api/online-manager'
 import { importRoomKey } from '@/utils/online/crypto'
-import { resolveIceServers } from '@/utils/online/webrtc-helpers'
 import { consumeReconnectPassword } from '@/utils/relaunchSnapshot'
 import { toastError, toastSuccess } from '@/utils/toast'
 
@@ -46,7 +45,9 @@ export async function reconnectAsGuest(
     const data = resp.data
     store.roomState.participantId = data.participantId
     store.roomState.roomKey = data.roomKey || store.roomState.roomKey
-    const iceServers = resolveIceServers(data.iceServers, data.stunServers)
+    // 参与者自拉系统 TURN（凭据绑定自身 IP/device，P2P 打洞失败时走中继），
+    // 未启用 TURN 时返回云端 ice_servers / stunServers 兜底
+    const iceServers = await store.guestPullTurnServers()
     if (iceServers.length > 0) store.roomState.iceServers = iceServers
 
     // 重新注入加密密钥（新房间密钥）

@@ -28,6 +28,7 @@ import KickConfirmDialog from './KickConfirmDialog.vue'
 import WhitelistEditor from './WhitelistEditor.vue'
 import HostRoomInfoCard from './HostRoomInfoCard.vue'
 import RoomToolsDrawer from './RoomToolsDrawer.vue'
+import ConnectionTransportStatus from './ConnectionTransportStatus.vue'
 import {
   XCircleIcon,
   UsersIcon,
@@ -80,6 +81,8 @@ function onCloseKick() {
 }
 /** 已联通参与者数（channel open） */
 const connectedCount = computed(() => hostMesh.connectedCount())
+/** 房主全部参与者 PC（状态行传输方式检测用） */
+const hostPcs = computed(() => hostMesh.getConnPcs())
 /** 已确认参与者数（status='confirmed'） */
 const confirmedCount = computed(
   () => store.roomState.participants.filter((p) => p.status === 'confirmed').length,
@@ -111,6 +114,7 @@ function participantStateText(participantId: string): string {
           <span class="text-xs text-gray-500">总参与者数</span>
           <span class="text-xs text-gray-900">{{ room.participants.length }}</span>
         </div>
+        <ConnectionTransportStatus :pcs="hostPcs" :ice-servers="room.iceServers" />
         <AlertV2 v-if="connectedCount > 0" type="info" :message="connectedHintMessage" />
       </div>
     </Card>

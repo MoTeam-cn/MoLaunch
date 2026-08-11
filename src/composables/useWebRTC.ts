@@ -49,6 +49,8 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
   const iceGatheringState = ref<RTCIceGatheringState>('new')
   /** 是否正在协商（fetchOfferAndAnswer / setRemoteOfferAndCreateAnswer 期间为 true） */
   const negotiating = ref(false)
+  /** 最近一次应用的房主 Offer SDP（用于 ICE restart 检测：房主重新上传 Offer 后对比变化） */
+  const lastOfferSdp = ref('')
   /** 数据通道（房主创建，加入方在 ondatachannel 接收） */
   const dataChannel = shallowRef<RTCDataChannel | null>(null)
   /** NAT 检测结果（detectNatType 后填充） */
@@ -161,6 +163,8 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
     try {
       const targetPc = ensurePeerConnection(iceServers)
       await targetPc.setRemoteDescription({ type: 'offer', sdp: remoteSdp })
+      // 记录本次应用的 Offer，供 ICE restart 检测对比
+      lastOfferSdp.value = remoteSdp
       // 添加房主的 ICE candidates
       for (const candidate of remoteIce) {
         try {
@@ -291,6 +295,7 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
     iceGatheringState,
     negotiating,
     dataChannel,
+    lastOfferSdp,
     natResult,
     detectingNat,
     // 方法

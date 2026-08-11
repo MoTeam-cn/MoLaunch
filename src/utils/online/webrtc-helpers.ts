@@ -80,6 +80,27 @@ export function resolveIceServers(
   return []
 }
 
+/**
+ * 合并两份 ICE 服务器列表（按 urls 首项去重，前者优先）
+ *
+ * 场景：参与者自拉系统 TURN 后与云端 ice_servers 合并；refreshRoomInfo
+ * 刷新时保留参与者已自拉的 TURN（凭据绑定自身，不可被覆盖）。
+ */
+export function mergeIceServerEntries(
+  base: IceServerEntry[],
+  additions: IceServerEntry[],
+): IceServerEntry[] {
+  if (additions.length === 0) return base
+  const seen = new Set(base.map((e) => e.urls[0]))
+  const merged = [...base]
+  for (const entry of additions) {
+    if (seen.has(entry.urls[0])) continue
+    seen.add(entry.urls[0])
+    merged.push(entry)
+  }
+  return merged
+}
+
 /** `buildIceServers` 输入参数 */
 export interface BuildIceServersOptions {
   /** STUN 服务器 URL 数组（来自 `room_get_stun`） */

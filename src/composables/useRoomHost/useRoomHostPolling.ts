@@ -4,12 +4,16 @@
  * 三路信令轮询（参与者/Answer 2s、保活 30s）、自动 Offer 生成、TURN 广播、
  * 30s 防刷屏 toast 与定时器启停；生命周期由主文件 useRoomHost.ts 负责。
  */
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { RoomClosedError } from '@/stores/online/roomActions'
 import type { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import type { useVirtualLan } from '@/composables/useVirtualLan'
-import { listAnswers, uploadParticipantOffer } from '@/utils/api/online-manager'
+import {
+  confirmParticipant,
+  listAnswers,
+  uploadParticipantOffer,
+} from '@/utils/api/online-manager'
 import { buildIceServers, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
 import type { IceServerEntry, PendingAnswer } from '@/types/online'
 import { toastError } from '@/utils/toast'
@@ -21,6 +25,12 @@ const POLL_ERROR_TOAST_INTERVAL = 30_000
 const POLL_ACTIVE_INTERVAL_MS = 2_000
 /** 轮询空闲退避间隔：无待处理项时降低云端压力（ms） */
 const POLL_IDLE_INTERVAL_MS = 10_000
+/** 单个参与者 ICE restart 最大次数（超限关闭连接，交由加入方全量重建） */
+const MAX_ICE_RESTART_ATTEMPTS = 2
+/** disconnected 状态触发 ICE restart 的宽限期（ICE 可自行恢复，需给足时间） */
+const DISCONNECT_RESTART_DELAY_MS = 8_000
+/** 两次 ICE restart 的最小间隔（等待加入方响应新 Offer 重答，避免耗尽次数） */
+const RESTART_COOLDOWN_MS = 15_000
 
 export interface RoomHostPollingOptions {
   /** 房间被服务端关闭（keepalive 返回 1001）时回调，由主文件清理连接并退出房间 */
@@ -41,6 +51,16 @@ export function useRoomHostPolling(
   const answering = ref(false)
   /** 正在为参与者生成 Offer 的集合，防止重复生成（key=participantId） */
   const offerGenerating = ref<Set<string>>(new Set())
+  /** 正在执行 ICE restart 的参与者（防并发，key=participantId） */
+  const restarting = new Set<string>()
+  /** 重启中且重启前已确认的参与者（key=participantId，value=wasConfirmed，用于自动放行重答） */
+  const restartInFlight = new Map<string, boolean>()
+  /** 各参与者 ICE restart 尝试次数 */
+  const restartAttempts = new Map<string, number>()
+  /** 各参与者 disconnected 状态起始时间（用于断连宽限期判定） */
+  const disconnectedAt = new Map<string, number>()
+  /** 各参与者 ICE restart 冷却截止时间（避免在加入方重答前重复重启） */
+  const restartCooldownUntil = new Map<string, number>()
   /** 轮询失败 toast 防刷屏：记录上次 toast 时间 */
   const lastAnswerErrorToastAt = ref(0)
   const lastOfferErrorToastAt = ref(0)
@@ -127,6 +147,127 @@ export function useRoomHostPolling(
   }
 
   /**
+   * 对指定参与者执行 ICE restart（P2P 断线恢复）
+   *
+   * 复用现有 PC（restartIce → 新 Offer），新 Offer 上传后加入方轮询到
+   * ice-ufrag 变化会自动重答，此间通过 restartInFlight 标记自动放行。
+   */
+  async function restartIceForParticipant(participantId: string, wasConfirmed: boolean) {
+    if (restarting.has(participantId)) return
+    restarting.add(participantId)
+    try {
+      const result = await hostMesh.restartIceFor(participantId)
+      if (!result) {
+        hostMesh.closeParticipant(participantId)
+        return
+      }
+      const upload = await uploadParticipantOffer(
+        store.roomState.roomCode,
+        participantId,
+        result.sdp,
+        result.iceCandidates,
+      )
+      if (upload.code !== 1) throw new Error(upload.msg || '上传新 Offer 失败')
+      // 重启前已确认的参与者，重答后自动放行（不再弹确认框）
+      restartInFlight.set(participantId, wasConfirmed)
+      restartAttempts.set(participantId, (restartAttempts.get(participantId) ?? 0) + 1)
+      restartCooldownUntil.set(participantId, Date.now() + RESTART_COOLDOWN_MS)
+      console.info(`[Online] 已对参与者 ${participantId} 执行 ICE restart`)
+    } catch (e) {
+      console.warn(`[Online] 参与者 ${participantId} ICE restart 失败:`, e)
+      maybeToastOfferError(
+        `ICE restart 失败：${e instanceof Error ? e.message : String(e)}`,
+      )
+    } finally {
+      restarting.delete(participantId)
+    }
+  }
+
+  /**
+   * 自动放行 ICE restart 重答（重启前已确认的参与者，不再弹确认框）
+   */
+  async function autoAcceptRestartAnswer(answer: PendingAnswer) {
+    restartInFlight.delete(answer.participantId)
+    try {
+      const result = await confirmParticipant(
+        store.roomState.roomCode,
+        answer.participantId,
+        true,
+      )
+      if (result.code !== 1) throw new Error(result.msg || '自动确认失败')
+      await hostMesh.setRemoteAnswer(
+        answer.participantId,
+        answer.sdpAnswer,
+        answer.iceCandidates ?? [],
+      )
+      console.info(`[Online] 已自动确认参与者 ${answer.participantId} 的 ICE restart 重答`)
+    } catch (e) {
+      console.warn(`[Online] 自动确认参与者 ${answer.participantId} 重答失败:`, e)
+    }
+  }
+
+  /**
+   * 扫描参与者连接状态，对 failed / 长时间 disconnected 的连接执行 ICE restart
+   *
+   * 由 pollParticipants 与 connectionStates 变化 watch 共同触发；
+   * restarting / restartAttempts 双重防并发与限次。
+   */
+  function scanRestartCandidates() {
+    const roomCode = store.roomState.roomCode
+    if (!roomCode || store.roomState.role !== 'host') return
+    const activeIds = new Set(
+      store.roomState.participants
+        .filter((p) => p.status === 'joined' || p.status === 'answered' || p.status === 'confirmed')
+        .map((p) => p.participantId),
+    )
+    const now = Date.now()
+    for (const [id, state] of hostMesh.connectionStates.entries()) {
+      if (!activeIds.has(id)) continue
+      if (offerGenerating.value.has(id) || restarting.has(id)) continue
+      const attempts = restartAttempts.get(id) ?? 0
+      const inCooldown = (restartCooldownUntil.get(id) ?? 0) > now
+      const giveUp = () => {
+        hostMesh.closeParticipant(id)
+        restartAttempts.delete(id)
+        restartInFlight.delete(id)
+        restartCooldownUntil.delete(id)
+        disconnectedAt.delete(id)
+      }
+      if (state === 'connected') {
+        // 恢复后清理重启状态（重答已由 autoAcceptRestartAnswer 处理或旧路径自愈）
+        restartAttempts.delete(id)
+        restartCooldownUntil.delete(id)
+        restartInFlight.delete(id)
+        disconnectedAt.delete(id)
+        continue
+      }
+      if (state === 'failed') {
+        if (inCooldown) continue
+        if (attempts >= MAX_ICE_RESTART_ATTEMPTS) {
+          console.warn(`[Online] 参与者 ${id} 多次 ICE restart 仍失败，关闭连接等待全量重建`)
+          giveUp()
+        } else {
+          const p = store.roomState.participants.find((x) => x.participantId === id)
+          void restartIceForParticipant(id, p?.status === 'confirmed')
+        }
+        continue
+      }
+      if (state === 'disconnected') {
+        const since = disconnectedAt.get(id) ?? now
+        disconnectedAt.set(id, since)
+        if (now - since >= DISCONNECT_RESTART_DELAY_MS && !inCooldown) {
+          if (attempts >= MAX_ICE_RESTART_ATTEMPTS) {
+            giveUp()
+          } else {
+            const p = store.roomState.participants.find((x) => x.participantId === id)
+            void restartIceForParticipant(id, p?.status === 'confirmed')
+          }
+        }
+      }
+    }
+  }
+
+  /**
    * 扫描参与者列表，为 status='joined' && !hostOfferReady 的参与者生成 Offer
    *
    * 由 pollParticipants 调用，每次刷新参与者列表后触发。
@@ -154,9 +295,17 @@ export function useRoomHostPolling(
           .map((p) => p.participantId),
       )
       for (const id of Array.from(hostMesh.connectionStates.keys())) {
-        if (!activeIds.has(id)) void hostMesh.closeParticipant(id)
+        if (!activeIds.has(id)) {
+          void hostMesh.closeParticipant(id)
+          restartAttempts.delete(id)
+          restartInFlight.delete(id)
+          restartCooldownUntil.delete(id)
+          disconnectedAt.delete(id)
+        }
       }
       await scanAndGenerateOffers()
+      // P2P 断线自动 ICE restart（failed / 长时间 disconnected）
+      scanRestartCandidates()
       // 发现新参与者时联动刷新 Answer（新申请随 join 提交，及时呈现给房主）
       if (store.roomState.participants.some((p) => p.status === 'joined')) {
         void pollAnswers()
@@ -176,7 +325,17 @@ export function useRoomHostPolling(
     try {
       const result = await listAnswers(store.roomState.roomCode)
       if (result.code === 1 && result.data) {
-        pendingAnswers.value = result.data.answers ?? []
+        const answers = result.data.answers ?? []
+        // ICE restart 重答自动放行：房主主动重启且重启前已确认的参与者，不再弹确认框
+        const manual: PendingAnswer[] = []
+        for (const a of answers) {
+          if (restartInFlight.get(a.participantId) === true) {
+            void autoAcceptRestartAnswer(a)
+          } else {
+            manual.push(a)
+          }
+        }
+        pendingAnswers.value = manual
         lastAnswerErrorToastAt.value = 0
       } else {
         console.warn(
@@ -304,6 +463,14 @@ export function useRoomHostPolling(
     if (participantsTimer) { clearTimeout(participantsTimer); participantsTimer = null }
     if (answerTimer) { clearTimeout(answerTimer); answerTimer = null }
   }
+
+  // 连接状态变化即时触发 ICE restart 扫描（无需等待下一轮参与者轮询）
+  watch(
+    () => Array.from(hostMesh.connectionStates.entries()),
+    () => {
+      if (timersActive) scanRestartCandidates()
+    },
+  )
 
   return {
     pendingAnswers,

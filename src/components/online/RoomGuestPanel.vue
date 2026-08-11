@@ -36,9 +36,13 @@ import {
 import VirtualIpCard from './VirtualIpCard.vue'
 import ModpackRequirementCard from './ModpackRequirementCard.vue'
 import RoomToolsDrawer from './RoomToolsDrawer.vue'
+import ConnectionTransportStatus from './ConnectionTransportStatus.vue'
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
+
+/** 加入方 PC 数组（状态行传输方式检测用，单 PC） */
+const guestPcs = computed(() => (guestWebrtc.pc.value ? [guestWebrtc.pc.value] : []))
 
 /** 房间工具抽屉开关（检查 MC 服务 / 网络连通性 / 端口自动检测） */
 const toolsDrawerOpen = ref(false)
@@ -179,6 +183,7 @@ onMounted(() => {
           {{ connStateText }}
         </span>
       </div>
+      <ConnectionTransportStatus :pcs="guestPcs" :ice-servers="room.iceServers" />
       <div v-if="connState === 'connected'" class="mt-2 p-2 bg-green-50 rounded text-xs text-green-700">
         <div class="flex items-start gap-1.5">
           <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />

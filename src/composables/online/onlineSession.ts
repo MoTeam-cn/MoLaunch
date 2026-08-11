@@ -17,7 +17,14 @@ import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import { useVirtualLan } from '@/composables/useVirtualLan'
 import { useRoomHost } from '@/composables/useRoomHost'
 import { reconnectAsGuest } from '@/composables/useRoomReconnect'
-import { getRoomInfo, lanFakeServerStart, lanFakeServerStop } from '@/utils/api/online-manager'
+import {
+  fetchParticipantOffer,
+  getRoomInfo,
+  lanFakeServerStart,
+  lanFakeServerStop,
+  submitAnswer,
+} from '@/utils/api/online-manager'
+import { mergeIceServerEntries, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
 import { resolveTunParticipantId } from '@/utils/online/tunRouting'
 import { importRoomKey } from '@/utils/online/crypto'
 import { peekJoinPassword } from '@/utils/relaunchSnapshot'
@@ -148,10 +155,98 @@ function createSession(): OnlineSession {
   const GUEST_RECONNECT_ATTEMPTS = 3
   const RECONNECT_BACKOFF_MS = [3_000, 6_000, 12_000]
   const DISCONNECT_RECOVERY_DELAY_MS = 5_000
+  /** 轻量重启（ICE restart）超时：超时未恢复回退全量重建 */
+  const LIGHT_RESTART_TIMEOUT_MS = 30_000
+  /** Offer 监控慢速间隔（连接正常时轮询，感知房主主动 restart） */
+  const RESTART_MONITOR_SLOW_MS = 15_000
+  /** Offer 监控快速间隔（断线恢复期间高频轮询） */
+  const RESTART_MONITOR_FAST_MS = 2_500
   let reconnectAttempts = 0
   let reconnecting = false
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
   let disconnectedRecoveryTimer: ReturnType<typeof setTimeout> | null = null
+  /** 房主新 Offer 监控定时器（ICE restart 检测） */
+  let restartMonitorTimer: ReturnType<typeof setTimeout> | null = null
+  /** 监控是否处于快速模式（断线恢复期间为 true） */
+  let restartMonitorFast = false
+  /** 轻量重启超时回退定时器（超时未恢复 → 全量重建） */
+  let lightRestartFallbackTimer: ReturnType<typeof setTimeout> | null = null
+
+  function clearRestartMonitor() {
+    if (restartMonitorTimer) {
+      clearTimeout(restartMonitorTimer)
+      restartMonitorTimer = null
+    }
+    if (lightRestartFallbackTimer) {
+      clearTimeout(lightRestartFallbackTimer)
+      lightRestartFallbackTimer = null
+    }
+    restartMonitorFast = false
+  }
+
+  function scheduleRestartMonitor() {
+    if (store.roomState.role !== 'guest' || !store.roomState.roomCode) return
+    if (restartMonitorTimer) clearTimeout(restartMonitorTimer)
+    restartMonitorTimer = setTimeout(
+      () => void restartMonitorTick(),
+      restartMonitorFast ? RESTART_MONITOR_FAST_MS : RESTART_MONITOR_SLOW_MS,
+    )
+  }
+
+  /**
+   * 轮询房主为本参与者上传的 Offer，发现新 Offer（ice-ufrag 变化）即重新 Answer 并提交。
+   *
+   * 房主在参与者 P2P 断线时执行 ICE restart 并上传新 Offer，加入方据此轻量恢复
+   * （无需 leaveRoom/joinRoom 全量重建）；连接正常时慢速轮询，兼容「房主侧感知断线、
+   * 加入方侧仍 connected」的不对称故障。
+   */
+  async function restartMonitorTick() {
+    if (store.roomState.role !== 'guest' || !store.roomState.roomCode) return
+    // 全量重建 / 初次协商进行中跳过，避免竞争（negotiating 由 useWebRTC 协商期间置 true）
+    if (reconnecting || guestWebrtc.negotiating.value) return
+    try {
+      const pid = store.roomState.participantId
+      if (!pid) return
+      const result = await fetchParticipantOffer(store.roomState.roomCode, pid)
+      if (result.code !== 1 || !result.data) return
+      if (!result.data.ready || !result.data.sdpOffer) return
+      if (result.data.sdpOffer === guestWebrtc.lastOfferSdp.value) return
+      const iceServers = store.roomState.iceServers.length > 0
+        ? store.roomState.iceServers
+        : stunUrlsToIceServers(store.roomState.stunServers)
+      const { sdp, iceCandidates } = await guestWebrtc.setRemoteOfferAndCreateAnswer(
+        iceServers,
+        result.data.sdpOffer,
+        result.data.iceCandidates ?? [],
+      )
+      const resp = await submitAnswer(store.roomState.roomCode, pid, sdp, iceCandidates)
+      if (resp.code === 1) {
+        console.info(`[Online] 已响应房主 ICE restart，重新提交 Answer（${pid}）`)
+      } else {
+        console.warn(`[Online] 重新提交 Answer 失败: ${resp.msg}`)
+      }
+    } catch (e) {
+      console.warn('[Online] 轮询房主新 Offer 异常:', e)
+    } finally {
+      scheduleRestartMonitor()
+    }
+  }
+
+  /** 启动轻量重启：快速轮询捕获房主新 Offer，超时未恢复回退全量重建 */
+  function startLightRestart() {
+    restartMonitorFast = true
+    scheduleRestartMonitor()
+    if (lightRestartFallbackTimer) clearTimeout(lightRestartFallbackTimer)
+    lightRestartFallbackTimer = setTimeout(() => {
+      lightRestartFallbackTimer = null
+      restartMonitorFast = false
+      const cur = guestWebrtc.connectionState.value
+      if (cur === 'failed' || cur === 'disconnected' || cur === 'closed') {
+        console.info('[Online] 轻量重启超时未恢复，回退全量重建')
+        void attemptGuestReconnect()
+      }
+    }, LIGHT_RESTART_TIMEOUT_MS)
+  }
 
   function clearReconnectTimers() {
     if (reconnectTimer) {
@@ -200,6 +295,12 @@ function createSession(): OnlineSession {
     if (state === 'connected') {
       reconnectAttempts = 0
       clearReconnectTimers()
+      // 恢复后切回慢速轮询（房主主动 restart 时仍能感知新 Offer）
+      restartMonitorFast = false
+      if (lightRestartFallbackTimer) {
+        clearTimeout(lightRestartFallbackTimer)
+        lightRestartFallbackTimer = null
+      }
       return
     }
     if (state === 'failed') {
@@ -207,7 +308,12 @@ function createSession(): OnlineSession {
         clearTimeout(disconnectedRecoveryTimer)
         disconnectedRecoveryTimer = null
       }
-      void attemptGuestReconnect()
+      // 优先轻量重启：快速轮询捕获房主 ICE restart 的新 Offer 后重答；超时回退全量重建
+      if (guestWebrtc.pc.value) {
+        startLightRestart()
+      } else {
+        void attemptGuestReconnect()
+      }
       return
     }
     if (state === 'disconnected') {
@@ -215,7 +321,7 @@ function createSession(): OnlineSession {
       disconnectedRecoveryTimer = setTimeout(() => {
         disconnectedRecoveryTimer = null
         const cur = guestWebrtc.connectionState.value
-        if (cur === 'failed' || cur === 'disconnected') void attemptGuestReconnect()
+        if (cur === 'failed' || cur === 'disconnected') startLightRestart()
       }, DISCONNECT_RECOVERY_DELAY_MS)
     }
   })
@@ -237,12 +343,17 @@ function createSession(): OnlineSession {
           if (msg.kind === 'control' && msg.subtype === CONTROL_SUBTYPE.TURN_SERVERS) {
             const turnServers = decodeTurnServersPayload(msg.payload)
             if (!turnServers || turnServers.length === 0) return
-            store.roomState.iceServers = turnServers
+            // 房主广播的 TURN 凭据绑定房主 IP+device，对参与者无效；
+            // 保留参与者自拉的系统 TURN（regionCode 为标记），仅合并广播中的 STUN/自定义 TURN
+            const ownTurn = store.roomState.iceServers.filter((e) => e.regionCode)
+            const usable = turnServers.filter((e) => !e.regionCode)
+            const merged = mergeIceServerEntries(ownTurn, usable)
+            store.roomState.iceServers = merged
             const currentPc = guestWebrtc.pc.value
             if (currentPc) {
               try {
                 currentPc.setConfiguration({
-                  iceServers: turnServers.map((entry) => {
+                  iceServers: merged.map((entry) => {
                     const server: RTCIceServer = { urls: entry.urls }
                     if (entry.username) server.username = entry.username
                     if (entry.credential) server.credential = entry.credential
@@ -334,6 +445,7 @@ function createSession(): OnlineSession {
     stopGuestMonitor()
     reconnectAttempts = 0
     clearReconnectTimers()
+    clearRestartMonitor()
     hostOps.stop()
     void stopLanFake()
     void lan.stop()
@@ -350,6 +462,7 @@ function createSession(): OnlineSession {
   async function guestLeaveAndCleanup() {
     reconnectAttempts = 0
     clearReconnectTimers()
+    clearRestartMonitor()
     await stopLanFake()
     await lan.stop()
     guestWebrtc.close()
@@ -365,6 +478,8 @@ function createSession(): OnlineSession {
       toastError(`虚拟网卡启动失败：${e instanceof Error ? e.message : String(e)}`)
     })
     startGuestMonitor()
+    // 启动房主新 Offer 监控（慢速模式；断线时 startLightRestart 切快速）
+    scheduleRestartMonitor()
   }
 
   /** 按当前角色同步会话：进房启动、退房清理 */
@@ -377,6 +492,7 @@ function createSession(): OnlineSession {
       stopGuestMonitor()
       reconnectAttempts = 0
       clearReconnectTimers()
+      clearRestartMonitor()
       hostOps.stop()
       void lan.stop()
       guestWebrtc.close()

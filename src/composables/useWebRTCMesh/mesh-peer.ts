@@ -220,6 +220,37 @@ export function useMeshPeer(deps: MeshPeerDeps) {
     return n
   }
 
+  /** 获取所有参与者 PC 快照（只读，用于传输方式统计） */
+  function getConnPcs(): RTCPeerConnection[] {
+    return Array.from(conns.value.values()).map((c) => c.pc)
+  }
+
+  /**
+   * 对指定参与者执行 ICE restart（P2P 断线恢复）
+   *
+   * 房主在参与者 PC 进入 failed 后调用：restartIce → 重新 createOffer →
+   * setLocalDescription → 收集新 candidate。新 Offer 由调用方重新上传，
+   * 加入方轮询到新 Offer（ice-ufrag 变化）后重新 Answer 即可建立新路径
+   * （TURN 中继等新候选参与协商）。连接不存在时返回 null。
+   */
+  async function restartIceFor(participantId: string): Promise<SdpResult | null> {
+    const conn = conns.value.get(participantId)
+    if (!conn) return null
+    try {
+      conn.pc.restartIce()
+      const offer = await conn.pc.createOffer()
+      await conn.pc.setLocalDescription(offer)
+      const iceCandidates = await collectIceCandidates(conn.pc)
+      return {
+        sdp: conn.pc.localDescription?.sdp ?? offer.sdp ?? '',
+        iceCandidates,
+      }
+    } catch (e) {
+      console.warn(`[Online] 参与者 ${participantId} ICE restart 失败:`, e)
+      return null
+    }
+  }
+
   return {
     conns,
     connectionStates,
@@ -232,5 +263,7 @@ export function useMeshPeer(deps: MeshPeerDeps) {
     close,
     getConnState,
     connectedCount,
+    getConnPcs,
+    restartIceFor,
   }
 }
