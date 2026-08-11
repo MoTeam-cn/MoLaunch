@@ -2,6 +2,10 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+- FRP 官方公共服务器创建隧道移除分配接口调用（[public-server.ts](src/utils/api/frp-manager/public-server.ts) / [usePublicServers.ts](src/composables/usePublicServers.ts) / [frp.rs](src-tauri/src/minecraft/online/frp.rs) / [public_server_actions.rs](src-tauri/src/commands/frp/manager/public_server_actions.rs)）：api-server 已移除 `POST /v1/frp/allocate|release|keepalive` 下发链路，`GET /v1/frp/servers` 列表直接返回完整连接信息（公共 token / 地址 / 端口 / TLS）。前端选择公共服务器后从列表项直接回填表单（远程端口客户端随机生成），不再请求云端分配 token 与端口；Rust 侧同步删除 `allocate_public_server` / `release_public_server` / `keepalive_public_server` 三个 IPC action、`PublicFrpServer` 精简为列表接口实际返回的 7 个字段（移除 `serverType` / `onlineUsers` / `maxUsers` / `loadPercent` / `allocatable`），避免反序列化因缺失字段失败。
+
 ## [0.3.5-rc7] - 2026-08-11
 
 - 修复检查更新对预发布版本比较失效（[check.rs](src-tauri/src/commands/system/updater/check.rs) / [check_test.rs](src-tauri/src/commands/system/updater/check_test.rs)）：原 `parse_semver` 用 `split(['.', '-'])` 拆版本并丢弃 pre-release 段，导致 `0.3.5-rc7` 与 `0.3.5-rc6` 被解析为相同版本，rc/beta/alpha 迭代时「检查更新」始终返回无更新。现按语义化版本规则比较——主版本号相同则比较 pre-release 段（纯数字按数值、`rc`/`beta` 前缀按前缀+数字尾比较），正式版高于预发布版，rc9→rc10 两位数字后缀也按数值正确识别。

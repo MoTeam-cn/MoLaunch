@@ -8,7 +8,6 @@ mod tunnel_actions;
 
 pub use dispatcher::dispatch;
 pub(crate) use dispatcher::{
-    AllocatePublicServerParams, AllocationIdParams, DetectPackageParams, EnsureFrpcParams,
-    InstallProviderFromUrlParams, InstallProviderParams, ProviderIdParams, ReadLogParams,
-    RunAuthAdapterParams, SaveApiKeyParams,
+    DetectPackageParams, EnsureFrpcParams, InstallProviderFromUrlParams, InstallProviderParams,
+    ProviderIdParams, ReadLogParams, RunAuthAdapterParams, SaveApiKeyParams,
 };

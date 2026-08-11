@@ -48,21 +48,6 @@ pub struct ReadLogParams {
     pub max_lines: Option<usize>,
 }
 
-/// 分配公共服务器端口参数（对应 apiServer `AllocateRequest`）
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AllocatePublicServerParams {
-    pub server_id: String,
-    pub tunnel_type: String,
-}
-
-/// 释放/续期分配参数
-#[derive(Debug, serde::Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AllocationIdParams {
-    pub allocation_id: String,
-}
-
 /// 保存 API Key 参数
 #[derive(Debug, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]

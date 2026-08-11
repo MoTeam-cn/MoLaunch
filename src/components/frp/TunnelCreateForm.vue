@@ -29,7 +29,7 @@ const emit = defineEmits<{
 }>()
 
 const {
-  form, isEdit, isOfficial, publicServersLoading, allocating, publicServerOptions,
+  form, isEdit, isOfficial, publicServersLoading, publicServerOptions,
   handlePublicServerChange, portSelecting, handleSelectPort, checkHint,
   handleImportConfig, handleSubmit,
 } = useTunnelCreateForm(
@@ -51,14 +51,10 @@ const {
       <Select
         v-model="form.publicServerId"
         :options="publicServerOptions"
-        :disabled="publicServersLoading || allocating"
+        :disabled="publicServersLoading"
         :placeholder="publicServersLoading ? '加载中...' : '选择服务器'"
         @update:model-value="handlePublicServerChange"
       />
-      <p v-if="allocating" class="mt-1 flex items-center gap-1 text-xs text-primary-600">
-        <ArrowPathIcon class="w-3.5 h-3.5 animate-spin" />
-        正在分配端口与 Token...
-      </p>
     </div>
 
     <div class="grid grid-cols-2 gap-3">
@@ -176,7 +172,7 @@ const {
         type="primary"
         size="small"
         :loading="actionLoading"
-        :disabled="!form.name.trim() || !form.serverAddr.trim() || (isOfficial && !form.allocationId)"
+        :disabled="!form.name.trim() || !form.serverAddr.trim()"
         @click="handleSubmit"
       >
         {{ isEdit ? '保存' : '创建' }}

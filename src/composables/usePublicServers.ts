@@ -2,16 +2,16 @@
  * 公共服务器（官方模式）逻辑
  *
  * 从 TunnelCreateForm.vue 抽离，避免组件超 300 行约束。
- * 包含公共服务器列表加载、分配端口与 token、错误回滚。
- * form 由调用方传入（reactive 对象），composable 直接写入分配结果。
+ * 列表接口直接返回完整连接信息（token/地址/端口），选择服务器后回填表单。
+ * form 由调用方传入（reactive 对象），composable 直接写入填充结果。
  */
-import { ref, computed } from 'vue'
-import { listPublicServers, allocatePublicServer } from '@/utils/api/frp-manager'
+import { computed, ref } from 'vue'
+import { listPublicServers } from '@/utils/api/frp-manager'
 import { toastError } from '@/utils/toast'
-import type { PublicFrpServer, TunnelType } from '@/types/frp'
+import type { PublicFrpServer } from '@/types/frp'
 
-/** external 公共服务器不由 api-server 分配端口，客户端为 frpc 生成临时端口。 */
-function pickExternalRemotePort(): number {
+/** 官方公共服务器不分配远程端口，客户端为 frpc 随机生成一个。 */
+function pickRemotePort(): number {
   const min = 10_000
   const max = 60_000
   const range = max - min + 1
@@ -26,27 +26,22 @@ function pickExternalRemotePort(): number {
 
 /** composable 需要读写的表单字段子集 */
 interface PublicServerFormTarget {
-  tunnelType: TunnelType
   serverAddr: string
   serverPort: number
   remotePort: number
   token: string
   useTls: boolean
-  allocationId: string
   publicServerId: string
 }
 
 export function usePublicServers(form: PublicServerFormTarget) {
   const publicServers = ref<PublicFrpServer[]>([])
   const publicServersLoading = ref(false)
-  const allocating = ref(false)
   const publicServerOptions = computed(() =>
-    publicServers.value
-      .filter(s => s.allocatable)
-      .map(s => ({
-        label: `${s.name}（${s.region}）· 负载 ${s.loadPercent}% · ${s.onlineUsers}/${s.maxUsers} 人`,
-        value: s.id,
-      })),
+    publicServers.value.map(s => ({
+      label: `${s.name}（${s.region}）`,
+      value: s.id,
+    })),
   )
 
   async function loadPublicServers() {
@@ -61,30 +56,20 @@ export function usePublicServers(form: PublicServerFormTarget) {
     }
   }
 
-  async function handlePublicServerChange(id: string | number) {
+  function handlePublicServerChange(id: string | number) {
     if (!id) return
-    allocating.value = true
-    try {
-      const resp = await allocatePublicServer({ serverId: String(id), tunnelType: form.tunnelType })
-      form.serverAddr = resp.server.serverAddr
-      form.serverPort = resp.server.serverPort
-      const allocatedRemotePort = resp.remotePort > 0 ? resp.remotePort : pickExternalRemotePort()
-      form.remotePort = allocatedRemotePort
-      form.token = resp.frpToken
-      form.useTls = resp.server.tlsEnabled
-      form.allocationId = resp.allocationId
-    } catch (e) {
-      toastError('分配公共服务器失败：' + e)
-      form.publicServerId = ''
-    } finally {
-      allocating.value = false
-    }
+    const server = publicServers.value.find(s => s.id === String(id))
+    if (!server) return
+    form.serverAddr = server.serverAddr
+    form.serverPort = server.serverPort
+    form.remotePort = pickRemotePort()
+    form.token = server.publicToken
+    form.useTls = server.tlsEnabled
   }
 
   return {
     publicServers,
     publicServersLoading,
-    allocating,
     publicServerOptions,
     loadPublicServers,
     handlePublicServerChange,

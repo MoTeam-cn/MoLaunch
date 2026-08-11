@@ -1,7 +1,6 @@
 //! Frp 公共服务接口客户端
-//! 对接 api-server `/v1/frp/*`：frpc 二进制分发（manifest）+ 公共 frps 服务器
-//! （servers/allocate/release/keepalive）。GET 明文响应携带 JWT；POST 走 ECIES 加密信封
-//! 由 `OnlineClient::call_v1` 统一处理。字段命名：apiServer 返回 snake_case，客户端结构体用
+//! 对接 api-server `/v1/frp/*`：frpc 二进制分发（manifest）+ 公共 frps 服务器列表
+//! （servers）。GET 明文响应携带 JWT。字段命名：apiServer 返回 snake_case，客户端结构体用
 //! camelCase + `alias` 同时支持反序列化（snake_case）与序列化给前端（camelCase）。
 
 use serde::{Deserialize, Serialize};
@@ -59,10 +58,9 @@ pub struct FrpManifest {
 
 // 公共 frps 服务器（GET /v1/frp/servers）
 
-/// 公共 frps 服务器信息
+/// 公共 frps 服务器信息（GET /v1/frp/servers）
 ///
-/// external 服务器附带 `publicToken`（客户端直接连接，无需 allocate）；
-/// self_managed 服务器 `publicToken` 为空，需调 allocate 获取 per-user token + remotePort。
+/// apiServer 直接返回完整连接信息（公共 token + 地址端口），客户端无需再调用分配接口。
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PublicFrpServer {
@@ -73,84 +71,11 @@ pub struct PublicFrpServer {
     pub server_addr: String,
     #[serde(alias = "server_port")]
     pub server_port: i32,
-    /// 服务器类型：`self_managed` / `external`
-    #[serde(alias = "server_type")]
-    pub server_type: String,
-    /// 仅 external 返回公共 token；self_managed 为空字符串
+    /// 公共共享 token（frpc token 字段）
     #[serde(alias = "public_token")]
     pub public_token: String,
-    #[serde(alias = "online_users")]
-    pub online_users: i32,
-    #[serde(alias = "max_users")]
-    pub max_users: i32,
-    /// 负载百分比（0-100）
-    #[serde(alias = "load_percent")]
-    pub load_percent: i32,
-    /// 是否可分配
-    pub allocatable: bool,
     #[serde(alias = "tls_enabled")]
     pub tls_enabled: bool,
-}
-
-// 分配端口（POST /v1/frp/allocate）
-
-/// 分配端口请求（加密信封内明文）
-///
-/// 字段命名与 apiServer `AllocateRequest` 一致（snake_case），
-/// 因为此结构体仅用于构造加密请求体，不参与前端序列化。
-#[derive(Debug, Clone, Serialize)]
-pub struct AllocateRequest {
-    /// 用户选择的服务器 ID（来自 GET /servers）
-    pub server_id: String,
-    /// 隧道类型（tcp / udp）
-    pub tunnel_type: String,
-}
-
-/// 分配端口响应（加密信封内明文，解密后由 `call_v1` 反序列化为 `BusinessResult<AllocateResponse>`）
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AllocateResponse {
-    /// 分配的服务器信息
-    pub server: AllocateServerInfo,
-    /// 用户专属远程端口（frpc remote_port）
-    #[serde(alias = "remote_port")]
-    pub remote_port: i32,
-    /// frps 鉴权 token（per-user，frpc token 字段）
-    #[serde(alias = "frp_token")]
-    pub frp_token: String,
-    /// 分配过期时间（Unix 秒，超时未续期则回收）
-    #[serde(alias = "expires_at")]
-    pub expires_at: i64,
-    /// 分配 ID（用于 release / keepalive）
-    #[serde(alias = "allocation_id")]
-    pub allocation_id: String,
-}
-
-/// 分配响应中的服务器信息
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct AllocateServerInfo {
-    pub id: String,
-    #[serde(alias = "server_addr")]
-    pub server_addr: String,
-    #[serde(alias = "server_port")]
-    pub server_port: i32,
-    #[serde(alias = "tls_enabled")]
-    pub tls_enabled: bool,
-}
-
-// 释放 / 续期（POST /v1/frp/release|keepalive）
-
-/// 释放分配请求（加密信封内明文）
-#[derive(Debug, Clone, Serialize)]
-pub struct ReleaseRequest {
-    pub allocation_id: String,
-}
-
-/// 续期分配请求（加密信封内明文）
-#[derive(Debug, Clone, Serialize)]
-pub struct KeepaliveRequest {
-    pub allocation_id: String,
 }
 
 // OnlineClient 扩展方法
@@ -189,52 +114,5 @@ impl OnlineClient {
     ) -> Result<BusinessResult<Vec<PublicFrpServer>>, ClientError> {
         self.call_v1::<Vec<PublicFrpServer>>(creds, "GET", api_paths::FRP_SERVERS, None, false)
             .await
-    }
-
-    /// 分配端口 + per-user token（POST /v1/frp/allocate）
-    ///
-    /// 请求/响应均走 ECIES 加密信封，CSRF 自动获取。
-    /// - self_managed 服务器：原子分配端口，返回 per-user token + remotePort
-    /// - external 服务器：直接返回公共 token，remotePort=0
-    pub async fn frp_allocate(
-        &self,
-        creds: &DeviceCredentials,
-        req: &AllocateRequest,
-    ) -> Result<BusinessResult<AllocateResponse>, ClientError> {
-        let body = serde_json::to_value(req)?;
-        self.call_v1::<AllocateResponse>(creds, "POST", api_paths::FRP_ALLOCATE, Some(&body), true)
-            .await
-    }
-
-    /// 释放分配（POST /v1/frp/release）
-    ///
-    /// 用户停止隧道时调用，便于端口回收。即使不调用，过期后也会自动回收。
-    pub async fn frp_release(
-        &self,
-        creds: &DeviceCredentials,
-        allocation_id: &str,
-    ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let body = serde_json::json!({ "allocation_id": allocation_id });
-        self.call_v1::<serde_json::Value>(creds, "POST", api_paths::FRP_RELEASE, Some(&body), true)
-            .await
-    }
-
-    /// 续期分配（POST /v1/frp/keepalive）
-    ///
-    /// frpc 运行期间定时调用，延长 `expiresAt`。续期失败提示用户重新分配。
-    pub async fn frp_keepalive(
-        &self,
-        creds: &DeviceCredentials,
-        allocation_id: &str,
-    ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
-        let body = serde_json::json!({ "allocation_id": allocation_id });
-        self.call_v1::<serde_json::Value>(
-            creds,
-            "POST",
-            api_paths::FRP_KEEPALIVE,
-            Some(&body),
-            true,
-        )
-        .await
     }
 }

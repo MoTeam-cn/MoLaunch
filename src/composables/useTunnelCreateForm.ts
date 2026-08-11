@@ -31,7 +31,7 @@ function createForm() {
     serverAddr: '', serverPort: 7000, remotePort: 30000, token: '', useTls: false,
     bandwidthLimit: '', bandwidthLimitMode: 'server', proxyUseEncryption: false,
     proxyUseCompression: false, proxyProtocolVersion: 'v1', advancedOpen: false,
-    publicServerId: '', allocationId: '',
+    publicServerId: '',
   })
 }
 
@@ -43,11 +43,11 @@ export function useTunnelCreateForm(
   const form = createForm()
   const isEdit = computed(() => !!editTunnel.value)
   const isOfficial = computed(() => form.mode === 'official')
-  const { publicServersLoading, allocating, publicServerOptions, loadPublicServers, handlePublicServerChange } = usePublicServers(form)
+  const { publicServersLoading, publicServerOptions, loadPublicServers, handlePublicServerChange } = usePublicServers(form)
 
   watch(() => form.mode, (mode) => {
     if (mode === 'official') void loadPublicServers()
-    else { form.publicServerId = ''; form.allocationId = '' }
+    else form.publicServerId = ''
   })
 
   const portSelecting = ref(false)
@@ -158,7 +158,7 @@ export function useTunnelCreateForm(
   }
 
   return {
-    form, isEdit, isOfficial, publicServersLoading, allocating, publicServerOptions,
+    form, isEdit, isOfficial, publicServersLoading, publicServerOptions,
     handlePublicServerChange, portSelecting, handleSelectPort, checkHint, handleImportConfig, handleSubmit,
   }
 }

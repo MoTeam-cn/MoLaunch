@@ -36,57 +36,16 @@ export interface ProviderIdParams {
 // 公共 frps 服务器（对接 apiServer `/v1/frp/*`）
 // ============================================================
 
-/** 公共 frps 服务器信息（GET /v1/frp/servers 返回数组元素） */
+/** 公共 frps 服务器信息（GET /v1/frp/servers 返回数组元素，直接含完整连接信息） */
 export interface PublicFrpServer {
   id: string
   name: string
   region: string
   serverAddr: string
   serverPort: number
-  /** 服务器类型：`self_managed` / `external` */
-  serverType: string
-  /** 仅 external 返回公共 token；self_managed 为空字符串 */
+  /** 公共共享 token（frpc token 字段） */
   publicToken: string
-  onlineUsers: number
-  maxUsers: number
-  /** 负载百分比（0-100） */
-  loadPercent: number
-  /** 是否可分配 */
-  allocatable: boolean
   tlsEnabled: boolean
-}
-
-/** 分配端口请求参数（POST /v1/frp/allocate） */
-export interface AllocatePublicServerParams {
-  serverId: string
-  tunnelType: TunnelType
-}
-
-/** 分配响应中的服务器信息 */
-export interface AllocateServerInfo {
-  id: string
-  serverAddr: string
-  serverPort: number
-  tlsEnabled: boolean
-}
-
-/** 分配端口响应（POST /v1/frp/allocate） */
-export interface AllocateResponse {
-  /** 分配的服务器信息 */
-  server: AllocateServerInfo
-  /** 用户专属远程端口（frpc remote_port，external 服务器为 0） */
-  remotePort: number
-  /** frps 鉴权 token（per-user，frpc token 字段） */
-  frpToken: string
-  /** 分配过期时间（Unix 秒，超时未续期则回收） */
-  expiresAt: number
-  /** 分配 ID（用于 release / keepalive） */
-  allocationId: string
-}
-
-/** 释放/续期分配参数 */
-export interface AllocationIdParams {
-  allocationId: string
 }
 
 // ============================================================
