@@ -50,13 +50,17 @@ function writeLastSeen(version: string): void {
 /**
  * 启动时检测并展示「本次更新」日志
  *
- * 规则（对齐 PCL2 UpgradeSub）：全新安装不弹；同版本 / 版本回退不弹；
- * 仅当上次版本低于当前版本时弹，且弹窗前先记录当前版本，保证只弹一次。
+ * 规则（对齐 PCL2 UpgradeSub）：首次运行仅记录当前版本（不弹窗，供后续升级对比）；
+ * 同版本 / 版本回退不弹；仅当上次版本低于当前版本时弹，且弹窗前先记录当前版本，保证只弹一次。
  */
 export function maybeShowUpdateLog(): void {
   const current = currentVersion()
   const lastSeen = readLastSeen()
-  if (lastSeen === null || lastSeen === current) return
+  if (lastSeen === null) {
+    writeLastSeen(current)
+    return
+  }
+  if (lastSeen === current) return
   if (compareVersion(lastSeen, current) > 0) return
   writeLastSeen(current)
   updateLogVisible.value = true
