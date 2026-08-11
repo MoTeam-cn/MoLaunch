@@ -29,7 +29,7 @@ export interface SdpResult {
 }
 
 /** fetchOfferAndAnswer 默认轮询参数 */
-const DEFAULT_POLL_INTERVAL_MS = 2000
+const DEFAULT_POLL_INTERVAL_MS = 1000
 const DEFAULT_POLL_TIMEOUT_MS = 30_000
 
 /**
@@ -83,6 +83,8 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
   function ensurePeerConnection(iceServers: IceServerEntry[]): RTCPeerConnection {
     if (pc.value) return pc.value
     const newPc = createPeerConnection(iceServers)
+    // 新建连接时重置状态，避免复用实例残留上一次会话的 closed
+    connectionState.value = 'new'
 
     // 连接状态同步
     newPc.onconnectionstatechange = () => {
@@ -267,8 +269,9 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
           /* ignore */
         }
         pc.value = null
+        // 仅在确实存在连接时置 closed，从未连接的实例保持 'new'
+        connectionState.value = 'closed'
       }
-      connectionState.value = 'closed'
       // 阶段三子任务 8：清除加密密钥，避免复用 composable 时残留旧密钥
       roomKey.value = null
     } catch {

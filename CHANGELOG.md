@@ -4,6 +4,11 @@
 
 ## [Unreleased]
 
+- 修复 P2P 联机加入方 WebRTC 状态异常显示 closed（[useWebRTC.ts](src/composables/useWebRTC.ts)）：`close()` 原先无条件将连接状态置为 closed，即使从未建立过 PeerConnection；应用启动时全局会话以空角色调用 `guestWebrtc.close()` 会让状态从启动起就显示 closed。现仅在确实存在连接时才置 closed，且新建 PeerConnection 时重置状态为 `new`，避免复用实例残留上一次会话的 closed。
+- P2P 联机握手提速：房主参与者/Answer 轮询间隔由 5s 收紧到 2s（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)），加入方 SDP Offer 轮询间隔由 2s 收紧到 1s（[useWebRTC.ts](src/composables/useWebRTC.ts)），从加入房间到房主看到「加入申请」的整体等待明显缩短。
+- 修复加入方连接建立后房主虚拟 IP 一直显示「等待房主广播」（[protocol.ts](src/utils/online/protocol.ts) / [mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [protocol.rs](src-tauri/src/minecraft/online/protocol.rs)）：新增 `HOST_VIRTUAL_IP` 控制消息（subtype 0x06），房主在参与者的 DataChannel 建立后向该参与者广播自己的虚拟 IP，加入方收到后回填并显示，无需再干等。
+- 加入方面板 WebRTC 状态徽章改为中文标签（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：`new` 显示「等待房主接受」、`connecting` 显示「连接中…」等，不再展示英文原始状态。
+
 - 修复 GitHub Issue 模板不生效（`.github/ISSUE_TEMPLATE/bug_report.md` / `feature_request.md` / `question.md`）：简单 Markdown 模板 front matter 的描述字段应为 `about`（`description` 仅适用于 Issue Forms 结构化表单），将三个模板的 `description:` 修正为 `about:`，模板现可正常显示于新建 Issue 的选择页。
 
 - 提交规范更新：commit message 默认不再携带 `!c` 标记（`!c` 仅作为可选的 CI 跳过标记，需要跳过本次推送触发的构建时才附加）；同步更新 `AI_AGENT_GUIDELINES.md` / `DEVELOPMENT_GUIDELINES.md` / `CONTRIBUTING.md` / `DEVELOPMENT_BLUEPRINT.md` / `.github/PULL_REQUEST_TEMPLATE.md` 中的格式示例与说明。

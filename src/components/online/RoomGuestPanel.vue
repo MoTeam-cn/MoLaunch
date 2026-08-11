@@ -46,6 +46,26 @@ useGuestReconnect(guestWebrtc, session.lan)
 const room = computed(() => store.roomState)
 const connState = guestWebrtc.connectionState
 
+/** WebRTC 状态中文标签 */
+const connStateText = computed(() => {
+  switch (connState.value) {
+    case 'connected':
+      return '已连接'
+    case 'connecting':
+      return '连接中…'
+    case 'new':
+      return '等待房主接受'
+    case 'disconnected':
+      return '连接中断'
+    case 'failed':
+      return '连接失败'
+    case 'closed':
+      return '已断开'
+    default:
+      return connState.value
+  }
+})
+
 /** 距过期剩余时间（秒） */
 const remainingSeconds = computed(() => {
   if (!room.value.expiresAt) return 0
@@ -151,7 +171,7 @@ onMounted(() => {
             'bg-red-50 text-red-700': connState === 'failed' || connState === 'closed',
           }"
         >
-          {{ connState }}
+          {{ connStateText }}
         </span>
       </div>
       <div v-if="connState === 'connected'" class="mt-2 p-2 bg-green-50 rounded text-xs text-green-700">

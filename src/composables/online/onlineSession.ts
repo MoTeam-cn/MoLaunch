@@ -25,6 +25,7 @@ import {
   CONTROL_SUBTYPE,
   parseHostMcPortPayload,
   decodeTurnServersPayload,
+  parseHostVirtualIpPayload,
 } from '@/utils/online/protocol'
 import { toastError } from '@/utils/toast'
 
@@ -236,6 +237,11 @@ function createSession(): OnlineSession {
                 console.warn('[Online] 加入方更新 PC 配置失败:', e)
               }
             }
+            return
+          }
+          if (msg.kind === 'control' && msg.subtype === CONTROL_SUBTYPE.HOST_VIRTUAL_IP) {
+            const ip = parseHostVirtualIpPayload(msg.payload)
+            if (ip) store.roomState.hostVirtualIp = ip
             return
           }
           if (msg.kind === 'data') void lan.forwardToTun(raw)

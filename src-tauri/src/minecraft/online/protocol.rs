@@ -2,7 +2,7 @@
 //! 定义 P2P DataChannel 上传输的二进制消息帧格式，用于虚拟网卡 IP 包转发
 //! 与控制消息（心跳、状态查询）。
 //! 帧格式：`type(1B) | seq(u32 BE) | length(u16 BE) | payload`，大端序网络字节序。
-//! Control 子类型：Heartbeat/StatusQuery/StatusResponse/HostMcPort/TurnServers。
+//! Control 子类型：Heartbeat/StatusQuery/StatusResponse/HostMcPort/TurnServers/HostVirtualIp。
 
 use std::io::{self, Cursor, Read};
 
@@ -49,6 +49,10 @@ pub enum ControlSubtype {
     /// [{"urls":["turn:turn.example.com:3478"],"username":"foo","credential":"bar"}]
     /// ```
     TurnServers = 0x05,
+    /// 房主虚拟 IP（参与者 DataChannel 建立后由房主下发，加入方连接界面显示用）
+    ///
+    /// payload 为 UTF-8 IP 字符串。
+    HostVirtualIp = 0x06,
 }
 
 impl ControlSubtype {
@@ -59,6 +63,7 @@ impl ControlSubtype {
             0x03 => Some(Self::StatusResponse),
             0x04 => Some(Self::HostMcPort),
             0x05 => Some(Self::TurnServers),
+            0x06 => Some(Self::HostVirtualIp),
             _ => None,
         }
     }

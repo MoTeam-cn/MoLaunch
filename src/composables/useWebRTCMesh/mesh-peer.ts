@@ -70,11 +70,13 @@ export function useMeshPeer(deps: MeshPeerDeps) {
    *
    * @param participantId 参与者 ID
    * @param iceServers ICE 服务器条目数组（含 STUN + TURN 凭据）
+   * @param onChannelOpen DataChannel 建立（onOpen）时回调，用于向该参与者下发控制消息
    * @returns SDP Offer + ICE candidates，由调用方上传到后端
    */
   async function createOfferFor(
     participantId: string,
     iceServers: IceServerEntry[],
+    onChannelOpen?: (participantId: string) => void,
   ): Promise<SdpResult> {
     // 已存在旧连接 → 先清理（不应发生，防御性处理）
     if (conns.value.has(participantId)) {
@@ -93,7 +95,10 @@ export function useMeshPeer(deps: MeshPeerDeps) {
 
       // DataChannel 事件（默认空 handler，业务侧可通过 setDataChannelHandlers 重新绑定）
       setupDataChannelHandlers(channel, {
-        onOpen: () => channelOpen.set(participantId, true),
+        onOpen: () => {
+          channelOpen.set(participantId, true)
+          onChannelOpen?.(participantId)
+        },
         onClose: () => channelOpen.set(participantId, false),
       })
 

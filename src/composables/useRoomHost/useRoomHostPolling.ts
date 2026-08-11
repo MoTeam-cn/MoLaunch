@@ -1,7 +1,7 @@
 /**
  * 房主轮询切片（useRoomHost 拆分）
  *
- * 三路信令轮询（参与者/Answer 5s、保活 30s）、自动 Offer 生成、TURN 广播、
+ * 三路信令轮询（参与者/Answer 2s、保活 30s）、自动 Offer 生成、TURN 广播、
  * 30s 防刷屏 toast 与定时器启停；生命周期由主文件 useRoomHost.ts 负责。
  */
 import { ref } from 'vue'
@@ -13,7 +13,7 @@ import { listAnswers, uploadParticipantOffer } from '@/utils/api/online-manager'
 import { buildIceServers, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
 import type { IceServerEntry, PendingAnswer } from '@/types/online'
 import { toastError } from '@/utils/toast'
-import { encodeTurnServers } from '@/utils/online/protocol'
+import { encodeHostVirtualIp, encodeTurnServers } from '@/utils/online/protocol'
 
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
@@ -68,7 +68,20 @@ export function useRoomHostPolling(
       const iceServers: IceServerEntry[] = store.roomState.iceServers.length > 0
         ? store.roomState.iceServers
         : stunUrlsToIceServers(store.roomState.stunServers)
-      const { sdp, iceCandidates } = await hostMesh.createOfferFor(participantId, iceServers)
+      // 通道建立后向该参与者广播房主虚拟 IP（加入方连接界面显示用）
+      const hostIp = store.roomState.selfVirtualIp
+      const { sdp, iceCandidates } = await hostMesh.createOfferFor(
+        participantId,
+        iceServers,
+        hostIp
+          ? () => {
+              void hostMesh.sendToParticipant(
+                participantId,
+                encodeHostVirtualIp(hostIpSeq++, hostIp),
+              )
+            }
+          : undefined,
+      )
 
       // 绑定 DataChannel.onMessage：参与者发来的包 → 转发到后端 TUN
       // setupDataChannelHandlers 仅更新传入字段，不影响 createOfferFor 默认绑定的 onOpen/onClose
@@ -220,9 +233,11 @@ export function useRoomHostPolling(
   let participantsTimer: ReturnType<typeof setInterval> | null = null
   /** TurnServers 控制消息的本地 seq 计数器（与 HostMcPort/TUN 数据包 seq 独立） */
   let turnSeq = 0
+  /** HostVirtualIp 控制消息的本地 seq 计数器 */
+  let hostIpSeq = 0
 
   /**
-   * 启动两路信令轮询定时器（参与者 5s / Answer 5s）
+   * 启动两路信令轮询定时器（参与者 2s / Answer 2s）
    *
    * 注：保活(30s)已由 store 层全局定时器承担（src/stores/online.ts GLOBAL_KEEPALIVE_INTERVAL），
    * 切页不停止；此处 doKeepalive 仅保留给「断连恢复补发」使用，避免重复上报。
@@ -230,8 +245,8 @@ export function useRoomHostPolling(
   function startTimers() {
     if (participantsTimer) clearInterval(participantsTimer)
     if (answerTimer) clearInterval(answerTimer)
-    participantsTimer = setInterval(() => void pollParticipants(), 5000)
-    answerTimer = setInterval(() => void pollAnswers(), 5000)
+    participantsTimer = setInterval(() => void pollParticipants(), 2000)
+    answerTimer = setInterval(() => void pollAnswers(), 2000)
   }
 
   /** 停止所有轮询定时器（云端断开或组件卸载时调用，避免持续失败刷屏） */
