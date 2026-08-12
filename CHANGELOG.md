@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.5-rc8] - 2026-08-12
+
 - `/v1` 业务请求自动应对 PoW challenge（[request.rs](src-tauri/src/minecraft/online/client/request.rs) / [auth.rs](src-tauri/src/minecraft/online/client/auth.rs)）：`call_v1` 与 auth 接口共用新增的 `send_with_pow_retry`，收到 `401 + code=1007`（pow_challenge_required）且 challenge.path 匹配时自动求解并携带 `{header_name}: {challenge_id}:{nonce}` 头重试一次，登录、注册、刷新及 TURN 拉取等接口无需各自处理 1007 挑战（此前 `GET /v1/signaling/rooms/{code}/turn` 会残留 401 WARN 日志且拉取失败降级兜底）。
 
 - 系统 TURN 改为进入房间即拉取、建房瞬间不拉（[useRoomHost.ts](src/composables/useRoomHost.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [RoomManager.vue](src/components/online/RoomManager.vue) / [LobbyBrowser.vue](src/components/online/LobbyBrowser.vue) / [roomRefreshActions.ts](src/stores/online/roomRefreshActions.ts) / [roomState.ts](src/stores/online/roomState.ts) / [mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts) / [useWebRTC.ts](src/composables/useWebRTC.ts) / [webrtc-helpers.ts](src/utils/online/webrtc-helpers.ts)）：加入方 join 后、房主首个参与者生成 Offer 时即拉取系统 TURN 并合并进 ICE 服务器，使首轮协商就带 relay candidate——P2P 直连不受影响（ICE 优先 host/srflx），打洞失败时中继立即可用，无需等 failed 后 ICE restart 的漫长恢复；建房瞬间（尚无参与者）不拉取，避免白费 `/turn` 请求与 PoW 计算。同一房间仅拉取一次（`systemTurnServers` / `systemTurnLoaded` 缓存，房间切换清空），首轮拉取失败降级 STUN+自定义 TURN，P2P 失败恢复路径幂等重试。另新增 `toRtcIceServers` 公共转换（createPeerConnection / setConfiguration 两处共用）。
