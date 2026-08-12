@@ -58,6 +58,13 @@ const loaderLabel = computed(() => {
 function handleJoin() {
   emit('join', props.room)
 }
+
+/** 房间已满/已关闭时禁用加入按钮的原因（未禁用时为空字符串） */
+const disabledReason = computed(() => {
+  if (props.room.status === 'closed') return '该房间已关闭'
+  if (props.room.playerCount >= props.room.maxPlayers) return '该房间人数已满'
+  return ''
+})
 </script>
 
 <template>
@@ -112,12 +119,21 @@ function handleJoin() {
           加入
         </Button>
       </Tooltip>
+      <Tooltip v-if="disabledReason" :text="disabledReason" position="top" :delay="200">
+        <Button
+          type="primary"
+          size="small"
+          disabled
+        >
+          <template #icon><ArrowRightOnRectangleIcon class="w-3.5 h-3.5" /></template>
+          加入
+        </Button>
+      </Tooltip>
       <Button
         v-else
         type="primary"
         size="small"
         :loading="joining"
-        :disabled="room.status === 'closed' || room.playerCount >= room.maxPlayers"
         @click="handleJoin"
       >
         <template #icon><ArrowRightOnRectangleIcon class="w-3.5 h-3.5" /></template>
