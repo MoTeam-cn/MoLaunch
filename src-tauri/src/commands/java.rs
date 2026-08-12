@@ -267,6 +267,13 @@ pub async fn download_java(
     let config = state.config.lock().await;
     let dl_mode = crate::minecraft::sources::DownloadSourceMode::from_str(&config.download.source);
     let mirror_url = config.download.mirror_url.clone();
+    let manager_config = crate::minecraft::download::config::DownloadManagerConfig {
+        max_threads: config.download.max_threads as usize,
+        chunk_count: config.download.chunk_count.max(1) as usize,
+        speed_limit: config.download.max_speed,
+        source_mode: dl_mode,
+        user_agent: None,
+    };
     drop(config);
 
     let java_exe = java::download::download_java_runtime(
@@ -274,6 +281,7 @@ pub async fn download_java(
         dl_mode,
         mirror_url.as_deref(),
         Some(app),
+        &manager_config,
     )
     .await?;
 

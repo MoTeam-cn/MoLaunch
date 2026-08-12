@@ -3,11 +3,16 @@
 //! fetching → matching → manifest → downloading → verifying
 
 use std::path::PathBuf;
+use std::sync::Arc;
 use tauri::AppHandle;
 
 use crate::log_info;
-use crate::minecraft::sources::DownloadSourceMode;
+use crate::minecraft::download::config::DownloadManagerConfig;
+use crate::minecraft::download::manager::DownloadManager;
+use crate::minecraft::download::types::{DownloadStatus, DownloadTask, GlobalProgress};
+use crate::minecraft::sources::{build_replace_urls, DownloadSourceMode};
 
+use super::constants::DOWNLOAD_DOMAIN_REPLACEMENTS;
 use super::fetch;
 use super::files;
 use super::progress;
@@ -20,6 +25,7 @@ use super::verify;
 /// - `mode`: 下载源模式（Official / Mirror / Smart）
 /// - `mirror_url`: 自定义镜像源 URL（None 或空则用 BMCLAPI）
 /// - `app`: Tauri AppHandle（用于推送进度事件）
+/// - `manager_config`: 通用 DownloadManager 配置（并发/分片/限速）
 ///
 /// 返回下载的 Java 可执行文件路径（java.exe）
 pub async fn download_java_runtime(
@@ -27,6 +33,7 @@ pub async fn download_java_runtime(
     mode: DownloadSourceMode,
     mirror_url: Option<&str>,
     app: Option<&AppHandle>,
+    manager_config: &DownloadManagerConfig,
 ) -> Result<PathBuf, String> {
     let client = crate::http::get_client();
 
@@ -51,7 +58,7 @@ pub async fn download_java_runtime(
     let total_bytes = files::total_bytes(&files_to_download);
     log_info!("[JavaDownload] {} files to download", total_files);
 
-    // 阶段 4：下载文件
+    // 阶段 4：下载文件（复用通用 DownloadManager：文件级并发 + 分片 + SHA1 校验）
     let runtime_dir = files::get_runtime_dir(&component)?;
     progress::emit(
         app,
@@ -65,15 +72,67 @@ pub async fn download_java_runtime(
             target_major, total_files
         ),
     );
-    files::download_all_files(
-        &client,
-        &files_to_download,
-        &runtime_dir,
-        mirror_url,
-        mode,
-        app,
-    )
-    .await?;
+    let tasks = files_to_download
+        .iter()
+        .map(|(path_str, file)| {
+            let download_info = &file.downloads.as_ref().unwrap().raw;
+            let local_path = runtime_dir.join(path_str);
+            files::validate_path_traversal(path_str, &local_path, &runtime_dir)?;
+            let urls = build_replace_urls(
+                &download_info.url,
+                mirror_url,
+                DOWNLOAD_DOMAIN_REPLACEMENTS,
+                mode,
+            );
+            Ok(DownloadTask {
+                id: path_str.clone(),
+                urls,
+                local_path: local_path.to_string_lossy().to_string(),
+                expected_size: download_info.size as i64,
+                expected_hash: if download_info.sha1.is_empty() {
+                    None
+                } else {
+                    Some(download_info.sha1.clone())
+                },
+            })
+        })
+        .collect::<Result<Vec<_>, String>>()?;
+    let progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>> = app.map(|handle| {
+        let handle = handle.clone();
+        Arc::new(move |gp: GlobalProgress| {
+            let done = gp.completed_files + gp.skipped_files;
+            progress::emit(
+                Some(&handle),
+                "downloading",
+                done,
+                gp.total_files,
+                gp.downloaded_bytes,
+                gp.total_bytes,
+                &format!("已下载 {} / {} 文件", done, gp.total_files),
+            );
+        }) as Arc<dyn Fn(GlobalProgress) + Send + Sync>
+    });
+    let results = DownloadManager::from_config(manager_config)
+        .download_batch(tasks, progress_callback)
+        .await;
+    if let Some(failed) = results.iter().find(|r| r.status == DownloadStatus::Failed) {
+        let _ = std::fs::remove_dir_all(&runtime_dir);
+        return Err(format!(
+            "下载文件失败: {} - {}",
+            failed.task_id,
+            failed.error.clone().unwrap_or_default()
+        ));
+    }
+    for (path_str, file) in &files_to_download {
+        if file.executable {
+            let _exe_path = runtime_dir.join(path_str);
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                let _ = std::fs::set_permissions(_exe_path, std::fs::Permissions::from_mode(0o755));
+            }
+        }
+    }
 
     // 阶段 5：验证下载的 Java
     progress::emit(app, "verifying", 0, 1, 0, 0, "正在验证 Java...");

@@ -170,11 +170,19 @@ impl LaunchPipeline {
                     &self.config.download_source,
                 );
                 let mirror_url = self.config.mirror_url.clone();
+                let manager_config = crate::minecraft::download::config::DownloadManagerConfig {
+                    max_threads: self.config.max_threads as usize,
+                    chunk_count: self.config.chunk_count.max(1) as usize,
+                    speed_limit: self.config.speed_limit,
+                    source_mode: dl_mode,
+                    user_agent: None,
+                };
                 let downloaded = crate::minecraft::java::download::download_java_runtime(
                     target_major,
                     dl_mode,
                     mirror_url.as_deref(),
                     app_handle.as_ref(),
+                    &manager_config,
                 )
                 .await
                 .map_err(|e| LaunchError {
