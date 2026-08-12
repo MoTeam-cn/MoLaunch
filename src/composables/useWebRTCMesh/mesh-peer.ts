@@ -156,7 +156,17 @@ export function useMeshPeer(deps: MeshPeerDeps) {
   ): Promise<boolean> {
     const conn = conns.value.get(participantId)
     if (!conn || conn.pc.signalingState !== 'have-local-offer') return false
-    await conn.pc.setRemoteDescription({ type: 'answer', sdp: remoteSdp })
+    try {
+      await conn.pc.setRemoteDescription({ type: 'answer', sdp: remoteSdp })
+    } catch (e) {
+      // 幂等：setRemoteAnswer 与 closeParticipant / ICE restart 并发时，
+      // signalingState 可能在守卫后变化（已放行/已关闭/正在 restart），
+      // setRemoteDescription 会抛 InvalidStateError。此类瞬态竞态视为「跳过」
+      // 而非「协商失败」，不得由调用方误关闭一个正在自愈的连接。
+      if (e instanceof DOMException && e.name === 'InvalidStateError') return false
+      if (conn.pc.signalingState !== 'have-local-offer') return false
+      throw e
+    }
     for (const candidate of remoteIce) {
       try {
         await conn.pc.addIceCandidate({ candidate })
