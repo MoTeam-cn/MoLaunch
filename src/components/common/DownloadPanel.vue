@@ -10,7 +10,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
-import { ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
+import { ArrowDownTrayIcon } from '@heroicons/vue/24/solid'
 import { backToTopVisible } from '@/composables/useFloatingButtonState'
 
 const router = useRouter()
@@ -28,42 +28,79 @@ function goToDownloads() {
 
 <template>
   <transition
-    enter-active-class="transition ease-out duration-300"
-    enter-from-class="opacity-0 scale-50"
-    enter-to-class="opacity-100 scale-100"
+    enter-active-class="transition ease-out duration-250"
+    enter-from-class="opacity-0 translate-y-2"
+    enter-to-class="opacity-100 translate-y-0"
     leave-active-class="transition ease-in duration-200"
-    leave-from-class="opacity-100 scale-100"
-    leave-to-class="opacity-0 scale-50"
+    leave-from-class="opacity-100 translate-y-0"
+    leave-to-class="opacity-0 translate-y-2"
   >
     <!-- 有下载任务时显示（下载开始/结束由后端 download-panel-state 事件驱动） -->
-    <!-- 保留原生 button：浮动下载按钮（fixed w-14 h-14 rounded-full），
-         Button.vue 的 scoped size 类固定 height/padding 无法承载圆形浮动按钮 -->
+    <!-- 视觉与 BackToTop 完全统一：44px 纯色圆钮 + solid 白图标 + 相同阴影/动效 -->
     <button
       v-if="versionStore.downloading"
-      :class="['fixed right-6 z-[10001] w-14 h-14 bg-primary-600 rounded-full shadow-lg flex items-center justify-center hover:bg-primary-700 active:scale-95 transition-all group', positionClass]"
+      :class="['download-panel-btn', positionClass]"
       @click="goToDownloads"
     >
-      <ArrowDownTrayIcon class="w-6 h-6 text-white group-hover:scale-110 transition-transform" />
-      
-      <!-- 旋转光环 -->
-      <svg class="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 56 56">
+      <ArrowDownTrayIcon class="w-5 h-5 text-white" />
+
+      <!-- 进度环（仅下载按钮独有，白描边圆环） -->
+      <svg class="panel-ring" viewBox="0 0 44 44">
         <circle
-          cx="28" cy="28" r="26"
+          cx="22" cy="22" r="19"
           fill="none"
           stroke="rgba(255,255,255,0.3)"
           stroke-width="2"
         />
         <circle
-          cx="28" cy="28" r="26"
+          cx="22" cy="22" r="19"
           fill="none"
           stroke="white"
           stroke-width="2"
           stroke-linecap="round"
-          :stroke-dasharray="163.36"
-          :stroke-dashoffset="163.36 - (163.36 * (versionStore.downloadProgress?.percentage || 0) / 100)"
+          stroke-dasharray="119.38"
+          :stroke-dashoffset="119.38 - (119.38 * (versionStore.downloadProgress?.percentage || 0) / 100)"
           class="transition-all duration-300"
         />
       </svg>
     </button>
   </transition>
 </template>
+
+<style scoped>
+.download-panel-btn {
+  position: fixed;
+  right: 24px;
+  z-index: 10001;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--color-primary-600);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgb(var(--color-primary-rgb-600) / 0.35);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease, bottom 0.2s ease;
+}
+
+.download-panel-btn:hover {
+  background: var(--color-primary-700);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgb(var(--color-primary-rgb-600) / 0.4);
+}
+
+.download-panel-btn:active {
+  transform: translateY(0) scale(0.95);
+}
+
+.panel-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+  pointer-events: none;
+}
+</style>
