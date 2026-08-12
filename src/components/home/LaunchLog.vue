@@ -77,15 +77,13 @@ const launchingVersion = computed(() => versionStore.launchingVersionId || versi
 
 // Java 自动下载进度
 const javaDl = computed(() => versionStore.javaDownloadProgress)
+// 百分比字节优先：Java runtime 大文件先被并发下载，按文件数比例会滞后于真实下载量
 const javaDlPercent = computed(() => {
   const p = javaDl.value
-  if (!p || p.total === 0) return 0
-  return Math.round((p.current / p.total) * 100)
-})
-const javaDlBytesPercent = computed(() => {
-  const p = javaDl.value
-  if (!p || p.bytes_total === 0) return 0
-  return Math.round((p.bytes_downloaded / p.bytes_total) * 100)
+  if (!p) return 0
+  if (p.bytes_total > 0) return Math.min(100, Math.round((p.bytes_downloaded / p.bytes_total) * 100))
+  if (p.total > 0) return Math.min(100, Math.round((p.current / p.total) * 100))
+  return 0
 })
 const javaDlStageText = computed(() => {
   const p = javaDl.value
@@ -150,7 +148,7 @@ const javaDlStageText = computed(() => {
           <div class="h-1.5 overflow-hidden rounded-full bg-blue-100">
             <div
               class="h-full rounded-full bg-blue-500 transition-all duration-300"
-              :style="{ width: javaDlBytesPercent + '%' }"
+              :style="{ width: javaDlPercent + '%' }"
             />
           </div>
           <div v-if="javaDl.bytes_total > 0" class="mt-1 text-[10px] text-blue-500">

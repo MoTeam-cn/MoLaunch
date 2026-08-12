@@ -29,12 +29,13 @@ const { start } = useTauriEvent<JavaDownloadProgress>(
 /** 有效目标 Java 大版本号（0/异常值不参与下载） */
 const targetMajor = computed(() => (props.targetMajor && props.targetMajor > 0 ? props.targetMajor : null))
 
-/** 进度百分比（0~100） */
+/** 进度百分比（0~100），字节优先：Java runtime 大文件（jvm.dll 等）先被并发下载，
+ *  按文件数比例会严重滞后（字节过半时文件数才十几个），字节比例更贴近真实速度 */
 const progressPercent = computed(() => {
   const p = progress.value
   if (!p) return 0
-  if (p.total > 0) return Math.min(100, Math.round((p.current / p.total) * 100))
   if (p.bytes_total > 0) return Math.min(100, Math.round((p.bytes_downloaded / p.bytes_total) * 100))
+  if (p.total > 0) return Math.min(100, Math.round((p.current / p.total) * 100))
   return p.stage === 'done' ? 100 : 30 // 不确定阶段显示 30%
 })
 
