@@ -81,6 +81,24 @@ export function getChangelogNotes(): string[] {
   return updateLogNotes
 }
 
+/** 从 Markdown 内容中提取 `note:` 前缀行（服务端 release_notes 可选格式），返回文本列表 */
+export function extractNoteLines(markdown: string): string[] {
+  const notes: string[] = []
+  for (const line of markdown.split('\n')) {
+    const m = line.trim().match(/^note:\s*(.*)$/i)
+    if (m && m[1].trim()) notes.push(m[1].trim())
+  }
+  return notes
+}
+
+/** 剔除 Markdown 中的 `note:` 前缀行（避免与提取出的高亮块重复展示） */
+export function stripNoteLines(markdown: string): string {
+  return markdown
+    .split('\n')
+    .filter((line) => !/^\s*note:\s*/i.test(line))
+    .join('\n')
+}
+
 /** 直接弹出更新日志弹窗（dev-api 测试用） */
 export function showUpdateLog(): void {
   updateLogVisible.value = true

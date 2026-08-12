@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 检查更新抽屉同步「作者的话」note 高亮（[UpdateDialog.vue](src/components/about/UpdateDialog.vue) / [updateLog.ts](src/utils/updateLog.ts)）：检查更新弹窗的更新日志此前直接按时间线渲染服务端 release_notes，未提取 `note:` commit；现与启动时更新版本弹窗一致——优先从服务端 notes 解析 `note:` 前缀行（新增 `extractNoteLines` / `stripNoteLines` 工具），提取不到则回退构建时 git note（`getChangelogNotes`），以「作者的话」高亮块展示在时间线上方，并从时间线中剔除原 note 行避免重复。
+
 ## [0.3.5-rc8] - 2026-08-12
 
 - `/v1` 业务请求自动应对 PoW challenge（[request.rs](src-tauri/src/minecraft/online/client/request.rs) / [auth.rs](src-tauri/src/minecraft/online/client/auth.rs)）：`call_v1` 与 auth 接口共用新增的 `send_with_pow_retry`，收到 `401 + code=1007`（pow_challenge_required）且 challenge.path 匹配时自动求解并携带 `{header_name}: {challenge_id}:{nonce}` 头重试一次，登录、注册、刷新及 TURN 拉取等接口无需各自处理 1007 挑战（此前 `GET /v1/signaling/rooms/{code}/turn` 会残留 401 WARN 日志且拉取失败降级兜底）。

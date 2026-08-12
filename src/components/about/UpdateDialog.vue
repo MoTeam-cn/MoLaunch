@@ -18,6 +18,7 @@
 import { computed } from 'vue'
 import {
   ArrowPathIcon,
+  ChatBubbleOvalLeftIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
@@ -27,6 +28,8 @@ import Drawer from '@/components/common/Drawer.vue'
 import ReleaseTimeline from '@/components/about/ReleaseTimeline.vue'
 import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'
 import { formatBytes } from '@/utils/format'
+import { handleMarkdownLinkClick, renderMarkdown } from '@/utils/markdown'
+import { extractNoteLines, getChangelogNotes, stripNoteLines } from '@/utils/updateLog'
 import {
   updateState,
   checkForUpdate,
@@ -36,6 +39,17 @@ import {
 
 /** 是否显示弹窗（仅当 showDialog=true 时渲染） */
 const visible = computed(() => updateState.showDialog)
+
+/** 作者的话：优先解析服务端 notes 中的 `note:` 行，无则回退构建时 git note（与启动弹窗同源） */
+const notes = computed(() => {
+  const server = extractNoteLines(updateState.notes)
+  return server.length > 0 ? server : getChangelogNotes()
+})
+
+/** 时间线内容：提取到 note 时剔除原 note 行，避免与高亮块重复展示 */
+const timelineContent = computed(() =>
+  notes.value.length > 0 ? stripNoteLines(updateState.notes) : updateState.notes,
+)
 
 /**
  * 监听 macOS/Linux 更新下载进度（Rust install_unix.rs 经 Tauri 事件推送）
@@ -121,12 +135,27 @@ function onRetry() {
           <Tag size="small" color="red">强制更新</Tag>
         </span>
       </div>
-      <!-- 更新日志：时间线组件负责分段渲染；仅此区域独立滚动 -->
+      <!-- 更新日志：note 高亮 + 时间线；仅此区域独立滚动 -->
       <div
         v-if="updateState.notes"
         class="min-h-0 flex-1 overflow-y-auto rounded-md bg-gray-50 p-3"
       >
-        <ReleaseTimeline :notes="updateState.notes" />
+        <!-- 作者的话：与启动弹窗一致，note 提取后高亮展示 -->
+        <div
+          v-for="(note, index) in notes"
+          :key="index"
+          class="mb-2 flex gap-2 rounded-md border border-primary-200 bg-primary-50 px-3 py-2.5"
+        >
+          <ChatBubbleOvalLeftIcon class="mt-0.5 h-4 w-4 shrink-0 text-primary-500" />
+          <!-- eslint-disable vue/no-v-html -- renderMarkdown 已用 DOMPurify 消毒 -->
+          <div
+            class="markdown-body min-w-0 flex-1 text-xs leading-relaxed text-gray-700"
+            @click="handleMarkdownLinkClick"
+            v-html="renderMarkdown(note)"
+          />
+          <!-- eslint-enable vue/no-v-html -->
+        </div>
+        <ReleaseTimeline :notes="timelineContent" />
       </div>
       <p v-if="updateState.forceUpdate" class="pt-2 text-xs text-red-500">
         此版本为重要更新，需要立即安装后才能继续使用。
@@ -204,3 +233,25 @@ function onRetry() {
     </template>
   </Drawer>
 </template>
+
+<style scoped>
+.markdown-body :deep(p) {
+  margin: 0.125rem 0;
+}
+
+.markdown-body :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown-body :deep(a) {
+  color: var(--color-primary-500, #4f6ef2);
+  text-decoration: underline;
+}
+
+.markdown-body :deep(code) {
+  padding: 0.0625rem 0.25rem;
+  border-radius: 0.25rem;
+  background-color: #e5e6eb;
+  font-family: inherit;
+}
+</style>
