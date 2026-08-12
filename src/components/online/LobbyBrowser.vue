@@ -7,16 +7,17 @@
  * - 房间卡片列表（LobbyRoomCard）
  * - 空状态（icon + text 垂直水平居中）
  * - 分页（复用 community/Pagination）
- * - 加入房间流程（无密码直接加入，有密码弹 showPrompt 输入）
+ * - 加入房间流程（无密码无整合包直接加入；有密码/整合包弹 LobbyJoinDialog 抽屉，
+ *   失败内联展示可重试，成功后抽屉收起、组件随分类切换卸载）
  *
  * 加入流程复用 Online.vue provide 的 guestWebrtc + store.guestJoinRoom，
  * 加入成功后 store.roomState.role 变化触发 Online.vue watch(isInRoom) 自动跳转房间详情。
  */
-import { ref, computed, onMounted, inject } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, inject } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
-import { listLobbyRooms } from '@/utils/api/online-manager'
-import { showPrompt } from '@/utils/modal'
+import { listLobbyRooms, submitAnswer } from '@/utils/api/online-manager'
+import { rememberJoinPassword } from '@/utils/relaunchSnapshot'
 import { toastError, toastInfo } from '@/utils/toast'
 import Input from '@/components/common/Input.vue'
 import Select from '@/components/common/Select.vue'
@@ -24,8 +25,8 @@ import Button from '@/components/common/Button.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
 import Pagination from '@/components/community/Pagination.vue'
 import LobbyRoomCard from './LobbyRoomCard.vue'
-import LobbyJoinConfirmDialog from './LobbyJoinConfirmDialog.vue'
-import type { LobbyRoomItem } from '@/types/online'
+import LobbyJoinDialog from './LobbyJoinDialog.vue'
+import type { JoinRoomResponse, LobbyRoomItem } from '@/types/online'
 import {
   MagnifyingGlassIcon,
   ArrowPathIcon,
@@ -44,8 +45,7 @@ const page = ref(0) // 0-indexed，与 Pagination 组件一致
 const pageSize = ref(20)
 const loading = ref(false)
 const joiningCode = ref('') // 当前正在加入的房间码（禁用重复点击）
-const confirmRoom = ref<LobbyRoomItem | null>(null) // 加入确认弹窗中的房间（有整合包时先弹确认）
-let pendingJoinAction: (() => void) | null = null // 确认抽屉关闭动画结束后的待执行动作
+const joinTarget = ref<LobbyRoomItem | null>(null) // 加入抽屉中的房间（有密码/整合包时弹出）
 
 const keyword = ref('')
 const loader = ref('') // 空=不过滤
@@ -61,6 +61,11 @@ const loaderOptions = [
 
 /** 搜索防抖定时器 */
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+/** 离开大厅超过该时长后，从其他分类切回时自动刷新列表 */
+const STALE_THRESHOLD_MS = 15_000
+/** 上次离开大厅的时间戳（0 = 从未离开过，初始挂载不触发自动刷新） */
+let leftAt = 0
 
 async function fetchRooms(): Promise<boolean> {
   loading.value = true
@@ -121,45 +126,64 @@ async function handleJoin(room: LobbyRoomItem) {
     toastInfo('您当前在房间中哟，如果要加入 请先退出或者关闭房间')
     return
   }
-  // 房间关联了整合包时先弹确认窗，供加入方校验/安装整合包
-  if (room.modpack) {
-    confirmRoom.value = room
+  // 有密码 / 关联整合包：先弹加入抽屉（密码输入 + 整合包校验），确认后再执行加入
+  if (room.hasPassword || room.modpack) {
+    joinTarget.value = room
     return
   }
-  await proceedJoin(room.roomCode, room.hasPassword)
+  await handleDirectJoin(room.roomCode)
 }
 
-/** 弹窗确认后或无整合包时直接走密码/加入流程 */
-async function proceedJoin(roomCode: string, hasPassword: boolean) {
-  if (hasPassword) {
-    showPrompt('加入房间', `房间 ${roomCode} 需要密码，请输入：`, (password) => {
-      void doJoin(roomCode, password)
-    }, { placeholder: '房间密码' })
-  } else {
-    await doJoin(roomCode, '')
+/** 无密码无整合包房间直接加入：失败走 toast（无抽屉承载错误提示） */
+async function handleDirectJoin(roomCode: string) {
+  joiningCode.value = roomCode
+  try {
+    const res = await joinViaLobby(roomCode, '')
+    if (!res.ok) toastError(res.error || '加入房间失败')
+  } finally {
+    joiningCode.value = ''
   }
 }
 
-function onConfirmJoin() {
-  const room = confirmRoom.value
-  if (!room) return
-  // 记录加入动作：先播完确认抽屉的关闭动画（@close 触发）再继续，
-  // 避免抽屉瞬间卸载后突然又蹦出密码抽屉的突兀动画
-  pendingJoinAction = () => { void proceedJoin(room.roomCode, room.hasPassword) }
+/** 加入抽屉「加入房间」回调：错误由抽屉内联展示，成功由抽屉收起 */
+async function handleJoinDialogJoin(password: string): Promise<{ ok: boolean; error?: string }> {
+  const room = joinTarget.value
+  if (!room) return { ok: false, error: '房间信息丢失，请重试' }
+  return joinViaLobby(room.roomCode, password)
 }
 
-/** 加入确认抽屉关闭动画结束后统一卸载，并执行确认/取消的待定动作 */
+/** 加入抽屉关闭动画结束后卸载（v-if 移除） */
 function onJoinDialogClosed() {
-  const action = pendingJoinAction
-  pendingJoinAction = null
-  confirmRoom.value = null
-  action?.()
+  joinTarget.value = null
 }
 
-async function doJoin(roomCode: string, password: string) {
-  joiningCode.value = roomCode
+/**
+ * 统一加入：仅完成 join 拿到 participantId（成功后 role='guest'，
+ * Online.vue watch(isInRoom) 自动跳转房间详情）；Answer 协商放后台继续
+ */
+async function joinViaLobby(roomCode: string, password: string): Promise<{ ok: boolean; error?: string }> {
+  let joinResp: JoinRoomResponse | null = null
   try {
-    const joinResp = await store.guestJoinRoom(roomCode, password)
+    joinResp = await store.guestJoinRoom(roomCode, password)
+    // 记住加入密码：与 RoomManager 一致，断线自动重连/提权重启重进房间需要重新 join
+    rememberJoinPassword(password)
+  } catch (e) {
+    // 与 RoomManager 加入路径一致：失败时清理，避免服务端参与者残留导致大厅人数虚高
+    await store.guestLeaveRoom().catch(() => toastError('离开房间失败'))
+    store.resetRoomState()
+    guestWebrtc.close()
+    return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  }
+  void continueJoin(roomCode, joinResp.participantId)
+  return { ok: true }
+}
+
+/**
+ * 后台建连：TURN 拉取 → 等待房主 Offer（最长 180s）→ 生成 Answer 提交。
+ * Answer 必须提交（与 RoomManager/reconnectAsGuest 一致），否则房主永远等不到确认
+ */
+async function continueJoin(roomCode: string, participantId: string) {
+  try {
     // 进入房间即拉取系统 TURN（同房间缓存一次）：首轮协商带 relay candidate，
     // P2P 仍优先直连，打洞失败时中继立即可用，无需等 failed 后再 ICE restart
     let iceServers = store.roomState.iceServers
@@ -168,8 +192,9 @@ async function doJoin(roomCode: string, password: string) {
     } catch (e) {
       console.warn('[Online] 拉取系统 TURN 失败，按房间内 ICE 直连:', e)
     }
-    await guestWebrtc.fetchOfferAndAnswer(roomCode, joinResp.participantId, iceServers)
-    // 加入成功后 store.roomState.role='guest'，Online.vue watch(isInRoom) 自动跳转房间详情
+    const { sdp, iceCandidates } = await guestWebrtc.fetchOfferAndAnswer(roomCode, participantId, iceServers)
+    const answer = await submitAnswer(roomCode, participantId, sdp, iceCandidates)
+    if (answer.code !== 1) throw new Error(answer.msg || '提交 Answer 失败')
   } catch (e) {
     toastError(e instanceof Error ? e.message : String(e))
     // 与 RoomManager 加入路径一致：失败（含等待房主接受超时）时清理，
@@ -177,13 +202,22 @@ async function doJoin(roomCode: string, password: string) {
     await store.guestLeaveRoom().catch(() => toastError('离开房间失败'))
     store.resetRoomState()
     guestWebrtc.close()
-  } finally {
-    joiningCode.value = ''
   }
 }
 
 onMounted(() => {
   void fetchRooms()
+})
+
+// keep-alive 下切走再切回：离开超过 15s 自动刷新，避免展示陈旧列表（15s 内切回不刷新防闪烁）
+onActivated(() => {
+  if (leftAt > 0 && Date.now() - leftAt > STALE_THRESHOLD_MS) {
+    void fetchRooms()
+  }
+})
+
+onDeactivated(() => {
+  leftAt = Date.now()
 })
 </script>
 
@@ -243,12 +277,12 @@ onMounted(() => {
       @change="onPageChange"
     />
 
-    <!-- 加入确认弹窗（房间有整合包时先弹此窗） -->
-    <LobbyJoinConfirmDialog
-      v-if="confirmRoom"
-      :room="confirmRoom"
+    <!-- 加入房间抽屉（有密码 / 整合包时弹出：密码输入 + 整合包校验，错误内联可重试） -->
+    <LobbyJoinDialog
+      v-if="joinTarget"
+      :room="joinTarget"
+      :join="handleJoinDialogJoin"
       @close="onJoinDialogClosed"
-      @confirm="onConfirmJoin"
     />
   </div>
 </template>
