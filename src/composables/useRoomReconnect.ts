@@ -37,11 +37,25 @@ export async function reconnectAsGuest(
     guestWebrtc.close()
 
     // 先移除服务端旧 participant 记录（房间不存在等失败不阻塞，直接走重加入）
-    await leaveRoom(roomCode).catch(() => {})
+    // 记录清理是否成功：清理失败时旧记录（status=joined）会残留，导致 joinRoom 返回
+    // AlreadyJoined 冲突，此时需要再清一次并重试
+    let leftClean = true
+    try {
+      await leaveRoom(roomCode)
+    } catch {
+      leftClean = false
+    }
 
     // 重新加入：新 participant_id 触发房主自动生成新 Offer
-    const resp = await joinRoom(roomCode, password)
-    if (resp.code !== 1 || !resp.data) throw new Error(resp.msg || '重新加入房间失败')
+    let resp = await joinRoom(roomCode, password)
+    if (resp.code !== 1 || !resp.data) {
+      // 旧记录清理失败引发的 AlreadyJoined：再清一次并重试（避免静默吞掉 leaveRoom 失败）
+      if (!leftClean) {
+        await leaveRoom(roomCode).catch(() => {})
+        resp = await joinRoom(roomCode, password)
+      }
+      if (resp.code !== 1 || !resp.data) throw new Error(resp.msg || '重新加入房间失败')
+    }
     const data = resp.data
     // 记住房间密码：提权重启恢复的房间走 consumeReconnectPassword 一次性消费，
     // 此处落盘到 pendingJoinPassword，后续 P2P 断线自动重连 peekJoinPassword 才不会拿到空串
