@@ -49,7 +49,7 @@ export function useRoomHost(options: {
       onRoomClosed?.(msg)
     },
   })
-  const actions = useRoomHostActions(store, hostMesh, lan, polling.pendingAnswers)
+  const actions = useRoomHostActions(store, hostMesh, lan)
   const {
     pendingAnswers,
     offerGenerating,

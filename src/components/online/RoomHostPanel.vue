@@ -2,11 +2,11 @@
 /**
  * 房主面板（阶段三 mesh 拓扑）
  *
- * 显示房间信息 + 待确认 Answer 列表 + 参与者列表 + P2P 状态 + 关闭按钮。
+ * 显示房间信息 + 加入申请列表（参与者驱动）+ 参与者列表 + P2P 状态 + 关闭按钮。
  *
- * 业务逻辑（信令轮询 / 自动 Offer / 确认 Answer / 踢出封禁 / 关闭房间）由
+ * 业务逻辑（信令轮询 / 授权前置 Offer / 自动放行 Answer / 踢出封禁 / 关闭房间）由
  * 全局联机会话 onlineSession 持有（App 级初始化，切页不断连），此处仅消费状态：
- * - pendingAnswers / bannedList / handleConfirm / handleKick 等来自会话
+ * - joinedRequests / bannedList / handleConfirm / handleKick 等来自会话
  * - WebRTC 实例通过 inject 获取（hostMesh，多 PC 管理器）
  * - TUN 桥接与数据分发由会话统一管理（onTunPacket 按角色路由）
  */
@@ -43,7 +43,6 @@ const hostMesh = inject('hostMesh') as ReturnType<typeof useWebRTCMesh>
 
 /** 房主业务逻辑来自全局联机会话（轮询/Offer/交互处理/TUN 均常驻应用生命周期） */
 const {
-  pendingAnswers,
   bannedList,
   banServerTime,
   handleConfirm,
@@ -54,6 +53,13 @@ const {
 } = getOnlineSession()
 
 const room = computed(() => store.roomState)
+
+/** 待处理加入申请：参与者处于 joined/answered 状态（授权前置，确认后才生成 Offer） */
+const joinedRequests = computed(() =>
+  store.roomState.participants.filter(
+    (p) => p.status === 'joined' || p.status === 'answered',
+  ),
+)
 
 /** 踢出确认弹窗状态（null=关闭，有值=正在选择封禁时长） */
 const kickTarget = ref<{ participantId: string; devicePk: string; virtualIp?: string } | null>(null)
@@ -137,7 +143,7 @@ function participantStateText(participantId: string): string {
           <template #icon><ClockIcon class="w-3.5 h-3.5" /></template>
           <span class="flex items-center gap-1">
             加入申请
-            <Tag v-if="pendingAnswers.length > 0" size="small" color="red">{{ pendingAnswers.length }}</Tag>
+            <Tag v-if="joinedRequests.length > 0" size="small" color="red">{{ joinedRequests.length }}</Tag>
           </span>
         </Button>
         <Button type="outline" size="small" @click="participantDrawerOpen = true">
@@ -166,13 +172,13 @@ function participantStateText(participantId: string): string {
     <!-- 待确认加入申请抽屉 -->
     <Drawer
       v-model:visible="pendingDrawerOpen"
-      title="待确认加入请求"
+      title="待处理加入申请"
       placement="right"
       :width="420"
       render-in-place
       popup-container="#app-content"
     >
-      <PendingAnswerList :answers="pendingAnswers" @confirm="handleConfirm" />
+      <PendingAnswerList :requests="joinedRequests" @confirm="handleConfirm" />
     </Drawer>
 
     <!-- 参与者列表抽屉 -->

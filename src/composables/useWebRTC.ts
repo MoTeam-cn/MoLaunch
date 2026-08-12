@@ -31,7 +31,8 @@ export interface SdpResult {
 
 /** fetchOfferAndAnswer 默认轮询参数 */
 const DEFAULT_POLL_INTERVAL_MS = 1000
-const DEFAULT_POLL_TIMEOUT_MS = 30_000
+/** 等待房主接受申请并生成 Offer 的超时：授权前置后加入方需等房主确认，不宜过短 */
+const DEFAULT_POLL_TIMEOUT_MS = 180_000
 
 /**
  * 加入方 WebRTC composable
@@ -221,7 +222,7 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
    * @param participantId 本参与者的 ID（来自 joinRoom 响应）
    * @param iceServers ICE 服务器条目数组（含 STUN + TURN 凭据）
    * @param pollIntervalMs 轮询间隔，默认 2000ms
-   * @param timeoutMs 总超时，默认 30000ms（超时抛错）
+   * @param timeoutMs 总超时，默认 180000ms（等待房主接受申请；超时抛错）
    */
   async function fetchOfferAndAnswer(
     roomCode: string,
@@ -237,7 +238,7 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
       // eslint-disable-next-line no-constant-condition
       while (true) {
         if (Date.now() >= deadline) {
-          throw new Error(`等待房主生成 SDP Offer 超时（${timeoutMs / 1000}s）`)
+          throw new Error(`等待房主接受申请超时（${timeoutMs / 1000}s）`)
         }
         const result = await fetchParticipantOffer(roomCode, participantId)
         if (result.code !== 1 || !result.data) {

@@ -172,6 +172,11 @@ async function doJoin(roomCode: string, password: string) {
     // 加入成功后 store.roomState.role='guest'，Online.vue watch(isInRoom) 自动跳转房间详情
   } catch (e) {
     toastError(e instanceof Error ? e.message : String(e))
+    // 与 RoomManager 加入路径一致：失败（含等待房主接受超时）时清理，
+    // 避免服务端参与者残留导致大厅人数虚高 / 重进房间状态异常
+    await store.guestLeaveRoom().catch(() => toastError('离开房间失败'))
+    store.resetRoomState()
+    guestWebrtc.close()
   } finally {
     joiningCode.value = ''
   }

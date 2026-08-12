@@ -14,7 +14,7 @@ import type { useWebRTC } from '@/composables/useWebRTC'
 import type { useVirtualLan } from '@/composables/useVirtualLan'
 import { joinRoom, leaveRoom, submitAnswer } from '@/utils/api/online-manager'
 import { importRoomKey } from '@/utils/online/crypto'
-import { consumeReconnectPassword } from '@/utils/relaunchSnapshot'
+import { consumeReconnectPassword, rememberJoinPassword } from '@/utils/relaunchSnapshot'
 import { toastError, toastSuccess } from '@/utils/toast'
 
 /**
@@ -43,6 +43,9 @@ export async function reconnectAsGuest(
     const resp = await joinRoom(roomCode, password)
     if (resp.code !== 1 || !resp.data) throw new Error(resp.msg || '重新加入房间失败')
     const data = resp.data
+    // 记住房间密码：提权重启恢复的房间走 consumeReconnectPassword 一次性消费，
+    // 此处落盘到 pendingJoinPassword，后续 P2P 断线自动重连 peekJoinPassword 才不会拿到空串
+    if (password) rememberJoinPassword(password)
     store.roomState.participantId = data.participantId
     store.roomState.roomKey = data.roomKey || store.roomState.roomKey
     // 参与者自拉系统 TURN（凭据绑定自身 IP/device，P2P 打洞失败时走中继），

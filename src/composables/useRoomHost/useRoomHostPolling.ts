@@ -217,6 +217,25 @@ export function useRoomHostPolling(
   }
 
   /**
+   * 自动放行已确认参与者的 Answer（授权前置：房主在 Offer 生成前已确认）
+   *
+   * 直接 setRemoteAnswer 建立 P2P 连接，无需二次确认；失败时关闭残留 PC。
+   */
+  async function autoAcceptConfirmedAnswer(answer: PendingAnswer) {
+    try {
+      await hostMesh.setRemoteAnswer(
+        answer.participantId,
+        answer.sdpAnswer,
+        answer.iceCandidates ?? [],
+      )
+      console.info(`[Online] 已自动放行参与者 ${answer.participantId} 的 Answer`)
+    } catch (e) {
+      console.warn(`[Online] 自动放行参与者 ${answer.participantId} 的 Answer 失败:`, e)
+      hostMesh.closeParticipant(answer.participantId)
+    }
+  }
+
+  /**
    * 扫描参与者连接状态，对 failed / 长时间 disconnected 的连接执行 ICE restart
    *
    * 由 pollParticipants 与 connectionStates 变化 watch 共同触发；
@@ -278,15 +297,17 @@ export function useRoomHostPolling(
   }
 
   /**
-   * 扫描参与者列表，为 status='joined' && !hostOfferReady 的参与者生成 Offer
+   * 扫描参与者列表，为 status='confirmed' && !hostOfferReady 的参与者生成 Offer
    *
    * 由 pollParticipants 调用，每次刷新参与者列表后触发。
+   * 授权前置：只有房主在「加入申请」中确认接受（status='confirmed'）后才生成
+   * Offer，加入方在授权前只会看到 ready=false，保持「等待房主接受」而不启动连接。
    */
   async function scanAndGenerateOffers() {
     const roomCode = store.roomState.roomCode
     if (!roomCode || store.roomState.role !== 'host') return
     const needOffer = store.roomState.participants.filter(
-      (p) => p.status === 'joined' && !p.hostOfferReady,
+      (p) => p.status === 'confirmed' && !p.hostOfferReady,
     )
     // 并发生成（每个参与者独立 PC，互不干扰）
     await Promise.all(needOffer.map((p) => generateOfferForParticipant(p.participantId)))
@@ -316,8 +337,12 @@ export function useRoomHostPolling(
       await scanAndGenerateOffers()
       // P2P 断线自动 ICE restart（failed / 长时间 disconnected）
       scanRestartCandidates()
-      // 发现新参与者时联动刷新 Answer（新申请随 join 提交，及时呈现给房主）
-      if (store.roomState.participants.some((p) => p.status === 'joined')) {
+      // 发现新申请或已确认参与者时联动刷新 Answer（申请随 join/confirm 提交，及时呈现）
+      if (
+        store.roomState.participants.some(
+          (p) => p.status === 'joined' || p.status === 'confirmed',
+        )
+      ) {
         void pollAnswers()
       }
     } catch (e) {
@@ -336,11 +361,20 @@ export function useRoomHostPolling(
       const result = await listAnswers(store.roomState.roomCode)
       if (result.code === 1 && result.data) {
         const answers = result.data.answers ?? []
-        // ICE restart 重答自动放行：房主主动重启且重启前已确认的参与者，不再弹确认框
+        // 已确认参与者的 Answer 自动放行：授权前置（房主在 Offer 生成前已确认），
+        // Answer 到达即 setRemoteAnswer 建立连接，不再二次确认。
+        // ICE restart 重答（restartInFlight 标记）同样自动放行。
         const manual: PendingAnswer[] = []
         for (const a of answers) {
           if (restartInFlight.get(a.participantId) === true) {
             void autoAcceptRestartAnswer(a)
+            continue
+          }
+          const p = store.roomState.participants.find(
+            (x) => x.participantId === a.participantId,
+          )
+          if (p && p.status === 'confirmed') {
+            void autoAcceptConfirmedAnswer(a)
           } else {
             manual.push(a)
           }
@@ -434,7 +468,7 @@ export function useRoomHostPolling(
     if (!timersActive) return
     if (participantsTimer) clearTimeout(participantsTimer)
     const hasPendingOffer = store.roomState.participants.some(
-      (p) => p.status === 'joined' && !p.hostOfferReady,
+      (p) => p.status === 'confirmed' && !p.hostOfferReady,
     )
     participantsTimer = setTimeout(
       () => void pollParticipants(),
@@ -442,13 +476,18 @@ export function useRoomHostPolling(
     )
   }
 
-  /** 存在待确认申请时保持活跃间隔，否则退避到空闲间隔 */
+  /** 存在待确认申请或已确认参与者时保持活跃间隔（Answer 自动放行需及时拉取），否则退避到空闲间隔 */
   function scheduleAnswersNext() {
     if (!timersActive) return
     if (answerTimer) clearTimeout(answerTimer)
+    const hasPendingAnswers =
+      pendingAnswers.value.length > 0 ||
+      store.roomState.participants.some(
+        (p) => p.status === 'joined' || p.status === 'confirmed',
+      )
     answerTimer = setTimeout(
       () => void pollAnswers(),
-      pendingAnswers.value.length > 0 ? POLL_ACTIVE_INTERVAL_MS : POLL_IDLE_INTERVAL_MS,
+      hasPendingAnswers ? POLL_ACTIVE_INTERVAL_MS : POLL_IDLE_INTERVAL_MS,
     )
   }
 

@@ -1,10 +1,9 @@
 /**
  * 房主交互动作切片（useRoomHost 拆分）
  *
- * 确认/拒绝 Answer、踢出（可选封禁）、封禁列表、解封、关闭房间；
- * pendingAnswers 由轮询切片创建，经参数传入保持状态同步。
+ * 接受/拒绝加入申请（授权前置）、踢出（可选封禁）、封禁列表、解封、关闭房间；
+ * 参与者列表由轮询切片维护，此处仅消费 store + hostMesh + lan。
  */
-import type { Ref } from 'vue'
 import { ref } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import type { useWebRTCMesh } from '@/composables/useWebRTCMesh'
@@ -15,7 +14,7 @@ import {
   listBannedParticipants,
   unbanParticipant,
 } from '@/utils/api/online-manager'
-import type { PendingAnswer, RoomBan } from '@/types/online'
+import type { ParticipantInfo, RoomBan } from '@/types/online'
 import { showConfirm } from '@/utils/modal'
 import { toastSuccess, toastError } from '@/utils/toast'
 
@@ -23,7 +22,6 @@ export function useRoomHostActions(
   store: ReturnType<typeof useOnlineStore>,
   hostMesh: ReturnType<typeof useWebRTCMesh>,
   lan: ReturnType<typeof useVirtualLan>,
-  pendingAnswers: Ref<PendingAnswer[]>,
 ) {
   /** 封禁列表（仅房主，按需刷新：挂载时 + 踢人带封禁后 + 解封后） */
   const bannedList = ref<RoomBan[]>([])
@@ -50,33 +48,25 @@ export function useRoomHostActions(
   }
 
   /**
-   * 确认/拒绝参与者连接
+   * 确认/拒绝加入申请（授权前置：接受后才生成 Offer，加入方授权前只等待不连接）
    *
-   * - 接受：confirmParticipant(true) → hostMesh.setRemoteAnswer(participantId, ...)
-   * - 拒绝：confirmParticipant(false) → hostMesh.closeParticipant(participantId)
+   * - 接受：confirmParticipant(true) → 参与者状态变 confirmed → 下一轮 pollParticipants
+   *   自动为其生成 SDP Offer，加入方拿到 Offer 后提交 Answer，pollAnswers 自动放行建连
+   * - 拒绝：confirmParticipant(false) → 清理残留 PC，参与者状态变 rejected
    */
-  async function handleConfirm(answer: PendingAnswer, accepted: boolean) {
+  async function handleConfirm(participant: ParticipantInfo, accepted: boolean) {
     try {
       const result = await confirmParticipant(
         store.roomState.roomCode,
-        answer.participantId,
+        participant.participantId,
         accepted,
       )
       if (result.code !== 1) throw new Error(result.msg || '确认操作失败')
-      if (accepted) {
-        await hostMesh.setRemoteAnswer(
-          answer.participantId,
-          answer.sdpAnswer,
-          answer.iceCandidates ?? [],
-        )
-      } else {
-        // 拒绝连接：关闭对应 PC 释放资源
-        hostMesh.closeParticipant(answer.participantId)
+      if (!accepted) {
+        // 拒绝申请：关闭可能存在的残留 PC（Offer 尚未生成时 PC 不存在）
+        hostMesh.closeParticipant(participant.participantId)
       }
-      pendingAnswers.value = pendingAnswers.value.filter(
-        (a) => a.participantId !== answer.participantId,
-      )
-      toastSuccess(accepted ? '已接受连接' : '已拒绝连接')
+      toastSuccess(accepted ? '已接受加入申请' : '已拒绝加入申请')
       await store.refreshParticipants()
     } catch (e) {
       toastError(`确认失败：${e instanceof Error ? e.message : String(e)}`)

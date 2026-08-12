@@ -169,7 +169,8 @@ impl OnlineClient {
 
     /// 房主为指定参与者上传 SDP Offer（PUT /v1/signaling/rooms/{code}/participants/{participant_id}/offer）
     ///
-    /// mesh 拓扑：房主轮询 participants 列表发现 `host_offer_ready=false` 的 `joined` 参与者时，
+    /// mesh 拓扑：授权前置——房主在「加入申请」中确认接受（status=confirmed）后，
+    /// 轮询 participants 列表发现 `host_offer_ready=false` 的 confirmed 参与者时，
     /// 为其创建独立 PeerConnection + DataChannel + Offer，然后调用本接口上传。
     pub async fn signaling_upload_participant_offer(
         &self,
