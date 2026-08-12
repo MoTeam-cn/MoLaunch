@@ -3,7 +3,7 @@
 /**
  * ci-upload.cjs — 上传安装包到 apiServer（MoSign-v2 鉴权，纯 Node 实现）
  * 用法: node ci-upload.cjs <version> <platform> <arch> <bundle_type> <package_path> <sig_path> <release_url> [release_notes]
- * 环境变量: MOLAUNCH_ACTION_PUSH_KEY（必填）/ API_BASE_URL（默认 https://api.molaunch.moiu.cn）
+ * 环境变量: MOLAUNCH_ACTION_PUSH_KEY（必填）/ MOLAUNCH_ACTION_PUSH_SERVER（必填，apiServer 地址）
  */
 
 'use strict';
@@ -54,10 +54,14 @@ function resolveChannel(version) {
 const CHANNEL = resolveChannel(VERSION);
 console.log(`渠道推导: version=${VERSION} -> channel=${CHANNEL}`);
 
-const API_BASE_URL = process.env.API_BASE_URL || 'https://api.molaunch.moiu.cn';
+const API_BASE_URL = process.env.MOLAUNCH_ACTION_PUSH_SERVER;
 const PUSH_KEY = process.env.MOLAUNCH_ACTION_PUSH_KEY;
 
 // ===== 环境校验 =====
+if (!API_BASE_URL) {
+  console.error('::error::MOLAUNCH_ACTION_PUSH_SERVER 环境变量未设置');
+  process.exit(1);
+}
 if (!PUSH_KEY) {
   console.error('::error::MOLAUNCH_ACTION_PUSH_KEY 环境变量未设置');
   process.exit(1);

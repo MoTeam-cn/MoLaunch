@@ -237,6 +237,7 @@ jobs:
         shell: bash
         env:
           MOLAUNCH_ACTION_PUSH_KEY: ${{ secrets.MOLAUNCH_ACTION_PUSH_KEY }}
+          MOLAUNCH_ACTION_PUSH_SERVER: ${{ secrets.MOLAUNCH_ACTION_PUSH_SERVER }}
         run: |
           node scripts/ci-upload.cjs \
             "${{ steps.version.outputs.VERSION }}" \
@@ -254,6 +255,7 @@ jobs:
         shell: bash
         env:
           MOLAUNCH_ACTION_PUSH_KEY: ${{ secrets.MOLAUNCH_ACTION_PUSH_KEY }}
+          MOLAUNCH_ACTION_PUSH_SERVER: ${{ secrets.MOLAUNCH_ACTION_PUSH_SERVER }}
         run: |
           node scripts/ci-upload.cjs \
             "${{ steps.version.outputs.VERSION }}" \
