@@ -1,8 +1,9 @@
 /**
  * 房主轮询切片（useRoomHost 拆分）
  *
- * 三路信令轮询（参与者/Answer 2s、保活 30s）、自动 Offer 生成、TURN 广播、
- * 30s 防刷屏 toast 与定时器启停；生命周期由主文件 useRoomHost.ts 负责。
+ * 三路信令轮询（参与者/Answer 2s、保活 30s）、自动 Offer 生成、ICE restart
+ * 断线恢复（P2P 失败时懒加载系统 TURN）、30s 防刷屏 toast 与定时器启停；
+ * 生命周期由主文件 useRoomHost.ts 负责。
  */
 import { ref, watch } from 'vue'
 import { useOnlineStore } from '@/stores/online'
@@ -17,7 +18,7 @@ import {
 import { buildIceServers, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
 import type { IceServerEntry, PendingAnswer } from '@/types/online'
 import { toastError } from '@/utils/toast'
-import { encodeHostMcPort, encodeHostVirtualIp, encodeTurnServers } from '@/utils/online/protocol'
+import { encodeHostMcPort, encodeHostVirtualIp } from '@/utils/online/protocol'
 
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
@@ -156,7 +157,13 @@ export function useRoomHostPolling(
     if (restarting.has(participantId)) return
     restarting.add(participantId)
     try {
-      const result = await hostMesh.restartIceFor(participantId)
+      // P2P 失败才懒加载系统 TURN：先合并进 roomState.iceServers，
+      // restart 前注入到该参与者 PC 配置，重新收集 relay candidate
+      await ensureSystemTurnServers()
+      const iceServers: IceServerEntry[] = store.roomState.iceServers.length > 0
+        ? store.roomState.iceServers
+        : stunUrlsToIceServers(store.roomState.stunServers)
+      const result = await hostMesh.restartIceFor(participantId, iceServers)
       if (!result) {
         hostMesh.closeParticipant(participantId)
         return
@@ -371,43 +378,42 @@ export function useRoomHostPolling(
   }
 
   /**
-   * 拉取系统 TURN 服务器并广播给已联通参与者（阶段三子任务 7 阶段 F）
+   * 懒加载系统 TURN 并合并进 roomState.iceServers（P2P 失败 ICE restart 前调用）
    *
-   * 流程：
-   * 1. 调 `store.fetchTurnServers`（房主独占接口）拉取经服务端负载过滤的可用 TURN
-   * 2. 与 STUN + 用户自定义 TURN 合并为统一 iceServers
-   * 3. 更新本地 `store.roomState.iceServers`（影响后续 `generateOfferForParticipant`）
-   * 4. 通过 `encodeTurnServers` 编码 + `hostMesh.broadcastPacket` 下发
-   *
-   * 失败仅 warn，不阻塞主流程（系统 TURN 不可用时降级为 STUN + 用户自定义 TURN）。
-   * 房间刚创建时参与者尚未联通，broadcastPacket 返回 0 属正常；后续参与者 PC 建立后
-   * 由房主手动重新触发或下次轮询时通过其他机制获取（当前实现仅 onMounted 触发一次）。
+   * 房间刚创建/加入时不拉取（多数 NAT 场景 STUN 即可直连），仅当参与者出现
+   * failed / 长时间 disconnected 需要重协商时才拉取，避免建房即触发额外的
+   * /turn 请求与 PoW 计算。失败仅 warn，不阻塞 ICE restart 流程（降级为
+   * STUN + 用户自定义 TURN），下次 restart 时自动重试。
    */
-  async function fetchAndBroadcastTurnServers() {
+  let systemTurnLoaded = false
+  let systemTurnLoading: Promise<void> | null = null
+  async function ensureSystemTurnServers() {
     if (store.roomState.role !== 'host' || !store.roomState.roomCode) return
-    try {
-      const turnResp = await store.fetchTurnServers()
-      const systemTurn: IceServerEntry[] = turnResp?.servers ?? []
-      const merged = buildIceServers({
-        stunServers: store.roomState.stunServers,
-        customTurnServers: store.customTurnServers,
-        systemTurnServers: systemTurn,
-      })
-      if (merged.length === 0) {
-        console.info('[Online] 房主无可用 ICE 服务器，跳过 TURN 广播')
-        return
-      }
-      // 更新本地 iceServers，影响后续 generateOfferForParticipant
-      store.roomState.iceServers = merged
-      // 阶段三子任务 8：broadcastPacket 异步加密后发送，sent 计数仅用于日志
-      void hostMesh.broadcastPacket(encodeTurnServers(turnSeq++, merged)).then((sent) => {
+    if (systemTurnLoaded) return
+    if (systemTurnLoading) return systemTurnLoading
+    systemTurnLoading = (async () => {
+      try {
+        const turnResp = await store.fetchTurnServers()
+        const systemTurn: IceServerEntry[] = turnResp?.servers ?? []
+        if (systemTurn.length === 0) return
+        const merged = buildIceServers({
+          stunServers: store.roomState.stunServers,
+          customTurnServers: store.customTurnServers,
+          systemTurnServers: systemTurn,
+        })
+        if (merged.length === 0) return
+        store.roomState.iceServers = merged
+        systemTurnLoaded = true
         console.info(
-          `[Online] 房主已广播 ICE 服务器列表：${systemTurn.length} 系统 TURN + ${store.customTurnServers.length} 自定义 TURN，已发送给 ${sent} 个参与者`,
+          `[Online] 房主已懒加载系统 TURN：${systemTurn.length} 个，用于后续 ICE restart`,
         )
-      }).catch((e) => console.warn('[Online] 广播 ICE 服务器列表失败:', e))
-    } catch (e) {
-      console.warn('[Online] 拉取/广播 TURN 服务器失败:', e)
-    }
+      } catch (e) {
+        console.warn('[Online] 懒加载系统 TURN 失败，继续按 STUN/自定义 TURN 重协商:', e)
+      } finally {
+        systemTurnLoading = null
+      }
+    })()
+    return systemTurnLoading
   }
 
   // 定时器句柄（setTimeout 链式调度：稳态退避，活跃保持高频）
@@ -415,8 +421,6 @@ export function useRoomHostPolling(
   let participantsTimer: ReturnType<typeof setTimeout> | null = null
   /** 调度开关：stopTimers 置 false，防止进行中的请求完成后重新拉起定时器 */
   let timersActive = false
-  /** TurnServers 控制消息的本地 seq 计数器（与 HostMcPort/TUN 数据包 seq 独立） */
-  let turnSeq = 0
   /** HostVirtualIp 控制消息的本地 seq 计数器 */
   let hostIpSeq = 0
   /** HostMcPort 控制消息的本地 seq 计数器 */
@@ -472,6 +476,14 @@ export function useRoomHostPolling(
     },
   )
 
+  // 房间切换时重置系统 TURN 懒加载标记（新房间重新拉取）
+  watch(
+    () => store.roomState.roomCode,
+    () => {
+      systemTurnLoaded = false
+    },
+  )
+
   return {
     pendingAnswers,
     offerGenerating,
@@ -480,6 +492,5 @@ export function useRoomHostPolling(
     doKeepalive,
     startTimers,
     stopTimers,
-    fetchAndBroadcastTurnServers,
   }
 }

@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+- `/v1` 业务请求自动应对 PoW challenge（[request.rs](src-tauri/src/minecraft/online/client/request.rs) / [auth.rs](src-tauri/src/minecraft/online/client/auth.rs)）：`call_v1` 与 auth 接口共用新增的 `send_with_pow_retry`，收到 `401 + code=1007`（pow_challenge_required）且 challenge.path 匹配时自动求解并携带 `{header_name}: {challenge_id}:{nonce}` 头重试一次，登录、注册、刷新及 TURN 拉取等接口无需各自处理 1007 挑战（此前 `GET /v1/signaling/rooms/{code}/turn` 会残留 401 WARN 日志且拉取失败降级兜底）。
+
+- 系统 TURN 改为 P2P 失败时懒加载（[useRoomHost.ts](src/composables/useRoomHost.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [RoomManager.vue](src/components/online/RoomManager.vue) / [LobbyBrowser.vue](src/components/online/LobbyBrowser.vue) / [roomRefreshActions.ts](src/stores/online/roomRefreshActions.ts) / [roomState.ts](src/stores/online/roomState.ts) / [mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts) / [useWebRTC.ts](src/composables/useWebRTC.ts) / [webrtc-helpers.ts](src/utils/online/webrtc-helpers.ts)）：建房/加入房间不再主动拉取系统 TURN（多数 NAT 直连用不上中继，避免建房即触发 `/turn` 请求与 PoW 计算），改为 ICE 进入 failed / 长时间 disconnected 恢复前懒加载——房主侧在 `restartIce()` 前拉取并 `setConfiguration` 注入全部参与者 PC 重新收集 relay candidate，加入方侧在轻量重启/全量重建前拉取并注入当前 PC；同一房间仅拉取一次（`systemTurnServers` 缓存，房间切换清空），失败降级 STUN+自定义 TURN 不阻塞恢复。另新增 `toRtcIceServers` 公共转换（createPeerConnection / setConfiguration 两处共用）。实际表现：直连成功时不再产生 /turn 请求。
+
+- 修复联机大厅加入含整合包房间确认抽屉直接消失后突然弹出密码抽屉（[LobbyJoinConfirmDialog.vue](src/components/online/LobbyJoinConfirmDialog.vue) / [LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：原实现点击「加入房间」瞬间卸载确认抽屉（关闭动画被截断），随后才弹出「输入密码」抽屉，视觉上「内容消失后右边突然蹦出抽屉」。现改为先播完确认抽屉的关闭动画，`Drawer` 关闭动画结束后（`@close`）再卸载组件，并记录待执行加入动作（延续原「有整合包先确认、有密码再输入」流程），两个抽屉动画平滑衔接。
+
 - 种子地图「从存档加载」弹窗改为项目通用抽屉形式（[LoadSaveDrawer.vue](src/views/tools/data/LoadSaveDrawer.vue) / [SeedMap.vue](src/views/tools/data/SeedMap.vue)）：原 [LoadSaveModal.vue](src/views/tools/data/LoadSaveModal.vue) 为自定义居中 Modal，现重写为复用 `components/common/Drawer.vue` 的右侧抽屉（`placement=right` + `render-in-place` + `popup-container=#app-content`），交互与房间工具抽屉等保持一致，删除旧 Modal 组件。
 
 - 修复「本次更新日志」弹窗首次运行死锁（[updateLog.ts](src/utils/updateLog.ts)）：原逻辑在 localStorage 无记录（全新安装/从未弹过窗）时直接跳过且不写入，导致 key 永不落盘、后续升级永远检测不到版本变化。现改为首次运行仅记录当前版本（不弹窗），升级时才能正常对比弹窗。

@@ -29,9 +29,22 @@ onMounted(() => {
   visible.value = true
 })
 
-/** 关闭（取消按钮 / 遮罩 / ESC 统一走此路径，通知父组件卸载） */
-function handleClose() {
+/**
+ * 取消/遮罩/ESC：先播完关闭动画，@close 由 Drawer 在动画结束后触发
+ * （避免立即 emit close 导致组件瞬间卸载、关闭动画被截断）
+ */
+function handleCancel() {
   visible.value = false
+}
+
+/** 确认加入：先播完关闭动画，父组件在 @close 后继续密码/加入流程 */
+function handleConfirm() {
+  visible.value = false
+  emit('confirm')
+}
+
+/** Drawer 关闭动画结束后通知父组件卸载（v-if 移除） */
+function onClosed() {
   emit('close')
 }
 </script>
@@ -43,7 +56,8 @@ function handleClose() {
     :width="520"
     render-in-place
     popup-container="#app-content"
-    @update:visible="handleClose"
+    @update:visible="handleCancel"
+    @close="onClosed"
   >
     <template #title>
       <div class="flex items-center gap-1.5">
@@ -61,8 +75,8 @@ function handleClose() {
 
     <template #footer>
       <div class="flex justify-end gap-2">
-        <Button type="ghost" size="small" @click="handleClose">取消</Button>
-        <Button type="primary" size="small" @click="emit('confirm')">加入房间</Button>
+        <Button type="ghost" size="small" @click="handleCancel">取消</Button>
+        <Button type="primary" size="small" @click="handleConfirm">加入房间</Button>
       </div>
     </template>
   </Drawer>

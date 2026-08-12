@@ -11,6 +11,7 @@ import {
   createPeerConnection,
   collectIceCandidates,
   setupDataChannelHandlers,
+  toRtcIceServers,
   wrapHandlersWithDecrypt,
   type WebRtcConnectionState,
   type DataChannelHandlers,
@@ -108,6 +109,21 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
   }
 
   /**
+   * 刷新现有 PC 的 ICE 服务器配置（P2P 失败懒加载系统 TURN 后调用，重协商生效）
+   *
+   * PC 不存在时静默跳过；仅在下次 ICE restart / 重答时应用新服务器。
+   */
+  function applyIceServers(iceServers: IceServerEntry[]): void {
+    const targetPc = pc.value
+    if (!targetPc) return
+    try {
+      targetPc.setConfiguration({ iceServers: toRtcIceServers(iceServers) })
+    } catch {
+      /* 配置注入失败不阻塞重协商 */
+    }
+  }
+
+  /**
    * 重新绑定 DataChannel 事件处理器
    *
    * 用于在 ondatachannel 触发后或协商完成后，由业务侧注入收包逻辑。
@@ -162,6 +178,13 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
     negotiating.value = true
     try {
       const targetPc = ensurePeerConnection(iceServers)
+      // ensurePeerConnection 仅首次创建时应用配置；已存在的 PC（ICE restart 重答）
+      // 需显式 setConfiguration，使 P2P 失败后懒加载的系统 TURN 参与本次协商
+      try {
+        targetPc.setConfiguration({ iceServers: toRtcIceServers(iceServers) })
+      } catch {
+        /* 配置注入失败不阻塞协商 */
+      }
       await targetPc.setRemoteDescription({ type: 'offer', sdp: remoteSdp })
       // 记录本次应用的 Offer，供 ICE restart 检测对比
       lastOfferSdp.value = remoteSdp
@@ -303,6 +326,7 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
     setRemoteOfferAndCreateAnswer,
     fetchOfferAndAnswer,
     setDataChannelHandlers,
+    applyIceServers,
     sendPacket,
     setRoomKey,
     detectNatType,

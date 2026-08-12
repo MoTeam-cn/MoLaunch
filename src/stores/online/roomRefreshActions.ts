@@ -83,8 +83,13 @@ export function useRoomRefreshActions(deps: RoomRefreshDeps) {
     if (roomState.value.role !== 'guest' || !roomState.value.roomCode) {
       return roomState.value.iceServers
     }
-    const resp = await fetchTurnServers()
-    if (!resp || resp.servers.length === 0) return roomState.value.iceServers
+    // 同一房间仅拉取一次：/turn 签发的凭证绑定自身 IP+device，房间不变可复用，
+    // 避免 P2P 失败多次恢复时重复请求与重复求解 PoW
+    let resp = systemTurnServers.value
+    if (!resp) {
+      resp = await fetchTurnServers()
+      if (!resp || resp.servers.length === 0) return roomState.value.iceServers
+    }
     roomState.value.iceServers = mergeIceServerEntries(
       roomState.value.iceServers,
       resp.servers,

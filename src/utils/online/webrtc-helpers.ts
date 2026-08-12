@@ -137,6 +137,20 @@ export function buildIceServers(options: BuildIceServersOptions): IceServerEntry
 }
 
 /**
+ * 将 IceServerEntry 数组转换为 RTCIceServer 数组（RTCConfiguration.iceServers 使用）
+ *
+ * createPeerConnection 与 PC 运行期 setConfiguration 复用，避免两处重复映射。
+ */
+export function toRtcIceServers(entries: IceServerEntry[]): RTCIceServer[] {
+  return entries.map((entry) => {
+    const server: RTCIceServer = { urls: entry.urls }
+    if (entry.username) server.username = entry.username
+    if (entry.credential) server.credential = entry.credential
+    return server
+  })
+}
+
+/**
  * 创建 RTCPeerConnection
  *
  * @param iceServers ICE 服务器条目数组（可含 STUN + TURN 凭据）
@@ -147,12 +161,7 @@ export function createPeerConnection(iceServers: IceServerEntry[]): RTCPeerConne
     throw new Error('当前环境不支持 RTCPeerConnection')
   }
   const config: RTCConfiguration = {
-    iceServers: iceServers.map((entry) => {
-      const server: RTCIceServer = { urls: entry.urls }
-      if (entry.username) server.username = entry.username
-      if (entry.credential) server.credential = entry.credential
-      return server
-    }),
+    iceServers: toRtcIceServers(iceServers),
     // iceTransportPolicy='all' 同时收集 host/srflx/relay candidate
     // 若未来需要强制走 TURN 中转可改为 'relay'，当前默认允许 P2P 直连优先
     iceTransportPolicy: 'all',

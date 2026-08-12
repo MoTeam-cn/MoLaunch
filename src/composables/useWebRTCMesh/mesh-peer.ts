@@ -10,6 +10,7 @@ import {
   collectIceCandidates,
   createDataChannel,
   setupDataChannelHandlers,
+  toRtcIceServers,
   wrapHandlersWithDecrypt,
   type WebRtcConnectionState,
   type DataChannelHandlers,
@@ -233,10 +234,15 @@ export function useMeshPeer(deps: MeshPeerDeps) {
    * 加入方轮询到新 Offer（ice-ufrag 变化）后重新 Answer 即可建立新路径
    * （TURN 中继等新候选参与协商）。连接不存在时返回 null。
    */
-  async function restartIceFor(participantId: string): Promise<SdpResult | null> {
+  async function restartIceFor(
+    participantId: string,
+    iceServers: IceServerEntry[],
+  ): Promise<SdpResult | null> {
     const conn = conns.value.get(participantId)
     if (!conn) return null
     try {
+      // P2P 失败懒加载的系统 TURN 在 restart 前注入，restart 后重新收集 relay candidate
+      conn.pc.setConfiguration({ iceServers: toRtcIceServers(iceServers) })
       conn.pc.restartIce()
       const offer = await conn.pc.createOffer()
       await conn.pc.setLocalDescription(offer)

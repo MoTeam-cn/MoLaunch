@@ -21,7 +21,7 @@ export function useRoomStateSlice() {
   const stunServers = ref<string[]>([])
   /** 用户自定义 TURN 服务器列表（SettingsOnline UI 配置，`apply_config` 持久化） */
   const customTurnServers = ref<IceServerEntry[]>([])
-  /** 系统提供的 TURN 服务器快照（房主独占，fetchTurnServers 填充） */
+  /** 系统提供的 TURN 服务器快照（fetchTurnServers 填充，房主/参与者共用，房间切换时清空） */
   const systemTurnServers = ref<TurnServersResponse | null>(null)
 
   /** 设置用户自定义 TURN 服务器列表（持久化由调用方负责） */
@@ -32,6 +32,8 @@ export function useRoomStateSlice() {
   /** 重置房间状态（不调用后端，仅清空本地 roomState） */
   function resetRoomState(): void {
     roomState.value = emptyRoom()
+    // 清空系统 TURN 缓存：凭证绑定当前房间（IP+device），新房间需重新拉取
+    systemTurnServers.value = null
   }
 
   return {

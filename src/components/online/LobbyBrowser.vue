@@ -45,6 +45,7 @@ const pageSize = ref(20)
 const loading = ref(false)
 const joiningCode = ref('') // 当前正在加入的房间码（禁用重复点击）
 const confirmRoom = ref<LobbyRoomItem | null>(null) // 加入确认弹窗中的房间（有整合包时先弹确认）
+let pendingJoinAction: (() => void) | null = null // 确认抽屉关闭动画结束后的待执行动作
 
 const keyword = ref('')
 const loader = ref('') // 空=不过滤
@@ -141,21 +142,27 @@ async function proceedJoin(roomCode: string, hasPassword: boolean) {
 
 function onConfirmJoin() {
   const room = confirmRoom.value
-  confirmRoom.value = null
-  if (room) void proceedJoin(room.roomCode, room.hasPassword)
+  if (!room) return
+  // 记录加入动作：先播完确认抽屉的关闭动画（@close 触发）再继续，
+  // 避免抽屉瞬间卸载后突然又蹦出密码抽屉的突兀动画
+  pendingJoinAction = () => { void proceedJoin(room.roomCode, room.hasPassword) }
 }
 
-function onCloseConfirm() {
+/** 加入确认抽屉关闭动画结束后统一卸载，并执行确认/取消的待定动作 */
+function onJoinDialogClosed() {
+  const action = pendingJoinAction
+  pendingJoinAction = null
   confirmRoom.value = null
+  action?.()
 }
 
 async function doJoin(roomCode: string, password: string) {
   joiningCode.value = roomCode
   try {
     const joinResp = await store.guestJoinRoom(roomCode, password)
-    // 参与者自拉系统 TURN（凭据绑定自身 IP/device，P2P 打洞失败时走中继），
-    // 未启用 TURN 时返回云端 ice_servers / stunServers 兜底
-    const iceServers = await store.guestPullTurnServers()
+    // 首次连接仅用房间内 ICE 服务器（STUN + 自定义 TURN）尝试 P2P 直连，
+    // 系统 TURN 留到直连失败（iceconnectionstatechange=failed）时再懒加载
+    const iceServers = store.roomState.iceServers
     await guestWebrtc.fetchOfferAndAnswer(roomCode, joinResp.participantId, iceServers)
     // 加入成功后 store.roomState.role='guest'，Online.vue watch(isInRoom) 自动跳转房间详情
   } catch (e) {
@@ -230,7 +237,7 @@ onMounted(() => {
     <LobbyJoinConfirmDialog
       v-if="confirmRoom"
       :room="confirmRoom"
-      @close="onCloseConfirm"
+      @close="onJoinDialogClosed"
       @confirm="onConfirmJoin"
     />
   </div>

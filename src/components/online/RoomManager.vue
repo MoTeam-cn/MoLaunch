@@ -79,9 +79,9 @@ async function handleJoinRoom() {
     // 记住加入密码：提权重启后自动重连同一房间需要重新 join
     rememberJoinPassword(joinForm.value.password)
     // mesh 拓扑：房主为本参与者单独生成 Offer，需要轮询拉取
-    // 参与者自拉系统 TURN（凭据绑定自身 IP/device，P2P 打洞失败时走中继），
-    // 未启用 TURN 时返回云端 ice_servers / stunServers 兜底
-    const iceServers = await store.guestPullTurnServers()
+    // 首次连接仅用房间内 ICE 服务器（STUN + 自定义 TURN）尝试 P2P 直连，
+    // 系统 TURN 留到直连失败（iceconnectionstatechange=failed）时再懒加载
+    const iceServers = store.roomState.iceServers
     const { sdp, iceCandidates } = await guestWebrtc.fetchOfferAndAnswer(
       code,
       joinResp.participantId,

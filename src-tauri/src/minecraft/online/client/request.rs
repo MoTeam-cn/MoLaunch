@@ -5,11 +5,56 @@ use crate::minecraft::online::client_types::{BusinessResult, ClientError, Unifie
 use crate::minecraft::online::crypto::{b64u_decode, CryptoError};
 use crate::minecraft::online::ecies::{is_envelope, open, seal, Envelope};
 use crate::minecraft::online::http_log;
+use crate::minecraft::online::pow::{parse_challenge, solve_challenge};
 use crate::minecraft::online::storage::DeviceCredentials;
 
 use super::OnlineClient;
 
 impl OnlineClient {
+    /// 发送请求并自动处理服务端 PoW challenge 重试（auth 鉴权与 /v1 业务请求共用）
+    ///
+    /// `build_request(pow_proof)` 每次构造请求：首次不携带 PoW 头；收到
+    /// `401 + code:1007` 且 challenge.path 与 path_label 一致时，求解后携带
+    /// `{header_name}: {challenge_id}:{nonce}` 头重试一次。求解超时/失败按
+    /// 原始 401 返回，交由调用方处理。
+    pub(super) async fn send_with_pow_retry(
+        path_label: &str,
+        mut build_request: impl FnMut(Option<&(String, String)>) -> reqwest::RequestBuilder,
+    ) -> Result<(u16, String), ClientError> {
+        let mut pow_proof: Option<(String, String)> = None;
+        loop {
+            let req = build_request(pow_proof.as_ref());
+            let resp = req.send().await?;
+            let status = resp.status().as_u16();
+            let body = resp.text().await?;
+
+            if status == 401 && pow_proof.is_none() {
+                if let Some(challenge) = parse_challenge(&body) {
+                    if challenge.path == path_label {
+                        if let Some(salt) = challenge.salt_bytes() {
+                            if let Some(nonce) = solve_challenge(&salt, challenge.difficulty).await
+                            {
+                                crate::log_info!(
+                                    "[Online] {} PoW 求解成功（difficulty={}, nonce={}）",
+                                    path_label,
+                                    challenge.difficulty,
+                                    nonce
+                                );
+                                pow_proof = Some((
+                                    challenge.header_name.clone(),
+                                    format!("{}:{}", challenge.challenge_id, nonce),
+                                ));
+                                continue;
+                            }
+                        }
+                    }
+                }
+                crate::log_warn!("[Online] {} PoW 求解失败/放弃，按原始 401 处理", path_label);
+            }
+            return Ok((status, body));
+        }
+    }
+
     /// 调用 /v1 业务接口（自动加 ECIES 信封、携带 JWT、CSRF）
     ///
     /// 参数：
@@ -76,36 +121,46 @@ impl OnlineClient {
             None
         };
 
-        // 发起请求
-        let req_builder = match method.to_uppercase().as_str() {
-            "GET" => get_client().get(&url),
-            "POST" => get_client().post(&url),
-            "PUT" => get_client().put(&url),
-            "PATCH" => get_client().patch(&url),
-            "DELETE" => get_client().delete(&url),
-            other => {
-                return Err(ClientError::Business {
-                    code: 0,
-                    msg: format!("不支持的 HTTP 方法: {}", other),
-                })
+        // 发起请求（自动处理服务端 PoW challenge：401 + code:1007 时求解后重试一次）
+        let method_upper = method.to_uppercase();
+        if !matches!(
+            method_upper.as_str(),
+            "GET" | "POST" | "PUT" | "PATCH" | "DELETE"
+        ) {
+            return Err(ClientError::Business {
+                code: 0,
+                msg: format!("不支持的 HTTP 方法: {}", method_upper),
+            });
+        }
+
+        let (status, body_text) = Self::send_with_pow_retry(path, |pow_proof| {
+            let req_builder = match method_upper.as_str() {
+                "GET" => get_client().get(&url),
+                "POST" => get_client().post(&url),
+                "PUT" => get_client().put(&url),
+                "PATCH" => get_client().patch(&url),
+                "DELETE" => get_client().delete(&url),
+                _ => unreachable!("method 已在调用前校验"),
+            };
+            let mut req_builder = req_builder.header("Authorization", format!("Bearer {}", jwt));
+
+            if need_csrf {
+                req_builder = req_builder.header("X-CSRF-Token", &csrf_token);
             }
-        };
 
-        let mut req_builder = req_builder.header("Authorization", format!("Bearer {}", jwt));
+            if let Some((header_name, proof)) = pow_proof {
+                req_builder = req_builder.header(header_name, proof);
+            }
 
-        if need_csrf {
-            req_builder = req_builder.header("X-CSRF-Token", &csrf_token);
-        }
+            if let Some(envelope) = &req_body {
+                req_builder = req_builder
+                    .header("Content-Type", "application/json")
+                    .json(envelope);
+            }
 
-        if let Some(envelope) = &req_body {
-            req_builder = req_builder
-                .header("Content-Type", "application/json")
-                .json(envelope);
-        }
-
-        let resp = req_builder.send().await?;
-        let status = resp.status().as_u16();
-        let body_text = resp.text().await?;
+            req_builder
+        })
+        .await?;
 
         crate::log_debug!(
             "[Online] call_v1 响应: {} {} status={}, body_len={}B",
