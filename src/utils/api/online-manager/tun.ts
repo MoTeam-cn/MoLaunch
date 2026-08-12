@@ -12,6 +12,7 @@ import type {
   LanFakeStartResponse,
   LanPortProbeParams,
   LanPortProbeResponse,
+  RunningMcPortResponse,
   TunForwardResponse,
   TunStartParams,
   TunStartResponse,
@@ -98,6 +99,18 @@ export function lanFakeServerStop(): Promise<{ success: boolean }> {
  */
 export function lanPortProbe(params: LanPortProbeParams): Promise<LanPortProbeResponse> {
   return onlineManager<LanPortProbeResponse>(ONLINE_ACTIONS.LAN_PORT_PROBE, params)
+}
+
+/**
+ * 按当前游戏进程 PID 扫描监听端口，回查 MC 局域网候选端口（进房时调用）
+ *
+ * 先启动 MC（已开放局域网）再开房间时，watcher 的端口事件在监听注册前发出
+ * 已被丢弃且不会重发，进房后主动回查补上；取 `ports` 最后一项作为当前端口。
+ *
+ * @returns 当前游戏进程监听的候选端口列表（升序）；空表示未开放局域网或游戏非本启动器启动
+ */
+export function getRunningMcPort(): Promise<RunningMcPortResponse> {
+  return onlineManager<RunningMcPortResponse>(ONLINE_ACTIONS.GET_RUNNING_MC_PORT)
 }
 
 /**

@@ -1,8 +1,9 @@
-//! MC 局域网端口探测 action（与 MC 多人游戏发现房间同源）
+//! MC 局域网端口探测 actions
 //!
-//! 监听 UDP 多播 224.0.2.60:4445，解析 MC 服务器周期广播的
-//! `[MOTD]...[/MOTD][AD]port[/AD]`，得到局域网服务实际端口。
-//! 房主可探测自己 MC 服务器端口；加入方可探测本地伪装代理端口。
+//! - `lan_port_probe`：监听 UDP 多播 224.0.2.60:4445，解析 MC 服务器周期广播的
+//!   `[MOTD]...[/MOTD][AD]port[/AD]`，得到局域网服务实际端口。
+//!   房主可探测自己 MC 服务器端口；加入方可探测本地伪装代理端口。
+//! - `get_running_mc_port`：按当前游戏进程 PID 扫描监听端口，进房时回查用。
 
 use serde::{Deserialize, Serialize};
 use tokio::net::UdpSocket;
@@ -49,7 +50,16 @@ fn parse_lan_broadcast(raw: &str) -> Option<(String, u16)> {
     Some((raw[motd_start..motd_end].to_string(), port))
 }
 
-/// 注册局域网端口探测 action 到 dispatcher
+/// `get_running_mc_port` 返回
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RunningMcPortResponse {
+    pub success: bool,
+    /// 当前游戏进程监听的 MC 局域网候选端口（升序；空=未开放局域网或游戏非本启动器启动）
+    pub ports: Vec<u16>,
+}
+
+/// 注册局域网端口探测 actions 到 dispatcher
 pub fn register_lan_probe_actions(d: &mut Dispatcher) {
     d.register(
         "lan_port_probe",
@@ -120,6 +130,29 @@ pub fn register_lan_probe_actions(d: &mut Dispatcher) {
                 };
             }
             serde_json::to_value(resp).map_err(|e| e.to_string())
+        }),
+    );
+
+    // 按当前游戏进程 PID 扫描监听端口：先启动 MC（开放局域网）再进房时，
+    // watcher 的端口事件已在监听注册前发出并被丢弃，进房后主动回查补上。
+    d.register(
+        "get_running_mc_port",
+        handler!(state, _app, _params, {
+            let pid = *state.current_pid.lock().await;
+            let ports = match pid {
+                Some(pid) => crate::minecraft::launch::watcher::ports::listening_tcp_ports(pid),
+                None => Vec::new(),
+            };
+            log_info!(
+                "[Online] get_running_mc_port: pid={:?}, ports={:?}",
+                pid,
+                ports
+            );
+            serde_json::to_value(RunningMcPortResponse {
+                success: true,
+                ports,
+            })
+            .map_err(|e| e.to_string())
         }),
     );
 }

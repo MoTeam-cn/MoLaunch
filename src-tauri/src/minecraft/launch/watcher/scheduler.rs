@@ -4,6 +4,7 @@
 
 use super::log_parser::detect_load_progress;
 use super::log_reader::{read_logs, tail_latest_log};
+use super::ports::listening_tcp_ports;
 use super::process::GameWatcher;
 use super::types::{ExitInfo, GameState};
 use crate::log_info;
@@ -73,37 +74,6 @@ async fn emit_lan_port_if_matched(
     if let Some(port) = parse_lan_port(line) {
         report_lan_port(port, app_handle, last_port).await;
     }
-}
-
-/// 枚举指定进程监听的 TCP 端口（排除回环地址）
-///
-/// 基于 netstat2 直接读取系统套接字表，不依赖游戏日志格式与 stdout 可用性；
-/// MC 开放局域网后由 Java 进程监听一个非回环 TCP 端口，据此自动识别上报。
-fn listening_tcp_ports(pid: u32) -> Vec<u16> {
-    let af_flags = netstat2::AddressFamilyFlags::all();
-    let proto_flags = netstat2::ProtocolFlags::TCP;
-    let Ok(sockets) = netstat2::get_sockets_info(af_flags, proto_flags) else {
-        return Vec::new();
-    };
-    let mut ports = Vec::new();
-    for sock in sockets {
-        if !sock.associated_pids.contains(&pid) {
-            continue;
-        }
-        if let netstat2::ProtocolSocketInfo::Tcp(tcp) = sock.protocol_socket_info {
-            if tcp.state != netstat2::TcpState::Listen {
-                continue;
-            }
-            // 回环监听多为 JVM 内部服务（RMI 等），排除以降低误报
-            if tcp.local_addr.is_loopback() {
-                continue;
-            }
-            ports.push(tcp.local_port);
-        }
-    }
-    ports.sort_unstable();
-    ports.dedup();
-    ports
 }
 
 impl GameWatcher {

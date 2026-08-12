@@ -72,3 +72,10 @@ export interface LanPortProbeResponse {
   /** 失败原因（成功时为空） */
   error: string
 }
+
+/** `get_running_mc_port` 返回 */
+export interface RunningMcPortResponse {
+  success: boolean
+  /** 当前游戏进程监听的 MC 局域网候选端口（升序；空=未开放局域网或游戏非本启动器启动） */
+  ports: number[]
+}

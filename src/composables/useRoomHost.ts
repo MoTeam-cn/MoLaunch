@@ -14,6 +14,7 @@ import type { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import type { useVirtualLan } from '@/composables/useVirtualLan'
 import { importRoomKey } from '@/utils/online/crypto'
 import { encodeHostMcPort } from '@/utils/online/protocol'
+import { getRunningMcPort } from '@/utils/api/online-manager'
 import { toastError } from '@/utils/toast'
 import { useRoomHostPolling } from './useRoomHost/useRoomHostPolling'
 import { useRoomHostActions } from './useRoomHost/useRoomHostActions'
@@ -77,6 +78,25 @@ export function useRoomHost(options: {
   let mcPortSeq = 0
 
   /**
+   * 应用自动捕获的 MC 端口（watcher 事件 / 进房回查共用）
+   *
+   * 手动指定端口为最高可信度，自动捕获结果不再覆盖；端口与当前一致时跳过，
+   * 避免进房回查与事件驱动对同一端口重复广播。
+   */
+  function applyDetectedPort(port: number) {
+    if (!port || port <= 0) return
+    if (store.roomState.hostMcPortManual) return
+    if (store.roomState.hostMcPort === port) return
+    store.roomState.hostMcPort = port
+    // 阶段三子任务 8：broadcastPacket 异步加密后发送，sent 计数仅用于日志
+    void hostMesh.broadcastPacket(encodeHostMcPort(mcPortSeq++, port)).then((sent) => {
+      console.info(
+        `[Online] 房主 MC 局域网端口已捕获: ${port}，已广播给 ${sent} 个参与者`,
+      )
+    }).catch((e) => console.warn('[Online] 广播 MC 端口失败:', e))
+  }
+
+  /**
    * 启动房主运营（轮询 + 密钥注入 + TUN + TURN 广播 + MC 端口监听）
    *
    * 全局会话在进入房间（role=host）时调用；组件默认在 onMounted 调用。
@@ -105,23 +125,20 @@ export function useRoomHost(options: {
     // 首个参与者加入生成 Offer 时按需拉取、一个房间一次（见 useRoomHostPolling.ensureSystemTurnServers）
 
     // 监听后端 GameWatcher 的 MC 局域网端口检测事件
-    // 房主在 MC 中「Open to LAN」后，watcher 捕获 stdout 端口 → emit 此事件
-    // 收到后：1) 更新本地 store.roomState.hostMcPort  2) 通过 DataChannel 广播给所有已联通参与者
+    // 房主在 MC 中「Open to LAN」后，watcher 捕获 stdout/监听端口 → emit 此事件
     void listen<number>('online://mc-port-detected', (event) => {
-      const port = event.payload
-      if (!port || port <= 0) return
-      // 手动指定端口为最高可信度，自动捕获结果不再覆盖
-      if (store.roomState.hostMcPortManual) return
-      store.roomState.hostMcPort = port
-      // 阶段三子任务 8：broadcastPacket 异步加密后发送，sent 计数仅用于日志
-      void hostMesh.broadcastPacket(encodeHostMcPort(mcPortSeq++, port)).then((sent) => {
-        console.info(
-          `[Online] 房主 MC 局域网端口已捕获: ${port}，已广播给 ${sent} 个参与者`,
-        )
-      }).catch((e) => console.warn('[Online] 广播 MC 端口失败:', e))
+      applyDetectedPort(event.payload)
     }).then((unlisten) => {
       mcPortUnlisten = unlisten
     }).catch((e) => console.warn('[Online] 注册 MC 端口检测事件监听失败:', e))
+
+    // 进房回查：先启动 MC（已开放局域网）再进房时，端口事件在监听注册前发出
+    // 已被丢弃且 watcher 按端口去重不会重发，主动回查当前游戏进程补上
+    void getRunningMcPort().then((res) => {
+      if (!res.success || res.ports.length === 0) return
+      // 与 watcher 事件「后者覆盖」的生效顺序一致，取候选端口最后一项
+      applyDetectedPort(res.ports[res.ports.length - 1])
+    }).catch((e) => console.warn('[Online] 回查 MC 局域网端口失败:', e))
   }
 
   /** 停止房主运营（停轮询 + 移除 MC 端口监听），幂等 */

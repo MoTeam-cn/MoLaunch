@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **先启动 MC（已开放局域网）再开房间时端口不再丢失，进房自动回查补上**（[useRoomHost.ts](src/composables/useRoomHost.ts) / [lan_probe.rs](src-tauri/src/commands/online/manager/lan_probe.rs) / [ports.rs](src-tauri/src/minecraft/launch/watcher/ports.rs) / [scheduler.rs](src-tauri/src/minecraft/launch/watcher/scheduler.rs) / [tun.ts](src/utils/api/online-manager/tun.ts)）：watcher 检测到 MC 局域网端口后经 `online://mc-port-detected` 事件推送，但事件只在端口首次变化时发出（`last_port` 按端口去重），若在开房间（监听注册）之前已开放局域网，事件被丢弃且不会重发，房间详情端口停留在建房表单默认值。现抽取 `listening_tcp_ports` 到 `watcher/ports.rs` 供联机模块复用，新增 `get_running_mc_port` action 按当前游戏进程 PID 扫描监听端口，房主进房时主动回查一次；事件回查共用 `applyDetectedPort`（含手动端口守卫与重复端口去重）。
+
 - **`setRemoteAnswer` 幂等处理 ICE restart 并发竞态，不再误关自愈中的连接**（[mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts)）：`setRemoteAnswer` 与 `closeParticipant` / ICE restart 并发时，`signalingState` 可能在幂等守卫（`!== have-local-offer`）之后才变化，`setRemoteDescription` 会抛 `InvalidStateError`。现捕获该异常视为「跳过」（返回 `false`）而非「协商失败」，调用方 `autoAcceptConfirmedAnswer` 不再对该瞬态竞态执行 `closeParticipant` 误杀一个正在恢复的连接；仅真正异常才抛出让调用方关闭残留 PC。
 
 - **加入方 Offer 监控链在协商/重连进行中不再断裂**（[onlineSession.ts](src/composables/online/onlineSession.ts)）：`restartMonitorTick` 此前在 `reconnecting || negotiating` 时早退且**不重新排程**，若恰好在该窗口触发则监控链永久停止，房主 ICE restart 后的新 Offer 不被感知直到连接最终失败。现早退分支也调用 `scheduleRestartMonitor()`，配合 `finally` 兜底，任何路径都持续排程，不再依赖在途调用兜底。

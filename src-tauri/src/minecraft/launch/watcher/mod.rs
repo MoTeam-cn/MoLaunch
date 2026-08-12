@@ -5,6 +5,7 @@
 mod analyzer;
 mod log_parser;
 mod log_reader;
+pub(crate) mod ports;
 mod process;
 mod scheduler;
 mod types;
