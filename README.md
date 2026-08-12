@@ -9,7 +9,7 @@
 现代化、跨平台的 Minecraft Java 版启动器。
 
 [![License](https://img.shields.io/badge/License-MoLaunch%20Limited%20Distribution%20License-red.svg)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.3.6--rc2-blue.svg)](https://github.com/MoTeam-cn/MoLaunch)
+[![Version](https://img.shields.io/badge/version-0.3.6--rc3-blue.svg)](https://github.com/MoTeam-cn/MoLaunch)
 [![Tauri](https://img.shields.io/badge/Tauri-2-orange.svg)](https://v2.tauri.app/)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883.svg)](https://vuejs.org/)
 [![Rust](https://img.shields.io/badge/Rust-2021-dea584.svg)](https://www.rust-lang.org/)
