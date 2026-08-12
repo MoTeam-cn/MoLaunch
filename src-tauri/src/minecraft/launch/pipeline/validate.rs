@@ -27,6 +27,7 @@ impl LaunchPipeline {
             // 启动时文件补全属后台任务，静默下载（不触发前端下载面板）
             app_handle: None,
             silent: true,
+            panel_counter: None,
         };
         crate::minecraft::download::manager::DownloadManager::from_config(&download_config)
     }

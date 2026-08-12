@@ -276,6 +276,7 @@ pub async fn download_java(
         // Java 下载走独立进度事件（java-download-progress），不触发下载面板
         app_handle: None,
         silent: true,
+        panel_counter: None,
     };
     drop(config);
 

@@ -159,6 +159,10 @@ pub(super) async fn ensure_system_default_frpc(state: &AppState) -> Result<Strin
     // 提取成功后删除临时 ZIP 文件（注释承诺"提取 frpc 后删除"，原实现遗漏）
     let _ = std::fs::remove_file(&zip_path);
 
+    // 标记整体完成：start_grouped 已 reset_stages 置 is_active=true，
+    // 若不 mark_complete 会残留 is_active，导致重启后 isDownloading 恢复误判下载面板
+    session.mark_complete(state);
+
     // 6. 校验文件大小（防止下载截断/损坏）
     let metadata =
         std::fs::metadata(&target_path).map_err(|e| format!("frpc 文件元数据读取失败: {}", e))?;

@@ -111,6 +111,7 @@ fn test_from_config_preserves_fields() {
         user_agent: None,
         app_handle: None,
         silent: false,
+        panel_counter: None,
     };
     let manager = DownloadManager::from_config(&config);
     assert_eq!(manager.max_threads, 8);

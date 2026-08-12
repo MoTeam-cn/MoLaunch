@@ -79,14 +79,15 @@ impl DownloadManager {
         manager.client = client;
         manager.app_handle = config.app_handle.clone();
         manager.silent = config.silent;
+        manager.active_batches = config.panel_counter.clone();
         manager
     }
 
     /// 从 AppState 提取下载配置并构造（统一收敛 3 处重复的 lock/extract/drop）
+    ///
+    /// `app_handle` / `panel_counter` 由 `DownloadManagerConfig::from_state` 自动填充
     pub async fn from_state(state: &AppState) -> Self {
-        let mut manager = Self::from_config(&DownloadManagerConfig::from_state(state).await);
-        manager.active_batches = Some(state.panel_active_count.clone());
-        manager
+        Self::from_config(&DownloadManagerConfig::from_state(state).await)
     }
 
     /// 设置取消信号（用于支持前端取消下载）

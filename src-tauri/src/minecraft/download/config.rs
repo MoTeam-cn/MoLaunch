@@ -2,6 +2,7 @@
 //!
 //! 从 `AppConfig.download` 提取 DownloadManager 所需字段，收敛调用层重复的 lock/extract 套件。
 
+use std::sync::Arc;
 use tauri::AppHandle;
 
 use crate::minecraft::sources::DownloadSourceMode;
@@ -26,6 +27,9 @@ pub struct DownloadManagerConfig {
     pub app_handle: Option<AppHandle>,
     /// 静默下载（不 emit 面板事件，供 Java 下载 / 程序更新 / 启动补全等后台任务）
     pub silent: bool,
+    /// 共享批次计数（来自 AppState.panel_active_count，协调并发批次的面板显隐；
+    /// 非 None 时批次开始/结束才参与"首个显示、最后隐藏"的计数）
+    pub panel_counter: Option<Arc<std::sync::atomic::AtomicUsize>>,
 }
 
 impl DownloadManagerConfig {
@@ -45,6 +49,7 @@ impl DownloadManagerConfig {
             user_agent: None,
             app_handle: state.app_handle.get().cloned(),
             silent: false,
+            panel_counter: Some(state.panel_active_count.clone()),
         }
     }
 
@@ -65,6 +70,7 @@ impl DownloadManagerConfig {
             user_agent: None,
             app_handle: state.app_handle.get().cloned(),
             silent: false,
+            panel_counter: Some(state.panel_active_count.clone()),
         }
     }
 
