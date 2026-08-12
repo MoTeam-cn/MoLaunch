@@ -6,7 +6,6 @@
  * - 版本筛选 RadioButton（HorizontalFilter）
  * - 版本按游戏版本分组卡片（VersionGroupCard 子组件，可折叠/展开带动画）
  * - 加载进度条
- * - 下载进度浮层（DownloadProgressOverlay 子组件）
  *
  * 下载/前置检查/整合包安装逻辑分别抽到 useResourceDownload / useResourceModpackInstall composable。
  */
