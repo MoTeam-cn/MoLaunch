@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复云端更新日志「作者的话」note 解析（[updateLog.ts](src/utils/updateLog.ts)）：服务端 release_notes 的 note 行为 `- note: 内容` markdown 列表项格式，`extractNoteLines` / `stripNoteLines` 原正则仅匹配行首 `note:` 导致提取失败，检查更新抽屉回退展示构建时旧 note；现兼容 `[-*+]?` 列表前缀，并清理 note 文本行尾的 commit 链接（支持 `(https://...)` 括号包裹形式）。
+
 ## [0.3.5] - 2026-08-12
 
 - 修复进入主页时账号 IPC 重复调用（[useAccountCards.ts](src/composables/useAccountCards.ts)）：`get_ms_accounts` / `get_offline_accounts` / `get_authlib_accounts` 原先各被调用两次——账号卡片组件挂载时（AccountSelector onMounted）拉一遍、App.vue 启动流程的 `restoreSession` 内 `Promise.all` 又拉一遍，产生成堆 `[Startup][IPC]` 日志。现账号列表统一由 `restoreSession` 加载，卡片组件不再自行拉取（数据为 store 响应式，加载完成后自动渲染）；登录成功 / 删除 / 切换账号后的刷新仍由 auth store 内部显式触发。
