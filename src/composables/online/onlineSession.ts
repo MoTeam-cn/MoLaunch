@@ -206,8 +206,12 @@ function createSession(): OnlineSession {
    */
   async function restartMonitorTick() {
     if (store.roomState.role !== 'guest' || !store.roomState.roomCode) return
-    // 全量重建 / 初次协商进行中跳过，避免竞争（negotiating 由 useWebRTC 协商期间置 true）
-    if (reconnecting || guestWebrtc.negotiating.value) return
+    // 全量重建 / 初次协商进行中跳过，避免竞争（negotiating 由 useWebRTC 协商期间置 true）；
+    // 注意早退时也必须重新排程，否则监控链断裂（此轮跳过不调度，后续房主新 Offer 将不被感知）
+    if (reconnecting || guestWebrtc.negotiating.value) {
+      scheduleRestartMonitor()
+      return
+    }
     try {
       const pid = store.roomState.participantId
       if (!pid) return
@@ -354,6 +358,18 @@ function createSession(): OnlineSession {
           void ensureGuestTurnServers().then(() => startLightRestart())
         }
       }, DISCONNECT_RECOVERY_DELAY_MS)
+      return
+    }
+    if (state === 'closed') {
+      // 连接被关闭但角色仍是 guest（全量重建失败后的终态）：不再有 PC 可供轻量重启，
+      // 直接进入全量重建；reconnectAttempts 已耗尽的场景由 attemptGuestReconnect 顶部守卫
+      // 给出明确提示，避免永久停留在「假在线、无连接」的半死状态。
+      if (disconnectedRecoveryTimer) {
+        clearTimeout(disconnectedRecoveryTimer)
+        disconnectedRecoveryTimer = null
+      }
+      void attemptGuestReconnect()
+      return
     }
   })
 
