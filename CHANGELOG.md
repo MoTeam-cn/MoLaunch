@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复进入主页时账号 IPC 重复调用（[useAccountCards.ts](src/composables/useAccountCards.ts)）：`get_ms_accounts` / `get_offline_accounts` / `get_authlib_accounts` 原先各被调用两次——账号卡片组件挂载时（AccountSelector onMounted）拉一遍、App.vue 启动流程的 `restoreSession` 内 `Promise.all` 又拉一遍，产生成堆 `[Startup][IPC]` 日志。现账号列表统一由 `restoreSession` 加载，卡片组件不再自行拉取（数据为 store 响应式，加载完成后自动渲染）；登录成功 / 删除 / 切换账号后的刷新仍由 auth store 内部显式触发。
+
 - 下载面板与返回顶部按钮视觉完全统一（[DownloadPanel.vue](src/components/common/DownloadPanel.vue)）：下载按钮缩至与 BackToTop 一致的 44px 圆钮、图标改用 solid 风格白图标、采用相同阴影与 hover/active 动效（hover 上移 2px + 阴影增强、按下缩小）；进度环内缩（r=15 / dasharray 94.25）并在按钮边缘留白，避免白色描边环把按钮视觉轮廓撑大一圈；BackToTop 消失时下载按钮从避让位平滑滑回贴底（`bottom` 过渡），两个浮标同时出现不再突兀。Tailwind 浮动类收敛为 scoped CSS。
 
 - 清理前端死代码（[Trigger.vue](src/components/common/Trigger.vue) / [InstalledList.vue](src/components/version/InstalledList.vue) / [DownloadProgressOverlay.vue](src/components/community/resource-detail/DownloadProgressOverlay.vue) / [useCommunityDownload.ts](src/composables/useCommunityDownload.ts) / [deeplink.ts](src/utils/deeplink.ts) / [click-outside.ts](src/utils/click-outside.ts)）：全仓无引用的孤儿组件（预留未接线的 popover 触发器、被 VersionSection 取代的旧版已安装列表、规划未接入的下载进度浮层）、连带孤儿 composable（useCommunityDownload）、前端无消费方的深链接工具均删除；`click-outside.ts` 移除仅被孤儿组件调用的 `onClickOutside`（保留 Drawer 使用的 `onEscape`）；`useExternalDownload` 子目录下已被根目录版本取代的旧实现切片一并清理。

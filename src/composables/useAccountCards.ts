@@ -4,7 +4,7 @@
  * 封装卡片列表构建（顺序稳定）、当前索引管理 + 边界检查、切换/删除/登出账号与首次加载拉取。
  * 调用方仅需解构返回值即可在模板中使用。
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import type { AccountCardData } from '@/components/home/account-selector/types'
@@ -198,12 +198,11 @@ export function useAccountCards() {
     }
   }
 
-  onMounted(() => {
-    authStore.loadMsAccounts()
-    authStore.loadOfflineAccounts()
-    // authlib 账号也需要加载，否则外置登录账号不显示在卡片栏
-    authStore.loadAuthlibAccounts()
-  })
+  // 账号列表（微软/离线/authlib）由 App.vue 启动时的 restoreSession 统一加载，
+  // 本组件挂载早于 restoreSession 完成（子组件先于父组件 onMounted），
+  // 不再自行拉取，避免与 restoreSession 的 Promise.all 重复调用同一批 IPC
+  // （此前 get_ms_accounts / get_offline_accounts / get_authlib_accounts 各被调用两次）；
+  // 登录成功 / 删除 / 切换账号后的刷新仍由 auth store 内部的 load 显式触发
 
   return {
     cards,
