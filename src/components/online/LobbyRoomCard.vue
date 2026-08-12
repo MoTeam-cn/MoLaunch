@@ -119,7 +119,7 @@ const disabledReason = computed(() => {
           加入
         </Button>
       </Tooltip>
-      <Tooltip v-if="disabledReason" :text="disabledReason" position="top" :delay="200">
+      <Tooltip v-else-if="disabledReason" :text="disabledReason" position="top" :delay="200">
         <Button
           type="primary"
           size="small"

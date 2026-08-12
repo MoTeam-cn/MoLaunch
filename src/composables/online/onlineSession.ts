@@ -508,8 +508,12 @@ function createSession(): OnlineSession {
     clearRestartMonitor()
     await stopLanFake()
     await lan.stop()
+    // 主动退出：置 reconnecting 防止 guestWebrtc.close() 触发的 connectionState='closed'
+    // watch 分支在 await guestLeaveRoom 期间误触发 attemptGuestReconnect 重新加入刚退出的房间
+    reconnecting = true
     guestWebrtc.close()
     await store.guestLeaveRoom()
+    reconnecting = false
   }
 
   /** 加入方会话：密钥注入 + TUN 启动 + 房间状态监控 */

@@ -27,8 +27,8 @@ export function useRoomHostActions(
   const bannedList = ref<RoomBan[]>([])
   /** 服务端当前时间（Unix 秒，由 listBannedParticipants 返回，用于计算剩余封禁时长） */
   const banServerTime = ref(0)
-  /** 正在处理确认/拒绝的参与者（key=participantId，防连点重复提交） */
-  const confirming = new Set<string>()
+  /** 正在处理确认/拒绝的参与者（key=participantId，防连点重复提交；响应式 Set 使按钮禁用生效） */
+  const confirming = ref<Set<string>>(new Set())
 
   /** 刷新封禁列表（仅房主，按需调用：挂载时 / 踢人带封禁后 / 解封后） */
   async function refreshBans() {
@@ -57,8 +57,8 @@ export function useRoomHostActions(
    */
   async function handleConfirm(participant: ParticipantInfo, accepted: boolean) {
     // 防连点：同一条申请在请求返回前禁止再次提交
-    if (confirming.has(participant.participantId)) return
-    confirming.add(participant.participantId)
+    if (confirming.value.has(participant.participantId)) return
+    confirming.value.add(participant.participantId)
     try {
       const result = await confirmParticipant(
         store.roomState.roomCode,
@@ -75,7 +75,7 @@ export function useRoomHostActions(
     } catch (e) {
       toastError(`确认失败：${e instanceof Error ? e.message : String(e)}`)
     } finally {
-      confirming.delete(participant.participantId)
+      confirming.value.delete(participant.participantId)
     }
   }
 

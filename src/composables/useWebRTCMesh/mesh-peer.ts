@@ -200,9 +200,11 @@ export function useMeshPeer(deps: MeshPeerDeps) {
       }
     } finally {
       conns.value.delete(participantId)
-      channelOpen.delete(participantId)
       negotiating.delete(participantId)
+      // 先置 closed（供 UI/scanRestartCandidates 感知），再删除 channelOpen 键，
+      // 避免 setConnState 内部 channelOpen.set(id,false) 撤销上面的 delete 造成键残留累积
       setConnState(participantId, 'closed')
+      channelOpen.delete(participantId)
     }
   }
 
