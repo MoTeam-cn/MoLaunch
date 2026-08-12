@@ -16,6 +16,7 @@ import { useCreateRoomForm } from '@/composables/useCreateRoomForm'
 const {
   store,
   createForm,
+  creating,
   modpackMeta,
   onModpackEnabledChange,
   publicRoomHint,
@@ -125,7 +126,7 @@ watch(
         </div>
         <!-- 创建按钮 -->
         <div class="pt-1">
-          <Button type="primary" long :loading="store.roomLoading" @click="handleCreateRoom">
+          <Button type="primary" long :loading="store.roomLoading || creating" :disabled="creating" @click="handleCreateRoom">
             <template #icon><PlusIcon class="w-4 h-4" /></template>
             创建房间
           </Button>

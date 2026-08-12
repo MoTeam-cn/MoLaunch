@@ -45,6 +45,7 @@ const hostMesh = inject('hostMesh') as ReturnType<typeof useWebRTCMesh>
 const {
   bannedList,
   banServerTime,
+  confirming,
   handleConfirm,
   handleKick,
   handleUnban,
@@ -178,7 +179,7 @@ function participantStateText(participantId: string): string {
       render-in-place
       popup-container="#app-content"
     >
-      <PendingAnswerList :requests="joinedRequests" @confirm="handleConfirm" />
+      <PendingAnswerList :requests="joinedRequests" :busy="confirming" @confirm="handleConfirm" />
     </Drawer>
 
     <!-- 参与者列表抽屉 -->

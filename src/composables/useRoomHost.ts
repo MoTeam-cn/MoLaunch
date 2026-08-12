@@ -62,6 +62,7 @@ export function useRoomHost(options: {
   const {
     bannedList,
     banServerTime,
+    confirming,
     handleConfirm,
     handleKick,
     handleUnban,
@@ -178,6 +179,7 @@ export function useRoomHost(options: {
     offerGenerating,
     bannedList,
     banServerTime,
+    confirming,
     handleConfirm,
     handleKick,
     handleUnban,

@@ -54,6 +54,7 @@ export interface OnlineSession {
   offerGenerating: ReturnType<typeof useRoomHost>['offerGenerating']
   bannedList: ReturnType<typeof useRoomHost>['bannedList']
   banServerTime: ReturnType<typeof useRoomHost>['banServerTime']
+  confirming: ReturnType<typeof useRoomHost>['confirming']
   handleConfirm: ReturnType<typeof useRoomHost>['handleConfirm']
   handleKick: ReturnType<typeof useRoomHost>['handleKick']
   handleUnban: ReturnType<typeof useRoomHost>['handleUnban']
@@ -552,6 +553,7 @@ function createSession(): OnlineSession {
     offerGenerating: hostOps.offerGenerating,
     bannedList: hostOps.bannedList,
     banServerTime: hostOps.banServerTime,
+    confirming: hostOps.confirming,
     handleConfirm: hostOps.handleConfirm,
     handleKick: hostOps.handleKick,
     handleUnban: hostOps.handleUnban,

@@ -14,6 +14,8 @@ import type { ParticipantInfo } from '@/types/online'
 
 const props = defineProps<{
   requests: ParticipantInfo[]
+  /** 正在处理确认/拒绝的参与者集合（key=participantId），处理期间禁用对应按钮防连点 */
+  busy?: Set<string>
 }>()
 
 const emit = defineEmits<{
@@ -47,8 +49,8 @@ const isEmpty = computed(() => props.requests.length === 0)
           <div class="text-xs text-gray-500">虚拟 IP: {{ req.virtualIp || '分配中' }}</div>
         </div>
         <div class="flex items-center gap-1">
-          <Button type="primary" size="mini" @click="emit('confirm', req, true)">接受</Button>
-          <Button type="ghost" size="mini" @click="emit('confirm', req, false)">拒绝</Button>
+          <Button type="primary" size="mini" :disabled="props.busy?.has(req.participantId)" @click="emit('confirm', req, true)">接受</Button>
+          <Button type="ghost" size="mini" :disabled="props.busy?.has(req.participantId)" @click="emit('confirm', req, false)">拒绝</Button>
         </div>
       </div>
       <div class="text-xs text-gray-400">加入时间: {{ formatTimestamp(req.joinedAt) }}</div>

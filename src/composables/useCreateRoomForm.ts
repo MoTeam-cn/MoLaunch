@@ -50,6 +50,8 @@ export function useCreateRoomForm() {
   const versionsLoading = ref(false)
   /** 版本信息解析中（避免重复点击/提交） */
   const versionResolving = ref(false)
+  /** 创建流程进行中（含 stun 阶段，避免重复提交；由 roomLoading 之外的独立标记承载） */
+  const creating = ref(false)
 
   onMounted(async () => {
     versionsLoading.value = true
@@ -145,6 +147,7 @@ export function useCreateRoomForm() {
 
   /** 房主创建房间（mesh 拓扑：不生成本地 Offer，参与者加入后再 per-participant 生成） */
   async function handleCreateRoom() {
+    if (creating.value) return
     if (!createForm.value.selectedVersionId) {
       toastError('请选择 MC 版本：创建房间前需指明房主的 Minecraft 版本')
       return
@@ -166,6 +169,7 @@ export function useCreateRoomForm() {
       return
     }
 
+    creating.value = true
     try {
       store.roomCreateStep = 'stun'
       const stun = await store.fetchStunServers()
@@ -193,12 +197,14 @@ export function useCreateRoomForm() {
       toastError(`创建房间失败：${e instanceof Error ? e.message : String(e)}`)
     } finally {
       store.roomCreateStep = null
+      creating.value = false
     }
   }
 
   return {
     store,
     createForm,
+    creating,
     modpackMeta,
     onModpackEnabledChange,
     publicRoomHint,
