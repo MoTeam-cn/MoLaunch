@@ -224,6 +224,15 @@ export function useMeshPeer(deps: MeshPeerDeps) {
     return connectionStates.get(participantId)
   }
 
+  /**
+   * 移除指定参与者的连接状态键（连接已关闭且参与者已离开/被拒时调用）。
+   *
+   * 避免长会话中 connectionStates 残留 'closed' 键无界累积。
+   */
+  function removeConnState(participantId: string) {
+    connectionStates.delete(participantId)
+  }
+
   /** 当前已联通（channel open）的参与者数量 */
   function connectedCount(): number {
     let n = 0
@@ -280,6 +289,7 @@ export function useMeshPeer(deps: MeshPeerDeps) {
     closeParticipant,
     close,
     getConnState,
+    removeConnState,
     connectedCount,
     getConnPcs,
     restartIceFor,

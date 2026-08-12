@@ -359,6 +359,8 @@ export function useRoomHostPolling(
       for (const id of Array.from(hostMesh.connectionStates.keys())) {
         if (!activeIds.has(id)) {
           void hostMesh.closeParticipant(id)
+          // 清理已离开参与者的连接状态键，避免 connectionStates 残留 'closed' 条目无界累积
+          hostMesh.removeConnState(id)
           restartAttempts.delete(id)
           restartInFlight.delete(id)
           restartCooldownUntil.delete(id)

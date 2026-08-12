@@ -64,6 +64,7 @@ export function useWebRTCMesh(options?: { autoClose?: boolean }) {
     closeParticipant: peer.closeParticipant,
     close: peer.close,
     getConnState: peer.getConnState,
+    removeConnState: peer.removeConnState,
     connectedCount: peer.connectedCount,
     getConnPcs: peer.getConnPcs,
     restartIceFor: peer.restartIceFor,
