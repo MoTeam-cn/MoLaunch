@@ -68,19 +68,8 @@ pub(super) async fn spawn_frpc(
             .replace("{frpc}", &frpc_path.to_string_lossy())
             .replace("{tunnelId}", remote_id);
         log_info!("[Frp] 使用厂商命令模式启动: {}", template);
-        let mut segs = template.split("{token}");
-        let mut head_parts = segs.next().unwrap_or("").split_whitespace();
-        let _ = head_parts.next();
-        for arg in head_parts {
+        for arg in build_command_args(&template, token) {
             cmd.arg(arg);
-        }
-        if template.contains("{token}") && !token.is_empty() {
-            cmd.arg(token);
-        }
-        for seg in segs {
-            for arg in seg.split_whitespace() {
-                cmd.arg(arg);
-            }
         }
     } else {
         cmd.arg("-c").arg(config_path.as_ref().unwrap());
@@ -158,4 +147,60 @@ fn configure_environment(cmd: &mut tokio::process::Command) {
         })
         .collect();
     log_debug!("[Frp] 传给 frpc 的环境变量: {}", env_desc.join("; "));
+}
+
+/// 构造命令模式启动参数（跳过首个二进制路径词，逐词内联替换 `{token}`）
+///
+/// `{token}` 是参数内联占位符（如 Lolia `-t 17062:{token}`：token 必须与
+/// 端口拼接为同一参数，不能拆成独立参数），token 为空时整词替换为空则跳过。
+fn build_command_args(template: &str, token: &str) -> Vec<String> {
+    let mut words = template.split_whitespace();
+    let _ = words.next();
+    words
+        .filter_map(|word| {
+            if word.contains("{token}") {
+                let substituted = word.replace("{token}", token);
+                if substituted.is_empty() {
+                    None
+                } else {
+                    Some(substituted)
+                }
+            } else {
+                Some(word.to_string())
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::build_command_args;
+
+    #[test]
+    fn token_inline_concatenated() {
+        let args = build_command_args("{frpc} -t 17062:{token}", "jmbscabc");
+        assert_eq!(args, vec!["-t", "17062:jmbscabc"]);
+    }
+
+    #[test]
+    fn token_as_standalone_word() {
+        let args = build_command_args("{frpc} -u {token} -p 123", "abc");
+        assert_eq!(args, vec!["-u", "abc", "-p", "123"]);
+    }
+
+    #[test]
+    fn token_in_middle_with_trailing_args() {
+        let args = build_command_args("{frpc} -t 17062:{token} --server relay.example.com", "abc");
+        assert_eq!(
+            args,
+            vec!["-t", "17062:abc", "--server", "relay.example.com"]
+        );
+    }
+
+    #[test]
+    fn empty_token_skips_standalone_placeholder() {
+        let args = build_command_args("{frpc} -t 17062:{token}", "");
+        assert_eq!(args, vec!["-t", "17062:"]);
+        assert_eq!(build_command_args("{frpc} -t {token}", ""), vec!["-t"]);
+    }
 }
