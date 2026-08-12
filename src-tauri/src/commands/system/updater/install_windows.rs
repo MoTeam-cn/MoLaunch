@@ -1,63 +1,41 @@
 //! Windows 便携版下载安装流程
 //!
-//! 1. 下载新 exe 到临时目录（流式下载，按节流阈值推送进度事件）
+//! 1. 复用通用 DownloadManager 下载新 exe 到临时目录（分片/限速/失败重试，进度经回调转发）
 //! 2. 释放 updater.exe 到 AppData
 //! 3. 启动 updater.exe 子进程（传递旧 exe 路径、新 exe 路径、主进程 PID）
 //! 4. 主程序退出（updater 接管替换文件）
 
-use futures_util::StreamExt;
-use std::io::Write;
+use std::sync::Arc;
 use tauri::AppHandle;
 use tauri::Emitter;
 
-use super::{UpdateInfo, PROGRESS_EVENT, PROGRESS_THROTTLE_BYTES};
+use crate::minecraft::download::config::DownloadManagerConfig;
+use crate::minecraft::download::manager::DownloadManager;
+use crate::minecraft::download::types::{DownloadStatus, DownloadTask, GlobalProgress};
+use crate::state::AppState;
+
+use super::{UpdateInfo, PROGRESS_EVENT};
 
 /// Windows 便携版下载安装流程
 #[cfg(target_os = "windows")]
 pub(super) async fn download_and_install_windows(
     app: &AppHandle,
+    state: &AppState,
     info: UpdateInfo,
 ) -> Result<(), String> {
     if info.download_url.is_empty() {
         return Err("下载 URL 为空".into());
     }
 
-    // 1. 下载新 exe 到临时目录（流式读取，实时推送进度，与 macOS/Linux 路径一致）
+    // 1. 下载新 exe 到临时目录（复用通用 DownloadManager：分片/限速/失败重试 + 进度回调）
     let temp_dir = std::env::temp_dir().join("molaunch_update");
     std::fs::create_dir_all(&temp_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
     let new_exe = temp_dir.join("MoLaunch_new.exe");
 
     log::info!("[Updater] 开始下载新版本: {}", info.download_url);
-    let response = crate::http::get_client()
-        .get(&info.download_url)
-        .send()
+    let downloaded = download_with_manager(state, &info.download_url, &new_exe, Some(app))
         .await
-        .map_err(|e| format!("下载请求失败: {}", crate::http::request_error_msg(&e)))?;
-    let total = response.content_length().unwrap_or(0);
-    let mut file = std::fs::File::create(&new_exe).map_err(|e| format!("创建临时文件失败: {e}"))?;
-    let mut stream = response.bytes_stream();
-    let mut downloaded: u64 = 0;
-    let mut last_emit: u64 = 0;
-    while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| format!("下载读取失败: {e}"))?;
-        file.write_all(&chunk)
-            .map_err(|e| format!("写入临时文件失败: {e}"))?;
-        downloaded += chunk.len() as u64;
-        if downloaded.saturating_sub(last_emit) >= PROGRESS_THROTTLE_BYTES
-            || (total > 0 && downloaded >= total)
-        {
-            last_emit = downloaded;
-            let _ = app.emit(
-                PROGRESS_EVENT,
-                serde_json::json!({ "downloaded": downloaded, "total": total }),
-            );
-        }
-    }
-    // 收尾推送一次最终进度（total 未知时前端依赖它切换 installing 状态）
-    let _ = app.emit(
-        PROGRESS_EVENT,
-        serde_json::json!({ "downloaded": downloaded, "total": total }),
-    );
+        .map_err(|e| format!("下载安装包失败: {e}"))?;
     log::info!(
         "[Updater] 下载完成: {} ({} bytes)",
         new_exe.display(),
@@ -135,10 +113,12 @@ pub(super) fn last_signature_path() -> Result<std::path::PathBuf, String> {
 ///
 /// 前端定时检查发现新版本后调用此命令，将安装包下载到 appdata。
 /// 下载完成后不立即替换，等用户退出程序时由 `apply_pending_update` 触发替换。
-///
-/// 若 last.exe 已存在且版本相同（通过文件大小判断），跳过重复下载。
+/// 每次定时检查命中都会重新下载覆盖 last.exe（无 size/hash 元数据，不做重复跳过）。
 #[cfg(target_os = "windows")]
-pub(super) async fn download_update_to_appdata_impl(info: UpdateInfo) -> Result<bool, String> {
+pub(super) async fn download_update_to_appdata_impl(
+    state: &AppState,
+    info: UpdateInfo,
+) -> Result<bool, String> {
     if info.download_url.is_empty() {
         return Err("下载 URL 为空".into());
     }
@@ -159,17 +139,9 @@ pub(super) async fn download_update_to_appdata_impl(info: UpdateInfo) -> Result<
         last_exe.display()
     );
 
-    let response = crate::http::get_client()
-        .get(&info.download_url)
-        .send()
+    let downloaded = download_with_manager(state, &info.download_url, &last_exe, None)
         .await
-        .map_err(|e| format!("下载请求失败: {}", crate::http::request_error_msg(&e)))?;
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| format!("下载读取失败: {e}"))?;
-
-    std::fs::write(&last_exe, &bytes).map_err(|e| format!("写入 last.exe 失败: {e}"))?;
+        .map_err(|e| format!("后台下载失败: {e}"))?;
 
     // 签名随 last.exe 一起缓存（last.sig），退出时 apply_pending_update 读出传给 updater.exe
     // 写失败时回滚 last.exe，保证 last.exe/last.sig 配对一致性
@@ -182,7 +154,7 @@ pub(super) async fn download_update_to_appdata_impl(info: UpdateInfo) -> Result<
     log::info!(
         "[Updater] 后台下载完成: {} ({} bytes)",
         last_exe.display(),
-        bytes.len()
+        downloaded
     );
 
     Ok(true)
@@ -243,4 +215,51 @@ pub(super) async fn apply_pending_update_impl(_app: &AppHandle) -> Result<bool, 
         .map_err(|e| format!("启动 updater.exe 失败: {e}"))?;
 
     Ok(true)
+}
+
+/// 复用通用 DownloadManager 下载单个文件到本地路径
+///
+/// 返回实际下载字节数；`emit_progress` 非 None 时把 DownloadManager 的
+/// GlobalProgress 转发为 `update-download-progress` 事件（供更新弹窗进度条使用）。
+/// expected_size 传 0（未知）：单流路径会从响应头回填 total，分片路径由收尾事件兜底。
+async fn download_with_manager(
+    state: &AppState,
+    url: &str,
+    local_path: &std::path::Path,
+    emit_progress: Option<&AppHandle>,
+) -> Result<u64, String> {
+    let task = DownloadTask {
+        id: "update-exe".to_string(),
+        urls: vec![url.to_string()],
+        local_path: local_path.to_string_lossy().to_string(),
+        expected_size: 0,
+        expected_hash: None,
+    };
+    let progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>> =
+        emit_progress.map(|app| {
+            let app = app.clone();
+            Arc::new(move |p: GlobalProgress| {
+                let _ = app.emit(
+                    PROGRESS_EVENT,
+                    serde_json::json!({ "downloaded": p.downloaded_bytes, "total": p.total_bytes }),
+                );
+            }) as Arc<dyn Fn(GlobalProgress) + Send + Sync>
+        });
+    let manager = DownloadManager::from_config(&DownloadManagerConfig::from_state(state).await);
+    let results = manager.download_batch(vec![task], progress_callback).await;
+    let result = results.first().ok_or_else(|| "下载结果为空".to_string())?;
+    if result.status == DownloadStatus::Failed {
+        return Err(result
+            .error
+            .clone()
+            .unwrap_or_else(|| "下载失败".to_string()));
+    }
+    // 收尾推送一次最终进度（total 未知时前端依赖它切换 installing 状态）
+    if let Some(app) = emit_progress {
+        let _ = app.emit(
+            PROGRESS_EVENT,
+            serde_json::json!({ "downloaded": result.downloaded, "total": result.downloaded }),
+        );
+    }
+    Ok(result.downloaded)
 }

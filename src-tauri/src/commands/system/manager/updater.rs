@@ -15,10 +15,10 @@ pub(super) fn register(d: &mut Dispatcher) {
     );
     d.register(
         "download_and_install_update",
-        handler!(_state, app, params, {
+        handler!(state, app, params, {
             let p: crate::commands::system::updater::UpdateInfo =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            crate::commands::system::updater::download_and_install(&app, p).await?;
+            crate::commands::system::updater::download_and_install(&app, &state, p).await?;
             Ok(serde_json::Value::Null)
         }),
     );
@@ -26,11 +26,11 @@ pub(super) fn register(d: &mut Dispatcher) {
     // Windows 便携版后台静默下载新版本到 appdata/last.exe
     d.register(
         "download_update_to_appdata",
-        handler!(_state, _app, params, {
+        handler!(state, _app, params, {
             let p: crate::commands::system::updater::UpdateInfo =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let downloaded =
-                crate::commands::system::updater::download_update_to_appdata(p).await?;
+                crate::commands::system::updater::download_update_to_appdata(&state, p).await?;
             serde_json::to_value(downloaded).map_err(|e| e.to_string())
         }),
     );

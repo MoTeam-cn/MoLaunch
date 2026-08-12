@@ -8,6 +8,7 @@ use tauri::AppHandle;
 
 #[cfg(not(target_os = "windows"))]
 use crate::log_info;
+use crate::state::AppState;
 
 /// 更新信息（check_update 返回，download_and_install_update 接收）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -32,16 +33,20 @@ pub struct UpdateInfo {
 
 /// 下载并安装更新（平台内部分流）
 ///
-/// - **Windows**：自实现下载 + 启动 updater.exe 子进程
+/// - **Windows**：复用通用 DownloadManager 下载 + 启动 updater.exe 子进程
 /// - **macOS / Linux**：转发到官方 plugin 的 download_and_install()
-pub async fn download_and_install(app: &AppHandle, info: UpdateInfo) -> Result<(), String> {
+pub async fn download_and_install(
+    app: &AppHandle,
+    state: &AppState,
+    info: UpdateInfo,
+) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        super::install_windows::download_and_install_windows(app, info).await
+        super::install_windows::download_and_install_windows(app, state, info).await
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = info;
+        let _ = (state, info);
         super::install_unix::download_and_install_unix(app).await
     }
 }
@@ -50,21 +55,23 @@ pub async fn download_and_install(app: &AppHandle, info: UpdateInfo) -> Result<(
 ///
 /// 前端定时检查发现新版本后调用此命令，将安装包下载到 appdata。
 /// 下载完成后不立即替换，等用户退出程序时由 `apply_pending_update` 触发替换。
+/// 每次定时检查命中都会重新下载覆盖 last.exe（无 size/hash 元数据，不做重复跳过）。
 ///
-/// 若 last.exe 已存在且版本相同（通过文件大小判断），跳过重复下载。
-///
-/// **平台差异**：Windows 便携版自实现后台预下载（绕过文件锁、支持退出时延迟替换）；
+/// **平台差异**：Windows 便携版复用通用 DownloadManager 后台预下载（绕过文件锁、支持退出时延迟替换）；
 /// macOS / Linux 由官方 `tauri-plugin-updater` 接管，无后台预下载流程，调用此命令
 /// 仅记录 INFO 日志后返回 `Ok(false)`，前端应通过 `download_and_install_update` 触发更新。
-pub async fn download_update_to_appdata(info: UpdateInfo) -> Result<bool, String> {
+pub async fn download_update_to_appdata(
+    state: &AppState,
+    info: UpdateInfo,
+) -> Result<bool, String> {
     #[cfg(target_os = "windows")]
     {
-        super::install_windows::download_update_to_appdata_impl(info).await
+        super::install_windows::download_update_to_appdata_impl(state, info).await
     }
 
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = info;
+        let _ = (state, info);
         log_info!(
             "[Updater] download_update_to_appdata 在 macOS/Linux 上由 tauri-plugin-updater 接管，无后台预下载"
         );
