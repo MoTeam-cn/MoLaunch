@@ -127,6 +127,7 @@ async function silentCheckAndDownload(): Promise<void> {
       }
 
       console.info('[Updater] 发现新版本 %s，开始后台下载到 appdata', info.version)
+      updateState.silentDownloading = true
       const downloaded = await systemManager<boolean>(
         SYSTEM_ACTIONS.DOWNLOAD_UPDATE_TO_APPDATA,
         info,
@@ -144,5 +145,6 @@ async function silentCheckAndDownload(): Promise<void> {
     console.error('[Updater] silentCheckAndDownload error:', e)
   } finally {
     updaterFlags.silentChecking = false
+    updateState.silentDownloading = false
   }
 }

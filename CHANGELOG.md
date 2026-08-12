@@ -6,7 +6,7 @@
 
 - 修复云端更新日志「作者的话」note 解析（[updateLog.ts](src/utils/updateLog.ts)）：服务端 release_notes 的 note 行为 `- note: 内容` markdown 列表项格式，`extractNoteLines` / `stripNoteLines` 原正则仅匹配行首 `note:` 导致提取失败，检查更新抽屉回退展示构建时旧 note；现兼容 `[-*+]?` 列表前缀，并清理 note 文本行尾的 commit 链接（支持 `(https://...)` 括号包裹形式）。
 
-- 修复静默下载期间手动「检查更新」无响应（[check.ts](src/utils/updater/check.ts) / [state.ts](src/utils/updater/state.ts)）：Windows 后台预下载与手动检查共享 `updaterFlags.checking` 防并发标志，静默下载流程（`silentCheckAndDownload` 两步：检查 + 下载新 exe 到 `%APPDATA%/.Molaunch/last.exe`）期间 `checking` 被长时占用，手动 `checkForUpdate` 命中 `if (checking) return` 被静默忽略，表现为「检查更新」按钮点击无反应，下载完成才恢复；现拆分为独立标志 `checking`（手动检查）与 `silentChecking`（静默检查 + 后台下载），两者互不阻塞。
+- 修复静默下载期间手动「检查更新」无响应（[check.ts](src/utils/updater/check.ts) / [state.ts](src/utils/updater/state.ts)）：Windows 后台预下载与手动检查共享 `updaterFlags.checking` 防并发标志，静默下载流程（`silentCheckAndDownload` 两步：检查 + 下载新 exe 到 `%APPDATA%/.Molaunch/last.exe`）期间 `checking` 被长时占用，手动 `checkForUpdate` 命中 `if (checking) return` 被静默忽略，表现为「检查更新」按钮点击无反应，下载完成才恢复；现拆分为独立标志 `checking`（手动检查）与 `silentChecking`（静默检查 + 后台下载），两者互不阻塞；另在更新弹窗底部，后台预下载期间「立即更新」按钮禁用置灰并 hover 提示「后台正在预下载新版本，无需手动更新，退出应用后自动安装」（[state.ts](src/utils/updater/state.ts) 新增响应式 `silentDownloading` 状态 + [UpdateDialog.vue](src/components/about/UpdateDialog.vue) 复用 Tooltip 组件），避免与后台预下载并发下载同一版本。
 
 ## [0.3.5] - 2026-08-12
 

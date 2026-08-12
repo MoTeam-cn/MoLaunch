@@ -37,6 +37,8 @@ export interface UpdateState {
   error: string
   /** 是否显示弹窗（手动触发或发现更新时为 true） */
   showDialog: boolean
+  /** Windows 后台静默预下载更新包中（供 UI 禁用「立即更新」并提示） */
+  silentDownloading: boolean
 }
 
 /** 全局更新状态（响应式，组件可直接 watch） */
@@ -49,6 +51,7 @@ export const updateState = reactive<UpdateState>({
   total: 0,
   error: '',
   showDialog: false,
+  silentDownloading: false,
 })
 
 /** 内部可变单例状态（跨切片共享，经对象属性读写避免跨模块重新绑定） */

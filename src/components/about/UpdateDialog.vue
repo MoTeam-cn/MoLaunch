@@ -25,6 +25,7 @@ import {
 import Button from '@/components/common/Button.vue'
 import Tag from '@/components/common/Tag.vue'
 import Drawer from '@/components/common/Drawer.vue'
+import Tooltip from '@/components/common/Tooltip.vue'
 import ReleaseTimeline from '@/components/about/ReleaseTimeline.vue'
 import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'
 import { formatBytes } from '@/utils/format'
@@ -227,7 +228,23 @@ function onRetry() {
       >
         <template v-if="updateState.status === 'available'">
           <Button v-if="canClose" type="ghost" size="small" @click="onLater">稍后</Button>
-          <Button type="primary" size="small" @click="onUpdate">立即更新</Button>
+          <Tooltip
+            :text="
+              updateState.silentDownloading
+                ? '后台正在预下载新版本，无需手动更新，退出应用后自动安装'
+                : ''
+            "
+            position="top"
+          >
+            <Button
+              type="primary"
+              size="small"
+              :disabled="updateState.silentDownloading"
+              @click="onUpdate"
+            >
+              立即更新
+            </Button>
+          </Tooltip>
         </template>
         <template v-else>
           <Button v-if="canClose" type="ghost" size="small" @click="closeDialog">关闭</Button>
