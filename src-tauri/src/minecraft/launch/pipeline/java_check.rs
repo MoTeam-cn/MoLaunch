@@ -176,6 +176,9 @@ impl LaunchPipeline {
                     speed_limit: self.config.speed_limit,
                     source_mode: dl_mode,
                     user_agent: None,
+                    // 启动时自动下载 Java 属后台任务，静默下载（不触发前端下载面板）
+                    app_handle: None,
+                    silent: true,
                 };
                 let downloaded = crate::minecraft::java::download::download_java_runtime(
                     target_major,

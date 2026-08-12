@@ -68,6 +68,7 @@ pub async fn download_file(
         "外部下载",
         vec![(&file_name, 1.0)],
         manager,
+        false,
     )
     .await;
     {

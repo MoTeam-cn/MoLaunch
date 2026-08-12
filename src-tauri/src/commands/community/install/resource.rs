@@ -49,7 +49,8 @@ pub async fn download_resource(
     // 启动 DownloadSession：统一 reset_stages + flag 重置 + manager 构造
     // （之前手工 lock + reset_stages + store flag + DownloadManager::new 6 步合并为 1 行）
     let session =
-        DownloadSession::start_grouped(state, "社区资源", vec![(&final_file_name, 1.0)]).await;
+        DownloadSession::start_grouped(state, "社区资源", vec![(&final_file_name, 1.0)], false)
+            .await;
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.version_name = final_file_name.clone();
@@ -144,7 +145,8 @@ pub async fn download_resource_to_path(
     }
 
     // 启动 DownloadSession：统一 reset_stages + flag 重置 + manager 构造
-    let session = DownloadSession::start_grouped(state, "社区资源", vec![(&file_name, 1.0)]).await;
+    let session =
+        DownloadSession::start_grouped(state, "社区资源", vec![(&file_name, 1.0)], false).await;
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.version_name = file_name.clone();

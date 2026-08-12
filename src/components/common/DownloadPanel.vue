@@ -35,7 +35,7 @@ function goToDownloads() {
     leave-from-class="opacity-100 scale-100"
     leave-to-class="opacity-0 scale-50"
   >
-    <!-- 有下载任务时显示 -->
+    <!-- 有下载任务时显示（下载开始/结束由后端 download-panel-state 事件驱动） -->
     <!-- 保留原生 button：浮动下载按钮（fixed w-14 h-14 rounded-full），
          Button.vue 的 scoped size 类固定 height/padding 无法承载圆形浮动按钮 -->
     <button

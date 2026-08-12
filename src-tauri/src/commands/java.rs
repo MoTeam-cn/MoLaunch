@@ -273,6 +273,9 @@ pub async fn download_java(
         speed_limit: config.download.max_speed,
         source_mode: dl_mode,
         user_agent: None,
+        // Java 下载走独立进度事件（java-download-progress），不触发下载面板
+        app_handle: None,
+        silent: true,
     };
     drop(config);
 

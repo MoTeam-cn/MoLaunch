@@ -35,7 +35,7 @@ pub async fn download_modpack_archive(
         expected_hash: None,
     };
 
-    let session = DownloadSession::attach(state).await;
+    let session = DownloadSession::attach(state, false).await;
     let stage0_callback = session.make_progress_callback(state, 0);
     let archive_results = session
         .manager()

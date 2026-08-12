@@ -1,9 +1,12 @@
 //! DownloadManager 主实现：批量下载编排（限速 / URL 重排 / 进度跟踪）
 
 use crate::log_debug;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
 use std::time::Duration;
+use tauri::AppHandle;
+use tauri::Emitter;
 use tokio::sync::Mutex;
 
 use super::super::super::sources::DownloadSourceMode;
@@ -13,6 +16,9 @@ use super::super::rate_limiter::RateLimiter;
 use super::super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
 use super::state::ProgressTracker;
 use crate::state::AppState;
+
+/// 下载面板显隐事件（前端监听此事件控制浮动下载面板显示/隐藏）
+pub const PANEL_STATE_EVENT: &str = "download-panel-state";
 
 /// 下载管理器
 pub struct DownloadManager {
@@ -26,6 +32,12 @@ pub struct DownloadManager {
     cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
     /// 暂停信号（可选，由外部传入）
     pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+    /// 应用句柄（非 None 且非 silent 时下载开始/结束 emit 面板事件）
+    app_handle: Option<AppHandle>,
+    /// 静默下载（不 emit 面板事件，供 Java 下载 / 程序更新 / 启动补全等后台任务）
+    silent: bool,
+    /// 共享批次计数（来自 AppState，协调并发批次的面板显隐）
+    active_batches: Option<Arc<std::sync::atomic::AtomicUsize>>,
 }
 
 impl DownloadManager {
@@ -46,6 +58,9 @@ impl DownloadManager {
             progress: Arc::new(StdMutex::new(GlobalProgress::default())),
             cancel_flag: None,
             pause_flag: None,
+            app_handle: None,
+            silent: false,
+            active_batches: None,
         }
     }
 
@@ -62,12 +77,16 @@ impl DownloadManager {
             config.source_mode,
         );
         manager.client = client;
+        manager.app_handle = config.app_handle.clone();
+        manager.silent = config.silent;
         manager
     }
 
     /// 从 AppState 提取下载配置并构造（统一收敛 3 处重复的 lock/extract/drop）
     pub async fn from_state(state: &AppState) -> Self {
-        Self::from_config(&DownloadManagerConfig::from_state(state).await)
+        let mut manager = Self::from_config(&DownloadManagerConfig::from_state(state).await);
+        manager.active_batches = Some(state.panel_active_count.clone());
+        manager
     }
 
     /// 设置取消信号（用于支持前端取消下载）
@@ -80,6 +99,35 @@ impl DownloadManager {
     pub fn with_pause_flag(mut self, flag: Arc<std::sync::atomic::AtomicBool>) -> Self {
         self.pause_flag = Some(flag);
         self
+    }
+
+    /// 设置静默模式（不 emit 面板显隐事件）
+    ///
+    /// 供后台任务使用：Java 下载 / 程序更新 / 启动时文件补全等场景
+    /// 不应打扰用户弹出下载面板。
+    pub fn with_silent(mut self, silent: bool) -> Self {
+        self.silent = silent;
+        self
+    }
+
+    /// 接入共享批次计数（协调并发批次的面板显隐）
+    ///
+    /// 多个 DownloadManager 实例共享同一个 `AppState.panel_active_count`，
+    /// 首个批次开始 emit 显示、最后批次结束 emit 隐藏，避免并发下载时面板提前消失。
+    pub fn with_panel_counter(mut self, counter: Arc<std::sync::atomic::AtomicUsize>) -> Self {
+        self.active_batches = Some(counter);
+        self
+    }
+
+    /// 通知前端下载面板显隐（silent 或缺少 AppHandle 时静默跳过）
+    fn notify_panel(&self, visible: bool) {
+        if self.silent {
+            return;
+        }
+        let Some(app) = &self.app_handle else {
+            return;
+        };
+        let _ = app.emit(PANEL_STATE_EVENT, serde_json::json!({ "visible": visible }));
     }
 
     /// 检查是否已取消
@@ -145,6 +193,18 @@ impl DownloadManager {
         tasks: Vec<DownloadTask>,
         progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
     ) -> Vec<DownloadProgress> {
+        // 通知面板显示：首个非静默批次开始时 emit 显示（并发批次由共享计数器协调）
+        let panel_enabled = !self.silent && self.app_handle.is_some();
+        if panel_enabled {
+            let first = match &self.active_batches {
+                Some(c) => c.fetch_add(1, Ordering::SeqCst) == 0,
+                None => true,
+            };
+            if first {
+                self.notify_panel(true);
+            }
+        }
+
         let total_bytes: u64 = tasks.iter().map(|t| t.expected_size.max(0) as u64).sum();
 
         let tracker = Arc::new(ProgressTracker::new(
@@ -255,6 +315,17 @@ impl DownloadManager {
         tracker.finish();
 
         let _ = timer_handle.await;
+
+        // 通知面板隐藏：最后批次结束时 emit 隐藏
+        if panel_enabled {
+            let last = match &self.active_batches {
+                Some(c) => c.fetch_sub(1, Ordering::SeqCst) == 1,
+                None => true,
+            };
+            if last {
+                self.notify_panel(false);
+            }
+        }
 
         let final_results = results.lock().await.clone();
         final_results

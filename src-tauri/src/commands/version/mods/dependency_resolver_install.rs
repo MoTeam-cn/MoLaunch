@@ -109,8 +109,13 @@ pub async fn install_mod_with_dependencies(
     );
 
     // 启动 DownloadSession（1 个 stage）
-    let session =
-        DownloadSession::start_grouped(state, "Mod 及前置", vec![("下载 Mod 及前置", 100.0)]).await;
+    let session = DownloadSession::start_grouped(
+        state,
+        "Mod 及前置",
+        vec![("下载 Mod 及前置", 100.0)],
+        false,
+    )
+    .await;
     {
         let mut ds = state.download_state.lock().unwrap();
         ds.version_name = main_version.file_name.clone();

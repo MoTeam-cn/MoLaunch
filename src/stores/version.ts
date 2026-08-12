@@ -145,6 +145,11 @@ export const useVersionStore = defineStore('version', () => {
     downloadProgress.value = null
   }
 
+  /** 由后端 download-panel-state 事件驱动面板显隐（静默下载不触发） */
+  function setDownloading(visible: boolean) {
+    downloading.value = visible
+  }
+
   function getVersionById(id: string): VersionInfo | undefined {
     return versions.value.find(v => v.id === id)
   }
@@ -199,6 +204,7 @@ export const useVersionStore = defineStore('version', () => {
     startDownload,
     updateProgress,
     finishDownload,
+    setDownloading,
     getVersionById,
     getReleaseVersions,
     getSnapshotVersions,

@@ -109,6 +109,13 @@ export function initDownloadStream() {
     }
   })()
 
+  // 订阅后端下载面板显隐事件
+  // 下载批次开始时 DownloadManager emit {visible:true}，全部结束后 emit {visible:false}
+  // 静默下载（Java / 程序更新 / 启动补全）不触发，面板保持隐藏
+  void listen<{ visible: boolean }>('download-panel-state', (event) => {
+    versionStore.setDownloading(event.payload.visible === true)
+  })
+
   // 订阅后端下载进度事件（模块级单例，App 生命周期内不注销）
   void listen<RawDownloadProgress>('download-progress', (event) => {
     handleProgress(event.payload)

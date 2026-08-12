@@ -55,6 +55,9 @@ pub struct AppState {
     /// 供后台任务/进度回调向前端 emit 事件（如 `download-progress`）。
     /// 在 setup 之前不会被使用（下载只能经 IPC 触发，IPC 在 setup 后可用）。
     pub app_handle: Arc<std::sync::OnceLock<tauri::AppHandle>>,
+    /// 非静默进行中的下载批次计数（多个 DownloadManager 实例共享，
+    /// 用于协调下载面板显隐：首个批次开始显示、最后批次结束隐藏）
+    pub panel_active_count: Arc<std::sync::atomic::AtomicUsize>,
 }
 
 impl Default for AppState {
@@ -110,6 +113,7 @@ impl AppState {
             virtual_lan_bridge: Arc::new(TokioMutex::new(None)),
             lan_fake_server: Arc::new(TokioMutex::new(None)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
+            panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
     }
 }

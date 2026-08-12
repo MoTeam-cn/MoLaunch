@@ -250,6 +250,7 @@ pub(crate) async fn download_and_replace(
         state,
         label,
         vec![("下载新版本", 80.0), ("替换旧版本", 20.0)],
+        false,
     )
     .await;
     {

@@ -245,7 +245,12 @@ async fn download_with_manager(
                 );
             }) as Arc<dyn Fn(GlobalProgress) + Send + Sync>
         });
-    let manager = DownloadManager::from_config(&DownloadManagerConfig::from_state(state).await);
+    // 更新程序属后台任务，静默下载（进度经 update-download-progress 推送，不触发下载面板）
+    let manager = DownloadManager::from_config(
+        &DownloadManagerConfig::from_state(state)
+            .await
+            .with_silent(true),
+    );
     let results = manager.download_batch(vec![task], progress_callback).await;
     let result = results.first().ok_or_else(|| "下载结果为空".to_string())?;
     if result.status == DownloadStatus::Failed {

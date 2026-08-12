@@ -100,6 +100,7 @@ pub(super) async fn ensure_system_default_frpc(state: &AppState) -> Result<Strin
         state,
         "frpc 下载",
         vec![("frpc 二进制", 1.0)],
+        false,
     )
     .await;
     {

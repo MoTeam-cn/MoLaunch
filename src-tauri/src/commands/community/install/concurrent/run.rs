@@ -61,7 +61,7 @@ pub async fn download_files_concurrent(
 
     // 子流程接入：仅构造 manager + callback（stages / flag 已由 install_modpack 处理）
     // manager 内部从 config 读取 max_threads/chunk_count/speed_limit/source_mode
-    let session = DownloadSession::attach(state).await;
+    let session = DownloadSession::attach(state, false).await;
     let progress_callback = session.make_progress_callback(state, stage_index);
     let results = session
         .manager()

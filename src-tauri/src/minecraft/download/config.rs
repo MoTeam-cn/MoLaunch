@@ -2,6 +2,8 @@
 //!
 //! 从 `AppConfig.download` 提取 DownloadManager 所需字段，收敛调用层重复的 lock/extract 套件。
 
+use tauri::AppHandle;
+
 use crate::minecraft::sources::DownloadSourceMode;
 use crate::state::AppState;
 
@@ -20,6 +22,10 @@ pub struct DownloadManagerConfig {
     pub source_mode: DownloadSourceMode,
     /// 自定义 User-Agent（None 使用默认 UA）
     pub user_agent: Option<String>,
+    /// 应用句柄（下载开始/结束 emit `download-panel-state` 控制前端面板显隐）
+    pub app_handle: Option<AppHandle>,
+    /// 静默下载（不 emit 面板事件，供 Java 下载 / 程序更新 / 启动补全等后台任务）
+    pub silent: bool,
 }
 
 impl DownloadManagerConfig {
@@ -37,6 +43,8 @@ impl DownloadManagerConfig {
             speed_limit: config.download.max_speed,
             source_mode: DownloadSourceMode::from_str(&config.download.source),
             user_agent: None,
+            app_handle: state.app_handle.get().cloned(),
+            silent: false,
         }
     }
 
@@ -55,7 +63,18 @@ impl DownloadManagerConfig {
             speed_limit: config.download.max_speed,
             source_mode: DownloadSourceMode::from_str(&config.download.meta_source),
             user_agent: None,
+            app_handle: state.app_handle.get().cloned(),
+            silent: false,
         }
+    }
+
+    /// 标记静默下载（不 emit 面板显隐事件）
+    ///
+    /// 供后台任务使用：Java 下载 / 程序更新 / 启动时文件补全等场景
+    /// 不应打扰用户弹出下载面板。
+    pub fn with_silent(mut self, silent: bool) -> Self {
+        self.silent = silent;
+        self
     }
 
     /// 应用外部下载的可选覆盖参数（线程数 / 分片数 / 限速 / UA）

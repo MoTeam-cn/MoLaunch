@@ -109,6 +109,8 @@ fn test_from_config_preserves_fields() {
         speed_limit: 1024,
         source_mode: DownloadSourceMode::Mirror,
         user_agent: None,
+        app_handle: None,
+        silent: false,
     };
     let manager = DownloadManager::from_config(&config);
     assert_eq!(manager.max_threads, 8);

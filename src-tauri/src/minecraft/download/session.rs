@@ -29,14 +29,18 @@ impl DownloadSession {
     /// 2. 重置 cancel/pause flag（防止上次任务残留状态影响新任务）
     /// 3. 从 config 构造 `DownloadManager` 并接入 flag
     ///
+    /// `silent`：静默下载（不 emit 面板显隐事件），供后台任务使用；
+    /// 用户主动下载（MC 本体 / 资源 / 整合包）传 `false`。
+    ///
     /// 用于独立入口：`download_resource` / `download_resource_to_path` / `download_file`（外部）。
     pub async fn start_grouped(
         state: &AppState,
         group_name: &str,
         stages: Vec<(&str, f64)>,
+        silent: bool,
     ) -> Self {
         let manager = DownloadManager::from_state(state).await;
-        Self::start_grouped_with_manager(state, group_name, stages, manager).await
+        Self::start_grouped_with_manager(state, group_name, stages, manager, silent).await
     }
 
     /// 启动一个分组下载会话（使用外部传入的 `DownloadManager`）
@@ -48,6 +52,7 @@ impl DownloadSession {
         group_name: &str,
         stages: Vec<(&str, f64)>,
         manager: DownloadManager,
+        silent: bool,
     ) -> Self {
         // 1. 注册 stages
         {
@@ -67,10 +72,12 @@ impl DownloadSession {
             .download_pause_flag
             .store(false, std::sync::atomic::Ordering::Relaxed);
 
-        // 3. 接入 flag
+        // 3. 接入 flag + 静默 + 共享批次计数
         let manager = manager
             .with_cancel_flag(state.download_cancel_flag.clone())
-            .with_pause_flag(state.download_pause_flag.clone());
+            .with_pause_flag(state.download_pause_flag.clone())
+            .with_silent(silent)
+            .with_panel_counter(state.panel_active_count.clone());
 
         Self {
             manager,
@@ -85,11 +92,12 @@ impl DownloadSession {
     /// - `download_files_concurrent`（`install_modpack` 已初始化）
     ///
     /// **不**重置 stages / flag，避免覆盖父会话状态。
-    pub async fn attach(state: &AppState) -> Self {
+    pub async fn attach(state: &AppState, silent: bool) -> Self {
         let manager = DownloadManager::from_state(state)
             .await
             .with_cancel_flag(state.download_cancel_flag.clone())
-            .with_pause_flag(state.download_pause_flag.clone());
+            .with_pause_flag(state.download_pause_flag.clone())
+            .with_silent(silent);
         Self {
             manager,
             group_name: String::new(),
