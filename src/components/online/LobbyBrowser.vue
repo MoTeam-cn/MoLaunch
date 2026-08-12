@@ -218,6 +218,9 @@ onActivated(() => {
 
 onDeactivated(() => {
   leftAt = Date.now()
+  // 加入成功后 drawer 滑出动画可能被 keep-alive 冻结（isInRoom watch 立即切走分类），
+  // @close 不触发导致 joinTarget 残留、回到大厅后再次点击房间抽屉无法打开；此处主动清理
+  joinTarget.value = null
 })
 </script>
 
