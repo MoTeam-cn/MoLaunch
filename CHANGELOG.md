@@ -4,11 +4,11 @@
 
 ## [Unreleased]
 
+## [0.3.5-rc9] - 2026-08-12
+
 - apiServer 地址移入 CI Secret（[ci-upload.cjs](scripts/ci-upload.cjs) / [release.yml](.github/workflows/release.yml)）：上传脚本不再硬编码 apiServer 地址（原默认 `https://api.molaunch.moiu.cn`），改为从 `MOLAUNCH_ACTION_PUSH_SERVER` 环境变量读取并校验必填；release 工作流两处上传步骤注入 `secrets.MOLAUNCH_ACTION_PUSH_SERVER`。
 
 - CI 上传脚本 MoSign API 请求增加 Cloudflare 回源错误重试（[ci-upload.cjs](scripts/ci-upload.cjs)）：预签名上传 URL、完成分片、注册版本三个接口此前直接裸请求，遇 HTTP 520~530（如 522）即失败退出；现抽取公共 `apiPostWithRetry`（复用与 S3 上传同一套 RETRYABLE_STATUS / MAX_RETRIES 退避策略，每次重试重新签名），三个接口统一接入，消除重复的签名+请求样板代码。
-
-## [0.3.5-rc9] - 2026-08-12
 
 - 修复厂商 frpc 命令模式 token 拼接错误（[spawn.rs](src-tauri/src/commands/frp/process/spawn.rs)）：模板 `-t 17062:{token}` 原被拆成 `-t 17062:` + 独立参数 token，frpc 将 token 当作未知子命令导致启动失败；现按词内联替换 `{token}`，token 与端口拼为同一参数（与 args 模式行为一致），并补单元测试。
 
