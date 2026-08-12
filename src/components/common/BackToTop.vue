@@ -1,13 +1,13 @@
 <script setup lang="ts">
 /**
  * 返回顶部按钮组件
- * 蓝色主题 + 涟漪动画 + 平滑出现
+ * 与右下角下载面板同款简约风格：纯色圆钮 + 白色图标，无装饰动画
  *
  * 显示策略：
  * - 仅响应位于主内容区 <main> 内的外部滚动容器，过滤弹窗 / 下拉框等浮层
  * - 标记 `data-inner-scroll` 的内部滚动容器（如 AI 聊天消息列表）不触发，
  *   避免全局右下角按钮遮挡页面内操作（如发送按钮）
- * - 迟滞阈值：未显示时需 scrollTop > 700 才出现；已显示时仅在 scrollTop ≤ 一屏高度时隐藏
+ * - 迟滞阈值：未显示时需 scrollTop > 400 才出现；已显示时仅在 scrollTop ≤ 一屏高度时隐藏
  *   （避免在临界点反复闪烁）
  * - 路由切换时重置状态，防止旧按钮残留到新页面
  */
@@ -18,7 +18,6 @@ import { ArrowUpIcon } from '@heroicons/vue/24/solid'
 import { backToTopVisible, backToTopEnabled } from '@/composables/useFloatingButtonState'
 
 const visible = ref(false)
-const isHover = ref(false)
 let activeEl: Element | null = null
 const router = useRouter()
 
@@ -128,17 +127,8 @@ onUnmounted(() => {
       v-if="visible"
       class="back-to-top-btn"
       @click="scrollToTop"
-      @mouseenter="isHover = true"
-      @mouseleave="isHover = false"
     >
-      <!-- 涟漪背景 -->
-      <span class="ripple-bg" :class="{ 'ripple-active': isHover }"></span>
-
-      <!-- 图标 -->
-      <ArrowUpIcon class="w-5 h-5 text-white relative z-10 transition-transform duration-300" :class="{ '-translate-y-0.5': isHover }" />
-
-      <!-- 外圈光晕 -->
-      <span class="glow-ring" :class="{ 'glow-active': isHover }"></span>
+      <ArrowUpIcon class="w-5 h-5 text-white" />
     </button>
   </Transition>
 </template>
@@ -152,88 +142,50 @@ onUnmounted(() => {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: linear-gradient(135deg, var(--color-primary-500) 0%, var(--color-primary-600) 100%);
+  background: var(--color-primary-600);
   border: none;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow:
-    0 4px 14px rgb(var(--color-primary-rgb-600) / 0.4),
-    0 2px 6px rgb(var(--color-primary-rgb-600) / 0.2);
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  overflow: hidden;
+  box-shadow: 0 2px 8px rgb(var(--color-primary-rgb-600) / 0.35);
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .back-to-top-btn:hover {
-  transform: translateY(-2px) scale(1.05);
-  box-shadow: 
-    0 6px 20px rgba(37, 99, 235, 0.5),
-    0 4px 10px rgba(37, 99, 235, 0.3);
+  background: var(--color-primary-700);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgb(var(--color-primary-rgb-600) / 0.4);
 }
 
 .back-to-top-btn:active {
   transform: translateY(0) scale(0.95);
 }
 
-/* 涟漪背景 */
-.ripple-bg {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  background: radial-gradient(circle at center, rgba(255,255,255,0.3) 0%, transparent 70%);
-  transform: scale(0);
-  opacity: 0;
-  transition: all 0.6s ease-out;
-}
-
-.ripple-active {
-  transform: scale(2.5);
-  opacity: 1;
-}
-
-/* 外圈光晕 */
-.glow-ring {
-  position: absolute;
-  inset: -4px;
-  border-radius: 50%;
-  border: 2px solid rgba(59, 130, 246, 0);
-  transition: all 0.4s ease-out;
-}
-
-.glow-active {
-  inset: -8px;
-  border-color: rgba(59, 130, 246, 0.3);
-}
-
-/* 进入/离开动画 */
+/* 进入/离开动画（简洁淡入滑入） */
 .back-to-top-enter-active {
-  animation: slide-in 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: slide-in 0.25s ease-out;
 }
 
 .back-to-top-leave-active {
-  animation: slide-out 0.3s ease-in forwards;
+  animation: slide-out 0.2s ease-in forwards;
 }
 
 @keyframes slide-in {
-  0% {
+  from {
     opacity: 0;
-    transform: translateY(20px) scale(0.8);
+    transform: translateY(8px);
   }
-  60% {
+  to {
     opacity: 1;
-    transform: translateY(-4px) scale(1.02);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 
 @keyframes slide-out {
   to {
     opacity: 0;
-    transform: translateY(10px) scale(0.9);
+    transform: translateY(8px);
   }
 }
 </style>
