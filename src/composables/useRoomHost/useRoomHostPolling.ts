@@ -54,6 +54,15 @@ export function useRoomHostPolling(
   const answering = ref(false)
   /** 正在为参与者生成 Offer 的集合，防止重复生成（key=participantId） */
   const offerGenerating = ref<Set<string>>(new Set())
+  /**
+   * 已生成本地 Offer 但服务端尚未置 hostOfferReady 的参与者（key=participantId）。
+   *
+   * 服务端上传 Offer 后置 hostOfferReady 存在 <2s 轮询周期延迟：若不记录，
+   * 下一轮 pollParticipants 刷新仍返回 hostOfferReady=false，此时 offerGenerating 已移除
+   * 会触发重复生成，而 createOfferFor 会先关闭旧 PC，破坏进行中的协商。此处作为本地
+   * 「Offer 已生成待确认」标记，抑制重复生成；待 refresh 到 hostOfferReady=true 后清除。
+   */
+  const offerReadyLocal = new Set<string>()
   /** 正在执行 ICE restart 的参与者（防并发，key=participantId） */
   const restarting = new Set<string>()
   /** 重启中且重启前已确认的参与者（key=participantId，value=wasConfirmed，用于自动放行重答） */
@@ -140,6 +149,9 @@ export function useRoomHostPolling(
       if (result.code !== 1) {
         throw new Error(result.msg || '上传 SDP Offer 失败')
       }
+      // 服务端可能尚未将 hostOfferReady 置 true（> 轮询周期），本地标记已生成，
+      // 抑制同 participantId 在刷新滞后窗口内的重复生成（否则 createOfferFor 会先关旧 PC）
+      offerReadyLocal.add(participantId)
     } catch (e) {
       console.warn(`[Online] 为参与者 ${participantId} 生成 Offer 失败:`, e)
       maybeToastOfferError(
@@ -184,6 +196,8 @@ export function useRoomHostPolling(
       restartInFlight.set(participantId, wasConfirmed)
       restartAttempts.set(participantId, (restartAttempts.get(participantId) ?? 0) + 1)
       restartCooldownUntil.set(participantId, Date.now() + RESTART_COOLDOWN_MS)
+      // 新 Offer 已上传，切回 Answer 快档（2s），避免停在 30s 慢速档延迟感知加入方重答
+      scheduleAnswersNext()
       console.info(`[Online] 已对参与者 ${participantId} 执行 ICE restart`)
     } catch (e) {
       console.warn(`[Online] 参与者 ${participantId} ICE restart 失败:`, e)
@@ -314,7 +328,11 @@ export function useRoomHostPolling(
     const roomCode = store.roomState.roomCode
     if (!roomCode || store.roomState.role !== 'host') return
     const needOffer = store.roomState.participants.filter(
-      (p) => p.status === 'confirmed' && !p.hostOfferReady,
+      (p) =>
+        p.status === 'confirmed' &&
+        !p.hostOfferReady &&
+        // 已生成但服务端尚未确认的跳过，避免刷新滞后窗口内重复生成关闭旧 PC
+        !offerReadyLocal.has(p.participantId),
     )
     // 并发生成（每个参与者独立 PC，互不干扰）
     await Promise.all(needOffer.map((p) => generateOfferForParticipant(p.participantId)))
@@ -332,6 +350,12 @@ export function useRoomHostPolling(
           .filter((p) => p.status === 'joined' || p.status === 'answered' || p.status === 'confirmed')
           .map((p) => p.participantId),
       )
+      // 已确认参与者：服务端 hostOfferReady=true 后清除本地生成标记，恢复正常生成状态
+      for (const p of store.roomState.participants) {
+        if (p.status !== 'confirmed' || p.hostOfferReady) {
+          offerReadyLocal.delete(p.participantId)
+        }
+      }
       for (const id of Array.from(hostMesh.connectionStates.keys())) {
         if (!activeIds.has(id)) {
           void hostMesh.closeParticipant(id)
@@ -499,6 +523,10 @@ export function useRoomHostPolling(
       ) ||
       store.roomState.participants.some(
         (p) => p.status === 'confirmed' && !hostMesh.channelOpen.get(p.participantId),
+      ) ||
+      // ICE restart 进行中（已上传新 Offer、等待加入方重答）保持快档，尽快捕获重答
+      Array.from(restartInFlight.keys()).some(
+        (id) => !hostMesh.channelOpen.get(id),
       )
     answerTimer = setTimeout(
       () => void pollAnswers(),
