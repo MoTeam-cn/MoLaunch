@@ -4,7 +4,7 @@
 
 ## [Unreleased]
 
-- 下载面板与返回顶部按钮视觉完全统一（[DownloadPanel.vue](src/components/common/DownloadPanel.vue)）：下载按钮缩至与 BackToTop 一致的 44px 圆钮、图标改用 solid 风格白图标、采用相同阴影与 hover/active 动效（hover 上移 2px + 阴影增强、按下缩小）；BackToTop 消失时下载按钮从避让位平滑滑回贴底（`bottom` 过渡），两个浮标同时出现不再突兀。进度环按 44px 尺寸重算（r=19 / dasharray 119.38），Tailwind 浮动类收敛为 scoped CSS。
+- 下载面板与返回顶部按钮视觉完全统一（[DownloadPanel.vue](src/components/common/DownloadPanel.vue)）：下载按钮缩至与 BackToTop 一致的 44px 圆钮、图标改用 solid 风格白图标、采用相同阴影与 hover/active 动效（hover 上移 2px + 阴影增强、按下缩小）；进度环内缩（r=15 / dasharray 94.25）并在按钮边缘留白，避免白色描边环把按钮视觉轮廓撑大一圈；BackToTop 消失时下载按钮从避让位平滑滑回贴底（`bottom` 过渡），两个浮标同时出现不再突兀。Tailwind 浮动类收敛为 scoped CSS。
 
 - 清理前端死代码（[Trigger.vue](src/components/common/Trigger.vue) / [InstalledList.vue](src/components/version/InstalledList.vue) / [DownloadProgressOverlay.vue](src/components/community/resource-detail/DownloadProgressOverlay.vue) / [useCommunityDownload.ts](src/composables/useCommunityDownload.ts) / [deeplink.ts](src/utils/deeplink.ts) / [click-outside.ts](src/utils/click-outside.ts)）：全仓无引用的孤儿组件（预留未接线的 popover 触发器、被 VersionSection 取代的旧版已安装列表、规划未接入的下载进度浮层）、连带孤儿 composable（useCommunityDownload）、前端无消费方的深链接工具均删除；`click-outside.ts` 移除仅被孤儿组件调用的 `onClickOutside`（保留 Drawer 使用的 `onEscape`）；`useExternalDownload` 子目录下已被根目录版本取代的旧实现切片一并清理。
 

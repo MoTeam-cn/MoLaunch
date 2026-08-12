@@ -44,22 +44,22 @@ function goToDownloads() {
     >
       <ArrowDownTrayIcon class="w-5 h-5 text-white" />
 
-      <!-- 进度环（仅下载按钮独有，白描边圆环） -->
+      <!-- 进度环（仅下载按钮独有，内缩留白避免撑大按钮视觉轮廓） -->
       <svg class="panel-ring" viewBox="0 0 44 44">
         <circle
-          cx="22" cy="22" r="19"
+          cx="22" cy="22" r="15"
           fill="none"
           stroke="rgba(255,255,255,0.3)"
           stroke-width="2"
         />
         <circle
-          cx="22" cy="22" r="19"
+          cx="22" cy="22" r="15"
           fill="none"
           stroke="white"
           stroke-width="2"
           stroke-linecap="round"
-          stroke-dasharray="119.38"
-          :stroke-dashoffset="119.38 - (119.38 * (versionStore.downloadProgress?.percentage || 0) / 100)"
+          stroke-dasharray="94.25"
+          :stroke-dashoffset="94.25 - (94.25 * (versionStore.downloadProgress?.percentage || 0) / 100)"
           class="transition-all duration-300"
         />
       </svg>
