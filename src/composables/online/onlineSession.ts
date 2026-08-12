@@ -215,8 +215,8 @@ function createSession(): OnlineSession {
       if (result.code !== 1 || !result.data) return
       if (!result.data.ready || !result.data.sdpOffer) return
       if (result.data.sdpOffer === guestWebrtc.lastOfferSdp.value) return
-      // P2P 失败懒加载的系统 TURN（store 层缓存，同一房间仅拉取一次），
-      // 重答前确保已合并进 iceServers 并注入 PC 配置
+      // 系统 TURN 加入时已拉取（store 层缓存），此处幂等兜底：
+      // 首轮未拉取成功时自动重试，重答前确保已合并进 iceServers 并注入 PC 配置
       await ensureGuestTurnServers()
       const iceServers = store.roomState.iceServers.length > 0
         ? store.roomState.iceServers
@@ -298,21 +298,21 @@ function createSession(): OnlineSession {
   }
 
   /**
-   * 加入方懒加载系统 TURN 并注入当前 PC 配置（P2P 失败恢复前调用）
+   * 加入方确保系统 TURN 已注入当前 PC 配置（失败恢复/重启兜底）
    *
-   * `store.guestPullTurnServers` 同一房间仅拉取一次（缓存命中零开销）；
-   * 注入失败不阻塞恢复流程，继续按当前配置重协商。
+   * 进入房间时已由 join 链路拉取注入（同房间缓存一次），此处幂等；
+   * 首轮拉取失败时恢复路径自动重试。注入失败不阻塞流程，继续按当前配置重协商。
    */
   async function ensureGuestTurnServers() {
     try {
       const iceServers = await store.guestPullTurnServers()
       guestWebrtc.applyIceServers(iceServers)
     } catch (e) {
-      console.warn('[Online] 懒加载系统 TURN 失败，继续按当前配置重协商:', e)
+      console.warn('[Online] 拉取系统 TURN 失败，继续按当前配置重协商:', e)
     }
   }
 
-  /** 加入方 P2P 失败恢复：先懒加载系统 TURN，再按是否有现有 PC 走轻量重启或全量重建 */
+  /** 加入方 P2P 失败恢复：先确保系统 TURN 注入（幂等兜底），再按是否有现有 PC 走轻量重启或全量重建 */
   async function pullTurnThenRecover() {
     await ensureGuestTurnServers()
     if (guestWebrtc.pc.value) {
@@ -340,7 +340,7 @@ function createSession(): OnlineSession {
         clearTimeout(disconnectedRecoveryTimer)
         disconnectedRecoveryTimer = null
       }
-      // 先懒加载系统 TURN 再恢复（P2P 直连已失败，重协商需有 relay candidate 兜底）：
+      // 先确保系统 TURN 注入再恢复（P2P 直连已失败，重协商需有 relay candidate 兜底）：
       // 有现有 PC 走轻量重启（捕获房主重启后的新 Offer 重答），否则全量重建
       void pullTurnThenRecover()
       return

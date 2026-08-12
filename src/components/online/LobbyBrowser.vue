@@ -160,9 +160,14 @@ async function doJoin(roomCode: string, password: string) {
   joiningCode.value = roomCode
   try {
     const joinResp = await store.guestJoinRoom(roomCode, password)
-    // 首次连接仅用房间内 ICE 服务器（STUN + 自定义 TURN）尝试 P2P 直连，
-    // 系统 TURN 留到直连失败（iceconnectionstatechange=failed）时再懒加载
-    const iceServers = store.roomState.iceServers
+    // 进入房间即拉取系统 TURN（同房间缓存一次）：首轮协商带 relay candidate，
+    // P2P 仍优先直连，打洞失败时中继立即可用，无需等 failed 后再 ICE restart
+    let iceServers = store.roomState.iceServers
+    try {
+      iceServers = await store.guestPullTurnServers()
+    } catch (e) {
+      console.warn('[Online] 拉取系统 TURN 失败，按房间内 ICE 直连:', e)
+    }
     await guestWebrtc.fetchOfferAndAnswer(roomCode, joinResp.participantId, iceServers)
     // 加入成功后 store.roomState.role='guest'，Online.vue watch(isInRoom) 自动跳转房间详情
   } catch (e) {

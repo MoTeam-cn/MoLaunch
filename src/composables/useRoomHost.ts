@@ -1,7 +1,7 @@
 /**
  * 房主房间运营 composable（阶段三 mesh 拓扑）：切片组装 + 生命周期
  *
- * - useRoomHostPolling：三路信令轮询 / 自动 Offer / ICE restart 懒加载 TURN / 定时器启停
+ * - useRoomHostPolling：三路信令轮询 / 自动 Offer / ICE restart / 系统 TURN 按需就位 / 定时器启停
  * - useRoomHostActions：确认/拒绝 Answer / 踢出封禁 / 解封 / 关闭房间
  * 只负责业务逻辑不渲染 UI；默认 onMounted 启动轮询与事件监听，onUnmounted 清理；
  * 全局联机会话传 `autoLifecycle: false`，由会话显式调用 `start` / `stop`。
@@ -100,8 +100,8 @@ export function useRoomHost(options: {
       toastError(`虚拟网卡启动失败：${e instanceof Error ? e.message : String(e)}`)
     })
 
-    // 房主进入面板不再主动拉取系统 TURN（避免建房即触发 /turn 请求与 PoW 计算），
-    // 改为 P2P 失败（failed/长时间 disconnected）ICE restart 时懒加载（见 useRoomHostPolling）
+    // 建房瞬间不主动拉取系统 TURN（尚无参与者，避免白费 /turn 请求与 PoW 计算）；
+    // 首个参与者加入生成 Offer 时按需拉取、一个房间一次（见 useRoomHostPolling.ensureSystemTurnServers）
 
     // 监听后端 GameWatcher 的 MC 局域网端口检测事件
     // 房主在 MC 中「Open to LAN」后，watcher 捕获 stdout 端口 → emit 此事件

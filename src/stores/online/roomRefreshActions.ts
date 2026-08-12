@@ -75,7 +75,9 @@ export function useRoomRefreshActions(deps: RoomRefreshDeps) {
    *
    * 房主广播的 TURN 凭据绑定房主 IP+device，对参与者无效；参与者必须自拉
    * `/turn` 获取绑定自身 IP+device 的凭据（服务端已允许参与者调用），
-   * P2P 打洞失败时浏览器才能成功分配 relay candidate 走中继。
+   * 进入房间（join 后首轮协商前）即拉取一次，使首轮协商带 relay candidate，
+   * P2P 打洞失败时浏览器直接走中继；失败恢复路径再次调用时幂等重试。
+   * 同一房间仅请求一次：/turn 签发的凭证绑定自身 IP+device，房间不变可复用。
    *
    * @returns 合并后的 ICE 服务器列表（供 fetchOfferAndAnswer 使用）
    */

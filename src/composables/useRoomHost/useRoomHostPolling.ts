@@ -2,8 +2,8 @@
  * 房主轮询切片（useRoomHost 拆分）
  *
  * 三路信令轮询（参与者/Answer 2s、保活 30s）、自动 Offer 生成、ICE restart
- * 断线恢复（P2P 失败时懒加载系统 TURN）、30s 防刷屏 toast 与定时器启停；
- * 生命周期由主文件 useRoomHost.ts 负责。
+ * 断线恢复（系统 TURN 在参与者开始协商时按需就位）、30s 防刷屏 toast 与
+ * 定时器启停；生命周期由主文件 useRoomHost.ts 负责。
  */
 import { ref, watch } from 'vue'
 import { useOnlineStore } from '@/stores/online'
@@ -90,6 +90,9 @@ export function useRoomHostPolling(
     if (offerGenerating.value.has(participantId)) return
     offerGenerating.value.add(participantId)
     try {
+      // 参与者加入、开始协商前确保系统 TURN 已就位（同房间缓存一次）：
+      // 首次 Offer 即带 relay candidate，P2P 打洞失败时无需等待 ICE restart
+      await ensureSystemTurnServers()
       // 阶段三子任务 7：优先使用 iceServers（含 STUN + 用户自定义 TURN + 系统 TURN）
       // 旧房间 iceServers 为空时回退到 stunServers 并转为 IceServerEntry[]
       const iceServers: IceServerEntry[] = store.roomState.iceServers.length > 0
@@ -157,8 +160,8 @@ export function useRoomHostPolling(
     if (restarting.has(participantId)) return
     restarting.add(participantId)
     try {
-      // P2P 失败才懒加载系统 TURN：先合并进 roomState.iceServers，
-      // restart 前注入到该参与者 PC 配置，重新收集 relay candidate
+      // ensure 幂等：首轮协商已拉取成功则零开销；首轮拉取失败时此处自动重试，
+      // restart 前注入该参与者 PC 配置，重新收集 relay candidate
       await ensureSystemTurnServers()
       const iceServers: IceServerEntry[] = store.roomState.iceServers.length > 0
         ? store.roomState.iceServers
@@ -378,12 +381,12 @@ export function useRoomHostPolling(
   }
 
   /**
-   * 懒加载系统 TURN 并合并进 roomState.iceServers（P2P 失败 ICE restart 前调用）
+   * 确保系统 TURN 已合并进 roomState.iceServers（参与者开始协商时调用）
    *
-   * 房间刚创建/加入时不拉取（多数 NAT 场景 STUN 即可直连），仅当参与者出现
-   * failed / 长时间 disconnected 需要重协商时才拉取，避免建房即触发额外的
-   * /turn 请求与 PoW 计算。失败仅 warn，不阻塞 ICE restart 流程（降级为
-   * STUN + 用户自定义 TURN），下次 restart 时自动重试。
+   * 建房瞬间不拉取（此时尚无参与者）；首个参与者加入生成 Offer 时首次拉取
+   * （同房间缓存一次），首轮协商即带 relay candidate——P2P 直连不受影响
+   * （ICE 优先 host/srflx），打洞失败时中继立即可用，无需等 failed 后 restart。
+   * 失败仅 warn 不阻塞协商（降级 STUN + 自定义 TURN），restart 路径自动重试。
    */
   let systemTurnLoaded = false
   let systemTurnLoading: Promise<void> | null = null
@@ -405,10 +408,10 @@ export function useRoomHostPolling(
         store.roomState.iceServers = merged
         systemTurnLoaded = true
         console.info(
-          `[Online] 房主已懒加载系统 TURN：${systemTurn.length} 个，用于后续 ICE restart`,
+          `[Online] 房主已就位系统 TURN：${systemTurn.length} 个，用于首轮/后续协商`,
         )
       } catch (e) {
-        console.warn('[Online] 懒加载系统 TURN 失败，继续按 STUN/自定义 TURN 重协商:', e)
+        console.warn('[Online] 拉取系统 TURN 失败，继续按 STUN/自定义 TURN 协商:', e)
       } finally {
         systemTurnLoading = null
       }
@@ -476,7 +479,7 @@ export function useRoomHostPolling(
     },
   )
 
-  // 房间切换时重置系统 TURN 懒加载标记（新房间重新拉取）
+  // 房间切换时重置系统 TURN 就位标记（新房间重新拉取）
   watch(
     () => store.roomState.roomCode,
     () => {
