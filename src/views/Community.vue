@@ -56,8 +56,8 @@ async function doSearch() {
     if (projects.value.length === 0) {
       toastInfo('未找到匹配的资源')
     }
-  } catch (e: any) {
-    toastError('搜索失败: ' + (e?.message || String(e)))
+  } catch (e: unknown) {
+    toastError('搜索失败: ' + (e instanceof Error ? e.message : String(e)))
     projects.value = []
     total.value = 0
     fail()

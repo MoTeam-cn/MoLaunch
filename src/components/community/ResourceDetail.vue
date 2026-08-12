@@ -77,8 +77,8 @@ watch(
           nextTick(() => setFilter(target))
         }
       }
-    } catch (e: any) {
-      toastError('加载版本列表失败: ' + (e?.message || String(e)))
+    } catch (e: unknown) {
+      toastError('加载版本列表失败: ' + (e instanceof Error ? e.message : String(e)))
       fail()
     } finally {
       loading.value = false
