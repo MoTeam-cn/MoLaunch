@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复 Windows 更新弹窗进度停滞与「完整日志」无反馈（[install_windows.rs](src-tauri/src/commands/system/updater/install_windows.rs) / [install_unix.rs](src-tauri/src/commands/system/updater/install_unix.rs) / [mod.rs](src-tauri/src/commands/system/updater/mod.rs) / [UpdateDialog.vue](src/components/about/UpdateDialog.vue) / [UpdateLogDialog.vue](src/components/about/UpdateLogDialog.vue)）：Windows 更新下载原为一次性 `response.bytes()` 全程不推进度、下完立即 `app.exit(0)`，前端进度条只能停在 0% 且无感退出。现改为流式下载，按节流阈值（每累计 256KB）经 `update-download-progress` 事件实时推送 `downloaded/total`（进度常量 `PROGRESS_EVENT` / `PROGRESS_THROTTLE_BYTES` 提升为 updater 模块公共常量，Windows / macOS / Linux 共用），收满 total 时前端切换「安装中」，启动 updater.exe 前停留 1 秒让用户感知；启动后更新日志抽屉的「完整更新日志」按钮改为先 toast 提示、1s 后再打开 GitHub Releases，避免无任何点击反馈。
+
 - 修复更新包签名校验失败（[verify.rs](src-tauri/updater/src/verify.rs) / [verify_test.rs](src-tauri/updater/src/verify_test.rs)）：tauri `signer sign` 生成的 `.sig` 文件内容为「4 行标准 minisign 文本的 base64 编码」（与 tauri-plugin-updater 约定一致），updater 此前直接按 4 行文本解析导致 `Invalid encoding in minisign data`。现签名解析先检测文本格式，非文本则先 base64 解码再解析，两种格式均兼容，并补单元测试。
 
 ## [0.3.5-rc9] - 2026-08-12

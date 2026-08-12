@@ -21,6 +21,7 @@ import {
   updateLogVisible,
 } from '@/utils/updateLog'
 import { openLink } from '@/utils/aboutLogos'
+import { toastInfo } from '@/utils/toast'
 
 const visible = computed(() => updateLogVisible.value)
 const version = getChangelogVersion()
@@ -32,9 +33,10 @@ function onVisibleChange(v: boolean) {
   if (!v) closeUpdateLog()
 }
 
-/** 打开 GitHub Releases 查看完整更新日志 */
+/** 打开 GitHub Releases 查看完整更新日志（先提示，1s 后打开） */
 function onOpenFullLog() {
-  openLink(UPDATE_LOG_GITHUB_URL)
+  toastInfo('正在打开完整更新日志...')
+  setTimeout(() => openLink(UPDATE_LOG_GITHUB_URL), 1000)
 }
 </script>
 

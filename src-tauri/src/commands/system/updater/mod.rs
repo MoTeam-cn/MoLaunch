@@ -10,5 +10,11 @@ mod install_unix;
 #[cfg(target_os = "windows")]
 mod install_windows;
 
+/// 更新下载进度事件名（前端 UpdateDialog 监听，写入 updateState.downloaded/total）
+pub(super) const PROGRESS_EVENT: &str = "update-download-progress";
+
+/// 进度事件推送节流阈值（每累计下载 256KB 推送一次，避免高频 IPC 事件压垮前端）
+pub(super) const PROGRESS_THROTTLE_BYTES: u64 = 256 * 1024;
+
 pub use api::{apply_pending_update, download_and_install, download_update_to_appdata, UpdateInfo};
 pub use check::check_update;

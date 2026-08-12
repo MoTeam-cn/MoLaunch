@@ -52,16 +52,20 @@ const timelineContent = computed(() =>
 )
 
 /**
- * 监听 macOS/Linux 更新下载进度（Rust install_unix.rs 经 Tauri 事件推送）
+ * 监听更新下载进度（Rust install_windows.rs / install_unix.rs 经 Tauri 事件推送）
  *
  * 仅在 downloading 状态写入真实 downloaded/total：
  * - total>0 时进度条显示真实百分比
  * - total=0 时保持 indeterminate 动画（后端尚未获得 Content-Length）
+ * - 收满 total 时切换 installing（Windows 下载完成后会短暂停留再退出重启）
  */
 onGlobalEvent<{ downloaded: number; total: number }>('update-download-progress', (payload) => {
   if (updateState.status !== 'downloading') return
   if (typeof payload?.downloaded === 'number') updateState.downloaded = payload.downloaded
   if (typeof payload?.total === 'number') updateState.total = payload.total
+  if (updateState.total > 0 && updateState.downloaded >= updateState.total) {
+    updateState.status = 'installing'
+  }
 })
 
 /** 是否允许关闭（强制更新 / 下载中 / 安装中 时禁止） */
