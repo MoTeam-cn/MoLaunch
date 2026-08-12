@@ -2,7 +2,7 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [0.3.6-rc1] - 2026-08-12
 
 - 重做大厅加入房间交互并修复「提交 Answer 缺失导致永远连不上」（[LobbyBrowser.vue](src/components/online/LobbyBrowser.vue) / [LobbyJoinDialog.vue](src/components/online/LobbyJoinDialog.vue)，替换删除 [LobbyJoinConfirmDialog.vue](src/components/online/LobbyJoinConfirmDialog.vue)）：此前 `doJoin` 走 `showPrompt` 密码弹窗——点确定立即收起、`guestJoinRoom` 成功瞬间 Online.vue watch 直接把大厅切到房间详情（页面在抽屉关闭动画中「抽动」），且 `fetchOfferAndAnswer` 拿到房主 Offer 生成 Answer 后**从未 `submitAnswer`**（RoomManager / reconnectAsGuest 均提交，唯大厅入口漏掉），房主永远收不到 Answer、无法 confirm 建连，「加入中」卡死到最后超时，表现为「大厅加入房间很奇怪」。现重做为统一加入抽屉：有密码/整合包的房间先弹抽屉（密码输入 + 整合包校验内嵌）→ 点「加入房间」后抽屉保持打开显示加入中 → **失败时抽屉不收起、错误内联展示可直接改密码重试**（取消按钮此时禁用），成功才收起抽屉、`@close` 后组件卸载并由 role 变化切到房间详情；无密码无整合包房间仍直接加入。加入成功拆两段：`joinViaLobby` 只完成 `guestJoinRoom`（拿到 participantId 后抽屉收起），`continueJoin` 后台继续 TURN 拉取 → 等待房主 Offer → 生成 Answer 并 `submitAnswer`（[online-manager/room.ts](src/utils/api/online-manager/room.ts)），失败清理参与者与 RoomManager 对齐。
 
