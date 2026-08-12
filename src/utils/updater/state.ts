@@ -55,8 +55,10 @@ export const updateState = reactive<UpdateState>({
 export const updaterFlags = {
   /** 当前待安装的更新信息（checkForUpdate 后缓存，downloadAndInstall 使用） */
   pendingUpdate: null as UpdateInfo | null,
-  /** 防止并发检查 */
+  /** 防止并发检查（仅手动 checkForUpdate 使用） */
   checking: false,
+  /** 防止并发静默检查+后台下载（仅 silentCheckAndDownload 使用，避免占用 checking 阻塞手动检查） */
+  silentChecking: false,
   /** 防止并发下载 */
   installing: false,
   /** Windows 后台静默下载已完成的版本号（避免 10 分钟定时重复下载同一版本） */

@@ -113,8 +113,8 @@ export function initAutoCheck(): void {
  * 已下载过同一版本时跳过（`appdataDownloadedVersion` 去重）。
  */
 async function silentCheckAndDownload(): Promise<void> {
-  if (updaterFlags.checking) return
-  updaterFlags.checking = true
+  if (updaterFlags.silentChecking) return
+  updaterFlags.silentChecking = true
 
   try {
     const info = await systemManager<UpdateInfo>(SYSTEM_ACTIONS.CHECK_UPDATE)
@@ -143,6 +143,6 @@ async function silentCheckAndDownload(): Promise<void> {
   } catch (e) {
     console.error('[Updater] silentCheckAndDownload error:', e)
   } finally {
-    updaterFlags.checking = false
+    updaterFlags.silentChecking = false
   }
 }
