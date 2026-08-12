@@ -387,9 +387,12 @@ export function useRoomHostPolling(
   /** 轮询待确认 Answer */
   async function pollAnswers() {
     if (store.roomState.role !== 'host' || !store.roomState.roomCode || answering.value) return
+    const reqRoomCode = store.roomState.roomCode
     answering.value = true
     try {
-      const result = await listAnswers(store.roomState.roomCode)
+      const result = await listAnswers(reqRoomCode)
+      // 离开/关闭房间（roomCode 已变更）后不再处理本次结果，避免对陈旧 roomCode 发起无效请求
+      if (store.roomState.role !== 'host' || store.roomState.roomCode !== reqRoomCode) return
       if (result.code === 1 && result.data) {
         const answers = result.data.answers ?? []
         // 已确认参与者的 Answer 自动放行：授权前置（房主在 Offer 生成前已确认），

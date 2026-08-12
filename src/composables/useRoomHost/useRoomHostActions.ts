@@ -38,7 +38,6 @@ export function useRoomHostActions(
       if (result.code === 1 && result.data) {
         bannedList.value = result.data.bans ?? []
         banServerTime.value = result.data.serverTime ?? 0
-        toastSuccess('封禁列表已刷新')
       } else {
         console.warn(`[Online] refreshBans 业务失败: code=${result.code}, msg=${result.msg}`)
         toastError(result.msg || '刷新封禁列表失败')

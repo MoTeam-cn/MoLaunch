@@ -200,7 +200,8 @@ export function useMeshPeer(deps: MeshPeerDeps) {
       }
     } finally {
       conns.value.delete(participantId)
-      channelOpen.set(participantId, false)
+      channelOpen.delete(participantId)
+      negotiating.delete(participantId)
       setConnState(participantId, 'closed')
     }
   }
