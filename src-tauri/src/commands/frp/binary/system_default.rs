@@ -92,6 +92,9 @@ pub(super) async fn ensure_system_default_frpc(state: &AppState) -> Result<Strin
     // - DownloadSession::start_grouped 初始化 stages + flag + manager
     // - 构造 DownloadTask，download_batch 执行下载
     // - 下载到临时 ZIP 文件，提取 frpc 后删除
+    //
+    // silent=true：frpc 属后台组件补全（同 Java / 更新程序），
+    // 前端 ProviderList 按钮有独立 loading 状态，不弹下载面板
     let zip_url = manifest.url.clone();
     let zip_path = dir.join("frpc_download.zip");
     log_info!("[Frp] 开始下载 frpc: {} -> {}", zip_url, zip_path.display());
@@ -100,7 +103,7 @@ pub(super) async fn ensure_system_default_frpc(state: &AppState) -> Result<Strin
         state,
         "frpc 下载",
         vec![("frpc 二进制", 1.0)],
-        false,
+        true,
     )
     .await;
     {
