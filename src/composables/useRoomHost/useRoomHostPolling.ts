@@ -26,6 +26,8 @@ const POLL_ERROR_TOAST_INTERVAL = 30_000
 const POLL_ACTIVE_INTERVAL_MS = 2_000
 /** 轮询空闲退避间隔：无待处理项时降低云端压力（ms） */
 const POLL_IDLE_INTERVAL_MS = 10_000
+/** Answer 轮询全连接慢速档：所有已确认参与者均建立连接后，仅需低频感知 ICE restart 重答（ms） */
+const POLL_ANSWERS_CONNECTED_MS = 30_000
 /** 单个参与者 ICE restart 最大次数（超限关闭连接，交由加入方全量重建） */
 const MAX_ICE_RESTART_ATTEMPTS = 2
 /** disconnected 状态触发 ICE restart 的宽限期（ICE 可自行恢复，需给足时间） */
@@ -205,12 +207,14 @@ export function useRoomHostPolling(
         true,
       )
       if (result.code !== 1) throw new Error(result.msg || '自动确认失败')
-      await hostMesh.setRemoteAnswer(
+      const ok = await hostMesh.setRemoteAnswer(
         answer.participantId,
         answer.sdpAnswer,
         answer.iceCandidates ?? [],
       )
-      console.info(`[Online] 已自动确认参与者 ${answer.participantId} 的 ICE restart 重答`)
+      if (ok) {
+        console.info(`[Online] 已自动确认参与者 ${answer.participantId} 的 ICE restart 重答`)
+      }
     } catch (e) {
       console.warn(`[Online] 自动确认参与者 ${answer.participantId} 重答失败:`, e)
     }
@@ -219,16 +223,19 @@ export function useRoomHostPolling(
   /**
    * 自动放行已确认参与者的 Answer（授权前置：房主在 Offer 生成前已确认）
    *
-   * 直接 setRemoteAnswer 建立 P2P 连接，无需二次确认；失败时关闭残留 PC。
+   * 直接 setRemoteAnswer 建立 P2P 连接，无需二次确认；幂等跳过（已放行/PC 未就绪）
+   * 不得关闭已建立的连接，仅真正协商失败时关闭残留 PC。
    */
   async function autoAcceptConfirmedAnswer(answer: PendingAnswer) {
     try {
-      await hostMesh.setRemoteAnswer(
+      const ok = await hostMesh.setRemoteAnswer(
         answer.participantId,
         answer.sdpAnswer,
         answer.iceCandidates ?? [],
       )
-      console.info(`[Online] 已自动放行参与者 ${answer.participantId} 的 Answer`)
+      if (ok) {
+        console.info(`[Online] 已自动放行参与者 ${answer.participantId} 的 Answer`)
+      }
     } catch (e) {
       console.warn(`[Online] 自动放行参与者 ${answer.participantId} 的 Answer 失败:`, e)
       hostMesh.closeParticipant(answer.participantId)
@@ -463,12 +470,14 @@ export function useRoomHostPolling(
   /** HostMcPort 控制消息的本地 seq 计数器 */
   let mcPortSeq = 0
 
-  /** 存在待生成 Offer 的参与者时保持活跃间隔，否则退避到空闲间隔 */
+  /** 存在待授权申请或待生成 Offer 的参与者时保持活跃间隔，否则退避到空闲间隔 */
   function scheduleParticipantsNext() {
     if (!timersActive) return
     if (participantsTimer) clearTimeout(participantsTimer)
     const hasPendingOffer = store.roomState.participants.some(
-      (p) => p.status === 'confirmed' && !p.hostOfferReady,
+      (p) =>
+        p.status === 'joined' ||
+        (p.status === 'confirmed' && !p.hostOfferReady),
     )
     participantsTimer = setTimeout(
       () => void pollParticipants(),
@@ -476,18 +485,24 @@ export function useRoomHostPolling(
     )
   }
 
-  /** 存在待确认申请或已确认参与者时保持活跃间隔（Answer 自动放行需及时拉取），否则退避到空闲间隔 */
+  /**
+   * 存在待确认申请、待授权申请或未建立连接的已确认参与者时保持活跃间隔，
+   * 否则（全部已连接）退避到慢速档，仅低频感知 ICE restart 重答。
+   */
   function scheduleAnswersNext() {
     if (!timersActive) return
     if (answerTimer) clearTimeout(answerTimer)
     const hasPendingAnswers =
       pendingAnswers.value.length > 0 ||
       store.roomState.participants.some(
-        (p) => p.status === 'joined' || p.status === 'confirmed',
+        (p) => p.status === 'joined' || p.status === 'answered',
+      ) ||
+      store.roomState.participants.some(
+        (p) => p.status === 'confirmed' && !hostMesh.channelOpen.get(p.participantId),
       )
     answerTimer = setTimeout(
       () => void pollAnswers(),
-      hasPendingAnswers ? POLL_ACTIVE_INTERVAL_MS : POLL_IDLE_INTERVAL_MS,
+      hasPendingAnswers ? POLL_ACTIVE_INTERVAL_MS : POLL_ANSWERS_CONNECTED_MS,
     )
   }
 

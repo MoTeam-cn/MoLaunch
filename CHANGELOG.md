@@ -2,6 +2,16 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Fixed
+- **修复已连接参与者被重复自动放行导致的 `setRemoteAnswer` 状态错误与连接被打断**（[mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)）：服务端 `find_pending_answers` 会永久返回已确认参与者已提交的 Answer（无消费语义），房主此前每 2s 轮询都对同一参与者重复 `setRemoteAnswer`——WebRTC 中一次协商完成后 `signalingState` 回到 `stable`，再次设置 Answer 必然抛 `Called in wrong state: stable`，且失败处理里 `closeParticipant` 还会把已建立的 P2P 连接关掉再靠 ICE restart 自愈，形成「每 2 秒闪断一次」的破坏循环。现 `setRemoteAnswer` 幂等化：PC 不存在或不在 `have-local-offer` 状态时返回 `false` 直接跳过，**不再抛错、不再误关已建连接**（ICE restart 后 PC 处于 `have-local-offer`，放行不受影响）；两处 autoAccept 按返回值区分「成功/跳过/失败」，仅真正协商失败才关闭残留 PC。
+
+### Changed
+- **信令轮询按连接状态自适应降频，大幅降低云端请求压力**（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [useWebRTC.ts](src/composables/useWebRTC.ts)）：
+  - 房主 Answer 轮询（`pollAnswers`）：原条件只要存在 `confirmed` 参与者就永远 2s 高频；现仅「有待确认申请（`answered`/`joined`）或已确认但尚未建连（DataChannel 未 open）的参与者」保持 2s，**全部连接建立后退避到 30s 慢速档**，仅低频感知 ICE restart 重答（断线时 channel 关闭自动回到 2s）；参与者轮询同样把新加入申请（`joined`）纳入活跃条件，新申请出现即回到 2s 及时展示。
+  - 加入方等待房主 Offer 的轮询（`fetchOfferAndAnswer`）：间隔由 1000ms（与注释不符的回归）恢复为 2000ms，并在等待期间指数退避（2s→4s→8s→10s 封顶，总超时仍为 180s），避免授权前置下长等待时对云端每分钟 60 次请求。
+
 ## [0.3.6-rc1] - 2026-08-12
 
 - 重做大厅加入房间交互并修复「提交 Answer 缺失导致永远连不上」（[LobbyBrowser.vue](src/components/online/LobbyBrowser.vue) / [LobbyJoinDialog.vue](src/components/online/LobbyJoinDialog.vue)，替换删除 [LobbyJoinConfirmDialog.vue](src/components/online/LobbyJoinConfirmDialog.vue)）：此前 `doJoin` 走 `showPrompt` 密码弹窗——点确定立即收起、`guestJoinRoom` 成功瞬间 Online.vue watch 直接把大厅切到房间详情（页面在抽屉关闭动画中「抽动」），且 `fetchOfferAndAnswer` 拿到房主 Offer 生成 Answer 后**从未 `submitAnswer`**（RoomManager / reconnectAsGuest 均提交，唯大厅入口漏掉），房主永远收不到 Answer、无法 confirm 建连，「加入中」卡死到最后超时，表现为「大厅加入房间很奇怪」。现重做为统一加入抽屉：有密码/整合包的房间先弹抽屉（密码输入 + 整合包校验内嵌）→ 点「加入房间」后抽屉保持打开显示加入中 → **失败时抽屉不收起、错误内联展示可直接改密码重试**（取消按钮此时禁用），成功才收起抽屉、`@close` 后组件卸载并由 role 变化切到房间详情；无密码无整合包房间仍直接加入。加入成功拆两段：`joinViaLobby` 只完成 `guestJoinRoom`（拿到 participantId 后抽屉收起），`continueJoin` 后台继续 TURN 拉取 → 等待房主 Offer → 生成 Answer 并 `submitAnswer`（[online-manager/room.ts](src/utils/api/online-manager/room.ts)），失败清理参与者与 RoomManager 对齐。

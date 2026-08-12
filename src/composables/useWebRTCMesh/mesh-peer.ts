@@ -141,7 +141,9 @@ export function useMeshPeer(deps: MeshPeerDeps) {
   /**
    * 为指定参与者设置远端 Answer
    *
-   * 在收到 `listAnswers` 中该参与者的 Answer 后调用。
+   * 在收到 `listAnswers` 中该参与者的 Answer 后调用。幂等：
+   * PC 不存在或当前不在 `have-local-offer` 状态（已放行/协商已完成）时返回 `false`，
+   * 调用方应跳过且不得关闭已建立的连接；设置成功返回 `true`。
    *
    * @param participantId 参与者 ID
    * @param remoteSdp 参与者的 SDP Answer
@@ -151,11 +153,9 @@ export function useMeshPeer(deps: MeshPeerDeps) {
     participantId: string,
     remoteSdp: string,
     remoteIce: string[],
-  ): Promise<void> {
+  ): Promise<boolean> {
     const conn = conns.value.get(participantId)
-    if (!conn) {
-      throw new Error(`参与者 ${participantId} 的 PeerConnection 不存在，请先 createOfferFor`)
-    }
+    if (!conn || conn.pc.signalingState !== 'have-local-offer') return false
     await conn.pc.setRemoteDescription({ type: 'answer', sdp: remoteSdp })
     for (const candidate of remoteIce) {
       try {
@@ -164,6 +164,7 @@ export function useMeshPeer(deps: MeshPeerDeps) {
         /* 单个 candidate 失败不阻塞整体协商 */
       }
     }
+    return true
   }
 
   /**

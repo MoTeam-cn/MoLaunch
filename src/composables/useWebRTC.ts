@@ -30,7 +30,8 @@ export interface SdpResult {
 }
 
 /** fetchOfferAndAnswer 默认轮询参数 */
-const DEFAULT_POLL_INTERVAL_MS = 1000
+const DEFAULT_POLL_INTERVAL_MS = 2000
+const DEFAULT_POLL_MAX_INTERVAL_MS = 10_000
 /** 等待房主接受申请并生成 Offer 的超时：授权前置后加入方需等房主确认，不宜过短 */
 const DEFAULT_POLL_TIMEOUT_MS = 180_000
 
@@ -233,6 +234,7 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
   ): Promise<SdpResult> {
     const deadline = Date.now() + timeoutMs
     negotiating.value = true
+    let waitMs = pollIntervalMs
     try {
       // 轮询房主生成的 Offer，超时抛错
       // eslint-disable-next-line no-constant-condition
@@ -251,8 +253,9 @@ export function useWebRTC(options?: { autoClose?: boolean }) {
             result.data.iceCandidates ?? [],
           )
         }
-        // 未就绪，等待下一轮
-        await new Promise((resolve) => setTimeout(resolve, pollIntervalMs))
+        // 未就绪，指数退避等待下一轮（上限 10s，避免长期等待时对云端高频轮询）
+        await new Promise((resolve) => setTimeout(resolve, waitMs))
+        waitMs = Math.min(Math.floor(waitMs * 2), DEFAULT_POLL_MAX_INTERVAL_MS)
       }
     } finally {
       negotiating.value = false
