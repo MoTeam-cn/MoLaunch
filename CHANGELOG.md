@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.5] - 2026-08-12
+
 - 修复进入主页时账号 IPC 重复调用（[useAccountCards.ts](src/composables/useAccountCards.ts)）：`get_ms_accounts` / `get_offline_accounts` / `get_authlib_accounts` 原先各被调用两次——账号卡片组件挂载时（AccountSelector onMounted）拉一遍、App.vue 启动流程的 `restoreSession` 内 `Promise.all` 又拉一遍，产生成堆 `[Startup][IPC]` 日志。现账号列表统一由 `restoreSession` 加载，卡片组件不再自行拉取（数据为 store 响应式，加载完成后自动渲染）；登录成功 / 删除 / 切换账号后的刷新仍由 auth store 内部显式触发。
 
 - 下载面板与返回顶部按钮视觉完全统一（[DownloadPanel.vue](src/components/common/DownloadPanel.vue)）：下载按钮缩至与 BackToTop 一致的 44px 圆钮、图标改用 solid 风格白图标、采用相同阴影与 hover/active 动效（hover 上移 2px + 阴影增强、按下缩小）；进度环贴边外圈（r=20 / dasharray 125.66）；BackToTop 消失时下载按钮从避让位平滑滑回贴底（`bottom` 过渡），两个浮标同时出现不再突兀。Tailwind 浮动类收敛为 scoped CSS。
