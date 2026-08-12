@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.3.5-rc9] - 2026-08-12
+
 - 修复厂商 frpc 命令模式 token 拼接错误（[spawn.rs](src-tauri/src/commands/frp/process/spawn.rs)）：模板 `-t 17062:{token}` 原被拆成 `-t 17062:` + 独立参数 token，frpc 将 token 当作未知子命令导致启动失败；现按词内联替换 `{token}`，token 与端口拼为同一参数（与 args 模式行为一致），并补单元测试。
 
 - 检查更新抽屉同步「作者的话」note 高亮（[UpdateDialog.vue](src/components/about/UpdateDialog.vue) / [updateLog.ts](src/utils/updateLog.ts)）：检查更新弹窗的更新日志此前直接按时间线渲染服务端 release_notes，未提取 `note:` commit；现与启动时更新版本弹窗一致——优先从服务端 notes 解析 `note:` 前缀行（新增 `extractNoteLines` / `stripNoteLines` 工具），提取不到则回退构建时 git note（`getChangelogNotes`），以「作者的话」高亮块展示在时间线上方，并从时间线中剔除原 note 行避免重复。
