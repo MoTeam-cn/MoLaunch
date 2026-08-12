@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+- 修复更新包签名校验失败（[verify.rs](src-tauri/updater/src/verify.rs) / [verify_test.rs](src-tauri/updater/src/verify_test.rs)）：tauri `signer sign` 生成的 `.sig` 文件内容为「4 行标准 minisign 文本的 base64 编码」（与 tauri-plugin-updater 约定一致），updater 此前直接按 4 行文本解析导致 `Invalid encoding in minisign data`。现签名解析先检测文本格式，非文本则先 base64 解码再解析，两种格式均兼容，并补单元测试。
+
 ## [0.3.5-rc9] - 2026-08-12
 
 - apiServer 地址移入 CI Secret（[ci-upload.cjs](scripts/ci-upload.cjs) / [release.yml](.github/workflows/release.yml)）：上传脚本不再硬编码 apiServer 地址（原默认 `https://api.molaunch.moiu.cn`），改为从 `MOLAUNCH_ACTION_PUSH_SERVER` 环境变量读取并校验必填；release 工作流两处上传步骤注入 `secrets.MOLAUNCH_ACTION_PUSH_SERVER`。

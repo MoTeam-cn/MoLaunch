@@ -29,7 +29,10 @@ fn main() {
     ));
 
     if !wait_for_process_exit(args.pid, Duration::from_secs(WAIT_TIMEOUT_SECS)) {
-        log(&format!("等待主进程 {} 退出超时（{}s）", args.pid, WAIT_TIMEOUT_SECS));
+        log(&format!(
+            "等待主进程 {} 退出超时（{}s）",
+            args.pid, WAIT_TIMEOUT_SECS
+        ));
         std::process::exit(2);
     }
     log("主进程已退出");

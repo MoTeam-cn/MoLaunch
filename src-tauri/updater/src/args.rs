@@ -18,9 +18,20 @@ impl Args {
 
         while let Some(arg) = args.next() {
             match arg.as_str() {
-                "--old-exe" => old_exe = Some(PathBuf::from(args.next().ok_or("缺少 --old-exe 值")?)),
-                "--new-exe" => new_exe = Some(PathBuf::from(args.next().ok_or("缺少 --new-exe 值")?)),
-                "--pid" => pid = Some(args.next().ok_or("缺少 --pid 值")?.parse().map_err(|_| "pid 必须是数字")?),
+                "--old-exe" => {
+                    old_exe = Some(PathBuf::from(args.next().ok_or("缺少 --old-exe 值")?))
+                }
+                "--new-exe" => {
+                    new_exe = Some(PathBuf::from(args.next().ok_or("缺少 --new-exe 值")?))
+                }
+                "--pid" => {
+                    pid = Some(
+                        args.next()
+                            .ok_or("缺少 --pid 值")?
+                            .parse()
+                            .map_err(|_| "pid 必须是数字")?,
+                    )
+                }
                 "--signature" => signature = Some(args.next().ok_or("缺少 --signature 值")?),
                 _ => return Err(format!("未知参数: {}", arg)),
             }
