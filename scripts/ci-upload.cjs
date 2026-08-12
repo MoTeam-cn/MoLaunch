@@ -156,6 +156,39 @@ function uploadSingle(item, buffer, label) {
   return s3PutWithRetry(item.upload_url, buffer, label);
 }
 
+// MoSign-v2 API POST（签名 + 请求 + Cloudflare 回源错误重试）
+// 与 s3PutWithRetry 同一套 RETRYABLE_STATUS / MAX_RETRIES 退避策略，
+// 每次尝试重新签名（timestamp/nonce 每次生成）
+async function apiPostWithRetry(reqPath, bodyBuffer, label) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const sign = signRequest('POST', reqPath, bodyBuffer);
+      const resp = await httpRequest(`${API_BASE_URL}${reqPath}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-MoSign-Version': 'MoSign-v2',
+          'X-MoSign-Timestamp': sign.timestamp,
+          'X-MoSign-Nonce': sign.nonce,
+          'X-MoSign-Signature': sign.signature,
+        },
+      }, bodyBuffer);
+      if (resp.status >= 200 && resp.status < 300) return resp;
+      const err = new Error(`${label} API 请求失败 (HTTP ${resp.status}): ${resp.body.toString().slice(0, 500)}`);
+      err.code = 'API_FAILED';
+      err.httpStatus = resp.status;
+      throw err;
+    } catch (err) {
+      const retryable = err.code === 'API_FAILED' && RETRYABLE_STATUS.has(err.httpStatus)
+        || err.networkError;
+      if (!retryable || attempt > MAX_RETRIES) throw err;
+      const delay = Math.min(1000 * 2 ** (attempt - 1), 8000);
+      console.log(`::warning::${label} API 请求失败 (${err.httpStatus ? `HTTP ${err.httpStatus}` : err.code})，${delay}ms 后第 ${attempt} 次重试（共最多 ${MAX_RETRIES} 次）...`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+}
+
 // 分片上传（大文件）：按 part_number 顺序 PUT 各分片，收集 ETag
 async function uploadMultipart(item, buffer, label) {
   const { upload_id, part_size, parts } = item.multipart;
@@ -186,19 +219,9 @@ async function completeMultipartUpload(item, parts) {
     download_key: item.download_key,
     parts,
   }));
-  const completeSign = signRequest('POST', completePath, completeBody);
   console.log('完成分片上传（CompleteMultipartUpload）...');
 
-  const resp = await httpRequest(`${API_BASE_URL}${completePath}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-MoSign-Version': 'MoSign-v2',
-      'X-MoSign-Timestamp': completeSign.timestamp,
-      'X-MoSign-Nonce': completeSign.nonce,
-      'X-MoSign-Signature': completeSign.signature,
-    },
-  }, completeBody);
+  const resp = await apiPostWithRetry(completePath, completeBody, '完成分片');
 
   let data;
   try {
@@ -258,19 +281,9 @@ async function main() {
     sizes: [FILE_SIZE, sigBuffer.length],
   }));
 
-  const presignSign = signRequest('POST', presignPath, presignBody);
   console.log('请求预签名上传 URL...');
 
-  const presignResp = await httpRequest(`${API_BASE_URL}${presignPath}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-MoSign-Version': 'MoSign-v2',
-      'X-MoSign-Timestamp': presignSign.timestamp,
-      'X-MoSign-Nonce': presignSign.nonce,
-      'X-MoSign-Signature': presignSign.signature,
-    },
-  }, presignBody);
+  const presignResp = await apiPostWithRetry(presignPath, presignBody, '预签名');
 
   let presignData;
   try {
@@ -337,19 +350,9 @@ async function main() {
     min_version: '',
   }));
 
-  const releaseSign = signRequest('POST', releasePath, releaseBody);
   console.log('注册版本到 apiServer...');
 
-  const releaseResp = await httpRequest(`${API_BASE_URL}${releasePath}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-MoSign-Version': 'MoSign-v2',
-      'X-MoSign-Timestamp': releaseSign.timestamp,
-      'X-MoSign-Nonce': releaseSign.nonce,
-      'X-MoSign-Signature': releaseSign.signature,
-    },
-  }, releaseBody);
+  const releaseResp = await apiPostWithRetry(releasePath, releaseBody, '注册版本');
 
   let releaseData;
   try {
