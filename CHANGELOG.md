@@ -2,6 +2,43 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Fixed
+
+- **`setRemoteAnswer` 幂等处理 ICE restart 并发竞态，不再误关自愈中的连接**（[mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts)）：`setRemoteAnswer` 与 `closeParticipant` / ICE restart 并发时，`signalingState` 可能在幂等守卫（`!== have-local-offer`）之后才变化，`setRemoteDescription` 会抛 `InvalidStateError`。现捕获该异常视为「跳过」（返回 `false`）而非「协商失败」，调用方 `autoAcceptConfirmedAnswer` 不再对该瞬态竞态执行 `closeParticipant` 误杀一个正在恢复的连接；仅真正异常才抛出让调用方关闭残留 PC。
+
+- **加入方 Offer 监控链在协商/重连进行中不再断裂**（[onlineSession.ts](src/composables/online/onlineSession.ts)）：`restartMonitorTick` 此前在 `reconnecting || negotiating` 时早退且**不重新排程**，若恰好在该窗口触发则监控链永久停止，房主 ICE restart 后的新 Offer 不被感知直到连接最终失败。现早退分支也调用 `scheduleRestartMonitor()`，配合 `finally` 兜底，任何路径都持续排程，不再依赖在途调用兜底。
+
+- **加入方连接被关闭后的恢复路径补全**（[onlineSession.ts](src/composables/online/onlineSession.ts)）：`connectionState` watch 此前仅处理 `connected/failed/disconnected`，不处理 `closed`——全量重建失败后 `pc=null`、`connectionState='closed'`，`pullTurnThenRecover` 不再触发，加入方永久停留在「假在线、无连接」的半死状态。现补 `closed` 分支：角色仍为 guest 时直接 `attemptGuestReconnect`；`reconnectAttempts` 已耗尽时给出明确 toast。
+
+- **重连时 `leaveRoom` 失败导致 `AlreadyJoined` 冲突增加重试兜底**（[useRoomReconnect.ts](src/composables/useRoomReconnect.ts)）：`reconnectAsGuest` 先 `leaveRoom` 清理旧 participant 记录，失败被 `.catch()` 静默吞掉时旧记录（status=joined）残留，`joinRoom` 返回 `AlreadyJoined` 使重连停摆。现记录清理是否成功（`leftClean`），`joinRoom` 失败且清理失败时再清一次并重试一次，仍失败才抛出。
+
+- **ICE restart 后切回 Answer 快档，缩短断线恢复感知延迟**（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)）：全参与者建连后 `answerTimer` 停在 30s 慢速档，ICE restart 上传新 Offer 后不会切回快档，房主最长 30s 后才拉到加入方重答。现 `restartIceForParticipant` 上传新 Offer 后调用 `scheduleAnswersNext()`，且 `scheduleAnswersNext` 把 `restartInFlight` 中尚未建连的参与者纳入快档判定，尽快捕获重答。
+
+- **抑制刷新滞后窗口内 Offer 重复生成关闭进行中的 PC**（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)）：服务端上传 Offer 后置 `hostOfferReady` 存在 <2s 轮询周期延迟，若此时 `offerGenerating` 已移除会触发重复生成，而 `createOfferFor` 会先关闭旧 PC 破坏进行中的协商。现新增本地 `offerReadyLocal` 集合标记「已生成待服务端确认」，抑制同 participantId 在滞后窗口内重复生成，服务端确认 `hostOfferReady=true` 或参与者离开后清除。
+
+- **大厅 keep-alive 下加入成功后清理 `joinTarget`，抽屉可再次打开**（[LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：加入成功后 `isInRoom` watch 立即切走分类，抽屉滑出动画被 keep-alive 冻结、`@close` 不触发，`joinTarget` 残留导致回到大厅后密码/整合包房间抽屉无法再打开。现在 `onDeactivated` 主动清理 `joinTarget`。
+
+- **房间已满/已关闭时加入按钮禁用并提示原因**（[LobbyRoomCard.vue](src/components/online/LobbyRoomCard.vue)）：已满/已关闭房间的加入按钮此前禁用但无任何原因提示。现新增 `disabledReason` computed，三态互斥渲染「在房间中 / 房间已满或已关闭 / 可加入」。
+
+- **接受/拒绝加入申请与创建房间按钮增加防重复提交守卫**（[PendingAnswerList.vue](src/components/online/PendingAnswerList.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [useRoomHostActions.ts](src/composables/useRoomHost/useRoomHostActions.ts) / [useRoomHost.ts](src/composables/useRoomHost.ts) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) / [useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts)）：接受/拒绝按钮连点会并行发出多个 `confirmParticipant`；创建房间「stun」阶段（`fetchStunServers` 不置 `roomLoading`）按钮仍可点导致并发建房。现 `handleConfirm` 用响应式 `confirming` Set 防重入并驱动按钮禁用，`handleCreateRoom` 用 `creating` 标志覆盖 stun 阶段防连点。
+
+- **清理已离开参与者的连接状态残留键，避免无界累积**（[mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts) / [useWebRTCMesh.ts](src/composables/useWebRTCMesh.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)）：长会话中已关闭/已离开参与者的 `connectionStates`/`channelOpen`/`negotiating` 键此前永不删除，随加入/离开次数无界累积。现 `closeParticipant` 删除 `negotiating` 与 `channelOpen` 键，新增 `removeConnState` 供轮询在离开参与者清理时同步删除 `connectionStates`、`offerReadyLocal` 及各 restart 标记键。
+
+- **轮询结果陈旧防护与冗余提示清理**（[useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [useRoomHostActions.ts](src/composables/useRoomHost/useRoomHostActions.ts)）：`pollAnswers` 请求在途期间离开/关闭房间后，结果返回仍会执行自动放行逻辑产生对空 roomCode 的无效请求，现快照 `reqRoomCode` 并在处理后校验 role/roomCode 匹配，不匹配直接丢弃；`refreshBans` 移除每次刷新都弹的「封禁列表已刷新」冗余 toast。
+
+- **修复上一轮联机修复引入的 5 处回归**（[LobbyRoomCard.vue](src/components/online/LobbyRoomCard.vue) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [useRoomHostActions.ts](src/composables/useRoomHost/useRoomHostActions.ts) / [mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts)）：
+  - `LobbyRoomCard` 的 `inRoom` 与 `disabledReason` 两个独立 `v-if` 在房间中时同屏渲染双按钮，改为互斥链 `v-if/v-else-if/v-else`。
+  - `guestLeaveAndCleanup` 主动退出时 `guestWebrtc.close()` 触发的 `closed` watch 会在 `await guestLeaveRoom` 期间误触发 `attemptGuestReconnect` 重新加入刚退出的房间，现置 `reconnecting=true` 阻断。
+  - `offerReadyLocal` 清理只遍历当前参与者列表，参与者在 Offer 生成后、`hostOfferReady` 置位前离开会残留键无界累积，现在离开清理循环一并 `delete`。
+  - `confirming` 为非响应式 Set 时按钮禁用反馈失效，改为 `ref<Set<string>>` 使 `:disabled` 生效。
+  - `closeParticipant` 先删 `channelOpen` 键再被 `setConnState` 内部 `channelOpen.set(false)` 撤销，调整为先置 `closed` 再删键。
+
+### Changed
+
+- **移除前端 composable 与组件中的 `any` 类型，改用 `unknown` 配合类型守卫**（[useDebouncedSave.ts](src/composables/useDebouncedSave.ts) / [useFabricApi.ts](src/composables/useFabricApi.ts) / [usePackUpdate.ts](src/composables/usePackUpdate.ts) / [useModUpdate.ts](src/composables/useModUpdate.ts) / [useResourceDownload.ts](src/composables/useResourceDownload.ts) / [useDependencyConfirm.ts](src/composables/useResourceDownload/useDependencyConfirm.ts) / [useResourceModpackInstall.ts](src/composables/useResourceModpackInstall.ts) / [ResourceDetail.vue](src/components/community/ResourceDetail.vue) / [Community.vue](src/views/Community.vue)）：`catch (e: any)` 改为 `catch (e: unknown)` 并用 `e instanceof Error ? e.message : ...` 类型守卫提取错误信息；`useDebouncedSave` 实现返回类型 `: any` 改为 `SimpleReturn | PatchReturn` 联合类型（保留 overload 精确签名），符合「禁止使用 any、无法确定用 unknown 并配合类型守卫」的规范。
+
 ## [0.3.6-rc2] - 2026-08-13
 
 > 小更新，但是用联机服务的必更新。
