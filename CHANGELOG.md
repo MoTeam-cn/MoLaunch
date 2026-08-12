@@ -4,6 +4,8 @@
 
 ## [0.3.6-rc2] - 2026-08-13
 
+> 小更新，但是用联机服务的必更新。
+
 ### Fixed
 - **修复已连接参与者被重复自动放行导致的 `setRemoteAnswer` 状态错误与连接被打断**（[mesh-peer.ts](src/composables/useWebRTCMesh/mesh-peer.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts)）：服务端 `find_pending_answers` 会永久返回已确认参与者已提交的 Answer（无消费语义），房主此前每 2s 轮询都对同一参与者重复 `setRemoteAnswer`——WebRTC 中一次协商完成后 `signalingState` 回到 `stable`，再次设置 Answer 必然抛 `Called in wrong state: stable`，且失败处理里 `closeParticipant` 还会把已建立的 P2P 连接关掉再靠 ICE restart 自愈，形成「每 2 秒闪断一次」的破坏循环。现 `setRemoteAnswer` 幂等化：PC 不存在或不在 `have-local-offer` 状态时返回 `false` 直接跳过，**不再抛错、不再误关已建连接**（ICE restart 后 PC 处于 `have-local-offer`，放行不受影响）；两处 autoAccept 按返回值区分「成功/跳过/失败」，仅真正协商失败才关闭残留 PC。
 
