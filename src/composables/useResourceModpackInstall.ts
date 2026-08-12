@@ -90,8 +90,8 @@ export function useResourceModpackInstall(
         undefined, undefined, instanceName,
       )
       toastSuccess(`整合包 ${instanceName} 安装完成`)
-    } catch (e: any) {
-      const msg = e?.message || String(e)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
       if (isCancelledError(e)) {
         toastInfo('下载已取消')

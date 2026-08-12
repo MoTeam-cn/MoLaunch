@@ -8,18 +8,14 @@
 import { onScopeDispose } from 'vue'
 import type { ConfigPatch } from '@/utils/api/config'
 
-/** 简单模式：只做时间防抖 */
-export function useDebouncedSave(
-  flushFn: () => Promise<void> | void,
-  delay?: number,
-): { scheduleSave: () => void; flushSave: () => void }
+/** 简单模式返回：只做时间防抖 */
+interface SimpleReturn {
+  scheduleSave: () => void
+  flushSave: () => void
+}
 
-/** 字段追踪模式：自动追踪改变的字段，flush 时只传改变的字段 */
-export function useDebouncedSave(
-  pattern: 'patch',
-  flushFn: (patch: ConfigPatch) => Promise<void> | void,
-  delay?: number,
-): {
+/** 字段追踪模式返回：自动追踪改变字段 */
+interface PatchReturn {
   /** 标记字段已改变，并防抖触发 flush */
   markDirty: (key: keyof ConfigPatch, value: unknown) => void
   /** 立即 flush，返回未保存的 patch */
@@ -30,11 +26,24 @@ export function useDebouncedSave(
   isDirty: () => boolean
 }
 
+/** 简单模式：只做时间防抖 */
+export function useDebouncedSave(
+  flushFn: () => Promise<void> | void,
+  delay?: number,
+): SimpleReturn
+
+/** 字段追踪模式：自动追踪改变的字段，flush 时只传改变的字段 */
+export function useDebouncedSave(
+  pattern: 'patch',
+  flushFn: (patch: ConfigPatch) => Promise<void> | void,
+  delay?: number,
+): PatchReturn
+
 export function useDebouncedSave(
   arg1: 'patch' | (() => Promise<void> | void),
   arg2?: (() => Promise<void> | void) | ((patch: ConfigPatch) => Promise<void> | void) | number,
   arg3?: number,
-): any {
+): SimpleReturn | PatchReturn {
   // ============ 字段追踪模式 ============
   if (arg1 === 'patch') {
     const flushFn = arg2 as (patch: ConfigPatch) => Promise<void> | void

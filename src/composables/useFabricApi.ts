@@ -35,9 +35,9 @@ export function useFabricApi(
         fabricApiState.value = 'empty'
       }
       fabricApiError.value = ''
-    } catch (e: any) {
+    } catch (e: unknown) {
       console.error('Failed to load Fabric API versions:', e)
-      fabricApiError.value = typeof e === 'string' ? e : (e?.message || String(e))
+      fabricApiError.value = e instanceof Error ? e.message : typeof e === 'string' ? e : String(e)
       fabricApiLatest.value = null
       fabricApiState.value = 'error'
     }

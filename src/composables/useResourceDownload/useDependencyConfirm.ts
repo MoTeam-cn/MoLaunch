@@ -118,8 +118,8 @@ export function useDependencyConfirm(deps: {
       if (versionStore.downloading) {
         versionStore.finishDownload()
       }
-    } catch (e: any) {
-      const msg = e?.message || String(e)
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : String(e)
       if (isCancelledError(e)) {
         toastInfo('下载已取消')
         versionStore.finishDownload()

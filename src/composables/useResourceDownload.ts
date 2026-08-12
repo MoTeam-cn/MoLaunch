@@ -164,8 +164,8 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
           versionStore.finishDownload()
           toastSuccess(`${finalFileName} 下载完成`)
         }
-      } catch (e: any) {
-        const msg = e?.message || String(e)
+      } catch (e: unknown) {
+        const msg = e instanceof Error ? e.message : String(e)
         // 后端已 mark_failed 重置 is_active，前端用 showModal + onConfirm 让用户点击确定后退出下载页
         showModal({
           type: 'error',
@@ -257,9 +257,9 @@ export function useResourceDownload(options: UseResourceDownloadOptions) {
         confirm.openDependencyDialog(v)
         return true
       }
-    } catch (e: any) {
+    } catch (e: unknown) {
       // 检查失败不阻断下载，仅提示并降级到普通下载
-      const msg = e?.message || String(e)
+      const msg = e instanceof Error ? e.message : String(e)
       console.debug('[ResourceDetail] 前置 Mod 检查失败:', msg)
       toastInfo('前置 Mod 检查失败，直接下载主 Mod')
     }

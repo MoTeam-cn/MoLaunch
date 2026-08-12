@@ -119,8 +119,8 @@ export function useModUpdate(
       if (filteredVersions.value.length > 0) {
         selectedVersionId.value = filteredVersions.value[0].id
       }
-    } catch (e: any) {
-      error.value = typeof e === 'string' ? e : (e?.message || String(e))
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : typeof e === 'string' ? e : String(e)
       toastError('查询版本列表失败：' + String(e))
     } finally {
       loading.value = false
@@ -161,8 +161,8 @@ export function useModUpdate(
           // 安装后扫描兜底：检查新版本是否引入缺失前置
           // 不实际安装（避免与 updateMod 删除逻辑冲突），仅 toast 提示用户去资源页安装
           await scanMissingDepsAfterInstall(version)
-        } catch (e: any) {
-          const msg = typeof e === 'string' ? e : (e?.message || String(e))
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : String(e)
           // 用户主动取消：仅 toast 提示并退出下载页，不弹错误窗
           if (isCancelledError(e)) {
             toastInfo('下载已取消')
@@ -212,8 +212,8 @@ export function useModUpdate(
         const suffix = count > 3 ? ' 等' : ''
         toastInfo(`新版本检测到 ${count} 个缺失前置：${names}${suffix}，请前往社区资源页安装`)
       }
-    } catch (e: any) {
-      console.debug('[useModUpdate] 前置扫描失败:', e?.message || e)
+    } catch (e: unknown) {
+      console.debug('[useModUpdate] 前置扫描失败:', e)
     }
   }
 

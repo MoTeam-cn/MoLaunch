@@ -79,8 +79,8 @@ export function usePackUpdate(
       if (filteredVersions.value.length > 0) {
         selectedVersionId.value = filteredVersions.value[0].id
       }
-    } catch (e: any) {
-      error.value = typeof e === 'string' ? e : (e?.message || String(e))
+    } catch (e: unknown) {
+      error.value = e instanceof Error ? e.message : typeof e === 'string' ? e : String(e)
       toastError('查询版本列表失败：' + String(e))
     } finally {
       loading.value = false
@@ -113,8 +113,8 @@ export function usePackUpdate(
           toastSuccess(`已安装 ${version.version}`)
           emit('installed')
           emit('update:visible', false)
-        } catch (e: any) {
-          const msg = typeof e === 'string' ? e : (e?.message || String(e))
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : typeof e === 'string' ? e : String(e)
           if (isCancelledError(e)) {
             toastInfo('下载已取消')
             versionStore.finishDownload()
