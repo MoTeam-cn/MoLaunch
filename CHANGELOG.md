@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Fixed
+
+- **版本同步补齐多语言 README 版本徽章**（[sync-version.cjs](scripts/sync-version.cjs) / [version-sync.yml](.github/workflows/version-sync.yml)）：原脚本只更新主 README.md 的 shields.io 版本徽章，README_EN / README_JA / README_ZH-HANT 的徽章停留在旧版本（如 0.3.5-rc4），打 tag 后多语言文档版本漂移。现改为遍历根目录全部 4 个语言 README 同步徽章，并同步扩展 git-auto-commit 的 file_pattern 以纳入 bot 自动提交范围。
+
 ## [0.3.6-rc3] - 2026-08-13
 
 > 使用审查模型修复部分漏洞，可选项安全更新

@@ -5,7 +5,7 @@
  *
  * 用法：node sync-version.cjs <version>
  * 覆盖：package.json / package-lock.json / src-tauri/Cargo.toml
- *       / src-tauri/tauri.conf.json / README.md 版本徽章
+ *       / src-tauri/tauri.conf.json / 各语言 README 版本徽章
  */
 'use strict';
 
@@ -19,6 +19,8 @@ if (!VERSION) {
 }
 
 const root = path.join(__dirname, '..');
+// 根目录各语言 README（版本徽章需同步，避免多语言文档版本漂移）
+const README_FILES = ['README.md', 'README_EN.md', 'README_JA.md', 'README_ZH-HANT.md'];
 const read = (f) => fs.readFileSync(path.join(root, f), 'utf8');
 const write = (f, content) => fs.writeFileSync(path.join(root, f), content);
 
@@ -64,7 +66,9 @@ function main() {
   if (updateText('src-tauri/Cargo.toml', /^version = ".*"$/m, `version = "${VERSION}"`)) changed.push('src-tauri/Cargo.toml');
   if (updateTauriJson('src-tauri/tauri.conf.json')) changed.push('src-tauri/tauri.conf.json');
   const badge = VERSION.replace(/-/g, '--');
-  if (updateText('README.md', /(img\.shields\.io\/badge\/version-).*(-blue\.svg)/, `$1${badge}$2`)) changed.push('README.md');
+  for (const file of README_FILES) {
+    if (updateText(file, /(img\.shields\.io\/badge\/version-).*(-blue\.svg)/, `$1${badge}$2`)) changed.push(file);
+  }
   console.log(`sync version -> ${VERSION}`);
   console.log(changed.length ? `updated: ${changed.join(', ')}` : 'no changes');
 }

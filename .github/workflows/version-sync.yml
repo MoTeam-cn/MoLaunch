@@ -7,7 +7,8 @@ name: Version Sync
 #   - package.json / package-lock.json
 #   - src-tauri/Cargo.toml
 #   - src-tauri/tauri.conf.json
-#   - README.md（版本徽章，shields.io 路径中 "-" 为分隔符，版本内 "-" 需双写 "--" 转义）
+#   - README.md / README_EN.md / README_JA.md / README_ZH-HANT.md
+#     （版本徽章，shields.io 路径中 "-" 为分隔符，版本内 "-" 需双写 "--" 转义）
 #
 # 更新逻辑抽离到 scripts/sync-version.cjs（Node.js），本步仅保留一行 node 调用
 #
@@ -77,7 +78,7 @@ jobs:
         uses: stefanzweifel/git-auto-commit-action@v7
         with:
           commit_message: 'chore(version): 同步版本号至 ${{ steps.version.outputs.VERSION }} !c'
-          file_pattern: package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md
+          file_pattern: package.json package-lock.json src-tauri/Cargo.toml src-tauri/tauri.conf.json README.md README_EN.md README_JA.md README_ZH-HANT.md
 
   # 无论版本文件是否被更新，都要激活发布工作流；版本号由 sync job 解析后传入。
   # 可复用工作流必须在 job 级通过 uses 调用（step 级 uses 只接受本地 action 目录）。
