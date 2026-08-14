@@ -62,9 +62,9 @@ export function drawAchievement(ctx: CanvasRenderingContext2D, opts: Achievement
   ctx.fillStyle = opts.contentColor
   ctx.fillText(truncateText(ctx, opts.content, textMaxWidth), textX, 50)
 
-  // MoLaunch 版权水印（右下角，小字半透明，不抢主体）
-  ctx.font = `8px ${opts.fontFamily}`
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)'
+  // MoLaunch 版权水印（右下角，半透明小字）
+  ctx.font = `10px ${opts.fontFamily}`
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.65)'
   ctx.textAlign = 'right'
   ctx.fillText('MoLaunch', width - 6, height - 6)
   ctx.textAlign = 'left'
