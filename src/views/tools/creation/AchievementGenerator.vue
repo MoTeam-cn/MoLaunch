@@ -207,19 +207,19 @@ async function exportPng() {
       </div>
 
       <!-- 预览与导出 -->
-      <div class="flex flex-col items-center gap-4 rounded-lg bg-gray-100 p-4">
+      <div class="relative flex flex-col items-center gap-4 rounded-lg bg-gray-100 p-4">
         <canvas
           ref="canvasRef"
           class="rounded shadow-sm"
           :style="{ width: ACHIEVEMENT_SIZE.width + 'px', height: ACHIEVEMENT_SIZE.height + 'px' }"
         />
-        <div class="flex items-center gap-2">
-          <Button size="small" :disabled="exporting" @click="exportPng">
-            <template #icon><ArrowDownTrayIcon class="h-4 w-4" /></template>
-            {{ exporting ? '导出中…' : '导出 PNG 到指定目录' }}
-          </Button>
-          <span class="text-xs text-gray-400">图片右下角含 MoLaunch 版权水印</span>
-        </div>
+        <Button size="small" :disabled="exporting" @click="exportPng">
+          <template #icon><ArrowDownTrayIcon class="h-4 w-4" /></template>
+          {{ exporting ? '导出中…' : '导出 PNG 到指定目录' }}
+        </Button>
+        <span class="absolute right-2.5 bottom-1.5 text-[10px] leading-none text-gray-400"
+          >图片右下角含 MoLaunch 版权水印</span
+        >
       </div>
     </div>
   </section>
