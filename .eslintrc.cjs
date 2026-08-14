@@ -23,5 +23,7 @@ module.exports = {
   ignorePatterns: [
     'src-tauri/resources/view/*.min.js',
     'src-tauri/resources/wasm/*.js',
+    // Node 工具脚本（资产生成/CI 上传等），非前端代码，不参与前端 lint
+    'scripts/**',
   ],
 }
