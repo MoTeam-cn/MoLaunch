@@ -26,6 +26,8 @@
 
 - **合成配方生成器改为左右双栏布局**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：原三栏（设置｜编辑+预览｜调色板）布局在 ≤1280px 窗口折叠为单列。现重写为「左：展示区（槽位编辑 + 校验提示 + JSON 预览）+ 右：功能区（配方设置 + 物品/标签调色板）」两栏，内容多高就多高、由页面滚动条自然滚动，不锁定容器高度；JSON 预览保持最大高度内部滚动，校验提示改为复用项目 `Alert` 组件逐条展示。
 
+- **合成配方槽位编辑器支持点击空格子编辑**（[RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [formatter.ts](src/utils/recipe-generator/formatter.ts)）：点击空格子（结果槽除外）发出 `edit-slot` 请求供页面弹抽屉选择，当前编辑中的格子以蓝色高亮；槽位标题映射 `slotCaption` 提取到 `formatter.ts` 供编辑器与页面复用，避免重复实现。
+
 ### Fixed
 
 - **合成配方页切换不再报 atlas 为空的 2 个 Vue prop 校验警告**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：首帧渲染时 `loading=false` 而 `atlas` 仍为 `null`，`v-else` 主体分支会把 `atlas!`（实际为 null）传给 RecipeSlotsEditor / ItemPalette 触发警告。现将 `loading` 初始值改为 `true`，资源加载完成前不渲染主体。

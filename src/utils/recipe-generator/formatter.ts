@@ -76,6 +76,18 @@ export function slotCount(value: SlotValue | undefined): number | undefined {
     : undefined
 }
 
+const SLOT_CAPTIONS: Record<string, string> = {
+  ingredient: '原料',
+  template: '模板',
+  base: '底材',
+  addition: '材料',
+}
+
+/** 槽位展示标题（如 smithing.base -> 底材） */
+export function slotCaption(slot: RecipeSlot): string {
+  return SLOT_CAPTIONS[slot.split('.')[1]] ?? slot.split('.')[1]
+}
+
 /** 组装 ingredient 字段值 */
 export function formatIngredient(
   value: SlotValue,

@@ -3,11 +3,13 @@
  * 合成配方槽位网格编辑器
  *
  * crafting：3x3（或 2x2）网格 + 结果槽；其余类型：一行输入槽 + 结果槽。
- * 点击已放置的槽位可清除；结果槽滚轮可调整产出数量（1-64）。
+ * 点击空格子请求编辑（父组件弹抽屉选择），点击已放置槽位可清除；
+ * 结果槽滚轮可调整产出数量（1-64）；当前编辑中的槽位高亮。
  */
 import { computed } from 'vue'
 import type { RecipeSlot, RecipeSlotContext, SlotValue } from '@/utils/recipe-generator/types'
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
+import { slotCaption } from '@/utils/recipe-generator/formatter'
 import RecipeItemIcon from './RecipeItemIcon.vue'
 
 const props = withDefaults(
@@ -20,27 +22,18 @@ const props = withDefaults(
     twoByTwo?: boolean
     resultSlot?: RecipeSlot | null
     gridSlots?: RecipeSlot[]
+    editingSlot?: RecipeSlot | null
   }>(),
-  { twoByTwo: false, resultSlot: null, gridSlots: () => [] },
+  { twoByTwo: false, resultSlot: null, gridSlots: () => [], editingSlot: null },
 )
 
 const emit = defineEmits<{
   'update-slot': [slot: RecipeSlot, value: SlotValue | undefined]
   'update-count': [slot: RecipeSlot, count: number]
+  'edit-slot': [slot: RecipeSlot]
 }>()
 
 type Display = { texture: string | null; label: string; count: number }
-
-const SLOT_CAPTIONS: Record<string, string> = {
-  ingredient: '原料',
-  template: '模板',
-  base: '底材',
-  addition: '材料',
-}
-
-function slotCaption(slot: RecipeSlot): string {
-  return SLOT_CAPTIONS[slot.split('.')[1]] ?? slot.split('.')[1]
-}
 
 function displayFor(value: SlotValue | undefined): Display | null {
   if (!value) return null
@@ -86,6 +79,7 @@ const rowSlots = computed(() =>
 
 function onSlotClick(slot: RecipeSlot) {
   if (props.values[slot]) emit('update-slot', slot, undefined)
+  else if (slot !== props.resultSlot) emit('edit-slot', slot)
 }
 
 function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
@@ -109,7 +103,7 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
           :key="index"
           type="button"
           class="recipe-slot-cell"
-          :class="{ filled: cell?.display }"
+          :class="{ filled: cell?.display, editing: editingSlot === cell?.slot }"
           @click="cell?.slot && onSlotClick(cell.slot)"
         >
           <RecipeItemIcon
@@ -160,7 +154,7 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
         <button
           type="button"
           class="recipe-slot-cell"
-          :class="{ filled: entry.display }"
+          :class="{ filled: entry.display, editing: editingSlot === entry.slot }"
           @click="onSlotClick(entry.slot)"
           @wheel="onResultWheel($event, entry.slot)"
         >
@@ -234,6 +228,11 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
   border-style: solid;
   border-color: #c9cdd4;
   background: #fff;
+}
+
+.recipe-slot-cell.editing {
+  border-color: #165dff;
+  box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.25);
 }
 
 .recipe-result-cell {
