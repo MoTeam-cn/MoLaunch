@@ -66,7 +66,7 @@ function updateLogPlugin(): Plugin {
 export default defineConfig({
   plugins: [vue(), updateLogPlugin()],
   test: {
-    // 仅扫描 src 下的测试，排除 code-libs/Frp 等第三方源码目录
+    // 仅扫描 src 下的测试，排除工作区内的第三方源码目录
     include: ['src/**/*.test.ts'],
   },
   define: {
@@ -74,7 +74,7 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
   },
   optimizeDeps: {
-    // 限定依赖预构建扫描入口，避免误扫 code-libs 等未安装依赖的目录
+    // 限定依赖预构建扫描入口，避免误扫工作区内未安装依赖的目录
     entries: ['index.html', 'src/main.ts'],
   },
   resolve: {

@@ -1,7 +1,7 @@
 /**
  * 配方槽位布局：背景图（各工作台 GUI 示意图）+ 槽位像素盒（696×292 坐标系）
  *
- * 背景图暂取自 Axolotl 项目（src/assets/Syn/*.png），仅作临时占位，后续自行替换
+ * 背景图暂为临时占位（src/assets/Syn/*.png），后续自行替换
  */
 import craftingImage from '../../../../assets/Syn/合成.png?url'
 import smeltingImage from '../../../../assets/Syn/熔炼.png?url'
