@@ -21,6 +21,7 @@ import { validateRecipe } from '../validation'
 import { createDatapackFiles, createPackMcmeta, sanitizeRecipeName } from '../datapack'
 import { generateRecipeJson, getCraftingGridValues } from '../recipe-engine'
 import { loadVersionItems, loadVersionTags } from '../resources'
+import { tagLabel } from '../tag-zh'
 import type { RecipeSlotContext, RecipeState } from '../types'
 
 function makeContext(): RecipeSlotContext {
@@ -390,5 +391,20 @@ describe('resources', () => {
     expect(keys.length).toBeGreaterThan(10)
     expect(keys).toContain('minecraft:planks')
     expect(tags['minecraft:planks'].length).toBeGreaterThan(0)
+  })
+})
+
+describe('tag-zh', () => {
+  it('labels every shipped vanilla tag with a Chinese name', async () => {
+    const tags = await loadVersionTags('26.2')
+    for (const id of Object.keys(tags)) {
+      const label = tagLabel(id)
+      expect(label).not.toBe('')
+      expect(label).not.toBe(id)
+    }
+  })
+
+  it('falls back to a readable name for unknown tags', () => {
+    expect(tagLabel('minecraft:foo_bar/baz')).toBe('Foo Bar / Baz')
   })
 })

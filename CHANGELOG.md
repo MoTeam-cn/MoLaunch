@@ -32,6 +32,8 @@
 
 - **配方抽屉内容限高自适应，并新增目标槽位说明**（[ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：抽屉内物品/标签调色板不再固定 28rem 高度，改为随抽屉内容区自适应填满（`flex:1; min-height:0`，虚拟滚动列表在抽屉内部滚动），展开抽屉不再把整页撑长、不再出现多余滚动条；抽屉顶部新增说明「您正在为「XX」选择物品」（如「第 3 格」「底材」），明确当前正在编辑的目标槽位。
 
+- **标签调色板重做：多标签成行 + 中文显示**（[tag-zh.ts](src/utils/recipe-generator/tag-zh.ts) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：标签不再一行一个英文 ID，改为每行 2 个标签成行展示（保留按行虚拟滚动）并新增「共 N 个标签」统计；新增内置标签中文名映射 `tag-zh.ts`（覆盖全部 235 个内置标签，未知标签回退为可读英文），调色板条目与已放入槽位的标签均显示中文名，搜索框同时支持中文名 / 英文 ID 匹配。
+
 ### Fixed
 
 - **修复配方物品/标签资源加载为空，抽屉只剩一个「default」标签**（[resources.ts](src/utils/recipe-generator/resources.ts)）：`import.meta.glob` 加载 JSON 资产时模块形状为 `{ default: <json> }`，此前直接 `await mod()` 导致物品列表始终为空、标签只读到一个 `default` 键——这正是抽屉里标签只有「default」、无法筛选的原因。现按项目约定取 `.default`（与 `aboutLogos` 一致），物品/标签正常加载；新增资源加载回归测试。

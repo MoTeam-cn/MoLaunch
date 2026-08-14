@@ -10,6 +10,7 @@ import { computed } from 'vue'
 import type { RecipeSlot, RecipeSlotContext, SlotValue } from '@/utils/recipe-generator/types'
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
 import { slotCaption } from '@/utils/recipe-generator/formatter'
+import { tagLabel } from '@/utils/recipe-generator/tag-zh'
 import RecipeItemIcon from './RecipeItemIcon.vue'
 
 const props = withDefaults(
@@ -54,7 +55,7 @@ function displayFor(value: SlotValue | undefined): Display | null {
       count: value.count ?? 1,
     }
   }
-  if (value.kind === 'vanilla_tag') return { texture: null, label: `#${value.id}`, count: 1 }
+  if (value.kind === 'vanilla_tag') return { texture: null, label: `#${tagLabel(value.id)}`, count: 1 }
   return {
     texture: null,
     label: `#${props.context.customTagsByUid[value.uid]?.id ?? '未知标签'}`,
