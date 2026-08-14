@@ -26,6 +26,8 @@
 
 - **创作工具页签打通可用高度链，子页各自内部滚动**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：CreationPage 根节点改为 `h-full` flex 纵向布局，子菜单固定顶部，内容区 `flex-1` 占满剩余高度；合成配方页签容器获得确定高度（供左右双栏布局填充），渐变文字页签保留 `p-6` 内边距并改由自身区域滚动，页面不再整体纵向拉长。
 
+- **合成配方生成器改为左右双栏布局，页面不再纵向拉长**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：原三栏（设置｜编辑+预览｜调色板）布局在 ≤1280px 窗口折叠为单列，内容被纵向拉长。现重写为「左：展示区（槽位编辑 + 校验提示 + JSON 预览）+ 右：功能区（配方设置 + 物品/标签调色板）」双栏并占满可用高度；JSON 预览与校验提示各自内部滚动，窄窗口（≤960px）下上下堆叠且两栏各自内部滚动，页面始终不再被拉长。
+
 ### Fixed
 
 - **合成配方页切换不再报 atlas 为空的 2 个 Vue prop 校验警告**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：首帧渲染时 `loading=false` 而 `atlas` 仍为 `null`，`v-else` 主体分支会把 `atlas!`（实际为 null）传给 RecipeSlotsEditor / ItemPalette 触发警告。现将 `loading` 初始值改为 `true`，资源加载完成前不渲染主体。

@@ -228,67 +228,10 @@ async function exportPack() {
       </div>
     </div>
 
-    <div v-if="loading" class="text-center py-10 text-sm text-gray-400">正在加载版本资源…</div>
+    <div v-if="loading" class="flex-1 flex items-center justify-center text-sm text-gray-400">正在加载版本资源…</div>
     <div v-else class="recipe-generator-body">
-      <!-- 左：设置 -->
-      <section class="recipe-panel recipe-settings">
-        <h3 class="recipe-panel-title">配方设置</h3>
-        <div class="recipe-form">
-          <label class="recipe-field">
-            <span class="recipe-field-label">目标版本</span>
-            <Select v-model="selectedVersion" :options="versionOptions" size="small" />
-          </label>
-          <label class="recipe-field">
-            <span class="recipe-field-label">配方类型</span>
-            <Select v-model="recipe.recipeType" :options="typeOptions" size="small" />
-          </label>
-          <label class="recipe-field">
-            <span class="recipe-field-label">配方名称</span>
-            <Input v-model="recipe.name" size="small" placeholder="文件名（自动清理非法字符）" />
-          </label>
-          <label v-if="recipe.recipeType !== 'smithing' && recipe.recipeType !== 'smithing_trim' && recipe.recipeType !== 'smithing_transform'" class="recipe-field">
-            <span class="recipe-field-label">分组</span>
-            <Input v-model="recipe.group" size="small" placeholder="可空" />
-          </label>
-          <label v-if="supportsRecipeCategory(selectedVersion, recipe.recipeType) && categoryOptions.length" class="recipe-field">
-            <span class="recipe-field-label">分类</span>
-            <Select v-model="recipe.category" :options="categoryOptions" size="small" />
-          </label>
-
-          <div v-if="recipe.recipeType === 'crafting'" class="recipe-checkbox-group">
-            <Checkbox v-model="recipe.crafting.shapeless">无序合成</Checkbox>
-            <Checkbox v-model="recipe.crafting.twoByTwo">2×2 网格</Checkbox>
-            <Checkbox v-model="recipe.crafting.keepWhitespace">保留空格</Checkbox>
-          </div>
-          <div v-if="isRecipeTypeAvailable(selectedVersion, recipe.recipeType) && (recipe.recipeType === 'smelting' || recipe.recipeType === 'blasting' || recipe.recipeType === 'smoking' || recipe.recipeType === 'campfire_cooking')" class="recipe-checkbox-group">
-            <label class="recipe-field-inline">
-              <span>经验</span>
-              <Input v-model.number="recipe.cooking.experience" type="number" size="small" min="0" step="0.1" />
-            </label>
-            <label class="recipe-field-inline">
-              <span>时长</span>
-              <Input
-                :model-value="recipe.cooking.time ?? ''"
-                type="number"
-                size="small"
-                min="1"
-                :placeholder="String(DEFAULT_COOKING_TIME[recipe.recipeType])"
-                @update:model-value="onCookingTimeChange"
-              />
-            </label>
-          </div>
-          <div v-if="recipe.recipeType === 'smithing_trim' && supportsSmithingTrimPattern(selectedVersion)" class="recipe-field">
-            <span class="recipe-field-label">纹饰图案</span>
-            <Input v-model="recipe.smithing.trimPattern" size="small" placeholder="minecraft:silence_armor_trim_smithing_template" />
-          </div>
-          <div v-if="supportsShowNotification(selectedVersion, recipe.recipeType, recipe.crafting.shapeless)" class="recipe-checkbox-group">
-            <Checkbox v-model="recipe.showNotification">显示完成通知</Checkbox>
-          </div>
-        </div>
-      </section>
-
-      <!-- 中：编辑 + 预览 -->
-      <section class="recipe-panel recipe-editor">
+      <!-- 左：展示区（槽位编辑 + 校验 + JSON 预览） -->
+      <section class="recipe-panel recipe-display">
         <RecipeSlotsEditor
           :slots="inputSlots"
           :grid-slots="gridSlots"
@@ -302,7 +245,7 @@ async function exportPack() {
           @update-count="updateCount"
         />
         <p class="text-xs text-gray-400">
-          从右侧选择物品自动填入第一个空格，点击格子可清除，结果槽滚轮调整数量
+          从右侧调色板选择物品自动填入第一个空格，点击格子可清除，结果槽滚轮调整数量
         </p>
 
         <div v-if="issues.length" class="recipe-issues">
@@ -324,40 +267,100 @@ async function exportPack() {
         </div>
       </section>
 
-      <!-- 右：调色板 -->
-      <aside class="recipe-panel recipe-palette">
-        <div class="recipe-palette-tabs">
-          <span
-            class="recipe-palette-tab"
-            :class="{ active: activeTab === 'items' }"
-            @click="activeTab = 'items'"
-          >物品</span>
-          <span
-            class="recipe-palette-tab"
-            :class="{ active: activeTab === 'tags' }"
-            @click="activeTab = 'tags'"
-          >标签</span>
-        </div>
-        <ItemPalette
-          v-if="activeTab === 'items'"
-          :items="items"
-          :atlas-url="atlasUrl"
-          :atlas="atlas!"
-          @pick="pickValue"
-        />
-        <TagPalette v-else :tags="tags" @pick="pickValue" />
-      </aside>
+      <!-- 右：功能区（配方设置 + 调色板） -->
+      <div class="recipe-functions">
+        <section class="recipe-panel recipe-settings">
+          <h3 class="recipe-panel-title">配方设置</h3>
+          <div class="recipe-form">
+            <label class="recipe-field">
+              <span class="recipe-field-label">目标版本</span>
+              <Select v-model="selectedVersion" :options="versionOptions" size="small" />
+            </label>
+            <label class="recipe-field">
+              <span class="recipe-field-label">配方类型</span>
+              <Select v-model="recipe.recipeType" :options="typeOptions" size="small" />
+            </label>
+            <label class="recipe-field">
+              <span class="recipe-field-label">配方名称</span>
+              <Input v-model="recipe.name" size="small" placeholder="文件名（自动清理非法字符）" />
+            </label>
+            <label v-if="recipe.recipeType !== 'smithing' && recipe.recipeType !== 'smithing_trim' && recipe.recipeType !== 'smithing_transform'" class="recipe-field">
+              <span class="recipe-field-label">分组</span>
+              <Input v-model="recipe.group" size="small" placeholder="可空" />
+            </label>
+            <label v-if="supportsRecipeCategory(selectedVersion, recipe.recipeType) && categoryOptions.length" class="recipe-field">
+              <span class="recipe-field-label">分类</span>
+              <Select v-model="recipe.category" :options="categoryOptions" size="small" />
+            </label>
+
+            <div v-if="recipe.recipeType === 'crafting'" class="recipe-checkbox-group">
+              <Checkbox v-model="recipe.crafting.shapeless">无序合成</Checkbox>
+              <Checkbox v-model="recipe.crafting.twoByTwo">2×2 网格</Checkbox>
+              <Checkbox v-model="recipe.crafting.keepWhitespace">保留空格</Checkbox>
+            </div>
+            <div v-if="isRecipeTypeAvailable(selectedVersion, recipe.recipeType) && (recipe.recipeType === 'smelting' || recipe.recipeType === 'blasting' || recipe.recipeType === 'smoking' || recipe.recipeType === 'campfire_cooking')" class="recipe-checkbox-group">
+              <label class="recipe-field-inline">
+                <span>经验</span>
+                <Input v-model.number="recipe.cooking.experience" type="number" size="small" min="0" step="0.1" />
+              </label>
+              <label class="recipe-field-inline">
+                <span>时长</span>
+                <Input
+                  :model-value="recipe.cooking.time ?? ''"
+                  type="number"
+                  size="small"
+                  min="1"
+                  :placeholder="String(DEFAULT_COOKING_TIME[recipe.recipeType])"
+                  @update:model-value="onCookingTimeChange"
+                />
+              </label>
+            </div>
+            <div v-if="recipe.recipeType === 'smithing_trim' && supportsSmithingTrimPattern(selectedVersion)" class="recipe-field">
+              <span class="recipe-field-label">纹饰图案</span>
+              <Input v-model="recipe.smithing.trimPattern" size="small" placeholder="minecraft:silence_armor_trim_smithing_template" />
+            </div>
+            <div v-if="supportsShowNotification(selectedVersion, recipe.recipeType, recipe.crafting.shapeless)" class="recipe-checkbox-group">
+              <Checkbox v-model="recipe.showNotification">显示完成通知</Checkbox>
+            </div>
+          </div>
+        </section>
+
+        <aside class="recipe-panel recipe-palette">
+          <div class="recipe-palette-tabs">
+            <span
+              class="recipe-palette-tab"
+              :class="{ active: activeTab === 'items' }"
+              @click="activeTab = 'items'"
+            >物品</span>
+            <span
+              class="recipe-palette-tab"
+              :class="{ active: activeTab === 'tags' }"
+              @click="activeTab = 'tags'"
+            >标签</span>
+          </div>
+          <ItemPalette
+            v-if="activeTab === 'items'"
+            :items="items"
+            :atlas-url="atlasUrl"
+            :atlas="atlas!"
+            @pick="pickValue"
+          />
+          <TagPalette v-else :tags="tags" @pick="pickValue" />
+        </aside>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .recipe-generator-page {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
   padding: 1rem;
-  min-height: 100%;
+  overflow: hidden;
 }
 
 .recipe-generator-header {
@@ -367,15 +370,18 @@ async function exportPack() {
 }
 
 .recipe-generator-body {
+  flex: 1;
+  min-height: 0;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1rem;
-  align-items: start;
+  overflow: hidden;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 960px) {
   .recipe-generator-body {
     grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
@@ -428,18 +434,21 @@ async function exportPack() {
   font-size: 0.8rem;
 }
 
-.recipe-editor {
+.recipe-display {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
+  overflow: hidden;
 }
 
 .recipe-issues {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  max-height: 6rem;
   padding: 0.5rem 0.75rem;
+  overflow-y: auto;
   border: 1px solid #ffd8cc;
   border-radius: 6px;
   background: #fff7e8;
@@ -451,6 +460,8 @@ async function exportPack() {
 }
 
 .recipe-preview {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -463,7 +474,8 @@ async function exportPack() {
 }
 
 .recipe-preview-code {
-  max-height: 20rem;
+  flex: 1;
+  min-height: 0;
   margin: 0;
   padding: 0.75rem;
   overflow: auto;
@@ -478,12 +490,36 @@ async function exportPack() {
 }
 
 .recipe-preview-empty {
-  padding: 2rem 0;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1px dashed #e5e6eb;
   border-radius: 6px;
   color: #86909c;
   font-size: 0.75rem;
   text-align: center;
+}
+
+.recipe-functions {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: hidden;
+}
+
+.recipe-settings {
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.recipe-palette {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .recipe-palette-tabs {
