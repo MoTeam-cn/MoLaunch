@@ -7,20 +7,18 @@
  * - 右侧：头部（ChatHeader，含模型选择/进度条）、消息列表（含技能调用条目）、输入区
  * - 弹窗：AskUserDialog（工具 ask_user 提问）、VersionPickerDialog（版本隔离开关下先选版本）
  */
-import { computed, ref, watch } from 'vue'
+import { ref, watch } from 'vue'
 import { CommandLineIcon, PaperAirplaneIcon, PaperClipIcon, PauseIcon, Squares2X2Icon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import { useAiChat } from '@/composables/useAiChat'
 import Button from '@/components/common/Button.vue'
 import Input from '@/components/common/Input.vue'
 import Tooltip from '@/components/common/Tooltip.vue'
-import ToolToc from '@/components/common/ToolToc.vue'
 import ChatConversationList from '@/components/experimental/ChatConversationList.vue'
 import ChatHeader from '@/components/experimental/ChatHeader.vue'
-import ChatMessageItem, { type LocalMessage } from '@/components/experimental/ChatMessageItem.vue'
+import ChatMessageItem from '@/components/experimental/ChatMessageItem.vue'
 import ToolCallEntry from '@/components/experimental/ToolCallEntry.vue'
 import AskUserDialog from '@/components/experimental/AskUserDialog.vue'
 import VersionPickerDialog from '@/components/experimental/VersionPickerDialog.vue'
-import { markdownToPlainText } from '@/utils/markdown'
 
 const c = useAiChat()
 
@@ -31,19 +29,6 @@ function onScroll() {
   const el = listRef.value
   if (el) c.setScrolledUp(el.scrollHeight - el.scrollTop - el.clientHeight > 64)
 }
-
-/** TOC 目录条目标题：取用户消息内容前 15 字预览（会话目录直接使用用户消息，无需模型生成摘要） */
-function tocTitle(msg: LocalMessage): string {
-  const plain = markdownToPlainText(msg.content).trim().replace(/\s+/g, ' ')
-  return plain.slice(0, 15) || '提问'
-}
-
-/** 触发 TOC 重新扫描：会话或消息集合变化时（含流式完成后刷新） */
-const tocRefreshKey = computed(() => {
-  const msgs = c.messages.value
-  const last = msgs[msgs.length - 1]
-  return c.activeId.value + ':' + msgs.length + ':' + (last ? last.id : 0)
-})
 
 watch(
   () => {
@@ -122,9 +107,6 @@ watch(
                     :calls="c.toolCallsByMessage.value[msg.id]"
                   />
                   <ChatMessageItem
-                    :id="msg.role === 'user' && msg.id > 0 ? `msg-${msg.id}` : undefined"
-                    :data-toc-card="msg.role === 'user' && msg.id > 0 ? `msg-${msg.id}` : undefined"
-                    :data-toc-title="msg.role === 'user' && msg.id > 0 ? tocTitle(msg) : undefined"
                     :message="msg"
                     :model="c.currentModel.value || null"
                     :busy="c.loading.value"
@@ -160,14 +142,6 @@ watch(
             </div>
           </Transition>
         </div>
-
-        <!-- 目录概览（TOC）：悬浮于消息区右侧，展示各条 AI 回复的摘要标签，点击快捷跳转 -->
-        <ToolToc
-          :refresh-key="tocRefreshKey"
-          container-selector="#experimental-chat-scroll"
-          :scroll-offset="16"
-          :min-items="2"
-        />
       </div>
 
       <!-- 输入区 -->

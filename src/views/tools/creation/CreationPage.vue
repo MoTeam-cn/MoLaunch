@@ -36,17 +36,12 @@ onMounted(() => {
     <!-- 顶部子菜单：外容器对 creation 分类不设 padding（与设置页 about 页签一致），菜单紧贴左上角，滚动时吸顶 -->
     <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
-    <!-- 内容区：p-6 由本组件提供；渐变文字根节点自带 data-toc-card -->
+    <!-- 内容区：p-6 由本组件提供；子工具锚点 id 保留供外部跳转 -->
     <div class="p-6">
       <div v-if="activeSubTab === 'gradient-text'" id="tool-gradient-text">
         <GradientTextPage />
       </div>
-      <div
-        v-else
-        id="tool-recipe-generator"
-        data-toc-card="tool-recipe-generator"
-        data-toc-title="合成配方"
-      >
+      <div v-else id="tool-recipe-generator">
         <RecipeGeneratorPage />
       </div>
     </div>

@@ -225,8 +225,6 @@ function randomColor() {
 
 <template>
   <section
-    data-toc-card="tool-gradient-text"
-    data-toc-title="渐变文字"
     class="rounded-lg border border-gray-300 bg-white overflow-hidden"
   >
     <!-- 标题 -->

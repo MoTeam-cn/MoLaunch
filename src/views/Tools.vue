@@ -11,7 +11,7 @@
  * / 创作工具 / Java 管理 / 诊断工具 / 游戏资源 / 种子地图 / 指令生成
  */
 
-import { ref, nextTick, watch } from 'vue'
+import { ref } from 'vue'
 import {
   ArrowDownTrayIcon,
   FaceSmileIcon,
@@ -41,7 +41,6 @@ import GameResourcePage from './tools/game-resource/GameResourcePage.vue'
 import SeedMapPage from './tools/seedmap/SeedMapPage.vue'
 import CreationPage from './tools/creation/CreationPage.vue'
 import CommandPage from './tools/command/CommandPage.vue'
-import ToolToc from '@/components/common/ToolToc.vue'
 import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
 import { hasAgreedToday } from '@/utils/disclaimer'
 
@@ -138,15 +137,6 @@ const activeCategory = ref<string>('fun-tools')
 /** 使用协议抽屉：当日未同意过工具协议时弹出（同意后存 localStorage，次日重新提醒） */
 const disclaimerVisible = ref(!hasAgreedToday('tools'))
 
-// 分类切换时递增，触发 ToolToc 重新扫描（含 NavSidebar 从 URL query.tab 恢复时）
-const tocRefreshKey = ref(0)
-
-watch(activeCategory, () => {
-  nextTick(() => {
-    tocRefreshKey.value++
-  })
-})
-
 const activeDesc = () =>
   categories.find((c) => c.id === activeCategory.value)?.desc ?? ''
 </script>
@@ -165,12 +155,12 @@ const activeDesc = () =>
         <p class="text-xs text-gray-500 mt-1">{{ activeDesc() }}</p>
       </div>
 
-      <!-- 内容区（滚动条保持在最右侧，TOC 悬浮不占布局） -->
+      <!-- 内容区（滚动条保持在最右侧） -->
       <div class="flex-1 relative overflow-hidden">
-        <!-- creation/command 分类子组件已自带 p-6 内边距（顶部子菜单需贴边），避免双重 padding，与设置页 about 页签一致 -->
+        <!-- 各分类页自带 SubTabBar + p-6（顶部子菜单需贴边）；仅直接在 Tools.vue 渲染的分类需要外层 p-6 -->
         <div
           class="h-full overflow-y-auto tools-scroll-container"
-          :class="activeCategory === 'creation' || activeCategory === 'command' ? '' : 'p-6'"
+          :class="['external-download', 'fun-tools', 'quick-tools'].includes(activeCategory) ? 'p-6' : ''"
         >
           <ExternalDownload v-if="activeCategory === 'external-download'" />
           <LuckyTool v-else-if="activeCategory === 'fun-tools'" />
@@ -186,8 +176,6 @@ const activeDesc = () =>
           <SeedMapPage v-else-if="activeCategory === 'seedmap'" />
           <CommandPage v-else-if="activeCategory === 'command'" />
         </div>
-        <!-- 右侧悬浮 TOC 导航条（工具数 ≥ 3 时自动显示，不跟随滚动） -->
-        <ToolToc :refresh-key="tocRefreshKey" :scroll-offset="20" />
       </div>
     </div>
 
