@@ -125,7 +125,7 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
         >
           <RecipeItemIcon
             v-if="displayFor(values[resultSlot])"
-            :texture="displayFor(values[resultSlot])?.texture"
+            :texture="displayFor(values[resultSlot])?.texture ?? null"
             :atlas-url="atlasUrl"
             :atlas="atlas"
             :size="38"

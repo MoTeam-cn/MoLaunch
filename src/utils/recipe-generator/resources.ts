@@ -33,7 +33,7 @@ const itemsGlob = import.meta.glob<VersionItemsManifest>('./assets/items/*.json'
 const tagsGlob = import.meta.glob<Record<string, string[]>>('./assets/tags/*.json')
 
 const atlasLayoutPromise = import('./assets/texture-atlas.json').then(
-  (m) => m.default as AtlasLayout,
+  (m) => m.default as unknown as AtlasLayout,
 )
 const atlasPngUrl = new URL('./assets/texture-atlas.png', import.meta.url).href
 

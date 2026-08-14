@@ -54,27 +54,29 @@ const TAG_VERSIONS = new Set<JavaVersionId>([
 ])
 
 /** 版本列表（新版在前，界面与导出按此顺序） */
-export const JAVA_VERSION_LIST: readonly JavaVersionMeta[] = [
-  '26.2',
-  '26.1',
-  '1.21.11',
-  '1.21.9',
-  '1.21.7',
-  '1.21.6',
-  '1.21.5',
-  '1.21.4',
-  '1.21.2',
-  '1.21',
-  '1.20',
-  '1.19',
-  '1.18',
-  '1.17',
-  '1.16',
-  '1.15',
-  '1.14',
-  '1.13',
-  '1.12',
-].map((id) => ({
+export const JAVA_VERSION_LIST: readonly JavaVersionMeta[] = (
+  [
+    '26.2',
+    '26.1',
+    '1.21.11',
+    '1.21.9',
+    '1.21.7',
+    '1.21.6',
+    '1.21.5',
+    '1.21.4',
+    '1.21.2',
+    '1.21',
+    '1.20',
+    '1.19',
+    '1.18',
+    '1.17',
+    '1.16',
+    '1.15',
+    '1.14',
+    '1.13',
+    '1.12',
+  ] as const
+).map((id) => ({
   id,
   ...metadata[id],
   hasVanillaTags: TAG_VERSIONS.has(id),

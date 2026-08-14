@@ -10,7 +10,7 @@ import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import Input from '@/components/common/Input.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
-import { Toast } from '@/components/common/Toast'
+import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 import {
   buildSlotContext,
   getAtlasLayout,
@@ -39,7 +39,7 @@ import {
   getInputSlots,
   getResultSlots,
 } from '@/utils/recipe-generator/formatter'
-import { validateRecipe, describeRecipeIssues } from '@/utils/recipe-generator/validation'
+import { validateRecipe } from '@/utils/recipe-generator/validation'
 import { exportRecipePack } from '@/utils/recipe-generator/exporter'
 import { sanitizeRecipeName } from '@/utils/recipe-generator/datapack'
 import type { JavaVersionId, RecipeSlot, RecipeSlotContext, RecipeState, SlotValue } from '@/utils/recipe-generator/types'
@@ -157,7 +157,7 @@ const recipeName = computed(() => (recipe.name.trim() ? recipe.name.trim() : 're
 function pickValue(value: SlotValue) {
   const target = inputSlots.value.find((slot) => !recipe.slots[slot])
   if (target) recipe.slots[target] = value
-  else Toast('合成格已填满，请先清除一些格子')
+  else toastInfo('合成格已填满，请先清除一些格子')
 }
 
 function updateSlot(slot: RecipeSlot, value: SlotValue | undefined) {
@@ -170,20 +170,25 @@ function updateCount(slot: RecipeSlot, count: number) {
   if (value && (value.kind === 'item' || value.kind === 'custom_item')) value.count = count
 }
 
+function onCookingTimeChange(value: string | number) {
+  const str = String(value).trim()
+  recipe.cooking.time = str === '' ? null : Number(str)
+}
+
 async function copyJson() {
   if (!recipeJsonText.value) return
   try {
     await navigator.clipboard.writeText(recipeJsonText.value)
-    Toast('配方 JSON 已复制到剪贴板')
+    toastSuccess('配方 JSON 已复制到剪贴板')
   } catch {
-    Toast('复制失败，请手动选择复制')
+    toastError('复制失败，请手动选择复制')
   }
 }
 
 const exporting = ref(false)
 async function exportPack() {
   if (!isValid.value || !recipeJson.value) {
-    Toast('请先修复校验问题')
+    toastInfo('请先修复校验问题')
     return
   }
   exporting.value = true
@@ -194,10 +199,10 @@ async function exportPack() {
       tags: [],
       defaultFileName: sanitizeRecipeName(recipeName.value, 'recipe'),
     })
-    if (result.ok) Toast(`已导出到 ${result.path}`)
-    else if (result.reason === 'cancelled') Toast('已取消导出')
-    else if (result.reason === 'unsupported') Toast('该版本不支持数据包，已改为单配方 JSON')
-    else Toast(`导出失败：${result.reason}`)
+    if (result.ok) toastSuccess(`已导出到 ${result.path}`)
+    else if (result.reason === 'cancelled') toastInfo('已取消导出')
+    else if (result.reason === 'unsupported') toastInfo('该版本不支持数据包，已改为单配方 JSON')
+    else toastError(`导出失败：${result.reason}`)
   } finally {
     exporting.value = false
   }
@@ -257,11 +262,12 @@ async function exportPack() {
             <label class="recipe-field-inline">
               <span>时长</span>
               <Input
-                v-model.number="recipe.cooking.time"
+                :model-value="recipe.cooking.time ?? ''"
                 type="number"
                 size="small"
                 min="1"
                 :placeholder="String(DEFAULT_COOKING_TIME[recipe.recipeType])"
+                @update:model-value="onCookingTimeChange"
               />
             </label>
           </div>

@@ -13,7 +13,7 @@ const props = withDefaults(
     size?: number
     label?: string
   }>(),
-  { size: 32 },
+  { size: 32, label: '' },
 )
 
 const region = computed(() => (props.texture ? props.atlas.layout[props.texture] : undefined))

@@ -1,10 +1,10 @@
 /**
  * 合成配方生成器 - 校验（问题码 + 中文提示）
  */
-import type { JavaVersionId, RecipeSlotContext, RecipeState, RecipeType } from './types'
+import type { JavaVersionId, RecipeSlotContext, RecipeState } from './types'
 import { isRecipeTypeAvailable, supportsItemTags, supportsSmithingTrimPattern } from './versions'
 import { parseIdentifier } from './identifier'
-import { getInputSlots, getResultSlots, resolveItemId, resolveTagId } from './formatter'
+import { getInputSlots, getResultSlots } from './formatter'
 
 export const RECIPE_ISSUE_CODES = [
   'unsupported-type',

@@ -14,8 +14,7 @@ import {
   supportsShowNotification,
   supportsSmithingTrimPattern,
 } from './versions'
-import type { JavaVersionId } from './types'
-import type { RecipeSlotContext, RecipeState, RecipeType, SlotValue } from './types'
+import type { JavaVersionId, RecipeSlot, RecipeSlotContext, RecipeState, RecipeType, SlotValue } from './types'
 import { itemRefToString, parseIdentifier } from './identifier'
 
 export type FormatterStrategy = 'legacy' | 'object' | 'id-result' | 'string'
@@ -168,7 +167,7 @@ export function getCraftingCells(state: RecipeState): (SlotValue | null)[] {
   const size = state.crafting.twoByTwo ? 2 : 3
   const cells: (SlotValue | null)[] = []
   for (let index = 0; index < size * size; index += 1) {
-    cells.push(state.slots[`crafting.${index + 1}`] ?? null)
+    cells.push(state.slots[`crafting.${index + 1}` as RecipeSlot] ?? null)
   }
   return cells
 }
@@ -176,7 +175,7 @@ export function getCraftingCells(state: RecipeState): (SlotValue | null)[] {
 /** 计算 pattern（keepWhitespace 时保留完整网格；否则裁剪空行空列），并建立 key -> 槽位值 */
 export function buildCraftingPattern(
   state: RecipeState,
-  context: RecipeSlotContext,
+  _context: RecipeSlotContext,
 ): { pattern: string[]; keys: { char: string; value: SlotValue }[] } {
   const size = state.crafting.twoByTwo ? 2 : 3
   const cells = getCraftingCells(state)
