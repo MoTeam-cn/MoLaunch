@@ -102,6 +102,8 @@ function pick(item: AssetItem) {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
   padding: 0.75rem;
 }
 
@@ -116,7 +118,8 @@ function pick(item: AssetItem) {
 }
 
 .item-palette-grid {
-  height: 28rem;
+  flex: 1;
+  min-height: 0;
   padding-right: 2px;
 }
 

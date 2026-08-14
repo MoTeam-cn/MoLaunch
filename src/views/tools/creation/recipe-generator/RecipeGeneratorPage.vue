@@ -176,6 +176,12 @@ const drawerTitle = computed(() => {
   return editingSlot.value.startsWith('crafting.') ? `选择物品（第 ${label} 格）` : `选择${label}`
 })
 
+const drawerHint = computed(() => {
+  if (!editingSlot.value) return ''
+  const label = slotCaption(editingSlot.value)
+  return editingSlot.value.startsWith('crafting.') ? `第 ${label} 格` : label
+})
+
 watch(drawerVisible, (visible) => {
   if (!visible) editingSlot.value = null
 })
@@ -367,6 +373,7 @@ async function exportPack() {
       :esc-to-close="true"
     >
       <div class="recipe-drawer-palette">
+        <p class="recipe-drawer-hint">您正在为「{{ drawerHint }}」选择物品</p>
         <div class="recipe-palette-tabs">
           <span
             class="recipe-palette-tab"
@@ -527,6 +534,13 @@ async function exportPack() {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  height: 100%;
+  min-height: 0;
+}
+
+.recipe-drawer-hint {
+  color: #86909c;
+  font-size: 0.75rem;
 }
 
 .recipe-palette-tabs {

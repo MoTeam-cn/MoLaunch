@@ -68,11 +68,14 @@ function pick(id: string) {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+  flex: 1;
+  min-height: 0;
   padding: 0.75rem;
 }
 
 .tag-palette-list {
-  height: 28rem;
+  flex: 1;
+  min-height: 0;
   padding-right: 2px;
 }
 
