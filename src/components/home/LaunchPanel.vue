@@ -82,7 +82,10 @@ async function handleLaunch() {
     })
     toastSuccess('游戏已启动')
   } catch (e) {
-    toastError('启动失败：' + String(e))
+    // 用户主动取消启动：已在取消时提示「已取消启动」，不再弹「启动失败」
+    if (!String(e).includes('启动已取消')) {
+      toastError('启动失败：' + String(e))
+    }
   }
 }
 </script>

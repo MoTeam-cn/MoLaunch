@@ -1,5 +1,6 @@
 //! LaunchPipeline 结构体与基础方法（进度 / 状态查询 / 取消 / 停止）
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
@@ -16,7 +17,7 @@ pub struct LaunchPipeline {
     pub(super) progress: Arc<RwLock<LaunchProgress>>,
     #[allow(dead_code)]
     pub(super) current_stage: Arc<Mutex<LaunchStage>>,
-    pub(super) cancel_flag: Arc<Mutex<bool>>,
+    pub(super) cancel_flag: Arc<AtomicBool>,
     pub(super) watcher: Arc<Mutex<Option<GameWatcher>>>,
     pub(super) child_process: ChildProcessHandle,
 }
@@ -33,7 +34,7 @@ impl LaunchPipeline {
                 message: "初始化中...".to_string(),
             })),
             current_stage: Arc::new(Mutex::new(LaunchStage::Init)),
-            cancel_flag: Arc::new(Mutex::new(false)),
+            cancel_flag: Arc::new(AtomicBool::new(false)),
             watcher: Arc::new(Mutex::new(None)),
             child_process: Arc::new(Mutex::new(None)),
         }
@@ -108,6 +109,11 @@ impl LaunchPipeline {
 
     /// 取消启动
     pub async fn cancel(&self) {
-        *self.cancel_flag.lock().await = true;
+        self.cancel_flag.store(true, Ordering::SeqCst);
+    }
+
+    /// 是否已请求取消（供下载/文件校验等耗时环节快速中止）
+    pub(super) fn is_cancelled(&self) -> bool {
+        self.cancel_flag.load(Ordering::SeqCst)
     }
 }

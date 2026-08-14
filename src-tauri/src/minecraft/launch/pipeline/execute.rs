@@ -57,7 +57,7 @@ impl LaunchPipeline {
         );
 
         // 检查取消
-        if *self.cancel_flag.lock().await {
+        if self.is_cancelled() {
             return Err(LaunchError {
                 stage: LaunchStage::Init,
                 message: "启动已取消".to_string(),
@@ -73,7 +73,7 @@ impl LaunchPipeline {
             .await;
 
         // 检查取消
-        if *self.cancel_flag.lock().await {
+        if self.is_cancelled() {
             return Err(LaunchError {
                 stage: LaunchStage::GetJava,
                 message: "启动已取消".to_string(),
@@ -89,7 +89,7 @@ impl LaunchPipeline {
             .await;
 
         // 检查取消
-        if *self.cancel_flag.lock().await {
+        if self.is_cancelled() {
             return Err(LaunchError {
                 stage: LaunchStage::ValidateFiles,
                 message: "启动已取消".to_string(),
@@ -105,7 +105,7 @@ impl LaunchPipeline {
             .await;
 
         // 检查取消
-        if *self.cancel_flag.lock().await {
+        if self.is_cancelled() {
             return Err(LaunchError {
                 stage: LaunchStage::BuildArgs,
                 message: "启动已取消".to_string(),

@@ -141,7 +141,11 @@ export function useLaunchState() {
       return pid
     } catch (e) {
       console.error('Failed to launch game:', e)
-      toastError(e instanceof Error ? e.message : String(e))
+      // 用户主动取消启动：调用方已提示「已取消启动」，此处不再重复弹错误
+      const msg = e instanceof Error ? e.message : String(e)
+      if (!msg.includes('启动已取消')) {
+        toastError(msg)
+      }
       throw e
     } finally {
       stopProgressListener()

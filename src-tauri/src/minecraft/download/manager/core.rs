@@ -132,7 +132,7 @@ impl DownloadManager {
     }
 
     /// 检查是否已取消
-    fn is_cancelled(&self) -> bool {
+    pub(crate) fn is_cancelled(&self) -> bool {
         self.cancel_flag
             .as_ref()
             .map(|f| f.load(std::sync::atomic::Ordering::Relaxed))

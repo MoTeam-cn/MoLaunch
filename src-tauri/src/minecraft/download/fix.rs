@@ -32,6 +32,11 @@ pub async fn fix_version_files(
     // merge_version_json 会处理父版本不存在的情况（容错机制）
     let merged_json = json_merge::merge_version_json(&json, game_dir)?;
 
+    // 取消检查：取消后立即中止后续阶段，避免继续扫描/下载
+    if manager.is_cancelled() {
+        return Err(anyhow::anyhow!("下载已取消"));
+    }
+
     // 1. 下载主 jar（client.jar）
     // 修复：传原始 json 给 download_client_jar（含 inheritsFrom，用于判断 jar 路径）
     // 之前只传 merged_json，但 merge_version_json 会移除 inheritsFrom，
@@ -53,6 +58,11 @@ pub async fn fix_version_files(
         );
     }
 
+    // 取消检查
+    if manager.is_cancelled() {
+        return Err(anyhow::anyhow!("下载已取消"));
+    }
+
     // 2. 下载 Libraries（启动时用快速检查模式）
     // 启动时的文件补全：使用快速检查模式（只检查文件存在 + 大小，不计算 SHA1）
     // 启动时只构建 classpath，不做哈希校验，避免每次启动卡顿
@@ -66,6 +76,11 @@ pub async fn fix_version_files(
         true, // quick_check
     )
     .await?;
+
+    // 取消检查
+    if manager.is_cancelled() {
+        return Err(anyhow::anyhow!("下载已取消"));
+    }
 
     // 3. 下载 Assets（启动时用快速检查模式）
     let _ = download_assets(

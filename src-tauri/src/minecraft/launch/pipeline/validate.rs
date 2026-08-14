@@ -30,6 +30,16 @@ impl LaunchPipeline {
             panel_counter: None,
         };
         crate::minecraft::download::manager::DownloadManager::from_config(&download_config)
+            .with_cancel_flag(self.cancel_flag.clone())
+    }
+
+    /// 校验阶段取消错误（与 execute 阶段间检查保持同一提示文案）
+    fn cancelled_error() -> LaunchError {
+        LaunchError {
+            stage: LaunchStage::ValidateFiles,
+            message: "启动已取消".to_string(),
+            is_user_facing: true,
+        }
     }
 
     /// 检查文件完整性并自动补全
@@ -72,21 +82,37 @@ impl LaunchPipeline {
                     is_user_facing: false,
                 })?;
 
+        // 取消检查
+        if self.is_cancelled() {
+            return Err(Self::cancelled_error());
+        }
+
         self.update_progress(LaunchStage::ValidateFiles, 0.4, "正在检查并补全文件...")
             .await;
 
         // 用 LaunchConfig 中的下载参数构造 DownloadManager（build_launch_config 已从全局 config 填充）
         // 替代之前硬编码的 8/4/0/Smart，用户设置的限速/分片/线程数现在对启动时文件补全也生效
+        // 接入 cancel_flag：下载任务可感知停止启动并立即中止
         let manager = self.download_manager();
 
-        crate::minecraft::download::fix_version_files(
+        // 取消检查
+        if self.is_cancelled() {
+            return Err(Self::cancelled_error());
+        }
+
+        let fix_result = crate::minecraft::download::fix_version_files(
             &self.config.version_id,
             &self.config.game_dir,
             self.config.mirror_url.as_deref(),
             &manager,
         )
-        .await
-        .map_err(|e| LaunchError {
+        .await;
+
+        // 取消优先：无论补全结果如何，只要已请求取消就以「启动已取消」快速返回
+        if self.is_cancelled() {
+            return Err(Self::cancelled_error());
+        }
+        fix_result.map_err(|e| LaunchError {
             stage: LaunchStage::ValidateFiles,
             message: format!("文件补全失败: {}", e),
             is_user_facing: true,
