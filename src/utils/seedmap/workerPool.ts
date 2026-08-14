@@ -10,6 +10,7 @@ import type {
   BiomeAtPointParams,
   WorkerStructure, WorkerToMainMsg,
 } from './types'
+import type { WasmBundle } from '@/utils/wasm-loader'
 
 interface JobResolver<T = unknown> {
   resolve: (value?: T) => void
@@ -62,10 +63,9 @@ export class WorkerPool {
 
   /**
    * 初始化 WorkerPool：创建 N 个 Worker 并并行 init
-   * @param wasmJsUrl Emscripten cubiomes.js 的 URL
-   * @param wasmUrl cubiomes.wasm 的 URL
+   * @param bundle 主线程缓存的胶水 JS + WASM 二进制（各 Worker 通过 postMessage 共享，不再各自 fetch）
    */
-  async init(wasmJsUrl: string, wasmUrl: string): Promise<void> {
+  async init(bundle: WasmBundle): Promise<void> {
     if (this.disposed) throw new Error('WorkerPool 已 dispose')
     const count = this.plannedCount
     const initPromises: Promise<void>[] = []
@@ -94,7 +94,15 @@ export class WorkerPool {
         // （之前用 '__init__' 固定 key，但 init 消息无 jobId，Worker 内 catch 不会 postError，导致失败被吞）
         handle.pending.set(jobId, { resolve: () => resolve(), reject })
       })
-      worker.postMessage({ type: 'init', jobId, wasmJsUrl, wasmUrl, seedEpoch: 0 })
+      worker.postMessage({
+        type: 'init',
+        jobId,
+        wasmJsUrl: bundle.wasmJsUrl,
+        wasmUrl: bundle.wasmUrl,
+        wasmJsCode: bundle.jsCode,
+        wasmBytes: bundle.wasmBytes,
+        seedEpoch: 0,
+      })
       initPromises.push(initPromise)
     }
     await Promise.all(initPromises)

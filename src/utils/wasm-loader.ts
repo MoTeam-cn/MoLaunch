@@ -110,3 +110,46 @@ export async function loadWasmBytes(
 export function prefetchWasmUrl(filename: string, type = 'wasm'): string {
   return resUrl(filename, type)
 }
+
+/** Emscripten 胶水 JS + WASM 二进制（种子地图 Worker 初始化用） */
+export interface WasmBundle {
+  /** 胶水 JS 代码文本（cubiomes.js） */
+  jsCode: string
+  /** WASM 二进制（cubiomes.wasm） */
+  wasmBytes: ArrayBuffer
+  /** 胶水 JS 的 res:// URL（回退与日志用） */
+  wasmJsUrl: string
+  /** WASM 的 res:// URL（Emscripten locateFile 回退用） */
+  wasmUrl: string
+}
+
+/** 主线程缓存：同一份胶水 JS + WASM 只 fetch 一次，Worker 通过 postMessage 共享字节 */
+const bundleCache = new Map<string, Promise<WasmBundle>>()
+
+/**
+ * 获取 Emscripten 胶水 JS + WASM 二进制（主线程缓存，Worker 不再各自 fetch）
+ *
+ * 每次进入页面重复创建 Worker 时，由主线程先把字节拉取一次并缓存，
+ * init 消息携带字节传给各 Worker，避免每个 Worker 都走一次 res:// 加载。
+ *
+ * @param jsFilename 胶水 JS 文件名（如 'cubiomes.js'），wasm 取同名 .wasm
+ * @param type 资源类型子目录（默认 'wasm'）
+ */
+export function getWasmBundle(jsFilename: string, type = 'wasm'): Promise<WasmBundle> {
+  const wasmFilename = jsFilename.replace(/\.js$/, '.wasm')
+  const key = `${type}/${jsFilename}`
+  let cached = bundleCache.get(key)
+  if (!cached) {
+    cached = (async () => {
+      const wasmJsUrl = resUrl(jsFilename, type)
+      const wasmUrl = resUrl(wasmFilename, type)
+      const [jsResp, wasmBytes] = await Promise.all([fetch(wasmJsUrl), loadWasmBytes(wasmFilename, type)])
+      if (!jsResp.ok) {
+        throw new Error(`加载 ${jsFilename} 失败: HTTP ${jsResp.status}`)
+      }
+      return { jsCode: await jsResp.text(), wasmBytes, wasmJsUrl, wasmUrl }
+    })()
+    bundleCache.set(key, cached)
+  }
+  return cached
+}

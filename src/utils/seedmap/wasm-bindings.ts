@@ -80,13 +80,22 @@ export async function initModule(msg: InitMsg): Promise<void> {
     return
   }
 
-  const [jsResp, wasmResp] = await Promise.all([
-    fetch(msg.wasmJsUrl),
-    fetch(msg.wasmUrl),
-  ])
-  if (!jsResp.ok) throw new Error(`加载 cubiomes.js 失败: HTTP ${jsResp.status}`)
-  if (!wasmResp.ok) throw new Error(`加载 cubiomes.wasm 失败: HTTP ${wasmResp.status}`)
-  const [jsCode, wasmBinary] = await Promise.all([jsResp.text(), wasmResp.arrayBuffer()])
+  // 优先使用主线程缓存并通过 postMessage 传入的字节（各 Worker 共享，不再各自 fetch）；
+  // 无缓存时回退到按 URL fetch（兼容独立调用场景）
+  let jsCode: string
+  let wasmBinary: ArrayBuffer
+  if (msg.wasmJsCode && msg.wasmBytes) {
+    jsCode = msg.wasmJsCode
+    wasmBinary = msg.wasmBytes
+  } else {
+    const [jsResp, wasmResp] = await Promise.all([
+      fetch(msg.wasmJsUrl),
+      fetch(msg.wasmUrl),
+    ])
+    if (!jsResp.ok) throw new Error(`加载 cubiomes.js 失败: HTTP ${jsResp.status}`)
+    if (!wasmResp.ok) throw new Error(`加载 cubiomes.wasm 失败: HTTP ${wasmResp.status}`)
+    ;[jsCode, wasmBinary] = await Promise.all([jsResp.text(), wasmResp.arrayBuffer()])
+  }
 
   const factoryFn = new Function(jsCode + '\nreturn createCubiomesModule;')
   const factory = factoryFn()

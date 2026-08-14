@@ -18,10 +18,14 @@ export interface InitMsg {
   type: 'init'
   /** init 任务 ID（用于错误转发：init 失败时 Worker 通过 error 消息回传 jobId） */
   jobId: string
-  /** Emscripten 胶水代码 cubiomes.js 的 res:// URL */
+  /** Emscripten 胶水代码 cubiomes.js 的 res:// URL（无 wasmJsCode 时回退 fetch） */
   wasmJsUrl: string
   /** cubiomes.wasm 的 res:// URL */
   wasmUrl: string
+  /** 主线程缓存的胶水 JS 文本（优先使用，避免每个 Worker 重复 fetch） */
+  wasmJsCode?: string
+  /** 主线程缓存的 WASM 二进制（优先使用） */
+  wasmBytes?: ArrayBuffer
   /** 初始 seedEpoch（通常 0） */
   seedEpoch: number
 }

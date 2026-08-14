@@ -9,7 +9,7 @@ import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { getStructIcon, getStructIconUrl } from '@/utils/seedmap/constants'
 import { WorkerPool } from '@/utils/seedmap/workerPool'
-import { resUrl } from '@/utils/wasm-loader'
+import { getWasmBundle } from '@/utils/wasm-loader'
 import { formatCoord, copyToClipboard } from '@/utils/seedmap/format'
 import { getStructuresForVersion } from '@/utils/seedmap/structures'
 import type { Dimension, WorkerStructure } from '@/utils/seedmap/types'
@@ -265,7 +265,7 @@ export function useSeedMap() {
     initMap()
     try {
       pool = new WorkerPool()
-      await pool.init(resUrl('cubiomes.js'), resUrl('cubiomes.wasm'))
+      await pool.init(await getWasmBundle('cubiomes.js'))
       await loadSeed(DEFAULT_SEED)
     } catch (e) {
       toastError('WorkerPool 初始化失败: ' + (e instanceof Error ? e.message : String(e)))
