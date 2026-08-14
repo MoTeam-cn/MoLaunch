@@ -6,8 +6,8 @@ use tauri::AppHandle;
 
 use super::types::*;
 use super::{
-    archive, cleanup, crash_analyzer, data_export, download, filename, memory, mod_tools, nbt,
-    network, picker_window, resourcepack, screenshot, version_json,
+    archive, cleanup, crash_analyzer, download, filename, memory, mod_tools, nbt, network,
+    picker_window, resourcepack, screenshot, version_json,
 };
 use crate::handler;
 use crate::state::AppState;
@@ -96,16 +96,6 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             let p: ModDedupScanParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             mod_tools::mod_dedup_scan(&state, p).await
-        }),
-    );
-
-    // 启动器数据导出
-    d.register(
-        "export_launcher_data",
-        handler!(state, _app, params, {
-            let p: ExportLauncherDataParams =
-                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            data_export::export_launcher_data(&state, p).await
         }),
     );
 
@@ -260,6 +250,16 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             let p: NbtParseParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             nbt::parse(&state, p).await
+        }),
+    );
+
+    // 合成配方生成器：数据包 zip 打包导出
+    d.register(
+        "recipe_generator_export",
+        handler!(_state, _app, params, {
+            let p: RecipeGeneratorExportParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            recipe_generator::export_datapack(p)
         }),
     );
 

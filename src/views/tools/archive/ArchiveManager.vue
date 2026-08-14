@@ -6,7 +6,7 @@
  * - 备份：将存档打包为 zip（可选排除玩家数据）
  * - 恢复：从 zip 解压到 saves/ 目录
  * 默认扫全局 {game_dir}/saves/，可选具体版本按版本隔离配置解析路径。
- * 备份/恢复路径通过 Input 手动填写（与 DataExporter 一致）。
+ * 备份/恢复路径通过 Input 手动填写。
  *
  * 子组件拆分（避免主文件超 300 行）：
  * - ArchiveBackupDialog：备份弹窗（target/downloadDir/versionId → close）

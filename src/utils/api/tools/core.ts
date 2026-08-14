@@ -43,8 +43,6 @@ export const TOOLS_ACTIONS = {
   MOD_DEPENDENCY_CHECK: 'mod_dependency_check',
   // Mod 去重扫描
   MOD_DEDUP_SCAN: 'mod_dedup_scan',
-  // 启动器数据导出
-  EXPORT_LAUNCHER_DATA: 'export_launcher_data',
   // 崩溃日志分析
   CRASH_ANALYZE: 'crash_analyze',
   // 截图批量管理

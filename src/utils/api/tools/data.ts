@@ -1,36 +1,11 @@
 /**
- * 工具模块 - 数据类工具（导出 / 崩溃分析 / 截图 / 资源包 / 版本 JSON / NBT）
+ * 工具模块 - 数据类工具（崩溃分析 / 截图 / 资源包 / 版本 JSON / NBT）
  *
- * 对应后端 `tools_manager` 的 export_launcher_data / crash_analyze / screenshot_* /
+ * 对应后端 `tools_manager` 的 crash_analyze / screenshot_* /
  * resourcepack_* / version_json_* / nbt_parse action。
  */
 
 import { TOOLS_ACTIONS, toolsManager } from './core'
-
-// ==================== 启动器数据导出 ====================
-
-/** 启动器数据导出请求参数 */
-export interface ExportLauncherDataParams {
-  /** 导出 zip 的完整路径 */
-  output_path: string
-  include_config: boolean
-  include_versions: boolean
-  include_accounts: boolean
-}
-
-/** 启动器数据导出结果 */
-export interface ExportResult {
-  success: boolean
-  file_path: string
-  file_size: number
-  /** 导出的数据类型（"config" / "versions" / "accounts"） */
-  exported_items: string[]
-}
-
-/** 启动器数据导出 */
-export function exportLauncherData(params: ExportLauncherDataParams): Promise<ExportResult> {
-  return toolsManager<ExportResult>(TOOLS_ACTIONS.EXPORT_LAUNCHER_DATA, params)
-}
 
 // ==================== 崩溃日志分析 ====================
 
