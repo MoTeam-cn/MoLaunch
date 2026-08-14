@@ -33,11 +33,11 @@ onMounted(() => {
 
 <template>
   <div>
-    <!-- 顶部子菜单：-mx-6 -mt-6 抵消工具页滚动容器 p-6 内边距，紧贴左上角（sticky 吸顶） -->
-    <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky class="-mx-6 -mt-6" />
+    <!-- 顶部子菜单：外容器对 creation 分类不设 padding（与设置页 about 页签一致），菜单紧贴左上角，滚动时吸顶 -->
+    <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
-    <div class="pt-4">
-      <!-- 内容区：按当前子页签渲染（渐变文字根节点自带 data-toc-card） -->
+    <!-- 内容区：p-6 由本组件提供；渐变文字根节点自带 data-toc-card -->
+    <div class="p-6">
       <div v-if="activeSubTab === 'gradient-text'" id="tool-gradient-text">
         <GradientTextPage />
       </div>

@@ -159,7 +159,11 @@ const activeDesc = () =>
 
       <!-- 内容区（滚动条保持在最右侧，TOC 悬浮不占布局） -->
       <div class="flex-1 relative overflow-hidden">
-        <div class="h-full overflow-y-auto p-6 tools-scroll-container">
+        <!-- creation 分类子组件已自带 p-6 内边距（顶部子菜单需贴边），避免双重 padding，与设置页 about 页签一致 -->
+        <div
+          class="h-full overflow-y-auto tools-scroll-container"
+          :class="activeCategory === 'creation' ? '' : 'p-6'"
+        >
           <ExternalDownload v-if="activeCategory === 'external-download'" />
           <LuckyTool v-else-if="activeCategory === 'fun-tools'" />
           <QuickTools v-else-if="activeCategory === 'quick-tools'" />

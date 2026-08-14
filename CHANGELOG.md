@@ -20,7 +20,7 @@
 
 - **合成配方调色板改为虚拟滚动，滑动不再卡顿**（[ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue)）：物品调色板最多 1180 个条目、标签调色板同样量大，此前一次性渲染全部 DOM，滚动与输入搜索明显卡顿。现复用项目已内置的 `vue-virtual-scroller`（`RecycleScroller`）只渲染可视区条目（物品按 4 列一行虚拟化，标签按行虚拟化），列表高度行为保持不变。
 
-- **创作工具顶部子菜单紧贴页面左上角**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：此前子菜单距离顶部与左侧各有 24px 内边距（来自工具页滚动容器 `p-6`），现用负外边距 `-mx-6 -mt-6` 抵消容器内边距，与设置页一致紧贴左上角，滚动时仍 sticky 吸顶。
+- **创作工具顶部子菜单紧贴页面左上角**（[Tools.vue](src/views/Tools.vue) / [CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：此前子菜单距离顶部与左侧各有 24px 内边距（来自工具页滚动容器 `p-6`），且负外边距方案受 margin collapse 影响顶部始终无法贴边。现采用与设置页 about 页签完全相同的方案——工具页外容器对 creation 分类不设 padding，由 CreationPage 自带 `p-6`，顶部子菜单渲染在 padding 之外紧贴左上角，滚动时仍 sticky 吸顶。
 
 - **创作工具分类页改为顶部子菜单切换**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：渐变文字生成器与合成配方生成器此前垂直叠加一页放不下，现复用设置页同款 `SubTabBar` 顶部菜单栏（sticky 吸顶、带图标），每次只渲染当前工具；支持 `?subtab=` 深链直达指定工具，`#tool-gradient-text` / `#tool-recipe-generator` 目录锚点保留。
 
