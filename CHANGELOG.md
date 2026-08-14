@@ -24,6 +24,8 @@
 
 ### Fixed
 
+- **合成配方页切换不再报 atlas 为空的 2 个 Vue prop 校验警告**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：首帧渲染时 `loading=false` 而 `atlas` 仍为 `null`，`v-else` 主体分支会把 `atlas!`（实际为 null）传给 RecipeSlotsEditor / ItemPalette 触发警告。现将 `loading` 初始值改为 `true`，资源加载完成前不渲染主体。
+
 - **合成配方生成器界面全中文化**（[versions.ts](src/utils/recipe-generator/versions.ts) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：配方类型下拉由英文 ID 改为中文（合成/熔炼/高炉烧炼/烟熏/营火烹饪/切石/锻造/纹饰锻造/锻造转换），分类下拉改为中文（装备/建筑/杂物/红石/食物/方块），页头副标题、分组/分类标签、文件名占位符改为中文；物品调色板条目主文案改显中文名（英文 ID 保留在悬停提示），非合成类槽位下方英文标题（ingredient/template/base/addition）改为原料/模板/底材/材料。
 
 - **合成配方生成器：修复物品图标图集切割错位**（[RecipeItemIcon.vue](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)）：此前背景图直接按图集原始尺寸（2048×528）平铺，而槽位/调色板图标元素为 30～38px，16×16 紧密排列的贴图会一个格子露出相邻 2 个甚至 2×2 个。现按「元素尺寸 / 贴图区域宽度」等比放大背景尺寸与偏移，每个图标只显示其对应的单个贴图。

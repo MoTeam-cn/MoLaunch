@@ -114,7 +114,8 @@ const items = ref<AssetItem[]>([])
 const tags = ref<Record<string, string[]>>({})
 const atlas = ref<AtlasLayout | null>(null)
 const atlasUrl = ref('')
-const loading = ref(false)
+// 初始为 true：避免首帧渲染时 atlas 仍为 null，把空对象传给子组件触发 prop 校验警告
+const loading = ref(true)
 const activeTab = ref<'items' | 'tags'>('items')
 
 const context = computed<RecipeSlotContext>(() => buildSlotContext(items.value, tags.value))
