@@ -46,6 +46,8 @@
 
 ### Fixed
 
+- **修复配方生成器结果槽点击无响应、非合成类型仍显示九字格**（[RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [formatter.ts](src/utils/recipe-generator/formatter.ts)）：① 结果槽此前被 `slot !== resultSlot` 判断排除在点击编辑之外，空结果槽点击无反应（页面却提示「缺少配方产物」），现允许点击结果槽打开物品抽屉选择产物（已填点击仍为清除、滚轮调数量不变）；② `gridSlots` 此前对任何配方类型都返回 3×3 网格槽，导致熔炼/切石/锻造等类型仍显示九字格，现仅合成配方返回网格，其余类型走「一行输入槽 + 结果槽」布局（行模式此前漏渲染结果槽，现补齐并带「产物」标题）；③ 抽屉标题/槽位标签为结果槽显示「产物」，修复点击结果槽时显示「第 产物 格」的问题；④ 结果槽选完物品直接关闭抽屉，不再跳转到输入槽。
+
 - **修复配方物品图标缺失与床图标错用羊毛**（[generate.mjs](scripts/generate-recipe-assets/generate.mjs)）：三类成因逐一修复——① 上游 minecraft-assets 的 items_textures 把各色床错误映射为对应羊毛贴图，现静态覆写为官方床实体贴图 `entity/bed/<color>`（含 1.12 旧版床）；② 1.21.9+ 起 items_textures 删除指南针条目但贴图文件仍在，覆写为 `items/compass_16`；③ 26.2「Chaos Cubed」新增的朱砂/硫黄方块族（26 个）与金蒲公英，minecraft-assets 尚未收录，现从 Mojang 官方 26.2 客户端 jar 提取 9 张基础方块纹理（台阶/楼梯/墙复用基础纹理，与既有 slab/stairs 映射惯例一致），铜傀儡像 8 变种一并覆写为官方实体贴图（waxed 复用对应氧化态）；图集重建后仅 `air` 无贴图。
 
 - **修复配方物品/标签资源加载为空，抽屉只剩一个「default」标签**（[resources.ts](src/utils/recipe-generator/resources.ts)）：`import.meta.glob` 加载 JSON 资产时模块形状为 `{ default: <json> }`，此前直接 `await mod()` 导致物品列表始终为空、标签只读到一个 `default` 键——这正是抽屉里标签只有「default」、无法筛选的原因。现按项目约定取 `.default`（与 `aboutLogos` 一致），物品/标签正常加载；新增资源加载回归测试。

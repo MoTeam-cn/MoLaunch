@@ -81,6 +81,7 @@ const SLOT_CAPTIONS: Record<string, string> = {
   template: '模板',
   base: '底材',
   addition: '材料',
+  result: '产物',
 }
 
 /** 槽位展示标题（如 smithing.base -> 底材） */

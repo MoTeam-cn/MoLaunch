@@ -86,7 +86,7 @@ function onSlotClick(slot: RecipeSlot) {
   if (props.values[slot]) {
     closeHover()
     emit('update-slot', slot, undefined)
-  } else if (slot !== props.resultSlot) {
+  } else {
     emit('edit-slot', slot)
   }
 }
@@ -232,6 +232,31 @@ onBeforeUnmount(clearCloseTimer)
         <span class="recipe-slot-caption">{{ slotCaption(entry.slot) }}</span>
       </div>
       <span v-if="resultSlot" class="recipe-grid-arrow">→</span>
+      <div v-if="resultSlot" class="recipe-slot-item">
+        <button
+          type="button"
+          class="recipe-slot-cell recipe-result-cell"
+          :class="{ filled: values[resultSlot], 'is-tag': !!resultDisplay?.members?.length }"
+          @click="onSlotClick(resultSlot)"
+          @wheel="onResultWheel($event, resultSlot)"
+          @mouseenter="onSlotHover($event, resultDisplay)"
+          @mouseleave="scheduleClose"
+        >
+          <RecipeItemIcon
+            v-if="resultDisplay"
+            :texture="resultDisplay.texture"
+            :atlas-url="atlasUrl"
+            :atlas="atlas"
+            :size="36"
+            :label="resultDisplay.label"
+          />
+          <span v-if="resultDisplay" class="recipe-slot-count">
+            {{ resultDisplay.count }}
+          </span>
+          <span v-if="resultDisplay?.members?.length" class="recipe-slot-tag-badge">#</span>
+        </button>
+        <span class="recipe-slot-caption">{{ slotCaption(resultSlot) }}</span>
+      </div>
     </div>
 
     <Teleport to="body">

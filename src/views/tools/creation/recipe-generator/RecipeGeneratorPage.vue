@@ -162,7 +162,9 @@ const recipeJson = computed(() => {
 
 const recipeJsonText = computed(() => (recipeJson.value ? JSON.stringify(recipeJson.value, null, 2) : ''))
 
-const gridSlots = computed<RecipeSlot[]>(() => [...CRAFTING_GRID_SLOTS])
+const gridSlots = computed<RecipeSlot[]>(() =>
+  recipe.recipeType === 'crafting' ? [...CRAFTING_GRID_SLOTS] : [],
+)
 const inputSlots = computed<RecipeSlot[]>(() => getInputSlots(recipe))
 /** 当前可编辑的输入槽位（crafting 按 2x2/3x3 裁剪，与网格显示一致） */
 const editableSlots = computed<RecipeSlot[]>(() => {
@@ -179,13 +181,15 @@ const drawerVisible = ref(false)
 const drawerTitle = computed(() => {
   if (!editingSlot.value) return '选择物品'
   const label = slotCaption(editingSlot.value)
-  return editingSlot.value.startsWith('crafting.') ? `选择物品（第 ${label} 格）` : `选择${label}`
+  const isCraftingGrid = editingSlot.value.startsWith('crafting.') && !editingSlot.value.endsWith('.result')
+  return isCraftingGrid ? `选择物品（第 ${label} 格）` : `选择${label}`
 })
 
 const drawerHint = computed(() => {
   if (!editingSlot.value) return ''
   const label = slotCaption(editingSlot.value)
-  return editingSlot.value.startsWith('crafting.') ? `第 ${label} 格` : label
+  const isCraftingGrid = editingSlot.value.startsWith('crafting.') && !editingSlot.value.endsWith('.result')
+  return isCraftingGrid ? `第 ${label} 格` : label
 })
 
 watch(drawerVisible, (visible) => {
@@ -201,6 +205,10 @@ function pickValue(value: SlotValue) {
   const slot = editingSlot.value
   if (!slot) return
   recipe.slots[slot] = value
+  if (slot === resultSlot.value) {
+    drawerVisible.value = false
+    return
+  }
   // 连续放置：填完不关闭抽屉，自动定位下一个空格子；全部填满才关闭
   const slots = editableSlots.value
   const next =
