@@ -20,6 +20,7 @@ import { formatRecipeJson } from '../formatter'
 import { validateRecipe } from '../validation'
 import { createDatapackFiles, createPackMcmeta, sanitizeRecipeName } from '../datapack'
 import { generateRecipeJson, getCraftingGridValues } from '../recipe-engine'
+import { loadVersionItems, loadVersionTags } from '../resources'
 import type { RecipeSlotContext, RecipeState } from '../types'
 
 function makeContext(): RecipeSlotContext {
@@ -373,5 +374,21 @@ describe('recipe-engine', () => {
 
   it('throws a Chinese message for invalid recipes', () => {
     expect(() => generateRecipeJson(makeState(), '1.20', makeContext())).toThrow(/缺少/)
+  })
+})
+
+describe('resources', () => {
+  it('loads version items with a non-empty item list', async () => {
+    const items = await loadVersionItems('1.21')
+    expect(items.length).toBeGreaterThan(0)
+    expect(items.some((item) => item.texture)).toBe(true)
+  })
+
+  it('loads version tags as a map of many vanilla tags', async () => {
+    const tags = await loadVersionTags('1.21')
+    const keys = Object.keys(tags)
+    expect(keys.length).toBeGreaterThan(10)
+    expect(keys).toContain('minecraft:planks')
+    expect(tags['minecraft:planks'].length).toBeGreaterThan(0)
   })
 })

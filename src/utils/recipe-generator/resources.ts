@@ -29,8 +29,8 @@ export type AtlasLayout = {
   layout: Record<string, [number, number, number, number]>
 }
 
-const itemsGlob = import.meta.glob<VersionItemsManifest>('./assets/items/*.json')
-const tagsGlob = import.meta.glob<Record<string, string[]>>('./assets/tags/*.json')
+const itemsGlob = import.meta.glob<{ default: VersionItemsManifest }>('./assets/items/*.json')
+const tagsGlob = import.meta.glob<{ default: Record<string, string[]> }>('./assets/tags/*.json')
 
 const atlasLayoutPromise = import('./assets/texture-atlas.json').then(
   (m) => m.default as unknown as AtlasLayout,
@@ -45,7 +45,7 @@ export async function loadVersionItems(version: JavaVersionId): Promise<AssetIte
   if (cached) return cached
   const mod = itemsGlob[`./assets/items/${version}.json`]
   if (!mod) return []
-  const manifest = await mod()
+  const manifest = (await mod()).default
   const items = manifest.items ?? []
   itemsCache.set(version, items)
   return items
@@ -56,7 +56,7 @@ export async function loadVersionTags(version: JavaVersionId): Promise<Record<st
   if (cached) return cached
   const mod = tagsGlob[`./assets/tags/${version}.json`]
   if (!mod) return {}
-  const tags = await mod()
+  const tags = (await mod()).default ?? {}
   tagsCache.set(version, tags)
   return tags
 }
