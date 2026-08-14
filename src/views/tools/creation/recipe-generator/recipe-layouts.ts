@@ -1,13 +1,13 @@
 /**
  * 配方槽位布局：背景图（各工作台 GUI 示意图）+ 槽位像素盒（696×292 坐标系）
  *
- * 背景图暂取自 Axolotl 项目（assets/bg/*.png），仅作临时占位，后续自行替换
+ * 背景图暂取自 Axolotl 项目（src/assets/Syn/*.png），仅作临时占位，后续自行替换
  */
-import craftingImage from './assets/bg/合成.png?url'
-import smeltingImage from './assets/bg/熔炼.png?url'
-import campfireImage from './assets/bg/篝火.png?url'
-import stonecutterImage from './assets/bg/切石机.png?url'
-import smithingImage from './assets/bg/锻造.png?url'
+import craftingImage from '../../../../assets/Syn/合成.png?url'
+import smeltingImage from '../../../../assets/Syn/熔炼.png?url'
+import campfireImage from '../../../../assets/Syn/篝火.png?url'
+import stonecutterImage from '../../../../assets/Syn/切石机.png?url'
+import smithingImage from '../../../../assets/Syn/锻造.png?url'
 import type { RecipeSlot, RecipeType } from '@/utils/recipe-generator/types'
 
 export const RECIPE_IMAGE_WIDTH = 696
