@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **合成配方生成器床物品图标改为 3D 立体渲染**（[bed-render.mjs](scripts/generate-recipe-assets/bed-render.mjs)（新增） / [generate.mjs](scripts/generate-recipe-assets/generate.mjs)）：图集中 16 色床物品此前误用 64×64 实体「折叠展开图」（`entity/bed/<color>` 被映射为经典实体贴图），在槽位中显示为平面展开且模糊。现依据 26.2 官方床模型几何（`template_bed_head/foot`）与按面拆分的 9 张分面贴图（`bed_head_north` / `bed_down` / 各色 `_bed_head_{east,up,west}` / `_bed_foot_{east,south,up,west}`），在生成器中内置软件 3D 光栅化（painter's 深度排序 + z-buffer + 重心插值纹理采样 + 4× 超采样 + bbox 居中适配），渲染参数与游戏内 `display.gui`（rotation [30,340,0] / translation [2,3,0] / scale [0.5325]）一致，为 16 色床各渲染一张 16×16 立体图标（含床垫、床头高板、床尾矮板与四条腿），替换图集内 `entity/bed/<color>` 条目；图集纹理数 1180→1209，图集尺寸同步更新。
+
 - **合成配方调色板改为虚拟滚动，滑动不再卡顿**（[ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue)）：物品调色板最多 1180 个条目、标签调色板同样量大，此前一次性渲染全部 DOM，滚动与输入搜索明显卡顿。现复用项目已内置的 `vue-virtual-scroller`（`RecycleScroller`）只渲染可视区条目（物品按 4 列一行虚拟化，标签按行虚拟化），列表高度行为保持不变。
 
 - **创作工具顶部子菜单紧贴页面左上角**（[Tools.vue](src/views/Tools.vue) / [CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：此前子菜单距离顶部与左侧各有 24px 内边距（来自工具页滚动容器 `p-6`），且负外边距方案受 margin collapse 影响顶部始终无法贴边。现采用与设置页 about 页签完全相同的方案——工具页外容器对 creation 分类不设 padding，由 CreationPage 自带 `p-6`，顶部子菜单渲染在 padding 之外紧贴左上角，滚动时仍 sticky 吸顶。

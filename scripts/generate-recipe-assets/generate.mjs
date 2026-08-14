@@ -20,6 +20,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import zlib from 'node:zlib'
 import { PNG } from 'pngjs'
+import { renderBedIcon } from './bed-render.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const CACHE_DIR = path.join(__dirname, '.cache')
@@ -541,6 +542,33 @@ async function fetchZhCn() {
   return new Map(Object.entries(obj))
 }
 
+/** 床分面贴图逻辑名 -> 26.2 jar 内文件名（16 色 × 7 面 + 2 共享） */
+const BED_FACE_FILES = (color) => ({
+  bed_head_north: 'bed_head_north',
+  bed_down: 'bed_down',
+  head_up: `${color}_bed_head_up`,
+  head_west: `${color}_bed_head_west`,
+  head_east: `${color}_bed_head_east`,
+  foot_up: `${color}_bed_foot_up`,
+  foot_west: `${color}_bed_foot_west`,
+  foot_east: `${color}_bed_foot_east`,
+  foot_south: `${color}_bed_foot_south`,
+})
+
+/** 从 26.2 jar 提取 9 张分面贴图并渲染 16x16 立体床图标（失败返回 null 回落实体贴图） */
+async function renderBedForColor(color) {
+  try {
+    const jar = fs.readFileSync(path.join(CACHE_DIR, 'jar', '26.2.jar'))
+    const texs = {}
+    for (const [logical, file] of Object.entries(BED_FACE_FILES(color))) {
+      texs[logical] = PNG.sync.read(zipEntry(jar, `assets/minecraft/textures/block/${file}.png`))
+    }
+    return renderBedIcon(texs)
+  } catch {
+    return null
+  }
+}
+
 /** 收集所有版本用到的纹理 -> 下载 -> 打包图集 */
 async function buildAtlas(versionManifests) {
   // 每个纹理 key -> 引用它的最高资产版本
@@ -559,20 +587,28 @@ async function buildAtlas(versionManifests) {
   const TILE_PAD = 0
   const tiles = []
   const failed = []
+  const bedIcons = new Map()
   let index = 0
   for (const [key, assetVer] of textureRefs) {
     index += 1
-    const buf = await fetchTexturePng(assetVer, key)
-    if (!buf) {
-      failed.push(key)
-      continue
+    const bedColor = key.startsWith('entity/bed/') ? key.slice('entity/bed/'.length) : null
+    let png = null
+    if (bedColor && BLOCK_COLORS.includes(bedColor)) {
+      png = bedIcons.get(bedColor) ?? (await renderBedForColor(bedColor))
+      if (png) bedIcons.set(bedColor, png)
     }
-    let png
-    try {
-      png = PNG.sync.read(buf)
-    } catch {
-      failed.push(key)
-      continue
+    if (!png) {
+      const buf = await fetchTexturePng(assetVer, key)
+      if (!buf) {
+        failed.push(key)
+        continue
+      }
+      try {
+        png = PNG.sync.read(buf)
+      } catch {
+        failed.push(key)
+        continue
+      }
     }
     tiles.push({ key, png })
     if (index % 200 === 0) console.log(`[atlas] 已下载 ${index}/${textureRefs.size}`)
