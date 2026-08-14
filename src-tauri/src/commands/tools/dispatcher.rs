@@ -7,7 +7,7 @@ use tauri::AppHandle;
 use super::types::*;
 use super::{
     archive, cleanup, crash_analyzer, download, filename, memory, mod_tools, nbt, network,
-    picker_window, resourcepack, screenshot, version_json,
+    picker_window, recipe_generator, resourcepack, screenshot, version_json,
 };
 use crate::handler;
 use crate::state::AppState;

@@ -1,0 +1,9 @@
+{
+  "name": "generate-recipe-assets",
+  "private": true,
+  "type": "module",
+  "description": "生成合成配方生成器的内置物品/标签/纹理图集数据（MIT 数据源）",
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  }
+}

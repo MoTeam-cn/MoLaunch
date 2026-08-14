@@ -39,7 +39,7 @@ pub(super) fn emit_zip_progress(app: &AppHandle, version_id: &str, current: usiz
 }
 
 /// 创建 zip writer + 父目录
-pub(super) fn create_zip_writer(
+pub(crate) fn create_zip_writer(
     pack_path: &Path,
 ) -> Result<(zip::ZipWriter<File>, zip::write::SimpleFileOptions), String> {
     if let Some(parent) = pack_path.parent() {
@@ -76,7 +76,7 @@ pub(super) fn write_file_entry(
 }
 
 /// 把字符串写入 zip
-pub(super) fn write_string_entry(
+pub(crate) fn write_string_entry(
     zip: &mut zip::ZipWriter<File>,
     options: zip::write::SimpleFileOptions,
     zip_path: &str,

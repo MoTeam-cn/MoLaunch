@@ -26,6 +26,7 @@ pub use mod_tools::*;
 pub use nbt::*;
 pub use network::*;
 pub use picker_window::*;
+pub use recipe_generator::*;
 pub use resourcepack::*;
 pub use screenshot::*;
 pub use version_json::*;

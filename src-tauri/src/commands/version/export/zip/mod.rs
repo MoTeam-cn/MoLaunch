@@ -6,7 +6,7 @@
 mod api;
 mod compress;
 mod curseforge;
-mod helpers;
+pub(crate) mod helpers;
 mod hmcl;
 mod mcbbs;
 mod mmc;

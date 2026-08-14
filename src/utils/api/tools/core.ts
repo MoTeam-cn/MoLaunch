@@ -71,6 +71,8 @@ export const TOOLS_ACTIONS = {
   OPEN_PICKER_WINDOW: 'open_picker_window',
   // NBT 数据查看
   NBT_PARSE: 'nbt_parse',
+  // 合成配方生成器：数据包 zip 打包
+  RECIPE_GENERATOR_EXPORT: 'recipe_generator_export',
 } as const
 
 /** action 名称类型 */

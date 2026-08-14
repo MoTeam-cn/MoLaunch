@@ -8,7 +8,7 @@
  *
  * 分类（每分组 ≤ 3 个工具，重要/高频工具单独一栏）：
  * 外部下载 / 趣味工具 / 便捷工具 / 存档管理 / Mod 工具 / 网络工具 / 计算工具
- * / Java 管理 / 诊断工具 / 游戏资源 / 种子地图
+ * / 创作工具 / Java 管理 / 诊断工具 / 游戏资源 / 种子地图
  */
 
 import { ref, nextTick, watch } from 'vue'
@@ -24,6 +24,7 @@ import {
   BugAntIcon,
   SwatchIcon,
   MapIcon,
+  PaintBrushIcon,
 } from '@heroicons/vue/24/outline'
 import NavSidebar from '@/components/common/NavSidebar.vue'
 import ExternalDownload from './ExternalDownload.vue'
@@ -37,6 +38,7 @@ import JavaPage from './tools/java/JavaPage.vue'
 import DiagnosticPage from './tools/diagnostic/DiagnosticPage.vue'
 import GameResourcePage from './tools/game-resource/GameResourcePage.vue'
 import SeedMapPage from './tools/seedmap/SeedMapPage.vue'
+import CreationPage from './tools/creation/CreationPage.vue'
 import ToolToc from '@/components/common/ToolToc.vue'
 import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
 import { hasAgreedToday } from '@/utils/disclaimer'
@@ -90,6 +92,12 @@ const categories: ToolCategory[] = [
     label: '计算工具',
     icon: CalculatorIcon,
     desc: '坐标距离计算、游戏内调色板等计算辅助工具',
+  },
+  {
+    id: 'creation',
+    label: '创作工具',
+    icon: PaintBrushIcon,
+    desc: '渐变文字生成、合成配方生成等离线创作辅助工具',
   },
   {
     id: 'java',
@@ -159,6 +167,7 @@ const activeDesc = () =>
           <ModToolsPage v-else-if="activeCategory === 'mod-tools'" />
           <NetworkPage v-else-if="activeCategory === 'network'" />
           <CalcPage v-else-if="activeCategory === 'calc'" />
+          <CreationPage v-else-if="activeCategory === 'creation'" />
           <JavaPage v-else-if="activeCategory === 'java'" />
           <DiagnosticPage v-else-if="activeCategory === 'diagnostic'" />
           <GameResourcePage v-else-if="activeCategory === 'game-resource'" />

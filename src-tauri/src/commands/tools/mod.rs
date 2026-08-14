@@ -19,6 +19,7 @@ pub mod mod_tools;
 pub mod nbt;
 pub mod network;
 pub mod picker_window;
+pub mod recipe_generator;
 pub mod resourcepack;
 pub mod screenshot;
 pub mod types;
