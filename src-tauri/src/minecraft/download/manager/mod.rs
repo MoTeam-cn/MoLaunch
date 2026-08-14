@@ -6,3 +6,4 @@ mod core;
 mod state;
 
 pub use core::DownloadManager;
+pub use core::PanelLease;

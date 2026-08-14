@@ -9,7 +9,7 @@ use crate::log_debug;
 
 use super::super::sources::DownloadSourceMode;
 use super::super::version::json_merge;
-use super::manager::DownloadManager;
+use super::manager::{DownloadManager, PanelLease};
 use super::stages::{download_assets, download_client_jar, download_libraries};
 use super::types::GlobalProgress;
 use super::util::fetch_with_retry;
@@ -56,6 +56,10 @@ pub async fn download_version_full(
         .await
         .with_cancel_flag(state.download_cancel_flag.clone())
         .with_pause_flag(state.download_pause_flag.clone());
+
+    // 多阶段串行下载：会话级持有面板，避免阶段切换时共享计数瞬间归零
+    // emit `visible:false`，导致前端下载面板闪烁/误跳回主页
+    let _lease = PanelLease::acquire(&manager);
 
     // Step 1: 版本清单
     if let Some(ref cb) = stage_callback {

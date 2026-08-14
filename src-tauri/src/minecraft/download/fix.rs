@@ -3,7 +3,7 @@
 use std::path::Path;
 
 use super::super::version::json_merge;
-use super::manager::DownloadManager;
+use super::manager::{DownloadManager, PanelLease};
 use super::stages::{download_assets, download_client_jar, download_libraries};
 use crate::log_debug;
 
@@ -36,6 +36,10 @@ pub async fn fix_version_files(
     if manager.is_cancelled() {
         return Err(anyhow::anyhow!("下载已取消"));
     }
+
+    // 多阶段串行下载：会话级持有面板，避免 jar/libraries/assets 阶段切换时
+    // 面板计数瞬间归零 emit `visible:false` 导致前端误跳转
+    let _lease = PanelLease::acquire(manager);
 
     // 1. 下载主 jar（client.jar）
     // 修复：传原始 json 给 download_client_jar（含 inheritsFrom，用于判断 jar 路径）

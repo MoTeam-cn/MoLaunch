@@ -79,6 +79,10 @@ impl DownloadSession {
             .with_silent(silent)
             .with_panel_counter(state.panel_active_count.clone());
 
+        // 会话级持有面板：阶段切换时共享计数不会瞬间归零 emit `visible:false`
+        // 导致前端下载面板闪烁/误跳转（由 Drop 统一释放）
+        manager.hold_panel();
+
         Self {
             manager,
             group_name: group_name.to_string(),
@@ -92,12 +96,14 @@ impl DownloadSession {
     /// - `download_files_concurrent`（`install_modpack` 已初始化）
     ///
     /// **不**重置 stages / flag，避免覆盖父会话状态。
+    /// 与顶层会话一致持有面板（父会话已持有时计数叠加，互不干扰）。
     pub async fn attach(state: &AppState, silent: bool) -> Self {
         let manager = DownloadManager::from_state(state)
             .await
             .with_cancel_flag(state.download_cancel_flag.clone())
             .with_pause_flag(state.download_pause_flag.clone())
             .with_silent(silent);
+        manager.hold_panel();
         Self {
             manager,
             group_name: String::new(),
@@ -148,5 +154,12 @@ impl DownloadSession {
     pub fn mark_failed(&self, state: &AppState, error_code: i32) {
         let mut ds = state.download_state.lock().unwrap();
         ds.mark_failed(error_code);
+    }
+}
+
+impl Drop for DownloadSession {
+    fn drop(&mut self) {
+        // 释放会话持有的面板显示（与构造时的 hold_panel 配对）
+        self.manager.release_panel();
     }
 }

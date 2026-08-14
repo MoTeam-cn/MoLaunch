@@ -131,6 +131,39 @@ impl DownloadManager {
         let _ = app.emit(PANEL_STATE_EVENT, serde_json::json!({ "visible": visible }));
     }
 
+    /// 持有面板显示（多批次串行操作的顶层调用方使用）
+    ///
+    /// 与 `release_panel` 配对：批次循环外持有一次后，内部各 `download_batch`
+    /// 的增减只在共享计数上叠加，阶段切换时计数不再瞬间归零，
+    /// 避免 emit `visible:false` 导致前端下载面板闪烁/误跳转。
+    /// silent 或缺少 AppHandle 时为无操作。
+    pub fn hold_panel(&self) {
+        if self.silent || self.app_handle.is_none() {
+            return;
+        }
+        let first = match &self.active_batches {
+            Some(c) => c.fetch_add(1, Ordering::SeqCst) == 0,
+            None => true,
+        };
+        if first {
+            self.notify_panel(true);
+        }
+    }
+
+    /// 释放面板显示（与 `hold_panel` 配对，操作结束时调用）
+    pub fn release_panel(&self) {
+        if self.silent || self.app_handle.is_none() {
+            return;
+        }
+        let last = match &self.active_batches {
+            Some(c) => c.fetch_sub(1, Ordering::SeqCst) == 1,
+            None => true,
+        };
+        if last {
+            self.notify_panel(false);
+        }
+    }
+
     /// 检查是否已取消
     pub(crate) fn is_cancelled(&self) -> bool {
         self.cancel_flag
@@ -195,16 +228,7 @@ impl DownloadManager {
         progress_callback: Option<Arc<dyn Fn(GlobalProgress) + Send + Sync>>,
     ) -> Vec<DownloadProgress> {
         // 通知面板显示：首个非静默批次开始时 emit 显示（并发批次由共享计数器协调）
-        let panel_enabled = !self.silent && self.app_handle.is_some();
-        if panel_enabled {
-            let first = match &self.active_batches {
-                Some(c) => c.fetch_add(1, Ordering::SeqCst) == 0,
-                None => true,
-            };
-            if first {
-                self.notify_panel(true);
-            }
-        }
+        self.hold_panel();
 
         let total_bytes: u64 = tasks.iter().map(|t| t.expected_size.max(0) as u64).sum();
 
@@ -318,15 +342,7 @@ impl DownloadManager {
         let _ = timer_handle.await;
 
         // 通知面板隐藏：最后批次结束时 emit 隐藏
-        if panel_enabled {
-            let last = match &self.active_batches {
-                Some(c) => c.fetch_sub(1, Ordering::SeqCst) == 1,
-                None => true,
-            };
-            if last {
-                self.notify_panel(false);
-            }
-        }
+        self.release_panel();
 
         let final_results = results.lock().await.clone();
         final_results
@@ -335,6 +351,25 @@ impl DownloadManager {
     /// 获取当前进度
     pub async fn get_progress(&self) -> GlobalProgress {
         self.progress.lock().unwrap().clone()
+    }
+}
+
+/// 面板持有守卫：多批次串行操作期间持有面板显示，离开作用域时（含错误提前返回）自动释放
+pub struct PanelLease<'a> {
+    manager: &'a DownloadManager,
+}
+
+impl<'a> PanelLease<'a> {
+    /// 获取面板持有（立即 emit 显示，若为首个持有者）
+    pub fn acquire(manager: &'a DownloadManager) -> Self {
+        manager.hold_panel();
+        Self { manager }
+    }
+}
+
+impl Drop for PanelLease<'_> {
+    fn drop(&mut self) {
+        self.manager.release_panel();
     }
 }
 
