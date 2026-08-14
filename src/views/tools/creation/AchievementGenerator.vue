@@ -93,9 +93,9 @@ function draw() {
 /** Canvas 直接引用 @font-face 字体时需先触发加载，否则首帧会回退到默认字体 */
 async function ensureFonts() {
   await Promise.allSettled([
-    document.fonts.load('700 18px "Minecraft Default"'),
+    document.fonts.load('700 16px "Minecraft Default"'),
     document.fonts.load('400 8px "Minecraft Default"'),
-    document.fonts.load('400 18px "Unifont CJK"'),
+    document.fonts.load('400 16px "Unifont CJK"'),
   ])
   await document.fonts.ready
 }

@@ -2,7 +2,7 @@
  * 成就生成器 - Canvas 绘制
  *
  * 320×64 逻辑尺寸、2 倍率绘制保证清晰；三层直角边框模拟原版成就弹窗，
- * 18px 粗像素字与参考图质感一致，图标加深色衬底，右下角叠加白色 MoLaunch 版权水印。
+ * 16px 粗像素字贴近参考图质感，右下角叠加白色 MoLaunch 版权水印。
  */
 
 export const ACHIEVEMENT_SIZE = { width: 320, height: 64 } as const
@@ -44,22 +44,19 @@ export function drawAchievement(ctx: CanvasRenderingContext2D, opts: Achievement
   ctx.fillStyle = '#212121'
   ctx.fillRect(6, 6, width - 12, height - 12)
 
-  // 物品图标 30×30，垂直居中于左侧；外围 1px 深色衬底提升层次感
+  // 物品图标 30×30，垂直居中于左侧（保留纹理透明背景，不额外加衬底）
   const iconX = 17
   if (opts.icon) {
     const [sx, sy, sw, sh] = opts.icon.region
-    const iconY = (height - 30) / 2
-    ctx.fillStyle = '#141414'
-    ctx.fillRect(iconX - 1, iconY - 1, 32, 32)
-    ctx.drawImage(opts.icon.img, sx, sy, sw, sh, iconX, iconY, 30, 30)
+    ctx.drawImage(opts.icon.img, sx, sy, sw, sh, iconX, (height - 30) / 2, 30, 30)
   }
 
-  // 标题 / 内容两行文字：18px 粗像素字（字形高约 12px，与参考图一致），纯色无描边
+  // 标题 / 内容两行文字：16px 粗像素字（字形高约 10px，贴近参考图），纯色无描边
   const textX = 60
   const textMaxWidth = width - textX - 14
   ctx.textAlign = 'left'
   ctx.textBaseline = 'alphabetic'
-  ctx.font = `bold 18px ${opts.fontFamily}`
+  ctx.font = `bold 16px ${opts.fontFamily}`
   ctx.fillStyle = opts.titleColor
   ctx.fillText(truncateText(ctx, opts.title, textMaxWidth), textX, 28)
   ctx.fillStyle = opts.contentColor
