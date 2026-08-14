@@ -164,6 +164,12 @@ const recipeJsonText = computed(() => (recipeJson.value ? JSON.stringify(recipeJ
 
 const gridSlots = computed<RecipeSlot[]>(() => [...CRAFTING_GRID_SLOTS])
 const inputSlots = computed<RecipeSlot[]>(() => getInputSlots(recipe))
+/** 当前可编辑的输入槽位（crafting 按 2x2/3x3 裁剪，与网格显示一致） */
+const editableSlots = computed<RecipeSlot[]>(() => {
+  if (recipe.recipeType !== 'crafting') return inputSlots.value
+  const size = recipe.crafting.twoByTwo ? 2 : 3
+  return gridSlots.value.slice(0, size * size)
+})
 const resultSlot = computed<RecipeSlot | undefined>(() => getResultSlots(recipe)[0])
 const recipeName = computed(() => (recipe.name.trim() ? recipe.name.trim() : 'recipe'))
 
@@ -195,7 +201,13 @@ function pickValue(value: SlotValue) {
   const slot = editingSlot.value
   if (!slot) return
   recipe.slots[slot] = value
-  drawerVisible.value = false
+  // 连续放置：填完不关闭抽屉，自动定位下一个空格子；全部填满才关闭
+  const slots = editableSlots.value
+  const next =
+    slots.slice(slots.indexOf(slot) + 1).find((s) => !recipe.slots[s]) ??
+    slots.find((s) => !recipe.slots[s])
+  if (next) editingSlot.value = next
+  else drawerVisible.value = false
 }
 
 function updateSlot(slot: RecipeSlot, value: SlotValue | undefined) {
@@ -558,8 +570,8 @@ async function exportPack() {
 }
 
 .recipe-palette-tab.active {
-  color: #165dff;
+  color: var(--color-primary-500);
   font-weight: 600;
-  border-bottom: 2px solid #165dff;
+  border-bottom: 2px solid var(--color-primary-500);
 }
 </style>

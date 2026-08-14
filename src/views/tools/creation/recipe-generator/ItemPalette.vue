@@ -146,8 +146,8 @@ function pick(item: AssetItem) {
 }
 
 .item-palette-entry:hover {
-  border-color: #165dff;
-  background: #f2f6ff;
+  border-color: var(--color-primary-500);
+  background: var(--color-primary-50);
 }
 
 .item-palette-name {

@@ -222,7 +222,7 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
 }
 
 .recipe-slot-cell:hover {
-  border-color: #165dff;
+  border-color: var(--color-primary-500);
 }
 
 .recipe-slot-cell.filled {
@@ -232,8 +232,8 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
 }
 
 .recipe-slot-cell.editing {
-  border-color: #165dff;
-  box-shadow: 0 0 0 2px rgba(22, 93, 255, 0.25);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px rgb(var(--color-primary-rgb-500) / 0.25);
 }
 
 .recipe-result-cell {

@@ -34,6 +34,8 @@
 
 - **标签调色板重做：多标签成行 + 中文显示**（[tag-zh.ts](src/utils/recipe-generator/tag-zh.ts) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：标签不再一行一个英文 ID，改为每行 2 个标签成行展示（保留按行虚拟滚动）并新增「共 N 个标签」统计；新增内置标签中文名映射 `tag-zh.ts`（覆盖全部 235 个内置标签，未知标签回退为可读英文），调色板条目与已放入槽位的标签均显示中文名，搜索框同时支持中文名 / 英文 ID 匹配。
 
+- **抽屉交互与主题色优化**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：抽屉内主色元素（页签激活态、物品/标签悬停高亮、正在编辑的格子边框与光晕）由硬编码蓝色改为跟随主题色变量；选择物品/标签后抽屉不再立即关闭，而是自动定位到下一个空格子（crafting 按 2x2/3x3 网格顺序、其他类型按输入槽顺序）连续放置，全部填满才关闭，避免每次点击都跳回合成区。
+
 ### Fixed
 
 - **修复配方物品/标签资源加载为空，抽屉只剩一个「default」标签**（[resources.ts](src/utils/recipe-generator/resources.ts)）：`import.meta.glob` 加载 JSON 资产时模块形状为 `{ default: <json> }`，此前直接 `await mod()` 导致物品列表始终为空、标签只读到一个 `default` 键——这正是抽屉里标签只有「default」、无法筛选的原因。现按项目约定取 `.default`（与 `aboutLogos` 一致），物品/标签正常加载；新增资源加载回归测试。

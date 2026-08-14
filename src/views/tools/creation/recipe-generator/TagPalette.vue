@@ -133,8 +133,8 @@ function pick(id: string) {
 }
 
 .tag-palette-entry:hover {
-  border-color: #165dff;
-  background: #f2f6ff;
+  border-color: var(--color-primary-500);
+  background: var(--color-primary-50);
 }
 
 .tag-palette-name {
