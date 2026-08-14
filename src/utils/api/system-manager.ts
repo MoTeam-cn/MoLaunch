@@ -27,12 +27,13 @@ export async function systemManager<T = unknown>(
  * 业务代码应优先使用此常量而非裸字符串，避免拼写错误。
  */
 export const SYSTEM_ACTIONS = {
-  // game_dir（7 个）
+  // game_dir（8 个）
   OPEN_GAME_DIR: 'open_game_dir',
   OPEN_PATH: 'open_path',
   REVEAL_IN_EXPLORER: 'reveal_in_explorer',
   GET_GAME_DIR: 'get_game_dir',
   WRITE_TEXT_FILE: 'write_text_file',
+  WRITE_BINARY_FILE: 'write_binary_file',
   GET_SYSTEM_MEMORY: 'get_system_memory',
   SET_GAME_DIR: 'set_game_dir',
   // config（2 个）

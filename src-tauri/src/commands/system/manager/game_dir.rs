@@ -20,6 +20,13 @@ struct WriteTextFileParams {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct WriteBinaryFileParams {
+    path: String,
+    base64: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SetGameDirParams {
     game_dir: String,
 }
@@ -64,6 +71,15 @@ pub(super) fn register(d: &mut Dispatcher) {
             let p: WriteTextFileParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             crate::commands::system::game_dir::write_text_file(p.path, p.content).await?;
+            Ok(serde_json::Value::Null)
+        }),
+    );
+    d.register(
+        "write_binary_file",
+        handler!(_state, _app, params, {
+            let p: WriteBinaryFileParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            crate::commands::system::game_dir::write_binary_file(p.path, p.base64).await?;
             Ok(serde_json::Value::Null)
         }),
     );

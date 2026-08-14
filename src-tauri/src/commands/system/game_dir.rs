@@ -57,6 +57,29 @@ pub async fn write_text_file(path: String, content: String) -> Result<(), String
     Ok(())
 }
 
+/// 写入二进制文件到指定路径
+///
+/// `base64_content` 为 Base64 编码的原始字节（如 Canvas 导出的 PNG 图片），
+/// 与 `write_text_file` 走相同的路径策略（覆盖写入 + 自动建父目录）。
+pub async fn write_binary_file(path: String, base64_content: String) -> Result<(), String> {
+    use base64::Engine;
+
+    let path = std::path::PathBuf::from(&path);
+
+    // 确保父目录存在
+    if let Some(parent) = path.parent() {
+        crate::utils::fs::ensure_dir(parent)?;
+    }
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_content.trim())
+        .map_err(|e| format!("Base64 解码失败: {}", e))?;
+    std::fs::write(&path, bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+
+    log_info!("[System] Binary file written: {}", path.display());
+    Ok(())
+}
+
 /// 更新游戏目录
 ///
 /// 通过 `system_manager` 的 `set_game_dir` action 暴露给前端。
