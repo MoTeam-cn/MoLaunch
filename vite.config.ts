@@ -5,6 +5,23 @@ import { execFileSync } from 'node:child_process'
 import { resolve } from 'path'
 import pkg from './package.json'
 
+/** 静态资源扩展名 → 输出目录，主构建与 worker 构建共用 */
+const ASSET_EXT_DIRS: [string[], string][] = [
+  [['css'], 'css'],
+  [['json'], 'json'],
+  [['js', 'mjs', 'cjs'], 'js'],
+  [['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif', 'ico', 'bmp'], 'img'],
+  [['woff', 'woff2', 'ttf', 'otf', 'eot'], 'font'],
+]
+
+function assetDir(fileName: string): string {
+  const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
+  for (const [exts, dir] of ASSET_EXT_DIRS) {
+    if (exts.includes(ext)) return dir
+  }
+  return ''
+}
+
 /**
  * 基于 git 生成「本次更新」日志：取「上一 tag → 最新 tag」间的 commit（剥离 !c 标记），
  * `note:` 前缀的 commit 作为作者寄语单独提取；无 tag 时回退最近 20 条。git 不可用返回空。
@@ -91,6 +108,17 @@ export default defineConfig({
   },
   // Env variables starting with the item of `envPrefix` will be exposed in tauri's source code through `import.meta.env`.
   envPrefix: ['VITE_', 'TAURI_ENV_*'],
+  // worker 独立构建不继承主 build.rollupOptions.output，这里显式归类，
+  // 避免结构图标重复输出到 assets/ 根目录
+  worker: {
+    rollupOptions: {
+      output: {
+        entryFileNames: 'assets/js/[name]-[hash].js',
+        chunkFileNames: 'assets/js/[name]-[hash].js',
+        assetFileNames: 'assets/img/[name]-[hash].[ext]',
+      },
+    },
+  },
   esbuild: {
     // 生产构建剥离 console.* 和 debugger，防止 PII 泄露（CWE-532）
     drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : [],
@@ -118,14 +146,11 @@ export default defineConfig({
         // 静态资源按扩展名分类输出；@lobehub 品牌图标统一放 assets/@lobehub/ 便于识别
         assetFileNames: (assetInfo) => {
           const fileName = assetInfo.name ?? ''
-          const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
-          if (ext === 'css') return 'assets/css/[name]-[hash].[ext]'
-          if (ext === 'json') return 'assets/json/[name]-[hash].[ext]'
-          if (['js', 'mjs', 'cjs'].includes(ext)) return 'assets/js/[name]-[hash].[ext]'
           if (assetInfo.originalFileNames?.some((f) => f.includes('@lobehub/icons-static-svg'))) {
             return 'assets/@lobehub/[name]-[hash].[ext]'
           }
-          return 'assets/[name]-[hash].[ext]'
+          const dir = assetDir(fileName)
+          return dir ? `assets/${dir}/[name]-[hash].[ext]` : 'assets/[name]-[hash].[ext]'
         },
         manualChunks(id) {
           // 仅处理 node_modules 中的依赖，业务代码走默认拆分
