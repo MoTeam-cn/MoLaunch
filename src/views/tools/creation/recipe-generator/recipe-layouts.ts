@@ -3,11 +3,11 @@
  *
  * 背景图暂为临时占位（src/assets/Syn/*.png），后续自行替换
  */
-import craftingImage from '../../../../assets/Syn/合成.png?url'
-import smeltingImage from '../../../../assets/Syn/熔炼.png?url'
-import campfireImage from '../../../../assets/Syn/篝火.png?url'
-import stonecutterImage from '../../../../assets/Syn/切石机.png?url'
-import smithingImage from '../../../../assets/Syn/锻造.png?url'
+import craftingImage from '@/assets/Syn/crafting.png?url'
+import smeltingImage from '@/assets/Syn/smelting.png?url'
+import campfireImage from '@/assets/Syn/campfire.png?url'
+import stonecutterImage from '@/assets/Syn/stonecutter.png?url'
+import smithingImage from '@/assets/Syn/smithing.png?url'
 import type { RecipeSlot, RecipeType } from '@/utils/recipe-generator/types'
 
 export const RECIPE_IMAGE_WIDTH = 696

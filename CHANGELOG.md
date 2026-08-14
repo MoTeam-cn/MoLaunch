@@ -26,6 +26,10 @@
 
 ### Changed
 
+- **组件导入全面改为 `defineAsyncComponent` 懒加载，并修复批量替换遗留问题**（[src/components](src/components) / [src/views](src/views) / [src/plugins](src/plugins)）：页面与弹窗组件（公共 Button/Tag/Input 等、联机/社区/下载/设置各模块）统一改为异步组件按需加载，进入对应路由时再拉取 chunk，减小首屏体积。同时修复批量替换遗留问题：① 图片资源被误包进 `defineAsyncComponent`——图片（PNG/SVG）导入返回的是 URL 而非组件，全部恢复为静态导入（[recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts) / [VersionSelect.vue](src/views/VersionSelect.vue) / [LoaderSelect.vue](src/views/LoaderSelect.vue) / [AboutTab.vue](src/views/settings/more/AboutTab.vue) / [FabricApiInfoCard.vue](src/components/install/FabricApiInfoCard.vue) 共 13 处，`?url` 后缀保留）；② 所有使用 `defineAsyncComponent` 的文件此前缺失 `vue` 导入（非编译宏，需显式导入），导致 TS2304 编译报错，已全部补齐。
+
+- **合成台背景图改英文名并改用 `@/assets` 别名引用**（[src/assets/Syn](src/assets/Syn) / [recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts)）：`src/assets/Syn/` 下 5 张中文名背景图（切石机/合成/熔炼/篝火/锻造）改名为 `stonecutter.png` / `crafting.png` / `smelting.png` / `campfire.png` / `smithing.png`，`recipe-layouts.ts` 引用同步更新并统一改用 `@/assets` 别名（替代多级相对路径）。
+
 - **写入文件命令增加安全校验（防恶意文件）**（[game_dir.rs](src-tauri/src/commands/system/game_dir.rs)）：`write_text_file` / `write_binary_file` 统一校验写入路径（非空、无空字节、长度 ≤ 260，并解析 `.` / `..` 防路径穿越）且限制内容大小（文本 ≤ 10MB、二进制 ≤ 20MB）；`write_binary_file` 追加 PNG 魔数校验（`89 50 4E 47 0D 0A 1A 0A`），拒绝写入非 PNG 内容，防止恶意文件落盘。
 
 - **成就生成器默认改用 Minecraft 原版像素字体**（[AchievementGenerator.vue](src/views/tools/creation/AchievementGenerator.vue)）：字体下拉新增「Minecraft 原版（推荐）」并默认选中，font-family 链为 `'Minecraft Default', 'Unifont CJK', 'Microsoft YaHei', 'PingFang SC', sans-serif`——拉丁/数字用官方像素字、中文用 unifont 像素字（与游戏内一致），缺失字形再回退系统字体；绘制前先 `document.fonts.load` + `document.fonts.ready` 触发并等待内置字体加载，Canvas 首帧即用真实字体而非系统回退。
