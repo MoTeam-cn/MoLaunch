@@ -24,6 +24,8 @@
 
 - **创作工具分类页改为顶部子菜单切换**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：渐变文字生成器与合成配方生成器此前垂直叠加一页放不下，现复用设置页同款 `SubTabBar` 顶部菜单栏（sticky 吸顶、带图标），每次只渲染当前工具；支持 `?subtab=` 深链直达指定工具，`#tool-gradient-text` / `#tool-recipe-generator` 目录锚点保留。
 
+- **创作工具页签打通可用高度链，子页各自内部滚动**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：CreationPage 根节点改为 `h-full` flex 纵向布局，子菜单固定顶部，内容区 `flex-1` 占满剩余高度；合成配方页签容器获得确定高度（供左右双栏布局填充），渐变文字页签保留 `p-6` 内边距并改由自身区域滚动，页面不再整体纵向拉长。
+
 ### Fixed
 
 - **合成配方页切换不再报 atlas 为空的 2 个 Vue prop 校验警告**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：首帧渲染时 `loading=false` 而 `atlas` 仍为 `null`，`v-else` 主体分支会把 `atlas!`（实际为 null）传给 RecipeSlotsEditor / ItemPalette 触发警告。现将 `loading` 初始值改为 `true`，资源加载完成前不渲染主体。
