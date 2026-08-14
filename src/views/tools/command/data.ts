@@ -6,42 +6,44 @@
  * - 常见可召唤实体表
  */
 
-/** 常用附魔（Java 命名空间 ID，lvl 为自然获取最高等级） */
+/** 常用附魔（Java 命名空间 ID，lvl 为自然获取最高等级，legacy 为 1.12.2 及以前的数字附魔 ID） */
 export interface EnchantmentOption {
   id: string
   name: string
   lvl: number
+  /** 1.12.2 及以前使用的数字附魔 ID（1.13+ 新增附魔无此字段） */
+  legacy?: number
 }
 
 export const ENCHANTMENTS: EnchantmentOption[] = [
-  { id: 'sharpness', name: '锋利', lvl: 5 },
-  { id: 'smite', name: '亡灵杀手', lvl: 5 },
-  { id: 'bane_of_arthropods', name: '节肢杀手', lvl: 5 },
-  { id: 'efficiency', name: '效率', lvl: 5 },
-  { id: 'fortune', name: '时运', lvl: 3 },
-  { id: 'silk_touch', name: '精准采集', lvl: 1 },
-  { id: 'unbreaking', name: '耐久', lvl: 3 },
-  { id: 'protection', name: '保护', lvl: 4 },
-  { id: 'fire_protection', name: '火焰保护', lvl: 4 },
-  { id: 'blast_protection', name: '爆炸保护', lvl: 4 },
-  { id: 'projectile_protection', name: '弹射物保护', lvl: 4 },
-  { id: 'feather_falling', name: '摔落保护', lvl: 4 },
-  { id: 'thorns', name: '荆棘', lvl: 3 },
-  { id: 'depth_strider', name: '深海探索者', lvl: 3 },
-  { id: 'frost_walker', name: '冰霜行者', lvl: 2 },
-  { id: 'respiration', name: '水下呼吸', lvl: 3 },
-  { id: 'aqua_affinity', name: '水下速掘', lvl: 1 },
-  { id: 'looting', name: '抢夺', lvl: 3 },
-  { id: 'mending', name: '经验修补', lvl: 1 },
-  { id: 'infinity', name: '无限', lvl: 1 },
-  { id: 'power', name: '力量', lvl: 5 },
-  { id: 'punch', name: '冲击', lvl: 2 },
-  { id: 'flame', name: '火矢', lvl: 1 },
-  { id: 'knockback', name: '击退', lvl: 2 },
-  { id: 'fire_aspect', name: '火焰附加', lvl: 2 },
-  { id: 'sweeping', name: '横扫之刃', lvl: 3 },
-  { id: 'luck_of_the_sea', name: '海之眷顾', lvl: 3 },
-  { id: 'lure', name: '饵钓', lvl: 3 },
+  { id: 'sharpness', name: '锋利', lvl: 5, legacy: 16 },
+  { id: 'smite', name: '亡灵杀手', lvl: 5, legacy: 17 },
+  { id: 'bane_of_arthropods', name: '节肢杀手', lvl: 5, legacy: 18 },
+  { id: 'efficiency', name: '效率', lvl: 5, legacy: 32 },
+  { id: 'fortune', name: '时运', lvl: 3, legacy: 35 },
+  { id: 'silk_touch', name: '精准采集', lvl: 1, legacy: 33 },
+  { id: 'unbreaking', name: '耐久', lvl: 3, legacy: 34 },
+  { id: 'protection', name: '保护', lvl: 4, legacy: 0 },
+  { id: 'fire_protection', name: '火焰保护', lvl: 4, legacy: 1 },
+  { id: 'blast_protection', name: '爆炸保护', lvl: 4, legacy: 3 },
+  { id: 'projectile_protection', name: '弹射物保护', lvl: 4, legacy: 4 },
+  { id: 'feather_falling', name: '摔落保护', lvl: 4, legacy: 2 },
+  { id: 'thorns', name: '荆棘', lvl: 3, legacy: 7 },
+  { id: 'depth_strider', name: '深海探索者', lvl: 3, legacy: 8 },
+  { id: 'frost_walker', name: '冰霜行者', lvl: 2, legacy: 9 },
+  { id: 'respiration', name: '水下呼吸', lvl: 3, legacy: 5 },
+  { id: 'aqua_affinity', name: '水下速掘', lvl: 1, legacy: 6 },
+  { id: 'looting', name: '抢夺', lvl: 3, legacy: 21 },
+  { id: 'mending', name: '经验修补', lvl: 1, legacy: 70 },
+  { id: 'infinity', name: '无限', lvl: 1, legacy: 51 },
+  { id: 'power', name: '力量', lvl: 5, legacy: 48 },
+  { id: 'punch', name: '冲击', lvl: 2, legacy: 49 },
+  { id: 'flame', name: '火矢', lvl: 1, legacy: 50 },
+  { id: 'knockback', name: '击退', lvl: 2, legacy: 19 },
+  { id: 'fire_aspect', name: '火焰附加', lvl: 2, legacy: 20 },
+  { id: 'sweeping', name: '横扫之刃', lvl: 3, legacy: 22 },
+  { id: 'luck_of_the_sea', name: '海之眷顾', lvl: 3, legacy: 61 },
+  { id: 'lure', name: '饵钓', lvl: 3, legacy: 62 },
   { id: 'loyalty', name: '忠诚', lvl: 3 },
   { id: 'channeling', name: '引雷', lvl: 1 },
   { id: 'riptide', name: '激流', lvl: 3 },
@@ -49,6 +51,11 @@ export const ENCHANTMENTS: EnchantmentOption[] = [
   { id: 'soul_speed', name: '灵魂疾行', lvl: 3 },
   { id: 'swift_sneak', name: '迅捷潜行', lvl: 3 },
 ]
+
+/** 1.12.2 及以前的附魔 ID 映射（id -> 数字 ID），供旧版本 /give 生成使用 */
+export const ENCHANT_IDS_1_12: Record<string, number> = Object.fromEntries(
+  ENCHANTMENTS.filter((e) => e.legacy !== undefined).map((e) => [e.id, e.legacy as number]),
+)
 
 /** 常见可召唤实体（Java 命名空间 ID + 中文名） */
 export interface EntityOption {

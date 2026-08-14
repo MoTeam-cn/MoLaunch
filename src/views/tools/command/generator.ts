@@ -12,6 +12,8 @@
  * - 文本组件内部 JSON 双引号需转义为 \"，SNBT 字符串内单引号需转义为 \'
  */
 
+import { ENCHANT_IDS_1_12 } from './data'
+
 /** Minecraft 16 色选项：中文名 + 指令内 id + 预览色值（供 ColorSelect 渲染圆形色块） */
 export interface ColorOption {
   label: string
@@ -82,6 +84,7 @@ export const TARGETS: TargetOption[] = [
 export const GIVE_VERSIONS: TargetOption[] = [
   { id: '1.20.5', label: '1.20.5+（物品组件）' },
   { id: '1.13', label: '1.13 - 1.20.4（NBT）' },
+  { id: '1.12', label: '1.12.2 及以前（数字附魔 ID）' },
 ]
 
 /** give 指令参数 */
@@ -89,7 +92,7 @@ export interface GiveParams {
   itemId: string
   count: number
   target: string
-  /** 指令目标版本：'1.20.5' 输出物品组件格式，其余输出 1.13 - 1.20.4 NBT 格式 */
+  /** 指令目标版本：'1.20.5' 物品组件 / '1.12' 数字附魔 ID / 其余 1.13 - 1.20.4 NBT */
   version: string
   enchantments: { id: string; lvl: number }[]
   name: string
@@ -102,6 +105,27 @@ export interface GiveParams {
 export function buildGiveCommand(p: GiveParams): string {
   const item = `minecraft:${p.itemId}`
   const count = p.count > 0 ? ` ${p.count}` : ''
+  if (p.version === '1.12') {
+    // 1.12.2 及以前：ench 用数字 ID（short，s 后缀），Name/Lore 为纯字符串，数量后需 data 位（0）
+    const parts: string[] = []
+    const ench = p.enchantments
+      .filter((e) => e.id in ENCHANT_IDS_1_12)
+      .map((e) => `{id:${ENCHANT_IDS_1_12[e.id]}s,lvl:${e.lvl}s}`)
+      .join(',')
+    if (ench) parts.push(`ench:[${ench}]`)
+    const displayParts: string[] = []
+    if (p.name.trim()) {
+      displayParts.push(`Name:"${escapeJsonText(p.name.trim())}"`)
+    }
+    if (p.lore.length > 0) {
+      displayParts.push(`Lore:[${p.lore.map((l) => `"${escapeJsonText(l)}"`).join(',')}]`)
+    }
+    if (displayParts.length > 0) {
+      parts.push(`display:{${displayParts.join(',')}}`)
+    }
+    const nbt = parts.length > 0 ? ` {${parts.join(',')}}` : ''
+    return `/give ${p.target} ${item} ${p.count > 0 ? p.count : 1} 0${nbt}`
+  }
   if (p.version === '1.20.5') {
     // 1.20.5+ 物品组件格式：方括号内以 minecraft:* 为键，enchantments 用 levels map，键含冒号需引号
     const parts: string[] = []
