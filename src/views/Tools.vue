@@ -6,41 +6,26 @@
  * - 左侧 w-48 菜单（activeCategory 切换高亮）
  * - 右侧内容区 v-if 切换子组件
  *
- * 分类（每分组 ≤ 3 个工具，重要/高频工具单独一栏）：
- * 外部下载 / 趣味工具 / 便捷工具 / 存档管理 / Mod 工具 / 网络工具 / 计算工具
- * / 创作工具 / Java 管理 / 诊断工具 / 游戏资源 / 种子地图 / 指令生成
+ * 分类（6 个一级菜单，内部子工具用顶部 SubTabBar 切换）：
+ * 下载管理 / 常用工具 / 存档资源 / Mod 网络 / Java 诊断 / 创作指令
  */
 
 import { ref } from 'vue'
 import {
   ArrowDownTrayIcon,
-  FaceSmileIcon,
   WrenchScrewdriverIcon,
   ArchiveBoxIcon,
   PuzzlePieceIcon,
-  SignalIcon,
-  CalculatorIcon,
   CommandLineIcon,
-  BoltIcon,
-  BugAntIcon,
-  SwatchIcon,
-  MapIcon,
   PaintBrushIcon,
 } from '@heroicons/vue/24/outline'
 import NavSidebar from '@/components/common/NavSidebar.vue'
 import ExternalDownload from './ExternalDownload.vue'
-import LuckyTool from './quick-tools/LuckyTool.vue'
-import QuickTools from './QuickTools.vue'
-import ArchivePage from './tools/archive/ArchivePage.vue'
-import ModToolsPage from './tools/mod-tools/ModToolsPage.vue'
-import NetworkPage from './tools/network/NetworkPage.vue'
-import CalcPage from './tools/calc/CalcPage.vue'
-import JavaPage from './tools/java/JavaPage.vue'
-import DiagnosticPage from './tools/diagnostic/DiagnosticPage.vue'
-import GameResourcePage from './tools/game-resource/GameResourcePage.vue'
-import SeedMapPage from './tools/seedmap/SeedMapPage.vue'
-import CreationPage from './tools/creation/CreationPage.vue'
-import CommandPage from './tools/command/CommandPage.vue'
+import CommonPage from './tools/CommonPage.vue'
+import StoragePage from './tools/StoragePage.vue'
+import ModNetworkPage from './tools/ModNetworkPage.vue'
+import JavaDiagPage from './tools/JavaDiagPage.vue'
+import CreateCmdPage from './tools/CreateCmdPage.vue'
 import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
 import { hasAgreedToday } from '@/utils/disclaimer'
 
@@ -54,85 +39,43 @@ interface ToolCategory {
 const categories: ToolCategory[] = [
   {
     id: 'external-download',
-    label: '外部下载',
+    label: '下载管理',
     icon: ArrowDownTrayIcon,
     desc: '通过 URL 下载任意文件，支持自定义目录、暂停、取消和进度展示',
   },
   {
-    id: 'fun-tools',
-    label: '趣味工具',
-    icon: FaceSmileIcon,
-    desc: '今日人品、每日运势等趣味小工具',
-  },
-  {
-    id: 'quick-tools',
-    label: '便捷工具',
+    id: 'common',
+    label: '常用工具',
     icon: WrenchScrewdriverIcon,
-    desc: '清理游戏垃圾、内存优化、启动器数据导出等实用工具',
+    desc: '今日人品、清理游戏垃圾、内存优化等日常实用小工具',
   },
   {
-    id: 'archive',
-    label: '存档管理',
+    id: 'storage',
+    label: '存档资源',
     icon: ArchiveBoxIcon,
-    desc: '备份、恢复和导出游戏世界存档',
+    desc: '游戏世界存档备份/恢复/导出，截图批量管理、资源包转换与种子地图',
   },
   {
-    id: 'mod-tools',
-    label: 'Mod 工具',
+    id: 'mod-network',
+    label: 'Mod 网络',
     icon: PuzzlePieceIcon,
-    desc: 'Mod 依赖检测、文件去重等 Mod 管理辅助工具',
+    desc: 'Mod 依赖检测/文件去重，服务器状态检测与网络延迟测试',
   },
   {
-    id: 'network',
-    label: '网络工具',
-    icon: SignalIcon,
-    desc: '服务器状态检测、网络延迟测试',
-  },
-  {
-    id: 'calc',
-    label: '计算工具',
-    icon: CalculatorIcon,
-    desc: '坐标距离计算、游戏内调色板等计算辅助工具',
-  },
-  {
-    id: 'creation',
-    label: '创作工具',
-    icon: PaintBrushIcon,
-    desc: '渐变文字生成、合成配方生成等离线创作辅助工具',
-  },
-  {
-    id: 'java',
-    label: 'Java 管理',
+    id: 'java-diag',
+    label: 'Java 诊断',
     icon: CommandLineIcon,
-    desc: '管理 Java 运行时版本，启动游戏的核心依赖',
+    desc: 'Java 运行时下载与检测，版本 JSON 编辑、NBT 数据查看',
   },
   {
-    id: 'diagnostic',
-    label: '诊断工具',
-    icon: BugAntIcon,
-    desc: '崩溃日志分析、版本 JSON 编辑、NBT 数据查看',
-  },
-  {
-    id: 'game-resource',
-    label: '游戏资源',
-    icon: SwatchIcon,
-    desc: '截图批量管理、资源包格式转换',
-  },
-  {
-    id: 'seedmap',
-    label: '种子地图',
-    icon: MapIcon,
-    desc: '输入种子加载 Minecraft 建筑位置地图，支持群系/结构查询',
-  },
-  {
-    id: 'command',
-    label: '指令生成',
-    icon: BoltIcon,
-    desc: '纯前端生成 Minecraft 指令：物品编辑、告示牌商店、召唤实体',
+    id: 'create-cmd',
+    label: '创作指令',
+    icon: PaintBrushIcon,
+    desc: '渐变文字/合成配方等创作工具，及物品编辑、告示牌商店、召唤实体指令生成',
   },
 ]
 
-const activeCategory = ref<string>('fun-tools')
+const activeCategory = ref<string>('common')
 
 /** 使用协议抽屉：当日未同意过工具协议时弹出（同意后存 localStorage，次日重新提醒） */
 const disclaimerVisible = ref(!hasAgreedToday('tools'))
@@ -160,21 +103,14 @@ const activeDesc = () =>
         <!-- 各分类页自带 SubTabBar + p-6（顶部子菜单需贴边）；仅直接在 Tools.vue 渲染的分类需要外层 p-6 -->
         <div
           class="h-full overflow-y-auto tools-scroll-container"
-          :class="['external-download', 'fun-tools', 'quick-tools'].includes(activeCategory) ? 'p-6' : ''"
+          :class="activeCategory === 'external-download' ? 'p-6' : ''"
         >
           <ExternalDownload v-if="activeCategory === 'external-download'" />
-          <LuckyTool v-else-if="activeCategory === 'fun-tools'" />
-          <QuickTools v-else-if="activeCategory === 'quick-tools'" />
-          <ArchivePage v-else-if="activeCategory === 'archive'" />
-          <ModToolsPage v-else-if="activeCategory === 'mod-tools'" />
-          <NetworkPage v-else-if="activeCategory === 'network'" />
-          <CalcPage v-else-if="activeCategory === 'calc'" />
-          <CreationPage v-else-if="activeCategory === 'creation'" />
-          <JavaPage v-else-if="activeCategory === 'java'" />
-          <DiagnosticPage v-else-if="activeCategory === 'diagnostic'" />
-          <GameResourcePage v-else-if="activeCategory === 'game-resource'" />
-          <SeedMapPage v-else-if="activeCategory === 'seedmap'" />
-          <CommandPage v-else-if="activeCategory === 'command'" />
+          <CommonPage v-else-if="activeCategory === 'common'" />
+          <StoragePage v-else-if="activeCategory === 'storage'" />
+          <ModNetworkPage v-else-if="activeCategory === 'mod-network'" />
+          <JavaDiagPage v-else-if="activeCategory === 'java-diag'" />
+          <CreateCmdPage v-else />
         </div>
       </div>
     </div>
