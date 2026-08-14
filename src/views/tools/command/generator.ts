@@ -32,6 +32,9 @@ export const MC_COLORS = [
   'white',
 ]
 
+/** 16 色下拉选项（适配公共 Select 组件 options 格式） */
+export const COLOR_OPTIONS: { label: string; value: string }[] = MC_COLORS.map((c) => ({ label: c, value: c }))
+
 /** JSON 字符串转义（用于文本组件内部） */
 export function escapeJsonText(text: string): string {
   return text

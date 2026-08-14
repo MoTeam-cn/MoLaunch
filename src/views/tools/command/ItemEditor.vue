@@ -9,11 +9,12 @@ import { computed, onMounted, ref } from 'vue'
 import { CubeIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
 import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
+import Select from '@/components/common/Select.vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import { loadVersionItems } from '@/utils/recipe-generator/resources'
 import type { AssetItem } from '@/utils/recipe-generator/resources'
 import { ENCHANTMENTS } from './data'
-import { MC_COLORS, TARGETS, buildGiveCommand } from './generator'
+import { COLOR_OPTIONS, TARGETS, buildGiveCommand } from './generator'
 
 const items = ref<AssetItem[]>([])
 const keyword = ref('')
@@ -45,6 +46,9 @@ function pickItem(item: AssetItem) {
   selected.value = item
   keyword.value = ''
 }
+
+const targetOptions = computed(() => TARGETS.map((t) => ({ label: t.label, value: t.id })))
+const enchantOptions = computed(() => ENCHANTMENTS.map((o) => ({ label: `${o.name}（${o.id}）`, value: o.id })))
 
 const command = computed(() => {
   if (!selected.value) return ''
@@ -113,9 +117,7 @@ async function copyCommand() {
         </div>
         <div>
           <div class="text-xs font-medium text-gray-500 mb-2">目标玩家</div>
-          <select v-model="target" class="w-full rounded border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-primary-500">
-            <option v-for="t in TARGETS" :key="t.id" :value="t.id">{{ t.label }}</option>
-          </select>
+          <Select v-model="target" :options="targetOptions" />
         </div>
       </div>
 
@@ -127,9 +129,7 @@ async function copyCommand() {
         </div>
         <div>
           <div class="text-xs font-medium text-gray-500 mb-2">颜色</div>
-          <select v-model="nameColor" class="rounded border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-primary-500">
-            <option v-for="c in MC_COLORS" :key="c" :value="c">{{ c }}</option>
-          </select>
+          <Select v-model="nameColor" :options="COLOR_OPTIONS" />
         </div>
       </div>
 
@@ -150,9 +150,7 @@ async function copyCommand() {
         </div>
         <div v-if="enchants.length" class="space-y-2">
           <div v-for="(e, idx) in enchants" :key="idx" class="flex items-center gap-2">
-            <select v-model="e.id" class="flex-1 rounded border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-primary-500">
-              <option v-for="opt in ENCHANTMENTS" :key="opt.id" :value="opt.id">{{ opt.name }}（{{ opt.id }}）</option>
-            </select>
+            <Select v-model="e.id" :options="enchantOptions" class="flex-1" />
             <Input v-model.number="e.lvl" type="number" min="1" max="255" size="small" width="64px" />
             <Button type="text" size="mini" @click="removeEnchant(idx)">
               <template #icon><TrashIcon class="h-4 w-4 text-red-500" /></template>

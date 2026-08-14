@@ -9,9 +9,10 @@ import { computed, ref } from 'vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
+import Select from '@/components/common/Select.vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import { ENTITIES } from './data'
-import { MC_COLORS, buildSummonCommand } from './generator'
+import { COLOR_OPTIONS, buildSummonCommand } from './generator'
 
 const entityId = ref(ENTITIES[0].id)
 const x = ref('~')
@@ -20,6 +21,8 @@ const z = ref('~')
 const name = ref('')
 const nameColor = ref('white')
 const count = ref(1)
+
+const entityOptions = computed(() => ENTITIES.map((e) => ({ label: `${e.name}（${e.id}）`, value: e.id })))
 
 const command = computed(() =>
   buildSummonCommand({
@@ -49,9 +52,7 @@ async function copyCommand() {
       <!-- 实体选择 -->
       <div>
         <div class="text-xs font-medium text-gray-500 mb-2">实体</div>
-        <select v-model="entityId" class="w-full rounded border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-primary-500">
-          <option v-for="e in ENTITIES" :key="e.id" :value="e.id">{{ e.name }}（{{ e.id }}）</option>
-        </select>
+        <Select v-model="entityId" :options="entityOptions" />
       </div>
 
       <!-- 坐标 -->
@@ -79,9 +80,7 @@ async function copyCommand() {
       <!-- 颜色 -->
       <div v-if="name.trim()">
         <div class="text-xs font-medium text-gray-500 mb-2">名称颜色</div>
-        <select v-model="nameColor" class="rounded border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-primary-500">
-          <option v-for="c in MC_COLORS" :key="c" :value="c">{{ c }}</option>
-        </select>
+        <Select v-model="nameColor" :options="COLOR_OPTIONS" />
       </div>
 
       <!-- 指令结果 -->

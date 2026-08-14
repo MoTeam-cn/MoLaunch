@@ -9,9 +9,10 @@ import { computed, ref } from 'vue'
 import { DocumentTextIcon } from '@heroicons/vue/24/outline'
 import Input from '@/components/common/Input.vue'
 import Button from '@/components/common/Button.vue'
+import Select from '@/components/common/Select.vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import { SIGN_FACINGS, SIGN_IDS } from './data'
-import { MC_COLORS, buildSignShopCommand } from './generator'
+import { COLOR_OPTIONS, buildSignShopCommand } from './generator'
 
 const signId = ref(SIGN_IDS[0])
 const facing = ref(SIGN_FACINGS[0].id)
@@ -20,6 +21,9 @@ const y = ref('~')
 const z = ref('~')
 const lines = ref<string[]>(['', '', '', ''])
 const textColor = ref('white')
+
+const signOptions = computed(() => SIGN_IDS.map((s) => ({ label: s, value: s })))
+const facingOptions = computed(() => SIGN_FACINGS.map((f) => ({ label: f.name, value: f.id })))
 
 const command = computed(() =>
   buildSignShopCommand({
@@ -50,15 +54,11 @@ async function copyCommand() {
       <div class="grid grid-cols-2 gap-4">
         <div>
           <div class="text-xs font-medium text-gray-500 mb-2">告示牌类型</div>
-          <select v-model="signId" class="w-full rounded border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-primary-500">
-            <option v-for="s in SIGN_IDS" :key="s" :value="s">{{ s }}</option>
-          </select>
+          <Select v-model="signId" :options="signOptions" />
         </div>
         <div>
           <div class="text-xs font-medium text-gray-500 mb-2">朝向</div>
-          <select v-model="facing" class="w-full rounded border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-primary-500">
-            <option v-for="f in SIGN_FACINGS" :key="f.id" :value="f.id">{{ f.name }}</option>
-          </select>
+          <Select v-model="facing" :options="facingOptions" />
         </div>
       </div>
 
@@ -78,9 +78,7 @@ async function copyCommand() {
           <span class="text-xs font-medium text-gray-500">文字内容（最多 4 行）</span>
           <div class="flex items-center gap-1.5">
             <span class="text-xs text-gray-400">颜色</span>
-            <select v-model="textColor" class="rounded border border-gray-300 px-2 py-1.5 text-xs outline-none focus:border-primary-500">
-              <option v-for="c in MC_COLORS" :key="c" :value="c">{{ c }}</option>
-            </select>
+            <Select v-model="textColor" :options="COLOR_OPTIONS" />
           </div>
         </div>
         <div class="space-y-2">
