@@ -152,6 +152,38 @@ describe('formatter', () => {
     expect(json.result).toEqual({ id: 'minecraft:iron_block' })
   })
 
+  it('emits ingredient count on 1.21.2+ and omits it on older versions', () => {
+    const state = makeState({
+      slots: {
+        'crafting.1': { kind: 'item', id: 'minecraft:oak_planks', count: 2 },
+        'crafting.2': { kind: 'item', id: 'minecraft:oak_sapling' },
+        'crafting.result': { kind: 'item', id: 'minecraft:stick' },
+      },
+    })
+    expect(formatRecipeJson(state, '1.21.2', makeContext()).key).toEqual({
+      A: { item: 'minecraft:oak_planks', count: 2 },
+      B: 'minecraft:oak_sapling',
+    })
+    expect(formatRecipeJson(state, '1.20', makeContext()).key).toEqual({
+      A: { item: 'minecraft:oak_planks' },
+      B: { item: 'minecraft:oak_sapling' },
+    })
+  })
+
+  it('emits cooking ingredient count on 1.21.2+', () => {
+    const state = makeState({
+      recipeType: 'smelting',
+      slots: {
+        'cooking.ingredient': { kind: 'item', id: 'minecraft:iron_ore', count: 3 },
+        'cooking.result': { kind: 'item', id: 'minecraft:iron_ingot' },
+      },
+    })
+    expect(formatRecipeJson(state, '1.21.2', makeContext()).ingredient).toEqual({
+      item: 'minecraft:iron_ore',
+      count: 3,
+    })
+  })
+
   it('formats legacy 1.12 recipe with separate data field and bare type', () => {
     const state = makeState({
       slots: {

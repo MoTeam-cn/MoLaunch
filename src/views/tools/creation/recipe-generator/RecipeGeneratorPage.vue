@@ -284,7 +284,6 @@ async function exportPack() {
       <section class="recipe-panel recipe-display">
         <RecipeSlotsEditor
           :layout="recipeLayout!"
-          :result-slot="resultSlot"
           :values="recipe.slots"
           :context="context"
           :atlas-url="atlasUrl"
@@ -296,7 +295,7 @@ async function exportPack() {
           @edit-slot="openSlotDrawer"
         />
         <p class="text-xs text-gray-400">
-          点击空格子从抽屉选择物品/标签，点击已放置格子可清除，结果槽滚轮调整数量
+          点击空格子从抽屉选择物品/标签，点击已放置格子可清除，滚轮调整数量
         </p>
 
         <div v-if="issues.length" class="recipe-issues">

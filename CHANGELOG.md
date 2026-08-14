@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **合成配方输入槽支持滚轮调整数量**（[RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [formatter.ts](src/utils/recipe-generator/formatter.ts)）：此前仅结果槽可滚轮调产出数量。现所有已放置物品槽位（合成格/原料/模板/底材/材料）均可滚轮调整 1-64；JSON 输出中 1.21.2+（string 策略）的输入槽位携带 `count` 字段（`{item, count}` / `{tag, count}`，旧版本策略不输出以保证数据包合法），如「2 个锻造模板 + 树苗」的合成。
+
 - **合成配方生成器背景图统一迁移至 `src/assets/Syn/`**（[recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts)）：背景图此前存放在 `recipe-generator/assets/bg/` 局部目录，现统一迁至全局资源目录 `src/assets/Syn/`（5 张 Axolotl 临时占位图不变，后续自行替换）。
 
 - **合成配方生成器槽位改为「工作台界面背景图 + 热点」布局**（[recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts)（新增） / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [vite.config.ts](vite.config.ts)）：此前除合成外的配方类型均复用抽象网格/行布局，观感与 Minecraft 原版工作台界面不一致。现引入布局数据模块 `recipe-layouts.ts`——每种配方类型绑定对应工作台 GUI 背景图（合成/熔炼/篝火/切石机/锻造共 5 张，696×292 坐标系），槽位以像素盒精确定位；编辑器按布局渲染背景图与绝对定位热点，点击空热点弹抽屉选物、点击已放置槽位清除、结果槽滚轮调数量、标签悬浮成员浮层与 2×2 禁用槽 barrier 遮罩均保留。背景图暂取自 Axolotl 项目作临时占位（代码中已标注，后续自行替换）。vite.config.ts 增加 vitest `include: ['src/**/*.test.ts']`，避免扫描到工作区第三方源码目录（code-libs/Frp）的测试文件。

@@ -4,7 +4,7 @@
  *
  * 槽位由布局数据（背景图 + 像素盒）驱动，各配方类型显示对应工作台界面；
  * 点击空热点请求编辑（父组件弹抽屉选择），点击已放置槽位清除；
- * 结果槽滚轮可调整产出数量（1-64）；2x2 时禁用槽以 barrier 遮罩。
+ * 滚轮可调整槽位数量（1-64）；2x2 时禁用槽以 barrier 遮罩。
  */
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { RecipeSlot, RecipeSlotContext, SlotValue } from '@/utils/recipe-generator/types'
@@ -35,10 +35,9 @@ const props = withDefaults(
     atlasUrl: string
     atlas: AtlasLayout
     twoByTwo?: boolean
-    resultSlot?: RecipeSlot | null
     editingSlot?: RecipeSlot | null
   }>(),
-  { twoByTwo: false, resultSlot: null, editingSlot: null },
+  { twoByTwo: false, editingSlot: null },
 )
 
 const emit = defineEmits<{
@@ -131,8 +130,7 @@ function onSlotClick(slot: RecipeSlot) {
   }
 }
 
-function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
-  if (slot !== props.resultSlot) return
+function onSlotWheel(event: WheelEvent, slot: RecipeSlot) {
   const value = props.values[slot]
   if (!value || (value.kind !== 'item' && value.kind !== 'custom_item')) return
   event.preventDefault()
@@ -193,7 +191,7 @@ function clearCloseTimer() {
         :style="slotBoxStyle(entry.box)"
         :data-recipe-slot="entry.slot"
         @click="!entry.disabled && onSlotClick(entry.slot)"
-        @wheel="onResultWheel($event, entry.slot)"
+        @wheel="!entry.disabled && onSlotWheel($event, entry.slot)"
         @mouseenter="onSlotHover($event, entry.disabled ? null : entry.display)"
         @mouseleave="scheduleClose"
       >

@@ -89,15 +89,19 @@ export function slotCaption(slot: RecipeSlot): string {
   return SLOT_CAPTIONS[slot.split('.')[1]] ?? slot.split('.')[1]
 }
 
-/** 组装 ingredient 字段值 */
+/** 组装 ingredient 字段值（1.21.2+ 输入支持 count） */
 export function formatIngredient(
   value: SlotValue,
   context: RecipeSlotContext,
   strategy: FormatterStrategy,
+  count?: number,
 ): unknown {
   const itemId = resolveItemId(value, context)
   if (itemId) {
-    if (strategy === 'string') return itemId
+    if (strategy === 'string') {
+      if (count !== undefined && count > 1) return { item: itemId, count }
+      return itemId
+    }
     if (strategy === 'legacy') {
       const ref = parseIdentifier(itemId)
       if (!ref) throw new Error('无效的物品标识符')
@@ -112,7 +116,11 @@ export function formatIngredient(
   const tagId = resolveTagId(value, context)
   if (tagId) {
     if (strategy === 'legacy') throw new Error('1.12 不支持标签')
-    return strategy === 'string' ? `#${tagId}` : { tag: tagId }
+    if (strategy === 'string') {
+      if (count !== undefined && count > 1) return { tag: tagId, count }
+      return `#${tagId}`
+    }
+    return { tag: tagId }
   }
   throw new Error('无效的槽位值')
 }
@@ -331,12 +339,12 @@ export function formatRecipeJson(
     if (state.crafting.shapeless) {
       json.ingredients = getCraftingCells(state)
         .filter((cell): cell is SlotValue => cell !== null)
-        .map((value) => formatIngredient(value, context, strategy))
+        .map((value) => formatIngredient(value, context, strategy, slotCount(value)))
     } else {
       const { pattern, keys } = buildCraftingPattern(state, context)
       json.pattern = pattern
       json.key = Object.fromEntries(
-        keys.map(({ char, value }) => [char, formatIngredient(value, context, strategy)]),
+        keys.map(({ char, value }) => [char, formatIngredient(value, context, strategy, slotCount(value))]),
       )
     }
     const result = state.slots['crafting.result']
@@ -348,7 +356,9 @@ export function formatRecipeJson(
     state.recipeType === 'campfire_cooking'
   ) {
     const ingredient = state.slots['cooking.ingredient']
-    if (ingredient) json.ingredient = formatIngredient(ingredient, context, strategy)
+    if (ingredient) {
+      json.ingredient = formatIngredient(ingredient, context, strategy, slotCount(ingredient))
+    }
     const result = state.slots['cooking.result']
     if (result) {
       json.result = formatCookingResult(result, context, strategy, slotCount(result))
@@ -357,7 +367,9 @@ export function formatRecipeJson(
     json.cookingtime = state.cooking.time ?? DEFAULT_COOKING_TIME[state.recipeType]
   } else if (state.recipeType === 'stonecutter') {
     const ingredient = state.slots['stonecutter.ingredient']
-    if (ingredient) json.ingredient = formatIngredient(ingredient, context, strategy)
+    if (ingredient) {
+      json.ingredient = formatIngredient(ingredient, context, strategy, slotCount(ingredient))
+    }
     const result = state.slots['stonecutter.result']
     if (result) {
       json.result = formatStonecutterResult(result, context, strategy, slotCount(result))
@@ -366,9 +378,13 @@ export function formatRecipeJson(
     const template = state.slots['smithing.template']
     const base = state.slots['smithing.base']
     const addition = state.slots['smithing.addition']
-    if (template) json.template = formatIngredient(template, context, strategy)
-    if (base) json.base = formatIngredient(base, context, strategy)
-    if (addition) json.addition = formatIngredient(addition, context, strategy)
+    if (template) {
+      json.template = formatIngredient(template, context, strategy, slotCount(template))
+    }
+    if (base) json.base = formatIngredient(base, context, strategy, slotCount(base))
+    if (addition) {
+      json.addition = formatIngredient(addition, context, strategy, slotCount(addition))
+    }
     if (
       state.recipeType === 'smithing_trim' &&
       state.smithing.trimPattern &&
