@@ -19,6 +19,7 @@ import { systemManager, SYSTEM_ACTIONS } from '@/utils/api/system-manager'
 import ColorSelect from '../command/ColorSelect.vue'
 import { COLOR_OPTIONS } from '../command/generator'
 import RecipeItemIcon from './recipe-generator/RecipeItemIcon.vue'
+import { matchItem } from '@/utils/recipe-generator/itemSearch'
 import { ACHIEVEMENT_SCALE, ACHIEVEMENT_SIZE, drawAchievement } from './achievement/draw'
 
 const items = ref<AssetItem[]>([])
@@ -55,14 +56,7 @@ function colorHex(v: string) {
 const filteredItems = computed(() => {
   const q = keyword.value.trim().toLowerCase()
   if (!q) return items.value.slice(0, 200)
-  return items.value
-    .filter(
-      (i) =>
-        i.id.toLowerCase().includes(q) ||
-        i.name.toLowerCase().includes(q) ||
-        i.zh.toLowerCase().includes(q),
-    )
-    .slice(0, 200)
+  return items.value.filter((i) => matchItem(i, q)).slice(0, 200)
 })
 
 function pickItem(item: AssetItem) {
@@ -153,7 +147,7 @@ async function exportPng() {
       <!-- 成就图标 -->
       <div>
         <div class="text-xs font-medium text-gray-500 mb-2">成就图标</div>
-        <Input v-model="keyword" placeholder="搜索物品（ID / 名称 / 中文）…" size="small" clearable />
+        <Input v-model="keyword" placeholder="搜索物品（ID / 名称 / 中文 / 拼音）…" size="small" clearable />
         <div
           v-if="atlas && filteredItems.length && !selected"
           class="mt-2 max-h-48 overflow-y-auto rounded border border-gray-200"

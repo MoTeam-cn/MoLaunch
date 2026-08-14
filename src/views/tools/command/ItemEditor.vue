@@ -13,6 +13,7 @@ import Select from '@/components/common/Select.vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import { loadVersionItems } from '@/utils/recipe-generator/resources'
 import type { AssetItem } from '@/utils/recipe-generator/resources'
+import { matchItem } from '@/utils/recipe-generator/itemSearch'
 import { ENCHANTMENTS } from './data'
 import { GIVE_VERSIONS, TARGETS, buildGiveCommand } from './generator'
 import ColorSelect from './ColorSelect.vue'
@@ -36,12 +37,7 @@ onMounted(async () => {
 const filteredItems = computed(() => {
   const q = keyword.value.trim().toLowerCase()
   if (!q) return items.value.slice(0, 200)
-  return items.value.filter(
-    (i) =>
-      i.id.toLowerCase().includes(q) ||
-      i.name.toLowerCase().includes(q) ||
-      i.zh.toLowerCase().includes(q),
-  ).slice(0, 200)
+  return items.value.filter((i) => matchItem(i, q)).slice(0, 200)
 })
 
 function pickItem(item: AssetItem) {
@@ -94,7 +90,7 @@ async function copyCommand() {
       <!-- 物品选择 -->
       <div>
         <div class="text-xs font-medium text-gray-500 mb-2">选择物品</div>
-        <Input v-model="keyword" placeholder="搜索物品（ID / 名称 / 中文）…" size="small" clearable />
+        <Input v-model="keyword" placeholder="搜索物品（ID / 名称 / 中文 / 拼音）…" size="small" clearable />
         <div v-if="filteredItems.length && !selected" class="mt-2 max-h-48 overflow-y-auto rounded border border-gray-200">
           <button
             v-for="item in filteredItems"

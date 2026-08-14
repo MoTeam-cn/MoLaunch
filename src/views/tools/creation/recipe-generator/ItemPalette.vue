@@ -8,6 +8,7 @@ import 'vue-virtual-scroller/index.css'
 import type { AssetItem, AtlasLayout } from '@/utils/recipe-generator/resources'
 import type { SlotValue } from '@/utils/recipe-generator/types'
 import RecipeItemIcon from './RecipeItemIcon.vue'
+import { matchItem } from '@/utils/recipe-generator/itemSearch'
 
 const props = defineProps<{
   items: AssetItem[]
@@ -24,12 +25,7 @@ const query = ref('')
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
   if (!q) return props.items
-  return props.items.filter(
-    (item) =>
-      item.id.toLowerCase().includes(q) ||
-      item.name.toLowerCase().includes(q) ||
-      item.zh.toLowerCase().includes(q),
-  )
+  return props.items.filter((item) => matchItem(item, q))
 })
 
 /** 每行 4 个，按行做虚拟滚动，避免上千个 DOM 节点导致滑动卡顿 */
@@ -58,7 +54,7 @@ function pick(item: AssetItem) {
         v-model="query"
         type="text"
         class="w-full rounded border border-gray-300 px-3 py-1.5 text-sm outline-none transition focus:border-primary-500"
-        placeholder="搜索物品（名称 / ID / 中文）…"
+        placeholder="搜索物品（名称 / ID / 中文 / 拼音）…"
       />
     </div>
     <div class="item-palette-count">
