@@ -20,6 +20,8 @@
 
 ### Changed
 
+- **移除顶部导航栏右上角「最大化/还原」窗口按钮**（[TopNavLayout.vue](src/components/layout/TopNavLayout.vue)）：窗口控制仅保留最小化与关闭，删除最大化/还原按钮及其 `isMaximized` 状态与窗口 resize 监听；双击标题栏拖拽区域等系统级最大化方式不受影响。
+
 - **物品编辑支持指令版本兼容，颜色下拉改为中文 + 圆形色块**（[generator.ts](src/views/tools/command/generator.ts) / [ColorSelect.vue](src/views/tools/command/ColorSelect.vue)（新增） / [ItemEditor.vue](src/views/tools/command/ItemEditor.vue) / [SignShop.vue](src/views/tools/command/SignShop.vue) / [SummonEntity.vue](src/views/tools/command/SummonEntity.vue) / [data.ts](src/views/tools/command/data.ts)）：/give 指令生成新增「指令版本」选择——「1.20.5+（物品组件）」输出物品组件方括号格式（`[minecraft:enchantments={levels:{"minecraft:sharpness":1}},minecraft:custom_name='...',minecraft:lore=[...]]`），「1.13 - 1.20.4（NBT）」输出原有 `{Enchantments:[...],display:{Name:...}}` 花括号格式，「1.12.2 及以前（数字附魔 ID）」输出 `ench:[{id:16s,lvl:5s}]` + 字符串 Name/Lore（`/give <玩家> <物品> <数量> 0 {NBT}`，附魔表补充 legacy 数字 ID，1.13+ 才有的附魔自动跳过）；16 色选项由英文名改为中文名（黑色/深蓝/金色/…），并新增封装公共 `Select` 的 `ColorSelect` 组件在触发器与下拉选项中渲染圆形色块预览，物品编辑 / 告示牌商店 / 召唤实体三处颜色选择统一复用。
 
 - **指令生成工具下拉改用公共 Select 组件**（[ItemEditor.vue](src/views/tools/command/ItemEditor.vue) / [SignShop.vue](src/views/tools/command/SignShop.vue) / [SummonEntity.vue](src/views/tools/command/SummonEntity.vue) / [generator.ts](src/views/tools/command/generator.ts)）：物品编辑（目标玩家 / 名称颜色 / 附魔）、告示牌商店（类型 / 朝向 / 文字颜色）、召唤实体（实体 / 名称颜色）共 8 处浏览器原生 `<select>` 全部替换为项目公共 `Select` 组件，下拉交互与设置页保持一致；16 色选项映射提取为公共 `COLOR_OPTIONS` 供三个组件复用，避免重复实现。

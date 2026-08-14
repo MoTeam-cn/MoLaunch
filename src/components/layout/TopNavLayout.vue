@@ -24,8 +24,6 @@ const { enabled: experimentalEnabled } = useExperimental()
 
 const router = useRouter()
 const route = useRoute()
-const isMaximized = ref(false)
-const unlistenResized = ref<(() => void) | null>(null)
 
 const visibleNavItems = computed(() => {
   const items = topNavItems.filter((i) => i.path !== experimentalNavItem.path)
@@ -164,17 +162,9 @@ const trayCheckEvent = useTauriEvent('tray-check-update', () => {
 onMounted(async () => {
   closeReqEvent.start()
   trayCheckEvent.start()
-  isMaximized.value = await appWindow.isMaximized()
-  unlistenResized.value = await appWindow.onResized(async () => {
-    isMaximized.value = await appWindow.isMaximized()
-  })
 })
 
 onUnmounted(() => {
-  if (unlistenResized.value) {
-    unlistenResized.value()
-    unlistenResized.value = null
-  }
   closeReqEvent.stop()
   trayCheckEvent.stop()
 })
@@ -239,20 +229,6 @@ onUnmounted(() => {
           >
             <svg class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
               <rect x="1" y="5.5" width="10" height="1" rx="0.5" fill="currentColor" />
-            </svg>
-          </button>
-
-          <!-- 最大化/还原 -->
-          <button
-            class="h-full w-11 flex items-center justify-center hover:bg-white/10 transition-colors group"
-            @click="appWindow.toggleMaximize()"
-          >
-            <svg v-if="!isMaximized" class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
-              <rect x="1.5" y="1.5" width="9" height="9" rx="1" stroke="currentColor" stroke-width="1" />
-            </svg>
-            <svg v-else class="w-3.5 h-3.5 text-white/60 group-hover:text-white" viewBox="0 0 12 12" fill="none">
-              <rect x="3.5" y="0.5" width="7.5" height="7.5" rx="1" stroke="currentColor" stroke-width="1" />
-              <path d="M1 3.5V10C1 10.5523 1.44772 11 2 11H8.5" stroke="currentColor" stroke-width="1" />
             </svg>
           </button>
 
