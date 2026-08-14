@@ -30,6 +30,8 @@
 
 - **成就生成器默认改用 Minecraft 原版像素字体**（[AchievementGenerator.vue](src/views/tools/creation/AchievementGenerator.vue)）：字体下拉新增「Minecraft 原版（推荐）」并默认选中，font-family 链为 `'Minecraft Default', 'Unifont CJK', 'Microsoft YaHei', 'PingFang SC', sans-serif`——拉丁/数字用官方像素字、中文用 unifont 像素字（与游戏内一致），缺失字形再回退系统字体；绘制前先 `document.fonts.load` + `document.fonts.ready` 触发并等待内置字体加载，Canvas 首帧即用真实字体而非系统回退。
 
+- **成就生成器弹窗质感对齐参考图**（[draw.ts](src/views/tools/creation/achievement/draw.ts) / [AchievementGenerator.vue](src/views/tools/creation/AchievementGenerator.vue)）：按第三方成就生成网站输出样例逐像素比对后调整绘制参数——画布高度 65→64，三层边框去掉 4~5px 圆角改直角（与原版成就弹窗一致，黑 2px + 灰 4px + 内底 #212121）；标题/内容文字由 12px/11px 细字统一升级为 `bold 18px` 粗像素字（Minecraft Default 700 实测字形高约 12px、字符约 10px 宽，与样例字形吻合），文字起始 x 48→60、基线对齐样例（28/50）；物品图标保持 30×30 垂直居中并新增 1px 深色衬底（#141414）提升层次感；版权水印降为 8px、0.5 不透明度的右下角小字，不喧宾夺主；Vue 侧 `ensureFonts` 预加载字号同步更新为 18px。
+
 - **成就生成器预览区水印说明改为右下角小字**（[AchievementGenerator.vue](src/views/tools/creation/AchievementGenerator.vue)）：「图片右下角含 MoLaunch 版权水印」说明不再与导出按钮同行，改为预览灰底容器右下角绝对定位的小字（10px，与图片内实际水印位置呼应），导出按钮单独一行居中。
 
 - **移除顶部导航栏右上角「最大化/还原」窗口按钮**（[TopNavLayout.vue](src/components/layout/TopNavLayout.vue)）：窗口控制仅保留最小化与关闭，删除最大化/还原按钮及其 `isMaximized` 状态与窗口 resize 监听；双击标题栏拖拽区域等系统级最大化方式不受影响。

@@ -2,7 +2,7 @@
 /**
  * 创作指令 - 成就生成器
  *
- * Canvas 2D 绘制原版风格「获得成就」弹窗（320×65、2 倍率输出），
+ * Canvas 2D 绘制原版风格「获得成就」弹窗（320×64、2 倍率输出），
  * 支持物品图标 / 标题内容颜色 / 字体，导出 PNG 到指定目录；
  * 图片右下角固定叠加白色 MoLaunch 版权水印。
  */
@@ -93,9 +93,9 @@ function draw() {
 /** Canvas 直接引用 @font-face 字体时需先触发加载，否则首帧会回退到默认字体 */
 async function ensureFonts() {
   await Promise.allSettled([
-    document.fonts.load('700 12px "Minecraft Default"'),
-    document.fonts.load('400 9px "Minecraft Default"'),
-    document.fonts.load('400 12px "Unifont CJK"'),
+    document.fonts.load('700 18px "Minecraft Default"'),
+    document.fonts.load('400 8px "Minecraft Default"'),
+    document.fonts.load('400 18px "Unifont CJK"'),
   ])
   await document.fonts.ready
 }
