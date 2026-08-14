@@ -26,6 +26,8 @@
 
 ### Changed
 
+- **种子地图 Worker 改为共享单例，页签切换不再重复创建 Worker/拉取模块**（[workerPool.ts](src/utils/seedmap/workerPool.ts) / [useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：此前每次进入种子地图（子页签 `v-if` 切换销毁重建）都会新建 `WorkerPool` 并重新创建 N 个 Worker，每个 Worker 都要重新拉取整条 worker 模块图（wasm-bindings.ts、tile-render、结构查找等），dev 下表现为 wasm-bindings.ts 等模块被反复请求。现在新增模块级共享单例 `getSharedWorkerPool()`：Worker 首次进入创建一次后常驻，`init` 幂等（已初始化且有存活 Worker 时直接复用，全部终止才重建），页面卸载不再 `dispose` Worker；切换离开/回到种子地图不再重复创建 Worker、拉取 worker 模块或重复实例化 WASM。
+
 - **种子地图 WASM 改为主线程缓存，重复进入页面不再重复加载 JS/WASM**（[wasm-loader.ts](src/utils/wasm-loader.ts) / [workerPool.ts](src/utils/seedmap/workerPool.ts) / [wasm-bindings.ts](src/utils/seedmap/wasm-bindings.ts) / [types.ts](src/utils/seedmap/types.ts) / [useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：此前每个 Worker 初始化时各自 `fetch` `cubiomes.js`（17KB）+ `cubiomes.wasm`（755KB），且每次进入种子地图（子页签 `v-if` 切换销毁重建）都会重新走一遍 res:// 加载。现在新增主线程缓存 `getWasmBundle()`——同一份胶水 JS 文本 + WASM 二进制整个应用生命周期只 fetch 一次，WorkerPool 通过 init 消息把字节分发给各 Worker（`wasmJsCode`/`wasmBytes`），Worker 端优先使用传入字节，仅无缓存时回退按 URL fetch；切换离开/回到种子地图不再触发任何 res:// 网络加载。
 
 - **构建产物静态资源按类别分目录输出**（[vite.config.ts](vite.config.ts) / [constants.ts](src/utils/seedmap/constants.ts)）：`assetFileNames` 按扩展名把图片输出到 `assets/img/`（png/jpg/webp/svg 等）、字体输出到 `assets/font/`（woff/woff2/ttf/otf/eot），与既有 `assets/css` / `assets/js` / `assets/json` 目录规则一致；同时修复 Web Worker 独立构建不继承主 `assetFileNames` 导致的结构图标重复输出——worker 产物在顶层 `worker.rollupOptions.output` 显式归类（入口/动态 chunk 进 `assets/js/`、图片进 `assets/img/`），并移除 `import.meta.glob` 加载结构图标时的 `query:'?url'` 写法（默认导出即资源 URL），消除 webp 在 `assets/` 根目录的残留。

@@ -47,6 +47,8 @@ export class WorkerPool {
   private workers: WorkerHandle[] = []
   private nextWorkerIdx = 0
   private disposed = false
+  /** 已成功完成一次 init（共享单例场景下页面重入直接复用，不重复创建 Worker） */
+  private initialized = false
   /** 计划创建的 Worker 数量（init 后归零） */
   private plannedCount: number
 
@@ -67,6 +69,13 @@ export class WorkerPool {
    */
   async init(bundle: WasmBundle): Promise<void> {
     if (this.disposed) throw new Error('WorkerPool 已 dispose')
+    // 已成功 init 且有存活 Worker：直接复用，不再重复创建 Worker / 拉取 worker 模块图
+    if (this.initialized && this.workers.some((w) => !w.terminated)) return
+    // 首次 init 或上次中断/全部终止：清理残留 Worker 后重建
+    for (const w of this.workers) {
+      try { w.worker.terminate() } catch { /* ignore */ }
+    }
+    this.workers = []
     const count = this.plannedCount
     const initPromises: Promise<void>[] = []
     for (let i = 0; i < count; i++) {
@@ -106,6 +115,7 @@ export class WorkerPool {
       initPromises.push(initPromise)
     }
     await Promise.all(initPromises)
+    this.initialized = true
   }
 
   /** 广播 prepare_seed 到所有 Worker，等所有 Worker 确认 */
@@ -296,4 +306,19 @@ export class WorkerPool {
       try { worker.worker.terminate() } catch { /* ignore */ }
     }
   }
+}
+
+// ===== 共享单例 =====
+let sharedPool: WorkerPool | null = null
+
+/**
+ * 获取全局共享的 WorkerPool 单例
+ *
+ * 种子地图页签切换（v-if 销毁重建组件）不销毁 Worker：首次进入创建一次，
+ * 之后直接复用，避免每次进入重复创建 Worker、重新拉取 worker 模块图（wasm-bindings 等）
+ * 与重复实例化 WASM。
+ */
+export function getSharedWorkerPool(): WorkerPool {
+  if (!sharedPool) sharedPool = new WorkerPool()
+  return sharedPool
 }

@@ -8,7 +8,7 @@
 import { ref, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { getStructIcon, getStructIconUrl } from '@/utils/seedmap/constants'
-import { WorkerPool } from '@/utils/seedmap/workerPool'
+import { getSharedWorkerPool, type WorkerPool } from '@/utils/seedmap/workerPool'
 import { getWasmBundle } from '@/utils/wasm-loader'
 import { formatCoord, copyToClipboard } from '@/utils/seedmap/format'
 import { getStructuresForVersion } from '@/utils/seedmap/structures'
@@ -264,7 +264,8 @@ export function useSeedMap() {
     await nextTick()
     initMap()
     try {
-      pool = new WorkerPool()
+      // 共享单例 Worker：首次进入创建后常驻，页签切换不再重复创建 Worker / 拉取模块
+      pool = getSharedWorkerPool()
       await pool.init(await getWasmBundle('cubiomes.js'))
       await loadSeed(DEFAULT_SEED)
     } catch (e) {
@@ -274,7 +275,7 @@ export function useSeedMap() {
   onBeforeUnmount(() => {
     disposeEvents?.()
     disposeEvents = null
-    pool?.dispose()
+    // 共享单例 Worker 常驻，不 dispose：下次进入直接复用（避免重复创建 Worker/拉取模块）
     pool = null
     if (map) { map.setTarget(undefined); map = null }
   })
