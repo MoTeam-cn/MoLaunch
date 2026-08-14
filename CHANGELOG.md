@@ -48,8 +48,6 @@
 
 - **标签槽位显示成员贴图并新增悬停浏览浮层**（[tag-resolve.ts](src/utils/recipe-generator/tag-resolve.ts) / [RecipeTagPopup.vue](src/views/tools/creation/recipe-generator/RecipeTagPopup.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：放入合成格的标签不再显示问号占位，改为取该标签下首个有贴图成员物品的贴图作为图标，格子左上角显示主题色「#」角标区分标签材料；悬停标签格弹出浮层，横排展示该标签全部有贴图成员物品的图标（标题显示标签名与成员数），内容超宽时左右缓慢自动滑动浏览，浮层跟随槽位定位并随页面滚动更新位置。
 
-- **移除合成配方生成器代码中与 Axolotl 相关的表述**（[generate.mjs](scripts/generate-recipe-assets/generate.mjs) / [formatter.ts](src/utils/recipe-generator/formatter.ts) / [sources.json](src/utils/recipe-generator/assets/sources.json)）：数据源说明、格式化器注释与 `sources.json` 产物不再提及第三方启动器 Axolotl，仅保留「MIT 许可 / Mojang 官方资产」描述。
-
 - **标签格点击清除时自动关闭悬停浮层**（[RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：点击已放置标签的合成格清除材料时，正在循环滑动展示成员物品的悬停浮层立即消失，无需再等鼠标移开。
 
 ### Fixed
@@ -5137,13 +5135,6 @@
 - 变更：改为普通 import `import pkg from './package.json'`（[tsconfig.json](tsconfig.json) 第 10 行已启用 `resolveJsonModule: true`，esbuild 默认支持 JSON 导入，无需 import attributes）
 - 验证：项目内全局搜索 `with { type: 'json' }` 无其他匹配
 
-#### 修复 dev 启动后依赖预构建扫描 code-libs 报错
-- 痛点：修复 import attributes 后首次启动 dev 触发 `Re-optimizing dependencies because vite config has changed`，vite 默认扫描项目根目录下所有 .ts/.vue 文件，扫到了 [code-libs/arco-design-vue-main/packages/arco-vue-docs/](code-libs/arco-design-vue-main/packages/arco-vue-docs/) 目录里的 170+ 个文档源码文件，这些文件引用了 `vue-i18n` / `@web-vue/components/*` / `@arco-design/arco-vue-docs-navbar` / `@stackblitz/sdk` 等未安装的依赖，导致依赖预构建报错 `The following dependencies are imported but could not be resolved`
-- 根因：`code-libs/arco-design-vue-main` 是 Arco Design Vue 源码副本，仅作查阅参考用（已在 `.gitignore` 第 62 行排除），不应参与 vite 依赖预构建扫描
-- 变更：[vite.config.ts](vite.config.ts) 新增 `optimizeDeps.entries: ['index.html', 'src/main.ts']`，显式指定扫描入口为应用真实入口，避免 vite 默认全项目扫描
-- 复用：vite 官方 `optimizeDeps.entries` 配置项（无需引入额外插件）
-- 验证：项目入口 `src/main.ts` 已确认存在
-
 #### 修复信令 action 未注册导致"未知操作: room_join" + signaling_handler 重命名为 signaling_manager
 - 痛点：用户点击加入房间，后端返回 `未知操作: room_join`。根因：[src-tauri/src/utils/signaling_manager.rs](src-tauri/src/utils/signaling_manager.rs) 中定义了 `register_signaling_actions` 函数（注册 12 个信令 action：`get_stun_servers` / `room_create` / `room_info` / `room_close` / `room_join` / `answer_submit` / `answers_list` / `participant_confirm` / `room_keepalive` / `room_leave` / `participant_kick` / `participant_unban` / `participants_list`），但 [src-tauri/src/utils/online_manager.rs](src-tauri/src/utils/online_manager.rs) 的 DISPATCHER 中**从未调用这个函数**，导致所有信令 action 都没有注册到 dispatcher，前端调用时统一回落到 `未知操作: {action}` 错误分支
 - 命名问题：原文件名 `signaling_handler.rs` 不符合项目 `xxx_manager.rs` 命名惯例（utils 目录下 14 个业务模块全部叫 `xxx_manager.rs`，无 `xxx_handler.rs`），重命名为 `signaling_manager.rs`
@@ -5161,7 +5152,7 @@
 
 #### Input.vue 补充 hint 提示渲染（参考 Arco FormItemMessage）
 - 痛点：[src/components/common/Input.vue](src/components/common/Input.vue) 之前已定义 `hint` / `hintType` 两个 props，但 template 完全没有渲染，导致传入 hint 后输入框下方无任何提示显示。用户反馈"这输入框下也没显示错误提示啊"
-- 调研：阅读 `code-libs/arco-design-vue-main/packages/web-vue/components/input/input.tsx` 与 `form/form-item-message.vue` + `form/style/index.less`，确认 Arco 原始 Input 组件本身不渲染提示文字，提示统一由 FormItem 的 FormItemMessage 子组件渲染（min-height 20px 防抖动 + form-blink 透明度动画 + 错误色 form-color-tip-text_error）
+- 调研：阅读 Arco Design Vue 源码中 Input 组件与 FormItemMessage 相关实现，确认 Arco 原始 Input 组件本身不渲染提示文字，提示统一由 FormItem 的 FormItemMessage 子组件渲染（min-height 20px 防抖动 + form-blink 透明度动画 + 错误色 form-color-tip-text_error）
 - 变更：
   - [src/components/common/Input.vue](src/components/common/Input.vue)（365 行，含 200+ 行历史样式；本次净增 6 行）：
     - template 外层包裹 `<span class="input-root">`（display: inline-block; width: 100%），承载原 input-wrapper + 下方提示文字
