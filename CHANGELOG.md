@@ -40,6 +40,8 @@
 
 - **移除合成配方生成器代码中与 Axolotl 相关的表述**（[generate.mjs](scripts/generate-recipe-assets/generate.mjs) / [formatter.ts](src/utils/recipe-generator/formatter.ts) / [sources.json](src/utils/recipe-generator/assets/sources.json)）：数据源说明、格式化器注释与 `sources.json` 产物不再提及第三方启动器 Axolotl，仅保留「MIT 许可 / Mojang 官方资产」描述。
 
+- **标签格点击清除时自动关闭悬停浮层**（[RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：点击已放置标签的合成格清除材料时，正在循环滑动展示成员物品的悬停浮层立即消失，无需再等鼠标移开。
+
 ### Fixed
 
 - **修复配方物品图标缺失与床图标错用羊毛**（[generate.mjs](scripts/generate-recipe-assets/generate.mjs)）：三类成因逐一修复——① 上游 minecraft-assets 的 items_textures 把各色床错误映射为对应羊毛贴图，现静态覆写为官方床实体贴图 `entity/bed/<color>`（含 1.12 旧版床）；② 1.21.9+ 起 items_textures 删除指南针条目但贴图文件仍在，覆写为 `items/compass_16`；③ 26.2「Chaos Cubed」新增的朱砂/硫黄方块族（26 个）与金蒲公英，minecraft-assets 尚未收录，现从 Mojang 官方 26.2 客户端 jar 提取 9 张基础方块纹理（台阶/楼梯/墙复用基础纹理，与既有 slab/stairs 映射惯例一致），铜傀儡像 8 变种一并覆写为官方实体贴图（waxed 复用对应氧化态）；图集重建后仅 `air` 无贴图。

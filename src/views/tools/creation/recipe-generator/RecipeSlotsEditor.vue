@@ -83,8 +83,12 @@ const resultDisplay = computed(() =>
 )
 
 function onSlotClick(slot: RecipeSlot) {
-  if (props.values[slot]) emit('update-slot', slot, undefined)
-  else if (slot !== props.resultSlot) emit('edit-slot', slot)
+  if (props.values[slot]) {
+    closeHover()
+    emit('update-slot', slot, undefined)
+  } else if (slot !== props.resultSlot) {
+    emit('edit-slot', slot)
+  }
 }
 
 function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
