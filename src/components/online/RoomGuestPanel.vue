@@ -37,11 +37,12 @@ import VirtualIpCard from './VirtualIpCard.vue'
 import ModpackRequirementCard from './ModpackRequirementCard.vue'
 import RoomToolsDrawer from './RoomToolsDrawer.vue'
 import ConnectionTransportStatus from './ConnectionTransportStatus.vue'
+import P2pFailureCard from './P2pFailureCard.vue'
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
 
-/** 加入方 PC 数组（状态行传输方式检测用，单 PC） */
+/** 加入方本地 PC 数组（状态行传输方式检测用，单 PC） */
 const guestPcs = computed(() => (guestWebrtc.pc.value ? [guestWebrtc.pc.value] : []))
 
 /** 房间工具抽屉开关（检查 MC 服务 / 网络连通性 / 端口自动检测） */
@@ -49,6 +50,8 @@ const toolsDrawerOpen = ref(false)
 
 /** 全局联机会话：退出房间清理 / TUN / 密钥注入均由会话统一管理 */
 const session = getOnlineSession()
+/** 对端（房主）NAT 条目：组网失败诊断卡片展示用 */
+const hostPeerNat = computed(() => [{ label: '房主', natType: session.hostNatType.value }])
 // 管理员提权重启恢复：存在待重连密码时挂载后自动重连（重建 WebRTC 与房间会话，TUN 同步重启）
 useGuestReconnect(guestWebrtc, session.lan)
 
@@ -212,10 +215,10 @@ onMounted(() => {
           </div>
         </div>
       </div>
-      <AlertV2
+      <P2pFailureCard
         v-else-if="connState === 'failed'"
-        type="error"
-        message="连接失败，可能是 NAT 兼容性问题。请检查网络环境后重试"
+        :self-nat-type="store.natResult?.type ?? null"
+        :peers="hostPeerNat"
       />
     </Card>
 

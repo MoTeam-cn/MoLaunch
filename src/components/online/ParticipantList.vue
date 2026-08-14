@@ -8,16 +8,30 @@
 import Button from '@/components/common/Button.vue'
 import { UsersIcon } from '@heroicons/vue/24/outline'
 import type { ParticipantInfo } from '@/types/online'
+import { resolveNatMeta, getNatFeasibilityColorClass } from '@/utils/online/nat-type'
 
 defineProps<{
   participants: ParticipantInfo[]
   /** 获取参与者连接状态文本（由父组件代理查 hostMesh.getConnState） */
   connStateText: (participantId: string) => string
+  /** 获取参与者 NAT 类型（由父组件代理查 participantNatTypes，未上报返回 null） */
+  natTypeOf: (participantId: string) => string | null
 }>()
 
 const emit = defineEmits<{
   kick: [participantId: string, devicePk: string]
 }>()
+
+/** NAT 类型展示（未知回退原始字符串/未获取） */
+function natBadgeText(natType: string | null) {
+  return resolveNatMeta(natType)?.label ?? (natType || '未获取')
+}
+
+/** NAT 徽章配色 */
+function natBadgeClass(natType: string | null) {
+  const meta = resolveNatMeta(natType)
+  return meta ? getNatFeasibilityColorClass(meta.feasibility) : 'bg-gray-100 text-gray-600'
+}
 </script>
 
 <template>
@@ -34,8 +48,14 @@ const emit = defineEmits<{
     >
       <div>
         <div class="text-xs font-medium text-gray-900">{{ p.devicePk.slice(0, 12) }}...</div>
-        <div class="text-xs text-gray-500">
-          {{ p.virtualIp }} · {{ p.status }} · {{ connStateText(p.participantId) }}
+        <div class="mt-0.5 flex items-center gap-1.5 text-xs text-gray-500">
+          <span>{{ p.virtualIp }} · {{ p.status }} · {{ connStateText(p.participantId) }}</span>
+          <span
+            class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[11px] font-medium"
+            :class="natBadgeClass(natTypeOf(p.participantId))"
+          >
+            {{ natBadgeText(natTypeOf(p.participantId)) }}
+          </span>
         </div>
       </div>
       <Button type="ghost" size="mini" @click="emit('kick', p.participantId, p.devicePk)">踢出</Button>

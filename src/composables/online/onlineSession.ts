@@ -35,9 +35,11 @@ import { peekJoinPassword } from '@/utils/relaunchSnapshot'
 import {
   decode,
   CONTROL_SUBTYPE,
+  encodeNatType,
   parseHostMcPortPayload,
   decodeTurnServersPayload,
   parseHostVirtualIpPayload,
+  parseNatTypePayload,
 } from '@/utils/online/protocol'
 import { toastError } from '@/utils/toast'
 
@@ -70,6 +72,10 @@ export interface OnlineSession {
   lanFakeActive: Ref<boolean>
   /** 局域网伪装本地监听端口（0 表示未启用） */
   lanFakePort: Ref<number>
+  /** 房主下发的 NAT 类型（组网失败诊断展示用，未收到时为 null） */
+  hostNatType: Ref<string | null>
+  /** 各参与者上报的 NAT 类型（key=participantId，房主侧组网诊断展示用） */
+  participantNatTypes: Map<string, string>
 }
 
 let session: OnlineSession | null = null
@@ -415,11 +421,35 @@ function createSession(): OnlineSession {
             if (ip) store.roomState.hostVirtualIp = ip
             return
           }
+          if (msg.kind === 'control' && msg.subtype === CONTROL_SUBTYPE.NAT_TYPE) {
+            const natType = parseNatTypePayload(msg.payload)
+            if (natType) hostNatType.value = natType
+            return
+          }
           if (msg.kind === 'data') void lan.forwardToTun(raw)
         },
       })
     },
     { immediate: true },
+  )
+
+  // 双方 NAT 类型交换：加入方上报自己的 NAT，并接收房主下发的 NAT（供组网失败诊断展示）
+  const hostNatType = ref<string | null>(null)
+  let guestNatSeq = 0
+  function reportGuestNat() {
+    const channel = guestWebrtc.dataChannel.value
+    const natType = store.natResult?.type
+    if (!channel || channel.readyState !== 'open' || !natType) return
+    guestNatSeq += 1
+    channel.send(encodeNatType(guestNatSeq, natType))
+  }
+  // NAT 检测完成或 DataChannel 重新打开（含重连恢复）时补报
+  watch(() => store.natResult?.type, reportGuestNat)
+  watch(
+    () => guestWebrtc.dataChannel.value?.readyState,
+    (state) => {
+      if (state === 'open') reportGuestNat()
+    },
   )
 
   // 加入方 MC 局域网伪装：本地伪装 LAN 服务器，本机 MC 多人游戏界面直接发现房主房间
@@ -555,6 +585,7 @@ function createSession(): OnlineSession {
     lan,
     pendingAnswers: hostOps.pendingAnswers,
     offerGenerating: hostOps.offerGenerating,
+    participantNatTypes: hostOps.participantNatTypes,
     bannedList: hostOps.bannedList,
     banServerTime: hostOps.banServerTime,
     confirming: hostOps.confirming,
@@ -568,5 +599,6 @@ function createSession(): OnlineSession {
     guestLeaveAndCleanup,
     lanFakeActive,
     lanFakePort,
+    hostNatType,
   }
 }

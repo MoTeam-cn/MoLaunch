@@ -2,7 +2,7 @@
 //! 定义 P2P DataChannel 上传输的二进制消息帧格式，用于虚拟网卡 IP 包转发
 //! 与控制消息（心跳、状态查询）。
 //! 帧格式：`type(1B) | seq(u32 BE) | length(u16 BE) | payload`，大端序网络字节序。
-//! Control 子类型：Heartbeat/StatusQuery/StatusResponse/HostMcPort/TurnServers/HostVirtualIp。
+//! Control 子类型：Heartbeat/StatusQuery/StatusResponse/HostMcPort/TurnServers/HostVirtualIp/NatType。
 
 use std::io::{self, Cursor, Read};
 
@@ -53,6 +53,13 @@ pub enum ControlSubtype {
     ///
     /// payload 为 UTF-8 IP 字符串。
     HostVirtualIp = 0x06,
+    /// 双方交换 NAT 类型（DataChannel 建立后互报，供组网失败诊断展示）
+    ///
+    /// payload 为 JSON UTF-8 字节，结构为 `{"nat":"<类型>"}`：
+    /// ```json
+    /// {"nat":"RestrictedCone"}
+    /// ```
+    NatType = 0x07,
 }
 
 impl ControlSubtype {

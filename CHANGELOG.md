@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **联机 P2P 组网失败诊断：友好提示 + 双方 NAT 类型 + TURN 无资源时给出 FRP 替代方案**（[protocol.ts](src/utils/online/protocol.ts) / [protocol.rs](src-tauri/src/minecraft/online/protocol.rs) / [onlineSession.ts](src/composables/online/onlineSession.ts) / [useRoomHostPolling.ts](src/composables/useRoomHost/useRoomHostPolling.ts) / [useRoomHost.ts](src/composables/useRoomHost.ts) / [P2pFailureCard.vue](src/components/online/P2pFailureCard.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue) / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [ParticipantList.vue](src/components/online/ParticipantList.vue) / [format.ts](src/utils/online/format.ts)）：协议层新增控制消息 `NatType(0x07)`（前后端同步），DataChannel 建立后双方自动交换 NAT 类型；加入方面板连接失败时以全新 `P2pFailureCard` 替代僵硬错误提示——用通俗文案解释「双方网络都处于较严格 NAT、打洞未穿透」，并绘制「我的网络 / 对方网络」的 NAT 徽章（悬停可看联机兼容性说明）；当服务端 TURN 中继无可用资源（未拉取到或返回空列表）时补充给出第三方内网穿透 / FRP（SakuraFrp、花生壳）、虚拟组网（ZeroTier、Radmin VPN、Tailscale）、路由器 UPnP/DMZ 等替代联机方案；房主侧对 `failed` 参与者同样展示诊断卡片，参与者列表新增 NAT 徽章列；NAT 元数据解析提取为共享 `resolveNatMeta`。
+
 ### Removed
 
 - **移除工具模块「启动器数据导出」功能**（[data_export.rs](src-tauri/src/commands/tools/data_export.rs) / [types/data_export.rs](src-tauri/src/commands/tools/types/data_export.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [mod.rs](src-tauri/src/commands/tools/mod.rs) / [types/mod.rs](src-tauri/src/commands/tools/types/mod.rs) / [DataExporter.vue](src/views/tools/data/DataExporter.vue) / [QuickTools.vue](src/views/QuickTools.vue) / [data.ts](src/utils/api/tools/data.ts) / [core.ts](src/utils/api/tools/core.ts)）：便捷工具页「启动器数据导出」无实际意义，前后端整体移除——后端删除 `data_export` 模块与 `export_launcher_data` action 注册，前端删除 `DataExporter.vue` 组件、`exportLauncherData` 封装及 `EXPORT_LAUNCHER_DATA` action 常量；`tools/data.ts` 中其余数据类工具（崩溃分析 / 截图 / 资源包 / 版本 JSON / NBT）封装保留。

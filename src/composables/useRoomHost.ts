@@ -54,6 +54,7 @@ export function useRoomHost(options: {
   const {
     pendingAnswers,
     offerGenerating,
+    participantNatTypes,
     pollParticipants,
     pollAnswers,
     doKeepalive,
@@ -194,6 +195,7 @@ export function useRoomHost(options: {
   return {
     pendingAnswers,
     offerGenerating,
+    participantNatTypes,
     bannedList,
     banServerTime,
     confirming,

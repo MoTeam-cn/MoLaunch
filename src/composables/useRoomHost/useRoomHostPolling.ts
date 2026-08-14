@@ -5,7 +5,7 @@
  * 断线恢复（系统 TURN 在参与者开始协商时按需就位）、30s 防刷屏 toast 与
  * 定时器启停；生命周期由主文件 useRoomHost.ts 负责。
  */
-import { ref, watch } from 'vue'
+import { reactive, ref, watch } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { RoomClosedError } from '@/stores/online/roomActions'
 import type { useWebRTCMesh } from '@/composables/useWebRTCMesh'
@@ -18,7 +18,14 @@ import {
 import { buildIceServers, stunUrlsToIceServers } from '@/utils/online/webrtc-helpers'
 import type { IceServerEntry, PendingAnswer } from '@/types/online'
 import { toastError } from '@/utils/toast'
-import { encodeHostMcPort, encodeHostVirtualIp } from '@/utils/online/protocol'
+import {
+  CONTROL_SUBTYPE,
+  decode,
+  encodeHostMcPort,
+  encodeHostVirtualIp,
+  encodeNatType,
+  parseNatTypePayload,
+} from '@/utils/online/protocol'
 
 /** 防刷屏 toast 间隔：30s 内同类型错误不重复弹 */
 const POLL_ERROR_TOAST_INTERVAL = 30_000
@@ -63,6 +70,8 @@ export function useRoomHostPolling(
    * 「Offer 已生成待确认」标记，抑制重复生成；待 refresh 到 hostOfferReady=true 后清除。
    */
   const offerReadyLocal = new Set<string>()
+  /** 各参与者上报的 NAT 类型（组网失败诊断展示用，key=participantId） */
+  const participantNatTypes = reactive(new Map<string, string>())
   /** 正在执行 ICE restart 的参与者（防并发，key=participantId） */
   const restarting = new Set<string>()
   /** 重启中且重启前已确认的参与者（key=participantId，value=wasConfirmed，用于自动放行重答） */
@@ -115,27 +124,42 @@ export function useRoomHostPolling(
       const { sdp, iceCandidates } = await hostMesh.createOfferFor(
         participantId,
         iceServers,
-        hostIp
-          ? () => {
-              void hostMesh.sendToParticipant(
-                participantId,
-                encodeHostVirtualIp(hostIpSeq++, hostIp),
-              )
-              const hostPort = store.roomState.hostMcPort
-              if (hostPort > 0) {
-                void hostMesh.sendToParticipant(
-                  participantId,
-                  encodeHostMcPort(mcPortSeq++, hostPort),
-                )
-              }
-            }
-          : undefined,
+        () => {
+          if (hostIp) {
+            void hostMesh.sendToParticipant(
+              participantId,
+              encodeHostVirtualIp(hostIpSeq++, hostIp),
+            )
+          }
+          const hostPort = store.roomState.hostMcPort
+          if (hostPort > 0) {
+            void hostMesh.sendToParticipant(
+              participantId,
+              encodeHostMcPort(mcPortSeq++, hostPort),
+            )
+          }
+          // 下发房主 NAT 类型：参与者侧展示组网诊断（P2P 直连失败原因）
+          const hostNat = store.natResult?.type
+          if (hostNat) {
+            void hostMesh.sendToParticipant(
+              participantId,
+              encodeNatType(hostNatSeq++, hostNat),
+            )
+          }
+        },
       )
 
       // 绑定 DataChannel.onMessage：参与者发来的包 → 转发到后端 TUN
       // setupDataChannelHandlers 仅更新传入字段，不影响 createOfferFor 默认绑定的 onOpen/onClose
       hostMesh.setDataChannelHandlers(participantId, {
         onMessage: (raw) => {
+          const msg = decode(raw)
+          // 参与者上报的 NAT 类型：收集用于房主侧组网诊断展示，不转发 TUN
+          if (msg?.kind === 'control' && msg.subtype === CONTROL_SUBTYPE.NAT_TYPE) {
+            const natType = parseNatTypePayload(msg.payload)
+            if (natType) participantNatTypes.set(participantId, natType)
+            return
+          }
           void lan.forwardToTun(raw)
         },
       })
@@ -366,6 +390,7 @@ export function useRoomHostPolling(
           restartInFlight.delete(id)
           restartCooldownUntil.delete(id)
           disconnectedAt.delete(id)
+          participantNatTypes.delete(id)
         }
       }
       await scanAndGenerateOffers()
@@ -499,6 +524,8 @@ export function useRoomHostPolling(
   let hostIpSeq = 0
   /** HostMcPort 控制消息的本地 seq 计数器 */
   let mcPortSeq = 0
+  /** NatType 控制消息的本地 seq 计数器 */
+  let hostNatSeq = 0
 
   /** 存在待授权申请或待生成 Offer 的参与者时保持活跃间隔，否则退避到空闲间隔 */
   function scheduleParticipantsNext() {
@@ -578,6 +605,7 @@ export function useRoomHostPolling(
   return {
     pendingAnswers,
     offerGenerating,
+    participantNatTypes,
     pollParticipants,
     pollAnswers,
     doKeepalive,

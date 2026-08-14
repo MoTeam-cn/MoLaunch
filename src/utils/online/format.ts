@@ -65,6 +65,12 @@ export const NAT_TYPE_META: Record<NatType, NatTypeMeta> = {
   },
 }
 
+/** 解析 NAT 类型元数据（未知/空值回退 null，兼容协议上报的原始字符串） */
+export function resolveNatMeta(type: string | null | undefined): NatTypeMeta | null {
+  if (!type) return null
+  return NAT_TYPE_META[type as NatType] ?? null
+}
+
 /** 根据可行性等级返回徽章颜色 class（Tailwind） */
 export function getNatFeasibilityColorClass(feasibility: NatTypeMeta['feasibility']): string {
   switch (feasibility) {

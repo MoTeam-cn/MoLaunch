@@ -30,6 +30,7 @@ export const MESSAGE_TYPE = {
  * - 0x04 HostMcPort：payload 为 2 字节大端序 u16 端口（房主广播 MC 局域网端口）
  * - 0x05 TurnServers：payload 为 JSON UTF-8 字节（结构 IceServerEntry[]，加入方用于重建 PC 应用新 ICE）
  * - 0x06 HostVirtualIp：payload 为 UTF-8 IP 字符串（房主通道建立后广播自己的虚拟 IP）
+ * - 0x07 NatType：payload 为 JSON UTF-8 字节（结构 {"nat":"<类型>"}，双方交换 NAT 类型用于组网诊断）
  */
 export const CONTROL_SUBTYPE = {
   HEARTBEAT: 0x01,
@@ -38,6 +39,7 @@ export const CONTROL_SUBTYPE = {
   HOST_MC_PORT: 0x04,
   TURN_SERVERS: 0x05,
   HOST_VIRTUAL_IP: 0x06,
+  NAT_TYPE: 0x07,
 } as const
 
 /** 帧头部长度（type + seq + length = 1 + 4 + 2 = 7 字节） */
@@ -229,4 +231,47 @@ export function parseHostVirtualIpPayload(payload: Uint8Array): string | null {
   if (payload.length === 0) return null
   const ip = new TextDecoder().decode(payload)
   return ip.length > 0 ? ip : null
+}
+
+/**
+ * 编码 NatType 控制消息为二进制帧
+ *
+ * 房主 / 参与者 DataChannel 建立后，通过 sendToParticipant / channel.send 上报
+ * 自己的 NAT 类型，供对端展示组网诊断信息（P2P 直连失败原因）。
+ *
+ * 帧结构（与后端 protocol.rs encode 一致）：
+ * - type(1) = 0x02 Control
+ * - seq(4) = 大端序 u32
+ * - length(2) = 1 + jsonBytes.length（subtype 1 字节 + JSON N 字节）
+ * - subtype(1) = 0x07 NatType
+ * - json(N) = UTF-8 编码的 JSON 字符串（结构 {"nat":"<类型>"}）
+ */
+export function encodeNatType(seq: number, natType: string): ArrayBuffer {
+  const json = JSON.stringify({ nat: natType })
+  const jsonBytes = new TextEncoder().encode(json)
+  // type(1) + seq(4) + length(2) + subtype(1) + json(N) = 8 + N
+  const buf = new ArrayBuffer(8 + jsonBytes.length)
+  const view = new DataView(buf)
+  view.setUint8(0, MESSAGE_TYPE.CONTROL)
+  view.setUint32(1, seq, false) // big-endian
+  view.setUint16(5, 1 + jsonBytes.length, false) // length = subtype(1) + json(N)
+  view.setUint8(7, CONTROL_SUBTYPE.NAT_TYPE)
+  new Uint8Array(buf, 8, jsonBytes.length).set(jsonBytes)
+  return buf
+}
+
+/**
+ * 从 Control + NatType 消息的 payload 解析 NAT 类型字符串
+ *
+ * 期望 payload 为 `{"nat":"<类型>"}` 的 JSON UTF-8 字节。
+ * 解析失败或字段非法时返回 null。
+ */
+export function parseNatTypePayload(payload: Uint8Array): string | null {
+  try {
+    const parsed = JSON.parse(new TextDecoder().decode(payload)) as { nat?: unknown }
+    if (typeof parsed.nat === 'string' && parsed.nat) return parsed.nat
+    return null
+  } catch {
+    return null
+  }
 }

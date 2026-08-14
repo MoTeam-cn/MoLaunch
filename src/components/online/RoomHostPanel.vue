@@ -29,6 +29,7 @@ import WhitelistEditor from './WhitelistEditor.vue'
 import HostRoomInfoCard from './HostRoomInfoCard.vue'
 import RoomToolsDrawer from './RoomToolsDrawer.vue'
 import ConnectionTransportStatus from './ConnectionTransportStatus.vue'
+import P2pFailureCard from './P2pFailureCard.vue'
 import {
   XCircleIcon,
   UsersIcon,
@@ -42,6 +43,7 @@ const store = useOnlineStore()
 const hostMesh = inject('hostMesh') as ReturnType<typeof useWebRTCMesh>
 
 /** 房主业务逻辑来自全局联机会话（轮询/Offer/交互处理/TUN 均常驻应用生命周期） */
+const session = getOnlineSession()
 const {
   bannedList,
   banServerTime,
@@ -51,7 +53,7 @@ const {
   handleUnban,
   refreshBans,
   handleCloseRoom,
-} = getOnlineSession()
+} = session
 
 const room = computed(() => store.roomState)
 
@@ -103,6 +105,26 @@ const connectedHintMessage =
 function participantStateText(participantId: string): string {
   return hostMesh.getConnState(participantId) ?? 'unknown'
 }
+
+/** 获取参与者上报的 NAT 类型（未上报返回 null，参与者列表展示用） */
+function participantNatType(participantId: string): string | null {
+  return session.participantNatTypes.get(participantId) ?? null
+}
+
+/** 连接状态 failed 的参与者（P2P 组网失败诊断展示用） */
+const failedParticipants = computed(() =>
+  store.roomState.participants.filter(
+    (p) => hostMesh.getConnState(p.participantId) === 'failed',
+  ),
+)
+
+/** 失败参与者的 NAT 条目（房主侧诊断卡片展示用） */
+const failedPeerNats = computed(() =>
+  failedParticipants.value.map((p) => ({
+    label: `设备 ${p.devicePk.slice(0, 8)}`,
+    natType: session.participantNatTypes.get(p.participantId) ?? null,
+  })),
+)
 </script>
 
 <template>
@@ -123,6 +145,11 @@ function participantStateText(participantId: string): string {
         </div>
         <ConnectionTransportStatus :pcs="hostPcs" :ice-servers="room.iceServers" />
         <AlertV2 v-if="connectedCount > 0" type="info" :message="connectedHintMessage" />
+        <P2pFailureCard
+          v-if="failedParticipants.length > 0"
+          :self-nat-type="store.natResult?.type ?? null"
+          :peers="failedPeerNats"
+        />
       </div>
     </Card>
 
@@ -194,6 +221,7 @@ function participantStateText(participantId: string): string {
       <ParticipantList
         :participants="room.participants"
         :conn-state-text="participantStateText"
+        :nat-type-of="participantNatType"
         @kick="onKick"
       />
     </Drawer>
