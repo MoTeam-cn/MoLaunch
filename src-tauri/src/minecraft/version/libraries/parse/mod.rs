@@ -5,4 +5,4 @@ mod path;
 mod rules;
 
 pub use parser::parse_libraries;
-pub use rules::{check_rules, is_native_matching_arch};
+pub use rules::{check_rules, check_rules_with_features, is_native_matching_arch};

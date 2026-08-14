@@ -125,6 +125,7 @@ pub fn build_launch_arguments(
         server_port,
         extra_game_args,
         custom_info,
+        &crate::storage::registry::launcher_client_id(),
     )?;
 
     // 在 launch 前设置游戏语言（写入有效目录，适配隔离模式）

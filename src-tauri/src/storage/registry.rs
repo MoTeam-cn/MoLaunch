@@ -184,3 +184,37 @@ pub(crate) fn reg_get_str(name: &str) -> Option<String> {
 pub(crate) fn reg_set_str(name: &str, value: &str) -> Result<(), String> {
     reg_set(&(), name, value)
 }
+
+/// 启动器 clientId 存储键名（对应版本 JSON 启动参数 `${clientid}`）
+const KEY_LAUNCHER_CLIENT_ID: &str = "LauncherClientId";
+
+/// 获取启动器 clientId：首次生成 UUIDv4 并持久化，之后复用
+///
+/// 正版微软启动参数中的 `${clientid}` 需要稳定的客户端标识，
+/// 生成一次存入系统注册表 KV（Windows 注册表 / 非 Windows system.json），跨启动复用。
+pub(crate) fn launcher_client_id() -> String {
+    if let Some(id) = reg_get_str(KEY_LAUNCHER_CLIENT_ID) {
+        return id;
+    }
+    let id = gen_uuid_v4();
+    let _ = reg_set_str(KEY_LAUNCHER_CLIENT_ID, &id);
+    id
+}
+
+/// 生成 UUIDv4（项目无 uuid crate，使用 rand 生成随机字节并置位 version/variant）
+fn gen_uuid_v4() -> String {
+    use rand::RngCore;
+    let mut bytes = [0u8; 16];
+    rand::thread_rng().fill_bytes(&mut bytes);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40; // version 4
+    bytes[8] = (bytes[8] & 0x3f) | 0x80; // variant 10xx
+    let hex = hex::encode(bytes);
+    format!(
+        "{}-{}-{}-{}-{}",
+        &hex[0..8],
+        &hex[8..12],
+        &hex[12..16],
+        &hex[16..20],
+        &hex[20..32]
+    )
+}

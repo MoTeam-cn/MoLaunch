@@ -32,6 +32,18 @@ pub fn is_native_matching_arch(classifier: &str) -> bool {
 
 /// Check if rules match current platform
 pub fn check_rules(rules: &Option<Vec<serde_json::Value>>) -> bool {
+    check_rules_with_features(rules, &[])
+}
+
+/// Check if rules match current platform and feature flags.
+///
+/// 高版本 version JSON 的 `arguments.game` 中 `--width/--height`、`--quickPlay*`
+/// 等参数通过 feature 规则（`has_custom_resolution`、`is_quick_play_singleplayer` 等）
+/// 控制是否注入；`features` 传入这些 feature 的实际取值，缺失视为 `false`。
+pub fn check_rules_with_features(
+    rules: &Option<Vec<serde_json::Value>>,
+    features: &[(&str, bool)],
+) -> bool {
     let rules = match rules {
         Some(r) => r,
         None => return true,
@@ -61,9 +73,17 @@ pub fn check_rules(rules: &Option<Vec<serde_json::Value>>) -> bool {
             }
         }
 
-        if let Some(features) = rule.get("features") {
-            if features.get("is_demo_user").is_some() {
-                is_right_rule = false;
+        if let Some(feats) = rule.get("features").and_then(|f| f.as_object()) {
+            for (name, required_val) in feats {
+                let required_val = required_val.as_bool().unwrap_or(false);
+                let has = features
+                    .iter()
+                    .find(|(n, _)| *n == name.as_str())
+                    .map(|(_, v)| *v)
+                    .unwrap_or(false);
+                if has != required_val {
+                    is_right_rule = false;
+                }
             }
         }
 

@@ -12,6 +12,7 @@ use super::AuthInfo;
 /// `custom_info`：版本独立自定义信息
 /// - 非空：替换 `${version_type}` 为 custom_info 值（显示在游戏主界面左下角和 F3 左上角）
 /// - 空/None：从参数列表删除 `--versionType` 及其值，避免 MC 显示空字符串或占位符
+/// `client_id`：启动器客户端标识（替换 `${clientid}` 占位符，供正版账号识别）
 pub(super) fn build_game_args(
     json: &serde_json::Value,
     game_dir: &Path,
@@ -25,8 +26,10 @@ pub(super) fn build_game_args(
     server_port: Option<u32>,
     extra_game_args: &[String],
     custom_info: Option<&str>,
+    client_id: &str,
 ) -> anyhow::Result<Vec<String>> {
     let mut args = Vec::new();
+    let has_custom_resolution = window_width.is_some() && window_height.is_some();
 
     if let Some(game_args) = json["arguments"]["game"].as_array() {
         for arg in game_args {
@@ -56,7 +59,10 @@ pub(super) fn build_game_args(
                 continue;
             };
 
-            if !crate::minecraft::version::libraries::check_rules(&rules) {
+            if !crate::minecraft::version::libraries::check_rules_with_features(
+                &rules,
+                &[("has_custom_resolution", has_custom_resolution)],
+            ) {
                 continue;
             }
 
@@ -106,6 +112,8 @@ pub(super) fn build_game_args(
     };
 
     let mut final_args = Vec::new();
+    let resolution_width = window_width.map(|v| v.to_string()).unwrap_or_default();
+    let resolution_height = window_height.map(|v| v.to_string()).unwrap_or_default();
     for arg in args {
         let replaced = arg
             .replace("${auth_player_name}", &auth_info.username)
@@ -120,7 +128,15 @@ pub(super) fn build_game_args(
             .replace("${assets_root}", assets_dir)
             .replace("${assets_index_name}", asset_index)
             .replace("${user_properties}", "{}")
-            .replace("${version_type}", &version_type_replacement);
+            .replace("${version_type}", &version_type_replacement)
+            .replace("${clientid}", client_id)
+            .replace("${auth_xuid}", &auth_info.xuid)
+            .replace("${resolution_width}", &resolution_width)
+            .replace("${resolution_height}", &resolution_height)
+            .replace("${quickPlayPath}", "")
+            .replace("${quickPlaySingleplayer}", "")
+            .replace("${quickPlayMultiplayer}", "")
+            .replace("${quickPlayRealms}", "");
         final_args.push(replaced);
     }
 
@@ -134,11 +150,14 @@ pub(super) fn build_game_args(
         }
     }
 
+    // 分辨率参数：高版本由 JSON 的 has_custom_resolution 规则注入，旧版本手动补充
     if let (Some(width), Some(height)) = (window_width, window_height) {
-        final_args.push("--width".to_string());
-        final_args.push(width.to_string());
-        final_args.push("--height".to_string());
-        final_args.push(height.to_string());
+        if !final_args.iter().any(|a| a.starts_with("--width")) {
+            final_args.push("--width".to_string());
+            final_args.push(width.to_string());
+            final_args.push("--height".to_string());
+            final_args.push(height.to_string());
+        }
     }
 
     // 服务器参数
@@ -152,11 +171,16 @@ pub(super) fn build_game_args(
 
         if is_quickplay {
             // 1.20+：--quickPlayMultiplayer <ip:port> 或 <ip>
-            final_args.push("--quickPlayMultiplayer".to_string());
-            if let Some(port) = server_port {
-                final_args.push(format!("{}:{}", server, port));
-            } else {
-                final_args.push(server.to_string());
+            if !final_args
+                .iter()
+                .any(|a| a.starts_with("--quickPlayMultiplayer"))
+            {
+                final_args.push("--quickPlayMultiplayer".to_string());
+                if let Some(port) = server_port {
+                    final_args.push(format!("{}:{}", server, port));
+                } else {
+                    final_args.push(server.to_string());
+                }
             }
         } else {
             // 老版本：--server <ip> --port <port>
