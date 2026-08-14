@@ -8,7 +8,7 @@
  *
  * 分类（每分组 ≤ 3 个工具，重要/高频工具单独一栏）：
  * 外部下载 / 趣味工具 / 便捷工具 / 存档管理 / Mod 工具 / 网络工具 / 计算工具
- * / 创作工具 / Java 管理 / 诊断工具 / 游戏资源 / 种子地图
+ * / 创作工具 / Java 管理 / 诊断工具 / 游戏资源 / 种子地图 / 指令生成
  */
 
 import { ref, nextTick, watch } from 'vue'
@@ -21,6 +21,7 @@ import {
   SignalIcon,
   CalculatorIcon,
   CommandLineIcon,
+  BoltIcon,
   BugAntIcon,
   SwatchIcon,
   MapIcon,
@@ -39,6 +40,7 @@ import DiagnosticPage from './tools/diagnostic/DiagnosticPage.vue'
 import GameResourcePage from './tools/game-resource/GameResourcePage.vue'
 import SeedMapPage from './tools/seedmap/SeedMapPage.vue'
 import CreationPage from './tools/creation/CreationPage.vue'
+import CommandPage from './tools/command/CommandPage.vue'
 import ToolToc from '@/components/common/ToolToc.vue'
 import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
 import { hasAgreedToday } from '@/utils/disclaimer'
@@ -123,6 +125,12 @@ const categories: ToolCategory[] = [
     icon: MapIcon,
     desc: '输入种子加载 Minecraft 建筑位置地图，支持群系/结构查询',
   },
+  {
+    id: 'command',
+    label: '指令生成',
+    icon: BoltIcon,
+    desc: '纯前端生成 Minecraft 指令：物品编辑、告示牌商店、召唤实体',
+  },
 ]
 
 const activeCategory = ref<string>('fun-tools')
@@ -159,10 +167,10 @@ const activeDesc = () =>
 
       <!-- 内容区（滚动条保持在最右侧，TOC 悬浮不占布局） -->
       <div class="flex-1 relative overflow-hidden">
-        <!-- creation 分类子组件已自带 p-6 内边距（顶部子菜单需贴边），避免双重 padding，与设置页 about 页签一致 -->
+        <!-- creation/command 分类子组件已自带 p-6 内边距（顶部子菜单需贴边），避免双重 padding，与设置页 about 页签一致 -->
         <div
           class="h-full overflow-y-auto tools-scroll-container"
-          :class="activeCategory === 'creation' ? '' : 'p-6'"
+          :class="activeCategory === 'creation' || activeCategory === 'command' ? '' : 'p-6'"
         >
           <ExternalDownload v-if="activeCategory === 'external-download'" />
           <LuckyTool v-else-if="activeCategory === 'fun-tools'" />
@@ -176,6 +184,7 @@ const activeDesc = () =>
           <DiagnosticPage v-else-if="activeCategory === 'diagnostic'" />
           <GameResourcePage v-else-if="activeCategory === 'game-resource'" />
           <SeedMapPage v-else-if="activeCategory === 'seedmap'" />
+          <CommandPage v-else-if="activeCategory === 'command'" />
         </div>
         <!-- 右侧悬浮 TOC 导航条（工具数 ≥ 3 时自动显示，不跟随滚动） -->
         <ToolToc :refresh-key="tocRefreshKey" :scroll-offset="20" />
