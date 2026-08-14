@@ -3,6 +3,8 @@
  * 合成配方调色板：按名称/ID 搜索物品，点击放置到槽位
  */
 import { computed, ref } from 'vue'
+import { RecycleScroller } from 'vue-virtual-scroller'
+import 'vue-virtual-scroller/index.css'
 import type { AssetItem, AtlasLayout } from '@/utils/recipe-generator/resources'
 import type { SlotValue } from '@/utils/recipe-generator/types'
 import RecipeItemIcon from './RecipeItemIcon.vue'
@@ -30,6 +32,20 @@ const filtered = computed(() => {
   )
 })
 
+/** 每行 4 个，按行做虚拟滚动，避免上千个 DOM 节点导致滑动卡顿 */
+const COLUMNS = 4
+const ROW_HEIGHT = 64
+
+type PaletteRow = { key: string; items: AssetItem[] }
+
+const rows = computed<PaletteRow[]>(() => {
+  const result: PaletteRow[] = []
+  for (let i = 0; i < filtered.value.length; i += COLUMNS) {
+    result.push({ key: `row-${i}`, items: filtered.value.slice(i, i + COLUMNS) })
+  }
+  return result
+})
+
 function pick(item: AssetItem) {
   emit('pick', { kind: 'item', id: item.id })
 }
@@ -48,27 +64,36 @@ function pick(item: AssetItem) {
     <div class="item-palette-count">
       共 {{ filtered.length }} 个物品
     </div>
-    <div class="item-palette-grid">
-      <button
-        v-for="item in filtered"
-        :key="item.id"
-        type="button"
-        class="item-palette-entry"
-        :title="item.name"
-        @click="pick(item)"
-      >
-        <RecipeItemIcon
-          :texture="item.texture"
-          :atlas-url="atlasUrl"
-          :atlas="atlas"
-          :size="30"
-          :label="item.zh || item.name"
-        />
-        <span class="item-palette-name" :title="`${item.name}（${item.zh}）`">
-          {{ item.zh || item.name }}
-        </span>
-      </button>
-    </div>
+    <RecycleScroller
+      class="item-palette-grid"
+      :items="rows"
+      :item-size="ROW_HEIGHT"
+      key-field="key"
+    >
+      <template #default="{ item }">
+        <div class="item-palette-row">
+          <button
+            v-for="entry in item.items"
+            :key="entry.id"
+            type="button"
+            class="item-palette-entry"
+            :title="entry.name"
+            @click="pick(entry)"
+          >
+            <RecipeItemIcon
+              :texture="entry.texture"
+              :atlas-url="atlasUrl"
+              :atlas="atlas"
+              :size="30"
+              :label="entry.zh || entry.name"
+            />
+            <span class="item-palette-name" :title="`${entry.name}（${entry.zh}）`">
+              {{ entry.zh || entry.name }}
+            </span>
+          </button>
+        </div>
+      </template>
+    </RecycleScroller>
   </div>
 </template>
 
@@ -91,12 +116,15 @@ function pick(item: AssetItem) {
 }
 
 .item-palette-grid {
+  height: 28rem;
+  padding-right: 2px;
+}
+
+.item-palette-row {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.4rem;
-  overflow-y: auto;
-  max-height: 28rem;
-  padding-right: 2px;
+  height: 64px;
 }
 
 .item-palette-entry {

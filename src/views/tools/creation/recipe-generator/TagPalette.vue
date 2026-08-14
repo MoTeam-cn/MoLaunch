@@ -3,6 +3,8 @@
  * 合成配方调色板 - 原版标签：搜索标签，点击放置到槽位
  */
 import { computed, ref } from 'vue'
+import { RecycleScroller } from 'vue-virtual-scroller'
+import 'vue-virtual-scroller/index.css'
 import type { SlotValue } from '@/utils/recipe-generator/types'
 
 const props = defineProps<{
@@ -27,6 +29,9 @@ const filtered = computed(() => {
   return entries.value.filter((entry) => entry.id.toLowerCase().includes(q))
 })
 
+/** 标签较多，用虚拟滚动只渲染可视区，避免滑动卡顿 */
+const ITEM_HEIGHT = 42
+
 function pick(id: string) {
   emit('pick', { kind: 'vanilla_tag', id })
 }
@@ -42,18 +47,19 @@ function pick(id: string) {
         placeholder="搜索标签…"
       />
     </div>
-    <div class="tag-palette-list">
-      <button
-        v-for="entry in filtered"
-        :key="entry.id"
-        type="button"
-        class="tag-palette-entry"
-        @click="pick(entry.id)"
-      >
-        <span class="tag-palette-name">#{{ entry.id }}</span>
-        <span class="tag-palette-count">{{ entry.count }}</span>
-      </button>
-    </div>
+    <RecycleScroller
+      class="tag-palette-list"
+      :items="filtered"
+      :item-size="ITEM_HEIGHT"
+      key-field="id"
+    >
+      <template #default="{ item }">
+        <button type="button" class="tag-palette-entry" @click="pick(item.id)">
+          <span class="tag-palette-name">#{{ item.id }}</span>
+          <span class="tag-palette-count">{{ item.count }}</span>
+        </button>
+      </template>
+    </RecycleScroller>
   </div>
 </template>
 
@@ -66,11 +72,7 @@ function pick(id: string) {
 }
 
 .tag-palette-list {
-  display: flex;
-  max-height: 28rem;
-  flex-direction: column;
-  gap: 0.25rem;
-  overflow-y: auto;
+  height: 28rem;
   padding-right: 2px;
 }
 
@@ -78,6 +80,7 @@ function pick(id: string) {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  height: 42px;
   padding: 0.4rem 0.6rem;
   border: 1px solid #e5e6eb;
   border-radius: 4px;
