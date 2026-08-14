@@ -190,6 +190,12 @@ pub async fn download_chunked(
     if let Err(e) = merge_chunks(local_path, chunk_count, file_size) {
         // 断点续传：不清理 .part 文件，保留用于重试时续传
         // （合并失败通常是某分片大小不匹配，保留已下载部分可避免重头下载）
+        // 回滚 file_progress：分片字节已全部计入，但合并失败文件将被重新下载，
+        // 避免 downloaded_bytes 与后续单流/续传重复累计导致进度虚高
+        if let Some(ref fp) = file_progress {
+            let mut p = fp.lock().unwrap();
+            p.downloaded_bytes = p.downloaded_bytes.saturating_sub(total_downloaded);
+        }
         return ChunkDownloadResult {
             downloaded: total_downloaded,
             total: file_size,

@@ -63,6 +63,8 @@ pub(super) async fn download_with_retries(
                         if let Some(err) = verify::check_chunk(task, result.total) {
                             log_warn!("[Chunk] 文件校验失败：{} - {}", task.local_path, err);
                             let _ = std::fs::remove_file(&task.local_path);
+                            // 回滚已计数进度：文件将被单流重新下载，避免 downloaded_bytes 重复累计
+                            rollback_progress(&progress, result.downloaded);
                         } else {
                             if let Some(ref ids) = chunked_task_ids {
                                 ids.lock().unwrap().insert(task.id.clone());
@@ -111,6 +113,8 @@ pub(super) async fn download_with_retries(
                     if let Some(err) = verify::check_stream(task, file_size, downloaded) {
                         log_warn!("文件校验失败：{} - {}", task.local_path, err);
                         let _ = std::fs::remove_file(&task.local_path);
+                        // 回滚已计数进度：文件将由下一个 URL 重新下载，避免进度重复累计
+                        rollback_progress(&progress, downloaded);
                         continue 'url_loop;
                     }
                     return Some(verify::completed(task, downloaded, total, speed));
@@ -146,4 +150,15 @@ fn request_timeout(source_mode: DownloadSourceMode, url: &str) -> Duration {
 fn is_cancelled(flag: &Option<Arc<AtomicBool>>) -> bool {
     flag.as_ref()
         .is_some_and(|flag| flag.load(Ordering::Relaxed))
+}
+
+/// 回滚已计入进度的字节（校验失败需重新下载时调用，避免 downloaded_bytes 重复累计虚高）
+fn rollback_progress(progress: &Option<Arc<StdMutex<GlobalProgress>>>, bytes: u64) {
+    if bytes == 0 {
+        return;
+    }
+    if let Some(ref p) = progress {
+        let mut p = p.lock().unwrap();
+        p.downloaded_bytes = p.downloaded_bytes.saturating_sub(bytes);
+    }
 }
