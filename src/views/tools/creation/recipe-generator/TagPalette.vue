@@ -65,14 +65,18 @@ function pick(id: string) {
 
 <style scoped>
 .tag-palette {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
+  overflow: hidden;
 }
 
 .tag-palette-list {
-  height: 28rem;
+  flex: 1;
+  min-height: 0;
   padding-right: 2px;
 }
 
