@@ -12,7 +12,8 @@ import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import { ENTITIES } from './data'
-import { COLOR_OPTIONS, buildSummonCommand } from './generator'
+import { buildSummonCommand } from './generator'
+import ColorSelect from './ColorSelect.vue'
 
 const entityId = ref(ENTITIES[0].id)
 const x = ref('~')
@@ -80,7 +81,7 @@ async function copyCommand() {
       <!-- 颜色 -->
       <div v-if="name.trim()">
         <div class="text-xs font-medium text-gray-500 mb-2">名称颜色</div>
-        <Select v-model="nameColor" :options="COLOR_OPTIONS" />
+        <ColorSelect v-model="nameColor" />
       </div>
 
       <!-- 指令结果 -->

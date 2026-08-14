@@ -14,13 +14,15 @@ import { copyToClipboard } from '@/utils/clipboard'
 import { loadVersionItems } from '@/utils/recipe-generator/resources'
 import type { AssetItem } from '@/utils/recipe-generator/resources'
 import { ENCHANTMENTS } from './data'
-import { COLOR_OPTIONS, TARGETS, buildGiveCommand } from './generator'
+import { GIVE_VERSIONS, TARGETS, buildGiveCommand } from './generator'
+import ColorSelect from './ColorSelect.vue'
 
 const items = ref<AssetItem[]>([])
 const keyword = ref('')
 const selected = ref<AssetItem | null>(null)
 const count = ref(1)
 const target = ref('@p')
+const giveVersion = ref('1.13')
 const itemName = ref('')
 const nameColor = ref('gold')
 const loreText = ref('')
@@ -48,6 +50,7 @@ function pickItem(item: AssetItem) {
 }
 
 const targetOptions = computed(() => TARGETS.map((t) => ({ label: t.label, value: t.id })))
+const versionOptions = computed(() => GIVE_VERSIONS.map((v) => ({ label: v.label, value: v.id })))
 const enchantOptions = computed(() => ENCHANTMENTS.map((o) => ({ label: `${o.name}（${o.id}）`, value: o.id })))
 
 const command = computed(() => {
@@ -56,6 +59,7 @@ const command = computed(() => {
     itemId: selected.value.id.replace(/^minecraft:/, ''),
     count: count.value,
     target: target.value,
+    version: giveVersion.value,
     enchantments: enchants.value,
     name: itemName.value,
     nameColor: nameColor.value,
@@ -109,8 +113,8 @@ async function copyCommand() {
         </div>
       </div>
 
-      <!-- 数量 + 目标 -->
-      <div class="grid grid-cols-2 gap-4">
+      <!-- 数量 + 目标 + 版本 -->
+      <div class="grid grid-cols-3 gap-4">
         <div>
           <div class="text-xs font-medium text-gray-500 mb-2">数量</div>
           <Input v-model.number="count" type="number" min="1" size="small" />
@@ -118,6 +122,10 @@ async function copyCommand() {
         <div>
           <div class="text-xs font-medium text-gray-500 mb-2">目标玩家</div>
           <Select v-model="target" :options="targetOptions" />
+        </div>
+        <div>
+          <div class="text-xs font-medium text-gray-500 mb-2">指令版本</div>
+          <Select v-model="giveVersion" :options="versionOptions" />
         </div>
       </div>
 
@@ -129,7 +137,7 @@ async function copyCommand() {
         </div>
         <div>
           <div class="text-xs font-medium text-gray-500 mb-2">颜色</div>
-          <Select v-model="nameColor" :options="COLOR_OPTIONS" />
+          <ColorSelect v-model="nameColor" />
         </div>
       </div>
 

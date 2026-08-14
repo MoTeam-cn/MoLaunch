@@ -12,28 +12,31 @@
  * - 文本组件内部 JSON 双引号需转义为 \"，SNBT 字符串内单引号需转义为 \'
  */
 
-/** Minecraft 标准 16 色名称 */
-export const MC_COLORS = [
-  'black',
-  'dark_blue',
-  'dark_green',
-  'dark_aqua',
-  'dark_red',
-  'dark_purple',
-  'gold',
-  'gray',
-  'dark_gray',
-  'blue',
-  'green',
-  'aqua',
-  'red',
-  'light_purple',
-  'yellow',
-  'white',
-]
+/** Minecraft 16 色选项：中文名 + 指令内 id + 预览色值（供 ColorSelect 渲染圆形色块） */
+export interface ColorOption {
+  label: string
+  value: string
+  color: string
+}
 
-/** 16 色下拉选项（适配公共 Select 组件 options 格式） */
-export const COLOR_OPTIONS: { label: string; value: string }[] = MC_COLORS.map((c) => ({ label: c, value: c }))
+export const COLOR_OPTIONS: ColorOption[] = [
+  { label: '黑色', value: 'black', color: '#000000' },
+  { label: '深蓝', value: 'dark_blue', color: '#0000AA' },
+  { label: '深绿', value: 'dark_green', color: '#00AA00' },
+  { label: '深青', value: 'dark_aqua', color: '#00AAAA' },
+  { label: '深红', value: 'dark_red', color: '#AA0000' },
+  { label: '深紫', value: 'dark_purple', color: '#AA00AA' },
+  { label: '金色', value: 'gold', color: '#FFAA00' },
+  { label: '灰色', value: 'gray', color: '#AAAAAA' },
+  { label: '深灰', value: 'dark_gray', color: '#555555' },
+  { label: '蓝色', value: 'blue', color: '#5555FF' },
+  { label: '绿色', value: 'green', color: '#55FF55' },
+  { label: '青色', value: 'aqua', color: '#55FFFF' },
+  { label: '红色', value: 'red', color: '#FF5555' },
+  { label: '浅紫', value: 'light_purple', color: '#FF55FF' },
+  { label: '黄色', value: 'yellow', color: '#FFFF55' },
+  { label: '白色', value: 'white', color: '#FFFFFF' },
+]
 
 /** JSON 字符串转义（用于文本组件内部） */
 export function escapeJsonText(text: string): string {
@@ -75,11 +78,19 @@ export const TARGETS: TargetOption[] = [
   { id: '@r', label: '@r 随机玩家' },
 ]
 
+/** give 指令目标版本选项 */
+export const GIVE_VERSIONS: TargetOption[] = [
+  { id: '1.20.5', label: '1.20.5+（物品组件）' },
+  { id: '1.13', label: '1.13 - 1.20.4（NBT）' },
+]
+
 /** give 指令参数 */
 export interface GiveParams {
   itemId: string
   count: number
   target: string
+  /** 指令目标版本：'1.20.5' 输出物品组件格式，其余输出 1.13 - 1.20.4 NBT 格式 */
+  version: string
   enchantments: { id: string; lvl: number }[]
   name: string
   nameColor: string
@@ -87,8 +98,28 @@ export interface GiveParams {
   loreColor: string
 }
 
-/** 构建 /give 指令（NBT 部分：Enchantments + display.Name + display.Lore） */
+/** 构建 /give 指令（按目标版本输出不同格式） */
 export function buildGiveCommand(p: GiveParams): string {
+  const item = `minecraft:${p.itemId}`
+  const count = p.count > 0 ? ` ${p.count}` : ''
+  if (p.version === '1.20.5') {
+    // 1.20.5+ 物品组件格式：方括号内以 minecraft:* 为键，enchantments 用 levels map，键含冒号需引号
+    const parts: string[] = []
+    if (p.enchantments.length > 0) {
+      const levels = p.enchantments.map((e) => `"minecraft:${e.id}":${e.lvl}`).join(',')
+      parts.push(`minecraft:enchantments={levels:{${levels}}}`)
+    }
+    if (p.name.trim()) {
+      parts.push(`minecraft:custom_name=${componentSnbt(p.name.trim(), p.nameColor)}`)
+    }
+    if (p.lore.length > 0) {
+      const lore = p.lore.map((l) => componentSnbt(l, p.loreColor)).join(',')
+      parts.push(`minecraft:lore=[${lore}]`)
+    }
+    const components = parts.length > 0 ? `[${parts.join(',')}]` : ''
+    return `/give ${p.target} ${item}${components}${count}`
+  }
+  // 1.13 - 1.20.4 旧 NBT 格式：Enchantments + display.Name + display.Lore
   const nbtParts: string[] = []
   if (p.enchantments.length > 0) {
     const ench = p.enchantments
@@ -108,8 +139,7 @@ export function buildGiveCommand(p: GiveParams): string {
     nbtParts.push(`display:{${displayParts.join(',')}}`)
   }
   const nbt = nbtParts.length > 0 ? `{${nbtParts.join(',')}}` : ''
-  const count = p.count > 0 ? ` ${p.count}` : ''
-  return `/give ${p.target} minecraft:${p.itemId}${nbt}${count}`
+  return `/give ${p.target} ${item}${nbt}${count}`
 }
 
 /** 告示牌商店指令参数 */

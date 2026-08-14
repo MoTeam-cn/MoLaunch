@@ -12,7 +12,8 @@ import Button from '@/components/common/Button.vue'
 import Select from '@/components/common/Select.vue'
 import { copyToClipboard } from '@/utils/clipboard'
 import { SIGN_FACINGS, SIGN_IDS } from './data'
-import { COLOR_OPTIONS, buildSignShopCommand } from './generator'
+import { buildSignShopCommand } from './generator'
+import ColorSelect from './ColorSelect.vue'
 
 const signId = ref(SIGN_IDS[0])
 const facing = ref(SIGN_FACINGS[0].id)
@@ -78,7 +79,7 @@ async function copyCommand() {
           <span class="text-xs font-medium text-gray-500">文字内容（最多 4 行）</span>
           <div class="flex items-center gap-1.5">
             <span class="text-xs text-gray-400">颜色</span>
-            <Select v-model="textColor" :options="COLOR_OPTIONS" />
+            <ColorSelect v-model="textColor" />
           </div>
         </div>
         <div class="space-y-2">
