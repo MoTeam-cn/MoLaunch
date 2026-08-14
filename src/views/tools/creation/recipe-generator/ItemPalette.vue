@@ -99,13 +99,10 @@ function pick(item: AssetItem) {
 
 <style scoped>
 .item-palette {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  overflow: hidden;
 }
 
 .item-palette-search input {
@@ -119,8 +116,7 @@ function pick(item: AssetItem) {
 }
 
 .item-palette-grid {
-  flex: 1;
-  min-height: 0;
+  height: 28rem;
   padding-right: 2px;
 }
 
