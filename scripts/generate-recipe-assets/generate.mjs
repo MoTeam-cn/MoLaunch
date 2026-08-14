@@ -7,8 +7,10 @@
  * - 纹理：PrismarineJS/minecraft-assets（items_textures.json + items|blocks/*.png，覆盖 1.12~1.21.11）
  * - 标签：destruc7i0n/crafting（vanilla-tags，覆盖 1.14~26.2）
  * - 中文名：Mojang 官方 assets 的 zh_cn.json（取最新 26.2）
+ * - 26.2 jar 纹理：Mojang 官方 26.2 客户端 jar（朱砂/硫黄族等 minecraft-assets 未收录的方块纹理）
  *
- * 26.2 无独立物品表：以 26.1 为基础 + 26.2 标签中新增物品补齐，纹理回落 1.21.11。
+ * 26.2 无独立物品表：以 26.1 为基础 + 26.2 标签中新增物品补齐，纹理回落 1.21.11，
+ * 其中朱砂/硫黄族与金蒲公英的方块纹理从 26.2 官方客户端 jar 提取。
  * 1.12 旧版：按 minecraft-data blocks.json variations 展开 data 变体，经
  * 自动匹配 + 静态表映射到现代扁平 ID 以复用现代纹理与中文名。
  */
@@ -16,6 +18,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import zlib from 'node:zlib'
 import { PNG } from 'pngjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -134,6 +137,53 @@ const DYE_VARIANTS = [
 /** 1.12 旗帜（物品 data 0-15 = 颜色）-> 现代 <color>_banner */
 const BANNER_VARIANTS = BLOCK_COLORS
 
+// ---------------------------------------------------------------- 纹理覆写
+
+/** 26.2 铜傀儡像变种（waxed 复用对应氧化态实体贴图） */
+const COPPER_GOLEM_STATES = [
+  ['copper_golem_statue', 'copper_golem'],
+  ['exposed_copper_golem_statue', 'exposed_copper_golem'],
+  ['weathered_copper_golem_statue', 'weathered_copper_golem'],
+  ['oxidized_copper_golem_statue', 'oxidized_copper_golem'],
+]
+
+/** 上游 items_textures 缺失/错误映射的静态覆写（minecraft-assets 文件均已验证存在） */
+const STATIC_TEXTURES = new Map([
+  ...BLOCK_COLORS.map((c) => [`${c}_bed`, `entity/bed/${c}`]),
+  ['compass', 'items/compass_16'],
+  ...COPPER_GOLEM_STATES.map(([name, t]) => [name, `entity/copper_golem/${t}`]),
+  ...COPPER_GOLEM_STATES.map(([name, t]) => [`waxed_${name}`, `entity/copper_golem/${t}`]),
+])
+
+/** 26.2 官方客户端 jar 内的方块纹理（minecraft-assets 尚未收录；slab/stairs/wall 复用基础纹理） */
+const JAR_TEXTURES = new Map([
+  ['cinnabar', 'blocks/cinnabar'],
+  ['polished_cinnabar', 'blocks/polished_cinnabar'],
+  ['cinnabar_bricks', 'blocks/cinnabar_bricks'],
+  ['chiseled_cinnabar', 'blocks/chiseled_cinnabar'],
+  ['sulfur', 'blocks/sulfur'],
+  ['polished_sulfur', 'blocks/polished_sulfur'],
+  ['sulfur_bricks', 'blocks/sulfur_bricks'],
+  ['chiseled_sulfur', 'blocks/chiseled_sulfur'],
+  ['golden_dandelion', 'blocks/golden_dandelion'],
+])
+
+function jarTextureKeyFor(name) {
+  const base = name.replace(/_(slab|stairs|wall)$/, '').replace(/_brick$/, '_bricks')
+  return JAR_TEXTURES.get(base) ?? null
+}
+
+/** 统一纹理 key 解析：静态覆写 > 版本纹理表 > 最新纹理表 > 26.2 jar 纹理 */
+function resolveTextureKey(name, textureMap, latestTextures) {
+  return (
+    STATIC_TEXTURES.get(name) ??
+    textureMap?.get(name) ??
+    latestTextures.get(name) ??
+    jarTextureKeyFor(name) ??
+    null
+  )
+}
+
 // ---------------------------------------------------------------- 网络辅助
 
 async function fetchRetry(url, attempts = 4) {
@@ -166,6 +216,59 @@ async function fetchTexturePng(assetVersion, key) {
   fs.mkdirSync(path.dirname(cacheFile), { recursive: true })
   fs.writeFileSync(cacheFile, buf)
   return buf
+}
+
+/** 从 zip/jar Buffer 读取指定条目（method 0=store / 8=deflate） */
+function zipEntry(buf, entryPath) {
+  let eocd = -1
+  for (let i = buf.length - 22; i >= 0; i -= 1) {
+    if (buf[i] === 0x50 && buf[i + 1] === 0x4b && buf[i + 2] === 0x05 && buf[i + 3] === 0x06) {
+      eocd = i
+      break
+    }
+  }
+  if (eocd < 0) throw new Error(`zip 缺少 EOCD: ${entryPath}`)
+  const cdSize = buf.readUInt32LE(eocd + 12)
+  const cdOffset = buf.readUInt32LE(eocd + 16)
+  let p = cdOffset
+  const end = cdOffset + cdSize
+  while (p + 46 <= end) {
+    if (buf.readUInt32LE(p) !== 0x02014b50) break
+    const fnLen = buf.readUInt16LE(p + 28)
+    const name = buf.subarray(p + 46, p + 46 + fnLen).toString('utf8')
+    if (name === entryPath) {
+      const method = buf.readUInt16LE(p + 10)
+      const csize = buf.readUInt32LE(p + 20)
+      const localOffset = buf.readUInt32LE(p + 42)
+      const dataStart =
+        localOffset + 30 + buf.readUInt16LE(localOffset + 26) + buf.readUInt16LE(localOffset + 28)
+      const data = buf.subarray(dataStart, dataStart + csize)
+      return method === 8 ? zlib.inflateRawSync(data) : data
+    }
+    p += 46 + fnLen + buf.readUInt16LE(p + 30) + buf.readUInt16LE(p + 32)
+  }
+  throw new Error(`zip 未找到条目: ${entryPath}`)
+}
+
+/** 预填 26.2 官方客户端 jar 纹理到 PNG 缓存（朱砂/硫黄等 minecraft-assets 未收录） */
+async function ensureJarTextures() {
+  const jarPath = path.join(CACHE_DIR, 'jar', '26.2.jar')
+  if (!fs.existsSync(jarPath)) {
+    const manifest = await fetchJson('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json')
+    const ver = manifest.versions.find((v) => v.id === '26.2')
+    const verJson = await fetchJson(ver.url)
+    const buf = Buffer.from(await fetchRetry(verJson.downloads.client.url, 3))
+    fs.mkdirSync(path.dirname(jarPath), { recursive: true })
+    fs.writeFileSync(jarPath, buf)
+  }
+  const jar = fs.readFileSync(jarPath)
+  for (const key of new Set([...JAR_TEXTURES.values()])) {
+    const cacheFile = path.join(CACHE_DIR, 'png', `1.21.11_${key.replaceAll('/', '_')}`)
+    if (fs.existsSync(cacheFile)) continue
+    const entryPath = `assets/minecraft/textures/${key.replace('blocks/', 'block/')}.png`
+    fs.writeFileSync(cacheFile, zipEntry(jar, entryPath))
+    console.log(`[jar] 提取纹理 ${key}`)
+  }
 }
 
 // ---------------------------------------------------------------- 工具函数
@@ -255,7 +358,8 @@ async function main() {
   }
   console.log('[tags] 完成')
 
-  // 6. 纹理图集
+  // 6. 纹理图集（先预填 26.2 官方 jar 纹理缓存）
+  await ensureJarTextures()
   const { atlasPng, layout, usedCount, atlasSize } = await buildAtlas(versionManifests)
   fs.writeFileSync(path.join(OUT_DIR, 'texture-atlas.png'), PNG.sync.write(atlasPng))
   fs.writeFileSync(
@@ -266,9 +370,10 @@ async function main() {
     path.join(OUT_DIR, 'sources.json'),
     JSON.stringify(
       {
-        comment: 'MIT 许可数据源，非 Axolotl GPL 资产。',
+        comment: 'MIT 许可 / Mojang 官方数据源，非 Axolotl GPL 资产。',
         items: 'PrismarineJS/minecraft-data (MIT)',
         textures: 'PrismarineJS/minecraft-assets (MIT)',
+        jarTextures: 'Mojang official 26.2 client jar',
         tags: 'destruc7i0n/crafting (MIT)',
         names: 'Mojang official assets zh_cn.json',
         atlasSize: [atlasPng.width, atlasPng.height],
@@ -296,7 +401,7 @@ async function buildVersionItems(version, ctx) {
   for (const item of items) {
     if (seen.has(item.name)) continue
     seen.add(item.name)
-    const textureKey = textureMap.get(item.name) ?? latestTextures.get(item.name) ?? null
+    const textureKey = resolveTextureKey(item.name, textureMap, latestTextures)
     entries.push({
       id: `minecraft:${item.name}`,
       name: item.displayName,
@@ -319,7 +424,7 @@ async function buildVersionItems(version, ctx) {
           id: `minecraft:${name}`,
           name: readableFromId(name),
           zh: zhOf(name) ?? '',
-          texture: latestTextures.get(name) ?? null,
+          texture: resolveTextureKey(name, textureMap, latestTextures),
         })
       }
     }
@@ -356,7 +461,7 @@ async function buildLegacyItems(ctx) {
     if (seen.has(id)) return
     seen.add(id)
     const modern = modernById.get(modernId)
-    const textureKey = latestTextures.get(modernId) ?? null
+    const textureKey = resolveTextureKey(modernId, null, latestTextures)
     entries.push({
       id,
       name: displayName,

@@ -1,11 +1,12 @@
 {
-  "comment": "MIT 许可数据源，非 Axolotl GPL 资产。",
+  "comment": "MIT 许可 / Mojang 官方数据源，非 Axolotl GPL 资产。",
   "items": "PrismarineJS/minecraft-data (MIT)",
   "textures": "PrismarineJS/minecraft-assets (MIT)",
+  "jarTextures": "Mojang official 26.2 client jar",
   "tags": "destruc7i0n/crafting (MIT)",
   "names": "Mojang official assets zh_cn.json",
   "atlasSize": [
     2048,
-    528
+    688
   ]
 }
