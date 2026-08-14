@@ -6,6 +6,8 @@
 
 ### Added
 
+- **工具页新增「成就生成器」**（[AchievementGenerator.vue](src/views/tools/creation/AchievementGenerator.vue)（新增） / [draw.ts](src/views/tools/creation/achievement/draw.ts)（新增） / [CreateCmdPage.vue](src/views/tools/CreateCmdPage.vue)）：创作指令分类新增子工具，Canvas 2D 直绘原版风格「获得成就」弹窗（320×65、2 倍率输出，三层边框 + 物品图标 + 标题/内容与 16 色），复用合成配方物品图集与物品搜索数据源、`ColorSelect` 组件；预览实时刷新，支持导出 PNG 到指定目录（保存对话框 + 后端 `write_binary_file`），图片右下角固定白色 `MoLaunch` 版权水印；字体可选等宽（像素风）/ 微软雅黑 / 宋体 / Arial。
+
 - **新增二进制文件写入能力（后端 `write_binary_file`）**（[game_dir.rs](src-tauri/src/commands/system/game_dir.rs) / [manager/game_dir.rs](src-tauri/src/commands/system/manager/game_dir.rs) / [system-manager.ts](src/utils/api/system-manager.ts)）：system_manager 新增 `write_binary_file` action（前端 `WRITE_BINARY_FILE`），接收 Base64 编码的原始字节（如 Canvas 导出的 PNG），覆盖写入并自动创建父目录，为「导出图片到指定目录」类功能提供统一通道。
 
 - **工具页新增「指令生成」分类与三类纯前端指令生成器**（[CommandPage.vue](src/views/tools/command/CommandPage.vue) / [ItemEditor.vue](src/views/tools/command/ItemEditor.vue) / [SignShop.vue](src/views/tools/command/SignShop.vue) / [SummonEntity.vue](src/views/tools/command/SummonEntity.vue) / [data.ts](src/views/tools/command/data.ts) / [generator.ts](src/views/tools/command/generator.ts) / [Tools.vue](src/views/Tools.vue)）：新增「指令生成」分类，纯前端离线生成 Minecraft Java 指令——物品编辑（/give）复用合成配方物品数据（5000+ 条）支持搜索选择、数量与目标玩家（@p/@a/@s/@r）、自定义名称/16 色、Lore 多行、34 种常用附魔动态增删；告示牌商店（/setblock）支持 12 种告示牌类型、4 朝向、四行文字与颜色；召唤实体（/summon）支持 30 种常见实体、`~` 相对坐标、数量与自定义名称。SNBT/文本组件转义与指令拼接逻辑集中在独立纯函数模块 `generator.ts`（JSON 双引号转义 + 单引号 SNBT 包裹），分类页复用 SubTabBar 顶部菜单栏并支持 `?subtab=` 深链直达子工具。

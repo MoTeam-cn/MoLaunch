@@ -8,15 +8,24 @@
  * - 物品编辑（/give）
  * - 告示牌商店（/setblock）
  * - 召唤实体（/summon）
+ * - 成就生成器（导出 PNG）
  *
  * 深链支持：URL `?subtab=recipe-generator` 可直接切到对应子页签。
  */
 import { onMounted, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import SubTabBar from '@/components/common/SubTabBar.vue'
-import { CubeIcon, DocumentTextIcon, GiftIcon, PencilSquareIcon, SparklesIcon } from '@heroicons/vue/24/outline'
+import {
+  CubeIcon,
+  DocumentTextIcon,
+  GiftIcon,
+  PencilSquareIcon,
+  SparklesIcon,
+  TrophyIcon,
+} from '@heroicons/vue/24/outline'
 import GradientTextPage from './creation/GradientTextPage.vue'
 import RecipeGeneratorPage from './creation/recipe-generator/RecipeGeneratorPage.vue'
+import AchievementGenerator from './creation/AchievementGenerator.vue'
 import ItemEditor from './command/ItemEditor.vue'
 import SignShop from './command/SignShop.vue'
 import SummonEntity from './command/SummonEntity.vue'
@@ -27,6 +36,7 @@ const subTabs = [
   { id: 'item', label: '物品编辑', icon: GiftIcon },
   { id: 'sign-shop', label: '告示牌商店', icon: DocumentTextIcon },
   { id: 'summon', label: '召唤实体', icon: SparklesIcon },
+  { id: 'achievement', label: '成就生成器', icon: TrophyIcon },
 ]
 const activeSubTab = ref('gradient-text')
 
@@ -50,7 +60,8 @@ onMounted(() => {
         <RecipeGeneratorPage v-else-if="activeSubTab === 'recipe-generator'" />
         <ItemEditor v-else-if="activeSubTab === 'item'" />
         <SignShop v-else-if="activeSubTab === 'sign-shop'" />
-        <SummonEntity v-else />
+        <SummonEntity v-else-if="activeSubTab === 'summon'" />
+        <AchievementGenerator v-else />
       </div>
     </div>
   </div>
