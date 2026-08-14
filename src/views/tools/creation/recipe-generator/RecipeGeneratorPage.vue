@@ -7,6 +7,7 @@
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from '@/components/common/Button.vue'
+import Alert from '@/components/common/Alert.vue'
 import Select from '@/components/common/Select.vue'
 import Input from '@/components/common/Input.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
@@ -228,7 +229,7 @@ async function exportPack() {
       </div>
     </div>
 
-    <div v-if="loading" class="flex-1 flex items-center justify-center text-sm text-gray-400">正在加载版本资源…</div>
+    <div v-if="loading" class="text-center py-10 text-sm text-gray-400">正在加载版本资源…</div>
     <div v-else class="recipe-generator-body">
       <!-- 左：展示区（槽位编辑 + 校验 + JSON 预览） -->
       <section class="recipe-panel recipe-display">
@@ -249,7 +250,13 @@ async function exportPack() {
         </p>
 
         <div v-if="issues.length" class="recipe-issues">
-          <div v-for="item in issues" :key="item.code" class="recipe-issue">{{ item.message }}</div>
+          <Alert
+            v-for="item in issues"
+            :key="item.code"
+            type="warning"
+            :message="item.message"
+            :truncate="false"
+          />
         </div>
 
         <div class="recipe-preview">
@@ -354,13 +361,10 @@ async function exportPack() {
 
 <style scoped>
 .recipe-generator-page {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  overflow: hidden;
 }
 
 .recipe-generator-header {
@@ -370,18 +374,15 @@ async function exportPack() {
 }
 
 .recipe-generator-body {
-  flex: 1;
-  min-height: 0;
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1rem;
-  overflow: hidden;
+  align-items: start;
 }
 
 @media (max-width: 960px) {
   .recipe-generator-body {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
 
@@ -439,29 +440,15 @@ async function exportPack() {
   flex-direction: column;
   gap: 0.75rem;
   padding: 1rem;
-  overflow: hidden;
 }
 
 .recipe-issues {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  max-height: 6rem;
-  padding: 0.5rem 0.75rem;
-  overflow-y: auto;
-  border: 1px solid #ffd8cc;
-  border-radius: 6px;
-  background: #fff7e8;
-}
-
-.recipe-issue {
-  color: #e8590c;
-  font-size: 0.75rem;
+  gap: 0.5rem;
 }
 
 .recipe-preview {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
@@ -474,8 +461,7 @@ async function exportPack() {
 }
 
 .recipe-preview-code {
-  flex: 1;
-  min-height: 0;
+  max-height: 20rem;
   margin: 0;
   padding: 0.75rem;
   overflow: auto;
@@ -490,10 +476,7 @@ async function exportPack() {
 }
 
 .recipe-preview-empty {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  padding: 2rem 0;
   border: 1px dashed #e5e6eb;
   border-radius: 6px;
   color: #86909c;
@@ -505,21 +488,6 @@ async function exportPack() {
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  overflow: hidden;
-}
-
-.recipe-settings {
-  flex: 0 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-
-.recipe-palette {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .recipe-palette-tabs {
