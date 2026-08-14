@@ -22,6 +22,7 @@ import { createDatapackFiles, createPackMcmeta, sanitizeRecipeName } from '../da
 import { generateRecipeJson, getCraftingGridValues } from '../recipe-engine'
 import { loadVersionItems, loadVersionTags } from '../resources'
 import { tagLabel } from '../tag-zh'
+import { resolveTagDisplay } from '../tag-resolve'
 import type { RecipeSlotContext, RecipeState } from '../types'
 
 function makeContext(): RecipeSlotContext {
@@ -406,5 +407,77 @@ describe('tag-zh', () => {
 
   it('falls back to a readable name for unknown tags', () => {
     expect(tagLabel('minecraft:foo_bar/baz')).toBe('Foo Bar / Baz')
+  })
+})
+
+describe('tag-resolve', () => {
+  function makeTagContext(): RecipeSlotContext {
+    return {
+      itemsById: {
+        'minecraft:oak_planks': {
+          id: 'minecraft:oak_planks',
+          name: 'Oak Planks',
+          zh: '橡木木板',
+          texture: 'oak_planks',
+        },
+        'minecraft:spruce_planks': {
+          id: 'minecraft:spruce_planks',
+          name: 'Spruce Planks',
+          zh: '云杉木板',
+          texture: 'spruce_planks',
+        },
+        'minecraft:air': { id: 'minecraft:air', name: 'Air', zh: '', texture: null },
+      },
+      customItemsByUid: {},
+      customTagsByUid: {
+        'tag-1': {
+          uid: 'tag-1',
+          id: 'mymod:wood',
+          values: [
+            { type: 'item', id: 'minecraft:oak_planks' },
+            { type: 'tag', id: 'minecraft:planks' },
+            { type: 'item', id: 'minecraft:air' },
+          ],
+        },
+      },
+      vanillaTags: {
+        'minecraft:planks': ['minecraft:oak_planks', 'minecraft:spruce_planks', 'minecraft:air'],
+      },
+    }
+  }
+
+  it('resolves vanilla tag display with the first textured member', () => {
+    const display = resolveTagDisplay({ kind: 'vanilla_tag', id: 'minecraft:planks' }, makeTagContext())
+    expect(display.label).toBe(`#${tagLabel('minecraft:planks')}`)
+    expect(display.texture).toBe('oak_planks')
+    expect(display.members.map((member) => member.id)).toEqual([
+      'minecraft:oak_planks',
+      'minecraft:spruce_planks',
+    ])
+  })
+
+  it('expands custom tag members, including nested tag references, deduped', () => {
+    const display = resolveTagDisplay({ kind: 'custom_tag', uid: 'tag-1' }, makeTagContext())
+    expect(display.label).toBe('#mymod:wood')
+    expect(display.texture).toBe('oak_planks')
+    const ids = display.members.map((member) => member.id)
+    expect(ids).toContain('minecraft:oak_planks')
+    expect(ids).toContain('minecraft:spruce_planks')
+    expect(ids).not.toContain('minecraft:air')
+    expect(ids).toHaveLength(2)
+  })
+
+  it('falls back to null texture when no member has a texture', () => {
+    const context = makeTagContext()
+    context.vanillaTags['minecraft:empty'] = ['minecraft:air']
+    const display = resolveTagDisplay({ kind: 'vanilla_tag', id: 'minecraft:empty' }, context)
+    expect(display.texture).toBeNull()
+    expect(display.members).toHaveLength(0)
+  })
+
+  it('labels unknown custom tags with a placeholder', () => {
+    const display = resolveTagDisplay({ kind: 'custom_tag', uid: 'missing' }, makeTagContext())
+    expect(display.label).toBe('#未知标签')
+    expect(display.members).toHaveLength(0)
   })
 })

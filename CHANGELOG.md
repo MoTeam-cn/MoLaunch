@@ -36,6 +36,8 @@
 
 - **抽屉交互与主题色优化**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：抽屉内主色元素（页签激活态、物品/标签悬停高亮、正在编辑的格子边框与光晕）由硬编码蓝色改为跟随主题色变量；选择物品/标签后抽屉不再立即关闭，而是自动定位到下一个空格子（crafting 按 2x2/3x3 网格顺序、其他类型按输入槽顺序）连续放置，全部填满才关闭，避免每次点击都跳回合成区。
 
+- **标签槽位显示成员贴图并新增悬停浏览浮层**（[tag-resolve.ts](src/utils/recipe-generator/tag-resolve.ts) / [RecipeTagPopup.vue](src/views/tools/creation/recipe-generator/RecipeTagPopup.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：放入合成格的标签不再显示问号占位，改为取该标签下首个有贴图成员物品的贴图作为图标，格子左上角显示主题色「#」角标区分标签材料；悬停标签格弹出浮层，横排展示该标签全部有贴图成员物品的图标（标题显示标签名与成员数），内容超宽时左右缓慢自动滑动浏览，浮层跟随槽位定位并随页面滚动更新位置。
+
 ### Fixed
 
 - **修复配方物品/标签资源加载为空，抽屉只剩一个「default」标签**（[resources.ts](src/utils/recipe-generator/resources.ts)）：`import.meta.glob` 加载 JSON 资产时模块形状为 `{ default: <json> }`，此前直接 `await mod()` 导致物品列表始终为空、标签只读到一个 `default` 键——这正是抽屉里标签只有「default」、无法筛选的原因。现按项目约定取 `.default`（与 `aboutLogos` 一致），物品/标签正常加载；新增资源加载回归测试。

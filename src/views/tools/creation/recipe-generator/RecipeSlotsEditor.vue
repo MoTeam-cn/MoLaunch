@@ -6,12 +6,13 @@
  * 点击空格子请求编辑（父组件弹抽屉选择），点击已放置槽位可清除；
  * 结果槽滚轮可调整产出数量（1-64）；当前编辑中的槽位高亮。
  */
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, ref } from 'vue'
 import type { RecipeSlot, RecipeSlotContext, SlotValue } from '@/utils/recipe-generator/types'
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
 import { slotCaption } from '@/utils/recipe-generator/formatter'
-import { tagLabel } from '@/utils/recipe-generator/tag-zh'
+import { resolveTagDisplay, type TagDisplay, type TagMember } from '@/utils/recipe-generator/tag-resolve'
 import RecipeItemIcon from './RecipeItemIcon.vue'
+import RecipeTagPopup from './RecipeTagPopup.vue'
 
 const props = withDefaults(
   defineProps<{
@@ -34,7 +35,7 @@ const emit = defineEmits<{
   'edit-slot': [slot: RecipeSlot]
 }>()
 
-type Display = { texture: string | null; label: string; count: number }
+type Display = { texture: string | null; label: string; count: number; members?: TagMember[] }
 
 function displayFor(value: SlotValue | undefined): Display | null {
   if (!value) return null
@@ -55,12 +56,11 @@ function displayFor(value: SlotValue | undefined): Display | null {
       count: value.count ?? 1,
     }
   }
-  if (value.kind === 'vanilla_tag') return { texture: null, label: `#${tagLabel(value.id)}`, count: 1 }
-  return {
-    texture: null,
-    label: `#${props.context.customTagsByUid[value.uid]?.id ?? '未知标签'}`,
-    count: 1,
+  if (value.kind === 'vanilla_tag' || value.kind === 'custom_tag') {
+    const display = resolveTagDisplay(value, props.context)
+    return { texture: display.texture, label: display.label, count: 1, members: display.members }
   }
+  return null
 }
 
 const gridDisplay = computed(() => {
@@ -78,6 +78,10 @@ const rowSlots = computed(() =>
     .map((slot) => ({ slot, display: displayFor(props.values[slot]) })),
 )
 
+const resultDisplay = computed(() =>
+  displayFor(props.resultSlot ? props.values[props.resultSlot] : undefined),
+)
+
 function onSlotClick(slot: RecipeSlot) {
   if (props.values[slot]) emit('update-slot', slot, undefined)
   else if (slot !== props.resultSlot) emit('edit-slot', slot)
@@ -92,6 +96,39 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
   const delta = event.deltaY > 0 ? -1 : 1
   emit('update-count', slot, Math.max(1, Math.min(64, current + delta)))
 }
+
+const hover = ref<TagDisplay | null>(null)
+const hoverAnchor = ref<HTMLElement | null>(null)
+let closeTimer: ReturnType<typeof setTimeout> | null = null
+
+function onSlotHover(event: MouseEvent, display: Display | null) {
+  if (!display?.members?.length) return
+  clearCloseTimer()
+  hover.value = { texture: display.texture, label: display.label, members: display.members }
+  hoverAnchor.value = event.currentTarget as HTMLElement
+}
+
+function closeHover() {
+  hover.value = null
+  hoverAnchor.value = null
+}
+
+function scheduleClose() {
+  clearCloseTimer()
+  closeTimer = setTimeout(() => {
+    closeTimer = null
+    closeHover()
+  }, 250)
+}
+
+function clearCloseTimer() {
+  if (closeTimer) {
+    clearTimeout(closeTimer)
+    closeTimer = null
+  }
+}
+
+onBeforeUnmount(clearCloseTimer)
 </script>
 
 <template>
@@ -104,8 +141,14 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
           :key="index"
           type="button"
           class="recipe-slot-cell"
-          :class="{ filled: cell?.display, editing: editingSlot === cell?.slot }"
+          :class="{
+            filled: cell?.display,
+            editing: editingSlot === cell?.slot,
+            'is-tag': !!cell?.display?.members?.length,
+          }"
           @click="cell?.slot && onSlotClick(cell.slot)"
+          @mouseenter="onSlotHover($event, cell?.display ?? null)"
+          @mouseleave="scheduleClose"
         >
           <RecipeItemIcon
             v-if="cell?.display"
@@ -118,6 +161,7 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
           <span v-if="cell?.display" class="recipe-slot-count">
             {{ cell.display.count > 1 ? cell.display.count : '' }}
           </span>
+          <span v-if="cell?.display?.members?.length" class="recipe-slot-tag-badge">#</span>
         </button>
       </div>
       <template v-if="resultSlot">
@@ -125,21 +169,24 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
         <button
           type="button"
           class="recipe-slot-cell recipe-result-cell"
-          :class="{ filled: values[resultSlot] }"
+          :class="{ filled: values[resultSlot], 'is-tag': !!resultDisplay?.members?.length }"
           @click="onSlotClick(resultSlot)"
           @wheel="onResultWheel($event, resultSlot)"
+          @mouseenter="onSlotHover($event, resultDisplay)"
+          @mouseleave="scheduleClose"
         >
           <RecipeItemIcon
-            v-if="displayFor(values[resultSlot])"
-            :texture="displayFor(values[resultSlot])?.texture ?? null"
+            v-if="resultDisplay"
+            :texture="resultDisplay.texture"
             :atlas-url="atlasUrl"
             :atlas="atlas"
             :size="38"
-            :label="displayFor(values[resultSlot])?.label"
+            :label="resultDisplay.label"
           />
-          <span v-if="displayFor(values[resultSlot])" class="recipe-slot-count">
-            {{ displayFor(values[resultSlot])?.count }}
+          <span v-if="resultDisplay" class="recipe-slot-count">
+            {{ resultDisplay.count }}
           </span>
+          <span v-if="resultDisplay?.members?.length" class="recipe-slot-tag-badge">#</span>
         </button>
       </template>
     </div>
@@ -155,9 +202,15 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
         <button
           type="button"
           class="recipe-slot-cell"
-          :class="{ filled: entry.display, editing: editingSlot === entry.slot }"
+          :class="{
+            filled: entry.display,
+            editing: editingSlot === entry.slot,
+            'is-tag': !!entry.display?.members?.length,
+          }"
           @click="onSlotClick(entry.slot)"
           @wheel="onResultWheel($event, entry.slot)"
+          @mouseenter="onSlotHover($event, entry.display)"
+          @mouseleave="scheduleClose"
         >
           <RecipeItemIcon
             v-if="entry.display"
@@ -170,11 +223,24 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
           <span v-if="entry.display" class="recipe-slot-count">
             {{ entry.display.count }}
           </span>
+          <span v-if="entry.display?.members?.length" class="recipe-slot-tag-badge">#</span>
         </button>
         <span class="recipe-slot-caption">{{ slotCaption(entry.slot) }}</span>
       </div>
       <span v-if="resultSlot" class="recipe-grid-arrow">→</span>
     </div>
+
+    <Teleport to="body">
+      <RecipeTagPopup
+        v-if="hover"
+        :display="hover"
+        :atlas-url="atlasUrl"
+        :atlas="atlas"
+        :anchor="hoverAnchor"
+        @enter="clearCloseTimer"
+        @leave="scheduleClose"
+      />
+    </Teleport>
   </div>
 </template>
 
@@ -253,6 +319,17 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
   font-size: 10px;
   font-weight: 600;
   line-height: 14px;
+  pointer-events: none;
+}
+
+.recipe-slot-tag-badge {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  color: var(--color-primary-500);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
   pointer-events: none;
 }
 
