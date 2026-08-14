@@ -16,6 +16,10 @@
 
 - **移除工具模块「启动器数据导出」功能**（[data_export.rs](src-tauri/src/commands/tools/data_export.rs) / [types/data_export.rs](src-tauri/src/commands/tools/types/data_export.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [mod.rs](src-tauri/src/commands/tools/mod.rs) / [types/mod.rs](src-tauri/src/commands/tools/types/mod.rs) / [DataExporter.vue](src/views/tools/data/DataExporter.vue) / [QuickTools.vue](src/views/QuickTools.vue) / [data.ts](src/utils/api/tools/data.ts) / [core.ts](src/utils/api/tools/core.ts)）：便捷工具页「启动器数据导出」无实际意义，前后端整体移除——后端删除 `data_export` 模块与 `export_launcher_data` action 注册，前端删除 `DataExporter.vue` 组件、`exportLauncherData` 封装及 `EXPORT_LAUNCHER_DATA` action 常量；`tools/data.ts` 中其余数据类工具（崩溃分析 / 截图 / 资源包 / 版本 JSON / NBT）封装保留。
 
+### Changed
+
+- **创作工具分类页改为顶部子菜单切换**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：渐变文字生成器与合成配方生成器此前垂直叠加一页放不下，现复用设置页同款 `SubTabBar` 顶部菜单栏（sticky 吸顶、带图标），每次只渲染当前工具；支持 `?subtab=` 深链直达指定工具，`#tool-gradient-text` / `#tool-recipe-generator` 目录锚点保留。
+
 ### Fixed
 
 - **合成配方生成器界面全中文化**（[versions.ts](src/utils/recipe-generator/versions.ts) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：配方类型下拉由英文 ID 改为中文（合成/熔炼/高炉烧炼/烟熏/营火烹饪/切石/锻造/纹饰锻造/锻造转换），分类下拉改为中文（装备/建筑/杂物/红石/食物/方块），页头副标题、分组/分类标签、文件名占位符改为中文；物品调色板条目主文案改显中文名（英文 ID 保留在悬停提示），非合成类槽位下方英文标题（ingredient/template/base/addition）改为原料/模板/底材/材料。
