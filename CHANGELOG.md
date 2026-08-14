@@ -26,6 +26,8 @@
 
 ### Changed
 
+- **App.vue 非启动关键组件改为懒加载**（[App.vue](src/App.vue)）：滚动返回/下载面板/拖拽遮罩/更新弹窗/更新日志/测试版水印等 6 个组件改为 `defineAsyncComponent` 按需加载；根布局 `TopNavLayout` 与 5 个全局弹窗（错误弹窗/崩溃/提示/用户协议/Toast）因启动期需以组件实例注册全局服务，保留静态导入避免时序失效。
+
 - **组件导入全面改为 `defineAsyncComponent` 懒加载，并修复批量替换遗留问题**（[src/components](src/components) / [src/views](src/views) / [src/plugins](src/plugins)）：页面与弹窗组件（公共 Button/Tag/Input 等、联机/社区/下载/设置各模块）统一改为异步组件按需加载，进入对应路由时再拉取 chunk，减小首屏体积。同时修复批量替换遗留问题：① 图片资源被误包进 `defineAsyncComponent`——图片（PNG/SVG）导入返回的是 URL 而非组件，全部恢复为静态导入（[recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts) / [VersionSelect.vue](src/views/VersionSelect.vue) / [LoaderSelect.vue](src/views/LoaderSelect.vue) / [AboutTab.vue](src/views/settings/more/AboutTab.vue) / [FabricApiInfoCard.vue](src/components/install/FabricApiInfoCard.vue) 共 13 处，`?url` 后缀保留）；② 所有使用 `defineAsyncComponent` 的文件此前缺失 `vue` 导入（非编译宏，需显式导入），导致 TS2304 编译报错，已全部补齐。
 
 - **合成台背景图改英文名并改用 `@/assets` 别名引用**（[src/assets/Syn](src/assets/Syn) / [recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts)）：`src/assets/Syn/` 下 5 张中文名背景图（切石机/合成/熔炼/篝火/锻造）改名为 `stonecutter.png` / `crafting.png` / `smelting.png` / `campfire.png` / `smithing.png`，`recipe-layouts.ts` 引用同步更新并统一改用 `@/assets` 别名（替代多级相对路径）。

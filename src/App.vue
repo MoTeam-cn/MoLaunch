@@ -3,20 +3,20 @@
  * MoLaunch 根组件
  */
 
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineAsyncComponent } from 'vue'
 import router from '@/router'
 import TopNavLayout from '@/components/layout/TopNavLayout.vue'
-import BackToTop from '@/components/common/BackToTop.vue'
-import DownloadPanel from '@/components/common/DownloadPanel.vue'
-import DragOverlay from '@/components/common/DragOverlay.vue'
 import MessageDrawer from '@/components/common/MessageDrawer.vue'
 import CrashDialog from '@/components/common/CrashDialog.vue'
 import HintDialog from '@/components/common/HintDialog.vue'
 import UserAgreementDialog from '@/components/common/UserAgreementDialog.vue'
 import Toast from '@/components/common/Toast.vue'
-import UpdateDialog from '@/components/about/UpdateDialog.vue'
-import UpdateLogDialog from '@/components/about/UpdateLogDialog.vue'
-import Watermark from '@/components/common/Watermark.vue'
+const BackToTop = defineAsyncComponent(() => import('@/components/common/BackToTop.vue'))
+const DownloadPanel = defineAsyncComponent(() => import('@/components/common/DownloadPanel.vue'))
+const DragOverlay = defineAsyncComponent(() => import('@/components/common/DragOverlay.vue'))
+const UpdateDialog = defineAsyncComponent(() => import('@/components/about/UpdateDialog.vue'))
+const UpdateLogDialog = defineAsyncComponent(() => import('@/components/about/UpdateLogDialog.vue'))
+const Watermark = defineAsyncComponent(() => import('@/components/common/Watermark.vue'))
 import { useSdkStore } from '@/stores/sdk'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
