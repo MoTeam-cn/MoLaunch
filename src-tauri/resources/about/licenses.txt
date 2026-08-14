@@ -108,3 +108,5 @@
 | windows | Microsoft | MIT / Apache-2.0 | https://docs.rs/windows | https://github.com/microsoft/windows-rs/blob/master/license-mit |
 | winreg | winreg contributors | MIT License | https://docs.rs/winreg | https://github.com/gentoo90/winreg-rs/blob/master/LICENSE |
 | libc | libc contributors | MIT / Apache-2.0 | https://docs.rs/libc | https://github.com/rust-lang/libc/blob/master/LICENSE-MIT |
+| Minecraft Default 字体（Minecraft 官方默认像素字体） | 字体源数据版权归 Mojang Studios（Minecraft 游戏资产）；TTF 由 tryashtar/minecraft-ttf 从游戏字体资源自动生成 | 游戏资产按 Minecraft EULA 使用；生成仓库未提供独立 LICENSE | https://github.com/tryashtar/minecraft-ttf | https://github.com/tryashtar/minecraft-ttf/releases |
+| Unifont（CJK 子集，Unifont-16.0.04） | Copyright (c) 1998-2025 Roman Czyborra、Paul Hardy 等 unifoundry 贡献者 | GNU GPL v2+ with Font Embedding Exception | https://unifoundry.com | https://unifoundry.com/LICENSE.txt |

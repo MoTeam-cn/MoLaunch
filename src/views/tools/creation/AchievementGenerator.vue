@@ -32,10 +32,15 @@ const title = ref('获得成就！')
 const titleColor = ref('gold')
 const content = ref('达成一个成就')
 const contentColor = ref('white')
-const fontFamily = ref("Consolas, 'Courier New', monospace")
+
+/** Minecraft 官方默认像素字体 + unifont CJK 中文像素字回退（与游戏内中文同款） */
+const MINECRAFT_FONT = "'Minecraft Default', 'Unifont CJK', 'Microsoft YaHei', 'PingFang SC', sans-serif"
+
+const fontFamily = ref(MINECRAFT_FONT)
 const exporting = ref(false)
 
 const fontOptions = [
+  { label: 'Minecraft 原版（推荐）', value: MINECRAFT_FONT },
   { label: '等宽（像素风）', value: "Consolas, 'Courier New', monospace" },
   { label: '微软雅黑', value: "'Microsoft YaHei', 'PingFang SC', sans-serif" },
   { label: '宋体', value: "SimSun, 'Songti SC', serif" },
@@ -85,7 +90,23 @@ function draw() {
   })
 }
 
-watch([title, titleColor, content, contentColor, fontFamily, selected], () => nextTick(draw))
+/** Canvas 直接引用 @font-face 字体时需先触发加载，否则首帧会回退到默认字体 */
+async function ensureFonts() {
+  await Promise.allSettled([
+    document.fonts.load('700 12px "Minecraft Default"'),
+    document.fonts.load('400 9px "Minecraft Default"'),
+    document.fonts.load('400 12px "Unifont CJK"'),
+  ])
+  await document.fonts.ready
+}
+
+async function redraw() {
+  await ensureFonts()
+  await nextTick()
+  draw()
+}
+
+watch([title, titleColor, content, contentColor, fontFamily, selected], () => void redraw())
 
 onMounted(async () => {
   const [itemList, layout] = await Promise.all([loadVersionItems('26.2'), getAtlasLayout()])
@@ -96,8 +117,7 @@ onMounted(async () => {
   await img.decode()
   atlasImg.value = img
   selected.value = itemList.find((i) => i.id === 'diamond') ?? null
-  await nextTick()
-  draw()
+  await redraw()
 })
 
 async function exportPng() {

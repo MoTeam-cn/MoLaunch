@@ -12,6 +12,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 成就生成器内置字体：Minecraft 官方默认像素字体 + unifont CJK 子集（Minecraft 中文同款） */
+@font-face {
+  font-family: 'Minecraft Default';
+  src: url('../fonts/MinecraftDefault-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Minecraft Default';
+  src: url('../fonts/MinecraftDefault-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Unifont CJK';
+  src: url('../fonts/Unifont-CJK.otf') format('opentype');
+  font-display: swap;
+}
+
 @layer base {
   :root {
     /* 默认主色：Arco 蓝 #165dff

@@ -8,6 +8,8 @@
 
 - **工具页新增「成就生成器」**（[AchievementGenerator.vue](src/views/tools/creation/AchievementGenerator.vue)（新增） / [draw.ts](src/views/tools/creation/achievement/draw.ts)（新增） / [CreateCmdPage.vue](src/views/tools/CreateCmdPage.vue)）：创作指令分类新增子工具，Canvas 2D 直绘原版风格「获得成就」弹窗（320×65、2 倍率输出，三层边框 + 物品图标 + 标题/内容与 16 色），复用合成配方物品图集与物品搜索数据源、`ColorSelect` 组件；预览实时刷新，支持导出 PNG 到指定目录（保存对话框 + 后端 `write_binary_file`），图片右下角固定白色 `MoLaunch` 版权水印；字体可选等宽（像素风）/ 微软雅黑 / 宋体 / Arial。
 
+- **成就生成器内置 Minecraft 官方像素字体与 unifont CJK 中文像素字**（[src/assets/fonts](src/assets/fonts/) / [main.css](src/assets/styles/main.css) / [licenses.txt](src-tauri/resources/about/licenses.txt)）：新增 3 个字体资产——`MinecraftDefault-Regular.ttf` / `MinecraftDefault-Bold.ttf`（tryashtar/minecraft-ttf v1.4，从 Minecraft 1.21.6-pre3 官方字体资源生成，SHA-256 与 release 页校验值一致）+ `Unifont-CJK.otf`（unifoundry Unifont 16.0.04 按 CJK 区块子集，覆盖全部 20992 个 CJK 汉字，与游戏内中文 unifont 渲染同款）；main.css 全局注册 `@font-face`（`Minecraft Default` 400/700 字重 + `Unifont CJK`），第三方许可登记于 licenses.txt。
+
 - **新增二进制文件写入能力（后端 `write_binary_file`）**（[game_dir.rs](src-tauri/src/commands/system/game_dir.rs) / [manager/game_dir.rs](src-tauri/src/commands/system/manager/game_dir.rs) / [system-manager.ts](src/utils/api/system-manager.ts)）：system_manager 新增 `write_binary_file` action（前端 `WRITE_BINARY_FILE`），接收 Base64 编码的原始字节（如 Canvas 导出的 PNG），覆盖写入并自动创建父目录，为「导出图片到指定目录」类功能提供统一通道。
 
 - **工具页新增「指令生成」分类与三类纯前端指令生成器**（[CommandPage.vue](src/views/tools/command/CommandPage.vue) / [ItemEditor.vue](src/views/tools/command/ItemEditor.vue) / [SignShop.vue](src/views/tools/command/SignShop.vue) / [SummonEntity.vue](src/views/tools/command/SummonEntity.vue) / [data.ts](src/views/tools/command/data.ts) / [generator.ts](src/views/tools/command/generator.ts) / [Tools.vue](src/views/Tools.vue)）：新增「指令生成」分类，纯前端离线生成 Minecraft Java 指令——物品编辑（/give）复用合成配方物品数据（5000+ 条）支持搜索选择、数量与目标玩家（@p/@a/@s/@r）、自定义名称/16 色、Lore 多行、34 种常用附魔动态增删；告示牌商店（/setblock）支持 12 种告示牌类型、4 朝向、四行文字与颜色；召唤实体（/summon）支持 30 种常见实体、`~` 相对坐标、数量与自定义名称。SNBT/文本组件转义与指令拼接逻辑集中在独立纯函数模块 `generator.ts`（JSON 双引号转义 + 单引号 SNBT 包裹），分类页复用 SubTabBar 顶部菜单栏并支持 `?subtab=` 深链直达子工具。
@@ -25,6 +27,8 @@
 ### Changed
 
 - **写入文件命令增加安全校验（防恶意文件）**（[game_dir.rs](src-tauri/src/commands/system/game_dir.rs)）：`write_text_file` / `write_binary_file` 统一校验写入路径（非空、无空字节、长度 ≤ 260，并解析 `.` / `..` 防路径穿越）且限制内容大小（文本 ≤ 10MB、二进制 ≤ 20MB）；`write_binary_file` 追加 PNG 魔数校验（`89 50 4E 47 0D 0A 1A 0A`），拒绝写入非 PNG 内容，防止恶意文件落盘。
+
+- **成就生成器默认改用 Minecraft 原版像素字体**（[AchievementGenerator.vue](src/views/tools/creation/AchievementGenerator.vue)）：字体下拉新增「Minecraft 原版（推荐）」并默认选中，font-family 链为 `'Minecraft Default', 'Unifont CJK', 'Microsoft YaHei', 'PingFang SC', sans-serif`——拉丁/数字用官方像素字、中文用 unifont 像素字（与游戏内一致），缺失字形再回退系统字体；绘制前先 `document.fonts.load` + `document.fonts.ready` 触发并等待内置字体加载，Canvas 首帧即用真实字体而非系统回退。
 
 - **移除顶部导航栏右上角「最大化/还原」窗口按钮**（[TopNavLayout.vue](src/components/layout/TopNavLayout.vue)）：窗口控制仅保留最小化与关闭，删除最大化/还原按钮及其 `isMaximized` 状态与窗口 resize 监听；双击标题栏拖拽区域等系统级最大化方式不受影响。
 
