@@ -21,10 +21,13 @@ const region = computed(() => (props.texture ? props.atlas.layout[props.texture]
 const backgroundStyle = computed(() => {
   const regionValue = region.value
   if (!regionValue) return {}
+  // 图集内贴图为 16x16 紧密排列，需按 元素尺寸/贴图宽 等比放大背景，
+  // 否则 32px+ 元素会同时露出相邻多个贴图
+  const scale = props.size / regionValue[2]
   return {
     backgroundImage: `url(${props.atlasUrl})`,
-    backgroundSize: `${props.atlas.size[0]}px ${props.atlas.size[1]}px`,
-    backgroundPosition: `-${regionValue[0]}px -${regionValue[1]}px`,
+    backgroundSize: `${props.atlas.size[0] * scale}px ${props.atlas.size[1] * scale}px`,
+    backgroundPosition: `-${regionValue[0] * scale}px -${regionValue[1] * scale}px`,
   }
 })
 </script>

@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- **合成配方生成器：修复物品图标图集切割错位**（[RecipeItemIcon.vue](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)）：此前背景图直接按图集原始尺寸（2048×528）平铺，而槽位/调色板图标元素为 30～38px，16×16 紧密排列的贴图会一个格子露出相邻 2 个甚至 2×2 个。现按「元素尺寸 / 贴图区域宽度」等比放大背景尺寸与偏移，每个图标只显示其对应的单个贴图。
+
 - **合成配方生成器：修正 typecheck/lint 报错**（[formatter.ts](src/utils/recipe-generator/formatter.ts) / [versions.ts](src/utils/recipe-generator/versions.ts) / [validation.ts](src/utils/recipe-generator/validation.ts) / [resources.ts](src/utils/recipe-generator/resources.ts) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [RecipeItemIcon.vue](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)）：补齐 `RecipeSlot` 类型导入与网格槽位索引类型收窄、版本列表改为 `as const` 字面量数组（`metadata` 索引类型收敛）、图集 JSON 经 `unknown` 中转断言、清理未使用导入；Toast 改为项目统一 `@/utils/toast`（成功/错误/普通分级），cooking 时长输入改为 `:model-value` + 更新回调以支持 `number | null`（空值回落默认时长），图标组件 `label` prop 补默认值消除 `vue/require-default-prop` 警告。
 
 - **版本同步补齐多语言 README 版本徽章**（[sync-version.cjs](scripts/sync-version.cjs) / [version-sync.yml](.github/workflows/version-sync.yml)）：原脚本只更新主 README.md 的 shields.io 版本徽章，README_EN / README_JA / README_ZH-HANT 的徽章停留在旧版本（如 0.3.5-rc4），打 tag 后多语言文档版本漂移。现改为遍历根目录全部 4 个语言 README 同步徽章，并同步扩展 git-auto-commit 的 file_pattern 以纳入 bot 自动提交范围。
