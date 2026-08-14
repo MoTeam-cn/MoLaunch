@@ -5,7 +5,7 @@
  * - 拖动自由调宽：右侧边缘拖拽手柄，宽度范围 160~360px，持久化到 localStorage
  * - 折叠态 hover 自动展开：收起为窄条后，鼠标移入自动展开、移出自动收起
  */
-import { onBeforeUnmount, ref } from 'vue'
+import { onBeforeUnmount, ref, defineAsyncComponent } from 'vue'
 import {
   ChatBubbleLeftRightIcon,
   ChevronDoubleLeftIcon,
@@ -14,8 +14,8 @@ import {
   TrashIcon,
   LockClosedIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import type { ConversationItem } from '@/utils/api/experimental'
 
 defineProps<{

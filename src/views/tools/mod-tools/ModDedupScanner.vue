@@ -6,17 +6,17 @@
  * 重复指同一 mod_id（slug）在 mods 目录下存在多个版本文件，
  * 可据此手动清理冗余旧版本。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import {
   Squares2X2Icon,
   MagnifyingGlassIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { toastSuccess, toastWarning, toastError } from '@/utils/toast'
 import { modDedupScan } from '@/utils/api/tools'
 import type { ModDedupResult } from '@/utils/api/tools'

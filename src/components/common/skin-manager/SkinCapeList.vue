@@ -9,11 +9,11 @@
  * - 当前已装备披风高亮 + "取消当前披风"按钮
  * - emit equip/unequip，业务逻辑由父组件处理
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import type { SkinCapeInfo } from '@/utils/tauri'
 import { getCapeIcon } from '@/utils/cape-icon'
 import { onImageCached } from '@/composables/useImageCache'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 const props = defineProps<{
   capes: SkinCapeInfo['capes']

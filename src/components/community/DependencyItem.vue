@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 前置 Mod 依赖项卡片
  *
@@ -6,9 +7,9 @@
  * 用于 DependencyConfirmDialog 列表。
  */
 import type { ResolvedDependency } from '@/types/community'
-import Tooltip from '@/components/common/Tooltip.vue'
-import CachedImage from '@/components/common/CachedImage.vue'
-import Tag from '@/components/common/Tag.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const CachedImage = defineAsyncComponent(() => import('@/components/common/CachedImage.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import {
   CheckCircleIcon,
   ExclamationCircleIcon,

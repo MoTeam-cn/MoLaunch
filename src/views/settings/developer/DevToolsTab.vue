@@ -11,9 +11,9 @@
  * - 隐藏前提：DevTools 已打开（后端 AtomicBool 维护状态）
  * - 解锁状态存 sessionStorage，重启后恢复；DevTools 关闭自动恢复水印
  */
-import { ref, onMounted, computed } from 'vue'
-import Button from '@/components/common/Button.vue'
-import Alert from '@/components/common/Alert.vue'
+import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 import {
   closeDevTools,
   isDevToolsOpen,

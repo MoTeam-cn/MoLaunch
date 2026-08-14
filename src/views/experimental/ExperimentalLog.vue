@@ -9,10 +9,10 @@
  * - 第二级：AiLogAnalyzer AI 弹窗——不包含输入框，收到本地初检后的日志文本自动打开
  *   弹窗并发起 AI 深度分析（后端 localAnalyze=true 只把命中关键词前后 ±15 行上下文发给 AI）。
  */
-import { ref } from 'vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
-import CrashAnalyzer from '@/views/tools/data/CrashAnalyzer.vue'
-import AiLogAnalyzer from '@/components/experimental/AiLogAnalyzer.vue'
+import { ref, defineAsyncComponent } from 'vue'
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const CrashAnalyzer = defineAsyncComponent(() => import('@/views/tools/data/CrashAnalyzer.vue'))
+const AiLogAnalyzer = defineAsyncComponent(() => import('@/components/experimental/AiLogAnalyzer.vue'))
 
 /** 本地引擎初检完成后传回给 AI 面板的日志文本 */
 const aiLogText = ref<string | undefined>(undefined)

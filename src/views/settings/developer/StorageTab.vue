@@ -5,11 +5,11 @@
  * 展示缓存目录路径和存储信息路径，每项带「打开」或「定位」按钮。
  * 数据由父组件 SettingsDeveloper.vue 统一加载后通过 props 下发。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import type { StorageDirs } from '@/utils/api/developer'
 import { openPath, revealInExplorer } from '@/utils/api/system'
 import { toastError } from '@/utils/toast'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import {
   FolderOpenIcon,
   DocumentTextIcon,

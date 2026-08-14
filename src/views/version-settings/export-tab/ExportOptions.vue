@@ -10,9 +10,9 @@
  *
  * 与父组件 ExportTab 通过 v-model:checked 双向绑定，保持选项状态同步。
  */
-import { computed } from 'vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Tag from '@/components/common/Tag.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import type { ExportOption } from '@/utils/api/version-export-manager'
 
 interface Props {

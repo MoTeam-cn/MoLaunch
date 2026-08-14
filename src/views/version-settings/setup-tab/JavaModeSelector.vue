@@ -13,16 +13,16 @@
  *
  * 通过 useVersionSettings 共享状态（模块级单例），无需 props。
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, defineAsyncComponent } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { isJavaCompatible } from '@/utils/api/java'
 import { toastSuccess, toastError } from '@/utils/toast'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import type { JavaRequirements } from '@/types/java'
-import JavaCustomMode from './JavaCustomMode.vue'
+const JavaCustomMode = defineAsyncComponent(() => import('./JavaCustomMode.vue'))
 import { safeCall } from '@/utils/async'
 
 const javaStore = useJavaStore()

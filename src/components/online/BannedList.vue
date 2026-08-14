@@ -7,9 +7,9 @@
  * - bannedUntil = 0 → 永久封禁（红色标签）
  * - bannedUntil > serverTime → 临时封禁，显示剩余时长（橙色标签）
  */
-import { computed } from 'vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { LockOpenIcon } from '@heroicons/vue/24/outline'
 import type { RoomBan } from '@/types/online'
 import { formatTimestamp } from '@/utils/format'

@@ -10,14 +10,14 @@
  *
  * 深链支持：URL `?subtab=palette` 可直接切到对应子页签。
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import SubTabBar from '@/components/common/SubTabBar.vue'
+const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { FaceSmileIcon, MapPinIcon, SwatchIcon, WrenchScrewdriverIcon } from '@heroicons/vue/24/outline'
-import LuckyTool from '../quick-tools/LuckyTool.vue'
-import QuickTools from '../QuickTools.vue'
-import CoordCalculator from './calc/CoordCalculator.vue'
-import ColorPalette from './calc/ColorPalette.vue'
+const LuckyTool = defineAsyncComponent(() => import('../quick-tools/LuckyTool.vue'))
+const QuickTools = defineAsyncComponent(() => import('../QuickTools.vue'))
+const CoordCalculator = defineAsyncComponent(() => import('./calc/CoordCalculator.vue'))
+const ColorPalette = defineAsyncComponent(() => import('./calc/ColorPalette.vue'))
 
 const subTabs = [
   { id: 'luck', label: '今日人品', icon: FaceSmileIcon },

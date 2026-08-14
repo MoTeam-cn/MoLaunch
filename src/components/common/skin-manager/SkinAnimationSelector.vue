@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 皮肤 3D 预览动画状态选择器
  *
@@ -6,7 +7,7 @@
  * - 图标用 SVG path 数组（24x24 viewBox，stroke 风格）
  * - v-model 双向绑定当前动画
  */
-import Tooltip from '../Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('../Tooltip.vue'))
 
 export type AnimationType = 'idle' | 'walk' | 'run' | 'fly' | 'wave' | 'crouch' | 'hit' | 'swim' | 'none'
 

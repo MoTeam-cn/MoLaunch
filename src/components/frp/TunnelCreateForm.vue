@@ -1,12 +1,12 @@
 <script setup lang="ts">
 /** 隧道创建/编辑表单：模板保留，状态与交互逻辑由 composable 管理。 */
-import { toRef } from 'vue'
-import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Input from '@/components/common/Input.vue'
-import InputGroup from '@/components/common/InputGroup.vue'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+import { toRef, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const InputGroup = defineAsyncComponent(() => import('@/components/common/InputGroup.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { useTunnelCreateForm, modeOptions, typeOptions, bandwidthLimitModeOptions, proxyProtocolVersionOptions } from '@/composables/useTunnelCreateForm'
 import type { CreateTunnelParams, Tunnel, UpdateTunnelParams } from '@/types/frp'
 import {

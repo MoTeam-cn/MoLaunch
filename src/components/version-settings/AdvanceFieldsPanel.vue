@@ -10,11 +10,11 @@
  * 字段值版本独立，通过 updateVersionPersonalization 保存到 setup.ini。
  * 复用 useVersionSettings 共享状态，自行加载 + 失焦保存。
  */
-import { reactive, onMounted } from 'vue'
+import { reactive, onMounted, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError } from '@/utils/toast'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Input from '@/components/common/Input.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { safeCall } from '@/utils/async'
 

@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import Alert from '@/components/common/Alert.vue'
-import Button from '@/components/common/Button.vue'
-import AiEndpointSettings from './AiEndpointSettings.vue'
-import AiContextSettings from './AiContextSettings.vue'
-import AiModelSettings from './AiModelSettings.vue'
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const AiEndpointSettings = defineAsyncComponent(() => import('./AiEndpointSettings.vue'))
+const AiContextSettings = defineAsyncComponent(() => import('./AiContextSettings.vue'))
+const AiModelSettings = defineAsyncComponent(() => import('./AiModelSettings.vue'))
 import {
   aiLoadConfig,
   aiSaveConfig,

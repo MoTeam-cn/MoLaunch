@@ -12,13 +12,13 @@
  * - useOnlineStore：deviceStatus + logout/clear + setCustomTurnServers
  * - showConfirm：全局 Modal 服务
  */
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useConfigPage } from '@/composables/useConfigPage'
 import { showConfirm } from '@/utils/modal'
-import Button from '@/components/common/Button.vue'
-import TurnServerEntryEditor from '@/components/online/TurnServerEntryEditor.vue'
-import ApiServerCard from '@/components/settings/ApiServerCard.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const TurnServerEntryEditor = defineAsyncComponent(() => import('@/components/online/TurnServerEntryEditor.vue'))
+const ApiServerCard = defineAsyncComponent(() => import('@/components/settings/ApiServerCard.vue'))
 import {
   ArrowRightOnRectangleIcon,
   TrashIcon,

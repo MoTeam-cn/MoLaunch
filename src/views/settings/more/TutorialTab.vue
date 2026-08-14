@@ -8,15 +8,15 @@
  * 教程内容存储在 src-tauri/resources/templates/tutorial-*.html，
  * 通过 picker 模板机制直接加载。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import {
   BookOpenIcon,
   ArrowRightIcon,
   CodeBracketIcon,
   RocketLaunchIcon,
 } from '@heroicons/vue/24/outline'
-import Card from '@/components/common/Card.vue'
-import Button from '@/components/common/Button.vue'
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { TUTORIALS, type TutorialCategory } from '@/tutorials'
 import { openDisplayWindow } from '@/utils/picker-window'
 

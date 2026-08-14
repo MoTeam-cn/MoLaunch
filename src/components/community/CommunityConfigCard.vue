@@ -8,10 +8,10 @@
  * - Mod 管理样式：标题/详情显示译名或文件名
  * - 忽略 Quilt：在显示 Mod 加载器时是否过滤 Quilt
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
-import Select from '@/components/common/Select.vue'
-import Button from '@/components/common/Button.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 const source = ref<number>(2)
 const filenameFormat = ref<number>(1)

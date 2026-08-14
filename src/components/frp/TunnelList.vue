@@ -3,9 +3,9 @@
  * 隧道列表：卡片列表（状态/地址/操作按钮）+ 空状态/加载态。
  * 从 TunnelManager.vue 拆出，避免 Vue 组件超 300 行。
  */
-import { computed } from 'vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 import { buildTunnelLink } from '@/utils/frp-tunnel-link'
 import type { ProviderInfo, TunnelWithStatus } from '@/types/frp'

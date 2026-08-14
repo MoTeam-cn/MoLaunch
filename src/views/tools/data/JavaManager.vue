@@ -9,16 +9,16 @@
  * - 重新检测按钮触发 store.refreshJava()
  * - AlertV2 提示用户前往设置页切换 Java
  */
-import { onMounted } from 'vue'
+import { onMounted, defineAsyncComponent } from 'vue'
 import {
   CommandLineIcon,
   ArrowPathIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 import { useJavaStore } from '@/stores/java'
 import { toastSuccess, toastError } from '@/utils/toast'
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 主页右侧默认内容区 - 时钟卡片
  *
@@ -15,7 +16,7 @@
  * 逻辑已抽离到 composables/useHomeClockCards.ts。
  */
 import { useHomeClockCards } from '@/composables/useHomeClockCards'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 const {
   timeText,

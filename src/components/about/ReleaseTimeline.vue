@@ -3,8 +3,8 @@
  * 更新日志时间线组件：将合并的多版本 Markdown 按版本拆分为时间线节点。
  * 版本与条目解析见 releaseTimeline.ts，单个节点渲染见 ReleaseTimelineItem.vue。
  */
-import { reactive, computed } from 'vue'
-import ReleaseTimelineItem from '@/components/about/ReleaseTimelineItem.vue'
+import { reactive, computed, defineAsyncComponent } from 'vue'
+const ReleaseTimelineItem = defineAsyncComponent(() => import('@/components/about/ReleaseTimelineItem.vue'))
 import { handleMarkdownLinkClick } from '@/utils/markdown'
 import { parseReleaseNotes } from '@/components/about/releaseTimeline'
 

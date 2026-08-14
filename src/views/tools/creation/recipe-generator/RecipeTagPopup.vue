@@ -2,10 +2,10 @@
 /**
  * 标签槽位悬停浮层：展示标签全部成员物品贴图，内容超宽时左右缓慢滑动
  */
-import { nextTick, onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, reactive, ref, watch, defineAsyncComponent } from 'vue'
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
 import type { TagDisplay } from '@/utils/recipe-generator/tag-resolve'
-import RecipeItemIcon from './RecipeItemIcon.vue'
+const RecipeItemIcon = defineAsyncComponent(() => import('./RecipeItemIcon.vue'))
 
 const props = defineProps<{
   display: TagDisplay

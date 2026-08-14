@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import Input from '@/components/common/Input.vue'
+import { defineAsyncComponent } from 'vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 
 interface Props {
   maxInputTokens: number

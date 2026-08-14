@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 虚拟 IP 显示卡片行（阶段三走查重构）
  *
@@ -7,8 +8,8 @@
  * 复制逻辑自包含，调用方无需传入 copyText。
  */
 import { WifiIcon, ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 
 defineProps<{

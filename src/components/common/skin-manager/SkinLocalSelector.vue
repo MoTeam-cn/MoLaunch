@@ -7,9 +7,9 @@
  * - 点击选中，emit select(skinName)
  * - 业务逻辑（保存到注册表 + 刷新预览）由父组件处理
  */
-import { computed } from 'vue'
-import SkinAvatar from '../SkinAvatar.vue'
-import Button from '../Button.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const SkinAvatar = defineAsyncComponent(() => import('../SkinAvatar.vue'))
+const Button = defineAsyncComponent(() => import('../Button.vue'))
 import { getDefaultSkinsForVersion, isCustomSkin } from '@/utils/default-skin'
 
 const props = defineProps<{

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * Fabric API 信息卡片
  *
@@ -8,10 +9,10 @@
  * 父组件通过 useFabricApi composable 管理状态，将结果以 props 传入本组件。
  */
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
-import Alert from '@/components/common/Alert.vue'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { formatBytes, formatDate } from '@/utils/format'
 import type { FabricApiVersion } from '@/utils/api/loader'
 import type { FabricApiState } from '@/composables/useFabricApi'

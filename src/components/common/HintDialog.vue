@@ -116,7 +116,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import {
   CheckIcon,
   InformationCircleIcon,
@@ -124,8 +124,8 @@ import {
   StarIcon,
 } from '@heroicons/vue/24/outline'
 import { open } from '@tauri-apps/plugin-shell'
-import Drawer from '@/components/common/Drawer.vue'
-import Button from '@/components/common/Button.vue'
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import SegmentedButtons, { type SegmentedOption } from '@/components/common/SegmentedButtons.vue'
 import { applyConfig } from '@/utils/api/config'
 import { resolveStarHintConfig, type StarHintRemoteConfig } from '@/utils/starHint'

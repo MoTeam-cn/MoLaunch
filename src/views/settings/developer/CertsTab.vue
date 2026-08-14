@@ -11,7 +11,7 @@
  * - trust_mode / ignore_tls 通过 applyConfig 持久化（AppConfig.tls + 注册表 IgnoreTls）
  * - 证书增删查通过 system_manager 的 list_custom_certs / add_custom_cert / remove_custom_cert
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
 import {
   listCustomCerts,
@@ -22,9 +22,9 @@ import {
 import { pickFile } from '@/utils/fileDialog'
 import { toastSuccess, toastError, toastInfo, toastWarning } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
-import Select from '@/components/common/Select.vue'
-import Button from '@/components/common/Button.vue'
-import Alert from '@/components/common/Alert.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 import {
   PlusIcon,
   TrashIcon,

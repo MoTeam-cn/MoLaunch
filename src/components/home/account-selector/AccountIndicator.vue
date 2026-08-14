@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 账号卡片栏指示器（圆点 + 计数）
  * - 每个圆点对应一张账号卡片，末尾圆点对应「添加账号」卡片
  * - 点击圆点切换到对应卡片
  */
-import Tooltip from '@/components/common/Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import type { AccountCardData } from './types'
 
 defineProps<{

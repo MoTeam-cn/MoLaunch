@@ -97,15 +97,15 @@
  * - 协议内容与完整条款外链来自 utils/userAgreement.ts（本地默认 + 远端下发预留）
  * - 同意后经 acceptUserAgreement 持久化到系统存储（userAgreed + 版本号）
  */
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import {
   ShieldCheckIcon,
   DocumentTextIcon,
   ArrowTopRightOnSquareIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 import { openLink } from '@/utils/aboutLogos'
 import { toastError, toastSuccess } from '@/utils/toast'
 import {

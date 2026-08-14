@@ -6,7 +6,7 @@
  * 缺失依赖指某 mod 声明依赖的 mod_id 不在 mods 目录已安装集合中
  * （排除 minecraft / java / fabricloader / fabric-api 等内置依赖）。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import {
   PuzzlePieceIcon,
   MagnifyingGlassIcon,
@@ -14,9 +14,9 @@ import {
   ExclamationCircleIcon,
   ArrowRightIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { toastSuccess, toastWarning, toastError } from '@/utils/toast'
 import { modDependencyCheck } from '@/utils/api/tools'
 import type { ModDependencyResult, MissingDep } from '@/utils/api/tools'

@@ -13,13 +13,13 @@
  * 不从房主接收 `downloadUrl`。一键安装时通过 `getProjectVersions` 反查平台 API
  * 获取下载链接，避免 api-server / 房主成为 URL 分发中心（详见 lobby-modpack-share.md）。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { checkLocalModpack } from '@/utils/api/version'
 import { useModpackInstall } from '@/composables/useModpackInstall'
 import { formatBytes } from '@/utils/format'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import type { ModpackMeta } from '@/types/online'
 import {
   CheckCircleIcon,

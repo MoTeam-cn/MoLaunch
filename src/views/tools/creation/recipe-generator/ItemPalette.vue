@@ -2,12 +2,12 @@
 /**
  * 合成配方调色板：按名称/ID 搜索物品，点击放置到槽位
  */
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/index.css'
 import type { AssetItem, AtlasLayout } from '@/utils/recipe-generator/resources'
 import type { SlotValue } from '@/utils/recipe-generator/types'
-import RecipeItemIcon from './RecipeItemIcon.vue'
+const RecipeItemIcon = defineAsyncComponent(() => import('./RecipeItemIcon.vue'))
 import { matchItem } from '@/utils/recipe-generator/itemSearch'
 
 const props = defineProps<{

@@ -9,11 +9,11 @@
  *
  * 纯前端计算，无后端调用
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, defineAsyncComponent } from 'vue'
 import { SwatchIcon, ClipboardIcon } from '@heroicons/vue/24/outline'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/seedmap/format'
 

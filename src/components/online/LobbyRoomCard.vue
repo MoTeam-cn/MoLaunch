@@ -5,10 +5,10 @@
  * 展示单个公开房间的摘要信息：房间码、加载器、MC 版本、人数、整合包摘要。
  * 点击「加入」按钮 emit join 事件，由父组件处理加入流程（密码弹窗 + joinRoom）。
  */
-import { computed } from 'vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { formatBytes } from '@/utils/format'
 import type { LobbyRoomItem } from '@/types/online'
 import {

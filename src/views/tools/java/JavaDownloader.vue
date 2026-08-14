@@ -11,13 +11,13 @@
  * - 版本校验复用 `isJavaMajorValid`，官方档判断复用 `hasOfficialRuntime`
  * - 下载复用 `JavaDownloadBar`（按 targetMajor 驱动）
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { ArrowDownTrayIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Tag from '@/components/common/Tag.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
-import JavaDownloadBar from '@/views/version-settings/JavaDownloadBar.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const JavaDownloadBar = defineAsyncComponent(() => import('@/views/version-settings/JavaDownloadBar.vue'))
 import { useJavaStore } from '@/stores/java'
 import { toastSuccess } from '@/utils/toast'
 import {

@@ -8,11 +8,11 @@
  *
  * 供「Java 环境检测」与「Java 下载器」复用；仅当 targetMajor 有效时才渲染。
  */
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, defineAsyncComponent } from 'vue'
 import { useTauriEvent } from '@/composables/useTauriEvent'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError } from '@/utils/toast'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import type { JavaDownloadProgress } from '@/types/java'
 
 const props = defineProps<{ targetMajor: number | null }>()

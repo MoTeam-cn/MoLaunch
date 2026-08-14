@@ -1,17 +1,18 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 资源包/光影版本更新/更改对话框（薄编排层）
  *
  * 逻辑在 composables/usePackUpdate.ts，版本列表表格复用 mod-tab/VersionTable.vue。
  * 本文件仅负责弹窗外壳（teleport + transition + 标题栏 + 内容区 + 底部操作栏）。
  */
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { usePackUpdate } from '@/composables/usePackUpdate'
 import { formatDownloads } from '@/utils/format'
 import { defaultAsset } from '@/utils/assets'
 import type { PackInfo, PackKind } from '@/utils/api/personalization'
 import { XMarkIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
-import VersionTable from '../mod-tab/VersionTable.vue'
+const VersionTable = defineAsyncComponent(() => import('../mod-tab/VersionTable.vue'))
 
 interface Props {
   visible: boolean

@@ -11,25 +11,25 @@
  * - TUN 桥接与数据分发由会话统一管理（onTunPacket 按角色路由）
  */
 
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTCMesh } from '@/composables/useWebRTCMesh'
 import { getOnlineSession } from '@/composables/online/onlineSession'
-import Button from '@/components/common/Button.vue'
-import Card from '@/components/common/Card.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Drawer from '@/components/common/Drawer.vue'
-import Tag from '@/components/common/Tag.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
-import PendingAnswerList from './PendingAnswerList.vue'
-import ParticipantList from './ParticipantList.vue'
-import BannedList from './BannedList.vue'
-import KickConfirmDialog from './KickConfirmDialog.vue'
-import WhitelistEditor from './WhitelistEditor.vue'
-import HostRoomInfoCard from './HostRoomInfoCard.vue'
-import RoomToolsDrawer from './RoomToolsDrawer.vue'
-import ConnectionTransportStatus from './ConnectionTransportStatus.vue'
-import P2pFailureCard from './P2pFailureCard.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const PendingAnswerList = defineAsyncComponent(() => import('./PendingAnswerList.vue'))
+const ParticipantList = defineAsyncComponent(() => import('./ParticipantList.vue'))
+const BannedList = defineAsyncComponent(() => import('./BannedList.vue'))
+const KickConfirmDialog = defineAsyncComponent(() => import('./KickConfirmDialog.vue'))
+const WhitelistEditor = defineAsyncComponent(() => import('./WhitelistEditor.vue'))
+const HostRoomInfoCard = defineAsyncComponent(() => import('./HostRoomInfoCard.vue'))
+const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
+const ConnectionTransportStatus = defineAsyncComponent(() => import('./ConnectionTransportStatus.vue'))
+const P2pFailureCard = defineAsyncComponent(() => import('./P2pFailureCard.vue'))
 import {
   XCircleIcon,
   UsersIcon,

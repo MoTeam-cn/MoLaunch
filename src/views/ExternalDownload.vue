@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 外部下载工具子组件（由 Tools.vue 作为侧边栏内容区承载）
  *
@@ -19,13 +20,13 @@ import {
   InformationCircleIcon,
   Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
-import Tag from '@/components/common/Tag.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const CollapsibleCard = defineAsyncComponent(() => import('@/components/common/CollapsibleCard.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { useExternalDownload } from '@/composables/useExternalDownload'
-import DownloadedFileList from './external-download/DownloadedFileList.vue'
+const DownloadedFileList = defineAsyncComponent(() => import('./external-download/DownloadedFileList.vue'))
 
 const {
   url,

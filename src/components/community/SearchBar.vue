@@ -5,12 +5,12 @@
  * 使用项目自定义 Select 组件
  */
 
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, defineAsyncComponent } from 'vue'
 import type { ResourceType, CategoryTagInfo } from '@/types/community'
 import { SOURCE_OPTIONS, LOADER_OPTIONS } from '@/types/community'
-import Select from '@/components/common/Select.vue'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { MagnifyingGlassIcon, ArrowPathIcon } from '@heroicons/vue/24/outline'
 import { getCategoryTags } from '@/utils/api/community'
 import { useSearchHistory } from '@/composables/useSearchHistory'

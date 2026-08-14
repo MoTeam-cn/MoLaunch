@@ -5,11 +5,11 @@
  * 组网失败时替代僵硬错误提示：以友好文案说明原因，绘制双方 NAT 类型；
  * 服务端 TURN 中继无可用资源时给出第三方 FRP / 虚拟组网等替代联机方案。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { resolveNatMeta, getNatFeasibilityColorClass } from '@/utils/online/nat-type'
 import { useOnlineStore } from '@/stores/online'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 export interface PeerNatEntry {
   /** 对端标识（如「房主」或设备短 ID） */

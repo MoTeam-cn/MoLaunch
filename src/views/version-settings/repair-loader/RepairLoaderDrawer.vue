@@ -7,14 +7,14 @@
  * `repair-loader-progress` 事件按阶段渲染进度条：
  * 重装 → 合并资源文件 → 完成（遮蔽罩提示）/错误。
  */
-import { ref, watch, computed, onUnmounted } from 'vue'
+import { ref, watch, computed, onUnmounted, defineAsyncComponent } from 'vue'
 import {
   CheckCircleIcon,
   XCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-import Drawer from '@/components/common/Drawer.vue'
-import Button from '@/components/common/Button.vue'
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'
 import * as tauri from '@/utils/tauri'
 import {

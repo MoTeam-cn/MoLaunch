@@ -6,14 +6,14 @@
  * 后端按 6 类模式（Java 版本 / 缺失 Mod / 内存 / 显卡驱动 / Mod 冲突 / 其他）
  * 做大小写不敏感匹配，返回带严重级别与修复建议的条目列表。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import {
   CommandLineIcon,
   MagnifyingGlassIcon,
   ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { SparklesIcon } from '@heroicons/vue/24/outline'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { crashAnalyze } from '@/utils/api/tools'

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
-import Select from '@/components/common/Select.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 
 const maxThreads = ref(8)
 const chunkCount = ref(4)

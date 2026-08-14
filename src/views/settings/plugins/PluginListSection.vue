@@ -2,16 +2,16 @@
 /**
  * 已安装插件列表（含权限 tag 展示、启用/禁用切换、卸载、刷新）
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { usePluginStore } from '@/stores/plugins'
 import {
   PERMISSION_REGISTRY,
   getPermissionMeta,
   type PermissionMeta,
 } from '@/plugins/permissions'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirmAsync } from '@/utils/modal'
 import {

@@ -18,16 +18,16 @@
  * - 子面板 RoomHostPanel / RoomGuestPanel 同样 inject 获取，链路一致。
  */
 
-import { ref, inject, computed } from 'vue'
+import { ref, inject, computed, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import type { useWebRTC } from '@/composables/useWebRTC'
-import Button from '@/components/common/Button.vue'
-import Card from '@/components/common/Card.vue'
-import Input from '@/components/common/Input.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
-import RoomHostPanel from './RoomHostPanel.vue'
-import RoomGuestPanel from './RoomGuestPanel.vue'
-import CreateRoomForm from './CreateRoomForm.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const RoomHostPanel = defineAsyncComponent(() => import('./RoomHostPanel.vue'))
+const RoomGuestPanel = defineAsyncComponent(() => import('./RoomGuestPanel.vue'))
+const CreateRoomForm = defineAsyncComponent(() => import('./CreateRoomForm.vue'))
 import {
   ArrowRightOnRectangleIcon,
 } from '@heroicons/vue/24/outline'

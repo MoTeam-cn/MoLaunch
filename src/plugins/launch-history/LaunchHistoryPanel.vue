@@ -8,7 +8,7 @@
  * 数据来源：后端 get_launch_history 命令（内存累积，重启后清空）。
  * 刷新策略：进入页面加载一次，监听 plugin:game-launch / plugin:game-exit 事件实时刷新。
  */
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { pluginSdk } from '@/plugins/sdk'
 import {
   ClockIcon,
@@ -16,7 +16,7 @@ import {
   XCircleIcon,
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { formatDateTime } from '@/utils/format'
 
 interface HistoryItem {

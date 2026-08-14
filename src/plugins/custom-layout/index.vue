@@ -8,9 +8,9 @@
  *
  * 供 Home.vue 通过 homePanelComponent 渲染。
  */
-import { computed } from 'vue'
-import CustomLayoutPanel from './CustomLayoutPanel.vue'
-import HtmlLayoutPanel from './HtmlLayoutPanel.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const CustomLayoutPanel = defineAsyncComponent(() => import('./CustomLayoutPanel.vue'))
+const HtmlLayoutPanel = defineAsyncComponent(() => import('./HtmlLayoutPanel.vue'))
 import type { CustomLayoutConfig } from '@/types/plugin'
 
 const props = defineProps<{

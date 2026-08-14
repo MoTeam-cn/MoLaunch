@@ -11,7 +11,7 @@
  * 数据来源：pluginSdk.getSystemMemory / getRunningGamePid / getConfig / getCacheStats。
  * 刷新策略：进入页面加载一次，之后每 3 秒轮询内存与运行状态（缓存统计不轮询，手动刷新）。
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { pluginSdk } from '@/plugins/sdk'
 import type { CacheStatsResult } from '@/plugins/sdk'
 import {
@@ -22,7 +22,7 @@ import {
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
 import { formatBytes } from '@/utils/format'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 interface MemoryInfo {
   total: number

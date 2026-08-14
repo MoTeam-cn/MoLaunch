@@ -12,12 +12,12 @@
  * - checkbox 沿用项目惯例（`accent-primary-500`），与 WhitelistEditor / ExportTab 一致
  * - 文件大小格式化复用 `utils/format.ts` 的 `formatBytes`
  */
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, defineAsyncComponent } from 'vue'
 import { readLocalModpackMeta } from '@/utils/api/version'
 import { formatBytes } from '@/utils/format'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Tag from '@/components/common/Tag.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import type { ModpackMeta, ModpackMetaFile } from '@/types/online'
 import {
   CubeIcon,

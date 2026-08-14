@@ -5,10 +5,10 @@
  * 版本隔离开启后，日志 / Mods 等资源按版本存放，手动附加上下文前需先选择版本。
  * 版本列表来自后端 `list_installed_versions`。
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { XMarkIcon, CubeIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 
 const props = defineProps<{
   visible: boolean

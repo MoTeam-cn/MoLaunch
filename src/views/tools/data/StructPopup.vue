@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 结构 popup 浮窗组件（OL Overlay 内容）
  * 复用：Button.vue / format.ts / constants.ts / toast.ts
@@ -11,7 +12,7 @@ import {
   ClipboardDocumentIcon, ClipboardDocumentCheckIcon,
   MapPinIcon, ArrowRightIcon, XMarkIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { formatCoord, copyToClipboard } from '@/utils/seedmap/format'
 import { getStructIcon, getStructIconUrl } from '@/utils/seedmap/constants'
 import { toastSuccess, toastError } from '@/utils/toast'

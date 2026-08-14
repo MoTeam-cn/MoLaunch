@@ -9,11 +9,11 @@
  * - 导入成功才标记为已导入；全部导入成功后自动 emit close 收起面板
  * - 导入失败不标记、不关闭，错误由 store 的 toast 提示
  */
-import { ref, computed, watch } from 'vue'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
+import { ref, computed, watch, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { useFrpStore } from '@/stores/frp'
 import { fetchTunnels, getAuthStatus } from '@/utils/api/frp-manager'
 import { toastError, toastSuccess } from '@/utils/toast'

@@ -10,8 +10,8 @@
  * 分组聚合与折叠状态由 useDownloadTaskGroups composable 管理。
  */
 import { formatBytes } from '@/utils/format'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import {
   CheckCircleIcon,
   ClockIcon,
@@ -20,7 +20,7 @@ import {
   PlayCircleIcon,
   XCircleIcon,
 } from '@heroicons/vue/24/outline'
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, defineAsyncComponent } from 'vue'
 import { useDownloadTaskGroups } from '@/composables/useDownloadTaskGroups'
 import type { DownloadStage } from '@/types/download'
 

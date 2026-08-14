@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 单个 Mod 列表项
  * - 34×34 圆角真实 Logo 图标（来自平台工程 logo_url，经 image_cache 缓存；无 logo fallback 到默认图）
@@ -20,8 +21,8 @@
  * - Shift+点击 范围选择（由 useMultiSelect composable 处理）
  * - 按钮使用 @click.stop 避免触发选中
  */
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { formatBytes } from '@/utils/format'
 import { modTitle, modSubtitle, loaderVisual } from '@/utils/mod-display'
 import { defaultAsset } from '@/utils/assets'

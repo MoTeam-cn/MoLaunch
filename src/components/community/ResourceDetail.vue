@@ -9,7 +9,7 @@
  *
  * 下载/前置检查/整合包安装逻辑分别抽到 useResourceDownload / useResourceModpackInstall composable。
  */
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, defineAsyncComponent } from 'vue'
 import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { getProjectVersions } from '@/utils/api/community'
 import { toastError } from '@/utils/toast'
@@ -17,11 +17,11 @@ import { useVersionGroups, getFilterVersionName } from '@/composables/useVersion
 import { useSearchProgress } from '@/composables/useSearchProgress'
 import { useResourceDownload } from '@/composables/useResourceDownload'
 import { useResourceModpackInstall } from '@/composables/useResourceModpackInstall'
-import HorizontalFilter from '@/components/common/HorizontalFilter.vue'
-import ResourceDetailHeader from './resource-detail/ResourceDetailHeader.vue'
+const HorizontalFilter = defineAsyncComponent(() => import('@/components/common/HorizontalFilter.vue'))
+const ResourceDetailHeader = defineAsyncComponent(() => import('./resource-detail/ResourceDetailHeader.vue'))
 import { ArchiveBoxXMarkIcon } from '@heroicons/vue/24/outline'
-import VersionGroupCard from './resource-detail/VersionGroupCard.vue'
-import DependencyConfirmDialog from './DependencyConfirmDialog.vue'
+const VersionGroupCard = defineAsyncComponent(() => import('./resource-detail/VersionGroupCard.vue'))
+const DependencyConfirmDialog = defineAsyncComponent(() => import('./DependencyConfirmDialog.vue'))
 
 interface Props {
   visible: boolean

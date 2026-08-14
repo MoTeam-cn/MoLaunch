@@ -2,11 +2,11 @@
 /**
  * 关于子页签：MoLaunch 介绍 + 实现原理 + 技术栈 + 检查更新入口
  */
-import { computed, ref } from 'vue'
-import Card from '@/components/common/Card.vue'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
-import MoLaunchIntro from '@/components/about/MoLaunchIntro.vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const MoLaunchIntro = defineAsyncComponent(() => import('@/components/about/MoLaunchIntro.vue'))
 import { openLink } from '@/utils/aboutLogos'
 import { checkForUpdate } from '@/utils/updater'
 import type { AboutData } from '@/utils/api/about'

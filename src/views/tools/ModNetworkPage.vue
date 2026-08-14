@@ -10,14 +10,14 @@
  *
  * 深链支持：URL `?subtab=latency` 可直接切到对应子页签。
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import SubTabBar from '@/components/common/SubTabBar.vue'
+const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { BoltIcon, ScissorsIcon, ServerIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'
-import ModDependencyChecker from './mod-tools/ModDependencyChecker.vue'
-import ModDedupScanner from './mod-tools/ModDedupScanner.vue'
-import ServerPinger from './network/ServerPinger.vue'
-import NetworkLatencyTester from './network/NetworkLatencyTester.vue'
+const ModDependencyChecker = defineAsyncComponent(() => import('./mod-tools/ModDependencyChecker.vue'))
+const ModDedupScanner = defineAsyncComponent(() => import('./mod-tools/ModDedupScanner.vue'))
+const ServerPinger = defineAsyncComponent(() => import('./network/ServerPinger.vue'))
+const NetworkLatencyTester = defineAsyncComponent(() => import('./network/NetworkLatencyTester.vue'))
 
 const subTabs = [
   { id: 'dependency', label: '依赖检测', icon: ShieldCheckIcon },

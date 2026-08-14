@@ -9,11 +9,11 @@
  * 自定义组件：Button / Tooltip（项目约定，不用原生 button / title）。
  * 图标使用 @heroicons/vue/24/outline（项目已有依赖，不用 emoji）。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { checkTunnels, type TunnelCheckResult, type CheckEntry } from '@/utils/frp-tunnel-check'
 import { toastInfo, toastError } from '@/utils/toast'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import {
   XMarkIcon,
   ArrowPathIcon,

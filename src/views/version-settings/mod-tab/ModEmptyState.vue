@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * Mod 列表空状态组件
  *
@@ -9,7 +10,7 @@
  * - no-match：有 Mod 但筛选/搜索后无匹配（仅提示文案）
  */
 import { PuzzlePieceIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 defineProps<{
   variant: 'not-modable' | 'loading' | 'empty' | 'no-match'

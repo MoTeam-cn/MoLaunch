@@ -4,9 +4,9 @@
  * 展开/收起动画 + 版本列表 + 说明 + 兼容性禁用
  */
 
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { XMarkIcon, CheckIcon } from '@heroicons/vue/24/outline'
-import Tag from '@/components/common/Tag.vue'
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 
 interface VersionItem {
   key: string

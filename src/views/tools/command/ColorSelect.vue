@@ -2,8 +2,8 @@
 /**
  * 颜色下拉选择：中文标签 + 圆形色块预览，封装公共 Select
  */
-import { computed } from 'vue'
-import Select from '@/components/common/Select.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { COLOR_OPTIONS } from './generator'
 
 const model = defineModel<string>('modelValue', { required: true })

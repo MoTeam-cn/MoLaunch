@@ -6,19 +6,19 @@
  * 支持物品图标 / 标题内容颜色 / 字体，导出 PNG 到指定目录；
  * 图片右下角固定叠加白色 MoLaunch 版权水印。
  */
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch, defineAsyncComponent } from 'vue'
 import { ArrowDownTrayIcon, TrophyIcon } from '@heroicons/vue/24/outline'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { pickSavePath } from '@/utils/fileDialog'
 import { getAtlasLayout, getAtlasPngUrl, loadVersionItems } from '@/utils/recipe-generator/resources'
 import type { AssetItem, AtlasLayout } from '@/utils/recipe-generator/resources'
 import { systemManager, SYSTEM_ACTIONS } from '@/utils/api/system-manager'
-import ColorSelect from '../command/ColorSelect.vue'
+const ColorSelect = defineAsyncComponent(() => import('../command/ColorSelect.vue'))
 import { COLOR_OPTIONS } from '../command/generator'
-import RecipeItemIcon from './recipe-generator/RecipeItemIcon.vue'
+const RecipeItemIcon = defineAsyncComponent(() => import('./recipe-generator/RecipeItemIcon.vue'))
 import { matchItem } from '@/utils/recipe-generator/itemSearch'
 import { ACHIEVEMENT_SCALE, ACHIEVEMENT_SIZE, drawAchievement } from './achievement/draw'
 

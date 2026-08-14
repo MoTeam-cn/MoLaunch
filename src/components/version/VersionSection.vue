@@ -3,10 +3,10 @@
  * 可展开的版本分类组件
  */
 
-import { ref, type Component } from 'vue'
+import { ref, type Component, defineAsyncComponent } from 'vue'
 import { ChevronRightIcon, TrashIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 
 interface VersionItem {
   id: string

@@ -14,9 +14,9 @@
   - 弹层定位逻辑复用 Select.vue 的实现，并补充右侧边界夹紧
 -->
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, defineAsyncComponent } from 'vue'
 import { PRESET_COLORS } from '@/utils/color'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 interface Props {
   /** 当前选中的 HEX 颜色（如 "#165dff"） */

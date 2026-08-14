@@ -4,10 +4,10 @@
  *
  * 勾选「下次不再提醒」后，将本次选择持久化到 closeBehavior 配置（由父组件执行）。
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { ArrowRightOnRectangleIcon, XMarkIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 
 interface Props {
   modelValue: boolean

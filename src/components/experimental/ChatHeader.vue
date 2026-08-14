@@ -2,16 +2,16 @@
 /**
  * AI 聊天头部：会话标题、模型选择、思考设置（图标 + 右侧抽屉）、清空按钮
  */
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { TrashIcon, AdjustmentsHorizontalIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
-import Select from '@/components/common/Select.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Slider from '@/components/common/Slider.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Drawer from '@/components/common/Drawer.vue'
-import ModelIcon from '@/components/common/ModelIcon.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Slider = defineAsyncComponent(() => import('@/components/common/Slider.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const ModelIcon = defineAsyncComponent(() => import('@/components/common/ModelIcon.vue'))
 
 const props = defineProps<{
   title: string

@@ -6,7 +6,7 @@
  * 右侧根据当前分类渲染对应子组件
  * 共享状态通过 useVersionSettings composable 单例管理
  */
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   Squares2X2Icon,
@@ -18,13 +18,13 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
-import Button from '@/components/common/Button.vue'
-import NavSidebar from '@/components/common/NavSidebar.vue'
-import OverviewTab from './version-settings/OverviewTab.vue'
-import SetupTab from './version-settings/SetupTab.vue'
-import ModTab from './version-settings/ModTab.vue'
-import PackTab from './version-settings/PackTab.vue'
-import ExportTab from './version-settings/ExportTab.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
+const OverviewTab = defineAsyncComponent(() => import('./version-settings/OverviewTab.vue'))
+const SetupTab = defineAsyncComponent(() => import('./version-settings/SetupTab.vue'))
+const ModTab = defineAsyncComponent(() => import('./version-settings/ModTab.vue'))
+const PackTab = defineAsyncComponent(() => import('./version-settings/PackTab.vue'))
+const ExportTab = defineAsyncComponent(() => import('./version-settings/ExportTab.vue'))
 
 const router = useRouter()
 const route = useRoute()

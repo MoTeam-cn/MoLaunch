@@ -16,8 +16,8 @@
  *   { label: '自定义', value: 'custom' },
  * ]" />
  */
-import { computed } from 'vue'
-import Button from '@/components/common/Button.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 export interface SegmentedOption<T = string> {
   label: string

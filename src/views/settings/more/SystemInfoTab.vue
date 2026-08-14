@@ -6,10 +6,10 @@
  * 开发者模式解锁入口已迁移至「鸣谢 → 法律信息」中的隐藏字段，
  * 本页仅展示应用版本、SDK 状态与设备 ID。
  */
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import { useSdkStore } from '@/stores/sdk'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Alert from '@/components/common/Alert.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 
 const sdkStore = useSdkStore()
 

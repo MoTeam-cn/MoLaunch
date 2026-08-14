@@ -15,18 +15,18 @@
  *
  * See: docs/updater/design.md §4.2.2
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import {
   ArrowPathIcon,
   ChatBubbleOvalLeftIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
-import Drawer from '@/components/common/Drawer.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import ReleaseTimeline from '@/components/about/ReleaseTimeline.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const ReleaseTimeline = defineAsyncComponent(() => import('@/components/about/ReleaseTimeline.vue'))
 import { onGlobalEvent } from '@/composables/useGlobalTauriEvent'
 import { formatBytes } from '@/utils/format'
 import { handleMarkdownLinkClick, renderMarkdown } from '@/utils/markdown'

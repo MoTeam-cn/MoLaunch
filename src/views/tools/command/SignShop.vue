@@ -5,15 +5,15 @@
  * 配置告示牌四行文字（含颜色代码）、放置坐标与朝向，
  * 生成 /setblock 指令放置带文本的告示牌，用于搭建告示牌商店。
  */
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { DocumentTextIcon } from '@heroicons/vue/24/outline'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 import { SIGN_FACINGS, SIGN_IDS } from './data'
 import { buildSignShopCommand } from './generator'
-import ColorSelect from './ColorSelect.vue'
+const ColorSelect = defineAsyncComponent(() => import('./ColorSelect.vue'))
 
 const signId = ref(SIGN_IDS[0])
 const facing = ref(SIGN_FACINGS[0].id)

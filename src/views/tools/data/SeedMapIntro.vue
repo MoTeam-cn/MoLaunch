@@ -13,9 +13,9 @@
  * - 结构查找（region 遍历 + chunk finder 分块）
  * - 性能优化（tile 缓存、并发控制、低 zoom 跳过）
  */
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import { ChevronDownIcon, BeakerIcon } from '@heroicons/vue/24/outline'
-import Tag from '@/components/common/Tag.vue'
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 
 const isOpen = ref(false)
 

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 微软账号皮肤上传 + 账号管理快捷入口
  *
@@ -8,7 +9,7 @@
  */
 import { open } from '@tauri-apps/plugin-shell'
 import { toastError } from '@/utils/toast'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 const props = defineProps<{
   variant: 'classic' | 'slim'

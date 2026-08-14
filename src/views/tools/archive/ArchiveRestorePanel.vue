@@ -10,13 +10,13 @@
  * 复用：Button/Input 自定义组件、showConfirm 回调式确认、
  * pickFile 文件对话框。
  */
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import {
   ArrowDownTrayIcon,
   FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { archiveRestore } from '@/utils/api/tools'

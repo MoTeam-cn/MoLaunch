@@ -5,7 +5,7 @@
  * 统一从右侧滑出，复用公共 Drawer 组件（render-in-place 挂载到 #app-content）
  * defineExpose 对外接口与旧 Modal.vue 完全一致，utils/modal.ts 调用方无需改动
  */
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, defineAsyncComponent } from 'vue'
 import {
   ExclamationTriangleIcon,
   XCircleIcon,
@@ -13,8 +13,8 @@ import {
   CheckCircleIcon,
   ChevronDownIcon,
 } from '@heroicons/vue/24/outline'
-import Drawer from '@/components/common/Drawer.vue'
-import Button from '@/components/common/Button.vue'
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 
 export type ModalType = 'error' | 'warning' | 'info' | 'success'

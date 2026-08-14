@@ -6,11 +6,11 @@
  * 触发与去重逻辑见 utils/updateLog.ts；内容为 vite 构建时从 CHANGELOG.md
  * 提取的当前版本段落（虚拟模块 virtual:update-log），时间线渲染复用 ReleaseTimeline。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { ArrowTopRightOnSquareIcon, ChatBubbleOvalLeftIcon, SparklesIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Drawer from '@/components/common/Drawer.vue'
-import ReleaseTimeline from '@/components/about/ReleaseTimeline.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const ReleaseTimeline = defineAsyncComponent(() => import('@/components/about/ReleaseTimeline.vue'))
 import { handleMarkdownLinkClick, renderMarkdown } from '@/utils/markdown'
 import {
   UPDATE_LOG_GITHUB_URL,

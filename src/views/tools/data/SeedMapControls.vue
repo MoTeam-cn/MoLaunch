@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 种子地图地图叠加控件：悬浮坐标/群系名、结构提示、坐标输入面板、缩放按钮、加载遮罩。
  * 从 SeedMap.vue 拆出，避免 Vue 组件超 300 行。
  */
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { formatCoord } from '@/utils/seedmap/format'
 import { getStructIcon } from '@/utils/seedmap/constants'
 import type { WorkerStructure } from '@/utils/seedmap/types'

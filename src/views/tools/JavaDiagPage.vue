@@ -12,15 +12,15 @@
  *
  * 深链支持：URL `?subtab=manager` 可直接切到对应子页签。
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import SubTabBar from '@/components/common/SubTabBar.vue'
+const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { ArrowDownTrayIcon, CodeBracketIcon, MagnifyingGlassIcon, ServerStackIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
-import JavaDownloader from './java/JavaDownloader.vue'
-import JavaEnvCheck from './java/JavaEnvCheck.vue'
-import JavaManager from './data/JavaManager.vue'
-import VersionJsonEditor from './data/VersionJsonEditor.vue'
-import NbtViewer from './data/NbtViewer.vue'
+const JavaDownloader = defineAsyncComponent(() => import('./java/JavaDownloader.vue'))
+const JavaEnvCheck = defineAsyncComponent(() => import('./java/JavaEnvCheck.vue'))
+const JavaManager = defineAsyncComponent(() => import('./data/JavaManager.vue'))
+const VersionJsonEditor = defineAsyncComponent(() => import('./data/VersionJsonEditor.vue'))
+const NbtViewer = defineAsyncComponent(() => import('./data/NbtViewer.vue'))
 
 const subTabs = [
   { id: 'downloader', label: 'Java 下载器', icon: ArrowDownTrayIcon },

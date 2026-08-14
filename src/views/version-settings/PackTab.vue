@@ -6,15 +6,15 @@
  * 子组件位于 pack-tab/（PackToolbar / PackListItem / PackEmptyState / PackUpdateDialog），
  * 详情弹窗复用社区 `@/components/community/ResourceDetail.vue`。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { usePackOperations } from '@/composables/usePackOperations'
-import ResourceDetail from '@/components/community/ResourceDetail.vue'
-import PackListItem from './pack-tab/PackListItem.vue'
-import PackToolbar from './pack-tab/PackToolbar.vue'
-import PackEmptyState from './pack-tab/PackEmptyState.vue'
-import PackUpdateDialog from './pack-tab/PackUpdateDialog.vue'
+const ResourceDetail = defineAsyncComponent(() => import('@/components/community/ResourceDetail.vue'))
+const PackListItem = defineAsyncComponent(() => import('./pack-tab/PackListItem.vue'))
+const PackToolbar = defineAsyncComponent(() => import('./pack-tab/PackToolbar.vue'))
+const PackEmptyState = defineAsyncComponent(() => import('./pack-tab/PackEmptyState.vue'))
+const PackUpdateDialog = defineAsyncComponent(() => import('./pack-tab/PackUpdateDialog.vue'))
 import type { PackKind } from '@/utils/tauri'
 
 const props = defineProps<{ kind: PackKind }>()

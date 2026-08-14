@@ -8,8 +8,8 @@
  * 注意：`line-clamp-N` 需静态类名才能被 Tailwind JIT 扫描到，故用映射表；
  * 溢出检测用 ResizeObserver（父容器如 Drawer 展开后尺寸变化会自动重测）。
  */
-import { onMounted, onUnmounted, ref, watch } from 'vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+import { onMounted, onUnmounted, ref, watch, defineAsyncComponent } from 'vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 interface Props {
   text: string

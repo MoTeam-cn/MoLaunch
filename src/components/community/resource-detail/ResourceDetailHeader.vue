@@ -8,7 +8,7 @@
  *
  * openMcmod 和 copyName 内部处理（只依赖 project prop）
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { open as openUrl } from '@tauri-apps/plugin-shell'
 import type { ResourceProject } from '@/types/community'
 import { getMcmodUrl } from '@/utils/api/community'
@@ -22,8 +22,8 @@ import {
   BookOpenIcon,
   CubeIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import CachedImage from '@/components/common/CachedImage.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const CachedImage = defineAsyncComponent(() => import('@/components/common/CachedImage.vue'))
 
 const props = defineProps<{ project: ResourceProject }>()
 const emit = defineEmits<{ close: [] }>()

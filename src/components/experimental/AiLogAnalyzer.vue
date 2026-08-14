@@ -10,10 +10,10 @@
  *
  * 流程：本地引擎转交 AI（externalLogText）→ 自动打开弹窗并发起流式分析。
  */
-import { ref, watch, onBeforeUnmount } from 'vue'
+import { ref, watch, onBeforeUnmount, defineAsyncComponent } from 'vue'
 import { SparklesIcon, XMarkIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import AnalyzeStageBar, { type AnalyzeStage } from '@/components/experimental/AnalyzeStageBar.vue'
 import { useAiLogAnalyzer } from '@/composables/useAiLogAnalyzer'
 import { renderMarkdown } from '@/utils/markdown'

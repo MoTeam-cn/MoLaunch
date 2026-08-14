@@ -8,12 +8,12 @@
  * 开启后：首次使用时惰性初始化 SQLite 聊天库（`.Molaunch/experimental/chat.db`）；
  * 关闭后仅隐藏入口，不删除已有数据。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { toastError, toastInfo } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
-import Alert from '@/components/common/Alert.vue'
-import Select from '@/components/common/Select.vue'
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { EXPERIMENTAL_CHANGED_EVENT } from '@/composables/useExperimental'
 
 const experimentalEnabled = ref(false)

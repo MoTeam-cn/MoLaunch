@@ -5,9 +5,9 @@
  * 接收 NbtNode + path + expandedSet，递归渲染树形结构。
  * 点击容器节点（compound/list）触发 toggle 事件。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { ChevronRightIcon, ChevronDownIcon } from '@heroicons/vue/24/outline'
-import Tag from '@/components/common/Tag.vue'
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import type { NbtNode } from '@/utils/api/tools'
 
 const props = defineProps<{

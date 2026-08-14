@@ -5,10 +5,10 @@
  * 自动捕获显示 + 手动覆盖：手动指定端口为最高可信度（自动捕获不再覆盖），
  * 确认后由父级经 HOST_MC_PORT 控制消息广播给参与者。
  */
-import { ref } from 'vue'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Tag from '@/components/common/Tag.vue'
+import { ref, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { PencilSquareIcon } from '@heroicons/vue/24/outline'
 
 const props = defineProps<{

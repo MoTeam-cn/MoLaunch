@@ -5,9 +5,9 @@
  * - 名称 + 类型标签（zip/文件夹）+ 大小 + 文件名（hover Tooltip）
  * - 操作：详情、打开文件位置、启用/禁用、更新（有 project 时）、删除（hover 时显示）
  */
-import { computed } from 'vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { formatBytes } from '@/utils/format'
 import { usePackIcon } from '@/composables/usePackIcon'
 import { defaultAsset } from '@/utils/assets'

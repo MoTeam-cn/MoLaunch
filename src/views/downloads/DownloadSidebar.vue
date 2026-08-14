@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 下载页左侧分类菜单（从 Versions.vue 抽出）
  *
@@ -8,7 +9,7 @@
  * - 底部"打开游戏目录"按钮
  */
 import { FolderOpenIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import type { ResourceType } from '@/types/community'
 import { useTabPersistence } from '@/composables/useTabPersistence'
 

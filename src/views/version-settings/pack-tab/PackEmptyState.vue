@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 资源包/光影列表空状态组件
  * 四种 variant：loading（spinner）/ empty（未安装）/ no-match（筛选无匹配）/ not-modable（光影无加载器）
  */
 import { CubeIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import type { PackKind } from '@/utils/tauri'
 
 const props = defineProps<{

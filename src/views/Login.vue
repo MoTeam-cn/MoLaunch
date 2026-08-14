@@ -7,16 +7,16 @@
  * 用户可在登录页直接选择外置登录，无需进入版本设置。
  */
 
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { open } from '@tauri-apps/plugin-shell'
-import Alert from '@/components/common/Alert.vue'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import DeviceCodeModal from '@/components/common/DeviceCodeModal.vue'
-import SubTabBar from '@/components/common/SubTabBar.vue'
-import ExternalLoginPanel from '@/components/common/ExternalLoginPanel.vue'
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const DeviceCodeModal = defineAsyncComponent(() => import('@/components/common/DeviceCodeModal.vue'))
+const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
+const ExternalLoginPanel = defineAsyncComponent(() => import('@/components/common/ExternalLoginPanel.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 
 const router = useRouter()

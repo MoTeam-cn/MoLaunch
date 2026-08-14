@@ -3,7 +3,7 @@
  * 单条聊天消息
  * Markdown 渲染、流式光标、hover 操作栏（时间 / 删除 / 重新生成 / 复制 / 编辑）。
  */
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch, defineAsyncComponent } from 'vue'
 import {
   ArrowPathIcon,
   ChevronDownIcon,
@@ -12,11 +12,11 @@ import {
   PencilIcon,
   TrashIcon,
 } from '@heroicons/vue/24/outline'
-import ModelIcon from '@/components/common/ModelIcon.vue'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import CopyMessageDialog from '@/components/experimental/CopyMessageDialog.vue'
+const ModelIcon = defineAsyncComponent(() => import('@/components/common/ModelIcon.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const CopyMessageDialog = defineAsyncComponent(() => import('@/components/experimental/CopyMessageDialog.vue'))
 import { renderMarkdown, handleMarkdownLinkClick } from '@/utils/markdown'
 import { mountMdIcons } from '@/utils/md-icons'
 import { formatTimestamp } from '@/utils/format'

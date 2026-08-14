@@ -13,19 +13,19 @@
  * 加入流程复用 Online.vue provide 的 guestWebrtc + store.guestJoinRoom，
  * 加入成功后 store.roomState.role 变化触发 Online.vue watch(isInRoom) 自动跳转房间详情。
  */
-import { ref, computed, onMounted, onActivated, onDeactivated, inject } from 'vue'
+import { ref, computed, onMounted, onActivated, onDeactivated, inject, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
 import { listLobbyRooms, submitAnswer } from '@/utils/api/online-manager'
 import { rememberJoinPassword } from '@/utils/relaunchSnapshot'
 import { toastError, toastInfo } from '@/utils/toast'
-import Input from '@/components/common/Input.vue'
-import Select from '@/components/common/Select.vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Pagination from '@/components/community/Pagination.vue'
-import LobbyRoomCard from './LobbyRoomCard.vue'
-import LobbyJoinDialog from './LobbyJoinDialog.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Pagination = defineAsyncComponent(() => import('@/components/community/Pagination.vue'))
+const LobbyRoomCard = defineAsyncComponent(() => import('./LobbyRoomCard.vue'))
+const LobbyJoinDialog = defineAsyncComponent(() => import('./LobbyJoinDialog.vue'))
 import type { JoinRoomResponse, LobbyRoomItem } from '@/types/online'
 import {
   MagnifyingGlassIcon,

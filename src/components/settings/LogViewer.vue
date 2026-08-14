@@ -5,13 +5,13 @@
  * 使用 CollapsibleCard 实现带动画的展开/收起，默认收起，展开时才加载日志（懒加载）。
  * 父组件只需传入 `logsDir`（用于「打开目录」按钮），其余状态自行管理。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { parseLogLines, logLineClass, type LogLine } from '@/utils/log-display'
-import Select from '@/components/common/Select.vue'
-import Button from '@/components/common/Button.vue'
-import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const CollapsibleCard = defineAsyncComponent(() => import('@/components/common/CollapsibleCard.vue'))
 import {
   FolderOpenIcon,
   ArrowPathIcon,

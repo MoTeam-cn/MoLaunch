@@ -7,13 +7,13 @@
  *
  * 数据来源：get_cache_stats IPC 命令（后端 utils/cache_stats.rs）。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { formatBytes } from '@/utils/format'
-import Button from '@/components/common/Button.vue'
-import Alert from '@/components/common/Alert.vue'
-import Tag from '@/components/common/Tag.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import {
   FolderOpenIcon,
   ArrowPathIcon,

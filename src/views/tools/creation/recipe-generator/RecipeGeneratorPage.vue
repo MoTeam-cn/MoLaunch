@@ -5,14 +5,14 @@
  * 交互：点击空格子弹出抽屉选择物品/标签填入该格；点击已放置格子可清除；
  * 结果槽滚轮可调整产出数量；顶部切换版本/类型，实时校验并预览配方 JSON。
  */
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch, defineAsyncComponent } from 'vue'
 import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Alert from '@/components/common/Alert.vue'
-import Drawer from '@/components/common/Drawer.vue'
-import Select from '@/components/common/Select.vue'
-import Input from '@/components/common/Input.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 import {
   buildSlotContext,
@@ -50,9 +50,9 @@ import { exportRecipePack } from '@/utils/recipe-generator/exporter'
 import { sanitizeRecipeName } from '@/utils/recipe-generator/datapack'
 import type { JavaVersionId, RecipeSlot, RecipeSlotContext, RecipeState, SlotValue } from '@/utils/recipe-generator/types'
 import { getRecipeLayout } from './recipe-layouts'
-import RecipeSlotsEditor from './RecipeSlotsEditor.vue'
-import ItemPalette from './ItemPalette.vue'
-import TagPalette from './TagPalette.vue'
+const RecipeSlotsEditor = defineAsyncComponent(() => import('./RecipeSlotsEditor.vue'))
+const ItemPalette = defineAsyncComponent(() => import('./ItemPalette.vue'))
+const TagPalette = defineAsyncComponent(() => import('./TagPalette.vue'))
 
 let uidCounter = 0
 function createUid(prefix: string): string {

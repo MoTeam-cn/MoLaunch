@@ -19,10 +19,10 @@
  * - 使用 [Button.vue](src/components/common/Button.vue) 而非原生 `<button>`
  * - 使用 [Tooltip.vue](src/components/common/Tooltip.vue) 而非原生 `title`
  */
-import { computed } from 'vue'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { TrashIcon } from '@heroicons/vue/24/outline'
 import type { IceServerEntry } from '@/types/online'
 

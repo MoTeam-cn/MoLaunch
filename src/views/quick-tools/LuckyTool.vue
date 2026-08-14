@@ -5,10 +5,10 @@
  * 基于本机设备 ID 与当前日期通过确定性哈希算法生成 0-100 幸运值：
  * 同一设备同一天结果固定，跨天自动重置，纯前端计算不依赖后端。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { SparklesIcon, QuestionMarkCircleIcon } from '@heroicons/vue/24/outline'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { getTodayLuck } from '@/utils/lucky'
 import type { TodayLuck } from '@/utils/lucky'
 import { getDeviceId } from '@/utils/api/java'

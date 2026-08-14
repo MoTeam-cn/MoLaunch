@@ -8,15 +8,15 @@
  *
  * 通过 useVersionSettings 共享 selectedId/personalization，自行调用保存接口。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import * as tauri from '@/utils/tauri'
 import { pickFile } from '@/utils/fileDialog'
 import { isJavaCompatible } from '@/utils/api/java'
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import type { JavaRequirements } from '@/types/java'
 

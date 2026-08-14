@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 参与者列表（房主面板子组件，置于「参与者」抽屉内）
  *
  * 纯展示 + emit 事件。
  * 接收参与者列表与连接状态查询函数，渲染为列表，每条提供踢出按钮。
  */
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { UsersIcon } from '@heroicons/vue/24/outline'
 import type { ParticipantInfo } from '@/types/online'
 import { resolveNatMeta, getNatFeasibilityColorClass } from '@/utils/online/nat-type'

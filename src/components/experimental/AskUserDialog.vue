@@ -7,12 +7,12 @@
  * 选项支持 `label` 文本与 `description` 备注/注释，选中后经底部「提交」确认，
  * 也支持输入自定义答案回填；关闭（X / ESC / 点击遮罩）视为取消。
  */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Drawer from '@/components/common/Drawer.vue'
-import OverflowText from '@/components/common/OverflowText.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const OverflowText = defineAsyncComponent(() => import('@/components/common/OverflowText.vue'))
 import type { AskUserOption } from '@/utils/api/experimental'
 
 const props = defineProps<{

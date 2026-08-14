@@ -9,17 +9,17 @@
  * 默认扫全局 {game_dir}/resourcepacks/，可选具体版本按版本隔离配置解析路径。
  * 转换走 showConfirm 回调式，目标已存在时后端返回失败提示。
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import {
   Square3Stack3DIcon,
   ArrowPathIcon,
   ArrowPathRoundedSquareIcon,
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Select from '@/components/common/Select.vue'
-import Tag from '@/components/common/Tag.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { resourcepackList, resourcepackConvert } from '@/utils/api/tools'

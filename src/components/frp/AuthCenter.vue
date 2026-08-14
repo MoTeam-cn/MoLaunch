@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 认证中心：管理厂商 OAuth2 / Device Code / API Key 认证。
  * 参见 FRP_MANAGER_DESIGN.md §6.8。
  * 逻辑见 composables/useFrpAuthCenter.ts，本文件仅保留模板组装。
  */
 import { useFrpStore } from '@/stores/frp'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { useFrpAuthCenter } from '@/composables/useFrpAuthCenter'
 import {
   ShieldCheckIcon,

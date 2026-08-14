@@ -5,16 +5,16 @@
  * 调用 Windows API 释放进程工作集内存，支持轻量/强力两种模式。
  * 优化按钮位于右侧，清理模式使用 Button 组件 primary/outline 切换。
  */
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import {
   CpuChipIcon,
   CheckCircleIcon,
   QuestionMarkCircleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirmAsync } from '@/utils/modal'
 import { memoryOptimize } from '@/utils/api/tools'

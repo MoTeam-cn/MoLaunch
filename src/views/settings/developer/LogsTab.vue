@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 开发者 - 日志子页签
  *
@@ -8,8 +9,8 @@
  *
  * 两者均为 CollapsibleCard 包裹的独立组件，内部自行管理数据加载。
  */
-import LogViewer from '@/components/settings/LogViewer.vue'
-import HttpLogViewer from '@/components/settings/HttpLogViewer.vue'
+const LogViewer = defineAsyncComponent(() => import('@/components/settings/LogViewer.vue'))
+const HttpLogViewer = defineAsyncComponent(() => import('@/components/settings/HttpLogViewer.vue'))
 
 defineProps<{
   /** 日志目录路径（LogViewer「打开目录」按钮使用） */

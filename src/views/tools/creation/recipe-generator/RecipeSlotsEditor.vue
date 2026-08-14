@@ -6,7 +6,7 @@
  * 点击空热点请求编辑（父组件弹抽屉选择），点击已放置槽位清除；
  * 滚轮可调整槽位数量（1-64）；2x2 时禁用槽以 barrier 遮罩。
  */
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, defineAsyncComponent } from 'vue'
 import type { RecipeSlot, RecipeSlotContext, SlotValue } from '@/utils/recipe-generator/types'
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
 import {
@@ -16,8 +16,8 @@ import {
   type RecipeLayoutSlotBox,
 } from './recipe-layouts'
 import { resolveTagDisplay, type TagDisplay, type TagMember } from '@/utils/recipe-generator/tag-resolve'
-import RecipeItemIcon from './RecipeItemIcon.vue'
-import RecipeTagPopup from './RecipeTagPopup.vue'
+const RecipeItemIcon = defineAsyncComponent(() => import('./RecipeItemIcon.vue'))
+const RecipeTagPopup = defineAsyncComponent(() => import('./RecipeTagPopup.vue'))
 
 const TWO_BY_TWO_DISABLED_SLOTS = new Set<RecipeSlot>([
   'crafting.3',

@@ -7,14 +7,14 @@
  * - 无任务时：空状态（DownloadEmptyState 子组件）
  */
 
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { showConfirm } from '@/utils/modal'
 import { toastInfo, toastError, toastWarning } from '@/utils/toast'
 import { pauseDownload, resumeDownload, cancelDownload, getDownloadProgress, isDownloading } from '@/utils/tauri'
-import DownloadStatsPanel from './downloads/DownloadStatsPanel.vue'
-import TaskGroupCard from '@/components/downloads/TaskGroupCard.vue'
+const DownloadStatsPanel = defineAsyncComponent(() => import('./downloads/DownloadStatsPanel.vue'))
+const TaskGroupCard = defineAsyncComponent(() => import('@/components/downloads/TaskGroupCard.vue'))
 import { safeCall } from '@/utils/async'
 import { applyProgressPatch } from '@/utils/downloadProgress'
 

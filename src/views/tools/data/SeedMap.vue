@@ -13,18 +13,18 @@
 import {
   MapIcon, ArrowPathIcon, FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
-import StructPopup from './StructPopup.vue'
-import SeedMapIntro from './SeedMapIntro.vue'
-import LoadSaveDrawer from './LoadSaveDrawer.vue'
-import SeedMapControls from './SeedMapControls.vue'
-import SeedMapSidebar from './SeedMapSidebar.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const StructPopup = defineAsyncComponent(() => import('./StructPopup.vue'))
+const SeedMapIntro = defineAsyncComponent(() => import('./SeedMapIntro.vue'))
+const LoadSaveDrawer = defineAsyncComponent(() => import('./LoadSaveDrawer.vue'))
+const SeedMapControls = defineAsyncComponent(() => import('./SeedMapControls.vue'))
+const SeedMapSidebar = defineAsyncComponent(() => import('./SeedMapSidebar.vue'))
 import { useSeedMap } from './useSeedMap'
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import { toastSuccess } from '@/utils/toast'
 
 const {

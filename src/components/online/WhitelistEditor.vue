@@ -17,13 +17,13 @@
  * - 使用 [Tooltip.vue](src/components/common/Tooltip.vue) 而非原生 `title`
  * - checkbox 沿用项目惯例（`accent-primary-500`），与 ExportTab / ArchiveManager 一致
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 import {
   PlusIcon,
   TrashIcon,

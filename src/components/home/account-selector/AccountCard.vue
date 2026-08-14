@@ -4,10 +4,10 @@
  * - 头像 + 用户名 + 类型/状态 + 皮肤/登出按钮
  * - 纯展示组件，所有操作通过 emit 上抛由父组件处理
  */
-import { computed } from 'vue'
-import SkinAvatar from '@/components/common/SkinAvatar.vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const SkinAvatar = defineAsyncComponent(() => import('@/components/common/SkinAvatar.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import type { AccountCardData } from './types'
 
 const props = defineProps<{ card: AccountCardData }>()

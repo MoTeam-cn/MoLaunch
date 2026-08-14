@@ -94,17 +94,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import {
   ChevronRightIcon,
   DocumentTextIcon,
   ExclamationTriangleIcon,
   LightBulbIcon,
 } from '@heroicons/vue/24/outline'
-import Drawer from '@/components/common/Drawer.vue'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
-import Collapse from '@/components/common/Collapse.vue'
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
 import { pickSavePath } from '@/utils/fileDialog'
 import { openPath, writeTextFile } from '@/utils/api/system'
 import { toastError, toastSuccess } from '@/utils/toast'

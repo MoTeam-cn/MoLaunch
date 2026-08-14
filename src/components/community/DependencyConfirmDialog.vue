@@ -9,11 +9,11 @@
  *
  * 调用方：ResourceDetail.vue 的 handleDownload 流程
  */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import type { ResolvedDependency } from '@/types/community'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
-import DependencyItem from './DependencyItem.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const DependencyItem = defineAsyncComponent(() => import('./DependencyItem.vue'))
 import {
   XMarkIcon,
   CheckCircleIcon,

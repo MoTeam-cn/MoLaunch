@@ -15,14 +15,14 @@
  * 数据来源：get_config / apply_config（developerMode 字段），
  * 解锁状态通过 developerUnlocked 只读字段获取。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { lockDeveloperMode } from '@/utils/api/developer'
 import { toastError, toastSuccess, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
-import Alert from '@/components/common/Alert.vue'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { safeCall } from '@/utils/async'
 import { ArrowUturnLeftIcon } from '@heroicons/vue/24/outline'
 

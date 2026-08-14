@@ -5,7 +5,7 @@
  * 输入 host + port，通过 SLP 协议（1.7+）获取服务器 MOTD / 在线人数 / 版本 / 延迟 / Favicon。
  * 纯 Rust TCP 实现，无需第三方 API。
  */
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import {
   ServerStackIcon,
   BoltIcon,
@@ -17,9 +17,9 @@ import {
   DocumentTextIcon,
   PaintBrushIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { serverPing } from '@/utils/api/tools'
 import type { ServerPingResult } from '@/utils/api/tools'

@@ -6,15 +6,15 @@
  * - 底部：版本选择 + 版本设置 + 启动按钮
  */
 
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { ShieldCheckIcon, ServerStackIcon, UserIcon } from '@heroicons/vue/24/outline'
 import { ArrowPathIcon, PlayIcon, StopIcon } from '@heroicons/vue/24/solid'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
 import { toastError, toastWarning, toastSuccess, toastInfo } from '@/utils/toast'
-import AccountSelector from './AccountSelector.vue'
-import VersionSelector from './VersionSelector.vue'
+const AccountSelector = defineAsyncComponent(() => import('./AccountSelector.vue'))
+const VersionSelector = defineAsyncComponent(() => import('./VersionSelector.vue'))
 
 const authStore = useAuthStore()
 const versionStore = useVersionStore()

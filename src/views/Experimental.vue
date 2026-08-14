@@ -6,18 +6,18 @@
  * 子分类：AI 聊天（Agent 对话，SQLite 存储会话）/ 日志分析 / AI 设置。
  * 后续将在此页面持续扩展更多实验性能力。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import {
   ChatBubbleLeftRightIcon,
   BugAntIcon,
   CogIcon,
   ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
-import NavSidebar from '@/components/common/NavSidebar.vue'
-import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
-import ExperimentalChat from './experimental/ExperimentalChat.vue'
-import ExperimentalLog from './experimental/ExperimentalLog.vue'
-import SettingsAi from './settings/SettingsAi.vue'
+const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
+const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
+const ExperimentalChat = defineAsyncComponent(() => import('./experimental/ExperimentalChat.vue'))
+const ExperimentalLog = defineAsyncComponent(() => import('./experimental/ExperimentalLog.vue'))
+const SettingsAi = defineAsyncComponent(() => import('./settings/SettingsAi.vue'))
 import { useExperimental } from '@/composables/useExperimental'
 import { hasAgreedToday } from '@/utils/disclaimer'
 

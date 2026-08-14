@@ -84,10 +84,11 @@
 </template>
 
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 import { onBeforeRouteLeave } from 'vue-router'
 import { ShieldExclamationIcon } from '@heroicons/vue/24/outline'
-import Drawer from '@/components/common/Drawer.vue'
-import Button from '@/components/common/Button.vue'
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { markAgreedToday, type DisclaimerKind } from '@/utils/disclaimer'
 import { toastSuccess, toastWarning } from '@/utils/toast'
 

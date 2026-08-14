@@ -12,11 +12,11 @@
  * （version API）、getVersionGameVersion（personalization API）、mapMcVersionToCubiomes
  * （useSeedMap）、Drawer/Button/Select/Tooltip 自定义组件。
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { ArrowPathIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
-import Drawer from '@/components/common/Drawer.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
 import { archiveList, extractSaveSeed, type ArchiveItem } from '@/utils/api/tools'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 import { getVersionGameVersion } from '@/utils/api/personalization'

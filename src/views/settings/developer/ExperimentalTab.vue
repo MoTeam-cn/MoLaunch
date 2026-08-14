@@ -4,13 +4,13 @@
  *
  * 包含 Modrinth CDN 直连开关与更新检测分支切换。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { getUpdateBranch, setUpdateBranch, type UpdateBranch } from '@/utils/api/developer'
 import { getCurrentChannel, getVersionInfo } from '@/utils/version'
 import { toastError, toastInfo } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
-import Select from '@/components/common/Select.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 
 // ==================== Modrinth CDN 直连 ====================
 const modrinthCdnRawEnabled = ref(false)

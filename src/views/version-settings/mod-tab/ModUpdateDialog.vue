@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * Mod 版本更新/更改对话框（薄编排层）
  *
@@ -8,7 +9,7 @@
  * 采用 teleport + transition 自承载弹窗（与 ResourceDetail 一致），
  * 不使用 singleton Modal（Modal 仅适合简单确认/提示，不支持自定义宽度和表格内容）。
  */
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { useModUpdate } from '@/composables/useModUpdate'
 import { formatDownloads } from '@/utils/format'
 import type { ModInfo } from '@/utils/api/personalization'
@@ -19,7 +20,7 @@ import {
   ArrowUpIcon,
   ArrowDownIcon,
 } from '@heroicons/vue/24/outline'
-import VersionTable from './VersionTable.vue'
+const VersionTable = defineAsyncComponent(() => import('./VersionTable.vue'))
 import { defaultAsset } from '@/utils/assets'
 
 interface Props {

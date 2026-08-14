@@ -15,13 +15,13 @@
  *   - useAccountCards     账号列表构建 + 切换/删除/登出 composable
  */
 
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
-import SkinManager from '@/components/common/SkinManager.vue'
-import AccountCard from './account-selector/AccountCard.vue'
+const SkinManager = defineAsyncComponent(() => import('@/components/common/SkinManager.vue'))
+const AccountCard = defineAsyncComponent(() => import('./account-selector/AccountCard.vue'))
 import type { AccountCardData } from './account-selector/types'
-import AccountIndicator from './account-selector/AccountIndicator.vue'
-import LoginPrompt from './account-selector/LoginPrompt.vue'
+const AccountIndicator = defineAsyncComponent(() => import('./account-selector/AccountIndicator.vue'))
+const LoginPrompt = defineAsyncComponent(() => import('./account-selector/LoginPrompt.vue'))
 import { useSwipeNavigation } from '@/composables/useSwipeNavigation'
 import { useAccountCards } from '@/composables/useAccountCards'
 import { toastError } from '@/utils/toast'

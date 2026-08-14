@@ -9,10 +9,10 @@
  *
  * 封禁时长语义由 api-server 约定：ban_duration_seconds=0 表示永久。
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
-import Drawer from '@/components/common/Drawer.vue'
-import Button from '@/components/common/Button.vue'
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 defineProps<{
   devicePk: string

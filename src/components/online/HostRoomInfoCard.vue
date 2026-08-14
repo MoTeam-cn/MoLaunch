@@ -5,14 +5,14 @@
  * 端口区使用 HostMcPortEditor：自动捕获显示 + 手动指定（最高可信度），
  * 手动值经会话 setManualMcPort 广播给所有参与者。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { getOnlineSession } from '@/composables/online/onlineSession'
-import Button from '@/components/common/Button.vue'
-import Card from '@/components/common/Card.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
-import HostMcPortEditor from './HostMcPortEditor.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const HostMcPortEditor = defineAsyncComponent(() => import('./HostMcPortEditor.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 import {
   ServerStackIcon,

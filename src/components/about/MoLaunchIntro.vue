@@ -12,9 +12,9 @@
  * - UI 设计理念（单列布局 / Arco Design 紧凑风格）
  * - 数据存储与安全（本地加密、设备 ID 绑定）
  */
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import { ChevronDownIcon, BeakerIcon } from '@heroicons/vue/24/outline'
-import Tag from '@/components/common/Tag.vue'
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 
 const isOpen = ref(false)
 

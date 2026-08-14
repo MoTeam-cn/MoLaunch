@@ -13,14 +13,14 @@
  * - authType：none/oauth2/device_code/api_key
  * - distribution：system/bundled/url
  */
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, defineAsyncComponent } from 'vue'
 import { useFrpStore } from '@/stores/frp'
 import { showConfirm, showPrompt } from '@/utils/modal'
 import { toastInfo } from '@/utils/toast'
 import { pickFile, pickDirectory } from '@/utils/fileDialog'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Select from '@/components/common/Select.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import {
   ServerStackIcon,
   ArrowDownTrayIcon,

@@ -5,18 +5,18 @@
  * 配置物品信息生成 /give 指令：物品、数量、目标玩家、
  * 自定义名称（含颜色代码）、Lore、附魔列表。
  */
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, defineAsyncComponent } from 'vue'
 import { CubeIcon, PlusIcon, TrashIcon } from '@heroicons/vue/24/outline'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 import { loadVersionItems } from '@/utils/recipe-generator/resources'
 import type { AssetItem } from '@/utils/recipe-generator/resources'
 import { matchItem } from '@/utils/recipe-generator/itemSearch'
 import { ENCHANTMENTS } from './data'
 import { GIVE_VERSIONS, TARGETS, buildGiveCommand } from './generator'
-import ColorSelect from './ColorSelect.vue'
+const ColorSelect = defineAsyncComponent(() => import('./ColorSelect.vue'))
 
 const items = ref<AssetItem[]>([])
 const keyword = ref('')

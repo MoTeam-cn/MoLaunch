@@ -7,7 +7,7 @@
  *
  * 布局：文本编辑（左） + 输出配置（右），底部预设管理。
  */
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, defineAsyncComponent } from 'vue'
 import {
   ArrowDownTrayIcon,
   BookmarkIcon,
@@ -19,13 +19,13 @@ import {
   XMarkIcon,
   PencilSquareIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Select from '@/components/common/Select.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import ColorPicker from '@/components/common/ColorPicker.vue'
-import SegmentedButtons from '@/components/common/SegmentedButtons.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const ColorPicker = defineAsyncComponent(() => import('@/components/common/ColorPicker.vue'))
+const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import {
   buildGradientCharacters,
   generateGradientOutput,

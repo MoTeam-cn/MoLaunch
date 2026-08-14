@@ -8,8 +8,8 @@
  * 排版：不引入 markdown，正文用极简渲染器输出——先 HTML 转义防注入，再对短引号内容
  * （产品名 / 法律术语，≤20 字符）加粗 + 字距，段落按空行拆分、段内换行保留，提升可读性。
  */
-import { ref, computed, onMounted } from 'vue'
-import Button from '@/components/common/Button.vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { getProjectLicense } from '@/utils/api/about'
 import { openLink } from '@/utils/aboutLogos'
 import {

@@ -7,12 +7,12 @@
  * - 高级选项（ToggleRow 公共组件 × 3）
  * - 游戏目录（只读展示）
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
-import Select from '@/components/common/Select.vue'
-import ToggleRow from '@/components/settings/ToggleRow.vue'
-import JavaPathSelector from './settings-launch/JavaPathSelector.vue'
-import MemoryAllocation from './settings-launch/MemoryAllocation.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const ToggleRow = defineAsyncComponent(() => import('@/components/settings/ToggleRow.vue'))
+const JavaPathSelector = defineAsyncComponent(() => import('./settings-launch/JavaPathSelector.vue'))
+const MemoryAllocation = defineAsyncComponent(() => import('./settings-launch/MemoryAllocation.vue'))
 
 const gameDir = ref('')
 const isolationMode = ref(4)

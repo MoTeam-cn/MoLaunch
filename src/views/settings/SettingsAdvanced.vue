@@ -1,14 +1,14 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { useConfigPage } from '@/composables/useConfigPage'
-import Alert from '@/components/common/Alert.vue'
-import Input from '@/components/common/Input.vue'
-import Select from '@/components/common/Select.vue'
-import DevModeToggle from '@/components/settings/DevModeToggle.vue'
-import CommunityConfigCard from '@/components/community/CommunityConfigCard.vue'
-import ExperimentalToggle from '@/components/settings/ExperimentalToggle.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const DevModeToggle = defineAsyncComponent(() => import('@/components/settings/DevModeToggle.vue'))
+const CommunityConfigCard = defineAsyncComponent(() => import('@/components/community/CommunityConfigCard.vue'))
+const ExperimentalToggle = defineAsyncComponent(() => import('@/components/settings/ExperimentalToggle.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import {
   ExclamationTriangleIcon,
   EyeIcon,

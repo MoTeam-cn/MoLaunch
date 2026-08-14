@@ -6,17 +6,17 @@
  * 默认扫全局 {game_dir}/screenshots/，可选具体版本按版本隔离配置解析路径。
  * 删除走 showConfirm 回调式（项目规范：业务逻辑放入 onConfirm 回调）。
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import {
   PhotoIcon,
   ArrowPathIcon,
   TrashIcon,
   CheckCircleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Select from '@/components/common/Select.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { screenshotList, screenshotDelete } from '@/utils/api/tools'

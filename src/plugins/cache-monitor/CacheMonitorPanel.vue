@@ -9,7 +9,7 @@
  *
  * 数据来源：pluginSdk.getCacheStats()
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { pluginSdk } from '@/plugins/sdk'
 import type { CacheStatsResult, CacheStatEntry } from '@/plugins/sdk'
 import {
@@ -18,7 +18,7 @@ import {
   ClockIcon,
 } from '@heroicons/vue/24/outline'
 import { formatBytes } from '@/utils/format'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 const cacheStats = ref<CacheStatsResult | null>(null)
 const loading = ref(true)

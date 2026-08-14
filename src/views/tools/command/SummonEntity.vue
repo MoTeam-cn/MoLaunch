@@ -5,15 +5,15 @@
  * 配置实体、坐标（支持 ~ 相对坐标）、自定义名称与数量，
  * 生成 /summon 指令。
  */
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { SparklesIcon } from '@heroicons/vue/24/outline'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 import { ENTITIES } from './data'
 import { buildSummonCommand } from './generator'
-import ColorSelect from './ColorSelect.vue'
+const ColorSelect = defineAsyncComponent(() => import('./ColorSelect.vue'))
 
 const entityId = ref(ENTITIES[0].id)
 const x = ref('~')

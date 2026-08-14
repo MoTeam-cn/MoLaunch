@@ -7,14 +7,14 @@
  * - 自动检测已安装 Java / 手动导入 javaw.exe
  * - 下拉列表展示已检测到的 Java（带版本信息）
  */
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useJavaStore } from '@/stores/java'
 import { pickFile } from '@/utils/fileDialog'
 import { toastInfo, toastSuccess } from '@/utils/toast'
 import { showError } from '@/utils/modal'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
-import Tag from '@/components/common/Tag.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { ArrowPathIcon, DocumentPlusIcon } from '@heroicons/vue/24/outline'
 import { safeCall } from '@/utils/async'
 

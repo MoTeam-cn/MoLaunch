@@ -12,20 +12,20 @@
  *
  * 分组计算与渲染委托给 CleanupGroupList.vue，本组件只负责状态管理与编排。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import {
   TrashIcon,
   ArrowPathIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { cleanupScan, cleanupExecute } from '@/utils/api/tools'
 import type { CleanupItem, CleanupExecuteResult } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
-import CleanupGroupList from './CleanupGroupList.vue'
+const CleanupGroupList = defineAsyncComponent(() => import('./CleanupGroupList.vue'))
 
 const scanState = ref<'idle' | 'scanning' | 'ready' | 'cleaning'>('idle')
 const scanItems = ref<CleanupItem[]>([])

@@ -10,15 +10,15 @@
  * 复用：Button/Checkbox/Input 自定义组件、showConfirm 回调式确认、
  * pickSavePath 文件对话框、formatBytes 字节格式化。
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import {
   ArrowUpTrayIcon,
   CheckCircleIcon,
   FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { archiveBackup } from '@/utils/api/tools'

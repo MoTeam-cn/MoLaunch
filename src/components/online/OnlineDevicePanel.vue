@@ -12,12 +12,12 @@
  *           useOnlineStore.natResult（由 Online.vue 进入页面时自动检测，侧边栏切换不丢失）
  */
 
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
-import Button from '@/components/common/Button.vue'
-import Card from '@/components/common/Card.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import SealedOverlay from '@/components/common/SealedOverlay.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const SealedOverlay = defineAsyncComponent(() => import('@/components/common/SealedOverlay.vue'))
 import {
   UserPlusIcon,
   ArrowRightOnRectangleIcon,

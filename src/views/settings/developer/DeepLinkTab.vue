@@ -10,7 +10,7 @@
  * 后端由 system_manager 的 get_deeplink_status / register_deeplink
  * / unregister_deeplink 三个 action 支撑（utils::deeplink::protocol）。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import {
   getDeeplinkStatus,
   registerDeeplink,
@@ -18,7 +18,7 @@ import {
   type DeeplinkStatus,
 } from '@/utils/api/developer'
 import { toastError, toastSuccess } from '@/utils/toast'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 const status = ref<DeeplinkStatus | null>(null)
 const loading = ref(false)

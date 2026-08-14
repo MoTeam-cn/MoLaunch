@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 自定义布局配置区（格式 / 来源 / 内联编辑器 / URL 加载 / 示例导出）
  *
  * 由 HomePanelModeSection 在 panelMode === 'custom' 时渲染。
  * 逻辑集中在 useCustomLayout composable，此处仅保留模板 + 组装。
  */
-import Select from '@/components/common/Select.vue'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import {
   ArrowPathIcon,
   ArrowDownTrayIcon,

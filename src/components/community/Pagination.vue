@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 分页组件
  * 仅 3 个按钮：首页 / 上一页 / 下一页 + 当前页码
@@ -10,7 +11,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 interface Props {
   page: number

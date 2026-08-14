@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 外观设置区：主题色 + 启动器语言
  */
 import { useSettingsStore } from '@/stores/settings'
-import Select from '@/components/common/Select.vue'
-import ColorPicker from '@/components/common/ColorPicker.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const ColorPicker = defineAsyncComponent(() => import('@/components/common/ColorPicker.vue'))
 
 const settingsStore = useSettingsStore()
 </script>

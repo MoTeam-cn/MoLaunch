@@ -5,12 +5,12 @@
  * 管理 Minecraft 文件夹的列表展示、切换、添加、移除。
  * 父组件在文件夹切换后需要重新加载版本列表（通过 @switched 事件）。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { pickDirectory } from '@/utils/fileDialog'
 import { toastSuccess, toastWarning, toastError, toastInfo } from '@/utils/toast'
 import { showConfirm, showPrompt } from '@/utils/modal'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import {
   FolderIcon,
   PlusIcon,

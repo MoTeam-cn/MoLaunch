@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 开关行组件 - 统一 label + description + Tooltip + Toggle 按钮布局
  *
@@ -8,7 +9,7 @@
  *
  * 通过 v-model 双向绑定开关状态；tooltipText 可选，未提供时不渲染 Tooltip。
  */
-import Tooltip from '@/components/common/Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 interface Props {
   /** 开关状态（v-model） */

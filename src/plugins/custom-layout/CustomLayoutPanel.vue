@@ -14,7 +14,7 @@
  * 渲染委托给 LayoutSectionRenderer 子组件，HTML shadow DOM 渲染与渲染辅助函数
  * 分别提取到 htmlShadowRenderer.ts / renderHelpers.ts。
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { usePolling } from '@/composables/usePolling'
 import { parseJsonLayout, parseXmlLayout } from './parser'
 import { loadDataContext, type DataContext } from './datasource'
@@ -28,8 +28,8 @@ import {
   ClockIcon,
   ArrowPathIcon,
 } from '@heroicons/vue/24/outline'
-import LayoutSectionRenderer from './LayoutSectionRenderer.vue'
-import Button from '@/components/common/Button.vue'
+const LayoutSectionRenderer = defineAsyncComponent(() => import('./LayoutSectionRenderer.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 const props = defineProps<{
   /** 布局格式 */

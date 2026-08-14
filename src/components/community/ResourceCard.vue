@@ -4,7 +4,7 @@
  * 固定高度，横向布局：Logo + 标题/描述 + 版本/下载量/时间/来源
  */
 
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import type { ResourceProject } from '@/types/community'
 import { ModLoaderFlags } from '@/types/community'
 import {
@@ -15,7 +15,7 @@ import {
   CubeIcon,
 } from '@heroicons/vue/24/outline'
 import { formatDownloads } from '@/utils/format'
-import CachedImage from '@/components/common/CachedImage.vue'
+const CachedImage = defineAsyncComponent(() => import('@/components/common/CachedImage.vue'))
 
 const props = defineProps<{ project: ResourceProject }>()
 const emit = defineEmits<{ click: [project: ResourceProject] }>()

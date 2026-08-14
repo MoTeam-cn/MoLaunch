@@ -10,15 +10,15 @@
  * - 前端 dev_mode=false 时禁用输入框/重置按钮，阻止 watch 触发保存
  * - 监听 DevModeToggle.vue 分发的 'developer-mode-changed' 事件实时联动
  */
-import { ref, watch, computed, onMounted, onUnmounted } from 'vue'
+import { ref, watch, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { getServerTime } from '@/utils/api/online-manager'
 import { useConfigPage } from '@/composables/useConfigPage'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { formatTimestamp } from '@/utils/format'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import {
   GlobeAltIcon,
   ArrowPathIcon,

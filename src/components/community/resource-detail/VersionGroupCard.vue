@@ -12,7 +12,7 @@
 import type { ResourceProject, ResourceVersion } from '@/types/community'
 import { ModLoaderFlags } from '@/types/community'
 import { formatBytes, formatDownloads } from '@/utils/format'
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import {
   ChevronDownIcon,
   CubeIcon,
@@ -20,9 +20,9 @@ import {
   RocketLaunchIcon,
   Squares2X2Icon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
-import DependencyInlineList from './DependencyInlineList.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const DependencyInlineList = defineAsyncComponent(() => import('./DependencyInlineList.vue'))
 
 defineProps<{
   title: string

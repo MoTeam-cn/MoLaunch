@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 账号选择器未登录状态
  * - 显示用户图标 + 「立即登录」按钮
  * - 点击按钮跳转到登录页
  */
 import { useRouter } from 'vue-router'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 const router = useRouter()
 function login() { router.push('/login') }

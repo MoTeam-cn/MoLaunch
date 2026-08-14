@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * authlib 多角色选择弹窗
  *
@@ -9,7 +10,7 @@
  */
 
 import type { AuthlibProfile } from '@/types/auth'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 defineProps<{
   visible: boolean

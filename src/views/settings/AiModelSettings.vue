@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Select from '@/components/common/Select.vue'
-import Tag from '@/components/common/Tag.vue'
+import { defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 
 interface Props {
   remoteModels: string[]

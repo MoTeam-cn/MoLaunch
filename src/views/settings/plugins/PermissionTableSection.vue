@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 可用权限说明表格（可展开/收起，分三组：始终允许 / 普通 / 高级）
  */
@@ -8,7 +9,7 @@ import {
   ADVANCED_PERMISSIONS,
   RISK_STYLES,
 } from '@/plugins/permissions'
-import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
+const CollapsibleCard = defineAsyncComponent(() => import('@/components/common/CollapsibleCard.vue'))
 import { ShieldCheckIcon } from '@heroicons/vue/24/outline'
 </script>
 

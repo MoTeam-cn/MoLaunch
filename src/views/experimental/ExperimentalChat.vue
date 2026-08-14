@@ -7,19 +7,19 @@
  * - 右侧：头部（ChatHeader，含模型选择/进度条）、消息列表（含技能调用条目）、输入区
  * - 弹窗：AskUserDialog（工具 ask_user 提问）、VersionPickerDialog（版本隔离开关下先选版本）
  */
-import { computed, ref, watch } from 'vue'
+import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { CommandLineIcon, PaperAirplaneIcon, PaperClipIcon, PauseIcon, Squares2X2Icon, ChatBubbleLeftRightIcon } from '@heroicons/vue/24/outline'
 import { useAiChat } from '@/composables/useAiChat'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import ToolToc from '@/components/common/ToolToc.vue'
-import ChatConversationList from '@/components/experimental/ChatConversationList.vue'
-import ChatHeader from '@/components/experimental/ChatHeader.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const ToolToc = defineAsyncComponent(() => import('@/components/common/ToolToc.vue'))
+const ChatConversationList = defineAsyncComponent(() => import('@/components/experimental/ChatConversationList.vue'))
+const ChatHeader = defineAsyncComponent(() => import('@/components/experimental/ChatHeader.vue'))
 import ChatMessageItem, { type LocalMessage } from '@/components/experimental/ChatMessageItem.vue'
-import ToolCallEntry from '@/components/experimental/ToolCallEntry.vue'
-import AskUserDialog from '@/components/experimental/AskUserDialog.vue'
-import VersionPickerDialog from '@/components/experimental/VersionPickerDialog.vue'
+const ToolCallEntry = defineAsyncComponent(() => import('@/components/experimental/ToolCallEntry.vue'))
+const AskUserDialog = defineAsyncComponent(() => import('@/components/experimental/AskUserDialog.vue'))
+const VersionPickerDialog = defineAsyncComponent(() => import('@/components/experimental/VersionPickerDialog.vue'))
 import { markdownToPlainText } from '@/utils/markdown'
 
 const c = useAiChat()

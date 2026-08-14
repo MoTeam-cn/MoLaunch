@@ -6,16 +6,16 @@
  * 保存前后端会先校验 JSON 合法性，校验失败返回详细解析错误。
  * 因误改可能导致版本无法启动，保存走 showConfirm 回调式二次确认。
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import {
   DocumentTextIcon,
   FolderOpenIcon,
   CheckIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showConfirm } from '@/utils/modal'
 import { versionJsonRead, versionJsonSave } from '@/utils/api/tools'

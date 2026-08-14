@@ -1,17 +1,17 @@
 <script setup lang="ts">
 /** 下载页面 */
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { backToTopEnabled } from '@/composables/useFloatingButtonState'
 import { showError } from '@/utils/modal'
 import { formatTimestamp } from '@/utils/format'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
-import LoaderSelect from './LoaderSelect.vue'
-import VersionSection from '@/components/version/VersionSection.vue'
-import Community from './Community.vue'
-import DownloadSidebar from './downloads/DownloadSidebar.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const LoaderSelect = defineAsyncComponent(() => import('./LoaderSelect.vue'))
+const VersionSection = defineAsyncComponent(() => import('@/components/version/VersionSection.vue'))
+const Community = defineAsyncComponent(() => import('./Community.vue'))
+const DownloadSidebar = defineAsyncComponent(() => import('./downloads/DownloadSidebar.vue'))
 import {
   CubeIcon, ArchiveBoxIcon,
   StarIcon, BeakerIcon, ClockIcon, SparklesIcon,

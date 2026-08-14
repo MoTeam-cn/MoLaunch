@@ -1,15 +1,15 @@
 <script setup lang="ts">
 /** 创建房间表单：MC 版本 Select 下拉 + 高级设置（白名单/整合包关联，置于抽屉内） */
-import { ref, watch } from 'vue'
-import Button from '@/components/common/Button.vue'
-import Card from '@/components/common/Card.vue'
-import Input from '@/components/common/Input.vue'
-import Select from '@/components/common/Select.vue'
-import Drawer from '@/components/common/Drawer.vue'
-import Tag from '@/components/common/Tag.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
-import WhitelistEditor from './WhitelistEditor.vue'
-import ModpackSelector from './ModpackSelector.vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const WhitelistEditor = defineAsyncComponent(() => import('./WhitelistEditor.vue'))
+const ModpackSelector = defineAsyncComponent(() => import('./ModpackSelector.vue'))
 import { Cog8ToothIcon, PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
 import { useCreateRoomForm } from '@/composables/useCreateRoomForm'
 

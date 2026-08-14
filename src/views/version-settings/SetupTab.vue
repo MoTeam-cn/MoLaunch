@@ -8,17 +8,17 @@
  * 高级选项字段拆分到 AdvanceFieldsPanel 子组件
  * 进阶开关复用 ToggleRow 公共组件
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError } from '@/utils/toast'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Input from '@/components/common/Input.vue'
-import ToggleRow from '@/components/settings/ToggleRow.vue'
-import AdvanceFieldsPanel from '@/components/version-settings/AdvanceFieldsPanel.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const ToggleRow = defineAsyncComponent(() => import('@/components/settings/ToggleRow.vue'))
+const AdvanceFieldsPanel = defineAsyncComponent(() => import('@/components/version-settings/AdvanceFieldsPanel.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
-import MemorySection from './MemorySection.vue'
-import JavaModeSelector from './setup-tab/JavaModeSelector.vue'
+const MemorySection = defineAsyncComponent(() => import('./MemorySection.vue'))
+const JavaModeSelector = defineAsyncComponent(() => import('./setup-tab/JavaModeSelector.vue'))
 import { safeCall } from '@/utils/async'
 
 const { selectedId, personalization, loadPersonalization } = useVersionSettings()

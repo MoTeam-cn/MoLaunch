@@ -1,12 +1,13 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 已下载文件列表（icon + 文件名 + 大小/时间 + 删除按钮）
  */
 import type { ExternalDownloadEntry } from '@/utils/api/tools'
 import { formatBytes, formatDateTime } from '@/utils/format'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { DocumentIcon, ExclamationCircleIcon, TrashIcon } from '@heroicons/vue/24/outline'
 
 defineProps<{

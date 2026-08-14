@@ -14,7 +14,7 @@
  * - 有选中项时顶部显示 MultiSelectBar，所有项显示复选框列
  * - ESC 清空选中
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   PlayIcon,
@@ -25,11 +25,11 @@ import {
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useModOperations } from '@/composables/useModOperations'
 import MultiSelectBar, { type MultiSelectAction } from '@/components/common/MultiSelectBar.vue'
-import ResourceDetail from '@/components/community/ResourceDetail.vue'
-import ModListItem from './mod-tab/ModListItem.vue'
-import ModToolbar from './mod-tab/ModToolbar.vue'
-import ModEmptyState from './mod-tab/ModEmptyState.vue'
-import ModUpdateDialog from './mod-tab/ModUpdateDialog.vue'
+const ResourceDetail = defineAsyncComponent(() => import('@/components/community/ResourceDetail.vue'))
+const ModListItem = defineAsyncComponent(() => import('./mod-tab/ModListItem.vue'))
+const ModToolbar = defineAsyncComponent(() => import('./mod-tab/ModToolbar.vue'))
+const ModEmptyState = defineAsyncComponent(() => import('./mod-tab/ModEmptyState.vue'))
+const ModUpdateDialog = defineAsyncComponent(() => import('./mod-tab/ModUpdateDialog.vue'))
 
 const router = useRouter()
 const { selectedId, isModable } = useVersionSettings()

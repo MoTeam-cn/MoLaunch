@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 import { ChevronDownIcon } from '@heroicons/vue/24/outline'
-import Collapse from '@/components/common/Collapse.vue'
-import Tag from '@/components/common/Tag.vue'
+const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { handleMarkdownLinkClick } from '@/utils/markdown'
 import {
   CHANNEL_LABELS,

@@ -9,16 +9,16 @@
  * 4. 外部插件安装入口（文件夹 + ZIP + 示例导出）
  * 5. 可用权限说明表格 → PermissionTableSection
  */
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { usePluginStore } from '@/stores/plugins'
-import Alert from '@/components/common/Alert.vue'
-import Button from '@/components/common/Button.vue'
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { toastInfo, toastSuccess, toastError } from '@/utils/toast'
 import { exportPluginSample } from '@/utils/api/plugins'
 import { pickFile, pickDirectory, pickSavePath } from '@/utils/fileDialog'
-import PluginFlowSteps from './plugins/PluginFlowSteps.vue'
-import PluginListSection from './plugins/PluginListSection.vue'
-import PermissionTableSection from './plugins/PermissionTableSection.vue'
+const PluginFlowSteps = defineAsyncComponent(() => import('./plugins/PluginFlowSteps.vue'))
+const PluginListSection = defineAsyncComponent(() => import('./plugins/PluginListSection.vue'))
+const PermissionTableSection = defineAsyncComponent(() => import('./plugins/PermissionTableSection.vue'))
 import {
   FolderOpenIcon,
   DocumentArrowUpIcon,

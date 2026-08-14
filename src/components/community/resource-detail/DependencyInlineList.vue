@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 前置 Mod 内联列表（版本条目下方展开）
  *
@@ -10,7 +11,7 @@
  */
 import type { ResourceProject } from '@/types/community'
 import { CubeIcon } from '@heroicons/vue/24/outline'
-import CachedImage from '@/components/common/CachedImage.vue'
+const CachedImage = defineAsyncComponent(() => import('@/components/common/CachedImage.vue'))
 
 defineProps<{
   /** 前置项目详情列表 */

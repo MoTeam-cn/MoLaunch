@@ -18,20 +18,20 @@
  * - useFrpSidebar：FRP 侧边栏子菜单（含「教程帮助」动作项，点击跳转设置-教程页）
  */
 
-import { ref, computed, onMounted, provide } from 'vue'
+import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOnlineStore } from '@/stores/online'
 import { getOnlineSession } from '@/composables/online/onlineSession'
-import NavSidebar from '@/components/common/NavSidebar.vue'
-import OnlineDevicePanel from '@/components/online/OnlineDevicePanel.vue'
-import RoomManager from '@/components/online/RoomManager.vue'
-import LobbyBrowser from '@/components/online/LobbyBrowser.vue'
-import ProviderList from '@/components/frp/ProviderList.vue'
-import TunnelManager from '@/components/frp/TunnelManager.vue'
-import FrpLogs from '@/components/frp/FrpLogs.vue'
-import AuthCenter from '@/components/frp/AuthCenter.vue'
-import OnlineTopBar from '@/views/online/OnlineTopBar.vue'
-import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
+const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
+const OnlineDevicePanel = defineAsyncComponent(() => import('@/components/online/OnlineDevicePanel.vue'))
+const RoomManager = defineAsyncComponent(() => import('@/components/online/RoomManager.vue'))
+const LobbyBrowser = defineAsyncComponent(() => import('@/components/online/LobbyBrowser.vue'))
+const ProviderList = defineAsyncComponent(() => import('@/components/frp/ProviderList.vue'))
+const TunnelManager = defineAsyncComponent(() => import('@/components/frp/TunnelManager.vue'))
+const FrpLogs = defineAsyncComponent(() => import('@/components/frp/FrpLogs.vue'))
+const AuthCenter = defineAsyncComponent(() => import('@/components/frp/AuthCenter.vue'))
+const OnlineTopBar = defineAsyncComponent(() => import('@/views/online/OnlineTopBar.vue'))
+const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
 import { useOnlineNav, type OnlineCategoryId } from '@/composables/useOnlineNav'
 import { hasAgreedToday } from '@/utils/disclaimer'
 import { showWarning } from '@/utils/modal'

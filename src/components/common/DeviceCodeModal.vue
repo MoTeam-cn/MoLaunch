@@ -4,12 +4,12 @@
  * 支持 Web Auth Code Flow（官方 ID）和 Device Code Flow（自定义 ID）
  */
 
-import { computed, ref, watch, onUnmounted } from 'vue'
+import { computed, ref, watch, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { open } from '@tauri-apps/plugin-shell'
 import { useAuthStore } from '@/stores/auth'
-import Button from '@/components/common/Button.vue'
-import StepProgressBar from '@/components/common/StepProgressBar.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const StepProgressBar = defineAsyncComponent(() => import('@/components/common/StepProgressBar.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'
 

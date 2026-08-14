@@ -6,11 +6,11 @@
  * Markdown 标记后的纯文本），选择复制为「渲染后文本」或「Markdown 原文」。
  * 点击遮罩外部或按 ESC 关闭；组件风格与项目统一（Button / AlertV2 / Input）。
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { XMarkIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { markdownToPlainText } from '@/utils/markdown'
 import { copyToClipboard } from '@/utils/clipboard'
 import { toastError, toastSuccess } from '@/utils/toast'

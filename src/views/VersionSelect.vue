@@ -8,16 +8,16 @@
  * - 点击版本项即选，选完返回主页
  * - 文件夹切换后由 FolderSidebar 触发 @switched 事件，本组件重新加载版本列表
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useVersionStore } from '@/stores/version'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import * as tauri from '@/utils/tauri'
 import grassIcon from '@/assets/blocks/Grass.png'
 import { inferVersionType, typeMetaMap, type VersionTypeMeta } from '@/composables/useVersionMeta'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
-import FolderSidebar from './version-select/FolderSidebar.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const FolderSidebar = defineAsyncComponent(() => import('./version-select/FolderSidebar.vue'))
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import {
   ArrowLeftIcon,

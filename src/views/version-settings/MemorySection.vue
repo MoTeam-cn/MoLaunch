@@ -4,13 +4,13 @@
  * 抄全局设置 SettingsLaunch.vue 的可视化 UI，新增「跟随全局」模式。
  * 通过 updateVersionPersonalization 保存到 setup.ini。
  */
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { toastSuccess, toastError, toastWarning } from '@/utils/toast'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useDebouncedSave } from '@/composables/useDebouncedSave'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
 import { safeCall } from '@/utils/async'

@@ -13,15 +13,15 @@
  * 加入方无需轮询 answers（房主会主动 confirm），仅房间状态异常时主动退出。
  */
 
-import { computed, inject, onMounted, ref } from 'vue'
+import { computed, inject, onMounted, ref, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useWebRTC } from '@/composables/useWebRTC'
 import { useGuestReconnect } from '@/composables/useRoomReconnect'
 import { getOnlineSession } from '@/composables/online/onlineSession'
-import Button from '@/components/common/Button.vue'
-import Card from '@/components/common/Card.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import AlertV2 from '@/components/common/AlertV2.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 import { showConfirm } from '@/utils/modal'
 import { toastError } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -33,11 +33,11 @@ import {
   ClipboardDocumentIcon,
   Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
-import VirtualIpCard from './VirtualIpCard.vue'
-import ModpackRequirementCard from './ModpackRequirementCard.vue'
-import RoomToolsDrawer from './RoomToolsDrawer.vue'
-import ConnectionTransportStatus from './ConnectionTransportStatus.vue'
-import P2pFailureCard from './P2pFailureCard.vue'
+const VirtualIpCard = defineAsyncComponent(() => import('./VirtualIpCard.vue'))
+const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
+const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
+const ConnectionTransportStatus = defineAsyncComponent(() => import('./ConnectionTransportStatus.vue'))
+const P2pFailureCard = defineAsyncComponent(() => import('./P2pFailureCard.vue'))
 
 const store = useOnlineStore()
 const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>

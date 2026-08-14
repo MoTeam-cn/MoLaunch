@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 版本设置 - 概览子页：版本展示、个性化、快捷方式、高级管理
  * 业务逻辑已抽取到 `@/composables/useVersionOverviewActions`，本文件仅负责模板组装。
@@ -6,13 +7,13 @@
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useJavaStore } from '@/stores/java'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
-import Tag from '@/components/common/Tag.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useVersionOverviewActions } from '@/composables/useVersionOverviewActions'
-import RepairLoaderDrawer from './repair-loader/RepairLoaderDrawer.vue'
+const RepairLoaderDrawer = defineAsyncComponent(() => import('./repair-loader/RepairLoaderDrawer.vue'))
 
 const router = useRouter()
 const authStore = useAuthStore()

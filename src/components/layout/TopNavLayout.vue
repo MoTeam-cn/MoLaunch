@@ -3,7 +3,7 @@
  * 顶部导航布局组件
  */
 
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow'
 import { invoke } from '@tauri-apps/api/core'
@@ -13,8 +13,8 @@ import { useOnlineStore } from '@/stores/online'
 import { applyPendingUpdate, checkForUpdate } from '@/utils/updater'
 import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastError } from '@/utils/toast'
-import Tooltip from '@/components/common/Tooltip.vue'
-import ExitConfirmDialog from './ExitConfirmDialog.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const ExitConfirmDialog = defineAsyncComponent(() => import('./ExitConfirmDialog.vue'))
 import { topNavItems, experimentalNavItem } from './topNavItems'
 import { useTauriEvent } from '@/composables/useTauriEvent'
 import { useExperimental } from '@/composables/useExperimental'

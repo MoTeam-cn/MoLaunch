@@ -12,12 +12,12 @@
  * - 工具栏靠右对齐
  * - 表格展示：时间 / 方法 / req_id / 路径 / 状态码（倒序，最新在第一行）
  */
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { ArrowPathIcon, DocumentTextIcon } from '@heroicons/vue/24/outline'
-import CollapsibleCard from '@/components/common/CollapsibleCard.vue'
-import Select from '@/components/common/Select.vue'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const CollapsibleCard = defineAsyncComponent(() => import('@/components/common/CollapsibleCard.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { readHttpLogs, listHttpLogFiles, type HttpLogEntry } from '@/utils/api/developer'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'

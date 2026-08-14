@@ -9,7 +9,7 @@
  * 业务逻辑抽取到 `@/composables/useExportTab`，选项列表渲染由
  * `./export-tab/ExportOptions.vue` 负责，本文件仅负责整体布局。
  */
-import { onMounted, computed } from 'vue'
+import { onMounted, computed, defineAsyncComponent } from 'vue'
 import {
   ArrowUpTrayIcon,
   CheckIcon,
@@ -17,14 +17,14 @@ import {
   DocumentArrowDownIcon,
   DocumentArrowUpIcon,
 } from '@heroicons/vue/24/outline'
-import Input from '@/components/common/Input.vue'
-import Button from '@/components/common/Button.vue'
-import Checkbox from '@/components/common/Checkbox.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Select from '@/components/common/Select.vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import { useExportTab } from '@/composables/useExportTab'
-import ExportOptions from './export-tab/ExportOptions.vue'
+const ExportOptions = defineAsyncComponent(() => import('./export-tab/ExportOptions.vue'))
 
 const { selectedId } = useVersionSettings()
 const {

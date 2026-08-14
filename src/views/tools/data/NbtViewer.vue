@@ -6,19 +6,19 @@
  * 前端用 NbtTreeNode 递归组件渲染树，支持展开/折叠。
  * 后端手动实现 NBT 解析器（gzip 解压 + 大端二进制解析），无需 nightly crate。
  */
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import {
   CubeIcon,
   BoltIcon,
   DocumentIcon,
   FolderOpenIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastError } from '@/utils/toast'
 import { nbtParse } from '@/utils/api/tools'
 import type { NbtNode } from '@/utils/api/tools'
-import NbtTreeNode from '@/views/tools/data/NbtTreeNode.vue'
+const NbtTreeNode = defineAsyncComponent(() => import('@/views/tools/data/NbtTreeNode.vue'))
 import { pickFile } from '@/utils/fileDialog'
 
 const filePath = ref('')

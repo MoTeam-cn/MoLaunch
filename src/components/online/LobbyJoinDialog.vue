@@ -10,12 +10,12 @@
  * Online.vue watch(isInRoom) 自动切到房间详情）：失败时抽屉保持打开、内联展示错误可重试；
  * 成功时收起抽屉，父组件在 @close 后卸载本组件。
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
-import Drawer from '@/components/common/Drawer.vue'
-import ModpackRequirementCard from './ModpackRequirementCard.vue'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import type { LobbyRoomItem } from '@/types/online'
 
 const props = defineProps<{

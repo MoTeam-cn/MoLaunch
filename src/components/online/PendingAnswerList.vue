@@ -6,8 +6,8 @@
  * 接收待确认加入申请的参与者列表（status=joined/answered），
  * 渲染为卡片列表，每条提供接受/拒绝按钮。
  */
-import { computed } from 'vue'
-import Button from '@/components/common/Button.vue'
+import { computed, defineAsyncComponent } from 'vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { ClockIcon } from '@heroicons/vue/24/outline'
 import { formatTimestamp } from '@/utils/format'
 import type { ParticipantInfo } from '@/types/online'

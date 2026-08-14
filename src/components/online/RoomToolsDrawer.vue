@@ -6,14 +6,14 @@
  * - 检查网络连通性：复用 tcpCheck，加入方检查与房主的链路（仅加入方可见）
  * - 端口自动检测：监听 MC 局域网发现广播（224.0.2.60:4445），解析 [AD]port[/AD]
  */
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { serverPing, tcpCheck } from '@/utils/api/tools'
 import type { ServerPingResult, TcpCheckResult } from '@/utils/api/tools'
 import { lanPortProbe } from '@/utils/api/online-manager'
 import type { LanPortProbeResponse } from '@/types/online'
-import Button from '@/components/common/Button.vue'
-import Drawer from '@/components/common/Drawer.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
 import { toastError } from '@/utils/toast'
 import {
   BoltIcon,

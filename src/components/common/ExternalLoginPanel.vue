@@ -12,16 +12,16 @@
  * 与离线/微软登录平级，账号保存后可在账号管理中自由切换。
  */
 
-import { computed, ref } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { open } from '@tauri-apps/plugin-shell'
 import { authlibFetchServerMeta, authlibLogin, authlibSelectProfile } from '@/utils/api/authlib'
 import { normalizeAuthlibServerUrl, willAutoCompletePath } from '@/utils/authlib-url'
 import type { AuthlibProfile, AuthlibServerMeta } from '@/types/auth'
 import { useAuthStore } from '@/stores/auth'
 import { toastWarning, toastSuccess, toastError } from '@/utils/toast'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import ProfileSelectModal from './ProfileSelectModal.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const ProfileSelectModal = defineAsyncComponent(() => import('./ProfileSelectModal.vue'))
 
 const emit = defineEmits<{ (e: 'success'): void }>()
 

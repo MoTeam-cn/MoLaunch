@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * Mod 管理顶部工具栏
  * - 从文件安装 / 打开文件夹 / 刷新
  * - 全部/已启用/已禁用 筛选按钮组（带计数 badge）
  * - 搜索框
  */
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import {
   ArrowDownTrayIcon,
   FolderOpenIcon,

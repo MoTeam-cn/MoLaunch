@@ -12,13 +12,13 @@
  *   - 实例名生成 + 安装按钮
  */
 
-import { ref, onMounted, computed, toRef } from 'vue'
+import { ref, onMounted, computed, toRef, defineAsyncComponent } from 'vue'
 import { ChevronLeftIcon, ArrowDownTrayIcon } from '@heroicons/vue/24/outline'
-import LoaderCard from '@/components/common/LoaderCard.vue'
-import Alert from '@/components/common/Alert.vue'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
-import FabricApiInfoCard from '@/components/install/FabricApiInfoCard.vue'
+const LoaderCard = defineAsyncComponent(() => import('@/components/common/LoaderCard.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const FabricApiInfoCard = defineAsyncComponent(() => import('@/components/install/FabricApiInfoCard.vue'))
 import { useLoaderData } from '@/composables/useLoaderData'
 import { useLoaderCompatibility } from '@/composables/useLoaderCompatibility'
 import { useFabricApi } from '@/composables/useFabricApi'

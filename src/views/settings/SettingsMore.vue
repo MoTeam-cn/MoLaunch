@@ -15,9 +15,9 @@
  * 深链支持：URL `?subtab=tutorial` 可直接切到「教程」子页签（联机页 FRP 子菜单
  * 「教程」按钮通过 `/apps/settings?tab=about&subtab=tutorial` 跳转）。
  */
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import SubTabBar from '@/components/common/SubTabBar.vue'
+const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { getAboutData, type AboutData } from '@/utils/api/about'
 import {
   InformationCircleIcon,
@@ -26,11 +26,11 @@ import {
   ScaleIcon,
   BookOpenIcon,
 } from '@heroicons/vue/24/outline'
-import AboutTab from './more/AboutTab.vue'
-import SystemInfoTab from './more/SystemInfoTab.vue'
-import CreditsTab from './more/CreditsTab.vue'
-import LicenseTab from './more/LicenseTab.vue'
-import TutorialTab from './more/TutorialTab.vue'
+const AboutTab = defineAsyncComponent(() => import('./more/AboutTab.vue'))
+const SystemInfoTab = defineAsyncComponent(() => import('./more/SystemInfoTab.vue'))
+const CreditsTab = defineAsyncComponent(() => import('./more/CreditsTab.vue'))
+const LicenseTab = defineAsyncComponent(() => import('./more/LicenseTab.vue'))
+const TutorialTab = defineAsyncComponent(() => import('./more/TutorialTab.vue'))
 
 // ── 子页签 ──
 const subTabs = [

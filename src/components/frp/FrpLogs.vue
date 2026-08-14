@@ -14,7 +14,7 @@
  * 日志颜色复用 `logLineClass`（项目约定），禁止重复定义颜色 class。
  * 翻译规则和诊断规则独立在 utils/ 下，便于维护和扩展。
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import { useFrpStore } from '@/stores/frp'
 import { useTauriEvent } from '@/composables/useTauriEvent'
 import { parseLogLines, logLineClass, type LogLine } from '@/utils/log-display'
@@ -23,9 +23,9 @@ import { diagnoseLogs, diagnoseBadgeClass, type DiagnoseResult } from '@/utils/f
 import { extractTunnelLink } from '@/utils/frp-tunnel-link'
 import { toastInfo } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'
-import Button from '@/components/common/Button.vue'
-import Select from '@/components/common/Select.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import {
   ArrowPathIcon,
   TrashIcon,

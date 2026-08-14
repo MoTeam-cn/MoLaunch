@@ -8,7 +8,7 @@
  * 分组规则：display_name 形如 "游戏日志 - 1.19.2" 归入版本 "1.19.2"，
  * 无 " - " 后缀的归入 "全局" 分组。分组计算内聚于此组件，父级只传原始 items。
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import {
   CheckIcon,
   CheckCircleIcon,
@@ -16,8 +16,8 @@ import {
   FolderIcon,
   CubeIcon,
 } from '@heroicons/vue/24/outline'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Tag from '@/components/common/Tag.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import type { CleanupItem } from '@/utils/api/tools'
 import { formatBytes } from '@/utils/format'
 

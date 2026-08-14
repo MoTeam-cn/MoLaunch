@@ -10,14 +10,14 @@
  *
  * 深链支持：URL `?subtab=screenshot` 可直接切到对应子页签。
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import SubTabBar from '@/components/common/SubTabBar.vue'
+const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import { CameraIcon, FolderIcon, MapIcon, PhotoIcon } from '@heroicons/vue/24/outline'
-import ArchiveManager from './archive/ArchiveManager.vue'
-import ScreenshotManager from './data/ScreenshotManager.vue'
-import ResourcePackConverter from './data/ResourcePackConverter.vue'
-import SeedMap from './data/SeedMap.vue'
+const ArchiveManager = defineAsyncComponent(() => import('./archive/ArchiveManager.vue'))
+const ScreenshotManager = defineAsyncComponent(() => import('./data/ScreenshotManager.vue'))
+const ResourcePackConverter = defineAsyncComponent(() => import('./data/ResourcePackConverter.vue'))
+const SeedMap = defineAsyncComponent(() => import('./data/SeedMap.vue'))
 
 const subTabs = [
   { id: 'archive', label: '存档管理', icon: FolderIcon },

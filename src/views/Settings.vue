@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import SettingsLaunch from './settings/SettingsLaunch.vue'
-import SettingsDownload from './settings/SettingsDownload.vue'
-import SettingsPersonal from './settings/SettingsPersonal.vue'
-import SettingsAdvanced from './settings/SettingsAdvanced.vue'
-import SettingsPlugins from './settings/SettingsPlugins.vue'
-import SettingsCache from './settings/SettingsCache.vue'
-import SettingsDeveloper from './settings/SettingsDeveloper.vue'
-import SettingsMore from './settings/SettingsMore.vue'
-import SettingsOnline from './settings/SettingsOnline.vue'
-import NavSidebar from '@/components/common/NavSidebar.vue'
-import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
+import { ref, computed, watch, onMounted, onUnmounted, defineAsyncComponent } from 'vue'
+const SettingsLaunch = defineAsyncComponent(() => import('./settings/SettingsLaunch.vue'))
+const SettingsDownload = defineAsyncComponent(() => import('./settings/SettingsDownload.vue'))
+const SettingsPersonal = defineAsyncComponent(() => import('./settings/SettingsPersonal.vue'))
+const SettingsAdvanced = defineAsyncComponent(() => import('./settings/SettingsAdvanced.vue'))
+const SettingsPlugins = defineAsyncComponent(() => import('./settings/SettingsPlugins.vue'))
+const SettingsCache = defineAsyncComponent(() => import('./settings/SettingsCache.vue'))
+const SettingsDeveloper = defineAsyncComponent(() => import('./settings/SettingsDeveloper.vue'))
+const SettingsMore = defineAsyncComponent(() => import('./settings/SettingsMore.vue'))
+const SettingsOnline = defineAsyncComponent(() => import('./settings/SettingsOnline.vue'))
+const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
+const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
 import { getConfigMap } from '@/utils/api/config'
 import { hasAgreedToday } from '@/utils/disclaimer'
 import {

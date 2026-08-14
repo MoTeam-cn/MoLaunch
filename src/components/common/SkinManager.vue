@@ -18,17 +18,17 @@
  *   - SkinPreviewPanel       3D 预览
  */
 
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, defineAsyncComponent } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
 import SkinAnimationSelector, { type AnimationType } from './skin-manager/SkinAnimationSelector.vue'
-import SkinCapeList from './skin-manager/SkinCapeList.vue'
-import SkinUploadPanel from './skin-manager/SkinUploadPanel.vue'
-import SkinLocalSelector from './skin-manager/SkinLocalSelector.vue'
-import SkinPreviewPanel from './skin-manager/SkinPreviewPanel.vue'
-import AlertV2 from './AlertV2.vue'
-import Button from './Button.vue'
-import Tooltip from './Tooltip.vue'
+const SkinCapeList = defineAsyncComponent(() => import('./skin-manager/SkinCapeList.vue'))
+const SkinUploadPanel = defineAsyncComponent(() => import('./skin-manager/SkinUploadPanel.vue'))
+const SkinLocalSelector = defineAsyncComponent(() => import('./skin-manager/SkinLocalSelector.vue'))
+const SkinPreviewPanel = defineAsyncComponent(() => import('./skin-manager/SkinPreviewPanel.vue'))
+const AlertV2 = defineAsyncComponent(() => import('./AlertV2.vue'))
+const Button = defineAsyncComponent(() => import('./Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('./Tooltip.vue'))
 import { useSkinOperations } from '@/composables/useSkinOperations'
 
 const props = defineProps<{ visible: boolean }>()

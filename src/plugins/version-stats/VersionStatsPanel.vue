@@ -8,10 +8,10 @@
  *
  * 数据来源：pluginSdk.listInstalledVersionsWithType（一次拉取，无轮询）。
  */
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import { pluginSdk } from '@/plugins/sdk'
 import { ArrowPathIcon, ChartBarIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 interface InstalledVersion {
   id: string

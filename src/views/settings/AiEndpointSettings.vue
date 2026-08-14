@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import Input from '@/components/common/Input.vue'
-import Select from '@/components/common/Select.vue'
+import { defineAsyncComponent } from 'vue'
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 
 interface Props {
   baseUrl: string

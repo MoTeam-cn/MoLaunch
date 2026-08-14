@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * Mod 版本列表表格子组件
  *
  * 展示过滤后的版本列表，支持单选（点击行选中）。
  */
-import Tooltip from '@/components/common/Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { formatBytes, formatDate } from '@/utils/format'
 import { releaseTypeClass } from '@/composables/useModUpdate'
 import type { ResourceVersion } from '@/types/community'

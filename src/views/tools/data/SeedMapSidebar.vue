@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 种子地图结构筛选栏：出生点/要塞/校验开关 + 按版本可选结构图标按钮。
  * 从 SeedMap.vue 拆出，避免 Vue 组件超 300 行。
  */
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { getStructIcon, getStructIconUrl } from '@/utils/seedmap/constants'
 import type { StructureTypeConfig } from '@/utils/seedmap/structures'
 import { HomeIcon, KeyIcon, ShieldCheckIcon } from '@heroicons/vue/24/outline'

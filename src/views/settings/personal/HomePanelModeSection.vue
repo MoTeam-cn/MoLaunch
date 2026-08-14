@@ -2,11 +2,11 @@
 /**
  * 主页右侧内容区配置：模式选择 + 插件选择 + 自定义布局（CustomLayoutSection）
  */
-import { computed } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import { usePluginStore } from '@/stores/plugins'
 import { toastInfo } from '@/utils/toast'
-import Select from '@/components/common/Select.vue'
-import CustomLayoutSection from './CustomLayoutSection.vue'
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const CustomLayoutSection = defineAsyncComponent(() => import('./CustomLayoutSection.vue'))
 
 const pluginStore = usePluginStore()
 

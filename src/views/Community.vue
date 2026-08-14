@@ -4,16 +4,16 @@
  * 搜索栏 + 单列结果列表 + 分页 + 详情弹窗
  */
 
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import type { ResourceType, ResourceProject, SearchResult } from '@/types/community'
 import { searchResources } from '@/utils/api/community'
 import { toastError, toastInfo } from '@/utils/toast'
 import { useVersionStore } from '@/stores/version'
 import { useSearchProgress } from '@/composables/useSearchProgress'
-import SearchBar from '@/components/community/SearchBar.vue'
-import Pagination from '@/components/community/Pagination.vue'
-import ResourceCard from '@/components/community/ResourceCard.vue'
-import ResourceDetail from '@/components/community/ResourceDetail.vue'
+const SearchBar = defineAsyncComponent(() => import('@/components/community/SearchBar.vue'))
+const Pagination = defineAsyncComponent(() => import('@/components/community/Pagination.vue'))
+const ResourceCard = defineAsyncComponent(() => import('@/components/community/ResourceCard.vue'))
+const ResourceDetail = defineAsyncComponent(() => import('@/components/community/ResourceDetail.vue'))
 
 const props = defineProps<{ resourceType: ResourceType }>()
 const versionStore = useVersionStore()

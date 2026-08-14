@@ -5,15 +5,15 @@
  * 输入多个 URL（每行一个），并发测试 HTTP 延迟。
  * 提供官方源 / BMCLAPI 预设按钮，一键填充。
  */
-import { ref, computed } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import {
   SignalIcon,
   BoltIcon,
   CheckCircleIcon,
   XCircleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Input from '@/components/common/Input.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import { networkLatencyTest } from '@/utils/api/tools'
 import type { LatencyItem } from '@/utils/api/tools'

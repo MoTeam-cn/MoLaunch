@@ -1,13 +1,14 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * 皮肤管理 - 3D 预览面板（从 SkinManager.vue 抽出）
  *
  * 显示当前账号的 3D 人物模型、头像、用户名、皮肤模型、披风/皮肤名称，
  * 以及下载当前皮肤 PNG 到本地的按钮。
  */
-import SkinAvatar from '../SkinAvatar.vue'
-import SkinModel3D from '../SkinModel3D.vue'
-import Tooltip from '../Tooltip.vue'
+const SkinAvatar = defineAsyncComponent(() => import('../SkinAvatar.vue'))
+const SkinModel3D = defineAsyncComponent(() => import('../SkinModel3D.vue'))
+const Tooltip = defineAsyncComponent(() => import('../Tooltip.vue'))
 import type { AnimationType } from './SkinAnimationSelector.vue'
 import type { CapeInfo } from '@/utils/tauri'
 

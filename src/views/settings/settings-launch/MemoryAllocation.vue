@@ -9,13 +9,13 @@
  *
  * 配置加载与防抖保存复用 useConfigPage composable，独立维护 loaded 守卫。
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import * as tauri from '@/utils/tauri'
 import { formatBytes, formatMemoryMB } from '@/utils/format'
 import { useConfigPage } from '@/composables/useConfigPage'
 import { useMemoryVisualizer } from '@/composables/useMemoryVisualizer'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { safeCall } from '@/utils/async'
 import { toastError } from '@/utils/toast'
 

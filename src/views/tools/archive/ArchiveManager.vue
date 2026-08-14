@@ -12,25 +12,25 @@
  * - ArchiveBackupDialog：备份弹窗（target/downloadDir/versionId → close）
  * - ArchiveRestorePanel：恢复面板（versionId → restored 触发列表刷新）
  */
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, defineAsyncComponent } from 'vue'
 import {
   ArchiveBoxIcon,
   ArrowPathIcon,
   ArrowUpTrayIcon,
   ExclamationCircleIcon,
 } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Select from '@/components/common/Select.vue'
-import Tag from '@/components/common/Tag.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { archiveList, getDownloadDir } from '@/utils/api/tools'
 import type { ArchiveItem } from '@/utils/api/tools'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 import { getConfigMap } from '@/utils/api/config'
 import { formatBytes, formatTimestamp } from '@/utils/format'
-import ArchiveBackupDialog from './ArchiveBackupDialog.vue'
-import ArchiveRestorePanel from './ArchiveRestorePanel.vue'
+const ArchiveBackupDialog = defineAsyncComponent(() => import('./ArchiveBackupDialog.vue'))
+const ArchiveRestorePanel = defineAsyncComponent(() => import('./ArchiveRestorePanel.vue'))
 
 const items = ref<ArchiveItem[]>([])
 const totalSize = ref(0)

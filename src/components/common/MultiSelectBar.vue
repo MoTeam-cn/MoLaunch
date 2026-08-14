@@ -26,15 +26,15 @@
  * />
  * ```
  */
-import { computed, type Component } from 'vue'
+import { computed, type Component, defineAsyncComponent } from 'vue'
 import {
   CheckCircleIcon,
   XMarkIcon,
   Squares2X2Icon,
   ArrowTopRightOnSquareIcon,
 } from '@heroicons/vue/24/outline'
-import Tooltip from '@/components/common/Tooltip.vue'
-import Button from '@/components/common/Button.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 
 /** 操作按钮变体样式 */
 type ActionVariant = 'enable' | 'disable' | 'update' | 'delete' | 'default'

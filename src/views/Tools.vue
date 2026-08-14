@@ -10,7 +10,7 @@
  * 下载管理 / 常用工具 / 存档资源 / Mod 网络 / Java 诊断 / 创作指令
  */
 
-import { ref } from 'vue'
+import { ref, defineAsyncComponent } from 'vue'
 import {
   ArrowDownTrayIcon,
   WrenchScrewdriverIcon,
@@ -19,14 +19,14 @@ import {
   CommandLineIcon,
   PaintBrushIcon,
 } from '@heroicons/vue/24/outline'
-import NavSidebar from '@/components/common/NavSidebar.vue'
-import ExternalDownload from './ExternalDownload.vue'
-import CommonPage from './tools/CommonPage.vue'
-import StoragePage from './tools/StoragePage.vue'
-import ModNetworkPage from './tools/ModNetworkPage.vue'
-import JavaDiagPage from './tools/JavaDiagPage.vue'
-import CreateCmdPage from './tools/CreateCmdPage.vue'
-import DisclaimerDialog from '@/components/common/DisclaimerDialog.vue'
+const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
+const ExternalDownload = defineAsyncComponent(() => import('./ExternalDownload.vue'))
+const CommonPage = defineAsyncComponent(() => import('./tools/CommonPage.vue'))
+const StoragePage = defineAsyncComponent(() => import('./tools/StoragePage.vue'))
+const ModNetworkPage = defineAsyncComponent(() => import('./tools/ModNetworkPage.vue'))
+const JavaDiagPage = defineAsyncComponent(() => import('./tools/JavaDiagPage.vue'))
+const CreateCmdPage = defineAsyncComponent(() => import('./tools/CreateCmdPage.vue'))
+const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
 import { hasAgreedToday } from '@/utils/disclaimer'
 
 interface ToolCategory {

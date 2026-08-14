@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { defineAsyncComponent } from 'vue'
 /**
  * Online 顶部标题栏
  *
@@ -12,8 +13,8 @@
  * 复用项目自定义 Button / Tooltip 组件，不使用原生 HTML。
  */
 import { Cog6ToothIcon } from '@heroicons/vue/24/outline'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 /** 状态徽章结构（与 useOnlineNav.badge 返回值同形） */
 interface StatusBadge {

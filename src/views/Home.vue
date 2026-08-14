@@ -5,17 +5,17 @@
  * 右侧：根据插件设置渲染时钟卡片 / 启动日志 / 插件组件 / 自定义布局
  */
 
-import { computed, ref, watch, onMounted } from 'vue'
+import { computed, ref, watch, onMounted, defineAsyncComponent } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useVersionStore } from '@/stores/version'
 import { useJavaStore } from '@/stores/java'
 import { usePluginStore } from '@/stores/plugins'
 import { useVersionSettings } from '@/composables/useVersionSettings'
 import * as tauri from '@/utils/tauri'
-import LaunchPanel from '@/components/home/LaunchPanel.vue'
-import LaunchLog from '@/components/home/LaunchLog.vue'
-import HomeClockCard from '@/components/home/HomeClockCard.vue'
-import CustomLayout from '@/plugins/custom-layout/index.vue'
+const LaunchPanel = defineAsyncComponent(() => import('@/components/home/LaunchPanel.vue'))
+const LaunchLog = defineAsyncComponent(() => import('@/components/home/LaunchLog.vue'))
+const HomeClockCard = defineAsyncComponent(() => import('@/components/home/HomeClockCard.vue'))
+const CustomLayout = defineAsyncComponent(() => import('@/plugins/custom-layout/index.vue'))
 
 const authStore = useAuthStore()
 const versionStore = useVersionStore()

@@ -4,16 +4,16 @@
  * 状态同步：监听 frp-tunnel-status 事件自动刷新列表。
  * 列表卡片已拆至 TunnelList.vue，本文件保留操作栏与面板组装。
  */
-import { ref, computed, onMounted, onUnmounted, inject } from 'vue'
+import { ref, computed, onMounted, onUnmounted, inject, defineAsyncComponent } from 'vue'
 import { useFrpStore } from '@/stores/frp'
 import { showConfirm } from '@/utils/modal'
 import { toastWarning, toastInfo } from '@/utils/toast'
-import Button from '@/components/common/Button.vue'
-import Tooltip from '@/components/common/Tooltip.vue'
-import TunnelCreateForm from './TunnelCreateForm.vue'
-import TunnelSelfCheck from './TunnelSelfCheck.vue'
-import RemoteTunnelSync from './RemoteTunnelSync.vue'
-import TunnelList from './TunnelList.vue'
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const TunnelCreateForm = defineAsyncComponent(() => import('./TunnelCreateForm.vue'))
+const TunnelSelfCheck = defineAsyncComponent(() => import('./TunnelSelfCheck.vue'))
+const RemoteTunnelSync = defineAsyncComponent(() => import('./RemoteTunnelSync.vue'))
+const TunnelList = defineAsyncComponent(() => import('./TunnelList.vue'))
 import type { CreateTunnelParams, TunnelWithStatus, UpdateTunnelParams } from '@/types/frp'
 import { ArrowPathIcon, PlusIcon, ChevronDownIcon, ShieldCheckIcon, CloudArrowDownIcon } from '@heroicons/vue/24/outline'
 

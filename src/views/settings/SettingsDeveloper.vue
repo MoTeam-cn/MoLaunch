@@ -21,8 +21,8 @@
  * - 仅在本组件存活时生效（onUnmounted 自动解绑），由 useDevShortcuts 在 capture
  *   阶段 stopImmediatePropagation 抢占事件流，绕过 useDevToolsGuard 全局防护
  */
-import { ref, onMounted } from 'vue'
-import SubTabBar from '@/components/common/SubTabBar.vue'
+import { ref, onMounted, defineAsyncComponent } from 'vue'
+const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import * as tauri from '@/utils/tauri'
 import { toastError } from '@/utils/toast'
 import { useDevShortcuts } from '@/composables/useDevShortcuts'
@@ -35,13 +35,13 @@ import {
   CpuChipIcon,
   LinkIcon,
 } from '@heroicons/vue/24/outline'
-import ExperimentalTab from './developer/ExperimentalTab.vue'
-import DevToolsTab from './developer/DevToolsTab.vue'
-import CertsTab from './developer/CertsTab.vue'
-import LogsTab from './developer/LogsTab.vue'
-import StorageTab from './developer/StorageTab.vue'
-import SystemTab from './developer/SystemTab.vue'
-import DeepLinkTab from './developer/DeepLinkTab.vue'
+const ExperimentalTab = defineAsyncComponent(() => import('./developer/ExperimentalTab.vue'))
+const DevToolsTab = defineAsyncComponent(() => import('./developer/DevToolsTab.vue'))
+const CertsTab = defineAsyncComponent(() => import('./developer/CertsTab.vue'))
+const LogsTab = defineAsyncComponent(() => import('./developer/LogsTab.vue'))
+const StorageTab = defineAsyncComponent(() => import('./developer/StorageTab.vue'))
+const SystemTab = defineAsyncComponent(() => import('./developer/SystemTab.vue'))
+const DeepLinkTab = defineAsyncComponent(() => import('./developer/DeepLinkTab.vue'))
 
 // ── 子页签 ──
 const subTabs = [

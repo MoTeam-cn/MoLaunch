@@ -12,9 +12,9 @@
  *
  * 深链支持：URL `?subtab=recipe-generator` 可直接切到对应子页签。
  */
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
-import SubTabBar from '@/components/common/SubTabBar.vue'
+const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
 import {
   CubeIcon,
   DocumentTextIcon,
@@ -23,12 +23,12 @@ import {
   SparklesIcon,
   TrophyIcon,
 } from '@heroicons/vue/24/outline'
-import GradientTextPage from './creation/GradientTextPage.vue'
-import RecipeGeneratorPage from './creation/recipe-generator/RecipeGeneratorPage.vue'
-import AchievementGenerator from './creation/AchievementGenerator.vue'
-import ItemEditor from './command/ItemEditor.vue'
-import SignShop from './command/SignShop.vue'
-import SummonEntity from './command/SummonEntity.vue'
+const GradientTextPage = defineAsyncComponent(() => import('./creation/GradientTextPage.vue'))
+const RecipeGeneratorPage = defineAsyncComponent(() => import('./creation/recipe-generator/RecipeGeneratorPage.vue'))
+const AchievementGenerator = defineAsyncComponent(() => import('./creation/AchievementGenerator.vue'))
+const ItemEditor = defineAsyncComponent(() => import('./command/ItemEditor.vue'))
+const SignShop = defineAsyncComponent(() => import('./command/SignShop.vue'))
+const SummonEntity = defineAsyncComponent(() => import('./command/SummonEntity.vue'))
 
 const subTabs = [
   { id: 'gradient-text', label: '渐变文字', icon: PencilSquareIcon },

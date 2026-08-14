@@ -3,9 +3,9 @@
  * 下载管理页左侧统计面板
  * 所有统计数据通过 props 接收（父组件已 computed）
  */
-import { ref, watch } from 'vue'
+import { ref, watch, defineAsyncComponent } from 'vue'
 import { formatBytes, formatSpeed } from '@/utils/format'
-import Tooltip from '@/components/common/Tooltip.vue'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 const props = defineProps<{
   currentStageName: string
