@@ -24,11 +24,7 @@
 
 - **创作工具分类页改为顶部子菜单切换**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：渐变文字生成器与合成配方生成器此前垂直叠加一页放不下，现复用设置页同款 `SubTabBar` 顶部菜单栏（sticky 吸顶、带图标），每次只渲染当前工具；支持 `?subtab=` 深链直达指定工具，`#tool-gradient-text` / `#tool-recipe-generator` 目录锚点保留。
 
-- **创作工具页签打通可用高度链，子页各自内部滚动**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：CreationPage 根节点改为 `h-full` flex 纵向布局，子菜单固定顶部，内容区 `flex-1` 占满剩余高度；合成配方页签容器获得确定高度（供左右双栏布局填充），渐变文字页签保留 `p-6` 内边距并改由自身区域滚动，页面不再整体纵向拉长。
-
-- **合成配方生成器改为左右双栏布局，页面不再纵向拉长**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：原三栏（设置｜编辑+预览｜调色板）布局在 ≤1280px 窗口折叠为单列，内容被纵向拉长。现重写为「左：展示区（槽位编辑 + 校验提示 + JSON 预览）+ 右：功能区（配方设置 + 物品/标签调色板）」双栏并占满可用高度；JSON 预览与校验提示各自内部滚动，窄窗口（≤960px）下上下堆叠且两栏各自内部滚动，页面始终不再被拉长。
-
-- **合成配方调色板列表高度改为自适应填充**（[ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue)）：虚拟滚动列表由固定 `28rem` 改为 `flex: 1` 填充所在栏剩余高度，配合双栏布局随窗口高度自适应，不再固定截断。
+- **合成配方生成器改为左右双栏布局**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：原三栏（设置｜编辑+预览｜调色板）布局在 ≤1280px 窗口折叠为单列。现重写为「左：展示区（槽位编辑 + 校验提示 + JSON 预览）+ 右：功能区（配方设置 + 物品/标签调色板）」两栏，内容多高就多高、由页面滚动条自然滚动，不锁定容器高度；JSON 预览保持最大高度内部滚动，校验提示改为复用项目 `Alert` 组件逐条展示。
 
 ### Fixed
 

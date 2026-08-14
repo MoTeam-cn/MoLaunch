@@ -32,19 +32,18 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="h-full flex flex-col overflow-hidden">
-    <!-- 顶部子菜单：外容器对 creation 分类不设 padding（与设置页 about 页签一致），菜单紧贴左上角 -->
+  <div>
+    <!-- 顶部子菜单：外容器对 creation 分类不设 padding（与设置页 about 页签一致），菜单紧贴左上角，滚动时吸顶 -->
     <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
-    <!-- 内容区：recipe 页签占满剩余高度（内部滚动），渐变文字页签保持 p-6 + 自身滚动 -->
-    <div class="flex-1 min-h-0 flex flex-col overflow-hidden">
-      <div v-if="activeSubTab === 'gradient-text'" id="tool-gradient-text" class="flex-1 min-h-0 overflow-y-auto p-6">
+    <!-- 内容区：p-6 由本组件提供；渐变文字根节点自带 data-toc-card -->
+    <div class="p-6">
+      <div v-if="activeSubTab === 'gradient-text'" id="tool-gradient-text">
         <GradientTextPage />
       </div>
       <div
         v-else
         id="tool-recipe-generator"
-        class="flex-1 min-h-0 flex flex-col overflow-hidden"
         data-toc-card="tool-recipe-generator"
         data-toc-title="合成配方"
       >
