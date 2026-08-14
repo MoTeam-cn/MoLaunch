@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **合成配方生成器槽位改为「工作台界面背景图 + 热点」布局**（[recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts)（新增） / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [vite.config.ts](vite.config.ts)）：此前除合成外的配方类型均复用抽象网格/行布局，观感与 Minecraft 原版工作台界面不一致。现引入布局数据模块 `recipe-layouts.ts`——每种配方类型绑定对应工作台 GUI 背景图（合成/熔炼/篝火/切石机/锻造共 5 张，696×292 坐标系），槽位以像素盒精确定位；编辑器按布局渲染背景图与绝对定位热点，点击空热点弹抽屉选物、点击已放置槽位清除、结果槽滚轮调数量、标签悬浮成员浮层与 2×2 禁用槽 barrier 遮罩均保留。背景图暂取自 Axolotl 项目作临时占位（代码中已标注，后续自行替换）。vite.config.ts 增加 vitest `include: ['src/**/*.test.ts']`，避免扫描到工作区第三方源码目录（code-libs/Frp）的测试文件。
+
 - **合成配方生成器床物品图标改为 3D 立体渲染**（[bed-render.mjs](scripts/generate-recipe-assets/bed-render.mjs)（新增） / [generate.mjs](scripts/generate-recipe-assets/generate.mjs)）：图集中 16 色床物品此前误用 64×64 实体「折叠展开图」（`entity/bed/<color>` 被映射为经典实体贴图），在槽位中显示为平面展开且模糊。现依据 26.2 官方床模型几何（`template_bed_head/foot`）与按面拆分的 9 张分面贴图（`bed_head_north` / `bed_down` / 各色 `_bed_head_{east,up,west}` / `_bed_foot_{east,south,up,west}`），在生成器中内置软件 3D 光栅化（painter's 深度排序 + z-buffer + 重心插值纹理采样 + 4× 超采样 + bbox 居中适配），渲染参数与游戏内 `display.gui`（rotation [30,340,0] / translation [2,3,0] / scale [0.5325]）一致，为 16 色床各渲染一张 16×16 立体图标（含床垫、床头高板、床尾矮板与四条腿），替换图集内 `entity/bed/<color>` 条目；图集纹理数 1180→1209，图集尺寸同步更新。
 
 - **合成配方调色板改为虚拟滚动，滑动不再卡顿**（[ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [TagPalette.vue](src/views/tools/creation/recipe-generator/TagPalette.vue)）：物品调色板最多 1180 个条目、标签调色板同样量大，此前一次性渲染全部 DOM，滚动与输入搜索明显卡顿。现复用项目已内置的 `vue-virtual-scroller`（`RecycleScroller`）只渲染可视区条目（物品按 4 列一行虚拟化，标签按行虚拟化），列表高度行为保持不变。

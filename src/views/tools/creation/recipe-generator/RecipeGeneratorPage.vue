@@ -48,6 +48,7 @@ import { validateRecipe } from '@/utils/recipe-generator/validation'
 import { exportRecipePack } from '@/utils/recipe-generator/exporter'
 import { sanitizeRecipeName } from '@/utils/recipe-generator/datapack'
 import type { JavaVersionId, RecipeSlot, RecipeSlotContext, RecipeState, SlotValue } from '@/utils/recipe-generator/types'
+import { getRecipeLayout } from './recipe-layouts'
 import RecipeSlotsEditor from './RecipeSlotsEditor.vue'
 import ItemPalette from './ItemPalette.vue'
 import TagPalette from './TagPalette.vue'
@@ -173,6 +174,7 @@ const editableSlots = computed<RecipeSlot[]>(() => {
   return gridSlots.value.slice(0, size * size)
 })
 const resultSlot = computed<RecipeSlot | undefined>(() => getResultSlots(recipe)[0])
+const recipeLayout = computed(() => getRecipeLayout(recipe.recipeType))
 const recipeName = computed(() => (recipe.name.trim() ? recipe.name.trim() : 'recipe'))
 
 const editingSlot = ref<RecipeSlot | null>(null)
@@ -281,8 +283,7 @@ async function exportPack() {
       <!-- 左：展示区（槽位编辑 + 校验 + JSON 预览） -->
       <section class="recipe-panel recipe-display">
         <RecipeSlotsEditor
-          :slots="inputSlots"
-          :grid-slots="gridSlots"
+          :layout="recipeLayout!"
           :result-slot="resultSlot"
           :values="recipe.slots"
           :context="context"

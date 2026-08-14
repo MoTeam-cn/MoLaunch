@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig, type Plugin } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import { execFileSync } from 'node:child_process'
@@ -64,6 +65,10 @@ function updateLogPlugin(): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [vue(), updateLogPlugin()],
+  test: {
+    // 仅扫描 src 下的测试，排除 code-libs/Frp 等第三方源码目录
+    include: ['src/**/*.test.ts'],
+  },
   define: {
     // 注入应用版本号（来自 package.json），供「其他」页展示与开发者模式解锁
     __APP_VERSION__: JSON.stringify(pkg.version),

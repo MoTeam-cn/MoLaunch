@@ -1,32 +1,44 @@
 <script setup lang="ts">
 /**
- * 合成配方槽位网格编辑器
+ * 合成配方槽位编辑器：工作台背景图 + 槽位热点
  *
- * crafting：3x3（或 2x2）网格 + 结果槽；其余类型：一行输入槽 + 结果槽。
- * 点击空格子请求编辑（父组件弹抽屉选择），点击已放置槽位可清除；
- * 结果槽滚轮可调整产出数量（1-64）；当前编辑中的槽位高亮。
+ * 槽位由布局数据（背景图 + 像素盒）驱动，各配方类型显示对应工作台界面；
+ * 点击空热点请求编辑（父组件弹抽屉选择），点击已放置槽位清除；
+ * 结果槽滚轮可调整产出数量（1-64）；2x2 时禁用槽以 barrier 遮罩。
  */
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import type { RecipeSlot, RecipeSlotContext, SlotValue } from '@/utils/recipe-generator/types'
 import type { AtlasLayout } from '@/utils/recipe-generator/resources'
-import { slotCaption } from '@/utils/recipe-generator/formatter'
+import {
+  RECIPE_IMAGE_HEIGHT,
+  RECIPE_IMAGE_WIDTH,
+  type RecipeLayout,
+  type RecipeLayoutSlotBox,
+} from './recipe-layouts'
 import { resolveTagDisplay, type TagDisplay, type TagMember } from '@/utils/recipe-generator/tag-resolve'
 import RecipeItemIcon from './RecipeItemIcon.vue'
 import RecipeTagPopup from './RecipeTagPopup.vue'
 
+const TWO_BY_TWO_DISABLED_SLOTS = new Set<RecipeSlot>([
+  'crafting.3',
+  'crafting.6',
+  'crafting.7',
+  'crafting.8',
+  'crafting.9',
+])
+
 const props = withDefaults(
   defineProps<{
-    slots: RecipeSlot[]
+    layout: RecipeLayout
     values: Partial<Record<RecipeSlot, SlotValue>>
     context: RecipeSlotContext
     atlasUrl: string
     atlas: AtlasLayout
     twoByTwo?: boolean
     resultSlot?: RecipeSlot | null
-    gridSlots?: RecipeSlot[]
     editingSlot?: RecipeSlot | null
   }>(),
-  { twoByTwo: false, resultSlot: null, gridSlots: () => [], editingSlot: null },
+  { twoByTwo: false, resultSlot: null, editingSlot: null },
 )
 
 const emit = defineEmits<{
@@ -63,24 +75,52 @@ function displayFor(value: SlotValue | undefined): Display | null {
   return null
 }
 
-const gridDisplay = computed(() => {
-  const size = props.twoByTwo ? 2 : 3
-  const cells = Array.from({ length: size * size }, (_, index) => {
-    const slot = props.gridSlots[index]
-    return slot ? { slot, display: displayFor(props.values[slot]) } : null
-  })
-  return { size, cells }
+const barrierDisplay = computed<Display | null>(() => {
+  const item = props.context.itemsById['minecraft:barrier']
+  return item ? { texture: item.texture, label: item.name, count: 1 } : null
 })
 
-const rowSlots = computed(() =>
-  props.slots
-    .filter((slot) => !props.gridSlots.includes(slot))
-    .map((slot) => ({ slot, display: displayFor(props.values[slot]) })),
+const layoutSlots = computed(() =>
+  (Object.entries(props.layout.slots) as [RecipeSlot, RecipeLayoutSlotBox][]).map(([slot, box]) => ({
+    slot,
+    box,
+    display: displayFor(props.values[slot]),
+    disabled: props.twoByTwo && TWO_BY_TWO_DISABLED_SLOTS.has(slot),
+  })),
 )
 
-const resultDisplay = computed(() =>
-  displayFor(props.resultSlot ? props.values[props.resultSlot] : undefined),
-)
+const stageRef = ref<HTMLElement | null>(null)
+const stageWidth = ref(0)
+let stageObserver: ResizeObserver | null = null
+
+onMounted(() => {
+  if (!stageRef.value) return
+  stageObserver = new ResizeObserver((entries) => {
+    stageWidth.value = entries[0]?.contentRect.width ?? 0
+  })
+  stageObserver.observe(stageRef.value)
+})
+
+onBeforeUnmount(() => {
+  clearCloseTimer()
+  stageObserver?.disconnect()
+  stageObserver = null
+})
+
+function slotBoxStyle(box: RecipeLayoutSlotBox) {
+  return {
+    left: `${(box.x1 / RECIPE_IMAGE_WIDTH) * 100}%`,
+    top: `${(box.y1 / RECIPE_IMAGE_HEIGHT) * 100}%`,
+    width: `${((box.x2 - box.x1) / RECIPE_IMAGE_WIDTH) * 100}%`,
+    height: `${((box.y2 - box.y1) / RECIPE_IMAGE_HEIGHT) * 100}%`,
+  }
+}
+
+function slotIconSize(box: RecipeLayoutSlotBox): number {
+  if (!stageWidth.value) return 32
+  const backgroundSize = Math.min(box.x2 - box.x1, box.y2 - box.y1)
+  return Math.max(1, Math.round((backgroundSize / RECIPE_IMAGE_WIDTH) * stageWidth.value * 0.9))
+}
 
 function onSlotClick(slot: RecipeSlot) {
   if (props.values[slot]) {
@@ -131,131 +171,52 @@ function clearCloseTimer() {
     closeTimer = null
   }
 }
-
-onBeforeUnmount(clearCloseTimer)
 </script>
 
 <template>
   <div class="recipe-slots-editor">
-    <!-- crafting 网格 -->
-    <div v-if="gridDisplay.size" class="recipe-slot-grid-wrap">
-      <div class="recipe-slot-grid" :class="{ 'is-two-by-two': twoByTwo }">
-        <button
-          v-for="(cell, index) in gridDisplay.cells"
-          :key="index"
-          type="button"
-          class="recipe-slot-cell"
-          :class="{
-            filled: cell?.display,
-            editing: editingSlot === cell?.slot,
-            'is-tag': !!cell?.display?.members?.length,
-          }"
-          @click="cell?.slot && onSlotClick(cell.slot)"
-          @mouseenter="onSlotHover($event, cell?.display ?? null)"
-          @mouseleave="scheduleClose"
-        >
-          <RecipeItemIcon
-            v-if="cell?.display"
-            :texture="cell.display.texture"
-            :atlas-url="atlasUrl"
-            :atlas="atlas"
-            :size="34"
-            :label="cell.display.label"
-          />
-          <span v-if="cell?.display" class="recipe-slot-count">
-            {{ cell.display.count > 1 ? cell.display.count : '' }}
-          </span>
-          <span v-if="cell?.display?.members?.length" class="recipe-slot-tag-badge">#</span>
-        </button>
-      </div>
-      <template v-if="resultSlot">
-        <span class="recipe-grid-arrow">→</span>
-        <button
-          type="button"
-          class="recipe-slot-cell recipe-result-cell"
-          :class="{ filled: values[resultSlot], 'is-tag': !!resultDisplay?.members?.length }"
-          @click="onSlotClick(resultSlot)"
-          @wheel="onResultWheel($event, resultSlot)"
-          @mouseenter="onSlotHover($event, resultDisplay)"
-          @mouseleave="scheduleClose"
-        >
-          <RecipeItemIcon
-            v-if="resultDisplay"
-            :texture="resultDisplay.texture"
-            :atlas-url="atlasUrl"
-            :atlas="atlas"
-            :size="38"
-            :label="resultDisplay.label"
-          />
-          <span v-if="resultDisplay" class="recipe-slot-count">
-            {{ resultDisplay.count }}
-          </span>
-          <span v-if="resultDisplay?.members?.length" class="recipe-slot-tag-badge">#</span>
-        </button>
-      </template>
-    </div>
-
-    <!-- 其余类型：输入槽 + 结果槽 一行 -->
-    <div v-else class="recipe-slot-row">
+    <div
+      ref="stageRef"
+      class="recipe-layout-stage"
+      :style="{ backgroundImage: `url('${layout.image}')` }"
+    >
       <div
-        v-for="entry in rowSlots"
+        v-for="entry in layoutSlots"
         :key="entry.slot"
-        class="recipe-slot-item"
-        :class="{ 'is-result': entry.slot === resultSlot }"
+        class="recipe-layout-hotspot"
+        :class="{
+          filled: !!entry.display && !entry.disabled,
+          editing: editingSlot === entry.slot && !entry.disabled,
+          'is-tag': !!entry.display?.members?.length,
+          disabled: entry.disabled,
+        }"
+        :style="slotBoxStyle(entry.box)"
+        :data-recipe-slot="entry.slot"
+        @click="!entry.disabled && onSlotClick(entry.slot)"
+        @wheel="onResultWheel($event, entry.slot)"
+        @mouseenter="onSlotHover($event, entry.disabled ? null : entry.display)"
+        @mouseleave="scheduleClose"
       >
-        <button
-          type="button"
-          class="recipe-slot-cell"
-          :class="{
-            filled: entry.display,
-            editing: editingSlot === entry.slot,
-            'is-tag': !!entry.display?.members?.length,
-          }"
-          @click="onSlotClick(entry.slot)"
-          @wheel="onResultWheel($event, entry.slot)"
-          @mouseenter="onSlotHover($event, entry.display)"
-          @mouseleave="scheduleClose"
-        >
-          <RecipeItemIcon
-            v-if="entry.display"
-            :texture="entry.display.texture"
-            :atlas-url="atlasUrl"
-            :atlas="atlas"
-            :size="36"
-            :label="entry.display.label"
-          />
-          <span v-if="entry.display" class="recipe-slot-count">
-            {{ entry.display.count }}
-          </span>
-          <span v-if="entry.display?.members?.length" class="recipe-slot-tag-badge">#</span>
-        </button>
-        <span class="recipe-slot-caption">{{ slotCaption(entry.slot) }}</span>
-      </div>
-      <span v-if="resultSlot" class="recipe-grid-arrow">→</span>
-      <div v-if="resultSlot" class="recipe-slot-item">
-        <button
-          type="button"
-          class="recipe-slot-cell recipe-result-cell"
-          :class="{ filled: values[resultSlot], 'is-tag': !!resultDisplay?.members?.length }"
-          @click="onSlotClick(resultSlot)"
-          @wheel="onResultWheel($event, resultSlot)"
-          @mouseenter="onSlotHover($event, resultDisplay)"
-          @mouseleave="scheduleClose"
-        >
-          <RecipeItemIcon
-            v-if="resultDisplay"
-            :texture="resultDisplay.texture"
-            :atlas-url="atlasUrl"
-            :atlas="atlas"
-            :size="36"
-            :label="resultDisplay.label"
-          />
-          <span v-if="resultDisplay" class="recipe-slot-count">
-            {{ resultDisplay.count }}
-          </span>
-          <span v-if="resultDisplay?.members?.length" class="recipe-slot-tag-badge">#</span>
-        </button>
-        <span class="recipe-slot-caption">{{ slotCaption(resultSlot) }}</span>
+        <RecipeItemIcon
+          v-if="entry.disabled && barrierDisplay"
+          :texture="barrierDisplay.texture"
+          :atlas-url="atlasUrl"
+          :atlas="atlas"
+          :size="slotIconSize(entry.box)"
+          :label="barrierDisplay.label"
+        />
+        <RecipeItemIcon
+          v-else-if="entry.display"
+          :texture="entry.display.texture"
+          :atlas-url="atlasUrl"
+          :atlas="atlas"
+          :size="slotIconSize(entry.box)"
+          :label="entry.display.label"
+        />
+        <span v-if="entry.display && !entry.disabled" class="recipe-slot-count">
+          {{ entry.display.count }}
+        </span>
+        <span v-if="entry.display?.members?.length && !entry.disabled" class="recipe-slot-tag-badge">#</span>
       </div>
     </div>
 
@@ -278,63 +239,56 @@ onBeforeUnmount(clearCloseTimer)
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
+  width: 100%;
 }
 
-.recipe-slot-grid-wrap {
+.recipe-layout-stage {
+  position: relative;
+  width: 100%;
+  max-width: 30rem;
+  aspect-ratio: 696 / 292;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
+  background-color: #f7f8fa;
+  background-repeat: no-repeat;
+  background-size: cover;
+}
+
+.recipe-layout-hotspot {
+  position: absolute;
   display: flex;
   align-items: center;
-  gap: 1rem;
-}
-
-.recipe-slot-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 3.25rem);
-  grid-auto-rows: 3.25rem;
-  gap: 0.4rem;
-  padding: 0.5rem;
-  border: 1px solid #e5e6eb;
-  border-radius: 6px;
-  background: #f7f8fa;
-}
-
-.recipe-slot-grid.is-two-by-two {
-  grid-template-columns: repeat(2, 3.25rem);
-}
-
-.recipe-slot-cell {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
-  width: 3.25rem;
-  height: 3.25rem;
-  border: 2px dashed #e5e6eb;
+  border: 2px dashed transparent;
   border-radius: 4px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.12);
   cursor: pointer;
-  transition: border-color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
 }
 
-.recipe-slot-cell:hover {
+.recipe-layout-hotspot:hover {
   border-color: var(--color-primary-500);
+  background: rgba(255, 255, 255, 0.32);
 }
 
-.recipe-slot-cell.filled {
+.recipe-layout-hotspot.filled {
   border-style: solid;
-  border-color: #c9cdd4;
-  background: #fff;
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(0, 0, 0, 0.18);
 }
 
-.recipe-slot-cell.editing {
+.recipe-layout-hotspot.editing {
   border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 2px rgb(var(--color-primary-rgb-500) / 0.25);
+  box-shadow: 0 0 0 2px rgb(var(--color-primary-rgb-500) / 0.4);
 }
 
-.recipe-result-cell {
-  width: 3.75rem;
-  height: 3.75rem;
+.recipe-layout-hotspot.disabled {
   border-style: solid;
+  border-color: rgba(255, 255, 255, 0.25);
+  background: rgba(0, 0, 0, 0.42);
+  cursor: not-allowed;
 }
 
 .recipe-slot-count {
@@ -360,31 +314,5 @@ onBeforeUnmount(clearCloseTimer)
   font-weight: 700;
   line-height: 1;
   pointer-events: none;
-}
-
-.recipe-grid-arrow {
-  color: #86909c;
-  font-size: 1.25rem;
-}
-
-.recipe-slot-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-}
-
-.recipe-slot-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.25rem;
-}
-
-.recipe-slot-caption {
-  color: #86909c;
-  font-size: 0.65rem;
-  text-transform: capitalize;
 }
 </style>
