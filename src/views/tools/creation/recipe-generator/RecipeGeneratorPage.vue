@@ -6,6 +6,7 @@
  * 结果槽滚轮可调整产出数量；顶部切换版本/类型，实时校验并预览配方 JSON。
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUpIcon } from '@heroicons/vue/24/outline'
 import Button from '@/components/common/Button.vue'
 import Alert from '@/components/common/Alert.vue'
 import Drawer from '@/components/common/Drawer.vue'
@@ -203,6 +204,49 @@ function openSlotDrawer(slot: RecipeSlot) {
   drawerVisible.value = true
 }
 
+/** 当前编辑槽位四方向可移动性（crafting 按网格行列，其余为线性列表） */
+const drawerNav = computed(() => {
+  if (!editingSlot.value) return null
+  const slots = editableSlots.value
+  const index = slots.indexOf(editingSlot.value)
+  if (index < 0) return null
+  const size = recipe.recipeType === 'crafting' ? (recipe.crafting.twoByTwo ? 2 : 3) : 0
+  if (size > 0) {
+    const col = index % size
+    const row = Math.floor(index / size)
+    return {
+      up: row > 0,
+      down: row < size - 1,
+      left: col > 0,
+      right: col < size - 1,
+    }
+  }
+  return {
+    up: index > 0,
+    down: index < slots.length - 1,
+    left: index > 0,
+    right: index < slots.length - 1,
+  }
+})
+
+function moveEditing(direction: 'up' | 'down' | 'left' | 'right') {
+  const nav = drawerNav.value
+  if (!nav || !nav[direction]) return
+  const slots = editableSlots.value
+  const index = slots.indexOf(editingSlot.value!)
+  const size = recipe.recipeType === 'crafting' ? (recipe.crafting.twoByTwo ? 2 : 3) : 0
+  let next: number
+  if (size > 0) {
+    if (direction === 'up') next = index - size
+    else if (direction === 'down') next = index + size
+    else if (direction === 'left') next = index - 1
+    else next = index + 1
+  } else {
+    next = direction === 'up' || direction === 'left' ? index - 1 : index + 1
+  }
+  editingSlot.value = slots[next]
+}
+
 function pickValue(value: SlotValue) {
   const slot = editingSlot.value
   if (!slot) return
@@ -393,7 +437,47 @@ async function exportPack() {
       :esc-to-close="true"
     >
       <div class="recipe-drawer-palette">
-        <p class="recipe-drawer-hint">您正在为「{{ drawerHint }}」选择物品</p>
+        <div class="recipe-drawer-nav">
+          <p class="recipe-drawer-hint">您正在为「{{ drawerHint }}」选择物品</p>
+          <div class="recipe-drawer-dpad">
+            <button
+              class="recipe-dpad-btn"
+              :disabled="!drawerNav?.up"
+              title="上移一格"
+              aria-label="上移一格"
+              @click="moveEditing('up')"
+            >
+              <ArrowUpIcon class="recipe-dpad-icon" />
+            </button>
+            <button
+              class="recipe-dpad-btn"
+              :disabled="!drawerNav?.down"
+              title="下移一格"
+              aria-label="下移一格"
+              @click="moveEditing('down')"
+            >
+              <ArrowDownIcon class="recipe-dpad-icon" />
+            </button>
+            <button
+              class="recipe-dpad-btn"
+              :disabled="!drawerNav?.left"
+              title="左移一格"
+              aria-label="左移一格"
+              @click="moveEditing('left')"
+            >
+              <ArrowLeftIcon class="recipe-dpad-icon" />
+            </button>
+            <button
+              class="recipe-dpad-btn"
+              :disabled="!drawerNav?.right"
+              title="右移一格"
+              aria-label="右移一格"
+              @click="moveEditing('right')"
+            >
+              <ArrowRightIcon class="recipe-dpad-icon" />
+            </button>
+          </div>
+        </div>
         <div class="recipe-palette-tabs">
           <span
             class="recipe-palette-tab"
@@ -558,9 +642,53 @@ async function exportPack() {
   min-height: 0;
 }
 
+.recipe-drawer-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .recipe-drawer-hint {
   color: #86909c;
   font-size: 0.75rem;
+}
+
+.recipe-drawer-dpad {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.recipe-dpad-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+  background: #fff;
+  color: #4e5969;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.recipe-dpad-btn:hover:not(:disabled) {
+  border-color: var(--color-primary-500);
+  color: var(--color-primary-500);
+}
+
+.recipe-dpad-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.recipe-dpad-icon {
+  width: 0.9rem;
+  height: 0.9rem;
 }
 
 .recipe-palette-tabs {

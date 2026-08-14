@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **配方抽屉新增方向键快速切换目标格**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：抽屉提示「您正在为「第 X 格」选择物品」右侧新增上/下/左/右四个方向键按钮，无需关闭抽屉即可在格子间切换（合成网格按行列移动，2×2/3×3 自动适配；熔炼/切石/锻造等线性槽位按上一个/下一个移动），到达边界时对应按钮自动禁用。
+
 - **合成配方输入槽支持滚轮调整数量**（[RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [formatter.ts](src/utils/recipe-generator/formatter.ts)）：此前仅结果槽可滚轮调产出数量。现所有已放置物品槽位（合成格/原料/模板/底材/材料）均可滚轮调整 1-64；JSON 输出中 1.21.2+（string 策略）的输入槽位携带 `count` 字段（`{item, count}` / `{tag, count}`，旧版本策略不输出以保证数据包合法），如「2 个锻造模板 + 树苗」的合成。
 
 - **合成配方生成器背景图统一迁移至 `src/assets/Syn/`**（[recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts)）：背景图此前存放在 `recipe-generator/assets/bg/` 局部目录，现统一迁至全局资源目录 `src/assets/Syn/`（5 张 Axolotl 临时占位图不变，后续自行替换）。
