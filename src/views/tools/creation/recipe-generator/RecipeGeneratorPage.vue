@@ -27,6 +27,8 @@ import {
   getSupportedRecipeTypes,
   isRecipeTypeAvailable,
   LATEST_JAVA_VERSION,
+  RECIPE_CATEGORY_LABELS,
+  RECIPE_TYPE_LABELS,
   supportsRecipeCategory,
   supportsShowNotification,
   supportsSmithingTrimPattern,
@@ -96,8 +98,15 @@ const versionOptions = [
 
 const typeOptions = computed(() =>
   getSupportedRecipeTypes(selectedVersion.value).map((type) => ({
-    label: type,
+    label: RECIPE_TYPE_LABELS[type],
     value: type,
+  })),
+)
+
+const categoryOptions = computed(() =>
+  (getRecipeCategoryOptions(recipe.recipeType) ?? []).map((value) => ({
+    label: RECIPE_CATEGORY_LABELS[value] ?? value,
+    value,
   })),
 )
 
@@ -214,7 +223,7 @@ async function exportPack() {
     <div class="recipe-generator-header">
       <div class="flex items-center gap-2">
         <span class="text-base font-semibold text-gray-800">合成配方生成器</span>
-        <span class="text-xs text-gray-400">Shaped / Shapeless / Cooking / Stonecutter / Smithing</span>
+        <span class="text-xs text-gray-400">合成 · 熔炼 · 切石 · 锻造，全版本离线生成数据包</span>
       </div>
     </div>
 
@@ -234,19 +243,15 @@ async function exportPack() {
           </label>
           <label class="recipe-field">
             <span class="recipe-field-label">配方名称</span>
-            <Input v-model="recipe.name" size="small" placeholder="export_name" />
+            <Input v-model="recipe.name" size="small" placeholder="文件名（自动清理非法字符）" />
           </label>
           <label v-if="recipe.recipeType !== 'smithing' && recipe.recipeType !== 'smithing_trim' && recipe.recipeType !== 'smithing_transform'" class="recipe-field">
-            <span class="recipe-field-label">分组 group</span>
+            <span class="recipe-field-label">分组</span>
             <Input v-model="recipe.group" size="small" placeholder="可空" />
           </label>
-          <label v-if="supportsRecipeCategory(selectedVersion, recipe.recipeType) && getRecipeCategoryOptions(recipe.recipeType)" class="recipe-field">
-            <span class="recipe-field-label">分类 category</span>
-            <Select
-              v-model="recipe.category"
-              :options="getRecipeCategoryOptions(recipe.recipeType)!.map((value) => ({ label: value, value }))"
-              size="small"
-            />
+          <label v-if="supportsRecipeCategory(selectedVersion, recipe.recipeType) && categoryOptions.length" class="recipe-field">
+            <span class="recipe-field-label">分类</span>
+            <Select v-model="recipe.category" :options="categoryOptions" size="small" />
           </label>
 
           <div v-if="recipe.recipeType === 'crafting'" class="recipe-checkbox-group">

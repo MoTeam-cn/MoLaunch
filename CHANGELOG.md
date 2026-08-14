@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- **合成配方生成器界面全中文化**（[versions.ts](src/utils/recipe-generator/versions.ts) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [ItemPalette.vue](src/views/tools/creation/recipe-generator/ItemPalette.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue)）：配方类型下拉由英文 ID 改为中文（合成/熔炼/高炉烧炼/烟熏/营火烹饪/切石/锻造/纹饰锻造/锻造转换），分类下拉改为中文（装备/建筑/杂物/红石/食物/方块），页头副标题、分组/分类标签、文件名占位符改为中文；物品调色板条目主文案改显中文名（英文 ID 保留在悬停提示），非合成类槽位下方英文标题（ingredient/template/base/addition）改为原料/模板/底材/材料。
+
 - **合成配方生成器：修复物品图标图集切割错位**（[RecipeItemIcon.vue](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)）：此前背景图直接按图集原始尺寸（2048×528）平铺，而槽位/调色板图标元素为 30～38px，16×16 紧密排列的贴图会一个格子露出相邻 2 个甚至 2×2 个。现按「元素尺寸 / 贴图区域宽度」等比放大背景尺寸与偏移，每个图标只显示其对应的单个贴图。
 
 - **合成配方生成器：修正 typecheck/lint 报错**（[formatter.ts](src/utils/recipe-generator/formatter.ts) / [versions.ts](src/utils/recipe-generator/versions.ts) / [validation.ts](src/utils/recipe-generator/validation.ts) / [resources.ts](src/utils/recipe-generator/resources.ts) / [RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue) / [RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [RecipeItemIcon.vue](src/views/tools/creation/recipe-generator/RecipeItemIcon.vue)）：补齐 `RecipeSlot` 类型导入与网格槽位索引类型收窄、版本列表改为 `as const` 字面量数组（`metadata` 索引类型收敛）、图集 JSON 经 `unknown` 中转断言、清理未使用导入；Toast 改为项目统一 `@/utils/toast`（成功/错误/普通分级），cooking 时长输入改为 `:model-value` + 更新回调以支持 `number | null`（空值回落默认时长），图标组件 `label` prop 补默认值消除 `vue/require-default-prop` 警告。

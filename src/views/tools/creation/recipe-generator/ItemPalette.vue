@@ -62,10 +62,10 @@ function pick(item: AssetItem) {
           :atlas-url="atlasUrl"
           :atlas="atlas"
           :size="30"
-          :label="item.name"
+          :label="item.zh || item.name"
         />
         <span class="item-palette-name" :title="`${item.name}（${item.zh}）`">
-          {{ item.name }}
+          {{ item.zh || item.name }}
         </span>
       </button>
     </div>

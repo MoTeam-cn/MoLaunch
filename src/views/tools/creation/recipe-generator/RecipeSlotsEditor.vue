@@ -31,6 +31,17 @@ const emit = defineEmits<{
 
 type Display = { texture: string | null; label: string; count: number }
 
+const SLOT_CAPTIONS: Record<string, string> = {
+  ingredient: '原料',
+  template: '模板',
+  base: '底材',
+  addition: '材料',
+}
+
+function slotCaption(slot: RecipeSlot): string {
+  return SLOT_CAPTIONS[slot.split('.')[1]] ?? slot.split('.')[1]
+}
+
 function displayFor(value: SlotValue | undefined): Display | null {
   if (!value) return null
   if (value.kind === 'item') {
@@ -165,7 +176,7 @@ function onResultWheel(event: WheelEvent, slot: RecipeSlot) {
             {{ entry.display.count }}
           </span>
         </button>
-        <span class="recipe-slot-caption">{{ entry.slot.split('.')[1] }}</span>
+        <span class="recipe-slot-caption">{{ slotCaption(entry.slot) }}</span>
       </div>
       <span v-if="resultSlot" class="recipe-grid-arrow">→</span>
     </div>

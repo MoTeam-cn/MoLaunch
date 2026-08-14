@@ -136,6 +136,29 @@ export const ALL_RECIPE_TYPES: readonly RecipeType[] = [
   'smithing_transform',
 ]
 
+/** 配方类型中文名（界面下拉展示） */
+export const RECIPE_TYPE_LABELS: Record<RecipeType, string> = {
+  crafting: '合成',
+  smelting: '熔炼',
+  blasting: '高炉烧炼',
+  smoking: '烟熏',
+  campfire_cooking: '营火烹饪',
+  stonecutter: '切石',
+  smithing: '锻造',
+  smithing_trim: '纹饰锻造',
+  smithing_transform: '锻造转换',
+}
+
+/** 配方分类（category 字段）中文名 */
+export const RECIPE_CATEGORY_LABELS: Record<string, string> = {
+  equipment: '装备',
+  building: '建筑',
+  misc: '杂物',
+  redstone: '红石',
+  food: '食物',
+  blocks: '方块',
+}
+
 export function isRecipeTypeAvailable(version: JavaVersionId, type: RecipeType): boolean {
   const availability = recipeTypeAvailability[type]
   if (!isVersionAtLeast(version, availability.minVersion)) return false
