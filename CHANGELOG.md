@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **写入文件命令增加安全校验（防恶意文件）**（[game_dir.rs](src-tauri/src/commands/system/game_dir.rs)）：`write_text_file` / `write_binary_file` 统一校验写入路径（非空、无空字节、长度 ≤ 260，并解析 `.` / `..` 防路径穿越）且限制内容大小（文本 ≤ 10MB、二进制 ≤ 20MB）；`write_binary_file` 追加 PNG 魔数校验（`89 50 4E 47 0D 0A 1A 0A`），拒绝写入非 PNG 内容，防止恶意文件落盘。
+
 - **移除顶部导航栏右上角「最大化/还原」窗口按钮**（[TopNavLayout.vue](src/components/layout/TopNavLayout.vue)）：窗口控制仅保留最小化与关闭，删除最大化/还原按钮及其 `isMaximized` 状态与窗口 resize 监听；双击标题栏拖拽区域等系统级最大化方式不受影响。
 
 - **物品编辑支持指令版本兼容，颜色下拉改为中文 + 圆形色块**（[generator.ts](src/views/tools/command/generator.ts) / [ColorSelect.vue](src/views/tools/command/ColorSelect.vue)（新增） / [ItemEditor.vue](src/views/tools/command/ItemEditor.vue) / [SignShop.vue](src/views/tools/command/SignShop.vue) / [SummonEntity.vue](src/views/tools/command/SummonEntity.vue) / [data.ts](src/views/tools/command/data.ts)）：/give 指令生成新增「指令版本」选择——「1.20.5+（物品组件）」输出物品组件方括号格式（`[minecraft:enchantments={levels:{"minecraft:sharpness":1}},minecraft:custom_name='...',minecraft:lore=[...]]`），「1.13 - 1.20.4（NBT）」输出原有 `{Enchantments:[...],display:{Name:...}}` 花括号格式，「1.12.2 及以前（数字附魔 ID）」输出 `ench:[{id:16s,lvl:5s}]` + 字符串 Name/Lore（`/give <玩家> <物品> <数量> 0 {NBT}`，附魔表补充 legacy 数字 ID，1.13+ 才有的附魔自动跳过）；16 色选项由英文名改为中文名（黑色/深蓝/金色/…），并新增封装公共 `Select` 的 `ColorSelect` 组件在触发器与下拉选项中渲染圆形色块预览，物品编辑 / 告示牌商店 / 召唤实体三处颜色选择统一复用。

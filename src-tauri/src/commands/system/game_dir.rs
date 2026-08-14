@@ -6,6 +6,45 @@
 
 use crate::log_info;
 use crate::state::AppState;
+use std::path::{Component, Path, PathBuf};
+
+/// 单次写入允许的最大字节数（文本）
+const MAX_TEXT_BYTES: usize = 10 * 1024 * 1024;
+/// 单次写入允许的最大字节数（二进制，如 PNG 图片）
+const MAX_BINARY_BYTES: usize = 20 * 1024 * 1024;
+/// PNG 文件魔数：89 50 4E 47 0D 0A 1A 0A
+const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+/// 最长路径字符数（Windows MAX_PATH）
+const MAX_PATH_CHARS: usize = 260;
+
+/// 校验写入路径：非空、无空字节、长度不超限，并解析 `.` / `..` 防路径穿越，
+/// 返回规范化后的路径。
+fn validate_write_path(raw: &str) -> Result<PathBuf, String> {
+    let path = raw.trim();
+    if path.is_empty() {
+        return Err("写入文件路径不能为空".to_string());
+    }
+    if path.contains('\0') {
+        return Err("写入文件路径包含非法字符".to_string());
+    }
+    if path.chars().count() > MAX_PATH_CHARS {
+        return Err("写入文件路径过长".to_string());
+    }
+    let mut normalized = PathBuf::new();
+    for component in Path::new(path).components() {
+        match component {
+            Component::CurDir => {}
+            Component::ParentDir => {
+                normalized.pop();
+            }
+            other => normalized.push(other.as_os_str()),
+        }
+    }
+    if normalized.as_os_str().is_empty() {
+        return Err("写入文件路径无效".to_string());
+    }
+    Ok(normalized)
+}
 
 /// 打开游戏目录
 pub async fn open_game_dir(state: &AppState) -> Result<(), String> {
@@ -43,8 +82,15 @@ pub async fn get_game_dir(state: &AppState) -> Result<String, String> {
 ///
 /// 用于导出示例文件（插件模板、布局示例等），路径通常由前端 `pickSavePath` 对话框返回。
 /// 若文件已存在则覆盖，父目录不存在时自动创建。
+/// 写入前校验路径合法性（防穿越）与内容大小上限，防止恶意文件落盘。
 pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
-    let path = std::path::PathBuf::from(&path);
+    let path = validate_write_path(&path)?;
+    if content.len() > MAX_TEXT_BYTES {
+        return Err(format!(
+            "文本内容过大（> {} MB），已拒绝写入",
+            MAX_TEXT_BYTES / 1024 / 1024
+        ));
+    }
 
     // 确保父目录存在
     if let Some(parent) = path.parent() {
@@ -57,23 +103,32 @@ pub async fn write_text_file(path: String, content: String) -> Result<(), String
     Ok(())
 }
 
-/// 写入二进制文件到指定路径
+/// 写入 PNG 图片到指定路径
 ///
-/// `base64_content` 为 Base64 编码的原始字节（如 Canvas 导出的 PNG 图片），
-/// 与 `write_text_file` 走相同的路径策略（覆盖写入 + 自动建父目录）。
+/// `base64_content` 为 Base64 编码的 PNG 字节（Canvas `toDataURL` 导出）。
+/// 写入前校验路径合法性（防穿越）、大小上限与 PNG 魔数，拒绝非图片内容。
 pub async fn write_binary_file(path: String, base64_content: String) -> Result<(), String> {
     use base64::Engine;
 
-    let path = std::path::PathBuf::from(&path);
+    let path = validate_write_path(&path)?;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_content.trim())
+        .map_err(|e| format!("Base64 解码失败: {}", e))?;
+    if bytes.len() > MAX_BINARY_BYTES {
+        return Err(format!(
+            "写入内容过大（> {} MB），已拒绝写入",
+            MAX_BINARY_BYTES / 1024 / 1024
+        ));
+    }
+    if bytes.len() < PNG_SIGNATURE.len() || bytes[..PNG_SIGNATURE.len()] != PNG_SIGNATURE {
+        return Err("写入内容不是合法的 PNG 图片，已拒绝".to_string());
+    }
 
     // 确保父目录存在
     if let Some(parent) = path.parent() {
         crate::utils::fs::ensure_dir(parent)?;
     }
 
-    let bytes = base64::engine::general_purpose::STANDARD
-        .decode(base64_content.trim())
-        .map_err(|e| format!("Base64 解码失败: {}", e))?;
     std::fs::write(&path, bytes).map_err(|e| format!("写入文件失败: {}", e))?;
 
     log_info!("[System] Binary file written: {}", path.display());
