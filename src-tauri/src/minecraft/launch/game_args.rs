@@ -12,7 +12,7 @@ use super::AuthInfo;
 /// `custom_info`：版本独立自定义信息
 /// - 非空：替换 `${version_type}` 为 custom_info 值（显示在游戏主界面左下角和 F3 左上角）
 /// - 空/None：从参数列表删除 `--versionType` 及其值，避免 MC 显示空字符串或占位符
-/// `client_id`：启动器客户端标识（替换 `${clientid}` 占位符，供正版账号识别）
+///   `client_id`：启动器客户端标识（替换 `${clientid}` 占位符，供正版账号识别）
 pub(super) fn build_game_args(
     json: &serde_json::Value,
     game_dir: &Path,
