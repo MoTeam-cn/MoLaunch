@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **微软登录链路抓取并持久化 Xbox 用户 ID（xuid）**（[exchange.rs](src-tauri/src/minecraft/auth/microsoft/exchange.rs) / [types.rs](src-tauri/src/minecraft/auth/storage/types.rs) / [save.rs](src-tauri/src/minecraft/auth/storage/save.rs) / [load/file.rs](src-tauri/src/minecraft/auth/storage/load/file.rs) / [load/registry.rs](src-tauri/src/minecraft/auth/storage/load/registry.rs) / [registry.rs](src-tauri/src/minecraft/auth/storage/registry.rs) / [state/auth.rs](src-tauri/src/state/auth.rs) / [types.rs](src-tauri/src/minecraft/launch/types.rs)）：登录/刷新时从 XSTS 响应 `DisplayClaims.xui[0].xui` 提取 Xbox 用户 ID，随微软账号与当前用户持久化（`StoredMsAccount`/`CurrentUser`/`LocalAuthResult`/`AuthInfo` 新增 `xuid` 字段，`#[serde(default)]` 兼容旧数据，Windows 注册表新增 `MsCurrentXuid` 加密键、非 Windows 加密文件新增 xuid 字段，账号切换/刷新/静默刷新路径同步更新），供后续启动参数 `--xuid` 使用；离线/authlib 账号该字段为空。
+
 - **配方抽屉新增方向键快速切换目标格**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：抽屉提示「您正在为「第 X 格」选择物品」右侧新增上/下/左/右四个方向键按钮，无需关闭抽屉即可在格子间切换（合成网格按行列移动，2×2/3×3 自动适配；熔炼/切石/锻造等线性槽位按上一个/下一个移动），到达边界时对应按钮自动禁用。
 
 - **合成配方输入槽支持滚轮调整数量**（[RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [formatter.ts](src/utils/recipe-generator/formatter.ts)）：此前仅结果槽可滚轮调产出数量。现所有已放置物品槽位（合成格/原料/模板/底材/材料）均可滚轮调整 1-64；JSON 输出中 1.21.2+（string 策略）的输入槽位携带 `count` 字段（`{item, count}` / `{tag, count}`，旧版本策略不输出以保证数据包合法），如「2 个锻造模板 + 树苗」的合成。

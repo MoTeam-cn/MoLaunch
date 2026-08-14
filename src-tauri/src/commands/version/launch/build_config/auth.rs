@@ -12,12 +12,13 @@ pub(super) async fn resolve_auth(
     login_type: Option<String>,
 ) -> AuthInfo {
     let login_type = login_type.unwrap_or_else(|| "Legacy".to_string());
-    let (access_token, client_token, server_url) = match state.auth_storage.load().await {
+    let (access_token, client_token, server_url, xuid) = match state.auth_storage.load().await {
         Ok(auth_state) => match auth_state.current_user {
             Some(current) if current.uuid == uuid => (
                 current.access_token,
                 current.client_token,
                 current.server_url,
+                current.xuid.unwrap_or_default(),
             ),
             Some(current) => {
                 log_warn!(
@@ -25,13 +26,13 @@ pub(super) async fn resolve_auth(
                     current.uuid,
                     uuid
                 );
-                (String::new(), String::new(), None)
+                (String::new(), String::new(), None, String::new())
             }
-            None => (String::new(), String::new(), None),
+            None => (String::new(), String::new(), None, String::new()),
         },
         Err(e) => {
             log_warn!("从 auth_storage 加载 token 失败: {}，使用空 token", e);
-            (String::new(), String::new(), None)
+            (String::new(), String::new(), None, String::new())
         }
     };
 
@@ -42,6 +43,7 @@ pub(super) async fn resolve_auth(
         client_token,
         login_type,
         server_url,
+        xuid,
     }
 }
 

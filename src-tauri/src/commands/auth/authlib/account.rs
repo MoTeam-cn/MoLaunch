@@ -98,6 +98,7 @@ pub async fn switch_authlib_account(
         profile_json: None,
         server_url: current.server_url,
         server_name: current.server_name,
+        xuid: String::new(),
     };
 
     {

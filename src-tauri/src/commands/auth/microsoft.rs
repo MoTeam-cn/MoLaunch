@@ -192,6 +192,7 @@ pub async fn ms_login_refresh(state: &AppState) -> Result<LocalAuthResult, Strin
             &result.access_token,
             &result.refresh_token,
             result.expires_at,
+            &result.xuid,
         )
         .await
     {
@@ -219,6 +220,7 @@ fn to_local_auth(r: &microsoft::MicrosoftLoginResult) -> LocalAuthResult {
         profile_json: Some(r.profile_json.clone()),
         server_url: None,
         server_name: None,
+        xuid: r.xuid.clone(),
     }
 }
 

@@ -70,6 +70,7 @@ impl AuthStorage {
             expires_at: None,
             server_url: Some(server_url.to_string()),
             server_name: Some(server_name.to_string()),
+            xuid: None,
         };
         state.current_user = Some(current.clone());
 
@@ -177,6 +178,7 @@ impl AuthStorage {
             expires_at: None,
             server_url: Some(account.server_url.clone()),
             server_name: Some(account.server_name.clone()),
+            xuid: None,
         });
 
         let current = state.current_user.clone();

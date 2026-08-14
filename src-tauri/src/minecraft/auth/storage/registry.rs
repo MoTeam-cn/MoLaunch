@@ -41,6 +41,9 @@ pub(crate) const KEY_MS_CURRENT_EXPIRES: &str = "MsCurrentExpires";
 /// 当前微软账号档案 JSON（加密）
 #[cfg(windows)]
 pub(crate) const KEY_MS_CURRENT_PROFILE: &str = "MsCurrentProfile";
+/// 当前微软账号 Xbox 用户 ID（加密）
+#[cfg(windows)]
+pub(crate) const KEY_MS_CURRENT_XUID: &str = "MsCurrentXuid";
 
 /// 当前 authlib 账号用户名（加密）
 #[cfg(windows)]
@@ -73,6 +76,7 @@ pub(crate) const ALL_KEYS: &[&str] = &[
     KEY_MS_CURRENT_REFRESH,
     KEY_MS_CURRENT_EXPIRES,
     KEY_MS_CURRENT_PROFILE,
+    KEY_MS_CURRENT_XUID,
     KEY_MS_ACCOUNTS,
     KEY_OFFLINE_ACCOUNTS,
     KEY_AUTHLIB_ACCOUNTS,

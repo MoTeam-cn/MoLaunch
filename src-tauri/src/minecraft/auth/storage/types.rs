@@ -20,6 +20,9 @@ pub struct StoredMsAccount {
     pub refresh_token: String,
     pub expires_at: u64,
     pub profile_json: String,
+    /// Xbox 用户 ID（旧版本登录的账号无此字段，反序列化回退空串）
+    #[serde(default)]
+    pub xuid: String,
 }
 
 impl StoredMsAccount {
@@ -32,6 +35,7 @@ impl StoredMsAccount {
             "refresh_token": self.refresh_token,
             "expires_at": self.expires_at,
             "profile_json": self.profile_json,
+            "xuid": self.xuid,
         })
     }
 }
@@ -45,6 +49,7 @@ impl From<&MicrosoftLoginResult> for StoredMsAccount {
             refresh_token: result.refresh_token.clone(),
             expires_at: result.expires_at,
             profile_json: result.profile_json.clone(),
+            xuid: result.xuid.clone(),
         }
     }
 }
@@ -143,6 +148,9 @@ pub struct CurrentUser {
     /// authlib 登录的服务器显示名（仅 authlib 登录有，用于 UI 展示）
     #[serde(default)]
     pub server_name: Option<String>,
+    /// 微软登录的 Xbox 用户 ID（仅微软登录有，用于启动参数 `--xuid`）
+    #[serde(default)]
+    pub xuid: Option<String>,
 }
 
 impl CurrentUser {
@@ -159,6 +167,7 @@ impl CurrentUser {
             "expires_at": self.expires_at,
             "server_url": self.server_url,
             "server_name": self.server_name,
+            "xuid": self.xuid,
         })
     }
 }

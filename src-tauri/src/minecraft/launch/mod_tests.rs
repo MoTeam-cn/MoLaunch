@@ -30,6 +30,7 @@ fn test_auth_info_debug() {
         client_token: "client_secret".to_string(),
         login_type: "Microsoft".to_string(),
         server_url: None,
+        xuid: String::new(),
     };
     let debug_str = format!("{:?}", auth);
     assert!(debug_str.contains("***"));

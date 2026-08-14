@@ -87,6 +87,13 @@ impl AuthStorage {
                         None => Value::Null,
                     },
                 );
+                obj.insert(
+                    "xuid".into(),
+                    match &user.xuid {
+                        Some(v) => json!(self.encrypt(v).await?),
+                        None => Value::Null,
+                    },
+                );
                 Value::Object(obj)
             }
             None => Value::Null,
@@ -176,7 +183,7 @@ impl AuthStorage {
             KEY_AUTHLIB_CURRENT_SERVER_URL, KEY_AUTHLIB_CURRENT_UUID, KEY_LEGACY_NAME,
             KEY_LEGACY_UUID, KEY_LOGIN_TYPE, KEY_MS_ACCOUNTS, KEY_MS_CURRENT_ACCESS,
             KEY_MS_CURRENT_EXPIRES, KEY_MS_CURRENT_NAME, KEY_MS_CURRENT_PROFILE,
-            KEY_MS_CURRENT_REFRESH, KEY_MS_CURRENT_UUID, KEY_OFFLINE_ACCOUNTS,
+            KEY_MS_CURRENT_REFRESH, KEY_MS_CURRENT_UUID, KEY_MS_CURRENT_XUID, KEY_OFFLINE_ACCOUNTS,
         };
 
         let key = reg_key()?;
@@ -215,6 +222,10 @@ impl AuthStorage {
                     }
                     if let Some(ref profile) = user.profile_json {
                         self.reg_set_encrypted(&key, KEY_MS_CURRENT_PROFILE, profile)
+                            .await?;
+                    }
+                    if let Some(ref xuid) = user.xuid {
+                        self.reg_set_encrypted(&key, KEY_MS_CURRENT_XUID, xuid)
                             .await?;
                     }
                 }

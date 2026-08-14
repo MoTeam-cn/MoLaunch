@@ -122,6 +122,7 @@ pub async fn switch_offline_account(
         profile_json: None,
         server_url: None,
         server_name: None,
+        xuid: String::new(),
     };
 
     // 更新当前用户（持久化）
@@ -142,6 +143,7 @@ pub async fn switch_offline_account(
             expires_at: None,
             server_url: None,
             server_name: None,
+            xuid: None,
         });
         state
             .auth_storage

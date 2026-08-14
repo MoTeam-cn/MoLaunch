@@ -19,7 +19,7 @@ impl AuthStorage {
             KEY_AUTHLIB_CURRENT_SERVER_URL, KEY_AUTHLIB_CURRENT_UUID, KEY_LEGACY_NAME,
             KEY_LEGACY_UUID, KEY_LOGIN_TYPE, KEY_MS_ACCOUNTS, KEY_MS_CURRENT_ACCESS,
             KEY_MS_CURRENT_EXPIRES, KEY_MS_CURRENT_NAME, KEY_MS_CURRENT_PROFILE,
-            KEY_MS_CURRENT_REFRESH, KEY_MS_CURRENT_UUID, KEY_OFFLINE_ACCOUNTS,
+            KEY_MS_CURRENT_REFRESH, KEY_MS_CURRENT_UUID, KEY_MS_CURRENT_XUID, KEY_OFFLINE_ACCOUNTS,
         };
 
         let key = reg_key()?;
@@ -50,6 +50,7 @@ impl AuthStorage {
                     expires_at: None,
                     server_url: None,
                     server_name: None,
+                    xuid: None,
                 });
             }
         } else if login_type == "Microsoft" {
@@ -77,6 +78,7 @@ impl AuthStorage {
                     .and_then(|s| s.parse::<u64>().ok())
                     .unwrap_or(0);
                 let profile = self.reg_get_decrypted(&key, KEY_MS_CURRENT_PROFILE).await;
+                let xuid = self.reg_get_decrypted(&key, KEY_MS_CURRENT_XUID).await;
 
                 state.current_user = Some(CurrentUser {
                     name,
@@ -89,6 +91,7 @@ impl AuthStorage {
                     expires_at: Some(expires),
                     server_url: None,
                     server_name: None,
+                    xuid: xuid.filter(|s| !s.is_empty()),
                 });
             }
         } else if login_type == "AuthlibInjector" {
@@ -128,6 +131,7 @@ impl AuthStorage {
                     expires_at: None,
                     server_url,
                     server_name,
+                    xuid: None,
                 });
             }
         }

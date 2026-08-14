@@ -69,8 +69,10 @@ async fn exchange_xbl_token(oauth_token: &str) -> Result<XblTokenResponse, Micro
     Ok(result)
 }
 
-/// 步骤 3：XBL Token → XSTS Token + UHS
-async fn exchange_xsts_token(xbl_token: &str) -> Result<(String, String), MicrosoftLoginError> {
+/// 步骤 3：XBL Token → XSTS Token + UHS + XUID
+async fn exchange_xsts_token(
+    xbl_token: &str,
+) -> Result<(String, String, String), MicrosoftLoginError> {
     log_info!("Exchanging XBL token for XSTS token");
     let body = serde_json::json!({
         "Properties": { "SandboxId": "RETAIL", "UserTokens": [xbl_token] },
@@ -127,8 +129,18 @@ async fn exchange_xsts_token(xbl_token: &str) -> Result<(String, String), Micros
             MicrosoftLoginError::new(format!("xsts missing UHS: {}", body_text)).with_step("xsts")
         })?
         .to_string();
+    // XUID（Xbox 用户 ID）：缺失时回退空串，避免阻塞登录流程
+    let xuid = result
+        .display_claims
+        .as_ref()
+        .and_then(|dc| dc.get("xui"))
+        .and_then(|xui| xui.get(0))
+        .and_then(|item| item.get("xui"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
     log_info!("XSTS token and UHS obtained successfully");
-    Ok((result.token, uhs))
+    Ok((result.token, uhs, xuid))
 }
 
 /// 步骤 4：XSTS Token + UHS → Minecraft Access Token
@@ -259,7 +271,7 @@ where
     progress("xbl");
     let xbl = exchange_xbl_token(oauth_access_token).await?;
     progress("xsts");
-    let (xsts, uhs) = exchange_xsts_token(&xbl.token).await?;
+    let (xsts, uhs, xuid) = exchange_xsts_token(&xbl.token).await?;
     progress("mc_token");
     let mc = exchange_mc_token(&xsts, &uhs).await?;
     progress("entitlements");
@@ -277,6 +289,7 @@ where
         refresh_token: oauth_refresh_token.to_string(),
         expires_at,
         profile_json,
+        xuid,
     })
 }
 

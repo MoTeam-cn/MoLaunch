@@ -33,6 +33,7 @@ impl AuthStorage {
             expires_at: Some(result.expires_at),
             server_url: None,
             server_name: None,
+            xuid: Some(result.xuid.clone()),
         });
 
         self.save(&state).await
@@ -75,6 +76,7 @@ impl AuthStorage {
             expires_at: None,
             server_url: None,
             server_name: None,
+            xuid: None,
         });
 
         self.save(&state).await
@@ -159,6 +161,7 @@ impl AuthStorage {
         access_token: &str,
         refresh_token: &str,
         expires_at: u64,
+        xuid: &str,
     ) -> Result<(), String> {
         let mut state = self.load().await.unwrap_or_default();
 
@@ -168,6 +171,7 @@ impl AuthStorage {
                 account.access_token = access_token.to_string();
                 account.refresh_token = refresh_token.to_string();
                 account.expires_at = expires_at;
+                account.xuid = xuid.to_string();
                 break;
             }
         }
@@ -178,6 +182,7 @@ impl AuthStorage {
                 current.access_token = access_token.to_string();
                 current.refresh_token = Some(refresh_token.to_string());
                 current.expires_at = Some(expires_at);
+                current.xuid = Some(xuid.to_string());
             }
         }
 

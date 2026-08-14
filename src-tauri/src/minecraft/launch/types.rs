@@ -34,6 +34,9 @@ pub struct AuthInfo {
     /// -Dauthlibinjector.yggdrasil.prefetched 参数
     #[serde(default)]
     pub server_url: Option<String>,
+    /// 微软登录的 Xbox 用户 ID（仅微软登录有值），用于高版本启动参数 `--xuid`
+    #[serde(default)]
+    pub xuid: String,
 }
 
 impl std::fmt::Debug for AuthInfo {
@@ -45,6 +48,7 @@ impl std::fmt::Debug for AuthInfo {
             .field("client_token", &"***")
             .field("login_type", &self.login_type)
             .field("server_url", &self.server_url)
+            .field("xuid", &self.xuid)
             .finish()
     }
 }

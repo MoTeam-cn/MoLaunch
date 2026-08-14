@@ -36,7 +36,13 @@ pub async fn get_ms_accounts(state: &AppState) -> Result<Vec<MsAccountInfo>, Str
                 Ok(r) => {
                     if let Err(e) = state
                         .auth_storage
-                        .update_ms_token(&a.uuid, &r.access_token, &r.refresh_token, r.expires_at)
+                        .update_ms_token(
+                            &a.uuid,
+                            &r.access_token,
+                            &r.refresh_token,
+                            r.expires_at,
+                            &r.xuid,
+                        )
                         .await
                     {
                         log_warn!("Failed to update persisted token: {}", e);
@@ -92,7 +98,13 @@ pub async fn switch_ms_account(state: &AppState, uuid: String) -> Result<LocalAu
                 .map_err(log_err("Failed to refresh MS token"))?;
             if let Err(e) = state
                 .auth_storage
-                .update_ms_token(&uuid, &r.access_token, &r.refresh_token, r.expires_at)
+                .update_ms_token(
+                    &uuid,
+                    &r.access_token,
+                    &r.refresh_token,
+                    r.expires_at,
+                    &r.xuid,
+                )
                 .await
             {
                 log_warn!("Failed to update persisted token: {}", e);
@@ -115,6 +127,7 @@ pub async fn switch_ms_account(state: &AppState, uuid: String) -> Result<LocalAu
         profile_json: Some(account.profile_json.clone()),
         server_url: None,
         server_name: None,
+        xuid: account.xuid.clone(),
     };
 
     // 更新当前用户（持久化）
@@ -135,6 +148,7 @@ pub async fn switch_ms_account(state: &AppState, uuid: String) -> Result<LocalAu
             expires_at: Some(expires_at),
             server_url: None,
             server_name: None,
+            xuid: Some(account.xuid.clone()),
         });
         state
             .auth_storage

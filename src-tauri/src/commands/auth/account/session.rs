@@ -42,6 +42,7 @@ pub async fn get_login_status(state: &AppState) -> Result<Option<LocalAuthResult
                                     &r.access_token,
                                     &r.refresh_token,
                                     r.expires_at,
+                                    &r.xuid,
                                 )
                                 .await
                             {
@@ -56,6 +57,7 @@ pub async fn get_login_status(state: &AppState) -> Result<Option<LocalAuthResult
                                 profile_json: Some(r.profile_json.clone()),
                                 server_url: None,
                                 server_name: None,
+                                xuid: r.xuid.clone(),
                             };
                             let mut auth = state.auth.lock().await;
                             auth.current_user = Some(auth_result.clone());
@@ -77,6 +79,7 @@ pub async fn get_login_status(state: &AppState) -> Result<Option<LocalAuthResult
             profile_json: user.profile_json,
             server_url: user.server_url,
             server_name: user.server_name,
+            xuid: user.xuid.unwrap_or_default(),
         };
         let mut auth = state.auth.lock().await;
         auth.current_user = Some(auth_result.clone());

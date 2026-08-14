@@ -54,6 +54,7 @@ impl AuthStorage {
                 };
                 let server_url = self.decrypt_opt_field(user_obj, "server_url").await;
                 let server_name = self.decrypt_opt_field(user_obj, "server_name").await;
+                let xuid = self.decrypt_opt_field(user_obj, "xuid").await;
 
                 state.current_user = Some(CurrentUser {
                     name,
@@ -66,6 +67,7 @@ impl AuthStorage {
                     expires_at,
                     server_url,
                     server_name,
+                    xuid,
                 });
             }
         }

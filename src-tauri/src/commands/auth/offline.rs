@@ -30,6 +30,7 @@ pub async fn login_offline(state: &AppState, username: String) -> Result<LocalAu
         profile_json: None,
         server_url: None,
         server_name: None,
+        xuid: String::new(),
     };
 
     {

@@ -33,6 +33,9 @@ pub struct LocalAuthResult {
     /// authlib 登录的服务器显示名（仅 authlib 登录有，用于 UI 展示）
     #[serde(default)]
     pub server_name: Option<String>,
+    /// 微软登录的 Xbox 用户 ID（仅微软登录有，用于启动参数 `--xuid`）
+    #[serde(default)]
+    pub xuid: String,
 }
 
 /// 认证状态

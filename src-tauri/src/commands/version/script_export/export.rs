@@ -114,7 +114,7 @@ pub async fn export_launch_script(
     // 构建认证信息
     // 从 auth_storage 获取当前用户的真实 token，写入脚本后可直接启动；
     // 安全提示已写入脚本头部，文件权限限制为当前用户
-    let (real_access_token, real_client_token, real_server_url) = {
+    let (real_access_token, real_client_token, real_server_url, real_xuid) = {
         match state.auth_storage.load().await {
             Ok(auth_state) => {
                 if let Some(ref current) = auth_state.current_user {
@@ -123,15 +123,16 @@ pub async fn export_launch_script(
                             current.access_token.clone(),
                             current.client_token.clone(),
                             current.server_url.clone(),
+                            current.xuid.clone().unwrap_or_default(),
                         )
                     } else {
-                        (String::new(), String::new(), None)
+                        (String::new(), String::new(), None, String::new())
                     }
                 } else {
-                    (String::new(), String::new(), None)
+                    (String::new(), String::new(), None, String::new())
                 }
             }
-            Err(_) => (String::new(), String::new(), None),
+            Err(_) => (String::new(), String::new(), None, String::new()),
         }
     };
     let login_type_str = login_type.clone().unwrap_or_else(|| "Legacy".to_string());
@@ -143,6 +144,7 @@ pub async fn export_launch_script(
         client_token: real_client_token,
         login_type: login_type_str,
         server_url: real_server_url,
+        xuid: real_xuid,
     };
 
     // 离线账号皮肤：与 launch.rs 一致，调整 UUID 匹配皮肤变体

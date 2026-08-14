@@ -73,6 +73,7 @@ pub async fn authlib_login(
                 profile_json: None,
                 server_url: current.server_url,
                 server_name: current.server_name,
+                xuid: String::new(),
             };
 
             // 同步内存状态
@@ -168,6 +169,7 @@ pub async fn authlib_select_profile(
         profile_json: None,
         server_url: current.server_url,
         server_name: current.server_name,
+        xuid: String::new(),
     };
 
     {

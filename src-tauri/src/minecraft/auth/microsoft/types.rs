@@ -91,6 +91,8 @@ pub struct MicrosoftLoginResult {
     pub refresh_token: String,
     pub expires_at: u64,
     pub profile_json: String,
+    /// Xbox 用户 ID（XSTS DisplayClaims.xui[0].xui），用于启动参数 `--xuid`
+    pub xuid: String,
 }
 
 /// 微软登录错误
