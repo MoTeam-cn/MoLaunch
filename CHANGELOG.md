@@ -26,6 +26,8 @@
 
 ### Changed
 
+- **JSON 数据构建时原样输出到 `assets/json/`，不再编译进 JS chunk**（[vite.config.ts](vite.config.ts) / [resources.ts](src/utils/recipe-generator/resources.ts)）：`assetsInclude` 将 JSON 视为静态资源、`assetFileNames` 按扩展名归类输出（带内容 hash）；合成配方生成器的物品表/原版标签/纹理图集 JSON 由「懒加载拆分的 JS chunk」改为 `?url` 资源引用 + `fetch` 运行时加载，产物中 JSON 保持原始格式、可独立缓存。
+
 - **App.vue 非启动关键组件改为懒加载**（[App.vue](src/App.vue)）：滚动返回/下载面板/拖拽遮罩/更新弹窗/更新日志/测试版水印等 6 个组件改为 `defineAsyncComponent` 按需加载；根布局 `TopNavLayout` 与 5 个全局弹窗（错误弹窗/崩溃/提示/用户协议/Toast）因启动期需以组件实例注册全局服务，保留静态导入避免时序失效。
 
 - **组件导入全面改为 `defineAsyncComponent` 懒加载，并修复批量替换遗留问题**（[src/components](src/components) / [src/views](src/views) / [src/plugins](src/plugins)）：页面与弹窗组件（公共 Button/Tag/Input 等、联机/社区/下载/设置各模块）统一改为异步组件按需加载，进入对应路由时再拉取 chunk，减小首屏体积。同时修复批量替换遗留问题：① 图片资源被误包进 `defineAsyncComponent`——图片（PNG/SVG）导入返回的是 URL 而非组件，全部恢复为静态导入（[recipe-layouts.ts](src/views/tools/creation/recipe-generator/recipe-layouts.ts) / [VersionSelect.vue](src/views/VersionSelect.vue) / [LoaderSelect.vue](src/views/LoaderSelect.vue) / [AboutTab.vue](src/views/settings/more/AboutTab.vue) / [FabricApiInfoCard.vue](src/components/install/FabricApiInfoCard.vue) 共 13 处，`?url` 后缀保留）；② 所有使用 `defineAsyncComponent` 的文件此前缺失 `vue` 导入（非编译宏，需显式导入），导致 TS2304 编译报错，已全部补齐。

@@ -29,13 +29,25 @@ export type AtlasLayout = {
   layout: Record<string, [number, number, number, number]>
 }
 
-const itemsGlob = import.meta.glob<{ default: VersionItemsManifest }>('./assets/items/*.json')
-const tagsGlob = import.meta.glob<{ default: Record<string, string[]> }>('./assets/tags/*.json')
+const itemsGlob = import.meta.glob<string>('./assets/items/*.json', {
+  query: '?url',
+  import: 'default',
+})
+const tagsGlob = import.meta.glob<string>('./assets/tags/*.json', {
+  query: '?url',
+  import: 'default',
+})
 
-const atlasLayoutPromise = import('./assets/texture-atlas.json').then(
-  (m) => m.default as unknown as AtlasLayout,
-)
+const atlasLayoutUrl = new URL('./assets/texture-atlas.json', import.meta.url).href
 const atlasPngUrl = new URL('./assets/texture-atlas.png', import.meta.url).href
+
+async function fetchJson<T>(url: string): Promise<T> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`加载资源失败：${url}（HTTP ${res.status}）`)
+  return res.json() as Promise<T>
+}
+
+const atlasLayoutPromise = fetchJson<AtlasLayout>(atlasLayoutUrl)
 
 const itemsCache = new Map<JavaVersionId, AssetItem[]>()
 const tagsCache = new Map<JavaVersionId, Record<string, string[]>>()
@@ -43,9 +55,9 @@ const tagsCache = new Map<JavaVersionId, Record<string, string[]>>()
 export async function loadVersionItems(version: JavaVersionId): Promise<AssetItem[]> {
   const cached = itemsCache.get(version)
   if (cached) return cached
-  const mod = itemsGlob[`./assets/items/${version}.json`]
-  if (!mod) return []
-  const manifest = (await mod()).default
+  const urlLoader = itemsGlob[`./assets/items/${version}.json`]
+  if (!urlLoader) return []
+  const manifest = await fetchJson<VersionItemsManifest>(await urlLoader())
   const items = manifest.items ?? []
   itemsCache.set(version, items)
   return items
@@ -54,9 +66,9 @@ export async function loadVersionItems(version: JavaVersionId): Promise<AssetIte
 export async function loadVersionTags(version: JavaVersionId): Promise<Record<string, string[]>> {
   const cached = tagsCache.get(version)
   if (cached) return cached
-  const mod = tagsGlob[`./assets/tags/${version}.json`]
-  if (!mod) return {}
-  const tags = (await mod()).default ?? {}
+  const urlLoader = tagsGlob[`./assets/tags/${version}.json`]
+  if (!urlLoader) return {}
+  const tags = await fetchJson<Record<string, string[]>>(await urlLoader())
   tagsCache.set(version, tags)
   return tags
 }

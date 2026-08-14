@@ -65,6 +65,8 @@ function updateLogPlugin(): Plugin {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [vue(), updateLogPlugin()],
+  // JSON 数据作为静态资源原样输出（不编译进 JS chunk），运行时由 fetch 加载
+  assetsInclude: ['**/*.json'],
   test: {
     // 仅扫描 src 下的测试，排除工作区内的第三方源码目录
     include: ['src/**/*.test.ts'],
@@ -118,6 +120,7 @@ export default defineConfig({
           const fileName = assetInfo.name ?? ''
           const ext = fileName.split('.').pop()?.toLowerCase() ?? ''
           if (ext === 'css') return 'assets/css/[name]-[hash].[ext]'
+          if (ext === 'json') return 'assets/json/[name]-[hash].[ext]'
           if (['js', 'mjs', 'cjs'].includes(ext)) return 'assets/js/[name]-[hash].[ext]'
           if (assetInfo.originalFileNames?.some((f) => f.includes('@lobehub/icons-static-svg'))) {
             return 'assets/@lobehub/[name]-[hash].[ext]'
