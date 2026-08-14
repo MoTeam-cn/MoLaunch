@@ -61,6 +61,11 @@
 
 - **移除前端 composable 与组件中的 `any` 类型，改用 `unknown` 配合类型守卫**（[useDebouncedSave.ts](src/composables/useDebouncedSave.ts) / [useFabricApi.ts](src/composables/useFabricApi.ts) / [usePackUpdate.ts](src/composables/usePackUpdate.ts) / [useModUpdate.ts](src/composables/useModUpdate.ts) / [useResourceDownload.ts](src/composables/useResourceDownload.ts) / [useDependencyConfirm.ts](src/composables/useResourceDownload/useDependencyConfirm.ts) / [useResourceModpackInstall.ts](src/composables/useResourceModpackInstall.ts) / [ResourceDetail.vue](src/components/community/ResourceDetail.vue) / [Community.vue](src/views/Community.vue)）：`catch (e: any)` 改为 `catch (e: unknown)` 并用 `e instanceof Error ? e.message : ...` 类型守卫提取错误信息；`useDebouncedSave` 实现返回类型 `: any` 改为 `SimpleReturn | PatchReturn` 联合类型（保留 overload 精确签名），符合「禁止使用 any、无法确定用 unknown 并配合类型守卫」的规范。
 
+- **Frp 子项目 CI 对齐主仓库：同步后以 `workflow_call` 直调构建工作流，上传脚本重写为主仓库同格式**（[sync-upstream.yml](Frp/.github/workflows/sync-upstream.yml) / [goreleaser.yml](Frp/.github/workflows/goreleaser.yml) / [ci-upload.cjs](Frp/hack/ci-upload.cjs)）：
+  - `sync-upstream.yml` 删除「Trigger goreleaser build workflow」步骤（原 `gh workflow run` 主动触发 + `sleep 10` 等 tag 服务端可见），sync job 输出 `tag` / `should_sync`，新增 `release` job 在 job 级 `uses: ./.github/workflows/goreleaser.yml` 以 `workflow_call` 直调构建（与主仓库 version-sync.yml → release.yml 模式一致），移除 `actions: write` 权限与 `GH_TOKEN`。
+  - `goreleaser.yml` 新增 `workflow_call` 触发（input `tag`，required），checkout ref 与版本解析由 `github.event.inputs.tag` 改为 `inputs.tag`（兼容 workflow_dispatch）；上传步骤 env 由 `API_BASE_URL` 改为 `secrets.MOLAUNCH_ACTION_PUSH_SERVER`。
+  - `hack/ci-upload.cjs` 重写为 [scripts/ci-upload.cjs](scripts/ci-upload.cjs) 同格式：apiServer 地址改读必填 `MOLAUNCH_ACTION_PUSH_SERVER`（原 `API_BASE_URL` + 硬编码默认地址）；预签名请求带 `sizes`，超过分片阈值走分片上传（与 updater 共用 `/v3/ci/complete-upload`）；新增 Cloudflare 回源错误码（520~527/530）与网络错误的指数退避重试（`s3PutWithRetry` / `apiPostWithRetry`）；保留 frp 特有 `component` 参数与 `/v3/ci/frp/presign-upload`、`/v3/ci/frp/releases` 端点。
+
 ## [0.3.6-rc2] - 2026-08-13
 
 > 小更新，但是用联机服务的必更新。
