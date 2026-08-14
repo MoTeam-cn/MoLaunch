@@ -10,16 +10,16 @@
 
 | name | version | url | desc |
 | --- | --- | --- | --- |
-| Vite | ^5.0.12 | https://vitejs.dev | 下一代前端构建工具 |
+| Vite | ^6.4.3 | https://vitejs.dev | 下一代前端构建工具 |
 | TypeScript | ^5.3.3 | https://www.typescriptlang.org | JavaScript 超集，类型安全 |
 | vue-tsc | ^2.2.12 | https://github.com/vuejs/language-tools | Vue SFC 类型检查工具 |
-| @vitejs/plugin-vue | ^5.0.3 | https://github.com/vitejs/vite-plugin-vue | Vite Vue SFC 编译插件 |
-| Vitest | ^1.2.2 | https://vitest.dev | Vite 原生单元测试框架 |
+| @vitejs/plugin-vue | ^6.0.8 | https://github.com/vitejs/vite-plugin-vue | Vite Vue SFC 编译插件 |
+| Vitest | ^3.2.7 | https://vitest.dev | Vite 原生单元测试框架 |
 | @vue/test-utils | ^2.4.3 | https://test-utils.vuejs.org | Vue 组件单元测试工具 |
 | @rushstack/eslint-patch | ^1.6.0 | https://github.com/microsoft/rushstack | ESLint 兼容性补丁 |
 | @types/node | ^20.11.5 | https://github.com/DefinitelyTyped/DefinitelyTyped | Node.js TypeScript 类型声明 |
 | @vue/eslint-config-prettier | ^9.0.0 | https://github.com/vuejs/eslint-config-prettier | Vue ESLint 与 Prettier 配置 |
-| @vue/eslint-config-typescript | ^12.0.0 | https://github.com/vuejs/eslint-config-typescript | Vue TypeScript ESLint 配置 |
+| @vue/eslint-config-typescript | ^13.0.0 | https://github.com/vuejs/eslint-config-typescript | Vue TypeScript ESLint 配置 |
 | @vue/tsconfig | ^0.5.1 | https://github.com/vuejs/tsconfig | Vue TypeScript 配置 |
 | ESLint | ^8.56.0 | https://eslint.org | JavaScript / Vue 代码规范检查 |
 | eslint-plugin-vue | ^9.20.1 | https://github.com/vuejs/eslint-plugin-vue | Vue ESLint 规则 |

@@ -28,3 +28,5 @@
 | OpenLayers | ^10.9.0 | https://openlayers.org | 地图渲染引擎（种子地图瓦片/矢量图层/交互） |
 | marked | ^18.0.7 | https://github.com/markedjs/marked | Markdown 解析库（嵌入资源，picker 子窗口 markdown 模板通过 res:// 协议加载 view/marked.min.js） |
 | qrcodejs | — | https://github.com/davidshimjs/qrcodejs | 二维码生成库（嵌入资源，picker 子窗口 qrcode 模板通过 res:// 协议加载 view/qrcode.min.js，DOM 渲染离线可用） |
+| country-flag-icons | ^1.6.20 | https://gitlab.com/catamphetamine/country-flag-icons | 国旗 SVG 图标库（服务器地区/镜像选择） |
+| pinyin-pro | ^3.29.1 | https://github.com/zh-lx/pinyin-pro | 中文拼音转换库（物品搜索拼音匹配） |

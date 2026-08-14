@@ -21,8 +21,9 @@
 | Tauri Plugin Process | 2 | https://v2.tauri.app/plugin/process/ | 官方进程管理插件 |
 | Tauri Plugin Updater | 2 | https://v2.tauri.app/plugin/updater/ | 官方自动更新插件（非 Windows） |
 | Tokio | 1.35 | https://tokio.rs | Rust 异步运行时 |
-| Reqwest | 0.11 | https://docs.rs/reqwest | HTTP 客户端（rustls-tls） |
-| rustls-native-certs | 0.6 | https://docs.rs/rustls-native-certs | 操作系统信任根证书加载 |
+| Reqwest | 0.12 | https://docs.rs/reqwest | HTTP 客户端（rustls-tls） |
+| rustls-native-certs | 0.8 | https://docs.rs/rustls-native-certs | 操作系统信任根证书加载 |
+| x509-parser | 0.17 | https://docs.rs/x509-parser | X.509 证书解析（CA 属性/有效期校验） |
 | Serde | 1.0 | https://serde.rs | 序列化/反序列化框架 |
 | serde_json | 1.0 | https://docs.rs/serde_json | JSON 序列化 |
 | anyhow | 1 | https://docs.rs/anyhow | 错误处理 |
@@ -31,7 +32,7 @@
 | env_logger | 0.10 | https://docs.rs/env_logger | 日志后端 |
 | once_cell | 1 | https://docs.rs/once_cell | 全局单例（Lazy 初始化） |
 | libloading | 0.8 | https://docs.rs/libloading | 动态库加载（SDK FFI） |
-| zip | 2 | https://docs.rs/zip | ZIP 压缩/解压（jar 读取） |
+| zip | 4 | https://docs.rs/zip | ZIP 压缩/解压（jar 读取） |
 | flate2 | 1 | https://docs.rs/flate2 | gzip 解压（NBT 文件 .dat） |
 | fastnbt | 2 | https://docs.rs/fastnbt | NBT 数据解析（存档 level.dat 等） |
 | notify | 8 | https://docs.rs/notify | 文件系统监听（mods 目录刷新） |
@@ -60,4 +61,4 @@
 | windows | 0.58 | https://docs.rs/windows | Windows API 绑定（窗口标题修改） |
 | winreg | 0.52 | https://docs.rs/winreg | Windows 注册表读写（仅 Windows） |
 | libc | 0.2 | https://docs.rs/libc | Unix 进程组管理（仅 Unix） |
-| rusqlite | 0.31 | https://docs.rs/rusqlite | SQLite 数据库访问 |
+| rusqlite | 0.40 | https://docs.rs/rusqlite | SQLite 数据库访问 |

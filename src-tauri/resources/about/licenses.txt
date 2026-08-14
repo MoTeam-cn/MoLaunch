@@ -43,6 +43,8 @@
 | OpenLayers | OpenLayers Contributors | BSD-2-Clause | https://openlayers.org | https://github.com/openlayers/openlayers/blob/main/LICENSE.md |
 | marked | Marked contributors | MIT License | https://github.com/markedjs/marked | https://github.com/markedjs/marked/blob/master/LICENSE.md |
 | qrcodejs | Copyright (c) 2012 davidshimjs | MIT License | https://github.com/davidshimjs/qrcodejs | https://github.com/davidshimjs/qrcodejs/blob/master/LICENSE |
+| country-flag-icons | Copyright (c) 2017-present catamphetamine | MIT License | https://gitlab.com/catamphetamine/country-flag-icons | https://gitlab.com/catamphetamine/country-flag-icons/-/blob/master/LICENSE |
+| pinyin-pro | Copyright (c) 2022-present zh-lx | MIT License | https://github.com/zh-lx/pinyin-pro | https://github.com/zh-lx/pinyin-pro/blob/main/LICENSE |
 | Vite | Evan You and Vite Contributors | MIT License | https://vitejs.dev | https://github.com/vitejs/vite/blob/main/LICENSE |
 | TypeScript | Microsoft | Apache-2.0 | https://www.typescriptlang.org | https://github.com/microsoft/TypeScript/blob/main/LICENSE.txt |
 | Vue Language Tools (vue-tsc) | Vue Language Tools contributors | MIT License | https://github.com/vuejs/language-tools | https://github.com/vuejs/language-tools/blob/master/LICENSE |
@@ -70,6 +72,7 @@
 | Tokio | Tokio Contributors | MIT License | https://tokio.rs | https://github.com/tokio-rs/tokio/blob/master/LICENSE |
 | Reqwest | Sean McArthur | MIT / Apache-2.0 | https://docs.rs/reqwest | https://github.com/seanmonstar/reqwest/blob/master/LICENSE-MIT |
 | rustls-native-certs | rustls-native-certs contributors | Apache-2.0 / ISC / MIT | https://docs.rs/rustls-native-certs | https://github.com/ctz/rustls-native-certs/blob/main/LICENSE |
+| x509-parser | Rusticata contributors | MIT / Apache-2.0 | https://docs.rs/x509-parser | https://github.com/rusticata/x509-parser/blob/master/LICENSE-MIT |
 | Serde | The Serde Developers | MIT / Apache-2.0 | https://serde.rs | https://github.com/serde-rs/serde/blob/master/LICENSE-MIT |
 | serde_json | The Serde Developers | MIT / Apache-2.0 | https://docs.rs/serde_json | https://github.com/serde-rs/json/blob/master/LICENSE-MIT |
 | anyhow | David Tolnay | MIT / Apache-2.0 | https://docs.rs/anyhow | https://github.com/dtolnay/anyhow/blob/master/LICENSE-MIT |
