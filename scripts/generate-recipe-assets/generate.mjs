@@ -2,7 +2,7 @@
 /**
  * 生成合成配方生成器内置数据资产（输出至 src/utils/recipe-generator/assets/）
  *
- * 数据源（均为 MIT 许可，与 Axolotl GPL 资产无关）：
+ * 数据源（均为 MIT 许可 / Mojang 官方资产）：
  * - 物品表：PrismarineJS/minecraft-data（items.json / blocks.json，覆盖 1.12~26.1）
  * - 纹理：PrismarineJS/minecraft-assets（items_textures.json + items|blocks/*.png，覆盖 1.12~1.21.11）
  * - 标签：destruc7i0n/crafting（vanilla-tags，覆盖 1.14~26.2）
@@ -370,7 +370,7 @@ async function main() {
     path.join(OUT_DIR, 'sources.json'),
     JSON.stringify(
       {
-        comment: 'MIT 许可 / Mojang 官方数据源，非 Axolotl GPL 资产。',
+        comment: 'MIT 许可 / Mojang 官方数据源。',
         items: 'PrismarineJS/minecraft-data (MIT)',
         textures: 'PrismarineJS/minecraft-assets (MIT)',
         jarTextures: 'Mojang official 26.2 client jar',

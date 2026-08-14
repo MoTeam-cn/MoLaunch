@@ -1,5 +1,5 @@
 {
-  "comment": "MIT 许可 / Mojang 官方数据源，非 Axolotl GPL 资产。",
+  "comment": "MIT 许可 / Mojang 官方数据源。",
   "items": "PrismarineJS/minecraft-data (MIT)",
   "textures": "PrismarineJS/minecraft-assets (MIT)",
   "jarTextures": "Mojang official 26.2 client jar",

@@ -1,7 +1,7 @@
 /**
  * 合成配方生成器 - 版本策略格式化器
  *
- * 配方 JSON 随版本演进，按四档策略输出（与 Axolotl recipe-generator 一致）：
+ * 配方 JSON 随版本演进，按四档策略输出：
  * - legacy(1.12)：{item: "ns:id", data}，type 无命名空间，不支持标签
  * - object(1.13~1.19)：ingredient {item|tag}，result {item, count}，cooking result 为字符串
  * - id-result(1.20~1.21.1)：ingredient {item|tag}，result {id, count}
