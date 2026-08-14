@@ -18,6 +18,8 @@
 
 ### Changed
 
+- **创作工具顶部子菜单紧贴页面左上角**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：此前子菜单距离顶部与左侧各有 24px 内边距（来自工具页滚动容器 `p-6`），现用负外边距 `-mx-6 -mt-6` 抵消容器内边距，与设置页一致紧贴左上角，滚动时仍 sticky 吸顶。
+
 - **创作工具分类页改为顶部子菜单切换**（[CreationPage.vue](src/views/tools/creation/CreationPage.vue)）：渐变文字生成器与合成配方生成器此前垂直叠加一页放不下，现复用设置页同款 `SubTabBar` 顶部菜单栏（sticky 吸顶、带图标），每次只渲染当前工具；支持 `?subtab=` 深链直达指定工具，`#tool-gradient-text` / `#tool-recipe-generator` 目录锚点保留。
 
 ### Fixed

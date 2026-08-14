@@ -32,21 +32,23 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <!-- 顶部子菜单（sticky 固定，滚动时吸顶） -->
-    <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
+  <div>
+    <!-- 顶部子菜单：-mx-6 -mt-6 抵消工具页滚动容器 p-6 内边距，紧贴左上角（sticky 吸顶） -->
+    <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky class="-mx-6 -mt-6" />
 
-    <!-- 内容区：按当前子页签渲染（渐变文字根节点自带 data-toc-card） -->
-    <div v-if="activeSubTab === 'gradient-text'" id="tool-gradient-text">
-      <GradientTextPage />
-    </div>
-    <div
-      v-else
-      id="tool-recipe-generator"
-      data-toc-card="tool-recipe-generator"
-      data-toc-title="合成配方"
-    >
-      <RecipeGeneratorPage />
+    <div class="pt-4">
+      <!-- 内容区：按当前子页签渲染（渐变文字根节点自带 data-toc-card） -->
+      <div v-if="activeSubTab === 'gradient-text'" id="tool-gradient-text">
+        <GradientTextPage />
+      </div>
+      <div
+        v-else
+        id="tool-recipe-generator"
+        data-toc-card="tool-recipe-generator"
+        data-toc-title="合成配方"
+      >
+        <RecipeGeneratorPage />
+      </div>
     </div>
   </div>
 </template>
