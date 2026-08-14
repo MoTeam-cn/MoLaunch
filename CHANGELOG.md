@@ -28,6 +28,8 @@
 
 - **合成配方槽位编辑器支持点击空格子编辑**（[RecipeSlotsEditor.vue](src/views/tools/creation/recipe-generator/RecipeSlotsEditor.vue) / [formatter.ts](src/utils/recipe-generator/formatter.ts)）：点击空格子（结果槽除外）发出 `edit-slot` 请求供页面弹抽屉选择，当前编辑中的格子以蓝色高亮；槽位标题映射 `slotCaption` 提取到 `formatter.ts` 供编辑器与页面复用，避免重复实现。
 
+- **物品/标签调色板改为抽屉选择**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：移除右侧常驻调色板，改为点击配方空格子时从右侧展开抽屉（`Drawer`，标题随目标槽位显示，如「选择底材」/「选择物品（第 3 格）」），抽屉内保留物品/标签页签与搜索；选中后填入该格并自动关闭，点遮罩或按 ESC 取消，正在编辑的格子持续高亮。
+
 ### Fixed
 
 - **合成配方页切换不再报 atlas 为空的 2 个 Vue prop 校验警告**（[RecipeGeneratorPage.vue](src/views/tools/creation/recipe-generator/RecipeGeneratorPage.vue)）：首帧渲染时 `loading=false` 而 `atlas` 仍为 `null`，`v-else` 主体分支会把 `atlas!`（实际为 null）传给 RecipeSlotsEditor / ItemPalette 触发警告。现将 `loading` 初始值改为 `true`，资源加载完成前不渲染主体。

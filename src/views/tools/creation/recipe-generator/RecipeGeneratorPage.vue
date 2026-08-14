@@ -2,12 +2,13 @@
 /**
  * 合成配方生成器：配方编辑 + JSON 预览 + 数据包导出
  *
- * 交互：从右侧调色板点选物品自动填入第一个空格；点击已放置格子可清除；
+ * 交互：点击空格子弹出抽屉选择物品/标签填入该格；点击已放置格子可清除；
  * 结果槽滚轮可调整产出数量；顶部切换版本/类型，实时校验并预览配方 JSON。
  */
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import Button from '@/components/common/Button.vue'
 import Alert from '@/components/common/Alert.vue'
+import Drawer from '@/components/common/Drawer.vue'
 import Select from '@/components/common/Select.vue'
 import Input from '@/components/common/Input.vue'
 import Checkbox from '@/components/common/Checkbox.vue'
@@ -41,6 +42,7 @@ import {
 import {
   getInputSlots,
   getResultSlots,
+  slotCaption,
 } from '@/utils/recipe-generator/formatter'
 import { validateRecipe } from '@/utils/recipe-generator/validation'
 import { exportRecipePack } from '@/utils/recipe-generator/exporter'
@@ -165,10 +167,29 @@ const inputSlots = computed<RecipeSlot[]>(() => getInputSlots(recipe))
 const resultSlot = computed<RecipeSlot | undefined>(() => getResultSlots(recipe)[0])
 const recipeName = computed(() => (recipe.name.trim() ? recipe.name.trim() : 'recipe'))
 
+const editingSlot = ref<RecipeSlot | null>(null)
+const drawerVisible = ref(false)
+
+const drawerTitle = computed(() => {
+  if (!editingSlot.value) return '选择物品'
+  const label = slotCaption(editingSlot.value)
+  return editingSlot.value.startsWith('crafting.') ? `选择物品（第 ${label} 格）` : `选择${label}`
+})
+
+watch(drawerVisible, (visible) => {
+  if (!visible) editingSlot.value = null
+})
+
+function openSlotDrawer(slot: RecipeSlot) {
+  editingSlot.value = slot
+  drawerVisible.value = true
+}
+
 function pickValue(value: SlotValue) {
-  const target = inputSlots.value.find((slot) => !recipe.slots[slot])
-  if (target) recipe.slots[target] = value
-  else toastInfo('合成格已填满，请先清除一些格子')
+  const slot = editingSlot.value
+  if (!slot) return
+  recipe.slots[slot] = value
+  drawerVisible.value = false
 }
 
 function updateSlot(slot: RecipeSlot, value: SlotValue | undefined) {
@@ -242,11 +263,13 @@ async function exportPack() {
           :atlas-url="atlasUrl"
           :atlas="atlas!"
           :two-by-two="recipe.crafting.twoByTwo && recipe.recipeType === 'crafting'"
+          :editing-slot="editingSlot"
           @update-slot="updateSlot"
           @update-count="updateCount"
+          @edit-slot="openSlotDrawer"
         />
         <p class="text-xs text-gray-400">
-          从右侧调色板选择物品自动填入第一个空格，点击格子可清除，结果槽滚轮调整数量
+          点击空格子从抽屉选择物品/标签，点击已放置格子可清除，结果槽滚轮调整数量
         </p>
 
         <div v-if="issues.length" class="recipe-issues">
@@ -274,7 +297,7 @@ async function exportPack() {
         </div>
       </section>
 
-      <!-- 右：功能区（配方设置 + 调色板） -->
+      <!-- 右：功能区（配方设置） -->
       <div class="recipe-functions">
         <section class="recipe-panel recipe-settings">
           <h3 class="recipe-panel-title">配方设置</h3>
@@ -331,31 +354,41 @@ async function exportPack() {
             </div>
           </div>
         </section>
-
-        <aside class="recipe-panel recipe-palette">
-          <div class="recipe-palette-tabs">
-            <span
-              class="recipe-palette-tab"
-              :class="{ active: activeTab === 'items' }"
-              @click="activeTab = 'items'"
-            >物品</span>
-            <span
-              class="recipe-palette-tab"
-              :class="{ active: activeTab === 'tags' }"
-              @click="activeTab = 'tags'"
-            >标签</span>
-          </div>
-          <ItemPalette
-            v-if="activeTab === 'items'"
-            :items="items"
-            :atlas-url="atlasUrl"
-            :atlas="atlas!"
-            @pick="pickValue"
-          />
-          <TagPalette v-else :tags="tags" @pick="pickValue" />
-        </aside>
       </div>
     </div>
+
+    <!-- 贴图选择抽屉：点击空格子展开 -->
+    <Drawer
+      v-model:visible="drawerVisible"
+      :title="drawerTitle"
+      placement="right"
+      :width="380"
+      :mask-closable="true"
+      :esc-to-close="true"
+    >
+      <div class="recipe-drawer-palette">
+        <div class="recipe-palette-tabs">
+          <span
+            class="recipe-palette-tab"
+            :class="{ active: activeTab === 'items' }"
+            @click="activeTab = 'items'"
+          >物品</span>
+          <span
+            class="recipe-palette-tab"
+            :class="{ active: activeTab === 'tags' }"
+            @click="activeTab = 'tags'"
+          >标签</span>
+        </div>
+        <ItemPalette
+          v-if="activeTab === 'items'"
+          :items="items"
+          :atlas-url="atlasUrl"
+          :atlas="atlas!"
+          @pick="pickValue"
+        />
+        <TagPalette v-else :tags="tags" @pick="pickValue" />
+      </div>
+    </Drawer>
   </div>
 </template>
 
@@ -375,7 +408,7 @@ async function exportPack() {
 
 .recipe-generator-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 1rem;
   align-items: start;
 }
@@ -488,6 +521,12 @@ async function exportPack() {
   display: flex;
   flex-direction: column;
   gap: 1rem;
+}
+
+.recipe-drawer-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
 .recipe-palette-tabs {
