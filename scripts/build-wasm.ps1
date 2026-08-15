@@ -21,6 +21,11 @@
 
 $ErrorActionPreference = "Stop"
 
+# emcc 缓存固定到项目内 .cache/emscripten（默认写 emsdk 目录，无写权限时 emcc 会挂起）
+if (-not $env:EM_CACHE) {
+    $env:EM_CACHE = Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")) ".cache/emscripten"
+}
+
 # 切换到 src-tauri 目录（cubiomes 源码在此目录下）
 Set-Location "$PSScriptRoot/../src-tauri"
 
@@ -82,9 +87,31 @@ if (-not (Get-Command emcc -ErrorAction SilentlyContinue)) {
         $envScript = Join-Path $p "emsdk_env.ps1"
         if (Test-Path $envScript) {
             Write-Host "Activating emsdk at $p ..." -ForegroundColor Cyan
-            . $envScript
-            $emsdkFound = $true
-            break
+            # emsdk_env.ps1 调用 python 时 stderr 输出会被 PS5.1 当作 NativeCommandError，
+            # 在 ErrorActionPreference=Stop 下直接终止脚本，故激活期间临时降级
+            $oldEAP = $ErrorActionPreference
+            $ErrorActionPreference = "Continue"
+            . $envScript | Out-Null
+            $ErrorActionPreference = $oldEAP
+            if (Get-Command emcc -ErrorAction SilentlyContinue) {
+                $emsdkFound = $true
+                break
+            }
+            $emccDir = Join-Path $p "upstream/emscripten"
+            if (Test-Path (Join-Path $emccDir "emcc.exe")) {
+                # 直连 emcc：emcc.exe 依赖 EMSDK_NODE/EMSDK_PYTHON/EM_CONFIG，
+                # 缺少时 emcc 调用会以 9009 失败
+                $env:EMSDK = $p
+                $env:EM_CONFIG = Join-Path $p ".emscripten"
+                $nodeDir = Get-ChildItem (Join-Path $p "node") -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($nodeDir) { $env:EMSDK_NODE = Join-Path $nodeDir.FullName "bin/node.exe" }
+                $pyDir = Get-ChildItem (Join-Path $p "python") -Directory -ErrorAction SilentlyContinue | Select-Object -First 1
+                if ($pyDir) { $env:EMSDK_PYTHON = Join-Path $pyDir.FullName "python.exe" }
+                $env:PATH = "$emccDir;$env:PATH"
+                $emsdkFound = $true
+                Write-Host "emsdk 激活被占用，直连 emcc 目录：$emccDir" -ForegroundColor Yellow
+                break
+            }
         }
     }
     if (-not $emsdkFound) {

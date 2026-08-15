@@ -1,8 +1,8 @@
 /// <reference types="vitest/config" />
-import { defineConfig, type Plugin } from 'vite'
+import { defineConfig, type Plugin, type ViteDevServer } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import { execFileSync } from 'node:child_process'
-import { resolve } from 'path'
+import { execFileSync, spawn } from 'node:child_process'
+import { resolve, sep } from 'path'
 import pkg from './package.json'
 
 /** 静态资源扩展名 → 输出目录，主构建与 worker 构建共用 */
@@ -12,6 +12,7 @@ const ASSET_EXT_DIRS: [string[], string][] = [
   [['js', 'mjs', 'cjs'], 'js'],
   [['png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'avif', 'ico', 'bmp'], 'img'],
   [['woff', 'woff2', 'ttf', 'otf', 'eot'], 'font'],
+  [['wasm'], 'wasm'],
 ]
 
 function assetDir(fileName: string): string {
@@ -79,9 +80,71 @@ function updateLogPlugin(): Plugin {
   }
 }
 
+/**
+ * dev 专用：监听 src-tauri/cubiomes 目录下 .c/.h 文件变化，防抖后自动执行
+ * npm run build:wasm，编译完成整页刷新 —— 等价旧 rust 时代
+ * build.rs 的 rerun-if-changed=cubiomes 自动构建替换。
+ */
+function cubiomesWatchPlugin(): Plugin {
+  const cubiomesDir = [__dirname, 'src-tauri', 'cubiomes'].join(sep)
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let building = false
+  let pending = false
+  let onChange: ((file: string) => void) | undefined
+
+  const rebuild = (server: ViteDevServer) => {
+    if (building) {
+      pending = true
+      return
+    }
+    building = true
+    server.config.logger.info('[cubiomes] 检测到源码变化，开始重新编译 WASM…')
+    const win32 = process.platform === 'win32'
+    const child = spawn(
+      win32 ? (process.env.ComSpec ?? 'cmd.exe') : 'npm',
+      win32 ? ['/c', 'npm run build:wasm'] : ['run', 'build:wasm'],
+      { cwd: __dirname, stdio: 'inherit' },
+    )
+    child.on('close', (code) => {
+      building = false
+      if (code === 0) {
+        server.config.logger.info('[cubiomes] WASM 编译完成，刷新页面')
+        server.ws.send({ type: 'full-reload' })
+      } else {
+        server.config.logger.error('[cubiomes] WASM 编译失败，请查看上方日志')
+      }
+      if (pending) {
+        pending = false
+        rebuild(server)
+      }
+    })
+  }
+
+  return {
+    name: 'molaunch:cubiomes-watch',
+    apply: 'serve',
+    configureServer(server) {
+      server.watcher.add(cubiomesDir)
+      onChange = (file: string) => {
+        if (!/\.c$/i.test(file) && !/\.h$/i.test(file)) return
+        if (timer) clearTimeout(timer)
+        timer = setTimeout(() => rebuild(server), 500)
+      }
+      server.watcher.on('change', onChange)
+      server.watcher.on('add', onChange)
+    },
+    onServerClose(server) {
+      if (onChange) {
+        server.watcher.off('change', onChange)
+        server.watcher.off('add', onChange)
+      }
+    },
+  }
+}
+
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue(), updateLogPlugin()],
+  plugins: [vue(), updateLogPlugin(), cubiomesWatchPlugin()],
   // JSON 数据作为静态资源原样输出（不编译进 JS chunk），运行时由 fetch 加载
   assetsInclude: ['**/*.json'],
   test: {

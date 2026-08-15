@@ -56,6 +56,9 @@ coverage/
 node_modules
 /logo_data
 
+# emcc 编译缓存（cubiomes WASM 构建产物，不入库）
+/.cache
+
 #SDK Cache
 /sdk_data
 
