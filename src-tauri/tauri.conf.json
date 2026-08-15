@@ -14,9 +14,11 @@
     "externalBin": [
       "binaries/easytier-core"
     ],
-    "resources": [
-      "resources/*"
-    ],
+    "resources": {
+      "resources/*": ".",
+      "resources/easytier/Packet.dll": "sidecar/Packet.dll",
+      "resources/easytier/wintun.dll": "sidecar/wintun.dll"
+    },
     "icon": [
       "Images/icon.ico",
       "Images/icon.png",
