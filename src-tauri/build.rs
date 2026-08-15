@@ -15,8 +15,7 @@ use build_script::cubiomes_wasm::compile_cubiomes_wasm;
 use std::path::Path;
 
 fn main() {
-    // 先检查 easytier-core 侧车（缺失时给出中文下载指引并终止，避免 tauri-build 报晦涩英文错误）
-    #[cfg(target_os = "windows")]
+    // 先检查 easytier-core 嵌入式资源（缺失时给出中文下载指引并终止，避免 include_bytes! 报晦涩编译错误）
     build_script::easytier::check_easytier();
 
     tauri_build::build();

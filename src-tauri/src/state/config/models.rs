@@ -60,7 +60,7 @@ pub struct OnlineConfig {
     pub api_server_url: String,
     #[serde(default)]
     pub custom_turn_servers: Vec<IceServerEntry>,
-    /// easytier-core 可执行文件路径（相对 resource_dir 或绝对路径；默认指向打包侧车）
+    /// easytier-core 可执行文件路径（绝对路径；留空使用内置嵌入式资源，释放到 AppData/.Molaunch/easytier/）
     #[serde(default = "crate::state::config::defaults::default_easytier_core_path")]
     pub easytier_core_path: String,
     /// 虚拟网络内节点标识（预留字段，用于房客侧 easytier hostname）

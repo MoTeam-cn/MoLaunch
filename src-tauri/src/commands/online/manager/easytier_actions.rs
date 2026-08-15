@@ -27,8 +27,8 @@ const DEFAULT_GUEST_HOSTNAME: &str = "mo-launch-guest";
 
 /// 解析 easytier-core 可执行文件路径。
 ///
-/// 绝对路径直接校验存在性；相对路径依次尝试 resource_dir（release 侧车 `sidecar/` 优先）、
-/// 当前 exe 同目录（dev 模式 externalBin 落在 `target/debug/`）。
+/// 优先级：配置的绝对路径（直接校验存在性）→ 相对路径兼容旧配置（依次尝试
+/// resource_dir / exe 同目录）→ 兜底释放内置嵌入式资源到 AppData/.Molaunch/easytier/。
 fn resolve_core_path(app: &tauri::AppHandle, configured: &str) -> Result<PathBuf, String> {
     let p = PathBuf::from(configured);
     if p.is_absolute() {
@@ -40,34 +40,26 @@ fn resolve_core_path(app: &tauri::AppHandle, configured: &str) -> Result<PathBuf
             p.display()
         ));
     }
-    let mut candidates: Vec<PathBuf> = Vec::new();
-    if let Ok(dir) = app.path().resource_dir() {
-        candidates.push(dir.join(&p));
-        if p.components().count() == 1 {
-            candidates.push(dir.join("sidecar").join(&p));
-        }
-    }
-    if let Ok(exe) = std::env::current_exe() {
-        if let Some(dir) = exe.parent() {
+    // 相对路径（旧配置兼容，如 `sidecar/easytier-core.exe`）
+    if !configured.is_empty() {
+        let mut candidates: Vec<PathBuf> = Vec::new();
+        if let Ok(dir) = app.path().resource_dir() {
             candidates.push(dir.join(&p));
-            if p.components().count() == 1 {
-                candidates.push(dir.join("sidecar").join(&p));
+        }
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                candidates.push(dir.join(&p));
+            }
+        }
+        for c in &candidates {
+            if c.is_file() {
+                return Ok(c.clone());
             }
         }
     }
-    for c in &candidates {
-        if c.is_file() {
-            return Ok(c.clone());
-        }
-    }
-    Err(format!(
-        "easytier-core 不存在（已尝试: {}）",
-        candidates
-            .iter()
-            .map(|c| c.display().to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    ))
+    // 兜底：释放内置嵌入式资源（默认配置为空时走此路径）
+    crate::resources::extract_easytier_core()
+        .map_err(|e| format!("释放内置 easytier-core 失败: {e}"))
 }
 
 /// 读取配置中的 easytier-core 路径

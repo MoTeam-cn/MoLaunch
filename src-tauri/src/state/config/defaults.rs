@@ -13,9 +13,9 @@ pub(crate) fn default_close_behavior() -> String {
     "ask".to_string()
 }
 
-/// OnlineConfig.easytier_core_path 默认值：externalBin 侧车位于 resource_dir 下 sidecar/ 目录
+/// OnlineConfig.easytier_core_path 默认值：空串表示使用内置嵌入式资源（AppData/.Molaunch/easytier/）
 pub(crate) fn default_easytier_core_path() -> String {
-    "sidecar/easytier-core.exe".to_string()
+    String::new()
 }
 
 impl Default for AppConfig {

@@ -11,13 +11,8 @@
     "publisher": "MoTeam",
     "copyright": "Copyright © 2026 MoTeam. All rights reserved.",
     "createUpdaterArtifacts": true,
-    "externalBin": [
-      "binaries/easytier-core"
-    ],
     "resources": {
-      "resources/*": ".",
-      "resources/easytier/Packet.dll": "sidecar/Packet.dll",
-      "resources/easytier/wintun.dll": "sidecar/wintun.dll"
+      "resources/*": "."
     },
     "icon": [
       "Images/icon.ico",
