@@ -123,18 +123,6 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         //                worker 内通过 importScripts 加载并调用 createCubiomesModule() 实例化
         "wasm/cubiomes.wasm" => Some(include_bytes!("../resources/wasm/cubiomes.wasm")),
         "wasm/cubiomes.js" => Some(include_bytes!("../resources/wasm/cubiomes.js")),
-        // wintun.dll（Windows 联机模块 TUN 接口驱动，按 target_arch 嵌入对应架构版本）
-        // 来源：https://www.wintun.net/（WireGuard 项目，已签名）
-        // 运行时由 `extract_wintun` 释放到 %APPDATA%/.Molaunch/wintun.dll
-        // 注册统一逻辑路径 `wintun/wintun.dll`，编译时按架构选择不同物理文件
-        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-        "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/amd64/wintun.dll")),
-        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-        "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/arm64/wintun.dll")),
-        #[cfg(all(target_os = "windows", target_arch = "x86"))]
-        "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/x86/wintun.dll")),
-        #[cfg(all(target_os = "windows", target_arch = "arm"))]
-        "wintun/wintun.dll" => Some(include_bytes!("../resources/wintun/arm/wintun.dll")),
         // marked.min.js（Markdown 渲染库，picker markdown 模板通过 res:// 协议加载）
         // 来源：https://cdn.jsdelivr.net/npm/marked/marked.min.js
         // 用于 picker 子窗口的 markdown.html 模板渲染 markdown 文本
@@ -278,26 +266,6 @@ pub fn extract_updater() -> anyhow::Result<std::path::PathBuf> {
         .join("updater.exe");
 
     extract_resource("updater/updater.exe", &target_path)?;
-
-    Ok(target_path)
-}
-
-/// 释放 wintun.dll 到 AppData 全局目录（Windows 专属）
-///
-/// wintun.dll 是 WireGuard 项目的 Windows 虚拟网卡驱动，由 `tun-rs` 在运行时
-/// 通过 `libloading` 加载。放 AppData 而非 temp 目录，避免 temp 被清理导致后续
-/// 启动失败；放全局位置而非启动器目录，支持多实例共享同一份驱动。
-///
-/// 编译时 `embedded_bytes` 按 `target_arch` 选择对应架构的 dll 嵌入（amd64/arm64/x86/arm），
-/// 运行时统一释放到 `%APPDATA%/.Molaunch/wintun.dll`。复用 `extract_resource`
-/// 的 sha256 校验机制。调用方为 `minecraft::online::bridge::VirtualLanBridge::start`。
-#[cfg(target_os = "windows")]
-pub fn extract_wintun() -> anyhow::Result<std::path::PathBuf> {
-    let target_path = crate::storage::appdata::appdata_root()
-        .map_err(|e| anyhow::anyhow!(e))?
-        .join("wintun.dll");
-
-    extract_resource("wintun/wintun.dll", &target_path)?;
 
     Ok(target_path)
 }
