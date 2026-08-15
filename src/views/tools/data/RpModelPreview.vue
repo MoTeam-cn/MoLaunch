@@ -6,11 +6,12 @@
  * Resources → Structure([1,1,1]) 单方块渲染。拖拽旋转，滚轮缩放。
  */
 import { onBeforeUnmount, ref, watch } from 'vue'
+import * as THREE from 'three'
 import { CubeTransparentIcon, CursorArrowRaysIcon } from '@heroicons/vue/24/outline'
 import { Structure, ThreeStructureRenderer } from '@mattzh72/lodestone'
 import Tooltip from '@/components/common/Tooltip.vue'
 import { rpReadMany } from '@/utils/api/tools'
-import { buildPreviewResources } from '@/utils/resourcepack/previewResources'
+import { buildPreviewResources, type UV4 } from '@/utils/resourcepack/previewResources'
 
 const props = defineProps<{
   workDir: string
@@ -35,27 +36,124 @@ let dragging = false
 let lastX = 0
 let lastY = 0
 
+interface AnimVertex {
+  index: number
+  baseUv: [number, number]
+  baseLimit: [number, number, number, number]
+}
+interface AnimGroup {
+  mesh: THREE.Mesh
+  vertices: AnimVertex[]
+}
+interface AnimState {
+  frames: UV4[]
+  frame: number
+  groups: AnimGroup[]
+}
+let animStates: AnimState[] = []
+let animClock = 0
+let lastLoopTime = 0
+/** Minecraft 动画纹理默认速度：每帧 1 tick = 50ms */
+const ANIM_INTERVAL_MS = 50
+
 function clamp(v: number, min: number, max: number) {
   return Math.min(max, Math.max(min, v))
 }
 
 function disposeRenderer() {
   disposed = true
+  animStates = []
   if (rafId) cancelAnimationFrame(rafId)
   rafId = 0
   renderer?.dispose()
   renderer = null
 }
 
+/** 扫描 chunk 几何，按 frame0 的 texLimit 匹配动画纹理顶点并快照初始 UV，供帧轮播平移 */
+function setupAnimations(animations: Record<string, UV4[]>) {
+  animStates = []
+  animClock = 0
+  const meshes = (renderer as unknown as { chunkMeshes?: THREE.Mesh[] }).chunkMeshes ?? []
+  for (const [id, frames] of Object.entries(animations)) {
+    if (frames.length < 2) continue
+    const base = frames[0]
+    const groups: AnimGroup[] = []
+    for (const mesh of meshes) {
+      const uvAttr = mesh.geometry.getAttribute('uv')
+      const limit = mesh.geometry.getAttribute('texLimit')
+      if (!uvAttr || !limit) continue
+      const vertices: AnimVertex[] = []
+      for (let i = 0; i < limit.count; i++) {
+        if (
+          Math.abs(limit.getX(i) - base[0]) < 1e-6 &&
+          Math.abs(limit.getY(i) - base[1]) < 1e-6 &&
+          Math.abs(limit.getZ(i) - base[2]) < 1e-6 &&
+          Math.abs(limit.getW(i) - base[3]) < 1e-6
+        ) {
+          vertices.push({
+            index: i,
+            baseUv: [uvAttr.getX(i), uvAttr.getY(i)],
+            baseLimit: [limit.getX(i), limit.getY(i), limit.getZ(i), limit.getW(i)],
+          })
+        }
+      }
+      if (vertices.length) groups.push({ mesh, vertices })
+    }
+    if (groups.length) {
+      animStates.push({ frames, frame: 0, groups })
+      console.log(
+        `[preview] 动画纹理 ${id}：${frames.length} 帧，` +
+          `${groups.reduce((n, g) => n + g.vertices.length, 0)} 顶点已接入帧轮播`,
+      )
+    }
+  }
+}
+
+/** 将动画纹理顶点 uv/texLimit 平移到第 frameIndex 帧（相对 frame0 快照位移，无累计误差） */
+function applyAnimFrame(state: AnimState, frameIndex: number) {
+  if (frameIndex === state.frame) return
+  const base = state.frames[0]
+  const next = state.frames[frameIndex]
+  const dU = next[0] - base[0]
+  const dV = next[1] - base[1]
+  for (const group of state.groups) {
+    const uvAttr = group.mesh.geometry.getAttribute('uv')
+    const limit = group.mesh.geometry.getAttribute('texLimit')
+    for (const v of group.vertices) {
+      uvAttr.setXY(v.index, v.baseUv[0] + dU, v.baseUv[1] + dV)
+      limit.setXYZW(
+        v.index,
+        v.baseLimit[0] + dU,
+        v.baseLimit[1] + dV,
+        v.baseLimit[2] + dU,
+        v.baseLimit[3] + dV,
+      )
+    }
+    uvAttr.needsUpdate = true
+    limit.needsUpdate = true
+  }
+  state.frame = frameIndex
+}
+
 function startLoop() {
+  lastLoopTime = performance.now()
   const loop = () => {
     if (disposed || !renderer) return
+    const now = performance.now()
+    const elapsed = now - lastLoopTime
+    lastLoopTime = now
     if (autoRotate.value && !dragging) yaw += 0.006
     const target = renderer.getCamera().target
     const x = target[0] + radius * Math.cos(pitch) * Math.sin(yaw)
     const y = target[1] + radius * Math.sin(pitch)
     const z = target[2] + radius * Math.cos(pitch) * Math.cos(yaw)
     renderer.setCameraPosition([x, y, z])
+    if (animStates.length) {
+      animClock += elapsed
+      for (const state of animStates) {
+        applyAnimFrame(state, Math.floor(animClock / ANIM_INTERVAL_MS) % state.frames.length)
+      }
+    }
     renderer.drawStructure()
     rafId = requestAnimationFrame(loop)
   }
@@ -71,14 +169,24 @@ async function loadPreview() {
     const res = await rpReadMany(props.workDir, props.relPath)
     if (res.error) throw new Error(res.error)
     const files = new Map(Object.entries(res.files))
-    const { resources, blockId } = await buildPreviewResources(files, res.root)
+    const { resources, blockId, animations } = await buildPreviewResources(files, res.root)
     const canvas = canvasEl.value
     if (!canvas) return
     const structure = new Structure([1, 1, 1])
     structure.addBlock([0, 0, 0], blockId)
     renderer = new ThreeStructureRenderer(canvas, structure, resources)
-    const chunkCount = (renderer as unknown as { chunkMeshes?: unknown[] }).chunkMeshes?.length ?? 0
-    console.log(`[preview] renderer 就绪：chunkMeshes=${chunkCount}，canvas=${canvas.clientWidth || 360}x${canvas.clientHeight || 420}`)
+    const internals = renderer as unknown as {
+      opaqueMaterial?: { side: number }
+      transparentMaterial?: { side: number }
+      chunkMeshes?: unknown[]
+    }
+    // 物品/模型平面只有单面几何（builtin/generated 仅 south），背面会被 FrontSide 剔除成空白，改为双面
+    if (internals.opaqueMaterial) internals.opaqueMaterial.side = THREE.DoubleSide
+    if (internals.transparentMaterial) internals.transparentMaterial.side = THREE.DoubleSide
+    console.log(
+      `[preview] renderer 就绪：chunkMeshes=${internals.chunkMeshes?.length ?? 0}，` +
+        `canvas=${canvas.clientWidth || 360}x${canvas.clientHeight || 420}`,
+    )
     renderer.setViewport(
       0,
       0,
@@ -87,7 +195,10 @@ async function loadPreview() {
       window.devicePixelRatio,
     )
     await renderer.whenReady()
-    if (renderer) startLoop()
+    if (renderer) {
+      setupAnimations(animations)
+      startLoop()
+    }
   } catch (e) {
     console.error('[preview] 3D 预览加载失败:', e)
     error.value = e instanceof Error ? e.message : String(e)

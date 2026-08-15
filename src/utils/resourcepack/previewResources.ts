@@ -241,11 +241,11 @@ function buildModelProvider(
   }
 }
 
-/** 构建预览 Resources；返回渲染目标 blockId */
+/** 构建预览 Resources；返回渲染目标 blockId 与动画帧表 */
 export async function buildPreviewResources(
   files: Map<string, RpPreviewFile>,
   root: string,
-): Promise<{ resources: Resources; blockId: string }> {
+): Promise<{ resources: Resources; blockId: string; animations: Record<string, UV4[]> }> {
   const vanilla = await getVanillaBase()
 
   const packBlockstates = new Map<string, unknown>()
@@ -329,18 +329,25 @@ export async function buildPreviewResources(
     console.log(`[preview] 纹理 ${layer0} UV=${JSON.stringify(atlas.idMap[layer0] ?? atlas.missingUV)}`)
   }
 
+  const animations: Record<string, UV4[]> = {}
+  for (const [id, frames] of Object.entries(atlas.frameUvs)) {
+    if (frames.length > 1) animations[id] = frames
+  }
   return {
     resources: createPreviewResources(atlas, blockDefinitions, blockModels, vanilla),
     blockId,
+    animations,
   }
 }
 
-type UV4 = [number, number, number, number]
+export type UV4 = [number, number, number, number]
 
 interface MergedAtlas {
   imageData: ImageData
-  /** id -> UV 归一化坐标；unknown id 回退 missingUV */
+  /** id -> UV 归一化坐标；unknown id 回退 missingUV；动画纹理指向第一帧 */
   idMap: Record<string, UV4>
+  /** 动画纹理 id -> 全部帧 UV（帧数 > 1 时存在），按帧序排列 */
+  frameUvs: Record<string, UV4[]>
   missingUV: UV4
 }
 
@@ -356,13 +363,15 @@ async function mergeAtlas(vanilla: VanillaPackBase, packTextures: Map<string, st
 
   let allocY = size0
   let size = size0
-  const placements: { id: string; x: number; y: number; w: number; h: number }[] = []
+  const placements: { id: string; x: number; y: number; w: number; h: number; frame?: number }[] = []
 
-  const place = async (id: string, dataUri: string, w: number, h: number, frameH?: number) => {
+  const place = async (id: string, dataUri: string, w: number, h: number) => {
     const bitmap = await loadBitmap(dataUri)
-    const drawH = frameH ?? h
-    if (allocY + drawH + 1 > size) {
-      const newSize = upperPowerOfTwo(Math.max(size, allocY + drawH + 1))
+    // Minecraft 垂直动画条（每帧 w×w）：lodestone 不支持动画帧，逐帧烘焙进图集供预览轮播
+    const frames = h > w && h % w === 0 ? Math.floor(h / w) : 1
+    const totalH = frames > 1 ? frames * (w + 1) : h + 1
+    if (allocY + totalH > size) {
+      const newSize = upperPowerOfTwo(Math.max(size, allocY + totalH))
       const bigger = document.createElement('canvas')
       bigger.width = newSize
       bigger.height = newSize
@@ -373,23 +382,30 @@ async function mergeAtlas(vanilla: VanillaPackBase, packTextures: Map<string, st
       ctx = bctx
       size = newSize
     }
-    ctx.drawImage(bitmap, 0, 0, w, drawH, 0, allocY, w, drawH)
-    placements.push({ id, x: 0, y: allocY, w, h: drawH })
-    allocY += drawH + 1
+    if (frames === 1) {
+      ctx.drawImage(bitmap, 0, 0, w, h, 0, allocY, w, h)
+      placements.push({ id, x: 0, y: allocY, w, h })
+      allocY += h + 1
+      return
+    }
+    console.log(`[preview] pack 纹理 ${id} 尺寸 ${w}x${h} 为动画条 ${frames} 帧，全部烘焙进图集`)
+    for (let f = 0; f < frames; f++) {
+      ctx.drawImage(bitmap, 0, f * w, w, w, 0, allocY, w, w)
+      placements.push({ id, x: 0, y: allocY, w, h: w, frame: f })
+      allocY += w + 1
+    }
   }
 
   // 16px 占位格（未知纹理回退）+ 全部 pack 纹理
   await place('__missing__', missingTextureDataUri(), 16, 16)
   for (const [id, uri] of packTextures) {
     const [w, h] = await imageSize(uri)
-    // Minecraft 垂直动画条（每帧 w×w）：lodestone 不支持动画帧，仅取第一帧，避免整条贴面变形
-    const frameH = h > w && h % w === 0 ? w : h
-    if (frameH !== h) console.log(`[preview] pack 纹理 ${id} 尺寸 ${w}x${h} 为动画条，仅取第一帧 ${w}x${frameH}`)
-    await place(id, uri, w, h, frameH)
+    await place(id, uri, w, h)
   }
   console.log(`[preview] 图集最终尺寸 ${size}`)
 
   const idMap: Record<string, UV4> = {}
+  const frameUvs: Record<string, UV4[]> = {}
   const tex = vanilla.assets.textures
   for (const id of Object.keys(tex)) {
     const [u, v, du, dv] = tex[id]
@@ -399,12 +415,20 @@ async function mergeAtlas(vanilla: VanillaPackBase, packTextures: Map<string, st
   const missingUV = placements.find((p) => p.id === '__missing__')!
   for (const p of placements) {
     if (p.id === '__missing__') continue
-    idMap[p.id] = [p.x / size, p.y / size, (p.x + p.w) / size, (p.y + p.h) / size]
+    const uv: UV4 = [p.x / size, p.y / size, (p.x + p.w) / size, (p.y + p.h) / size]
+    if (p.frame === undefined) {
+      idMap[p.id] = uv
+    } else {
+      if (!frameUvs[p.id]) frameUvs[p.id] = []
+      frameUvs[p.id]!.push(uv)
+      if (p.frame === 0) idMap[p.id] = uv
+    }
   }
 
   return {
     imageData: ctx.getImageData(0, 0, size, size),
     idMap,
+    frameUvs,
     missingUV: [missingUV.x / size, missingUV.y / size, (missingUV.x + missingUV.w) / size, (missingUV.y + missingUV.h) / size],
   }
 }
