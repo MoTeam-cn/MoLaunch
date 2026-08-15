@@ -60,6 +60,9 @@ pub struct OnlineConfig {
     pub api_server_url: String,
     #[serde(default)]
     pub custom_turn_servers: Vec<IceServerEntry>,
+    /// easytier-core 可执行文件路径（相对 resource_dir 或绝对路径；默认指向打包侧车）
+    #[serde(default = "crate::state::config::defaults::default_easytier_core_path")]
+    pub easytier_core_path: String,
 }
 
 impl Default for OnlineConfig {
@@ -67,6 +70,7 @@ impl Default for OnlineConfig {
         Self {
             api_server_url: "https://api.molaunch.moiu.cn".to_string(),
             custom_turn_servers: Vec::new(),
+            easytier_core_path: crate::state::config::defaults::default_easytier_core_path(),
         }
     }
 }

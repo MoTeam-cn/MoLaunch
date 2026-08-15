@@ -13,6 +13,11 @@ pub(crate) fn default_close_behavior() -> String {
     "ask".to_string()
 }
 
+/// OnlineConfig.easytier_core_path 默认值：externalBin 侧车位于 resource_dir 下 sidecar/ 目录
+pub(crate) fn default_easytier_core_path() -> String {
+    "sidecar/easytier-core.exe".to_string()
+}
+
 impl Default for AppConfig {
     fn default() -> Self {
         let game_dir = super::paths::get_default_game_dir();
