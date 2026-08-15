@@ -43,8 +43,9 @@ pub struct ModpackMeta {
 }
 
 /// 创建房间请求（房主本地生成完整 Scaffolding 码后登记）
+///
+/// 字段名即 snake_case，与服务端 `CreateRoomRequest` DTO 契约一致。
 #[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct CreateRoomRequest {
     /// 完整 Scaffolding 房间码 `U/NNNN-NNNN-SSSS-SSSS`
     pub room_code: String,
@@ -159,3 +160,7 @@ pub struct JoinRoomResponse {
     #[serde(default, alias = "modpack")]
     pub modpack: Option<ModpackMeta>,
 }
+
+#[cfg(test)]
+#[path = "room_tests.rs"]
+mod tests;
