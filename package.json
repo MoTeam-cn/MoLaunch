@@ -18,6 +18,7 @@
     "@heroicons/vue": "^2.2.0",
     "@lobehub/icons": "^5.15.0",
     "@lobehub/icons-static-svg": "^1.94.0",
+    "@mattzh72/lodestone": "^0.6.0",
     "@tauri-apps/api": "^2.11.1",
     "@tauri-apps/plugin-deep-link": "^2.4.9",
     "@tauri-apps/plugin-dialog": "^2.7.2",
@@ -31,6 +32,7 @@
     "pinia": "^2.1.7",
     "pinyin-pro": "^3.29.1",
     "skinview3d": "^3.4.2",
+    "three": "^0.164.1",
     "vue": "^3.4.15",
     "vue-router": "^4.2.5",
     "vue-virtual-scroller": "^3.0.4"
