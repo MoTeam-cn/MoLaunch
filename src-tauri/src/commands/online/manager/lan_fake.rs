@@ -109,10 +109,16 @@ impl LanFakeServer {
 pub struct LanFakeStartParams {
     /// 多人游戏界面显示的服务器名称（MOTD）
     pub motd: String,
-    /// 转发目标 IP（房主虚拟 IP，走 TUN 路由）
+    /// 转发目标 IP（房主 easytier 虚拟 IP，缺省固定 `10.244.0.1`）
+    #[serde(default = "default_host_virtual_ip")]
     pub target_ip: String,
     /// 转发目标端口（房主 MC 局域网端口）
     pub target_port: u16,
+}
+
+/// 房主 easytier 固定虚拟 IP
+fn default_host_virtual_ip() -> String {
+    crate::minecraft::online::scaffolding::easytier::HOST_VIRTUAL_IP.to_string()
 }
 
 /// `lan_fake_server_start` 返回

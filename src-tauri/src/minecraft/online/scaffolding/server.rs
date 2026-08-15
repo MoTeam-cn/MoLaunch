@@ -38,6 +38,14 @@ pub struct ScaffoldingServerState {
 }
 
 impl ScaffoldingServerState {
+    /// 创建空的联机中心状态
+    pub fn new() -> Self {
+        Self {
+            mc_port: Arc::new(Mutex::new(None)),
+            players: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
     /// 由房主侧更新 MC 服务器端口（None 表示未启动）
     pub fn set_mc_port(&self, port: Option<u16>) {
         *self.mc_port.lock().unwrap() = port;
@@ -67,11 +75,7 @@ pub struct ScaffoldingServer {
 impl ScaffoldingServer {
     /// 启动联机中心，默认监听 `0.0.0.0:13448`（含虚拟 IP），被占则退为随机端口
     pub async fn start() -> Result<Self, String> {
-        Self::start_on(ScaffoldingServerState {
-            mc_port: Arc::new(Mutex::new(None)),
-            players: Arc::new(Mutex::new(Vec::new())),
-        })
-        .await
+        Self::start_on(ScaffoldingServerState::new()).await
     }
 
     /// 启动联机中心并挂载外部共享状态（MC 端口由房主探测任务写入）
