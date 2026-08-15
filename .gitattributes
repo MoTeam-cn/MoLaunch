@@ -1,0 +1,23 @@
+# 统一文本文件行尾策略：仓库内与工作区一律 LF
+# text=auto 让 git add 时把 CRLF 归一化为 LF；eol=lf 强制检出 LF，
+# 并显式覆盖 core.autocrlf 的隐式强制 CRLF，避免 LF 工作区文件被误报为已修改。
+# 配合仓库级 core.autocrlf=false 使用（见 CHANGELOG）。
+* text=auto eol=lf
+
+# 二进制文件不做行尾转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+*.jar binary
+*.zip binary
+*.gz binary
+*.7z binary
+*.wasm binary

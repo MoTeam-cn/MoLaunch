@@ -40,6 +40,8 @@
 
 ### Changed
 
+- **新增 `.gitattributes` 统一文本行尾策略，修复 `Cargo.toml` 反复被误报为已修改**（[.gitattributes](.gitattributes)（新增） / 仓库级 `core.autocrlf=false`）：此前行尾处理完全依赖全局 `core.autocrlf=true` 的隐式强制 CRLF，任何工具/编辑器把 `Cargo.toml` 以 LF 写回后，git status 会在索引 stat 过期时将其误判为已修改（`git diff` 实际为空，工作区与索引 blob 哈希一致）。现在新增 `.gitattributes` 显式声明 `* text=auto eol=lf`（仓库内与工作区一律 LF，`git add` 时 CRLF 自动归一化为 LF；二进制扩展名如 png/ttf/wasm/jar 等声明为 `binary` 不转换），并在仓库级关闭 `core.autocrlf`（`git config core.autocrlf false`，不影响其他仓库）；已执行 `git add --renormalize .` 将索引行尾统一规范化并刷新全部 stat 缓存。修复后 LF/CRLF 两种工作区行尾均被正确识别为 clean，不再误报。
+
 - **NBT 编辑器界面细节优化**（[NbtViewer.vue](src/views/tools/data/NbtViewer.vue) / [NbtTreeNode.vue](src/views/tools/data/NbtTreeNode.vue)）：① NBT 树展示区最大高度 500px→320px（与同目录 JavaManager 等列表高度一致）；② 叶子值与数组编辑输入框宽度由固定 `w-48`/`w-56` 改为按内容自适应（中文字符 14px、其他 7.5px 估算宽度，80~240px / 140~320px 区间伸缩）；③ 保存栏自写的 amber 提示框改用公共 `Alert` 组件（`type="warning"` 不截断完整展示）；④ 保存前的原生 `window.confirm` + toast 双重提示改为项目惯例的 `showConfirmAsync` 确认弹窗。
 
 - **版本 JSON 编辑从「Java 诊断」移入「常用工具」分类**（[CommonPage.vue](src/views/tools/CommonPage.vue) / [JavaDiagPage.vue](src/views/tools/JavaDiagPage.vue) / [Tools.vue](src/views/Tools.vue)）：版本 JSON 编辑维护的是 Minecraft 游戏版本元数据（`versions/{id}/{id}.json`），与 Java 运行时（下载器/环境检测/运行时列表）无关，从 Java 诊断迁至常用工具分类作为杂项便捷工具；Java 诊断分类现只保留纯 Java 工具，两侧分类描述同步更新。
