@@ -96,3 +96,40 @@ pub struct OpenPortInfo {
 pub struct ListOpenPortsResult {
     pub ports: Vec<OpenPortInfo>,
 }
+
+/// 正版玩家皮肤获取请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SkinFetchParams {
+    /// 玩家名（不区分大小写，正版 API 会规范化为实际注册名）
+    pub name: String,
+}
+
+/// 正版玩家皮肤获取结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SkinFetchResult {
+    /// 玩家名（正版 API 返回的规范化名称）
+    pub name: String,
+    /// 玩家 UUID（32 位十六进制，无连字符）
+    pub uuid: String,
+    /// 皮肤模型："slim"（Alex 细手臂）| "classic"（Steve 粗手臂）
+    pub skin_model: String,
+    /// 皮肤图片地址
+    pub skin_url: String,
+    /// 皮肤 PNG（base64 data URI，供前端直接预览）
+    pub skin_image: String,
+    /// 披风地址（无披风时为 None）
+    pub cape_url: Option<String>,
+    /// 披风 PNG（base64 data URI，无披风时为 None）
+    pub cape_image: Option<String>,
+    /// 失败原因（成功时为空）
+    pub error: String,
+}
+
+/// 保存皮肤图片请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SkinSaveImageParams {
+    /// 保存路径（含文件名，如 D:/skin/Steve.png）
+    pub save_path: String,
+    /// 图片 base64（不含 data URI 前缀）
+    pub image_base64: String,
+}

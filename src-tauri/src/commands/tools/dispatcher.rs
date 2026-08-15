@@ -233,6 +233,24 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
 
+    // 正版玩家皮肤获取 / 保存
+    d.register(
+        "skin_fetch",
+        handler!(state, _app, params, {
+            let p: SkinFetchParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            network::fetch_skin(&state, p).await
+        }),
+    );
+    d.register(
+        "skin_save_image",
+        handler!(state, _app, params, {
+            let p: SkinSaveImageParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            network::save_skin_image(&state, p).await
+        }),
+    );
+
     // 选择器子窗口（通用 HTML 渲染 + on_navigation 选择回调）
     d.register(
         "open_picker_window",
