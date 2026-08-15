@@ -1,35 +1,24 @@
 /**
- * 联机 API - 大厅浏览
- *
- * 2 个 action：lobby_list_rooms（分页公开房间）+ lobby_list_categories（分类，MVP 仅 global）。
- * 列表接口不返回 SDP/ICE/room_key 等敏感字段，加入方需走完整 join 流程。
+ * 大厅 IPC 封装（Scaffolding 收敛版：packages 聚合 + rooms 列表）
  */
-
 import type {
   BusinessResult,
-  LobbyCategoriesResponse,
   LobbyListQuery,
   LobbyListResponse,
+  LobbyPackagesResponse,
 } from '@/types/online'
-import { ONLINE_ACTIONS, onlineManager } from './core'
+import { onlineManager, ONLINE_ACTIONS } from './core'
 
-/**
- * 查询大厅公开房间列表
- *
- * @param query 查询参数（页码/过滤/关键词），所有字段可选
- * @returns 房间列表 + 分页信息
- */
-export function listLobbyRooms(
-  query?: LobbyListQuery,
-): Promise<BusinessResult<LobbyListResponse>> {
-  return onlineManager(ONLINE_ACTIONS.LOBBY_LIST_ROOMS, query ?? {})
+/** 查询大厅聚合（按整合包分组，含热度/房间数） */
+export function listLobbyPackages(): Promise<BusinessResult<LobbyPackagesResponse>> {
+  return onlineManager<BusinessResult<LobbyPackagesResponse>>(ONLINE_ACTIONS.LOBBY_LIST_PACKAGES, {})
 }
 
-/**
- * 查询大厅分类列表
- *
- * MVP 阶段仅返回 `global` 一个分类，`roomCount` 实时统计。
- */
-export function listLobbyCategories(): Promise<BusinessResult<LobbyCategoriesResponse>> {
-  return onlineManager(ONLINE_ACTIONS.LOBBY_LIST_CATEGORIES)
+/** 查询某整合包下的公开房间摘要列表 */
+export function listLobbyRooms(query: LobbyListQuery = {}): Promise<BusinessResult<LobbyListResponse>> {
+  return onlineManager<BusinessResult<LobbyListResponse>>(ONLINE_ACTIONS.LOBBY_LIST_ROOMS, {
+    packageId: query.packageId,
+    page: query.page,
+    pageSize: query.pageSize,
+  })
 }

@@ -4,6 +4,7 @@
  * 封装 scaffolding_host_start / scaffolding_host_stop / scaffolding_client_probe IPC：
  * - 房主：hostStart 一站式启动（探测 MC 端口 → 联机中心 → easytier）
  * - 房客：probe 加入网络后探测房主 MC 服务地址
+ * 探测结果写入 online store 的 easytier 切片（mcIp/mcPort），供面板统一消费。
  */
 import { ref } from 'vue'
 import {
@@ -11,22 +12,16 @@ import {
   scaffoldingHostStart,
   scaffoldingHostStop,
 } from '@/utils/api/online-manager/easytier'
+import { useOnlineStore } from '@/stores/online'
 import { EASYTIER_HOST_VIRTUAL_IP } from '@/types/online'
 
 /** Scaffolding 联机中心 composable */
 export function useScaffolding() {
+  const store = useOnlineStore()
   const starting = ref(false)
   const stopping = ref(false)
   const probing = ref(false)
   const error = ref('')
-  /** 房主虚拟 IP（MC 连接目标） */
-  const mcIp = ref('')
-  /** 房主 MC 局域网端口 */
-  const mcPort = ref(0)
-  /** 联机中心实际监听端口（房主） */
-  const centerPort = ref(0)
-  /** 联机中心 hostname（房主） */
-  const hostname = ref('')
 
   /** 房主一站式启动联机中心 */
   async function hostStart(
@@ -37,10 +32,11 @@ export function useScaffolding() {
     error.value = ''
     try {
       const res = await scaffoldingHostStart({ roomCode, mcPort: port })
-      mcIp.value = EASYTIER_HOST_VIRTUAL_IP
-      mcPort.value = res.mcPort
-      centerPort.value = res.centerPort
-      hostname.value = res.hostname
+      store.setEasyTierRuntime({
+        mcIp: EASYTIER_HOST_VIRTUAL_IP,
+        mcPort: res.mcPort,
+        centerPort: res.centerPort,
+      })
       return { ok: true }
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e)
@@ -55,12 +51,9 @@ export function useScaffolding() {
     stopping.value = true
     try {
       await scaffoldingHostStop()
+      store.resetEasyTierRuntime()
     } finally {
       stopping.value = false
-      mcIp.value = ''
-      mcPort.value = 0
-      centerPort.value = 0
-      hostname.value = ''
     }
   }
 
@@ -72,8 +65,7 @@ export function useScaffolding() {
     error.value = ''
     try {
       const res = await scaffoldingClientProbe({ roomCode })
-      mcIp.value = res.mcIp
-      mcPort.value = res.mcPort
+      store.setEasyTierRuntime({ mcIp: res.mcIp, mcPort: res.mcPort })
       return { ok: true, mcIp: res.mcIp, mcPort: res.mcPort }
     } catch (e) {
       error.value = e instanceof Error ? e.message : String(e)
@@ -88,10 +80,6 @@ export function useScaffolding() {
     stopping,
     probing,
     error,
-    mcIp,
-    mcPort,
-    centerPort,
-    hostname,
     hostStart,
     hostStop,
     probe,

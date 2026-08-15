@@ -1,9 +1,9 @@
 /**
- * 联机 store easytier 切片（easytier 运行时状态，供全局访问/重启恢复）
+ * 联机 store easytier 切片（easytier + Scaffolding 运行时状态，供全局访问/重启恢复）
  */
 import { ref } from 'vue'
 
-/** easytier 运行时状态 */
+/** easytier + Scaffolding 运行时状态 */
 export interface EasyTierRuntime {
   /** 是否已加入虚拟网络 */
   joined: boolean
@@ -17,6 +17,12 @@ export interface EasyTierRuntime {
   rpcPortal: string
   /** easytier-core 子进程 PID */
   pid?: number
+  /** 房主 MC 虚拟 IP（房客 probe 到后写入，即进服地址） */
+  mcIp: string
+  /** 房主 MC 局域网端口 */
+  mcPort: number
+  /** 联机中心实际监听端口（房主） */
+  centerPort: number
 }
 
 /** 创建 easytier 运行时切片 */
@@ -42,5 +48,8 @@ function emptyRuntime(): EasyTierRuntime {
     virtualIp: '',
     rpcPortal: '',
     pid: undefined,
+    mcIp: '',
+    mcPort: 0,
+    centerPort: 0,
   }
 }
