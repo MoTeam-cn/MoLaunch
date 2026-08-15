@@ -11,6 +11,9 @@
     "publisher": "MoTeam",
     "copyright": "Copyright © 2026 MoTeam. All rights reserved.",
     "createUpdaterArtifacts": true,
+    "externalBin": [
+      "binaries/easytier-core"
+    ],
     "resources": [
       "resources/*"
     ],

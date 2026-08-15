@@ -36,6 +36,8 @@
 
 ### Added
 
+- **easytier-core 二进制集成到 Tauri 打包（Agent D，联机重构 Phase 0）**（[tauri.conf.json](src-tauri/tauri.conf.json) / [build.rs](src-tauri/build.rs) / [build_script/easytier.rs](src-tauri/build_script/easytier.rs)（新增） / [models.rs](src-tauri/src/state/config/models.rs) / [defaults.rs](src-tauri/src/state/config/defaults.rs) / [licenses.txt](src-tauri/resources/about/licenses.txt) / [.gitignore](.gitignore)）：① `bundle.externalBin` 声明 `binaries/easytier-core`，release 产物自动携带 easytier-core 侧车进程（tauri-build v2 要求文件命名为 `easytier-core-{target_triple}.exe`，当前打包版本 v2.6.4，来源 GitHub Releases `easytier-windows-x86_64-v2.6.4.zip`，Apache-2.0）；② build.rs 新增构建期检查（`build_script/easytier.rs`）：exe 缺失时打印明确中文报错与下载提示并终止构建，存在时打印版本供核对；③ `OnlineConfig` 新增 `easytier_core_path` 配置字段（serde 默认值 `sidecar/easytier-core.exe`，相对 resource_dir，运行时拼接由联机重构 Agent B 实现），旧配置自动补默认值；④ 第三方许可登记 easytier（Apache-2.0 + 来源 URL）；⑤ `.gitignore` 忽略 `src-tauri/binaries/`（二进制构建期获取，不入库）。
+
 - **资源包编辑器 pack.mcmeta 按版本推导 pack_format（M4 版本隔离：表单）**（[RpMcmetaForm.vue](src/views/tools/data/RpMcmetaForm.vue) / [resourcepack.ts](src/utils/api/tools/resourcepack.ts) / [core.ts](src/utils/api/tools/core.ts)）：pack.mcmeta 表单新增「按版本推导」下拉——选项为已安装 MC 版本，选择后调用 `rp_version_pack_format` 由版本正向推导 pack_format 并自动回填输入框（推导中显示加载态），与资源包转换器「下拉选版本」交互一致；同时保留手填 pack_format 反向展示适用版本的联动校验。新增 `rpVersionPackFormat` API 封装与 `RP_VERSION_PACK_FORMAT` action 常量。
 
 - **资源包编辑器版本隔离下拉（M4 版本隔离：编辑器）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：文件树顶部新增版本下拉框——选项「全局（不隔离）」+ 已安装 MC 版本，选择后按该版本的隔离目录扫描 resourcepacks（`resourcepackList(versionId)`），修复此前固定扫描全局目录导致列表为空的问题；隔离模式为 All(4) 时自动默认选中第一个已安装版本（与资源包转换器交互一致），切换版本实时刷新列表。
