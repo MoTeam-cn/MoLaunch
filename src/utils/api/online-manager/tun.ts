@@ -16,7 +16,7 @@ import type {
   TunForwardResponse,
   TunStartParams,
   TunStartResponse,
-} from '@/types/online'
+} from '@/types/online/tun'
 import { ONLINE_ACTIONS, onlineManager } from './core'
 
 /**

@@ -11,7 +11,7 @@ import { useOnlineStore } from '@/stores/online'
 import { serverPing, tcpCheck } from '@/utils/api/tools'
 import type { ServerPingResult, TcpCheckResult } from '@/utils/api/tools'
 import { lanPortProbe } from '@/utils/api/online-manager'
-import type { LanPortProbeResponse } from '@/types/online'
+import type { LanPortProbeResponse } from '@/types/online/tun'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
 import { toastError } from '@/utils/toast'

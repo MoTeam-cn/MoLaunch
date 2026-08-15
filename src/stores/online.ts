@@ -10,12 +10,14 @@ import { defineStore } from 'pinia'
 
 // re-export 类型定义，保持调用方路径兼容
 export * from './online/types'
+export type { EasyTierRuntime } from './online/easytierSlice'
 
 // 切片
 import { useOnlineAuthSlice } from './online/authSlice'
 import { useOnlineRoomSlice } from './online/roomSlice'
 import { useOnlineWhitelistSlice } from './online/whitelistSlice'
 import { useOnlineNatSlice } from './online/natSlice'
+import { useOnlineEasyTierSlice } from './online/easytierSlice'
 import { RoomClosedError } from './online/roomActions'
 import { toastError } from '@/utils/toast'
 
@@ -28,6 +30,7 @@ export const useOnlineStore = defineStore('online', () => {
   const roomSlice = useOnlineRoomSlice()
   const whitelistSlice = useOnlineWhitelistSlice(roomSlice.roomState)
   const natSlice = useOnlineNatSlice()
+  const easytierSlice = useOnlineEasyTierSlice()
 
   /**
    * 重置房间状态（不调用后端，仅清空本地）
@@ -74,6 +77,8 @@ export const useOnlineStore = defineStore('online', () => {
     ...whitelistSlice,
     // NAT 检测
     ...natSlice,
+    // easytier 运行时
+    ...easytierSlice,
     // 顶层方法
     resetRoomState,
     // 供测试/调试暴露的定时器句柄

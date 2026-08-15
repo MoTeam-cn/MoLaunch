@@ -124,6 +124,13 @@ export const ONLINE_ACTIONS = {
   // 大厅浏览（联机大厅阶段 5）
   LOBBY_LIST_ROOMS: 'lobby_list_rooms',
   LOBBY_LIST_CATEGORIES: 'lobby_list_categories',
+  LOBBY_LIST_PACKAGES: 'lobby_list_packages',
+  // easytier 虚拟组网 + Scaffolding 联机中心
+  EASYTIER_JOIN: 'easytier_join',
+  EASYTIER_STOP: 'easytier_stop',
+  SCAFFOLDING_HOST_START: 'scaffolding_host_start',
+  SCAFFOLDING_HOST_STOP: 'scaffolding_host_stop',
+  SCAFFOLDING_CLIENT_PROBE: 'scaffolding_client_probe',
 } as const
 
 /** action 名称类型 */
