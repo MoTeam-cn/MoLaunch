@@ -1,6 +1,7 @@
 //! 应用全局状态（AppState）
 
-use crate::minecraft::online::bridge::VirtualLanBridge;
+use crate::minecraft::online::scaffolding::easytier::EasyTier;
+use crate::minecraft::online::scaffolding::server::ScaffoldingServer;
 use crate::sdk::SdkInstance;
 use crate::{log_info, log_warn};
 use std::sync::{Arc, Mutex};
@@ -40,11 +41,15 @@ pub struct AppState {
     /// `authlib_login` 返回 `NeedSelect` 时暂存，前端选定 profile 后
     /// `authlib_select_profile` 取出使用。同一时间只允许一个待处理登录。
     pub authlib_pending: Arc<TokioMutex<Option<PendingAuthlibLogin>>>,
-    /// 联机虚拟网卡桥接器（阶段三子任务 5：TUN ↔ DataChannel 桥接）
+    /// easytier 虚拟网络进程（房主与房客共用，加入房间时创建，退出时停止）
     ///
-    /// 房主与加入方共用同一实例，每次进入房间时 `tun_start` 创建并替换，
-    /// `tun_stop` 关闭并置 None。同一时间仅允许一个桥接实例。
-    pub virtual_lan_bridge: Arc<TokioMutex<Option<VirtualLanBridge>>>,
+    /// 房主固定虚拟 IP `10.244.0.1`（联机中心锚点），房客走 `--dhcp` 自动分配。
+    /// `easytier_join` 创建并替换，`easytier_stop` 停止并置 None。
+    pub easytier: Arc<TokioMutex<Option<EasyTier>>>,
+    /// 联机中心 TCP 服务（仅房主，监听虚拟 IP，解析 §2.3 大端序帧）
+    ///
+    /// `scaffolding_host_start` 创建并替换，`scaffolding_host_stop` 停止并置 None。
+    pub scaffolding_server: Arc<TokioMutex<Option<ScaffoldingServer>>>,
     /// MC 局域网服务器伪装（加入方本地伪装 LAN 服务器，多人游戏界面直接发现房主房间）
     ///
     /// 加入方进入房间且 TUN 就绪后由 `lan_fake_server_start` 创建并替换，
@@ -110,7 +115,8 @@ impl AppState {
             chat_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             analyze_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             authlib_pending: Arc::new(TokioMutex::new(None)),
-            virtual_lan_bridge: Arc::new(TokioMutex::new(None)),
+            easytier: Arc::new(TokioMutex::new(None)),
+            scaffolding_server: Arc::new(TokioMutex::new(None)),
             lan_fake_server: Arc::new(TokioMutex::new(None)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
             panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),

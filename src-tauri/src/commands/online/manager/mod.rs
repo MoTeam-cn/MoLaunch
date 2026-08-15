@@ -6,7 +6,6 @@ mod dispatcher;
 mod lan_fake;
 mod lan_probe;
 mod signaling_manager;
-mod tun;
 
 pub(crate) use dispatcher::{
     build_device_status, login_fresh, make_client, make_storage, read_api_server_url,

@@ -80,7 +80,7 @@ pub fn request_exit(app: AppHandle) {
 ///
 /// 补齐此前退出路径的清理缺口：
 /// 1. 遍历 frpc 全局进程表停止所有隧道（避免残留 frpc.exe）
-/// 2. 停止 TUN 虚拟网卡桥接器（此前依赖 Drop 兜底）
+/// 2. 停止 easytier 虚拟网络与联机中心服务（此前依赖 Drop 兜底）
 /// 3. 保存配置到文件
 pub fn cleanup_and_exit(app: &AppHandle) {
     let app = app.clone();
@@ -88,13 +88,23 @@ pub fn cleanup_and_exit(app: &AppHandle) {
         crate::commands::frp::process::stop_all_tunnels().await;
 
         if let Some(state) = app.try_state::<AppState>() {
-            let bridge = {
-                let mut guard = state.virtual_lan_bridge.lock().await;
+            // 停止 easytier 虚拟网络
+            let easytier = {
+                let mut guard = state.easytier.lock().await;
                 guard.take()
             };
-            if let Some(bridge) = bridge {
-                log_info!("[Exit] 停止 TUN 虚拟网卡");
-                bridge.stop().await;
+            if let Some(easytier) = easytier {
+                log_info!("[Exit] 停止 easytier 虚拟网络");
+                easytier.stop().await;
+            }
+            // 停止联机中心 TCP 服务
+            let server = {
+                let mut guard = state.scaffolding_server.lock().await;
+                guard.take()
+            };
+            if let Some(server) = server {
+                log_info!("[Exit] 停止联机中心服务");
+                server.stop().await;
             }
 
             let config = state.config.lock().await;

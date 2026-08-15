@@ -95,11 +95,6 @@ rand = "0.8"
 # PEM 格式密钥解析（内置云端 RSA 公钥 PEM）
 pem = "3"
 
-# 虚拟网卡（阶段三：TUN 接口管理，跨平台 TUN/TAP 库）
-# Windows 底层为 Wintun 驱动，需随程序分发 wintun.dll
-# Linux/macOS 需 root 或 CAP_NET_ADMIN 权限
-tun-rs = { version = "2", features = ["async_tokio"] }
-
 # Frp 认证体系：token 经 SDK 内置 DES 加密后存文件（`<base_dir>/frp/auth/{provider_id}.json`），
 # 替代原 keyring（OS 密钥存储）。文件随实例数据目录迁移，Unix 下 0o600 权限。
 
