@@ -75,6 +75,9 @@ node_modules
 # Tools
 /tools
 
+# 工具链本地产物（Playwright MCP 运行数据等）
+.playwright-mcp/
+
 # 文件备份（批量替换前生成的临时备份，不入库）
 /CHANGELOG.bak
 
