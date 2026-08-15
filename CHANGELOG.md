@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **房主房间信息卡移除「剩余时间」显示**（[HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue)）：不再展示房间保留倒计时，房间信息卡精简为房间码 / MC 版本与端口 / 加载器 / 备注 / 房间类型 / 私密标识。
+
 - **恢复联机侧边栏「房间管理」子菜单，新增「房间详情」子项**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue)）：侧边栏从扁平「设备 / 联机大厅 / 创建房间 / 加入房间」恢复为「设备 / 联机大厅 / 房间管理（创建房间 · 加入房间 · 房间详情）+ FRP」子菜单结构；在房间中时「创建房间」「加入房间」置灰（disabled，需先退出房间），未在房间时「房间详情」置灰；进入房间自动切到「房间详情」（`room_details` 按角色回落 RoomManager：房主→create、房客→join），离开房间且当前在房间详情时切回创建房间；保留云端离线封禁（sealed）与 `?tab=` 恢复机制。「大厅重复加入」已由 LobbyBrowser `inRoom` 双检查防护（`handleJoin`/`doJoin` 拦截 + 卡片按钮置灰）。
 
 - **设备页面新增「虚拟组网（easytier）」状态卡片，后端 emit 推送运行状态**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [EasyTierStatusCard.vue](src/components/online/EasyTierStatusCard.vue)）：① 后端 `EasyTier` 新增 `version` 字段（启动时执行 `--version` 查询，失败为空串）；② 新增 `easytier-status` 事件——`easytier_join`/`scaffolding_host_start`/`scaffolding_client_probe` 加入成功、`easytier_stop`/`scaffolding_host_stop` 停止后推送 `{joined, version, pid, rpcPortal}`；③ 新增 `easytier_status` IPC 查询动作（页面打开兜底拉取）；④ 前端设备面板新增 easytier 状态卡片，展示组网状态徽章 / core 版本 / 虚拟网络 / 虚拟 IP / 进程 PID，`useTauriEvent` 监听事件实时同步到 store。
