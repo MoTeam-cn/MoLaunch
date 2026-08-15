@@ -25,7 +25,6 @@ import { collectExpandPaths, filterTreeNode, normalizeKeyword } from '@/utils/re
 import { resourcepackList, rpOpen, rpRead, rpExport } from '@/utils/api/tools'
 import type { RpOpenResult, RpReadResult, RpTreeNode, ResourcePackItem } from '@/utils/api/tools'
 import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
-import { getConfigMap } from '@/utils/api/config'
 import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
@@ -105,14 +104,7 @@ function countFiles(node?: RpTreeNode): number {
 
 onMounted(async () => {
   await loadVersions()
-  // 隔离模式为 All(4) 时所有版本都隔离，默认选第一个已安装版本（与资源包转换器一致）
-  const config = await getConfigMap()
-  if (config.isolationMode === 4 && installedVersions.value.length > 0) {
-    selectedVersionId.value = installedVersions.value[0].id
-    // watch 会自动触发 loadPacks
-  } else {
-    await loadPacks()
-  }
+  await loadPacks()
 })
 
 async function loadPacks() {
@@ -283,17 +275,28 @@ async function saveAsZip() {
 
     <div class="px-5 py-4">
       <!-- 资源包列表 -->
-      <button
-        class="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"
-        @click="listOpen = !listOpen"
-      >
-        <ChevronDownIcon
-          class="h-4 w-4 transition-transform"
-          :class="listOpen ? '' : '-rotate-90'"
-        />
-        资源包列表
-        <span class="text-xs text-gray-400">（{{ packs.length }}）</span>
-      </button>
+      <div class="flex flex-wrap items-center gap-2">
+        <button
+          class="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-800"
+          @click="listOpen = !listOpen"
+        >
+          <ChevronDownIcon
+            class="h-4 w-4 transition-transform"
+            :class="listOpen ? '' : '-rotate-90'"
+          />
+          资源包列表
+          <span class="text-xs text-gray-400">（{{ packs.length }}）</span>
+        </button>
+        <div class="ml-auto flex items-center gap-1.5">
+          <span class="text-xs text-gray-400">版本</span>
+          <Select
+            v-model="selectedVersionId"
+            :options="versionOptions"
+            class="w-40"
+            title="选择资源包隔离目录（按 MC 版本）"
+          />
+        </div>
+      </div>
       <div v-show="listOpen" class="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
         <button
           v-for="p in packs"
@@ -365,14 +368,6 @@ async function saveAsZip() {
       <div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-[280px_1fr]">
         <!-- 文件树 -->
         <div class="max-h-[560px] overflow-y-auto p-2 md:border-r md:border-gray-200">
-          <div class="mb-2 flex items-center gap-1 px-1">
-            <Select
-              v-model="selectedVersionId"
-              :options="versionOptions"
-              class="w-40 shrink-0"
-              title="选择资源包隔离目录（按 MC 版本）"
-            />
-          </div>
           <div class="relative mb-2 px-1">
             <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input

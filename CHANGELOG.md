@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- **资源包编辑器版本下拉调整（M4 版本隔离修复）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：版本下拉从「已打开包的文件树区域」移到「资源包列表」顶部（打开包前即可选择，与资源包转换器布局一致）；移除隔离模式 All(4) 时强制默认选中第一个已安装版本的逻辑，改为默认「全局（不隔离）」由用户自行选择，避免用户无法在编辑器内主动切换版本。
+
 ### Added
 
 - **资源包编辑器 pack.mcmeta 按版本推导 pack_format（M4 版本隔离：表单）**（[RpMcmetaForm.vue](src/views/tools/data/RpMcmetaForm.vue) / [resourcepack.ts](src/utils/api/tools/resourcepack.ts) / [core.ts](src/utils/api/tools/core.ts)）：pack.mcmeta 表单新增「按版本推导」下拉——选项为已安装 MC 版本，选择后调用 `rp_version_pack_format` 由版本正向推导 pack_format 并自动回填输入框（推导中显示加载态），与资源包转换器「下拉选版本」交互一致；同时保留手填 pack_format 反向展示适用版本的联动校验。新增 `rpVersionPackFormat` API 封装与 `RP_VERSION_PACK_FORMAT` action 常量。
