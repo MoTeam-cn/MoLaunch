@@ -15,6 +15,10 @@ use build_script::cubiomes_wasm::compile_cubiomes_wasm;
 use std::path::Path;
 
 fn main() {
+    // 先检查 easytier-core 侧车（缺失时给出中文下载指引并终止，避免 tauri-build 报晦涩英文错误）
+    #[cfg(target_os = "windows")]
+    build_script::easytier::check_easytier();
+
     tauri_build::build();
 
     // 同步项目许可协议（根目录 LICENSE → resources/LICENSE.txt 副本）
