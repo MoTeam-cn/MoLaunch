@@ -1,45 +1,51 @@
 /**
- * 创建房间表单 composable
+ * 创建房间表单 composable（Scaffolding 收敛版）
  *
- * 表单状态、版本列表加载与解析、提交校验与创建流程（stun → create 两步）、高级设置徽章；
+ * 表单状态、版本列表加载与解析、本地生成 U/xxx 码、登记 + 拉起联机中心一站式流程；
  * 返回全部模板所需状态与动作，主文件仅保留模板与组装。
  */
 import { ref, computed, onMounted } from 'vue'
 import { useOnlineStore } from '@/stores/online'
+import { useRoomHost } from './useRoomHost'
 import {
   listInstalledVersionsWithType,
   getVersionLoaderInfo,
   type InstalledVersionInfo,
 } from '@/utils/api/version'
 import { getVersionGameVersion } from '@/utils/api/personalization'
+import { generateScaffoldingCode } from '@/types/online'
 import type { ModpackMeta } from '@/types/online'
 import { toastError, toastWarning } from '@/utils/toast'
 
-/** 创建房间表单 composable（表单状态 / 校验 / 提交 / 进阶配置） */
+/** 创建流程阶段（UI 步骤指示） */
+export type CreateStep = 'idle' | 'code' | 'register' | 'start'
+
+/** 创建房间表单 composable（表单状态 / 校验 / 提交 / 整合包） */
 export function useCreateRoomForm() {
   const store = useOnlineStore()
+  const roomHost = useRoomHost()
 
   /** 创建房间表单 */
   const createForm = ref({
-    maxPlayers: 4,
+    remark: '',
+    isPublic: true,
     password: '',
     mcVersion: '',         // 纯 MC 版本号（如 1.20.1），由 getVersionGameVersion 解析
     mcPort: 25565,
     selectedVersionId: '', // 选中的 version_id（Select 回显用）
     hostLoader: '',        // forge/fabric/neoforge/.../release
     hostLoaderVersion: '', // 如 47.3.0
-    roomType: 'private' as 'private' | 'lobby', // 联机大厅阶段 2：private 仅房间码 / lobby 加入大厅
   })
 
-  /** 整合包元数据（联机大厅阶段 3，undefined=纯原版房间） */
+  /** 整合包元数据（undefined=纯原版房间） */
   const modpackMeta = ref<ModpackMeta | undefined>()
-  /** 整合包勾选状态（联机大厅阶段 3，即使版本无元数据也反映用户勾选意图，用于徽章联动） */
+  /** 整合包勾选状态（即使版本无元数据也反映用户勾选意图） */
   const modpackEnabled = ref(false)
 
   const publicRoomHint = computed(() =>
-    createForm.value.roomType === 'lobby'
-      ? '房间将加入联机大厅，其他玩家可在「联机大厅」中检索并加入'
-      : '仅凭房间码加入，不会出现在大厅列表中',
+    createForm.value.isPublic
+      ? '公开房间将按整合包聚类进入「联机大厅」，其他玩家可检索并加入'
+      : '私密房间仅凭房间码加入，不会出现在大厅列表中',
   )
 
   /** 已安装版本列表（用于 MC 版本下拉选择） */
@@ -50,8 +56,15 @@ export function useCreateRoomForm() {
   const versionsLoading = ref(false)
   /** 版本信息解析中（避免重复点击/提交） */
   const versionResolving = ref(false)
-  /** 创建流程进行中（含 stun 阶段，避免重复提交；由 roomLoading 之外的独立标记承载） */
+  /** 创建流程进行中（避免重复提交） */
   const creating = ref(false)
+  /** 当前创建阶段（UI 步骤指示） */
+  const createStep = ref<CreateStep>('idle')
+  const createSteps = [
+    { key: 'code', label: '生成房间码' },
+    { key: 'register', label: '登记房间' },
+    { key: 'start', label: '拉起联机中心' },
+  ] as const
 
   onMounted(async () => {
     versionsLoading.value = true
@@ -66,7 +79,7 @@ export function useCreateRoomForm() {
   })
 
   /**
-   * 选择已安装版本后异步解析三字段（联机大厅阶段 1）
+   * 选择已安装版本后异步解析三字段
    *
    * - `mcVersion` ← getVersionGameVersion（inheritsFrom / --fml.mcVersion / URL 正则 / jar / id）
    * - `hostLoader` + `hostLoaderVersion` ← getVersionLoaderInfo（setup.ini 的 Type + XxxVersion）
@@ -75,7 +88,6 @@ export function useCreateRoomForm() {
    */
   async function onVersionSelect(value: string | number) {
     const versionId = String(value)
-    // 清空操作（allow-clear 触发 emit ''）：重置所有版本相关字段，不再调用解析接口
     if (!versionId) {
       createForm.value.selectedVersionId = ''
       createForm.value.mcVersion = ''
@@ -84,7 +96,6 @@ export function useCreateRoomForm() {
       return
     }
     createForm.value.selectedVersionId = versionId
-    // 立即清空旧值，避免异步返回前显示脏数据
     createForm.value.mcVersion = ''
     createForm.value.hostLoader = ''
     createForm.value.hostLoaderVersion = ''
@@ -108,44 +119,16 @@ export function useCreateRoomForm() {
     }
   }
 
-  /** 最大人数提示：mesh 拓扑 5+ 人带宽压力陡增，超限显示 error */
-  const maxPlayersHint = computed(() => {
-    const v = createForm.value.maxPlayers
-    if (v < 2) return '至少需要 2 人（房主 + 1 参与者）'
-    if (v > 5) return 'mesh 模式不建议超过 5 人，请使用专业服务器'
-    return 'mesh 模式建议 2-5 人，超过请使用专业服务器'
-  })
-  const maxPlayersHintType = computed<'default' | 'error' | 'success'>(() => {
-    const v = createForm.value.maxPlayers
-    if (v < 2 || v > 5) return 'error'
-    return 'default'
-  })
-
-  /** 白名单表单状态 */
-  const whitelistForm = ref({ enabled: false, deviceIds: [] as string[] })
-
-  /** 高级设置状态徽章：同时反映整合包勾选与白名单启用状态 */
-  const advancedBadge = computed(() => {
-    const parts: string[] = []
-    if (modpackEnabled.value) parts.push('已关联整合包')
-    if (whitelistForm.value.enabled) parts.push('白名单已启用')
-    return parts.length > 0 ? parts.join(' · ') : '未启用'
-  })
-  const advancedBadgeActive = computed(() =>
-    modpackEnabled.value || whitelistForm.value.enabled,
-  )
-
-  /** 整合包勾选状态变化回调（联机大厅阶段 3） */
+  /** 整合包勾选状态变化回调 */
   function onModpackEnabledChange(enabled: boolean) {
     modpackEnabled.value = enabled
   }
 
-  /** 创建房间步骤指示器（mesh 拓扑两步：stun → create） */
-  const createSteps = [{ key: 'stun' as const, label: '获取 STUN 服务器' }, { key: 'create' as const, label: '创建房间' }]
-  const stepOrder = ['stun', 'create'] as const
-  const currentStepIndex = computed(() => store.roomCreateStep ? stepOrder.indexOf(store.roomCreateStep) : -1)
-
-  /** 房主创建房间（mesh 拓扑：不生成本地 Offer，参与者加入后再 per-participant 生成） */
+  /**
+   * 房主创建房间（本地生成完整码 → 登记 → 拉起联机中心）
+   *
+   * 拉起失败时回滚登记并清空本地房间状态。
+   */
   async function handleCreateRoom() {
     if (creating.value) return
     if (!createForm.value.selectedVersionId) {
@@ -164,39 +147,35 @@ export function useCreateRoomForm() {
       toastError('MC 端口无效：端口范围 1-65535')
       return
     }
-    if (createForm.value.maxPlayers < 2 || createForm.value.maxPlayers > 5) {
-      toastError('人数无效：mesh 模式最大人数范围为 2-5')
-      return
-    }
 
     creating.value = true
     try {
-      store.roomCreateStep = 'stun'
-      const stun = await store.fetchStunServers()
+      createStep.value = 'code'
+      const roomCode = generateScaffoldingCode()
 
-      store.roomCreateStep = 'create'
-      await store.hostCreateRoom(
-        '',
-        [],
-        createForm.value.maxPlayers,
-        createForm.value.password,
-        createForm.value.mcVersion,
-        createForm.value.mcPort,
-        stun,
-        whitelistForm.value.enabled,
-        whitelistForm.value.deviceIds,
-        createForm.value.hostLoader,
-        createForm.value.hostLoaderVersion,
-        createForm.value.roomType,
-        // 公开房间携带大厅 ID（当前固定 global，阶段 5 做大厅选择器后扩展）
-        createForm.value.roomType === 'lobby' ? 'global' : undefined,
-        // 联机大厅阶段 3：整合包元数据（undefined=纯原版房间）
-        modpackMeta.value,
-      )
+      createStep.value = 'register'
+      await store.hostCreateRoom({
+        roomCode,
+        remark: createForm.value.remark,
+        isPublic: createForm.value.isPublic,
+        password: createForm.value.password,
+        hostMcVersion: createForm.value.mcVersion,
+        hostMcPort: createForm.value.mcPort,
+        hostLoader: createForm.value.hostLoader,
+        hostLoaderVersion: createForm.value.hostLoaderVersion,
+        modpack: modpackMeta.value,
+      })
+
+      createStep.value = 'start'
+      const started = await roomHost.hostStart()
+      if (!started.ok) {
+        await store.hostCloseRoom()
+        throw new Error(started.error || '拉起联机中心失败')
+      }
     } catch (e) {
       toastError(`创建房间失败：${e instanceof Error ? e.message : String(e)}`)
     } finally {
-      store.roomCreateStep = null
+      createStep.value = 'idle'
       creating.value = false
     }
   }
@@ -205,19 +184,15 @@ export function useCreateRoomForm() {
     store,
     createForm,
     creating,
+    createSteps,
+    createStep,
     modpackMeta,
+    modpackEnabled,
     onModpackEnabledChange,
     publicRoomHint,
     versionOptions,
     versionsLoading,
     onVersionSelect,
-    maxPlayersHint,
-    maxPlayersHintType,
-    whitelistForm,
-    advancedBadge,
-    advancedBadgeActive,
-    createSteps,
-    currentStepIndex,
     handleCreateRoom,
   }
 }

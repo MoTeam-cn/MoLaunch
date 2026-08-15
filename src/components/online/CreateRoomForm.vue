@@ -1,55 +1,46 @@
 <script setup lang="ts">
-/** 创建房间表单：MC 版本 Select 下拉 + 高级设置（白名单/整合包关联，置于抽屉内） */
-import { ref, watch, defineAsyncComponent } from 'vue'
+/** 创建房间表单：MC 版本 + 房间设置 + 整合包关联（Scaffolding 收敛版，一站式创建） */
+import { ref, computed, watch, defineAsyncComponent } from 'vue'
+import { PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { useCreateRoomForm } from '@/composables/useCreateRoomForm'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
-const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
-const WhitelistEditor = defineAsyncComponent(() => import('./WhitelistEditor.vue'))
 const ModpackSelector = defineAsyncComponent(() => import('./ModpackSelector.vue'))
-import { Cog8ToothIcon, PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
-import { useCreateRoomForm } from '@/composables/useCreateRoomForm'
+const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
 
 const {
   store,
   createForm,
   creating,
+  createSteps,
+  createStep,
   modpackMeta,
   onModpackEnabledChange,
   publicRoomHint,
   versionOptions,
   versionsLoading,
   onVersionSelect,
-  maxPlayersHint,
-  maxPlayersHintType,
-  whitelistForm,
-  advancedBadge,
-  advancedBadgeActive,
-  createSteps,
-  currentStepIndex,
   handleCreateRoom,
 } = useCreateRoomForm()
-
-/** 高级设置抽屉开关（详情页仅保留入口按钮） */
-const advancedDrawerOpen = ref(false)
 
 /** 创建进度抽屉开关：提交创建时自动弹出，完成/失败自动收起 */
 const createProgressOpen = ref(false)
 watch(
-  () => store.roomCreateStep,
+  () => createStep.value,
   (step) => {
-    createProgressOpen.value = step !== null
+    createProgressOpen.value = step !== 'idle'
   },
 )
+const currentStepIndex = computed(() => createSteps.findIndex((s) => s.key === createStep.value))
 </script>
 
 <template>
   <div class="space-y-4">
-    <AlertV2 type="info" message="P2P联机对房主的网络质量要求较高，如遇连接不上可尝试更换房主" />
-    <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
+    <AlertV2 type="info" message="联机基于 easytier 虚拟局域网（Scaffolding）：房主需先在游戏中开启「对局域网开放」，再填写下方信息创建房间" />
     <!-- 基础信息卡片 -->
     <Card title="创建房间">
       <div class="space-y-4 py-1">
@@ -69,60 +60,54 @@ watch(
         <!-- MC 端口 -->
         <div class="flex items-center gap-3">
           <label class="w-24 text-xs text-gray-600 shrink-0">MC 端口</label>
-          <Input v-model="createForm.mcPort" type="number" placeholder="25565" />
+          <Input v-model.number="createForm.mcPort" type="number" placeholder="25565" />
         </div>
-        <!-- 最大人数 -->
+        <!-- 房间备注 -->
         <div class="flex items-center gap-3">
-          <label class="w-24 text-xs text-gray-600 shrink-0">最大人数</label>
-          <Input
-            v-model="createForm.maxPlayers"
-            type="number"
-            placeholder="4"
-            :hint="maxPlayersHint"
-            :hint-type="maxPlayersHintType"
-          />
+          <label class="w-24 text-xs text-gray-600 shrink-0">房间备注</label>
+          <Input v-model="createForm.remark" placeholder="例如：开黑速通，随到随玩（选填）" maxlength="40" />
+        </div>
+        <!-- 房间类型：公开 / 私密 -->
+        <div class="flex items-center gap-3">
+          <label class="w-24 text-xs text-gray-600 shrink-0">房间类型</label>
+          <div class="flex-1 space-y-1">
+            <div class="flex gap-2">
+              <Button
+                :type="createForm.isPublic ? 'primary' : 'outline'"
+                long
+                size="small"
+                @click="createForm.isPublic = true"
+              >
+                公开
+              </Button>
+              <Button
+                :type="!createForm.isPublic ? 'primary' : 'outline'"
+                long
+                size="small"
+                @click="createForm.isPublic = false"
+              >
+                私密
+              </Button>
+            </div>
+            <p class="text-xs text-gray-500">{{ publicRoomHint }}</p>
+          </div>
         </div>
         <!-- 房间密码 -->
         <div class="flex items-center gap-3">
           <label class="w-24 text-xs text-gray-600 shrink-0">房间密码</label>
           <Input v-model="createForm.password" placeholder="留空表示无密码" />
         </div>
-        <!-- 房间类型：私密 / 公开（联机大厅阶段 2） -->
-        <div class="flex items-center gap-3">
-          <label class="w-24 text-xs text-gray-600 shrink-0">房间类型</label>
-          <div class="flex-1 space-y-1">
-            <div class="flex gap-2">
-              <Button
-                :type="createForm.roomType === 'private' ? 'primary' : 'outline'"
-                long
-                size="small"
-                @click="createForm.roomType = 'private'"
-              >
-                私密
-              </Button>
-              <Button
-                :type="createForm.roomType === 'lobby' ? 'primary' : 'outline'"
-                long
-                size="small"
-                @click="createForm.roomType = 'lobby'"
-              >
-                公开
-              </Button>
-            </div>
-            <p class="text-xs text-gray-500">{{ publicRoomHint }}</p>
+        <!-- 整合包关联 -->
+        <div class="flex items-start gap-3">
+          <label class="w-24 text-xs text-gray-600 shrink-0 pt-2">整合包</label>
+          <div class="flex-1 space-y-2">
+            <ModpackSelector
+              v-model="modpackMeta"
+              :version-id="createForm.selectedVersionId"
+              @enabled-change="onModpackEnabledChange"
+            />
+            <ModpackRequirementCard v-if="modpackMeta" :modpack="modpackMeta" />
           </div>
-        </div>
-        <!-- 高级设置入口（内容置于抽屉内，详情页仅保留按钮；未启用时不显示状态徽章） -->
-        <div class="pt-2">
-          <Button type="outline" long @click="advancedDrawerOpen = true">
-            <template #icon><Cog8ToothIcon class="w-4 h-4" /></template>
-            <span class="flex items-center justify-center gap-1">
-              高级设置
-              <Tag v-if="advancedBadgeActive" size="small" color="arcoblue">
-                {{ advancedBadge }}
-              </Tag>
-            </span>
-          </Button>
         </div>
         <!-- 创建按钮 -->
         <div class="pt-1">
@@ -133,29 +118,6 @@ watch(
         </div>
       </div>
     </Card>
-
-    <!-- 高级设置抽屉：整合包关联 + 白名单管理 -->
-    <Drawer
-      v-model:visible="advancedDrawerOpen"
-      title="高级设置"
-      placement="right"
-      :width="420"
-      render-in-place
-      popup-container="#app-content"
-    >
-      <div class="space-y-3">
-        <!-- 整合包关联（联机大厅阶段 3） -->
-        <ModpackSelector
-          v-model="modpackMeta"
-          :version-id="createForm.selectedVersionId"
-          @enabled-change="onModpackEnabledChange"
-        />
-        <div class="border-t border-gray-100 pt-3">
-          <div class="text-xs text-gray-500 mb-2">白名单管理：启用后仅白名单内设备可加入房间</div>
-          <WhitelistEditor v-model="whitelistForm" mode="create" />
-        </div>
-      </div>
-    </Drawer>
 
     <!-- 创建进度抽屉：提交创建时自动弹出，完成/失败自动收起 -->
     <Drawer

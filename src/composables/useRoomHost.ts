@@ -6,7 +6,6 @@
  */
 import { computed } from 'vue'
 import { useOnlineStore } from '@/stores/online'
-import { scaffoldingHostStop } from '@/utils/api/online-manager/easytier'
 import { useEasyTier } from './useEasyTier'
 import { useScaffolding } from './useScaffolding'
 
