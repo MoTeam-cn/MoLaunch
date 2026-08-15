@@ -28,6 +28,10 @@
 
 - **移除工具模块「启动器数据导出」功能**（[data_export.rs](src-tauri/src/commands/tools/data_export.rs) / [types/data_export.rs](src-tauri/src/commands/tools/types/data_export.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [mod.rs](src-tauri/src/commands/tools/mod.rs) / [types/mod.rs](src-tauri/src/commands/tools/types/mod.rs) / [DataExporter.vue](src/views/tools/data/DataExporter.vue) / [QuickTools.vue](src/views/QuickTools.vue) / [data.ts](src/utils/api/tools/data.ts) / [core.ts](src/utils/api/tools/core.ts)）：便捷工具页「启动器数据导出」无实际意义，前后端整体移除——后端删除 `data_export` 模块与 `export_launcher_data` action 注册，前端删除 `DataExporter.vue` 组件、`exportLauncherData` 封装及 `EXPORT_LAUNCHER_DATA` action 常量；`tools/data.ts` 中其余数据类工具（崩溃分析 / 截图 / 资源包 / 版本 JSON / NBT）封装保留。
 
+### Fixed
+
+- **NBT 编辑器「从存档选择」抽屉无法打开并出现多余属性警告**（[NbtViewer.vue](src/views/tools/data/NbtViewer.vue)）：抽屉改用 `v-model:visible` 绑定（此前误用普通 `v-model` 传入未声明的 `modelValue`，`visible` prop 收不到值导致抽屉点不开，同时多余属性透传到 teleport 根节点的 Drawer 触发 Vue 警告「Extraneous non-props attributes (modelValue)」）。
+
 ### Changed
 
 - **种子地图 Worker 改为共享单例，页签切换不再重复创建 Worker/拉取模块**（[workerPool.ts](src/utils/seedmap/workerPool.ts) / [useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：此前每次进入种子地图（子页签 `v-if` 切换销毁重建）都会新建 `WorkerPool` 并重新创建 N 个 Worker，每个 Worker 都要重新拉取整条 worker 模块图（wasm-bindings.ts、tile-render、结构查找等），dev 下表现为 wasm-bindings.ts 等模块被反复请求。现在新增模块级共享单例 `getSharedWorkerPool()`：Worker 首次进入创建一次后常驻，`init` 幂等（已初始化且有存活 Worker 时直接复用，全部终止才重建），页面卸载不再 `dispose` Worker；切换离开/回到种子地图不再重复创建 Worker、拉取 worker 模块或重复实例化 WASM。

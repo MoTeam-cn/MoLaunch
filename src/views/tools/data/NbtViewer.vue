@@ -246,6 +246,6 @@ watch(chunkSelect, (idx) => {
       </div>
     </div>
 
-    <NbtSaveDrawer v-model="saveDrawerVisible" @select="handleDrawerSelect" />
+    <NbtSaveDrawer v-model:visible="saveDrawerVisible" @select="handleDrawerSelect" />
   </section>
 </template>
