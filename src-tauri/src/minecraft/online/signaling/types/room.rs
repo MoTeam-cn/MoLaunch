@@ -1,7 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-use super::ice::IceServerEntry;
-
 /// 整合包元数据（联机大厅阶段 3 新增）
 ///
 /// 房主创建房间时关联本地已安装整合包，上报元数据给 api-server。
@@ -44,74 +42,32 @@ pub struct ModpackMeta {
     pub manifest_hash: Option<String>,
 }
 
-/// 创建房间请求
+/// 创建房间请求（房主本地生成完整 Scaffolding 码后登记）
 #[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct CreateRoomRequest {
-    pub sdp_offer: String,
-    pub ice_candidates: Vec<String>,
-    pub max_players: u32,
+    /// 完整 Scaffolding 房间码 `U/NNNN-NNNN-SSSS-SSSS`
+    pub room_code: String,
+    /// 房主备注（大厅展示）
+    #[serde(skip_serializing_if = "String::is_empty", default)]
+    pub remark: String,
+    /// 是否公开（公开房间进大厅，按整合包聚类）
+    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
+    pub is_public: bool,
+    /// 房间密码（空串表示无密码）
+    #[serde(skip_serializing_if = "String::is_empty", default)]
     pub password: String,
-    pub stun_servers: Vec<String>,
-    /// ICE 服务器列表（新客户端优先，可包含 STUN + TURN 凭据）
-    ///
-    /// 阶段三子任务 7 新增。为空时服务端使用 `stun_servers` 转换为
-    /// `IceServerEntry { urls, username: None, credential: None }` 后落库。
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub ice_servers: Vec<IceServerEntry>,
-    /// 房主 MC 版本（客户端扩展字段，由启动器探测本地 MC 端口后填入）
+    /// 房主 MC 版本
     pub host_mc_version: String,
-    /// 房主 MC 端口（客户端扩展字段，启动器探测本地 Java 进程端口后填入）
+    /// 房主 MC 端口（联机中心 hostname 用）
     pub host_mc_port: u16,
-    /// 房主加载器类型（联机大厅阶段 1 新增）
-    ///
-    /// 客户端从 `setup.ini` 的 `Type` 字段读取，值为 `forge` / `fabric` / `neoforge` /
-    /// `quilt` / `optifine` / `liteloader` / `release` / `snapshot` / `old` / `unknown`。
-    /// 服务端可据此在大厅列表展示加载器图标，加入方据此判断兼容性。
-    /// `None` 表示旧客户端未上报（兼容字段）。
+    /// 房主加载器类型
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub host_loader: Option<String>,
-    /// 房主加载器版本号（联机大厅阶段 1 新增）
-    ///
-    /// 客户端从 `setup.ini` 的 `ForgeVersion` / `FabricVersion` / ... 字段读取，
-    /// 如 `47.3.0`。无加载器（原版）或 setup.ini 缺失时为 `None`。
+    /// 房主加载器版本号
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub host_loader_version: Option<String>,
-    /// 房间类型（联机大厅阶段 2 新增）
-    ///
-    /// - `private`：仅房间码加入（默认，兼容旧客户端）
-    /// - `public`：加入大厅，可被大厅浏览页检索到
-    ///
-    /// 客户端未传时后端默认 `private`，保证旧客户端行为不变。
-    /// 注：`CreateRoomRequest` 仅序列化（不反序列化），故无需 `#[serde(default)]`，
-    /// 由 `signaling_manager::CreateRoomParams` 反序列化时填默认值。
-    #[serde(skip_serializing_if = "std::string::String::is_empty", default)]
-    pub room_type: String,
-    /// 大厅 ID（联机大厅阶段 2 新增）
-    ///
-    /// 仅当 `room_type = "lobby"` 时生效，标识房间归属的大厅。
-    /// 当前固定为 `global`（全球大厅），后续阶段 5 大厅浏览页支持多大厅选择后扩展。
-    /// `private` 房间忽略此字段；`lobby` 房间未传时后端兜底 `global`。
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub lobby_id: Option<String>,
-    /// 是否启用白名单（阶段三子任务 8 安全加强）
-    ///
-    /// `true` 时仅 `whitelist` 数组中的设备可加入；
-    /// `true` 且 `whitelist` 为空 = 拒绝所有人加入（仅房主）。
-    /// 默认 `false`（不启用白名单，允许任何已注册设备加入）。
-    #[serde(skip_serializing_if = "std::ops::Not::not", default)]
-    pub whitelist_enabled: bool,
-    /// 白名单设备 `device_id` 数组（阶段三子任务 8 安全加强）
-    ///
-    /// 房主创建房间时传入的初始白名单（`device_id` 友好标识）。
-    /// 仅当 `whitelist_enabled = true` 时生效；未启用时此字段被忽略。
-    /// 房主可在房间运行期间通过 `POST /v1/signaling/rooms/:code/whitelist` 动态增删。
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub whitelist: Vec<String>,
-    /// 整合包元数据（联机大厅阶段 3 新增）
-    ///
-    /// 房主创建房间时关联本地已安装整合包。`None` 表示无整合包（纯原版房间）。
-    /// 客户端从 `versions/{id}/modpack.meta.json` 读取后填充此字段。
-    /// 不包含 `download_url`，加入方通过现有 IPC 反查平台 API 获取。
+    /// 整合包元数据（`None` = 纯原版房间）
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub modpack: Option<ModpackMeta>,
 }
@@ -125,99 +81,81 @@ pub struct CreateRoomRequest {
 pub struct CreateRoomResponse {
     #[serde(alias = "room_code")]
     pub room_code: String,
-    #[serde(alias = "host_virtual_ip")]
-    pub host_virtual_ip: String,
-    pub subnet: String,
     #[serde(alias = "created_at")]
     pub created_at: u64,
     #[serde(alias = "expires_at")]
     pub expires_at: u64,
-    /// DataChannel 加密密钥（Base64Url 编码的 32 字节 AES-256 密钥）
-    ///
-    /// 阶段三子任务 8 新增。空字符串表示服务器未启用加密（兼容旧服务器）。
-    #[serde(default, alias = "room_key")]
-    pub room_key: String,
 }
 
 /// 房间公开信息
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RoomInfoResponse {
-    #[serde(alias = "room_code")]
+    /// 完整 Scaffolding 房间码（无权限的公开查询可能省略）
+    #[serde(default, alias = "room_code")]
     pub room_code: String,
+    /// N 段公开标识（大厅展示/去重）
+    #[serde(default, alias = "public_identifier")]
+    pub public_identifier: String,
     #[serde(alias = "host_device_pk")]
     pub host_device_pk: String,
-    #[serde(alias = "max_players")]
-    pub max_players: u32,
-    #[serde(alias = "player_count")]
-    pub player_count: u32,
+    /// 是否设置密码
     #[serde(alias = "has_password")]
     pub has_password: bool,
-    #[serde(alias = "stun_servers")]
-    pub stun_servers: Vec<String>,
-    /// ICE 服务器列表（统一承载 STUN + TURN，新客户端优先使用）
-    ///
-    /// 阶段三子任务 7 新增。客户端应优先使用此字段构造 `RTCPeerConnection`，
-    /// 为空时回退使用 `stun_servers`。
-    #[serde(default, alias = "ice_servers")]
-    pub ice_servers: Vec<IceServerEntry>,
+    /// 房主备注
+    #[serde(default, alias = "remark")]
+    pub remark: String,
     pub status: String,
     #[serde(alias = "created_at")]
     pub created_at: u64,
     #[serde(alias = "expires_at")]
     pub expires_at: u64,
-    /// 房主 MC 版本（客户端扩展字段，由创建房间时上报）
+    /// 房主 MC 版本
     #[serde(default, alias = "host_mc_version")]
     pub host_mc_version: String,
-    /// 房主 MC 端口（客户端扩展字段）
+    /// 房主 MC 端口
     #[serde(default, alias = "host_mc_port")]
     pub host_mc_port: u16,
-    /// 是否启用白名单（阶段三子任务 8 安全加强）
-    ///
-    /// `true` 时仅白名单内设备可加入；`false` 时允许任何已注册设备加入。
-    /// 加入方据此判断是否提示房主添加自己到白名单。
-    #[serde(default, alias = "whitelist_enabled")]
-    pub whitelist_enabled: bool,
-    /// 房间类型（联机大厅阶段 2，`private` / `public`，旧服务器缺省 `private`）
-    #[serde(default, alias = "room_type")]
-    pub room_type: String,
-    /// 房主加载器类型（联机大厅阶段 1，如 `forge` / `fabric`，旧服务器缺省 None）
+    /// 房主加载器类型
     #[serde(default, alias = "host_loader")]
     pub host_loader: Option<String>,
-    /// 房主加载器版本号（联机大厅阶段 1，如 `47.3.0`，旧服务器缺省 None）
+    /// 房主加载器版本号
     #[serde(default, alias = "host_loader_version")]
     pub host_loader_version: Option<String>,
-    /// 整合包元数据（联机大厅阶段 3，`None` 表示纯原版房间）
-    ///
-    /// 加入方据此判断是否需要一键安装，通过 `check_local_modpack` IPC 校验本地是否已装同款。
+    /// 整合包元数据（`None` = 纯原版房间）
     #[serde(default, alias = "modpack")]
     pub modpack: Option<ModpackMeta>,
 }
 
-/// 加入房间响应
+/// 加入房间响应（join 闸门通过后返回完整码，供房客解析组网）
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct JoinRoomResponse {
-    #[serde(alias = "participant_id")]
-    pub participant_id: String,
-    #[serde(alias = "host_sdp_offer")]
-    pub host_sdp_offer: String,
-    #[serde(alias = "host_ice_candidates")]
-    pub host_ice_candidates: Vec<String>,
-    #[serde(alias = "stun_servers")]
-    pub stun_servers: Vec<String>,
-    /// ICE 服务器列表（与房主一致，统一承载 STUN + TURN）
-    ///
-    /// 阶段三子任务 7 新增。客户端应优先使用此字段构造 `RTCPeerConnection`，
-    /// 为空时回退使用 `stun_servers`。
-    #[serde(default, alias = "ice_servers")]
-    pub ice_servers: Vec<IceServerEntry>,
-    #[serde(alias = "player_virtual_ip")]
-    pub player_virtual_ip: String,
-    pub subnet: String,
-    /// DataChannel 加密密钥（Base64Url 编码的 32 字节 AES-256 密钥，与房主一致）
-    ///
-    /// 阶段三子任务 8 新增。空字符串表示服务器未启用加密（兼容旧服务器）。
-    #[serde(default, alias = "room_key")]
-    pub room_key: String,
+    /// 完整 Scaffolding 房间码 `U/NNNN-NNNN-SSSS-SSSS`
+    #[serde(alias = "room_code")]
+    pub room_code: String,
+    /// N 段公开标识
+    #[serde(default, alias = "public_identifier")]
+    pub public_identifier: String,
+    /// 房主备注
+    #[serde(default, alias = "remark")]
+    pub remark: String,
+    /// 是否设置密码
+    #[serde(alias = "has_password")]
+    pub has_password: bool,
+    /// 房主 MC 版本
+    #[serde(default, alias = "host_mc_version")]
+    pub host_mc_version: String,
+    /// 房主 MC 端口
+    #[serde(default, alias = "host_mc_port")]
+    pub host_mc_port: u16,
+    /// 房主加载器类型
+    #[serde(default, alias = "host_loader")]
+    pub host_loader: Option<String>,
+    /// 房主加载器版本号
+    #[serde(default, alias = "host_loader_version")]
+    pub host_loader_version: Option<String>,
+    /// 整合包元数据（`None` = 纯原版房间）
+    #[serde(default, alias = "modpack")]
+    pub modpack: Option<ModpackMeta>,
 }

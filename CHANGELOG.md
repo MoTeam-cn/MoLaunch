@@ -34,6 +34,12 @@
 
 - **资源包编辑器版本下拉调整（M4 版本隔离修复）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：版本下拉从「已打开包的文件树区域」移到「资源包列表」顶部（打开包前即可选择，与资源包转换器布局一致）；移除隔离模式 All(4) 时强制默认选中第一个已安装版本的逻辑，改为默认「全局（不隔离）」由用户自行选择，避免用户无法在编辑器内主动切换版本。
 
+### Changed
+
+- **信令接口收敛为 Scaffolding 方案（Agent B，联机重构 Phase 1）**（[api_paths.rs](src-tauri/src/api_paths.rs) / [room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs) / [lobby.rs](src-tauri/src/minecraft/online/signaling/lobby.rs) / [types/room.rs](src-tauri/src/minecraft/online/signaling/types/room.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [lobby_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/lobby_actions.rs)）：① api-server 路由收敛为 6 个（创建/查询/加入/关闭房间 + `lobby/packages` + `lobby/rooms`），新增 `SIGNALING_ROOM_CLOSE`/`SIGNALING_LOBBY_PACKAGES`，移除 STUN/TURN/保活/参与者/封禁/白名单等 16 个旧路径；② 房间接口改传完整 Scaffolding 码（创建登记、join 闸门返回完整码供房客组网、close 为 POST 方法），`RoomInfoResponse`/`JoinRoomResponse` 携带 modpack 元数据与房主 MC 信息；③ `lobby_list_packages`/`lobby_list_rooms` 改调聚合接口，房间摘要仅含 N 段公开标识（不含密钥）；④ 删除 SDP/白名单/封禁相关的 `session_actions`/`whitelist_actions` 与底层 `session.rs`/`whitelist.rs`/`types/session.rs`；⑤ `types/ice.rs` 瘦身为仅保留配置占位 `IceServerEntry`。
+- **`config/models.rs`：`OnlineConfig` 新增 `network_identity` 字段**（联机重构 Phase 1，预留房客 EasyTier hostname 默认值）。
+- **`lan_fake.rs`：`LanFakeStartParams.target_ip` 缺省为房主虚拟 IP**（`10.244.0.1`，对齐 Scaffolding 联机方案）。
+
 ### Added
 
 - **easytier/Scaffolding 联机 IPC 动作（Agent B，联机重构 Phase 1）**（[easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)（新增） / [dispatcher.rs](src-tauri/src/commands/online/manager/dispatcher.rs) / [lan_fake.rs](src-tauri/src/commands/online/manager/lan_fake.rs) / [server.rs](src-tauri/src/minecraft/online/scaffolding/server.rs)）：① 新增 `easytier_join`/`easytier_stop`/`scaffolding_host_start`/`scaffolding_host_stop`/`scaffolding_client_probe` 五个 action 并注册进 dispatcher；② easytier-core 路径解析支持绝对路径直校验 + 相对路径按 resource_dir（release 侧车 `sidecar/` 优先）/ 当前 exe 同目录（dev externalBin）多候选探测；③ 房主 hostname 默认 `scaffolding-mc-server-{mc_port}`（MC 端口实时探测，沿用 lan_probe 的进程监听端口逻辑），房客 hostname 取配置 `network_identity`、缺省 `mo-launch-guest`；④ `scaffolding_host_start` 一站式启动（停旧实例 → 探测 MC 端口 → 联机中心 → 房主 easytier 固定虚拟 IP）；⑤ `scaffolding_client_probe` 解析房间码后按房客身份 `--dhcp` 加入网络再 discover_mc；⑥ `LanFakeStartParams.target_ip` 缺省为房主虚拟 IP `10.244.0.1`；⑦ `ScaffoldingServerState` 新增 `new()` 构造器。

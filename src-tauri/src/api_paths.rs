@@ -31,48 +31,17 @@ pub const FRP_MANIFEST: &str =
 /// 公共 frps 服务器列表（GET，直接返回完整连接信息）
 pub const FRP_SERVERS: &str = "/v1/frp/servers";
 
-// ===== v1 Signaling =====
+// ===== v1 Signaling（Scaffolding 联机收敛） =====
 
-/// STUN 服务器列表（GET）
-pub const SIGNALING_STUN: &str = "/v1/signaling/stun";
-/// 创建房间（POST）
+/// 创建房间（登记完整 Scaffolding 码，POST）
 pub const SIGNALING_ROOMS: &str = "/v1/signaling/rooms";
-/// 房间公开信息 / 关闭房间（GET / DELETE）
+/// 房间信息（GET，`room_code` 可为完整码或 N 段公开标识）
 pub const SIGNALING_ROOM: &str = "/v1/signaling/rooms/{room_code}";
-/// 加入房间（POST）
+/// 加入房间（POST，密码/封禁闸门 → 返回完整码）
 pub const SIGNALING_ROOM_JOIN: &str = "/v1/signaling/rooms/{room_code}/join";
-/// 房主保活（POST）
-pub const SIGNALING_ROOM_KEEPALIVE: &str = "/v1/signaling/rooms/{room_code}/keepalive";
-/// TURN 服务器列表（GET，仅房主）
-pub const SIGNALING_ROOM_TURN: &str = "/v1/signaling/rooms/{room_code}/turn";
-/// 退出房间（DELETE）
-pub const SIGNALING_ROOM_PARTICIPANTS_ME: &str = "/v1/signaling/rooms/{room_code}/participants/me";
-/// 提交 SDP Answer（POST）
-pub const SIGNALING_ROOM_ANSWER: &str = "/v1/signaling/rooms/{room_code}/answer";
-/// 待确认 Answer 列表（GET）
-pub const SIGNALING_ROOM_ANSWERS: &str = "/v1/signaling/rooms/{room_code}/answers";
-/// 确认/拒绝连接（POST）
-pub const SIGNALING_ROOM_CONFIRM: &str = "/v1/signaling/rooms/{room_code}/confirm";
-/// 踢出参与者（POST）
-pub const SIGNALING_ROOM_KICK: &str = "/v1/signaling/rooms/{room_code}/kick";
-/// 解封参与者（POST）
-pub const SIGNALING_ROOM_UNBAN: &str = "/v1/signaling/rooms/{room_code}/unban";
-/// 封禁列表（GET，仅房主）
-pub const SIGNALING_ROOM_BANS: &str = "/v1/signaling/rooms/{room_code}/bans";
-/// 参与者列表（GET）
-pub const SIGNALING_ROOM_PARTICIPANTS: &str = "/v1/signaling/rooms/{room_code}/participants";
-/// 房主上传 / 参与者拉取 SDP Offer（PUT / GET）
-pub const SIGNALING_ROOM_PARTICIPANT_OFFER: &str =
-    "/v1/signaling/rooms/{room_code}/participants/{participant_id}/offer";
-/// 白名单列表 / 添加条目（GET / POST）
-pub const SIGNALING_ROOM_WHITELIST: &str = "/v1/signaling/rooms/{room_code}/whitelist";
-/// 移除白名单条目（DELETE，`device_id` 需 URL 编码）
-pub const SIGNALING_ROOM_WHITELIST_REMOVE: &str =
-    "/v1/signaling/rooms/{room_code}/whitelist?device_id={device_id}";
-/// 白名单启用状态（PATCH）
-pub const SIGNALING_ROOM_WHITELIST_ENABLED: &str =
-    "/v1/signaling/rooms/{room_code}/whitelist/enabled";
-/// 大厅房间列表（GET，query 字符串由调用方拼接在常量之后）
+/// 房主关闭房间（POST）
+pub const SIGNALING_ROOM_CLOSE: &str = "/v1/signaling/rooms/{room_code}/close";
+/// 大厅聚合（按整合包分组 + 热度，GET）
+pub const SIGNALING_LOBBY_PACKAGES: &str = "/v1/signaling/lobby/packages";
+/// 某整合包下的公开房间列表（GET，query 字符串由调用方拼接在常量之后）
 pub const SIGNALING_LOBBY_ROOMS: &str = "/v1/signaling/lobby/rooms";
-/// 大厅分类列表（GET）
-pub const SIGNALING_LOBBY_CATEGORIES: &str = "/v1/signaling/lobby/categories";

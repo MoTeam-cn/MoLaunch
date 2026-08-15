@@ -26,7 +26,5 @@ pub(super) async fn make_client(state: &AppState) -> OnlineClient {
 /// 注册全部信令 action 到 dispatcher
 pub fn register_signaling_actions(d: &mut Dispatcher) {
     super::room_actions::register(d);
-    super::session_actions::register(d);
-    super::whitelist_actions::register(d);
     super::lobby_actions::register(d);
 }
