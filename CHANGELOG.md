@@ -38,6 +38,8 @@
 
 ### Changed
 
+- **修复 CI lint 报错：cubiomes 编译产物不再参与 ESLint**（[.eslintrc.cjs](.eslintrc.cjs)）：`src/assets/seedmap/`（emcc 编译生成的 cubiomes.js/wasm）加入 `ignorePatterns`，与既有产物忽略先例（`src-tauri/resources/view/*.min.js`）一致；此前 CI 的 `npm run lint` 会扫描入库产物并报大量 `globalThis is not defined`（no-undef）。
+
 - **cubiomes submodule 移至项目根目录（前端接管编译）**（[.gitmodules](.gitmodules) / [vite.config.ts](vite.config.ts) / [build-wasm.ps1](scripts/build-wasm.ps1) / [structures.ts](src/utils/seedmap/structures.ts)）：cubiomes 仓库（https://github.com/MoTeam-cn/cubiomes）由 `src-tauri/cubiomes` 移至根目录 `cubiomes/`——该库当前仅用于前端种子地图 WASM 编译，与后端（Rust）无关；`.gitmodules` 的 submodule 注册（path/section）同步改为 `cubiomes`，[vite.config.ts](vite.config.ts) dev 插件监听目录、[build-wasm.ps1](scripts/build-wasm.ps1) 的 cwd（项目根）与输出路径（`src/assets/seedmap`）、[structures.ts](src/utils/seedmap/structures.ts) 注释均调整为项目根相对路径。
 
 - **Vite 构建 wasm 独立输出到 `wasm/` 目录 + dev 自动检测 cubiomes 源码重编译**（[vite.config.ts](vite.config.ts) / [build-wasm.ps1](scripts/build-wasm.ps1) / [.gitignore](.gitignore)）：① `ASSET_EXT_DIRS` 新增 `[['wasm'], 'wasm']` 分类，wasm 资产统一输出到 `dist/assets/wasm/`（主构建与 worker 构建共用），`cubiomes.wasm` 不再混入 `assets/` 根目录；② 新增 dev 专用插件 `cubiomesWatchPlugin`——监听 `cubiomes/` 下 .c/.h 变化，防抖 500ms 后自动执行 `npm run build:wasm`，编译成功整页刷新（`full-reload`），等价旧 Rust 时代 build.rs 的 `rerun-if-changed` 自动构建替换；监听清理挂到 `onServerClose` 钩子（configureServer 返回函数会被 Vite 在中间件配置完成后立即调用，不能用于清理）；③ [build-wasm.ps1](scripts/build-wasm.ps1) 固定 emcc 缓存到项目内 `.cache/emscripten`（`EM_CACHE`），避免写入 emsdk 目录在无写权限/沙箱环境下 emcc 挂起，缓存位置可预测。

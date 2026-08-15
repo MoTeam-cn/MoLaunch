@@ -22,6 +22,8 @@ module.exports = {
   },
   ignorePatterns: [
     'src-tauri/resources/view/*.min.js',
+    // cubiomes 编译产物（emcc 生成），非手写代码，不参与前端 lint
+    'src/assets/seedmap/**',
     // Node 工具脚本（资产生成/CI 上传等），非前端代码，不参与前端 lint
     'scripts/**',
   ],
