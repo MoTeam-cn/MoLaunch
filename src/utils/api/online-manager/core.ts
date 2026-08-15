@@ -99,6 +99,7 @@ export const ONLINE_ACTIONS = {
   // easytier 虚拟组网 + Scaffolding 联机中心
   EASYTIER_JOIN: 'easytier_join',
   EASYTIER_STOP: 'easytier_stop',
+  EASYTIER_STATUS: 'easytier_status',
   SCAFFOLDING_HOST_START: 'scaffolding_host_start',
   SCAFFOLDING_HOST_STOP: 'scaffolding_host_stop',
   SCAFFOLDING_CLIENT_PROBE: 'scaffolding_client_probe',

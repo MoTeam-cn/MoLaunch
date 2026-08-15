@@ -15,6 +15,23 @@ pub const HOST_VIRTUAL_IP: &str = "10.244.0.1";
 pub struct EasyTier {
     child: Child,
     rpc_portal: String,
+    version: String,
+}
+
+/// 查询 easytier-core 版本（`--version` 输出形如 `easytier-core 2.6.4`，取第二段）
+async fn query_version(core_path: &Path) -> String {
+    match tokio::process::Command::new(core_path)
+        .arg("--version")
+        .output()
+        .await
+    {
+        Ok(out) if out.status.success() => String::from_utf8_lossy(&out.stdout)
+            .split_whitespace()
+            .nth(1)
+            .unwrap_or("")
+            .to_string(),
+        _ => String::new(),
+    }
 }
 
 /// 申请一个空闲的本地端口（用于 rpc-portal）
@@ -101,12 +118,23 @@ impl EasyTier {
             });
         }
 
-        Ok(Self { child, rpc_portal })
+        let version = query_version(core_path).await;
+
+        Ok(Self {
+            child,
+            rpc_portal,
+            version,
+        })
     }
 
     /// 当前 rpc-portal 地址
     pub fn rpc_portal(&self) -> &str {
         &self.rpc_portal
+    }
+
+    /// easytier-core 版本号（`--version` 查询失败时为空字符串）
+    pub fn version(&self) -> &str {
+        &self.version
     }
 
     /// 子进程 PID（未运行则为 None）

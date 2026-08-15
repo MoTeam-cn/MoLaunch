@@ -34,6 +34,20 @@ export interface EasyTierJoinResult {
   rpcPortal: string
   /** easytier-core 子进程 PID */
   pid?: number
+  /** easytier-core 版本号（`--version` 查询失败时为空串） */
+  version?: string
+}
+
+/** `easytier_status` 查询返回 / `easytier-status` 事件 payload */
+export interface EasyTierStatusResult {
+  /** 是否已加入虚拟网络 */
+  joined: boolean
+  /** easytier-core 版本号 */
+  version: string
+  /** 子进程 PID（未运行时为空） */
+  pid?: number
+  /** rpc-portal 地址（未运行时为空串） */
+  rpcPortal: string
 }
 
 /** `scaffolding_host_start` 参数 */

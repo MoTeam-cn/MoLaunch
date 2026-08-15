@@ -8,6 +8,7 @@ import { onlineManager, ONLINE_ACTIONS } from './core'
 import type {
   EasyTierJoinParams,
   EasyTierJoinResult,
+  EasyTierStatusResult,
   ScaffoldingClientProbeParams,
   ScaffoldingClientProbeResult,
   ScaffoldingHostStartParams,
@@ -22,6 +23,11 @@ export function joinEasyTier(params: EasyTierJoinParams): Promise<EasyTierJoinRe
 /** 停止当前 easytier 子进程 */
 export function stopEasyTier(): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.EASYTIER_STOP)
+}
+
+/** 查询当前 easytier 运行状态（joined/version/pid/rpcPortal） */
+export function getEasyTierStatus(): Promise<EasyTierStatusResult> {
+  return onlineManager<EasyTierStatusResult>(ONLINE_ACTIONS.EASYTIER_STATUS)
 }
 
 /** 房主一站式启动：探测 MC 端口 → 联机中心 → easytier */

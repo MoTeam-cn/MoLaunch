@@ -20,10 +20,33 @@ use crate::minecraft::online::scaffolding::server::{
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 use std::path::PathBuf;
-use tauri::Manager;
+use tauri::{Emitter, Manager};
 
 /// 房客侧默认 hostname（未配置 network_identity 时使用）
 const DEFAULT_GUEST_HOSTNAME: &str = "mo-launch-guest";
+
+/// easytier 运行状态推送事件（前端经 useTauriEvent 监听）
+const EASYTIER_STATUS_EVENT: &str = "easytier-status";
+
+/// 构造并推送 easytier 运行状态事件（加入/停止后调用，供设备页展示）
+async fn emit_easytier_status(app: &tauri::AppHandle, state: &AppState) {
+    let guard = state.easytier.lock().await;
+    let payload = match guard.as_ref() {
+        Some(e) => serde_json::json!({
+            "joined": true,
+            "version": e.version(),
+            "pid": e.pid(),
+            "rpcPortal": e.rpc_portal(),
+        }),
+        None => serde_json::json!({
+            "joined": false,
+            "version": "",
+            "pid": null,
+            "rpcPortal": "",
+        }),
+    };
+    let _ = app.emit(EASYTIER_STATUS_EVENT, payload);
+}
 
 /// 解析 easytier-core 可执行文件路径。
 ///
@@ -217,6 +240,7 @@ pub fn register(d: &mut Dispatcher) {
             let rpc_portal = easytier.rpc_portal().to_string();
             let pid = easytier.pid();
             *state.easytier.lock().await = Some(easytier);
+            emit_easytier_status(&app, &state).await;
 
             log_info!(
                 "[Online] easytier 已加入网络 {}（hostname={}，rpc={}）",
@@ -235,12 +259,13 @@ pub fn register(d: &mut Dispatcher) {
 
     d.register(
         "easytier_stop",
-        handler!(state, _app, _params, {
+        handler!(state, app, _params, {
             let old = state.easytier.lock().await.take();
             if let Some(old) = old {
                 old.stop().await;
                 log_info!("[Online] easytier 已停止");
             }
+            emit_easytier_status(&app, &state).await;
             serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
         }),
     );
@@ -299,6 +324,7 @@ pub fn register(d: &mut Dispatcher) {
             let pid = easytier.pid();
             *state.scaffolding_server.lock().await = Some(server);
             *state.easytier.lock().await = Some(easytier);
+            emit_easytier_status(&app, &state).await;
 
             log_info!(
                 "[Online] 房主联机中心已启动: center_port={}, hostname={}, mc_port={}",
@@ -320,7 +346,7 @@ pub fn register(d: &mut Dispatcher) {
 
     d.register(
         "scaffolding_host_stop",
-        handler!(state, _app, _params, {
+        handler!(state, app, _params, {
             let old_easytier = state.easytier.lock().await.take();
             if let Some(old_easytier) = old_easytier {
                 old_easytier.stop().await;
@@ -329,6 +355,7 @@ pub fn register(d: &mut Dispatcher) {
             if let Some(old_server) = old_server {
                 old_server.stop().await;
             }
+            emit_easytier_status(&app, &state).await;
             log_info!("[Online] 房主联机中心已停止");
             serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
         }),
@@ -367,6 +394,7 @@ pub fn register(d: &mut Dispatcher) {
                     hostname
                 );
                 *state.easytier.lock().await = Some(easytier);
+                emit_easytier_status(&app, &state).await;
             }
 
             let center_ip = p.center_ip.unwrap_or_else(|| HOST_VIRTUAL_IP.to_string());
@@ -386,6 +414,28 @@ pub fn register(d: &mut Dispatcher) {
                     Err(e)
                 }
             }
+        }),
+    );
+
+    d.register(
+        "easytier_status",
+        handler!(state, _app, _params, {
+            let guard = state.easytier.lock().await;
+            let value = match guard.as_ref() {
+                Some(e) => serde_json::json!({
+                    "joined": true,
+                    "version": e.version(),
+                    "pid": e.pid(),
+                    "rpcPortal": e.rpc_portal(),
+                }),
+                None => serde_json::json!({
+                    "joined": false,
+                    "version": "",
+                    "pid": null,
+                    "rpcPortal": "",
+                }),
+            };
+            serde_json::to_value(value).map_err(|e| e.to_string())
         }),
     );
 }

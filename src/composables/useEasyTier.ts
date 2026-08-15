@@ -36,6 +36,9 @@ export function useEasyTier() {
   /** 虚拟网络名 */
   const networkName = computed(() => store.easytierRuntime.networkName)
 
+  /** easytier-core 版本号 */
+  const version = computed(() => store.easytierRuntime.version)
+
   /** 加入虚拟网络（房主 isHost=true 固定 IP） */
   async function join(params: EasyTierJoinParams): Promise<{ ok: boolean; error?: string }> {
     joining.value = true
@@ -49,6 +52,7 @@ export function useEasyTier() {
         virtualIp: params.isHost ? EASYTIER_HOST_VIRTUAL_IP : '',
         rpcPortal: res.rpcPortal,
         pid: res.pid,
+        version: res.version ?? '',
       })
       return { ok: res.success }
     } catch (e) {
@@ -70,5 +74,5 @@ export function useEasyTier() {
     }
   }
 
-  return { status, ip, peers, networkName, joining, stopping, error, join, stop }
+  return { status, ip, peers, networkName, version, joining, stopping, error, join, stop }
 }

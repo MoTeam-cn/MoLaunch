@@ -17,6 +17,8 @@ export interface EasyTierRuntime {
   rpcPortal: string
   /** easytier-core 子进程 PID */
   pid?: number
+  /** easytier-core 版本号（后端 --version 查询，失败时为空串） */
+  version: string
   /** 房主 MC 虚拟 IP（房客 probe 到后写入，即进服地址） */
   mcIp: string
   /** 房主 MC 局域网端口 */
@@ -48,6 +50,7 @@ function emptyRuntime(): EasyTierRuntime {
     virtualIp: '',
     rpcPortal: '',
     pid: undefined,
+    version: '',
     mcIp: '',
     mcPort: 0,
     centerPort: 0,

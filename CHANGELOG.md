@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **设备页面新增「虚拟组网（easytier）」状态卡片，后端 emit 推送运行状态**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [EasyTierStatusCard.vue](src/components/online/EasyTierStatusCard.vue)）：① 后端 `EasyTier` 新增 `version` 字段（启动时执行 `--version` 查询，失败为空串）；② 新增 `easytier-status` 事件——`easytier_join`/`scaffolding_host_start`/`scaffolding_client_probe` 加入成功、`easytier_stop`/`scaffolding_host_stop` 停止后推送 `{joined, version, pid, rpcPortal}`；③ 新增 `easytier_status` IPC 查询动作（页面打开兜底拉取）；④ 前端设备面板新增 easytier 状态卡片，展示组网状态徽章 / core 版本 / 虚拟网络 / 虚拟 IP / 进程 PID，`useTauriEvent` 监听事件实时同步到 store。
+
 - **设备页面加回 NAT 类型检测**（[nat.ts](src/types/online/nat.ts) / [nat.ts](src/utils/online/nat.ts) / [natSlice.ts](src/stores/online/natSlice.ts)）：恢复基于 WebRTC ICE candidate 的 STUN 探测实现（`detectNatTypeWithStun`，host/srflx 组合推断 openCone/restrictedCone/symmetric/blocked），含类型定义、`NAT_TYPE_META` 展示映射与 store `detectNat`/`forceDetectNat` 切片；设备页「网络环境」卡片展示 NAT 类型徽章（tooltip 说明联机可行性）+ 重新检测按钮。
 
 - **创建房间页面整合包改回收进「高级设置」抽屉，减少页面堆积**（[CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) / [useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts)）：整合包选择器与需求卡片不再平铺在创建表单中，收进「高级设置」右侧抽屉（420px）；入口按钮带齿轮图标，已勾选整合包时显示「已关联整合包」状态徽章（`advancedBadge`/`advancedBadgeActive`，基于整合包勾选状态，白名单已在 Scaffolding 收敛中移除故不涉及）。

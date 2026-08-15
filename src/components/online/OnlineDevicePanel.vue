@@ -17,6 +17,7 @@ const Button = defineAsyncComponent(() => import('@/components/common/Button.vue
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const SealedOverlay = defineAsyncComponent(() => import('@/components/common/SealedOverlay.vue'))
+const EasyTierStatusCard = defineAsyncComponent(() => import('./EasyTierStatusCard.vue'))
 import {
   UserPlusIcon,
   ArrowRightOnRectangleIcon,
@@ -187,6 +188,9 @@ async function handleDetectNat() {
         <SignalSlashIcon class="w-3.5 h-3.5 inline mr-1" />{{ onlineStore.natResult.error }}
       </div>
     </Card>
+
+    <!-- 虚拟组网（easytier 状态，无需登录即可展示，不依赖云端） -->
+    <EasyTierStatusCard v-if="status?.registered" />
 
     <!-- 设备信息（已注册时显示；云端离线时封存） -->
     <Card v-if="status?.registered" title="设备信息">
