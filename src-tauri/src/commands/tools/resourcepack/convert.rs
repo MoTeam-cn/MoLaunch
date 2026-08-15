@@ -184,13 +184,33 @@ fn zip_directory(src_dir: &Path, output_zip: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// 解压 zip 到目录
-fn unzip_to_dir(src_zip: &Path, output_dir: &Path) -> Result<(), String> {
+/// 解压 zip 到目录（安全解压：拦截 `..` 路径穿越条目）
+pub(crate) fn unzip_to_dir(src_zip: &Path, output_dir: &Path) -> Result<(), String> {
     let file = File::open(src_zip).map_err(|e| format!("打开 zip 失败: {}", e))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("读取 zip 失败: {}", e))?;
     std::fs::create_dir_all(output_dir).map_err(|e| format!("创建输出目录失败: {}", e))?;
-    archive
-        .extract(output_dir)
-        .map_err(|e| format!("解压失败: {}", e))?;
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .map_err(|e| format!("读取 zip 条目失败: {}", e))?;
+        let name = entry.name().replace('\\', "/");
+        if Path::new(&name)
+            .components()
+            .any(|c| matches!(c, std::path::Component::ParentDir))
+        {
+            return Err(format!("zip 包含非法路径条目: {}", name));
+        }
+        if entry.is_dir() {
+            std::fs::create_dir_all(output_dir.join(&name))
+                .map_err(|e| format!("创建目录失败: {}", e))?;
+        } else {
+            let dest = output_dir.join(&name);
+            if let Some(parent) = dest.parent() {
+                std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+            }
+            let mut out = File::create(&dest).map_err(|e| format!("创建文件失败: {}", e))?;
+            std::io::copy(&mut entry, &mut out).map_err(|e| format!("解压失败: {}", e))?;
+        }
+    }
     Ok(())
 }

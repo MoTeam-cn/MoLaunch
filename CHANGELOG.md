@@ -36,6 +36,8 @@
 
 ### Fixed
 
+- **资源包 zip→folder 解压增加 zip-slip 路径穿越防护**（[convert.rs](src-tauri/src/commands/tools/resourcepack/convert.rs)）：`unzip_to_dir` 由 `archive.extract` 整体解压改为逐条目解压，先归一化反斜杠再检查条目路径是否含 `..` 跳转（`Component::ParentDir`），命中即中止并报错，防止恶意 zip 写入解压目录之外；函数可见性提升为 `pub(crate)` 供资源包编辑器模块复用。
+
 - **NBT 编辑器「从存档选择」抽屉被顶部导航遮挡**（[NbtSaveDrawer.vue](src/views/tools/data/NbtSaveDrawer.vue)）：抽屉默认 teleport 到 body、z-index 低于 nav，被导航层盖住无法交互；参照种子地图 LoadSaveDrawer 显式指定 `render-in-place` + `popup-container="#app-content"`，改为在内容区内就地渲染，避免被 nav 遮挡。
 
 - **NBT 编辑器「从存档选择」抽屉无法打开并出现多余属性警告**（[NbtViewer.vue](src/views/tools/data/NbtViewer.vue)）：抽屉改用 `v-model:visible` 绑定（此前误用普通 `v-model` 传入未声明的 `modelValue`，`visible` prop 收不到值导致抽屉点不开，同时多余属性透传到 teleport 根节点的 Drawer 触发 Vue 警告「Extraneous non-props attributes (modelValue)」）。
