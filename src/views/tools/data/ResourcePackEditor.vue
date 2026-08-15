@@ -20,6 +20,7 @@ import { toastError, toastSuccess } from '@/utils/toast'
 import { pickFile, pickDirectory, pickSavePath } from '@/utils/fileDialog'
 import { formatBytes } from '@/utils/format'
 import { showConfirmAsync } from '@/utils/modal'
+import { collectExpandPaths, filterTreeNode, normalizeKeyword } from '@/utils/resourcepack/filterTree'
 import { resourcepackList, rpOpen, rpRead, rpExport } from '@/utils/api/tools'
 import type { RpOpenResult, RpReadResult, RpTreeNode, ResourcePackItem } from '@/utils/api/tools'
 import {
@@ -27,6 +28,8 @@ import {
   ChevronDownIcon,
   CubeIcon,
   FolderOpenIcon,
+  MagnifyingGlassIcon,
+  XMarkIcon,
 } from '@heroicons/vue/24/outline'
 
 const packs = ref<ResourcePackItem[]>([])
@@ -38,8 +41,28 @@ const reading = ref(false)
 const expandedSet = ref<Set<string>>(new Set())
 const listOpen = ref(true)
 const exporting = ref(false)
+/** 文件树搜索关键字（空 = 不过滤） */
+const searchQuery = ref('')
 /** 模型文件视图模式：false = 3D 预览，true = JSON 文本编辑 */
 const modelEditMode = ref(false)
+
+/** 过滤后的文件树（无关键字或未打开包时返回原树） */
+const filteredTree = computed(() => {
+  const tree = current.value?.tree
+  if (!tree) return null
+  const kw = normalizeKeyword(searchQuery.value)
+  return filterTreeNode(tree, kw)
+})
+
+watch(searchQuery, (v) => {
+  const kw = normalizeKeyword(v)
+  if (!current.value || !kw) return
+  // 搜索时自动展开所有命中路径的祖先目录
+  const paths = collectExpandPaths(current.value.tree, kw)
+  const next = new Set(expandedSet.value)
+  paths.forEach((p) => next.add(p))
+  expandedSet.value = next
+})
 
 watch(selectedNode, () => {
   modelEditMode.value = false
@@ -307,13 +330,32 @@ async function saveAsZip() {
       <div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-[280px_1fr]">
         <!-- 文件树 -->
         <div class="max-h-[560px] overflow-y-auto p-2 md:border-r md:border-gray-200">
+          <div class="relative mb-2 px-1">
+            <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+            <input
+              v-model="searchQuery"
+              type="text"
+              class="w-full rounded border border-gray-300 py-1 pl-8 pr-7 text-sm text-gray-700 placeholder:text-gray-400 focus:border-blue-400 focus:outline-none"
+              placeholder="搜索文件…"
+            />
+            <button
+              v-if="searchQuery"
+              type="button"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              @click="searchQuery = ''"
+            >
+              <XMarkIcon class="h-4 w-4" />
+            </button>
+          </div>
           <RpFileTreeNode
-            :node="current.tree"
+            v-if="filteredTree"
+            :node="filteredTree"
             :selected-path="selectedNode?.rel_path ?? ''"
             :expanded-set="expandedSet"
             @select="selectNode"
             @toggle="toggleNode"
           />
+          <p v-else class="px-1 py-4 text-center text-xs text-gray-400">未找到匹配的文件</p>
         </div>
 
         <!-- 内容分发 -->
