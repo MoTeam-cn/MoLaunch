@@ -174,9 +174,8 @@ fn open_inner(params: &RpOpenParams) -> Result<RpOpenResult, String> {
 
     let (work_dir, format, name) = if is_zip {
         let dir = create_session_dir()?;
-        unzip_to_dir(&src_canon, &dir).map_err(|e| {
+        unzip_to_dir(&src_canon, &dir).inspect_err(|_| {
             let _ = std::fs::remove_dir_all(&dir);
-            e
         })?;
         (
             dir,
@@ -303,8 +302,10 @@ fn read_many_inner(params: &RpReadManyParams) -> Result<RpReadManyResult, String
         };
         let parsed = serde_json::from_str::<serde_json::Value>(&text);
         // 起始文件 JSON 损坏时直接报错，关联文件损坏则跳过
-        if parsed.is_err() && rel == params.rel_path {
-            return Err(format!("JSON 解析失败: {}", parsed.unwrap_err()));
+        if rel == params.rel_path {
+            if let Err(e) = &parsed {
+                return Err(format!("JSON 解析失败: {}", e));
+            }
         }
         let Ok(v) = parsed else { continue };
         let default_ns = namespace_of(&rel).unwrap_or("minecraft");

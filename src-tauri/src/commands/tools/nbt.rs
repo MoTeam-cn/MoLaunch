@@ -287,14 +287,14 @@ fn save_mca_chunk(file_path: &str, chunk_index: usize, root: &NbtNode) -> Result
     let mut cursor = 2usize; // 数据区从扇区 2（8KiB 之后）开始
     chunks.sort_by_key(|(i, _)| *i);
     for (index, data) in chunks {
-        let sector_count = (data.len() + 511) / 512;
+        let sector_count = data.len().div_ceil(512);
         let entry = index * 4;
         out[entry] = (cursor >> 16) as u8;
         out[entry + 1] = (cursor >> 8) as u8;
         out[entry + 2] = cursor as u8;
         out[entry + 3] = sector_count as u8;
         out.extend_from_slice(&data);
-        out.extend(std::iter::repeat(0u8).take(sector_count * 512 - data.len()));
+        out.extend(std::iter::repeat_n(0u8, sector_count * 512 - data.len()));
         cursor += sector_count;
     }
     std::fs::write(file_path, &out).map_err(log_err("mca 写入文件失败"))?;
@@ -498,7 +498,7 @@ fn read_root_name(data: &[u8]) -> String {
 /// gzip 解压（检测 gzip 魔数 0x1f 0x8b，如 player .dat / level.dat）
 fn gunzip_if_needed(raw: &[u8]) -> Result<Vec<u8>, String> {
     if raw.len() >= 2 && raw[0] == 0x1f && raw[1] == 0x8b {
-        let mut decoder = flate2::read::GzDecoder::new(&raw[..]);
+        let mut decoder = flate2::read::GzDecoder::new(raw);
         let mut out = Vec::new();
         decoder
             .read_to_end(&mut out)

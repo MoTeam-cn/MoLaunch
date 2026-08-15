@@ -3,6 +3,7 @@
 //! 2. `sessionserver.mojang.com/session/minecraft/profile/{uuid}` → properties.textures.value（base64）
 //! 3. base64 解码 → textures.SKIN.url / CAPE.url / metadata.model（slim）
 //! 4. 下载 SKIN / CAPE PNG → base64 data URI 返回（前端直接预览）
+//!
 //! 保存走 `skin_save_image`（base64 写 PNG 文件，带文件头与大小校验）。
 
 use base64::Engine;
