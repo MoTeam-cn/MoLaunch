@@ -74,6 +74,16 @@ export interface RpPackFormatInfoResult {
   error: string
 }
 
+/** MC 版本推导 pack_format 结果（复用皮肤资源包版本映射） */
+export interface RpVersionPackFormatResult {
+  /** 推导出的 pack_format 数值 */
+  pack_format: number
+  /** 是否为可解析的版本号 */
+  known: boolean
+  /** 失败原因（成功时为空） */
+  error: string
+}
+
 /** 写回单文件参数 */
 export interface RpWriteParams {
   /** 工作目录（rp_open 返回） */
@@ -138,6 +148,13 @@ export function rpReadMany(workDir: string, relPath: string): Promise<RpReadMany
 export function rpPackFormatInfo(packFormat: number): Promise<RpPackFormatInfoResult> {
   return toolsManager<RpPackFormatInfoResult>(TOOLS_ACTIONS.RP_PACK_FORMAT_INFO, {
     pack_format: packFormat,
+  })
+}
+
+/** 由 MC 版本推导 pack_format（下拉选版本后自动回填） */
+export function rpVersionPackFormat(mcVersion: string): Promise<RpVersionPackFormatResult> {
+  return toolsManager<RpVersionPackFormatResult>(TOOLS_ACTIONS.RP_VERSION_PACK_FORMAT, {
+    mc_version: mcVersion,
   })
 }
 

@@ -56,6 +56,7 @@ export const TOOLS_ACTIONS = {
   RP_READ: 'rp_read',
   RP_READ_MANY: 'rp_read_many',
   RP_PACK_FORMAT_INFO: 'rp_pack_format_info',
+  RP_VERSION_PACK_FORMAT: 'rp_version_pack_format',
   RP_WRITE: 'rp_write',
   RP_EXPORT: 'rp_export',
   // 版本 JSON 编辑

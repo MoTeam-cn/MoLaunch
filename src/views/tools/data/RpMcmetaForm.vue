@@ -5,11 +5,13 @@
  * 解析包元信息 JSON 原文，编辑 pack_format 与 description 后写回；
  * 保留原 JSON 中其他顶层字段（overlays / language 等）不破坏。
  */
-import { computed, ref, watch, defineAsyncComponent } from 'vue'
+import { computed, ref, watch, defineAsyncComponent, onMounted } from 'vue'
 import { CheckIcon, CubeIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
-import { rpPackFormatInfo, rpWrite } from '@/utils/api/tools'
+import { rpPackFormatInfo, rpVersionPackFormat, rpWrite } from '@/utils/api/tools'
+import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
 
 const props = defineProps<{
   workDir: string
@@ -31,6 +33,13 @@ const loaded = ref(false)
 /** 实时查询的 pack_format → MC 版本（输入变化时异步回填） */
 const liveVersion = ref<string | null>(null)
 const versionKnown = ref(true)
+/** 已安装版本（下拉选版本 → 自动推导 pack_format） */
+const installedVersions = ref<InstalledVersionInfo[]>([])
+const selectedMcVersion = ref('')
+const deriving = ref(false)
+const versionOptions = computed(() =>
+  installedVersions.value.map((v) => ({ label: v.id, value: v.id })),
+)
 
 const validFormat = computed(() => {
   const n = Number(packFormat.value)
@@ -52,6 +61,29 @@ watch(packFormat, async (v) => {
     versionKnown.value = res.known
   } catch {
     // 查询失败保持默认展示
+  }
+})
+
+/** 选中已安装版本 → 后端推导 pack_format 回填输入框 */
+watch(selectedMcVersion, async (v) => {
+  if (!v) return
+  deriving.value = true
+  try {
+    const res = await rpVersionPackFormat(v)
+    if (res.error || !res.known) return
+    packFormat.value = String(res.pack_format)
+  } catch {
+    // 推导失败保持原值
+  } finally {
+    deriving.value = false
+  }
+})
+
+onMounted(async () => {
+  try {
+    installedVersions.value = await listInstalledVersionsWithType()
+  } catch {
+    // 版本列表加载失败则隐藏推导下拉
   }
 })
 
@@ -139,6 +171,18 @@ async function doSave() {
             class="w-full rounded border border-gray-300 px-2 py-1 text-sm text-gray-700 focus:border-blue-400 focus:outline-none"
             placeholder="如 15"
           />
+        </div>
+      </div>
+      <div v-if="versionOptions.length" class="flex border-b border-gray-200">
+        <div class="w-32 shrink-0 bg-gray-50 px-3 py-2 text-xs text-gray-500">按版本推导</div>
+        <div class="flex flex-1 items-center gap-2 px-3 py-1.5">
+          <Select
+            v-model="selectedMcVersion"
+            :options="versionOptions"
+            placeholder="选择 MC 版本自动填充 pack_format"
+            class="w-full"
+          />
+          <span v-if="deriving" class="shrink-0 text-xs text-gray-400">推导中…</span>
         </div>
       </div>
       <div class="flex border-b border-gray-200">
