@@ -297,7 +297,7 @@ async function saveAsZip() {
           />
         </div>
       </div>
-      <div v-show="listOpen" class="mt-2 grid grid-cols-2 gap-2 md:grid-cols-3">
+      <div v-show="listOpen" class="mt-2 grid max-h-[132px] grid-cols-2 gap-2 overflow-y-auto md:grid-cols-3">
         <button
           v-for="p in packs"
           :key="p.path"
@@ -367,7 +367,7 @@ async function saveAsZip() {
 
       <div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-[280px_1fr]">
         <!-- 文件树 -->
-        <div class="max-h-[560px] overflow-y-auto p-2 md:border-r md:border-gray-200">
+        <div class="max-h-[400px] overflow-y-auto p-2 md:border-r md:border-gray-200">
           <div class="relative mb-2 px-1">
             <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input

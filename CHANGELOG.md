@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **资源包编辑器列表与文件树高度限制（M4 UI 布局）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：资源包列表网格新增三排高度上限（`max-h-[132px]` + 超出滚动，桌面三列 / 窄屏两列均不超高）；打开包后的左侧文件树区域高度上限由 560px 收窄至 400px，避免包内文件较多时占满页面，左右区域各自独立滚动。
+
 - **资源包编辑器版本下拉调整（M4 版本隔离修复）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：版本下拉从「已打开包的文件树区域」移到「资源包列表」顶部（打开包前即可选择，与资源包转换器布局一致）；移除隔离模式 All(4) 时强制默认选中第一个已安装版本的逻辑，改为默认「全局（不隔离）」由用户自行选择，避免用户无法在编辑器内主动切换版本。
 
 ### Added
