@@ -2,7 +2,7 @@
  * 联机功能统一 API - 核心入口（`online_manager` IPC 经 `action` 分发）
  *
  * params 字段名一律 camelCase（后端 `#[serde(rename_all = "camelCase")]`）。
- * 各 action 便捷封装拆分至同目录：auth / room / turn / mesh / tun / whitelist / lobby。
+ * 各 action 便捷封装拆分至同目录：auth / room / lobby / easytier / lan。
  */
 
 import { invoke } from '@tauri-apps/api/core'
@@ -83,47 +83,18 @@ export const ONLINE_ACTIONS = {
   AUTH_INIT: 'auth_init',
   // 手动刷新 token（用 refresh_token 换新 access_token）
   AUTH_REFRESH: 'auth_refresh',
-  // 信令
-  ROOM_GET_STUN: 'room_get_stun',
+  // 房间（Scaffolding 方案：创建/查询/加入/关闭）
   ROOM_CREATE: 'room_create',
   ROOM_GET: 'room_get',
   ROOM_CLOSE: 'room_close',
   ROOM_JOIN: 'room_join',
-  ROOM_SUBMIT_ANSWER: 'room_submit_answer',
-  ROOM_LIST_ANSWERS: 'room_list_answers',
-  ROOM_CONFIRM: 'room_confirm',
-  ROOM_KEEPALIVE: 'room_keepalive',
-  ROOM_LEAVE: 'room_leave',
-  ROOM_KICK: 'room_kick',
-  ROOM_UNBAN: 'room_unban',
-  // 阶段 6.2：房主查询封禁列表
-  ROOM_LIST_BANS: 'room_list_bans',
-  ROOM_LIST_PARTICIPANTS: 'room_list_participants',
-  // TURN 中继：房主独占（阶段三子任务 7）
-  ROOM_GET_TURN: 'room_get_turn',
-  // mesh 拓扑：参与者级 SDP Offer
-  ROOM_UPLOAD_PARTICIPANT_OFFER: 'room_upload_participant_offer',
-  ROOM_FETCH_PARTICIPANT_OFFER: 'room_fetch_participant_offer',
-  // TUN 桥接：数据分发打通
-  TUN_START: 'tun_start',
-  TUN_FORWARD_TO: 'tun_forward_to',
-  TUN_STOP: 'tun_stop',
+  // MC 局域网伪装 + 端口探测
   LAN_FAKE_SERVER_START: 'lan_fake_server_start',
   LAN_FAKE_SERVER_STOP: 'lan_fake_server_stop',
-  // MC 局域网端口探测：监听发现广播解析 [AD]port[/AD]
   LAN_PORT_PROBE: 'lan_port_probe',
-  // MC 局域网端口回查：按当前游戏进程 PID 扫描监听端口（进房时补事件丢失）
   GET_RUNNING_MC_PORT: 'get_running_mc_port',
-  // TUN 权限不足时以管理员权限重启
-  RESTART_AS_ADMIN: 'restart_as_admin',
-  // 房主白名单管理（阶段三子任务 8 安全加强）
-  ROOM_LIST_WHITELIST: 'room_list_whitelist',
-  ROOM_ADD_WHITELIST: 'room_add_whitelist',
-  ROOM_REMOVE_WHITELIST: 'room_remove_whitelist',
-  ROOM_SET_WHITELIST_ENABLED: 'room_set_whitelist_enabled',
-  // 大厅浏览（联机大厅阶段 5）
+  // 大厅浏览（按整合包聚合 + 公开房间列表）
   LOBBY_LIST_ROOMS: 'lobby_list_rooms',
-  LOBBY_LIST_CATEGORIES: 'lobby_list_categories',
   LOBBY_LIST_PACKAGES: 'lobby_list_packages',
   // easytier 虚拟组网 + Scaffolding 联机中心
   EASYTIER_JOIN: 'easytier_join',

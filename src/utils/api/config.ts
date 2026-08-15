@@ -6,7 +6,6 @@
  */
 
 import { CONFIG_ACTIONS, configManager } from './config-manager'
-import type { IceServerEntry } from '@/types/online'
 
 // ==================== 配置快照与补丁类型 ====================
 
@@ -68,10 +67,8 @@ export interface ConfigSnapshot {
   // 开发者模式（从注册表读，developerUnlocked 为只读）
   developerUnlocked: boolean
   developerMode: boolean
-  // 联机（api-server 地址 + 用户自定义 TURN 服务器列表）
+  // 联机（api-server 地址）
   onlineApiServerUrl: string
-  /** 用户自定义 TURN 服务器列表（阶段三子任务 7 新增） */
-  onlineCustomTurnServers: IceServerEntry[]
   // TLS 证书
   /** TLS 信任源模式：builtin / system / custom / system+custom / builtin+custom / all */
   tlsTrustMode: string
@@ -148,14 +145,8 @@ export interface ConfigPatch {
   javaPath?: string
   // 开发者模式（注册表存储，后端内部分流到 registry，仅已解锁时可生效）
   developerMode?: boolean
-  // 联机（api-server 地址，空字符串后端会忽略不更新；自定义 TURN 列表）
+  // 联机（api-server 地址，空字符串后端会忽略不更新）
   onlineApiServerUrl?: string
-  /**
-   * 用户自定义 TURN 服务器列表（阶段三子任务 7 新增）
-   *
-   * 传空数组表示清空所有自定义 TURN；不传（undefined）表示不更新。
-   */
-  onlineCustomTurnServers?: IceServerEntry[]
   // TLS 证书
   /** TLS 信任源模式：builtin / system / custom / system+custom / builtin+custom / all */
   tlsTrustMode?: string

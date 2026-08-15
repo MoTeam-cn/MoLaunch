@@ -53,7 +53,7 @@ export function useRoomActionsSlice(deps: RoomActionDeps) {
       applyRoomState({
         role: 'host',
         roomCode: params.roomCode,
-        publicIdentifier: parsed?.publicId ?? '',
+        publicIdentifier: parsed ? `U/${parsed.publicId}` : '',
         remark: params.remark,
         isPublic: params.isPublic,
         hasPassword: Boolean(params.password),

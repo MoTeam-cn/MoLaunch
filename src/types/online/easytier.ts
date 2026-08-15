@@ -86,27 +86,60 @@ export interface ScaffoldingRoomCode {
   secret: string
 }
 
-/** 生成 Scaffolding 格式房间码（U/NNNN-NNNN-SSSS-SSSS） */
+/** 房间码字符集（与后端一致，剔除易混淆的 I / O） */
+export const SCAFFOLDING_CODE_CHARSET = '0123456789ABCDEFGHJKMNPQRSTUVWXYZ'
+
+/** 生成符合后端校验规则的房间码：16 位字符，base-33 小端序整型可被 7 整除 */
 export function generateScaffoldingCode(): string {
-  const segment = () => {
-    let s = ''
-    for (let i = 0; i < 4; i++) s += Math.floor(Math.random() * 10).toString()
-    return s
-  }
-  const n1 = segment()
-  const n2 = segment()
-  const s1 = segment()
-  const s2 = segment()
-  return `U/${n1}-${n2}-${s1}-${s2}`
+  let chars = ''
+  do {
+    chars = ''
+    for (let i = 0; i < 16; i++) {
+      chars += SCAFFOLDING_CODE_CHARSET[Math.floor(Math.random() * SCAFFOLDING_CODE_CHARSET.length)]
+    }
+  } while (!validateScaffoldingChecksum(chars))
+  const g = (i: number) => chars.slice(i, i + 4)
+  return `U/${g(0)}-${g(4)}-${g(8)}-${g(12)}`
 }
 
-/** 解析 Scaffolding 房间码；格式非法时返回 null */
-export function parseScaffoldingCode(code: string): ScaffoldingRoomCode | null {
-  const m = /^U\/(\d{4})-(\d{4})-(\d{4})-(\d{4})$/.exec(code.trim().toUpperCase())
-  if (!m) return null
-  return {
-    full: `U/${m[1]}-${m[2]}-${m[3]}-${m[4]}`,
-    publicId: `${m[1]}-${m[2]}`,
-    secret: `${m[3]}-${m[4]}`,
+/** base-33 小端序模 7 校验（与 src-tauri code.rs 一致，生成时使用） */
+function validateScaffoldingChecksum(chars: string): boolean {
+  if (chars.length !== 16) return false
+  const baseMod = SCAFFOLDING_CODE_CHARSET.length % 7
+  let pow = 1
+  let acc = 0
+  for (const c of chars) {
+    const v = SCAFFOLDING_CODE_CHARSET.indexOf(c)
+    if (v < 0) return false
+    acc = (acc + (v % 7) * pow) % 7
+    pow = (pow * baseMod) % 7
   }
+  return acc === 0
+}
+
+/** 解析 Scaffolding 房间码；格式非法时返回 null（仅格式校验，不查校验和，兼容官方字符集） */
+export function parseScaffoldingCode(code: string): ScaffoldingRoomCode | null {
+  const trimmed = code.trim()
+  if (!/^U\//i.test(trimmed)) return null
+  const body = trimmed.slice(2).toUpperCase()
+  if (body.length !== 19) return null
+  if (body[4] !== '-' || body[9] !== '-' || body[14] !== '-') return null
+  const parts = body.split('-')
+  if (parts.length !== 4) return null
+  for (const part of parts) {
+    if (part.length !== 4) return null
+    for (const c of part) {
+      if (!SCAFFOLDING_CODE_CHARSET.includes(c)) return null
+    }
+  }
+  return {
+    full: `U/${parts[0]}-${parts[1]}-${parts[2]}-${parts[3]}`,
+    publicId: `${parts[0]}-${parts[1]}`,
+    secret: `${parts[2]}-${parts[3]}`,
+  }
+}
+
+/** 由 N 段派生虚拟网络名（scaffolding-mc-{N 段}） */
+export function scaffoldingNetworkName(publicId: string): string {
+  return `${EASYTIER_NETWORK_PREFIX}${publicId}`
 }
