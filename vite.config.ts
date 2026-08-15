@@ -81,12 +81,12 @@ function updateLogPlugin(): Plugin {
 }
 
 /**
- * dev 专用：监听 src-tauri/cubiomes 目录下 .c/.h 文件变化，防抖后自动执行
+ * dev 专用：监听 cubiomes 目录下 .c/.h 文件变化，防抖后自动执行
  * npm run build:wasm，编译完成整页刷新 —— 等价旧 rust 时代
  * build.rs 的 rerun-if-changed=cubiomes 自动构建替换。
  */
 function cubiomesWatchPlugin(): Plugin {
-  const cubiomesDir = [__dirname, 'src-tauri', 'cubiomes'].join(sep)
+  const cubiomesDir = [__dirname, 'cubiomes'].join(sep)
   let timer: ReturnType<typeof setTimeout> | undefined
   let building = false
   let pending = false

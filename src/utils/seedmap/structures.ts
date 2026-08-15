@@ -19,7 +19,7 @@ import type { Dimension } from './types'
  * - 'nether_fossil'：下界化石，biome 检查启发式（soul_sand_valley 中心标记）
  * - 'fossil' / 'fossil_diamond'：化石，biome 检查启发式（desert/swamp/mangrove 中心标记；diamond 额外要求 deep_dark）
  *
- * 枚举值来源：src-tauri/cubiomes/finders.h:14-44；版本值来源：biomes.h MCVersion 枚举
+ * 枚举值来源：cubiomes/finders.h:14-44；版本值来源：biomes.h MCVersion 枚举
  * （与 useSeedMap.ts 的 SEEDMAP_MC_VERSIONS 对齐）。
  */
 export type StructureQueryMode =

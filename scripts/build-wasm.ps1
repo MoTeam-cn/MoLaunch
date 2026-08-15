@@ -1,6 +1,6 @@
 ﻿# 构建 cubiomes WASM（种子地图工具）
 #
-# 用途：将 src-tauri/cubiomes/ 下的 C 源码编译为 WebAssembly，
+# 用途：将 cubiomes/ 下的 C 源码编译为 WebAssembly，
 #       输出到 src/assets/seedmap/cubiomes.{js,wasm}（前端 Vite 资产目录，
 #       dev 由 dev server 提供，build 由 Vite 处理为带 hash 的产物）。
 #
@@ -26,11 +26,11 @@ if (-not $env:EM_CACHE) {
     $env:EM_CACHE = Join-Path (Resolve-Path (Join-Path $PSScriptRoot "..")) ".cache/emscripten"
 }
 
-# 切换到 src-tauri 目录（cubiomes 源码在此目录下）
-Set-Location "$PSScriptRoot/../src-tauri"
+# 切换到项目根目录（cubiomes 源码在此目录下）
+Set-Location "$PSScriptRoot/.."
 
-# 输出目录：前端 src/assets/seedmap（相对 src-tauri 为 ../src/assets/seedmap）
-$outDir = "../src/assets/seedmap"
+# 输出目录：前端 src/assets/seedmap（相对项目根）
+$outDir = "src/assets/seedmap"
 $wasmOut = Join-Path $outDir "cubiomes.wasm"
 $jsOut = Join-Path $outDir "cubiomes.js"
 
