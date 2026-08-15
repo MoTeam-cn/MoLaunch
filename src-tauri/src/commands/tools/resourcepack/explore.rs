@@ -18,7 +18,7 @@ use crate::state::AppState;
 use super::super::types::{
     RpExportParams, RpExportResult, RpOpenParams, RpOpenResult, RpPackFormatInfoParams,
     RpPackFormatInfoResult, RpReadManyParams, RpReadManyResult, RpReadParams, RpReadResult,
-    RpTreeNode, RpWriteParams, RpWriteResult,
+    RpTreeNode, RpVersionPackFormatParams, RpVersionPackFormatResult, RpWriteParams, RpWriteResult,
 };
 use super::convert::unzip_to_dir;
 use super::convert::zip_directory_with_comment;
@@ -123,6 +123,30 @@ fn pack_format_info_inner(fmt: u32) -> RpPackFormatInfoResult {
     RpPackFormatInfoResult {
         mc_version: version.to_string(),
         known: version != "未知版本",
+        error: String::new(),
+    }
+}
+
+/// 由 MC 版本推导 pack_format（复用皮肤资源包的版本映射，前端下拉选版本后自动回填）
+pub async fn rp_version_pack_format(
+    _state: &AppState,
+    params: RpVersionPackFormatParams,
+) -> Result<serde_json::Value, String> {
+    let result = version_pack_format_inner(&params.mc_version);
+    serde_json::to_value(&result).map_err(|e| e.to_string())
+}
+
+fn version_pack_format_inner(mc_version: &str) -> RpVersionPackFormatResult {
+    let pack_format = crate::minecraft::launch::skin_resourcepack::get_pack_format(mc_version);
+    let known = !mc_version.trim().is_empty()
+        && crate::utils::version::parse_number(mc_version)
+            .first()
+            .copied()
+            .unwrap_or(0)
+            > 0;
+    RpVersionPackFormatResult {
+        pack_format,
+        known,
         error: String::new(),
     }
 }

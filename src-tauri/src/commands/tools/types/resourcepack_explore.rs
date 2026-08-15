@@ -164,3 +164,21 @@ pub struct RpPackFormatInfoResult {
     /// 失败原因（成功时为空）
     pub error: String,
 }
+
+/// 资源包编辑器 - MC 版本推导 pack_format 请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpVersionPackFormatParams {
+    /// MC 版本号（如 "1.20.1"），支持已安装版本 ID 或任意形如 "x.y[.z]" 的版本
+    pub mc_version: String,
+}
+
+/// 资源包编辑器 - MC 版本推导 pack_format 结果（复用皮肤资源包的版本映射）
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpVersionPackFormatResult {
+    /// 推导出的 pack_format 数值
+    pub pack_format: u32,
+    /// 是否为可解析的版本号（无法解析时按默认值返回）
+    pub known: bool,
+    /// 失败原因（成功时为空）
+    pub error: String,
+}

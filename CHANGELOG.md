@@ -6,6 +6,8 @@
 
 ### Added
 
+- **资源包编辑器 MC 版本推导 pack_format 接口（M4 版本隔离：后端）**（[explore.rs](src-tauri/src/commands/tools/resourcepack/explore.rs) / [explore_test.rs](src-tauri/src/commands/tools/resourcepack/explore_test.rs) / [types/resourcepack_explore.rs](src-tauri/src/commands/tools/types/resourcepack_explore.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [mod.rs](src-tauri/src/commands/tools/resourcepack/mod.rs) / [skin_resourcepack/generate.rs](src-tauri/src/minecraft/launch/skin_resourcepack/generate.rs) / [skin_resourcepack/mod.rs](src-tauri/src/minecraft/launch/skin_resourcepack/mod.rs)）：新增 `rp_version_pack_format` action——输入 MC 版本号，复用皮肤资源包既有 `get_pack_format` 版本映射表（可见性由 `pub(super)` 提升为 `pub(crate)` 供编辑器复用）正向推导 pack_format，返回数值与版本可解析标志；前端下拉选版本后自动回填，避免两处维护版本映射。含 1 项新单元测试（多版本推导结果 + 空版本不可解析）。
+
 - **资源包编辑器文件树搜索过滤（M4）**（[filterTree.ts](src/utils/resourcepack/filterTree.ts)（新增） / [ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：文件树顶部新增搜索框——按关键字实时过滤（匹配文件名与相对路径，不区分大小写），目录仅保留含命中子孙的节点；搜索时自动展开命中路径的全部祖先目录，清空关键字恢复原展开状态；无命中时显示「未找到匹配的文件」空态。过滤逻辑抽为独立纯函数模块（`normalizeKeyword` / `filterTreeNode` / `collectExpandPaths`），不改动原树结构。
 
 - **资源包编辑器动画纹理帧预览（M4）**（[RpAnimPreview.vue](src/views/tools/data/RpAnimPreview.vue)（新增） / [RpTexturePreview.vue](src/views/tools/data/RpTexturePreview.vue)）：动画纹理（存在同名 `.png.mcmeta`）预览新增「动画预览」入口——读取 `.png.mcmeta` 的 `animation` 段解析动画配置（默认帧宽=纹理宽、帧高=帧宽，支持显式 width/height、frametime 全局帧时长、frames 帧表与单帧 time 覆盖），按 sprite sheet 帧坐标逐帧绘制到 canvas 播放；支持播放/暂停、1×/2×/4× 速度倍率，展示帧尺寸、总帧数与当前帧序号（1 tick = 50ms）；缺失/损坏的 mcmeta 按默认动画处理不阻塞预览。

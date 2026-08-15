@@ -13,8 +13,9 @@ const DEFAULT_SKINS_1193: &[&str] = &[
 
 /// 根据MC版本返回对应的 pack_format
 ///
-/// 版本映射覆盖 1.6 到 1.20.5+
-pub(super) fn get_pack_format(mc_version: &str) -> u32 {
+/// 版本映射覆盖 1.6 到 1.20.5+；
+/// crate 级可见，供资源包编辑器 pack_format 联动校验复用。
+pub(crate) fn get_pack_format(mc_version: &str) -> u32 {
     let v = parse_version_number(mc_version);
     let major = v.first().copied().unwrap_or(0);
     let minor = v.get(1).copied().unwrap_or(0);

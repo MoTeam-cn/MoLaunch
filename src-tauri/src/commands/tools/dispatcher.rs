@@ -177,6 +177,14 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             resourcepack::rp_pack_format_info(&state, p).await
         }),
     );
+    d.register(
+        "rp_version_pack_format",
+        handler!(state, _app, params, {
+            let p: RpVersionPackFormatParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            resourcepack::rp_version_pack_format(&state, p).await
+        }),
+    );
     // 资源包可视化编辑器：写回单文件与导出打包
     d.register(
         "rp_write",

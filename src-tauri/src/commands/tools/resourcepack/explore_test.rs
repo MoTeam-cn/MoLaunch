@@ -7,8 +7,8 @@ use base64::Engine;
 
 use super::{
     build_tree, classify_file, export_inner, pack_format_info_inner, pack_format_to_version,
-    read_many_inner, resolve_in_work_dir, write_inner, RpExportParams, RpReadManyParams,
-    RpWriteParams,
+    read_many_inner, resolve_in_work_dir, version_pack_format_inner, write_inner, RpExportParams,
+    RpReadManyParams, RpWriteParams,
 };
 
 /// 同步运行异步逻辑（测试用）
@@ -61,6 +61,20 @@ fn test_pack_format_info_inner() {
     let unknown = pack_format_info_inner(999);
     assert!(!unknown.known);
     assert_eq!(unknown.mc_version, "未知版本");
+}
+
+#[test]
+fn test_version_pack_format_inner() {
+    assert_eq!(version_pack_format_inner("1.12.2").pack_format, 4);
+    assert_eq!(version_pack_format_inner("1.16.5").pack_format, 7);
+    assert_eq!(version_pack_format_inner("1.19.3").pack_format, 12);
+    assert_eq!(version_pack_format_inner("1.20.1").pack_format, 15);
+    assert_eq!(version_pack_format_inner("1.20.5").pack_format, 34);
+    assert!(version_pack_format_inner("1.20.1").known);
+
+    let empty = version_pack_format_inner("");
+    assert_eq!(empty.pack_format, 15);
+    assert!(!empty.known);
 }
 
 #[test]

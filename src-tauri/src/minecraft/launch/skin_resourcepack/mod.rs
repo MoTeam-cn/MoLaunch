@@ -6,4 +6,5 @@
 mod generate;
 mod install;
 
+pub(crate) use generate::get_pack_format;
 pub use install::{apply_skin_resourcepack, remove_skin_resourcepack};
