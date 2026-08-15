@@ -16,8 +16,9 @@ use crate::log_warn;
 use crate::state::AppState;
 
 use super::super::types::{
-    RpExportParams, RpExportResult, RpOpenParams, RpOpenResult, RpReadManyParams, RpReadManyResult,
-    RpReadParams, RpReadResult, RpTreeNode, RpWriteParams, RpWriteResult,
+    RpExportParams, RpExportResult, RpOpenParams, RpOpenResult, RpPackFormatInfoParams,
+    RpPackFormatInfoResult, RpReadManyParams, RpReadManyResult, RpReadParams, RpReadResult,
+    RpTreeNode, RpWriteParams, RpWriteResult,
 };
 use super::convert::unzip_to_dir;
 use super::convert::zip_directory_with_comment;
@@ -106,6 +107,24 @@ pub async fn rp_read_many(
         );
     }
     serde_json::to_value(&result).map_err(|e| e.to_string())
+}
+
+/// 查询 pack_format 对应的 MC 版本（供前端表单输入时联动校验提示）
+pub async fn rp_pack_format_info(
+    _state: &AppState,
+    params: RpPackFormatInfoParams,
+) -> Result<serde_json::Value, String> {
+    let result = pack_format_info_inner(params.pack_format);
+    serde_json::to_value(&result).map_err(|e| e.to_string())
+}
+
+fn pack_format_info_inner(fmt: u32) -> RpPackFormatInfoResult {
+    let version = pack_format_to_version(fmt);
+    RpPackFormatInfoResult {
+        mc_version: version.to_string(),
+        known: version != "未知版本",
+        error: String::new(),
+    }
 }
 
 fn open_inner(params: &RpOpenParams) -> Result<RpOpenResult, String> {

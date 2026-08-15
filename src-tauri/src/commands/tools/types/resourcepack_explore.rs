@@ -146,3 +146,21 @@ pub struct RpExportResult {
     /// 提示信息
     pub message: String,
 }
+
+/// 资源包编辑器 - pack_format 版本查询请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpPackFormatInfoParams {
+    /// pack_format 数值
+    pub pack_format: u32,
+}
+
+/// 资源包编辑器 - pack_format 版本查询结果（供前端表单联动校验）
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpPackFormatInfoResult {
+    /// 对应 MC 版本范围描述（如 "1.20.5–1.21.x"），未知为 "未知版本"
+    pub mc_version: String,
+    /// 是否为已知的 pack_format（用于前端校验提示）
+    pub known: bool,
+    /// 失败原因（成功时为空）
+    pub error: String,
+}

@@ -7,7 +7,7 @@ mod helpers;
 mod list;
 
 pub use convert::convert;
-pub use explore::{rp_export, rp_open, rp_read, rp_read_many, rp_write};
+pub use explore::{rp_export, rp_open, rp_pack_format_info, rp_read, rp_read_many, rp_write};
 pub use list::list;
 
 // 私有 use：保持子模块 `use super::{resolve_packs_dir, path_to_string};` 引用可用
