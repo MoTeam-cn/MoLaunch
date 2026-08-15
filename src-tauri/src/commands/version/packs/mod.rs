@@ -3,7 +3,7 @@
 //! 13 个 action 已聚合为 `version_packs_manager` 一个 IPC 入口通过 `action` 字段分发。
 
 mod helpers;
-mod icon;
+pub(crate) mod icon;
 pub mod install;
 pub mod list;
 pub mod manage;

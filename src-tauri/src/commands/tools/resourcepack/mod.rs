@@ -2,10 +2,12 @@
 //! 目录解析与路径处理由 helpers 统一提供。
 
 mod convert;
+mod explore;
 mod helpers;
 mod list;
 
 pub use convert::convert;
+pub use explore::{rp_open, rp_read};
 pub use list::list;
 
 // 私有 use：保持子模块 `use super::{resolve_packs_dir, path_to_string};` 引用可用

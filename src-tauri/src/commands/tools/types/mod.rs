@@ -13,6 +13,7 @@ mod network;
 mod picker_window;
 mod recipe_generator;
 mod resourcepack;
+mod resourcepack_explore;
 mod screenshot;
 mod version_json;
 
@@ -28,6 +29,7 @@ pub use network::*;
 pub use picker_window::*;
 pub use recipe_generator::*;
 pub use resourcepack::*;
+pub use resourcepack_explore::*;
 pub use screenshot::*;
 pub use version_json::*;
 

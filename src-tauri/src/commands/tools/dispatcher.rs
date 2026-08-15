@@ -144,6 +144,23 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             resourcepack::convert(&state, p).await
         }),
     );
+    // 资源包可视化编辑器：打开（zip/folder → 结构树）与单文件读取
+    d.register(
+        "rp_open",
+        handler!(state, _app, params, {
+            let p: RpOpenParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            resourcepack::rp_open(&state, p).await
+        }),
+    );
+    d.register(
+        "rp_read",
+        handler!(state, _app, params, {
+            let p: RpReadParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            resourcepack::rp_read(&state, p).await
+        }),
+    );
 
     // 版本 JSON 读写
     d.register(
