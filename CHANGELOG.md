@@ -44,7 +44,7 @@
 
 ### Changed
 
-- **nbt.rs 模块化拆分：NBT 逻辑按职责拆分为 `nbt/` 目录**（[mod.rs](src-tauri/src/commands/tools/nbt/mod.rs) / [mca.rs](src-tauri/src/commands/tools/nbt/mca.rs) / [convert.rs](src-tauri/src/commands/tools/nbt/convert.rs) / [scan.rs](src-tauri/src/commands/tools/nbt/scan.rs) / [compress.rs](src-tauri/src/commands/tools/nbt/compress.rs)（新增） / [nbt_test.rs](src-tauri/src/commands/tools/nbt/nbt_test.rs)（移动））：原 566 行单文件按职责拆分为 `nbt/` 子模块——mod.rs 保留公共命令（`parse`/`save`/`list_save_files`）与普通 NBT 保存、根名读取、原子写；mca.rs 负责 Anvil 区块容器解析与重打包；convert.rs 负责 NbtNode ↔ fastnbt::Value 树转换；scan.rs 负责存档目录扫描分类；compress.rs 负责 gzip/zlib 压缩辅助。子模块函数仅对父模块可见（`pub(super)`），公共命令签名与 dispatcher 调用不变，测试文件随模块目录迁移、行为零改动。
+- **nbt.rs 模块化拆分：NBT 逻辑按职责拆分为 `nbt/` 目录**（[mod.rs](src-tauri/src/commands/tools/nbt/mod.rs) / [api.rs](src-tauri/src/commands/tools/nbt/api.rs) / [mca.rs](src-tauri/src/commands/tools/nbt/mca.rs) / [convert.rs](src-tauri/src/commands/tools/nbt/convert.rs) / [scan.rs](src-tauri/src/commands/tools/nbt/scan.rs) / [compress.rs](src-tauri/src/commands/tools/nbt/compress.rs)（新增） / [nbt_test.rs](src-tauri/src/commands/tools/nbt/nbt_test.rs)（移动））：原 566 行单文件按职责拆分为 `nbt/` 子模块——mod.rs 仅作入口注册（`mod` 声明 + `pub use` 重导出公共命令，不存放逻辑）；api.rs 承载公共命令（`parse`/`save`/`list_save_files`）与普通 NBT 保存、根名读取、原子写；mca.rs 负责 Anvil 区块容器解析与重打包；convert.rs 负责 NbtNode ↔ fastnbt::Value 树转换；scan.rs 负责存档目录扫描分类；compress.rs 负责 gzip/zlib 压缩辅助。子模块函数仅对父模块可见（`pub(super)`），公共命令签名与 dispatcher 调用不变，测试文件随模块目录迁移、行为零改动。
 
 - **移除 cubiomes submodule 注册**（[.gitmodules](.gitmodules)（删除））：cubiomes 不再作为 submodule 引入，源码由 update-cubiomes 工作流按需 `git clone` 拉取，本地仓库不再包含该目录，避免 submodule 状态干扰日常 git 操作。
 
