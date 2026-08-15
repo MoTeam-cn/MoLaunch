@@ -47,7 +47,7 @@ const categories: ToolCategory[] = [
     id: 'common',
     label: '常用工具',
     icon: WrenchScrewdriverIcon,
-    desc: '今日人品、清理游戏垃圾、内存优化等日常实用小工具',
+    desc: '今日人品、清理游戏垃圾、内存优化、版本 JSON 编辑等日常实用小工具',
   },
   {
     id: 'storage',
@@ -65,7 +65,7 @@ const categories: ToolCategory[] = [
     id: 'java-diag',
     label: 'Java 诊断',
     icon: CommandLineIcon,
-    desc: 'Java 运行时下载与检测，版本 JSON 编辑等启动排障工具',
+    desc: 'Java 运行时下载、环境检测与启动排障工具',
   },
   {
     id: 'create-cmd',

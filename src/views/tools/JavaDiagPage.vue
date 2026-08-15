@@ -7,24 +7,21 @@
  * - Java 下载器
  * - 已安装版本 Java 环境检测
  * - Java 运行时列表
- * - 版本 JSON 编辑
  *
  * 深链支持：URL `?subtab=manager` 可直接切到对应子页签。
  */
 import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
-import { ArrowDownTrayIcon, CodeBracketIcon, MagnifyingGlassIcon, ServerStackIcon } from '@heroicons/vue/24/outline'
+import { ArrowDownTrayIcon, MagnifyingGlassIcon, ServerStackIcon } from '@heroicons/vue/24/outline'
 const JavaDownloader = defineAsyncComponent(() => import('./java/JavaDownloader.vue'))
 const JavaEnvCheck = defineAsyncComponent(() => import('./java/JavaEnvCheck.vue'))
 const JavaManager = defineAsyncComponent(() => import('./data/JavaManager.vue'))
-const VersionJsonEditor = defineAsyncComponent(() => import('./data/VersionJsonEditor.vue'))
 
 const subTabs = [
   { id: 'downloader', label: 'Java 下载器', icon: ArrowDownTrayIcon },
   { id: 'env-check', label: '环境检测', icon: MagnifyingGlassIcon },
   { id: 'manager', label: '运行时列表', icon: ServerStackIcon },
-  { id: 'version-json', label: '版本 JSON', icon: CodeBracketIcon },
 ]
 const activeSubTab = ref('downloader')
 
@@ -47,7 +44,6 @@ onMounted(() => {
         <JavaDownloader v-if="activeSubTab === 'downloader'" />
         <JavaEnvCheck v-else-if="activeSubTab === 'env-check'" />
         <JavaManager v-else-if="activeSubTab === 'manager'" />
-        <VersionJsonEditor v-else-if="activeSubTab === 'version-json'" />
       </div>
     </div>
   </div>

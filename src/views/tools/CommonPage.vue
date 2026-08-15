@@ -7,23 +7,26 @@
  * - 便捷工具（清理垃圾/内存优化/协议诊断等）
  * - 坐标距离计算
  * - 游戏内调色板
+ * - 版本 JSON 编辑
  *
  * 深链支持：URL `?subtab=palette` 可直接切到对应子页签。
  */
 import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
-import { FaceSmileIcon, MapPinIcon, SwatchIcon, WrenchScrewdriverIcon } from '@heroicons/vue/24/outline'
+import { CodeBracketIcon, FaceSmileIcon, MapPinIcon, SwatchIcon, WrenchScrewdriverIcon } from '@heroicons/vue/24/outline'
 const LuckyTool = defineAsyncComponent(() => import('../quick-tools/LuckyTool.vue'))
 const QuickTools = defineAsyncComponent(() => import('../QuickTools.vue'))
 const CoordCalculator = defineAsyncComponent(() => import('./calc/CoordCalculator.vue'))
 const ColorPalette = defineAsyncComponent(() => import('./calc/ColorPalette.vue'))
+const VersionJsonEditor = defineAsyncComponent(() => import('./data/VersionJsonEditor.vue'))
 
 const subTabs = [
   { id: 'luck', label: '今日人品', icon: FaceSmileIcon },
   { id: 'quick', label: '便捷工具', icon: WrenchScrewdriverIcon },
   { id: 'coord', label: '坐标计算', icon: MapPinIcon },
   { id: 'palette', label: '调色板', icon: SwatchIcon },
+  { id: 'version-json', label: '版本 JSON', icon: CodeBracketIcon },
 ]
 const activeSubTab = ref('luck')
 
@@ -46,7 +49,8 @@ onMounted(() => {
         <LuckyTool v-if="activeSubTab === 'luck'" />
         <QuickTools v-else-if="activeSubTab === 'quick'" />
         <CoordCalculator v-else-if="activeSubTab === 'coord'" />
-        <ColorPalette v-else />
+        <ColorPalette v-else-if="activeSubTab === 'palette'" />
+        <VersionJsonEditor v-else />
       </div>
     </div>
   </div>
