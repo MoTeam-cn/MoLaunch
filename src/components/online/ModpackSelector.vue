@@ -84,9 +84,13 @@ async function loadMeta() {
   loading.value = true
   error.value = ''
   try {
-    localMeta.value = await readLocalModpackMeta(props.versionId)
-    emit('update:modelValue', localMeta.value ? toMeta(localMeta.value) : undefined)
+    const meta = await readLocalModpackMeta(props.versionId)
+    // 读取期间用户可能已取消勾选：跳过回写，避免已取消的整合包被"复活"
+    if (!enabled.value) return
+    localMeta.value = meta
+    emit('update:modelValue', meta ? toMeta(meta) : undefined)
   } catch (e) {
+    if (!enabled.value) return
     error.value = e instanceof Error ? e.message : String(e)
     localMeta.value = null
     emit('update:modelValue', undefined)

@@ -10,6 +10,8 @@
 
 ### Fixed
 
+- **勾选整合包后无法取消换其他包：异步读取竞态导致已取消的整合包被"复活"**（[ModpackSelector.vue](src/components/online/ModpackSelector.vue)）：`loadMeta()` 在 `await readLocalModpackMeta` 返回后无条件 emit 有值——用户在读取期间取消勾选（已 emit `undefined` 并清空本地元数据），异步返回后又被回写，父组件 `modpackMeta` 被恢复，UI 上表现为无法真正取消。修复：读取完成后回检 `enabled` 状态，用户已取消则跳过回写（成功与失败分支均回检）。
+
 - **修复资源包 explore 测试的目录构造与源 zip 位置**（[explore_test.rs](src-tauri/src/commands/tools/resourcepack/explore_test.rs)）：① `test_build_tree_classifies_and_marks_animated` 写 `assets/minecraft/lang/zh_cn.json` 前未创建 `lang` 目录，`fs::write` 报 NotFound；② `test_export_zip_roundtrip_preserves_comment` 把带注释的源 zip 放在工作目录内，导出打包时被当成普通文件打进产物（配合 convert.rs 的临时文件排除修复，产物条目数收敛为预期 2），源 zip 移到工作目录外并在测试后清理。
 
 - **修复 mca 往返测试：测试构造的区块数据写入位置与位置表不一致**（[nbt_test.rs](src-tauri/src/commands/tools/nbt_test.rs)）：`build_mca` 测试辅助把区块数据（长度+压缩类型+zlib 数据）追加到 8192 字节区域头之后，而位置表指向扇区 2——解析器在偏移 1024 处读到的长度恒为 0，`mca_parse_and_save` 报「mca 文件中没有可解析的区块」。改为把数据写入位置表指向的扇区起始处，扇区数按实际大小计算。
