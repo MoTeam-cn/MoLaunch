@@ -83,6 +83,10 @@ async function loadVanillaBase(): Promise<VanillaPackBase> {
   const failed = resList.find((r) => !r.ok)
   if (failed) throw new Error(`原版内置资源加载失败: ${failed.status} ${failed.statusText}`)
   const assets = await assetsRes.json()
+  // lodestone 只特判 builtin/generated；内置 item 模板（如 item/milk_bucket）的 parent 是 builtin/entity，
+  // 缺失会导致其 flatten 时被静默清空、引用它们的模型渲染黑屏。注入等价定义使其生成 layer0 平面。
+  assets.models ??= {}
+  assets.models['builtin/entity'] = { parent: 'builtin/generated' }
   const atlas = await decodeAtlasToImageData(await atlasRes.blob())
   const flags = {
     opaque: parseBlockList(await opaqueRes.text()),
@@ -193,24 +197,30 @@ function missingParentInChain(
     const id = stack.pop()!
     if (seen.has(id)) continue
     seen.add(id)
-    const json = packModels.get(id) ?? vanillaModels[id]
+    // assets key 不带 minecraft: 前缀，查询时回退无前缀形式
+    const json = packModels.get(id) ?? vanillaModels[id] ?? vanillaModels[id.slice(id.indexOf(':') + 1)]
     if (json == null || typeof json !== 'object') {
-      // vanilla item 模板（item/generated、item/handheld 等）由 builtin/generated 平面兜底，
-      // lodestone 内置资源只有 block 模型，此类缺失不算断链
-      if (isVanillaItemFallback(id)) continue
+      // vanilla item 模板（item/generated、item/handheld 等）与 builtin 平面由 generated 兜底，不算断链
+      if (isVanillaFallback(id)) continue
       return id
     }
     const parent = (json as Record<string, unknown>).parent
     if (typeof parent !== 'string') continue
-    if (parent === 'builtin/generated' || parent === 'minecraft:builtin/generated') continue // lodestone 内置生成平面，无需 parent 文件
+    if (
+      parent === 'builtin/generated' ||
+      parent === 'minecraft:builtin/generated' ||
+      parent === 'builtin/entity' ||
+      parent === 'minecraft:builtin/entity'
+    )
+      continue // lodestone 内置生成平面，无需 parent 文件
     stack.push(parent.includes(':') ? parent : `minecraft:${parent}`)
   }
   return null
 }
 
-/** minecraft:item/* 命名空间：lodestone 未内置 item 模型，统一以 builtin/generated 平面兜底 */
-function isVanillaItemFallback(id: string): boolean {
-  return id.startsWith('minecraft:item/')
+/** minecraft:item/* 与 minecraft:builtin/* 命名空间：lodestone 未内置或为特殊平面，统一以 generated 平面兜底 */
+function isVanillaFallback(id: string): boolean {
+  return id.startsWith('minecraft:item/') || id.startsWith('minecraft:builtin/')
 }
 
 let fallbackItemModel: BlockModel | null = null
@@ -220,7 +230,7 @@ function getFallbackItemModel(): BlockModel {
   return fallbackItemModel
 }
 
-/** 模型读取：pack 优先 → vanilla 回退 → vanilla item 模板以 generated 平面兜底 */
+/** 模型读取：pack 优先 → vanilla 回退 → vanilla item/builtin 模板以 generated 平面兜底 */
 function buildModelProvider(
   blockModels: Map<string, BlockModel>,
   vanilla: VanillaPackBase,
@@ -231,7 +241,7 @@ function buildModelProvider(
       return (
         blockModels.get(key) ??
         vanilla.resources.getBlockModel(id) ??
-        (isVanillaItemFallback(key) ? getFallbackItemModel() : null)
+        (isVanillaFallback(key) ? getFallbackItemModel() : null)
       )
     },
   }

@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **3D 预览 builtin/entity 链模型黑屏修复**（[previewResources.ts](src/utils/resourcepack/previewResources.ts)）：lodestone 只特判 `builtin/generated`，内置原版 item 模板（如 `item/milk_bucket`）的 parent 是 `builtin/entity`，其缺失会导致这些模板在 flatten 时被静默清空，引用它们的模型渲染黑屏并持续打印 `parent minecraft:builtin/entity does not exist!`。修复：① 加载原版内置资源时注入 `builtin/entity` 等价定义（映射为 generated 平面），内置模板可正常生成 layer0 平面、警告消除；② parent 链检测把 `builtin/entity` 与 `builtin/generated` 同等视为内置平面，且 vanilla 查询支持无前缀 key（assets key 不带 `minecraft:` 前缀），检测与渲染路径一致；③ 兜底范围由 `minecraft:item/*` 扩展至 `minecraft:builtin/*`。
+
 - **3D 预览 vanilla item 父模型误报缺失修复**（[previewResources.ts](src/utils/resourcepack/previewResources.ts)）：`minecraft:item/*` 命名的模型引用（如 `minecraft:item/handheld`、`minecraft:item/generated` 等 vanilla 内置物品模板）统一以 `builtin/generated` 平面兜底渲染——lodestone 内置原版资源只有 block 模型、无 item 模型，此类模型并非真正缺失，不再误报「模型依赖缺失」；模型读取（flatten 与渲染两处）抽为统一的 `buildModelProvider`，pack 优先 → vanilla 回退 → vanilla item 模板平面兜底，parent 链检测与渲染逻辑保持一致。模组命名空间（如 `SRParasites:item/...`）缺失仍按原逻辑报错。
 
 - **编辑器「有未保存的修改」改为与初始值比较（改回原值即清除提示）**（[VersionJsonEditor.vue](src/views/tools/data/VersionJsonEditor.vue) / [RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue) / [RpMcmetaForm.vue](src/views/tools/data/RpMcmetaForm.vue) / [RpLangTable.vue](src/views/tools/data/RpLangTable.vue)）：版本 JSON 编辑、资源包文本/JSON 编辑器、pack.mcmeta 表单、语言文件表格四个编辑器的 dirty 判定由「任何编辑动作即置 true」改为「当前值 ≠ 加载时初始快照」——修改后再改回原值，未保存提示自动消失；保存成功后同步更新快照，保证保存后的再次编辑判定正确。
