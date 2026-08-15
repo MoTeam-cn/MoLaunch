@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **3D 预览高度限制：不再超出内容分发区产生滚动拉长页面；JSON 编辑模式下「返回 3D 预览」与保存按钮同行**（[RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue) / [RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue) / [ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：① 3D 预览渲染容器高度由 420px 收窄至 330px（含标题栏约 358px），完整落在内容分发区 400px 高度内，不再出现内部滚动条、页面不被拉长，视口与日志兜底尺寸同步更新；② RpTextEditor 底部按钮行由「保存按钮右对齐」改为「`actions` 插槽 + 保存按钮（`ml-auto` 右对齐）」——资源包编辑器模型 JSON 编辑模式下通过插槽注入「返回 3D 预览」按钮与保存按钮同行，原底部切换按钮仅在 3D 预览模式显示「编辑 JSON」，其他类型文本编辑（无插槽内容）布局不变。
+
 - **3D 预览背面空白：物品/模型平面为单面几何，材质改为双面渲染**（[RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue)）：`builtin/generated` 平面只有 south 面（16×16 单面 quad），材质使用 `THREE.FrontSide`——旋转到背面时被背面剔除（backface culling）整面消失成空白。修复：renderer 构造后立即将 lodestone 内部的 `opaqueMaterial` / `transparentMaterial` 的 `side` 置为 `THREE.DoubleSide`，正面背面均可看到纹理（材质在构造器内创建，设置时机在 `whenReady` 之前）。
 
 - **3D 预览支持动画纹理帧轮播，不再只显示第一帧**（[previewResources.ts](src/utils/resourcepack/previewResources.ts) / [RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue)）：pack 纹理为 Minecraft 垂直动画条时（高度为宽度的整数倍，如弓的 pulling 纹理 32×640 = 20 帧 × 32px），此前为规避整条 640px 贴面变形只裁剪第一帧、预览静止。修复：① `mergeAtlas` 把动画条全部帧逐帧烘焙进图集（帧间 1px 间隔），导出 `frameUvs`（id → 按序帧 UV），`idMap` 仍指向第一帧保证初始采样正确；② `buildPreviewResources` 返回 `animations` 帧表；③ RpModelPreview 在 `whenReady` 后扫描 chunk 几何，按帧 0 的 `texLimit` 匹配动画顶点并快照初始 `uv`/`texLimit`，rAF 循环按 50ms/帧（Minecraft 默认动画速度 1 tick）以帧间位移增量平移属性缓冲（相对快照计算、无累计误差），纹理实时轮播显示全部帧。

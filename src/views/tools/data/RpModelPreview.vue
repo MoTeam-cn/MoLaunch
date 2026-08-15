@@ -185,13 +185,13 @@ async function loadPreview() {
     if (internals.transparentMaterial) internals.transparentMaterial.side = THREE.DoubleSide
     console.log(
       `[preview] renderer 就绪：chunkMeshes=${internals.chunkMeshes?.length ?? 0}，` +
-        `canvas=${canvas.clientWidth || 360}x${canvas.clientHeight || 420}`,
+        `canvas=${canvas.clientWidth || 360}x${canvas.clientHeight || 330}`,
     )
     renderer.setViewport(
       0,
       0,
       canvas.clientWidth || 360,
-      canvas.clientHeight || 420,
+      canvas.clientHeight || 330,
       window.devicePixelRatio,
     )
     await renderer.whenReady()
@@ -256,7 +256,7 @@ onBeforeUnmount(disposeRenderer)
       </button>
     </div>
     <div
-      class="relative h-[420px] overflow-hidden rounded border border-gray-200 bg-gray-900"
+      class="relative h-[330px] overflow-hidden rounded border border-gray-200 bg-gray-900"
     >
       <canvas
         ref="canvasEl"

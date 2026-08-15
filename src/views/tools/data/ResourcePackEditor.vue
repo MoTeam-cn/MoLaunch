@@ -457,13 +457,23 @@ async function saveAsZip() {
                 :name="selectedNode.name"
                 :file-type="selectedNode.file_type"
                 :content="textContent"
-              />
+              >
+                <template #actions>
+                  <button
+                    class="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+                    @click="modelEditMode = false"
+                  >
+                    返回 3D 预览
+                  </button>
+                </template>
+              </RpTextEditor>
             </div>
             <button
+              v-if="!modelEditMode"
               class="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
-              @click="modelEditMode = !modelEditMode"
+              @click="modelEditMode = true"
             >
-              {{ modelEditMode ? '返回 3D 预览' : '编辑 JSON' }}
+              编辑 JSON
             </button>
           </div>
           <div v-else-if="selectedNode && canEditText">

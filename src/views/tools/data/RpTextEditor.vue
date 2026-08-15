@@ -111,10 +111,12 @@ async function doSave() {
       class="w-full resize-y rounded border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
       placeholder="文件内容..."
     ></textarea>
-    <div class="flex justify-end">
+    <div class="flex items-center gap-2">
+      <slot name="actions" />
       <Button
         type="primary"
         size="small"
+        class="ml-auto"
         :loading="saving"
         :disabled="!dirty || (isJson && !!jsonError)"
         @click="doSave"
