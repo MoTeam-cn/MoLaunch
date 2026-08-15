@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **恢复房间详情页「房间工具」抽屉（检查 MC 服务 / 网络连通性 / 端口自动检测）**（[RoomToolsDrawer.vue](src/components/online/RoomToolsDrawer.vue) 恢复 / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：房主与加入方面板新增「房间工具」入口按钮，右侧抽屉恢复三个工具：① 检查 MC 服务（SLP 协议，房主测本机 127.0.0.1、加入方测房主虚拟 IP，展示 MOTD/人数/版本/延迟）；② 检查网络连通性（TCP 握手，仅加入方可见，与房主 P2P + 虚拟网卡链路检测）；③ 端口自动检测（监听局域网发现广播解析 `[AD]port[/AD]`）。适配 Scaffolding 收敛后的 API 契约：`serverPing`/`tcpCheck` 从 `@/utils/api/tools/network` 导入，房主虚拟 IP 改用固定 `EASYTIER_HOST_VIRTUAL_IP` 常量，`lanPortProbe` 改为直接传超时参数。
+
 - **房主房间信息卡移除「剩余时间」显示**（[HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue)）：不再展示房间保留倒计时，房间信息卡精简为房间码 / MC 版本与端口 / 加载器 / 备注 / 房间类型 / 私密标识。
 
 - **恢复联机侧边栏「房间管理」子菜单，新增「房间详情」子项**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue)）：侧边栏从扁平「设备 / 联机大厅 / 创建房间 / 加入房间」恢复为「设备 / 联机大厅 / 房间管理（创建房间 · 加入房间 · 房间详情）+ FRP」子菜单结构；在房间中时「创建房间」「加入房间」置灰（disabled，需先退出房间），未在房间时「房间详情」置灰；进入房间自动切到「房间详情」（`room_details` 按角色回落 RoomManager：房主→create、房客→join），离开房间且当前在房间详情时切回创建房间；保留云端离线封禁（sealed）与 `?tab=` 恢复机制。「大厅重复加入」已由 LobbyBrowser `inRoom` 双检查防护（`handleJoin`/`doJoin` 拦截 + 卡片按钮置灰）。

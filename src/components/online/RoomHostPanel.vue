@@ -7,7 +7,7 @@
  * 创建编排由 CreateRoomForm 完成（登记 + hostStart），此处仅消费状态；
  * 关闭流程（停联机中心/easytier → room_close）由 useRoomHost().handleCloseRoom 一站式完成。
  */
-import { computed, defineAsyncComponent } from 'vue'
+import { computed, ref, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useRoomHost } from '@/composables/useRoomHost'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
@@ -15,12 +15,16 @@ const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const HostRoomInfoCard = defineAsyncComponent(() => import('./HostRoomInfoCard.vue'))
 const EasyTierStatusBadge = defineAsyncComponent(() => import('./EasyTierStatusBadge.vue'))
-import { XCircleIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
+import { XCircleIcon, ExclamationTriangleIcon, Cog6ToothIcon } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
 const roomHost = useRoomHost()
 
 const room = computed(() => store.roomState)
+
+/** 房间工具抽屉开关（检查 MC 服务 / 网络连通性 / 端口自动检测） */
+const toolsDrawerOpen = ref(false)
 
 function handleCloseRoom() {
   void roomHost.handleCloseRoom()
@@ -49,6 +53,14 @@ function handleCloseRoom() {
       </div>
     </Card>
 
+    <!-- 房间工具 -->
+    <div class="pt-2">
+      <Button type="outline" long @click="toolsDrawerOpen = true">
+        <template #icon><Cog6ToothIcon class="w-4 h-4" /></template>
+        房间工具
+      </Button>
+    </div>
+
     <!-- 关闭房间 -->
     <div class="pt-2">
       <Button type="outline" long :loading="store.roomLoading" @click="handleCloseRoom">
@@ -57,4 +69,6 @@ function handleCloseRoom() {
       </Button>
     </div>
   </div>
+
+  <RoomToolsDrawer v-model:visible="toolsDrawerOpen" />
 </template>

@@ -11,7 +11,7 @@
  *
  * 挂载后自动探测进服地址（scaffolding_client_probe，join 闸门已拿完整码）。
  */
-import { computed, onMounted, defineAsyncComponent } from 'vue'
+import { computed, onMounted, ref, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { getOnlineSession } from '@/composables/online/onlineSession'
 import { useEasyTier, type EasyTierStatus } from '@/composables/useEasyTier'
@@ -20,6 +20,7 @@ const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
+const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
 import { showConfirm } from '@/utils/modal'
 import { toastError } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'
@@ -29,6 +30,7 @@ import {
   ExclamationTriangleIcon,
   ClipboardDocumentIcon,
   ArrowPathIcon,
+  Cog6ToothIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -38,6 +40,9 @@ const session = getOnlineSession()
 const room = computed(() => store.roomState)
 /** 探测结果（mcIp/mcPort 由 scaffolding.probe 写入 store.easytierRuntime） */
 const entry = computed(() => store.easytierRuntime)
+
+/** 房间工具抽屉开关（检查 MC 服务 / 网络连通性 / 端口自动检测） */
+const toolsDrawerOpen = ref(false)
 
 const connStateText = computed(() => {
   switch (easytier.status.value) {
@@ -185,6 +190,14 @@ onMounted(() => {
       </div>
     </Card>
 
+    <!-- 房间工具 -->
+    <div class="pt-2">
+      <Button type="outline" long @click="toolsDrawerOpen = true">
+        <template #icon><Cog6ToothIcon class="w-4 h-4" /></template>
+        房间工具
+      </Button>
+    </div>
+
     <!-- 退出房间 -->
     <div class="pt-2">
       <Button type="outline" long :loading="store.roomLoading" @click="handleLeaveRoom">
@@ -193,4 +206,6 @@ onMounted(() => {
       </Button>
     </div>
   </div>
+
+  <RoomToolsDrawer v-model:visible="toolsDrawerOpen" />
 </template>
