@@ -58,7 +58,7 @@ $sources = @(
 # 缺源码时若有入库产物则直接复用，否则报错提示先运行工作流
 $missingSources = @($sources | Where-Object { -not (Test-Path $_) })
 if ($missingSources.Count -gt 0) {
-    if (Test-Path $wasmOut -and (Test-Path $jsOut)) {
+    if ((Test-Path $wasmOut) -and (Test-Path $jsOut)) {
         Write-Host "缺少 cubiomes 源码（$($missingSources[0])），复用已入库产物（$wasmOut）" -ForegroundColor Yellow
         exit 0
     }
@@ -130,7 +130,7 @@ if (-not (Get-Command emcc -ErrorAction SilentlyContinue)) {
         }
     }
     if (-not $emsdkFound) {
-        if (Test-Path $wasmOut -and (Test-Path $jsOut)) {
+        if ((Test-Path $wasmOut) -and (Test-Path $jsOut)) {
             Write-Host "emcc 不可用，使用已入库的 cubiomes WASM 产物（$wasmOut）" -ForegroundColor Yellow
             exit 0
         }

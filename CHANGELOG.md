@@ -42,7 +42,7 @@
 
 - **cubiomes 编译迁移至 GitHub Actions 工作流自动维护（替代 dev 自动检测）**（[update-cubiomes.yml](.github/workflows/update-cubiomes.yml)（新增） / [build-wasm.ps1](scripts/build-wasm.ps1)）：新增 `update-cubiomes` 工作流——每日（UTC 04:00，可手动触发）通过 `git ls-remote` 检测 cubiomes 上游仓库（MoTeam-cn/cubiomes）HEAD commit，与入库产物记录（`src/assets/seedmap/cubiomes.upstream.txt`）比对：一致则跳过；有更新则拉取源码 → emcc 编译（复用 build-wasm.ps1）→ 更新产物与记录并提交回 main（`!c` 跳过 CI）。本地不再需要保留 cubiomes 源码目录，产物由本工作流统一维护。
 
-- **cubiomes WASM 编译容错：本地无源码时复用入库产物**（[build-wasm.ps1](scripts/build-wasm.ps1) / [prebuild.mjs](scripts/prebuild.mjs)）：本地删除 cubiomes 源码目录后，`npm run build:wasm` 检测到源文件缺失时直接复用已入库的 `src/assets/seedmap` 产物并退出（exit 0），Windows 本地构建/发布不再依赖源码；缺源码且无产物时明确报错提示先运行 update-cubiomes 工作流。
+- **cubiomes WASM 编译容错：本地无源码时复用入库产物**（[build-wasm.ps1](scripts/build-wasm.ps1) / [prebuild.mjs](scripts/prebuild.mjs)）：本地删除 cubiomes 源码目录后，`npm run build:wasm` 检测到源文件缺失时直接复用已入库的 `src/assets/seedmap` 产物并退出（exit 0），Windows 本地构建/发布不再依赖源码；缺源码且无产物时明确报错提示先运行 update-cubiomes 工作流。（顺带修复该文件两处 `Test-Path` 条件表达式未加括号、`-and` 被解析为命名参数的问题）
 
 - **修复 CI lint 报错：cubiomes 编译产物不再参与 ESLint**（[.eslintrc.cjs](.eslintrc.cjs)）：`src/assets/seedmap/`（emcc 编译生成的 cubiomes.js/wasm）加入 `ignorePatterns`，与既有产物忽略先例（`src-tauri/resources/view/*.min.js`）一致；此前 CI 的 `npm run lint` 会扫描入库产物并报大量 `globalThis is not defined`（no-undef）。
 
