@@ -463,7 +463,8 @@ function createPreviewResources(
       return atlas.idMap[String(id)] ?? atlas.missingUV
     },
     getPixelSize() {
-      return 16
+      // lodestone 约定：1 个图集像素对应的 UV 大小（shader 用它做半像素采样缩进）
+      return 1 / atlas.imageData.width
     },
   }
   const blockPropertiesProvider: BlockPropertiesProvider = vanilla.resources
@@ -483,7 +484,7 @@ function createPreviewResources(
       return textureProvider.getTextureUV(id)
     },
     getPixelSize() {
-      return 16
+      return 1 / atlas.imageData.width
     },
     getBlockFlags(id) {
       return flagProvider.getBlockFlags(id)

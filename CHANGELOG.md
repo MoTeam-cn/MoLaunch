@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **3D 预览纹理采样错乱：getPixelSize 硬编码 16 导致 shader clamp 边界失效**（[previewResources.ts](src/utils/resourcepack/previewResources.ts)）：lodestone 的 `getPixelSize()` 约定返回「1 个图集像素对应的 UV 大小」(`part / 16 = 1 / 图集宽度`)，fragment shader 用它做半像素采样缩进（`vTexLimit ± vec2(0.5,0.5)*pixelSize`）。此前 `createPreviewResources` 硬编码返回 `16`，在 0~1 的 UV 空间里相当于偏移 8 个 UV 单位——clamp 下界远大于上界（`min > max`），GLSL `clamp` 行为未定义，纹理采样坐标完全错乱，渲染结果与纹理内容无关（此前「方块/变形」现象的深层原因）。修复：`getPixelSize()` 返回 `1 / 图集宽度`（`atlas.imageData.width`），与 lodestone 约定及合并后图集尺寸（4096）一致，半像素缩进恢复正常，纹理可正确采样。
+
 - **3D 预览动画条纹理（垂直多帧）整条贴面变形，改为仅取第一帧**（[previewResources.ts](src/utils/resourcepack/previewResources.ts)）：pack 纹理为 Minecraft 垂直动画条时（高度为宽度的整数倍，如弓的 pulling 纹理 32×640 = 20 帧 × 32px），lodestone 不支持动画帧，`mergeAtlas` 把整条 640px 作为 UV 贴到 16×16 模型面上，垂直压缩 40 倍——渲染呈一团变形的「方块」，与原图完全不符。修复：放置 pack 纹理时检测动画条特征（`h > w && h % w === 0`），仅裁剪顶部第一帧（w×w）区域绘制并映射 UV；新增排查日志（pack 纹理实际尺寸、动画条裁剪提示、图集最终尺寸、flatten 后首元素 from/to/faces），便于区分「纹理数据」与「模型几何」两类问题。
 
 - **3D 预览黑屏修复：disposed 标志未在重新加载时重置，动画循环从未启动**（[RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue)）：`loadPreview` 开头调用 `disposeRenderer()` 把 `disposed` 置为 `true` 以停止旧渲染循环，但创建新 `ThreeStructureRenderer` 后未把 `disposed` 重置为 `false`——`startLoop` 的 rAF 回调首帧即因 `disposed === true` 直接 return，canvas 一帧未画。此前模型解析/纹理映射等日志（`elements=1`、UV 正常）均已确认无误，页面仍一片黑且无任何报错，正是此原因。修复：创建新 renderer 前重置 `disposed = false`，并新增 renderer 就绪日志（`chunkMeshes` 数量与 canvas 尺寸），确认几何实际进入渲染管线。
