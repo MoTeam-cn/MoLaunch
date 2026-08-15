@@ -27,6 +27,9 @@ const emit = defineEmits<{
 
 const packFormat = ref('')
 const description = ref('')
+/** 加载时的初始值快照，用于判定是否真正有改动 */
+const originalPackFormat = ref('')
+const originalDescription = ref('')
 const dirty = ref(false)
 const saving = ref(false)
 const loaded = ref(false)
@@ -105,13 +108,18 @@ function parseContent() {
   } catch {
     // 解析失败保持空表单
   } finally {
+    originalPackFormat.value = packFormat.value
+    originalDescription.value = description.value
     loaded.value = true
   }
 }
 
 watch(() => props.content, parseContent, { immediate: true, flush: 'sync' })
 watch([packFormat, description], () => {
-  if (loaded.value) dirty.value = true
+  if (loaded.value) {
+    dirty.value =
+      packFormat.value !== originalPackFormat.value || description.value !== originalDescription.value
+  }
 })
 
 async function doSave() {
@@ -142,6 +150,8 @@ async function doSave() {
       return
     }
     toastSuccess('pack.mcmeta 已保存')
+    originalPackFormat.value = packFormat.value
+    originalDescription.value = description.value
     dirty.value = false
     emit('saved', { packFormat: Number(packFormat.value), description: description.value })
   } catch (e) {

@@ -23,6 +23,8 @@ const props = defineProps<{
 const emit = defineEmits<{ (e: 'saved'): void }>()
 
 const text = ref('')
+/** 加载时的初始内容快照，用于判定是否真正有改动 */
+const original = ref('')
 const dirty = ref(false)
 const saving = ref(false)
 const loaded = ref(false)
@@ -43,13 +45,14 @@ watch(
   (v) => {
     loaded.value = false
     text.value = v
+    original.value = v
     dirty.value = false
     loaded.value = true
   },
   { immediate: true, flush: 'sync' },
 )
 watch(text, () => {
-  if (loaded.value) dirty.value = true
+  if (loaded.value) dirty.value = text.value !== original.value
 })
 
 async function doSave() {
@@ -74,6 +77,7 @@ async function doSave() {
       return
     }
     toastSuccess('已保存')
+    original.value = text.value
     dirty.value = false
     emit('saved')
   } catch (e) {

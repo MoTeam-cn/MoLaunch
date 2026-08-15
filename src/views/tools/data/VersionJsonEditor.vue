@@ -27,6 +27,8 @@ const selectedVersion = ref<string>('')
 const versionOptions = ref<{ label: string; value: string }[]>([])
 
 const content = ref('')
+/** 加载时的初始内容快照，用于判定是否真正有改动 */
+const original = ref('')
 const filePath = ref('')
 const loading = ref(false)
 const saving = ref(false)
@@ -38,7 +40,7 @@ const canSave = computed(() => selectedVersion.value !== '' && dirty.value && co
 // 此时 loading.value 仍为 true，不会误设 dirty。
 // 默认 flush:'pre'（微任务）会在 loading.value=false 之后才执行，导致刚加载就误报"有未保存的修改"。
 watch(content, () => {
-  if (!loading.value) dirty.value = true
+  if (!loading.value) dirty.value = content.value !== original.value
 }, { flush: 'sync' })
 
 onMounted(async () => {
@@ -58,6 +60,7 @@ async function loadJson() {
   dirty.value = false
   try {
     const res = await versionJsonRead(selectedVersion.value)
+    original.value = res.content
     content.value = res.content
     filePath.value = res.path
     dirty.value = false
@@ -86,6 +89,7 @@ async function doSave() {
   try {
     await versionJsonSave(selectedVersion.value, content.value)
     toastSuccess('保存成功')
+    original.value = content.value
     dirty.value = false
   } catch (e) {
     toastError('保存失败: ' + (e instanceof Error ? e.message : String(e)))

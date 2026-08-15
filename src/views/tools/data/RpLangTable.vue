@@ -22,6 +22,8 @@ interface LangEntry {
 }
 
 const entries = ref<LangEntry[]>([])
+/** 加载时的初始条目快照（序列化），用于判定是否真正有改动 */
+const originalJson = ref('')
 const dirty = ref(false)
 const saving = ref(false)
 const loaded = ref(false)
@@ -42,6 +44,7 @@ function parseContent() {
   } catch {
     // 解析失败保持空表格
   } finally {
+    originalJson.value = JSON.stringify(entries.value)
     loaded.value = true
   }
 }
@@ -50,7 +53,7 @@ watch(() => props.content, parseContent, { immediate: true, flush: 'sync' })
 watch(
   entries,
   () => {
-    if (loaded.value) dirty.value = true
+    if (loaded.value) dirty.value = JSON.stringify(entries.value) !== originalJson.value
   },
   { deep: true },
 )
@@ -91,6 +94,7 @@ async function doSave() {
       return
     }
     toastSuccess('语言文件已保存')
+    originalJson.value = JSON.stringify(entries.value)
     dirty.value = false
     emit('saved')
   } catch (e) {
