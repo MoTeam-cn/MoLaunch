@@ -95,6 +95,7 @@ fn test_resolve_in_work_dir_rejects_parent_dir() {
 fn test_build_tree_classifies_and_marks_animated() {
     let dir = std::env::temp_dir().join(format!("rp-tree-test-{}", std::process::id()));
     fs::create_dir_all(dir.join("assets/minecraft/textures/block")).unwrap();
+    fs::create_dir_all(dir.join("assets/minecraft/lang")).unwrap();
     fs::write(dir.join("pack.mcmeta"), r#"{"pack":{"pack_format":15}}"#).unwrap();
     fs::write(
         dir.join("assets/minecraft/textures/block/stone.png"),
@@ -216,8 +217,8 @@ fn test_export_zip_roundtrip_preserves_comment() {
     )
     .unwrap();
 
-    // 构造带注释的源 zip（模拟 loader 附加属性）
-    let src_zip = dir.join("src.zip");
+    // 构造带注释的源 zip（模拟 loader 附加属性；放工作目录外，避免被打进产物）
+    let src_zip = std::env::temp_dir().join(format!("rp-export-src-{}.zip", std::process::id()));
     {
         let f = fs::File::create(&src_zip).unwrap();
         let mut w = zip::ZipWriter::new(f);
@@ -245,6 +246,7 @@ fn test_export_zip_roundtrip_preserves_comment() {
     assert!(archive.by_name("assets/minecraft/lang/zh_cn.json").is_ok());
 
     fs::remove_dir_all(&dir).unwrap();
+    fs::remove_file(&src_zip).ok();
 }
 
 #[test]
