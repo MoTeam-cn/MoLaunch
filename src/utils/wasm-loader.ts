@@ -1,20 +1,34 @@
 /**
- * WASM 加载工具：从 Vite public/seedmap/ 静态资源加载 cubiomes WASM 文件。
- * dev 由 Vite dev server 提供，build 时复制到 dist/seedmap/。
+ * WASM 加载工具：从 Vite assets 加载 cubiomes WASM 文件。
+ * 产物位于 src/assets/seedmap/，经 import.meta.glob(...?url) 交给 Vite 处理——
+ * dev 由 dev server 提供源文件，build 输出带 hash 的产物并自动替换 URL。
  * 提供 loadWasm() 加载 + seedmapUrl() 获取 URL 供 Worker fetch。
  */
 
-/** seedmap 静态资源目录（public/seedmap/，构建时复制到 dist/seedmap/） */
-const SEEDMAP_BASE = '/seedmap/'
+// Vite assets 清单：cubiomes.{js,wasm}（?url 强制按静态资产处理，build 后带 hash 文件名）
+const seedmapAssets = import.meta.glob<string>('../assets/seedmap/*.{js,wasm}', {
+  query: '?url',
+  import: 'default',
+  eager: true,
+})
+
+// basename → 最终 URL 映射（如 'cubiomes.js' → '/assets/cubiomes-<hash>.js'）
+const seedmapUrlMap = new Map<string, string>(
+  Object.entries(seedmapAssets).map(([key, url]) => [key.split('/').pop()!, url]),
+)
 
 /**
- * 构造 seedmap 静态资源 URL
+ * 获取 seedmap WASM/JS 资产的最终 URL
+ * dev 为源文件路径（/src/assets/seedmap/...），build 为带 hash 的产物路径
  *
  * @param filename 资源文件名（如 'cubiomes.wasm'）
- * @returns 完整 URL，如 '/seedmap/cubiomes.wasm'
  */
 export function seedmapUrl(filename: string): string {
-  return `${SEEDMAP_BASE}${filename}`
+  const url = seedmapUrlMap.get(filename)
+  if (!url) {
+    throw new Error(`未知的 seedmap 资源: ${filename}`)
+  }
+  return url
 }
 
 /**
@@ -34,7 +48,7 @@ export async function loadWasmModule(
   if (!response.ok) {
     throw new Error(`WASM 加载失败: ${filename} (HTTP ${response.status})`)
   }
-  // compileStreaming 需要 CORS + 正确 MIME，Vite 静态资源已配置
+  // compileStreaming 需要 CORS + 正确 MIME，Vite assets 已配置
   return WebAssembly.compileStreaming(response)
 }
 
@@ -73,9 +87,9 @@ export interface WasmBundle {
   jsCode: string
   /** WASM 二进制（cubiomes.wasm） */
   wasmBytes: ArrayBuffer
-  /** 胶水 JS 的静态 URL（回退与日志用） */
+  /** 胶水 JS 的资产 URL（回退与日志用） */
   wasmJsUrl: string
-  /** WASM 的静态 URL（Emscripten locateFile 回退用） */
+  /** WASM 的资产 URL（Emscripten locateFile 回退用） */
   wasmUrl: string
 }
 
@@ -86,7 +100,7 @@ const bundleCache = new Map<string, Promise<WasmBundle>>()
  * 获取 Emscripten 胶水 JS + WASM 二进制（主线程缓存，Worker 不再各自 fetch）
  *
  * 每次进入页面重复创建 Worker 时，由主线程先把字节拉取一次并缓存，
- * init 消息携带字节传给各 Worker，避免每个 Worker 都走一次静态资源加载。
+ * init 消息携带字节传给各 Worker，避免每个 Worker 都走一次资产加载。
  *
  * @param jsFilename 胶水 JS 文件名（如 'cubiomes.js'），wasm 取同名 .wasm
  */

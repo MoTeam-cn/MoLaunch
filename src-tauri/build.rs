@@ -6,7 +6,7 @@
 //! build 逻辑已模块化到 build_script/ 子目录：
 //! - build_script/easytier.rs：检查 easytier-core 嵌入式资源
 //! - build_script/updater.rs：updater.exe 增量构建（仅 Windows）
-//! - cubiomes WASM 已迁移前端编译（scripts/build-wasm.ps1 → public/seedmap/），本脚本不再负责
+//! - cubiomes WASM 已迁移前端编译（scripts/build-wasm.ps1 → src/assets/seedmap/），本脚本不再负责
 
 mod build_script;
 

@@ -34,4 +34,4 @@ pub use screenshot::*;
 pub use version_json::*;
 
 // 注：种子地图相关类型已删除——工具迁移至前端 WASM 方案，不再走后端 IPC。
-// 前端通过静态资源 public/seedmap/ 加载 cubiomes.wasm，在 Worker 中直接调用 cubiomes C 函数。
+// 前端通过 Vite assets（src/assets/seedmap/）加载 cubiomes.wasm，在 Worker 中直接调用 cubiomes C 函数。

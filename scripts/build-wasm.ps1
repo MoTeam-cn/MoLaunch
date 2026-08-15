@@ -1,14 +1,14 @@
 ﻿# 构建 cubiomes WASM（种子地图工具）
 #
 # 用途：将 src-tauri/cubiomes/ 下的 C 源码编译为 WebAssembly，
-#       输出到 public/seedmap/cubiomes.{js,wasm}（前端 Vite 静态资源，
-#       dev 由 dev server 提供，build 时原样复制进 dist/）。
+#       输出到 src/assets/seedmap/cubiomes.{js,wasm}（前端 Vite 资产目录，
+#       dev 由 dev server 提供，build 由 Vite 处理为带 hash 的产物）。
 #
 # 定位：cubiomes 归前端管理后的唯一编译入口。
 #   - 发布流程：tauri.conf.json beforeBuildCommand 先执行本脚本再跑 Vite build
 #   - 手动验证：npm run build:wasm
 #
-# 容错：emcc 不可用（未装 emsdk）时，若 public/seedmap 产物已存在则跳过，
+# 容错：emcc 不可用（未装 emsdk）时，若 src/assets/seedmap 产物已存在则跳过，
 #       直接使用入库产物，保证无 Emscripten 环境也能构建。
 #
 # 增量：所有 .c/.h 源文件都不比产物新时跳过编译（改源码后自动触发重编译）。
@@ -24,8 +24,8 @@ $ErrorActionPreference = "Stop"
 # 切换到 src-tauri 目录（cubiomes 源码在此目录下）
 Set-Location "$PSScriptRoot/../src-tauri"
 
-# 输出目录：前端 public/seedmap（相对 src-tauri 为 ../public/seedmap）
-$outDir = "../public/seedmap"
+# 输出目录：前端 src/assets/seedmap（相对 src-tauri 为 ../src/assets/seedmap）
+$outDir = "../src/assets/seedmap"
 $wasmOut = Join-Path $outDir "cubiomes.wasm"
 $jsOut = Join-Path $outDir "cubiomes.js"
 
@@ -165,5 +165,5 @@ $wasmSize = (Get-Item $wasmOut).Length
 $jsSize = (Get-Item $jsOut).Length
 Write-Host ""
 Write-Host "cubiomes WASM compiled successfully:" -ForegroundColor Green
-Write-Host "  public/seedmap/cubiomes.js   ($jsSize bytes)" -ForegroundColor Gray
-Write-Host "  public/seedmap/cubiomes.wasm ($wasmSize bytes)" -ForegroundColor Gray
+Write-Host "  src/assets/seedmap/cubiomes.js   ($jsSize bytes)" -ForegroundColor Gray
+Write-Host "  src/assets/seedmap/cubiomes.wasm ($wasmSize bytes)" -ForegroundColor Gray
