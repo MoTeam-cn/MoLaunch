@@ -5,9 +5,10 @@
  * blockstate/模型 JSON → rp_read_many 批量读取引用链 → 合并原版资源构建
  * Resources → Structure([1,1,1]) 单方块渲染。拖拽旋转，滚轮缩放。
  */
-import { onBeforeUnmount, ref, watch } from 'vue'
+import { defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
 import { CubeTransparentIcon, CursorArrowRaysIcon } from '@heroicons/vue/24/outline'
 import { Structure, ThreeStructureRenderer } from '@mattzh72/lodestone'
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { rpReadMany } from '@/utils/api/tools'
 import { buildPreviewResources } from '@/utils/resourcepack/previewResources'
 
@@ -16,6 +17,8 @@ const props = defineProps<{
   relPath: string
   name: string
 }>()
+
+const emit = defineEmits<{ (e: 'failed', message: string): void }>()
 
 const canvasEl = ref<HTMLCanvasElement | null>(null)
 const loading = ref(false)
@@ -84,6 +87,7 @@ async function loadPreview() {
     if (renderer) startLoop()
   } catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
+    emit('failed', error.value)
   } finally {
     loading.value = false
   }
@@ -120,14 +124,16 @@ onBeforeUnmount(disposeRenderer)
 <template>
   <div class="space-y-3">
     <div class="flex items-center gap-2">
-      <CubeTransparentIcon class="h-4 w-4 text-gray-500" />
-      <h4 class="truncate text-sm font-medium text-gray-700">{{ name }}</h4>
-      <span class="flex items-center gap-1 text-xs text-gray-400">
+      <CubeTransparentIcon class="h-4 w-4 shrink-0 text-gray-500" />
+      <Tooltip :text="name" class="min-w-0 flex-1 truncate">
+        <h4 class="w-full truncate text-sm font-medium text-gray-700">{{ name }}</h4>
+      </Tooltip>
+      <span class="flex shrink-0 items-center gap-1 text-xs text-gray-400">
         <CursorArrowRaysIcon class="h-3.5 w-3.5" />
         拖拽旋转 · 滚轮缩放
       </span>
       <button
-        class="ml-auto rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:border-blue-400 hover:bg-blue-50"
+        class="ml-auto shrink-0 rounded border border-gray-200 px-2 py-1 text-xs text-gray-600 hover:border-blue-400 hover:bg-blue-50"
         :class="autoRotate ? 'border-blue-400 bg-blue-50 text-blue-600' : ''"
         @click="autoRotate = !autoRotate"
       >

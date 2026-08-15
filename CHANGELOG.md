@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **资源包编辑器 3D 预览黑屏修复与 tooltip 增强**（[previewResources.ts](src/utils/resourcepack/previewResources.ts) / [RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue) / [ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue) / [RpFileTreeNode.vue](src/views/tools/data/RpFileTreeNode.vue) / [RpTexturePreview.vue](src/views/tools/data/RpTexturePreview.vue) / [RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue)）：① 3D 预览新增模型 parent 链检测（`missingParentInChain`，pack 优先 / vanilla 回退，`builtin/generated` 特判），当模型引用链缺失（如 `SRParasites:item/weapon_bow_sentient` 这类模组模型不在资源包内、lodestone 方块渲染器无法解析）时抛出可读错误，不再黑屏；② RpModelPreview 加载失败时向父组件派发 `failed` 事件，资源包编辑器自动切换到 JSON 编辑并 toast 提示原因（仅首次，手动切回 3D 后不再自动跳转）；③ 文件树每个节点（文件/目录）包 `Tooltip` 显示完整 `rel_path`；④ 纹理/文本/模型预览标题行被省略的长文件名也用 Tooltip 显示完整名称（布局类移到 Tooltip trigger 上，`min-w-0 flex-1 truncate` 保持原有不换行、按钮不右移的布局）。
+
 - **资源包编辑器内容区布局与 ZIP 保存交互修复**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue) / [RpTexturePreview.vue](src/views/tools/data/RpTexturePreview.vue) / [RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue)）：① 纹理/文本预览标题行文件名改为 `min-w-0 flex-1 truncate`（图标/动画纹理 tag/操作按钮 `shrink-0`），长文件名（如 `icedragonbonenunchakuspinning_e.png`）不再把 tag 挤换行、按钮挤右移、撑宽内容区；② 右侧内容分发区高度上限由 560px 收窄至 400px，与左侧文件树等高，显示大图时不再拉长页面、左侧文件树下方不再出现空白；③ 「保存 ZIP」确认提示改用 `displayPath` 清洗 Windows `canonicalize` 返回的 `\\?\` 长路径前缀后再展示；④ 「另存为 ZIP」默认文件名去掉包名已带的 `.zip` 后缀（`Emis_Rlcraft.zip.zip` → `Emis_Rlcraft.zip`）。
 
 - **资源包编辑器列表与文件树高度限制（M4 UI 布局）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：资源包列表网格新增三排高度上限（`max-h-[132px]` + 超出滚动，桌面三列 / 窄屏两列均不超高）；打开包后的左侧文件树区域高度上限由 560px 收窄至 400px，避免包内文件较多时占满页面，左右区域各自独立滚动。

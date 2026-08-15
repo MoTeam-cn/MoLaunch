@@ -181,6 +181,28 @@ function resolveModelRef(
   return candidates.find((c) => packModels.has(c) || vanillaModels[c] != null) ?? null
 }
 
+/** 沿 parent 链（pack 优先、vanilla 回退）检查模型是否可解析；返回第一个断链的模型 id（null = 链完整） */
+function missingParentInChain(
+  modelId: string,
+  packModels: Map<string, unknown>,
+  vanillaModels: Record<string, unknown>,
+): string | null {
+  const seen = new Set<string>()
+  const stack = [modelId]
+  while (stack.length) {
+    const id = stack.pop()!
+    if (seen.has(id)) continue
+    seen.add(id)
+    const json = packModels.get(id) ?? vanillaModels[id]
+    if (json == null || typeof json !== 'object') return id
+    const parent = (json as Record<string, unknown>).parent
+    if (typeof parent !== 'string') continue
+    if (parent === 'builtin/generated' || parent === 'minecraft:builtin/generated') continue // lodestone 内置生成平面，无需 parent 文件
+    stack.push(parent.includes(':') ? parent : `minecraft:${parent}`)
+  }
+  return null
+}
+
 /** 构建预览 Resources；返回渲染目标 blockId */
 export async function buildPreviewResources(
   files: Map<string, RpPreviewFile>,
@@ -227,6 +249,13 @@ export async function buildPreviewResources(
     modelId = rootId && packModels.has(rootId) ? rootId : null
     if (!modelId) throw new Error('模型文件解析失败或不存在')
     blockId = PREVIEW_BLOCK
+  }
+
+  const missing = missingParentInChain(modelId, packModels, vanilla.assets.models)
+  if (missing) {
+    throw new Error(
+      `模型依赖缺失，无法 3D 渲染：${missing}（资源包与原版资源中均不存在）`,
+    )
   }
 
   const blockDefinitions = new Map<string, BlockDefinition>()

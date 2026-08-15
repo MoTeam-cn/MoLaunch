@@ -17,7 +17,7 @@ const RpLangTable = defineAsyncComponent(() => import('./RpLangTable.vue'))
 const RpSoundPreview = defineAsyncComponent(() => import('./RpSoundPreview.vue'))
 const RpTextEditor = defineAsyncComponent(() => import('./RpTextEditor.vue'))
 const RpModelPreview = defineAsyncComponent(() => import('./RpModelPreview.vue'))
-import { toastError, toastSuccess } from '@/utils/toast'
+import { toastError, toastSuccess, toastWarning } from '@/utils/toast'
 import { pickFile, pickDirectory, pickSavePath } from '@/utils/fileDialog'
 import { formatBytes } from '@/utils/format'
 import { showConfirmAsync } from '@/utils/modal'
@@ -47,6 +47,8 @@ const exporting = ref(false)
 const searchQuery = ref('')
 /** 模型文件视图模式：false = 3D 预览，true = JSON 文本编辑 */
 const modelEditMode = ref(false)
+/** 3D 预览失败自动回退标记（切换文件时重置，避免手动切回 3D 后反复自动跳转） */
+const modelFallbacked = ref(false)
 /** 版本隔离：'' = 全局（不隔离），其他 = 具体版本 ID（参考资源包转换器） */
 const selectedVersionId = ref('')
 const installedVersions = ref<InstalledVersionInfo[]>([])
@@ -75,7 +77,16 @@ watch(searchQuery, (v) => {
 
 watch(selectedNode, () => {
   modelEditMode.value = false
+  modelFallbacked.value = false
 })
+
+/** 3D 预览加载失败时自动切回 JSON 编辑（仅首次，用户手动切回 3D 后不再自动跳转） */
+function onModelPreviewFailed(message: string) {
+  if (modelEditMode.value || modelFallbacked.value) return
+  modelFallbacked.value = true
+  modelEditMode.value = true
+  toastWarning(`3D 预览不可用：${message}，已切换为 JSON 编辑`)
+}
 
 const fileCount = computed(() => countFiles(current.value?.tree))
 const canEditText = computed(() =>
@@ -436,6 +447,7 @@ async function saveAsZip() {
               :work-dir="current.work_dir"
               :rel-path="selectedNode.rel_path"
               :name="selectedNode.name"
+              @failed="onModelPreviewFailed"
             />
             <div v-else class="space-y-2">
               <p class="text-xs text-gray-400">JSON 文本编辑（切换后内容即时生效）</p>

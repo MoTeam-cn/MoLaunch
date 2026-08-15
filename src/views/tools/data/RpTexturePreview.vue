@@ -6,6 +6,7 @@
 import { ref, watch, defineAsyncComponent } from 'vue'
 import { ArrowUpTrayIcon, FilmIcon, PaintBrushIcon, PhotoIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const RpPixelEditor = defineAsyncComponent(() => import('./RpPixelEditor.vue'))
 const RpAnimPreview = defineAsyncComponent(() => import('./RpAnimPreview.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
@@ -90,7 +91,9 @@ async function replaceTexture(dataUri: string) {
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       <PhotoIcon class="h-4 w-4 shrink-0 text-gray-500" />
-      <h4 class="min-w-0 flex-1 truncate text-sm font-medium text-gray-700">{{ name }}</h4>
+      <Tooltip :text="name" class="min-w-0 flex-1 truncate">
+        <h4 class="w-full truncate text-sm font-medium text-gray-700">{{ name }}</h4>
+      </Tooltip>
       <span v-if="animated" class="shrink-0 rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-600">
         动画纹理
       </span>
