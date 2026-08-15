@@ -30,9 +30,13 @@
 
 ### Fixed
 
+- **NBT 编辑器「从存档选择」抽屉被顶部导航遮挡**（[NbtSaveDrawer.vue](src/views/tools/data/NbtSaveDrawer.vue)）：抽屉默认 teleport 到 body、z-index 低于 nav，被导航层盖住无法交互；参照种子地图 LoadSaveDrawer 显式指定 `render-in-place` + `popup-container="#app-content"`，改为在内容区内就地渲染，避免被 nav 遮挡。
+
 - **NBT 编辑器「从存档选择」抽屉无法打开并出现多余属性警告**（[NbtViewer.vue](src/views/tools/data/NbtViewer.vue)）：抽屉改用 `v-model:visible` 绑定（此前误用普通 `v-model` 传入未声明的 `modelValue`，`visible` prop 收不到值导致抽屉点不开，同时多余属性透传到 teleport 根节点的 Drawer 触发 Vue 警告「Extraneous non-props attributes (modelValue)」）。
 
 ### Changed
+
+- **版本 JSON 编辑从「Java 诊断」移入「常用工具」分类**（[CommonPage.vue](src/views/tools/CommonPage.vue) / [JavaDiagPage.vue](src/views/tools/JavaDiagPage.vue) / [Tools.vue](src/views/Tools.vue)）：版本 JSON 编辑维护的是 Minecraft 游戏版本元数据（`versions/{id}/{id}.json`），与 Java 运行时（下载器/环境检测/运行时列表）无关，从 Java 诊断迁至常用工具分类作为杂项便捷工具；Java 诊断分类现只保留纯 Java 工具，两侧分类描述同步更新。
 
 - **NBT 编辑器从「Java 诊断」移入「存档资源」分类**（[StoragePage.vue](src/views/tools/StoragePage.vue) / [JavaDiagPage.vue](src/views/tools/JavaDiagPage.vue) / [Tools.vue](src/views/Tools.vue)）：NBT 编辑器编辑的是存档内数据文件（level.dat / playerdata / region .mca），与存档备份/恢复、种子地图同属存档数据类工具，从 Java 诊断（Java 下载/环境检测/版本 JSON）迁至存档资源分类，页签名由「NBT 查看」改为「NBT 编辑器」；Java 诊断与存档资源分类描述同步更新。
 

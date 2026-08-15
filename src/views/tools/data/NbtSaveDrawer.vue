@@ -130,6 +130,8 @@ function handleCancel() {
     :visible="props.visible"
     title="从存档选择 NBT 文件"
     :width="460"
+    render-in-place
+    popup-container="#app-content"
     @update:visible="(v: boolean) => emit('update:visible', v)"
   >
     <div class="flex flex-col gap-4 p-5">
