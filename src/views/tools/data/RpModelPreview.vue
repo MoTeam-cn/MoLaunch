@@ -66,6 +66,7 @@ async function loadPreview() {
   error.value = ''
   loading.value = true
   disposeRenderer()
+  disposed = false
   try {
     const res = await rpReadMany(props.workDir, props.relPath)
     if (res.error) throw new Error(res.error)
@@ -76,6 +77,8 @@ async function loadPreview() {
     const structure = new Structure([1, 1, 1])
     structure.addBlock([0, 0, 0], blockId)
     renderer = new ThreeStructureRenderer(canvas, structure, resources)
+    const chunkCount = (renderer as unknown as { chunkMeshes?: unknown[] }).chunkMeshes?.length ?? 0
+    console.log(`[preview] renderer 就绪：chunkMeshes=${chunkCount}，canvas=${canvas.clientWidth || 360}x${canvas.clientHeight || 420}`)
     renderer.setViewport(
       0,
       0,

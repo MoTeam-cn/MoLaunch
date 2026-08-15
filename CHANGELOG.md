@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **3D 预览黑屏修复：disposed 标志未在重新加载时重置，动画循环从未启动**（[RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue)）：`loadPreview` 开头调用 `disposeRenderer()` 把 `disposed` 置为 `true` 以停止旧渲染循环，但创建新 `ThreeStructureRenderer` 后未把 `disposed` 重置为 `false`——`startLoop` 的 rAF 回调首帧即因 `disposed === true` 直接 return，canvas 一帧未画。此前模型解析/纹理映射等日志（`elements=1`、UV 正常）均已确认无误，页面仍一片黑且无任何报错，正是此原因。修复：创建新 renderer 前重置 `disposed = false`，并新增 renderer 就绪日志（`chunkMeshes` 数量与 canvas 尺寸），确认几何实际进入渲染管线。
+
 - **3D 预览模组命名空间缺失 parent 不再报错/黑屏，改为 generated 平面兜底 + 排查日志**（[previewResources.ts](src/utils/resourcepack/previewResources.ts) / [RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue)）：模组模型的 parent 链若在资源包与原版中均不存在（如 `SRParasites:item/weapon_bow_sentient` 仅引用单个 pulling 变体文件），此前 `missingParentInChain` 抛「模型依赖缺失」错误——而 RpModelPreview 的 catch 不打印任何日志、错误遮罩为深色半透明背景，视觉上与黑屏无异。修复：① parent 链缺失不再抛错，改为 `console.warn` 诊断后继续渲染——模型读取兜底由 `minecraft:item/*`、`minecraft:builtin/*` 扩展为任意缺失 id 一律回退 `builtin/generated` 平面，带 `layer0` 纹理的模型仍能通过 flatten 的 generationMarker 传播生成可见平面；② 新增 `[preview]` 前缀排查日志——渲染模型 id、flatten 后 `elements` 数量与 `layer0` 纹理引用、纹理 UV 映射，RpModelPreview 加载失败时打印 `console.error`，黑屏时可在控制台直接定位是「无几何」还是「无纹理」。
 
 - **3D 预览 builtin/entity 链模型黑屏修复**（[previewResources.ts](src/utils/resourcepack/previewResources.ts)）：lodestone 只特判 `builtin/generated`，内置原版 item 模板（如 `item/milk_bucket`）的 parent 是 `builtin/entity`，其缺失会导致这些模板在 flatten 时被静默清空，引用它们的模型渲染黑屏并持续打印 `parent minecraft:builtin/entity does not exist!`。修复：① 加载原版内置资源时注入 `builtin/entity` 等价定义（映射为 generated 平面），内置模板可正常生成 layer0 平面、警告消除；② parent 链检测把 `builtin/entity` 与 `builtin/generated` 同等视为内置平面，且 vanilla 查询支持无前缀 key（assets key 不带 `minecraft:` 前缀），检测与渲染路径一致；③ 兜底范围由 `minecraft:item/*` 扩展至 `minecraft:builtin/*`。
