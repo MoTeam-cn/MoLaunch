@@ -1,13 +1,14 @@
 <script setup lang="ts">
-/** 创建房间表单：MC 版本 + 房间设置 + 整合包关联（Scaffolding 收敛版，一站式创建） */
+/** 创建房间表单：MC 版本 + 房间设置 + 高级设置抽屉（Scaffolding 收敛版，一站式创建） */
 import { ref, computed, watch, defineAsyncComponent } from 'vue'
-import { PlusIcon, ArrowPathIcon, CheckCircleIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, ArrowPathIcon, CheckCircleIcon, Cog8ToothIcon } from '@heroicons/vue/24/outline'
 import { useCreateRoomForm } from '@/composables/useCreateRoomForm'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const ModpackSelector = defineAsyncComponent(() => import('./ModpackSelector.vue'))
 const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
@@ -20,12 +21,17 @@ const {
   createStep,
   modpackMeta,
   onModpackEnabledChange,
+  advancedBadge,
+  advancedBadgeActive,
   publicRoomHint,
   versionOptions,
   versionsLoading,
   onVersionSelect,
   handleCreateRoom,
 } = useCreateRoomForm()
+
+/** 高级设置抽屉开关（整合包关联收进抽屉，避免页面堆积） */
+const advancedDrawerOpen = ref(false)
 
 /** 创建进度抽屉开关：提交创建时自动弹出，完成/失败自动收起 */
 const createProgressOpen = ref(false)
@@ -97,17 +103,17 @@ const currentStepIndex = computed(() => createSteps.findIndex((s) => s.key === c
           <label class="w-24 text-xs text-gray-600 shrink-0">房间密码</label>
           <Input v-model="createForm.password" placeholder="留空表示无密码" />
         </div>
-        <!-- 整合包关联 -->
-        <div class="flex items-start gap-3">
-          <label class="w-24 text-xs text-gray-600 shrink-0 pt-2">整合包</label>
-          <div class="flex-1 space-y-2">
-            <ModpackSelector
-              v-model="modpackMeta"
-              :version-id="createForm.selectedVersionId"
-              @enabled-change="onModpackEnabledChange"
-            />
-            <ModpackRequirementCard v-if="modpackMeta" :modpack="modpackMeta" />
-          </div>
+        <!-- 高级设置入口（整合包关联置于抽屉内，避免页面堆积；已勾选时显示状态徽章） -->
+        <div class="pt-2">
+          <Button type="outline" long @click="advancedDrawerOpen = true">
+            <template #icon><Cog8ToothIcon class="w-4 h-4" /></template>
+            <span class="flex items-center justify-center gap-1">
+              高级设置
+              <Tag v-if="advancedBadgeActive" size="small" color="arcoblue">
+                {{ advancedBadge }}
+              </Tag>
+            </span>
+          </Button>
         </div>
         <!-- 创建按钮 -->
         <div class="pt-1">
@@ -118,6 +124,25 @@ const currentStepIndex = computed(() => createSteps.findIndex((s) => s.key === c
         </div>
       </div>
     </Card>
+
+    <!-- 高级设置抽屉：整合包关联 -->
+    <Drawer
+      v-model:visible="advancedDrawerOpen"
+      title="高级设置"
+      placement="right"
+      :width="420"
+      render-in-place
+      popup-container="#app-content"
+    >
+      <div class="space-y-3">
+        <ModpackSelector
+          v-model="modpackMeta"
+          :version-id="createForm.selectedVersionId"
+          @enabled-change="onModpackEnabledChange"
+        />
+        <ModpackRequirementCard v-if="modpackMeta" :modpack="modpackMeta" />
+      </div>
+    </Drawer>
 
     <!-- 创建进度抽屉：提交创建时自动弹出，完成/失败自动收起 -->
     <Drawer

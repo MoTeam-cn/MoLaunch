@@ -124,6 +124,10 @@ export function useCreateRoomForm() {
     modpackEnabled.value = enabled
   }
 
+  /** 高级设置状态徽章：反映整合包勾选状态 */
+  const advancedBadge = computed(() => (modpackEnabled.value ? '已关联整合包' : '未启用'))
+  const advancedBadgeActive = computed(() => modpackEnabled.value)
+
   /**
    * 房主创建房间（本地生成完整码 → 登记 → 拉起联机中心）
    *
@@ -189,6 +193,8 @@ export function useCreateRoomForm() {
     modpackMeta,
     modpackEnabled,
     onModpackEnabledChange,
+    advancedBadge,
+    advancedBadgeActive,
     publicRoomHint,
     versionOptions,
     versionsLoading,

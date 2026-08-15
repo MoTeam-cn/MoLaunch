@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **创建房间页面整合包改回收进「高级设置」抽屉，减少页面堆积**（[CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) / [useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts)）：整合包选择器与需求卡片不再平铺在创建表单中，收进「高级设置」右侧抽屉（420px）；入口按钮带齿轮图标，已勾选整合包时显示「已关联整合包」状态徽章（`advancedBadge`/`advancedBadgeActive`，基于整合包勾选状态，白名单已在 Scaffolding 收敛中移除故不涉及）。
+
 ### Fixed
 
 - **修复资源包 explore 测试的目录构造与源 zip 位置**（[explore_test.rs](src-tauri/src/commands/tools/resourcepack/explore_test.rs)）：① `test_build_tree_classifies_and_marks_animated` 写 `assets/minecraft/lang/zh_cn.json` 前未创建 `lang` 目录，`fs::write` 报 NotFound；② `test_export_zip_roundtrip_preserves_comment` 把带注释的源 zip 放在工作目录内，导出打包时被当成普通文件打进产物（配合 convert.rs 的临时文件排除修复，产物条目数收敛为预期 2），源 zip 移到工作目录外并在测试后清理。
