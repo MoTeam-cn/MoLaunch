@@ -9,7 +9,7 @@ import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { CheckIcon, CubeIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
-import { rpWrite } from '@/utils/api/tools'
+import { rpPackFormatInfo, rpWrite } from '@/utils/api/tools'
 
 const props = defineProps<{
   workDir: string
@@ -28,10 +28,31 @@ const description = ref('')
 const dirty = ref(false)
 const saving = ref(false)
 const loaded = ref(false)
+/** 实时查询的 pack_format → MC 版本（输入变化时异步回填） */
+const liveVersion = ref<string | null>(null)
+const versionKnown = ref(true)
 
 const validFormat = computed(() => {
   const n = Number(packFormat.value)
   return packFormat.value.trim() !== '' && Number.isInteger(n) && n >= 0
+})
+
+/** 展示的适用版本：实时查询结果优先，无则用打开包时返回的 mcVersion */
+const displayVersion = computed(() => liveVersion.value ?? props.mcVersion ?? '未知')
+
+watch(packFormat, async (v) => {
+  liveVersion.value = null
+  versionKnown.value = true
+  if (!validFormat.value) return
+  const n = Number(v)
+  try {
+    const res = await rpPackFormatInfo(n)
+    if (res.error) return
+    liveVersion.value = res.mc_version
+    versionKnown.value = res.known
+  } catch {
+    // 查询失败保持默认展示
+  }
 })
 
 function parseContent() {
@@ -122,7 +143,10 @@ async function doSave() {
       </div>
       <div class="flex border-b border-gray-200">
         <div class="w-32 shrink-0 bg-gray-50 px-3 py-2 text-xs text-gray-500">适用版本</div>
-        <div class="flex-1 px-3 py-2 text-sm text-gray-700">{{ mcVersion ?? '未知' }}</div>
+        <div class="flex-1 px-3 py-2 text-sm" :class="versionKnown ? 'text-gray-700' : 'text-red-600'">
+          {{ displayVersion }}
+          <span v-if="!versionKnown" class="ml-2 text-xs">（未知 pack_format，请核对）</span>
+        </div>
       </div>
       <div class="flex">
         <div class="w-32 shrink-0 bg-gray-50 px-3 py-2 text-xs text-gray-500">描述</div>

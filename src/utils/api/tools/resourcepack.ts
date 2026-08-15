@@ -64,6 +64,16 @@ export interface RpReadManyResult {
   error: string
 }
 
+/** pack_format 版本查询结果 */
+export interface RpPackFormatInfoResult {
+  /** 对应 MC 版本范围描述（如 "1.20.5–1.21.x"），未知为 "未知版本" */
+  mc_version: string
+  /** 是否为已知的 pack_format（用于前端校验提示） */
+  known: boolean
+  /** 失败原因（成功时为空） */
+  error: string
+}
+
 /** 写回单文件参数 */
 export interface RpWriteParams {
   /** 工作目录（rp_open 返回） */
@@ -121,6 +131,13 @@ export function rpReadMany(workDir: string, relPath: string): Promise<RpReadMany
   return toolsManager<RpReadManyResult>(TOOLS_ACTIONS.RP_READ_MANY, {
     work_dir: workDir,
     rel_path: relPath,
+  })
+}
+
+/** 查询 pack_format 对应的 MC 版本（表单输入时实时联动校验） */
+export function rpPackFormatInfo(packFormat: number): Promise<RpPackFormatInfoResult> {
+  return toolsManager<RpPackFormatInfoResult>(TOOLS_ACTIONS.RP_PACK_FORMAT_INFO, {
+    pack_format: packFormat,
   })
 }
 
