@@ -83,14 +83,17 @@ fn build_mca(chunk_root: &NbtNode) -> Vec<u8> {
     let compressed = encoder.finish().unwrap();
 
     let index = 10usize;
-    let mut out = vec![0u8; 8192];
-    out[index * 4 + 2] = 2; // 扇区偏移 2
-    out[index * 4 + 3] = 1; // 1 个扇区
-    let len = compressed.len() + 1;
-    out.extend_from_slice(&(len as u32).to_be_bytes());
-    out.push(2); // zlib
-    out.extend_from_slice(&compressed);
-    out.resize(8192 + 512, 0);
+    let sector_offset = 2usize;
+    let mut chunk_data = Vec::with_capacity(compressed.len() + 5);
+    chunk_data.extend_from_slice(&((compressed.len() + 1) as u32).to_be_bytes());
+    chunk_data.push(2); // zlib
+    chunk_data.extend_from_slice(&compressed);
+    let sector_count = chunk_data.len().div_ceil(512);
+
+    let mut out = vec![0u8; 8192 + sector_count * 512];
+    out[index * 4 + 2] = sector_offset as u8; // 扇区偏移 2（3 字节大端）
+    out[index * 4 + 3] = sector_count as u8;
+    out[sector_offset * 512..sector_offset * 512 + chunk_data.len()].copy_from_slice(&chunk_data);
     out
 }
 

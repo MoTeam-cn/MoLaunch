@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **修复 mca 往返测试：测试构造的区块数据写入位置与位置表不一致**（[nbt_test.rs](src-tauri/src/commands/tools/nbt_test.rs)）：`build_mca` 测试辅助把区块数据（长度+压缩类型+zlib 数据）追加到 8192 字节区域头之后，而位置表指向扇区 2——解析器在偏移 1024 处读到的长度恒为 0，`mca_parse_and_save` 报「mca 文件中没有可解析的区块」。改为把数据写入位置表指向的扇区起始处，扇区数按实际大小计算。
+
 - **修复资源包导出 zip 时把输出临时文件打进产物**（[convert.rs](src-tauri/src/commands/tools/resourcepack/convert.rs)）：`zip_directory_with_comment` 在打包前先创建输出临时文件再递归收集目录文件，输出临时文件被当成普通文件写入 zip——导出目标位于工作目录内时（资源包编辑器导出、往返测试），产物多出 1 个空条目。收集后排除输出路径自身。
 
 - **`cargo clippy -- -D warnings` 全绿（Agent B，联机重构 Phase 1 收尾）**：① [server.rs](src-tauri/src/minecraft/online/scaffolding/server.rs) 为 `ScaffoldingServerState` 补充 `Default` impl（`new_without_default`）；② 修复 rust 1.94 新 lint 触发的存量告警——[nbt.rs](src-tauri/src/commands/tools/nbt.rs) 手写 `div_ceil`/`repeat().take()`/整段切片、[explore.rs](src-tauri/src/commands/tools/resourcepack/explore.rs) `map_err` 改 `inspect_err` 与 `is_err+unwrap_err` 改 `if let`、[skin.rs](src-tauri/src/commands/tools/network/skin.rs) doc 列表项缩进。均为无行为变化的机械改写，未引入新逻辑。
