@@ -1,291 +1,192 @@
 <script setup lang="ts">
 /**
- * 大厅浏览页（联机大厅阶段 5）
+ * 联机大厅（Scaffolding 收敛版）
  *
- * 功能：
- * - 搜索框 + 加载器过滤 + 刷新
- * - 房间卡片列表（LobbyRoomCard）
- * - 空状态（icon + text 垂直水平居中）
- * - 分页（复用 community/Pagination）
- * - 加入房间流程（无密码无整合包直接加入；有密码/整合包弹 LobbyJoinDialog 抽屉，
- *   失败内联展示可重试，成功后抽屉收起、组件随分类切换卸载）
- *
- * 加入流程复用 Online.vue provide 的 guestWebrtc + store.guestJoinRoom，
- * 加入成功后 store.roomState.role 变化触发 Online.vue watch(isInRoom) 自动跳转房间详情。
+ * 按整合包聚类的卡片（热度排序），点击展开该整合包下的公开房间摘要列表；
+ * 加入房间：无密码直接进房，有密码弹 LobbyJoinDialog；进房后由 RoomManager 切到房客面板。
  */
-import { ref, computed, onMounted, onActivated, onDeactivated, inject, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import {
+  FireIcon,
+  CubeIcon,
+  ChevronDownIcon,
+  ArrowPathIcon,
+  UserGroupIcon,
+  Squares2X2Icon,
+} from '@heroicons/vue/24/outline'
+import { listLobbyPackages, listLobbyRooms } from '@/utils/api/online-manager'
+import type { LobbyPackageItem, LobbyRoomItem } from '@/types/online'
 import { useOnlineStore } from '@/stores/online'
-import { useWebRTC } from '@/composables/useWebRTC'
-import { listLobbyRooms, submitAnswer } from '@/utils/api/online-manager'
-import { rememberJoinPassword } from '@/utils/relaunchSnapshot'
-import { toastError, toastInfo } from '@/utils/toast'
-const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
-const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+import { toastError } from '@/utils/toast'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
-const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
-const Pagination = defineAsyncComponent(() => import('@/components/community/Pagination.vue'))
+const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const LobbyRoomCard = defineAsyncComponent(() => import('./LobbyRoomCard.vue'))
 const LobbyJoinDialog = defineAsyncComponent(() => import('./LobbyJoinDialog.vue'))
-import type { JoinRoomResponse, LobbyRoomItem } from '@/types/online'
-import {
-  MagnifyingGlassIcon,
-  ArrowPathIcon,
-  ServerStackIcon,
-} from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
-const guestWebrtc = inject('guestWebrtc') as ReturnType<typeof useWebRTC>
 
-/** 当前是否已在房间中（role !== null）。在房间中时禁用大厅加入按钮，需先退出/关闭当前房间 */
-const isInRoom = computed(() => store.roomState.role !== null)
-
+const packages = ref<LobbyPackageItem[]>([])
+const packagesLoading = ref(false)
+const expandedId = ref<string | null>(null)
+const roomsLoading = ref(false)
 const rooms = ref<LobbyRoomItem[]>([])
-const total = ref(0)
-const page = ref(0) // 0-indexed，与 Pagination 组件一致
-const pageSize = ref(20)
-const loading = ref(false)
-const joiningCode = ref('') // 当前正在加入的房间码（禁用重复点击）
-const joinTarget = ref<LobbyRoomItem | null>(null) // 加入抽屉中的房间（有密码/整合包时弹出）
+/** 正在加入的房间（LobbyRoomCard joining 标记） */
+const joiningId = ref<string | null>(null)
+/** 密码弹窗目标房间 */
+const joinTarget = ref<LobbyRoomItem | null>(null)
 
-const keyword = ref('')
-const loader = ref('') // 空=不过滤
+/** 是否已在房间中（房主/房客均禁止再加入） */
+const inRoom = computed(() => store.roomState.role !== null)
 
-const loaderOptions = [
-  { label: '全部加载器', value: '' },
-  { label: 'Forge', value: 'forge' },
-  { label: 'Fabric', value: 'fabric' },
-  { label: 'NeoForge', value: 'neoforge' },
-  { label: 'Quilt', value: 'quilt' },
-  { label: '原版', value: 'vanilla' },
-]
-
-/** 搜索防抖定时器 */
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-
-/** 离开大厅超过该时长后，从其他分类切回时自动刷新列表 */
-const STALE_THRESHOLD_MS = 15_000
-/** 上次离开大厅的时间戳（0 = 从未离开过，初始挂载不触发自动刷新） */
-let leftAt = 0
-
-async function fetchRooms(): Promise<boolean> {
-  loading.value = true
+async function loadPackages() {
+  packagesLoading.value = true
   try {
-    const result = await listLobbyRooms({
-      page: page.value + 1, // 后端 1-indexed
-      pageSize: pageSize.value,
-      loader: loader.value || undefined,
-      keyword: keyword.value.trim() || undefined,
-    })
-    if (result.code === 1 && result.data) {
-      rooms.value = result.data.items
-      total.value = result.data.total
-      return true
-    } else {
-      toastError(result.msg || '获取大厅列表失败')
+    const res = await listLobbyPackages()
+    if (res.code !== 1 || !res.data) throw new Error(res.msg || '加载大厅失败')
+    packages.value = res.data.items
+    if (!res.data.items.some((p) => p.modpackId === expandedId.value)) {
+      expandedId.value = null
       rooms.value = []
-      total.value = 0
-      return false
     }
   } catch (e) {
-    toastError(e instanceof Error ? e.message : String(e))
-    rooms.value = []
-    total.value = 0
-    return false
+    console.error('Failed to load lobby packages:', e)
+    toastError(`加载大厅失败：${e instanceof Error ? e.message : String(e)}`)
   } finally {
-    loading.value = false
+    packagesLoading.value = false
   }
 }
 
-/** 手动刷新（仅点击刷新按钮时调用）：成功时提示，自动加载/搜索/翻页不提示 */
-async function handleManualRefresh() {
-  const ok = await fetchRooms()
-  if (ok) toastInfo('已刷新房间列表')
-}
-
-function onSearchInput() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    page.value = 0
-    void fetchRooms()
-  }, 400)
-}
-
-function onLoaderChange() {
-  page.value = 0
-  void fetchRooms()
-}
-
-function onPageChange(p: number) {
-  page.value = p
-  void fetchRooms()
-}
-
-async function handleJoin(room: LobbyRoomItem) {
-  // 兜底校验：按钮已 disabled，但防止未来代码变更绕过
-  if (isInRoom.value) {
-    toastInfo('您当前在房间中哟，如果要加入 请先退出或者关闭房间')
+/** 展开/收起某整合包的房间列表 */
+async function toggleExpand(pkg: LobbyPackageItem) {
+  if (expandedId.value === pkg.modpackId) {
+    expandedId.value = null
+    rooms.value = []
     return
   }
-  // 有密码 / 关联整合包：先弹加入抽屉（密码输入 + 整合包校验），确认后再执行加入
-  if (room.hasPassword || room.modpack) {
+  expandedId.value = pkg.modpackId
+  roomsLoading.value = true
+  rooms.value = []
+  try {
+    const res = await listLobbyRooms({ packageId: pkg.modpackId, page: 1, pageSize: 50 })
+    if (res.code !== 1 || !res.data) throw new Error(res.msg || '加载房间列表失败')
+    rooms.value = res.data.items
+  } catch (e) {
+    console.error('Failed to load lobby rooms:', e)
+    toastError(`加载房间列表失败：${e instanceof Error ? e.message : String(e)}`)
+    expandedId.value = null
+  } finally {
+    roomsLoading.value = false
+  }
+}
+
+function handleJoin(room: LobbyRoomItem) {
+  if (inRoom.value) return
+  if (room.hasPassword) {
     joinTarget.value = room
     return
   }
-  await handleDirectJoin(room.roomCode)
+  void doJoin(room, '')
 }
 
-/** 无密码无整合包房间直接加入：失败走 toast（无抽屉承载错误提示） */
-async function handleDirectJoin(roomCode: string) {
-  joiningCode.value = roomCode
+/** 执行加入（含密码）：成功 ok=true；失败 ok=false + error 内联展示 */
+async function doJoin(room: LobbyRoomItem, password: string): Promise<{ ok: boolean; error?: string }> {
+  if (inRoom.value) return { ok: false, error: '您当前已在房间中' }
+  joiningId.value = room.publicIdentifier
   try {
-    const res = await joinViaLobby(roomCode, '')
-    if (!res.ok) toastError(res.error || '加入房间失败')
-  } finally {
-    joiningCode.value = ''
-  }
-}
-
-/** 加入抽屉「加入房间」回调：错误由抽屉内联展示，成功由抽屉收起 */
-async function handleJoinDialogJoin(password: string): Promise<{ ok: boolean; error?: string }> {
-  const room = joinTarget.value
-  if (!room) return { ok: false, error: '房间信息丢失，请重试' }
-  return joinViaLobby(room.roomCode, password)
-}
-
-/** 加入抽屉关闭动画结束后卸载（v-if 移除） */
-function onJoinDialogClosed() {
-  joinTarget.value = null
-}
-
-/**
- * 统一加入：仅完成 join 拿到 participantId（成功后 role='guest'，
- * Online.vue watch(isInRoom) 自动跳转房间详情）；Answer 协商放后台继续
- */
-async function joinViaLobby(roomCode: string, password: string): Promise<{ ok: boolean; error?: string }> {
-  let joinResp: JoinRoomResponse | null = null
-  try {
-    joinResp = await store.guestJoinRoom(roomCode, password)
-    // 记住加入密码：与 RoomManager 一致，断线自动重连/提权重启重进房间需要重新 join
-    rememberJoinPassword(password)
+    await store.guestJoinRoom(room.publicIdentifier, password)
+    return { ok: true }
   } catch (e) {
-    // 与 RoomManager 加入路径一致：失败时清理，避免服务端参与者残留导致大厅人数虚高
-    await store.guestLeaveRoom().catch(() => toastError('离开房间失败'))
-    store.resetRoomState()
-    guestWebrtc.close()
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  } finally {
+    joiningId.value = null
   }
-  void continueJoin(roomCode, joinResp.participantId)
-  return { ok: true }
 }
 
-/**
- * 后台建连：TURN 拉取 → 等待房主 Offer（最长 180s）→ 生成 Answer 提交。
- * Answer 必须提交（与 RoomManager/reconnectAsGuest 一致），否则房主永远等不到确认
- */
-async function continueJoin(roomCode: string, participantId: string) {
-  try {
-    // 进入房间即拉取系统 TURN（同房间缓存一次）：首轮协商带 relay candidate，
-    // P2P 仍优先直连，打洞失败时中继立即可用，无需等 failed 后再 ICE restart
-    let iceServers = store.roomState.iceServers
-    try {
-      iceServers = await store.guestPullTurnServers()
-    } catch (e) {
-      console.warn('[Online] 拉取系统 TURN 失败，按房间内 ICE 直连:', e)
-    }
-    const { sdp, iceCandidates } = await guestWebrtc.fetchOfferAndAnswer(roomCode, participantId, iceServers)
-    const answer = await submitAnswer(roomCode, participantId, sdp, iceCandidates)
-    if (answer.code !== 1) throw new Error(answer.msg || '提交 Answer 失败')
-  } catch (e) {
-    toastError(e instanceof Error ? e.message : String(e))
-    // 与 RoomManager 加入路径一致：失败（含等待房主接受超时）时清理，
-    // 避免服务端参与者残留导致大厅人数虚高 / 重进房间状态异常
-    await store.guestLeaveRoom().catch(() => toastError('离开房间失败'))
-    store.resetRoomState()
-    guestWebrtc.close()
-  }
+/** 密码弹窗的 join 回调 */
+function joinWithPassword(password: string) {
+  if (!joinTarget.value) return Promise.resolve({ ok: false, error: '房间信息已失效' })
+  return doJoin(joinTarget.value, password)
 }
 
 onMounted(() => {
-  void fetchRooms()
-})
-
-// keep-alive 下切走再切回：离开超过 15s 自动刷新，避免展示陈旧列表（15s 内切回不刷新防闪烁）
-onActivated(() => {
-  if (leftAt > 0 && Date.now() - leftAt > STALE_THRESHOLD_MS) {
-    void fetchRooms()
-  }
-})
-
-onDeactivated(() => {
-  leftAt = Date.now()
-  // 加入成功后 drawer 滑出动画可能被 keep-alive 冻结（isInRoom watch 立即切走分类），
-  // @close 不触发导致 joinTarget 残留、回到大厅后再次点击房间抽屉无法打开；此处主动清理
-  joinTarget.value = null
+  void loadPackages()
 })
 </script>
 
 <template>
   <div class="space-y-4">
-    <!-- 搜索栏 -->
-    <div class="flex items-center gap-2">
-      <Input
-        v-model="keyword"
-        placeholder="搜索房间码 / 整合包名称"
-        width="320px"
-        @input="onSearchInput"
-      >
-        <template #prefix><MagnifyingGlassIcon class="w-4 h-4 text-gray-400" /></template>
-      </Input>
-      <Select v-model="loader" :options="loaderOptions" style="width: 180px" @update:model-value="onLoaderChange" />
-      <Tooltip text="刷新列表" class="ml-auto">
-        <Button type="ghost" size="small" :loading="loading" @click="handleManualRefresh">
-          <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
+    <AlertV2 type="info" message="大厅房间按整合包聚类展示，点击卡片可查看该整合包下的公开房间；私密房间需凭房间码从「加入房间」进入" />
+
+    <Card title="联机大厅">
+      <template #extra>
+        <Button type="ghost" size="small" :loading="packagesLoading" @click="loadPackages">
+          <template #icon><ArrowPathIcon class="w-3.5 h-3.5" /></template>
+          刷新
         </Button>
-      </Tooltip>
-    </div>
+      </template>
 
-    <!-- 加载中 -->
-    <div v-if="loading && rooms.length === 0" class="flex items-center justify-center py-12 text-gray-400">
-      <ArrowPathIcon class="w-5 h-5 animate-spin mr-2" />
-      <span class="text-sm">正在加载联机大厅列表...</span>
-    </div>
+      <div v-if="packagesLoading" class="py-10 text-center text-sm text-gray-500">正在加载大厅...</div>
 
-    <!-- 空状态 -->
-    <div
-      v-else-if="rooms.length === 0"
-      class="flex flex-col items-center justify-center py-16 text-gray-400"
-    >
-      <ServerStackIcon class="w-10 h-10 mb-3 text-gray-300" />
-      <span class="text-sm">暂无公开房间，去创建一个吧</span>
-    </div>
+      <div v-else-if="packages.length === 0" class="py-10 flex flex-col items-center justify-center gap-2 text-gray-400">
+        <Squares2X2Icon class="w-8 h-8" />
+        <span class="text-sm">暂无公开房间，快去创建一个吧</span>
+      </div>
 
-    <!-- 房间列表 -->
-    <div v-else class="space-y-3">
-      <LobbyRoomCard
-        v-for="room in rooms"
-        :key="room.roomCode"
-        :room="room"
-        :joining="joiningCode === room.roomCode"
-        :in-room="isInRoom"
-        @join="handleJoin"
-      />
-    </div>
+      <div v-else class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+        <div
+          v-for="pkg in packages"
+          :key="pkg.modpackId"
+          class="rounded-lg border bg-white overflow-hidden"
+          :class="expandedId === pkg.modpackId ? 'border-primary-300 shadow-sm' : 'border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all'"
+        >
+          <button
+            type="button"
+            class="w-full px-4 py-3 text-left flex items-center gap-2"
+            @click="toggleExpand(pkg)"
+          >
+            <CubeIcon class="w-4 h-4 text-gray-400 shrink-0" />
+            <span class="text-sm font-medium text-gray-800 truncate flex-1">{{ pkg.name }}</span>
+            <Tag size="small" color="arcoblue" class="shrink-0">{{ pkg.source }}</Tag>
+            <span v-if="pkg.mcVersion" class="text-xs text-gray-500 shrink-0">MC {{ pkg.mcVersion }}</span>
+            <span class="inline-flex items-center gap-0.5 text-xs text-gray-500 shrink-0">
+              <UserGroupIcon class="w-3.5 h-3.5" />
+              {{ pkg.roomCount }}
+            </span>
+            <span class="inline-flex items-center gap-0.5 text-xs text-orange-500 shrink-0">
+              <FireIcon class="w-3.5 h-3.5" />
+              {{ pkg.heat }}
+            </span>
+            <ChevronDownIcon
+              class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
+              :class="expandedId === pkg.modpackId ? 'rotate-180' : ''"
+            />
+          </button>
 
-    <!-- 分页 -->
-    <Pagination
-      v-if="total > pageSize"
-      :page="page"
-      :total="total"
-      :page-size="pageSize"
-      @change="onPageChange"
-    />
+          <div v-if="expandedId === pkg.modpackId" class="border-t border-gray-100 px-3 py-3 space-y-2 bg-gray-50/50">
+            <div v-if="roomsLoading" class="py-4 text-center text-xs text-gray-500">正在加载房间...</div>
+            <div v-else-if="rooms.length === 0" class="py-4 text-center text-xs text-gray-400">该整合包暂无公开房间</div>
+            <template v-else>
+              <LobbyRoomCard
+                v-for="room in rooms"
+                :key="room.publicIdentifier"
+                :room="room"
+                :joining="joiningId === room.publicIdentifier"
+                :in-room="inRoom"
+                @join="handleJoin"
+              />
+            </template>
+          </div>
+        </div>
+      </div>
+    </Card>
 
-    <!-- 加入房间抽屉（有密码 / 整合包时弹出：密码输入 + 整合包校验，错误内联可重试） -->
     <LobbyJoinDialog
       v-if="joinTarget"
       :room="joinTarget"
-      :join="handleJoinDialogJoin"
-      @close="onJoinDialogClosed"
+      :join="joinWithPassword"
+      @close="joinTarget = null"
     />
   </div>
 </template>

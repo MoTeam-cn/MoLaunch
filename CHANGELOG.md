@@ -48,6 +48,8 @@
 
 ### Added
 
+- **联机大厅改为整合包聚类卡片（Agent C，联机重构 Phase 2）**（[LobbyBrowser.vue](src/components/online/LobbyBrowser.vue) / [LobbyRoomCard.vue](src/components/online/LobbyRoomCard.vue) / [LobbyJoinDialog.vue](src/components/online/LobbyJoinDialog.vue)）：① 大厅按整合包聚合展示卡片（房间数/热度/MC 版本），点击展开该整合包下的公开房间摘要列表（`lobby_list_packages` + `lobby_list_rooms`）；② 房间摘要行仅展示 N 段公开标识/备注/人数/密码标记/加载器，加入走 `guestJoinRoom(publicIdentifier)` 闸门拿完整码；③ 密码房间弹抽屉输密码，移除旧 join 的 roomCode/modpack 字段依赖。
+
 - **创建房间新流程（Agent C，联机重构 Phase 2）**（[useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts) / [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：创建表单收敛为「选包（MC 版本+整合包）→ 备注 → 公开/私密 → 密码 → 本地生成 U/xxx 码 → 登记 apiServer → 拉起联机中心」一站式流程；删除白名单/最大人数/高级设置抽屉，整合包选择与本地比对卡片内联展示，创建进度抽屉展示「生成房间码 → 登记房间 → 拉起联机中心」三步；`useRoomHost` 移除未使用的 `scaffoldingHostStop` 导入。
 
 - **前端联机清理残留（Agent C，联机重构 Phase 2 前置）**（[core.ts](src/utils/api/online-manager/core.ts) / [index.ts](src/utils/api/online-manager/index.ts)（新增） / [config.ts](src/utils/api/config.ts) / [types/online.ts](src/types/online.ts) / [signaling.ts](src/types/online/signaling.ts)）：① `ONLINE_ACTIONS` 移除 room_get_stun/room_submit_answer/room_list_answers/room_confirm/room_keepalive/room_leave/room_kick/room_unban/room_list_bans/room_list_participants/room_get_turn/room_upload_participant_offer/room_fetch_participant_offer/tun_*/restart_as_admin/whitelist_*/lobby_list_categories 等已废弃 action；② 新增 online-manager 目录聚合出口 `index.ts`；③ 前端配置与类型清理 `IceServerEntry`/`StunServersResponse`/`TurnServersResponse` 及 `onlineCustomTurnServers` 字段、删除 nat/whitelist/tun 类型文件，signaling 仅保留 `BusinessResult`。

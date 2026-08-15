@@ -1,10 +1,8 @@
 <script setup lang="ts">
 /**
- * 大厅加入房间抽屉（联机大厅阶段 5.8）
+ * 大厅加入房间抽屉（Scaffolding 收敛版）
  *
- * 有密码 / 关联整合包的房间加入前弹此抽屉（无密码无整合包的房间直接加入，不弹此窗）：
- * - 整合包：内嵌 ModpackRequirementCard 供校验/安装
- * - 密码：输入框，空密码内联提示
+ * 有密码的房间加入前弹此抽屉（无密码的房间直接加入，不弹此窗）。
  *
  * 点「加入房间」执行 props.join（父组件负责加入，成功后 role 变化触发
  * Online.vue watch(isInRoom) 自动切到房间详情）：失败时抽屉保持打开、内联展示错误可重试；
@@ -13,7 +11,6 @@
 import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { CheckCircleIcon } from '@heroicons/vue/24/outline'
 const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
-const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import type { LobbyRoomItem } from '@/types/online'
@@ -86,14 +83,11 @@ function onClosed() {
 
     <p class="text-sm text-gray-600">
       房间
-      <code class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{{ room.roomCode }}</code>
-      <template v-if="room.hasPassword">需要密码，请输入后加入</template>
-      <template v-else>关联了整合包，请确认本地已安装</template>
+      <code class="bg-gray-100 px-1.5 py-0.5 rounded text-gray-800">{{ room.publicIdentifier }}</code>
+      需要密码，请输入后加入
     </p>
 
-    <ModpackRequirementCard v-if="room.modpack" :modpack="room.modpack" class="mt-4" />
-
-    <div v-if="room.hasPassword" class="mt-4">
+    <div class="mt-4">
       <label class="mb-1 block text-sm font-medium text-gray-700">房间密码</label>
       <Input
         v-model="password"
