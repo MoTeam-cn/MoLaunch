@@ -15,4 +15,5 @@ pub use restore::restore;
 pub use seed::extract_save_seed;
 
 // 私有 use：保持子模块 `use super::resolve_saves_dir;` 引用可用
-use helpers::resolve_saves_dir;
+// 提升为 pub(super)：NBT 编辑器等兄弟模块复用 saves 目录解析
+pub(super) use helpers::resolve_saves_dir;

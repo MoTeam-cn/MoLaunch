@@ -10,7 +10,7 @@ use crate::minecraft::isolation::{get_effective_game_dir, IsolationMode};
 use crate::state::{resolve_game_dir, AppState};
 
 /// 解析 saves 目录（同 screenshot::resolve_shots_dir 的语义）
-pub(super) async fn resolve_saves_dir(state: &AppState, version_id: Option<&str>) -> PathBuf {
+pub(crate) async fn resolve_saves_dir(state: &AppState, version_id: Option<&str>) -> PathBuf {
     let game_dir = {
         let config = state.config.lock().await;
         resolve_game_dir(&config.game_dir)

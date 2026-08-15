@@ -243,13 +243,29 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
         }),
     );
 
-    // NBT 数据查看
+    // NBT 数据查看与编辑
     d.register(
         "nbt_parse",
         handler!(state, _app, params, {
             let p: NbtParseParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             nbt::parse(&state, p).await
+        }),
+    );
+    d.register(
+        "nbt_save",
+        handler!(state, _app, params, {
+            let p: NbtSaveParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            nbt::save(&state, p).await
+        }),
+    );
+    d.register(
+        "nbt_list_save_files",
+        handler!(state, _app, params, {
+            let p: NbtListSaveFilesParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            nbt::list_save_files(&state, p).await
         }),
     );
 
