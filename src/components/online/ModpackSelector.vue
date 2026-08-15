@@ -9,7 +9,7 @@
  * - versionId 变化时若已开启则自动重新读取
  *
  * # 复用约定
- * - checkbox 沿用项目惯例（`accent-primary-500`），与 WhitelistEditor / ExportTab 一致
+ * - checkbox 沿用项目惯例（`accent-primary-500`）
  * - 文件大小格式化复用 `utils/format.ts` 的 `formatBytes`
  */
 import { ref, computed, watch, defineAsyncComponent } from 'vue'
