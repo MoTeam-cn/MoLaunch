@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **资源包编辑器内容区布局与 ZIP 保存交互修复**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue) / [RpTexturePreview.vue](src/views/tools/data/RpTexturePreview.vue) / [RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue)）：① 纹理/文本预览标题行文件名改为 `min-w-0 flex-1 truncate`（图标/动画纹理 tag/操作按钮 `shrink-0`），长文件名（如 `icedragonbonenunchakuspinning_e.png`）不再把 tag 挤换行、按钮挤右移、撑宽内容区；② 右侧内容分发区高度上限由 560px 收窄至 400px，与左侧文件树等高，显示大图时不再拉长页面、左侧文件树下方不再出现空白；③ 「保存 ZIP」确认提示改用 `displayPath` 清洗 Windows `canonicalize` 返回的 `\\?\` 长路径前缀后再展示；④ 「另存为 ZIP」默认文件名去掉包名已带的 `.zip` 后缀（`Emis_Rlcraft.zip.zip` → `Emis_Rlcraft.zip`）。
+
 - **资源包编辑器列表与文件树高度限制（M4 UI 布局）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：资源包列表网格新增三排高度上限（`max-h-[132px]` + 超出滚动，桌面三列 / 窄屏两列均不超高）；打开包后的左侧文件树区域高度上限由 560px 收窄至 400px，避免包内文件较多时占满页面，左右区域各自独立滚动。
 
 - **资源包编辑器版本下拉调整（M4 版本隔离修复）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：版本下拉从「已打开包的文件树区域」移到「资源包列表」顶部（打开包前即可选择，与资源包转换器布局一致）；移除隔离模式 All(4) 时强制默认选中第一个已安装版本的逻辑，改为默认「全局（不隔离）」由用户自行选择，避免用户无法在编辑器内主动切换版本。

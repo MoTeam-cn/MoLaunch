@@ -102,6 +102,11 @@ function countFiles(node?: RpTreeNode): number {
   )
 }
 
+/** Windows canonicalize 返回的路径带 `\\?\` 前缀，仅展示时去掉 */
+function displayPath(p: string): string {
+  return p.startsWith('\\\\?\\') ? p.slice(4) : p
+}
+
 onMounted(async () => {
   await loadVersions()
   await loadPacks()
@@ -205,7 +210,7 @@ async function saveZip() {
   if (!c || !c.is_zip || !c.src_path || exporting.value) return
   const ok = await showConfirmAsync(
     '保存 ZIP',
-    `将把当前编辑内容打包并覆盖原 ZIP：\n${c.src_path}\n确定保存？`,
+    `将把当前编辑内容打包并覆盖原 ZIP：\n${displayPath(c.src_path)}\n确定保存？`,
   )
   if (!ok) return
   exporting.value = true
@@ -235,7 +240,7 @@ async function saveAsZip() {
   const path = await pickSavePath({
     title: '导出资源包 ZIP',
     filters: [{ name: 'ZIP', extensions: ['zip'] }],
-    defaultPath: `${c.name}.zip`,
+    defaultPath: `${c.name.replace(/\.zip$/i, '')}.zip`,
   })
   if (!path) return
   exporting.value = true
@@ -397,7 +402,7 @@ async function saveAsZip() {
         </div>
 
         <!-- 内容分发 -->
-        <div class="max-h-[560px] overflow-y-auto p-4">
+        <div class="max-h-[400px] overflow-y-auto p-4">
           <RpMcmetaForm
             v-if="selectedNode?.file_type === 'mcmeta'"
             :work-dir="current.work_dir"

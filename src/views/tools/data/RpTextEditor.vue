@@ -86,9 +86,9 @@ async function doSave() {
 <template>
   <div class="space-y-2">
     <div class="flex items-center gap-2">
-      <DocumentTextIcon class="h-4 w-4 text-gray-500" />
-      <h4 class="text-sm font-medium text-gray-700">{{ name }}</h4>
-      <span class="truncate text-xs text-gray-400">{{ relPath }}</span>
+      <DocumentTextIcon class="h-4 w-4 shrink-0 text-gray-500" />
+      <h4 class="min-w-0 flex-1 truncate text-sm font-medium text-gray-700">{{ name }}</h4>
+      <span class="min-w-0 truncate text-xs text-gray-400">{{ relPath }}</span>
     </div>
     <div v-if="dirty" class="flex items-center gap-1.5 text-xs text-amber-600">
       <ExclamationTriangleIcon class="h-3.5 w-3.5" />
