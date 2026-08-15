@@ -20,6 +20,8 @@
 
 ### Fixed
 
+- **修复从大厅加入房间返回「房间码格式无效」**（[room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs)）：大厅传入的 `code_id` 是 N 段公开标识（如 `YNZE-U61D`），而 api-server `join_room` 的 `valid_format` 只接受完整 21 位 `U/` 前缀码，N 段必然校验失败返回 400 InvalidRoomCode——服务端修复见 api-server 侧 CHANGELOG（`join`/`info` 兼容 N 段）。客户端侧同步修复：完整码含 `U/` 前缀，`/` 作为路径参数会拆断 axum 路由段，本次在 `signaling_get_room`/`signaling_join_room`/`signaling_close_room` 三个端点统一用 `urlencoding::encode` 对房间码做 URL 编码（`/` → `%2F`，axum 自动解码），消除完整码加入/查询/关闭时因路径拆断导致的 404/400。
+
 - **修复设备页「虚拟组网（easytier）」卡片虚拟网络 / 虚拟 IP 恒为空**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [easytier.ts](src/types/online/easytier.ts) / [EasyTierStatusCard.vue](src/components/online/EasyTierStatusCard.vue)）：后端 `EasyTier` 只保存 rpc-portal / version，`easytier-status` 事件与 `easytier_status` 查询的 payload 也不含 `networkName`/`virtualIp`——前端卡片 `{{ networkName || '-' }}` / `{{ ip || '-' }}` 恒显示 `-`。修复：① `EasyTier` 结构新增 `network_name`/`virtual_ip` 字段，`join()` 时保存（房主固定 `10.244.0.1`，房客 DHCP 动态分配不回显）；② `easytier-status` 事件推送与 `easytier_status` IPC 查询的 payload 统一补 `networkName`/`virtualIp` 字段（抽取共用 `easytier_status_payload` 构造，消除两处重复）；③ 前端 `EasyTierStatusResult` 类型与设备页卡片两处 `setEasyTierRuntime` 同步补写这两个字段。
 
 - **修复房间详情连接状态显示「已组网」时伴随空白红色错误块**（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue)）：`v-if="roomHost.easytier.error"` 嵌套 ref 未解包——`useRoomHost().easytier` 返回的 `error` 是 ref 对象，模板编译产物为 `_ctx.roomHost.easytier.error`（无 `unref`），RefImpl 对象恒为 truthy 导致红块永远渲染，而插值对 RefImpl 输出空内容（`toDisplayString` 返回 `[]`）。修复：模板中改用 `roomHost.easytier.error.value` 显式解包，错误信息为空时不渲染、有值时正常显示文字。
