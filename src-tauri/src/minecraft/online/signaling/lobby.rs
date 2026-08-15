@@ -6,7 +6,7 @@ use crate::api_paths;
 use crate::minecraft::online::client::{BusinessResult, ClientError, OnlineClient};
 use crate::minecraft::online::storage::DeviceCredentials;
 
-/// 大厅聚合条目（按整合包分组）
+/// 大厅聚合条目（按整合包分组，字段对齐 api-server `LobbyPackageItem`）
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LobbyPackageItem {
@@ -19,25 +19,28 @@ pub struct LobbyPackageItem {
     pub source: String,
     #[serde(alias = "project_id")]
     pub project_id: String,
+    /// 平台文件 ID
+    #[serde(alias = "file_id")]
+    pub file_id: String,
+    /// 整合包对应的 MC 版本
+    #[serde(alias = "mc_version")]
+    pub mc_version: String,
+    /// 整合包自身版本号
+    #[serde(default, alias = "modpack_version")]
+    pub modpack_version: Option<String>,
+    /// 加载器类型
+    #[serde(default)]
+    pub loader: Option<String>,
     /// 公开房间数（该整合包下）
     #[serde(alias = "room_count")]
     pub room_count: u32,
-    /// 热度（服务端按房间数/在线数聚合排序）
-    #[serde(default, alias = "heat")]
-    pub heat: u32,
-    #[serde(skip_serializing_if = "Option::is_none", default, alias = "mc_version")]
-    pub mc_version: Option<String>,
 }
 
-/// 大厅聚合响应
+/// 大厅聚合响应（api-server 返回 `{ packages: [...] }`，非分页）
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LobbyPackagesResponse {
-    pub total: u32,
-    pub page: u32,
-    #[serde(alias = "page_size")]
-    pub page_size: u32,
-    pub items: Vec<LobbyPackageItem>,
+    pub packages: Vec<LobbyPackageItem>,
 }
 
 /// 大厅房间列表查询参数（GET /v1/signaling/lobby/rooms）
@@ -57,37 +60,34 @@ pub struct LobbyListQuery {
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LobbyRoomItem {
-    /// N 段公开标识（去重/入房用，不含密钥）
-    #[serde(alias = "public_identifier")]
+    /// N 段公开标识（去重/入房用，不含密钥；服务端字段为 `code_id`）
+    #[serde(alias = "code_id")]
     pub public_identifier: String,
     /// 房主备注
-    #[serde(default, alias = "remark")]
+    #[serde(default)]
     pub remark: String,
     /// 是否设置密码
     #[serde(alias = "has_password")]
     pub has_password: bool,
-    #[serde(default, alias = "player_count")]
+    /// 当前在线人数（服务端暂不返回，恒为 0）
+    #[serde(default)]
     pub player_count: u32,
-    #[serde(default, alias = "max_players")]
+    #[serde(alias = "max_players")]
     pub max_players: u32,
     /// 房主 MC 版本
     #[serde(default, alias = "host_mc_version")]
-    pub host_mc_version: String,
+    pub host_mc_version: Option<String>,
     #[serde(default, alias = "host_loader")]
     pub host_loader: Option<String>,
     #[serde(alias = "created_at")]
     pub created_at: u64,
 }
 
-/// 大厅房间列表响应
+/// 大厅房间列表响应（api-server 返回 `{ rooms: [...] }`，非分页）
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct LobbyListResponse {
-    pub total: u32,
-    pub page: u32,
-    #[serde(alias = "page_size")]
-    pub page_size: u32,
-    pub items: Vec<LobbyRoomItem>,
+    pub rooms: Vec<LobbyRoomItem>,
 }
 
 impl OnlineClient {

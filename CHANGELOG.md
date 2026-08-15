@@ -16,6 +16,8 @@
 
 ### Fixed
 
+- **修复大厅列表 `lobby_list_packages` 失败：`missing field total`（契约对齐线上 api-server）**（[lobby.rs](src-tauri/src/minecraft/online/signaling/lobby.rs) / [lobby.ts](src/types/online/lobby.ts) / [LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：线上 api-server 返回**非分页结构** `{ packages: [...] }` / `{ rooms: [...] }`，而客户端按分页结构 `{ total, page, pageSize, items }` 解析导致 serde 反序列化失败。修复：① 后端 `LobbyPackagesResponse`/`LobbyListResponse` 改为 `packages`/`rooms` 直取，`LobbyRoomItem` 公开标识对齐服务端 `code_id` 字段、`host_mc_version` 改可选；② `LobbyPackageItem` 补 `file_id`/`modpack_version`/`loader` 字段，移除服务端不存在的 `heat`（前端热度徽章一并移除）；③ 前端类型与 LobbyBrowser `data.items` → `data.packages`/`data.rooms` 同步。分页参数在 query 中保留兼容（服务端暂不支持分页）。
+
 - **勾选整合包后无法取消换其他包：异步读取竞态导致已取消的整合包被"复活"**（[ModpackSelector.vue](src/components/online/ModpackSelector.vue)）：`loadMeta()` 在 `await readLocalModpackMeta` 返回后无条件 emit 有值——用户在读取期间取消勾选（已 emit `undefined` 并清空本地元数据），异步返回后又被回写，父组件 `modpackMeta` 被恢复，UI 上表现为无法真正取消。修复：读取完成后回检 `enabled` 状态，用户已取消则跳过回写（成功与失败分支均回检）。
 
 - **修复资源包 explore 测试的目录构造与源 zip 位置**（[explore_test.rs](src-tauri/src/commands/tools/resourcepack/explore_test.rs)）：① `test_build_tree_classifies_and_marks_animated` 写 `assets/minecraft/lang/zh_cn.json` 前未创建 `lang` 目录，`fs::write` 报 NotFound；② `test_export_zip_roundtrip_preserves_comment` 把带注释的源 zip 放在工作目录内，导出打包时被当成普通文件打进产物（配合 convert.rs 的临时文件排除修复，产物条目数收敛为预期 2），源 zip 移到工作目录外并在测试后清理。

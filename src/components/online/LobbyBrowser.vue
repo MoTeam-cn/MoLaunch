@@ -7,7 +7,6 @@
  */
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 import {
-  FireIcon,
   CubeIcon,
   ChevronDownIcon,
   ArrowPathIcon,
@@ -45,8 +44,8 @@ async function loadPackages() {
   try {
     const res = await listLobbyPackages()
     if (res.code !== 1 || !res.data) throw new Error(res.msg || '加载大厅失败')
-    packages.value = res.data.items
-    if (!res.data.items.some((p) => p.modpackId === expandedId.value)) {
+    packages.value = res.data.packages
+    if (!res.data.packages.some((p) => p.modpackId === expandedId.value)) {
       expandedId.value = null
       rooms.value = []
     }
@@ -71,7 +70,7 @@ async function toggleExpand(pkg: LobbyPackageItem) {
   try {
     const res = await listLobbyRooms({ packageId: pkg.modpackId, page: 1, pageSize: 50 })
     if (res.code !== 1 || !res.data) throw new Error(res.msg || '加载房间列表失败')
-    rooms.value = res.data.items
+    rooms.value = res.data.rooms
   } catch (e) {
     console.error('Failed to load lobby rooms:', e)
     toastError(`加载房间列表失败：${e instanceof Error ? e.message : String(e)}`)
@@ -153,10 +152,6 @@ onMounted(() => {
             <span class="inline-flex items-center gap-0.5 text-xs text-gray-500 shrink-0">
               <UserGroupIcon class="w-3.5 h-3.5" />
               {{ pkg.roomCount }}
-            </span>
-            <span class="inline-flex items-center gap-0.5 text-xs text-orange-500 shrink-0">
-              <FireIcon class="w-3.5 h-3.5" />
-              {{ pkg.heat }}
             </span>
             <ChevronDownIcon
               class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
