@@ -6,6 +6,8 @@
 
 ### Added
 
+- **资源包编辑器版本隔离下拉（M4 版本隔离：编辑器）**（[ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：文件树顶部新增版本下拉框——选项「全局（不隔离）」+ 已安装 MC 版本，选择后按该版本的隔离目录扫描 resourcepacks（`resourcepackList(versionId)`），修复此前固定扫描全局目录导致列表为空的问题；隔离模式为 All(4) 时自动默认选中第一个已安装版本（与资源包转换器交互一致），切换版本实时刷新列表。
+
 - **资源包编辑器 MC 版本推导 pack_format 接口（M4 版本隔离：后端）**（[explore.rs](src-tauri/src/commands/tools/resourcepack/explore.rs) / [explore_test.rs](src-tauri/src/commands/tools/resourcepack/explore_test.rs) / [types/resourcepack_explore.rs](src-tauri/src/commands/tools/types/resourcepack_explore.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [mod.rs](src-tauri/src/commands/tools/resourcepack/mod.rs) / [skin_resourcepack/generate.rs](src-tauri/src/minecraft/launch/skin_resourcepack/generate.rs) / [skin_resourcepack/mod.rs](src-tauri/src/minecraft/launch/skin_resourcepack/mod.rs)）：新增 `rp_version_pack_format` action——输入 MC 版本号，复用皮肤资源包既有 `get_pack_format` 版本映射表（可见性由 `pub(super)` 提升为 `pub(crate)` 供编辑器复用）正向推导 pack_format，返回数值与版本可解析标志；前端下拉选版本后自动回填，避免两处维护版本映射。含 1 项新单元测试（多版本推导结果 + 空版本不可解析）。
 
 - **资源包编辑器文件树搜索过滤（M4）**（[filterTree.ts](src/utils/resourcepack/filterTree.ts)（新增） / [ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：文件树顶部新增搜索框——按关键字实时过滤（匹配文件名与相对路径，不区分大小写），目录仅保留含命中子孙的节点；搜索时自动展开命中路径的全部祖先目录，清空关键字恢复原展开状态；无命中时显示「未找到匹配的文件」空态。过滤逻辑抽为独立纯函数模块（`normalizeKeyword` / `filterTreeNode` / `collectExpandPaths`），不改动原树结构。

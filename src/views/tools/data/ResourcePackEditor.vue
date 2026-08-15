@@ -9,6 +9,7 @@
 import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const RpFileTreeNode = defineAsyncComponent(() => import('./RpFileTreeNode.vue'))
 const RpMcmetaForm = defineAsyncComponent(() => import('./RpMcmetaForm.vue'))
 const RpTexturePreview = defineAsyncComponent(() => import('./RpTexturePreview.vue'))
@@ -23,6 +24,8 @@ import { showConfirmAsync } from '@/utils/modal'
 import { collectExpandPaths, filterTreeNode, normalizeKeyword } from '@/utils/resourcepack/filterTree'
 import { resourcepackList, rpOpen, rpRead, rpExport } from '@/utils/api/tools'
 import type { RpOpenResult, RpReadResult, RpTreeNode, ResourcePackItem } from '@/utils/api/tools'
+import { listInstalledVersionsWithType, type InstalledVersionInfo } from '@/utils/api/version'
+import { getConfigMap } from '@/utils/api/config'
 import {
   ArrowDownTrayIcon,
   ChevronDownIcon,
@@ -45,6 +48,13 @@ const exporting = ref(false)
 const searchQuery = ref('')
 /** 模型文件视图模式：false = 3D 预览，true = JSON 文本编辑 */
 const modelEditMode = ref(false)
+/** 版本隔离：'' = 全局（不隔离），其他 = 具体版本 ID（参考资源包转换器） */
+const selectedVersionId = ref('')
+const installedVersions = ref<InstalledVersionInfo[]>([])
+const versionOptions = computed(() => [
+  { label: '全局（不隔离）', value: '' },
+  ...installedVersions.value.map((v) => ({ label: v.id, value: v.id })),
+])
 
 /** 过滤后的文件树（无关键字或未打开包时返回原树） */
 const filteredTree = computed(() => {
@@ -93,16 +103,41 @@ function countFiles(node?: RpTreeNode): number {
   )
 }
 
-onMounted(loadPacks)
+onMounted(async () => {
+  await loadVersions()
+  // 隔离模式为 All(4) 时所有版本都隔离，默认选第一个已安装版本（与资源包转换器一致）
+  const config = await getConfigMap()
+  if (config.isolationMode === 4 && installedVersions.value.length > 0) {
+    selectedVersionId.value = installedVersions.value[0].id
+    // watch 会自动触发 loadPacks
+  } else {
+    await loadPacks()
+  }
+})
 
 async function loadPacks() {
   try {
-    const res = await resourcepackList()
+    const res = await resourcepackList(selectedVersionId.value || undefined)
     packs.value = res.items ?? []
   } catch (e) {
     toastError(`加载资源包列表失败: ${e instanceof Error ? e.message : String(e)}`)
   }
 }
+
+async function loadVersions() {
+  try {
+    installedVersions.value = await listInstalledVersionsWithType()
+  } catch {
+    toastError('加载版本列表失败')
+  }
+}
+
+// 版本切换时按隔离目录重新加载列表（首次加载由 onMounted 触发，跳过初始回调）
+watch(selectedVersionId, (newVal, oldVal) => {
+  if (oldVal !== '' || newVal !== '') {
+    loadPacks()
+  }
+})
 
 async function openPath(path: string) {
   if (opening.value) return
@@ -330,6 +365,14 @@ async function saveAsZip() {
       <div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-[280px_1fr]">
         <!-- 文件树 -->
         <div class="max-h-[560px] overflow-y-auto p-2 md:border-r md:border-gray-200">
+          <div class="mb-2 flex items-center gap-1 px-1">
+            <Select
+              v-model="selectedVersionId"
+              :options="versionOptions"
+              class="w-40 shrink-0"
+              title="选择资源包隔离目录（按 MC 版本）"
+            />
+          </div>
           <div class="relative mb-2 px-1">
             <MagnifyingGlassIcon class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
