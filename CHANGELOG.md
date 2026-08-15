@@ -18,6 +18,8 @@
 
 ### Fixed
 
+- **修复房间详情连接状态显示「已组网」时伴随空白红色错误块**（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue)）：`v-if="roomHost.easytier.error"` 嵌套 ref 未解包——`useRoomHost().easytier` 返回的 `error` 是 ref 对象，模板编译产物为 `_ctx.roomHost.easytier.error`（无 `unref`），RefImpl 对象恒为 truthy 导致红块永远渲染，而插值对 RefImpl 输出空内容（`toDisplayString` 返回 `[]`）。修复：模板中改用 `roomHost.easytier.error.value` 显式解包，错误信息为空时不渲染、有值时正常显示文字。
+
 - **修复创建房间报 `请求解密失败`（1001）：请求体字段契约回归**（[room.rs](src-tauri/src/minecraft/online/signaling/types/room.rs) / [room_tests.rs](src-tauri/src/minecraft/online/signaling/types/room_tests.rs)）：Scaffolding 重构后客户端 `CreateRoomRequest` 带 `#[serde(rename_all = "camelCase")]`，序列化为 `roomCode`/`isPublic`/`hostMcPort`，而 api-server 的 `CreateRoomRequest` DTO 为 snake_case 且 `room_code` 必填——服务端解密信封成功后在 `serde_json::from_slice` 反序列化业务数据时 `missing field room_code`，向客户端返回 code=1001「请求解密失败」。修复：移除客户端 `CreateRoomRequest` 的 camelCase 重命名（字段名本身即 snake_case），与服务端 DTO 契约一致；新增序列化契约回归测试（断言 snake_case 键 + 空字段跳过）。
 
 - **修复大厅列表 `lobby_list_packages` 失败：`missing field total`（契约对齐线上 api-server）**（[lobby.rs](src-tauri/src/minecraft/online/signaling/lobby.rs) / [lobby.ts](src/types/online/lobby.ts) / [LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：线上 api-server 返回**非分页结构** `{ packages: [...] }` / `{ rooms: [...] }`，而客户端按分页结构 `{ total, page, pageSize, items }` 解析导致 serde 反序列化失败。修复：① 后端 `LobbyPackagesResponse`/`LobbyListResponse` 改为 `packages`/`rooms` 直取，`LobbyRoomItem` 公开标识对齐服务端 `code_id` 字段、`host_mc_version` 改可选；② `LobbyPackageItem` 补 `file_id`/`modpack_version`/`loader` 字段，移除服务端不存在的 `heat`（前端热度徽章一并移除）；③ 前端类型与 LobbyBrowser `data.items` → `data.packages`/`data.rooms` 同步。分页参数在 query 中保留兼容（服务端暂不支持分页）。

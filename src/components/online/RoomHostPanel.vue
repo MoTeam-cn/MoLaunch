@@ -40,9 +40,9 @@ function handleCloseRoom() {
         <span class="text-xs text-gray-500">easytier 虚拟网络</span>
         <EasyTierStatusBadge />
       </div>
-      <div v-if="roomHost.easytier.error" class="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 flex items-start gap-1.5">
+      <div v-if="roomHost.easytier.error.value" class="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 flex items-start gap-1.5">
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
-        <span>{{ roomHost.easytier.error }}</span>
+        <span>{{ roomHost.easytier.error.value }}</span>
       </div>
       <div class="mt-3 pt-3 border-t border-gray-100 text-xs text-gray-500">
         房主 MC 端口由联机中心自动托管（scaffolding-mc-server-{{ room.hostMcPort }}），加入方组网后自动探测进服地址
