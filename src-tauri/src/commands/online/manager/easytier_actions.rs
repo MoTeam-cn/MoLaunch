@@ -28,23 +28,32 @@ const DEFAULT_GUEST_HOSTNAME: &str = "mo-launch-guest";
 /// easytier 运行状态推送事件（前端经 useTauriEvent 监听）
 const EASYTIER_STATUS_EVENT: &str = "easytier-status";
 
-/// 构造并推送 easytier 运行状态事件（加入/停止后调用，供设备页展示）
-async fn emit_easytier_status(app: &tauri::AppHandle, state: &AppState) {
-    let guard = state.easytier.lock().await;
-    let payload = match guard.as_ref() {
+/// 构造 easytier 运行状态 payload（`easytier-status` 事件推送 / `easytier_status` IPC 查询共用）
+fn easytier_status_payload(easytier: &Option<EasyTier>) -> serde_json::Value {
+    match easytier {
         Some(e) => serde_json::json!({
             "joined": true,
             "version": e.version(),
             "pid": e.pid(),
             "rpcPortal": e.rpc_portal(),
+            "networkName": e.network_name(),
+            "virtualIp": e.virtual_ip().unwrap_or(""),
         }),
         None => serde_json::json!({
             "joined": false,
             "version": "",
             "pid": null,
             "rpcPortal": "",
+            "networkName": "",
+            "virtualIp": "",
         }),
-    };
+    }
+}
+
+/// 构造并推送 easytier 运行状态事件（加入/停止后调用，供设备页展示）
+async fn emit_easytier_status(app: &tauri::AppHandle, state: &AppState) {
+    let guard = state.easytier.lock().await;
+    let payload = easytier_status_payload(&guard);
     let _ = app.emit(EASYTIER_STATUS_EVENT, payload);
 }
 
@@ -421,21 +430,7 @@ pub fn register(d: &mut Dispatcher) {
         "easytier_status",
         handler!(state, _app, _params, {
             let guard = state.easytier.lock().await;
-            let value = match guard.as_ref() {
-                Some(e) => serde_json::json!({
-                    "joined": true,
-                    "version": e.version(),
-                    "pid": e.pid(),
-                    "rpcPortal": e.rpc_portal(),
-                }),
-                None => serde_json::json!({
-                    "joined": false,
-                    "version": "",
-                    "pid": null,
-                    "rpcPortal": "",
-                }),
-            };
-            serde_json::to_value(value).map_err(|e| e.to_string())
+            serde_json::to_value(easytier_status_payload(&guard)).map_err(|e| e.to_string())
         }),
     );
 }

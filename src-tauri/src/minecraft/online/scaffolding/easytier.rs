@@ -16,6 +16,8 @@ pub struct EasyTier {
     child: Child,
     rpc_portal: String,
     version: String,
+    network_name: String,
+    virtual_ip: Option<String>,
 }
 
 /// 查询 easytier-core 版本（`--version` 输出形如 `easytier-core 2.6.4`，取第二段）
@@ -124,12 +126,24 @@ impl EasyTier {
             child,
             rpc_portal,
             version,
+            network_name: network_name.to_string(),
+            virtual_ip: ip.map(|s| s.to_string()),
         })
     }
 
     /// 当前 rpc-portal 地址
     pub fn rpc_portal(&self) -> &str {
         &self.rpc_portal
+    }
+
+    /// 虚拟网络名
+    pub fn network_name(&self) -> &str {
+        &self.network_name
+    }
+
+    /// 本机虚拟 IP（房主固定 `10.244.0.1`；房客 DHCP 动态分配，未回显时为 None）
+    pub fn virtual_ip(&self) -> Option<&str> {
+        self.virtual_ip.as_deref()
     }
 
     /// easytier-core 版本号（`--version` 查询失败时为空字符串）

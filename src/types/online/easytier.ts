@@ -48,6 +48,10 @@ export interface EasyTierStatusResult {
   pid?: number
   /** rpc-portal 地址（未运行时为空串） */
   rpcPortal: string
+  /** 虚拟网络名（scaffolding-mc-{N 段}，未运行时为空串） */
+  networkName: string
+  /** 本机虚拟 IP（房主固定 10.244.0.1；房客 DHCP 未回显时为空串） */
+  virtualIp: string
 }
 
 /** `scaffolding_host_start` 参数 */

@@ -27,13 +27,15 @@ const ip = computed(() => store.easytierRuntime.virtualIp)
 const networkName = computed(() => store.easytierRuntime.networkName)
 const pid = computed(() => store.easytierRuntime.pid)
 
-/** 后端 emit 推送：实时同步组网状态（joined/version/pid/rpcPortal） */
+/** 后端 emit 推送：实时同步组网状态（joined/version/pid/rpcPortal/networkName/virtualIp） */
 const { start } = useTauriEvent<EasyTierStatusResult>('easytier-status', (payload) => {
   store.setEasyTierRuntime({
     joined: payload.joined,
     version: payload.version ?? '',
     pid: payload.pid,
     rpcPortal: payload.rpcPortal ?? '',
+    networkName: payload.networkName ?? '',
+    virtualIp: payload.virtualIp ?? '',
   })
 })
 
@@ -47,6 +49,8 @@ onMounted(async () => {
       version: status.version ?? '',
       pid: status.pid,
       rpcPortal: status.rpcPortal ?? '',
+      networkName: status.networkName ?? '',
+      virtualIp: status.virtualIp ?? '',
     })
   } catch {
     // 查询失败保持现状，等待后续 emit 推送
