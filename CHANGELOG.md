@@ -34,6 +34,8 @@
 
 ### Changed
 
+- **NBT 编辑器从「Java 诊断」移入「存档资源」分类**（[StoragePage.vue](src/views/tools/StoragePage.vue) / [JavaDiagPage.vue](src/views/tools/JavaDiagPage.vue) / [Tools.vue](src/views/Tools.vue)）：NBT 编辑器编辑的是存档内数据文件（level.dat / playerdata / region .mca），与存档备份/恢复、种子地图同属存档数据类工具，从 Java 诊断（Java 下载/环境检测/版本 JSON）迁至存档资源分类，页签名由「NBT 查看」改为「NBT 编辑器」；Java 诊断与存档资源分类描述同步更新。
+
 - **种子地图 Worker 改为共享单例，页签切换不再重复创建 Worker/拉取模块**（[workerPool.ts](src/utils/seedmap/workerPool.ts) / [useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：此前每次进入种子地图（子页签 `v-if` 切换销毁重建）都会新建 `WorkerPool` 并重新创建 N 个 Worker，每个 Worker 都要重新拉取整条 worker 模块图（wasm-bindings.ts、tile-render、结构查找等），dev 下表现为 wasm-bindings.ts 等模块被反复请求。现在新增模块级共享单例 `getSharedWorkerPool()`：Worker 首次进入创建一次后常驻，`init` 幂等（已初始化且有存活 Worker 时直接复用，全部终止才重建），页面卸载不再 `dispose` Worker；切换离开/回到种子地图不再重复创建 Worker、拉取 worker 模块或重复实例化 WASM。
 
 - **种子地图 WASM 改为主线程缓存，重复进入页面不再重复加载 JS/WASM**（[wasm-loader.ts](src/utils/wasm-loader.ts) / [workerPool.ts](src/utils/seedmap/workerPool.ts) / [wasm-bindings.ts](src/utils/seedmap/wasm-bindings.ts) / [types.ts](src/utils/seedmap/types.ts) / [useSeedMap.ts](src/views/tools/data/useSeedMap.ts)）：此前每个 Worker 初始化时各自 `fetch` `cubiomes.js`（17KB）+ `cubiomes.wasm`（755KB），且每次进入种子地图（子页签 `v-if` 切换销毁重建）都会重新走一遍 res:// 加载。现在新增主线程缓存 `getWasmBundle()`——同一份胶水 JS 文本 + WASM 二进制整个应用生命周期只 fetch 一次，WorkerPool 通过 init 消息把字节分发给各 Worker（`wasmJsCode`/`wasmBytes`），Worker 端优先使用传入字节，仅无缓存时回退按 URL fetch；切换离开/回到种子地图不再触发任何 res:// 网络加载。

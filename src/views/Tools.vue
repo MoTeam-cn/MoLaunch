@@ -53,7 +53,7 @@ const categories: ToolCategory[] = [
     id: 'storage',
     label: '存档资源',
     icon: ArchiveBoxIcon,
-    desc: '游戏世界存档备份/恢复/导出，截图批量管理、资源包转换与种子地图',
+    desc: '游戏世界存档备份/恢复/导出，截图批量管理、资源包转换、种子地图与 NBT 数据编辑',
   },
   {
     id: 'mod-network',
@@ -65,7 +65,7 @@ const categories: ToolCategory[] = [
     id: 'java-diag',
     label: 'Java 诊断',
     icon: CommandLineIcon,
-    desc: 'Java 运行时下载与检测，版本 JSON 编辑、NBT 数据查看',
+    desc: 'Java 运行时下载与检测，版本 JSON 编辑等启动排障工具',
   },
   {
     id: 'create-cmd',
