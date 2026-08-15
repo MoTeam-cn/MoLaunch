@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **3D 预览 vanilla item 父模型误报缺失修复**（[previewResources.ts](src/utils/resourcepack/previewResources.ts)）：`minecraft:item/*` 命名的模型引用（如 `minecraft:item/handheld`、`minecraft:item/generated` 等 vanilla 内置物品模板）统一以 `builtin/generated` 平面兜底渲染——lodestone 内置原版资源只有 block 模型、无 item 模型，此类模型并非真正缺失，不再误报「模型依赖缺失」；模型读取（flatten 与渲染两处）抽为统一的 `buildModelProvider`，pack 优先 → vanilla 回退 → vanilla item 模板平面兜底，parent 链检测与渲染逻辑保持一致。模组命名空间（如 `SRParasites:item/...`）缺失仍按原逻辑报错。
+
 - **编辑器「有未保存的修改」改为与初始值比较（改回原值即清除提示）**（[VersionJsonEditor.vue](src/views/tools/data/VersionJsonEditor.vue) / [RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue) / [RpMcmetaForm.vue](src/views/tools/data/RpMcmetaForm.vue) / [RpLangTable.vue](src/views/tools/data/RpLangTable.vue)）：版本 JSON 编辑、资源包文本/JSON 编辑器、pack.mcmeta 表单、语言文件表格四个编辑器的 dirty 判定由「任何编辑动作即置 true」改为「当前值 ≠ 加载时初始快照」——修改后再改回原值，未保存提示自动消失；保存成功后同步更新快照，保证保存后的再次编辑判定正确。
 
 - **资源包编辑器 tooltip 改为仅省略时显示并修复递归节点不生效**（[Tooltip.vue](src/components/common/Tooltip.vue) / [RpFileTreeNode.vue](src/views/tools/data/RpFileTreeNode.vue) / [RpTexturePreview.vue](src/views/tools/data/RpTexturePreview.vue) / [RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue) / [RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue)）：① Tooltip 组件新增 `overflowOnly` 选项——递归检测 trigger 子树 `scrollWidth > clientWidth`，仅当文本实际被 CSS 省略（截断）时才显示提示，未省略时不再弹完整名称；ResizeObserver 监听容器宽度变化、`onUpdated` 监听内容变化实时刷新判定；② 文件树节点（含二级三级递归子节点）与纹理/文本/模型预览标题行的 tooltip 全部改用 `overflow-only`，只有被省略的长文件名才显示完整名称；③ Tooltip 由 `defineAsyncComponent` 异步引入改为同步静态导入，修复递归嵌套渲染中二级三级节点 tooltip 绑定不生效的问题。

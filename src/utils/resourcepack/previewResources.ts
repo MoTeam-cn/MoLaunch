@@ -194,13 +194,47 @@ function missingParentInChain(
     if (seen.has(id)) continue
     seen.add(id)
     const json = packModels.get(id) ?? vanillaModels[id]
-    if (json == null || typeof json !== 'object') return id
+    if (json == null || typeof json !== 'object') {
+      // vanilla item 模板（item/generated、item/handheld 等）由 builtin/generated 平面兜底，
+      // lodestone 内置资源只有 block 模型，此类缺失不算断链
+      if (isVanillaItemFallback(id)) continue
+      return id
+    }
     const parent = (json as Record<string, unknown>).parent
     if (typeof parent !== 'string') continue
     if (parent === 'builtin/generated' || parent === 'minecraft:builtin/generated') continue // lodestone 内置生成平面，无需 parent 文件
     stack.push(parent.includes(':') ? parent : `minecraft:${parent}`)
   }
   return null
+}
+
+/** minecraft:item/* 命名空间：lodestone 未内置 item 模型，统一以 builtin/generated 平面兜底 */
+function isVanillaItemFallback(id: string): boolean {
+  return id.startsWith('minecraft:item/')
+}
+
+let fallbackItemModel: BlockModel | null = null
+
+function getFallbackItemModel(): BlockModel {
+  if (!fallbackItemModel) fallbackItemModel = BlockModel.fromJson({ parent: 'builtin/generated' })
+  return fallbackItemModel
+}
+
+/** 模型读取：pack 优先 → vanilla 回退 → vanilla item 模板以 generated 平面兜底 */
+function buildModelProvider(
+  blockModels: Map<string, BlockModel>,
+  vanilla: VanillaPackBase,
+): BlockModelProvider {
+  return {
+    getBlockModel(id) {
+      const key = String(id)
+      return (
+        blockModels.get(key) ??
+        vanilla.resources.getBlockModel(id) ??
+        (isVanillaItemFallback(key) ? getFallbackItemModel() : null)
+      )
+    },
+  }
 }
 
 /** 构建预览 Resources；返回渲染目标 blockId */
@@ -269,12 +303,7 @@ export async function buildPreviewResources(
       // 损坏模型跳过
     }
   }
-  const modelAccessor: BlockModelProvider = {
-    getBlockModel(id) {
-      const key = String(id)
-      return blockModels.get(key) ?? vanilla.resources.getBlockModel(id)
-    },
-  }
+  const modelAccessor: BlockModelProvider = buildModelProvider(blockModels, vanilla)
   for (const m of blockModels.values()) m.flatten(modelAccessor)
 
   const atlas = await mergeAtlas(vanilla, packTextures)
@@ -398,12 +427,7 @@ function createPreviewResources(
   blockModels: Map<string, BlockModel>,
   vanilla: VanillaPackBase,
 ): Resources {
-  const modelProvider: BlockModelProvider = {
-    getBlockModel(id) {
-      const key = String(id)
-      return blockModels.get(key) ?? vanilla.resources.getBlockModel(id)
-    },
-  }
+  const modelProvider: BlockModelProvider = buildModelProvider(blockModels, vanilla)
   const flagProvider: BlockFlagsProvider = vanilla.resources
   const textureProvider: TextureAtlasProvider = {
     getTextureAtlas() {
