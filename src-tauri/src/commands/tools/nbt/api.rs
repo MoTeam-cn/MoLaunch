@@ -190,7 +190,3 @@ fn atomic_write(path: &Path, data: &[u8]) -> Result<(), String> {
     std::fs::rename(&tmp, path).map_err(log_err("NBT 替换文件失败"))?;
     Ok(())
 }
-
-#[cfg(test)]
-#[path = "nbt_test.rs"]
-mod nbt_test;

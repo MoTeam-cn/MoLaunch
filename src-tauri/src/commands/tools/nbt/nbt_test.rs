@@ -132,7 +132,7 @@ fn mca_parse_and_save() {
         .push(leaf("Sections", "list", serde_json::Value::Null));
     edited.children.last_mut().unwrap().children = vec![leaf("", "int", serde_json::json!(0))];
 
-    let tmp = std::env::temp_dir().join("mol_test_chunk.mca");
+    let tmp = std::env::temp_dir().join(format!("mol_test_chunk_{}.mca", std::process::id()));
     std::fs::write(&tmp, &raw).unwrap();
     save_mca_chunk(tmp.to_str().unwrap(), 10, &edited).unwrap();
     let after = std::fs::read(&tmp).unwrap();
