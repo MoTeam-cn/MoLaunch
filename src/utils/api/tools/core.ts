@@ -69,8 +69,10 @@ export const TOOLS_ACTIONS = {
   LIST_OPEN_PORTS: 'list_open_ports',
   // 选择器子窗口（通用 HTML 渲染 + on_navigation 选择回调）
   OPEN_PICKER_WINDOW: 'open_picker_window',
-  // NBT 数据查看
+  // NBT 数据查看与编辑
   NBT_PARSE: 'nbt_parse',
+  NBT_SAVE: 'nbt_save',
+  NBT_LIST_SAVE_FILES: 'nbt_list_save_files',
   // 合成配方生成器：数据包 zip 打包
   RECIPE_GENERATOR_EXPORT: 'recipe_generator_export',
 } as const

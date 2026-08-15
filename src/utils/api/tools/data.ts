@@ -144,7 +144,7 @@ export function versionJsonSave(versionId: string, content: string): Promise<Ver
   return toolsManager<VersionJsonSaveResult>(TOOLS_ACTIONS.VERSION_JSON_SAVE, { version_id: versionId, content })
 }
 
-// ==================== NBT 数据查看 ====================
+// ==================== NBT 数据查看与编辑 ====================
 
 /** NBT 树节点 */
 export interface NbtNode {
@@ -154,12 +154,65 @@ export interface NbtNode {
   children: NbtNode[]
 }
 
-/** NBT 解析结果 */
-export interface NbtParseResult {
+/** mca 文件中的单个区块 */
+export interface NbtChunkInfo {
+  index: number
+  /** 区块在区域内的 x（0-31） */
+  x: number
+  /** 区块在区域内的 z（0-31） */
+  z: number
   root: NbtNode
 }
 
-/** 解析 NBT 文件 */
+/** NBT 解析结果 */
+export interface NbtParseResult {
+  root: NbtNode
+  /** 文件类型：nbt（普通 NBT）/ mca（Anvil 区块容器） */
+  file_type: 'nbt' | 'mca'
+  chunks: NbtChunkInfo[]
+}
+
+/** NBT 保存结果 */
+export interface NbtSaveResult {
+  success: boolean
+}
+
+/** 存档内 NBT 文件条目 */
+export interface NbtSaveFileItem {
+  rel_path: string
+  name: string
+  size: number
+  /** 类别：level / player / region / other */
+  kind: 'level' | 'player' | 'region' | 'other'
+  path: string
+}
+
+/** 存档内 NBT 文件列表结果 */
+export interface NbtListSaveFilesResult {
+  items: NbtSaveFileItem[]
+}
+
+/** 解析 NBT / mca 文件 */
 export function nbtParse(filePath: string): Promise<NbtParseResult> {
   return toolsManager<NbtParseResult>(TOOLS_ACTIONS.NBT_PARSE, { file_path: filePath })
+}
+
+/** 保存 NBT / mca 文件（mca 文件需传 chunkIndex 指定写回区块） */
+export function nbtSave(filePath: string, root: NbtNode, chunkIndex?: number): Promise<NbtSaveResult> {
+  return toolsManager<NbtSaveResult>(TOOLS_ACTIONS.NBT_SAVE, {
+    file_path: filePath,
+    root,
+    chunk_index: chunkIndex ?? null,
+  })
+}
+
+/** 列出存档目录内的 NBT 文件（versionId 可选，按版本隔离目录） */
+export function nbtListSaveFiles(
+  worldName: string,
+  versionId?: string,
+): Promise<NbtListSaveFilesResult> {
+  return toolsManager<NbtListSaveFilesResult>(TOOLS_ACTIONS.NBT_LIST_SAVE_FILES, {
+    world_name: worldName,
+    version_id: versionId ?? null,
+  })
 }
