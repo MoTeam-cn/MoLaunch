@@ -1,12 +1,13 @@
 <script setup lang="ts">
 /**
  * 纹理 PNG 2D 预览（data URI）+ 纹理替换（导入本地图片 → rp_write base64 写回）
- * + 像素画板编辑（RpPixelEditor，canvas 原生逐像素绘制后写回）
+ * + 像素画板编辑（RpPixelEditor）+ 动画帧预览（RpAnimPreview，.png.mcmeta 帧播放）
  */
 import { ref, watch, defineAsyncComponent } from 'vue'
-import { ArrowUpTrayIcon, PaintBrushIcon, PhotoIcon } from '@heroicons/vue/24/outline'
+import { ArrowUpTrayIcon, FilmIcon, PaintBrushIcon, PhotoIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const RpPixelEditor = defineAsyncComponent(() => import('./RpPixelEditor.vue'))
+const RpAnimPreview = defineAsyncComponent(() => import('./RpAnimPreview.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { rpWrite } from '@/utils/api/tools'
 
@@ -23,14 +24,14 @@ const emit = defineEmits<{ (e: 'saved'): void }>()
 const displaySrc = ref('')
 const replacing = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
-/** 像素画板编辑模式 */
-const editMode = ref(false)
+/** 编辑模式：null = 普通预览，'pixel' = 像素画板，'anim' = 动画帧预览 */
+const editMode = ref<'pixel' | 'anim' | null>(null)
 
 watch(
   () => props.src,
   (v) => {
     displaySrc.value = v
-    editMode.value = false
+    editMode.value = null
   },
   { immediate: true },
 )
@@ -104,7 +105,11 @@ async function replaceTexture(dataUri: string) {
           <template #icon><ArrowUpTrayIcon class="h-4 w-4" /></template>
           替换纹理
         </Button>
-        <Button v-if="!editMode" size="small" @click="editMode = true">
+        <Button v-if="!editMode && animated" size="small" type="outline" @click="editMode = 'anim'">
+          <template #icon><FilmIcon class="h-4 w-4" /></template>
+          动画预览
+        </Button>
+        <Button v-if="!editMode" size="small" @click="editMode = 'pixel'">
           <template #icon><PaintBrushIcon class="h-4 w-4" /></template>
           像素画板
         </Button>
@@ -112,13 +117,21 @@ async function replaceTexture(dataUri: string) {
       <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileChange" />
     </div>
     <RpPixelEditor
-      v-if="editMode"
+      v-if="editMode === 'pixel'"
       :work-dir="workDir"
       :rel-path="relPath"
       :src="displaySrc"
       :name="name"
       @saved="emit('saved')"
-      @close="editMode = false"
+      @close="editMode = null"
+    />
+    <RpAnimPreview
+      v-else-if="editMode === 'anim'"
+      :work-dir="workDir"
+      :rel-path="relPath"
+      :src="displaySrc"
+      :name="name"
+      @close="editMode = null"
     />
     <div v-else-if="displaySrc" class="grid place-items-center rounded border border-gray-200 bg-gray-50 p-4">
       <img :src="displaySrc" class="max-h-96 max-w-full object-contain" alt="纹理预览" />
