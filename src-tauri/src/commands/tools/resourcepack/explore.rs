@@ -5,6 +5,7 @@
 //! - folder 包：直接以原目录作为工作目录；
 //! - 路径安全：读取路径先拦截 `..` 跳转，再经 canonicalize 校验必须位于工作目录内。
 
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use std::io::Read;
 use std::path::{Component, Path, PathBuf};
 
@@ -15,8 +16,8 @@ use crate::log_warn;
 use crate::state::AppState;
 
 use super::super::types::{
-    RpExportParams, RpExportResult, RpOpenParams, RpOpenResult, RpReadParams, RpReadResult,
-    RpTreeNode, RpWriteParams, RpWriteResult,
+    RpExportParams, RpExportResult, RpOpenParams, RpOpenResult, RpReadManyParams, RpReadManyResult,
+    RpReadParams, RpReadResult, RpTreeNode, RpWriteParams, RpWriteResult,
 };
 use super::convert::unzip_to_dir;
 use super::convert::zip_directory_with_comment;
@@ -77,6 +78,33 @@ pub async fn rp_read(_state: &AppState, params: RpReadParams) -> Result<serde_js
             }
         }
     };
+    serde_json::to_value(&result).map_err(|e| e.to_string())
+}
+
+/// 批量读取模型与关联纹理：blockstate → 模型（含 parent 链）→ 被引用纹理 png，
+/// 供前端构建 lodestone Resources 做 3D 预览。缺失/损坏的关联文件静默跳过，不阻塞整批。
+pub async fn rp_read_many(
+    _state: &AppState,
+    params: RpReadManyParams,
+) -> Result<serde_json::Value, String> {
+    let result = match read_many_inner(&params) {
+        Ok(r) => r,
+        Err(e) => {
+            log_warn!("[RpReadMany] failed: root={} err={}", params.rel_path, e);
+            RpReadManyResult {
+                root: params.rel_path.clone(),
+                files: BTreeMap::new(),
+                error: e,
+            }
+        }
+    };
+    if result.error.is_empty() {
+        log_info!(
+            "[RpReadMany] success: root={} files={}",
+            result.root,
+            result.files.len()
+        );
+    }
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
@@ -208,6 +236,194 @@ fn read_inner(params: &RpReadParams) -> Result<RpReadResult, String> {
             error: String::new(),
         })
     }
+}
+
+fn read_many_inner(params: &RpReadManyParams) -> Result<RpReadManyResult, String> {
+    let work_dir = PathBuf::from(&params.work_dir);
+    resolve_in_work_dir(&work_dir, &params.rel_path)?;
+    let lower = params.rel_path.to_lowercase();
+    if !lower.contains("/blockstates/") && !lower.contains("/models/") {
+        return Err("仅支持 blockstates 或 models 目录下的 JSON 文件".to_string());
+    }
+
+    let mut files: BTreeMap<String, RpReadResult> = BTreeMap::new();
+    let mut visited: HashSet<String> = HashSet::new();
+    let mut queue: VecDeque<String> = VecDeque::new();
+    queue.push_back(params.rel_path.clone());
+
+    while let Some(rel) = queue.pop_front() {
+        if !visited.insert(rel.clone()) {
+            continue;
+        }
+        let Some(text) = read_text_limited(&work_dir, &rel) else {
+            continue; // 缺失（如 vanilla parent）/超限/非文本 → 跳过
+        };
+        let parsed = serde_json::from_str::<serde_json::Value>(&text);
+        // 起始文件 JSON 损坏时直接报错，关联文件损坏则跳过
+        if parsed.is_err() && rel == params.rel_path {
+            return Err(format!("JSON 解析失败: {}", parsed.unwrap_err()));
+        }
+        let Ok(v) = parsed else { continue };
+        let default_ns = namespace_of(&rel).unwrap_or("minecraft");
+
+        files.insert(
+            rel.clone(),
+            RpReadResult {
+                kind: "text".to_string(),
+                content: text,
+                error: String::new(),
+            },
+        );
+
+        if rel.to_lowercase().contains("/blockstates/") {
+            for model in blockstate_model_refs(&v) {
+                queue_model(&mut queue, &model, default_ns);
+            }
+        } else {
+            let (parent, textures) = model_refs(&v);
+            if let Some(p) = parent {
+                queue_model(&mut queue, &p, default_ns);
+            }
+            for tex in textures {
+                let tex_rel = texture_rel(&tex, default_ns);
+                if visited.contains(&tex_rel) {
+                    continue;
+                }
+                visited.insert(tex_rel.clone());
+                if let Some(content) = read_media_data_uri(&work_dir, &tex_rel) {
+                    files.insert(
+                        tex_rel,
+                        RpReadResult {
+                            kind: "data_uri".to_string(),
+                            content,
+                            error: String::new(),
+                        },
+                    );
+                }
+            }
+        }
+    }
+
+    Ok(RpReadManyResult {
+        root: params.rel_path.clone(),
+        files,
+        error: String::new(),
+    })
+}
+
+/// 模型 id 可能无命名空间：优先当前文件命名空间，再补 minecraft，缺失项由读取时跳过
+fn queue_model(queue: &mut VecDeque<String>, raw: &str, default_ns: &str) {
+    let (ns, path) = split_id(raw, default_ns);
+    queue.push_back(format!("assets/{}/models/{}.json", ns, path));
+    if raw.find(':').is_none() && ns != "minecraft" {
+        queue.push_back(format!("assets/minecraft/models/{}.json", path));
+    }
+}
+
+fn texture_rel(raw: &str, default_ns: &str) -> String {
+    let (ns, path) = split_id(raw, default_ns);
+    format!("assets/{}/textures/{}.png", ns, path)
+}
+
+/// "ns:path" 或 "path"（用默认命名空间补全）
+fn split_id(raw: &str, default_ns: &str) -> (String, String) {
+    let trimmed = raw.trim();
+    match trimmed.find(':') {
+        Some(idx) => (trimmed[..idx].to_string(), trimmed[idx + 1..].to_string()),
+        None => (default_ns.to_string(), trimmed.to_string()),
+    }
+}
+
+/// 从相对路径取命名空间（assets/<ns>/...）
+fn namespace_of(rel: &str) -> Option<&str> {
+    let mut parts = rel.split('/');
+    match (parts.next(), parts.next()) {
+        (Some("assets"), Some(ns)) if !ns.is_empty() => Some(ns),
+        _ => None,
+    }
+}
+
+/// blockstate JSON 的模型引用：variants 与 multipart.apply
+fn blockstate_model_refs(v: &serde_json::Value) -> Vec<String> {
+    let mut refs = Vec::new();
+    if let Some(variants) = v.get("variants").and_then(|x| x.as_object()) {
+        for entry in variants.values() {
+            collect_model_entry(entry, &mut refs);
+        }
+    }
+    if let Some(multipart) = v.get("multipart").and_then(|x| x.as_array()) {
+        for part in multipart {
+            if let Some(apply) = part.get("apply") {
+                collect_model_entry(apply, &mut refs);
+            }
+        }
+    }
+    refs
+}
+
+/// model 引用的三种形态：字符串 / {model,..} / 数组
+fn collect_model_entry(v: &serde_json::Value, out: &mut Vec<String>) {
+    match v {
+        serde_json::Value::String(s) => out.push(s.clone()),
+        serde_json::Value::Object(o) => {
+            if let Some(m) = o.get("model").and_then(|x| x.as_str()) {
+                out.push(m.to_string());
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for item in arr {
+                if let Some(m) = item.get("model").and_then(|x| x.as_str()) {
+                    out.push(m.to_string());
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// model JSON 的 parent 与纹理引用（跳过 `#key` 内部引用）
+fn model_refs(v: &serde_json::Value) -> (Option<String>, Vec<String>) {
+    let parent = v
+        .get("parent")
+        .and_then(|x| x.as_str())
+        .map(|s| s.to_string());
+    let mut textures = Vec::new();
+    if let Some(tex) = v.get("textures").and_then(|x| x.as_object()) {
+        for val in tex.values() {
+            if let Some(s) = val.as_str() {
+                if !s.is_empty() && !s.starts_with('#') {
+                    textures.push(s.to_string());
+                }
+            }
+        }
+    }
+    (parent, textures)
+}
+
+/// 读文本（限 MAX_TEXT_SIZE），缺失/超限/非 UTF-8 返回 None
+fn read_text_limited(work_dir: &Path, rel: &str) -> Option<String> {
+    let target = resolve_in_work_dir(work_dir, rel).ok()?;
+    if std::fs::metadata(&target).ok()?.len() > MAX_TEXT_SIZE {
+        return None;
+    }
+    std::fs::read_to_string(&target).ok()
+}
+
+/// 读图片为 base64 data URI（限 MAX_MEDIA_SIZE），缺失/超限/读取失败返回 None
+fn read_media_data_uri(work_dir: &Path, rel: &str) -> Option<String> {
+    let target = resolve_in_work_dir(work_dir, rel).ok()?;
+    if std::fs::metadata(&target).ok()?.len() > MAX_MEDIA_SIZE {
+        return None;
+    }
+    let mut bytes = Vec::new();
+    std::fs::File::open(&target)
+        .ok()?
+        .read_to_end(&mut bytes)
+        .ok()?;
+    Some(format!(
+        "data:image/png;base64,{}",
+        base64::engine::general_purpose::STANDARD.encode(&bytes)
+    ))
 }
 
 /// 写回包内单文件：text 原文 / base64 二进制（复用 rp_read 的路径安全校验）

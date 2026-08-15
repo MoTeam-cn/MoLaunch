@@ -6,8 +6,8 @@ use std::io::Write;
 use base64::Engine;
 
 use super::{
-    build_tree, classify_file, export_inner, pack_format_to_version, resolve_in_work_dir,
-    write_inner, RpExportParams, RpWriteParams,
+    build_tree, classify_file, export_inner, pack_format_to_version, read_many_inner,
+    resolve_in_work_dir, write_inner, RpExportParams, RpReadManyParams, RpWriteParams,
 };
 
 /// 同步运行异步逻辑（测试用）
@@ -216,6 +216,103 @@ fn test_export_zip_roundtrip_preserves_comment() {
     assert_eq!(archive.comment(), b"loader-comment");
     assert_eq!(archive.len(), 2);
     assert!(archive.by_name("assets/minecraft/lang/zh_cn.json").is_ok());
+
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn test_read_many_blockstate_collects_model_parent_texture() {
+    let dir = std::env::temp_dir().join(format!("rp-readmany-{}", std::process::id()));
+    fs::create_dir_all(dir.join("assets/test/blockstates")).unwrap();
+    fs::create_dir_all(dir.join("assets/test/models/block")).unwrap();
+    fs::create_dir_all(dir.join("assets/test/textures/block")).unwrap();
+    fs::write(
+        dir.join("assets/test/blockstates/chest.json"),
+        r#"{"variants":{"facing=north":{"model":"block/chest"},"facing=east":[{"model":"test:block/chest2","y":90}]},"multipart":[{"when":{"a":"1"},"apply":{"model":"block/chest2"}}]}"#,
+    )
+    .unwrap();
+    fs::write(
+        dir.join("assets/test/models/block/chest.json"),
+        r##"{"parent":"block/chest_base","textures":{"all":"test:block/chest_front","particle":"#all"}}"##,
+    )
+    .unwrap();
+    fs::write(
+        dir.join("assets/test/models/block/chest_base.json"),
+        r#"{"parent":"block/cube_all","textures":{"all":"block/chest_front"}}"#,
+    )
+    .unwrap();
+    fs::write(
+        dir.join("assets/test/models/block/chest2.json"),
+        r#"{"parent":"block/chest"}"#,
+    )
+    .unwrap();
+    fs::write(
+        dir.join("assets/test/textures/block/chest_front.png"),
+        b"png1",
+    )
+    .unwrap();
+
+    let r = read_many_inner(&RpReadManyParams {
+        work_dir: dir.to_string_lossy().to_string(),
+        rel_path: "assets/test/blockstates/chest.json".to_string(),
+    })
+    .unwrap();
+    assert!(r.error.is_empty());
+    assert_eq!(r.root, "assets/test/blockstates/chest.json");
+
+    // 根 blockstate + 3 个模型 + 1 张纹理
+    assert_eq!(r.files.len(), 5);
+    assert!(r.files.contains_key("assets/test/blockstates/chest.json"));
+    assert!(r.files.contains_key("assets/test/models/block/chest.json"));
+    assert!(r
+        .files
+        .contains_key("assets/test/models/block/chest_base.json"));
+    assert!(r.files.contains_key("assets/test/models/block/chest2.json"));
+    // 纹理带命名空间引用
+    let tex = r
+        .files
+        .get("assets/test/textures/block/chest_front.png")
+        .expect("纹理");
+    assert_eq!(tex.kind, "data_uri");
+    assert!(tex.content.starts_with("data:image/png;base64,"));
+
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn test_read_many_skips_missing_parent_and_texture() {
+    let dir = std::env::temp_dir().join(format!("rp-readmany-skip-{}", std::process::id()));
+    fs::create_dir_all(dir.join("assets/foo/models/item")).unwrap();
+    fs::write(
+        dir.join("assets/foo/models/item/sword.json"),
+        r##"{"parent":"item/handheld","textures":{"layer0":"foo:item/sword","particle":"#layer0"}}"##,
+    )
+    .unwrap();
+
+    // 模型只自身在包内：vanilla parent（item/handheld）与纹理均缺失，应静默跳过不报错
+    let r = read_many_inner(&RpReadManyParams {
+        work_dir: dir.to_string_lossy().to_string(),
+        rel_path: "assets/foo/models/item/sword.json".to_string(),
+    })
+    .unwrap();
+    assert!(r.error.is_empty());
+    assert_eq!(r.files.len(), 1);
+    assert!(r.files.contains_key("assets/foo/models/item/sword.json"));
+
+    fs::remove_dir_all(&dir).unwrap();
+}
+
+#[test]
+fn test_read_many_rejects_non_model_root() {
+    let dir = std::env::temp_dir().join(format!("rp-readmany-root-{}", std::process::id()));
+    fs::create_dir_all(&dir).unwrap();
+    fs::write(dir.join("pack.mcmeta"), r#"{"pack":{"pack_format":15}}"#).unwrap();
+
+    let r = read_many_inner(&RpReadManyParams {
+        work_dir: dir.to_string_lossy().to_string(),
+        rel_path: "pack.mcmeta".to_string(),
+    });
+    assert!(r.is_err());
 
     fs::remove_dir_all(&dir).unwrap();
 }

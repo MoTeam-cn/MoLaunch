@@ -1,3 +1,5 @@
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 /// 资源包编辑器 - 打开请求参数
@@ -74,6 +76,26 @@ pub struct RpReadResult {
     pub kind: String,
     /// 文件内容
     pub content: String,
+    /// 失败原因（成功时为空）
+    pub error: String,
+}
+
+/// 资源包编辑器 - 批量读取模型与关联纹理请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpReadManyParams {
+    /// 工作目录（rp_open 返回）
+    pub work_dir: String,
+    /// 起始文件：blockstates/*.json 或 models/**/*.json（相对包根）
+    pub rel_path: String,
+}
+
+/// 资源包编辑器 - 批量读取结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpReadManyResult {
+    /// 起始文件相对路径
+    pub root: String,
+    /// rel_path -> 文件内容（model/blockstate 为 text，关联纹理为 data_uri）
+    pub files: BTreeMap<String, RpReadResult>,
     /// 失败原因（成功时为空）
     pub error: String,
 }
