@@ -3,14 +3,14 @@
  * 联机主页
  *
  * 采用与 [Settings.vue](src/views/Settings.vue) 一致的侧边栏布局：
- * - 左侧 NavSidebar：设备 / 房间管理（房间管理下有「创建房间」「加入房间」两个子项）
- * - 右侧内容区：根据 activeCategory 切换 OnlineDevicePanel / RoomManager
+ * - 左侧 NavSidebar：设备 / 联机大厅 / 创建房间 / 加入房间（+ FRP 子菜单）
+ * - 右侧内容区：根据 activeCategory 切换 OnlineDevicePanel / LobbyBrowser / RoomManager / FRP 面板
  *
  * 状态联动：
  * - 未注册 / 未登录时仅显示「设备」分类
- * - 登录成功（isReady=true）后自动追加「房间管理」分类并展开子项，选中「创建房间」
+ * - 登录成功（isReady=true）后自动追加「联机大厅」「创建房间」「加入房间」分类并默认选中「创建房间」
  * - 未就绪（退出登录等）自动切回「设备」分类；JWT 过期不切回（后端自动续期兜底）
- * - 已进入房间时（role=host/guest），RoomManager 自动显示对应面板
+ * - 已进入房间时（role=host/guest），RoomManager 自动显示对应面板（创建/加入分类均路由到 RoomManager）
  *
  * 拆分（保持主文件 ≤ 300 行约束）：
  * - useOnlineNav：导航分类配置 + categories/badge/activeDesc/activeLabel + watch 联动
@@ -21,7 +21,6 @@
 import { ref, computed, onMounted, provide, defineAsyncComponent } from 'vue'
 import { useRouter } from 'vue-router'
 import { useOnlineStore } from '@/stores/online'
-import { getOnlineSession } from '@/composables/online/onlineSession'
 const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
 const OnlineDevicePanel = defineAsyncComponent(() => import('@/components/online/OnlineDevicePanel.vue'))
 const RoomManager = defineAsyncComponent(() => import('@/components/online/RoomManager.vue'))
@@ -36,29 +35,10 @@ import { useOnlineNav, type OnlineCategoryId } from '@/composables/useOnlineNav'
 import { hasAgreedToday } from '@/utils/disclaimer'
 import { showWarning } from '@/utils/modal'
 
-/**
- * WebRTC 实例全局化（联机会话挂载）
- *
- * 原实现：实例提升到 Online.vue 页面级，离开联机页（路由切走）时 Online.vue
- * 卸载 → onUnmounted 触发 close() → P2P 断开、虚拟网卡丢失。
- *
- * 现实现：实例由全局联机会话 onlineSession 持有（App 级初始化，常驻整个应用
- * 生命周期），Online.vue 仅从会话取出实例并 provide。切换侧边栏菜单或离开
- * 联机页面都不会断开连接，回到联机页直接恢复。
- *
- * provide key 与原 RoomManager.vue 保持一致（'hostMesh' / 'guestWebrtc'），
- * 子组件 RoomHostPanel / RoomGuestPanel 的 inject 链路无需改动。
- */
-const HOST_MESH_KEY = 'hostMesh'
-const GUEST_WEBRTC_KEY = 'guestWebrtc'
-const { hostMesh, guestWebrtc } = getOnlineSession()
-provide(HOST_MESH_KEY, hostMesh)
-provide(GUEST_WEBRTC_KEY, guestWebrtc)
-
 const router = useRouter()
 const onlineStore = useOnlineStore()
 
-/** 当前激活分类（device / lobby / create / join / room_details / providers / tunnels / auth / logs） */
+/** 当前激活分类（device / lobby / create / join / providers / tunnels / auth / logs） */
 const activeCategory = ref<OnlineCategoryId>('device')
 
 /** 使用协议抽屉：当日未同意过协议时进入联机页弹出（同意后存 localStorage，次日重新提醒） */
@@ -100,8 +80,6 @@ onMounted(() => {
   // 云端未连接时不发起任何网络请求，避免无意义失败
   if (!onlineStore.cloudConnected) return
   void onlineStore.refreshStatus()
-  // 进入联机页自动检测 NAT 类型（已有结果时跳过，结果保留在 store 中侧边栏切换不丢失）
-  void onlineStore.detectNat()
 })
 
 function goSettings() {
@@ -148,11 +126,13 @@ function handleCategoryChange(id: string): void {
 // OnlineDevicePanel / LobbyBrowser / RoomManager 各自缓存，
 // 切换侧边栏菜单时仅 deactivate → activate，不触发 onUnmounted，
 // 表单输入 / 搜索结果 / 分页位置等组件级状态完整保留。
-// 房间连接（WebRTC 实例）由 Online.vue provide，不受影响。
+// 联机连接由全局会话（App 级初始化）持有，不受页面切换影响。
 const currentComponent = computed(() => {
   switch (activeCategory.value) {
     case 'device': return OnlineDevicePanel
     case 'lobby': return LobbyBrowser
+    case 'create':
+    case 'join': return RoomManager
     case 'providers': return ProviderList
     case 'tunnels': return TunnelManager
     case 'auth': return AuthCenter
@@ -163,11 +143,10 @@ const currentComponent = computed(() => {
 
 /** 仅 RoomManager 需要 mode prop，其余组件传空对象避免 fallthrough */
 const currentProps = computed<Record<string, unknown>>(() => {
-  if (activeCategory.value === 'device' || activeCategory.value === 'lobby') return {}
-  const mode: 'create' | 'join' = activeCategory.value === 'room_details'
-    ? (onlineStore.roomState.role === 'guest' ? 'join' : 'create')
-    : (activeCategory.value === 'join' ? 'join' : 'create')
-  return { mode }
+  if (activeCategory.value === 'create' || activeCategory.value === 'join') {
+    return { mode: activeCategory.value }
+  }
+  return {}
 })
 </script>
 
@@ -180,7 +159,7 @@ const currentProps = computed<Record<string, unknown>>(() => {
   -->
   <div class="h-full">
     <!--
-      云端离线时不再整页遮罩：页面可进入，房间管理/联机大厅由 useOnlineNav 置为封禁态
+      云端离线时不再整页遮罩：页面可进入，联机大厅/创建房间/加入房间由 useOnlineNav 置为封禁态
       （灰色 + 锁图标，点击弹窗告知原因）；FRP（第三方隧道）不依赖 MoLaunch 云端仍可用。
     -->
     <div class="flex h-full rounded-xl overflow-hidden bg-white shadow-sm">
