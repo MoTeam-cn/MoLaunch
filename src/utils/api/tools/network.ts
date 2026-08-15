@@ -85,3 +85,42 @@ export interface ListOpenPortsResult {
 export function listOpenPorts(): Promise<ListOpenPortsResult> {
   return toolsManager<ListOpenPortsResult>(TOOLS_ACTIONS.LIST_OPEN_PORTS)
 }
+
+// ==================== 正版玩家皮肤 ====================
+
+/** 正版玩家皮肤获取结果 */
+export interface SkinFetchResult {
+  /** 玩家名（正版 API 返回的规范化名称） */
+  name: string
+  /** 玩家 UUID（32 位十六进制，无连字符） */
+  uuid: string
+  /** 皮肤模型："slim"（Alex 细手臂）| "classic"（Steve 粗手臂） */
+  skin_model: string
+  /** 皮肤图片地址 */
+  skin_url: string
+  /** 皮肤 PNG（base64 data URI，供直接预览） */
+  skin_image: string
+  /** 披风地址（无披风时为 null） */
+  cape_url: string | null
+  /** 披风 PNG（base64 data URI，无披风时为 null） */
+  cape_image: string | null
+  /** 失败原因（成功时为空） */
+  error: string
+}
+
+/** 获取正版玩家皮肤（输入玩家名，返回 UUID / 模型 / 皮肤与披风图片） */
+export function skinFetch(name: string): Promise<SkinFetchResult> {
+  return toolsManager<SkinFetchResult>(TOOLS_ACTIONS.SKIN_FETCH, { name })
+}
+
+/**
+ * 保存皮肤图片到本地路径（base64 → PNG 文件）
+ * @param savePath 保存路径（含文件名，如 D:/skin/Steve.png）
+ * @param imageBase64 图片 base64（不含 data URI 前缀）
+ */
+export function skinSaveImage(savePath: string, imageBase64: string): Promise<{ success: boolean }> {
+  return toolsManager<{ success: boolean }>(TOOLS_ACTIONS.SKIN_SAVE_IMAGE, {
+    save_path: savePath,
+    image_base64: imageBase64,
+  })
+}

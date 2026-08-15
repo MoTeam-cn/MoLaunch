@@ -8,18 +8,20 @@
  * - 坐标距离计算
  * - 游戏内调色板
  * - 版本 JSON 编辑
+ * - 正版玩家皮肤下载
  *
  * 深链支持：URL `?subtab=palette` 可直接切到对应子页签。
  */
 import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
-import { CodeBracketIcon, FaceSmileIcon, MapPinIcon, SwatchIcon, WrenchScrewdriverIcon } from '@heroicons/vue/24/outline'
+import { CodeBracketIcon, FaceSmileIcon, MapPinIcon, SwatchIcon, UserIcon, WrenchScrewdriverIcon } from '@heroicons/vue/24/outline'
 const LuckyTool = defineAsyncComponent(() => import('../quick-tools/LuckyTool.vue'))
 const QuickTools = defineAsyncComponent(() => import('../QuickTools.vue'))
 const CoordCalculator = defineAsyncComponent(() => import('./calc/CoordCalculator.vue'))
 const ColorPalette = defineAsyncComponent(() => import('./calc/ColorPalette.vue'))
 const VersionJsonEditor = defineAsyncComponent(() => import('./data/VersionJsonEditor.vue'))
+const SkinFetcher = defineAsyncComponent(() => import('./network/SkinFetcher.vue'))
 
 const subTabs = [
   { id: 'luck', label: '今日人品', icon: FaceSmileIcon },
@@ -27,6 +29,7 @@ const subTabs = [
   { id: 'coord', label: '坐标计算', icon: MapPinIcon },
   { id: 'palette', label: '调色板', icon: SwatchIcon },
   { id: 'version-json', label: '版本 JSON', icon: CodeBracketIcon },
+  { id: 'skin', label: '皮肤下载', icon: UserIcon },
 ]
 const activeSubTab = ref('luck')
 
@@ -50,7 +53,8 @@ onMounted(() => {
         <QuickTools v-else-if="activeSubTab === 'quick'" />
         <CoordCalculator v-else-if="activeSubTab === 'coord'" />
         <ColorPalette v-else-if="activeSubTab === 'palette'" />
-        <VersionJsonEditor v-else />
+        <VersionJsonEditor v-else-if="activeSubTab === 'version-json'" />
+        <SkinFetcher v-else />
       </div>
     </div>
   </div>

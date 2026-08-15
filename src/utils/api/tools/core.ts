@@ -67,6 +67,9 @@ export const TOOLS_ACTIONS = {
   TCP_CHECK: 'tcp_check',
   // 列出本机监听端口（供 Frp 内网端口选择）
   LIST_OPEN_PORTS: 'list_open_ports',
+  // 正版玩家皮肤获取 / 保存
+  SKIN_FETCH: 'skin_fetch',
+  SKIN_SAVE_IMAGE: 'skin_save_image',
   // 选择器子窗口（通用 HTML 渲染 + on_navigation 选择回调）
   OPEN_PICKER_WINDOW: 'open_picker_window',
   // NBT 数据查看与编辑
