@@ -106,7 +106,7 @@ async function doSave() {
     </div>
     <textarea
       v-model="text"
-      rows="16"
+      rows="12"
       spellcheck="false"
       class="w-full resize-y rounded border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
       placeholder="文件内容..."
