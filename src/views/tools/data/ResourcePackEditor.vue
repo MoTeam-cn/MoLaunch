@@ -1,9 +1,10 @@
 <script setup lang="ts">
 /**
- * 资源包可视化编辑器 - M1 查看器闭环
+ * 资源包可视化编辑器 - M1 查看器闭环 + M2 编辑闭环
  *
  * 打开资源包（resourcepacks 目录列表 / 本地 ZIP / 文件夹）→ 包信息栏 +
- * 左文件树右内容分发（mcmeta 表单 / 纹理 2D / 语言表格 / 声音试听 / JSON 文本）。
+ * 左文件树右内容分发（mcmeta 表单编辑 / 纹理 2D 预览与替换 / 语言表格编辑 /
+ * JSON 文本编辑 / 声音试听）→ 保存回原包 / 另存为 ZIP。
  */
 import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
@@ -13,12 +14,15 @@ const RpMcmetaForm = defineAsyncComponent(() => import('./RpMcmetaForm.vue'))
 const RpTexturePreview = defineAsyncComponent(() => import('./RpTexturePreview.vue'))
 const RpLangTable = defineAsyncComponent(() => import('./RpLangTable.vue'))
 const RpSoundPreview = defineAsyncComponent(() => import('./RpSoundPreview.vue'))
-import { toastError } from '@/utils/toast'
-import { pickFile, pickDirectory } from '@/utils/fileDialog'
+const RpTextEditor = defineAsyncComponent(() => import('./RpTextEditor.vue'))
+import { toastError, toastSuccess } from '@/utils/toast'
+import { pickFile, pickDirectory, pickSavePath } from '@/utils/fileDialog'
 import { formatBytes } from '@/utils/format'
-import { resourcepackList, rpOpen, rpRead } from '@/utils/api/tools'
+import { showConfirmAsync } from '@/utils/modal'
+import { resourcepackList, rpOpen, rpRead, rpExport } from '@/utils/api/tools'
 import type { RpOpenResult, RpReadResult, RpTreeNode, ResourcePackItem } from '@/utils/api/tools'
 import {
+  ArrowDownTrayIcon,
   ChevronDownIcon,
   CubeIcon,
   FolderOpenIcon,
@@ -32,9 +36,10 @@ const fileContent = ref<RpReadResult | null>(null)
 const reading = ref(false)
 const expandedSet = ref<Set<string>>(new Set())
 const listOpen = ref(true)
+const exporting = ref(false)
 
 const fileCount = computed(() => countFiles(current.value?.tree))
-const canReadText = computed(() =>
+const canEditText = computed(() =>
   ['json', 'model', 'text'].includes(selectedNode.value?.file_type ?? ''),
 )
 const textContent = computed(() =>
@@ -107,7 +112,6 @@ async function selectNode(node: RpTreeNode) {
   if (node.kind !== 'file') return
   selectedNode.value = node
   fileContent.value = null
-  if (node.file_type === 'mcmeta') return
   if (!current.value) return
   reading.value = true
   try {
@@ -121,6 +125,73 @@ async function selectNode(node: RpTreeNode) {
     toastError(`读取失败: ${e instanceof Error ? e.message : String(e)}`)
   } finally {
     reading.value = false
+  }
+}
+
+function onMcmetaSaved(meta: { packFormat: number; description: string | null }) {
+  if (!current.value) return
+  const old = current.value.pack_format
+  current.value.pack_format = meta.packFormat
+  current.value.description = meta.description
+  if (old !== meta.packFormat) current.value.mc_version = null
+}
+
+/** zip 会话保存回原 zip（覆盖原包前二次确认） */
+async function saveZip() {
+  const c = current.value
+  if (!c || !c.is_zip || !c.src_path || exporting.value) return
+  const ok = await showConfirmAsync(
+    '保存 ZIP',
+    `将把当前编辑内容打包并覆盖原 ZIP：\n${c.src_path}\n确定保存？`,
+  )
+  if (!ok) return
+  exporting.value = true
+  try {
+    const res = await rpExport({
+      work_dir: c.work_dir,
+      path: c.src_path,
+      format: 'zip',
+      src_path: c.src_path,
+    })
+    if (!res.success) {
+      toastError(res.message)
+      return
+    }
+    toastSuccess(`已保存 ZIP：${res.output_path}`)
+  } catch (e) {
+    toastError(`导出失败: ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    exporting.value = false
+  }
+}
+
+/** 另存为 ZIP（pickSavePath 选择目标路径） */
+async function saveAsZip() {
+  const c = current.value
+  if (!c || exporting.value) return
+  const path = await pickSavePath({
+    title: '导出资源包 ZIP',
+    filters: [{ name: 'ZIP', extensions: ['zip'] }],
+    defaultPath: `${c.name}.zip`,
+  })
+  if (!path) return
+  exporting.value = true
+  try {
+    const res = await rpExport({
+      work_dir: c.work_dir,
+      path,
+      format: 'zip',
+      src_path: c.src_path,
+    })
+    if (!res.success) {
+      toastError(res.message)
+      return
+    }
+    toastSuccess(`已导出：${res.output_path}`)
+  } catch (e) {
+    toastError(`导出失败: ${e instanceof Error ? e.message : String(e)}`)
+  } finally {
+    exporting.value = false
   }
 }
 </script>
@@ -196,6 +267,28 @@ async function selectNode(node: RpTreeNode) {
             <span v-if="current.description"> · {{ current.description }}</span>
           </p>
         </div>
+        <div class="flex shrink-0 items-center gap-2">
+          <Button
+            v-if="current.is_zip && current.src_path"
+            size="small"
+            type="outline"
+            :loading="exporting"
+            :disabled="exporting"
+            @click="saveZip"
+          >
+            <template #icon><ArrowDownTrayIcon class="h-4 w-4" /></template>
+            保存 ZIP
+          </Button>
+          <Button
+            size="small"
+            :loading="exporting"
+            :disabled="exporting"
+            @click="saveAsZip"
+          >
+            <template #icon><ArrowDownTrayIcon class="h-4 w-4" /></template>
+            另存为 ZIP
+          </Button>
+        </div>
       </div>
 
       <div class="grid grid-cols-1 border-t border-gray-200 md:grid-cols-[280px_1fr]">
@@ -214,34 +307,40 @@ async function selectNode(node: RpTreeNode) {
         <div class="max-h-[560px] overflow-y-auto p-4">
           <RpMcmetaForm
             v-if="selectedNode?.file_type === 'mcmeta'"
-            :pack-format="current.pack_format"
+            :work-dir="current.work_dir"
+            :rel-path="selectedNode.rel_path"
+            :content="textContent"
             :mc-version="current.mc_version"
-            :description="current.description"
+            @saved="onMcmetaSaved"
           />
           <RpTexturePreview
             v-else-if="selectedNode?.file_type === 'png'"
+            :work-dir="current.work_dir"
+            :rel-path="selectedNode.rel_path"
             :src="mediaContent"
             :animated="selectedNode.animated"
             :name="selectedNode.name"
           />
           <RpLangTable
             v-else-if="selectedNode?.file_type === 'lang'"
+            :work-dir="current.work_dir"
+            :rel-path="selectedNode.rel_path"
             :content="textContent"
           />
           <RpSoundPreview
             v-else-if="selectedNode?.file_type === 'ogg'"
             :src="mediaContent"
           />
-          <div v-else-if="selectedNode && canReadText" class="space-y-2">
-            <div class="flex items-center gap-2">
-              <h4 class="text-sm font-medium text-gray-700">{{ selectedNode.name }}</h4>
-              <span class="text-xs text-gray-400">{{ selectedNode.rel_path }}</span>
-            </div>
-            <pre
-              v-if="textContent"
-              class="max-h-[500px] overflow-auto rounded border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700"
-            >{{ textContent }}</pre>
-            <p v-else-if="reading" class="text-sm text-gray-400">读取中…</p>
+          <div v-else-if="selectedNode && canEditText">
+            <p v-if="reading && !fileContent" class="py-8 text-center text-sm text-gray-400">读取中…</p>
+            <RpTextEditor
+              v-else
+              :work-dir="current.work_dir"
+              :rel-path="selectedNode.rel_path"
+              :name="selectedNode.name"
+              :file-type="selectedNode.file_type"
+              :content="textContent"
+            />
           </div>
           <div v-else-if="selectedNode" class="flex flex-col items-center justify-center gap-1 py-16 text-gray-400">
             <p class="text-sm">暂不支持预览该类型文件</p>
