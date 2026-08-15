@@ -150,9 +150,9 @@ onMounted(() => {
           {{ connStateText }}
         </span>
       </div>
-      <div v-if="easytier.error" class="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 flex items-start gap-1.5">
+      <div v-if="easytier.error.value" class="mt-2 p-2 bg-red-50 rounded text-xs text-red-700 flex items-start gap-1.5">
         <ExclamationTriangleIcon class="w-3.5 h-3.5 mt-0.5 shrink-0" />
-        <span>{{ easytier.error }}</span>
+        <span>{{ easytier.error.value }}</span>
       </div>
     </Card>
 
@@ -178,7 +178,7 @@ onMounted(() => {
         </div>
       </div>
       <div class="mt-3 pt-3 border-t border-gray-100">
-        <Button type="outline" long size="small" :loading="session.scaffolding.probing" @click="reProbe">
+        <Button type="outline" long size="small" :loading="session.scaffolding.probing.value" @click="reProbe">
           <template #icon><ArrowPathIcon class="w-3.5 h-3.5" /></template>
           重新探测进服地址
         </Button>

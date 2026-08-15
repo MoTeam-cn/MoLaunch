@@ -10,6 +10,7 @@ import { invoke } from '@tauri-apps/api/core'
 import * as tauri from '@/utils/tauri'
 import { safeCall } from '@/utils/async'
 import { useOnlineStore } from '@/stores/online'
+import { getOnlineSession } from '@/composables/online/onlineSession'
 import { applyPendingUpdate, checkForUpdate } from '@/utils/updater'
 import { getConfigMap, applyConfig } from '@/utils/api/config'
 import { toastError } from '@/utils/toast'
@@ -109,17 +110,23 @@ async function doExit() {
   exiting.value = true
   // 关闭窗口前先保存配置
   await safeCall(() => tauri.saveConfigToFile(), 'save config before close')
-  // 联机状态清理：根据角色通知服务端退出房间，避免僵尸房间/参与者记录
+  // 联机状态清理：房主先停联机中心再关闭登记，房客停 easytier 并清空本地状态
   // 3s 超时保护，网络问题不卡住关窗；API 失败不阻塞关窗（服务端 keepalive 超时兜底）
   const role = onlineStore.roomState.role
   if (role === 'host') {
     await Promise.race([
-      onlineStore.hostCloseRoom().catch(() => toastError('离开房间失败')),
+      getOnlineSession().host.handleCloseRoom().catch(() => toastError('离开房间失败')),
       new Promise<void>((r) => setTimeout(r, 3000)),
     ])
   } else if (role === 'guest') {
     await Promise.race([
-      onlineStore.guestLeaveRoom().catch(() => toastError('离开房间失败')),
+      (async () => {
+        try {
+          await getOnlineSession().easytier.stop()
+        } finally {
+          onlineStore.resetRoomState()
+        }
+      })().catch(() => toastError('离开房间失败')),
       new Promise<void>((r) => setTimeout(r, 3000)),
     ])
   }

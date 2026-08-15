@@ -121,8 +121,8 @@ async function initApp() {
   isRestoring.value = false
 
   // 恢复重启前的会话快照（页面 + 房间，SDK 加密存储）
-  // 房主：roomState 恢复后 RoomHostPanel 挂载会自动重建 TUN 与 Offer 轮询
-  // 加入方：roomState 恢复 + 转存重连密码，RoomGuestPanel 挂载后自动重连
+  // 房主：roomState 恢复后 RoomHostPanel 展示房间信息（联机中心需在面板内重新拉起）
+  // 加入方：roomState 恢复 + 转存重连密码，RoomGuestPanel 挂载后自动探测进服地址
   const snapshot = await consumeRelaunchSnapshot()
   if (snapshot) {
     if (snapshot.room?.role) {

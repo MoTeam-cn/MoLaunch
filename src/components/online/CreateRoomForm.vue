@@ -65,7 +65,7 @@ const currentStepIndex = computed(() => createSteps.findIndex((s) => s.key === c
         <!-- 房间备注 -->
         <div class="flex items-center gap-3">
           <label class="w-24 text-xs text-gray-600 shrink-0">房间备注</label>
-          <Input v-model="createForm.remark" placeholder="例如：开黑速通，随到随玩（选填）" maxlength="40" />
+          <Input v-model="createForm.remark" placeholder="例如：开黑速通，随到随玩（选填）" :maxlength="40" />
         </div>
         <!-- 房间类型：公开 / 私密 -->
         <div class="flex items-center gap-3">
