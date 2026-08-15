@@ -14,8 +14,15 @@ use crate::log_info;
 use crate::log_warn;
 use crate::state::AppState;
 
-use super::super::types::{RpOpenParams, RpOpenResult, RpReadParams, RpReadResult, RpTreeNode};
+use super::super::types::{
+    RpExportParams, RpExportResult, RpOpenParams, RpOpenResult, RpReadParams, RpReadResult,
+    RpTreeNode, RpWriteParams, RpWriteResult,
+};
 use super::convert::unzip_to_dir;
+use super::convert::zip_directory_with_comment;
+use super::helpers::path_to_string;
+
+use crate::error_util::log_err;
 
 /// 文本类文件读取上限
 const MAX_TEXT_SIZE: u64 = 2 * 1024 * 1024;
@@ -37,6 +44,7 @@ pub async fn rp_open(_state: &AppState, params: RpOpenParams) -> Result<serde_js
                 format: String::new(),
                 size: 0,
                 icon_data_url: None,
+                src_path: None,
                 pack_format: None,
                 mc_version: None,
                 description: None,
@@ -141,6 +149,11 @@ fn open_inner(params: &RpOpenParams) -> Result<RpOpenResult, String> {
         format,
         size,
         icon_data_url,
+        src_path: if is_zip {
+            Some(src_canon.to_string_lossy().to_string())
+        } else {
+            None
+        },
         pack_format,
         mc_version,
         description,
@@ -195,6 +208,140 @@ fn read_inner(params: &RpReadParams) -> Result<RpReadResult, String> {
             error: String::new(),
         })
     }
+}
+
+/// 写回包内单文件：text 原文 / base64 二进制（复用 rp_read 的路径安全校验）
+pub async fn rp_write(
+    _state: &AppState,
+    params: RpWriteParams,
+) -> Result<serde_json::Value, String> {
+    let result = match write_inner(&params) {
+        Ok(r) => r,
+        Err(e) => {
+            log_warn!("[RpWrite] failed: rel={} err={}", params.rel_path, e);
+            RpWriteResult {
+                success: false,
+                message: e,
+            }
+        }
+    };
+    if result.success {
+        log_info!(
+            "[RpWrite] success: rel={} kind={}",
+            params.rel_path,
+            params.kind
+        );
+    }
+    serde_json::to_value(&result).map_err(|e| e.to_string())
+}
+
+fn write_inner(params: &RpWriteParams) -> Result<RpWriteResult, String> {
+    let work_dir = PathBuf::from(&params.work_dir);
+    let target = resolve_in_work_dir(&work_dir, &params.rel_path)?;
+
+    match params.kind.to_lowercase().as_str() {
+        "text" => {
+            if params.content.len() as u64 > MAX_TEXT_SIZE {
+                return Err(format!(
+                    "内容超过 {}MB，拒绝写入",
+                    MAX_TEXT_SIZE / 1024 / 1024
+                ));
+            }
+            std::fs::write(&target, &params.content).map_err(|e| format!("写入文件失败: {}", e))?;
+        }
+        "base64" => {
+            let raw = params.content.trim();
+            let b64 = raw
+                .strip_prefix("data:")
+                .and_then(|s| s.split_once(','))
+                .map(|(_, data)| data)
+                .unwrap_or(raw);
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(b64)
+                .map_err(|e| format!("base64 解码失败: {}", e))?;
+            if bytes.len() as u64 > MAX_MEDIA_SIZE {
+                return Err(format!(
+                    "文件超过 {}MB，拒绝写入",
+                    MAX_MEDIA_SIZE / 1024 / 1024
+                ));
+            }
+            std::fs::write(&target, &bytes).map_err(|e| format!("写入文件失败: {}", e))?;
+        }
+        other => return Err(format!("不支持的写入类型: {}", other)),
+    }
+    Ok(RpWriteResult {
+        success: true,
+        message: "保存成功".to_string(),
+    })
+}
+
+/// 导出资源包：zip 会话保存回原 zip / 另存为 zip（folder 会话保存即直写，仅另存为走此接口）
+pub async fn rp_export(
+    _state: &AppState,
+    params: RpExportParams,
+) -> Result<serde_json::Value, String> {
+    let result = match export_inner(&params).await {
+        Ok(r) => r,
+        Err(e) => {
+            log_warn!("[RpExport] failed: path={} err={}", params.path, e);
+            RpExportResult {
+                success: false,
+                output_path: params.path.clone(),
+                message: e,
+            }
+        }
+    };
+    if result.success {
+        log_info!("[RpExport] success: path={}", result.output_path);
+    }
+    serde_json::to_value(&result).map_err(|e| e.to_string())
+}
+
+async fn export_inner(params: &RpExportParams) -> Result<RpExportResult, String> {
+    if params.format.to_lowercase() != "zip" {
+        return Err("当前仅支持导出为 zip".to_string());
+    }
+    let work_dir = PathBuf::from(&params.work_dir);
+    let work_canon = work_dir
+        .canonicalize()
+        .map_err(|e| format!("工作目录不可用: {}", e))?;
+    if !work_canon.is_dir() {
+        return Err("工作目录不可用".to_string());
+    }
+    let target = PathBuf::from(&params.path);
+    let parent = target.parent().ok_or_else(|| "目标路径无效".to_string())?;
+    if !parent.exists() {
+        return Err(format!("目标目录不存在: {}", parent.display()));
+    }
+    if target.is_dir() {
+        return Err("目标路径不能是目录".to_string());
+    }
+
+    // 写临时文件后原子替换，避免打包失败损坏原 zip
+    let final_target = target.clone();
+    let tmp_target = final_target.with_extension("tmp");
+    let src_zip: Option<PathBuf> = params.src_path.as_ref().map(PathBuf::from);
+    let work_clone = work_canon.clone();
+    let tmp_clone = tmp_target.clone();
+    let export_result = tokio::task::spawn_blocking(move || {
+        zip_directory_with_comment(&work_clone, &tmp_clone, src_zip.as_deref())
+    })
+    .await
+    .map_err(log_err("资源包导出任务失败"))?;
+    if let Err(e) = export_result {
+        let _ = std::fs::remove_file(&tmp_target);
+        return Err(e);
+    }
+    if final_target.exists() {
+        std::fs::remove_file(&final_target).map_err(|e| format!("替换目标文件失败: {}", e))?;
+    }
+    std::fs::rename(&tmp_target, &final_target).map_err(|e| format!("写入目标文件失败: {}", e))?;
+
+    Ok(RpExportResult {
+        success: true,
+        output_path: path_to_string(&target),
+        message: "导出成功".to_string(),
+    })
 }
 
 /// 路径安全：拦截绝对路径与 `..` 跳转，canonicalize 后必须位于工作目录内

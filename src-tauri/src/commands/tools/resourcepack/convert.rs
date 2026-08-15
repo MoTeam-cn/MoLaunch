@@ -155,7 +155,16 @@ fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
 }
 
 /// 将目录内容打包为 zip（保留相对路径，zip 内使用正斜杠）
-fn zip_directory(src_dir: &Path, output_zip: &Path) -> Result<(), String> {
+pub(crate) fn zip_directory(src_dir: &Path, output_zip: &Path) -> Result<(), String> {
+    zip_directory_with_comment(src_dir, output_zip, None)
+}
+
+/// 打包目录为 zip，并从源 zip 复制注释（保留 loader 附加属性；源为 None 时不复制）
+pub(crate) fn zip_directory_with_comment(
+    src_dir: &Path,
+    output_zip: &Path,
+    src_zip: Option<&Path>,
+) -> Result<(), String> {
     let file = File::create(output_zip).map_err(|e| format!("创建 zip 失败: {}", e))?;
     let mut zip = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default();
@@ -177,6 +186,17 @@ fn zip_directory(src_dir: &Path, output_zip: &Path) -> Result<(), String> {
             .map_err(|e| format!("读取源文件失败: {}", e))?;
         zip.write_all(&buf)
             .map_err(|e| format!("写入 zip 内容失败: {}", e))?;
+    }
+
+    if let Some(sp) = src_zip {
+        if let Ok(f) = File::open(sp) {
+            if let Ok(archive) = zip::ZipArchive::new(f) {
+                let comment = String::from_utf8_lossy(archive.comment()).into_owned();
+                if !comment.is_empty() {
+                    zip.set_comment(comment);
+                }
+            }
+        }
     }
 
     zip.finish()

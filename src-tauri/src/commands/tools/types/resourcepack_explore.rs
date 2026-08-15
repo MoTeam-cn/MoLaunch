@@ -25,6 +25,8 @@ pub struct RpOpenResult {
     pub size: u64,
     /// 包图标（pack.png base64 data URI），无则为 None
     pub icon_data_url: Option<String>,
+    /// 原包路径（zip 会话为源 zip 路径，folder 会话为原目录路径；保存回原包时使用）
+    pub src_path: Option<String>,
     /// pack.mcmeta 的 pack_format，缺失/解析失败时为 None
     pub pack_format: Option<u32>,
     /// pack_format 对应的 MC 版本范围描述（如 "1.20.5–1.21.x"）
@@ -74,4 +76,51 @@ pub struct RpReadResult {
     pub content: String,
     /// 失败原因（成功时为空）
     pub error: String,
+}
+
+/// 资源包编辑器 - 写回单文件请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpWriteParams {
+    /// 工作目录（rp_open 返回）
+    pub work_dir: String,
+    /// 包内相对路径（正斜杠）
+    pub rel_path: String,
+    /// 内容类型：text（UTF-8 文本）/ base64（图片等二进制，允许带 data URI 前缀）
+    pub kind: String,
+    /// 内容（text 为原文；base64 为编码数据）
+    pub content: String,
+}
+
+/// 资源包编辑器 - 写回结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpWriteResult {
+    /// 是否成功
+    pub success: bool,
+    /// 提示信息
+    pub message: String,
+}
+
+/// 资源包编辑器 - 导出请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpExportParams {
+    /// 工作目录（rp_open 返回）
+    pub work_dir: String,
+    /// 导出目标路径：保存回原包时传原 zip 路径，另存为时传用户选择路径
+    pub path: String,
+    /// 导出格式：zip（当前仅支持 zip 打包）
+    pub format: String,
+    /// 原 zip 路径（zip 会话的源包，另存时复制其注释等附加属性），无则 None
+    #[serde(default)]
+    pub src_path: Option<String>,
+}
+
+/// 资源包编辑器 - 导出结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct RpExportResult {
+    /// 是否成功
+    pub success: bool,
+    /// 输出路径
+    pub output_path: String,
+    /// 提示信息
+    pub message: String,
 }
