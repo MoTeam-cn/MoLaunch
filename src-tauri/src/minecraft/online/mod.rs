@@ -14,6 +14,7 @@ pub mod frp;
 pub mod http_log;
 pub mod pow;
 pub mod protocol;
+pub mod scaffolding;
 pub mod signaling;
 pub mod storage;
 pub mod tun;
