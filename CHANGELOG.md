@@ -48,6 +48,10 @@
 
 ### Added
 
+- **房主/房客面板改写（Agent C，联机重构 Phase 2）**（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue) / [EasyTierStatusBadge.vue](src/components/online/EasyTierStatusBadge.vue)（新增））：① 房主面板仅保留房间信息 + easytier 连接状态 + 关闭房间按钮，删除 SDP/白名单/参与者/封禁/工具抽屉等全部旧块；② 房间信息卡房间码展示 N 段公开标识（6 位显示名），点击可折叠展开完整 U/xxx 码并一键复制，展示 MC 版本/端口、加载器、备注、公开状态、剩余时间；③ 新增 EasyTierStatusBadge 状态徽章供房主/房客面板共用。
+
+- **房客面板与加入流程改写（Agent C，联机重构 Phase 2）**（[RoomManager.vue](src/components/online/RoomManager.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：① RoomManager 移除 WebRTC inject/申请确认/密码记忆，加入表单改为「输码（N 段或完整 U/xxx）→ 密码 → 进房」，进房后自动切房客面板；② 房客面板展示房间信息、easytier 连接状态徽章、进服地址（mcIp:mcPort 一键复制）与重新探测按钮，挂载后自动 `scaffolding_client_probe`，退出房间停 easytier + 清空本地状态。
+
 - **联机大厅改为整合包聚类卡片（Agent C，联机重构 Phase 2）**（[LobbyBrowser.vue](src/components/online/LobbyBrowser.vue) / [LobbyRoomCard.vue](src/components/online/LobbyRoomCard.vue) / [LobbyJoinDialog.vue](src/components/online/LobbyJoinDialog.vue)）：① 大厅按整合包聚合展示卡片（房间数/热度/MC 版本），点击展开该整合包下的公开房间摘要列表（`lobby_list_packages` + `lobby_list_rooms`）；② 房间摘要行仅展示 N 段公开标识/备注/人数/密码标记/加载器，加入走 `guestJoinRoom(publicIdentifier)` 闸门拿完整码；③ 密码房间弹抽屉输密码，移除旧 join 的 roomCode/modpack 字段依赖。
 
 - **创建房间新流程（Agent C，联机重构 Phase 2）**（[useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts) / [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：创建表单收敛为「选包（MC 版本+整合包）→ 备注 → 公开/私密 → 密码 → 本地生成 U/xxx 码 → 登记 apiServer → 拉起联机中心」一站式流程；删除白名单/最大人数/高级设置抽屉，整合包选择与本地比对卡片内联展示，创建进度抽屉展示「生成房间码 → 登记房间 → 拉起联机中心」三步；`useRoomHost` 移除未使用的 `scaffoldingHostStop` 导入。
