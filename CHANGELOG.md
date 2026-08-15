@@ -6,6 +6,8 @@
 
 ### Fixed
 
+- **修复资源包导出 zip 时把输出临时文件打进产物**（[convert.rs](src-tauri/src/commands/tools/resourcepack/convert.rs)）：`zip_directory_with_comment` 在打包前先创建输出临时文件再递归收集目录文件，输出临时文件被当成普通文件写入 zip——导出目标位于工作目录内时（资源包编辑器导出、往返测试），产物多出 1 个空条目。收集后排除输出路径自身。
+
 - **`cargo clippy -- -D warnings` 全绿（Agent B，联机重构 Phase 1 收尾）**：① [server.rs](src-tauri/src/minecraft/online/scaffolding/server.rs) 为 `ScaffoldingServerState` 补充 `Default` impl（`new_without_default`）；② 修复 rust 1.94 新 lint 触发的存量告警——[nbt.rs](src-tauri/src/commands/tools/nbt.rs) 手写 `div_ceil`/`repeat().take()`/整段切片、[explore.rs](src-tauri/src/commands/tools/resourcepack/explore.rs) `map_err` 改 `inspect_err` 与 `is_err+unwrap_err` 改 `if let`、[skin.rs](src-tauri/src/commands/tools/network/skin.rs) doc 列表项缩进。均为无行为变化的机械改写，未引入新逻辑。
 
 - **3D 预览高度限制：不再超出内容分发区产生滚动拉长页面；JSON 编辑模式下「返回 3D 预览」与保存按钮同行**（[RpModelPreview.vue](src/views/tools/data/RpModelPreview.vue) / [RpTextEditor.vue](src/views/tools/data/RpTextEditor.vue) / [ResourcePackEditor.vue](src/views/tools/data/ResourcePackEditor.vue)）：① 3D 预览渲染容器高度由 420px 收窄至 300px（含标题栏与间距约 340px），完整落在内容分发区 400px 高度内并留足余量，不再出现内部滚动条、页面不被拉长，视口与日志兜底尺寸同步更新；② RpTextEditor 编辑区高度固定为 272px（与 3D 预览渲染容器整体观感一致，textarea 仍可手动拉伸），模型 JSON 编辑与 3D 预览两种模式整体高度一致，「返回 3D 预览」/「编辑 JSON」按钮位置不跳动，且均不超出内容区高度；③ RpTextEditor 底部按钮行由「保存按钮右对齐」改为「`actions` 插槽 + 保存按钮（`ml-auto` 右对齐）」——资源包编辑器模型 JSON 编辑模式下通过插槽注入「返回 3D 预览」按钮与保存按钮同行，原底部切换按钮仅在 3D 预览模式显示「编辑 JSON」，其他类型文本编辑（无插槽内容）布局不变。

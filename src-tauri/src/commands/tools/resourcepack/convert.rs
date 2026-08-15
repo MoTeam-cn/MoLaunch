@@ -171,6 +171,8 @@ pub(crate) fn zip_directory_with_comment(
 
     let mut entries: Vec<PathBuf> = Vec::new();
     collect_files(src_dir, &mut entries);
+    // 输出 zip 临时文件在打包前已创建，排除自身避免被打进产物
+    entries.retain(|p| p.as_path() != output_zip);
 
     for file_path in entries {
         let rel = file_path
