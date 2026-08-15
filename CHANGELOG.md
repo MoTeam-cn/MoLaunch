@@ -36,6 +36,8 @@
 
 ### Changed
 
+- **NBT 编辑器界面细节优化**（[NbtViewer.vue](src/views/tools/data/NbtViewer.vue) / [NbtTreeNode.vue](src/views/tools/data/NbtTreeNode.vue)）：① NBT 树展示区最大高度 500px→320px（与同目录 JavaManager 等列表高度一致）；② 叶子值与数组编辑输入框宽度由固定 `w-48`/`w-56` 改为按内容自适应（中文字符 14px、其他 7.5px 估算宽度，80~240px / 140~320px 区间伸缩）；③ 保存栏自写的 amber 提示框改用公共 `Alert` 组件（`type="warning"` 不截断完整展示）；④ 保存前的原生 `window.confirm` + toast 双重提示改为项目惯例的 `showConfirmAsync` 确认弹窗。
+
 - **版本 JSON 编辑从「Java 诊断」移入「常用工具」分类**（[CommonPage.vue](src/views/tools/CommonPage.vue) / [JavaDiagPage.vue](src/views/tools/JavaDiagPage.vue) / [Tools.vue](src/views/Tools.vue)）：版本 JSON 编辑维护的是 Minecraft 游戏版本元数据（`versions/{id}/{id}.json`），与 Java 运行时（下载器/环境检测/运行时列表）无关，从 Java 诊断迁至常用工具分类作为杂项便捷工具；Java 诊断分类现只保留纯 Java 工具，两侧分类描述同步更新。
 
 - **NBT 编辑器从「Java 诊断」移入「存档资源」分类**（[StoragePage.vue](src/views/tools/StoragePage.vue) / [JavaDiagPage.vue](src/views/tools/JavaDiagPage.vue) / [Tools.vue](src/views/Tools.vue)）：NBT 编辑器编辑的是存档内数据文件（level.dat / playerdata / region .mca），与存档备份/恢复、种子地图同属存档数据类工具，从 Java 诊断（Java 下载/环境检测/版本 JSON）迁至存档资源分类，页签名由「NBT 查看」改为「NBT 编辑器」；Java 诊断与存档资源分类描述同步更新。

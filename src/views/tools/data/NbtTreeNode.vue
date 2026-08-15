@@ -59,6 +59,15 @@ const addMode = ref(false)
 const addName = ref('')
 const addType = ref('string')
 
+/** 按内容估算文本像素宽度（中文 14px、其他 7.5px），输入框宽度随内容自适应 */
+function textWidth(s: string): number {
+  let w = 0
+  for (const ch of s) w += ch.charCodeAt(0) > 255 ? 14 : 7.5
+  return w
+}
+const editInputWidth = computed(() => `${Math.min(Math.max(textWidth(editText.value) + 32, 80), 240)}px`)
+const arrayInputWidth = computed(() => `${Math.min(Math.max(textWidth(arrayText.value) + 32, 140), 320)}px`)
+
 function toggle() {
   if (isContainer.value) emit('toggle', key.value)
 }
@@ -190,7 +199,8 @@ function removeNode() {
             v-if="editing"
             v-model="editText"
             size="small"
-            class="w-48 flex-none"
+            class="flex-none"
+            :width="editInputWidth"
             @keydown.enter="commitEdit"
             @keydown.esc="cancelEdit"
             @blur="commitEdit"
@@ -207,7 +217,8 @@ function removeNode() {
             v-if="arrayEditing"
             v-model="arrayText"
             size="small"
-            class="w-56 flex-none"
+            class="flex-none"
+            :width="arrayInputWidth"
             placeholder="逗号分隔，如 1, 2, 3"
             @keydown.enter="commitArrayEdit"
             @keydown.esc="arrayEditing = false"

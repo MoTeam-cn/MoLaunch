@@ -13,14 +13,15 @@ import {
   DocumentIcon,
   FolderOpenIcon,
   CheckIcon,
-  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const NbtTreeNode = defineAsyncComponent(() => import('@/views/tools/data/NbtTreeNode.vue'))
 const NbtSaveDrawer = defineAsyncComponent(() => import('@/views/tools/data/NbtSaveDrawer.vue'))
-import { toastError, toastSuccess, toastWarning } from '@/utils/toast'
+import { toastError, toastSuccess } from '@/utils/toast'
+import { showConfirmAsync } from '@/utils/modal'
 import { nbtParse, nbtSave } from '@/utils/api/tools'
 import type { NbtNode, NbtChunkInfo } from '@/utils/api/tools'
 import { pickFile } from '@/utils/fileDialog'
@@ -119,9 +120,9 @@ async function handleSave() {
   const tree = displayRoot.value
   if (!path || !tree) return
   const chunk = fileType.value === 'mca' ? currentChunk.value : null
-  toastWarning('保存将覆盖原文件，建议提前备份')
   const targetDesc = chunk ? `区块 (${chunk.x}, ${chunk.z})` : '文件'
-  if (!window.confirm(`确认将修改写回${targetDesc}？\n${path}`)) return
+  const ok = await showConfirmAsync('确认保存', `确认将修改写回${targetDesc}？\n${path}`)
+  if (!ok) return
   saving.value = true
   try {
     if (fileType.value === 'mca') {
@@ -211,7 +212,7 @@ watch(chunkSelect, (idx) => {
       <div
         v-if="displayRoot"
         data-inner-scroll
-        class="max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 p-3"
+        class="max-h-[320px] overflow-y-auto rounded-lg border border-gray-200 p-3"
       >
         <NbtTreeNode
           :node="displayRoot"
@@ -233,12 +234,14 @@ watch(chunkSelect, (idx) => {
       <!-- 保存栏 -->
       <div
         v-if="displayRoot"
-        class="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3"
+        class="flex items-center gap-3"
       >
-        <div class="flex items-center gap-2 text-xs text-amber-700">
-          <ExclamationTriangleIcon class="h-4 w-4 flex-none" />
-          <span>点击叶子节点值可直接编辑，悬停节点可新增/删除；保存将覆盖原文件，建议先备份。</span>
-        </div>
+        <Alert
+          type="warning"
+          message="点击叶子节点值可直接编辑，悬停节点可新增/删除；保存将覆盖原文件，建议先备份。"
+          :truncate="false"
+          class="flex-1"
+        />
         <Button type="primary" :loading="saving" class="flex-none" @click="handleSave">
           <template #icon><CheckIcon class="h-4 w-4" /></template>
           保存修改
