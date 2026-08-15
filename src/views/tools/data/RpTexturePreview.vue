@@ -1,10 +1,12 @@
 <script setup lang="ts">
 /**
  * 纹理 PNG 2D 预览（data URI）+ 纹理替换（导入本地图片 → rp_write base64 写回）
+ * + 像素画板编辑（RpPixelEditor，canvas 原生逐像素绘制后写回）
  */
 import { ref, watch, defineAsyncComponent } from 'vue'
-import { ArrowUpTrayIcon, PhotoIcon } from '@heroicons/vue/24/outline'
+import { ArrowUpTrayIcon, PaintBrushIcon, PhotoIcon } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const RpPixelEditor = defineAsyncComponent(() => import('./RpPixelEditor.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { rpWrite } from '@/utils/api/tools'
 
@@ -21,11 +23,14 @@ const emit = defineEmits<{ (e: 'saved'): void }>()
 const displaySrc = ref('')
 const replacing = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+/** 像素画板编辑模式 */
+const editMode = ref(false)
 
 watch(
   () => props.src,
   (v) => {
     displaySrc.value = v
+    editMode.value = false
   },
   { immediate: true },
 )
@@ -88,19 +93,34 @@ async function replaceTexture(dataUri: string) {
       <span v-if="animated" class="rounded bg-purple-100 px-1.5 py-0.5 text-xs text-purple-600">
         动画纹理
       </span>
-      <Button
-        class="ml-auto"
-        type="outline"
-        size="small"
-        :loading="replacing"
-        @click="openPicker"
-      >
-        <template #icon><ArrowUpTrayIcon class="h-4 w-4" /></template>
-        替换纹理
-      </Button>
+      <div class="ml-auto flex items-center gap-2">
+        <Button
+          v-if="!editMode"
+          type="outline"
+          size="small"
+          :loading="replacing"
+          @click="openPicker"
+        >
+          <template #icon><ArrowUpTrayIcon class="h-4 w-4" /></template>
+          替换纹理
+        </Button>
+        <Button v-if="!editMode" size="small" @click="editMode = true">
+          <template #icon><PaintBrushIcon class="h-4 w-4" /></template>
+          像素画板
+        </Button>
+      </div>
       <input ref="fileInput" type="file" accept="image/*" class="hidden" @change="onFileChange" />
     </div>
-    <div v-if="displaySrc" class="grid place-items-center rounded border border-gray-200 bg-gray-50 p-4">
+    <RpPixelEditor
+      v-if="editMode"
+      :work-dir="workDir"
+      :rel-path="relPath"
+      :src="displaySrc"
+      :name="name"
+      @saved="emit('saved')"
+      @close="editMode = false"
+    />
+    <div v-else-if="displaySrc" class="grid place-items-center rounded border border-gray-200 bg-gray-50 p-4">
       <img :src="displaySrc" class="max-h-96 max-w-full object-contain" alt="纹理预览" />
     </div>
     <p v-else class="text-sm text-gray-400">纹理加载失败</p>

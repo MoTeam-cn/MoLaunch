@@ -6,6 +6,8 @@
 
 ### Added
 
+- **资源包编辑器纹理像素画板（M4，canvas 原生）**（[RpPixelEditor.vue](src/views/tools/data/RpPixelEditor.vue)（新增） / [RpTexturePreview.vue](src/views/tools/data/RpTexturePreview.vue)）：纹理预览新增「像素画板」入口，切换到逐像素编辑模式——纹理加载到 canvas（`image-rendering: pixelated` 放大显示，最长边 ≤512px 自适应缩放），画笔/橡皮/取色三种工具（取色后自动切回画笔），MC 16 色预设 + 自定义 `input[type=color]` 取色，可开关像素网格线（透明像素显示棋盘格底），30 步撤销栈；「保存」经 `rpWrite` base64 写回包内同名文件并刷新预览。不改动既有「替换纹理」能力。
+
 - **资源包编辑器 pack_format 与 MC 版本联动校验（M4 前端）**（[RpMcmetaForm.vue](src/views/tools/data/RpMcmetaForm.vue) / [resourcepack.ts](src/utils/api/tools/resourcepack.ts) / [core.ts](src/utils/api/tools/core.ts)）：pack.mcmeta 表单编辑 pack_format 时实时调用 `rp_pack_format_info` 查询对应 MC 版本范围并联动展示（优先于打开包时返回的版本，输入非法时不查询）；未知 pack_format 值以红色提示「未知 pack_format，请核对」，避免保存后才发现版本不匹配。新增 `rpPackFormatInfo` 类型安全 API 封装与 `RP_PACK_FORMAT_INFO` action 常量。
 
 - **资源包编辑器 pack_format 版本查询接口（M4 pack_format 联动校验：后端）**（[explore.rs](src-tauri/src/commands/tools/resourcepack/explore.rs) / [explore_test.rs](src-tauri/src/commands/tools/resourcepack/explore_test.rs) / [types/resourcepack_explore.rs](src-tauri/src/commands/tools/types/resourcepack_explore.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [mod.rs](src-tauri/src/commands/tools/resourcepack/mod.rs)）：新增 `rp_pack_format_info` action——输入 pack_format 数值，复用既有 `pack_format_to_version` 映射表返回对应 MC 版本范围描述与 `known` 标志（未知值 `known=false`），供前端表单输入时实时联动校验，避免前端重复维护版本映射表。含 1 项新单元测试（已知/未知 pack_format 返回值与 known 标志）。
