@@ -34,6 +34,8 @@ src-tauri/.cargo/
 src-tauri/WixTools/
 src-tauri/NSIS/
 src-tauri/gen/
+# easytier-core 等侧车二进制构建期获取（externalBin），不入库
+src-tauri/binaries/
 
 # Updater（独立 Cargo 项目，CI/build.rs 实时构建产物，不入库）
 src-tauri/resources/updater/updater.exe
