@@ -7,8 +7,8 @@
 //! - easytier.rs：检查 easytier-core 侧车二进制（externalBin，仅 Windows 平台）
 
 pub mod cubiomes_wasm;
-pub mod emsdk;
 #[cfg(target_os = "windows")]
 pub mod easytier;
+pub mod emsdk;
 #[cfg(target_os = "windows")]
 pub mod updater;

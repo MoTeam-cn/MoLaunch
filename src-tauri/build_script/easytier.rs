@@ -33,7 +33,10 @@ pub fn check_easytier() {
             bin_path.display(),
             target_triple
         );
-        println!("cargo:warning=联机功能依赖 easytier-core，请下载 v{} 并解压出 easytier-core.exe：", EASYTIER_VERSION);
+        println!(
+            "cargo:warning=联机功能依赖 easytier-core，请下载 v{} 并解压出 easytier-core.exe：",
+            EASYTIER_VERSION
+        );
         println!("cargo:warning=  {}", DOWNLOAD_URL);
         println!(
             "cargo:warning=将 easytier-core.exe 重命名为 {} 放入 src-tauri/binaries/ 后重新构建。",
