@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **设备页面加回 NAT 类型检测**（[nat.ts](src/types/online/nat.ts) / [nat.ts](src/utils/online/nat.ts) / [natSlice.ts](src/stores/online/natSlice.ts)）：恢复基于 WebRTC ICE candidate 的 STUN 探测实现（`detectNatTypeWithStun`，host/srflx 组合推断 openCone/restrictedCone/symmetric/blocked），含类型定义、`NAT_TYPE_META` 展示映射与 store `detectNat`/`forceDetectNat` 切片；设备页「网络环境」卡片展示 NAT 类型徽章（tooltip 说明联机可行性）+ 重新检测按钮。
+
 - **创建房间页面整合包改回收进「高级设置」抽屉，减少页面堆积**（[CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) / [useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts)）：整合包选择器与需求卡片不再平铺在创建表单中，收进「高级设置」右侧抽屉（420px）；入口按钮带齿轮图标，已勾选整合包时显示「已关联整合包」状态徽章（`advancedBadge`/`advancedBadgeActive`，基于整合包勾选状态，白名单已在 Scaffolding 收敛中移除故不涉及）。
 
 ### Fixed

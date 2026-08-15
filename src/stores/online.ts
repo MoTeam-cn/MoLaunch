@@ -16,12 +16,14 @@ export type { EasyTierRuntime } from './online/easytierSlice'
 import { useOnlineAuthSlice } from './online/authSlice'
 import { useOnlineRoomSlice } from './online/roomSlice'
 import { useOnlineEasyTierSlice } from './online/easytierSlice'
+import { useOnlineNatSlice } from './online/natSlice'
 
 export const useOnlineStore = defineStore('online', () => {
   // 组合各切片
   const authSlice = useOnlineAuthSlice()
   const roomSlice = useOnlineRoomSlice()
   const easytierSlice = useOnlineEasyTierSlice()
+  const natSlice = useOnlineNatSlice()
 
   /**
    * 重置房间状态（不调用后端，仅清空本地）
@@ -37,6 +39,8 @@ export const useOnlineStore = defineStore('online', () => {
     ...roomSlice,
     // easytier 运行时
     ...easytierSlice,
+    // NAT 检测
+    ...natSlice,
     // 顶层方法
     resetRoomState,
   }

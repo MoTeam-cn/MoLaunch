@@ -78,8 +78,11 @@ provide('goToLogs', goToLogs)
 
 onMounted(() => {
   // 云端未连接时不发起任何网络请求，避免无意义失败
-  if (!onlineStore.cloudConnected) return
-  void onlineStore.refreshStatus()
+  if (onlineStore.cloudConnected) {
+    void onlineStore.refreshStatus()
+  }
+  // NAT 检测依赖本地 WebRTC/STUN，与云端无关，进入页面即自动检测一次
+  void onlineStore.detectNat()
 })
 
 function goSettings() {

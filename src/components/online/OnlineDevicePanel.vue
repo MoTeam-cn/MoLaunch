@@ -5,16 +5,17 @@
  * 根据设备认证状态显示：
  * - 未注册：注册引导卡片
  * - 已注册未登录：登录卡片（JWT 过期不触发登录卡片，由后端自动续期兜底）
- * - 已注册：设备信息卡片（设备 ID / api-server / 最后登录 / JWT 过期时间）
+ * - 已注册：网络环境卡片（NAT 类型检测）+ 设备信息卡片（设备 ID / api-server / 最后登录 / JWT 过期时间）
  *
- * 状态来源：useOnlineStore.deviceStatus（由 Online.vue 在 onMounted 时刷新）。
- * 已移除旧 WebRTC 架构的 NAT 类型检测。
+ * 状态来源：useOnlineStore.deviceStatus（由 Online.vue 在 onMounted 时刷新）
+ *           useOnlineStore.natResult（由 Online.vue 进入页面时自动检测，侧边栏切换不丢失）
  */
 
 import { computed, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const SealedOverlay = defineAsyncComponent(() => import('@/components/common/SealedOverlay.vue'))
 import {
   UserPlusIcon,
@@ -23,14 +24,19 @@ import {
   GlobeAltIcon,
   ClockIcon,
   KeyIcon,
+  SignalIcon,
+  ArrowPathIcon,
+  SignalSlashIcon,
 } from '@heroicons/vue/24/outline'
 import { formatTimestamp } from '@/utils/format'
+import { NAT_TYPE_META, getNatFeasibilityColorClass } from '@/utils/online/nat'
 import { stripMcsdkPrefix } from '@/utils/online/device-id'
+import { toastSuccess, toastError } from '@/utils/toast'
 import { showWarning } from '@/utils/modal'
 
 const onlineStore = useOnlineStore()
 
-/** 云端离线：注册/登录/设备信息均依赖云端，显示封条遮罩 */
+/** 云端离线：注册/登录/设备信息均依赖云端，显示封条遮罩；NAT 检测（第三方 STUN）仍可用 */
 const offline = computed(() => !onlineStore.cloudConnected && !onlineStore.initializing)
 
 /** 点击封条弹窗告知原因（封存的云端功能因连接失败暂不可用） */
@@ -62,6 +68,23 @@ async function handleRegister() {
 
 async function handleLogin() {
   await onlineStore.login()
+}
+
+// ============ NAT 类型检测 ============
+// 复用 store 的 natDetecting 状态（与 Online.vue 自动检测共享，避免重复触发）
+const detectingNat = computed(() => onlineStore.natDetecting)
+
+async function handleDetectNat() {
+  try {
+    await onlineStore.forceDetectNat()
+    if (onlineStore.natResult?.error) {
+      toastError('NAT 检测失败，请检查网络后重试')
+    } else {
+      toastSuccess('NAT 检测完成')
+    }
+  } catch {
+    toastError('NAT 检测失败，请检查网络后重试')
+  }
 }
 </script>
 
@@ -128,6 +151,40 @@ async function handleLogin() {
             登录设备
           </Button>
         </div>
+      </div>
+    </Card>
+
+    <!-- 网络环境（NAT 检测，已注册时显示；NAT 检测不依赖云端，离线时仍可用） -->
+    <Card v-if="status?.registered" title="网络环境">
+      <div class="flex items-center justify-between py-1">
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+          <SignalIcon class="w-4 h-4 text-gray-400" />
+          <span>NAT 类型</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <Tooltip
+            v-if="onlineStore.natResult"
+            :text="NAT_TYPE_META[onlineStore.natResult.type].tooltip"
+            position="left"
+          >
+            <span
+              class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium cursor-help"
+              :class="getNatFeasibilityColorClass(NAT_TYPE_META[onlineStore.natResult.type].feasibility)"
+            >
+              {{ NAT_TYPE_META[onlineStore.natResult.type].label }}
+            </span>
+          </Tooltip>
+          <span v-else-if="detectingNat" class="text-xs text-gray-400">检测中...</span>
+          <span v-else class="text-xs text-gray-400">未检测</span>
+          <Tooltip text="重新检测 NAT 类型">
+            <Button type="ghost" size="mini" :loading="detectingNat" @click="handleDetectNat">
+              <template #icon><ArrowPathIcon class="w-3.5 h-3.5" /></template>
+            </Button>
+          </Tooltip>
+        </div>
+      </div>
+      <div v-if="onlineStore.natResult?.error" class="mt-2 text-xs text-red-500">
+        <SignalSlashIcon class="w-3.5 h-3.5 inline mr-1" />{{ onlineStore.natResult.error }}
       </div>
     </Card>
 
