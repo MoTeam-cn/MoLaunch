@@ -18,6 +18,7 @@ import {
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
+const SkinModel3D = defineAsyncComponent(() => import('@/components/common/SkinModel3D.vue'))
 import { toastSuccess, toastError } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'
 import { pickSavePath } from '@/utils/fileDialog'
@@ -48,6 +49,14 @@ async function doFetch() {
 /** 模型标签：slim=Alex（细手臂），classic=Steve（粗手臂） */
 const modelLabel = computed(() =>
   result.value?.skin_model === 'slim' ? 'Alex 模型（细手臂）' : 'Steve 模型（粗手臂）',
+)
+
+/** 3D 模型用的皮肤/披风 data URI（空字符串归一化为 null，组件显示"无皮肤数据"占位） */
+const skinUrl = computed(() => result.value?.skin_image || null)
+const capeUrl = computed(() => result.value?.cape_image || null)
+/** 3D 模型变体：slim（Alex）/ classic（Steve），与后端 skin_model 字段对齐 */
+const modelVariant = computed<'classic' | 'slim'>(() =>
+  result.value?.skin_model === 'slim' ? 'slim' : 'classic',
 )
 
 /** 32 位 UUID 格式化为 8-4-4-4-12 标准形式 */
@@ -151,52 +160,68 @@ async function saveImage(kind: 'skin' | 'cape') {
             </div>
           </div>
 
-          <!-- 皮肤 / 披风 -->
+          <!-- 3D 模型 + 皮肤/披风 -->
           <div class="flex flex-wrap gap-4">
-            <div class="rounded-lg border border-gray-200 p-3">
+            <div class="min-w-[260px] flex-1 rounded-lg border border-gray-200 p-3">
               <div class="mb-2 flex items-center justify-between">
-                <span class="text-xs font-medium text-gray-700">皮肤</span>
-                <Button
-                  type="secondary"
-                  size="small"
-                  :loading="saving === 'skin'"
-                  @click="saveImage('skin')"
-                >
-                  <template #icon><ArrowDownTrayIcon class="h-3.5 w-3.5" /></template>
-                  保存
-                </Button>
+                <span class="text-xs font-medium text-gray-700">3D 预览</span>
+                <span class="text-[10px] text-gray-400">拖动旋转 / 滚轮缩放</span>
               </div>
-              <img
-                :src="result.skin_image"
-                :alt="result.name + ' 的皮肤'"
-                class="h-44 w-44 object-contain rounded bg-gray-100"
-              />
-            </div>
-            <div v-if="result.cape_image" class="rounded-lg border border-gray-200 p-3">
-              <div class="mb-2 flex items-center justify-between">
-                <span class="text-xs font-medium text-gray-700">披风</span>
-                <Button
-                  type="secondary"
-                  size="small"
-                  :loading="saving === 'cape'"
-                  @click="saveImage('cape')"
-                >
-                  <template #icon><ArrowDownTrayIcon class="h-3.5 w-3.5" /></template>
-                  保存
-                </Button>
+              <div class="flex justify-center rounded-md bg-white p-2 shadow-sm">
+                <SkinModel3D
+                  :skin-url="skinUrl"
+                  :cape-url="capeUrl"
+                  :variant="modelVariant"
+                  :height="320"
+                />
               </div>
-              <img
-                :src="result.cape_image"
-                :alt="result.name + ' 的披风'"
-                class="h-44 w-44 object-contain rounded bg-gray-100"
-              />
             </div>
-            <div
-              v-else
-              class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 p-3 text-xs text-gray-400"
-            >
-              <CheckIcon class="h-4 w-4" />
-              该玩家未设置披风
+            <div class="space-y-3">
+              <div class="rounded-lg border border-gray-200 p-3">
+                <div class="mb-2 flex items-center justify-between">
+                  <span class="text-xs font-medium text-gray-700">皮肤</span>
+                  <Button
+                    type="secondary"
+                    size="small"
+                    :loading="saving === 'skin'"
+                    @click="saveImage('skin')"
+                  >
+                    <template #icon><ArrowDownTrayIcon class="h-3.5 w-3.5" /></template>
+                    保存
+                  </Button>
+                </div>
+                <img
+                  :src="result.skin_image"
+                  :alt="result.name + ' 的皮肤'"
+                  class="h-28 w-28 object-contain rounded bg-gray-100"
+                />
+              </div>
+              <div v-if="result.cape_image" class="rounded-lg border border-gray-200 p-3">
+                <div class="mb-2 flex items-center justify-between">
+                  <span class="text-xs font-medium text-gray-700">披风</span>
+                  <Button
+                    type="secondary"
+                    size="small"
+                    :loading="saving === 'cape'"
+                    @click="saveImage('cape')"
+                  >
+                    <template #icon><ArrowDownTrayIcon class="h-3.5 w-3.5" /></template>
+                    保存
+                  </Button>
+                </div>
+                <img
+                  :src="result.cape_image"
+                  :alt="result.name + ' 的披风'"
+                  class="h-28 w-28 object-contain rounded bg-gray-100"
+                />
+              </div>
+              <div
+                v-else
+                class="flex items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 p-3 text-xs text-gray-400"
+              >
+                <CheckIcon class="h-4 w-4" />
+                该玩家未设置披风
+              </div>
             </div>
           </div>
         </template>
