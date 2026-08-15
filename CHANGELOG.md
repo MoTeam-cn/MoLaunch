@@ -44,6 +44,8 @@
 
 ### Changed
 
+- **nbt.rs 模块化拆分：NBT 逻辑按职责拆分为 `nbt/` 目录**（[mod.rs](src-tauri/src/commands/tools/nbt/mod.rs) / [mca.rs](src-tauri/src/commands/tools/nbt/mca.rs) / [convert.rs](src-tauri/src/commands/tools/nbt/convert.rs) / [scan.rs](src-tauri/src/commands/tools/nbt/scan.rs) / [compress.rs](src-tauri/src/commands/tools/nbt/compress.rs)（新增） / [nbt_test.rs](src-tauri/src/commands/tools/nbt/nbt_test.rs)（移动））：原 566 行单文件按职责拆分为 `nbt/` 子模块——mod.rs 保留公共命令（`parse`/`save`/`list_save_files`）与普通 NBT 保存、根名读取、原子写；mca.rs 负责 Anvil 区块容器解析与重打包；convert.rs 负责 NbtNode ↔ fastnbt::Value 树转换；scan.rs 负责存档目录扫描分类；compress.rs 负责 gzip/zlib 压缩辅助。子模块函数仅对父模块可见（`pub(super)`），公共命令签名与 dispatcher 调用不变，测试文件随模块目录迁移、行为零改动。
+
 - **移除 cubiomes submodule 注册**（[.gitmodules](.gitmodules)（删除））：cubiomes 不再作为 submodule 引入，源码由 update-cubiomes 工作流按需 `git clone` 拉取，本地仓库不再包含该目录，避免 submodule 状态干扰日常 git 操作。
 
 - **cubiomes 编译迁移至 GitHub Actions 工作流自动维护（替代 dev 自动检测）**（[update-cubiomes.yml](.github/workflows/update-cubiomes.yml)（新增） / [build-wasm.ps1](scripts/build-wasm.ps1)）：新增 `update-cubiomes` 工作流——每日（UTC 04:00，可手动触发）通过 `git ls-remote` 检测 cubiomes 上游仓库（MoTeam-cn/cubiomes）HEAD commit，与入库产物记录（`src/assets/seedmap/cubiomes.upstream.txt`）比对：一致则跳过；有更新则拉取源码 → emcc 编译（复用 build-wasm.ps1）→ 更新产物与记录并提交回 main（`!c` 跳过 CI）。本地不再需要保留 cubiomes 源码目录，产物由本工作流统一维护。
