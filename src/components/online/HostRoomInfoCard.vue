@@ -1,52 +1,28 @@
 <script setup lang="ts">
 /**
- * 房主房间信息卡（房间码 / 虚拟 IP / MC 版本端口 / 剩余时间 / 人数）
+ * 房主房间信息卡（Scaffolding 收敛版）
  *
- * 端口区使用 HostMcPortEditor：自动捕获显示 + 手动指定（最高可信度），
- * 手动值经会话 setManualMcPort 广播给所有参与者。
+ * 房间码展示 N 段公开标识（6 位显示名），可折叠查看完整 U/xxx 码并一键复制；
+ * 另展示 MC 版本/端口、加载器、备注、公开状态与剩余时间（房主新开房会续期）。
  */
-import { computed, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
-import { getOnlineSession } from '@/composables/online/onlineSession'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
-const HostMcPortEditor = defineAsyncComponent(() => import('./HostMcPortEditor.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 import {
   ServerStackIcon,
-  WifiIcon,
   ClockIcon,
-  UsersIcon,
   ClipboardDocumentIcon,
+  EyeSlashIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
-const { setManualMcPort, clearManualMcPort } = getOnlineSession()
 const room = computed(() => store.roomState)
 
-/** 当前总人数（含房主） */
-const totalPlayers = computed(() => room.value.participants.length + 1)
-
-/**
- * 是否接近人数上限（mesh 拓扑预警）
- *
- * 总人数 >= maxPlayers - 1（还差 1 人就满）时显示橙色预警条；
- * maxPlayers <= 2 不预警（2 人房间本就最小单位）。
- */
-const nearPlayerLimit = computed(
-  () =>
-    room.value.maxPlayers > 2 &&
-    totalPlayers.value >= room.value.maxPlayers - 1 &&
-    room.value.participants.length > 0,
-)
-
-/** 接近人数上限预警文案（AlertV2 纯文本 message） */
-const nearPlayerLimitMessage = computed(
-  () =>
-    `接近人数上限（${totalPlayers.value}/${room.value.maxPlayers}），mesh 拓扑下房主上行带宽随人数线性增长，继续邀请可能出现卡顿，建议改用专业服务器`,
-)
+/** 完整房间码折叠状态（默认收起，只展示 N 段公开标识） */
+const showFullCode = ref(false)
 
 const remainingSeconds = computed(() => {
   if (!room.value.expiresAt) return 0
@@ -61,11 +37,20 @@ const remainingText = computed(() => {
   return h > 0 ? `${h}小时${m}分钟` : `${m}分钟`
 })
 
-/** 复制虚拟 IP 到剪贴板 */
-async function copyVirtualIp() {
-  const ip = room.value.selfVirtualIp
-  if (!ip) return
-  await copyToClipboard(ip, { toast: true })
+const loaderText = computed(() => {
+  const type = room.value.hostLoader
+  const map: Record<string, string> = {
+    forge: 'Forge', fabric: 'Fabric', neoforge: 'NeoForge',
+    quilt: 'Quilt', vanilla: '原版', release: '原版',
+  }
+  const name = type ? (map[type] ?? type) : ''
+  return room.value.hostLoaderVersion ? `${name} ${room.value.hostLoaderVersion}` : name
+})
+
+/** 复制完整房间码（U/xxx，含 S 段密钥） */
+async function copyFullCode() {
+  if (!room.value.roomCode) return
+  await copyToClipboard(room.value.roomCode, { toast: true })
 }
 </script>
 
@@ -76,18 +61,16 @@ async function copyVirtualIp() {
         <div class="flex items-center gap-2 text-sm text-gray-600">
           <ServerStackIcon class="w-4 h-4 text-gray-400" /><span>房间码</span>
         </div>
-        <code class="text-base font-semibold text-primary-600 tracking-wider bg-primary-50 px-3 py-1 rounded">
-          {{ room.roomCode }}
-        </code>
-      </div>
-      <div class="px-1 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-gray-600">
-          <WifiIcon class="w-4 h-4 text-gray-400" /><span>虚拟 IP</span>
-        </div>
-        <div class="flex items-center gap-1">
-          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ room.selfVirtualIp }}</code>
-          <Tooltip text="复制虚拟 IP">
-            <Button type="ghost" size="mini" @click="copyVirtualIp">
+        <div class="flex items-center gap-1.5">
+          <code
+            class="text-base font-semibold text-primary-600 tracking-wider bg-primary-50 px-3 py-1 rounded cursor-pointer select-all"
+            title="点击切换完整码"
+            @click="showFullCode = !showFullCode"
+          >
+            {{ showFullCode ? room.roomCode : room.publicIdentifier }}
+          </code>
+          <Tooltip text="复制完整房间码">
+            <Button type="ghost" size="mini" @click="copyFullCode">
               <template #icon><ClipboardDocumentIcon class="w-3.5 h-3.5" /></template>
             </Button>
           </Tooltip>
@@ -97,16 +80,30 @@ async function copyVirtualIp() {
         <div class="flex items-center gap-2 text-sm text-gray-600">
           <ServerStackIcon class="w-4 h-4 text-gray-400" /><span>MC 版本 / 端口</span>
         </div>
-        <div class="flex items-center gap-1.5">
-          <span class="text-xs text-gray-900">{{ room.hostMcVersion || '-' }}</span>
-          <span class="text-gray-300">:</span>
-          <HostMcPortEditor
-            :value="room.hostMcPort"
-            :manual="room.hostMcPortManual"
-            @confirm="setManualMcPort"
-            @clear="clearManualMcPort"
-          />
+        <span class="text-xs text-gray-900">
+          {{ room.hostMcVersion || '-' }}<template v-if="room.hostMcPort">:{{ room.hostMcPort }}</template>
+        </span>
+      </div>
+      <div v-if="loaderText" class="px-1 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+          <ServerStackIcon class="w-4 h-4 text-gray-400" /><span>加载器</span>
         </div>
+        <span class="text-xs text-gray-900">{{ loaderText }}</span>
+      </div>
+      <div v-if="room.remark" class="px-1 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+          <ServerStackIcon class="w-4 h-4 text-gray-400" /><span>备注</span>
+        </div>
+        <span class="text-xs text-gray-900 truncate max-w-[50%]">{{ room.remark }}</span>
+      </div>
+      <div class="px-1 py-3 flex items-center justify-between">
+        <div class="flex items-center gap-2 text-sm text-gray-600">
+          <ServerStackIcon class="w-4 h-4 text-gray-400" />
+          <span>房间类型</span>
+        </div>
+        <span class="text-xs text-gray-900">
+          {{ room.isPublic ? '公开' : '私密' }}<template v-if="room.hasPassword"> · 有密码</template>
+        </span>
       </div>
       <div class="px-1 py-3 flex items-center justify-between">
         <div class="flex items-center gap-2 text-sm text-gray-600">
@@ -119,13 +116,12 @@ async function copyVirtualIp() {
           {{ remainingText }}
         </span>
       </div>
-      <div class="px-1 py-3 flex items-center justify-between">
+      <div v-if="!room.isPublic" class="px-1 py-3 flex items-center justify-between">
         <div class="flex items-center gap-2 text-sm text-gray-600">
-          <UsersIcon class="w-4 h-4 text-gray-400" /><span>人数</span>
+          <EyeSlashIcon class="w-4 h-4 text-gray-400" /><span>私密房间</span>
         </div>
-        <span class="text-xs text-gray-900">{{ totalPlayers }} / {{ room.maxPlayers }}</span>
+        <span class="text-xs text-gray-500">仅凭房间码加入，不进大厅</span>
       </div>
     </div>
-    <AlertV2 v-if="nearPlayerLimit" type="warning" :message="nearPlayerLimitMessage" />
   </Card>
 </template>
