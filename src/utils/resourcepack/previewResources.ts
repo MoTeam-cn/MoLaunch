@@ -311,9 +311,16 @@ export async function buildPreviewResources(
   const target = blockModels.get(modelId) as
     | { elements?: unknown[]; textures?: Record<string, string> }
     | undefined
+  const firstEl = target?.elements?.[0] as
+    | { from?: number[]; to?: number[]; faces?: Record<string, unknown> }
+    | undefined
   console.log(
     `[preview] 渲染模型 ${modelId}：elements=${target?.elements?.length ?? 0}，` +
       `layer0=${target?.textures?.layer0 ?? '(无)'}，packModels=${packModels.size}，packTextures=${packTextures.size}`,
+  )
+  console.log(
+    `[preview] 首元素 from=${JSON.stringify(firstEl?.from)} to=${JSON.stringify(firstEl?.to)} ` +
+      `faces=${JSON.stringify(firstEl?.faces ? Object.keys(firstEl.faces) : [])}`,
   )
 
   const atlas = await mergeAtlas(vanilla, packTextures)
@@ -351,10 +358,11 @@ async function mergeAtlas(vanilla: VanillaPackBase, packTextures: Map<string, st
   let size = size0
   const placements: { id: string; x: number; y: number; w: number; h: number }[] = []
 
-  const place = async (id: string, dataUri: string, w: number, h: number) => {
+  const place = async (id: string, dataUri: string, w: number, h: number, frameH?: number) => {
     const bitmap = await loadBitmap(dataUri)
-    if (allocY + h + 1 > size) {
-      const newSize = upperPowerOfTwo(Math.max(size, allocY + h + 1))
+    const drawH = frameH ?? h
+    if (allocY + drawH + 1 > size) {
+      const newSize = upperPowerOfTwo(Math.max(size, allocY + drawH + 1))
       const bigger = document.createElement('canvas')
       bigger.width = newSize
       bigger.height = newSize
@@ -365,17 +373,21 @@ async function mergeAtlas(vanilla: VanillaPackBase, packTextures: Map<string, st
       ctx = bctx
       size = newSize
     }
-    ctx.drawImage(bitmap, 0, allocY, w, h)
-    placements.push({ id, x: 0, y: allocY, w, h })
-    allocY += h + 1
+    ctx.drawImage(bitmap, 0, 0, w, drawH, 0, allocY, w, drawH)
+    placements.push({ id, x: 0, y: allocY, w, h: drawH })
+    allocY += drawH + 1
   }
 
   // 16px 占位格（未知纹理回退）+ 全部 pack 纹理
   await place('__missing__', missingTextureDataUri(), 16, 16)
   for (const [id, uri] of packTextures) {
     const [w, h] = await imageSize(uri)
-    await place(id, uri, w, h)
+    // Minecraft 垂直动画条（每帧 w×w）：lodestone 不支持动画帧，仅取第一帧，避免整条贴面变形
+    const frameH = h > w && h % w === 0 ? w : h
+    if (frameH !== h) console.log(`[preview] pack 纹理 ${id} 尺寸 ${w}x${h} 为动画条，仅取第一帧 ${w}x${frameH}`)
+    await place(id, uri, w, h, frameH)
   }
+  console.log(`[preview] 图集最终尺寸 ${size}`)
 
   const idMap: Record<string, UV4> = {}
   const tex = vanilla.assets.textures
