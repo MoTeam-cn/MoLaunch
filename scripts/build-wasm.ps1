@@ -1,30 +1,73 @@
-# 手动构建 cubiomes WASM（种子地图工具）
+﻿# 构建 cubiomes WASM（种子地图工具）
 #
 # 用途：将 src-tauri/cubiomes/ 下的 C 源码编译为 WebAssembly，
-#       输出到 src-tauri/resources/wasm/cubiomes.{js,wasm}。
+#       输出到 public/seedmap/cubiomes.{js,wasm}（前端 Vite 静态资源，
+#       dev 由 dev server 提供，build 时原样复制进 dist/）。
 #
-# 何时运行：
-#   - 首次拉取项目后（若 resources/wasm/cubiomes.wasm 缺失）
-#   - 替换为原站 minecraftsearch.com 修改版 cubiomes 源码后
-#   - 修改 cubiomes_wrapper.c 或 cubiomes C 源码后
+# 定位：cubiomes 归前端管理后的唯一编译入口。
+#   - 发布流程：tauri.conf.json beforeBuildCommand 先执行本脚本再跑 Vite build
+#   - 手动验证：npm run build:wasm
 #
-# 前置条件：
-#   已安装 emsdk 并激活：
+# 容错：emcc 不可用（未装 emsdk）时，若 public/seedmap 产物已存在则跳过，
+#       直接使用入库产物，保证无 Emscripten 环境也能构建。
+#
+# 增量：所有 .c/.h 源文件都不比产物新时跳过编译（改源码后自动触发重编译）。
+#
+# 前置条件（需要重编译时）：已安装 emsdk 并激活：
 #     cd <emsdk 目录>
 #     ./emsdk install latest
 #     ./emsdk activate latest
 #     ./emsdk_env.ps1   (Windows)
-#
-# 运行方式：
-#   npm run build:wasm
-#
-# 注意：build.rs 已恢复自动编译（cargo build 会触发）。
-# 此脚本作为手动构建入口，便于单独验证 WASM 编译是否成功。
 
 $ErrorActionPreference = "Stop"
 
-# 切换到 src-tauri 目录（cubiomes 源码与 resources/wasm 均在此目录下）
+# 切换到 src-tauri 目录（cubiomes 源码在此目录下）
 Set-Location "$PSScriptRoot/../src-tauri"
+
+# 输出目录：前端 public/seedmap（相对 src-tauri 为 ../public/seedmap）
+$outDir = "../public/seedmap"
+$wasmOut = Join-Path $outDir "cubiomes.wasm"
+$jsOut = Join-Path $outDir "cubiomes.js"
+
+# 源文件清单（与 cubiomes_wrapper.c 封装层一致）
+$sources = @(
+    "cubiomes/biomenoise.c",
+    "cubiomes/biomes.c",
+    "cubiomes/finders.c",
+    "cubiomes/generator.c",
+    "cubiomes/layers.c",
+    "cubiomes/noise.c",
+    "cubiomes/terrainnoise.c",
+    "cubiomes/quadbase.c",
+    "cubiomes/util.c",
+    "cubiomes/xradv.c",
+    # cubiomes_wrapper.c 提供高级 API（gen_biomes/get_structure_pos/...），
+    # WASM 端通过 ccall 调用这些封装函数
+    "cubiomes/cubiomes_wrapper.c"
+)
+
+# 增量判断：产物存在且所有 .c/.h 源文件都不比产物新 → 跳过
+function Test-IncrementalSkip {
+    if (-not (Test-Path $wasmOut) -or -not (Test-Path $jsOut)) {
+        return $false
+    }
+    $outMtime = (Get-Item $wasmOut).LastWriteTime
+    foreach ($s in $sources) {
+        $srcFiles = Get-ChildItem -Recurse -File (Split-Path $s) -Filter "*.c" -ErrorAction SilentlyContinue
+        $srcFiles += Get-ChildItem -Recurse -File (Split-Path $s) -Filter "*.h" -ErrorAction SilentlyContinue
+        foreach ($f in $srcFiles) {
+            if ($f.LastWriteTime -gt $outMtime) {
+                return $false
+            }
+        }
+    }
+    return $true
+}
+
+if (Test-IncrementalSkip) {
+    Write-Host "cubiomes WASM 已是最新，跳过编译（$wasmOut）" -ForegroundColor Gray
+    exit 0
+}
 
 # 自动检测并激活 emsdk 环境（若 emcc 不在 PATH）
 if (-not (Get-Command emcc -ErrorAction SilentlyContinue)) {
@@ -45,52 +88,60 @@ if (-not (Get-Command emcc -ErrorAction SilentlyContinue)) {
         }
     }
     if (-not $emsdkFound) {
+        if (Test-Path $wasmOut -and (Test-Path $jsOut)) {
+            Write-Host "emcc 不可用，使用已入库的 cubiomes WASM 产物（$wasmOut）" -ForegroundColor Yellow
+            exit 0
+        }
         Write-Error "emcc not found in PATH and no emsdk installation detected. Please install emsdk."
         exit 1
     }
 }
 
-# 源文件清单（与 build.rs compile_cubiomes_wasm 的 sources 一致）
-$sources = @(
-    "cubiomes/biomenoise.c",
-    "cubiomes/biomes.c",
-    "cubiomes/finders.c",
-    "cubiomes/generator.c",
-    "cubiomes/layers.c",
-    "cubiomes/noise.c",
-    "cubiomes/terrainnoise.c",
-    "cubiomes/quadbase.c",
-    "cubiomes/util.c",
-    "cubiomes/xradv.c",
-    # cubiomes_wrapper.c 提供高级 API（gen_biomes/get_structure_pos/...），
-    # WASM 端通过 ccall 调用这些封装函数
-    "cubiomes/cubiomes_wrapper.c"
-)
-
 # 导出的 C 函数（前端 worker 通过 _xxx 调用）
 # _malloc/_free 用于 JS 端分配/释放内存传递 buffer
 $exportedFunctions = "_cubiomes_gen_biomes," +
                      "_cubiomes_gen_biomes_with_height," +
+                     "_cubiomes_gen_biomes_static," +
+                     "_cubiomes_gen_biomes_with_height_static," +
+                     "_cubiomes_gen_biomes_at_y," +
+                     "_cubiomes_gen_biomes_at_y_with_height," +
+                     "_cubiomes_get_biome_data_pointer," +
+                     "_cubiomes_get_biome_data_size," +
+                     "_cubiomes_get_height_data_pointer," +
+                     "_cubiomes_get_height_data_size," +
+                     "_cubiomes_get_height_grid_dims," +
+                     "_cubiomes_init_biome_colors," +
+                     "_cubiomes_get_all_biome_colors," +
+                     "_cubiomes_get_image_dimensions," +
+                     "_cubiomes_free_static_buffers," +
                      "_cubiomes_get_structure_pos," +
                      "_cubiomes_is_viable," +
                      "_cubiomes_get_region_size," +
                      "_cubiomes_estimate_spawn," +
                      "_cubiomes_first_stronghold," +
+                     "_cubiomes_find_strongholds," +
+                     "_cubiomes_is_slime_chunk," +
+                     "_cubiomes_find_ravines," +
+                     "_cubiomes_find_nether_fossils," +
+                     "_cubiomes_find_fossils," +
+                     "_cubiomes_get_biome_at_point," +
                      "_malloc,_free"
 
 # 确保输出目录存在
-New-Item -ItemType Directory -Force -Path "resources/wasm" | Out-Null
+New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 Write-Host "Compiling cubiomes to WebAssembly via emcc..." -ForegroundColor Cyan
 
 # 调用 emcc 编译
-# 参数说明（与 build.rs 一致）：
+# 参数说明（与原 build.rs compile_cubiomes_wasm 一致）：
 #   -I cubiomes            头文件搜索路径
 #   -O2 -fwrapv            优化级别 + 整数溢出回绕（cubiomes 依赖有符号溢出行为）
 #   -s WASM=1              输出 WASM 而非 asm.js
 #   -s MODULARIZE=1        包装为工厂函数（createCubiomesModule）
 #   -s EXPORT_NAME=...     工厂函数名
 #   -s ALLOW_MEMORY_GROWTH=1  允许内存自动增长（cubiomes 大范围生成需要）
+#   -s MAXIMUM_MEMORY=512MB   显式内存上限：不设时不同 emcc 版本默认不一致，
+#                              1.16 layer stack 的 allocCache 拖动累积会 calloc 失败
 #   -s EXPORTED_RUNTIME_METHODS=...  导出 JS 辅助方法（ccall/cwrap/HEAP 视图）
 #   -s EXPORTED_FUNCTIONS=...        导出 C 函数
 emcc @sources `
@@ -100,18 +151,19 @@ emcc @sources `
     -s MODULARIZE=1 `
     -s EXPORT_NAME=createCubiomesModule `
     -s ALLOW_MEMORY_GROWTH=1 `
+    -s MAXIMUM_MEMORY=512MB `
     -s "EXPORTED_RUNTIME_METHODS=ccall,cwrap,HEAPU8,HEAPU32,HEAP32,HEAPF32" `
     -s "EXPORTED_FUNCTIONS=$exportedFunctions" `
-    -o resources/wasm/cubiomes.js
+    -o $jsOut
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "emcc compilation failed (exit code $LASTEXITCODE)"
     exit 1
 }
 
-$wasmSize = (Get-Item "resources/wasm/cubiomes.wasm").Length
-$jsSize = (Get-Item "resources/wasm/cubiomes.js").Length
+$wasmSize = (Get-Item $wasmOut).Length
+$jsSize = (Get-Item $jsOut).Length
 Write-Host ""
 Write-Host "cubiomes WASM compiled successfully:" -ForegroundColor Green
-Write-Host "  resources/wasm/cubiomes.js   ($jsSize bytes)" -ForegroundColor Gray
-Write-Host "  resources/wasm/cubiomes.wasm ($wasmSize bytes)" -ForegroundColor Gray
+Write-Host "  public/seedmap/cubiomes.js   ($jsSize bytes)" -ForegroundColor Gray
+Write-Host "  public/seedmap/cubiomes.wasm ($wasmSize bytes)" -ForegroundColor Gray

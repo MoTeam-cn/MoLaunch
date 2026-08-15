@@ -230,7 +230,7 @@ export async function openImageViewerWindow(params: {
 /**
  * 打开 Markdown 渲染窗口
  *
- * 通过 res:// 协议加载后端嵌入的 marked.min.js 渲染 markdown 文本。
+ * 依赖库由后端 picker scheme 内联注入，渲染 markdown 文本。
  *
  * @param params.title 标题
  * @param params.content Markdown 文本

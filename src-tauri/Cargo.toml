@@ -13,8 +13,8 @@ crate-type = ["lib", "cdylib", "staticlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
-# cubiomes 现在通过 Emscripten (emcc) 编译为 WebAssembly（见 build.rs），
-# 不再使用 cc crate 编译为静态库——前端通过 WASM 直接调用，无需 Rust FFI 中转
+# cubiomes 已迁移前端编译（scripts/build-wasm.ps1 → public/seedmap/），
+# 不再使用 cc crate 编译为静态库或经 build.rs 编译——前端通过 WASM 直接调用，无需 Rust FFI 中转
 
 [dependencies]
 # 启用 devtools feature：让 release 构建也支持 open_devtools() 调用

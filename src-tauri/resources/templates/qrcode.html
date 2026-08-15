@@ -85,7 +85,7 @@
       textPreviewEl.textContent = text;
       textPreviewEl.title = text;
 
-      // qrcode.min.js 已由后端内联注入（避免 res:// 跨源加载问题）
+      // qrcode.min.js 已由后端内联注入（避免子窗口跨源加载依赖库）
       try {
         if (typeof QRCode === 'undefined') {
           loadingEl.innerHTML = '<div class="error">二维码库加载失败</div>';

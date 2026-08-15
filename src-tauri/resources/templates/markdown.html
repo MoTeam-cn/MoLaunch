@@ -111,7 +111,7 @@
       document.title = DATA.title;
     }
 
-    // marked.min.js 已由后端内联注入（避免 res:// 跨源加载问题）
+    // marked.min.js 已由后端内联注入（避免子窗口跨源加载依赖库）
     try {
       var markdownText = DATA.content || '';
       if (typeof marked !== 'undefined') {

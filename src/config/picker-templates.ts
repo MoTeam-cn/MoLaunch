@@ -102,20 +102,19 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     ].join('; '),
   },
 
-  /** Markdown 渲染页面（通过 res:// 加载 marked.min.js） */
+  /** Markdown 渲染页面（依赖库由 scheme.rs 内联注入） */
   'markdown': {
     template: 'markdown',
     title: '文档',
     width: 720,
     height: 560,
-    // marked/dompurify 由 scheme.rs 内联注入，需保留 'unsafe-inline'；
-    // 保留 res: 兼容模板内其他 res:// 资源引用（Windows 上转为 https://res.localhost/）
+    // marked/dompurify 由 scheme.rs 内联注入，需保留 'unsafe-inline'
     csp: [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' res: https://res.localhost",
+      "script-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
-      "connect-src 'self' picker: res: https://res.localhost",
+      "connect-src 'self' picker:",
     ].join('; '),
   },
 
@@ -143,14 +142,13 @@ export const PICKER_TEMPLATES: Record<string, PickerTemplateConfig> = {
     title: '二维码',
     width: 360,
     height: 420,
-    // qrcode.min.js 由 scheme.rs 内联注入，需保留 'unsafe-inline'；
-    // 保留 res: 兼容模板内其他 res:// 资源引用（Windows 上转为 https://res.localhost/）
+    // qrcode.min.js 由 scheme.rs 内联注入，需保留 'unsafe-inline'
     csp: [
       "default-src 'self'",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self' 'unsafe-inline' res: https://res.localhost",
+      "script-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob:",
-      "connect-src 'self' picker: res: https://res.localhost",
+      "connect-src 'self' picker:",
     ].join('; '),
   },
 }

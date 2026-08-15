@@ -1,17 +1,15 @@
 //! Build script
 //!
 //! 1. 调用 Tauri build 生成 IPC 类型与配置
-//! 2. 调用 Emscripten (emcc) 将 cubiomes C 源码编译为 WebAssembly
-//! 3. 自动构建 updater.exe（Windows 便携版更新器，仅 Windows 平台）
+//! 2. 自动构建 updater.exe（Windows 便携版更新器，仅 Windows 平台）
 //!
-//! emcc 相关逻辑已模块化到 build_script/ 子目录：
-//! - build_script/cubiomes_wasm.rs：编译入口、源文件清单、增量编译判断
-//! - build_script/emsdk.rs：emcc 可执行文件查找与环境变量配置
+//! build 逻辑已模块化到 build_script/ 子目录：
+//! - build_script/easytier.rs：检查 easytier-core 嵌入式资源
 //! - build_script/updater.rs：updater.exe 增量构建（仅 Windows）
+//! - cubiomes WASM 已迁移前端编译（scripts/build-wasm.ps1 → public/seedmap/），本脚本不再负责
 
 mod build_script;
 
-use build_script::cubiomes_wasm::compile_cubiomes_wasm;
 use std::path::Path;
 
 fn main() {
@@ -23,10 +21,6 @@ fn main() {
     // 同步项目许可协议（根目录 LICENSE → resources/LICENSE.txt 副本）
     // resources.rs 通过 include_str! 在编译期嵌入二进制，确保每次打包都包含最新许可协议
     sync_license();
-
-    // 自动编译 cubiomes 到 WASM（每次 cubiomes 源码变化时重新编译）
-    compile_cubiomes_wasm();
-    println!("cargo:rerun-if-changed=cubiomes");
 
     // 自动构建 updater.exe 并复制到 resources/updater/（仅 Windows）
     #[cfg(target_os = "windows")]

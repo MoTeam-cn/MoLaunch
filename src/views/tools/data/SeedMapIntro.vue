@@ -60,7 +60,7 @@ function toggle() {
             <span class="font-medium text-primary-600">cubiomes</span>（C 库，Emscripten 编译为 WASM），
             本项目使用 <span class="font-medium text-primary-600">MoTeam-cn/cubiomes</span> 分支，
             原生支持 MC 1.7~26.2 的群系、高度图与结构生成。WASM 加载采用 new Function +
-            instantiateWasm 回调预实例化，避免 res:// 协议下 fetch 兼容性问题；每次调用后重新
+            instantiateWasm 回调预实例化（cubiomes.{js,wasm} 为前端静态资源）；每次调用后重新
             读取 HEAPU8 防止内存增长导致视图 detach。多 Worker 串行队列处理生成与查找任务，
             结构查找按 region 遍历（regionSize × 16 转 block），大范围自动分块调用
             callChunkFinder 合并结果。性能上启用 tile 缓存（cacheSize 4096）、preload 预加载

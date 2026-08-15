@@ -93,8 +93,7 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
 
         // 注入依赖库（markdown 模板需要 marked/dompurify，qrcode 模板需要 qrcode）
         // tutorial-* 模板使用 base-help.html 硬编码 HTML，无需注入依赖库
-        // 直接内联嵌入避免 res:// 跨源加载（picker 子窗口 origin 为 https://picker.localhost/，
-        // res:// 资源在 Windows 上转为 https://res.localhost/，跨源 script 加载受 CSP 限制）
+        // 直接内联嵌入（picker 子窗口跨源 script 加载受 CSP 限制）
         let lib_script = match template_name.as_str() {
             "markdown" => inject_libs(&["view/marked.min.js", "view/dompurify.min.js"]),
             "qrcode" => inject_libs(&["view/qrcode.min.js"]),

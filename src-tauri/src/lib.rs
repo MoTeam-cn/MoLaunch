@@ -11,7 +11,6 @@ pub mod http;
 pub mod logger;
 pub mod migrations;
 pub mod minecraft;
-pub mod res_scheme;
 pub mod resources;
 pub mod sdk;
 pub mod splash;
@@ -25,13 +24,13 @@ use tauri::Emitter;
 use tauri::Manager;
 
 /// 判定 webview 导航是否为本应用内部 URL。
-/// 仅放行：内置协议（tauri/res/cache-image/picker/picker-result/molaunch）与
+/// 仅放行：内置协议（tauri/cache-image/picker/picker-result/molaunch）与
 /// http(s) 下 localhost 及 *.localhost 主机（开发服务器、生产 tauri.localhost、
 /// Windows 上自定义协议映射的 https://{scheme}.localhost）。
 /// 其余一律拦截，防止外部站点在 webview 内直接加载（页面会困在应用内无法关闭）。
 fn is_internal_navigation(url: &tauri::Url) -> bool {
     match url.scheme() {
-        "tauri" | "res" | "cache-image" | "picker" | "picker-result" | "molaunch" => true,
+        "tauri" | "cache-image" | "picker" | "picker-result" | "molaunch" => true,
         "http" | "https" => url
             .host_str()
             .is_some_and(|host| host == "localhost" || host.ends_with(".localhost")),
@@ -301,10 +300,6 @@ pub fn run() {
     // 注册 cache-image 自定义 URI scheme（图片缓存协议，抽离至 minecraft::image_cache）
     log_info!("[Startup] Registering cache-image URI scheme...");
     let builder = minecraft::image_cache::register_uri_scheme(builder);
-
-    // 注册 res:// 自定义 URI scheme（前端访问后端嵌入资源，如 WASM 文件）
-    log_info!("[Startup] Registering res:// URI scheme...");
-    let builder = res_scheme::register_res_scheme(builder);
 
     // 注册 picker:// 自定义 URI scheme（选择器子窗口 HTML 渲染）
     log_info!("[Startup] Registering picker URI scheme...");
