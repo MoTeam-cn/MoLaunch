@@ -18,6 +18,8 @@
 
 - **创建房间页面整合包改回收进「高级设置」抽屉，减少页面堆积**（[CreateRoomForm.vue](src/components/online/CreateRoomForm.vue) / [useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts)）：整合包选择器与需求卡片不再平铺在创建表单中，收进「高级设置」右侧抽屉（420px）；入口按钮带齿轮图标，已勾选整合包时显示「已关联整合包」状态徽章（`advancedBadge`/`advancedBadgeActive`，基于整合包勾选状态，白名单已在 Scaffolding 收敛中移除故不涉及）。
 
+- **加入方首次进房组网成功后提示「当前成功与主网络组网，可以开始游玩」**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：进入加入方面板自动执行探测（`scaffolding_client_probe`，含 easytier 组网 + 房主 MC 服务发现），成功后 toast 提示可开始游玩，失败仍提示探测错误；手动「重新探测进服地址」保持原行为（仅失败时提示），避免重复打扰。
+
 ### Fixed
 
 - **修复从大厅加入房间返回「房间码格式无效」**（[room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs)）：大厅传入的 `code_id` 是 N 段公开标识（如 `YNZE-U61D`），而 api-server `join_room` 的 `valid_format` 只接受完整 21 位 `U/` 前缀码，N 段必然校验失败返回 400 InvalidRoomCode——服务端修复见 api-server 侧 CHANGELOG（`join`/`info` 兼容 N 段）。客户端侧同步修复：完整码含 `U/` 前缀，`/` 作为路径参数会拆断 axum 路由段，本次在 `signaling_get_room`/`signaling_join_room`/`signaling_close_room` 三个端点统一用 `urlencoding::encode` 对房间码做 URL 编码（`/` → `%2F`，axum 自动解码），消除完整码加入/查询/关闭时因路径拆断导致的 404/400。

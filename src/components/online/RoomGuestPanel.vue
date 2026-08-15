@@ -22,7 +22,7 @@ const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.v
 const ModpackRequirementCard = defineAsyncComponent(() => import('./ModpackRequirementCard.vue'))
 const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
 import { showConfirm } from '@/utils/modal'
-import { toastError } from '@/utils/toast'
+import { toastError, toastSuccess } from '@/utils/toast'
 import { copyToClipboard } from '@/utils/clipboard'
 import {
   XCircleIcon,
@@ -78,6 +78,16 @@ async function reProbe() {
   }
 }
 
+/** 首次进入房间：组网 + 探测成功后提示可开始游玩 */
+async function initialProbe() {
+  const res = await session.reconnect.reconnect()
+  if (res.ok) {
+    toastSuccess('当前成功与主网络组网，可以开始游玩')
+  } else {
+    toastError(`探测失败：${res.error ?? '未知错误'}`)
+  }
+}
+
 /** 退出房间：停 easytier + 清空本地状态 */
 function handleLeaveRoom() {
   showConfirm(
@@ -102,7 +112,7 @@ async function copyText(text: string) {
 
 onMounted(() => {
   if (room.value.role === 'guest' && room.value.roomCode) {
-    void reProbe()
+    void initialProbe()
   }
 })
 </script>
