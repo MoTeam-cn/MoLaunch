@@ -199,11 +199,7 @@ function missingParentInChain(
     seen.add(id)
     // assets key 不带 minecraft: 前缀，查询时回退无前缀形式
     const json = packModels.get(id) ?? vanillaModels[id] ?? vanillaModels[id.slice(id.indexOf(':') + 1)]
-    if (json == null || typeof json !== 'object') {
-      // vanilla item 模板（item/generated、item/handheld 等）与 builtin 平面由 generated 兜底，不算断链
-      if (isVanillaFallback(id)) continue
-      return id
-    }
+    if (json == null || typeof json !== 'object') return id
     const parent = (json as Record<string, unknown>).parent
     if (typeof parent !== 'string') continue
     if (
@@ -218,11 +214,6 @@ function missingParentInChain(
   return null
 }
 
-/** minecraft:item/* 与 minecraft:builtin/* 命名空间：lodestone 未内置或为特殊平面，统一以 generated 平面兜底 */
-function isVanillaFallback(id: string): boolean {
-  return id.startsWith('minecraft:item/') || id.startsWith('minecraft:builtin/')
-}
-
 let fallbackItemModel: BlockModel | null = null
 
 function getFallbackItemModel(): BlockModel {
@@ -230,19 +221,22 @@ function getFallbackItemModel(): BlockModel {
   return fallbackItemModel
 }
 
-/** 模型读取：pack 优先 → vanilla 回退 → vanilla item/builtin 模板以 generated 平面兜底 */
+/** 模型读取：pack 优先 → vanilla 回退 → 任意缺失 id 以 generated 平面兜底（layer0 纹理仍可显示） */
 function buildModelProvider(
   blockModels: Map<string, BlockModel>,
   vanilla: VanillaPackBase,
 ): BlockModelProvider {
+  const warned = new Set<string>()
   return {
     getBlockModel(id) {
       const key = String(id)
-      return (
-        blockModels.get(key) ??
-        vanilla.resources.getBlockModel(id) ??
-        (isVanillaFallback(key) ? getFallbackItemModel() : null)
-      )
+      const found = blockModels.get(key) ?? vanilla.resources.getBlockModel(id)
+      if (found) return found
+      if (!warned.has(key)) {
+        warned.add(key)
+        console.warn(`[preview] 模型 ${key} 缺失，已回退 generated 平面（带 layer0 纹理仍可显示）`)
+      }
+      return getFallbackItemModel()
     },
   }
 }
@@ -297,9 +291,7 @@ export async function buildPreviewResources(
 
   const missing = missingParentInChain(modelId, packModels, vanilla.assets.models)
   if (missing) {
-    throw new Error(
-      `模型依赖缺失，无法 3D 渲染：${missing}（资源包与原版资源中均不存在）`,
-    )
+    console.warn(`[preview] parent 链存在缺失模型 ${missing}，已回退 generated 平面渲染`)
   }
 
   const blockDefinitions = new Map<string, BlockDefinition>()
@@ -316,7 +308,19 @@ export async function buildPreviewResources(
   const modelAccessor: BlockModelProvider = buildModelProvider(blockModels, vanilla)
   for (const m of blockModels.values()) m.flatten(modelAccessor)
 
+  const target = blockModels.get(modelId) as
+    | { elements?: unknown[]; textures?: Record<string, string> }
+    | undefined
+  console.log(
+    `[preview] 渲染模型 ${modelId}：elements=${target?.elements?.length ?? 0}，` +
+      `layer0=${target?.textures?.layer0 ?? '(无)'}，packModels=${packModels.size}，packTextures=${packTextures.size}`,
+  )
+
   const atlas = await mergeAtlas(vanilla, packTextures)
+  const layer0 = target?.textures?.layer0
+  if (layer0) {
+    console.log(`[preview] 纹理 ${layer0} UV=${JSON.stringify(atlas.idMap[layer0] ?? atlas.missingUV)}`)
+  }
 
   return {
     resources: createPreviewResources(atlas, blockDefinitions, blockModels, vanilla),

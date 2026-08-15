@@ -86,6 +86,7 @@ async function loadPreview() {
     await renderer.whenReady()
     if (renderer) startLoop()
   } catch (e) {
+    console.error('[preview] 3D 预览加载失败:', e)
     error.value = e instanceof Error ? e.message : String(e)
     emit('failed', error.value)
   } finally {
