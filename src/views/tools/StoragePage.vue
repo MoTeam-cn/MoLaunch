@@ -7,6 +7,7 @@
  * - NBT 编辑器（level.dat / playerdata / region .mca）
  * - 截图批量管理
  * - 资源包转换
+ * - 资源包编辑器（不进入游戏可视化查看/编辑资源包）
  * - 种子地图
  *
  * 深链支持：URL `?subtab=screenshot` 可直接切到对应子页签。
@@ -14,11 +15,12 @@
 import { onMounted, ref, defineAsyncComponent } from 'vue'
 import { useRoute } from 'vue-router'
 const SubTabBar = defineAsyncComponent(() => import('@/components/common/SubTabBar.vue'))
-import { CameraIcon, FolderIcon, MapIcon, PhotoIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
+import { CameraIcon, CubeIcon, FolderIcon, MapIcon, PhotoIcon, TableCellsIcon } from '@heroicons/vue/24/outline'
 const ArchiveManager = defineAsyncComponent(() => import('./archive/ArchiveManager.vue'))
 const NbtViewer = defineAsyncComponent(() => import('./data/NbtViewer.vue'))
 const ScreenshotManager = defineAsyncComponent(() => import('./data/ScreenshotManager.vue'))
 const ResourcePackConverter = defineAsyncComponent(() => import('./data/ResourcePackConverter.vue'))
+const ResourcePackEditor = defineAsyncComponent(() => import('./data/ResourcePackEditor.vue'))
 const SeedMap = defineAsyncComponent(() => import('./data/SeedMap.vue'))
 
 const subTabs = [
@@ -26,6 +28,7 @@ const subTabs = [
   { id: 'nbt', label: 'NBT 编辑器', icon: TableCellsIcon },
   { id: 'screenshot', label: '截图管理', icon: CameraIcon },
   { id: 'resourcepack', label: '资源包转换', icon: PhotoIcon },
+  { id: 'resourcepack-editor', label: '资源包编辑器', icon: CubeIcon },
   { id: 'seedmap', label: '种子地图', icon: MapIcon },
 ]
 const activeSubTab = ref('archive')
@@ -45,11 +48,12 @@ onMounted(() => {
     <SubTabBar v-model="activeSubTab" :tabs="subTabs" sticky />
 
     <div class="p-6">
-      <div class="mx-auto max-w-3xl">
+      <div class="mx-auto" :class="activeSubTab === 'resourcepack-editor' ? 'max-w-6xl' : 'max-w-3xl'">
         <ArchiveManager v-if="activeSubTab === 'archive'" />
         <NbtViewer v-else-if="activeSubTab === 'nbt'" />
         <ScreenshotManager v-else-if="activeSubTab === 'screenshot'" />
         <ResourcePackConverter v-else-if="activeSubTab === 'resourcepack'" />
+        <ResourcePackEditor v-else-if="activeSubTab === 'resourcepack-editor'" />
         <SeedMap v-else />
       </div>
     </div>

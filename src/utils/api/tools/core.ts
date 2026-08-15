@@ -51,6 +51,9 @@ export const TOOLS_ACTIONS = {
   // 资源包转换
   RESOURCEPACK_LIST: 'resourcepack_list',
   RESOURCEPACK_CONVERT: 'resourcepack_convert',
+  // 资源包可视化编辑器
+  RP_OPEN: 'rp_open',
+  RP_READ: 'rp_read',
   // 版本 JSON 编辑
   VERSION_JSON_READ: 'version_json_read',
   VERSION_JSON_SAVE: 'version_json_save',
