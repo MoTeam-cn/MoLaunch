@@ -9,7 +9,7 @@
  * 避免遮挡下拉框选项导致无法框选。
  */
 
-import { ref, nextTick, onUnmounted } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, onUpdated, ref } from 'vue'
 
 interface Props {
   text: string
@@ -17,12 +17,15 @@ interface Props {
   delay?: number
   /** 是否以块级元素渲染（宽度撑满父容器），默认 false（inline-flex，宽度收缩到内容） */
   block?: boolean
+  /** 仅当内容被省略（文本溢出）时才显示 tooltip，默认 false（始终显示） */
+  overflowOnly?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
   position: 'top',
   delay: 300,
   block: false,
+  overflowOnly: false,
 })
 
 const visible = ref(false)
@@ -30,11 +33,45 @@ const triggerRef = ref<HTMLElement | null>(null)
 const tipRef = ref<HTMLElement | null>(null)
 const tipStyle = ref<Record<string, string>>({})
 const arrowStyle = ref<Record<string, string>>({})
+/** overflowOnly 模式：内容是否被省略（存在 scrollWidth > clientWidth 的元素） */
+const overflowed = ref(false)
+const canShow = computed(() => !props.overflowOnly || overflowed.value)
 let timer: ReturnType<typeof setTimeout> | null = null
 let hideTimer: ReturnType<typeof setTimeout> | null = null
 let observer: MutationObserver | null = null
+let resizeObserver: ResizeObserver | null = null
+
+/** 递归查找 trigger 子树中文本溢出（scrollWidth > clientWidth）的元素 */
+function detectOverflow(): boolean {
+  const root = triggerRef.value
+  if (!root) return false
+  const stack: Element[] = [...root.children]
+  while (stack.length) {
+    const el = stack.pop()!
+    if (el.scrollWidth > el.clientWidth + 1) return true
+    if (el.children.length) stack.push(...el.children)
+  }
+  return false
+}
+
+function refreshOverflow() {
+  overflowed.value = detectOverflow()
+}
+
+onMounted(() => {
+  if (!props.overflowOnly) return
+  refreshOverflow()
+  if (triggerRef.value) {
+    resizeObserver = new ResizeObserver(refreshOverflow)
+    resizeObserver.observe(triggerRef.value)
+  }
+})
+
+onUpdated(refreshOverflow)
 
 function show() {
+  // overflowOnly 模式下内容未省略时不需要提示
+  if (props.overflowOnly && !overflowed.value) return
   // 清除待执行的隐藏定时器（鼠标从 tooltip body 移回 trigger 时取消隐藏）
   if (hideTimer) { clearTimeout(hideTimer); hideTimer = null }
   timer = setTimeout(() => {
@@ -172,6 +209,7 @@ onUnmounted(() => {
   if (timer) clearTimeout(timer)
   if (hideTimer) clearTimeout(hideTimer)
   stopObserver()
+  resizeObserver?.disconnect()
 })
 </script>
 
@@ -179,7 +217,7 @@ onUnmounted(() => {
   <div ref="triggerRef" class="tooltip-trigger" :class="{ 'tooltip-trigger--block': block }" @mouseenter="show" @mouseleave="hide" @focus="show" @blur="hide">
     <slot />
     <teleport to="body">
-      <div v-if="visible && text" ref="tipRef" :style="tipStyle" class="tooltip-body" @mouseenter="cancelHide" @mouseleave="hide">
+      <div v-if="visible && text && canShow" ref="tipRef" :style="tipStyle" class="tooltip-body" @mouseenter="cancelHide" @mouseleave="hide">
         {{ text }}
         <div class="tooltip-arrow" :style="arrowStyle"></div>
       </div>

@@ -6,6 +6,7 @@
  */
 import { defineAsyncComponent } from 'vue'
 import { formatBytes } from '@/utils/format'
+import Tooltip from '@/components/common/Tooltip.vue'
 import type { RpTreeNode } from '@/utils/api/tools'
 import {
   ChevronRightIcon,
@@ -30,7 +31,6 @@ const emit = defineEmits<{
 }>()
 
 const RpFileTreeNode = defineAsyncComponent(() => import('./RpFileTreeNode.vue'))
-const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 
 function isExpanded(relPath: string) {
   return props.expandedSet.has(relPath)
@@ -64,7 +64,7 @@ function handleClick(child: RpTreeNode) {
 <template>
   <div>
     <div v-for="child in node.children" :key="child.rel_path">
-      <Tooltip :text="child.rel_path" block>
+      <Tooltip :text="child.rel_path" block overflow-only>
         <div
           class="flex cursor-pointer select-none items-center gap-1 rounded px-1.5 py-0.5 text-sm"
           :class="

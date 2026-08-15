@@ -5,10 +5,10 @@
  * blockstate/模型 JSON → rp_read_many 批量读取引用链 → 合并原版资源构建
  * Resources → Structure([1,1,1]) 单方块渲染。拖拽旋转，滚轮缩放。
  */
-import { defineAsyncComponent, onBeforeUnmount, ref, watch } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 import { CubeTransparentIcon, CursorArrowRaysIcon } from '@heroicons/vue/24/outline'
 import { Structure, ThreeStructureRenderer } from '@mattzh72/lodestone'
-const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+import Tooltip from '@/components/common/Tooltip.vue'
 import { rpReadMany } from '@/utils/api/tools'
 import { buildPreviewResources } from '@/utils/resourcepack/previewResources'
 
@@ -125,7 +125,7 @@ onBeforeUnmount(disposeRenderer)
   <div class="space-y-3">
     <div class="flex items-center gap-2">
       <CubeTransparentIcon class="h-4 w-4 shrink-0 text-gray-500" />
-      <Tooltip :text="name" class="min-w-0 flex-1 truncate">
+      <Tooltip :text="name" class="min-w-0 flex-1 truncate" overflow-only>
         <h4 class="w-full truncate text-sm font-medium text-gray-700">{{ name }}</h4>
       </Tooltip>
       <span class="flex shrink-0 items-center gap-1 text-xs text-gray-400">

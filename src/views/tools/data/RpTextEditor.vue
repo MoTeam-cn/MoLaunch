@@ -6,8 +6,8 @@
  */
 import { computed, ref, watch, defineAsyncComponent } from 'vue'
 import { CheckIcon, DocumentTextIcon, ExclamationTriangleIcon } from '@heroicons/vue/24/outline'
+import Tooltip from '@/components/common/Tooltip.vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
-const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { rpWrite } from '@/utils/api/tools'
 
@@ -88,7 +88,7 @@ async function doSave() {
   <div class="space-y-2">
     <div class="flex items-center gap-2">
       <DocumentTextIcon class="h-4 w-4 shrink-0 text-gray-500" />
-      <Tooltip :text="name" class="min-w-0 flex-1 truncate">
+      <Tooltip :text="name" class="min-w-0 flex-1 truncate" overflow-only>
         <h4 class="w-full truncate text-sm font-medium text-gray-700">{{ name }}</h4>
       </Tooltip>
       <span class="min-w-0 truncate text-xs text-gray-400">{{ relPath }}</span>
