@@ -108,7 +108,7 @@ async function doSave() {
       v-model="text"
       rows="12"
       spellcheck="false"
-      class="w-full resize-y rounded border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
+      class="h-[300px] w-full resize-y rounded border border-gray-200 bg-gray-50 p-3 font-mono text-xs text-gray-700 focus:border-blue-400 focus:outline-none"
       placeholder="文件内容..."
     ></textarea>
     <div class="flex items-center gap-2">
