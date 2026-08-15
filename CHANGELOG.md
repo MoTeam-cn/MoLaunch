@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **恢复联机侧边栏「房间管理」子菜单，新增「房间详情」子项**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue)）：侧边栏从扁平「设备 / 联机大厅 / 创建房间 / 加入房间」恢复为「设备 / 联机大厅 / 房间管理（创建房间 · 加入房间 · 房间详情）+ FRP」子菜单结构；在房间中时「创建房间」「加入房间」置灰（disabled，需先退出房间），未在房间时「房间详情」置灰；进入房间自动切到「房间详情」（`room_details` 按角色回落 RoomManager：房主→create、房客→join），离开房间且当前在房间详情时切回创建房间；保留云端离线封禁（sealed）与 `?tab=` 恢复机制。「大厅重复加入」已由 LobbyBrowser `inRoom` 双检查防护（`handleJoin`/`doJoin` 拦截 + 卡片按钮置灰）。
+
 - **设备页面新增「虚拟组网（easytier）」状态卡片，后端 emit 推送运行状态**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs) / [EasyTierStatusCard.vue](src/components/online/EasyTierStatusCard.vue)）：① 后端 `EasyTier` 新增 `version` 字段（启动时执行 `--version` 查询，失败为空串）；② 新增 `easytier-status` 事件——`easytier_join`/`scaffolding_host_start`/`scaffolding_client_probe` 加入成功、`easytier_stop`/`scaffolding_host_stop` 停止后推送 `{joined, version, pid, rpcPortal}`；③ 新增 `easytier_status` IPC 查询动作（页面打开兜底拉取）；④ 前端设备面板新增 easytier 状态卡片，展示组网状态徽章 / core 版本 / 虚拟网络 / 虚拟 IP / 进程 PID，`useTauriEvent` 监听事件实时同步到 store。
 
 - **设备页面加回 NAT 类型检测**（[nat.ts](src/types/online/nat.ts) / [nat.ts](src/utils/online/nat.ts) / [natSlice.ts](src/stores/online/natSlice.ts)）：恢复基于 WebRTC ICE candidate 的 STUN 探测实现（`detectNatTypeWithStun`，host/srflx 组合推断 openCone/restrictedCone/symmetric/blocked），含类型定义、`NAT_TYPE_META` 展示映射与 store `detectNat`/`forceDetectNat` 切片；设备页「网络环境」卡片展示 NAT 类型徽章（tooltip 说明联机可行性）+ 重新检测按钮。

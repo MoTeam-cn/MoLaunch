@@ -1,18 +1,25 @@
 /**
  * Online 联机页导航分类与状态联动 composable
  *
- * 分类扁平化为：设备 / 联机大厅 / 创建房间 / 加入房间（+ FRP 子菜单）。
+ * 分类结构（恢复历史子菜单）：
+ * - 设备 / 联机大厅 / 房间管理（创建房间·加入房间·房间详情 子菜单）+ FRP 子菜单
+ * - 未在房间：「创建房间」「加入房间」可用，「房间详情」灰色
+ * - 在房间中：「创建房间」「加入房间」灰色（必须先退出），「房间详情」可用
+ *
  * 就绪判定仅依赖「已注册 + 已登录」（不判断本地 token 过期，由后端自动续期）；
- * isReady watch 从 URL ?tab= 恢复激活项，isInRoom watch 进出房间自动切换分类。
+ * 云端离线（cloudConnected=false）时联机分类封禁置灰（点击由 Online.vue 拦截弹窗）。
+ * isReady watch 从 URL ?tab= 恢复激活项，isInRoom watch 进出房间自动切换「房间详情」。
  */
 
 import { computed, watch, type Ref, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   DevicePhoneMobileIcon,
-  GlobeAltIcon,
+  ServerStackIcon,
   PlusIcon,
   ArrowRightOnRectangleIcon,
+  HomeIcon,
+  GlobeAltIcon,
 } from '@heroicons/vue/24/outline'
 import { useOnlineStore } from '@/stores/online'
 import { frpCategory } from '@/composables/useFrpSidebar'
@@ -32,7 +39,7 @@ export interface NavCategory {
 
 /** Online 页激活分类 ID 联合类型（tutorial 为侧边栏动作项，不会真正成为激活态） */
 export type OnlineCategoryId =
-  | 'device' | 'lobby' | 'create' | 'join'
+  | 'device' | 'lobby' | 'create' | 'join' | 'room_details'
   | 'providers' | 'tunnels' | 'auth' | 'logs' | 'tutorial'
 
 /** 设备分类（始终可用） */
@@ -51,25 +58,31 @@ const lobbyCategory: NavCategory = {
   desc: '浏览公开房间列表，按整合包聚类展示并一键加入',
 }
 
-/** 创建房间分类（选整合包 → 生成房间码 → 拉起联机中心） */
-const createCategory: NavCategory = {
-  id: 'create',
-  label: '创建房间',
-  icon: PlusIcon,
-  desc: '选择整合包、生成房间码并作为房主拉起联机中心',
+/** 房间管理分类（已就绪时可用），子菜单：创建房间 / 加入房间 / 房间详情 */
+const roomCategory: NavCategory = {
+  id: 'room',
+  label: '房间管理',
+  icon: ServerStackIcon,
+  desc: '创建或加入房间、管理参与者与连接信息',
+  children: [
+    {
+      id: 'create',
+      label: '创建房间',
+      icon: PlusIcon,
+      desc: '选择整合包、生成房间码并作为房主拉起联机中心',
+    },
+    {
+      id: 'join',
+      label: '加入房间',
+      icon: ArrowRightOnRectangleIcon,
+      desc: '输入 6 位公开标识加入已有房间',
+    },
+  ],
 }
 
-/** 加入房间分类（输码 → 加入网络 → 探测进服地址） */
-const joinCategory: NavCategory = {
-  id: 'join',
-  label: '加入房间',
-  icon: ArrowRightOnRectangleIcon,
-  desc: '输入 6 位公开标识加入已有房间',
-}
-
-/** URL `?tab=` 可恢复的合法分类 ID（device/lobby/create/join + FRP 子项） */
+/** URL `?tab=` 可恢复的合法分类 ID（device/lobby + 房间管理子项 + FRP 子项） */
 const VALID_TABS = new Set<OnlineCategoryId>([
-  'device', 'lobby', 'create', 'join',
+  'device', 'lobby', 'create', 'join', 'room_details',
   'providers', 'tunnels', 'auth', 'logs',
 ])
 
@@ -93,7 +106,7 @@ export function useOnlineNav(
   const status = computed(() => onlineStore.deviceStatus)
 
   /**
-   * 联机功能是否就绪（显示联机大厅 / 创建房间 / 加入房间 / FRP 分类）
+   * 联机功能是否就绪（显示联机大厅 / 房间管理 / FRP 分类）
    *
    * 仅判断「已注册 + 已登录」，**不判断 token_expired**：
    * 后端 `load_creds_with_auto_refresh` 会在业务 action 调用前自动 refresh 续期，
@@ -106,11 +119,21 @@ export function useOnlineNav(
   /** 是否在房间中（role=host/guest） */
   const isInRoom = computed(() => onlineStore.roomState.role !== null)
 
+  /** 房间详情子项（追加到房间管理子菜单，未在房间时 disabled 灰色不可点） */
+  const roomDetailsChild = computed<NavCategory>(() => ({
+    id: 'room_details',
+    label: '房间详情',
+    icon: HomeIcon,
+    desc: '查看当前房间状态、参与者列表与连接信息',
+    disabled: !isInRoom.value,
+  }))
+
   /**
    * 实际渲染的分类列表
    *
    * 云端离线（cloudConnected=false 且初始化已完成）时联机分类封禁置灰
    * （可点击但由 Online.vue 拦截弹窗告知原因），FRP 不受云端影响仍可用。
+   * 已就绪时「房间管理」展开子菜单：创建/加入房间在房间中置灰，房间详情未在房间置灰。
    */
   const categories = computed<NavCategory[]>(() => {
     const offline = !onlineStore.cloudConnected && !onlineStore.initializing
@@ -118,13 +141,23 @@ export function useOnlineNav(
       return [
         deviceCategory,
         { ...lobbyCategory, sealed: true },
-        { ...createCategory, sealed: true },
-        { ...joinCategory, sealed: true },
+        {
+          ...roomCategory,
+          sealed: true,
+          children: roomCategory.children!.map((child) => ({ ...child, sealed: true })),
+        },
         frpCategory,
       ]
     }
     if (!isReady.value) return [deviceCategory]
-    return [deviceCategory, lobbyCategory, createCategory, joinCategory, frpCategory]
+    const inRoom = isInRoom.value
+    const children: NavCategory[] = [
+      { ...roomCategory.children![0], disabled: inRoom },
+      { ...roomCategory.children![1], disabled: inRoom },
+      roomDetailsChild.value,
+    ]
+    const roomWithDetails: NavCategory = { ...roomCategory, children }
+    return [deviceCategory, lobbyCategory, roomWithDetails, frpCategory]
   })
 
   /** 状态徽章文案与颜色 */
@@ -138,18 +171,26 @@ export function useOnlineNav(
     return { text: '需登录', dotClass: 'bg-yellow-500', wrapClass: 'bg-yellow-50 text-yellow-700' }
   })
 
-  /** 当前激活分类的描述 */
+  /** 当前激活分类的描述（子项优先） */
   const activeDesc = computed(() => {
     for (const cat of categories.value) {
       if (cat.id === activeCategory.value) return cat.desc ?? ''
+      if (cat.children) {
+        const child = cat.children.find(c => c.id === activeCategory.value)
+        if (child) return child.desc ?? ''
+      }
     }
     return ''
   })
 
-  /** 当前激活分类的标签 */
+  /** 当前激活分类的标签（子项优先） */
   const activeLabel = computed(() => {
     for (const cat of categories.value) {
       if (cat.id === activeCategory.value) return cat.label
+      if (cat.children) {
+        const child = cat.children.find(c => c.id === activeCategory.value)
+        if (child) return child.label
+      }
     }
     return ''
   })
@@ -173,9 +214,9 @@ export function useOnlineNav(
       return
     }
     if (ready) {
-      // 已进入房间时，无论 URL tab 如何，直接切到对应房主/房客面板
+      // 已进入房间时，无论 URL tab 如何，直接切到房间详情
       if (isInRoom.value) {
-        activeCategory.value = onlineStore.roomState.role === 'guest' ? 'join' : 'create'
+        activeCategory.value = 'room_details'
         return
       }
       const tab = route.query.tab as string | undefined
@@ -194,18 +235,19 @@ export function useOnlineNav(
   /**
    * 房间状态变化时自动切换分类
    *
-   * - 进入房间（role: null → host/guest）：房主切「创建房间」、房客切「加入房间」，
-   *   内容区 RoomManager 按 role 渲染对应面板（进入后不退出，无「房间详情」子项）
-   * - 离开房间（role: host/guest → null）：保持当前分类，RoomManager 恢复表单
+   * - 进入房间（role: null → host/guest）：自动切到「房间详情」（RoomManager 按 role 渲染对应面板）
+   * - 离开房间（role: host/guest → null）：若当前停在「房间详情」，切回创建房间
    */
   watch(isInRoom, (inRoom) => {
     if (inRoom) {
-      activeCategory.value = onlineStore.roomState.role === 'guest' ? 'join' : 'create'
+      activeCategory.value = 'room_details'
+    } else if (activeCategory.value === 'room_details') {
+      activeCategory.value = 'create'
     }
   })
 
   /**
-   * 云端连接状态变化：断开时若停留在被封禁的分类（大厅/创建/加入）强制切回「设备」，
+   * 云端连接状态变化：断开时若停留在被封禁的分类（大厅/房间管理）强制切回「设备」，
    * 避免内容区仍渲染 RoomManager/Lobby 而侧边栏已封禁的不一致状态
    */
   watch(

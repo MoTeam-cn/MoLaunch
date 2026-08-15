@@ -135,7 +135,8 @@ const currentComponent = computed(() => {
     case 'device': return OnlineDevicePanel
     case 'lobby': return LobbyBrowser
     case 'create':
-    case 'join': return RoomManager
+    case 'join':
+    case 'room_details': return RoomManager
     case 'providers': return ProviderList
     case 'tunnels': return TunnelManager
     case 'auth': return AuthCenter
@@ -144,10 +145,17 @@ const currentComponent = computed(() => {
   }
 })
 
-/** 仅 RoomManager 需要 mode prop，其余组件传空对象避免 fallthrough */
+/**
+ * 仅 RoomManager 需要 mode prop，其余组件传空对象避免 fallthrough
+ *
+ * 房间详情（room_details）按角色回落到对应面板：房主 → create，房客 → join
+ */
 const currentProps = computed<Record<string, unknown>>(() => {
   if (activeCategory.value === 'create' || activeCategory.value === 'join') {
     return { mode: activeCategory.value }
+  }
+  if (activeCategory.value === 'room_details') {
+    return { mode: onlineStore.roomState.role === 'guest' ? 'join' : 'create' }
   }
   return {}
 })
