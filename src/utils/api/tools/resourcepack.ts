@@ -54,6 +54,16 @@ export interface RpReadResult {
   error: string
 }
 
+/** 批量读取模型与关联纹理结果（3D 预览） */
+export interface RpReadManyResult {
+  /** 起始文件相对路径 */
+  root: string
+  /** rel_path -> 文件内容（model/blockstate 为 text，关联纹理为 data_uri） */
+  files: Record<string, RpReadResult>
+  /** 失败原因（成功时为空） */
+  error: string
+}
+
 /** 写回单文件参数 */
 export interface RpWriteParams {
   /** 工作目录（rp_open 返回） */
@@ -101,6 +111,14 @@ export function rpOpen(path: string, previousWorkDir?: string): Promise<RpOpenRe
 /** 读取包内单文件（png/ogg → data URI，json/lang/文本 → 原文） */
 export function rpRead(workDir: string, relPath: string): Promise<RpReadResult> {
   return toolsManager<RpReadResult>(TOOLS_ACTIONS.RP_READ, {
+    work_dir: workDir,
+    rel_path: relPath,
+  })
+}
+
+/** 批量读取模型与关联纹理（blockstate/模型 + parent 链 + 被引用纹理 png，供 3D 预览） */
+export function rpReadMany(workDir: string, relPath: string): Promise<RpReadManyResult> {
+  return toolsManager<RpReadManyResult>(TOOLS_ACTIONS.RP_READ_MANY, {
     work_dir: workDir,
     rel_path: relPath,
   })

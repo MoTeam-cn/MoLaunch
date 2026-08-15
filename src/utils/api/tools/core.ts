@@ -54,6 +54,7 @@ export const TOOLS_ACTIONS = {
   // 资源包可视化编辑器
   RP_OPEN: 'rp_open',
   RP_READ: 'rp_read',
+  RP_READ_MANY: 'rp_read_many',
   RP_WRITE: 'rp_write',
   RP_EXPORT: 'rp_export',
   // 版本 JSON 编辑

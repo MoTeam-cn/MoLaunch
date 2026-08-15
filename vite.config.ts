@@ -99,6 +99,11 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      // lodestone 包 exports 未开放 assets 子路径，别名直指 node_modules 实体供 ?url 静态导入
+      '@mattzh72/lodestone/assets': resolve(
+        __dirname,
+        'node_modules/@mattzh72/lodestone/assets',
+      ),
     },
   },
   // Tauri expects a fixed port, fail if that port is not available

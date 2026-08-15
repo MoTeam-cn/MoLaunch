@@ -6,7 +6,7 @@
  * 左文件树右内容分发（mcmeta 表单编辑 / 纹理 2D 预览与替换 / 语言表格编辑 /
  * JSON 文本编辑 / 声音试听）→ 保存回原包 / 另存为 ZIP。
  */
-import { computed, defineAsyncComponent, onMounted, ref } from 'vue'
+import { computed, defineAsyncComponent, onMounted, ref, watch } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const RpFileTreeNode = defineAsyncComponent(() => import('./RpFileTreeNode.vue'))
@@ -15,6 +15,7 @@ const RpTexturePreview = defineAsyncComponent(() => import('./RpTexturePreview.v
 const RpLangTable = defineAsyncComponent(() => import('./RpLangTable.vue'))
 const RpSoundPreview = defineAsyncComponent(() => import('./RpSoundPreview.vue'))
 const RpTextEditor = defineAsyncComponent(() => import('./RpTextEditor.vue'))
+const RpModelPreview = defineAsyncComponent(() => import('./RpModelPreview.vue'))
 import { toastError, toastSuccess } from '@/utils/toast'
 import { pickFile, pickDirectory, pickSavePath } from '@/utils/fileDialog'
 import { formatBytes } from '@/utils/format'
@@ -37,11 +38,23 @@ const reading = ref(false)
 const expandedSet = ref<Set<string>>(new Set())
 const listOpen = ref(true)
 const exporting = ref(false)
+/** 模型文件视图模式：false = 3D 预览，true = JSON 文本编辑 */
+const modelEditMode = ref(false)
+
+watch(selectedNode, () => {
+  modelEditMode.value = false
+})
 
 const fileCount = computed(() => countFiles(current.value?.tree))
 const canEditText = computed(() =>
   ['json', 'model', 'text'].includes(selectedNode.value?.file_type ?? ''),
 )
+/** 模型 / blockstate JSON → 3D 预览 */
+const isModelFile = computed(() => {
+  const t = selectedNode.value?.file_type
+  if (t === 'model') return true
+  return t === 'json' && (selectedNode.value?.rel_path ?? '').includes('/blockstates/')
+})
 const textContent = computed(() =>
   fileContent.value?.kind === 'text' ? fileContent.value.content : '',
 )
@@ -331,6 +344,31 @@ async function saveAsZip() {
             v-else-if="selectedNode?.file_type === 'ogg'"
             :src="mediaContent"
           />
+          <!-- 模型 / blockstate：3D 预览 ⇄ JSON 文本编辑 -->
+          <div v-else-if="selectedNode && isModelFile">
+            <RpModelPreview
+              v-if="!modelEditMode"
+              :work-dir="current.work_dir"
+              :rel-path="selectedNode.rel_path"
+              :name="selectedNode.name"
+            />
+            <div v-else class="space-y-2">
+              <p class="text-xs text-gray-400">JSON 文本编辑（切换后内容即时生效）</p>
+              <RpTextEditor
+                :work-dir="current.work_dir"
+                :rel-path="selectedNode.rel_path"
+                :name="selectedNode.name"
+                :file-type="selectedNode.file_type"
+                :content="textContent"
+              />
+            </div>
+            <button
+              class="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700"
+              @click="modelEditMode = !modelEditMode"
+            >
+              {{ modelEditMode ? '返回 3D 预览' : '编辑 JSON' }}
+            </button>
+          </div>
           <div v-else-if="selectedNode && canEditText">
             <p v-if="reading && !fileContent" class="py-8 text-center text-sm text-gray-400">读取中…</p>
             <RpTextEditor
