@@ -37,6 +37,12 @@ pub struct ScaffoldingServerState {
     players: Arc<Mutex<Vec<PlayerEntry>>>,
 }
 
+impl Default for ScaffoldingServerState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScaffoldingServerState {
     /// 创建空的联机中心状态
     pub fn new() -> Self {
