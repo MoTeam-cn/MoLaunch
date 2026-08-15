@@ -38,6 +38,8 @@
 
 ### Changed
 
+- **cubiomes WASM 编译容错：本地无源码时复用入库产物**（[build-wasm.ps1](scripts/build-wasm.ps1) / [prebuild.mjs](scripts/prebuild.mjs)）：本地删除 cubiomes 源码目录后，`npm run build:wasm` 检测到源文件缺失时直接复用已入库的 `src/assets/seedmap` 产物并退出（exit 0），Windows 本地构建/发布不再依赖源码；缺源码且无产物时明确报错提示先运行 update-cubiomes 工作流。
+
 - **修复 CI lint 报错：cubiomes 编译产物不再参与 ESLint**（[.eslintrc.cjs](.eslintrc.cjs)）：`src/assets/seedmap/`（emcc 编译生成的 cubiomes.js/wasm）加入 `ignorePatterns`，与既有产物忽略先例（`src-tauri/resources/view/*.min.js`）一致；此前 CI 的 `npm run lint` 会扫描入库产物并报大量 `globalThis is not defined`（no-undef）。
 
 - **cubiomes submodule 移至项目根目录（前端接管编译）**（[.gitmodules](.gitmodules) / [vite.config.ts](vite.config.ts) / [build-wasm.ps1](scripts/build-wasm.ps1) / [structures.ts](src/utils/seedmap/structures.ts)）：cubiomes 仓库（https://github.com/MoTeam-cn/cubiomes）由 `src-tauri/cubiomes` 移至根目录 `cubiomes/`——该库当前仅用于前端种子地图 WASM 编译，与后端（Rust）无关；`.gitmodules` 的 submodule 注册（path/section）同步改为 `cubiomes`，[vite.config.ts](vite.config.ts) dev 插件监听目录、[build-wasm.ps1](scripts/build-wasm.ps1) 的 cwd（项目根）与输出路径（`src/assets/seedmap`）、[structures.ts](src/utils/seedmap/structures.ts) 注释均调整为项目根相对路径。

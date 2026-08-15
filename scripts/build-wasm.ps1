@@ -5,13 +5,16 @@
 #       dev 由 dev server 提供，build 由 Vite 处理为带 hash 的产物）。
 #
 # 定位：cubiomes 归前端管理后的唯一编译入口。
+#   - 产物维护：GitHub Actions 的 update-cubiomes 工作流自动检测上游更新并编译提交，
+#     本地开发环境默认不保留 cubiomes 源码目录
 #   - 发布流程：tauri.conf.json beforeBuildCommand 先执行本脚本再跑 Vite build
 #   - 手动验证：npm run build:wasm
 #
-# 容错：emcc 不可用（未装 emsdk）时，若 src/assets/seedmap 产物已存在则跳过，
-#       直接使用入库产物，保证无 Emscripten 环境也能构建。
+# 容错：本地缺 cubiomes 源码（产物由工作流维护）或 emcc 不可用（未装 emsdk）时，
+#       若 src/assets/seedmap 产物已存在则跳过，直接使用入库产物，
+#       保证无 Emscripten 环境也能构建。
 #
-# 增量：所有 .c/.h 源文件都不比产物新时跳过编译（改源码后自动触发重编译）。
+# 增量：所有 .c/.h 源文件都不比产物新时跳过编译（工作流环境有源码时生效）。
 #
 # 前置条件（需要重编译时）：已安装 emsdk 并激活：
 #     cd <emsdk 目录>
@@ -50,6 +53,18 @@ $sources = @(
     # WASM 端通过 ccall 调用这些封装函数
     "cubiomes/cubiomes_wrapper.c"
 )
+
+# 本地开发默认无 cubiomes 源码（产物由 GitHub Actions 的 update-cubiomes 工作流维护）：
+# 缺源码时若有入库产物则直接复用，否则报错提示先运行工作流
+$missingSources = @($sources | Where-Object { -not (Test-Path $_) })
+if ($missingSources.Count -gt 0) {
+    if (Test-Path $wasmOut -and (Test-Path $jsOut)) {
+        Write-Host "缺少 cubiomes 源码（$($missingSources[0])），复用已入库产物（$wasmOut）" -ForegroundColor Yellow
+        exit 0
+    }
+    Write-Error "缺少 cubiomes 源码（$($missingSources -join ', ')）且无入库产物，请先在 GitHub Actions 运行 update-cubiomes 工作流生成产物。"
+    exit 1
+}
 
 # 增量判断：产物存在且所有 .c/.h 源文件都不比产物新 → 跳过
 function Test-IncrementalSkip {
