@@ -1,5 +1,5 @@
 // 构建前置：先编译 cubiomes WASM，再执行 Vite build。
-// - Windows：走 scripts/build-wasm.ps1（含增量判断；本地无 cubiomes 源码或 emcc 缺失时复用入库产物）
+// - Windows：走 scripts/build-wasm.cjs（含增量判断；本地无 cubiomes 源码或 emcc 缺失时复用入库产物）
 // - 其他平台：无 emsdk 环境，直接复用仓库已提交的 src/assets/seedmap 产物
 import { spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'

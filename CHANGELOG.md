@@ -14,6 +14,8 @@
 
 ### Changed
 
+- **cubiomes 编译脚本迁移至 Node**（[build-wasm.cjs](scripts/build-wasm.cjs)（新增） / [build-wasm.ps1](scripts/build-wasm.ps1)（删除） / [package.json](package.json) / [prebuild.mjs](scripts/prebuild.mjs) / [build.rs](src-tauri/build.rs)）：`build:wasm` 由 `powershell -File scripts/build-wasm.ps1` 改为 `node scripts/build-wasm.cjs`——Node 18+ 纯内置 API（child_process/fs/path），无 PowerShell 依赖；行为与原 ps1 一致（cubiomes 源码缺失或 emcc 不可用时复用入库产物、`.c/.h` 未变更时增量跳过、emcc 不在 PATH 时自动激活 emsdk 候选目录并直连 emcc），emcc 参数与导出函数清单不变；调用方同步更新（package.json 脚本、prebuild.mjs 注释、update-cubiomes 工作流注释、build.rs 与 Cargo.toml 注释）。
+
 - **cubiomes 恢复为 git submodule 引入**（[.gitmodules](.gitmodules) / [update-cubiomes.yml](.github/workflows/update-cubiomes.yml)）：cubiomes 源码重新以 submodule 形式挂载在项目根目录 `cubiomes/`（指向 https://github.com/MoTeam-cn/cubiomes），仓库结构更直观、本地可直接改上游源码；`update-cubiomes` 工作流同步适配：不再独立 clone 源码，改为 `git submodule update --init --depth 1` + `git submodule update --remote --depth 1` 拉取最新源码编译，submodule 指针变更随 WASM 产物一并提交，产物与上游 commit 记录保持一致。
 
 - **发布工作流构建产物设置显式 7 天保留**（[release.yml](.github/workflows/release.yml)）：`windows-setup` / `macos-package` / `linux-package` / `windows-portable` 四个 upload-artifact 步骤此前未设置 `retention-days`，继承仓库默认保留（GitHub 默认最长 90 天）；产物实际仅用于同一次运行内跨 job 传递（最终安装包已附加到 GitHub Release / 推 S3 永久保存），现统一显式 `retention-days: 7`，与 api-server 发布工作流一致，及时释放 Actions 存储空间。

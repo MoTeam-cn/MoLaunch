@@ -12,7 +12,7 @@
     "lint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix --ignore-path .gitignore",
     "typecheck": "vue-tsc --noEmit",
     "test": "vitest",
-    "build:wasm": "powershell -ExecutionPolicy Bypass -File scripts/build-wasm.ps1"
+    "build:wasm": "node scripts/build-wasm.cjs"
   },
   "dependencies": {
     "@heroicons/vue": "^2.2.0",
