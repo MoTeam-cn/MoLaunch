@@ -268,6 +268,8 @@
 
 - **peer_count 注释补充**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs)）：说明配置公共中继节点（--peers）时节点数会偏大，由服务端按房间上限钳制。
 
+- **深层链接事件改名 deeplink-new**（[router.rs](src-tauri/src/deeplink/router.rs) / [handlers.rs](src-tauri/src/deeplink/handlers.rs)）：去 :// 前缀统一事件命名风格（与项目 kebab-case 事件名一致，如 easytier-status）；deep-link 插件固定事件 deep-link://new-url 除外（插件生态约定，不可改）。
+
 ### Fixed
 
 - **修复 mca 重打包后解析失败：「mca 文件中没有可解析的区块」（扇区偏移错位）**（[mca.rs](src-tauri/src/commands/tools/nbt/mca.rs) / [nbt_test.rs](src-tauri/src/commands/tools/nbt/nbt_test.rs)）：`save_mca_chunk` 重建文件时位置表以 512B 扇区为单位写入，但 cursor 从 2 开始——位置表指向字节 1024（仍在 8KiB 头部保留区、恒为 0），实际数据却 append 在字节 8192（= 扇区 16），重打包后解析器在错误偏移读到长度 0 而跳过全部区块。修复：cursor 改为 16（8KiB 头部之后第一个扇区），测试夹具 `build_mca` 同步改为标准布局（扇区偏移 16），与生产代码写入位置一致。

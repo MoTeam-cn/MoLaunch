@@ -65,15 +65,15 @@ where
 /// 1. 解析 URL → [`DeeplinkRequest`]
 /// 2. 按 host 段查路由表，找到则 spawn 异步执行 handler
 /// 3. 未注册的路由记 warning（预留扩展点：后续可接"安装方询问"）
-/// 4. 无论是否命中都 emit `deeplink://new` 事件给前端（前端可做页面跳转展示）
+/// 4. 无论是否命中都 emit `deeplink-new` 事件给前端（前端可做页面跳转展示）
 pub fn dispatch(app: &AppHandle, raw: &str) {
     let Some(req) = parse(raw) else {
         return;
     };
     log_info!("[Deeplink] 收到: {}", raw);
 
-    // emit 给前端（前端监听 deeplink://new 做页面跳转）
-    let _ = app.emit("deeplink://new", &req);
+    // emit 给前端（前端监听 deeplink-new 做页面跳转）
+    let _ = app.emit("deeplink-new", &req);
 
     // 查路由表分发
     let host = req.host.clone();

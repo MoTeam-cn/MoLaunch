@@ -47,7 +47,7 @@ pub fn register_builtin() {
 
     // molaunch://open?page=<page_path>
     //
-    // 打开前端指定页面。前端监听 deeplink://new 事件后自行路由，
+    // 打开前端指定页面。前端监听 deeplink-new 事件后自行路由，
     // 这里仅做日志登记（保证有对应 handler 存在）。
     register_sync("open", |_app, req| {
         let page = req.get_str("page").unwrap_or("").to_string();
