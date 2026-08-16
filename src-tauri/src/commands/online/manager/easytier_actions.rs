@@ -153,14 +153,16 @@ async fn probe_mc_port(state: &AppState) -> Option<u16> {
 /// 房主后台监视循环：每 5s 扫描游戏监听端口并回写联机中心。
 ///
 /// - 手动端口设置时跳过自动更新（最高权重），不自动关房；
-/// - 端口连续 `AUTO_CLOSE_FAIL_LIMIT` 次不可达（30s）自动关闭房间并推送事件；
+/// - 从未探测到端口（游戏尚未开局域网）时无限等待（支持先开房后开局域网）；
+///   仅「已探测到过端口后再不可达」连续 `AUTO_CLOSE_FAIL_LIMIT` 次（30s）
+///   自动关闭房间并推送事件；
 /// - 外部 `easytier_stop`/`scaffolding_host_stop` 抢先时（easytier 为 None）直接退出。
 async fn host_watch_loop(
     center_state: ScaffoldingServerState,
     app: tauri::AppHandle,
     state: AppState,
-    mut current_mc_port: Option<u16>,
 ) {
+    let mut current_mc_port: Option<u16> = None;
     let mut fail_count: u32 = 0;
     loop {
         if state.easytier.lock().await.is_none() {
@@ -181,11 +183,15 @@ async fn host_watch_loop(
             .map(crate::minecraft::launch::watcher::ports::listening_tcp_ports)
             .unwrap_or_default();
         if ports.is_empty() {
-            fail_count += 1;
-            if fail_count >= AUTO_CLOSE_FAIL_LIMIT {
-                log_warn!("[Online] 房主监视: MC 端口连续 {fail_count} 次不可达，自动关闭房间");
-                auto_close_room(&state, &app).await;
-                return;
+            // 从未探测到端口（游戏尚未开局域网）→ 无限等待，不累计失败，
+            // 支持「先开房后开局域网」场景；仅「已探测到过端口后再不可达」触发自动关房
+            if current_mc_port.is_some() {
+                fail_count += 1;
+                if fail_count >= AUTO_CLOSE_FAIL_LIMIT {
+                    log_warn!("[Online] 房主监视: MC 端口连续 {fail_count} 次不可达，自动关闭房间");
+                    auto_close_room(&state, &app).await;
+                    return;
+                }
             }
         } else {
             fail_count = 0;
@@ -482,7 +488,7 @@ pub fn register(d: &mut Dispatcher) {
             let watch_app = app.clone();
             let watch_state = state.clone();
             let watch = tokio::spawn(async move {
-                host_watch_loop(watch_center, watch_app, watch_state, mc_port).await;
+                host_watch_loop(watch_center, watch_app, watch_state).await;
             });
             *state.scaffolding_host_watch.lock().await = Some(watch.abort_handle());
 
