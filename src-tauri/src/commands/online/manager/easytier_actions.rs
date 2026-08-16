@@ -126,7 +126,7 @@ pub struct EasytierJoinParams {
     /// 是否为房主（房主固定虚拟 IP `10.244.0.1`，房客走 `--dhcp`）
     #[serde(default)]
     pub is_host: bool,
-    /// 节点 hostname（房主必须为 `scaffolding-mc-server-{mc_port}`）
+    /// 节点 hostname（房主必须为 `scaffolding-mc-server-{center_port}`，联机中心端口）
     #[serde(default)]
     pub hostname: Option<String>,
     /// 追加 easytier-core CLI 参数（如 `--peers` 公共服务器）
@@ -177,7 +177,7 @@ pub struct ScaffoldingHostStartResponse {
     pub success: bool,
     /// 联机中心实际监听端口
     pub center_port: u16,
-    /// 中心 hostname（`scaffolding-mc-server-{mc_port}`）
+    /// 中心 hostname（`scaffolding-mc-server-{center_port}`）
     pub hostname: String,
     /// 房主 MC 局域网端口
     pub mc_port: u16,
@@ -230,7 +230,7 @@ pub fn register(d: &mut Dispatcher) {
                 (true, Some(h)) => h,
                 (true, None) => {
                     return Err(
-                        "房主模式必须提供 hostname（格式 scaffolding-mc-server-{mc_port}）"
+                        "房主模式必须提供 hostname（格式 scaffolding-mc-server-{center_port}）"
                             .to_string(),
                     )
                 }

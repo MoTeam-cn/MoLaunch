@@ -21,7 +21,7 @@ export interface EasyTierJoinParams {
   networkSecret: string
   /** 是否房主（房主固定虚拟 IP，房客 --dhcp） */
   isHost?: boolean
-  /** 节点 hostname（房主必须为 `scaffolding-mc-server-{mc_port}`） */
+  /** 节点 hostname（房主必须为 `scaffolding-mc-server-{center_port}`，联机中心端口） */
   hostname?: string
   /** 追加 easytier-core CLI 参数 */
   extra?: string[]
@@ -67,7 +67,7 @@ export interface ScaffoldingHostStartResult {
   success: boolean
   /** 联机中心实际监听端口 */
   centerPort: number
-  /** 中心 hostname（`scaffolding-mc-server-{mc_port}`） */
+  /** 中心 hostname（`scaffolding-mc-server-{center_port}`） */
   hostname: string
   /** 房主 MC 局域网端口 */
   mcPort: number

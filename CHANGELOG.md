@@ -14,6 +14,8 @@
 
 ### Changed
 
+- **房主 easytier hostname 后缀改为真实联机中心端口（对齐 Terracotta 标准）**（[server.rs](src-tauri/src/minecraft/online/scaffolding/server.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)）：`ScaffoldingServer::hostname()` 原返回 `scaffolding-mc-server-{mc_port 或 13448}`（后缀是 MC 端口），陶瓦房客按标准语义从 hostname 后缀解析「联机中心端口」并 port-forward 到联机中心——拿到 MC 端口会连错端口导致握手失败。修复：hostname 改为 `scaffolding-mc-server-{center_port}`，使用联机中心**真实监听端口**（`self.port`，含 13448 被占退为随机端口的情况），与 Terracotta `start_host`（`HostName("scaffolding-mc-server-{SCAFFOLDING_PORT}")`）语义一致；相关注释与错误文案同步更新。
+
 - **Scaffolding 房间码字符集 base 33 → 34（对齐 Terracotta 标准，修复与 PCL CE/HMCL 互连）**（[easytier.ts](src/types/online/easytier.ts) / [code.rs](src-tauri/src/minecraft/online/scaffolding/code.rs)）：房间码字符集由 33 字符（剔除 I/O/L）改为 34 字符（仅剔除 I/O，保留 L，与陶瓦联机 Terracotta `static CHARS` 一致）；三端同步——前端 `SCAFFOLDING_CODE_CHARSET`、Rust `code.rs` `CHARSET`、api-server `room_code.rs` `ALPHABET`，7 整除校验随 `CHARSET.len() % 7` / 34 进制自动适配，生成侧数学等价。解析侧保持宽松格式校验（不查校验和），兼容外部客户端码。
 
 - **cubiomes 编译脚本迁移至 Node**（[build-wasm.cjs](scripts/build-wasm.cjs)（新增） / [build-wasm.ps1](scripts/build-wasm.ps1)（删除） / [package.json](package.json) / [prebuild.mjs](scripts/prebuild.mjs) / [build.rs](src-tauri/build.rs)）：`build:wasm` 由 `powershell -File scripts/build-wasm.ps1` 改为 `node scripts/build-wasm.cjs`——Node 18+ 纯内置 API（child_process/fs/path），无 PowerShell 依赖；行为与原 ps1 一致（cubiomes 源码缺失或 emcc 不可用时复用入库产物、`.c/.h` 未变更时增量跳过、emcc 不在 PATH 时自动激活 emsdk 候选目录并直连 emcc），emcc 参数与导出函数清单不变；调用方同步更新（package.json 脚本、prebuild.mjs 注释、update-cubiomes 工作流注释、build.rs 与 Cargo.toml 注释）。

@@ -14,7 +14,7 @@ use tokio::task::JoinHandle;
 /// 联机中心默认监听端口（被占时退回随机端口）
 pub const DEFAULT_CENTER_PORT: u16 = 13448;
 
-/// 中心 hostname 前缀：`scaffolding-mc-server-{mc_port}`
+/// 中心 hostname 前缀：`scaffolding-mc-server-{center_port}`（标准语义，房客据此后缀发现联机中心端口）
 pub const CENTER_HOSTNAME_PREFIX: &str = "scaffolding-mc-server-";
 
 /// 标准协议列表（`\0` 分隔，用于 c:protocols 响应）
@@ -139,15 +139,9 @@ impl ScaffoldingServer {
         self.port
     }
 
-    /// 中心 hostname：`scaffolding-mc-server-{mc_port}`（MC 端口由房主启动流程写入状态）
+    /// 中心 hostname：`scaffolding-mc-server-{center_port}`（真实联机中心端口，含端口被占退为随机端口的情况）
     pub fn hostname(&self) -> String {
-        let port = self
-            .state
-            .mc_port
-            .lock()
-            .unwrap()
-            .unwrap_or(DEFAULT_CENTER_PORT);
-        format!("{CENTER_HOSTNAME_PREFIX}{port}")
+        format!("{CENTER_HOSTNAME_PREFIX}{}", self.port)
     }
 
     /// 共享状态（供房主更新 MC 端口 / 房主档案）
