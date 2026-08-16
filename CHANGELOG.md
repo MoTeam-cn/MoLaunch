@@ -6,7 +6,7 @@
 
 ### Added
 
-- **新增 easytier-core 自动更新工作流**（[update-easytier.yml](.github/workflows/update-easytier.yml) / [update-easytier.ps1](scripts/update-easytier.ps1)）：每日（UTC 04:00，也可手动触发）对比 GitHub Releases 最新 stable（`releases/latest`，仅 stable 版本）与 [easytier.rs](src-tauri/build_script/easytier.rs) 记录的 `EASYTIER_VERSION`，不一致则下载 6 个平台包（windows x86_64/arm64、linux x86_64/aarch64、macos x86_64/aarch64）解压替换 `src-tauri/resources/easytier/{os}/{arch}/` 下的 `easytier-core` 及 Windows 依赖 DLL，同步更新版本常量并提交（`!c` 跳过 CI）；Linux/macOS 二进制提交时显式补回执行位。
+- **新增 easytier-core 自动更新工作流**（[update-easytier.yml](.github/workflows/update-easytier.yml) / [update-easytier.cjs](scripts/update-easytier.cjs)）：每日（UTC 04:00，也可手动触发）对比 GitHub Releases 最新 stable（`releases/latest`，仅 stable 版本）与 [easytier.rs](src-tauri/build_script/easytier.rs) 记录的 `EASYTIER_VERSION`，不一致则下载 6 个平台包（windows x86_64/arm64、linux x86_64/aarch64、macos x86_64/aarch64）解压替换 `src-tauri/resources/easytier/{os}/{arch}/` 下的 `easytier-core` 及 Windows 依赖 DLL，同步更新版本常量并提交（`!c` 跳过 CI）。脚本为 Node 18+（仅内置 fetch + 系统 unzip，无第三方依赖），运行在 `ubuntu-latest` runner，Linux/macOS 二进制在脚本内 `chmodSync` 补回执行位。
 
 - **新增构建产物手动清理工作流**（[cleanup-artifacts.yml](.github/workflows/cleanup-artifacts.yml)）：仅 `workflow_dispatch` 手动触发，触发时输入「清理多少天前上传的构建产物」阈值（0 = 全部删除，默认 7 天），经 GitHub Actions API 分页列出全部 artifacts 并删除创建时间早于阈值的产物；用于在 GitHub 自动过期之外提前回收（例如发布工作流仅用于跨 job 传递的安装包产物），及时腾出 Actions 存储空间。
 

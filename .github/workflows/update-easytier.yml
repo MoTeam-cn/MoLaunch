@@ -1,8 +1,9 @@
 # 自动更新 easytier-core 嵌入式资源（联机虚拟组网）
 #
 # 每日（UTC 04:00）对比 GitHub Releases 最新 stable 与 build_script/easytier.rs 记录的版本，
-# 不一致则调用 scripts/update-easytier.ps1 下载 6 个平台包替换 src-tauri/resources/easytier/
-# 并更新版本常量后提交（也可在 Actions 页面手动触发）。版本仅拉取 stable（releases/latest）。
+# 不一致则调用 scripts/update-easytier.cjs（Node 18+，ubuntu runner 自带 unzip）下载 6 个平台包
+# 替换 src-tauri/resources/easytier/ 并更新版本常量后提交（也可在 Actions 页面手动触发）。
+# 版本仅拉取 stable（releases/latest）。
 
 name: Update EasyTier
 
@@ -21,7 +22,7 @@ concurrency:
 jobs:
   update:
     name: Sync easytier-core
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
@@ -30,14 +31,7 @@ jobs:
 
       - name: Check & update easytier-core
         id: update
-        shell: pwsh
-        run: ./scripts/update-easytier.ps1
-
-      # Git for Windows 提交时按文件系统权限记录模式，Unix 侧二进制需显式加回执行位
-      - name: Fix executable bits
-        if: steps.update.outputs.updated == 'true'
-        shell: bash
-        run: chmod +x src-tauri/resources/easytier/linux/*/easytier-core src-tauri/resources/easytier/macos/*/easytier-core
+        run: node ./scripts/update-easytier.cjs
 
       # 有更新才提交（无变化自动跳过），!c 跳过 CI
       - name: Commit updated binaries
