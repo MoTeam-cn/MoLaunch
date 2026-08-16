@@ -1,10 +1,10 @@
 //! easytier / Scaffolding 联机 IPC 动作。
 //!
 //! - `easytier_join`：拉起 easytier-core 加入虚拟网络（房主固定 IP，房客 DHCP）
-//! - `easytier_stop`：停止当前 easytier 子进程
-//! - `scaffolding_host_start`：房主一站式启动（探测 MC 端口 → 联机中心 → easytier）
+//! - `easytier_stop`：停止当前 easytier 子进程（清空房客 port-forward 记录）
+//! - `scaffolding_host_start`：房主一站式启动（探测 MC 端口 → 联机中心 → easytier no-tun + 白名单）
 //! - `scaffolding_host_stop`：停止联机中心与 easytier
-//! - `scaffolding_client_probe`：房客解析房间码 → 加入网络 → 探测房主 MC 服务
+//! - `scaffolding_client_probe`：房客解析房间码 → 加入网络（no-tun）→ 建立 port-forward → 探测房主 MC 服务
 
 use serde::{Deserialize, Serialize};
 
@@ -14,13 +14,18 @@ use crate::log_info;
 use crate::log_warn;
 use crate::minecraft::online::scaffolding::client as scaffolding_client;
 use crate::minecraft::online::scaffolding::code as room_code;
-use crate::minecraft::online::scaffolding::easytier::{EasyTier, HOST_VIRTUAL_IP};
-use crate::minecraft::online::scaffolding::server::{ScaffoldingServer, ScaffoldingServerState};
+use crate::minecraft::online::scaffolding::easytier::{
+    pick_free_port, EasyTier, PortForwardRule, HOST_VIRTUAL_IP,
+};
+use crate::minecraft::online::scaffolding::server::{
+    ScaffoldingServer, ScaffoldingServerState, CENTER_HOSTNAME_PREFIX,
+};
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::{Emitter, Manager};
+use tokio::net::TcpListener;
 
 /// 房客侧默认 hostname（未配置 network_identity 时使用）
 const DEFAULT_GUEST_HOSTNAME: &str = "mo-launch-guest";
@@ -155,6 +160,142 @@ async fn probe_mc_port(state: &AppState) -> Option<u16> {
     }
 }
 
+/// 房主 easytier no-tun 白名单参数（允许虚拟网络流量注入本机端口）。
+///
+/// 联机中心（TCP）+ MC 端口（TCP/UDP）逗号分隔；MC 端口未知时仅放行联机中心，
+/// 待监视循环发现端口后经 `rebuild_host_easytier` 重建。
+fn host_whitelist_args(center_port: u16, mc_port: Option<u16>) -> Vec<String> {
+    match mc_port {
+        Some(mc_port) => vec![
+            "--tcp-whitelist".to_string(),
+            format!("{center_port},{mc_port}"),
+            "--udp-whitelist".to_string(),
+            mc_port.to_string(),
+        ],
+        None => vec!["--tcp-whitelist".to_string(), center_port.to_string()],
+    }
+}
+
+/// 申请本地转发端口：优先复用 mc_port（MC 感知的服务端口不变），被占则随机空闲端口
+async fn pick_local_port(mc_port: u16) -> Result<u16, String> {
+    if TcpListener::bind(("0.0.0.0", mc_port)).await.is_ok() {
+        return Ok(mc_port);
+    }
+    pick_free_port().await
+}
+
+/// 以最新 MC 端口重建房主 easytier（no-tun + 白名单），供监视循环端口变化时调用。
+///
+/// 先停旧进程再以新白名单 join；失败时 easytier 置空（监视循环随之退出）。
+async fn rebuild_host_easytier(
+    state: &AppState,
+    app: &tauri::AppHandle,
+    mc_port: Option<u16>,
+) -> Result<(), String> {
+    let center_port = state
+        .scaffolding_server
+        .lock()
+        .await
+        .as_ref()
+        .map(|s| s.port())
+        .ok_or_else(|| "联机中心未运行".to_string())?;
+    let (network_name, network_secret) = state
+        .host_network_cred
+        .lock()
+        .await
+        .clone()
+        .ok_or_else(|| "房主网络凭据缺失".to_string())?;
+    let core_path = resolve_core_path(app, &configured_core_path(state).await)?;
+    let cli_path = resolve_cli_path(&core_path);
+    let mut extra = configured_easytier_peers(state).await;
+    extra.extend(host_whitelist_args(center_port, mc_port));
+    let easytier = EasyTier::join(
+        &core_path,
+        &cli_path,
+        &network_name,
+        &network_secret,
+        Some(HOST_VIRTUAL_IP),
+        &format!("{CENTER_HOSTNAME_PREFIX}{center_port}"),
+        extra,
+        true,
+    )
+    .await?;
+    let old = state.easytier.lock().await.take();
+    if let Some(old) = old {
+        old.stop().await;
+    }
+    *state.easytier.lock().await = Some(easytier);
+    emit_easytier_status(app, state).await;
+    log_info!("[Online] 房主 easytier 已重建（no-tun 白名单，mc_port={mc_port:?}）");
+    Ok(())
+}
+
+/// 确保房客 port-forward 规则指向 `mc_ip:mc_port`；目标变化时移除旧规则并重建。
+///
+/// 返回本地转发端口（尽力与 mc_port 相同，供进服地址 `127.0.0.1:{local_port}` 使用）。
+async fn ensure_guest_port_forwards(
+    state: &AppState,
+    mc_ip: &str,
+    mc_port: u16,
+) -> Result<u16, String> {
+    let desired_dst = format!("{mc_ip}:{mc_port}");
+    {
+        let rules = state.client_port_forwards.lock().await;
+        if let Some(rule) = rules.iter().find(|r| r.dst_addr == desired_dst) {
+            let local_port = rule
+                .bind_addr
+                .rsplit(':')
+                .next()
+                .and_then(|s| s.parse::<u16>().ok())
+                .unwrap_or(mc_port);
+            return Ok(local_port);
+        }
+    }
+    // 目标变化：先移除旧规则（进程存活期间经 RPC 清理）
+    let old_rules = {
+        let mut rules = state.client_port_forwards.lock().await;
+        std::mem::take(&mut *rules)
+    };
+    {
+        let guard = state.easytier.lock().await;
+        if let Some(easytier) = guard.as_ref() {
+            for rule in &old_rules {
+                let _ = easytier
+                    .remove_port_forward(&rule.proto, &rule.bind_addr)
+                    .await;
+            }
+        }
+    }
+    // 建立 TCP + UDP 两条规则（本地监听 → 房主虚拟 IP）
+    let local_port = pick_local_port(mc_port).await?;
+    let bind_addr = format!("0.0.0.0:{local_port}");
+    {
+        let guard = state.easytier.lock().await;
+        let easytier = guard
+            .as_ref()
+            .ok_or_else(|| "easytier 未加入网络".to_string())?;
+        easytier
+            .add_port_forward("tcp", &bind_addr, &desired_dst)
+            .await?;
+        easytier
+            .add_port_forward("udp", &bind_addr, &desired_dst)
+            .await?;
+    }
+    let mut rules = state.client_port_forwards.lock().await;
+    rules.push(PortForwardRule {
+        proto: "tcp".into(),
+        bind_addr: bind_addr.clone(),
+        dst_addr: desired_dst.clone(),
+    });
+    rules.push(PortForwardRule {
+        proto: "udp".into(),
+        bind_addr,
+        dst_addr: desired_dst.clone(),
+    });
+    log_info!("[Online] 房客 port-forward 已建立: 127.0.0.1:{local_port} -> {desired_dst}");
+    Ok(local_port)
+}
+
 /// 房主后台监视循环：每 5s 扫描游戏监听端口并回写联机中心。
 ///
 /// - 手动端口设置时跳过自动更新（最高权重），不自动关房；
@@ -178,6 +319,10 @@ async fn host_watch_loop(
             if current_mc_port != Some(manual) {
                 current_mc_port = Some(manual);
                 center_state.set_mc_port(Some(manual));
+                if let Err(e) = rebuild_host_easytier(&state, &app, Some(manual)).await {
+                    log_error!("[Online] 房主监视: 重建 easytier 白名单失败: {e}");
+                    return;
+                }
                 log_info!("[Online] 房主监视: 手动 MC 端口 {manual} 已同步");
             }
             tokio::time::sleep(WATCH_INTERVAL).await;
@@ -218,6 +363,10 @@ async fn host_watch_loop(
                     MC_PORT_CHANGE_EVENT,
                     serde_json::json!({ "mcPort": chosen }),
                 );
+                if let Err(e) = rebuild_host_easytier(&state, &app, Some(chosen)).await {
+                    log_error!("[Online] 房主监视: 重建 easytier 白名单失败: {e}");
+                    return;
+                }
                 log_info!("[Online] 房主监视: MC 端口已更新为 {chosen}");
             }
         }
@@ -239,6 +388,8 @@ async fn auto_close_room(state: &AppState, app: &tauri::AppHandle) {
     }
     *state.scaffolding_host_watch.lock().await = None;
     *state.manual_mc_port.lock().await = None;
+    *state.host_network_cred.lock().await = None;
+    *state.client_port_forwards.lock().await = Vec::new();
     emit_easytier_status(app, state).await;
     let _ = app.emit(
         HOST_AUTO_CLOSE_EVENT,
@@ -336,9 +487,9 @@ pub struct ScaffoldingHostSetMcPortParams {
 #[serde(rename_all = "camelCase")]
 pub struct ScaffoldingClientProbeResponse {
     pub success: bool,
-    /// 房主虚拟 IP（MC 客户端连接目标，配合 lan_fake 转发）
+    /// 进服连接地址 IP（no-tun 下固定为本机 `127.0.0.1`，指向本地 port-forward）
     pub mc_ip: String,
-    /// 房主 MC 局域网端口
+    /// 进服连接端口（本地 port-forward 端口，尽力与房主 MC 端口相同）
     pub mc_port: u16,
 }
 
@@ -420,7 +571,14 @@ pub fn register(d: &mut Dispatcher) {
         handler!(state, app, _params, {
             let old = state.easytier.lock().await.take();
             if let Some(old) = old {
+                // 先经 RPC 移除房客 port-forward 规则，再停止进程
+                let rules = state.client_port_forwards.lock().await;
+                for rule in rules.iter() {
+                    let _ = old.remove_port_forward(&rule.proto, &rule.bind_addr).await;
+                }
+                drop(rules);
                 old.stop().await;
+                *state.client_port_forwards.lock().await = Vec::new();
                 log_info!("[Online] easytier 已停止");
             }
             emit_easytier_status(&app, &state).await;
@@ -464,11 +622,12 @@ pub fn register(d: &mut Dispatcher) {
             let hostname = server.hostname();
             let center_port = server.port();
 
-            // 启动 easytier（房主固定虚拟 IP + 中心 hostname；no-tun 迁移中暂保持 TUN）
+            // 启动 easytier（房主固定虚拟 IP + 中心 hostname + no-tun 白名单）
             let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
             let cli_path = resolve_cli_path(&core_path);
             let mut extra = Vec::new();
             extra.extend(configured_easytier_peers(&state).await);
+            extra.extend(host_whitelist_args(center_port, mc_port));
             let easytier = match EasyTier::join(
                 &core_path,
                 &cli_path,
@@ -477,7 +636,7 @@ pub fn register(d: &mut Dispatcher) {
                 Some(HOST_VIRTUAL_IP),
                 &hostname,
                 extra,
-                false,
+                true,
             )
             .await
             {
@@ -487,6 +646,8 @@ pub fn register(d: &mut Dispatcher) {
                     return Err(e);
                 }
             };
+            // 记录网络凭据供监视循环按 MC 端口变化重建白名单
+            *state.host_network_cred.lock().await = Some((network_name, network_secret));
             let rpc_portal = easytier.rpc_portal().to_string();
             let pid = easytier.pid();
             *state.scaffolding_server.lock().await = Some(server);
@@ -529,6 +690,8 @@ pub fn register(d: &mut Dispatcher) {
                 watch.abort();
             }
             *state.manual_mc_port.lock().await = None;
+            *state.host_network_cred.lock().await = None;
+            *state.client_port_forwards.lock().await = Vec::new();
             let old_easytier = state.easytier.lock().await.take();
             if let Some(old_easytier) = old_easytier {
                 old_easytier.stop().await;
@@ -550,7 +713,7 @@ pub fn register(d: &mut Dispatcher) {
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
             let (network_name, network_secret) = room_code::parse(&p.room_code)?;
 
-            // 若尚未加入网络，先以房客身份（--dhcp）加入；no-tun 迁移中暂保持 TUN
+            // 若尚未加入网络，先以房客身份（--dhcp，no-tun）加入
             if state.easytier.lock().await.is_none() {
                 let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
                 let cli_path = resolve_cli_path(&core_path);
@@ -572,7 +735,7 @@ pub fn register(d: &mut Dispatcher) {
                     None,
                     &hostname,
                     extra,
-                    false,
+                    true,
                 )
                 .await?;
                 log_info!(
@@ -597,21 +760,28 @@ pub fn register(d: &mut Dispatcher) {
                 )
                 .await?
             };
-            match scaffolding_client::discover_mc(&center_ip, center_port).await {
-                Ok((mc_ip, mc_port)) => {
-                    log_info!("[Online] 房客发现房主 MC 服务: {}:{}", mc_ip, mc_port);
-                    serde_json::to_value(ScaffoldingClientProbeResponse {
-                        success: true,
-                        mc_ip,
-                        mc_port,
-                    })
-                    .map_err(|e| e.to_string())
-                }
-                Err(e) => {
-                    log_error!("[Online] 房客探测联机中心失败: {e}");
-                    Err(e)
-                }
-            }
+            let (mc_ip, mc_port) =
+                match scaffolding_client::discover_mc(&center_ip, center_port).await {
+                    Ok(x) => x,
+                    Err(e) => {
+                        log_error!("[Online] 房客探测联机中心失败: {e}");
+                        return Err(e);
+                    }
+                };
+            // no-tun 下建立本地 port-forward：MC 客户端连接 127.0.0.1:local_port
+            let local_port = ensure_guest_port_forwards(&state, &mc_ip, mc_port).await?;
+            log_info!(
+                "[Online] 房客发现房主 MC 服务: {}:{}（本地转发 127.0.0.1:{}）",
+                mc_ip,
+                mc_port,
+                local_port
+            );
+            serde_json::to_value(ScaffoldingClientProbeResponse {
+                success: true,
+                mc_ip: "127.0.0.1".to_string(),
+                mc_port: local_port,
+            })
+            .map_err(|e| e.to_string())
         }),
     );
 
@@ -643,18 +813,22 @@ pub fn register(d: &mut Dispatcher) {
                     .ok_or_else(|| "easytier 未加入网络".to_string())?;
                 scaffolding_client::resolve_center_addr(None, None, easytier).await?
             };
-            match scaffolding_client::discover_mc(&center_ip, center_port).await {
-                Ok((mc_ip, mc_port)) => serde_json::to_value(ScaffoldingClientProbeResponse {
-                    success: true,
-                    mc_ip,
-                    mc_port,
-                })
-                .map_err(|e| e.to_string()),
-                Err(e) => {
-                    log_error!("[Online] 房客轮询联机中心失败: {e}");
-                    Err(e)
-                }
-            }
+            let (mc_ip, mc_port) =
+                match scaffolding_client::discover_mc(&center_ip, center_port).await {
+                    Ok(x) => x,
+                    Err(e) => {
+                        log_error!("[Online] 房客轮询联机中心失败: {e}");
+                        return Err(e);
+                    }
+                };
+            // 端口变化时经 ensure_guest_port_forwards 重建本地转发规则
+            let local_port = ensure_guest_port_forwards(&state, &mc_ip, mc_port).await?;
+            serde_json::to_value(ScaffoldingClientProbeResponse {
+                success: true,
+                mc_ip: "127.0.0.1".to_string(),
+                mc_port: local_port,
+            })
+            .map_err(|e| e.to_string())
         }),
     );
 

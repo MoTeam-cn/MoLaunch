@@ -1,6 +1,6 @@
 //! 应用全局状态（AppState）
 
-use crate::minecraft::online::scaffolding::easytier::EasyTier;
+use crate::minecraft::online::scaffolding::easytier::{EasyTier, PortForwardRule};
 use crate::minecraft::online::scaffolding::server::ScaffoldingServer;
 use crate::sdk::SdkInstance;
 use crate::{log_info, log_warn};
@@ -46,6 +46,16 @@ pub struct AppState {
     /// 房主固定虚拟 IP `10.144.144.1`（联机中心锚点），房客走 `--dhcp` 自动分配。
     /// `easytier_join` 创建并替换，`easytier_stop` 停止并置 None。
     pub easytier: Arc<TokioMutex<Option<EasyTier>>>,
+    /// 房客 no-tun 用户态端口转发规则（`scaffolding_client_probe` 创建，`easytier_stop` 清理）
+    ///
+    /// no-tun 模式不创建虚拟网卡，房客经本地 port-forward 进出虚拟网络：
+    /// 联机中心 TCP 转发（探测通道）+ MC TCP/UDP 转发（进服通道）。
+    /// 记录用于端口变更时重建规则；停止 easytier 进程即隐式清除，此处仅同步记录。
+    pub client_port_forwards: Arc<TokioMutex<Vec<PortForwardRule>>>,
+    /// 房主网络凭据（network_name, network_secret），供监视循环按 MC 端口变化重建白名单
+    ///
+    /// `scaffolding_host_start` 写入，`scaffolding_host_stop` / 自动关房时清空。
+    pub host_network_cred: Arc<TokioMutex<Option<(String, String)>>>,
     /// 联机中心 TCP 服务（仅房主，监听虚拟 IP，解析 §2.3 大端序帧）
     ///
     /// `scaffolding_host_start` 创建并替换，`scaffolding_host_stop` 停止并置 None。
@@ -124,6 +134,8 @@ impl AppState {
             analyze_cancel_flag: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             authlib_pending: Arc::new(TokioMutex::new(None)),
             easytier: Arc::new(TokioMutex::new(None)),
+            client_port_forwards: Arc::new(TokioMutex::new(Vec::new())),
+            host_network_cred: Arc::new(TokioMutex::new(None)),
             scaffolding_server: Arc::new(TokioMutex::new(None)),
             scaffolding_host_watch: Arc::new(TokioMutex::new(None)),
             manual_mc_port: Arc::new(TokioMutex::new(None)),
