@@ -215,7 +215,9 @@ impl EasyTier {
         ))
     }
 
-    /// 虚拟网络在线节点数（`peer list` 返回节点数组，含本机，即房间在线人数）。
+    /// 虚拟网络在线节点数（`peer list` 返回节点数组，含本机）。
+    ///
+    /// 若配置了公共中继节点（`--peers`）会一并计入导致偏大，服务端会按房间人数上限钳制。
     pub async fn peer_count(&self) -> Result<usize, String> {
         let nodes = self.easytier_cli(&["peer", "list"]).await?;
         let Some(nodes) = nodes.as_array() else {
