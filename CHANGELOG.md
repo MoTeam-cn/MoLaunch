@@ -6,7 +6,8 @@
 
 ### Added
 
-- **联机页新增「红石联机」子菜单与入口面板**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)（新增））：基于 hongshi 内核的第三方隧道联机入口——侧边栏新增「红石联机」分类（含「创建房间」子项，图标 LinkIcon），独立于 MoLaunch 云端（不像房间管理受云端连接影响），URL `?tab=` 可恢复 `redstone_create`；点击「创建房间」渲染 `RedStoneCreatePanel`，当前展示接入规划说明（后续按 docs/REDSTONE_ONLINE_PLAN.md 落地内核获取/隧道创建/联机地址展示）。
+- **联机页新增「红石联机」子菜单与入口面板**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)（新增））：基于 hongshi 内核的第三方隧道联机入口——侧边栏新增「红石联机」分类（含「创建房间」子项，图标 LinkIcon），独立于 MoLaunch 云端（不像房间管理受云端连接影响），URL `?tab=` 可恢复 `redstone_create`；点击「创建房间」渲染 `RedStoneCreatePanel`，当前展示接入规划说明（后续按 docs/REDSTONE_ONLINE_DESIGN.md 落地内核释放/隧道创建/联机地址展示）。
+- **红石联机内核资源内置入库**（`src-tauri/resources/hongshi/`）：随安装包分发 windows-amd64 / linux-amd64+arm64 / darwin-amd64+arm64 五个平台内核，运行时经 `extract_hongshi_core` 释放（sha256 幂等校验），不再依赖 hongshi 云端运行时下载（规避其频发抽风与每日 5 次下载限流），具体接入见 docs/REDSTONE_ONLINE_DESIGN.md。
 
 ### Changed
 
