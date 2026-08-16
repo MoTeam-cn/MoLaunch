@@ -57,14 +57,22 @@ async fn check_tcp_item(target: &AddressTarget) -> AddressLatencyItem {
 
 /// UDP 探针延迟：connect + 发 1 字节并等待对端回包
 async fn check_udp(target: &AddressTarget) -> AddressLatencyItem {
-    let addr = match tokio::net::lookup_host((target.host.as_str(), target.port)).await {
-        Ok(mut it) => match it.next() {
-            Some(a) => a,
-            None => return item(target, false, 0, "DNS 解析无结果"),
-        },
+    let addrs = match tokio::net::lookup_host((target.host.as_str(), target.port)).await {
+        Ok(it) => it.collect::<Vec<_>>(),
         Err(e) => return item(target, false, 0, &format!("DNS 解析失败: {e}")),
     };
-    let sock = match tokio::net::UdpSocket::bind("0.0.0.0:0").await {
+    // 优先 IPv4（与 ping / tcp 一致），无 IPv4 时才用 IPv6
+    let addr = match addrs.iter().find(|a| a.is_ipv4()).or_else(|| addrs.first()) {
+        Some(a) => *a,
+        None => return item(target, false, 0, "DNS 解析无结果"),
+    };
+    // socket 地址族必须与目标一致，否则 Windows 报 os error 10047（协议不兼容）
+    let bind_addr = if addr.is_ipv4() {
+        "0.0.0.0:0"
+    } else {
+        "[::]:0"
+    };
+    let sock = match tokio::net::UdpSocket::bind(bind_addr).await {
         Ok(s) => s,
         Err(e) => return item(target, false, 0, &format!("创建 UDP socket 失败: {e}")),
     };

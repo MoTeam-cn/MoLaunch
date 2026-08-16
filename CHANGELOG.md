@@ -28,6 +28,7 @@
 - **修复地址测速无端口目标仍被判无效**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)）：`parseLine` 此前仍强制要求 `host:port` 格式，未携带端口（如 `www.baidu.com`）被误判为格式无效；现按是否含冒号分支解析，无端口时默认 80，带端口时校验范围 1-65535。
 - **ICMP ping 改为自实现，弃用系统 ping 命令**（[addr.rs](src-tauri/src/commands/tools/network/addr.rs) / [icmp.rs](src-tauri/src/commands/tools/network/icmp.rs)（新增））：此前依赖系统 ping 命令并解析输出，存在中文 Windows（GBK）编码与输出格式差异问题，导致 `www.baidu.com` 报「无法解析 ping 结果」或假 0ms；现直接 DNS 解析取 IPv4 后发送 ICMP Echo 报文并计时（参考 surge-ping 的 DGRAM/RAW socket 方案，仅新增底层 socket2 依赖），返回真实 RTT；删除系统 ping 输出适配（`parse_ping_rtt` / `decode_output`）与 [addr_test.rs](src-tauri/src/commands/tools/network/addr_test.rs)。
 - **移除地址测速持续探测**（[addr.rs](src-tauri/src/commands/tools/network/addr.rs) / [network.ts](src/utils/api/tools/network.ts) / [core.ts](src/utils/api/tools/core.ts) / [AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)）：删除「持续监测」勾选与按钮、后端 persistent 周期任务与 `tools-latency-update` 事件推送、`address_latency_stop` 命令及 AppState `latency_test_task` 句柄，地址测速收敛为一次性测试；`AddressLatencyResult` 移除 `task_id`，ping 协议结果不再显示端口。
+- **修复地址测速 UDP 探针报 os error 10047**（[addr.rs](src-tauri/src/commands/tools/network/addr.rs)）：UDP socket 此前固定绑定 IPv4（`0.0.0.0`），而 `lookup_host` 首个结果可能为 IPv6，`connect` 时报「使用了与请求的协议不兼容的地址」；现按解析结果地址族选择 socket（优先 IPv4 与 ping/tcp 一致，无 IPv4 时绑定 `[::]:0` 走 IPv6）。
 
 ## [0.3.6-rc5] - 2026-08-16
 
