@@ -26,6 +26,8 @@
 
 ### Fixed
 
+- **修复 mca 重打包后解析失败：「mca 文件中没有可解析的区块」（扇区偏移错位）**（[mca.rs](src-tauri/src/commands/tools/nbt/mca.rs) / [nbt_test.rs](src-tauri/src/commands/tools/nbt/nbt_test.rs)）：`save_mca_chunk` 重建文件时位置表以 512B 扇区为单位写入，但 cursor 从 2 开始——位置表指向字节 1024（仍在 8KiB 头部保留区、恒为 0），实际数据却 append 在字节 8192（= 扇区 16），重打包后解析器在错误偏移读到长度 0 而跳过全部区块。修复：cursor 改为 16（8KiB 头部之后第一个扇区），测试夹具 `build_mca` 同步改为标准布局（扇区偏移 16），与生产代码写入位置一致。
+
 - **修复房间详情 easytier 虚拟网络状态不实时更新（需切设备页才刷新）**（[App.vue](src/App.vue) / [EasyTierStatusCard.vue](src/components/online/EasyTierStatusCard.vue)）：`easytier-status` 事件监听原只在设备页卡片 `EasyTierStatusCard.vue` 挂载时注册，房间详情徽章 `EasyTierStatusBadge.vue` 只读 store——先进入房间详情时 store 从未被事件更新，状态不刷新，需切到设备页才显示「已组网」。修复：把事件监听提升为全局，`App.vue` 挂载时注册一次 `easytier-status` 监听、收到事件即写入 online store 的 easytier 切片；设备页卡片移除重复监听，仅保留打开页面时的 `easytier_status` 查询兜底；房间详情徽章纯读 store 自动实时刷新。
 
 - **修复 nbt mca 往返测试偶发失败（并发竞态）**（[nbt_test.rs](src-tauri/src/commands/tools/nbt/nbt_test.rs) / [api.rs](src-tauri/src/commands/tools/nbt/api.rs)）：`nbt_test.rs` 被 `mod.rs` 与 `api.rs` 各 `#[path]` include 一次，同一份 `mca_parse_and_save` 被编译为两个并发测试，共享临时文件 `mol_test_chunk.mca` 交叉读写——一方在对方 `save_mca_chunk` 前读到未修改数据导致 `Some(5) != Some(99)` 断言失败，一方读到只写完 8KiB 头部的半成品导致「mca 文件中没有可解析的区块」。修复：移除 `api.rs` 中重复的测试模块 include（测试只依赖 `convert`/`mca`，与 api 无关），临时文件改用 `{pid}` 唯一后缀防未来并发冲突。

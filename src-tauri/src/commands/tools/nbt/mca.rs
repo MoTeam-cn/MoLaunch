@@ -1,6 +1,6 @@
 //! mca（Anvil 区块容器）解析与保存
 //!
-//! 格式：8KiB 头部（4KiB 位置表 1024×4B + 4KiB 时间戳表），数据区从扇区 2 起。
+//! 格式：8KiB 头部（4KiB 位置表 1024×4B + 4KiB 时间戳表），数据区从扇区 16 起（8KiB 头部之后）。
 //! 位置条目：3 字节扇区偏移（512B/扇区）+ 1 字节扇区数；全 0 表示区块不存在。
 //! 区块数据：4B 长度（含压缩类型字节）+ 1B 压缩类型（1=gzip, 2=zlib, 3=none）+ payload。
 
@@ -127,7 +127,7 @@ pub(super) fn save_mca_chunk(
     // 重建：新位置表 + 保留时间戳表 + 按索引顺序写区块（扇区对齐）
     let mut out = vec![0u8; 8192];
     out[4096..8192].copy_from_slice(&raw[4096..8192]);
-    let mut cursor = 2usize; // 数据区从扇区 2（8KiB 之后）开始
+    let mut cursor = 16usize; // 数据区从扇区 16（8KiB 头部之后）开始
     chunks.sort_by_key(|(i, _)| *i);
     for (index, data) in chunks {
         let sector_count = data.len().div_ceil(512);
