@@ -130,9 +130,18 @@ fn register_heartbeat_room(d: &mut Dispatcher) {
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             let creds = super::load_creds(&state).await?;
             let client = super::make_client(&state).await;
-            log_debug!("[Online] room_heartbeat: code={}", p.room_code);
+            // 房主经 easytier peer list 统计在线人数（查询失败不阻断心跳，降级为不带人数）
+            let player_count = match &*state.easytier.lock().await {
+                Some(et) => et.peer_count().await.ok(),
+                None => None,
+            };
+            log_debug!(
+                "[Online] room_heartbeat: code={}, player_count={:?}",
+                p.room_code,
+                player_count
+            );
             let result = client
-                .signaling_heartbeat_room(&creds, &p.room_code)
+                .signaling_heartbeat_room(&creds, &p.room_code, player_count)
                 .await
                 .map_err(|e| {
                     log_error!("[Online] room_heartbeat 失败: {}", e);

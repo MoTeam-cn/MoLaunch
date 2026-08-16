@@ -24,8 +24,8 @@ export interface RoomActionDeps {
 /** 房间已关闭错误（旧 keepalive 轮询兼容，已无定时器使用） */
 export class RoomClosedError extends Error {}
 
-/** 房主心跳间隔（毫秒，3 分钟；须小于服务端 heartbeat_timeout 300 秒） */
-const HEARTBEAT_INTERVAL_MS = 3 * 60 * 1000
+/** 房主心跳间隔（毫秒，2 分钟；须小于服务端 heartbeat_timeout 180 秒） */
+const HEARTBEAT_INTERVAL_MS = 2 * 60 * 1000
 
 /** 房主心跳定时器（store 单例，创建房间时启动、关闭房间时停止） */
 let heartbeatTimer: ReturnType<typeof setInterval> | null = null

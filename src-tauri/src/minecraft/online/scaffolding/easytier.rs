@@ -215,6 +215,15 @@ impl EasyTier {
         ))
     }
 
+    /// 虚拟网络在线节点数（`peer list` 返回节点数组，含本机，即房间在线人数）。
+    pub async fn peer_count(&self) -> Result<usize, String> {
+        let nodes = self.easytier_cli(&["peer", "list"]).await?;
+        let Some(nodes) = nodes.as_array() else {
+            return Err("easytier-cli 输出不是 JSON 数组".to_string());
+        };
+        Ok(nodes.len())
+    }
+
     /// 添加用户态端口转发（本地 `bind_addr` 监听到虚拟网络内 `dst_addr`）。
     ///
     /// no-tun 下无虚拟网卡，本地应用须经转发才能访问虚拟网络（房主侧白名单端口）。

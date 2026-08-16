@@ -70,15 +70,18 @@ impl OnlineClient {
 
     /// 房主心跳上报（POST /v1/signaling/rooms/{code}/heartbeat）
     ///
-    /// 客户端每 3 分钟上报一次，服务端刷新 `last_keepalive_at` 并续期 `expires_at`；
-    /// 超过 `signaling.heartbeat_timeout`（默认 300 秒）未上报的房间会被清理任务删除。
+    /// 客户端每 2 分钟上报一次，可选携带 `playerCount`（房主经 easytier peer list 统计在线人数），
+    /// 服务端刷新 `last_keepalive_at` 并续期 `expires_at`；
+    /// 超过 `signaling.heartbeat_timeout`（默认 180 秒）未上报的房间会被清理任务删除。
     pub async fn signaling_heartbeat_room(
         &self,
         creds: &DeviceCredentials,
         room_code: &str,
+        player_count: Option<usize>,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
         let path = path_with_room_code(api_paths::SIGNALING_ROOM_HEARTBEAT, room_code);
-        self.call_v1::<serde_json::Value>(creds, "POST", &path, None, true)
+        let body = player_count.map(|n| serde_json::json!({ "playerCount": n }));
+        self.call_v1::<serde_json::Value>(creds, "POST", &path, body.as_ref(), true)
             .await
     }
 }
