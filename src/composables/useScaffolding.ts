@@ -8,7 +8,9 @@
  */
 import { ref } from 'vue'
 import {
+  scaffoldingClientPoll,
   scaffoldingClientProbe,
+  scaffoldingHostSetMcPort,
   scaffoldingHostStart,
   scaffoldingHostStop,
 } from '@/utils/api/online-manager/easytier'
@@ -34,8 +36,9 @@ export function useScaffolding() {
       const res = await scaffoldingHostStart({ roomCode, mcPort: port })
       store.setEasyTierRuntime({
         mcIp: EASYTIER_HOST_VIRTUAL_IP,
-        mcPort: res.mcPort,
         centerPort: res.centerPort,
+        // 未探测到端口时（先开房后开局域网）暂不写入，由后台监视循环自动补回
+        ...(res.mcPort != null ? { mcPort: res.mcPort } : {}),
       })
       return { ok: true }
     } catch (e) {
@@ -57,6 +60,14 @@ export function useScaffolding() {
     }
   }
 
+  /** 房主手动指定 MC 端口（最高权重，自动探测不再覆盖；null 恢复自动模式） */
+  async function setMcPort(port: number | null): Promise<void> {
+    await scaffoldingHostSetMcPort({ mcPort: port })
+    if (port != null) {
+      store.setEasyTierRuntime({ mcPort: port })
+    }
+  }
+
   /** 房客解析房间码 → 加入网络 → 探测房主 MC 服务 */
   async function probe(
     roomCode: string,
@@ -75,6 +86,18 @@ export function useScaffolding() {
     }
   }
 
+  /** 房客周期轮询房主 MC 端口（轻量，需已加入网络；不写入 store，由调用方决定） */
+  async function poll(
+    roomCode: string,
+  ): Promise<{ ok: boolean; mcIp?: string; mcPort?: number; error?: string }> {
+    try {
+      const res = await scaffoldingClientPoll({ roomCode })
+      return { ok: true, mcIp: res.mcIp, mcPort: res.mcPort }
+    } catch (e) {
+      return { ok: false, error: e instanceof Error ? e.message : String(e) }
+    }
+  }
+
   return {
     starting,
     stopping,
@@ -82,6 +105,8 @@ export function useScaffolding() {
     error,
     hostStart,
     hostStop,
+    setMcPort,
     probe,
+    poll,
   }
 }

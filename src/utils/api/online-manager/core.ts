@@ -103,7 +103,9 @@ export const ONLINE_ACTIONS = {
   EASYTIER_STATUS: 'easytier_status',
   SCAFFOLDING_HOST_START: 'scaffolding_host_start',
   SCAFFOLDING_HOST_STOP: 'scaffolding_host_stop',
+  SCAFFOLDING_HOST_SET_MC_PORT: 'scaffolding_host_set_mc_port',
   SCAFFOLDING_CLIENT_PROBE: 'scaffolding_client_probe',
+  SCAFFOLDING_CLIENT_POLL: 'scaffolding_client_poll',
 } as const
 
 /** action 名称类型 */

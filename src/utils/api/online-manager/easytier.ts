@@ -11,6 +11,7 @@ import type {
   EasyTierStatusResult,
   ScaffoldingClientProbeParams,
   ScaffoldingClientProbeResult,
+  ScaffoldingHostSetMcPortParams,
   ScaffoldingHostStartParams,
   ScaffoldingHostStartResult,
 } from '@/types/online'
@@ -42,6 +43,13 @@ export function scaffoldingHostStop(): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.SCAFFOLDING_HOST_STOP)
 }
 
+/** 房主手动指定 MC 端口（最高权重；null 清除手动覆盖，恢复自动探测） */
+export function scaffoldingHostSetMcPort(
+  params: ScaffoldingHostSetMcPortParams,
+): Promise<{ success: boolean }> {
+  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.SCAFFOLDING_HOST_SET_MC_PORT, params)
+}
+
 /** 房客解析房间码 → 加入网络 → 探测房主 MC 服务 */
 export function scaffoldingClientProbe(
   params: ScaffoldingClientProbeParams,
@@ -50,4 +58,11 @@ export function scaffoldingClientProbe(
     ONLINE_ACTIONS.SCAFFOLDING_CLIENT_PROBE,
     params,
   )
+}
+
+/** 房客周期轮询房主 MC 端口（轻量，无 join 分支，需已加入网络） */
+export function scaffoldingClientPoll(
+  params: ScaffoldingClientProbeParams,
+): Promise<ScaffoldingClientProbeResult> {
+  return onlineManager<ScaffoldingClientProbeResult>(ONLINE_ACTIONS.SCAFFOLDING_CLIENT_POLL, params)
 }

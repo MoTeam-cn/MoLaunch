@@ -69,10 +69,16 @@ export interface ScaffoldingHostStartResult {
   centerPort: number
   /** 中心 hostname（`scaffolding-mc-server-{center_port}`） */
   hostname: string
-  /** 房主 MC 局域网端口 */
-  mcPort: number
+  /** 房主 MC 局域网端口（先开房后开局域网时为 null，后台监视发现端口后自动更新） */
+  mcPort: number | null
   rpcPortal: string
   pid?: number
+}
+
+/** `scaffolding_host_set_mc_port` 参数 */
+export interface ScaffoldingHostSetMcPortParams {
+  /** 手动指定 MC 端口；null 清除手动覆盖，恢复自动探测 */
+  mcPort: number | null
 }
 
 /** `scaffolding_client_probe` 参数 */
