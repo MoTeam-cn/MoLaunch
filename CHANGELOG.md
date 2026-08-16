@@ -116,6 +116,8 @@
 
 - **补全 5 平台 easytier-cli 嵌入式资源**（[src-tauri/resources/easytier](src-tauri/resources/easytier/)）：easytier-cli 随包资源此前仅提交了 windows/x86_64 一份，导致 linux/macos/windows-arm64 构建时 uild_script/easytier.rs 检查报「缺少 easytier 嵌入式资源」并终止；本次从 EasyTier v2.6.4 Release 补全 linux x86_64/aarch64、macos x86_64/aarch64、windows aarch64 共 5 份 easytier-cli（SHA256 与上游 release digest 逐一核对一致），全平台 core+cli 资源齐备，CI 构建恢复。
 
+- **联机房间详情修复：手动端口输入改用统一 Input 组件 + 端口显示实时联动**（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue)）：① 手动指定端口输入框由原生 \<input>\ 换用项目统一 Input 组件（回车触发经 \@keydown.enter\ 透传，端口范围校验逻辑保持不变）；② 「MC 版本 / 端口」显示改为优先取实时端口（手动指定 / 自动探测后即时更新），未探测到时回退创建时快照，修复改端口后上方显示不联动的问题。
+
 ### Changed
 
 - **房客侧 easytier 节点自动发现（对齐 Terracotta 标准，去掉硬编码联机中心地址）**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [client.rs](src-tauri/src/minecraft/online/scaffolding/client.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)）：`scaffolding_client_probe` 原在中心地址缺省时硬编码 `10.144.144.1:13448`，跨启动器场景（如陶瓦房主）下房主 IP/端口均不可预期，导致房客连错地址。修复：随包附带 **easytier-cli**（与 core 同版本，资源层 [resources.rs](src-tauri/src/resources.rs) 嵌入并同目录释放、[build_script/easytier.rs](src-tauri/build_script/easytier.rs) 构建期校验、[update-easytier.cjs](scripts/update-easytier.cjs) 自动更新同步提取）；`EasyTier::discover_center()` 经 `easytier-cli -p {rpc-portal} -o json peer list` 查询虚拟网络节点，按 hostname 前缀 `scaffolding-mc-server-` 匹配房主并解析联机中心端口，`client::resolve_center_addr` 显式参数优先、缺失时自动发现，再走标准 c:ping/c:protocols/c:server_port 探测。实测 v2.6.4 `peer list -o json` 输出结构（ipv4/hostname 字段）。

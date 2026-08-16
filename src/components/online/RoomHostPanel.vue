@@ -15,6 +15,7 @@ import { toastError, toastSuccess } from '@/utils/toast'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const HostRoomInfoCard = defineAsyncComponent(() => import('./HostRoomInfoCard.vue'))
 const EasyTierStatusBadge = defineAsyncComponent(() => import('./EasyTierStatusBadge.vue'))
 const RoomToolsDrawer = defineAsyncComponent(() => import('./RoomToolsDrawer.vue'))
@@ -118,14 +119,11 @@ onMounted(() => {
         <Button type="ghost" size="small" @click="clearManualPort">恢复自动</Button>
       </div>
       <div class="mt-3 pt-3 border-t border-gray-100 flex items-center gap-2">
-        <input
+        <Input
           v-model="manualPortInput"
-          type="number"
-          min="1"
-          max="65535"
           placeholder="手动指定端口（最高权重）"
-          class="flex-1 min-w-0 rounded-md border border-gray-300 px-2 py-1 text-sm"
-          @keyup.enter="applyManualPort"
+          class="flex-1 min-w-0"
+          @keydown.enter="applyManualPort"
         />
         <Button type="outline" size="small" @click="applyManualPort">应用</Button>
       </div>

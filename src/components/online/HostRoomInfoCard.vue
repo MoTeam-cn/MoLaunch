@@ -49,6 +49,12 @@ const portAlertMessage = computed(
     'MoLaunch 的端口热更新仅对同启动器生效',
 )
 
+/** 展示端口：优先实时端口（手动指定/自动探测），未探测到回退创建时快照 */
+const displayMcPort = computed(() => {
+  const live = store.easytierRuntime.mcPort
+  return live > 0 ? live : room.value.hostMcPort
+})
+
 /** 复制完整房间码（U/xxx，含 S 段密钥） */
 async function copyFullCode() {
   if (!room.value.roomCode) return
@@ -89,7 +95,7 @@ async function copyFullCode() {
           <ServerStackIcon class="w-4 h-4 text-gray-400" /><span>MC 版本 / 端口</span>
         </div>
         <span class="text-xs text-gray-900">
-          {{ room.hostMcVersion || '-' }}<template v-if="room.hostMcPort">:{{ room.hostMcPort }}</template>
+          {{ room.hostMcVersion || '-' }}<template v-if="displayMcPort">:{{ displayMcPort }}</template>
         </span>
       </div>
       <div v-if="loaderText" class="px-1 py-3 flex items-center justify-between">
