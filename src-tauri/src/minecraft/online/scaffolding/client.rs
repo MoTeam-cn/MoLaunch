@@ -1,5 +1,6 @@
-//! Scaffolding 房客发现流程：连接联机中心，依次执行 c:ping / c:protocols / c:server_port。
+//! Scaffolding 房客发现流程：解析联机中心地址，连接后依次执行 c:ping / c:protocols / c:server_port。
 
+use crate::minecraft::online::scaffolding::easytier::EasyTier;
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
@@ -62,6 +63,21 @@ async fn send_request(
             .map_err(|e| format!("读取响应体失败: {e}"))?;
     }
     Ok((status_buf[0], data))
+}
+
+/// 解析联机中心地址：显式参数优先，否则经 easytier-cli 从虚拟网络自动发现。
+///
+/// 返回 (center_ip, center_port)。hint 全部提供时直接返回；任一缺失时调用
+/// `EasyTier::discover_center`（按 hostname 前缀 `scaffolding-mc-server-` 匹配房主节点）。
+pub async fn resolve_center_addr(
+    center_ip_hint: Option<&str>,
+    center_port_hint: Option<u16>,
+    easytier: &EasyTier,
+) -> Result<(String, u16), String> {
+    match (center_ip_hint, center_port_hint) {
+        (Some(ip), Some(port)) => Ok((ip.to_string(), port)),
+        _ => easytier.discover_center().await,
+    }
 }
 
 /// 房客发现流程：校验中心连通性、协商协议列表、获取 MC 服务器端口。

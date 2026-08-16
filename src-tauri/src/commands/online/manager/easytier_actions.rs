@@ -14,9 +14,7 @@ use crate::log_info;
 use crate::minecraft::online::scaffolding::client as scaffolding_client;
 use crate::minecraft::online::scaffolding::code as room_code;
 use crate::minecraft::online::scaffolding::easytier::{EasyTier, HOST_VIRTUAL_IP};
-use crate::minecraft::online::scaffolding::server::{
-    ScaffoldingServer, ScaffoldingServerState, DEFAULT_CENTER_PORT,
-};
+use crate::minecraft::online::scaffolding::server::{ScaffoldingServer, ScaffoldingServerState};
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 use std::path::PathBuf;
@@ -92,6 +90,18 @@ fn resolve_core_path(app: &tauri::AppHandle, configured: &str) -> Result<PathBuf
     // 兜底：释放内置嵌入式资源（默认配置为空时走此路径）
     crate::resources::extract_easytier_core()
         .map_err(|e| format!("释放内置 easytier-core 失败: {e}"))
+}
+
+/// 解析 easytier-cli 可执行文件路径（与 core 同目录，随包附带）。
+///
+/// 自定义 core 路径时按同目录推断 cli；内置资源释放时两者同目录释放。
+fn resolve_cli_path(core_path: &PathBuf) -> PathBuf {
+    let cli_name = if cfg!(target_os = "windows") {
+        "easytier-cli.exe"
+    } else {
+        "easytier-cli"
+    };
+    core_path.with_file_name(cli_name)
 }
 
 /// 读取配置中的 easytier-core 路径
@@ -213,6 +223,7 @@ pub fn register(d: &mut Dispatcher) {
             }
 
             let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
+            let cli_path = resolve_cli_path(&core_path);
             let ip = if p.is_host {
                 Some(HOST_VIRTUAL_IP)
             } else {
@@ -239,6 +250,7 @@ pub fn register(d: &mut Dispatcher) {
 
             let easytier = EasyTier::join(
                 &core_path,
+                &cli_path,
                 &p.network_name,
                 &p.network_secret,
                 ip,
@@ -313,8 +325,10 @@ pub fn register(d: &mut Dispatcher) {
 
             // 启动 easytier（房主固定虚拟 IP + 中心 hostname）
             let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
+            let cli_path = resolve_cli_path(&core_path);
             let easytier = match EasyTier::join(
                 &core_path,
+                &cli_path,
                 &network_name,
                 &network_secret,
                 Some(HOST_VIRTUAL_IP),
@@ -380,6 +394,7 @@ pub fn register(d: &mut Dispatcher) {
             // 若尚未加入网络，先以房客身份（--dhcp）加入
             if state.easytier.lock().await.is_none() {
                 let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
+                let cli_path = resolve_cli_path(&core_path);
                 let hostname = {
                     let identity = configured_network_identity(&state).await;
                     if identity.is_empty() {
@@ -390,6 +405,7 @@ pub fn register(d: &mut Dispatcher) {
                 };
                 let easytier = EasyTier::join(
                     &core_path,
+                    &cli_path,
                     &network_name,
                     &network_secret,
                     None,
@@ -406,8 +422,19 @@ pub fn register(d: &mut Dispatcher) {
                 emit_easytier_status(&app, &state).await;
             }
 
-            let center_ip = p.center_ip.unwrap_or_else(|| HOST_VIRTUAL_IP.to_string());
-            let center_port = p.center_port.unwrap_or(DEFAULT_CENTER_PORT);
+            // 解析联机中心地址：显式参数优先，否则经 easytier-cli 从虚拟网络自动发现
+            let (center_ip, center_port) = {
+                let guard = state.easytier.lock().await;
+                let easytier = guard
+                    .as_ref()
+                    .ok_or_else(|| "easytier 未加入网络".to_string())?;
+                scaffolding_client::resolve_center_addr(
+                    p.center_ip.as_deref(),
+                    p.center_port,
+                    easytier,
+                )
+                .await?
+            };
             match scaffolding_client::discover_mc(&center_ip, center_port).await {
                 Ok((mc_ip, mc_port)) => {
                     log_info!("[Online] 房客发现房主 MC 服务: {}:{}", mc_ip, mc_port);

@@ -1,4 +1,4 @@
-// 自动更新 easytier-core 嵌入式资源（联机虚拟组网）
+// 自动更新 easytier 嵌入式资源（联机虚拟组网：core + cli）
 //
 // 对比 GitHub Releases 最新 stable 与 src-tauri/build_script/easytier.rs 记录的版本，
 // 不一致则下载 6 个平台 zip（依赖系统 unzip）解压替换 src-tauri/resources/easytier/{os}/{arch}/，
@@ -85,14 +85,22 @@ async function main() {
       execFileSync("unzip", ["-o", zipPath, "-d", unzipDir], { stdio: "inherit" });
 
       const coreName = platform === "windows" ? "easytier-core.exe" : "easytier-core";
+      const cliName = platform === "windows" ? "easytier-cli.exe" : "easytier-cli";
       const core = findFile(unzipDir, coreName);
       if (!core) throw new Error(`${zipName} 中未找到 ${coreName}`);
+      const cli = findFile(unzipDir, cliName);
+      if (!cli) throw new Error(`${zipName} 中未找到 ${cliName}`);
 
       const destDir = path.join("src-tauri/resources/easytier", platform, arch);
       fs.mkdirSync(destDir, { recursive: true });
       const coreDest = path.join(destDir, coreName);
       fs.copyFileSync(core, coreDest);
-      if (platform !== "windows") fs.chmodSync(coreDest, 0o755);
+      const cliDest = path.join(destDir, cliName);
+      fs.copyFileSync(cli, cliDest);
+      if (platform !== "windows") {
+        fs.chmodSync(coreDest, 0o755);
+        fs.chmodSync(cliDest, 0o755);
+      }
 
       if (platform === "windows") {
         for (const dll of ["Packet.dll", "wintun.dll"]) {

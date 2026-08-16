@@ -162,6 +162,31 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "easytier/easytier-core" => Some(include_bytes!(
             "../resources/easytier/macos/aarch64/easytier-core"
         )),
+        // easytier-cli（联机管理客户端，与 core 同版本同目录释放；用于房客经 rpc-portal 查询虚拟网络节点发现联机中心）
+        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+        "easytier/easytier-cli" => Some(include_bytes!(
+            "../resources/easytier/windows/x86_64/easytier-cli.exe"
+        )),
+        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
+        "easytier/easytier-cli" => Some(include_bytes!(
+            "../resources/easytier/windows/aarch64/easytier-cli.exe"
+        )),
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        "easytier/easytier-cli" => Some(include_bytes!(
+            "../resources/easytier/linux/x86_64/easytier-cli"
+        )),
+        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+        "easytier/easytier-cli" => Some(include_bytes!(
+            "../resources/easytier/linux/aarch64/easytier-cli"
+        )),
+        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+        "easytier/easytier-cli" => Some(include_bytes!(
+            "../resources/easytier/macos/x86_64/easytier-cli"
+        )),
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        "easytier/easytier-cli" => Some(include_bytes!(
+            "../resources/easytier/macos/aarch64/easytier-cli"
+        )),
         // easytier 依赖动态库（Windows 专属，Packet.dll + wintun.dll 与核心同目录释放）
         #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
         "easytier/Packet.dll" => Some(include_bytes!(
@@ -311,7 +336,8 @@ pub fn extract_updater() -> anyhow::Result<std::path::PathBuf> {
 ///
 /// easytier-core 是联机虚拟组网核心，编译时按平台/架构嵌入对应版本，运行时
 /// 释放到 `<appdata>/.Molaunch/easytier/`（Windows 同时释放依赖的
-/// Packet.dll/wintun.dll，与核心同目录以便加载）。复用 `extract_resource`
+/// Packet.dll/wintun.dll，与核心同目录以便加载）。easytier-cli 管理客户端
+/// 与核心同版本同目录释放（供房客查询虚拟网络节点）。复用 `extract_resource`
 /// 的 sha256 校验机制。Unix 下 `extract_resource` 的 chmod 600 会去掉执行位，
 /// 故释放后需补回执行权限。调用方为 `commands::online::manager::easytier_actions`。
 pub fn extract_easytier_core() -> anyhow::Result<std::path::PathBuf> {
@@ -324,16 +350,21 @@ pub fn extract_easytier_core() -> anyhow::Result<std::path::PathBuf> {
         extract_resource("easytier/wintun.dll", &dir.join("wintun.dll"))?;
     }
 
-    let core_name = if cfg!(target_os = "windows") {
-        "easytier-core.exe"
+    let (core_name, cli_name) = if cfg!(target_os = "windows") {
+        ("easytier-core.exe", "easytier-cli.exe")
     } else {
-        "easytier-core"
+        ("easytier-core", "easytier-cli")
     };
     let core_path = dir.join(core_name);
     extract_resource("easytier/easytier-core", &core_path)?;
+    let cli_path = dir.join(cli_name);
+    extract_resource("easytier/easytier-cli", &cli_path)?;
 
     #[cfg(unix)]
-    crate::minecraft::system::shell::make_executable(&core_path);
+    {
+        crate::minecraft::system::shell::make_executable(&core_path);
+        crate::minecraft::system::shell::make_executable(&cli_path);
+    }
 
     Ok(core_path)
 }
