@@ -14,6 +14,10 @@
 
 - **联机菜单归类调整：父级「房间管理」更名为「搭桥联机」**（[useOnlineNav.ts](src/composables/useOnlineNav.ts)）：Scaffolding 联机分类由「房间管理」归类为「搭桥联机」，其下原有「搭桥联机」子项改回「创建房间」，与红石联机「创建房间」子项命名一致避免歧义；分类描述、文件头注释与 URL tab 恢复逻辑同步更新。
 
+### Fixed
+
+- **修复红石联机 IPC 请求参数结构**（[redstone.ts](src/utils/api/redstone.ts)）：`redstoneManager` 统一入口改为 `invoke('redstone_manager', { req: { action, params } })`，与后端 `req: ActionRequest` 契约一致，修复调用报 `invalid args missing required key req` 的问题（此前 action/params 直接作为顶层参数）。
+
 ## [0.3.6-rc5] - 2026-08-16
 
 ### Fixed

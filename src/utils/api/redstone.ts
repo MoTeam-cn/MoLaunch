@@ -21,9 +21,9 @@ export const REDSTONE_ACTIONS = {
   STOP: 'redstone_stop',
 } as const
 
-/** 红石联机统一调用入口 */
+/** 红石联机统一调用入口（action/params 放在 req 中，与后端 `req: ActionRequest` 契约一致） */
 export function redstoneManager<T = unknown>(action: string, params?: unknown): Promise<T> {
-  return invoke<T>('redstone_manager', { action, params: params ?? null })
+  return invoke<T>('redstone_manager', { req: { action, params: params ?? null } })
 }
 
 /** 获取中转服务器列表 */
