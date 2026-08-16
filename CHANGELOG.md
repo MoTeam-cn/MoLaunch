@@ -58,6 +58,8 @@
 
 - **加入方首次进房组网成功后提示「当前成功与主网络组网，可以开始游玩」**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：进入加入方面板自动执行探测（`scaffolding_client_probe`，含 easytier 组网 + 房主 MC 服务发现），成功后 toast 提示可开始游玩，失败仍提示探测错误；手动「重新探测进服地址」保持原行为（仅失败时提示），避免重复打扰。
 
+- **联机使用协议抽屉「联机功能说明」重写**（[DisclaimerDialog.vue](src/components/common/DisclaimerDialog.vue)）：明确说明 MoLaunch 联机基于与「陶瓦联机」相同的 Scaffolding 协议与 EasyTier 独立开发、房间码互通（陶瓦联机/PCL 等协议兼容启动器的房间码可直接加入）；介绍「联机大厅」按整合包找房、可直加无密码公开房间与陌生人游玩；明确优缺点——互通与大厅找房便利，端口热更新等增强仅对本启动器生效（其他启动器玩家需退出重进房间）；保留 P2P/TUN、MoLaunch 服务器职责与 FRP 第三方声明。
+
 ### Fixed
 
 - **修复 mca 重打包后解析失败：「mca 文件中没有可解析的区块」（扇区偏移错位）**（[mca.rs](src-tauri/src/commands/tools/nbt/mca.rs) / [nbt_test.rs](src-tauri/src/commands/tools/nbt/nbt_test.rs)）：`save_mca_chunk` 重建文件时位置表以 512B 扇区为单位写入，但 cursor 从 2 开始——位置表指向字节 1024（仍在 8KiB 头部保留区、恒为 0），实际数据却 append 在字节 8192（= 扇区 16），重打包后解析器在错误偏移读到长度 0 而跳过全部区块。修复：cursor 改为 16（8KiB 头部之后第一个扇区），测试夹具 `build_mca` 同步改为标准布局（扇区偏移 16），与生产代码写入位置一致。
