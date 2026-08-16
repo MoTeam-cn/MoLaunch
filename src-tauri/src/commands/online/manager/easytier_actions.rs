@@ -114,6 +114,17 @@ async fn configured_network_identity(state: &AppState) -> String {
     state.config.lock().await.online.network_identity.clone()
 }
 
+/// 读取配置中的公共 easytier 中继节点，展开为 `--peers` 参数序列
+async fn configured_easytier_peers(state: &AppState) -> Vec<String> {
+    let peers = &state.config.lock().await.online.easytier_public_peers;
+    let mut args = Vec::new();
+    for p in peers.iter().filter(|p| !p.trim().is_empty()) {
+        args.push("--peers".to_string());
+        args.push(p.trim().to_string());
+    }
+    args
+}
+
 /// 按当前游戏进程 PID 探测 MC 局域网端口（沿用 lan_probe 逻辑）
 async fn probe_mc_port(state: &AppState) -> Option<u16> {
     let pid = *state.current_pid.lock().await;
@@ -248,6 +259,8 @@ pub fn register(d: &mut Dispatcher) {
                 (false, h) => h.unwrap_or(guest_hostname),
             };
 
+            let mut extra = p.extra.unwrap_or_default();
+            extra.extend(configured_easytier_peers(&state).await);
             let easytier = EasyTier::join(
                 &core_path,
                 &cli_path,
@@ -255,7 +268,7 @@ pub fn register(d: &mut Dispatcher) {
                 &p.network_secret,
                 ip,
                 &hostname,
-                p.extra.unwrap_or_default(),
+                extra,
             )
             .await?;
             let rpc_portal = easytier.rpc_portal().to_string();
@@ -326,6 +339,8 @@ pub fn register(d: &mut Dispatcher) {
             // 启动 easytier（房主固定虚拟 IP + 中心 hostname）
             let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
             let cli_path = resolve_cli_path(&core_path);
+            let mut extra = Vec::new();
+            extra.extend(configured_easytier_peers(&state).await);
             let easytier = match EasyTier::join(
                 &core_path,
                 &cli_path,
@@ -333,7 +348,7 @@ pub fn register(d: &mut Dispatcher) {
                 &network_secret,
                 Some(HOST_VIRTUAL_IP),
                 &hostname,
-                Vec::new(),
+                extra,
             )
             .await
             {
@@ -403,6 +418,8 @@ pub fn register(d: &mut Dispatcher) {
                         identity
                     }
                 };
+                let mut extra = Vec::new();
+                extra.extend(configured_easytier_peers(&state).await);
                 let easytier = EasyTier::join(
                     &core_path,
                     &cli_path,
@@ -410,7 +427,7 @@ pub fn register(d: &mut Dispatcher) {
                     &network_secret,
                     None,
                     &hostname,
-                    Vec::new(),
+                    extra,
                 )
                 .await?;
                 log_info!(

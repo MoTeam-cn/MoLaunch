@@ -73,6 +73,9 @@ pub struct OnlineSnapshot {
     /// 用户自定义 TURN 服务器列表（阶段三子任务 7 新增）
     #[serde(rename = "onlineCustomTurnServers", default)]
     pub custom_turn_servers: Vec<IceServerEntry>,
+    /// 公共 easytier 中继节点列表（`--peers` 参数）
+    #[serde(rename = "onlineEasytierPublicPeers", default)]
+    pub easytier_public_peers: Vec<String>,
 }
 
 /// TLS 配置快照（serde(flatten) 展平到 ConfigSnapshot）

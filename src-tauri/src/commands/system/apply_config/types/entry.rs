@@ -87,6 +87,7 @@ pub fn build_snapshot(
         online: OnlineSnapshot {
             api_server_url: config.online.api_server_url.clone(),
             custom_turn_servers: config.online.custom_turn_servers.clone(),
+            easytier_public_peers: config.online.easytier_public_peers.clone(),
         },
         tls: TlsSnapshot {
             trust_mode: config.tls.trust_mode.clone(),

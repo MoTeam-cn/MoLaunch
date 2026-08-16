@@ -77,6 +77,11 @@ pub struct OnlinePatch {
     /// `None` 表示不更新。
     #[serde(rename = "onlineCustomTurnServers")]
     pub custom_turn_servers: Option<Vec<IceServerEntry>>,
+    /// 公共 easytier 中继节点列表（`--peers` 参数）
+    ///
+    /// `Some` 表示要更新此字段（含空数组，表示清空）；`None` 表示不更新。
+    #[serde(rename = "onlineEasytierPublicPeers")]
+    pub easytier_public_peers: Option<Vec<String>>,
 }
 
 /// 配置补丁：所有字段可选，仅传需要更新的字段

@@ -250,6 +250,13 @@ pub(super) fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigP
         );
         config.online.custom_turn_servers = servers.clone();
     }
+    if let Some(ref peers) = patch.online.easytier_public_peers {
+        log_info!(
+            "[Config] online_easytier_public_peers count = {}",
+            peers.len()
+        );
+        config.online.easytier_public_peers = peers.clone();
+    }
 }
 
 /// TLS 域：tls.trust_mode

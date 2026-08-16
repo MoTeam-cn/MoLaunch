@@ -66,6 +66,9 @@ pub struct OnlineConfig {
     /// 虚拟网络内节点标识（预留字段，用于房客侧 easytier hostname）
     #[serde(default)]
     pub network_identity: String,
+    /// 公共 easytier 中继节点列表（`--peers` 参数，格式 `tcp://host:port` / `udp://host:port`；用于公网组网穿越 NAT）
+    #[serde(default)]
+    pub easytier_public_peers: Vec<String>,
 }
 
 impl Default for OnlineConfig {
@@ -75,6 +78,7 @@ impl Default for OnlineConfig {
             custom_turn_servers: Vec::new(),
             easytier_core_path: crate::state::config::defaults::default_easytier_core_path(),
             network_identity: String::new(),
+            easytier_public_peers: Vec::new(),
         }
     }
 }
