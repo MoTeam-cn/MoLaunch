@@ -5,7 +5,7 @@
  * 按整合包聚类的卡片（热度排序），点击展开该整合包下的公开房间摘要列表；
  * 加入房间：无密码直接进房，有密码弹 LobbyJoinDialog；进房后由 RoomManager 切到房客面板。
  */
-import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
+import { ref, computed, onMounted, onActivated, defineAsyncComponent } from 'vue'
 import {
   CubeIcon,
   ChevronDownIcon,
@@ -44,8 +44,8 @@ const OTHER_GROUP_ID = '__other__'
 /** 是否已在房间中（房主/房客均禁止再加入） */
 const inRoom = computed(() => store.roomState.role !== null)
 
-async function loadPackages() {
-  packagesLoading.value = true
+async function loadPackages(silent = false) {
+  if (!silent) packagesLoading.value = true
   try {
     const res = await listLobbyPackages()
     if (res.code !== 1 || !res.data) throw new Error(res.msg || '加载大厅失败')
@@ -59,7 +59,7 @@ async function loadPackages() {
     console.error('Failed to load lobby packages:', e)
     toastError(`加载大厅失败：${e instanceof Error ? e.message : String(e)}`)
   } finally {
-    packagesLoading.value = false
+    if (!silent) packagesLoading.value = false
   }
 }
 
@@ -138,8 +138,15 @@ function joinWithPassword(password: string) {
   return doJoin(joinTarget.value, password)
 }
 
+/** 激活序号：keep-alive 下首次激活紧邻 onMounted，跳过避免重复加载 */
+let activatedCount = 0
 onMounted(() => {
   void loadPackages()
+})
+onActivated(() => {
+  activatedCount += 1
+  // 从其他菜单切回联机大厅时静默刷新（避免点亮的 loading 闪烁）
+  if (activatedCount > 1) void loadPackages(true)
 })
 </script>
 
@@ -150,7 +157,7 @@ onMounted(() => {
 
     <Card title="联机大厅">
       <template #extra>
-        <Button type="ghost" size="small" :loading="packagesLoading" @click="loadPackages">
+        <Button type="ghost" size="small" :loading="packagesLoading" @click="loadPackages()">
           <template #icon><ArrowPathIcon class="w-3.5 h-3.5" /></template>
           刷新
         </Button>
