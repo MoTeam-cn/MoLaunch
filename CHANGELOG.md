@@ -17,6 +17,7 @@
 - **红石联机创建面板完善交互**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts)（新增） / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)）：面板逻辑抽离为 composable（组件收敛至模板组装）；「本地 MC 服务」新增「选择端口」按钮，复用 port-picker 子窗口（与 FRP 创建隧道一致）；持续监听后端 `scaffolding-mc-port-change` / `mc-port-detected` 事件自动回填端口并 toast 提示；创建/重启/停止按钮补齐 loading 防呆，停止隧道成功新增成功提示。
 - **搭桥联机创建房间支持端口选择与事件回填**（[useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts) / [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：MC 端口输入框旁新增「选择端口」按钮（复用 port-picker 子窗口，loading 防呆）；持续监听后端 `scaffolding-mc-port-change` / `mc-port-detected` 事件，后端推送端口变化时自动回填 MC 端口并 toast 提示。
 - **工具页新增「地址测速」子页**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)（新增） / [network.ts](src/utils/api/tools/network.ts) / [core.ts](src/utils/api/tools/core.ts) / [ModNetworkPage.vue](src/views/tools/ModNetworkPage.vue)）：支持 TCP 握手 / UDP 探针 / 系统 ping 三种协议对 `host:port` 目标测延迟（支持 `名称|host:port` 前缀）；勾选「持续监测」后由后端周期测试并经 `tools-latency-update` 事件实时推送刷新结果，「停止监测」对应 `address_latency_stop`。
+- **红石联机节点延迟显示与自动首选**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)）：拉取中转服务器列表后自动对各节点 ping 测延迟，下拉选项展示各节点延迟（`xxms` 后缀），「测延迟」按钮可手动重测（loading 防呆）；自动选中延迟最低的可达节点作为默认服务器，全部失败时保持列表首个节点。
 
 ### Fixed
 

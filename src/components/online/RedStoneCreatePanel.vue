@@ -8,6 +8,7 @@
 import { defineAsyncComponent } from 'vue'
 import {
   ArrowPathIcon,
+  BoltIcon,
   ClipboardDocumentIcon,
   PlayIcon,
   ServerStackIcon,
@@ -24,8 +25,9 @@ import { useRedStonePanel } from '@/composables/useRedStonePanel'
 const {
   serverLoading, serverError, useManualServer, server, mcPort, portSelecting,
   phase, errorMessage, creating, stopping, restarting,
-  serverOptions, address,
-  handleSelectPort, loadServers, handleCreate, handleRestart, handleStop, copyAddress,
+  serverOptions, address, latencyTesting,
+  handleSelectPort, loadServers, testServersLatency,
+  handleCreate, handleRestart, handleStop, copyAddress,
 } = useRedStonePanel()
 </script>
 
@@ -46,6 +48,9 @@ const {
           <div class="flex-1">
             <Select v-model="server" :options="serverOptions" placeholder="选择中转服务器" />
           </div>
+          <Button type="outline" :loading="latencyTesting" @click="testServersLatency()">
+            <template #icon><BoltIcon class="w-4 h-4" /></template>测延迟
+          </Button>
           <Button type="outline" :loading="serverLoading" @click="loadServers">
             <template #icon><ArrowPathIcon class="w-4 h-4" /></template>刷新
           </Button>

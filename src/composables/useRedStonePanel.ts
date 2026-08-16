@@ -8,6 +8,7 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, onDeactivated } from 'vue'
 import { redstoneGetServers, redstoneStart, redstoneStatus, redstoneStop } from '@/utils/api/redstone'
 import { getRunningMcPort } from '@/utils/api/online-manager'
+import { addressLatencyTest } from '@/utils/api/tools'
 import { copyToClipboard } from '@/utils/clipboard'
 import { toastError, toastSuccess } from '@/utils/toast'
 import { openPickerWindow } from '@/utils/picker-window'
@@ -28,6 +29,9 @@ export function useRedStonePanel() {
   const server = ref('')
   const mcPort = ref('')
   const portSelecting = ref(false)
+  /** 节点延迟缓存（host → ms，测试失败为 null） */
+  const latencies = ref<Record<string, number | null>>({})
+  const latencyTesting = ref(false)
   const phase = ref<RedStoneCreatePhase>('idle')
   const status = ref<RedStoneStatusResult | null>(null)
   const errorMessage = ref('')
@@ -40,7 +44,11 @@ export function useRedStonePanel() {
   let mountedOnce = false
 
   const serverOptions = computed(() =>
-    servers.value.map((s) => ({ label: `${s.host}（${s.region}）`, value: s.host })),
+    servers.value.map((s) => {
+      const ms = latencies.value[s.host]
+      const suffix = ms != null ? ` · ${ms}ms` : ''
+      return { label: `${s.host}（${s.region}）${suffix}`, value: s.host }
+    }),
   )
   const address = computed(() => {
     const host = status.value?.server
@@ -68,6 +76,36 @@ export function useRedStonePanel() {
       serverError.value = `服务器列表拉取失败：${toMessage(e)}，可手动填写地址`
     } finally {
       serverLoading.value = false
+    }
+    void testServersLatency()
+  }
+
+  /** 测试各节点延迟（ping），自动首选延迟最低的可达节点 */
+  async function testServersLatency(autoSelect = true) {
+    if (servers.value.length === 0 || latencyTesting.value) return
+    latencyTesting.value = true
+    try {
+      const res = await addressLatencyTest(
+        servers.value.map((s) => ({
+          name: s.region,
+          host: s.host,
+          port: 443,
+          protocol: 'ping' as const,
+        })),
+      )
+      const map: Record<string, number | null> = {}
+      for (const item of res.results) map[item.host] = item.reachable ? item.latency_ms : null
+      latencies.value = map
+      if (autoSelect) {
+        const best = res.results
+          .filter((r) => r.reachable)
+          .sort((a, b) => a.latency_ms - b.latency_ms)[0]
+        if (best && servers.value.some((s) => s.host === best.host)) server.value = best.host
+      }
+    } catch (e) {
+      toastError(`节点延迟测试失败：${toMessage(e)}`)
+    } finally {
+      latencyTesting.value = false
     }
   }
   /** 复用 port-picker 子窗口选择本机端口（与 FRP 创建隧道一致） */
@@ -264,6 +302,8 @@ export function useRedStonePanel() {
     server,
     mcPort,
     portSelecting,
+    latencies,
+    latencyTesting,
     phase,
     errorMessage,
     creating,
@@ -273,6 +313,7 @@ export function useRedStonePanel() {
     address,
     handleSelectPort,
     loadServers,
+    testServersLatency,
     handleCreate,
     handleRestart,
     handleStop,
