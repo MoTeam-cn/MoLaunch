@@ -18,7 +18,7 @@ use tokio::sync::Mutex;
 ///
 /// GameWatcher 从游戏进程日志（stdout/latest.log）或进程监听端口检测到
 /// MC 局域网端口时，通过此事件通知前端联机模块。payload 为 u16 端口号。
-pub const ONLINE_MC_PORT_DETECTED_EVENT: &str = "online://mc-port-detected";
+pub const ONLINE_MC_PORT_DETECTED_EVENT: &str = "mc-port-detected";
 
 /// MC 开放局域网时日志中的端口正则
 ///

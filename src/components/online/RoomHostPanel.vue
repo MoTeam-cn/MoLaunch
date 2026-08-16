@@ -79,7 +79,7 @@ const portChangeListener = useTauriEvent<{ mcPort: number }>('scaffolding-mc-por
 })
 
 /** watcher 捕获的 MC 局域网端口事件（payload 为裸端口号，日志/监听双信号去重上报） */
-const mcPortDetectedListener = useTauriEvent<number>('online://mc-port-detected', (port) => {
+const mcPortDetectedListener = useTauriEvent<number>('mc-port-detected', (port) => {
   if (port && port !== store.easytierRuntime.mcPort) {
     store.setEasyTierRuntime({ mcPort: port })
     toastSuccess(`MC 端口已自动更新为 ${port}`)
