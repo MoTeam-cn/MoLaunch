@@ -19,6 +19,7 @@
 ### Fixed
 
 - **修复红石联机 IPC 请求参数结构**（[redstone.ts](src/utils/api/redstone.ts)）：`redstoneManager` 统一入口改为 `invoke('redstone_manager', { req: { action, params } })`，与后端 `req: ActionRequest` 契约一致，修复调用报 `invalid args missing required key req` 的问题（此前 action/params 直接作为顶层参数）。
+- **修复红石服务器列表解析**（[manager.rs](src-tauri/src/commands/redstone/manager.rs)）：`newserver.json` 线上实际返回 `{ 节点名: host }` map 格式（官方文档示例为 array），解析改为兼容两种格式，修复 "解析红石服务器列表失败: error decoding response body" 报错；空列表时明确报错。
 
 ## [0.3.6-rc5] - 2026-08-16
 

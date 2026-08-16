@@ -37,12 +37,33 @@ struct RedstoneStartParams {
     mc_port: u16,
 }
 
-/// newserver.json 单条服务器记录
-#[derive(Debug, Deserialize)]
-struct ServerEntry {
-    host: String,
-    #[serde(default)]
-    region: Option<String>,
+/// newserver.json 解析：线上实际为 map（region → host），官方文档示例为 array（[{host, region}]），
+/// 统一转换为 `{ host, region }` 列表。
+fn parse_new_server(value: serde_json::Value) -> Vec<serde_json::Value> {
+    match value {
+        // map 格式（线上实际）：{ "南京": "nanjing.hongshi.site", "成都": "chengdu.hongshi.site" }
+        serde_json::Value::Object(map) => map
+            .into_iter()
+            .map(|(region, host)| {
+                let host = host.as_str().unwrap_or_default().to_string();
+                serde_json::json!({ "host": host, "region": region })
+            })
+            .collect(),
+        // array 格式（官方文档示例）：[{ "host": "relay-1.hongshi.site", "region": "cn-east" }]
+        serde_json::Value::Array(arr) => arr
+            .into_iter()
+            .map(|e| {
+                let host = e
+                    .get("host")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or_default()
+                    .to_string();
+                let region = e.get("region").and_then(|v| v.as_str());
+                serde_json::json!({ "host": host, "region": region })
+            })
+            .collect(),
+        _ => Vec::new(),
+    }
 }
 
 fn register(d: &mut Dispatcher) {
@@ -60,14 +81,14 @@ fn register(d: &mut Dispatcher) {
                 .send()
                 .await
                 .map_err(|e| format!("获取红石服务器列表失败: {e}"))?;
-            let entries: Vec<ServerEntry> = resp
+            let value: serde_json::Value = resp
                 .json()
                 .await
                 .map_err(|e| format!("解析红石服务器列表失败: {e}"))?;
-            let servers: Vec<serde_json::Value> = entries
-                .into_iter()
-                .map(|e| serde_json::json!({ "host": e.host, "region": e.region }))
-                .collect();
+            let servers = parse_new_server(value);
+            if servers.is_empty() {
+                return Err("红石服务器列表格式异常".to_string());
+            }
             Ok(serde_json::json!({ "servers": servers }))
         }),
     );
