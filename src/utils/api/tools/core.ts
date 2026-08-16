@@ -73,9 +73,8 @@ export const TOOLS_ACTIONS = {
   SERVER_PING: 'server_ping',
   // TCP 端口连通性检测（Frp 等非 MC 协议服务）
   TCP_CHECK: 'tcp_check',
-  // 地址延迟测试（tcping / udping / ping，persistent=true 时经 tools-latency-update 事件推送）
+  // 地址延迟测试（tcping / udping / ping）
   ADDRESS_LATENCY_TEST: 'address_latency_test',
-  ADDRESS_LATENCY_STOP: 'address_latency_stop',
   // 列出本机监听端口（供 Frp 内网端口选择）
   LIST_OPEN_PORTS: 'list_open_ports',
   // 正版玩家皮肤获取 / 保存

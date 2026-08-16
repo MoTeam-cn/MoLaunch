@@ -8,7 +8,7 @@ mod ports;
 mod skin;
 mod tcp;
 
-pub use addr::{address_latency_stop, address_latency_test};
+pub use addr::address_latency_test;
 pub use latency::latency_test;
 pub use ping::server_ping;
 pub use ports::{list_open_ports, list_open_ports_sync};

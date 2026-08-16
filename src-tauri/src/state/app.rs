@@ -78,10 +78,6 @@ pub struct AppState {
     /// `redstone_start` 创建并替换（单实例），`redstone_stop` 停止并置 None；
     /// 隧道状态由内核写入同目录 tunnel.ini，`redstone_status` 轮询读取。
     pub redstone: Arc<TokioMutex<Option<crate::commands::redstone::tunnel::HongshiTunnel>>>,
-    /// 地址延迟持续测试任务句柄（tools `address_latency_test` persistent=true 时 spawn）
-    ///
-    /// 周期测试后经 `tools-latency-update` 事件推送；`address_latency_stop` 或新一轮持续测试时 abort。
-    pub latency_test_task: Arc<TokioMutex<Option<tokio::task::AbortHandle>>>,
     /// 应用句柄（Tauri setup 钩子中注入）
     ///
     /// 供后台任务/进度回调向前端 emit 事件（如 `download-progress`）。
@@ -150,7 +146,6 @@ impl AppState {
             manual_mc_port: Arc::new(TokioMutex::new(None)),
             lan_fake_server: Arc::new(TokioMutex::new(None)),
             redstone: Arc::new(TokioMutex::new(None)),
-            latency_test_task: Arc::new(TokioMutex::new(None)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
             panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }

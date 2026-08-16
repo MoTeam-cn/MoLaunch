@@ -100,16 +100,6 @@ fn default_latency_protocol() -> String {
 pub struct AddressLatencyTestParams {
     /// 待测目标列表
     pub targets: Vec<AddressTarget>,
-    /// 是否持续获取：true 时后端周期测试并经 `tools-latency-update` 事件推送，需 `address_latency_stop` 停止
-    #[serde(default)]
-    pub persistent: bool,
-    /// 持续测试间隔（毫秒，默认 3000，最小 1000）
-    #[serde(default = "default_latency_interval")]
-    pub interval_ms: u64,
-}
-
-fn default_latency_interval() -> u64 {
-    3000
 }
 
 /// 地址延迟测试单条结果
@@ -131,8 +121,6 @@ pub struct AddressLatencyItem {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct AddressLatencyResult {
     pub results: Vec<AddressLatencyItem>,
-    /// 持续测试任务标识（persistent=true 时返回，供 `address_latency_stop` 停止）
-    pub task_id: Option<String>,
 }
 
 /// 本机监听端口条目

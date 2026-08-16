@@ -96,31 +96,13 @@ export interface AddressLatencyItem {
 /** 地址延迟测试结果 */
 export interface AddressLatencyResult {
   results: AddressLatencyItem[]
-  /** 持续测试任务 id（persistent=true 时返回，供停止） */
-  task_id: string | null
 }
-
-/** 地址延迟持续测试 emit 事件名（payload = AddressLatencyResult） */
-export const LATENCY_UPDATE_EVENT = 'tools-latency-update'
 
 /**
  * 地址延迟测试（tcp 握手 / udp 探针 / 系统 ping）
- * @param persistent true 时后端按 intervalMs 周期测试并经 `tools-latency-update` 事件推送，需调用 addressLatencyStop 停止
  */
-export function addressLatencyTest(
-  targets: AddressTarget[],
-  opts?: { persistent?: boolean; intervalMs?: number },
-): Promise<AddressLatencyResult> {
-  return toolsManager<AddressLatencyResult>(TOOLS_ACTIONS.ADDRESS_LATENCY_TEST, {
-    targets,
-    persistent: opts?.persistent ?? false,
-    interval_ms: opts?.intervalMs ?? 3000,
-  })
-}
-
-/** 停止持续地址延迟测试 */
-export function addressLatencyStop(): Promise<Record<string, never>> {
-  return toolsManager<Record<string, never>>(TOOLS_ACTIONS.ADDRESS_LATENCY_STOP)
+export function addressLatencyTest(targets: AddressTarget[]): Promise<AddressLatencyResult> {
+  return toolsManager<AddressLatencyResult>(TOOLS_ACTIONS.ADDRESS_LATENCY_TEST, { targets })
 }
 
 /** 本机监听端口条目 */

@@ -1,24 +1,19 @@
-//! 地址延迟测试（tcp 握手 / udp 探针 / 系统 ping，支持持续模式经事件推送）
+//! 地址延迟测试（tcp 握手 / udp 探针 / 系统 ping）
 //!
-//! 一次性（persistent=false）：并发测试所有目标并返回首轮结果；
-//! 持续（persistent=true）：先返回首轮结果，同时 spawn 后台任务按 interval_ms 周期
-//! 测试并经 `tools-latency-update` 事件推送，直到 `address_latency_stop` 停止。
+//! 一次性并发测试所有目标并返回结果；ping 输出兼容 UTF-8 / GBK 编码，
+//! 解析不到 RTT 时视为不可达，避免假 0ms 成功。
 
 use std::time::{Duration, Instant};
 
 use futures_util::future::join_all;
-use tauri::Emitter;
 
 use crate::log_info;
-use crate::state::AppState;
 
 use super::super::types::{
     AddressLatencyItem, AddressLatencyResult, AddressLatencyTestParams, AddressTarget,
 };
 use super::tcp::check_tcp;
 
-/// 持续延迟测试 emit 事件名（payload = AddressLatencyResult）
-pub const LATENCY_UPDATE_EVENT: &str = "tools-latency-update";
 /// 单轮测试超时（tcp 连接 / ping 命令执行）
 const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 /// UDP 探针等待对端回包超时
@@ -26,68 +21,17 @@ const UDP_RECV_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// 地址延迟测试入口
 pub async fn address_latency_test(
-    state: &AppState,
-    app: tauri::AppHandle,
     params: AddressLatencyTestParams,
 ) -> Result<serde_json::Value, String> {
-    let task_id = if params.persistent {
-        // 替换并停止上一轮持续任务（同一时刻仅一个）
-        if let Some(old) = state.latency_test_task.lock().await.take() {
-            old.abort();
-        }
-        let targets = params.targets.clone();
-        let interval = Duration::from_millis(params.interval_ms.max(1000));
-        let app_handle = app.clone();
-        let handle = tokio::spawn(async move {
-            loop {
-                tokio::time::sleep(interval).await;
-                let result = run_tests(&targets).await;
-                let _ = app_handle.emit(LATENCY_UPDATE_EVENT, &result);
-            }
-        })
-        .abort_handle();
-        *state.latency_test_task.lock().await = Some(handle);
-        Some(format!(
-            "latency-{}",
-            std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_millis())
-                .unwrap_or(0)
-        ))
-    } else {
-        None
-    };
-
-    let result = run_tests(&params.targets).await;
-    log_info!(
-        "[AddressLatency] 测试 {} 个目标, persistent={}",
-        result.results.len(),
-        params.persistent
-    );
-    serde_json::to_value(AddressLatencyResult {
-        results: result.results,
-        task_id,
-    })
-    .map_err(|e| e.to_string())
-}
-
-/// 停止持续延迟测试任务
-pub async fn address_latency_stop(state: &AppState) -> Result<serde_json::Value, String> {
-    if let Some(handle) = state.latency_test_task.lock().await.take() {
-        handle.abort();
-        log_info!("[AddressLatency] 持续测试已停止");
-    }
-    Ok(serde_json::json!({}))
+    let results = run_tests(&params.targets).await;
+    log_info!("[AddressLatency] 测试 {} 个目标", results.len());
+    serde_json::to_value(AddressLatencyResult { results }).map_err(|e| e.to_string())
 }
 
 /// 并发测试全部目标
-async fn run_tests(targets: &[AddressTarget]) -> AddressLatencyResult {
+async fn run_tests(targets: &[AddressTarget]) -> Vec<AddressLatencyItem> {
     let futures = targets.iter().map(check_target);
-    let results = join_all(futures).await;
-    AddressLatencyResult {
-        results,
-        task_id: None,
-    }
+    join_all(futures).await
 }
 
 /// 按协议执行单目标延迟测试
@@ -158,12 +102,20 @@ async fn check_ping(target: &AddressTarget) -> AddressLatencyItem {
     if !output.status.success() {
         return item(target, false, 0, "ping 失败（主机不可达或禁 ICMP）");
     }
-    let text = String::from_utf8_lossy(&output.stdout).to_string();
+    let text = decode_output(&output.stdout);
     match parse_ping_rtt(&text) {
         Some(ms) => item(target, true, ms, ""),
-        // 命令成功但输出格式未识别（如 time<1ms 或本地回环），按可达处理
-        None => item(target, true, 0, ""),
+        // 命令成功但未解析到 RTT：不当作可达（避免假 0ms）
+        None => item(target, false, 0, "无法解析 ping 结果（未识别 RTT）"),
     }
+}
+
+/// 解码子进程输出：优先 UTF-8，失败按 GBK（中文 Windows 默认代码页 936）
+fn decode_output(bytes: &[u8]) -> String {
+    if let Ok(s) = std::str::from_utf8(bytes) {
+        return s.to_string();
+    }
+    encoding_rs::GBK.decode(bytes).0.into_owned()
 }
 
 /// 从 ping 输出解析 RTT 毫秒（兼容中英文：`time=12.3 ms` / `时间=12ms` / `time<1ms`）

@@ -2,11 +2,10 @@
 /**
  * 地址测速
  *
- * 对地址做 TCP 握手（tcping）/ UDP 探针 / ICMP ping 测延迟；
- * 支持持续监测：后端按间隔周期测试并经 `tools-latency-update` 事件推送，实时刷新。
+ * 对地址做 TCP 握手（tcping）/ UDP 探针 / ICMP ping 测延迟。
  * 每行一个目标：host 或 host:port（端口缺省 80），可加名称前缀 名称|host。
  */
-import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 import {
   SignalIcon,
   BoltIcon,
@@ -15,15 +14,9 @@ import {
 } from '@heroicons/vue/24/outline'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
-const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
-import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
-import {
-  addressLatencyTest,
-  addressLatencyStop,
-  LATENCY_UPDATE_EVENT,
-} from '@/utils/api/tools'
-import type { AddressLatencyItem, AddressLatencyResult, AddressTarget } from '@/utils/api/tools'
-import { useTauriEvent } from '@/composables/useTauriEvent'
+import { toastSuccess, toastError } from '@/utils/toast'
+import { addressLatencyTest } from '@/utils/api/tools'
+import type { AddressLatencyItem, AddressTarget } from '@/utils/api/tools'
 
 const PROTOCOL_OPTIONS = [
   { label: 'TCP 握手', value: 'tcp' },
@@ -33,9 +26,7 @@ const PROTOCOL_OPTIONS = [
 
 const text = ref('')
 const protocol = ref<'tcp' | 'udp' | 'ping'>('tcp')
-const persistent = ref(false)
 const testing = ref(false)
-const monitoring = ref(false)
 const results = ref<AddressLatencyItem[]>([])
 
 interface ParsedTarget {
@@ -102,10 +93,6 @@ function latencyColor(ms: number): string {
 
 async function doTest() {
   if (!canTest.value) return
-  if (persistent.value) {
-    await startMonitoring()
-    return
-  }
   testing.value = true
   results.value = []
   try {
@@ -119,47 +106,6 @@ async function doTest() {
     testing.value = false
   }
 }
-
-async function startMonitoring() {
-  if (monitoring.value) return
-  monitoring.value = true
-  testing.value = true
-  try {
-    const res = await addressLatencyTest(targets.value, { persistent: true, intervalMs: 3000 })
-    results.value = res.results
-    toastSuccess('已开始持续监测，结果将实时推送')
-  } catch (e) {
-    monitoring.value = false
-    toastError('开始监测失败: ' + (e instanceof Error ? e.message : String(e)))
-  } finally {
-    testing.value = false
-  }
-}
-
-async function stopMonitoring() {
-  if (!monitoring.value) return
-  try {
-    await addressLatencyStop()
-    toastInfo('已停止持续监测')
-  } catch (e) {
-    toastError('停止监测失败: ' + (e instanceof Error ? e.message : String(e)))
-  } finally {
-    monitoring.value = false
-  }
-}
-
-/** 后端持续测试周期推送事件（persistent=true 时） */
-const latencyListener = useTauriEvent<AddressLatencyResult>(LATENCY_UPDATE_EVENT, (payload) => {
-  if (payload.results.length > 0) results.value = payload.results
-})
-
-onMounted(() => {
-  void latencyListener.start()
-})
-
-onUnmounted(() => {
-  if (monitoring.value) void addressLatencyStop()
-})
 </script>
 
 <template>
@@ -170,7 +116,7 @@ onUnmounted(() => {
     </div>
     <div class="px-5 pb-5 space-y-3">
       <p class="text-xs text-gray-500">
-        对地址做 TCP 握手 / UDP 探针 / ICMP ping 测延迟；勾选持续监测后结果由后端实时推送。
+        对地址做 TCP 握手 / UDP 探针 / ICMP ping 测延迟。
       </p>
 
       <!-- 目标输入 -->
@@ -184,33 +130,24 @@ onUnmounted(() => {
         以下行格式无效：{{ invalidLines.join('；') }}
       </div>
 
-      <!-- 协议与持续监测 -->
-      <div class="flex items-center gap-3 flex-wrap">
-        <div class="flex items-center gap-2">
-          <Button
-            v-for="opt in PROTOCOL_OPTIONS"
-            :key="opt.value"
-            :type="protocol === opt.value ? 'primary' : 'outline'"
-            size="small"
-            @click="protocol = opt.value"
-          >{{ opt.label }}</Button>
-        </div>
-        <label class="flex items-center gap-1.5 text-xs text-gray-600">
-          <Checkbox v-model="persistent" />持续监测（3s 间隔）
-        </label>
+      <!-- 协议选择 -->
+      <div class="flex items-center gap-2 flex-wrap">
+        <Button
+          v-for="opt in PROTOCOL_OPTIONS"
+          :key="opt.value"
+          :type="protocol === opt.value ? 'primary' : 'outline'"
+          size="small"
+          @click="protocol = opt.value"
+        >{{ opt.label }}</Button>
       </div>
 
       <!-- 操作按钮 -->
       <div class="flex items-center gap-3">
-        <Button v-if="monitoring" type="outline" @click="stopMonitoring">
-          <template #icon><XCircleIcon class="h-4 w-4" /></template>停止监测
-        </Button>
-        <Button v-else type="primary" :loading="testing" :disabled="!canTest" @click="doTest">
+        <Button type="primary" :loading="testing" :disabled="!canTest" @click="doTest">
           <template #icon><BoltIcon class="h-4 w-4" /></template>
-          {{ testing ? '测试中...' : persistent ? '开始监测' : '开始测试' }}
+          {{ testing ? '测试中...' : '开始测试' }}
         </Button>
         <span v-if="targets.length > 0" class="text-xs text-gray-400">{{ targets.length }} 个目标</span>
-        <span v-if="monitoring" class="text-xs text-green-500 animate-pulse">持续监测中…</span>
       </div>
 
       <!-- 测试结果 -->
@@ -224,7 +161,7 @@ onUnmounted(() => {
           <XCircleIcon v-else class="h-4 w-4 flex-none text-red-400" />
           <div class="flex-1 min-w-0">
             <div class="truncate text-sm text-gray-800">
-              {{ item.name ? item.name + ' · ' : '' }}{{ item.host }}:{{ item.port }}
+              {{ item.name ? item.name + ' · ' : '' }}{{ item.host }}{{ item.protocol === 'ping' ? '' : ':' + item.port }}
             </div>
             <div v-if="item.error" class="text-xs text-red-400">{{ item.error }}</div>
             <div v-else class="text-xs text-gray-400">{{ item.protocol }} 探测成功</div>
