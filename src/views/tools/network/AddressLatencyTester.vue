@@ -4,7 +4,7 @@
  *
  * 对地址做 TCP 握手（tcping）/ UDP 探针 / ICMP ping 测延迟；
  * 支持持续监测：后端按间隔周期测试并经 `tools-latency-update` 事件推送，实时刷新。
- * 每行一个目标：host 或 host:port（端口缺省 443），可加名称前缀 名称|host。
+ * 每行一个目标：host 或 host:port（端口缺省 80），可加名称前缀 名称|host。
  */
 import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import {
@@ -44,6 +44,9 @@ interface ParsedTarget {
   port: number
 }
 
+/** 未携带端口时的默认端口 */
+const DEFAULT_PORT = 80
+
 function parseLine(line: string): ParsedTarget | null {
   const trimmed = line.trim()
   if (!trimmed) return null
@@ -54,11 +57,21 @@ function parseLine(line: string): ParsedTarget | null {
     name = trimmed.slice(0, sep).trim()
     addr = trimmed.slice(sep + 1).trim()
   }
+  let host: string
+  let port: number
   const idx = addr.lastIndexOf(':')
-  if (idx <= 0) return null
-  const host = addr.slice(0, idx).trim()
-  const port = Number(addr.slice(idx + 1))
-  if (!host || !Number.isInteger(port) || port < 1 || port > 65535) return null
+  if (idx <= 0) {
+    // 未携带端口：host 或 名称|host，默认使用 80
+    host = addr.trim()
+    port = DEFAULT_PORT
+  } else {
+    host = addr.slice(0, idx).trim()
+    const portStr = addr.slice(idx + 1).trim()
+    if (!/^\d+$/.test(portStr)) return null
+    port = Number(portStr)
+    if (port < 1 || port > 65535) return null
+  }
+  if (!host) return null
   return { name: name || undefined, host, port }
 }
 
@@ -165,7 +178,7 @@ onUnmounted(() => {
         v-model="text"
         textarea
         :rows="5"
-        placeholder="每行一个目标：host 或 host:port，可加名称前缀「名称|host」，端口缺省 443，如 主服|1.2.3.4"
+        placeholder="每行一个目标：host 或 host:port，可加名称前缀「名称|host」，端口缺省 80，如 主服|1.2.3.4"
       />
       <div v-if="invalidLines.length > 0" class="text-xs text-red-400">
         以下行格式无效：{{ invalidLines.join('；') }}

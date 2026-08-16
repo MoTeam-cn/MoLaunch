@@ -19,12 +19,13 @@
 - **工具页新增「地址测速」子页**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)（新增） / [network.ts](src/utils/api/tools/network.ts) / [core.ts](src/utils/api/tools/core.ts) / [ModNetworkPage.vue](src/views/tools/ModNetworkPage.vue)）：支持 TCP 握手 / UDP 探针 / 系统 ping 三种协议对 `host:port` 目标测延迟（支持 `名称|host:port` 前缀）；勾选「持续监测」后由后端周期测试并经 `tools-latency-update` 事件实时推送刷新结果，「停止监测」对应 `address_latency_stop`。
 - **红石联机节点延迟显示与自动首选**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)）：拉取中转服务器列表后自动对各节点 ping 测延迟，下拉选项展示各节点延迟（`xxms` 后缀），「测延迟」按钮可手动重测（loading 防呆）；自动选中延迟最低的可达节点作为默认服务器，全部失败时保持列表首个节点。
 - **工具页细节调整**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue) / [NetworkLatencyTester.vue](src/views/tools/network/NetworkLatencyTester.vue)）：地址测速协议选择改用项目 Button 组件按钮组（选中高亮 primary），输入示例改为通用 `host:port` 写法；移除已失效的 MCBBS 下载源预设。
-- **地址测速输入兼容无端口目标**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)）：目标行支持省略端口（默认 443），可直接输入 `www.baidu.com` 或 `名称|host`；格式校验提示由「无法解析」改为「格式无效」，避免与 DNS 解析混淆。
+- **地址测速输入兼容无端口目标**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)）：目标行支持省略端口（默认 80），可直接输入 `www.baidu.com` 或 `名称|host`；格式校验提示由「无法解析」改为「格式无效」，避免与 DNS 解析混淆。
 
 ### Fixed
 
 - **修复红石联机 IPC 请求参数结构**（[redstone.ts](src/utils/api/redstone.ts)）：`redstoneManager` 统一入口改为 `invoke('redstone_manager', { req: { action, params } })`，与后端 `req: ActionRequest` 契约一致，修复调用报 `invalid args missing required key req` 的问题（此前 action/params 直接作为顶层参数）。
 - **修复红石服务器列表解析**（[manager.rs](src-tauri/src/commands/redstone/manager.rs)）：`newserver.json` 线上实际返回 `{ 节点名: host }` map 格式（官方文档示例为 array），解析改为兼容两种格式，修复 "解析红石服务器列表失败: error decoding response body" 报错；空列表时明确报错。
+- **修复地址测速无端口目标仍被判无效**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)）：`parseLine` 此前仍强制要求 `host:port` 格式，未携带端口（如 `www.baidu.com`）被误判为格式无效；现按是否含冒号分支解析，无端口时默认 80，带端口时校验范围 1-65535。
 
 ## [0.3.6-rc5] - 2026-08-16
 
