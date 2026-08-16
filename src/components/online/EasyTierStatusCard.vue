@@ -3,14 +3,12 @@
  * easytier 虚拟组网状态卡片（设备面板展示）
  *
  * 展示组网状态 / core 版本 / 虚拟 IP / 虚拟网络名 / 进程 PID。
- * 状态来源双通道：后端 `easytier-status` 事件推送（加入/停止时 emit）+ 打开页面时
+ * 状态来源：全局已监听后端 `easytier-status` 事件（App.vue 注册）+ 打开页面时
  * `easytier_status` 查询兜底，统一写入 online store 的 easytier 切片。
  */
 import { computed, onMounted, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
-import { useTauriEvent } from '@/composables/useTauriEvent'
 import { getEasyTierStatus } from '@/utils/api/online-manager/easytier'
-import type { EasyTierStatusResult } from '@/types/online'
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const EasyTierStatusBadge = defineAsyncComponent(() => import('./EasyTierStatusBadge.vue'))
 import {
@@ -27,21 +25,8 @@ const ip = computed(() => store.easytierRuntime.virtualIp)
 const networkName = computed(() => store.easytierRuntime.networkName)
 const pid = computed(() => store.easytierRuntime.pid)
 
-/** 后端 emit 推送：实时同步组网状态（joined/version/pid/rpcPortal/networkName/virtualIp） */
-const { start } = useTauriEvent<EasyTierStatusResult>('easytier-status', (payload) => {
-  store.setEasyTierRuntime({
-    joined: payload.joined,
-    version: payload.version ?? '',
-    pid: payload.pid,
-    rpcPortal: payload.rpcPortal ?? '',
-    networkName: payload.networkName ?? '',
-    virtualIp: payload.virtualIp ?? '',
-  })
-})
-
 onMounted(async () => {
-  // 打开页面时查询一次兜底（emit 仅在有动作时推送）
-  start()
+  // 打开页面时查询一次兜底（emit 仅在有动作时推送，全局监听在 App.vue 已注册）
   try {
     const status = await getEasyTierStatus()
     store.setEasyTierRuntime({

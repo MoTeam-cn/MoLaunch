@@ -26,6 +26,8 @@
 
 ### Fixed
 
+- **修复房间详情 easytier 虚拟网络状态不实时更新（需切设备页才刷新）**（[App.vue](src/App.vue) / [EasyTierStatusCard.vue](src/components/online/EasyTierStatusCard.vue)）：`easytier-status` 事件监听原只在设备页卡片 `EasyTierStatusCard.vue` 挂载时注册，房间详情徽章 `EasyTierStatusBadge.vue` 只读 store——先进入房间详情时 store 从未被事件更新，状态不刷新，需切到设备页才显示「已组网」。修复：把事件监听提升为全局，`App.vue` 挂载时注册一次 `easytier-status` 监听、收到事件即写入 online store 的 easytier 切片；设备页卡片移除重复监听，仅保留打开页面时的 `easytier_status` 查询兜底；房间详情徽章纯读 store 自动实时刷新。
+
 - **修复 nbt mca 往返测试偶发失败（并发竞态）**（[nbt_test.rs](src-tauri/src/commands/tools/nbt/nbt_test.rs) / [api.rs](src-tauri/src/commands/tools/nbt/api.rs)）：`nbt_test.rs` 被 `mod.rs` 与 `api.rs` 各 `#[path]` include 一次，同一份 `mca_parse_and_save` 被编译为两个并发测试，共享临时文件 `mol_test_chunk.mca` 交叉读写——一方在对方 `save_mca_chunk` 前读到未修改数据导致 `Some(5) != Some(99)` 断言失败，一方读到只写完 8KiB 头部的半成品导致「mca 文件中没有可解析的区块」。修复：移除 `api.rs` 中重复的测试模块 include（测试只依赖 `convert`/`mca`，与 api 无关），临时文件改用 `{pid}` 唯一后缀防未来并发冲突。
 
 - **修复从大厅加入房间返回「房间码格式无效」**（[room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs)）：大厅传入的 `code_id` 是 N 段公开标识（如 `YNZE-U61D`），而 api-server `join_room` 的 `valid_format` 只接受完整 21 位 `U/` 前缀码，N 段必然校验失败返回 400 InvalidRoomCode——服务端修复见 api-server 侧 CHANGELOG（`join`/`info` 兼容 N 段）。客户端侧同步修复：完整码含 `U/` 前缀，`/` 作为路径参数会拆断 axum 路由段，本次在 `signaling_get_room`/`signaling_join_room`/`signaling_close_room` 三个端点统一用 `urlencoding::encode` 对房间码做 URL 编码（`/` → `%2F`，axum 自动解码），消除完整码加入/查询/关闭时因路径拆断导致的 404/400。

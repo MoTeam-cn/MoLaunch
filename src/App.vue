@@ -42,6 +42,8 @@ import { initOnlineSession } from '@/composables/online/onlineSession'
 import { useDragDrop } from '@/composables/useDragDrop'
 import { useDevToolsGuard } from '@/composables/useDevToolsGuard'
 import { useExternalLinkGuard } from '@/composables/useExternalLinkGuard'
+import { useTauriEvent } from '@/composables/useTauriEvent'
+import type { EasyTierStatusResult } from '@/types/online'
 
 const sdkStore = useSdkStore()
 const authStore = useAuthStore()
@@ -63,9 +65,26 @@ useDragDrop()
 useDevToolsGuard()
 // 全局外部链接拦截：webview 内禁止直接跳转外部网站，统一走系统浏览器
 useExternalLinkGuard()
+// 全局监听 easytier-status 事件：组网状态实时写入 store，
+// 设备页卡片与房间详情徽章均读 store，跨页面即时刷新（无需切页兜底）
+const { start: startEasyTierStatusListen } = useTauriEvent<EasyTierStatusResult>(
+  'easytier-status',
+  (payload) => {
+    onlineStore.setEasyTierRuntime({
+      joined: payload.joined,
+      version: payload.version ?? '',
+      pid: payload.pid,
+      rpcPortal: payload.rpcPortal ?? '',
+      networkName: payload.networkName ?? '',
+      virtualIp: payload.virtualIp ?? '',
+    })
+  },
+)
 
 onMounted(() => {
   console.log('[Startup][Frontend] App.vue onMounted @', new Date().toISOString())
+  // 优先注册 easytier 状态全局监听，保证后续会话/页面触发的组网事件都能写入 store
+  startEasyTierStatusListen()
   setModalRef(modalRef.value)
   setCrashDialogRef(crashDialogRef.value)
   setBuyHintDialogRef(hintDialogRef.value)
