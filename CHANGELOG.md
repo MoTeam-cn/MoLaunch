@@ -18,6 +18,8 @@
 
 - **前端接入联机端口热更新 API**（[core.ts](src/utils/api/online-manager/core.ts) / [types/easytier.ts](src/types/online/easytier.ts) / [api/easytier.ts](src/utils/api/online-manager/easytier.ts) / [useScaffolding.ts](src/composables/useScaffolding.ts)）：`ONLINE_ACTIONS` 新增 `scaffolding_host_set_mc_port` / `scaffolding_client_poll` 并补齐封装（`scaffoldingHostSetMcPort` 手动端口最高权重、`scaffoldingClientPoll` 房客周期轮询）；`useScaffolding` 新增 `setMcPort` / `poll` 方法；`ScaffoldingHostStartResult.mcPort` 改为可空，hostStart 未探测到端口时（先开房后开局域网）暂不写入 store，等后台监视循环自动补回。
 
+- **房客面板端口自动轮询 + 手动端口覆盖**（[RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：组网探测成功后启动 5s 周期轮询（`scaffolding_client_poll`），房主端口变化自动更新进服地址并提示；连续 3 次（15s）轮询失败停止并提示「房主可能已关闭房间」（不清房间状态）；进服地址卡片新增手动端口设置（最高权重，轮询不再覆盖），支持一键恢复自动；退出房间/组件卸载时清理轮询定时器。
+
 ### Changed
 
 - **房客侧 easytier 节点自动发现（对齐 Terracotta 标准，去掉硬编码联机中心地址）**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [client.rs](src-tauri/src/minecraft/online/scaffolding/client.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)）：`scaffolding_client_probe` 原在中心地址缺省时硬编码 `10.144.144.1:13448`，跨启动器场景（如陶瓦房主）下房主 IP/端口均不可预期，导致房客连错地址。修复：随包附带 **easytier-cli**（与 core 同版本，资源层 [resources.rs](src-tauri/src/resources.rs) 嵌入并同目录释放、[build_script/easytier.rs](src-tauri/build_script/easytier.rs) 构建期校验、[update-easytier.cjs](scripts/update-easytier.cjs) 自动更新同步提取）；`EasyTier::discover_center()` 经 `easytier-cli -p {rpc-portal} -o json peer list` 查询虚拟网络节点，按 hostname 前缀 `scaffolding-mc-server-` 匹配房主并解析联机中心端口，`client::resolve_center_addr` 显式参数优先、缺失时自动发现，再走标准 c:ping/c:protocols/c:server_port 探测。实测 v2.6.4 `peer list -o json` 输出结构（ipv4/hostname 字段）。
