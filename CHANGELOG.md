@@ -7,27 +7,43 @@
 ### Added
 
 - **联机页新增「红石联机」子菜单与入口面板**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)（新增））：基于 hongshi 内核的第三方隧道联机入口——侧边栏新增「红石联机」分类（含「创建房间」子项，图标 LinkIcon），独立于 MoLaunch 云端（不像房间管理受云端连接影响），URL `?tab=` 可恢复 `redstone_create`；点击「创建房间」渲染 `RedStoneCreatePanel`（完整功能面板：中转服务器选择/手动填写、MC 端口自动探测回填、隧道创建与 2s 轮询状态、`<server>:<port>` 联机地址展示与复制、停止/重启、退出码与超时错误映射，round-trip 详见 docs/REDSTONE_ONLINE_DESIGN.md）。
+
 - **红石联机后端命令与内核释放**（[resources.rs](src-tauri/src/resources.rs) / [commands/redstone/](src-tauri/src/commands/redstone/)（新增） / [state/app.rs](src-tauri/src/state/app.rs) / [lib.rs](src-tauri/src/lib.rs) / [tray.rs](src-tauri/src/tray.rs)）：`embedded_bytes` 新增 `hongshi/hongshi` 分支（按平台/架构映射 windows-amd64 / linux-amd64+arm64 / darwin-amd64+arm64）+ `extract_hongshi_core()`（`ensure_appdata_subdir("hongshi")` 经 `extract_resource` sha256 幂等释放，Unix 补执行权限，与 easytier 同构）；`redstone_manager` 单入口注册 4 个 action——`redstone_get_servers`（拉取 hongshi.site/newserver.json）、`redstone_start`（释放内核→停止旧实例→经 `HongshiTunnel::spawn` 以 `-server/-port/-status-file` 拉起子进程，CREATE_NO_WINDOW + 日志后台消费）、`redstone_status`（进程存活 + `parse_tunnel_status` 大小写不敏感解析 tunnel.ini 的 open/closed/unknown 与端口）、`redstone_stop`（kill 并清 AppState 引用）；AppState 新增 `redstone: Arc<TokioMutex<Option<HongshiTunnel>>>`；统一退出清理链 `cleanup_and_exit` 新增停止红石隧道（与 easytier 停止并列）；前端封装 [redstone.ts](src/utils/api/redstone.ts)（新增）与类型 [redstone.ts](src/types/redstone.ts)（新增），`thread` 参数兼容 `mc_port`/`mcPort`。附带 5 个 tunnel.ini 解析单测。
+
 - **红石联机内核资源内置入库**（`src-tauri/resources/hongshi/`）：随安装包分发 windows-amd64 / linux-amd64+arm64 / darwin-amd64+arm64 五个平台内核，运行时经 `extract_hongshi_core` 释放（sha256 幂等校验），不再依赖 hongshi 云端运行时下载（规避其频发抽风与每日 5 次下载限流），具体接入见 docs/REDSTONE_ONLINE_DESIGN.md。
+
 - **新增地址延迟测试工具**（[addr.rs](src-tauri/src/commands/tools/network/addr.rs)（新增） / [icmp.rs](src-tauri/src/commands/tools/network/icmp.rs)（新增） / [types/network.rs](src-tauri/src/commands/tools/types/network.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs)）：`address_latency_test` 支持 tcp 握手（tcping）/ udp 探针 / icmp ping 三种协议测目标延迟；TCP 检测复用 [tcp.rs](src-tauri/src/commands/tools/network/tcp.rs) 的 `check_tcp`（改 pub(crate)）；ICMP ping 为自实现单次 Echo——socket 方案参考 surge-ping（Linux 非特权 SOCK_DGRAM 优先、失败回退 SOCK_RAW，报文构造 / checksum / 回包解析均独立实现，仅引入底层 socket2 封装），附带单测（[icmp_test.rs](src-tauri/src/commands/tools/network/icmp_test.rs)（新增））。
 
 ### Changed
 
 - **联机菜单归类调整：父级「房间管理」更名为「搭桥联机」**（[useOnlineNav.ts](src/composables/useOnlineNav.ts)）：Scaffolding 联机分类由「房间管理」归类为「搭桥联机」，其下原有「搭桥联机」子项改回「创建房间」，与红石联机「创建房间」子项命名一致避免歧义；分类描述、文件头注释与 URL tab 恢复逻辑同步更新。
+
 - **红石联机创建面板完善交互**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts)（新增） / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)）：面板逻辑抽离为 composable（组件收敛至模板组装）；「本地 MC 服务」新增「选择端口」按钮，复用 port-picker 子窗口（与 FRP 创建隧道一致）；持续监听后端 `scaffolding-mc-port-change` / `mc-port-detected` 事件自动回填端口并 toast 提示；创建/重启/停止按钮补齐 loading 防呆，停止隧道成功新增成功提示。
+
 - **搭桥联机创建房间支持端口选择与事件回填**（[useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts) / [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：MC 端口输入框旁新增「选择端口」按钮（复用 port-picker 子窗口，loading 防呆）；持续监听后端 `scaffolding-mc-port-change` / `mc-port-detected` 事件，后端推送端口变化时自动回填 MC 端口并 toast 提示。
+
 - **工具页新增「地址测速」子页**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)（新增） / [network.ts](src/utils/api/tools/network.ts) / [core.ts](src/utils/api/tools/core.ts) / [ModNetworkPage.vue](src/views/tools/ModNetworkPage.vue)）：支持 TCP 握手 / UDP 探针 / 系统 ping 三种协议对 `host:port` 目标测延迟（支持 `名称|host:port` 前缀）。
+
 - **红石联机节点延迟显示与自动首选**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)）：拉取中转服务器列表后自动对各节点 ping 测延迟，下拉选项展示各节点延迟（`xxms` 后缀），「测延迟」按钮可手动重测（loading 防呆）；自动选中延迟最低的可达节点作为默认服务器，全部失败时保持列表首个节点。
+
 - **工具页细节调整**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue) / [NetworkLatencyTester.vue](src/views/tools/network/NetworkLatencyTester.vue)）：地址测速协议选择改用项目 Button 组件按钮组（选中高亮 primary），输入示例改为通用 `host:port` 写法；移除已失效的 MCBBS 下载源预设。
+
 - **地址测速输入兼容无端口目标**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)）：目标行支持省略端口（默认 80），可直接输入 `www.baidu.com` 或 `名称|host`；格式校验提示由「无法解析」改为「格式无效」，避免与 DNS 解析混淆。
+
+- **红石联机中转服务器延迟显示优化为 Tag + 阈值色映射**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)）：下拉选项与触发器内延迟改为 Tag 包裹展示，延迟经新增 latencyTagColor 按阈值映射预设色（<50 绿 / <150 金 / <300 橙 / 否则红，未测灰）；serverOptions 改为附加 latencyMs 字段自定义渲染。同时补齐按钮操作 toast 反馈：刷新成功/失败、延迟测试完成（含自动首选节点）、端口选择成功、创建/重启发起提示、隧道建立/关闭/超时/失败轮询结果实时提示。
 
 ### Fixed
 
 - **修复红石联机 IPC 请求参数结构**（[redstone.ts](src/utils/api/redstone.ts)）：`redstoneManager` 统一入口改为 `invoke('redstone_manager', { req: { action, params } })`，与后端 `req: ActionRequest` 契约一致，修复调用报 `invalid args missing required key req` 的问题（此前 action/params 直接作为顶层参数）。
+
 - **修复红石服务器列表解析**（[manager.rs](src-tauri/src/commands/redstone/manager.rs)）：`newserver.json` 线上实际返回 `{ 节点名: host }` map 格式（官方文档示例为 array），解析改为兼容两种格式，修复 "解析红石服务器列表失败: error decoding response body" 报错；空列表时明确报错。
+
 - **修复地址测速无端口目标仍被判无效**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)）：`parseLine` 此前仍强制要求 `host:port` 格式，未携带端口（如 `www.baidu.com`）被误判为格式无效；现按是否含冒号分支解析，无端口时默认 80，带端口时校验范围 1-65535。
+
 - **ICMP ping 改为自实现，弃用系统 ping 命令**（[addr.rs](src-tauri/src/commands/tools/network/addr.rs) / [icmp.rs](src-tauri/src/commands/tools/network/icmp.rs)（新增））：此前依赖系统 ping 命令并解析输出，存在中文 Windows（GBK）编码与输出格式差异问题，导致 `www.baidu.com` 报「无法解析 ping 结果」或假 0ms；现直接 DNS 解析取 IPv4 后发送 ICMP Echo 报文并计时（参考 surge-ping 的 DGRAM/RAW socket 方案，仅新增底层 socket2 依赖），返回真实 RTT；删除系统 ping 输出适配（`parse_ping_rtt` / `decode_output`）与 [addr_test.rs](src-tauri/src/commands/tools/network/addr_test.rs)。
+
 - **移除地址测速持续探测**（[addr.rs](src-tauri/src/commands/tools/network/addr.rs) / [network.ts](src/utils/api/tools/network.ts) / [core.ts](src/utils/api/tools/core.ts) / [AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)）：删除「持续监测」勾选与按钮、后端 persistent 周期任务与 `tools-latency-update` 事件推送、`address_latency_stop` 命令及 AppState `latency_test_task` 句柄，地址测速收敛为一次性测试；`AddressLatencyResult` 移除 `task_id`，ping 协议结果不再显示端口。
+
 - **修复地址测速 UDP 探针报 os error 10047**（[addr.rs](src-tauri/src/commands/tools/network/addr.rs)）：UDP socket 此前固定绑定 IPv4（`0.0.0.0`），而 `lookup_host` 首个结果可能为 IPv6，`connect` 时报「使用了与请求的协议不兼容的地址」；现按解析结果地址族选择 socket（优先 IPv4 与 ping/tcp 一致，无 IPv4 时绑定 `[::]:0` 走 IPv6）。
 
 ## [0.3.6-rc5] - 2026-08-16

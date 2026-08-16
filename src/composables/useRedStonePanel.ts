@@ -10,7 +10,7 @@ import { redstoneGetServers, redstoneStart, redstoneStatus, redstoneStop } from 
 import { getRunningMcPort } from '@/utils/api/online-manager'
 import { addressLatencyTest } from '@/utils/api/tools'
 import { copyToClipboard } from '@/utils/clipboard'
-import { toastError, toastSuccess } from '@/utils/toast'
+import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 import { openPickerWindow } from '@/utils/picker-window'
 import { useTauriEvent } from '@/composables/useTauriEvent'
 import type { RedStoneServer, RedStoneStatusResult } from '@/types/redstone'
@@ -19,6 +19,18 @@ const POLL_INTERVAL = 2000
 const POLL_TIMEOUT = 15000
 const CLOSED_MESSAGE = '房间已关闭（长时间无人或服务器维护）'
 export type RedStoneCreatePhase = 'idle' | 'creating' | 'open' | 'closed' | 'error'
+
+/**
+ * 延迟 → Tag 预设色映射（沿用联机测速默认阈值：
+ * <50 绿 / <150 金 / <300 橙 / 否则红；未测灰）
+ */
+export function latencyTagColor(ms: number | null): string {
+  if (ms == null) return 'gray'
+  if (ms < 50) return 'green'
+  if (ms < 150) return 'gold'
+  if (ms < 300) return 'orange'
+  return 'red'
+}
 
 /** 红石联机创建面板逻辑（含端口选择与 MC 端口事件自动回填） */
 export function useRedStonePanel() {
@@ -44,11 +56,11 @@ export function useRedStonePanel() {
   let mountedOnce = false
 
   const serverOptions = computed(() =>
-    servers.value.map((s) => {
-      const ms = latencies.value[s.host]
-      const suffix = ms != null ? ` · ${ms}ms` : ''
-      return { label: `${s.host}（${s.region}）${suffix}`, value: s.host }
-    }),
+    servers.value.map((s) => ({
+      label: `${s.host}（${s.region}）`,
+      value: s.host,
+      latencyMs: latencies.value[s.host] ?? null,
+    })),
   )
   const address = computed(() => {
     const host = status.value?.server
@@ -67,6 +79,7 @@ export function useRedStonePanel() {
       if (res.servers.length > 0) {
         useManualServer.value = false
         if (!res.servers.some((s) => s.host === server.value)) server.value = res.servers[0].host
+        toastSuccess(`服务器列表已刷新（${res.servers.length} 个节点）`)
       } else {
         useManualServer.value = true
         serverError.value = '暂无可用的中转服务器，可手动填写服务器地址'
@@ -74,6 +87,7 @@ export function useRedStonePanel() {
     } catch (e) {
       useManualServer.value = true
       serverError.value = `服务器列表拉取失败：${toMessage(e)}，可手动填写地址`
+      toastError(`服务器列表拉取失败：${toMessage(e)}`)
     } finally {
       serverLoading.value = false
     }
@@ -96,12 +110,17 @@ export function useRedStonePanel() {
       const map: Record<string, number | null> = {}
       for (const item of res.results) map[item.host] = item.reachable ? item.latency_ms : null
       latencies.value = map
+      const reachable = res.results.filter((r) => r.reachable)
+      let bestHost: string | null = null
       if (autoSelect) {
-        const best = res.results
-          .filter((r) => r.reachable)
-          .sort((a, b) => a.latency_ms - b.latency_ms)[0]
-        if (best && servers.value.some((s) => s.host === best.host)) server.value = best.host
+        const best = [...reachable].sort((a, b) => a.latency_ms - b.latency_ms)[0]
+        if (best && servers.value.some((s) => s.host === best.host)) {
+          server.value = best.host
+          bestHost = best.host
+        }
       }
+      const bestMsg = bestHost ? `，已自动首选 ${bestHost}` : ''
+      toastSuccess(`延迟测试完成：${reachable.length}/${res.results.length} 个节点可达${bestMsg}`)
     } catch (e) {
       toastError(`节点延迟测试失败：${toMessage(e)}`)
     } finally {
@@ -114,7 +133,10 @@ export function useRedStonePanel() {
     portSelecting.value = true
     try {
       const value = await openPickerWindow({ title: '选择本机端口', template: 'port-picker', data: {}, width: 400, height: 500 })
-      if (value) mcPort.value = String(value)
+      if (value) {
+        mcPort.value = String(value)
+        toastSuccess(`已选择端口 ${value}`)
+      }
     } catch (e) {
       if (!(e instanceof Error && e.message.includes('取消'))) toastError('选择端口失败：' + e)
     } finally {
@@ -151,18 +173,35 @@ export function useRedStonePanel() {
     try {
       const res = await redstoneStatus()
       status.value = res
-      if (res.status === 'open') { phase.value = 'open'; errorMessage.value = ''; return true }
-      if (res.status === 'closed') { phase.value = 'closed'; errorMessage.value = CLOSED_MESSAGE; return true }
+      if (res.status === 'open') {
+        phase.value = 'open'
+        errorMessage.value = ''
+        toastSuccess('隧道已建立，可复制地址分享给好友')
+        return true
+      }
+      if (res.status === 'closed') {
+        phase.value = 'closed'
+        errorMessage.value = CLOSED_MESSAGE
+        toastError(CLOSED_MESSAGE)
+        return true
+      }
       if (!res.running) {
         phase.value = 'error'
         errorMessage.value = '隧道创建失败：服务器不可达或暂无可分配端口，请稍后重试或更换服务器'
+        toastError(errorMessage.value)
         return true
       }
-      if (Date.now() - pollStart > POLL_TIMEOUT) { phase.value = 'error'; errorMessage.value = '隧道建立超时'; return true }
+      if (Date.now() - pollStart > POLL_TIMEOUT) {
+        phase.value = 'error'
+        errorMessage.value = '隧道建立超时'
+        toastError('隧道建立超时，请检查中转服务器或稍后重试')
+        return true
+      }
       return false
     } catch (e) {
       phase.value = 'error'
       errorMessage.value = `查询隧道状态失败：${toMessage(e)}`
+      toastError(errorMessage.value)
       return true
     } finally {
       polling = false
@@ -188,6 +227,7 @@ export function useRedStonePanel() {
     } catch (e) {
       phase.value = 'error'
       errorMessage.value = `隧道创建失败：${toMessage(e)}`
+      toastError(errorMessage.value)
     } finally {
       creating.value = false
     }
@@ -200,6 +240,7 @@ export function useRedStonePanel() {
       toastError(error)
       return
     }
+    toastInfo(`正在连接 ${server.value.trim()} 创建隧道…`)
     void launchTunnel(server.value.trim(), Number(mcPort.value))
   }
 
@@ -212,6 +253,7 @@ export function useRedStonePanel() {
       return
     }
     restarting.value = true
+    toastInfo(`正在重启隧道（${server.value.trim()}）…`)
     try {
       await redstoneStop()
     } catch (e) {

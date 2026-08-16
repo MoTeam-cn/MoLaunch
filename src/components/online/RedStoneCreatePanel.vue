@@ -5,7 +5,7 @@
  * 选择中转服务器 + 本地 MC 端口拉起 hongshi 内核创建隧道；
  * 状态机/轮询/端口选择与事件回填逻辑见 useRedStonePanel，本文件仅模板组装。
  */
-import { defineAsyncComponent } from 'vue'
+import { computed, defineAsyncComponent } from 'vue'
 import {
   ArrowPathIcon,
   BoltIcon,
@@ -19,8 +19,9 @@ const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
-import { useRedStonePanel } from '@/composables/useRedStonePanel'
+import { latencyTagColor, useRedStonePanel } from '@/composables/useRedStonePanel'
 
 const {
   serverLoading, serverError, useManualServer, server, mcPort, portSelecting,
@@ -29,6 +30,8 @@ const {
   handleSelectPort, loadServers, testServersLatency,
   handleCreate, handleRestart, handleStop, copyAddress,
 } = useRedStonePanel()
+
+const selectedOption = computed(() => serverOptions.value.find((o) => o.value === server.value))
 </script>
 
 <template>
@@ -46,7 +49,34 @@ const {
         </div>
         <div v-else class="flex items-center gap-2">
           <div class="flex-1">
-            <Select v-model="server" :options="serverOptions" placeholder="选择中转服务器" />
+            <Select v-model="server" :options="serverOptions" placeholder="选择中转服务器" custom-option>
+              <template #selected="{ label }">
+                <span class="flex items-center gap-2 min-w-0 w-full">
+                  <span class="truncate min-w-0 flex-1">{{ label }}</span>
+                  <Tag v-if="selectedOption?.latencyMs != null" :color="latencyTagColor(selectedOption.latencyMs)" size="small">
+                    {{ selectedOption.latencyMs }}ms
+                  </Tag>
+                </span>
+              </template>
+              <template #option="{ option, selected }">
+                <span class="flex items-center gap-2 min-w-0 flex-1 self-center">
+                  <span class="truncate min-w-0">{{ option.label }}</span>
+                </span>
+                <span class="flex items-center gap-2 flex-none self-center">
+                  <Tag v-if="option.latencyMs != null" :color="latencyTagColor(option.latencyMs)" size="small">
+                    {{ option.latencyMs }}ms
+                  </Tag>
+                  <svg
+                    v-if="selected"
+                    class="w-3 h-3 flex-none text-primary-500"
+                    viewBox="0 0 1024 1024"
+                    fill="currentColor"
+                  >
+                    <path d="M912 192c-12.8 0-25.6 4.266667-34.133333 12.8L384 699.2 234.666667 548.266667c-17.066667-17.066667-46.933333-17.066667-64 0-17.066667 17.066667-17.066667 46.933333 0 64l179.2 179.2c8.533333 8.533333 21.333333 12.8 34.133333 12.8s25.6-4.266667 34.133333-12.8l520.533334-520.533334c17.066667-17.066667 17.066667-46.933333 0-64-8.533333-8.533333-21.333333-12.8-34.133334-12.8z" />
+                  </svg>
+                </span>
+              </template>
+            </Select>
           </div>
           <Button type="outline" :loading="latencyTesting" @click="testServersLatency()">
             <template #icon><BoltIcon class="w-4 h-4" /></template>测延迟
