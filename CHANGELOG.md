@@ -34,6 +34,8 @@
 
 - **port-picker 端口选择支持按进程过滤（红石联机仅显示 Java 端口）**（[ports.rs](src-tauri/src/commands/tools/network/ports.rs) / [scheme.rs](src-tauri/src/commands/tools/picker_window/scheme.rs) / [mod.rs](src-tauri/src/commands/tools/network/mod.rs) / [port-picker.html](src-tauri/resources/templates/port-picker.html) / [useRedStonePanel.ts](src/composables/useRedStonePanel.ts)）：端口枚举核心抽取为 `collect_open_ports`，新增 `list_open_ports_sync_filtered` 按进程名大小写不敏感子串过滤；picker scheme handler 从 data store 读取 `process_filter`，初始注入与 `/data` 定时刷新均按过滤返回，`port-picker.html` 有过滤条件时显示「仅显示 Java 进程端口」提示条并调整搜索占位符；红石联机「选择端口」传 `process_filter: 'java'`（红石隧道仅支持穿透 Java 版联机端口），FRP 两处调用不受影响。
 
+- 红石联机创建房间面板说明卡新增自动关闭规则提醒：隧道无玩家 10 分钟或运行满 6 小时后将自动关闭
+
 ### Fixed
 
 - **修复红石联机 IPC 请求参数结构**（[redstone.ts](src/utils/api/redstone.ts)）：`redstoneManager` 统一入口改为 `invoke('redstone_manager', { req: { action, params } })`，与后端 `req: ActionRequest` 契约一致，修复调用报 `invalid args missing required key req` 的问题（此前 action/params 直接作为顶层参数）。

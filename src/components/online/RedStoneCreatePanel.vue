@@ -141,6 +141,7 @@ const selectedOption = computed(() => serverOptions.value.find((o) => o.value ==
     </Card>
     <Card title="说明">
       <AlertV2 type="info" message="隧道上限 10 人 / 10Mbps；每次创建地址不同，无需长期保留" />
+      <AlertV2 type="warning" message="隧道无玩家 10 分钟或运行满 6 小时后将自动关闭" />
     </Card>
   </div>
 </template>
