@@ -5,6 +5,8 @@
  * （WASM 为单实例，内存增长可能 detach 旧视图，所有读取必须经 ensureHeap）。
  */
 import type { InitMsg } from './types'
+/** Emscripten 胶水代码（?raw 构建期内联，来源固定为仓库产物，不接收运行时输入） */
+import cubiomesGlueCode from '@/assets/seedmap/cubiomes.js?raw'
 
 /** 共享 WASM 单例状态（render / structure-search 经此访问 Module） */
 export const wasm = {
@@ -80,27 +82,25 @@ export async function initModule(msg: InitMsg): Promise<void> {
     return
   }
 
-  // 优先使用主线程缓存并通过 postMessage 传入的字节（各 Worker 共享，不再各自 fetch）；
-  // 无缓存时回退到按 URL fetch（兼容独立调用场景）
-  let jsCode: string
-  let wasmBinary: ArrayBuffer
-  if (msg.wasmJsCode && msg.wasmBytes) {
-    jsCode = msg.wasmJsCode
-    wasmBinary = msg.wasmBytes
-  } else {
-    const [jsResp, wasmResp] = await Promise.all([
-      fetch(msg.wasmJsUrl),
-      fetch(msg.wasmUrl),
-    ])
-    if (!jsResp.ok) throw new Error(`加载 cubiomes.js 失败: HTTP ${jsResp.status}`)
-    if (!wasmResp.ok) throw new Error(`加载 cubiomes.wasm 失败: HTTP ${wasmResp.status}`)
-    ;[jsCode, wasmBinary] = await Promise.all([jsResp.text(), wasmResp.arrayBuffer()])
+  // 胶水代码为仓库内静态产物（Vite ?raw 构建期内联）：校验指纹后执行，杜绝任意代码注入
+  if (!cubiomesGlueCode.startsWith('var createCubiomesModule=')) {
+    throw new Error('cubiomes.js 产物异常，拒绝执行')
   }
-
-  const factoryFn = new Function(jsCode + '\nreturn createCubiomesModule;')
+  const factoryFn = new Function(cubiomesGlueCode + '\nreturn createCubiomesModule;')
   const factory = factoryFn()
   if (typeof factory !== 'function') {
     throw new Error(`createCubiomesModule 非函数 (typeof=${typeof factory})`)
+  }
+
+  // WASM 二进制：优先主线程缓存并 postMessage 传入的字节（各 Worker 共享，不再各自 fetch）；
+  // 无缓存时回退到按 URL fetch（兼容独立调用场景）
+  let wasmBinary: ArrayBuffer
+  if (msg.wasmBytes) {
+    wasmBinary = msg.wasmBytes
+  } else {
+    const wasmResp = await fetch(msg.wasmUrl)
+    if (!wasmResp.ok) throw new Error(`加载 cubiomes.wasm 失败: HTTP ${wasmResp.status}`)
+    wasmBinary = await wasmResp.arrayBuffer()
   }
 
   wasm.module = await factory({

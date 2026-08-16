@@ -108,7 +108,6 @@ export class WorkerPool {
         jobId,
         wasmJsUrl: bundle.wasmJsUrl,
         wasmUrl: bundle.wasmUrl,
-        wasmJsCode: bundle.jsCode,
         wasmBytes: bundle.wasmBytes,
         seedEpoch: 0,
       })
