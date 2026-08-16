@@ -2,6 +2,16 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Added
+
+- **联机页新增「红石联机」子菜单与入口面板**（[useOnlineNav.ts](src/composables/useOnlineNav.ts) / [Online.vue](src/views/Online.vue) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)（新增））：基于 hongshi 内核的第三方隧道联机入口——侧边栏新增「红石联机」分类（含「创建房间」子项，图标 LinkIcon），独立于 MoLaunch 云端（不像房间管理受云端连接影响），URL `?tab=` 可恢复 `redstone_create`；点击「创建房间」渲染 `RedStoneCreatePanel`，当前展示接入规划说明（后续按 docs/REDSTONE_ONLINE_PLAN.md 落地内核获取/隧道创建/联机地址展示）。
+
+### Changed
+
+- **房间管理「创建房间」子菜单更名为「搭桥联机」**（[useOnlineNav.ts](src/composables/useOnlineNav.ts)）：原 Scaffolding 联机入口「创建房间」改名为「搭桥联机」，避免与红石联机的「创建房间」子项混淆，分类描述同步更新。
+
 ## [0.3.6-rc5] - 2026-08-16
 
 ### Fixed

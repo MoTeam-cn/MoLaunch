@@ -20,6 +20,7 @@ import {
   ArrowRightOnRectangleIcon,
   HomeIcon,
   GlobeAltIcon,
+  LinkIcon,
 } from '@heroicons/vue/24/outline'
 import { useOnlineStore } from '@/stores/online'
 import { frpCategory } from '@/composables/useFrpSidebar'
@@ -40,6 +41,7 @@ export interface NavCategory {
 /** Online 页激活分类 ID 联合类型（tutorial 为侧边栏动作项，不会真正成为激活态） */
 export type OnlineCategoryId =
   | 'device' | 'lobby' | 'create' | 'join' | 'room_details'
+  | 'redstone_create'
   | 'providers' | 'tunnels' | 'auth' | 'logs' | 'tutorial'
 
 /** 设备分类（始终可用） */
@@ -58,16 +60,16 @@ const lobbyCategory: NavCategory = {
   desc: '浏览公开房间列表，按整合包聚类展示并一键加入',
 }
 
-/** 房间管理分类（已就绪时可用），子菜单：创建房间 / 加入房间 / 房间详情 */
+/** 房间管理分类（已就绪时可用），子菜单：搭桥联机 / 加入房间 / 房间详情 */
 const roomCategory: NavCategory = {
   id: 'room',
   label: '房间管理',
   icon: ServerStackIcon,
-  desc: '创建或加入房间、管理参与者与连接信息',
+  desc: '搭桥联机或加入房间、管理参与者与连接信息',
   children: [
     {
       id: 'create',
-      label: '创建房间',
+      label: '搭桥联机',
       icon: PlusIcon,
       desc: '选择整合包、生成房间码并作为房主拉起联机中心',
     },
@@ -80,9 +82,26 @@ const roomCategory: NavCategory = {
   ],
 }
 
-/** URL `?tab=` 可恢复的合法分类 ID（device/lobby + 房间管理子项 + FRP 子项） */
+/** 红石联机分类（独立第三方联机内核，不依赖 MoLaunch 云端），子菜单：创建房间 */
+const redstoneCategory: NavCategory = {
+  id: 'redstone',
+  label: '红石联机',
+  icon: LinkIcon,
+  desc: '基于红石内核创建隧道联机，分享并复制联机地址给好友',
+  children: [
+    {
+      id: 'redstone_create',
+      label: '创建房间',
+      icon: PlusIcon,
+      desc: '下载红石内核并创建隧道，生成可分享的联机地址',
+    },
+  ],
+}
+
+/** URL `?tab=` 可恢复的合法分类 ID（device/lobby + 房间管理子项 + 红石联机 + FRP 子项） */
 const VALID_TABS = new Set<OnlineCategoryId>([
   'device', 'lobby', 'create', 'join', 'room_details',
+  'redstone_create',
   'providers', 'tunnels', 'auth', 'logs',
 ])
 
@@ -146,6 +165,7 @@ export function useOnlineNav(
           sealed: true,
           children: roomCategory.children!.map((child) => ({ ...child, sealed: true })),
         },
+        redstoneCategory,
         frpCategory,
       ]
     }
@@ -157,7 +177,7 @@ export function useOnlineNav(
       roomDetailsChild.value,
     ]
     const roomWithDetails: NavCategory = { ...roomCategory, children }
-    return [deviceCategory, lobbyCategory, roomWithDetails, frpCategory]
+    return [deviceCategory, lobbyCategory, roomWithDetails, redstoneCategory, frpCategory]
   })
 
   /** 状态徽章文案与颜色 */
