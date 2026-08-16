@@ -97,6 +97,15 @@ pub fn cleanup_and_exit(app: &AppHandle) {
                 log_info!("[Exit] 停止 easytier 虚拟网络");
                 easytier.stop().await;
             }
+            // 停止红石联机隧道（hongshi 子进程）
+            let redstone = {
+                let mut guard = state.redstone.lock().await;
+                guard.take()
+            };
+            if let Some(redstone) = redstone {
+                log_info!("[Exit] 停止红石联机隧道");
+                redstone.stop().await;
+            }
             // 停止联机中心 TCP 服务
             let server = {
                 let mut guard = state.scaffolding_server.lock().await;
