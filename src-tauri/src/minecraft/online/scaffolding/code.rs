@@ -3,8 +3,6 @@
 //! 房间码形如 `U/NNNN-NNNN-SSSS-SSSS`：前两段为网络名标识 N，后两段为网络密钥 S。
 //! 校验规则：字符按 0-9、A-H、J-N、P-Z（含 L）映射到 [0, 34) 后，按小端序读得的整型应能被 7 整除。
 
-use rand::RngCore;
-
 /// 房间码字符集（剔除易混淆的 I / O，保留 L；与 Terracotta 标准一致，共 34 字符）
 const CHARSET: &[u8] = b"0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
@@ -16,7 +14,8 @@ fn char_to_value(c: u8) -> Option<u8> {
     CHARSET.iter().position(|&x| x == c).map(|i| i as u8)
 }
 
-/// 小端序 base-34 整型模 7 校验（模运算避免溢出）
+/// 小端序 base-34 整型模 7 校验（模运算避免溢出；供生成结果的回归测试使用）
+#[cfg(test)]
 fn validate_checksum(chars: &[u8]) -> bool {
     if chars.len() != 16 {
         return false;
@@ -35,38 +34,36 @@ fn validate_checksum(chars: &[u8]) -> bool {
 }
 
 /// 生成符合校验规则的房间码 `U/NNNN-NNNN-SSSS-SSSS`
+///
+/// 与陶瓦 Terracotta 对齐「一次成型」：随机 u128 → `% 34^16` 限定可表达范围 →
+/// 低 3 位归零强制被 7 整除（充当校验和）→ 小端序 base-34 逐位编码，三段同源。
 pub fn generate_room_code() -> String {
-    let mut rng = rand::thread_rng();
-    loop {
-        let mut idx = [0u8; 16];
-        rng.fill_bytes(&mut idx);
-        let mut chars = [0u8; 16];
-        for (i, &n) in idx.iter().enumerate() {
-            chars[i] = CHARSET[n as usize % CHARSET.len()];
-        }
-        if !validate_checksum(&chars) {
-            continue;
-        }
-        return format!(
-            "U/{}{}{}{}-{}{}{}{}-{}{}{}{}-{}{}{}{}",
-            chars[0] as char,
-            chars[1] as char,
-            chars[2] as char,
-            chars[3] as char,
-            chars[4] as char,
-            chars[5] as char,
-            chars[6] as char,
-            chars[7] as char,
-            chars[8] as char,
-            chars[9] as char,
-            chars[10] as char,
-            chars[11] as char,
-            chars[12] as char,
-            chars[13] as char,
-            chars[14] as char,
-            chars[15] as char,
-        );
+    let mut value = rand::random::<u128>() % (34u128.pow(16));
+    value -= value % 7;
+    let mut chars = [0u8; 16];
+    for c in chars.iter_mut() {
+        *c = CHARSET[(value % 34) as usize];
+        value /= 34;
     }
+    format!(
+        "U/{}{}{}{}-{}{}{}{}-{}{}{}{}-{}{}{}{}",
+        chars[0] as char,
+        chars[1] as char,
+        chars[2] as char,
+        chars[3] as char,
+        chars[4] as char,
+        chars[5] as char,
+        chars[6] as char,
+        chars[7] as char,
+        chars[8] as char,
+        chars[9] as char,
+        chars[10] as char,
+        chars[11] as char,
+        chars[12] as char,
+        chars[13] as char,
+        chars[14] as char,
+        chars[15] as char,
+    )
 }
 
 /// 解析房间码，返回 (network_name, network_secret)
@@ -132,6 +129,9 @@ mod tests {
             let (name, secret) = parse(&code).unwrap();
             assert!(name.starts_with(NETWORK_NAME_PREFIX));
             assert!(!secret.is_empty());
+            // 一次成型生成的结果必须通过校验和（防回归）
+            let chars: Vec<u8> = code[2..].bytes().filter(|&b| b != b'-').collect();
+            assert!(validate_checksum(&chars));
         }
     }
 
