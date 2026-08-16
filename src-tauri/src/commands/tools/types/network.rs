@@ -76,6 +76,65 @@ pub struct TcpCheckResult {
     pub error: String,
 }
 
+/// 地址延迟测试目标
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AddressTarget {
+    /// 显示名（如「南京」），缺省用 host
+    #[serde(default)]
+    pub name: Option<String>,
+    /// 目标主机（域名或 IP）
+    pub host: String,
+    /// 目标端口（ping 协议忽略）
+    pub port: u16,
+    /// 测延迟协议：tcp（默认，TCP 握手）/ udp（UDP 探针）/ ping（ICMP，系统 ping）
+    #[serde(default = "default_latency_protocol")]
+    pub protocol: String,
+}
+
+fn default_latency_protocol() -> String {
+    "tcp".to_string()
+}
+
+/// 地址延迟测试请求参数
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddressLatencyTestParams {
+    /// 待测目标列表
+    pub targets: Vec<AddressTarget>,
+    /// 是否持续获取：true 时后端周期测试并经 `tools-latency-update` 事件推送，需 `address_latency_stop` 停止
+    #[serde(default)]
+    pub persistent: bool,
+    /// 持续测试间隔（毫秒，默认 3000，最小 1000）
+    #[serde(default = "default_latency_interval")]
+    pub interval_ms: u64,
+}
+
+fn default_latency_interval() -> u64 {
+    3000
+}
+
+/// 地址延迟测试单条结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddressLatencyItem {
+    pub name: Option<String>,
+    pub host: String,
+    pub port: u16,
+    pub protocol: String,
+    /// 是否可达
+    pub reachable: bool,
+    /// 延迟（毫秒），失败时为 0
+    pub latency_ms: u64,
+    /// 失败原因（成功时为空）
+    pub error: String,
+}
+
+/// 地址延迟测试结果
+#[derive(Debug, Serialize, Deserialize)]
+pub struct AddressLatencyResult {
+    pub results: Vec<AddressLatencyItem>,
+    /// 持续测试任务标识（persistent=true 时返回，供 `address_latency_stop` 停止）
+    pub task_id: Option<String>,
+}
+
 /// 本机监听端口条目
 #[derive(Debug, Serialize, Deserialize)]
 pub struct OpenPortInfo {

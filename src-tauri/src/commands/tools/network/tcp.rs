@@ -44,8 +44,8 @@ pub async fn tcp_check(
     serde_json::to_value(&result).map_err(|e| e.to_string())
 }
 
-/// 执行 TCP 连接检测（3 秒超时）
-async fn check_tcp(host: &str, port: u16) -> TcpCheckResult {
+/// 执行 TCP 连接检测（3 秒超时），供 tcp_check 与地址延迟测试（tcping）复用
+pub(crate) async fn check_tcp(host: &str, port: u16) -> TcpCheckResult {
     let start = Instant::now();
     match tokio::time::timeout(Duration::from_secs(3), TcpStream::connect((host, port))).await {
         Ok(Ok(_stream)) => TcpCheckResult {

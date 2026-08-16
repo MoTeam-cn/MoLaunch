@@ -282,6 +282,21 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             network::tcp_check(&state, p).await
         }),
     );
+    // 地址延迟测试（tcp 握手 / udp 探针 / 系统 ping；persistent=true 时周期测试并经事件推送）
+    d.register(
+        "address_latency_test",
+        handler!(state, app, params, {
+            let p: AddressLatencyTestParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            network::address_latency_test(&state, app, p).await
+        }),
+    );
+    d.register(
+        "address_latency_stop",
+        handler!(state, _app, _params, {
+            network::address_latency_stop(&state).await
+        }),
+    );
 
     // 列出本机监听端口（供 Frp 内网端口选择）
     d.register(
