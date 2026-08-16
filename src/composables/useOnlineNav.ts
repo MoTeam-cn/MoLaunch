@@ -2,7 +2,7 @@
  * Online 联机页导航分类与状态联动 composable
  *
  * 分类结构（恢复历史子菜单）：
- * - 设备 / 联机大厅 / 房间管理（创建房间·加入房间·房间详情 子菜单）+ FRP 子菜单
+ * - 设备 / 联机大厅 / 搭桥联机（创建房间·加入房间·房间详情 子菜单）+ 红石联机 + FRP 子菜单
  * - 未在房间：「创建房间」「加入房间」可用，「房间详情」灰色
  * - 在房间中：「创建房间」「加入房间」灰色（必须先退出），「房间详情」可用
  *
@@ -60,16 +60,16 @@ const lobbyCategory: NavCategory = {
   desc: '浏览公开房间列表，按整合包聚类展示并一键加入',
 }
 
-/** 房间管理分类（已就绪时可用），子菜单：搭桥联机 / 加入房间 / 房间详情 */
+/** 搭桥联机分类（已就绪时可用），子菜单：创建房间 / 加入房间 / 房间详情 */
 const roomCategory: NavCategory = {
   id: 'room',
-  label: '房间管理',
+  label: '搭桥联机',
   icon: ServerStackIcon,
   desc: '搭桥联机或加入房间、管理参与者与连接信息',
   children: [
     {
       id: 'create',
-      label: '搭桥联机',
+      label: '创建房间',
       icon: PlusIcon,
       desc: '选择整合包、生成房间码并作为房主拉起联机中心',
     },
@@ -98,7 +98,7 @@ const redstoneCategory: NavCategory = {
   ],
 }
 
-/** URL `?tab=` 可恢复的合法分类 ID（device/lobby + 房间管理子项 + 红石联机 + FRP 子项） */
+/** URL `?tab=` 可恢复的合法分类 ID（device/lobby + 搭桥联机子项 + 红石联机 + FRP 子项） */
 const VALID_TABS = new Set<OnlineCategoryId>([
   'device', 'lobby', 'create', 'join', 'room_details',
   'redstone_create',
@@ -125,7 +125,7 @@ export function useOnlineNav(
   const status = computed(() => onlineStore.deviceStatus)
 
   /**
-   * 联机功能是否就绪（显示联机大厅 / 房间管理 / FRP 分类）
+   * 联机功能是否就绪（显示联机大厅 / 搭桥联机 / FRP 分类）
    *
    * 仅判断「已注册 + 已登录」，**不判断 token_expired**：
    * 后端 `load_creds_with_auto_refresh` 会在业务 action 调用前自动 refresh 续期，
@@ -138,7 +138,7 @@ export function useOnlineNav(
   /** 是否在房间中（role=host/guest） */
   const isInRoom = computed(() => onlineStore.roomState.role !== null)
 
-  /** 房间详情子项（追加到房间管理子菜单，未在房间时 disabled 灰色不可点） */
+  /** 房间详情子项（追加到搭桥联机子菜单，未在房间时 disabled 灰色不可点） */
   const roomDetailsChild = computed<NavCategory>(() => ({
     id: 'room_details',
     label: '房间详情',
@@ -152,7 +152,7 @@ export function useOnlineNav(
    *
    * 云端离线（cloudConnected=false 且初始化已完成）时联机分类封禁置灰
    * （可点击但由 Online.vue 拦截弹窗告知原因），FRP 不受云端影响仍可用。
-   * 已就绪时「房间管理」展开子菜单：创建/加入房间在房间中置灰，房间详情未在房间置灰。
+   * 已就绪时「搭桥联机」展开子菜单：创建/加入房间在房间中置灰，房间详情未在房间置灰。
    */
   const categories = computed<NavCategory[]>(() => {
     const offline = !onlineStore.cloudConnected && !onlineStore.initializing

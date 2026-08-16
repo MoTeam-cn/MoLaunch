@@ -12,7 +12,7 @@
 
 ### Changed
 
-- **房间管理「创建房间」子菜单更名为「搭桥联机」**（[useOnlineNav.ts](src/composables/useOnlineNav.ts)）：原 Scaffolding 联机入口「创建房间」改名为「搭桥联机」，避免与红石联机的「创建房间」子项混淆，分类描述同步更新。
+- **联机菜单归类调整：父级「房间管理」更名为「搭桥联机」**（[useOnlineNav.ts](src/composables/useOnlineNav.ts)）：Scaffolding 联机分类由「房间管理」归类为「搭桥联机」，其下原有「搭桥联机」子项改回「创建房间」，与红石联机「创建房间」子项命名一致避免歧义；分类描述、文件头注释与 URL tab 恢复逻辑同步更新。
 
 ## [0.3.6-rc5] - 2026-08-16
 
