@@ -1,0 +1,66 @@
+# 构建产物手动清理工作流
+#
+# 仅手动触发（workflow_dispatch），触发时输入清理阈值天数。
+# 遍历仓库全部 Actions artifacts，删除创建时间早于 N 天前的产物，及时腾出存储空间；
+# GitHub 自身会按各产物的 retention-days 自动过期，本工作流用于提前回收
+# （例如发布工作流的安装包产物只用于跨 job 传递，GitHub Release / S3 才是永久载体）。
+
+name: Cleanup Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      days:
+        description: '清理多少天前上传的构建产物（0 = 全部删除）'
+        required: true
+        default: '7'
+        type: number
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    name: Delete Artifacts
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete stale artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const days = Number(context.payload.inputs.days);
+            if (!Number.isFinite(days) || days < 0) {
+              throw new Error(`无效的天数参数: ${context.payload.inputs.days}`);
+            }
+            const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+            let deleted = 0;
+            let kept = 0;
+            for (let page = 1; ; page++) {
+              const { data } = await github.rest.actions.listArtifactsForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                per_page: 100,
+                page,
+              });
+              for (const artifact of data.artifacts) {
+                const created = Date.parse(artifact.created_at);
+                if (created > cutoff) {
+                  kept++;
+                  continue;
+                }
+                try {
+                  await github.rest.actions.deleteArtifact({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    artifact_id: artifact.id,
+                  });
+                  deleted++;
+                  console.log(`已删除: ${artifact.name} (id=${artifact.id}, created=${artifact.created_at})`);
+                } catch (err) {
+                  console.log(`跳过: ${artifact.name} 删除失败 (${err.message})`);
+                }
+              }
+              if (data.artifacts.length < 100) break;
+            }
+            console.log(`清理完成: 删除 ${deleted} 个, 保留 ${kept} 个`);

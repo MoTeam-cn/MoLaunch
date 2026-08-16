@@ -6,6 +6,8 @@
 
 ### Added
 
+- **新增构建产物手动清理工作流**（[cleanup-artifacts.yml](.github/workflows/cleanup-artifacts.yml)）：仅 `workflow_dispatch` 手动触发，触发时输入「清理多少天前上传的构建产物」阈值（0 = 全部删除，默认 7 天），经 GitHub Actions API 分页列出全部 artifacts 并删除创建时间早于阈值的产物；用于在 GitHub 自动过期之外提前回收（例如发布工作流仅用于跨 job 传递的安装包产物），及时腾出 Actions 存储空间。
+
 - **房主房间心跳保活（keepalive）**（[room.ts](src/utils/api/online-manager/room.ts) / [core.ts](src/utils/api/online-manager/core.ts) / [roomActions.ts](src/stores/online/roomActions.ts) / [room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [api_paths.rs](src-tauri/src/api_paths.rs)）：房主创建房间成功后启动 3 分钟心跳定时器，经新增 `room_heartbeat` IPC action 上报 `POST /v1/signaling/rooms/{code}/heartbeat`，关闭房间时停止；配合服务端 `signaling.heartbeat_timeout`（默认 300 秒）超时清理机制，防止崩溃/断网后房间成为永不清理的僵尸房间（服务端改动见 api-server 侧 CHANGELOG）。
 
 ### Changed
