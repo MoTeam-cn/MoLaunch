@@ -120,6 +120,8 @@
 
 - **房主心跳携带房间在线人数（easytier peer list）+ 心跳间隔降至 2 分钟**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [roomActions.ts](src/stores/online/roomActions.ts)）：① \EasyTier\ 新增 \peer_count()\（复用 \easytier_cli peer list\ 统计虚拟网络在线节点数，含本机）；② \oom_heartbeat\ 心跳上报时房主侧查询在线人数随请求体携带 \playerCount\（查询失败降级为不带人数，不阻断心跳，向后兼容）；③ 房主心跳间隔由 3 分钟降至 2 分钟（配合服务端 \heartbeat_timeout\ 180 秒）。
 
+- **大厅房间展示真实在线人数（对接 api-server current_players）**（[lobby.rs](src-tauri/src/minecraft/online/signaling/lobby.rs) / [lobby.ts](src/types/online/lobby.ts)）：LobbyRoomItem.player_count 新增 alias current_players 对接服务端随心跳上报的在线人数（房主经 easytier peer list 统计，含房主本机），大厅卡片人数不再恒为 0、满房时正确禁用加入。
+
 ### Changed
 
 - **房客侧 easytier 节点自动发现（对齐 Terracotta 标准，去掉硬编码联机中心地址）**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [client.rs](src-tauri/src/minecraft/online/scaffolding/client.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)）：`scaffolding_client_probe` 原在中心地址缺省时硬编码 `10.144.144.1:13448`，跨启动器场景（如陶瓦房主）下房主 IP/端口均不可预期，导致房客连错地址。修复：随包附带 **easytier-cli**（与 core 同版本，资源层 [resources.rs](src-tauri/src/resources.rs) 嵌入并同目录释放、[build_script/easytier.rs](src-tauri/build_script/easytier.rs) 构建期校验、[update-easytier.cjs](scripts/update-easytier.cjs) 自动更新同步提取）；`EasyTier::discover_center()` 经 `easytier-cli -p {rpc-portal} -o json peer list` 查询虚拟网络节点，按 hostname 前缀 `scaffolding-mc-server-` 匹配房主并解析联机中心端口，`client::resolve_center_addr` 显式参数优先、缺失时自动发现，再走标准 c:ping/c:protocols/c:server_port 探测。实测 v2.6.4 `peer list -o json` 输出结构（ipv4/hostname 字段）。

@@ -47,7 +47,7 @@ export interface LobbyRoomItem {
   publicIdentifier: string
   remark: string
   hasPassword: boolean
-  /** 当前在线人数（服务端暂不返回，恒为 0） */
+  /** 当前在线人数（房主随心跳上报 easytier peer list 节点数，含房主本机） */
   playerCount: number
   maxPlayers: number
   hostMcVersion?: string

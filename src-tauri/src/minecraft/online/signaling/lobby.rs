@@ -69,8 +69,8 @@ pub struct LobbyRoomItem {
     /// 是否设置密码
     #[serde(alias = "has_password")]
     pub has_password: bool,
-    /// 当前在线人数（服务端暂不返回，恒为 0）
-    #[serde(default)]
+    /// 当前在线人数（房主随心跳上报 easytier peer list 节点数，含房主本机）
+    #[serde(default, alias = "current_players")]
     pub player_count: u32,
     #[serde(alias = "max_players")]
     pub max_players: u32,
