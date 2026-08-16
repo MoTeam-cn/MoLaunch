@@ -19,3 +19,4 @@
 | OpenLayers | https://openlayers.org | 高性能开源地图渲染引擎，种子地图工具的瓦片渲染、矢量图层与交互基础 | openlayers.png | OpenLayers Contributors |
 | MoCDN | https://www.mocdn.net | 提供 CurseForge 和 Modrinth 的文件下载加速服务 | mocdn-logo.png | MoTeam:MoTeam.png |
 | Plain Craft Launcher 2 (PCL2) | https://github.com/Meloong-Git/PCL | 知名的 Minecraft Java 版启动器。本启动器在早期开发阶段受到了 PCL2 的启发，在此特别致谢 | PCL2.ico | 龙腾猫跃:LTCatt.jpg |
+| Scaffolding-MC | https://github.com/Scaffolding-MC/Scaffolding-MC | Minecraft 联机客户端数据交换协议（基于 EasyTier），定义房间码、联机网络与联机信息获取等标准流程。MoLaunch 联机模块基于与该协议一致的规范与 EasyTier 独立实现，与其他基于陶瓦联机（Scaffolding）的启动器通过房间码互相兼容，并额外提供联机大厅 |  | burningtnt, Silverteal |

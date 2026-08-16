@@ -26,6 +26,8 @@
 
 - **房主房间详情端口变更提示**（[HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue)）：房主侧房间信息卡片新增 AlertV2 提示，仅当 MC 端口确实偏离创建时的端口（自动热更新或手动覆盖后）才动态显示：提醒非 MoLaunch 启动器联机的朋友无法感知新端口，需退出房间后重新加入才能进入（MoLaunch 端口热更新仅对同启动器生效）。
 
+- **关于页「特别鸣谢」「许可与版权声明」补充 Scaffolding-MC**（[acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt) / [licenses.txt](src-tauri/resources/about/licenses.txt)）：鸣谢区新增 Scaffolding-MC（Minecraft 联机客户端数据交换协议，基于 EasyTier，定义房间码/联机网络/联机信息获取等标准流程；MoLaunch 联机模块基于与其一致的规范与 EasyTier 独立实现，与其他基于陶瓦联机（Scaffolding）的启动器房间码互通，并额外提供联机大厅），作者 burningtnt、Silverteal；许可区新增对应条目（仓库未提供开源许可证，MoLaunch 为独立实现）。注意：about txt 经 include_str! 嵌入后端二进制，需重新编译 Rust 后端后生效。
+
 ### Changed
 
 - **房客侧 easytier 节点自动发现（对齐 Terracotta 标准，去掉硬编码联机中心地址）**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [client.rs](src-tauri/src/minecraft/online/scaffolding/client.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)）：`scaffolding_client_probe` 原在中心地址缺省时硬编码 `10.144.144.1:13448`，跨启动器场景（如陶瓦房主）下房主 IP/端口均不可预期，导致房客连错地址。修复：随包附带 **easytier-cli**（与 core 同版本，资源层 [resources.rs](src-tauri/src/resources.rs) 嵌入并同目录释放、[build_script/easytier.rs](src-tauri/build_script/easytier.rs) 构建期校验、[update-easytier.cjs](scripts/update-easytier.cjs) 自动更新同步提取）；`EasyTier::discover_center()` 经 `easytier-cli -p {rpc-portal} -o json peer list` 查询虚拟网络节点，按 hostname 前缀 `scaffolding-mc-server-` 匹配房主并解析联机中心端口，`client::resolve_center_addr` 显式参数优先、缺失时自动发现，再走标准 c:ping/c:protocols/c:server_port 探测。实测 v2.6.4 `peer list -o json` 输出结构（ipv4/hostname 字段）。
