@@ -16,7 +16,6 @@ import {
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
-const SegmentedButtons = defineAsyncComponent(() => import('@/components/common/SegmentedButtons.vue'))
 import { toastSuccess, toastError, toastInfo } from '@/utils/toast'
 import {
   addressLatencyTest,
@@ -30,7 +29,7 @@ const PROTOCOL_OPTIONS = [
   { label: 'TCP 握手', value: 'tcp' },
   { label: 'UDP 探针', value: 'udp' },
   { label: 'Ping', value: 'ping' },
-]
+] as const
 
 const text = ref('')
 const protocol = ref<'tcp' | 'udp' | 'ping'>('tcp')
@@ -166,7 +165,7 @@ onUnmounted(() => {
         v-model="text"
         textarea
         :rows="5"
-        placeholder="每行一个目标：host:port，可加名称前缀「名称|host:port」，如 南京|nanjing.hongshi.site:443"
+        placeholder="每行一个目标：host:port，可加名称前缀「名称|host:port」，如 主服|1.2.3.4:25565"
       />
       <div v-if="invalidLines.length > 0" class="text-xs text-red-400">
         以下行无法解析：{{ invalidLines.join('；') }}
@@ -174,7 +173,15 @@ onUnmounted(() => {
 
       <!-- 协议与持续监测 -->
       <div class="flex items-center gap-3 flex-wrap">
-        <SegmentedButtons v-model="protocol" :options="PROTOCOL_OPTIONS" />
+        <div class="flex items-center gap-2">
+          <Button
+            v-for="opt in PROTOCOL_OPTIONS"
+            :key="opt.value"
+            :type="protocol === opt.value ? 'primary' : 'outline'"
+            size="small"
+            @click="protocol = opt.value"
+          >{{ opt.label }}</Button>
+        </div>
         <label class="flex items-center gap-1.5 text-xs text-gray-600">
           <Checkbox v-model="persistent" />持续监测（3s 间隔）
         </label>

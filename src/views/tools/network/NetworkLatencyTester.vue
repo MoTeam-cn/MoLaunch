@@ -41,10 +41,6 @@ const PRESETS: Record<string, string[]> = {
     'https://bmclapi2.bangbang93.com',
     'https://bmclapi2.bangbang93.com/mc/game/version_manifest.json',
   ],
-  'MCBBS': [
-    'https://download.mcbbs.net',
-    'https://download.mcbbs.net/mc/game/version_manifest.json',
-  ],
 }
 
 function loadPreset(name: string) {

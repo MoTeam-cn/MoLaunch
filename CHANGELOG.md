@@ -18,6 +18,7 @@
 - **搭桥联机创建房间支持端口选择与事件回填**（[useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts) / [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：MC 端口输入框旁新增「选择端口」按钮（复用 port-picker 子窗口，loading 防呆）；持续监听后端 `scaffolding-mc-port-change` / `mc-port-detected` 事件，后端推送端口变化时自动回填 MC 端口并 toast 提示。
 - **工具页新增「地址测速」子页**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)（新增） / [network.ts](src/utils/api/tools/network.ts) / [core.ts](src/utils/api/tools/core.ts) / [ModNetworkPage.vue](src/views/tools/ModNetworkPage.vue)）：支持 TCP 握手 / UDP 探针 / 系统 ping 三种协议对 `host:port` 目标测延迟（支持 `名称|host:port` 前缀）；勾选「持续监测」后由后端周期测试并经 `tools-latency-update` 事件实时推送刷新结果，「停止监测」对应 `address_latency_stop`。
 - **红石联机节点延迟显示与自动首选**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts) / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)）：拉取中转服务器列表后自动对各节点 ping 测延迟，下拉选项展示各节点延迟（`xxms` 后缀），「测延迟」按钮可手动重测（loading 防呆）；自动选中延迟最低的可达节点作为默认服务器，全部失败时保持列表首个节点。
+- **工具页细节调整**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue) / [NetworkLatencyTester.vue](src/views/tools/network/NetworkLatencyTester.vue)）：地址测速协议选择改用项目 Button 组件按钮组（选中高亮 primary），输入示例改为通用 `host:port` 写法；移除已失效的 MCBBS 下载源预设。
 
 ### Fixed
 
