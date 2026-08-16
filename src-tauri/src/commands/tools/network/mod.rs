@@ -12,6 +12,6 @@ mod tcp;
 pub use addr::address_latency_test;
 pub use latency::latency_test;
 pub use ping::server_ping;
-pub use ports::{list_open_ports, list_open_ports_sync};
+pub use ports::{list_open_ports, list_open_ports_sync, list_open_ports_sync_filtered};
 pub use skin::{fetch_skin, save_skin_image};
 pub use tcp::tcp_check;

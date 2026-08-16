@@ -84,6 +84,13 @@
       gap: 8px; color: #6c7086; font-size: 13px; text-align: center;
     }
     .empty svg { width: 32px; height: 32px; opacity: 0.6; }
+    /* 进程过滤提示条 */
+    .filter-hint {
+      margin-bottom: 8px; padding: 6px 10px; background: #313244;
+      border-left: 3px solid #89b4fa; border-radius: 4px;
+      color: #a6adc8; font-size: 12px;
+    }
+    .filter-hint b { color: #89b4fa; font-weight: 600; }
     ::-webkit-scrollbar { width: 6px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #45475a; border-radius: 3px; }
@@ -99,6 +106,7 @@
       </svg>
     </button>
   </div>
+  <div class="filter-hint" id="filterHint" style="display:none">仅显示 <b>Java</b> 进程（java/javaw）的开放端口，请先开启游戏并打开「对局域网开放」</div>
   <div class="list-wrap">
     <div class="list" id="list"></div>
     <div class="overlay" id="overlay">
@@ -120,9 +128,19 @@
     var searchEl = document.getElementById('search');
     var refreshEl = document.getElementById('refresh');
     var overlayEl = document.getElementById('overlay');
+    var filterHintEl = document.getElementById('filterHint');
+    var processFilter = DATA.process_filter || '';
     var dataUrl = window.location.href.replace(/\/$/, '') + '/data';
     /** 记录用户手动折叠/展开状态，避免数据刷新时丢失 */
     var groupCollapseState = {};
+
+    /** 显示进程过滤提示条（有过滤条件时），并调整搜索占位符 */
+    function applyFilterHint() {
+      if (!processFilter) { filterHintEl.style.display = 'none'; return; }
+      filterHintEl.style.display = 'block';
+      searchEl.placeholder = '搜索端口或 IP（已限定 ' + processFilter + ' 进程）...';
+    }
+    applyFilterHint();
 
     function escapeHtml(s) {
       return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');

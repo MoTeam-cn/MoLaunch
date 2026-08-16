@@ -11,6 +11,35 @@ use super::super::types::{ListOpenPortsResult, OpenPortInfo};
 /// `list_open_ports` 调用本函数后序列化，避免逻辑重复。
 /// 枚举失败时返回空列表（picker 场景下比抛错更友好）。
 pub fn list_open_ports_sync() -> Vec<OpenPortInfo> {
+    collect_open_ports()
+}
+
+/// 仅返回占用进程名匹配过滤关键字（大小写不敏感子串）的监听端口
+///
+/// 供 picker 按进程限制场景使用（如红石联机只允许 Java 版联机端口）；
+/// 过滤关键字为空时行为与 `list_open_ports_sync` 一致。
+pub fn list_open_ports_sync_filtered(process_filter: Option<&str>) -> Vec<OpenPortInfo> {
+    let filter = process_filter.map(str::trim).filter(|s| !s.is_empty());
+    let ports = collect_open_ports();
+    match filter {
+        Some(keyword) => {
+            let keyword = keyword.to_lowercase();
+            ports
+                .into_iter()
+                .filter(|p| {
+                    p.process_name
+                        .as_deref()
+                        .map(|name| name.to_lowercase().contains(&keyword))
+                        .unwrap_or(false)
+                })
+                .collect()
+        }
+        None => ports,
+    }
+}
+
+/// 枚举核心：同时枚举 IPv4/IPv6 的 TCP + UDP 套接字，解析进程信息，排序去重
+fn collect_open_ports() -> Vec<OpenPortInfo> {
     // 同时枚举 IPv4/IPv6 的 TCP + UDP 套接字
     let af_flags = netstat2::AddressFamilyFlags::all();
     let proto_flags = netstat2::ProtocolFlags::TCP | netstat2::ProtocolFlags::UDP;

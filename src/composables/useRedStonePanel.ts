@@ -127,12 +127,21 @@ export function useRedStonePanel() {
       latencyTesting.value = false
     }
   }
-  /** 复用 port-picker 子窗口选择本机端口（与 FRP 创建隧道一致） */
+  /**
+   * 复用 port-picker 子窗口选择本机端口（与 FRP 创建隧道一致）；
+   * 红石隧道仅支持穿透 Java 版联机端口，故按进程名过滤只显示 Java 进程的开放端口
+   */
   async function handleSelectPort() {
     if (portSelecting.value) return
     portSelecting.value = true
     try {
-      const value = await openPickerWindow({ title: '选择本机端口', template: 'port-picker', data: {}, width: 400, height: 500 })
+      const value = await openPickerWindow({
+        title: '选择 MC 端口（Java）',
+        template: 'port-picker',
+        data: { process_filter: 'java' },
+        width: 400,
+        height: 500,
+      })
       if (value) {
         mcPort.value = String(value)
         toastSuccess(`已选择端口 ${value}`)

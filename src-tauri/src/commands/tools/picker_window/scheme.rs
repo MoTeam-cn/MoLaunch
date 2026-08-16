@@ -36,9 +36,14 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
             .ok()
             .and_then(|store| store.get(picker_id).cloned());
 
-        // port-picker 模板：/data 请求返回实时端口列表
+        // 读取进程过滤条件（port-picker 按进程限制场景使用，如红石联机仅显示 Java 端口）
+        let process_filter = get_process_filter(picker_id);
+
+        // port-picker 模板：/data 请求返回实时端口列表（按进程过滤）
         if template_name == "port-picker" && is_data_request {
-            let ports = crate::commands::tools::network::list_open_ports_sync();
+            let ports = crate::commands::tools::network::list_open_ports_sync_filtered(
+                process_filter.as_deref(),
+            );
             let json = serde_json::json!({ "ports": ports });
             return build_response(
                 200,
@@ -54,11 +59,17 @@ pub fn register_picker_scheme<R: Runtime>(builder: Builder<R>) -> Builder<R> {
             .unwrap_or_else(|_| "<html><body>模板不存在</body></html>".to_string());
 
         // 注入数据：
-        // - port-picker：注入实时端口列表
+        // - port-picker：注入实时端口列表（含进程过滤条件，供模板显示提示）
         // - 其他模板：注入前端传入的 data
         let data_json = if template_name == "port-picker" {
-            let ports = crate::commands::tools::network::list_open_ports_sync();
-            serde_json::json!({ "ports": ports })
+            let ports = crate::commands::tools::network::list_open_ports_sync_filtered(
+                process_filter.as_deref(),
+            );
+            let mut data = serde_json::json!({ "ports": ports });
+            if let Some(filter) = process_filter {
+                data["process_filter"] = serde_json::Value::String(filter);
+            }
+            data
         } else {
             PICKER_DATA_STORE
                 .lock()
@@ -137,6 +148,20 @@ fn inject_libs(paths: &[&str]) -> Option<String> {
         }
     }
     (!html.is_empty()).then_some(html)
+}
+
+/// 从 data store 读取进程过滤条件（port-picker 按进程限制场景使用）
+fn get_process_filter(picker_id: &str) -> Option<String> {
+    PICKER_DATA_STORE
+        .lock()
+        .ok()
+        .and_then(|store| store.get(picker_id).cloned())
+        .and_then(|data| {
+            data.get("process_filter")
+                .and_then(|v| v.as_str())
+                .map(String::from)
+        })
+        .filter(|s| !s.is_empty())
 }
 
 /// 构造响应（注入 CSP 响应头）
