@@ -104,10 +104,10 @@ export interface ScaffoldingRoomCode {
   secret: string
 }
 
-/** 房间码字符集（与后端一致，剔除易混淆的 I / O） */
-export const SCAFFOLDING_CODE_CHARSET = '0123456789ABCDEFGHJKMNPQRSTUVWXYZ'
+/** 房间码字符集（与后端一致，剔除易混淆的 I / O，保留 L；与 Terracotta 标准一致） */
+export const SCAFFOLDING_CODE_CHARSET = '0123456789ABCDEFGHJKLMNPQRSTUVWXYZ'
 
-/** 生成符合后端校验规则的房间码：16 位字符，base-33 小端序整型可被 7 整除 */
+/** 生成符合后端校验规则的房间码：16 位字符，base-34 小端序整型可被 7 整除 */
 export function generateScaffoldingCode(): string {
   let chars = ''
   do {
@@ -120,7 +120,7 @@ export function generateScaffoldingCode(): string {
   return `U/${g(0)}-${g(4)}-${g(8)}-${g(12)}`
 }
 
-/** base-33 小端序模 7 校验（与 src-tauri code.rs 一致，生成时使用） */
+/** base-34 小端序模 7 校验（与 src-tauri code.rs 一致，生成时使用） */
 function validateScaffoldingChecksum(chars: string): boolean {
   if (chars.length !== 16) return false
   const baseMod = SCAFFOLDING_CODE_CHARSET.length % 7

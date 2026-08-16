@@ -14,6 +14,8 @@
 
 ### Changed
 
+- **Scaffolding 房间码字符集 base 33 → 34（对齐 Terracotta 标准，修复与 PCL CE/HMCL 互连）**（[easytier.ts](src/types/online/easytier.ts) / [code.rs](src-tauri/src/minecraft/online/scaffolding/code.rs)）：房间码字符集由 33 字符（剔除 I/O/L）改为 34 字符（仅剔除 I/O，保留 L，与陶瓦联机 Terracotta `static CHARS` 一致）；三端同步——前端 `SCAFFOLDING_CODE_CHARSET`、Rust `code.rs` `CHARSET`、api-server `room_code.rs` `ALPHABET`，7 整除校验随 `CHARSET.len() % 7` / 34 进制自动适配，生成侧数学等价。解析侧保持宽松格式校验（不查校验和），兼容外部客户端码。
+
 - **cubiomes 编译脚本迁移至 Node**（[build-wasm.cjs](scripts/build-wasm.cjs)（新增） / [build-wasm.ps1](scripts/build-wasm.ps1)（删除） / [package.json](package.json) / [prebuild.mjs](scripts/prebuild.mjs) / [build.rs](src-tauri/build.rs)）：`build:wasm` 由 `powershell -File scripts/build-wasm.ps1` 改为 `node scripts/build-wasm.cjs`——Node 18+ 纯内置 API（child_process/fs/path），无 PowerShell 依赖；行为与原 ps1 一致（cubiomes 源码缺失或 emcc 不可用时复用入库产物、`.c/.h` 未变更时增量跳过、emcc 不在 PATH 时自动激活 emsdk 候选目录并直连 emcc），emcc 参数与导出函数清单不变；调用方同步更新（package.json 脚本、prebuild.mjs 注释、update-cubiomes 工作流注释、build.rs 与 Cargo.toml 注释）。
 
 - **cubiomes 恢复为 git submodule 引入**（[.gitmodules](.gitmodules) / [update-cubiomes.yml](.github/workflows/update-cubiomes.yml)）：cubiomes 源码重新以 submodule 形式挂载在项目根目录 `cubiomes/`（指向 https://github.com/MoTeam-cn/cubiomes），仓库结构更直观、本地可直接改上游源码；`update-cubiomes` 工作流同步适配：不再独立 clone 源码，改为 `git submodule update --init --depth 1` + `git submodule update --remote --depth 1` 拉取最新源码编译，submodule 指针变更随 WASM 产物一并提交，产物与上游 commit 记录保持一致。

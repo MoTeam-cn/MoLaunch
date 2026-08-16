@@ -1,12 +1,12 @@
 //! Scaffolding 联机房间码：生成 / 解析 / 公开标识。
 //!
 //! 房间码形如 `U/NNNN-NNNN-SSSS-SSSS`：前两段为网络名标识 N，后两段为网络密钥 S。
-//! 校验规则：字符按 0-9、A-H、J-N、P-Z 映射到 [0, 33) 后，按小端序读得的整型应能被 7 整除。
+//! 校验规则：字符按 0-9、A-H、J-N、P-Z（含 L）映射到 [0, 34) 后，按小端序读得的整型应能被 7 整除。
 
 use rand::RngCore;
 
-/// 房间码字符集（剔除易混淆的 I / O）
-const CHARSET: &[u8] = b"0123456789ABCDEFGHJKMNPQRSTUVWXYZ";
+/// 房间码字符集（剔除易混淆的 I / O，保留 L；与 Terracotta 标准一致，共 34 字符）
+const CHARSET: &[u8] = b"0123456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 /// 网络名前缀
 const NETWORK_NAME_PREFIX: &str = "scaffolding-mc-";
@@ -16,7 +16,7 @@ fn char_to_value(c: u8) -> Option<u8> {
     CHARSET.iter().position(|&x| x == c).map(|i| i as u8)
 }
 
-/// 小端序 base-33 整型模 7 校验（模运算避免溢出）
+/// 小端序 base-34 整型模 7 校验（模运算避免溢出）
 fn validate_checksum(chars: &[u8]) -> bool {
     if chars.len() != 16 {
         return false;
