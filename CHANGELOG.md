@@ -354,6 +354,8 @@
 
 - **版本同步补齐多语言 README 版本徽章**（[sync-version.cjs](scripts/sync-version.cjs) / [version-sync.yml](.github/workflows/version-sync.yml)）：原脚本只更新主 README.md 的 shields.io 版本徽章，README_EN / README_JA / README_ZH-HANT 的徽章停留在旧版本（如 0.3.5-rc4），打 tag 后多语言文档版本漂移。现改为遍历根目录全部 4 个语言 README 同步徽章，并同步扩展 git-auto-commit 的 file_pattern 以纳入 bot 自动提交范围。
 
+- **联机房主面板监听 watcher 端口事件，端口显示跟随自动捕获**（[RoomHostPanel.vue](src/components/online/RoomHostPanel.vue)）：\online://mc-port-detected\（payload 为裸端口号）此前无人监听，后端日志显示「检测到 MC 局域网端口」但前端 MC 端口仍停留手动指定值；新增监听后 watcher 捕获（日志正则/监听端口轮询双信号）的端口实时写入 \easytierRuntime.mcPort\，MC 端口卡片与房间信息卡片联动更新。
+
 ### Removed
 
 - **移除工具模块「启动器数据导出」功能**（[data_export.rs](src-tauri/src/commands/tools/data_export.rs) / [types/data_export.rs](src-tauri/src/commands/tools/types/data_export.rs) / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [mod.rs](src-tauri/src/commands/tools/mod.rs) / [types/mod.rs](src-tauri/src/commands/tools/types/mod.rs) / [DataExporter.vue](src/views/tools/data/DataExporter.vue) / [QuickTools.vue](src/views/QuickTools.vue) / [data.ts](src/utils/api/tools/data.ts) / [core.ts](src/utils/api/tools/core.ts)）：便捷工具页「启动器数据导出」无实际意义，前后端整体移除——后端删除 `data_export` 模块与 `export_launcher_data` action 注册，前端删除 `DataExporter.vue` 组件、`exportLauncherData` 封装及 `EXPORT_LAUNCHER_DATA` action 常量；`tools/data.ts` 中其余数据类工具（崩溃分析 / 截图 / 资源包 / 版本 JSON / NBT）封装保留。
