@@ -72,25 +72,28 @@ jobs:
 
       # 生成本次更新日志（release_notes），随版本注册一并上报 api-server，
       # 供启动器「检查更新」对话框展示本次更新内容。
+      # 注意：提交多时 release_notes 可达几十 KB，不能走命令行参数（Windows CreateProcess
+      # 参数列表约 32KB 上限会报 Argument list too long），故先 git log 重定向到临时文件，
+      # 由 ci-upload.cjs 按文件路径读取。
       - name: Generate release notes from commits
+        id: generate-notes
         shell: bash
         run: |
           VERSION_TAG="v${{ steps.version.outputs.VERSION }}"
           CUR_SHA=$(git rev-parse "${VERSION_TAG}^{commit}" 2>/dev/null || git rev-parse HEAD)
           PREV_TAG=$(git describe --tags --abbrev=0 "${CUR_SHA}^" 2>/dev/null || echo "")
           REPO_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
-          if [ -z "$PREV_TAG" ]; then
-            LOG=$(git log --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))" "$CUR_SHA" | head -50)
-          else
-            LOG=$(git log "${PREV_TAG}..${CUR_SHA}" --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))")
-          fi
+          NOTES_FILE="${RUNNER_TEMP}/release-notes.txt"
           {
-            echo "RELEASE_NOTES<<EOF"
             echo "## MoLaunch ${{ steps.version.outputs.VERSION }}"
             echo ""
-            echo "$LOG"
-            echo "EOF"
-          } >> $GITHUB_ENV
+            if [ -z "$PREV_TAG" ]; then
+              git log --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))" "$CUR_SHA" | head -50
+            else
+              git log "${PREV_TAG}..${CUR_SHA}" --oneline --no-merges --format="- %s ([%h](${REPO_URL}/commit/%H))"
+            fi
+          } > "$NOTES_FILE"
+          echo "notes_file=$NOTES_FILE" >> "$GITHUB_OUTPUT"
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -247,7 +250,7 @@ jobs:
             "${{ steps.locate.outputs.setup_file }}" \
             "${{ steps.locate.outputs.sig_file }}" \
             "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}" \
-            "$RELEASE_NOTES"
+            "${{ steps.generate-notes.outputs.notes_file }}"
 
       # Windows 便携版单独上传（bundle_type=portable，云端仅此一份 Windows 产物）
       - name: Upload portable build (Windows only)
@@ -265,7 +268,7 @@ jobs:
             "${{ steps.locate.outputs.portable_file }}" \
             "${{ steps.locate.outputs.portable_sig }}" \
             "https://github.com/${{ github.repository }}/releases/tag/v${{ steps.version.outputs.VERSION }}" \
-            "$RELEASE_NOTES"
+            "${{ steps.generate-notes.outputs.notes_file }}"
 
       # Windows setup 安装版不推送云端（S3），仅作为 workflow artifact 传递，
       # 由 release job 附加到 GitHub Release（供用户手动下载安装）。

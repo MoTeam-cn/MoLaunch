@@ -38,7 +38,13 @@ const BUNDLE_TYPE = args[3];
 const PACKAGE_PATH = args[4];
 const SIG_PATH = args[5];
 const RELEASE_URL = args[6];
-const RELEASE_NOTES = args[7] || '';
+// release_notes 可为内联文本，或 CI 场景下的临时文件路径（提交多时 notes 达几十 KB，
+// 命令行参数受 Windows ~32KB 限制会报 Argument list too long，故由 Workflow 写文件后传路径）
+let releaseNotes = args[7] || '';
+if (releaseNotes && fs.existsSync(releaseNotes) && fs.statSync(releaseNotes).isFile()) {
+  releaseNotes = fs.readFileSync(releaseNotes, 'utf8');
+}
+const RELEASE_NOTES = releaseNotes;
 
 // ===== 渠道推导 =====
 // 无后缀→stable；rc/beta→beta；alpha/dev/canary/nightly/未知→alpha（收敛到服务端合法取值）
