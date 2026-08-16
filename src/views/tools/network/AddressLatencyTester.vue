@@ -4,7 +4,7 @@
  *
  * 对地址做 TCP 握手（tcping）/ UDP 探针 / ICMP ping 测延迟；
  * 支持持续监测：后端按间隔周期测试并经 `tools-latency-update` 事件推送，实时刷新。
- * 每行一个目标：`host:port`，可加名称前缀 `名称|host:port`。
+ * 每行一个目标：host 或 host:port（端口缺省 443），可加名称前缀 名称|host。
  */
 import { ref, computed, defineAsyncComponent, onMounted, onUnmounted } from 'vue'
 import {
@@ -165,10 +165,10 @@ onUnmounted(() => {
         v-model="text"
         textarea
         :rows="5"
-        placeholder="每行一个目标：host:port，可加名称前缀「名称|host:port」，如 主服|1.2.3.4:25565"
+        placeholder="每行一个目标：host 或 host:port，可加名称前缀「名称|host」，端口缺省 443，如 主服|1.2.3.4"
       />
       <div v-if="invalidLines.length > 0" class="text-xs text-red-400">
-        以下行无法解析：{{ invalidLines.join('；') }}
+        以下行格式无效：{{ invalidLines.join('；') }}
       </div>
 
       <!-- 协议与持续监测 -->
