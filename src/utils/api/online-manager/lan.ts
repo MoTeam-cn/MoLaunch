@@ -9,7 +9,7 @@ import type {
   RunningMcPortResult,
 } from '@/types/online'
 
-/** 启动 MC 局域网伪装服务（TCP 转发 + UDP 周期广播） */
+/** 启动 MC 局域网伪装服务（UDP 周期广播，进服流量由 port-forward 承担） */
 export function lanFakeServerStart(params: LanFakeStartParams): Promise<LanFakeStartResult> {
   return onlineManager<LanFakeStartResult>(ONLINE_ACTIONS.LAN_FAKE_SERVER_START, params)
 }

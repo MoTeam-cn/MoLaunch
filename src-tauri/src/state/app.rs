@@ -70,8 +70,8 @@ pub struct AppState {
     pub manual_mc_port: Arc<TokioMutex<Option<u16>>>,
     /// MC 局域网服务器伪装（加入方本地伪装 LAN 服务器，多人游戏界面直接发现房主房间）
     ///
-    /// 加入方进入房间且 TUN 就绪后由 `lan_fake_server_start` 创建并替换，
-    /// 退出房间/停 TUN 时 `lan_fake_server_stop` 关闭并置 None。
+    /// 加入方进入房间后由 `lan_fake_server_start` 创建并替换（纯 UDP 广播，
+    /// 进服流量由 port-forward 承担），退出房间时 `lan_fake_server_stop` 关闭并置 None。
     pub lan_fake_server: Arc<TokioMutex<Option<crate::commands::online::manager::LanFakeServer>>>,
     /// 应用句柄（Tauri setup 钩子中注入）
     ///
