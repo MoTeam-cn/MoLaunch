@@ -6,6 +6,8 @@
 
 ### Added
 
+- **新增 easytier-core 自动更新工作流**（[update-easytier.yml](.github/workflows/update-easytier.yml) / [update-easytier.ps1](scripts/update-easytier.ps1)）：每日（UTC 04:00，也可手动触发）对比 GitHub Releases 最新 stable（`releases/latest`，仅 stable 版本）与 [easytier.rs](src-tauri/build_script/easytier.rs) 记录的 `EASYTIER_VERSION`，不一致则下载 6 个平台包（windows x86_64/arm64、linux x86_64/aarch64、macos x86_64/aarch64）解压替换 `src-tauri/resources/easytier/{os}/{arch}/` 下的 `easytier-core` 及 Windows 依赖 DLL，同步更新版本常量并提交（`!c` 跳过 CI）；Linux/macOS 二进制提交时显式补回执行位。
+
 - **新增构建产物手动清理工作流**（[cleanup-artifacts.yml](.github/workflows/cleanup-artifacts.yml)）：仅 `workflow_dispatch` 手动触发，触发时输入「清理多少天前上传的构建产物」阈值（0 = 全部删除，默认 7 天），经 GitHub Actions API 分页列出全部 artifacts 并删除创建时间早于阈值的产物；用于在 GitHub 自动过期之外提前回收（例如发布工作流仅用于跨 job 传递的安装包产物），及时腾出 Actions 存储空间。
 
 - **房主房间心跳保活（keepalive）**（[room.ts](src/utils/api/online-manager/room.ts) / [core.ts](src/utils/api/online-manager/core.ts) / [roomActions.ts](src/stores/online/roomActions.ts) / [room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [api_paths.rs](src-tauri/src/api_paths.rs)）：房主创建房间成功后启动 3 分钟心跳定时器，经新增 `room_heartbeat` IPC action 上报 `POST /v1/signaling/rooms/{code}/heartbeat`，关闭房间时停止；配合服务端 `signaling.heartbeat_timeout`（默认 300 秒）超时清理机制，防止崩溃/断网后房间成为永不清理的僵尸房间（服务端改动见 api-server 侧 CHANGELOG）。
