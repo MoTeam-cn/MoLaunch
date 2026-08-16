@@ -13,7 +13,7 @@ on:
       days:
         description: '清理多少天前上传的构建产物（0 = 全部删除）'
         required: true
-        default: '7'
+        default: 7
         type: number
 
 permissions:
