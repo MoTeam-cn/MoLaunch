@@ -10,6 +10,7 @@ import { useOnlineStore } from '@/stores/online'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 import { copyToClipboard } from '@/utils/clipboard'
 import {
   ServerStackIcon,
@@ -33,6 +34,21 @@ const loaderText = computed(() => {
   return room.value.hostLoaderVersion ? `${name} ${room.value.hostLoaderVersion}` : name
 })
 
+/** MC 端口是否已偏离创建时的端口（自动热更新 / 手动覆盖后为 true，仅房主侧有意义） */
+const portChanged = computed(
+  () =>
+    room.value.role === 'host' &&
+    store.easytierRuntime.mcPort > 0 &&
+    store.easytierRuntime.mcPort !== room.value.hostMcPort,
+)
+
+const portAlertMessage = computed(
+  () =>
+    `MC 端口已变更为 ${store.easytierRuntime.mcPort}（创建时为 ${room.value.hostMcPort}）：` +
+    '未使用 MoLaunch 启动器联机的朋友无法感知新端口，需要退出房间后重新加入才能进入；' +
+    'MoLaunch 的端口热更新仅对同启动器生效',
+)
+
 /** 复制完整房间码（U/xxx，含 S 段密钥） */
 async function copyFullCode() {
   if (!room.value.roomCode) return
@@ -42,6 +58,12 @@ async function copyFullCode() {
 
 <template>
   <Card title="房间信息">
+    <AlertV2
+      v-if="portChanged"
+      type="warning"
+      class="mb-3"
+      :message="portAlertMessage"
+    />
     <div class="divide-y divide-gray-100">
       <div class="px-1 py-3 flex items-center justify-between">
         <div class="flex items-center gap-2 text-sm text-gray-600">
