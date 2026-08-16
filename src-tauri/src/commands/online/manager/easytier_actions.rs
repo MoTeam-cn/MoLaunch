@@ -18,7 +18,7 @@ use crate::minecraft::online::scaffolding::easytier::{EasyTier, HOST_VIRTUAL_IP}
 use crate::minecraft::online::scaffolding::server::{ScaffoldingServer, ScaffoldingServerState};
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tauri::{Emitter, Manager};
 
@@ -39,6 +39,11 @@ const WATCH_INTERVAL: Duration = Duration::from_secs(5);
 
 /// 端口连续不可达次数阈值（6 次 = 30s，触发自动关房）
 const AUTO_CLOSE_FAIL_LIMIT: u32 = 6;
+
+/// `EasytierJoinParams.no_tun` 缺省值：不创建虚拟网卡（用户态转发，无需管理员权限）
+fn default_no_tun() -> bool {
+    true
+}
 
 /// 构造 easytier 运行状态 payload（`easytier-status` 事件推送 / `easytier_status` IPC 查询共用）
 fn easytier_status_payload(easytier: &Option<EasyTier>) -> serde_json::Value {
@@ -109,7 +114,7 @@ fn resolve_core_path(app: &tauri::AppHandle, configured: &str) -> Result<PathBuf
 /// 解析 easytier-cli 可执行文件路径（与 core 同目录，随包附带）。
 ///
 /// 自定义 core 路径时按同目录推断 cli；内置资源释放时两者同目录释放。
-fn resolve_cli_path(core_path: &PathBuf) -> PathBuf {
+fn resolve_cli_path(core_path: &Path) -> PathBuf {
     let cli_name = if cfg!(target_os = "windows") {
         "easytier-cli.exe"
     } else {
@@ -253,6 +258,9 @@ pub struct EasytierJoinParams {
     /// 是否为房主（房主固定虚拟 IP `10.144.144.1`，房客走 `--dhcp`）
     #[serde(default)]
     pub is_host: bool,
+    /// 是否 no-tun 模式（默认 true：不创建虚拟网卡，走用户态端口转发）
+    #[serde(default = "default_no_tun")]
+    pub no_tun: bool,
     /// 节点 hostname（房主必须为 `scaffolding-mc-server-{center_port}`，联机中心端口）
     #[serde(default)]
     pub hostname: Option<String>,
@@ -384,6 +392,7 @@ pub fn register(d: &mut Dispatcher) {
                 ip,
                 &hostname,
                 extra,
+                p.no_tun,
             )
             .await?;
             let rpc_portal = easytier.rpc_portal().to_string();
@@ -455,7 +464,7 @@ pub fn register(d: &mut Dispatcher) {
             let hostname = server.hostname();
             let center_port = server.port();
 
-            // 启动 easytier（房主固定虚拟 IP + 中心 hostname）
+            // 启动 easytier（房主固定虚拟 IP + 中心 hostname；no-tun 迁移中暂保持 TUN）
             let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
             let cli_path = resolve_cli_path(&core_path);
             let mut extra = Vec::new();
@@ -468,6 +477,7 @@ pub fn register(d: &mut Dispatcher) {
                 Some(HOST_VIRTUAL_IP),
                 &hostname,
                 extra,
+                false,
             )
             .await
             {
@@ -540,7 +550,7 @@ pub fn register(d: &mut Dispatcher) {
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
             let (network_name, network_secret) = room_code::parse(&p.room_code)?;
 
-            // 若尚未加入网络，先以房客身份（--dhcp）加入
+            // 若尚未加入网络，先以房客身份（--dhcp）加入；no-tun 迁移中暂保持 TUN
             if state.easytier.lock().await.is_none() {
                 let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
                 let cli_path = resolve_cli_path(&core_path);
@@ -562,6 +572,7 @@ pub fn register(d: &mut Dispatcher) {
                     None,
                     &hostname,
                     extra,
+                    false,
                 )
                 .await?;
                 log_info!(

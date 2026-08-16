@@ -4,3 +4,6 @@ pub mod client;
 pub mod code;
 pub mod easytier;
 pub mod server;
+
+#[cfg(test)]
+mod easytier_test;
