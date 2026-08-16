@@ -2,8 +2,8 @@
 /**
  * 房间工具抽屉（房主 / 加入方共用）
  *
- * - 检查 MC 服务：复用 serverPing（SLP 协议），房主测本机、加入方测房主虚拟 IP（走 TUN）
- * - 检查网络连通性：复用 tcpCheck，加入方检查与房主的链路（仅加入方可见）
+ * - 检查 MC 服务：复用 serverPing（SLP 协议），房主测本机、加入方测本地 port-forward 地址
+ * - 检查网络连通性：复用 tcpCheck，加入方经本地 port-forward 检查房主 MC 服务（仅加入方可见）
  * - 端口自动检测：监听 MC 局域网发现广播（224.0.2.60:4445），解析 [AD]port[/AD]
  */
 import { computed, ref, defineAsyncComponent } from 'vue'
@@ -11,7 +11,6 @@ import { useOnlineStore } from '@/stores/online'
 import { serverPing, tcpCheck } from '@/utils/api/tools/network'
 import type { ServerPingResult, TcpCheckResult } from '@/utils/api/tools/network'
 import { lanPortProbe } from '@/utils/api/online-manager'
-import { EASYTIER_HOST_VIRTUAL_IP } from '@/types/online'
 import type { LanPortProbeResult } from '@/types/online'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Drawer = defineAsyncComponent(() => import('@/components/common/Drawer.vue'))
@@ -34,11 +33,11 @@ const store = useOnlineStore()
 const room = computed(() => store.roomState)
 const isHost = computed(() => room.value.role === 'host')
 
-/** MC 服务检测目标：房主测本机，加入方测房主虚拟 IP */
+/** MC 服务检测目标：房主测本机，加入方测本地 port-forward 转发端口（no-tun 进服地址） */
 const mcTarget = computed(() =>
   isHost.value
     ? { host: '127.0.0.1', port: room.value.hostMcPort }
-    : { host: EASYTIER_HOST_VIRTUAL_IP, port: room.value.hostMcPort },
+    : { host: '127.0.0.1', port: store.easytierRuntime.mcPort },
 )
 
 const mcLoading = ref(false)
@@ -62,14 +61,14 @@ async function checkMcService() {
 const connLoading = ref(false)
 const connResult = ref<TcpCheckResult | null>(null)
 async function checkConnectivity() {
-  if (!room.value.hostMcPort) {
-    toastError('尚未获取到端口')
+  if (!store.easytierRuntime.mcPort) {
+    toastError('尚未获取到进服端口')
     return
   }
   connLoading.value = true
   connResult.value = null
   try {
-    connResult.value = await tcpCheck(EASYTIER_HOST_VIRTUAL_IP, room.value.hostMcPort)
+    connResult.value = await tcpCheck('127.0.0.1', store.easytierRuntime.mcPort)
   } catch (e) {
     toastError(`检测失败：${e instanceof Error ? e.message : String(e)}`)
   } finally {
@@ -163,9 +162,9 @@ function latencyColor(ms: number): string {
             <WifiIcon class="w-4 h-4 text-gray-500" />
             <span class="text-sm font-medium text-gray-800">检查网络连通性</span>
           </div>
-          <code class="text-xs text-gray-500">{{ EASYTIER_HOST_VIRTUAL_IP }}:{{ room.hostMcPort || '-' }}</code>
+          <code class="text-xs text-gray-500">127.0.0.1:{{ store.easytierRuntime.mcPort || '-' }}</code>
         </div>
-        <p class="mt-1 text-xs text-gray-400">通过 TCP 握手检查与房主的 P2P + 虚拟网卡链路是否通畅</p>
+        <p class="mt-1 text-xs text-gray-400">通过 TCP 握手经本地端口转发检查与房主 MC 服务的链路是否通畅</p>
         <Button class="mt-3" type="outline" size="small" :loading="connLoading" @click="checkConnectivity">
           <template #icon><BoltIcon class="w-3.5 h-3.5" /></template>
           {{ connLoading ? '检测中…' : '开始检测' }}

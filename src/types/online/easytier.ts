@@ -21,6 +21,8 @@ export interface EasyTierJoinParams {
   networkSecret: string
   /** 是否房主（房主固定虚拟 IP，房客 --dhcp） */
   isHost?: boolean
+  /** 是否 no-tun 模式（默认 true：不创建虚拟网卡，走用户态端口转发） */
+  noTun?: boolean
   /** 节点 hostname（房主必须为 `scaffolding-mc-server-{center_port}`，联机中心端口） */
   hostname?: string
   /** 追加 easytier-core CLI 参数 */
@@ -94,9 +96,9 @@ export interface ScaffoldingClientProbeParams {
 /** `scaffolding_client_probe` 返回 */
 export interface ScaffoldingClientProbeResult {
   success: boolean
-  /** 房主虚拟 IP（MC 客户端连接目标，配合 lan_fake 转发） */
+  /** 进服连接地址 IP（no-tun 下固定为本地 127.0.0.1，指向本地 port-forward） */
   mcIp: string
-  /** 房主 MC 局域网端口 */
+  /** 进服连接端口（本地 port-forward 端口，尽力与房主 MC 端口相同） */
   mcPort: number
 }
 

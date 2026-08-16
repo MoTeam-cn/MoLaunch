@@ -19,7 +19,7 @@ export interface EasyTierRuntime {
   pid?: number
   /** easytier-core 版本号（后端 --version 查询，失败时为空串） */
   version: string
-  /** 房主 MC 虚拟 IP（房客 probe 到后写入，即进服地址） */
+  /** 房主 MC 进服地址（房客 probe 后写入；no-tun 下为本地 port-forward 地址 127.0.0.1:local_port） */
   mcIp: string
   /** 房主 MC 局域网端口 */
   mcPort: number
