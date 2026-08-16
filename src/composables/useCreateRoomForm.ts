@@ -15,7 +15,9 @@ import {
 import { getVersionGameVersion } from '@/utils/api/personalization'
 import { generateScaffoldingCode } from '@/types/online'
 import type { ModpackMeta } from '@/types/online'
-import { toastError, toastWarning } from '@/utils/toast'
+import { toastError, toastSuccess, toastWarning } from '@/utils/toast'
+import { openPickerWindow } from '@/utils/picker-window'
+import { useTauriEvent } from '@/composables/useTauriEvent'
 
 /** 创建流程阶段（UI 步骤指示） */
 export type CreateStep = 'idle' | 'code' | 'register' | 'start'
@@ -36,6 +38,20 @@ export function useCreateRoomForm() {
     hostLoader: '',        // forge/fabric/neoforge/.../release
     hostLoaderVersion: '', // 如 47.3.0
   })
+
+  /** 端口选择子窗口打开中（loading 防呆） */
+  const portSelecting = ref(false)
+  /** 复用 port-picker 子窗口选择本机端口（与 FRP 创建隧道一致） */
+  async function handleSelectPort() {
+    if (portSelecting.value) return
+    portSelecting.value = true
+    try {
+      const value = await openPickerWindow({ title: '选择本机端口', template: 'port-picker', data: {}, width: 400, height: 500 })
+      if (value) createForm.value.mcPort = Number(value)
+    } catch (e) {
+      if (!(e instanceof Error && e.message.includes('取消'))) toastError('选择端口失败：' + e)
+    } finally { portSelecting.value = false }
+  }
 
   /** 整合包元数据（undefined=纯原版房间） */
   const modpackMeta = ref<ModpackMeta | undefined>()
@@ -66,8 +82,25 @@ export function useCreateRoomForm() {
     { key: 'start', label: '拉起联机中心' },
   ] as const
 
+  /** 后端 MC 端口变更事件（后台监视发现新端口）自动回填 */
+  const portChangeListener = useTauriEvent<{ mcPort: number }>('scaffolding-mc-port-change', (p) => {
+    if (p.mcPort && Number(p.mcPort) !== Number(createForm.value.mcPort)) {
+      createForm.value.mcPort = Number(p.mcPort)
+      toastSuccess(`MC 端口已自动更新为 ${p.mcPort}`)
+    }
+  })
+  /** watcher 捕获的 MC 局域网端口事件（payload 为裸端口号） */
+  const mcPortDetectedListener = useTauriEvent<number>('mc-port-detected', (port) => {
+    if (port && Number(port) !== Number(createForm.value.mcPort)) {
+      createForm.value.mcPort = Number(port)
+      toastSuccess(`MC 端口已自动更新为 ${port}`)
+    }
+  })
+
   onMounted(async () => {
     versionsLoading.value = true
+    void portChangeListener.start()
+    void mcPortDetectedListener.start()
     try {
       installedVersions.value = await listInstalledVersionsWithType()
     } catch (e) {
@@ -193,6 +226,8 @@ export function useCreateRoomForm() {
     modpackMeta,
     modpackEnabled,
     onModpackEnabledChange,
+    portSelecting,
+    handleSelectPort,
     advancedBadge,
     advancedBadgeActive,
     publicRoomHint,

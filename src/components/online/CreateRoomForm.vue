@@ -1,7 +1,7 @@
 <script setup lang="ts">
 /** 创建房间表单：MC 版本 + 房间设置 + 高级设置抽屉（Scaffolding 收敛版，一站式创建） */
 import { ref, computed, watch, defineAsyncComponent } from 'vue'
-import { PlusIcon, ArrowPathIcon, CheckCircleIcon, Cog8ToothIcon } from '@heroicons/vue/24/outline'
+import { PlusIcon, ArrowPathIcon, CheckCircleIcon, Cog8ToothIcon, ServerStackIcon } from '@heroicons/vue/24/outline'
 import { useCreateRoomForm } from '@/composables/useCreateRoomForm'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
@@ -23,6 +23,8 @@ const {
   onModpackEnabledChange,
   advancedBadge,
   advancedBadgeActive,
+  portSelecting,
+  handleSelectPort,
   publicRoomHint,
   versionOptions,
   versionsLoading,
@@ -67,7 +69,12 @@ const currentStepIndex = computed(() => createSteps.findIndex((s) => s.key === c
         <!-- MC 端口 -->
         <div class="flex items-center gap-3">
           <label class="w-24 text-xs text-gray-600 shrink-0">MC 端口</label>
-          <Input v-model.number="createForm.mcPort" type="number" placeholder="25565" />
+          <div class="flex-1 flex items-center gap-2">
+            <Input v-model.number="createForm.mcPort" type="number" placeholder="25565" class="flex-1" />
+            <Button type="outline" :loading="portSelecting" @click="handleSelectPort">
+              <template #icon><ServerStackIcon class="w-4 h-4" /></template>选择端口
+            </Button>
+          </div>
         </div>
         <!-- 房间备注 -->
         <div class="flex items-center gap-3">
