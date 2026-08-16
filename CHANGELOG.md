@@ -2,13 +2,13 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
-## [Unreleased]
+## [0.3.6-rc5] - 2026-08-16
 
 ### Fixed
 
 - **修复 CodeQL 告警：cubiomes glue 改为构建期静态导入**（[wasm-bindings.ts](src/utils/seedmap/wasm-bindings.ts) / [types.ts](src/utils/seedmap/types.ts) / [workerPool.ts](src/utils/seedmap/workerPool.ts) / [wasm-loader.ts](src/utils/wasm-loader.ts)）：`new Function` 的执行代码原可能取自 postMessage 投递的 `wasmJsCode` 或 `fetch(wasmJsUrl).text()`，被 CodeQL 判定为 Code injection；现改为 Worker 内 `import ... from 'cubiomes.js?raw'` 构建期内联防代码文本（非运行时输入），移除消息通道 `wasmJsCode` 与 glue 文本 fetch（仅保留 WASM 二进制走 URL fetch，二进制不进入 JS 执行），并增加 `var createCubiomesModule=` 指纹校验兜底。
 
-- **修复 Windows runner 上 ci-upload 报 Argument list too long**（[release.yml](.github/workflows/release.yml) / [ci-upload.cjs](scripts/ci-upload.cjs)）：提交数多时 release_notes 达几十 KB，作为命令行参数超出 Windows CreateProcess 约 32KB 上限；改为 Generate release notes 步骤把 \git log\ 直接重定向到 \\/release-notes.txt\（bash 内建、不经 argv），ci-upload.cjs 第 8 参接收文件路径并读取（兼容原内联文本传参）。
+- **修复 Windows runner 上 ci-upload 报 Argument list too long**（[release.yml](.github/workflows/release.yml) / [ci-upload.cjs](scripts/ci-upload.cjs)）：提交数多时 release_notes 达几十 KB，作为命令行参数超出 Windows CreateProcess 约 32KB 上限；改为 Generate release notes 步骤把 `git log` 直接重定向到 `${RUNNER_TEMP}/release-notes.txt`（bash 内建、不经 argv），ci-upload.cjs 第 8 参接收文件路径并读取（兼容原内联文本传参）。
 
 ## [0.3.6-rc4] - 2026-08-16
 
