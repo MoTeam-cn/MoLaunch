@@ -6,8 +6,10 @@ use super::{checksum, make_echo_request, parse_echo_reply};
 
 #[test]
 fn checksum_recomputed_is_zero() {
-    // 对整个报文（含已计算的校验和）再求和应为 0
-    let data = [0x45, 0x00, 0x00, 0x73];
+    // 发送端：校验和字段（偏移 [2..4]）先置 0，对整个报文求和取反后写入；
+    // 接收端：对含校验和的整个报文再求和取反必为 0
+    let mut data: [u8; 4] = [0x45, 0x00, 0x00, 0x73];
+    data[2..4].copy_from_slice(&[0, 0]);
     let sum = checksum(&data);
     let mut with_sum = data.to_vec();
     with_sum[2..4].copy_from_slice(&sum.to_be_bytes());

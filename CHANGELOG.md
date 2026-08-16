@@ -2,6 +2,12 @@
 
 本项目所有重要变更均会记录在此文件中。格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)。
 
+## [Unreleased]
+
+### Fixed
+
+- 修复 ICMP 校验和单测用例（[icmp_test.rs](src-tauri/src/commands/tools/network/icmp_test.rs)）：按 RFC 1071 在求和前置零校验和字段（偏移 [2..4]），原用例将校验和字段原始值当作数据字参与求和，导致接收端重算校验和不为 0（CI 单测失败）。
+
 ## [0.3.6-rc6] - 2026-08-17
 
 ### Added
