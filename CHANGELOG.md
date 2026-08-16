@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **发布工作流构建产物设置显式 7 天保留**（[release.yml](.github/workflows/release.yml)）：`windows-setup` / `macos-package` / `linux-package` / `windows-portable` 四个 upload-artifact 步骤此前未设置 `retention-days`，继承仓库默认保留（GitHub 默认最长 90 天）；产物实际仅用于同一次运行内跨 job 传递（最终安装包已附加到 GitHub Release / 推 S3 永久保存），现统一显式 `retention-days: 7`，与 api-server 发布工作流一致，及时释放 Actions 存储空间。
+
 - **恢复房间详情页「房间工具」抽屉（检查 MC 服务 / 网络连通性 / 端口自动检测）**（[RoomToolsDrawer.vue](src/components/online/RoomToolsDrawer.vue) 恢复 / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：房主与加入方面板新增「房间工具」入口按钮，右侧抽屉恢复三个工具：① 检查 MC 服务（SLP 协议，房主测本机 127.0.0.1、加入方测房主虚拟 IP，展示 MOTD/人数/版本/延迟）；② 检查网络连通性（TCP 握手，仅加入方可见，与房主 P2P + 虚拟网卡链路检测）；③ 端口自动检测（监听局域网发现广播解析 `[AD]port[/AD]`）。适配 Scaffolding 收敛后的 API 契约：`serverPing`/`tcpCheck` 从 `@/utils/api/tools/network` 导入，房主虚拟 IP 改用固定 `EASYTIER_HOST_VIRTUAL_IP` 常量，`lanPortProbe` 改为直接传超时参数。
 
 - **房主房间信息卡移除「剩余时间」显示**（[HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue)）：不再展示房间保留倒计时，房间信息卡精简为房间码 / MC 版本与端口 / 加载器 / 备注 / 房间类型 / 私密标识。

@@ -277,6 +277,7 @@ jobs:
           name: windows-setup
           path: |
             src-tauri/target/release/bundle/nsis/*-setup.exe
+          retention-days: 7
           if-no-files-found: error
 
       # macOS 安装包（app.tar.gz + .sig）作为 workflow artifact 传递，
@@ -290,6 +291,7 @@ jobs:
           path: |
             ${{ steps.locate.outputs.setup_file }}
             ${{ steps.locate.outputs.sig_file }}
+          retention-days: 7
           if-no-files-found: error
 
       # Linux 安装包（AppImage + .sig）作为 workflow artifact 传递，
@@ -302,6 +304,7 @@ jobs:
           path: |
             ${{ steps.locate.outputs.setup_file }}
             ${{ steps.locate.outputs.sig_file }}
+          retention-days: 7
           if-no-files-found: error
 
       # Windows 便携版（MoLaunch_<ver>_x64.exe + .sig）作为 workflow artifact 传递，
@@ -314,6 +317,7 @@ jobs:
           path: |
             ${{ steps.locate.outputs.portable_file }}
             ${{ steps.locate.outputs.portable_sig }}
+          retention-days: 7
           if-no-files-found: error
 
   # 创建 GitHub Release 页面（历史回顾 + 承载 Windows setup / macOS / Linux 安装包下载）
