@@ -1,5 +1,5 @@
 /**
- * Frp 侧边栏分类定义 composable（从 Online.vue 抽离，避免主文件超 300 行）
+ * FRP 联机侧边栏分类定义 composable（从 Online.vue 抽离，避免主文件超 300 行）
  *
  * 返回 frpCategory 常量供 Online.vue 的 categories computed 追加；含「认证中心」「运行日志」子项。
  */
@@ -13,23 +13,27 @@ import {
   DocumentTextIcon,
   BookOpenIcon,
 } from '@heroicons/vue/24/outline'
+import gofrpIcon from '@/assets/Common/gofrp-icon.png'
 
 /** NavCategory 类型（与 Online.vue 内部定义一致） */
 interface NavCategory {
   id: string
   label: string
   icon: Component
+  /** 可选图标图片地址（传入时 NavSidebar 优先渲染 <img>，否则渲染 icon 组件） */
+  image?: string
   desc?: string
   children?: NavCategory[]
   disabled?: boolean
 }
 
-/** Frp 管理分类（厂商列表 + 穿透管理 + 认证中心 + 运行日志） */
+/** FRP 联机分类（厂商列表 + 穿透管理 + 认证中心 + 运行日志） */
 export const frpCategory: NavCategory = {
   id: 'frp',
-  label: 'Frp 管理',
+  label: 'FRP 联机',
   icon: CloudIcon,
-  desc: '管理 Frp 内网穿透厂商、隧道与 frpc 进程',
+  image: gofrpIcon,
+  desc: '管理 FRP 内网穿透厂商、隧道与 frpc 进程',
   children: [
     {
       id: 'providers',

@@ -27,6 +27,8 @@ interface NavCategory {
   id: string
   label: string
   icon: Component
+  /** 可选图标图片地址（传入时优先渲染 <img>，否则渲染 icon 组件） */
+  image?: string
   desc?: string
   /** 可选子菜单项（有 children 时父项点击展开/收起，不切换选中态） */
   children?: NavCategory[]
@@ -140,7 +142,8 @@ useTabPersistence(
           ]"
           @click="handleClick(cat)"
         >
-          <component :is="cat.icon" class="w-5 h-5 mr-3 shrink-0" />
+          <img v-if="cat.image" :src="cat.image" class="w-5 h-5 mr-3 shrink-0 object-contain" alt="" />
+          <component :is="cat.icon" v-else class="w-5 h-5 mr-3 shrink-0" />
           <span class="flex-1 text-left">{{ cat.label }}</span>
           <!-- 展开图标（仅有 children 且非封禁时显示，带旋转动画）；封禁项显示锁图标 -->
           <LockClosedIcon v-if="cat.sealed" class="w-4 h-4 text-gray-300 shrink-0" />

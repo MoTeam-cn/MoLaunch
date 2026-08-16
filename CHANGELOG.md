@@ -36,6 +36,8 @@
 
 - 红石联机创建房间面板说明卡新增自动关闭规则提醒：隧道无玩家 10 分钟或运行满 6 小时后将自动关闭
 
+- 联机页侧边栏分类换用品牌图标：搭桥联机/红石联机/FRP 联机分别使用 easytier/hongshi/gofrp 图标，NavSidebar 支持可选 image 字段优先渲染图片，并将「Frp 管理」更名为「FRP 联机」
+
 ### Fixed
 
 - **修复红石联机 IPC 请求参数结构**（[redstone.ts](src/utils/api/redstone.ts)）：`redstoneManager` 统一入口改为 `invoke('redstone_manager', { req: { action, params } })`，与后端 `req: ActionRequest` 契约一致，修复调用报 `invalid args missing required key req` 的问题（此前 action/params 直接作为顶层参数）。

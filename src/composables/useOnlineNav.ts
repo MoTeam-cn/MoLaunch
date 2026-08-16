@@ -24,12 +24,16 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useOnlineStore } from '@/stores/online'
 import { frpCategory } from '@/composables/useFrpSidebar'
+import easytierIcon from '@/assets/Common/easytier-icon.png'
+import hongshiIcon from '@/assets/Common/hongshi-icon.png'
 
 /** 侧边栏分类项（与 NavSidebar.vue / useFrpSidebar 内部定义同形） */
 export interface NavCategory {
   id: string
   label: string
   icon: Component
+  /** 可选图标图片地址（传入时 NavSidebar 优先渲染 <img>，否则渲染 icon 组件） */
+  image?: string
   desc?: string
   children?: NavCategory[]
   /** 禁用态：未满足前置条件时灰色不可点击 */
@@ -65,6 +69,7 @@ const roomCategory: NavCategory = {
   id: 'room',
   label: '搭桥联机',
   icon: ServerStackIcon,
+  image: easytierIcon,
   desc: '搭桥联机或加入房间、管理参与者与连接信息',
   children: [
     {
@@ -87,6 +92,7 @@ const redstoneCategory: NavCategory = {
   id: 'redstone',
   label: '红石联机',
   icon: LinkIcon,
+  image: hongshiIcon,
   desc: '基于红石内核创建隧道联机，分享并复制联机地址给好友',
   children: [
     {
