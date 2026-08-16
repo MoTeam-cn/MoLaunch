@@ -30,6 +30,7 @@ const TunnelManager = defineAsyncComponent(() => import('@/components/frp/Tunnel
 const FrpLogs = defineAsyncComponent(() => import('@/components/frp/FrpLogs.vue'))
 const AuthCenter = defineAsyncComponent(() => import('@/components/frp/AuthCenter.vue'))
 const RedStoneCreatePanel = defineAsyncComponent(() => import('@/components/online/RedStoneCreatePanel.vue'))
+const RedStoneKernelPanel = defineAsyncComponent(() => import('@/components/online/RedStoneKernelPanel.vue'))
 const OnlineTopBar = defineAsyncComponent(() => import('@/views/online/OnlineTopBar.vue'))
 const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
 import { useOnlineNav, type OnlineCategoryId } from '@/composables/useOnlineNav'
@@ -143,6 +144,7 @@ const currentComponent = computed(() => {
     case 'auth': return AuthCenter
     case 'logs': return FrpLogs
     case 'redstone_create': return RedStoneCreatePanel
+    case 'redstone_status': return RedStoneKernelPanel
     default: return RoomManager
   }
 })

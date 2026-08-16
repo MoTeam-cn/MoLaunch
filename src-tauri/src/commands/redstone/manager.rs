@@ -1,5 +1,6 @@
 //! 红石联机动作分发（redstone_manager 的命令层实现）
-//! 统一注册 redstone_get_servers / redstone_start / redstone_status / redstone_stop，
+//! 统一注册 redstone_get_servers / redstone_start / redstone_status / redstone_stop
+//! / redstone_log_files / redstone_read_log，
 //! 内核经 extract_hongshi_core 释放后由 HongshiTunnel 子进程封装拉起。
 
 use once_cell::sync::Lazy;
@@ -161,6 +162,33 @@ fn register(d: &mut Dispatcher) {
                 log_info!("[Redstone] 隧道已停止");
             }
             Ok(serde_json::json!({}))
+        }),
+    );
+
+    // 列出红石内核日志文件（logs/ 目录，按时间倒序）
+    d.register(
+        "redstone_log_files",
+        handler!(_state, _app, _params, {
+            let files = crate::commands::redstone::log::list_log_files()?;
+            Ok(serde_json::json!({ "files": files }))
+        }),
+    );
+
+    // 读取指定红石内核日志文件尾部内容
+    d.register(
+        "redstone_read_log",
+        handler!(_state, _app, params, {
+            let file_name = params
+                .get("file_name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let max_lines = params
+                .get("max_lines")
+                .and_then(|v| v.as_u64())
+                .map(|v| v as usize);
+            let content = crate::commands::redstone::log::read_log_file(file_name, max_lines)?;
+            Ok(serde_json::json!({ "content": content }))
         }),
     );
 }

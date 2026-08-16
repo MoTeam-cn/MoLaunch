@@ -206,7 +206,7 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         )),
         // hongshi（红石联机内核，按平台/架构嵌入对应版本；Windows 仅 amd64 官方产物）
         // 来源：https://hongshi.site/docs-api.html（人工下载入库，见 docs/REDSTONE_ONLINE_DESIGN.md 附录 A）
-        // 运行时由 `extract_hongshi_core` 释放到 AppData/.Molaunch/hongshi/
+        // 运行时由 `extract_hongshi_core` 释放到 `<temp>/MoLaunch/hongshi/`
         #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
         "hongshi/hongshi" => Some(include_bytes!(
             "../resources/hongshi/windows/x86_64/hongshi-windows-amd64.exe"
@@ -392,15 +392,14 @@ pub fn extract_easytier_core() -> anyhow::Result<std::path::PathBuf> {
     Ok(core_path)
 }
 
-/// 释放 hongshi 内核到 AppData 全局目录，返回可执行文件路径
+/// 释放 hongshi 内核到系统临时目录，返回可执行文件路径
 ///
 /// hongshi 是红石联机内核，编译时按平台/架构嵌入对应版本（Windows 仅 amd64 官方
-/// 产物），运行时释放到 `<appdata>/.Molaunch/hongshi/`，状态文件 tunnel.ini 写
-/// 同目录。复用 `extract_resource` 的 sha256 校验机制；Unix 下需补回执行权限。
-/// 调用方为 `commands::redstone::manager`。
+/// 产物），运行时释放到 `<temp>/MoLaunch/hongshi/`（按需释放，非 AppData 持久目录；
+/// 内核日志与 tunnel.ini 状态文件均落于此目录）。复用 `extract_resource` 的 sha256
+/// 校验机制；Unix 下需补回执行权限。调用方为 `commands::redstone::manager`。
 pub fn extract_hongshi_core() -> anyhow::Result<std::path::PathBuf> {
-    let dir = crate::storage::appdata::ensure_appdata_subdir("hongshi")
-        .map_err(|e| anyhow::anyhow!(e))?;
+    let dir = crate::utils::cache_temp::ensure_hongshi_dir().map_err(|e| anyhow::anyhow!(e))?;
     let target_name = if cfg!(target_os = "windows") {
         "hongshi.exe"
     } else {
@@ -413,4 +412,19 @@ pub fn extract_hongshi_core() -> anyhow::Result<std::path::PathBuf> {
         crate::minecraft::system::shell::make_executable(&target);
     }
     Ok(target)
+}
+
+/// 红石内核工作目录（`<temp>/MoLaunch/hongshi/`）
+///
+/// 与 `extract_hongshi_core` 的释放目录一致：状态文件 tunnel.ini 与
+/// 内核日志 logs/ 均落于此目录（内核日志路径约定见 hongshi 官方接入文档 §5）。
+pub fn hongshi_kernel_dir() -> std::path::PathBuf {
+    crate::utils::cache_temp::hongshi_dir()
+}
+
+/// 红石内核日志目录（`<temp>/MoLaunch/hongshi/logs/`）
+///
+/// hongshi 内核按文档约定在工作目录下写 `logs/<YYYY-MM-DD>.log` 日志。
+pub fn hongshi_logs_dir() -> std::path::PathBuf {
+    hongshi_kernel_dir().join("logs")
 }

@@ -40,3 +40,25 @@ export interface RedStoneStatusResult {
 
 /** `redstone_stop` 返回 */
 export interface RedStoneStopResult {}
+
+/** 日志文件条目（`redstone_log_files` 返回项，日志路径 `<temp>/MoLaunch/hongshi/logs/`） */
+export interface RedStoneLogFileInfo {
+  fileName: string
+  sizeBytes: number
+  modifiedAt: number
+}
+
+/** `redstone_log_files` 返回 */
+export interface RedStoneLogFilesResult {
+  files: RedStoneLogFileInfo[]
+}
+
+/** `redstone_read_log` 返回（读取尾部 maxLines 行） */
+export interface RedStoneLogContent {
+  lines: string[]
+  hasMore: boolean
+}
+
+export interface RedStoneReadLogResult {
+  content: RedStoneLogContent
+}

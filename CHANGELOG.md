@@ -40,6 +40,8 @@
 
 - 联机大厅从其他菜单切回时自动静默刷新（keep-alive 下 onActivated 触发，首次加载不重复）：列表数据在后台更新，不闪烁 loading 状态
 
+- 红石联机内核迁移至系统临时目录并新增状态/日志面板：内核与 tunnel.ini、logs 日志统一释放/生成于 <temp>/MoLaunch/hongshi/（按需释放、随系统清理），spawn 设置 current_dir 对齐官方日志路径约定；后端新增 redstone_log_files / redstone_read_log 接口（尾部读取、防路径穿越）；联机页红石分类新增「内核状态」子菜单与面板，展示运行状态/隧道信息并支持阅读日期日志（log-display 兼容时间戳 + 单括号级别格式）
+
 ### Fixed
 
 - **修复红石联机 IPC 请求参数结构**（[redstone.ts](src/utils/api/redstone.ts)）：`redstoneManager` 统一入口改为 `invoke('redstone_manager', { req: { action, params } })`，与后端 `req: ActionRequest` 契约一致，修复调用报 `invalid args missing required key req` 的问题（此前 action/params 直接作为顶层参数）。

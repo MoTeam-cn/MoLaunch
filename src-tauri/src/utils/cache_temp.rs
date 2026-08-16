@@ -42,3 +42,16 @@ pub fn ensure_sdk_dir() -> anyhow::Result<PathBuf> {
 pub fn sdk_library_path(sdk_filename: &str) -> PathBuf {
     CacheTemp::instance().sdk_library_path(sdk_filename)
 }
+
+/// hongshi 子目录路径（`<temp>/MoLaunch/hongshi/`）
+///
+/// 红石联机内核释放目录，随系统临时目录自动清理；tunnel.ini 状态文件
+/// 与内核日志（logs/）均落于此目录。
+pub fn hongshi_dir() -> PathBuf {
+    CacheTemp::instance().hongshi_dir()
+}
+
+/// 确保 hongshi 子目录存在，返回完整路径
+pub fn ensure_hongshi_dir() -> anyhow::Result<PathBuf> {
+    CacheTemp::instance().ensure_hongshi_dir()
+}

@@ -7,6 +7,8 @@
 import { invoke } from '@tauri-apps/api/core'
 import type {
   RedStoneGetServersResult,
+  RedStoneLogFilesResult,
+  RedStoneReadLogResult,
   RedStoneStartParams,
   RedStoneStartResult,
   RedStoneStatusResult,
@@ -19,6 +21,8 @@ export const REDSTONE_ACTIONS = {
   START: 'redstone_start',
   STATUS: 'redstone_status',
   STOP: 'redstone_stop',
+  LOG_FILES: 'redstone_log_files',
+  READ_LOG: 'redstone_read_log',
 } as const
 
 /** 红石联机统一调用入口（action/params 放在 req 中，与后端 `req: ActionRequest` 契约一致） */
@@ -46,9 +50,24 @@ export function redstoneStop(): Promise<RedStoneStopResult> {
   return redstoneManager<RedStoneStopResult>(REDSTONE_ACTIONS.STOP)
 }
 
+/** 列出红石内核日志文件（logs/ 目录，按时间倒序） */
+export function redstoneLogFiles(): Promise<RedStoneLogFilesResult> {
+  return redstoneManager<RedStoneLogFilesResult>(REDSTONE_ACTIONS.LOG_FILES)
+}
+
+/** 读取指定红石内核日志文件尾部内容（maxLines 默认 500） */
+export function redstoneReadLog(fileName: string, maxLines?: number): Promise<RedStoneReadLogResult> {
+  return redstoneManager<RedStoneReadLogResult>(REDSTONE_ACTIONS.READ_LOG, {
+    file_name: fileName,
+    max_lines: maxLines ?? 500,
+  })
+}
+
 export default {
   redstoneGetServers,
   redstoneStart,
   redstoneStatus,
   redstoneStop,
+  redstoneLogFiles,
+  redstoneReadLog,
 }

@@ -1,6 +1,7 @@
 //! 系统临时目录缓存模块 - 管理 `<temp>/MoLaunch/` 目录
 //!
-//! 存放 `TaskTemp/`（安装包临时下载）和 `sdk/`（SDK 动态库释放）。
+//! 存放 `TaskTemp/`（安装包临时下载）、`sdk/`（SDK 动态库）与
+//! `hongshi/`（红石联机内核）等子目录。
 //! 设计与 `Storage` / `Cache` 一致：全局单例 + OnceLock 懒加载。
 
 use std::path::PathBuf;
@@ -10,6 +11,8 @@ use std::sync::OnceLock;
 const SUBDIR_TASK_TEMP: &str = "TaskTemp";
 /// SDK 子目录名（动态库释放）
 const SUBDIR_SDK: &str = "sdk";
+/// hongshi 子目录名（红石联机内核释放）
+const SUBDIR_HONGSHI: &str = "hongshi";
 
 static CACHE_TEMP: OnceLock<CacheTemp> = OnceLock::new();
 
@@ -68,5 +71,22 @@ impl CacheTemp {
     /// 传入当前平台的 SDK 文件名（通过 `sdk::get_sdk_filename()` 获取）。
     pub fn sdk_library_path(&self, sdk_filename: &str) -> PathBuf {
         self.sdk_dir().join(sdk_filename)
+    }
+
+    /// hongshi 子目录路径（`<temp>/MoLaunch/hongshi/`）
+    ///
+    /// 红石联机内核释放目录，随系统临时目录自动清理；
+    /// tunnel.ini 状态文件与内核日志（logs/）均落于此目录。
+    pub fn hongshi_dir(&self) -> PathBuf {
+        self.base_dir.join(SUBDIR_HONGSHI)
+    }
+
+    /// 确保 hongshi 子目录存在，返回完整路径
+    pub fn ensure_hongshi_dir(&self) -> anyhow::Result<PathBuf> {
+        let path = self.hongshi_dir();
+        if !path.exists() {
+            std::fs::create_dir_all(&path)?;
+        }
+        Ok(path)
     }
 }

@@ -4,6 +4,7 @@
  * 纯展示函数：解析日志文本为带行号与级别的行数组，并按业界惯例返回级别对应的文字颜色 class。
  *
  * 后端日志格式：[HH:MM:SS.ms] [LEVEL] message
+ * 红石内核日志格式：2026/08/09 15:32:39 [LEVEL] message（单括号时间戳）
  * 会话分隔标记格式：=== MoLaunch Started ===（后端每次启动时打印，开头会带一个 \n）
  */
 
@@ -36,8 +37,11 @@ export function parseLogLines(content: string): LogLine[] {
     if (/^===\s+.+\s+===\s*$/.test(text.trim())) {
       return { no, text, level: 'session' as const }
     }
-    // 匹配第二个方括号内的级别
-    const m = text.match(/^\[[^\]]*\]\s*\[(\w+)\]/)
+    // 匹配第二个方括号内的级别（后端格式 [time] [LEVEL]）
+    // 兼容红石内核等单括号时间戳格式：2026/08/09 15:32:39 [INFO] message
+    const m =
+      text.match(/^\[[^\]]*\]\s*\[(\w+)\]/) ??
+      text.match(/^\d{4}\/\d{2}\/\d{2} \d{2}:\d{2}:\d{2} \[(\w+)\]/)
     let level: LogLine['level'] = 'other'
     if (m) {
       const lv = m[1].toUpperCase()

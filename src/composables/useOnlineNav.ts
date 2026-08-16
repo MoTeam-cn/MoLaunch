@@ -21,6 +21,7 @@ import {
   HomeIcon,
   GlobeAltIcon,
   LinkIcon,
+  SignalIcon,
 } from '@heroicons/vue/24/outline'
 import { useOnlineStore } from '@/stores/online'
 import { frpCategory } from '@/composables/useFrpSidebar'
@@ -45,7 +46,7 @@ export interface NavCategory {
 /** Online 页激活分类 ID 联合类型（tutorial 为侧边栏动作项，不会真正成为激活态） */
 export type OnlineCategoryId =
   | 'device' | 'lobby' | 'create' | 'join' | 'room_details'
-  | 'redstone_create'
+  | 'redstone_create' | 'redstone_status'
   | 'providers' | 'tunnels' | 'auth' | 'logs' | 'tutorial'
 
 /** 设备分类（始终可用） */
@@ -101,13 +102,19 @@ const redstoneCategory: NavCategory = {
       icon: PlusIcon,
       desc: '下载红石内核并创建隧道，生成可分享的联机地址',
     },
+    {
+      id: 'redstone_status',
+      label: '内核状态',
+      icon: SignalIcon,
+      desc: '查看红石内核运行状态与日志',
+    },
   ],
 }
 
 /** URL `?tab=` 可恢复的合法分类 ID（device/lobby + 搭桥联机子项 + 红石联机 + FRP 子项） */
 const VALID_TABS = new Set<OnlineCategoryId>([
   'device', 'lobby', 'create', 'join', 'room_details',
-  'redstone_create',
+  'redstone_create', 'redstone_status',
   'providers', 'tunnels', 'auth', 'logs',
 ])
 

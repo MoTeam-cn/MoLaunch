@@ -37,12 +37,18 @@ fn ini_get_ci(ini: &crate::storage::ini::IniFile, section: &str, key: &str) -> O
 
 impl HongshiTunnel {
     /// 启动 hongshi 内核建立隧道（内部确保内核已释放就位；status-file 由内核原子写）
+    ///
+    /// 工作目录固定为内核所在目录（`<temp>/MoLaunch/hongshi/`），
+    /// 内核按官方约定在 cwd 下写 `logs/<YYYY-MM-DD>.log` 日志。
     pub async fn spawn(server: &str, mc_port: u16, status_file: &Path) -> Result<Self, String> {
         let kernel_path = crate::resources::extract_hongshi_core()
             .map_err(|e| format!("释放红石内核失败: {e}"))?;
         if !kernel_path.is_file() {
             return Err(format!("红石内核不存在: {}", kernel_path.display()));
         }
+        let kernel_dir = kernel_path
+            .parent()
+            .ok_or_else(|| "红石内核路径无效".to_string())?;
         let mut cmd = tokio::process::Command::new(&kernel_path);
         cmd.arg("-server")
             .arg(server)
@@ -50,6 +56,7 @@ impl HongshiTunnel {
             .arg(mc_port.to_string())
             .arg("-status-file")
             .arg(status_file)
+            .current_dir(kernel_dir)
             .kill_on_drop(true)
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::piped());
