@@ -50,6 +50,14 @@ pub struct AppState {
     ///
     /// `scaffolding_host_start` 创建并替换，`scaffolding_host_stop` 停止并置 None。
     pub scaffolding_server: Arc<TokioMutex<Option<ScaffoldingServer>>>,
+    /// 联机中心后台监视任务句柄（房主，每 5s 扫描 MC 端口 + 30s 自动关房）
+    ///
+    /// `scaffolding_host_start` spawn 并存储，`scaffolding_host_stop` 与自动关房时 abort 并置 None。
+    pub scaffolding_host_watch: Arc<TokioMutex<Option<tokio::task::AbortHandle>>>,
+    /// 房主手动指定的 MC 端口（最高权重：自动探测不覆盖；None 为自动模式）
+    ///
+    /// 由 `scaffolding_host_set_mc_port` 写入，`scaffolding_host_start`/`scaffolding_host_stop` 复位。
+    pub manual_mc_port: Arc<TokioMutex<Option<u16>>>,
     /// MC 局域网服务器伪装（加入方本地伪装 LAN 服务器，多人游戏界面直接发现房主房间）
     ///
     /// 加入方进入房间且 TUN 就绪后由 `lan_fake_server_start` 创建并替换，
@@ -117,6 +125,8 @@ impl AppState {
             authlib_pending: Arc::new(TokioMutex::new(None)),
             easytier: Arc::new(TokioMutex::new(None)),
             scaffolding_server: Arc::new(TokioMutex::new(None)),
+            scaffolding_host_watch: Arc::new(TokioMutex::new(None)),
+            manual_mc_port: Arc::new(TokioMutex::new(None)),
             lan_fake_server: Arc::new(TokioMutex::new(None)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
             panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use crate::handler;
 use crate::log_error;
 use crate::log_info;
+use crate::log_warn;
 use crate::minecraft::online::scaffolding::client as scaffolding_client;
 use crate::minecraft::online::scaffolding::code as room_code;
 use crate::minecraft::online::scaffolding::easytier::{EasyTier, HOST_VIRTUAL_IP};
@@ -18,6 +19,7 @@ use crate::minecraft::online::scaffolding::server::{ScaffoldingServer, Scaffoldi
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 use std::path::PathBuf;
+use std::time::Duration;
 use tauri::{Emitter, Manager};
 
 /// 房客侧默认 hostname（未配置 network_identity 时使用）
@@ -25,6 +27,18 @@ const DEFAULT_GUEST_HOSTNAME: &str = "mo-launch-guest";
 
 /// easytier 运行状态推送事件（前端经 useTauriEvent 监听）
 const EASYTIER_STATUS_EVENT: &str = "easytier-status";
+
+/// 房主自动关闭房间事件（后端→房主前端，触发房间清理登记）
+const HOST_AUTO_CLOSE_EVENT: &str = "scaffolding-host-auto-close";
+
+/// 房主 MC 端口变更事件（后端→房主前端，展示实时端口）
+const MC_PORT_CHANGE_EVENT: &str = "scaffolding-mc-port-change";
+
+/// 房主后台监视循环周期（5s）
+const WATCH_INTERVAL: Duration = Duration::from_secs(5);
+
+/// 端口连续不可达次数阈值（6 次 = 30s，触发自动关房）
+const AUTO_CLOSE_FAIL_LIMIT: u32 = 6;
 
 /// 构造 easytier 运行状态 payload（`easytier-status` 事件推送 / `easytier_status` IPC 查询共用）
 fn easytier_status_payload(easytier: &Option<EasyTier>) -> serde_json::Value {
@@ -136,6 +150,92 @@ async fn probe_mc_port(state: &AppState) -> Option<u16> {
     }
 }
 
+/// 房主后台监视循环：每 5s 扫描游戏监听端口并回写联机中心。
+///
+/// - 手动端口设置时跳过自动更新（最高权重），不自动关房；
+/// - 端口连续 `AUTO_CLOSE_FAIL_LIMIT` 次不可达（30s）自动关闭房间并推送事件；
+/// - 外部 `easytier_stop`/`scaffolding_host_stop` 抢先时（easytier 为 None）直接退出。
+async fn host_watch_loop(
+    center_state: ScaffoldingServerState,
+    app: tauri::AppHandle,
+    state: AppState,
+    mut current_mc_port: Option<u16>,
+) {
+    let mut fail_count: u32 = 0;
+    loop {
+        if state.easytier.lock().await.is_none() {
+            return;
+        }
+        // 手动端口最高权重：始终同步手动值，不自动覆盖、不自动关房
+        if let Some(manual) = *state.manual_mc_port.lock().await {
+            if current_mc_port != Some(manual) {
+                current_mc_port = Some(manual);
+                center_state.set_mc_port(Some(manual));
+                log_info!("[Online] 房主监视: 手动 MC 端口 {manual} 已同步");
+            }
+            tokio::time::sleep(WATCH_INTERVAL).await;
+            continue;
+        }
+        let pid = *state.current_pid.lock().await;
+        let ports = pid
+            .map(crate::minecraft::launch::watcher::ports::listening_tcp_ports)
+            .unwrap_or_default();
+        if ports.is_empty() {
+            fail_count += 1;
+            if fail_count >= AUTO_CLOSE_FAIL_LIMIT {
+                log_warn!("[Online] 房主监视: MC 端口连续 {fail_count} 次不可达，自动关闭房间");
+                auto_close_room(&state, &app).await;
+                return;
+            }
+        } else {
+            fail_count = 0;
+            // 已知端口仍在监听则保持不变；否则取与已知端口最接近者（无已知时取升序第一个）
+            let chosen = match current_mc_port {
+                Some(cur) if ports.contains(&cur) => cur,
+                _ => {
+                    let target = current_mc_port.unwrap_or(0);
+                    *ports
+                        .iter()
+                        .min_by_key(|p| p.abs_diff(target))
+                        .unwrap_or(&ports[0])
+                }
+            };
+            if current_mc_port != Some(chosen) {
+                current_mc_port = Some(chosen);
+                center_state.set_mc_port(Some(chosen));
+                let _ = app.emit(
+                    MC_PORT_CHANGE_EVENT,
+                    serde_json::json!({ "mcPort": chosen }),
+                );
+                log_info!("[Online] 房主监视: MC 端口已更新为 {chosen}");
+            }
+        }
+        tokio::time::sleep(WATCH_INTERVAL).await;
+    }
+}
+
+/// 自动关闭房间：停 easytier + 停联机中心 + 清空状态 + 推送前端事件。
+///
+/// 幂等：各状态为 None 时 no-op，重复调用安全。
+async fn auto_close_room(state: &AppState, app: &tauri::AppHandle) {
+    let old_easytier = state.easytier.lock().await.take();
+    if let Some(old_easytier) = old_easytier {
+        old_easytier.stop().await;
+    }
+    let old_server = state.scaffolding_server.lock().await.take();
+    if let Some(old_server) = old_server {
+        old_server.stop().await;
+    }
+    *state.scaffolding_host_watch.lock().await = None;
+    *state.manual_mc_port.lock().await = None;
+    emit_easytier_status(app, state).await;
+    let _ = app.emit(
+        HOST_AUTO_CLOSE_EVENT,
+        serde_json::json!({ "reason": "mc_unreachable" }),
+    );
+    log_info!("[Online] 房间已自动关闭（MC 服务 30s 不可达）");
+}
+
 /// `easytier_join` 参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -200,12 +300,21 @@ pub struct ScaffoldingHostStartResponse {
     pub center_port: u16,
     /// 中心 hostname（`scaffolding-mc-server-{center_port}`）
     pub hostname: String,
-    /// 房主 MC 局域网端口
-    pub mc_port: u16,
+    /// 房主 MC 局域网端口（先开房后开局域网时为 None，后台监视发现端口后自动更新）
+    pub mc_port: Option<u16>,
     /// rpc-portal 地址
     pub rpc_portal: String,
     /// easytier 子进程 PID
     pub pid: Option<u32>,
+}
+
+/// `scaffolding_host_set_mc_port` 参数
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScaffoldingHostSetMcPortParams {
+    /// 手动指定的 MC 端口（None 清除手动覆盖，恢复自动探测）
+    #[serde(default)]
+    pub mc_port: Option<u16>,
 }
 
 /// `scaffolding_client_probe` 返回
@@ -311,7 +420,12 @@ pub fn register(d: &mut Dispatcher) {
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
             let (network_name, network_secret) = room_code::parse(&p.room_code)?;
 
-            // 停止旧实例（easytier + 联机中心），保证幂等
+            // 停止旧实例（后台监视 + easytier + 联机中心），保证幂等
+            let old_watch = state.scaffolding_host_watch.lock().await.take();
+            if let Some(old_watch) = old_watch {
+                old_watch.abort();
+            }
+            *state.manual_mc_port.lock().await = None;
             let old_easytier = state.easytier.lock().await.take();
             if let Some(old_easytier) = old_easytier {
                 old_easytier.stop().await;
@@ -321,18 +435,17 @@ pub fn register(d: &mut Dispatcher) {
                 old_server.stop().await;
             }
 
-            // MC 端口：显式参数优先，否则按游戏进程探测
+            // MC 端口：显式参数优先，其次按游戏进程探测；均未获知时允许先开房，
+            // 由后台监视循环发现端口后自动回写（host_watch_loop）
             let mc_port = match p.mc_port {
-                Some(port) => port,
-                None => probe_mc_port(&state).await.ok_or_else(|| {
-                    "未探测到 MC 局域网端口，请先在游戏内开放局域网后重试".to_string()
-                })?,
+                Some(port) => Some(port),
+                None => probe_mc_port(&state).await,
             };
 
             // 启动联机中心（监听虚拟 IP，MC 端口写入共享状态）
             let center_state = ScaffoldingServerState::new();
-            center_state.set_mc_port(Some(mc_port));
-            let server = ScaffoldingServer::start_on(center_state).await?;
+            center_state.set_mc_port(mc_port);
+            let server = ScaffoldingServer::start_on(center_state.clone()).await?;
             let hostname = server.hostname();
             let center_port = server.port();
 
@@ -364,8 +477,17 @@ pub fn register(d: &mut Dispatcher) {
             *state.easytier.lock().await = Some(easytier);
             emit_easytier_status(&app, &state).await;
 
+            // 启动后台监视循环（端口热更新 + 自动关房）
+            let watch_center = center_state.clone();
+            let watch_app = app.clone();
+            let watch_state = state.clone();
+            let watch = tokio::spawn(async move {
+                host_watch_loop(watch_center, watch_app, watch_state, mc_port).await;
+            });
+            *state.scaffolding_host_watch.lock().await = Some(watch.abort_handle());
+
             log_info!(
-                "[Online] 房主联机中心已启动: center_port={}, hostname={}, mc_port={}",
+                "[Online] 房主联机中心已启动: center_port={}, hostname={}, mc_port={:?}",
                 center_port,
                 hostname,
                 mc_port
@@ -385,6 +507,12 @@ pub fn register(d: &mut Dispatcher) {
     d.register(
         "scaffolding_host_stop",
         handler!(state, app, _params, {
+            // 中止后台监视任务，清除手动端口覆盖
+            let watch = state.scaffolding_host_watch.lock().await.take();
+            if let Some(watch) = watch {
+                watch.abort();
+            }
+            *state.manual_mc_port.lock().await = None;
             let old_easytier = state.easytier.lock().await.take();
             if let Some(old_easytier) = old_easytier {
                 old_easytier.stop().await;
@@ -464,6 +592,49 @@ pub fn register(d: &mut Dispatcher) {
                 }
                 Err(e) => {
                     log_error!("[Online] 房客探测联机中心失败: {e}");
+                    Err(e)
+                }
+            }
+        }),
+    );
+
+    d.register(
+        "scaffolding_host_set_mc_port",
+        handler!(state, _app, params, {
+            let p: ScaffoldingHostSetMcPortParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
+            *state.manual_mc_port.lock().await = p.mc_port;
+            // 手动端口立即生效（联机中心直接回写）；清除时由监视循环自动补回
+            if let Some(server) = state.scaffolding_server.lock().await.as_ref() {
+                server.state().set_mc_port(p.mc_port);
+            }
+            log_info!("[Online] 房主手动 MC 端口: {:?}", p.mc_port);
+            serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "scaffolding_client_poll",
+        handler!(state, _app, params, {
+            let _p: ScaffoldingClientProbeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
+            // 轻量轮询：不 join，仅解析中心地址后探测 MC 端口（复用 probe 发现逻辑）
+            let (center_ip, center_port) = {
+                let guard = state.easytier.lock().await;
+                let easytier = guard
+                    .as_ref()
+                    .ok_or_else(|| "easytier 未加入网络".to_string())?;
+                scaffolding_client::resolve_center_addr(None, None, easytier).await?
+            };
+            match scaffolding_client::discover_mc(&center_ip, center_port).await {
+                Ok((mc_ip, mc_port)) => serde_json::to_value(ScaffoldingClientProbeResponse {
+                    success: true,
+                    mc_ip,
+                    mc_port,
+                })
+                .map_err(|e| e.to_string()),
+                Err(e) => {
+                    log_error!("[Online] 房客轮询联机中心失败: {e}");
                     Err(e)
                 }
             }
