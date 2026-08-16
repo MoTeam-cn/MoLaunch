@@ -67,6 +67,62 @@ export function tcpCheck(host: string, port: number): Promise<TcpCheckResult> {
   return toolsManager<TcpCheckResult>(TOOLS_ACTIONS.TCP_CHECK, { host, port })
 }
 
+// ==================== 地址延迟测试 ====================
+
+/** 地址延迟测试目标 */
+export interface AddressTarget {
+  /** 显示名（如「南京」），缺省用 host */
+  name?: string
+  host: string
+  port: number
+  /** 测延迟协议：tcp（默认，TCP 握手）/ udp（UDP 探针）/ ping（ICMP，系统 ping） */
+  protocol?: 'tcp' | 'udp' | 'ping'
+}
+
+/** 地址延迟测试单条结果 */
+export interface AddressLatencyItem {
+  name: string | null
+  host: string
+  port: number
+  protocol: string
+  /** 是否可达 */
+  reachable: boolean
+  /** 延迟（毫秒），失败时为 0 */
+  latency_ms: number
+  /** 失败原因（成功时为空） */
+  error: string
+}
+
+/** 地址延迟测试结果 */
+export interface AddressLatencyResult {
+  results: AddressLatencyItem[]
+  /** 持续测试任务 id（persistent=true 时返回，供停止） */
+  task_id: string | null
+}
+
+/** 地址延迟持续测试 emit 事件名（payload = AddressLatencyResult） */
+export const LATENCY_UPDATE_EVENT = 'tools-latency-update'
+
+/**
+ * 地址延迟测试（tcp 握手 / udp 探针 / 系统 ping）
+ * @param persistent true 时后端按 intervalMs 周期测试并经 `tools-latency-update` 事件推送，需调用 addressLatencyStop 停止
+ */
+export function addressLatencyTest(
+  targets: AddressTarget[],
+  opts?: { persistent?: boolean; intervalMs?: number },
+): Promise<AddressLatencyResult> {
+  return toolsManager<AddressLatencyResult>(TOOLS_ACTIONS.ADDRESS_LATENCY_TEST, {
+    targets,
+    persistent: opts?.persistent ?? false,
+    interval_ms: opts?.intervalMs ?? 3000,
+  })
+}
+
+/** 停止持续地址延迟测试 */
+export function addressLatencyStop(): Promise<Record<string, never>> {
+  return toolsManager<Record<string, never>>(TOOLS_ACTIONS.ADDRESS_LATENCY_STOP)
+}
+
 /** 本机监听端口条目 */
 export interface OpenPortInfo {
   local_addr: string

@@ -16,6 +16,7 @@
 - **联机菜单归类调整：父级「房间管理」更名为「搭桥联机」**（[useOnlineNav.ts](src/composables/useOnlineNav.ts)）：Scaffolding 联机分类由「房间管理」归类为「搭桥联机」，其下原有「搭桥联机」子项改回「创建房间」，与红石联机「创建房间」子项命名一致避免歧义；分类描述、文件头注释与 URL tab 恢复逻辑同步更新。
 - **红石联机创建面板完善交互**（[useRedStonePanel.ts](src/composables/useRedStonePanel.ts)（新增） / [RedStoneCreatePanel.vue](src/components/online/RedStoneCreatePanel.vue)）：面板逻辑抽离为 composable（组件收敛至模板组装）；「本地 MC 服务」新增「选择端口」按钮，复用 port-picker 子窗口（与 FRP 创建隧道一致）；持续监听后端 `scaffolding-mc-port-change` / `mc-port-detected` 事件自动回填端口并 toast 提示；创建/重启/停止按钮补齐 loading 防呆，停止隧道成功新增成功提示。
 - **搭桥联机创建房间支持端口选择与事件回填**（[useCreateRoomForm.ts](src/composables/useCreateRoomForm.ts) / [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：MC 端口输入框旁新增「选择端口」按钮（复用 port-picker 子窗口，loading 防呆）；持续监听后端 `scaffolding-mc-port-change` / `mc-port-detected` 事件，后端推送端口变化时自动回填 MC 端口并 toast 提示。
+- **工具页新增「地址测速」子页**（[AddressLatencyTester.vue](src/views/tools/network/AddressLatencyTester.vue)（新增） / [network.ts](src/utils/api/tools/network.ts) / [core.ts](src/utils/api/tools/core.ts) / [ModNetworkPage.vue](src/views/tools/ModNetworkPage.vue)）：支持 TCP 握手 / UDP 探针 / 系统 ping 三种协议对 `host:port` 目标测延迟（支持 `名称|host:port` 前缀）；勾选「持续监测」后由后端周期测试并经 `tools-latency-update` 事件实时推送刷新结果，「停止监测」对应 `address_latency_stop`。
 
 ### Fixed
 
