@@ -204,6 +204,29 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         "easytier/wintun.dll" => Some(include_bytes!(
             "../resources/easytier/windows/aarch64/wintun.dll"
         )),
+        // hongshi（红石联机内核，按平台/架构嵌入对应版本；Windows 仅 amd64 官方产物）
+        // 来源：https://hongshi.site/docs-api.html（人工下载入库，见 docs/REDSTONE_ONLINE_DESIGN.md 附录 A）
+        // 运行时由 `extract_hongshi_core` 释放到 AppData/.Molaunch/hongshi/
+        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+        "hongshi/hongshi" => Some(include_bytes!(
+            "../resources/hongshi/windows/x86_64/hongshi-windows-amd64.exe"
+        )),
+        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+        "hongshi/hongshi" => Some(include_bytes!(
+            "../resources/hongshi/linux/x86_64/hongshi-linux-amd64"
+        )),
+        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+        "hongshi/hongshi" => Some(include_bytes!(
+            "../resources/hongshi/linux/aarch64/hongshi-linux-arm64"
+        )),
+        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+        "hongshi/hongshi" => Some(include_bytes!(
+            "../resources/hongshi/macos/x86_64/hongshi-darwin-amd64"
+        )),
+        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+        "hongshi/hongshi" => Some(include_bytes!(
+            "../resources/hongshi/macos/aarch64/hongshi-darwin-arm64"
+        )),
         _ => None,
     }
 }
@@ -367,4 +390,27 @@ pub fn extract_easytier_core() -> anyhow::Result<std::path::PathBuf> {
     }
 
     Ok(core_path)
+}
+
+/// 释放 hongshi 内核到 AppData 全局目录，返回可执行文件路径
+///
+/// hongshi 是红石联机内核，编译时按平台/架构嵌入对应版本（Windows 仅 amd64 官方
+/// 产物），运行时释放到 `<appdata>/.Molaunch/hongshi/`，状态文件 tunnel.ini 写
+/// 同目录。复用 `extract_resource` 的 sha256 校验机制；Unix 下需补回执行权限。
+/// 调用方为 `commands::redstone::manager`。
+pub fn extract_hongshi_core() -> anyhow::Result<std::path::PathBuf> {
+    let dir = crate::storage::appdata::ensure_appdata_subdir("hongshi")
+        .map_err(|e| anyhow::anyhow!(e))?;
+    let target_name = if cfg!(target_os = "windows") {
+        "hongshi.exe"
+    } else {
+        "hongshi"
+    };
+    let target = dir.join(target_name);
+    extract_resource("hongshi/hongshi", &target)?;
+    #[cfg(unix)]
+    {
+        crate::minecraft::system::shell::make_executable(&target);
+    }
+    Ok(target)
 }

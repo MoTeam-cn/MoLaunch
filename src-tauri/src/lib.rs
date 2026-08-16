@@ -244,6 +244,8 @@ pub fn run() {
             commands::experimental::experimental_manager,
             // 联机功能命令（6 个 action，阶段一认证相关，已聚合为 online_manager 单一入口）
             commands::online::online_manager,
+            // 红石联机命令（4 个 action，hongshi 隧道管理，已聚合为 redstone_manager 单一入口）
+            commands::redstone::redstone_manager,
             // Frp 内网穿透命令（8 个 action，厂商/隧道/进程管理，已聚合为 frp_manager 单一入口）
             commands::frp::frp_manager,
             // 托盘退出命令（前端完成联机退房等清理后调用，后端再统一清理 frpc/TUN 后退出）

@@ -73,6 +73,11 @@ pub struct AppState {
     /// 加入方进入房间后由 `lan_fake_server_start` 创建并替换（纯 UDP 广播，
     /// 进服流量由 port-forward 承担），退出房间时 `lan_fake_server_stop` 关闭并置 None。
     pub lan_fake_server: Arc<TokioMutex<Option<crate::commands::online::manager::LanFakeServer>>>,
+    /// 红石联机内核进程（hongshi 隧道，创建房间时启动，停止时置 None）
+    ///
+    /// `redstone_start` 创建并替换（单实例），`redstone_stop` 停止并置 None；
+    /// 隧道状态由内核写入同目录 tunnel.ini，`redstone_status` 轮询读取。
+    pub redstone: Arc<TokioMutex<Option<crate::commands::redstone::tunnel::HongshiTunnel>>>,
     /// 应用句柄（Tauri setup 钩子中注入）
     ///
     /// 供后台任务/进度回调向前端 emit 事件（如 `download-progress`）。
@@ -140,6 +145,7 @@ impl AppState {
             scaffolding_host_watch: Arc::new(TokioMutex::new(None)),
             manual_mc_port: Arc::new(TokioMutex::new(None)),
             lan_fake_server: Arc::new(TokioMutex::new(None)),
+            redstone: Arc::new(TokioMutex::new(None)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
             panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
