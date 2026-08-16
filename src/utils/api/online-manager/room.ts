@@ -32,3 +32,8 @@ export function joinRoom(roomCode: string, password: string): Promise<BusinessRe
 export function closeRoom(roomCode: string): Promise<BusinessResult<unknown>> {
   return onlineManager<BusinessResult<unknown>>(ONLINE_ACTIONS.ROOM_CLOSE, { roomCode })
 }
+
+/** 房主心跳上报（每 3 分钟一次，防止房间被云端超时清理） */
+export function heartbeatRoom(roomCode: string): Promise<BusinessResult<unknown>> {
+  return onlineManager<BusinessResult<unknown>>(ONLINE_ACTIONS.ROOM_HEARTBEAT, { roomCode })
+}

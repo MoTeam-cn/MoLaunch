@@ -9,7 +9,7 @@
 import type { Ref } from 'vue'
 import type { CreateRoomResponse, JoinRoomResponse, ModpackMeta, RoomInfoResponse } from '@/types/online'
 import { parseScaffoldingCode } from '@/types/online'
-import { closeRoom, createRoom, getRoomInfo, joinRoom } from '@/utils/api/online-manager'
+import { closeRoom, createRoom, getRoomInfo, heartbeatRoom, joinRoom } from '@/utils/api/online-manager'
 import { toastSuccess } from '@/utils/toast'
 import type { RoomCreateStep, RoomState } from './types'
 import { emptyRoom } from './types'
@@ -23,6 +23,26 @@ export interface RoomActionDeps {
 
 /** 房间已关闭错误（旧 keepalive 轮询兼容，已无定时器使用） */
 export class RoomClosedError extends Error {}
+
+/** 房主心跳间隔（毫秒，3 分钟；须小于服务端 heartbeat_timeout 300 秒） */
+const HEARTBEAT_INTERVAL_MS = 3 * 60 * 1000
+
+/** 房主心跳定时器（store 单例，创建房间时启动、关闭房间时停止） */
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null
+
+function stopHeartbeatTimer(): void {
+  if (heartbeatTimer !== null) {
+    clearInterval(heartbeatTimer)
+    heartbeatTimer = null
+  }
+}
+
+function startHeartbeatTimer(roomCode: string): void {
+  stopHeartbeatTimer()
+  heartbeatTimer = setInterval(() => {
+    heartbeatRoom(roomCode).catch(() => {})
+  }, HEARTBEAT_INTERVAL_MS)
+}
 
 /** 创建房间动作切片 */
 export function useRoomActionsSlice(deps: RoomActionDeps) {
@@ -63,6 +83,7 @@ export function useRoomActionsSlice(deps: RoomActionDeps) {
         hostLoaderVersion: params.hostLoaderVersion ?? '',
         hostModpack: params.modpack,
       })
+      startHeartbeatTimer(params.roomCode)
       toastSuccess(`房间已创建：${parsed?.publicId ?? params.roomCode}`)
       return result.data
     } finally {
@@ -77,6 +98,7 @@ export function useRoomActionsSlice(deps: RoomActionDeps) {
     roomLoading.value = true
     try {
       await closeRoom(roomState.value.roomCode)
+      stopHeartbeatTimer()
       roomState.value = emptyRoom()
       toastSuccess('房间已关闭')
     } finally {

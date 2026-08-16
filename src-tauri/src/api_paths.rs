@@ -41,6 +41,8 @@ pub const SIGNALING_ROOM: &str = "/v1/signaling/rooms/{room_code}";
 pub const SIGNALING_ROOM_JOIN: &str = "/v1/signaling/rooms/{room_code}/join";
 /// 房主关闭房间（POST）
 pub const SIGNALING_ROOM_CLOSE: &str = "/v1/signaling/rooms/{room_code}/close";
+/// 房主心跳上报（POST，每 3 分钟一次，超时未上报由服务端清理）
+pub const SIGNALING_ROOM_HEARTBEAT: &str = "/v1/signaling/rooms/{room_code}/heartbeat";
 /// 大厅聚合（按整合包分组 + 热度，GET）
 pub const SIGNALING_LOBBY_PACKAGES: &str = "/v1/signaling/lobby/packages";
 /// 某整合包下的公开房间列表（GET，query 字符串由调用方拼接在常量之后）

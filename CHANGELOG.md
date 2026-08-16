@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **房主房间心跳保活（keepalive）**（[room.ts](src/utils/api/online-manager/room.ts) / [core.ts](src/utils/api/online-manager/core.ts) / [roomActions.ts](src/stores/online/roomActions.ts) / [room_api.rs](src-tauri/src/minecraft/online/signaling/room_api.rs) / [room_actions.rs](src-tauri/src/commands/online/manager/signaling_manager/room_actions.rs) / [api_paths.rs](src-tauri/src/api_paths.rs)）：房主创建房间成功后启动 3 分钟心跳定时器，经新增 `room_heartbeat` IPC action 上报 `POST /v1/signaling/rooms/{code}/heartbeat`，关闭房间时停止；配合服务端 `signaling.heartbeat_timeout`（默认 300 秒）超时清理机制，防止崩溃/断网后房间成为永不清理的僵尸房间（服务端改动见 api-server 侧 CHANGELOG）。
+
 ### Changed
 
 - **恢复房间详情页「房间工具」抽屉（检查 MC 服务 / 网络连通性 / 端口自动检测）**（[RoomToolsDrawer.vue](src/components/online/RoomToolsDrawer.vue) 恢复 / [RoomHostPanel.vue](src/components/online/RoomHostPanel.vue) / [RoomGuestPanel.vue](src/components/online/RoomGuestPanel.vue)）：房主与加入方面板新增「房间工具」入口按钮，右侧抽屉恢复三个工具：① 检查 MC 服务（SLP 协议，房主测本机 127.0.0.1、加入方测房主虚拟 IP，展示 MOTD/人数/版本/延迟）；② 检查网络连通性（TCP 握手，仅加入方可见，与房主 P2P + 虚拟网卡链路检测）；③ 端口自动检测（监听局域网发现广播解析 `[AD]port[/AD]`）。适配 Scaffolding 收敛后的 API 契约：`serverPing`/`tcpCheck` 从 `@/utils/api/tools/network` 导入，房主虚拟 IP 改用固定 `EASYTIER_HOST_VIRTUAL_IP` 常量，`lanPortProbe` 改为直接传超时参数。

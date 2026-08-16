@@ -1,4 +1,4 @@
-//! 房间生命周期 action 注册：创建/查询/加入/关闭（Scaffolding 收敛版）。
+//! 房间生命周期 action 注册：创建/查询/加入/关闭/心跳（Scaffolding 收敛版）。
 
 use crate::handler;
 use crate::log_debug;
@@ -15,6 +15,7 @@ pub fn register(d: &mut Dispatcher) {
     register_get_room(d);
     register_join_room(d);
     register_close_room(d);
+    register_heartbeat_room(d);
 }
 
 fn register_create_room(d: &mut Dispatcher) {
@@ -114,6 +115,27 @@ fn register_close_room(d: &mut Dispatcher) {
                 .await
                 .map_err(|e| {
                     log_error!("[Online] room_close 失败: {}", e);
+                    e.to_string()
+                })?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
+}
+
+fn register_heartbeat_room(d: &mut Dispatcher) {
+    d.register(
+        "room_heartbeat",
+        handler!(state, _app, params, {
+            let p: RoomCodeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let creds = super::load_creds(&state).await?;
+            let client = super::make_client(&state).await;
+            log_debug!("[Online] room_heartbeat: code={}", p.room_code);
+            let result = client
+                .signaling_heartbeat_room(&creds, &p.room_code)
+                .await
+                .map_err(|e| {
+                    log_error!("[Online] room_heartbeat 失败: {}", e);
                     e.to_string()
                 })?;
             serde_json::to_value(result).map_err(|e| e.to_string())

@@ -1,4 +1,4 @@
-//! 房间生命周期接口：创建/查询/加入/关闭（Scaffolding 收敛版）。
+//! 房间生命周期接口：创建/查询/加入/关闭/心跳（Scaffolding 收敛版）。
 
 use super::types::{CreateRoomRequest, CreateRoomResponse, JoinRoomResponse, RoomInfoResponse};
 use crate::api_paths;
@@ -64,6 +64,20 @@ impl OnlineClient {
         room_code: &str,
     ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
         let path = path_with_room_code(api_paths::SIGNALING_ROOM_CLOSE, room_code);
+        self.call_v1::<serde_json::Value>(creds, "POST", &path, None, true)
+            .await
+    }
+
+    /// 房主心跳上报（POST /v1/signaling/rooms/{code}/heartbeat）
+    ///
+    /// 客户端每 3 分钟上报一次，服务端刷新 `last_keepalive_at` 并续期 `expires_at`；
+    /// 超过 `signaling.heartbeat_timeout`（默认 300 秒）未上报的房间会被清理任务删除。
+    pub async fn signaling_heartbeat_room(
+        &self,
+        creds: &DeviceCredentials,
+        room_code: &str,
+    ) -> Result<BusinessResult<serde_json::Value>, ClientError> {
+        let path = path_with_room_code(api_paths::SIGNALING_ROOM_HEARTBEAT, room_code);
         self.call_v1::<serde_json::Value>(creds, "POST", &path, None, true)
             .await
     }

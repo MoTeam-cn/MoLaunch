@@ -83,11 +83,12 @@ export const ONLINE_ACTIONS = {
   AUTH_INIT: 'auth_init',
   // 手动刷新 token（用 refresh_token 换新 access_token）
   AUTH_REFRESH: 'auth_refresh',
-  // 房间（Scaffolding 方案：创建/查询/加入/关闭）
+  // 房间（Scaffolding 方案：创建/查询/加入/关闭/心跳）
   ROOM_CREATE: 'room_create',
   ROOM_GET: 'room_get',
   ROOM_CLOSE: 'room_close',
   ROOM_JOIN: 'room_join',
+  ROOM_HEARTBEAT: 'room_heartbeat',
   // MC 局域网伪装 + 端口探测
   LAN_FAKE_SERVER_START: 'lan_fake_server_start',
   LAN_FAKE_SERVER_STOP: 'lan_fake_server_stop',
