@@ -1,7 +1,8 @@
 //! 网络工具（延迟测试 + 服务器状态检测 SLP + TCP 连通性 + 地址延迟 + 本机端口枚举 + 正版皮肤获取）
-//! 子模块：latency（HTTP 延迟）/ ping（MC 服务器 SLP）/ tcp（TCP 端口连通性）/ addr（地址延迟 tcp/udp/ping）/ ports（本机监听端口）/ skin（正版玩家皮肤）
+//! 子模块：latency（HTTP 延迟）/ ping（MC 服务器 SLP）/ tcp（TCP 端口连通性）/ addr（地址延迟 tcp/udp/icmp）/ icmp（自实现 ICMPv4 ping）/ ports（本机监听端口）/ skin（正版玩家皮肤）
 
 mod addr;
+mod icmp;
 mod latency;
 mod ping;
 mod ports;

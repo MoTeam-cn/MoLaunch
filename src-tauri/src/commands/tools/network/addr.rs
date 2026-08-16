@@ -1,8 +1,9 @@
-//! 地址延迟测试（tcp 握手 / udp 探针 / 系统 ping）
+//! 地址延迟测试（tcp 握手 / udp 探针 / icmp ping）
 //!
-//! 一次性并发测试所有目标并返回结果；ping 输出兼容 UTF-8 / GBK 编码，
-//! 解析不到 RTT 时视为不可达，避免假 0ms 成功。
+//! 一次性并发测试所有目标并返回结果；ICMP ping 自实现（见 icmp 模块），
+//! 不依赖系统 ping 命令，无编码与输出格式差异问题。
 
+use std::net::{IpAddr, Ipv4Addr};
 use std::time::{Duration, Instant};
 
 use futures_util::future::join_all;
@@ -12,9 +13,10 @@ use crate::log_info;
 use super::super::types::{
     AddressLatencyItem, AddressLatencyResult, AddressLatencyTestParams, AddressTarget,
 };
+use super::icmp::ping_once;
 use super::tcp::check_tcp;
 
-/// 单轮测试超时（tcp 连接 / ping 命令执行）
+/// 单轮测试超时（tcp 连接 / icmp ping / udp 探针）
 const PROBE_TIMEOUT: Duration = Duration::from_secs(3);
 /// UDP 探针等待对端回包超时
 const UDP_RECV_TIMEOUT: Duration = Duration::from_secs(1);
@@ -79,69 +81,29 @@ async fn check_udp(target: &AddressTarget) -> AddressLatencyItem {
     }
 }
 
-/// ICMP ping 延迟（调用系统 ping 命令并解析 RTT）
+/// ICMP ping 延迟（自实现：DNS 解析取 IPv4 后发送 ICMP Echo，不依赖系统 ping）
 async fn check_ping(target: &AddressTarget) -> AddressLatencyItem {
-    let mut cmd = tokio::process::Command::new("ping");
-    #[cfg(windows)]
-    {
-        cmd.arg("-n")
-            .arg("1")
-            .arg("-w")
-            .arg("3000")
-            .arg(&target.host);
-    }
-    #[cfg(not(windows))]
-    {
-        cmd.arg("-c").arg("1").arg("-W").arg("3").arg(&target.host);
-    }
-    let output = match tokio::time::timeout(PROBE_TIMEOUT, cmd.output()).await {
-        Ok(Ok(o)) => o,
-        Ok(Err(e)) => return item(target, false, 0, &format!("执行 ping 失败: {e}")),
-        Err(_) => return item(target, false, 0, "ping 执行超时"),
+    let ip = match resolve_ipv4(&target.host).await {
+        Ok(ip) => ip,
+        Err(e) => return item(target, false, 0, &e),
     };
-    if !output.status.success() {
-        return item(target, false, 0, "ping 失败（主机不可达或禁 ICMP）");
-    }
-    let text = decode_output(&output.stdout);
-    match parse_ping_rtt(&text) {
-        Some(ms) => item(target, true, ms, ""),
-        // 命令成功但未解析到 RTT：不当作可达（避免假 0ms）
-        None => item(target, false, 0, "无法解析 ping 结果（未识别 RTT）"),
+    match ping_once(ip, PROBE_TIMEOUT).await {
+        Ok(rtt) => item(target, true, rtt.as_millis() as u64, ""),
+        Err(e) => item(target, false, 0, &e),
     }
 }
 
-/// 解码子进程输出：优先 UTF-8，失败按 GBK（中文 Windows 默认代码页 936）
-fn decode_output(bytes: &[u8]) -> String {
-    if let Ok(s) = std::str::from_utf8(bytes) {
-        return s.to_string();
-    }
-    encoding_rs::GBK.decode(bytes).0.into_owned()
-}
-
-/// 从 ping 输出解析 RTT 毫秒（兼容中英文：`time=12.3 ms` / `时间=12ms` / `time<1ms`）
-fn parse_ping_rtt(output: &str) -> Option<u64> {
-    for line in output.lines() {
-        let (pos, _) = if let Some(p) = line.find("time=") {
-            (p + 5, 5)
-        } else if let Some(p) = line.find("时间=") {
-            (p + 3, 3)
-        } else {
-            continue;
-        };
-        let rest = &line[pos..];
-        if rest.starts_with('<') {
-            // time<1ms：不足 1ms
-            return Some(1);
-        }
-        let digits: String = rest
-            .chars()
-            .take_while(|c| c.is_ascii_digit() || *c == '.')
-            .collect();
-        if let Some(ms) = digits.split('.').next().and_then(|s| s.parse::<u64>().ok()) {
-            return Some(ms);
+/// 解析主机名为 IPv4（IP 字面量直接返回；当前仅支持 IPv4 探测）
+async fn resolve_ipv4(host: &str) -> Result<Ipv4Addr, String> {
+    let addrs = tokio::net::lookup_host((host, 0))
+        .await
+        .map_err(|e| format!("DNS 解析失败: {e}"))?;
+    for addr in addrs {
+        if let IpAddr::V4(ip) = addr.ip() {
+            return Ok(ip);
         }
     }
-    None
+    Err("DNS 解析无 IPv4 地址（当前仅支持 IPv4 探测）".to_string())
 }
 
 fn item(
@@ -160,7 +122,3 @@ fn item(
         error: error.to_string(),
     }
 }
-
-#[cfg(test)]
-#[path = "addr_test.rs"]
-mod tests;

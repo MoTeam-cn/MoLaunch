@@ -38,6 +38,9 @@ tauri-plugin-process = "2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tokio = { version = "1.35", features = ["sync", "rt", "macros", "process", "net", "io-util"] }
+# 自实现 ICMP ping（addr 测速）所需的底层 socket 封装，参考 surge-ping 的 raw/dgram socket 方案
+# 需要 `all` feature 提供 Type::RAW（SOCK_RAW）
+socket2 = { version = "0.5", features = ["all"] }
 log = "0.4"
 env_logger = "0.10"
 thiserror = "1.0"
