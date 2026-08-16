@@ -43,7 +43,7 @@ pub struct AppState {
     pub authlib_pending: Arc<TokioMutex<Option<PendingAuthlibLogin>>>,
     /// easytier 虚拟网络进程（房主与房客共用，加入房间时创建，退出时停止）
     ///
-    /// 房主固定虚拟 IP `10.244.0.1`（联机中心锚点），房客走 `--dhcp` 自动分配。
+    /// 房主固定虚拟 IP `10.144.144.1`（联机中心锚点），房客走 `--dhcp` 自动分配。
     /// `easytier_join` 创建并替换，`easytier_stop` 停止并置 None。
     pub easytier: Arc<TokioMutex<Option<EasyTier>>>,
     /// 联机中心 TCP 服务（仅房主，监听虚拟 IP，解析 §2.3 大端序帧）

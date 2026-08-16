@@ -109,7 +109,7 @@ impl LanFakeServer {
 pub struct LanFakeStartParams {
     /// 多人游戏界面显示的服务器名称（MOTD）
     pub motd: String,
-    /// 转发目标 IP（房主 easytier 虚拟 IP，缺省固定 `10.244.0.1`）
+    /// 转发目标 IP（房主 easytier 虚拟 IP，缺省固定 `10.144.144.1`）
     #[serde(default = "default_host_virtual_ip")]
     pub target_ip: String,
     /// 转发目标端口（房主 MC 局域网端口）

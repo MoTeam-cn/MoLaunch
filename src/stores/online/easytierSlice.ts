@@ -11,7 +11,7 @@ export interface EasyTierRuntime {
   networkName: string
   /** 虚拟网络密钥（房间码 S 段） */
   networkSecret: string
-  /** 本机虚拟 IP（房主固定 10.244.0.1；房客 DHCP 未回显时为空） */
+  /** 本机虚拟 IP（房主固定 10.144.144.1；房客 DHCP 未回显时为空） */
   virtualIp: string
   /** easytier rpc-portal 地址 */
   rpcPortal: string

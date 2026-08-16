@@ -14,6 +14,8 @@
 
 ### Changed
 
+- **房主 easytier 固定虚拟 IP 对齐 Terracotta 标准 `10.144.144.1`**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [easytier.ts](src/types/online/easytier.ts)）：Scaffolding 联机中心锚点 IP 由 `10.244.0.1` 改为 `10.144.144.1`（陶瓦联机 Terracotta 的 `-i 10.144.144.1`），保证跨启动器场景下房主地址一致；`HOST_VIRTUAL_IP` / `EASYTIER_HOST_VIRTUAL_IP` 与全部相关注释同步更新（lan_fake / easytier_actions / store / useEasyTier 等），grep 确认代码无 `10.244` 残留。
+
 - **房主 easytier hostname 后缀改为真实联机中心端口（对齐 Terracotta 标准）**（[server.rs](src-tauri/src/minecraft/online/scaffolding/server.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)）：`ScaffoldingServer::hostname()` 原返回 `scaffolding-mc-server-{mc_port 或 13448}`（后缀是 MC 端口），陶瓦房客按标准语义从 hostname 后缀解析「联机中心端口」并 port-forward 到联机中心——拿到 MC 端口会连错端口导致握手失败。修复：hostname 改为 `scaffolding-mc-server-{center_port}`，使用联机中心**真实监听端口**（`self.port`，含 13448 被占退为随机端口的情况），与 Terracotta `start_host`（`HostName("scaffolding-mc-server-{SCAFFOLDING_PORT}")`）语义一致；相关注释与错误文案同步更新。
 
 - **Scaffolding 房间码字符集 base 33 → 34（对齐 Terracotta 标准，修复与 PCL CE/HMCL 互连）**（[easytier.ts](src/types/online/easytier.ts) / [code.rs](src-tauri/src/minecraft/online/scaffolding/code.rs)）：房间码字符集由 33 字符（剔除 I/O/L）改为 34 字符（仅剔除 I/O，保留 L，与陶瓦联机 Terracotta `static CHARS` 一致）；三端同步——前端 `SCAFFOLDING_CODE_CHARSET`、Rust `code.rs` `CHARSET`、api-server `room_code.rs` `ALPHABET`，7 整除校验随 `CHARSET.len() % 7` / 34 进制自动适配，生成侧数学等价。解析侧保持宽松格式校验（不查校验和），兼容外部客户端码。

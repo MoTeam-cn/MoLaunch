@@ -30,7 +30,7 @@ export function useEasyTier() {
     return 'idle'
   })
 
-  /** 本机虚拟 IP（房主固定 10.244.0.1；房客 DHCP 未回显） */
+  /** 本机虚拟 IP（房主固定 10.144.144.1；房客 DHCP 未回显） */
   const ip = computed(() => store.easytierRuntime.virtualIp)
 
   /** 虚拟网络名 */

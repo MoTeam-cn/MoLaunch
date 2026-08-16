@@ -6,7 +6,7 @@
 export interface LanFakeStartParams {
   /** 多人游戏界面显示的服务器名称（MOTD） */
   motd: string
-  /** 转发目标 IP（房主 easytier 虚拟 IP，缺省 10.244.0.1） */
+  /** 转发目标 IP（房主 easytier 虚拟 IP，缺省 10.144.144.1） */
   targetIp?: string
   /** 转发目标端口（房主 MC 局域网端口） */
   targetPort: number

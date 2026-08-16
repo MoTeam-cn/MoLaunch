@@ -6,8 +6,8 @@
  * - S 段：虚拟网络密钥，仅房主/加入方本地持有
  */
 
-/** 房主 easytier 固定虚拟 IP */
-export const EASYTIER_HOST_VIRTUAL_IP = '10.244.0.1'
+/** 房主 easytier 固定虚拟 IP（与 Terracotta 标准 10.144.144.1 对齐） */
+export const EASYTIER_HOST_VIRTUAL_IP = '10.144.144.1'
 
 /** Scaffolding 联机中心默认端口 */
 export const SCAFFOLDING_CENTER_PORT = 13448
@@ -50,7 +50,7 @@ export interface EasyTierStatusResult {
   rpcPortal: string
   /** 虚拟网络名（scaffolding-mc-{N 段}，未运行时为空串） */
   networkName: string
-  /** 本机虚拟 IP（房主固定 10.244.0.1；房客 DHCP 未回显时为空串） */
+  /** 本机虚拟 IP（房主固定 10.144.144.1；房客 DHCP 未回显时为空串） */
   virtualIp: string
 }
 
@@ -79,7 +79,7 @@ export interface ScaffoldingHostStartResult {
 export interface ScaffoldingClientProbeParams {
   /** 完整房间码 `U/NNNN-NNNN-SSSS-SSSS` */
   roomCode: string
-  /** 联机中心虚拟 IP（缺省取房主固定 10.244.0.1） */
+  /** 联机中心虚拟 IP（缺省取房主固定 10.144.144.1） */
   centerIp?: string
   /** 联机中心 TCP 端口（缺省 13448） */
   centerPort?: number

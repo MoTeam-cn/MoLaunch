@@ -1,6 +1,6 @@
 //! easytier-core 子进程封装。
 //!
-//! 房主使用固定虚拟 IP（`-i 10.244.0.1`），房客使用 `--dhcp` 动态分配；
+//! 房主使用固定虚拟 IP（`-i 10.144.144.1`，与 Terracotta 标准一致），房客使用 `--dhcp` 动态分配；
 //! 均通过 `--rpc-portal 127.0.0.1:动态端口` 暴露本地控制端口。
 
 use crate::log_debug;
@@ -8,8 +8,8 @@ use std::path::Path;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 
-/// 房主默认虚拟 IP（Scaffolding 联机中心固定地址）
-pub const HOST_VIRTUAL_IP: &str = "10.244.0.1";
+/// 房主默认虚拟 IP（Scaffolding 联机中心固定地址，与 Terracotta 标准 `10.144.144.1` 对齐）
+pub const HOST_VIRTUAL_IP: &str = "10.144.144.1";
 
 /// easytier-core 子进程句柄
 pub struct EasyTier {
@@ -141,7 +141,7 @@ impl EasyTier {
         &self.network_name
     }
 
-    /// 本机虚拟 IP（房主固定 `10.244.0.1`；房客 DHCP 动态分配，未回显时为 None）
+    /// 本机虚拟 IP（房主固定 `10.144.144.1`；房客 DHCP 动态分配，未回显时为 None）
     pub fn virtual_ip(&self) -> Option<&str> {
         self.virtual_ip.as_deref()
     }

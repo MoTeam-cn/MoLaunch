@@ -123,7 +123,7 @@ pub struct EasytierJoinParams {
     pub network_name: String,
     /// 虚拟网络密钥（来自房间码 S 段）
     pub network_secret: String,
-    /// 是否为房主（房主固定虚拟 IP `10.244.0.1`，房客走 `--dhcp`）
+    /// 是否为房主（房主固定虚拟 IP `10.144.144.1`，房客走 `--dhcp`）
     #[serde(default)]
     pub is_host: bool,
     /// 节点 hostname（房主必须为 `scaffolding-mc-server-{center_port}`，联机中心端口）
@@ -151,7 +151,7 @@ pub struct ScaffoldingHostStartParams {
 pub struct ScaffoldingClientProbeParams {
     /// 完整房间码 `U/NNNN-NNNN-SSSS-SSSS`
     pub room_code: String,
-    /// 联机中心虚拟 IP（缺省取房主固定 `10.244.0.1`）
+    /// 联机中心虚拟 IP（缺省取房主固定 `10.144.144.1`）
     #[serde(default)]
     pub center_ip: Option<String>,
     /// 联机中心 TCP 端口（缺省 13448）
