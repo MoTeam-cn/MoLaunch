@@ -47,6 +47,7 @@ const currentStepIndex = computed(() => createSteps.findIndex((s) => s.key === c
 <template>
   <div class="space-y-4">
     <AlertV2 type="info" message="联机基于 easytier 虚拟局域网（Scaffolding）：房主需先在游戏中开启「对局域网开放」，再填写下方信息创建房间" />
+    <AlertV2 type="info" message="公开房间创建后会在「联机大厅」展示，其他协议兼容启动器（陶瓦联机、PCL 等）玩家可凭房间码或直接从大厅加入" />
     <!-- 基础信息卡片 -->
     <Card title="创建房间">
       <div class="space-y-4 py-1">

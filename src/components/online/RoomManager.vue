@@ -75,6 +75,7 @@ async function handleJoinRoom() {
 
     <!-- 加入房间表单（mode=join 且未在房间） -->
     <div v-else class="space-y-4">
+      <AlertV2 type="info" message="MoLaunch 联机与「陶瓦联机」基于同一 Scaffolding 协议：其他协议兼容启动器（陶瓦联机、PCL 等）获得的房间码均可在此直接加入" />
       <AlertV2 type="info" message="联机基于 easytier 虚拟局域网：凭房间码加入后自动组网，进入房间后即可看到房主开服的进服地址" />
       <AlertV2 type="info" message="如遇到违法违规房间，请及时向我们举报" />
       <Card title="加入房间">

@@ -26,6 +26,8 @@
 
 - **房主房间详情端口变更提示**（[HostRoomInfoCard.vue](src/components/online/HostRoomInfoCard.vue)）：房主侧房间信息卡片新增 AlertV2 提示，仅当 MC 端口确实偏离创建时的端口（自动热更新或手动覆盖后）才动态显示：提醒非 MoLaunch 启动器联机的朋友无法感知新端口，需退出房间后重新加入才能进入（MoLaunch 端口热更新仅对同启动器生效）。
 
+- **联机页面补充兼容性说明**（[LobbyBrowser.vue](src/components/online/LobbyBrowser.vue) / [RoomManager.vue](src/components/online/RoomManager.vue) / [CreateRoomForm.vue](src/components/online/CreateRoomForm.vue)）：联机大厅页新增 AlertV2 说明与「陶瓦联机」同协议互通、公开房间（未设密码）可直加与陌生人游玩；加入房间页新增房间码互通提示（陶瓦联机/PCL 等协议兼容启动器的房间码可直接加入）；创建房间页新增公开房间会展示在大厅、可被其他协议兼容启动器玩家凭房间码或大厅加入的提示。
+
 - **关于页「特别鸣谢」「许可与版权声明」补充 Scaffolding-MC**（[acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt) / [licenses.txt](src-tauri/resources/about/licenses.txt)）：鸣谢区新增 Scaffolding-MC（Minecraft 联机客户端数据交换协议，基于 EasyTier，定义房间码/联机网络/联机信息获取等标准流程；MoLaunch 联机模块基于与其一致的规范与 EasyTier 独立实现，与其他基于陶瓦联机（Scaffolding）的启动器房间码互通，并额外提供联机大厅），作者 burningtnt、Silverteal；许可区新增对应条目（仓库未提供开源许可证，MoLaunch 为独立实现）。注意：about txt 经 include_str! 嵌入后端二进制，需重新编译 Rust 后端后生效。
 
 ### Changed

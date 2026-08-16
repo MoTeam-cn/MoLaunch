@@ -116,6 +116,7 @@ onMounted(() => {
 
 <template>
   <div class="space-y-4">
+    <AlertV2 type="info" message="MoLaunch 联机基于与「陶瓦联机」相同的 Scaffolding 协议与 EasyTier 实现，房间码与其他协议兼容启动器互通；大厅中的公开房间（未设密码）可直接加入，与陌生人一起游玩" />
     <AlertV2 type="info" message="大厅房间按整合包聚类展示，点击卡片可查看该整合包下的公开房间；私密房间需凭房间码从「加入房间」进入" />
 
     <Card title="联机大厅">
