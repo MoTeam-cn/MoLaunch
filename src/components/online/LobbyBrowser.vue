@@ -31,10 +31,15 @@ const packagesLoading = ref(false)
 const expandedId = ref<string | null>(null)
 const roomsLoading = ref(false)
 const rooms = ref<LobbyRoomItem[]>([])
+/** 未关联整合包（纯原版等）的公开房间数（「其他房间」分组） */
+const otherRoomCount = ref(0)
 /** 正在加入的房间（LobbyRoomCard joining 标记） */
 const joiningId = ref<string | null>(null)
 /** 密码弹窗目标房间 */
 const joinTarget = ref<LobbyRoomItem | null>(null)
+
+/** 「其他房间」分组展开标识（独立于整合包 modpackId 命名空间） */
+const OTHER_GROUP_ID = '__other__'
 
 /** 是否已在房间中（房主/房客均禁止再加入） */
 const inRoom = computed(() => store.roomState.role !== null)
@@ -45,6 +50,7 @@ async function loadPackages() {
     const res = await listLobbyPackages()
     if (res.code !== 1 || !res.data) throw new Error(res.msg || '加载大厅失败')
     packages.value = res.data.packages
+    otherRoomCount.value = res.data.otherRoomCount ?? 0
     if (!res.data.packages.some((p) => p.modpackId === expandedId.value)) {
       expandedId.value = null
       rooms.value = []
@@ -74,6 +80,29 @@ async function toggleExpand(pkg: LobbyPackageItem) {
   } catch (e) {
     console.error('Failed to load lobby rooms:', e)
     toastError(`加载房间列表失败：${e instanceof Error ? e.message : String(e)}`)
+    expandedId.value = null
+  } finally {
+    roomsLoading.value = false
+  }
+}
+
+/** 展开/收起「其他房间」（未关联整合包/纯原版公开房间，服务端不传 package_id 返回全部再过滤） */
+async function toggleOtherGroup() {
+  if (expandedId.value === OTHER_GROUP_ID) {
+    expandedId.value = null
+    rooms.value = []
+    return
+  }
+  expandedId.value = OTHER_GROUP_ID
+  roomsLoading.value = true
+  rooms.value = []
+  try {
+    const res = await listLobbyRooms({ page: 1, pageSize: 50 })
+    if (res.code !== 1 || !res.data) throw new Error(res.msg || '加载房间列表失败')
+    rooms.value = res.data.rooms.filter((r) => !r.modpack)
+  } catch (e) {
+    console.error('Failed to load other rooms:', e)
+    toastError(`加载其他房间失败：${e instanceof Error ? e.message : String(e)}`)
     expandedId.value = null
   } finally {
     roomsLoading.value = false
@@ -117,7 +146,7 @@ onMounted(() => {
 <template>
   <div class="space-y-4">
     <AlertV2 type="info" message="MoLaunch 联机基于与「陶瓦联机」相同的 Scaffolding 协议与 EasyTier 实现，房间码与其他协议兼容启动器互通；大厅中的公开房间（未设密码）可直接加入，与陌生人一起游玩" />
-    <AlertV2 type="info" message="大厅房间按整合包聚类展示，点击卡片可查看该整合包下的公开房间；私密房间需凭房间码从「加入房间」进入" />
+    <AlertV2 type="info" message="大厅房间按整合包聚类展示，点击卡片可查看该整合包下的公开房间；未关联整合包的原版房间归入「其他房间」；私密房间需凭房间码从「加入房间」进入" />
 
     <Card title="联机大厅">
       <template #extra>
@@ -129,7 +158,7 @@ onMounted(() => {
 
       <div v-if="packagesLoading" class="py-10 text-center text-sm text-gray-500">正在加载大厅...</div>
 
-      <div v-else-if="packages.length === 0" class="py-10 flex flex-col items-center justify-center gap-2 text-gray-400">
+      <div v-else-if="packages.length === 0 && otherRoomCount === 0" class="py-10 flex flex-col items-center justify-center gap-2 text-gray-400">
         <Squares2X2Icon class="w-8 h-8" />
         <span class="text-sm">暂无公开房间，快去创建一个吧</span>
       </div>
@@ -163,6 +192,45 @@ onMounted(() => {
           <div v-if="expandedId === pkg.modpackId" class="border-t border-gray-100 px-3 py-3 space-y-2 bg-gray-50/50">
             <div v-if="roomsLoading" class="py-4 text-center text-xs text-gray-500">正在加载房间...</div>
             <div v-else-if="rooms.length === 0" class="py-4 text-center text-xs text-gray-400">该整合包暂无公开房间</div>
+            <template v-else>
+              <LobbyRoomCard
+                v-for="room in rooms"
+                :key="room.publicIdentifier"
+                :room="room"
+                :joining="joiningId === room.publicIdentifier"
+                :in-room="inRoom"
+                @join="handleJoin"
+              />
+            </template>
+          </div>
+        </div>
+
+        <div
+          v-if="otherRoomCount > 0"
+          class="rounded-lg border bg-white overflow-hidden"
+          :class="expandedId === OTHER_GROUP_ID ? 'border-primary-300 shadow-sm' : 'border-gray-200 hover:border-primary-300 hover:shadow-sm transition-all'"
+        >
+          <button
+            type="button"
+            class="w-full px-4 py-3 text-left flex items-center gap-2"
+            @click="toggleOtherGroup"
+          >
+            <Squares2X2Icon class="w-4 h-4 text-gray-400 shrink-0" />
+            <span class="text-sm font-medium text-gray-800 truncate flex-1">其他房间</span>
+            <Tag size="small" color="gray" class="shrink-0">原版</Tag>
+            <span class="inline-flex items-center gap-0.5 text-xs text-gray-500 shrink-0">
+              <UserGroupIcon class="w-3.5 h-3.5" />
+              {{ otherRoomCount }}
+            </span>
+            <ChevronDownIcon
+              class="w-4 h-4 text-gray-400 shrink-0 transition-transform"
+              :class="expandedId === OTHER_GROUP_ID ? 'rotate-180' : ''"
+            />
+          </button>
+
+          <div v-if="expandedId === OTHER_GROUP_ID" class="border-t border-gray-100 px-3 py-3 space-y-2 bg-gray-50/50">
+            <div v-if="roomsLoading" class="py-4 text-center text-xs text-gray-500">正在加载房间...</div>
+            <div v-else-if="rooms.length === 0" class="py-4 text-center text-xs text-gray-400">暂无其他公开房间</div>
             <template v-else>
               <LobbyRoomCard
                 v-for="room in rooms"

@@ -122,6 +122,8 @@
 
 - **大厅房间展示真实在线人数（对接 api-server current_players）**（[lobby.rs](src-tauri/src/minecraft/online/signaling/lobby.rs) / [lobby.ts](src/types/online/lobby.ts)）：LobbyRoomItem.player_count 新增 alias current_players 对接服务端随心跳上报的在线人数（房主经 easytier peer list 统计，含房主本机），大厅卡片人数不再恒为 0、满房时正确禁用加入。
 
+- **联机大厅新增「其他房间」分组（原版/未关联整合包房间可见）**（[lobby.rs](src-tauri/src/minecraft/online/signaling/lobby.rs) / [lobby.ts](src/types/online/lobby.ts) / [LobbyBrowser.vue](src/components/online/LobbyBrowser.vue)）：此前大厅完全由整合包聚合驱动，未关联整合包（纯原版）的公开房间在大厅不可见；现 \LobbyPackagesResponse\ 新增 \otherRoomCount\（对接 api-server \other_room_count\），\LobbyRoomItem\ 补 \modpack\ 摘要字段（新增 \LobbyModpackSummary\ 类型，Vue/Rust 两端同步），大厅新增「其他房间」卡片（无整合包房间数大于 0 时展示），展开时按全部公开房间过滤出无整合包房间，空态判断同步放宽。
+
 ### Changed
 
 - **房客侧 easytier 节点自动发现（对齐 Terracotta 标准，去掉硬编码联机中心地址）**（[easytier.rs](src-tauri/src/minecraft/online/scaffolding/easytier.rs) / [client.rs](src-tauri/src/minecraft/online/scaffolding/client.rs) / [easytier_actions.rs](src-tauri/src/commands/online/manager/easytier_actions.rs)）：`scaffolding_client_probe` 原在中心地址缺省时硬编码 `10.144.144.1:13448`，跨启动器场景（如陶瓦房主）下房主 IP/端口均不可预期，导致房客连错地址。修复：随包附带 **easytier-cli**（与 core 同版本，资源层 [resources.rs](src-tauri/src/resources.rs) 嵌入并同目录释放、[build_script/easytier.rs](src-tauri/build_script/easytier.rs) 构建期校验、[update-easytier.cjs](scripts/update-easytier.cjs) 自动更新同步提取）；`EasyTier::discover_center()` 经 `easytier-cli -p {rpc-portal} -o json peer list` 查询虚拟网络节点，按 hostname 前缀 `scaffolding-mc-server-` 匹配房主并解析联机中心端口，`client::resolve_center_addr` 显式参数优先、缺失时自动发现，再走标准 c:ping/c:protocols/c:server_port 探测。实测 v2.6.4 `peer list -o json` 输出结构（ipv4/hostname 字段）。

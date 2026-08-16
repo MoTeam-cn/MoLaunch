@@ -29,6 +29,8 @@ export interface LobbyPackageItem {
 /** 大厅聚合响应（api-server 返回非分页结构） */
 export interface LobbyPackagesResponse {
   packages: LobbyPackageItem[]
+  /** 未关联整合包（纯原版等）的公开房间数，展示为「其他房间」分组 */
+  otherRoomCount: number
 }
 
 /** 大厅房间列表查询参数（仅 packageId 生效，服务端忽略分页参数） */
@@ -53,6 +55,20 @@ export interface LobbyRoomItem {
   hostMcVersion?: string
   hostLoader?: string
   createdAt: number
+  /** 关联整合包摘要（无整合包时为 null，归类为「其他房间」） */
+  modpack?: LobbyModpackSummary | null
+}
+
+/** 房间关联的整合包摘要（字段对齐 api-server LobbyModpackSummary） */
+export interface LobbyModpackSummary {
+  modpackId: string
+  name: string
+  modpackVersion?: string
+  source: string
+  projectId: string
+  fileId: string
+  mcVersion: string
+  loader?: string
 }
 
 /** 大厅房间列表响应（api-server 返回非分页结构） */

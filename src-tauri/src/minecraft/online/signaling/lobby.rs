@@ -41,6 +41,9 @@ pub struct LobbyPackageItem {
 #[serde(rename_all = "camelCase")]
 pub struct LobbyPackagesResponse {
     pub packages: Vec<LobbyPackageItem>,
+    /// 未关联整合包（纯原版等）的公开房间数，前端归类为「其他房间」展示
+    #[serde(alias = "other_room_count")]
+    pub other_room_count: u64,
 }
 
 /// 大厅房间列表查询参数（GET /v1/signaling/lobby/rooms）
@@ -81,6 +84,29 @@ pub struct LobbyRoomItem {
     pub host_loader: Option<String>,
     #[serde(alias = "created_at")]
     pub created_at: u64,
+    /// 关联整合包摘要（无整合包时为 None，前端归入「其他房间」分组）
+    #[serde(default)]
+    pub modpack: Option<LobbyModpackSummary>,
+}
+
+/// 房间关联的整合包摘要（对齐 api-server `LobbyModpackSummary`，轻量字段）
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LobbyModpackSummary {
+    #[serde(alias = "modpack_id")]
+    pub modpack_id: String,
+    pub name: String,
+    #[serde(default, alias = "modpack_version")]
+    pub modpack_version: Option<String>,
+    pub source: String,
+    #[serde(alias = "project_id")]
+    pub project_id: String,
+    #[serde(alias = "file_id")]
+    pub file_id: String,
+    #[serde(alias = "mc_version")]
+    pub mc_version: String,
+    #[serde(default)]
+    pub loader: Option<String>,
 }
 
 /// 大厅房间列表响应（api-server 返回 `{ rooms: [...] }`，非分页）
