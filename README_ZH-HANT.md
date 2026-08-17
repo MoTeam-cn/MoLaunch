@@ -122,6 +122,7 @@ Minecraft 為 Mojang Synergies AB 的商標。MoLaunch 不隸屬於 Mojang、Mic
 - **[Arco Design Vue](https://github.com/arco-design/arco-design-vue)** — 前端核心元件（Button / Input / Select / Drawer / Slider 等）參考其特色與實作，提取原始碼複刻改寫為 Vue SFC + Tailwind 形式，版權聲明註解見各原始檔頂部
 - **[Element Plus Icons](https://github.com/element-plus/element-plus-icons)** — 依需求提取 SVG path 資料（`src/utils/element-icons.ts`），僅引入圖示未引入執行期依賴
 - **[Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL)** — 一款被廣泛使用的 Minecraft 啟動器；MoLaunch 前期從零開始開發，為相關啟動邏輯提供了實作參考
+- **[Scaffolding-MC](https://github.com/Scaffolding-MC/Scaffolding-MC)** — Minecraft 聯機用戶端資料交換協定（基於 EasyTier），定義房間碼、聯機網路與聯機資訊獲取等標準流程；MoLaunch 聯機模組基於與其一致的規範與 EasyTier 獨立實作，與其他基於陶瓦聯機（Scaffolding）的啟動器房間碼互通
 
 ### 核心依賴
 
@@ -133,6 +134,7 @@ Minecraft 為 Mojang Synergies AB 的商標。MoLaunch 不隸屬於 Mojang、Mic
 - **[Cubiomes](https://github.com/Cubitect/cubiomes)** — 世界結構產生演算法（編譯為 WASM）
 - **[OpenLayers](https://github.com/openlayers/openlayers)** — 結構定址互動式地圖
 - **[Tokio](https://github.com/tokio-rs/tokio)** / **[Reqwest](https://github.com/seanmonstar/reqwest)** — Rust 非同步執行環境與 HTTP 用戶端
+- **[EasyTier](https://github.com/EasyTier/EasyTier)** — 點對點虛擬組網核心，搭橋聯機 / 聯機大廳的底層網路引擎（免虛擬網卡）
 
 完整第三方授權與版權清單見 [licenses.txt](./src-tauri/resources/about/licenses.txt)。
 

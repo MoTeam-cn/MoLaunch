@@ -122,6 +122,7 @@ We would like to thank the following open-source projects and communities for th
 - **[Arco Design Vue](https://github.com/arco-design/arco-design-vue)** — The frontend core components (Button / Input / Select / Drawer / Slider, etc.) are inspired by and reimplemented from its source code as Vue SFC + Tailwind; the copyright notices are included at the top of the corresponding source files
 - **[Element Plus Icons](https://github.com/element-plus/element-plus-icons)** — SVG path data extracted on demand (`src/utils/element-icons.ts`); only icons are reused, with no runtime dependency
 - **[Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL)** — A widely used Minecraft launcher; MoLaunch was developed from scratch in its early days, with the game launching logic referencing PCL2's implementation
+- **[Scaffolding-MC](https://github.com/Scaffolding-MC/Scaffolding-MC)** — Minecraft multiplayer client data-exchange protocol (based on EasyTier) defining room codes, virtual networks, and network discovery flows; MoLaunch's online module is an independent implementation following the same specification, with room-code compatibility with other Scaffolding-based launchers
 
 ### Core Dependencies
 
@@ -133,6 +134,7 @@ We would like to thank the following open-source projects and communities for th
 - **[Cubiomes](https://github.com/Cubitect/cubiomes)** — world structure generation algorithms (compiled to WASM)
 - **[OpenLayers](https://github.com/openlayers/openlayers)** — interactive map for structure location
 - **[Tokio](https://github.com/tokio-rs/tokio)** / **[Reqwest](https://github.com/seanmonstar/reqwest)** — Rust async runtime & HTTP client
+- **[EasyTier](https://github.com/EasyTier/EasyTier)** — peer-to-peer virtual networking engine powering bridged play and the room lobby (no TUN adapter required)
 
 See [licenses.txt](./src-tauri/resources/about/licenses.txt) for the complete list of third-party licenses and copyrights.
 

@@ -122,6 +122,7 @@ Minecraft は Mojang Synergies AB の商標です。MoLaunch は Mojang、Micros
 - **[Arco Design Vue](https://github.com/arco-design/arco-design-vue)** — フロントエンドのコアコンポーネント（Button / Input / Select / Drawer / Slider など）の実装を参考に、ソースコードを抽出して Vue SFC + Tailwind 形式に書き直しています。著作権表示は各ソースファイルの先頭に記載
 - **[Element Plus Icons](https://github.com/element-plus/element-plus-icons)** — SVG パスデータを抽出して使用（`src/utils/element-icons.ts`）。アイコンのみで実行時依存はなし
 - **[Plain Craft Launcher 2 (PCL2)](https://github.com/Meloong-Git/PCL)** — 広く使われている Minecraft ランチャー。MoLaunch は当初ゼロから開発を始めましたが、一部の起動ロジックで参考にさせていただきました
+- **[Scaffolding-MC](https://github.com/Scaffolding-MC/Scaffolding-MC)** — Minecraft オンラインのクライアント間データ交換プロトコル（EasyTier ベース）で、ルームコード・仮想ネットワーク・ネットワーク情報取得などの標準フローを定義。MoLaunch のオンラインモジュールは同一仕様に基づく EasyTier による独立実装で、Scaffolding 準拠ランチャーとルームコード互換
 
 ### コア依存
 
@@ -133,6 +134,7 @@ Minecraft は Mojang Synergies AB の商標です。MoLaunch は Mojang、Micros
 - **[Cubiomes](https://github.com/Cubitect/cubiomes)** — ワールド構造生成アルゴリズム（WASM にコンパイル）
 - **[OpenLayers](https://github.com/openlayers/openlayers)** — 構造検索用のインタラクティブマップ
 - **[Tokio](https://github.com/tokio-rs/tokio)** / **[Reqwest](https://github.com/seanmonstar/reqwest)** — Rust 非同期ランタイムと HTTP クライアント
+- **[EasyTier](https://github.com/EasyTier/EasyTier)** — P2P 仮想ネットワークエンジン。連携プレイ / ルームロビーの基盤ネットワーク（仮想 NIC 不要）
 
 サードパーティのライセンスと著作権の完全な一覧は [licenses.txt](./src-tauri/resources/about/licenses.txt) を参照してください。
 
