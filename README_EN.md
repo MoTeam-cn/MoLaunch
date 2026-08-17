@@ -97,7 +97,7 @@ MoLaunch covers the entire Minecraft launching workflow, ready to use out of the
 - **Utilities** — Launcher data migration (PCL2 / HMCL / MultiMC / CurseForge, and more), seed map, NBT editor, world backup & restore, resource pack editor & converter, Mod dependency check & dedup, server pinger, address latency test, Java diagnostics, crash analysis, and command / recipe generators
 - **AI Assistant (Experimental)** — Conversational analysis of game logs and crashes, plus rule-based log analysis
 - **Plugins & Personalization** — Customizable home page with plugin mode and custom layouts (JSON / HTML / XML), built-in plugins such as quick stats, cache monitor, and system monitor
-- **System Capabilities** — molaunch:// deep link, auto-update, cache management, log viewer, and developer tools
+- **System Capabilities** — auto-update, cache management, log viewer, and developer tools
 
 Cloud operations such as login are handled through the MoLaunch Cloud, which adds a lightweight PoW check in front of its APIs to deter scripted abuse—invisible during normal use.
 
