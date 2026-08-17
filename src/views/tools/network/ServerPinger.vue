@@ -32,12 +32,40 @@ const result = ref<ServerPingResult | null>(null)
 /** MOTD 显示模式：true=彩色（§ 解析），false=纯文本 */
 const motdColored = ref(true)
 
+/** 拆分 `host:port`（含 IPv6 方括号形式 `[::1]:25565`），非法端口返回 null */
+function splitHostPort(v: string): { host: string; port: number } | null {
+  const m = v.match(/^\[([^\]]+)\]:(\d{1,5})$/) || v.match(/^([^:]+):(\d{1,5})$/)
+  if (!m) return null
+  const port = parseInt(m[2] ?? m[4], 10)
+  if (port < 1 || port > 65535) return null
+  return { host: m[1] ?? m[3], port }
+}
+
+/** 粘贴 `host:port` 时自动拆分，端口填入端口框 */
+function onHostPaste(e: ClipboardEvent) {
+  const text = e.clipboardData?.getData('text') ?? ''
+  const split = splitHostPort(text.trim())
+  if (split) {
+    e.preventDefault()
+    host.value = split.host
+    port.value = split.port
+  }
+}
+
 async function doPing() {
-  if (!host.value.trim()) return
+  let h = host.value.trim()
+  let p = port.value || 25565
+  // 兜底：地址框内直接带端口（如手动输入 host:port）时同样拆分
+  const split = splitHostPort(h)
+  if (split) {
+    h = split.host
+    p = split.port
+  }
+  if (!h) return
   pinging.value = true
   result.value = null
   try {
-    const res = await serverPing(host.value.trim(), port.value || 25565)
+    const res = await serverPing(h, p)
     result.value = res
     if (res.error) {
       toastError('检测失败：' + res.error)
@@ -74,7 +102,7 @@ function latencyColor(ms: number): string {
       <div class="flex items-end gap-3">
         <div class="flex-1">
           <label class="mb-1 block text-xs font-medium text-gray-700">服务器地址</label>
-          <Input v-model="host" placeholder="如 mc.hypixel.net" clearable />
+          <Input v-model="host" placeholder="如 mc.hypixel.net" clearable @paste="onHostPaste" />
         </div>
         <div class="w-28">
           <label class="mb-1 block text-xs font-medium text-gray-700">端口</label>
