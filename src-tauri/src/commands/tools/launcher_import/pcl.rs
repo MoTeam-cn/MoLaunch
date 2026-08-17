@@ -30,8 +30,7 @@ pub(super) fn detect_pcl2ce() -> LauncherSource {
         return empty_source(LauncherKind::Pcl2Ce, "未检测到 PCL2CE 配置文件".to_string());
     };
 
-    let json = std::fs::read_to_string(&config_path)
-        .ok()
+    let json = super::detect::read_text_file(&config_path)
         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
     let Some(json) = json else {
         log_debug!("[LauncherImport] PCL2CE 配置文件解析失败");
@@ -99,6 +98,9 @@ fn collect_source(kind: LauncherKind, folders: Vec<(String, PathBuf)>) -> Launch
     for (name, folder) in folders {
         instances.extend(collect_from_folder(&name, &folder));
     }
+    // 多个 LaunchFolder 可能匹配同一实例（共享 .minecraft 布局），按路径去重
+    let mut seen = std::collections::HashSet::new();
+    instances.retain(|i| seen.insert(i.path.clone()));
     instances.sort_by(|a, b| a.name.cmp(&b.name));
 
     LauncherSource {

@@ -172,11 +172,9 @@ fn symlink_import(
     // 若目标 JSON 已存在于源数据目录（之前导入过），不覆盖
     let json_path = data_dir.join(format!("{}.json", name));
     if !(json_path.is_file()
-        && serde_json::from_str::<serde_json::Value>(
-            &std::fs::read_to_string(&json_path)
-                .map_err(|e| format!("读取版本 JSON 失败: {}", e))?,
-        )
-        .is_ok())
+        && super::detect::read_text_file(&json_path)
+            .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+            .is_some())
     {
         std::fs::write(&json_path, json_content)
             .map_err(|e| format!("写入版本 JSON 失败: {}", e))?;
@@ -222,7 +220,7 @@ fn build_version_json(
     mc_version: &str,
 ) -> Result<serde_json::Value, String> {
     if let Some(json_path) = find_version_json(source_dir) {
-        if let Ok(content) = std::fs::read_to_string(&json_path) {
+        if let Some(content) = super::detect::read_text_file(&json_path) {
             if let Ok(mut json) = serde_json::from_str::<serde_json::Value>(&content) {
                 let has_libraries = json
                     .get("libraries")

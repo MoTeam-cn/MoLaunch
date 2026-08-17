@@ -17,8 +17,7 @@ pub(super) fn detect_hmcl() -> LauncherSource {
         return empty_source("未检测到 HMCL 配置文件".to_string());
     };
 
-    let json = std::fs::read_to_string(&config_path)
-        .ok()
+    let json = super::detect::read_text_file(&config_path)
         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
     let Some(json) = json else {
         log_debug!(

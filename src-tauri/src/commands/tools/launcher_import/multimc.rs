@@ -57,11 +57,11 @@ fn read_instances_dir(base: &Path, kind: &LauncherKind) -> Option<PathBuf> {
         _ => return None,
     };
     let cfg_path = base.join(cfg_name);
-    let content = std::fs::read_to_string(cfg_path).ok()?;
+    let content = super::detect::read_text_file(&cfg_path)?;
     for line in content.lines() {
         let line = line.trim();
         if let Some(value) = line.strip_prefix("InstanceDir=") {
-            let value = value.trim();
+            let value = value.trim().trim_matches('"').trim();
             if value.is_empty() {
                 return None;
             }

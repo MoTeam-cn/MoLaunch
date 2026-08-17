@@ -32,8 +32,8 @@ pub fn detect_instance_info(instance_dir: &Path) -> DetectedInfo {
     let mut info = DetectedInfo::default();
 
     if let Some(json_path) = find_version_json(instance_dir) {
-        match std::fs::read_to_string(&json_path) {
-            Ok(content) => match serde_json::from_str::<serde_json::Value>(&content) {
+        if let Some(content) = super::detect::read_text_file(&json_path) {
+            match serde_json::from_str::<serde_json::Value>(&content) {
                 Ok(json) => {
                     info.mc_version =
                         extract_original_version(&json, &content).map(|v| normalize_version(&v));
@@ -45,12 +45,7 @@ pub fn detect_instance_info(instance_dir: &Path) -> DetectedInfo {
                     json_path.display(),
                     e
                 ),
-            },
-            Err(e) => log_debug!(
-                "[LauncherImport] 读取版本 JSON 失败 {}: {}",
-                json_path.display(),
-                e
-            ),
+            }
         }
     }
 
@@ -130,12 +125,12 @@ fn is_candidate(path: &Path) -> bool {
 
 /// JSON 文件能否提取出版本号
 fn json_extracts_version(path: &Path) -> bool {
-    match std::fs::read_to_string(path) {
-        Ok(content) => serde_json::from_str::<serde_json::Value>(&content)
+    match super::detect::read_text_file(path) {
+        Some(content) => serde_json::from_str::<serde_json::Value>(&content)
             .ok()
             .and_then(|json| extract_original_version(&json, &content))
             .is_some(),
-        Err(_) => false,
+        None => false,
     }
 }
 

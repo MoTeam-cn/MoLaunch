@@ -21,6 +21,13 @@ pub async fn list_sources() -> Vec<LauncherSource> {
         super::curseforge::detect_curseforge(),
     ];
     sources.retain(|s| !s.instances.is_empty());
+    // 跨来源去重：同一实例可能被 PCL2 注册表与 PCL2CE 配置同时匹配，
+    // 或不同启动器来源指向同一路径（对应 Axolotl 的 InstanceCollector 设计）
+    let mut seen = std::collections::HashSet::new();
+    for source in &mut sources {
+        source.instances.retain(|i| seen.insert(i.path.clone()));
+    }
+    sources.retain(|s| !s.instances.is_empty());
     let total: usize = sources.iter().map(|s| s.instances.len()).sum();
     log_info!(
         "[LauncherImport] 探测到 {} 个来源，共 {} 个可导入实例",
@@ -126,6 +133,22 @@ pub(super) fn strip_extended_prefix(path: &Path) -> PathBuf {
     #[cfg(not(target_os = "windows"))]
     {
         path.to_path_buf()
+    }
+}
+
+/// 读取文本文件（容错编码）：UTF-8（含 BOM）→ GB18030（GBK 超集）回退
+///
+/// 中文 Windows 下 HMCL/PCL 等启动器的 JSON/INI 配置文件常为 GBK/GB18030 编码，
+/// UTF-8 严格解析会失败或产生乱码，需按编码回退（对应 Axolotl 的 chardetng 编码检测）。
+pub(super) fn read_text_file(path: &Path) -> Option<String> {
+    let bytes = std::fs::read(path).ok()?;
+    let bytes = bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(&bytes);
+    match std::str::from_utf8(bytes) {
+        Ok(s) => Some(s.to_string()),
+        Err(_) => {
+            let (decoded, _, _) = encoding_rs::GB18030.decode(bytes);
+            Some(decoded.into_owned())
+        }
     }
 }
 
