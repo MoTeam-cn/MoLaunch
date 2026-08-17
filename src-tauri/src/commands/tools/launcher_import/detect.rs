@@ -219,6 +219,18 @@ pub(super) fn sorted_subdirs(dir: &Path) -> Vec<PathBuf> {
     dirs
 }
 
+/// Program Files 目录（Windows；其他平台返回 None）
+pub(super) fn program_files() -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        std::env::var_os("ProgramFiles").map(PathBuf::from)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        None
+    }
+}
+
 /// 判断目录内是否存在 `{name}.json`（PCL2/HMCL 版本目录标志）
 pub(super) fn has_own_json(dir: &Path) -> bool {
     let name = dir.file_name().unwrap_or_default().to_string_lossy();

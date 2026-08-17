@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 
 use crate::log_debug;
 
-use super::detect::{data_dir, home_dir, instance_from_dir, sorted_subdirs};
+use super::detect::{data_dir, home_dir, instance_from_dir, program_files, sorted_subdirs};
 use crate::commands::tools::types::{ImportableInstance, LauncherKind, LauncherSource};
 
 /// 探测 MultiMC
@@ -109,19 +109,6 @@ fn find_base(kind: LauncherKind) -> Option<PathBuf> {
         _ => return None,
     };
     candidates.into_iter().find(|c| c.join(cfg_name).is_file())
-}
-
-/// Program Files 目录（Windows）
-fn program_files() -> Option<PathBuf> {
-    #[cfg(target_os = "windows")]
-    {
-        std::env::var_os("ProgramFiles").map(PathBuf::from)
-    }
-    #[cfg(not(target_os = "windows"))]
-    {
-        let _ = Path::new("");
-        None
-    }
 }
 
 fn empty_source(kind: LauncherKind, reason: String) -> LauncherSource {
