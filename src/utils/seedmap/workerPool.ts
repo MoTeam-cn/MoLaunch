@@ -1,5 +1,5 @@
 /**
- * 种子地图 WorkerPool 调度层（复刻 minecraftsearch.com，docs/Map/map.md §4.1）
+ * 种子地图 WorkerPool 调度层
  *
  * 多 Worker 并行生成 tile / 查找结构；prepareSeed 广播给全部 Worker 确认后才返回；
  * 任务经 jobId 关联 Promise。Worker 数 = clamp(4, 0.75*hardwareConcurrency, 16)，低配降到 2。

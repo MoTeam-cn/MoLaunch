@@ -1,7 +1,6 @@
 //! ECIES 加密信封协议（MoSign-v1 业务接口端到端加密）
 //!
 //! 信封结构：`{payload: Base64Url(AES-256-GCM 密文, 前 12B 为 nonce), key: Base64Url(临时 X25519 公钥)}`。
-//! 协议参考：`api-server/docs/auth.md`「业务接口加密信封协议」章节。
 
 use rand::rngs::OsRng;
 use serde::{Deserialize, Serialize};

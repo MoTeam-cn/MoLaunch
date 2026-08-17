@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 /// **安全设计**：不包含 `download_url` 字段。加入方通过现有 `getProjectVersions`
 /// IPC 反查平台 API 获取下载链接，避免 api-server 成为 URL 分发中心。
 ///
-/// 字段与 api-server `room_modpacks` 表一致（详见 docs/online/lobby-modpack-share.md §3.2）。
 #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ModpackMeta {

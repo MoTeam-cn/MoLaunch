@@ -1,7 +1,6 @@
 //! MoSign-v1 设备认证协议
 //!
 //! 实现 MoLaunch API Server 的设备注册/登录/登出流程。
-//! 协议参考：`api-server/docs/auth.md`（注册/登录/刷新的完整流程与算法清单）
 
 mod helpers;
 mod keypair;

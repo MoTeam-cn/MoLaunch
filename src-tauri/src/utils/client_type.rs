@@ -35,7 +35,7 @@ fn channel_code(version: &str) -> u8 {
 
 /// 平台/架构 → 平台码（clientType 十位）
 ///
-/// 由编译时目标平台推导，覆盖 docs/client.md 的全部桌面 + 移动端编码。
+/// 由编译时目标平台推导。
 /// 未知平台返回 0（理论上不会发生，防御性兜底）。
 ///
 /// 用 `cfg!` 宏（编译期求值的 bool）而非 `#[cfg]` + return 链：

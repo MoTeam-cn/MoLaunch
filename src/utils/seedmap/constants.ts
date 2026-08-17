@@ -86,7 +86,7 @@ export const STRUCTURE_ICONS: Record<string, StructureIconDef> = {
   End_City:        { shape: 'square',   color: '#FFB6C1', label: '末地城' },
   End_Gateway:     { shape: 'circle',   color: '#E6E6FA', label: '末地折跃门' },
   Slime_Chunks:    { shape: 'circle',   color: '#44FF44', label: '史莱姆区块' },
-  // 扩展结构（方案 A）—— 颜色取自 docs/Map/prompt-structures.md
+  // 扩展结构（方案 A）
   Ravine:                  { shape: 'circle',  color: '#7A6B5A', label: '峡谷' },
   Mega_Ravine:             { shape: 'circle',  color: '#5A4B3A', label: '巨型峡谷' },
   Underwater_Ravine:       { shape: 'circle',  color: '#4A7A8B', label: '水下峡谷' },
@@ -114,7 +114,7 @@ for (const [key, val] of Object.entries(globModules)) {
 /**
  * 结构名 → 图标文件名别名映射
  *
- * 部分结构变体共用同一图标（参考 docs/Map/prompt-structures.md §图标资源 URL）：
+ * 部分结构变体共用同一图标：
  * - Mega_Ravine / Underwater_Ravine / Mega_Underwater_Ravine → ravine.webp
  *   （canyon carver 系列视觉相似，原站统一用 ravine.webp）
  */

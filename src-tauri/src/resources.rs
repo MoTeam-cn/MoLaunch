@@ -132,7 +132,6 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         // 来源：src-tauri/updater/ 独立 Cargo 项目构建产物
         // 运行时由 `extract_updater` 释放到 %APPDATA%/.Molaunch/updater/updater.exe
         // 作用：主程序退出后替换 exe 文件，绕过 Windows 文件锁
-        // See: docs/updater/design.md §4 Windows 便携版 updater
         #[cfg(target_os = "windows")]
         "updater/updater.exe" => Some(include_bytes!("../resources/updater/updater.exe")),
         // easytier-core（联机虚拟组网核心，按平台/架构嵌入对应版本）
@@ -205,7 +204,7 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
             "../resources/easytier/windows/aarch64/wintun.dll"
         )),
         // hongshi（红石联机内核，按平台/架构嵌入对应版本；Windows 仅 amd64 官方产物）
-        // 来源：https://hongshi.site/docs-api.html（人工下载入库，见 docs/REDSTONE_ONLINE_DESIGN.md 附录 A）
+        // 来源：https://hongshi.site/docs-api.html（人工下载入库）
         // 运行时由 `extract_hongshi_core` 释放到 `<temp>/MoLaunch/hongshi/`
         #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
         "hongshi/hongshi" => Some(include_bytes!(

@@ -109,7 +109,6 @@ export function isLtsJavaMajor(major: number): boolean {
 
 /**
  * Mojang 官方 Runtime 实际提供的 Java 大版本（对齐官方 all.json 五档：8/16/17/21/25，
- * 下载源固定为 Mojang）。映射关系见 docs/java-runtime-download-bugs-and-fix.md。
  */
 export const OFFICIAL_JAVA_MAJORS = [25, 21, 17, 16, 8]
 

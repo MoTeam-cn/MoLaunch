@@ -13,7 +13,6 @@
  * - 不显示"稍后"按钮
  * - 禁用关闭按钮 / 遮罩点击 / ESC 关闭
  *
- * See: docs/updater/design.md §4.2.2
  */
 import { computed, defineAsyncComponent } from 'vue'
 import {

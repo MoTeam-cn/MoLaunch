@@ -2,7 +2,6 @@
 //!
 //! 提供 MoSign-v1 协议所需的加密原语：Base64Url、Ed25519、X25519（ECDH）、
 //! HKDF-SHA256、AES-256-GCM、RSA-OAEP-SHA256。
-//! 算法参考：`api-server/docs/auth.md`「算法清单」
 
 use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};

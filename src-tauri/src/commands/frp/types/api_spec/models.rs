@@ -1,6 +1,5 @@
 //! Open API 接口规范模型（endpoints.json 反序列化结构）
 //!
-//! 设计参考：docs/Frp Test/frp/api/endpoints.json。
 //! 厂商接口响应结构各不相同，通过此规范将差异全部做成可配置项。
 
 use serde::Deserialize;

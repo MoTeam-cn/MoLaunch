@@ -2,7 +2,6 @@
  * MoLaunch 开屏动画逻辑（供 public/splash.html 使用）
  *
  * 说明：脚本抽成外部文件以满足全局 CSP（script-src 'self'，不允许内联脚本）。
- * 与 docs/Run-html/run.html 设计稿保持一致。
  */
 
 document.addEventListener('DOMContentLoaded', () => {

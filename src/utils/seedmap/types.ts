@@ -3,7 +3,6 @@
  *
  * 主→Worker：init / prepare_seed / generate / find_structures / obsolete / dispose；
  * Worker→主：init_complete / seed_prepared / tile_result / structure_result / error。
- * 参考 minecraftsearch.com（docs/Map/map.md）：单 Worker 内嵌 WASM，主线程以 seedEpoch 协调。
  */
 
 /** MC 版本（与 cubiomes MC_* 常量对应） */

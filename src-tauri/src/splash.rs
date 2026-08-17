@@ -8,7 +8,6 @@
 //! 4. 本命令关闭开屏窗口、显示并聚焦主窗口
 //!
 //! 开屏页位于 `public/splash.html`（Vite 构建时复制到 dist，dev 模式经 devUrl 提供），
-//! 与 `docs/Run-html/run.html` 设计稿保持同步。
 
 use crate::log_info;
 use tauri::Manager;

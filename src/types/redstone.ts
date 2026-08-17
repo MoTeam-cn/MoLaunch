@@ -1,7 +1,6 @@
 /**
  * 红石联机（hongshi 内核隧道）类型定义
  *
- * 与后端 redstone_manager action 契约一一对应（见 docs/REDSTONE_ONLINE_DESIGN.md）。
  */
 
 /** 中转服务器条目（来自 hongshi.site/newserver.json） */

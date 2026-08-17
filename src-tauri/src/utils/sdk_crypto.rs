@@ -1,11 +1,11 @@
 //! SDK Token 加解密封装：完全依赖 RunSDK 内置实现
-//! （加密 AES-256-CBC，解密自动兼容旧版 DES，协议见 docs/token-encryption.md）。
+//! （加密 AES-256-CBC，解密自动兼容旧版 DES）。
 
 use crate::sdk::SdkInstance;
 use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
 
-/// 加密字符串（SDK AES-256-CBC，协议见 docs/token-encryption.md）
+/// 加密字符串（SDK AES-256-CBC）
 pub async fn encrypt_with_sdk(
     sdk_arc: &Arc<TokioMutex<Option<SdkInstance>>>,
     data: &str,
