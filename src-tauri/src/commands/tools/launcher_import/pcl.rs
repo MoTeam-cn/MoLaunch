@@ -298,7 +298,11 @@ mod tests {
         let tmp = std::env::temp_dir().join(format!("molaunch_pcl_{}", name));
         let root = tmp.join("PCL");
         std::fs::create_dir_all(&root).unwrap();
-        std::fs::write(root.join("Setup.ini"), format!("LaunchFolderSelect:{}\n", select)).unwrap();
+        std::fs::write(
+            root.join("Setup.ini"),
+            format!("LaunchFolderSelect:{}\n", select),
+        )
+        .unwrap();
         (tmp, root)
     }
 
@@ -306,17 +310,23 @@ mod tests {
     fn resolve_launch_folder_dollar_prefix() {
         // `$.minecraft\` → PCL 根目录的父目录 + .minecraft（PCL2 默认布局）
         let (tmp, root) = setup_root("dollar", "$.minecraft\\");
-        assert_eq!(resolve_launch_folder(&root).unwrap(), tmp.join(".minecraft"));
+        assert_eq!(
+            resolve_launch_folder(&root).unwrap(),
+            tmp.join(".minecraft")
+        );
         std::fs::remove_dir_all(&tmp).ok();
     }
 
     #[test]
     fn resolve_launch_folder_absolute() {
-        // 绝对路径直接使用
-        let (tmp, root) = setup_root("abs", "C:\\custom\\mc");
+        // 绝对路径直接使用（跨平台：Windows 的 `C:\` 在 Linux 上非绝对路径，用 temp_dir 构造）
+        let (tmp, root) = setup_root(
+            "abs",
+            &std::env::temp_dir().join("custom_mc").to_string_lossy(),
+        );
         assert_eq!(
             resolve_launch_folder(&root).unwrap(),
-            PathBuf::from("C:\\custom\\mc")
+            std::env::temp_dir().join("custom_mc")
         );
         std::fs::remove_dir_all(&tmp).ok();
     }
@@ -325,7 +335,10 @@ mod tests {
     fn resolve_launch_folder_relative() {
         // 无前缀相对路径 → 相对 PCL 根目录
         let (tmp, root) = setup_root("rel", ".minecraft");
-        assert_eq!(resolve_launch_folder(&root).unwrap(), root.join(".minecraft"));
+        assert_eq!(
+            resolve_launch_folder(&root).unwrap(),
+            root.join(".minecraft")
+        );
         std::fs::remove_dir_all(&tmp).ok();
     }
 }

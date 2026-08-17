@@ -14,9 +14,11 @@
 
 ### Fixed
 
-- **修复启动器导入页点击 checkbox 区域无法勾选**（[LauncherImportPage.vue](src/views/tools/LauncherImportPage.vue)）：`Checkbox` 组件内部为 `<label>` 包裹原生 `<input>`，点击 label 时浏览器会模拟一次 input click 并冒泡，原 `@click.stop="toggleSelect"` 被触发两次（真实 click + 模拟 click），勾选后立即取消。改为 `@click.stop` 仅阻止冒泡 + `@change` 触发 `toggleSelect`，点击 checkbox 区域与行其他区域均可正常勾选。
+- **修复 CI 工作流 format/clippy/test 失败**（[pcl.rs](src-tauri/src/commands/tools/launcher_import/pcl.rs) / [detect.rs](src-tauri/src/commands/tools/launcher_import/detect.rs)）：`resolve_launch_folder_absolute` 测试改用跨平台绝对路径（`temp_dir` 构造，Windows 的 `C:\` 在 Linux 上 `is_absolute()` 为 false 导致走了 `root.join` 分支）；`home_dir` 的 `or_else` 改 `or`（CI clippy 1.97 的 `unnecessary_lazy_evaluations` 提示）；补跑 `cargo fmt` 格式化测试代码。
 
 - **启动器导入页实例选择改用 Checkbox 组件**（[LauncherImportPage.vue](src/views/tools/LauncherImportPage.vue)）：替换原生 `<input type="checkbox">` 为项目通用 `Checkbox` 组件（复用 `ScreenshotManager.vue` 的受控用法 `:checked` + `@click.stop`），行容器由 `label` 改为 `div` 避免 label 嵌套，视觉与交互与其他工具页一致。
+
+- **修复启动器导入页点击 checkbox 区域无法勾选**（[LauncherImportPage.vue](src/views/tools/LauncherImportPage.vue)）：`Checkbox` 组件内部为 `<label>` 包裹原生 `<input>`，点击 label 时浏览器会模拟一次 input click 并冒泡，原 `@click.stop="toggleSelect"` 被触发两次（真实 click + 模拟 click），勾选后立即取消。改为 `@click.stop` 仅阻止冒泡 + `@change` 触发 `toggleSelect`，点击 checkbox 区域与行其他区域均可正常勾选。
 
 - **修复 PCL2 实例检测不到（Setup.ini 兜底探测）**（[pcl.rs](src-tauri/src/commands/tools/launcher_import/pcl.rs) / [detect.rs](src-tauri/src/commands/tools/launcher_import/detect.rs) / [multimc.rs](src-tauri/src/commands/tools/launcher_import/multimc.rs)）：原实现仅依赖注册表 `LaunchFolders`（PCL2"启动文件夹"功能），未配置该功能的用户（共享 `.minecraft` + 版本隔离布局）检测结果为空。现新增 Setup.ini 兜底——从注册表 `CacheDownloadFolder`（PCL2 新版必写）或常见位置（桌面/文档/下载/Program Files）发现 PCL 根目录（含 PCL 特征键校验避免误判），解析 `LaunchFolderSelect` 定位游戏数据目录（`$` = PCL 根父目录、绝对路径、相对路径三种规则，含单测）；`collect_from_folder` 增强为版本隔离枚举 + 共享根判定（按 saves/mods 等游戏数据特征区分，纯 versions 容器根不算共享实例）；`program_files` 提取到 detect.rs 公共复用（消除 multimc.rs 重复实现）。
 

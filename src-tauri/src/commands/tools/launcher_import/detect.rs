@@ -193,7 +193,7 @@ pub(super) fn data_dir() -> Option<PathBuf> {
 
 /// 用户主目录
 pub(super) fn home_dir() -> Option<PathBuf> {
-    std::env::var_os("HOME").map(PathBuf::from).or_else(|| {
+    std::env::var_os("HOME").map(PathBuf::from).or({
         #[cfg(target_os = "windows")]
         {
             std::env::var_os("USERPROFILE").map(PathBuf::from)
