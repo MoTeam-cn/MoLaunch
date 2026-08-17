@@ -90,12 +90,14 @@ This repository contains the open-source code of MoLaunch. You can use the prebu
 
 MoLaunch covers the entire Minecraft launching workflow, ready to use out of the box:
 
-- **Version Management** — Vanilla / Forge / Fabric / NeoForge / OptiFine loaders, with multi-version isolation
-- **Downloads & Installation** — One-click install for Mods, Resource Packs, and Modpacks (CurseForge / Modrinth), with resumable downloads and mirror acceleration in China
-- **Accounts & Skins** — Microsoft account login, skin / cape management, and 3D preview
-- **Online Multiplayer** — Room lobby, WebRTC P2P virtual LAN, FRP tunnels without port forwarding
-- **Utilities** — Seed map, NBT editor, world backup, Mod dependency checks, and more
-- **AI Assistant (Experimental)** — Conversational analysis of game logs and crash causes
+- **Version Management** — Vanilla / Forge / Fabric / NeoForge / OptiFine loaders, multi-version isolation, custom Java and launch arguments
+- **Downloads & Installation** — One-click install for Mods, Resource Packs, and Modpacks (CurseForge / Modrinth), resumable downloads and China mirror acceleration
+- **Accounts & Skins** — Microsoft / Offline / External login (authlib-injector), multi-account management, and 3D skin / cape preview
+- **Online Multiplayer** — Room lobby, bridged play over EasyTier virtual networking (Scaffolding protocol compatible, no TUN adapter required), FRP tunnels for NAT traversal, and Redstone relay (third-party tunnel, no port forwarding)
+- **Utilities** — Launcher data migration (PCL2 / HMCL / MultiMC / CurseForge, and more), seed map, NBT editor, world backup & restore, resource pack editor & converter, Mod dependency check & dedup, server pinger, address latency test, Java diagnostics, crash analysis, and command / recipe generators
+- **AI Assistant (Experimental)** — Conversational analysis of game logs and crashes, plus rule-based log analysis
+- **Plugins & Personalization** — Customizable home page with plugin mode and custom layouts (JSON / HTML / XML), built-in plugins such as quick stats, cache monitor, and system monitor
+- **System Capabilities** — molaunch:// deep link, auto-update, cache management, log viewer, and developer tools
 
 Cloud operations such as login are handled through the MoLaunch Cloud, which adds a lightweight PoW check in front of its APIs to deter scripted abuse—invisible during normal use.
 

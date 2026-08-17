@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **README 功能特性章节同步项目现状**（[README.md](README.md) / [README_EN.md](README_EN.md) / [README_ZH-HANT.md](README_ZH-HANT.md) / [README_JA.md](README_JA.md)）：按当前功能审计结果重写四个语言版本的功能列表——联机部分移除已废弃的 WebRTC P2P 虚拟局域网，改为「联机大厅 + 搭桥联机（EasyTier 虚拟组网、陶瓦联机协议互通、免虚拟网卡）+ FRP 内网穿透 + 红石联机」；账户部分补充离线 / 外置登录（authlib-injector）与多账号管理；工具部分补充启动器数据迁移、资源包编辑与转换、Mod 去重、服务器状态检测、地址测速、崩溃分析、创作指令生成等；新增插件与个性化（自定义布局 / 内置插件）与系统能力（molaunch:// 深链、自更新、缓存管理、日志查看、开发者工具）条目。
+
 - **关于页 Scaffolding-MC 鸣谢项补充 Logo 与作者头像**（[acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt)）：logo 补为 `Scaffolding-MC.png`，作者 `burningtnt` / `Silverteal` 分别挂载头像 `burningtnt.png` / `Silverteal.png`（图片位于 `src/assets/AboutIcon/`，经 `import.meta.glob` 自动打包映射）。注意：txt 经 `include_str!` 嵌入后端二进制，需重新编译 Rust 后端后生效。
 
 ### Fixed
