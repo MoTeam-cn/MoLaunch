@@ -6,14 +6,15 @@
  * - 左侧 w-48 菜单（activeCategory 切换高亮）
  * - 右侧内容区 v-if 切换子组件
  *
- * 分类（6 个一级菜单，内部子工具用顶部 SubTabBar 切换）：
- * 下载管理 / 常用工具 / 存档资源 / Mod 网络 / Java 诊断 / 创作指令
+ * 分类（7 个一级菜单，内部子工具用顶部 SubTabBar 切换）：
+ * 下载管理 / 常用工具 / 数据迁移 / 存档资源 / Mod 网络 / Java 诊断 / 创作指令
  */
 
 import { ref, defineAsyncComponent } from 'vue'
 import {
   ArrowDownTrayIcon,
   WrenchScrewdriverIcon,
+  InboxArrowDownIcon,
   ArchiveBoxIcon,
   PuzzlePieceIcon,
   CommandLineIcon,
@@ -22,6 +23,7 @@ import {
 const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
 const ExternalDownload = defineAsyncComponent(() => import('./ExternalDownload.vue'))
 const CommonPage = defineAsyncComponent(() => import('./tools/CommonPage.vue'))
+const LauncherImportPage = defineAsyncComponent(() => import('./tools/LauncherImportPage.vue'))
 const StoragePage = defineAsyncComponent(() => import('./tools/StoragePage.vue'))
 const ModNetworkPage = defineAsyncComponent(() => import('./tools/ModNetworkPage.vue'))
 const JavaDiagPage = defineAsyncComponent(() => import('./tools/JavaDiagPage.vue'))
@@ -48,6 +50,12 @@ const categories: ToolCategory[] = [
     label: '常用工具',
     icon: WrenchScrewdriverIcon,
     desc: '今日人品、清理游戏垃圾、内存优化、版本 JSON 编辑等日常实用小工具',
+  },
+  {
+    id: 'launcher-import',
+    label: '数据迁移',
+    icon: InboxArrowDownIcon,
+    desc: '从 PCL2 / HMCL / MultiMC / CurseForge 等启动器导入实例，支持复制或符号链接',
   },
   {
     id: 'storage',
@@ -107,6 +115,7 @@ const activeDesc = () =>
         >
           <ExternalDownload v-if="activeCategory === 'external-download'" />
           <CommonPage v-else-if="activeCategory === 'common'" />
+          <LauncherImportPage v-else-if="activeCategory === 'launcher-import'" />
           <StoragePage v-else-if="activeCategory === 'storage'" />
           <ModNetworkPage v-else-if="activeCategory === 'mod-network'" />
           <JavaDiagPage v-else-if="activeCategory === 'java-diag'" />

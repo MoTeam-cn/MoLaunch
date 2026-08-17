@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **新增「启动器数据导入」工具**（[launcher_import/](src-tauri/src/commands/tools/launcher_import/)（新增） / [types/launcher_import.rs](src-tauri/src/commands/tools/types/launcher_import.rs)（新增） / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [LauncherImportPage.vue](src/views/tools/LauncherImportPage.vue)（新增） / [Tools.vue](src/views/Tools.vue)）：工具页新增「数据迁移」一级分类，支持从 PCL2（注册表 LaunchFolders）/ PCL2CE（config.v1.json）/ HMCL（hmcl.json）/ MultiMC / Prism Launcher（instance.cfg）/ CurseForge（minecraftinstance.json）/ 手动选择文件夹（Generic）探测并导入实例；导入时自动检测 MC 版本与加载器（复用 `extract_original_version` / `detect_loaders`），生成版本 JSON 并迁移游戏数据到 `{game_dir}/versions/{name}/`（复制或符号链接两种模式），写入 setup.ini 强制隔离（indie_type=1）保证数据在启动时生效；`mod.rs` 仅作入口，逻辑按 detect/parse/migrate 拆分。
+
 ### Changed
 
 - **关于页 Scaffolding-MC 鸣谢项补充 Logo 与作者头像**（[acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt)）：logo 补为 `Scaffolding-MC.png`，作者 `burningtnt` / `Silverteal` 分别挂载头像 `burningtnt.png` / `Silverteal.png`（图片位于 `src/assets/AboutIcon/`，经 `import.meta.glob` 自动打包映射）。注意：txt 经 `include_str!` 嵌入后端二进制，需重新编译 Rust 后端后生效。

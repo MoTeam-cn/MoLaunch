@@ -88,6 +88,12 @@ export const TOOLS_ACTIONS = {
   NBT_LIST_SAVE_FILES: 'nbt_list_save_files',
   // 合成配方生成器：数据包 zip 打包
   RECIPE_GENERATOR_EXPORT: 'recipe_generator_export',
+  // 启动器数据导入：探测外部启动器实例
+  LAUNCHER_IMPORT_SOURCES: 'launcher_import_sources',
+  // 启动器数据导入：扫描手动选择的路径（Generic 来源）
+  LAUNCHER_IMPORT_SCAN_PATH: 'launcher_import_scan_path',
+  // 启动器数据导入：执行单个实例导入
+  LAUNCHER_IMPORT_RUN: 'launcher_import_run',
 } as const
 
 /** action 名称类型 */

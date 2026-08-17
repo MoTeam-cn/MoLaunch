@@ -6,8 +6,8 @@ use tauri::AppHandle;
 
 use super::types::*;
 use super::{
-    archive, cleanup, crash_analyzer, download, filename, memory, mod_tools, nbt, network,
-    picker_window, recipe_generator, resourcepack, screenshot, version_json,
+    archive, cleanup, crash_analyzer, download, filename, launcher_import, memory, mod_tools, nbt,
+    network, picker_window, recipe_generator, resourcepack, screenshot, version_json,
 };
 use crate::handler;
 use crate::state::AppState;
@@ -361,6 +361,37 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             let p: RecipeGeneratorExportParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
             recipe_generator::export_datapack(p)
+        }),
+    );
+
+    // 启动器数据导入：探测外部启动器实例
+    d.register(
+        "launcher_import_sources",
+        handler!(_state, _app, _params, {
+            let sources = launcher_import::list_sources().await;
+            serde_json::to_value(sources).map_err(|e| format!("序列化失败: {}", e))
+        }),
+    );
+    // 启动器数据导入：扫描手动选择的路径（Generic 来源）
+    d.register(
+        "launcher_import_scan_path",
+        handler!(_state, _app, params, {
+            let path = params
+                .get("path")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| "缺少 path 参数".to_string())?;
+            let source = launcher_import::scan_generic_path(std::path::Path::new(path))?;
+            serde_json::to_value(source).map_err(|e| format!("序列化失败: {}", e))
+        }),
+    );
+    // 启动器数据导入：执行单个实例导入
+    d.register(
+        "launcher_import_run",
+        handler!(state, _app, params, {
+            let p: LauncherImportRequest =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let result = launcher_import::run_import(&state, p).await?;
+            serde_json::to_value(result).map_err(|e| format!("序列化失败: {}", e))
         }),
     );
 

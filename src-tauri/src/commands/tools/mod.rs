@@ -1,6 +1,6 @@
 //! 工具模块（统一 IPC 入口）
 //! 子模块：download/filename/cleanup/memory/mod_tools/crash_analyzer/
-//! screenshot/resourcepack/version_json/archive/network/nbt/picker_window。
+//! screenshot/resourcepack/version_json/archive/network/nbt/picker_window/launcher_import。
 //! 种子地图工具已迁移至前端 WASM（cubiomes 编译为 WebAssembly，前端 Worker 直接调用）。
 
 use tauri::{AppHandle, State};
@@ -14,6 +14,7 @@ pub mod crash_analyzer;
 mod dispatcher;
 pub mod download;
 pub mod filename;
+pub mod launcher_import;
 pub mod memory;
 pub mod mod_tools;
 pub mod nbt;
