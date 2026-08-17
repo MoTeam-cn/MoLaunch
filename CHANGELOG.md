@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **《用户协议》外链地址切换为新版云端页面**（[userAgreement.ts](src/utils/userAgreement.ts)）：服务条款外链由 `terms-of-service.html` 更新为 `https://molaunch.moiu.cn/terms`，隐私声明外链由 `privacy-policy.html` 更新为 `https://molaunch.moiu.cn/privacy`。
+
 - **README 鸣谢部分补充联机相关项目**（[README.md](README.md) / [README_EN.md](README_EN.md) / [README_ZH-HANT.md](README_ZH-HANT.md) / [README_JA.md](README_JA.md)）：四个语言版本「特别感谢」在 PCL2 之后新增 Scaffolding-MC（联机客户端数据交换协议，搭桥联机基于与其一致的规范独立实现、房间码互通）；「核心依赖」新增 EasyTier（点对点虚拟组网内核，搭桥联机 / 联机大厅底层网络引擎）。
 
 - **README 功能特性章节同步项目现状**（[README.md](README.md) / [README_EN.md](README_EN.md) / [README_ZH-HANT.md](README_ZH-HANT.md) / [README_JA.md](README_JA.md)）：按当前功能审计结果重写四个语言版本的功能列表——联机部分移除已废弃的 WebRTC P2P 虚拟局域网，改为「联机大厅 + 搭桥联机（EasyTier 虚拟组网、陶瓦联机协议互通、免虚拟网卡）+ FRP 内网穿透 + 红石联机」；账户部分补充离线 / 外置登录（authlib-injector）与多账号管理；工具部分补充启动器数据迁移、资源包编辑与转换、Mod 去重、服务器状态检测、地址测速、崩溃分析、创作指令生成等；新增插件与个性化（自定义布局 / 内置插件）与系统能力（自更新、缓存管理、日志查看、开发者工具）条目。
