@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **关于页 Scaffolding-MC 鸣谢项补充 Logo 与作者头像**（[acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt)）：logo 补为 `Scaffolding-MC.png`，作者 `burningtnt` / `Silverteal` 分别挂载头像 `burningtnt.png` / `Silverteal.png`（图片位于 `src/assets/AboutIcon/`，经 `import.meta.glob` 自动打包映射）。注意：txt 经 `include_str!` 嵌入后端二进制，需重新编译 Rust 后端后生效。
+
 ### Fixed
 
 - 修复 ICMP 校验和单测用例（[icmp_test.rs](src-tauri/src/commands/tools/network/icmp_test.rs)）：按 RFC 1071 在求和前置零校验和字段（偏移 [2..4]），原用例将校验和字段原始值当作数据字参与求和，导致接收端重算校验和不为 0（CI 单测失败）。
