@@ -153,8 +153,12 @@ pub(super) fn read_text_file(path: &Path) -> Option<String> {
 }
 
 /// 目录 → 可导入实例（自动补充版本/加载器检测信息）
+///
+/// 实例路径统一经 `strip_extended_prefix` 规范化：注册表/配置中的路径值
+/// （PCL LaunchFolders、HMCL gameDir、MultiMC InstanceDir）可能残留 `\\?\` 前缀。
 pub(super) fn instance_from_dir(name: &str, path: &Path) -> ImportableInstance {
-    let info = detect_instance_info(path);
+    let path = strip_extended_prefix(path);
+    let info = detect_instance_info(&path);
     ImportableInstance {
         name: name.to_string(),
         path: path.to_string_lossy().to_string(),
