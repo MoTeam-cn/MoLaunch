@@ -103,6 +103,9 @@ pem = "3"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+# Windows 目录联接（junction）：创建目录链接无需管理员权限/开发者模式，
+# 用于启动器导入的符号链接模式（junction 优先，失败回退 symlink）
+junction = "1"
 # Win32 API（用于游戏窗口标题修改、权限收紧等）
 windows = { version = "0.58", features = [
     "Win32_Foundation",

@@ -34,41 +34,24 @@ pub async fn list_sources() -> Vec<LauncherSource> {
 ///
 /// 支持三种布局：
 /// - 路径本身是实例（含版本 JSON 或 `.minecraft`）；
-/// - `versions/` 子目录布局（PCL2/HMCL 风格）；
+/// - `versions/` 子目录布局（PCL2/HMCL 风格，子目录含 `{name}.json` 或 `.minecraft`）；
 /// - `instances/` 子目录布局（MultiMC 风格）。
 pub fn scan_generic_path(path: &Path) -> Result<LauncherSource, String> {
-    let path = path
-        .canonicalize()
-        .map_err(|e| format!("路径无效 {}: {}", path.display(), e))?;
-    if !path.is_dir() {
-        return Err(format!("不是有效目录: {}", path.display()));
-    }
+    let path = normalize_user_path(path)?;
     let base_name = path
         .file_name()
         .map(|n| n.to_string_lossy().to_string())
         .unwrap_or_else(|| "通用实例文件夹".to_string());
 
-    let mut instances = Vec::new();
+    let mut instances: Vec<ImportableInstance> = Vec::new();
 
     // 布局 1：versions/ 子目录（PCL2/HMCL 风格）
     let versions_dir = path.join("versions");
     if versions_dir.is_dir() {
-        for entry in std::fs::read_dir(&versions_dir).map_err(|e| format!("读取目录失败: {}", e))?
-        {
-            let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
-            let dir = entry.path();
-            if dir.is_dir()
-                && dir
-                    .join(format!(
-                        "{}.json",
-                        dir.file_name().unwrap_or_default().to_string_lossy()
-                    ))
-                    .is_file()
-            {
-                instances.push(instance_from_dir(
-                    &dir.file_name().unwrap_or_default().to_string_lossy(),
-                    &dir,
-                ));
+        for dir in sorted_subdirs(&versions_dir) {
+            let name = dir.file_name().unwrap_or_default().to_string_lossy();
+            if has_own_json(&dir) || dir.join(".minecraft").is_dir() {
+                instances.push(instance_from_dir(&name, &dir));
             }
         }
     }
@@ -76,16 +59,10 @@ pub fn scan_generic_path(path: &Path) -> Result<LauncherSource, String> {
     // 布局 2：instances/ 子目录（MultiMC 风格）
     let instances_dir = path.join("instances");
     if instances_dir.is_dir() {
-        for entry in
-            std::fs::read_dir(&instances_dir).map_err(|e| format!("读取目录失败: {}", e))?
-        {
-            let entry = entry.map_err(|e| format!("读取目录项失败: {}", e))?;
-            let dir = entry.path();
-            if dir.is_dir() && dir.join("instance.cfg").is_file() {
-                instances.push(instance_from_dir(
-                    &dir.file_name().unwrap_or_default().to_string_lossy(),
-                    &dir,
-                ));
+        for dir in sorted_subdirs(&instances_dir) {
+            let name = dir.file_name().unwrap_or_default().to_string_lossy();
+            if dir.join("instance.cfg").is_file() {
+                instances.push(instance_from_dir(&name, &dir));
             }
         }
     }
@@ -97,6 +74,11 @@ pub fn scan_generic_path(path: &Path) -> Result<LauncherSource, String> {
         instances.push(instance_from_dir(&base_name, &path));
     }
 
+    // 去重（同一实例可能被多种布局匹配）
+    let mut seen = std::collections::HashSet::new();
+    instances.retain(|i| seen.insert(i.path.clone()));
+    instances.sort_by(|a, b| a.name.cmp(&b.name));
+
     if instances.is_empty() {
         return Err(format!("目录 {} 下未发现可导入的实例", path.display()));
     }
@@ -107,6 +89,44 @@ pub fn scan_generic_path(path: &Path) -> Result<LauncherSource, String> {
         base_path: path.to_string_lossy().to_string(),
         instances,
     })
+}
+
+/// 规范化用户输入的路径：转绝对路径、去除 Windows 长路径 `\\?\` 前缀、校验存在
+///
+/// 注意：不使用 `canonicalize()`——Windows 上它返回 `\\?\C:\...` 扩展前缀路径，
+/// 直接展示给用户不友好（如 `\\?\C:\Users\...\无人入眠`）。
+pub(super) fn normalize_user_path(path: &Path) -> Result<PathBuf, String> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()
+            .map_err(|e| format!("获取当前目录失败: {}", e))?
+            .join(path)
+    };
+    let stripped = strip_extended_prefix(&absolute);
+    if !stripped.is_dir() {
+        return Err(format!("不是有效目录: {}", stripped.display()));
+    }
+    Ok(stripped)
+}
+
+/// 去除 Windows 扩展路径前缀 `\\?\`（含 UNC 形式 `\\?\UNC\`），其他平台原样返回
+pub(super) fn strip_extended_prefix(path: &Path) -> PathBuf {
+    #[cfg(target_os = "windows")]
+    {
+        let s = path.to_string_lossy();
+        if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+            return PathBuf::from(format!(r"\\{}", rest));
+        }
+        if let Some(rest) = s.strip_prefix(r"\\?\") {
+            return PathBuf::from(rest);
+        }
+        path.to_path_buf()
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        path.to_path_buf()
+    }
 }
 
 /// 目录 → 可导入实例（自动补充版本/加载器检测信息）

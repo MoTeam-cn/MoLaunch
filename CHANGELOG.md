@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **修复启动器导入路径规范化与符号链接创建**（[detect.rs](src-tauri/src/commands/tools/launcher_import/detect.rs) / [migrate.rs](src-tauri/src/commands/tools/launcher_import/migrate.rs) / [Cargo.toml](src-tauri/Cargo.toml)）：手动选择文件夹扫描不再使用 `canonicalize()`（Windows 上返回 `\\?\C:\...` 扩展前缀路径，直接展示给用户不友好），新增 `normalize_user_path` / `strip_extended_prefix` 统一去除 `\\?\` 与 `\\?\UNC\` 前缀（导入执行侧同样处理前端传入的源路径）；符号链接模式改为 Windows junction 优先（新增 `junction` 依赖，无需管理员权限/开发者模式），失败回退符号链接并给出明确提示；versions/ 布局检测条件放宽为 `{name}.json` 或 `.minecraft` 子目录，并补充实例去重。
+
 - 修复 ICMP 校验和单测用例（[icmp_test.rs](src-tauri/src/commands/tools/network/icmp_test.rs)）：按 RFC 1071 在求和前置零校验和字段（偏移 [2..4]），原用例将校验和字段原始值当作数据字参与求和，导致接收端重算校验和不为 0（CI 单测失败）。
 
 ## [0.3.6-rc6] - 2026-08-17

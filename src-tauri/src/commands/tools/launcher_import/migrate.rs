@@ -18,6 +18,7 @@ use crate::minecraft::version::setup::VersionSetup;
 use crate::minecraft::version::state::VersionType;
 use crate::state::{resolve_game_dir_from_state, AppState};
 
+use super::detect::strip_extended_prefix;
 use super::parse::{detect_instance_info, find_version_json, normalize_version};
 use crate::commands::tools::types::{ImportResultItem, LauncherImportRequest};
 
@@ -37,9 +38,10 @@ pub async fn run_import(
     state: &AppState,
     req: LauncherImportRequest,
 ) -> Result<ImportResultItem, String> {
-    let source_dir = PathBuf::from(&req.source_path);
+    // 源路径：去除 Windows 长路径 `\\?\` 前缀（前端传入的扫描路径可能带此前缀）
+    let source_dir = strip_extended_prefix(&PathBuf::from(&req.source_path));
     if !source_dir.is_dir() {
-        return Err(format!("源路径不存在或不是目录: {}", req.source_path));
+        return Err(format!("源路径不存在或不是目录: {}", source_dir.display()));
     }
 
     // 实例名：优先请求值，否则取源目录名
@@ -184,19 +186,28 @@ fn symlink_import(
     Ok(())
 }
 
-/// 创建目录符号链接（Windows 需开发者模式/管理员权限，失败给出明确提示）
+/// 创建目录链接：Windows 优先 junction（无需管理员权限/开发者模式），失败回退符号链接
 fn create_dir_link(target: &Path, link: &Path) -> Result<(), String> {
     if link.exists() {
         return Err(format!("目标路径已存在: {}", link.display()));
     }
     #[cfg(target_os = "windows")]
     {
-        std::os::windows::fs::symlink_dir(target, link).map_err(|e| {
-            format!(
-                "创建符号链接失败: {}（Windows 需要开发者模式或管理员权限）",
-                e
-            )
-        })
+        match junction::create(target, link) {
+            Ok(()) => Ok(()),
+            Err(junction_err) => {
+                log_info!(
+                    "[LauncherImport] junction 创建失败（{}），回退符号链接",
+                    junction_err
+                );
+                std::os::windows::fs::symlink_dir(target, link).map_err(|e| {
+                    format!(
+                        "创建符号链接失败: {}（junction 失败: {}；Windows 需要开发者模式或管理员权限）",
+                        e, junction_err
+                    )
+                })
+            }
+        }
     }
     #[cfg(not(target_os = "windows"))]
     {
