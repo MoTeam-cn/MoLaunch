@@ -177,7 +177,8 @@ onMounted(loadSources)
             <Checkbox
               class="flex-none"
               :checked="selected.has(instanceKey(source, inst.path))"
-              @click.stop="toggleSelect(source, inst.path)"
+              @click.stop
+              @change="toggleSelect(source, inst.path)"
             />
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
