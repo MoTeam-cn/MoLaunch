@@ -18,6 +18,7 @@ import { pickDirectory } from '@/utils/fileDialog'
 import { toastError, toastInfo, toastSuccess } from '@/utils/toast'
 
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 
 const sources = ref<LauncherSource[]>([])
 const loading = ref(false)
@@ -167,16 +168,16 @@ onMounted(loadSources)
           <span class="truncate text-xs text-gray-400">{{ source.base_path }}</span>
         </div>
         <div class="space-y-1">
-          <label
+          <div
             v-for="inst in source.instances"
             :key="inst.path"
             class="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-gray-50"
+            @click="toggleSelect(source, inst.path)"
           >
-            <input
-              type="checkbox"
-              class="h-4 w-4 accent-primary-500"
+            <Checkbox
+              class="flex-none"
               :checked="selected.has(instanceKey(source, inst.path))"
-              @change="toggleSelect(source, inst.path)"
+              @click.stop="toggleSelect(source, inst.path)"
             />
             <div class="min-w-0 flex-1">
               <div class="flex items-center gap-2">
@@ -196,7 +197,7 @@ onMounted(loadSources)
             >
               {{ results[instanceKey(source, inst.path)].message }}
             </span>
-          </label>
+          </div>
         </div>
       </div>
 

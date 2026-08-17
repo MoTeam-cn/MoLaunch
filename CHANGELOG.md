@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- **启动器导入页实例选择改用 Checkbox 组件**（[LauncherImportPage.vue](src/views/tools/LauncherImportPage.vue)）：替换原生 `<input type="checkbox">` 为项目通用 `Checkbox` 组件（复用 `ScreenshotManager.vue` 的受控用法 `:checked` + `@click.stop`），行容器由 `label` 改为 `div` 避免 label 嵌套，视觉与交互与其他工具页一致。
+
 - **修复 PCL2 实例检测不到（Setup.ini 兜底探测）**（[pcl.rs](src-tauri/src/commands/tools/launcher_import/pcl.rs) / [detect.rs](src-tauri/src/commands/tools/launcher_import/detect.rs) / [multimc.rs](src-tauri/src/commands/tools/launcher_import/multimc.rs)）：原实现仅依赖注册表 `LaunchFolders`（PCL2"启动文件夹"功能），未配置该功能的用户（共享 `.minecraft` + 版本隔离布局）检测结果为空。现新增 Setup.ini 兜底——从注册表 `CacheDownloadFolder`（PCL2 新版必写）或常见位置（桌面/文档/下载/Program Files）发现 PCL 根目录（含 PCL 特征键校验避免误判），解析 `LaunchFolderSelect` 定位游戏数据目录（`$` = PCL 根父目录、绝对路径、相对路径三种规则，含单测）；`collect_from_folder` 增强为版本隔离枚举 + 共享根判定（按 saves/mods 等游戏数据特征区分，纯 versions 容器根不算共享实例）；`program_files` 提取到 detect.rs 公共复用（消除 multimc.rs 重复实现）。
 
 - **启动器导入对齐 Axolotl：跨来源去重与配置编码容错**（[detect.rs](src-tauri/src/commands/tools/launcher_import/detect.rs) / [pcl.rs](src-tauri/src/commands/tools/launcher_import/pcl.rs) / [hmcl.rs](src-tauri/src/commands/tools/launcher_import/hmcl.rs) / [multimc.rs](src-tauri/src/commands/tools/launcher_import/multimc.rs) / [parse.rs](src-tauri/src/commands/tools/launcher_import/parse.rs) / [migrate.rs](src-tauri/src/commands/tools/launcher_import/migrate.rs)）：探测结果按实例路径全局去重（PCL2 注册表与 PCL2CE 配置指向同一路径、多 LaunchFolder 共享布局等场景不再重复列出，对应 Axolotl 的 InstanceCollector 设计）；新增 `read_text_file` 编码容错读取（UTF-8 含 BOM → GB18030 回退，复用既有 encoding_rs 依赖，对应 Axolotl 的 chardetng 编码检测），应用于 HMCL/PCL2CE 配置、MultiMC/Prism cfg、版本 JSON 等全部配置读取，解决中文 Windows 下 GBK 编码配置文件解析失败；MultiMC `InstanceDir` 支持引号包裹。
