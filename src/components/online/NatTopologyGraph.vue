@@ -384,13 +384,15 @@ function ensureChart() {
 }
 
 /** 节点被拖出画布可视区（落点越界）时重建图表，释放 fx/fy 让力导向拉回 */
-function handleDragEnd(params: {
-  dataType?: string
-  data?: { id?: string }
-  event?: { offsetX?: number; offsetY?: number }
-}) {
-  if (params.dataType !== 'node' || !params.data?.id || !chart) return
-  const { offsetX, offsetY } = params.event ?? {}
+function handleDragEnd(params: unknown) {
+  if (!chart) return
+  const p = params as {
+    dataType?: string
+    data?: { id?: string } | null
+    event?: { offsetX?: number; offsetY?: number }
+  }
+  if (p.dataType !== 'node' || !p.data?.id) return
+  const { offsetX, offsetY } = p.event ?? {}
   if (offsetX == null || offsetY == null) return
   const margin = 24
   if (
