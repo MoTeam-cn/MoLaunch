@@ -334,7 +334,7 @@ function buildOption() {
         links,
         categories,
         roam: true,
-        draggable: true,
+        draggable: false,
         edgeSymbol: ['none', 'arrow'],
         edgeSymbolSize: [0, 8],
         label: {
@@ -377,32 +377,8 @@ function ensureChart() {
     chart = echarts.init(chartEl.value)
     resizeObserver = new ResizeObserver(() => chart?.resize())
     resizeObserver.observe(chartEl.value)
-    // 节点被拖出画布范围时自动释放固定位置，力导向重新布局拉回
-    chart.on('dragend', handleDragEnd)
   }
   chart.setOption(buildOption(), true)
-}
-
-/** 节点被拖出画布可视区（落点越界）时重建图表，释放 fx/fy 让力导向拉回 */
-function handleDragEnd(params: unknown) {
-  if (!chart) return
-  const p = params as {
-    dataType?: string
-    data?: { id?: string } | null
-    event?: { offsetX?: number; offsetY?: number }
-  }
-  if (p.dataType !== 'node' || !p.data?.id) return
-  const { offsetX, offsetY } = p.event ?? {}
-  if (offsetX == null || offsetY == null) return
-  const margin = 24
-  if (
-    offsetX < -margin ||
-    offsetX > chart.getWidth() + margin ||
-    offsetY < -margin ||
-    offsetY > chart.getHeight() + margin
-  ) {
-    chart.setOption(buildOption(), true)
-  }
 }
 
 watch(
