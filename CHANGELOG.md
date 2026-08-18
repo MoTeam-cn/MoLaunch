@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **easytier 内核外部下载改造设计文档**（[EASYTIER_EXTERNAL_DOWNLOAD_DESIGN.md](docs/EASYTIER_EXTERNAL_DOWNLOAD_DESIGN.md)（新增））：放弃内置 easytier 内核（14 个二进制资源内嵌导致包体超标），改为经 GitHub API（主源 `api.github.com` / 备选 `github-api.mocdn.net`）获取最新版本号并下载对应平台 zip 安装到 `<appdata>/.Molaunch/easytier/`；默认只下载一次，设置页联机 Tab 新增安装状态 Tag 与下载/更新功能；镜像源来自前端 `githubProxy.json`，启动时测速筛选 30 个经 IPC 传给后端，下载时对候选源 HEAD+Range 0-1 竞速选最快者；文档含分阶段可复选实施清单。
+
 ## [0.3.6] - 2026-08-19
 
 ### Added
