@@ -3,7 +3,7 @@
  * 正版玩家皮肤下载
  *
  * 输入正版玩家名，通过 Mojang 官方 API 获取该玩家的 UUID / 皮肤模型 / 皮肤与披风
- * （流程参照 PCL2：api.mojang.com 取 UUID → sessionserver.mojang.com 取 textures →
+ * （流程：api.mojang.com 取 UUID → sessionserver.mojang.com 取 textures →
  * 下载 textures.minecraft.net 的皮肤/披风 PNG），支持预览与保存到本地。
  */
 import { ref, computed, defineAsyncComponent } from 'vue'

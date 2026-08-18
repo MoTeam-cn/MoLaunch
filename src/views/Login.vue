@@ -3,7 +3,7 @@
  * 登录页面
  * 支持离线登录、微软登录（Web Authorization Code Flow）和 authlib 外置登录（yggdrasil 协议）
  *
- * 三种登录方式通过 SubTabBar 切换，与 PCL2 的多登录方式选择一致。
+ * 三种登录方式通过 SubTabBar 切换。
  * 用户可在登录页直接选择外置登录，无需进入版本设置。
  */
 

@@ -2,7 +2,7 @@
 /**
  * 更新日志弹窗（启动时展示）
  *
- * 对齐 PCL2 的做法：应用升级到新版本后，启动时自动展示一次本次更新日志。
+ * 做法：应用升级到新版本后，启动时自动展示一次本次更新日志。
  * 触发与去重逻辑见 utils/updateLog.ts；内容为 vite 构建时从 CHANGELOG.md
  * 提取的当前版本段落（虚拟模块 virtual:update-log），时间线渲染复用 ReleaseTimeline。
  */

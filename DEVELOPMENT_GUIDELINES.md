@@ -321,7 +321,7 @@ pub async fn example_command(
 - 页面背景：`page #f0f5ff`
 - 输入框默认灰底 `#f2f3f5`，focus 时白底蓝边框
 - 图标统一使用 `@heroicons/vue`，不使用 Emoji
-- UI 采用单列布局（参考 PCL2）
+- UI 采用单列布局
 - 空状态提示必须 icon + text 垂直水平居中
 
 #### 全局组件调用方式
@@ -422,10 +422,10 @@ git push origin main --tags
 
 ### 2.6 常规泛化描述约束
 
-【必须】提交信息使用常规、泛化的技术描述，严禁出现敏感引用或第三方项目代号（如 PCL2、pcl 等）。描述应遮掩实际意图，使用通用术语。
+【必须】提交信息使用常规、泛化的技术描述，严禁出现敏感引用或第三方项目代号。描述应遮掩实际意图，使用通用术语。
 
 - 允许：`refactor(state): 提取状态访问 helper 消除重复套件`
-- 禁止：`refactor(state): 参考 PCL2 实现 FileSystemWatcher`
+- 禁止：`refactor(state): 参考 XXXX 实现 FileSystemWatcher`
 
 ### 2.7 完整示例
 

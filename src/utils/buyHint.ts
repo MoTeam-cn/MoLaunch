@@ -2,7 +2,7 @@
  * 正版购买提示服务
  *
  * - 游戏启动成功时计数自增并持久化（系统存储，非 AppConfig）
- * - 命中阈值（对齐 PCL2：3/8/15/30/…/1900）且非微软账号、中文系统时弹出「正版购买建议」
+ * - 命中阈值且非微软账号、中文系统时弹出「正版购买建议」
  * - 抽屉内「前往购买」打开官网并永久忽略；「暂不考虑」仅关闭，下次阈值再次提醒
  */
 
@@ -11,7 +11,7 @@ import { applyConfig, getConfigMap } from '@/utils/api/config'
 import { useAuthStore } from '@/stores/auth'
 import { maybeTriggerStarHint } from '@/utils/starHint'
 
-/** 触发购买提示的启动次数阈值（对齐 PCL2 ModLaunch.vb：3/8/15/30/…/1900） */
+/** 触发购买提示的启动次数阈值 */
 const BUY_HINT_THRESHOLDS = [
   3, 8, 15, 30, 50, 70, 90, 110, 130, 180, 220, 280, 330, 380, 450, 550, 660,
   750, 880, 950, 1100, 1300, 1500, 1700, 1900,

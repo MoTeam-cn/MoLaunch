@@ -1,4 +1,4 @@
-//! 正版玩家皮肤获取（API 流程参照 PCL2 ModMinecraft.McSkinGetAddress + ModLaunch.McLoginMojangUuid）：
+//! 正版玩家皮肤获取：
 //! 1. `api.mojang.com/users/profiles/minecraft/{name}` → UUID
 //! 2. `sessionserver.mojang.com/session/minecraft/profile/{uuid}` → properties.textures.value（base64）
 //! 3. base64 解码 → textures.SKIN.url / CAPE.url / metadata.model（slim）

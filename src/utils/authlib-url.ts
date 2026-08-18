@@ -1,7 +1,7 @@
 /**
  * yggdrasil 服务器 URL 规范化工具
  *
- * 将域名/皮肤站页面地址自动补全为后端可识别的 yggdrasil API 根地址（与 PCL2 行为一致），
+ * 将域名/皮肤站页面地址自动补全为后端可识别的 yggdrasil API 根地址，
  * 详细规则见 normalizeAuthlibServerUrl。
  */
 

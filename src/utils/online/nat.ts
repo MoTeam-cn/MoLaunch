@@ -38,7 +38,7 @@ export function parseCandidateAddress(candidate: string): string | null {
 /**
  * 根据 ICE candidate 列表推断 NAT 类型
  *
- * 算法（参考 PCL2 与业界同类实现）：
+ * 算法：
  * 1. 收集所有 host / srflx candidate
  * 2. 无 host 且无 srflx → Unknown
  * 3. 有 host 但无 srflx → Blocked（UDP 出站被拦截）

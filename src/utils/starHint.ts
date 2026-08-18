@@ -1,8 +1,8 @@
 /**
- * "去 GitHub 点 Star"提示服务（参照 PCL2 赞助弹窗，但目标为项目仓库而非爱发电）
+ * "去 GitHub 点 Star"提示服务
  *
  * - 复用游戏启动成功计数（与购买提示共用 launchCount，不重复自增）
- * - 命中阈值（对齐 PCL2 赞助弹窗：10/20/40/…/2000）且中文系统时弹出「支持 MoLaunch」
+ * - 命中阈值且中文系统时弹出「支持 MoLaunch」
  * - 抽屉内「去点 Star」打开 GitHub 仓库并永久忽略；「暂不考虑」仅关闭，下次阈值再次提醒
  * - 文案 / 阈值 / 目标地址支持远程下发：`fetchRemoteStarHintConfig` 当前返回 null（未启用），
  *   后续 apiServer 就绪后接入即可覆盖本地默认，无需改动触发链路
@@ -11,7 +11,7 @@
 import { ref } from 'vue'
 import type { ConfigSnapshot } from '@/utils/api/config'
 
-/** 触发点 Star 提示的启动次数阈值（对齐 PCL2 ModLaunch.vb 赞助弹窗） */
+/** 触发点 Star 提示的启动次数阈值 */
 export const STAR_HINT_THRESHOLDS = [
   10, 20, 40, 60, 80, 100, 120, 150, 200, 250, 300, 350, 400, 500, 600, 700,
   800, 900, 1000, 1200, 1400, 1600, 1800, 2000,

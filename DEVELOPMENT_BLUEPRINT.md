@@ -157,7 +157,7 @@ ai_core/state...）→ repositories/storage/http → 结果返回
 
 ## 五、UI 规范
 
-- 单列布局（参考 PCL2）；图标用 `@heroicons/vue`，不使用 Emoji
+- 单列布局；图标用 `@heroicons/vue`，不使用 Emoji
 - 主色 `brand-2 #0b5bcb`，悬停 `brand-3 #1370f3`，页面背景 `page #f0f5ff`，圆角 2px/4px
 - 空状态：icon + text 垂直水平居中
 - 图标通用名：`@heroicons/vue`；品牌图标走 `element-icons.ts` / `md-icons.ts` 等
