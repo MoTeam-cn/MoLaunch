@@ -89,6 +89,13 @@ pub(super) fn mark_stage_complete(stage: &str) {
     }
 }
 
+/// 等待取消信号（配合 tokio::select! 实现 AI 调用可即时取消）
+pub(crate) async fn wait_cancel(cancel: &AtomicBool) {
+    while !cancel.load(Ordering::Relaxed) {
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+}
+
 /// 按阶段权重加权计算总进度（0-100）
 fn compute_total_progress() -> f64 {
     let (weights, stages) = (

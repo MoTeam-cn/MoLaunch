@@ -39,14 +39,17 @@ pub(super) async fn request_actions(
             Some(error) => format!("{base}\n上次输出校验失败：{error}。请完整重发合法 JSON。"),
             None => base.clone(),
         };
-        let content = match ai_core::chat_json(
-            config,
-            PromptKind::ModTranslation,
-            user_content,
-            Some(model),
-        )
-        .await
-        {
+        let content = match tokio::select! {
+            result = ai_core::chat_json(
+                config,
+                PromptKind::ModTranslation,
+                user_content,
+                Some(model),
+            ) => result,
+            _ = crate::mod_translation::wait_cancel(cancel) => {
+                return Err("任务已取消".to_string())
+            }
+        } {
             Ok(content) => content,
             Err(e) => {
                 let msg = format!("AI 修复方案调用失败: {e}");

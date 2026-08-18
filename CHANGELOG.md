@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译 AI 调用可即时取消，假进度不再虚高**（[Cargo.toml](src-tauri/Cargo.toml) / [mod.rs](src-tauri/src/mod_translation/mod.rs) / [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs) / [translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [repair_ai.rs](src-tauri/src/mod_translation/repair_ai.rs) / [useModTranslation.ts](src/composables/useModTranslation.ts)）：各路由 AI 调用（chat_json）改用 `tokio::select!` 与取消信号竞争，点取消后 100ms 内中断当前请求并结束任务，不再等待 HTTP 超时或重试结束（tokio 启用 `time` 特性，新增 `wait_cancel` 辅助函数）；前端假进度封顶改为「真实总进度 +5%」，避免语言翻译完成（55%）时假进度虚高显示 99%。
+
 - **模组翻译重试反馈完善：重试输出日志、分进度推进、续传补全已完成阶段**（[translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs) / [repair_ai.rs](src-tauri/src/mod_translation/repair_ai.rs) / [task.rs](src-tauri/src/mod_translation/task.rs) / [mod.rs](src-tauri/src/mod_translation/mod.rs)）：各路由 AI 调用失败（如 HTTP 524）时立即输出 WARN 日志（不再等重试全部结束才提示）；重试时分进度随重试轮次推进（不再卡在固定值）；断点续传时根据 checkpoint 阶段补全已完成阶段进度为 100%（前端分进度折叠区显示「完成」），repair 阶段完成后记录 checkpoint 阶段。
 
 - **模组翻译进度展示重构：总进度条 + 分进度折叠区，重试循环响应取消**（[types.rs](src-tauri/src/mod_translation/types.rs) / [mod.rs](src-tauri/src/mod_translation/mod.rs) / [repair_ai.rs](src-tauri/src/mod_translation/repair_ai.rs) / [repair.rs](src-tauri/src/mod_translation/repair.rs) / [experimental-mod-translation.ts](src/utils/api/experimental-mod-translation.ts) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)）：进度卡片改为总进度条（按阶段权重加权计算）+ 分进度折叠区——折叠开关位于总进度行，默认折叠，展开后列出所有阶段（按权重降序），未开始显示 0% + 「暂未开始」、进行中显示分进度、完成显示「完成」；`TaskSnapshot` 新增 `stages` 字段（stage/weight/progress 列表），后端 `update_status` 每次推送时构建；`request_actions` 增加取消信号检查，重试循环中可即时响应取消，不再等待重试全部结束。

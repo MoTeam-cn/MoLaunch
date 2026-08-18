@@ -56,7 +56,10 @@ export function useModTranslation() {
   function startTaskFakeProgress(): void {
     if (taskTimer !== null) return
     taskTimer = window.setInterval(() => {
-      taskFakeProgress.value = Math.min(99, taskFakeProgress.value + 0.5)
+      // 假进度不超过真实总进度 +5%，避免总进度虚高（如 56% 显示 99%）
+      const real = snapshot.value?.progress ?? 0
+      const cap = Math.min(99, real + 5)
+      taskFakeProgress.value = Math.min(cap, taskFakeProgress.value + 0.5)
     }, 300)
   }
 

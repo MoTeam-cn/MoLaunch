@@ -182,14 +182,15 @@ async fn translate_batch(
                 &source.namespace,
                 &pending,
             );
-            let content = match ai_core::chat_json(
-                config,
-                PromptKind::ModTranslation,
-                user_prompt,
-                Some(model),
-            )
-            .await
-            {
+            let content = match tokio::select! {
+                result = ai_core::chat_json(
+                    config,
+                    PromptKind::ModTranslation,
+                    user_prompt,
+                    Some(model),
+                ) => result,
+                _ = super::wait_cancel(cancel) => return Err("任务已取消".to_string()),
+            } {
                 Ok(content) => content,
                 Err(e) => {
                     log_warn!("[ModTranslation] AI 批量翻译调用失败: {e}");

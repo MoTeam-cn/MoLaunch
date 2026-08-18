@@ -60,14 +60,15 @@ pub async fn run_class_route(
                 );
             }
             let user_prompt = build_class_prompt(inspection, batch, last_error.as_deref());
-            let content = match ai_core::chat_json(
-                config,
-                PromptKind::ModTranslation,
-                user_prompt,
-                Some(model),
-            )
-            .await
-            {
+            let content = match tokio::select! {
+                result = ai_core::chat_json(
+                    config,
+                    PromptKind::ModTranslation,
+                    user_prompt,
+                    Some(model),
+                ) => result,
+                _ = super::wait_cancel(cancel) => return Err("任务已取消".to_string()),
+            } {
                 Ok(content) => content,
                 Err(e) => {
                     let msg = format!("AI class 判定调用失败: {e}");
