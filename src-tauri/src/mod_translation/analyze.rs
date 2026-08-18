@@ -436,12 +436,6 @@ pub fn inspect_jar(workspace: &Path, input_path: &Path, signed: bool) -> JarInsp
     if language_sources.is_empty() {
         warnings.push("未找到 en_us 语言文件或含 en_us 路径的文本".to_string());
     }
-    if !existing_chinese.is_empty() {
-        warnings.push(format!(
-            "模组已包含 {} 个中文语言文件，翻译将覆盖这些文件",
-            existing_chinese.len()
-        ));
-    }
     if signed {
         warnings.push("JAR 含签名文件，翻译重打包后签名将失效".to_string());
     }
