@@ -33,8 +33,8 @@ use crate::ai_core;
 
 use self::resume::Checkpoint;
 use self::types::{
-    AnalyzeParams, AnalyzeResult, JarInspection, RetryInfo, SourceSummary, StageProgress,
-    StartParams, TaskSnapshot,
+    AnalyzeParams, AnalyzeResult, JarInspection, ProgressFn, RetryInfo, SourceSummary,
+    StageProgress, StartParams, TaskSnapshot,
 };
 
 /// 进度事件名（前端经 useTauriEvent 订阅）
@@ -93,6 +93,26 @@ pub(super) fn mark_stage_complete(stage: &str) {
 pub(crate) async fn wait_cancel(cancel: &AtomicBool) {
     while !cancel.load(Ordering::Relaxed) {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    }
+}
+
+/// 批次内平滑进度：AI 调用期间分进度从 start 平滑爬升到 cap（取消时结束）
+pub(crate) async fn smooth_progress(
+    start: f64,
+    cap: f64,
+    cancel: &AtomicBool,
+    on_progress: &ProgressFn,
+    message: &str,
+    retry: Option<RetryInfo>,
+) {
+    let mut p = start.min(cap);
+    on_progress(p, message, retry);
+    while !cancel.load(Ordering::Relaxed) {
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+        if p < cap {
+            p = (p + 0.5).min(cap);
+            on_progress(p, message, retry);
+        }
     }
 }
 

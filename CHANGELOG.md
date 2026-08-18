@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译分进度批次内平滑爬升，重试与解析失败均输出日志**（[mod.rs](src-tauri/src/mod_translation/mod.rs) / [translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs)）：新增 `smooth_progress` 辅助函数，AI 调用期间分进度从批次起点平滑爬升到批次上限（每 200ms +0.5，取消即停），不再卡在固定值或仅重试时 +5%；重试时推送「第 x/y 次重试」信息并输出 WARN 日志，class 判定解析失败（模型返回内容但校验不通过）也立即输出日志，不再静默重试到完全失败才提示。
+
 - **修复模组翻译分进度范围与重试封顶不一致**（[translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs) / [translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [task.rs](src-tauri/src/mod_translation/task.rs)）：语言翻译与 class 文本的分进度计算由 0-90 统一为 0-100（`90.0 *` → `100.0 *`），重试推进封顶由 90 改为 100，class 阶段启动初始进度由 90 改为 0，避免分进度卡在 5%/90% 且与「完成=100%」语义冲突。
 
 - **模组翻译 AI 调用可即时取消，假进度不再虚高**（[Cargo.toml](src-tauri/Cargo.toml) / [mod.rs](src-tauri/src/mod_translation/mod.rs) / [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs) / [translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [repair_ai.rs](src-tauri/src/mod_translation/repair_ai.rs) / [useModTranslation.ts](src/composables/useModTranslation.ts)）：各路由 AI 调用（chat_json）改用 `tokio::select!` 与取消信号竞争，点取消后 100ms 内中断当前请求并结束任务，不再等待 HTTP 超时或重试结束（tokio 启用 `time` 特性，新增 `wait_cancel` 辅助函数）；前端假进度封顶改为「真实总进度 +5%」，避免语言翻译完成（55%）时假进度虚高显示 99%。

@@ -43,22 +43,21 @@ pub async fn run_class_route(
             return Err("任务已取消".to_string());
         }
         let base_progress = 100.0 * (handled as f64 / total as f64);
+        let batch_cap = 100.0 * ((handled + batch.len()).min(total) as f64 / total as f64);
         let (mut last_error, mut decisions) = (None, Vec::new());
         for attempt in 0..MAX_BATCH_ATTEMPTS {
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
             }
-            if attempt > 0 {
-                let retry_progress = (base_progress + attempt as f64 * 5.0).min(100.0);
-                on_progress(
-                    retry_progress,
-                    &format!("class 判定第 {}/{} 次重试", attempt + 1, MAX_BATCH_ATTEMPTS),
-                    Some(RetryInfo {
-                        attempt: attempt as u32 + 1,
-                        total: MAX_BATCH_ATTEMPTS as u32,
-                    }),
-                );
-            }
+            let retry = (attempt > 0).then(|| RetryInfo {
+                attempt: attempt as u32 + 1,
+                total: MAX_BATCH_ATTEMPTS as u32,
+            });
+            let msg = if attempt > 0 {
+                format!("class 判定第 {}/{} 次重试", attempt + 1, MAX_BATCH_ATTEMPTS)
+            } else {
+                format!("class 文本判定：{handled}/{total}")
+            };
             let user_prompt = build_class_prompt(inspection, batch, last_error.as_deref());
             let content = match tokio::select! {
                 result = ai_core::chat_json(
@@ -68,6 +67,14 @@ pub async fn run_class_route(
                     Some(model),
                 ) => result,
                 _ = super::wait_cancel(cancel) => return Err("任务已取消".to_string()),
+                _ = super::smooth_progress(
+                    base_progress,
+                    batch_cap,
+                    cancel,
+                    on_progress,
+                    &msg,
+                    retry,
+                ) => return Err("任务已取消".to_string()),
             } {
                 Ok(content) => content,
                 Err(e) => {
@@ -86,7 +93,9 @@ pub async fn run_class_route(
                     break;
                 }
                 Err(e) => {
-                    last_error = Some(e);
+                    let msg = format!("class 判定解析失败: {e}");
+                    log_warn!("[ModTranslation] {msg}");
+                    last_error = Some(msg);
                     if attempt + 1 == MAX_BATCH_ATTEMPTS {
                         break;
                     }

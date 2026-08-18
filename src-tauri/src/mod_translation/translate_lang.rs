@@ -72,6 +72,7 @@ pub async fn run_language_route(
                 return Err("任务已取消".to_string());
             }
             let progress = 100.0 * (translated as f64 / total as f64);
+            let batch_cap = 100.0 * ((translated + chunk.len()).min(total) as f64 / total as f64);
             let batch = translate_batch(
                 inspection,
                 source,
@@ -83,13 +84,14 @@ pub async fn run_language_route(
                 cancel,
                 on_progress,
                 progress,
+                batch_cap,
             )
             .await?;
             let done = batch.len();
             accepted.extend(batch);
             translated += done;
             on_progress(
-                progress,
+                batch_cap,
                 &format!("翻译中：{translated}/{total} 条目"),
                 None,
             );
@@ -129,6 +131,7 @@ async fn translate_batch(
     cancel: &AtomicBool,
     on_progress: &ProgressFn,
     base_progress: f64,
+    batch_cap: f64,
 ) -> Result<BTreeMap<String, String>, String> {
     let mut accepted: BTreeMap<String, String> = BTreeMap::new();
     let mut pending: Vec<(String, String)> = Vec::new();
@@ -160,17 +163,15 @@ async fn translate_batch(
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
             }
-            if round > 1 {
-                let retry_progress = (base_progress + round as f64 * 2.0).min(100.0);
-                on_progress(
-                    retry_progress,
-                    &format!("{action} 第 {round}/{max_rounds} 次重试"),
-                    Some(RetryInfo {
-                        attempt: round as u32,
-                        total: max_rounds as u32,
-                    }),
-                );
-            }
+            let retry = (round > 1).then(|| RetryInfo {
+                attempt: round as u32,
+                total: max_rounds as u32,
+            });
+            let msg = if round > 1 {
+                format!("{action} 第 {round}/{max_rounds} 次重试")
+            } else {
+                "翻译中".to_string()
+            };
             pending
                 .retain(|(key, _)| work_graph.model_attempt_count(&ids[key]) < MAX_ITEM_ATTEMPTS);
             if pending.is_empty() {
@@ -190,19 +191,18 @@ async fn translate_batch(
                     Some(model),
                 ) => result,
                 _ = super::wait_cancel(cancel) => return Err("任务已取消".to_string()),
+                _ = super::smooth_progress(
+                    base_progress,
+                    batch_cap,
+                    cancel,
+                    on_progress,
+                    &msg,
+                    retry,
+                ) => return Err("任务已取消".to_string()),
             } {
                 Ok(content) => content,
                 Err(e) => {
                     log_warn!("[ModTranslation] AI 批量翻译调用失败: {e}");
-                    let retry_progress = (base_progress + round as f64 * 2.0).min(100.0);
-                    on_progress(
-                        retry_progress,
-                        &format!("{action} 第 {round}/{max_rounds} 次重试"),
-                        Some(RetryInfo {
-                            attempt: round as u32,
-                            total: max_rounds as u32,
-                        }),
-                    );
                     continue;
                 }
             };
