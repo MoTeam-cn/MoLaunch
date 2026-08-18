@@ -323,6 +323,9 @@ pub fn build_resource_coverage(
 }
 
 /// token 报价预估（分析阶段展示，供用户评估成本）
+///
+/// 输入 token = 每批固定开销（system prompt + user 模板，编译期内嵌读取）
+/// + 条目字符 token；输出 token = 译文字符 token + class 译文 token。
 pub fn quote_translation_metrics(
     language_entries: usize,
     language_chars: usize,
@@ -331,12 +334,21 @@ pub fn quote_translation_metrics(
 ) -> Quote {
     let language_batches = language_entries.div_ceil(40);
     let class_batches = class_candidates.div_ceil(16);
+    // 每批请求固定携带 system prompt 与 user 模板（resources 编译期内嵌，运行时零 IO）
+    let system_prompt_chars = crate::resources::read_resource("prompts/mod_translation.md")
+        .map(|s| s.chars().count())
+        .unwrap_or(0);
+    let user_template_chars = crate::resources::read_resource("prompts/mod_translation_user.md")
+        .map(|s| s.chars().count())
+        .unwrap_or(0);
+    let per_batch_overhead = (system_prompt_chars + user_template_chars) as f64 * 0.35;
     let points = 10
         + (language_batches + class_batches) as u64 * 2
         + ((language_chars + class_chars) as u64).div_ceil(1_000);
-    let estimated_input_tokens = (language_chars as f64 * 0.35 + language_batches as f64 * 600.0)
+    let estimated_input_tokens = (language_chars as f64 * 0.35
+        + language_batches as f64 * (600.0 + per_batch_overhead))
         as u64
-        + (class_chars as f64 * 0.3 + class_batches as f64 * 500.0) as u64;
+        + (class_chars as f64 * 0.3 + class_batches as f64 * (500.0 + per_batch_overhead)) as u64;
     let estimated_output_tokens =
         (language_chars as f64 * 0.6) as u64 + class_candidates as u64 * 40;
     let estimated_tokens = ((estimated_input_tokens + estimated_output_tokens) as f64 * 1.2) as u64;

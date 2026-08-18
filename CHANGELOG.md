@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译报价预估计入 system prompt 与 user 模板 token**（[analyze.rs](src-tauri/src/mod_translation/analyze.rs)）：`quote_translation_metrics` 原只按条目字符与每批固定 600/500 估算输入 token，未包含每批请求固定携带的 system prompt（mod_translation.md）与 user 模板（mod_translation_user.md）；现读取两模板字符数折算为每批固定开销（×0.35 字符/token），语言与 class 批次均计入，输入 token 预估更贴近实际。
+
 - **模组翻译 user prompt 模板外置到 prompts 目录，测试移至独立文件**（[mod_translation_user.md](src-tauri/resources/prompts/mod_translation_user.md)（新增） / [resources.rs](src-tauri/src/resources.rs) / [prompt.rs](src-tauri/src/mod_translation/prompt.rs) / [prompt_test.rs](src-tauri/src/mod_translation/prompt_test.rs)（新增））：批量翻译的 user 侧格式指令不再硬编码在代码中，外置为 `resources/prompts/mod_translation_user.md`（编译期内嵌，`{data}` 占位符注入条目数据，模板缺失时内置兜底）；prompt.rs 内联测试移至 `prompt_test.rs`（`#[path]` 子模块引入），并补充 user prompt 数据注入断言。
 
 - **模组翻译提示词补充输出格式要求，修复「AI 响应缺少 translations 数组」**（[mod_translation.md](src-tauri/resources/prompts/mod_translation.md) / [prompt.rs](src-tauri/src/mod_translation/prompt.rs)）：system prompt 模板新增第 5 条明确输出结构 `{"translations":[{"key","translation"}]}` 且 key 与输入一一对应；user prompt 前置同样的格式指令（模型对 system prompt 格式要求响应不稳定，user 侧再强调一次），避免模型返回非约定结构导致解析失败。
