@@ -7,12 +7,16 @@
 use crate::ai_core::config::AiConfig;
 
 /// 构造带可选 `Authorization: Bearer <api_key>` 的请求构建器
+///
+/// 使用无客户端级整体超时的客户端：非流式请求的整体耗时由
+/// `send_with_timeout`（timeout_secs，默认 60s）控制，避免全局客户端
+/// 30s 超时误杀大请求体 / 慢响应的场景（如模组翻译批量请求）。
 pub(crate) fn authorized_builder(
     config: &AiConfig,
     method: reqwest::Method,
     url: String,
 ) -> reqwest::RequestBuilder {
-    let mut builder = crate::http::get_client()
+    let mut builder = no_timeout_client()
         .request(method, url)
         .header("Accept-Language", "zh-CN");
     if !config.api_key.is_empty() {
@@ -41,9 +45,12 @@ pub(crate) fn authorized_stream_builder(
     builder
 }
 
-/// 流式专用 HTTP 客户端：复用全局客户端同款管线（代理 / IP 版本 / TLS 信任源），
-/// 但不设置客户端级整体超时（timeout(None)），避免思考型模型长首 token 被误杀。
-fn stream_client() -> reqwest::Client {
+/// 无客户端级整体超时的 HTTP 客户端（复用全局客户端同款管线）
+///
+/// 流式链路与 AI 非流式请求共用：整体耗时由调用方的超时包装
+/// （`send_with_timeout` / `send_stream_with_timeout`）控制，避免全局
+/// 客户端 30s 超时误杀长耗时请求（思考型模型首 token、大请求体翻译等）。
+fn no_timeout_client() -> reqwest::Client {
     let config = crate::config::load_config().ok().flatten();
     let (mode, kind, url, ip_version, trust_mode) = config
         .as_ref()
@@ -67,6 +74,11 @@ fn stream_client() -> reqwest::Client {
         });
     let ignore_tls = crate::commands::system::developer::is_ignore_tls();
     crate::http::build_stream_client(&mode, &kind, &url, &ip_version, &trust_mode, ignore_tls)
+}
+
+/// 流式专用 HTTP 客户端：复用无超时客户端（代理 / IP 版本 / TLS 信任源一致）
+fn stream_client() -> reqwest::Client {
+    no_timeout_client()
 }
 
 /// 通用超时包装：限制外部 future 在 `timeout_secs`（下限 5s）内完成

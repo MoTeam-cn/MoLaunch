@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **修复 AI 非流式请求被全局 30s 超时误杀**（[transport.rs](src-tauri/src/ai_core/client/transport.rs) / [http.rs](src-tauri/src/http.rs)）：非流式 AI 请求（如模组翻译批量调用）原走全局 HTTP 客户端（自带 30s 客户端级超时），大请求体 / 慢响应场景下被提前掐断，表现为 `error sending request for url` 且无原因；现改为与流式链路一致的无整体超时客户端，整体耗时由 `send_with_timeout`（默认 60s）控制；同时 `request_error_msg` 拼接错误 source 链（如 `timed out`），超时原因不再被吞掉，便于定位。
+
 - **模组翻译任务失败补充后端错误日志与前端醒目提示**（[task.rs](src-tauri/src/mod_translation/task.rs) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)）：语言翻译 / 质量回修 / class 文本三个阶段的失败分支补记 `log_error!`（含阶段与错误详情），便于定位 AI 调用失败原因；前端任务进度区在失败时以红色文字展示错误信息（原为普通灰色文本，失败原因不明显）。
 
 - **模组翻译页重构为三态流程（上传 → 分析中 → 结果区）**（[ModTranslation.vue](src/views/experimental/ModTranslation.vue) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)（新增） / [useModTranslation.ts](src/composables/useModTranslation.ts) / [Experimental.vue](src/views/Experimental.vue)）：页面固定高度不随内容滚动，按阶段切换视图——① **上传区**：虚线拖放框铺满整个容器（拖入 jar 悬停高亮，支持点击选择）；② **分析中**：居中旋转指示器 + 文件名 + 假进度条（0-95% 随机推进，完成后跳 100%）；③ **结果区**：淡入过渡动画后进入左右分栏——左侧内容区展示分析结果（基本信息、语言源列表、成本与覆盖分析，超高内部滚动），右侧固定宽度操作区承载翻译设置（模型 / 批次 / 选项 / 开始翻译）与任务进度（进度条 / 取消 / 完成报告）；结果区顶部提供「返回上传」按钮（翻译进行中禁止返回），可重新选择 JAR。

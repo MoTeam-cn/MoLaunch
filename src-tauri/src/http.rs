@@ -9,6 +9,7 @@ pub use client::{
 };
 pub use tls::ignore_tls_allowed;
 
+use std::error::Error;
 use std::sync::{OnceLock, RwLock};
 use std::time::Duration;
 
@@ -67,7 +68,7 @@ pub fn get_client() -> reqwest::Client {
 
 /// 错误链中是否包含 TLS 证书校验失败（抓包代理/中间人场景）
 pub fn is_tls_cert_error(e: &(dyn std::error::Error + 'static)) -> bool {
-    std::iter::successors(Some(e), |err| err.source()).any(|err| {
+    std::iter::successors(Some(e), |err| (*err).source()).any(|err| {
         let msg = err.to_string().to_ascii_lowercase();
         msg.contains("certificate")
             || msg.contains("unknownissuer")
@@ -75,12 +76,17 @@ pub fn is_tls_cert_error(e: &(dyn std::error::Error + 'static)) -> bool {
     })
 }
 
-/// 格式化请求错误：TLS 证书校验失败时提示中间人攻击
+/// 格式化请求错误：TLS 证书校验失败时提示中间人攻击；其余显示完整错误链
+/// （reqwest 超时等错误的外层消息不含原因，需拼接 source 如 "timed out"）
 pub fn request_error_msg(e: &reqwest::Error) -> String {
     if is_tls_cert_error(e) {
         "检测到中间人攻击，已自动断开链接".to_string()
     } else {
-        e.to_string()
+        let mut msg = e.to_string();
+        if let Some(source) = e.source() {
+            msg.push_str(&format!("（{}）", source));
+        }
+        msg
     }
 }
 
