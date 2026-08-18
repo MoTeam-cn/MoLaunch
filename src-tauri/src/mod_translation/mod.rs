@@ -4,6 +4,7 @@
 //! 启动翻译时若路径一致则复用，否则重新解包分析。
 
 pub mod analyze;
+pub mod class;
 pub mod jar;
 pub mod lang;
 pub mod prompt;
@@ -144,6 +145,8 @@ pub fn current_status() -> TaskSnapshot {
             message: String::new(),
             output_path: None,
             error: None,
+            mod_name: None,
+            report: None,
         })
 }
 
@@ -331,6 +334,8 @@ fn to_result(inspection: &JarInspection) -> AnalyzeResult {
         filename: inspection.original_filename.clone(),
         loader: inspection.loader.as_str().to_string(),
         mod_ids: inspection.mod_ids.clone(),
+        project_names: inspection.project_names.clone(),
+        version: inspection.version.clone(),
         signed: inspection.signed,
         sources: inspection
             .language_sources
@@ -348,6 +353,10 @@ fn to_result(inspection: &JarInspection) -> AnalyzeResult {
             .iter()
             .map(|s| s.required_count())
             .sum(),
+        class_candidates: inspection.class_candidates.clone(),
+        quote: inspection.quote.clone(),
+        coverage: inspection.coverage.clone(),
+        mod_name: None,
         warnings: inspection.warnings.clone(),
     }
 }

@@ -97,9 +97,15 @@ pub struct JarInspection {
     pub original_filename: String,
     pub loader: Loader,
     pub mod_ids: Vec<String>,
+    pub project_names: Vec<String>,
+    pub version: Option<String>,
     pub signed: bool,
     pub language_sources: Vec<LanguageSource>,
     pub language_entries: usize,
+    pub class_candidates: Vec<ClassCandidate>,
+    pub coverage: Vec<ResourceCoverage>,
+    pub quote: Quote,
+    pub mod_name: Option<ModNameResult>,
     pub warnings: Vec<String>,
 }
 
@@ -117,9 +123,15 @@ pub struct AnalyzeResult {
     pub filename: String,
     pub loader: String,
     pub mod_ids: Vec<String>,
+    pub project_names: Vec<String>,
+    pub version: Option<String>,
     pub signed: bool,
     pub sources: Vec<SourceSummary>,
     pub total_entries: usize,
+    pub class_candidates: Vec<ClassCandidate>,
+    pub quote: Quote,
+    pub coverage: Vec<ResourceCoverage>,
+    pub mod_name: Option<ModNameResult>,
     pub warnings: Vec<String>,
 }
 
@@ -133,6 +145,67 @@ pub struct SourceSummary {
     pub entries: usize,
 }
 
+/// class 常量池候选（运行时可见字符串，跨文件按文本聚合）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClassCandidate {
+    pub id: String,
+    pub path: String,
+    pub paths: Vec<String>,
+    pub occurrences: usize,
+    pub text: String,
+}
+
+/// token 报价预估（分析阶段展示，供用户评估成本）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Quote {
+    pub estimated_input_tokens: u64,
+    pub estimated_output_tokens: u64,
+    pub estimated_tokens: u64,
+    pub estimated_calls: u64,
+    pub language_batches: u64,
+    pub class_batches: u64,
+    pub points: u64,
+    pub characters: u64,
+    pub entries: u64,
+}
+
+/// 资源覆盖诊断（每个工作区文件的处置结论）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ResourceCoverage {
+    pub path: String,
+    pub media_type: String,
+    pub disposition: String,
+    pub target_path: Option<String>,
+    pub text_candidates: u64,
+    pub reason: String,
+}
+
+/// 模组中文名决策结果
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ModNameResult {
+    pub name: String,
+    pub source: String,
+}
+
+/// 任务完成报告（终态快照携带）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TranslationReport {
+    pub task_id: String,
+    pub ok: bool,
+    pub output_path: String,
+    pub mod_name: Option<ModNameResult>,
+    pub language_attempted: usize,
+    pub language_accepted: usize,
+    pub class_resolved: usize,
+    pub class_total: usize,
+    pub warnings: Vec<String>,
+}
+
 /// 启动翻译请求参数
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -142,6 +215,19 @@ pub struct StartParams {
     pub model: String,
     /// 每批翻译条目数（20/40/80）
     pub batch_size: u32,
+    /// 是否生成模组中文名（默认开）
+    #[serde(default = "default_true")]
+    pub generate_mod_name: bool,
+    /// 是否启用质量回修兜底（默认开）
+    #[serde(default = "default_true")]
+    pub repair_enabled: bool,
+    /// 是否翻译 class 常量池文本（默认开）
+    #[serde(default = "default_true")]
+    pub class_text_enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 /// 任务状态快照（前端轮询/事件共用）
@@ -151,13 +237,15 @@ pub struct TaskSnapshot {
     pub task_id: String,
     /// running / completed / failed / cancelled
     pub status: String,
-    /// analyze / translate / package
+    /// analyze / research / language / repair / class / validation / package
     pub stage: String,
     /// 0-100
     pub progress: f64,
     pub message: String,
     pub output_path: Option<String>,
     pub error: Option<String>,
+    pub mod_name: Option<ModNameResult>,
+    pub report: Option<TranslationReport>,
 }
 
 impl TaskSnapshot {
@@ -170,6 +258,8 @@ impl TaskSnapshot {
             message: String::new(),
             output_path: None,
             error: None,
+            mod_name: None,
+            report: None,
         }
     }
 }
