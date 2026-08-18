@@ -33,14 +33,20 @@ pub(super) async fn request_actions(
             Some(error) => format!("{base}\n上次输出校验失败：{error}。请完整重发合法 JSON。"),
             None => base.clone(),
         };
-        let content = ai_core::chat_json(
+        let content = match ai_core::chat_json(
             config,
             PromptKind::ModTranslation,
             user_content,
             Some(model),
         )
         .await
-        .map_err(|e| format!("AI 修复方案调用失败: {e}"))?;
+        {
+            Ok(content) => content,
+            Err(e) => {
+                last_error = Some(format!("AI 修复方案调用失败: {e}"));
+                continue;
+            }
+        };
         match parse_actions_response(&content)
             .and_then(|actions| validate_response(issues, &actions).map(|_| actions))
         {

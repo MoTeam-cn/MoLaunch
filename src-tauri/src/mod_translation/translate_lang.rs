@@ -181,10 +181,27 @@ async fn translate_batch(
                 &source.namespace,
                 &pending,
             );
-            let content =
-                ai_core::chat_json(config, PromptKind::ModTranslation, user_prompt, Some(model))
-                    .await
-                    .map_err(|e| format!("AI 批量翻译调用失败: {e}"))?;
+            let content = match ai_core::chat_json(
+                config,
+                PromptKind::ModTranslation,
+                user_prompt,
+                Some(model),
+            )
+            .await
+            {
+                Ok(content) => content,
+                Err(_) => {
+                    on_progress(
+                        base_progress,
+                        &format!("{action} 第 {round}/{max_rounds} 次重试"),
+                        Some(RetryInfo {
+                            attempt: round as u32,
+                            total: max_rounds as u32,
+                        }),
+                    );
+                    continue;
+                }
+            };
             let parsed = prompt::parse_translations_response(&content)?;
             let by_key: BTreeMap<&str, &str> = parsed
                 .iter()

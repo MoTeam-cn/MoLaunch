@@ -164,7 +164,41 @@ pub(super) async fn run_task(
         }
     }
 
-    // 2) 质量回修兜底（复验 → AI 修复 → 原子写回）
+    // 2) class 常量池文本翻译（确定性排除 → AI 判定 → 改写写回）
+    if !cancelled
+        && fatal.is_none()
+        && class_text_enabled
+        && !inspection.class_candidates.is_empty()
+    {
+        update_status(&app, "class", 90.0, "class 文本判定", None);
+        match translate_class::run_class_route(
+            &workspace,
+            &inspection,
+            &config,
+            &model,
+            &mut class_ledger,
+            &cancel_flag,
+            &class_progress,
+        )
+        .await
+        {
+            Ok(()) => {}
+            Err(e) if e == CANCEL_MSG || cancel_flag.load(Ordering::Relaxed) => cancelled = true,
+            Err(e) => {
+                log_error!("[ModTranslation] class 文本翻译失败: {e}");
+                fatal = Some(e)
+            }
+        }
+        checkpoint.class_exclusions = class_ledger.snapshot_exclusions();
+        checkpoint.class_changed_files = class_ledger.replaced_files.clone();
+        checkpoint.class_replacement_count = class_ledger.replacement_count;
+        checkpoint.work_graph =
+            Some(serde_json::to_value(work_graph.snapshot()).unwrap_or_default());
+        checkpoint.stage = "class".to_string();
+        let _ = resume::save_checkpoint(&workspace, &checkpoint);
+    }
+
+    // 3) 质量回修兜底（复验 → AI 修复 → 原子写回）
     if !cancelled && fatal.is_none() && repair_enabled {
         let sources: Vec<&LanguageSource> = inspection
             .language_sources
@@ -206,40 +240,6 @@ pub(super) async fn run_task(
                 let _ = resume::save_checkpoint(&workspace, &checkpoint);
             }
         }
-    }
-
-    // 3) class 常量池文本翻译（确定性排除 → AI 判定 → 改写写回）
-    if !cancelled
-        && fatal.is_none()
-        && class_text_enabled
-        && !inspection.class_candidates.is_empty()
-    {
-        update_status(&app, "class", 90.0, "class 文本判定", None);
-        match translate_class::run_class_route(
-            &workspace,
-            &inspection,
-            &config,
-            &model,
-            &mut class_ledger,
-            &cancel_flag,
-            &class_progress,
-        )
-        .await
-        {
-            Ok(()) => {}
-            Err(e) if e == CANCEL_MSG || cancel_flag.load(Ordering::Relaxed) => cancelled = true,
-            Err(e) => {
-                log_error!("[ModTranslation] class 文本翻译失败: {e}");
-                fatal = Some(e)
-            }
-        }
-        checkpoint.class_exclusions = class_ledger.snapshot_exclusions();
-        checkpoint.class_changed_files = class_ledger.replaced_files.clone();
-        checkpoint.class_replacement_count = class_ledger.replacement_count;
-        checkpoint.work_graph =
-            Some(serde_json::to_value(work_graph.snapshot()).unwrap_or_default());
-        checkpoint.stage = "class".to_string();
-        let _ = resume::save_checkpoint(&workspace, &checkpoint);
     }
 
     // 4) 结果处理：取消/失败保留工作区供续传；成功打包后清理

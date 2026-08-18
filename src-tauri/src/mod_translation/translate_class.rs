@@ -59,10 +59,23 @@ pub async fn run_class_route(
                 );
             }
             let user_prompt = build_class_prompt(inspection, batch, last_error.as_deref());
-            let content =
-                ai_core::chat_json(config, PromptKind::ModTranslation, user_prompt, Some(model))
-                    .await
-                    .map_err(|e| format!("AI class 判定调用失败: {e}"))?;
+            let content = match ai_core::chat_json(
+                config,
+                PromptKind::ModTranslation,
+                user_prompt,
+                Some(model),
+            )
+            .await
+            {
+                Ok(content) => content,
+                Err(e) => {
+                    last_error = Some(format!("AI class 判定调用失败: {e}"));
+                    if attempt + 1 == MAX_BATCH_ATTEMPTS {
+                        break;
+                    }
+                    continue;
+                }
+            };
             match parse_and_validate_decisions(&content, batch) {
                 Ok(value) => {
                     decisions = value;
