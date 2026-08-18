@@ -185,7 +185,7 @@ pub(super) async fn run_task(
         && class_text_enabled
         && !inspection.class_candidates.is_empty()
     {
-        update_status(&app, "class", 90.0, "class 文本判定", None);
+        update_status(&app, "class", 0.0, "class 文本判定", None);
         match translate_class::run_class_route(
             &workspace,
             &inspection,

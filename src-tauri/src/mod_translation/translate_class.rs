@@ -42,14 +42,14 @@ pub async fn run_class_route(
         if cancel.load(Ordering::Relaxed) {
             return Err("任务已取消".to_string());
         }
-        let base_progress = 90.0 * (handled as f64 / total as f64);
+        let base_progress = 100.0 * (handled as f64 / total as f64);
         let (mut last_error, mut decisions) = (None, Vec::new());
         for attempt in 0..MAX_BATCH_ATTEMPTS {
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
             }
             if attempt > 0 {
-                let retry_progress = (base_progress + attempt as f64 * 5.0).min(90.0);
+                let retry_progress = (base_progress + attempt as f64 * 5.0).min(100.0);
                 on_progress(
                     retry_progress,
                     &format!("class 判定第 {}/{} 次重试", attempt + 1, MAX_BATCH_ATTEMPTS),
@@ -106,7 +106,7 @@ pub async fn run_class_route(
                 Err(e) => log_warn!("[ModTranslation] class 处置失败: {e}"),
             }
         }
-        let progress = 90.0 * (handled as f64 / total as f64);
+        let progress = 100.0 * (handled as f64 / total as f64);
         on_progress(
             progress,
             &format!("class 文本判定：{handled}/{total}"),

@@ -71,7 +71,7 @@ pub async fn run_language_route(
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
             }
-            let progress = 90.0 * (translated as f64 / total as f64);
+            let progress = 100.0 * (translated as f64 / total as f64);
             let batch = translate_batch(
                 inspection,
                 source,
@@ -161,7 +161,7 @@ async fn translate_batch(
                 return Err("任务已取消".to_string());
             }
             if round > 1 {
-                let retry_progress = (base_progress + round as f64 * 2.0).min(90.0);
+                let retry_progress = (base_progress + round as f64 * 2.0).min(100.0);
                 on_progress(
                     retry_progress,
                     &format!("{action} 第 {round}/{max_rounds} 次重试"),
@@ -194,7 +194,7 @@ async fn translate_batch(
                 Ok(content) => content,
                 Err(e) => {
                     log_warn!("[ModTranslation] AI 批量翻译调用失败: {e}");
-                    let retry_progress = (base_progress + round as f64 * 2.0).min(90.0);
+                    let retry_progress = (base_progress + round as f64 * 2.0).min(100.0);
                     on_progress(
                         retry_progress,
                         &format!("{action} 第 {round}/{max_rounds} 次重试"),
