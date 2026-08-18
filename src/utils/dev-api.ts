@@ -75,6 +75,8 @@ export interface MolaunchDevAPI {
   showPrompt(title?: string, message?: string, defaultValue?: string): Promise<string | null>
   /** 一次触发错误 / 警告 / 信息 / 成功 4 条消息，验证消息队列依次展示不丢失（测试用） */
   demoMessages(): void
+  /** 模拟云端连接状态（测试封存/封禁 UI 用）；online=false 时联机分类封禁、设备信息卡片封存 */
+  simulateCloud(online: boolean, reason?: string): Promise<void>
 }
 
 /** 全局 Window 类型扩展，使 `window.molaunch` 在 TypeScript 中可识别 */
@@ -178,6 +180,13 @@ MoLaunch Dev API 可用命令：
   molaunch.demoMessages()
       一次触发错误 / 警告 / 信息 / 成功 4 条消息，验证消息队列依次展示不丢失（测试用）
 
+  molaunch.simulateCloud(online, reason?)
+      模拟云端连接状态（测试封存/封禁 UI 用）
+      - online: true=云端在线 / false=云端离线
+      - reason: 离线时的错误原因（可选，默认「模拟云端离线」）
+      离线时侧边栏联机分类封禁（灰色置灰）、设备面板「设备信息」卡片封存遮罩；
+      用 simulateCloud(true) 恢复在线（页面刷新后自动恢复真实状态）
+
 示例：
   await molaunch.pickPort()
   await molaunch.picker('confirm', { message: '测试弹窗' })
@@ -197,6 +206,8 @@ MoLaunch Dev API 可用命令：
   const ok = await molaunch.showConfirm('确认删除', '确定要删除吗？')
   const nickname = await molaunch.showPrompt('输入昵称', '请输入你的游戏昵称')
   molaunch.demoMessages()
+  await molaunch.simulateCloud(false)  // 模拟云端离线，查看封存/封禁效果
+  await molaunch.simulateCloud(true)   // 恢复云端在线
 `.trim()
 
 /** 动态加载所有 Pinia store 并返回 $state 映射 */
@@ -371,6 +382,22 @@ export function setupDevApi(router: Router): void {
       showWarningMessage('Java 版本不受支持', '该版本要求 Java 8，当前检测到 Java 21。', '建议：在「版本设置 → Java」中为该版本指定 Java 8。')
       showInfoMessage('下载任务完成', '已成功下载 3 个文件。')
       showSuccessMessage('启动成功', '游戏已正常退出。')
+    },
+    async simulateCloud(online, reason) {
+      const { useOnlineStore } = await import('@/stores/online')
+      const store = useOnlineStore()
+      // 直接改写 store state 触发响应式；页面刷新后由 initAuth 恢复真实状态
+      store.cloudConnected = online
+      store.initializing = false
+      store.cloudError = online ? null : (reason ?? '模拟云端离线（dev-api）')
+      const offline = !store.cloudConnected && !store.initializing
+      console.log(
+        `%c[molaunch.simulateCloud]%c 云端已设为「${online ? '在线' : '离线'}」${
+          offline ? '，可查看侧边栏分类封禁与设备信息卡片封存效果' : '，封存/封禁已解除'
+        }`,
+        'color:#165dff;font-weight:bold',
+        'color:inherit',
+      )
     },
   }
 
