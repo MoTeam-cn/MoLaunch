@@ -24,7 +24,7 @@
 
 ### Changed
 
-- **模组翻译页重构为固定布局（顶部选择区 + 左右分栏）**（[ModTranslation.vue](src/views/experimental/ModTranslation.vue) / [Experimental.vue](src/views/Experimental.vue)）：页面改为固定高度不随内容滚动，顶部「选择模组 JAR」虚线拖放框常驻；分析完成后左右分栏——左侧内容区展示分析结果（基本信息、语言源列表、成本与覆盖分析，超高时内部滚动），右侧固定宽度操作区承载翻译设置（模型 / 批次 / 选项 / 开始翻译）与任务进度（进度条 / 取消 / 完成报告），布局向专业工具对齐。
+- **模组翻译页重构为三态流程（上传 → 分析中 → 结果区）**（[ModTranslation.vue](src/views/experimental/ModTranslation.vue) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)（新增） / [useModTranslation.ts](src/composables/useModTranslation.ts) / [Experimental.vue](src/views/Experimental.vue)）：页面固定高度不随内容滚动，按阶段切换视图——① **上传区**：虚线拖放框铺满整个容器（拖入 jar 悬停高亮，支持点击选择）；② **分析中**：居中旋转指示器 + 文件名 + 假进度条（0-95% 随机推进，完成后跳 100%）；③ **结果区**：淡入过渡动画后进入左右分栏——左侧内容区展示分析结果（基本信息、语言源列表、成本与覆盖分析，超高内部滚动），右侧固定宽度操作区承载翻译设置（模型 / 批次 / 选项 / 开始翻译）与任务进度（进度条 / 取消 / 完成报告）；结果区顶部提供「返回上传」按钮（翻译进行中禁止返回），可重新选择 JAR。
 
 - **模组翻译页支持拖入 JAR 文件**（[ModTranslation.vue](src/views/experimental/ModTranslation.vue) / [useModTranslation.ts](src/composables/useModTranslation.ts) / [useDragDrop.ts](src/composables/useDragDrop.ts) / [state.ts](src/composables/useDragDrop/state.ts)）：「选择模组 JAR」区改为虚线拖放框，拖入单个 jar 文件直接进入分析（经 Tauri `onDragDropEvent` 页面局部监听，拖入悬停时虚线框高亮），仍保留点击选择按钮；页面挂载期间通过 `setDragSuppressed` 置位全局拖拽抑制标志，全局拖拽（遮蔽层与 Mod 安装分发）整体静默，页面卸载后自动恢复，避免 jar 被当作 Mod 安装。
 

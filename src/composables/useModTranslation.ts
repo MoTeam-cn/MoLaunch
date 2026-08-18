@@ -22,28 +22,62 @@ import { safeCall } from '@/utils/async'
 export const MOD_TRANSLATION_EVENT = 'mod-translation-event'
 
 export function useModTranslation() {
+  /** 视图阶段：upload（选择/上传，铺满容器）→ analyzing（假进度条）→ result（左右分栏） */
+  const view = ref<'upload' | 'analyzing' | 'result'>('upload')
   const analyzing = ref(false)
   const analyzeResult = ref<ModTranslationAnalyzeResult | null>(null)
   const snapshot = ref<ModTranslationTaskSnapshot | null>(null)
   const jarPath = ref('')
   /** 局部拖放框悬停状态（拖入 jar 时高亮） */
   const dragging = ref(false)
+  /** 分析中假进度（0-100，线性推进，完成后跳 100） */
+  const fakeProgress = ref(0)
+  let progressTimer: number | null = null
   let unlistenDrag: (() => void) | null = null
 
   const running = computed(() => snapshot.value?.status === 'running')
   const completed = computed(() => snapshot.value?.status === 'completed')
 
+  function startFakeProgress(): void {
+    fakeProgress.value = 0
+    progressTimer = window.setInterval(() => {
+      fakeProgress.value = Math.min(95, fakeProgress.value + Math.random() * 6)
+    }, 300)
+  }
+
+  function stopFakeProgress(): void {
+    if (progressTimer !== null) {
+      window.clearInterval(progressTimer)
+      progressTimer = null
+    }
+  }
+
   /** 分析 JAR：解包并汇总语言源 */
   async function analyze(path: string): Promise<boolean> {
+    view.value = 'analyzing'
     analyzing.value = true
+    startFakeProgress()
     const result = await safeCall(() => modTranslationAnalyze(path), 'analyze mod jar')
+    stopFakeProgress()
     analyzing.value = false
     if (result) {
       jarPath.value = path
       analyzeResult.value = result
+      fakeProgress.value = 100
+      // 短暂停留展示 100% 后进入结果区（过渡动画由模板 Transition 处理）
+      window.setTimeout(() => {
+        view.value = 'result'
+      }, 300)
       return true
     }
+    view.value = 'upload'
+    fakeProgress.value = 0
     return false
+  }
+
+  /** 返回上传区（保留已分析结果用于「重新选择」提示） */
+  function backToUpload(): void {
+    view.value = 'upload'
   }
 
   /** 启动翻译任务（后台执行，进度经事件推送） */
@@ -87,6 +121,8 @@ export function useModTranslation() {
   function reset(): void {
     analyzeResult.value = null
     snapshot.value = null
+    view.value = 'upload'
+    fakeProgress.value = 0
   }
 
   const { start: startListen } = useTauriEvent<ModTranslationTaskSnapshot>(
@@ -132,12 +168,15 @@ export function useModTranslation() {
   }
 
   onUnmounted(() => {
+    stopFakeProgress()
     unlistenDrag?.()
     unlistenDrag = null
     setDragSuppressed(false)
   })
 
   return {
+    view,
+    fakeProgress,
     analyzing,
     analyzeResult,
     snapshot,
@@ -149,6 +188,7 @@ export function useModTranslation() {
     cancel,
     refreshStatus,
     reset,
+    backToUpload,
     initDragDrop,
   }
 }
