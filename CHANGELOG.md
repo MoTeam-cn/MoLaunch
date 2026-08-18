@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **修复质量回修阶段模型返回非法 issueId 导致任务整体失败**（[repair.rs](src-tauri/src/mod_translation/repair.rs)）：模型偶发截断/幻觉 issueId（如返回 13 位而非 16 位）时，`validate_response` 直接报错、重试 2 次后整个任务失败，即使语言翻译已完成（zh_cn 已写回）也无法打包。现改为：① 未知 issueId 按前缀唯一匹配兜底（处理截断）；② 回修批次失败仅记录警告并跳过该批次，不再阻塞打包（回修本就是兜底，残留问题由完成报告提示）；③ 提示词明确要求原样复制 issueId。
+
 - **模组翻译前端优化：富文本确认框、AlertV2 警告、虚线包裹展开区**（[MessageDrawer.vue](src/components/common/MessageDrawer.vue) / [modal.ts](src/utils/modal.ts) / [ModTranslation.vue](src/views/experimental/ModTranslation.vue) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)）：全局消息抽屉与确认弹窗新增 `messageHtml` 富文本消息支持（经 DOMPurify 消毒后渲染），覆盖中文语言文件确认框中的文件路径以加粗显示且允许长路径折行，不再出现「如」字单独换行；分析结果区「已包含中文语言文件」提示改用 AlertV2 warning 组件；「成本与覆盖分析」展开内容以虚线边框包裹，视觉更规整。
 
 - **模组翻译新增中文语言文件预检与覆盖风险提示**（[types.rs](src-tauri/src/mod_translation/types.rs) / [analyze.rs](src-tauri/src/mod_translation/analyze.rs) / [mod.rs](src-tauri/src/mod_translation/mod.rs) / [experimental-mod-translation.ts](src/utils/api/experimental-mod-translation.ts) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue) / [ModTranslation.vue](src/views/experimental/ModTranslation.vue)）：分析阶段检测 JAR 内已有的中文语言文件（zh_cn / zh_tw 的 json/lang/properties），结果携带文件路径、语言标识与条目数；前端分析结果区以黄色警告条列出将覆盖的中文文件，开始翻译前若存在中文文件则弹确认框（用户确认后才覆盖翻译），避免误覆盖模组自带中文。

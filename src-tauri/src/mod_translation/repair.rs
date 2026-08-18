@@ -5,6 +5,7 @@ use std::path::Path;
 use std::sync::atomic::Ordering;
 
 use crate::ai_core::{self, PromptKind};
+use crate::log_warn;
 use sha2::{Digest, Sha256};
 
 use super::lang;
@@ -153,7 +154,7 @@ fn build_repair_prompt(issues: &[RepairIssue]) -> String {
             serde_json::json!({"id": issue.id, "kind": issue.kind, "source": issue.source, "current": issue.current, "messages": issue.messages})
         })
         .collect();
-    serde_json::json!({"task": "修复以下语言条目的质量问题，只输出 JSON 对象：{\"actions\":[{\"action\":\"translate\"|\"keep-source\",\"issueId\":\"...\",\"translation\":\"...\",\"reason\":\"...\"}]}", "rules": "translate 必须含简体中文并保留全部占位符；确实应保留原文时用 keep-source 并给出 reason。每个 issue 恰好一个 action。", "issues": list})
+    serde_json::json!({"task": "修复以下语言条目的质量问题，只输出 JSON 对象：{\"actions\":[{\"action\":\"translate\"|\"keep-source\",\"issueId\":\"...\",\"translation\":\"...\",\"reason\":\"...\"}]}", "rules": "translate 必须含简体中文并保留全部占位符；确实应保留原文时用 keep-source 并给出 reason。每个 issue 恰好一个 action。issueId 必须原样复制 issues 中的 id，不得修改、截断或自行生成。", "issues": list})
         .to_string()
 }
 
@@ -190,17 +191,30 @@ fn parse_actions_response(content: &str) -> Result<Vec<RepairAction>, String> {
     Ok(result)
 }
 
+/// 模型可能截断/改写 issueId：先精确匹配，再按前缀唯一匹配兜底
+fn resolve_issue_id<'a>(expected: &'a HashSet<&str>, raw: &str) -> Option<&'a str> {
+    if expected.contains(raw) {
+        return expected.iter().copied().find(|id| *id == raw);
+    }
+    let mut matches = expected.iter().filter(|id| id.starts_with(raw));
+    let first = matches.next()?;
+    if matches.next().is_some() {
+        return None; // 前缀不唯一，无法确定
+    }
+    Some(*first)
+}
+
 fn validate_response(issues: &[RepairIssue], actions: &[RepairAction]) -> Result<(), String> {
     let expected: HashSet<&str> = issues.iter().map(|issue| issue.id.as_str()).collect();
     let mut seen = HashSet::new();
     for action in actions {
-        if !expected.contains(action.issue_id.as_str()) {
+        let Some(issue_id) = resolve_issue_id(&expected, &action.issue_id) else {
             return Err(format!("模型返回未知 issue：{}", action.issue_id));
+        };
+        if !seen.insert(issue_id) {
+            return Err(format!("模型重复返回 issue：{issue_id}"));
         }
-        if !seen.insert(action.issue_id.as_str()) {
-            return Err(format!("模型重复返回 issue：{}", action.issue_id));
-        }
-        let issue = issues.iter().find(|i| i.id == action.issue_id).unwrap();
+        let issue = issues.iter().find(|i| i.id == issue_id).unwrap();
         let label = issue.key.as_deref().unwrap_or(action.issue_id.as_str());
         match action.action.as_str() {
             "translate" => {
@@ -337,8 +351,15 @@ pub async fn run_repair_passes(
                 .find(|s| s.target_path == target_path)
                 .ok_or_else(|| format!("未知语言目标：{target_path}"))?;
             for batch in group.chunks(MAX_REPAIR_BATCH) {
-                let actions = request_actions(batch, config, model).await?;
-                apply_actions(workspace, source, &actions, work_graph)?;
+                // 回修是兜底：批次失败仅跳过，不阻塞打包
+                match request_actions(batch, config, model).await {
+                    Ok(actions) => {
+                        if let Err(e) = apply_actions(workspace, source, &actions, work_graph) {
+                            log_warn!("[ModTranslation] 质量回修写回失败，跳过该批次: {e}");
+                        }
+                    }
+                    Err(e) => log_warn!("[ModTranslation] 质量回修批次失败，跳过: {e}"),
+                }
             }
         }
     }
@@ -485,6 +506,30 @@ mod tests {
             },
         ];
         assert!(validate_response(&issues, &no_reason).is_err()); // keep-source 缺理由
+    }
+
+    #[test]
+    fn validate_response_accepts_truncated_issue_id() {
+        let issues = vec![issue("abcdef1234567890", "Spawn %d zombies")];
+        let actions = vec![RepairAction {
+            action: "translate".to_string(),
+            issue_id: "abcdef123456".to_string(), // 模型截断的 id
+            translation: Some("生成 %d 只僵尸".to_string()),
+            reason: None,
+        }];
+        assert!(validate_response(&issues, &actions).is_ok());
+        // 前缀不唯一时仍拒绝
+        let issues = vec![
+            issue("abcdef1234567890", "Spawn %d zombies"),
+            issue("abcdef1234567891", "Hello"),
+        ];
+        let actions = vec![RepairAction {
+            action: "translate".to_string(),
+            issue_id: "abcdef123456".to_string(),
+            translation: Some("生成 %d 只僵尸".to_string()),
+            reason: None,
+        }];
+        assert!(validate_response(&issues, &actions).is_err());
     }
 
     #[test]
