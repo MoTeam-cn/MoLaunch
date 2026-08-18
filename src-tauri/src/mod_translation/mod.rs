@@ -5,9 +5,12 @@
 
 pub mod analyze;
 pub mod class;
+pub mod error;
 pub mod jar;
+pub mod json_value;
 pub mod lang;
 pub mod prompt;
+pub mod quality;
 pub mod translate;
 pub mod types;
 

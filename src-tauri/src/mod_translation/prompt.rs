@@ -1,46 +1,7 @@
 //! 模组翻译：AI 响应解析、占位符保护
 
-use std::collections::BTreeSet;
-
-use once_cell::sync::Lazy;
-use regex::Regex;
-
+use super::quality::extract_protected_tokens;
 use super::types::{has_chinese, Loader};
-
-/// 提取文本中的保护占位符集合（%s、%1$s、{0}、{{x}}、§格式码、\n、尖括号标签等）
-pub fn extract_protected_tokens(text: &str) -> BTreeSet<String> {
-    let mut set = BTreeSet::new();
-    for cap in PRINTF_RE.captures_iter(text) {
-        if let Some(m) = cap.get(0) {
-            set.insert(m.as_str().to_string());
-        }
-    }
-    for cap in BRACE_RE.captures_iter(text) {
-        if let Some(m) = cap.get(0) {
-            set.insert(m.as_str().to_string());
-        }
-    }
-    for cap in FORMAT_CODE_RE.captures_iter(text) {
-        if let Some(m) = cap.get(0) {
-            set.insert(m.as_str().to_string());
-        }
-    }
-    for cap in ESCAPE_RE.captures_iter(text) {
-        if let Some(m) = cap.get(0) {
-            set.insert(m.as_str().to_string());
-        }
-    }
-    set
-}
-
-static PRINTF_RE: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"%[-+#0-9]*\.?[0-9]*[a-zA-Z%$][a-zA-Z0-9$]*|%[a-zA-Z]").expect("PRINTF_RE")
-});
-static BRACE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\{\{[^}]*\}\}|\{[0-9]+(?::[^}]*)?\}").expect("BRACE_RE"));
-static FORMAT_CODE_RE: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"§[0-9a-fk-orx]").expect("FORMAT_CODE_RE"));
-static ESCAPE_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\\n|\\t|\\r").expect("ESCAPE_RE"));
 
 /// 校验翻译是否合格：非空、含简体中文、占位符集合与源一致
 pub fn validate_translation(source: &str, translation: &str) -> bool {
@@ -149,11 +110,11 @@ mod tests {
 
     #[test]
     fn protected_tokens_extraction() {
-        let set = extract_protected_tokens("a %1$s b {2} c {{x}} d §6 e \\n");
-        assert!(set.contains("%1$s"));
-        assert!(set.contains("{2}"));
-        assert!(set.contains("{{x}}"));
-        assert!(set.contains("§6"));
-        assert!(set.contains("\\n"));
+        let tokens = extract_protected_tokens("a %1$s b {2} c {{x}} d §6 e \\n");
+        assert!(tokens.iter().any(|t| t == "%1$s"));
+        assert!(tokens.iter().any(|t| t == "{2}"));
+        assert!(tokens.iter().any(|t| t == "{{x}}"));
+        assert!(tokens.iter().any(|t| t == "§6"));
+        assert!(tokens.iter().any(|t| t == "\\n"));
     }
 }
