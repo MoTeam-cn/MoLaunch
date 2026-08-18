@@ -10,6 +10,8 @@ interface ModalOptions {
   type: ModalType
   title: string
   message: string
+  /** 富文本消息（经 DOMPurify 消毒后渲染，优先于 message） */
+  messageHtml?: string
   details?: string
   confirmText?: string
   showCancel?: boolean
@@ -30,7 +32,13 @@ export interface ModalInstance {
   warning: (title: string, message: string, details?: string) => void
   info: (title: string, message: string, details?: string) => void
   success: (title: string, message: string, details?: string) => void
-  confirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) => void
+  confirm: (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    onCancel?: () => void,
+    opts?: { messageHtml?: string },
+  ) => void
   prompt: (
     title: string,
     message: string,
@@ -65,8 +73,14 @@ export function showSuccess(title: string, message: string, details?: string) {
   modalRef.value?.success(title, message, details)
 }
 
-export function showConfirm(title: string, message: string, onConfirm: () => void, onCancel?: () => void) {
-  modalRef.value?.confirm(title, message, onConfirm, onCancel)
+export function showConfirm(
+  title: string,
+  message: string,
+  onConfirm: () => void,
+  onCancel?: () => void,
+  opts?: { messageHtml?: string },
+) {
+  modalRef.value?.confirm(title, message, onConfirm, onCancel, opts)
 }
 
 /**
@@ -79,9 +93,13 @@ export function showConfirm(title: string, message: string, onConfirm: () => voi
  * @param message 提示消息
  * @returns true=确认，false=取消
  */
-export function showConfirmAsync(title: string, message: string): Promise<boolean> {
+export function showConfirmAsync(
+  title: string,
+  message: string,
+  opts?: { messageHtml?: string },
+): Promise<boolean> {
   return new Promise((resolve) => {
-    showConfirm(title, message, () => resolve(true), () => resolve(false))
+    showConfirm(title, message, () => resolve(true), () => resolve(false), opts)
   })
 }
 

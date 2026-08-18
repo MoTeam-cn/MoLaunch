@@ -68,6 +68,9 @@ async function handleStart() {
     const ok = await showConfirmAsync(
       '覆盖中文语言文件',
       `该模组已包含 ${existing.length} 个中文语言文件（如 ${existing[0].path}），翻译将覆盖这些文件，是否继续？`,
+      {
+        messageHtml: `该模组已包含 <strong>${existing.length}</strong> 个中文语言文件（如 <strong class="font-semibold break-all">${existing[0].path}</strong>），翻译将覆盖这些文件，是否继续？`,
+      },
     )
     if (!ok) return
   }

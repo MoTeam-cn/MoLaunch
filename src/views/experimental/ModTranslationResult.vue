@@ -9,6 +9,7 @@ const Select = defineAsyncComponent(() => import('@/components/common/Select.vue
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 import * as tauri from '@/utils/tauri'
 import { toastError } from '@/utils/toast'
 import type {
@@ -133,8 +134,11 @@ async function handleOpenDir() {
               <span class="text-gray-500 w-16 shrink-0">class 文本</span>
               <span class="text-gray-800">{{ props.analyzeResult.classCandidates.length }} 个候选</span>
             </div>
-            <div v-if="props.analyzeResult.existingChinese.length" class="mt-3 rounded border border-yellow-300 bg-yellow-50 px-3 py-2">
-              <p class="text-xs font-medium text-yellow-700">该模组已包含中文语言文件，翻译将覆盖以下文件：</p>
+            <div v-if="props.analyzeResult.existingChinese.length" class="mt-3">
+              <AlertV2
+                type="warning"
+                :message="`该模组已包含 ${props.analyzeResult.existingChinese.length} 个中文语言文件，翻译将覆盖以下文件：`"
+              />
               <ul class="mt-1 space-y-0.5">
                 <li
                   v-for="item in props.analyzeResult.existingChinese"
@@ -188,7 +192,7 @@ async function handleOpenDir() {
               成本与覆盖分析
             </button>
             <Collapse :open="detailOpen">
-              <div class="mt-2 space-y-3">
+              <div class="mt-2 space-y-3 rounded-lg border border-dashed border-gray-300 p-3">
                 <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
                   <div>预估 token：{{ props.analyzeResult.quote.estimatedTokens }}</div>
                   <div>调用次数：{{ props.analyzeResult.quote.estimatedCalls }}</div>

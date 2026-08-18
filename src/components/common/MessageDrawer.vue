@@ -6,6 +6,7 @@
  * defineExpose 对外接口与旧 Modal.vue 完全一致，utils/modal.ts 调用方无需改动
  */
 import { ref, computed, nextTick, defineAsyncComponent } from 'vue'
+import DOMPurify from 'dompurify'
 import {
   ExclamationTriangleIcon,
   XCircleIcon,
@@ -23,6 +24,8 @@ interface ModalOptions {
   type: ModalType
   title: string
   message: string
+  /** 富文本消息（经 DOMPurify 消毒后 v-html 渲染，优先于 message） */
+  messageHtml?: string
   details?: string
   confirmText?: string
   showCancel?: boolean
@@ -141,11 +144,18 @@ defineExpose({
   success: (title: string, message: string, details?: string) => {
     show({ type: 'success', title, message, details })
   },
-  confirm: (title: string, message: string, onConfirm: () => void, onCancel?: () => void) => {
+  confirm: (
+    title: string,
+    message: string,
+    onConfirm: () => void,
+    onCancel?: () => void,
+    opts?: { messageHtml?: string },
+  ) => {
     show({
       type: 'warning',
       title,
       message,
+      messageHtml: opts?.messageHtml,
       showCancel: true,
       onConfirm,
       onCancel,
@@ -189,8 +199,15 @@ defineExpose({
       </div>
     </template>
 
-    <!-- 消息（支持 \n 换行） -->
-    <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line break-words">{{ options.message }}</p>
+    <!-- 消息（支持 \n 换行；messageHtml 提供时经 DOMPurify 消毒后渲染富文本） -->
+    <!-- eslint-disable vue/no-v-html -- 富文本消息已用 DOMPurify 消毒 -->
+    <p
+      v-if="options.messageHtml"
+      class="text-sm text-gray-600 leading-relaxed break-words"
+      v-html="DOMPurify.sanitize(options.messageHtml)"
+    />
+    <!-- eslint-enable vue/no-v-html -->
+    <p v-else class="text-sm text-gray-600 leading-relaxed whitespace-pre-line break-words">{{ options.message }}</p>
 
     <!-- 输入框 -->
     <div v-if="options.showInput" class="mt-4">
