@@ -1,18 +1,17 @@
 <script setup lang="ts">
 /**
- * 网络拓扑图（基于 WebRTC ICE candidate 绘制，ECharts graph）
+ * 网络拓扑图（基于 WebRTC ICE candidate 绘制，ECharts graph 力导向布局）
  *
- * 默认折叠，经 Collapse 组件展开。以 ECharts 图（线条互连）直观展示
- * 「本机 → NAT 设备 → 公网（STUN 服务器 / 反射地址）」链路，
- * 节点与连线颜色继承页面主题色（CSS 变量 --color-primary-*，运行时随换肤变化）。
- * 附带 NAT 分享算法：复制分享内容 / 导入朋友分享，判断双方联机可能性。
+ * 默认折叠，经 Collapse 组件展开。展示「本机 → NAT 设备 → STUN 服务器 / 反射地址」
+ * 链路；导入朋友分享后，朋友侧节点一并入图，并以 P2P 连线标注双方联机可能性。
+ * 配色继承页面主题色（CSS 变量 --color-primary-*，运行时随换肤变化）。
  * 数据源：NatDetectionResult.ice / localIp / publicIp / stunServers。
  */
 
 import { computed, defineAsyncComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import * as echarts from 'echarts/core'
 import { GraphChart } from 'echarts/charts'
-import { TooltipComponent } from 'echarts/components'
+import { TooltipComponent, LegendComponent } from 'echarts/components'
 import { CanvasRenderer } from 'echarts/renderers'
 import type { NatDetectionResult } from '@/types/online'
 import { NAT_TYPE_META } from '@/utils/online/nat'
@@ -33,7 +32,7 @@ import {
   ArrowDownTrayIcon,
 } from '@heroicons/vue/24/outline'
 
-echarts.use([GraphChart, TooltipComponent, CanvasRenderer])
+echarts.use([GraphChart, TooltipComponent, LegendComponent, CanvasRenderer])
 
 const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
@@ -60,14 +59,7 @@ const isReachable = computed(
 )
 const publicIp = computed(() => props.result?.publicIp ?? srflxs.value[0]?.address ?? '')
 const publicPort = computed(() => (srflxs.value[0] ? String(srflxs.value[0].port) : ''))
-const stunServer = computed(
-  () => (props.result?.stunServers ?? []).map((s) => s.replace(/^stun:/, '')).join('、') || '',
-)
-
-/** 长地址截断显示 */
-function truncate(s: string, n: number): string {
-  return s.length > n ? `${s.slice(0, n)}…` : s
-}
+const stunServers = computed(() => props.result?.stunServers ?? [])
 
 // ============ ECharts 拓扑图 ============
 const chartEl = ref<HTMLDivElement | null>(null)
@@ -80,107 +72,249 @@ function cssVar(name: string, fallback: string): string {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback
 }
 
+/** 边标签配置（统一样式） */
+function edgeLabel(text: string, color = '#86909c'): object {
+  return { show: true, formatter: text, fontSize: 9, color, position: 'middle', offset: [0, -6] }
+}
+
 function buildOption() {
   const primary = cssVar('--color-primary-500', '#165dff')
   const primaryDark = cssVar('--color-primary-700', '#0a3aae')
-  const textLight = '#86909c'
-  const reachable = isReachable.value
-  const edgeColor = reachable ? '#10b981' : '#ef4444'
+  const primaryLight = cssVar('--color-primary-100', '#dde5ff')
+  const friendColor = '#722ed1'
+  const friendDark = '#531dab'
+  const friendLight = '#f5e8ff'
+  const stunColor = '#86909c'
+  const textColor = '#4e5969'
+
+  const categories = [
+    { name: '本机', itemStyle: { color: primary } },
+    { name: 'NAT 设备', itemStyle: { color: primaryDark } },
+    { name: 'STUN 服务器', itemStyle: { color: stunColor } },
+    { name: '反射地址', itemStyle: { color: primaryLight } },
+    { name: '朋友设备', itemStyle: { color: friendColor } },
+    { name: '朋友 NAT', itemStyle: { color: friendDark } },
+    { name: '朋友反射', itemStyle: { color: friendLight } },
+  ]
+
+  const nodes: Record<string, unknown>[] = []
+  const links: Record<string, unknown>[] = []
+
+  // ---- 本机侧 ----
+  nodes.push({
+    id: 'local',
+    name: '本机',
+    category: 0,
+    symbolSize: 46,
+    label: { fontSize: 12, fontWeight: 500, color: textColor },
+    desc: `本地出口地址：${localIp.value || '未知'}`,
+  })
+  nodes.push({
+    id: 'nat',
+    name: `NAT 设备\n(${natLabel.value})`,
+    category: 1,
+    symbolSize: 46,
+    label: { fontSize: 12, fontWeight: 500, color: textColor },
+    desc: isReachable.value
+      ? `反射地址：${publicIp.value || '未知'}:${publicPort.value || '-'}`
+      : 'UDP 出站受限，无法获取反射地址',
+  })
+  links.push({
+    source: 'local',
+    target: 'nat',
+    label: edgeLabel('Host'),
+    lineStyle: { color: primary, width: 2, type: 'solid' },
+  })
+
+  // STUN 服务器（最多 2 个）
+  stunServers.value.slice(0, 2).forEach((s, i) => {
+    const id = `stun-${i}`
+    nodes.push({
+      id,
+      name: `STUN ${i + 1}`,
+      category: 2,
+      symbolSize: 40,
+      label: { fontSize: 11, color: textColor },
+      desc: `服务器：${s}`,
+    })
+    links.push({
+      source: 'nat',
+      target: id,
+      label: edgeLabel('查询'),
+      lineStyle: { color: stunColor, width: 1.8, type: 'dashed', curveness: i === 0 ? 0.15 : -0.15 },
+    })
+  })
+
+  // 反射地址（srflx，最多 2 个）
+  srflxs.value.slice(0, 2).forEach((c, i) => {
+    const id = `srflx-${i}`
+    nodes.push({
+      id,
+      name: `反射 ${i + 1}`,
+      category: 3,
+      symbolSize: 36,
+      label: { fontSize: 10, color: textColor },
+      desc: `${c.address}:${c.port}`,
+    })
+    links.push({
+      source: 'nat',
+      target: id,
+      label: edgeLabel('srflx'),
+      lineStyle: { color: '#a9aeb8', width: 1.5, type: 'dotted', curveness: i === 0 ? 0.1 : -0.1 },
+    })
+    if (stunServers.value[i]) {
+      links.push({
+        source: id,
+        target: `stun-${i}`,
+        label: { show: false },
+        lineStyle: { color: '#c9cdd4', width: 1.2, type: 'solid', curveness: i === 0 ? 0.1 : -0.1 },
+      })
+    }
+  })
+
+  // ---- 朋友侧（导入分享后） ----
+  if (friendShare.value) {
+    nodes.push({
+      id: 'friend-local',
+      name: '朋友设备',
+      category: 4,
+      symbolSize: 46,
+      label: { fontSize: 12, fontWeight: 500, color: textColor },
+      desc: `本地出口地址：${friendShare.value.localIp || '未知'}`,
+    })
+    nodes.push({
+      id: 'friend-nat',
+      name: `朋友 NAT\n(${friendNatLabel.value})`,
+      category: 5,
+      symbolSize: 46,
+      label: { fontSize: 12, fontWeight: 500, color: textColor },
+      desc: `反射地址：${friendShare.value.publicIp || '未知'}`,
+    })
+    links.push({
+      source: 'friend-local',
+      target: 'friend-nat',
+      label: edgeLabel('Host'),
+      lineStyle: { color: friendColor, width: 2, type: 'solid' },
+    })
+
+    const friendSrflxs = (friendShare.value.ice ?? [])
+      .filter((c) => c.kind === 'srflx')
+      .slice(0, 2)
+    friendSrflxs.forEach((c, i) => {
+      const id = `friend-srflx-${i}`
+      nodes.push({
+        id,
+        name: `朋友反射 ${i + 1}`,
+        category: 6,
+        symbolSize: 36,
+        label: { fontSize: 10, color: textColor },
+        desc: `${c.address}:${c.port}`,
+      })
+      links.push({
+        source: 'friend-nat',
+        target: id,
+        label: edgeLabel('srflx'),
+        lineStyle: { color: '#c9cdd4', width: 1.5, type: 'dotted', curveness: i === 0 ? 0.1 : -0.1 },
+      })
+    })
+
+    // P2P 直连：我的反射 → 朋友反射（颜色/线型随联机可能性等级）
+    if (srflxs.value.length > 0 && friendSrflxs.length > 0 && verdict.value) {
+      const styleMap: Record<P2PVerdict['level'], { color: string; type: string }> = {
+        high: { color: '#10b981', type: 'solid' },
+        medium: { color: '#f7ba1e', type: 'dashed' },
+        low: { color: '#ff7d00', type: 'dashed' },
+        none: { color: '#f53f3f', type: 'dashed' },
+        unknown: { color: '#86909c', type: 'dashed' },
+      }
+      const style = styleMap[verdict.value.level]
+      links.push({
+        source: 'srflx-0',
+        target: 'friend-srflx-0',
+        label: edgeLabel(verdict.value.label, style.color),
+        lineStyle: { color: style.color, width: 2.2, type: style.type, curveness: 0.2 },
+      })
+    }
+  }
+
   return {
     backgroundColor: 'transparent',
     tooltip: {
-      show: true,
       trigger: 'item',
-      formatter: (params: { dataType?: string; data?: { name?: string; desc?: string } }) => {
-        if (params.dataType === 'node' && params.data) {
-          return `<b>${params.data.name ?? ''}</b><br/>${params.data.desc ?? ''}`
+      formatter: (params: { dataType?: string; name?: string; data?: { desc?: string } }) => {
+        if (params.dataType === 'node') {
+          return `<strong>${params.name ?? ''}</strong><br/>${params.data?.desc ?? ''}`
         }
         return ''
       },
+      backgroundColor: '#ffffff',
+      borderColor: '#e5e6eb',
+      borderWidth: 1,
+      textStyle: { color: '#1d2129' },
+    },
+    legend: {
+      show: true,
+      data: categories.map((c) => c.name),
+      icon: 'circle',
+      orient: 'horizontal',
+      left: 'center',
+      top: 0,
+      itemWidth: 10,
+      itemHeight: 10,
+      textStyle: { fontSize: 11, color: textColor },
+      backgroundColor: '#f2f3f5',
+      borderRadius: 20,
+      padding: [3, 12],
+      borderColor: '#e5e6eb',
+      borderWidth: 1,
     },
     series: [
       {
         type: 'graph',
-        layout: 'none',
-        roam: false,
-        draggable: false,
+        layout: 'force',
+        force: {
+          repulsion: 300,
+          edgeLength: [80, 200],
+          gravity: 0.08,
+          friction: 0.2,
+          layoutAnimation: true,
+        },
+        data: nodes,
+        links,
+        categories,
+        roam: true,
+        draggable: true,
         edgeSymbol: ['none', 'arrow'],
-        edgeSymbolSize: 8,
+        edgeSymbolSize: [0, 8],
         label: {
           show: true,
-          position: 'inside',
-          color: '#ffffff',
+          position: 'bottom',
           fontSize: 12,
-          fontWeight: 600,
-          lineHeight: 18,
+          color: textColor,
+          offset: [0, 6],
         },
-        itemStyle: { borderRadius: 8 },
-        data: [
-          {
-            name: '本机',
-            x: 90,
-            y: 100,
-            symbol: 'roundRect',
-            symbolSize: [120, 60],
-            itemStyle: { color: primary },
-            label: { formatter: `本机\n${truncate(localIp.value || '未知', 16)}` },
-            desc: `本地出口地址：${localIp.value || '未知'}`,
-          },
-          {
-            name: 'NAT 设备',
-            x: 300,
-            y: 100,
-            symbol: 'roundRect',
-            symbolSize: [120, 60],
-            itemStyle: { color: primaryDark },
-            label: { formatter: `NAT 设备\n${natLabel.value}` },
-            desc: reachable
-              ? `反射地址：${publicIp.value || '未知'}:${publicPort.value || '-'}`
-              : 'UDP 出站受限，无法获取反射地址',
-          },
-          {
-            name: '公网',
-            x: 510,
-            y: 100,
-            symbol: 'roundRect',
-            symbolSize: [120, 60],
-            itemStyle: { color: reachable ? '#10b981' : '#ef4444' },
-            label: { formatter: `公网 STUN\n${truncate(stunServer.value || 'STUN 服务器', 14)}` },
-            desc: reachable
-              ? `STUN：${stunServer.value || '未知'}\n公网 IP：${publicIp.value || '未知'}`
-              : '无法获取反射地址',
-          },
-        ],
-        links: [
-          {
-            source: '本机',
-            target: 'NAT 设备',
-            lineStyle: { color: primary, width: 1.5 },
-            label: {
-              show: true,
-              formatter: '局域网',
-              position: 'middle',
-              color: textLight,
-              fontSize: 11,
-            },
-          },
-          {
-            source: 'NAT 设备',
-            target: '公网',
-            lineStyle: {
-              color: edgeColor,
-              width: 1.5,
-              type: reachable ? 'solid' : 'dashed',
-            },
-            label: {
-              show: true,
-              formatter: '公网',
-              position: 'middle',
-              color: textLight,
-              fontSize: 11,
-            },
-          },
-        ],
+        edgeLabel: {
+          show: true,
+          fontSize: 9,
+          color: '#86909c',
+          position: 'middle',
+          offset: [0, -6],
+        },
+        lineStyle: {
+          color: 'source',
+          curveness: 0.2,
+          width: 1.8,
+          opacity: 0.7,
+        },
+        itemStyle: {
+          borderColor: '#e5e6eb',
+          borderWidth: 1.5,
+        },
+        symbolSize: 44,
+        emphasis: {
+          focus: 'adjacency',
+          lineStyle: { width: 2.5 },
+        },
       },
     ],
   }
@@ -197,7 +331,7 @@ function ensureChart() {
 }
 
 watch(
-  () => [props.result, open.value, hasData.value],
+  () => [props.result, open.value, hasData.value, friendShare.value, verdict.value],
   async () => {
     await nextTick()
     if (hasData.value && open.value) ensureChart()
@@ -257,7 +391,7 @@ function handleImport() {
   }
   showPrompt(
     '导入 NAT 分享',
-    '粘贴朋友分享的 NAT 内容，判断双方联机可能性：',
+    '粘贴朋友分享的 NAT 内容，朋友侧节点将加入拓扑图并判断联机可能性：',
     (value) => {
       const data = parseNatShare(value)
       if (!data) {
@@ -308,7 +442,11 @@ function handleImport() {
           暂无 ICE candidate 数据，点击「重新检测」获取后展示
         </p>
         <template v-else>
-          <div ref="chartEl" class="w-full" style="height: 180px"></div>
+          <div
+            ref="chartEl"
+            class="w-full"
+            :style="{ height: friendShare ? '340px' : '280px' }"
+          ></div>
           <!-- 与朋友的联机可能性 -->
           <div v-if="verdict && friendShare" class="mt-3 rounded-lg border border-gray-200 p-3">
             <div class="flex items-center justify-between">
