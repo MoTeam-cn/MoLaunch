@@ -49,8 +49,9 @@ pub async fn run_class_route(
                 return Err("任务已取消".to_string());
             }
             if attempt > 0 {
+                let retry_progress = (base_progress + attempt as f64 * 5.0).min(90.0);
                 on_progress(
-                    base_progress,
+                    retry_progress,
                     &format!("class 判定第 {}/{} 次重试", attempt + 1, MAX_BATCH_ATTEMPTS),
                     Some(RetryInfo {
                         attempt: attempt as u32 + 1,
@@ -69,7 +70,9 @@ pub async fn run_class_route(
             {
                 Ok(content) => content,
                 Err(e) => {
-                    last_error = Some(format!("AI class 判定调用失败: {e}"));
+                    let msg = format!("AI class 判定调用失败: {e}");
+                    log_warn!("[ModTranslation] {msg}");
+                    last_error = Some(msg);
                     if attempt + 1 == MAX_BATCH_ATTEMPTS {
                         break;
                     }

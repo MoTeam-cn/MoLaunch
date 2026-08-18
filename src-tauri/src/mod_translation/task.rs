@@ -66,10 +66,25 @@ pub(super) async fn run_task(
     }
 
     let task_id = super::current_status().task_id;
-    super::init_stage_weights(repair_enabled, class_text_enabled);
 
     // 断点续传：恢复检查点、工作图与 class 账本
     let mut checkpoint = checkpoint.unwrap_or_else(|| Checkpoint::fresh(task_id.clone()));
+    super::init_stage_weights(repair_enabled, class_text_enabled);
+
+    // 断点续传：补全已完成阶段进度（前端分进度折叠区显示 100%）
+    match checkpoint.stage.as_str() {
+        "language" => super::mark_stage_complete("language"),
+        "class" => {
+            super::mark_stage_complete("language");
+            super::mark_stage_complete("class");
+        }
+        "repair" => {
+            super::mark_stage_complete("language");
+            super::mark_stage_complete("class");
+            super::mark_stage_complete("repair");
+        }
+        _ => {}
+    }
     let mut work_graph = checkpoint
         .work_graph
         .as_ref()
@@ -237,6 +252,7 @@ pub(super) async fn run_task(
             if !cancelled && fatal.is_none() {
                 checkpoint.work_graph =
                     Some(serde_json::to_value(work_graph.snapshot()).unwrap_or_default());
+                checkpoint.stage = "repair".to_string();
                 let _ = resume::save_checkpoint(&workspace, &checkpoint);
             }
         }

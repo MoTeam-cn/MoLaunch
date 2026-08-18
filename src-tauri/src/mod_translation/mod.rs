@@ -82,6 +82,13 @@ pub(super) fn init_stage_weights(repair_enabled: bool, class_text_enabled: bool)
     }
 }
 
+/// 标记阶段已完成（断点续传补全进度用）
+pub(super) fn mark_stage_complete(stage: &str) {
+    if let Ok(mut slot) = STAGE_PROGRESS.lock() {
+        slot.insert(stage.to_string(), 100.0);
+    }
+}
+
 /// 按阶段权重加权计算总进度（0-100）
 fn compute_total_progress() -> f64 {
     let (weights, stages) = (

@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::ai_core::{self, PromptKind};
-use crate::log_info;
+use crate::{log_info, log_warn};
 
 use super::lang;
 use super::ledger::{WorkGraph, WorkKind};
@@ -161,8 +161,9 @@ async fn translate_batch(
                 return Err("任务已取消".to_string());
             }
             if round > 1 {
+                let retry_progress = (base_progress + round as f64 * 2.0).min(90.0);
                 on_progress(
-                    base_progress,
+                    retry_progress,
                     &format!("{action} 第 {round}/{max_rounds} 次重试"),
                     Some(RetryInfo {
                         attempt: round as u32,
@@ -190,9 +191,11 @@ async fn translate_batch(
             .await
             {
                 Ok(content) => content,
-                Err(_) => {
+                Err(e) => {
+                    log_warn!("[ModTranslation] AI 批量翻译调用失败: {e}");
+                    let retry_progress = (base_progress + round as f64 * 2.0).min(90.0);
                     on_progress(
-                        base_progress,
+                        retry_progress,
                         &format!("{action} 第 {round}/{max_rounds} 次重试"),
                         Some(RetryInfo {
                             attempt: round as u32,

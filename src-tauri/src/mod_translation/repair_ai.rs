@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::ai_core::{self, PromptKind};
+use crate::log_warn;
 use crate::mod_translation::prompt;
 use crate::mod_translation::repair::{RepairAction, RepairIssue};
 use crate::mod_translation::types::{has_chinese, ProgressFn, RetryInfo};
@@ -48,7 +49,9 @@ pub(super) async fn request_actions(
         {
             Ok(content) => content,
             Err(e) => {
-                last_error = Some(format!("AI 修复方案调用失败: {e}"));
+                let msg = format!("AI 修复方案调用失败: {e}");
+                log_warn!("[ModTranslation] {msg}");
+                last_error = Some(msg);
                 continue;
             }
         };
