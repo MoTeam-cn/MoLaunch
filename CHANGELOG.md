@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **class 判定容错与重试策略优化：id 容错匹配、宽容解析、未覆盖候选单独请求**（[translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [translate_class_test.rs](src-tauri/src/mod_translation/translate_class_test.rs)）：排查「模型返回未知或重复 class 候选」根因——模型回显 24 位十六进制 id 时偶发增删字符（如 `037980176fd0aea1aebd7ab2` 被改写为 `037980176fd0aea1ebd7ab2`），整批校验失败触发最多 3 次全量重试。修复：① **id 容错匹配**：精确匹配失败时按编辑距离 ≤1 唯一匹配兜底（新增 `resolve_candidate_id` / `edit_distance_at_most_1`）；② **宽容解析**：`parse_and_validate_decisions` 不再因单个未知/重复/无效 decision 整批失败，逐条丢弃并记录 WARN，返回未覆盖候选列表；③ **未覆盖候选单独请求**：批次内有效判定直接应用，未覆盖候选单独发起一次小请求（`retry_uncovered`），失败即跳过，不再整批重试；④ **提示词约束强化**：明确 id 为 24 位十六进制、必须逐字符原样复制。
+
 - **模组翻译 AI 响应 reasoning 回退：content 为空时读取 reasoning 字段**（[chat.rs](src-tauri/src/ai_core/client/chat.rs) / [types.rs](src-tauri/src/ai_core/client/types.rs)）：部分思考模型在 `content` 为空时把输出放在 `reasoning` 字段（即使已携带 `thinking=disabled` 也可能出现）。修复：`ChatResponseMessage` 新增 `reasoning` 字段，`chat_inner` 解析时 `content` 为空（或空白）则回退读取 `reasoning`，与禁用思考参数双保险。
 
 - **模组翻译 AI 请求禁用思考模式：思考模型输出固定走 content 字段**（[chat.rs](src-tauri/src/ai_core/client/chat.rs) / [types.rs](src-tauri/src/ai_core/client/types.rs)）：排查「修复方案校验失败: AI 响应中未找到 JSON 对象」根因——deepseek-v4-flash 等思考模型把输出放在 `reasoning` 字段、`content` 为空，后端只读 `content` 导致解析失败。修复：`ChatRequest` 新增 `thinking` 字段（`{"thinking":{"type":"disabled"}}`），`chat_json`（模组翻译专用）统一携带禁用思考参数，强制模型输出走 `content`；普通 `chat` 不受影响。

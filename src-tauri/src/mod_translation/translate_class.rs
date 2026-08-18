@@ -42,9 +42,10 @@ pub async fn run_class_route(
         if cancel.load(Ordering::Relaxed) {
             return Err("任务已取消".to_string());
         }
+        let batch_refs: Vec<&ClassCandidate> = batch.iter().collect();
         let base_progress = 100.0 * (handled as f64 / total as f64);
         let batch_cap = 100.0 * ((handled + batch.len()).min(total) as f64 / total as f64);
-        let (mut last_error, mut decisions) = (None, Vec::new());
+        let mut last_error = None;
         for attempt in 0..MAX_BATCH_ATTEMPTS {
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
@@ -60,7 +61,7 @@ pub async fn run_class_route(
                     "class 文本判定中".to_string()
                 }
             };
-            let user_prompt = build_class_prompt(inspection, batch, last_error.as_deref());
+            let user_prompt = build_class_prompt(inspection, &batch_refs, last_error.as_deref());
             let content = match tokio::select! {
                 result = ai_core::chat_json(
                     config,
@@ -91,9 +92,29 @@ pub async fn run_class_route(
                     continue;
                 }
             };
-            match parse_and_validate_decisions(&content, batch) {
-                Ok(value) => {
-                    decisions = value;
+            match parse_and_validate_decisions(&content, &batch_refs) {
+                Ok((valid, uncovered)) => {
+                    if valid.is_empty() && uncovered.is_empty() {
+                        log_warn!("[ModTranslation] class 判定批次全部无效，跳过");
+                    }
+                    for decision in &valid {
+                        match apply_decision(workspace, &batch_refs, decision, class_ledger) {
+                            Ok(()) => handled += 1,
+                            Err(e) => log_warn!("[ModTranslation] class 处置失败: {e}"),
+                        }
+                    }
+                    if !uncovered.is_empty() {
+                        handled += retry_uncovered(
+                            workspace,
+                            inspection,
+                            &uncovered,
+                            config,
+                            model,
+                            class_ledger,
+                            cancel,
+                        )
+                        .await;
+                    }
                     break;
                 }
                 Err(e) => {
@@ -104,19 +125,6 @@ pub async fn run_class_route(
                         break;
                     }
                 }
-            }
-        }
-        if decisions.is_empty() {
-            log_warn!(
-                "[ModTranslation] class 判定批次失败：{}",
-                last_error.unwrap_or_default()
-            );
-            continue;
-        }
-        for decision in decisions {
-            match apply_decision(workspace, batch, &decision, class_ledger) {
-                Ok(()) => handled += 1,
-                Err(e) => log_warn!("[ModTranslation] class 处置失败: {e}"),
             }
         }
         let progress = 100.0 * (handled as f64 / total as f64);
@@ -147,7 +155,7 @@ fn resolve_deterministic_exclusions(
 
 fn build_class_prompt(
     inspection: &JarInspection,
-    batch: &[ClassCandidate],
+    batch: &[&ClassCandidate],
     last_error: Option<&str>,
 ) -> String {
     let candidates: Vec<Value> = batch
@@ -156,7 +164,7 @@ fn build_class_prompt(
         .collect();
     let mut prompt_value = serde_json::json!({
         "task": "判断 Minecraft 模组 class 常量文本是否展示给玩家；translate 必须提供含简体中文的 translation 且占位符原样保留，exclude 必须提供 reason",
-        "output": "只输出 JSON 对象：{\"decisions\":[{\"id\":\"候选id\",\"action\":\"translate\"|\"exclude\",\"translation\":\"译文\",\"reason\":\"理由\"}]}。id 必须原样复制 candidates 中的 id，每个候选恰好一个 decision，不得遗漏、不得新增。注意：本任务输出 decisions 数组，不是 translations 数组。",
+        "output": "只输出 JSON 对象：{\"decisions\":[{\"id\":\"候选id\",\"action\":\"translate\"|\"exclude\",\"translation\":\"译文\",\"reason\":\"理由\"}]}。id 是 24 位十六进制字符串，必须逐字符原样复制 candidates 中的 id，禁止增删改任何字符；每个候选恰好一个 decision，不得遗漏、不得新增。注意：本任务输出 decisions 数组，不是 translations 数组。",
         "loader": inspection.loader.as_str(),
         "modIds": inspection.mod_ids,
         "candidates": candidates,
@@ -171,10 +179,56 @@ fn str_at<'a>(item: &'a Value, key: &str) -> &'a str {
     item.get(key).and_then(Value::as_str).unwrap_or("")
 }
 
-fn parse_and_validate_decisions(
+/// 编辑距离 ≤1 判断（id 为 ASCII hex，按字节比较）
+fn edit_distance_at_most_1(a: &str, b: &str) -> bool {
+    let (short, long) = if a.len() <= b.len() { (a, b) } else { (b, a) };
+    if long.len() - short.len() > 1 {
+        return false;
+    }
+    if short.len() == long.len() {
+        return short
+            .bytes()
+            .zip(long.bytes())
+            .filter(|(x, y)| x != y)
+            .count()
+            <= 1;
+    }
+    let (mut i, mut j, mut skipped) = (0usize, 0usize, false);
+    while i < short.len() && j < long.len() {
+        if short.as_bytes()[i] == long.as_bytes()[j] {
+            i += 1;
+            j += 1;
+        } else if !skipped {
+            skipped = true;
+            j += 1;
+        } else {
+            return false;
+        }
+    }
+    true
+}
+
+/// 模型可能改写/截断 id：先精确匹配，再按编辑距离 ≤1 唯一匹配兜底
+fn resolve_candidate_id<'a>(expected: &'a HashSet<&str>, raw: &str) -> Option<&'a str> {
+    if expected.contains(raw) {
+        return expected.iter().copied().find(|id| *id == raw);
+    }
+    let mut matches = expected
+        .iter()
+        .filter(|id| edit_distance_at_most_1(id, raw));
+    let first = matches.next()?;
+    if matches.next().is_some() {
+        return None; // 不唯一，无法确定
+    }
+    Some(*first)
+}
+
+/// 宽容解析：未知/重复/无效 decision 逐条丢弃并记录 WARN，不整批失败
+/// 返回 (有效 decisions, 未覆盖候选)。未覆盖候选由调用方单独请求或跳过。
+fn parse_and_validate_decisions<'a>(
     content: &str,
-    candidates: &[ClassCandidate],
-) -> Result<Vec<DecisionEntry>, String> {
+    candidates: &'a [&'a ClassCandidate],
+) -> Result<(Vec<DecisionEntry>, Vec<&'a ClassCandidate>), String> {
     let stripped = prompt::strip_json_fences(content);
     let start = stripped.find('{').ok_or("AI 响应中未找到 JSON 对象")?;
     let end = stripped.rfind('}').ok_or("AI 响应中未找到 JSON 对象")?;
@@ -185,21 +239,30 @@ fn parse_and_validate_decisions(
         .and_then(Value::as_array)
         .ok_or("AI 响应缺少 decisions 数组")?;
     let expected: HashSet<&str> = candidates.iter().map(|c| c.id.as_str()).collect();
-    let by_id: HashMap<_, _> = candidates.iter().map(|c| (c.id.as_str(), c)).collect();
+    let by_id: HashMap<_, _> = candidates.iter().map(|c| (c.id.as_str(), *c)).collect();
     let mut seen: HashSet<&str> = HashSet::new();
     let mut result = Vec::new();
     for item in items {
-        let id = str_at(item, "id");
-        if !expected.contains(id) || !seen.insert(id) {
-            return Err(format!("模型返回未知或重复 class 候选：{id}"));
+        let raw_id = str_at(item, "id");
+        let Some(id) = resolve_candidate_id(&expected, raw_id) else {
+            log_warn!("[ModTranslation] 丢弃未知 class 候选：{raw_id}");
+            continue;
+        };
+        if !seen.insert(id) {
+            log_warn!("[ModTranslation] 丢弃重复 class 候选：{id}");
+            continue;
         }
         let action = str_at(item, "action");
         let reason = str_at(item, "reason");
-        let candidate = by_id.get(id).ok_or_else(|| format!("候选缺失：{id}"))?;
+        let candidate = by_id
+            .get(id)
+            .copied()
+            .ok_or_else(|| format!("候选缺失：{id}"))?;
         match action {
             "exclude" => {
                 if reason.trim().is_empty() {
-                    return Err(format!("class 候选 {id} 缺少判定理由"));
+                    log_warn!("[ModTranslation] 丢弃缺少理由的 class 候选：{id}");
+                    continue;
                 }
                 result.push(DecisionEntry {
                     id: id.to_string(),
@@ -212,12 +275,14 @@ fn parse_and_validate_decisions(
                 let raw = str_at(item, "translation");
                 let translation = quality::normalize_model_translation(&candidate.text, raw);
                 if !has_chinese(&translation) {
-                    return Err(format!("class 候选 {id} 的译文不含简体中文"));
+                    log_warn!("[ModTranslation] 丢弃译文不含中文的 class 候选：{id}");
+                    continue;
                 }
                 if let Some(error) =
                     quality::validate_protected_tokens(&candidate.text, &translation)
                 {
-                    return Err(format!("class 候选 {id}：{error}"));
+                    log_warn!("[ModTranslation] 丢弃占位符不符的 class 候选 {id}：{error}");
+                    continue;
                 }
                 result.push(DecisionEntry {
                     id: id.to_string(),
@@ -226,24 +291,76 @@ fn parse_and_validate_decisions(
                     reason: Some(reason.to_string()),
                 });
             }
-            other => return Err(format!("class 候选 {id} 返回未知动作：{other}")),
+            other => {
+                log_warn!("[ModTranslation] 丢弃未知动作的 class 候选 {id}：{other}");
+                continue;
+            }
         }
     }
-    let (seen_n, expected_n) = (seen.len(), expected.len());
-    if seen_n != expected_n {
-        return Err(format!("模型只判定了 {seen_n}/{expected_n} 个候选"));
+    let uncovered: Vec<&ClassCandidate> = candidates
+        .iter()
+        .copied()
+        .filter(|c| !seen.contains(c.id.as_str()))
+        .collect();
+    Ok((result, uncovered))
+}
+
+/// 未覆盖候选单独请求一次，失败即跳过（不整批重试）
+async fn retry_uncovered(
+    workspace: &Path,
+    inspection: &JarInspection,
+    uncovered: &[&ClassCandidate],
+    config: &ai_core::AiConfig,
+    model: &str,
+    class_ledger: &mut ClassDecisionLedger,
+    cancel: &AtomicBool,
+) -> usize {
+    if uncovered.is_empty() || cancel.load(Ordering::Relaxed) {
+        return 0;
     }
-    Ok(result)
+    let user_prompt = build_class_prompt(inspection, uncovered, None);
+    let content = match ai_core::chat_json(
+        config,
+        PromptKind::ModTranslation,
+        user_prompt,
+        Some(model),
+        Some(super::AI_TIMEOUT_SECS),
+    )
+    .await
+    {
+        Ok(c) => c,
+        Err(e) => {
+            log_warn!("[ModTranslation] class 未覆盖候选单独请求失败: {e}");
+            return 0;
+        }
+    };
+    match parse_and_validate_decisions(&content, uncovered) {
+        Ok((valid, _)) => {
+            let mut handled = 0;
+            for decision in &valid {
+                match apply_decision(workspace, uncovered, decision, class_ledger) {
+                    Ok(()) => handled += 1,
+                    Err(e) => log_warn!("[ModTranslation] class 处置失败: {e}"),
+                }
+            }
+            handled
+        }
+        Err(e) => {
+            log_warn!("[ModTranslation] class 未覆盖候选解析失败: {e}");
+            0
+        }
+    }
 }
 
 fn apply_decision(
     workspace: &Path,
-    candidates: &[ClassCandidate],
+    candidates: &[&ClassCandidate],
     decision: &DecisionEntry,
     ledger: &mut ClassDecisionLedger,
 ) -> Result<(), String> {
     let candidate = candidates
         .iter()
+        .copied()
         .find(|c| c.id == decision.id)
         .ok_or_else(|| format!("未知候选：{}", decision.id))?;
     match decision.action.as_str() {
