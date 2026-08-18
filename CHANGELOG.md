@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Changed
+
+- **发布工作流 Linux 依赖安装提速：APT 包缓存**（[release.yml](.github/workflows/release.yml)）：`Install dependencies (ubuntu only)` 原每次运行执行 `apt-get update` + 下载安装 libwebkit2gtk-4.1-dev 等大包（数百 MB），无缓存导致该步骤可卡 10 分钟；改用 `awalsh128/cache-apt-pkgs-action` 缓存 .deb 包，命中时跳过 update 与下载直接安装，并开启 `execute_install_scripts` 保证 webkit 等包 postinst 脚本执行。
+
 ### Added
 
 - **easytier 内核外部下载改造设计文档**（[EASYTIER_EXTERNAL_DOWNLOAD_DESIGN.md](docs/EASYTIER_EXTERNAL_DOWNLOAD_DESIGN.md)（新增））：放弃内置 easytier 内核（14 个二进制资源内嵌导致包体超标），改为经 GitHub API（主源 `api.github.com` / 备选 `github-api.mocdn.net`）获取最新版本号并下载对应平台 zip 安装到 `<appdata>/.Molaunch/easytier/`；默认只下载一次，设置页联机 Tab 新增安装状态 Tag 与下载/更新功能；镜像源来自前端 `githubProxy.json`，启动时测速筛选 30 个经 IPC 传给后端，下载时对候选源 HEAD+Range 0-1 竞速选最快者；文档含分阶段可复选实施清单。
