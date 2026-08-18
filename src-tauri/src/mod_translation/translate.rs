@@ -9,10 +9,7 @@ use crate::log_info;
 
 use super::lang;
 use super::prompt;
-use super::types::{has_chinese, JarInspection, LanguageKind, LanguageSource};
-
-/// 进度回调（0-100 + 消息）
-pub type ProgressFn = dyn Fn(f64, &str) + Send + Sync;
+use super::types::{has_chinese, JarInspection, LanguageKind, LanguageSource, ProgressFn};
 
 /// 单批最大重试次数（含首次调用共 2 次）
 const MAX_BATCH_ATTEMPTS: usize = 2;

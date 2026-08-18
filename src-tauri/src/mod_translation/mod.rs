@@ -17,6 +17,8 @@ pub mod quality;
 pub mod repair;
 pub mod resume;
 pub mod translate;
+pub mod translate_class;
+pub mod translate_lang;
 pub mod types;
 
 use std::path::{Path, PathBuf};

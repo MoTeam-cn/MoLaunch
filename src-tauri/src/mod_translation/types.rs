@@ -5,6 +5,9 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+/// 进度回调（0-100 + 消息），供各翻译路由共用
+pub type ProgressFn = dyn Fn(f64, &str) + Send + Sync;
+
 /// 模组加载器（用于翻译提示词上下文）
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
