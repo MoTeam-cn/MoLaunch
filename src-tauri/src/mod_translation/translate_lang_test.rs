@@ -28,6 +28,7 @@ fn sample_inspection() -> JarInspection {
             entries: 0,
         },
         mod_name: None,
+        existing_chinese: Vec::new(),
         warnings: Vec::new(),
     }
 }

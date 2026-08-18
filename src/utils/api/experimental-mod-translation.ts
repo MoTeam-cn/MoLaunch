@@ -66,6 +66,13 @@ export interface ModTranslationReport {
   warnings: string[]
 }
 
+/** 已存在的中文语言文件（预检：模组自带 zh_cn/zh_tw 时提示覆盖风险） */
+export interface ModTranslationExistingChinese {
+  path: string
+  locale: string
+  entries: number
+}
+
 export interface ModTranslationAnalyzeResult {
   filename: string
   loader: string
@@ -79,6 +86,7 @@ export interface ModTranslationAnalyzeResult {
   quote: ModTranslationQuote
   coverage: ModTranslationResourceCoverage[]
   modName: ModTranslationModName | null
+  existingChinese: ModTranslationExistingChinese[]
   warnings: string[]
 }
 

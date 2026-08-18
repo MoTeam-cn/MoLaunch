@@ -7,7 +7,9 @@ use sha2::{Digest, Sha256};
 
 use super::class;
 use super::lang;
-use super::types::{JarInspection, LanguageKind, LanguageSource, Loader, Quote, ResourceCoverage};
+use super::types::{
+    ExistingChinese, JarInspection, LanguageKind, LanguageSource, Loader, Quote, ResourceCoverage,
+};
 
 /// 发现标准语言文件 `assets/<ns>/lang/en_us.{json,lang,properties}`
 pub fn find_standard_sources(workspace: &Path) -> Vec<LanguageSource> {
@@ -366,6 +368,40 @@ pub fn quote_translation_metrics(
     }
 }
 
+/// 检测 JAR 内已有的中文语言文件（zh_cn / zh_tw 等），供预检提示覆盖风险
+pub fn find_existing_chinese(workspace: &Path) -> Vec<ExistingChinese> {
+    let mut result = Vec::new();
+    for relative in super::jar::collect_files(workspace).unwrap_or_default() {
+        let lower = relative.to_ascii_lowercase();
+        let locale = if lower.contains("zh_cn") || lower.contains("zh-cn") {
+            "zh_cn"
+        } else if lower.contains("zh_tw") || lower.contains("zh-tw") {
+            "zh_tw"
+        } else {
+            continue;
+        };
+        if !(lower.ends_with(".json") || lower.ends_with(".lang") || lower.ends_with(".properties"))
+        {
+            continue;
+        }
+        let path = workspace.join(&relative);
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let entries = if lower.ends_with(".json") {
+            lang::read_json_lang(&content).map(|m| m.len()).unwrap_or(0)
+        } else {
+            lang::parse_keyvalue(&content).0.len()
+        };
+        result.push(ExistingChinese {
+            path: relative,
+            locale: locale.to_string(),
+            entries,
+        });
+    }
+    result
+}
+
 /// 汇总 JAR 分析结果（signed 由解包阶段传入）
 pub fn inspect_jar(workspace: &Path, input_path: &Path, signed: bool) -> JarInspection {
     let standard = find_standard_sources(workspace);
@@ -389,6 +425,7 @@ pub fn inspect_jar(workspace: &Path, input_path: &Path, signed: bool) -> JarInsp
         .map(|c| c.text.chars().count())
         .sum();
     let coverage = build_resource_coverage(workspace, &language_sources);
+    let existing_chinese = find_existing_chinese(workspace);
     let quote = quote_translation_metrics(
         required_entries,
         language_chars,
@@ -398,6 +435,12 @@ pub fn inspect_jar(workspace: &Path, input_path: &Path, signed: bool) -> JarInsp
     let mut warnings = Vec::new();
     if language_sources.is_empty() {
         warnings.push("未找到 en_us 语言文件或含 en_us 路径的文本".to_string());
+    }
+    if !existing_chinese.is_empty() {
+        warnings.push(format!(
+            "模组已包含 {} 个中文语言文件，翻译将覆盖这些文件",
+            existing_chinese.len()
+        ));
     }
     if signed {
         warnings.push("JAR 含签名文件，翻译重打包后签名将失效".to_string());
@@ -428,6 +471,7 @@ pub fn inspect_jar(workspace: &Path, input_path: &Path, signed: bool) -> JarInsp
         coverage,
         quote,
         mod_name: None,
+        existing_chinese,
         warnings,
     }
 }

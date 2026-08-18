@@ -10,6 +10,7 @@ import { ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
 import { pickFile } from '@/utils/fileDialog'
 import { safeCall } from '@/utils/async'
 import { toastSuccess, toastInfo } from '@/utils/toast'
+import { showConfirmAsync } from '@/utils/modal'
 import { aiLoadConfig } from '@/utils/api/ai'
 import { useModTranslation } from '@/composables/useModTranslation'
 
@@ -61,6 +62,14 @@ async function handleStart() {
   if (!model.value) {
     toastInfo('请先选择翻译模型')
     return
+  }
+  const existing = analyzeResult.value?.existingChinese ?? []
+  if (existing.length > 0) {
+    const ok = await showConfirmAsync(
+      '覆盖中文语言文件',
+      `该模组已包含 ${existing.length} 个中文语言文件（如 ${existing[0].path}），翻译将覆盖这些文件，是否继续？`,
+    )
+    if (!ok) return
   }
   if (await start(model.value, batchSize.value, { generateModName: generateModName.value, repairEnabled: repairEnabled.value, classTextEnabled: classTextEnabled.value })) {
     toastSuccess('翻译任务已启动')

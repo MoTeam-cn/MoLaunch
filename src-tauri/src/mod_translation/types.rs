@@ -93,6 +93,18 @@ pub fn has_chinese(text: &str) -> bool {
     text.chars().any(|c| matches!(c, '\u{4e00}'..='\u{9fff}'))
 }
 
+/// 已存在的中文语言文件（预检：模组自带 zh_cn/zh_tw 时提示覆盖风险）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExistingChinese {
+    /// 工作区相对路径
+    pub path: String,
+    /// 语言标识（zh_cn / zh_tw）
+    pub locale: String,
+    /// 条目数
+    pub entries: usize,
+}
+
 /// JAR 分析结果
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JarInspection {
@@ -109,6 +121,7 @@ pub struct JarInspection {
     pub coverage: Vec<ResourceCoverage>,
     pub quote: Quote,
     pub mod_name: Option<ModNameResult>,
+    pub existing_chinese: Vec<ExistingChinese>,
     pub warnings: Vec<String>,
 }
 
@@ -135,6 +148,7 @@ pub struct AnalyzeResult {
     pub quote: Quote,
     pub coverage: Vec<ResourceCoverage>,
     pub mod_name: Option<ModNameResult>,
+    pub existing_chinese: Vec<ExistingChinese>,
     pub warnings: Vec<String>,
 }
 

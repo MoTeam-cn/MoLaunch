@@ -191,6 +191,7 @@ fn to_result(inspection: &JarInspection) -> AnalyzeResult {
         quote: inspection.quote.clone(),
         coverage: inspection.coverage.clone(),
         mod_name: None,
+        existing_chinese: inspection.existing_chinese.clone(),
         warnings: inspection.warnings.clone(),
     }
 }

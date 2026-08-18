@@ -133,6 +133,18 @@ async function handleOpenDir() {
               <span class="text-gray-500 w-16 shrink-0">class 文本</span>
               <span class="text-gray-800">{{ props.analyzeResult.classCandidates.length }} 个候选</span>
             </div>
+            <div v-if="props.analyzeResult.existingChinese.length" class="mt-3 rounded border border-yellow-300 bg-yellow-50 px-3 py-2">
+              <p class="text-xs font-medium text-yellow-700">该模组已包含中文语言文件，翻译将覆盖以下文件：</p>
+              <ul class="mt-1 space-y-0.5">
+                <li
+                  v-for="item in props.analyzeResult.existingChinese"
+                  :key="item.path"
+                  class="text-xs text-yellow-700"
+                >
+                  {{ item.locale }} · {{ item.path }}（{{ item.entries }} 条）
+                </li>
+              </ul>
+            </div>
             <div v-if="props.analyzeResult.signed" class="flex items-center gap-2">
               <span class="text-yellow-600">JAR 含签名文件，重打包后签名将失效</span>
             </div>
