@@ -8,7 +8,7 @@ use tauri::AppHandle;
 
 use crate::ai_core;
 use crate::storage::cache::Cache;
-use crate::{log_info, log_warn};
+use crate::{log_error, log_info, log_warn};
 
 use super::analyze;
 use super::jar;
@@ -144,7 +144,10 @@ pub(super) async fn run_task(
                 Err(e) if e == CANCEL_MSG || cancel_flag.load(Ordering::Relaxed) => {
                     cancelled = true
                 }
-                Err(e) => fatal = Some(e),
+                Err(e) => {
+                    log_error!("[ModTranslation] 语言翻译失败: {e}");
+                    fatal = Some(e)
+                }
             }
             if !cancelled && fatal.is_none() {
                 checkpoint.completed_language_batches = completed_batches.clone();
@@ -180,7 +183,10 @@ pub(super) async fn run_task(
                 Err(e) if e == CANCEL_MSG || cancel_flag.load(Ordering::Relaxed) => {
                     cancelled = true
                 }
-                Err(e) => fatal = Some(e),
+                Err(e) => {
+                    log_error!("[ModTranslation] 质量回修失败: {e}");
+                    fatal = Some(e)
+                }
             }
             if !cancelled && fatal.is_none() {
                 checkpoint.work_graph =
@@ -210,7 +216,10 @@ pub(super) async fn run_task(
         {
             Ok(()) => {}
             Err(e) if e == CANCEL_MSG || cancel_flag.load(Ordering::Relaxed) => cancelled = true,
-            Err(e) => fatal = Some(e),
+            Err(e) => {
+                log_error!("[ModTranslation] class 文本翻译失败: {e}");
+                fatal = Some(e)
+            }
         }
         checkpoint.class_exclusions = class_ledger.snapshot_exclusions();
         checkpoint.class_changed_files = class_ledger.replaced_files.clone();

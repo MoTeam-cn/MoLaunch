@@ -76,6 +76,7 @@ const statusText = computed(() => {
   if (s.status === 'cancelled') return '任务已取消'
   return s.message || '翻译中...'
 })
+const failed = computed(() => props.snapshot?.status === 'failed')
 
 async function handleOpenDir() {
   if (!props.snapshot?.outputPath) return
@@ -226,7 +227,7 @@ async function handleOpenDir() {
         <!-- 任务进度 -->
         <div v-if="props.snapshot && props.snapshot.status !== 'idle'" class="bg-white rounded-lg border border-gray-300 p-5">
           <div class="flex items-center justify-between gap-2 mb-2">
-            <span class="text-sm font-semibold text-gray-900">{{ statusText }}</span>
+            <span class="text-sm font-semibold" :class="failed ? 'text-red-600' : 'text-gray-900'">{{ statusText }}</span>
             <div class="flex items-center gap-2">
               <span v-if="props.running" class="text-xs text-gray-500">{{ Math.round(props.snapshot.progress) }}%</span>
               <Button v-if="props.running" type="ghost" size="small" @click="emit('cancel')">取消</Button>
