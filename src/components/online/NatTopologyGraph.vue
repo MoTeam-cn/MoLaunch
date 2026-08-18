@@ -333,8 +333,8 @@ function buildOption() {
         data: nodes,
         links,
         categories,
-        roam: true,
-        draggable: true,
+        roam: false,
+        draggable: false,
         edgeSymbol: ['none', 'arrow'],
         edgeSymbolSize: [0, 8],
         label: {
