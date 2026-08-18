@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **AlertV2 支持默认插槽，中文语言文件警告完整包裹标题与文件列表**（[AlertV2.vue](src/components/common/AlertV2.vue) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)）：AlertV2 新增默认插槽渲染（传入插槽时渲染插槽内容，否则回退 message，`message` 改为可选并补默认值），图标改为顶部对齐适配多行内容；模组翻译结果区「已包含中文语言文件」警告由仅包裹标题改为 AlertV2 完整包裹标题 + 文件列表（locale · 路径 · 条目数），视觉更统一。
+
 - **质量回修模块拆分重构，测试迁移至独立文件**（[repair.rs](src-tauri/src/mod_translation/repair.rs) / [repair_ai.rs](src-tauri/src/mod_translation/repair_ai.rs)（新增） / [repair_apply.rs](src-tauri/src/mod_translation/repair_apply.rs)（新增） / [repair_test.rs](src-tauri/src/mod_translation/repair_test.rs)（新增））：repair.rs 原 530+ 行超限，按职责拆分为三部分——repair.rs 保留类型定义、问题收集与多轮编排（177 行），AI 修复方案请求与响应校验移至 repair_ai.rs，修复方案应用与原子写回移至 repair_apply.rs；内联测试迁移至 repair_test.rs（`#[path]` 子模块引入，与 prompt_test/translate_lang_test 一致），子模块经 `#[path]` 显式声明并采用绝对路径导入。
 
 - **修复质量回修阶段模型返回非法 issueId 导致任务整体失败**（[repair.rs](src-tauri/src/mod_translation/repair.rs)）：模型偶发截断/幻觉 issueId（如返回 13 位而非 16 位）时，`validate_response` 直接报错、重试 2 次后整个任务失败，即使语言翻译已完成（zh_cn 已写回）也无法打包。现改为：① 未知 issueId 按前缀唯一匹配兜底（处理截断）；② 回修批次失败仅记录警告并跳过该批次，不再阻塞打包（回修本就是兜底，残留问题由完成报告提示）；③ 提示词明确要求原样复制 issueId。

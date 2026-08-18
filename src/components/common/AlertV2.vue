@@ -9,17 +9,19 @@
  *
  * 用法：<AlertV2 type="info" message="提示文字" />
  * 支持 5 种类型：info / warning / error / success / debug
+ * 传入默认插槽时渲染插槽内容（可含多行/列表），否则渲染 message。
  */
 
 import { elementIcons } from '@/utils/element-icons'
 
 interface Props {
   type?: 'info' | 'warning' | 'error' | 'success' | 'debug'
-  message: string
+  message?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
   type: 'info',
+  message: '',
 })
 
 const typeConfig = {
@@ -34,15 +36,17 @@ const config = typeConfig[props.type]
 </script>
 
 <template>
-  <div class="flex items-center gap-2 rounded-md bg-gray-50 p-2.5 text-xs text-gray-500">
+  <div class="flex items-start gap-2 rounded-md bg-gray-50 p-2.5 text-xs text-gray-500">
     <svg
-      class="h-3.5 w-3.5 shrink-0"
+      class="mt-0.5 h-3.5 w-3.5 shrink-0"
       :class="config.iconColor"
       :viewBox="config.icon.viewBox"
       fill="currentColor"
     >
       <path :d="config.icon.path" />
     </svg>
-    <span class="leading-relaxed">{{ message }}</span>
+    <div class="min-w-0 flex-1 leading-relaxed">
+      <slot>{{ message }}</slot>
+    </div>
   </div>
 </template>
