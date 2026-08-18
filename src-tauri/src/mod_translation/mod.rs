@@ -373,8 +373,11 @@ fn update_status(app: &AppHandle, stage: &str, progress: f64, message: &str) {
     let _ = app.emit(EVENT_NAME, &snapshot);
 }
 
-/// 终态：写入状态 + emit 事件
-fn finish(app: &AppHandle, snapshot: TaskSnapshot) {
+/// 终态：写入状态 + emit 事件（task_id 为空时从当前状态补全）
+fn finish(app: &AppHandle, mut snapshot: TaskSnapshot) {
+    if snapshot.task_id.is_empty() {
+        snapshot.task_id = current_status().task_id;
+    }
     store_status(&snapshot);
     let _ = app.emit(EVENT_NAME, &snapshot);
 }
