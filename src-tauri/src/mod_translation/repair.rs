@@ -143,12 +143,6 @@ pub async fn run_repair_passes(
         if cancel.load(Ordering::Relaxed) {
             return Err("任务已取消".to_string());
         }
-        let pass_progress = pass as f64 / MAX_REPAIR_PASSES as f64 * 100.0;
-        on_progress(
-            pass_progress,
-            &format!("质量复验第 {}/{} 轮", pass + 1, MAX_REPAIR_PASSES),
-            None,
-        );
         let issues = collect_issues(workspace, sources, work_graph);
         if issues.is_empty() {
             on_progress(100.0, "质量复验完成", None);
@@ -159,34 +153,44 @@ pub async fn run_repair_passes(
             let path = issue.target_path.clone().unwrap_or_default();
             groups.entry(path).or_default().push(issue);
         }
-        for (target_path, group) in groups {
+        // 展平为批次列表，进度按批次连续推进（不再按轮次跳变）
+        let batches: Vec<(&str, &[RepairIssue])> = groups
+            .iter()
+            .flat_map(|(path, group)| {
+                group
+                    .chunks(MAX_REPAIR_BATCH)
+                    .map(move |batch| (path.as_str(), batch))
+            })
+            .collect();
+        let total_batches = batches.len().max(1);
+        let pass_start = pass as f64 / MAX_REPAIR_PASSES as f64 * 100.0;
+        let pass_end = (pass + 1) as f64 / MAX_REPAIR_PASSES as f64 * 100.0;
+        for (idx, (target_path, batch)) in batches.iter().enumerate() {
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
             }
+            let base = pass_start + (idx as f64 / total_batches as f64) * (pass_end - pass_start);
+            let cap =
+                pass_start + ((idx + 1) as f64 / total_batches as f64) * (pass_end - pass_start);
             let source = sources
                 .iter()
-                .find(|s| s.target_path == target_path)
+                .find(|s| s.target_path == *target_path)
                 .ok_or_else(|| format!("未知语言目标：{target_path}"))?;
-            for batch in group.chunks(MAX_REPAIR_BATCH) {
-                // 回修是兜底：批次失败仅跳过，不阻塞打包
-                match repair_ai::request_actions(
-                    batch,
-                    config,
-                    model,
-                    on_progress,
-                    pass_progress,
-                    cancel,
-                )
+            // 回修是兜底：批次失败仅跳过，不阻塞打包
+            match repair_ai::request_actions(batch, config, model, on_progress, base, cap, cancel)
                 .await
-                {
-                    Ok(actions) => {
-                        if let Err(e) =
-                            repair_apply::apply_actions(workspace, source, &actions, work_graph)
-                        {
-                            log_warn!("[ModTranslation] 质量回修写回失败，跳过该批次: {e}");
-                        }
+            {
+                Ok(actions) => {
+                    if let Err(e) =
+                        repair_apply::apply_actions(workspace, source, &actions, work_graph)
+                    {
+                        log_warn!("[ModTranslation] 质量回修写回失败，跳过该批次: {e}");
+                        on_progress(base, &format!("质量回修写回失败，跳过: {e}"), None);
                     }
-                    Err(e) => log_warn!("[ModTranslation] 质量回修批次失败，跳过: {e}"),
+                }
+                Err(e) => {
+                    log_warn!("[ModTranslation] 质量回修批次失败，跳过: {e}");
+                    on_progress(base, &format!("质量回修批次失败，跳过: {e}"), None);
                 }
             }
         }

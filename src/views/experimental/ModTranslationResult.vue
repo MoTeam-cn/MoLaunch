@@ -297,6 +297,17 @@ async function handleOpenDir() {
               :style="{ width: displayProgress + '%' }"
             />
           </div>
+          <!-- 当前阶段子进度条（直接可见，不折叠） -->
+          <div v-if="props.running" class="mt-2 flex items-center gap-2 text-xs">
+            <span class="w-16 shrink-0 text-gray-500">{{ stageLabels[props.snapshot.stage] ?? props.snapshot.stage }}</span>
+            <div class="flex-1 h-1 overflow-hidden rounded-full bg-gray-200">
+              <div
+                class="h-full bg-primary-500 transition-all duration-200"
+                :style="{ width: props.snapshot.stageProgress + '%' }"
+              />
+            </div>
+            <span class="w-16 text-right shrink-0 text-gray-700">{{ Math.round(props.snapshot.stageProgress) }}%</span>
+          </div>
           <!-- 总进度行：折叠开关 + 重试信息 -->
           <div class="mt-1.5 flex items-center justify-between text-xs text-gray-500">
             <span>总进度 {{ Math.round(displayProgress) }}%</span>

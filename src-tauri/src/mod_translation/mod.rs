@@ -92,6 +92,14 @@ pub(super) fn mark_stage_complete(stage: &str) {
     }
 }
 
+/// 读取某阶段当前分进度（失败分支推送时取 max 避免进度回退）
+pub(crate) fn current_stage_progress(stage: &str) -> f64 {
+    STAGE_PROGRESS
+        .lock()
+        .map(|s| s.get(stage).copied().unwrap_or(0.0))
+        .unwrap_or(0.0)
+}
+
 /// 等待取消信号（配合 tokio::select! 实现 AI 调用可即时取消）
 pub(crate) async fn wait_cancel(cancel: &AtomicBool) {
     while !cancel.load(Ordering::Relaxed) {
@@ -211,7 +219,10 @@ pub async fn start_task(app: AppHandle, params: StartParams) -> Result<TaskSnaps
         chrono::Local::now().timestamp_millis()
     );
     let cancel_flag = Arc::new(AtomicBool::new(false));
-    let snapshot = TaskSnapshot::new(task_id);
+    // 任务启动即初始化阶段权重与进度列表，前端立即能看到各阶段（避免事件到达前无子阶段）
+    init_stage_weights(params.repair_enabled, params.class_text_enabled);
+    let mut snapshot = TaskSnapshot::new(task_id);
+    snapshot.stages = build_stages();
     if let Ok(mut slot) = RUNNING.lock() {
         *slot = Some(RunningTask {
             cancel_flag: cancel_flag.clone(),

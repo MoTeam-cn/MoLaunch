@@ -17,6 +17,7 @@ pub(super) async fn request_actions(
     model: &str,
     on_progress: &ProgressFn,
     base_progress: f64,
+    cap_progress: f64,
     cancel: &AtomicBool,
 ) -> Result<Vec<RepairAction>, String> {
     let base = build_repair_prompt(issues);
@@ -25,24 +26,27 @@ pub(super) async fn request_actions(
         if cancel.load(Ordering::Relaxed) {
             return Err("任务已取消".to_string());
         }
+        let retry = (attempt > 0).then(|| RetryInfo {
+            attempt: attempt as u32 + 1,
+            total: MAX_ACTIONS_ATTEMPTS,
+        });
         if attempt > 0 {
             log_warn!(
                 "[ModTranslation] 质量复验第 {}/{} 次重试",
                 attempt + 1,
                 MAX_ACTIONS_ATTEMPTS
             );
-            on_progress(
-                base_progress,
-                &format!("质量复验第 {}/{} 次重试", attempt + 1, MAX_ACTIONS_ATTEMPTS),
-                Some(RetryInfo {
-                    attempt: attempt + 1,
-                    total: MAX_ACTIONS_ATTEMPTS,
-                }),
-            );
         }
         let user_content = match &last_error {
             Some(error) => format!("{base}\n上次输出校验失败：{error}。请完整重发合法 JSON。"),
             None => base.clone(),
+        };
+        let msg = move |_p: f64| {
+            if attempt > 0 {
+                format!("质量复验第 {}/{} 次重试", attempt + 1, MAX_ACTIONS_ATTEMPTS)
+            } else {
+                "质量复验中".to_string()
+            }
         };
         let content = match tokio::select! {
             result = ai_core::chat_json(
@@ -55,11 +59,22 @@ pub(super) async fn request_actions(
             _ = crate::mod_translation::wait_cancel(cancel) => {
                 return Err("任务已取消".to_string())
             }
+            _ = crate::mod_translation::smooth_progress(
+                "repair",
+                base_progress,
+                cap_progress,
+                cancel,
+                on_progress,
+                msg,
+                retry,
+            ) => return Err("任务已取消".to_string()),
         } {
             Ok(content) => content,
             Err(e) => {
                 let msg = format!("AI 修复方案调用失败: {e}");
                 log_warn!("[ModTranslation] {msg}");
+                let current = crate::mod_translation::current_stage_progress("repair");
+                on_progress(current.max(base_progress), &msg, retry);
                 last_error = Some(msg);
                 continue;
             }
@@ -68,7 +83,13 @@ pub(super) async fn request_actions(
             .and_then(|actions| validate_response(issues, &actions).map(|_| actions))
         {
             Ok(actions) => return Ok(actions),
-            Err(error) => last_error = Some(error),
+            Err(error) => {
+                let msg = format!("修复方案校验失败: {error}");
+                log_warn!("[ModTranslation] {msg}");
+                let current = crate::mod_translation::current_stage_progress("repair");
+                on_progress(current.max(base_progress), &msg, retry);
+                last_error = Some(error);
+            }
         }
     }
     Err(last_error.unwrap_or_else(|| "模型没有返回修复操作".to_string()))
