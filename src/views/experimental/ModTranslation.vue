@@ -10,6 +10,9 @@ import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
+const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
+const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { pickFile } from '@/utils/fileDialog'
 import { safeCall } from '@/utils/async'
 import { toastError, toastSuccess, toastInfo } from '@/utils/toast'
@@ -28,6 +31,10 @@ const batchOptions = [
   { label: '40 条/批（推荐）', value: 40 },
   { label: '80 条/批（更快）', value: 80 },
 ]
+const generateModName = ref(true)
+const repairEnabled = ref(true)
+const classTextEnabled = ref(true)
+const detailOpen = ref(false)
 
 const loaderLabels: Record<string, string> = {
   fabric: 'Fabric',
@@ -40,6 +47,24 @@ const kindLabels: Record<string, string> = {
   'key-value': '.lang/.properties',
   'structured-json': '结构化 JSON',
   'free-text': '自由文本',
+}
+const dispositionLabels: Record<string, string> = {
+  standard_language: '标准语言',
+  structured_source: '结构化源',
+  generated_target: '生成目标',
+  class_review: 'class 复核',
+  unknown: '未知',
+  protected: '保护',
+}
+const modNameSourceLabels: Record<string, string> = {
+  embedded_chinese: '内嵌中文',
+  ai_recommended: 'AI 推荐',
+  known_chinese: '已知译名',
+  translated_display_name: '直译显示名',
+  translated_filename: '直译文件名',
+  original_filename: '原文件名',
+  display_name: '显示名',
+  mod_id: 'Mod ID',
 }
 
 const statusText = computed(() => {
@@ -67,7 +92,7 @@ async function handleStart() {
     toastInfo('请先选择翻译模型')
     return
   }
-  if (await start(model.value, batchSize.value)) {
+  if (await start(model.value, batchSize.value, { generateModName: generateModName.value, repairEnabled: repairEnabled.value, classTextEnabled: classTextEnabled.value })) {
     toastSuccess('翻译任务已启动')
   }
 }
@@ -131,6 +156,14 @@ onMounted(async () => {
           <span class="text-gray-500 w-16 shrink-0">条目数</span>
           <span class="text-gray-800">{{ analyzeResult.totalEntries }}</span>
         </div>
+        <div v-if="analyzeResult.version" class="flex items-center gap-2">
+          <span class="text-gray-500 w-16 shrink-0">版本</span>
+          <span class="text-gray-800">{{ analyzeResult.version }}</span>
+        </div>
+        <div v-if="analyzeResult.classCandidates.length" class="flex items-center gap-2">
+          <span class="text-gray-500 w-16 shrink-0">class 文本</span>
+          <span class="text-gray-800">{{ analyzeResult.classCandidates.length }} 个候选</span>
+        </div>
         <div v-if="analyzeResult.signed" class="flex items-center gap-2">
           <span class="text-yellow-600">JAR 含签名文件，重打包后签名将失效</span>
         </div>
@@ -159,6 +192,46 @@ onMounted(async () => {
           </div>
         </div>
       </div>
+
+      <div class="px-5 pb-4">
+        <button
+          class="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+          @click="detailOpen = !detailOpen"
+        >
+          <svg
+            class="w-3 h-3 transition-transform duration-200"
+            :class="detailOpen ? 'rotate-90' : ''"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+          </svg>
+          成本与覆盖分析
+        </button>
+        <Collapse :open="detailOpen">
+          <div class="mt-2 space-y-3">
+            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+              <div>预估 token：{{ analyzeResult.quote.estimatedTokens }}</div>
+              <div>调用次数：{{ analyzeResult.quote.estimatedCalls }}</div>
+              <div>语言批次：{{ analyzeResult.quote.languageBatches }}</div>
+              <div>class 批次：{{ analyzeResult.quote.classBatches }}</div>
+              <div>预估点数：{{ analyzeResult.quote.points }}</div>
+            </div>
+            <div class="border border-gray-200 rounded overflow-hidden">
+              <div class="max-h-40 overflow-y-auto divide-y divide-gray-100">
+                <div
+                  v-for="item in analyzeResult.coverage"
+                  :key="item.path"
+                  class="px-3 py-1.5 text-xs flex items-center gap-2"
+                >
+                  <span class="flex-1 truncate text-gray-700">{{ item.path }}</span>
+                  <Tag size="small" color="gray">{{ dispositionLabels[item.disposition] ?? item.disposition }}</Tag>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Collapse>
+      </div>
     </div>
 
     <!-- 翻译设置与启动 -->
@@ -172,6 +245,14 @@ onMounted(async () => {
         <div class="flex items-center gap-3">
           <span class="text-sm text-gray-500 w-16 shrink-0">批次</span>
           <Select v-model="batchSize" :options="batchOptions" />
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="text-sm text-gray-500 w-16 shrink-0">选项</span>
+          <div class="flex items-center gap-4">
+            <Checkbox v-model="generateModName">生成中文名</Checkbox>
+            <Checkbox v-model="repairEnabled">质量回修</Checkbox>
+            <Checkbox v-model="classTextEnabled">class 文本</Checkbox>
+          </div>
         </div>
         <div class="pt-2">
           <Button type="primary" @click="handleStart">开始翻译</Button>
@@ -197,6 +278,14 @@ onMounted(async () => {
       <div v-if="completed && snapshot.outputPath" class="mt-3 flex items-center gap-3">
         <span class="text-xs text-gray-500 truncate">{{ snapshot.outputPath }}</span>
         <Button type="ghost" size="small" @click="handleOpenDir">打开所在目录</Button>
+      </div>
+      <div v-if="completed && snapshot.modName" class="mt-2 flex items-center gap-2 text-xs">
+        <span class="text-gray-500">模组中文名</span>
+        <span class="text-gray-800">{{ snapshot.modName.name }}</span>
+        <Tag size="small" color="primary">{{ modNameSourceLabels[snapshot.modName.source] ?? snapshot.modName.source }}</Tag>
+      </div>
+      <div v-if="completed && snapshot.report" class="mt-1 text-xs text-gray-500">
+        语言条目 {{ snapshot.report.languageAccepted }}/{{ snapshot.report.languageAttempted }}；class 文本 {{ snapshot.report.classResolved }}/{{ snapshot.report.classTotal }}
       </div>
     </div>
   </div>

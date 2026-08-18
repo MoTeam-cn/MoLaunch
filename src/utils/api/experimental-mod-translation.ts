@@ -15,13 +15,70 @@ export interface ModTranslationSourceSummary {
   entries: number
 }
 
+/** class 常量池候选（运行时可见字符串，跨文件按文本聚合） */
+export interface ModTranslationClassCandidate {
+  id: string
+  path: string
+  paths: string[]
+  occurrences: number
+  text: string
+}
+
+/** token 报价预估（分析阶段展示，供用户评估成本） */
+export interface ModTranslationQuote {
+  estimatedInputTokens: number
+  estimatedOutputTokens: number
+  estimatedTokens: number
+  estimatedCalls: number
+  languageBatches: number
+  classBatches: number
+  points: number
+  characters: number
+  entries: number
+}
+
+/** 资源覆盖诊断（每个工作区文件的处置结论） */
+export interface ModTranslationResourceCoverage {
+  path: string
+  mediaType: string
+  disposition: string
+  targetPath: string | null
+  textCandidates: number
+  reason: string
+}
+
+/** 模组中文名决策结果 */
+export interface ModTranslationModName {
+  name: string
+  source: string
+}
+
+/** 任务完成报告（终态快照携带） */
+export interface ModTranslationReport {
+  taskId: string
+  ok: boolean
+  outputPath: string
+  modName: ModTranslationModName | null
+  languageAttempted: number
+  languageAccepted: number
+  classResolved: number
+  classTotal: number
+  warnings: string[]
+}
+
 export interface ModTranslationAnalyzeResult {
   filename: string
   loader: string
   modIds: string[]
+  projectNames: string[]
+  version: string | null
   signed: boolean
   sources: ModTranslationSourceSummary[]
   totalEntries: number
+  classCandidates: ModTranslationClassCandidate[]
+  quote: ModTranslationQuote
+  coverage: ModTranslationResourceCoverage[]
+  modName: ModTranslationModName | null
   warnings: string[]
 }
 
@@ -29,18 +86,26 @@ export interface ModTranslationTaskSnapshot {
   taskId: string
   /** idle / running / completed / failed / cancelled */
   status: string
-  /** analyze / translate / package */
+  /** analyze / language / repair / class / validation / package */
   stage: string
   progress: number
   message: string
   outputPath: string | null
   error: string | null
+  modName: ModTranslationModName | null
+  report: ModTranslationReport | null
 }
 
 export interface ModTranslationStartParams {
   jarPath: string
   model: string
   batchSize: number
+  /** 是否生成模组中文名（默认开） */
+  generateModName?: boolean
+  /** 是否启用质量回修兜底（默认开） */
+  repairEnabled?: boolean
+  /** 是否翻译 class 常量池文本（默认开） */
+  classTextEnabled?: boolean
 }
 
 export function modTranslationAnalyze(jarPath: string): Promise<ModTranslationAnalyzeResult> {

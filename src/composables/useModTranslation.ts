@@ -42,10 +42,22 @@ export function useModTranslation() {
   }
 
   /** 启动翻译任务（后台执行，进度经事件推送） */
-  async function start(model: string, batchSize: number): Promise<boolean> {
+  async function start(
+    model: string,
+    batchSize: number,
+    options?: { generateModName?: boolean; repairEnabled?: boolean; classTextEnabled?: boolean },
+  ): Promise<boolean> {
     if (!jarPath.value) return false
     const result = await safeCall(
-      () => modTranslationStart({ jarPath: jarPath.value, model, batchSize }),
+      () =>
+        modTranslationStart({
+          jarPath: jarPath.value,
+          model,
+          batchSize,
+          generateModName: options?.generateModName,
+          repairEnabled: options?.repairEnabled,
+          classTextEnabled: options?.classTextEnabled,
+        }),
       'start mod translation',
     )
     if (result) {
