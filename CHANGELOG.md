@@ -6,6 +6,8 @@
 
 ### Added
 
+- **新增「模组翻译」实验功能后端**（[mod_translation/](src-tauri/src/mod_translation/)（新增） / [dispatcher.rs](src-tauri/src/commands/experimental/manager/dispatcher.rs) / [lib.rs](src-tauri/src/lib.rs)）：AI 批量翻译 JAR 内语言文件并重打包为 `<原名>-zh_cn.jar`。安全解包（路径穿越 / 符号链接 / 压缩比 / 体积上限防护，签名文件检测）→ 语言源发现（标准 `assets/<ns>/lang/en_us.{json,lang,properties}`、路径含 `en_us` 的结构化 JSON 与自由文本 .txt/.md）→ 分批调用 `chat_json` 翻译（占位符 `%s`/`{0}`/`§a`/`\n` 校验，单批最多重试 2 次）→ 按原格式写回 zh_cn → 依据归档清单重打包；单任务模型（分析/启动/取消/状态 4 个 action），进度经 `mod-translation-event` 事件推送，工作区缓存于 `.Molaunch/cache/mod-translation` 并在任务结束后清理。
+
 - **AI 客户端新增 `chat_json` 接口**（[chat.rs](src-tauri/src/ai_core/client/chat.rs) / [types.rs](src-tauri/src/ai_core/client/types.rs)）：复用单轮聊天逻辑，追加 OpenAI 兼容 `response_format=json_object` 约束模型只输出 JSON 对象（`ChatRequest` 新增可选 `response_format` 字段，`skip_serializing_if` 保证向后兼容，既有 `chat` 行为不变）；供结构化结果场景使用（如模组翻译批量翻译）。
 
 - **Dev API 新增 `simulateCloud` 调试命令**（[dev-api.ts](src/utils/dev-api.ts)）：`molaunch.simulateCloud(false)` 模拟云端离线（侧边栏联机分类封禁、设备面板「设备信息」卡片封存遮罩），`simulateCloud(true)` 恢复在线，便于验证封存/封禁 UI；直接改写 online store state 触发响应式，页面刷新后由 `initAuth` 恢复真实状态。

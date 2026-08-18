@@ -22,6 +22,7 @@ use super::common::ensure_enabled;
 use crate::ai_core;
 use crate::commands::ai::types::{AiProbeParams, AnalyzeCrashParams};
 use crate::handler;
+use crate::mod_translation;
 use crate::state::AppState;
 use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 
@@ -283,6 +284,46 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
                 .await
                 .map_err(|e| e.to_string())?;
             serde_json::to_value(models).map_err(|e| e.to_string())
+        }),
+    );
+
+    // ===== 模组翻译（AI 批量翻译 JAR 语言文件）=====
+    d.register(
+        "mod_translation_analyze",
+        handler!(state, _app, params, {
+            ensure_enabled(&state).await?;
+            let p: mod_translation::types::AnalyzeParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let result = mod_translation::analyze_jar(p).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "mod_translation_start",
+        handler!(state, app, params, {
+            ensure_enabled(&state).await?;
+            let p: mod_translation::types::StartParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let result = mod_translation::start_task(app, p).await?;
+            serde_json::to_value(result).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "mod_translation_cancel",
+        handler!(state, _app, _params, {
+            ensure_enabled(&state).await?;
+            mod_translation::cancel_task()?;
+            serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "mod_translation_status",
+        handler!(state, _app, _params, {
+            ensure_enabled(&state).await?;
+            serde_json::to_value(mod_translation::current_status()).map_err(|e| e.to_string())
         }),
     );
 

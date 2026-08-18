@@ -11,6 +11,7 @@ pub mod http;
 pub mod logger;
 pub mod migrations;
 pub mod minecraft;
+pub mod mod_translation;
 pub mod resources;
 pub mod sdk;
 pub mod splash;
