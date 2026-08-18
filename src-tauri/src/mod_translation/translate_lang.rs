@@ -167,11 +167,11 @@ async fn translate_batch(
                 attempt: round as u32,
                 total: max_rounds as u32,
             });
-            let msg = move |p: f64| {
+            let msg = move |_p: f64| {
                 if round > 1 {
                     format!("{action} 第 {round}/{max_rounds} 次重试")
                 } else {
-                    format!("翻译中（{p:.0}%）")
+                    "翻译中".to_string()
                 }
             };
             pending
