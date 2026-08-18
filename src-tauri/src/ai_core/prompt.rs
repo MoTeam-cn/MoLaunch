@@ -20,6 +20,8 @@ pub enum PromptKind {
     LogAnalysis,
     /// 日志分析（AI 模式，5 环节逐步输出）
     LogAnalyzeSteps,
+    /// 模组翻译（批量条目翻译，要求 JSON 输出）
+    ModTranslation,
 }
 
 impl PromptKind {
@@ -32,6 +34,7 @@ impl PromptKind {
             PromptKind::Title => "prompts/title.md",
             PromptKind::LogAnalysis => "prompts/log_analysis.md",
             PromptKind::LogAnalyzeSteps => "prompts/log_analyze_steps.md",
+            PromptKind::ModTranslation => "prompts/mod_translation.md",
         }
     }
 }
@@ -89,6 +92,11 @@ fn fallback_prompt(kind: &PromptKind) -> String {
              禁止使用 Emoji 表情，不要臆造不存在的错误。"
                 .to_string()
         }
+        PromptKind::ModTranslation => "你是 Minecraft 模组翻译专家，把英文游戏文本翻译成简体中文。\
+             要求：忠实原意，符合 Minecraft 中文社区习惯用语；\
+             保留所有占位符、格式码与特殊标记（%s、{0}、§a、\\n、<...> 等）原样不动；\
+             专有名词保持常见译法；只输出 JSON 对象，不要输出任何解释或围栏标记。"
+            .to_string(),
     }
 }
 

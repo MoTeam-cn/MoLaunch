@@ -42,6 +42,9 @@ fn embedded_text(path: &str) -> Option<&'static str> {
         "prompts/log_analyze_steps.md" => {
             Some(include_str!("../resources/prompts/log_analyze_steps.md"))
         }
+        "prompts/mod_translation.md" => {
+            Some(include_str!("../resources/prompts/mod_translation.md"))
+        }
         "samples/plugin/index.html" => Some(include_str!("../resources/samples/plugin/index.html")),
         "samples/layout/layout-sample.json" => Some(include_str!(
             "../resources/samples/layout/layout-sample.json"
