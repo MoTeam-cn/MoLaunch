@@ -17,6 +17,10 @@ export const EXPERIMENTAL_ACTIONS = {
   CANCEL_LOG_ANALYZE: 'cancel_log_analyze',
   LIST_INSTALLED_VERSIONS: 'list_installed_versions',
   AI_ANALYZE_LOG: 'ai_analyze_log',
+  MOD_TRANSLATION_ANALYZE: 'mod_translation_analyze',
+  MOD_TRANSLATION_START: 'mod_translation_start',
+  MOD_TRANSLATION_CANCEL: 'mod_translation_cancel',
+  MOD_TRANSLATION_STATUS: 'mod_translation_status',
 } as const
 
 export type ExperimentalAction = typeof EXPERIMENTAL_ACTIONS[keyof typeof EXPERIMENTAL_ACTIONS]

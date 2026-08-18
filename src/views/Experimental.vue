@@ -11,12 +11,14 @@ import {
   ChatBubbleLeftRightIcon,
   BugAntIcon,
   CogIcon,
+  LanguageIcon,
   ShieldCheckIcon,
 } from '@heroicons/vue/24/outline'
 const NavSidebar = defineAsyncComponent(() => import('@/components/common/NavSidebar.vue'))
 const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
 const ExperimentalChat = defineAsyncComponent(() => import('./experimental/ExperimentalChat.vue'))
 const ExperimentalLog = defineAsyncComponent(() => import('./experimental/ExperimentalLog.vue'))
+const ModTranslation = defineAsyncComponent(() => import('./experimental/ModTranslation.vue'))
 const SettingsAi = defineAsyncComponent(() => import('./settings/SettingsAi.vue'))
 import { useExperimental } from '@/composables/useExperimental'
 import { hasAgreedToday } from '@/utils/disclaimer'
@@ -24,6 +26,7 @@ import { hasAgreedToday } from '@/utils/disclaimer'
 const categories = [
   { id: 'chat', label: 'AI 聊天', icon: ChatBubbleLeftRightIcon, desc: '与 AI 对话，支持工具自动分析日志与崩溃' },
   { id: 'log', label: '日志分析', icon: BugAntIcon, desc: '规则引擎崩溃日志分析（仅本页可用）' },
+  { id: 'mod-translation', label: '模组翻译', icon: LanguageIcon, desc: 'AI 批量翻译模组 JAR 语言文件并重打包' },
   { id: 'ai-settings', label: 'AI 设置', icon: CogIcon, desc: '本地 OpenAI 兼容服务配置' },
 ]
 
@@ -61,6 +64,9 @@ const disclaimerVisible = ref(!hasAgreedToday('experimental'))
         <ExperimentalChat v-if="activeCategory === 'chat'" />
         <div v-else-if="activeCategory === 'log'" class="h-full overflow-y-auto p-6">
           <ExperimentalLog />
+        </div>
+        <div v-else-if="activeCategory === 'mod-translation'" class="h-full overflow-y-auto p-6">
+          <ModTranslation />
         </div>
         <div v-else-if="activeCategory === 'ai-settings'" class="h-full overflow-y-auto p-6">
           <SettingsAi />
