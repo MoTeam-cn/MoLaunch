@@ -16,6 +16,7 @@ import { useModTranslation } from '@/composables/useModTranslation'
 const {
   view,
   fakeProgress,
+  taskFakeProgress,
   analyzing,
   analyzeResult,
   snapshot,
@@ -137,6 +138,7 @@ onMounted(async () => {
         :snapshot="snapshot"
         :running="running"
         :completed="completed"
+        :task-fake-progress="taskFakeProgress"
         :model-options="modelOptions"
         @start="handleStart"
         @cancel="handleCancel"

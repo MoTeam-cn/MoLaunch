@@ -21,6 +21,7 @@ const props = defineProps<{
   snapshot: ModTranslationTaskSnapshot | null
   running: boolean
   completed: boolean
+  taskFakeProgress: number
   modelOptions: { label: string; value: string }[]
 }>()
 const model = defineModel<string>('model', { default: '' })
@@ -77,6 +78,11 @@ const statusText = computed(() => {
   return s.message || '翻译中...'
 })
 const failed = computed(() => props.snapshot?.status === 'failed')
+/** 展示进度：running 期间取真实进度与假进度的较大值（假进度平滑爬升，避免卡住） */
+const displayProgress = computed(() => {
+  if (!props.snapshot) return 0
+  return props.running ? Math.max(props.snapshot.progress, props.taskFakeProgress) : props.snapshot.progress
+})
 
 async function handleOpenDir() {
   if (!props.snapshot?.outputPath) return
@@ -229,14 +235,14 @@ async function handleOpenDir() {
           <div class="flex items-center justify-between gap-2 mb-2">
             <span class="text-sm font-semibold" :class="failed ? 'text-red-600' : 'text-gray-900'">{{ statusText }}</span>
             <div class="flex items-center gap-2">
-              <span v-if="props.running" class="text-xs text-gray-500">{{ Math.round(props.snapshot.progress) }}%</span>
+              <span v-if="props.running" class="text-xs text-gray-500">{{ Math.round(displayProgress) }}%</span>
               <Button v-if="props.running" type="ghost" size="small" @click="emit('cancel')">取消</Button>
             </div>
           </div>
           <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               class="h-full bg-primary-500 transition-all duration-200"
-              :style="{ width: props.snapshot.progress + '%' }"
+              :style="{ width: displayProgress + '%' }"
             />
           </div>
           <div v-if="props.completed && props.snapshot.outputPath" class="mt-3 flex items-center gap-3">

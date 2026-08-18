@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译任务进度条增加假进度平滑爬升**（[useModTranslation.ts](src/composables/useModTranslation.ts) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)）：翻译任务进行中，进度条在真实进度基础上以假进度缓慢爬升（每 300ms +0.5，封顶 95%），真实进度事件更新时同步跟进，避免 AI 请求耗时期间进度条长时间卡在固定数值；终态停止假进度并定格真实进度。
+
 - **修复 AI 非流式请求被全局 30s 超时误杀**（[transport.rs](src-tauri/src/ai_core/client/transport.rs) / [http.rs](src-tauri/src/http.rs)）：非流式 AI 请求（如模组翻译批量调用）原走全局 HTTP 客户端（自带 30s 客户端级超时），大请求体 / 慢响应场景下被提前掐断，表现为 `error sending request for url` 且无原因；现改为与流式链路一致的无整体超时客户端，整体耗时由 `send_with_timeout`（默认 60s）控制；同时 `request_error_msg` 拼接错误 source 链（如 `timed out`），超时原因不再被吞掉，便于定位。
 
 - **模组翻译任务失败补充后端错误日志与前端醒目提示**（[task.rs](src-tauri/src/mod_translation/task.rs) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)）：语言翻译 / 质量回修 / class 文本三个阶段的失败分支补记 `log_error!`（含阶段与错误详情），便于定位 AI 调用失败原因；前端任务进度区在失败时以红色文字展示错误信息（原为普通灰色文本，失败原因不明显）。

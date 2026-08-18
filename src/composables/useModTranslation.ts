@@ -4,7 +4,7 @@
  * 单任务模型：分析 → 启动翻译 → 进度事件订阅 → 完成/失败/取消。
  * 进度事件 `mod-translation-event` 由后端 emit，经 useTauriEvent 订阅。
  */
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import {
   modTranslationAnalyze,
   modTranslationCancel,
@@ -33,10 +33,39 @@ export function useModTranslation() {
   /** 分析中假进度（0-100，线性推进，完成后跳 100） */
   const fakeProgress = ref(0)
   let progressTimer: number | null = null
+  /** 任务阶段假进度（真实进度更新慢时平滑爬升，避免进度条长时间卡住） */
+  const taskFakeProgress = ref(0)
+  let taskTimer: number | null = null
   let unlistenDrag: (() => void) | null = null
 
   const running = computed(() => snapshot.value?.status === 'running')
   const completed = computed(() => snapshot.value?.status === 'completed')
+
+  // 任务进度事件更新时：running 期间假进度从真实进度缓慢爬升（封顶 95），
+  // 真实进度跳变时假进度同步跟进；终态停止并定格真实进度。
+  watch(snapshot, (s) => {
+    if (s?.status === 'running') {
+      taskFakeProgress.value = Math.max(taskFakeProgress.value, s.progress)
+      startTaskFakeProgress()
+    } else {
+      stopTaskFakeProgress()
+      if (s) taskFakeProgress.value = s.progress
+    }
+  })
+
+  function startTaskFakeProgress(): void {
+    if (taskTimer !== null) return
+    taskTimer = window.setInterval(() => {
+      taskFakeProgress.value = Math.min(95, taskFakeProgress.value + 0.5)
+    }, 300)
+  }
+
+  function stopTaskFakeProgress(): void {
+    if (taskTimer !== null) {
+      window.clearInterval(taskTimer)
+      taskTimer = null
+    }
+  }
 
   function startFakeProgress(): void {
     fakeProgress.value = 0
@@ -169,6 +198,7 @@ export function useModTranslation() {
 
   onUnmounted(() => {
     stopFakeProgress()
+    stopTaskFakeProgress()
     unlistenDrag?.()
     unlistenDrag = null
     setDragSuppressed(false)
@@ -177,6 +207,7 @@ export function useModTranslation() {
   return {
     view,
     fakeProgress,
+    taskFakeProgress,
     analyzing,
     analyzeResult,
     snapshot,
