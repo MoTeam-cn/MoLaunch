@@ -14,6 +14,16 @@ pub(crate) struct ChatRequest {
     pub(crate) stream: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) max_tokens: Option<u32>,
+    /// 响应格式约束（OpenAI 兼容 `response_format`，如 json_object）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) response_format: Option<ResponseFormat>,
+}
+
+/// 响应格式约束（OpenAI 兼容 `response_format`）
+#[derive(Debug, Serialize)]
+pub(crate) struct ResponseFormat {
+    #[serde(rename = "type")]
+    pub(crate) ty: &'static str,
 }
 
 #[derive(Debug, Serialize)]

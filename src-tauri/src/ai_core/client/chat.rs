@@ -7,7 +7,7 @@
 use super::transport::{authorized_builder, send_with_timeout};
 use super::types::{
     ChatCompletionsRequest, ChatCompletionsResponse, ChatMessage, ChatRequest, ChatResponse,
-    ChatResult, ChatTurn, ModelsResponse, ToolCall, ToolDef,
+    ChatResult, ChatTurn, ModelsResponse, ResponseFormat, ToolCall, ToolDef,
 };
 use crate::ai_core::config::AiConfig;
 use crate::ai_core::prompt::{system_prompt, PromptKind};
@@ -20,6 +20,29 @@ pub async fn chat(
     kind: PromptKind,
     user_content: String,
     model: Option<&str>,
+) -> anyhow::Result<String> {
+    chat_inner(config, kind, user_content, model, false).await
+}
+
+/// 同 [`chat`]，但追加 `response_format=json_object` 约束模型只输出 JSON 对象
+///
+/// 供结构化结果场景复用（如模组翻译的批量翻译返回），避免调用方手工剥离多余文本。
+pub async fn chat_json(
+    config: &AiConfig,
+    kind: PromptKind,
+    user_content: String,
+    model: Option<&str>,
+) -> anyhow::Result<String> {
+    chat_inner(config, kind, user_content, model, true).await
+}
+
+/// 单轮聊天内部实现：`json_mode` 决定是否下发 `response_format=json_object`
+async fn chat_inner(
+    config: &AiConfig,
+    kind: PromptKind,
+    user_content: String,
+    model: Option<&str>,
+    json_mode: bool,
 ) -> anyhow::Result<String> {
     let model = config.resolve_model(model);
     if model.is_empty() {
@@ -41,6 +64,7 @@ pub async fn chat(
         ],
         stream: false,
         max_tokens: Some(config.max_output_tokens),
+        response_format: json_mode.then_some(ResponseFormat { ty: "json_object" }),
     };
 
     let (status, text) = send_with_timeout(config.timeout_secs, async {

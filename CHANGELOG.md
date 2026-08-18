@@ -6,6 +6,8 @@
 
 ### Added
 
+- **AI 客户端新增 `chat_json` 接口**（[chat.rs](src-tauri/src/ai_core/client/chat.rs) / [types.rs](src-tauri/src/ai_core/client/types.rs)）：复用单轮聊天逻辑，追加 OpenAI 兼容 `response_format=json_object` 约束模型只输出 JSON 对象（`ChatRequest` 新增可选 `response_format` 字段，`skip_serializing_if` 保证向后兼容，既有 `chat` 行为不变）；供结构化结果场景使用（如模组翻译批量翻译）。
+
 - **Dev API 新增 `simulateCloud` 调试命令**（[dev-api.ts](src/utils/dev-api.ts)）：`molaunch.simulateCloud(false)` 模拟云端离线（侧边栏联机分类封禁、设备面板「设备信息」卡片封存遮罩），`simulateCloud(true)` 恢复在线，便于验证封存/封禁 UI；直接改写 online store state 触发响应式，页面刷新后由 `initAuth` 恢复真实状态。
 
 - **新增「启动器数据导入」工具**（[launcher_import/](src-tauri/src/commands/tools/launcher_import/)（新增） / [types/launcher_import.rs](src-tauri/src/commands/tools/types/launcher_import.rs)（新增） / [dispatcher.rs](src-tauri/src/commands/tools/dispatcher.rs) / [LauncherImportPage.vue](src/views/tools/LauncherImportPage.vue)（新增） / [Tools.vue](src/views/Tools.vue)）：工具页新增「数据迁移」一级分类，支持从 PCL2（注册表 LaunchFolders）/ PCL2CE（config.v1.json）/ HMCL（hmcl.json）/ MultiMC / Prism Launcher（instance.cfg）/ CurseForge（minecraftinstance.json）/ 手动选择文件夹（Generic）探测并导入实例；导入时自动检测 MC 版本与加载器（复用 `extract_original_version` / `detect_loaders`），生成版本 JSON 并迁移游戏数据到 `{game_dir}/versions/{name}/`（复制或符号链接两种模式），写入 setup.ini 强制隔离（indie_type=1）保证数据在启动时生效；`mod.rs` 仅作入口，逻辑按 detect/parse/migrate 拆分。

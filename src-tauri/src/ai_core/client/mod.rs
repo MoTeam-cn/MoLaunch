@@ -8,7 +8,7 @@ mod tokens;
 mod transport;
 mod types;
 
-pub use chat::{chat, chat_completions, list_models};
+pub use chat::{chat, chat_completions, chat_json, list_models};
 pub use stream::chat_completions_stream;
 pub use tokens::estimate_tokens;
 pub use types::{

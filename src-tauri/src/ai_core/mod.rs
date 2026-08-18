@@ -9,8 +9,8 @@ pub mod prompt;
 pub mod storage;
 
 pub use client::{
-    chat, chat_completions, chat_completions_stream, estimate_tokens, list_models, ChatResult,
-    ChatTurn, StreamCallbacks, StreamToolDelta, StreamUsage, ToolCall, ToolDef,
+    chat, chat_completions, chat_completions_stream, chat_json, estimate_tokens, list_models,
+    ChatResult, ChatTurn, StreamCallbacks, StreamToolDelta, StreamUsage, ToolCall, ToolDef,
 };
 pub use config::AiConfig;
 pub use prompt::PromptKind;
