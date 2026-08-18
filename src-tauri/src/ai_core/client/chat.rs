@@ -21,19 +21,21 @@ pub async fn chat(
     user_content: String,
     model: Option<&str>,
 ) -> anyhow::Result<String> {
-    chat_inner(config, kind, user_content, model, false).await
+    chat_inner(config, kind, user_content, model, false, None).await
 }
 
 /// 同 [`chat`]，但追加 `response_format=json_object` 约束模型只输出 JSON 对象
 ///
 /// 供结构化结果场景复用（如模组翻译的批量翻译返回），避免调用方手工剥离多余文本。
+/// `timeout_secs` 可覆盖全局超时（如模组翻译批量输出大、耗时长的场景传 120s）。
 pub async fn chat_json(
     config: &AiConfig,
     kind: PromptKind,
     user_content: String,
     model: Option<&str>,
+    timeout_secs: Option<u64>,
 ) -> anyhow::Result<String> {
-    chat_inner(config, kind, user_content, model, true).await
+    chat_inner(config, kind, user_content, model, true, timeout_secs).await
 }
 
 /// 单轮聊天内部实现：`json_mode` 决定是否下发 `response_format=json_object`
@@ -43,6 +45,7 @@ async fn chat_inner(
     user_content: String,
     model: Option<&str>,
     json_mode: bool,
+    timeout_secs: Option<u64>,
 ) -> anyhow::Result<String> {
     let model = config.resolve_model(model);
     if model.is_empty() {
@@ -67,7 +70,8 @@ async fn chat_inner(
         response_format: json_mode.then_some(ResponseFormat { ty: "json_object" }),
     };
 
-    let (status, text) = send_with_timeout(config.timeout_secs, async {
+    let timeout = timeout_secs.unwrap_or(config.timeout_secs);
+    let (status, text) = send_with_timeout(timeout, async {
         let resp = authorized_builder(config, reqwest::Method::POST, url)
             .header("Content-Type", "application/json; charset=utf-8")
             .json(&req)

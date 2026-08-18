@@ -38,7 +38,8 @@ pub async fn run_class_route(
         return Ok(());
     }
     let mut handled = 0usize;
-    for batch in candidates.chunks(CLASS_BATCH_SIZE) {
+    let batch_count = (total + CLASS_BATCH_SIZE - 1) / CLASS_BATCH_SIZE;
+    for (batch_idx, batch) in candidates.chunks(CLASS_BATCH_SIZE).enumerate() {
         if cancel.load(Ordering::Relaxed) {
             return Err("任务已取消".to_string());
         }
@@ -56,7 +57,11 @@ pub async fn run_class_route(
             let msg = if attempt > 0 {
                 format!("class 判定第 {}/{} 次重试", attempt + 1, MAX_BATCH_ATTEMPTS)
             } else {
-                format!("class 文本判定：{handled}/{total}")
+                format!(
+                    "class 文本判定：批次 {}/{}（{handled}/{total}）",
+                    batch_idx + 1,
+                    batch_count
+                )
             };
             let user_prompt = build_class_prompt(inspection, batch, last_error.as_deref());
             let content = match tokio::select! {
@@ -65,6 +70,7 @@ pub async fn run_class_route(
                     PromptKind::ModTranslation,
                     user_prompt,
                     Some(model),
+                    Some(super::AI_TIMEOUT_SECS),
                 ) => result,
                 _ = super::wait_cancel(cancel) => return Err("任务已取消".to_string()),
                 _ = super::smooth_progress(
@@ -118,7 +124,11 @@ pub async fn run_class_route(
         let progress = 100.0 * (handled as f64 / total as f64);
         on_progress(
             progress,
-            &format!("class 文本判定：{handled}/{total}"),
+            &format!(
+                "class 文本判定：批次 {}/{}（{handled}/{total}）",
+                batch_idx + 1,
+                batch_count
+            ),
             None,
         );
     }

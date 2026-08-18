@@ -41,11 +41,10 @@ export function useModTranslation() {
   const running = computed(() => snapshot.value?.status === 'running')
   const completed = computed(() => snapshot.value?.status === 'completed')
 
-  // 任务进度事件更新时：running 期间分进度假进度从真实分进度缓慢爬升（封顶 99），
-  // 真实分进度跳变时假进度同步跟进；终态停止并定格真实总进度。
+  // 任务进度事件更新时：running 期间假进度基于真实总进度平滑爬升（封顶 +5%），
+  // 永不回退（阶段切换时 stageProgress 从 100 归零，不能把假进度拉回）；终态停止并定格真实总进度。
   watch(snapshot, (s) => {
     if (s?.status === 'running') {
-      taskFakeProgress.value = Math.max(taskFakeProgress.value, s.stageProgress)
       startTaskFakeProgress()
     } else {
       stopTaskFakeProgress()
@@ -56,10 +55,10 @@ export function useModTranslation() {
   function startTaskFakeProgress(): void {
     if (taskTimer !== null) return
     taskTimer = window.setInterval(() => {
-      // 假进度不超过真实总进度 +5%，避免总进度虚高（如 56% 显示 99%）
+      // 假进度不超过真实总进度 +5%，避免总进度虚高（如 56% 显示 99%）；永不回退
       const real = snapshot.value?.progress ?? 0
       const cap = Math.min(99, real + 5)
-      taskFakeProgress.value = Math.min(cap, taskFakeProgress.value + 0.5)
+      taskFakeProgress.value = Math.max(taskFakeProgress.value, Math.min(cap, taskFakeProgress.value + 0.5))
     }, 300)
   }
 

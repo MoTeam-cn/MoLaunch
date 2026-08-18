@@ -26,6 +26,11 @@ pub(super) async fn request_actions(
             return Err("任务已取消".to_string());
         }
         if attempt > 0 {
+            log_warn!(
+                "[ModTranslation] 质量复验第 {}/{} 次重试",
+                attempt + 1,
+                MAX_ACTIONS_ATTEMPTS
+            );
             on_progress(
                 base_progress,
                 &format!("质量复验第 {}/{} 次重试", attempt + 1, MAX_ACTIONS_ATTEMPTS),
@@ -45,6 +50,7 @@ pub(super) async fn request_actions(
                 PromptKind::ModTranslation,
                 user_content,
                 Some(model),
+                Some(crate::mod_translation::AI_TIMEOUT_SECS),
             ) => result,
             _ = crate::mod_translation::wait_cancel(cancel) => {
                 return Err("任务已取消".to_string())

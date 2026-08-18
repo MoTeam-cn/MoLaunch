@@ -40,6 +40,9 @@ use self::types::{
 /// 进度事件名（前端经 useTauriEvent 订阅）
 pub const EVENT_NAME: &str = "mod-translation-event";
 
+/// 模组翻译 AI 调用超时（秒）：批量输出大、耗时长的场景覆盖全局默认 60s
+pub(crate) const AI_TIMEOUT_SECS: u64 = 120;
+
 /// 已就绪的分析结果（analyze 与 start 之间传递工作区）
 #[derive(Clone)]
 pub(crate) struct Prepared {
