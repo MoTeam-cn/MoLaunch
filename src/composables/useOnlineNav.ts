@@ -54,7 +54,7 @@ const deviceCategory: NavCategory = {
   id: 'device',
   label: '设备',
   icon: DevicePhoneMobileIcon,
-  desc: '注册联机设备、登录获取访问凭证、查看设备 ID 与 JWT 状态',
+  desc: '查看网络环境（NAT 类型）、虚拟组网状态与设备信息',
 }
 
 /** 联机大厅分类（浏览公开房间，按整合包聚类） */

@@ -18,6 +18,8 @@
 
 - **关于页 Scaffolding-MC 鸣谢项补充 Logo 与作者头像**（[acknowledgements.txt](src-tauri/resources/about/acknowledgements.txt)）：logo 补为 `Scaffolding-MC.png`，作者 `burningtnt` / `Silverteal` 分别挂载头像 `burningtnt.png` / `Silverteal.png`（图片位于 `src/assets/AboutIcon/`，经 `import.meta.glob` 自动打包映射）。注意：txt 经 `include_str!` 嵌入后端二进制，需重新编译 Rust 后端后生效。
 
+- **联机设备面板移除「注册设备」引导并常驻 NAT / 虚拟组网卡片**（[OnlineDevicePanel.vue](src/components/online/OnlineDevicePanel.vue) / [useOnlineNav.ts](src/composables/useOnlineNav.ts)）：设备注册/登录由后端 `auth_init` 启动时无感完成（注册即登录），「注册设备」引导卡片在云端在线时永不出现、离线时又被封存，属无效 UI，已移除；「网络环境」（NAT 类型检测，本地 STUN）与「虚拟组网」（easytier 状态，本地进程）卡片不再受 `registered` 条件限制，始终显示；设备信息卡片保持已注册时显示、云端离线时封存；侧边栏「设备」分类描述同步更新。
+
 ### Fixed
 
 - **服务器状态检测支持粘贴 `host:port` 自动拆分端口**（[ServerPinger.vue](src/views/tools/network/ServerPinger.vue)）：地址框粘贴 `ip:port`（含 IPv6 方括号形式 `[::1]:25565`）时自动拆分，端口填入端口框（非法端口不处理）；`doPing` 增加兜底解析，手动输入带端口地址同样正确检测。

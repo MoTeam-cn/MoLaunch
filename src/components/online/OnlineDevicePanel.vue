@@ -2,10 +2,12 @@
 /**
  * 联机 - 设备面板（Scaffolding 收敛版）
  *
- * 根据设备认证状态显示：
- * - 未注册：注册引导卡片
- * - 已注册未登录：登录卡片（JWT 过期不触发登录卡片，由后端自动续期兜底）
- * - 已注册：网络环境卡片（NAT 类型检测）+ 设备信息卡片（设备 ID / api-server / 最后登录 / JWT 过期时间）
+ * 设备注册/登录由后端 auth_init 启动时无感完成（注册即登录），无需手动注册引导。
+ * 面板固定展示：
+ * - 网络环境卡片（NAT 类型检测，本地 STUN，不依赖云端）
+ * - 虚拟组网卡片（easytier 状态，本地进程，不依赖云端）
+ * - 设备信息卡片（设备 ID / api-server / 最后登录 / JWT 过期时间，云端离线时封存）
+ * - 已注册未登录时额外显示登录卡片（用户主动登出后手动登录）
  *
  * 状态来源：useOnlineStore.deviceStatus（由 Online.vue 在 onMounted 时刷新）
  *           useOnlineStore.natResult（由 Online.vue 进入页面时自动检测，侧边栏切换不丢失）
@@ -19,7 +21,6 @@ const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.v
 const SealedOverlay = defineAsyncComponent(() => import('@/components/common/SealedOverlay.vue'))
 const EasyTierStatusCard = defineAsyncComponent(() => import('./EasyTierStatusCard.vue'))
 import {
-  UserPlusIcon,
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
   GlobeAltIcon,
@@ -50,7 +51,6 @@ function showSealedReason(label: string) {
 }
 
 const status = computed(() => onlineStore.deviceStatus)
-const isUnregistered = computed(() => !status.value || !status.value.registered)
 /**
  * 是否需要登录卡片：仅「已注册但未登录」时显示。
  *
@@ -62,10 +62,6 @@ const isUnregistered = computed(() => !status.value || !status.value.registered)
 const needLogin = computed(
   () => !!status.value && status.value.registered && !status.value.logged_in,
 )
-
-async function handleRegister() {
-  await onlineStore.register()
-}
 
 async function handleLogin() {
   await onlineStore.login()
@@ -102,31 +98,6 @@ async function handleDetectNat() {
       </div>
     </div>
 
-    <!-- 未注册：注册引导（云端离线时封存） -->
-    <Card v-else-if="isUnregistered" title="注册设备">
-      <div class="relative">
-        <SealedOverlay
-          v-if="offline"
-          :reason="onlineStore.cloudError || ''"
-          @request="showSealedReason('注册设备')"
-        />
-        <div class="py-6 flex flex-col items-center text-center">
-          <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-50">
-            <UserPlusIcon class="h-7 w-7 text-primary-600" />
-          </div>
-          <div class="mb-2 text-sm font-semibold text-gray-700">注册联机设备</div>
-          <p class="mb-5 text-xs text-gray-500 max-w-md">
-            注册将为你的设备生成唯一的密钥对，用于联机服务的身份验证。
-            密钥保存在本地，不会上传到云端。
-          </p>
-          <Button type="primary" :loading="onlineStore.loading" @click="handleRegister">
-            <template #icon><UserPlusIcon class="w-4 h-4" /></template>
-            立即注册
-          </Button>
-        </div>
-      </div>
-    </Card>
-
     <!-- 已注册未登录：登录卡片（云端离线时封存） -->
     <Card v-else-if="needLogin" title="设备登录">
       <div class="relative">
@@ -155,8 +126,8 @@ async function handleDetectNat() {
       </div>
     </Card>
 
-    <!-- 网络环境（NAT 检测，已注册时显示；NAT 检测不依赖云端，离线时仍可用） -->
-    <Card v-if="status?.registered" title="网络环境">
+    <!-- 网络环境（NAT 检测，本地 STUN 不依赖云端，始终显示） -->
+    <Card title="网络环境">
       <div class="flex items-center justify-between py-1">
         <div class="flex items-center gap-2 text-sm text-gray-600">
           <SignalIcon class="w-4 h-4 text-gray-400" />
@@ -189,8 +160,8 @@ async function handleDetectNat() {
       </div>
     </Card>
 
-    <!-- 虚拟组网（easytier 状态，无需登录即可展示，不依赖云端） -->
-    <EasyTierStatusCard v-if="status?.registered" />
+    <!-- 虚拟组网（easytier 状态，本地进程不依赖云端，始终显示） -->
+    <EasyTierStatusCard />
 
     <!-- 设备信息（已注册时显示；云端离线时封存） -->
     <Card v-if="status?.registered" title="设备信息">
