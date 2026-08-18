@@ -63,6 +63,7 @@
 | Autoprefixer | PostCSS contributors | MIT License | https://github.com/postcss/autoprefixer | https://github.com/postcss/autoprefixer/blob/main/LICENSE |
 | Arco Design Vue | Copyright (c) 2019 Arco Design | MIT License | https://arco.design | https://github.com/arco-design/arco-design-vue/blob/main/LICENSE |
 | Element Plus Icons | Element Plus Team | MIT License | https://github.com/element-plus/element-plus-icons | https://github.com/element-plus/element-plus-icons/blob/main/LICENSE |
+| Apache ECharts | Apache Software Foundation | Apache-2.0 | https://echarts.apache.org | https://github.com/apache/echarts/blob/master/LICENSE |
 | Cubiomes | Copyright (c) 2019-2024 Cubitect | MIT License | https://github.com/Cubitect/cubiomes | https://github.com/Cubitect/cubiomes/blob/master/LICENSE |
 | McSDK | MoTeam | Apache-2.0 | https://github.com/MoTeam-cn/Mc_SDK | https://github.com/MoTeam-cn/Mc_SDK/blob/main/LICENSE |
 | Cubiomes (xpple fork) | Cubitect, xpple | MIT License | https://github.com/MoTeam-cn/cubiomes | https://github.com/MoTeam-cn/cubiomes/blob/master/LICENSE |
