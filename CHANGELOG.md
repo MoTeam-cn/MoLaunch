@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- **修复模组翻译标准语言文件被重复捕获**（[analyze.rs](src-tauri/src/mod_translation/analyze.rs)）：`find_other_sources` 按路径段 `en_us.` 前缀匹配时会把标准 lang 文件（`assets/<ns>/lang/en_us.json`）误判为结构化 JSON，导致同一文件被翻译两次；现先收集标准源路径集合并在结构化/自由文本发现时排除。
+
 - **修复网络拓扑图异步组件初始化时序崩溃**（[NatTopologyGraph.vue](src/components/online/NatTopologyGraph.vue)）：`watch` 以 `immediate: true` 在 setup 阶段同步执行时调用了引用后续声明变量的 `buildOption`，触发 TDZ 报错使异步组件 setup 抛异常，进而导致父级渲染时 `locateNonHydratedAsyncRoot` 读取 null 崩溃；将 NAT 分享相关状态声明前移至 ECharts 图表初始化逻辑之前，保证 immediate watch 执行时所有依赖已初始化。
 
 - **服务器状态检测支持粘贴 `host:port` 自动拆分端口**（[ServerPinger.vue](src/views/tools/network/ServerPinger.vue)）：地址框粘贴 `ip:port`（含 IPv6 方括号形式 `[::1]:25565`）时自动拆分，端口填入端口框（非法端口不处理）；`doPing` 增加兜底解析，手动输入带端口地址同样正确检测。

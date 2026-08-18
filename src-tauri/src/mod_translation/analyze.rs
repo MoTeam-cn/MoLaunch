@@ -1,6 +1,6 @@
 //! 模组翻译：JAR 分析（语言源发现 + 加载器探测）
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
@@ -64,11 +64,14 @@ fn read_source_entries(kind: LanguageKind, path: &Path) -> BTreeMap<String, Stri
     }
 }
 
-/// 发现路径含 `en_us` 的结构化 JSON / 自由文本
-pub fn find_other_sources(workspace: &Path) -> Vec<LanguageSource> {
+/// 发现路径含 `en_us` 的结构化 JSON / 自由文本（排除标准 lang 源，避免重复捕获）
+pub fn find_other_sources(workspace: &Path, standard: &HashSet<String>) -> Vec<LanguageSource> {
     let mut sources = Vec::new();
     for relative in super::jar::collect_files(workspace).unwrap_or_default() {
         let lower = relative.to_ascii_lowercase();
+        if standard.contains(&lower) {
+            continue;
+        }
         let has_en_us = lower
             .split('/')
             .any(|segment| segment == "en_us" || segment.starts_with("en_us."));
@@ -184,8 +187,13 @@ pub fn file_hash(path: &Path) -> Result<String, String> {
 
 /// 汇总 JAR 分析结果（signed 由解包阶段传入）
 pub fn inspect_jar(workspace: &Path, input_path: &Path, signed: bool) -> JarInspection {
-    let mut language_sources = find_standard_sources(workspace);
-    language_sources.extend(find_other_sources(workspace));
+    let standard = find_standard_sources(workspace);
+    let standard_set: HashSet<String> = standard
+        .iter()
+        .map(|s| s.source_path.to_ascii_lowercase())
+        .collect();
+    let mut language_sources = standard;
+    language_sources.extend(find_other_sources(workspace, &standard_set));
     let (loader, mod_ids, _) = detect_loader(workspace);
     let language_entries = language_sources.iter().map(|s| s.entries.len()).sum();
     let mut warnings = Vec::new();
