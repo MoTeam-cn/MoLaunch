@@ -71,6 +71,7 @@ pub async fn run_class_route(
                 ) => result,
                 _ = super::wait_cancel(cancel) => return Err("任务已取消".to_string()),
                 _ = super::smooth_progress(
+                    "class",
                     base_progress,
                     batch_cap,
                     cancel,
@@ -125,7 +126,8 @@ pub async fn run_class_route(
             None,
         );
     }
-    on_progress(100.0, "class 文本翻译完成", None);
+    let final_progress = 100.0 * (handled as f64 / total as f64);
+    on_progress(final_progress, "class 文本翻译完成", None);
     Ok(())
 }
 

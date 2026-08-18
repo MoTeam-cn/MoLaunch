@@ -121,10 +121,9 @@ pub fn write_keyvalue(
         {
             false
         } else {
-            let (key, eq_pos, sep_len) = if let Some(eq) = line.find('=') {
-                (line[..eq].trim(), Some(eq), 1)
-            } else if let Some(colon) = line.find(':') {
-                (line[..colon].trim(), Some(colon), 1)
+            let (key, eq_pos, sep_len) = if let Some(sep) = find_unescaped_separator(line) {
+                let sep_char = line[sep..].chars().next().unwrap_or('=');
+                (line[..sep].trim(), Some(sep), sep_char.len_utf8())
             } else {
                 (line.trim(), None, 0)
             };

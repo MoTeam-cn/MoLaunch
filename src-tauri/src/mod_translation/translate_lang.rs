@@ -115,7 +115,8 @@ pub async fn run_language_route(
             );
         }
     }
-    on_progress(100.0, "语言翻译完成", None);
+    let final_progress = 100.0 * (translated as f64 / total as f64);
+    on_progress(final_progress, "语言翻译完成", None);
     Ok(())
 }
 
@@ -195,6 +196,7 @@ async fn translate_batch(
                 ) => result,
                 _ = super::wait_cancel(cancel) => return Err("任务已取消".to_string()),
                 _ = super::smooth_progress(
+                    "language",
                     base_progress,
                     batch_cap,
                     cancel,

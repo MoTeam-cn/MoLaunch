@@ -272,7 +272,31 @@ impl<'a> Parser<'a> {
                             let code = u16::from_str_radix(std::str::from_utf8(hex).unwrap(), 16)
                                 .unwrap_or(0xfffd);
                             self.pos += 4;
-                            out.push(char::from_u32(code as u32).unwrap_or('\u{fffd}'));
+                            // 代理对：高代理（0xD800-0xDBFF）后紧跟 \u 低代理（0xDC00-0xDFFF）时合并
+                            if (0xD800..=0xDBFF).contains(&code) {
+                                let next = self.bytes.get(self.pos..self.pos + 6);
+                                let low = next
+                                    .filter(|n| n.starts_with(b"\\u"))
+                                    .and_then(|n| {
+                                        u16::from_str_radix(
+                                            std::str::from_utf8(&n[2..6]).unwrap_or(""),
+                                            16,
+                                        )
+                                        .ok()
+                                    })
+                                    .filter(|n| (0xDC00..=0xDFFF).contains(n));
+                                if let Some(low) = low {
+                                    let combined = 0x10000
+                                        + ((code as u32 - 0xD800) << 10)
+                                        + (low as u32 - 0xDC00);
+                                    out.push(char::from_u32(combined).unwrap_or('\u{fffd}'));
+                                    self.pos += 6;
+                                    continue;
+                                }
+                                out.push('\u{fffd}');
+                            } else {
+                                out.push(char::from_u32(code as u32).unwrap_or('\u{fffd}'));
+                            }
                         }
                         _ => return Err(format!("JSON 未知转义: \\{}", esc as char)),
                     }

@@ -1,9 +1,11 @@
 //! 断点续传：工作区匹配 + 检查点读写（临时文件 + rename 原子写）。
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+use crate::mod_translation::ledger::ClassDecision;
 use crate::mod_translation::types::JarInspection;
 
 pub const RESUME_FILE: &str = ".mod-translator-resume.json";
@@ -29,6 +31,9 @@ pub struct Checkpoint {
     pub task_id: String,
     pub completed_language_batches: Vec<String>,
     pub class_exclusions: Vec<String>,
+    /// 完整 class 处置决策（含 translate 译文），续传时恢复避免重复判定
+    #[serde(default)]
+    pub class_decisions: BTreeMap<String, ClassDecision>,
     pub class_replacement_count: usize,
     pub class_changed_files: Vec<String>,
     #[serde(default)]

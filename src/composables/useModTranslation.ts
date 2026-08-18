@@ -132,6 +132,8 @@ export function useModTranslation() {
     )
     if (result) {
       snapshot.value = result
+      // 新任务重置假进度，避免沿用上一任务的终态值（如 100）导致进度条卡死
+      taskFakeProgress.value = 0
       return true
     }
     return false
@@ -154,6 +156,7 @@ export function useModTranslation() {
     snapshot.value = null
     view.value = 'upload'
     fakeProgress.value = 0
+    taskFakeProgress.value = 0
   }
 
   const { start: startListen } = useTauriEvent<ModTranslationTaskSnapshot>(

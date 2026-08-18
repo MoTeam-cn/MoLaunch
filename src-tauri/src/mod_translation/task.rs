@@ -12,7 +12,7 @@ use crate::{log_error, log_info, log_warn};
 
 use super::analyze;
 use super::jar;
-use super::ledger::{ClassDecision, ClassDecisionLedger, WorkGraph, WorkGraphSnapshot};
+use super::ledger::{ClassDecisionLedger, WorkGraph, WorkGraphSnapshot};
 use super::memory::{self, TranslationMemory};
 use super::mod_name;
 use super::package;
@@ -92,20 +92,7 @@ pub(super) async fn run_task(
         .map(WorkGraph::from_snapshot)
         .unwrap_or_else(|| WorkGraph::new(task_id));
     let mut class_ledger = ClassDecisionLedger {
-        decisions: checkpoint
-            .class_exclusions
-            .iter()
-            .map(|id| {
-                (
-                    id.clone(),
-                    ClassDecision {
-                        action: "exclude".to_string(),
-                        translation: None,
-                        reason: Some("断点续传时已排除".to_string()),
-                    },
-                )
-            })
-            .collect(),
+        decisions: checkpoint.class_decisions.clone().into_iter().collect(),
         replaced_files: checkpoint.class_changed_files.clone(),
         replacement_count: checkpoint.class_replacement_count,
     };
@@ -180,10 +167,13 @@ pub(super) async fn run_task(
     }
 
     // 2) class 常量池文本翻译（确定性排除 → AI 判定 → 改写写回）
+    // 断点续传：checkpoint.stage 为 class/repair 时 class 已完成，跳过
+    let class_done = matches!(checkpoint.stage.as_str(), "class" | "repair");
     if !cancelled
         && fatal.is_none()
         && class_text_enabled
         && !inspection.class_candidates.is_empty()
+        && !class_done
     {
         update_status(&app, "class", 0.0, "class 文本判定", None);
         match translate_class::run_class_route(
@@ -204,17 +194,22 @@ pub(super) async fn run_task(
                 fatal = Some(e)
             }
         }
-        checkpoint.class_exclusions = class_ledger.snapshot_exclusions();
-        checkpoint.class_changed_files = class_ledger.replaced_files.clone();
-        checkpoint.class_replacement_count = class_ledger.replacement_count;
-        checkpoint.work_graph =
-            Some(serde_json::to_value(work_graph.snapshot()).unwrap_or_default());
-        checkpoint.stage = "class".to_string();
-        let _ = resume::save_checkpoint(&workspace, &checkpoint);
+        if !cancelled && fatal.is_none() {
+            checkpoint.class_decisions = class_ledger.decisions.clone().into_iter().collect();
+            checkpoint.class_exclusions = class_ledger.snapshot_exclusions();
+            checkpoint.class_changed_files = class_ledger.replaced_files.clone();
+            checkpoint.class_replacement_count = class_ledger.replacement_count;
+            checkpoint.work_graph =
+                Some(serde_json::to_value(work_graph.snapshot()).unwrap_or_default());
+            checkpoint.stage = "class".to_string();
+            let _ = resume::save_checkpoint(&workspace, &checkpoint);
+        }
     }
 
     // 3) 质量回修兜底（复验 → AI 修复 → 原子写回）
-    if !cancelled && fatal.is_none() && repair_enabled {
+    // 断点续传：checkpoint.stage 为 repair 时质量回修已完成，跳过
+    let repair_done = checkpoint.stage == "repair";
+    if !cancelled && fatal.is_none() && repair_enabled && !repair_done {
         let sources: Vec<&LanguageSource> = inspection
             .language_sources
             .iter()
@@ -260,10 +255,11 @@ pub(super) async fn run_task(
 
     // 4) 结果处理：取消/失败保留工作区供续传；成功打包后清理
     let outcome = if cancelled {
+        let current = super::current_status();
         Some(TaskSnapshot {
             status: "cancelled".to_string(),
             stage: "translate".to_string(),
-            progress: 0.0,
+            progress: current.progress,
             message: "任务已取消".to_string(),
             ..TaskSnapshot::new(String::new())
         })

@@ -163,10 +163,12 @@ fn read_mods_toml_ids(path: &Path) -> Vec<String> {
     let mut ids = Vec::new();
     for line in content.lines() {
         let line = line.trim();
-        if let Some(rest) = line.strip_prefix("modId=") {
-            let id = rest.trim().trim_matches('"').to_string();
-            if !id.is_empty() {
-                ids.push(id);
+        if let Some(rest) = line.strip_prefix("modId") {
+            if let Some(rest) = rest.trim_start().strip_prefix('=') {
+                let id = rest.trim().trim_matches('"').to_string();
+                if !id.is_empty() {
+                    ids.push(id);
+                }
             }
         }
     }

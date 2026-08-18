@@ -101,7 +101,9 @@ pub(crate) async fn wait_cancel(cancel: &AtomicBool) {
 
 /// 批次内平滑进度：AI 调用期间分进度从 start 平滑爬升到 cap（取消时结束）
 /// `message` 为闭包，按当前进度动态生成消息（如批次内进度百分比）
+/// 起始值取 max(start, 当前阶段已推送进度)，重试时不再回退
 pub(crate) async fn smooth_progress<F>(
+    stage: &str,
     start: f64,
     cap: f64,
     cancel: &AtomicBool,
@@ -111,7 +113,11 @@ pub(crate) async fn smooth_progress<F>(
 ) where
     F: Fn(f64) -> String + Send + Sync + 'static,
 {
-    let mut p = start.min(cap);
+    let current = STAGE_PROGRESS
+        .lock()
+        .map(|s| s.get(stage).copied().unwrap_or(0.0))
+        .unwrap_or(0.0);
+    let mut p = start.max(current).min(cap);
     on_progress(p, &message(p), retry);
     while !cancel.load(Ordering::Relaxed) {
         tokio::time::sleep(std::time::Duration::from_millis(200)).await;

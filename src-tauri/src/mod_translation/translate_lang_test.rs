@@ -106,6 +106,9 @@ fn memory_hit_short_circuits_ai_call() {
             &mut memory,
             &mut graph,
             &cancel,
+            &|_, _, _| {},
+            0.0,
+            100.0,
         )
         .await
         .unwrap();

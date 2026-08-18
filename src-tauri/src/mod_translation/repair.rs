@@ -151,6 +151,7 @@ pub async fn run_repair_passes(
         );
         let issues = collect_issues(workspace, sources, work_graph);
         if issues.is_empty() {
+            on_progress(100.0, "质量复验完成", None);
             return Ok(true);
         }
         let mut groups: BTreeMap<String, Vec<RepairIssue>> = BTreeMap::new();
@@ -191,5 +192,6 @@ pub async fn run_repair_passes(
         }
     }
     let remaining = collect_issues(workspace, sources, work_graph);
+    on_progress(100.0, "质量复验完成", None);
     Ok(remaining.is_empty())
 }
