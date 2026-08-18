@@ -20,7 +20,7 @@ use super::repair;
 use super::resume::{self, Checkpoint};
 use super::translate_class;
 use super::translate_lang;
-use super::types::{LanguageSource, TaskSnapshot};
+use super::types::{LanguageSource, ProgressFn, TaskSnapshot};
 use super::{failed_snapshot, finish, update_status, Prepared};
 
 /// 缓存工作区根目录（`.Molaunch/cache/mod-translation`）
@@ -217,20 +217,20 @@ pub(super) async fn run_task(
             .collect();
         if !sources.is_empty() {
             update_status(&app, "repair", 0.0, "质量复验中", None);
-            let repair_progress = {
+            let repair_progress: Arc<ProgressFn> = Arc::new({
                 let app = app.clone();
                 move |progress: f64, message: &str, retry: Option<super::RetryInfo>| {
                     update_status(&app, "repair", progress, message, retry)
                 }
-            };
+            });
             match repair::run_repair_passes(
                 &workspace,
                 &sources,
                 &mut work_graph,
                 &config,
                 &model,
-                &cancel_flag,
-                &repair_progress,
+                cancel_flag.clone(),
+                repair_progress,
             )
             .await
             {
