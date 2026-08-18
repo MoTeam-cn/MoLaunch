@@ -107,9 +107,10 @@ fn build_repair_prompt(issues: &[RepairIssue]) -> String {
         })
         .collect();
     serde_json::json!({
-        "task": "修复以下语言条目的质量问题，只输出 JSON 对象：{\"actions\":[{\"action\":\"translate\"|\"keep-source\",\"issueId\":\"...\",\"translation\":\"...\",\"reason\":\"...\"}]}",
+        "task": "修复以下语言条目的质量问题，只输出 JSON 对象：{\"actions\":[{\"action\":\"translate\"|\"keep-source\",\"issueId\":\"...\",\"translation\":\"...\",\"reason\":\"...\"}]}。issues 数组包含待修复条目，数量非零，必须逐一处理。",
         "rules": format!(
-            "translate 必须含简体中文并保留全部占位符；确实应保留原文时用 keep-source 并给出 reason。必须为 issues 中每一个 id 输出恰好一个 action，覆盖全部 {} 个 issue，不得遗漏任何一个。issueId 必须原样复制 issues 中的 id，不得修改、截断或自行生成。输出精简：keep-source 时省略 translation 字段，reason 一句话即可。",
+            "translate 必须含简体中文并保留全部占位符；确实应保留原文时用 keep-source 并给出 reason。必须为 issues 中每一个 id 输出恰好一个 action，覆盖全部 {} 个 issue，不得遗漏任何一个。issueId 必须原样复制 issues 中的 id，不得修改、截断或自行生成。输出精简：keep-source 时省略 translation 字段，reason 一句话即可。\n\n【严重警告】issues 数组包含 {} 个条目，非空且必须全部处理。禁止输出空 actions 数组，禁止声称 issues 为空、不存在或无法处理，禁止忽略任何条目。若输出空 actions 或遗漏条目，本次修复将被判定为失败并重试。",
+            issues.len(),
             issues.len()
         ),
         "issues": list
@@ -125,10 +126,9 @@ fn str_field(item: &serde_json::Value, name: &str) -> Option<String> {
 
 pub(crate) fn parse_actions_response(content: &str) -> Result<Vec<RepairAction>, String> {
     let stripped = prompt::strip_json_fences(content);
-    let start = stripped.find('{').ok_or("AI 响应中未找到 JSON 对象")?;
-    let end = stripped.rfind('}').ok_or("AI 响应中未找到 JSON 对象")?;
-    let value: serde_json::Value = serde_json::from_str(&stripped[start..=end])
-        .map_err(|e| format!("解析修复 JSON 失败: {e}"))?;
+    let json_str = prompt::extract_json_object(stripped).ok_or("AI 响应中未找到 JSON 对象")?;
+    let value: serde_json::Value =
+        serde_json::from_str(json_str).map_err(|e| format!("解析修复 JSON 失败: {e}"))?;
     let actions = value
         .get("actions")
         .and_then(serde_json::Value::as_array)

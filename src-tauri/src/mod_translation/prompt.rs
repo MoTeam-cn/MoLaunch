@@ -12,14 +12,48 @@ pub fn validate_translation(source: &str, translation: &str) -> bool {
     extract_protected_tokens(source) == extract_protected_tokens(t)
 }
 
+/// 从文本中提取第一个完整 JSON 对象（括号匹配，跳过字符串内的 `{`/`}`）
+///
+/// 容错：模型可能在 JSON 对象后追加解释文本，`rfind('}')` 会取到解释里的 `}`，
+/// 导致截取范围混入非法内容。括号匹配从首个 `{` 开始，找到与之配对的 `}`。
+pub fn extract_json_object(content: &str) -> Option<&str> {
+    let start = content.find('{')?;
+    let bytes = content.as_bytes();
+    let mut depth = 0i32;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (i, &b) in bytes.iter().enumerate().skip(start) {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if b == b'\\' {
+                escaped = true;
+            } else if b == b'"' {
+                in_string = false;
+            }
+        } else {
+            match b {
+                b'"' => in_string = true,
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Some(&content[start..=i]);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+    None
+}
+
 /// 从 AI 响应中剥离围栏并提取翻译 JSON
 ///
 /// 容错：去掉 ```json 围栏后取首个 `{` 到末个 `}` 之间的内容再解析。
 pub fn parse_translations_response(content: &str) -> Result<Vec<(String, String)>, String> {
     let stripped = strip_json_fences(content);
-    let start = stripped.find('{').ok_or("AI 响应中未找到 JSON 对象")?;
-    let end = stripped.rfind('}').ok_or("AI 响应中未找到 JSON 对象")?;
-    let json_str = &stripped[start..=end];
+    let json_str = extract_json_object(stripped).ok_or("AI 响应中未找到 JSON 对象")?;
     let value: serde_json::Value =
         serde_json::from_str(json_str).map_err(|e| format!("解析翻译 JSON 失败: {e}"))?;
     let translations = value

@@ -230,10 +230,9 @@ fn parse_and_validate_decisions<'a>(
     candidates: &'a [&'a ClassCandidate],
 ) -> Result<(Vec<DecisionEntry>, Vec<&'a ClassCandidate>), String> {
     let stripped = prompt::strip_json_fences(content);
-    let start = stripped.find('{').ok_or("AI 响应中未找到 JSON 对象")?;
-    let end = stripped.rfind('}').ok_or("AI 响应中未找到 JSON 对象")?;
-    let value: Value = serde_json::from_str(&stripped[start..=end])
-        .map_err(|e| format!("解析 class 判定 JSON 失败: {e}"))?;
+    let json_str = prompt::extract_json_object(stripped).ok_or("AI 响应中未找到 JSON 对象")?;
+    let value: Value =
+        serde_json::from_str(json_str).map_err(|e| format!("解析 class 判定 JSON 失败: {e}"))?;
     let items = value
         .get("decisions")
         .and_then(Value::as_array)

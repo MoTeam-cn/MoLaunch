@@ -297,6 +297,10 @@ async function handleOpenDir() {
               :style="{ width: displayProgress + '%' }"
             />
           </div>
+          <!-- AI 异常兜底提示 -->
+          <div class="mt-1.5 text-xs text-gray-400">
+            AI 偶发异常（如返回空结果）会自动跳过对应条目，不影响整体翻译
+          </div>
           <!-- 总进度行：折叠开关 + 重试信息 -->
           <div class="mt-1.5 flex items-center justify-between text-xs text-gray-500">
             <span>总进度 {{ Math.round(displayProgress) }}%</span>
