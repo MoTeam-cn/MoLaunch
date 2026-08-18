@@ -102,7 +102,13 @@ async fn chat_inner(
         .choices
         .into_iter()
         .next()
-        .and_then(|c| c.message.content)
+        .and_then(|c| {
+            let msg = c.message;
+            // 部分思考模型 content 为空时把输出放在 reasoning 字段，回退读取
+            msg.content
+                .filter(|s| !s.trim().is_empty())
+                .or(msg.reasoning)
+        })
         .ok_or_else(|| anyhow::anyhow!("AI 响应为空"))
 }
 

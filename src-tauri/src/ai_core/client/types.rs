@@ -56,6 +56,9 @@ pub(crate) struct ChatChoice {
 #[derive(Debug, Deserialize)]
 pub(crate) struct ChatResponseMessage {
     pub(crate) content: Option<String>,
+    /// 部分思考模型在 content 为空时把输出放在 reasoning 字段
+    #[serde(default)]
+    pub(crate) reasoning: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
