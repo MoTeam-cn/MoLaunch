@@ -22,6 +22,7 @@ pub mod translate_class;
 pub mod translate_lang;
 pub mod types;
 
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -32,7 +33,8 @@ use crate::ai_core;
 
 use self::resume::Checkpoint;
 use self::types::{
-    AnalyzeParams, AnalyzeResult, JarInspection, SourceSummary, StartParams, TaskSnapshot,
+    AnalyzeParams, AnalyzeResult, JarInspection, RetryInfo, SourceSummary, StartParams,
+    TaskSnapshot,
 };
 
 /// 进度事件名（前端经 useTauriEvent 订阅）
@@ -55,6 +57,47 @@ struct RunningTask {
 static PREPARED: Mutex<Option<Prepared>> = Mutex::new(None);
 static RUNNING: Mutex<Option<RunningTask>> = Mutex::new(None);
 static STATUS: Mutex<Option<TaskSnapshot>> = Mutex::new(None);
+/// 各阶段分进度（stage -> 0-100），用于计算总进度
+static STAGE_PROGRESS: Mutex<BTreeMap<String, f64>> = Mutex::new(BTreeMap::new());
+/// 阶段权重（任务启动时按启用开关设置，未启用阶段权重为 0）
+static STAGE_WEIGHTS: Mutex<BTreeMap<String, f64>> = Mutex::new(BTreeMap::new());
+
+/// 任务启动时重置阶段进度并设置权重（未启用阶段不设权重，总进度自动归一化）
+pub(super) fn init_stage_weights(repair_enabled: bool, class_text_enabled: bool) {
+    if let Ok(mut slot) = STAGE_PROGRESS.lock() {
+        slot.clear();
+    }
+    let mut weights = BTreeMap::from([
+        ("language".to_string(), 0.55),
+        ("package".to_string(), 0.05),
+    ]);
+    if repair_enabled {
+        weights.insert("repair".to_string(), 0.20);
+    }
+    if class_text_enabled {
+        weights.insert("class".to_string(), 0.20);
+    }
+    if let Ok(mut slot) = STAGE_WEIGHTS.lock() {
+        *slot = weights;
+    }
+}
+
+/// 按阶段权重加权计算总进度（0-100）
+fn compute_total_progress() -> f64 {
+    let (weights, stages) = (
+        STAGE_WEIGHTS.lock().unwrap_or_else(|e| e.into_inner()),
+        STAGE_PROGRESS.lock().unwrap_or_else(|e| e.into_inner()),
+    );
+    let total_weight: f64 = weights.values().sum();
+    if total_weight <= 0.0 {
+        return 0.0;
+    }
+    weights
+        .iter()
+        .map(|(stage, w)| w * stages.get(stage).copied().unwrap_or(0.0))
+        .sum::<f64>()
+        / total_weight
+}
 
 /// 分析 JAR：解包 → 探测加载器 → 汇总语言源
 pub async fn analyze_jar(params: AnalyzeParams) -> Result<AnalyzeResult, String> {
@@ -154,6 +197,8 @@ pub fn current_status() -> TaskSnapshot {
             status: "idle".to_string(),
             stage: String::new(),
             progress: 0.0,
+            stage_progress: 0.0,
+            retry: None,
             message: String::new(),
             output_path: None,
             error: None,
@@ -207,11 +252,22 @@ pub(super) fn failed_snapshot(stage: &str, error: &str) -> TaskSnapshot {
     }
 }
 
-/// 更新状态并向前端 emit 进度事件
-pub(super) fn update_status(app: &AppHandle, stage: &str, progress: f64, message: &str) {
+/// 更新状态并向前端 emit 进度事件（progress 为当前阶段分进度，总进度按权重计算）
+pub(super) fn update_status(
+    app: &AppHandle,
+    stage: &str,
+    progress: f64,
+    message: &str,
+    retry: Option<RetryInfo>,
+) {
+    if let Ok(mut slot) = STAGE_PROGRESS.lock() {
+        slot.insert(stage.to_string(), progress);
+    }
     let mut snapshot = current_status();
     snapshot.stage = stage.to_string();
-    snapshot.progress = progress;
+    snapshot.stage_progress = progress;
+    snapshot.progress = compute_total_progress();
+    snapshot.retry = retry;
     snapshot.message = message.to_string();
     store_status(&snapshot);
     let _ = app.emit(EVENT_NAME, &snapshot);

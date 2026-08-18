@@ -13,7 +13,7 @@ use super::class;
 use super::ledger::{ClassDecision, ClassDecisionLedger};
 use super::prompt;
 use super::quality;
-use super::types::{has_chinese, ClassCandidate, JarInspection, ProgressFn};
+use super::types::{has_chinese, ClassCandidate, JarInspection, ProgressFn, RetryInfo};
 
 const CLASS_BATCH_SIZE: usize = 16;
 const MAX_BATCH_ATTEMPTS: usize = 3;
@@ -34,7 +34,7 @@ pub async fn run_class_route(
     let candidates = class_ledger.unresolved(&inspection.class_candidates);
     let total = candidates.len();
     if total == 0 {
-        on_progress(95.0, "class 文本无待判定候选");
+        on_progress(100.0, "class 文本无待判定候选", None);
         return Ok(());
     }
     let mut handled = 0usize;
@@ -42,10 +42,21 @@ pub async fn run_class_route(
         if cancel.load(Ordering::Relaxed) {
             return Err("任务已取消".to_string());
         }
+        let base_progress = 90.0 * (handled as f64 / total as f64);
         let (mut last_error, mut decisions) = (None, Vec::new());
         for attempt in 0..MAX_BATCH_ATTEMPTS {
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
+            }
+            if attempt > 0 {
+                on_progress(
+                    base_progress,
+                    &format!("class 判定第 {}/{} 次重试", attempt + 1, MAX_BATCH_ATTEMPTS),
+                    Some(RetryInfo {
+                        attempt: attempt as u32 + 1,
+                        total: MAX_BATCH_ATTEMPTS as u32,
+                    }),
+                );
             }
             let user_prompt = build_class_prompt(inspection, batch, last_error.as_deref());
             let content =
@@ -78,10 +89,14 @@ pub async fn run_class_route(
                 Err(e) => log_warn!("[ModTranslation] class 处置失败: {e}"),
             }
         }
-        let progress = 90.0 + 5.0 * (handled as f64 / total as f64);
-        on_progress(progress, &format!("class 文本判定：{handled}/{total}"));
+        let progress = 90.0 * (handled as f64 / total as f64);
+        on_progress(
+            progress,
+            &format!("class 文本判定：{handled}/{total}"),
+            None,
+        );
     }
-    on_progress(95.0, "class 文本翻译完成");
+    on_progress(100.0, "class 文本翻译完成", None);
     Ok(())
 }
 

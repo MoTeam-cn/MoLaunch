@@ -5,16 +5,30 @@ use std::collections::HashSet;
 use crate::ai_core::{self, PromptKind};
 use crate::mod_translation::prompt;
 use crate::mod_translation::repair::{RepairAction, RepairIssue};
-use crate::mod_translation::types::has_chinese;
+use crate::mod_translation::types::{has_chinese, ProgressFn, RetryInfo};
+
+const MAX_ACTIONS_ATTEMPTS: u32 = 2;
 
 pub(super) async fn request_actions(
     issues: &[RepairIssue],
     config: &ai_core::AiConfig,
     model: &str,
+    on_progress: &ProgressFn,
+    base_progress: f64,
 ) -> Result<Vec<RepairAction>, String> {
     let base = build_repair_prompt(issues);
     let mut last_error = None;
-    for _ in 0..2 {
+    for attempt in 0..MAX_ACTIONS_ATTEMPTS {
+        if attempt > 0 {
+            on_progress(
+                base_progress,
+                &format!("质量复验第 {}/{} 次重试", attempt + 1, MAX_ACTIONS_ATTEMPTS),
+                Some(RetryInfo {
+                    attempt: attempt + 1,
+                    total: MAX_ACTIONS_ATTEMPTS,
+                }),
+            );
+        }
         let user_content = match &last_error {
             Some(error) => format!("{base}\n上次输出校验失败：{error}。请完整重发合法 JSON。"),
             None => base.clone(),

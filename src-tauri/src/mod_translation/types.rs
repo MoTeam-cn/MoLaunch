@@ -5,8 +5,16 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-/// 进度回调（0-100 + 消息），供各翻译路由共用
-pub type ProgressFn = dyn Fn(f64, &str) + Send + Sync;
+/// 重试信息（前端展示"第 x/y 次重试"）
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RetryInfo {
+    pub attempt: u32,
+    pub total: u32,
+}
+
+/// 进度回调（分进度 0-100 + 消息 + 重试信息），供各翻译路由共用
+pub type ProgressFn = dyn Fn(f64, &str, Option<RetryInfo>) + Send + Sync;
 
 /// 模组加载器（用于翻译提示词上下文）
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -256,8 +264,12 @@ pub struct TaskSnapshot {
     pub status: String,
     /// analyze / research / language / repair / class / validation / package
     pub stage: String,
-    /// 0-100
+    /// 总进度（0-100，按阶段权重加权计算）
     pub progress: f64,
+    /// 当前阶段分进度（0-100）
+    pub stage_progress: f64,
+    /// 重试信息（重试时携带）
+    pub retry: Option<RetryInfo>,
     pub message: String,
     pub output_path: Option<String>,
     pub error: Option<String>,
@@ -272,6 +284,8 @@ impl TaskSnapshot {
             status: "running".to_string(),
             stage: "analyze".to_string(),
             progress: 0.0,
+            stage_progress: 0.0,
+            retry: None,
             message: String::new(),
             output_path: None,
             error: None,

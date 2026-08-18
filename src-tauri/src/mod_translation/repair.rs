@@ -11,7 +11,7 @@ use crate::{ai_core, log_warn};
 use super::lang;
 use super::ledger::{WorkGraph, WorkKind, WorkStatus};
 use super::quality::{audit_invariants, audit_semantic, AuditSeverity};
-use super::types::{LanguageKind, LanguageSource};
+use super::types::{LanguageKind, LanguageSource, ProgressFn};
 
 #[path = "repair_ai.rs"]
 mod repair_ai;
@@ -137,11 +137,18 @@ pub async fn run_repair_passes(
     config: &ai_core::AiConfig,
     model: &str,
     cancel: &std::sync::atomic::AtomicBool,
+    on_progress: &ProgressFn,
 ) -> Result<bool, String> {
-    for _ in 0..MAX_REPAIR_PASSES {
+    for pass in 0..MAX_REPAIR_PASSES {
         if cancel.load(Ordering::Relaxed) {
             return Err("任务已取消".to_string());
         }
+        let pass_progress = pass as f64 / MAX_REPAIR_PASSES as f64 * 100.0;
+        on_progress(
+            pass_progress,
+            &format!("质量复验第 {}/{} 轮", pass + 1, MAX_REPAIR_PASSES),
+            None,
+        );
         let issues = collect_issues(workspace, sources, work_graph);
         if issues.is_empty() {
             return Ok(true);
@@ -161,7 +168,9 @@ pub async fn run_repair_passes(
                 .ok_or_else(|| format!("未知语言目标：{target_path}"))?;
             for batch in group.chunks(MAX_REPAIR_BATCH) {
                 // 回修是兜底：批次失败仅跳过，不阻塞打包
-                match repair_ai::request_actions(batch, config, model).await {
+                match repair_ai::request_actions(batch, config, model, on_progress, pass_progress)
+                    .await
+                {
                     Ok(actions) => {
                         if let Err(e) =
                             repair_apply::apply_actions(workspace, source, &actions, work_graph)

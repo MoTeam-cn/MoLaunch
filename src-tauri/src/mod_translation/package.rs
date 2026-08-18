@@ -21,7 +21,7 @@ pub(super) fn package(
     work_graph: &WorkGraph,
     class_ledger: &ClassDecisionLedger,
 ) -> Option<TaskSnapshot> {
-    update_status(app, "package", 95.0, "正在打包");
+    update_status(app, "package", 95.0, "正在打包", None);
     let manifest = match jar::ArchiveManifest::read(workspace) {
         Some(m) => m,
         None => return Some(failed_snapshot("package", "缺少归档清单，无法重打包")),

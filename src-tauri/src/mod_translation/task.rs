@@ -66,6 +66,7 @@ pub(super) async fn run_task(
     }
 
     let task_id = super::current_status().task_id;
+    super::init_stage_weights(repair_enabled, class_text_enabled);
 
     // 断点续传：恢复检查点、工作图与 class 账本
     let mut checkpoint = checkpoint.unwrap_or_else(|| Checkpoint::fresh(task_id.clone()));
@@ -104,11 +105,15 @@ pub(super) async fn run_task(
 
     let lang_progress = {
         let app = app.clone();
-        move |progress: f64, message: &str| update_status(&app, "language", progress, message)
+        move |progress: f64, message: &str, retry: Option<super::RetryInfo>| {
+            update_status(&app, "language", progress, message, retry)
+        }
     };
     let class_progress = {
         let app = app.clone();
-        move |progress: f64, message: &str| update_status(&app, "class", progress, message)
+        move |progress: f64, message: &str, retry: Option<super::RetryInfo>| {
+            update_status(&app, "class", progress, message, retry)
+        }
     };
 
     let mut cancelled = false;
@@ -121,7 +126,7 @@ pub(super) async fn run_task(
             .language_sources
             .retain(|s| s.required_count() > 0 && !completed_batches.contains(&s.target_path));
         if !pending.language_sources.is_empty() {
-            update_status(&app, "language", 10.0, "开始翻译");
+            update_status(&app, "language", 10.0, "开始翻译", None);
             match translate_lang::run_language_route(
                 &workspace,
                 &pending,
@@ -167,7 +172,13 @@ pub(super) async fn run_task(
             .filter(|s| s.required_count() > 0)
             .collect();
         if !sources.is_empty() {
-            update_status(&app, "repair", 90.0, "质量复验中");
+            update_status(&app, "repair", 0.0, "质量复验中", None);
+            let repair_progress = {
+                let app = app.clone();
+                move |progress: f64, message: &str, retry: Option<super::RetryInfo>| {
+                    update_status(&app, "repair", progress, message, retry)
+                }
+            };
             match repair::run_repair_passes(
                 &workspace,
                 &sources,
@@ -175,6 +186,7 @@ pub(super) async fn run_task(
                 &config,
                 &model,
                 &cancel_flag,
+                &repair_progress,
             )
             .await
             {
@@ -202,7 +214,7 @@ pub(super) async fn run_task(
         && class_text_enabled
         && !inspection.class_candidates.is_empty()
     {
-        update_status(&app, "class", 90.0, "class 文本判定");
+        update_status(&app, "class", 90.0, "class 文本判定", None);
         match translate_class::run_class_route(
             &workspace,
             &inspection,

@@ -12,7 +12,7 @@ use super::ledger::{WorkGraph, WorkKind};
 use super::memory::TranslationMemory;
 use super::prompt;
 use super::quality;
-use super::types::{JarInspection, LanguageKind, LanguageSource, ProgressFn};
+use super::types::{JarInspection, LanguageKind, LanguageSource, ProgressFn, RetryInfo};
 
 /// 单条模型尝试累计上限（fast + deep 通道合计）
 const MAX_ITEM_ATTEMPTS: usize = 6;
@@ -43,7 +43,7 @@ pub async fn run_language_route(
         .collect();
     let total: usize = sources.iter().map(|s| s.required_count()).sum();
     if total == 0 {
-        on_progress(90.0, "没有需要翻译的条目");
+        on_progress(100.0, "没有需要翻译的条目", None);
         return Ok(());
     }
     let batch_size = batch_size.clamp(1, 100);
@@ -71,15 +71,28 @@ pub async fn run_language_route(
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
             }
+            let progress = 90.0 * (translated as f64 / total as f64);
             let batch = translate_batch(
-                inspection, source, chunk, config, model, memory, work_graph, cancel,
+                inspection,
+                source,
+                chunk,
+                config,
+                model,
+                memory,
+                work_graph,
+                cancel,
+                on_progress,
+                progress,
             )
             .await?;
             let done = batch.len();
             accepted.extend(batch);
             translated += done;
-            let progress = 10.0 + 80.0 * (translated as f64 / total as f64);
-            on_progress(progress, &format!("翻译中：{translated}/{total} 条目"));
+            on_progress(
+                progress,
+                &format!("翻译中：{translated}/{total} 条目"),
+                None,
+            );
         }
         if !accepted.is_empty() {
             write_back(workspace, source, &accepted)?;
@@ -100,7 +113,7 @@ pub async fn run_language_route(
             );
         }
     }
-    on_progress(90.0, "语言翻译完成");
+    on_progress(100.0, "语言翻译完成", None);
     Ok(())
 }
 
@@ -114,6 +127,8 @@ async fn translate_batch(
     memory: &mut TranslationMemory,
     work_graph: &mut WorkGraph,
     cancel: &AtomicBool,
+    on_progress: &ProgressFn,
+    base_progress: f64,
 ) -> Result<BTreeMap<String, String>, String> {
     let mut accepted: BTreeMap<String, String> = BTreeMap::new();
     let mut pending: Vec<(String, String)> = Vec::new();
@@ -144,6 +159,16 @@ async fn translate_batch(
             round += 1;
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
+            }
+            if round > 1 {
+                on_progress(
+                    base_progress,
+                    &format!("{action} 第 {round}/{max_rounds} 次重试"),
+                    Some(RetryInfo {
+                        attempt: round as u32,
+                        total: max_rounds as u32,
+                    }),
+                );
             }
             pending
                 .retain(|(key, _)| work_graph.model_attempt_count(&ids[key]) < MAX_ITEM_ATTEMPTS);

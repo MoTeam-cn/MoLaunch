@@ -33,7 +33,7 @@ export function useModTranslation() {
   /** 分析中假进度（0-100，线性推进，完成后跳 100） */
   const fakeProgress = ref(0)
   let progressTimer: number | null = null
-  /** 任务阶段假进度（真实进度更新慢时平滑爬升，避免进度条长时间卡住） */
+  /** 任务阶段假进度（分进度更新慢时平滑爬升，避免进度条长时间卡住） */
   const taskFakeProgress = ref(0)
   let taskTimer: number | null = null
   let unlistenDrag: (() => void) | null = null
@@ -41,11 +41,11 @@ export function useModTranslation() {
   const running = computed(() => snapshot.value?.status === 'running')
   const completed = computed(() => snapshot.value?.status === 'completed')
 
-  // 任务进度事件更新时：running 期间假进度从真实进度缓慢爬升（封顶 95），
-  // 真实进度跳变时假进度同步跟进；终态停止并定格真实进度。
+  // 任务进度事件更新时：running 期间分进度假进度从真实分进度缓慢爬升（封顶 99），
+  // 真实分进度跳变时假进度同步跟进；终态停止并定格真实总进度。
   watch(snapshot, (s) => {
     if (s?.status === 'running') {
-      taskFakeProgress.value = Math.max(taskFakeProgress.value, s.progress)
+      taskFakeProgress.value = Math.max(taskFakeProgress.value, s.stageProgress)
       startTaskFakeProgress()
     } else {
       stopTaskFakeProgress()
@@ -56,7 +56,7 @@ export function useModTranslation() {
   function startTaskFakeProgress(): void {
     if (taskTimer !== null) return
     taskTimer = window.setInterval(() => {
-      taskFakeProgress.value = Math.min(95, taskFakeProgress.value + 0.5)
+      taskFakeProgress.value = Math.min(99, taskFakeProgress.value + 0.5)
     }, 300)
   }
 

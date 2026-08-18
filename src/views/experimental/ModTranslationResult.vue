@@ -3,7 +3,7 @@
  * 模组翻译 - 分析结果区（左右分栏）：左侧内容区 + 右侧操作区。
  * 设置项经 defineModel 双向绑定，操作经 emit 上报父组件。
  */
-import { ref, computed, defineAsyncComponent } from 'vue'
+import { ref, computed, watch, onUnmounted, defineAsyncComponent } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
@@ -79,7 +79,50 @@ const statusText = computed(() => {
   return s.message || '翻译中...'
 })
 const failed = computed(() => props.snapshot?.status === 'failed')
-/** 展示进度：running 期间取真实进度与假进度的较大值（假进度平滑爬升，避免卡住） */
+/** 阶段文字（后端 stage 映射，未知阶段回退原文） */
+const stageLabels: Record<string, string> = {
+  analyze: '分析中',
+  language: '语言翻译',
+  repair: '质量复验',
+  class: 'class 文本',
+  validation: '校验中',
+  package: '打包中',
+  translate: '翻译中',
+}
+const stageText = computed(() => {
+  const stage = props.snapshot?.stage
+  return stage ? (stageLabels[stage] ?? stage) : ''
+})
+/** 当前阶段动画点（1-5 循环，running 期间每 300ms 递增） */
+const dotCount = ref(0)
+let dotTimer: number | null = null
+watch(
+  () => props.running,
+  (running) => {
+    if (running) {
+      dotTimer = window.setInterval(() => {
+        dotCount.value = (dotCount.value % 5) + 1
+      }, 300)
+    } else {
+      if (dotTimer !== null) {
+        window.clearInterval(dotTimer)
+        dotTimer = null
+      }
+      dotCount.value = 0
+    }
+  },
+)
+onUnmounted(() => {
+  if (dotTimer !== null) window.clearInterval(dotTimer)
+})
+/** 展示分进度：running 期间取真实分进度与假进度的较大值（假进度平滑爬升，避免卡住） */
+const displayStageProgress = computed(() => {
+  if (!props.snapshot) return 0
+  return props.running
+    ? Math.max(props.snapshot.stageProgress, props.taskFakeProgress)
+    : props.snapshot.stageProgress
+})
+/** 展示总进度：后端按阶段权重加权计算，running 期间与假进度取较大值 */
 const displayProgress = computed(() => {
   if (!props.snapshot) return 0
   return props.running ? Math.max(props.snapshot.progress, props.taskFakeProgress) : props.snapshot.progress
@@ -248,17 +291,28 @@ async function handleOpenDir() {
         <!-- 任务进度 -->
         <div v-if="props.snapshot && props.snapshot.status !== 'idle'" class="bg-white rounded-lg border border-gray-300 p-5">
           <div class="flex items-center justify-between gap-2 mb-2">
-            <span class="text-sm font-semibold" :class="failed ? 'text-red-600' : 'text-gray-900'">{{ statusText }}</span>
+            <span class="text-sm font-semibold" :class="failed ? 'text-red-600' : 'text-gray-900'">
+              {{ statusText }}<span v-if="props.running" class="text-primary-500">{{ '.'.repeat(dotCount) }}</span>
+            </span>
             <div class="flex items-center gap-2">
-              <span v-if="props.running" class="text-xs text-gray-500">{{ Math.round(displayProgress) }}%</span>
+              <span v-if="props.running" class="text-xs text-gray-500">{{ Math.round(displayStageProgress) }}%</span>
               <Button v-if="props.running" type="ghost" size="small" @click="emit('cancel')">取消</Button>
             </div>
           </div>
+          <!-- 分进度条（当前阶段） -->
           <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               class="h-full bg-primary-500 transition-all duration-200"
-              :style="{ width: displayProgress + '%' }"
+              :style="{ width: displayStageProgress + '%' }"
             />
+          </div>
+          <!-- 总进度（按阶段权重加权）+ 重试信息 -->
+          <div class="mt-1.5 flex items-center justify-between text-xs text-gray-500">
+            <span v-if="stageText">{{ stageText }} · 总进度 {{ Math.round(displayProgress) }}%</span>
+            <span v-else>总进度 {{ Math.round(displayProgress) }}%</span>
+            <span v-if="props.running && props.snapshot.retry" class="text-yellow-600">
+              第 {{ props.snapshot.retry.attempt }}/{{ props.snapshot.retry.total }} 次重试
+            </span>
           </div>
           <div v-if="props.completed && props.snapshot.outputPath" class="mt-3 flex items-center gap-3">
             <span class="text-xs text-gray-500 truncate">{{ props.snapshot.outputPath }}</span>

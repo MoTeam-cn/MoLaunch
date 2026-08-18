@@ -96,7 +96,12 @@ export interface ModTranslationTaskSnapshot {
   status: string
   /** analyze / language / repair / class / validation / package */
   stage: string
+  /** 总进度（0-100，按阶段权重加权计算） */
   progress: number
+  /** 当前阶段分进度（0-100） */
+  stageProgress: number
+  /** 重试信息（重试时携带） */
+  retry: { attempt: number; total: number } | null
   message: string
   outputPath: string | null
   error: string | null
