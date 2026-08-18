@@ -13,6 +13,7 @@ const Select = defineAsyncComponent(() => import('@/components/common/Select.vue
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
 const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+import { ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
 import { pickFile } from '@/utils/fileDialog'
 import { safeCall } from '@/utils/async'
 import { toastError, toastSuccess, toastInfo } from '@/utils/toast'
@@ -20,8 +21,7 @@ import * as tauri from '@/utils/tauri'
 import { aiLoadConfig } from '@/utils/api/ai'
 import { useModTranslation } from '@/composables/useModTranslation'
 
-const { analyzing, analyzeResult, snapshot, running, completed, analyze, start, cancel, reset } =
-  useModTranslation()
+const { analyzing, analyzeResult, snapshot, dragging, running, completed, analyze, start, cancel, reset, initDragDrop } = useModTranslation()
 
 const model = ref('')
 const modelOptions = ref<{ label: string; value: string }[]>([])
@@ -68,13 +68,20 @@ const modNameSourceLabels: Record<string, string> = {
 }
 
 const statusText = computed(() => {
-  if (!snapshot.value) return ''
   const s = snapshot.value
+  if (!s) return ''
   if (s.status === 'completed') return s.message || '翻译完成'
   if (s.status === 'failed') return s.error || '任务失败'
   if (s.status === 'cancelled') return '任务已取消'
   return s.message || '翻译中...'
 })
+
+/** 分析指定 JAR 路径（点击选择与拖入共用） */
+async function analyzeFile(path: string): Promise<void> {
+  reset()
+  const ok = await analyze(path)
+  if (ok) toastSuccess(`分析完成，共 ${analyzeResult.value?.totalEntries ?? 0} 个待翻译条目`)
+}
 
 async function handlePick() {
   const file = await pickFile({
@@ -82,9 +89,7 @@ async function handlePick() {
     filters: [{ name: 'JAR 文件', extensions: ['jar'] }],
   })
   if (!file) return
-  reset()
-  const ok = await analyze(file)
-  if (ok) toastSuccess(`分析完成，共 ${analyzeResult.value?.totalEntries ?? 0} 个待翻译条目`)
+  await analyzeFile(file)
 }
 
 async function handleStart() {
@@ -103,9 +108,8 @@ async function handleCancel() {
 
 async function handleOpenDir() {
   if (!snapshot.value?.outputPath) return
-  const dir = snapshot.value.outputPath.replace(/\\[^\\/]+$/, '')
   try {
-    await tauri.openPath(dir)
+    await tauri.openPath(snapshot.value.outputPath.replace(/\\[^\\/]+$/, ''))
   } catch (e) {
     toastError('打开目录失败：' + e)
   }
@@ -117,20 +121,22 @@ onMounted(async () => {
     modelOptions.value = (config.models ?? []).map((m) => ({ label: m, value: m }))
     model.value = config.defaultModel ?? ''
   }
+  initDragDrop(analyzeFile)
 })
 </script>
 
 <template>
   <div class="space-y-4">
-    <AlertV2
-      type="info"
-      message="选择模组 JAR 后，后端会安全解包并识别其中的英文语言文件；翻译使用实验性 AI 服务（需先在「AI 设置」配置），完成后在同目录输出「原名-zh_cn.jar」。"
-    />
+    <AlertV2 type="info" message="选择模组 JAR 后，后端会安全解包并识别其中的英文语言文件；翻译使用实验性 AI 服务（需先在「AI 设置」配置），完成后在同目录输出「原名-zh_cn.jar」。" />
 
     <!-- 选择 JAR -->
     <div class="bg-white rounded-lg border border-gray-300 p-5">
       <h3 class="text-sm font-semibold text-gray-900 mb-3">1. 选择模组 JAR</h3>
-      <div class="flex items-center gap-3">
+      <div
+        :class="[dragging ? 'border-primary-500 bg-primary-50' : 'border-gray-300', 'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-5 py-8 transition-colors']"
+      >
+        <ArrowUpTrayIcon class="h-6 w-6 text-gray-400" aria-hidden="true" />
+        <p class="text-sm text-gray-600">将 JAR 文件拖入此处，或点击下方按钮选择</p>
         <Button type="outline" size="default" :disabled="running" :loading="analyzing" @click="handlePick">
           {{ analyzeResult ? '重新选择 JAR' : '选择 JAR 文件' }}
         </Button>

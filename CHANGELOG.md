@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译页支持拖入 JAR 文件**（[ModTranslation.vue](src/views/experimental/ModTranslation.vue) / [useModTranslation.ts](src/composables/useModTranslation.ts) / [useDragDrop.ts](src/composables/useDragDrop.ts) / [state.ts](src/composables/useDragDrop/state.ts)）：「选择模组 JAR」区改为虚线拖放框，拖入单个 jar 文件直接进入分析（经 Tauri `onDragDropEvent` 页面局部监听，拖入悬停时虚线框高亮），仍保留点击选择按钮；页面挂载期间通过 `setDragSuppressed` 置位全局拖拽抑制标志，全局拖拽（遮蔽层与 Mod 安装分发）整体静默，页面卸载后自动恢复，避免 jar 被当作 Mod 安装。
+
 - **《用户协议》外链地址切换为新版云端页面**（[userAgreement.ts](src/utils/userAgreement.ts)）：服务条款外链由 `terms-of-service.html` 更新为 `https://molaunch.moiu.cn/terms`，隐私声明外链由 `privacy-policy.html` 更新为 `https://molaunch.moiu.cn/privacy`。
 
 - **README 鸣谢部分补充联机相关项目**（[README.md](README.md) / [README_EN.md](README_EN.md) / [README_ZH-HANT.md](README_ZH-HANT.md) / [README_JA.md](README_JA.md)）：四个语言版本「特别感谢」在 PCL2 之后新增 Scaffolding-MC（联机客户端数据交换协议，搭桥联机基于与其一致的规范独立实现、房间码互通）；「核心依赖」新增 EasyTier（点对点虚拟组网内核，搭桥联机 / 联机大厅底层网络引擎）。

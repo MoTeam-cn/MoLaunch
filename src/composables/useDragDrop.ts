@@ -14,7 +14,7 @@ export * from './useDragDrop/state'
 export * from './useDragDrop/handlers'
 
 // 仅 useDragDrop() 生命周期函数需要的状态/处理函数
-import { dragState, classifyDrag, hideOverlay } from './useDragDrop/state'
+import { dragState, classifyDrag, getDragSuppressed, hideOverlay } from './useDragDrop/state'
 import { handleFileDrop } from './useDragDrop/handlers'
 
 /**
@@ -36,6 +36,8 @@ export function useDragDrop(): () => void {
     try {
       const webview = getCurrentWebview()
       unlisten = await webview.onDragDropEvent(async (event) => {
+        // 页面置位抑制标志时（如模组翻译页局部拖放框），全局拖拽整体静默
+        if (getDragSuppressed()) return
         const payload = event.payload
         switch (payload.type) {
           case 'enter': {

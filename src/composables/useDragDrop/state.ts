@@ -33,6 +33,20 @@ export const dragState = reactive<DragDropState>({
   status: 'pending',
 })
 
+/**
+ * 全局拖拽抑制标志：页面挂载期间置位后，全局拖拽（蒙层与 drop 分发）整体静默，
+ * 由该页面自行处理拖入文件（如模组翻译页的局部拖放框）。
+ */
+let dragSuppressed = false
+
+export function setDragSuppressed(suppressed: boolean): void {
+  dragSuppressed = suppressed
+}
+
+export function getDragSuppressed(): boolean {
+  return dragSuppressed
+}
+
 /** 暴露给 DragOverlay 的只读状态 */
 export function useDragDropState() {
   return readonly(dragState)
