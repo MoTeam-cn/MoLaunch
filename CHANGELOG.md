@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译 user prompt 模板外置到 prompts 目录，测试移至独立文件**（[mod_translation_user.md](src-tauri/resources/prompts/mod_translation_user.md)（新增） / [resources.rs](src-tauri/src/resources.rs) / [prompt.rs](src-tauri/src/mod_translation/prompt.rs) / [prompt_test.rs](src-tauri/src/mod_translation/prompt_test.rs)（新增））：批量翻译的 user 侧格式指令不再硬编码在代码中，外置为 `resources/prompts/mod_translation_user.md`（编译期内嵌，`{data}` 占位符注入条目数据，模板缺失时内置兜底）；prompt.rs 内联测试移至 `prompt_test.rs`（`#[path]` 子模块引入），并补充 user prompt 数据注入断言。
+
 - **模组翻译提示词补充输出格式要求，修复「AI 响应缺少 translations 数组」**（[mod_translation.md](src-tauri/resources/prompts/mod_translation.md) / [prompt.rs](src-tauri/src/mod_translation/prompt.rs)）：system prompt 模板新增第 5 条明确输出结构 `{"translations":[{"key","translation"}]}` 且 key 与输入一一对应；user prompt 前置同样的格式指令（模型对 system prompt 格式要求响应不稳定，user 侧再强调一次），避免模型返回非约定结构导致解析失败。
 
 - **模组翻译任务进度条增加假进度平滑爬升**（[useModTranslation.ts](src/composables/useModTranslation.ts) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)）：翻译任务进行中，进度条在真实进度基础上以假进度缓慢爬升（每 300ms +0.5，封顶 95%），真实进度事件更新时同步跟进，避免 AI 请求耗时期间进度条长时间卡在固定数值；终态停止假进度并定格真实进度。

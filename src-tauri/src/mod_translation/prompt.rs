@@ -63,8 +63,8 @@ pub fn strip_json_fences(content: &str) -> &str {
 
 /// 构造批量翻译用户消息
 ///
-/// 前置输出格式指令（模型对 system prompt 的格式要求响应不稳定，user 侧
-/// 再强调一次），随后附待翻译条目 JSON 数据。
+/// 模板外置在 `resources/prompts/mod_translation_user.md`（编译期内嵌），
+/// 以 `{data}` 占位符注入待翻译条目 JSON 数据；模板缺失时使用内置兜底。
 pub fn build_translation_user_prompt(
     loader: Loader,
     mod_ids: &[String],
@@ -82,45 +82,14 @@ pub fn build_translation_user_prompt(
         "entries": entries_json,
     })
     .to_string();
-    format!(
-        "请翻译 entries 中的条目，严格按此格式返回 JSON：{{\"translations\":[{{\"key\":\"原key\",\"translation\":\"简体中文译文\"}}]}}，key 与 entries 一一对应，不得遗漏或新增。\n\n{data}"
-    )
+    let template = crate::resources::read_resource("prompts/mod_translation_user.md")
+        .unwrap_or_else(|_| {
+            "请翻译 entries 中的条目，严格按此格式返回 JSON：{{\"translations\":[{{\"key\":\"原key\",\"translation\":\"简体中文译文\"}}]}}，key 与 entries 一一对应，不得遗漏或新增。\n\n{data}"
+                .to_string()
+        });
+    template.replace("{data}", &data)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn strip_fences_handles_code_block() {
-        let input = "```json\n{\"translations\":[{\"key\":\"a\",\"translation\":\"甲\"}]}\n```";
-        assert!(parse_translations_response(input).is_ok());
-    }
-
-    #[test]
-    fn parse_response_without_fences() {
-        let input = "{\"translations\":[{\"key\":\"a\",\"translation\":\"甲\"}]}";
-        let parsed = parse_translations_response(input).unwrap();
-        assert_eq!(parsed, vec![("a".to_string(), "甲".to_string())]);
-    }
-
-    #[test]
-    fn placeholders_preserved() {
-        assert!(validate_translation("Diamond %s", "钻石 %s"));
-        assert!(validate_translation("Hello {0}", "你好 {0}"));
-        assert!(validate_translation("§aGreen", "§a绿色"));
-        assert!(!validate_translation("Diamond %s", "钻石"));
-        assert!(!validate_translation("Hello", "Hello"));
-        assert!(!validate_translation("Diamond", "钻石 %s"));
-    }
-
-    #[test]
-    fn protected_tokens_extraction() {
-        let tokens = extract_protected_tokens("a %1$s b {2} c {{x}} d §6 e \\n");
-        assert!(tokens.iter().any(|t| t == "%1$s"));
-        assert!(tokens.iter().any(|t| t == "{2}"));
-        assert!(tokens.iter().any(|t| t == "{{x}}"));
-        assert!(tokens.iter().any(|t| t == "§6"));
-        assert!(tokens.iter().any(|t| t == "\\n"));
-    }
-}
+#[path = "prompt_test.rs"]
+mod tests;
