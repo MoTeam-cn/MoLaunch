@@ -33,8 +33,8 @@ use crate::ai_core;
 
 use self::resume::Checkpoint;
 use self::types::{
-    AnalyzeParams, AnalyzeResult, JarInspection, RetryInfo, SourceSummary, StartParams,
-    TaskSnapshot,
+    AnalyzeParams, AnalyzeResult, JarInspection, RetryInfo, SourceSummary, StageProgress,
+    StartParams, TaskSnapshot,
 };
 
 /// 进度事件名（前端经 useTauriEvent 订阅）
@@ -97,6 +97,24 @@ fn compute_total_progress() -> f64 {
         .map(|(stage, w)| w * stages.get(stage).copied().unwrap_or(0.0))
         .sum::<f64>()
         / total_weight
+}
+
+/// 构建各阶段进度列表（前端分进度折叠区展示，按权重降序）
+fn build_stages() -> Vec<StageProgress> {
+    let (weights, stages) = (
+        STAGE_WEIGHTS.lock().unwrap_or_else(|e| e.into_inner()),
+        STAGE_PROGRESS.lock().unwrap_or_else(|e| e.into_inner()),
+    );
+    let mut list: Vec<StageProgress> = weights
+        .iter()
+        .map(|(stage, weight)| StageProgress {
+            stage: stage.clone(),
+            weight: *weight,
+            progress: stages.get(stage).copied().unwrap_or(0.0),
+        })
+        .collect();
+    list.sort_by(|a, b| b.weight.total_cmp(&a.weight));
+    list
 }
 
 /// 分析 JAR：解包 → 探测加载器 → 汇总语言源
@@ -199,6 +217,7 @@ pub fn current_status() -> TaskSnapshot {
             progress: 0.0,
             stage_progress: 0.0,
             retry: None,
+            stages: Vec::new(),
             message: String::new(),
             output_path: None,
             error: None,
@@ -268,6 +287,7 @@ pub(super) fn update_status(
     snapshot.stage_progress = progress;
     snapshot.progress = compute_total_progress();
     snapshot.retry = retry;
+    snapshot.stages = build_stages();
     snapshot.message = message.to_string();
     store_status(&snapshot);
     let _ = app.emit(EVENT_NAME, &snapshot);

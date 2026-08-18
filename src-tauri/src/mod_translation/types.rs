@@ -13,6 +13,17 @@ pub struct RetryInfo {
     pub total: u32,
 }
 
+/// 单阶段进度（前端分进度折叠区展示）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StageProgress {
+    pub stage: String,
+    /// 阶段权重（0-1，未启用阶段不出现）
+    pub weight: f64,
+    /// 分进度（0-100）
+    pub progress: f64,
+}
+
 /// 进度回调（分进度 0-100 + 消息 + 重试信息），供各翻译路由共用
 pub type ProgressFn = dyn Fn(f64, &str, Option<RetryInfo>) + Send + Sync;
 
@@ -270,6 +281,8 @@ pub struct TaskSnapshot {
     pub stage_progress: f64,
     /// 重试信息（重试时携带）
     pub retry: Option<RetryInfo>,
+    /// 各阶段进度（前端分进度折叠区展示）
+    pub stages: Vec<StageProgress>,
     pub message: String,
     pub output_path: Option<String>,
     pub error: Option<String>,
@@ -286,6 +299,7 @@ impl TaskSnapshot {
             progress: 0.0,
             stage_progress: 0.0,
             retry: None,
+            stages: Vec::new(),
             message: String::new(),
             output_path: None,
             error: None,

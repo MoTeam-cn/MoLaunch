@@ -1,6 +1,7 @@
 //! 质量回修：AI 修复方案请求与响应校验
 
 use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::ai_core::{self, PromptKind};
 use crate::mod_translation::prompt;
@@ -15,10 +16,14 @@ pub(super) async fn request_actions(
     model: &str,
     on_progress: &ProgressFn,
     base_progress: f64,
+    cancel: &AtomicBool,
 ) -> Result<Vec<RepairAction>, String> {
     let base = build_repair_prompt(issues);
     let mut last_error = None;
     for attempt in 0..MAX_ACTIONS_ATTEMPTS {
+        if cancel.load(Ordering::Relaxed) {
+            return Err("任务已取消".to_string());
+        }
         if attempt > 0 {
             on_progress(
                 base_progress,

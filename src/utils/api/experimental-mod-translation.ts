@@ -102,6 +102,8 @@ export interface ModTranslationTaskSnapshot {
   stageProgress: number
   /** 重试信息（重试时携带） */
   retry: { attempt: number; total: number } | null
+  /** 各阶段进度（分进度折叠区展示） */
+  stages: { stage: string; weight: number; progress: number }[]
   message: string
   outputPath: string | null
   error: string | null

@@ -168,8 +168,15 @@ pub async fn run_repair_passes(
                 .ok_or_else(|| format!("未知语言目标：{target_path}"))?;
             for batch in group.chunks(MAX_REPAIR_BATCH) {
                 // 回修是兜底：批次失败仅跳过，不阻塞打包
-                match repair_ai::request_actions(batch, config, model, on_progress, pass_progress)
-                    .await
+                match repair_ai::request_actions(
+                    batch,
+                    config,
+                    model,
+                    on_progress,
+                    pass_progress,
+                    cancel,
+                )
+                .await
                 {
                     Ok(actions) => {
                         if let Err(e) =

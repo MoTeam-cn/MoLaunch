@@ -89,10 +89,6 @@ const stageLabels: Record<string, string> = {
   package: '打包中',
   translate: '翻译中',
 }
-const stageText = computed(() => {
-  const stage = props.snapshot?.stage
-  return stage ? (stageLabels[stage] ?? stage) : ''
-})
 /** 当前阶段动画点（1-5 循环，running 期间每 300ms 递增） */
 const dotCount = ref(0)
 let dotTimer: number | null = null
@@ -115,18 +111,13 @@ watch(
 onUnmounted(() => {
   if (dotTimer !== null) window.clearInterval(dotTimer)
 })
-/** 展示分进度：running 期间取真实分进度与假进度的较大值（假进度平滑爬升，避免卡住） */
-const displayStageProgress = computed(() => {
-  if (!props.snapshot) return 0
-  return props.running
-    ? Math.max(props.snapshot.stageProgress, props.taskFakeProgress)
-    : props.snapshot.stageProgress
-})
 /** 展示总进度：后端按阶段权重加权计算，running 期间与假进度取较大值 */
 const displayProgress = computed(() => {
   if (!props.snapshot) return 0
   return props.running ? Math.max(props.snapshot.progress, props.taskFakeProgress) : props.snapshot.progress
 })
+/** 分进度折叠区开关（默认折叠） */
+const stageOpen = ref(false)
 
 async function handleOpenDir() {
   if (!props.snapshot?.outputPath) return
@@ -295,25 +286,65 @@ async function handleOpenDir() {
               {{ statusText }}<span v-if="props.running" class="text-primary-500">{{ '.'.repeat(dotCount) }}</span>
             </span>
             <div class="flex items-center gap-2">
-              <span v-if="props.running" class="text-xs text-gray-500">{{ Math.round(displayStageProgress) }}%</span>
+              <span v-if="props.running" class="text-xs text-gray-500">{{ Math.round(displayProgress) }}%</span>
               <Button v-if="props.running" type="ghost" size="small" @click="emit('cancel')">取消</Button>
             </div>
           </div>
-          <!-- 分进度条（当前阶段） -->
+          <!-- 总进度条（按阶段权重加权计算） -->
           <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
             <div
               class="h-full bg-primary-500 transition-all duration-200"
-              :style="{ width: displayStageProgress + '%' }"
+              :style="{ width: displayProgress + '%' }"
             />
           </div>
-          <!-- 总进度（按阶段权重加权）+ 重试信息 -->
+          <!-- 总进度行：折叠开关 + 重试信息 -->
           <div class="mt-1.5 flex items-center justify-between text-xs text-gray-500">
-            <span v-if="stageText">{{ stageText }} · 总进度 {{ Math.round(displayProgress) }}%</span>
-            <span v-else>总进度 {{ Math.round(displayProgress) }}%</span>
-            <span v-if="props.running && props.snapshot.retry" class="text-yellow-600">
-              第 {{ props.snapshot.retry.attempt }}/{{ props.snapshot.retry.total }} 次重试
-            </span>
+            <span>总进度 {{ Math.round(displayProgress) }}%</span>
+            <div class="flex items-center gap-2">
+              <span v-if="props.running && props.snapshot.retry" class="text-yellow-600">
+                第 {{ props.snapshot.retry.attempt }}/{{ props.snapshot.retry.total }} 次重试
+              </span>
+              <button
+                v-if="props.snapshot.stages.length"
+                class="flex items-center gap-0.5 hover:text-gray-700"
+                @click="stageOpen = !stageOpen"
+              >
+                <svg
+                  class="w-3 h-3 transition-transform duration-200"
+                  :class="stageOpen ? 'rotate-90' : ''"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                </svg>
+                各阶段
+              </button>
+            </div>
           </div>
+          <!-- 分进度折叠区：所有阶段进度（未开始 0% + 暂未开始） -->
+          <Collapse :open="stageOpen">
+            <div class="mt-2 space-y-2">
+              <div
+                v-for="s in props.snapshot.stages"
+                :key="s.stage"
+                class="flex items-center gap-2 text-xs"
+              >
+                <span class="w-16 shrink-0 text-gray-500">{{ stageLabels[s.stage] ?? s.stage }}</span>
+                <div class="flex-1 h-1 overflow-hidden rounded-full bg-gray-200">
+                  <div
+                    class="h-full bg-primary-500 transition-all duration-200"
+                    :style="{ width: s.progress + '%' }"
+                  />
+                </div>
+                <span
+                  class="w-16 text-right shrink-0"
+                  :class="s.progress >= 100 ? 'text-green-600' : s.progress > 0 ? 'text-gray-700' : 'text-gray-400'"
+                >
+                  {{ s.progress >= 100 ? '完成' : s.progress > 0 ? Math.round(s.progress) + '%' : '暂未开始' }}
+                </span>
+              </div>
+            </div>
+          </Collapse>
           <div v-if="props.completed && props.snapshot.outputPath" class="mt-3 flex items-center gap-3">
             <span class="text-xs text-gray-500 truncate">{{ props.snapshot.outputPath }}</span>
             <Button type="ghost" size="small" @click="handleOpenDir">打开所在目录</Button>
