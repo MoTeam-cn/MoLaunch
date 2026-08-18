@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译页重构为固定布局（顶部选择区 + 左右分栏）**（[ModTranslation.vue](src/views/experimental/ModTranslation.vue) / [Experimental.vue](src/views/Experimental.vue)）：页面改为固定高度不随内容滚动，顶部「选择模组 JAR」虚线拖放框常驻；分析完成后左右分栏——左侧内容区展示分析结果（基本信息、语言源列表、成本与覆盖分析，超高时内部滚动），右侧固定宽度操作区承载翻译设置（模型 / 批次 / 选项 / 开始翻译）与任务进度（进度条 / 取消 / 完成报告），布局向专业工具对齐。
+
 - **模组翻译页支持拖入 JAR 文件**（[ModTranslation.vue](src/views/experimental/ModTranslation.vue) / [useModTranslation.ts](src/composables/useModTranslation.ts) / [useDragDrop.ts](src/composables/useDragDrop.ts) / [state.ts](src/composables/useDragDrop/state.ts)）：「选择模组 JAR」区改为虚线拖放框，拖入单个 jar 文件直接进入分析（经 Tauri `onDragDropEvent` 页面局部监听，拖入悬停时虚线框高亮），仍保留点击选择按钮；页面挂载期间通过 `setDragSuppressed` 置位全局拖拽抑制标志，全局拖拽（遮蔽层与 Mod 安装分发）整体静默，页面卸载后自动恢复，避免 jar 被当作 Mod 安装。
 
 - **《用户协议》外链地址切换为新版云端页面**（[userAgreement.ts](src/utils/userAgreement.ts)）：服务条款外链由 `terms-of-service.html` 更新为 `https://molaunch.moiu.cn/terms`，隐私声明外链由 `privacy-policy.html` 更新为 `https://molaunch.moiu.cn/privacy`。

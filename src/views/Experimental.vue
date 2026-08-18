@@ -65,7 +65,7 @@ const disclaimerVisible = ref(!hasAgreedToday('experimental'))
         <div v-else-if="activeCategory === 'log'" class="h-full overflow-y-auto p-6">
           <ExperimentalLog />
         </div>
-        <div v-else-if="activeCategory === 'mod-translation'" class="h-full overflow-y-auto p-6">
+        <div v-else-if="activeCategory === 'mod-translation'" class="h-full p-6">
           <ModTranslation />
         </div>
         <div v-else-if="activeCategory === 'ai-settings'" class="h-full overflow-y-auto p-6">

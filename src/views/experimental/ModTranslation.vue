@@ -1,13 +1,9 @@
 <script setup lang="ts">
 /**
- * 实验性 - 模组翻译
- *
- * 流程：选择 JAR → 后端安全解包并分析语言源 → 选择模型与批次 → 启动批量翻译 →
- * 进度经事件实时刷新 → 完成后同目录输出 `<原名>-zh_cn.jar`。
+ * 实验性 - 模组翻译：选择 JAR → 分析语言源 → 批量翻译 → 重打包输出 `<原名>-zh_cn.jar`。
  * 单任务模型：翻译进行中不允许重新分析或再次启动。
  */
 import { ref, computed, onMounted, defineAsyncComponent } from 'vue'
-const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Checkbox = defineAsyncComponent(() => import('@/components/common/Checkbox.vue'))
@@ -126,14 +122,12 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="space-y-4">
-    <AlertV2 type="info" message="选择模组 JAR 后，后端会安全解包并识别其中的英文语言文件；翻译使用实验性 AI 服务（需先在「AI 设置」配置），完成后在同目录输出「原名-zh_cn.jar」。" />
-
-    <!-- 选择 JAR -->
-    <div class="bg-white rounded-lg border border-gray-300 p-5">
+  <div class="flex h-full flex-col gap-4">
+    <!-- 顶部：选择 JAR（固定） -->
+    <div class="bg-white rounded-lg border border-gray-300 p-5 shrink-0">
       <h3 class="text-sm font-semibold text-gray-900 mb-3">1. 选择模组 JAR</h3>
       <div
-        :class="[dragging ? 'border-primary-500 bg-primary-50' : 'border-gray-300', 'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-5 py-8 transition-colors']"
+        :class="[dragging ? 'border-primary-500 bg-primary-50' : 'border-gray-300', 'flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed px-5 py-6 transition-colors']"
       >
         <ArrowUpTrayIcon class="h-6 w-6 text-gray-400" aria-hidden="true" />
         <p class="text-sm text-gray-600">将 JAR 文件拖入此处，或点击下方按钮选择</p>
@@ -144,154 +138,160 @@ onMounted(async () => {
       </div>
     </div>
 
-    <!-- 分析结果 -->
-    <div v-if="analyzeResult" class="bg-white rounded-lg border border-gray-300 overflow-hidden">
-      <div class="px-5 pt-4 pb-3 border-b border-gray-100">
-        <h3 class="text-sm font-semibold text-gray-900">2. 分析结果</h3>
-      </div>
-      <div class="px-5 py-3 space-y-2 text-sm">
-        <div class="flex items-center gap-2">
-          <span class="text-gray-500 w-16 shrink-0">加载器</span>
-          <span class="text-gray-800">{{ loaderLabels[analyzeResult.loader] ?? analyzeResult.loader }}</span>
+    <!-- 分析完成后：左侧内容区 + 右侧操作区 -->
+    <div v-if="analyzeResult" class="flex flex-1 min-h-0 gap-4">
+      <!-- 左侧：分析结果（内容区，内部滚动） -->
+      <div class="flex-1 min-w-0 flex flex-col bg-white rounded-lg border border-gray-300 overflow-hidden">
+        <div class="px-5 pt-4 pb-3 border-b border-gray-100 shrink-0">
+          <h3 class="text-sm font-semibold text-gray-900">2. 分析结果</h3>
         </div>
-        <div v-if="analyzeResult.modIds.length" class="flex items-center gap-2">
-          <span class="text-gray-500 w-16 shrink-0">Mod ID</span>
-          <span class="text-gray-800">{{ analyzeResult.modIds.join(', ') }}</span>
-        </div>
-        <div class="flex items-center gap-2">
-          <span class="text-gray-500 w-16 shrink-0">条目数</span>
-          <span class="text-gray-800">{{ analyzeResult.totalEntries }}</span>
-        </div>
-        <div v-if="analyzeResult.version" class="flex items-center gap-2">
-          <span class="text-gray-500 w-16 shrink-0">版本</span>
-          <span class="text-gray-800">{{ analyzeResult.version }}</span>
-        </div>
-        <div v-if="analyzeResult.classCandidates.length" class="flex items-center gap-2">
-          <span class="text-gray-500 w-16 shrink-0">class 文本</span>
-          <span class="text-gray-800">{{ analyzeResult.classCandidates.length }} 个候选</span>
-        </div>
-        <div v-if="analyzeResult.signed" class="flex items-center gap-2">
-          <span class="text-yellow-600">JAR 含签名文件，重打包后签名将失效</span>
-        </div>
-        <div v-for="warn in analyzeResult.warnings" :key="warn" class="flex items-center gap-2">
-          <span class="text-yellow-600">{{ warn }}</span>
-        </div>
-      </div>
-
-      <div class="px-5 pb-4">
-        <div class="border border-gray-200 rounded overflow-hidden">
-          <div class="bg-gray-50 px-3 py-2 text-xs text-gray-500 flex items-center gap-3 border-b border-gray-200">
-            <span class="w-32 shrink-0">类型</span>
-            <span class="flex-1 truncate">文件</span>
-            <span class="w-16 text-right shrink-0">待译条目</span>
-          </div>
-          <div class="max-h-48 overflow-y-auto divide-y divide-gray-100">
-            <div
-              v-for="source in analyzeResult.sources"
-              :key="source.sourcePath"
-              class="px-3 py-2 text-xs flex items-center gap-3"
-            >
-              <span class="w-32 shrink-0 text-gray-500">{{ kindLabels[source.kind] ?? source.kind }}</span>
-              <span class="flex-1 truncate text-gray-700">{{ source.targetPath }}</span>
-              <span class="w-16 text-right shrink-0 text-gray-700">{{ source.entries }}</span>
+        <div class="flex-1 min-h-0 overflow-y-auto px-5 py-3">
+          <div class="space-y-2 text-sm">
+            <div class="flex items-center gap-2">
+              <span class="text-gray-500 w-16 shrink-0">加载器</span>
+              <span class="text-gray-800">{{ loaderLabels[analyzeResult.loader] ?? analyzeResult.loader }}</span>
+            </div>
+            <div v-if="analyzeResult.modIds.length" class="flex items-center gap-2">
+              <span class="text-gray-500 w-16 shrink-0">Mod ID</span>
+              <span class="text-gray-800">{{ analyzeResult.modIds.join(', ') }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-gray-500 w-16 shrink-0">条目数</span>
+              <span class="text-gray-800">{{ analyzeResult.totalEntries }}</span>
+            </div>
+            <div v-if="analyzeResult.version" class="flex items-center gap-2">
+              <span class="text-gray-500 w-16 shrink-0">版本</span>
+              <span class="text-gray-800">{{ analyzeResult.version }}</span>
+            </div>
+            <div v-if="analyzeResult.classCandidates.length" class="flex items-center gap-2">
+              <span class="text-gray-500 w-16 shrink-0">class 文本</span>
+              <span class="text-gray-800">{{ analyzeResult.classCandidates.length }} 个候选</span>
+            </div>
+            <div v-if="analyzeResult.signed" class="flex items-center gap-2">
+              <span class="text-yellow-600">JAR 含签名文件，重打包后签名将失效</span>
+            </div>
+            <div v-for="warn in analyzeResult.warnings" :key="warn" class="flex items-center gap-2">
+              <span class="text-yellow-600">{{ warn }}</span>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div class="px-5 pb-4">
-        <button
-          class="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-          @click="detailOpen = !detailOpen"
-        >
-          <svg
-            class="w-3 h-3 transition-transform duration-200"
-            :class="detailOpen ? 'rotate-90' : ''"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
-          </svg>
-          成本与覆盖分析
-        </button>
-        <Collapse :open="detailOpen">
-          <div class="mt-2 space-y-3">
-            <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
-              <div>预估 token：{{ analyzeResult.quote.estimatedTokens }}</div>
-              <div>调用次数：{{ analyzeResult.quote.estimatedCalls }}</div>
-              <div>语言批次：{{ analyzeResult.quote.languageBatches }}</div>
-              <div>class 批次：{{ analyzeResult.quote.classBatches }}</div>
-              <div>预估点数：{{ analyzeResult.quote.points }}</div>
+          <div class="mt-4 border border-gray-200 rounded overflow-hidden">
+            <div class="bg-gray-50 px-3 py-2 text-xs text-gray-500 flex items-center gap-3 border-b border-gray-200">
+              <span class="w-32 shrink-0">类型</span>
+              <span class="flex-1 truncate">文件</span>
+              <span class="w-16 text-right shrink-0">待译条目</span>
             </div>
-            <div class="border border-gray-200 rounded overflow-hidden">
-              <div class="max-h-40 overflow-y-auto divide-y divide-gray-100">
-                <div
-                  v-for="item in analyzeResult.coverage"
-                  :key="item.path"
-                  class="px-3 py-1.5 text-xs flex items-center gap-2"
-                >
-                  <span class="flex-1 truncate text-gray-700">{{ item.path }}</span>
-                  <Tag size="small" color="gray">{{ dispositionLabels[item.disposition] ?? item.disposition }}</Tag>
-                </div>
+            <div class="max-h-48 overflow-y-auto divide-y divide-gray-100">
+              <div
+                v-for="source in analyzeResult.sources"
+                :key="source.sourcePath"
+                class="px-3 py-2 text-xs flex items-center gap-3"
+              >
+                <span class="w-32 shrink-0 text-gray-500">{{ kindLabels[source.kind] ?? source.kind }}</span>
+                <span class="flex-1 truncate text-gray-700">{{ source.targetPath }}</span>
+                <span class="w-16 text-right shrink-0 text-gray-700">{{ source.entries }}</span>
               </div>
             </div>
           </div>
-        </Collapse>
-      </div>
-    </div>
 
-    <!-- 翻译设置与启动 -->
-    <div v-if="analyzeResult && !running" class="bg-white rounded-lg border border-gray-300 p-5">
-      <h3 class="text-sm font-semibold text-gray-900 mb-3">3. 翻译设置</h3>
-      <div class="space-y-3">
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-500 w-16 shrink-0">模型</span>
-          <Select v-model="model" :options="modelOptions" placeholder="选择翻译模型" />
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-500 w-16 shrink-0">批次</span>
-          <Select v-model="batchSize" :options="batchOptions" />
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="text-sm text-gray-500 w-16 shrink-0">选项</span>
-          <div class="flex items-center gap-4">
-            <Checkbox v-model="generateModName">生成中文名</Checkbox>
-            <Checkbox v-model="repairEnabled">质量回修</Checkbox>
-            <Checkbox v-model="classTextEnabled">class 文本</Checkbox>
+          <div class="mt-4">
+            <button
+              class="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+              @click="detailOpen = !detailOpen"
+            >
+              <svg
+                class="w-3 h-3 transition-transform duration-200"
+                :class="detailOpen ? 'rotate-90' : ''"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+              >
+                <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+              </svg>
+              成本与覆盖分析
+            </button>
+            <Collapse :open="detailOpen">
+              <div class="mt-2 space-y-3">
+                <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                  <div>预估 token：{{ analyzeResult.quote.estimatedTokens }}</div>
+                  <div>调用次数：{{ analyzeResult.quote.estimatedCalls }}</div>
+                  <div>语言批次：{{ analyzeResult.quote.languageBatches }}</div>
+                  <div>class 批次：{{ analyzeResult.quote.classBatches }}</div>
+                  <div>预估点数：{{ analyzeResult.quote.points }}</div>
+                </div>
+                <div class="border border-gray-200 rounded overflow-hidden">
+                  <div class="max-h-40 overflow-y-auto divide-y divide-gray-100">
+                    <div
+                      v-for="item in analyzeResult.coverage"
+                      :key="item.path"
+                      class="px-3 py-1.5 text-xs flex items-center gap-2"
+                    >
+                      <span class="flex-1 truncate text-gray-700">{{ item.path }}</span>
+                      <Tag size="small" color="gray">{{ dispositionLabels[item.disposition] ?? item.disposition }}</Tag>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Collapse>
           </div>
         </div>
-        <div class="pt-2">
-          <Button type="primary" @click="handleStart">开始翻译</Button>
-        </div>
       </div>
-    </div>
 
-    <!-- 任务进度 -->
-    <div v-if="snapshot && snapshot.status !== 'idle'" class="bg-white rounded-lg border border-gray-300 p-5">
-      <div class="flex items-center justify-between gap-2 mb-2">
-        <span class="text-sm font-semibold text-gray-900">{{ statusText }}</span>
-        <div class="flex items-center gap-2">
-          <span v-if="running" class="text-xs text-gray-500">{{ Math.round(snapshot.progress) }}%</span>
-          <Button v-if="running" type="ghost" size="small" @click="handleCancel">取消</Button>
+      <!-- 右侧：操作区（固定宽度，内部滚动） -->
+      <div class="w-80 shrink-0 min-h-0 flex flex-col gap-4 overflow-y-auto">
+        <!-- 翻译设置 -->
+        <div v-if="!running" class="bg-white rounded-lg border border-gray-300 p-5">
+          <h3 class="text-sm font-semibold text-gray-900 mb-3">3. 翻译设置</h3>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-gray-500 w-16 shrink-0">模型</span>
+              <Select v-model="model" :options="modelOptions" placeholder="选择翻译模型" />
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-gray-500 w-16 shrink-0">批次</span>
+              <Select v-model="batchSize" :options="batchOptions" />
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-gray-500 w-16 shrink-0">选项</span>
+              <div class="flex flex-col gap-2">
+                <Checkbox v-model="generateModName">生成中文名</Checkbox>
+                <Checkbox v-model="repairEnabled">质量回修</Checkbox>
+                <Checkbox v-model="classTextEnabled">class 文本</Checkbox>
+              </div>
+            </div>
+            <div class="pt-2">
+              <Button type="primary" class="w-full" @click="handleStart">开始翻译</Button>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
-        <div
-          class="h-full bg-primary-500 transition-all duration-200"
-          :style="{ width: snapshot.progress + '%' }"
-        />
-      </div>
-      <div v-if="completed && snapshot.outputPath" class="mt-3 flex items-center gap-3">
-        <span class="text-xs text-gray-500 truncate">{{ snapshot.outputPath }}</span>
-        <Button type="ghost" size="small" @click="handleOpenDir">打开所在目录</Button>
-      </div>
-      <div v-if="completed && snapshot.modName" class="mt-2 flex items-center gap-2 text-xs">
-        <span class="text-gray-500">模组中文名</span>
-        <span class="text-gray-800">{{ snapshot.modName.name }}</span>
-        <Tag size="small" color="primary">{{ modNameSourceLabels[snapshot.modName.source] ?? snapshot.modName.source }}</Tag>
-      </div>
-      <div v-if="completed && snapshot.report" class="mt-1 text-xs text-gray-500">
-        语言条目 {{ snapshot.report.languageAccepted }}/{{ snapshot.report.languageAttempted }}；class 文本 {{ snapshot.report.classResolved }}/{{ snapshot.report.classTotal }}
+
+        <!-- 任务进度 -->
+        <div v-if="snapshot && snapshot.status !== 'idle'" class="bg-white rounded-lg border border-gray-300 p-5">
+          <div class="flex items-center justify-between gap-2 mb-2">
+            <span class="text-sm font-semibold text-gray-900">{{ statusText }}</span>
+            <div class="flex items-center gap-2">
+              <span v-if="running" class="text-xs text-gray-500">{{ Math.round(snapshot.progress) }}%</span>
+              <Button v-if="running" type="ghost" size="small" @click="handleCancel">取消</Button>
+            </div>
+          </div>
+          <div class="h-1.5 w-full overflow-hidden rounded-full bg-gray-200">
+            <div
+              class="h-full bg-primary-500 transition-all duration-200"
+              :style="{ width: snapshot.progress + '%' }"
+            />
+          </div>
+          <div v-if="completed && snapshot.outputPath" class="mt-3 flex items-center gap-3">
+            <span class="text-xs text-gray-500 truncate">{{ snapshot.outputPath }}</span>
+            <Button type="ghost" size="small" @click="handleOpenDir">打开所在目录</Button>
+          </div>
+          <div v-if="completed && snapshot.modName" class="mt-2 flex items-center gap-2 text-xs">
+            <span class="text-gray-500">模组中文名</span>
+            <span class="text-gray-800">{{ snapshot.modName.name }}</span>
+            <Tag size="small" color="primary">{{ modNameSourceLabels[snapshot.modName.source] ?? snapshot.modName.source }}</Tag>
+          </div>
+          <div v-if="completed && snapshot.report" class="mt-1 text-xs text-gray-500">
+            语言条目 {{ snapshot.report.languageAccepted }}/{{ snapshot.report.languageAttempted }}；class 文本 {{ snapshot.report.classResolved }}/{{ snapshot.report.classTotal }}
+          </div>
+        </div>
       </div>
     </div>
   </div>
