@@ -79,10 +79,14 @@ pub(super) async fn request_actions(
                 continue;
             }
         };
-        match parse_actions_response(&content)
-            .and_then(|actions| validate_response(issues, &actions).map(|_| actions))
-        {
-            Ok(actions) => return Ok(actions),
+        match parse_actions_response(&content) {
+            Ok(actions) => {
+                let (validated, dropped) = validate_response(issues, &actions);
+                if dropped {
+                    log_warn!("[ModTranslation] 修复方案不完整，未覆盖/无效的 issue 保留原文");
+                }
+                return Ok(validated);
+            }
             Err(error) => {
                 let msg = format!("修复方案校验失败: {error}");
                 log_warn!("[ModTranslation] {msg}");
@@ -102,8 +106,15 @@ fn build_repair_prompt(issues: &[RepairIssue]) -> String {
             serde_json::json!({"id": issue.id, "kind": issue.kind, "source": issue.source, "current": issue.current, "messages": issue.messages})
         })
         .collect();
-    serde_json::json!({"task": "修复以下语言条目的质量问题，只输出 JSON 对象：{\"actions\":[{\"action\":\"translate\"|\"keep-source\",\"issueId\":\"...\",\"translation\":\"...\",\"reason\":\"...\"}]}", "rules": "translate 必须含简体中文并保留全部占位符；确实应保留原文时用 keep-source 并给出 reason。每个 issue 恰好一个 action。issueId 必须原样复制 issues 中的 id，不得修改、截断或自行生成。", "issues": list})
-        .to_string()
+    serde_json::json!({
+        "task": "修复以下语言条目的质量问题，只输出 JSON 对象：{\"actions\":[{\"action\":\"translate\"|\"keep-source\",\"issueId\":\"...\",\"translation\":\"...\",\"reason\":\"...\"}]}",
+        "rules": format!(
+            "translate 必须含简体中文并保留全部占位符；确实应保留原文时用 keep-source 并给出 reason。必须为 issues 中每一个 id 输出恰好一个 action，覆盖全部 {} 个 issue，不得遗漏任何一个。issueId 必须原样复制 issues 中的 id，不得修改、截断或自行生成。输出精简：keep-source 时省略 translation 字段，reason 一句话即可。",
+            issues.len()
+        ),
+        "issues": list
+    })
+    .to_string()
 }
 
 fn str_field(item: &serde_json::Value, name: &str) -> Option<String> {
@@ -152,43 +163,55 @@ fn resolve_issue_id<'a>(expected: &'a HashSet<&str>, raw: &str) -> Option<&'a st
     Some(*first)
 }
 
+/// 宽容校验：丢弃未知/重复/无效 action，未覆盖的 issue 自动保留原文
+/// 返回 (有效 actions, 是否有丢弃)。回修是兜底，不因模型输出不完整阻塞。
 pub(crate) fn validate_response(
     issues: &[RepairIssue],
     actions: &[RepairAction],
-) -> Result<(), String> {
+) -> (Vec<RepairAction>, bool) {
     let expected: HashSet<&str> = issues.iter().map(|issue| issue.id.as_str()).collect();
     let mut seen = HashSet::new();
+    let mut result = Vec::new();
+    let mut dropped = false;
     for action in actions {
         let Some(issue_id) = resolve_issue_id(&expected, &action.issue_id) else {
-            return Err(format!("模型返回未知 issue：{}", action.issue_id));
+            dropped = true;
+            continue;
         };
         if !seen.insert(issue_id) {
-            return Err(format!("模型重复返回 issue：{issue_id}"));
+            dropped = true;
+            continue;
         }
         let issue = issues.iter().find(|i| i.id == issue_id).unwrap();
         let label = issue.key.as_deref().unwrap_or(action.issue_id.as_str());
-        match action.action.as_str() {
+        let valid = match action.action.as_str() {
             "translate" => {
                 let t = action.translation.as_deref().unwrap_or_default();
-                if !has_chinese(t) || !prompt::validate_translation(&issue.source, t) {
-                    return Err(format!("条目 {label} 的译文不含中文或占位符不一致"));
-                }
+                has_chinese(t) && prompt::validate_translation(&issue.source, t)
             }
             "keep-source" => {
                 let reason = action.reason.as_deref().unwrap_or_default();
-                if reason.trim().is_empty() {
-                    return Err(format!("条目 {label} 的 keep-source 缺少理由"));
-                }
+                !reason.trim().is_empty()
             }
-            other => return Err(format!("未知 action 类型：{other}")),
+            _ => false,
+        };
+        if !valid {
+            dropped = true;
+            log_warn!("[ModTranslation] 丢弃无效修复 action：{label}");
+            continue;
+        }
+        result.push(action.clone());
+    }
+    // 未覆盖的 issue 自动保留原文
+    for issue in issues {
+        if !seen.contains(issue.id.as_str()) {
+            result.push(RepairAction {
+                action: "keep-source".to_string(),
+                issue_id: issue.id.clone(),
+                translation: None,
+                reason: Some("模型未处理，保留原文".to_string()),
+            });
         }
     }
-    if seen.len() != expected.len() {
-        return Err(format!(
-            "模型只处理了 {}/{} 个 issue",
-            seen.len(),
-            expected.len()
-        ));
-    }
-    Ok(())
+    (result, dropped)
 }

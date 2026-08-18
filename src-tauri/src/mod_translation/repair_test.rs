@@ -115,10 +115,17 @@ fn validate_response_checks_coverage_duplicates_and_content() {
             reason: Some("品牌名".to_string()),
         },
     ];
-    assert!(validate_response(&issues, &good).is_ok());
-    assert!(validate_response(&issues, &good[..1]).is_err()); // 未全覆盖
+    let (validated, dropped) = validate_response(&issues, &good);
+    assert!(!dropped && validated.len() == 2);
+    // 未全覆盖：宽容处理补 keep-source，不报错
+    let (validated, dropped) = validate_response(&issues, &good[..1]);
+    assert!(dropped && validated.len() == 2);
+    assert!(validated.iter().any(|a| a.action == "keep-source"));
+    // 重复：丢弃重复项
     let dup = vec![good[0].clone(), good[0].clone()];
-    assert!(validate_response(&issues, &dup).is_err()); // 重复
+    let (validated, dropped) = validate_response(&issues, &dup);
+    assert!(dropped && validated.len() == 2);
+    // 译文无中文：丢弃该 action
     let latin = vec![
         RepairAction {
             action: "translate".to_string(),
@@ -128,7 +135,10 @@ fn validate_response_checks_coverage_duplicates_and_content() {
         },
         good[1].clone(),
     ];
-    assert!(validate_response(&issues, &latin).is_err()); // 译文无中文
+    let (validated, dropped) = validate_response(&issues, &latin);
+    assert!(dropped && validated.len() == 2);
+    assert!(validated.iter().any(|a| a.action == "keep-source"));
+    // keep-source 缺理由：丢弃该 action
     let no_reason = vec![
         good[0].clone(),
         RepairAction {
@@ -138,7 +148,8 @@ fn validate_response_checks_coverage_duplicates_and_content() {
             reason: None,
         },
     ];
-    assert!(validate_response(&issues, &no_reason).is_err()); // keep-source 缺理由
+    let (validated, dropped) = validate_response(&issues, &no_reason);
+    assert!(dropped && validated.len() == 2);
 }
 
 #[test]
@@ -150,8 +161,9 @@ fn validate_response_accepts_truncated_issue_id() {
         translation: Some("生成 %d 只僵尸".to_string()),
         reason: None,
     }];
-    assert!(validate_response(&issues, &actions).is_ok());
-    // 前缀不唯一时仍拒绝
+    let (validated, dropped) = validate_response(&issues, &actions);
+    assert!(!dropped && validated.len() == 1);
+    // 前缀不唯一时丢弃该 action，未覆盖项保留原文
     let issues = vec![
         issue("abcdef1234567890", "Spawn %d zombies"),
         issue("abcdef1234567891", "Hello"),
@@ -162,7 +174,9 @@ fn validate_response_accepts_truncated_issue_id() {
         translation: Some("生成 %d 只僵尸".to_string()),
         reason: None,
     }];
-    assert!(validate_response(&issues, &actions).is_err());
+    let (validated, dropped) = validate_response(&issues, &actions);
+    assert!(dropped && validated.len() == 2);
+    assert!(validated.iter().all(|a| a.action == "keep-source"));
 }
 
 #[test]
