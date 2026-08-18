@@ -8,7 +8,6 @@ const Button = defineAsyncComponent(() => import('@/components/common/Button.vue
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const ModTranslationResult = defineAsyncComponent(() => import('./ModTranslationResult.vue'))
 import { ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
-import { open as openUrl } from '@tauri-apps/plugin-shell'
 import { pickFile } from '@/utils/fileDialog'
 import { safeCall } from '@/utils/async'
 import { toastSuccess, toastInfo } from '@/utils/toast'
@@ -110,12 +109,14 @@ onMounted(async () => {
     <Transition name="view-fade" mode="out-in">
       <!-- 上传区：铺满容器 -->
       <div v-if="view === 'upload'" key="upload" class="h-full flex flex-col gap-3">
-        <AlertV2 type="warning" class="shrink-0">
-          <p>
-            本模组翻译功能仍处于调整优化阶段，受 AI 大模型幻觉影响，翻译准确率与可用性可能不尽如人意，我们会持续优化提示词。建议优先使用更稳定、更完善的
-            <a class="text-yellow-700 underline cursor-pointer" @click="openUrl(MCMOD_I18N_URL)">i18n 翻译模组或资源包</a>；
-            本功能仅作为其尚未翻译或翻译较少的模组的备选方案。
-          </p>
+        <AlertV2 type="warning" class="shrink-0" :link="{ url: MCMOD_I18N_URL }">
+          <template #default="{ openLink }">
+            <p>
+              本模组翻译功能仍处于调整优化阶段，受 AI 大模型幻觉影响，翻译准确率与可用性可能不尽如人意，我们会持续优化提示词。建议优先使用更稳定、更完善的
+              <a class="text-amber-600 underline cursor-pointer" @click="openLink">i18n 翻译模组或资源包</a>；
+              本功能仅作为其尚未翻译或翻译较少的模组的备选方案。
+            </p>
+          </template>
         </AlertV2>
         <div
           class="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-colors"

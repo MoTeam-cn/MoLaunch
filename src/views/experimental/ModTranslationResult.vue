@@ -11,7 +11,6 @@ const Collapse = defineAsyncComponent(() => import('@/components/common/Collapse
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
-import { open as openUrl } from '@tauri-apps/plugin-shell'
 import * as tauri from '@/utils/tauri'
 import { toastError } from '@/utils/toast'
 import type {
@@ -146,12 +145,14 @@ async function handleOpenDir() {
     </div>
 
     <!-- 功能定位提示 -->
-    <AlertV2 type="warning" class="shrink-0">
-      <p>
-        本模组翻译功能仍处于调整优化阶段，受 AI 大模型幻觉影响，翻译准确率与可用性可能不尽如人意，我们会持续优化提示词。建议优先使用更稳定、更完善的
-        <a class="text-yellow-700 underline cursor-pointer" @click="openUrl(MCMOD_I18N_URL)">i18n 翻译模组或资源包</a>；
-        本功能仅作为其尚未翻译或翻译较少的模组的备选方案。
-      </p>
+    <AlertV2 type="warning" class="shrink-0" :link="{ url: MCMOD_I18N_URL }">
+      <template #default="{ openLink }">
+        <p>
+          本模组翻译功能仍处于调整优化阶段，受 AI 大模型幻觉影响，翻译准确率与可用性可能不尽如人意，我们会持续优化提示词。建议优先使用更稳定、更完善的
+          <a class="text-amber-600 underline cursor-pointer" @click="openLink">i18n 翻译模组或资源包</a>；
+          本功能仅作为其尚未翻译或翻译较少的模组的备选方案。
+        </p>
+      </template>
     </AlertV2>
 
     <!-- 左右分栏 -->

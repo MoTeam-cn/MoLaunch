@@ -13,10 +13,14 @@
  */
 
 import { elementIcons } from '@/utils/element-icons'
+import { open as openUrl } from '@tauri-apps/plugin-shell'
+import { toastInfo } from '@/utils/toast'
 
 interface Props {
   type?: 'info' | 'warning' | 'error' | 'success' | 'debug'
   message?: string
+  /** 外部链接配置：slot 内通过 openLink 触发，点击后 toast 提示并延迟 0.5s 跳转 */
+  link?: { url: string; toast?: string }
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +37,15 @@ const typeConfig = {
 }
 
 const config = typeConfig[props.type]
+
+function handleLinkClick() {
+  const link = props.link
+  if (!link) return
+  toastInfo(link.toast ?? '正在打开外部链接…')
+  setTimeout(() => {
+    openUrl(link.url)
+  }, 500)
+}
 </script>
 
 <template>
@@ -46,7 +59,7 @@ const config = typeConfig[props.type]
       <path :d="config.icon.path" />
     </svg>
     <div class="min-w-0 flex-1 leading-relaxed">
-      <slot>{{ message }}</slot>
+      <slot :open-link="handleLinkClick">{{ message }}</slot>
     </div>
   </div>
 </template>
