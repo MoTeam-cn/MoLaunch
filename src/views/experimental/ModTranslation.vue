@@ -5,8 +5,10 @@
  */
 import { ref, onMounted, defineAsyncComponent } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 const ModTranslationResult = defineAsyncComponent(() => import('./ModTranslationResult.vue'))
 import { ArrowUpTrayIcon } from '@heroicons/vue/24/outline'
+import { open as openUrl } from '@tauri-apps/plugin-shell'
 import { pickFile } from '@/utils/fileDialog'
 import { safeCall } from '@/utils/async'
 import { toastSuccess, toastInfo } from '@/utils/toast'
@@ -38,6 +40,8 @@ const batchSize = ref(40)
 const generateModName = ref(true)
 const repairEnabled = ref(true)
 const classTextEnabled = ref(true)
+/** i18n 翻译模组/资源包（MC百科） */
+const MCMOD_I18N_URL = 'https://www.mcmod.cn/class/1188.html'
 /** 分析中展示的文件名 */
 const analyzingName = ref('')
 
@@ -105,9 +109,16 @@ onMounted(async () => {
   <div class="h-full overflow-hidden">
     <Transition name="view-fade" mode="out-in">
       <!-- 上传区：铺满容器 -->
-      <div v-if="view === 'upload'" key="upload" class="h-full">
+      <div v-if="view === 'upload'" key="upload" class="h-full flex flex-col gap-3">
+        <AlertV2 type="warning" class="shrink-0">
+          <p>
+            本模组翻译功能仍处于调整优化阶段，受 AI 大模型幻觉影响，翻译准确率与可用性可能不尽如人意，我们会持续优化提示词。建议优先使用更稳定、更完善的
+            <a class="text-yellow-700 underline cursor-pointer" @click="openUrl(MCMOD_I18N_URL)">i18n 翻译模组或资源包</a>；
+            本功能仅作为其尚未翻译或翻译较少的模组的备选方案。
+          </p>
+        </AlertV2>
         <div
-          class="h-full flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-colors"
+          class="flex-1 min-h-0 flex flex-col items-center justify-center gap-4 rounded-xl border-2 border-dashed transition-colors"
           :class="dragging ? 'border-primary-500 bg-primary-50' : 'border-gray-300'"
         >
           <ArrowUpTrayIcon class="h-10 w-10 text-gray-400" aria-hidden="true" />
