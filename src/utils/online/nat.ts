@@ -4,7 +4,7 @@
  * 基于 WebRTC ICE candidates 的 srflx/host 类型组合判断 NAT 类型，
  * 展示文案/颜色映射见文件内 NAT_TYPE_META。
  */
-import type { NatDetectionResult, NatType } from '@/types/online'
+import type { NatDetectionResult, NatType, IceCandidateInfo } from '@/types/online'
 
 /**
  * 解析 ICE candidate 字符串中的 candidate 类型
@@ -53,6 +53,8 @@ export function detectNatType(candidates: string[]): NatDetectionResult {
 
   const hostCandidates: string[] = []
   const srflxCandidates: { address: string; port: number }[] = []
+  // 保留完整 candidate 解析详情（网络拓扑图数据源）
+  const ice: IceCandidateInfo[] = []
 
   console.log(`[NAT] 收集到 ${candidates.length} 个 candidate，开始推断 NAT 类型`)
   for (const c of candidates) {
@@ -60,13 +62,16 @@ export function detectNatType(candidates: string[]): NatDetectionResult {
     if (!type) continue
     const addr = parseCandidateAddress(c)
     if (!addr) continue
+    // 从 candidate 中提取端口与协议（candidate:foundation component protocol priority addr port typ ...）
+    const parts = c.replace(/^candidate:/i, '').split(/\s+/)
+    const port = Number(parts[5])
+    if (!Number.isNaN(port)) {
+      ice.push({ kind: type, address: addr, port, protocol: parts[2] })
+    }
 
     if (type === 'host') {
       hostCandidates.push(addr)
     } else if (type === 'srflx') {
-      // 从 candidate 中提取端口（address 后紧跟的字段）
-      const parts = c.replace(/^candidate:/i, '').split(/\s+/)
-      const port = Number(parts[5])
       if (!Number.isNaN(port)) {
         srflxCandidates.push({ address: addr, port })
       }
@@ -110,6 +115,7 @@ export function detectNatType(candidates: string[]): NatDetectionResult {
     durationMs: Math.round(performance.now() - start),
     localIp,
     publicIp,
+    ice,
   }
 }
 
@@ -135,6 +141,7 @@ export function detectNatTypeWithStun(
         type: 'Unknown',
         durationMs: 0,
         error: '当前环境不支持 RTCPeerConnection',
+        stunServers,
       })
       return
     }
@@ -163,12 +170,13 @@ export function detectNatTypeWithStun(
           type,
           durationMs: Math.round(performance.now() - start),
           error,
+          stunServers,
         })
       } else {
         // 复用 detectNatType 的解析逻辑
         const result = detectNatType(candidates)
         console.log(`[NAT] 检测完成: type=${result.type}, 耗时 ${result.durationMs}ms`)
-        resolve(result)
+        resolve({ ...result, stunServers })
       }
     }
 
@@ -187,7 +195,7 @@ export function detectNatTypeWithStun(
         } catch {
           /* ignore */
         }
-        resolve(result)
+        resolve({ ...result, stunServers })
       }
     }, timeoutMs)
 
@@ -220,7 +228,7 @@ export function detectNatTypeWithStun(
           } catch {
             /* ignore */
           }
-          resolve(result)
+          resolve({ ...result, stunServers })
         }
       }
     }

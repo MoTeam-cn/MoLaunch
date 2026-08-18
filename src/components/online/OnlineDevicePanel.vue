@@ -18,8 +18,10 @@ import { useOnlineStore } from '@/stores/online'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
+const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const SealedOverlay = defineAsyncComponent(() => import('@/components/common/SealedOverlay.vue'))
 const EasyTierStatusCard = defineAsyncComponent(() => import('./EasyTierStatusCard.vue'))
+const NatTopologyGraph = defineAsyncComponent(() => import('./NatTopologyGraph.vue'))
 import {
   ArrowRightOnRectangleIcon,
   UserCircleIcon,
@@ -31,7 +33,7 @@ import {
   SignalSlashIcon,
 } from '@heroicons/vue/24/outline'
 import { formatTimestamp } from '@/utils/format'
-import { NAT_TYPE_META, getNatFeasibilityColorClass } from '@/utils/online/nat'
+import { NAT_TYPE_META } from '@/utils/online/nat'
 import { stripMcsdkPrefix } from '@/utils/online/device-id'
 import { toastSuccess, toastError } from '@/utils/toast'
 import { showWarning } from '@/utils/modal'
@@ -70,6 +72,22 @@ async function handleLogin() {
 // ============ NAT 类型检测 ============
 // 复用 store 的 natDetecting 状态（与 Online.vue 自动检测共享，避免重复触发）
 const detectingNat = computed(() => onlineStore.natDetecting)
+
+/** NAT 类型元数据色 → 项目 Tag 组件预设色映射（yellow 对应 Tag 的 gold） */
+const NAT_TAG_COLOR: Record<string, string> = {
+  green: 'green',
+  blue: 'blue',
+  yellow: 'gold',
+  red: 'red',
+  gray: 'gray',
+}
+
+/** NAT 类型标签的 Tag 颜色（默认 gray） */
+const natTagColor = computed(() => {
+  const result = onlineStore.natResult
+  if (!result) return 'gray'
+  return NAT_TAG_COLOR[NAT_TYPE_META[result.type]?.color ?? 'gray'] ?? 'gray'
+})
 
 async function handleDetectNat() {
   try {
@@ -139,12 +157,9 @@ async function handleDetectNat() {
             :text="NAT_TYPE_META[onlineStore.natResult.type].tooltip"
             position="left"
           >
-            <span
-              class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium cursor-help"
-              :class="getNatFeasibilityColorClass(NAT_TYPE_META[onlineStore.natResult.type].feasibility)"
-            >
+            <Tag size="medium" :color="natTagColor" class="cursor-help">
               {{ NAT_TYPE_META[onlineStore.natResult.type].label }}
-            </span>
+            </Tag>
           </Tooltip>
           <span v-else-if="detectingNat" class="text-xs text-gray-400">检测中...</span>
           <span v-else class="text-xs text-gray-400">未检测</span>
@@ -158,6 +173,8 @@ async function handleDetectNat() {
       <div v-if="onlineStore.natResult?.error" class="mt-2 text-xs text-red-500">
         <SignalSlashIcon class="w-3.5 h-3.5 inline mr-1" />{{ onlineStore.natResult.error }}
       </div>
+      <!-- 网络拓扑（基于 ICE candidate，默认折叠） -->
+      <NatTopologyGraph :result="onlineStore.natResult" />
     </Card>
 
     <!-- 虚拟组网（easytier 状态，本地进程不依赖云端，始终显示） -->

@@ -22,6 +22,8 @@
 
 - **联机设备面板移除「注册设备」引导并常驻 NAT / 虚拟组网卡片**（[OnlineDevicePanel.vue](src/components/online/OnlineDevicePanel.vue) / [useOnlineNav.ts](src/composables/useOnlineNav.ts)）：设备注册/登录由后端 `auth_init` 启动时无感完成（注册即登录），「注册设备」引导卡片在云端在线时永不出现、离线时又被封存，属无效 UI，已移除；「网络环境」（NAT 类型检测，本地 STUN）与「虚拟组网」（easytier 状态，本地进程）卡片不再受 `registered` 条件限制，始终显示；设备信息卡片保持已注册时显示、云端离线时封存；侧边栏「设备」分类描述同步更新。
 
+- **NAT 类型改用 Tag 组件并新增网络拓扑图**（[OnlineDevicePanel.vue](src/components/online/OnlineDevicePanel.vue) / [NatTopologyGraph.vue](src/components/online/NatTopologyGraph.vue)（新增） / [nat.ts](src/utils/online/nat.ts) / [types/online/nat.ts](src/types/online/nat.ts)）：NAT 类型徽章由自定义 span 改为项目 `Tag` 组件（可行性色映射 Tag 预设色，yellow→gold）；「网络环境」卡片内新增「网络拓扑」折叠区块（默认收起，复用 `Collapse` 组件），基于 WebRTC ICE candidate 结果前端绘制 SVG 拓扑图——本机（局域网地址）→ NAT 设备（类型 + 反射地址）→ 公网（STUN 服务器 + 公网 IP）链路，UDP 阻断时公网连线红色虚线；`NatDetectionResult` 新增 `ice`（candidate 解析详情）与 `stunServers` 字段作为拓扑图数据源。
+
 ### Fixed
 
 - **服务器状态检测支持粘贴 `host:port` 自动拆分端口**（[ServerPinger.vue](src/views/tools/network/ServerPinger.vue)）：地址框粘贴 `ip:port`（含 IPv6 方括号形式 `[::1]:25565`）时自动拆分，端口填入端口框（非法端口不处理）；`doPing` 增加兜底解析，手动输入带端口地址同样正确检测。
