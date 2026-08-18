@@ -17,6 +17,16 @@ pub(crate) struct ChatRequest {
     /// 响应格式约束（OpenAI 兼容 `response_format`，如 json_object）
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) response_format: Option<ResponseFormat>,
+    /// 思考模式（思考模型禁用后输出走 content 而非 reasoning）
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) thinking: Option<ThinkingConfig>,
+}
+
+/// 思考模式配置（deepseek 等思考模型：enabled/disabled）
+#[derive(Debug, Serialize)]
+pub(crate) struct ThinkingConfig {
+    #[serde(rename = "type")]
+    pub(crate) ty: &'static str,
 }
 
 /// 响应格式约束（OpenAI 兼容 `response_format`）

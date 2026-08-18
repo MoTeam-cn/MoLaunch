@@ -7,7 +7,7 @@
 use super::transport::{authorized_builder, send_with_timeout};
 use super::types::{
     ChatCompletionsRequest, ChatCompletionsResponse, ChatMessage, ChatRequest, ChatResponse,
-    ChatResult, ChatTurn, ModelsResponse, ResponseFormat, ToolCall, ToolDef,
+    ChatResult, ChatTurn, ModelsResponse, ResponseFormat, ThinkingConfig, ToolCall, ToolDef,
 };
 use crate::ai_core::config::AiConfig;
 use crate::ai_core::prompt::{system_prompt, PromptKind};
@@ -21,13 +21,14 @@ pub async fn chat(
     user_content: String,
     model: Option<&str>,
 ) -> anyhow::Result<String> {
-    chat_inner(config, kind, user_content, model, false, None).await
+    chat_inner(config, kind, user_content, model, false, None, false).await
 }
 
 /// 同 [`chat`]，但追加 `response_format=json_object` 约束模型只输出 JSON 对象
 ///
 /// 供结构化结果场景复用（如模组翻译的批量翻译返回），避免调用方手工剥离多余文本。
 /// `timeout_secs` 可覆盖全局超时（如模组翻译批量输出大、耗时长的场景传 120s）。
+/// 同时携带 `thinking=disabled` 禁用思考模式，避免思考模型把输出放入 reasoning 字段。
 pub async fn chat_json(
     config: &AiConfig,
     kind: PromptKind,
@@ -35,10 +36,11 @@ pub async fn chat_json(
     model: Option<&str>,
     timeout_secs: Option<u64>,
 ) -> anyhow::Result<String> {
-    chat_inner(config, kind, user_content, model, true, timeout_secs).await
+    chat_inner(config, kind, user_content, model, true, timeout_secs, true).await
 }
 
-/// 单轮聊天内部实现：`json_mode` 决定是否下发 `response_format=json_object`
+/// 单轮聊天内部实现：`json_mode` 决定是否下发 `response_format=json_object`，
+/// `disable_thinking` 决定是否携带 `thinking=disabled`（思考模型输出走 content）
 async fn chat_inner(
     config: &AiConfig,
     kind: PromptKind,
@@ -46,6 +48,7 @@ async fn chat_inner(
     model: Option<&str>,
     json_mode: bool,
     timeout_secs: Option<u64>,
+    disable_thinking: bool,
 ) -> anyhow::Result<String> {
     let model = config.resolve_model(model);
     if model.is_empty() {
@@ -68,6 +71,7 @@ async fn chat_inner(
         stream: false,
         max_tokens: Some(config.max_output_tokens),
         response_format: json_mode.then_some(ResponseFormat { ty: "json_object" }),
+        thinking: disable_thinking.then_some(ThinkingConfig { ty: "disabled" }),
     };
 
     let timeout = timeout_secs.unwrap_or(config.timeout_secs);

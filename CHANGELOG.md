@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译 AI 请求禁用思考模式：思考模型输出固定走 content 字段**（[chat.rs](src-tauri/src/ai_core/client/chat.rs) / [types.rs](src-tauri/src/ai_core/client/types.rs)）：排查「修复方案校验失败: AI 响应中未找到 JSON 对象」根因——deepseek-v4-flash 等思考模型把输出放在 `reasoning` 字段、`content` 为空，后端只读 `content` 导致解析失败。修复：`ChatRequest` 新增 `thinking` 字段（`{"thinking":{"type":"disabled"}}`），`chat_json`（模组翻译专用）统一携带禁用思考参数，强制模型输出走 `content`；普通 `chat` 不受影响。
+
 - **模组翻译质量复验进度卡死修复：审计耗时期间平滑爬升、批次进度连续推进、失败不回退**（[repair.rs](src-tauri/src/mod_translation/repair.rs) / [task.rs](src-tauri/src/mod_translation/task.rs)）：排查「质量复验分进度走到 25% 卡死、失败后跳到 50%」根因——每轮 `collect_issues` 重新审计全部条目（日志实测第二轮耗时约 106 秒），期间无任何进度推送导致进度条卡死；轮次推进时 `pass_start` 直接跳到下一档（25%→50%）造成跳变。修复：① **审计耗时期间平滑爬升**：`run_repair_passes` 改为接收 `Arc<ProgressFn>` / `Arc<AtomicBool>`，每轮 `collect_issues` 前 `tokio::spawn` 启动 `smooth_progress` 从当前进度平滑爬升到本轮上限，审计完成后取消，进度不再卡死；② **批次进度连续推进**：进度按实际推送值连续推进（`progress = max(progress, 当前分进度)`），不再按轮次跳变；③ **失败不回退**：批次失败 / 写回失败推送 `max(当前值, 批次起点)`，避免 smooth_progress 已爬升后又被拉回。
 
 - **模组翻译质量复验根因修复：提示词明确覆盖全部 issue 并精简输出，宽容校验不因模型输出不完整阻塞**（[repair_ai.rs](src-tauri/src/mod_translation/repair_ai.rs) / [repair_test.rs](src-tauri/src/mod_translation/repair_test.rs)）：排查「模型只处理了 23/24 个 issue」根因——模型输出 JSON 在列表中间被截断（`EOF while parsing a list`），最后一个 action 未闭合导致整批校验失败重试。修复：① **提示词强化**：rules 明确「必须为 issues 中每一个 id 输出恰好一个 action，覆盖全部 N 个 issue，不得遗漏任何一个」，并新增「输出精简：keep-source 时省略 translation 字段，reason 一句话即可」降低输出量、减少截断概率；② **宽容校验**：`validate_response` 重构为返回 `(有效 actions, 是否有丢弃)`——未知/重复/无效 action 逐条丢弃并记录 WARN，未覆盖的 issue 自动补 `keep-source`（保留原文），回修是兜底不再因模型输出不完整整批失败重试；JSON 截断（解析失败）仍走重试。
