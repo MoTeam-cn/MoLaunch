@@ -54,14 +54,16 @@ pub async fn run_class_route(
                 attempt: attempt as u32 + 1,
                 total: MAX_BATCH_ATTEMPTS as u32,
             });
-            let msg = if attempt > 0 {
-                format!("class 判定第 {}/{} 次重试", attempt + 1, MAX_BATCH_ATTEMPTS)
-            } else {
-                format!(
-                    "class 文本判定：批次 {}/{}（{handled}/{total}）",
-                    batch_idx + 1,
-                    batch_count
-                )
+            let msg = move |p: f64| {
+                if attempt > 0 {
+                    format!("class 判定第 {}/{} 次重试", attempt + 1, MAX_BATCH_ATTEMPTS)
+                } else {
+                    format!(
+                        "class 文本判定：批次 {}/{}（{handled}/{total} · {p:.0}%）",
+                        batch_idx + 1,
+                        batch_count
+                    )
+                }
             };
             let user_prompt = build_class_prompt(inspection, batch, last_error.as_deref());
             let content = match tokio::select! {
@@ -78,7 +80,7 @@ pub async fn run_class_route(
                     batch_cap,
                     cancel,
                     on_progress,
-                    &msg,
+                    msg,
                     retry,
                 ) => return Err("任务已取消".to_string()),
             } {
@@ -161,6 +163,7 @@ fn build_class_prompt(
         .collect();
     let mut prompt_value = serde_json::json!({
         "task": "判断 Minecraft 模组 class 常量文本是否展示给玩家；translate 必须提供含简体中文的 translation 且占位符原样保留，exclude 必须提供 reason",
+        "output": "只输出 JSON 对象：{\"decisions\":[{\"id\":\"候选id\",\"action\":\"translate\"|\"exclude\",\"translation\":\"译文\",\"reason\":\"理由\"}]}。id 必须原样复制 candidates 中的 id，每个候选恰好一个 decision，不得遗漏、不得新增。注意：本任务输出 decisions 数组，不是 translations 数组。",
         "loader": inspection.loader.as_str(),
         "modIds": inspection.mod_ids,
         "candidates": candidates,

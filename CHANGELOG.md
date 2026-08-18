@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **修复 class 判定 AI 响应缺少 decisions 数组，批次内消息随进度更新**（[translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs) / [mod.rs](src-tauri/src/mod_translation/mod.rs)）：class 判定复用语言翻译的 system prompt（要求输出 `translations` 数组），模型按 system prompt 输出导致解析失败——`build_class_prompt` 现明确要求输出 `{"decisions":[...]}` 结构并强调「不是 translations 数组」；`smooth_progress` 消息参数改为泛型闭包按当前进度动态生成，class 批次消息由固定「（0/16）」改为「（0/16 · 45%）」随批次内进度实时更新，语言翻译批次内消息同步显示进度百分比。
+
 - **模组翻译 AI 调用超时提升至 2 分钟，class 批次标题随批次更新，前端假进度不再回退**（[chat.rs](src-tauri/src/ai_core/client/chat.rs) / [mod.rs](src-tauri/src/mod_translation/mod.rs) / [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs) / [translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [repair_ai.rs](src-tauri/src/mod_translation/repair_ai.rs) / [useModTranslation.ts](src/composables/useModTranslation.ts)）：`chat_json` 新增 `timeout_secs` 可选参数覆盖全局默认 60s，模组翻译三个路由统一传 120s（批量输出数千 token、130 token/s 需数十秒，60s 易误杀）；class 文本判定消息由固定「0/16」改为「批次 x/y（已处理/总数）」随批次推进更新；质量复验重试时输出 WARN 日志；前端假进度移除「阶段完成时 stageProgress=100 直接跳满」逻辑（阶段切换时被总进度 +5% 封顶拉回导致 90%→70%→90% 波动），改为基于真实总进度平滑爬升且永不回退。
 
 - **模组翻译分进度批次内平滑爬升，重试与解析失败均输出日志**（[mod.rs](src-tauri/src/mod_translation/mod.rs) / [translate_class.rs](src-tauri/src/mod_translation/translate_class.rs) / [translate_lang.rs](src-tauri/src/mod_translation/translate_lang.rs)）：新增 `smooth_progress` 辅助函数，AI 调用期间分进度从批次起点平滑爬升到批次上限（每 200ms +0.5，取消即停），不再卡在固定值或仅重试时 +5%；重试时推送「第 x/y 次重试」信息并输出 WARN 日志，class 判定解析失败（模型返回内容但校验不通过）也立即输出日志，不再静默重试到完全失败才提示。

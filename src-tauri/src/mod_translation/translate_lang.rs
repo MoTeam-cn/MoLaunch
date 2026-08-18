@@ -167,10 +167,12 @@ async fn translate_batch(
                 attempt: round as u32,
                 total: max_rounds as u32,
             });
-            let msg = if round > 1 {
-                format!("{action} 第 {round}/{max_rounds} 次重试")
-            } else {
-                "翻译中".to_string()
+            let msg = move |p: f64| {
+                if round > 1 {
+                    format!("{action} 第 {round}/{max_rounds} 次重试")
+                } else {
+                    format!("翻译中（{p:.0}%）")
+                }
             };
             pending
                 .retain(|(key, _)| work_graph.model_attempt_count(&ids[key]) < MAX_ITEM_ATTEMPTS);
@@ -197,7 +199,7 @@ async fn translate_batch(
                     batch_cap,
                     cancel,
                     on_progress,
-                    &msg,
+                    msg,
                     retry,
                 ) => return Err("任务已取消".to_string()),
             } {
