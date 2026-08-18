@@ -24,6 +24,8 @@
 
 ### Changed
 
+- **模组翻译提示词补充输出格式要求，修复「AI 响应缺少 translations 数组」**（[mod_translation.md](src-tauri/resources/prompts/mod_translation.md) / [prompt.rs](src-tauri/src/mod_translation/prompt.rs)）：system prompt 模板新增第 5 条明确输出结构 `{"translations":[{"key","translation"}]}` 且 key 与输入一一对应；user prompt 前置同样的格式指令（模型对 system prompt 格式要求响应不稳定，user 侧再强调一次），避免模型返回非约定结构导致解析失败。
+
 - **模组翻译任务进度条增加假进度平滑爬升**（[useModTranslation.ts](src/composables/useModTranslation.ts) / [ModTranslationResult.vue](src/views/experimental/ModTranslationResult.vue)）：翻译任务进行中，进度条在真实进度基础上以假进度缓慢爬升（每 300ms +0.5，封顶 95%），真实进度事件更新时同步跟进，避免 AI 请求耗时期间进度条长时间卡在固定数值；终态停止假进度并定格真实进度。
 
 - **修复 AI 非流式请求被全局 30s 超时误杀**（[transport.rs](src-tauri/src/ai_core/client/transport.rs) / [http.rs](src-tauri/src/http.rs)）：非流式 AI 请求（如模组翻译批量调用）原走全局 HTTP 客户端（自带 30s 客户端级超时），大请求体 / 慢响应场景下被提前掐断，表现为 `error sending request for url` 且无原因；现改为与流式链路一致的无整体超时客户端，整体耗时由 `send_with_timeout`（默认 60s）控制；同时 `request_error_msg` 拼接错误 source 链（如 `timed out`），超时原因不再被吞掉，便于定位。

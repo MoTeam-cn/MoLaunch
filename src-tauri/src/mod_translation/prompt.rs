@@ -62,6 +62,9 @@ pub fn strip_json_fences(content: &str) -> &str {
 }
 
 /// 构造批量翻译用户消息
+///
+/// 前置输出格式指令（模型对 system prompt 的格式要求响应不稳定，user 侧
+/// 再强调一次），随后附待翻译条目 JSON 数据。
 pub fn build_translation_user_prompt(
     loader: Loader,
     mod_ids: &[String],
@@ -72,13 +75,16 @@ pub fn build_translation_user_prompt(
         .iter()
         .map(|(key, source)| serde_json::json!({ "key": key, "source": source }))
         .collect();
-    serde_json::json!({
+    let data = serde_json::json!({
         "loader": loader.as_str(),
         "modIds": mod_ids,
         "namespace": namespace,
         "entries": entries_json,
     })
-    .to_string()
+    .to_string();
+    format!(
+        "请翻译 entries 中的条目，严格按此格式返回 JSON：{{\"translations\":[{{\"key\":\"原key\",\"translation\":\"简体中文译文\"}}]}}，key 与 entries 一一对应，不得遗漏或新增。\n\n{data}"
+    )
 }
 
 #[cfg(test)]
