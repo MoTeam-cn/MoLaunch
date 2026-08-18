@@ -334,7 +334,7 @@ function buildOption() {
         links,
         categories,
         roam: true,
-        draggable: false,
+        draggable: true,
         edgeSymbol: ['none', 'arrow'],
         edgeSymbolSize: [0, 8],
         label: {
@@ -377,8 +377,69 @@ function ensureChart() {
     chart = echarts.init(chartEl.value)
     resizeObserver = new ResizeObserver(() => chart?.resize())
     resizeObserver.observe(chartEl.value)
+    // 节点被拖出画布可视区时自动释放固定位置，力导向重新布局拉回
+    chart.on('dragend', handleDragEnd)
+    bindManualPan()
   }
   chart.setOption(buildOption(), true)
+}
+
+/**
+ * 手动平移兜底：ECharts graph 的 roam pan 仅在图内容包围盒（节点外接矩形）内有效，
+ * 包围盒外的空白区域无法平移。此处监听 zrender 底层事件，在包围盒外按下拖动时
+ * 通过 graphRoam action 平移画布，实现全域可拖拽。
+ */
+function bindManualPan() {
+  if (!chart) return
+  const zr = chart.getZr()
+  let panning = false
+  let lastX = 0
+  let lastY = 0
+  zr.on('mousedown', (e: { offsetX: number; offsetY: number }) => {
+    // 包围盒内交给 ECharts（节点拖拽 / 内置 pan），包围盒外手动平移
+    if (chart?.containPixel({ seriesIndex: 0 }, [e.offsetX, e.offsetY])) {
+      panning = false
+      return
+    }
+    panning = true
+    lastX = e.offsetX
+    lastY = e.offsetY
+  })
+  zr.on('mousemove', (e: { offsetX: number; offsetY: number }) => {
+    if (!panning || !chart) return
+    const dx = e.offsetX - lastX
+    const dy = e.offsetY - lastY
+    lastX = e.offsetX
+    lastY = e.offsetY
+    chart.dispatchAction({ type: 'graphRoam', dx, dy })
+  })
+  zr.on('mouseup', () => {
+    panning = false
+  })
+  zr.on('globalout', () => {
+    panning = false
+  })
+}
+
+/** 节点被拖出画布可视区（节点中心越界）时重建图表，释放 fx/fy 让力导向拉回 */
+function handleDragEnd(params: unknown) {
+  if (!chart) return
+  const p = params as { dataType?: string; data?: { id?: string; x?: number; y?: number } | null }
+  if (p.dataType !== 'node' || !p.data?.id) return
+  const { x, y } = p.data
+  if (x == null || y == null) return
+  const pixel = chart.convertToPixel({ seriesIndex: 0 }, [x, y])
+  if (!Array.isArray(pixel)) return
+  const [px, py] = pixel
+  const margin = 24
+  if (
+    px < -margin ||
+    px > chart.getWidth() + margin ||
+    py < -margin ||
+    py > chart.getHeight() + margin
+  ) {
+    chart.setOption(buildOption(), true)
+  }
 }
 
 watch(
