@@ -14,6 +14,7 @@ pub mod memory;
 pub mod mod_name;
 pub mod prompt;
 pub mod quality;
+pub mod repair;
 pub mod resume;
 pub mod translate;
 pub mod types;
