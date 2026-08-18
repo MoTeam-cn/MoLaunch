@@ -61,6 +61,57 @@ const publicIp = computed(() => props.result?.publicIp ?? srflxs.value[0]?.addre
 const publicPort = computed(() => (srflxs.value[0] ? String(srflxs.value[0].port) : ''))
 const stunServers = computed(() => props.result?.stunServers ?? [])
 
+// ============ NAT 分享 ============
+const friendShare = ref<NatShareData | null>(null)
+const verdict = ref<P2PVerdict | null>(null)
+
+const myNatLabel = computed(() =>
+  props.result ? (NAT_TYPE_META[props.result.type]?.label ?? '未知') : '',
+)
+const friendNatLabel = computed(() =>
+  friendShare.value ? (NAT_TYPE_META[friendShare.value.type]?.label ?? '未知') : '',
+)
+
+/** 联机可能性等级 → Tag 预设色 */
+const VERDICT_TAG_COLOR: Record<P2PVerdict['level'], string> = {
+  high: 'green',
+  medium: 'blue',
+  low: 'gold',
+  none: 'red',
+  unknown: 'gray',
+}
+
+async function handleShare() {
+  if (!props.result) {
+    toastWarning('请先检测 NAT 类型')
+    return
+  }
+  const ok = await copyToClipboard(serializeNatShare(props.result))
+  if (ok) toastSuccess('分享内容已复制，发送给朋友即可')
+}
+
+function handleImport() {
+  const result = props.result
+  if (!result) {
+    toastWarning('请先检测 NAT 类型')
+    return
+  }
+  showPrompt(
+    '导入 NAT 分享',
+    '粘贴朋友分享的 NAT 内容，朋友侧节点将加入拓扑图并判断联机可能性：',
+    (value) => {
+      const data = parseNatShare(value)
+      if (!data) {
+        toastError('分享内容无效，请确认完整复制')
+        return
+      }
+      friendShare.value = data
+      verdict.value = judgeP2PFeasibility(result.type, data.type)
+    },
+    { placeholder: 'MoLaunchNATv1|...' },
+  )
+}
+
 // ============ ECharts 拓扑图 ============
 const chartEl = ref<HTMLDivElement | null>(null)
 let chart: echarts.ECharts | null = null
@@ -353,57 +404,6 @@ onBeforeUnmount(() => {
   chart?.dispose()
   chart = null
 })
-
-// ============ NAT 分享 ============
-const friendShare = ref<NatShareData | null>(null)
-const verdict = ref<P2PVerdict | null>(null)
-
-const myNatLabel = computed(() =>
-  props.result ? (NAT_TYPE_META[props.result.type]?.label ?? '未知') : '',
-)
-const friendNatLabel = computed(() =>
-  friendShare.value ? (NAT_TYPE_META[friendShare.value.type]?.label ?? '未知') : '',
-)
-
-/** 联机可能性等级 → Tag 预设色 */
-const VERDICT_TAG_COLOR: Record<P2PVerdict['level'], string> = {
-  high: 'green',
-  medium: 'blue',
-  low: 'gold',
-  none: 'red',
-  unknown: 'gray',
-}
-
-async function handleShare() {
-  if (!props.result) {
-    toastWarning('请先检测 NAT 类型')
-    return
-  }
-  const ok = await copyToClipboard(serializeNatShare(props.result))
-  if (ok) toastSuccess('分享内容已复制，发送给朋友即可')
-}
-
-function handleImport() {
-  const result = props.result
-  if (!result) {
-    toastWarning('请先检测 NAT 类型')
-    return
-  }
-  showPrompt(
-    '导入 NAT 分享',
-    '粘贴朋友分享的 NAT 内容，朋友侧节点将加入拓扑图并判断联机可能性：',
-    (value) => {
-      const data = parseNatShare(value)
-      if (!data) {
-        toastError('分享内容无效，请确认完整复制')
-        return
-      }
-      friendShare.value = data
-      verdict.value = judgeP2PFeasibility(result.type, data.type)
-    },
-    { placeholder: 'MoLaunchNATv1|...' },
-  )
-}
 </script>
 
 <template>
