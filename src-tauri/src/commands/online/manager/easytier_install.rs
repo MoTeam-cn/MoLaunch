@@ -208,6 +208,15 @@ pub fn register(d: &mut Dispatcher) {
         );
     }
 
+    // 取消安装（设置取消标志，下载链实时检查后中断；解压/移动阶段在阶段间检查）
+    d.register(
+        "easytier_cancel",
+        handler!(state, _app, _params, {
+            state.easytier_cancel.store(true, Ordering::SeqCst);
+            serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
+        }),
+    );
+
     d.register(
         "set_github_proxies",
         handler!(state, _app, params, {

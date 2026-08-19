@@ -139,6 +139,8 @@ pub(super) async fn install_version(
     if state.easytier.lock().await.is_some() {
         return Err("easytier 正在组网运行中，请先退出联机网络再更新内核".to_string());
     }
+    // 重置取消标志（覆盖手动安装与 ensure_installed 自动安装入口，避免上次取消残留）
+    state.easytier_cancel.store(false, Ordering::SeqCst);
     let client = crate::http::get_client();
     let dir = install_dir()?;
     let asset = asset_name(version);
@@ -198,6 +200,8 @@ pub(super) async fn install_version(
         .await
         .with_silent(true)
         .with_preserve_order(true)
+        // 取消信号：`easytier_cancel` action 设置后，分片/单流下载链实时检查并中断
+        .with_cancel_flag(state.easytier_cancel.clone())
         // 镜像可能返回 HTML/挑战页等非 zip 内容（大小校验无法识别），魔数校验失败自动回退官方
         .with_content_validator(Arc::new(|p| {
             if is_zip_file(p) {
@@ -212,7 +216,14 @@ pub(super) async fn install_version(
         .next()
         .ok_or_else(|| "下载失败：无结果".to_string())?;
     if result.status != DownloadStatus::Completed {
+        // 下载失败/取消：清理临时 zip，避免残留
+        let _ = std::fs::remove_file(&zip_path);
         return Err(result.error.unwrap_or_else(|| "下载失败".to_string()));
+    }
+    // 下载完成后检查取消（解压/移动阶段用户仍可取消，阶段间检查）
+    if state.easytier_cancel.load(Ordering::SeqCst) {
+        let _ = std::fs::remove_file(&zip_path);
+        return Err("下载已取消".to_string());
     }
     // 下载完成：强制推进到 80%（分片下载实际字节与 HEAD 探测值可能有偏差，
     // 字节映射可能停在 80 以下，需收尾补发避免进度条停留中途）

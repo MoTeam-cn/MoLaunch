@@ -82,6 +82,8 @@ pub struct AppState {
     pub github_proxies: Arc<TokioMutex<Vec<crate::utils::github_download::GithubProxy>>>,
     /// easytier 内核安装进行中标志（防重入：`easytier_install` / `ensure_installed` 共用）
     pub easytier_installing: Arc<std::sync::atomic::AtomicBool>,
+    /// easytier 内核安装取消标志（`easytier_cancel` 设置，下载链实时检查后中断）
+    pub easytier_cancel: Arc<std::sync::atomic::AtomicBool>,
     /// 应用句柄（Tauri setup 钩子中注入）
     ///
     /// 供后台任务/进度回调向前端 emit 事件（如 `download-progress`）。
@@ -155,6 +157,7 @@ impl AppState {
             redstone: Arc::new(TokioMutex::new(None)),
             github_proxies: Arc::new(TokioMutex::new(github_proxies)),
             easytier_installing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            easytier_cancel: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
             panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
