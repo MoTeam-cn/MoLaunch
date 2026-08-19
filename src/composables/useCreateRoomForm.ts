@@ -7,6 +7,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { useRoomHost } from './useRoomHost'
+import { useEasyTierInstall } from './useEasyTierInstall'
 import {
   listInstalledVersionsWithType,
   getVersionLoaderInfo,
@@ -26,6 +27,8 @@ export type CreateStep = 'idle' | 'code' | 'register' | 'start'
 export function useCreateRoomForm() {
   const store = useOnlineStore()
   const roomHost = useRoomHost()
+  /** easytier 内核前置检查（创建前必须已安装，缺失时弹窗引导前往设置页） */
+  const install = useEasyTierInstall()
 
   /** 创建房间表单 */
   const createForm = ref({
@@ -184,6 +187,10 @@ export function useCreateRoomForm() {
       toastError('MC 端口无效：端口范围 1-65535')
       return
     }
+
+    // 前置依赖：easytier 内核未安装时不创建房间（弹窗引导前往设置页下载）
+    const kernelOk = await install.ensureKernel('创建房间')
+    if (!kernelOk) return
 
     creating.value = true
     try {

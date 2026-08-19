@@ -33,8 +33,8 @@ const RedStoneCreatePanel = defineAsyncComponent(() => import('@/components/onli
 const RedStoneKernelPanel = defineAsyncComponent(() => import('@/components/online/RedStoneKernelPanel.vue'))
 const OnlineTopBar = defineAsyncComponent(() => import('@/views/online/OnlineTopBar.vue'))
 const DisclaimerDialog = defineAsyncComponent(() => import('@/components/common/DisclaimerDialog.vue'))
-const EasyTierInstallModal = defineAsyncComponent(() => import('@/components/online/EasyTierInstallModal.vue'))
 import { useOnlineNav, type OnlineCategoryId } from '@/composables/useOnlineNav'
+import { useEasyTierInstall } from '@/composables/useEasyTierInstall'
 import { hasAgreedToday } from '@/utils/disclaimer'
 import { showWarning } from '@/utils/modal'
 
@@ -49,13 +49,16 @@ const disclaimerVisible = ref(!hasAgreedToday('online'))
 
 const { categories, badge, activeDesc, activeLabel } = useOnlineNav(activeCategory)
 
-/** 当前分类中处于封禁态（云端离线）的 id → 名称 映射，用于点击时弹窗告知原因 */
-const sealedCategories = computed<Record<string, string>>(() => {
-  const map: Record<string, string> = {}
+/** easytier 内核缺失弹窗（封存拦截复用，引导前往设置页下载） */
+const install = useEasyTierInstall()
+
+/** 当前分类中处于封禁态的 id → { 名称, 原因 } 映射，用于点击时弹窗告知原因 */
+const sealedCategories = computed<Record<string, { label: string; reason: 'cloud' | 'kernel' }>>(() => {
+  const map: Record<string, { label: string; reason: 'cloud' | 'kernel' }> = {}
   for (const cat of categories.value) {
-    if (cat.sealed) map[cat.id] = cat.label
+    if (cat.sealed) map[cat.id] = { label: cat.label, reason: cat.sealedReason ?? 'cloud' }
     for (const child of cat.children ?? []) {
-      if (child.sealed) map[child.id] = child.label
+      if (child.sealed) map[child.id] = { label: child.label, reason: child.sealedReason ?? 'cloud' }
     }
   }
   return map
@@ -114,11 +117,16 @@ function handleCategoryChange(id: string): void {
     goTutorial()
     return
   }
-  const sealedLabel = sealedCategories.value[id]
-  if (sealedLabel) {
+  const sealed = sealedCategories.value[id]
+  if (sealed) {
+    if (sealed.reason === 'kernel') {
+      // easytier 内核缺失：引导前往 设置-联机 页面下载
+      install.promptMissing(sealed.label)
+      return
+    }
     showWarning(
       '功能已封存',
-      `「${sealedLabel}」需要连接云端服务，当前云端连接失败，暂不可用。`,
+      `「${sealed.label}」需要连接云端服务，当前云端连接失败，暂不可用。`,
       onlineStore.cloudError ?? undefined,
     )
     return
@@ -203,8 +211,5 @@ const currentProps = computed<Record<string, unknown>>(() => {
 
     <!-- 使用协议抽屉（当日未同意时展示；teleport 到 #app-content，位置不影响单根约束） -->
     <DisclaimerDialog v-model:visible="disclaimerVisible" kind="online" />
-
-    <!-- easytier 内核安装进度弹窗（搭桥前置依赖，事件驱动自动显隐） -->
-    <EasyTierInstallModal />
   </div>
 </template>

@@ -16,6 +16,7 @@ import {
 import { listLobbyPackages, listLobbyRooms } from '@/utils/api/online-manager'
 import type { LobbyPackageItem, LobbyRoomItem } from '@/types/online'
 import { useOnlineStore } from '@/stores/online'
+import { useEasyTierInstall } from '@/composables/useEasyTierInstall'
 import { toastError } from '@/utils/toast'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
@@ -25,6 +26,8 @@ const LobbyRoomCard = defineAsyncComponent(() => import('./LobbyRoomCard.vue'))
 const LobbyJoinDialog = defineAsyncComponent(() => import('./LobbyJoinDialog.vue'))
 
 const store = useOnlineStore()
+/** easytier 内核前置检查（大厅加入前必须已安装，缺失时弹窗引导前往设置页） */
+const install = useEasyTierInstall()
 
 const packages = ref<LobbyPackageItem[]>([])
 const packagesLoading = ref(false)
@@ -121,6 +124,9 @@ function handleJoin(room: LobbyRoomItem) {
 /** 执行加入（含密码）：成功 ok=true；失败 ok=false + error 内联展示 */
 async function doJoin(room: LobbyRoomItem, password: string): Promise<{ ok: boolean; error?: string }> {
   if (inRoom.value) return { ok: false, error: '您当前已在房间中' }
+  // 前置依赖：easytier 内核未安装时不加入房间（弹窗引导前往设置页下载）
+  const kernelOk = await install.ensureKernel('加入房间')
+  if (!kernelOk) return { ok: false, error: 'easytier 内核未安装' }
   joiningId.value = room.publicIdentifier
   try {
     await store.guestJoinRoom(room.publicIdentifier, password)

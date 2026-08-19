@@ -9,16 +9,23 @@
 import { computed, onMounted, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
 import { getEasyTierStatus } from '@/utils/api/online-manager/easytier'
+import { useEasyTierInstall } from '@/composables/useEasyTierInstall'
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
+const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const EasyTierStatusBadge = defineAsyncComponent(() => import('./EasyTierStatusBadge.vue'))
 import {
   ServerStackIcon,
   GlobeAltIcon,
   TagIcon,
   CpuChipIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
+/** easytier 内核安装状态（缺失时显示下载引导，点击前往设置页） */
+const install = useEasyTierInstall()
+/** 内核缺失（明确未安装才显示引导；null=未知/检查中不显示） */
+const kernelMissing = computed(() => install.installed.value === false)
 
 const version = computed(() => store.easytierRuntime.version)
 const ip = computed(() => store.easytierRuntime.virtualIp)
@@ -40,11 +47,22 @@ onMounted(async () => {
   } catch {
     // 查询失败保持现状，等待后续 emit 推送
   }
+  // 内核安装状态（缺失时显示引导条；done 事件自动解除）
+  void install.checkStatus()
 })
 </script>
 
 <template>
   <Card title="虚拟组网（easytier）">
+    <!-- 内核缺失引导：联机功能依赖 easytier 内核，未安装时引导前往设置页下载 -->
+    <div
+      v-if="kernelMissing"
+      class="mb-3 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2"
+    >
+      <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 shrink-0" />
+      <span class="flex-1 text-xs text-amber-700">easytier 内核未安装，联机功能暂不可用</span>
+      <Button size="small" type="primary" @click="install.promptMissing('虚拟组网')">前往设置下载</Button>
+    </div>
     <div class="divide-y divide-gray-100">
       <div class="px-1 py-3 flex items-center justify-between">
         <div class="flex items-center gap-2 text-sm text-gray-600">

@@ -14,6 +14,7 @@
  */
 import { ref, computed, defineAsyncComponent } from 'vue'
 import { useOnlineStore } from '@/stores/online'
+import { useEasyTierInstall } from '@/composables/useEasyTierInstall'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
@@ -32,6 +33,8 @@ defineProps<{
 }>()
 
 const store = useOnlineStore()
+/** easytier 内核前置检查（加入前必须已安装，缺失时弹窗引导前往设置页） */
+const install = useEasyTierInstall()
 
 /** 加入房间表单 */
 const joinForm = ref({
@@ -53,6 +56,9 @@ async function handleJoinRoom() {
     toastError('请输入房间码')
     return
   }
+  // 前置依赖：easytier 内核未安装时不加入房间（弹窗引导前往设置页下载）
+  const kernelOk = await install.ensureKernel('加入房间')
+  if (!kernelOk) return
   try {
     await store.guestJoinRoom(code, joinForm.value.password)
   } catch (e) {

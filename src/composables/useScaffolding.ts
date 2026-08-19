@@ -15,13 +15,11 @@ import {
   scaffoldingHostStop,
 } from '@/utils/api/online-manager/easytier'
 import { useOnlineStore } from '@/stores/online'
-import { useEasyTierInstall } from './useEasyTierInstall'
 import { EASYTIER_HOST_VIRTUAL_IP } from '@/types/online'
 
 /** Scaffolding 联机中心 composable */
 export function useScaffolding() {
   const store = useOnlineStore()
-  const install = useEasyTierInstall()
   const starting = ref(false)
   const stopping = ref(false)
   const probing = ref(false)
@@ -35,12 +33,6 @@ export function useScaffolding() {
     starting.value = true
     error.value = ''
     try {
-      // 前置依赖：easytier 内核未安装时自动下载（进度弹窗由 EasyTierInstallModal 展示）
-      const ready = await install.ensureInstalled()
-      if (!ready.ok) {
-        error.value = ready.error ?? 'easytier 内核安装失败'
-        return { ok: false, error: error.value }
-      }
       const res = await scaffoldingHostStart({ roomCode, mcPort: port })
       store.setEasyTierRuntime({
         mcIp: EASYTIER_HOST_VIRTUAL_IP,
@@ -83,12 +75,6 @@ export function useScaffolding() {
     probing.value = true
     error.value = ''
     try {
-      // 前置依赖：easytier 内核未安装时自动下载（进度弹窗由 EasyTierInstallModal 展示）
-      const ready = await install.ensureInstalled()
-      if (!ready.ok) {
-        error.value = ready.error ?? 'easytier 内核安装失败'
-        return { ok: false, error: error.value }
-      }
       const res = await scaffoldingClientProbe({ roomCode })
       store.setEasyTierRuntime({ mcIp: res.mcIp, mcPort: res.mcPort })
       return { ok: true, mcIp: res.mcIp, mcPort: res.mcPort }

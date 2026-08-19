@@ -11,7 +11,7 @@
  * isReady watch 从 URL ?tab= 恢复激活项，isInRoom watch 进出房间自动切换「房间详情」。
  */
 
-import { computed, watch, type Ref, type Component } from 'vue'
+import { computed, watch, onMounted, type Ref, type Component } from 'vue'
 import { useRoute } from 'vue-router'
 import {
   DevicePhoneMobileIcon,
@@ -25,6 +25,7 @@ import {
 } from '@heroicons/vue/24/outline'
 import { useOnlineStore } from '@/stores/online'
 import { frpCategory } from '@/composables/useFrpSidebar'
+import { useEasyTierInstall } from './useEasyTierInstall'
 import easytierIcon from '@/assets/Common/easytier-icon.png'
 import hongshiIcon from '@/assets/Common/hongshi-icon.png'
 
@@ -39,8 +40,10 @@ export interface NavCategory {
   children?: NavCategory[]
   /** 禁用态：未满足前置条件时灰色不可点击 */
   disabled?: boolean
-  /** 封禁态：云端离线时灰色置灰但点击仍会触发，由 Online.vue 拦截弹窗告知原因 */
+  /** 封禁态：灰色置灰但点击仍会触发，由 Online.vue 拦截弹窗告知原因 */
   sealed?: boolean
+  /** 封禁原因：cloud=云端离线，kernel=easytier 内核缺失（默认 cloud） */
+  sealedReason?: 'cloud' | 'kernel'
 }
 
 /** Online 页激活分类 ID 联合类型（tutorial 为侧边栏动作项，不会真正成为激活态） */
@@ -137,6 +140,15 @@ export function useOnlineNav(
 ) {
   const status = computed(() => onlineStore.deviceStatus)
 
+  /** easytier 内核安装状态（缺失时封存创建/加入/大厅，引导前往设置页下载） */
+  const install = useEasyTierInstall()
+  onMounted(() => {
+    void install.checkStatus()
+  })
+
+  /** 内核是否缺失（明确未安装才封存；null=未知/检查中不封存，避免进入页面瞬间闪烁） */
+  const kernelMissing = computed(() => install.installed.value === false)
+
   /**
    * 联机功能是否就绪（显示联机大厅 / 搭桥联机 / FRP 分类）
    *
@@ -172,11 +184,16 @@ export function useOnlineNav(
     if (offline) {
       return [
         deviceCategory,
-        { ...lobbyCategory, sealed: true },
+        { ...lobbyCategory, sealed: true, sealedReason: 'cloud' },
         {
           ...roomCategory,
           sealed: true,
-          children: roomCategory.children!.map((child) => ({ ...child, sealed: true })),
+          sealedReason: 'cloud',
+          children: roomCategory.children!.map((child) => ({
+            ...child,
+            sealed: true,
+            sealedReason: 'cloud',
+          })),
         },
         redstoneCategory,
         frpCategory,
@@ -185,12 +202,18 @@ export function useOnlineNav(
     if (!isReady.value) return [deviceCategory]
     const inRoom = isInRoom.value
     const children: NavCategory[] = [
-      { ...roomCategory.children![0], disabled: inRoom },
-      { ...roomCategory.children![1], disabled: inRoom },
+      { ...roomCategory.children![0], disabled: inRoom, sealed: kernelMissing.value, sealedReason: 'kernel' },
+      { ...roomCategory.children![1], disabled: inRoom, sealed: kernelMissing.value, sealedReason: 'kernel' },
       roomDetailsChild.value,
     ]
     const roomWithDetails: NavCategory = { ...roomCategory, children }
-    return [deviceCategory, lobbyCategory, roomWithDetails, redstoneCategory, frpCategory]
+    return [
+      deviceCategory,
+      { ...lobbyCategory, sealed: kernelMissing.value, sealedReason: 'kernel' },
+      roomWithDetails,
+      redstoneCategory,
+      frpCategory,
+    ]
   })
 
   /** 状态徽章文案与颜色 */
