@@ -1,6 +1,7 @@
 //! DownloadManager 主实现：批量下载编排（限速 / URL 重排 / 进度跟踪）
 
 use crate::log_debug;
+use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
@@ -38,6 +39,8 @@ pub struct DownloadManager {
     silent: bool,
     /// 保持调用方传入的 URL 顺序（跳过 reorder_urls，供镜像优先+官方保底等场景）
     preserve_order: bool,
+    /// 内容校验器（可选）：大小校验通过后执行，失败视为该下载源无效（删除文件回退下一 URL）
+    content_validator: Option<Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>>,
     /// 共享批次计数（来自 AppState，协调并发批次的面板显隐）
     active_batches: Option<Arc<std::sync::atomic::AtomicUsize>>,
 }
@@ -63,6 +66,7 @@ impl DownloadManager {
             app_handle: None,
             silent: false,
             preserve_order: false,
+            content_validator: None,
             active_batches: None,
         }
     }
@@ -120,6 +124,18 @@ impl DownloadManager {
     /// 避免按用户下载源模式过滤/重排破坏意图。
     pub fn with_preserve_order(mut self, preserve: bool) -> Self {
         self.preserve_order = preserve;
+        self
+    }
+
+    /// 设置内容校验器：大小校验通过后执行，失败视为该下载源无效（删除文件回退下一 URL）
+    ///
+    /// 供"镜像优先 + 官方保底"等场景使用：镜像返回 HTML/挑战页等非目标内容
+    /// （HTTP 200 且长度匹配，大小校验无法识别）时自动剔除该源，回退官方保底。
+    pub fn with_content_validator(
+        mut self,
+        validator: Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>,
+    ) -> Self {
+        self.content_validator = Some(validator);
         self
     }
 
@@ -298,6 +314,7 @@ impl DownloadManager {
             let chunked_ids = chunked_task_ids.clone();
             let cancel_flag = self.cancel_flag.clone();
             let pause_flag = self.pause_flag.clone();
+            let content_validator = self.content_validator.clone();
             let batch_tracker = tracker.clone();
 
             let handle = tokio::spawn(async move {
@@ -330,6 +347,7 @@ impl DownloadManager {
                     Some(chunked_ids.clone()),
                     pause_flag.clone(),
                     cancel_flag.clone(),
+                    content_validator,
                 )
                 .await;
 

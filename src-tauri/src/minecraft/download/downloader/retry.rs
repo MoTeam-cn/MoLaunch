@@ -1,5 +1,6 @@
 //! URL 顺序、重试与下载方式选择
 
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
@@ -28,7 +29,14 @@ pub(super) async fn download_with_retries(
     chunked_task_ids: Option<Arc<StdMutex<std::collections::HashSet<String>>>>,
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
+    content_validator: Option<Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>>,
 ) -> Option<DownloadProgress> {
+    // 内容校验失败：删除文件、回滚已计进度、继续下一 URL（镜像坏文件自动回退官方等保底源）
+    let invalid_content = |err: String, downloaded: u64| {
+        log_warn!("文件内容校验失败：{} - {}", task.local_path, err);
+        let _ = std::fs::remove_file(&task.local_path);
+        rollback_progress(&progress, downloaded);
+    };
     'url_loop: for url in urls {
         let timeout = request_timeout(source_mode, url);
         let mut chunk_disabled = false;
@@ -66,6 +74,13 @@ pub(super) async fn download_with_retries(
                             // 回滚已计数进度：文件将被单流重新下载，避免 downloaded_bytes 重复累计
                             rollback_progress(&progress, result.downloaded);
                         } else {
+                            // 大小校验通过后执行内容校验（如 zip 魔数），失败视为该源无效
+                            if let Some(v) = &content_validator {
+                                if let Err(err) = v(Path::new(&task.local_path)) {
+                                    invalid_content(err, result.downloaded);
+                                    continue 'url_loop;
+                                }
+                            }
                             if let Some(ref ids) = chunked_task_ids {
                                 ids.lock().unwrap().insert(task.id.clone());
                             }
@@ -116,6 +131,13 @@ pub(super) async fn download_with_retries(
                         // 回滚已计数进度：文件将由下一个 URL 重新下载，避免进度重复累计
                         rollback_progress(&progress, downloaded);
                         continue 'url_loop;
+                    }
+                    // 大小校验通过后执行内容校验，失败视为该源无效
+                    if let Some(v) = &content_validator {
+                        if let Err(err) = v(Path::new(&task.local_path)) {
+                            invalid_content(err, downloaded);
+                            continue 'url_loop;
+                        }
                     }
                     return Some(verify::completed(task, downloaded, total, speed));
                 }

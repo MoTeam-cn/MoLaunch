@@ -3,6 +3,7 @@
 //! 与 `easytier_install.rs` 拆分（单文件 ≤350 行约束）：本文件只含安装实现，
 //! IPC 注册 / 状态查询 / 进度事件入口保持在父模块。
 
+use std::io::Read;
 use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -102,6 +103,24 @@ async fn probe_zip_size(client: &reqwest::Client, url: &str) -> u64 {
     }
 }
 
+/// 校验 zip 魔数（PK\x03\x04 文件头 / PK\x05\x06 空归档 / PK\x07\x08 分卷）
+///
+/// 镜像可能返回 HTML/挑战页等非 zip 内容（HTTP 200 且长度匹配，大小校验无法识别），
+/// 魔数校验失败时下载链自动剔除该源回退官方保底，避免解压阶段才报 EOCD 错误。
+fn is_zip_file(path: &Path) -> bool {
+    let mut buf = [0u8; 4];
+    let mut file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(_) => return false,
+    };
+    if file.read_exact(&mut buf).is_err() {
+        return false;
+    }
+    buf.starts_with(b"PK")
+        && matches!(buf[2], 0x03 | 0x05 | 0x07)
+        && matches!(buf[3], 0x04 | 0x06 | 0x08)
+}
+
 /// 下载并安装指定版本（下载 → 解压 → version.txt → 执行权限）
 pub(super) async fn install_version(
     state: &AppState,
@@ -162,7 +181,15 @@ pub(super) async fn install_version(
     let manager = crate::minecraft::download::DownloadManager::from_state(state)
         .await
         .with_silent(true)
-        .with_preserve_order(true);
+        .with_preserve_order(true)
+        // 镜像可能返回 HTML/挑战页等非 zip 内容（大小校验无法识别），魔数校验失败自动回退官方
+        .with_content_validator(Arc::new(|p| {
+            if is_zip_file(p) {
+                Ok(())
+            } else {
+                Err("下载内容不是有效的 ZIP 文件（镜像可能返回了错误页面）".to_string())
+            }
+        }));
     let results = manager.download_batch(vec![task], Some(progress_cb)).await;
     let result = results
         .into_iter()

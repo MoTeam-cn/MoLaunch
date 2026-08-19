@@ -29,6 +29,7 @@ pub async fn download_single(
     chunked_task_ids: Option<Arc<StdMutex<std::collections::HashSet<String>>>>,
     pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
     cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+    content_validator: Option<Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>>,
 ) -> DownloadProgress {
     let checker = FileChecker::new()
         .with_actual_size(task.expected_size)
@@ -70,6 +71,7 @@ pub async fn download_single(
         chunked_task_ids,
         pause_flag,
         cancel_flag.clone(),
+        content_validator,
     )
     .await;
 

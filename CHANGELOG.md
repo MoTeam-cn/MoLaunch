@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **修复内核下载 ZIP 解析失败（Could not find EOCD）**（[core.rs](src-tauri/src/minecraft/download/manager/core.rs) / [single.rs](src-tauri/src/minecraft/download/downloader/single.rs) / [retry.rs](src-tauri/src/minecraft/download/downloader/retry.rs) / [easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：镜像源可能返回 HTML/挑战页等非 zip 内容（HTTP 200 且长度与探测值一致），下载链仅校验文件大小无法识别，解压阶段 `zip::ZipArchive::new` 才报 `invalid Zip archive: Could not find EOCD`。① **下载链新增内容校验器**：`DownloadManager::with_content_validator` 注册可选内容校验闭包，分片/单流大小校验通过后执行，失败删除文件、回滚已计进度、继续下一 URL（镜像坏文件自动回退官方保底）；② **easytier 接入 zip 魔数校验**：校验 `PK\x03\x04`/`PK\x05\x06`/`PK\x07\x08` 魔数，非 zip 内容在下载阶段即被剔除，不再等到解压才报错。
+
 - **镜像源「重新测速」与「保存」按钮加载态解耦**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：原两按钮共享 `proxiesBusy` 加载态，点「重新测速」时「保存」按钮也进入 loading 不可操作；拆为独立的 `probeBusy` / `saveBusy`，两操作互不干扰，「添加镜像」在任一操作进行时禁用。
 
 - **镜像源测速禁止重定向 + 内置清单剔除重定向源**（[githubProxy.ts](src/utils/githubProxy.ts) / [github_download.rs](src-tauri/src/utils/github_download.rs) / [githubProxy.json](src/assets/Common/githubProxy.json)）：① **前端测速禁止重定向**：`probeSource` 的 HEAD/GET 探测均加 `redirect: 'error'`，会跳转的镜像直接判定失败剔除；② **后端竞速禁止重定向**：`pick_fastest` 改用共享无重定向单例 `no_redirect_client()`（reqwest 重定向策略为 client 级，无法 per-request 覆盖），签名去掉 `client` 参数，调用方同步更新；③ **内置清单排查**：对全部 114 个源并发探测（GET + Range 0-1），剔除明确 302 重定向的 `gh.b52m.cn`（跳转 `gh.beimengvv.xyz`）与 `ghfile.geekertao.top`（跳转 `gh.dpik.top`），剩余 112 个；404/403/521/超时源由运行时测速自动过滤。
