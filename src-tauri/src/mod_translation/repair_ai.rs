@@ -171,6 +171,7 @@ pub(crate) fn validate_response(
 ) -> (Vec<RepairAction>, bool) {
     let expected: HashSet<&str> = issues.iter().map(|issue| issue.id.as_str()).collect();
     let mut seen = HashSet::new();
+    let mut covered = HashSet::new();
     let mut result = Vec::new();
     let mut dropped = false;
     for action in actions {
@@ -201,10 +202,11 @@ pub(crate) fn validate_response(
             continue;
         }
         result.push(action.clone());
+        covered.insert(issue_id);
     }
     // 未覆盖的 issue 自动保留原文
     for issue in issues {
-        if !seen.contains(issue.id.as_str()) {
+        if !covered.contains(issue.id.as_str()) {
             dropped = true;
             result.push(RepairAction {
                 action: "keep-source".to_string(),

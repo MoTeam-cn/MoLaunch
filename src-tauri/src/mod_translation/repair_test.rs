@@ -5,9 +5,16 @@ use crate::mod_translation::ledger::{WorkGraph, WorkKind, WorkStatus};
 use crate::mod_translation::types::{LanguageKind, LanguageSource};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+
+static TEMP_SEQ: AtomicUsize = AtomicUsize::new(0);
 
 fn temp_dir() -> PathBuf {
-    let dir = std::env::temp_dir().join(format!("mo_launch_repair_test_{}", std::process::id()));
+    let seq = TEMP_SEQ.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!(
+        "mo_launch_repair_test_{}_{seq}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(dir.join("assets/demo/lang")).unwrap();
     dir
