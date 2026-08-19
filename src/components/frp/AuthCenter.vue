@@ -10,6 +10,7 @@ const Button = defineAsyncComponent(() => import('@/components/common/Button.vue
 const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 import { useFrpAuthCenter } from '@/composables/useFrpAuthCenter'
+import { providerIconSrc } from '@/utils/frp-provider'
 import {
   ShieldCheckIcon,
   ArrowPathIcon,
@@ -53,7 +54,7 @@ const {
         <div class="flex items-start gap-3">
           <!-- 厂商图标 -->
           <div class="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center shrink-0 overflow-hidden">
-            <img v-if="provider.icon" :src="provider.icon" :alt="provider.name" class="w-full h-full object-cover" />
+            <img v-if="providerIconSrc(provider.icon, provider.id)" :src="providerIconSrc(provider.icon, provider.id)" :alt="provider.name" class="w-full h-full object-cover" />
             <ShieldCheckIcon v-else class="w-5 h-5 text-primary-600" />
           </div>
 
