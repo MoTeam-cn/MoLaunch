@@ -163,11 +163,15 @@ async fn download_zip(
     version: &str,
     target: &Path,
     proxies: &[GithubProxy],
+    on_progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
 ) -> Result<(), String> {
     let asset = asset_name(version);
     let official =
         format!("{GITHUB_DOWNLOAD_BASE}/{EASYTIER_REPO}/releases/download/v{version}/{asset}");
-    if download_to(client, &official, target).await.is_ok() {
+    if download_to(client, &official, target, on_progress)
+        .await
+        .is_ok()
+    {
         return Ok(());
     }
     log_warn!("[EasyTier] 官方源下载失败，尝试镜像竞速");
@@ -182,10 +186,10 @@ async fn download_zip(
         candidates.push(url);
     }
     let fastest = pick_fastest(client, &candidates).await?;
-    download_to(client, &fastest, target).await
+    download_to(client, &fastest, target, on_progress).await
 }
 
-/// 镜像竞速：并发 HEAD + Range 0-1 测速，取响应最快者
+/// 镜像竞速：并发 HEAD + Range 0-1 测速（单请求 10s 超时），取响应最快者
 async fn pick_fastest(client: &reqwest::Client, candidates: &[String]) -> Result<String, String> {
     let mut handles = Vec::with_capacity(candidates.len());
     for url in candidates {
@@ -193,7 +197,12 @@ async fn pick_fastest(client: &reqwest::Client, candidates: &[String]) -> Result
         let url = url.clone();
         handles.push(tokio::spawn(async move {
             let start = std::time::Instant::now();
-            let resp = client.get(&url).header("Range", "bytes=0-1").send().await;
+            let resp = client
+                .get(&url)
+                .header("Range", "bytes=0-1")
+                .timeout(Duration::from_secs(10))
+                .send()
+                .await;
             match resp {
                 Ok(r) if r.status().is_success() || r.status().as_u16() == 206 => {
                     Some((start.elapsed(), url))
@@ -214,8 +223,13 @@ async fn pick_fastest(client: &reqwest::Client, candidates: &[String]) -> Result
         .ok_or_else(|| "所有镜像源均不可用".to_string())
 }
 
-/// 流式下载文件（reqwest bytes_stream）
-async fn download_to(client: &reqwest::Client, url: &str, target: &Path) -> Result<(), String> {
+/// 流式下载文件（reqwest bytes_stream，按字节回调进度：done/total）
+async fn download_to(
+    client: &reqwest::Client,
+    url: &str,
+    target: &Path,
+    on_progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
+) -> Result<(), String> {
     use futures_util::StreamExt;
     use std::io::Write;
     let resp = client
@@ -229,10 +243,14 @@ async fn download_to(client: &reqwest::Client, url: &str, target: &Path) -> Resu
     if let Some(parent) = target.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {e}"))?;
     }
+    let total = resp.content_length();
     let mut out = std::fs::File::create(target).map_err(|e| format!("创建文件失败: {e}"))?;
     let mut stream = resp.bytes_stream();
+    let mut done: u64 = 0;
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("读取响应失败: {e}"))?;
+        done += chunk.len() as u64;
+        on_progress(done, total);
         out.write_all(&chunk)
             .map_err(|e| format!("写入文件失败: {e}"))?;
     }
@@ -315,6 +333,10 @@ async fn install_version(
     app: &tauri::AppHandle,
     version: &str,
 ) -> Result<(), String> {
+    // Windows 下无法覆盖运行中的 exe：正在组网时拒绝重装，提示先退出
+    if state.easytier.lock().await.is_some() {
+        return Err("easytier 正在组网运行中，请先退出联机网络再更新内核".to_string());
+    }
     let client = crate::http::build_client_with_user_agent("MoLaunch", Some(120_000));
     let dir = install_dir()?;
     let asset = asset_name(version);
@@ -323,7 +345,19 @@ async fn install_version(
 
     emit_progress(app, "download", 5, &format!("下载 easytier v{version}"));
     let proxies = state.github_proxies.lock().await.clone();
-    download_zip(&client, version, &zip_path, &proxies).await?;
+    // 下载进度：5%→80% 按字节映射，仅在百分比变化时推送（避免逐 chunk 刷屏）
+    let last_pct = std::sync::atomic::AtomicU8::new(5);
+    let on_progress = |done: u64, total: Option<u64>| {
+        let pct = match total {
+            Some(t) if t > 0 => 5 + (done.saturating_mul(75) / t) as u8,
+            _ => 5,
+        };
+        if pct > last_pct.load(Ordering::Relaxed) {
+            last_pct.store(pct, Ordering::Relaxed);
+            emit_progress(app, "download", pct, &format!("下载中 {pct}%"));
+        }
+    };
+    download_zip(&client, version, &zip_path, &proxies, &on_progress).await?;
 
     emit_progress(app, "extract", 80, "解压安装");
     let extract_dir =
