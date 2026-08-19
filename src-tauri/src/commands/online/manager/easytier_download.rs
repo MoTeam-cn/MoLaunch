@@ -159,19 +159,29 @@ pub(super) async fn install_version(
     // 候选 URL：镜像优先（竞速选最快镜像），官方保底
     let mut urls: Vec<String> = Vec::new();
     if !proxies.is_empty() {
+        if state.easytier_cancel.load(Ordering::SeqCst) {
+            return Err("下载已取消".to_string());
+        }
         let candidates: Vec<String> = proxies
             .iter()
             .map(|p| build_proxy_url(p, EASYTIER_REPO, version, &asset))
             .collect();
         crate::log_debug!("[EasyTier] 镜像竞速候选: {candidates:?}");
-        if let Ok(fastest) = pick_fastest(&candidates).await {
+        if let Ok(fastest) = pick_fastest(&candidates, Some(state.easytier_cancel.clone())).await {
             urls.push(fastest);
+        } else if state.easytier_cancel.load(Ordering::SeqCst) {
+            // 竞速期间被取消：直接中断，不继续官方保底
+            return Err("下载已取消".to_string());
         }
     }
     urls.push(format!(
         "https://github.com/{EASYTIER_REPO}/releases/download/v{version}/{asset}"
     ));
 
+    // 探测大小前检查取消（HEAD 探测最长 10s，取消应立即中断）
+    if state.easytier_cancel.load(Ordering::SeqCst) {
+        return Err("下载已取消".to_string());
+    }
     // 探测大小（分片下载需要 expected_size > 0；探测失败走单流兜底）
     let expected_size = probe_zip_size(&client, &urls[0]).await;
     let task = DownloadTask {

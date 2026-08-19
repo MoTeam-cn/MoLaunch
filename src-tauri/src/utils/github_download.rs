@@ -2,6 +2,7 @@
 //! 供 easytier 内核等外部二进制按需下载复用。
 
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
@@ -38,7 +39,13 @@ pub fn build_proxy_url(proxy: &GithubProxy, repo: &str, version: &str, asset: &s
 ///
 /// 逐候选 DEBUG 日志（发送的原始 URL + 状态/错误 + 耗时 + 最终胜者）：
 /// 排查"full 模式被拼成 path"等 URL 形态问题，定位竞速为何全灭回退官方。
-pub async fn pick_fastest(candidates: &[String]) -> Result<String, String> {
+///
+/// `cancel_flag`：等待测速期间每 200ms 轮询取消信号，取消立即中断竞速（返回「下载已取消」），
+/// 避免挂起镜像（10s 超时）拖住取消响应。
+pub async fn pick_fastest(
+    candidates: &[String],
+    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
+) -> Result<String, String> {
     let client = crate::http::no_redirect_client();
     let mut handles = Vec::with_capacity(candidates.len());
     for url in candidates {
@@ -84,10 +91,24 @@ pub async fn pick_fastest(candidates: &[String]) -> Result<String, String> {
         }));
     }
     let mut best: Option<(Duration, String)> = None;
-    for h in handles {
-        if let Ok(Some((elapsed, url))) = h.await {
-            if best.as_ref().map(|(t, _)| elapsed < *t).unwrap_or(true) {
-                best = Some((elapsed, url));
+    for mut h in handles {
+        // 每 200ms 轮询取消信号，同时等待测速完成（&mut 借用避免 select 丢弃已完成结果）
+        loop {
+            if let Some(ref flag) = cancel_flag {
+                if flag.load(std::sync::atomic::Ordering::Relaxed) {
+                    return Err("下载已取消".to_string());
+                }
+            }
+            match tokio::time::timeout(Duration::from_millis(200), &mut h).await {
+                Ok(r) => {
+                    if let Ok(Some((elapsed, url))) = r {
+                        if best.as_ref().map(|(t, _)| elapsed < *t).unwrap_or(true) {
+                            best = Some((elapsed, url));
+                        }
+                    }
+                    break;
+                }
+                Err(_) => continue,
             }
         }
     }
@@ -151,7 +172,7 @@ pub async fn download_release_zip(
         for p in proxies {
             candidates.push(build_proxy_url(p, repo, version, asset));
         }
-        if let Ok(fastest) = pick_fastest(&candidates).await {
+        if let Ok(fastest) = pick_fastest(&candidates, None).await {
             if download_to(client, &fastest, target, on_progress)
                 .await
                 .is_ok()
