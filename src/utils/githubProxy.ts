@@ -2,7 +2,8 @@
  * GitHub 镜像源筛选工具
  *
  * 读取 src/assets/Common/githubProxy.json，对每个源构造 easytier release 下载测速 URL，
- * 并发 HEAD + Range: bytes=0-1 请求，筛选可用（2xx/206）且响应快的 30 个作为默认源。
+ * 并发探测可用（HEAD 优先，部分镜像不支持 HEAD 时回退 GET 短 Range），
+ * 按响应耗时排序取最快的前 10 个作为默认源。
  * 启动时执行一次：已有用户自定义镜像源（配置持久化）则保留，否则注入默认源。
  * 失败静默（后端下载时回退官方源）。
  *
@@ -16,10 +17,10 @@ import { setGithubProxies } from '@/utils/api/online-manager/easytier'
 /** 测速用固定版本（已知存在的 release，仅验证可用性与速度） */
 const PROBE_VERSION = '2.6.4'
 const EASYTIER_REPO = 'EasyTier/EasyTier'
-/** 筛选数量上限 */
-const PROXY_LIMIT = 30
-/** 单源测速超时（ms） */
-const PROBE_TIMEOUT = 5000
+/** 筛选数量上限（按响应耗时取最快 N 个） */
+const PROXY_LIMIT = 10
+/** 单源测速超时（ms）：部分镜像响应较慢，5s 过严会误杀可用源 */
+const PROBE_TIMEOUT = 8000
 
 /** 启动时筛选出的默认源缓存（设置页"恢复默认"复用） */
 let defaultProxies: GithubProxy[] = []
@@ -41,20 +42,30 @@ function buildProbeUrl(proxy: GithubProxy): string {
     : `${base}https://github.com/${EASYTIER_REPO}/releases/download/v${PROBE_VERSION}/${asset}`
 }
 
-/** 单源测速：HEAD + Range 0-1，返回耗时（ms）；失败返回 null */
+/**
+ * 单源测速：HEAD + Range 0-1 优先；部分镜像不支持 HEAD（405/501/403）时
+ * 回退 GET + Range 0-1023（读取响应头即完成并释放连接）。
+ * 返回耗时（ms），失败返回 null。
+ */
 async function probeSource(proxy: GithubProxy): Promise<number | null> {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), PROBE_TIMEOUT)
+  const start = performance.now()
+  const url = buildProbeUrl(proxy)
   try {
-    const start = performance.now()
-    const resp = await fetch(buildProbeUrl(proxy), {
+    let resp = await fetch(url, {
       method: 'HEAD',
       headers: { Range: 'bytes=0-1' },
       signal: controller.signal,
     })
-    if (resp.ok || resp.status === 206) {
-      return performance.now() - start
+    if (resp.status === 405 || resp.status === 501 || resp.status === 403) {
+      resp = await fetch(url, {
+        headers: { Range: 'bytes=0-1023' },
+        signal: controller.signal,
+      })
+      if (resp.ok || resp.status === 206) await resp.body?.cancel()
     }
+    if (resp.ok || resp.status === 206) return performance.now() - start
     return null
   } catch {
     return null
@@ -63,7 +74,7 @@ async function probeSource(proxy: GithubProxy): Promise<number | null> {
   }
 }
 
-/** 读取镜像源清单并筛选可用且快的 30 个 */
+/** 读取镜像源清单并筛选可用且快的前 PROXY_LIMIT 个 */
 async function probeDefaults(): Promise<GithubProxy[]> {
   const proxyData = (await (await fetch(proxyJsonUrl)).json()) as { sources: GithubProxy[] }
   const sources = (proxyData.sources ?? []) as GithubProxy[]

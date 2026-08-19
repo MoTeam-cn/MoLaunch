@@ -22,13 +22,13 @@ const ApiServerCard = defineAsyncComponent(() => import('@/components/settings/A
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
   ArrowRightOnRectangleIcon,
   CheckIcon,
   CloudIcon,
-  InformationCircleIcon,
   PlusIcon,
   ServerStackIcon,
   TrashIcon,
@@ -302,14 +302,11 @@ onMounted(() => {
             </div>
             <p class="text-xs text-gray-400 mt-1">{{ installProgress?.message }}</p>
             <!-- 下载安抚提示：GitHub 部分地区网络不稳定时避免用户干等 -->
-            <div
-              class="mt-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5"
-            >
-              <InformationCircleIcon class="mt-px h-4 w-4 shrink-0 text-amber-500" />
-              <p class="text-xs leading-relaxed text-amber-700">
-                受网络环境影响，GitHub 在部分地区的访问可能不稳定。若内核下载出现速度慢或进度卡顿，属正常现象，请稍安勿躁，下载完成后会自动继续安装。
-              </p>
-            </div>
+            <AlertV2
+              type="warning"
+              message="受网络环境影响，GitHub 在部分地区的访问可能不稳定。若内核下载出现速度慢或进度卡顿，属正常现象，请稍安勿躁，下载完成后会自动继续安装。"
+              class="mt-3"
+            />
           </div>
         </div>
       </div>

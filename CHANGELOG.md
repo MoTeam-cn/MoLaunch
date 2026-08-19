@@ -6,6 +6,10 @@
 
 ### Changed
 
+- **GitHub 镜像源测速筛选优化：解决只剩 1 个镜像的问题**（[githubProxy.ts](src/utils/githubProxy.ts)）：部分 ghproxy 类镜像不支持 HEAD 请求（返回 405/501/403），原逻辑直接判定失败，加上 5s 超时过严，导致测速后仅筛出个别源（如 XiaoMo 镜像）。① **HEAD 失败回退 GET**：`probeSource` 在 HEAD 返回 405/501/403 时回退 `GET + Range: bytes=0-1023`（读取响应头即释放连接），兼容仅支持 GET 的镜像；② **超时放宽**：5s → 8s，避免误杀慢速但可用的源；③ **筛选数量收敛**：`PROXY_LIMIT` 30 → 10（按响应耗时取最快前 10 个填入，后端下载时再竞速选最优、官方保底）。
+
+- **内核下载安抚提示改用 AlertV2 组件**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：进度条下方的琥珀色自定义 div 提示替换为项目通用 `AlertV2` 组件（`type="warning"`，灰底简洁风格），文案与触发时机不变（download/extract 阶段展示）。
+
 - **设置-联机页优化：镜像源输入布局修复 + 内核下载安抚提示**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：① **镜像源输入框布局修复**：`Input` 根元素 `.input-root` 为 scoped 样式 `width:100%`（特异性高于 tailwind `w-32`），导致名称输入框恒 100% 宽把类型/镜像地址挤到溢出省略；改用组件 `width` prop（内联样式优先）+ grid 固定列宽布局（`7rem 7rem minmax(0,1fr) auto`），名称/类型列固定、镜像地址自适应可收缩；类型下拉文案精简为「追加路径 / 完整 URL」适配窄列（卡片顶部说明文字已解释两种模式）；② **下载安抚提示**：内核下载（download/extract 阶段）进度条下方新增琥珀色提示条（icon + 文字），说明 GitHub 部分地区网络不稳定、下载慢或卡顿属正常现象、稍安勿躁。
 
 - **修复 easytier 安装进度跳变：71% 突跳完成**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：分片下载的 `expected_size` 经 HEAD 探测，实际下载字节与之存在偏差时字节映射（5→80%）可能停在 80 以下就 Completed，随后直接 emit done(100)，前端进度条"突然完成"。① **后端收尾补发**：下载成功后强制 emit `download 80%`（"下载完成"）再进入解压，解压阶段 emit `extract 85%`；② **前端 extract 阶段也展示进度条**：`showProgress` 由仅 download 扩展为 download/extract，Tag 文案区分「下载中 N% / 解压安装 N%」，进度条 71→80→85→100 平滑过渡。
