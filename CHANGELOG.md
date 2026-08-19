@@ -10,6 +10,8 @@
 
 ### Changed
 
+- **顶部子菜单（SubTabBar）支持横向滚动**（[SubTabBar.vue](src/components/common/SubTabBar.vue)）：子页签增多（如开发者页面 9 个）时容器宽度不足会换行，改为 `overflow-x-auto` + 子项 `flex-none` / `whitespace-nowrap`，超出宽度时横向滚动（复用全局滚动条样式），不再换行。
+
 - **厂商列表/认证中心「系统默认」厂商改用 gofrp 图标**（[frp-provider.ts](src/utils/frp-provider.ts) / [ProviderList.vue](src/components/frp/ProviderList.vue) / [AuthCenter.vue](src/components/frp/AuthCenter.vue)）：系统默认厂商后端不返回 icon，前端原回退到通用图标（ServerStackIcon/ShieldCheckIcon）；新增 `providerIconSrc` 公共函数，系统默认厂商（`system-default`）固定使用 gofrp 图标，外部厂商仍用 manifest 提供的图标，两个页面复用。
 
 - **easytier 内核解压改为白名单过滤**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：`extract_zip_safely` 由黑名单（跳过 `easytier-web.exe` / `easytier-web-embed.exe`）改为白名单（只解压需要的文件），仅保留 core/cli 二进制；Windows 另保留 `WinDivert64.sys` 驱动与 `wintun.dll` / `Packet.dll` 两个依赖 DLL（easytier-core 流量转发必需，缺失会导致 cli/core 启动报缺 DLL），其余文件（Web UI 独立版/内嵌版、文档等）全部跳过，避免占用安装目录空间；临时 zip 与解压目录在安装完成后照常清理。

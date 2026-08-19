@@ -32,7 +32,7 @@ function selectTab(id: string) {
 
 <template>
   <div
-    class="flex items-center gap-1 border-b border-gray-200 bg-white px-1"
+    class="flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1"
     :class="sticky ? 'sticky top-0 z-20 shadow-sm' : ''"
   >
     <!-- 保留原生 button：Tab 切换项（relative 布局 + 底部指示线 + active 状态），
@@ -40,7 +40,7 @@ function selectTab(id: string) {
     <button
       v-for="tab in tabs"
       :key="tab.id"
-      class="relative flex items-center gap-1.5 px-4 py-2.5 text-[13px] font-medium transition-colors"
+      class="relative flex flex-none items-center gap-1.5 whitespace-nowrap px-4 py-2.5 text-[13px] font-medium transition-colors"
       :class="modelValue === tab.id
         ? 'text-primary-600'
         : 'text-gray-500 hover:text-gray-700'"
