@@ -2,12 +2,13 @@
 /**
  * 开发者 - IPC 命令调试器子页签
  *
- * 输入 Tauri 命令名 + JSON 参数直接 invoke，查看返回结果或错误。
- * 命令名提供 datalist 自动补全（后端 generate_handler 注册的命令）。
+ * 选择 Tauri 命令名（Select 下拉，后端 generate_handler 注册的命令）+ JSON 参数直接 invoke，
+ * 查看返回结果或错误。
  */
-import { ref, defineAsyncComponent } from 'vue'
+import { ref, computed, defineAsyncComponent } from 'vue'
 const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
 const Input = defineAsyncComponent(() => import('@/components/common/Input.vue'))
+const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 import { invoke } from '@tauri-apps/api/core'
 import { toastError } from '@/utils/toast'
@@ -47,6 +48,9 @@ const loading = ref(false)
 const result = ref<string | null>(null)
 const error = ref<string | null>(null)
 const elapsed = ref<number | null>(null)
+
+/** Select 下拉选项（命令名列表） */
+const commandOptions = computed(() => KNOWN_COMMANDS.map(c => ({ label: c, value: c })))
 
 async function run() {
   const name = command.value.trim()
@@ -111,15 +115,7 @@ async function copyResult() {
       <div class="px-5 pb-5 space-y-4">
         <div>
           <p class="text-sm font-medium text-gray-900 mb-1.5">命令名</p>
-          <Input
-            v-model="command"
-            placeholder="如 version_launch_manager"
-            list="ipc-command-list"
-            clearable
-          />
-          <datalist id="ipc-command-list">
-            <option v-for="c in KNOWN_COMMANDS" :key="c" :value="c" />
-          </datalist>
+          <Select v-model="command" :options="commandOptions" placeholder="请选择命令" />
         </div>
 
         <div>

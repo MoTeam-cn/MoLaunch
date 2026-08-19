@@ -10,6 +10,7 @@ const Button = defineAsyncComponent(() => import('@/components/common/Button.vue
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Alert = defineAsyncComponent(() => import('@/components/common/Alert.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import { listInstalledVersionsWithType } from '@/utils/api/version'
 import { previewLaunchArgs, type LaunchArgsPreview } from '@/utils/api/launch'
 import { useAuthStore } from '@/stores/auth'
@@ -152,14 +153,14 @@ async function copyArg(arg: string) {
             <div class="px-4 py-3">
               <p class="text-xs font-bold text-gray-900 mb-2">JVM 参数（{{ preview.jvm_args.length }}）</p>
               <div class="flex flex-wrap gap-1.5">
-                <Tag
-                  v-for="(arg, i) in preview.jvm_args"
-                  :key="i"
-                  size="small"
-                  color="arcoblue"
-                  class="max-w-full cursor-pointer"
-                  @click="copyArg(arg)"
-                >{{ shortArg(arg) }}</Tag>
+                <Tooltip v-for="(arg, i) in preview.jvm_args" :key="i" text="点击复制" position="top">
+                  <Tag
+                    size="small"
+                    color="arcoblue"
+                    class="max-w-full cursor-pointer"
+                    @click="copyArg(arg)"
+                  >{{ shortArg(arg) }}</Tag>
+                </Tooltip>
               </div>
             </div>
             <!-- 主类 -->
@@ -176,14 +177,14 @@ async function copyArg(arg: string) {
             <div class="px-4 py-3">
               <p class="text-xs font-bold text-gray-900 mb-2">游戏参数（{{ preview.game_args.length }}）</p>
               <div class="flex flex-wrap gap-1.5">
-                <Tag
-                  v-for="(arg, i) in preview.game_args"
-                  :key="i"
-                  size="small"
-                  color="green"
-                  class="max-w-full cursor-pointer"
-                  @click="copyArg(arg)"
-                >{{ shortArg(arg) }}</Tag>
+                <Tooltip v-for="(arg, i) in preview.game_args" :key="i" text="点击复制" position="top">
+                  <Tag
+                    size="small"
+                    color="green"
+                    class="max-w-full cursor-pointer"
+                    @click="copyArg(arg)"
+                  >{{ shortArg(arg) }}</Tag>
+                </Tooltip>
               </div>
             </div>
             <!-- 目录信息 -->
