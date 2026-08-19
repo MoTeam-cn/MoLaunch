@@ -10,7 +10,7 @@
 
 ### Refactored
 
-- **测速抽成通用组件 + GitHub 版本查询参数化**（[probe.rs](src-tauri/src/utils/probe.rs)（新增）/ [github_download.rs](src-tauri/src/utils/github_download.rs) / [easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs) / [easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：为 frpc 等外部二进制复用做准备——① **测速抽成独立组件**：`probe_urls`（并发 HEAD+Range 0-1 测速 + 200ms 取消轮询 + 耗时排序）与 `pick_fastest`（取首封装）从 `github_download.rs` 移到新模块 `utils/probe.rs`，日志前缀改 `[Probe]`，不依赖 GitHub 可通用复用；② **GitHub 版本查询参数化**：`fetch_latest_release` / `fetch_tag_name` 从 `easytier_install.rs` 移到 `github_download.rs`，repo 参数化（主源 `api.github.com` / 备选 `github-api.mocdn.net` 回退逻辑保留），easytier 调用处传 `EASYTIER_REPO`。
+- **测速抽成通用组件 + GitHub 版本查询参数化**（[probe.rs](src-tauri/src/utils/probe.rs)（新增）/ [github_download.rs](src-tauri/src/utils/github_download.rs) / [easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs) / [easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：为 frpc 等外部二进制复用做准备——① **测速抽成独立组件**：`probe_urls`（并发 HEAD+Range 0-1 测速 + 200ms 取消轮询 + 耗时排序）与 `pick_fastest`（取首封装）从 `github_download.rs` 移到新模块 `utils/probe.rs`，日志前缀改 `[Probe]`，不依赖 GitHub 可通用复用；② **GitHub 版本查询参数化**：`fetch_latest_release` / `fetch_tag_name` 从 `easytier_install.rs` 移到 `github_download.rs`，repo 参数化（主源 `api.github.com` / 备选 `github-api.mocdn.net` 回退逻辑保留），easytier 调用处传 `EASYTIER_REPO`；同步更新 [FRP_GITHUB_DOWNLOAD_RESEARCH.md](docs/online/FRP_GITHUB_DOWNLOAD_RESEARCH.md) 中组件位置与实施步骤（版本查询泛化标记已完成）。
 
 ### Fixed
 
