@@ -8,7 +8,7 @@ use super::{LaunchError, LaunchPipeline, LaunchStage};
 
 impl LaunchPipeline {
     /// 检测Java
-    pub(super) async fn detect_java(&self) -> Result<PathBuf, LaunchError> {
+    pub async fn detect_java(&self) -> Result<PathBuf, LaunchError> {
         let version_dir = self
             .config
             .game_dir

@@ -101,3 +101,56 @@ export interface LaunchHistoryEntry {
 export async function getLaunchHistory(): Promise<LaunchHistoryEntry[]> {
   return versionLaunchManager<LaunchHistoryEntry[]>(VERSION_LAUNCH_ACTIONS.GET_LAUNCH_HISTORY)
 }
+
+/**
+ * 启动参数预览结果（token 已脱敏，不包含 access_token / client_token）
+ */
+export interface LaunchArgsPreview {
+  jvm_args: string[]
+  game_args: string[]
+  main_class: string
+  classpath: string
+  version_id: string
+  game_dir: string
+  assets_dir: string
+  asset_index: string
+  username: string
+  uuid: string
+  login_type: string
+  server_url: string | null
+  xuid: string
+  /** 实际使用的 Java 路径 */
+  java_path: string
+}
+
+/**
+ * 预览启动参数（组装 JVM 参数但不启动游戏）
+ *
+ * 参数与 launchGame 一致；username/uuid/loginType 传当前登录账号，
+ * 未登录时传空字符串（后端按离线兜底处理）。
+ */
+export async function previewLaunchArgs(params: {
+  versionId: string
+  javaPath?: string
+  username: string
+  uuid: string
+  loginType?: string
+  windowWidth?: number
+  windowHeight?: number
+  serverAddress?: string
+  serverPort?: number
+  extraJvmArgs?: string[]
+}): Promise<LaunchArgsPreview> {
+  return versionLaunchManager<LaunchArgsPreview>(VERSION_LAUNCH_ACTIONS.PREVIEW_LAUNCH_ARGS, {
+    versionId: params.versionId,
+    javaPath: params.javaPath ?? null,
+    username: params.username,
+    uuid: params.uuid,
+    loginType: params.loginType ?? null,
+    windowWidth: params.windowWidth ?? null,
+    windowHeight: params.windowHeight ?? null,
+    serverAddress: params.serverAddress ?? null,
+    serverPort: params.serverPort ?? null,
+    extraJvmArgs: params.extraJvmArgs ?? null,
+  })
+}

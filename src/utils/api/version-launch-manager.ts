@@ -32,6 +32,7 @@ export const VERSION_LAUNCH_ACTIONS = {
   GET_RUNNING_GAME: 'get_running_game',
   GET_LAUNCH_HISTORY: 'get_launch_history',
   EXPORT_LAUNCH_SCRIPT: 'export_launch_script',
+  PREVIEW_LAUNCH_ARGS: 'preview_launch_args',
 } as const
 
 /** action 名称类型 */

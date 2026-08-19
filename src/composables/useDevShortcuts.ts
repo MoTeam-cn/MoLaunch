@@ -2,7 +2,7 @@
  * 开发者页面独占快捷键 composable（仅 SettingsDeveloper.vue 挂载）
  *
  * capture 阶段 stopImmediatePropagation 抢占事件流，绕过 useDevToolsGuard 全局防护；
- * Ctrl/Cmd+Shift+D 切换 DevTools、Alt+1~6 切换子页签。DevTools 切换仍需后端 require_dev_mode() 校验。
+ * Ctrl/Cmd+Shift+D 切换 DevTools、Alt+1~9 切换子页签。DevTools 切换仍需后端 require_dev_mode() 校验。
  */
 
 import { onMounted, onUnmounted } from 'vue'
@@ -46,8 +46,8 @@ function createHandler(opts: DevShortcutsOptions) {
       return
     }
 
-    // Alt + 1~6：切换子页签
-    if (alt && !ctrl && !shift && /^[1-6]$/.test(key)) {
+    // Alt + 1~9：切换子页签
+    if (alt && !ctrl && !shift && /^[1-9]$/.test(key)) {
       e.preventDefault()
       e.stopPropagation()
       e.stopImmediatePropagation()

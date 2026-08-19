@@ -4,6 +4,10 @@
 
 ## [Unreleased]
 
+### Added
+
+- **开发者页面新增「IPC 调试器」与「启动参数预览」两个子页签**（[IpcDebuggerTab.vue](src/views/settings/developer/IpcDebuggerTab.vue) / [LaunchPreviewTab.vue](src/views/settings/developer/LaunchPreviewTab.vue) / [preview.rs](src-tauri/src/commands/version/launch/preview.rs) / [manager.rs](src-tauri/src/commands/version/launch/manager.rs) / [launch.ts](src/utils/api/launch.ts)）：① **IPC 调试器**：输入后端注册的 Tauri 命令名（datalist 自动补全）+ JSON 参数直接 invoke，展示返回结果或错误与耗时，支持一键复制；② **启动参数预览**：选择已安装版本，后端复用 `build_launch_config` + 流水线 `detect_java` / `build_arguments` 组装最终启动参数（JVM 参数 / classpath / 主类 / 游戏参数 / 目录信息 / 账号信息）但不启动游戏，token 脱敏不返回；`detect_java` / `build_arguments` 可见性由 `pub(super)` 放宽为 `pub` 供预览命令复用；快捷键 Alt+1~9 切换子页签（原 1~6）。
+
 ### Changed
 
 - **厂商列表/认证中心「系统默认」厂商改用 gofrp 图标**（[frp-provider.ts](src/utils/frp-provider.ts) / [ProviderList.vue](src/components/frp/ProviderList.vue) / [AuthCenter.vue](src/components/frp/AuthCenter.vue)）：系统默认厂商后端不返回 icon，前端原回退到通用图标（ServerStackIcon/ShieldCheckIcon）；新增 `providerIconSrc` 公共函数，系统默认厂商（`system-default`）固定使用 gofrp 图标，外部厂商仍用 manifest 提供的图标，两个页面复用。

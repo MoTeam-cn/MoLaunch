@@ -125,10 +125,7 @@ impl LaunchPipeline {
     }
 
     /// 构建启动参数
-    pub(super) async fn build_arguments(
-        &self,
-        java_path: &Path,
-    ) -> Result<LaunchArguments, LaunchError> {
+    pub async fn build_arguments(&self, java_path: &Path) -> Result<LaunchArguments, LaunchError> {
         // 外置登录（authlib-injector）：确保 authlib-injector.jar 已下载到缓存
         // 仅当 auth_info.server_url 有值时执行。失败不阻塞启动，
         // add_authlib_args 内部会检测 jar 是否存在并打印警告。

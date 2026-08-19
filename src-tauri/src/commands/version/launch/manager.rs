@@ -14,7 +14,7 @@ use crate::utils::dispatcher::{ActionRequest, Dispatcher};
 use super::super::script_export;
 use super::{
     cancel_launch, get_launch_history, get_launch_progress, get_running_game, launch_game,
-    stop_game,
+    preview_launch_args, stop_game,
 };
 
 /// launch_game 参数（与原 launch_game 命令参数一一对应，字段名 camelCase）
@@ -45,6 +45,22 @@ struct ExportLaunchScriptParams {
     login_type: Option<String>,
     java_path: Option<String>,
     save_path: String,
+}
+
+/// preview_launch_args 参数（与 launch_game 参数一致，字段名 camelCase）
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PreviewLaunchArgsParams {
+    version_id: String,
+    java_path: Option<String>,
+    username: String,
+    uuid: String,
+    login_type: Option<String>,
+    window_width: Option<u32>,
+    window_height: Option<u32>,
+    server_address: Option<String>,
+    server_port: Option<u32>,
+    extra_jvm_args: Option<Vec<String>>,
 }
 
 static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
@@ -130,6 +146,30 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
             )
             .await?;
             serde_json::to_value(()).map_err(|e| e.to_string())
+        }),
+    );
+
+    d.register(
+        "preview_launch_args",
+        handler!(state, app, params, {
+            let p: PreviewLaunchArgsParams =
+                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
+            let r = preview_launch_args(
+                &state,
+                &app,
+                p.version_id,
+                p.java_path,
+                p.username,
+                p.uuid,
+                p.login_type,
+                p.window_width,
+                p.window_height,
+                p.server_address,
+                p.server_port,
+                p.extra_jvm_args,
+            )
+            .await?;
+            serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );
 

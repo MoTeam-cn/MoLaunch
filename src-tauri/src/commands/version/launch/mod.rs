@@ -6,10 +6,12 @@ mod build;
 mod build_config;
 mod failure;
 mod manager;
+mod preview;
 mod spawn;
 mod types;
 
 pub use build::*;
+pub use preview::*;
 pub use spawn::*;
 pub use types::GameExitEvent;
 
