@@ -7,6 +7,7 @@ use super::super::{
 use super::archive;
 use crate::log_info;
 use std::path::Path;
+use std::time::Duration;
 
 /// 外部厂商 frpc 下载（distribution=url）
 ///
@@ -39,11 +40,9 @@ pub(crate) async fn ensure_external_frpc(
         download_url
     );
 
-    // 构造禁止自动重定向的 client，手动校验重定向域名（防止重定向到非白名单域名）
-    // 对应设计文档 §7.7 frpc 二进制下载安全。
-    // 复用 crate::http 统一管线（代理 / IP 版本 / TLS 信任源 / User-Agent 与全局一致）。
-    let client =
-        crate::http::build_client_with_redirect(reqwest::redirect::Policy::none(), Some(60_000));
+    // 复用全局无重定向 client（禁用自动重定向），手动校验重定向域名（防止重定向到非白名单域名）
+    // 对应设计文档 §7.7 frpc 二进制下载安全；超时 per-request 覆盖为 60s。
+    let client = crate::http::no_redirect_client();
 
     let mut current_url = download_url.clone();
     let mut redirects = 0u32;
@@ -51,6 +50,7 @@ pub(crate) async fn ensure_external_frpc(
     let response = loop {
         let resp = client
             .get(&current_url)
+            .timeout(Duration::from_secs(60))
             .send()
             .await
             .map_err(|e| format!("下载失败: {}", crate::http::request_error_msg(&e)))?;

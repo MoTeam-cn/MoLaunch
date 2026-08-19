@@ -6,6 +6,7 @@ use super::super::{EndpointDef, Envelope};
 use super::{envelope, redirect, transport};
 use crate::log_debug;
 use crate::log_error;
+use std::time::Duration;
 
 /// 最大响应体大小（1MB）
 const MAX_RESPONSE_SIZE: usize = 1024 * 1024;
@@ -47,6 +48,8 @@ pub(super) async fn send_request(
             "POST" => client.post(&current_url),
             other => return Err(format!("不支持的 HTTP 方法: {}", other)),
         };
+        // 单请求超时覆盖（client 级 30s 兜底，厂商 API 收紧到 10s）
+        request = request.timeout(Duration::from_millis(transport::DEFAULT_TIMEOUT_MS));
 
         if hops == 0 {
             // 首次请求：注入 token + query 参数

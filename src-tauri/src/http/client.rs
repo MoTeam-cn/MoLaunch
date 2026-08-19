@@ -86,6 +86,29 @@ pub fn build_client_with_redirect(
     })
 }
 
+/// 构建禁用自动重定向的 HTTP 客户端（与主客户端同配置，仅重定向策略不同）。
+pub fn build_no_redirect_client(
+    proxy_mode: &str,
+    proxy_type: &str,
+    proxy_url: &str,
+    ip_version: &str,
+    trust_mode: &str,
+    ignore_tls: bool,
+) -> reqwest::Client {
+    build_client_inner(ClientBuildParams {
+        proxy_mode,
+        proxy_type,
+        proxy_url,
+        ip_version,
+        timeout: Duration::from_secs(30),
+        trust_mode,
+        ignore_tls,
+        redirect: Some(reqwest::redirect::Policy::none()),
+        user_agent: None,
+        no_timeout: false,
+    })
+}
+
 /// 基于当前配置构建带自定义 User-Agent 的 HTTP 客户端。
 pub fn build_client_with_user_agent(user_agent: &str, timeout_ms: Option<u64>) -> reqwest::Client {
     let (mode, kind, url, ip_version, trust_mode) = current_http_config();

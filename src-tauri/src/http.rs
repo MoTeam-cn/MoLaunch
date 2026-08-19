@@ -4,8 +4,8 @@ mod client;
 mod tls;
 
 pub use client::{
-    build_client, build_client_with_redirect, build_client_with_user_agent, build_stream_client,
-    ClientBuildParams,
+    build_client, build_client_with_redirect, build_client_with_user_agent,
+    build_no_redirect_client, build_stream_client, ClientBuildParams,
 };
 pub use tls::ignore_tls_allowed;
 
@@ -15,6 +15,9 @@ use std::time::Duration;
 
 /// 全局 HTTP 客户端（可热重建）。
 static HTTP_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
+
+/// 全局无重定向 HTTP 客户端（可热重建，与主客户端同配置，仅禁用自动重定向）。
+static NO_REDIRECT_CLIENT: RwLock<Option<reqwest::Client>> = RwLock::new(None);
 
 /// 编译时生成的 User-Agent 字符串（缓存）。
 static USER_AGENT: OnceLock<String> = OnceLock::new();
@@ -43,8 +46,15 @@ pub fn init_client(
         trust_mode,
         ignore_tls,
     );
+    let no_redirect = build_no_redirect_client(
+        proxy_mode, proxy_type, proxy_url, ip_version, trust_mode, ignore_tls,
+    );
     let mut guard = HTTP_CLIENT.write().expect("HTTP_CLIENT poisoned");
     *guard = Some(client);
+    let mut guard = NO_REDIRECT_CLIENT
+        .write()
+        .expect("NO_REDIRECT_CLIENT poisoned");
+    *guard = Some(no_redirect);
 }
 
 /// 获取全局 HTTP 客户端。
@@ -64,6 +74,21 @@ pub fn get_client() -> reqwest::Client {
         .tls_built_in_root_certs(true)
         .build()
         .expect("Failed to build default HTTP client")
+}
+
+/// 获取全局无重定向 HTTP 客户端（禁用自动重定向，30s 兜底，可 per-request 覆盖超时）。
+///
+/// 供需要手动校验重定向（域名白名单等）的场景复用，避免各自新建 client。
+pub fn no_redirect_client() -> reqwest::Client {
+    {
+        let guard = NO_REDIRECT_CLIENT
+            .read()
+            .expect("NO_REDIRECT_CLIENT poisoned");
+        if let Some(ref client) = *guard {
+            return client.clone();
+        }
+    }
+    build_client_with_redirect(reqwest::redirect::Policy::none(), Some(30_000))
 }
 
 /// 错误链中是否包含 TLS 证书校验失败（抓包代理/中间人场景）
