@@ -20,8 +20,10 @@ use super::easytier_install::{
 #[cfg(unix)]
 use super::easytier_install::{cli_name, core_name};
 
-/// 解压 zip 到目标目录（剥离共享顶层目录 + Zip Slip 防护）
-fn extract_zip_safely(zip_path: &Path, dst: &Path) -> Result<(), String> {
+/// 解压 zip 到目标目录（剥离共享顶层目录 + Zip Slip 防护 + 跳过无用文件）
+///
+/// `skip_files` 为文件名黑名单（仅匹配文件名，不匹配路径），命中条目直接跳过不解压。
+fn extract_zip_safely(zip_path: &Path, dst: &Path, skip_files: &[&str]) -> Result<(), String> {
     let file = std::fs::File::open(zip_path).map_err(|e| format!("打开 ZIP 失败: {e}"))?;
     let mut archive = zip::ZipArchive::new(file).map_err(|e| format!("解析 ZIP 失败: {e}"))?;
     // 确定共享顶层前缀（所有条目同一根目录时剥离，扁平包不剥离）
@@ -49,6 +51,14 @@ fn extract_zip_safely(zip_path: &Path, dst: &Path) -> Result<(), String> {
         let name = entry.name().to_string();
         let rel = name.strip_prefix(&prefix).unwrap_or(&name);
         if rel.is_empty() {
+            continue;
+        }
+        // 跳过无用文件（如 easytier 发布包中的 Web UI 独立版/内嵌版）
+        let file_name = Path::new(&rel)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        if skip_files.contains(&file_name) {
             continue;
         }
         let path = dst.join(rel);
@@ -251,7 +261,13 @@ pub(super) async fn install_version(
         let _ = std::fs::remove_dir_all(&extract_dir);
     }
     std::fs::create_dir_all(&extract_dir).map_err(|e| format!("创建临时目录失败: {e}"))?;
-    extract_zip_safely(&zip_path, &extract_dir)?;
+    // Windows 发布包含 Web UI 独立版/内嵌版（MoLaunch 不需要），解压时剔除避免占用空间；
+    // WinDivert64.sys 为 easytier-core 流量转发依赖驱动，必须保留
+    #[cfg(windows)]
+    let skip_files: &[&str] = &["easytier-web.exe", "easytier-web-embed.exe"];
+    #[cfg(not(windows))]
+    let skip_files: &[&str] = &[];
+    extract_zip_safely(&zip_path, &extract_dir, skip_files)?;
     let _ = std::fs::remove_file(&zip_path);
 
     // 清空安装目录旧文件（防残留旧版本），再移动新文件
