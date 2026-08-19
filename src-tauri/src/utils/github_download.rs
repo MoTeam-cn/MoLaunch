@@ -35,6 +35,9 @@ pub fn build_proxy_url(proxy: &GithubProxy, repo: &str, version: &str, asset: &s
 ///
 /// 使用共享无重定向单例 `no_redirect_client()`：会跳转的镜像直接失败剔除
 /// （重定向引入额外跳转，慢且不稳定）。
+///
+/// 逐候选 DEBUG 日志（发送的原始 URL + 状态/错误 + 耗时 + 最终胜者）：
+/// 排查"full 模式被拼成 path"等 URL 形态问题，定位竞速为何全灭回退官方。
 pub async fn pick_fastest(candidates: &[String]) -> Result<String, String> {
     let client = crate::http::no_redirect_client();
     let mut handles = Vec::with_capacity(candidates.len());
@@ -51,9 +54,32 @@ pub async fn pick_fastest(candidates: &[String]) -> Result<String, String> {
                 .await;
             match resp {
                 Ok(r) if r.status().is_success() || r.status().as_u16() == 206 => {
+                    crate::log_debug!(
+                        "[EasyTier] 竞速探测可用: {}ms status={} url={}",
+                        start.elapsed().as_millis(),
+                        r.status(),
+                        url
+                    );
                     Some((start.elapsed(), url))
                 }
-                _ => None,
+                Ok(r) => {
+                    crate::log_debug!(
+                        "[EasyTier] 竞速探测被拒: {}ms status={} url={}",
+                        start.elapsed().as_millis(),
+                        r.status(),
+                        url
+                    );
+                    None
+                }
+                Err(e) => {
+                    crate::log_debug!(
+                        "[EasyTier] 竞速探测失败: {}ms err={} url={}",
+                        start.elapsed().as_millis(),
+                        crate::http::request_error_msg(&e),
+                        url
+                    );
+                    None
+                }
             }
         }));
     }
@@ -65,8 +91,13 @@ pub async fn pick_fastest(candidates: &[String]) -> Result<String, String> {
             }
         }
     }
-    best.map(|(_, url)| url)
-        .ok_or_else(|| "所有镜像源均不可用".to_string())
+    match best {
+        Some((_, url)) => {
+            crate::log_debug!("[EasyTier] 竞速胜者: {url}");
+            Ok(url)
+        }
+        None => Err("所有镜像源均不可用".to_string()),
+    }
 }
 
 /// 流式下载文件（reqwest bytes_stream，单请求 120s 超时，按字节回调进度：done/total）

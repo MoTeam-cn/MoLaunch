@@ -91,6 +91,9 @@ fn move_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
 }
 
 /// 探测下载源文件大小（HEAD 请求，失败返回 0 走单流兜底）
+///
+/// 注意：reqwest 对 HEAD 响应 `content_length()` 一律返回 0（HEAD 无 body），
+/// 需直接读 Content-Length 响应头才能拿到真实大小。
 async fn probe_zip_size(client: &reqwest::Client, url: &str) -> u64 {
     match client
         .head(url)
@@ -98,7 +101,12 @@ async fn probe_zip_size(client: &reqwest::Client, url: &str) -> u64 {
         .send()
         .await
     {
-        Ok(r) if r.status().is_success() => r.content_length().unwrap_or(0),
+        Ok(r) if r.status().is_success() => r
+            .headers()
+            .get(reqwest::header::CONTENT_LENGTH)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| v.parse::<u64>().ok())
+            .unwrap_or(0),
         _ => 0,
     }
 }
