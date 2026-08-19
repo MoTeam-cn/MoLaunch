@@ -12,6 +12,10 @@
 
 - **测速抽成通用组件 + GitHub 版本查询参数化**（[probe.rs](src-tauri/src/utils/probe.rs)（新增）/ [github_download.rs](src-tauri/src/utils/github_download.rs) / [easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs) / [easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：为 frpc 等外部二进制复用做准备——① **测速抽成独立组件**：`probe_urls`（并发 HEAD+Range 0-1 测速 + 200ms 取消轮询 + 耗时排序）与 `pick_fastest`（取首封装）从 `github_download.rs` 移到新模块 `utils/probe.rs`，日志前缀改 `[Probe]`，不依赖 GitHub 可通用复用；② **GitHub 版本查询参数化**：`fetch_latest_release` / `fetch_tag_name` 从 `easytier_install.rs` 移到 `github_download.rs`，repo 参数化（主源 `api.github.com` / 备选 `github-api.mocdn.net` 回退逻辑保留），easytier 调用处传 `EASYTIER_REPO`；同步更新 [FRP_GITHUB_DOWNLOAD_RESEARCH.md](docs/online/FRP_GITHUB_DOWNLOAD_RESEARCH.md) 中组件位置与实施步骤（版本查询泛化标记已完成）。
 
+### Style
+
+- **cargo fmt 修复 CI 格式检查**（[easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs) / [github_download.rs](src-tauri/src/utils/github_download.rs) / [probe.rs](src-tauri/src/utils/probe.rs)）：`log_debug!` 宏调用压缩为单行、文件末尾补空行，通过 `cargo fmt --check`。
+
 ### Fixed
 
 - **修复 GitHub 镜像源测速被 CSP 拦截：测速从前端移到后端**（[github_download.rs](src-tauri/src/utils/github_download.rs) / [easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs) / [githubProxy.ts](src/utils/githubProxy.ts) / [easytier.ts](src/utils/api/online-manager/easytier.ts) / [core.ts](src/utils/api/online-manager/core.ts) / [tauri.conf.json](src-tauri/tauri.conf.json)）：前端 `githubProxy.ts` 原用浏览器 fetch 测速镜像源，镜像域名为运行时用户自定义 URL，静态 CSP 白名单无法覆盖，被 `connect-src` 拦截导致测速全部失败。① **测速移到后端**：`github_download.rs` 提取公共 `probe_urls`（并发 HEAD+Range 0-1 测速 + 200ms 取消轮询 + 耗时排序），`pick_fastest` 改为其取首封装；新增 `probe_fastest_proxies`（随机抽 30 个测速返回最快 10 个，禁止重定向）；新增 `probe_github_proxies` IPC action，前端 `githubProxy.ts` 改为读取 `githubProxy.json` 全部源交给后端测速筛选，删除前端 fetch 测速逻辑；② **CSP 恢复严格**：`connect-src` 移除临时放宽的 `https:` `http:` 与无用的 `ws://127.0.0.1:*`，恢复原白名单；③ **测速链路 DEBUG 日志**：命令入口记录收到/返回源数，`probe_fastest_proxies` 记录抽样数与可用/返回数，逐候选测速结果沿用 `probe_urls` 的 DEBUG 日志。
