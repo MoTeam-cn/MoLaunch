@@ -4,8 +4,10 @@
  * 读取 src/assets/Common/githubProxy.json，对每个源构造 easytier release 下载测速 URL，
  * 并发 HEAD + Range: bytes=0-1 请求，筛选可用（2xx/206）且响应快的 30 个，
  * 经 setGithubProxies 传给后端（下载时竞速选源）。启动时执行一次，失败静默。
+ *
+ * 注：项目 assetsInclude 将 *.json 视为静态资源（不编译进 chunk），故经 ?url 导入后 fetch 加载。
  */
-import proxyData from '@/assets/Common/githubProxy.json'
+import proxyJsonUrl from '@/assets/Common/githubProxy.json?url'
 import type { GithubProxy } from '@/types/online'
 import { setGithubProxies } from '@/utils/api/online-manager/easytier'
 
@@ -59,6 +61,7 @@ async function probeSource(proxy: GithubProxy): Promise<number | null> {
 /** 读取镜像源清单并筛选可用且快的 30 个，传给后端（失败静默） */
 export async function initGithubProxies(): Promise<void> {
   try {
+    const proxyData = (await (await fetch(proxyJsonUrl)).json()) as { sources: GithubProxy[] }
     const sources = (proxyData.sources ?? []) as GithubProxy[]
     const results = await Promise.all(sources.map((s) => probeSource(s).then((ms) => ({ s, ms }))))
     const picked = results

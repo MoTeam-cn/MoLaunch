@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **修复 githubProxy.json 加载 500：改经 `?url` + fetch 加载**（[githubProxy.ts](src/utils/githubProxy.ts)）：项目 `assetsInclude: ['**/*.json']` 将 JSON 视为静态资源，直接 `import` JSON 会先被 asset 插件转为 URL 模块、再被 vite:json 插件 `JSON.parse` 失败返回 500（报错 `Failed to parse JSON file`）；改为 `?url` 导入 + `fetch` 加载，与 previewResources / recipe-generator 既有约定一致。
+
 - **发布工作流 Linux 依赖安装提速：APT 包缓存**（[release.yml](.github/workflows/release.yml)）：`Install dependencies (ubuntu only)` 原每次运行执行 `apt-get update` + 下载安装 libwebkit2gtk-4.1-dev 等大包（数百 MB），无缓存导致该步骤可卡 10 分钟；改用 `awalsh128/cache-apt-pkgs-action` 缓存 .deb 包，命中时跳过 update 与下载直接安装，并开启 `execute_install_scripts` 保证 webkit 等包 postinst 脚本执行。
 - **CI 工作流 Linux 依赖安装同步提速**（[ci.yml](.github/workflows/ci.yml)）：`rust-clippy` / `rust-test` 两个 job 的依赖安装步骤同步改用 APT 包缓存，与 release.yml 保持一致。
 
