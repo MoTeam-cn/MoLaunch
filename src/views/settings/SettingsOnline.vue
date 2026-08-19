@@ -341,7 +341,9 @@ onMounted(() => {
             <Input v-model="p.name" placeholder="可选" size="small" width="100%" />
             <Select v-model="p.type" :options="proxyTypeOptions" />
             <Input v-model="p.base" placeholder="https://mirror.example.com" size="small" width="100%" />
-            <Button type="text" size="small" @click="removeProxyRow(i)">删除</Button>
+            <!-- justify-self-end：auto 轨道默认被 justify-content stretch 拉伸填满剩余空间，
+                 grid item 又默认 stretch，导致删除按钮被撑到整列宽；取消拉伸只占内容宽度并右对齐 -->
+            <Button type="text" size="small" class="justify-self-end" @click="removeProxyRow(i)">删除</Button>
           </div>
           <div
             v-if="githubProxies.length === 0"
