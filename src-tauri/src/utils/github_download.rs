@@ -26,7 +26,8 @@ pub fn build_proxy_url(proxy: &GithubProxy, repo: &str, version: &str, asset: &s
     if proxy.proxy_type == "path" {
         format!("{base}/{repo}/releases/download/v{version}/{asset}")
     } else {
-        format!("{base}{GITHUB_DOWNLOAD_BASE}/{repo}/releases/download/v{version}/{asset}")
+        // full 模式：base 与完整 GitHub URL 之间补 `/`（base 可能无尾斜杠）
+        format!("{base}/{GITHUB_DOWNLOAD_BASE}/{repo}/releases/download/v{version}/{asset}")
     }
 }
 

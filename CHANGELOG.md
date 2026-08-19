@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **修复 GitHub 镜像源 full 模式 URL 拼接缺斜杠 + 「恢复默认」改名「重新测速」**（[github_download.rs](src-tauri/src/utils/github_download.rs) / [githubProxy.ts](src/utils/githubProxy.ts) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：① **full 模式拼接 bug**：`build_proxy_url` / `buildProbeUrl` 对 base 做 `trim_end_matches('/')` 去尾斜杠后直接拼接完整 GitHub URL，base 无尾斜杠的源（如 `https://gh.wsmdn.dpdns.org`）会拼出 `dpdns.orghttps://github.com/...` 错误 URL，下载必然失败；改为 base 与 GitHub URL 之间补 `/`；② **按钮改名**：镜像源卡片「恢复默认」→「重新测速」（语义更准确：对内置清单全部并发测速、筛选最快前 10 个替换当前列表），外包 `Tooltip` 说明用途，成功 toast 改为「已重新测速，筛选出 N 个可用镜像源」带数量反馈。
+
 - **GitHub 镜像源测速筛选优化：解决只剩 1 个镜像的问题**（[githubProxy.ts](src/utils/githubProxy.ts)）：部分 ghproxy 类镜像不支持 HEAD 请求（返回 405/501/403），原逻辑直接判定失败，加上 5s 超时过严，导致测速后仅筛出个别源（如 XiaoMo 镜像）。① **HEAD 失败回退 GET**：`probeSource` 在 HEAD 返回 405/501/403 时回退 `GET + Range: bytes=0-1023`（读取响应头即释放连接），兼容仅支持 GET 的镜像；② **超时放宽**：5s → 8s，避免误杀慢速但可用的源；③ **筛选数量收敛**：`PROXY_LIMIT` 30 → 10（按响应耗时取最快前 10 个填入，后端下载时再竞速选最优、官方保底）。
 
 - **内核下载安抚提示改用 AlertV2 组件**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：进度条下方的琥珀色自定义 div 提示替换为项目通用 `AlertV2` 组件（`type="warning"`，灰底简洁风格），文案与触发时机不变（download/extract 阶段展示）。

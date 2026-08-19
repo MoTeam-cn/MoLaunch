@@ -39,7 +39,7 @@ function buildProbeUrl(proxy: GithubProxy): string {
   const asset = probeAssetName()
   return proxy.type === 'path'
     ? `${base}/${EASYTIER_REPO}/releases/download/v${PROBE_VERSION}/${asset}`
-    : `${base}https://github.com/${EASYTIER_REPO}/releases/download/v${PROBE_VERSION}/${asset}`
+    : `${base}/https://github.com/${EASYTIER_REPO}/releases/download/v${PROBE_VERSION}/${asset}`
 }
 
 /**

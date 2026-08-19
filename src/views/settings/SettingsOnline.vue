@@ -23,6 +23,7 @@ const Input = defineAsyncComponent(() => import('@/components/common/Input.vue')
 const Select = defineAsyncComponent(() => import('@/components/common/Select.vue'))
 const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 const AlertV2 = defineAsyncComponent(() => import('@/components/common/AlertV2.vue'))
+const Tooltip = defineAsyncComponent(() => import('@/components/common/Tooltip.vue'))
 import {
   ArrowDownTrayIcon,
   ArrowPathIcon,
@@ -213,7 +214,7 @@ async function handleSaveProxies() {
   }
 }
 
-/** 恢复默认：重新测速筛选 githubProxy.json 并注入 */
+/** 重新测速：对 githubProxy.json 全部源并发探测，筛选最快的前 10 个替换当前列表 */
 async function handleRestoreDefaultProxies() {
   proxiesBusy.value = true
   try {
@@ -223,10 +224,10 @@ async function handleRestoreDefaultProxies() {
     } else {
       githubProxies.value = list.map((p) => ({ name: p.name ?? '', type: p.type, base: p.base }))
       refreshConfig()
-      toastSuccess('已恢复默认镜像源')
+      toastSuccess(`已重新测速，筛选出 ${list.length} 个可用镜像源`)
     }
   } catch (e) {
-    toastError(`恢复失败: ${e}`)
+    toastError(`重新测速失败: ${e}`)
   } finally {
     proxiesBusy.value = false
   }
@@ -353,10 +354,12 @@ onMounted(() => {
               添加镜像
             </Button>
             <div class="flex items-center gap-2">
-              <Button type="outline" size="small" :loading="proxiesBusy" @click="handleRestoreDefaultProxies">
-                <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
-                恢复默认
-              </Button>
+              <Tooltip text="对内置镜像源清单全部并发测速，筛选响应最快的前 10 个替换当前列表" position="top">
+                <Button type="outline" size="small" :loading="proxiesBusy" @click="handleRestoreDefaultProxies">
+                  <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
+                  重新测速
+                </Button>
+              </Tooltip>
               <Button type="primary" size="small" :loading="proxiesBusy" @click="handleSaveProxies">
                 <template #icon><CheckIcon class="w-4 h-4" /></template>
                 保存
