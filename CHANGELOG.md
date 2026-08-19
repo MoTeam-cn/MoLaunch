@@ -10,9 +10,9 @@
 
 ### Changed
 
-- **顶部子菜单（SubTabBar）支持横向滚动**（[SubTabBar.vue](src/components/common/SubTabBar.vue)）：子页签增多（如开发者页面 9 个）时容器宽度不足会换行，改为 `overflow-x-auto` + 子项 `flex-none` / `whitespace-nowrap`，超出宽度时横向滚动，不再换行；滚动条细化为 4px，默认隐藏、鼠标悬停在子菜单区域时显示（JS mouseenter/mouseleave 控制，避免 CSS `:hover` 在滚动条上的怪异行为）；点击被遮挡的 tab 时自动滚动到可见区域。
+- **顶部子菜单（SubTabBar）支持横向滚动**（[SubTabBar.vue](src/components/common/SubTabBar.vue)）：子页签增多（如开发者页面 9 个）时容器宽度不足会换行，改为 `overflow-x-auto` + 子项 `flex-none` / `whitespace-nowrap`，超出宽度时横向滚动，不再换行；滚动条细化为 4px，默认隐藏、鼠标悬停在子菜单区域时显示（JS mouseenter/mouseleave 控制，避免 CSS `:hover` 在滚动条上的怪异行为）；点击被遮挡的 tab 时自动滚动到可见区域；底部选中指示条改为单条滑动动画（跟随 active tab 平滑移动）。
 
-- **启动参数预览结果美化**（[LaunchPreviewTab.vue](src/views/settings/developer/LaunchPreviewTab.vue)）：JVM 参数 / 游戏参数改为 Tag 标签流式展示（蓝/绿区分），各区块标题加粗、目录与账号信息逐行带标签前缀，结果区高度上限 28rem → 36rem，页面铺开更充分。
+- **启动参数预览结果美化**（[LaunchPreviewTab.vue](src/views/settings/developer/LaunchPreviewTab.vue)）：JVM 参数 / 游戏参数改为 Tag 标签流式展示（蓝/绿区分），各区块标题加粗、目录与账号信息逐行带标签前缀；超长参数自动省略仅显示前 20 字符（点击 Tag 复制完整值），结果区高度上限 36rem → 20rem。
 
 - **厂商列表/认证中心「系统默认」厂商改用 gofrp 图标**（[frp-provider.ts](src/utils/frp-provider.ts) / [ProviderList.vue](src/components/frp/ProviderList.vue) / [AuthCenter.vue](src/components/frp/AuthCenter.vue)）：系统默认厂商后端不返回 icon，前端原回退到通用图标（ServerStackIcon/ShieldCheckIcon）；新增 `providerIconSrc` 公共函数，系统默认厂商（`system-default`）固定使用 gofrp 图标，外部厂商仍用 manifest 提供的图标，两个页面复用。
 

@@ -13,7 +13,7 @@ const Tag = defineAsyncComponent(() => import('@/components/common/Tag.vue'))
 import { listInstalledVersionsWithType } from '@/utils/api/version'
 import { previewLaunchArgs, type LaunchArgsPreview } from '@/utils/api/launch'
 import { useAuthStore } from '@/stores/auth'
-import { toastError } from '@/utils/toast'
+import { toastError, toastSuccess } from '@/utils/toast'
 import { safeCall } from '@/utils/async'
 import { PaperAirplaneIcon, ClipboardDocumentIcon } from '@heroicons/vue/24/outline'
 
@@ -82,6 +82,21 @@ async function copyAll() {
     toastError('复制失败')
   }
 }
+
+/** 超长参数省略显示（仅展示前 20 字符，点击 Tag 复制完整值） */
+function shortArg(arg: string): string {
+  return arg.length > 20 ? arg.slice(0, 20) + '…' : arg
+}
+
+/** 点击 Tag 复制完整参数 */
+async function copyArg(arg: string) {
+  try {
+    await navigator.clipboard.writeText(arg)
+    toastSuccess('已复制参数')
+  } catch {
+    toastError('复制失败')
+  }
+}
 </script>
 
 <template>
@@ -127,7 +142,7 @@ async function copyAll() {
             <span class="text-xs font-semibold text-gray-700">预览结果 · {{ preview.version_id }}</span>
             <span class="text-xs text-gray-400 font-mono">{{ preview.login_type }} · {{ preview.username }}</span>
           </div>
-          <div data-inner-scroll class="max-h-[36rem] overflow-y-auto divide-y divide-gray-100">
+          <div data-inner-scroll class="max-h-[20rem] overflow-y-auto divide-y divide-gray-100">
             <!-- Java -->
             <div class="px-4 py-3">
               <p class="text-xs font-bold text-gray-900 mb-1.5">Java 路径</p>
@@ -137,7 +152,14 @@ async function copyAll() {
             <div class="px-4 py-3">
               <p class="text-xs font-bold text-gray-900 mb-2">JVM 参数（{{ preview.jvm_args.length }}）</p>
               <div class="flex flex-wrap gap-1.5">
-                <Tag v-for="(arg, i) in preview.jvm_args" :key="i" size="small" color="arcoblue">{{ arg }}</Tag>
+                <Tag
+                  v-for="(arg, i) in preview.jvm_args"
+                  :key="i"
+                  size="small"
+                  color="arcoblue"
+                  class="max-w-full cursor-pointer"
+                  @click="copyArg(arg)"
+                >{{ shortArg(arg) }}</Tag>
               </div>
             </div>
             <!-- 主类 -->
@@ -154,7 +176,14 @@ async function copyAll() {
             <div class="px-4 py-3">
               <p class="text-xs font-bold text-gray-900 mb-2">游戏参数（{{ preview.game_args.length }}）</p>
               <div class="flex flex-wrap gap-1.5">
-                <Tag v-for="(arg, i) in preview.game_args" :key="i" size="small" color="green">{{ arg }}</Tag>
+                <Tag
+                  v-for="(arg, i) in preview.game_args"
+                  :key="i"
+                  size="small"
+                  color="green"
+                  class="max-w-full cursor-pointer"
+                  @click="copyArg(arg)"
+                >{{ shortArg(arg) }}</Tag>
               </div>
             </div>
             <!-- 目录信息 -->

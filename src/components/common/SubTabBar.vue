@@ -4,11 +4,12 @@
  *
  * 用于页面内的子页签切换（如：关于 / 鸣谢 / 教程）。
  * 支持 sticky 固定模式，滚动时子菜单栏吸顶。
+ * 底部选中指示条为单条滑动动画（跟随 active tab 平滑移动）。
  *
  * 用法：
  * <SubTabBar v-model="activeTab" :tabs="tabs" sticky />
  */
-import { ref, nextTick } from 'vue'
+import { ref, nextTick, watch, onMounted } from 'vue'
 
 interface Tab {
   id: string
@@ -22,7 +23,7 @@ interface Props {
   sticky?: boolean
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   sticky: false,
 })
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
@@ -30,6 +31,22 @@ const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 /** 鼠标是否悬停在子菜单区域（控制细滚动条显隐） */
 const hovered = ref(false)
 const containerRef = ref<HTMLElement | null>(null)
+/** 滑动指示条位置（left/width，相对容器内容原点） */
+const indicatorStyle = ref({ left: '0px', width: '0px' })
+
+/** 计算 active tab 的位置，驱动指示条滑动 */
+function updateIndicator() {
+  nextTick(() => {
+    const container = containerRef.value
+    if (!container) return
+    const btn = container.querySelector<HTMLElement>(`[data-tab-id="${props.modelValue}"]`)
+    if (!btn) return
+    indicatorStyle.value = {
+      left: `${btn.offsetLeft}px`,
+      width: `${btn.offsetWidth}px`,
+    }
+  })
+}
 
 function selectTab(id: string) {
   emit('update:modelValue', id)
@@ -49,17 +66,20 @@ function selectTab(id: string) {
     }
   })
 }
+
+watch(() => props.modelValue, updateIndicator)
+onMounted(updateIndicator)
 </script>
 
 <template>
   <div
     ref="containerRef"
-    class="sub-tab-bar flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1"
+    class="sub-tab-bar relative flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1"
     :class="[sticky ? 'sticky top-0 z-20 shadow-sm' : '', { 'show-scrollbar': hovered }]"
     @mouseenter="hovered = true"
     @mouseleave="hovered = false"
   >
-    <!-- 保留原生 button：Tab 切换项（relative 布局 + 底部指示线 + active 状态），
+    <!-- 保留原生 button：Tab 切换项（relative 布局 + active 状态），
          Button.vue 的 scoped size 类与布局不适合带指示线的 Tab 组件 -->
     <button
       v-for="tab in tabs"
@@ -73,13 +93,12 @@ function selectTab(id: string) {
     >
       <component :is="tab.icon" v-if="tab.icon" class="h-4 w-4" />
       {{ tab.label }}
-      <!-- 底部选中指示线（所有 tab 均渲染，通过 opacity + scaleX 平滑过渡） -->
-      <span
-        class="absolute bottom-0 left-2 right-2 h-0.5 origin-center rounded-full bg-primary-500 transition-all duration-200 ease-out"
-        :class="modelValue === tab.id ? 'opacity-100' : 'opacity-0'"
-        :style="{ transform: modelValue === tab.id ? 'scaleX(1)' : 'scaleX(0)' }"
-      />
     </button>
+    <!-- 底部选中指示条：单条滑动动画，跟随 active tab 平滑移动 -->
+    <span
+      class="pointer-events-none absolute bottom-0 h-0.5 rounded-full bg-primary-500 transition-all duration-300 ease-out"
+      :style="indicatorStyle"
+    />
   </div>
 </template>
 
