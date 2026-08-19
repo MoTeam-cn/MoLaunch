@@ -324,9 +324,9 @@ onMounted(() => {
         </p>
         <div v-if="!proxiesLoaded" class="mt-3 h-20 bg-gray-100 rounded animate-pulse" />
         <template v-else>
-          <!-- 表头：grid 固定列宽（名称/类型固定，镜像地址自适应），与输入行对齐 -->
+          <!-- 表头：grid 固定列宽（名称自适应加宽，类型固定，镜像地址收窄），与输入行对齐 -->
           <div
-            class="mt-3 grid grid-cols-[7rem_7rem_minmax(0,1fr)_auto] items-center gap-2 text-xs text-gray-400"
+            class="mt-3 grid grid-cols-[minmax(0,1fr)_7rem_16rem_auto] items-center gap-2 text-xs text-gray-400"
           >
             <span>名称</span>
             <span>类型</span>
@@ -336,7 +336,7 @@ onMounted(() => {
           <div
             v-for="(p, i) in githubProxies"
             :key="i"
-            class="mt-2 grid grid-cols-[7rem_7rem_minmax(0,1fr)_auto] items-center gap-2"
+            class="mt-2 grid grid-cols-[minmax(0,1fr)_7rem_16rem_auto] items-center gap-2"
           >
             <Input v-model="p.name" placeholder="可选" size="small" width="100%" />
             <Select v-model="p.type" :options="proxyTypeOptions" />
