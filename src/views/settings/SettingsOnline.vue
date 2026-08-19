@@ -327,7 +327,7 @@ onMounted(() => {
           <!-- 表头：名称/类型固定，镜像地址 minmax(0,1fr) 自适应填满剩余宽度（长地址不被截断），
                第 4 列 auto 仅占删除按钮内容宽、紧跟其后，无中间留白 -->
           <div
-            class="mt-3 grid grid-cols-[6rem_7rem_minmax(0,1fr)_auto] items-center gap-2 text-xs text-gray-400"
+            class="mt-3 grid grid-cols-[8rem_7rem_minmax(0,1fr)_auto] items-center gap-2 text-xs text-gray-400"
           >
             <span>名称</span>
             <span>类型</span>
@@ -337,7 +337,7 @@ onMounted(() => {
           <div
             v-for="(p, i) in githubProxies"
             :key="i"
-            class="mt-2 grid grid-cols-[6rem_7rem_minmax(0,1fr)_auto] items-center gap-2"
+            class="mt-2 grid grid-cols-[8rem_7rem_minmax(0,1fr)_auto] items-center gap-2"
           >
             <Input v-model="p.name" placeholder="可选" size="small" width="100%" />
             <Select v-model="p.type" :options="proxyTypeOptions" />
