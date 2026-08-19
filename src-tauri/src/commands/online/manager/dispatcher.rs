@@ -234,6 +234,8 @@ static DISPATCHER: Lazy<Dispatcher> = Lazy::new(|| {
     signaling_manager::register_signaling_actions(&mut d);
     // easytier / Scaffolding 联机动作
     super::easytier_actions::register(&mut d);
+    // easytier 内核外部下载安装动作
+    super::easytier_install::register(&mut d);
     // MC 局域网伪装：lan_fake_server_start / lan_fake_server_stop
     lan_fake::register_lan_fake_actions(&mut d);
     // MC 局域网端口探测：lan_port_probe（监听发现广播解析 [AD]port[/AD]）

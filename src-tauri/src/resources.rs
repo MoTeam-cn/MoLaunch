@@ -140,75 +140,6 @@ fn embedded_bytes(path: &str) -> Option<&'static [u8]> {
         // 作用：主程序退出后替换 exe 文件，绕过 Windows 文件锁
         #[cfg(target_os = "windows")]
         "updater/updater.exe" => Some(include_bytes!("../resources/updater/updater.exe")),
-        // easytier-core（联机虚拟组网核心，按平台/架构嵌入对应版本）
-        // 来源：https://github.com/EasyTier/EasyTier/releases（v2.6.4，Apache-2.0）
-        // 运行时由 `extract_easytier_core` 释放到 AppData/.Molaunch/easytier/
-        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-        "easytier/easytier-core" => Some(include_bytes!(
-            "../resources/easytier/windows/x86_64/easytier-core.exe"
-        )),
-        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-        "easytier/easytier-core" => Some(include_bytes!(
-            "../resources/easytier/windows/aarch64/easytier-core.exe"
-        )),
-        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-        "easytier/easytier-core" => Some(include_bytes!(
-            "../resources/easytier/linux/x86_64/easytier-core"
-        )),
-        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-        "easytier/easytier-core" => Some(include_bytes!(
-            "../resources/easytier/linux/aarch64/easytier-core"
-        )),
-        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-        "easytier/easytier-core" => Some(include_bytes!(
-            "../resources/easytier/macos/x86_64/easytier-core"
-        )),
-        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-        "easytier/easytier-core" => Some(include_bytes!(
-            "../resources/easytier/macos/aarch64/easytier-core"
-        )),
-        // easytier-cli（联机管理客户端，与 core 同版本同目录释放；用于房客经 rpc-portal 查询虚拟网络节点发现联机中心）
-        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-        "easytier/easytier-cli" => Some(include_bytes!(
-            "../resources/easytier/windows/x86_64/easytier-cli.exe"
-        )),
-        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-        "easytier/easytier-cli" => Some(include_bytes!(
-            "../resources/easytier/windows/aarch64/easytier-cli.exe"
-        )),
-        #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-        "easytier/easytier-cli" => Some(include_bytes!(
-            "../resources/easytier/linux/x86_64/easytier-cli"
-        )),
-        #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-        "easytier/easytier-cli" => Some(include_bytes!(
-            "../resources/easytier/linux/aarch64/easytier-cli"
-        )),
-        #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-        "easytier/easytier-cli" => Some(include_bytes!(
-            "../resources/easytier/macos/x86_64/easytier-cli"
-        )),
-        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-        "easytier/easytier-cli" => Some(include_bytes!(
-            "../resources/easytier/macos/aarch64/easytier-cli"
-        )),
-        // easytier 依赖动态库（Windows 专属，Packet.dll + wintun.dll 与核心同目录释放）
-        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-        "easytier/Packet.dll" => Some(include_bytes!(
-            "../resources/easytier/windows/x86_64/Packet.dll"
-        )),
-        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-        "easytier/Packet.dll" => Some(include_bytes!(
-            "../resources/easytier/windows/aarch64/Packet.dll"
-        )),
-        #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-        "easytier/wintun.dll" => Some(include_bytes!(
-            "../resources/easytier/windows/x86_64/wintun.dll"
-        )),
-        #[cfg(all(target_os = "windows", target_arch = "aarch64"))]
-        "easytier/wintun.dll" => Some(include_bytes!(
-            "../resources/easytier/windows/aarch64/wintun.dll"
-        )),
         // hongshi（红石联机内核，按平台/架构嵌入对应版本；Windows 仅 amd64 官方产物）
         // 来源：https://hongshi.site/docs-api.html（人工下载入库）
         // 运行时由 `extract_hongshi_core` 释放到 `<temp>/MoLaunch/hongshi/`
@@ -358,43 +289,6 @@ pub fn extract_updater() -> anyhow::Result<std::path::PathBuf> {
     extract_resource("updater/updater.exe", &target_path)?;
 
     Ok(target_path)
-}
-
-/// 释放 easytier-core 到 AppData 全局目录，返回可执行文件路径
-///
-/// easytier-core 是联机虚拟组网核心，编译时按平台/架构嵌入对应版本，运行时
-/// 释放到 `<appdata>/.Molaunch/easytier/`（Windows 同时释放依赖的
-/// Packet.dll/wintun.dll，与核心同目录以便加载）。easytier-cli 管理客户端
-/// 与核心同版本同目录释放（供房客查询虚拟网络节点）。复用 `extract_resource`
-/// 的 sha256 校验机制。Unix 下 `extract_resource` 的 chmod 600 会去掉执行位，
-/// 故释放后需补回执行权限。调用方为 `commands::online::manager::easytier_actions`。
-pub fn extract_easytier_core() -> anyhow::Result<std::path::PathBuf> {
-    let dir = crate::storage::appdata::ensure_appdata_subdir("easytier")
-        .map_err(|e| anyhow::anyhow!(e))?;
-
-    #[cfg(target_os = "windows")]
-    {
-        extract_resource("easytier/Packet.dll", &dir.join("Packet.dll"))?;
-        extract_resource("easytier/wintun.dll", &dir.join("wintun.dll"))?;
-    }
-
-    let (core_name, cli_name) = if cfg!(target_os = "windows") {
-        ("easytier-core.exe", "easytier-cli.exe")
-    } else {
-        ("easytier-core", "easytier-cli")
-    };
-    let core_path = dir.join(core_name);
-    extract_resource("easytier/easytier-core", &core_path)?;
-    let cli_path = dir.join(cli_name);
-    extract_resource("easytier/easytier-cli", &cli_path)?;
-
-    #[cfg(unix)]
-    {
-        crate::minecraft::system::shell::make_executable(&core_path);
-        crate::minecraft::system::shell::make_executable(&cli_path);
-    }
-
-    Ok(core_path)
 }
 
 /// 释放 hongshi 内核到系统临时目录，返回可执行文件路径

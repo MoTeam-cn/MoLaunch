@@ -4,6 +4,7 @@ mod auth_actions;
 mod auth_register_login;
 mod dispatcher;
 mod easytier_actions;
+pub(crate) mod easytier_install;
 mod lan_fake;
 mod lan_probe;
 mod signaling_manager;

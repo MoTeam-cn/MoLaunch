@@ -4,7 +4,6 @@
 //! 2. 自动构建 updater.exe（Windows 便携版更新器，仅 Windows 平台）
 //!
 //! build 逻辑已模块化到 build_script/ 子目录：
-//! - build_script/easytier.rs：检查 easytier-core 嵌入式资源
 //! - build_script/updater.rs：updater.exe 增量构建（仅 Windows）
 //! - cubiomes WASM 已迁移前端编译（scripts/build-wasm.cjs → src/assets/seedmap/），本脚本不再负责
 
@@ -13,9 +12,6 @@ mod build_script;
 use std::path::Path;
 
 fn main() {
-    // 先检查 easytier-core 嵌入式资源（缺失时给出中文下载指引并终止，避免 include_bytes! 报晦涩编译错误）
-    build_script::easytier::check_easytier();
-
     tauri_build::build();
 
     // 同步项目许可协议（根目录 LICENSE → resources/LICENSE.txt 副本）

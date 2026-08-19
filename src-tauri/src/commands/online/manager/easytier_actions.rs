@@ -82,8 +82,12 @@ async fn emit_easytier_status(app: &tauri::AppHandle, state: &AppState) {
 /// 解析 easytier-core 可执行文件路径。
 ///
 /// 优先级：配置的绝对路径（直接校验存在性）→ 相对路径兼容旧配置（依次尝试
-/// resource_dir / exe 同目录）→ 兜底释放内置嵌入式资源到 AppData/.Molaunch/easytier/。
-fn resolve_core_path(app: &tauri::AppHandle, configured: &str) -> Result<PathBuf, String> {
+/// resource_dir / exe 同目录）→ 兜底自动下载安装到 AppData/.Molaunch/easytier/。
+async fn resolve_core_path(
+    state: &AppState,
+    app: &tauri::AppHandle,
+    configured: &str,
+) -> Result<PathBuf, String> {
     let p = PathBuf::from(configured);
     if p.is_absolute() {
         if p.is_file() {
@@ -111,9 +115,10 @@ fn resolve_core_path(app: &tauri::AppHandle, configured: &str) -> Result<PathBuf
             }
         }
     }
-    // 兜底：释放内置嵌入式资源（默认配置为空时走此路径）
-    crate::resources::extract_easytier_core()
-        .map_err(|e| format!("释放内置 easytier-core 失败: {e}"))
+    // 兜底：自动下载安装（默认配置为空时走此路径，已安装直接返回）
+    crate::commands::online::manager::easytier_install::ensure_installed(state, app)
+        .await
+        .map_err(|e| format!("安装 easytier-core 失败: {e}"))
 }
 
 /// 解析 easytier-cli 可执行文件路径（与 core 同目录，随包附带）。
@@ -205,7 +210,7 @@ async fn rebuild_host_easytier(
         .await
         .clone()
         .ok_or_else(|| "房主网络凭据缺失".to_string())?;
-    let core_path = resolve_core_path(app, &configured_core_path(state).await)?;
+    let core_path = resolve_core_path(&state, app, &configured_core_path(state).await).await?;
     let cli_path = resolve_cli_path(&core_path);
     let mut extra = configured_easytier_peers(state).await;
     extra.extend(host_whitelist_args(center_port, mc_port));
@@ -507,7 +512,8 @@ pub fn register(d: &mut Dispatcher) {
                 old.stop().await;
             }
 
-            let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
+            let core_path =
+                resolve_core_path(&state, &app, &configured_core_path(&state).await).await?;
             let cli_path = resolve_cli_path(&core_path);
             let ip = if p.is_host {
                 Some(HOST_VIRTUAL_IP)
@@ -623,7 +629,8 @@ pub fn register(d: &mut Dispatcher) {
             let center_port = server.port();
 
             // 启动 easytier（房主固定虚拟 IP + 中心 hostname + no-tun 白名单）
-            let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
+            let core_path =
+                resolve_core_path(&state, &app, &configured_core_path(&state).await).await?;
             let cli_path = resolve_cli_path(&core_path);
             let mut extra = Vec::new();
             extra.extend(configured_easytier_peers(&state).await);
@@ -715,7 +722,8 @@ pub fn register(d: &mut Dispatcher) {
 
             // 若尚未加入网络，先以房客身份（--dhcp，no-tun）加入
             if state.easytier.lock().await.is_none() {
-                let core_path = resolve_core_path(&app, &configured_core_path(&state).await)?;
+                let core_path =
+                    resolve_core_path(&state, &app, &configured_core_path(&state).await).await?;
                 let cli_path = resolve_cli_path(&core_path);
                 let hostname = {
                     let identity = configured_network_identity(&state).await;

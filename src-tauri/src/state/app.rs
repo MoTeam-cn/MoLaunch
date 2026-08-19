@@ -78,6 +78,11 @@ pub struct AppState {
     /// `redstone_start` 创建并替换（单实例），`redstone_stop` 停止并置 None；
     /// 隧道状态由内核写入同目录 tunnel.ini，`redstone_status` 轮询读取。
     pub redstone: Arc<TokioMutex<Option<crate::commands::redstone::tunnel::HongshiTunnel>>>,
+    /// 前端筛选的 GitHub 镜像源（easytier 内核下载竞速选源用，`set_github_proxies` 写入）
+    pub github_proxies:
+        Arc<TokioMutex<Vec<crate::commands::online::manager::easytier_install::GithubProxy>>>,
+    /// easytier 内核安装进行中标志（防重入：`easytier_install` / `ensure_installed` 共用）
+    pub easytier_installing: Arc<std::sync::atomic::AtomicBool>,
     /// 应用句柄（Tauri setup 钩子中注入）
     ///
     /// 供后台任务/进度回调向前端 emit 事件（如 `download-progress`）。
@@ -146,6 +151,8 @@ impl AppState {
             manual_mc_port: Arc::new(TokioMutex::new(None)),
             lan_fake_server: Arc::new(TokioMutex::new(None)),
             redstone: Arc::new(TokioMutex::new(None)),
+            github_proxies: Arc::new(TokioMutex::new(Vec::new())),
+            easytier_installing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
             panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
         }
