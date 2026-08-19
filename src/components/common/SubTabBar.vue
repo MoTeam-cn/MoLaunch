@@ -8,6 +8,8 @@
  * 用法：
  * <SubTabBar v-model="activeTab" :tabs="tabs" sticky />
  */
+import { ref } from 'vue'
+
 interface Tab {
   id: string
   label: string
@@ -25,6 +27,9 @@ withDefaults(defineProps<Props>(), {
 })
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 
+/** 鼠标是否悬停在子菜单区域（控制细滚动条显隐） */
+const hovered = ref(false)
+
 function selectTab(id: string) {
   emit('update:modelValue', id)
 }
@@ -33,7 +38,9 @@ function selectTab(id: string) {
 <template>
   <div
     class="sub-tab-bar flex items-center gap-1 overflow-x-auto border-b border-gray-200 bg-white px-1"
-    :class="sticky ? 'sticky top-0 z-20 shadow-sm' : ''"
+    :class="[sticky ? 'sticky top-0 z-20 shadow-sm' : '', { 'show-scrollbar': hovered }]"
+    @mouseenter="hovered = true"
+    @mouseleave="hovered = false"
   >
     <!-- 保留原生 button：Tab 切换项（relative 布局 + 底部指示线 + active 状态），
          Button.vue 的 scoped size 类与布局不适合带指示线的 Tab 组件 -->
@@ -59,7 +66,7 @@ function selectTab(id: string) {
 </template>
 
 <style scoped>
-/* 细滚动条：默认隐藏，鼠标悬停在子菜单区域时显示 */
+/* 细滚动条：默认隐藏，鼠标悬停在子菜单区域时显示（JS 控制，避免 CSS :hover 在滚动条上的怪异行为） */
 .sub-tab-bar::-webkit-scrollbar {
   height: 4px;
 }
@@ -73,11 +80,11 @@ function selectTab(id: string) {
   border-radius: 9999px;
 }
 
-.sub-tab-bar:hover::-webkit-scrollbar-thumb {
+.sub-tab-bar.show-scrollbar::-webkit-scrollbar-thumb {
   background: #d1d5db;
 }
 
-.sub-tab-bar:hover::-webkit-scrollbar-thumb:hover {
+.sub-tab-bar.show-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #9ca3af;
 }
 </style>
