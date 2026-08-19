@@ -8,7 +8,7 @@ use tokio::sync::Mutex;
 use super::super::super::sources::DownloadSourceMode;
 use super::super::super::utils::file_checker::FileChecker;
 use super::super::rate_limiter::RateLimiter;
-use super::super::types::{DownloadProgress, DownloadTask, GlobalProgress};
+use super::super::types::{ContentValidator, DownloadProgress, DownloadTask, GlobalProgress};
 use crate::log_debug;
 
 #[path = "retry.rs"]
@@ -29,7 +29,7 @@ pub async fn download_single(
     chunked_task_ids: Option<Arc<StdMutex<std::collections::HashSet<String>>>>,
     pause_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
     cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
-    content_validator: Option<Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>>,
+    content_validator: Option<ContentValidator>,
 ) -> DownloadProgress {
     let checker = FileChecker::new()
         .with_actual_size(task.expected_size)

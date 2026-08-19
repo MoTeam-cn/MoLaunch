@@ -8,7 +8,9 @@ use tokio::sync::Mutex;
 
 use super::super::super::super::sources::DownloadSourceMode;
 use super::super::super::rate_limiter::RateLimiter;
-use super::super::super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
+use super::super::super::types::{
+    ContentValidator, DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress,
+};
 use super::verify;
 use crate::minecraft::download::chunk;
 use crate::{log_debug, log_warn};
@@ -29,7 +31,7 @@ pub(super) async fn download_with_retries(
     chunked_task_ids: Option<Arc<StdMutex<std::collections::HashSet<String>>>>,
     pause_flag: Option<Arc<AtomicBool>>,
     cancel_flag: Option<Arc<AtomicBool>>,
-    content_validator: Option<Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>>,
+    content_validator: Option<ContentValidator>,
 ) -> Option<DownloadProgress> {
     // 内容校验失败：删除文件、回滚已计进度、继续下一 URL（镜像坏文件自动回退官方等保底源）
     let invalid_content = |err: String, downloaded: u64| {

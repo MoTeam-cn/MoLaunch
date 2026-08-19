@@ -278,7 +278,7 @@ impl TaskMemory {
             .get("decisions")
             .and_then(serde_json::Value::as_array)
         {
-            self.decisions.extend(decisions.iter().take(50).cloned());
+            self.decisions.extend(decisions.iter().cloned());
             while self.decisions.len() > 200 {
                 self.decisions.remove(0);
             }

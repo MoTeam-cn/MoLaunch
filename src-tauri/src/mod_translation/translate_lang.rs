@@ -22,6 +22,7 @@ const FAST_MAX_ATTEMPTS: usize = 2;
 const DEEP_MAX_ATTEMPTS: usize = 3;
 
 /// 语言翻译路由：过滤待译条目 → 分批（memory 命中短路）→ 双通道 → 逐 source 写回
+#[allow(clippy::too_many_arguments)]
 pub async fn run_language_route(
     workspace: &Path,
     inspection: &JarInspection,
@@ -121,6 +122,7 @@ pub async fn run_language_route(
 }
 
 /// 翻译一批条目：memory 命中直取；未命中走 fast（≤2 轮）/ deep（≤3 轮）双通道
+#[allow(clippy::too_many_arguments)]
 async fn translate_batch(
     inspection: &JarInspection,
     source: &LanguageSource,
@@ -164,7 +166,7 @@ async fn translate_batch(
             if cancel.load(Ordering::Relaxed) {
                 return Err("任务已取消".to_string());
             }
-            let retry = (round > 1).then(|| RetryInfo {
+            let retry = (round > 1).then_some(RetryInfo {
                 attempt: round as u32,
                 total: max_rounds as u32,
             });

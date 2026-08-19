@@ -1,7 +1,6 @@
 //! DownloadManager 主实现：批量下载编排（限速 / URL 重排 / 进度跟踪）
 
 use crate::log_debug;
-use std::path::Path;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::sync::Mutex as StdMutex;
@@ -14,7 +13,9 @@ use super::super::super::sources::DownloadSourceMode;
 use super::super::config::DownloadManagerConfig;
 use super::super::downloader;
 use super::super::rate_limiter::RateLimiter;
-use super::super::types::{DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress};
+use super::super::types::{
+    ContentValidator, DownloadProgress, DownloadStatus, DownloadTask, GlobalProgress,
+};
 use super::state::ProgressTracker;
 use crate::state::AppState;
 
@@ -40,7 +41,7 @@ pub struct DownloadManager {
     /// 保持调用方传入的 URL 顺序（跳过 reorder_urls，供镜像优先+官方保底等场景）
     preserve_order: bool,
     /// 内容校验器（可选）：大小校验通过后执行，失败视为该下载源无效（删除文件回退下一 URL）
-    content_validator: Option<Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>>,
+    content_validator: Option<ContentValidator>,
     /// 共享批次计数（来自 AppState，协调并发批次的面板显隐）
     active_batches: Option<Arc<std::sync::atomic::AtomicUsize>>,
 }
@@ -131,10 +132,7 @@ impl DownloadManager {
     ///
     /// 供"镜像优先 + 官方保底"等场景使用：镜像返回 HTML/挑战页等非目标内容
     /// （HTTP 200 且长度匹配，大小校验无法识别）时自动剔除该源，回退官方保底。
-    pub fn with_content_validator(
-        mut self,
-        validator: Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>,
-    ) -> Self {
+    pub fn with_content_validator(mut self, validator: ContentValidator) -> Self {
         self.content_validator = Some(validator);
         self
     }

@@ -240,6 +240,7 @@ fn parse_and_validate_decisions<'a>(
     let expected: HashSet<&str> = candidates.iter().map(|c| c.id.as_str()).collect();
     let by_id: HashMap<_, _> = candidates.iter().map(|c| (c.id.as_str(), *c)).collect();
     let mut seen: HashSet<&str> = HashSet::new();
+    let mut covered: HashSet<&str> = HashSet::new();
     let mut result = Vec::new();
     for item in items {
         let raw_id = str_at(item, "id");
@@ -269,6 +270,7 @@ fn parse_and_validate_decisions<'a>(
                     translation: None,
                     reason: Some(reason.to_string()),
                 });
+                covered.insert(id);
             }
             "translate" => {
                 let raw = str_at(item, "translation");
@@ -289,6 +291,7 @@ fn parse_and_validate_decisions<'a>(
                     translation: Some(translation),
                     reason: Some(reason.to_string()),
                 });
+                covered.insert(id);
             }
             other => {
                 log_warn!("[ModTranslation] 丢弃未知动作的 class 候选 {id}：{other}");
@@ -299,7 +302,7 @@ fn parse_and_validate_decisions<'a>(
     let uncovered: Vec<&ClassCandidate> = candidates
         .iter()
         .copied()
-        .filter(|c| !seen.contains(c.id.as_str()))
+        .filter(|c| !covered.contains(c.id.as_str()))
         .collect();
     Ok((result, uncovered))
 }

@@ -26,6 +26,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   type: 'info',
   message: '',
+  link: undefined,
 })
 
 const typeConfig = {

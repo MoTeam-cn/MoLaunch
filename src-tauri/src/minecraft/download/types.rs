@@ -1,6 +1,12 @@
 //! Download types
 
+use std::path::Path;
+use std::sync::Arc;
+
 use serde::{Deserialize, Serialize};
+
+/// 内容校验器：大小校验通过后执行，失败视为该下载源无效（删除文件回退下一 URL）
+pub type ContentValidator = Arc<dyn Fn(&Path) -> Result<(), String> + Send + Sync>;
 
 /// 下载任务
 #[derive(Debug, Clone, Serialize, Deserialize)]

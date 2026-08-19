@@ -51,24 +51,21 @@ fn apply_flat_translations(
     prefix: &str,
     translations: &BTreeMap<String, String>,
 ) {
-    match value {
-        Value::Object(obj) => {
-            for (key, v) in obj.iter_mut() {
-                let path = if prefix.is_empty() {
-                    key.clone()
-                } else {
-                    format!("{prefix}.{key}")
-                };
-                if let Some(t) = translations.get(&path) {
-                    if let Value::String(s) = v {
-                        *s = t.clone();
-                        continue;
-                    }
+    if let Value::Object(obj) = value {
+        for (key, v) in obj.iter_mut() {
+            let path = if prefix.is_empty() {
+                key.clone()
+            } else {
+                format!("{prefix}.{key}")
+            };
+            if let Some(t) = translations.get(&path) {
+                if let Value::String(s) = v {
+                    *s = t.clone();
+                    continue;
                 }
-                apply_flat_translations(v, &path, translations);
             }
+            apply_flat_translations(v, &path, translations);
         }
-        _ => {}
     }
 }
 
@@ -127,7 +124,7 @@ pub fn write_keyvalue(
             } else {
                 (line.trim(), None, 0)
             };
-            if eq_pos.is_some() {
+            if let Some(eq_pos) = eq_pos {
                 if let Some(t) = translations.get(key) {
                     // 保留原分隔符与缩进：重建为 "key=value"
                     let indent = line.len() - line.trim_start().len();
@@ -136,7 +133,7 @@ pub fn write_keyvalue(
                     } else {
                         String::new()
                     };
-                    let sep = line[eq_pos.unwrap()..eq_pos.unwrap() + sep_len].to_string();
+                    let sep = line[eq_pos..eq_pos + sep_len].to_string();
                     out.push_str(&format!("{prefix}{key}{sep}{t}"));
                     true
                 } else {

@@ -206,11 +206,11 @@ pub(super) async fn install_version(
     let last_pct = std::sync::atomic::AtomicU8::new(5);
     let app2 = app.clone();
     let progress_cb: Arc<dyn Fn(GlobalProgress) + Send + Sync> = Arc::new(move |p| {
-        let pct = if p.total_bytes > 0 {
-            5 + (p.downloaded_bytes.saturating_mul(75) / p.total_bytes) as u8
-        } else {
-            5
-        };
+        let pct = p
+            .downloaded_bytes
+            .saturating_mul(75)
+            .checked_div(p.total_bytes)
+            .map_or(5, |v| 5 + v as u8);
         if pct > last_pct.load(Ordering::Relaxed) {
             last_pct.store(pct, Ordering::Relaxed);
             emit_progress(&app2, "download", pct, &format!("下载中 {pct}%"));
@@ -264,9 +264,14 @@ pub(super) async fn install_version(
     // 白名单解压：只保留 core/cli 二进制；Windows 另需 WinDivert64.sys 驱动 +
     // wintun.dll / Packet.dll 两个依赖 DLL（easytier-core 流量转发必需），
     // 其余文件（Web UI 独立版/内嵌版、文档等）全部跳过，避免占用安装目录空间
-    let mut keep_files: Vec<&str> = vec![core_name(), cli_name()];
     #[cfg(windows)]
-    keep_files.extend(["WinDivert64.sys", "wintun.dll", "Packet.dll"]);
+    let keep_files: Vec<&str> = {
+        let mut files = vec![core_name(), cli_name()];
+        files.extend(["WinDivert64.sys", "wintun.dll", "Packet.dll"]);
+        files
+    };
+    #[cfg(not(windows))]
+    let keep_files: Vec<&str> = vec![core_name(), cli_name()];
     extract_zip_safely(&zip_path, &extract_dir, &keep_files)?;
     let _ = std::fs::remove_file(&zip_path);
 

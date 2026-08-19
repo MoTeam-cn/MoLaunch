@@ -27,7 +27,7 @@ pub(super) async fn request_actions(
             return Err("任务已取消".to_string());
         }
         let retry = (attempt > 0).then(|| RetryInfo {
-            attempt: attempt as u32 + 1,
+            attempt: attempt + 1,
             total: MAX_ACTIONS_ATTEMPTS,
         });
         if attempt > 0 {
@@ -205,6 +205,7 @@ pub(crate) fn validate_response(
     // 未覆盖的 issue 自动保留原文
     for issue in issues {
         if !seen.contains(issue.id.as_str()) {
+            dropped = true;
             result.push(RepairAction {
                 action: "keep-source".to_string(),
                 issue_id: issue.id.clone(),

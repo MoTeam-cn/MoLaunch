@@ -210,7 +210,7 @@ async fn rebuild_host_easytier(
         .await
         .clone()
         .ok_or_else(|| "房主网络凭据缺失".to_string())?;
-    let core_path = resolve_core_path(&state, app, &configured_core_path(state).await).await?;
+    let core_path = resolve_core_path(state, app, &configured_core_path(state).await).await?;
     let cli_path = resolve_cli_path(&core_path);
     let mut extra = configured_easytier_peers(state).await;
     extra.extend(host_whitelist_args(center_port, mc_port));

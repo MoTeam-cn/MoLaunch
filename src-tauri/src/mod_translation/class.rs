@@ -29,8 +29,11 @@ pub fn class_string_constants(bytes: &[u8]) -> Vec<String> {
         .collect()
 }
 
-/// 解析常量池：返回 (Utf8 条目(索引,文本,start,end), String 引用的 Utf8 索引)
-fn parse_pool(bytes: &[u8]) -> Result<(Vec<(u16, String, usize, usize)>, HashSet<u16>), String> {
+/// 常量池解析结果：Utf8 条目(索引,文本,start,end) + String 引用的 Utf8 索引
+type PoolEntries = (Vec<(u16, String, usize, usize)>, HashSet<u16>);
+
+/// 解析常量池
+fn parse_pool(bytes: &[u8]) -> Result<PoolEntries, String> {
     if bytes.len() < 10 || bytes[0..4] != [0xca, 0xfe, 0xba, 0xbe] {
         return Err("not a valid Java class file".to_string());
     }

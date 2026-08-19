@@ -68,7 +68,7 @@ fn deterministic_exclusions_are_recorded_without_model_calls() {
 
 #[test]
 fn class_decisions_validation_rejects_invalid_json() {
-    let candidates = vec![candidate("c1", "demo/A.class", "Iron Ingot")];
+    let candidates = [candidate("c1", "demo/A.class", "Iron Ingot")];
     let refs: Vec<&ClassCandidate> = candidates.iter().collect();
     // 缺少 decisions 数组 → 拒绝
     assert!(parse_and_validate_decisions(r#"{"foo":1}"#, &refs).is_err());
@@ -78,22 +78,19 @@ fn class_decisions_validation_rejects_invalid_json() {
 
 #[test]
 fn class_decisions_validation_drops_invalid_and_reports_uncovered() {
-    let candidates = vec![
+    let candidates = [
         candidate("c1", "demo/A.class", "Iron Ingot"),
         candidate("c2", "demo/B.class", "Hello"),
     ];
     let refs: Vec<&ClassCandidate> = candidates.iter().collect();
     // translate 缺中文译文 → 丢弃该 decision，返回未覆盖
-    let bad = format!(
-        r#"{{"decisions":[{{"id":"c1","action":"translate","translation":"Iron Ingot","reason":"visible"}}]}}"#
-    );
-    let (decisions, uncovered) = parse_and_validate_decisions(&bad, &refs).unwrap();
+    let bad = r#"{"decisions":[{"id":"c1","action":"translate","translation":"Iron Ingot","reason":"visible"}]}"#;
+    let (decisions, uncovered) = parse_and_validate_decisions(bad, &refs).unwrap();
     assert!(decisions.is_empty());
     assert_eq!(uncovered.len(), 2);
     // 只覆盖 c1 → 宽容返回未覆盖 c2
-    let partial =
-        format!(r#"{{"decisions":[{{"id":"c1","action":"exclude","reason":"internal"}}]}}"#);
-    let (decisions, uncovered) = parse_and_validate_decisions(&partial, &refs).unwrap();
+    let partial = r#"{"decisions":[{"id":"c1","action":"exclude","reason":"internal"}]}"#;
+    let (decisions, uncovered) = parse_and_validate_decisions(partial, &refs).unwrap();
     assert_eq!(decisions.len(), 1);
     assert_eq!(decisions[0].id, "c1");
     assert_eq!(uncovered.len(), 1);
@@ -113,7 +110,7 @@ fn class_decisions_validation_drops_invalid_and_reports_uncovered() {
 
 #[test]
 fn class_decisions_validation_accepts_valid_translate() {
-    let candidates = vec![candidate("c1", "demo/A.class", "Spawn %d zombies")];
+    let candidates = [candidate("c1", "demo/A.class", "Spawn %d zombies")];
     let refs: Vec<&ClassCandidate> = candidates.iter().collect();
     let ok = r#"{"decisions":[{"id":"c1","action":"translate","translation":"生成 %d 只僵尸","reason":"visible"}]}"#;
     let (decisions, uncovered) = parse_and_validate_decisions(ok, &refs).unwrap();
@@ -129,7 +126,7 @@ fn class_decisions_validation_accepts_valid_translate() {
 
 #[test]
 fn class_decisions_validation_tolerates_edited_id() {
-    let candidates = vec![
+    let candidates = [
         candidate("037980176fd0aea1aebd7ab2", "demo/A.class", "Iron Ingot"),
         candidate("12b1fb25cf755a9ce87c22a4", "demo/B.class", "Hello"),
     ];
