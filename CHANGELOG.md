@@ -6,7 +6,7 @@
 
 ### Changed
 
-- **设置页镜像源表单列宽调整**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：镜像源编辑行 grid 列宽由「名称 7rem / 类型 7rem / 镜像地址自适应」调整为「名称自适应加宽 / 类型 7rem / 镜像地址 16rem 收窄」，名称 input 更宽、镜像地址 input 更短，表头同步对齐。
+- **GitHub 镜像源持久化到 config.ini**（[save.rs](src-tauri/src/config/save.rs) / [load.rs](src-tauri/src/config/load.rs)）：`github_proxies` 此前只存内存（`state.github_proxies` / `AppConfig.online.github_proxies`），`save_config`/`load_config` 均不读写，重启后用户保存的镜像源全部丢失。现在 `save_config` 将 `github_proxies` 以 JSON 序列化写入 `[Online] github_proxies`，`load_config` 启动时反序列化回填（空列表忽略，保持默认），`set_github_proxies` 经 `update_config` 落盘生效。
 
 - **镜像源测速移回前端，`no-cors` 模式消除 CORS 报错刷屏**（[githubProxy.ts](src/utils/githubProxy.ts) / [easytier.ts](src/utils/api/online-manager/easytier.ts) / [core.ts](src/utils/api/online-manager/core.ts) / [easytier.ts](src/types/online/easytier.ts) / [github_download.rs](src-tauri/src/utils/github_download.rs) / [easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs)）：① **测速放回前端**：恢复浏览器 fetch 探测（HEAD + Range 0-1），并从全部源中**随机抽取 30 个**测速、按耗时取**最快前 10 个**作为默认源（后端下载时再竞速选择，避免全量并发测速对代理不友好）；② **`mode: 'no-cors'` 消除 CORS 报错**：跨域镜像经 no-cors 发出，跳过 CORS 校验，控制台不再输出 `Access to fetch at ... has been blocked by CORS` 刷屏；响应为 opaque（不可读）仅用于确认服务器可达并测耗时，源的真实可用性由后端下载竞速（retry 顺序尝试 + 官方保底）兜底；③ **no-cors 限制**：redirect 强制为 `follow`（设 `error` 会直接抛 TypeError 导致请求全部失败），跳转耗时计入排序、慢源自然淘汰，后端下载竞速 `pick_fastest` 仍禁止重定向兜底；④ **移除后端测速链路**：删除 `github_download::probe_proxies`/`ProxyProbeResult` 与 `github_probe` IPC、前端 `probeGithubProxies`/`GITHUB_PROBE`/`ProxyProbeResult` 类型，后端仅保留下载竞速 `pick_fastest`。
 

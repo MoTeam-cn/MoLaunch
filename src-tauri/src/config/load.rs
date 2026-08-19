@@ -176,6 +176,20 @@ pub fn load_config() -> Result<Option<AppConfig>, String> {
         }
     }
 
+    // Online.github_proxies（GitHub 镜像源，JSON 序列化存储）
+    if let Some(list_json) = config.get("Online", "github_proxies") {
+        match serde_json::from_str::<Vec<crate::utils::github_download::GithubProxy>>(&list_json) {
+            Ok(proxies) => {
+                if !proxies.is_empty() {
+                    app_config.online.github_proxies = proxies;
+                }
+            }
+            Err(e) => {
+                log_warn!("Failed to parse github_proxies list: {}", e);
+            }
+        }
+    }
+
     // TLS（信任源模式，未配置时保留默认 builtin）
     app_config.tls.trust_mode = config.get_or("TLS", "trust_mode", &app_config.tls.trust_mode);
 

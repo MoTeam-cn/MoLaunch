@@ -178,6 +178,12 @@ pub fn save_config(config: &AppConfig) -> Result<(), String> {
 
     // Online
     ini.set("Online", "api_server_url", &config.online.api_server_url);
+    // GitHub 镜像源（JSON 序列化存储，重启不丢失）
+    ini.set(
+        "Online",
+        "github_proxies",
+        &serde_json::to_string(&config.online.github_proxies).unwrap_or_else(|_| "[]".to_string()),
+    );
 
     // TLS（信任源模式持久化，IgnoreTls 走注册表不在此处）
     ini.set("TLS", "trust_mode", &config.tls.trust_mode);
