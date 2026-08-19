@@ -5,6 +5,7 @@
 
 use once_cell::sync::Lazy;
 use serde::Deserialize;
+use std::time::Duration;
 
 use crate::handler;
 use crate::log_info;
@@ -73,12 +74,10 @@ fn register(d: &mut Dispatcher) {
     d.register(
         "redstone_get_servers",
         handler!(_state, _app, _params, {
-            let client = crate::http::build_client_with_redirect(
-                reqwest::redirect::Policy::default(),
-                Some(10_000),
-            );
-            let resp = client
+            // 复用全局主 client（重定向策略一致），单请求 10s 超时
+            let resp = crate::http::get_client()
                 .get("https://hongshi.site/newserver.json")
+                .timeout(Duration::from_secs(10))
                 .send()
                 .await
                 .map_err(|e| format!("获取红石服务器列表失败: {e}"))?;

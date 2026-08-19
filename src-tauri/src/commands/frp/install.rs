@@ -10,6 +10,7 @@ use super::provider::{frpc_platform_skip, write_provider_frpc_version};
 use super::{ensure_dir, providers_root, validate_provider_id, ProviderInfo, ProviderManifest};
 use crate::log_info;
 use std::path::Path;
+use std::time::Duration;
 
 pub use files::install_provider_from_dir;
 pub use uninstall::uninstall_provider;
@@ -27,12 +28,10 @@ pub async fn install_provider_from_url(url: String) -> Result<ProviderInfo, Stri
 
     log_info!("[Frp] 开始从 URL 下载厂商包: {}", url);
 
-    let client = crate::http::build_client_with_redirect(
-        reqwest::redirect::Policy::limited(5),
-        Some(60_000),
-    );
-    let response = client
+    // 复用全局主 client（用户主动提供的 HTTPS URL，默认重定向策略即可），单请求 60s 超时
+    let response = crate::http::get_client()
         .get(&url)
+        .timeout(Duration::from_secs(60))
         .send()
         .await
         .map_err(|e| format!("下载失败: {}", crate::http::request_error_msg(&e)))?;
