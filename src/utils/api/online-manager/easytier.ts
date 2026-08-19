@@ -48,6 +48,11 @@ export function updateEasyTier(): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.EASYTIER_UPDATE)
 }
 
+/** 取消 easytier 内核安装/更新（设置后端取消标志，下载链实时中断） */
+export function cancelEasyTierInstall(): Promise<{ success: boolean }> {
+  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.EASYTIER_CANCEL)
+}
+
 /** 把前端筛选的 GitHub 镜像源传给后端（下载竞速选源用） */
 export function setGithubProxies(proxies: GithubProxy[]): Promise<{ success: boolean }> {
   return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.SET_GITHUB_PROXIES, proxies)

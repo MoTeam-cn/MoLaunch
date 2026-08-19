@@ -12,6 +12,7 @@ import {
   getEasyTierInstallStatus,
   installEasyTier,
   updateEasyTier,
+  cancelEasyTierInstall,
   setGithubProxies,
 } from '@/utils/api/online-manager/easytier'
 import { getConfigMap, refreshConfig } from '@/utils/tauri'
@@ -133,10 +134,24 @@ async function handleInstall() {
       toastSuccess('easytier 内核安装完成')
     }
   } catch (e) {
-    toastError(`操作失败: ${e}`)
+    // 用户主动取消时后端返回「下载已取消」，不再提示错误（error 事件已清理进度）
+    if (String(e).includes('取消')) {
+      toastSuccess('已取消下载')
+    } else {
+      toastError(`操作失败: ${e}`)
+    }
   } finally {
     installBusy.value = false
     await refreshInstallStatus()
+  }
+}
+
+/** 取消内核安装/更新（下载/解压阶段可点） */
+async function handleCancelInstall() {
+  try {
+    await cancelEasyTierInstall()
+  } catch (e) {
+    toastError(`取消失败: ${e}`)
   }
 }
 
@@ -276,6 +291,10 @@ onMounted(() => {
             <Tag :color="tagColor" size="small">{{ tagText }}</Tag>
           </div>
           <div class="mt-3 flex items-center justify-end gap-4">
+            <!-- 下载/解压期间显示取消按钮（主按钮保持 loading 不可点） -->
+            <Button v-if="showProgress" type="outline" size="small" @click="handleCancelInstall">
+              取消
+            </Button>
             <Button
               :type="installStatus?.installed && !hasUpdate ? 'outline' : 'primary'"
               size="small"
