@@ -12,11 +12,11 @@ use std::time::Duration;
 use crate::log_info;
 use crate::minecraft::download::types::{DownloadStatus, DownloadTask, GlobalProgress};
 use crate::state::AppState;
-use crate::utils::github_download::{build_proxy_url, pick_fastest};
+use crate::utils::github_download::build_proxy_url;
+use crate::utils::probe::pick_fastest;
 
 use super::easytier_install::{
-    asset_name, cli_name, core_name, emit_progress, fetch_latest_release, install_dir,
-    EASYTIER_REPO, VERSION_FILE,
+    asset_name, cli_name, core_name, emit_progress, install_dir, EASYTIER_REPO, VERSION_FILE,
 };
 
 /// 解压 zip 到目标目录（剥离共享顶层目录 + Zip Slip 防护 + 白名单过滤）
@@ -307,6 +307,10 @@ pub(super) async fn install_version(
 
 /// 下载安装最新版（`easytier_install` / `easytier_update` 共用）
 pub(super) async fn install_latest(state: &AppState, app: &tauri::AppHandle) -> Result<(), String> {
-    let version = fetch_latest_release().await?;
+    let version = crate::utils::github_download::fetch_latest_release(
+        &crate::http::get_client(),
+        EASYTIER_REPO,
+    )
+    .await?;
     install_version(state, app, &version).await
 }

@@ -3,23 +3,17 @@
 
 use std::path::PathBuf;
 use std::sync::atomic::Ordering;
-use std::time::Duration;
 
 use serde::Serialize;
 use tauri::Emitter;
 
 use crate::handler;
-use crate::log_warn;
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 use crate::utils::github_download::{probe_fastest_proxies, GithubProxy};
 
 /// easytier GitHub 仓库
 pub(super) const EASYTIER_REPO: &str = "EasyTier/EasyTier";
-/// GitHub API 主源
-const GITHUB_API_PRIMARY: &str = "https://api.github.com";
-/// GitHub API 备选源（仅 API 功能）
-const GITHUB_API_FALLBACK: &str = "https://github-api.mocdn.net";
 /// 安装进度事件名
 const EASYTIER_INSTALL_PROGRESS_EVENT: &str = "easytier-install-progress";
 /// 版本标记文件名
@@ -61,39 +55,6 @@ pub(super) fn cli_name() -> &'static str {
     } else {
         "easytier-cli"
     }
-}
-
-/// 查询最新版本号（主源失败回退备选；失败返回错误由前端提示）
-pub async fn fetch_latest_release() -> Result<String, String> {
-    let client = crate::http::get_client();
-    let primary = format!("{GITHUB_API_PRIMARY}/repos/{EASYTIER_REPO}/releases/latest");
-    match fetch_tag_name(&client, &primary).await {
-        Ok(tag) => Ok(tag),
-        Err(e) => {
-            log_warn!("[EasyTier] GitHub API 主源失败: {e}，回退备选源");
-            let fallback = format!("{GITHUB_API_FALLBACK}/repos/{EASYTIER_REPO}/releases/latest");
-            fetch_tag_name(&client, &fallback).await
-        }
-    }
-}
-
-/// 请求 release API 解析 tag_name（去 v 前缀，单请求 30s 超时）
-async fn fetch_tag_name(client: &reqwest::Client, url: &str) -> Result<String, String> {
-    let resp = client
-        .get(url)
-        .timeout(Duration::from_secs(30))
-        .send()
-        .await
-        .map_err(|e| format!("请求失败: {e}"))?;
-    if !resp.status().is_success() {
-        return Err(format!("HTTP {}", resp.status()));
-    }
-    let value: serde_json::Value = resp.json().await.map_err(|e| format!("解析失败: {e}"))?;
-    let tag = value
-        .get("tag_name")
-        .and_then(|v| v.as_str())
-        .ok_or_else(|| "响应缺少 tag_name".to_string())?;
-    Ok(tag.trim_start_matches('v').to_string())
 }
 
 /// 当前平台 release 资产名（`easytier-{os}-{arch}-v{version}.zip`）
@@ -180,7 +141,12 @@ pub fn register(d: &mut Dispatcher) {
             let (installed, version) = (is_installed(), installed_version().unwrap_or_default());
             // 已安装时查询最新版本（提示更新）；未安装无需查询
             let latest_version = if installed {
-                fetch_latest_release().await.unwrap_or_default()
+                crate::utils::github_download::fetch_latest_release(
+                    &crate::http::get_client(),
+                    EASYTIER_REPO,
+                )
+                .await
+                .unwrap_or_default()
             } else {
                 String::new()
             };

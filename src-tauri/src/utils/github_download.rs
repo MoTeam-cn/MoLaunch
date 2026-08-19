@@ -1,11 +1,12 @@
-//! GitHub 下载公共组件：release 资产下载（镜像优先 + 官方保底）
-//! 供 easytier 内核等外部二进制按需下载复用。
+//! GitHub 下载公共组件：release 版本查询 + 资产下载（镜像优先 + 官方保底）
+//! 供 easytier 内核、frpc 等外部二进制按需下载复用（repo 参数化）。
 
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
+
+use crate::utils::probe::{pick_fastest, probe_urls};
 
 /// GitHub 镜像源（type: path 追加路径 / type: full 追加完整 URL）
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,6 +21,10 @@ pub struct GithubProxy {
 
 /// 官方下载源
 const GITHUB_DOWNLOAD_BASE: &str = "https://github.com";
+/// GitHub API 主源
+const GITHUB_API_PRIMARY: &str = "https://api.github.com";
+/// GitHub API 备选源（仅 API 功能）
+const GITHUB_API_FALLBACK: &str = "https://github-api.mocdn.net";
 
 /// 构造镜像源下载 URL（type: path 追加路径 / type: full 追加完整 GitHub URL）
 pub fn build_proxy_url(proxy: &GithubProxy, repo: &str, version: &str, asset: &str) -> String {
@@ -32,99 +37,36 @@ pub fn build_proxy_url(proxy: &GithubProxy, repo: &str, version: &str, asset: &s
     }
 }
 
-/// 并发测速 URL 列表（HEAD + Range 0-1，单请求 10s 超时，禁止重定向），
-/// 返回按耗时升序排列的可用列表；`cancel_flag` 置位时返回「下载已取消」。
-///
-/// 使用共享无重定向单例 `no_redirect_client()`：会跳转的镜像直接失败剔除
-/// （重定向引入额外跳转，慢且不稳定）。
-///
-/// 逐候选 DEBUG 日志（发送的原始 URL + 状态/错误 + 耗时）：
-/// 排查"full 模式被拼成 path"等 URL 形态问题，定位竞速为何全灭回退官方。
-pub async fn probe_urls(
-    urls: &[String],
-    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
-) -> Result<Vec<(Duration, String)>, String> {
-    let client = crate::http::no_redirect_client();
-    let mut handles = Vec::with_capacity(urls.len());
-    for url in urls {
-        let client = client.clone();
-        let url = url.clone();
-        handles.push(tokio::spawn(async move {
-            let start = std::time::Instant::now();
-            let resp = client
-                .get(&url)
-                .header("Range", "bytes=0-1")
-                .timeout(Duration::from_secs(10))
-                .send()
-                .await;
-            match resp {
-                Ok(r) if r.status().is_success() || r.status().as_u16() == 206 => {
-                    crate::log_debug!(
-                        "[GitHub] 测速可用: {}ms status={} url={}",
-                        start.elapsed().as_millis(),
-                        r.status(),
-                        url
-                    );
-                    Some((start.elapsed(), url))
-                }
-                Ok(r) => {
-                    crate::log_debug!(
-                        "[GitHub] 测速被拒: {}ms status={} url={}",
-                        start.elapsed().as_millis(),
-                        r.status(),
-                        url
-                    );
-                    None
-                }
-                Err(e) => {
-                    crate::log_debug!(
-                        "[GitHub] 测速失败: {}ms err={} url={}",
-                        start.elapsed().as_millis(),
-                        crate::http::request_error_msg(&e),
-                        url
-                    );
-                    None
-                }
-            }
-        }));
-    }
-    let mut results = Vec::new();
-    for mut h in handles {
-        // 每 200ms 轮询取消信号，同时等待测速完成（&mut 借用避免 select 丢弃已完成结果）
-        loop {
-            if let Some(ref flag) = cancel_flag {
-                if flag.load(std::sync::atomic::Ordering::Relaxed) {
-                    return Err("下载已取消".to_string());
-                }
-            }
-            match tokio::time::timeout(Duration::from_millis(200), &mut h).await {
-                Ok(r) => {
-                    if let Ok(Some((elapsed, url))) = r {
-                        results.push((elapsed, url));
-                    }
-                    break;
-                }
-                Err(_) => continue,
-            }
+/// 查询指定仓库最新版本号（主源失败回退备选；失败返回错误由前端提示）
+pub async fn fetch_latest_release(client: &reqwest::Client, repo: &str) -> Result<String, String> {
+    let primary = format!("{GITHUB_API_PRIMARY}/repos/{repo}/releases/latest");
+    match fetch_tag_name(client, &primary).await {
+        Ok(tag) => Ok(tag),
+        Err(e) => {
+            crate::log_warn!("[GitHub] API 主源失败: {e}，回退备选源");
+            let fallback = format!("{GITHUB_API_FALLBACK}/repos/{repo}/releases/latest");
+            fetch_tag_name(client, &fallback).await
         }
     }
-    results.sort_by_key(|(t, _)| *t);
-    Ok(results)
 }
 
-/// 镜像竞速：并发测速取响应最快者（`probe_urls` 的取首封装）
-pub async fn pick_fastest(
-    candidates: &[String],
-    cancel_flag: Option<Arc<std::sync::atomic::AtomicBool>>,
-) -> Result<String, String> {
-    let results = probe_urls(candidates, cancel_flag).await?;
-    match results.into_iter().next() {
-        Some((_, url)) => {
-            crate::log_debug!("[GitHub] 竞速胜者: {url}");
-            Ok(url)
-        }
-        None => Err("所有镜像源均不可用".to_string()),
+/// 请求 release API 解析 tag_name（去 v 前缀，单请求 30s 超时）
+async fn fetch_tag_name(client: &reqwest::Client, url: &str) -> Result<String, String> {
+    let resp = client
+        .get(url)
+        .timeout(Duration::from_secs(30))
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("HTTP {}", resp.status()));
     }
+    let value: serde_json::Value = resp.json().await.map_err(|e| format!("解析失败: {e}"))?;
+    let tag = value
+        .get("tag_name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "响应缺少 tag_name".to_string())?;
+    Ok(tag.trim_start_matches('v').to_string())
 }
 
 /// 镜像源测速筛选：随机抽 `sample` 个，并发测速（禁止重定向），
