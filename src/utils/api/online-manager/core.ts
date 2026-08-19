@@ -106,7 +106,6 @@ export const ONLINE_ACTIONS = {
   EASYTIER_INSTALL: 'easytier_install',
   EASYTIER_UPDATE: 'easytier_update',
   SET_GITHUB_PROXIES: 'set_github_proxies',
-  GITHUB_PROBE: 'github_probe',
   SCAFFOLDING_HOST_START: 'scaffolding_host_start',
   SCAFFOLDING_HOST_STOP: 'scaffolding_host_stop',
   SCAFFOLDING_HOST_SET_MC_PORT: 'scaffolding_host_set_mc_port',

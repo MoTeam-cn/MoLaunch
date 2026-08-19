@@ -12,12 +12,10 @@ use crate::handler;
 use crate::log_warn;
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
-use crate::utils::github_download::{probe_proxies, GithubProxy};
+use crate::utils::github_download::GithubProxy;
 
 /// easytier GitHub 仓库
 pub(super) const EASYTIER_REPO: &str = "EasyTier/EasyTier";
-/// 镜像源测速用固定版本（已知存在的 release，仅验证可用性与速度）
-const PROBE_VERSION: &str = "2.6.4";
 /// GitHub API 主源
 const GITHUB_API_PRIMARY: &str = "https://api.github.com";
 /// GitHub API 备选源（仅 API 功能）
@@ -209,22 +207,6 @@ pub fn register(d: &mut Dispatcher) {
             }),
         );
     }
-
-    d.register(
-        "github_probe",
-        handler!(_state, _app, params, {
-            let proxies: Vec<GithubProxy> =
-                serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
-            let results = probe_proxies(
-                &proxies,
-                EASYTIER_REPO,
-                PROBE_VERSION,
-                &asset_name(PROBE_VERSION),
-            )
-            .await;
-            serde_json::to_value(results).map_err(|e| e.to_string())
-        }),
-    );
 
     d.register(
         "set_github_proxies",

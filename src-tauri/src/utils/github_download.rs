@@ -69,62 +69,6 @@ pub async fn pick_fastest(candidates: &[String]) -> Result<String, String> {
         .ok_or_else(|| "所有镜像源均不可用".to_string())
 }
 
-/// 镜像源测速结果（按耗时升序）
-#[derive(Debug, Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ProxyProbeResult {
-    pub name: String,
-    pub proxy_type: String,
-    pub base: String,
-    /// 响应耗时（ms）
-    pub ms: u64,
-}
-
-/// 并发测速全部镜像源（GET + Range 0-1，单请求 8s 超时，禁止重定向），
-/// 返回按耗时升序排序的可用源；不可用的源剔除（静默）。
-///
-/// 与 `pick_fastest` 同源：`no_redirect_client()` 使会跳转的镜像直接失败剔除。
-/// 供前端「重新测速」经 IPC 调用（Rust reqwest 无浏览器 CORS 限制，避免控制台跨域报错刷屏）。
-pub async fn probe_proxies(
-    proxies: &[GithubProxy],
-    repo: &str,
-    version: &str,
-    asset: &str,
-) -> Vec<ProxyProbeResult> {
-    let client = crate::http::no_redirect_client();
-    let mut handles = Vec::with_capacity(proxies.len());
-    for p in proxies {
-        let client = client.clone();
-        let p = p.clone();
-        let url = build_proxy_url(&p, repo, version, asset);
-        handles.push(tokio::spawn(async move {
-            let start = std::time::Instant::now();
-            let resp = client
-                .get(&url)
-                .header("Range", "bytes=0-1")
-                .timeout(Duration::from_secs(8))
-                .send()
-                .await;
-            let ok =
-                matches!(&resp, Ok(r) if r.status().is_success() || r.status().as_u16() == 206);
-            ok.then(|| ProxyProbeResult {
-                name: p.name,
-                proxy_type: p.proxy_type,
-                base: p.base,
-                ms: start.elapsed().as_millis() as u64,
-            })
-        }));
-    }
-    let mut results: Vec<ProxyProbeResult> = Vec::new();
-    for h in handles {
-        if let Ok(Some(r)) = h.await {
-            results.push(r);
-        }
-    }
-    results.sort_by_key(|r| r.ms);
-    results
-}
-
 /// 流式下载文件（reqwest bytes_stream，单请求 120s 超时，按字节回调进度：done/total）
 pub async fn download_to(
     client: &reqwest::Client,
