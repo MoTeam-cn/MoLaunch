@@ -31,11 +31,12 @@ pub fn build_proxy_url(proxy: &GithubProxy, repo: &str, version: &str, asset: &s
     }
 }
 
-/// 镜像竞速：并发 HEAD + Range 0-1 测速（单请求 10s 超时），取响应最快者
-pub async fn pick_fastest(
-    client: &reqwest::Client,
-    candidates: &[String],
-) -> Result<String, String> {
+/// 镜像竞速：并发 HEAD + Range 0-1 测速（单请求 10s 超时，禁止重定向），取响应最快者
+///
+/// 使用共享无重定向单例 `no_redirect_client()`：会跳转的镜像直接失败剔除
+/// （重定向引入额外跳转，慢且不稳定）。
+pub async fn pick_fastest(candidates: &[String]) -> Result<String, String> {
+    let client = crate::http::no_redirect_client();
     let mut handles = Vec::with_capacity(candidates.len());
     for url in candidates {
         let client = client.clone();
@@ -119,7 +120,7 @@ pub async fn download_release_zip(
         for p in proxies {
             candidates.push(build_proxy_url(p, repo, version, asset));
         }
-        if let Ok(fastest) = pick_fastest(client, &candidates).await {
+        if let Ok(fastest) = pick_fastest(&candidates).await {
             if download_to(client, &fastest, target, on_progress)
                 .await
                 .is_ok()

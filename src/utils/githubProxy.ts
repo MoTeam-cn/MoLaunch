@@ -45,6 +45,7 @@ function buildProbeUrl(proxy: GithubProxy): string {
 /**
  * 单源测速：HEAD + Range 0-1 优先；部分镜像不支持 HEAD（405/501/403）时
  * 回退 GET + Range 0-1023（读取响应头即完成并释放连接）。
+ * `redirect: 'error'` 禁止重定向——会跳转的镜像直接剔除（重定向引入额外跳转，慢且不稳定）。
  * 返回耗时（ms），失败返回 null。
  */
 async function probeSource(proxy: GithubProxy): Promise<number | null> {
@@ -56,11 +57,13 @@ async function probeSource(proxy: GithubProxy): Promise<number | null> {
     let resp = await fetch(url, {
       method: 'HEAD',
       headers: { Range: 'bytes=0-1' },
+      redirect: 'error',
       signal: controller.signal,
     })
     if (resp.status === 405 || resp.status === 501 || resp.status === 403) {
       resp = await fetch(url, {
         headers: { Range: 'bytes=0-1023' },
+        redirect: 'error',
         signal: controller.signal,
       })
       if (resp.ok || resp.status === 206) await resp.body?.cancel()

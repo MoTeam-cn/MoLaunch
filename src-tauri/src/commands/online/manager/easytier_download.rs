@@ -127,7 +127,7 @@ pub(super) async fn install_version(
             .iter()
             .map(|p| build_proxy_url(p, EASYTIER_REPO, version, &asset))
             .collect();
-        if let Ok(fastest) = pick_fastest(&client, &candidates).await {
+        if let Ok(fastest) = pick_fastest(&candidates).await {
             urls.push(fastest);
         }
     }

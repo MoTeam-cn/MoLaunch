@@ -146,11 +146,6 @@
             "base": "https://gh.con.sh/"
         },
         {
-            "name": "gh.b52m.cn",
-            "type": "full",
-            "base": "https://gh.b52m.cn/"
-        },
-        {
             "name": "github.dpik.top",
             "type": "full",
             "base": "https://github.dpik.top/"
@@ -279,11 +274,6 @@
             "name": "github.chenc.dev",
             "type": "full",
             "base": "https://github.chenc.dev/"
-        },
-        {
-            "name": "ghfile.geekertao.top",
-            "type": "full",
-            "base": "https://ghfile.geekertao.top/"
         },
         {
             "name": "kenyu.ggff.net",
