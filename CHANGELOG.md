@@ -6,7 +6,7 @@
 
 ### Changed
 
-- **修复 GitHub 镜像源删除按钮被 grid auto 轨道拉伸变宽**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：镜像源编辑行 grid 第 4 列为 `auto` 轨道，`justify-content` 默认 stretch 会把 `auto` 轨道拉伸填满容器剩余空间，删除按钮作为 grid item 又默认 `justify-self: stretch` 被撑到整列宽（窗口越宽按钮越宽）。给删除按钮加 `justify-self-end`，取消拉伸、只占内容宽度并右对齐。
+- **修复 GitHub 镜像源编辑行布局：删除按钮不再占一半宽、中间不留白**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：镜像源编辑行 grid 第 4 列原为 `auto` 轨道，`justify-content` 默认 stretch 会把 `auto` 轨道拉伸填满容器剩余空间，删除按钮作为 grid item 又默认 `justify-self: stretch` 被撑到整列宽（窗口越宽按钮越宽）、中间留大片空白。第 4 列改为 `min-content`（表头 + 数据行同步），轨道收缩为按钮内容宽度，整行紧凑无留白。
 
 - **镜像源编辑行列宽微调 + `github_proxies` 默认配置写入 defaults**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [config.ini](src-tauri/resources/defaults/config.ini)）：① **列宽**：名称列 5rem→6rem（名称不再过短）、镜像地址列 16rem→12rem（整行收窄，删除按钮不再被推远）；② **默认配置**：`[Online] github_proxies=[]` 写入 `resources/defaults/config.ini`，启动时 `sync_config` 自动补全缺失键到用户 config.ini（无需后端代码硬编码默认值），`load_config` 解析逻辑保持不变。
 
