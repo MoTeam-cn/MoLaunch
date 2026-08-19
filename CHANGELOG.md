@@ -6,7 +6,7 @@
 
 ### Changed
 
-- **修复 GitHub 镜像源编辑行布局：镜像地址自适应填满、删除按钮不再拉伸**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：编辑行 grid 原为 `6rem 7rem 12rem auto` 固定列宽，`auto` 轨道被 `justify-content` stretch（默认）拉伸填满剩余空间，删除按钮作为 grid item 被撑到整列宽、镜像地址 input 固定 12rem 不占满页面。改为 `8rem 7rem minmax(0,1fr) auto`：名称列加宽至 8rem，镜像地址列吸收剩余宽度自适应填满（长地址不被截断），第 4 列 auto 仅占删除按钮内容宽、紧跟其后，无中间留白。
+- **修复 GitHub 镜像源编辑行布局：镜像地址自适应填满、删除按钮不再拉伸**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：编辑行 grid 原为 `6rem 7rem 12rem auto` 固定列宽，`auto` 轨道被 `justify-content` stretch（默认）拉伸填满剩余空间，删除按钮作为 grid item 被撑到整列宽、镜像地址 input 固定 12rem 不占满页面。改为 `13rem 7rem minmax(0,1fr) auto`：名称列加宽至 13rem，镜像地址列吸收剩余宽度自适应填满（长地址不被截断），第 4 列 auto 仅占删除按钮内容宽、紧跟其后，无中间留白；表头列宽与数据行保持一致，标签与 input 对齐。
 
 - **镜像源编辑行列宽微调 + `github_proxies` 默认配置写入 defaults**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [config.ini](src-tauri/resources/defaults/config.ini)）：① **列宽**：名称列 5rem→6rem（名称不再过短）、镜像地址列 16rem→12rem（整行收窄，删除按钮不再被推远）；② **默认配置**：`[Online] github_proxies=[]` 写入 `resources/defaults/config.ini`，启动时 `sync_config` 自动补全缺失键到用户 config.ini（无需后端代码硬编码默认值），`load_config` 解析逻辑保持不变。
 
