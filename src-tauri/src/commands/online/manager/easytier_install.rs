@@ -1,8 +1,9 @@
 //! easytier 内核外部下载安装（放弃内置，按需从 GitHub 下载）
-//! 版本查询 / 下载 / 解压安装 / 状态查询；镜像竞速选源。
+//! 版本查询 / 下载 / 解压安装 / 状态查询；镜像优先 + 官方保底，走 DownloadManager 分片下载。
 
 use std::path::{Path, PathBuf};
 use std::sync::atomic::Ordering;
+use std::sync::Arc;
 use std::time::Duration;
 
 use serde::Serialize;
@@ -11,6 +12,7 @@ use tauri::Emitter;
 use crate::handler;
 use crate::log_info;
 use crate::log_warn;
+use crate::minecraft::download::types::{DownloadStatus, DownloadTask, GlobalProgress};
 use crate::state::AppState;
 use crate::utils::dispatcher::Dispatcher;
 use crate::utils::github_download::GithubProxy;
@@ -219,6 +221,19 @@ fn move_dir_contents(src: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// 探测下载源文件大小（HEAD 请求，失败返回 0 走单流兜底）
+async fn probe_zip_size(client: &reqwest::Client, url: &str) -> u64 {
+    match client
+        .head(url)
+        .timeout(Duration::from_secs(10))
+        .send()
+        .await
+    {
+        Ok(r) if r.status().is_success() => r.content_length().unwrap_or(0),
+        _ => 0,
+    }
+}
+
 /// 下载并安装指定版本（下载 → 解压 → version.txt → 执行权限）
 async fn install_version(
     state: &AppState,
@@ -237,28 +252,59 @@ async fn install_version(
 
     emit_progress(app, "download", 5, &format!("下载 easytier v{version}"));
     let proxies = state.github_proxies.lock().await.clone();
+    // 候选 URL：镜像优先（竞速选最快镜像），官方保底
+    let mut urls: Vec<String> = Vec::new();
+    if !proxies.is_empty() {
+        let candidates: Vec<String> = proxies
+            .iter()
+            .map(|p| {
+                crate::utils::github_download::build_proxy_url(p, EASYTIER_REPO, version, &asset)
+            })
+            .collect();
+        if let Ok(fastest) = crate::utils::github_download::pick_fastest(&client, &candidates).await
+        {
+            urls.push(fastest);
+        }
+    }
+    urls.push(format!(
+        "https://github.com/{EASYTIER_REPO}/releases/download/v{version}/{asset}"
+    ));
+
+    // 探测大小（分片下载需要 expected_size > 0；探测失败走单流兜底）
+    let expected_size = probe_zip_size(&client, &urls[0]).await;
+    let task = DownloadTask {
+        id: format!("easytier-{version}"),
+        urls,
+        local_path: zip_path.to_string_lossy().to_string(),
+        expected_size: expected_size as i64,
+        expected_hash: None,
+    };
+
     // 下载进度：5%→80% 按字节映射，仅在百分比变化时推送（避免逐 chunk 刷屏）
     let last_pct = std::sync::atomic::AtomicU8::new(5);
-    let on_progress = |done: u64, total: Option<u64>| {
-        let pct = match total {
-            Some(t) if t > 0 => 5 + (done.saturating_mul(75) / t) as u8,
-            _ => 5,
+    let app2 = app.clone();
+    let progress_cb: Arc<dyn Fn(GlobalProgress) + Send + Sync> = Arc::new(move |p| {
+        let pct = if p.total_bytes > 0 {
+            5 + (p.downloaded_bytes.saturating_mul(75) / p.total_bytes) as u8
+        } else {
+            5
         };
         if pct > last_pct.load(Ordering::Relaxed) {
             last_pct.store(pct, Ordering::Relaxed);
-            emit_progress(app, "download", pct, &format!("下载中 {pct}%"));
+            emit_progress(&app2, "download", pct, &format!("下载中 {pct}%"));
         }
-    };
-    crate::utils::github_download::download_release_zip(
-        &client,
-        EASYTIER_REPO,
-        version,
-        &asset,
-        &zip_path,
-        &proxies,
-        &on_progress,
-    )
-    .await?;
+    });
+    let manager = crate::minecraft::download::DownloadManager::from_state(state)
+        .await
+        .with_silent(true);
+    let results = manager.download_batch(vec![task], Some(progress_cb)).await;
+    let result = results
+        .into_iter()
+        .next()
+        .ok_or_else(|| "下载失败：无结果".to_string())?;
+    if result.status != DownloadStatus::Completed {
+        return Err(result.error.unwrap_or_else(|| "下载失败".to_string()));
+    }
 
     emit_progress(app, "extract", 80, "解压安装");
     let extract_dir =
@@ -366,7 +412,12 @@ pub fn register(d: &mut Dispatcher) {
         handler!(state, _app, params, {
             let proxies: Vec<GithubProxy> =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {e}"))?;
-            *state.github_proxies.lock().await = proxies;
+            *state.github_proxies.lock().await = proxies.clone();
+            // 持久化到配置（重启不丢失）
+            crate::commands::system::update_config(&state, |config| {
+                config.online.github_proxies = proxies;
+            })
+            .await?;
             serde_json::to_value(serde_json::json!({ "success": true })).map_err(|e| e.to_string())
         }),
     );

@@ -62,10 +62,10 @@ pub fn register(d: &mut Dispatcher) {
 
     d.register(
         "install_provider_from_url",
-        handler!(_state, _app, params, {
+        handler!(state, _app, params, {
             let p: InstallProviderFromUrlParams =
                 serde_json::from_value(params).map_err(|e| format!("参数解析失败: {}", e))?;
-            let r = frp::install::install_provider_from_url(p.url).await?;
+            let r = frp::install::install_provider_from_url(&state, p.url).await?;
             serde_json::to_value(r).map_err(|e| e.to_string())
         }),
     );

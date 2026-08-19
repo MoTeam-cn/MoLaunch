@@ -1,6 +1,7 @@
 //! 配置补丁类型：apply_config 入参，所有字段 Option<T>，仅传需要改的字段
 
 use crate::minecraft::online::signaling::IceServerEntry;
+use crate::utils::github_download::GithubProxy;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -82,6 +83,11 @@ pub struct OnlinePatch {
     /// `Some` 表示要更新此字段（含空数组，表示清空）；`None` 表示不更新。
     #[serde(rename = "onlineEasytierPublicPeers")]
     pub easytier_public_peers: Option<Vec<String>>,
+    /// 用户自定义 GitHub 镜像源（full/path 模式）
+    ///
+    /// `Some` 表示要更新此字段（含空数组，表示清空）；`None` 表示不更新。
+    #[serde(rename = "onlineGithubProxies")]
+    pub github_proxies: Option<Vec<GithubProxy>>,
 }
 
 /// 配置补丁：所有字段可选，仅传需要更新的字段

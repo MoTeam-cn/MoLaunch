@@ -9,8 +9,9 @@ mod zip;
 use super::provider::{frpc_platform_skip, write_provider_frpc_version};
 use super::{ensure_dir, providers_root, validate_provider_id, ProviderInfo, ProviderManifest};
 use crate::log_info;
+use crate::minecraft::download::types::{DownloadStatus, DownloadTask};
+use crate::state::AppState;
 use std::path::Path;
-use std::time::Duration;
 
 pub use files::install_provider_from_dir;
 pub use uninstall::uninstall_provider;
@@ -21,31 +22,39 @@ pub use zip::install_provider_from_zip;
 /// 下载 ZIP 到临时文件，复用 `install_provider_from_zip` 安装逻辑。
 /// 仅允许 HTTPS URL（用户主动提供，无域名白名单限制）。
 /// 无论安装成功或失败，临时文件都会被清理。
-pub async fn install_provider_from_url(url: String) -> Result<ProviderInfo, String> {
+pub async fn install_provider_from_url(
+    state: &AppState,
+    url: String,
+) -> Result<ProviderInfo, String> {
     if !url.starts_with("https://") {
         return Err("URL 必须使用 HTTPS".to_string());
     }
 
     log_info!("[Frp] 开始从 URL 下载厂商包: {}", url);
 
-    // 复用全局主 client（用户主动提供的 HTTPS URL，默认重定向策略即可），单请求 60s 超时
-    let response = crate::http::get_client()
-        .get(&url)
-        .timeout(Duration::from_secs(60))
-        .send()
-        .await
-        .map_err(|e| format!("下载失败: {}", crate::http::request_error_msg(&e)))?;
-    if !response.status().is_success() {
-        return Err(format!("下载失败: HTTP {}", response.status()));
-    }
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| format!("读取下载内容失败: {}", e))?;
+    // 走 DownloadManager 分片下载（silent 不弹面板），失败自动重试
     let temp_zip =
         std::env::temp_dir().join(format!("molaunch-provider-{}.zip", std::process::id()));
-    std::fs::write(&temp_zip, &bytes).map_err(|e| format!("写入临时文件失败: {}", e))?;
-    log_info!("[Frp] 厂商包下载完成，大小: {} 字节", bytes.len());
+    let _ = std::fs::remove_file(&temp_zip);
+    let task = DownloadTask {
+        id: format!("provider-{}", std::process::id()),
+        urls: vec![url],
+        local_path: temp_zip.to_string_lossy().to_string(),
+        expected_size: 0,
+        expected_hash: None,
+    };
+    let manager = crate::minecraft::download::DownloadManager::from_state(state)
+        .await
+        .with_silent(true);
+    let results = manager.download_batch(vec![task], None).await;
+    let result = results
+        .into_iter()
+        .next()
+        .ok_or_else(|| "下载失败：无结果".to_string())?;
+    if result.status != DownloadStatus::Completed {
+        return Err(result.error.unwrap_or_else(|| "下载失败".to_string()));
+    }
+    log_info!("[Frp] 厂商包下载完成，大小: {} 字节", result.downloaded);
 
     let result = install_provider_from_zip(temp_zip.to_string_lossy().to_string()).await;
     let _ = std::fs::remove_file(&temp_zip);

@@ -1,6 +1,7 @@
 //! 配置快照类型：get_config 返回的全量配置快照
 
 use crate::minecraft::online::signaling::IceServerEntry;
+use crate::utils::github_download::GithubProxy;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -76,6 +77,9 @@ pub struct OnlineSnapshot {
     /// 公共 easytier 中继节点列表（`--peers` 参数）
     #[serde(rename = "onlineEasytierPublicPeers", default)]
     pub easytier_public_peers: Vec<String>,
+    /// 用户自定义 GitHub 镜像源（full/path 模式）
+    #[serde(rename = "onlineGithubProxies", default)]
+    pub github_proxies: Vec<GithubProxy>,
 }
 
 /// TLS 配置快照（serde(flatten) 展平到 ConfigSnapshot）

@@ -69,6 +69,9 @@ pub struct OnlineConfig {
     /// 公共 easytier 中继节点列表（`--peers` 参数，格式 `tcp://host:port` / `udp://host:port`；用于公网组网穿越 NAT）
     #[serde(default)]
     pub easytier_public_peers: Vec<String>,
+    /// 用户自定义 GitHub 镜像源（easytier 内核等外部二进制下载竞速选源用，支持 full/path 模式）
+    #[serde(default)]
+    pub github_proxies: Vec<crate::utils::github_download::GithubProxy>,
 }
 
 impl Default for OnlineConfig {
@@ -79,6 +82,7 @@ impl Default for OnlineConfig {
             easytier_core_path: crate::state::config::defaults::default_easytier_core_path(),
             network_identity: String::new(),
             easytier_public_peers: Vec::new(),
+            github_proxies: Vec::new(),
         }
     }
 }

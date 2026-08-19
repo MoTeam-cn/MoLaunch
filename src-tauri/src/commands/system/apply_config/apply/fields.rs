@@ -257,6 +257,10 @@ pub(super) fn apply_online(config: &mut crate::state::AppConfig, patch: &ConfigP
         );
         config.online.easytier_public_peers = peers.clone();
     }
+    if let Some(ref proxies) = patch.online.github_proxies {
+        log_info!("[Config] online_github_proxies count = {}", proxies.len());
+        config.online.github_proxies = proxies.clone();
+    }
 }
 
 /// TLS 域：tls.trust_mode

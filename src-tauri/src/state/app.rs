@@ -128,6 +128,9 @@ impl AppState {
         // 创建 SDK Arc（需先创建以便共享给 auth_storage）
         let sdk_arc = Arc::new(TokioMutex::new(sdk));
 
+        // 启动时从配置加载用户自定义 GitHub 镜像源（前端启动时再合并默认源后 set_github_proxies）
+        let github_proxies = config.online.github_proxies.clone();
+
         Self {
             sdk: sdk_arc.clone(),
             config: Arc::new(TokioMutex::new(config)),
@@ -150,7 +153,7 @@ impl AppState {
             manual_mc_port: Arc::new(TokioMutex::new(None)),
             lan_fake_server: Arc::new(TokioMutex::new(None)),
             redstone: Arc::new(TokioMutex::new(None)),
-            github_proxies: Arc::new(TokioMutex::new(Vec::new())),
+            github_proxies: Arc::new(TokioMutex::new(github_proxies)),
             easytier_installing: Arc::new(std::sync::atomic::AtomicBool::new(false)),
             app_handle: Arc::new(std::sync::OnceLock::new()),
             panel_active_count: Arc::new(std::sync::atomic::AtomicUsize::new(0)),

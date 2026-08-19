@@ -6,6 +6,12 @@
 
 ### Changed
 
+- **easytier / frp 下载改造：镜像优先 + DownloadManager 分片下载**（[github_download.rs](src-tauri/src/utils/github_download.rs) / [easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs) / [install.rs](src-tauri/src/commands/frp/install.rs) / [provider_actions.rs](src-tauri/src/commands/frp/manager/provider_actions.rs)）：① **easytier 下载镜像优先官方保底**：`download_release_zip` 由官方优先改为并发竞速选最快镜像下载，全部失败才回退官方，解决官方源限速慢问题；② **easytier 安装走 DownloadManager 分片下载**：`install_version` 改用 `DownloadManager::download_batch`（镜像竞速胜者优先 + 官方保底 URL 列表，`expected_size` 经 HEAD 探测，进度映射 5%→80% 推送），失败自动重试候选 URL；③ **frp 厂商包走 DownloadManager**：`install_provider_from_url` 增加 `state` 参数，改用 `download_batch`（silent 不弹面板），与下载管理器统一重试/暂停逻辑。
+
+### Added
+
+- **GitHub 镜像源配置持久化 + 自定义镜像源支持**（[models.rs](src-tauri/src/state/config/models.rs) / [patch.rs](src-tauri/src/commands/system/apply_config/types/patch.rs) / [fields.rs](src-tauri/src/commands/system/apply_config/apply/fields.rs) / [snapshot.rs](src-tauri/src/commands/system/apply_config/types/snapshot.rs) / [entry.rs](src-tauri/src/commands/system/apply_config/types/entry.rs) / [app.rs](src-tauri/src/state/app.rs) / [easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs)）：`OnlineConfig` / `OnlinePatch`（`onlineGithubProxies`）/ `OnlineSnapshot` 新增 `github_proxies` 字段，`apply_online` 支持更新；`AppState::new()` 启动时从配置加载用户自定义镜像源；`set_github_proxies` 写入运行时缓存的同时经 `update_config` 持久化到配置，重启不丢失。
+
 - **修复 githubProxy.json 加载 500：改经 `?url` + fetch 加载**（[githubProxy.ts](src/utils/githubProxy.ts)）：项目 `assetsInclude: ['**/*.json']` 将 JSON 视为静态资源，直接 `import` JSON 会先被 asset 插件转为 URL 模块、再被 vite:json 插件 `JSON.parse` 失败返回 500（报错 `Failed to parse JSON file`）；改为 `?url` 导入 + `fetch` 加载，与 previewResources / recipe-generator 既有约定一致。
 
 - **发布工作流 Linux 依赖安装提速：APT 包缓存**（[release.yml](.github/workflows/release.yml)）：`Install dependencies (ubuntu only)` 原每次运行执行 `apt-get update` + 下载安装 libwebkit2gtk-4.1-dev 等大包（数百 MB），无缓存导致该步骤可卡 10 分钟；改用 `awalsh128/cache-apt-pkgs-action` 缓存 .deb 包，命中时跳过 update 与下载直接安装，并开启 `execute_install_scripts` 保证 webkit 等包 postinst 脚本执行。

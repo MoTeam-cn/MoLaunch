@@ -1,18 +1,20 @@
-//! GitHub 下载公共组件：release 资产下载（官方优先 + 镜像竞速选源）
+//! GitHub 下载公共组件：release 资产下载（镜像优先 + 官方保底）
 //! 供 easytier 内核等外部二进制按需下载复用。
 
 use std::path::Path;
 use std::time::Duration;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 /// GitHub 镜像源（type: path 追加路径 / type: full 追加完整 URL）
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GithubProxy {
     #[serde(rename = "type")]
     pub proxy_type: String,
     pub base: String,
+    #[serde(default)]
+    pub name: String,
 }
 
 /// 官方下载源
@@ -100,7 +102,7 @@ pub async fn download_to(
     Ok(())
 }
 
-/// 下载 release 资产 zip（官方 URL 优先，失败走镜像竞速）
+/// 下载 release 资产 zip（镜像优先：竞速选最快镜像下载，失败回退官方）
 pub async fn download_release_zip(
     client: &reqwest::Client,
     repo: &str,
@@ -110,17 +112,22 @@ pub async fn download_release_zip(
     proxies: &[GithubProxy],
     on_progress: &(dyn Fn(u64, Option<u64>) + Send + Sync),
 ) -> Result<(), String> {
+    // 镜像优先：并发竞速选最快镜像下载（镜像通常比官方快）
+    if !proxies.is_empty() {
+        let mut candidates = Vec::with_capacity(proxies.len());
+        for p in proxies {
+            candidates.push(build_proxy_url(p, repo, version, asset));
+        }
+        if let Ok(fastest) = pick_fastest(client, &candidates).await {
+            if download_to(client, &fastest, target, on_progress)
+                .await
+                .is_ok()
+            {
+                return Ok(());
+            }
+        }
+    }
+    // 官方保底
     let official = format!("{GITHUB_DOWNLOAD_BASE}/{repo}/releases/download/v{version}/{asset}");
-    if download_to(client, &official, target, on_progress)
-        .await
-        .is_ok()
-    {
-        return Ok(());
-    }
-    let mut candidates = Vec::with_capacity(proxies.len());
-    for p in proxies {
-        candidates.push(build_proxy_url(p, repo, version, asset));
-    }
-    let fastest = pick_fastest(client, &candidates).await?;
-    download_to(client, &fastest, target, on_progress).await
+    download_to(client, &official, target, on_progress).await
 }
