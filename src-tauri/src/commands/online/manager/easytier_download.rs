@@ -139,6 +139,13 @@ pub(super) async fn install_version(
 
     emit_progress(app, "download", 5, &format!("下载 easytier v{version}"));
     let proxies = state.github_proxies.lock().await.clone();
+    crate::log_debug!(
+        "[EasyTier] 下载镜像源: {:?}",
+        proxies
+            .iter()
+            .map(|p| (&p.name, &p.proxy_type))
+            .collect::<Vec<_>>()
+    );
     // 候选 URL：镜像优先（竞速选最快镜像），官方保底
     let mut urls: Vec<String> = Vec::new();
     if !proxies.is_empty() {
@@ -146,6 +153,7 @@ pub(super) async fn install_version(
             .iter()
             .map(|p| build_proxy_url(p, EASYTIER_REPO, version, &asset))
             .collect();
+        crate::log_debug!("[EasyTier] 镜像竞速候选: {candidates:?}");
         if let Ok(fastest) = pick_fastest(&candidates).await {
             urls.push(fastest);
         }
