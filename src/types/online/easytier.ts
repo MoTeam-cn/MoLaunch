@@ -80,6 +80,8 @@ export interface EasyTierInstallProgress {
 
 /** 前端传入后端的 GitHub 镜像源（type: path 追加路径 / type: full 追加完整 URL） */
 export interface GithubProxy {
+  /** 镜像源名称（用于设置页展示，可为空） */
+  name?: string
   type: 'path' | 'full'
   base: string
 }

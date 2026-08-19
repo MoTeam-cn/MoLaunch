@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **设置-联机页：easytier 安装进度修复 + 下载按钮靠右 + 自定义 GitHub 镜像源卡片**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [githubProxy.ts](src/utils/githubProxy.ts) / [easytier.ts](src/types/online/easytier.ts) / [config.ts](src/utils/api/config.ts)）：① **进度显示修复**：`showProgress` 由依赖 `installStatus.downloading` 状态轮询改为以 `easytier-install-progress` 事件 phase（download 阶段）为准，下载期间进度条/百分比实时展示，不再"按钮干转圈"；② **按钮靠右**：内核操作按钮改为 `justify-end` 右对齐；③ **自定义镜像源卡片**：新增「GitHub 镜像源」管理卡片，支持增删改（name/type/base），type 支持 path（镜像前缀 + GitHub 路径）与 full（镜像 + 完整 GitHub URL）两种模式，保存经 `setGithubProxies` 写运行时缓存并持久化配置（重启不丢失），「恢复默认」重新测速筛选 `githubProxy.json` 注入；④ **启动注入逻辑**：`initGithubProxies` 启动时若配置已有自定义源则保留（后端 AppState 已加载），否则测速筛选默认源注入；`ConfigSnapshot`/`ConfigPatch` 新增 `onlineGithubProxies` 字段。
+
 - **easytier / frp 下载改造：镜像优先 + DownloadManager 分片下载**（[github_download.rs](src-tauri/src/utils/github_download.rs) / [easytier_install.rs](src-tauri/src/commands/online/manager/easytier_install.rs) / [install.rs](src-tauri/src/commands/frp/install.rs) / [provider_actions.rs](src-tauri/src/commands/frp/manager/provider_actions.rs)）：① **easytier 下载镜像优先官方保底**：`download_release_zip` 由官方优先改为并发竞速选最快镜像下载，全部失败才回退官方，解决官方源限速慢问题；② **easytier 安装走 DownloadManager 分片下载**：`install_version` 改用 `DownloadManager::download_batch`（镜像竞速胜者优先 + 官方保底 URL 列表，`expected_size` 经 HEAD 探测，进度映射 5%→80% 推送），失败自动重试候选 URL；③ **frp 厂商包走 DownloadManager**：`install_provider_from_url` 增加 `state` 参数，改用 `download_batch`（silent 不弹面板），与下载管理器统一重试/暂停逻辑。
 
 ### Added

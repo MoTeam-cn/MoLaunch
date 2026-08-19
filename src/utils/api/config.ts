@@ -6,6 +6,7 @@
  */
 
 import { CONFIG_ACTIONS, configManager } from './config-manager'
+import type { GithubProxy } from '@/types/online'
 
 // ==================== 配置快照与补丁类型 ====================
 
@@ -71,6 +72,8 @@ export interface ConfigSnapshot {
   onlineApiServerUrl: string
   /** 公共 easytier 中继节点列表（--peers 参数，格式 tcp://host:port / udp://host:port） */
   onlineEasytierPublicPeers: string[]
+  /** 用户自定义 GitHub 镜像源（easytier 等外部下载竞速选源用，type: path / full） */
+  onlineGithubProxies: GithubProxy[]
   // TLS 证书
   /** TLS 信任源模式：builtin / system / custom / system+custom / builtin+custom / all */
   tlsTrustMode: string
@@ -151,6 +154,8 @@ export interface ConfigPatch {
   onlineApiServerUrl?: string
   /** 公共 easytier 中继节点列表（--peers 参数；空数组表示清空） */
   onlineEasytierPublicPeers?: string[]
+  /** 用户自定义 GitHub 镜像源（空数组表示清空） */
+  onlineGithubProxies?: GithubProxy[]
   // TLS 证书
   /** TLS 信任源模式：builtin / system / custom / system+custom / builtin+custom / all */
   tlsTrustMode?: string
