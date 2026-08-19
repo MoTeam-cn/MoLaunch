@@ -56,6 +56,34 @@ export interface EasyTierStatusResult {
   virtualIp: string
 }
 
+/** `easytier_install_status` 返回（easytier 内核安装状态） */
+export interface EasyTierInstallStatus {
+  /** 是否已安装（core 文件存在） */
+  installed: boolean
+  /** 已安装版本（未安装为空串） */
+  version: string
+  /** 最新版本（查询失败为空串） */
+  latestVersion: string
+  /** 是否正在下载安装 */
+  downloading: boolean
+}
+
+/** `easytier-install-progress` 事件 payload（安装进度） */
+export interface EasyTierInstallProgress {
+  /** 阶段：query / download / extract / done / error */
+  phase: 'query' | 'download' | 'extract' | 'done' | 'error'
+  /** 进度百分比（0-100） */
+  percent: number
+  /** 阶段描述 */
+  message: string
+}
+
+/** 前端传入后端的 GitHub 镜像源（type: path 追加路径 / type: full 追加完整 URL） */
+export interface GithubProxy {
+  type: 'path' | 'full'
+  base: string
+}
+
 /** `scaffolding_host_start` 参数 */
 export interface ScaffoldingHostStartParams {
   /** 完整房间码 `U/NNNN-NNNN-SSSS-SSSS` */

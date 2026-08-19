@@ -6,9 +6,11 @@
  */
 import { onlineManager, ONLINE_ACTIONS } from './core'
 import type {
+  EasyTierInstallStatus,
   EasyTierJoinParams,
   EasyTierJoinResult,
   EasyTierStatusResult,
+  GithubProxy,
   ScaffoldingClientProbeParams,
   ScaffoldingClientProbeResult,
   ScaffoldingHostSetMcPortParams,
@@ -29,6 +31,26 @@ export function stopEasyTier(): Promise<{ success: boolean }> {
 /** 查询当前 easytier 运行状态（joined/version/pid/rpcPortal） */
 export function getEasyTierStatus(): Promise<EasyTierStatusResult> {
   return onlineManager<EasyTierStatusResult>(ONLINE_ACTIONS.EASYTIER_STATUS)
+}
+
+/** 查询 easytier 内核安装状态（installed/version/latestVersion/downloading） */
+export function getEasyTierInstallStatus(): Promise<EasyTierInstallStatus> {
+  return onlineManager<EasyTierInstallStatus>(ONLINE_ACTIONS.EASYTIER_INSTALL_STATUS)
+}
+
+/** 下载安装 easytier 内核最新版（进度经 `easytier-install-progress` 事件推送） */
+export function installEasyTier(): Promise<{ success: boolean }> {
+  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.EASYTIER_INSTALL)
+}
+
+/** 更新 easytier 内核到最新版（语义同 install） */
+export function updateEasyTier(): Promise<{ success: boolean }> {
+  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.EASYTIER_UPDATE)
+}
+
+/** 把前端筛选的 GitHub 镜像源传给后端（下载竞速选源用） */
+export function setGithubProxies(proxies: GithubProxy[]): Promise<{ success: boolean }> {
+  return onlineManager<{ success: boolean }>(ONLINE_ACTIONS.SET_GITHUB_PROXIES, proxies)
 }
 
 /** 房主一站式启动：探测 MC 端口 → 联机中心 → easytier */

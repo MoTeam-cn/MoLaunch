@@ -44,4 +44,7 @@ if (renderNonTauriWarning()) {
   pluginStore.syncFromBackend().catch((e) => {
     console.warn('[Startup][Frontend] Plugin backend sync failed:', e)
   })
+
+  // mount 后异步筛选 GitHub 镜像源传给后端（easytier 内核下载竞速选源用，失败静默）
+  import('./utils/githubProxy').then(({ initGithubProxies }) => initGithubProxies())
 }

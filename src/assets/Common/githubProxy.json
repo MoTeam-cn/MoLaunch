@@ -1,0 +1,574 @@
+{
+    "sources": [
+        {
+            "name": "XiaoMo 镜像",
+            "type": "path",
+            "base": "https://hub.xiaomocs.com/github"
+        },
+        {
+            "name": "gh-proxy.net",
+            "type": "full",
+            "base": "https://gh-proxy.net/"
+        },
+        {
+            "name": "github.cnxiaobai.com",
+            "type": "full",
+            "base": "https://github.cnxiaobai.com/"
+        },
+        {
+            "name": "hub.gitmirror.com",
+            "type": "full",
+            "base": "https://hub.gitmirror.com/"
+        },
+        {
+            "name": "5555.cab",
+            "type": "full",
+            "base": "https://www.5555.cab/"
+        },
+        {
+            "name": "git.tangbai.cc",
+            "type": "full",
+            "base": "https://git.tangbai.cc/"
+        },
+        {
+            "name": "gh.ddlc.top",
+            "type": "full",
+            "base": "https://gh.ddlc.top/"
+        },
+        {
+            "name": "ghproxy.xiaopa.cc",
+            "type": "full",
+            "base": "https://ghproxy.xiaopa.cc/"
+        },
+        {
+            "name": "ghproxy.cfd",
+            "type": "full",
+            "base": "https://ghproxy.cfd/"
+        },
+        {
+            "name": "ghproxy.cc",
+            "type": "full",
+            "base": "https://ghproxy.cc/"
+        },
+        {
+            "name": "ghproxy.monkeyray.net",
+            "type": "full",
+            "base": "https://ghproxy.monkeyray.net/"
+        },
+        {
+            "name": "cf.ghproxy.cc",
+            "type": "full",
+            "base": "https://cf.ghproxy.cc/"
+        },
+        {
+            "name": "gitproxy.mrhjx.cn",
+            "type": "full",
+            "base": "https://gitproxy.mrhjx.cn/"
+        },
+        {
+            "name": "gh.xxooo.cf",
+            "type": "full",
+            "base": "https://gh.xxooo.cf/"
+        },
+        {
+            "name": "github.xxlab.tech",
+            "type": "full",
+            "base": "https://github.xxlab.tech/"
+        },
+        {
+            "name": "ghproxy.1888866.xyz",
+            "type": "full",
+            "base": "https://ghproxy.1888866.xyz/"
+        },
+        {
+            "name": "github.mlmle.cn",
+            "type": "full",
+            "base": "https://github.mlmle.cn/"
+        },
+        {
+            "name": "fastgit.cc",
+            "type": "full",
+            "base": "https://fastgit.cc/"
+        },
+        {
+            "name": "gh.1k.ink",
+            "type": "full",
+            "base": "https://gh.1k.ink/"
+        },
+        {
+            "name": "ghproxy.net",
+            "type": "full",
+            "base": "https://ghproxy.net/"
+        },
+        {
+            "name": "github.boringhex.top",
+            "type": "full",
+            "base": "https://github.boringhex.top/"
+        },
+        {
+            "name": "ghfast.top",
+            "type": "full",
+            "base": "https://ghfast.top/"
+        },
+        {
+            "name": "y.whereisdoge.work",
+            "type": "full",
+            "base": "https://y.whereisdoge.work/"
+        },
+        {
+            "name": "ghproxy.imciel.com",
+            "type": "full",
+            "base": "https://ghproxy.imciel.com/"
+        },
+        {
+            "name": "gh.jdck.fun",
+            "type": "full",
+            "base": "https://gh.jdck.fun/"
+        },
+        {
+            "name": "xiaomo-station.top",
+            "type": "full",
+            "base": "https://xiaomo-station.top/"
+        },
+        {
+            "name": "gh.monlor.com",
+            "type": "full",
+            "base": "https://gh.monlor.com/"
+        },
+        {
+            "name": "g.blfrp.cn",
+            "type": "full",
+            "base": "https://g.blfrp.cn/"
+        },
+        {
+            "name": "gh.con.sh",
+            "type": "full",
+            "base": "https://gh.con.sh/"
+        },
+        {
+            "name": "gh.b52m.cn",
+            "type": "full",
+            "base": "https://gh.b52m.cn/"
+        },
+        {
+            "name": "github.dpik.top",
+            "type": "full",
+            "base": "https://github.dpik.top/"
+        },
+        {
+            "name": "github.geekery.cn",
+            "type": "full",
+            "base": "https://github.geekery.cn/"
+        },
+        {
+            "name": "gh.halonice.com",
+            "type": "full",
+            "base": "https://gh.halonice.com/"
+        },
+        {
+            "name": "github.limoruirui.com",
+            "type": "full",
+            "base": "https://github.limoruirui.com/"
+        },
+        {
+            "name": "git.yylx.win",
+            "type": "full",
+            "base": "https://git.yylx.win/"
+        },
+        {
+            "name": "github.tbedu.top",
+            "type": "full",
+            "base": "https://github.tbedu.top/"
+        },
+        {
+            "name": "ghproxy.vansour.top",
+            "type": "full",
+            "base": "https://ghproxy.vansour.top/"
+        },
+        {
+            "name": "tvv.tw",
+            "type": "full",
+            "base": "https://tvv.tw/"
+        },
+        {
+            "name": "ghproxy.xzhouqd.com",
+            "type": "full",
+            "base": "https://ghproxy.xzhouqd.com/"
+        },
+        {
+            "name": "github-proxy.memory-echoes.cn",
+            "type": "full",
+            "base": "https://github-proxy.memory-echoes.cn/"
+        },
+        {
+            "name": "gh.catmak.name",
+            "type": "full",
+            "base": "https://gh.catmak.name/"
+        },
+        {
+            "name": "hub.ddayh.com",
+            "type": "full",
+            "base": "https://hub.ddayh.com/"
+        },
+        {
+            "name": "github.ruojian.space",
+            "type": "full",
+            "base": "https://github.ruojian.space/"
+        },
+        {
+            "name": "ghproxy.cxkpro.top",
+            "type": "full",
+            "base": "https://ghproxy.cxkpro.top/"
+        },
+        {
+            "name": "ghp.keleyaa.com",
+            "type": "full",
+            "base": "https://ghp.keleyaa.com/"
+        },
+        {
+            "name": "github-proxy.lixxing.top",
+            "type": "full",
+            "base": "https://github-proxy.lixxing.top/"
+        },
+        {
+            "name": "gh.padao.fun",
+            "type": "full",
+            "base": "https://gh.padao.fun/"
+        },
+        {
+            "name": "gp.871201.xyz",
+            "type": "full",
+            "base": "https://gp.871201.xyz/"
+        },
+        {
+            "name": "gh.wsmdn.dpdns.org",
+            "type": "full",
+            "base": "https://gh.wsmdn.dpdns.org/"
+        },
+        {
+            "name": "ggg.clwap.dpdns.org",
+            "type": "full",
+            "base": "https://ggg.clwap.dpdns.org/"
+        },
+        {
+            "name": "gh-proxy.com",
+            "type": "full",
+            "base": "https://gh-proxy.com/"
+        },
+        {
+            "name": "gh.dpik.top",
+            "type": "full",
+            "base": "https://gh.dpik.top/"
+        },
+        {
+            "name": "gp.zkitefly.eu.org",
+            "type": "full",
+            "base": "https://gp.zkitefly.eu.org/"
+        },
+        {
+            "name": "gh.bugdey.us.kg",
+            "type": "full",
+            "base": "https://gh.bugdey.us.kg/"
+        },
+        {
+            "name": "code-hub-hk.freexy.top",
+            "type": "full",
+            "base": "https://code-hub-hk.freexy.top/"
+        },
+        {
+            "name": "github.chenc.dev",
+            "type": "full",
+            "base": "https://github.chenc.dev/"
+        },
+        {
+            "name": "ghfile.geekertao.top",
+            "type": "full",
+            "base": "https://ghfile.geekertao.top/"
+        },
+        {
+            "name": "kenyu.ggff.net",
+            "type": "full",
+            "base": "https://kenyu.ggff.net/"
+        },
+        {
+            "name": "gh.nxnow.top",
+            "type": "full",
+            "base": "https://gh.nxnow.top/"
+        },
+        {
+            "name": "github.bullb.net",
+            "type": "full",
+            "base": "https://github.bullb.net/"
+        },
+        {
+            "name": "gitproxy.197545.xyz",
+            "type": "full",
+            "base": "https://gitproxy.197545.xyz/"
+        },
+        {
+            "name": "gitproxy.127731.xyz",
+            "type": "full",
+            "base": "https://gitproxy.127731.xyz/"
+        },
+        {
+            "name": "gitproxy1.127731.xyz",
+            "type": "full",
+            "base": "https://gitproxy1.127731.xyz/"
+        },
+        {
+            "name": "jiashu.1win.eu.org",
+            "type": "full",
+            "base": "https://jiashu.1win.eu.org/"
+        },
+        {
+            "name": "ghproxy.mf-dust.dpdns.org",
+            "type": "full",
+            "base": "https://ghproxy.mf-dust.dpdns.org/"
+        },
+        {
+            "name": "j.1lin.dpdns.org",
+            "type": "full",
+            "base": "https://j.1lin.dpdns.org/"
+        },
+        {
+            "name": "gh.jasonzeng.dev",
+            "type": "full",
+            "base": "https://gh.jasonzeng.dev/"
+        },
+        {
+            "name": "proxy.baguoyuyan.com",
+            "type": "full",
+            "base": "https://proxy.baguoyuyan.com/"
+        },
+        {
+            "name": "github.1ms.xx.kg",
+            "type": "full",
+            "base": "https://github.1ms.xx.kg/"
+        },
+        {
+            "name": "gh.198962.xyz",
+            "type": "full",
+            "base": "https://gh.198962.xyz/"
+        },
+        {
+            "name": "github.880824.xyz",
+            "type": "full",
+            "base": "https://github.880824.xyz/"
+        },
+        {
+            "name": "ghps.cc",
+            "type": "full",
+            "base": "https://ghps.cc/"
+        },
+        {
+            "name": "30006000.xyz",
+            "type": "full",
+            "base": "https://30006000.xyz/"
+        },
+        {
+            "name": "github.tianrld.top",
+            "type": "full",
+            "base": "https://github.tianrld.top/"
+        },
+        {
+            "name": "getgit.love8yun.eu.org",
+            "type": "full",
+            "base": "https://getgit.love8yun.eu.org/"
+        },
+        {
+            "name": "github.788787.xyz",
+            "type": "full",
+            "base": "https://github.788787.xyz/"
+        },
+        {
+            "name": "ghm.078465.xyz",
+            "type": "full",
+            "base": "https://ghm.078465.xyz/"
+        },
+        {
+            "name": "github-proxy.com",
+            "type": "full",
+            "base": "https://github-proxy.com/"
+        },
+        {
+            "name": "proxy.yaoyaoling.net",
+            "type": "full",
+            "base": "https://proxy.yaoyaoling.net/"
+        },
+        {
+            "name": "ghproxy.sakuramoe.dev",
+            "type": "full",
+            "base": "https://ghproxy.sakuramoe.dev/"
+        },
+        {
+            "name": "ghproxy.053000.xyz",
+            "type": "full",
+            "base": "https://ghproxy.053000.xyz/"
+        },
+        {
+            "name": "gh.chjina.com",
+            "type": "full",
+            "base": "https://gh.chjina.com/"
+        },
+        {
+            "name": "git.zeas.cc",
+            "type": "full",
+            "base": "https://git.zeas.cc/"
+        },
+        {
+            "name": "ghpxy.hwinzniej.top",
+            "type": "full",
+            "base": "https://ghpxy.hwinzniej.top/"
+        },
+        {
+            "name": "gh.echofree.xyz",
+            "type": "full",
+            "base": "https://gh.echofree.xyz/"
+        },
+        {
+            "name": "github.zzrbk.xyz",
+            "type": "full",
+            "base": "https://github.zzrbk.xyz/"
+        },
+        {
+            "name": "git.669966.xyz",
+            "type": "full",
+            "base": "https://git.669966.xyz/"
+        },
+        {
+            "name": "github.ihnic.com",
+            "type": "full",
+            "base": "https://github.ihnic.com/"
+        },
+        {
+            "name": "gh.996986.xyz",
+            "type": "full",
+            "base": "https://gh.996986.xyz/"
+        },
+        {
+            "name": "gh.idayer.com",
+            "type": "full",
+            "base": "https://gh.idayer.com/"
+        },
+        {
+            "name": "github.ednovas.xyz",
+            "type": "full",
+            "base": "https://github.ednovas.xyz/"
+        },
+        {
+            "name": "gh.chalin.tk",
+            "type": "full",
+            "base": "https://gh.chalin.tk/"
+        },
+        {
+            "name": "j.1win.ggff.net",
+            "type": "full",
+            "base": "https://j.1win.ggff.net/"
+        },
+        {
+            "name": "github.lsdfxdk.nyc.mn",
+            "type": "full",
+            "base": "https://github.lsdfxdk.nyc.mn/"
+        },
+        {
+            "name": "gh.aaa.team",
+            "type": "full",
+            "base": "https://gh.aaa.team/"
+        },
+        {
+            "name": "gh.shiina-rimo.cafe",
+            "type": "full",
+            "base": "https://gh.shiina-rimo.cafe/"
+        },
+        {
+            "name": "ghproxy.mirror.skybyte.me",
+            "type": "full",
+            "base": "https://ghproxy.mirror.skybyte.me/"
+        },
+        {
+            "name": "gh.llkk.cc",
+            "type": "full",
+            "base": "https://gh.llkk.cc/"
+        },
+        {
+            "name": "git.40609891.xyz",
+            "type": "full",
+            "base": "https://git.40609891.xyz/"
+        },
+        {
+            "name": "github.oterea.top",
+            "type": "full",
+            "base": "https://github.oterea.top/"
+        },
+        {
+            "name": "gh.noki.icu",
+            "type": "full",
+            "base": "https://gh.noki.icu/"
+        },
+        {
+            "name": "gh.39.al",
+            "type": "full",
+            "base": "https://gh.39.al/"
+        },
+        {
+            "name": "ghproxy.cn",
+            "type": "full",
+            "base": "https://ghproxy.cn/"
+        },
+        {
+            "name": "down.npee.cn",
+            "type": "full",
+            "base": "https://down.npee.cn/"
+        },
+        {
+            "name": "github.kkproxy.dpdns.org",
+            "type": "full",
+            "base": "https://github.kkproxy.dpdns.org/"
+        },
+        {
+            "name": "free.cn.eu.org",
+            "type": "full",
+            "base": "https://free.cn.eu.org/"
+        },
+        {
+            "name": "git.951959483.xyz",
+            "type": "full",
+            "base": "https://git.951959483.xyz/"
+        },
+        {
+            "name": "git.820828.xyz",
+            "type": "full",
+            "base": "https://git.820828.xyz/"
+        },
+        {
+            "name": "ghproxy.fangkuai.fun",
+            "type": "full",
+            "base": "https://ghproxy.fangkuai.fun/"
+        },
+        {
+            "name": "github.cn86.dev",
+            "type": "full",
+            "base": "https://github.cn86.dev/"
+        },
+        {
+            "name": "github.zjzzy.cloudns.org",
+            "type": "full",
+            "base": "https://github.zjzzy.cloudns.org/"
+        },
+        {
+            "name": "ghb.nilive.top",
+            "type": "full",
+            "base": "https://ghb.nilive.top/"
+        },
+        {
+            "name": "gitproxy.click",
+            "type": "full",
+            "base": "https://gitproxy.click/"
+        },
+        {
+            "name": "proxy.atoposs.com",
+            "type": "full",
+            "base": "https://proxy.atoposs.com/"
+        }
+    ]
+}

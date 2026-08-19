@@ -101,6 +101,11 @@ export const ONLINE_ACTIONS = {
   EASYTIER_JOIN: 'easytier_join',
   EASYTIER_STOP: 'easytier_stop',
   EASYTIER_STATUS: 'easytier_status',
+  // easytier 内核外部下载安装
+  EASYTIER_INSTALL_STATUS: 'easytier_install_status',
+  EASYTIER_INSTALL: 'easytier_install',
+  EASYTIER_UPDATE: 'easytier_update',
+  SET_GITHUB_PROXIES: 'set_github_proxies',
   SCAFFOLDING_HOST_START: 'scaffolding_host_start',
   SCAFFOLDING_HOST_STOP: 'scaffolding_host_stop',
   SCAFFOLDING_HOST_SET_MC_PORT: 'scaffolding_host_set_mc_port',
