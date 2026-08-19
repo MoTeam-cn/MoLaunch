@@ -36,6 +36,8 @@ pub struct DownloadManager {
     app_handle: Option<AppHandle>,
     /// 静默下载（不 emit 面板事件，供 Java 下载 / 程序更新 / 启动补全等后台任务）
     silent: bool,
+    /// 保持调用方传入的 URL 顺序（跳过 reorder_urls，供镜像优先+官方保底等场景）
+    preserve_order: bool,
     /// 共享批次计数（来自 AppState，协调并发批次的面板显隐）
     active_batches: Option<Arc<std::sync::atomic::AtomicUsize>>,
 }
@@ -60,6 +62,7 @@ impl DownloadManager {
             pause_flag: None,
             app_handle: None,
             silent: false,
+            preserve_order: false,
             active_batches: None,
         }
     }
@@ -108,6 +111,15 @@ impl DownloadManager {
     /// 不应打扰用户弹出下载面板。
     pub fn with_silent(mut self, silent: bool) -> Self {
         self.silent = silent;
+        self
+    }
+
+    /// 保持调用方传入的 URL 顺序（跳过 reorder_urls）
+    ///
+    /// 供"镜像优先 + 官方保底"等调用方已排好序的场景使用，
+    /// 避免按用户下载源模式过滤/重排破坏意图。
+    pub fn with_preserve_order(mut self, preserve: bool) -> Self {
+        self.preserve_order = preserve;
         self
     }
 
@@ -276,7 +288,11 @@ impl DownloadManager {
             let results = results.clone();
             let client = self.client.clone();
             let limiter = rate_limiter.clone();
-            let urls = self.reorder_urls(&task.urls);
+            let urls = if self.preserve_order {
+                task.urls.clone()
+            } else {
+                self.reorder_urls(&task.urls)
+            };
             let source_mode = self.source_mode;
             let self_chunk_count = self.chunk_count;
             let chunked_ids = chunked_task_ids.clone();

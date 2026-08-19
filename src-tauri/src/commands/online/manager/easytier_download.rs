@@ -161,7 +161,8 @@ pub(super) async fn install_version(
     });
     let manager = crate::minecraft::download::DownloadManager::from_state(state)
         .await
-        .with_silent(true);
+        .with_silent(true)
+        .with_preserve_order(true);
     let results = manager.download_batch(vec![task], Some(progress_cb)).await;
     let result = results
         .into_iter()
