@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **镜像源「重新测速」与「保存」按钮加载态解耦**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：原两按钮共享 `proxiesBusy` 加载态，点「重新测速」时「保存」按钮也进入 loading 不可操作；拆为独立的 `probeBusy` / `saveBusy`，两操作互不干扰，「添加镜像」在任一操作进行时禁用。
+
 - **镜像源测速禁止重定向 + 内置清单剔除重定向源**（[githubProxy.ts](src/utils/githubProxy.ts) / [github_download.rs](src-tauri/src/utils/github_download.rs) / [githubProxy.json](src/assets/Common/githubProxy.json)）：① **前端测速禁止重定向**：`probeSource` 的 HEAD/GET 探测均加 `redirect: 'error'`，会跳转的镜像直接判定失败剔除；② **后端竞速禁止重定向**：`pick_fastest` 改用共享无重定向单例 `no_redirect_client()`（reqwest 重定向策略为 client 级，无法 per-request 覆盖），签名去掉 `client` 参数，调用方同步更新；③ **内置清单排查**：对全部 114 个源并发探测（GET + Range 0-1），剔除明确 302 重定向的 `gh.b52m.cn`（跳转 `gh.beimengvv.xyz`）与 `ghfile.geekertao.top`（跳转 `gh.dpik.top`），剩余 112 个；404/403/521/超时源由运行时测速自动过滤。
 
 - **修复 GitHub 镜像源 full 模式 URL 拼接缺斜杠 + 「恢复默认」改名「重新测速」**（[github_download.rs](src-tauri/src/utils/github_download.rs) / [githubProxy.ts](src/utils/githubProxy.ts) / [SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：① **full 模式拼接 bug**：`build_proxy_url` / `buildProbeUrl` 对 base 做 `trim_end_matches('/')` 去尾斜杠后直接拼接完整 GitHub URL，base 无尾斜杠的源（如 `https://gh.wsmdn.dpdns.org`）会拼出 `dpdns.orghttps://github.com/...` 错误 URL，下载必然失败；改为 base 与 GitHub URL 之间补 `/`；② **按钮改名**：镜像源卡片「恢复默认」→「重新测速」（语义更准确：对内置清单全部并发测速、筛选最快前 10 个替换当前列表），外包 `Tooltip` 说明用途，成功 toast 改为「已重新测速，筛选出 N 个可用镜像源」带数量反馈。

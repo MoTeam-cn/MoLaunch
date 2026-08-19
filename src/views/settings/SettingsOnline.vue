@@ -162,7 +162,9 @@ interface ProxyRow {
 
 const githubProxies = ref<ProxyRow[]>([])
 const proxiesLoaded = ref(false)
-const proxiesBusy = ref(false)
+/** 重新测速 / 保存 独立加载态（互不干扰：点重新测速时保存按钮保持可用） */
+const probeBusy = ref(false)
+const saveBusy = ref(false)
 
 /** type 选项（full: 镜像 + 完整 GitHub URL / path: 镜像前缀 + GitHub 路径），文案精简以适配窄列 */
 const proxyTypeOptions = [
@@ -202,7 +204,7 @@ async function handleSaveProxies() {
     toastError('至少保留一个镜像源')
     return
   }
-  proxiesBusy.value = true
+  saveBusy.value = true
   try {
     await setGithubProxies(list)
     refreshConfig()
@@ -210,13 +212,13 @@ async function handleSaveProxies() {
   } catch (e) {
     toastError(`保存失败: ${e}`)
   } finally {
-    proxiesBusy.value = false
+    saveBusy.value = false
   }
 }
 
 /** 重新测速：对 githubProxy.json 全部源并发探测，筛选最快的前 10 个替换当前列表 */
 async function handleRestoreDefaultProxies() {
-  proxiesBusy.value = true
+  probeBusy.value = true
   try {
     const list = await restoreDefaultProxies()
     if (list.length === 0) {
@@ -229,7 +231,7 @@ async function handleRestoreDefaultProxies() {
   } catch (e) {
     toastError(`重新测速失败: ${e}`)
   } finally {
-    proxiesBusy.value = false
+    probeBusy.value = false
   }
 }
 
@@ -349,18 +351,18 @@ onMounted(() => {
             <p class="mt-2 text-xs text-gray-400">暂无镜像源，可添加自定义或恢复默认</p>
           </div>
           <div class="mt-4 flex items-center justify-between gap-2">
-            <Button type="outline" size="small" :disabled="proxiesBusy" @click="addProxyRow">
+            <Button type="outline" size="small" :disabled="probeBusy || saveBusy" @click="addProxyRow">
               <template #icon><PlusIcon class="w-4 h-4" /></template>
               添加镜像
             </Button>
             <div class="flex items-center gap-2">
               <Tooltip text="对内置镜像源清单全部并发测速，筛选响应最快的前 10 个替换当前列表" position="top">
-                <Button type="outline" size="small" :loading="proxiesBusy" @click="handleRestoreDefaultProxies">
+                <Button type="outline" size="small" :loading="probeBusy" @click="handleRestoreDefaultProxies">
                   <template #icon><ArrowPathIcon class="w-4 h-4" /></template>
                   重新测速
                 </Button>
               </Tooltip>
-              <Button type="primary" size="small" :loading="proxiesBusy" @click="handleSaveProxies">
+              <Button type="primary" size="small" :loading="saveBusy" @click="handleSaveProxies">
                 <template #icon><CheckIcon class="w-4 h-4" /></template>
                 保存
               </Button>
