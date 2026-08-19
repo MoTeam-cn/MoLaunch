@@ -221,10 +221,16 @@ pub(super) async fn install_version(
             }
         }));
     let results = manager.download_batch(vec![task], Some(progress_cb)).await;
-    let result = results
-        .into_iter()
-        .next()
-        .ok_or_else(|| "下载失败：无结果".to_string())?;
+    let result = match results.into_iter().next() {
+        Some(r) => r,
+        None => {
+            // download_batch 取消时跳过任务不产生结果，需区分取消与异常
+            if state.easytier_cancel.load(Ordering::SeqCst) {
+                return Err("下载已取消".to_string());
+            }
+            return Err("下载失败：无结果".to_string());
+        }
+    };
     if result.status != DownloadStatus::Completed {
         // 下载失败/取消：清理临时 zip，避免残留
         let _ = std::fs::remove_file(&zip_path);
