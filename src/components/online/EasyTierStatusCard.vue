@@ -11,14 +11,13 @@ import { useOnlineStore } from '@/stores/online'
 import { getEasyTierStatus } from '@/utils/api/online-manager/easytier'
 import { useEasyTierInstall } from '@/composables/useEasyTierInstall'
 const Card = defineAsyncComponent(() => import('@/components/common/Card.vue'))
-const Button = defineAsyncComponent(() => import('@/components/common/Button.vue'))
+const SealedOverlay = defineAsyncComponent(() => import('@/components/common/SealedOverlay.vue'))
 const EasyTierStatusBadge = defineAsyncComponent(() => import('./EasyTierStatusBadge.vue'))
 import {
   ServerStackIcon,
   GlobeAltIcon,
   TagIcon,
   CpuChipIcon,
-  ExclamationTriangleIcon,
 } from '@heroicons/vue/24/outline'
 
 const store = useOnlineStore()
@@ -54,50 +53,49 @@ onMounted(async () => {
 
 <template>
   <Card title="虚拟组网（easytier）">
-    <!-- 内核缺失引导：联机功能依赖 easytier 内核，未安装时引导前往设置页下载 -->
-    <div
-      v-if="kernelMissing"
-      class="mb-3 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2"
-    >
-      <ExclamationTriangleIcon class="w-4 h-4 text-amber-500 shrink-0" />
-      <span class="flex-1 text-xs text-amber-700">easytier 内核未安装，联机功能暂不可用</span>
-      <Button size="small" type="primary" @click="install.promptMissing('虚拟组网')">前往设置下载</Button>
-    </div>
-    <div class="divide-y divide-gray-100">
-      <div class="px-1 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-gray-600">
-          <ServerStackIcon class="w-4 h-4 text-gray-400" />
-          <span>组网状态</span>
+    <!-- 内核缺失时封存（与「联机服务不可用」一致）：虚线红框遮罩，点击弹窗引导前往设置页下载 -->
+    <div class="relative">
+      <SealedOverlay
+        v-if="kernelMissing"
+        reason="easytier 内核未安装，联机功能暂不可用，请前往 设置-联机 页面下载内核"
+        @request="install.promptMissing('虚拟组网')"
+      />
+      <div class="divide-y divide-gray-100">
+        <div class="px-1 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <ServerStackIcon class="w-4 h-4 text-gray-400" />
+            <span>组网状态</span>
+          </div>
+          <EasyTierStatusBadge />
         </div>
-        <EasyTierStatusBadge />
-      </div>
-      <div class="px-1 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-gray-600">
-          <TagIcon class="w-4 h-4 text-gray-400" />
-          <span>core 版本</span>
+        <div class="px-1 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <TagIcon class="w-4 h-4 text-gray-400" />
+            <span>core 版本</span>
+          </div>
+          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ version || '-' }}</code>
         </div>
-        <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded">{{ version || '-' }}</code>
-      </div>
-      <div class="px-1 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-gray-600">
-          <GlobeAltIcon class="w-4 h-4 text-gray-400" />
-          <span>虚拟网络</span>
+        <div class="px-1 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <GlobeAltIcon class="w-4 h-4 text-gray-400" />
+            <span>虚拟网络</span>
+          </div>
+          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded max-w-[220px] truncate">{{ networkName || '-' }}</code>
         </div>
-        <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded max-w-[220px] truncate">{{ networkName || '-' }}</code>
-      </div>
-      <div class="px-1 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-gray-600">
-          <GlobeAltIcon class="w-4 h-4 text-gray-400" />
-          <span>虚拟 IP</span>
+        <div class="px-1 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <GlobeAltIcon class="w-4 h-4 text-gray-400" />
+            <span>虚拟 IP</span>
+          </div>
+          <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded font-mono">{{ ip || '-' }}</code>
         </div>
-        <code class="text-xs text-gray-900 bg-gray-50 px-2 py-0.5 rounded font-mono">{{ ip || '-' }}</code>
-      </div>
-      <div class="px-1 py-3 flex items-center justify-between">
-        <div class="flex items-center gap-2 text-sm text-gray-600">
-          <CpuChipIcon class="w-4 h-4 text-gray-400" />
-          <span>进程 PID</span>
+        <div class="px-1 py-3 flex items-center justify-between">
+          <div class="flex items-center gap-2 text-sm text-gray-600">
+            <CpuChipIcon class="w-4 h-4 text-gray-400" />
+            <span>进程 PID</span>
+          </div>
+          <span class="text-xs text-gray-900 font-mono">{{ pid ?? '-' }}</span>
         </div>
-        <span class="text-xs text-gray-900 font-mono">{{ pid ?? '-' }}</span>
       </div>
     </div>
   </Card>

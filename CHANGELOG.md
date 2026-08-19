@@ -6,7 +6,7 @@
 
 ### Changed
 
-- **easytier 内核解压剔除无用 Web UI 文件**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：Windows 发布包内含 `easytier-web.exe` / `easytier-web-embed.exe`（Web UI 独立版/内嵌版，MoLaunch 不需要）与 `WinDivert64.sys`（easytier-core 流量转发依赖驱动，必需保留）。`extract_zip_safely` 新增 `skip_files` 文件名黑名单参数，解压时跳过两个 web 文件，避免占用安装目录空间；临时 zip 与解压目录在安装完成后照常清理。
+- **easytier 内核解压改为白名单过滤**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：`extract_zip_safely` 由黑名单（跳过 `easytier-web.exe` / `easytier-web-embed.exe`）改为白名单（只解压需要的文件），仅保留 core/cli 二进制；Windows 另保留 `WinDivert64.sys` 驱动与 `wintun.dll` / `Packet.dll` 两个依赖 DLL（easytier-core 流量转发必需，缺失会导致 cli/core 启动报缺 DLL），其余文件（Web UI 独立版/内嵌版、文档等）全部跳过，避免占用安装目录空间；临时 zip 与解压目录在安装完成后照常清理。
 
 - **修复 GitHub 镜像源编辑行布局：镜像地址自适应填满、删除按钮不再拉伸**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue)）：编辑行 grid 原为 `6rem 7rem 12rem auto` 固定列宽，`auto` 轨道被 `justify-content` stretch（默认）拉伸填满剩余空间，删除按钮作为 grid item 被撑到整列宽、镜像地址 input 固定 12rem 不占满页面。改为 `13rem 7rem minmax(0,1fr) auto`：名称列加宽至 13rem，镜像地址列吸收剩余宽度自适应填满（长地址不被截断），第 4 列 auto 仅占删除按钮内容宽、紧跟其后，无中间留白；表头列宽与数据行保持一致，标签与 input 对齐。
 

@@ -279,8 +279,8 @@ export function useOnlineNav(
       if (tab && isValidCategory(tab)) {
         activeCategory.value = tab as OnlineCategoryId
       } else if (activeCategory.value === 'device') {
-        // 登录成功且 URL 无有效 tab → 默认跳到创建房间
-        activeCategory.value = 'create'
+        // 登录成功且 URL 无有效 tab → 默认跳到创建房间（内核缺失时停留设备页，避免落到被封禁分类）
+        activeCategory.value = kernelMissing.value ? 'device' : 'create'
       }
     } else if (activeCategory.value !== 'device') {
       // 未就绪（退出登录 / 认证失败）→ 切回设备；JWT 过期不触发（由后端自动续期）
@@ -314,6 +314,16 @@ export function useOnlineNav(
       }
     },
   )
+
+  /**
+   * 内核缺失时强制切回「设备」：避免停留在被封禁的创建/加入/大厅分类
+   * （内容区仍渲染 RoomManager/Lobby 而侧边栏已封禁的不一致状态）
+   */
+  watch(kernelMissing, (missing) => {
+    if (missing && ['create', 'join', 'lobby'].includes(activeCategory.value)) {
+      activeCategory.value = 'device'
+    }
+  })
 
   return {
     status,

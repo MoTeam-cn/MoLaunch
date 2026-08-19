@@ -49,8 +49,7 @@ pub(super) fn core_name() -> &'static str {
     }
 }
 
-/// 当前平台 cli 文件名（仅 Unix 补执行权限时使用）
-#[cfg(unix)]
+/// 当前平台 cli 文件名（Unix 补执行权限 / 白名单解压时使用）
 pub(super) fn cli_name() -> &'static str {
     if cfg!(target_os = "windows") {
         "easytier-cli.exe"
