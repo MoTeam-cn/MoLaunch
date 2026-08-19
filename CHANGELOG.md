@@ -8,6 +8,10 @@
 
 - **系统默认厂商 frpc 下载源改造调研文档**（[FRP_GITHUB_DOWNLOAD_RESEARCH.md](docs/online/FRP_GITHUB_DOWNLOAD_RESEARCH.md)（新增））：调研将系统默认厂商 frpc 的版本获取/下载从 apiServer `/v1/frp/manifest` 改为 GitHub API 拉取版本号 + 镜像竞速下载的可靠度。实测验证双源（`api.github.com` 主源 / `github-api.mocdn.net` 备选源）可用；确认 frp 官方资产命名差异（Windows zip / macOS-Linux tar.gz、os 用 darwin、arch 用 amd64）；评估复用 easytier 检查更新安装模式（泛化 `fetch_latest_release` repo 参数 + `pick_fastest` 竞速 + DownloadManager）的可行性；结论可行且与 easytier 完全同构，主要收益为解除登录依赖与版本自动同步，含风险权衡与实施步骤。**补充 apiServer 端重构调研**：梳理 frp 分发部分完整结构（`/v1/frp/manifest` + `/v3/ci/frp/*` + 管理后台 Frp 版本面板 + `frp_releases` 表），给出删除清单（6 个整文件 + 12 处注册点 + 配置 + 迁移 + 管理后台），明确保留公共 frps 服务器功能（`/v1/frp/servers`）与共用工具（rollout/s3/hex），并列出主仓库联动清理项（`frp.rs` / `api_paths.rs`）。
 
+### Fixed
+
+- **修复 GitHub 镜像源测速被 CSP 拦截**（[tauri.conf.json](src-tauri/tauri.conf.json)）：前端 `githubProxy.ts` 测速 fetch 的镜像源为运行时用户自定义 URL，静态 CSP 白名单无法覆盖，被 `connect-src` 拦截导致测速全部失败；将 `connect-src` 放宽至 `https:` `http:`（保留 `ws://127.0.0.1:*` 等原有限制），镜像源测速恢复正常。
+
 ## [0.3.7-rc1] - 2026-08-19
 
 ### Added
