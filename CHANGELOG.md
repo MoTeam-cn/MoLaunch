@@ -6,6 +6,8 @@
 
 ### Changed
 
+- **镜像源编辑行列宽微调 + `github_proxies` 默认配置写入 defaults**（[SettingsOnline.vue](src/views/settings/SettingsOnline.vue) / [config.ini](src-tauri/resources/defaults/config.ini)）：① **列宽**：名称列 5rem→6rem（名称不再过短）、镜像地址列 16rem→12rem（整行收窄，删除按钮不再被推远）；② **默认配置**：`[Online] github_proxies=[]` 写入 `resources/defaults/config.ini`，启动时 `sync_config` 自动补全缺失键到用户 config.ini（无需后端代码硬编码默认值），`load_config` 解析逻辑保持不变。
+
 - **easytier 下载流程加 DEBUG 日志**（[easytier_download.rs](src-tauri/src/commands/online/manager/easytier_download.rs)）：下载/竞速前打印镜像源列表（name + type）与竞速候选 URL，用于排查镜像源 full 模式被拼成 path 的问题。
 
 - **GitHub 镜像源持久化到 config.ini**（[save.rs](src-tauri/src/config/save.rs) / [load.rs](src-tauri/src/config/load.rs)）：`github_proxies` 此前只存内存（`state.github_proxies` / `AppConfig.online.github_proxies`），`save_config`/`load_config` 均不读写，重启后用户保存的镜像源全部丢失。现在 `save_config` 将 `github_proxies` 以 JSON 序列化写入 `[Online] github_proxies`，`load_config` 启动时反序列化回填（空列表忽略，保持默认），`set_github_proxies` 经 `update_config` 落盘生效。
