@@ -59,8 +59,9 @@ function sampleSources(sources: GithubProxy[], n: number): GithubProxy[] {
 /**
  * 单源测速：跨域镜像经 `mode: 'no-cors'` 发出——跳过 CORS 校验，控制台不输出跨域报错；
  * 响应 opaque（不可读）仅用于确认服务器可达并测耗时。
- * `redirect: 'error'` 禁止重定向——会跳转的镜像直接剔除（重定向引入额外跳转，慢且不稳定）。
- * 返回耗时（ms），失败（网络错误/超时/重定向）返回 null。
+ * 注意：no-cors 模式下 redirect 强制为 `follow`（规范限制，设 `error` 会直接抛 TypeError），
+ * 跳转耗时计入排序，慢源自然淘汰；后端下载竞速 `pick_fastest` 仍禁止重定向兜底。
+ * 返回耗时（ms），失败（网络错误/超时）返回 null。
  */
 async function probeSource(proxy: GithubProxy): Promise<number | null> {
   const controller = new AbortController()
@@ -71,7 +72,6 @@ async function probeSource(proxy: GithubProxy): Promise<number | null> {
       method: 'HEAD',
       headers: { Range: 'bytes=0-1' },
       mode: 'no-cors',
-      redirect: 'error',
       signal: controller.signal,
     })
     return performance.now() - start
